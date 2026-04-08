@@ -1,6 +1,7 @@
 # https://github.com/oxfordcontrol/Clarabel.jl/blob/4915b83e0d900d978681d5e8f3a3a5b8e18086f0/warmstart_test/portfolioOpt/higherorderRiskMeansure.jl#L23
 function PRM(x::VecNum, slv::Slv_VecSlv, alpha::Number = 0.05, p::Number = 2.0,
-             w::Option{<:StatsBase.AbstractWeights} = nothing)
+             w::Option{<:ObsWeights} = nothing)
+    w = get_observation_weights(w, x)
     if isa(slv, VecSlv)
         @argcheck(!isempty(slv))
     end
@@ -48,9 +49,7 @@ end
         end
         @argcheck(zero(alpha) < alpha < one(alpha))
         @argcheck(p >= one(p))
-        if !isnothing(w)
-            @argcheck(!isempty(w))
-        end
+        validate_observation_weights(w)
         return new{typeof(settings), typeof(slv), typeof(alpha), typeof(p), typeof(w)}(settings,
                                                                                        slv,
                                                                                        alpha,
@@ -59,8 +58,7 @@ end
 end
 function PowerNormValueatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                               slv::Option{<:Slv_VecSlv} = nothing, alpha::Number = 0.05,
-                              p::Number = 2.0,
-                              w::Option{<:StatsBase.AbstractWeights} = nothing)
+                              p::Number = 2.0, w::Option{<:ObsWeights} = nothing)
     return PowerNormValueatRisk(settings, slv, alpha, p, w)
 end
 function (r::PowerNormValueatRisk)(x::VecNum)
@@ -77,7 +75,7 @@ end
     function PowerNormValueatRiskRange(settings::RiskMeasureSettings,
                                        slv::Option{<:Slv_VecSlv}, alpha::Number,
                                        beta::Number, pa::Number, pb::Number,
-                                       w::Option{<:StatsBase.AbstractWeights})
+                                       w::Option{<:ObsWeights})
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv))
         end
@@ -85,9 +83,7 @@ end
         @argcheck(zero(beta) < beta < one(beta))
         @argcheck(pa > one(pa))
         @argcheck(pb > one(pb))
-        if !isnothing(w)
-            @argcheck(!isempty(w))
-        end
+        validate_observation_weights(w)
         return new{typeof(settings), typeof(slv), typeof(alpha), typeof(beta), typeof(pa),
                    typeof(pb), typeof(w)}(settings, slv, alpha, beta, pa, pb, w)
     end
@@ -96,7 +92,7 @@ function PowerNormValueatRiskRange(; settings::RiskMeasureSettings = RiskMeasure
                                    slv::Option{<:Slv_VecSlv} = nothing,
                                    alpha::Number = 0.05, beta::Number = 0.05,
                                    pa::Number = 2.0, pb::Number = 2.0,
-                                   w::Option{<:StatsBase.AbstractWeights} = nothing)
+                                   w::Option{<:ObsWeights} = nothing)
     return PowerNormValueatRiskRange(settings, slv, alpha, beta, pa, pb, w)
 end
 function (r::PowerNormValueatRiskRange)(x::VecNum)
@@ -117,15 +113,13 @@ end
     w
     function PowerNormDrawdownatRisk(settings::RiskMeasureSettings,
                                      slv::Option{<:Slv_VecSlv}, alpha::Number, p::Number,
-                                     w::Option{<:StatsBase.AbstractWeights})
+                                     w::Option{<:ObsWeights})
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv))
         end
         @argcheck(zero(alpha) < alpha < one(alpha))
         @argcheck(p >= one(p))
-        if !isnothing(w)
-            @argcheck(!isempty(w))
-        end
+        validate_observation_weights(w)
         return new{typeof(settings), typeof(slv), typeof(alpha), typeof(p), typeof(w)}(settings,
                                                                                        slv,
                                                                                        alpha,
@@ -134,8 +128,7 @@ end
 end
 function PowerNormDrawdownatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                                  slv::Option{<:Slv_VecSlv} = nothing, alpha::Number = 0.05,
-                                 p::Number = 2.0,
-                                 w::Option{<:StatsBase.AbstractWeights} = nothing)
+                                 p::Number = 2.0, w::Option{<:ObsWeights} = nothing)
     return PowerNormDrawdownatRisk(settings, slv, alpha, p, w)
 end
 function (r::PowerNormDrawdownatRisk)(x::VecNum)
@@ -150,16 +143,13 @@ end
     w
     function RelativePowerNormDrawdownatRisk(settings::HierarchicalRiskMeasureSettings,
                                              slv::Option{<:Slv_VecSlv}, alpha::Number,
-                                             p::Number,
-                                             w::Option{<:StatsBase.AbstractWeights})
+                                             p::Number, w::Option{<:ObsWeights})
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv))
         end
         @argcheck(zero(alpha) < alpha < one(alpha))
         @argcheck(p >= one(p))
-        if !isnothing(w)
-            @argcheck(!isempty(w))
-        end
+        validate_observation_weights(w)
         return new{typeof(settings), typeof(slv), typeof(alpha), typeof(p), typeof(w)}(settings,
                                                                                        slv,
                                                                                        alpha,
@@ -170,7 +160,7 @@ function RelativePowerNormDrawdownatRisk(;
                                          settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
                                          slv::Option{<:Slv_VecSlv} = nothing,
                                          alpha::Number = 0.05, p::Number = 2.0,
-                                         w::Option{<:StatsBase.AbstractWeights} = nothing)
+                                         w::Option{<:ObsWeights} = nothing)
     return RelativePowerNormDrawdownatRisk(settings, slv, alpha, p, w)
 end
 function (r::RelativePowerNormDrawdownatRisk)(x::VecNum)

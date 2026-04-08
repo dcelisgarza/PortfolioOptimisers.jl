@@ -56,11 +56,12 @@ function (r::RMCVaR{Nothing})(x::VecNum)
     end
     return var - sum_var / aT
 end
-function (r::RMCVaR{<:StatsBase.AbstractWeights})(x::VecNum)
-    sw = sum(r.w)
+function (r::RMCVaR{<:ObsWeights})(x::VecNum)
+    w = get_observation_weights(r.w, x)
+    sw = sum(w)
     order = sortperm(x)
     sorted_x = view(x, order)
-    sorted_w = view(r.w, order)
+    sorted_w = view(w, order)
     cum_w = cumsum(sorted_w)
     alpha = sw * r.alpha
     idx = searchsortedfirst(cum_w, alpha)
@@ -71,10 +72,6 @@ function (r::RMCVaR{<:StatsBase.AbstractWeights})(x::VecNum)
         -(LinearAlgebra.dot(sorted_x[1:(idx - 1)], sorted_w[1:(idx - 1)]) +
           sorted_x[idx] * (alpha - cum_w[idx - 1])) / alpha
     end
-end
-function (r::RMCVaR{<:DynamicAbstractWeights})(x::VecNum)
-    return ConditionalValueatRisk(; settings = r.settings, alpha = r.alpha,
-                                  w = get_observation_weights(r.w, x))(x)
 end
 @concrete struct ConditionalValueatRiskRange <: RiskMeasure
     settings
@@ -177,11 +174,12 @@ function (r::RMCVaRRg{Nothing})(x::VecNum)
     gain = var2 - sum_var2 / bT
     return loss - gain
 end
-function (r::RMCVaRRg{<:StatsBase.AbstractWeights})(x::VecNum)
-    sw = sum(r.w)
+function (r::RMCVaRRg{<:ObsWeights})(x::VecNum)
+    w = get_observation_weights(r.w, x)
+    sw = sum(w)
     order = sortperm(x)
     sorted_x = view(x, order)
-    sorted_w = view(r.w, order)
+    sorted_w = view(w, order)
     cum_w = cumsum(sorted_w)
     alpha = sw * r.alpha
     idx = searchsortedfirst(cum_w, alpha)
@@ -206,10 +204,6 @@ function (r::RMCVaRRg{<:StatsBase.AbstractWeights})(x::VecNum)
           sorted_x[idx] * (beta - cum_w[idx - 1])) / (beta)
     end
     return loss - gain
-end
-function (r::RMCVaRRg{<:DynamicAbstractWeights})(x::VecNum)
-    return ConditionalValueatRiskRange(; settings = r.settings, alpha = r.alpha,
-                                       beta = r.beta, w = get_observation_weights(r.w, x))(x)
 end
 @concrete struct ConditionalDrawdownatRisk <: RiskMeasure
     settings
@@ -268,12 +262,13 @@ function (r::RMCDaR{Nothing})(x::VecNum)
     end
     return var - sum_var / aT
 end
-function (r::RMCDaR{<:StatsBase.AbstractWeights})(x::VecNum)
-    sw = sum(r.w)
+function (r::RMCDaR{<:ObsWeights})(x::VecNum)
+    w = get_observation_weights(r.w, x)
+    sw = sum(w)
     dd = absolute_drawdown_vec(x)
     order = sortperm(dd)
     sorted_dd = view(dd, order)
-    sorted_w = view(r.w, order)
+    sorted_w = view(w, order)
     cum_w = cumsum(sorted_w)
     alpha = sw * r.alpha
     idx = searchsortedfirst(cum_w, alpha)
@@ -284,10 +279,6 @@ function (r::RMCDaR{<:StatsBase.AbstractWeights})(x::VecNum)
         -(LinearAlgebra.dot(sorted_dd[1:(idx - 1)], sorted_w[1:(idx - 1)]) +
           sorted_dd[idx] * (alpha - cum_w[idx - 1])) / alpha
     end
-end
-function (r::RMCDaR{<:DynamicAbstractWeights})(x::VecNum)
-    return ConditionalDrawdownatRisk(; settings = r.settings, alpha = r.alpha,
-                                     w = get_observation_weights(r.w, x))(x)
 end
 @concrete struct RelativeConditionalDrawdownatRisk <: HierarchicalRiskMeasure
     settings
@@ -317,12 +308,13 @@ function (r::RelativeConditionalDrawdownatRisk{<:Any, <:Any, Nothing})(x::VecNum
     end
     return var - sum_var / aT
 end
-function (r::RelativeConditionalDrawdownatRisk{<:Any, <:Any, <:StatsBase.AbstractWeights})(x::VecNum)
-    sw = sum(r.w)
+function (r::RelativeConditionalDrawdownatRisk{<:Any, <:Any, <:ObsWeights})(x::VecNum)
+    w = get_observation_weights(r.w, x)
+    sw = sum(w)
     dd = relative_drawdown_vec(x)
     order = sortperm(dd)
     sorted_dd = view(dd, order)
-    sorted_w = view(r.w, order)
+    sorted_w = view(w, order)
     cum_w = cumsum(sorted_w)
     alpha = sw * r.alpha
     idx = searchsortedfirst(cum_w, alpha)
@@ -333,10 +325,6 @@ function (r::RelativeConditionalDrawdownatRisk{<:Any, <:Any, <:StatsBase.Abstrac
         -(LinearAlgebra.dot(sorted_dd[1:(idx - 1)], sorted_w[1:(idx - 1)]) +
           sorted_dd[idx] * (alpha - cum_w[idx - 1])) / alpha
     end
-end
-function (r::RelativeConditionalDrawdownatRisk{<:Any, <:Any, <:DynamicAbstractWeights})(x::VecNum)
-    return RelativeConditionalDrawdownatRisk(; settings = r.settings, alpha = r.alpha,
-                                             w = get_observation_weights(r.w, x))(x)
 end
 for r in (ConditionalValueatRisk, ConditionalDrawdownatRisk)
     eval(quote

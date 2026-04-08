@@ -319,6 +319,7 @@ function fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator, rd::Retu
     if !isa(cols, Colon)
         opt = opt_view(opt, cols, rd.X)
     end
+    #! Add ability to do callbacks
     res = optimise(opt, rd_train)
     return predict(res, rd, test_idx, cols)
 end

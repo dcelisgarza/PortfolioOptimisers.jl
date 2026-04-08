@@ -8,24 +8,22 @@ const MedAbsDevMu = Union{<:Num_VecNum_VecScalar, <:MedianCenteringFunction}
     mu
     flag
     function MedianAbsoluteDeviation(settings::HierarchicalRiskMeasureSettings,
-                                     w::Option{<:StatsBase.AbstractWeights},
-                                     mu::MedAbsDevMu, flag::Bool = true)
+                                     w::Option{<:ObsWeights}, mu::MedAbsDevMu,
+                                     flag::Bool = true)
         if isa(mu, VecNum)
             @argcheck(!isempty(mu))
             @argcheck(all(isfinite, mu))
         elseif isa(mu, Number)
             @argcheck(isfinite(mu))
         end
-        if !isnothing(w)
-            @argcheck(!isempty(w))
-        end
+        validate_observation_weights(w)
         return new{typeof(settings), typeof(w), typeof(mu), typeof(flag)}(settings, w, mu,
                                                                           flag)
     end
 end
 function MedianAbsoluteDeviation(;
                                  settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
-                                 w::Option{<:StatsBase.AbstractWeights} = nothing,
+                                 w::Option{<:ObsWeights} = nothing,
                                  mu::MedAbsDevMu = MedianCentering(), flag::Bool = true)
     return MedianAbsoluteDeviation(settings, w, mu, flag)
 end
@@ -44,19 +42,20 @@ function calc_moment_target(::MedianAbsoluteDeviation{<:Any, Nothing, <:MeanCent
                                                       <:Any}, ::Any, x::VecNum)
     return Statistics.mean(x)
 end
-function calc_moment_target(r::MedianAbsoluteDeviation{<:Any, <:StatsBase.AbstractWeights,
-                                                       <:MeanCentering, <:Any}, ::Any,
-                            x::VecNum)
-    return Statistics.mean(x, r.w)
+function calc_moment_target(r::MedianAbsoluteDeviation{<:Any, <:ObsWeights, <:MeanCentering,
+                                                       <:Any}, ::Any, x::VecNum)
+    w = get_observation_weights(r.w, x)
+    return Statistics.mean(x, w)
 end
 function calc_moment_target(::MedianAbsoluteDeviation{<:Any, Nothing, <:MedianCentering,
                                                       <:Any}, ::Any, x::VecNum)
     return Statistics.median(x)
 end
-function calc_moment_target(r::MedianAbsoluteDeviation{<:Any, <:StatsBase.AbstractWeights,
+function calc_moment_target(r::MedianAbsoluteDeviation{<:Any, <:ObsWeights,
                                                        <:MedianCentering, <:Any}, ::Any,
                             x::VecNum)
-    return Statistics.median(x, r.w)
+    w = get_observation_weights(r.w, x)
+    return Statistics.median(x, w)
 end
 function calc_moment_target(r::MedianAbsoluteDeviation{<:Any, <:Any, <:VecNum, <:Any},
                             w::VecNum, ::Any)

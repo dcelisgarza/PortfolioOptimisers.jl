@@ -96,19 +96,16 @@ end
 function (r::ValueatRisk{<:Any, <:Any, Nothing})(x::VecNum)
     return -partialsort(x, ceil(Int, r.alpha * length(x)))
 end
-function (r::ValueatRisk{<:Any, <:Any, <:StatsBase.AbstractWeights})(x::VecNum)
-    sw = sum(r.w)
+function (r::ValueatRisk{<:Any, <:Any, <:ObsWeights})(x::VecNum)
+    w = get_observation_weights(r.w, x)
+    sw = sum(w)
     order = sortperm(x)
     sorted_x = view(x, order)
-    sorted_w = view(r.w, order)
+    sorted_w = view(w, order)
     cum_w = cumsum(sorted_w)
     idx = searchsortedfirst(cum_w, sw * r.alpha)
     idx = ifelse(idx > length(x), idx - 1, idx)
     return -sorted_x[idx]
-end
-function (r::ValueatRisk{<:Any, <:Any, <:DynamicAbstractWeights})(x::VecNum)
-    return ValueatRisk(; settings = r.settings, alpha = r.alpha,
-                       w = get_observation_weights(r.w, x), alg = r.alg)(x)
 end
 @concrete struct ValueatRiskRange <: RiskMeasure
     settings
@@ -151,8 +148,8 @@ function (r::ValueatRiskRange{<:Any, <:Any, <:Any, Nothing})(x::VecNum)
     gain = -partialsort!(x, ceil(Int, r.beta * length(x)); rev = true)
     return loss - gain
 end
-function (r::ValueatRiskRange{<:Any, <:Any, <:Any, <:StatsBase.AbstractWeights})(x::VecNum)
-    w = r.w
+function (r::ValueatRiskRange{<:Any, <:Any, <:Any, <:ObsWeights})(x::VecNum)
+    w = get_observation_weights(r.w, x)
     sw = sum(w)
     order = sortperm(x)
     sorted_x = view(x, order)
@@ -169,10 +166,6 @@ function (r::ValueatRiskRange{<:Any, <:Any, <:Any, <:StatsBase.AbstractWeights})
     idx = ifelse(idx > length(x), idx - 1, idx)
     gain = -sorted_x[idx]
     return loss - gain
-end
-function (r::ValueatRiskRange{<:Any, <:Any, <:Any, <:DynamicAbstractWeights})(x::VecNum)
-    return ValueatRiskRange(; settings = r.settings, alpha = r.alpha, beta = r.beta,
-                            w = get_observation_weights(r.w, x), alg = r.alg)(x)
 end
 @concrete struct DrawdownatRisk <: RiskMeasure
     settings
@@ -228,19 +221,16 @@ function (r::DrawdownatRisk{<:Any, <:Any, Nothing})(x::VecNum)
     dd = absolute_drawdown_vec(x)
     return -partialsort!(dd, ceil(Int, r.alpha * length(x)))
 end
-function (r::DrawdownatRisk{<:Any, <:Any, <:StatsBase.AbstractWeights})(x::VecNum)
+function (r::DrawdownatRisk{<:Any, <:Any, <:ObsWeights})(x::VecNum)
     dd = absolute_drawdown_vec(x)
     order = sortperm(dd)
     sorted_dd = view(dd, order)
-    sorted_w = view(r.w, order)
+    w = get_observation_weights(r.w, x)
+    sorted_w = view(w, order)
     cum_w = cumsum(sorted_w)
     idx = searchsortedfirst(cum_w, r.alpha)
     idx = ifelse(idx > length(dd), idx - 1, idx)
     return -sorted_dd[idx]
-end
-function (r::DrawdownatRisk{<:Any, <:Any, <:DynamicAbstractWeights})(x::VecNum)
-    return DrawdownatRisk(; settings = r.settings, alpha = r.alpha,
-                          w = get_observation_weights(r.w, x), b = r.b, s = r.s)(x)
 end
 @concrete struct RelativeDrawdownatRisk <: HierarchicalRiskMeasure
     settings
@@ -279,19 +269,16 @@ function (r::RelativeDrawdownatRisk{<:Any, <:Any, Nothing})(x::VecNum)
     dd = relative_drawdown_vec(x)
     return -partialsort!(dd, ceil(Int, r.alpha * length(x)))
 end
-function (r::RelativeDrawdownatRisk{<:Any, <:Any, <:StatsBase.AbstractWeights})(x::VecNum)
+function (r::RelativeDrawdownatRisk{<:Any, <:Any, <:ObsWeights})(x::VecNum)
     dd = relative_drawdown_vec(x)
     order = sortperm(dd)
     sorted_dd = view(dd, order)
-    sorted_w = view(r.w, order)
+    w = get_observation_weights(r.w, x)
+    sorted_w = view(w, order)
     cum_w = cumsum(sorted_w)
     idx = searchsortedfirst(cum_w, r.alpha)
     idx = ifelse(idx > length(dd), idx - 1, idx)
     return -sorted_dd[idx]
-end
-function (r::RelativeDrawdownatRisk{<:Any, <:Any, <:DynamicAbstractWeights})(x::VecNum)
-    return RelativeDrawdownatRisk(; settings = r.settings, alpha = r.alpha,
-                                  w = get_observation_weights(r.w, x))(x)
 end
 
 const CholRM = Union{<:Variance, <:StandardDeviation, <:DistributionValueatRisk}

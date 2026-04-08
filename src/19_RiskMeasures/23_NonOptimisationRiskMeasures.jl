@@ -1,14 +1,12 @@
 @concrete struct MeanReturn <: NonOptimisationRiskMeasure
     w
     flag
-    function MeanReturn(w::Option{<:StatsBase.AbstractWeights}, flag::Bool)
-        if !isnothing(w)
-            @argcheck(!isempty(w))
-        end
+    function MeanReturn(w::Option{<:ObsWeights}, flag::Bool)
+        validate_observation_weights(w)
         return new{typeof(w), typeof(flag)}(w, flag)
     end
 end
-function MeanReturn(; w::Option{<:StatsBase.AbstractWeights} = nothing, flag::Bool = false)
+function MeanReturn(; w::Option{<:ObsWeights} = nothing, flag::Bool = false)
     return MeanReturn(w, flag)
 end
 function (r::MeanReturn)(x::VecNum)
@@ -51,18 +49,15 @@ end
 @concrete struct ThirdCentralMoment <: NonOptimisationRiskMeasure
     w
     mu
-    function ThirdCentralMoment(w::Option{<:StatsBase.AbstractWeights},
-                                mu::Option{<:Num_VecNum_VecScalar})
-        if !isnothing(w)
-            @argcheck(!isempty(w))
-        end
+    function ThirdCentralMoment(w::Option{<:ObsWeights}, mu::Option{<:Num_VecNum_VecScalar})
+        validate_observation_weights(w)
         if isa(mu, VecNum)
             @argcheck(!isempty(mu))
         end
         return new{typeof(w), typeof(mu)}(w, mu)
     end
 end
-function ThirdCentralMoment(; w::Option{<:StatsBase.AbstractWeights} = nothing,
+function ThirdCentralMoment(; w::Option{<:ObsWeights} = nothing,
                             mu::Option{<:Num_VecNum_VecScalar} = nothing)
     return ThirdCentralMoment(w, mu)
 end
@@ -70,11 +65,9 @@ end
     ve
     w
     mu
-    function Skewness(ve::AbstractVarianceEstimator, w::Option{<:StatsBase.AbstractWeights},
+    function Skewness(ve::AbstractVarianceEstimator, w::Option{<:ObsWeights},
                       mu::Option{<:Num_VecNum_VecScalar})
-        if !isnothing(w)
-            @argcheck(!isempty(w))
-        end
+        validate_observation_weights(w)
         if isa(mu, VecNum)
             @argcheck(!isempty(mu))
         end
@@ -82,7 +75,7 @@ end
     end
 end
 function Skewness(; ve::AbstractVarianceEstimator = SimpleVariance(),
-                  w::Option{<:StatsBase.AbstractWeights} = nothing,
+                  w::Option{<:ObsWeights} = nothing,
                   mu::Option{<:Num_VecNum_VecScalar} = nothing)
     return Skewness(ve, w, mu)
 end
@@ -118,10 +111,16 @@ function risk_measure_view(r::ThirdCentralMoment, i, args...)
     mu = nothing_scalar_array_view(r.mu, i)
     return ThirdCentralMoment(; w = r.w, mu = mu)
 end
-function (r::ThirdCentralMoment)(w::VecNum, X::MatNum, fees::Option{<:Fees} = nothing)
+function (r::ThirdCentralMoment{<:Option{<:StatsBase.AbstractWeights}})(w::VecNum,
+                                                                        X::MatNum,
+                                                                        fees::Option{<:Fees} = nothing)
     val = calc_deviations_vec(r, w, X, fees)
     val .= val .^ 3
     return isnothing(r.w) ? Statistics.mean(val) : Statistics.mean(val, r.w)
+end
+function (r::ThirdCentralMoment{<:DynamicAbstractWeights})(w::VecNum, X::MatNum,
+                                                           fees::Option{<:Fees} = nothing)
+    return ThirdCentralMoment(; w = get_observation_weights(r.w, X), mu = r.mu)(w, X, fees)
 end
 function factory(r::Skewness, pr::AbstractPriorResult, args...; kwargs...)
     w = nothing_scalar_array_selector(r.w, pr.w)
@@ -132,12 +131,17 @@ function risk_measure_view(r::Skewness, i, args...)
     mu = nothing_scalar_array_view(r.mu, i)
     return Skewness(; ve = r.ve, w = r.w, mu = mu)
 end
-function (r::Skewness)(w::VecNum, X::MatNum, fees::Option{<:Fees} = nothing)
+function (r::Skewness{<:Any, <:Option{<:StatsBase.AbstractWeights}})(w::VecNum, X::MatNum,
+                                                                     fees::Option{<:Fees} = nothing)
     val = calc_deviations_vec(r, w, X, fees)
     sigma = Statistics.std(r.ve, val; mean = zero(eltype(val)))
     val .= val .^ 3
     res = isnothing(r.w) ? Statistics.mean(val) : Statistics.mean(val, r.w)
     return res / sigma^3
+end
+function (r::Skewness{<:Any, <:Option{<:DynamicAbstractWeights}})(w::VecNum, X::MatNum,
+                                                                  fees::Option{<:Fees} = nothing)
+    return Skewness(; ve = r.ve, w = get_observation_weights(r.w, X), mu = r.mu)(w, X, fees)
 end
 
 export MeanReturn, ThirdCentralMoment, Skewness, MeanReturnRiskRatio

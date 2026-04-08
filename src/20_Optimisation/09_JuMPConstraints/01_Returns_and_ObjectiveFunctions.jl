@@ -57,11 +57,8 @@ end
 @concrete struct LogarithmicReturn <: JuMPReturnsEstimator
     w
     lb
-    function LogarithmicReturn(w::Option{<:StatsBase.AbstractWeights},
-                               lb::Option{<:RkRtBounds})
-        if !isnothing(w)
-            @argcheck(!isempty(w))
-        end
+    function LogarithmicReturn(w::Option{<:ObsWeights}, lb::Option{<:RkRtBounds})
+        validate_observation_weights(w)
         if isa(lb, Number)
             @argcheck(isfinite(lb))
         elseif isa(lb, VecNum)
@@ -71,7 +68,7 @@ end
         return new{typeof(w), typeof(lb)}(w, lb)
     end
 end
-function LogarithmicReturn(; w::Option{<:StatsBase.AbstractWeights} = nothing,
+function LogarithmicReturn(; w::Option{<:ObsWeights} = nothing,
                            lb::Option{<:RkRtBounds} = nothing)
     return LogarithmicReturn(w, lb)
 end
