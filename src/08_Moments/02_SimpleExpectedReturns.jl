@@ -104,7 +104,6 @@ julia> mean(serw, X)
   - [`Statistics.mean`](https://juliastats.org/StatsBase.jl/stable/scalarstats/#Statistics.mean)
 """
 function Statistics.mean(me::SimpleExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)
-    #! X, w = moment_window_and_weights(X, me.w, me.window; dims = dims, kwargs...)
     w = get_observation_weights(me.w, X; dims = dims, kwargs...)
     return if isnothing(w)
         Statistics.mean(X; dims = dims)

@@ -74,8 +74,8 @@ function Coskewness(; me::AbstractExpectedReturnsEstimator = SimpleExpectedRetur
                     alg::AbstractMomentAlgorithm = Full())
     return Coskewness(me, mp, alg)
 end
-function factory(ce::Coskewness, w::ObsWeights)
-    return Coskewness(; me = factory(ce.me, w), mp = ce.mp, alg = ce.alg)
+function factory(ske::Coskewness, w::ObsWeights)
+    return Coskewness(; me = factory(ske.me, w), mp = ske.mp, alg = ske.alg)
 end
 """
     negative_spectral_coskewness(cskew::MatNum, X::MatNum,

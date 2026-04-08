@@ -1,0 +1,1 @@
+# Windowed variance
