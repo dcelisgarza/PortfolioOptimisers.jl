@@ -18,7 +18,7 @@ function WindowedExpectedReturns(;
     return WindowedExpectedReturns(me, w, window)
 end
 function factory(me::WindowedExpectedReturns, w::ObsWeights)
-    return WindowedExpectedReturns(; me = factory(me, w), w = w, window = me.window)
+    return WindowedExpectedReturns(; me = factory(me.me, w), w = w, window = me.window)
 end
 function Statistics.mean(me::WindowedExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)
     X, w = moment_window_and_weights(X, me.w, me.window; dims = dims, kwargs...)

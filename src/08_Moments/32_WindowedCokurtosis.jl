@@ -17,7 +17,7 @@ function WindowedCokurtosis(; ke::Cokurtosis = Cokurtosis(),
     return WindowedCokurtosis(ke, w, window)
 end
 function factory(ke::WindowedCokurtosis, w::ObsWeights)
-    return WindowedCokurtosis(; ke = factory(ke, w), w = w, window = ke.window)
+    return WindowedCokurtosis(; ke = factory(ke.ke, w), w = w, window = ke.window)
 end
 function cokurtosis(ke::WindowedCokurtosis, X::MatNum; dims::Int = 1, kwargs...)
     X, w = moment_window_and_weights(X, ke.w, ke.window; dims = dims, kwargs...)

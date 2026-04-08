@@ -985,7 +985,7 @@ const ObsWeights = Union{<:DynamicAbstractWeights, <:StatsBase.AbstractWeights}
 function get_observation_weights(::Option{<:DynamicAbstractWeights}, args...; kwargs...)
     return nothing
 end
-function get_observation_weights(w::StatsBase.AbstractWeights, args...; kwargs...)
+function get_observation_weights(w::VecNum, args...; kwargs...)
     return w
 end
 """

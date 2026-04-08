@@ -270,12 +270,12 @@ end
 function get_window(window::Integer, X::MatNum, dims::Int = 1)
     stop = lastindex(X, dims)
     start = firstindex(X, dims)
-    return max(1, stop - window):stop
+    return max(1, stop - window + 1):stop
 end
 function get_window(window::Integer, X::VecNum, args...)
     stop = lastindex(X)
     start = firstindex(X)
-    return max(1, stop - window):stop
+    return max(1, stop - window + 1):stop
 end
 function get_window(window::VecInt, args...)
     return window

@@ -18,7 +18,7 @@ function WindowedCovariance(;
     return WindowedCovariance(ce, w, window)
 end
 function factory(ce::WindowedCovariance, w::ObsWeights)
-    return WindowedCovariance(; ce = factory(ce, w), w = w, window = ce.window)
+    return WindowedCovariance(; ce = factory(ce.ce, w), w = w, window = ce.window)
 end
 function Statistics.cov(ce::WindowedCovariance, X::MatNum; dims::Int = 1, mean = nothing,
                         kwargs...)

@@ -488,9 +488,18 @@ Compute the covariance matrix robustly using the specified covariance estimator 
 function robust_cov(ce::StatsBase.CovarianceEstimator, X::MatNum; dims::Int = 1,
                     mean = nothing, kwargs...)
     return try
-        Statistics.cov(ce, X; dims = dims, mean = mean, kwargs...)
+        try
+            Statistics.cov(ce, X; dims = dims, mean = mean, kwargs...)
+        catch
+            Statistics.cov(ce, X; dims = dims, mean = mean)
+        end
     catch
-        Statistics.cov(ce, X; dims = dims, mean = mean)
+        X = Matrix(X)
+        try
+            Statistics.cov(ce, X; dims = dims, mean = mean, kwargs...)
+        catch
+            Statistics.cov(ce, X; dims = dims, mean = mean)
+        end
     end
     #=
     return if hasmethod(cov, (typeof(ce), typeof(X)), (:dims, :mean, :my_kwargs))
@@ -503,9 +512,18 @@ end
 function robust_cov(ce::StatsBase.CovarianceEstimator, X::MatNum,
                     w::StatsBase.AbstractWeights; dims::Int = 1, mean = nothing, kwargs...)
     return try
-        Statistics.cov(ce, X, w; dims = dims, mean = mean, kwargs...)
+        try
+            Statistics.cov(ce, X, w; dims = dims, mean = mean, kwargs...)
+        catch
+            Statistics.cov(ce, X, w; dims = dims, mean = mean)
+        end
     catch
-        Statistics.cov(ce, X, w; dims = dims, mean = mean)
+        X = Matrix(X)
+        try
+            Statistics.cov(ce, X, w; dims = dims, mean = mean, kwargs...)
+        catch
+            Statistics.cov(ce, X, w; dims = dims, mean = mean)
+        end
     end
     #=
     return if hasmethod(cov, (typeof(ce), typeof(X), typeof(w)), (:dims, :mean, :my_kwargs))
@@ -556,18 +574,37 @@ function robust_cor(ce::StatsBase.CovarianceEstimator, X::MatNum; dims::Int = 1,
                     mean = nothing, kwargs...)
     return try
         try
-            Statistics.cor(ce, X; dims = dims, mean = mean, kwargs...)
+            try
+                Statistics.cor(ce, X; dims = dims, mean = mean, kwargs...)
+            catch
+                Statistics.cor(ce, X; dims = dims, mean = mean)
+            end
         catch
-            Statistics.cor(ce, X; dims = dims, mean = mean)
+            sigma = robust_cov(ce, X; dims = dims, mean = mean, kwargs...)
+            if ismutable(sigma)
+                StatsBase.cov2cor!(sigma, sqrt.(LinearAlgebra.diag(sigma)))
+            else
+                sigma = StatsBase.cov2cor(Matrix(sigma))
+            end
+            sigma
         end
     catch
-        sigma = robust_cov(ce, X; dims = dims, mean = mean, kwargs...)
-        if ismutable(sigma)
-            StatsBase.cov2cor!(sigma, sqrt.(LinearAlgebra.diag(sigma)))
-        else
-            sigma = StatsBase.cov2cor(Matrix(sigma))
+        X = Matrix(X)
+        try
+            try
+                Statistics.cor(ce, X; dims = dims, mean = mean, kwargs...)
+            catch
+                Statistics.cor(ce, X; dims = dims, mean = mean)
+            end
+        catch
+            sigma = robust_cov(ce, X; dims = dims, mean = mean, kwargs...)
+            if ismutable(sigma)
+                StatsBase.cov2cor!(sigma, sqrt.(LinearAlgebra.diag(sigma)))
+            else
+                sigma = StatsBase.cov2cor(Matrix(sigma))
+            end
+            sigma
         end
-        sigma
     end
     #=
     return if hasmethod(cor, (typeof(ce), typeof(X)), (:dims, :mean, :my_kwargs))
@@ -589,18 +626,37 @@ function robust_cor(ce::StatsBase.CovarianceEstimator, X::MatNum,
                     w::StatsBase.AbstractWeights; dims::Int = 1, mean = nothing, kwargs...)
     return try
         try
-            Statistics.cor(ce, X, w; dims = dims, mean = mean, kwargs...)
+            try
+                Statistics.cor(ce, X, w; dims = dims, mean = mean, kwargs...)
+            catch
+                Statistics.cor(ce, X, w; dims = dims, mean = mean)
+            end
         catch
-            Statistics.cor(ce, X, w; dims = dims, mean = mean)
+            sigma = robust_cov(ce, X, w; dims = dims, mean = mean, kwargs...)
+            if ismutable(sigma)
+                StatsBase.cov2cor!(sigma, sqrt.(LinearAlgebra.diag(sigma)))
+            else
+                sigma = StatsBase.cov2cor(Matrix(sigma))
+            end
+            sigma
         end
     catch
-        sigma = robust_cov(ce, X, w; dims = dims, mean = mean, kwargs...)
-        if ismutable(sigma)
-            StatsBase.cov2cor!(sigma, sqrt.(LinearAlgebra.diag(sigma)))
-        else
-            sigma = StatsBase.cov2cor(Matrix(sigma))
+        X = Matrix(X)
+        try
+            try
+                Statistics.cor(ce, X, w; dims = dims, mean = mean, kwargs...)
+            catch
+                Statistics.cor(ce, X, w; dims = dims, mean = mean)
+            end
+        catch
+            sigma = robust_cov(ce, X, w; dims = dims, mean = mean, kwargs...)
+            if ismutable(sigma)
+                StatsBase.cov2cor!(sigma, sqrt.(LinearAlgebra.diag(sigma)))
+            else
+                sigma = StatsBase.cov2cor(Matrix(sigma))
+            end
+            sigma
         end
-        sigma
     end
     #=
     return if hasmethod(cor, (typeof(ce), typeof(X), typeof(w)), (:dims, :mean, :my_kwargs))
@@ -623,11 +679,24 @@ function moment_window_and_weights(X::MatNum, w::Option{<:ObsWeights}, args...; 
     w = get_observation_weights(w, X; dims = dims, kwargs...)
     return X, w
 end
+function moment_window_and_weights(X::VecNum, w::Option{<:ObsWeights}, args...; dims = dims,
+                                   kwargs...)
+    w = get_observation_weights(w, X; dims = dims, kwargs...)
+    return X, w
+end
 function moment_window_and_weights(X::MatNum, w::Option{<:ObsWeights}, window::Int_VecInt;
                                    dims::Int = 1, kwargs...)
     idx = get_window(window, X, dims)
     X = isone(dims) ? view(X, idx, :) : view(X, :, idx)
-    w = nothing_scalar_array_view(w, idx)
+    w = nothing_scalar_array_getindex(w, idx)
+    w = get_observation_weights(w, X; dims = dims, kwargs...)
+    return X, w
+end
+function moment_window_and_weights(X::VecNum, w::Option{<:ObsWeights}, window::Int_VecInt,
+                                   kwargs...)
+    idx = get_window(window, X, dims)
+    X = view(X, idx)
+    w = nothing_scalar_array_getindex(w, idx)
     w = get_observation_weights(w, X; dims = dims, kwargs...)
     return X, w
 end

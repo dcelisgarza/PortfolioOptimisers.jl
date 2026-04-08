@@ -17,7 +17,7 @@ function WindowedCoskewness(; ske::CoskewnessEstimator = Coskewness(),
     return WindowedCoskewness(ske, w, window)
 end
 function factory(ske::WindowedCoskewness, w::ObsWeights)
-    return WindowedCoskewness(; ske = factory(ske, w), w = w, window = ske.window)
+    return WindowedCoskewness(; ske = factory(ske.ske, w), w = w, window = ske.window)
 end
 function coskewness(ske::WindowedCoskewness, X::MatNum; dims::Int = 1, kwargs...)
     X, w = moment_window_and_weights(X, ske.w, ske.window; dims = dims, kwargs...)

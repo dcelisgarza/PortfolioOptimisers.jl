@@ -96,6 +96,10 @@
         me = PortfolioOptimisers.factory(me0, ew)
         @test me.me.w === ew
         @test me.rf == me0.rf
+
+        me0 = factory(WindowedExpectedReturns(; window = 50), ew)
+        me = factory(me0.me, ew[(end - 49):end])
+        @test mean(me0, rd.X) == mean(me, rd.X[(end - 49):end, :])
     end
     @testset "Covariance Estimators" begin
         ces = [Covariance(; alg = Full()),
@@ -389,6 +393,19 @@
                        cov(ProcessedCovariance(; alg = LoGo()), rd.X'; dims = 2))
         @test isapprox(cor(ProcessedCovariance(; alg = LoGo()), rd.X),
                        cor(ProcessedCovariance(; alg = LoGo()), rd.X'; dims = 2))
+
+        ce0 = factory(WindowedCovariance(ce = PortfolioOptimisersCovariance(ce = GeneralCovariance(ce = SimpleCovariance(corrected = false))),
+                                         window = 50), ew)
+        ce = factory(ce0.ce, ew[(end - 49):end])
+        @test isapprox(cov(ce0, rd.X[(end - 49):end, :]), cov(ce, rd.X[(end - 49):end, :]))
+        @test isapprox(cor(ce0, rd.X[(end - 49):end, :]), cor(ce, rd.X[(end - 49):end, :]))
+
+        # ce0 = factory( WindowedVariance(ce=SimpleVariance(corrected=false), window=50) , ew)
+        # ce = factory(ce0.ce, ew[end-49:end])
+        # @test isapprox(var(ce0, rd.X[end-49:end, :]), var(ce, rd.X[end-49:end,:]))
+        # @test isapprox(std(ce0, rd.X[end-49:end, :]), std(ce, rd.X[end-49:end,:]))
+        # @test isapprox(var(ce0, rd.X[end-49:end, 1]), var(ce, rd.X[end-49:end,1]))
+        # @test isapprox(std(ce0, rd.X[end-49:end, 2]), std(ce, rd.X[end-49:end,2]))
     end
     @testset "Regression" begin
         res = [StepwiseRegression(; alg = Forward()),
@@ -442,6 +459,13 @@
         sk = PortfolioOptimisers.factory(sk0, ew)
         @test sk.me.w === ew
         @test sk.alg === sk0.alg
+
+        ske0 = factory(WindowedCoskewness(window = 50), ew)
+        ske = factory(ske0.ske, ew[(end - 49):end])
+        sk0, V0=coskewness(ske0, rd.X[(end - 49):end, :])
+        sk, V=coskewness(ske, rd.X[(end - 49):end, :])
+        @test isapprox(sk0, sk)
+        @test isapprox(V0, V)
     end
     @testset "Cokurtosis" begin
         ktes = [Cokurtosis(; alg = Full()), Cokurtosis(; alg = Semi())]
@@ -460,6 +484,11 @@
         kt = PortfolioOptimisers.factory(kt0, ew)
         @test kt.me.w === ew
         @test kt.alg === kt0.alg
+
+        kte0 = factory(WindowedCokurtosis(window = 50), ew)
+        kte = factory(kte0.ke, ew[(end - 49):end])
+        @test isapprox(cokurtosis(kte0, rd.X[(end - 49):end, :]),
+                       cokurtosis(kte, rd.X[(end - 49):end, :]))
     end
     @testset "Distance" begin
         des = [Distance(; alg = SimpleAbsoluteDistance()),

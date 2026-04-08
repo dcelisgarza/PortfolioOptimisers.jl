@@ -17,7 +17,7 @@ function WindowedVariance(; ce::AbstractVarianceEstimator = SimpleVariance(),
     return WindowedVariance(ce, w, window)
 end
 function factory(ce::WindowedVariance, w::ObsWeights)
-    return WindowedVariance(; ce = factory(ce, w), w = w, window = ce.window)
+    return WindowedVariance(; ce = factory(ce.ce, w), w = w, window = ce.window)
 end
 function Statistics.var(ce::WindowedVariance, X::MatNum; dims::Int = 1, mean = nothing,
                         kwargs...)
