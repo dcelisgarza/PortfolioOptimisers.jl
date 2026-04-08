@@ -3,17 +3,14 @@
     alpha
     w
     function ConditionalValueatRisk(settings::RiskMeasureSettings, alpha::Number,
-                                    w::Option{<:StatsBase.AbstractWeights})
+                                    w::Option{<:ObsWeights})
         @argcheck(zero(alpha) < alpha < one(alpha))
-        if !isnothing(w)
-            @argcheck(!isempty(w))
-        end
+        validate_observation_weights(w)
         return new{typeof(settings), typeof(alpha), typeof(w)}(settings, alpha, w)
     end
 end
 function ConditionalValueatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                                alpha::Number = 0.05,
-                                w::Option{<:StatsBase.AbstractWeights} = nothing)
+                                alpha::Number = 0.05, w::Option{<:ObsWeights} = nothing)
     return ConditionalValueatRisk(settings, alpha, w)
 end
 @concrete struct DistributionallyRobustConditionalValueatRisk <: RiskMeasure
@@ -25,7 +22,7 @@ end
     function DistributionallyRobustConditionalValueatRisk(settings::RiskMeasureSettings,
                                                           alpha::Number, l::Number,
                                                           r::Number,
-                                                          w::Option{<:StatsBase.AbstractWeights})
+                                                          w::Option{<:ObsWeights})
         @argcheck(zero(alpha) < alpha < one(alpha))
         @argcheck(l > zero(l))
         @argcheck(r > zero(r))
@@ -42,7 +39,7 @@ function DistributionallyRobustConditionalValueatRisk(;
                                                       settings::RiskMeasureSettings = RiskMeasureSettings(),
                                                       alpha::Number = 0.05, l::Number = 1.0,
                                                       r::Number = 0.02,
-                                                      w::Option{<:StatsBase.AbstractWeights} = nothing)
+                                                      w::Option{<:ObsWeights} = nothing)
     return DistributionallyRobustConditionalValueatRisk(settings, alpha, l, r, w)
 end
 const RMCVaR{T} = Union{<:ConditionalValueatRisk{<:Any, <:Any, T},
@@ -75,19 +72,20 @@ function (r::RMCVaR{<:StatsBase.AbstractWeights})(x::VecNum)
           sorted_x[idx] * (alpha - cum_w[idx - 1])) / alpha
     end
 end
+function (r::RMCVaR{<:DynamicAbstractWeights})(x::VecNum)
+    return ConditionalValueatRisk(; settings = r.settings, alpha = r.alpha,
+                                  w = get_observation_weights(r.w, x))(x)
+end
 @concrete struct ConditionalValueatRiskRange <: RiskMeasure
     settings
     alpha
     beta
     w
     function ConditionalValueatRiskRange(settings::RiskMeasureSettings, alpha::Number,
-                                         beta::Number,
-                                         w::Option{<:StatsBase.AbstractWeights})
+                                         beta::Number, w::Option{<:ObsWeights})
         @argcheck(zero(alpha) < alpha < one(alpha))
         @argcheck(zero(beta) < beta < one(beta))
-        if !isnothing(w)
-            @argcheck(!isempty(w))
-        end
+        validate_observation_weights(w)
         return new{typeof(settings), typeof(alpha), typeof(beta), typeof(w)}(settings,
                                                                              alpha, beta, w)
     end
@@ -95,7 +93,7 @@ end
 function ConditionalValueatRiskRange(;
                                      settings::RiskMeasureSettings = RiskMeasureSettings(),
                                      alpha::Number = 0.05, beta::Number = 0.05,
-                                     w::Option{<:StatsBase.AbstractWeights} = nothing)
+                                     w::Option{<:ObsWeights} = nothing)
     return ConditionalValueatRiskRange(settings, alpha, beta, w)
 end
 function factory(r::ConditionalValueatRiskRange, pr::AbstractPriorResult, args...;
@@ -117,16 +115,14 @@ end
                                                                alpha::Number, l_a::Number,
                                                                r_a::Number, beta::Number,
                                                                l_b::Number, r_b::Number,
-                                                               w::Option{<:StatsBase.AbstractWeights})
+                                                               w::Option{<:ObsWeights})
         @argcheck(zero(alpha) < alpha < one(alpha))
         @argcheck(zero(beta) < beta < one(beta))
         @argcheck(l_a > zero(l_a))
         @argcheck(r_a > zero(r_a))
         @argcheck(l_b > zero(l_b))
         @argcheck(r_b > zero(r_b))
-        if !isnothing(w)
-            @argcheck(!isempty(w))
-        end
+        validate_observation_weights(w)
         return new{typeof(settings), typeof(alpha), typeof(l_a), typeof(r_a), typeof(beta),
                    typeof(l_b), typeof(r_b), typeof(w)}(settings, alpha, l_a, r_a, beta,
                                                         l_b, r_b, w)
@@ -140,7 +136,7 @@ function DistributionallyRobustConditionalValueatRiskRange(;
                                                            beta::Number = 0.05,
                                                            l_b::Number = 1.0,
                                                            r_b::Number = 0.02,
-                                                           w::Option{<:StatsBase.AbstractWeights} = nothing)
+                                                           w::Option{<:ObsWeights} = nothing)
     return DistributionallyRobustConditionalValueatRiskRange(settings, alpha, l_a, r_a,
                                                              beta, l_b, r_b, w)
 end
@@ -211,22 +207,23 @@ function (r::RMCVaRRg{<:StatsBase.AbstractWeights})(x::VecNum)
     end
     return loss - gain
 end
+function (r::RMCVaRRg{<:DynamicAbstractWeights})(x::VecNum)
+    return ConditionalValueatRiskRange(; settings = r.settings, alpha = r.alpha,
+                                       beta = r.beta, w = get_observation_weights(r.w, x))(x)
+end
 @concrete struct ConditionalDrawdownatRisk <: RiskMeasure
     settings
     alpha
     w
     function ConditionalDrawdownatRisk(settings::RiskMeasureSettings, alpha::Number,
-                                       w::Option{<:StatsBase.AbstractWeights})
+                                       w::Option{<:ObsWeights})
         @argcheck(zero(alpha) < alpha < one(alpha))
-        if !isnothing(w)
-            @argcheck(!isempty(w))
-        end
+        validate_observation_weights(w)
         return new{typeof(settings), typeof(alpha), typeof(w)}(settings, alpha, w)
     end
 end
 function ConditionalDrawdownatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                                   alpha::Number = 0.05,
-                                   w::Option{<:StatsBase.AbstractWeights} = nothing)
+                                   alpha::Number = 0.05, w::Option{<:ObsWeights} = nothing)
     return ConditionalDrawdownatRisk(settings, alpha, w)
 end
 @concrete struct DistributionallyRobustConditionalDrawdownatRisk <: RiskMeasure
@@ -238,13 +235,11 @@ end
     function DistributionallyRobustConditionalDrawdownatRisk(settings::RiskMeasureSettings,
                                                              alpha::Number, l::Number,
                                                              r::Number,
-                                                             w::Option{<:StatsBase.AbstractWeights})
+                                                             w::Option{<:ObsWeights})
         @argcheck(zero(alpha) < alpha < one(alpha))
         @argcheck(l > zero(l))
         @argcheck(r > zero(r))
-        if !isnothing(w)
-            @argcheck(!isempty(w))
-        end
+        validate_observation_weights(w)
         return new{typeof(settings), typeof(alpha), typeof(l), typeof(r), typeof(w)}(settings,
                                                                                      alpha,
                                                                                      l, r,
@@ -255,7 +250,7 @@ function DistributionallyRobustConditionalDrawdownatRisk(;
                                                          settings::RiskMeasureSettings = RiskMeasureSettings(),
                                                          alpha::Number = 0.05,
                                                          l::Number = 1.0, r::Number = 0.02,
-                                                         w::Option{<:StatsBase.AbstractWeights} = nothing)
+                                                         w::Option{<:ObsWeights} = nothing)
     return DistributionallyRobustConditionalDrawdownatRisk(settings, alpha, l, r, w)
 end
 const RMCDaR{T} = Union{<:ConditionalDrawdownatRisk{<:Any, <:Any, <:T},
@@ -290,24 +285,25 @@ function (r::RMCDaR{<:StatsBase.AbstractWeights})(x::VecNum)
           sorted_dd[idx] * (alpha - cum_w[idx - 1])) / alpha
     end
 end
+function (r::RMCDaR{<:DynamicAbstractWeights})(x::VecNum)
+    return ConditionalDrawdownatRisk(; settings = r.settings, alpha = r.alpha,
+                                     w = get_observation_weights(r.w, x))(x)
+end
 @concrete struct RelativeConditionalDrawdownatRisk <: HierarchicalRiskMeasure
     settings
     alpha
     w
     function RelativeConditionalDrawdownatRisk(settings::HierarchicalRiskMeasureSettings,
-                                               alpha::Number,
-                                               w::Option{<:StatsBase.AbstractWeights})
+                                               alpha::Number, w::Option{<:ObsWeights})
         @argcheck(zero(alpha) < alpha < one(alpha))
-        if !isnothing(w)
-            @argcheck(!isempty(w))
-        end
+        validate_observation_weights(w)
         return new{typeof(settings), typeof(alpha), typeof(w)}(settings, alpha, w)
     end
 end
 function RelativeConditionalDrawdownatRisk(;
                                            settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
                                            alpha::Number = 0.05,
-                                           w::Option{<:StatsBase.AbstractWeights} = nothing)
+                                           w::Option{<:ObsWeights} = nothing)
     return RelativeConditionalDrawdownatRisk(settings, alpha, w)
 end
 function (r::RelativeConditionalDrawdownatRisk{<:Any, <:Any, Nothing})(x::VecNum)
@@ -337,6 +333,10 @@ function (r::RelativeConditionalDrawdownatRisk{<:Any, <:Any, <:StatsBase.Abstrac
         -(LinearAlgebra.dot(sorted_dd[1:(idx - 1)], sorted_w[1:(idx - 1)]) +
           sorted_dd[idx] * (alpha - cum_w[idx - 1])) / alpha
     end
+end
+function (r::RelativeConditionalDrawdownatRisk{<:Any, <:Any, <:DynamicAbstractWeights})(x::VecNum)
+    return RelativeConditionalDrawdownatRisk(; settings = r.settings, alpha = r.alpha,
+                                             w = get_observation_weights(r.w, x))(x)
 end
 for r in (ConditionalValueatRisk, ConditionalDrawdownatRisk)
     eval(quote

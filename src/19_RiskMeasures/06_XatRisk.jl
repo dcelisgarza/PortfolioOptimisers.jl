@@ -72,18 +72,15 @@ end
     w
     alg
     function ValueatRisk(settings::RiskMeasureSettings, alpha::Number,
-                         w::Option{<:StatsBase.AbstractWeights},
-                         alg::ValueatRiskFormulation)
+                         w::Option{<:ObsWeights}, alg::ValueatRiskFormulation)
         @argcheck(zero(alpha) < alpha < one(alpha))
-        if !isnothing(w)
-            @argcheck(!isempty(w))
-        end
+        validate_observation_weights(w)
         return new{typeof(settings), typeof(alpha), typeof(w), typeof(alg)}(settings, alpha,
                                                                             w, alg)
     end
 end
 function ValueatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                     alpha::Number = 0.05, w::Option{<:StatsBase.AbstractWeights} = nothing,
+                     alpha::Number = 0.05, w::Option{<:ObsWeights} = nothing,
                      alg::ValueatRiskFormulation = MIPValueatRisk())
     return ValueatRisk(settings, alpha, w, alg)
 end
@@ -109,6 +106,10 @@ function (r::ValueatRisk{<:Any, <:Any, <:StatsBase.AbstractWeights})(x::VecNum)
     idx = ifelse(idx > length(x), idx - 1, idx)
     return -sorted_x[idx]
 end
+function (r::ValueatRisk{<:Any, <:Any, <:DynamicAbstractWeights})(x::VecNum)
+    return ValueatRisk(; settings = r.settings, alpha = r.alpha,
+                       w = get_observation_weights(r.w, x), alg = r.alg)(x)
+end
 @concrete struct ValueatRiskRange <: RiskMeasure
     settings
     alpha
@@ -116,13 +117,10 @@ end
     w
     alg
     function ValueatRiskRange(settings::RiskMeasureSettings, alpha::Number, beta::Number,
-                              w::Option{<:StatsBase.AbstractWeights},
-                              alg::ValueatRiskFormulation)
+                              w::Option{<:ObsWeights}, alg::ValueatRiskFormulation)
         @argcheck(zero(alpha) < alpha < one(alpha))
         @argcheck(zero(beta) < beta < one(beta))
-        if !isnothing(w)
-            @argcheck(!isempty(w))
-        end
+        validate_observation_weights(w)
         return new{typeof(settings), typeof(alpha), typeof(beta), typeof(w), typeof(alg)}(settings,
                                                                                           alpha,
                                                                                           beta,
@@ -132,7 +130,7 @@ end
 end
 function ValueatRiskRange(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                           alpha::Number = 0.05, beta::Number = 0.05,
-                          w::Option{<:StatsBase.AbstractWeights} = nothing,
+                          w::Option{<:ObsWeights} = nothing,
                           alg::ValueatRiskFormulation = MIPValueatRisk())
     return ValueatRiskRange(settings, alpha, beta, w, alg)
 end
@@ -172,6 +170,10 @@ function (r::ValueatRiskRange{<:Any, <:Any, <:Any, <:StatsBase.AbstractWeights})
     gain = -sorted_x[idx]
     return loss - gain
 end
+function (r::ValueatRiskRange{<:Any, <:Any, <:Any, <:DynamicAbstractWeights})(x::VecNum)
+    return ValueatRiskRange(; settings = r.settings, alpha = r.alpha, beta = r.beta,
+                            w = get_observation_weights(r.w, x), alg = r.alg)(x)
+end
 @concrete struct DrawdownatRisk <: RiskMeasure
     settings
     alpha
@@ -179,12 +181,10 @@ end
     b
     s
     function DrawdownatRisk(settings::RiskMeasureSettings, alpha::Number,
-                            w::Option{<:StatsBase.AbstractWeights}, b::Option{<:Number},
+                            w::Option{<:ObsWeights}, b::Option{<:Number},
                             s::Option{<:Number})
         @argcheck(zero(alpha) < alpha < one(alpha))
-        if !isnothing(w)
-            @argcheck(!isempty(w))
-        end
+        validate_observation_weights(w)
         bflag = !isnothing(b)
         sflag = !isnothing(s)
         if bflag
@@ -203,8 +203,7 @@ end
     end
 end
 function DrawdownatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                        alpha::Number = 0.05,
-                        w::Option{<:StatsBase.AbstractWeights} = nothing,
+                        alpha::Number = 0.05, w::Option{<:ObsWeights} = nothing,
                         b::Option{<:Number} = nothing, s::Option{<:Number} = nothing)
     return DrawdownatRisk(settings, alpha, w, b, s)
 end
@@ -239,24 +238,29 @@ function (r::DrawdownatRisk{<:Any, <:Any, <:StatsBase.AbstractWeights})(x::VecNu
     idx = ifelse(idx > length(dd), idx - 1, idx)
     return -sorted_dd[idx]
 end
+function (r::DrawdownatRisk{<:Any, <:Any, <:DynamicAbstractWeights})(x::VecNum)
+    return DrawdownatRisk(; settings = r.settings, alpha = r.alpha,
+                          w = get_observation_weights(r.w, x), b = r.b, s = r.s)(x)
+end
 @concrete struct RelativeDrawdownatRisk <: HierarchicalRiskMeasure
     settings
     alpha
     w
     function RelativeDrawdownatRisk(settings::HierarchicalRiskMeasureSettings,
-                                    alpha::Number, w::Option{<:StatsBase.AbstractWeights})
+                                    alpha::Number, w::Option{<:ObsWeights})
         @argcheck(zero(alpha) < alpha < one(alpha))
-        if !isnothing(w)
-            @argcheck(!isempty(w))
-        end
+        validate_observation_weights(w)
         return new{typeof(settings), typeof(alpha), typeof(w)}(settings, alpha, w)
     end
 end
 function RelativeDrawdownatRisk(;
                                 settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
-                                alpha::Number = 0.05,
-                                w::Option{<:StatsBase.AbstractWeights} = nothing)
+                                alpha::Number = 0.05, w::Option{<:ObsWeights} = nothing)
     return RelativeDrawdownatRisk(settings, alpha, w)
+end
+function factory(r::RelativeDrawdownatRisk, pr::AbstractPriorResult, args...; kwargs...)
+    w = nothing_scalar_array_selector(r.w, pr.w)
+    return RelativeDrawdownatRisk(; settings = r.settings, alpha = r.alpha, w = w)
 end
 function relative_drawdown_vec(x::VecNum)
     pushfirst!(x, zero(eltype(x)))
@@ -285,9 +289,9 @@ function (r::RelativeDrawdownatRisk{<:Any, <:Any, <:StatsBase.AbstractWeights})(
     idx = ifelse(idx > length(dd), idx - 1, idx)
     return -sorted_dd[idx]
 end
-function factory(r::RelativeDrawdownatRisk, pr::AbstractPriorResult, args...; kwargs...)
-    w = nothing_scalar_array_selector(r.w, pr.w)
-    return RelativeDrawdownatRisk(; settings = r.settings, alpha = r.alpha, w = w)
+function (r::RelativeDrawdownatRisk{<:Any, <:Any, <:DynamicAbstractWeights})(x::VecNum)
+    return RelativeDrawdownatRisk(; settings = r.settings, alpha = r.alpha,
+                                  w = get_observation_weights(r.w, x))(x)
 end
 
 const CholRM = Union{<:Variance, <:StandardDeviation, <:DistributionValueatRisk}

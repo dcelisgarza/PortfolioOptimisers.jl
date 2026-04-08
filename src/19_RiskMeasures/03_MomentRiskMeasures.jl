@@ -774,9 +774,7 @@ HighOrderMoment
         elseif isa(mu, Number)
             @argcheck(isfinite(mu))
         end
-        if !isnothing(w)
-            @argcheck(!isempty(w))
-        end
+        validate_observation_weights(w)
         return new{typeof(settings), typeof(w), typeof(mu), typeof(alg)}(settings, w, mu,
                                                                          alg)
     end
