@@ -12,6 +12,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::ConditionalValueatR
                                                                                             (lower_bound = 0)
                                                                                         end)
     wi = nothing_scalar_array_selector(r.w, pr.w)
+    wi = get_observation_weights(wi, net_X)
     cvar_risk = model[key] = if isnothing(wi)
         iat = inv(r.alpha * T)
         JuMP.@expression(model, var + sum(z_cvar) * iat)
@@ -40,6 +41,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::ConditionalValueatR
                                                                                                                                                                               (upper_bound = 0)
                                                                                                                                                                           end)
     wi = nothing_scalar_array_selector(r.w, pr.w)
+    wi = get_observation_weights(wi, net_X)
     cvar_risk_l, cvar_risk_h = if isnothing(wi)
         iat = inv(r.alpha * T)
         ibt = inv(r.beta * T)
@@ -172,6 +174,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                                                                                                                                                                                                                            0
                                                                                                                                                                                                                                        end)
     wi = nothing_scalar_array_selector(r.w, pr.w)
+    wi = get_observation_weights(wi, net_X)
     drcvar_risk = model[key] = if isnothing(wi)
         JuMP.@expression(model, radius * lb + Statistics.mean(s))
     else
@@ -336,6 +339,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    0
                                                                                                                                                                                                                                                                                                                                                                                                                                                                                end)
     wi = nothing_scalar_array_selector(r.w, pr.w)
+    wi = get_observation_weights(wi, net_X)
     drcvar_risk_l, drcvar_risk_h = model[Symbol(:drcvar_risk_l_, i)], model[Symbol(:drcvar_risk_h_, i)] = if isnothing(wi)
         JuMP.@expressions(model, begin
                               radius_l * lb_l + Statistics.mean(s_l)
@@ -366,6 +370,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::ConditionalDrawdown
                                                                                             (lower_bound = 0)
                                                                                         end)
     wi = nothing_scalar_array_selector(r.w, pr.w)
+    wi = get_observation_weights(wi, pr.X)
     cdar_risk = model[key] = if isnothing(wi)
         iat = inv(r.alpha * T)
         JuMP.@expression(model, dar + sum(z_cdar) * iat)
@@ -469,6 +474,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                                                                                                                                                                                                                            0
                                                                                                                                                                                                                                        end)
     wi = nothing_scalar_array_selector(r.w, pr.w)
+    wi = get_observation_weights(wi, pr.X)
     drcdar_risk = model[key] = if isnothing(wi)
         JuMP.@expression(model, radius * lb + Statistics.mean(s))
     else

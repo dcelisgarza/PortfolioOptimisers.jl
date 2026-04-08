@@ -24,6 +24,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::RelativisticValueat
     iopk = inv(opk)
     iomk = inv(omk)
     wi = nothing_scalar_array_selector(r.w, pr.w)
+    wi = get_observation_weights(wi, net_X)
     rlvar_risk = model[key] = if isnothing(wi)
         iat = inv(alpha * T)
         lnk = (iat^kappa - iat^(-kappa)) * ik2
@@ -102,6 +103,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::RelativisticValueat
     ik2_a = inv(2 * kappa_a)
     ik2_b = inv(2 * kappa_b)
     wi = nothing_scalar_array_selector(r.w, pr.w)
+    wi = get_observation_weights(wi, net_X)
     rlvar_risk_l, rlvar_risk_h = model[Symbol(:rlvar_risk_l_, i)], model[Symbol(:rlvar_risk_h_, i)] = if isnothing(wi)
         iat = inv(alpha * T)
         ibt = inv(beta * T)
@@ -237,6 +239,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::RelativisticDrawdow
                                                                                                                                                                                                                                                                                               [1:T]
                                                                                                                                                                                                                                                                                           end)
     wi = nothing_scalar_array_selector(r.w, pr.w)
+    wi = get_observation_weights(wi, pr.X)
     rldar_risk = model[key] = if isnothing(wi)
         iat = inv(alpha * T)
         lnk = (iat^kappa - iat^(-kappa)) * ik2

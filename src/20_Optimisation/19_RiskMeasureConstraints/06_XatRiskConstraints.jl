@@ -17,6 +17,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                                                               end)
     alpha = r.alpha
     wi = nothing_scalar_array_selector(r.w, pr.w)
+    wi = get_observation_weights(wi, net_X)
     if isnothing(wi)
         model[Symbol(:csvar_, i)] = JuMP.@constraint(model,
                                                      sc *
@@ -56,6 +57,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     alpha = r.alpha
     beta = r.beta
     wi = nothing_scalar_array_selector(r.w, pr.w)
+    wi = get_observation_weights(wi, net_X)
     if isnothing(wi)
         model[Symbol(:csvar_l_, i)], model[Symbol(:csvar_h_, i)] = JuMP.@constraints(model,
                                                                                      begin
@@ -205,6 +207,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::DrawdownatRisk,
                                                                               end)
     alpha = r.alpha
     wi = nothing_scalar_array_selector(r.w, pr.w)
+    wi = get_observation_weights(wi, pr.X)
     if isnothing(wi)
         model[Symbol(:csdar_, i)] = JuMP.@constraint(model,
                                                      sc *

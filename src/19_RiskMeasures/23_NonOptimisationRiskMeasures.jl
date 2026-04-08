@@ -139,8 +139,8 @@ function (r::Skewness{<:Any, <:Option{<:StatsBase.AbstractWeights}})(w::VecNum, 
     res = isnothing(r.w) ? Statistics.mean(val) : Statistics.mean(val, r.w)
     return res / sigma^3
 end
-function (r::Skewness{<:Any, <:Option{<:DynamicAbstractWeights}})(w::VecNum, X::MatNum,
-                                                                  fees::Option{<:Fees} = nothing)
+function (r::Skewness{<:Any, <:DynamicAbstractWeights})(w::VecNum, X::MatNum,
+                                                        fees::Option{<:Fees} = nothing)
     return Skewness(; ve = r.ve, w = get_observation_weights(r.w, X), mu = r.mu)(w, X, fees)
 end
 

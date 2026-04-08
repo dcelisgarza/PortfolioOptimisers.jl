@@ -5,6 +5,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::AverageDrawdown,
     dd = set_drawdown_constraints!(model, pr.X)
     T = length(dd) - 1
     wi = nothing_scalar_array_selector(r.w, pr.w)
+    wi = get_observation_weights(wi, pr.X)
     add_risk = model[Symbol(key)] = if isnothing(wi)
         JuMP.@expression(model, Statistics.mean(view(dd, 2:(T + 1))))
     else

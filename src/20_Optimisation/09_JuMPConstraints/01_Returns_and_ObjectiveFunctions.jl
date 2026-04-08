@@ -377,6 +377,7 @@ function set_return_constraints!(model::JuMP.Model, pret::LogarithmicReturn,
     T = length(X)
     JuMP.@variable(model, t_elog_ret[1:T])
     wi = nothing_scalar_array_selector(pret.w, pr.w)
+    wi = get_observation_weights(wi, X)
     if isnothing(wi)
         JuMP.@expression(model, ret, Statistics.mean(t_elog_ret))
     else

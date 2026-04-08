@@ -13,6 +13,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::EntropicValueatRisk
                                                                                                                                       [1:T]
                                                                                                                                   end)
     wi = nothing_scalar_array_selector(r.w, pr.w)
+    wi = get_observation_weights(wi, net_X)
     at = if isnothing(wi)
         model[Symbol(:cevar_, i)] = JuMP.@constraint(model,
                                                      sc * (sum(u_evar) - z_evar) <= 0)
@@ -52,6 +53,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::EntropicValueatRisk
                                                                                                                                                                                                                                                                           [1:T]
                                                                                                                                                                                                                                                                       end)
     wi = nothing_scalar_array_selector(r.w, pr.w)
+    wi = get_observation_weights(wi, net_X)
     at, bt = if isnothing(wi)
         model[Symbol(:cevar_l_, i)], model[Symbol(:cevar_h_, i)] = JuMP.@constraints(model,
                                                                                      begin
@@ -132,6 +134,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::EntropicDrawdownatR
                                                                                                                                       [1:T]
                                                                                                                                   end)
     wi = nothing_scalar_array_selector(r.w, pr.w)
+    wi = get_observation_weights(wi, pr.X)
     at = if isnothing(wi)
         model[Symbol(:cedar_, i)] = JuMP.@constraint(model,
                                                      sc * (sum(u_edar) - z_edar) <= 0)

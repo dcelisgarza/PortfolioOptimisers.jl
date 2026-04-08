@@ -16,6 +16,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::PowerNormValueatRis
                                                                                                                                                                           end)
 
     wi = nothing_scalar_array_selector(r.w, pr.w)
+    wi = get_observation_weights(wi, net_X)
     iaT = if isnothing(wi)
         model[Symbol(:cpvar_eq_, i)] = JuMP.@constraint(model,
                                                         sc * (sum(pvar_v) - pvar_t) <= 0)
@@ -70,6 +71,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::PowerNormValueatRis
                                                                                                                                                                                                                                                                                                                                                                   [1:T]
                                                                                                                                                                                                                                                                                                                                                               end)
     wi = nothing_scalar_array_selector(r.w, pr.w)
+    wi = get_observation_weights(wi, net_X)
     iaT, ibT = if isnothing(wi)
         model[Symbol(:cpvar_eq_l_, i)], model[Symbol(:cpvar_eq_h_, i)] = JuMP.@constraints(model,
                                                                                            begin
@@ -159,6 +161,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::PowerNormDrawdownat
                                                                                                                                                                               [1:T]
                                                                                                                                                                           end)
     wi = nothing_scalar_array_selector(r.w, pr.w)
+    wi = get_observation_weights(wi, pr.X)
     iaT = if isnothing(wi)
         model[Symbol(:cpdar_eq_, i)] = JuMP.@constraint(model,
                                                         sc * (sum(pdar_v) - pdar_t) <= 0)
