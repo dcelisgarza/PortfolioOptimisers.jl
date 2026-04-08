@@ -264,7 +264,7 @@ function nothing_scalar_array_view(x::AbstractVector{<:Union{<:AbstractVector,
                                    i)
     return [nothing_scalar_array_view(xi, i) for xi in x]
 end
-function get_window(::Any, X::ArrNum, args...)
+function get_window(::Option{<:Colon}, args...)
     return Colon()
 end
 function get_window(window::Integer, X::MatNum, dims::Int = 1)
