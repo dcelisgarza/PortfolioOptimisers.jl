@@ -394,18 +394,18 @@
         @test isapprox(cor(ProcessedCovariance(; alg = LoGo()), rd.X),
                        cor(ProcessedCovariance(; alg = LoGo()), rd.X'; dims = 2))
 
-        ce0 = factory(WindowedCovariance(ce = PortfolioOptimisersCovariance(ce = GeneralCovariance(ce = SimpleCovariance(corrected = false))),
+        ce0 = factory(WindowedCovariance(; ce = PortfolioOptimisersCovariance(ce = GeneralCovariance(ce = SimpleCovariance(corrected = false))),
                                          window = 50), ew)
         ce = factory(ce0.ce, ew[(end - 49):end])
         @test isapprox(cov(ce0, rd.X[(end - 49):end, :]), cov(ce, rd.X[(end - 49):end, :]))
         @test isapprox(cor(ce0, rd.X[(end - 49):end, :]), cor(ce, rd.X[(end - 49):end, :]))
 
-        # ce0 = factory( WindowedVariance(ce=SimpleVariance(corrected=false), window=50) , ew)
-        # ce = factory(ce0.ce, ew[end-49:end])
-        # @test isapprox(var(ce0, rd.X[end-49:end, :]), var(ce, rd.X[end-49:end,:]))
-        # @test isapprox(std(ce0, rd.X[end-49:end, :]), std(ce, rd.X[end-49:end,:]))
-        # @test isapprox(var(ce0, rd.X[end-49:end, 1]), var(ce, rd.X[end-49:end,1]))
-        # @test isapprox(std(ce0, rd.X[end-49:end, 2]), std(ce, rd.X[end-49:end,2]))
+        ce0 = factory(WindowedVariance(ce=SimpleVariance(corrected=false), window=50) , ew)
+        ce = factory(ce0.ce, ew[end-49:end])
+        @test isapprox(var(ce0, rd.X[end-49:end, :]), var(ce, rd.X[end-49:end,:]))
+        @test isapprox(std(ce0, rd.X[end-49:end, :]), std(ce, rd.X[end-49:end,:]))
+        @test isapprox(var(ce0, rd.X[end-49:end, 1]), var(ce, rd.X[end-49:end,1]))
+        @test isapprox(std(ce0, rd.X[end-49:end, 2]), std(ce, rd.X[end-49:end,2]))
     end
     @testset "Regression" begin
         res = [StepwiseRegression(; alg = Forward()),
