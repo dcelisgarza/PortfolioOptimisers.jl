@@ -1,1 +1,13 @@
 # Base JuMP Optimisation
+
+```@docs
+BaseJuMPOptimisationEstimator
+JuMPOptimisationEstimator
+RiskJuMPOptimisationEstimator
+ObjectiveFunction
+JuMPReturnsEstimator
+JuMPConstraintEstimator
+CustomJuMPConstraint
+CustomJuMPObjective
+JuMPOptimisationSolution
+```

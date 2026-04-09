@@ -1,1 +1,14 @@
 # Risk budgeting
+
+```@docs
+RiskBudgetingResult
+ProcessedFactorRiskBudgetingAttributes
+ProcessedAssetRiskBudgetingAttributes
+RiskBudgetingFormulation
+LogRiskBudgeting
+MixedIntegerRiskBudgeting
+RiskBudgetingAlgorithm
+AssetRiskBudgeting
+FactorRiskBudgeting
+RiskBudgeting
+```
