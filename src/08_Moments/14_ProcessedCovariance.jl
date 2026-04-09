@@ -10,7 +10,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     ProcessedCovariance(;
-        ce::AbstractCovarianceEstimator = Covariance(),
+        ce::StatsBase.CovarianceEstimator = Covariance(),
         alg::Option{<:AbstractMatrixProcessingAlgorithm} = nothing,
         pdm::Option{<:Posdef} = Posdef(),
     ) -> ProcessedCovariance
@@ -48,13 +48,13 @@ ProcessedCovariance
     alg
     "$(field_dict[:pdm])"
     pdm
-    function ProcessedCovariance(ce::AbstractCovarianceEstimator,
+    function ProcessedCovariance(ce::StatsBase.CovarianceEstimator,
                                  alg::Option{<:AbstractMatrixProcessingAlgorithm},
                                  pdm::Option{<:Posdef})
         return new{typeof(ce), typeof(alg), typeof(pdm)}(ce, alg, pdm)
     end
 end
-function ProcessedCovariance(; ce::AbstractCovarianceEstimator = Covariance(),
+function ProcessedCovariance(; ce::StatsBase.CovarianceEstimator = Covariance(),
                              alg::Option{<:AbstractMatrixProcessingAlgorithm} = nothing,
                              pdm::Option{<:Posdef} = Posdef())
     return ProcessedCovariance(ce, alg, pdm)

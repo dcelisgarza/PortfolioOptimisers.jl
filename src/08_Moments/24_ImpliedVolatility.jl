@@ -22,14 +22,14 @@ struct ImpliedVolatilityPremium <: ImpliedVolatilityAlgorithm end
     mp
     alg
     af
-    function ImpliedVolatility(ce::AbstractCovarianceEstimator,
+    function ImpliedVolatility(ce::StatsBase.CovarianceEstimator,
                                mp::AbstractMatrixProcessingEstimator,
                                alg::ImpliedVolatilityAlgorithm, af::Number)
         @argcheck(zero(af) < af, DomainError)
         return new{typeof(ce), typeof(mp), typeof(alg), typeof(af)}(ce, mp, alg, af)
     end
 end
-function ImpliedVolatility(; ce::AbstractCovarianceEstimator = Covariance(),
+function ImpliedVolatility(; ce::StatsBase.CovarianceEstimator = Covariance(),
                            mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing(),
                            alg::ImpliedVolatilityAlgorithm = ImpliedVolatilityRegression(),
                            af::Number = 252)

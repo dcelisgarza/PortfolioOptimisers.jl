@@ -395,19 +395,66 @@
                        cor(ProcessedCovariance(; alg = LoGo()), rd.X'; dims = 2))
 
         ce0 = factory(WindowedCovariance(;
-                                         ce = PortfolioOptimisersCovariance(ce = GeneralCovariance(ce = SimpleCovariance(corrected = false))),
+                                         ce = PortfolioOptimisersCovariance(;
+                                                                            ce = GeneralCovariance(;
+                                                                                                   ce = SimpleCovariance(;
+                                                                                                                         corrected = false))),
                                          window = 50), ew)
         ce = factory(ce0.ce, ew[(end - 49):end])
         @test isapprox(cov(ce0, rd.X[(end - 49):end, :]), cov(ce, rd.X[(end - 49):end, :]))
         @test isapprox(cor(ce0, rd.X[(end - 49):end, :]), cor(ce, rd.X[(end - 49):end, :]))
 
-        ce0 = factory(WindowedVariance(ce = SimpleVariance(corrected = false), window = 50),
+        ce0 = factory(WindowedCovariance(;
+                                         ce = PortfolioOptimisersCovariance(;
+                                                                            ce = GeneralCovariance(;
+                                                                                                   ce = SimpleCovariance(;
+                                                                                                                         corrected = false)))),
                       ew)
+        ce = factory(ce0.ce, ew)
+        @test isapprox(cov(ce0, rd.X), cov(ce, rd.X))
+        @test isapprox(cor(ce0, rd.X), cor(ce, rd.X))
+
+        ce0 = factory(WindowedVariance(; ce = SimpleVariance(; corrected = false),
+                                       window = 50), ew)
         ce = factory(ce0.ce, ew[(end - 49):end])
         @test isapprox(var(ce0, rd.X[(end - 49):end, :]), var(ce, rd.X[(end - 49):end, :]))
         @test isapprox(std(ce0, rd.X[(end - 49):end, :]), std(ce, rd.X[(end - 49):end, :]))
         @test isapprox(var(ce0, rd.X[(end - 49):end, 1]), var(ce, rd.X[(end - 49):end, 1]))
         @test isapprox(std(ce0, rd.X[(end - 49):end, 2]), std(ce, rd.X[(end - 49):end, 2]))
+
+        ce0 = factory(WindowedVariance(; ce = SimpleVariance(; corrected = false)), ew)
+        ce = factory(ce0.ce, ew)
+        @test isapprox(var(ce0, rd.X), var(ce, rd.X))
+        @test isapprox(std(ce0, rd.X), std(ce, rd.X))
+        @test isapprox(var(ce0, rd.X[:, 1]), var(ce, rd.X[:, 1]))
+        @test isapprox(std(ce0, rd.X[:, 2]), std(ce, rd.X[:, 2]))
+
+        ce0 = factory(WindowedVariance(;
+                                       ce = SimpleVariance(; me = nothing,
+                                                           corrected = false), window = 50),
+                      ew)
+        ce = factory(ce0.ce, ew[(end - 49):end])
+        @test isapprox(var(ce0, rd.X[(end - 49):end, :]; mean = zeros(1, size(rd.X, 2))),
+                       var(ce, rd.X[(end - 49):end, :]; mean = zeros(1, size(rd.X, 2))))
+        @test isapprox(std(ce0, rd.X[(end - 49):end, :]; mean = zeros(1, size(rd.X, 2))),
+                       std(ce, rd.X[(end - 49):end, :]; mean = zeros(1, size(rd.X, 2))))
+        @test isapprox(var(ce0, rd.X[(end - 49):end, 1]; mean = 0),
+                       var(ce, rd.X[(end - 49):end, 1]; mean = 0))
+        @test isapprox(std(ce0, rd.X[(end - 49):end, 2]; mean = 0),
+                       std(ce, rd.X[(end - 49):end, 2]; mean = 0))
+
+        ce0 = factory(WindowedVariance(;
+                                       ce = SimpleVariance(; me = nothing,
+                                                           corrected = false)), ew)
+        ce = factory(ce0.ce, ew)
+        @test isapprox(var(ce0, rd.X; mean = zeros(1, size(rd.X, 2))),
+                       var(ce, rd.X; mean = zeros(1, size(rd.X, 2))))
+        @test isapprox(std(ce0, rd.X; mean = zeros(1, size(rd.X, 2))),
+                       std(ce, rd.X; mean = zeros(1, size(rd.X, 2))))
+        @test isapprox(var(ce0, rd.X[:, 1]; mean = 0), var(ce, rd.X[:, 1]; mean = 0))
+        @test isapprox(std(ce0, rd.X[:, 2]; mean = 0), std(ce, rd.X[:, 2]; mean = 0))
+
+        @test find_uncorrelated_indices(rd.X; t = 0.5) == [4, 6, 12, 16, 17, 19]
     end
     @testset "Regression" begin
         res = [StepwiseRegression(; alg = Forward()),
@@ -462,10 +509,10 @@
         @test sk.me.w === ew
         @test sk.alg === sk0.alg
 
-        ske0 = factory(WindowedCoskewness(window = 50), ew)
+        ske0 = factory(WindowedCoskewness(; window = 50), ew)
         ske = factory(ske0.ske, ew[(end - 49):end])
-        sk0, V0=coskewness(ske0, rd.X[(end - 49):end, :])
-        sk, V=coskewness(ske, rd.X[(end - 49):end, :])
+        sk0, V0 = coskewness(ske0, rd.X[(end - 49):end, :])
+        sk, V = coskewness(ske, rd.X[(end - 49):end, :])
         @test isapprox(sk0, sk)
         @test isapprox(V0, V)
     end
@@ -487,7 +534,7 @@
         @test kt.me.w === ew
         @test kt.alg === kt0.alg
 
-        kte0 = factory(WindowedCokurtosis(window = 50), ew)
+        kte0 = factory(WindowedCokurtosis(; window = 50), ew)
         kte = factory(kte0.ke, ew[(end - 49):end])
         @test isapprox(cokurtosis(kte0, rd.X[(end - 49):end, :]),
                        cokurtosis(kte, rd.X[(end - 49):end, :]))

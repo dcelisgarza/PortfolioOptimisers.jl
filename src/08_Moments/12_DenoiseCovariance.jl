@@ -10,7 +10,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     DenoiseCovariance(;
-        ce::AbstractCovarianceEstimator,
+        ce::StatsBase.CovarianceEstimator,
         dn::Denoise = Denoise(),
         pdm::Option{<:Posdef} = Posdef(),
     ) -> DenoiseCovariance
@@ -58,12 +58,12 @@ DenoiseCovariance
     dn
     "$(field_dict[:pdm])"
     pdm
-    function DenoiseCovariance(ce::AbstractCovarianceEstimator, dn::Denoise,
+    function DenoiseCovariance(ce::StatsBase.CovarianceEstimator, dn::Denoise,
                                pdm::Option{<:Posdef})
         return new{typeof(ce), typeof(dn), typeof(pdm)}(ce, dn, pdm)
     end
 end
-function DenoiseCovariance(; ce::AbstractCovarianceEstimator = Covariance(),
+function DenoiseCovariance(; ce::StatsBase.CovarianceEstimator = Covariance(),
                            dn::Denoise = Denoise(), pdm::Option{<:Posdef} = Posdef())
     return DenoiseCovariance(ce, dn, pdm)
 end

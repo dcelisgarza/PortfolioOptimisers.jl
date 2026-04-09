@@ -4,7 +4,7 @@
     "$(field_dict[:oow])"
     w
     window
-    function WindowedCovariance(ce::AbstractCovarianceEstimator, w::Option{<:ObsWeights},
+    function WindowedCovariance(ce::StatsBase.CovarianceEstimator, w::Option{<:ObsWeights},
                                 window::Option{<:Int_VecInt})
         validate_observation_weights(w)
         assert_nonempty_nonneg_finite_val(window, :window)
@@ -12,7 +12,7 @@
     end
 end
 function WindowedCovariance(;
-                            ce::AbstractCovarianceEstimator = PortfolioOptimisersCovariance(),
+                            ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
                             w::Option{<:ObsWeights} = nothing,
                             window::Option{<:Int_VecInt} = nothing)
     return WindowedCovariance(ce, w, window)

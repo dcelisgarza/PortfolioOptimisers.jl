@@ -10,7 +10,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     DetoneCovariance(;
-        ce::AbstractCovarianceEstimator = Covariance(),
+        ce::StatsBase.CovarianceEstimator = Covariance(),
         dt::Detone = Detone(),
         pdm::Option{<:Posdef} = Posdef(),
     ) -> DetoneCovariance
@@ -52,12 +52,12 @@ DetoneCovariance
     dt
     "$(field_dict[:pdm])"
     pdm
-    function DetoneCovariance(ce::AbstractCovarianceEstimator, dt::Detone,
+    function DetoneCovariance(ce::StatsBase.CovarianceEstimator, dt::Detone,
                               pdm::Option{<:Posdef})
         return new{typeof(ce), typeof(dt), typeof(pdm)}(ce, dt, pdm)
     end
 end
-function DetoneCovariance(; ce::AbstractCovarianceEstimator = Covariance(),
+function DetoneCovariance(; ce::StatsBase.CovarianceEstimator = Covariance(),
                           dt::Detone = Detone(), pdm::Option{<:Posdef} = Posdef())
     return DetoneCovariance(ce, dt, pdm)
 end

@@ -12,7 +12,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     PortfolioOptimisersCovariance(;
-        ce::AbstractCovarianceEstimator = Covariance(),
+        ce::StatsBase.CovarianceEstimator = Covariance(),
         mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing()
     ) -> PortfolioOptimisersCovariance
 
@@ -50,12 +50,12 @@ PortfolioOptimisersCovariance
     ce
     "$(field_dict[:mp])"
     mp
-    function PortfolioOptimisersCovariance(ce::AbstractCovarianceEstimator,
+    function PortfolioOptimisersCovariance(ce::StatsBase.CovarianceEstimator,
                                            mp::AbstractMatrixProcessingEstimator)
         return new{typeof(ce), typeof(mp)}(ce, mp)
     end
 end
-function PortfolioOptimisersCovariance(; ce::AbstractCovarianceEstimator = Covariance(),
+function PortfolioOptimisersCovariance(; ce::StatsBase.CovarianceEstimator = Covariance(),
                                        mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing())
     return PortfolioOptimisersCovariance(ce, mp)
 end
@@ -144,20 +144,24 @@ function Statistics.cor(ce::PortfolioOptimisersCovariance, X::MatNum; dims = 1, 
 end
 function find_uncorrelated_indices(X::MatNum;
                                    ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
-                                   t::Number = 0.95, absolute::Bool = false)
+                                   t::Number = 0.95, absolute::Bool = false,
+                                   measure::VectorToScalarMeasure = MeanValue())
     N = size(X, 2)
     rho = !absolute ? Statistics.cor(ce, X) : abs.(Statistics.cor(ce, X))
-    mean_rho = Statistics.mean(rho; dims = 1)
+    summary_rho = [vec_to_real_measure(measure, x) for x in eachcol(rho)]
     tril_idx = findall(LinearAlgebra.tril!(trues(size(rho)), -1))
-    candidate_idx = findall(rho[tril_idx] .>= t)
+    candidate_idx = findall(x -> x >= t, rho[tril_idx])
     candidate_idx = candidate_idx[sortperm(rho[tril_idx][candidate_idx]; rev = true)]
     to_remove = sizehint!(Set{Int}(), div(length(candidate_idx), 2))
     for idx in candidate_idx
         i, j = tril_idx[idx][1], tril_idx[idx][2]
         if i ∉ to_remove && j ∉ to_remove
-            if mean_rho[i] > mean_rho[j]
+            if summary_rho[i] > summary_rho[j]
                 push!(to_remove, i)
+            elseif summary_rho[i] < summary_rho[j]
+                push!(to_remove, j)
             else
+                push!(to_remove, i)
                 push!(to_remove, j)
             end
         end
@@ -165,4 +169,4 @@ function find_uncorrelated_indices(X::MatNum;
     return setdiff(1:N, to_remove)
 end
 
-export PortfolioOptimisersCovariance
+export PortfolioOptimisersCovariance, find_uncorrelated_indices
