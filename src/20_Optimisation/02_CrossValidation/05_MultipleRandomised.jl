@@ -1,12 +1,112 @@
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for estimators that determine the size of each asset subset.
+
+# Related
+
+  - [`MultipleRandomised`](@ref)
+"""
 abstract type SubsetSizeEstimator <: AbstractEstimator end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for estimators that determine the number of random subsets to draw.
+
+# Related
+
+  - [`MultipleRandomised`](@ref)
+"""
 abstract type NumberSubsetsEstimator <: AbstractEstimator end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for estimators that determine the rolling window size.
+
+# Related
+
+  - [`MultipleRandomised`](@ref)
+"""
 abstract type WindowSizeEstimator <: AbstractEstimator end
+"""
+    const SubsetSizeEC
+
+Union of [`SubsetSizeEstimator`](@ref) subtypes and plain functions that compute a
+subset size from a returns dataset.
+"""
 const SubsetSizeEC = Union{<:SubsetSizeEstimator, <:Function}
+"""
+    const NumberSubsetsEC
+
+Union of [`NumberSubsetsEstimator`](@ref) subtypes and plain functions that compute the
+number of subsets from a returns dataset.
+"""
 const NumberSubsetsEC = Union{<:NumberSubsetsEstimator, <:Function}
+"""
+    const WindowSizeEC
+
+Union of [`WindowSizeEstimator`](@ref) subtypes and plain functions that compute a
+window size from a returns dataset.
+"""
 const WindowSizeEC = Union{<:WindowSizeEstimator, <:Function}
+"""
+    const SubsetSizeE
+
+Union of a concrete subset-size value or an estimator/function for it.
+"""
 const SubsetSizeE = Union{<:Number, <:SubsetSizeEC}
+"""
+    const NumberSubsetsE
+
+Union of a concrete number-of-subsets value or an estimator/function for it.
+"""
 const NumberSubsetsE = Union{<:Integer, <:NumberSubsetsEC}
+"""
+    const WindowSizeE
+
+Union of a concrete window-size value or an estimator/function for it.
+"""
 const WindowSizeE = Union{<:Number, <:WindowSizeEC}
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Cross-validation scheme that draws multiple random asset subsets and applies a
+walk-forward estimator to each. Each combination of a random asset subset and a set of
+walk-forward folds forms one *path*.
+
+# Fields
+
+  - `cv::WalkForwardEstimator`: Walk-forward estimator applied within each asset subset.
+  - `subset_size::SubsetSizeE`: Size of each asset subset (integer count, fraction of
+    total, or callable).
+  - `n_subsets::NumberSubsetsE`: Number of random subsets to draw.
+  - `max_comb::Integer`: Maximum number of combinations to enumerate exactly. When the
+    total number of combinations exceeds this limit an approximate sampling approach is
+    used.
+  - `window_size::Option{<:WindowSizeE}`: Optional rolling observation window. When set,
+    each subset uses a randomly chosen contiguous window of this length.
+  - `rng::Random.AbstractRNG`: Random number generator.
+  - `seed::Option{<:Integer}`: Optional random seed.
+
+# Constructors
+
+    MultipleRandomised(
+        cv::WalkForwardEstimator;
+        subset_size::SubsetSizeE = 1,
+        n_subsets::NumberSubsetsE = 2,
+        max_comb::Integer = 1_000_000_000,
+        window_size::Option{<:WindowSizeE} = nothing,
+        rng::Random.AbstractRNG = Random.default_rng(),
+        seed::Option{<:Integer} = nothing
+    ) -> MultipleRandomised
+
+# Related
+
+  - [`MultipleRandomisedResult`](@ref)
+  - [`WalkForwardEstimator`](@ref)
+  - [`IndexWalkForward`](@ref)
+  - [`DateWalkForward`](@ref)
+"""
 @concrete struct MultipleRandomised <: NonOptimisationSequentialCrossValidationEstimator
     cv
     subset_size
@@ -47,6 +147,24 @@ function MultipleRandomised(cv::WalkForwardEstimator; subset_size::SubsetSizeE =
                             seed::Option{<:Integer} = nothing)
     return MultipleRandomised(cv, subset_size, n_subsets, max_comb, window_size, rng, seed)
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Stores the split result produced by [`MultipleRandomised`](@ref). Contains the training,
+test, and asset index sets for every fold across all random paths, along with a path
+identifier for each fold.
+
+# Fields
+
+  - `train_idx::VecVecInt`: Training observation indices per fold.
+  - `test_idx::VecVecInt`: Test observation indices per fold.
+  - `asset_idx::VecVecInt`: Asset column indices per fold.
+  - `path_ids::VecInt`: Path identifier for each fold.
+
+# Related
+
+  - [`MultipleRandomised`](@ref)
+"""
 @concrete struct MultipleRandomisedResult <: NonOptimisationSequentialCrossValidationResult
     train_idx
     test_idx
