@@ -679,8 +679,7 @@ function moment_window_and_weights(X::MatNum, w::Option{<:ObsWeights}, args...; 
     w = get_observation_weights(w, X; dims = dims, kwargs...)
     return X, w
 end
-function moment_window_and_weights(X::VecNum, w::Option{<:ObsWeights}, args...;
-                                   kwargs...)
+function moment_window_and_weights(X::VecNum, w::Option{<:ObsWeights}, args...; kwargs...)
     w = get_observation_weights(w, X; kwargs...)
     return X, w
 end
