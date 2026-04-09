@@ -63,6 +63,25 @@ function LowerTailDependenceCovariance(; ve::AbstractVarianceEstimator = SimpleV
                                        ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())
     return LowerTailDependenceCovariance(ve, alpha, ex)
 end
+"""
+    factory(ce::LowerTailDependenceCovariance, w::ObsWeights) -> LowerTailDependenceCovariance
+
+Return a new [`LowerTailDependenceCovariance`](@ref) estimator with observation weights `w` applied to the underlying variance estimator.
+
+# Arguments
+
+  - $(arg_dict[:ce])
+  - $(arg_dict[:ow])
+
+# Returns
+
+  - $(ret_dict[:ce])
+
+# Related
+
+  - [`LowerTailDependenceCovariance`](@ref)
+  - [`factory`](@ref)
+"""
 function factory(ce::LowerTailDependenceCovariance, w::ObsWeights)
     return LowerTailDependenceCovariance(; ve = factory(ce.ve, w), alpha = ce.alpha,
                                          ex = ce.ex)

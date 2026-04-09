@@ -47,6 +47,25 @@ function ExcessExpectedReturns(;
                                rf::Number = 0.0)
     return ExcessExpectedReturns(me, rf)
 end
+"""
+    factory(me::ExcessExpectedReturns, w::ObsWeights) -> ExcessExpectedReturns
+
+Return a new [`ExcessExpectedReturns`](@ref) estimator with observation weights `w` applied to the underlying mean estimator.
+
+# Arguments
+
+  - `me`: Excess expected returns estimator.
+  - $(arg_dict[:ow])
+
+# Returns
+
+  - `me::ExcessExpectedReturns`: Updated estimator with weights applied.
+
+# Related
+
+  - [`ExcessExpectedReturns`](@ref)
+  - [`factory`](@ref)
+"""
 function factory(me::ExcessExpectedReturns, w::ObsWeights)
     return ExcessExpectedReturns(; me = factory(me.me, w), rf = me.rf)
 end

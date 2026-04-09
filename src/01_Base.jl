@@ -1168,7 +1168,7 @@ Validate that the input value is non-empty and finite.
       + `::VecPair`: `!isempty(val)`, `any(isfinite, getindex.(val, 2))`.
       + `::ArrNum`: `!isempty(val)`, `any(isfinite, val)`.
       + `::Pair`: `isfinite(val[2])`.
-      + `::Number`: `isfinite(val).
+      + `::Number`: `isfinite(val)`.
       + `args...`: Always passes.
 
 # Related

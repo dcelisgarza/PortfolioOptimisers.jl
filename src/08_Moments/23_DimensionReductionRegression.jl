@@ -15,6 +15,30 @@ These types are used to specify the dimension reduction method when constructing
   - [`AbstractRegressionAlgorithm`](@ref)
 """
 abstract type DimensionReductionTarget <: AbstractRegressionAlgorithm end
+"""
+    factory(drtgt::DimensionReductionTarget, args...; kwargs...) -> DimensionReductionTarget
+
+No-op factory for [`DimensionReductionTarget`](@ref) subtypes. Returns the target unchanged.
+
+Dimension reduction targets (such as [`PCA`](@ref) and [`PPCA`](@ref)) do not depend on observation weights, so this method returns `drtgt` unchanged. This allows generic code to call `factory` on dimension reduction targets without special-casing.
+
+# Arguments
+
+  - `drtgt`: Dimension reduction target.
+  - `args...`: Additional arguments (ignored).
+  - `kwargs...`: Additional keyword arguments (ignored).
+
+# Returns
+
+  - `drtgt`: The input dimension reduction target, unchanged.
+
+# Related
+
+  - [`DimensionReductionTarget`](@ref)
+  - [`PCA`](@ref)
+  - [`PPCA`](@ref)
+  - [`factory`](@ref)
+"""
 function factory(drtgt::DimensionReductionTarget, args...; kwargs...)
     return drtgt
 end

@@ -61,6 +61,25 @@ function DetoneCovariance(; ce::StatsBase.CovarianceEstimator = Covariance(),
                           dt::Detone = Detone(), pdm::Option{<:Posdef} = Posdef())
     return DetoneCovariance(ce, dt, pdm)
 end
+"""
+    factory(ce::DetoneCovariance, w::ObsWeights) -> DetoneCovariance
+
+Return a new [`DetoneCovariance`](@ref) estimator with observation weights `w` applied to the underlying covariance estimator.
+
+# Arguments
+
+  - $(arg_dict[:ce])
+  - $(arg_dict[:ow])
+
+# Returns
+
+  - $(ret_dict[:ce])
+
+# Related
+
+  - [`DetoneCovariance`](@ref)
+  - [`factory`](@ref)
+"""
 function factory(ce::DetoneCovariance, w::ObsWeights)
     return DetoneCovariance(; ce = factory(ce.ce, w), dt = ce.dt, pdm = ce.pdm)
 end

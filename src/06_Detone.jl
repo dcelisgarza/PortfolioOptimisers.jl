@@ -78,8 +78,8 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     Detone(;
-        n::Integer = 1,
         pdm::Option{<:Posdef} = Posdef(),
+        n::Integer = 1,
     ) -> Detone
 
 Keywords correspond to the struct's fields.

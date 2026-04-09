@@ -67,6 +67,25 @@ function DenoiseCovariance(; ce::StatsBase.CovarianceEstimator = Covariance(),
                            dn::Denoise = Denoise(), pdm::Option{<:Posdef} = Posdef())
     return DenoiseCovariance(ce, dn, pdm)
 end
+"""
+    factory(ce::DenoiseCovariance, w::ObsWeights) -> DenoiseCovariance
+
+Return a new [`DenoiseCovariance`](@ref) estimator with observation weights `w` applied to the underlying covariance estimator.
+
+# Arguments
+
+  - $(arg_dict[:ce])
+  - $(arg_dict[:ow])
+
+# Returns
+
+  - $(ret_dict[:ce])
+
+# Related
+
+  - [`DenoiseCovariance`](@ref)
+  - [`factory`](@ref)
+"""
 function factory(ce::DenoiseCovariance, w::ObsWeights)
     return DenoiseCovariance(; ce = factory(ce.ce, w), dn = ce.dn, pdm = ce.pdm)
 end

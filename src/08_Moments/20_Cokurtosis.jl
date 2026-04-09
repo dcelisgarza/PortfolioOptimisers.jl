@@ -74,6 +74,25 @@ function Cokurtosis(; me::AbstractExpectedReturnsEstimator = SimpleExpectedRetur
                     alg::AbstractMomentAlgorithm = Full())
     return Cokurtosis(me, mp, alg)
 end
+"""
+    factory(ke::Cokurtosis, w::ObsWeights) -> Cokurtosis
+
+Return a new [`Cokurtosis`](@ref) estimator with observation weights `w` applied to the underlying mean estimator.
+
+# Arguments
+
+  - `ke`: Cokurtosis estimator.
+  - $(arg_dict[:ow])
+
+# Returns
+
+  - `ke::Cokurtosis`: Updated estimator with weights applied.
+
+# Related
+
+  - [`Cokurtosis`](@ref)
+  - [`factory`](@ref)
+"""
 function factory(ke::Cokurtosis, w::ObsWeights)
     return Cokurtosis(; me = factory(ke.me, w), mp = ke.mp, alg = ke.alg)
 end

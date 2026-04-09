@@ -127,6 +127,25 @@ end
 function LinearModel(; kwargs::NamedTuple = (;))
     return LinearModel(kwargs)
 end
+"""
+    factory(re::LinearModel, w::ObsWeights) -> LinearModel
+
+Return a new [`LinearModel`](@ref) regression target with observation weights `w` added to the keyword arguments.
+
+# Arguments
+
+  - `re`: Linear model regression target.
+  - $(arg_dict[:ow])
+
+# Returns
+
+  - `re::LinearModel`: Updated regression target with weights included in `kwargs`.
+
+# Related
+
+  - [`LinearModel`](@ref)
+  - [`factory`](@ref)
+"""
 function factory(re::LinearModel, w::ObsWeights)
     return LinearModel(; kwargs = (; re.kwargs..., weights = w))
 end
@@ -210,6 +229,25 @@ function GeneralisedLinearModel(; args::Tuple = (Distributions.Normal(),),
                                 kwargs::NamedTuple = (;))
     return GeneralisedLinearModel(args, kwargs)
 end
+"""
+    factory(re::GeneralisedLinearModel, w::ObsWeights) -> GeneralisedLinearModel
+
+Return a new [`GeneralisedLinearModel`](@ref) regression target with observation weights `w` added to the keyword arguments.
+
+# Arguments
+
+  - `re`: Generalised linear model regression target.
+  - $(arg_dict[:ow])
+
+# Returns
+
+  - `re::GeneralisedLinearModel`: Updated regression target with weights included in `kwargs`.
+
+# Related
+
+  - [`GeneralisedLinearModel`](@ref)
+  - [`factory`](@ref)
+"""
 function factory(re::GeneralisedLinearModel, w::ObsWeights)
     return GeneralisedLinearModel(; args = re.args, kwargs = (; re.kwargs..., weights = w))
 end

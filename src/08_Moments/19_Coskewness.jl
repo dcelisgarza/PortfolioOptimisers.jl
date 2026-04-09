@@ -74,6 +74,25 @@ function Coskewness(; me::AbstractExpectedReturnsEstimator = SimpleExpectedRetur
                     alg::AbstractMomentAlgorithm = Full())
     return Coskewness(me, mp, alg)
 end
+"""
+    factory(ske::Coskewness, w::ObsWeights) -> Coskewness
+
+Return a new [`Coskewness`](@ref) estimator with observation weights `w` applied to the underlying mean estimator.
+
+# Arguments
+
+  - `ske`: Coskewness estimator.
+  - $(arg_dict[:ow])
+
+# Returns
+
+  - `ske::Coskewness`: Updated estimator with weights applied.
+
+# Related
+
+  - [`Coskewness`](@ref)
+  - [`factory`](@ref)
+"""
 function factory(ske::Coskewness, w::ObsWeights)
     return Coskewness(; me = factory(ske.me, w), mp = ske.mp, alg = ske.alg)
 end

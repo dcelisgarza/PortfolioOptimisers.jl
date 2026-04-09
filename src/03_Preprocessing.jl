@@ -73,6 +73,8 @@ $(DocStringExtensions.FIELDS)
         X::Option{<:MatNum} = nothing,
         nf::Option{<:VecStr} = nothing,
         F::Option{<:MatNum} = nothing,
+        nb::Option{<:VecStr} = nothing,
+        B::Option{<:VecNum_MatNum} = nothing,
         ts::Option{<:VecDate} = nothing,
         iv::Option{<:MatNum} = nothing,
         ivpa::Option{<:Num_VecNum} = nothing,
@@ -83,8 +85,12 @@ Keywords correspond to the struct's fields.
 ## Validation
 
   - If `nx` or `X` is not `nothing`, `!isempty(nx)`, `!isempty(X)`, and `length(nx) == size(X, 2)`.
-  - If `nf` or `F` is not `nothing`, `!isempty(nf)`, `!isempty(F)`, and `length(nf) == size(F, 2)`, and `size(X, 1) == size(F, 1)`.
+  - If `nf` or `F` is not `nothing`, `!isempty(nf)`, `!isempty(F)`, `length(nf) == size(F, 2)`, and `size(X, 1) == size(F, 1)`.
+  - If `nb` or `B` is not `nothing` and `B` is a matrix: `!isempty(nb)`, `!isempty(B)`, and `length(nb) == size(B, 2)`.
+  - If `nb` or `B` is not `nothing` and `B` is a vector: `length(nb) == 1`.
+  - If `X` and `B` are not `nothing`: if `B` is a vector, `size(X, 1) == size(B, 1)`; if `B` is a matrix, `size(X) == size(B)`.
   - If `ts` is not `nothing`, `!isempty(ts)`, and `length(ts) == size(X, 1)`.
+  - If `ts` and `B` are not `nothing`: `length(ts) == size(B, 1)`.
   - If `iv` is not `nothing`, `!isempty(iv)`, `all(x -> x >= 0, iv)`, `size(iv) == size(X)`.
   - If `ivpa` is not `nothing`, `all(x -> x >= 0, ivpa)`, `all(x -> isfinite(x), ivpa)`; if a vector, `length(ivpa) == size(iv, 2)`.
 
@@ -649,7 +655,7 @@ Int64[]
 
 # Related
 
-  - [`find_uncorrelated_indices`]-(@ref)
+  - [`find_uncorrelated_indices`](@ref)
   - [`prices_to_returns`](@ref)
 """
 function find_complete_indices(X::AbstractMatrix; dims::Int = 1)

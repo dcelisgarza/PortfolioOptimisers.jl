@@ -67,6 +67,25 @@ function DistanceCovariance(; metric::Distances.Metric = Distances.Euclidean(),
                             ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())
     return DistanceCovariance(metric, args, kwargs, w, ex)
 end
+"""
+    factory(ce::DistanceCovariance, w::ObsWeights) -> DistanceCovariance
+
+Return a new [`DistanceCovariance`](@ref) estimator with observation weights `w`.
+
+# Arguments
+
+  - $(arg_dict[:ce])
+  - $(arg_dict[:ow])
+
+# Returns
+
+  - $(ret_dict[:ce])
+
+# Related
+
+  - [`DistanceCovariance`](@ref)
+  - [`factory`](@ref)
+"""
 function factory(ce::DistanceCovariance, w::ObsWeights)
     return DistanceCovariance(; metric = ce.metric, args = ce.args, kwargs = ce.kwargs,
                               w = w, ex = ce.ex)
