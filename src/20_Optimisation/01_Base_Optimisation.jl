@@ -1,13 +1,102 @@
 abstract type AbstractOptimisationEstimator <: AbstractEstimator end
 const VecOptE = AbstractVector{<:AbstractOptimisationEstimator}
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for base portfolio optimisation estimators.
+
+`BaseOptimisationEstimator` is the parent for all internal optimiser components that configure the optimisation problem but are not directly invokable as top-level optimisers.
+
+# Related Types
+
+  - [`AbstractOptimisationEstimator`](@ref)
+  - [`OptimisationEstimator`](@ref)
+"""
 abstract type BaseOptimisationEstimator <: AbstractOptimisationEstimator end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for portfolio optimisation estimators that produce portfolio weights.
+
+Subtype `OptimisationEstimator` to implement concrete portfolio optimisers. All optimisers that can be invoked with `optimise` should subtype this.
+
+# Related Types
+
+  - [`NonFiniteAllocationOptimisationEstimator`](@ref)
+  - [`AbstractOptimisationEstimator`](@ref)
+"""
 abstract type OptimisationEstimator <: AbstractOptimisationEstimator end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for portfolio optimisation estimators that produce continuous (non-integer) portfolio weights.
+
+# Related Types
+
+  - [`OptimisationEstimator`](@ref)
+  - [`NaiveOptimisationEstimator`](@ref)
+  - [`ClusteringOptimisationEstimator`](@ref)
+"""
 abstract type NonFiniteAllocationOptimisationEstimator <: OptimisationEstimator end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for optimisation algorithms used by portfolio optimisers.
+
+# Related Types
+
+  - [`AbstractAlgorithm`](@ref)
+"""
 abstract type OptimisationAlgorithm <: AbstractAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for portfolio optimisation result types.
+
+All concrete optimisation result types should subtype `OptimisationResult`.
+
+# Related Types
+
+  - [`NonFiniteAllocationOptimisationResult`](@ref)
+  - [`OptimisationReturnCode`](@ref)
+"""
 abstract type OptimisationResult <: AbstractResult end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for continuous (non-integer allocation) optimisation results.
+
+# Related Types
+
+  - [`OptimisationResult`](@ref)
+  - [`NaiveOptimisationResult`](@ref)
+  - [`HierarchicalResult`](@ref)
+  - [`MeanRiskResult`](@ref)
+"""
 abstract type NonFiniteAllocationOptimisationResult <: OptimisationResult end
 const VecOpt = AbstractVector{<:NonFiniteAllocationOptimisationResult}
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for optimisation return codes.
+
+Concrete subtypes indicate whether an optimisation succeeded or failed.
+
+# Related Types
+
+  - [`OptimisationSuccess`](@ref)
+  - [`OptimisationFailure`](@ref)
+"""
 abstract type OptimisationReturnCode <: AbstractResult end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for intermediate optimisation model results.
+
+# Related Types
+
+  - [`OptimisationResult`](@ref)
+"""
 abstract type OptimisationModelResult <: AbstractResult end
 const OptE_Opt = Union{<:NonFiniteAllocationOptimisationEstimator,
                        <:NonFiniteAllocationOptimisationResult}
@@ -44,12 +133,95 @@ end
 function update_time_dependent_estimator(opt::VecOptE_Opt, args...)
     return [update_time_dependent_estimator(opti, args...) for opti in opt]
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for JuMP-based weight finaliser formulations.
+
+Defines the interface for norm types used when adjusting portfolio weights to satisfy bounds via a JuMP model.
+
+# Related Types
+
+  - [`RelativeErrorWeightFinaliser`](@ref)
+  - [`SquaredRelativeErrorWeightFinaliser`](@ref)
+  - [`AbsoluteErrorWeightFinaliser`](@ref)
+  - [`SquaredAbsoluteErrorWeightFinaliser`](@ref)
+  - [`JuMPWeightFinaliser`](@ref)
+"""
 abstract type JuMPWeightFinaliserFormulation <: AbstractAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Minimises the L1 norm of relative weight deviations when enforcing weight bounds.
+"""
 struct RelativeErrorWeightFinaliser <: JuMPWeightFinaliserFormulation end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Minimises the L2 norm (squared) of relative weight deviations when enforcing weight bounds.
+"""
 struct SquaredRelativeErrorWeightFinaliser <: JuMPWeightFinaliserFormulation end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Minimises the L1 norm of absolute weight deviations when enforcing weight bounds.
+"""
 struct AbsoluteErrorWeightFinaliser <: JuMPWeightFinaliserFormulation end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Minimises the L2 norm (squared) of absolute weight deviations when enforcing weight bounds.
+"""
 struct SquaredAbsoluteErrorWeightFinaliser <: JuMPWeightFinaliserFormulation end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for weight finaliser strategies.
+
+A `WeightFinaliser` enforces weight bounds after the optimisation has produced unconstrained weights.
+
+# Related Types
+
+  - [`IterativeWeightFinaliser`](@ref)
+  - [`JuMPWeightFinaliser`](@ref)
+"""
 abstract type WeightFinaliser <: AbstractAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Iteratively projects weights into the feasible region defined by weight bounds.
+
+`IterativeWeightFinaliser` repeatedly clips and redistributes portfolio weights until they satisfy the given lower and upper bounds, or the maximum number of iterations `iter` is reached.
+
+# Fields
+
+  - `iter`: Maximum number of iterations.
+
+# Constructors
+
+    IterativeWeightFinaliser(;
+        iter::Integer = 100
+    ) -> IterativeWeightFinaliser
+
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - `iter > 0`.
+
+# Examples
+
+```jldoctest
+julia> IterativeWeightFinaliser()
+IterativeWeightFinaliser
+  iter ┴ Int64: 100
+```
+
+# Related
+
+  - [`WeightFinaliser`](@ref)
+  - [`JuMPWeightFinaliser`](@ref)
+"""
 @concrete struct IterativeWeightFinaliser <: WeightFinaliser
     iter
     function IterativeWeightFinaliser(iter::Integer)
@@ -60,6 +232,42 @@ end
 function IterativeWeightFinaliser(; iter::Integer = 100)
     return IterativeWeightFinaliser(iter)
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Uses a JuMP optimisation model to enforce weight bounds.
+
+`JuMPWeightFinaliser` solves a small optimisation problem to find the closest feasible weights (in the sense of the chosen error formulation) that satisfy the given bounds. Falls back to [`IterativeWeightFinaliser`](@ref) if the JuMP model fails.
+
+# Fields
+
+  - `slv`: Solver or vector of solvers for the JuMP model.
+  - `sc`: Scale factor applied to constraints.
+  - `so`: Scale factor applied to the objective.
+  - `alg`: Error formulation (L1/L2 relative or absolute).
+
+# Constructors
+
+    JuMPWeightFinaliser(;
+        slv::Slv_VecSlv,
+        sc::Number = 1.0,
+        so::Number = 1.0,
+        alg::JuMPWeightFinaliserFormulation = RelativeErrorWeightFinaliser()
+    ) -> JuMPWeightFinaliser
+
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - If `slv` is a `VecSlv`: `!isempty(slv)`.
+  - `sc > 0`, `so > 0`.
+
+# Related
+
+  - [`WeightFinaliser`](@ref)
+  - [`IterativeWeightFinaliser`](@ref)
+  - [`JuMPWeightFinaliserFormulation`](@ref)
+"""
 @concrete struct JuMPWeightFinaliser <: WeightFinaliser
     slv
     sc
@@ -193,12 +401,40 @@ function finalise_weight_bounds(wf::WeightFinaliser, wb::WeightBounds, w::VecNum
     end
     return retcode, w
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Indicates that a portfolio optimisation completed successfully.
+
+# Fields
+
+  - `res`: Optional result or message from the solver (default: `nothing`).
+
+# Related
+
+  - [`OptimisationReturnCode`](@ref)
+  - [`OptimisationFailure`](@ref)
+"""
 @concrete struct OptimisationSuccess <: OptimisationReturnCode
     res
 end
 function OptimisationSuccess(; res = nothing)
     return OptimisationSuccess(res)
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Indicates that a portfolio optimisation failed.
+
+# Fields
+
+  - `res`: Optional error message or diagnostic information (default: `nothing`).
+
+# Related
+
+  - [`OptimisationReturnCode`](@ref)
+  - [`OptimisationSuccess`](@ref)
+"""
 @concrete struct OptimisationFailure <: OptimisationReturnCode
     res
 end

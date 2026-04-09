@@ -1,3 +1,17 @@
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for naive (heuristic) portfolio optimisation estimators.
+
+Naive optimisers compute portfolio weights directly from statistical properties of asset returns (e.g., volatility or equal weights) without solving an optimisation problem.
+
+# Related Types
+
+  - [`NonFiniteAllocationOptimisationEstimator`](@ref)
+  - [`InverseVolatility`](@ref)
+  - [`EqualWeighted`](@ref)
+  - [`RandomWeighted`](@ref)
+"""
 abstract type NaiveOptimisationEstimator <: NonFiniteAllocationOptimisationEstimator end
 function needs_previous_weights(opt::NaiveOptimisationEstimator)
     return needs_previous_weights(opt.fb)
@@ -8,6 +22,27 @@ end
 function assert_external_optimiser(::NaiveOptimisationEstimator)
     return nothing
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Result type for naive portfolio optimisation estimators.
+
+# Fields
+
+  - `oe`: Type of the optimisation estimator that produced this result.
+  - `pr`: Prior result used in optimisation (or `nothing`).
+  - `wb`: Weight bounds applied.
+  - `retcode`: Optimisation return code (`OptimisationSuccess` or `OptimisationFailure`).
+  - `w`: Optimal portfolio weights vector.
+  - `fb`: Fallback result (if a fallback optimiser was used).
+
+# Related
+
+  - [`NonFiniteAllocationOptimisationResult`](@ref)
+  - [`InverseVolatility`](@ref)
+  - [`EqualWeighted`](@ref)
+  - [`RandomWeighted`](@ref)
+"""
 @concrete struct NaiveOptimisationResult <: NonFiniteAllocationOptimisationResult
     oe
     pr
@@ -19,6 +54,68 @@ end
 function factory(res::NaiveOptimisationResult, fb::Option{<:OptE_Opt})
     return NaiveOptimisationResult(res.oe, res.pr, res.wb, res.retcode, res.w, fb)
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Inverse Volatility portfolio optimiser.
+
+`InverseVolatility` allocates portfolio weights inversely proportional to each asset's volatility (standard deviation). Optionally, `sq = true` uses variance instead.
+
+# Mathematical Definition
+
+```math
+w_i = \\frac{1 / \\sigma_i}{\\sum_{j=1}^N 1 / \\sigma_j}\\,,
+```
+
+where ``\\sigma_i`` is the standard deviation (or variance when `sq = true`) of asset ``i``.
+
+# Fields
+
+  - `pe`: Prior estimator or prior result for computing asset covariance.
+  - `wb`: Weight bounds estimator or bounds.
+  - `sets`: Asset sets (required when `wb` is a `WeightBoundsEstimator`).
+  - `wf`: Weight finaliser for enforcing bounds.
+  - `fb`: Fallback optimiser (used if this optimiser fails).
+  - `sq`: If `true`, weights are inversely proportional to variance rather than volatility.
+  - `brt`: If `true`, uses bootstrap returns instead of the original returns.
+  - `strict`: If `true`, strictly enforces weight bounds.
+
+# Constructors
+
+    InverseVolatility(;
+        pe::PrE_Pr = EmpiricalPrior(),
+        wb::Option{<:WbE_Wb} = WeightBounds(),
+        sets::Option{<:AssetSets} = nothing,
+        wf::WeightFinaliser = IterativeWeightFinaliser(),
+        fb::Option{<:OptE_Opt} = nothing,
+        sq::Bool = false,
+        brt::Bool = false,
+        strict::Bool = false
+    ) -> InverseVolatility
+
+Keywords correspond to the struct's fields.
+
+# Examples
+
+```jldoctest
+julia> InverseVolatility()
+InverseVolatility
+  pe ┼ EmpiricalPrior
+  wb ┼ WeightBounds
+  sets ┼ nothing
+  wf ┼ IterativeWeightFinaliser
+  fb ┼ nothing
+  sq ┼ Bool: false
+  brt ┼ Bool: false
+  strict ┴ Bool: false
+```
+
+# Related
+
+  - [`NaiveOptimisationEstimator`](@ref)
+  - [`EqualWeighted`](@ref)
+  - [`RandomWeighted`](@ref)
+"""
 @concrete struct InverseVolatility <: NaiveOptimisationEstimator
     pe
     wb
@@ -82,6 +179,55 @@ function optimise(iv::InverseVolatility{<:Any, <:Any, <:Any, <:Any, Nothing},
                   rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)
     return _optimise(iv, rd; dims = dims, kwargs...)
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Equal-weighted portfolio optimiser.
+
+`EqualWeighted` allocates equal weight to all ``N`` assets in the portfolio:
+
+```math
+w_i = \\frac{1}{N} \\quad \\forall i\\,.
+```
+
+# Fields
+
+  - `wb`: Weight bounds estimator or bounds.
+  - `sets`: Asset sets (required when `wb` is a `WeightBoundsEstimator`).
+  - `wf`: Weight finaliser for enforcing bounds.
+  - `fb`: Fallback optimiser.
+  - `strict`: If `true`, strictly enforces weight bounds.
+
+# Constructors
+
+    EqualWeighted(;
+        wb::Option{<:WbE_Wb} = WeightBounds(),
+        sets::Option{<:AssetSets} = nothing,
+        wf::WeightFinaliser = IterativeWeightFinaliser(),
+        fb::Option{<:OptE_Opt} = nothing,
+        strict::Bool = false
+    ) -> EqualWeighted
+
+Keywords correspond to the struct's fields.
+
+# Examples
+
+```jldoctest
+julia> EqualWeighted()
+EqualWeighted
+  wb ┼ WeightBounds
+  sets ┼ nothing
+  wf ┼ IterativeWeightFinaliser
+  fb ┼ nothing
+  strict ┴ Bool: false
+```
+
+# Related
+
+  - [`NaiveOptimisationEstimator`](@ref)
+  - [`InverseVolatility`](@ref)
+  - [`RandomWeighted`](@ref)
+"""
 @concrete struct EqualWeighted <: NaiveOptimisationEstimator
     wb
     sets
@@ -130,6 +276,72 @@ function optimise(ew::EqualWeighted{<:Any, <:Any, <:Any, Nothing},
                   rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)
     return _optimise(ew, rd; dims = dims, kwargs...)
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Random-weighted portfolio optimiser.
+
+`RandomWeighted` draws portfolio weights at random from a Dirichlet distribution with concentration parameter `alpha`. This can be used for simulation, benchmarking, or stress-testing.
+
+# Mathematical Definition
+
+```math
+\\boldsymbol{w} \\sim \\mathrm{Dirichlet}(\\boldsymbol{\\alpha})\\,,
+```
+
+where ``\\boldsymbol{\\alpha}`` is a scalar or vector concentration parameter. Larger values of ``\\alpha`` concentrate the distribution near equal weights.
+
+# Fields
+
+  - `alpha`: Dirichlet concentration parameter (scalar or vector, all positive).
+  - `rng`: Random number generator.
+  - `seed`: Optional seed for the RNG.
+  - `wb`: Weight bounds estimator or bounds.
+  - `sets`: Asset sets.
+  - `wf`: Weight finaliser for enforcing bounds.
+  - `fb`: Fallback optimiser.
+  - `strict`: If `true`, strictly enforces weight bounds.
+
+# Constructors
+
+    RandomWeighted(;
+        alpha::Num_VecNum = 1,
+        rng::Random.AbstractRNG = Random.default_rng(),
+        seed::Option{<:Integer} = nothing,
+        wb::Option{<:WbE_Wb} = nothing,
+        sets::Option{<:AssetSets} = nothing,
+        wf::WeightFinaliser = IterativeWeightFinaliser(),
+        fb::Option{<:OptE_Opt} = nothing,
+        strict::Bool = false
+    ) -> RandomWeighted
+
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - If `alpha` is provided: all elements positive and finite.
+
+# Examples
+
+```jldoctest
+julia> RandomWeighted()
+RandomWeighted
+  alpha ┼ Int64: 1
+  rng ┼ ...
+  seed ┼ nothing
+  wb ┼ nothing
+  sets ┼ nothing
+  wf ┼ IterativeWeightFinaliser
+  fb ┼ nothing
+  strict ┴ Bool: false
+```
+
+# Related
+
+  - [`NaiveOptimisationEstimator`](@ref)
+  - [`InverseVolatility`](@ref)
+  - [`EqualWeighted`](@ref)
+"""
 @concrete struct RandomWeighted <: NaiveOptimisationEstimator
     alpha
     rng

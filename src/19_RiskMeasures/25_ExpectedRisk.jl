@@ -64,6 +64,48 @@ end
 function number_effective_assets(w::VecNum)
     return inv(LinearAlgebra.dot(w, w))
 end
+"""
+    risk_contribution(
+        r::AbstractBaseRiskMeasure,
+        w::VecNum,
+        X::MatNum_Pr,
+        fees::Option{<:Fees} = nothing;
+        delta::Number = 1e-6,
+        marginal::Bool = false,
+        kwargs...
+    ) -> Vector
+
+Compute the risk contribution of each asset to the total portfolio risk using numerical differentiation.
+
+The risk contribution of asset ``i`` is defined as:
+
+```math
+\\mathrm{RC}_i = w_i \\cdot \\frac{\\partial \\rho(\\boldsymbol{w})}{\\partial w_i}\\,,
+```
+
+where the partial derivative is approximated by a two-sided finite difference with step size `delta`. When `marginal = true`, the weighting by ``w_i`` is omitted (i.e., only the marginal risk ``\\partial \\rho / \\partial w_i`` is returned).
+
+# Arguments
+
+  - `r::AbstractBaseRiskMeasure`: Risk measure to differentiate.
+  - `w::VecNum`: Portfolio weights vector.
+  - `X::MatNum_Pr`: Asset returns matrix or prior result.
+  - `fees::Option{<:Fees}`: Optional fee structure.
+
+# Keyword Arguments
+
+  - `delta::Number = 1e-6`: Finite difference step size.
+  - `marginal::Bool = false`: If `true`, returns marginal risk contributions (without ``w_i`` weighting).
+
+# Returns
+
+  - `Vector`: Risk contributions (or marginal risks) for each asset.
+
+# Related
+
+  - [`expected_risk`](@ref)
+  - [`factor_risk_contribution`](@ref)
+"""
 function risk_contribution(r::AbstractBaseRiskMeasure, w::VecNum, X::MatNum_Pr,
                            fees::Option{<:Fees} = nothing; delta::Number = 1e-6,
                            marginal::Bool = false, kwargs...)
@@ -89,6 +131,50 @@ function risk_contribution(r::AbstractBaseRiskMeasure, w::VecNum, X::MatNum_Pr,
     end
     return rc
 end
+"""
+    factor_risk_contribution(
+        r::AbstractBaseRiskMeasure,
+        w::VecNum,
+        X::MatNum_Pr,
+        fees::Option{<:Fees} = nothing;
+        re::RegE_Reg = StepwiseRegression(),
+        rd::ReturnsResult = ReturnsResult(),
+        delta::Number = 1e-6,
+        kwargs...
+    ) -> Vector
+
+Compute the risk contribution of each factor (and the idiosyncratic component) to the total portfolio risk using a factor regression.
+
+The factor risk contributions partition total portfolio risk into factor-specific components using the Brinson attribution framework:
+
+```math
+\\mathrm{FRC}_k = (\\mathbf{B}^\\intercal \\boldsymbol{w})_k \\cdot (\\mathbf{B}^{-\\intercal} \\nabla \\rho)_k\\,,
+```
+
+where ``\\mathbf{B}`` is the factor loading matrix estimated by regression.
+
+# Arguments
+
+  - `r::AbstractBaseRiskMeasure`: Risk measure to decompose.
+  - `w::VecNum`: Portfolio weights vector.
+  - `X::MatNum_Pr`: Asset returns matrix or prior result.
+  - `fees::Option{<:Fees}`: Optional fee structure.
+
+# Keyword Arguments
+
+  - `re::RegE_Reg = StepwiseRegression()`: Regression estimator for factor loadings.
+  - `rd::ReturnsResult = ReturnsResult()`: Returns result providing factor data.
+  - `delta::Number = 1e-6`: Finite difference step size.
+
+# Returns
+
+  - `Vector`: Risk contributions for each factor, with the last element being the idiosyncratic (off-factor) contribution.
+
+# Related
+
+  - [`risk_contribution`](@ref)
+  - [`expected_risk`](@ref)
+"""
 function factor_risk_contribution(r::AbstractBaseRiskMeasure, w::VecNum, X::MatNum_Pr,
                                   fees::Option{<:Fees} = nothing;
                                   re::RegE_Reg = StepwiseRegression(),

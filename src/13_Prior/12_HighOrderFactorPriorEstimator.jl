@@ -62,6 +62,53 @@ function cokurtosis_residuals(sigma::MatNum, X::MatNum,
     end
     return kt_res
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Represents the High Order Factor Prior Estimator.
+
+`HighOrderFactorPriorEstimator` extends a low-order factor prior with coskewness and cokurtosis moments estimated from a factor model. It supports error correction of higher-order moments using residuals from the factor regression.
+
+# Fields
+
+  - `pe`: Low-order factor prior estimator (the base estimator providing mean and covariance).
+  - `kte`: Cokurtosis estimator. If `nothing`, cokurtosis is not estimated.
+  - `ske`: Coskewness estimator. If `nothing`, coskewness is not estimated.
+  - `ex`: FLoops executor controlling parallelism for the cokurtosis residuals computation.
+  - `rsd`: If `true`, corrects the higher-order moments using factor regression residuals.
+
+# Constructors
+
+    HighOrderFactorPriorEstimator(;
+        pe::AbstractLowOrderPriorEstimator_F_AF = FactorPrior(),
+        kte::Option{<:CokurtosisEstimator} = Cokurtosis(; alg = Full()),
+        ske::Option{<:CoskewnessEstimator} = Coskewness(; alg = Full()),
+        ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
+        rsd::Bool = true
+    ) -> HighOrderFactorPriorEstimator
+
+Keywords correspond to the struct's fields.
+
+# Examples
+
+```jldoctest
+julia> HighOrderFactorPriorEstimator()
+HighOrderFactorPriorEstimator
+  pe ┼ FactorPrior
+  kte ┼ Cokurtosis
+  ske ┼ Coskewness
+  ex ┼ ThreadedEx
+  rsd ┴ Bool: true
+```
+
+# Related
+
+  - [`AbstractHighOrderPriorEstimator_F`](@ref)
+  - [`FactorPrior`](@ref)
+  - [`CokurtosisEstimator`](@ref)
+  - [`CoskewnessEstimator`](@ref)
+  - [`HighOrderPrior`](@ref)
+"""
 @concrete struct HighOrderFactorPriorEstimator <: AbstractHighOrderPriorEstimator_F
     pe
     kte
