@@ -41,7 +41,7 @@ julia> asset_sets_matrix(est, sets)
 # Related
 
   - [`AssetSets`](@ref)
-  - [`asset_sets_matrix`]-(@ref)
+  - [`asset_sets_matrix`](@ref)
   - [`AbstractConstraintEstimator`](@ref)
 """
 @concrete struct AssetSetsMatrixEstimator <: AbstractConstraintEstimator
@@ -101,7 +101,7 @@ julia> asset_sets_matrix("nx_sector", sets)
 
   - [`AssetSets`](@ref)
   - [`AssetSetsMatrixEstimator`](@ref)
-  - [`asset_sets_matrix_view`]-(@ref)
+  - [`asset_sets_matrix_view`](@ref)
 """
 function asset_sets_matrix(smtx::AbstractString, sets::AssetSets)
     @argcheck(haskey(sets.dict, smtx), KeyError("key $smtx not found in `sets.dict`"))
@@ -135,7 +135,7 @@ This method returns the input matrix `smtx` unchanged. It is used as a fallback 
 
   - [`AssetSets`](@ref)
   - [`AssetSetsMatrixEstimator`](@ref)
-  - [`asset_sets_matrix`]-(@ref)
+  - [`asset_sets_matrix`](@ref)
 """
 function asset_sets_matrix(smtx::Option{<:MatNum}, args...)
     return smtx
@@ -151,7 +151,7 @@ It is used for type stability and to provide a uniform interface for processing 
 
 # Related
 
-  - [`asset_sets_matrix`]-(@ref)
+  - [`asset_sets_matrix`](@ref)
 """
 function asset_sets_matrix(smtx::AssetSetsMatrixEstimator, sets::AssetSets)
     return asset_sets_matrix(smtx.val, sets)
@@ -160,7 +160,7 @@ end
     asset_sets_matrix(smtx::VecMatNum_ASetMatE,
                       sets::AssetSets)
 
-Broadcasts [`asset_sets_matrix`]-(@ref) over the vector.
+Broadcasts [`asset_sets_matrix`](@ref) over the vector.
 
 Provides a uniform interface for processing multiple constraint estimators simulatneously.
 """

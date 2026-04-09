@@ -27,7 +27,32 @@ abstract type AbstractClustersAlgorithm <: AbstractPhylogenyAlgorithm end
 function factory(alg::AbstractClustersAlgorithm, args...; kwargs...)
     return alg
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for all hierarchical clustering algorithm types in `PortfolioOptimisers.jl`.
+
+All concrete and/or abstract types implementing hierarchical clustering algorithms (such as hierarchical agglomerative clustering or DBHT) should be subtypes of `AbstractHierarchicalClusteringAlgorithm`.
+
+# Related
+
+  - [`AbstractClustersAlgorithm`](@ref)
+  - [`HClustAlgorithm`](@ref)
+  - [`DBHT`](@ref)
+"""
 abstract type AbstractHierarchicalClusteringAlgorithm <: AbstractClustersAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for all non-hierarchical clustering algorithm types in `PortfolioOptimisers.jl`.
+
+All concrete and/or abstract types implementing non-hierarchical clustering algorithms (such as k-means) should be subtypes of `AbstractNonHierarchicalClusteringAlgorithm`.
+
+# Related
+
+  - [`AbstractClustersAlgorithm`](@ref)
+  - [`KMeansAlgorithm`](@ref)
+"""
 abstract type AbstractNonHierarchicalClusteringAlgorithm <: AbstractClustersAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -345,7 +370,7 @@ HClustAlgorithm
 
 # Related
 
-  - [`AbstractHierarchicalClusteringAlgorithm`]-(@ref)
+  - [`AbstractHierarchicalClusteringAlgorithm`](@ref)
   - [`ClustersEstimator`](@ref)
 """
 @concrete struct HClustAlgorithm <: AbstractHierarchicalClusteringAlgorithm
@@ -420,7 +445,7 @@ ClustersEstimator
 # Related
 
   - [`AbstractClustersEstimator`](@ref)
-  - [`AbstractHierarchicalClusteringAlgorithm`]-(@ref)
+  - [`AbstractHierarchicalClusteringAlgorithm`](@ref)
   - [`AbstractOptimalNumberClustersEstimator`](@ref)
 """
 @concrete struct ClustersEstimator <: AbstractClustersEstimator

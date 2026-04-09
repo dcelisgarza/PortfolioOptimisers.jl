@@ -223,7 +223,7 @@ DBHT
 
 # Related
 
-  - [`AbstractHierarchicalClusteringAlgorithm`]-(@ref)
+  - [`AbstractHierarchicalClusteringAlgorithm`](@ref)
   - [`AbstractSimilarityMatrixAlgorithm`](@ref)
   - [`DBHTRootMethod`](@ref)
   - [`MaximumDistanceSimilarity`](@ref)

@@ -47,7 +47,7 @@ Defines the abstract interface for algorithms that compute the scaling parameter
 
 Subtypes implement specific methods for generating the scaling parameter, which controls the size of the ellipsoidal region representing uncertainty in risk or prior statistics.
 
-# Related Types
+# Related
 
   - [`NormalKUncertaintyAlgorithm`](@ref)
   - [`GeneralKUncertaintyAlgorithm`](@ref)
@@ -59,7 +59,7 @@ const Num_UcSK = Union{<:AbstractUncertaintyKAlgorithm, <:Number}
     ucs(uc::Option{<:Tuple{<:Option{<:AbstractUncertaintySetResult},
                            <:Option{<:AbstractUncertaintySetResult}}}, args...; kwargs...)
 
-Returns the argument(s) unchanged. This is a no-op function used to handle cases where no uncertainty sets, or a tuple of pre-processed sets is not `nothing`.
+Returns the argument(s) unchanged. This is a no-op function used to handle cases where uncertainty sets are pre-processed (`nothing` or a tuple of results).
 
 # Arguments
 
@@ -86,7 +86,7 @@ end
 """
     mu_ucs(uc::Option{<:AbstractUncertaintySetResult}, args...; kwargs...)
 
-Returns the argument unchanged. This is a no-op function used to handle cases where no expected returns uncertainty set is not `nothing`.
+Returns the argument unchanged. This is a no-op function used to handle cases where the expected returns uncertainty set is already a result or is absent (`nothing`).
 
 # Arguments
 
@@ -111,7 +111,7 @@ end
 """
     sigma_ucs(uc::Option{<:AbstractUncertaintySetResult}, args...; kwargs...)
 
-Returns the argument unchanged. This is a no-op function used to handle cases where no covariance uncertainty set is not `nothing`.
+Returns the argument unchanged. This is a no-op function used to handle cases where the covariance uncertainty set is already a result or is absent (`nothing`).
 
 # Arguments
 
@@ -409,7 +409,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Algorithm for computing the scaling parameter `k` for ellipsoidal uncertainty sets using a general formula `sqrt((1 - q) / q)`, this ignores the distribution of the underlying data.
 
-# Related Types
+# Related
 
   - [`AbstractUncertaintyKAlgorithm`](@ref)
   - [`NormalKUncertaintyAlgorithm`](@ref)
@@ -422,7 +422,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Algorithm for computing the scaling parameter `k` for ellipsoidal uncertainty sets using the chi-squared distribution in portfolio optimisation.
 
-# Related Types
+# Related
 
   - [`AbstractUncertaintyKAlgorithm`](@ref)
   - [`NormalKUncertaintyAlgorithm`](@ref)
@@ -436,7 +436,6 @@ struct ChiSqKUncertaintyAlgorithm <: AbstractUncertaintyKAlgorithm end
     k_ucs(::ChiSqKUncertaintyAlgorithm, q::Number, X::ArrNum, args...)
     k_ucs(type::Number, args...)
 
-ArrNum
 Computes the scaling parameter `k` for ellipsoidal uncertainty sets in portfolio optimisation.
 
 # Arguments
@@ -539,7 +538,7 @@ Defines the abstract interface for ellipsoidal uncertainty set result classes in
 
 Subtypes of this abstract type represent the class or category of ellipsoidal uncertainty sets, such as those for mean or covariance statistics. Used to distinguish between different types of ellipsoidal uncertainty set results.
 
-# Related Types
+# Related
 
   - [`MuEllipsoidalUncertaintySet`](@ref)
   - [`SigmaEllipsoidalUncertaintySet`](@ref)
@@ -552,7 +551,7 @@ Represents the class identifier for mean ellipsoidal uncertainty sets in portfol
 
 Used to distinguish ellipsoidal uncertainty sets that encode uncertainty for mean statistics, such as expected returns.
 
-# Related Types
+# Related
 
   - [`AbstractEllipsoidalUncertaintySetResultClass`](@ref)
   - [`SigmaEllipsoidalUncertaintySet`](@ref)
@@ -565,7 +564,7 @@ Represents the class identifier for covariance ellipsoidal uncertainty sets in p
 
 Used to distinguish ellipsoidal uncertainty sets that encode uncertainty for covariance statistics, such as covariance matrices.
 
-# Related Types
+# Related
 
   - [`AbstractEllipsoidalUncertaintySetResultClass`](@ref)
   - [`MuEllipsoidalUncertaintySet`](@ref)

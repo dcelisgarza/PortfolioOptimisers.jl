@@ -137,6 +137,20 @@ Abstract supertype for high order prior estimators.
   - [`prior`](@ref)
 """
 abstract type AbstractHighOrderPriorEstimator <: AbstractPriorEstimator end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+High order prior estimator using factor returns.
+
+`AbstractHighOrderPriorEstimator_F` is the base type for estimators that compute high order moments (such as coskewness and cokurtosis) requiring both asset and factor returns data. All concrete factor-based high order prior estimators should subtype this type.
+
+# Related
+
+  - [`AbstractHighOrderPriorEstimator`](@ref)
+  - [`AbstractLowOrderPriorEstimator_F`](@ref)
+  - [`AbstractHiLoOrderPriorEstimator_F`](@ref)
+  - [`prior`](@ref)
+"""
 abstract type AbstractHighOrderPriorEstimator_F <: AbstractHighOrderPriorEstimator end
 const AbstractHiLoOrderPriorEstimator_F = Union{<:AbstractLowOrderPriorEstimator_F,
                                                 <:AbstractHighOrderPriorEstimator_F}

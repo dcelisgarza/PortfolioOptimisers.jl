@@ -649,10 +649,10 @@ $(DocStringExtensions.FIELDS)
 
 # Constructors
 
-    BoruvkaTree(;
+    PrimTree(;
         args::Tuple = (),
         kwargs::NamedTuple = (;)
-    ) -> BoruvkaTree
+    ) -> PrimTree
 
 Keywords correspond to the struct's fields.
 
