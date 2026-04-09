@@ -679,9 +679,9 @@ function moment_window_and_weights(X::MatNum, w::Option{<:ObsWeights}, args...; 
     w = get_observation_weights(w, X; dims = dims, kwargs...)
     return X, w
 end
-function moment_window_and_weights(X::VecNum, w::Option{<:ObsWeights}, args...; dims = dims,
+function moment_window_and_weights(X::VecNum, w::Option{<:ObsWeights}, args...;
                                    kwargs...)
-    w = get_observation_weights(w, X; dims = dims, kwargs...)
+    w = get_observation_weights(w, X; kwargs...)
     return X, w
 end
 function moment_window_and_weights(X::MatNum, w::Option{<:ObsWeights}, window::Int_VecInt;
@@ -694,10 +694,10 @@ function moment_window_and_weights(X::MatNum, w::Option{<:ObsWeights}, window::I
 end
 function moment_window_and_weights(X::VecNum, w::Option{<:ObsWeights}, window::Int_VecInt,
                                    kwargs...)
-    idx = get_window(window, X, dims)
+    idx = get_window(window, X)
     X = view(X, idx)
     w = nothing_scalar_array_getindex(w, idx)
-    w = get_observation_weights(w, X; dims = dims, kwargs...)
+    w = get_observation_weights(w, X; kwargs...)
     return X, w
 end
 
