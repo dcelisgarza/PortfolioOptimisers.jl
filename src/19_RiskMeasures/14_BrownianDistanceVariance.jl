@@ -1,7 +1,117 @@
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for all Brownian Distance Variance formulation algorithms in `PortfolioOptimisers.jl`.
+
+All concrete types implementing specific formulations for the Brownian Distance Variance optimisation constraint should subtype `BrownianDistanceVarianceFormulation`.
+
+# Related Types
+
+  - [`NormOneConeBrownianDistanceVariance`](@ref)
+  - [`IneqBrownianDistanceVariance`](@ref)
+  - [`BrownianDistanceVariance`](@ref)
+"""
 abstract type BrownianDistanceVarianceFormulation <: AbstractAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Norm-one cone formulation for the Brownian Distance Variance optimisation constraint.
+
+Uses a norm-one cone constraint to encode the ``L^1`` structure of the Brownian distance matrix in the optimisation model.
+
+# Related Types
+
+  - [`BrownianDistanceVarianceFormulation`](@ref)
+  - [`IneqBrownianDistanceVariance`](@ref)
+  - [`BrownianDistanceVariance`](@ref)
+"""
 struct NormOneConeBrownianDistanceVariance <: BrownianDistanceVarianceFormulation end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Inequality formulation for the Brownian Distance Variance optimisation constraint.
+
+Uses explicit linear inequality constraints to encode the absolute value structure of the Brownian distance matrix in the optimisation model.
+
+# Related Types
+
+  - [`BrownianDistanceVarianceFormulation`](@ref)
+  - [`NormOneConeBrownianDistanceVariance`](@ref)
+  - [`BrownianDistanceVariance`](@ref)
+"""
 struct IneqBrownianDistanceVariance <: BrownianDistanceVarianceFormulation end
 const BDVarRkFormulations = Union{<:RSOCRiskExpr, <:QuadRiskExpr}
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Represents the Brownian Distance Variance (BDVar) risk measure.
+
+`BrownianDistanceVariance` measures dependence between portfolio returns and a reference using the Brownian (distance) covariance framework. It captures non-linear dependence and is zero if and only if the returns are independent of the reference.
+
+# Mathematical Definition
+
+Given a portfolio returns vector ``\\boldsymbol{x} = (x_1, \\ldots, x_T)^\\intercal``, define the pairwise absolute distance matrix:
+
+```math
+D_{ij} = |x_i - x_j|\\,.
+```
+
+The Brownian Distance Variance is:
+
+```math
+\\mathrm{BDVar}(\\boldsymbol{x}) = \\frac{1}{T^2} \\left( \\lVert \\mathbf{D} \\rVert_F^2 + \\frac{1}{T^2} \\left( \\sum_{i,j} D_{ij} \\right)^2 \\right)\\,,
+```
+
+where ``\\lVert \\cdot \\rVert_F`` denotes the Frobenius norm.
+
+# Fields
+
+  - `settings`: Risk measure configuration.
+  - `alg1`: Second-moment formulation used for the quadratic term in optimisation.
+  - `alg2`: Brownian distance variance formulation for the linear absolute-value constraint.
+
+# Constructors
+
+    BrownianDistanceVariance(;
+        settings::RiskMeasureSettings = RiskMeasureSettings(),
+        alg1::BDVarRkFormulations = QuadRiskExpr(),
+        alg2::BrownianDistanceVarianceFormulation = NormOneConeBrownianDistanceVariance()
+    ) -> BrownianDistanceVariance
+
+Keywords correspond to the struct's fields.
+
+# Functor
+
+    (r::BrownianDistanceVariance)(x::VecNum)
+
+Computes the Brownian Distance Variance of a portfolio returns vector `x`.
+
+## Arguments
+
+  - `x::VecNum`: Portfolio returns vector.
+
+# Examples
+
+```jldoctest
+julia> BrownianDistanceVariance()
+BrownianDistanceVariance
+  settings ┼ RiskMeasureSettings
+           │   scale ┼ Float64: 1.0
+           │      ub ┼ nothing
+           │     rke ┴ Bool: true
+      alg1 ┼ QuadRiskExpr
+      alg2 ┴ NormOneConeBrownianDistanceVariance
+```
+
+# Related
+
+  - [`RiskMeasure`](@ref)
+  - [`RiskMeasureSettings`](@ref)
+  - [`NormOneConeBrownianDistanceVariance`](@ref)
+  - [`IneqBrownianDistanceVariance`](@ref)
+  - [`QuadRiskExpr`](@ref)
+  - [`RSOCRiskExpr`](@ref)
+"""
 @concrete struct BrownianDistanceVariance <: RiskMeasure
     settings
     alg1
