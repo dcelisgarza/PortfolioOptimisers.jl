@@ -82,7 +82,7 @@ Where:
 # Arguments
 
   - `w`: Portfolio weights.
-  - `X`: Asset return matrix (assets × periods).
+  - `X`: Asset return matrix (observations × assets).
   - `fees`: [`Fees`](@ref) structure.
   - `args...`: Additional arguments (ignored).
 
@@ -221,6 +221,13 @@ Where:
 ## Per asset portfolio drawdowns
 
 The same definitions apply as above, but for each individual asset in the returns matrix ``\\mathbf{X}`` instead of the portfolio return ``\\mathbf{X} \\boldsymbol{w}``.
+
+# Arguments
+
+  - `X`: Array of asset or portfolio returns (vector or matrix).
+  - `compound`: If `true`, computes compounded drawdowns; otherwise, computes simple drawdowns.
+  - `cX`: If `true`, treats `X` as cumulative returns; otherwise, computes cumulative returns first.
+  - $(arg_dict[:dims])
 
 # Returns
 

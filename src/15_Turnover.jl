@@ -576,7 +576,7 @@ const TnE_Tn_VecTnE_Tn = Union{<:TnE_Tn, <:VecTnE_Tn}
     turnover_constraints(tn::VecTnE_Tn, sets::AssetSets; datatype::DataType = Float64,
                          strict::Bool = false)
 
-Broadcasts [`threshold_constraints`](@ref) over the vector.
+Broadcasts [`turnover_constraints`](@ref) over the vector.
 
 Provides a uniform interface for processing multiple constraint estimators simultaneously.
 

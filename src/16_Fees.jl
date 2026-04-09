@@ -977,14 +977,13 @@ end
 """
     calc_fees(w::VecNum, fees::Fees)
 
-Compute total fees for portfolio weights and prices.
+Compute total fees for portfolio weights.
 
 Sums proportional, fixed, and turnover fees for all assets.
 
 # Arguments
 
   - `w`: Portfolio weights.
-  - `p`: Asset prices.
   - `fees`: [`Fees`](@ref) structure.
 
 # Returns
@@ -1333,14 +1332,13 @@ end
 """
     calc_asset_fees(w::VecNum, fees::Fees)
 
-Compute total per asset fees for portfolio weights and prices.
+Compute total per asset fees for portfolio weights.
 
 Sums proportional, fixed, and turnover fees for all assets.
 
 # Arguments
 
   - `w`: Portfolio weights.
-  - `p`: Asset prices.
   - `fees`: [`Fees`](@ref) structure.
 
 # Returns
