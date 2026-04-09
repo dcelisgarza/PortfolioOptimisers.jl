@@ -14,8 +14,60 @@ function factory(res::SchurComplementHierarchicalRiskParityResult, fb::Option{<:
     return SchurComplementHierarchicalRiskParityResult(res.oe, res.pr, res.wb, res.clr,
                                                        res.gamma, res.retcode, res.w, fb)
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for Schur Complement algorithm variants.
+
+# Related Types
+
+  - [`NonMonotonicSchurComplement`](@ref)
+  - [`MonotonicSchurComplement`](@ref)
+"""
 abstract type SchurComplementAlgorithm <: AbstractAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Non-monotonic Schur Complement algorithm variant for SCHRP.
+
+Uses the raw Schur complement formula without monotonicity correction.
+
+# Related Types
+
+  - [`SchurComplementAlgorithm`](@ref)
+  - [`MonotonicSchurComplement`](@ref)
+"""
 struct NonMonotonicSchurComplement <: SchurComplementAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Monotonic Schur Complement algorithm variant for SCHRP.
+
+Applies a bisection-based correction to ensure the Schur complement allocation factor ``\\gamma`` is monotonically increasing with cluster risk, controlled by convergence tolerance `tol` and maximum iterations `iter`.
+
+# Fields
+
+  - `N`: Number of bisection steps.
+  - `tol`: Convergence tolerance.
+  - `iter`: Maximum iterations (or `nothing` for no limit).
+  - `strict`: If `true`, raises an error if convergence is not achieved.
+
+# Constructors
+
+    MonotonicSchurComplement(;
+        N::Integer = 10,
+        tol::Number = 1e-4,
+        iter::Option{<:Integer} = nothing,
+        strict::Bool = false
+    ) -> MonotonicSchurComplement
+
+Keywords correspond to the struct's fields.
+
+# Related Types
+
+  - [`SchurComplementAlgorithm`](@ref)
+  - [`NonMonotonicSchurComplement`](@ref)
+"""
 @concrete struct MonotonicSchurComplement <: SchurComplementAlgorithm
     N
     tol
@@ -36,6 +88,42 @@ function MonotonicSchurComplement(; N::Integer = 10, tol::Number = 1e-4,
                                   iter::Option{<:Integer} = nothing, strict::Bool = false)
     return MonotonicSchurComplement(N, tol, iter, strict)
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Parameters for the Schur Complement step of SCHRP.
+
+`SchurComplementParams` collects the risk measure, initial allocation factor ``\\gamma``, positive-definite matrix correction, and monotonicity algorithm used in the Schur Complement Hierarchical Risk Parity optimisation.
+
+# Fields
+
+  - `r`: Risk measure (`Variance` or `StandardDeviation`) used for intra-cluster risk.
+  - `gamma`: Initial allocation factor (``0 \\leq \\gamma \\leq 1``).
+  - `pdm`: Positive definite matrix correction method.
+  - `alg`: Schur Complement algorithm variant.
+  - `flag`: If `true`, uses the Schur Complement inversion; if `false`, uses the direct Schur inverse.
+
+# Constructors
+
+    SchurComplementParams(;
+        r::Sd_Var = Variance(),
+        gamma::Number = 0.5,
+        pdm::Option{<:Posdef} = Posdef(),
+        alg::SchurComplementAlgorithm = MonotonicSchurComplement(),
+        flag::Bool = true
+    ) -> SchurComplementParams
+
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - `0 <= gamma <= 1`.
+
+# Related
+
+  - [`SchurComplementHierarchicalRiskParity`](@ref)
+  - [`SchurComplementAlgorithm`](@ref)
+"""
 @concrete struct SchurComplementParams <: AbstractAlgorithm
     r
     gamma
@@ -65,6 +153,50 @@ function schur_complement_params_view(sp::SchurComplementParams, i, X::MatNum)
     return SchurComplementParams(; r = r, gamma = sp.gamma, pdm = sp.pdm, alg = sp.alg,
                                  flag = sp.flag)
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Schur Complement Hierarchical Risk Parity (SCHRP) portfolio optimiser.
+
+`SchurComplementHierarchicalRiskParity` extends HRP by using the Schur complement of the covariance matrix to more accurately decompose inter-cluster risk when allocating portfolio weights across the dendrogram.
+
+# Fields
+
+  - `opt`: Base hierarchical optimiser configuration.
+  - `params`: Schur Complement parameters (single or vector).
+  - `fb`: Fallback optimiser.
+
+# Constructors
+
+    SchurComplementHierarchicalRiskParity(;
+        opt::HierarchicalOptimiser = HierarchicalOptimiser(),
+        params::ScP_VecScP = SchurComplementParams(),
+        fb::Option{<:OptE_Opt} = nothing
+    ) -> SchurComplementHierarchicalRiskParity
+
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - If `params` is a vector: `!isempty(params)`.
+
+# Examples
+
+```jldoctest
+julia> SchurComplementHierarchicalRiskParity()
+SchurComplementHierarchicalRiskParity
+  opt ┼ HierarchicalOptimiser
+  params ┼ SchurComplementParams
+  fb ┴ nothing
+```
+
+# Related
+
+  - [`ClusteringOptimisationEstimator`](@ref)
+  - [`HierarchicalRiskParity`](@ref)
+  - [`HierarchicalEqualRiskContribution`](@ref)
+  - [`SchurComplementParams`](@ref)
+"""
 @concrete struct SchurComplementHierarchicalRiskParity <: ClusteringOptimisationEstimator
     opt
     params

@@ -1,6 +1,63 @@
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for Near Optimal Centering algorithm variants.
+
+# Related Types
+
+  - [`ConstrainedNearOptimalCentering`](@ref)
+  - [`UnconstrainedNearOptimalCentering`](@ref)
+"""
 abstract type NearOptimalCenteringAlgorithm <: OptimisationAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Constrained Near Optimal Centering algorithm.
+
+Applies Near Optimal Centering within the feasible region defined by the portfolio constraints.
+
+# Related Types
+
+  - [`NearOptimalCenteringAlgorithm`](@ref)
+  - [`UnconstrainedNearOptimalCentering`](@ref)
+"""
 struct ConstrainedNearOptimalCentering <: NearOptimalCenteringAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Unconstrained Near Optimal Centering algorithm.
+
+Applies Near Optimal Centering ignoring feasibility constraints (weights may temporarily violate bounds).
+
+# Related Types
+
+  - [`NearOptimalCenteringAlgorithm`](@ref)
+  - [`ConstrainedNearOptimalCentering`](@ref)
+"""
 struct UnconstrainedNearOptimalCentering <: NearOptimalCenteringAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Result type for Near Optimal Centering portfolio optimisation.
+
+# Fields
+
+  - `oe`: Type of the optimisation estimator that produced this result.
+  - `pa`: Processed optimisation attributes.
+  - `w_min_retcode`: Return code for the minimum-risk sub-problem.
+  - `w_opt_retcode`: Return code for the optimal-objective sub-problem.
+  - `w_max_retcode`: Return code for the maximum-risk sub-problem.
+  - `noc_retcode`: Return code for the Near Optimal Centering problem.
+  - `retcode`: Overall return code.
+  - `sol`: Optimisation solution.
+  - `model`: The JuMP model.
+  - `fb`: Fallback result.
+
+# Related
+
+  - [`NearOptimalCentering`](@ref)
+  - [`NonFiniteAllocationOptimisationResult`](@ref)
+"""
 @concrete struct NearOptimalCenteringResult <: NonFiniteAllocationOptimisationResult
     oe
     pa
@@ -27,6 +84,55 @@ function Base.getproperty(r::NearOptimalCenteringResult, sym::Symbol)
         getproperty(r.pa, sym)
     end
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Near Optimal Centering (NOC) portfolio optimiser.
+
+`NearOptimalCentering` finds a portfolio that is centrally located within the region of near-optimal solutions. It first solves the minimum-risk, maximum-risk, and user-specified optimal-objective sub-problems, then maximises the minimum distance to the efficient frontier boundaries, yielding a portfolio that is robust to small perturbations in risk-return space.
+
+# Fields
+
+  - `opt`: JuMP optimiser configuration.
+  - `r`: Risk measure or vector of risk measures.
+  - `obj`: Portfolio objective function for the central (optimal) point.
+  - `bins`: Number of equally-spaced risk bins for the frontier approximation.
+  - `w_min`: Pre-computed minimum-risk portfolio weights (or `nothing`).
+  - `w_min_ini`: Initial weights for the minimum-risk sub-problem.
+  - `w_opt`: Pre-computed optimal portfolio weights (or `nothing`).
+  - `w_opt_ini`: Initial weights for the optimal sub-problem.
+  - `w_max`: Pre-computed maximum-risk portfolio weights (or `nothing`).
+  - `w_max_ini`: Initial weights for the maximum-risk sub-problem.
+  - `ucs_flag`: If `true`, uncertainty set constraints are used.
+  - `alg`: Near Optimal Centering algorithm variant.
+  - `fb`: Fallback optimiser.
+
+# Constructors
+
+    NearOptimalCentering(;
+        opt::JuMPOptimiser = JuMPOptimiser(),
+        r::RM_VecRM = Variance(),
+        obj::Option{<:ObjectiveFunction} = nothing,
+        bins::Option{<:Number} = nothing,
+        w_min::Option{<:VecNum} = nothing,
+        w_min_ini::Option{<:VecNum} = nothing,
+        w_opt::Option{<:VecNum_VecVecNum} = nothing,
+        w_opt_ini::Option{<:VecNum_VecVecNum} = nothing,
+        w_max::Option{<:VecNum} = nothing,
+        w_max_ini::Option{<:VecNum} = nothing,
+        ucs_flag::Bool = false,
+        alg::NearOptimalCenteringAlgorithm = ConstrainedNearOptimalCentering(),
+        fb::Option{<:OptE_Opt} = nothing
+    ) -> NearOptimalCentering
+
+Keywords correspond to the struct's fields.
+
+# Related
+
+  - [`RiskJuMPOptimisationEstimator`](@ref)
+  - [`MeanRisk`](@ref)
+  - [`NearOptimalCenteringAlgorithm`](@ref)
+"""
 @concrete struct NearOptimalCentering <: RiskJuMPOptimisationEstimator
     opt
     r

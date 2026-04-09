@@ -1,5 +1,53 @@
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for base clustering optimisation estimators.
+
+These are intermediate configuration types used in hierarchical/clustering optimisation pipelines.
+
+# Related Types
+
+  - [`BaseOptimisationEstimator`](@ref)
+  - [`HierarchicalOptimiser`](@ref)
+"""
 abstract type BaseClusteringOptimisationEstimator <: BaseOptimisationEstimator end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for clustering-based portfolio optimisation estimators.
+
+Clustering optimisation estimators use asset clustering to decompose the portfolio optimisation problem. Subtypes include HRP, HERC, and SCHRP.
+
+# Related Types
+
+  - [`NonFiniteAllocationOptimisationEstimator`](@ref)
+  - [`HierarchicalRiskParity`](@ref)
+  - [`HierarchicalEqualRiskContribution`](@ref)
+  - [`SchurComplementHierarchicalRiskParity`](@ref)
+"""
 abstract type ClusteringOptimisationEstimator <: NonFiniteAllocationOptimisationEstimator end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Result type for hierarchical (clustering-based) portfolio optimisation.
+
+# Fields
+
+  - `oe`: Type of the optimisation estimator that produced this result.
+  - `pr`: Prior result used in optimisation.
+  - `clr`: Clustering result.
+  - `wb`: Weight bounds applied.
+  - `fees`: Fee structure applied (or `nothing`).
+  - `retcode`: Optimisation return code.
+  - `w`: Optimal portfolio weights vector.
+  - `fb`: Fallback result (if a fallback optimiser was used).
+
+# Related
+
+  - [`NonFiniteAllocationOptimisationResult`](@ref)
+  - [`HierarchicalRiskParity`](@ref)
+  - [`HierarchicalEqualRiskContribution`](@ref)
+"""
 @concrete struct HierarchicalResult <: NonFiniteAllocationOptimisationResult
     oe
     pr
@@ -14,6 +62,67 @@ function factory(res::HierarchicalResult, fb::Option{<:OptE_Opt})
     return HierarchicalResult(res.oe, res.pr, res.clr, res.wb, res.fees, res.retcode, res.w,
                               fb)
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Base configuration for hierarchical clustering-based portfolio optimisers.
+
+`HierarchicalOptimiser` combines a prior estimator, a clustering estimator, and weight bound/fee specifications to provide a reusable base configuration for hierarchical optimisers (HRP, HERC, SCHRP, etc.).
+
+# Fields
+
+  - `pe`: Prior estimator or prior result.
+  - `cle`: Hierarchical clustering estimator or clustering result.
+  - `slv`: Solver or vector of solvers (for risk measures requiring conic optimisation).
+  - `wb`: Weight bounds estimator or bounds.
+  - `fees`: Fee estimator or fee structure.
+  - `sets`: Asset sets.
+  - `wf`: Weight finaliser for enforcing bounds.
+  - `brt`: If `true`, uses bootstrap returns.
+  - `cle_pr`: If `true`, passes the prior result to the clustering estimator.
+  - `strict`: If `true`, strictly enforces weight bounds.
+
+# Constructors
+
+    HierarchicalOptimiser(;
+        pe::PrE_Pr = EmpiricalPrior(),
+        cle::HClE_HCl = ClustersEstimator(),
+        slv::Option{<:Slv_VecSlv} = nothing,
+        wb::Option{<:WbE_Wb} = WeightBounds(),
+        fees::Option{<:FeesE_Fees} = nothing,
+        sets::Option{<:AssetSets} = nothing,
+        wf::WeightFinaliser = IterativeWeightFinaliser(),
+        brt::Bool = false,
+        cle_pr::Bool = true,
+        strict::Bool = false
+    ) -> HierarchicalOptimiser
+
+Keywords correspond to the struct's fields.
+
+# Examples
+
+```jldoctest
+julia> HierarchicalOptimiser()
+HierarchicalOptimiser
+  pe ┼ EmpiricalPrior
+  cle ┼ ClustersEstimator
+  slv ┼ nothing
+  wb ┼ WeightBounds
+  fees ┼ nothing
+  sets ┼ nothing
+  wf ┼ IterativeWeightFinaliser
+  brt ┼ Bool: false
+  cle_pr ┼ Bool: true
+  strict ┴ Bool: false
+```
+
+# Related
+
+  - [`BaseClusteringOptimisationEstimator`](@ref)
+  - [`HierarchicalRiskParity`](@ref)
+  - [`HierarchicalEqualRiskContribution`](@ref)
+  - [`SchurComplementHierarchicalRiskParity`](@ref)
+"""
 @concrete struct HierarchicalOptimiser <: BaseClusteringOptimisationEstimator
     pe
     cle

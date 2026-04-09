@@ -1,3 +1,25 @@
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Result type for Risk Budgeting portfolio optimisation.
+
+# Fields
+
+  - `oe`: Type of the optimisation estimator that produced this result.
+  - `pa`: Processed optimisation attributes.
+  - `prb`: Processed risk budgeting attributes.
+  - `retcode`: Optimisation return code.
+  - `sol`: JuMP model solution.
+  - `model`: The JuMP model.
+  - `fb`: Fallback result.
+
+The `w` property is forwarded from `sol.w`.
+
+# Related
+
+  - [`RiskBudgeting`](@ref)
+  - [`NonFiniteAllocationOptimisationResult`](@ref)
+"""
 @concrete struct RiskBudgetingResult <: NonFiniteAllocationOptimisationResult
     oe
     pa
@@ -23,18 +45,111 @@ function Base.getproperty(r::RiskBudgetingResult, sym::Symbol)
         getfield(r, sym)
     end
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Processed factor risk budgeting attributes for intermediate computations.
+
+# Related
+
+  - [`RiskBudgeting`](@ref)
+  - [`FactorRiskBudgeting`](@ref)
+"""
 @concrete struct ProcessedFactorRiskBudgetingAttributes <: AbstractResult
     rkb
     b1
     rr
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Processed asset risk budgeting attributes for intermediate computations.
+
+# Related
+
+  - [`RiskBudgeting`](@ref)
+  - [`AssetRiskBudgeting`](@ref)
+"""
 @concrete struct ProcessedAssetRiskBudgetingAttributes <: AbstractResult
     rkb
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for risk budgeting optimisation formulations.
+
+# Related Types
+
+  - [`LogRiskBudgeting`](@ref)
+  - [`MixedIntegerRiskBudgeting`](@ref)
+"""
 abstract type RiskBudgetingFormulation <: OptimisationAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Log-barrier formulation for Risk Budgeting.
+
+Uses a logarithmic objective to enforce the risk budget constraints in a smooth, continuous optimisation formulation.
+
+# Related Types
+
+  - [`RiskBudgetingFormulation`](@ref)
+  - [`MixedIntegerRiskBudgeting`](@ref)
+"""
 struct LogRiskBudgeting <: RiskBudgetingFormulation end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Mixed-integer formulation for Risk Budgeting.
+
+Uses binary variables and big-M constraints to enforce the risk budget constraints, enabling exact cardinality control.
+
+# Related Types
+
+  - [`RiskBudgetingFormulation`](@ref)
+  - [`LogRiskBudgeting`](@ref)
+"""
 struct MixedIntegerRiskBudgeting <: RiskBudgetingFormulation end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for risk budgeting algorithm specifications.
+
+# Related Types
+
+  - [`AssetRiskBudgeting`](@ref)
+  - [`FactorRiskBudgeting`](@ref)
+"""
 abstract type RiskBudgetingAlgorithm <: OptimisationAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Asset-level Risk Budgeting algorithm.
+
+`AssetRiskBudgeting` specifies the risk budget as a vector of asset-level risk targets, optionally grouped by asset sets.
+
+# Fields
+
+  - `rkb`: Risk budget estimator or risk budget constraints.
+  - `sets`: Asset sets (required when `rkb` is a `RiskBudgetEstimator`).
+  - `alg`: Risk budgeting formulation.
+
+# Constructors
+
+    AssetRiskBudgeting(;
+        rkb::Option{<:RkbE_Rkb} = nothing,
+        sets::Option{<:AssetSets} = nothing,
+        alg::RiskBudgetingFormulation = LogRiskBudgeting()
+    ) -> AssetRiskBudgeting
+
+Keywords correspond to the struct's fields.
+
+# Related
+
+  - [`RiskBudgetingAlgorithm`](@ref)
+  - [`FactorRiskBudgeting`](@ref)
+  - [`RiskBudgeting`](@ref)
+"""
 @concrete struct AssetRiskBudgeting <: RiskBudgetingAlgorithm
     rkb
     sets
@@ -57,6 +172,37 @@ function risk_budgeting_algorithm_view(r::AssetRiskBudgeting, i)
     sets = asset_sets_view(r.sets, i)
     return AssetRiskBudgeting(; rkb = rkb, sets = sets, alg = r.alg)
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Factor-level Risk Budgeting algorithm.
+
+`FactorRiskBudgeting` specifies the risk budget at the factor level, using a factor model regression to decompose risk across factors and an idiosyncratic component.
+
+# Fields
+
+  - `re`: Regression estimator for factor loadings.
+  - `rkb`: Risk budget estimator or risk budget constraints.
+  - `sets`: Asset sets (required when `rkb` is a `RiskBudgetEstimator`).
+  - `flag`: If `true`, includes the idiosyncratic component in the budget.
+
+# Constructors
+
+    FactorRiskBudgeting(;
+        re::RegE_Reg = StepwiseRegression(),
+        rkb::Option{<:RkbE_Rkb} = nothing,
+        sets::Option{<:AssetSets} = nothing,
+        flag::Bool = true
+    ) -> FactorRiskBudgeting
+
+Keywords correspond to the struct's fields.
+
+# Related
+
+  - [`RiskBudgetingAlgorithm`](@ref)
+  - [`AssetRiskBudgeting`](@ref)
+  - [`RiskBudgeting`](@ref)
+"""
 @concrete struct FactorRiskBudgeting <: RiskBudgetingAlgorithm
     re
     rkb
@@ -79,6 +225,41 @@ function risk_budgeting_algorithm_view(r::FactorRiskBudgeting, i)
     re = regression_view(r.re, i)
     return FactorRiskBudgeting(; re = re, rkb = r.rkb, sets = r.sets, flag = r.flag)
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Risk Budgeting (RB) portfolio optimiser.
+
+`RiskBudgeting` allocates portfolio weights so that each asset (or factor) contributes a specified fraction of the total portfolio risk. It uses a logarithmic or mixed-integer formulation and can be combined with any risk measure.
+
+# Fields
+
+  - `opt`: JuMP optimiser configuration.
+  - `r`: Risk measure or vector of risk measures.
+  - `rba`: Risk budgeting algorithm (`AssetRiskBudgeting` or `FactorRiskBudgeting`).
+  - `wi`: Initial weights for warm-starting.
+  - `fb`: Fallback optimiser.
+
+# Constructors
+
+    RiskBudgeting(;
+        opt::JuMPOptimiser = JuMPOptimiser(),
+        r::RM_VecRM = Variance(),
+        rba::RiskBudgetingAlgorithm = AssetRiskBudgeting(),
+        wi::Option{<:VecNum} = nothing,
+        fb::Option{<:OptE_Opt} = nothing
+    ) -> RiskBudgeting
+
+Keywords correspond to the struct's fields.
+
+# Related
+
+  - [`RiskJuMPOptimisationEstimator`](@ref)
+  - [`MeanRisk`](@ref)
+  - [`RelaxedRiskBudgeting`](@ref)
+  - [`AssetRiskBudgeting`](@ref)
+  - [`FactorRiskBudgeting`](@ref)
+"""
 @concrete struct RiskBudgeting <: RiskJuMPOptimisationEstimator
     opt
     r

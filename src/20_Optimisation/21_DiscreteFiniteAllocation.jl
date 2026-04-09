@@ -1,3 +1,27 @@
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Result type for Discrete Allocation portfolio optimisation.
+
+# Fields
+
+  - `oe`: Type of the optimisation estimator that produced this result.
+  - `retcode`: Overall optimisation return code.
+  - `s_retcode`: Return code for the short allocation sub-problem.
+  - `l_retcode`: Return code for the long allocation sub-problem.
+  - `shares`: Vector of shares (integer quantities) for each asset.
+  - `cost`: Total cost of the allocated shares.
+  - `w`: Realised portfolio weights.
+  - `cash`: Remaining uninvested cash.
+  - `s_model`: JuMP model for the short allocation.
+  - `l_model`: JuMP model for the long allocation.
+  - `fb`: Fallback result.
+
+# Related
+
+  - [`DiscreteAllocation`](@ref)
+  - [`FiniteAllocationOptimisationResult`](@ref)
+"""
 @concrete struct DiscreteAllocationResult <: FiniteAllocationOptimisationResult
     oe
     retcode
@@ -16,6 +40,56 @@ function factory(res::DiscreteAllocationResult, fb::Option{<:FOptE_FOpt})
                                     res.shares, res.cost, res.w, res.cash, res.s_model,
                                     res.l_model, fb)
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Discrete Allocation portfolio optimiser.
+
+`DiscreteAllocation` allocates a portfolio by solving a Mixed-Integer Programming (MIP) problem to find the optimal number of shares for each asset, minimising the deviation between the target continuous weights and the realised discrete allocation.
+
+# Fields
+
+  - `slv`: MIP solver or vector of solvers.
+  - `sc`: Constraint scale factor.
+  - `so`: Objective scale factor.
+  - `wf`: Weight error formulation (L1/L2 relative or absolute).
+  - `fb`: Fallback allocator (default: `GreedyAllocation()`).
+
+# Constructors
+
+    DiscreteAllocation(;
+        slv::Slv_VecSlv,
+        sc::Number = 1,
+        so::Number = 1,
+        wf::JuMPWeightFinaliserFormulation = AbsoluteErrorWeightFinaliser(),
+        fb::Option{<:FOptE_FOpt} = GreedyAllocation()
+    ) -> DiscreteAllocation
+
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - If `slv` is a vector: `!isempty(slv)`.
+  - `sc > 0`, `so > 0`.
+
+# Examples
+
+```jldoctest
+julia> DiscreteAllocation(; slv = HiGHS.Optimizer)
+DiscreteAllocation
+  slv ┼ HiGHS.Optimizer
+  sc ┼ Int64: 1
+  so ┼ Int64: 1
+  wf ┼ AbsoluteErrorWeightFinaliser
+  fb ┴ GreedyAllocation
+```
+
+# Related
+
+  - [`FiniteAllocationOptimisationEstimator`](@ref)
+  - [`GreedyAllocation`](@ref)
+  - [`DiscreteAllocationResult`](@ref)
+"""
 @concrete struct DiscreteAllocation <: FiniteAllocationOptimisationEstimator
     slv
     sc

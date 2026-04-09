@@ -1,3 +1,59 @@
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Hierarchical Equal Risk Contribution (HERC) portfolio optimiser.
+
+`HierarchicalEqualRiskContribution` implements the Hierarchical Equal Risk Contribution algorithm. It clusters assets, then allocates weights so that each cluster contributes equally to total portfolio risk (using `ro`), and within each cluster, assets are weighted by inverse intra-cluster risk (using `ri`).
+
+# Fields
+
+  - `opt`: Base hierarchical optimiser configuration.
+  - `ri`: Intra-cluster risk measure or vector of risk measures.
+  - `ro`: Inter-cluster risk measure or vector of risk measures.
+  - `scai`: Scalariser for combining intra-cluster risk measures.
+  - `scao`: Scalariser for combining inter-cluster risk measures.
+  - `ex`: FLoops executor for parallelism.
+  - `fb`: Fallback optimiser.
+
+# Constructors
+
+    HierarchicalEqualRiskContribution(;
+        opt::HierarchicalOptimiser = HierarchicalOptimiser(),
+        ri::OptRM_VecOptRM = Variance(),
+        ro::OptRM_VecOptRM = ri,
+        scai::Scalariser = SumScalariser(),
+        scao::Scalariser = scai,
+        ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
+        fb::Option{<:OptE_Opt} = nothing
+    ) -> HierarchicalEqualRiskContribution
+
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - If `ri` or `ro` is a vector: `!isempty(ri)` / `!isempty(ro)`.
+
+# Examples
+
+```jldoctest
+julia> HierarchicalEqualRiskContribution()
+HierarchicalEqualRiskContribution
+  opt ┼ HierarchicalOptimiser
+  ri ┼ Variance
+  ro ┼ Variance
+  scai ┼ SumScalariser
+  scao ┼ SumScalariser
+  ex ┼ ThreadedEx
+  fb ┴ nothing
+```
+
+# Related
+
+  - [`ClusteringOptimisationEstimator`](@ref)
+  - [`HierarchicalRiskParity`](@ref)
+  - [`SchurComplementHierarchicalRiskParity`](@ref)
+  - [`HierarchicalOptimiser`](@ref)
+"""
 @concrete struct HierarchicalEqualRiskContribution <: ClusteringOptimisationEstimator
     opt
     ri

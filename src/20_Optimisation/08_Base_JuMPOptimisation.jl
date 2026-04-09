@@ -1,7 +1,71 @@
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for base JuMP-based portfolio optimisation estimators.
+
+These are configuration-level types (e.g., `JuMPOptimiser`) that define the optimisation problem setup for JuMP-based optimisers.
+
+# Related Types
+
+  - [`BaseOptimisationEstimator`](@ref)
+  - [`JuMPOptimiser`](@ref)
+"""
 abstract type BaseJuMPOptimisationEstimator <: BaseOptimisationEstimator end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for JuMP-based portfolio optimisation estimators.
+
+JuMP optimisers formulate and solve portfolio optimisation problems using mathematical programming via the JuMP.jl framework.
+
+# Related Types
+
+  - [`NonFiniteAllocationOptimisationEstimator`](@ref)
+  - [`RiskJuMPOptimisationEstimator`](@ref)
+  - [`MeanRisk`](@ref)
+"""
 abstract type JuMPOptimisationEstimator <: NonFiniteAllocationOptimisationEstimator end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for risk-based JuMP portfolio optimisation estimators.
+
+Subtype `RiskJuMPOptimisationEstimator` to implement optimisers that minimise or constrain risk measures as the primary objective.
+
+# Related Types
+
+  - [`JuMPOptimisationEstimator`](@ref)
+  - [`MeanRisk`](@ref)
+  - [`RiskBudgeting`](@ref)
+"""
 abstract type RiskJuMPOptimisationEstimator <: JuMPOptimisationEstimator end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for portfolio objective functions.
+
+Subtype `ObjectiveFunction` to implement portfolio optimisation objectives such as minimum risk, maximum return, or maximum Sharpe ratio.
+
+# Related Types
+
+  - [`MinimumRisk`](@ref)
+  - [`MaximumReturn`](@ref)
+  - [`MaximumSharpe`](@ref)
+  - [`MaximumUtility`](@ref)
+"""
 abstract type ObjectiveFunction <: AbstractEstimator end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for JuMP-based returns estimators used in optimisation models.
+
+`JuMPReturnsEstimator` types define how expected returns are incorporated into JuMP models.
+
+# Related Types
+
+  - [`MeanReturns`](@ref)
+  - [`FactorReturns`](@ref)
+"""
 abstract type JuMPReturnsEstimator <: AbstractEstimator end
 function factory(r::JuMPReturnsEstimator, args...; kwargs...)
     return r
@@ -9,8 +73,44 @@ end
 function jump_returns_view(r::JuMPReturnsEstimator, args...; kwargs...)
     return r
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for JuMP constraint estimators.
+
+Subtype `JuMPConstraintEstimator` to implement custom constraints or objectives for JuMP-based portfolio optimisers.
+
+# Related Types
+
+  - [`CustomJuMPConstraint`](@ref)
+  - [`CustomJuMPObjective`](@ref)
+"""
 abstract type JuMPConstraintEstimator <: AbstractConstraintEstimator end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for custom JuMP constraint implementations.
+
+Implement `add_custom_constraint!` to define custom JuMP model constraints.
+
+# Related Types
+
+  - [`JuMPConstraintEstimator`](@ref)
+  - [`CustomJuMPObjective`](@ref)
+"""
 abstract type CustomJuMPConstraint <: JuMPConstraintEstimator end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for custom JuMP objective implementations.
+
+Implement `add_custom_objective_term!` to add custom terms to the JuMP model objective.
+
+# Related Types
+
+  - [`JuMPConstraintEstimator`](@ref)
+  - [`CustomJuMPConstraint`](@ref)
+"""
 abstract type CustomJuMPObjective <: JuMPConstraintEstimator end
 function needs_previous_weights(::CustomJuMPConstraint)
     return false
@@ -36,6 +136,20 @@ end
 function add_custom_constraint!(args...; kwargs...)
     return nothing
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Stores the solution (portfolio weights) from a JuMP optimisation model.
+
+# Fields
+
+  - `w`: Optimal portfolio weights (non-empty array of numbers).
+
+# Related
+
+  - [`OptimisationModelResult`](@ref)
+  - [`JuMPOptimisationEstimator`](@ref)
+"""
 @concrete struct JuMPOptimisationSolution <: OptimisationModelResult
     w
     function JuMPOptimisationSolution(w::ArrNum)

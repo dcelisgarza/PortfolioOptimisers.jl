@@ -1,3 +1,15 @@
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Intermediate result type storing processed optimisation attributes for `JuMPOptimiser`.
+
+Used internally to pass processed constraints, bounds, and other data between optimisation stages.
+
+# Related
+
+  - [`JuMPOptimiser`](@ref)
+  - [`MeanRisk`](@ref)
+"""
 @concrete struct ProcessedJuMPOptimiserAttributes <: AbstractResult
     pr
     wb
@@ -29,6 +41,108 @@ function assert_finite_nonnegative_real_or_vec(val::VecNum)
     @argcheck(all(x -> zero(x) <= x, val))
     return nothing
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Main JuMP-based portfolio optimiser configuration.
+
+`JuMPOptimiser` collects all the inputs needed to formulate and solve a JuMP-based portfolio optimisation problem: prior estimator, solver, constraints, bounds, fees, tracking, regularisation, and more. It is intended to be passed to a higher-level optimiser such as [`MeanRisk`](@ref) or [`RiskBudgeting`](@ref).
+
+# Fields
+
+  - `pe`: Prior estimator or prior result.
+  - `slv`: Solver or vector of solvers.
+  - `wb`: Weight bounds estimator or bounds.
+  - `bgt`: Budget constraint (total weight sum). If a `Number`: the portfolio weights must sum to this value. If a `BudgetCostEstimator`: the budget is computed from asset-level data. Cannot be used together with `sbgt`.
+  - `sbgt`: Short-sale budget constraint range. If provided, `bgt` must not be a `BudgetCostEstimator`.
+  - `lt`: Long threshold estimator or threshold.
+  - `st`: Short threshold estimator or threshold.
+  - `lcse`: Linear constraint estimator or constraint(s).
+  - `cte`: Centring constraint estimator or constraint(s).
+  - `gcarde`: Grouped cardinality constraint estimator.
+  - `sgcarde`: Sub-grouped cardinality constraint estimator(s).
+  - `smtx`: Sub-group constraint matrix or estimator.
+  - `sgmtx`: Sub-grouped constraint matrix or estimator.
+  - `slt`: Sub-group long threshold.
+  - `sst`: Sub-group short threshold.
+  - `sglt`: Sub-grouped long threshold.
+  - `sgst`: Sub-grouped short threshold.
+  - `tn`: Turnover constraint estimator or constraints.
+  - `fees`: Fee estimator or fee structure.
+  - `sets`: Asset sets (required when any estimator-typed constraint is provided).
+  - `tr`: Tracking error constraint(s).
+  - `ple`: Placeholder constraints.
+  - `ret`: Returns estimator for JuMP models.
+  - `sca`: Scalariser for combining multiple risk measures.
+  - `ccnt`: Custom JuMP constraint.
+  - `cobj`: Custom JuMP objective.
+  - `sc`: Constraint scale factor.
+  - `so`: Objective scale factor.
+  - `ss`: Optional scalar shrinkage parameter.
+  - `card`: Global cardinality constraint (maximum number of non-zero weights).
+  - `scard`: Sub-group cardinality constraint(s).
+  - `nea`: Minimum number of effective assets.
+  - `l1`: L1 regularisation coefficient.
+  - `l2`: L2 regularisation coefficient.
+  - `linf`: L∞ regularisation coefficient.
+  - `lp`: Lp regularisation specification(s).
+  - `brt`: If `true`, uses bootstrap returns.
+  - `cle_pr`: If `true`, passes the prior result to the clustering estimator.
+  - `strict`: If `true`, strictly enforces weight bounds.
+
+# Constructors
+
+    JuMPOptimiser(;
+        pe::PrE_Pr = EmpiricalPrior(),
+        slv::Slv_VecSlv,
+        wb::Option{<:WbE_Wb} = WeightBounds(),
+        bgt::Option{<:Num_BgtCE} = 1.0,
+        sbgt::Option{<:Num_BgtRg} = nothing,
+        lt::Option{<:BtE_Bt} = nothing,
+        st::Option{<:BtE_Bt} = nothing,
+        lcse::Option{<:LcE_Lc_VecLcE_Lc} = nothing,
+        cte::Option{<:Lc_CC_VecCC} = nothing,
+        gcarde::Option{<:LcE_Lc} = nothing,
+        sgcarde::Option{<:LcE_Lc_VecLcE_Lc} = nothing,
+        smtx::Option{<:MatNum_ASetMatE_VecMatNum_ASetMatE} = nothing,
+        sgmtx::Option{<:MatNum_ASetMatE_VecMatNum_ASetMatE} = nothing,
+        slt::Option{<:BtE_Bt_VecOptBtE_Bt} = nothing,
+        sst::Option{<:BtE_Bt_VecOptBtE_Bt} = nothing,
+        sglt::Option{<:BtE_Bt_VecOptBtE_Bt} = nothing,
+        sgst::Option{<:BtE_Bt_VecOptBtE_Bt} = nothing,
+        tn::Option{<:TnE_Tn_VecTnE_Tn} = nothing,
+        fees::Option{<:FeesE_Fees} = nothing,
+        sets::Option{<:AssetSets} = nothing,
+        tr::Option{<:Tr_VecTr} = nothing,
+        ple::Option{<:PlCE_PhC_VecPlCE_PlC} = nothing,
+        ret::JuMPReturnsEstimator = ArithmeticReturn(),
+        sca::NonHierarchicalScalariser = SumScalariser(),
+        ccnt::Option{<:CustomJuMPConstraint} = nothing,
+        cobj::Option{<:CustomJuMPObjective} = nothing,
+        sc::Number = 1,
+        so::Number = 1,
+        ss::Option{<:Number} = nothing,
+        card::Option{<:Integer} = nothing,
+        scard::Option{<:Int_VecInt} = nothing,
+        nea::Option{<:Number} = nothing,
+        l1::Option{<:Number} = nothing,
+        l2::Option{<:Number} = nothing,
+        linf::Option{<:Number} = nothing,
+        lp::Option{LpReg_VecLpReg} = nothing,
+        brt::Bool = false,
+        cle_pr::Bool = true,
+        strict::Bool = false
+    ) -> JuMPOptimiser
+
+Keywords correspond to the struct's fields.
+
+# Related
+
+  - [`BaseJuMPOptimisationEstimator`](@ref)
+  - [`MeanRisk`](@ref)
+  - [`RiskBudgeting`](@ref)
+  - [`RelaxedRiskBudgeting`](@ref)
+"""
 @concrete struct JuMPOptimiser <: BaseJuMPOptimisationEstimator
     pe
     slv

@@ -1,6 +1,70 @@
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for relaxed risk budgeting algorithm variants.
+
+# Related Types
+
+  - [`BasicRelaxedRiskBudgeting`](@ref)
+  - [`RegularisedRelaxedRiskBudgeting`](@ref)
+  - [`RegularisedPenalisedRelaxedRiskBudgeting`](@ref)
+"""
 abstract type RelaxedRiskBudgetingAlgorithm <: OptimisationAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Basic Relaxed Risk Budgeting formulation.
+
+Uses the basic Second Order Cone (SOC) relaxation of the risk budgeting problem without additional regularisation.
+
+# Related Types
+
+  - [`RelaxedRiskBudgetingAlgorithm`](@ref)
+  - [`RegularisedRelaxedRiskBudgeting`](@ref)
+"""
 struct BasicRelaxedRiskBudgeting <: RelaxedRiskBudgetingAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Regularised Relaxed Risk Budgeting formulation.
+
+Extends the basic SOC formulation with a regularisation term to improve numerical stability.
+
+# Related Types
+
+  - [`RelaxedRiskBudgetingAlgorithm`](@ref)
+  - [`BasicRelaxedRiskBudgeting`](@ref)
+  - [`RegularisedPenalisedRelaxedRiskBudgeting`](@ref)
+"""
 struct RegularisedRelaxedRiskBudgeting <: RelaxedRiskBudgetingAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Regularised and penalised Relaxed Risk Budgeting formulation.
+
+Extends the regularised formulation with a penalty on deviations from target risk budgets, controlled by parameter `p`.
+
+# Fields
+
+  - `p`: Penalty parameter (positive finite number).
+
+# Constructors
+
+    RegularisedPenalisedRelaxedRiskBudgeting(;
+        p::Number = 1.0
+    ) -> RegularisedPenalisedRelaxedRiskBudgeting
+
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - `isfinite(p)` and `p > 0`.
+
+# Related Types
+
+  - [`RelaxedRiskBudgetingAlgorithm`](@ref)
+  - [`RegularisedRelaxedRiskBudgeting`](@ref)
+"""
 @concrete struct RegularisedPenalisedRelaxedRiskBudgeting <: RelaxedRiskBudgetingAlgorithm
     p
     function RegularisedPenalisedRelaxedRiskBudgeting(p::Number)
@@ -11,6 +75,39 @@ end
 function RegularisedPenalisedRelaxedRiskBudgeting(; p::Number = 1.0)
     return RegularisedPenalisedRelaxedRiskBudgeting(p)
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Relaxed Risk Budgeting (RRB) portfolio optimiser.
+
+`RelaxedRiskBudgeting` implements a relaxed formulation of the risk budgeting problem using a Second Order Cone constraint on the portfolio variance. Unlike [`RiskBudgeting`](@ref), it does not require a logarithmic or mixed-integer formulation, making it computationally more tractable.
+
+# Fields
+
+  - `opt`: JuMP optimiser configuration.
+  - `rba`: Risk budgeting algorithm.
+  - `wi`: Initial weights for warm-starting.
+  - `alg`: Relaxed risk budgeting algorithm variant.
+  - `fb`: Fallback optimiser.
+
+# Constructors
+
+    RelaxedRiskBudgeting(;
+        opt::JuMPOptimiser = JuMPOptimiser(),
+        rba::RiskBudgetingAlgorithm = AssetRiskBudgeting(),
+        wi::Option{<:VecNum} = nothing,
+        alg::RelaxedRiskBudgetingAlgorithm = BasicRelaxedRiskBudgeting(),
+        fb::Option{<:OptE_Opt} = nothing
+    ) -> RelaxedRiskBudgeting
+
+Keywords correspond to the struct's fields.
+
+# Related
+
+  - [`JuMPOptimisationEstimator`](@ref)
+  - [`RiskBudgeting`](@ref)
+  - [`RelaxedRiskBudgetingAlgorithm`](@ref)
+"""
 @concrete struct RelaxedRiskBudgeting <: JuMPOptimisationEstimator
     opt
     rba

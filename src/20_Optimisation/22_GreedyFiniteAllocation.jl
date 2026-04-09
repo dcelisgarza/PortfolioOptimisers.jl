@@ -1,3 +1,23 @@
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Result type for Greedy Allocation portfolio optimisation.
+
+# Fields
+
+  - `oe`: Type of the optimisation estimator that produced this result.
+  - `retcode`: Optimisation return code.
+  - `shares`: Vector of shares allocated to each asset.
+  - `cost`: Total cost of the allocated shares.
+  - `w`: Realised portfolio weights.
+  - `cash`: Remaining uninvested cash.
+  - `fb`: Fallback result.
+
+# Related
+
+  - [`GreedyAllocation`](@ref)
+  - [`FiniteAllocationOptimisationResult`](@ref)
+"""
 @concrete struct GreedyAllocationResult <: FiniteAllocationOptimisationResult
     oe
     retcode
@@ -11,6 +31,48 @@ function factory(res::GreedyAllocationResult, fb::Option{<:FOptE_FOpt})
     return GreedyAllocationResult(res.oe, res.retcode, res.shares, res.cost, res.w,
                                   res.cash, fb)
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Greedy Allocation portfolio optimiser.
+
+`GreedyAllocation` converts continuous portfolio weights to discrete share quantities using a greedy two-pass allocation: first round shares to the nearest `unit` multiple, then iteratively buy remaining shares with leftover cash in order of largest weight.
+
+# Fields
+
+  - `unit`: Minimum share purchase unit (e.g., 1 for whole shares, 0.01 for fractional shares).
+  - `args`: Additional positional arguments forwarded to `round`.
+  - `kwargs`: Additional keyword arguments forwarded to `round`.
+  - `fb`: Fallback allocator.
+
+# Constructors
+
+    GreedyAllocation(;
+        unit::Number = 1,
+        args::Tuple = (),
+        kwargs::NamedTuple = (;),
+        fb::Option{<:FOptE_FOpt} = nothing
+    ) -> GreedyAllocation
+
+Keywords correspond to the struct's fields.
+
+# Examples
+
+```jldoctest
+julia> GreedyAllocation()
+GreedyAllocation
+  unit ┼ Int64: 1
+  args ┼ ()
+  kwargs ┼ NamedTuple()
+  fb ┴ nothing
+```
+
+# Related
+
+  - [`FiniteAllocationOptimisationEstimator`](@ref)
+  - [`DiscreteAllocation`](@ref)
+  - [`GreedyAllocationResult`](@ref)
+"""
 @concrete struct GreedyAllocation <: FiniteAllocationOptimisationEstimator
     unit
     args

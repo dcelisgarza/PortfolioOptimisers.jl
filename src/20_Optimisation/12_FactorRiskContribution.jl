@@ -1,3 +1,26 @@
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Result type for Factor Risk Contribution portfolio optimisation.
+
+# Fields
+
+  - `oe`: Type of the optimisation estimator that produced this result.
+  - `pa`: Processed optimisation attributes.
+  - `rr`: Regression result used for factor decomposition.
+  - `frc_plr`: Factor risk contribution placeholder result.
+  - `retcode`: Optimisation return code.
+  - `sol`: JuMP model solution.
+  - `model`: The JuMP model.
+  - `fb`: Fallback result.
+
+The `w` property is forwarded from `sol.w`.
+
+# Related
+
+  - [`FactorRiskContribution`](@ref)
+  - [`NonFiniteAllocationOptimisationResult`](@ref)
+"""
 @concrete struct FactorRiskContributionResult <: NonFiniteAllocationOptimisationResult
     oe
     pa
@@ -25,6 +48,48 @@ function Base.getproperty(r::FactorRiskContributionResult, sym::Symbol)
         getfield(r, sym)
     end
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Factor Risk Contribution (FRC) portfolio optimiser.
+
+`FactorRiskContribution` allocates portfolio weights so that each factor (and the idiosyncratic component) contributes a target proportion to the total portfolio risk. It combines factor regression with a JuMP-based risk budgeting optimisation.
+
+# Fields
+
+  - `opt`: JuMP optimiser configuration.
+  - `re`: Regression estimator for computing factor loadings.
+  - `r`: Risk measure or vector of risk measures.
+  - `obj`: Portfolio objective function.
+  - `frc_ple`: Factor risk contribution placeholder constraints.
+  - `sets`: Asset sets.
+  - `wi`: Initial weights for warm-starting.
+  - `flag`: If `true`, uses the full factor regression decomposition; if `false`, uses a simplified approach.
+  - `fb`: Fallback optimiser.
+
+# Constructors
+
+    FactorRiskContribution(;
+        opt::JuMPOptimiser = JuMPOptimiser(),
+        re::RegE_Reg = StepwiseRegression(),
+        r::RM_VecRM = Variance(),
+        obj::ObjectiveFunction = MinimumRisk(),
+        frc_ple::Option{<:PlCE_PhC_VecPlCE_PlC} = nothing,
+        sets::Option{<:AssetSets} = nothing,
+        wi::Option{<:VecNum} = nothing,
+        flag::Bool = false,
+        fb::Option{<:OptE_Opt} = nothing
+    ) -> FactorRiskContribution
+
+Keywords correspond to the struct's fields.
+
+# Related
+
+  - [`RiskJuMPOptimisationEstimator`](@ref)
+  - [`MeanRisk`](@ref)
+  - [`RiskBudgeting`](@ref)
+  - [`factor_risk_contribution`](@ref)
+"""
 @concrete struct FactorRiskContribution <: RiskJuMPOptimisationEstimator
     opt
     re

@@ -1,3 +1,24 @@
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Result type for Mean-Risk portfolio optimisation.
+
+# Fields
+
+  - `oe`: Type of the optimisation estimator that produced this result.
+  - `pa`: Processed optimisation attributes.
+  - `retcode`: Optimisation return code.
+  - `sol`: Optimisation solution (or vector of solutions for the efficient frontier).
+  - `model`: The JuMP model used for optimisation.
+  - `fb`: Fallback result (if a fallback optimiser was used).
+
+The `w` property is forwarded from `sol.w`.
+
+# Related
+
+  - [`NonFiniteAllocationOptimisationResult`](@ref)
+  - [`MeanRisk`](@ref)
+"""
 @concrete struct MeanRiskResult <: NonFiniteAllocationOptimisationResult
     oe
     pa
@@ -20,6 +41,58 @@ function Base.getproperty(r::MeanRiskResult, sym::Symbol)
         getfield(r, sym)
     end
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Mean-Risk portfolio optimiser.
+
+`MeanRisk` formulates and solves a mean-risk portfolio optimisation problem using JuMP. It can optimise a wide variety of objective functions (minimum risk, maximum return, maximum Sharpe ratio, maximum utility) subject to risk, weight, cardinality, and custom constraints.
+
+# Fields
+
+  - `opt`: JuMP optimiser configuration (prior, solver, constraints, bounds, fees, etc.).
+  - `r`: Risk measure or vector of risk measures.
+  - `obj`: Portfolio objective function.
+  - `wi`: Initial portfolio weights for warm-starting the solver (or `nothing`).
+  - `fb`: Fallback optimiser.
+
+# Constructors
+
+    MeanRisk(;
+        opt::JuMPOptimiser = JuMPOptimiser(),
+        r::RM_VecRM = Variance(),
+        obj::ObjectiveFunction = MinimumRisk(),
+        wi::Option{<:VecNum} = nothing,
+        fb::Option{<:OptE_Opt} = nothing
+    ) -> MeanRisk
+
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - If `r` is a vector: `!isempty(r)`.
+  - If `wi` is provided: `!isempty(wi)`.
+
+# Examples
+
+```jldoctest
+julia> MeanRisk(; opt = JuMPOptimiser(; slv = Clarabel.Optimizer))
+MeanRisk
+  opt ┼ JuMPOptimiser
+  r ┼ Variance
+  obj ┼ MinimumRisk
+  wi ┼ nothing
+  fb ┴ nothing
+```
+
+# Related
+
+  - [`RiskJuMPOptimisationEstimator`](@ref)
+  - [`JuMPOptimiser`](@ref)
+  - [`MeanRiskResult`](@ref)
+  - [`ObjectiveFunction`](@ref)
+  - [`RiskMeasure`](@ref)
+"""
 @concrete struct MeanRisk <: RiskJuMPOptimisationEstimator
     opt
     r

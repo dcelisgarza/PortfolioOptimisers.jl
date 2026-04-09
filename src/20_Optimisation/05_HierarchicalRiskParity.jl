@@ -1,3 +1,50 @@
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Hierarchical Risk Parity (HRP) portfolio optimiser.
+
+`HierarchicalRiskParity` implements the Hierarchical Risk Parity algorithm of López de Prado (2016). It clusters assets using hierarchical clustering, then allocates weights by recursively bisecting the dendrogram and applying inverse-risk weighting within each cluster.
+
+# Fields
+
+  - `opt`: Base hierarchical optimiser configuration (prior, clustering, bounds, fees, etc.).
+  - `r`: Risk measure or vector of risk measures used to define the inter-cluster risk budget.
+  - `sca`: Scalariser for combining multiple risk measures.
+  - `fb`: Fallback optimiser.
+
+# Constructors
+
+    HierarchicalRiskParity(;
+        opt::HierarchicalOptimiser = HierarchicalOptimiser(),
+        r::OptRM_VecOptRM = Variance(),
+        sca::Scalariser = SumScalariser(),
+        fb::Option{<:OptE_Opt} = nothing
+    ) -> HierarchicalRiskParity
+
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - If `r` is a vector: `!isempty(r)`.
+
+# Examples
+
+```jldoctest
+julia> HierarchicalRiskParity()
+HierarchicalRiskParity
+  opt ┼ HierarchicalOptimiser
+  r ┼ Variance
+  sca ┼ SumScalariser
+  fb ┴ nothing
+```
+
+# Related
+
+  - [`ClusteringOptimisationEstimator`](@ref)
+  - [`HierarchicalOptimiser`](@ref)
+  - [`HierarchicalEqualRiskContribution`](@ref)
+  - [`SchurComplementHierarchicalRiskParity`](@ref)
+"""
 @concrete struct HierarchicalRiskParity <: ClusteringOptimisationEstimator
     opt
     r

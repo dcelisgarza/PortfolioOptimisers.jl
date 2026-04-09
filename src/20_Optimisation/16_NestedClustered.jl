@@ -1,3 +1,27 @@
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Result type for Nested Clustered Optimisation.
+
+# Fields
+
+  - `oe`: Type of the optimisation estimator that produced this result.
+  - `pr`: Prior result used in optimisation.
+  - `clr`: Clustering result.
+  - `wb`: Weight bounds applied.
+  - `fees`: Fee structure applied (or `nothing`).
+  - `resi`: Inner (intra-cluster) optimisation results.
+  - `reso`: Outer (inter-cluster) optimisation result.
+  - `cv`: Cross-validation result (or `nothing`).
+  - `retcode`: Overall optimisation return code.
+  - `w`: Final aggregated portfolio weights.
+  - `fb`: Fallback result.
+
+# Related
+
+  - [`NestedClustered`](@ref)
+  - [`NonFiniteAllocationOptimisationResult`](@ref)
+"""
 @concrete struct NestedClusteredResult <: NonFiniteAllocationOptimisationResult
     oe
     pr
@@ -98,6 +122,58 @@ function assert_external_optimiser(opt::VecOptE_Opt)
     assert_external_optimiser.(opt)
     return nothing
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Nested Clustered Optimisation (NCO) portfolio optimiser.
+
+`NestedClustered` implements the Nested Clustered Optimisation algorithm. It first clusters assets, then solves a within-cluster (inner) optimisation for each cluster independently, and finally solves an across-cluster (outer) optimisation to combine the cluster portfolios into a final portfolio.
+
+# Fields
+
+  - `pe`: Prior estimator or prior result.
+  - `cle`: Clustering estimator or clustering result.
+  - `wb`: Weight bounds estimator or bounds.
+  - `fees`: Fee estimator or fee structure.
+  - `sets`: Asset sets.
+  - `opti`: Inner (intra-cluster) portfolio optimiser.
+  - `opto`: Outer (inter-cluster) portfolio optimiser.
+  - `cv`: Cross-validation configuration for model selection.
+  - `wf`: Weight finaliser for enforcing bounds.
+  - `ex`: FLoops executor for parallelism.
+  - `fb`: Fallback optimiser.
+  - `brt`: If `true`, uses bootstrap returns.
+  - `cle_pr`: If `true`, passes the prior result to the clustering estimator.
+  - `strict`: If `true`, strictly enforces weight bounds.
+
+# Constructors
+
+    NestedClustered(;
+        pe::PrE_Pr = EmpiricalPrior(),
+        cle::ClE_Cl = ClustersEstimator(),
+        wb::Option{<:WbE_Wb} = WeightBounds(),
+        fees::Option{<:FeesE_Fees} = nothing,
+        sets::Option{<:AssetSets} = nothing,
+        opti::NonFiniteAllocationOptimisationEstimator,
+        opto::NonFiniteAllocationOptimisationEstimator = opti,
+        cv::Option{<:OptimisationCrossValidation} = nothing,
+        wf::WeightFinaliser = IterativeWeightFinaliser(),
+        ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
+        fb::Option{<:OptE_Opt} = nothing,
+        brt::Bool = false,
+        cle_pr::Bool = true,
+        strict::Bool = false
+    ) -> NestedClustered
+
+Keywords correspond to the struct's fields.
+
+# Related
+
+  - [`ClusteringOptimisationEstimator`](@ref)
+  - [`HierarchicalRiskParity`](@ref)
+  - [`Stacking`](@ref)
+  - [`NestedClusteredResult`](@ref)
+"""
 @concrete struct NestedClustered <: ClusteringOptimisationEstimator
     pe
     cle

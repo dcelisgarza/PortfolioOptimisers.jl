@@ -1,4 +1,28 @@
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for finite allocation portfolio optimisation estimators.
+
+Finite allocation estimators convert continuous portfolio weights into discrete share quantities given an investment budget and asset prices.
+
+# Related Types
+
+  - [`OptimisationEstimator`](@ref)
+  - [`DiscreteAllocation`](@ref)
+  - [`GreedyAllocation`](@ref)
+"""
 abstract type FiniteAllocationOptimisationEstimator <: OptimisationEstimator end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for finite allocation optimisation result types.
+
+# Related Types
+
+  - [`OptimisationResult`](@ref)
+  - [`DiscreteAllocationResult`](@ref)
+  - [`GreedyAllocationResult`](@ref)
+"""
 abstract type FiniteAllocationOptimisationResult <: OptimisationResult end
 const FOptE_FOpt = Union{<:FiniteAllocationOptimisationEstimator,
                          <:FiniteAllocationOptimisationResult}
