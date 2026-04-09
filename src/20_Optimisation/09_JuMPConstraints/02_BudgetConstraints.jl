@@ -1,10 +1,72 @@
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for all budget constraint estimators.
+
+# Related
+
+  - [`BudgetEstimator`](@ref)
+  - [`BudgetCostEstimator`](@ref)
+  - [`BudgetRange`](@ref)
+"""
 abstract type BudgetConstraintEstimator <: JuMPConstraintEstimator end
+"""
+    const Num_BgtCE = Union{<:Number, <:BudgetConstraintEstimator}
+
+Union of scalar budget values and [`BudgetConstraintEstimator`](@ref) instances.
+"""
 const Num_BgtCE = Union{<:Number, <:BudgetConstraintEstimator}
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for estimators that specify the portfolio budget range (sum of
+weights).
+
+# Related
+
+  - [`BudgetRange`](@ref)
+"""
 abstract type BudgetEstimator <: BudgetConstraintEstimator end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for estimators that specify transaction cost budgets.
+
+# Related
+
+  - [`BudgetCosts`](@ref)
+  - [`BudgetMarketImpact`](@ref)
+"""
 abstract type BudgetCostEstimator <: BudgetConstraintEstimator end
 function set_budget_costs!(args...)
     return nothing
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Specifies the portfolio budget constraint as a closed interval ``[\\mathrm{lb}, \\mathrm{ub}]``
+on the sum of weights. At least one of `lb` or `ub` must be provided.
+
+# Fields
+
+  - `lb::Option{<:Number}`: Lower bound on the sum of weights. Defaults to `1.0`.
+  - `ub::Option{<:Number}`: Upper bound on the sum of weights. Defaults to `1.0`.
+
+# Constructors
+
+    BudgetRange(; lb::Option{<:Number} = 1.0, ub::Option{<:Number} = 1.0) -> BudgetRange
+
+## Validation
+
+  - At least one of `lb`, `ub` must not be `nothing`.
+  - `lb` and `ub` must be finite.
+  - `lb <= ub` when both are provided.
+
+# Related
+
+  - [`BudgetCosts`](@ref)
+  - [`BudgetMarketImpact`](@ref)
+"""
 @concrete struct BudgetRange <: BudgetEstimator
     lb
     ub
@@ -34,6 +96,46 @@ end
 function set_budget_constraints!(args...)
     return nothing
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Budget constraint that accounts for linear transaction costs. Models the portfolio
+budget as:
+
+```math
+\\boldsymbol{v}_p^\\intercal \\boldsymbol{w}_p + \\boldsymbol{v}_n^\\intercal \\boldsymbol{w}_n
+\\in [\\mathrm{lb}, \\mathrm{ub}]
+```
+
+where ``\\boldsymbol{w}_p``, ``\\boldsymbol{w}_n`` are the positive and negative weight
+increments, and ``\\boldsymbol{v}_p``, ``\\boldsymbol{v}_n`` are the corresponding
+cost coefficients.
+
+# Fields
+
+  - `bgt::Num_BgtRg`: Budget target or range.
+  - `w::VecNum`: Initial portfolio weights (current holdings).
+  - `vp::Num_VecNum`: Cost coefficients for positive weight changes. Non-negative.
+  - `vn::Num_VecNum`: Cost coefficients for negative weight changes. Non-negative.
+  - `up::Num_VecNum`: Upper limit on positive weight changes. Non-negative.
+  - `un::Num_VecNum`: Upper limit on negative weight changes. Non-negative.
+
+# Constructors
+
+    BudgetCosts(;
+        bgt::Num_BgtRg = 1.0,
+        w::VecNum,
+        vp::Num_VecNum = 1.0,
+        vn::Num_VecNum = 1.0,
+        up::Num_VecNum = 1.0,
+        un::Num_VecNum = 1.0
+    ) -> BudgetCosts
+
+# Related
+
+  - [`BudgetRange`](@ref)
+  - [`BudgetMarketImpact`](@ref)
+"""
 @concrete struct BudgetCosts <: BudgetCostEstimator
     bgt
     w
@@ -88,6 +190,28 @@ function budget_view(bgt::BudgetCosts, i)
     un = nothing_scalar_array_view(bgt.un, i)
     return BudgetCosts(; bgt = bgt.bgt, w = w, vp = vp, vn = vn, up = up, un = un)
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Budget constraint that accounts for non-linear (power-law) market impact costs. Extends
+[`BudgetCosts`](@ref) with a `beta` exponent controlling the concavity of the market
+impact function.
+
+# Fields
+
+  - `bgt::Num_BgtRg`: Budget target or range.
+  - `w::VecNum`: Initial portfolio weights.
+  - `vp::Num_VecNum`: Cost coefficients for positive weight changes. Non-negative.
+  - `vn::Num_VecNum`: Cost coefficients for negative weight changes. Non-negative.
+  - `up::Num_VecNum`: Upper limit on positive weight changes. Non-negative.
+  - `un::Num_VecNum`: Upper limit on negative weight changes. Non-negative.
+  - `beta::Number`: Market impact exponent in `(0, 1]`.
+
+# Related
+
+  - [`BudgetRange`](@ref)
+  - [`BudgetCosts`](@ref)
+"""
 @concrete struct BudgetMarketImpact <: BudgetCostEstimator
     bgt
     w

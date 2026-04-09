@@ -1,3 +1,31 @@
+"""
+$(DocStringExtensions.TYPEDEF)
+
+JuMP returns estimator that computes portfolio returns as the arithmetic (dot-product)
+mean return: ``r = \\boldsymbol{\\mu}^\\intercal \\boldsymbol{w}``.
+
+Optionally supports an ellipsoidal uncertainty set on the mean vector and a lower bound
+on the portfolio return.
+
+# Fields
+
+  - `ucs`: Optional ellipsoidal uncertainty set on the mean return.
+  - `lb`: Optional lower bound on the portfolio return (scalar or vector).
+  - `mu`: Optional mean return override (scalar or vector).
+
+# Constructors
+
+    ArithmeticReturn(;
+        ucs::Option{<:UcSE_UcS} = nothing,
+        lb::Option{<:RkRtBounds} = nothing,
+        mu::Option{<:Num_VecNum} = nothing
+    ) -> ArithmeticReturn
+
+# Related
+
+  - [`LogarithmicReturn`](@ref)
+  - [`JuMPReturnsEstimator`](@ref)
+"""
 @concrete struct ArithmeticReturn <: JuMPReturnsEstimator
     ucs
     lb
@@ -54,6 +82,31 @@ end
 function no_bounds_returns_estimator(r::ArithmeticReturn, flag::Bool = true)
     return flag ? ArithmeticReturn(; ucs = r.ucs, mu = r.mu) : ArithmeticReturn()
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+JuMP returns estimator that computes portfolio returns as the logarithmic (geometric)
+mean return: ``r = \\prod_{t=1}^T (1 + \\boldsymbol{x}_t^\\intercal \\boldsymbol{w})^{1/T} - 1``.
+
+Optionally supports observation weights and a lower bound on the portfolio return.
+
+# Fields
+
+  - `w`: Optional observation weights.
+  - `lb`: Optional lower bound on the portfolio return (scalar or vector).
+
+# Constructors
+
+    LogarithmicReturn(;
+        w::Option{<:ObsWeights} = nothing,
+        lb::Option{<:RkRtBounds} = nothing
+    ) -> LogarithmicReturn
+
+# Related
+
+  - [`ArithmeticReturn`](@ref)
+  - [`JuMPReturnsEstimator`](@ref)
+"""
 @concrete struct LogarithmicReturn <: JuMPReturnsEstimator
     w
     lb
@@ -204,6 +257,25 @@ function return_sharpe_alog_ret_constraints(port, type, obj::Sharpe, ::AKelly, :
     return nothing
 end
 =#
+"""
+    bounds_returns_estimator(r, lb::Number)
+
+Return a copy of returns estimator `r` with its lower bound set to `lb`.
+
+# Arguments
+
+  - `r`: Returns estimator.
+  - `lb::Number`: Lower bound on the portfolio return.
+
+# Returns
+
+  - Returns estimator with updated lower bound.
+
+# Related
+
+  - [`ArithmeticReturn`](@ref)
+  - [`LogarithmicReturn`](@ref)
+"""
 for r in traverse_concrete_subtypes(JuMPReturnsEstimator)
     eval(quote
              function bounds_returns_estimator(r::$(r), lb::Number)
@@ -216,7 +288,44 @@ for r in traverse_concrete_subtypes(JuMPReturnsEstimator)
              end
          end)
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Objective function that minimises portfolio risk.
+
+# Related
+
+  - [`MaximumUtility`](@ref)
+  - [`MaximumRatio`](@ref)
+  - [`MaximumReturn`](@ref)
+  - [`ObjectiveFunction`](@ref)
+"""
 struct MinimumRisk <: ObjectiveFunction end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Objective function that maximises risk-adjusted utility:
+
+```math
+\\max\\; \\boldsymbol{\\mu}^\\intercal \\boldsymbol{w} - \\tfrac{l}{2}\\, R(\\boldsymbol{w})
+```
+
+where ``l`` is the risk-aversion coefficient and ``R`` is the portfolio risk.
+
+# Fields
+
+  - `l::Number`: Risk-aversion coefficient. Must be non-negative. Defaults to `2`.
+
+# Constructors
+
+    MaximumUtility(; l::Number = 2) -> MaximumUtility
+
+# Related
+
+  - [`MinimumRisk`](@ref)
+  - [`MaximumRatio`](@ref)
+  - [`ObjectiveFunction`](@ref)
+"""
 @concrete struct MaximumUtility <: ObjectiveFunction
     l
     function MaximumUtility(l::Number)
@@ -227,6 +336,34 @@ end
 function MaximumUtility(; l::Number = 2)
     return MaximumUtility(l)
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Objective function that maximises the risk-adjusted Sharpe-type ratio:
+
+```math
+\\max\\; \\frac{\\boldsymbol{\\mu}^\\intercal \\boldsymbol{w} - r_f}{R(\\boldsymbol{w})}
+```
+
+where ``r_f`` is the risk-free rate and ``R`` is the portfolio risk.
+
+# Fields
+
+  - `rf::Number`: Risk-free rate. Defaults to `0.0`.
+  - `ohf::Option{<:Number}`: Optional objective homogenisation factor used internally
+    for numerical stability. Defaults to `nothing` (auto-determined).
+
+# Constructors
+
+    MaximumRatio(; rf::Number = 0.0, ohf::Option{<:Number} = nothing) -> MaximumRatio
+
+# Related
+
+  - [`MinimumRisk`](@ref)
+  - [`MaximumUtility`](@ref)
+  - [`MaximumReturn`](@ref)
+  - [`ObjectiveFunction`](@ref)
+"""
 @concrete struct MaximumRatio <: ObjectiveFunction
     rf
     ohf
@@ -240,6 +377,18 @@ end
 function MaximumRatio(; rf::Number = 0.0, ohf::Option{<:Number} = nothing)
     return MaximumRatio(rf, ohf)
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Objective function that maximises portfolio return ``\\boldsymbol{\\mu}^\\intercal \\boldsymbol{w}``.
+
+# Related
+
+  - [`MinimumRisk`](@ref)
+  - [`MaximumUtility`](@ref)
+  - [`MaximumRatio`](@ref)
+  - [`ObjectiveFunction`](@ref)
+"""
 struct MaximumReturn <: ObjectiveFunction end
 function set_maximum_ratio_factor_variables!(model::JuMP.Model, mu::Num_VecNum,
                                              obj::MaximumRatio)

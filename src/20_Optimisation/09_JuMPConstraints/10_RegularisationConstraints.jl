@@ -29,7 +29,40 @@ function set_l2_regularisation!(model::JuMP.Model, l2_val::Number)
     add_to_objective_penalty!(model, l2)
     return nothing
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for all portfolio weight regularisation estimators.
+
+# Related
+
+  - [`LpRegularisation`](@ref)
+"""
 abstract type AbstractRegularisationEstimator <: AbstractEstimator end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Lp-norm regularisation term added to the optimisation objective:
+
+```math
+\\text{penalty} = \\mathrm{val} \\cdot \\left( \\sum_{i=1}^N |w_i|^p \\right)^{1/p}
+```
+
+Penalises concentrated portfolios by encouraging weight smoothness for ``p > 1``.
+
+# Fields
+
+  - `p::Number`: Lp norm exponent. Must satisfy `p > 1` and be finite.
+  - `val::Number`: Penalty coefficient. Must be positive and finite.
+
+# Constructors
+
+    LpRegularisation(; p::Number = 3, val::Number = 1e-3) -> LpRegularisation
+
+# Related
+
+  - [`AbstractRegularisationEstimator`](@ref)
+"""
 @concrete struct LpRegularisation <: AbstractRegularisationEstimator
     p
     val
