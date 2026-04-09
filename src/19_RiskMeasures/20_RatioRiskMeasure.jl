@@ -1,3 +1,51 @@
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Represents a risk ratio risk measure for hierarchical portfolio optimisation.
+
+`RiskRatioRiskMeasure` computes the ratio of two risk measures, enabling the construction of risk-adjusted performance metrics for use in hierarchical optimisation routines.
+
+# Mathematical Definition
+
+```math
+\\mathrm{RiskRatio}(\\boldsymbol{x}) = \\frac{r_1(\\boldsymbol{x})}{r_2(\\boldsymbol{x})}\\,,
+```
+
+where ``r_1`` and ``r_2`` are any two optimisation risk measures.
+
+# Fields
+
+  - `r1`: Numerator risk measure.
+  - `r2`: Denominator risk measure.
+
+# Constructors
+
+    RiskRatioRiskMeasure(;
+        r1::OptimisationRiskMeasure = Variance(),
+        r2::OptimisationRiskMeasure = ConditionalValueatRisk()
+    ) -> RiskRatioRiskMeasure
+
+Keywords correspond to the struct's fields.
+
+# Examples
+
+```jldoctest
+julia> RiskRatioRiskMeasure()
+RiskRatioRiskMeasure
+  r1 ┼ Variance
+     │   settings ┼ RiskMeasureSettings
+     │             ...
+  r2 ┴ ConditionalValueatRisk
+       settings ┼ RiskMeasureSettings
+                 ...
+```
+
+# Related
+
+  - [`HierarchicalRiskMeasure`](@ref)
+  - [`OptimisationRiskMeasure`](@ref)
+  - [`NonOptimisationRiskRatioRiskMeasure`](@ref)
+"""
 @concrete struct RiskRatioRiskMeasure <: HierarchicalRiskMeasure
     r1
     r2
@@ -17,6 +65,41 @@ end
 function factory(r::RiskRatioRiskMeasure, w::VecNum)
     return RiskRatioRiskMeasure(; r1 = factory(r.r1, w), r2 = factory(r.r2, w))
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Represents a non-optimisation risk ratio measure.
+
+`NonOptimisationRiskRatioRiskMeasure` computes the ratio of two risk measures for analysis or reporting purposes. Unlike `RiskRatioRiskMeasure`, it is not intended for use as an objective or constraint in optimisation routines.
+
+# Mathematical Definition
+
+```math
+\\mathrm{RiskRatio}(\\boldsymbol{x}) = \\frac{r_1(\\boldsymbol{x})}{r_2(\\boldsymbol{x})}\\,,
+```
+
+where ``r_1`` and ``r_2`` are any two base risk measures.
+
+# Fields
+
+  - `r1`: Numerator risk measure.
+  - `r2`: Denominator risk measure.
+
+# Constructors
+
+    NonOptimisationRiskRatioRiskMeasure(;
+        r1::AbstractBaseRiskMeasure = Variance(),
+        r2::AbstractBaseRiskMeasure = ConditionalValueatRisk()
+    ) -> NonOptimisationRiskRatioRiskMeasure
+
+Keywords correspond to the struct's fields.
+
+# Related
+
+  - [`NonOptimisationRiskMeasure`](@ref)
+  - [`AbstractBaseRiskMeasure`](@ref)
+  - [`RiskRatioRiskMeasure`](@ref)
+"""
 @concrete struct NonOptimisationRiskRatioRiskMeasure <: NonOptimisationRiskMeasure
     r1
     r2

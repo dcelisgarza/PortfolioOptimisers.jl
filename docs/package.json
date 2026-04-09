@@ -1,4 +1,9 @@
 {
+  "dependencies": {
+    "d3-format": "^3.1.0",
+    "markdown-it-footnote": "^4.0.0",
+    "patch-package": "^8.0.1"
+  },
   "devDependencies": {
     "@nolebase/vitepress-plugin-enhanced-readabilities": "^2.15.0",
     "@types/d3-format": "^3.0.4",
@@ -9,13 +14,8 @@
     "vitepress-plugin-tabs": "^0.6.0"
   },
   "scripts": {
-    "docs:dev": "vitepress dev build/.documenter",
     "docs:build": "vitepress build build/.documenter",
+    "docs:dev": "vitepress dev build/.documenter",
     "docs:preview": "vitepress preview build/.documenter"
-  },
-  "dependencies": {
-    "d3-format": "^3.1.0",
-    "markdown-it-footnote": "^4.0.0",
-    "patch-package": "^8.0.1"
   }
 }
