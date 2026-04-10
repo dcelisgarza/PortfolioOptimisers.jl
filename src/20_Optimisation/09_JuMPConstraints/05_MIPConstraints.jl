@@ -743,6 +743,7 @@ The single-matrix method enforces `sum(sib) ≤ card` for one sub-group. The vec
   - [`WeightBounds`](@ref)
 """
 function set_scardmip_constraints!(model::JuMP.Model, wb::WeightBounds,
+                                   card::Option{<:Integer}, smtx::Option{<:MatNum},
                                    lt::Option{<:Threshold}, st::Option{<:Threshold},
                                    ss::Option{<:Number}, i::Integer = 1)
     card_flag = !isnothing(card)
@@ -803,6 +804,7 @@ The single-matrix method enforces linear group cardinality constraints `A * sib 
   - [`WeightBounds`](@ref)
 """
 function set_sgcardmip_constraints!(model::JuMP.Model, wb::WeightBounds,
+                                    gcard::Option{<:LinearConstraint},
                                     smtx::Option{<:MatNum}, lt::Option{<:Threshold},
                                     st::Option{<:Threshold}, ss::Option{<:Number},
                                     i::Integer = 1)
