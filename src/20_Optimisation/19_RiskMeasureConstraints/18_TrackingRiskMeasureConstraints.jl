@@ -1,3 +1,37 @@
+"""
+    set_risk_constraints!(model, i, r::TrackingRiskMeasure{...,<:L1Tracking}, opt, pr, args...; kwargs...)
+    set_risk_constraints!(model, i, r::TrackingRiskMeasure{...,<:Union{L2Tracking,SquaredL2Tracking}}, opt, pr, args...; kwargs...)
+    set_risk_constraints!(model, i, r::TrackingRiskMeasure{...,<:LpTracking}, opt, pr, args...; kwargs...)
+    set_risk_constraints!(model, i, r::TrackingRiskMeasure{...,<:LInfTracking}, opt, pr, args...; kwargs...)
+    set_risk_constraints!(model, i, r::RiskTrackingRiskMeasure{...,<:IndependentVariableTracking}, opt, pr, pl, fees, args...; kwargs...)
+    set_risk_constraints!(model, i, r::RiskTrackingRiskMeasure{...,<:DependentVariableTracking}, opt, pr, pl, fees, args...; kwargs...)
+
+Add tracking risk constraints to `model`.
+
+The `L1Tracking` overload uses an L1-norm cone. The `L2Tracking` / `SquaredL2Tracking`
+overload uses an SOC. The `LpTracking` overload uses power cones parameterised by `r.alg.p`.
+The `LInfTracking` overload uses an infinity-norm cone. The independent-variable overload
+shifts the weight vector by a benchmark before delegating to [`set_triv_risk_constraints!`](@ref).
+The dependent-variable overload computes a benchmark risk and adds an L1-norm cone on the
+risk difference via [`set_trdv_risk_constraints!`](@ref).
+
+# Arguments
+
+  - `model::JuMP.Model`: The JuMP optimisation model.
+  - `i`: Constraint index for unique naming.
+  - `r`: Tracking risk measure instance.
+  - `opt::RiskJuMPOptimisationEstimator`: Optimisation estimator.
+  - `pr::AbstractPriorResult`: Prior result containing `X`.
+  - `pl`: Optional phylogeny constraints.
+  - `fees`: Optional fees structure.
+
+# Related
+
+  - [`set_tracking_risk!`](@ref)
+  - [`set_risk_tr_constraints!`](@ref)
+  - [`set_triv_risk_constraints!`](@ref)
+  - [`set_trdv_risk_constraints!`](@ref)
+"""
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::TrackingRiskMeasure{<:Any, <:Any, <:L1Tracking},
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
@@ -21,6 +55,29 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     set_risk_bounds_and_expression!(model, opt, tracking_risk, r.settings, key)
     return tracking_risk
 end
+"""
+    set_tracking_risk!(model, r::TrackingRiskMeasure{...,<:L2Tracking}, opt, tracking_risk, key)
+    set_tracking_risk!(model, r::TrackingRiskMeasure{...,<:SquaredL2Tracking}, opt, tracking_risk, key)
+
+Finalise the L2 or squared-L2 tracking risk expression and apply bounds.
+
+The `L2Tracking` overload calls [`set_risk_bounds_and_expression!`](@ref) directly with the
+SOC variable. The `SquaredL2Tracking` overload squares it and applies a sqrt-converted upper
+bound to the original SOC variable.
+
+# Arguments
+
+  - `model::JuMP.Model`: The JuMP optimisation model.
+  - `r::TrackingRiskMeasure`: Tracking risk measure instance.
+  - `opt::RiskJuMPOptimisationEstimator`: Optimisation estimator.
+  - `tracking_risk::JuMP.AbstractJuMPScalar`: Normalised tracking-risk SOC variable.
+  - `key::Symbol`: Symbol for storing the expression in the model.
+
+# Related
+
+  - [`set_risk_constraints!`](@ref)
+  - [`variance_risk_bounds_val`](@ref)
+"""
 function set_tracking_risk!(model::JuMP.Model,
                             r::TrackingRiskMeasure{<:Any, <:Any, <:L2Tracking},
                             opt::RiskJuMPOptimisationEstimator,
@@ -128,6 +185,28 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     set_risk_bounds_and_expression!(model, opt, tracking_risk, r.settings, key)
     return tracking_risk
 end
+"""
+    set_risk_tr_constraints!(key, model, r::RiskMeasure, opt, pr, pl, fees, args...; kwargs...)
+    set_risk_tr_constraints!(key, model, rs::VecRM, opt, pr, pl, fees, args...; kwargs...)
+
+Dispatch to indexed [`set_risk_constraints!`](@ref) for a single measure or iterate over a
+vector of measures, using a name prefix `key` for unique constraint naming.
+
+# Arguments
+
+  - `key`: Name prefix for unique constraint symbols.
+  - `model::JuMP.Model`: The JuMP optimisation model.
+  - `r`: A [`RiskMeasure`](@ref) or a vector of risk measures.
+  - `opt::JuMPOptimisationEstimator`: Optimisation estimator.
+  - `pr::AbstractPriorResult`: Prior result.
+  - `pl`: Optional phylogeny constraints.
+  - `fees`: Optional fees structure.
+
+# Related
+
+  - [`set_risk_constraints!`](@ref)
+  - [`set_triv_risk_constraints!`](@ref)
+"""
 function set_risk_tr_constraints!(key::Any, model::JuMP.Model, r::RiskMeasure,
                                   opt::JuMPOptimisationEstimator, pr::AbstractPriorResult,
                                   pl::Option{<:PlC_VecPlC}, fees::Option{<:Fees}, args...;
@@ -145,6 +224,31 @@ function set_risk_tr_constraints!(key::Any, model::JuMP.Model, rs::VecRM,
     end
     return nothing
 end
+"""
+    set_triv_risk_constraints!(model, i, r::RiskMeasure, opt, pr, pl, fees, args...; kwargs...)
+
+Set risk constraints for independent-variable tracking, saving and restoring any global
+singleton model state that would conflict with the nested solve.
+
+Stashes existing model-level expressions and constraints (e.g., `net_X`, `dd`, `wr_risk`,
+SDP matrices) with `old` prefixes, calls [`set_risk_tr_constraints!`](@ref) with the
+`triv_i_` naming prefix, then restores the original state.
+
+# Arguments
+
+  - `model::JuMP.Model`: The JuMP optimisation model.
+  - `i`: Constraint index for unique naming.
+  - `r::RiskMeasure`: Inner risk measure.
+  - `opt::RiskJuMPOptimisationEstimator`: Optimisation estimator.
+  - `pr::AbstractPriorResult`: Prior result.
+  - `pl`: Optional phylogeny constraints.
+  - `fees`: Optional fees structure.
+
+# Related
+
+  - [`set_risk_tr_constraints!`](@ref)
+  - [`set_trdv_risk_constraints!`](@ref)
+"""
 function set_triv_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMeasure,
                                     opt::RiskJuMPOptimisationEstimator,
                                     pr::AbstractPriorResult, pl::Option{<:PlC_VecPlC},
@@ -509,6 +613,32 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     set_risk_bounds_and_expression!(model, opt, tracking_risk, r.settings, key)
     return tracking_risk
 end
+"""
+    set_trdv_risk_constraints!(model, i, r::RiskMeasure, opt, pr, pl, fees, args...; kwargs...)
+
+Set risk constraints for dependent-variable tracking, saving and restoring variance-related
+model state.
+
+Stashes existing SDP matrices (`W`, `Au`, `E`) and variance flags, calls
+[`set_risk_tr_constraints!`](@ref) with the `trdv_i_` naming prefix, then restores the
+original state. This ensures the inner risk measure's variance constraints do not interfere
+with the outer model.
+
+# Arguments
+
+  - `model::JuMP.Model`: The JuMP optimisation model.
+  - `i`: Constraint index for unique naming.
+  - `r::RiskMeasure`: Inner risk measure.
+  - `opt::RiskJuMPOptimisationEstimator`: Optimisation estimator.
+  - `pr::AbstractPriorResult`: Prior result.
+  - `pl`: Optional phylogeny constraints.
+  - `fees`: Optional fees structure.
+
+# Related
+
+  - [`set_risk_tr_constraints!`](@ref)
+  - [`set_triv_risk_constraints!`](@ref)
+"""
 function set_trdv_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMeasure,
                                     opt::RiskJuMPOptimisationEstimator,
                                     pr::AbstractPriorResult, pl::Option{<:PlC_VecPlC},

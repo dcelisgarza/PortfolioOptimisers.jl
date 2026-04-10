@@ -1,3 +1,20 @@
+"""
+    set_owa_constraints!(model, X)
+
+Set up the OWA portfolio returns variable and equality constraint.
+
+Introduces a vector variable `owa` of length `T` and adds the equality constraint
+`sc * (net_X - owa) == 0`. Returns the existing `owa` if already present.
+
+# Arguments
+
+  - `model::JuMP.Model`: The JuMP optimisation model.
+  - `X::MatNum`: Asset returns matrix (`T × N`).
+
+# Related
+
+  - [`set_risk_constraints!`](@ref)
+"""
 function set_owa_constraints!(model::JuMP.Model, X::MatNum)
     if haskey(model, :owa)
         return model[:owa]
@@ -9,6 +26,32 @@ function set_owa_constraints!(model::JuMP.Model, X::MatNum)
     JuMP.@constraint(model, owac, sc * (net_X - owa) == 0)
     return owa
 end
+"""
+    set_risk_constraints!(model, i, r::OrderedWeightsArray{...,<:ExactOrderedWeightsArray}, opt, pr, args...; kwargs...)
+    set_risk_constraints!(model, i, r::OrderedWeightsArrayRange{...,<:ExactOrderedWeightsArray}, opt, pr, args...; kwargs...)
+    set_risk_constraints!(model, i, r::OrderedWeightsArray{...,<:ApproxOrderedWeightsArray}, opt, pr, args...; kwargs...)
+    set_risk_constraints!(model, i, r::OrderedWeightsArrayRange{...,<:ApproxOrderedWeightsArray}, opt, pr, args...; kwargs...)
+
+Add Ordered Weights Array (OWA) risk constraints to `model`.
+
+The exact overloads introduce auxiliary matrices and use a bilinear constraint to encode the
+exact OWA risk. The approximate overloads use the Wasserstein-based approximation via power
+cone constraints parameterised by `r.alg.p`. Range variants compute the difference between
+two OWA expressions (e.g. tail-Gini range).
+
+# Arguments
+
+  - `model::JuMP.Model`: The JuMP optimisation model.
+  - `i`: Constraint index for unique naming.
+  - `r`: OWA or OWA-range risk measure instance.
+  - `opt::RiskJuMPOptimisationEstimator`: Optimisation estimator.
+  - `pr::AbstractPriorResult`: Prior result containing `X`.
+
+# Related
+
+  - [`set_owa_constraints!`](@ref)
+  - [`set_risk_bounds_and_expression!`](@ref)
+"""
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::OrderedWeightsArray{<:Any, <:Any,
                                                       <:ExactOrderedWeightsArray},

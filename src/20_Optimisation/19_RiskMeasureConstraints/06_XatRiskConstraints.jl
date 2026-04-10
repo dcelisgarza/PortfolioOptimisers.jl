@@ -1,3 +1,32 @@
+"""
+    set_risk_constraints!(model, i, r::ValueatRisk{...,<:MIPValueatRisk}, opt, pr, args...; kwargs...)
+    set_risk_constraints!(model, i, r::ValueatRiskRange{...,<:MIPValueatRisk}, opt, pr, args...; kwargs...)
+    set_risk_constraints!(model, i, r::ValueatRisk{...,<:DistributionValueatRisk}, opt, pr, args...; kwargs...)
+    set_risk_constraints!(model, i, r::ValueatRiskRange{...,<:DistributionValueatRisk}, opt, pr, args...; kwargs...)
+    set_risk_constraints!(model, i, r::DrawdownatRisk, opt, pr, args...; kwargs...)
+
+Add Value-at-Risk, Value-at-Risk range, or Drawdown-at-Risk constraints to `model`.
+
+The MIP overloads introduce binary variables `z_var` and add big-M constraints to encode the
+empirical quantile. The distribution overloads use closed-form z-scores computed by
+[`compute_value_at_risk_z`](@ref) / [`compute_value_at_risk_cz`](@ref) and add an SOC
+constraint. The `DrawdownatRisk` overload applies the MIP approach to the drawdown series.
+
+# Arguments
+
+  - `model::JuMP.Model`: The JuMP optimisation model.
+  - `i`: Constraint index for unique naming.
+  - `r`: Risk measure instance.
+  - `opt::RiskJuMPOptimisationEstimator`: Optimisation estimator.
+  - `pr::AbstractPriorResult`: Prior result.
+
+# Related
+
+  - [`compute_value_at_risk_z`](@ref)
+  - [`compute_value_at_risk_cz`](@ref)
+  - [`set_drawdown_constraints!`](@ref)
+  - [`set_risk_bounds_and_expression!`](@ref)
+"""
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::ValueatRisk{<:Any, <:Any, <:Any, <:MIPValueatRisk},
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
@@ -111,6 +140,26 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     set_risk_bounds_and_expression!(model, opt, var_range_risk, r.settings, key)
     return var_range_risk
 end
+"""
+    compute_value_at_risk_z(dist::Distributions.Normal, alpha)
+    compute_value_at_risk_z(dist::Distributions.TDist, alpha)
+    compute_value_at_risk_z(::Distributions.Laplace, alpha)
+
+Compute the lower-tail z-score for a parametric VaR at significance level `alpha`.
+
+Returns the complementary quantile for Normal and scaled Student-t distributions, and the
+closed-form expression for the Laplace distribution.
+
+# Arguments
+
+  - `dist`: Distribution instance (Normal, TDist, or Laplace).
+  - `alpha::Number`: Significance level.
+
+# Related
+
+  - [`compute_value_at_risk_cz`](@ref)
+  - [`set_risk_constraints!`](@ref)
+"""
 function compute_value_at_risk_z(dist::Distributions.Normal, alpha::Number)
     return Distributions.cquantile(dist, alpha)
 end
@@ -122,6 +171,26 @@ end
 function compute_value_at_risk_z(::Distributions.Laplace, alpha::Number)
     return -log(2 * alpha) / sqrt(2)
 end
+"""
+    compute_value_at_risk_cz(dist::Distributions.Normal, alpha)
+    compute_value_at_risk_cz(dist::Distributions.TDist, alpha)
+    compute_value_at_risk_cz(::Distributions.Laplace, alpha)
+
+Compute the upper-tail z-score for a parametric VaR at significance level `alpha`.
+
+Used for the high (upper) bound in VaR range constraints. Returns the lower quantile for
+Normal and scaled Student-t distributions, and the closed-form expression for Laplace.
+
+# Arguments
+
+  - `dist`: Distribution instance (Normal, TDist, or Laplace).
+  - `alpha::Number`: Significance level.
+
+# Related
+
+  - [`compute_value_at_risk_z`](@ref)
+  - [`set_risk_constraints!`](@ref)
+"""
 function compute_value_at_risk_cz(dist::Distributions.Normal, alpha::Number)
     return Statistics.quantile(dist, alpha)
 end

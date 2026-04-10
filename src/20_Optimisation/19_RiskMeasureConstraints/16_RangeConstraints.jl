@@ -1,3 +1,25 @@
+"""
+    set_risk_constraints!(model, ::Any, r::Range, opt, pr, args...; kwargs...)
+
+Add range risk constraints to `model`.
+
+Calls [`set_wr_risk_expression!`](@ref) to obtain the worst-realisation variable, then
+introduces a best-realisation variable `br_risk` with constraint
+`sc * (br_risk .+ net_X) <= 0`, and defines `range_risk = wr_risk - br_risk`. Returns the
+existing expression if already present.
+
+# Arguments
+
+  - `model::JuMP.Model`: The JuMP optimisation model.
+  - `r::Range`: Range risk measure instance.
+  - `opt::RiskJuMPOptimisationEstimator`: Optimisation estimator.
+  - `pr::AbstractPriorResult`: Prior result containing `X`.
+
+# Related
+
+  - [`set_wr_risk_expression!`](@ref)
+  - [`set_risk_bounds_and_expression!`](@ref)
+"""
 function set_risk_constraints!(model::JuMP.Model, ::Any, r::Range,
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; kwargs...)

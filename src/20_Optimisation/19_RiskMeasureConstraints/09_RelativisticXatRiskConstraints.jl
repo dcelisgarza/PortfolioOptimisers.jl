@@ -1,3 +1,29 @@
+"""
+    set_risk_constraints!(model, i, r::RelativisticValueatRisk, opt, pr, args...; kwargs...)
+    set_risk_constraints!(model, i, r::RelativisticValueatRiskRange, opt, pr, args...; kwargs...)
+    set_risk_constraints!(model, i, r::RelativisticDrawdownatRisk, opt, pr, args...; kwargs...)
+
+Add Relativistic Value-at-Risk, RLVaR range, or Relativistic Drawdown-at-Risk constraints to
+`model`.
+
+Each overload uses power cone constraints (`PowerCone`) to encode the Tsallis entropy-based
+risk measure parameterised by `kappa`. Auxiliary variables `t`, `z`, `omega`, `psi`,
+`theta`, and `epsilon` are introduced. The range variant encodes both a lower-tail and
+upper-tail relativistic expression.
+
+# Arguments
+
+  - `model::JuMP.Model`: The JuMP optimisation model.
+  - `i`: Constraint index for unique naming.
+  - `r`: Risk measure instance with fields `alpha` and `kappa`.
+  - `opt::RiskJuMPOptimisationEstimator`: Optimisation estimator.
+  - `pr::AbstractPriorResult`: Prior result containing `X`.
+
+# Related
+
+  - [`set_drawdown_constraints!`](@ref)
+  - [`set_risk_bounds_and_expression!`](@ref)
+"""
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::RelativisticValueatRisk,
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; kwargs...)

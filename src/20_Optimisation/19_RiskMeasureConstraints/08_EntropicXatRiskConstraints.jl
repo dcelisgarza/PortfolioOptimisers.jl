@@ -1,3 +1,28 @@
+"""
+    set_risk_constraints!(model, i, r::EntropicValueatRisk, opt, pr, args...; kwargs...)
+    set_risk_constraints!(model, i, r::EntropicValueatRiskRange, opt, pr, args...; kwargs...)
+    set_risk_constraints!(model, i, r::EntropicDrawdownatRisk, opt, pr, args...; kwargs...)
+
+Add Entropic Value-at-Risk, EVaR range, or Entropic Drawdown-at-Risk constraints to `model`.
+
+Each overload uses exponential cone constraints (`ExponentialCone`) to encode the cumulant
+generating function bound. Scalar variables `t`, `z`, and per-observation variables `u` are
+introduced. `EVaR` and `EDaR` encode the single-tail bound; the range variant encodes both a
+lower and upper exponential cone.
+
+# Arguments
+
+  - `model::JuMP.Model`: The JuMP optimisation model.
+  - `i`: Constraint index for unique naming.
+  - `r`: Risk measure instance.
+  - `opt::RiskJuMPOptimisationEstimator`: Optimisation estimator.
+  - `pr::AbstractPriorResult`: Prior result containing `X`.
+
+# Related
+
+  - [`set_drawdown_constraints!`](@ref)
+  - [`set_risk_bounds_and_expression!`](@ref)
+"""
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::EntropicValueatRisk,
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; kwargs...)

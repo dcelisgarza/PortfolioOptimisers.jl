@@ -1,3 +1,30 @@
+"""
+    set_risk_constraints!(model, i, r::PowerNormValueatRisk, opt, pr, args...; kwargs...)
+    set_risk_constraints!(model, i, r::PowerNormValueatRiskRange, opt, pr, args...; kwargs...)
+    set_risk_constraints!(model, i, r::PowerNormDrawdownatRisk, opt, pr, args...; kwargs...)
+
+Add Power-Norm Value-at-Risk, PNVaR range, or Power-Norm Drawdown-at-Risk constraints to
+`model`.
+
+Each overload uses power cone constraints (`PowerCone`) parameterised by `r.p` (or `r.pa`,
+`r.pb` for the range variant) to encode the power-norm VaR. Auxiliary non-negative variables
+`pvar_w` and `pvar_v` encode per-observation exceedances, and a scalar `pvar_t` aggregates
+the total. The range variant introduces separate lower and upper tail variables. The drawdown
+variant operates on the drawdown path.
+
+# Arguments
+
+  - `model::JuMP.Model`: The JuMP optimisation model.
+  - `i`: Constraint index for unique naming.
+  - `r`: Risk measure instance.
+  - `opt::RiskJuMPOptimisationEstimator`: Optimisation estimator.
+  - `pr::AbstractPriorResult`: Prior result containing `X`.
+
+# Related
+
+  - [`set_drawdown_constraints!`](@ref)
+  - [`set_risk_bounds_and_expression!`](@ref)
+"""
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::PowerNormValueatRisk,
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; kwargs...)

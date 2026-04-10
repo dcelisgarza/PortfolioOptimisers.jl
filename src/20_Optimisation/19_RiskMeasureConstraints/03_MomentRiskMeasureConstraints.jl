@@ -1,3 +1,26 @@
+"""
+    calc_risk_constraint_target(r::LoHiOrderMoment{<:Any,<:Any,Nothing,<:Any}, w, mu, args...)
+    calc_risk_constraint_target(r::LoHiOrderMoment{<:Any,<:Any,<:VecNum,<:Any}, w, args...)
+    calc_risk_constraint_target(r::LoHiOrderMoment{<:Any,<:Any,<:VecScalar,<:Any}, w, ::Any, k)
+    calc_risk_constraint_target(r::LoHiOrderMoment{<:Any,<:Any,<:Number,<:Any}, ::Any, ::Any, k)
+
+Compute the target return used as the reference level for lower/upper moment risk constraints.
+
+Dispatches on the type of `r.mu`: when `nothing`, uses the prior mean vector `mu`; when a
+`VecNum`, uses `r.mu`; when a `VecScalar`, combines the vector and scalar parts with `k`;
+when a scalar `Number`, scales it by `k`.
+
+# Arguments
+
+  - `r::LoHiOrderMoment`: Risk measure carrying the target specification.
+  - `w`: Portfolio weight vector.
+  - `mu::VecNum`: Prior mean return vector.
+  - `k`: Leverage/scale variable from the model.
+
+# Related
+
+  - [`set_risk_constraints!`](@ref)
+"""
 function calc_risk_constraint_target(::LoHiOrderMoment{<:Any, <:Any, Nothing, <:Any},
                                      w::VecNum, mu::VecNum, args...)
     return LinearAlgebra.dot(w, mu)
@@ -14,6 +37,33 @@ function calc_risk_constraint_target(r::LoHiOrderMoment{<:Any, <:Any, <:Number, 
                                      ::Any, ::Any, k)
     return r.mu * k
 end
+"""
+    set_risk_constraints!(model, i, r::LowOrderMoment{<:Any,<:Any,<:Any,<:FirstLowerMoment}, opt, pr, args...; kwargs...)
+    set_risk_constraints!(model, i, r::LowOrderMoment{<:Any,<:Any,<:Any,<:MeanAbsoluteDeviation}, opt, pr, args...; kwargs...)
+    set_risk_constraints!(model, i, r::LowOrderMoment{<:Any,<:Any,<:Any,<:SecondMoment}, opt, pr, args...; kwargs...)
+
+Add first lower moment, mean absolute deviation, or second moment risk constraints to `model`.
+
+Each overload introduces auxiliary non-negative variables (semi-deviations or lower
+exceedances) for `T` observations, computes an observation-weighted mean, and adds an
+inequality constraint linking the auxiliary variables to the portfolio returns minus the
+target. The second-moment overload additionally supports full and lower-half formulations and
+multiple variance encodings via [`set_second_moment_risk!`](@ref).
+
+# Arguments
+
+  - `model::JuMP.Model`: The JuMP optimisation model.
+  - `i`: Constraint index for unique naming.
+  - `r::LowOrderMoment`: Risk measure instance.
+  - `opt::RiskJuMPOptimisationEstimator`: Optimisation estimator.
+  - `pr::AbstractPriorResult`: Prior result containing `X` (returns matrix) and `mu`.
+
+# Related
+
+  - [`calc_risk_constraint_target`](@ref)
+  - [`set_second_moment_risk!`](@ref)
+  - [`set_risk_bounds_and_expression!`](@ref)
+"""
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::LowOrderMoment{<:Any, <:Any, <:Any, <:FirstLowerMoment},
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
@@ -61,6 +111,35 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     set_risk_bounds_and_expression!(model, opt, mad_risk, r.settings, key)
     return mad_risk
 end
+"""
+    set_second_moment_risk!(model, ::QuadRiskExpr, ::Any, factor, second_moment, key, args...)
+    set_second_moment_risk!(model, ::RSOCRiskExpr, i, factor, second_moment, key, keyt, keyc, args...)
+    set_second_moment_risk!(model, ::SquaredSOCRiskExpr, i, factor, second_moment, key, keyt, keyc, tsecond_moment)
+    set_second_moment_risk!(model, ::SOCRiskExpr, i, factor, second_moment, key, keyt, keyc, tsecond_moment)
+
+Build the second-moment risk JuMP expression in one of four encodings.
+
+The `QuadRiskExpr` overload encodes variance as a quadratic dot product. The `RSOCRiskExpr`
+overload uses a rotated second-order cone to encode the squared norm. The `SquaredSOCRiskExpr`
+overload squares an existing SOC variable. The `SOCRiskExpr` overload returns the SOC
+variable directly (standard deviation form). All methods return the risk expression and a
+scaling factor.
+
+# Arguments
+
+  - `model::JuMP.Model`: The JuMP optimisation model.
+  - `i`: Constraint index for unique naming.
+  - `factor::Number`: Variance correction factor (e.g. `1 / (T - 1)`).
+  - `second_moment`: Return deviation vector or matrix.
+  - `key::Symbol`: Symbol for storing the expression in the model.
+  - `keyt`, `keyc`: Symbols for the auxiliary variable and its constraint.
+  - `tsecond_moment`: Pre-existing SOC variable (used by SquaredSOC/SOC overloads).
+
+# Related
+
+  - [`set_risk_constraints!`](@ref)
+  - [`second_moment_bound_val`](@ref)
+"""
 function set_second_moment_risk!(model::JuMP.Model, ::QuadRiskExpr, ::Any, factor::Number,
                                  second_moment, key::Symbol, args...)
     return model[key] = JuMP.@expression(model,
@@ -91,6 +170,28 @@ function set_second_moment_risk!(model::JuMP.Model, ::SOCRiskExpr, i::Any, facto
     factor = sqrt(factor)
     return model[key] = JuMP.@expression(model, factor * tsecond_moment), factor
 end
+"""
+    second_moment_bound_val(alg::SecondMomentFormulation, ub::Frontier, factor)
+    second_moment_bound_val(alg::SecondMomentFormulation, ub::VecNum, factor)
+    second_moment_bound_val(alg::SecondMomentFormulation, ub::Number, factor)
+    second_moment_bound_val(::Any, ::Nothing, ::Any)
+
+Convert an upper-bound value to the appropriate scale for the second-moment bounding variable.
+
+Scales `ub` by `inv(factor)` and, when the formulation is not `SOCRiskExpr`, applies a
+square-root transformation to convert from variance to standard-deviation units. Returns
+`nothing` when `ub` is `nothing`.
+
+# Arguments
+
+  - `alg::SecondMomentFormulation`: Second-moment risk formulation (e.g. `SOCRiskExpr`).
+  - `ub`: Upper bound value (scalar, vector, `Frontier`, or `nothing`).
+  - `factor::Number`: Variance correction factor.
+
+# Related
+
+  - [`set_second_moment_risk!`](@ref)
+"""
 function second_moment_bound_val(alg::SecondMomentFormulation, ub::Frontier, factor::Number)
     return _Frontier(; N = ub.N, factor = inv(factor), flag = isa(alg, SOCRiskExpr))
 end

@@ -1,3 +1,21 @@
+"""
+    get_chol_or_Gkt_pm(model, pr::HighOrderPrior)
+
+Retrieve or compute and cache the Cholesky factor of the co-kurtosis matrix.
+
+If `model` does not yet contain `Gkt`, computes the upper Cholesky factor of
+`pr.S2 * pr.kt * pr.S2'` and stores it as `model[:Gkt]`.
+
+# Arguments
+
+  - `model::JuMP.Model`: The JuMP optimisation model.
+  - `pr::HighOrderPrior`: High-order prior containing `kt` and `S2`.
+
+# Related
+
+  - [`get_kt_Akt_pm`](@ref)
+  - [`set_risk_constraints!`](@ref)
+"""
 function get_chol_or_Gkt_pm(model::JuMP.Model, pr::HighOrderPrior)
     if !haskey(model, :Gkt)
         #=
@@ -15,6 +33,24 @@ function get_chol_or_Gkt_pm(model::JuMP.Model, pr::HighOrderPrior)
     end
     return model[:Gkt]
 end
+"""
+    get_kt_Akt_pm(model, pr::HighOrderPrior)
+
+Retrieve or compute and cache the eigendecomposition of the co-kurtosis matrix.
+
+Builds the block-vectorised kurtosis matrix `A`, clamps its eigenvalues to be non-negative,
+and stores `vals_Akt` and `vecs_Akt` in `model`.
+
+# Arguments
+
+  - `model::JuMP.Model`: The JuMP optimisation model.
+  - `pr::HighOrderPrior`: High-order prior containing `kt` and `mu`.
+
+# Related
+
+  - [`get_chol_or_Gkt_pm`](@ref)
+  - [`set_risk_constraints!`](@ref)
+"""
 function get_kt_Akt_pm(model::JuMP.Model, pr::HighOrderPrior)
     if !haskey(model, :vecs_Akt)
         N = length(pr.mu)
@@ -28,6 +64,35 @@ function get_kt_Akt_pm(model::JuMP.Model, pr::HighOrderPrior)
     end
     return model[:vals_Akt], model[:vecs_Akt]
 end
+"""
+    set_kurtosis_risk!(model, r::Kurtosis{...,<:SOCRiskExpr}, opt, sqrt_kurtosis_risk, ::Any, key, args...)
+    set_kurtosis_risk!(model, r::Kurtosis{...,<:SquaredSOCRiskExpr}, opt, sqrt_kurtosis_risk, ::Any, key, args...)
+    set_kurtosis_risk!(model, r::Kurtosis{...,<:QuadRiskExpr}, opt, sqrt_kurtosis_risk, x_kurt, key, args...)
+    set_kurtosis_risk!(model, r::Kurtosis{...,<:RSOCRiskExpr}, opt, sqrt_kurtosis_risk, x_kurt, key, i)
+
+Finalise the kurtosis risk expression and apply bounds according to the chosen formulation.
+
+The `SOCRiskExpr` overload passes the SOC variable directly to
+[`set_risk_bounds_and_expression!`](@ref). The `SquaredSOCRiskExpr` overload squares the
+variable and bounds the original variable. The `QuadRiskExpr` overload uses a quadratic
+dot product of `x_kurt`. The `RSOCRiskExpr` overload adds a rotated second-order cone
+constraint.
+
+# Arguments
+
+  - `model::JuMP.Model`: The JuMP optimisation model.
+  - `r::Kurtosis`: Kurtosis risk measure instance.
+  - `opt::RiskJuMPOptimisationEstimator`: Optimisation estimator.
+  - `sqrt_kurtosis_risk`: SOC variable representing the square root of kurtosis risk.
+  - `x_kurt`: Auxiliary vector expression used in Quad/RSOC formulations.
+  - `key::Symbol`: Symbol for storing the expression in the model.
+  - `i`: Constraint index for unique naming (used by the RSOC overload).
+
+# Related
+
+  - [`set_risk_constraints!`](@ref)
+  - [`variance_risk_bounds_val`](@ref)
+"""
 function set_kurtosis_risk!(model::JuMP.Model,
                             r::Kurtosis{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                         <:SOCRiskExpr}, opt::RiskJuMPOptimisationEstimator,
@@ -81,6 +146,33 @@ function set_kurtosis_risk!(model::JuMP.Model,
     set_risk_expression!(model, qsqrt_kurtosis_risk, r.settings.scale, r.settings.rke)
     return qsqrt_kurtosis_risk
 end
+"""
+    set_risk_constraints!(model, i, r::Kurtosis{...,<:Integer,...}, opt, pr::HighOrderPrior, args...; kwargs...)
+    set_risk_constraints!(model, i, r::Kurtosis{...,Nothing,...}, opt, pr::HighOrderPrior, args...; kwargs...)
+    set_risk_constraints!(::JuMP.Model, ::Any, ::Kurtosis, ::RiskJuMPOptimisationEstimator, pr::LowOrderPrior, args...; kwargs...)
+
+Add kurtosis risk constraints to `model`.
+
+The `Integer N` overload uses an approximate spectral decomposition of the co-kurtosis tensor
+to build `N` eigen-directions and encodes kurtosis via SOC and equality constraints. The
+`Nothing N` overload uses the full Cholesky-based formulation with the duplication matrix.
+The `LowOrderPrior` overload unconditionally throws an `ArgumentError` since kurtosis
+estimation requires a high-order prior.
+
+# Arguments
+
+  - `model::JuMP.Model`: The JuMP optimisation model.
+  - `i`: Constraint index for unique naming.
+  - `r::Kurtosis`: Kurtosis risk measure instance.
+  - `opt::RiskJuMPOptimisationEstimator`: Optimisation estimator.
+  - `pr::HighOrderPrior`: High-order prior containing `kt`, `S2`, and `L2`.
+
+# Related
+
+  - [`get_chol_or_Gkt_pm`](@ref)
+  - [`get_kt_Akt_pm`](@ref)
+  - [`set_kurtosis_risk!`](@ref)
+"""
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::Kurtosis{<:Any, <:Any, <:Any, <:Any, <:Integer, <:Any,
                                            <:Any}, opt::RiskJuMPOptimisationEstimator,

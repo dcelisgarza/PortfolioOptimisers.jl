@@ -1,3 +1,32 @@
+"""
+    set_risk_constraints!(model, i, r::ConditionalValueatRisk, opt, pr, args...; kwargs...)
+    set_risk_constraints!(model, i, r::ConditionalValueatRiskRange, opt, pr, args...; kwargs...)
+    set_risk_constraints!(model, i, r::DistributionallyRobustConditionalValueatRisk, opt, pr, args...; kwargs...)
+    set_risk_constraints!(model, i, r::DistributionallyRobustConditionalValueatRiskRange, opt, pr, args...; kwargs...)
+    set_risk_constraints!(model, i, r::ConditionalDrawdownatRisk, opt, pr, args...; kwargs...)
+    set_risk_constraints!(model, i, r::DistributionallyRobustConditionalDrawdownatRisk, opt, pr, args...; kwargs...)
+
+Add conditional risk constraints (CVaR, DRCVaR, CDaR, and their range/DR variants) to `model`.
+
+Each overload introduces auxiliary non-negative exceedance variables and constructs the
+appropriate weighted-sum CVaR (or CDaR) expression. The distributionally robust variants add
+infinity-norm cone constraints to handle distributional ambiguity over an `r.r`-radius ball.
+Range variants compute the difference between lower-tail and upper-tail conditional
+risk expressions.
+
+# Arguments
+
+  - `model::JuMP.Model`: The JuMP optimisation model.
+  - `i`: Constraint index for unique naming.
+  - `r`: Risk measure instance.
+  - `opt::RiskJuMPOptimisationEstimator`: Optimisation estimator.
+  - `pr::AbstractPriorResult`: Prior result containing `X`.
+
+# Related
+
+  - [`set_drawdown_constraints!`](@ref)
+  - [`set_risk_bounds_and_expression!`](@ref)
+"""
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::ConditionalValueatRisk,
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; kwargs...)

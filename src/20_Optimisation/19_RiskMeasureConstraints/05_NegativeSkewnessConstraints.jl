@@ -1,3 +1,21 @@
+"""
+    get_chol_or_V_pm(model, pr::HighOrderPrior)
+
+Retrieve or compute and cache the square-root matrix of the co-skewness matrix `V`.
+
+If `model` does not yet contain `GV`, attempts a Cholesky factorisation of `pr.V` and falls
+back to `sqrt(pr.V)` for positive-semidefinite matrices. Stores the result as `model[:GV]`.
+
+# Arguments
+
+  - `model::JuMP.Model`: The JuMP optimisation model.
+  - `pr::HighOrderPrior`: High-order prior containing `V`.
+
+# Related
+
+  - [`set_negative_skewness_risk!`](@ref)
+  - [`set_risk_constraints!`](@ref)
+"""
 function get_chol_or_V_pm(model::JuMP.Model, pr::HighOrderPrior)
     if !haskey(model, :GV)
         G = try
@@ -13,6 +31,31 @@ function get_chol_or_V_pm(model::JuMP.Model, pr::HighOrderPrior)
     end
     return model[:GV]
 end
+"""
+    set_negative_skewness_risk!(model, r::NegativeSkewness{...,<:SOCRiskExpr}, opt, nskew_risk, key, args...)
+    set_negative_skewness_risk!(model, r::NegativeSkewness{...,<:SquaredSOCRiskExpr}, opt, nskew_risk, key, args...)
+    set_negative_skewness_risk!(model, r::NegativeSkewness{...,<:QuadRiskExpr}, opt, nskew_risk, key, V)
+
+Finalise the negative-skewness risk expression and apply bounds according to the formulation.
+
+The `SOCRiskExpr` overload passes the SOC variable directly to
+[`set_risk_bounds_and_expression!`](@ref). The `SquaredSOCRiskExpr` overload squares it. The
+`QuadRiskExpr` overload encodes skewness as the quadratic form `w' * V * w`.
+
+# Arguments
+
+  - `model::JuMP.Model`: The JuMP optimisation model.
+  - `r::NegativeSkewness`: Negative-skewness risk measure instance.
+  - `opt::RiskJuMPOptimisationEstimator`: Optimisation estimator.
+  - `nskew_risk`: SOC variable for negative-skewness risk.
+  - `key::Symbol`: Symbol for storing the expression in the model.
+  - `V::MatNum`: Co-skewness matrix (used only by the Quad overload).
+
+# Related
+
+  - [`set_risk_constraints!`](@ref)
+  - [`variance_risk_bounds_val`](@ref)
+"""
 function set_negative_skewness_risk!(model::JuMP.Model,
                                      r::NegativeSkewness{<:Any, <:Any, <:Any, <:Any,
                                                          <:SOCRiskExpr},
@@ -48,6 +91,30 @@ function set_negative_skewness_risk!(model::JuMP.Model,
     set_risk_expression!(model, qnskew_risk, r.settings.scale, r.settings.rke)
     return qnskew_risk
 end
+"""
+    set_risk_constraints!(model, i, r::NegativeSkewness, opt, pr::HighOrderPrior, args...; kwargs...)
+    set_risk_constraints!(::JuMP.Model, ::Any, ::NegativeSkewness, ::RiskJuMPOptimisationEstimator, pr::LowOrderPrior, args...; kwargs...)
+
+Add negative-skewness risk constraints to `model`.
+
+The `HighOrderPrior` overload selects the co-skewness matrix (from `r.V` or `pr.V`),
+creates a scalar variable, adds the SOC constraint `[sc * nskew_risk; sc * G * w] in SOC`,
+and dispatches to [`set_negative_skewness_risk!`](@ref) for bounding. The `LowOrderPrior`
+overload unconditionally throws an `ArgumentError`.
+
+# Arguments
+
+  - `model::JuMP.Model`: The JuMP optimisation model.
+  - `i`: Constraint index for unique naming.
+  - `r::NegativeSkewness`: Negative-skewness risk measure instance.
+  - `opt::RiskJuMPOptimisationEstimator`: Optimisation estimator.
+  - `pr::HighOrderPrior`: High-order prior containing `V`.
+
+# Related
+
+  - [`get_chol_or_V_pm`](@ref)
+  - [`set_negative_skewness_risk!`](@ref)
+"""
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::NegativeSkewness,
                                opt::RiskJuMPOptimisationEstimator, pr::HighOrderPrior,
                                args...; kwargs...)
