@@ -154,8 +154,43 @@ Subtypes find OWA weights by minimising a squared-distance or squared-sum object
   - [`MinimumSumSquares`](@ref)
 """
 abstract type SquaredOrderedWeightsArrayAlgorithm{T} <: AbstractOrderedWeightsArrayAlgorithm end
+"""
+    const UnionAllSOCRiskExpr = Union{<:SquaredSOCRiskExpr, <:RSOCRiskExpr, <:SOCRiskExpr}
+
+Union of all second-order cone risk expression formulation types.
+
+# Related
+
+  - [`SquaredSOCRiskExpr`](@ref)
+  - [`RSOCRiskExpr`](@ref)
+  - [`SOCRiskExpr`](@ref)
+  - [`UnionSOCRiskExpr`](@ref)
+  - [`UnionRSOCSOCRiskExpr`](@ref)
+"""
 const UnionAllSOCRiskExpr = Union{<:SquaredSOCRiskExpr, <:RSOCRiskExpr, <:SOCRiskExpr}
+"""
+    const UnionSOCRiskExpr = Union{<:SquaredSOCRiskExpr, <:SOCRiskExpr}
+
+Union of squared and plain SOC risk expression formulation types (excludes RSOC).
+
+# Related
+
+  - [`SquaredSOCRiskExpr`](@ref)
+  - [`SOCRiskExpr`](@ref)
+  - [`UnionAllSOCRiskExpr`](@ref)
+"""
 const UnionSOCRiskExpr = Union{<:SquaredSOCRiskExpr, <:SOCRiskExpr}
+"""
+    const UnionRSOCSOCRiskExpr = Union{<:RSOCRiskExpr, <:SOCRiskExpr}
+
+Union of RSOC and plain SOC risk expression formulation types (excludes squared SOC).
+
+# Related
+
+  - [`RSOCRiskExpr`](@ref)
+  - [`SOCRiskExpr`](@ref)
+  - [`UnionAllSOCRiskExpr`](@ref)
+"""
 const UnionRSOCSOCRiskExpr = Union{<:RSOCRiskExpr, <:SOCRiskExpr}
 """
 $(DocStringExtensions.TYPEDEF)

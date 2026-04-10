@@ -475,8 +475,31 @@ end
 function needs_previous_weights(r::ExpectedReturnRiskRatio)
     return needs_previous_weights(r.rk)
 end
+"""
+    const PerfRM = Union{...}
+
+Union of performance risk measures used to compute portfolio performance metrics (returns and return/risk ratios).
+
+# Related
+
+  - [`MeanReturn`](@ref)
+  - [`MeanReturnRiskRatio`](@ref)
+  - [`ExpectedReturn`](@ref)
+  - [`ExpectedReturnRiskRatio`](@ref)
+"""
 const PerfRM = Union{<:MeanReturn, <:MeanReturnRiskRatio, <:ExpectedReturn,
                      <:ExpectedReturnRiskRatio}
+"""
+    const PrRM = Union{<:ExpectedReturn, <:ExpectedReturnRiskRatio}
+
+Union of prior-based return risk measures that are incompatible with [`PredictionResult`](@ref) inputs and require the use of [`MeanReturn`](@ref) or [`MeanReturnRiskRatio`](@ref) instead.
+
+# Related
+
+  - [`ExpectedReturn`](@ref)
+  - [`ExpectedReturnRiskRatio`](@ref)
+  - [`PerfRM`](@ref)
+"""
 const PrRM = Union{<:ExpectedReturn, <:ExpectedReturnRiskRatio}
 function bigger_is_better(::PerfRM)
     return true

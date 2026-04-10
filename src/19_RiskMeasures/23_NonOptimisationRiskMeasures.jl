@@ -307,6 +307,19 @@ function Skewness(; ve::AbstractVarianceEstimator = SimpleVariance(),
                   mu::Option{<:Num_VecNum_VecScalar} = nothing)
     return Skewness(ve, w, mu)
 end
+"""
+    const TCM_Sk{T1, T2} = Union{...}
+
+Parameterised union of [`ThirdCentralMoment`](@ref) and [`Skewness`](@ref) sharing the same observation-weight (`T1`) and target-mean (`T2`) type parameters.
+
+Used for unified dispatch on moment-target calculation methods.
+
+# Related
+
+  - [`ThirdCentralMoment`](@ref)
+  - [`Skewness`](@ref)
+  - [`calc_moment_target`](@ref)
+"""
 const TCM_Sk{T1, T2} = Union{<:ThirdCentralMoment{T1, T2}, <:Skewness{<:Any, T1, T2}}
 function calc_moment_target(::TCM_Sk{Nothing, Nothing}, ::Any, x::VecNum)
     return Statistics.mean(x)

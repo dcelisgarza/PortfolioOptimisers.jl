@@ -785,6 +785,19 @@ function HighOrderMoment(; settings::RiskMeasureSettings = RiskMeasureSettings()
                          alg::HighOrderMomentMeasureAlgorithm = ThirdLowerMoment())
     return HighOrderMoment(settings, w, mu, alg)
 end
+"""
+    const LoHiOrderMoment{T1, T2, T3, T4} = Union{...}
+
+Parameterised union of [`LowOrderMoment`](@ref) and [`HighOrderMoment`](@ref) sharing the same type parameters.
+
+Used for unified dispatch on moment-target calculation methods.
+
+# Related
+
+  - [`LowOrderMoment`](@ref)
+  - [`HighOrderMoment`](@ref)
+  - [`calc_moment_target`](@ref)
+"""
 const LoHiOrderMoment{T1, T2, T3, T4} = Union{<:LowOrderMoment{T1, T2, T3, T4},
                                               <:HighOrderMoment{T1, T2, T3, T4}}
 """

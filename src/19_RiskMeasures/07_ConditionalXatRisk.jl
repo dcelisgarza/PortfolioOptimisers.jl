@@ -191,6 +191,18 @@ function DistributionallyRobustConditionalValueatRisk(;
                                                       w::Option{<:ObsWeights} = nothing)
     return DistributionallyRobustConditionalValueatRisk(settings, alpha, l, r, w)
 end
+"""
+    const RMCVaR{T} = Union{...}
+
+Parameterised union of [`ConditionalValueatRisk`](@ref) and [`DistributionallyRobustConditionalValueatRisk`](@ref) sharing the same observation-weight type parameter `T`.
+
+Used for unified dispatch on CVaR computation methods.
+
+# Related
+
+  - [`ConditionalValueatRisk`](@ref)
+  - [`DistributionallyRobustConditionalValueatRisk`](@ref)
+"""
 const RMCVaR{T} = Union{<:ConditionalValueatRisk{<:Any, <:Any, T},
                         <:DistributionallyRobustConditionalValueatRisk{<:Any, <:Any, <:Any,
                                                                        <:Any, T}}
@@ -449,6 +461,18 @@ function factory(r::DistributionallyRobustConditionalValueatRiskRange,
                                                              l_b = r.l_b, r_b = r.r_b,
                                                              w = w)
 end
+"""
+    const RMCVaRRg{T} = Union{...}
+
+Parameterised union of [`ConditionalValueatRiskRange`](@ref) and [`DistributionallyRobustConditionalValueatRiskRange`](@ref) sharing the same observation-weight type parameter `T`.
+
+Used for unified dispatch on CVaR-range computation methods.
+
+# Related
+
+  - [`ConditionalValueatRiskRange`](@ref)
+  - [`DistributionallyRobustConditionalValueatRiskRange`](@ref)
+"""
 const RMCVaRRg{T} = Union{<:ConditionalValueatRiskRange{<:Any, <:Any, <:Any, T},
                           <:DistributionallyRobustConditionalValueatRiskRange{<:Any, <:Any,
                                                                               <:Any, <:Any,
@@ -695,6 +719,18 @@ function DistributionallyRobustConditionalDrawdownatRisk(;
                                                          w::Option{<:ObsWeights} = nothing)
     return DistributionallyRobustConditionalDrawdownatRisk(settings, alpha, l, r, w)
 end
+"""
+    const RMCDaR{T} = Union{...}
+
+Parameterised union of [`ConditionalDrawdownatRisk`](@ref) and [`DistributionallyRobustConditionalDrawdownatRisk`](@ref) sharing the same observation-weight type parameter `T`.
+
+Used for unified dispatch on CDaR computation methods.
+
+# Related
+
+  - [`ConditionalDrawdownatRisk`](@ref)
+  - [`DistributionallyRobustConditionalDrawdownatRisk`](@ref)
+"""
 const RMCDaR{T} = Union{<:ConditionalDrawdownatRisk{<:Any, <:Any, <:T},
                         <:DistributionallyRobustConditionalDrawdownatRisk{<:Any, <:Any,
                                                                           <:Any, <:Any,

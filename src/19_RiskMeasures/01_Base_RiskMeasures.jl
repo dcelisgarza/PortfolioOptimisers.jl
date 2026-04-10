@@ -18,9 +18,35 @@ abstract type AbstractBaseRiskMeasure <: AbstractEstimator end
 function needs_previous_weights(::AbstractBaseRiskMeasure)
     return false
 end
+"""
+    bigger_is_better(r::AbstractBaseRiskMeasure) -> Bool
+
+Return whether a larger value of risk measure `r` is preferred over a smaller one.
+
+The default implementation returns `false` (lower risk is better) for all [`AbstractBaseRiskMeasure`](@ref) subtypes. Ratio-based or return-like measures that should be maximised may override this method to return `true`.
+
+# Returns
+
+  - `Bool`: `true` if a higher value of `r` is preferred; `false` otherwise.
+
+# Related
+
+  - [`AbstractBaseRiskMeasure`](@ref)
+"""
 function bigger_is_better(::AbstractBaseRiskMeasure)
     return false
 end
+"""
+    const VecBaseRM = AbstractVector{<:AbstractBaseRiskMeasure}
+
+Alias for an abstract vector of [`AbstractBaseRiskMeasure`](@ref) elements.
+
+# Related
+
+  - [`AbstractBaseRiskMeasure`](@ref)
+  - [`VecOptRM`](@ref)
+  - [`VecRM`](@ref)
+"""
 const VecBaseRM = AbstractVector{<:AbstractBaseRiskMeasure}
 function needs_previous_weights(r::VecBaseRM)
     return any(needs_previous_weights.(r))
@@ -55,7 +81,28 @@ All concrete risk measures that can be used as objectives or constraints in opti
   - [`AbstractBaseRiskMeasure`](@ref)
 """
 abstract type OptimisationRiskMeasure <: AbstractBaseRiskMeasure end
+"""
+    const VecOptRM = AbstractVector{<:OptimisationRiskMeasure}
+
+Alias for an abstract vector of [`OptimisationRiskMeasure`](@ref) elements.
+
+# Related
+
+  - [`OptimisationRiskMeasure`](@ref)
+  - [`OptRM_VecOptRM`](@ref)
+  - [`VecRM`](@ref)
+"""
 const VecOptRM = AbstractVector{<:OptimisationRiskMeasure}
+"""
+    const OptRM_VecOptRM = Union{<:OptimisationRiskMeasure, <:VecOptRM}
+
+Union type accepting a single [`OptimisationRiskMeasure`](@ref) or a vector of them.
+
+# Related
+
+  - [`OptimisationRiskMeasure`](@ref)
+  - [`VecOptRM`](@ref)
+"""
 const OptRM_VecOptRM = Union{<:OptimisationRiskMeasure, <:VecOptRM}
 """
 $(DocStringExtensions.TYPEDEF)
@@ -70,7 +117,28 @@ Subtype `RiskMeasure` to implement concrete risk measures that quantify portfoli
   - [`HierarchicalRiskMeasure`](@ref)
 """
 abstract type RiskMeasure <: OptimisationRiskMeasure end
+"""
+    const VecRM = AbstractVector{<:RiskMeasure}
+
+Alias for an abstract vector of [`RiskMeasure`](@ref) elements.
+
+# Related
+
+  - [`RiskMeasure`](@ref)
+  - [`RM_VecRM`](@ref)
+  - [`VecOptRM`](@ref)
+"""
 const VecRM = AbstractVector{<:RiskMeasure}
+"""
+    const RM_VecRM = Union{<:RiskMeasure, <:VecRM}
+
+Union type accepting a single [`RiskMeasure`](@ref) or a vector of them.
+
+# Related
+
+  - [`RiskMeasure`](@ref)
+  - [`VecRM`](@ref)
+"""
 const RM_VecRM = Union{<:RiskMeasure, <:VecRM}
 """
 $(DocStringExtensions.TYPEDEF)
@@ -163,7 +231,31 @@ end
 function _Frontier(; N::Integer = 20, factor::Number, flag::Bool)
     return Frontier(N, factor, flag)
 end
+"""
+    const RkRtBounds = Union{<:Num_VecNum, <:Frontier}
+
+Union type for risk-measure upper bound specifications.
+
+Accepts either a scalar/vector numeric bound or a [`Frontier`](@ref) sweep configuration. Used in [`RiskMeasureSettings`](@ref) to set the upper bound field.
+
+# Related
+
+  - [`Frontier`](@ref)
+  - [`Num_VecNum`](@ref)
+  - [`RiskMeasureSettings`](@ref)
+"""
 const RkRtBounds = Union{<:Num_VecNum, <:Frontier}
+"""
+    const Front_NumVec = Union{<:VecNum, <:Frontier}
+
+Union type for frontier or numeric-vector specifications used internally for risk bounds.
+
+# Related
+
+  - [`Frontier`](@ref)
+  - [`VecNum`](@ref)
+  - [`RkRtBounds`](@ref)
+"""
 const Front_NumVec = Union{<:VecNum, <:Frontier}
 """
 $(DocStringExtensions.TYPEDEF)

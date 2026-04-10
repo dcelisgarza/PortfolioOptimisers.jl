@@ -240,6 +240,42 @@ function Base.split(ccv::CombinatorialCrossValidation, rd::ReturnsResult)
     return CombinatorialCrossValidationResult(; train_idx = train_idx,
                                               test_idx = test_idx_list, path_ids = path_ids)
 end
+"""
+    optimal_number_folds(T::Integer, target_train_size::Integer,
+                         target_n_test_paths::Integer; train_size_w::Number = 1,
+                         n_test_paths_w::Number = 1, maxval::Number = 1e5) -> Tuple{Int, Int}
+
+Find the optimal `(n_folds, n_test_folds)` pair for combinatorial cross-validation by minimising a weighted cost that balances the average training size against the number of test paths.
+
+# Arguments
+
+  - `T`: Total number of observations in the dataset.
+  - `target_train_size`: Desired average number of observations in each training set.
+  - `target_n_test_paths`: Desired number of recombined test paths.
+  - `train_size_w`: Weight applied to the training-size component of the cost (default `1`).
+  - `n_test_paths_w`: Weight applied to the test-paths component of the cost (default `1`).
+  - `maxval`: Early-exit threshold; a fold configuration whose cost exceeds `maxval` prunes subsequent higher `n_test_folds` values (default `1e5`).
+
+# Returns
+
+  - `Tuple{Int, Int}`: The optimal `(n_folds, n_test_folds)` pair minimising the weighted cost. Returns `(0, 0)` when no valid configuration is found.
+
+# Details
+
+The cost function for a candidate `(n_folds, n_test_folds)` pair is:
+
+```math
+\\text{cost} = w_{\\text{ntp}} \\frac{|P(n,k) - P^*|}{P^*} + w_{\\text{tr}} \\frac{|\\bar{T}(n,k) - T^*|}{T^*}
+```
+
+where ``P(n,k)`` is the number of test paths, ``\\bar{T}(n,k)`` is the average training size, ``P^*`` is `target_n_test_paths`, and ``T^*`` is `target_train_size`.
+
+# Related
+
+  - [`CombinatorialCrossValidation`](@ref)
+  - [`n_test_paths`](@ref)
+  - [`average_train_size`](@ref)
+"""
 function optimal_number_folds(T::Integer, target_train_size::Integer,
                               target_n_test_paths::Integer; train_size_w::Number = 1,
                               n_test_paths_w::Number = 1, maxval::Number = 1e5)

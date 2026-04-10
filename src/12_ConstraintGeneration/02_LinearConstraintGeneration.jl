@@ -125,7 +125,27 @@ function LinearConstraint(; ineq::Option{<:PartialLinearConstraint} = nothing,
                           eq::Option{<:PartialLinearConstraint} = nothing)
     return LinearConstraint(ineq, eq)
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Alias for an abstract vector of [`LinearConstraint`](@ref) elements.
+
+# Related
+
+  - [`LinearConstraint`](@ref)
+  - [`Lc_VecLc`](@ref)
+"""
 const VecLc = AbstractVector{<:LinearConstraint}
+"""
+    const Lc_VecLc = Union{<:LinearConstraint, <:VecLc}
+
+Alias for a union of a single [`LinearConstraint`](@ref) or a vector of them.
+
+# Related
+
+  - [`LinearConstraint`](@ref)
+  - [`VecLc`](@ref)
+"""
 const Lc_VecLc = Union{<:LinearConstraint, <:VecLc}
 function Base.getproperty(obj::LinearConstraint, sym::Symbol)
     return if sym == :A_ineq
@@ -190,7 +210,27 @@ Structured result for standard linear constraint equation parsing.
                                                                                      eqn)
     end
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Alias for an abstract vector of [`ParsingResult`](@ref) elements.
+
+# Related
+
+  - [`ParsingResult`](@ref)
+  - [`PR_VecPR`](@ref)
+"""
 const VecPR = AbstractVector{<:ParsingResult}
+"""
+    const PR_VecPR = Union{<:ParsingResult, <:VecPR}
+
+Alias for a union of a single [`ParsingResult`](@ref) or a vector of them.
+
+# Related
+
+  - [`ParsingResult`](@ref)
+  - [`VecPR`](@ref)
+"""
 const PR_VecPR = Union{<:ParsingResult, <:VecPR}
 """
 $(DocStringExtensions.TYPEDEF)
@@ -1274,10 +1314,59 @@ end
 function LinearConstraintEstimator(; val::EqnType, key::Option{<:AbstractString} = nothing)
     return LinearConstraintEstimator(val, key)
 end
+"""
+    const LcE_Lc = Union{<:LinearConstraintEstimator, <:LinearConstraint}
+
+Alias for a union of linear constraint estimator and linear constraint types.
+
+# Related
+
+  - [`LinearConstraintEstimator`](@ref)
+  - [`LinearConstraint`](@ref)
+"""
 const LcE_Lc = Union{<:LinearConstraintEstimator, <:LinearConstraint}
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Alias for an abstract vector of [`LcE_Lc`](@ref) elements.
+
+# Related
+
+  - [`LcE_Lc`](@ref)
+"""
 const VecLcE_Lc = AbstractVector{<:LcE_Lc}
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Alias for an abstract vector of [`LinearConstraintEstimator`](@ref) elements.
+
+# Related
+
+  - [`LinearConstraintEstimator`](@ref)
+  - [`LcE_VecLcE`](@ref)
+"""
 const VecLcE = AbstractVector{<:LinearConstraintEstimator}
+"""
+    const LcE_Lc_VecLcE_Lc = Union{<:LcE_Lc, <:VecLcE_Lc}
+
+Alias for a union of [`LcE_Lc`](@ref) or a vector of them.
+
+# Related
+
+  - [`LcE_Lc`](@ref)
+  - [`VecLcE_Lc`](@ref)
+"""
 const LcE_Lc_VecLcE_Lc = Union{<:LcE_Lc, <:VecLcE_Lc}
+"""
+    const LcE_VecLcE = Union{<:LinearConstraintEstimator, <:VecLcE}
+
+Alias for a union of a single [`LinearConstraintEstimator`](@ref) or a vector of them.
+
+# Related
+
+  - [`LinearConstraintEstimator`](@ref)
+  - [`VecLcE`](@ref)
+"""
 const LcE_VecLcE = Union{<:LinearConstraintEstimator, <:VecLcE}
 """
     linear_constraints(lcs::Option{<:LinearConstraint}, args...; kwargs...)

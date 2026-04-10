@@ -4,4 +4,5 @@
 CombinatorialCrossValidation
 CombinatorialCrossValidationResult
 Base.split(ccv::CombinatorialCrossValidation, rd::ReturnsResult)
+optimal_number_folds
 ```

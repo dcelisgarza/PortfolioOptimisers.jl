@@ -74,6 +74,30 @@ abstract type CrossValidationSearchScorer <: AbstractEstimator end
 Union type for search cross-validation scoring strategies. Accepts either a subtype of `CrossValidationSearchScorer` or a plain function that accepts a matrix and returns an integer.
 """
 const CrossValSearchScorer = Union{<:CrossValidationSearchScorer, <:Function}
+"""
+$(DocStringExtensions.TYPEDEF)
+
+A [`CrossValidationSearchScorer`](@ref) that selects the parameter set with the highest mean score across cross-validation splits.
+
+When called with a score matrix (rows = CV splits, columns = parameter sets), it returns the column index with the largest mean score.
+
+# Examples
+
+```jldoctest
+julia> scorer = PortfolioOptimisers.HighestMeanScore();
+
+julia> scores = [0.5 0.8; 0.6 0.7];
+
+julia> scorer(scores)
+2
+```
+
+# Related
+
+  - [`CrossValidationSearchScorer`](@ref)
+  - [`CrossValSearchScorer`](@ref)
+  - [`SearchCrossValidationResult`](@ref)
+"""
 struct HighestMeanScore <: CrossValidationSearchScorer end
 function (s::HighestMeanScore)(X::MatNum; dims::Integer = 1)
     return argmax(dropdims(mean(X; dims = dims); dims = dims))

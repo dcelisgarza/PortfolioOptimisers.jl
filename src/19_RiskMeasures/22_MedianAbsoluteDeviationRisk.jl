@@ -34,6 +34,19 @@ Centres the returns series using the (weighted) mean before computing the Median
   - [`MedianAbsoluteDeviation`](@ref)
 """
 struct MeanCentering <: MedianCenteringFunction end
+"""
+    const MedAbsDevMu = Union{<:Num_VecNum_VecScalar, <:MedianCenteringFunction}
+
+Union of valid centring-target types for [`MedianAbsoluteDeviation`](@ref).
+
+Accepts a numeric scalar/vector target or a [`MedianCenteringFunction`](@ref) (e.g. mean or median centering).
+
+# Related
+
+  - [`Num_VecNum_VecScalar`](@ref)
+  - [`MedianCenteringFunction`](@ref)
+  - [`MedianAbsoluteDeviation`](@ref)
+"""
 const MedAbsDevMu = Union{<:Num_VecNum_VecScalar, <:MedianCenteringFunction}
 """
 $(DocStringExtensions.TYPEDEF)

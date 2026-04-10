@@ -313,6 +313,16 @@ function factory(r::RiskTrackingRiskMeasure, w::VecNum)
     return RiskTrackingRiskMeasure(; settings = r.settings, tr = factory(r.tr, w),
                                    r = factory(r.r, w), alg = r.alg)
 end
+"""
+    const TrRM = Union{<:TrackingRiskMeasure, <:RiskTrackingRiskMeasure}
+
+Union of tracking risk measures used for dispatch on factory methods and expected risk computations.
+
+# Related
+
+  - [`TrackingRiskMeasure`](@ref)
+  - [`RiskTrackingRiskMeasure`](@ref)
+"""
 const TrRM = Union{<:TrackingRiskMeasure, <:RiskTrackingRiskMeasure}
 
 export TrackingRiskMeasure, RiskTrackingRiskMeasure, RiskTrackingError

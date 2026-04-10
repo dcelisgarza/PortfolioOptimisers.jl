@@ -108,6 +108,16 @@ Uses the previous step's probabilities to optimise the next step's probabilities
   - [`H1_EntropyPooling`](@ref)
 """
 struct H2_EntropyPooling <: AbstractEntropyPoolingAlgorithm end
+"""
+    const StagedEP = Union{<:H1_EntropyPooling, <:H2_EntropyPooling}
+
+Alias for a union of staged entropy pooling algorithm types.
+
+# Related
+
+  - [`H1_EntropyPooling`](@ref)
+  - [`H2_EntropyPooling`](@ref)
+"""
 const StagedEP = Union{<:H1_EntropyPooling, <:H2_EntropyPooling}
 """
 $(DocStringExtensions.TYPEDEF)
@@ -363,6 +373,16 @@ function JuMPEntropyPooling(; slv::Slv_VecSlv, sc1::Number = 1, sc2::Number = 1e
                             alg::AbstractEntropyPoolingOptAlgorithm = ExpEntropyPooling())
     return JuMPEntropyPooling(slv, sc1, sc2, so, alg)
 end
+"""
+    const NonCVaREP = Union{<:OptimEntropyPooling, <:JuMPEntropyPooling}
+
+Alias for a union of non-CVaR entropy pooling algorithm types.
+
+# Related
+
+  - [`OptimEntropyPooling`](@ref)
+  - [`JuMPEntropyPooling`](@ref)
+"""
 const NonCVaREP = Union{<:OptimEntropyPooling, <:JuMPEntropyPooling}
 """
 $(DocStringExtensions.TYPEDEF)
@@ -606,6 +626,15 @@ function Base.getproperty(obj::EntropyPoolingPrior, sym::Symbol)
         getfield(obj, sym)
     end
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Alias for an abstract vector of [`EntropyPoolingPrior`](@ref) elements.
+
+# Related
+
+  - [`EntropyPoolingPrior`](@ref)
+"""
 const VecEP = AbstractVector{<:EntropyPoolingPrior}
 function factory(pe::EntropyPoolingPrior, w::ObsWeights)
     return EntropyPoolingPrior(; pe = factory(pe.pe, w), mu_views = pe.mu_views,

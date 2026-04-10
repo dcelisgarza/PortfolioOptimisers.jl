@@ -4,5 +4,6 @@
 MedianCenteringFunction
 MedianCentering
 MeanCentering
+MedAbsDevMu
 MedianAbsoluteDeviation
 ```

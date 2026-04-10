@@ -8,4 +8,6 @@ ValueatRisk
 ValueatRiskRange
 DrawdownatRisk
 RelativeDrawdownatRisk
+CholRM
+absolute_drawdown_vec
 ```

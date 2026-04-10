@@ -39,6 +39,16 @@ Represents the interface for all result types that encode uncertainty sets for r
   - [`AbstractUncertaintySetEstimator`](@ref)
 """
 abstract type AbstractUncertaintySetResult <: AbstractResult end
+"""
+    const UcSE_UcS = Union{<:AbstractUncertaintySetResult, <:AbstractUncertaintySetEstimator}
+
+Alias for a union of uncertainty set result and estimator types.
+
+# Related
+
+  - [`AbstractUncertaintySetResult`](@ref)
+  - [`AbstractUncertaintySetEstimator`](@ref)
+"""
 const UcSE_UcS = Union{<:AbstractUncertaintySetResult, <:AbstractUncertaintySetEstimator}
 """
 $(DocStringExtensions.TYPEDEF)
@@ -54,6 +64,15 @@ Subtypes implement specific methods for generating the scaling parameter, which 
   - [`ChiSqKUncertaintyAlgorithm`](@ref)
 """
 abstract type AbstractUncertaintyKAlgorithm <: AbstractAlgorithm end
+"""
+    const Num_UcSK = Union{<:AbstractUncertaintyKAlgorithm, <:Number}
+
+Alias for a union of uncertainty scaling algorithm and numeric types.
+
+# Related
+
+  - [`AbstractUncertaintyKAlgorithm`](@ref)
+"""
 const Num_UcSK = Union{<:AbstractUncertaintyKAlgorithm, <:Number}
 """
     ucs(uc::Option{<:Tuple{<:Option{<:AbstractUncertaintySetResult},

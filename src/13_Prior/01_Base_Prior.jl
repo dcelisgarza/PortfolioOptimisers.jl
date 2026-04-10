@@ -152,6 +152,17 @@ High order prior estimator using factor returns.
   - [`prior`](@ref)
 """
 abstract type AbstractHighOrderPriorEstimator_F <: AbstractHighOrderPriorEstimator end
+"""
+    const AbstractHiLoOrderPriorEstimator_F = Union{<:AbstractLowOrderPriorEstimator_F,
+                                                    <:AbstractHighOrderPriorEstimator_F}
+
+Alias for a union of low-order and high-order factor prior estimator types.
+
+# Related
+
+  - [`AbstractLowOrderPriorEstimator_F`](@ref)
+  - [`AbstractHighOrderPriorEstimator_F`](@ref)
+"""
 const AbstractHiLoOrderPriorEstimator_F = Union{<:AbstractLowOrderPriorEstimator_F,
                                                 <:AbstractHighOrderPriorEstimator_F}
 """
@@ -168,7 +179,27 @@ Abstract supertype for all prior result types.
   - [`AbstractResult`](@ref)
 """
 abstract type AbstractPriorResult <: AbstractResult end
+"""
+    const PrE_Pr = Union{<:AbstractPriorEstimator, <:AbstractPriorResult}
+
+Alias for a union of prior estimator and prior result types.
+
+# Related
+
+  - [`AbstractPriorEstimator`](@ref)
+  - [`AbstractPriorResult`](@ref)
+"""
 const PrE_Pr = Union{<:AbstractPriorEstimator, <:AbstractPriorResult}
+"""
+    const Pr_RR = Union{<:AbstractPriorResult, <:ReturnsResult}
+
+Alias for a union of prior result and returns result types.
+
+# Related
+
+  - [`AbstractPriorResult`](@ref)
+  - [`ReturnsResult`](@ref)
+"""
 const Pr_RR = Union{<:AbstractPriorResult, <:ReturnsResult}
 """
     prior(pr::AbstractPriorEstimator, rd::ReturnsResult; kwargs...)

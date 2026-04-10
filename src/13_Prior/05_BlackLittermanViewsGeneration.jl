@@ -50,6 +50,16 @@ end
 function BlackLittermanViews(; P::MatNum, Q::VecNum)
     return BlackLittermanViews(P, Q)
 end
+"""
+    const Lc_BLV = Union{<:LinearConstraintEstimator, <:BlackLittermanViews}
+
+Alias for a union of linear constraint estimator and Black-Litterman views types.
+
+# Related
+
+  - [`LinearConstraintEstimator`](@ref)
+  - [`BlackLittermanViews`](@ref)
+"""
 const Lc_BLV = Union{<:LinearConstraintEstimator, <:BlackLittermanViews}
 """
     get_black_litterman_views(lcs::PR_VecPR,

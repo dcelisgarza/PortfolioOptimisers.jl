@@ -186,6 +186,29 @@ function cumulative_returns(X::ArrNum, compound::Bool = false; dims::Int = 1)
         _relative_cumulative_returns(X; dims = dims)
     end
 end
+"""
+    absolute_drawdown_arr(X::ArrNum; cX::Bool = false, dims::Int = 1) -> ArrNum
+
+Compute the absolute drawdown array for a matrix of cumulative (or raw) returns.
+
+Each element represents the drawdown from the running peak along the specified dimension.
+
+# Arguments
+
+  - `X::ArrNum`: Returns array (or cumulative-returns array if `cX = true`).
+  - `cX::Bool = false`: If `true`, treat `X` as already cumulative returns.
+  - `dims::Int = 1`: Dimension along which to compute drawdowns.
+
+# Returns
+
+  - `ArrNum`: Drawdown array of the same shape as `X`.
+
+# Related
+
+  - [`absolute_drawdown_vec`](@ref)
+  - [`drawdowns`](@ref)
+  - [`cumulative_returns`](@ref)
+"""
 function absolute_drawdown_arr(X::ArrNum; cX::Bool = false, dims::Int = 1)
     cX = !cX ? _absolute_cumulative_returns(X; dims = dims) : X
     return cX - accumulate(max, cX; dims = dims, init = zero(eltype(X)))

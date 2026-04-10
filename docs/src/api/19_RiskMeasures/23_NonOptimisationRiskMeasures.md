@@ -5,4 +5,5 @@ MeanReturn
 MeanReturnRiskRatio
 ThirdCentralMoment
 Skewness
+TCM_Sk
 ```

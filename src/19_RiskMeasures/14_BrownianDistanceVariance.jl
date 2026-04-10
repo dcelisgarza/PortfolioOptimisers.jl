@@ -40,6 +40,17 @@ Uses explicit linear inequality constraints to encode the absolute value structu
   - [`BrownianDistanceVariance`](@ref)
 """
 struct IneqBrownianDistanceVariance <: BrownianDistanceVarianceFormulation end
+"""
+    const BDVarRkFormulations = Union{<:RSOCRiskExpr, <:QuadRiskExpr}
+
+Union of valid optimisation formulations for the [`BrownianDistanceVariance`](@ref) risk measure.
+
+# Related
+
+  - [`RSOCRiskExpr`](@ref)
+  - [`QuadRiskExpr`](@ref)
+  - [`BrownianDistanceVariance`](@ref)
+"""
 const BDVarRkFormulations = Union{<:RSOCRiskExpr, <:QuadRiskExpr}
 """
 $(DocStringExtensions.TYPEDEF)

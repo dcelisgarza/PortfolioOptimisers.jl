@@ -118,6 +118,17 @@ Specifically: `Union{<:QuadRiskExpr, <:SquaredSOCRiskExpr}`.
   - [`NegativeSkewness`](@ref)
 """
 const NSkeQuadFormulations = Union{<:QuadRiskExpr, <:SquaredSOCRiskExpr}
+"""
+    const QuadSecondMomentFormulations = Union{<:NSkeQuadFormulations, <:RSOCRiskExpr}
+
+Union of quadratic and RSOC formulations for second-moment (variance-based) risk expressions.
+
+# Related
+
+  - [`NSkeQuadFormulations`](@ref)
+  - [`RSOCRiskExpr`](@ref)
+  - [`Variance`](@ref)
+"""
 const QuadSecondMomentFormulations = Union{<:NSkeQuadFormulations, <:RSOCRiskExpr}
 """
 $(DocStringExtensions.TYPEDEF)

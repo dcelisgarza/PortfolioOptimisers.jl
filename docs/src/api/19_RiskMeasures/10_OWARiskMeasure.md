@@ -8,6 +8,9 @@ These types and functions implement the various existing formulations and risk m
 AbstractOrderedWeightsArrayEstimator
 AbstractOrderedWeightsArrayAlgorithm
 SquaredOrderedWeightsArrayAlgorithm
+UnionAllSOCRiskExpr
+UnionSOCRiskExpr
+UnionRSOCSOCRiskExpr
 ExponentialConeEntropy
 RelativeEntropy
 MaximumEntropy

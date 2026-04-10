@@ -1,4 +1,27 @@
+"""
+    const MatNum_Pr = Union{<:MatNum, <:AbstractPriorResult, <:ReturnsResult}
+
+Union of matrix-like types accepted as the data argument in [`risk_contribution`](@ref) and related functions.
+
+# Related
+
+  - [`MatNum`](@ref)
+  - [`AbstractPriorResult`](@ref)
+  - [`ReturnsResult`](@ref)
+"""
 const MatNum_Pr = Union{<:MatNum, <:AbstractPriorResult, <:ReturnsResult}
+"""
+    const ERkNetRet = Union{...}
+
+Union of risk measures whose expected risk is computed on net returns (returns after fees).
+
+These risk measures receive the net-returns vector `calc_net_returns(w, X, fees)` as their sole argument.
+
+# Related
+
+  - [`expected_risk`](@ref)
+  - [`calc_net_returns`](@ref)
+"""
 const ERkNetRet = Union{<:WorstRealisation, <:ValueatRisk, <:ValueatRiskRange,
                         <:ConditionalValueatRisk,
                         <:DistributionallyRobustConditionalValueatRisk,
@@ -17,17 +40,87 @@ const ERkNetRet = Union{<:WorstRealisation, <:ValueatRisk, <:ValueatRiskRange,
                         <:OrderedWeightsArrayRange, <:BrownianDistanceVariance,
                         <:MeanReturn, <:PowerNormValueatRisk, <:PowerNormValueatRiskRange,
                         <:PowerNormDrawdownatRisk, <:RelativePowerNormDrawdownatRisk}
+"""
+    const ERkwXFees = Union{...}
+
+Union of risk measures whose expected risk depends on both weights, returns matrix, and fees.
+
+These risk measures are called as `r(w, X, fees)`.
+
+# Related
+
+  - [`expected_risk`](@ref)
+  - [`LowOrderMoment`](@ref)
+  - [`HighOrderMoment`](@ref)
+  - [`TrackingRiskMeasure`](@ref)
+"""
 const ERkwXFees = Union{<:LowOrderMoment, <:HighOrderMoment, <:TrackingRiskMeasure,
                         <:RiskTrackingRiskMeasure, <:Kurtosis, <:ThirdCentralMoment,
                         <:Skewness, <:MedianAbsoluteDeviation}
+"""
+    const ERkX = Union{<:ERkNetRet, <:ERkwXFees}
+
+Union of all risk measures that require the returns matrix `X` (and optionally fees) for expected risk computation.
+
+# Related
+
+  - [`ERkNetRet`](@ref)
+  - [`ERkwXFees`](@ref)
+  - [`expected_risk`](@ref)
+"""
 const ERkX = Union{<:ERkNetRet, <:ERkwXFees}
+"""
+    const ERkw = Union{...}
+
+Union of risk measures whose expected risk depends only on portfolio weights.
+
+These risk measures are called as `r(w)`.
+
+# Related
+
+  - [`expected_risk`](@ref)
+  - [`StandardDeviation`](@ref)
+  - [`Variance`](@ref)
+"""
 const ERkw = Union{<:StandardDeviation, <:NegativeSkewness, <:TurnoverRiskMeasure,
                    <:Variance, <:UncertaintySetVariance, <:EqualRiskMeasure}
+"""
+    const TnTrRM = Union{<:TurnoverRiskMeasure, <:TrRM}
+
+Union of turnover and tracking risk measures used to update previous-weight dependent factories.
+
+# Related
+
+  - [`TurnoverRiskMeasure`](@ref)
+  - [`TrRM`](@ref)
+"""
 const TnTrRM = Union{<:TurnoverRiskMeasure, <:TrRM}
+"""
+    const SlvRM = Union{...}
+
+Union of solver-based risk measures (entropic and relativistic families) that require an iterative solver for expected risk computation.
+
+# Related
+
+  - [`expected_risk`](@ref)
+  - [`EntropicValueatRisk`](@ref)
+  - [`RelativisticValueatRisk`](@ref)
+"""
 const SlvRM = Union{<:EntropicValueatRisk, <:EntropicValueatRiskRange,
                     <:EntropicDrawdownatRisk, <:RelativeEntropicDrawdownatRisk,
                     <:RelativisticValueatRisk, <:RelativisticValueatRiskRange,
                     <:RelativisticDrawdownatRisk, <:RelativeRelativisticDrawdownatRisk}
+"""
+    const RkRatioRM = Union{<:RiskRatioRiskMeasure, <:NonOptimisationRiskRatioRiskMeasure}
+
+Union of all risk-ratio risk measures, where the expected risk is defined as the ratio of two component risk values.
+
+# Related
+
+  - [`RiskRatioRiskMeasure`](@ref)
+  - [`NonOptimisationRiskRatioRiskMeasure`](@ref)
+  - [`expected_risk`](@ref)
+"""
 const RkRatioRM = Union{<:RiskRatioRiskMeasure, <:NonOptimisationRiskRatioRiskMeasure}
 function expected_risk(r::ERkNetRet, w::VecNum, X::MatNum, fees::Option{<:Fees} = nothing;
                        kwargs...)

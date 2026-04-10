@@ -542,6 +542,26 @@ function factory(r::DrawdownatRisk, pr::AbstractPriorResult, args...; kwargs...)
     w = nothing_scalar_array_selector(r.w, pr.w)
     return DrawdownatRisk(; settings = r.settings, alpha = r.alpha, w = w, b = r.b, s = r.s)
 end
+"""
+    absolute_drawdown_vec(x::VecNum) -> Vector
+
+Compute the absolute drawdown series for a single-asset return vector.
+
+Each element of the result is the difference between the current cumulative return and its running maximum (always ≤ 0).
+
+# Arguments
+
+  - `x::VecNum`: Return series vector (modified in place temporarily, then restored).
+
+# Returns
+
+  - `Vector`: Drawdown vector of the same length as `x`.
+
+# Related
+
+  - [`absolute_drawdown_arr`](@ref)
+  - [`DrawdownatRisk`](@ref)
+"""
 function absolute_drawdown_vec(x::VecNum)
     pushfirst!(x, zero(eltype(x)))
     cs = cumsum(x)
@@ -691,6 +711,17 @@ function (r::RelativeDrawdownatRisk{<:Any, <:Any, <:ObsWeights})(x::VecNum)
     return -sorted_dd[idx]
 end
 
+"""
+    const CholRM = Union{<:Variance, <:StandardDeviation, <:DistributionValueatRisk}
+
+Union of risk measures that support Cholesky-factor-based computation.
+
+# Related
+
+  - [`Variance`](@ref)
+  - [`StandardDeviation`](@ref)
+  - [`DistributionValueatRisk`](@ref)
+"""
 const CholRM = Union{<:Variance, <:StandardDeviation, <:DistributionValueatRisk}
 
 export MIPValueatRisk, DistributionValueatRisk, ValueatRisk, ValueatRiskRange,

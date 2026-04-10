@@ -238,6 +238,13 @@ const arg_dict = Dict(
                       :pr_sigma => "`pr::AbstractPriorResult`: Prior result containing the covariance matrix `sigma`.",
                       :pl_opt => "`pl`: Optional phylogeny constraints.",
                       :fees_opt => "`fees`: Optional fees structure.")
+"""
+    field_dict
+
+Derived dictionary mapping argument keys to field description strings, used for `\$(FIELDS)`-style docstring interpolation.
+
+Each entry is derived from [`arg_dict`](@ref) by stripping the leading parameter name prefix (everything up to and including the first `:`).
+"""
 const field_dict = Dict(key => strip(val[(findfirst(":", val)[1] + 1):end])
                         for (key, val) in arg_dict)
 """
@@ -291,6 +298,13 @@ ret_dict = Dict(:mu => "`mu::ArrNum`: Expected returns vector `features x 1` if 
                 :varnum => "`vr::Number`: Variance of `X`",
                 :algw => "`alg`: New algorithm instance of the same type as the argument, with the new weights applied.",
                 :alg => "`alg`: The original algorithm instance.")
+"""
+    math_dict
+
+Dictionary of mathematical notation descriptions used for docstring interpolation throughout `PortfolioOptimisers.jl`.
+
+Keys are symbols that identify mathematical variables or subscripts; values are LaTeX-formatted strings suitable for embedding in docstrings.
+"""
 math_dict = Dict(:Xv => "``\\boldsymbol{X}``: Data vector `observations × 1`.",#
                  :tgt => "``t``: Target value, usually the unweighted (or weighted) expected value ``E[\\boldsymbol{X}]``.",#
                  :A => "``\\mathbf{A}``: Constraint coefficient matrix.",#
@@ -344,6 +358,18 @@ Result types encapsulate the outcomes of estimators. This makes dispatch and usa
   - [`AbstractAlgorithm`](@ref)
 """
 abstract type AbstractResult end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for dynamically computed observation weight estimators.
+
+`DynamicAbstractWeights` subtypes are used when observation weights must be computed from data (rather than supplied directly as a numeric vector). They are passed to estimators that accept an `ObsWeights` argument and evaluated at fit time.
+
+# Related
+
+  - [`ObsWeights`](@ref)
+  - [`AbstractEstimator`](@ref)
+"""
 abstract type DynamicAbstractWeights <: AbstractEstimator end
 """
     define_pretty_show(T, flag::Bool = true)
@@ -1002,6 +1028,18 @@ Alias for a union of an abstract string or an abstract vector.
   - [`Str_Expr`](@ref)
 """
 const Str_Vec = Union{<:AbstractString, <:AbstractVector}
+"""
+    const ObsWeights = Union{<:DynamicAbstractWeights, <:StatsBase.AbstractWeights}
+
+Union type for observation weights accepted by estimators.
+
+Accepts either a [`DynamicAbstractWeights`](@ref) subtype (weights computed from data at fit time) or a `StatsBase.AbstractWeights` instance (pre-computed numeric weights).
+
+# Related
+
+  - [`DynamicAbstractWeights`](@ref)
+  - [`get_observation_weights`](@ref)
+"""
 const ObsWeights = Union{<:DynamicAbstractWeights, <:StatsBase.AbstractWeights}
 function get_observation_weights(::Option{<:DynamicAbstractWeights}, args...; kwargs...)
     return nothing
