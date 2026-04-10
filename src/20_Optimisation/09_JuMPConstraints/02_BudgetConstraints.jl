@@ -100,6 +100,35 @@ const Num_BgtRg = Union{<:Number, <:BudgetRange}
 function budget_view(bgt::Num_BgtRg, ::Any)
     return bgt
 end
+"""
+    set_budget_constraints!(args...)
+    set_budget_constraints!(model::JuMP.Model, val::Number, w::VecNum)
+    set_budget_constraints!(model::JuMP.Model, bgt::BudgetRange, w::VecNum)
+    set_budget_constraints!(model::JuMP.Model, bgt::BudgetCosts, w::VecNum)
+    set_budget_constraints!(model::JuMP.Model, bgt::BudgetMarketImpact, w::VecNum)
+
+Add budget constraints to the JuMP optimisation model.
+
+The fall-through method does nothing. The concrete methods add the appropriate portfolio budget constraint based on the type of budget specification provided.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - `val::Number`: Fixed budget scalar.
+  - `bgt`: Budget constraint specification ([`BudgetRange`](@ref), [`BudgetCosts`](@ref), or [`BudgetMarketImpact`](@ref)).
+  - `w`: Portfolio weight vector.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`BudgetRange`](@ref)
+  - [`BudgetCosts`](@ref)
+  - [`BudgetMarketImpact`](@ref)
+  - [`set_weight_constraints!`](@ref)
+"""
 function set_budget_constraints!(args...)
     return nothing
 end

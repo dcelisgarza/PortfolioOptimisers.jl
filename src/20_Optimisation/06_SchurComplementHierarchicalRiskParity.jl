@@ -1,4 +1,27 @@
 const Sd_Var = Union{<:StandardDeviation, <:Variance}
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Result type returned by [`SchurComplementHierarchicalRiskParity`](@ref) optimisation.
+
+Stores the optimisation estimator, prior result, weight bounds, clustering result, Schur complement scaling parameter, return code, optimised weights, and optional fallback estimator.
+
+# Fields
+
+  - `oe`: Optimisation estimator used.
+  - `pr`: Prior result containing asset moments.
+  - `wb`: Weight bounds estimator.
+  - `clr`: Clustering result.
+  - `gamma`: Schur complement scaling parameter.
+  - `retcode`: Optimisation return code.
+  - `w`: Optimised asset weights.
+  - `fb`: Optional fallback optimisation estimator.
+
+# Related
+
+  - [`SchurComplementHierarchicalRiskParity`](@ref)
+  - [`NonFiniteAllocationOptimisationResult`](@ref)
+"""
 @concrete struct SchurComplementHierarchicalRiskParityResult <:
                  NonFiniteAllocationOptimisationResult
     oe

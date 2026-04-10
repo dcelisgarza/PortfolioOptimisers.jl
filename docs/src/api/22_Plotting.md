@@ -1,1 +1,16 @@
 # Plotting
+
+```@docs
+plot_ptf_cumulative_returns
+plot_asset_cumulative_returns
+plot_composition
+plot_stacked_bar_composition
+plot_stacked_area_composition
+plot_dendrogram
+plot_clusters
+plot_drawdowns
+plot_risk_contribution
+plot_factor_risk_contribution
+plot_measures
+plot_histogram
+```

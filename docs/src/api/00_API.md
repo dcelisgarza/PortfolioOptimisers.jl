@@ -767,10 +767,10 @@ Unlike all other estimators, finite allocation does not yield an "optimal" value
 
 - Prediction on unseen data [`PredictionReturnsResult`](@ref), [`PredictionResult`](@ref), [`MultiPeriodPredictionResult`](@ref), [`PopulationPredictionResult`](@ref) via [`predict`](@ref), [`fit_and_predict`](@ref)
 - Prediction scoring via [`PredictionCrossValScorer`](@ref), [`NearestQuantilePrediction`](@ref), and [`quantile_by_measure`](@ref)
-- ::: details Cross validation estimators used via [`split`](@ref) and [`cross_val_predict`](@ref)
+- ::: details Cross validation estimators used via `split` and [`fit_and_predict`](@ref)
   - K-Fold [`KFold`](@ref) returns a [`KFoldResult`](@ref)
   - Combinatorial [`CombinatorialCrossValidation`](@ref) returns a [`CombinatorialCrossValidationResult`](@ref)
-  - ::: details Walk forward [`WalkForward`](@ref) return a [`WalkForwardResult`](@ref)
+  - ::: details Walk forward [`WalkForwardEstimator`](@ref) return a [`WalkForwardResult`](@ref)
     - Index-based [`IndexWalkForward`](@ref), [`DateWalkForward`](@ref)
   - Multiple randomised [`MultipleRandomised`](@ref) returns a [`MultipleRandomisedResult`](@ref)
 - ::: details Hyperparameter tuning via [`search_cross_validation`](@ref).

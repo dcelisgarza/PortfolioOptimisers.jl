@@ -38,7 +38,6 @@ KFold
 
   - [`NonSequentialCrossValidationEstimator`](@ref)
   - [`KFoldResult`](@ref)
-  - [`split`](@ref)
   - [`n_splits`](@ref)
 """
 @concrete struct KFold <: NonSequentialCrossValidationEstimator
@@ -56,6 +55,24 @@ end
 function KFold(; n::Integer = 5, purged_size::Integer = 0, embargo_size::Integer = 0)
     return KFold(n, purged_size, embargo_size)
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Result type produced by [`KFold`](@ref) after splitting data into training and testing folds.
+
+Stores the train and test index vectors for each fold.
+
+# Fields
+
+  - `train_idx`: Vector of training index ranges for each fold.
+  - `test_idx`: Vector of testing index ranges for each fold.
+
+# Related
+
+  - [`KFold`](@ref)
+  - [`NonSequentialCrossValidationResult`](@ref)
+  - [`n_splits`](@ref)
+"""
 @concrete struct KFoldResult <: NonSequentialCrossValidationResult
     train_idx
     test_idx

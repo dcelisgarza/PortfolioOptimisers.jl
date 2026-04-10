@@ -156,12 +156,12 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Add linear inequality and equality weight constraints to the JuMP optimisation model.
 
-The fall-through method does nothing. The concrete method iterates over the collection of [`LinearConstraintModel`](@ref) objects `lcms` and adds `A * w ≤ k * B` (inequality) and `A * w = k * B` (equality) constraints for each entry.
+The fall-through method does nothing. The concrete method iterates over the collection of [`LinearConstraint`](@ref) objects `lcms` and adds `A * w ≤ k * B` (inequality) and `A * w = k * B` (equality) constraints for each entry.
 
 # Arguments
 
   - $(arg_dict[:model])
-  - `lcms`: Collection of [`LinearConstraintModel`](@ref) objects defining the linear constraints.
+  - `lcms`: Collection of [`LinearConstraint`](@ref) objects defining the linear constraints.
   - `key_ineq::Symbol`: Base key for naming inequality constraints in the model.
   - `key_eq::Symbol`: Base key for naming equality constraints in the model.
 
@@ -172,7 +172,7 @@ The fall-through method does nothing. The concrete method iterates over the coll
 # Related
 
   - [`non_zero_real_or_vec`](@ref)
-  - [`LinearConstraintModel`](@ref)
+  - [`LinearConstraint`](@ref)
   - [`set_weight_constraints!`](@ref)
 """
 function set_linear_weight_constraints!(args...)

@@ -50,7 +50,7 @@ Subtype `ObjectiveFunction` to implement portfolio optimisation objectives such 
 
   - [`MinimumRisk`](@ref)
   - [`MaximumReturn`](@ref)
-  - [`MaximumSharpe`](@ref)
+  - [`MaximumRatio`](@ref)
   - [`MaximumUtility`](@ref)
 """
 abstract type ObjectiveFunction <: AbstractEstimator end
@@ -63,8 +63,8 @@ Abstract supertype for JuMP-based returns estimators used in optimisation models
 
 # Related Types
 
-  - [`MeanReturns`](@ref)
-  - [`FactorReturns`](@ref)
+  - [`ArithmeticReturn`](@ref)
+  - [`LogarithmicReturn`](@ref)
 """
 abstract type JuMPReturnsEstimator <: AbstractEstimator end
 function factory(r::JuMPReturnsEstimator, args...; kwargs...)

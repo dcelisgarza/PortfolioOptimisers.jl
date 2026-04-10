@@ -30,8 +30,41 @@ All concrete and/or abstract types implementing specific OWA algorithms should b
   - [owa2](@cite) D. Cajas. *Higher order moment portfolio optimization with L-moments*. Available at SSRN 4393155 (2023).
 """
 abstract type AbstractOrderedWeightsArrayAlgorithm <: AbstractAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for entropy formulations used in the [`MaximumEntropy`](@ref) OWA algorithm.
+
+# Related
+
+  - [`ExponentialConeEntropy`](@ref)
+  - [`RelativeEntropy`](@ref)
+  - [`MaximumEntropy`](@ref)
+"""
 abstract type EntropyFormulation <: AbstractAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Entropy formulation for [`MaximumEntropy`](@ref) OWA that uses the exponential cone entropy constraint in JuMP.
+
+# Related
+
+  - [`EntropyFormulation`](@ref)
+  - [`RelativeEntropy`](@ref)
+  - [`MaximumEntropy`](@ref)
+"""
 struct ExponentialConeEntropy <: EntropyFormulation end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Entropy formulation for [`MaximumEntropy`](@ref) OWA that uses the relative entropy cone constraint in JuMP. This is the default entropy formulation.
+
+# Related
+
+  - [`EntropyFormulation`](@ref)
+  - [`ExponentialConeEntropy`](@ref)
+  - [`MaximumEntropy`](@ref)
+"""
 struct RelativeEntropy <: EntropyFormulation end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -107,6 +140,19 @@ end
 function MaximumEntropy(; alg::EntropyFormulation = RelativeEntropy())
     return MaximumEntropy(alg)
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for squared OWA weight optimisation algorithms.
+
+Subtypes find OWA weights by minimising a squared-distance or squared-sum objective subject to OWA constraints, and are parameterised by the optimisation algorithm type `T`.
+
+# Related
+
+  - [`AbstractOrderedWeightsArrayAlgorithm`](@ref)
+  - [`MinimumSquaredDistance`](@ref)
+  - [`MinimumSumSquares`](@ref)
+"""
 abstract type SquaredOrderedWeightsArrayAlgorithm{T} <: AbstractOrderedWeightsArrayAlgorithm end
 const UnionAllSOCRiskExpr = Union{<:SquaredSOCRiskExpr, <:RSOCRiskExpr, <:SOCRiskExpr}
 const UnionSOCRiskExpr = Union{<:SquaredSOCRiskExpr, <:SOCRiskExpr}
@@ -1078,8 +1124,54 @@ function owa_l_moment_crm(T::Integer,
     return owa_l_moment_crm(method, weights)
 end
 
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for ordered weights array (OWA) formulation types.
+
+Determines whether OWA weights are computed exactly or approximately.
+
+# Related
+
+  - [`ExactOrderedWeightsArray`](@ref)
+  - [`ApproxOrderedWeightsArray`](@ref)
+  - [`OrderedWeightsArray`](@ref)
+  - [`OrderedWeightsArrayRange`](@ref)
+"""
 abstract type OrderedWeightsArrayFormulation <: AbstractAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+OWA formulation that computes exact OWA weights by solving a linear programme.
+
+# Related
+
+  - [`OrderedWeightsArrayFormulation`](@ref)
+  - [`ApproxOrderedWeightsArray`](@ref)
+  - [`OrderedWeightsArray`](@ref)
+"""
 struct ExactOrderedWeightsArray <: OrderedWeightsArrayFormulation end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+OWA formulation that approximates OWA weights using a set of p-norm parameters.
+
+# Fields
+
+  - `p`: Vector of p-norm parameters used for the approximation. Each value must be greater than one.
+
+# Constructors
+
+    ApproxOrderedWeightsArray(;
+        p::VecNum = Float64[2, 3, 4, 10, 50]
+    ) -> ApproxOrderedWeightsArray
+
+# Related
+
+  - [`OrderedWeightsArrayFormulation`](@ref)
+  - [`ExactOrderedWeightsArray`](@ref)
+  - [`OrderedWeightsArray`](@ref)
+"""
 @concrete struct ApproxOrderedWeightsArray <: OrderedWeightsArrayFormulation
     p
     function ApproxOrderedWeightsArray(p::VecNum)
@@ -1091,6 +1183,35 @@ end
 function ApproxOrderedWeightsArray(; p::VecNum = Float64[2, 3, 4, 10, 50])
     return ApproxOrderedWeightsArray(p)
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Ordered Weights Array (OWA) risk measure.
+
+Computes portfolio risk as a linear combination of sorted portfolio returns using OWA weights. The OWA weights can be provided directly or computed from an OWA algorithm.
+
+# Fields
+
+  - `settings`: Risk measure settings.
+  - `w`: Optional vector of OWA weights. If `nothing`, the GMD weights are used.
+  - `alg`: OWA formulation algorithm used to compute weights when not provided.
+
+# Constructors
+
+    OrderedWeightsArray(;
+        settings::RiskMeasureSettings = RiskMeasureSettings(),
+        w::Option{<:VecNum} = nothing,
+        alg::OrderedWeightsArrayFormulation = ApproxOrderedWeightsArray()
+    ) -> OrderedWeightsArray
+
+# Related
+
+  - [`OrderedWeightsArrayRange`](@ref)
+  - [`OrderedWeightsArrayFormulation`](@ref)
+  - [`ExactOrderedWeightsArray`](@ref)
+  - [`ApproxOrderedWeightsArray`](@ref)
+  - [`RiskMeasureSettings`](@ref)
+"""
 @concrete struct OrderedWeightsArray <: RiskMeasure
     settings
     w
@@ -1112,6 +1233,38 @@ function (r::OrderedWeightsArray)(x::VecNum)
     w = isnothing(r.w) ? owa_gmd(length(x)) : r.w
     return LinearAlgebra.dot(w, sort(x))
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Ordered Weights Array Range (OWA Range) risk measure.
+
+Computes portfolio risk as the difference between two OWA linear combinations of sorted portfolio returns, providing a range-based risk measure.
+
+# Fields
+
+  - `settings`: Risk measure settings.
+  - `w1`: Optional first OWA weight vector (for the long side). If `nothing`, TG weights are used.
+  - `w2`: Optional second OWA weight vector (for the short side). If `nothing`, the reverse of `w1` is used.
+  - `alg`: OWA formulation algorithm.
+
+# Constructors
+
+    OrderedWeightsArrayRange(;
+        settings::RiskMeasureSettings = RiskMeasureSettings(),
+        w1::Option{<:VecNum} = nothing,
+        w2::Option{<:VecNum} = nothing,
+        alg::OrderedWeightsArrayFormulation = ApproxOrderedWeightsArray(),
+        rev::Bool = false
+    ) -> OrderedWeightsArrayRange
+
+# Related
+
+  - [`OrderedWeightsArray`](@ref)
+  - [`OrderedWeightsArrayFormulation`](@ref)
+  - [`ExactOrderedWeightsArray`](@ref)
+  - [`ApproxOrderedWeightsArray`](@ref)
+  - [`RiskMeasureSettings`](@ref)
+"""
 @concrete struct OrderedWeightsArrayRange <: RiskMeasure
     settings
     w1

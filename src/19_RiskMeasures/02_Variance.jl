@@ -104,6 +104,19 @@ Second-order cone risk expression optimisation formulation for applicable risk m
   - [`RSOCRiskExpr`](@ref)
 """
 struct SOCRiskExpr <: SecondMomentFormulation end
+"""
+    const NSkeQuadFormulations
+
+Union type of quadratic OWA risk expression formulations for the Negative Skewness risk measure.
+
+Specifically: `Union{<:QuadRiskExpr, <:SquaredSOCRiskExpr}`.
+
+# Related
+
+  - [`QuadRiskExpr`](@ref)
+  - [`SquaredSOCRiskExpr`](@ref)
+  - [`NegativeSkewness`](@ref)
+"""
 const NSkeQuadFormulations = Union{<:QuadRiskExpr, <:SquaredSOCRiskExpr}
 const QuadSecondMomentFormulations = Union{<:NSkeQuadFormulations, <:RSOCRiskExpr}
 """
@@ -216,7 +229,7 @@ julia> r(w)
 
 # Related
 
-  - [`set_variance_risk_constraints!`](@ref)
+  - [`set_risk_constraints!`](@ref)
 
   - [`set_risk_constraints!`](@ref)
 

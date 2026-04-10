@@ -1,4 +1,37 @@
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for all walk-forward cross-validation estimators in `PortfolioOptimisers.jl`.
+
+Walk-forward estimators split time series data into sequential training and testing windows, advancing the test window forward at each step. Subtypes implement index-based or date-based walk-forward schemes.
+
+# Related
+
+  - [`IndexWalkForward`](@ref)
+  - [`DateWalkForward`](@ref)
+  - [`WalkForwardResult`](@ref)
+  - [`SequentialCrossValidationEstimator`](@ref)
+"""
 abstract type WalkForwardEstimator <: SequentialCrossValidationEstimator end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Result type produced by [`WalkForwardEstimator`](@ref) subtypes after splitting time series data.
+
+Stores the train and test index vectors for each fold of the walk-forward cross-validation.
+
+# Fields
+
+  - `train_idx`: Vector of training index ranges for each fold.
+  - `test_idx`: Vector of testing index ranges for each fold.
+
+# Related
+
+  - [`WalkForwardEstimator`](@ref)
+  - [`IndexWalkForward`](@ref)
+  - [`DateWalkForward`](@ref)
+  - [`SequentialCrossValidationResult`](@ref)
+"""
 @concrete struct WalkForwardResult <: SequentialCrossValidationResult
     train_idx
     test_idx
@@ -61,7 +94,6 @@ IndexWalkForward
 
   - [`WalkForwardEstimator`](@ref)
   - [`WalkForwardResult`](@ref)
-  - [`split`](@ref)
   - [`n_splits`](@ref)
 """
 @concrete struct IndexWalkForward <: WalkForwardEstimator
@@ -114,6 +146,29 @@ function Base.split(iwf::IndexWalkForward, rd::ReturnsResult)
 
     return WalkForwardResult(; train_idx = train_indices, test_idx = test_indices)
 end
+"""
+    n_splits(cv, rd::ReturnsResult)
+    n_splits(cv)
+
+Return the number of cross-validation splits (folds) that would be produced by `cv` for the given returns data `rd`.
+
+# Arguments
+
+  - `cv`: A cross-validation estimator or result (e.g. [`KFold`](@ref), [`IndexWalkForward`](@ref), [`DateWalkForward`](@ref), [`CombinatorialCrossValidation`](@ref), [`MultipleRandomised`](@ref), or their corresponding result types).
+  - `rd::ReturnsResult`: Returns data used to determine the number of splits.
+
+# Returns
+
+  - `Integer`: The number of folds.
+
+# Related
+
+  - [`KFold`](@ref)
+  - [`IndexWalkForward`](@ref)
+  - [`DateWalkForward`](@ref)
+  - [`WalkForwardResult`](@ref)
+  - [`CombinatorialCrossValidation`](@ref)
+"""
 function n_splits(iwf::IndexWalkForward, rd::ReturnsResult)
     (; train_size, test_size, purged_size, reduce_test) = iwf
     T = size(rd.X, 1)
@@ -186,7 +241,6 @@ DateWalkForward
 
   - [`WalkForwardEstimator`](@ref)
   - [`WalkForwardResult`](@ref)
-  - [`split`](@ref)
   - [`n_splits`](@ref)
 """
 @concrete struct DateWalkForward <: WalkForwardEstimator

@@ -89,7 +89,7 @@ The [`KFold`](@ref) indices can be generated independently of the optimisation. 
 kfold = KFold(; n = 5)
 ````
 
-For demonstration purposes we can generate the splits using the [`split`](@ref) method. This is not necessary as the cross validation will generate them internally.
+For demonstration purposes we can generate the splits using the `split` method. This is not necessary as the cross validation will generate them internally.
 
 ````@example 10_CrossValidation
 kfold_res = split(kfold, rd)

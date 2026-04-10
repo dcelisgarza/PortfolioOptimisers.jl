@@ -2,6 +2,7 @@
 
 ```@docs
 SearchCV
+AbstractSearchCrossValidationEstimator
 CrossValidationSearchScorer
 CrossValSearchScorer
 AbstractSearchCrossValidationResult

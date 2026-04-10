@@ -7,10 +7,17 @@ These types and functions implement the various existing formulations and risk m
 ```@docs
 AbstractOrderedWeightsArrayEstimator
 AbstractOrderedWeightsArrayAlgorithm
+SquaredOrderedWeightsArrayAlgorithm
+ExponentialConeEntropy
+RelativeEntropy
 MaximumEntropy
 MinimumSquaredDistance
 MinimumSumSquares
 NormalisedConstantRelativeRiskAversion
+OrderedWeightsArray
+OrderedWeightsArrayRange
+ExactOrderedWeightsArray
+ApproxOrderedWeightsArray
 OWAJuMP
 owa_l_moment_crm
 owa_l_moment

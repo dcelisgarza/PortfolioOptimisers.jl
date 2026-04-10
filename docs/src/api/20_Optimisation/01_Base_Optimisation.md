@@ -20,5 +20,6 @@ SquaredAbsoluteErrorWeightFinaliser
 WeightFinaliser
 IterativeWeightFinaliser
 JuMPWeightFinaliser
+optimise
 calc_net_returns
 ```

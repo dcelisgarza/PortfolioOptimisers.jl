@@ -8,4 +8,5 @@ BudgetCostEstimator
 BudgetRange
 BudgetCosts
 BudgetMarketImpact
+set_budget_constraints!
 ```

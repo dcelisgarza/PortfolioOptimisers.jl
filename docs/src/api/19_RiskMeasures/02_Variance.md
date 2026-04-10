@@ -5,6 +5,7 @@ QuadRiskExpr
 SquaredSOCRiskExpr
 RSOCRiskExpr
 SOCRiskExpr
+NSkeQuadFormulations
 Variance
 StandardDeviation
 UncertaintySetVariance

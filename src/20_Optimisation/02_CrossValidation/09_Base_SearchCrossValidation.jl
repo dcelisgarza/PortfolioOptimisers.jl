@@ -4,6 +4,20 @@
 Cross-validations compatible with search-based hyperparameter tuning.
 """
 const SearchCV = Union{<:KFold, <:KFoldResult, <:WalkForwardEstimator, <:WalkForwardResult}
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for all search-based cross-validation estimators in `PortfolioOptimisers.jl`.
+
+Subtypes implement hyperparameter search strategies (e.g. grid search, randomised search) that use cross-validation to select the best estimator configuration.
+
+# Related
+
+  - [`GridSearchCrossValidation`](@ref)
+  - [`RandomisedSearchCrossValidation`](@ref)
+  - [`AbstractSearchCrossValidationResult`](@ref)
+  - [`SearchCV`](@ref)
+"""
 abstract type AbstractSearchCrossValidationEstimator <: AbstractEstimator end
 """
 $(DocStringExtensions.TYPEDEF)

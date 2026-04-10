@@ -27,4 +27,6 @@ PopulationPredictionResult
 predict
 fit_predict
 sort_by_measure
+quantile_by_measure
+fit_and_predict
 ```

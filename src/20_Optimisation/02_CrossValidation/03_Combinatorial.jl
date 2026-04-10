@@ -45,7 +45,6 @@ CombinatorialCrossValidation
 
   - [`NonSequentialCrossValidationEstimator`](@ref)
   - [`CombinatorialCrossValidationResult`](@ref)
-  - [`split`](@ref)
   - [`n_splits`](@ref)
 """
 @concrete struct CombinatorialCrossValidation <: NonSequentialCrossValidationEstimator
@@ -73,6 +72,25 @@ function CombinatorialCrossValidation(; n_folds::Integer = 10, n_test_folds::Int
     return CombinatorialCrossValidation(n_folds, n_test_folds, purged_size, embargo_size,
                                         warn_comb)
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Result type produced by [`CombinatorialCrossValidation`](@ref) after splitting data into combinatorial training and testing folds.
+
+Stores the train index vectors, nested test index vectors (one per path), and a matrix of path IDs mapping folds to paths.
+
+# Fields
+
+  - `train_idx`: Vector of training index ranges for each split.
+  - `test_idx`: Vector of vectors of testing index ranges (one per path per split).
+  - `path_ids`: Matrix mapping fold indices to path indices.
+
+# Related
+
+  - [`CombinatorialCrossValidation`](@ref)
+  - [`NonSequentialCrossValidationResult`](@ref)
+  - [`n_splits`](@ref)
+"""
 @concrete struct CombinatorialCrossValidationResult <: NonSequentialCrossValidationResult
     train_idx
     test_idx

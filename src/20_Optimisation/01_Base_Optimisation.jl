@@ -1,3 +1,16 @@
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for all portfolio optimisation estimators in `PortfolioOptimisers.jl`.
+
+All optimisers and optimisation components should subtype `AbstractOptimisationEstimator` to participate in the optimisation dispatch system.
+
+# Related
+
+  - [`BaseOptimisationEstimator`](@ref)
+  - [`OptimisationEstimator`](@ref)
+  - [`NonFiniteAllocationOptimisationEstimator`](@ref)
+"""
 abstract type AbstractOptimisationEstimator <: AbstractEstimator end
 const VecOptE = AbstractVector{<:AbstractOptimisationEstimator}
 """
@@ -447,6 +460,33 @@ end
 function opt_view(opt::VecOptE, args...)
     return [opt_view(opti, args...) for opti in opt]
 end
+"""
+    optimise(opt::OptimisationEstimator, args...; kwargs...) -> OptimisationResult
+    optimise(or::OptimisationResult, args...; kwargs...) -> OptimisationResult
+
+Run portfolio optimisation using the given estimator `opt` and return an [`OptimisationResult`](@ref).
+
+If `opt` returns an [`OptimisationFailure`](@ref), the fallback estimator is tried automatically until either a successful result is obtained or all fallbacks are exhausted.
+
+Passing an [`OptimisationResult`](@ref) directly returns it unchanged (pass-through method).
+
+# Arguments
+
+  - `opt`: Optimisation estimator (e.g. a [`JuMPOptimisationEstimator`](@ref) subtype).
+  - `args...`: Additional positional arguments forwarded to the concrete optimiser.
+  - `kwargs...`: Additional keyword arguments forwarded to the concrete optimiser.
+
+# Returns
+
+  - [`OptimisationResult`](@ref): The optimisation result.
+
+# Related
+
+  - [`OptimisationEstimator`](@ref)
+  - [`OptimisationResult`](@ref)
+  - [`OptimisationSuccess`](@ref)
+  - [`OptimisationFailure`](@ref)
+"""
 function optimise(or::OptimisationResult, args...; kwargs...)
     return or
 end

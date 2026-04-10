@@ -495,6 +495,30 @@ function sort_by_measure(ppred::PopulationPredictionResult, r::AbstractBaseRiskM
                   ppred.pred)
     return sort(pred; by = x -> expected_risk(r, x; kwargs...), rev = bigger_is_better(r))
 end
+"""
+    quantile_by_measure(ppred::PopulationPredictionResult, r::AbstractBaseRiskMeasure, q::Real;
+                        r_kwargs::NamedTuple = (;), q_kwargs::NamedTuple = (;))
+
+Select the successful path in `ppred` whose expected risk under `r` is closest to the `q`-th quantile of the risk distribution across all successful paths.
+
+# Arguments
+
+  - `ppred::PopulationPredictionResult`: Population prediction result.
+  - `r::AbstractBaseRiskMeasure`: Risk measure for computing path risks.
+  - `q::Real`: Quantile level in `[0, 1]`.
+  - `r_kwargs::NamedTuple = (;)`: Keyword arguments forwarded to `expected_risk`.
+  - `q_kwargs::NamedTuple = (;)`: Keyword arguments forwarded to `Statistics.quantile`.
+
+# Returns
+
+  - [`MultiPeriodPredictionResult`](@ref): The path closest to the `q`-th quantile.
+
+# Related
+
+  - [`sort_by_measure`](@ref)
+  - [`PopulationPredictionResult`](@ref)
+  - [`expected_risk`](@ref)
+"""
 function quantile_by_measure(ppred::PopulationPredictionResult, r::AbstractBaseRiskMeasure,
                              q::Real; r_kwargs::NamedTuple = (;),
                              q_kwargs::NamedTuple = (;))
@@ -646,6 +670,36 @@ function predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult,
                  test_idxs::VecVecInt, cols = :)
     return [predict(res, rd, test_idx, cols) for test_idx in test_idxs]
 end
+"""
+    fit_and_predict(opt, rd::ReturnsResult, cv::NonSeqCVER; cols, ex, id) -> MultiPeriodPredictionResult
+    fit_and_predict(opt, rd::ReturnsResult; train_idx, test_idx, cols) -> PredictionResult
+    fit_and_predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult; test_idx, cols) -> PredictionResult
+
+Fit an optimisation estimator on training data and predict on test data using cross-validation.
+
+The three-argument method (`opt`, `rd`, `cv`) performs full cross-validated prediction over all folds of `cv`.
+The two-argument methods operate on a single pre-defined train/test split or on a pre-existing result.
+
+# Arguments
+
+  - `opt`: Optimisation estimator or an existing optimisation result.
+  - `rd::ReturnsResult`: Full returns data.
+  - `cv::NonSeqCVER`: Non-sequential cross-validation estimator (e.g. [`KFold`](@ref) or [`CombinatorialCrossValidation`](@ref)).
+  - `train_idx::VecInt`: Training indices.
+  - `test_idx`: Test indices (vector or vector of vectors).
+  - `cols`: Column selector (default `:` for all assets).
+
+# Returns
+
+  - [`MultiPeriodPredictionResult`](@ref) or [`PredictionResult`](@ref).
+
+# Related
+
+  - [`predict`](@ref)
+  - [`optimise`](@ref)
+  - [`KFold`](@ref)
+  - [`CombinatorialCrossValidation`](@ref)
+"""
 function fit_and_predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult;
                          test_idx::VecInt_VecVecInt, cols = :, kwargs...)
     return predict(res, rd, test_idx, cols)

@@ -1939,6 +1939,30 @@ function logo!(je::LoGo, sigma::MatNum, X::MatNum; dims::Int = 1, kwargs...)
     posdef!(je.pdm, sigma)
     return nothing
 end
+"""
+    logo(je::LoGo, sigma::MatNum, X::MatNum; dims::Int = 1, kwargs...) -> MatNum
+
+Apply the LoGo (Local-Global) transformation to the covariance matrix and return the result as a new matrix.
+
+This is the non-mutating variant of [`logo!`](@ref). It copies `sigma` before applying the transformation.
+
+# Arguments
+
+  - `je::LoGo`: LoGo algorithm configuration.
+  - `sigma::MatNum`: Covariance matrix to transform (not mutated).
+  - `X::MatNum`: Returns data matrix.
+  - `dims::Int = 1`: Observation dimension.
+
+# Returns
+
+  - New matrix with LoGo transformation applied.
+
+# Related
+
+  - [`logo!`](@ref)
+  - [`LoGo`](@ref)
+  - [`J_LoGo`](@ref)
+"""
 function logo(je::LoGo, sigma::MatNum, X::MatNum; dims::Int = 1, kwargs...)
     sigma = copy(sigma)
     logo!(je, sigma, X; dims = dims, kwargs...)

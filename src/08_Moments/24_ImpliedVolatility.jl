@@ -63,6 +63,19 @@ function ImpliedVolatilityRegression(; ve::AbstractVarianceEstimator = SimpleVar
                                      re::AbstractRegressionTarget = LinearModel())
     return ImpliedVolatilityRegression(ve, ws, re)
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Implied volatility algorithm that scales implied volatility by a user-supplied premium factor.
+
+The premium factor can be a scalar or a vector (one per asset) and is used to convert raw implied volatilities into predicted realised volatilities.
+
+# Related
+
+  - [`ImpliedVolatilityAlgorithm`](@ref)
+  - [`ImpliedVolatilityRegression`](@ref)
+  - [`ImpliedVolatility`](@ref)
+"""
 struct ImpliedVolatilityPremium <: ImpliedVolatilityAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
