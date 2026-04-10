@@ -325,6 +325,11 @@ Fees
 ```
 
 # Related
+  - [`add_to_fees!`](@ref)
+  - [`set_non_fixed_fees!`](@ref)
+  - [`set_long_non_fixed_fees!`](@ref)
+  - [`set_short_non_fixed_fees!`](@ref)
+  - [`set_turnover_fees!`](@ref)
 
   - [`FeesEstimator`](@ref)
   - [`Option`](@ref)

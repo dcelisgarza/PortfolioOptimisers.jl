@@ -1,3 +1,11 @@
+"""
+    set_sdp_constraints!(model) -> W
+
+Add a semidefinite (PSD) constraint to the JuMP model for the portfolio weights.
+
+Creates a symmetric matrix variable `W` and enforces that the bordered matrix
+`[W w; w' k]` is positive semidefinite. Returns the JuMP variable `W`.
+"""
 function set_sdp_constraints!(model::JuMP.Model)
     if haskey(model, :W)
         return model[:W]
@@ -11,6 +19,14 @@ function set_sdp_constraints!(model::JuMP.Model)
     JuMP.@constraint(model, M_PSD, sc * M in JuMP.PSDCone())
     return W
 end
+"""
+    set_sdp_frc_constraints!(model) -> frc_W
+
+Add a semidefinite constraint for factor risk contribution to the JuMP model.
+
+Creates a symmetric matrix variable `frc_W` and enforces that the bordered matrix
+`[frc_W w1; w1' k]` is positive semidefinite. Returns the JuMP variable `frc_W`.
+"""
 function set_sdp_frc_constraints!(model::JuMP.Model)
     if haskey(model, :frc_W)
         return model[:frc_W]
@@ -24,6 +40,14 @@ function set_sdp_frc_constraints!(model::JuMP.Model)
     JuMP.@constraint(model, frc_M_PSD, sc * frc_M in JuMP.PSDCone())
     return frc_W
 end
+"""
+    set_sdp_phylogeny_constraints!(model, plgs)
+
+Add semidefinite phylogeny constraints to the JuMP model for
+[`SemiDefinitePhylogeny`](@ref) entries in `plgs`.
+
+Does nothing when `plgs` contains no `SemiDefinitePhylogeny` instances.
+"""
 function set_sdp_phylogeny_constraints!(model::JuMP.Model, plgs::Option{<:PlC_VecPlC})
     if !(isa(plgs, SemiDefinitePhylogeny) ||
          isa(plgs, AbstractVector) && any(x -> isa(x, SemiDefinitePhylogeny), plgs))
@@ -47,6 +71,13 @@ function set_sdp_phylogeny_constraints!(model::JuMP.Model, plgs::Option{<:PlC_Ve
     end
     return nothing
 end
+"""
+    set_sdp_frc_phylogeny_constraints!(model, plgs)
+
+Add semidefinite factor risk contribution phylogeny constraints to the JuMP model.
+
+Does nothing when `plgs` contains no `SemiDefinitePhylogeny` instances.
+"""
 function set_sdp_frc_phylogeny_constraints!(model::JuMP.Model,
                                             plgs::Option{<:PlCE_PhC_VecPlCE_PlC})
     if !(isa(plgs, SemiDefinitePhylogeny) ||

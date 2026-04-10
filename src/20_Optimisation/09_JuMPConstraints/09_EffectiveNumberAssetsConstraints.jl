@@ -1,3 +1,13 @@
+"""
+    set_number_effective_assets!(args...)
+    set_number_effective_assets!(model, val)
+
+Add an effective number of assets constraint to the JuMP model.
+
+Enforces ``\\|w\\|_2 \\le 1/\\sqrt{val}`` using a second-order cone constraint,
+which is equivalent to requiring ``N_{\\mathrm{eff}} \\ge val``.
+The fall-through method does nothing.
+"""
 function set_number_effective_assets!(args...)
     return nothing
 end

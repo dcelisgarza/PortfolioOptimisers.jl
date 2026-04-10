@@ -1,3 +1,13 @@
+"""
+    w_neg_flag(wb) -> Bool
+
+Return `true` when the weight bound `wb` contains at least one negative value,
+indicating a long-short strategy is required.
+
+  - `nothing` → `false`
+  - `Number`  → `wb < 0`
+  - `VecNum`  → any element `< 0`
+"""
 function w_neg_flag(::Nothing)
     return false
 end
@@ -7,6 +17,16 @@ end
 function w_neg_flag(wb::VecNum)
     return any(x -> x < zero(x), wb)
 end
+"""
+    w_finite_flag(wb) -> Bool
+
+Return `true` when `wb` contains at least one finite value, meaning a bound constraint
+should be added to the model.
+
+  - `nothing` → `false`
+  - `Number`  → `isfinite(wb)`
+  - `VecNum`  → any element finite
+"""
 function w_finite_flag(::Nothing)
     return false
 end
@@ -16,6 +36,16 @@ end
 function w_finite_flag(wb::VecNum)
     return any(isfinite, wb)
 end
+"""
+    set_weight_constraints!(args...)
+    set_weight_constraints!(model, wb, bgt, sbgt, long = false)
+
+Add weight bound constraints to the JuMP model.
+
+The fall-through method does nothing. The concrete method adds lower-bound and
+upper-bound constraints on the weight vector `w`, handles long-short decomposition
+when negative bounds are present, and delegates to `set_budget_constraints!`.
+"""
 function set_weight_constraints!(args...)
     return nothing
 end
@@ -56,6 +86,12 @@ function set_weight_constraints!(model::JuMP.Model, wb::WeightBounds,
     end
     return nothing
 end
+"""
+    non_zero_real_or_vec(x) -> Bool
+
+Return `true` when `x` is non-zero: `nothing` → `false`; scalar → `!iszero(x)`;
+vector → any element non-zero.
+"""
 function non_zero_real_or_vec(::Nothing)
     return false
 end
@@ -65,6 +101,15 @@ end
 function non_zero_real_or_vec(x::VecNum)
     return any(!iszero, x)
 end
+"""
+    set_linear_weight_constraints!(args...)
+    set_linear_weight_constraints!(model, lcms, key_ineq, key_eq)
+
+Add linear inequality and equality weight constraints defined by a collection of
+[`LinearConstraintModel`](@ref) objects `lcms` to the JuMP model.
+
+The fall-through method does nothing.
+"""
 function set_linear_weight_constraints!(args...)
     return nothing
 end

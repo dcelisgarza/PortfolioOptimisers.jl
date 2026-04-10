@@ -1,6 +1,21 @@
+"""
+    set_turnover_constraints!(args...)
+    set_turnover_constraints!(model, tns)
+
+Add turnover constraints to the JuMP model for each [`Turnover`](@ref) in `tns`.
+
+The fall-through method does nothing. Each concrete constraint limits
+``\\|w - w_b\\|_1 \\le val``.
+"""
 function set_turnover_constraints!(args...)
     return nothing
 end
+"""
+    _set_turnover_constraints!(model, tn, i=1)
+
+Add a single turnover constraint for [`Turnover`](@ref) `tn` to the JuMP model,
+using index `i` to generate unique variable/constraint names.
+"""
 function _set_turnover_constraints!(model::JuMP.Model, tn::Turnover, i::Integer = 1)
     w = model[:w]
     k = model[:k]

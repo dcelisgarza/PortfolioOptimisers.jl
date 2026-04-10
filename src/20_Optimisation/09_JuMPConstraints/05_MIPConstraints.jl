@@ -1,3 +1,12 @@
+"""
+    get_mip_ss(ss::Number, args...) -> Number
+    get_mip_ss(::Nothing, wb::WeightBounds) -> Number
+
+Return the big-M style scaling constant used by MIP constraints.
+
+When `ss` is a number it is returned directly. When `nothing`, the value is derived
+from the largest finite bound in `wb` (multiplied by 1000), defaulting to `1000.0`.
+"""
 function get_mip_ss(ss::Number, args...)
     return ss
 end
@@ -20,6 +29,13 @@ function get_mip_ss(::Nothing, wb::WeightBounds)
     end
     return (iszero(lb_mag) && iszero(ub_mag)) ? 1000.0 : max(lb_mag, ub_mag) * 1000.0
 end
+"""
+    mip_wb(::Any, ::Nothing, args...)
+    mip_wb(model, wb, il, is)
+
+Add MIP-compatible weight bound constraints using binary selection variables `il`
+(long) and `is` (short). The fall-through method does nothing when `wb` is `nothing`.
+"""
 function mip_wb(::Any, ::Nothing, args...)
     return nothing
 end
@@ -36,6 +52,16 @@ function mip_wb(model::JuMP.Model, wb::WeightBounds, il::VecNum, is::VecNum)
     end
     return nothing
 end
+"""
+    short_mip_threshold_constraints(model, wb, lt, st, ffl, ffs, ss,
+                                    lt_flag, st_flag, ffl_flag, ffs_flag, miprb_flag)
+
+Add MIP binary selection variables and threshold constraints for long-short portfolios.
+
+Creates `ilb`/`isb` binary indicator variables (or their continuous relaxations `ilf`/`isf`
+when `k` is variable), enforces that each asset is either long or short but not both,
+and applies long/short threshold and rebalancing constraints based on the flags provided.
+"""
 function short_mip_threshold_constraints(model::JuMP.Model, wb::WeightBounds,
                                          lt::Option{<:Threshold}, st::Option{<:Threshold},
                                          ffl::Option{<:Num_VecNum},
@@ -101,6 +127,15 @@ function short_mip_threshold_constraints(model::JuMP.Model, wb::WeightBounds,
     end
     return i_mip
 end
+"""
+    mip_constraints(model, wb, ffl, lt, ss, lt_flag, ffl_flag, miprb_flag) -> ib
+
+Add long-only MIP binary indicator variable `ib` and associated constraints.
+
+Creates a binary variable `ib[i]` per asset indicating whether the asset is held.
+Applies threshold constraints when `lt_flag` is set and fixed-fee costs when
+`ffl_flag` is set.
+"""
 function mip_constraints(model::JuMP.Model, wb::WeightBounds, ffl::Option{<:Num_VecNum},
                          lt::Option{<:Threshold}, ss::Option{<:Number}, lt_flag::Bool,
                          ffl_flag::Bool, miprb_flag::Bool)
@@ -139,6 +174,14 @@ function mip_constraints(model::JuMP.Model, wb::WeightBounds, ffl::Option{<:Num_
     end
     return ib
 end
+"""
+    set_iplg_constraints!(model, plgs)
+
+Add integer phylogeny cardinality constraints to the JuMP model.
+
+For each [`IntegerPhylogeny`](@ref) in `plgs`, enforces `A * ib ≤ B` where `ib` is
+the binary indicator variable produced by `mip_constraints`.
+"""
 function set_iplg_constraints!(model::JuMP.Model, plgs::PlC_VecPlC)
     ib = model[:ib]
     sc = model[:sc]
@@ -152,6 +195,14 @@ function set_iplg_constraints!(model::JuMP.Model, plgs::PlC_VecPlC)
     end
     return nothing
 end
+"""
+    set_mip_constraints!(model, wb, card, gcard, pl, lt, st, fees, ss, miprb_flag=false)
+
+Add all long-only MIP constraints to the JuMP model.
+
+Orchestrates cardinality, group cardinality, phylogeny, threshold, fee, and
+rebalancing constraints for long-only portfolios.
+"""
 function set_mip_constraints!(model::JuMP.Model, wb::WeightBounds, card::Option{<:Integer},
                               gcard::Option{<:LinearConstraint}, pl::Option{<:PlC_VecPlC},
                               lt::Option{<:Threshold}, st::Option{<:Threshold},
@@ -205,6 +256,13 @@ function set_mip_constraints!(model::JuMP.Model, wb::WeightBounds, card::Option{
     end
     return nothing
 end
+"""
+    smip_wb(::Any, ::Nothing, args...)
+    smip_wb(model, wb, smtx, smtx_expr, il, is, key, i)
+
+Add MIP weight bounds for sub-group selections using a selection matrix `smtx`.
+The fall-through method does nothing when `wb` is `nothing`.
+"""
 function smip_wb(::Any, ::Nothing, args...)
     return nothing
 end
@@ -226,6 +284,13 @@ function smip_wb(model::JuMP.Model, wb::WeightBounds, smtx::MatNum,
     end
     return nothing
 end
+"""
+    short_smip_threshold_constraints(model, wb, smtx, lt, st, ss,
+                                     lt_flag, st_flag, key1, key7, key8, i)
+
+Add sub-group MIP binary selection variables and threshold constraints for long-short
+portfolios using a selection matrix `smtx`.
+"""
 function short_smip_threshold_constraints(model::JuMP.Model, wb::WeightBounds,
                                           smtx::Option{<:MatNum}, lt::Option{<:Threshold},
                                           st::Option{<:Threshold}, ss::Option{<:Number},
@@ -320,6 +385,12 @@ function short_smip_threshold_constraints(model::JuMP.Model, wb::WeightBounds,
     end
     return i_mip
 end
+"""
+    smip_constraints(model, wb, smtx, lt, ss, lt_flag, key1…key6, i) -> sib
+
+Add sub-group MIP binary indicator variable `sib` for a single selection matrix
+group and associated weight/threshold constraints.
+"""
 function smip_constraints(model::JuMP.Model, wb::WeightBounds, smtx::Option{<:MatNum},
                           lt::Option{<:Threshold}, ss::Option{<:Number}, lt_flag::Bool,
                           key1::Symbol = :sib_, key2::Symbol = :i_smip_,
@@ -365,6 +436,15 @@ function smip_constraints(model::JuMP.Model, wb::WeightBounds, smtx::Option{<:Ma
     end
     return sib
 end
+"""
+    set_all_smip_constraints!(model, wb, card, gcard, smtx, lt, st, ss, i=1)
+    set_all_smip_constraints!(model, wb, card, gcard, smtxs, lt, st, ss)
+
+Add all sub-group MIP constraints for a single or multiple selection matrices.
+
+Handles cardinality, group-cardinality, threshold, and weight-bound constraints
+for sub-group mixed-integer portfolio optimisation.
+"""
 function set_all_smip_constraints!(model::JuMP.Model, wb::WeightBounds,
                                    card::Option{<:Integer},
                                    gcard::Option{<:LinearConstraint},
@@ -414,8 +494,13 @@ function set_all_smip_constraints!(model::JuMP.Model, wb::WeightBounds, card::Ve
     end
     return nothing
 end
+"""
+    set_scardmip_constraints!(model, wb, card, smtx, lt, st, ss, i=1)
+    set_scardmip_constraints!(model, wb, card::VecInt, smtx::VecMatNum, lt, st, ss)
+
+Add sub-group cardinality MIP constraints using a selection matrix `smtx`.
+"""
 function set_scardmip_constraints!(model::JuMP.Model, wb::WeightBounds,
-                                   card::Option{<:Integer}, smtx::Option{<:MatNum},
                                    lt::Option{<:Threshold}, st::Option{<:Threshold},
                                    ss::Option{<:Number}, i::Integer = 1)
     card_flag = !isnothing(card)
@@ -445,8 +530,13 @@ function set_scardmip_constraints!(model::JuMP.Model, wb::WeightBounds, card::Ve
     end
     return nothing
 end
+"""
+    set_sgcardmip_constraints!(model, wb, gcard, smtx, lt, st, ss, i=1)
+    set_sgcardmip_constraints!(model, wb, gcard::VecLc, smtx::VecMatNum, lt, st, ss)
+
+Add sub-group group-cardinality MIP constraints using a selection matrix `smtx`.
+"""
 function set_sgcardmip_constraints!(model::JuMP.Model, wb::WeightBounds,
-                                    gcard::Option{<:LinearConstraint},
                                     smtx::Option{<:MatNum}, lt::Option{<:Threshold},
                                     st::Option{<:Threshold}, ss::Option{<:Number},
                                     i::Integer = 1)
@@ -486,6 +576,12 @@ function set_sgcardmip_constraints!(model::JuMP.Model, wb::WeightBounds, gcard::
     end
     return nothing
 end
+"""
+    set_smip_constraints!(model, wb, card, gcard, smtx, sgmtx, lt, st, glt, gst, ss)
+
+Add all sub-group MIP constraints (both cardinality and group-cardinality) to the
+JuMP model, dispatching between separate or combined selection matrices.
+"""
 function set_smip_constraints!(model::JuMP.Model, wb::WeightBounds,
                                card::Option{<:Int_VecInt}, gcard::Option{<:Lc_VecLc},
                                smtx::Option{<:MatNum_VecMatNum},

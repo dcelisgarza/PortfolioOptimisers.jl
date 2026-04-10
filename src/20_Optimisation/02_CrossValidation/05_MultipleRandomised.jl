@@ -101,6 +101,7 @@ walk-forward folds forms one *path*.
     ) -> MultipleRandomised
 
 # Related
+  - [`MultipleRandomisedResult`](@ref)
 
   - [`MultipleRandomisedResult`](@ref)
   - [`WalkForwardEstimator`](@ref)
@@ -162,6 +163,7 @@ identifier for each fold.
   - `path_ids::VecInt`: Path identifier for each fold.
 
 # Related
+  - [`MultipleRandomised`](@ref)
 
   - [`MultipleRandomised`](@ref)
 """

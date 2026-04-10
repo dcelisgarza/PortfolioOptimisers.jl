@@ -45,6 +45,8 @@ EqualRiskMeasure
 ```
 
 # Related
+  - [`number_effective_assets`](@ref)
+  - [`set_number_effective_assets!`](@ref)
 
   - [`HierarchicalRiskMeasure`](@ref)
   - [`HierarchicalRiskMeasureSettings`](@ref)

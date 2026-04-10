@@ -22,6 +22,8 @@ on the portfolio return.
     ) -> ArithmeticReturn
 
 # Related
+  - [`bounds_returns_estimator`](@ref)
+  - [`LogarithmicReturn`](@ref)
 
   - [`LogarithmicReturn`](@ref)
   - [`JuMPReturnsEstimator`](@ref)
@@ -103,6 +105,8 @@ Optionally supports observation weights and a lower bound on the portfolio retur
     ) -> LogarithmicReturn
 
 # Related
+  - [`bounds_returns_estimator`](@ref)
+  - [`ArithmeticReturn`](@ref)
 
   - [`ArithmeticReturn`](@ref)
   - [`JuMPReturnsEstimator`](@ref)
@@ -294,6 +298,9 @@ $(DocStringExtensions.TYPEDEF)
 Objective function that minimises portfolio risk.
 
 # Related
+  - [`MaximumUtility`](@ref)
+  - [`MaximumRatio`](@ref)
+  - [`MaximumReturn`](@ref)
 
   - [`MaximumUtility`](@ref)
   - [`MaximumRatio`](@ref)
@@ -321,6 +328,9 @@ where ``l`` is the risk-aversion coefficient and ``R`` is the portfolio risk.
     MaximumUtility(; l::Number = 2) -> MaximumUtility
 
 # Related
+  - [`MinimumRisk`](@ref)
+  - [`MaximumRatio`](@ref)
+  - [`MaximumReturn`](@ref)
 
   - [`MinimumRisk`](@ref)
   - [`MaximumRatio`](@ref)
@@ -358,6 +368,9 @@ where ``r_f`` is the risk-free rate and ``R`` is the portfolio risk.
     MaximumRatio(; rf::Number = 0.0, ohf::Option{<:Number} = nothing) -> MaximumRatio
 
 # Related
+  - [`MinimumRisk`](@ref)
+  - [`MaximumUtility`](@ref)
+  - [`MaximumReturn`](@ref)
 
   - [`MinimumRisk`](@ref)
   - [`MaximumUtility`](@ref)
@@ -383,6 +396,9 @@ $(DocStringExtensions.TYPEDEF)
 Objective function that maximises portfolio return ``\\boldsymbol{\\mu}^\\intercal \\boldsymbol{w}``.
 
 # Related
+  - [`MinimumRisk`](@ref)
+  - [`MaximumUtility`](@ref)
+  - [`MaximumRatio`](@ref)
 
   - [`MinimumRisk`](@ref)
   - [`MaximumUtility`](@ref)

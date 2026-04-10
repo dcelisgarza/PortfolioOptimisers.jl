@@ -82,6 +82,8 @@ concentration as the given weight vector `w`.
   - `Number`: Effective number of assets.
 
 # Related
+  - [`set_number_effective_assets!`](@ref)
+  - [`EqualRiskMeasure`](@ref)
 
   - [`risk_contribution`](@ref)
   - [`EqualRiskMeasure`](@ref)

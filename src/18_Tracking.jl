@@ -797,6 +797,7 @@ TrackingError
 ```
 
 # Related
+  - [`set_tracking_error_constraints!`](@ref)
 
   - [`AbstractTracking`](@ref)
   - [`WeightsTracking`](@ref)

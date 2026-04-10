@@ -29,6 +29,7 @@ Keywords correspond to the struct's fields.
   - `err` is validated with [`assert_nonempty_nonneg_finite_val`](@ref).
 
 # Related
+  - [`set_tracking_error_constraints!`](@ref)
 
   - [`TrackingRiskMeasure`](@ref)
   - [`RiskTrackingRiskMeasure`](@ref)

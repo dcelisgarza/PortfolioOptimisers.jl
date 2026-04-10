@@ -60,6 +60,7 @@ Penalises concentrated portfolios by encouraging weight smoothness for ``p > 1``
     LpRegularisation(; p::Number = 3, val::Number = 1e-3) -> LpRegularisation
 
 # Related
+  - [`AbstractRegularisationEstimator`](@ref)
 
   - [`AbstractRegularisationEstimator`](@ref)
 """

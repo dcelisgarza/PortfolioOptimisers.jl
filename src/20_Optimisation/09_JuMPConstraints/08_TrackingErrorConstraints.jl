@@ -1,3 +1,16 @@
+"""
+    set_tracking_error_constraints!(args...; kwargs...)
+    set_tracking_error_constraints!(model, i, pr, tr, ...; kwargs...)
+    set_tracking_error_constraints!(model, pr, tres, ...; kwargs...)
+
+Add tracking error constraints to the JuMP model.
+
+The fall-through method does nothing. Concrete methods dispatch on the tracking
+algorithm (`L1Tracking`, `L2Tracking`, `SquaredL2Tracking`, `LpTracking`,
+`LInfTracking`, `IndependentVariableTracking`, `DependentVariableTracking`) and
+encode the appropriate norm-based distance from the benchmark.
+The collection method iterates over all tracking errors in `tres`.
+"""
 function set_tracking_error_constraints!(args...; kwargs...)
     return nothing
 end

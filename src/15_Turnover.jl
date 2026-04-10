@@ -336,6 +336,9 @@ Turnover
 ```
 
 # Related
+  - [`set_turnover_constraints!`](@ref)
+  - [`_set_turnover_constraints!`](@ref)
+  - [`set_turnover_fees!`](@ref)
 
   - [`TurnoverEstimator`](@ref)
   - [`AbstractResult`](@ref)

@@ -215,6 +215,9 @@ julia> r(w)
 ```
 
 # Related
+  - [`set_variance_risk_constraints!`](@ref)
+  - [`set_risk_constraints!`](@ref)
+  - [`scalarise_risk_expression!`](@ref)
 
   - [`RiskMeasureSettings`](@ref)
   - [`VarianceFormulation`](@ref)
