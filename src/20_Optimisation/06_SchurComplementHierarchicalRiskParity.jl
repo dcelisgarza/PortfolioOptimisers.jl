@@ -440,6 +440,9 @@ Allocates weights across cluster levels using the Schur complement of the covari
   - [`schur_augmentation`](@ref)
 """
 function schur_complement_weights(pr::AbstractPriorResult, items::VecVecInt,
+                                  wb::WeightBounds,
+                                  params::SchurComplementParams{<:Any, <:Any, <:Any,
+                                                                <:NonMonotonicSchurComplement,
                                                                 <:Any},
                                   gamma::Option{<:Number} = nothing)
     r = factory(params.r, pr)

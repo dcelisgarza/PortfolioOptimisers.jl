@@ -218,6 +218,8 @@ Combines optimised weights from multiple asset subsets, averaging over subsets t
   - [`MultipleRandomised`](@ref)
 """
 function subset_resampling_finaliser(N::Integer, n_subsets::Integer, asset_idx::MatNum,
+                                     wb::Option{<:WeightBounds}, wf::WeightFinaliser,
+                                     ress::VecOpt, ::VecNum)
     w = zeros(eltype(ress[1].w), N)
     for i in 1:n_subsets
         idx = view(asset_idx, :, i)

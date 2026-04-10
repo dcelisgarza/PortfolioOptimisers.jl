@@ -549,6 +549,7 @@ Various overloads handle different cost types (fixed value or [`BudgetRange`](@r
   - [`set_long_short_budget_constraints!`](@ref)
 """
 function set_cost_budget_constraints!(model::JuMP.Model, vp::Num_VecNum, vn::Num_VecNum,
+                                      val::Number, w::VecNum)
     k = model[:k]
     sc = model[:sc]
     wp = model[:wp]
