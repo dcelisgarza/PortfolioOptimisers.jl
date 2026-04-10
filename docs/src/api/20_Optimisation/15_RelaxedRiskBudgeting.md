@@ -6,4 +6,6 @@ BasicRelaxedRiskBudgeting
 RegularisedRelaxedRiskBudgeting
 RegularisedPenalisedRelaxedRiskBudgeting
 RelaxedRiskBudgeting
+set_relaxed_risk_budgeting_alg_constraints!
+set_relaxed_risk_budgeting_constraints!
 ```

@@ -29,4 +29,8 @@ fit_predict
 sort_by_measure
 quantile_by_measure
 fit_and_predict
+reconstruct_rd(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult, X::VecNum)
+reconstruct_rd(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult, X::VecVecNum)
+sort_predictions!(test_idx::VecVecInt, predictions::VecPredRes)
+sort_predictions!(res::CrossValidationResult, predictions::VecPredRes)
 ```

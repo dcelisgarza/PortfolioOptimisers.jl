@@ -148,6 +148,30 @@ function opt_view(rrb::RelaxedRiskBudgeting, i, X::MatNum)
     wi = nothing_scalar_array_view(rrb.wi, i)
     return RelaxedRiskBudgeting(; opt = opt, rba = rba, wi = wi, alg = rrb.alg, fb = rrb.fb)
 end
+"""
+    set_relaxed_risk_budgeting_alg_constraints!(alg, model, w, sigma, chol)
+
+Add algorithm-specific second-order cone constraints for Relaxed Risk Budgeting.
+
+Dispatches based on the RRB algorithm variant. Adds second-order cone constraints implementing the basic, regularised, or regularised-penalised RRB formulation.
+
+# Arguments
+
+  - `alg`: RRB algorithm ([`BasicRelaxedRiskBudgeting`](@ref), [`RegularisedRelaxedRiskBudgeting`](@ref), or [`RegularisedPenalisedRelaxedRiskBudgeting`](@ref)).
+  - `model::JuMP.Model`: JuMP optimisation model.
+  - `w::VecJuMPScalar`: Portfolio weight variables.
+  - `sigma::MatNum`: Covariance matrix.
+  - `chol::Option{<:MatNum}`: Optional pre-computed Cholesky factor.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`RelaxedRiskBudgeting`](@ref)
+  - [`set_relaxed_risk_budgeting_constraints!`](@ref)
+"""
 function set_relaxed_risk_budgeting_alg_constraints!(::BasicRelaxedRiskBudgeting,
                                                      model::JuMP.Model, w::VecJuMPScalar,
                                                      sigma::MatNum,
@@ -246,6 +270,30 @@ function _set_relaxed_risk_budgeting_constraints!(model::JuMP.Model,
     set_relaxed_risk_budgeting_alg_constraints!(rrb.alg, model, w, sigma, chol)
     return rkb
 end
+"""
+    set_relaxed_risk_budgeting_constraints!(model, rrb, pr, wb, args...)
+
+Add Relaxed Risk Budgeting (RRB) constraints and weight variables to the JuMP model.
+
+Dispatches based on the risk budgeting algorithm type. Configures weight variables, budget constraints, second-order cone constraints, and weight bounds.
+
+# Arguments
+
+  - `model::JuMP.Model`: JuMP optimisation model.
+  - `rrb::RelaxedRiskBudgeting`: RRB estimator configuration.
+  - `pr::AbstractPriorResult`: Prior result with asset moments.
+  - `wb::WeightBounds`: Weight bounds configuration.
+  - `args...`: Additional arguments (e.g. returns data for factor risk budgeting).
+
+# Returns
+
+  - Processed risk budgeting attributes.
+
+# Related
+
+  - [`RelaxedRiskBudgeting`](@ref)
+  - [`set_relaxed_risk_budgeting_alg_constraints!`](@ref)
+"""
 function set_relaxed_risk_budgeting_constraints!(model::JuMP.Model,
                                                  rrb::RelaxedRiskBudgeting{<:Any,
                                                                            <:FactorRiskBudgeting,

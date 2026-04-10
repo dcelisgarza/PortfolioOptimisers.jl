@@ -150,19 +150,100 @@ Matches either a [`NonFiniteAllocationOptimisationEstimator`](@ref) (specifying 
 """
 const OptE_Opt = Union{<:NonFiniteAllocationOptimisationEstimator,
                        <:NonFiniteAllocationOptimisationResult}
+"""
+    assert_special_nco_requirements(opt)
+
+Assert that the optimiser meets special requirements for Nested Clustered Optimisation (NCO).
+
+The default implementation does nothing. Overridden for estimators (e.g. [`Stacking`](@ref)) that have requirements which must be validated before NCO can proceed.
+
+# Arguments
+
+  - `opt`: Optimisation estimator, result, or vector thereof.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`NestedClustered`](@ref)
+  - [`Stacking`](@ref)
+"""
 function assert_special_nco_requirements(::OptE_Opt)
     return nothing
 end
 function factory(opt::OptE_Opt, ::Any)
     return opt
 end
+"""
+    needs_previous_weights(opt)
+
+Return `true` if the optimiser requires the previous period's weights.
+
+The default returns `false`. Overridden for optimisers that contain turnover constraints, tracking error constraints, or other time-dependent components that require the previous optimisation's weights.
+
+# Arguments
+
+  - `opt`: Optimisation estimator, result, risk measure, fee structure, or vector thereof.
+
+# Returns
+
+  - `Bool`: `true` if previous weights are needed.
+
+# Related
+
+  - [`is_time_dependent`](@ref)
+  - [`JuMPOptimiser`](@ref)
+"""
 function needs_previous_weights(::OptE_Opt)
     return false
 end
 #! Start: Overload these for all estimators which can use time-dependent constraints.
+"""
+    is_time_dependent(opt)
+
+Return `true` if the optimiser has time-dependent constraints or objectives.
+
+The default returns `false`. Overridden for estimators that must be updated between periods (e.g. when constraints depend on the current time step).
+
+# Arguments
+
+  - `opt`: Optimisation estimator, result, or vector thereof.
+
+# Returns
+
+  - `Bool`: `true` if the estimator is time-dependent.
+
+# Related
+
+  - [`update_time_dependent_estimator`](@ref)
+  - [`needs_previous_weights`](@ref)
+"""
 function is_time_dependent(::OptE_Opt)
     return false
 end
+"""
+    update_time_dependent_estimator(opt, args...)
+
+Update the estimator for the current time period.
+
+The default returns the estimator unchanged. Overridden for estimators that need to be updated between periods (e.g. sliding window constraints, time-varying parameters).
+
+# Arguments
+
+  - `opt`: Optimisation estimator or result.
+  - `args...`: Additional arguments (e.g. current period index, returns data).
+
+# Returns
+
+  - Updated estimator.
+
+# Related
+
+  - [`is_time_dependent`](@ref)
+  - [`path_fit_and_predict`](@ref)
+"""
 function update_time_dependent_estimator(opt::OptE_Opt, args...)
     return opt
 end
@@ -496,6 +577,30 @@ function opt_weight_bounds(wf::IterativeWeightFinaliser, wb::WeightBounds, w::Ve
     end
     return w
 end
+"""
+    finalise_weight_bounds(wf::WeightFinaliser, wb::WeightBounds, w::VecNum)
+
+Apply weight finalisation to enforce bounds and determine the optimisation return code.
+
+Runs [`opt_weight_bounds`](@ref) with the given finaliser and bounds, then returns a success or failure return code based on whether all weights are finite.
+
+# Arguments
+
+  - `wf::WeightFinaliser`: Weight finaliser algorithm.
+  - `wb::WeightBounds`: Weight bounds configuration.
+  - `w::VecNum`: Portfolio weights to finalise.
+
+# Returns
+
+  - `(retcode, w)`: Tuple of return code and adjusted weights.
+
+# Related
+
+  - [`WeightFinaliser`](@ref)
+  - [`WeightBounds`](@ref)
+  - [`OptimisationSuccess`](@ref)
+  - [`OptimisationFailure`](@ref)
+"""
 function finalise_weight_bounds(wf::WeightFinaliser, wb::WeightBounds, w::VecNum)
     w = opt_weight_bounds(wf, wb, w)
     retcode = if !any(!isfinite, w)
@@ -545,6 +650,28 @@ end
 function OptimisationFailure(; res = nothing)
     return OptimisationFailure(res)
 end
+"""
+    opt_view(opt, i, args...)
+
+Return a view or subset of an optimisation estimator for a given cluster index `i`.
+
+Default fallback returns the estimator unchanged. Overridden for composite estimators (e.g. [`JuMPOptimiser`](@ref), [`HierarchicalRiskParity`](@ref)) to slice all sub-estimators for the `i`-th cluster.
+
+# Arguments
+
+  - `opt`: Optimisation estimator or result.
+  - `i`: Cluster or asset index.
+  - `args...`: Additional arguments (e.g. asset returns matrix).
+
+# Returns
+
+  - Sliced or unchanged optimisation estimator.
+
+# Related
+
+  - [`JuMPOptimiser`](@ref)
+  - [`NestedClustered`](@ref)
+"""
 function opt_view(opt::AbstractOptimisationEstimator, args...)
     return opt
 end
@@ -581,6 +708,33 @@ Passing an [`OptimisationResult`](@ref) directly returns it unchanged (pass-thro
 function optimise(or::OptimisationResult, args...; kwargs...)
     return or
 end
+"""
+    _optimise(opt, rd, args...; dims, str_names, save, kwargs...)
+
+Internal dispatch function for portfolio optimisation.
+
+Called by [`optimise`](@ref) to perform the actual optimisation. Each optimisation estimator type implements its own overload. Returns the estimator-specific result type.
+
+# Arguments
+
+  - `opt`: Optimisation estimator (e.g. [`MeanRisk`](@ref), [`RiskBudgeting`](@ref), etc.).
+  - `rd::ReturnsResult`: Returns data.
+  - `dims::Int`: Observation dimension.
+  - `str_names::Bool`: Whether to use string names in the JuMP model.
+  - `save::Bool`: Whether to save the JuMP model in the result.
+  - `kwargs...`: Additional keyword arguments.
+
+# Returns
+
+  - Estimator-specific optimisation result.
+
+# Related
+
+  - [`optimise`](@ref)
+  - [`MeanRisk`](@ref)
+  - [`RiskBudgeting`](@ref)
+  - [`NearOptimalCentering`](@ref)
+"""
 function _optimise end
 function optimise(opt::OptimisationEstimator, args...; kwargs...)
     fb = Tuple{OptimisationEstimator, OptimisationResult}[]

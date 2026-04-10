@@ -13,4 +13,5 @@ WindowSizeE
 MultipleRandomised
 MultipleRandomisedResult
 Base.split(mrcv::MultipleRandomised, rd::ReturnsResult)
+path_fit_and_predict
 ```

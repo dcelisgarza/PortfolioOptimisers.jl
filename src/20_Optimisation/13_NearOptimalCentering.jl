@@ -247,6 +247,33 @@ function opt_view(noc::NearOptimalCentering, i, X::MatNum)
                                 w_min_ini = w_min_ini, w_opt = w_opt, w_opt_ini = w_opt_ini,
                                 w_max = w_max, w_max_ini = w_max_ini, fb = noc.fb)
 end
+"""
+    near_optimal_centering_risks(scalariser, r, pr, fees, slv, w_min, w_opt, w_max)
+
+Compute the scaled risk values for the minimum, optimal, and maximum portfolios.
+
+Used internally by Near Optimal Centering to evaluate the risk at the three anchor portfolios (minimum-risk, optimal, maximum-risk) using the given risk measure(s) and scalarisation strategy.
+
+# Arguments
+
+  - `scalariser`: Risk scalarisation strategy (e.g. `SumScalariser`, `LogSumExpScalariser`).
+  - `r`: Risk measure or vector of risk measures.
+  - `pr`: Prior result containing asset data.
+  - `fees`: Optional fees configuration.
+  - `slv`: Solver or vector of solvers.
+  - `w_min`: Minimum-risk portfolio weights.
+  - `w_opt`: Optimal portfolio weights (vector or vector of vectors).
+  - `w_max`: Maximum-risk portfolio weights.
+
+# Returns
+
+  - `(risk_min, risk_opt, risk_max)`: Tuple of risk values at the three anchor portfolios.
+
+# Related
+
+  - [`NearOptimalCentering`](@ref)
+  - [`near_optimal_centering_setup`](@ref)
+"""
 function near_optimal_centering_risks(::Any, r::RiskMeasure, pr::AbstractPriorResult,
                                       fees::Option{<:Fees}, slv::Slv_VecSlv, w_min::VecNum,
                                       w_opt::VecNum_VecVecNum, w_max::VecNum)
@@ -346,6 +373,35 @@ function near_optimal_centering_risks(::MaxScalariser, rs::VecRM, pr::AbstractPr
     end
     return risk_min, risk_opt, risk_max
 end
+"""
+    NearOptimalSetup
+
+Intermediate result type storing the setup data for Near Optimal Centering.
+
+Holds pre-computed portfolio weights, risk and return targets, and sub-problem return codes needed to formulate and solve the NOC optimisation problem.
+
+$(TYPEDEF)
+
+# Fields
+
+  - `w_opt`: Optimal (central) portfolio weights.
+  - `rk_opt`: Optimal risk target for the NOC problem.
+  - `rt_opt`: Optimal return target for the NOC problem.
+  - `rt_min`: Minimum return from the minimum-risk portfolio.
+  - `rt_max`: Maximum return from the maximum-return portfolio.
+  - `w_min`: Minimum-risk portfolio weights.
+  - `w_max`: Maximum-risk (maximum-return) portfolio weights.
+  - `r`: Risk measure or vector of risk measures.
+  - `opt`: Processed JuMP optimiser configuration.
+  - `w_min_retcode`: Return code for the minimum-risk sub-problem.
+  - `w_opt_retcode`: Return code for the optimal-objective sub-problem.
+  - `w_max_retcode`: Return code for the maximum-risk sub-problem.
+
+# Related
+
+  - [`NearOptimalCentering`](@ref)
+  - [`near_optimal_centering_setup`](@ref)
+"""
 @concrete struct NearOptimalSetup <: AbstractResult
     w_opt
     rk_opt
@@ -360,6 +416,29 @@ end
     w_opt_retcode
     w_max_retcode
 end
+"""
+    near_optimal_centering_setup(noc::NearOptimalCentering, rd::ReturnsResult; dims::Int = 1)
+
+Compute all prerequisite data for Near Optimal Centering.
+
+Solves the minimum-risk, optimal-objective, and maximum-risk sub-problems (unless pre-computed weights are provided), then computes the risk and return targets for the NOC problem.
+
+# Arguments
+
+  - `noc::NearOptimalCentering`: NOC estimator configuration.
+  - `rd::ReturnsResult`: Returns data.
+  - `dims::Int`: Observation dimension (default `1`).
+
+# Returns
+
+  - [`NearOptimalSetup`](@ref) containing all setup data needed for the NOC optimisation.
+
+# Related
+
+  - [`NearOptimalCentering`](@ref)
+  - [`NearOptimalSetup`](@ref)
+  - [`near_optimal_centering_risks`](@ref)
+"""
 function near_optimal_centering_setup(noc::NearOptimalCentering, rd::ReturnsResult;
                                       dims::Int = 1)
     w_min = noc.w_min
@@ -420,6 +499,27 @@ function near_optimal_centering_setup(noc::NearOptimalCentering, rd::ReturnsResu
     return NearOptimalSetup(w_opt, rk_opt, rt_opt, rt_min, rt_max, w_min, w_max, r, opt,
                             w_min_retcode, w_opt_retcode, w_max_retcode)
 end
+"""
+    set_near_optimal_centering_constraints!(model::JuMP.Model, wb::WeightBounds)
+
+Add Near Optimal Centering logarithmic barrier constraints to the JuMP model.
+
+Introduces log variables for portfolio weights, upper bound distances, risk, and return, then adds exponential cone constraints implementing the analytic centre formulation.
+
+# Arguments
+
+  - `model::JuMP.Model`: JuMP optimisation model.
+  - `wb::WeightBounds`: Weight bounds configuration.
+
+# Returns
+
+  - Objective expression for the NOC barrier function.
+
+# Related
+
+  - [`NearOptimalCentering`](@ref)
+  - [`set_near_optimal_objective_function!`](@ref)
+"""
 function set_near_optimal_centering_constraints!(model::JuMP.Model, wb::WeightBounds)
     w = model[:w]
     sc = model[:sc]
@@ -451,6 +551,29 @@ function set_near_optimal_centering_constraints!(model::JuMP.Model, wb::WeightBo
     JuMP.@expression(model, obj_expr, -(log_ret + log_risk + sum(log_w + log_delta_w)))
     return obj_expr
 end
+"""
+    set_near_optimal_objective_function!(alg, model, opt)
+
+Set the Near Optimal Centering objective function in the JuMP model.
+
+Formulates the NOC objective based on the algorithm variant. For `UnconstrainedNearOptimalCentering`, uses only the barrier function. For `ConstrainedNearOptimalCentering`, also adds objective penalties and custom objective terms.
+
+# Arguments
+
+  - `alg`: NOC algorithm variant ([`UnconstrainedNearOptimalCentering`](@ref) or [`ConstrainedNearOptimalCentering`](@ref)).
+  - `model::JuMP.Model`: JuMP optimisation model.
+  - `opt::BaseJuMPOptimisationEstimator`: JuMP optimiser configuration.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`NearOptimalCentering`](@ref)
+  - [`set_near_optimal_centering_constraints!`](@ref)
+  - [`solve_noc!`](@ref)
+"""
 function set_near_optimal_objective_function!(::UnconstrainedNearOptimalCentering,
                                               model::JuMP.Model,
                                               opt::BaseJuMPOptimisationEstimator)
@@ -469,6 +592,32 @@ function set_near_optimal_objective_function!(::ConstrainedNearOptimalCentering,
     JuMP.@objective(model, Min, so * obj_expr)
     return nothing
 end
+"""
+    solve_noc!(noc, model, rk_opt, rt_opt, opt, args...)
+
+Solve the Near Optimal Centering problem given the model, risk, and return targets.
+
+Sets model parameters for the risk and return targets, configures the NOC objective, and solves the JuMP model. Multiple overloads handle different algorithm variants and frontier sweep modes.
+
+# Arguments
+
+  - `noc::NearOptimalCentering`: NOC estimator configuration.
+  - `model::JuMP.Model`: JuMP optimisation model.
+  - `rk_opt`: Risk target(s) for the NOC problem.
+  - `rt_opt`: Return target(s) for the NOC problem.
+  - `opt::BaseJuMPOptimisationEstimator`: JuMP optimiser configuration.
+  - `args...`: Additional arguments (frontier bounds, flags, etc.).
+
+# Returns
+
+  - `(retcode, sol)` or `(retcodes, sols)` depending on the overload.
+
+# Related
+
+  - [`NearOptimalCentering`](@ref)
+  - [`set_near_optimal_objective_function!`](@ref)
+  - [`near_optimal_centering_setup`](@ref)
+"""
 function solve_noc!(noc::NearOptimalCentering, model::JuMP.Model, rk_opt::Number,
                     rt_opt::Number, opt::BaseJuMPOptimisationEstimator, args...)
     JuMP.@expression(model, noc_rk, rk_opt)

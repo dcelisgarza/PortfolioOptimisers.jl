@@ -81,6 +81,28 @@ function jump_returns_view(r::ArithmeticReturn, i, args...)
     mu = nothing_scalar_array_view(r.mu, i)
     return ArithmeticReturn(; ucs = uset, lb = r.lb, mu = mu)
 end
+"""
+    no_bounds_returns_estimator(r, args...)
+
+Create a version of the returns estimator with lower bounds removed.
+
+Used internally in risk frontier sub-problems to remove return lower bounds from the estimator so the sub-problem is unconstrained.
+
+# Arguments
+
+  - `r`: JuMP returns estimator ([`ArithmeticReturn`](@ref) or [`LogarithmicReturn`](@ref)).
+  - `args...`: Additional arguments (e.g. `flag::Bool` for uncertainty set handling).
+
+# Returns
+
+  - Returns estimator without bounds.
+
+# Related
+
+  - [`ArithmeticReturn`](@ref)
+  - [`LogarithmicReturn`](@ref)
+  - [`no_bounds_optimiser`](@ref)
+"""
 function no_bounds_returns_estimator(r::ArithmeticReturn, flag::Bool = true)
     return flag ? ArithmeticReturn(; ucs = r.ucs, mu = r.mu) : ArithmeticReturn()
 end
@@ -450,6 +472,29 @@ function set_maximum_ratio_factor_variables!(model::JuMP.Model, args...)
     JuMP.@expression(model, k, 1)
     return nothing
 end
+"""
+    set_return_bounds!(args...)
+    set_return_bounds!(model::JuMP.Model, lb::Number)
+    set_return_bounds!(model::JuMP.Model, lb::Front_NumVec)
+
+Add a return lower bound constraint to the JuMP model.
+
+The no-op fallback does nothing. With a scalar `lb`, adds a constraint `ret >= lb`. With a `Frontier` or vector `lb`, registers a return frontier expression for efficient frontier sweeps.
+
+# Arguments
+
+  - `model::JuMP.Model`: JuMP optimisation model.
+  - `lb`: Lower bound on portfolio return (scalar, vector, or `Frontier`).
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`set_return_constraints!`](@ref)
+  - [`ArithmeticReturn`](@ref)
+"""
 function set_return_bounds!(args...)
     return nothing
 end
@@ -506,6 +551,27 @@ function set_max_ratio_return_constraints!(model::JuMP.Model, obj::MaximumRatio,
     end
     return nothing
 end
+"""
+    add_fees_to_ret!(model::JuMP.Model, ret)
+
+Subtract the fees expression from the portfolio return expression in the JuMP model.
+
+If no fees are registered in the model, does nothing.
+
+# Arguments
+
+  - `model::JuMP.Model`: JuMP optimisation model.
+  - `ret`: JuMP return expression to modify in-place.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`add_market_impact_cost!`](@ref)
+  - [`set_return_constraints!`](@ref)
+"""
 function add_fees_to_ret!(model::JuMP.Model, ret)
     if !haskey(model, :fees)
         return nothing
@@ -514,6 +580,27 @@ function add_fees_to_ret!(model::JuMP.Model, ret)
     JuMP.add_to_expression!(ret, -fees)
     return nothing
 end
+"""
+    add_market_impact_cost!(model::JuMP.Model, ret)
+
+Subtract market impact costs from the portfolio return expression in the JuMP model.
+
+If no market impact cost expression is registered in the model, does nothing.
+
+# Arguments
+
+  - `model::JuMP.Model`: JuMP optimisation model.
+  - `ret`: JuMP return expression to modify in-place.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`add_fees_to_ret!`](@ref)
+  - [`set_return_constraints!`](@ref)
+"""
 function add_market_impact_cost!(model::JuMP.Model, ret)
     if !haskey(model, :wip)
         return nothing
@@ -522,6 +609,32 @@ function add_market_impact_cost!(model::JuMP.Model, ret)
     JuMP.add_to_expression!(ret, -cost_bgt_expr)
     return nothing
 end
+"""
+    set_return_constraints!(model, pret, obj, pr; kwargs...)
+
+Add portfolio return expression and associated constraints to the JuMP model.
+
+Dispatches based on the return estimator type. Registers the `ret` expression, applies fees and market impact costs, configures maximum Sharpe ratio constraints, and adds return lower bounds.
+
+# Arguments
+
+  - `model::JuMP.Model`: JuMP optimisation model.
+  - `pret`: JuMP returns estimator ([`ArithmeticReturn`](@ref) or [`LogarithmicReturn`](@ref)).
+  - `obj::ObjectiveFunction`: Portfolio objective function.
+  - `pr::AbstractPriorResult`: Prior result with asset moments.
+  - `kwargs...`: Additional keyword arguments (e.g. `rd` for uncertainty sets).
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`ArithmeticReturn`](@ref)
+  - [`LogarithmicReturn`](@ref)
+  - [`set_return_bounds!`](@ref)
+  - [`add_fees_to_ret!`](@ref)
+"""
 function set_return_constraints!(model::JuMP.Model,
                                  pret::ArithmeticReturn{Nothing, <:Any, <:Any},
                                  obj::ObjectiveFunction, pr::AbstractPriorResult; kwargs...)
@@ -535,6 +648,28 @@ function set_return_constraints!(model::JuMP.Model,
     set_return_bounds!(model, lb)
     return nothing
 end
+"""
+    set_ucs_return_constraints!(model, ucs, mu)
+
+Add uncertainty-set-robust return constraints to the JuMP model.
+
+Dispatches based on the uncertainty set type. For `BoxUncertaintySet`, uses a norm-1 cone constraint. For `EllipsoidalUncertaintySet`, uses a second-order cone constraint.
+
+# Arguments
+
+  - `model::JuMP.Model`: JuMP optimisation model.
+  - `ucs`: Uncertainty set ([`BoxUncertaintySet`](@ref) or [`EllipsoidalUncertaintySet`](@ref)).
+  - `mu`: Expected return vector.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`set_return_constraints!`](@ref)
+  - [`ArithmeticReturn`](@ref)
+"""
 function set_ucs_return_constraints!(model::JuMP.Model, ucs::BoxUncertaintySet,
                                      mu::Num_VecNum)
     sc = model[:sc]
@@ -632,6 +767,27 @@ function set_return_constraints!(model::JuMP.Model, pret::LogarithmicReturn,
     set_return_bounds!(model, lb)
     return nothing
 end
+"""
+    add_to_objective_penalty!(model::JuMP.Model, expr)
+
+Accumulate an expression into the objective penalty term `op` in the JuMP model.
+
+Creates the `op` expression if it does not yet exist, then adds `expr` to it.
+
+# Arguments
+
+  - `model::JuMP.Model`: JuMP optimisation model.
+  - `expr`: JuMP expression to add to the penalty.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`add_penalty_to_objective!`](@ref)
+  - [`set_portfolio_objective_function!`](@ref)
+"""
 function add_to_objective_penalty!(model::JuMP.Model, expr)
     op = if !haskey(model, :op)
         JuMP.@expression(model, op, zero(JuMP.AffExpr))
@@ -641,6 +797,28 @@ function add_to_objective_penalty!(model::JuMP.Model, expr)
     JuMP.add_to_expression!(op, expr)
     return nothing
 end
+"""
+    add_penalty_to_objective!(model::JuMP.Model, factor::Integer, expr)
+
+Add the accumulated objective penalty to the main objective expression.
+
+If an `op` penalty term exists in the model, adds `factor * op` to `expr` in-place. Does nothing if no penalty term has been registered.
+
+# Arguments
+
+  - `model::JuMP.Model`: JuMP optimisation model.
+  - `factor::Integer`: Sign factor (`1` for minimisation, `-1` for maximisation).
+  - `expr`: JuMP objective expression to modify in-place.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`add_to_objective_penalty!`](@ref)
+  - [`set_portfolio_objective_function!`](@ref)
+"""
 function add_penalty_to_objective!(model::JuMP.Model, factor::Integer, expr)
     if !haskey(model, :op)
         return nothing
@@ -649,6 +827,35 @@ function add_penalty_to_objective!(model::JuMP.Model, factor::Integer, expr)
     JuMP.add_to_expression!(expr, factor, op)
     return nothing
 end
+"""
+    set_portfolio_objective_function!(model, obj, pret, cobj, opt, pr)
+
+Set the portfolio objective function in the JuMP model.
+
+Dispatches based on the objective function type to configure the appropriate JuMP objective expression. Handles minimum risk, maximum utility, maximum Sharpe ratio, and maximum return objectives, including penalty terms and custom objective contributions.
+
+# Arguments
+
+  - `model::JuMP.Model`: JuMP optimisation model.
+  - `obj::ObjectiveFunction`: Portfolio objective (e.g. [`MinimumRisk`](@ref), [`MaximumUtility`](@ref)).
+  - `pret::JuMPReturnsEstimator`: Returns estimator.
+  - `cobj::Option{<:CustomJuMPObjective}`: Optional custom objective term.
+  - `opt::JuMPOptimisationEstimator`: JuMP optimiser configuration.
+  - `pr::AbstractPriorResult`: Prior result.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`MinimumRisk`](@ref)
+  - [`MaximumUtility`](@ref)
+  - [`MaximumRatio`](@ref)
+  - [`MaximumReturn`](@ref)
+  - [`add_penalty_to_objective!`](@ref)
+  - [`add_custom_objective_term!`](@ref)
+"""
 function set_portfolio_objective_function!(model::JuMP.Model, obj::MinimumRisk,
                                            pret::JuMPReturnsEstimator,
                                            cobj::Option{<:CustomJuMPObjective},

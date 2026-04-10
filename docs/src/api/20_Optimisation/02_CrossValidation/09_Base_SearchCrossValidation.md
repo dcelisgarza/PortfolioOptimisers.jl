@@ -7,6 +7,9 @@ CrossValidationSearchScorer
 CrossValSearchScorer
 HighestMeanScore
 AbstractSearchCrossValidationResult
+AbstractSearchCrossValidationAlgorithm
 SearchCrossValidationResult
 fit_and_score
+_expr_to_lens
+_eval_index
 ```

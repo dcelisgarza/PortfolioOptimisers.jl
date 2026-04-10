@@ -6,4 +6,5 @@ prior(pe::HighOrderPriorEstimator, X::MatNum,
                F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
 block_vec_pq
 dup_elim_sum_matrices
+duplication_matrix
 ```

@@ -485,6 +485,34 @@ function Base.split(mrcv::MultipleRandomised, rd::ReturnsResult)
     return MultipleRandomisedResult(; train_idx = train_indices, test_idx = test_indices,
                                     asset_idx = asset_indices, path_ids = path_ids)
 end
+"""
+    path_fit_and_predict(opt, rd, train_idx, test_idx, cols; ex, id)
+
+Fit and predict along a sequence of (train, test, asset) triples, respecting sequential constraints.
+
+Handles sequential and parallel execution. If the optimiser requires previous weights or is time-dependent, runs sequentially and passes weights/state between periods. Otherwise, runs in parallel using the provided executor.
+
+# Arguments
+
+  - `opt::NonFiniteAllocationOptimisationEstimator`: Portfolio optimisation estimator.
+  - `rd::ReturnsResult`: Full returns data.
+  - `train_idx`: Sequence of training index vectors.
+  - `test_idx`: Sequence of test index vectors.
+  - `cols`: Sequence of asset column indices for each fold.
+  - `ex::FLoops.Transducers.Executor`: Executor for parallel processing.
+  - `id`: Optional path identifier.
+
+# Returns
+
+  - [`MultiPeriodPredictionResult`](@ref) with predictions sorted by test index.
+
+# Related
+
+  - [`fit_and_predict`](@ref)
+  - [`needs_previous_weights`](@ref)
+  - [`is_time_dependent`](@ref)
+  - [`update_time_dependent_estimator`](@ref)
+"""
 function path_fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator,
                               rd::ReturnsResult, train_idx, test_idx, cols;
                               ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),

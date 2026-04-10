@@ -5,4 +5,5 @@ PowerNormValueatRisk
 PowerNormValueatRiskRange
 PowerNormDrawdownatRisk
 RelativePowerNormDrawdownatRisk
+PRM
 ```

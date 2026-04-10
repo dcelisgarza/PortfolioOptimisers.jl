@@ -29,6 +29,18 @@ Abstract result type for search-based cross-validation routines. Serves as the p
   - Subtypes must store the optimal estimator, test and train scores, parameter grid, and selected index.
 """
 abstract type AbstractSearchCrossValidationResult <: AbstractResult end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for all search-based cross-validation algorithm types.
+
+Subtypes define the strategy used to select the best hyperparameter combination from the search results (e.g. selecting by highest mean score).
+
+# Related
+
+  - [`AbstractSearchCrossValidationEstimator`](@ref)
+  - [`SearchCrossValidationResult`](@ref)
+"""
 abstract type AbstractSearchCrossValidationAlgorithm <: AbstractAlgorithm end
 """
     abstract type CrossValidationSearchScorer <: AbstractEstimator
@@ -188,8 +200,49 @@ function fit_and_score(opt::NonFiniteAllocationOptimisationEstimator,
     end
     return test_score, train_score
 end
+"""
+    _expr_to_lens(ex::Symbol)
+
+Convert a bare symbol into a `PropertyLens` for field access.
+
+Base case for the lens-building recursion: a bare symbol maps directly to an `Accessors.PropertyLens`.
+
+# Arguments
+
+  - `ex::Symbol`: A field name symbol.
+
+# Returns
+
+  - `Accessors.PropertyLens` for the symbol.
+
+# Related
+
+  - [`_expr_to_lens_chain`](@ref)
+  - [`parse_lens`](@ref)
+"""
 # Base case: bare symbol → PropertyLens
 _expr_to_lens(ex::Symbol) = Accessors.PropertyLens(ex)
+"""
+    _eval_index(x)
+
+Evaluate a literal index node in the AST without runtime `eval`.
+
+Converts integer, symbol, or vector expression AST nodes to concrete index values for use in `Accessors.IndexLens`.
+
+# Arguments
+
+  - `x::Integer`: An integer index.
+  - `x::Symbol`: A symbolic index.
+  - `ex::Expr`: A vector expression (`:vect` head).
+
+# Returns
+
+  - The evaluated index value.
+
+# Related
+
+  - [`_expr_to_lens_chain`](@ref)
+"""
 # Evaluate literal index nodes in the AST (no runtime eval needed)
 _eval_index(x::Integer) = x
 _eval_index(x::Symbol)  = x

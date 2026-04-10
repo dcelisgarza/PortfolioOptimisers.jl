@@ -622,6 +622,28 @@ function quantile_by_measure(ppred::PopulationPredictionResult, r::AbstractBaseR
     # idx = max(1, round(Int, Statistics.quantile(1:length(sorted_predictions), q)))
     # return sorted_predictions[idx]
 end
+"""
+    reconstruct_rd(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult, X)
+
+Reconstruct a `PredictionReturnsResult` from an optimisation result and returns data.
+
+Computes benchmark, investment vehicle, and per-asset allocation data from the optimisation result weights and the original returns data.
+
+# Arguments
+
+  - `res::NonFiniteAllocationOptimisationResult`: Fitted optimisation result.
+  - `rd::ReturnsResult`: Original returns data.
+  - `X`: Portfolio returns (vector or vector of vectors).
+
+# Returns
+
+  - [`PredictionReturnsResult`](@ref) with updated benchmark and investment vehicle data.
+
+# Related
+
+  - [`predict`](@ref)
+  - [`PredictionReturnsResult`](@ref)
+"""
 function reconstruct_rd(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult,
                         X::VecNum)
     nb = rd.nb
@@ -788,6 +810,27 @@ function fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator, rd::Retu
     res = optimise(opt, rd_train)
     return predict(res, rd, test_idx, cols)
 end
+"""
+    sort_predictions!(test_idx, predictions)
+
+Sort prediction results to match the order of test indices.
+
+Reorders `predictions` so that they align with the original time ordering of `test_idx`.
+
+# Arguments
+
+  - `test_idx::VecVecInt`: Vector of test index vectors.
+  - `predictions::VecPredRes`: Vector of prediction results.
+
+# Returns
+
+  - Sorted predictions vector.
+
+# Related
+
+  - [`fit_and_predict`](@ref)
+  - [`path_fit_and_predict`](@ref)
+"""
 function sort_predictions!(test_idx::VecVecInt, predictions::VecPredRes)
     @argcheck(all(x -> allunique(x), test_idx), "Test indices must be unique.")
     idx = sortperm(test_idx; by = x -> x[1])

@@ -167,6 +167,28 @@ function AssetRiskBudgeting(; rkb::Option{<:RkbE_Rkb} = nothing,
                             alg::RiskBudgetingFormulation = LogRiskBudgeting())
     return AssetRiskBudgeting(rkb, sets, alg)
 end
+"""
+    risk_budgeting_algorithm_view(r, i)
+
+Return a view or subset of a risk budgeting algorithm for cluster index `i`.
+
+Used in hierarchical optimisation to slice risk budget and asset set configurations for each cluster.
+
+# Arguments
+
+  - `r`: Risk budgeting algorithm ([`AssetRiskBudgeting`](@ref) or [`FactorRiskBudgeting`](@ref)).
+  - `i`: Cluster or asset index.
+
+# Returns
+
+  - Sliced risk budgeting algorithm.
+
+# Related
+
+  - [`AssetRiskBudgeting`](@ref)
+  - [`FactorRiskBudgeting`](@ref)
+  - [`RiskBudgeting`](@ref)
+"""
 function risk_budgeting_algorithm_view(r::AssetRiskBudgeting, i)
     rkb = risk_budget_view(r.rkb, i)
     sets = asset_sets_view(r.sets, i)
@@ -345,6 +367,31 @@ function _set_risk_budgeting_constraints!(model::JuMP.Model, rb::RiskBudgeting,
                       end)
     return rkb
 end
+"""
+    set_risk_budgeting_constraints!(model, rb, pr, wb, args...)
+
+Add risk budgeting constraints and weight variables to the JuMP model.
+
+Dispatches based on the risk budgeting algorithm and formulation. Sets up weight variables, logarithmic risk budget constraints, and weight bounds for the specified formulation (log, MIP, or factor-based).
+
+# Arguments
+
+  - `model::JuMP.Model`: JuMP optimisation model.
+  - `rb::RiskBudgeting`: Risk budgeting estimator configuration.
+  - `pr::AbstractPriorResult`: Prior result with asset moments.
+  - `wb::WeightBounds`: Weight bounds configuration.
+  - `args...`: Additional arguments (e.g. returns data for factor risk budgeting).
+
+# Returns
+
+  - Processed risk budgeting attributes.
+
+# Related
+
+  - [`RiskBudgeting`](@ref)
+  - [`AssetRiskBudgeting`](@ref)
+  - [`FactorRiskBudgeting`](@ref)
+"""
 function set_risk_budgeting_constraints!(model::JuMP.Model,
                                          rb::RiskBudgeting{<:Any, <:Any,
                                                            <:AssetRiskBudgeting{<:Any,
@@ -368,6 +415,27 @@ function set_risk_budgeting_constraints!(model::JuMP.Model,
     return ProcessedFactorRiskBudgetingAttributes(rkb, b1, rr)
 end
 ###########
+"""
+    set_rb_mip_w!(model::JuMP.Model, X::MatNum)
+
+Create long and short weight variables for MIP risk budgeting in the JuMP model.
+
+Registers long `lw`, short `sw` weight variables and the derived expressions `w = lw - sw` and `w_obj = lw + sw`.
+
+# Arguments
+
+  - `model::JuMP.Model`: JuMP optimisation model.
+  - `X::MatNum`: Asset returns matrix (used to determine number of assets).
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`set_risk_budgeting_constraints!`](@ref)
+  - [`RiskBudgeting`](@ref)
+"""
 function set_rb_mip_w!(model::JuMP.Model, X::MatNum)
     N = size(X, 2)
     JuMP.@variables(model, begin
