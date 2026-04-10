@@ -510,7 +510,7 @@ function fit_and_predict(res::NonFiniteAllocationOptimisationResult, rd::Returns
     test_idx = cv_res.test_idx
     predictions = Vector{PredictionResult}(undef, length(test_idx))
     FLoops.@floop ex for (i, test) in enumerate(test_idx)
-        predictions[i] = predict(res, rd, test)
+        predictions[i] = StatsAPI.predict(res, rd, test)
     end
     return MultiPeriodPredictionResult(; pred = predictions, id = id)
 end

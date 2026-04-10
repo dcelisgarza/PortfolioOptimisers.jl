@@ -225,7 +225,7 @@ $(DocStringExtensions.TYPEDEF)
 
 L-p norm tracking error estimator.
 
-Computes the Lp-norm of the difference between portfolio and benchmark returns: ``\|w^\top X - b\|_p``.
+Computes the Lp-norm of the difference between portfolio and benchmark returns: ``\\lvert\\mathbf{X} \\boldsymbol{w} - \\boldsymbol{b}\\rvert_p``.
 
 # Fields
 

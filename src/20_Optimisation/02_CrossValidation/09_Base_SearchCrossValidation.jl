@@ -153,7 +153,7 @@ function fit_and_score(opt::NonFiniteAllocationOptimisationEstimator,
                        train_idx::VecInt, test_idx::VecInt)
     rd_train = returns_result_view(rd, train_idx, :)
     res = optimise(opt, rd_train)
-    test_pred = predict(res, rd, test_idx)
+    test_pred = StatsAPI.predict(res, rd, test_idx)
     r = scv.r
     sign = ifelse(bigger_is_better(r), 1, -1)
     test_score = sign * expected_risk(scv.r, test_pred; scv.kwargs...)

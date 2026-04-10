@@ -197,7 +197,7 @@ function MultipleRandomisedResult(; train_idx::VecVecInt, test_idx::VecVecInt,
 end
 function n_splits(mre::MultipleRandomised, rd::ReturnsResult)
     if !isnothing(mre.window_size) && isa(mre.cv, DateWalkForward)
-        throw(ArgumentError("when using a `DateWalkForward` with `window_size`, the number of splits cannot be determined before calling `split`."))
+        throw(ArgumentError("when using a `DateWalkForward` with `window_size`, the number of splits cannot be determined before calling [`split`](@ref)."))
     end
     if !isnothing(mre.window_size)
         rd = returns_result_view(rd, 1:(mre.window_size), :)

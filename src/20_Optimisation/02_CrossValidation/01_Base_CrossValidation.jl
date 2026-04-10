@@ -625,7 +625,7 @@ optionally columns `cols`) of `rd` are used for the prediction.
 
   - [`PredictionResult`](@ref)
 """
-function predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)
+function StatsAPI.predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)
     X = calc_net_returns(res, rd.X)
     rd = reconstruct_rd(res, rd, X)
     return PredictionResult(; res = res, rd = rd)
@@ -659,15 +659,15 @@ function fit_predict(opt::OptE_Opt, rd::ReturnsResult)
     res = optimise(opt, rd)
     return predict(res, rd)
 end
-function predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult,
-                 test_idx::VecInt, cols = :)
+function StatsAPI.predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult,
+                          test_idx::VecInt, cols = :)
     rdi = returns_result_view(rd, test_idx, cols)
     X = calc_net_returns(res, rdi.X)
     rdi = reconstruct_rd(res, rdi, X)
     return PredictionResult(; res = res, rd = rdi)
 end
-function predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult,
-                 test_idxs::VecVecInt, cols = :)
+function StatsAPI.predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult,
+                          test_idxs::VecVecInt, cols = :)
     return [predict(res, rd, test_idx, cols) for test_idx in test_idxs]
 end
 """
