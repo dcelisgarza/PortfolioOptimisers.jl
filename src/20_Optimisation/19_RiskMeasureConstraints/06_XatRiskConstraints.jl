@@ -1,9 +1,5 @@
 """
-    set_risk_constraints!(model, i, r::ValueatRisk{...,<:MIPValueatRisk}, opt, pr, args...; kwargs...)
-    set_risk_constraints!(model, i, r::ValueatRiskRange{...,<:MIPValueatRisk}, opt, pr, args...; kwargs...)
-    set_risk_constraints!(model, i, r::ValueatRisk{...,<:DistributionValueatRisk}, opt, pr, args...; kwargs...)
-    set_risk_constraints!(model, i, r::ValueatRiskRange{...,<:DistributionValueatRisk}, opt, pr, args...; kwargs...)
-    set_risk_constraints!(model, i, r::DrawdownatRisk, opt, pr, args...; kwargs...)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
 Add Value-at-Risk, Value-at-Risk range, or Drawdown-at-Risk constraints to `model`.
 
@@ -19,6 +15,10 @@ constraint. The `DrawdownatRisk` overload applies the MIP approach to the drawdo
   - `r`: Risk measure instance.
   - `opt::RiskJuMPOptimisationEstimator`: Optimisation estimator.
   - `pr::AbstractPriorResult`: Prior result.
+
+# Returns
+
+  - `nothing`.
 
 # Related
 
@@ -141,9 +141,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     return var_range_risk
 end
 """
-    compute_value_at_risk_z(dist::Distributions.Normal, alpha)
-    compute_value_at_risk_z(dist::Distributions.TDist, alpha)
-    compute_value_at_risk_z(::Distributions.Laplace, alpha)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
 Compute the lower-tail z-score for a parametric VaR at significance level `alpha`.
 
@@ -154,6 +152,10 @@ closed-form expression for the Laplace distribution.
 
   - `dist`: Distribution instance (Normal, TDist, or Laplace).
   - `alpha::Number`: Significance level.
+
+# Returns
+
+  - `z::Number`: Lower-tail z-score for the parametric VaR.
 
 # Related
 
@@ -172,9 +174,7 @@ function compute_value_at_risk_z(::Distributions.Laplace, alpha::Number)
     return -log(2 * alpha) / sqrt(2)
 end
 """
-    compute_value_at_risk_cz(dist::Distributions.Normal, alpha)
-    compute_value_at_risk_cz(dist::Distributions.TDist, alpha)
-    compute_value_at_risk_cz(::Distributions.Laplace, alpha)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
 Compute the upper-tail z-score for a parametric VaR at significance level `alpha`.
 
@@ -185,6 +185,10 @@ Normal and scaled Student-t distributions, and the closed-form expression for La
 
   - `dist`: Distribution instance (Normal, TDist, or Laplace).
   - `alpha::Number`: Significance level.
+
+# Returns
+
+  - `z::Number`: Upper-tail z-score for the parametric VaR.
 
 # Related
 

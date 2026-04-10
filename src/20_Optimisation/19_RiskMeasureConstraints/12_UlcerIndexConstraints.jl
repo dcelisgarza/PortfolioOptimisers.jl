@@ -1,5 +1,5 @@
 """
-    set_risk_constraints!(model, ::Any, r::UlcerIndex, opt, pr, args...; kwargs...)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
 Add Ulcer Index risk constraints to `model`.
 
@@ -13,6 +13,10 @@ Introduces a scalar variable `uci` and the SOC constraint
   - `r::UlcerIndex`: Ulcer index risk measure instance.
   - `opt::RiskJuMPOptimisationEstimator`: Optimisation estimator.
   - `pr::AbstractPriorResult`: Prior result containing `X`.
+
+# Returns
+
+  - `nothing`.
 
 # Related
 

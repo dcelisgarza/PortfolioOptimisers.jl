@@ -1,8 +1,6 @@
 const NonFRCJuMPOpt = Union{<:MeanRisk, <:NearOptimalCentering, <:RiskBudgeting}
 """
-    scalarise_risk_expression!(model, ::SumScalariser)
-    scalarise_risk_expression!(model, sca::LogSumExpScalariser)
-    scalarise_risk_expression!(model, ::MaxScalariser)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
 Collapse the `risk_vec` expression array stored in `model` into a single scalar
 `risk` JuMP expression.
@@ -17,6 +15,10 @@ linear constraints to encode the maximum over all entries.
   - `model::JuMP.Model`: The JuMP optimisation model.
   - `sca`: Scalariser instance (one of [`SumScalariser`](@ref), [`LogSumExpScalariser`](@ref),
     or [`MaxScalariser`](@ref)).
+
+# Returns
+
+  - `nothing`.
 
 # Related
 
@@ -70,8 +72,7 @@ function scalarise_risk_expression!(model::JuMP.Model, ::MaxScalariser)
     return nothing
 end
 """
-    set_risk_constraints!(model, r::RiskMeasure, opt, pr, pl, fees, args...; kwargs...)
-    set_risk_constraints!(model, rs::VecRM, opt, pr, pl, fees, args...; kwargs...)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
 Dispatch to index-aware `set_risk_constraints!` for a single risk measure or iterate over a
 vector of risk measures.
@@ -87,6 +88,10 @@ overload calls `set_risk_constraints!(model, i, rs[i], ...)` for each element.
   - `pr::AbstractPriorResult`: Prior result.
   - `pl`: Optional phylogeny constraints.
   - `fees`: Optional fees structure.
+
+# Returns
+
+  - `nothing`.
 
 # Related
 
@@ -109,9 +114,7 @@ function set_risk_constraints!(model::JuMP.Model, rs::VecRM, opt::JuMPOptimisati
     return nothing
 end
 """
-    set_risk_upper_bound!(args...)
-    set_risk_upper_bound!(model, ::NonFRCJuMPOpt, r_expr, ub::Front_NumVec, key)
-    set_risk_upper_bound!(model, ::NonFRCJuMPOpt, r_expr, ub::Number, key)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
 Add an upper-bound constraint on a risk expression to `model`.
 
@@ -126,6 +129,10 @@ directly to the model.
   - `r_expr::JuMP.AbstractJuMPScalar`: The risk JuMP expression to bound.
   - `ub`: Upper bound; a scalar number or a frontier specification.
   - `key::Symbol`: Symbol used to name the constraint in the model.
+
+# Returns
+
+  - `nothing`.
 
 # Related
 
@@ -167,7 +174,7 @@ function set_risk_upper_bound!(model::JuMP.Model, ::NonFRCJuMPOpt,
     return nothing
 end
 """
-    set_risk_expression!(model, r_expr, scale, rke)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
 Push a scaled risk expression onto the `risk_vec` array in `model`.
 
@@ -180,6 +187,10 @@ and appends `scale * r_expr`.
   - `r_expr::JuMP.AbstractJuMPScalar`: The risk JuMP expression to add.
   - `scale::Number`: Scaling factor applied to the expression.
   - `rke::Bool`: When `false` this method is a no-op.
+
+# Returns
+
+  - `nothing`.
 
 # Related
 
@@ -199,7 +210,7 @@ function set_risk_expression!(model::JuMP.Model, r_expr::JuMP.AbstractJuMPScalar
     return nothing
 end
 """
-    set_risk_bounds_and_expression!(model, opt, r_expr, settings, key)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
 Apply an upper-bound constraint and register the risk expression for the objective.
 
@@ -213,6 +224,10 @@ with `settings.scale` and `settings.rke`.
   - `r_expr::JuMP.AbstractJuMPScalar`: Risk JuMP expression.
   - `settings::RiskMeasureSettings`: Settings carrying upper bound, scale, and `rke` flag.
   - `key::Symbol`: Symbol used to name constraints in the model.
+
+# Returns
+
+  - `nothing`.
 
 # Related
 
@@ -228,7 +243,7 @@ function set_risk_bounds_and_expression!(model::JuMP.Model,
     return nothing
 end
 """
-    set_drawdown_constraints!(model, X)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
 Add portfolio drawdown tracking variables and constraints to `model`.
 
@@ -241,6 +256,10 @@ present in `model`.
 
   - `model::JuMP.Model`: The JuMP optimisation model.
   - `X::MatNum`: Asset returns matrix (`T × N`).
+
+# Returns
+
+  - `dd`: JuMP variable array of length `T + 1` tracking portfolio drawdowns.
 
 # Related
 

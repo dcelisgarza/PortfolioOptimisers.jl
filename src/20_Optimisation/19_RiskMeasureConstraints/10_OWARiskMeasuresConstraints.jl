@@ -1,5 +1,5 @@
 """
-    set_owa_constraints!(model, X)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
 Set up the OWA portfolio returns variable and equality constraint.
 
@@ -10,6 +10,10 @@ Introduces a vector variable `owa` of length `T` and adds the equality constrain
 
   - `model::JuMP.Model`: The JuMP optimisation model.
   - `X::MatNum`: Asset returns matrix (`T × N`).
+
+# Returns
+
+  - `owa`: JuMP vector variable of length `T` for OWA portfolio returns.
 
 # Related
 
@@ -27,10 +31,7 @@ function set_owa_constraints!(model::JuMP.Model, X::MatNum)
     return owa
 end
 """
-    set_risk_constraints!(model, i, r::OrderedWeightsArray{...,<:ExactOrderedWeightsArray}, opt, pr, args...; kwargs...)
-    set_risk_constraints!(model, i, r::OrderedWeightsArrayRange{...,<:ExactOrderedWeightsArray}, opt, pr, args...; kwargs...)
-    set_risk_constraints!(model, i, r::OrderedWeightsArray{...,<:ApproxOrderedWeightsArray}, opt, pr, args...; kwargs...)
-    set_risk_constraints!(model, i, r::OrderedWeightsArrayRange{...,<:ApproxOrderedWeightsArray}, opt, pr, args...; kwargs...)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
 Add Ordered Weights Array (OWA) risk constraints to `model`.
 
@@ -46,6 +47,10 @@ two OWA expressions (e.g. tail-Gini range).
   - `r`: OWA or OWA-range risk measure instance.
   - `opt::RiskJuMPOptimisationEstimator`: Optimisation estimator.
   - `pr::AbstractPriorResult`: Prior result containing `X`.
+
+# Returns
+
+  - `nothing`.
 
 # Related
 

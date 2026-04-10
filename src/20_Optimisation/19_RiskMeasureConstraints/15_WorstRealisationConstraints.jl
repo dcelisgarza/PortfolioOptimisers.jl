@@ -1,5 +1,5 @@
 """
-    set_wr_risk_expression!(model, X)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
 Introduce the worst-realisation risk variable and constraint to `model`.
 
@@ -11,6 +11,10 @@ if already present.
 
   - `model::JuMP.Model`: The JuMP optimisation model.
   - `X::MatNum`: Asset returns matrix (`T × N`).
+
+# Returns
+
+  - `wr_risk`: JuMP scalar variable for the worst-realisation risk.
 
 # Related
 
@@ -27,7 +31,7 @@ function set_wr_risk_expression!(model::JuMP.Model, X::MatNum)
     return wr_risk
 end
 """
-    set_risk_constraints!(model, ::Any, r::WorstRealisation, opt, pr, args...; kwargs...)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
 Add worst-realisation risk constraints to `model`.
 
@@ -40,6 +44,10 @@ Delegates to [`set_wr_risk_expression!`](@ref) to create `wr_risk`, then calls
   - `r::WorstRealisation`: Worst-realisation risk measure instance.
   - `opt::RiskJuMPOptimisationEstimator`: Optimisation estimator.
   - `pr::AbstractPriorResult`: Prior result containing `X`.
+
+# Returns
+
+  - `nothing`.
 
 # Related
 

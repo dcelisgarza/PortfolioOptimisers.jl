@@ -1,5 +1,5 @@
 """
-    get_chol_or_sigma_pm(model, pr)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
 Retrieve or compute and cache the upper Cholesky factor of the prior covariance matrix.
 
@@ -10,6 +10,10 @@ If `model` does not yet contain a `G` expression, the factor is computed from `p
 
   - `model::JuMP.Model`: The JuMP optimisation model.
   - `pr::AbstractPriorResult`: Prior result containing `sigma` and optionally `chol`.
+
+# Returns
+
+  - `G::Matrix`: Upper Cholesky factor of the prior covariance matrix.
 
 # Related
 
@@ -23,7 +27,7 @@ function get_chol_or_sigma_pm(model::JuMP.Model, pr::AbstractPriorResult)
     return model[:G]
 end
 """
-    chol_sigma_selector(model, pr, r::CholRM)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
 Select the Cholesky factor to use for the covariance matrix.
 
@@ -35,6 +39,10 @@ both `nothing`, the Cholesky of `r.sigma` when `r.chol` is `nothing`, or `r.chol
   - `model::JuMP.Model`: The JuMP optimisation model.
   - `pr::AbstractPriorResult`: Prior result.
   - `r::CholRM`: Risk measure carrying optional `sigma` and `chol` fields.
+
+# Returns
+
+  - `G::Matrix`: Upper Cholesky factor of the selected covariance matrix.
 
 # Related
 
@@ -50,7 +58,7 @@ function chol_sigma_selector(model::JuMP.Model, pr::AbstractPriorResult, r::Chol
     end
 end
 """
-    set_variance_risk_bounds_and_expression!(model, opt, r_expr_ub, ub, key, r_expr, settings)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
 Set the upper-bound constraint and register the variance risk expression.
 
@@ -66,6 +74,10 @@ via [`set_risk_expression!`](@ref) according to `settings`.
   - `key::Symbol`: Symbol used to name constraints in the model.
   - `r_expr::JuMP.AbstractJuMPScalar`: Risk expression added to the objective.
   - `settings::RiskMeasureSettings`: Settings carrying scale and `rke` flag.
+
+# Returns
+
+  - `nothing`.
 
 # Related
 
@@ -83,8 +95,7 @@ function set_variance_risk_bounds_and_expression!(model::JuMP.Model,
     return nothing
 end
 """
-    set_risk!(model, i, r::StandardDeviation, opt, pr, args...; kwargs...)
-    set_risk!(model, i, r::Variance, opt::NonFRCJuMPOpt, pr, pl, args...; kwargs...)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
 Construct the raw standard-deviation or variance risk JuMP variable and second-order cone
 constraint.
@@ -102,6 +113,10 @@ risk-contribution constraints.
   - `opt`: Optimisation estimator.
   - `pr::AbstractPriorResult`: Prior result.
   - `pl`: Optional phylogeny constraints.
+
+# Returns
+
+  - A 2-tuple `(risk_expr, key)` of the JuMP risk expression and its model key.
 
 # Related
 
@@ -122,10 +137,7 @@ function set_risk!(model::JuMP.Model, i::Any, r::StandardDeviation,
     return sd_risk, key
 end
 """
-    set_risk_constraints!(model, i, r::StandardDeviation, opt, pr, args...; kwargs...)
-    set_risk_constraints!(model, i, r::Variance, opt::NonFRCJuMPOpt, pr, pl, args...; kwargs...)
-    set_risk_constraints!(model, i, r::Variance, opt::FactorRiskContribution, pr, pl, b1, args...; kwargs...)
-    set_risk_constraints!(model, i, r::UncertaintySetVariance, opt, pr, args...; kwargs...)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
 Add standard-deviation, variance, or uncertainty-set variance risk constraints to `model`.
 
@@ -144,6 +156,10 @@ formulations based on risk-contribution and phylogeny settings.
   - `pl`: Optional phylogeny constraints.
   - `fees`: Optional fees structure.
 
+# Returns
+
+  - `nothing`.
+
 # Related
 
   - [`set_risk!`](@ref)
@@ -158,8 +174,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::StandardDeviation,
     return sd_risk
 end
 """
-    sdp_rc_variance_flag!(::JuMP.Model, ::NonFRCJuMPOpt, ::Nothing)
-    sdp_rc_variance_flag!(::JuMP.Model, ::NonFRCJuMPOpt, ::LinearConstraint)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
 Return whether risk-contribution constraints require the SDP variance formulation.
 
@@ -172,6 +187,10 @@ Returns `false` for `Nothing` (no risk-contribution constraints) and `true` for
   - `opt::NonFRCJuMPOpt`: Optimisation estimator.
   - `rc`: Risk-contribution constraint (`nothing` or `LinearConstraint`).
 
+# Returns
+
+  - `flag::Bool`: Whether risk-contribution constraints require the SDP formulation.
+
 # Related
 
   - [`sdp_variance_flag!`](@ref)
@@ -183,7 +202,7 @@ function sdp_rc_variance_flag!(::JuMP.Model, ::NonFRCJuMPOpt, ::LinearConstraint
     return true
 end
 """
-    sdp_variance_flag!(model, rc_flag, pl)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
 Return whether the SDP (semidefinite) variance formulation should be used.
 
@@ -195,6 +214,10 @@ a `rc_variance` expression, or `pl` contains a `SemiDefinitePhylogeny` constrain
   - `model::JuMP.Model`: The JuMP optimisation model.
   - `rc_flag::Bool`: Whether risk-contribution constraints require SDP.
   - `pl`: Optional phylogeny constraint(s).
+
+# Returns
+
+  - `flag::Bool`: Whether the SDP variance formulation should be used.
 
 # Related
 
@@ -212,9 +235,7 @@ function sdp_variance_flag!(model::JuMP.Model, rc_flag::Bool, pl::Option{<:PlC_V
     end
 end
 """
-    set_variance_risk!(model, i, r::Variance, pr, flag, key)
-    set_variance_risk!(model, i, r::Variance{<:Any,<:Any,<:Any,<:Any,<:SquaredSOCRiskExpr}, pr, key)
-    set_variance_risk!(model, i, r::Variance{<:Any,<:Any,<:Any,<:Any,<:QuadRiskExpr}, pr, key)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
 Build the variance risk JuMP expression according to the selected formulation.
 
@@ -232,6 +253,10 @@ directly as ``\\boldsymbol{w}^\\intercal \\Sigma \\boldsymbol{w}``.
   - `flag::Bool`: Whether to use the SDP formulation.
   - `key::Symbol`: Symbol for storing the expression in the model.
 
+# Returns
+
+  - The variance risk JuMP expression.
+
 # Related
 
   - [`set_sdp_variance_risk!`](@ref)
@@ -246,7 +271,7 @@ function set_variance_risk!(model::JuMP.Model, i::Any, r::Variance, pr::Abstract
     end
 end
 """
-    set_sdp_variance_risk!(model, i, r::Variance, pr, key)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
 Build the SDP variance risk expression using the semidefinite matrix `W`.
 
@@ -260,6 +285,10 @@ under `key`.
   - `r::Variance`: Variance risk measure.
   - `pr::AbstractPriorResult`: Prior result containing `sigma`.
   - `key::Symbol`: Symbol for storing the expression in the model.
+
+# Returns
+
+  - The variance risk JuMP expression.
 
 # Related
 
@@ -299,7 +328,7 @@ function set_variance_risk!(model::JuMP.Model, i::Any,
     return model[key] = JuMP.@expression(model, LinearAlgebra.dot(w, sigma, w))
 end
 """
-    variance_risk_bounds_expr(model, i, flag)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
 Return the JuMP expression and symbol key used for the variance upper-bound check.
 
@@ -311,6 +340,10 @@ are returned; otherwise the standard-deviation variable and `:dev_i` key are ret
   - `model::JuMP.Model`: The JuMP optimisation model.
   - `i`: Constraint index.
   - `flag::Bool`: Whether the SDP formulation is used.
+
+# Returns
+
+  - A 2-tuple `(expr, key)` of the bound expression and its model key.
 
 # Related
 
@@ -326,10 +359,7 @@ function variance_risk_bounds_expr(model::JuMP.Model, i::Any, flag::Bool)
     end
 end
 """
-    variance_risk_bounds_val(flag, ub::Frontier)
-    variance_risk_bounds_val(flag, ub::VecNum)
-    variance_risk_bounds_val(flag, ub::Number)
-    variance_risk_bounds_val(::Any, ::Nothing)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
 Convert an upper-bound value to the appropriate scale for the variance or std formulation.
 
@@ -341,6 +371,10 @@ standard-deviation units via `sqrt`. Returns `nothing` when `ub` is `nothing`.
 
   - `flag::Bool`: Whether the SDP/variance formulation is used.
   - `ub`: Upper bound in variance units (scalar, vector, `Frontier`, or `nothing`).
+
+# Returns
+
+  - The rescaled upper bound, or `nothing` when `ub` is `nothing`.
 
 # Related
 
@@ -359,8 +393,7 @@ function variance_risk_bounds_val(::Any, ::Nothing)
     return nothing
 end
 """
-    rc_variance_constraints!(args...)
-    rc_variance_constraints!(model, i, rc::LinearConstraint, variance_risk)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
 Add linear risk-contribution constraints on the variance decomposition to `model`.
 
@@ -375,6 +408,10 @@ The fall-through method does nothing. The concrete method extracts the diagonal 
   - `i`: Constraint index for unique naming.
   - `rc::LinearConstraint`: Linear risk-contribution constraint.
   - `variance_risk::JuMP.AbstractJuMPScalar`: Total variance risk expression.
+
+# Returns
+
+  - `nothing`.
 
 # Related
 
@@ -453,8 +490,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::Variance,
     return variance_risk
 end
 """
-    set_ucs_variance_risk!(model, i, ucs::BoxUncertaintySet, args...)
-    set_ucs_variance_risk!(model, i, ucs::EllipsoidalUncertaintySet, sigma)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
 Build an uncertainty-set variance risk expression for box or ellipsoidal uncertainty.
 
@@ -469,6 +505,10 @@ and adds an SOC constraint to bound the ellipsoidal perturbation term.
   - `i`: Constraint index for unique naming.
   - `ucs`: Uncertainty set instance (`BoxUncertaintySet` or `EllipsoidalUncertaintySet`).
   - `sigma::MatNum`: Covariance matrix (used by `EllipsoidalUncertaintySet`).
+
+# Returns
+
+  - A 2-tuple `(ucs_variance_risk, key)` of the uncertainty-set variance expression and its model key.
 
 # Related
 

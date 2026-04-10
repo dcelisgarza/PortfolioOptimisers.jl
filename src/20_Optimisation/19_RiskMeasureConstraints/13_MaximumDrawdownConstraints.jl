@@ -1,5 +1,5 @@
 """
-    set_risk_constraints!(model, ::Any, r::MaximumDrawdown, opt, pr, args...; kwargs...)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
 Add maximum drawdown risk constraints to `model`.
 
@@ -13,6 +13,10 @@ observation. Returns the existing expression if already present.
   - `r::MaximumDrawdown`: Maximum drawdown risk measure instance.
   - `opt::RiskJuMPOptimisationEstimator`: Optimisation estimator.
   - `pr::AbstractPriorResult`: Prior result containing `X`.
+
+# Returns
+
+  - `nothing`.
 
 # Related
 

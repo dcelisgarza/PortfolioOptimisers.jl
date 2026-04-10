@@ -1,10 +1,5 @@
 """
-    set_risk_constraints!(model, i, r::TrackingRiskMeasure{...,<:L1Tracking}, opt, pr, args...; kwargs...)
-    set_risk_constraints!(model, i, r::TrackingRiskMeasure{...,<:Union{L2Tracking,SquaredL2Tracking}}, opt, pr, args...; kwargs...)
-    set_risk_constraints!(model, i, r::TrackingRiskMeasure{...,<:LpTracking}, opt, pr, args...; kwargs...)
-    set_risk_constraints!(model, i, r::TrackingRiskMeasure{...,<:LInfTracking}, opt, pr, args...; kwargs...)
-    set_risk_constraints!(model, i, r::RiskTrackingRiskMeasure{...,<:IndependentVariableTracking}, opt, pr, pl, fees, args...; kwargs...)
-    set_risk_constraints!(model, i, r::RiskTrackingRiskMeasure{...,<:DependentVariableTracking}, opt, pr, pl, fees, args...; kwargs...)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
 Add tracking risk constraints to `model`.
 
@@ -24,6 +19,10 @@ risk difference via [`set_trdv_risk_constraints!`](@ref).
   - `pr::AbstractPriorResult`: Prior result containing `X`.
   - `pl`: Optional phylogeny constraints.
   - `fees`: Optional fees structure.
+
+# Returns
+
+  - `nothing`.
 
 # Related
 
@@ -56,8 +55,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     return tracking_risk
 end
 """
-    set_tracking_risk!(model, r::TrackingRiskMeasure{...,<:L2Tracking}, opt, tracking_risk, key)
-    set_tracking_risk!(model, r::TrackingRiskMeasure{...,<:SquaredL2Tracking}, opt, tracking_risk, key)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
 Finalise the L2 or squared-L2 tracking risk expression and apply bounds.
 
@@ -72,6 +70,10 @@ bound to the original SOC variable.
   - `opt::RiskJuMPOptimisationEstimator`: Optimisation estimator.
   - `tracking_risk::JuMP.AbstractJuMPScalar`: Normalised tracking-risk SOC variable.
   - `key::Symbol`: Symbol for storing the expression in the model.
+
+# Returns
+
+  - `nothing`.
 
 # Related
 
@@ -186,8 +188,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     return tracking_risk
 end
 """
-    set_risk_tr_constraints!(key, model, r::RiskMeasure, opt, pr, pl, fees, args...; kwargs...)
-    set_risk_tr_constraints!(key, model, rs::VecRM, opt, pr, pl, fees, args...; kwargs...)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
 Dispatch to indexed [`set_risk_constraints!`](@ref) for a single measure or iterate over a
 vector of measures, using a name prefix `key` for unique constraint naming.
@@ -201,6 +202,10 @@ vector of measures, using a name prefix `key` for unique constraint naming.
   - `pr::AbstractPriorResult`: Prior result.
   - `pl`: Optional phylogeny constraints.
   - `fees`: Optional fees structure.
+
+# Returns
+
+  - `nothing`.
 
 # Related
 
@@ -225,7 +230,7 @@ function set_risk_tr_constraints!(key::Any, model::JuMP.Model, rs::VecRM,
     return nothing
 end
 """
-    set_triv_risk_constraints!(model, i, r::RiskMeasure, opt, pr, pl, fees, args...; kwargs...)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
 Set risk constraints for independent-variable tracking, saving and restoring any global
 singleton model state that would conflict with the nested solve.
@@ -243,6 +248,10 @@ SDP matrices) with `old` prefixes, calls [`set_risk_tr_constraints!`](@ref) with
   - `pr::AbstractPriorResult`: Prior result.
   - `pl`: Optional phylogeny constraints.
   - `fees`: Optional fees structure.
+
+# Returns
+
+  - `nothing`.
 
 # Related
 
@@ -614,7 +623,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     return tracking_risk
 end
 """
-    set_trdv_risk_constraints!(model, i, r::RiskMeasure, opt, pr, pl, fees, args...; kwargs...)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
 Set risk constraints for dependent-variable tracking, saving and restoring variance-related
 model state.
@@ -633,6 +642,10 @@ with the outer model.
   - `pr::AbstractPriorResult`: Prior result.
   - `pl`: Optional phylogeny constraints.
   - `fees`: Optional fees structure.
+
+# Returns
+
+  - `nothing`.
 
 # Related
 

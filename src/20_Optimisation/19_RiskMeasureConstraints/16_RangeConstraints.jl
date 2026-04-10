@@ -1,5 +1,5 @@
 """
-    set_risk_constraints!(model, ::Any, r::Range, opt, pr, args...; kwargs...)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
 Add range risk constraints to `model`.
 
@@ -14,6 +14,10 @@ existing expression if already present.
   - `r::Range`: Range risk measure instance.
   - `opt::RiskJuMPOptimisationEstimator`: Optimisation estimator.
   - `pr::AbstractPriorResult`: Prior result containing `X`.
+
+# Returns
+
+  - `nothing`.
 
 # Related
 

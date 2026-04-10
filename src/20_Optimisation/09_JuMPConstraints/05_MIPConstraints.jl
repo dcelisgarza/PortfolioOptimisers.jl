@@ -713,10 +713,34 @@ function set_all_smip_constraints!(model::JuMP.Model, wb::WeightBounds, card::Ve
     return nothing
 end
 """
-    set_scardmip_constraints!(model, wb, card, smtx, lt, st, ss, i=1)
-    set_scardmip_constraints!(model, wb, card::VecInt, smtx::VecMatNum, lt, st, ss)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
-Add sub-group cardinality MIP constraints using a selection matrix `smtx`.
+Add sub-group cardinality MIP constraints using a selection matrix.
+
+The single-matrix method enforces `sum(sib) ≤ card` for one sub-group. The vector method iterates over collections of cardinalities and selection matrices.
+
+# Arguments
+
+  - `model::JuMP.Model`: The JuMP optimisation model.
+  - `wb::WeightBounds`: Weight bound specification.
+  - `card`: Cardinality bound(s) for the sub-group(s).
+  - `smtx`: Selection matrix (or vector thereof).
+  - `lt`: Long-side minimum-holding threshold(s).
+  - `st`: Short-side minimum-holding threshold(s).
+  - `ss::Option{<:Number}`: Big-M scaling constant.
+  - `i::Integer = 1`: Index for generating unique names (single-matrix method only).
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`smip_constraints`](@ref)
+  - [`short_smip_threshold_constraints`](@ref)
+  - [`set_sgcardmip_constraints!`](@ref)
+  - [`set_smip_constraints!`](@ref)
+  - [`WeightBounds`](@ref)
 """
 function set_scardmip_constraints!(model::JuMP.Model, wb::WeightBounds,
                                    lt::Option{<:Threshold}, st::Option{<:Threshold},
@@ -749,10 +773,34 @@ function set_scardmip_constraints!(model::JuMP.Model, wb::WeightBounds, card::Ve
     return nothing
 end
 """
-    set_sgcardmip_constraints!(model, wb, gcard, smtx, lt, st, ss, i=1)
-    set_sgcardmip_constraints!(model, wb, gcard::VecLc, smtx::VecMatNum, lt, st, ss)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
-Add sub-group group-cardinality MIP constraints using a selection matrix `smtx`.
+Add sub-group group-cardinality MIP constraints using a selection matrix.
+
+The single-matrix method enforces linear group cardinality constraints `A * sib ≤ B` and `A * sib = B` on the sub-group binary indicator. The vector method iterates over multiple group constraints and selection matrices.
+
+# Arguments
+
+  - `model::JuMP.Model`: The JuMP optimisation model.
+  - `wb::WeightBounds`: Weight bound specification.
+  - `gcard`: Group-cardinality constraint(s).
+  - `smtx`: Selection matrix (or vector thereof).
+  - `lt`: Long-side minimum-holding threshold(s).
+  - `st`: Short-side minimum-holding threshold(s).
+  - `ss::Option{<:Number}`: Big-M scaling constant.
+  - `i::Integer = 1`: Index for generating unique names (single-matrix method only).
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`smip_constraints`](@ref)
+  - [`short_smip_threshold_constraints`](@ref)
+  - [`set_scardmip_constraints!`](@ref)
+  - [`set_smip_constraints!`](@ref)
+  - [`WeightBounds`](@ref)
 """
 function set_sgcardmip_constraints!(model::JuMP.Model, wb::WeightBounds,
                                     smtx::Option{<:MatNum}, lt::Option{<:Threshold},
@@ -795,10 +843,37 @@ function set_sgcardmip_constraints!(model::JuMP.Model, wb::WeightBounds, gcard::
     return nothing
 end
 """
-    set_smip_constraints!(model, wb, card, gcard, smtx, sgmtx, lt, st, glt, gst, ss)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
-Add all sub-group MIP constraints (both cardinality and group-cardinality) to the
-JuMP model, dispatching between separate or combined selection matrices.
+Add all sub-group MIP constraints (both cardinality and group-cardinality) to the JuMP optimisation model.
+
+Dispatches between combined selection matrices (calling [`set_all_smip_constraints!`](@ref)) and separate cardinality/group-cardinality selection matrices (calling [`set_scardmip_constraints!`](@ref) and [`set_sgcardmip_constraints!`](@ref) independently).
+
+# Arguments
+
+  - `model::JuMP.Model`: The JuMP optimisation model.
+  - `wb::WeightBounds`: Weight bound specification.
+  - `card`: Cardinality bound(s).
+  - `gcard`: Group-cardinality constraint(s).
+  - `smtx`: Cardinality selection matrix (or vector thereof).
+  - `sgmtx`: Group-cardinality selection matrix (or vector thereof).
+  - `lt`: Long-side minimum-holding threshold(s) for cardinality sub-groups.
+  - `st`: Short-side minimum-holding threshold(s) for cardinality sub-groups.
+  - `glt`: Long-side minimum-holding threshold(s) for group-cardinality sub-groups.
+  - `gst`: Short-side minimum-holding threshold(s) for group-cardinality sub-groups.
+  - `ss::Option{<:Number}`: Big-M scaling constant.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`set_all_smip_constraints!`](@ref)
+  - [`set_scardmip_constraints!`](@ref)
+  - [`set_sgcardmip_constraints!`](@ref)
+  - [`set_mip_constraints!`](@ref)
+  - [`WeightBounds`](@ref)
 """
 function set_smip_constraints!(model::JuMP.Model, wb::WeightBounds,
                                card::Option{<:Int_VecInt}, gcard::Option{<:Lc_VecLc},

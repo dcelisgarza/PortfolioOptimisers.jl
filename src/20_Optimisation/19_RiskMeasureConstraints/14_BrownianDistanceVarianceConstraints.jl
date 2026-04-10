@@ -1,6 +1,5 @@
 """
-    set_brownian_distance_variance_constraints!(model, ::NormOneConeBrownianDistanceVariance, Dt, Dx)
-    set_brownian_distance_variance_constraints!(model, ::IneqBrownianDistanceVariance, Dt, Dx)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
 Add auxiliary BDV constraints linking the symmetric distance matrix `Dt` to portfolio-return
 differences `Dx`.
@@ -15,6 +14,10 @@ and `Dt + Dx`.
   - `model::JuMP.Model`: The JuMP optimisation model.
   - `Dt::MatNum`: Symmetric JuMP matrix variable for absolute distances.
   - `Dx::MatNum`: JuMP expression matrix for portfolio-return pairwise differences.
+
+# Returns
+
+  - `nothing`.
 
 # Related
 
@@ -41,8 +44,7 @@ function set_brownian_distance_variance_constraints!(model::JuMP.Model,
     return nothing
 end
 """
-    set_brownian_distance_risk_constraint!(model, ::QuadRiskExpr, Dt, iT2)
-    set_brownian_distance_risk_constraint!(model, ::RSOCRiskExpr, Dt, iT2)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
 Build the Brownian distance variance risk expression.
 
@@ -56,6 +58,10 @@ of the quadratic dot product.
   - `model::JuMP.Model`: The JuMP optimisation model.
   - `Dt::MatNum`: Symmetric distance matrix variable.
   - `iT2::Number`: Inverse square of the number of observations (`1 / T^2`).
+
+# Returns
+
+  - `bdvariance_risk`: JuMP expression for the Brownian distance variance risk.
 
 # Related
 
@@ -80,7 +86,7 @@ function set_brownian_distance_risk_constraint!(model::JuMP.Model, ::RSOCRiskExp
     return bdvariance_risk
 end
 """
-    set_risk_constraints!(model, ::Any, r::BrownianDistanceVariance, opt, pr, args...; kwargs...)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
 Add Brownian distance variance risk constraints to `model`.
 
@@ -95,6 +101,10 @@ the existing expression if already present.
   - `r::BrownianDistanceVariance`: BDV risk measure instance.
   - `opt::RiskJuMPOptimisationEstimator`: Optimisation estimator.
   - `pr::AbstractPriorResult`: Prior result containing `X`.
+
+# Returns
+
+  - `nothing`.
 
 # Related
 

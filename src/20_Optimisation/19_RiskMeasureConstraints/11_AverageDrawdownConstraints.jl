@@ -1,5 +1,5 @@
 """
-    set_risk_constraints!(model, i, r::AverageDrawdown, opt, pr, args...; kwargs...)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
 Add average drawdown risk constraints to `model`.
 
@@ -13,6 +13,10 @@ an observation-weighted mean of the drawdown path as the risk expression.
   - `r::AverageDrawdown`: Average drawdown risk measure instance.
   - `opt::RiskJuMPOptimisationEstimator`: Optimisation estimator.
   - `pr::AbstractPriorResult`: Prior result containing `X`.
+
+# Returns
+
+  - `nothing`.
 
 # Related
 

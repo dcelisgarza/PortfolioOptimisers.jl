@@ -1,7 +1,5 @@
 """
-    set_risk_constraints!(model, i, r::PowerNormValueatRisk, opt, pr, args...; kwargs...)
-    set_risk_constraints!(model, i, r::PowerNormValueatRiskRange, opt, pr, args...; kwargs...)
-    set_risk_constraints!(model, i, r::PowerNormDrawdownatRisk, opt, pr, args...; kwargs...)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
 Add Power-Norm Value-at-Risk, PNVaR range, or Power-Norm Drawdown-at-Risk constraints to
 `model`.
@@ -19,6 +17,10 @@ variant operates on the drawdown path.
   - `r`: Risk measure instance.
   - `opt::RiskJuMPOptimisationEstimator`: Optimisation estimator.
   - `pr::AbstractPriorResult`: Prior result containing `X`.
+
+# Returns
+
+  - `nothing`.
 
 # Related
 

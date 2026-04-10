@@ -1,8 +1,5 @@
 """
-    calc_risk_constraint_target(r::LoHiOrderMoment{<:Any,<:Any,Nothing,<:Any}, w, mu, args...)
-    calc_risk_constraint_target(r::LoHiOrderMoment{<:Any,<:Any,<:VecNum,<:Any}, w, args...)
-    calc_risk_constraint_target(r::LoHiOrderMoment{<:Any,<:Any,<:VecScalar,<:Any}, w, ::Any, k)
-    calc_risk_constraint_target(r::LoHiOrderMoment{<:Any,<:Any,<:Number,<:Any}, ::Any, ::Any, k)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
 Compute the target return used as the reference level for lower/upper moment risk constraints.
 
@@ -16,6 +13,10 @@ when a scalar `Number`, scales it by `k`.
   - `w`: Portfolio weight vector.
   - `mu::VecNum`: Prior mean return vector.
   - `k`: Leverage/scale variable from the model.
+
+# Returns
+
+  - The scalar target return used as the lower moment reference.
 
 # Related
 
@@ -38,9 +39,7 @@ function calc_risk_constraint_target(r::LoHiOrderMoment{<:Any, <:Any, <:Number, 
     return r.mu * k
 end
 """
-    set_risk_constraints!(model, i, r::LowOrderMoment{<:Any,<:Any,<:Any,<:FirstLowerMoment}, opt, pr, args...; kwargs...)
-    set_risk_constraints!(model, i, r::LowOrderMoment{<:Any,<:Any,<:Any,<:MeanAbsoluteDeviation}, opt, pr, args...; kwargs...)
-    set_risk_constraints!(model, i, r::LowOrderMoment{<:Any,<:Any,<:Any,<:SecondMoment}, opt, pr, args...; kwargs...)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
 Add first lower moment, mean absolute deviation, or second moment risk constraints to `model`.
 
@@ -57,6 +56,10 @@ multiple variance encodings via [`set_second_moment_risk!`](@ref).
   - `r::LowOrderMoment`: Risk measure instance.
   - `opt::RiskJuMPOptimisationEstimator`: Optimisation estimator.
   - `pr::AbstractPriorResult`: Prior result containing `X` (returns matrix) and `mu`.
+
+# Returns
+
+  - `nothing`.
 
 # Related
 
@@ -112,10 +115,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     return mad_risk
 end
 """
-    set_second_moment_risk!(model, ::QuadRiskExpr, ::Any, factor, second_moment, key, args...)
-    set_second_moment_risk!(model, ::RSOCRiskExpr, i, factor, second_moment, key, keyt, keyc, args...)
-    set_second_moment_risk!(model, ::SquaredSOCRiskExpr, i, factor, second_moment, key, keyt, keyc, tsecond_moment)
-    set_second_moment_risk!(model, ::SOCRiskExpr, i, factor, second_moment, key, keyt, keyc, tsecond_moment)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
 Build the second-moment risk JuMP expression in one of four encodings.
 
@@ -134,6 +134,10 @@ scaling factor.
   - `key::Symbol`: Symbol for storing the expression in the model.
   - `keyt`, `keyc`: Symbols for the auxiliary variable and its constraint.
   - `tsecond_moment`: Pre-existing SOC variable (used by SquaredSOC/SOC overloads).
+
+# Returns
+
+  - A 2-tuple `(r_expr, factor)` of the risk JuMP expression and its scaling factor.
 
 # Related
 
@@ -171,10 +175,7 @@ function set_second_moment_risk!(model::JuMP.Model, ::SOCRiskExpr, i::Any, facto
     return model[key] = JuMP.@expression(model, factor * tsecond_moment), factor
 end
 """
-    second_moment_bound_val(alg::SecondMomentFormulation, ub::Frontier, factor)
-    second_moment_bound_val(alg::SecondMomentFormulation, ub::VecNum, factor)
-    second_moment_bound_val(alg::SecondMomentFormulation, ub::Number, factor)
-    second_moment_bound_val(::Any, ::Nothing, ::Any)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
 Convert an upper-bound value to the appropriate scale for the second-moment bounding variable.
 
@@ -187,6 +188,10 @@ square-root transformation to convert from variance to standard-deviation units.
   - `alg::SecondMomentFormulation`: Second-moment risk formulation (e.g. `SOCRiskExpr`).
   - `ub`: Upper bound value (scalar, vector, `Frontier`, or `nothing`).
   - `factor::Number`: Variance correction factor.
+
+# Returns
+
+  - The rescaled upper bound, or `nothing` when `ub` is `nothing`.
 
 # Related
 

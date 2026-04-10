@@ -1,5 +1,5 @@
 """
-    get_chol_or_V_pm(model, pr::HighOrderPrior)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
 Retrieve or compute and cache the square-root matrix of the co-skewness matrix `V`.
 
@@ -10,6 +10,10 @@ back to `sqrt(pr.V)` for positive-semidefinite matrices. Stores the result as `m
 
   - `model::JuMP.Model`: The JuMP optimisation model.
   - `pr::HighOrderPrior`: High-order prior containing `V`.
+
+# Returns
+
+  - `GV::Matrix`: Square-root factor of the co-skewness matrix.
 
 # Related
 
@@ -32,9 +36,7 @@ function get_chol_or_V_pm(model::JuMP.Model, pr::HighOrderPrior)
     return model[:GV]
 end
 """
-    set_negative_skewness_risk!(model, r::NegativeSkewness{...,<:SOCRiskExpr}, opt, nskew_risk, key, args...)
-    set_negative_skewness_risk!(model, r::NegativeSkewness{...,<:SquaredSOCRiskExpr}, opt, nskew_risk, key, args...)
-    set_negative_skewness_risk!(model, r::NegativeSkewness{...,<:QuadRiskExpr}, opt, nskew_risk, key, V)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
 Finalise the negative-skewness risk expression and apply bounds according to the formulation.
 
@@ -50,6 +52,10 @@ The `SOCRiskExpr` overload passes the SOC variable directly to
   - `nskew_risk`: SOC variable for negative-skewness risk.
   - `key::Symbol`: Symbol for storing the expression in the model.
   - `V::MatNum`: Co-skewness matrix (used only by the Quad overload).
+
+# Returns
+
+  - The negative-skewness risk JuMP expression.
 
 # Related
 
@@ -92,8 +98,7 @@ function set_negative_skewness_risk!(model::JuMP.Model,
     return qnskew_risk
 end
 """
-    set_risk_constraints!(model, i, r::NegativeSkewness, opt, pr::HighOrderPrior, args...; kwargs...)
-    set_risk_constraints!(::JuMP.Model, ::Any, ::NegativeSkewness, ::RiskJuMPOptimisationEstimator, pr::LowOrderPrior, args...; kwargs...)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
 Add negative-skewness risk constraints to `model`.
 
@@ -109,6 +114,10 @@ overload unconditionally throws an `ArgumentError`.
   - `r::NegativeSkewness`: Negative-skewness risk measure instance.
   - `opt::RiskJuMPOptimisationEstimator`: Optimisation estimator.
   - `pr::HighOrderPrior`: High-order prior containing `V`.
+
+# Returns
+
+  - `nothing`.
 
 # Related
 

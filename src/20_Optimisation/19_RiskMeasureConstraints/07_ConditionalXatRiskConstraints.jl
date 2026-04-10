@@ -1,10 +1,5 @@
 """
-    set_risk_constraints!(model, i, r::ConditionalValueatRisk, opt, pr, args...; kwargs...)
-    set_risk_constraints!(model, i, r::ConditionalValueatRiskRange, opt, pr, args...; kwargs...)
-    set_risk_constraints!(model, i, r::DistributionallyRobustConditionalValueatRisk, opt, pr, args...; kwargs...)
-    set_risk_constraints!(model, i, r::DistributionallyRobustConditionalValueatRiskRange, opt, pr, args...; kwargs...)
-    set_risk_constraints!(model, i, r::ConditionalDrawdownatRisk, opt, pr, args...; kwargs...)
-    set_risk_constraints!(model, i, r::DistributionallyRobustConditionalDrawdownatRisk, opt, pr, args...; kwargs...)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
 Add conditional risk constraints (CVaR, DRCVaR, CDaR, and their range/DR variants) to `model`.
 
@@ -21,6 +16,10 @@ risk expressions.
   - `r`: Risk measure instance.
   - `opt::RiskJuMPOptimisationEstimator`: Optimisation estimator.
   - `pr::AbstractPriorResult`: Prior result containing `X`.
+
+# Returns
+
+  - `nothing`.
 
 # Related
 

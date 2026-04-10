@@ -1,7 +1,5 @@
 """
-    set_risk_constraints!(model, i, r::RelativisticValueatRisk, opt, pr, args...; kwargs...)
-    set_risk_constraints!(model, i, r::RelativisticValueatRiskRange, opt, pr, args...; kwargs...)
-    set_risk_constraints!(model, i, r::RelativisticDrawdownatRisk, opt, pr, args...; kwargs...)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
 Add Relativistic Value-at-Risk, RLVaR range, or Relativistic Drawdown-at-Risk constraints to
 `model`.
@@ -18,6 +16,10 @@ upper-tail relativistic expression.
   - `r`: Risk measure instance with fields `alpha` and `kappa`.
   - `opt::RiskJuMPOptimisationEstimator`: Optimisation estimator.
   - `pr::AbstractPriorResult`: Prior result containing `X`.
+
+# Returns
+
+  - `nothing`.
 
 # Related
 

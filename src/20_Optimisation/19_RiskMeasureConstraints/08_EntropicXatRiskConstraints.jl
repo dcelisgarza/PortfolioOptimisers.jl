@@ -1,7 +1,5 @@
 """
-    set_risk_constraints!(model, i, r::EntropicValueatRisk, opt, pr, args...; kwargs...)
-    set_risk_constraints!(model, i, r::EntropicValueatRiskRange, opt, pr, args...; kwargs...)
-    set_risk_constraints!(model, i, r::EntropicDrawdownatRisk, opt, pr, args...; kwargs...)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
 Add Entropic Value-at-Risk, EVaR range, or Entropic Drawdown-at-Risk constraints to `model`.
 
@@ -17,6 +15,10 @@ lower and upper exponential cone.
   - `r`: Risk measure instance.
   - `opt::RiskJuMPOptimisationEstimator`: Optimisation estimator.
   - `pr::AbstractPriorResult`: Prior result containing `X`.
+
+# Returns
+
+  - `nothing`.
 
 # Related
 

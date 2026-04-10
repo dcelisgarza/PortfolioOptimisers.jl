@@ -1,5 +1,5 @@
 """
-    set_risk_constraints!(model, i, r::TurnoverRiskMeasure, opt, ::AbstractPriorResult, args...; kwargs...)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
 Add turnover risk constraints to `model`.
 
@@ -13,6 +13,10 @@ is the reference weight vector from `r.w`.
   - `i`: Constraint index for unique naming.
   - `r::TurnoverRiskMeasure`: Turnover risk measure instance carrying the benchmark weights.
   - `opt::RiskJuMPOptimisationEstimator`: Optimisation estimator.
+
+# Returns
+
+  - `nothing`.
 
 # Related
 
