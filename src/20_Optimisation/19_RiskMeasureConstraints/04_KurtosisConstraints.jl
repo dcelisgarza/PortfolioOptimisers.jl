@@ -230,6 +230,35 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                                                                                end)
     return set_kurtosis_risk!(model, r, opt, sqrt_kurtosis_risk, x_kurt, key, i)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Add JuMP risk constraints for `Kurtosis` with a continuous `Nothing` truncation parameter
+to `model`.
+
+Uses the full Cholesky-based SDP formulation to compute the portfolio kurtosis risk as a
+second-order cone constraint over the vectorised weight matrix `W`. This overload applies
+when the kurtosis truncation rank is `Nothing` (no truncation).
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - $(arg_dict[:ci])
+  - `r::Kurtosis{<:Any, <:Any, <:Any, <:Any, Nothing, <:Any, <:Any}`: The kurtosis risk
+    measure with no truncation.
+  - $(arg_dict[:opt_rjumpe])
+  - `pr::HighOrderPrior`: High-order prior containing the kurtosis matrix `kt`.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`Kurtosis`](@ref)
+  - [`set_risk_constraints!`](@ref)
+  - [`set_kurtosis_risk!`](@ref)
+"""
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::Kurtosis{<:Any, <:Any, <:Any, <:Any, Nothing, <:Any,
                                            <:Any}, opt::RiskJuMPOptimisationEstimator,
@@ -256,6 +285,28 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                                      JuMP.SecondOrderCone())
     return set_kurtosis_risk!(model, r, opt, sqrt_kurtosis_risk, x_kurt, key, i)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Throw an `ArgumentError` indicating that `Kurtosis` requires a `HighOrderPrior`.
+
+This fall-through overload is triggered when a `LowOrderPrior` is passed and always
+raises an error.
+
+# Arguments
+
+  - `r::Kurtosis`: The kurtosis risk measure (unused).
+  - `pr::LowOrderPrior`: A low-order prior (not compatible with kurtosis).
+
+# Returns
+
+  - Does not return; always throws `ArgumentError`.
+
+# Related
+
+  - [`Kurtosis`](@ref)
+  - [`set_risk_constraints!`](@ref)
+"""
 function set_risk_constraints!(::JuMP.Model, ::Any, ::Kurtosis,
                                ::RiskJuMPOptimisationEstimator, pr::LowOrderPrior, args...;
                                kwargs...)

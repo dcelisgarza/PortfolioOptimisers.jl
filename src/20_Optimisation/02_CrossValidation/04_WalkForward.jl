@@ -117,6 +117,27 @@ function IndexWalkForward(train_size::Integer, test_size::Integer; purged_size::
                           expend_train::Bool = false, reduce_test::Bool = false)
     return IndexWalkForward(train_size, test_size, purged_size, expend_train, reduce_test)
 end
+"""
+    Base.split(iwf::IndexWalkForward, rd::ReturnsResult) -> WalkForwardResult
+
+Split the returns data `rd` into sequential walk-forward folds using integer observation
+indices. Each fold advances the test window by `test_size` observations.
+
+# Arguments
+
+  - `iwf::IndexWalkForward`: Index-based walk-forward cross-validation estimator.
+  - `rd::ReturnsResult`: Returns data to split.
+
+# Returns
+
+  - `WalkForwardResult`: Result containing train and test index ranges for each fold.
+
+# Related
+
+  - [`IndexWalkForward`](@ref)
+  - [`WalkForwardResult`](@ref)
+  - [`n_splits`](@ref)
+"""
 function Base.split(iwf::IndexWalkForward, rd::ReturnsResult)
     (; train_size, test_size, purged_size, expend_train, reduce_test) = iwf
     T = size(rd.X, 1)
@@ -285,6 +306,31 @@ function DateWalkForward(train_size::IntPeriodDateRange, test_size::Integer;
     return DateWalkForward(train_size, test_size, period, period_offset, purged_size,
                            adjuster, previous, expend_train, reduce_test)
 end
+"""
+    Base.split(dwf::DateWalkForward{<:Integer}, rd::ReturnsResult) -> WalkForwardResult
+
+Split the returns data `rd` into sequential walk-forward folds using date-aligned indices,
+where `train_size` is specified as an integer number of date-range steps.
+
+The timestamp vector `rd.ts` must not be `nothing`. Training and test windows are aligned
+to the `period` date range and advanced by `test_size` steps at a time.
+
+# Arguments
+
+  - `dwf::DateWalkForward{<:Integer}`: Date-based walk-forward estimator with an integer
+    `train_size`.
+  - `rd::ReturnsResult`: Returns data containing the matrix `X` and timestamp vector `ts`.
+
+# Returns
+
+  - `WalkForwardResult`: Result containing train and test index ranges for each fold.
+
+# Related
+
+  - [`DateWalkForward`](@ref)
+  - [`WalkForwardResult`](@ref)
+  - [`n_splits`](@ref)
+"""
 function Base.split(dwf::DateWalkForward{<:Integer}, rd::ReturnsResult)
     @argcheck(!isnothing(rd.ts), IsNothingError)
     (; train_size, test_size, period, period_offset, purged_size, adjuster, previous, expend_train, reduce_test) = dwf
@@ -338,6 +384,29 @@ function special_div(a::Integer, b::Integer)
     q, r = divrem(a, b)
     return q - ifelse(iszero(r), 1, 0)
 end
+"""
+    n_splits(dwf::DateWalkForward{<:Integer}, rd::ReturnsResult) -> Integer
+
+Return the number of walk-forward folds that would be produced by `dwf` for the given
+returns data `rd` when the training window size is specified as an integer number of
+date-range steps.
+
+# Arguments
+
+  - `dwf::DateWalkForward{<:Integer}`: Date-based walk-forward estimator with an integer
+    `train_size`.
+  - `rd::ReturnsResult`: Returns data containing a timestamp vector `ts`.
+
+# Returns
+
+  - `Integer`: The number of folds.
+
+# Related
+
+  - [`DateWalkForward`](@ref)
+  - [`WalkForwardResult`](@ref)
+  - [`Base.split(dwf::DateWalkForward{<:Integer}, rd::ReturnsResult)`](@ref)
+"""
 function n_splits(dwf::DateWalkForward{<:Integer}, rd::ReturnsResult)
     @argcheck(!isnothing(rd.ts), IsNothingError)
     (; train_size, test_size, period, period_offset, adjuster, previous, reduce_test) = dwf
@@ -367,6 +436,31 @@ function n_splits(dwf::DateWalkForward{<:Integer}, rd::ReturnsResult)
     max_start = N - train_size - ifelse(reduce_test, 0, test_size)
     return max_start > 0 ? special_div(max_start, test_size) + 1 : 0
 end
+"""
+    Base.split(dwf::DateWalkForward{<:Any}, rd::ReturnsResult) -> WalkForwardResult
+
+Split the returns data `rd` into sequential walk-forward folds using date-aligned indices,
+where `train_size` is specified as a date `Period` (e.g., `Dates.Month(6)`).
+
+The timestamp vector `rd.ts` must not be `nothing`. Training windows are defined by
+subtracting `train_size` from the split date, allowing calendar-based window lengths.
+
+# Arguments
+
+  - `dwf::DateWalkForward{<:Any}`: Date-based walk-forward estimator with a `Period`
+    `train_size`.
+  - `rd::ReturnsResult`: Returns data containing the matrix `X` and timestamp vector `ts`.
+
+# Returns
+
+  - `WalkForwardResult`: Result containing train and test index ranges for each fold.
+
+# Related
+
+  - [`DateWalkForward`](@ref)
+  - [`WalkForwardResult`](@ref)
+  - [`n_splits`](@ref)
+"""
 function Base.split(dwf::DateWalkForward{<:Any}, rd::ReturnsResult)
     @argcheck(!isnothing(rd.ts), IsNothingError)
     (; train_size, test_size, period, period_offset, purged_size, adjuster, previous, expend_train, reduce_test) = dwf
@@ -424,6 +518,28 @@ function Base.split(dwf::DateWalkForward{<:Any}, rd::ReturnsResult)
     end
     return WalkForwardResult(; train_idx = train_indices, test_idx = test_indices)
 end
+"""
+    n_splits(dwf::DateWalkForward{<:Any}, rd::ReturnsResult) -> Integer
+
+Return the number of walk-forward folds that would be produced by `dwf` for the given
+returns data `rd` when the training window size is specified as a date `Period`.
+
+# Arguments
+
+  - `dwf::DateWalkForward{<:Any}`: Date-based walk-forward estimator with a `Period`
+    `train_size`.
+  - `rd::ReturnsResult`: Returns data containing a timestamp vector `ts`.
+
+# Returns
+
+  - `Integer`: The number of folds.
+
+# Related
+
+  - [`DateWalkForward`](@ref)
+  - [`WalkForwardResult`](@ref)
+  - [`Base.split(dwf::DateWalkForward{<:Any}, rd::ReturnsResult)`](@ref)
+"""
 function n_splits(dwf::DateWalkForward{<:Any}, rd::ReturnsResult)
     @argcheck(!isnothing(rd.ts), IsNothingError)
     (; train_size, test_size, period, period_offset, adjuster, previous, reduce_test) = dwf

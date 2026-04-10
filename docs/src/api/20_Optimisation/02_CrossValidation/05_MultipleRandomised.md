@@ -12,4 +12,5 @@ NumberSubsetsE
 WindowSizeE
 MultipleRandomised
 MultipleRandomisedResult
+Base.split(mrcv::MultipleRandomised, rd::ReturnsResult)
 ```

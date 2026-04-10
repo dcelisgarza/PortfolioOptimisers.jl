@@ -166,6 +166,28 @@ function get_path_ids(ccv::CombinatorialCrossValidation)
     end
     return ids
 end
+"""
+    Base.split(ccv::CombinatorialCrossValidation, rd::ReturnsResult) -> CombinatorialCrossValidationResult
+
+Split the returns data `rd` into all possible combinations of training and test folds using
+combinatorial cross-validation with optional purging and embargoing.
+
+# Arguments
+
+  - `ccv::CombinatorialCrossValidation`: Combinatorial cross-validation estimator.
+  - `rd::ReturnsResult`: Returns data to split.
+
+# Returns
+
+  - `CombinatorialCrossValidationResult`: Result containing train indices, nested test index
+    vectors (one per path), and a matrix of path IDs mapping folds to paths.
+
+# Related
+
+  - [`CombinatorialCrossValidation`](@ref)
+  - [`CombinatorialCrossValidationResult`](@ref)
+  - [`n_splits`](@ref)
+"""
 function Base.split(ccv::CombinatorialCrossValidation, rd::ReturnsResult)
     T = size(rd.X, 1)
     (; n_folds, n_test_folds, purged_size, embargo_size) = ccv

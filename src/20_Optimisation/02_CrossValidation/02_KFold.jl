@@ -86,6 +86,27 @@ end
 function KFoldResult(; train_idx::VecVecInt, test_idx::VecVecInt)
     return KFoldResult(train_idx, test_idx)
 end
+"""
+    Base.split(kf::KFold, rd::ReturnsResult) -> KFoldResult
+
+Split the returns data `rd` into `n` non-overlapping folds using k-fold cross-validation
+with optional purging and embargoing.
+
+# Arguments
+
+  - `kf::KFold`: K-fold cross-validation estimator.
+  - `rd::ReturnsResult`: Returns data to split.
+
+# Returns
+
+  - `KFoldResult`: Result containing train and test indices for each fold.
+
+# Related
+
+  - [`KFold`](@ref)
+  - [`KFoldResult`](@ref)
+  - [`n_splits`](@ref)
+"""
 function Base.split(kf::KFold, rd::ReturnsResult)
     T = size(rd.X, 1)
     (; n, purged_size, embargo_size) = kf

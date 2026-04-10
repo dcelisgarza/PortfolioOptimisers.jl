@@ -90,6 +90,34 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     set_risk_bounds_and_expression!(model, opt, flm_risk, r.settings, key)
     return flm_risk
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Add JuMP risk constraints for `LowOrderMoment` with `MeanAbsoluteDeviation` semi-deviation
+to `model`.
+
+Introduces auxiliary `mad` variables and adds constraints encoding the mean absolute
+deviation of portfolio returns relative to the target benchmark. Registers the risk
+expression and upper-bound constraint.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - $(arg_dict[:ci])
+  - `r::LowOrderMoment{<:Any, <:Any, <:Any, <:MeanAbsoluteDeviation}`: The MAD risk measure.
+  - $(arg_dict[:opt_rjumpe])
+  - $(arg_dict[:pr])
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`LowOrderMoment`](@ref)
+  - [`MeanAbsoluteDeviation`](@ref)
+  - [`set_risk_constraints!`](@ref)
+"""
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::LowOrderMoment{<:Any, <:Any, <:Any,
                                                  <:MeanAbsoluteDeviation},
@@ -209,6 +237,34 @@ end
 function second_moment_bound_val(::Any, ::Nothing, ::Any)
     return nothing
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Add JuMP risk constraints for `LowOrderMoment` with `SecondMoment` (semi-variance /
+semi-deviation) to `model`.
+
+Introduces a `sqrt_second_moment` variable and adds SOC or quadratic constraints encoding
+the second central moment of portfolio returns relative to the target benchmark. Registers
+the risk expression and upper-bound constraint.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - $(arg_dict[:ci])
+  - `r::LowOrderMoment{<:Any, <:Any, <:Any, <:SecondMoment}`: The second-moment risk measure.
+  - $(arg_dict[:opt_rjumpe])
+  - $(arg_dict[:pr])
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`LowOrderMoment`](@ref)
+  - [`SecondMoment`](@ref)
+  - [`set_risk_constraints!`](@ref)
+"""
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::LowOrderMoment{<:Any, <:Any, <:Any, <:SecondMoment},
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,

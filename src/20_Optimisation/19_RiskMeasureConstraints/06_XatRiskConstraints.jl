@@ -62,6 +62,35 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     set_risk_bounds_and_expression!(model, opt, var_risk, r.settings, key)
     return var_risk
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Add JuMP risk constraints for `ValueatRiskRange` using a MIP (big-M) formulation to
+`model`.
+
+Introduces binary variables and big-M constraints to encode both the lower-tail and
+upper-tail empirical quantiles. The range risk expression is the difference between the
+two VaR expressions.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - $(arg_dict[:ci])
+  - `r::ValueatRiskRange{<:Any, <:Any, <:Any, <:Any, <:MIPValueatRisk}`: The VaR range risk
+    measure with MIP formulation.
+  - $(arg_dict[:opt_rjumpe])
+  - $(arg_dict[:pr])
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`ValueatRiskRange`](@ref)
+  - [`MIPValueatRisk`](@ref)
+  - [`set_risk_constraints!`](@ref)
+"""
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::ValueatRiskRange{<:Any, <:Any, <:Any, <:Any,
                                                    <:MIPValueatRisk},
@@ -206,6 +235,36 @@ end
 function compute_value_at_risk_cz(::Distributions.Laplace, alpha::Number)
     return -log(2 * (one(alpha) - alpha)) / sqrt(2)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Add JuMP risk constraints for `ValueatRisk` using a parametric distribution formulation
+to `model`.
+
+Uses the closed-form z-score from `compute_value_at_risk_z` and adds a second-order cone
+constraint to bound the portfolio standard deviation. The VaR expression is
+`-mu'w + z * g_var`.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - $(arg_dict[:ci])
+  - `r::ValueatRisk{<:Any, <:Any, <:Any, <:DistributionValueatRisk}`: The VaR risk measure
+    with distribution-based formulation.
+  - $(arg_dict[:opt_rjumpe])
+  - $(arg_dict[:pr])
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`ValueatRisk`](@ref)
+  - [`DistributionValueatRisk`](@ref)
+  - [`compute_value_at_risk_z`](@ref)
+  - [`set_risk_constraints!`](@ref)
+"""
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::ValueatRisk{<:Any, <:Any, <:Any,
                                               <:DistributionValueatRisk},
@@ -226,6 +285,37 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     set_risk_bounds_and_expression!(model, opt, var_risk, r.settings, key)
     return var_risk
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Add JuMP risk constraints for `ValueatRiskRange` using a parametric distribution
+formulation to `model`.
+
+Uses closed-form z-scores from `compute_value_at_risk_z` and `compute_value_at_risk_cz`
+and adds a second-order cone constraint. The range risk expression is the difference
+between the lower-tail and upper-tail VaR expressions.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - $(arg_dict[:ci])
+  - `r::ValueatRiskRange{<:Any, <:Any, <:Any, <:Any, <:DistributionValueatRisk}`: The VaR
+    range risk measure with distribution-based formulation.
+  - $(arg_dict[:opt_rjumpe])
+  - $(arg_dict[:pr])
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`ValueatRiskRange`](@ref)
+  - [`DistributionValueatRisk`](@ref)
+  - [`compute_value_at_risk_z`](@ref)
+  - [`compute_value_at_risk_cz`](@ref)
+  - [`set_risk_constraints!`](@ref)
+"""
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::ValueatRiskRange{<:Any, <:Any, <:Any, <:Any,
                                                    <:DistributionValueatRisk},
@@ -262,6 +352,32 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     set_risk_bounds_and_expression!(model, opt, var_range_risk, r.settings, key)
     return var_range_risk
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Add JuMP risk constraints for `DrawdownatRisk` to `model`.
+
+Introduces binary variables and big-M constraints applied to the drawdown series to encode
+the empirical drawdown quantile at confidence level `r.alpha`.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - $(arg_dict[:ci])
+  - `r::DrawdownatRisk`: The drawdown-at-risk risk measure.
+  - $(arg_dict[:opt_rjumpe])
+  - $(arg_dict[:pr])
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`DrawdownatRisk`](@ref)
+  - [`set_drawdown_constraints!`](@ref)
+  - [`set_risk_constraints!`](@ref)
+"""
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::DrawdownatRisk,
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; kwargs...)

@@ -141,6 +141,28 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::NegativeSkewness,
                                                       JuMP.SecondOrderCone())
     return set_negative_skewness_risk!(model, r, opt, nskew_risk, key, V)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Throw an `ArgumentError` indicating that `NegativeSkewness` requires a `HighOrderPrior`.
+
+This fall-through overload is triggered when a `LowOrderPrior` is passed and always
+raises an error.
+
+# Arguments
+
+  - `r::NegativeSkewness`: The negative skewness risk measure (unused).
+  - `pr::LowOrderPrior`: A low-order prior (not compatible with negative skewness).
+
+# Returns
+
+  - Does not return; always throws `ArgumentError`.
+
+# Related
+
+  - [`NegativeSkewness`](@ref)
+  - [`set_risk_constraints!`](@ref)
+"""
 function set_risk_constraints!(::JuMP.Model, ::Any, ::NegativeSkewness,
                                ::RiskJuMPOptimisationEstimator, pr::LowOrderPrior, args...;
                                kwargs...)

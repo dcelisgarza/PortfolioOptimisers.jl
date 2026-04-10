@@ -454,6 +454,34 @@ function set_risk!(model::JuMP.Model, i::Any, r::Variance, opt::NonFRCJuMPOpt,
     rc_variance_constraints!(model, i, rc, variance_risk)
     return variance_risk, sdp_flag
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Add JuMP risk constraints for `Variance` to `model` using non-factor-risk-contribution
+optimisers.
+
+Computes the portfolio variance risk expression and registers the upper-bound constraint
+and objective contribution according to the variance risk measure settings.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - $(arg_dict[:ci])
+  - `r::Variance`: The variance risk measure.
+  - `opt::NonFRCJuMPOpt`: The optimisation estimator.
+  - $(arg_dict[:pr])
+  - $(arg_dict[:pl_opt])
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`Variance`](@ref)
+  - [`set_risk_constraints!`](@ref)
+  - [`set_risk!`](@ref)
+"""
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::Variance, opt::NonFRCJuMPOpt,
                                pr::AbstractPriorResult, pl::Option{<:PlC_VecPlC}, args...;
                                kwargs...)
@@ -467,6 +495,34 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::Variance, opt::NonF
                                              variance_risk, r.settings)
     return variance_risk
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Add JuMP risk constraints for `Variance` to `model` using a `FactorRiskContribution`
+optimiser.
+
+Computes factor-based risk contributions for the portfolio variance and registers the
+upper-bound constraint and objective contribution accordingly.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - $(arg_dict[:ci])
+  - `r::Variance`: The variance risk measure.
+  - `opt::FactorRiskContribution`: The factor risk contribution optimisation estimator.
+  - $(arg_dict[:pr])
+  - `b1::MatNum`: Factor budget matrix used for risk contribution computations.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`Variance`](@ref)
+  - [`set_risk_constraints!`](@ref)
+  - [`set_risk!`](@ref)
+"""
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::Variance,
                                opt::FactorRiskContribution, pr::AbstractPriorResult, ::Any,
                                ::Any, b1::MatNum, args...; kwargs...)
@@ -564,6 +620,33 @@ function set_ucs_variance_risk!(model::JuMP.Model, i::Any, ucs::EllipsoidalUncer
                                                  JuMP.SecondOrderCone())
     return ucs_variance_risk, key
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Add JuMP risk constraints for `UncertaintySetVariance` to `model`.
+
+Computes portfolio variance using an uncertainty set covariance matrix derived from
+the prior or the risk measure's own `ucs` field, and registers the upper-bound constraint
+and objective contribution.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - $(arg_dict[:ci])
+  - `r::UncertaintySetVariance`: The uncertainty set variance risk measure.
+  - $(arg_dict[:opt_rjumpe])
+  - $(arg_dict[:pr])
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`UncertaintySetVariance`](@ref)
+  - [`set_risk_constraints!`](@ref)
+  - [`set_ucs_variance_risk!`](@ref)
+"""
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::UncertaintySetVariance,
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; rd::ReturnsResult = ReturnsResult(), kwargs...)

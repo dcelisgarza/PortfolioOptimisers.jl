@@ -296,6 +296,29 @@ function get_n_subsets(n_subsets::NumberSubsetsEC, rd::Pr_RR)
     assert_nonempty_nonneg_finite_val(res - 2, "n_subsets - 2")
     return res
 end
+"""
+    Base.split(mrcv::MultipleRandomised, rd::ReturnsResult) -> MultipleRandomisedResult
+
+Split the returns data `rd` by drawing multiple random asset subsets and applying the
+internal walk-forward estimator to each subset. Each combination of a random asset subset
+and a set of walk-forward folds forms one path.
+
+# Arguments
+
+  - `mrcv::MultipleRandomised`: Multiple randomised cross-validation estimator.
+  - `rd::ReturnsResult`: Returns data to split.
+
+# Returns
+
+  - `MultipleRandomisedResult`: Result containing training, test, and asset indices for
+    every fold across all random paths, together with a path identifier for each fold.
+
+# Related
+
+  - [`MultipleRandomised`](@ref)
+  - [`MultipleRandomisedResult`](@ref)
+  - [`n_splits`](@ref)
+"""
 function Base.split(mrcv::MultipleRandomised, rd::ReturnsResult)
     T, N = size(rd.X)
     (; cv, subset_size, n_subsets, max_comb, window_size, rng, seed) = mrcv

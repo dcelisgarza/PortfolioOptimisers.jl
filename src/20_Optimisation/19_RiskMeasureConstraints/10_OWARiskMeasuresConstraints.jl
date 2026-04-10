@@ -83,6 +83,35 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     set_risk_bounds_and_expression!(model, opt, owa_risk, r.settings, key)
     return owa_risk
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Add JuMP risk constraints for `OrderedWeightsArrayRange` using the exact OWA formulation
+to `model`.
+
+Introduces auxiliary matrix variables and a bilinear constraint to encode the exact OWA
+range risk as the difference between two OWA tail expressions (e.g. tail-Gini range).
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - $(arg_dict[:ci])
+  - `r::OrderedWeightsArrayRange{<:Any, <:Any, <:Any, <:ExactOrderedWeightsArray}`: The
+    OWA range risk measure with exact formulation.
+  - $(arg_dict[:opt_rjumpe])
+  - $(arg_dict[:pr_X])
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`OrderedWeightsArrayRange`](@ref)
+  - [`ExactOrderedWeightsArray`](@ref)
+  - [`set_owa_constraints!`](@ref)
+  - [`set_risk_constraints!`](@ref)
+"""
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::OrderedWeightsArrayRange{<:Any, <:Any, <:Any,
                                                            <:ExactOrderedWeightsArray},
@@ -111,6 +140,34 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     set_risk_bounds_and_expression!(model, opt, owa_range_risk, r.settings, key)
     return owa_range_risk
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Add JuMP risk constraints for `OrderedWeightsArray` using the approximate OWA formulation
+to `model`.
+
+Uses the Wasserstein-based power cone approximation parameterised by `r.alg.p` to encode
+the OWA risk as a weighted sum of p-norm terms.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - $(arg_dict[:ci])
+  - `r::OrderedWeightsArray{<:Any, <:Any, <:ApproxOrderedWeightsArray}`: The OWA risk
+    measure with approximate formulation.
+  - $(arg_dict[:opt_rjumpe])
+  - $(arg_dict[:pr_X])
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`OrderedWeightsArray`](@ref)
+  - [`ApproxOrderedWeightsArray`](@ref)
+  - [`set_risk_constraints!`](@ref)
+"""
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::OrderedWeightsArray{<:Any, <:Any,
                                                       <:ApproxOrderedWeightsArray},
@@ -191,6 +248,34 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     set_risk_bounds_and_expression!(model, opt, aowa_risk, r.settings, key)
     return aowa_risk
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Add JuMP risk constraints for `OrderedWeightsArrayRange` using the approximate OWA
+formulation to `model`.
+
+Uses the Wasserstein-based power cone approximation parameterised by `r.alg.p` to encode
+both OWA tail expressions, then computes their difference as the range risk.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - $(arg_dict[:ci])
+  - `r::OrderedWeightsArrayRange{<:Any, <:Any, <:Any, <:ApproxOrderedWeightsArray}`: The
+    OWA range risk measure with approximate formulation.
+  - $(arg_dict[:opt_rjumpe])
+  - $(arg_dict[:pr_X])
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`OrderedWeightsArrayRange`](@ref)
+  - [`ApproxOrderedWeightsArray`](@ref)
+  - [`set_risk_constraints!`](@ref)
+"""
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::OrderedWeightsArrayRange{<:Any, <:Any, <:Any,
                                                            <:ApproxOrderedWeightsArray},

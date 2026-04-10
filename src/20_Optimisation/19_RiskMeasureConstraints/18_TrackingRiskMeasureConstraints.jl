@@ -97,6 +97,34 @@ function set_tracking_risk!(model::JuMP.Model,
     set_risk_expression!(model, qtracking_risk, r.settings.scale, r.settings.rke)
     return qtracking_risk
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Add JuMP risk constraints for `TrackingRiskMeasure` with `L2Tracking` or
+`SquaredL2Tracking` to `model`.
+
+Introduces a scalar variable and an SOC constraint to encode the L2 (root mean squared)
+tracking error between portfolio and benchmark returns.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - $(arg_dict[:ci])
+  - `r::TrackingRiskMeasure{<:Any, <:Any, <:Union{<:L2Tracking, <:SquaredL2Tracking}}`:
+    The tracking risk measure.
+  - $(arg_dict[:opt_rjumpe])
+  - $(arg_dict[:pr])
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`TrackingRiskMeasure`](@ref)
+  - [`L2Tracking`](@ref)
+  - [`set_risk_constraints!`](@ref)
+"""
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::TrackingRiskMeasure{<:Any, <:Any,
                                                       <:Union{<:L2Tracking,
