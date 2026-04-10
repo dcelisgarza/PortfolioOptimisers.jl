@@ -61,6 +61,31 @@ end
 function expected_risk(r::AbstractBaseRiskMeasure, w::VecVecNum, args...; kwargs...)
     return [expected_risk(r, wi, args...; kwargs...) for wi in w]
 end
+"""
+    number_effective_assets(w::VecNum)
+
+Compute the effective number of assets (Herfindahl-Hirschman inverse index):
+
+```math
+N_{\\mathrm{eff}} = \\frac{1}{\\sum_i w_i^2}
+```
+
+Returns the number of equally-weighted assets that would produce the same level of
+concentration as the given weight vector `w`.
+
+# Arguments
+
+  - `w::VecNum`: Portfolio weight vector.
+
+# Returns
+
+  - `Number`: Effective number of assets.
+
+# Related
+
+  - [`risk_contribution`](@ref)
+  - [`EqualRiskMeasure`](@ref)
+"""
 function number_effective_assets(w::VecNum)
     return inv(LinearAlgebra.dot(w, w))
 end
