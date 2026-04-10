@@ -14,10 +14,11 @@ MaximumEntropy
 MinimumSquaredDistance
 MinimumSumSquares
 NormalisedConstantRelativeRiskAversion
-OrderedWeightsArray
-OrderedWeightsArrayRange
+OrderedWeightsArrayFormulation
 ExactOrderedWeightsArray
 ApproxOrderedWeightsArray
+OrderedWeightsArray
+OrderedWeightsArrayRange
 OWAJuMP
 owa_l_moment_crm
 owa_l_moment
