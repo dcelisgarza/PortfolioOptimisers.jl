@@ -24,11 +24,8 @@ on the portfolio return.
 # Related
 
   - [`bounds_returns_estimator`](@ref)
-
   - [`LogarithmicReturn`](@ref)
-
   - [`LogarithmicReturn`](@ref)
-
   - [`JuMPReturnsEstimator`](@ref)
 """
 @concrete struct ArithmeticReturn <: JuMPReturnsEstimator
@@ -110,11 +107,8 @@ Optionally supports observation weights and a lower bound on the portfolio retur
 # Related
 
   - [`bounds_returns_estimator`](@ref)
-
   - [`ArithmeticReturn`](@ref)
-
   - [`ArithmeticReturn`](@ref)
-
   - [`JuMPReturnsEstimator`](@ref)
 """
 @concrete struct LogarithmicReturn <: JuMPReturnsEstimator
@@ -268,7 +262,7 @@ function return_sharpe_alog_ret_constraints(port, type, obj::Sharpe, ::AKelly, :
 end
 =#
 for (i, r) in enumerate(traverse_concrete_subtypes(JuMPReturnsEstimator))
-    doc_str=if isone(i)
+    doc_str = if isone(i)
         """
             bounds_returns_estimator(r, lb::Number)
 
@@ -292,8 +286,7 @@ for (i, r) in enumerate(traverse_concrete_subtypes(JuMPReturnsEstimator))
         nothing
     end
     eval(quote
-             @doc $(doc_str)
-             function bounds_returns_estimator(r::$(r), lb::Number)
+             @doc $(doc_str) function bounds_returns_estimator(r::$(r), lb::Number)
                  pnames = Tuple(setdiff(propertynames(r), (:lb,)))
                  return if isempty(pnames)
                      $(r)(; lb = lb)
@@ -311,17 +304,11 @@ Objective function that minimises portfolio risk.
 # Related
 
   - [`MaximumUtility`](@ref)
-
   - [`MaximumRatio`](@ref)
-
   - [`MaximumReturn`](@ref)
-
   - [`MaximumUtility`](@ref)
-
   - [`MaximumRatio`](@ref)
-
   - [`MaximumReturn`](@ref)
-
   - [`ObjectiveFunction`](@ref)
 """
 struct MinimumRisk <: ObjectiveFunction end
@@ -347,15 +334,10 @@ where ``l`` is the risk-aversion coefficient and ``R`` is the portfolio risk.
 # Related
 
   - [`MinimumRisk`](@ref)
-
   - [`MaximumRatio`](@ref)
-
   - [`MaximumReturn`](@ref)
-
   - [`MinimumRisk`](@ref)
-
   - [`MaximumRatio`](@ref)
-
   - [`ObjectiveFunction`](@ref)
 """
 @concrete struct MaximumUtility <: ObjectiveFunction
@@ -392,17 +374,11 @@ where ``r_f`` is the risk-free rate and ``R`` is the portfolio risk.
 # Related
 
   - [`MinimumRisk`](@ref)
-
   - [`MaximumUtility`](@ref)
-
   - [`MaximumReturn`](@ref)
-
   - [`MinimumRisk`](@ref)
-
   - [`MaximumUtility`](@ref)
-
   - [`MaximumReturn`](@ref)
-
   - [`ObjectiveFunction`](@ref)
 """
 @concrete struct MaximumRatio <: ObjectiveFunction
@@ -426,17 +402,11 @@ Objective function that maximises portfolio return ``\\boldsymbol{\\mu}^\\interc
 # Related
 
   - [`MinimumRisk`](@ref)
-
   - [`MaximumUtility`](@ref)
-
   - [`MaximumRatio`](@ref)
-
   - [`MinimumRisk`](@ref)
-
   - [`MaximumUtility`](@ref)
-
   - [`MaximumRatio`](@ref)
-
   - [`ObjectiveFunction`](@ref)
 """
 struct MaximumReturn <: ObjectiveFunction end

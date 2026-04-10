@@ -78,15 +78,10 @@ WeightBounds
 # Related
 
   - [`w_neg_flag`](@ref)
-
   - [`w_finite_flag`](@ref)
-
   - [`set_weight_constraints!`](@ref)
-
   - [`set_linear_weight_constraints!`](@ref)
-
   - [`WeightBoundsEstimator`](@ref)
-
   - [`weight_bounds_constraints`](@ref)
 """
 @concrete struct WeightBounds <: AbstractConstraintResult

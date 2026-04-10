@@ -498,7 +498,7 @@ pretty_table(hcat(DataFrame(:assets => rd.nx),
 #=
 ### 2.3 Clustering optimisers
 
-Clustering based optimisers use the relationship structure between assets. The weights are a function of the risks associated with those structures. Aside from the [`NestedClusters`](@ref) estimator, they all use an instance of [`HierarchicalOptimiser`](@ref) which defines common parameters for all clustering optimisers. [`HierarchicalOptimiser`](@ref) does not require a solver to be specified via the `slv` keyword unless the clustering optimisation estimator uses a risk measure that requires one.
+Clustering based optimisers use the relationship structure between assets. The weights are a function of the risks associated with those structures. Aside from the [`NestedClustered`](@ref) estimator, they all use an instance of [`HierarchicalOptimiser`](@ref) which defines common parameters for all clustering optimisers. [`HierarchicalOptimiser`](@ref) does not require a solver to be specified via the `slv` keyword unless the clustering optimisation estimator uses a risk measure that requires one.
 
 #### 2.3.1 Hierarchical risk parity
 

@@ -31,15 +31,10 @@ Keywords correspond to the struct's fields.
 # Related
 
   - [`set_tracking_error_constraints!`](@ref)
-
   - [`TrackingRiskMeasure`](@ref)
-
   - [`RiskTrackingRiskMeasure`](@ref)
-
   - [`WeightsTracking`](@ref)
-
   - [`IndependentVariableTracking`](@ref)
-
   - [`DependentVariableTracking`](@ref)
 """
 @concrete struct RiskTrackingError <: AbstractTracking

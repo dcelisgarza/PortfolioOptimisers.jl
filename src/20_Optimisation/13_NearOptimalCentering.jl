@@ -130,13 +130,9 @@ Keywords correspond to the struct's fields.
 # Related
 
   - [`scalarise_risk_expression!`](@ref)
-
   - [`set_risk_constraints!`](@ref)
-
   - [`RiskJuMPOptimisationEstimator`](@ref)
-
   - [`MeanRisk`](@ref)
-
   - [`NearOptimalCenteringAlgorithm`](@ref)
 """
 @concrete struct NearOptimalCentering <: RiskJuMPOptimisationEstimator

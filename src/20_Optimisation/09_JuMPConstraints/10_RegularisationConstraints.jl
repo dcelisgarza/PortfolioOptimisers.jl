@@ -62,7 +62,6 @@ Penalises concentrated portfolios by encouraging weight smoothness for ``p > 1``
 # Related
 
   - [`AbstractRegularisationEstimator`](@ref)
-
   - [`AbstractRegularisationEstimator`](@ref)
 """
 @concrete struct LpRegularisation <: AbstractRegularisationEstimator

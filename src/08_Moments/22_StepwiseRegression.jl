@@ -222,11 +222,8 @@ This method implements forward selection for stepwise regression, where variable
 # Related
 
   - [`StepwiseRegression`](@ref)
-
   - [`PValue`](@ref)
-
   - [`Forward`](@ref)
-
   - [`add_best_feature_after_pval_failure!`](@ref)
 """
 function _regression(re::StepwiseRegression{<:PValue, <:Forward}, x::VecNum, F::MatNum)

@@ -194,11 +194,8 @@ information for use in prediction result types.
 # Related
 
   - [`PredictionResult`](@ref)
-
   - [`MultiPeriodPredictionResult`](@ref)
-
   - [`PredictionResult`](@ref)
-
   - [`MultiPeriodPredictionResult`](@ref)
 """
 @concrete struct PredictionReturnsResult <: AbstractReturnsResult
@@ -298,17 +295,11 @@ result with the returns data from the test period.
 # Related
 
   - [`MultiPeriodPredictionResult`](@ref)
-
   - [`PopulationPredictionResult`](@ref)
-
   - [`predict`](@ref)
-
   - [`fit_predict`](@ref)
-
   - [`MultiPeriodPredictionResult`](@ref)
-
   - [`PopulationPredictionResult`](@ref)
-
   - [`PredictionReturnsResult`](@ref)
 """
 @concrete struct PredictionResult <: AbstractPredictionResult
@@ -364,17 +355,11 @@ Concatenates the test-period returns from all folds into an aggregated
 # Related
 
   - [`PredictionResult`](@ref)
-
   - [`PopulationPredictionResult`](@ref)
-
   - [`predict`](@ref)
-
   - [`sort_by_measure`](@ref)
-
   - [`PredictionResult`](@ref)
-
   - [`PopulationPredictionResult`](@ref)
-
   - [`PredictionReturnsResult`](@ref)
 """
 @concrete struct MultiPeriodPredictionResult <: AbstractPredictionResult
@@ -433,17 +418,11 @@ represents one random asset-subset path.
 # Related
 
   - [`PredictionResult`](@ref)
-
   - [`MultiPeriodPredictionResult`](@ref)
-
   - [`sort_by_measure`](@ref)
-
   - [`PredictionResult`](@ref)
-
   - [`MultiPeriodPredictionResult`](@ref)
-
   - [`sort_by_measure`](@ref)
-
   - [`MultipleRandomised`](@ref)
 """
 @concrete struct PopulationPredictionResult <: AbstractPredictionResult
@@ -482,11 +461,8 @@ risk under `r`. Paths where any fold returned a non-success retcode are excluded
 # Related
 
   - [`PopulationPredictionResult`](@ref)
-
   - [`expected_risk`](@ref)
-
   - [`PopulationPredictionResult`](@ref)
-
   - [`expected_risk`](@ref)
 """
 function sort_by_measure(ppred::PopulationPredictionResult, r::AbstractBaseRiskMeasure;
@@ -614,15 +590,10 @@ optionally columns `cols`) of `rd` are used for the prediction.
 # Related
 
   - [`fit_predict`](@ref)
-
   - [`PredictionResult`](@ref)
-
   - [`MultiPeriodPredictionResult`](@ref)
-
   - [`fit_predict`](@ref)
-
   - [`fit_and_predict`](@ref)
-
   - [`PredictionResult`](@ref)
 """
 function StatsAPI.predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)
@@ -648,11 +619,8 @@ Fit optimisation estimator `opt` on returns data `rd` and immediately produce a
 # Related
 
   - [`predict`](@ref)
-
   - [`PredictionResult`](@ref)
-
   - [`predict`](@ref)
-
   - [`fit_and_predict`](@ref)
 """
 function fit_predict(opt::OptE_Opt, rd::ReturnsResult)

@@ -120,17 +120,11 @@ Threshold
 # Related
 
   - [`short_mip_threshold_constraints`](@ref)
-
   - [`short_smip_threshold_constraints`](@ref)
-
   - [`mip_constraints`](@ref)
-
   - [`set_mip_constraints!`](@ref)
-
   - [`ThresholdEstimator`](@ref)
-
   - [`threshold_constraints`](@ref)
-
   - [`AbstractConstraintResult`](@ref)
 """
 @concrete struct Threshold <: AbstractConstraintResult

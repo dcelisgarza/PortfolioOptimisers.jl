@@ -21,5 +21,6 @@ WeightFinaliser
 IterativeWeightFinaliser
 JuMPWeightFinaliser
 optimise
-calc_net_returns
+calc_net_returns(res::NonFiniteAllocationOptimisationResult, X::MatNum,
+                          fees::Option{<:Fees} = nothing)
 ```

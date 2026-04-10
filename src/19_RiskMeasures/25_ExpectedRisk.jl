@@ -84,11 +84,8 @@ concentration as the given weight vector `w`.
 # Related
 
   - [`set_number_effective_assets!`](@ref)
-
   - [`EqualRiskMeasure`](@ref)
-
   - [`risk_contribution`](@ref)
-
   - [`EqualRiskMeasure`](@ref)
 """
 function number_effective_assets(w::VecNum)
