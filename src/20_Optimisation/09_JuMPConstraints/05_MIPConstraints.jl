@@ -50,10 +50,10 @@ The fall-through method does nothing when `wb` is `nothing`. The concrete method
 
 # Arguments
 
-  - `model::JuMP.Model`: The JuMP optimisation model.
-  - `wb::WeightBounds`: Weight bound specification.
-  - `il`: Long binary (or continuous relaxation) indicator variable.
-  - `is`: Short binary (or continuous relaxation) indicator variable.
+  - $(arg_dict[:model])
+  - $(arg_dict[:wb_arg])
+  - $(arg_dict[:il_arg])
+  - $(arg_dict[:is_arg])
 
 # Returns
 
@@ -91,18 +91,18 @@ Creates `ilb`/`isb` binary indicator variables (or their continuous relaxations 
 
 # Arguments
 
-  - `model::JuMP.Model`: The JuMP optimisation model.
-  - `wb::WeightBounds`: Weight bound specification.
-  - `lt::Option{<:Threshold}`: Long-side holding threshold.
-  - `st::Option{<:Threshold}`: Short-side holding threshold.
+  - $(arg_dict[:model])
+  - $(arg_dict[:wb_arg])
+  - $(arg_dict[:lt_arg])
+  - $(arg_dict[:st_arg])
   - `ffl::Option{<:Num_VecNum}`: Long-side fixed fee rate(s).
   - `ffs::Option{<:Num_VecNum}`: Short-side fixed fee rate(s).
-  - `ss::Option{<:Number}`: Big-M scaling constant (computed via [`get_mip_ss`](@ref) when `nothing`).
-  - `lt_flag::Bool`: Whether to apply the long-side threshold.
-  - `st_flag::Bool`: Whether to apply the short-side threshold.
+  - $(arg_dict[:ss_arg])
+  - $(arg_dict[:lt_flag_arg])
+  - $(arg_dict[:st_flag_arg])
   - `ffl_flag::Bool`: Whether to add long fixed fee expressions.
   - `ffs_flag::Bool`: Whether to add short fixed fee expressions.
-  - `miprb_flag::Bool`: Whether to add MIP rebalancing constraints.
+  - $(arg_dict[:miprb_flag_arg])
 
 # Returns
 
@@ -190,14 +190,14 @@ Creates binary variable `ib[i]` per asset indicating whether the asset is held. 
 
 # Arguments
 
-  - `model::JuMP.Model`: The JuMP optimisation model.
-  - `wb::WeightBounds`: Weight bound specification.
+  - $(arg_dict[:model])
+  - $(arg_dict[:wb_arg])
   - `ffl::Option{<:Num_VecNum}`: Long-side fixed fee rate(s).
-  - `lt::Option{<:Threshold}`: Long-side minimum-holding threshold.
-  - `ss::Option{<:Number}`: Big-M scaling constant (computed via [`get_mip_ss`](@ref) when `nothing`).
-  - `lt_flag::Bool`: Whether to apply the long threshold.
+  - $(arg_dict[:lt_arg])
+  - $(arg_dict[:ss_arg])
+  - $(arg_dict[:lt_flag_arg])
   - `ffl_flag::Bool`: Whether to add fixed fee expressions.
-  - `miprb_flag::Bool`: Whether to add MIP rebalancing constraints.
+  - $(arg_dict[:miprb_flag_arg])
 
 # Returns
 
@@ -260,7 +260,7 @@ Iterates over `plgs` and, for each [`IntegerPhylogeny`](@ref) entry, enforces `A
 
 # Arguments
 
-  - `model::JuMP.Model`: The JuMP optimisation model.
+  - $(arg_dict[:model])
   - `plgs`: Collection of phylogeny constraint objects.
 
 # Returns
@@ -295,15 +295,15 @@ Orchestrates cardinality, group cardinality, integer phylogeny, minimum-holding 
 
 # Arguments
 
-  - `model::JuMP.Model`: The JuMP optimisation model.
-  - `wb::WeightBounds`: Weight bound specification.
+  - $(arg_dict[:model])
+  - $(arg_dict[:wb_arg])
   - `card::Option{<:Integer}`: Optional maximum cardinality (number of non-zero assets).
   - `gcard::Option{<:LinearConstraint}`: Optional group cardinality constraint.
   - `pl::Option{<:PlC_VecPlC}`: Optional phylogeny constraint(s).
-  - `lt::Option{<:Threshold}`: Long-side minimum-holding threshold.
-  - `st::Option{<:Threshold}`: Short-side minimum-holding threshold.
+  - $(arg_dict[:lt_arg])
+  - $(arg_dict[:st_arg])
   - `fees::Option{<:Fees}`: Optional fee specification.
-  - `ss::Option{<:Number}`: Big-M scaling constant.
+  - $(arg_dict[:ss_arg])
   - `miprb_flag::Bool = false`: Whether to add MIP rebalancing constraints.
 
 # Returns
@@ -382,12 +382,12 @@ The fall-through method does nothing when `wb` is `nothing`. The concrete method
 
 # Arguments
 
-  - `model::JuMP.Model`: The JuMP optimisation model.
-  - `wb::WeightBounds`: Weight bound specification.
+  - $(arg_dict[:model])
+  - $(arg_dict[:wb_arg])
   - `smtx::MatNum`: Selection matrix mapping assets to sub-groups.
   - `smtx_expr`: JuMP expression for the sub-group weight combination.
-  - `il`: Long binary (or continuous relaxation) indicator variable.
-  - `is`: Short binary (or continuous relaxation) indicator variable.
+  - $(arg_dict[:il_arg])
+  - $(arg_dict[:is_arg])
   - `key::Symbol = :set_w_mip_`: Base key for naming constraints.
   - `i::Integer = 1`: Index for generating unique constraint names.
 
@@ -431,14 +431,14 @@ Creates per-group binary indicator variables and, when `k` is a JuMP variable, t
 
 # Arguments
 
-  - `model::JuMP.Model`: The JuMP optimisation model.
-  - `wb::WeightBounds`: Weight bound specification.
-  - `smtx::Option{<:MatNum}`: Selection matrix mapping assets to sub-groups.
-  - `lt::Option{<:Threshold}`: Long-side minimum-holding threshold.
-  - `st::Option{<:Threshold}`: Short-side minimum-holding threshold.
-  - `ss::Option{<:Number}`: Big-M scaling constant.
-  - `lt_flag::Bool`: Whether to apply the long threshold.
-  - `st_flag::Bool`: Whether to apply the short threshold.
+  - $(arg_dict[:model])
+  - $(arg_dict[:wb_arg])
+  - $(arg_dict[:smtx_arg])
+  - $(arg_dict[:lt_arg])
+  - $(arg_dict[:st_arg])
+  - $(arg_dict[:ss_arg])
+  - $(arg_dict[:lt_flag_arg])
+  - $(arg_dict[:st_flag_arg])
   - `key1::Symbol = :si`: Base key for long indicator variables.
   - `key7::Symbol = :smtx_expr_`: Base key for sub-group weight expressions.
   - `key8::Symbol = :set_w_mip_`: Base key for weight bound constraints.
@@ -560,12 +560,12 @@ Creates binary variable `sib` (or continuous relaxation when `k` is a JuMP varia
 
 # Arguments
 
-  - `model::JuMP.Model`: The JuMP optimisation model.
-  - `wb::WeightBounds`: Weight bound specification.
+  - $(arg_dict[:model])
+  - $(arg_dict[:wb_arg])
   - `smtx::Option{<:MatNum}`: Selection matrix for this sub-group.
-  - `lt::Option{<:Threshold}`: Long-side minimum-holding threshold.
-  - `ss::Option{<:Number}`: Big-M scaling constant.
-  - `lt_flag::Bool`: Whether to apply the long threshold.
+  - $(arg_dict[:lt_arg])
+  - $(arg_dict[:ss_arg])
+  - $(arg_dict[:lt_flag_arg])
   - `key1::Symbol = :sib_`: Base key for binary indicator variable.
   - `key2::Symbol = :i_smip_`: Base key for the indicator expression.
   - `key3::Symbol = :isbf_`: Base key for continuous relaxation variable.
@@ -640,14 +640,14 @@ The single-matrix method handles cardinality, group cardinality, long/short thre
 
 # Arguments
 
-  - `model::JuMP.Model`: The JuMP optimisation model.
-  - `wb::WeightBounds`: Weight bound specification.
+  - $(arg_dict[:model])
+  - $(arg_dict[:wb_arg])
   - `card`: Cardinality bound(s) for the sub-group(s).
   - `gcard`: Group-cardinality constraint(s) for the sub-group(s).
   - `smtx`: Selection matrix (or vector thereof) for the sub-group(s).
   - `lt`: Long-side minimum-holding threshold(s).
   - `st`: Short-side minimum-holding threshold(s).
-  - `ss::Option{<:Number}`: Big-M scaling constant.
+  - $(arg_dict[:ss_arg])
   - `i::Integer = 1`: Index for generating unique names (single-matrix method only).
 
 # Returns
@@ -721,13 +721,13 @@ The single-matrix method enforces `sum(sib) ≤ card` for one sub-group. The vec
 
 # Arguments
 
-  - `model::JuMP.Model`: The JuMP optimisation model.
-  - `wb::WeightBounds`: Weight bound specification.
+  - $(arg_dict[:model])
+  - $(arg_dict[:wb_arg])
   - `card`: Cardinality bound(s) for the sub-group(s).
   - `smtx`: Selection matrix (or vector thereof).
   - `lt`: Long-side minimum-holding threshold(s).
   - `st`: Short-side minimum-holding threshold(s).
-  - `ss::Option{<:Number}`: Big-M scaling constant.
+  - $(arg_dict[:ss_arg])
   - `i::Integer = 1`: Index for generating unique names (single-matrix method only).
 
 # Returns
@@ -781,13 +781,13 @@ The single-matrix method enforces linear group cardinality constraints `A * sib 
 
 # Arguments
 
-  - `model::JuMP.Model`: The JuMP optimisation model.
-  - `wb::WeightBounds`: Weight bound specification.
+  - $(arg_dict[:model])
+  - $(arg_dict[:wb_arg])
   - `gcard`: Group-cardinality constraint(s).
   - `smtx`: Selection matrix (or vector thereof).
   - `lt`: Long-side minimum-holding threshold(s).
   - `st`: Short-side minimum-holding threshold(s).
-  - `ss::Option{<:Number}`: Big-M scaling constant.
+  - $(arg_dict[:ss_arg])
   - `i::Integer = 1`: Index for generating unique names (single-matrix method only).
 
 # Returns
@@ -851,8 +851,8 @@ Dispatches between combined selection matrices (calling [`set_all_smip_constrain
 
 # Arguments
 
-  - `model::JuMP.Model`: The JuMP optimisation model.
-  - `wb::WeightBounds`: Weight bound specification.
+  - $(arg_dict[:model])
+  - $(arg_dict[:wb_arg])
   - `card`: Cardinality bound(s).
   - `gcard`: Group-cardinality constraint(s).
   - `smtx`: Cardinality selection matrix (or vector thereof).
@@ -861,7 +861,7 @@ Dispatches between combined selection matrices (calling [`set_all_smip_constrain
   - `st`: Short-side minimum-holding threshold(s) for cardinality sub-groups.
   - `glt`: Long-side minimum-holding threshold(s) for group-cardinality sub-groups.
   - `gst`: Short-side minimum-holding threshold(s) for group-cardinality sub-groups.
-  - `ss::Option{<:Number}`: Big-M scaling constant.
+  - $(arg_dict[:ss_arg])
 
 # Returns
 

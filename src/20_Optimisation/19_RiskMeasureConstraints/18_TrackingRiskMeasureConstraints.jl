@@ -12,13 +12,13 @@ risk difference via [`set_trdv_risk_constraints!`](@ref).
 
 # Arguments
 
-  - `model::JuMP.Model`: The JuMP optimisation model.
-  - `i`: Constraint index for unique naming.
+  - $(arg_dict[:model])
+  - $(arg_dict[:ci])
   - `r`: Tracking risk measure instance.
-  - `opt::RiskJuMPOptimisationEstimator`: Optimisation estimator.
-  - `pr::AbstractPriorResult`: Prior result containing `X`.
-  - `pl`: Optional phylogeny constraints.
-  - `fees`: Optional fees structure.
+  - $(arg_dict[:opt_rjumpe])
+  - $(arg_dict[:pr_X])
+  - $(arg_dict[:pl_opt])
+  - $(arg_dict[:fees_opt])
 
 # Returns
 
@@ -65,11 +65,11 @@ bound to the original SOC variable.
 
 # Arguments
 
-  - `model::JuMP.Model`: The JuMP optimisation model.
+  - $(arg_dict[:model])
   - `r::TrackingRiskMeasure`: Tracking risk measure instance.
-  - `opt::RiskJuMPOptimisationEstimator`: Optimisation estimator.
+  - $(arg_dict[:opt_rjumpe])
   - `tracking_risk::JuMP.AbstractJuMPScalar`: Normalised tracking-risk SOC variable.
-  - `key::Symbol`: Symbol for storing the expression in the model.
+  - $(arg_dict[:key_sym])
 
 # Returns
 
@@ -196,12 +196,12 @@ vector of measures, using a name prefix `key` for unique constraint naming.
 # Arguments
 
   - `key`: Name prefix for unique constraint symbols.
-  - `model::JuMP.Model`: The JuMP optimisation model.
+  - $(arg_dict[:model])
   - `r`: A [`RiskMeasure`](@ref) or a vector of risk measures.
-  - `opt::JuMPOptimisationEstimator`: Optimisation estimator.
-  - `pr::AbstractPriorResult`: Prior result.
-  - `pl`: Optional phylogeny constraints.
-  - `fees`: Optional fees structure.
+  - $(arg_dict[:opt_jumpe])
+  - $(arg_dict[:pr])
+  - $(arg_dict[:pl_opt])
+  - $(arg_dict[:fees_opt])
 
 # Returns
 
@@ -241,13 +241,13 @@ SDP matrices) with `old` prefixes, calls [`set_risk_tr_constraints!`](@ref) with
 
 # Arguments
 
-  - `model::JuMP.Model`: The JuMP optimisation model.
-  - `i`: Constraint index for unique naming.
+  - $(arg_dict[:model])
+  - $(arg_dict[:ci])
   - `r::RiskMeasure`: Inner risk measure.
-  - `opt::RiskJuMPOptimisationEstimator`: Optimisation estimator.
-  - `pr::AbstractPriorResult`: Prior result.
-  - `pl`: Optional phylogeny constraints.
-  - `fees`: Optional fees structure.
+  - $(arg_dict[:opt_rjumpe])
+  - $(arg_dict[:pr])
+  - $(arg_dict[:pl_opt])
+  - $(arg_dict[:fees_opt])
 
 # Returns
 
@@ -635,13 +635,13 @@ with the outer model.
 
 # Arguments
 
-  - `model::JuMP.Model`: The JuMP optimisation model.
-  - `i`: Constraint index for unique naming.
+  - $(arg_dict[:model])
+  - $(arg_dict[:ci])
   - `r::RiskMeasure`: Inner risk measure.
-  - `opt::RiskJuMPOptimisationEstimator`: Optimisation estimator.
-  - `pr::AbstractPriorResult`: Prior result.
-  - `pl`: Optional phylogeny constraints.
-  - `fees`: Optional fees structure.
+  - $(arg_dict[:opt_rjumpe])
+  - $(arg_dict[:pr])
+  - $(arg_dict[:pl_opt])
+  - $(arg_dict[:fees_opt])
 
 # Returns
 

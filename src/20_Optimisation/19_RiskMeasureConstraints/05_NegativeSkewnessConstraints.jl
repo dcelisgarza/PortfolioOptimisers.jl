@@ -8,7 +8,7 @@ back to `sqrt(pr.V)` for positive-semidefinite matrices. Stores the result as `m
 
 # Arguments
 
-  - `model::JuMP.Model`: The JuMP optimisation model.
+  - $(arg_dict[:model])
   - `pr::HighOrderPrior`: High-order prior containing `V`.
 
 # Returns
@@ -46,11 +46,11 @@ The `SOCRiskExpr` overload passes the SOC variable directly to
 
 # Arguments
 
-  - `model::JuMP.Model`: The JuMP optimisation model.
+  - $(arg_dict[:model])
   - `r::NegativeSkewness`: Negative-skewness risk measure instance.
-  - `opt::RiskJuMPOptimisationEstimator`: Optimisation estimator.
+  - $(arg_dict[:opt_rjumpe])
   - `nskew_risk`: SOC variable for negative-skewness risk.
-  - `key::Symbol`: Symbol for storing the expression in the model.
+  - $(arg_dict[:key_sym])
   - `V::MatNum`: Co-skewness matrix (used only by the Quad overload).
 
 # Returns
@@ -109,10 +109,10 @@ overload unconditionally throws an `ArgumentError`.
 
 # Arguments
 
-  - `model::JuMP.Model`: The JuMP optimisation model.
-  - `i`: Constraint index for unique naming.
+  - $(arg_dict[:model])
+  - $(arg_dict[:ci])
   - `r::NegativeSkewness`: Negative-skewness risk measure instance.
-  - `opt::RiskJuMPOptimisationEstimator`: Optimisation estimator.
+  - $(arg_dict[:opt_rjumpe])
   - `pr::HighOrderPrior`: High-order prior containing `V`.
 
 # Returns

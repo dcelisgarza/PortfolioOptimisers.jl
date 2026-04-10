@@ -9,10 +9,10 @@ Introduces a scalar variable `uci` and the SOC constraint
 
 # Arguments
 
-  - `model::JuMP.Model`: The JuMP optimisation model.
+  - $(arg_dict[:model])
   - `r::UlcerIndex`: Ulcer index risk measure instance.
-  - `opt::RiskJuMPOptimisationEstimator`: Optimisation estimator.
-  - `pr::AbstractPriorResult`: Prior result containing `X`.
+  - $(arg_dict[:opt_rjumpe])
+  - $(arg_dict[:pr_X])
 
 # Returns
 

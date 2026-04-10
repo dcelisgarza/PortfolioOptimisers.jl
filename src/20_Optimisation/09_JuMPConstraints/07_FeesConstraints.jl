@@ -7,7 +7,7 @@ Creates the `:fees` expression if it does not yet exist; otherwise adds `expr` t
 
 # Arguments
 
-  - `model::JuMP.Model`: The JuMP optimisation model.
+  - $(arg_dict[:model])
   - `expr::JuMP.AbstractJuMPScalar`: The fee expression to accumulate.
 
 # Returns
@@ -40,7 +40,7 @@ The fall-through method does nothing. The concrete method computes `val' * |w - 
 
 # Arguments
 
-  - `model::JuMP.Model`: The JuMP optimisation model.
+  - $(arg_dict[:model])
   - `tn::Turnover`: Turnover specification containing benchmark weights `w` and per-unit fee `val`.
 
 # Returns
@@ -84,7 +84,7 @@ The fall-through method does nothing. The concrete method delegates to [`set_lon
 
 # Arguments
 
-  - `model::JuMP.Model`: The JuMP optimisation model.
+  - $(arg_dict[:model])
   - `fees::Fees`: Fee specification containing long, short, and turnover fee rates.
 
 # Returns
@@ -111,7 +111,7 @@ The fall-through method does nothing. The concrete method adds `fl' * lw` to the
 
 # Arguments
 
-  - `model::JuMP.Model`: The JuMP optimisation model.
+  - $(arg_dict[:model])
   - `fl`: Long-side fee rate(s). Accepts a scalar `Number` or a `VecNum`.
 
 # Returns
@@ -137,7 +137,7 @@ The fall-through method does nothing. The concrete method adds `fs' * sw` to the
 
 # Arguments
 
-  - `model::JuMP.Model`: The JuMP optimisation model.
+  - $(arg_dict[:model])
   - `fs`: Short-side fee rate(s). Accepts a scalar `Number` or a `VecNum`.
 
 # Returns

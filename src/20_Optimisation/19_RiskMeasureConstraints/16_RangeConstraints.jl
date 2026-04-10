@@ -10,10 +10,10 @@ existing expression if already present.
 
 # Arguments
 
-  - `model::JuMP.Model`: The JuMP optimisation model.
+  - $(arg_dict[:model])
   - `r::Range`: Range risk measure instance.
-  - `opt::RiskJuMPOptimisationEstimator`: Optimisation estimator.
-  - `pr::AbstractPriorResult`: Prior result containing `X`.
+  - $(arg_dict[:opt_rjumpe])
+  - $(arg_dict[:pr_X])
 
 # Returns
 

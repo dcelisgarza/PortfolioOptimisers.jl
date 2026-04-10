@@ -7,7 +7,7 @@ The fall-through method does nothing. The concrete method introduces an auxiliar
 
 # Arguments
 
-  - `model::JuMP.Model`: The JuMP optimisation model.
+  - $(arg_dict[:model])
   - `val::Number`: Minimum required effective number of assets.
 
 # Returns

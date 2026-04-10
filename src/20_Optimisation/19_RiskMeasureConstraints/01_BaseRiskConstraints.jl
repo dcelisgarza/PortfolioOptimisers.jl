@@ -12,7 +12,7 @@ linear constraints to encode the maximum over all entries.
 
 # Arguments
 
-  - `model::JuMP.Model`: The JuMP optimisation model.
+  - $(arg_dict[:model])
   - `sca`: Scalariser instance (one of [`SumScalariser`](@ref), [`LogSumExpScalariser`](@ref),
     or [`MaxScalariser`](@ref)).
 
@@ -82,12 +82,12 @@ overload calls `set_risk_constraints!(model, i, rs[i], ...)` for each element.
 
 # Arguments
 
-  - `model::JuMP.Model`: The JuMP optimisation model.
+  - $(arg_dict[:model])
   - `r`: A [`RiskMeasure`](@ref) instance, or `rs` a vector of risk measures.
-  - `opt`: Optimisation estimator.
-  - `pr::AbstractPriorResult`: Prior result.
-  - `pl`: Optional phylogeny constraints.
-  - `fees`: Optional fees structure.
+  - $(arg_dict[:opt_jumpe])
+  - $(arg_dict[:pr])
+  - $(arg_dict[:pl_opt])
+  - $(arg_dict[:fees_opt])
 
 # Returns
 
@@ -125,7 +125,7 @@ directly to the model.
 
 # Arguments
 
-  - `model::JuMP.Model`: The JuMP optimisation model.
+  - $(arg_dict[:model])
   - `r_expr::JuMP.AbstractJuMPScalar`: The risk JuMP expression to bound.
   - `ub`: Upper bound; a scalar number or a frontier specification.
   - `key::Symbol`: Symbol used to name the constraint in the model.
@@ -183,7 +183,7 @@ and appends `scale * r_expr`.
 
 # Arguments
 
-  - `model::JuMP.Model`: The JuMP optimisation model.
+  - $(arg_dict[:model])
   - `r_expr::JuMP.AbstractJuMPScalar`: The risk JuMP expression to add.
   - `scale::Number`: Scaling factor applied to the expression.
   - `rke::Bool`: When `false` this method is a no-op.
@@ -219,11 +219,11 @@ with `settings.scale` and `settings.rke`.
 
 # Arguments
 
-  - `model::JuMP.Model`: The JuMP optimisation model.
-  - `opt::RiskJuMPOptimisationEstimator`: Optimisation estimator.
+  - $(arg_dict[:model])
+  - $(arg_dict[:opt_rjumpe])
   - `r_expr::JuMP.AbstractJuMPScalar`: Risk JuMP expression.
   - `settings::RiskMeasureSettings`: Settings carrying upper bound, scale, and `rke` flag.
-  - `key::Symbol`: Symbol used to name constraints in the model.
+  - $(arg_dict[:key_sym])
 
 # Returns
 
@@ -254,7 +254,7 @@ present in `model`.
 
 # Arguments
 
-  - `model::JuMP.Model`: The JuMP optimisation model.
+  - $(arg_dict[:model])
   - `X::MatNum`: Asset returns matrix (`T × N`).
 
 # Returns

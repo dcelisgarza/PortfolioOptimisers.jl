@@ -51,10 +51,10 @@ multiple variance encodings via [`set_second_moment_risk!`](@ref).
 
 # Arguments
 
-  - `model::JuMP.Model`: The JuMP optimisation model.
-  - `i`: Constraint index for unique naming.
+  - $(arg_dict[:model])
+  - $(arg_dict[:ci])
   - `r::LowOrderMoment`: Risk measure instance.
-  - `opt::RiskJuMPOptimisationEstimator`: Optimisation estimator.
+  - $(arg_dict[:opt_rjumpe])
   - `pr::AbstractPriorResult`: Prior result containing `X` (returns matrix) and `mu`.
 
 # Returns
@@ -127,11 +127,11 @@ scaling factor.
 
 # Arguments
 
-  - `model::JuMP.Model`: The JuMP optimisation model.
-  - `i`: Constraint index for unique naming.
+  - $(arg_dict[:model])
+  - $(arg_dict[:ci])
   - `factor::Number`: Variance correction factor (e.g. `1 / (T - 1)`).
   - `second_moment`: Return deviation vector or matrix.
-  - `key::Symbol`: Symbol for storing the expression in the model.
+  - $(arg_dict[:key_sym])
   - `keyt`, `keyc`: Symbols for the auxiliary variable and its constraint.
   - `tsecond_moment`: Pre-existing SOC variable (used by SquaredSOC/SOC overloads).
 

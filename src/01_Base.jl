@@ -216,7 +216,28 @@ const arg_dict = Dict(
                       :add_bridges => "`add_bridges`: The `add_bridges` keyword argument in [`set_optimizer`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.set_optimizer).",#
                       # RNG
                       :rng => "`rng`: Random number generator.",#
-                      :seed => "`seed`: Seed for the random number generator.")
+                      :seed => "`seed`: Seed for the random number generator.",
+                      # JuMP Optimisation
+                      :model => "`model::JuMP.Model`: The JuMP optimisation model.",
+                      :opt_rjumpe => "`opt::RiskJuMPOptimisationEstimator`: Risk-based optimisation estimator.",
+                      :opt_jumpe => "`opt::JuMPOptimisationEstimator`: JuMP optimisation estimator.",
+                      :ci => "`i`: Constraint index for unique variable and constraint naming.",
+                      :key_sym => "`key::Symbol`: Symbol used to name constraints or expressions in the model.",
+                      :wb_arg => "`wb::WeightBounds`: Weight bound specification containing lower and upper bounds.",
+                      :ss_arg => "`ss::Option{<:Number}`: Big-M scaling constant (computed via [`get_mip_ss`](@ref) when `nothing`).",
+                      :lt_arg => "`lt::Option{<:Threshold}`: Long-side minimum-holding threshold.",
+                      :st_arg => "`st::Option{<:Threshold}`: Short-side minimum-holding threshold.",
+                      :lt_flag_arg => "`lt_flag::Bool`: Whether to apply the long-side threshold.",
+                      :st_flag_arg => "`st_flag::Bool`: Whether to apply the short-side threshold.",
+                      :miprb_flag_arg => "`miprb_flag::Bool`: Whether to add MIP rebalancing constraints.",
+                      :il_arg => "`il`: Long binary (or continuous relaxation) indicator variable.",
+                      :is_arg => "`is`: Short binary (or continuous relaxation) indicator variable.",
+                      :smtx_arg => "`smtx::Option{<:MatNum}`: Selection matrix mapping assets to sub-groups.",
+                      :r_risk => "`r`: Risk measure instance.",
+                      :pr_X => "`pr::AbstractPriorResult`: Prior result containing the returns matrix `X`.",
+                      :pr_sigma => "`pr::AbstractPriorResult`: Prior result containing the covariance matrix `sigma`.",
+                      :pl_opt => "`pl`: Optional phylogeny constraints.",
+                      :fees_opt => "`fees`: Optional fees structure.")
 const field_dict = Dict(key => strip(val[(findfirst(":", val)[1] + 1):end])
                         for (key, val) in arg_dict)
 """

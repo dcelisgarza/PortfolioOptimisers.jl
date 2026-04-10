@@ -7,7 +7,7 @@ Creates a symmetric matrix variable `W` and enforces that the bordered matrix `[
 
 # Arguments
 
-  - `model::JuMP.Model`: The JuMP optimisation model.
+  - $(arg_dict[:model])
 
 # Returns
 
@@ -41,7 +41,7 @@ Creates a symmetric matrix variable `frc_W` and enforces that the bordered matri
 
 # Arguments
 
-  - `model::JuMP.Model`: The JuMP optimisation model.
+  - $(arg_dict[:model])
 
 # Returns
 
@@ -75,7 +75,7 @@ Iterates over `plgs` and, for each [`SemiDefinitePhylogeny`](@ref) entry, enforc
 
 # Arguments
 
-  - `model::JuMP.Model`: The JuMP optimisation model.
+  - $(arg_dict[:model])
   - `plgs`: Phylogeny constraint(s). Accepts `nothing`, a single phylogeny, or a vector.
 
 # Returns
@@ -120,7 +120,7 @@ Iterates over `plgs` and, for each [`SemiDefinitePhylogeny`](@ref) entry, enforc
 
 # Arguments
 
-  - `model::JuMP.Model`: The JuMP optimisation model.
+  - $(arg_dict[:model])
   - `plgs`: Phylogeny constraint(s). Accepts `nothing`, a single phylogeny, or a vector.
 
 # Returns

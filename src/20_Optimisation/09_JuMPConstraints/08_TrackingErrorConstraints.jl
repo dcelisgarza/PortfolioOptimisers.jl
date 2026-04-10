@@ -16,13 +16,13 @@ The collection method iterates over all tracking errors in `tres`.
 
 # Arguments
 
-  - `model::JuMP.Model`: The JuMP optimisation model.
+  - $(arg_dict[:model])
   - `i::Integer`: Constraint index for generating unique variable and constraint names.
   - `pr::AbstractPriorResult`: Prior result providing the return matrix `X`.
   - `tr`: Tracking error specification.
   - `opt`: Optimisation estimator (required for risk-based tracking variants).
-  - `pl`: Optional phylogeny constraints.
-  - `fees`: Optional fees structure.
+  - $(arg_dict[:pl_opt])
+  - $(arg_dict[:fees_opt])
 
 # Returns
 

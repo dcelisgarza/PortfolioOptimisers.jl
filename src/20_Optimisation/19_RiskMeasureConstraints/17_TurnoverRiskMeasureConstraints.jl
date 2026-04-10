@@ -9,10 +9,10 @@ is the reference weight vector from `r.w`.
 
 # Arguments
 
-  - `model::JuMP.Model`: The JuMP optimisation model.
-  - `i`: Constraint index for unique naming.
+  - $(arg_dict[:model])
+  - $(arg_dict[:ci])
   - `r::TurnoverRiskMeasure`: Turnover risk measure instance carrying the benchmark weights.
-  - `opt::RiskJuMPOptimisationEstimator`: Optimisation estimator.
+  - $(arg_dict[:opt_rjumpe])
 
 # Returns
 

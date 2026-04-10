@@ -8,7 +8,7 @@ If `model` does not yet contain `Gkt`, computes the upper Cholesky factor of
 
 # Arguments
 
-  - `model::JuMP.Model`: The JuMP optimisation model.
+  - $(arg_dict[:model])
   - `pr::HighOrderPrior`: High-order prior containing `kt` and `S2`.
 
 # Returns
@@ -47,7 +47,7 @@ and stores `vals_Akt` and `vecs_Akt` in `model`.
 
 # Arguments
 
-  - `model::JuMP.Model`: The JuMP optimisation model.
+  - $(arg_dict[:model])
   - `pr::HighOrderPrior`: High-order prior containing `kt` and `mu`.
 
 # Returns
@@ -85,12 +85,12 @@ constraint.
 
 # Arguments
 
-  - `model::JuMP.Model`: The JuMP optimisation model.
+  - $(arg_dict[:model])
   - `r::Kurtosis`: Kurtosis risk measure instance.
-  - `opt::RiskJuMPOptimisationEstimator`: Optimisation estimator.
+  - $(arg_dict[:opt_rjumpe])
   - `sqrt_kurtosis_risk`: SOC variable representing the square root of kurtosis risk.
   - `x_kurt`: Auxiliary vector expression used in Quad/RSOC formulations.
-  - `key::Symbol`: Symbol for storing the expression in the model.
+  - $(arg_dict[:key_sym])
   - `i`: Constraint index for unique naming (used by the RSOC overload).
 
 # Returns
@@ -168,10 +168,10 @@ estimation requires a high-order prior.
 
 # Arguments
 
-  - `model::JuMP.Model`: The JuMP optimisation model.
-  - `i`: Constraint index for unique naming.
+  - $(arg_dict[:model])
+  - $(arg_dict[:ci])
   - `r::Kurtosis`: Kurtosis risk measure instance.
-  - `opt::RiskJuMPOptimisationEstimator`: Optimisation estimator.
+  - $(arg_dict[:opt_rjumpe])
   - `pr::HighOrderPrior`: High-order prior containing `kt`, `S2`, and `L2`.
 
 # Returns

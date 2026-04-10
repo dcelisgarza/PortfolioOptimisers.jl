@@ -10,11 +10,11 @@ constraint. The `DrawdownatRisk` overload applies the MIP approach to the drawdo
 
 # Arguments
 
-  - `model::JuMP.Model`: The JuMP optimisation model.
-  - `i`: Constraint index for unique naming.
-  - `r`: Risk measure instance.
-  - `opt::RiskJuMPOptimisationEstimator`: Optimisation estimator.
-  - `pr::AbstractPriorResult`: Prior result.
+  - $(arg_dict[:model])
+  - $(arg_dict[:ci])
+  - $(arg_dict[:r_risk])
+  - $(arg_dict[:opt_rjumpe])
+  - $(arg_dict[:pr])
 
 # Returns
 

@@ -64,8 +64,8 @@ The fall-through method does nothing. The concrete method adds lower-bound and u
 
 # Arguments
 
-  - `model::JuMP.Model`: The JuMP optimisation model.
-  - `wb::WeightBounds`: Weight bound specification (lower and upper bounds).
+  - $(arg_dict[:model])
+  - $(arg_dict[:wb_arg])
   - `bgt`: Optional total budget constraint (number or [`BudgetRange`](@ref)).
   - `sbgt`: Optional short-side budget constraint.
   - `long::Bool = false`: When `true`, raises an error if any bound is negative.
@@ -160,7 +160,7 @@ The fall-through method does nothing. The concrete method iterates over the coll
 
 # Arguments
 
-  - `model::JuMP.Model`: The JuMP optimisation model.
+  - $(arg_dict[:model])
   - `lcms`: Collection of [`LinearConstraintModel`](@ref) objects defining the linear constraints.
   - `key_ineq::Symbol`: Base key for naming inequality constraints in the model.
   - `key_eq::Symbol`: Base key for naming equality constraints in the model.

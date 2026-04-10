@@ -11,11 +11,11 @@ upper-tail relativistic expression.
 
 # Arguments
 
-  - `model::JuMP.Model`: The JuMP optimisation model.
-  - `i`: Constraint index for unique naming.
+  - $(arg_dict[:model])
+  - $(arg_dict[:ci])
   - `r`: Risk measure instance with fields `alpha` and `kappa`.
-  - `opt::RiskJuMPOptimisationEstimator`: Optimisation estimator.
-  - `pr::AbstractPriorResult`: Prior result containing `X`.
+  - $(arg_dict[:opt_rjumpe])
+  - $(arg_dict[:pr_X])
 
 # Returns
 

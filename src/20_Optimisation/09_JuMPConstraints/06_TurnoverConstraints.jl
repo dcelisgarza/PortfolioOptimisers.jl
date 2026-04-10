@@ -7,7 +7,7 @@ The fall-through method does nothing. The concrete method iterates over the coll
 
 # Arguments
 
-  - `model::JuMP.Model`: The JuMP optimisation model.
+  - $(arg_dict[:model])
   - `tns`: One or more [`Turnover`](@ref) constraint specifications.
 
 # Returns
@@ -32,7 +32,7 @@ Introduces auxiliary variable `t_tn_i`, expression `tn_i = w - wb * k`, and enfo
 
 # Arguments
 
-  - `model::JuMP.Model`: The JuMP optimisation model.
+  - $(arg_dict[:model])
   - `tn::Turnover`: Turnover constraint specification containing benchmark weights `w` and tolerance `val`.
   - `i::Integer = 1`: Index used to generate unique variable and constraint names.
 

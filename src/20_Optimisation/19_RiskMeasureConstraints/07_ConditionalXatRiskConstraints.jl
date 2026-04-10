@@ -11,11 +11,11 @@ risk expressions.
 
 # Arguments
 
-  - `model::JuMP.Model`: The JuMP optimisation model.
-  - `i`: Constraint index for unique naming.
-  - `r`: Risk measure instance.
-  - `opt::RiskJuMPOptimisationEstimator`: Optimisation estimator.
-  - `pr::AbstractPriorResult`: Prior result containing `X`.
+  - $(arg_dict[:model])
+  - $(arg_dict[:ci])
+  - $(arg_dict[:r_risk])
+  - $(arg_dict[:opt_rjumpe])
+  - $(arg_dict[:pr_X])
 
 # Returns
 

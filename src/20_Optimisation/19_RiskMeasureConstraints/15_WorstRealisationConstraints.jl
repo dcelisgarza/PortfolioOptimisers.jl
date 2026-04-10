@@ -9,7 +9,7 @@ if already present.
 
 # Arguments
 
-  - `model::JuMP.Model`: The JuMP optimisation model.
+  - $(arg_dict[:model])
   - `X::MatNum`: Asset returns matrix (`T × N`).
 
 # Returns
@@ -40,10 +40,10 @@ Delegates to [`set_wr_risk_expression!`](@ref) to create `wr_risk`, then calls
 
 # Arguments
 
-  - `model::JuMP.Model`: The JuMP optimisation model.
+  - $(arg_dict[:model])
   - `r::WorstRealisation`: Worst-realisation risk measure instance.
-  - `opt::RiskJuMPOptimisationEstimator`: Optimisation estimator.
-  - `pr::AbstractPriorResult`: Prior result containing `X`.
+  - $(arg_dict[:opt_rjumpe])
+  - $(arg_dict[:pr_X])
 
 # Returns
 

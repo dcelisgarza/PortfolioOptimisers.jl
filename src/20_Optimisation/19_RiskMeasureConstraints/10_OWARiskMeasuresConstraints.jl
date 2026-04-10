@@ -8,7 +8,7 @@ Introduces a vector variable `owa` of length `T` and adds the equality constrain
 
 # Arguments
 
-  - `model::JuMP.Model`: The JuMP optimisation model.
+  - $(arg_dict[:model])
   - `X::MatNum`: Asset returns matrix (`T × N`).
 
 # Returns
@@ -42,11 +42,11 @@ two OWA expressions (e.g. tail-Gini range).
 
 # Arguments
 
-  - `model::JuMP.Model`: The JuMP optimisation model.
-  - `i`: Constraint index for unique naming.
+  - $(arg_dict[:model])
+  - $(arg_dict[:ci])
   - `r`: OWA or OWA-range risk measure instance.
-  - `opt::RiskJuMPOptimisationEstimator`: Optimisation estimator.
-  - `pr::AbstractPriorResult`: Prior result containing `X`.
+  - $(arg_dict[:opt_rjumpe])
+  - $(arg_dict[:pr_X])
 
 # Returns
 

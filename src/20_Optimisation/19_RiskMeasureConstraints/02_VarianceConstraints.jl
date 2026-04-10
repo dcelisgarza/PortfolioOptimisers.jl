@@ -8,7 +8,7 @@ If `model` does not yet contain a `G` expression, the factor is computed from `p
 
 # Arguments
 
-  - `model::JuMP.Model`: The JuMP optimisation model.
+  - $(arg_dict[:model])
   - `pr::AbstractPriorResult`: Prior result containing `sigma` and optionally `chol`.
 
 # Returns
@@ -36,8 +36,8 @@ both `nothing`, the Cholesky of `r.sigma` when `r.chol` is `nothing`, or `r.chol
 
 # Arguments
 
-  - `model::JuMP.Model`: The JuMP optimisation model.
-  - `pr::AbstractPriorResult`: Prior result.
+  - $(arg_dict[:model])
+  - $(arg_dict[:pr])
   - `r::CholRM`: Risk measure carrying optional `sigma` and `chol` fields.
 
 # Returns
@@ -67,11 +67,11 @@ via [`set_risk_expression!`](@ref) according to `settings`.
 
 # Arguments
 
-  - `model::JuMP.Model`: The JuMP optimisation model.
-  - `opt::RiskJuMPOptimisationEstimator`: Optimisation estimator.
+  - $(arg_dict[:model])
+  - $(arg_dict[:opt_rjumpe])
   - `r_expr_ub::JuMP.AbstractJuMPScalar`: Expression used for the upper-bound check.
   - `ub`: Upper bound value.
-  - `key::Symbol`: Symbol used to name constraints in the model.
+  - $(arg_dict[:key_sym])
   - `r_expr::JuMP.AbstractJuMPScalar`: Risk expression added to the objective.
   - `settings::RiskMeasureSettings`: Settings carrying scale and `rke` flag.
 
@@ -107,12 +107,12 @@ risk-contribution constraints.
 
 # Arguments
 
-  - `model::JuMP.Model`: The JuMP optimisation model.
-  - `i`: Constraint index for unique naming.
+  - $(arg_dict[:model])
+  - $(arg_dict[:ci])
   - `r`: Risk measure instance (`StandardDeviation` or `Variance`).
-  - `opt`: Optimisation estimator.
-  - `pr::AbstractPriorResult`: Prior result.
-  - `pl`: Optional phylogeny constraints.
+  - $(arg_dict[:opt_jumpe])
+  - $(arg_dict[:pr])
+  - $(arg_dict[:pl_opt])
 
 # Returns
 
@@ -148,13 +148,13 @@ formulations based on risk-contribution and phylogeny settings.
 
 # Arguments
 
-  - `model::JuMP.Model`: The JuMP optimisation model.
-  - `i`: Constraint index for unique naming.
-  - `r`: Risk measure instance.
-  - `opt`: Optimisation estimator.
-  - `pr::AbstractPriorResult`: Prior result.
-  - `pl`: Optional phylogeny constraints.
-  - `fees`: Optional fees structure.
+  - $(arg_dict[:model])
+  - $(arg_dict[:ci])
+  - $(arg_dict[:r_risk])
+  - $(arg_dict[:opt_jumpe])
+  - $(arg_dict[:pr])
+  - $(arg_dict[:pl_opt])
+  - $(arg_dict[:fees_opt])
 
 # Returns
 
@@ -183,7 +183,7 @@ Returns `false` for `Nothing` (no risk-contribution constraints) and `true` for
 
 # Arguments
 
-  - `model::JuMP.Model`: The JuMP optimisation model.
+  - $(arg_dict[:model])
   - `opt::NonFRCJuMPOpt`: Optimisation estimator.
   - `rc`: Risk-contribution constraint (`nothing` or `LinearConstraint`).
 
@@ -211,7 +211,7 @@ a `rc_variance` expression, or `pl` contains a `SemiDefinitePhylogeny` constrain
 
 # Arguments
 
-  - `model::JuMP.Model`: The JuMP optimisation model.
+  - $(arg_dict[:model])
   - `rc_flag::Bool`: Whether risk-contribution constraints require SDP.
   - `pl`: Optional phylogeny constraint(s).
 
@@ -246,12 +246,12 @@ directly as ``\\boldsymbol{w}^\\intercal \\Sigma \\boldsymbol{w}``.
 
 # Arguments
 
-  - `model::JuMP.Model`: The JuMP optimisation model.
-  - `i`: Constraint index for unique naming.
+  - $(arg_dict[:model])
+  - $(arg_dict[:ci])
   - `r::Variance`: Variance risk measure.
-  - `pr::AbstractPriorResult`: Prior result containing `sigma`.
+  - $(arg_dict[:pr_sigma])
   - `flag::Bool`: Whether to use the SDP formulation.
-  - `key::Symbol`: Symbol for storing the expression in the model.
+  - $(arg_dict[:key_sym])
 
 # Returns
 
@@ -280,11 +280,11 @@ under `key`.
 
 # Arguments
 
-  - `model::JuMP.Model`: The JuMP optimisation model.
-  - `i`: Constraint index for unique naming.
+  - $(arg_dict[:model])
+  - $(arg_dict[:ci])
   - `r::Variance`: Variance risk measure.
-  - `pr::AbstractPriorResult`: Prior result containing `sigma`.
-  - `key::Symbol`: Symbol for storing the expression in the model.
+  - $(arg_dict[:pr_sigma])
+  - $(arg_dict[:key_sym])
 
 # Returns
 
@@ -337,7 +337,7 @@ are returned; otherwise the standard-deviation variable and `:dev_i` key are ret
 
 # Arguments
 
-  - `model::JuMP.Model`: The JuMP optimisation model.
+  - $(arg_dict[:model])
   - `i`: Constraint index.
   - `flag::Bool`: Whether the SDP formulation is used.
 
@@ -404,8 +404,8 @@ The fall-through method does nothing. The concrete method extracts the diagonal 
 
 # Arguments
 
-  - `model::JuMP.Model`: The JuMP optimisation model.
-  - `i`: Constraint index for unique naming.
+  - $(arg_dict[:model])
+  - $(arg_dict[:ci])
   - `rc::LinearConstraint`: Linear risk-contribution constraint.
   - `variance_risk::JuMP.AbstractJuMPScalar`: Total variance risk expression.
 
@@ -501,8 +501,8 @@ and adds an SOC constraint to bound the ellipsoidal perturbation term.
 
 # Arguments
 
-  - `model::JuMP.Model`: The JuMP optimisation model.
-  - `i`: Constraint index for unique naming.
+  - $(arg_dict[:model])
+  - $(arg_dict[:ci])
   - `ucs`: Uncertainty set instance (`BoxUncertaintySet` or `EllipsoidalUncertaintySet`).
   - `sigma::MatNum`: Covariance matrix (used by `EllipsoidalUncertaintySet`).
 

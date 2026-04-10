@@ -11,7 +11,7 @@ and `Dt + Dx`.
 
 # Arguments
 
-  - `model::JuMP.Model`: The JuMP optimisation model.
+  - $(arg_dict[:model])
   - `Dt::MatNum`: Symmetric JuMP matrix variable for absolute distances.
   - `Dx::MatNum`: JuMP expression matrix for portfolio-return pairwise differences.
 
@@ -55,7 +55,7 @@ of the quadratic dot product.
 
 # Arguments
 
-  - `model::JuMP.Model`: The JuMP optimisation model.
+  - $(arg_dict[:model])
   - `Dt::MatNum`: Symmetric distance matrix variable.
   - `iT2::Number`: Inverse square of the number of observations (`1 / T^2`).
 
@@ -97,10 +97,10 @@ the existing expression if already present.
 
 # Arguments
 
-  - `model::JuMP.Model`: The JuMP optimisation model.
+  - $(arg_dict[:model])
   - `r::BrownianDistanceVariance`: BDV risk measure instance.
-  - `opt::RiskJuMPOptimisationEstimator`: Optimisation estimator.
-  - `pr::AbstractPriorResult`: Prior result containing `X`.
+  - $(arg_dict[:opt_rjumpe])
+  - $(arg_dict[:pr_X])
 
 # Returns
 
