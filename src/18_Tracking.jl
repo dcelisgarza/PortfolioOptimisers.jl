@@ -797,13 +797,19 @@ TrackingError
 ```
 
 # Related
+
   - [`set_tracking_error_constraints!`](@ref)
 
   - [`AbstractTracking`](@ref)
+
   - [`WeightsTracking`](@ref)
+
   - [`ReturnsTracking`](@ref)
+
   - [`NormTracking`](@ref)
+
   - [`L2Tracking`](@ref)
+
   - [`L1Tracking`](@ref)
 """
 @concrete struct TrackingError <: AbstractTracking

@@ -192,10 +192,13 @@ information for use in prediction result types.
   - `ivpa`: Investment vehicle per-asset allocation (`nothing`, scalar, or vector).
 
 # Related
+
   - [`PredictionResult`](@ref)
+
   - [`MultiPeriodPredictionResult`](@ref)
 
   - [`PredictionResult`](@ref)
+
   - [`MultiPeriodPredictionResult`](@ref)
 """
 @concrete struct PredictionReturnsResult <: AbstractReturnsResult
@@ -293,13 +296,19 @@ result with the returns data from the test period.
   - `rd::PredictionReturnsResult`: Returns data from the test fold.
 
 # Related
+
   - [`MultiPeriodPredictionResult`](@ref)
+
   - [`PopulationPredictionResult`](@ref)
+
   - [`predict`](@ref)
+
   - [`fit_predict`](@ref)
 
   - [`MultiPeriodPredictionResult`](@ref)
+
   - [`PopulationPredictionResult`](@ref)
+
   - [`PredictionReturnsResult`](@ref)
 """
 @concrete struct PredictionResult <: AbstractPredictionResult
@@ -353,13 +362,19 @@ Concatenates the test-period returns from all folds into an aggregated
   - `id`: Identifier for this multi-period result (e.g. path index).
 
 # Related
+
   - [`PredictionResult`](@ref)
+
   - [`PopulationPredictionResult`](@ref)
+
   - [`predict`](@ref)
+
   - [`sort_by_measure`](@ref)
 
   - [`PredictionResult`](@ref)
+
   - [`PopulationPredictionResult`](@ref)
+
   - [`PredictionReturnsResult`](@ref)
 """
 @concrete struct MultiPeriodPredictionResult <: AbstractPredictionResult
@@ -416,13 +431,19 @@ represents one random asset-subset path.
   - `pred::VecPredRes_MultiPredRes`: Collection of single or multi-period predictions.
 
 # Related
+
   - [`PredictionResult`](@ref)
+
   - [`MultiPeriodPredictionResult`](@ref)
+
   - [`sort_by_measure`](@ref)
 
   - [`PredictionResult`](@ref)
+
   - [`MultiPeriodPredictionResult`](@ref)
+
   - [`sort_by_measure`](@ref)
+
   - [`MultipleRandomised`](@ref)
 """
 @concrete struct PopulationPredictionResult <: AbstractPredictionResult
@@ -459,10 +480,13 @@ risk under `r`. Paths where any fold returned a non-success retcode are excluded
   - `Vector{MultiPeriodPredictionResult}`: Sorted vector of successful path predictions.
 
 # Related
+
   - [`PopulationPredictionResult`](@ref)
+
   - [`expected_risk`](@ref)
 
   - [`PopulationPredictionResult`](@ref)
+
   - [`expected_risk`](@ref)
 """
 function sort_by_measure(ppred::PopulationPredictionResult, r::AbstractBaseRiskMeasure;
@@ -564,12 +588,17 @@ optionally columns `cols`) of `rd` are used for the prediction.
   - [`PredictionResult`](@ref) or vector of [`PredictionResult`](@ref).
 
 # Related
+
   - [`fit_predict`](@ref)
+
   - [`PredictionResult`](@ref)
+
   - [`MultiPeriodPredictionResult`](@ref)
 
   - [`fit_predict`](@ref)
+
   - [`fit_and_predict`](@ref)
+
   - [`PredictionResult`](@ref)
 """
 function predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)
@@ -593,10 +622,13 @@ Fit optimisation estimator `opt` on returns data `rd` and immediately produce a
   - [`PredictionResult`](@ref).
 
 # Related
+
   - [`predict`](@ref)
+
   - [`PredictionResult`](@ref)
 
   - [`predict`](@ref)
+
   - [`fit_and_predict`](@ref)
 """
 function fit_predict(opt::OptE_Opt, rd::ReturnsResult)

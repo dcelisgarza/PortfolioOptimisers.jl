@@ -101,11 +101,15 @@ walk-forward folds forms one *path*.
     ) -> MultipleRandomised
 
 # Related
+
   - [`MultipleRandomisedResult`](@ref)
 
   - [`MultipleRandomisedResult`](@ref)
+
   - [`WalkForwardEstimator`](@ref)
+
   - [`IndexWalkForward`](@ref)
+
   - [`DateWalkForward`](@ref)
 """
 @concrete struct MultipleRandomised <: NonOptimisationSequentialCrossValidationEstimator
@@ -163,6 +167,7 @@ identifier for each fold.
   - `path_ids::VecInt`: Path identifier for each fold.
 
 # Related
+
   - [`MultipleRandomised`](@ref)
 
   - [`MultipleRandomised`](@ref)

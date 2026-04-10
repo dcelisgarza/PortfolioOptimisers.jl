@@ -129,8 +129,8 @@ Fits a portfolio optimisation estimator on training data, scores it on test and 
 
   - [`SearchCrossValidationResult`](@ref)
   - [`expected_risk`](@ref)
-  - [`predict`]-(@ref)
-  - [`NonFiniteAllocationOptimisationEstimator`]-(@ref)
+  - [`predict`](@ref)
+  - [`NonFiniteAllocationOptimisationEstimator`](@ref)
 
 # Examples
 """

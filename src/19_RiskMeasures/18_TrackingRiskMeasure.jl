@@ -29,12 +29,17 @@ Keywords correspond to the struct's fields.
   - `err` is validated with [`assert_nonempty_nonneg_finite_val`](@ref).
 
 # Related
+
   - [`set_tracking_error_constraints!`](@ref)
 
   - [`TrackingRiskMeasure`](@ref)
+
   - [`RiskTrackingRiskMeasure`](@ref)
+
   - [`WeightsTracking`](@ref)
+
   - [`IndependentVariableTracking`](@ref)
+
   - [`DependentVariableTracking`](@ref)
 """
 @concrete struct RiskTrackingError <: AbstractTracking
@@ -188,8 +193,8 @@ Represents the Risk Tracking risk measure.
 
 `RiskTrackingRiskMeasure` computes the deviation of portfolio risk from a benchmark portfolio risk, using any base risk measure. Two modes are supported:
 
-- **Independent** (`IndependentVariableTracking`): computes the risk of the weight difference ``\\boldsymbol{w} - \\boldsymbol{w}_b``.
-- **Dependent** (`DependentVariableTracking`): computes the absolute difference between the portfolio risk and the benchmark risk.
+  - **Independent** (`IndependentVariableTracking`): computes the risk of the weight difference ``\\boldsymbol{w} - \\boldsymbol{w}_b``.
+  - **Dependent** (`DependentVariableTracking`): computes the absolute difference between the portfolio risk and the benchmark risk.
 
 # Mathematical Definition
 

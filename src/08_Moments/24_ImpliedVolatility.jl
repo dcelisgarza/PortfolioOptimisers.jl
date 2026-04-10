@@ -67,19 +67,6 @@ struct ImpliedVolatilityPremium <: ImpliedVolatilityAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Implied volatility algorithm that uses an implied volatility premium to scale the latest implied volatility.
-
-`ImpliedVolatilityPremium` predicts realised volatility by dividing the most recent row of the implied volatility matrix by a user-supplied implied volatility premium adjustment factor `ivpa`. This is a simple scaling approach that does not require regression.
-
-# Related
-
-  - [`ImpliedVolatilityAlgorithm`](@ref)
-  - [`ImpliedVolatilityRegression`](@ref)
-  - [`ImpliedVolatility`](@ref)
-"""
-"""
-$(DocStringExtensions.TYPEDEF)
-
 Covariance estimator based on implied volatility scaling.
 
 `ImpliedVolatility` computes a covariance matrix by combining a base correlation estimator with predicted realised volatilities derived from implied volatility data. It supports two algorithms: [`ImpliedVolatilityRegression`](@ref), which fits a regression model to predict realised volatility from implied volatility, and [`ImpliedVolatilityPremium`](@ref), which scales implied volatility by a user-supplied factor.

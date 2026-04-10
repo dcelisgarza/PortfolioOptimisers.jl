@@ -146,7 +146,7 @@ Performs grid search cross-validation for portfolio optimisation estimators. Ite
 
 # Related
 
-  - [`NonFiniteAllocationOptimisationEstimator`]-(@ref)
+  - [`NonFiniteAllocationOptimisationEstimator`](@ref)
   - [`RandomisedSearchCrossValidation`](@ref)
   - [`ReturnsResult`](@ref)
   - [`GridSearchCrossValidation`](@ref)

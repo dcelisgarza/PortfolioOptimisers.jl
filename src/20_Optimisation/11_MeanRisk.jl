@@ -86,21 +86,35 @@ MeanRisk
 ```
 
 # Related
+
   - [`scalarise_risk_expression!`](@ref)
+
   - [`set_risk_constraints!`](@ref)
+
   - [`ArithmeticReturn`](@ref)
+
   - [`LogarithmicReturn`](@ref)
+
   - [`MinimumRisk`](@ref)
+
   - [`MaximumUtility`](@ref)
+
   - [`MaximumRatio`](@ref)
+
   - [`MaximumReturn`](@ref)
+
   - [`BudgetRange`](@ref)
+
   - [`LpRegularisation`](@ref)
 
   - [`RiskJuMPOptimisationEstimator`](@ref)
+
   - [`JuMPOptimiser`](@ref)
+
   - [`MeanRiskResult`](@ref)
+
   - [`ObjectiveFunction`](@ref)
+
   - [`RiskMeasure`](@ref)
 """
 @concrete struct MeanRisk <: RiskJuMPOptimisationEstimator

@@ -325,21 +325,35 @@ Fees
 ```
 
 # Related
+
   - [`add_to_fees!`](@ref)
+
   - [`set_non_fixed_fees!`](@ref)
+
   - [`set_long_non_fixed_fees!`](@ref)
+
   - [`set_short_non_fixed_fees!`](@ref)
+
   - [`set_turnover_fees!`](@ref)
 
   - [`FeesEstimator`](@ref)
+
   - [`Option`](@ref)
+
   - [`Turnover`](@ref)
+
   - [`Num_VecNum`](@ref)
+
   - [`AbstractResult`](@ref)
+
   - [`assert_nonempty_nonneg_finite_val`](@ref)
+
   - [`fees_constraints`](@ref)
+
   - [`calc_fees`](@ref)
+
   - [`calc_asset_fees`](@ref)
+
   - [`calc_net_returns`](@ref)
 """
 @concrete struct Fees <: AbstractResult

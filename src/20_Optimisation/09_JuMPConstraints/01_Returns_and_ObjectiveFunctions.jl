@@ -22,10 +22,13 @@ on the portfolio return.
     ) -> ArithmeticReturn
 
 # Related
+
   - [`bounds_returns_estimator`](@ref)
+
   - [`LogarithmicReturn`](@ref)
 
   - [`LogarithmicReturn`](@ref)
+
   - [`JuMPReturnsEstimator`](@ref)
 """
 @concrete struct ArithmeticReturn <: JuMPReturnsEstimator
@@ -105,10 +108,13 @@ Optionally supports observation weights and a lower bound on the portfolio retur
     ) -> LogarithmicReturn
 
 # Related
+
   - [`bounds_returns_estimator`](@ref)
+
   - [`ArithmeticReturn`](@ref)
 
   - [`ArithmeticReturn`](@ref)
+
   - [`JuMPReturnsEstimator`](@ref)
 """
 @concrete struct LogarithmicReturn <: JuMPReturnsEstimator
@@ -261,27 +267,32 @@ function return_sharpe_alog_ret_constraints(port, type, obj::Sharpe, ::AKelly, :
     return nothing
 end
 =#
-"""
-    bounds_returns_estimator(r, lb::Number)
+for (i, r) in enumerate(traverse_concrete_subtypes(JuMPReturnsEstimator))
+    doc_str=if isone(i)
+        """
+            bounds_returns_estimator(r, lb::Number)
 
-Return a copy of returns estimator `r` with its lower bound set to `lb`.
+        Return a copy of returns estimator `r` with its lower bound set to `lb`.
 
-# Arguments
+        # Arguments
 
-  - `r`: Returns estimator.
-  - `lb::Number`: Lower bound on the portfolio return.
+          - `r`: Returns estimator.
+          - `lb::Number`: Lower bound on the portfolio return.
 
-# Returns
+        # Returns
 
-  - Returns estimator with updated lower bound.
+          - Returns estimator with updated lower bound.
 
-# Related
+        # Related
 
-  - [`ArithmeticReturn`](@ref)
-  - [`LogarithmicReturn`](@ref)
-"""
-for r in traverse_concrete_subtypes(JuMPReturnsEstimator)
+          - [`ArithmeticReturn`](@ref)
+          - [`LogarithmicReturn`](@ref)
+        """
+    else
+        nothing
+    end
     eval(quote
+             @doc $(doc_str)
              function bounds_returns_estimator(r::$(r), lb::Number)
                  pnames = Tuple(setdiff(propertynames(r), (:lb,)))
                  return if isempty(pnames)
@@ -298,13 +309,19 @@ $(DocStringExtensions.TYPEDEF)
 Objective function that minimises portfolio risk.
 
 # Related
+
   - [`MaximumUtility`](@ref)
+
   - [`MaximumRatio`](@ref)
+
   - [`MaximumReturn`](@ref)
 
   - [`MaximumUtility`](@ref)
+
   - [`MaximumRatio`](@ref)
+
   - [`MaximumReturn`](@ref)
+
   - [`ObjectiveFunction`](@ref)
 """
 struct MinimumRisk <: ObjectiveFunction end
@@ -328,12 +345,17 @@ where ``l`` is the risk-aversion coefficient and ``R`` is the portfolio risk.
     MaximumUtility(; l::Number = 2) -> MaximumUtility
 
 # Related
+
   - [`MinimumRisk`](@ref)
+
   - [`MaximumRatio`](@ref)
+
   - [`MaximumReturn`](@ref)
 
   - [`MinimumRisk`](@ref)
+
   - [`MaximumRatio`](@ref)
+
   - [`ObjectiveFunction`](@ref)
 """
 @concrete struct MaximumUtility <: ObjectiveFunction
@@ -368,13 +390,19 @@ where ``r_f`` is the risk-free rate and ``R`` is the portfolio risk.
     MaximumRatio(; rf::Number = 0.0, ohf::Option{<:Number} = nothing) -> MaximumRatio
 
 # Related
+
   - [`MinimumRisk`](@ref)
+
   - [`MaximumUtility`](@ref)
+
   - [`MaximumReturn`](@ref)
 
   - [`MinimumRisk`](@ref)
+
   - [`MaximumUtility`](@ref)
+
   - [`MaximumReturn`](@ref)
+
   - [`ObjectiveFunction`](@ref)
 """
 @concrete struct MaximumRatio <: ObjectiveFunction
@@ -396,13 +424,19 @@ $(DocStringExtensions.TYPEDEF)
 Objective function that maximises portfolio return ``\\boldsymbol{\\mu}^\\intercal \\boldsymbol{w}``.
 
 # Related
+
   - [`MinimumRisk`](@ref)
+
   - [`MaximumUtility`](@ref)
+
   - [`MaximumRatio`](@ref)
 
   - [`MinimumRisk`](@ref)
+
   - [`MaximumUtility`](@ref)
+
   - [`MaximumRatio`](@ref)
+
   - [`ObjectiveFunction`](@ref)
 """
 struct MaximumReturn <: ObjectiveFunction end

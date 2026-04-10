@@ -59,10 +59,10 @@ IndexWalkForward
 
 # Related
 
-  - [`WalkForwardEstimator`]-(@ref)
-  - [`WalkForwardResult`]-(@ref)
-  - [`split`]-(@ref)
-  - [`n_splits`]-(@ref)
+  - [`WalkForwardEstimator`](@ref)
+  - [`WalkForwardResult`](@ref)
+  - [`split`](@ref)
+  - [`n_splits`](@ref)
 """
 @concrete struct IndexWalkForward <: WalkForwardEstimator
     train_size
@@ -184,10 +184,10 @@ DateWalkForward
 
 # Related
 
-  - [`WalkForwardEstimator`]-(@ref)
-  - [`WalkForwardResult`]-(@ref)
-  - [`split`]-(@ref)
-  - [`n_splits`]-(@ref)
+  - [`WalkForwardEstimator`](@ref)
+  - [`WalkForwardResult`](@ref)
+  - [`split`](@ref)
+  - [`n_splits`](@ref)
 """
 @concrete struct DateWalkForward <: WalkForwardEstimator
     train_size

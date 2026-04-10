@@ -36,10 +36,10 @@ KFold
 
 # Related
 
-  - [`NonSequentialCrossValidationEstimator`]-(@ref)
-  - [`KFoldResult`]-(@ref)
-  - [`split`]-(@ref)
-  - [`n_splits`]-(@ref)
+  - [`NonSequentialCrossValidationEstimator`](@ref)
+  - [`KFoldResult`](@ref)
+  - [`split`](@ref)
+  - [`n_splits`](@ref)
 """
 @concrete struct KFold <: NonSequentialCrossValidationEstimator
     n

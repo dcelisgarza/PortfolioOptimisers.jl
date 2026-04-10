@@ -63,11 +63,15 @@ on the sum of weights. At least one of `lb` or `ub` must be provided.
   - `lb <= ub` when both are provided.
 
 # Related
+
   - [`BudgetCosts`](@ref)
+
   - [`BudgetMarketImpact`](@ref)
+
   - [`set_weight_constraints!`](@ref)
 
   - [`BudgetCosts`](@ref)
+
   - [`BudgetMarketImpact`](@ref)
 """
 @concrete struct BudgetRange <: BudgetEstimator
@@ -135,10 +139,13 @@ cost coefficients.
     ) -> BudgetCosts
 
 # Related
+
   - [`BudgetRange`](@ref)
+
   - [`BudgetMarketImpact`](@ref)
 
   - [`BudgetRange`](@ref)
+
   - [`BudgetMarketImpact`](@ref)
 """
 @concrete struct BudgetCosts <: BudgetCostEstimator
@@ -213,10 +220,13 @@ impact function.
   - `beta::Number`: Market impact exponent in `(0, 1]`.
 
 # Related
+
   - [`BudgetRange`](@ref)
+
   - [`BudgetCosts`](@ref)
 
   - [`BudgetRange`](@ref)
+
   - [`BudgetCosts`](@ref)
 """
 @concrete struct BudgetMarketImpact <: BudgetCostEstimator

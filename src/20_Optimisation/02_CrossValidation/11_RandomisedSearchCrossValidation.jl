@@ -74,7 +74,7 @@ RandomisedSearchCrossValidation
 
 # Related
 
-  - [`AbstractSearchCrossValidationEstimator`]-(@ref)
+  - [`AbstractSearchCrossValidationEstimator`](@ref)
   - [`GridSearchCrossValidation`](@ref)
   - [`SearchCrossValidationResult`](@ref)
   - [`CrossValSearchScorer`](@ref)
@@ -219,7 +219,7 @@ Performs randomised search cross-validation for portfolio optimisation estimator
 
 # Related
 
-  - [`NonFiniteAllocationOptimisationEstimator`]-(@ref)
+  - [`NonFiniteAllocationOptimisationEstimator`](@ref)
   - [`RandomisedSearchCrossValidation`](@ref)
   - [`ReturnsResult`](@ref)
   - [`GridSearchCrossValidation`](@ref)

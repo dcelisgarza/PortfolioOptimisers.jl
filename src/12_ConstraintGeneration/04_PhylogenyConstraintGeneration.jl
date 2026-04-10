@@ -143,12 +143,17 @@ SemiDefinitePhylogeny
 ```
 
 # Related
+
   - [`set_sdp_constraints!`](@ref)
+
   - [`set_sdp_frc_constraints!`](@ref)
+
   - [`set_sdp_phylogeny_constraints!`](@ref)
 
   - [`SemiDefinitePhylogenyEstimator`](@ref)
+
   - [`AbstractPhylogenyConstraintResult`](@ref)
+
   - [`phylogeny_constraints`](@ref)
 """
 @concrete struct SemiDefinitePhylogeny <: AbstractPhylogenyConstraintResult
@@ -376,11 +381,15 @@ IntegerPhylogeny
 ```
 
 # Related
+
   - [`set_iplg_constraints!`](@ref)
+
   - [`mip_constraints`](@ref)
 
   - [`IntegerPhylogenyEstimator`](@ref)
+
   - [`AbstractPhylogenyConstraintResult`](@ref)
+
   - [`phylogeny_constraints`](@ref)
 """
 @concrete struct IntegerPhylogeny <: AbstractPhylogenyConstraintResult

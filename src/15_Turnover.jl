@@ -336,16 +336,25 @@ Turnover
 ```
 
 # Related
+
   - [`set_turnover_constraints!`](@ref)
+
   - [`_set_turnover_constraints!`](@ref)
+
   - [`set_turnover_fees!`](@ref)
 
   - [`TurnoverEstimator`](@ref)
+
   - [`AbstractResult`](@ref)
+
   - [`VecNum`](@ref)
+
   - [`Num_VecNum`](@ref)
+
   - [`turnover_constraints`](@ref)
+
   - [`factory(tn::Turnover, w::VecNum)`](@ref)
+
   - [`turnover_view`](@ref)
 """
 @concrete struct Turnover <: AbstractResult

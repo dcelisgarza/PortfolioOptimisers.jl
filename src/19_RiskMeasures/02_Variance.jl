@@ -215,17 +215,27 @@ julia> r(w)
 ```
 
 # Related
+
   - [`set_variance_risk_constraints!`](@ref)
+
   - [`set_risk_constraints!`](@ref)
+
   - [`scalarise_risk_expression!`](@ref)
 
   - [`RiskMeasureSettings`](@ref)
+
   - [`VarianceFormulation`](@ref)
+
   - [`QuadRiskExpr`](@ref)
+
   - [`SquaredSOCRiskExpr`](@ref)
+
   - [`SOCRiskExpr`](@ref)
+
   - [`RSOCRiskExpr`](@ref)
+
   - [`factory(r::Variance, pr::AbstractPriorResult, args...; kwargs...)`](@ref)
+
   - [`expected_risk`](@ref)
 """
 @concrete struct Variance <: RiskMeasure

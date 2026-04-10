@@ -43,10 +43,10 @@ CombinatorialCrossValidation
 
 # Related
 
-  - [`NonSequentialCrossValidationEstimator`]-(@ref)
-  - [`CombinatorialCrossValidationResult`]-(@ref)
-  - [`split`]-(@ref)
-  - [`n_splits`]-(@ref)
+  - [`NonSequentialCrossValidationEstimator`](@ref)
+  - [`CombinatorialCrossValidationResult`](@ref)
+  - [`split`](@ref)
+  - [`n_splits`](@ref)
 """
 @concrete struct CombinatorialCrossValidation <: NonSequentialCrossValidationEstimator
     n_folds

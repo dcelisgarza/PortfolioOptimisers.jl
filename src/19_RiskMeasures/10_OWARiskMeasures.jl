@@ -239,7 +239,7 @@ The `MinimumSumSquares` algorithm can be configured to use different second-orde
 
 # Related
 
-  - [`SquaredOrderedWeightsArrayAlgorithm`]-(@ref)
+  - [`SquaredOrderedWeightsArrayAlgorithm`](@ref)
   - [`OWAJuMP`](@ref)
 
 # References
