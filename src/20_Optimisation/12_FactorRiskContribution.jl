@@ -149,6 +149,28 @@ function opt_view(frc::FactorRiskContribution, i, X::MatNum)
                                   frc_ple = frc.frc_ple, sets = frc.sets, wi = frc.wi,
                                   flag = frc.flag, fb = frc.fb)
 end
+"""
+    set_factor_risk_contribution_constraints!(model, re, ...)
+
+Add factor risk contribution constraints to the JuMP model.
+
+Sets up the factor-level risk budgeting constraints in the optimisation model, using the regression result or estimator `re` to specify factor loadings.
+
+# Arguments
+
+  - `model`: JuMP model.
+  - `re`: Regression result or estimator ([`RegE_Reg`](@ref)).
+  - Additional risk and budget parameters.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`FactorRiskContribution`](@ref)
+  - [`RegE_Reg`](@ref)
+"""
 function set_factor_risk_contribution_constraints!(model::JuMP.Model, re::RegE_Reg,
                                                    rd::ReturnsResult, flag::Bool,
                                                    wi::Option{<:VecNum})

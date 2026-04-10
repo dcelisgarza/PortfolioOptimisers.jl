@@ -1,3 +1,16 @@
+"""
+    const NonFRCJuMPOpt = Union{<:MeanRisk, <:NearOptimalCentering, <:RiskBudgeting}
+
+Alias for JuMP optimisers that do not use factor risk contribution.
+
+Matches [`MeanRisk`](@ref), [`NearOptimalCentering`](@ref), or [`RiskBudgeting`](@ref). Used for dispatch in risk constraint generation functions that apply to these optimiser types but not to factor risk contribution.
+
+# Related
+
+  - [`MeanRisk`](@ref)
+  - [`NearOptimalCentering`](@ref)
+  - [`RiskBudgeting`](@ref)
+"""
 const NonFRCJuMPOpt = Union{<:MeanRisk, <:NearOptimalCentering, <:RiskBudgeting}
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

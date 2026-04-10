@@ -78,6 +78,18 @@ All concrete and/or abstract types implementing specific algorithms for determin
   - [`AbstractOptimalNumberClustersEstimator`](@ref)
 """
 abstract type AbstractOptimalNumberClustersAlgorithm <: AbstractAlgorithm end
+"""
+    const Int_ONC = Union{<:Integer, <:AbstractOptimalNumberClustersAlgorithm}
+
+Alias for an integer or optimal number of clusters algorithm.
+
+Matches either a plain integer (specifying the number of clusters directly) or an [`AbstractOptimalNumberClustersAlgorithm`](@ref) (which determines the optimal number automatically).
+
+# Related
+
+  - [`AbstractOptimalNumberClustersAlgorithm`](@ref)
+  - [`OptimalNumberClusters`](@ref)
+"""
 const Int_ONC = Union{<:Integer, <:AbstractOptimalNumberClustersAlgorithm}
 """
 $(DocStringExtensions.TYPEDEF)
@@ -92,6 +104,18 @@ All concrete and/or abstract types representing the result of a clustering estim
   - [`AbstractClustersAlgorithm`](@ref)
 """
 abstract type AbstractClusteringResult <: AbstractPhylogenyResult end
+"""
+    const ClTypes = Union{<:Clustering.ClusteringResult, <:Clustering.Hclust}
+
+Alias for clustering result types from the Clustering.jl package.
+
+Matches either a `Clustering.ClusteringResult` or `Clustering.Hclust`. Used internally to accept output from the Clustering.jl library for both flat and hierarchical clustering results.
+
+# Related
+
+  - [`Clusters`](@ref)
+  - [`ClustersEstimator`](@ref)
+"""
 const ClTypes = Union{<:Clustering.ClusteringResult, <:Clustering.Hclust}
 """
 $(DocStringExtensions.TYPEDEF)
@@ -476,10 +500,38 @@ function factory(cle::ClustersEstimator, w::StatsBase.AbstractWeights)
     return ClustersEstimator(; ce = factory(cle.ce, w), de = cle.de, alg = cle.alg,
                              onc = cle.onc)
 end
+"""
+    const HClE_HCl = Union{<:ClustersEstimator{<:Any, <:Any,
+                                               <:AbstractHierarchicalClusteringAlgorithm,
+                                               <:Any},
+                           <:Clusters{<:Clustering.Hclust, <:Any, <:Any, <:Any}}
+
+Alias for a hierarchical clustering estimator or result.
+
+Matches either a [`ClustersEstimator`](@ref) parameterised with a hierarchical clustering algorithm, or a [`Clusters`](@ref) result wrapping a `Clustering.Hclust`. Used internally for dispatch in hierarchical clustering workflows.
+
+# Related
+
+  - [`ClustersEstimator`](@ref)
+  - [`AbstractHierarchicalClusteringAlgorithm`](@ref)
+  - [`Clusters`](@ref)
+"""
 const HClE_HCl = Union{<:ClustersEstimator{<:Any, <:Any,
                                            <:AbstractHierarchicalClusteringAlgorithm,
                                            <:Any},
                        <:Clusters{<:Clustering.Hclust, <:Any, <:Any, <:Any}}
+"""
+    const ClE_Cl = Union{<:AbstractClustersEstimator, <:AbstractClusteringResult}
+
+Alias for a clustering estimator or result.
+
+Matches either an [`AbstractClustersEstimator`](@ref) or an [`AbstractClusteringResult`](@ref). Used for dispatch in phylogeny and network estimation workflows that accept either form.
+
+# Related
+
+  - [`AbstractClustersEstimator`](@ref)
+  - [`AbstractClusteringResult`](@ref)
+"""
 const ClE_Cl = Union{<:AbstractClustersEstimator, <:AbstractClusteringResult}
 
 export Clusters, clusterise, SecondOrderDifference, SilhouetteScore, OptimalNumberClusters,

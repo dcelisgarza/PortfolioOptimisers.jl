@@ -112,9 +112,51 @@ end
 function calc_net_asset_returns(w::VecNum, X::MatNum, fees::Fees)
     return X ⊙ transpose(w) .- transpose(calc_asset_fees(w, fees))
 end
+"""
+    _relative_cumulative_returns(X; dims = 1)
+
+Compute the relative cumulative returns from a return matrix.
+
+Internal helper that computes cumulative returns as `cumprod(1 .+ X; dims=dims)`, returning the cumulative portfolio value relative to the starting value.
+
+# Arguments
+
+  - `X`: Return matrix.
+  - `dims`: Observation dimension (default `1`).
+
+# Returns
+
+  - Relative cumulative return matrix.
+
+# Related
+
+  - [`_absolute_cumulative_returns`](@ref)
+  - [`relative_drawdown_arr`](@ref)
+"""
 function _relative_cumulative_returns(X::ArrNum; dims::Int = 1)
     return cumprod(one(eltype(X)) .+ X; dims = dims)
 end
+"""
+    _absolute_cumulative_returns(X; dims = 1)
+
+Compute the absolute cumulative returns from a return matrix.
+
+Internal helper that computes `cumsum(X; dims=dims)`, returning the cumulative sum of portfolio returns.
+
+# Arguments
+
+  - `X`: Return matrix.
+  - `dims`: Observation dimension (default `1`).
+
+# Returns
+
+  - Cumulative return matrix.
+
+# Related
+
+  - [`_relative_cumulative_returns`](@ref)
+  - [`absolute_drawdown_arr`](@ref)
+"""
 function _absolute_cumulative_returns(X::ArrNum; dims::Int = 1)
     return cumsum(X; dims = dims)
 end
@@ -213,6 +255,29 @@ function absolute_drawdown_arr(X::ArrNum; cX::Bool = false, dims::Int = 1)
     cX = !cX ? _absolute_cumulative_returns(X; dims = dims) : X
     return cX - accumulate(max, cX; dims = dims, init = zero(eltype(X)))
 end
+"""
+    relative_drawdown_arr(X::ArrNum; cX::Bool = false, dims::Int = 1) -> ArrNum
+
+Compute the relative drawdown array for a matrix of cumulative (or raw) compounded returns.
+
+Each element represents the relative drawdown from the running peak along the specified dimension.
+
+# Arguments
+
+  - `X::ArrNum`: Returns array (or cumulative-returns array if `cX = true`).
+  - `cX::Bool = false`: If `true`, treat `X` as already cumulative compounded returns.
+  - `dims::Int = 1`: Dimension along which to compute drawdowns.
+
+# Returns
+
+  - `ArrNum`: Relative drawdown array of the same shape as `X`.
+
+# Related
+
+  - [`absolute_drawdown_arr`](@ref)
+  - [`drawdowns`](@ref)
+  - [`cumulative_returns`](@ref)
+"""
 function relative_drawdown_arr(X::ArrNum; cX::Bool = false, dims::Int = 1)
     cX = !cX ? _relative_cumulative_returns(X; dims = dims) : X
     return cX ./ accumulate(max, cX; dims = dims, init = one(eltype(X))) .- one(eltype(X))

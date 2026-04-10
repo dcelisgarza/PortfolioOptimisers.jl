@@ -280,6 +280,19 @@ function PredictionReturnsResult(; nx::Option{<:VecStr} = nothing,
                                  ivpa::Option{<:Num_VecNum} = nothing)
     return PredictionReturnsResult(nx, X, nf, F, nb, B, ts, iv, ivpa)
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for all prediction result types in `PortfolioOptimisers.jl`.
+
+All concrete prediction result types from cross-validation should subtype `AbstractPredictionResult`.
+
+# Related
+
+  - [`PredictionResult`](@ref)
+  - [`MultiPeriodPredictionResult`](@ref)
+  - [`PopulationPredictionResult`](@ref)
+"""
 abstract type AbstractPredictionResult <: AbstractResult end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -314,8 +327,49 @@ function PredictionResult(; res::NonFiniteAllocationOptimisationResult,
                           rd::PredictionReturnsResult)
     return PredictionResult(res, rd)
 end
+"""
+    const VecPredRes = AbstractVector{<:PredictionResult}
+
+Alias for a vector of single-fold prediction results.
+
+Represents a collection of [`PredictionResult`](@ref) objects from cross-validation folds.
+
+# Related
+
+  - [`PredictionResult`](@ref)
+  - [`VecVecPredRes`](@ref)
+"""
 const VecPredRes = AbstractVector{<:PredictionResult}
+"""
+    const VecVecPredRes = AbstractVector{<:VecPredRes}
+
+Alias for a vector of vectors of prediction results.
+
+Represents the outer collection of cross-validation paths, where each inner vector contains prediction results from a single path.
+
+# Related
+
+  - [`VecPredRes`](@ref)
+  - [`CombinatorialCrossValidation`](@ref)
+"""
 const VecVecPredRes = AbstractVector{<:VecPredRes}
+"""
+    _prediction_expected_risk(r, X; kwargs...)
+
+Compute the expected risk for a prediction result's returns.
+
+Internal helper that dispatches on whether `X` is a plain vector or a vector of vectors.
+
+# Arguments
+
+  - `r`: Risk measure.
+  - `X`: Returns vector or vector of vectors.
+  - `kwargs...`: Additional keyword arguments passed to [`expected_risk`](@ref).
+
+# Returns
+
+  - Expected risk value(s).
+"""
 function _prediction_expected_risk(r::AbstractBaseRiskMeasure, X::VecNum; kwargs...)
     return expected_risk(r, SingletonVector{Int}(), reshape(X, :, 1); kwargs...)
 end
@@ -326,6 +380,22 @@ end
 function expected_risk(r::AbstractBaseRiskMeasure, pred::PredictionResult; kwargs...)
     return _prediction_expected_risk(r, pred.rd.X, kwargs...)
 end
+"""
+    mapreduce_RetMtx(rd, sym = :X)
+
+Concatenate return matrices from a vector of `PredictionReturnsResult` objects.
+
+Internal helper that vertically concatenates the field `sym` across all elements of `rd`. Handles both single-asset (vector) and multi-asset (vector of vectors) return data.
+
+# Arguments
+
+  - `rd`: Vector of [`PredictionReturnsResult`](@ref) objects.
+  - `sym`: Symbol of the field to extract (default `:X`).
+
+# Returns
+
+  - Concatenated return matrix or vector of vectors.
+"""
 function mapreduce_RetMtx(rd::AbstractVector{<:PredictionReturnsResult{<:Any, <:VecNum}},
                           sym = :X)
     return mapreduce(x -> getproperty(x, sym), vcat, rd)
@@ -387,6 +457,18 @@ function MultiPeriodPredictionResult(;
                                      id::Any = nothing)
     return MultiPeriodPredictionResult(pred, id)
 end
+"""
+    const VecMPredRes = AbstractVector{<:MultiPeriodPredictionResult}
+
+Alias for a vector of multi-period prediction results.
+
+Represents a collection of [`MultiPeriodPredictionResult`](@ref) objects.
+
+# Related
+
+  - [`MultiPeriodPredictionResult`](@ref)
+  - [`PredRes_MultiPredRes`](@ref)
+"""
 const VecMPredRes = AbstractVector{<:MultiPeriodPredictionResult}
 function Base.getproperty(mpred::MultiPeriodPredictionResult, sym::Symbol)
     return if sym == :res
@@ -402,7 +484,31 @@ function expected_risk(r::AbstractBaseRiskMeasure, mpred::MultiPeriodPredictionR
     X = mpred.mrd.X
     return _prediction_expected_risk(r, X; kwargs...)
 end
+"""
+    const PredRes_MultiPredRes = Union{<:PredictionResult, <:MultiPeriodPredictionResult}
+
+Alias for a single-fold or multi-period prediction result.
+
+Matches either a [`PredictionResult`](@ref) or a [`MultiPeriodPredictionResult`](@ref).
+
+# Related
+
+  - [`PredictionResult`](@ref)
+  - [`MultiPeriodPredictionResult`](@ref)
+  - [`VecPredRes_MultiPredRes`](@ref)
+"""
 const PredRes_MultiPredRes = Union{<:PredictionResult, <:MultiPeriodPredictionResult}
+"""
+    const VecPredRes_MultiPredRes = AbstractVector{<:PredRes_MultiPredRes}
+
+Alias for a vector of single-fold or multi-period prediction results.
+
+Represents a collection of [`PredRes_MultiPredRes`](@ref) elements.
+
+# Related
+
+  - [`PredRes_MultiPredRes`](@ref)
+"""
 const VecPredRes_MultiPredRes = AbstractVector{<:PredRes_MultiPredRes}
 """
 $(DocStringExtensions.TYPEDEF)

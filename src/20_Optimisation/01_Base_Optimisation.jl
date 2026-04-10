@@ -12,6 +12,17 @@ All optimisers and optimisation components should subtype `AbstractOptimisationE
   - [`NonFiniteAllocationOptimisationEstimator`](@ref)
 """
 abstract type AbstractOptimisationEstimator <: AbstractEstimator end
+"""
+    const VecOptE = AbstractVector{<:AbstractOptimisationEstimator}
+
+Alias for a vector of portfolio optimisation estimators.
+
+Represents a collection of [`AbstractOptimisationEstimator`](@ref) objects, used for dispatch in routines that process multiple optimisers simultaneously.
+
+# Related
+
+  - [`AbstractOptimisationEstimator`](@ref)
+"""
 const VecOptE = AbstractVector{<:AbstractOptimisationEstimator}
 """
 $(DocStringExtensions.TYPEDEF)
@@ -87,6 +98,18 @@ Abstract supertype for continuous (non-integer allocation) optimisation results.
   - [`MeanRiskResult`](@ref)
 """
 abstract type NonFiniteAllocationOptimisationResult <: OptimisationResult end
+"""
+    const VecOpt = AbstractVector{<:NonFiniteAllocationOptimisationResult}
+
+Alias for a vector of non-finite allocation optimisation results.
+
+Represents a collection of [`NonFiniteAllocationOptimisationResult`](@ref) objects.
+
+# Related
+
+  - [`NonFiniteAllocationOptimisationResult`](@ref)
+  - [`OptE_Opt`](@ref)
+"""
 const VecOpt = AbstractVector{<:NonFiniteAllocationOptimisationResult}
 """
 $(DocStringExtensions.TYPEDEF)
@@ -111,6 +134,20 @@ Abstract supertype for intermediate optimisation model results.
   - [`OptimisationResult`](@ref)
 """
 abstract type OptimisationModelResult <: AbstractResult end
+"""
+    const OptE_Opt = Union{<:NonFiniteAllocationOptimisationEstimator,
+                           <:NonFiniteAllocationOptimisationResult}
+
+Alias for a non-finite allocation optimisation estimator or result.
+
+Matches either a [`NonFiniteAllocationOptimisationEstimator`](@ref) (specifying an optimiser configuration) or a [`NonFiniteAllocationOptimisationResult`](@ref) (a pre-computed result). Used for dispatch in cross-validation and optimisation workflows that accept either form.
+
+# Related
+
+  - [`NonFiniteAllocationOptimisationEstimator`](@ref)
+  - [`NonFiniteAllocationOptimisationResult`](@ref)
+  - [`VecOptE_Opt`](@ref)
+"""
 const OptE_Opt = Union{<:NonFiniteAllocationOptimisationEstimator,
                        <:NonFiniteAllocationOptimisationResult}
 function assert_special_nco_requirements(::OptE_Opt)
@@ -130,6 +167,17 @@ function update_time_dependent_estimator(opt::OptE_Opt, args...)
     return opt
 end
 #! End: Overload these for all estimators which can use time-dependent constraints.
+"""
+    const VecOptE_Opt = AbstractVector{<:OptE_Opt}
+
+Alias for a vector of optimisation estimators or results.
+
+Represents a collection of [`OptE_Opt`](@ref) objects for batch processing.
+
+# Related
+
+  - [`OptE_Opt`](@ref)
+"""
 const VecOptE_Opt = AbstractVector{<:OptE_Opt}
 function factory(opt::VecOptE_Opt, args...)
     return [factory(opti, args...) for opti in opt]
@@ -300,6 +348,26 @@ function JuMPWeightFinaliser(; slv::Slv_VecSlv, sc::Number = 1.0, so::Number = 1
                              alg::JuMPWeightFinaliserFormulation = RelativeErrorWeightFinaliser())
     return JuMPWeightFinaliser(slv, sc, so, alg)
 end
+"""
+    set_clustering_weight_finaliser_alg!(model, ...)
+
+Set the clustering weight finalisation algorithm on the JuMP model.
+
+Configures how cluster-level weights are finalised in the hierarchical optimisation model, applying the specified weight finaliser.
+
+# Arguments
+
+  - `model`: JuMP model.
+  - Additional clustering and finaliser parameters.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`ClusteringOptimisationEstimator`](@ref)
+"""
 function set_clustering_weight_finaliser_alg!(model::JuMP.Model,
                                               ::RelativeErrorWeightFinaliser, wi::VecNum)
     wi[iszero.(wi)] .= eps(eltype(wi))
@@ -348,6 +416,29 @@ function set_clustering_weight_finaliser_alg!(model::JuMP.Model,
     JuMP.@objective(model, Min, so * t)
     return nothing
 end
+"""
+    opt_weight_bounds(wf, wb, w)
+
+Compute optimised weight bounds from the finaliser, bounds, and current weights.
+
+Adjusts the weight bounds based on the weight finaliser algorithm and the current weight allocation, used in hierarchical weight allocation.
+
+# Arguments
+
+  - `wf`: Weight finaliser algorithm.
+  - `wb`: Weight bounds.
+  - `w`: Current portfolio weights.
+
+# Returns
+
+  - Updated weight bounds.
+
+# Related
+
+  - [`WeightBounds`](@ref)
+  - [`JuMPWeightFinaliser`](@ref)
+  - [`IterativeWeightFinaliser`](@ref)
+"""
 function opt_weight_bounds(wf::JuMPWeightFinaliser, wb::WeightBounds, wi::VecNum)
     lb = wb.lb
     ub = wb.ub

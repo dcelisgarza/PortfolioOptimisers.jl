@@ -30,6 +30,25 @@ Used internally to pass processed constraints, bounds, and other data between op
     plr
     ret
 end
+"""
+    assert_finite_nonnegative_real_or_vec(val)
+
+Assert that a value is a finite, non-negative real number or vector of such.
+
+Throws an `ArgCheck` error if `val` contains non-finite or negative elements.
+
+# Arguments
+
+  - `val`: Scalar or vector to validate.
+
+# Returns
+
+  - `nothing` on success.
+
+# Related
+
+  - [`JuMPOptimiser`](@ref)
+"""
 function assert_finite_nonnegative_real_or_vec(val::Number)
     @argcheck(isfinite(val))
     @argcheck(val > zero(val))
@@ -476,6 +495,28 @@ function opt_view(opt::JuMPOptimiser, i, X::MatNum)
                          lp = opt.lp, brt = opt.brt, cle_pr = opt.cle_pr,
                          strict = opt.strict)
 end
+"""
+    processed_jump_optimiser_attributes(opt, rd; kwargs...)
+
+Compute and process all optimiser attributes from a JuMP optimiser and returns data.
+
+Internal function that applies the `factory` transform and resolves view slices for all estimator fields of `opt` given the returns data `rd`.
+
+# Arguments
+
+  - `opt`: [`JuMPOptimiser`](@ref) configuration.
+  - `rd`: [`ReturnsResult`](@ref) data.
+  - `kwargs...`: Additional keyword arguments.
+
+# Returns
+
+  - Named tuple of processed attributes.
+
+# Related
+
+  - [`JuMPOptimiser`](@ref)
+  - [`processed_jump_optimiser`](@ref)
+"""
 function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResult;
                                              dims::Int = 1)
     rd = returns_result_picker(rd, opt.brt)
@@ -524,11 +565,54 @@ function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResu
                                             smtx, sgmtx, slt, sst, sglt, sgst, tn, fees,
                                             plr, ret)
 end
+"""
+    no_bounds_optimiser(opt, args...)
+
+Create a version of the JuMP optimiser with bounds removed for unbounded sub-problems.
+
+Internal helper used in risk frontier construction sub-problems. Strips weight and risk bounds from `opt` so the sub-problem is unconstrained.
+
+# Arguments
+
+  - `opt`: [`JuMPOptimiser`](@ref) configuration.
+  - `args...`: Additional arguments.
+
+# Returns
+
+  - [`JuMPOptimiser`](@ref) without bounds.
+
+# Related
+
+  - [`no_bounds_returns_estimator`](@ref)
+  - [`JuMPOptimiser`](@ref)
+"""
 function no_bounds_optimiser(opt::JuMPOptimiser, args...)
     pnames = Tuple(setdiff(propertynames(opt), (:ret,)))
     return JuMPOptimiser(; ret = no_bounds_returns_estimator(opt.ret, args...),
                          NamedTuple{pnames}(getproperty.(opt, pnames))...)
 end
+"""
+    processed_jump_optimiser(opt, rd; dims = 1)
+
+Build a fully processed `JuMPOptimiser` from raw configuration and returns data.
+
+Applies all factories and view slices, returning an updated `JuMPOptimiser` ready for solving.
+
+# Arguments
+
+  - `opt`: [`JuMPOptimiser`](@ref) configuration.
+  - `rd`: [`ReturnsResult`](@ref) data.
+  - `dims`: Observation dimension.
+
+# Returns
+
+  - Processed [`JuMPOptimiser`](@ref).
+
+# Related
+
+  - [`JuMPOptimiser`](@ref)
+  - [`processed_jump_optimiser_attributes`](@ref)
+"""
 function processed_jump_optimiser(opt::JuMPOptimiser, rd::ReturnsResult; dims::Int = 1)
     (; pr, wb, lt, st, lcsr, ctr, gcardr, sgcardr, smtx, sgmtx, slt, sst, sglt, sgst, tn, fees, plr, ret) = processed_jump_optimiser_attributes(opt,
                                                                                                                                                 rd;

@@ -54,6 +54,27 @@ function block_vec_pq(A::MatNum, p::Integer, q::Integer)
     end
     return A_vec
 end
+"""
+    duplication_matrix(n::Int, diag::Bool = true)
+
+Construct the duplication matrix for a symmetric matrix of size `n × n`.
+
+The duplication matrix `D` maps the vech (half-vectorisation) of a symmetric matrix to its full vec. Used internally in coskewness and cokurtosis computation.
+
+# Arguments
+
+  - `n`: Size of the symmetric matrix.
+  - `diag`: Whether to include the diagonal elements.
+
+# Returns
+
+  - Sparse duplication matrix.
+
+# Related
+
+  - [`elimination_matrix`](@ref)
+  - [`summation_matrix`](@ref)
+"""
 # COV_EXCL_START
 function duplication_matrix(n::Int, diag::Bool = true)
     m = div(n * (n + 1), 2)
@@ -111,6 +132,27 @@ function duplication_matrix(n::Int, diag::Bool = true)
         SparseArrays.sparse(filtered_rows, filtered_cols, 1, nsq, m)
     end
 end
+"""
+    elimination_matrix(n::Int, diag::Bool = true)
+
+Construct the elimination matrix for a symmetric matrix of size `n × n`.
+
+The elimination matrix `L` extracts the unique (lower triangular) elements of a symmetric matrix. Used internally in coskewness and cokurtosis computation.
+
+# Arguments
+
+  - `n`: Size of the symmetric matrix.
+  - `diag`: Whether to include the diagonal elements.
+
+# Returns
+
+  - Sparse elimination matrix.
+
+# Related
+
+  - [`duplication_matrix`](@ref)
+  - [`summation_matrix`](@ref)
+"""
 function elimination_matrix(n::Int, diag::Bool = true)
     nsq = n^2
     r = 1
@@ -138,6 +180,27 @@ function elimination_matrix(n::Int, diag::Bool = true)
 
     return SparseArrays.sparse(1:m, v, 1, m, nsq)
 end
+"""
+    summation_matrix(n::Int, diag::Bool = true)
+
+Construct the summation matrix for a symmetric matrix of size `n × n`.
+
+The summation matrix `S` adds up contributions from both triangular halves of a symmetric matrix. Used internally in coskewness and cokurtosis computation.
+
+# Arguments
+
+  - `n`: Size of the symmetric matrix.
+  - `diag`: Whether to include the diagonal elements.
+
+# Returns
+
+  - Sparse summation matrix.
+
+# Related
+
+  - [`duplication_matrix`](@ref)
+  - [`elimination_matrix`](@ref)
+"""
 function summation_matrix(n::Int, diag::Bool = true)
     nsq = n^2
     r = 0
@@ -277,6 +340,27 @@ function dup_elim_sum_matrices(n::Int)
 
     return d, l, s
 end
+"""
+    dup_elim_sum_view(args...)
+
+Get a view of the duplication, elimination, and summation matrices for a given dimension.
+
+Internal helper used in high-order moment estimation. Returns the precomputed matrices for the given size, or computes them on demand.
+
+# Arguments
+
+  - `args...`: Matrix and dimension arguments.
+
+# Returns
+
+  - Tuple of (duplication, elimination, summation) matrices.
+
+# Related
+
+  - [`duplication_matrix`](@ref)
+  - [`elimination_matrix`](@ref)
+  - [`summation_matrix`](@ref)
+"""
 function dup_elim_sum_view(args...)
     return nothing, nothing, nothing
 end

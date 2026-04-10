@@ -410,6 +410,30 @@ Objective function that maximises portfolio return ``\\boldsymbol{\\mu}^\\interc
   - [`ObjectiveFunction`](@ref)
 """
 struct MaximumReturn <: ObjectiveFunction end
+"""
+    set_maximum_ratio_factor_variables!(model, mu, obj)
+    set_maximum_ratio_factor_variables!(model, args...)
+
+Set factor variables for the maximum ratio objective in the JuMP model.
+
+Configures the normalisation factor (`ohf`) and the homogenisation variable (`k`) required for the maximum Sharpe or similar ratio objectives. The no-op overload sets `k` to `1` for non-ratio objectives.
+
+# Arguments
+
+  - `model`: JuMP optimisation model.
+  - `mu`: Expected return vector or scalar.
+  - `obj`: Objective function (e.g., [`MaximumRatio`](@ref)).
+  - `args...`: Arguments (ignored in the fallback overload).
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`MaximumRatio`](@ref)
+  - [`ObjectiveFunction`](@ref)
+"""
 function set_maximum_ratio_factor_variables!(model::JuMP.Model, mu::Num_VecNum,
                                              obj::MaximumRatio)
     ohf = if isnothing(obj.ohf)
@@ -440,6 +464,30 @@ function set_return_bounds!(model::JuMP.Model, lb::Front_NumVec)
     JuMP.@expression(model, ret_frontier, lb)
     return nothing
 end
+"""
+    set_max_ratio_return_constraints!(args...)
+    set_max_ratio_return_constraints!(model, obj, mu)
+
+Set maximum ratio return constraints in the JuMP model.
+
+Various overloads handle different optimiser types (e.g., [`MaximumRatio`](@ref) objective). No-op fallback when not applicable.
+
+# Arguments
+
+  - `args...`: JuMP model and optimiser parameters (ignored in no-op fallback).
+  - `model`: JuMP optimisation model.
+  - `obj`: Objective function.
+  - `mu`: Expected return vector or scalar.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`set_max_ratio_log_return_constraints!`](@ref)
+  - [`MaximumRatio`](@ref)
+"""
 function set_max_ratio_return_constraints!(args...)
     return nothing
 end
@@ -528,6 +576,28 @@ function set_return_constraints!(model::JuMP.Model,
     set_return_bounds!(model, lb)
     return nothing
 end
+"""
+    set_max_ratio_log_return_constraints!(args...)
+    set_max_ratio_log_return_constraints!(model, ::MaximumRatio)
+
+Set maximum ratio log-return constraints in the JuMP model.
+
+Various overloads handle different optimiser types with logarithmic return objectives. No-op fallback when not applicable.
+
+# Arguments
+
+  - `args...`: Arguments (ignored in no-op fallback).
+  - `model`: JuMP optimisation model.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`set_max_ratio_return_constraints!`](@ref)
+  - [`MaximumRatio`](@ref)
+"""
 function set_max_ratio_log_return_constraints!(args...)
     return nothing
 end

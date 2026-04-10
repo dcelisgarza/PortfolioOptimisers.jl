@@ -113,6 +113,29 @@ function DiscreteAllocation(; slv::Slv_VecSlv, sc::Number = 1, so::Number = 1,
                             fb::Option{<:FOptE_FOpt} = GreedyAllocation())
     return DiscreteAllocation(slv, sc, so, wf, fb)
 end
+"""
+    set_discrete_error!(model, w, p, cash, ...)
+
+Add discrete allocation error constraints to the JuMP model.
+
+Sets up the tracking error objective between target weights and the discrete allocation, subject to available cash and price constraints.
+
+# Arguments
+
+  - `model`: JuMP model.
+  - `w`: Target portfolio weights.
+  - `p`: Asset prices.
+  - `cash`: Cash budget.
+  - Additional parameters.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`finite_sub_allocation`](@ref)
+"""
 function set_discrete_error!(model::JuMP.Model, w::VecNum, p::VecNum, cash::Number,
                              ::RelativeErrorWeightFinaliser)
     mask = iszero.(w)
@@ -167,6 +190,30 @@ function set_discrete_error!(model::JuMP.Model, w::VecNum, p::VecNum, cash::Numb
                       sc * (w * cash - x .* p)] in JuMP.SecondOrderCone())
     return nothing
 end
+"""
+    finite_sub_allocation(w, p, cash, bgt, ...)
+
+Compute the finite (integer) allocation for one side (long or short) of the portfolio.
+
+Solves a discrete allocation sub-problem using the given weights, prices, and cash budget.
+
+# Arguments
+
+  - `w`: Target portfolio weights.
+  - `p`: Asset prices.
+  - `cash`: Cash available for this side.
+  - `bgt`: Budget target.
+  - Additional parameters for solver configuration.
+
+# Returns
+
+  - Allocation vector (number of units per asset) or similar.
+
+# Related
+
+  - [`setup_alloc_optim`](@ref)
+  - [`adjust_long_cash`](@ref)
+"""
 function finite_sub_allocation(w::VecNum, p::VecNum, cash::Number, bgt::Number,
                                da::DiscreteAllocation, str_names::Bool = false)
     if isempty(w)

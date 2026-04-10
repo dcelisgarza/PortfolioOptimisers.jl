@@ -543,6 +543,19 @@ All concrete and/or abstract types implementing specific MST algorithms (e.g., K
   - [`PrimTree`](@ref)
 """
 abstract type AbstractTreeType <: AbstractPhylogenyAlgorithm end
+"""
+    const Tree_SimMat = Union{<:AbstractSimilarityMatrixAlgorithm, <:AbstractTreeType}
+
+Alias for a tree or similarity matrix algorithm.
+
+Matches either an [`AbstractSimilarityMatrixAlgorithm`](@ref) or an [`AbstractTreeType`](@ref). Used for dispatch in phylogeny estimation where either a spanning tree or a similarity matrix approach may be used.
+
+# Related
+
+  - [`AbstractSimilarityMatrixAlgorithm`](@ref)
+  - [`AbstractTreeType`](@ref)
+  - [`NetworkEstimator`](@ref)
+"""
 const Tree_SimMat = Union{<:AbstractSimilarityMatrixAlgorithm, <:AbstractTreeType}
 """
 $(DocStringExtensions.TYPEDEF)
@@ -731,9 +744,48 @@ All concrete and/or abstract types implementing network-based estimation algorit
   - [`AbstractCentralityEstimator`](@ref)
 """
 abstract type AbstractNetworkEstimator <: AbstractPhylogenyEstimator end
+"""
+    const NwE_Pl_ClE_Cl = Union{<:AbstractNetworkEstimator, <:PhylogenyResult, <:ClE_Cl}
+
+Alias for a network estimator, phylogeny result, or clustering estimator/result.
+
+Used internally for dispatch in phylogeny and network estimation workflows that accept any of these forms.
+
+# Related
+
+  - [`AbstractNetworkEstimator`](@ref)
+  - [`PhylogenyResult`](@ref)
+  - [`ClE_Cl`](@ref)
+"""
 const NwE_Pl_ClE_Cl = Union{<:AbstractNetworkEstimator, <:PhylogenyResult, <:ClE_Cl}
+"""
+    const NwE_PlM_ClE_Cl = Union{<:AbstractNetworkEstimator,
+                                 <:PhylogenyResult{<:AbstractMatrix}, <:ClE_Cl}
+
+Alias for a network estimator, matrix-phylogeny result, or clustering estimator/result.
+
+Similar to [`NwE_Pl_ClE_Cl`](@ref) but restricts `PhylogenyResult` to those wrapping an `AbstractMatrix`.
+
+# Related
+
+  - [`AbstractNetworkEstimator`](@ref)
+  - [`PhylogenyResult`](@ref)
+  - [`ClE_Cl`](@ref)
+"""
 const NwE_PlM_ClE_Cl = Union{<:AbstractNetworkEstimator,
                              <:PhylogenyResult{<:AbstractMatrix}, <:ClE_Cl}
+"""
+    const NwE_ClE_Cl = Union{<:AbstractNetworkEstimator, <:ClE_Cl}
+
+Alias for a network estimator or clustering estimator/result.
+
+Used for dispatch in phylogeny workflows that accept either a network estimator or a clustering estimator/result.
+
+# Related
+
+  - [`AbstractNetworkEstimator`](@ref)
+  - [`ClE_Cl`](@ref)
+"""
 const NwE_ClE_Cl = Union{<:AbstractNetworkEstimator, <:ClE_Cl}
 """
 $(DocStringExtensions.TYPEDEF)

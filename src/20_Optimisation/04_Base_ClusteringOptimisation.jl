@@ -181,6 +181,28 @@ function opt_view(hco::HierarchicalOptimiser, i)
                                  fees = fees, wf = hco.wf, sets = sets, brt = hco.brt,
                                  cle_pr = hco.cle_pr, strict = hco.strict)
 end
+"""
+    unitary_expected_risks(r, X, ...)
+
+Compute the expected risk for unitary (equal-weight) portfolios within each cluster.
+
+Returns a vector of risk values, one per cluster, where each risk is computed for the equal-weight portfolio within that cluster.
+
+# Arguments
+
+  - `r`: Risk measure.
+  - `X`: Asset return matrix.
+  - Additional cluster and weight parameters.
+
+# Returns
+
+  - Vector of expected risk values per cluster.
+
+# Related
+
+  - [`unitary_expected_risks!`](@ref)
+  - [`HierarchicalEqualRiskContribution`](@ref)
+"""
 function unitary_expected_risks(r::OptimisationRiskMeasure, X::MatNum,
                                 fees::Option{<:Fees} = nothing)
     wk = zeros(eltype(X), size(X, 2))
@@ -192,6 +214,29 @@ function unitary_expected_risks(r::OptimisationRiskMeasure, X::MatNum,
     end
     return rk
 end
+"""
+    unitary_expected_risks!(wk, rk, r, ...)
+
+Compute and store the expected risk for each cluster's unitary portfolio in-place.
+
+Fills `rk` with the expected risk for the equal-weight portfolio within each cluster, and `wk` with the corresponding weights.
+
+# Arguments
+
+  - `wk`: Output weight vector (in-place).
+  - `rk`: Output risk vector (in-place).
+  - `r`: Risk measure.
+  - Additional cluster and weight parameters.
+
+# Returns
+
+  - `nothing` (fills `wk` and `rk` in-place).
+
+# Related
+
+  - [`unitary_expected_risks`](@ref)
+  - [`HierarchicalEqualRiskContribution`](@ref)
+"""
 function unitary_expected_risks!(wk::VecNum, rk::VecNum, r::OptimisationRiskMeasure,
                                  X::MatNum, fees::Option{<:Fees} = nothing)
     fill!(rk, zero(eltype(X)))

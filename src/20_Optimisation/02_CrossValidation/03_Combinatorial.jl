@@ -111,6 +111,19 @@ function CombinatorialCrossValidationResult(; train_idx::VecVecInt, test_idx::Ve
                                             path_ids::AbstractMatrix{<:Integer})
     return CombinatorialCrossValidationResult(train_idx, test_idx, path_ids)
 end
+"""
+    const CombCVER = Union{<:CombinatorialCrossValidation,
+                           <:CombinatorialCrossValidationResult}
+
+Alias for a combinatorial cross-validation estimator or result.
+
+Matches either a [`CombinatorialCrossValidation`](@ref) estimator or a [`CombinatorialCrossValidationResult`](@ref).
+
+# Related
+
+  - [`CombinatorialCrossValidation`](@ref)
+  - [`CombinatorialCrossValidationResult`](@ref)
+"""
 const CombCVER = Union{<:CombinatorialCrossValidation, <:CombinatorialCrossValidationResult}
 function n_splits(n_folds::Integer, n_test_folds::Integer)
     return binomial(n_folds, n_test_folds)
@@ -118,12 +131,52 @@ end
 function n_splits(ccv::CombinatorialCrossValidation)
     return n_splits(ccv.n_folds, ccv.n_test_folds)
 end
+"""
+    n_test_paths(n_folds, n_test_folds)
+
+Compute the number of test paths in combinatorial cross-validation.
+
+Returns the number of unique recombined test paths from `n_folds` folds choosing `n_test_folds` test folds. Also accepts a `CombinatorialCrossValidation` object directly.
+
+# Arguments
+
+  - `n_folds`: Total number of folds.
+  - `n_test_folds`: Number of test folds per combination.
+
+# Returns
+
+  - Integer number of test paths.
+
+# Related
+
+  - [`CombinatorialCrossValidation`](@ref)
+  - [`recombined_paths`](@ref)
+"""
 function n_test_paths(n_folds::Integer, n_test_folds::Integer)
     return div(n_splits(n_folds, n_test_folds) * n_test_folds, n_folds)
 end
 function n_test_paths(ccv::CombinatorialCrossValidation)
     return div(n_splits(ccv) * ccv.n_test_folds, ccv.n_folds)
 end
+"""
+    average_train_size(T, n_folds, n_test_folds)
+
+Compute the average training set size for combinatorial cross-validation.
+
+# Arguments
+
+  - `T`: Total number of observations.
+  - `n_folds`: Total number of folds.
+  - `n_test_folds`: Number of test folds per combination.
+
+# Returns
+
+  - Average number of training observations per fold.
+
+# Related
+
+  - [`CombinatorialCrossValidation`](@ref)
+"""
 function average_train_size(T::Integer, n_folds::Integer, n_test_folds::Integer)
     return T / n_folds * (n_folds - n_test_folds)
 end
@@ -132,9 +185,49 @@ function average_train_size(ccv::CombinatorialCrossValidation, rd::ReturnsResult
     (; n_folds, n_test_folds) = ccv
     return average_train_size(T, n_folds, n_test_folds)
 end
+"""
+    test_set_index(ccv)
+
+Generate all test set index combinations for combinatorial cross-validation.
+
+Returns a vector of test fold index combinations for `ccv`.
+
+# Arguments
+
+  - `ccv`: [`CombinatorialCrossValidation`](@ref) configuration.
+
+# Returns
+
+  - Vector of test index combinations.
+
+# Related
+
+  - [`CombinatorialCrossValidation`](@ref)
+  - [`binary_train_test_sets`](@ref)
+"""
 function test_set_index(ccv::CombinatorialCrossValidation)
     return collect(Combinatorics.combinations(1:(ccv.n_folds), ccv.n_test_folds))
 end
+"""
+    binary_train_test_sets(ccv)
+
+Generate binary train/test set assignment matrices for combinatorial cross-validation.
+
+Returns a matrix indicating which samples are in train (0) and test (1) sets for each combination.
+
+# Arguments
+
+  - `ccv`: [`CombinatorialCrossValidation`](@ref) configuration.
+
+# Returns
+
+  - Binary train/test assignment matrix.
+
+# Related
+
+  - [`CombinatorialCrossValidation`](@ref)
+  - [`test_set_index`](@ref)
+"""
 function binary_train_test_sets(ccv::CombinatorialCrossValidation)
     n_folds = ccv.n_folds
     num_splits = n_splits(ccv)
@@ -145,6 +238,26 @@ function binary_train_test_sets(ccv::CombinatorialCrossValidation)
     end
     return folds_train_test
 end
+"""
+    recombined_paths(ccv)
+
+Generate the recombined test paths for combinatorial cross-validation.
+
+Returns a vector of vectors representing the recombined test paths — sequences of test fold indices that together cover the entire dataset.
+
+# Arguments
+
+  - `ccv`: [`CombinatorialCrossValidation`](@ref) configuration.
+
+# Returns
+
+  - Vector of recombined path index vectors.
+
+# Related
+
+  - [`CombinatorialCrossValidation`](@ref)
+  - [`n_test_paths`](@ref)
+"""
 function recombined_paths(ccv::CombinatorialCrossValidation)
     bidx = binary_train_test_sets(ccv)
     out = zeros(Int, size(bidx, 1), n_test_paths(ccv))
@@ -154,6 +267,26 @@ function recombined_paths(ccv::CombinatorialCrossValidation)
     end
     return out
 end
+"""
+    get_path_ids(ccv)
+
+Get path identifiers for each test combination in combinatorial cross-validation.
+
+Returns the path assignment for each test combination, mapping combinations to their recombined paths.
+
+# Arguments
+
+  - `ccv`: [`CombinatorialCrossValidation`](@ref) configuration.
+
+# Returns
+
+  - Vector of path IDs.
+
+# Related
+
+  - [`recombined_paths`](@ref)
+  - [`CombinatorialCrossValidation`](@ref)
+"""
 function get_path_ids(ccv::CombinatorialCrossValidation)
     rcp = recombined_paths(ccv)
     num_splits = n_splits(ccv)

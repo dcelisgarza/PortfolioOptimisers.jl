@@ -47,6 +47,27 @@ end
 function RiskBudget(; val::Num_VecNum)
     return RiskBudget(val)
 end
+"""
+    risk_budget_view(rb, i)
+
+Get a view or subset of risk budget constraints for asset cluster index `i`.
+
+Returns `nothing` for `nothing` inputs, the budget unchanged for estimators, or a sliced budget for [`RiskBudget`](@ref) results.
+
+# Arguments
+
+  - `rb`: Risk budget, estimator, or `nothing`.
+  - `i`: Cluster or asset index.
+
+# Returns
+
+  - Sliced risk budget or unchanged value.
+
+# Related
+
+  - [`RiskBudget`](@ref)
+  - [`RiskBudgetEstimator`](@ref)
+"""
 function risk_budget_view(::Nothing, args...)
     return nothing
 end
@@ -109,6 +130,19 @@ end
 function RiskBudgetEstimator(; val::EstValType, dval::Option{<:Number} = nothing)
     return RiskBudgetEstimator(val, dval)
 end
+"""
+    const RkbE_Rkb = Union{<:RiskBudgetEstimator, <:RiskBudget}
+
+Alias for a risk budget estimator or result.
+
+Matches either a [`RiskBudgetEstimator`](@ref) (specifying how to generate risk budget constraints) or a [`RiskBudget`](@ref) result (a pre-computed risk budget allocation). Used internally to accept either form in constraint generation dispatch.
+
+# Related
+
+  - [`RiskBudgetEstimator`](@ref)
+  - [`RiskBudget`](@ref)
+  - [`risk_budget_constraints`](@ref)
+"""
 const RkbE_Rkb = Union{<:RiskBudgetEstimator, <:RiskBudget}
 function risk_budget_view(rb::RiskBudgetEstimator, ::Any)
     return rb

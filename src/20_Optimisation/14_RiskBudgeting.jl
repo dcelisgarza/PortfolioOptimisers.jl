@@ -304,6 +304,28 @@ function opt_view(rb::RiskBudgeting, i, X::MatNum)
     wi = nothing_scalar_array_view(rb.wi, i)
     return RiskBudgeting(; opt = opt, r = r, rba = rba, wi = wi, fb = rb.fb)
 end
+"""
+    _set_risk_budgeting_constraints!(model, rb, ...)
+
+Internal function to set risk budgeting constraints in the JuMP model.
+
+Configures the equality constraints ensuring each asset's marginal risk contribution equals its budget target.
+
+# Arguments
+
+  - `model`: JuMP model.
+  - `rb`: [`RiskBudgeting`](@ref) optimiser configuration.
+  - Additional risk and budget parameters.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`RiskBudgeting`](@ref)
+  - [`_set_mip_risk_budgeting_constraints!`](@ref)
+"""
 function _set_risk_budgeting_constraints!(model::JuMP.Model, rb::RiskBudgeting,
                                           w::VecJuMPScalar; strict::Bool = false)
     N = length(w)
@@ -358,6 +380,28 @@ function set_rb_mip_w!(model::JuMP.Model, X::MatNum)
                       end)
     return nothing
 end
+"""
+    _set_mip_risk_budgeting_constraints!(model, rb, ...)
+
+Internal function to set mixed-integer risk budgeting constraints in the JuMP model.
+
+Configures binary variable constraints for MIP-based risk budgeting, where each asset's inclusion is a binary decision variable.
+
+# Arguments
+
+  - `model`: JuMP model.
+  - `rb`: [`RiskBudgeting`](@ref) optimiser configuration.
+  - Additional parameters.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`_set_risk_budgeting_constraints!`](@ref)
+  - [`RiskBudgeting`](@ref)
+"""
 function _set_mip_risk_budgeting_constraints!(model::JuMP.Model, rb::RiskBudgeting,
                                               w::VecJuMPScalar, w_obj::VecJuMPScalar;
                                               strict::Bool = false)

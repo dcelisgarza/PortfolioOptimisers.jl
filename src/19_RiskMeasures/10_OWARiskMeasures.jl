@@ -704,6 +704,26 @@ This function dispatches on the estimator `method` to compute OWA weights from a
 function owa_l_moment_crm(method::NormalisedConstantRelativeRiskAversion, weights::MatNum)
     return ncrra_weights(weights, method.g)
 end
+"""
+    owa_l_moment_crm_entropy(method, ...)
+
+Compute OWA L-moment CRM weights using entropy maximisation.
+
+Internal helper for the OWA (Ordered Weighted Average) L-moment constant relative risk measure, computing weights that maximise entropy subject to moment constraints.
+
+# Arguments
+
+  - `method`: OWA JuMP method configuration.
+  - Additional parameters.
+
+# Returns
+
+  - OWA weight vector.
+
+# Related
+
+  - [`owa_l_moment_crm_sumsq_obj`](@ref)
+"""
 function owa_l_moment_crm_entropy(method::OWAJuMP{<:Any, <:Any, <:Any, <:Any,
                                                   <:MaximumEntropy{<:RelativeEntropy}},
                                   model::JuMP.Model)
@@ -746,6 +766,26 @@ function owa_l_moment_crm(method::OWAJuMP{<:Any, <:Any, <:Any, <:Any, <:MaximumE
     owa_l_moment_crm_entropy(method, model)
     return owa_model_solve(model, method, weights)
 end
+"""
+    owa_l_moment_crm_sumsq_obj(method, ...)
+
+Compute OWA L-moment CRM weights by minimising sum of squared deviations.
+
+Internal helper for the OWA L-moment constant relative risk measure using a sum-of-squares objective.
+
+# Arguments
+
+  - `method`: OWA JuMP method configuration.
+  - Additional parameters.
+
+# Returns
+
+  - OWA weight vector.
+
+# Related
+
+  - [`owa_l_moment_crm_entropy`](@ref)
+"""
 function owa_l_moment_crm_sumsq_obj(method::OWAJuMP{<:Any, <:Any, <:Any, <:Any,
                                                     <:SquaredOrderedWeightsArrayAlgorithm{<:UnionRSOCSOCRiskExpr}},
                                     model::JuMP.Model)

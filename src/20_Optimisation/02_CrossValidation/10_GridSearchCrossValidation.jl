@@ -94,6 +94,26 @@ function GridSearchCrossValidation(p::MultiGSCVValType_VecMultiGSCVValType;
                                    train_score::Bool = false, kwargs::NamedTuple = (;))
     return GridSearchCrossValidation(p, cv, r, scorer, ex, train_score, kwargs)
 end
+"""
+    lens_val_grid(estval)
+
+Build a grid of (lens, value) pairs from a parameter specification.
+
+Converts the input vector of `key => values` pairs into a grid of Accessors.jl lens and value combinations for grid search cross-validation.
+
+# Arguments
+
+  - `estval`: Vector of `String => AbstractVector` pairs mapping parameter key paths to their candidate values.
+
+# Returns
+
+  - Grid of (lens, value) combinations.
+
+# Related
+
+  - [`parse_lens`](@ref)
+  - [`GridSearchCrossValidation`](@ref)
+"""
 function lens_val_grid(estval::AbstractVector{<:Pair{<:String, <:AbstractVector}})
     vals = vec(collect(Iterators.product(map(x -> x[2], estval)...)))
     lenses = fill(map(x -> parse_lens(x[1]), estval), length(vals))

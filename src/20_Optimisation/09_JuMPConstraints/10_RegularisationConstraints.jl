@@ -1,12 +1,58 @@
+"""
+    set_l1_regularisation!(args...)
+
+No-op fallback for L1 regularisation setup.
+
+Called when no L1 regularisation is configured. Returns `nothing`.
+
+# Related
+
+  - [`LpRegularisation`](@ref)
+  - [`set_lp_regularisation!`](@ref)
+"""
 function set_l1_regularisation!(args...)
     return nothing
 end
+"""
+    set_l2_regularisation!(args...)
+
+No-op fallback for L2 regularisation setup.
+
+Called when no L2 regularisation is configured. Returns `nothing`.
+
+# Related
+
+  - [`LpRegularisation`](@ref)
+  - [`set_lp_regularisation!`](@ref)
+"""
 function set_l2_regularisation!(args...)
     return nothing
 end
+"""
+    set_lp_regularisation!(args...)
+
+No-op fallback for Lp regularisation setup.
+
+Called when no Lp regularisation is configured. Returns `nothing`.
+
+# Related
+
+  - [`LpRegularisation`](@ref)
+"""
 function set_lp_regularisation!(args...)
     return nothing
 end
+"""
+    set_linf_regularisation!(args...)
+
+No-op fallback for L∞ regularisation setup.
+
+Called when no L∞ regularisation is configured. Returns `nothing`.
+
+# Related
+
+  - [`LpRegularisation`](@ref)
+"""
 function set_linf_regularisation!(args...)
     return nothing
 end
@@ -77,7 +123,32 @@ end
 function LpRegularisation(; p::Number = 3, val::Number = 1e-3)
     return LpRegularisation(p, val)
 end
+"""
+    const VecLpReg = AbstractVector{<:LpRegularisation}
+
+Alias for a vector of [`LpRegularisation`](@ref) objects.
+
+Represents a collection of Lp-norm regularisation terms to be added to the optimisation objective.
+
+# Related
+
+  - [`LpRegularisation`](@ref)
+  - [`LpReg_VecLpReg`](@ref)
+"""
 const VecLpReg = AbstractVector{<:LpRegularisation}
+"""
+    const LpReg_VecLpReg = Union{<:LpRegularisation, <:VecLpReg}
+
+Alias for a single or vector of Lp regularisation terms.
+
+Matches either a single [`LpRegularisation`](@ref) or a vector of them ([`VecLpReg`](@ref)).
+
+# Related
+
+  - [`LpRegularisation`](@ref)
+  - [`VecLpReg`](@ref)
+  - [`set_lp_regularisation!`](@ref)
+"""
 const LpReg_VecLpReg = Union{<:LpRegularisation, <:VecLpReg}
 function set_lp_regularisation!(model::JuMP.Model, lps::LpReg_VecLpReg)
     w = model[:w]

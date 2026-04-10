@@ -198,6 +198,27 @@ function set_relaxed_risk_budgeting_alg_constraints!(alg::RegularisedPenalisedRe
                       end)
     return nothing
 end
+"""
+    _set_relaxed_risk_budgeting_constraints!(model, ...)
+
+Internal function to set relaxed risk budgeting constraints in the JuMP model.
+
+Configures inequality constraints for the relaxed risk budgeting formulation, allowing small deviations from exact budget targets.
+
+# Arguments
+
+  - `model`: JuMP model.
+  - Additional relaxed risk budgeting parameters.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`RelaxedRiskBudgeting`](@ref)
+  - [`_set_risk_budgeting_constraints!`](@ref)
+"""
 function _set_relaxed_risk_budgeting_constraints!(model::JuMP.Model,
                                                   rrb::RelaxedRiskBudgeting,
                                                   w::VecJuMPScalar, sigma::MatNum,

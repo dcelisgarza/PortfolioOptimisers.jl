@@ -38,6 +38,25 @@ Abstract supertype for estimators that specify transaction cost budgets.
   - [`BudgetMarketImpact`](@ref)
 """
 abstract type BudgetCostEstimator <: BudgetConstraintEstimator end
+"""
+    set_budget_costs!(args...)
+
+Set transaction cost budget constraints in the JuMP model.
+
+No-op fallback when no cost budget is specified.
+
+# Arguments
+
+  - `args...`: Arguments (ignored).
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`set_long_short_budget_constraints!`](@ref)
+"""
 function set_budget_costs!(args...)
     return nothing
 end
@@ -92,7 +111,40 @@ end
 function BudgetRange(; lb::Option{<:Number} = 1.0, ub::Option{<:Number} = 1.0)
     return BudgetRange(lb, ub)
 end
+"""
+    const Num_BgtRg = Union{<:Number, <:BudgetRange}
+
+Alias for a scalar budget value or budget range.
+
+Matches either a plain number (fixed budget, e.g. `1.0`) or a [`BudgetRange`](@ref) (interval budget constraint). Used for dispatch in budget constraint generation.
+
+# Related
+
+  - [`BudgetRange`](@ref)
+  - [`set_long_short_budget_constraints!`](@ref)
+"""
 const Num_BgtRg = Union{<:Number, <:BudgetRange}
+"""
+    budget_view(bgt, i)
+
+Get a view or subset of the budget constraint for index `i`.
+
+For scalar or [`BudgetRange`](@ref) inputs, returns the input unchanged (budget applies to all assets).
+
+# Arguments
+
+  - `bgt`: Budget value, [`BudgetRange`](@ref), or `nothing`.
+  - `i`: Index (ignored for scalar/range budgets).
+
+# Returns
+
+  - The budget unchanged, or `nothing`.
+
+# Related
+
+  - [`BudgetRange`](@ref)
+  - [`set_long_short_budget_constraints!`](@ref)
+"""
 function budget_view(bgt::Num_BgtRg, ::Any)
     return bgt
 end
@@ -321,6 +373,26 @@ function set_budget_constraints!(model::JuMP.Model, bgt::BudgetRange, w::VecNum)
     end
     return nothing
 end
+"""
+    set_long_short_budget_constraints!(args...)
+
+Set budget constraints for long and short portfolio positions in the JuMP model.
+
+Various overloads handle different budget types (fixed, range), dispatching on the presence or absence of long/short budget configurations.
+
+# Arguments
+
+  - `args...`: JuMP model and budget parameters.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`BudgetRange`](@ref)
+  - [`set_cost_budget_constraints!`](@ref)
+"""
 function set_long_short_budget_constraints!(args...)
     return nothing
 end
@@ -452,8 +524,31 @@ function set_long_short_budget_constraints!(model::JuMP.Model, bgt::BudgetRange,
     end
     return nothing
 end
+"""
+    set_cost_budget_constraints!(model, vp, vn, val_or_bgt, w)
+
+Set cost-budget constraints in the JuMP model.
+
+Various overloads handle different cost types (fixed value or [`BudgetRange`](@ref)).
+
+# Arguments
+
+  - `model`: JuMP optimisation model.
+  - `vp`: Positive cost vector or scalar.
+  - `vn`: Negative cost vector or scalar.
+  - `val_or_bgt`: Fixed budget value or [`BudgetRange`](@ref).
+  - `w`: Portfolio weight vector.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`set_budget_costs!`](@ref)
+  - [`set_long_short_budget_constraints!`](@ref)
+"""
 function set_cost_budget_constraints!(model::JuMP.Model, vp::Num_VecNum, vn::Num_VecNum,
-                                      val::Number, w::VecNum)
     k = model[:k]
     sc = model[:sc]
     wp = model[:wp]

@@ -157,6 +157,22 @@ function distance(de::Distance{<:Any, <:CanonicalDistance},
     return distance(Distance(; power = de.power, alg = SimpleDistance()), ce, X;
                     dims = dims, kwargs...)
 end
+"""
+    const LTDCov_AllInternalLTDCov = Union{<:LowerTailDependenceCovariance,
+                                           <:PortfolioOptimisersCovariance{<:LowerTailDependenceCovariance},
+                                           <:DenoiseCovariance{<:LowerTailDependenceCovariance},
+                                           <:DetoneCovariance{<:LowerTailDependenceCovariance},
+                                           <:ProcessedCovariance{<:LowerTailDependenceCovariance}}
+
+Alias for all internal lower tail dependence covariance estimator types.
+
+Matches [`LowerTailDependenceCovariance`](@ref) or any wrapper around it (e.g., `PortfolioOptimisersCovariance`, `DenoiseCovariance`, `DetoneCovariance`, `ProcessedCovariance`). Used internally for dispatch in distance computation.
+
+# Related
+
+  - [`LowerTailDependenceCovariance`](@ref)
+  - [`DistCov_AllInternalDistCov`](@ref)
+"""
 const LTDCov_AllInternalLTDCov = Union{<:LowerTailDependenceCovariance,
                                        <:PortfolioOptimisersCovariance{<:LowerTailDependenceCovariance},
                                        <:DenoiseCovariance{<:LowerTailDependenceCovariance},
@@ -500,6 +516,21 @@ function cor_and_dist(de::Distance{<:Any, <:CanonicalDistance}, ce::MutualInfoCo
                                                              normalise = ce.normalise)), ce,
                         X; dims = dims, kwargs...)
 end
+"""
+    const AllInternalMutualInfoCov = Union{<:PortfolioOptimisersCovariance{<:MutualInfoCovariance},
+                                           <:DenoiseCovariance{<:MutualInfoCovariance},
+                                           <:DetoneCovariance{<:MutualInfoCovariance},
+                                           <:ProcessedCovariance{<:MutualInfoCovariance}}
+
+Alias for all internal mutual information covariance wrapper types.
+
+Matches any wrapper type around [`MutualInfoCovariance`](@ref). Used internally for dispatch in canonical distance computation.
+
+# Related
+
+  - [`MutualInfoCovariance`](@ref)
+  - [`DistCov_AllInternalDistCov`](@ref)
+"""
 const AllInternalMutualInfoCov = Union{<:PortfolioOptimisersCovariance{<:MutualInfoCovariance},
                                        <:DenoiseCovariance{<:MutualInfoCovariance},
                                        <:DetoneCovariance{<:MutualInfoCovariance},
@@ -516,6 +547,22 @@ function cor_and_dist(de::Distance{<:Any, <:CanonicalDistance},
     return cor_and_dist(Distance(; power = de.power, alg = LogDistance()), ce, X;
                         dims = dims, kwargs...)
 end
+"""
+    const DistCov_AllInternalDistCov = Union{<:DistanceCovariance,
+                                             <:PortfolioOptimisersCovariance{<:DistanceCovariance},
+                                             <:DenoiseCovariance{<:DistanceCovariance},
+                                             <:DetoneCovariance{<:DistanceCovariance},
+                                             <:ProcessedCovariance{<:DistanceCovariance}}
+
+Alias for all internal distance covariance estimator types.
+
+Matches [`DistanceCovariance`](@ref) or any wrapper around it. Used internally for dispatch in canonical distance computation.
+
+# Related
+
+  - [`DistanceCovariance`](@ref)
+  - [`LTDCov_AllInternalLTDCov`](@ref)
+"""
 const DistCov_AllInternalDistCov = Union{<:DistanceCovariance,
                                          <:PortfolioOptimisersCovariance{<:DistanceCovariance},
                                          <:DenoiseCovariance{<:DistanceCovariance},

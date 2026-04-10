@@ -195,9 +195,29 @@ function opt_view(sr::SubsetResampling, i, X::MatNum)
                             n_subsets = sr.n_subsets, max_comb = sr.max_comb, rng = sr.rng,
                             seed = sr.seed, fb = sr.fb, brt = sr.brt, strict = sr.strict)
 end
+"""
+    subset_resampling_finaliser(N, n_subsets, asset_idx, ...)
+
+Aggregate and finalise portfolio weights from subset resampling.
+
+Combines optimised weights from multiple asset subsets, averaging over subsets to produce the final portfolio weights.
+
+# Arguments
+
+  - `N`: Total number of assets.
+  - `n_subsets`: Number of asset subsets used in resampling.
+  - `asset_idx`: Matrix of asset indices for each subset.
+  - Additional weight and parameter inputs.
+
+# Returns
+
+  - Final aggregated portfolio weight vector.
+
+# Related
+
+  - [`MultipleRandomised`](@ref)
+"""
 function subset_resampling_finaliser(N::Integer, n_subsets::Integer, asset_idx::MatNum,
-                                     wb::Option{<:WeightBounds}, wf::WeightFinaliser,
-                                     ress::VecOpt, ::VecNum)
     w = zeros(eltype(ress[1].w), N)
     for i in 1:n_subsets
         idx = view(asset_idx, :, i)

@@ -256,6 +256,28 @@ Propagate or pass through prior result objects.
 function prior(pr::AbstractPriorResult, args...; kwargs...)
     return pr
 end
+"""
+    prior_view(pr, args...; kwargs...)
+
+Get a view or subset of a prior estimator or result for slicing.
+
+Returns the prior unchanged for estimators (they are not sliceable), or returns a sliced prior result for a given cluster or asset index. Used in hierarchical optimisation to provide cluster-specific priors.
+
+# Arguments
+
+  - `pr`: Prior estimator or result.
+  - `args...`: Additional arguments (index, etc.).
+  - `kwargs...`: Additional keyword arguments.
+
+# Returns
+
+  - Sliced prior result or unchanged estimator.
+
+# Related
+
+  - [`AbstractPriorEstimator`](@ref)
+  - [`LowOrderPrior`](@ref)
+"""
 function prior_view(pr::AbstractPriorEstimator, args...; kwargs...)
     return pr
 end

@@ -960,6 +960,21 @@ function parse_equation(eqn::AbstractString; ops1::Tuple = ("==", "<=", ">="),
     _rethrow_parse_error(rexpr, :rhs)
     return _parse_equation(lexpr, opstr, rexpr, datatype)
 end
+"""
+    _has_invalid_plus(expr)
+
+Check whether a Julia expression contains an invalid `+` operator in a constraint context.
+
+Internal helper used during linear constraint parsing to detect unsupported `+` operator usage in constraint expressions.
+
+# Arguments
+
+  - `expr`: Julia expression to check.
+
+# Returns
+
+  - `Bool`: `true` if the expression contains an invalid `+`, `false` otherwise.
+"""
 function _has_invalid_plus(expr)
     if !(isa(expr, Expr) && expr.head == :call)
         return false

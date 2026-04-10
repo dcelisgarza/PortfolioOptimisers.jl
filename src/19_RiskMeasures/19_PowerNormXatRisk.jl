@@ -1,3 +1,28 @@
+"""
+    PRM(x, slv, alpha = 0.05, p = 2.0, ...; kwargs...)
+
+Compute the Power-Norm Risk Measure (PRM) for a vector of portfolio returns.
+
+Solves a convex optimisation problem to compute the PRM at confidence level `alpha` with Lp-norm parameter `p`, using the specified solver(s).
+
+# Arguments
+
+  - `x`: Vector of portfolio returns.
+  - `slv`: Solver or vector of solvers.
+  - `alpha`: Confidence level (default `0.05`).
+  - `p`: Lp-norm parameter (default `2.0`).
+  - Additional parameters depending on the specific PRM formulation.
+  - `kwargs...`: Additional keyword arguments passed to the solver.
+
+# Returns
+
+  - PRM value (scalar).
+
+# Related
+
+  - [`PowerNormValueatRisk`](@ref)
+  - [`Slv_VecSlv`](@ref)
+"""
 # https://github.com/oxfordcontrol/Clarabel.jl/blob/4915b83e0d900d978681d5e8f3a3a5b8e18086f0/warmstart_test/portfolioOpt/higherorderRiskMeansure.jl#L23
 function PRM(x::VecNum, slv::Slv_VecSlv, alpha::Number = 0.05, p::Number = 2.0,
              w::Option{<:ObsWeights} = nothing)

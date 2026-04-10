@@ -194,6 +194,26 @@ _expr_to_lens(ex::Symbol) = Accessors.PropertyLens(ex)
 _eval_index(x::Integer) = x
 _eval_index(x::Symbol)  = x
 _eval_index(ex::Expr)   = ex.head === :vect ? [_eval_index(a) for a in ex.args] : error("Unsupported index expression: $ex")
+"""
+    _expr_to_lens_chain(ex)
+
+Convert a Julia expression to a chain of lens accessors.
+
+Internal helper for parsing hyperparameter key strings into composable Accessors.jl lenses.
+
+# Arguments
+
+  - `ex`: Julia expression representing a field access chain.
+
+# Returns
+
+  - Composed lens.
+
+# Related
+
+  - [`parse_lens`](@ref)
+  - [`_expr_to_lens`](@ref)
+"""
 function _expr_to_lens_chain(ex)
     optics = Union{Accessors.PropertyLens, Accessors.IndexLens}[]
     while ex isa Expr
@@ -211,6 +231,27 @@ function _expr_to_lens_chain(ex)
     push!(optics, Accessors.PropertyLens(ex))  # base case: Symbol
     return foldl(∘, optics)
 end
+"""
+    parse_lens(key::AbstractString)
+
+Parse a hyperparameter key string into an Accessors.jl lens.
+
+Converts a dotted string path (e.g., `"opt.pe.ce"`) into a composable lens for getting and setting nested fields of an estimator object.
+
+# Arguments
+
+  - `key`: Dotted field path string.
+
+# Returns
+
+  - Composed Accessors.jl lens.
+
+# Related
+
+  - [`_expr_to_lens_chain`](@ref)
+  - [`GridSearchCrossValidation`](@ref)
+  - [`RandomisedSearchCrossValidation`](@ref)
+"""
 function parse_lens(key::AbstractString)
     return _expr_to_lens_chain(Meta.parse(key))
 end

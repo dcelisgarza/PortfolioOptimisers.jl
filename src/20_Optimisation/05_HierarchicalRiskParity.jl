@@ -81,6 +81,29 @@ function opt_view(hrp::HierarchicalRiskParity, i, X::MatNum)
     opt = opt_view(hrp.opt, i)
     return HierarchicalRiskParity(; r = r, opt = opt, sca = hrp.sca, fb = hrp.fb)
 end
+"""
+    split_factor_weight_constraints(alpha, wb, w, ...)
+
+Split and scale factor weight constraints for hierarchical risk parity.
+
+Distributes the weight constraints across clusters based on the hierarchical factor `alpha` and the current weight allocation `w`.
+
+# Arguments
+
+  - `alpha`: Hierarchical scaling factor.
+  - `wb`: Weight bounds.
+  - `w`: Current portfolio weights.
+  - Additional parameters.
+
+# Returns
+
+  - Tuple of updated weight bounds for each cluster.
+
+# Related
+
+  - [`HierarchicalRiskParity`](@ref)
+  - [`WeightBounds`](@ref)
+"""
 function split_factor_weight_constraints(alpha::Number, wb::WeightBounds, w::VecNum,
                                          lc::VecNum, rc::VecNum)
     lb = wb.lb
@@ -138,6 +161,34 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:OptimisationRiskMeasure}
     retcode, w = finalise_weight_bounds(hrp.opt.wf, wb, w / sum(w))
     return HierarchicalResult(typeof(hrp), pr, clr, wb, fees, retcode, w, nothing)
 end
+"""
+    hrp_scalarised_risk(scalariser, wu, wk, rku, lc, rc, rs, X, fees)
+
+Compute the scalarised HRP left/right cluster risk for weight allocation.
+
+Aggregates risk measures across clusters using a scalariser (sum, max, min, or log-sum-exp), returning the left and right cluster risks used to allocate weights in HRP.
+
+# Arguments
+
+  - `scalariser`: Scalarisation strategy ([`SumScalariser`](@ref), [`MaxScalariser`](@ref), [`MinScalariser`](@ref), or [`LogSumExpScalariser`](@ref)).
+  - `wu`: Unitary weight matrix (pre-allocated buffer).
+  - `wk`: Cluster weight vector.
+  - `rku`: Unitary risk vector.
+  - `lc`: Left cluster asset indices.
+  - `rc`: Right cluster asset indices.
+  - `rs`: Vector of risk measures.
+  - `X`: Return matrix.
+  - `fees`: Optional fees.
+
+# Returns
+
+  - `(lrisk, rrisk)`: Left and right cluster risk scalars.
+
+# Related
+
+  - [`HierarchicalRiskParity`](@ref)
+  - [`herc_scalarised_risk_i!`](@ref)
+"""
 function hrp_scalarised_risk(::SumScalariser, wu::MatNum, wk::VecNum, rku::VecNum,
                              lc::VecNum, rc::VecNum, rs::VecOptRM, X::MatNum,
                              fees::Option{<:Fees})

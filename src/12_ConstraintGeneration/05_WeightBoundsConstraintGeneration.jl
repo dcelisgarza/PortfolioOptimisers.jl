@@ -1,3 +1,19 @@
+"""
+    validate_bounds(lb, ub)
+
+Validate that lower bounds do not exceed upper bounds.
+
+Checks that all lower bound values are less than or equal to corresponding upper bound values. Throws an `ArgCheck` error if validation fails. Various overloads handle scalar, vector, and mixed combinations.
+
+# Arguments
+
+  - `lb`: Lower bound (scalar, vector, or `nothing`).
+  - `ub`: Upper bound (scalar, vector, or `nothing`).
+
+# Returns
+
+  - `nothing`.
+"""
 function validate_bounds(lb::Number, ub::Number)
     @argcheck(lb <= ub)
     return nothing
@@ -30,6 +46,27 @@ end
 function validate_bounds(args...)
     return nothing
 end
+"""
+    weight_bounds_view(wb, i)
+
+Get a view or subset of portfolio weight bounds for asset index `i`.
+
+Returns a view of the weight bounds for the specified asset index `i`. If `wb` is `nothing`, returns `nothing`. For [`WeightBounds`](@ref) and [`WeightBoundsEstimator`](@ref), slices the bounds appropriately.
+
+# Arguments
+
+  - `wb`: Weight bounds object, estimator, or `nothing`.
+  - `i`: Asset index or range to slice.
+
+# Returns
+
+  - Sliced weight bounds or `nothing`.
+
+# Related
+
+  - [`WeightBounds`](@ref)
+  - [`WeightBoundsEstimator`](@ref)
+"""
 function weight_bounds_view(::Nothing, ::Any)
     return nothing
 end
@@ -193,6 +230,19 @@ function weight_bounds_view(wb::WeightBoundsEstimator, i)
     ub = nothing_scalar_array_view(wb.ub, i)
     return wb = WeightBoundsEstimator(; lb = lb, ub = ub, dlb = wb.dlb, dub = wb.dub)
 end
+"""
+    const WbE_Wb = Union{<:WeightBoundsEstimator, <:WeightBounds}
+
+Alias for a weight bounds estimator or result.
+
+Matches either a [`WeightBoundsEstimator`](@ref) (specifying how to generate weight bounds constraints) or a [`WeightBounds`](@ref) result. Used internally for dispatch in weight bounds constraint generation.
+
+# Related
+
+  - [`WeightBoundsEstimator`](@ref)
+  - [`WeightBounds`](@ref)
+  - [`weight_bounds_constraints`](@ref)
+"""
 const WbE_Wb = Union{<:WeightBoundsEstimator, <:WeightBounds}
 """
     weight_bounds_constraints(wb::WeightBoundsEstimator, sets::AssetSets; strict::Bool = false,

@@ -202,7 +202,41 @@ end
 function n_splits(mrr::MultipleRandomisedResult)
     return length(mrr.path_ids)
 end
+"""
+    const MRCVR = Union{<:MultipleRandomised, <:MultipleRandomisedResult}
+
+Alias for a multiple-randomised cross-validation estimator or result.
+
+Matches either a [`MultipleRandomised`](@ref) estimator or a [`MultipleRandomisedResult`](@ref).
+
+# Related
+
+  - [`MultipleRandomised`](@ref)
+  - [`MultipleRandomisedResult`](@ref)
+"""
 const MRCVR = Union{<:MultipleRandomised, <:MultipleRandomisedResult}
+"""
+    combination_by_index(idx, N, k)
+
+Return the `idx`-th combination of `k` items from `N` total items.
+
+Internal helper for combinatorial path generation. Converts a lexicographic combination index to the actual combination elements.
+
+# Arguments
+
+  - `idx`: Combination index (1-based).
+  - `N`: Total number of items.
+  - `k`: Number of items in each combination.
+
+# Returns
+
+  - Vector of `k` item indices.
+
+# Related
+
+  - [`CombinatorialCrossValidation`](@ref)
+  - [`sample_unique_assets`](@ref)
+"""
 function combination_by_index(idx::Integer, N::Integer, k::Integer)
     n_comb = binomial(N, k)
     @argcheck(0 < idx <= n_comb)
@@ -223,6 +257,29 @@ function combination_by_index(idx::Integer, N::Integer, k::Integer)
     end
     return combination
 end
+"""
+    sample_unique_assets(N, k, n_subsets; kwargs...)
+
+Sample `n_subsets` unique asset subsets of size `k` from `N` assets.
+
+Internal function used in multiple-randomised cross-validation to generate diverse asset subsets for resampling.
+
+# Arguments
+
+  - `N`: Total number of assets.
+  - `k`: Subset size.
+  - `n_subsets`: Number of unique subsets to sample.
+  - `kwargs...`: Additional keyword arguments (e.g., random seed).
+
+# Returns
+
+  - Matrix of size `(k, n_subsets)` with asset indices.
+
+# Related
+
+  - [`MultipleRandomised`](@ref)
+  - [`combination_by_index`](@ref)
+"""
 function sample_unique_assets(N::Integer, k::Integer, n_subsets::Integer;
                               max_comb::Integer = 1_000_000_000,
                               rng::Random.AbstractRNG = Random.default_rng(),
@@ -251,6 +308,28 @@ function sample_unique_assets(N::Integer, k::Integer, n_subsets::Integer;
     end
     return subsets
 end
+"""
+    get_subset_size(subset_size, rd, args...)
+
+Get the actual asset subset size for multiple-randomised cross-validation.
+
+Resolves the subset size from either an integer (direct count) or a fraction of the total assets.
+
+# Arguments
+
+  - `subset_size`: Integer or float subset size specification.
+  - `rd`: Returns result or prior.
+  - `args...`: Additional arguments.
+
+# Returns
+
+  - Integer subset size.
+
+# Related
+
+  - [`MultipleRandomised`](@ref)
+  - [`sample_unique_assets`](@ref)
+"""
 function get_subset_size(subset_size::Integer, rd::Pr_RR, args...)
     @argcheck(subset_size <= size(rd.X, 2),
               "subset_size must not be greater than the number of assets")
@@ -267,6 +346,28 @@ function get_subset_size(subset_size::SubsetSizeEC, rd::Pr_RR)
               "subset_size must not be greater than the number of assets")
     return res
 end
+"""
+    get_window_size(window_size, rd, args...)
+
+Get the actual rolling window size for multiple-randomised cross-validation.
+
+Resolves the window size from `nothing` (no windowing), an integer (direct count), a float (fraction of observations), or a callable.
+
+# Arguments
+
+  - `window_size`: Window size specification (`nothing`, integer, float, or callable).
+  - `rd`: Returns result or prior.
+  - `args...`: Additional arguments.
+
+# Returns
+
+  - Integer window size or `nothing`.
+
+# Related
+
+  - [`MultipleRandomised`](@ref)
+  - [`get_subset_size`](@ref)
+"""
 function get_window_size(::Nothing, args...)
     return nothing
 end
@@ -288,6 +389,27 @@ function get_window_size(window_size::WindowSizeEC, rd::Pr_RR)
               "window_size must not be greater than the number of observations")
     return res
 end
+"""
+    get_n_subsets(n_subsets, args...)
+
+Get the number of asset subsets for multiple-randomised cross-validation.
+
+Resolves the number of subsets from either an integer (direct count) or a callable that computes it from the returns data.
+
+# Arguments
+
+  - `n_subsets`: Integer or callable number-of-subsets specification.
+  - `args...`: Additional arguments (returns result or prior).
+
+# Returns
+
+  - Integer number of subsets.
+
+# Related
+
+  - [`MultipleRandomised`](@ref)
+  - [`sample_unique_assets`](@ref)
+"""
 function get_n_subsets(n_subsets::Integer, args...)
     return n_subsets
 end

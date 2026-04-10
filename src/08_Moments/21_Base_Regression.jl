@@ -26,6 +26,18 @@ All concrete and/or abstract types representing the output of regression-based m
   - [`AbstractRegressionEstimator`](@ref)
 """
 abstract type AbstractRegressionResult <: AbstractResult end
+"""
+    const RegE_Reg = Union{<:AbstractRegressionResult, <:AbstractRegressionEstimator}
+
+Alias for a regression result or estimator.
+
+Matches either an [`AbstractRegressionResult`](@ref) (pre-computed regression result) or an [`AbstractRegressionEstimator`](@ref) (regression specification). Used for dispatch in factor model and regression-based risk routines.
+
+# Related
+
+  - [`AbstractRegressionResult`](@ref)
+  - [`AbstractRegressionEstimator`](@ref)
+"""
 const RegE_Reg = Union{<:AbstractRegressionResult, <:AbstractRegressionEstimator}
 """
 $(DocStringExtensions.TYPEDEF)
@@ -439,6 +451,26 @@ end
 function regression_criterion_func(::AdjustedRSquared)
     return GLM.adjr2
 end
+"""
+    regression_threshold(alg)
+
+Return the threshold value for stepwise regression selection criteria.
+
+Returns the threshold value associated with a stepwise regression criterion. Dispatches on the criterion type to return either a minimum or maximum value.
+
+# Arguments
+
+  - `alg`: Stepwise regression criterion.
+
+# Returns
+
+  - Threshold value.
+
+# Related
+
+  - [`AbstractMinValStepwiseRegressionCriterion`](@ref)
+  - [`AbstractMaxValStepwiseRegressionCriteria`](@ref)
+"""
 function regression_threshold(::AbstractMinValStepwiseRegressionCriterion)
     return Inf
 end

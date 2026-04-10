@@ -265,6 +265,27 @@ function nothing_scalar_array_view(x::AbstractVector{<:Union{<:AbstractVector,
                                    i)
     return [nothing_scalar_array_view(xi, i) for xi in x]
 end
+"""
+    get_window(window, X, dims = 1)
+
+Get the row/observation window index range for a data array.
+
+Returns the index range corresponding to the last `window` observations (or all observations for `nothing`/`Colon`). Handles integer window sizes, vector index ranges, and `nothing`/`Colon` to mean "use all data".
+
+# Arguments
+
+  - `window`: Number of observations, index vector, `nothing`, or `Colon`.
+  - `X`: Data matrix or vector.
+  - `dims`: Observation dimension (default `1`).
+
+# Returns
+
+  - Index range or `Colon`.
+
+# Related
+
+  - [`moment_window_and_weights`](@ref)
+"""
 function get_window(::Option{<:Colon}, args...)
     return Colon()
 end

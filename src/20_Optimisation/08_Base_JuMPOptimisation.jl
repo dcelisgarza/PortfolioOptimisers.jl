@@ -70,6 +70,27 @@ abstract type JuMPReturnsEstimator <: AbstractEstimator end
 function factory(r::JuMPReturnsEstimator, args...; kwargs...)
     return r
 end
+"""
+    jump_returns_view(r, args...; kwargs...)
+
+Get a view or subset of JuMP returns estimator for slicing.
+
+Returns the estimator sliced for a given asset cluster or returns it unchanged.
+
+# Arguments
+
+  - `r`: JuMP returns estimator.
+  - `args...`: Additional arguments (index, etc.).
+  - `kwargs...`: Additional keyword arguments.
+
+# Returns
+
+  - Sliced or unchanged returns estimator.
+
+# Related
+
+  - [`JuMPReturnsEstimator`](@ref)
+"""
 function jump_returns_view(r::JuMPReturnsEstimator, args...; kwargs...)
     return r
 end
@@ -118,12 +139,54 @@ end
 function needs_previous_weights(::CustomJuMPObjective)
     return false
 end
+"""
+    custom_constraint_view(cc, args...; kwargs...)
+
+Get a view or subset of a custom JuMP constraint for slicing.
+
+Returns `nothing` if no custom constraint is provided, or the constraint unchanged otherwise. Used in hierarchical optimisation to propagate custom constraints per cluster.
+
+# Arguments
+
+  - `cc`: Custom JuMP constraint or `nothing`.
+  - `args...`: Additional arguments.
+  - `kwargs...`: Additional keyword arguments.
+
+# Returns
+
+  - Constraint or `nothing`.
+
+# Related
+
+  - [`CustomJuMPConstraint`](@ref)
+"""
 function custom_constraint_view(::Nothing, args...; kwargs...)
     return nothing
 end
 function custom_constraint_view(::CustomJuMPConstraint, args...; kwargs...)
     return nothing
 end
+"""
+    custom_objective_view(co, args...; kwargs...)
+
+Get a view or subset of a custom JuMP objective term for slicing.
+
+Returns `nothing` if no custom objective is provided, or the objective unchanged otherwise.
+
+# Arguments
+
+  - `co`: Custom JuMP objective or `nothing`.
+  - `args...`: Additional arguments.
+  - `kwargs...`: Additional keyword arguments.
+
+# Returns
+
+  - Objective or `nothing`.
+
+# Related
+
+  - [`CustomJuMPObjective`](@ref)
+"""
 function custom_objective_view(::Nothing, args...; kwargs...)
     return nothing
 end
@@ -180,6 +243,27 @@ function set_w!(model::JuMP.Model, X::MatNum, wi::Option{<:VecNum_VecVecNum})
     set_initial_w!(w, wi)
     return nothing
 end
+"""
+    process_model(model, retcode)
+
+Extract the solution from an optimised JuMP model based on the return code.
+
+On success, extracts the optimised weights from the model. On failure, returns an empty solution.
+
+# Arguments
+
+  - `model`: Optimised JuMP model.
+  - `retcode`: Optimisation return code ([`OptimisationSuccess`](@ref) or [`OptimisationFailure`](@ref)).
+
+# Returns
+
+  - Solution object.
+
+# Related
+
+  - [`OptimisationSuccess`](@ref)
+  - [`OptimisationFailure`](@ref)
+"""
 function process_model(model::JuMP.Model, ::OptimisationSuccess)
     k = JuMP.value(model[:k])
     ik = !iszero(k) ? inv(k) : 1

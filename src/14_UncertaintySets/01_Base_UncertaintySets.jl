@@ -187,6 +187,28 @@ end
 function ucs_selector(::Nothing, prior_ucs::UcSE_UcS)
     return prior_ucs
 end
+"""
+    ucs_view(risk_ucs, i)
+
+Get a view or subset of an uncertainty set for asset cluster index `i`.
+
+Returns the uncertainty set sliced for the given index, or unchanged for estimator types. Used in hierarchical optimisation to apply uncertainty sets per cluster.
+
+# Arguments
+
+  - `risk_ucs`: Uncertainty set result, estimator, or `nothing`.
+  - `i`: Cluster or asset index.
+
+# Returns
+
+  - Sliced uncertainty set or unchanged value.
+
+# Related
+
+  - [`AbstractUncertaintySetEstimator`](@ref)
+  - [`BoxUncertaintySet`](@ref)
+  - [`EllipsoidalUncertaintySet`](@ref)
+"""
 function ucs_view(risk_ucs::Option{<:AbstractUncertaintySetEstimator}, ::Any)
     return risk_ucs
 end

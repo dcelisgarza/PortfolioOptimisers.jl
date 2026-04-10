@@ -161,6 +161,26 @@ function commutation_matrix(X::MatNum)
     data = range(1, 1; length = mn)
     return SparseArrays.sparse(row, col, data, mn, mn)
 end
+"""
+    choose_scaling_parameter(ue, pr)
+
+Select the scaling parameter for a normal uncertainty set from the prior result.
+
+Internal helper that extracts the appropriate scaling parameter from `ue` given the prior result `pr`. Dispatches on the uncertainty set and prior types.
+
+# Arguments
+
+  - `ue`: [`NormalUncertaintySet`](@ref) estimator.
+  - `pr`: Prior result.
+
+# Returns
+
+  - Scaling parameter value.
+
+# Related
+
+  - [`NormalUncertaintySet`](@ref)
+"""
 function choose_scaling_parameter(ue::NormalUncertaintySet, pr::LowOrderPrior)
     return if !isnothing(ue.ens)
         ue.ens

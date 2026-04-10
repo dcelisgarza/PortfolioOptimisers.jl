@@ -59,6 +59,19 @@ struct ClusterNode{tid, tl, tr, td, tcnt} <: AbstractResult
                                                                                            ilevel)
     end
 end
+"""
+    const VecClN = AbstractVector{<:ClusterNode}
+
+Alias for a vector of [`ClusterNode`](@ref) objects.
+
+Represents an ordered collection of cluster nodes, typically used in hierarchical tree traversal and linkage computation.
+
+# Related
+
+  - [`ClusterNode`](@ref)
+  - [`to_tree`](@ref)
+  - [`pre_order`](@ref)
+"""
 const VecClN = AbstractVector{<:ClusterNode}
 """
     is_leaf(a::ClusterNode)

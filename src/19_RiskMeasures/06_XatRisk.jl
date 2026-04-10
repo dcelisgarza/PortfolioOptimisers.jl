@@ -17,6 +17,27 @@ abstract type ValueatRiskFormulation <: AbstractAlgorithm end
 function factory(alg::ValueatRiskFormulation, args...; kwargs...)
     return alg
 end
+"""
+    valueat_risk_formulation_view(r, args...)
+
+Get a view or subset of a Value-at-Risk formulation for slicing.
+
+Returns the formulation unchanged (for non-distribution types) or sliced (for distribution-based types). Used internally in hierarchical optimisation.
+
+# Arguments
+
+  - `r`: Value-at-Risk formulation.
+  - `args...`: Additional arguments (index, etc.).
+
+# Returns
+
+  - Sliced or unchanged formulation.
+
+# Related
+
+  - [`ValueatRiskFormulation`](@ref)
+  - [`DistributionValueatRisk`](@ref)
+"""
 function valueat_risk_formulation_view(r::ValueatRiskFormulation, args...)
     return r
 end
@@ -682,6 +703,26 @@ function factory(r::RelativeDrawdownatRisk, pr::AbstractPriorResult, args...; kw
     w = nothing_scalar_array_selector(r.w, pr.w)
     return RelativeDrawdownatRisk(; settings = r.settings, alpha = r.alpha, w = w)
 end
+"""
+    relative_drawdown_vec(x)
+
+Compute the relative drawdown vector for a vector of portfolio returns.
+
+Returns the relative drawdown at each time step, computed as the current portfolio value relative to its running maximum.
+
+# Arguments
+
+  - `x`: Vector of portfolio returns.
+
+# Returns
+
+  - Relative drawdown vector.
+
+# Related
+
+  - [`absolute_drawdown_vec`](@ref)
+  - [`relative_drawdown_arr`](@ref)
+"""
 function relative_drawdown_vec(x::VecNum)
     pushfirst!(x, zero(eltype(x)))
     cs = cumprod(x .+ one(eltype(x)))

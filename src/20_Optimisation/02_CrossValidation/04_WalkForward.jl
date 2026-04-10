@@ -47,6 +47,18 @@ end
 function WalkForwardResult(; train_idx::VecVecInt, test_idx::VecVecInt)
     return WalkForwardResult(train_idx, test_idx)
 end
+"""
+    const WFCVER = Union{<:WalkForwardEstimator, <:WalkForwardResult}
+
+Alias for a walk-forward cross-validation estimator or result.
+
+Matches either a [`WalkForwardEstimator`](@ref) or a [`WalkForwardResult`](@ref).
+
+# Related
+
+  - [`WalkForwardEstimator`](@ref)
+  - [`WalkForwardResult`](@ref)
+"""
 const WFCVER = Union{<:WalkForwardEstimator, <:WalkForwardResult}
 """
 $(DocStringExtensions.TYPEDEF)
@@ -200,9 +212,56 @@ function n_splits(iwf::IndexWalkForward, rd::ReturnsResult)
     end
     return val
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for date adjustment estimators in walk-forward cross-validation.
+
+Subtypes implement specific strategies for adjusting dates used in walk-forward splits.
+
+# Related
+
+  - [`DateWalkForward`](@ref)
+"""
 abstract type DateAdjusterEstimator <: AbstractEstimator end
+"""
+    const DatesUnionPeriod = Union{<:Dates.Period, <:Dates.CompoundPeriod}
+
+Alias for a Dates period or compound period.
+
+Used internally to accept either simple date periods (e.g., `Dates.Month(1)`) or compound periods (e.g., `Dates.Month(1) + Dates.Day(1)`) as date offsets in walk-forward cross-validation.
+
+# Related
+
+  - [`IntPeriodDateRange`](@ref)
+  - [`DateWalkForward`](@ref)
+"""
 const DatesUnionPeriod = Union{<:Dates.Period, <:Dates.CompoundPeriod}
+"""
+    const IntPeriodDateRange = Union{<:Integer, <:DatesUnionPeriod}
+
+Alias for an integer or date period used to specify window sizes.
+
+Matches either a plain integer (number of observations) or a date period ([`DatesUnionPeriod`](@ref)) for walk-forward cross-validation splits.
+
+# Related
+
+  - [`DatesUnionPeriod`](@ref)
+  - [`DateWalkForward`](@ref)
+"""
 const IntPeriodDateRange = Union{<:Integer, <:DatesUnionPeriod}
+"""
+    const DateAdjType = Union{<:Function, <:DateAdjusterEstimator}
+
+Alias for a date adjustment function or estimator.
+
+Matches either a plain `Function` or a [`DateAdjusterEstimator`](@ref) for adjusting dates in walk-forward cross-validation.
+
+# Related
+
+  - [`DateAdjusterEstimator`](@ref)
+  - [`DateWalkForward`](@ref)
+"""
 const DateAdjType = Union{<:Function, <:DateAdjusterEstimator}
 """
 $(DocStringExtensions.TYPEDEF)
@@ -380,6 +439,26 @@ function Base.split(dwf::DateWalkForward{<:Integer}, rd::ReturnsResult)
     end
     return WalkForwardResult(; train_idx = train_indices, test_idx = test_indices)
 end
+"""
+    special_div(a::Integer, b::Integer)
+
+Perform integer division with a special case for zero divisor.
+
+Returns zero if `b` is zero, otherwise computes `div(a, b)`. Used internally in walk-forward date calculations to avoid division by zero.
+
+# Arguments
+
+  - `a`: Dividend.
+  - `b`: Divisor.
+
+# Returns
+
+  - `div(a, b)` or zero if `b == 0`.
+
+# Related
+
+  - [`DateWalkForward`](@ref)
+"""
 function special_div(a::Integer, b::Integer)
     q, r = divrem(a, b)
     return q - ifelse(iszero(r), 1, 0)

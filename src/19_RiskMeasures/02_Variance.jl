@@ -683,6 +683,27 @@ end
 function (r::UncertaintySetVariance)(w::VecNum)
     return LinearAlgebra.dot(w, r.sigma, w)
 end
+"""
+    _no_bounds_risk_measure(r, flag)
+
+Return a version of the risk measure stripped of bounds for unbounded optimisation sub-problems.
+
+Internal helper used in frontier construction sub-problems where bounds are temporarily removed.
+
+# Arguments
+
+  - `r`: Risk measure.
+  - `flag`: Flag controlling which bounds to remove.
+
+# Returns
+
+  - Risk measure without bounds.
+
+# Related
+
+  - [`UncertaintySetVariance`](@ref)
+  - [`_no_bounds_no_risk_expr_risk_measure`](@ref)
+"""
 function _no_bounds_risk_measure(r::UncertaintySetVariance, ::Union{Val{true}, Nothing})
     return UncertaintySetVariance(;
                                   settings = RiskMeasureSettings(; rke = r.settings.rke,
@@ -699,6 +720,27 @@ function no_bounds_risk_measure(r::UncertaintySetVariance,
                                 flag::Union{Val{false}, Val{true}, Nothing} = nothing)
     return _no_bounds_risk_measure(r, flag)
 end
+"""
+    _no_bounds_no_risk_expr_risk_measure(r, flag)
+
+Return a version of the risk measure with neither bounds nor risk expressions for unbounded sub-problems.
+
+Internal helper used in frontier sub-problems that require removing all risk expression constraints.
+
+# Arguments
+
+  - `r`: Risk measure.
+  - `flag`: Flag controlling configuration.
+
+# Returns
+
+  - Simplified risk measure.
+
+# Related
+
+  - [`_no_bounds_risk_measure`](@ref)
+  - [`UncertaintySetVariance`](@ref)
+"""
 function _no_bounds_no_risk_expr_risk_measure(r::UncertaintySetVariance,
                                               ::Union{Val{true}, Nothing})
     return UncertaintySetVariance(;

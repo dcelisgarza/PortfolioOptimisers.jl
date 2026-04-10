@@ -88,9 +88,53 @@ function GreedyAllocation(; unit::Number = 1, args::Tuple = (), kwargs::NamedTup
                           fb::Option{<:FOptE_FOpt} = nothing)
     return GreedyAllocation(unit, args, kwargs, fb)
 end
+"""
+    roundmult(val, prec, args...; kwargs...)
+
+Round a value to the nearest multiple of `prec`.
+
+# Arguments
+
+  - `val`: Value to round.
+  - `prec`: Precision (multiple to round to).
+  - `args...`: Additional arguments passed to `Base.round`.
+  - `kwargs...`: Additional keyword arguments passed to `Base.round`.
+
+# Returns
+
+  - Rounded value.
+
+# Related
+
+  - [`GreedyAllocation`](@ref)
+"""
 function roundmult(val::Number, prec::Number, args...; kwargs...)
     return round(div(val, prec) * prec, args...; kwargs...)
 end
+"""
+    finite_sub_allocation!(w, p, cash, bgt, ...)
+
+In-place finite allocation for one side (long or short) of the portfolio using the greedy algorithm.
+
+Modifies the allocation in-place, greedily assigning shares to assets to minimise allocation error.
+
+# Arguments
+
+  - `w`: Target portfolio weights (in-place modified).
+  - `p`: Asset prices.
+  - `cash`: Cash available.
+  - `bgt`: Budget target.
+  - Additional parameters.
+
+# Returns
+
+  - Modified allocation vector.
+
+# Related
+
+  - [`finite_sub_allocation`](@ref)
+  - [`GreedyAllocation`](@ref)
+"""
 function finite_sub_allocation!(w::VecNum, p::VecNum, cash::Number, bgt::Number,
                                 ga::GreedyAllocation, args...)
     if isempty(w)

@@ -1,3 +1,27 @@
+"""
+    ERM(x, slv, alpha = 0.05, ...; kwargs...)
+
+Compute the Entropic Risk Measure (ERM) for a vector of portfolio returns.
+
+Solves a convex optimisation problem to compute the ERM at confidence level `alpha`, using the specified solver(s). The ERM is a coherent risk measure based on the exponential moment of the loss distribution.
+
+# Arguments
+
+  - `x`: Vector of portfolio returns.
+  - `slv`: Solver or vector of solvers.
+  - `alpha`: Confidence level (default `0.05`).
+  - Additional parameters depending on the specific ERM formulation.
+  - `kwargs...`: Additional keyword arguments passed to the solver.
+
+# Returns
+
+  - ERM value (scalar).
+
+# Related
+
+  - [`EntropicValueatRisk`](@ref)
+  - [`Slv_VecSlv`](@ref)
+"""
 function ERM(x::VecNum, slv::Slv_VecSlv, alpha::Number = 0.05,
              w::Option{<:ObsWeights} = nothing)
     w = get_observation_weights(w, x)

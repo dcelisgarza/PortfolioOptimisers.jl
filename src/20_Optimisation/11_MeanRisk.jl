@@ -189,6 +189,28 @@ function solve_mean_risk!(model::JuMP.Model, mr::MeanRisk, ret::JuMPReturnsEstim
     end
     return retcodes, sols
 end
+"""
+    _rebuild_risk_frontier(pr, fees, ...)
+
+Internal helper to rebuild the risk frontier from a prior result.
+
+Recomputes the risk range used for the efficient frontier given updated prior information and fee structures.
+
+# Arguments
+
+  - `pr`: Prior result with asset moments.
+  - `fees`: Optional fees configuration.
+  - Additional parameters.
+
+# Returns
+
+  - Tuple of risk bound values for the frontier.
+
+# Related
+
+  - [`rebuild_risk_frontier`](@ref)
+  - [`MeanRisk`](@ref)
+"""
 function _rebuild_risk_frontier(pr::AbstractPriorResult, fees::Option{<:Fees},
                                 r::RiskMeasure, risk_frontier::VecPair, w_min::VecNum,
                                 w_max::VecNum, i::Integer = 1)
@@ -204,6 +226,28 @@ function _rebuild_risk_frontier(pr::AbstractPriorResult, fees::Option{<:Fees},
     ub = range(rk_min, rk_max; length = N)
     return risk_frontier[i].first => (risk_frontier[1].second[1], ub)
 end
+"""
+    rebuild_risk_frontier(model, mr, ...)
+
+Rebuild the efficient frontier risk bounds from a solved JuMP model.
+
+Extracts and recomputes risk bound values from the optimised model for use in subsequent frontier sweeps.
+
+# Arguments
+
+  - `model`: Solved JuMP model.
+  - `mr`: MeanRisk optimiser configuration.
+  - Additional parameters.
+
+# Returns
+
+  - Updated risk bounds for the frontier.
+
+# Related
+
+  - [`MeanRisk`](@ref)
+  - [`_rebuild_risk_frontier`](@ref)
+"""
 function rebuild_risk_frontier(model::JuMP.Model,
                                mr::MeanRisk{<:Any, <:AbstractVector, <:Any, <:Any},
                                ret::JuMPReturnsEstimator, pr::AbstractPriorResult,

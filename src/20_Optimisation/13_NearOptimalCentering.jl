@@ -642,6 +642,28 @@ function solve_noc!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any,
     end
     return retcodes, sols
 end
+"""
+    get_overall_retcode(w_min_retcode, w_opt_retcode, w_max_retcode, noc_retcode)
+
+Compute the overall optimisation return code from individual sub-problem return codes.
+
+Combines the return codes from the minimum, optimal, and maximum weight sub-problems with the near-optimal centering return code to determine the overall status.
+
+# Arguments
+
+  - `w_min_retcode`: Return code from the minimum weight sub-problem.
+  - `w_opt_retcode`: Return code from the optimal weight sub-problem.
+  - `w_max_retcode`: Return code from the maximum weight sub-problem.
+  - `noc_retcode`: Return code from the near-optimal centering sub-problem.
+
+# Returns
+
+  - Overall return code.
+
+# Related
+
+  - [`NearOptimalCentering`](@ref)
+"""
 function get_overall_retcode(w_min_retcode, w_opt_retcode, w_max_retcode, noc_retcode)
     msg = ""
     if isa(w_min_retcode, OptimisationFailure)

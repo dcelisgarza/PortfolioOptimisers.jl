@@ -37,6 +37,19 @@ function OptimisationCrossValidation(; cv::OptCVER = KFold(),
                                      scorer::Option{<:PredictionCrossValScorer} = nothing)
     return OptimisationCrossValidation(cv, scorer)
 end
+"""
+    const NonCombOptCV = Union{<:KFold, <:WalkForwardEstimator}
+
+Alias for non-combinatorial optimisation cross-validation schemes.
+
+Matches either a [`KFold`](@ref) or a [`WalkForwardEstimator`](@ref). Used for dispatch in routines that require sequential or fold-based (non-combinatorial) cross-validation.
+
+# Related
+
+  - [`KFold`](@ref)
+  - [`WalkForwardEstimator`](@ref)
+  - [`CombinatorialCrossValidation`](@ref)
+"""
 const NonCombOptCV = Union{<:KFold, <:WalkForwardEstimator}
 
 export OptimisationCrossValidation

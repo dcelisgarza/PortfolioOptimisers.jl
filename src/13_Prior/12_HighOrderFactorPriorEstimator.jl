@@ -1,3 +1,23 @@
+"""
+    coskewness_residuals(X, me)
+
+Compute the coskewness residuals from asset return data.
+
+Internal helper that demeans `X` using the expected returns from `me` and returns the residual return matrix used in coskewness estimation.
+
+# Arguments
+
+  - `X`: Asset return matrix (observations × assets).
+  - `me`: Expected returns estimator.
+
+# Returns
+
+  - Residual return matrix.
+
+# Related
+
+  - [`cokurtosis_residuals`](@ref)
+"""
 function coskewness_residuals(X::MatNum, me::AbstractExpectedReturnsEstimator)
     N = size(X, 2)
     N2 = N^2
@@ -7,6 +27,27 @@ function coskewness_residuals(X::MatNum, me::AbstractExpectedReturnsEstimator)
     sk_err[idx] .= vec(Statistics.mean(me, X3; dims = 1))
     return sk_err
 end
+"""
+    cokurtosis_residuals(sigma, X, me)
+
+Compute the cokurtosis residuals from the covariance matrix and return data.
+
+Internal helper that standardises `X` using the covariance matrix `sigma` and expected returns from `me`, returning the standardised residual matrix used in cokurtosis estimation.
+
+# Arguments
+
+  - `sigma`: Covariance matrix.
+  - `X`: Asset return matrix (observations × assets).
+  - `me`: Expected returns estimator.
+
+# Returns
+
+  - Standardised residual matrix.
+
+# Related
+
+  - [`coskewness_residuals`](@ref)
+"""
 function cokurtosis_residuals(sigma::MatNum, X::MatNum,
                               me::AbstractExpectedReturnsEstimator,
                               ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())

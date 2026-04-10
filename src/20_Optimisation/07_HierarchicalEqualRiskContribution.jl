@@ -115,6 +115,33 @@ function opt_view(hec::HierarchicalEqualRiskContribution, i, X::MatNum)
     return HierarchicalEqualRiskContribution(; ri = ri, ro = ro, opt = opt, scai = hec.scai,
                                              scao = hec.scao, ex = hec.ex, fb = hec.fb)
 end
+"""
+    herc_scalarised_risk_o!(scalariser, wk, roku, rkbo, cl, ros, X, fees)
+
+Compute and accumulate the scalarised outer (inter-cluster) HERC risk in-place.
+
+Updates `rkbo` with inverse-risk weights for cluster `cl` and accumulates the scaled risk contribution using the given scalariser strategy.
+
+# Arguments
+
+  - `scalariser`: Scalarisation strategy ([`SumScalariser`](@ref), [`MaxScalariser`](@ref), [`MinScalariser`](@ref), or [`LogSumExpScalariser`](@ref)).
+  - `wk`: Cluster weight vector.
+  - `roku`: Unitary outer risk vector or matrix.
+  - `rkbo`: Outer risk buffer vector (modified in-place).
+  - `cl`: Cluster asset indices.
+  - `ros`: Vector of outer risk measures.
+  - `X`: Return matrix.
+  - `fees`: Optional fees.
+
+# Returns
+
+  - Scalarised outer cluster risk scalar.
+
+# Related
+
+  - [`HierarchicalEqualRiskContribution`](@ref)
+  - [`herc_scalarised_risk_i!`](@ref)
+"""
 function herc_scalarised_risk_o!(::SumScalariser, wk::VecNum, roku::VecNum, rkbo::VecNum,
                                  cl::VecInt, ros::VecOptRM, X::MatNum, fees::Option{<:Fees})
     crisk = zero(eltype(X))
@@ -213,6 +240,32 @@ function herc_scalarised_risk_o!(sca::LogSumExpScalariser, ::VecNum, roku::MatNu
     end
     return LogExpFunctions.logsumexp(crisk) / sca.gamma
 end
+"""
+    herc_scalarised_risk_i!(scalariser, wk, riku, cl, ris, X, fees)
+
+Compute the scalarised inner (intra-cluster) HERC risk for cluster `cl`.
+
+Aggregates inner risk measures across the assets in cluster `cl` using the given scalariser, returning the per-asset risk vector used for intra-cluster weight allocation.
+
+# Arguments
+
+  - `scalariser`: Scalarisation strategy ([`SumScalariser`](@ref), [`MaxScalariser`](@ref), [`MinScalariser`](@ref), or [`LogSumExpScalariser`](@ref)).
+  - `wk`: Cluster weight vector.
+  - `riku`: Unitary inner risk vector or matrix.
+  - `cl`: Cluster asset indices.
+  - `ris`: Vector of inner risk measures.
+  - `X`: Return matrix.
+  - `fees`: Optional fees.
+
+# Returns
+
+  - Per-asset inner risk vector for assets in `cl`.
+
+# Related
+
+  - [`HierarchicalEqualRiskContribution`](@ref)
+  - [`herc_scalarised_risk_o!`](@ref)
+"""
 function herc_scalarised_risk_i!(::SumScalariser, wk::VecNum, riku::VecNum, cl::VecInt,
                                  ris::VecOptRM, X::MatNum, fees::Option{<:Fees})
     risk = zeros(eltype(X), length(cl), 2)
@@ -323,6 +376,29 @@ function herc_scalarised_risk_i!(sca::LogSumExpScalariser, wk::VecNum, riku::Mat
     end
     return LogExpFunctions.logsumexp(view(risk, :, 2:N); dims = 2) / sca.gamma
 end
+"""
+    herc_risk(hec, pr, cls)
+
+Compute per-cluster risk contributions for HERC weight allocation.
+
+Evaluates the inner and outer risk measures for all clusters in `cls`, returning the risk arrays needed to allocate intra- and inter-cluster weights.
+
+# Arguments
+
+  - `hec`: [`HierarchicalEqualRiskContribution`](@ref) optimiser instance.
+  - `pr`: Prior result containing asset moments and return data.
+  - `cls`: Vector of vectors of asset indices per cluster.
+
+# Returns
+
+  - `(riku, roku)`: Inner and outer per-asset risk arrays.
+
+# Related
+
+  - [`HierarchicalEqualRiskContribution`](@ref)
+  - [`herc_scalarised_risk_i!`](@ref)
+  - [`herc_scalarised_risk_o!`](@ref)
+"""
 function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:OptimisationRiskMeasure,
                                                           <:OptimisationRiskMeasure, <:Any,
                                                           <:Any, <:FLoops.SequentialEx},

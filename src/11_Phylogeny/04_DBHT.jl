@@ -1834,6 +1834,21 @@ function LoGo(; de::AbstractDistanceEstimator = Distance(; alg = CanonicalDistan
               pdm::Option{<:Posdef} = Posdef())
     return LoGo(de, sim, pdm)
 end
+"""
+    const DVarInfo_DDVarInfo = Union{<:Distance{<:Any, <:VariationInfoDistance},
+                                     <:DistanceDistance{<:Any, <:VariationInfoDistance, <:Any,
+                                                        <:Any, <:Any}}
+
+Alias for distance types using variation of information metrics.
+
+Matches either a [`VariationInfoDistance`](@ref)-based [`Distance`](@ref) or a [`VariationInfoDistance`](@ref)-based [`DistanceDistance`](@ref). Used for dispatch in DBHT-based phylogeny computation.
+
+# Related
+
+  - [`VariationInfoDistance`](@ref)
+  - [`Distance`](@ref)
+  - [`DistanceDistance`](@ref)
+"""
 const DVarInfo_DDVarInfo = Union{<:Distance{<:Any, <:VariationInfoDistance},
                                  <:DistanceDistance{<:Any, <:VariationInfoDistance, <:Any,
                                                     <:Any, <:Any}}

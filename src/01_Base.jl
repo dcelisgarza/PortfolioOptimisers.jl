@@ -1041,6 +1041,28 @@ Accepts either a [`DynamicAbstractWeights`](@ref) subtype (weights computed from
   - [`get_observation_weights`](@ref)
 """
 const ObsWeights = Union{<:DynamicAbstractWeights, <:StatsBase.AbstractWeights}
+"""
+    get_observation_weights(w, args...; kwargs...)
+
+Get the observation weights for statistical estimation.
+
+Returns `nothing` for dynamic or unspecified weights (allowing estimators to compute them), or the provided weight vector directly.
+
+# Arguments
+
+  - `w`: Observation weights ([`DynamicAbstractWeights`](@ref), a plain vector, or `nothing`).
+  - `args...`: Additional arguments (ignored).
+  - `kwargs...`: Additional keyword arguments.
+
+# Returns
+
+  - `nothing` or the provided weight vector.
+
+# Related
+
+  - [`ObsWeights`](@ref)
+  - [`validate_observation_weights`](@ref)
+"""
 function get_observation_weights(::Option{<:DynamicAbstractWeights}, args...; kwargs...)
     return nothing
 end
@@ -1269,6 +1291,26 @@ end
 function assert_nonempty_finite_val(args...)
     return nothing
 end
+"""
+    validate_observation_weights(w)
+
+Validate that observation weights are normalised (sum to 1).
+
+Checks that `StatsBase.AbstractWeights` sum to approximately 1.0. The no-op fallback does nothing for other types.
+
+# Arguments
+
+  - `w`: Observation weights or any other type.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`ObsWeights`](@ref)
+  - [`get_observation_weights`](@ref)
+"""
 function validate_observation_weights(args...)
     return nothing
 end

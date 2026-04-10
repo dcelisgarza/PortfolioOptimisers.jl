@@ -38,6 +38,19 @@ Represents solver settings as either a single solver attribute, or a collection 
   - [`set_solver_attributes`](@ref)
 """
 const SlvSettings = Union{<:Pair, <:Dict_VecPair}
+"""
+    const SlvKeys = Union{<:AbstractString, <:JuMP.MOI.AbstractModelAttribute}
+
+Alias for JuMP solver attribute keys.
+
+Matches either a string key or a `JuMP.MOI.AbstractModelAttribute` instance. Used internally for validating and applying solver settings to JuMP models.
+
+# Related
+
+  - [`SlvSettings`](@ref)
+  - [`Solver`](@ref)
+  - [`set_solver_attributes`](@ref)
+"""
 const SlvKeys = Union{<:AbstractString, <:JuMP.MOI.AbstractModelAttribute}
 """
 $(DocStringExtensions.TYPEDEF)

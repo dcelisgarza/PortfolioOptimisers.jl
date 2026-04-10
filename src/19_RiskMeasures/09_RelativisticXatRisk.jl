@@ -1,3 +1,28 @@
+"""
+    RRM(x, slv, alpha = 0.05, kappa = 0.3, ...; kwargs...)
+
+Compute the Relativistic Risk Measure (RRM) for a vector of portfolio returns.
+
+Solves a convex optimisation problem to compute the RRM at confidence level `alpha` with relativistic parameter `kappa`, using the specified solver(s).
+
+# Arguments
+
+  - `x`: Vector of portfolio returns.
+  - `slv`: Solver or vector of solvers.
+  - `alpha`: Confidence level (default `0.05`).
+  - `kappa`: Relativistic parameter (default `0.3`).
+  - Additional parameters depending on the specific RRM formulation.
+  - `kwargs...`: Additional keyword arguments passed to the solver.
+
+# Returns
+
+  - RRM value (scalar).
+
+# Related
+
+  - [`RelativisticValueatRisk`](@ref)
+  - [`Slv_VecSlv`](@ref)
+"""
 function RRM(x::VecNum, slv::Slv_VecSlv, alpha::Number = 0.05, kappa::Number = 0.3,
              w::Option{<:ObsWeights} = nothing)
     w = get_observation_weights(w, x)

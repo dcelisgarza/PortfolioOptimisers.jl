@@ -228,6 +228,28 @@ end
 function Frontier(; N::Integer = 20)
     return Frontier(N, 1, true)
 end
+"""
+    _Frontier(; N = 20, factor, flag)
+
+Construct a range of N evenly-spaced frontier parameter values.
+
+Internal helper that generates a parameter grid (e.g., for risk bounds) used when sweeping the efficient frontier.
+
+# Arguments
+
+  - `N`: Number of frontier points (default 20).
+  - `factor`: Scaling factor for the range.
+  - `flag`: Controls whether to sweep from min-to-max or max-to-min.
+
+# Returns
+
+  - Vector of frontier parameter values.
+
+# Related
+
+  - [`MeanRisk`](@ref)
+  - [`NearOptimalCentering`](@ref)
+"""
 function _Frontier(; N::Integer = 20, factor::Number, flag::Bool)
     return Frontier(N, factor, flag)
 end
@@ -368,6 +390,27 @@ end
 function factory(rs::VecBaseRM, args...; kwargs...)
     return [factory(r, args...; kwargs...) for r in rs]
 end
+"""
+    risk_measure_view(rs, i, X)
+
+Get a view or subset of a risk measure for asset cluster index `i`.
+
+Returns the risk measure sliced for the given cluster or asset index. Used internally in hierarchical optimisation to apply risk measures to each cluster.
+
+# Arguments
+
+  - `rs`: Risk measure (or vector thereof).
+  - `i`: Cluster or asset index.
+  - `X`: Data matrix (used for dimension-aware slicing).
+
+# Returns
+
+  - Sliced risk measure or the original if no slicing is needed.
+
+# Related
+
+  - [`AbstractBaseRiskMeasure`](@ref)
+"""
 function risk_measure_view(rs::AbstractBaseRiskMeasure, ::Any, ::Any)
     return rs
 end
@@ -602,6 +645,27 @@ function nothing_scalar_array_selector(::Nothing,
                                        prior_variable::Num_ArrNum_VecScalar_DynWeights)
     return prior_variable
 end
+"""
+    risk_measure_nothing_scalar_array_view(risk_variable, prior_variable, i)
+
+Get a view of a risk measure's risk or prior variable for index `i`.
+
+Internal helper for slicing scalar, array, or `nothing` risk/prior variables by index. Dispatches on the types of `risk_variable` and `prior_variable`.
+
+# Arguments
+
+  - `risk_variable`: Risk variable (scalar, array, or `nothing`).
+  - `prior_variable`: Prior variable (array or `nothing`).
+  - `i`: Index or range to slice.
+
+# Returns
+
+  - Sliced or unchanged value.
+
+# Related
+
+  - [`risk_measure_view`](@ref)
+"""
 function risk_measure_nothing_scalar_array_view(::Nothing, ::Nothing, i)
     throw(ArgumentError("Both risk_variable and prior_variable are nothing."))
 end
@@ -611,6 +675,28 @@ end
 function risk_measure_nothing_scalar_array_view(::Nothing, prior_variable::ArrNum, i)
     return nothing_scalar_array_view(prior_variable, i)
 end
+"""
+    solver_selector(risk_solvers, slv)
+
+Select the appropriate solver for a risk measure computation.
+
+Returns the risk-measure-specific solver if provided, otherwise falls back to the optimiser-level solver. Returns `nothing` if neither is available.
+
+# Arguments
+
+  - `risk_solvers`: Risk-measure-specific solver(s) or `nothing`.
+  - `slv`: Optimiser-level solver(s) or `nothing`.
+
+# Returns
+
+  - Selected solver(s) or `nothing`.
+
+# Related
+
+  - [`Slv_VecSlv`](@ref)
+  - [`ERM`](@ref)
+  - [`RRM`](@ref)
+"""
 function solver_selector(risk_solvers::Slv_VecSlv, ::Any)
     return risk_solvers
 end

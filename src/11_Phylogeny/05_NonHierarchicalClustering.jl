@@ -64,6 +64,27 @@ function factory(alg::KMeansAlgorithm, w::StatsBase.AbstractWeights)
     return KMeansAlgorithm(; rng = alg.rng, seed = alg.seed,
                            kwargs = (; alg.kwargs..., weights = w))
 end
+"""
+    _get_k_clusters_from_alg(alg, D, k)
+
+Assign observations to `k` clusters using the specified clustering algorithm and distance matrix.
+
+Internal function used by non-hierarchical clustering estimators.
+
+# Arguments
+
+  - `alg`: Clustering algorithm (e.g., [`KMeansAlgorithm`](@ref)).
+  - `D`: Pairwise distance matrix.
+  - `k`: Number of clusters.
+
+# Returns
+
+  - Cluster assignments.
+
+# Related
+
+  - [`KMeansAlgorithm`](@ref)
+"""
 function _get_k_clusters_from_alg(alg::KMeansAlgorithm, D::MatNum, k::Integer)
     if !isnothing(alg.seed)
         Random.seed!(alg.rng, alg.seed)
