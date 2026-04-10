@@ -374,13 +374,11 @@ function near_optimal_centering_risks(::MaxScalariser, rs::VecRM, pr::AbstractPr
     return risk_min, risk_opt, risk_max
 end
 """
-    NearOptimalSetup
+$(DocStringExtensions.TYPEDEF)
 
 Intermediate result type storing the setup data for Near Optimal Centering.
 
 Holds pre-computed portfolio weights, risk and return targets, and sub-problem return codes needed to formulate and solve the NOC optimisation problem.
-
-$(TYPEDEF)
 
 # Fields
 

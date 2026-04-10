@@ -220,7 +220,6 @@ Base case for the lens-building recursion: a bare symbol maps directly to an `Ac
   - [`_expr_to_lens_chain`](@ref)
   - [`parse_lens`](@ref)
 """
-# Base case: bare symbol → PropertyLens
 _expr_to_lens(ex::Symbol) = Accessors.PropertyLens(ex)
 """
     _eval_index(x)
@@ -243,10 +242,9 @@ Converts integer, symbol, or vector expression AST nodes to concrete index value
 
   - [`_expr_to_lens_chain`](@ref)
 """
-# Evaluate literal index nodes in the AST (no runtime eval needed)
 _eval_index(x::Integer) = x
-_eval_index(x::Symbol)  = x
-_eval_index(ex::Expr)   = ex.head === :vect ? [_eval_index(a) for a in ex.args] : error("Unsupported index expression: $ex")
+_eval_index(x::Symbol) = x
+_eval_index(ex::Expr)  = ex.head === :vect ? [_eval_index(a) for a in ex.args] : error("Unsupported index expression: $ex")
 """
     _expr_to_lens_chain(ex)
 

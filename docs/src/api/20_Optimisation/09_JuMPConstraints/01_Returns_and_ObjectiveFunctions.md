@@ -5,7 +5,6 @@ ArithmeticReturn
 LogarithmicReturn
 bounds_returns_estimator
 no_bounds_returns_estimator(r::ArithmeticReturn, flag::Bool)
-no_bounds_returns_estimator(r::LogarithmicReturn, args...)
 MinimumRisk
 MaximumUtility
 MaximumRatio

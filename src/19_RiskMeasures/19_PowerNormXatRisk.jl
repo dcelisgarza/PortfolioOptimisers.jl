@@ -1,5 +1,6 @@
+# https://github.com/oxfordcontrol/Clarabel.jl/blob/4915b83e0d900d978681d5e8f3a3a5b8e18086f0/warmstart_test/portfolioOpt/higherorderRiskMeansure.jl#L23
 """
-    PRM(x, slv, alpha = 0.05, p = 2.0, ...; kwargs...)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
 Compute the Power-Norm Risk Measure (PRM) for a vector of portfolio returns.
 
@@ -23,7 +24,6 @@ Solves a convex optimisation problem to compute the PRM at confidence level `alp
   - [`PowerNormValueatRisk`](@ref)
   - [`Slv_VecSlv`](@ref)
 """
-# https://github.com/oxfordcontrol/Clarabel.jl/blob/4915b83e0d900d978681d5e8f3a3a5b8e18086f0/warmstart_test/portfolioOpt/higherorderRiskMeansure.jl#L23
 function PRM(x::VecNum, slv::Slv_VecSlv, alpha::Number = 0.05, p::Number = 2.0,
              w::Option{<:ObsWeights} = nothing)
     w = get_observation_weights(w, x)

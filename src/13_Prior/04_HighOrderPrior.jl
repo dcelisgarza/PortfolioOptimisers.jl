@@ -54,6 +54,7 @@ function block_vec_pq(A::MatNum, p::Integer, q::Integer)
     end
     return A_vec
 end
+# COV_EXCL_START
 """
     duplication_matrix(n::Int, diag::Bool = true)
 
@@ -75,7 +76,6 @@ The duplication matrix `D` maps the vech (half-vectorisation) of a symmetric mat
   - [`elimination_matrix`](@ref)
   - [`summation_matrix`](@ref)
 """
-# COV_EXCL_START
 function duplication_matrix(n::Int, diag::Bool = true)
     m = div(n * (n + 1), 2)
     nsq = n^2

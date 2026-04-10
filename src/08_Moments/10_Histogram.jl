@@ -383,6 +383,7 @@ function variation_info(X::MatNum, bins::Int_Bin = HacineGharbiRavier(),
     end
     return var_mtx
 end
+# COV_EXCL_START
 """
     mutual_variation_info(X::MatNum, bins::Int_Bin = Knuth(), normalise::Bool = true)
 
@@ -403,7 +404,6 @@ Compute the pairwise mutual information and variation of information matrices fr
   - [`Int_Bin`](@ref)
   - [`AbstractBins`](@ref)
 """
-# COV_EXCL_START
 function mutual_variation_info(X::MatNum, bins::Int_Bin = Knuth(), normalise::Bool = true)
     T, N = size(X)
     mut_mtx = Matrix{eltype(X)}(undef, N, N)
