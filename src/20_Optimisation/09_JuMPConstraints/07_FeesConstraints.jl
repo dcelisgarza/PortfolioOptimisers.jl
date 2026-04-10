@@ -1,7 +1,26 @@
 """
-    add_to_fees!(model, expr)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
-Accumulate `expr` into the model's `:fees` expression, creating it if absent.
+Accumulate a JuMP expression into the `:fees` expression of the optimisation model.
+
+Creates the `:fees` expression if it does not yet exist; otherwise adds `expr` to it in place.
+
+# Arguments
+
+  - `model::JuMP.Model`: The JuMP optimisation model.
+  - `expr::JuMP.AbstractJuMPScalar`: The fee expression to accumulate.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`set_non_fixed_fees!`](@ref)
+  - [`set_long_non_fixed_fees!`](@ref)
+  - [`set_short_non_fixed_fees!`](@ref)
+  - [`set_turnover_fees!`](@ref)
+  - [`Fees`](@ref)
 """
 function add_to_fees!(model::JuMP.Model, expr::JuMP.AbstractJuMPScalar)
     if !haskey(model, :fees)
@@ -13,13 +32,28 @@ function add_to_fees!(model::JuMP.Model, expr::JuMP.AbstractJuMPScalar)
     return nothing
 end
 """
-    set_turnover_fees!(args...)
-    set_turnover_fees!(model, tn)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
-Add turnover-based transaction fee expression to the JuMP model.
+Add a turnover-based transaction fee expression to the JuMP optimisation model.
 
-The fall-through method does nothing. The concrete method computes
-``\\mathrm{val}^\\intercal |w - w_t|`` and accumulates it into `:fees`.
+The fall-through method does nothing. The concrete method computes `val' * |w - wt|` via NormOneCone constraints and accumulates the result into the model's `:fees` expression via [`add_to_fees!`](@ref).
+
+# Arguments
+
+  - `model::JuMP.Model`: The JuMP optimisation model.
+  - `tn::Turnover`: Turnover specification containing benchmark weights `w` and per-unit fee `val`.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`add_to_fees!`](@ref)
+  - [`set_non_fixed_fees!`](@ref)
+  - [`set_turnover_constraints!`](@ref)
+  - [`Turnover`](@ref)
+  - [`Fees`](@ref)
 """
 function set_turnover_fees!(args...)
     return nothing
@@ -42,32 +76,80 @@ function set_turnover_fees!(model::JuMP.Model, tn::Turnover)
     return nothing
 end
 """
-    set_non_fixed_fees!(args...)
-    set_non_fixed_fees!(model, fees)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
-Add all non-fixed (proportional and turnover) fee expressions to the JuMP model.
+Add all non-fixed (proportional and turnover) fee expressions to the JuMP optimisation model.
 
-The fall-through method does nothing. The concrete method delegates to
-`set_long_non_fixed_fees!`, `set_short_non_fixed_fees!`, and `set_turnover_fees!`.
+The fall-through method does nothing. The concrete method delegates to [`set_long_non_fixed_fees!`](@ref), [`set_short_non_fixed_fees!`](@ref), and [`set_turnover_fees!`](@ref).
+
+# Arguments
+
+  - `model::JuMP.Model`: The JuMP optimisation model.
+  - `fees::Fees`: Fee specification containing long, short, and turnover fee rates.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`add_to_fees!`](@ref)
+  - [`set_long_non_fixed_fees!`](@ref)
+  - [`set_short_non_fixed_fees!`](@ref)
+  - [`set_turnover_fees!`](@ref)
+  - [`Fees`](@ref)
 """
 function set_non_fixed_fees!(args...)
     return nothing
 end
 """
-    set_long_non_fixed_fees!(args...)
-    set_long_non_fixed_fees!(model, fl)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
-Add proportional long-side fee expression `fl' * lw` to the JuMP model.
+Add proportional long-side fee expression to the JuMP optimisation model.
+
+The fall-through method does nothing. The concrete method adds `fl' * lw` to the model's `:fees` expression via [`add_to_fees!`](@ref).
+
+# Arguments
+
+  - `model::JuMP.Model`: The JuMP optimisation model.
+  - `fl`: Long-side fee rate(s). Accepts a scalar `Number` or a `VecNum`.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`add_to_fees!`](@ref)
+  - [`set_short_non_fixed_fees!`](@ref)
+  - [`set_non_fixed_fees!`](@ref)
+  - [`Fees`](@ref)
 """
 function set_long_non_fixed_fees!(args...)
     return nothing
 end
 """
-    set_short_non_fixed_fees!(args...)
-    set_short_non_fixed_fees!(model, fs)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
-Add proportional short-side fee expression `fs' * sw` to the JuMP model.
-Does nothing when no short-weight variable `:sw` exists.
+Add proportional short-side fee expression to the JuMP optimisation model.
+
+The fall-through method does nothing. The concrete method adds `fs' * sw` to the model's `:fees` expression via [`add_to_fees!`](@ref). Does nothing when no short-weight variable `:sw` exists in the model.
+
+# Arguments
+
+  - `model::JuMP.Model`: The JuMP optimisation model.
+  - `fs`: Short-side fee rate(s). Accepts a scalar `Number` or a `VecNum`.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`add_to_fees!`](@ref)
+  - [`set_long_non_fixed_fees!`](@ref)
+  - [`set_non_fixed_fees!`](@ref)
+  - [`Fees`](@ref)
 """
 function set_short_non_fixed_fees!(args...)
     return nothing

@@ -1,10 +1,23 @@
 """
-    set_sdp_constraints!(model) -> W
+$(DocStringExtensions.TYPEDSIGNATURES)
 
-Add a semidefinite (PSD) constraint to the JuMP model for the portfolio weights.
+Add a positive semidefinite (PSD) constraint to the JuMP optimisation model for the portfolio weights.
 
-Creates a symmetric matrix variable `W` and enforces that the bordered matrix
-`[W w; w' k]` is positive semidefinite. Returns the JuMP variable `W`.
+Creates a symmetric matrix variable `W` and enforces that the bordered matrix `[W w; wᵀ k]` lies in the PSD cone. Returns immediately if `W` already exists in `model`.
+
+# Arguments
+
+  - `model::JuMP.Model`: The JuMP optimisation model.
+
+# Returns
+
+  - `W`: Symmetric JuMP variable matrix of size `N × N`.
+
+# Related
+
+  - [`set_sdp_frc_constraints!`](@ref)
+  - [`set_sdp_phylogeny_constraints!`](@ref)
+  - [`SemiDefinitePhylogeny`](@ref)
 """
 function set_sdp_constraints!(model::JuMP.Model)
     if haskey(model, :W)
@@ -20,12 +33,25 @@ function set_sdp_constraints!(model::JuMP.Model)
     return W
 end
 """
-    set_sdp_frc_constraints!(model) -> frc_W
+$(DocStringExtensions.TYPEDSIGNATURES)
 
-Add a semidefinite constraint for factor risk contribution to the JuMP model.
+Add a positive semidefinite (PSD) constraint for factor risk contribution to the JuMP optimisation model.
 
-Creates a symmetric matrix variable `frc_W` and enforces that the bordered matrix
-`[frc_W w1; w1' k]` is positive semidefinite. Returns the JuMP variable `frc_W`.
+Creates a symmetric matrix variable `frc_W` and enforces that the bordered matrix `[frc_W w1; w1ᵀ k]` lies in the PSD cone. Returns immediately if `frc_W` already exists in `model`.
+
+# Arguments
+
+  - `model::JuMP.Model`: The JuMP optimisation model.
+
+# Returns
+
+  - `frc_W`: Symmetric JuMP variable matrix of size `Nf × Nf`.
+
+# Related
+
+  - [`set_sdp_constraints!`](@ref)
+  - [`set_sdp_frc_phylogeny_constraints!`](@ref)
+  - [`SemiDefinitePhylogeny`](@ref)
 """
 function set_sdp_frc_constraints!(model::JuMP.Model)
     if haskey(model, :frc_W)
@@ -41,12 +67,26 @@ function set_sdp_frc_constraints!(model::JuMP.Model)
     return frc_W
 end
 """
-    set_sdp_phylogeny_constraints!(model, plgs)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
-Add semidefinite phylogeny constraints to the JuMP model for
-[`SemiDefinitePhylogeny`](@ref) entries in `plgs`.
+Add semidefinite phylogeny constraints to the JuMP optimisation model.
 
-Does nothing when `plgs` contains no `SemiDefinitePhylogeny` instances.
+Iterates over `plgs` and, for each [`SemiDefinitePhylogeny`](@ref) entry, enforces `A ⊙ W = 0` and optionally adds `p * tr(W)` to the objective penalty. Does nothing when `plgs` contains no [`SemiDefinitePhylogeny`](@ref) instances.
+
+# Arguments
+
+  - `model::JuMP.Model`: The JuMP optimisation model.
+  - `plgs`: Phylogeny constraint(s). Accepts `nothing`, a single phylogeny, or a vector.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`set_sdp_constraints!`](@ref)
+  - [`set_sdp_frc_phylogeny_constraints!`](@ref)
+  - [`SemiDefinitePhylogeny`](@ref)
 """
 function set_sdp_phylogeny_constraints!(model::JuMP.Model, plgs::Option{<:PlC_VecPlC})
     if !(isa(plgs, SemiDefinitePhylogeny) ||
@@ -72,11 +112,26 @@ function set_sdp_phylogeny_constraints!(model::JuMP.Model, plgs::Option{<:PlC_Ve
     return nothing
 end
 """
-    set_sdp_frc_phylogeny_constraints!(model, plgs)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
-Add semidefinite factor risk contribution phylogeny constraints to the JuMP model.
+Add semidefinite phylogeny constraints for factor risk contribution to the JuMP optimisation model.
 
-Does nothing when `plgs` contains no `SemiDefinitePhylogeny` instances.
+Iterates over `plgs` and, for each [`SemiDefinitePhylogeny`](@ref) entry, enforces `A ⊙ frc_W = 0` and optionally adds `p * tr(frc_W)` to the objective penalty. Does nothing when `plgs` contains no [`SemiDefinitePhylogeny`](@ref) instances.
+
+# Arguments
+
+  - `model::JuMP.Model`: The JuMP optimisation model.
+  - `plgs`: Phylogeny constraint(s). Accepts `nothing`, a single phylogeny, or a vector.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`set_sdp_frc_constraints!`](@ref)
+  - [`set_sdp_phylogeny_constraints!`](@ref)
+  - [`SemiDefinitePhylogeny`](@ref)
 """
 function set_sdp_frc_phylogeny_constraints!(model::JuMP.Model,
                                             plgs::Option{<:PlCE_PhC_VecPlCE_PlC})

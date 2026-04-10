@@ -1,12 +1,23 @@
 """
-    set_number_effective_assets!(args...)
-    set_number_effective_assets!(model, val)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
-Add an effective number of assets constraint to the JuMP model.
+Add an effective number of assets constraint to the JuMP optimisation model.
 
-Enforces ``\\|w\\|_2 \\le 1/\\sqrt{val}`` using a second-order cone constraint,
-which is equivalent to requiring ``N_{\\mathrm{eff}} \\ge val``.
-The fall-through method does nothing.
+The fall-through method does nothing. The concrete method introduces an auxiliary variable `nea` and enforces `‖w‖₂ ≤ nea` via a SecondOrderCone constraint, combined with `nea * √val ≤ k`. This is equivalent to requiring the effective number of assets to be at least `val`.
+
+# Arguments
+
+  - `model::JuMP.Model`: The JuMP optimisation model.
+  - `val::Number`: Minimum required effective number of assets.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`number_effective_assets`](@ref)
+  - [`EqualRiskMeasure`](@ref)
 """
 function set_number_effective_assets!(args...)
     return nothing

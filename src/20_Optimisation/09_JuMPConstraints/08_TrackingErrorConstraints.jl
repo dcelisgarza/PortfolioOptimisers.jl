@@ -1,15 +1,41 @@
 """
-    set_tracking_error_constraints!(args...; kwargs...)
-    set_tracking_error_constraints!(model, i, pr, tr, ...; kwargs...)
-    set_tracking_error_constraints!(model, pr, tres, ...; kwargs...)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
-Add tracking error constraints to the JuMP model.
+Add tracking error constraints to the JuMP optimisation model.
 
-The fall-through method does nothing. Concrete methods dispatch on the tracking
-algorithm (`L1Tracking`, `L2Tracking`, `SquaredL2Tracking`, `LpTracking`,
-`LInfTracking`, `IndependentVariableTracking`, `DependentVariableTracking`) and
-encode the appropriate norm-based distance from the benchmark.
+The fall-through method does nothing. Concrete methods dispatch on the tracking algorithm type:
+
+  - [`L1Tracking`](@ref): Enforces `‖net_X - wb * k‖₁ ≤ err * T` via NormOneCone.
+  - [`L2Tracking`](@ref) / [`SquaredL2Tracking`](@ref): Enforces a scaled L2 norm via SecondOrderCone.
+  - [`LpTracking`](@ref): Enforces a scaled Lp norm via power cone.
+  - [`LInfTracking`](@ref): Enforces `‖net_X - wb * k‖_∞ ≤ err * scale` via NormInfinityCone.
+  - [`IndependentVariableTracking`](@ref): Substitutes `w - wb` for `w` and applies the chosen risk constraint.
+  - [`DependentVariableTracking`](@ref): Constrains the absolute difference between portfolio risk and benchmark risk.
+
 The collection method iterates over all tracking errors in `tres`.
+
+# Arguments
+
+  - `model::JuMP.Model`: The JuMP optimisation model.
+  - `i::Integer`: Constraint index for generating unique variable and constraint names.
+  - `pr::AbstractPriorResult`: Prior result providing the return matrix `X`.
+  - `tr`: Tracking error specification.
+  - `opt`: Optimisation estimator (required for risk-based tracking variants).
+  - `pl`: Optional phylogeny constraints.
+  - `fees`: Optional fees structure.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`TrackingError`](@ref)
+  - [`RiskTrackingError`](@ref)
+  - [`L1Tracking`](@ref)
+  - [`L2Tracking`](@ref)
+  - [`LpTracking`](@ref)
+  - [`LInfTracking`](@ref)
 """
 function set_tracking_error_constraints!(args...; kwargs...)
     return nothing

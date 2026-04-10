@@ -1,20 +1,49 @@
 """
-    set_turnover_constraints!(args...)
-    set_turnover_constraints!(model, tns)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
-Add turnover constraints to the JuMP model for each [`Turnover`](@ref) in `tns`.
+Add turnover constraints to the JuMP optimisation model.
 
-The fall-through method does nothing. Each concrete constraint limits
-``\\|w - w_b\\|_1 \\le val``.
+The fall-through method does nothing. The concrete method iterates over the collection of [`Turnover`](@ref) objects `tns` and delegates each to [`_set_turnover_constraints!`](@ref).
+
+# Arguments
+
+  - `model::JuMP.Model`: The JuMP optimisation model.
+  - `tns`: One or more [`Turnover`](@ref) constraint specifications.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`_set_turnover_constraints!`](@ref)
+  - [`Turnover`](@ref)
+  - [`set_turnover_fees!`](@ref)
 """
 function set_turnover_constraints!(args...)
     return nothing
 end
 """
-    _set_turnover_constraints!(model, tn, i=1)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
-Add a single turnover constraint for [`Turnover`](@ref) `tn` to the JuMP model,
-using index `i` to generate unique variable/constraint names.
+Add a single turnover constraint for a [`Turnover`](@ref) object to the JuMP optimisation model.
+
+Introduces auxiliary variable `t_tn_i`, expression `tn_i = w - wb * k`, and enforces `‖w - wb‖₁ ≤ val * k` via NormOneCone constraints.
+
+# Arguments
+
+  - `model::JuMP.Model`: The JuMP optimisation model.
+  - `tn::Turnover`: Turnover constraint specification containing benchmark weights `w` and tolerance `val`.
+  - `i::Integer = 1`: Index used to generate unique variable and constraint names.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`set_turnover_constraints!`](@ref)
+  - [`Turnover`](@ref)
 """
 function _set_turnover_constraints!(model::JuMP.Model, tn::Turnover, i::Integer = 1)
     w = model[:w]

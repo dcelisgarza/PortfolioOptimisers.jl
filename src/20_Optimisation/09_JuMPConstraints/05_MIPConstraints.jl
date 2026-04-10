@@ -1,11 +1,23 @@
 """
-    get_mip_ss(ss::Number, args...) -> Number
-    get_mip_ss(::Nothing, wb::WeightBounds) -> Number
+$(DocStringExtensions.TYPEDSIGNATURES)
 
 Return the big-M style scaling constant used by MIP constraints.
 
-When `ss` is a number it is returned directly. When `nothing`, the value is derived
-from the largest finite bound in `wb` (multiplied by 1000), defaulting to `1000.0`.
+When `ss` is a number it is returned directly. When `nothing`, the value is derived from the largest finite bound magnitude in `wb` multiplied by 1000, defaulting to `1000.0` when all bounds are infinite or absent.
+
+# Arguments
+
+  - `ss::Number`: Scaling constant. Returned as-is.
+
+# Returns
+
+  - `ss::Number`: The scaling constant.
+
+# Related
+
+  - [`mip_constraints`](@ref)
+  - [`smip_constraints`](@ref)
+  - [`WeightBounds`](@ref)
 """
 function get_mip_ss(ss::Number, args...)
     return ss
@@ -30,11 +42,29 @@ function get_mip_ss(::Nothing, wb::WeightBounds)
     return (iszero(lb_mag) && iszero(ub_mag)) ? 1000.0 : max(lb_mag, ub_mag) * 1000.0
 end
 """
-    mip_wb(::Any, ::Nothing, args...)
-    mip_wb(model, wb, il, is)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
-Add MIP-compatible weight bound constraints using binary selection variables `il`
-(long) and `is` (short). The fall-through method does nothing when `wb` is `nothing`.
+Add MIP-compatible weight bound constraints using binary selection variables.
+
+The fall-through method does nothing when `wb` is `nothing`. The concrete method adds `w ≥ is ⊙ lb` and `w ≤ il ⊙ ub` constraints when the respective finite bounds are present.
+
+# Arguments
+
+  - `model::JuMP.Model`: The JuMP optimisation model.
+  - `wb::WeightBounds`: Weight bound specification.
+  - `il`: Long binary (or continuous relaxation) indicator variable.
+  - `is`: Short binary (or continuous relaxation) indicator variable.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`mip_constraints`](@ref)
+  - [`smip_wb`](@ref)
+  - [`w_finite_flag`](@ref)
+  - [`WeightBounds`](@ref)
 """
 function mip_wb(::Any, ::Nothing, args...)
     return nothing
@@ -53,14 +83,38 @@ function mip_wb(model::JuMP.Model, wb::WeightBounds, il::VecNum, is::VecNum)
     return nothing
 end
 """
-    short_mip_threshold_constraints(model, wb, lt, st, ffl, ffs, ss,
-                                    lt_flag, st_flag, ffl_flag, ffs_flag, miprb_flag)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
 Add MIP binary selection variables and threshold constraints for long-short portfolios.
 
-Creates `ilb`/`isb` binary indicator variables (or their continuous relaxations `ilf`/`isf`
-when `k` is variable), enforces that each asset is either long or short but not both,
-and applies long/short threshold and rebalancing constraints based on the flags provided.
+Creates `ilb`/`isb` binary indicator variables (or their continuous relaxations `ilf`/`isf` when `k` is a JuMP variable), enforces that each asset is either long or short but not both (`ilb + isb ≤ 1`), and applies long/short minimum-holding threshold and rebalancing constraints based on the flags provided.
+
+# Arguments
+
+  - `model::JuMP.Model`: The JuMP optimisation model.
+  - `wb::WeightBounds`: Weight bound specification.
+  - `lt::Option{<:Threshold}`: Long-side holding threshold.
+  - `st::Option{<:Threshold}`: Short-side holding threshold.
+  - `ffl::Option{<:Num_VecNum}`: Long-side fixed fee rate(s).
+  - `ffs::Option{<:Num_VecNum}`: Short-side fixed fee rate(s).
+  - `ss::Option{<:Number}`: Big-M scaling constant (computed via [`get_mip_ss`](@ref) when `nothing`).
+  - `lt_flag::Bool`: Whether to apply the long-side threshold.
+  - `st_flag::Bool`: Whether to apply the short-side threshold.
+  - `ffl_flag::Bool`: Whether to add long fixed fee expressions.
+  - `ffs_flag::Bool`: Whether to add short fixed fee expressions.
+  - `miprb_flag::Bool`: Whether to add MIP rebalancing constraints.
+
+# Returns
+
+  - `i_mip`: Combined long+short indicator expression.
+
+# Related
+
+  - [`mip_constraints`](@ref)
+  - [`get_mip_ss`](@ref)
+  - [`mip_wb`](@ref)
+  - [`Threshold`](@ref)
+  - [`WeightBounds`](@ref)
 """
 function short_mip_threshold_constraints(model::JuMP.Model, wb::WeightBounds,
                                          lt::Option{<:Threshold}, st::Option{<:Threshold},
@@ -128,13 +182,36 @@ function short_mip_threshold_constraints(model::JuMP.Model, wb::WeightBounds,
     return i_mip
 end
 """
-    mip_constraints(model, wb, ffl, lt, ss, lt_flag, ffl_flag, miprb_flag) -> ib
+$(DocStringExtensions.TYPEDSIGNATURES)
 
-Add long-only MIP binary indicator variable `ib` and associated constraints.
+Add long-only MIP binary indicator variable and associated constraints to the JuMP optimisation model.
 
-Creates a binary variable `ib[i]` per asset indicating whether the asset is held.
-Applies threshold constraints when `lt_flag` is set and fixed-fee costs when
-`ffl_flag` is set.
+Creates binary variable `ib[i]` per asset indicating whether the asset is held. When `k` is a JuMP variable, introduces continuous relaxation `ibf` with big-M linking constraints. Optionally applies minimum-holding threshold, fixed-fee, and rebalancing constraints.
+
+# Arguments
+
+  - `model::JuMP.Model`: The JuMP optimisation model.
+  - `wb::WeightBounds`: Weight bound specification.
+  - `ffl::Option{<:Num_VecNum}`: Long-side fixed fee rate(s).
+  - `lt::Option{<:Threshold}`: Long-side minimum-holding threshold.
+  - `ss::Option{<:Number}`: Big-M scaling constant (computed via [`get_mip_ss`](@ref) when `nothing`).
+  - `lt_flag::Bool`: Whether to apply the long threshold.
+  - `ffl_flag::Bool`: Whether to add fixed fee expressions.
+  - `miprb_flag::Bool`: Whether to add MIP rebalancing constraints.
+
+# Returns
+
+  - `ib`: Binary indicator JuMP variable vector.
+
+# Related
+
+  - [`short_mip_threshold_constraints`](@ref)
+  - [`set_mip_constraints!`](@ref)
+  - [`mip_wb`](@ref)
+  - [`get_mip_ss`](@ref)
+  - [`set_iplg_constraints!`](@ref)
+  - [`Threshold`](@ref)
+  - [`WeightBounds`](@ref)
 """
 function mip_constraints(model::JuMP.Model, wb::WeightBounds, ffl::Option{<:Num_VecNum},
                          lt::Option{<:Threshold}, ss::Option{<:Number}, lt_flag::Bool,
@@ -175,12 +252,26 @@ function mip_constraints(model::JuMP.Model, wb::WeightBounds, ffl::Option{<:Num_
     return ib
 end
 """
-    set_iplg_constraints!(model, plgs)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
-Add integer phylogeny cardinality constraints to the JuMP model.
+Add integer phylogeny cardinality constraints to the JuMP optimisation model.
 
-For each [`IntegerPhylogeny`](@ref) in `plgs`, enforces `A * ib ≤ B` where `ib` is
-the binary indicator variable produced by `mip_constraints`.
+Iterates over `plgs` and, for each [`IntegerPhylogeny`](@ref) entry, enforces `A * ib ≤ B` where `ib` is the binary indicator variable created by [`mip_constraints`](@ref).
+
+# Arguments
+
+  - `model::JuMP.Model`: The JuMP optimisation model.
+  - `plgs`: Collection of phylogeny constraint objects.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`mip_constraints`](@ref)
+  - [`set_mip_constraints!`](@ref)
+  - [`IntegerPhylogeny`](@ref)
 """
 function set_iplg_constraints!(model::JuMP.Model, plgs::PlC_VecPlC)
     ib = model[:ib]
@@ -196,12 +287,38 @@ function set_iplg_constraints!(model::JuMP.Model, plgs::PlC_VecPlC)
     return nothing
 end
 """
-    set_mip_constraints!(model, wb, card, gcard, pl, lt, st, fees, ss, miprb_flag=false)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
-Add all long-only MIP constraints to the JuMP model.
+Add all long-only MIP constraints to the JuMP optimisation model.
 
-Orchestrates cardinality, group cardinality, phylogeny, threshold, fee, and
-rebalancing constraints for long-only portfolios.
+Orchestrates cardinality, group cardinality, integer phylogeny, minimum-holding threshold, fixed-fee, and rebalancing MIP constraints for long-only portfolios, dispatching to [`mip_constraints`](@ref), [`short_mip_threshold_constraints`](@ref), and [`set_iplg_constraints!`](@ref) as appropriate.
+
+# Arguments
+
+  - `model::JuMP.Model`: The JuMP optimisation model.
+  - `wb::WeightBounds`: Weight bound specification.
+  - `card::Option{<:Integer}`: Optional maximum cardinality (number of non-zero assets).
+  - `gcard::Option{<:LinearConstraint}`: Optional group cardinality constraint.
+  - `pl::Option{<:PlC_VecPlC}`: Optional phylogeny constraint(s).
+  - `lt::Option{<:Threshold}`: Long-side minimum-holding threshold.
+  - `st::Option{<:Threshold}`: Short-side minimum-holding threshold.
+  - `fees::Option{<:Fees}`: Optional fee specification.
+  - `ss::Option{<:Number}`: Big-M scaling constant.
+  - `miprb_flag::Bool = false`: Whether to add MIP rebalancing constraints.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`mip_constraints`](@ref)
+  - [`short_mip_threshold_constraints`](@ref)
+  - [`set_iplg_constraints!`](@ref)
+  - [`set_smip_constraints!`](@ref)
+  - [`WeightBounds`](@ref)
+  - [`Threshold`](@ref)
+  - [`IntegerPhylogeny`](@ref)
 """
 function set_mip_constraints!(model::JuMP.Model, wb::WeightBounds, card::Option{<:Integer},
                               gcard::Option{<:LinearConstraint}, pl::Option{<:PlC_VecPlC},
@@ -257,11 +374,32 @@ function set_mip_constraints!(model::JuMP.Model, wb::WeightBounds, card::Option{
     return nothing
 end
 """
-    smip_wb(::Any, ::Nothing, args...)
-    smip_wb(model, wb, smtx, smtx_expr, il, is, key, i)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
-Add MIP weight bounds for sub-group selections using a selection matrix `smtx`.
-The fall-through method does nothing when `wb` is `nothing`.
+Add sub-group MIP weight bound constraints using a selection matrix.
+
+The fall-through method does nothing when `wb` is `nothing`. The concrete method applies bounds `smtx * lb` and `smtx * ub` gated by binary selection variables `is` and `il` respectively.
+
+# Arguments
+
+  - `model::JuMP.Model`: The JuMP optimisation model.
+  - `wb::WeightBounds`: Weight bound specification.
+  - `smtx::MatNum`: Selection matrix mapping assets to sub-groups.
+  - `smtx_expr`: JuMP expression for the sub-group weight combination.
+  - `il`: Long binary (or continuous relaxation) indicator variable.
+  - `is`: Short binary (or continuous relaxation) indicator variable.
+  - `key::Symbol = :set_w_mip_`: Base key for naming constraints.
+  - `i::Integer = 1`: Index for generating unique constraint names.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`mip_wb`](@ref)
+  - [`smip_constraints`](@ref)
+  - [`WeightBounds`](@ref)
 """
 function smip_wb(::Any, ::Nothing, args...)
     return nothing
@@ -285,11 +423,39 @@ function smip_wb(model::JuMP.Model, wb::WeightBounds, smtx::MatNum,
     return nothing
 end
 """
-    short_smip_threshold_constraints(model, wb, smtx, lt, st, ss,
-                                     lt_flag, st_flag, key1, key7, key8, i)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
-Add sub-group MIP binary selection variables and threshold constraints for long-short
-portfolios using a selection matrix `smtx`.
+Add sub-group MIP binary selection variables and threshold constraints for long-short portfolios using a selection matrix.
+
+Creates per-group binary indicator variables and, when `k` is a JuMP variable, their continuous relaxations with big-M linking constraints. Applies long/short minimum-holding thresholds gated by the selection matrix `smtx`.
+
+# Arguments
+
+  - `model::JuMP.Model`: The JuMP optimisation model.
+  - `wb::WeightBounds`: Weight bound specification.
+  - `smtx::Option{<:MatNum}`: Selection matrix mapping assets to sub-groups.
+  - `lt::Option{<:Threshold}`: Long-side minimum-holding threshold.
+  - `st::Option{<:Threshold}`: Short-side minimum-holding threshold.
+  - `ss::Option{<:Number}`: Big-M scaling constant.
+  - `lt_flag::Bool`: Whether to apply the long threshold.
+  - `st_flag::Bool`: Whether to apply the short threshold.
+  - `key1::Symbol = :si`: Base key for long indicator variables.
+  - `key7::Symbol = :smtx_expr_`: Base key for sub-group weight expressions.
+  - `key8::Symbol = :set_w_mip_`: Base key for weight bound constraints.
+  - `i::Integer = 1`: Index for generating unique names.
+
+# Returns
+
+  - `i_mip`: Combined long+short indicator expression for the sub-group.
+
+# Related
+
+  - [`short_mip_threshold_constraints`](@ref)
+  - [`smip_constraints`](@ref)
+  - [`smip_wb`](@ref)
+  - [`get_mip_ss`](@ref)
+  - [`Threshold`](@ref)
+  - [`WeightBounds`](@ref)
 """
 function short_smip_threshold_constraints(model::JuMP.Model, wb::WeightBounds,
                                           smtx::Option{<:MatNum}, lt::Option{<:Threshold},
@@ -386,10 +552,39 @@ function short_smip_threshold_constraints(model::JuMP.Model, wb::WeightBounds,
     return i_mip
 end
 """
-    smip_constraints(model, wb, smtx, lt, ss, lt_flag, key1…key6, i) -> sib
+$(DocStringExtensions.TYPEDSIGNATURES)
 
-Add sub-group MIP binary indicator variable `sib` for a single selection matrix
-group and associated weight/threshold constraints.
+Add a sub-group MIP binary indicator variable and associated weight and threshold constraints for a single selection matrix group.
+
+Creates binary variable `sib` (or continuous relaxation when `k` is a JuMP variable) representing asset inclusion within the sub-group, then applies sub-group weight expression and optional threshold bounds via [`smip_wb`](@ref).
+
+# Arguments
+
+  - `model::JuMP.Model`: The JuMP optimisation model.
+  - `wb::WeightBounds`: Weight bound specification.
+  - `smtx::Option{<:MatNum}`: Selection matrix for this sub-group.
+  - `lt::Option{<:Threshold}`: Long-side minimum-holding threshold.
+  - `ss::Option{<:Number}`: Big-M scaling constant.
+  - `lt_flag::Bool`: Whether to apply the long threshold.
+  - `key1::Symbol = :sib_`: Base key for binary indicator variable.
+  - `key2::Symbol = :i_smip_`: Base key for the indicator expression.
+  - `key3::Symbol = :isbf_`: Base key for continuous relaxation variable.
+  - `key4::Symbol = :smtx_expr_`: Base key for sub-group weight expression.
+  - `key5::Symbol = :set_w_mip_`: Base key for weight bound constraints.
+  - `key6::Symbol = :w_smip_lt_`: Base key for threshold constraints.
+  - `i::Integer = 1`: Index for generating unique names.
+
+# Returns
+
+  - `sib`: Binary indicator JuMP variable for this sub-group.
+
+# Related
+
+  - [`smip_wb`](@ref)
+  - [`set_all_smip_constraints!`](@ref)
+  - [`set_scardmip_constraints!`](@ref)
+  - [`get_mip_ss`](@ref)
+  - [`WeightBounds`](@ref)
 """
 function smip_constraints(model::JuMP.Model, wb::WeightBounds, smtx::Option{<:MatNum},
                           lt::Option{<:Threshold}, ss::Option{<:Number}, lt_flag::Bool,
@@ -437,13 +632,36 @@ function smip_constraints(model::JuMP.Model, wb::WeightBounds, smtx::Option{<:Ma
     return sib
 end
 """
-    set_all_smip_constraints!(model, wb, card, gcard, smtx, lt, st, ss, i=1)
-    set_all_smip_constraints!(model, wb, card, gcard, smtxs, lt, st, ss)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
 Add all sub-group MIP constraints for a single or multiple selection matrices.
 
-Handles cardinality, group-cardinality, threshold, and weight-bound constraints
-for sub-group mixed-integer portfolio optimisation.
+The single-matrix method handles cardinality, group cardinality, long/short threshold, and weight-bound constraints for one sub-group. The vector method iterates over collections of cardinalities, group constraints, and selection matrices.
+
+# Arguments
+
+  - `model::JuMP.Model`: The JuMP optimisation model.
+  - `wb::WeightBounds`: Weight bound specification.
+  - `card`: Cardinality bound(s) for the sub-group(s).
+  - `gcard`: Group-cardinality constraint(s) for the sub-group(s).
+  - `smtx`: Selection matrix (or vector thereof) for the sub-group(s).
+  - `lt`: Long-side minimum-holding threshold(s).
+  - `st`: Short-side minimum-holding threshold(s).
+  - `ss::Option{<:Number}`: Big-M scaling constant.
+  - `i::Integer = 1`: Index for generating unique names (single-matrix method only).
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`smip_constraints`](@ref)
+  - [`short_smip_threshold_constraints`](@ref)
+  - [`set_scardmip_constraints!`](@ref)
+  - [`set_sgcardmip_constraints!`](@ref)
+  - [`set_smip_constraints!`](@ref)
+  - [`WeightBounds`](@ref)
 """
 function set_all_smip_constraints!(model::JuMP.Model, wb::WeightBounds,
                                    card::Option{<:Integer},
