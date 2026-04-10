@@ -393,6 +393,8 @@ Combines inner cluster weights `w_inner` with outer portfolio weights `w_outer`,
   - [`WeightBounds`](@ref)
 """
 function outer_optimisation_finaliser(wb::Option{<:WeightBounds}, wf::WeightFinaliser,
+                                      resi::VecOpt,
+                                      rcos::AbstractVector{<:OptimisationReturnCode},
                                       ws::VecVecNum, wi::MatNum)
     retcode_w = [outer_optimisation_finaliser(wb, wf, resi, rco, w, wi)
                  for (rco, w) in zip(rcos, ws)]
