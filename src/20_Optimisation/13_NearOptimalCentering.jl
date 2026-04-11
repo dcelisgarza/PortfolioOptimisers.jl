@@ -642,6 +642,29 @@ function solve_noc!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any,
     end
     return retcodes, sols
 end
+"""
+    compute_ret_lbs(lbs::Frontier, rt_min::Number, rt_max::Number)
+
+Compute return lower bounds for a `NearOptimalCentering` frontier sweep from pre-computed minimum and maximum return values.
+
+Constructs a uniformly spaced range of `lbs.N` return targets between `rt_min` and `rt_max`.
+
+# Arguments
+
+  - `lbs::Frontier`: Frontier configuration specifying the number of points.
+  - `rt_min::Number`: Minimum portfolio return (from the minimum-risk portfolio).
+  - `rt_max::Number`: Maximum portfolio return (from the maximum-return portfolio).
+
+# Returns
+
+  - Range of `lbs.N` equally spaced return lower bounds.
+
+# Related
+
+  - [`compute_ret_lbs`](@ref)
+  - [`NearOptimalCentering`](@ref)
+  - [`solve_noc!`](@ref)
+"""
 function compute_ret_lbs(lbs::Frontier, rt_min::Number, rt_max::Number)
     return range(rt_min, rt_max; length = lbs.N)
 end
@@ -697,6 +720,32 @@ function rebuild_risk_frontier(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:
     r = factory(noc.r, pr, noc.opt.slv)
     return [_rebuild_risk_frontier(pr, fees, r, risk_frontier, w_min, w_max)]
 end
+"""
+    compute_risk_ubs(model::JuMP.Model, noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:ConstrainedNearOptimalCentering}, pr::AbstractPriorResult, fees::Option{<:Fees}, w_min::VecNum, w_max::VecNum)
+
+Compute risk upper bounds for a constrained `NearOptimalCentering` frontier sweep.
+
+Identifies risk frontier entries that are not yet resolved (i.e. not concrete weight vectors) and rebuilds them using the minimum and maximum portfolio weights.
+
+# Arguments
+
+  - `model::JuMP.Model`: JuMP optimisation model containing `risk_frontier`.
+  - `noc::NearOptimalCentering{..., <:ConstrainedNearOptimalCentering}`: Constrained Near Optimal Centering optimiser.
+  - `pr::AbstractPriorResult`: Prior result with asset moments.
+  - `fees::Option{<:Fees}`: Optional fees configuration.
+  - `w_min::VecNum`: Minimum-risk portfolio weights.
+  - `w_max::VecNum`: Maximum-risk (maximum-return) portfolio weights.
+
+# Returns
+
+  - Updated risk frontier vector of `(keys, vals)` pairs.
+
+# Related
+
+  - [`compute_risk_ubs`](@ref)
+  - [`NearOptimalCentering`](@ref)
+  - [`solve_noc!`](@ref)
+"""
 function compute_risk_ubs(model::JuMP.Model,
                           noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any,
                                                     <:Any, <:Any, <:Any, <:Any, <:Any,

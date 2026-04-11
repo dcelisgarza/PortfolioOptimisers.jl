@@ -243,6 +243,28 @@ function FactorRiskBudgeting(; re::RegE_Reg = StepwiseRegression(),
                              sets::Option{<:AssetSets} = nothing, flag::Bool = true)
     return FactorRiskBudgeting(re, rkb, sets, flag)
 end
+"""
+    risk_budgeting_algorithm_view(r::FactorRiskBudgeting, i)
+
+Return a view of a `FactorRiskBudgeting` algorithm for cluster index `i`.
+
+Slices the regression estimator for the given cluster while keeping the risk budget, asset sets, and idiosyncratic flag unchanged.
+
+# Arguments
+
+  - `r::FactorRiskBudgeting`: Factor-level risk budgeting algorithm.
+  - `i`: Cluster or asset index.
+
+# Returns
+
+  - `FactorRiskBudgeting` with the regression estimator sliced to cluster `i`.
+
+# Related
+
+  - [`risk_budgeting_algorithm_view`](@ref)
+  - [`FactorRiskBudgeting`](@ref)
+  - [`AssetRiskBudgeting`](@ref)
+"""
 function risk_budgeting_algorithm_view(r::FactorRiskBudgeting, i)
     re = regression_view(r.re, i)
     return FactorRiskBudgeting(; re = re, rkb = r.rkb, sets = r.sets, flag = r.flag)

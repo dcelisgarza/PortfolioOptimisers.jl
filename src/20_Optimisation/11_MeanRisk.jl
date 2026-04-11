@@ -204,6 +204,32 @@ Dispatches based on the type of `lbs`: if a pre-computed vector of lower bounds 
 function compute_ret_lbs(lbs::VecNum, args...)
     return lbs
 end
+"""
+    compute_ret_lbs(lbs::Frontier, model::JuMP.Model, mr::MeanRisk, ret::JuMPReturnsEstimator, pr::AbstractPriorResult, fees::Option{<:Fees})
+
+Compute return lower bounds for a `MeanRisk` efficient frontier sweep by solving minimum and maximum return sub-problems.
+
+Solves the minimum-risk and maximum-return portfolios, then constructs a uniformly spaced range of `lbs.N` return targets spanning the two extremes.
+
+# Arguments
+
+  - `lbs::Frontier`: Frontier configuration specifying the number of points.
+  - `model::JuMP.Model`: JuMP optimisation model.
+  - `mr::MeanRisk`: MeanRisk estimator configuration.
+  - `ret::JuMPReturnsEstimator`: Returns estimator.
+  - `pr::AbstractPriorResult`: Prior result with asset moments.
+  - `fees::Option{<:Fees}`: Optional fees configuration.
+
+# Returns
+
+  - Range of return lower bounds for the frontier sweep.
+
+# Related
+
+  - [`compute_ret_lbs`](@ref)
+  - [`MeanRisk`](@ref)
+  - [`solve_mean_risk!`](@ref)
+"""
 function compute_ret_lbs(lbs::Frontier, model::JuMP.Model, mr::MeanRisk,
                          ret::JuMPReturnsEstimator, pr::AbstractPriorResult,
                          fees::Option{<:Fees} = nothing)

@@ -684,6 +684,29 @@ function set_ucs_return_constraints!(model::JuMP.Model, ucs::BoxUncertaintySet,
     add_market_impact_cost!(model, ret)
     return nothing
 end
+"""
+    set_ucs_return_constraints!(model::JuMP.Model, ucs::EllipsoidalUncertaintySet, mu::Num_VecNum)
+
+Add ellipsoidal uncertainty-set-robust return constraints to the JuMP model.
+
+Introduces a second-order cone constraint to model the worst-case expected return under an ellipsoidal uncertainty set for the mean vector.
+
+# Arguments
+
+  - `model::JuMP.Model`: JuMP optimisation model.
+  - `ucs::EllipsoidalUncertaintySet`: Ellipsoidal uncertainty set with covariance `sigma` and radius `k`.
+  - `mu::Num_VecNum`: Expected return vector.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`set_ucs_return_constraints!`](@ref)
+  - [`EllipsoidalUncertaintySet`](@ref)
+  - [`BoxUncertaintySet`](@ref)
+"""
 function set_ucs_return_constraints!(model::JuMP.Model, ucs::EllipsoidalUncertaintySet,
                                      mu::Num_VecNum)
     sc = model[:sc]
