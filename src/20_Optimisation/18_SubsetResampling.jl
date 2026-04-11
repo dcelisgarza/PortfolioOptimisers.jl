@@ -1,5 +1,37 @@
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for subset resampling portfolio optimisation estimators.
+
+# Related Types
+
+  - [`NonFiniteAllocationOptimisationEstimator`](@ref)
+  - [`SubsetResampling`](@ref)
+"""
 abstract type BaseSubsetResamplingOptimisationEstimator <:
               NonFiniteAllocationOptimisationEstimator end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Result type for Subset Resampling portfolio optimisation.
+
+# Fields
+
+  - `oe`: Type of the optimisation estimator that produced this result.
+  - `pr`: Prior result used in optimisation.
+  - `wb`: Weight bounds applied.
+  - `fees`: Fee structure applied (or `nothing`).
+  - `ress`: Vector of sub-optimisation results for each subset.
+  - `idx`: Subset index vector.
+  - `retcode`: Overall return code.
+  - `w`: Aggregated optimal portfolio weights.
+  - `fb`: Fallback result.
+
+# Related
+
+  - [`SubsetResampling`](@ref)
+  - [`NonFiniteAllocationOptimisationResult`](@ref)
+"""
 @concrete struct SubsetResamplingResult <: NonFiniteAllocationOptimisationResult
     oe
     pr
@@ -15,6 +47,59 @@ function factory(sr::SubsetResamplingResult, fb::Option{<:OptE_Opt})
     return SubsetResamplingResult(sr.oe, sr.pr, sr.wb, sr.fees, sr.ress, sr.idx, sr.retcode,
                                   sr.w, fb)
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Subset Resampling portfolio optimiser.
+
+`SubsetResampling` applies a resampling strategy by optimising a base optimiser (`opt`) over randomly drawn subsets of assets, then aggregating the results into a final portfolio weight vector. This improves robustness of portfolio weights to estimation error.
+
+# Fields
+
+  - `pe`: Prior estimator or prior result.
+  - `wb`: Weight bounds estimator or bounds.
+  - `fees`: Fee estimator or fee structure.
+  - `sets`: Asset sets.
+  - `opt`: Base portfolio optimiser applied to each subset.
+  - `wf`: Weight finaliser for enforcing bounds.
+  - `ex`: FLoops executor for parallelism.
+  - `subset_size`: Size of each subset (integer or fraction of total assets).
+  - `n_subsets`: Number of subsets to draw.
+  - `max_comb`: Maximum number of asset combinations to consider.
+  - `rng`: Random number generator.
+  - `seed`: Optional RNG seed for reproducibility.
+  - `fb`: Fallback optimiser.
+  - `brt`: If `true`, uses bootstrap returns.
+  - `strict`: If `true`, strictly enforces weight bounds.
+
+# Constructors
+
+    SubsetResampling(;
+        pe::PrE_Pr = EmpiricalPrior(),
+        wb::Option{<:WbE_Wb} = nothing,
+        fees::Option{<:FeesE_Fees} = nothing,
+        sets::Option{<:AssetSets} = nothing,
+        opt::NonFiniteAllocationOptimisationEstimator,
+        wf::WeightFinaliser = IterativeWeightFinaliser(),
+        ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
+        subset_size::SubsetSizeE = 0.5,
+        n_subsets::NumberSubsetsE = 100,
+        max_comb::Integer = 1000,
+        rng::Random.AbstractRNG = Random.default_rng(),
+        seed::Option{<:Integer} = nothing,
+        fb::Option{<:OptE_Opt} = nothing,
+        brt::Bool = false,
+        strict::Bool = false
+    ) -> SubsetResampling
+
+Keywords correspond to the struct's fields.
+
+# Related
+
+  - [`BaseSubsetResamplingOptimisationEstimator`](@ref)
+  - [`SubsetResamplingResult`](@ref)
+  - [`MeanRisk`](@ref)
+"""
 @concrete struct SubsetResampling <: BaseSubsetResamplingOptimisationEstimator
     pe
     wb
@@ -110,6 +195,28 @@ function opt_view(sr::SubsetResampling, i, X::MatNum)
                             n_subsets = sr.n_subsets, max_comb = sr.max_comb, rng = sr.rng,
                             seed = sr.seed, fb = sr.fb, brt = sr.brt, strict = sr.strict)
 end
+"""
+    subset_resampling_finaliser(N, n_subsets, asset_idx, ...)
+
+Aggregate and finalise portfolio weights from subset resampling.
+
+Combines optimised weights from multiple asset subsets, averaging over subsets to produce the final portfolio weights.
+
+# Arguments
+
+  - `N`: Total number of assets.
+  - `n_subsets`: Number of asset subsets used in resampling.
+  - `asset_idx`: Matrix of asset indices for each subset.
+  - Additional weight and parameter inputs.
+
+# Returns
+
+  - Final aggregated portfolio weight vector.
+
+# Related
+
+  - [`MultipleRandomised`](@ref)
+"""
 function subset_resampling_finaliser(N::Integer, n_subsets::Integer, asset_idx::MatNum,
                                      wb::Option{<:WeightBounds}, wf::WeightFinaliser,
                                      ress::VecOpt, ::VecNum)

@@ -74,7 +74,7 @@ RandomisedSearchCrossValidation
 
 # Related
 
-  - [`AbstractSearchCrossValidationEstimator`]-(@ref)
+  - [`AbstractSearchCrossValidationEstimator`](@ref)
   - [`GridSearchCrossValidation`](@ref)
   - [`SearchCrossValidationResult`](@ref)
   - [`CrossValSearchScorer`](@ref)
@@ -160,6 +160,29 @@ function RandomisedSearchCrossValidation(p::Union{<:AbstractVector{<:Pair{<:Abst
     return RandomisedSearchCrossValidation(p, cv, r, scorer, ex, n_iter, rng, seed,
                                            train_score, kwargs)
 end
+"""
+    make_p_grid(p, n_iter, rng, ...)
+
+Build a randomised parameter grid from a specification.
+
+Samples `n_iter` random parameter combinations from the provided distributions or ranges, for use in randomised search cross-validation.
+
+# Arguments
+
+  - `p`: Parameter specification (pair, vector of pairs, or dictionary).
+  - `n_iter`: Number of random parameter combinations to sample.
+  - `rng`: Random number generator.
+  - Additional arguments.
+
+# Returns
+
+  - Vector of sampled parameter combinations.
+
+# Related
+
+  - [`RandomisedSearchCrossValidation`](@ref)
+  - [`parse_lens`](@ref)
+"""
 function make_p_grid(p::Pair{<:AbstractString}, n_iter::Integer, rng::Random.AbstractRNG,
                      replace::Bool = false)
     vals = if isa(p[2], Distributions.Distribution)
@@ -219,7 +242,7 @@ Performs randomised search cross-validation for portfolio optimisation estimator
 
 # Related
 
-  - [`NonFiniteAllocationOptimisationEstimator`]-(@ref)
+  - [`NonFiniteAllocationOptimisationEstimator`](@ref)
   - [`RandomisedSearchCrossValidation`](@ref)
   - [`ReturnsResult`](@ref)
   - [`GridSearchCrossValidation`](@ref)

@@ -51,4 +51,3 @@ jobs:
             os: macOS-latest
             arch: x64
             allow_failure: true
-

@@ -1,3 +1,68 @@
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Represents a simple mean return measure for use in non-optimisation contexts.
+
+`MeanReturn` computes the arithmetic (or geometric, when `flag = true`) mean of portfolio returns. It is used as the numerator in risk-adjusted performance ratios such as `MeanReturnRiskRatio`.
+
+# Mathematical Definition
+
+For `flag = false` (arithmetic mean):
+
+```math
+\\bar{x} = \\frac{1}{T} \\sum_{t=1}^{T} x_t\\,.
+```
+
+For `flag = true` (log-return mean):
+
+```math
+\\bar{x}_{\\log} = \\frac{1}{T} \\sum_{t=1}^{T} \\log(1 + x_t)\\,.
+```
+
+For observation-weighted samples, the weighted mean is used instead.
+
+# Fields
+
+  - `w`: Optional observation weights.
+  - `flag`: If `true`, log-transforms returns before averaging.
+
+# Constructors
+
+    MeanReturn(;
+        w::Option{<:ObsWeights} = nothing,
+        flag::Bool = false
+    ) -> MeanReturn
+
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - If `w` is not `nothing`: `!isempty(w)`.
+
+# Functor
+
+    (r::MeanReturn)(x::VecNum)
+
+Computes the mean return of a portfolio returns vector `x`.
+
+## Arguments
+
+  - `x::VecNum`: Portfolio returns vector.
+
+# Examples
+
+```jldoctest
+julia> MeanReturn()
+MeanReturn
+     w ┼ nothing
+  flag ┴ Bool: false
+```
+
+# Related
+
+  - [`NonOptimisationRiskMeasure`](@ref)
+  - [`MeanReturnRiskRatio`](@ref)
+"""
 @concrete struct MeanReturn <: NonOptimisationRiskMeasure
     w
     flag
@@ -22,6 +87,43 @@ end
 function risk_measure_view(r::MeanReturn, ::Any, args...)
     return r
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Represents a mean return to risk ratio measure.
+
+`MeanReturnRiskRatio` computes the ratio of the mean portfolio return (minus a risk-free rate) to a risk measure, used for performance analysis and comparison. It generalises the Sharpe ratio by allowing any risk measure in the denominator.
+
+# Mathematical Definition
+
+```math
+\\mathrm{MRRR}(\\boldsymbol{x}) = \\frac{\\bar{x} - r_f}{\\rho(\\boldsymbol{x})}\\,,
+```
+
+where ``\\bar{x}`` is the mean return (computed by `rt`), ``r_f`` is the risk-free rate, and ``\\rho`` is any base risk measure (computed by `rk`).
+
+# Fields
+
+  - `rt`: Mean return estimator.
+  - `rk`: Risk measure for the denominator.
+  - `rf`: Risk-free rate.
+
+# Constructors
+
+    MeanReturnRiskRatio(;
+        rt::MeanReturn = MeanReturn(),
+        rk::AbstractBaseRiskMeasure = ConditionalValueatRisk(),
+        rf::Number = 0.0
+    ) -> MeanReturnRiskRatio
+
+Keywords correspond to the struct's fields.
+
+# Related
+
+  - [`NonOptimisationRiskMeasure`](@ref)
+  - [`MeanReturn`](@ref)
+  - [`AbstractBaseRiskMeasure`](@ref)
+"""
 @concrete struct MeanReturnRiskRatio <: NonOptimisationRiskMeasure
     rt
     rk
@@ -46,6 +148,68 @@ end
 function needs_previous_weights(r::MeanReturnRiskRatio)
     return needs_previous_weights(r.rk)
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Represents the Third Central Moment risk measure.
+
+`ThirdCentralMoment` computes the third central moment of portfolio returns about a specified centre. It is used as a measure of the asymmetry (skewness) of the return distribution in higher-order portfolio optimisation.
+
+# Mathematical Definition
+
+Let ``\\mu`` be the specified centre and ``\\delta_t = x_t - \\mu`` the centred deviations. The third central moment is:
+
+```math
+m_3(\\boldsymbol{x}) = \\frac{1}{T} \\sum_{t=1}^{T} \\delta_t^3\\,.
+```
+
+For observation-weighted samples, the weighted mean is used.
+
+# Fields
+
+  - `w`: Optional observation weights.
+  - `mu`: Centre (centering value, vector, or `VecScalar`).
+
+# Constructors
+
+    ThirdCentralMoment(;
+        w::Option{<:ObsWeights} = nothing,
+        mu::Option{<:Num_VecNum_VecScalar} = nothing
+    ) -> ThirdCentralMoment
+
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - If `mu` is a `VecNum`: `!isempty(mu)`.
+  - If `w` is not `nothing`: `!isempty(w)`.
+
+# Functor
+
+    (r::ThirdCentralMoment)(w::VecNum, X::MatNum, fees = nothing)
+
+Computes the third central moment of the portfolio returns.
+
+## Arguments
+
+  - `w::VecNum`: Portfolio weights vector.
+  - `X::MatNum`: Asset returns matrix (``T \\times N``).
+  - `fees`: Optional fee structure.
+
+# Examples
+
+```jldoctest
+julia> ThirdCentralMoment()
+ThirdCentralMoment
+   w ┼ nothing
+  mu ┴ nothing
+```
+
+# Related
+
+  - [`NonOptimisationRiskMeasure`](@ref)
+  - [`Skewness`](@ref)
+"""
 @concrete struct ThirdCentralMoment <: NonOptimisationRiskMeasure
     w
     mu
@@ -61,6 +225,74 @@ function ThirdCentralMoment(; w::Option{<:ObsWeights} = nothing,
                             mu::Option{<:Num_VecNum_VecScalar} = nothing)
     return ThirdCentralMoment(w, mu)
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Represents the standardised Skewness risk measure.
+
+`Skewness` computes the third standardised central moment (skewness) of portfolio returns. Negative skewness indicates a return distribution with a heavier left tail.
+
+# Mathematical Definition
+
+Let ``\\mu`` be the specified centre, ``\\delta_t = x_t - \\mu``, and ``\\sigma`` the standard deviation of returns. The skewness is:
+
+```math
+\\mathrm{Skew}(\\boldsymbol{x}) = \\frac{1}{T \\sigma^3} \\sum_{t=1}^{T} \\delta_t^3\\,.
+```
+
+# Fields
+
+  - `ve`: Variance estimator for computing ``\\sigma``.
+  - `w`: Optional observation weights.
+  - `mu`: Centre (centering value, vector, or `VecScalar`).
+
+# Constructors
+
+    Skewness(;
+        ve::AbstractVarianceEstimator = SimpleVariance(),
+        w::Option{<:ObsWeights} = nothing,
+        mu::Option{<:Num_VecNum_VecScalar} = nothing
+    ) -> Skewness
+
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - If `mu` is a `VecNum`: `!isempty(mu)`.
+  - If `w` is not `nothing`: `!isempty(w)`.
+
+# Functor
+
+    (r::Skewness)(w::VecNum, X::MatNum, fees = nothing)
+
+Computes the skewness of the portfolio returns.
+
+## Arguments
+
+  - `w::VecNum`: Portfolio weights vector.
+  - `X::MatNum`: Asset returns matrix (``T \\times N``).
+  - `fees`: Optional fee structure.
+
+# Examples
+
+```jldoctest
+julia> Skewness()
+Skewness
+  ve ┼ SimpleVariance
+     │          me ┼ SimpleExpectedReturns
+     │             │   w ┴ nothing
+     │           w ┼ nothing
+     │   corrected ┴ Bool: true
+   w ┼ nothing
+  mu ┴ nothing
+```
+
+# Related
+
+  - [`NonOptimisationRiskMeasure`](@ref)
+  - [`ThirdCentralMoment`](@ref)
+  - [`AbstractVarianceEstimator`](@ref)
+"""
 @concrete struct Skewness <: NonOptimisationRiskMeasure
     ve
     w
@@ -79,6 +311,19 @@ function Skewness(; ve::AbstractVarianceEstimator = SimpleVariance(),
                   mu::Option{<:Num_VecNum_VecScalar} = nothing)
     return Skewness(ve, w, mu)
 end
+"""
+    const TCM_Sk{T1, T2} = Union{...}
+
+Parameterised union of [`ThirdCentralMoment`](@ref) and [`Skewness`](@ref) sharing the same observation-weight (`T1`) and target-mean (`T2`) type parameters.
+
+Used for unified dispatch on moment-target calculation methods.
+
+# Related
+
+  - [`ThirdCentralMoment`](@ref)
+  - [`Skewness`](@ref)
+  - [`calc_moment_target`](@ref)
+"""
 const TCM_Sk{T1, T2} = Union{<:ThirdCentralMoment{T1, T2}, <:Skewness{<:Any, T1, T2}}
 function calc_moment_target(::TCM_Sk{Nothing, Nothing}, ::Any, x::VecNum)
     return Statistics.mean(x)

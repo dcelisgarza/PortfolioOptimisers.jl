@@ -14,6 +14,8 @@ expected_risk(r::ExpectedReturnRiskRatio, w::VecNum, pr::AbstractPriorResult,
 ## Private
 
 ```@docs
+PerfRM
+PrRM
 expected_return
 expected_ratio
 expected_risk_ret_ratio

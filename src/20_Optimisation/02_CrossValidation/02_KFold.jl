@@ -36,10 +36,9 @@ KFold
 
 # Related
 
-  - [`NonSequentialCrossValidationEstimator`]-(@ref)
-  - [`KFoldResult`]-(@ref)
-  - [`split`]-(@ref)
-  - [`n_splits`]-(@ref)
+  - [`NonSequentialCrossValidationEstimator`](@ref)
+  - [`KFoldResult`](@ref)
+  - [`n_splits`](@ref)
 """
 @concrete struct KFold <: NonSequentialCrossValidationEstimator
     n
@@ -56,6 +55,24 @@ end
 function KFold(; n::Integer = 5, purged_size::Integer = 0, embargo_size::Integer = 0)
     return KFold(n, purged_size, embargo_size)
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Result type produced by [`KFold`](@ref) after splitting data into training and testing folds.
+
+Stores the train and test index vectors for each fold.
+
+# Fields
+
+  - `train_idx`: Vector of training index ranges for each fold.
+  - `test_idx`: Vector of testing index ranges for each fold.
+
+# Related
+
+  - [`KFold`](@ref)
+  - [`NonSequentialCrossValidationResult`](@ref)
+  - [`n_splits`](@ref)
+"""
 @concrete struct KFoldResult <: NonSequentialCrossValidationResult
     train_idx
     test_idx
@@ -69,6 +86,27 @@ end
 function KFoldResult(; train_idx::VecVecInt, test_idx::VecVecInt)
     return KFoldResult(train_idx, test_idx)
 end
+"""
+    Base.split(kf::KFold, rd::ReturnsResult) -> KFoldResult
+
+Split the returns data `rd` into `n` non-overlapping folds using k-fold cross-validation
+with optional purging and embargoing.
+
+# Arguments
+
+  - `kf::KFold`: K-fold cross-validation estimator.
+  - `rd::ReturnsResult`: Returns data to split.
+
+# Returns
+
+  - `KFoldResult`: Result containing train and test indices for each fold.
+
+# Related
+
+  - [`KFold`](@ref)
+  - [`KFoldResult`](@ref)
+  - [`n_splits`](@ref)
+"""
 function Base.split(kf::KFold, rd::ReturnsResult)
     T = size(rd.X, 1)
     (; n, purged_size, embargo_size) = kf

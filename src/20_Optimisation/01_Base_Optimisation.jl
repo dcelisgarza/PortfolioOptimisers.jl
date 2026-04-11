@@ -1,33 +1,264 @@
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for all portfolio optimisation estimators in `PortfolioOptimisers.jl`.
+
+All optimisers and optimisation components should subtype `AbstractOptimisationEstimator` to participate in the optimisation dispatch system.
+
+# Related
+
+  - [`BaseOptimisationEstimator`](@ref)
+  - [`OptimisationEstimator`](@ref)
+  - [`NonFiniteAllocationOptimisationEstimator`](@ref)
+"""
 abstract type AbstractOptimisationEstimator <: AbstractEstimator end
+"""
+    const VecOptE = AbstractVector{<:AbstractOptimisationEstimator}
+
+Alias for a vector of portfolio optimisation estimators.
+
+Represents a collection of [`AbstractOptimisationEstimator`](@ref) objects, used for dispatch in routines that process multiple optimisers simultaneously.
+
+# Related
+
+  - [`AbstractOptimisationEstimator`](@ref)
+"""
 const VecOptE = AbstractVector{<:AbstractOptimisationEstimator}
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for base portfolio optimisation estimators.
+
+`BaseOptimisationEstimator` is the parent for all internal optimiser components that configure the optimisation problem but are not directly invokable as top-level optimisers.
+
+# Related Types
+
+  - [`AbstractOptimisationEstimator`](@ref)
+  - [`OptimisationEstimator`](@ref)
+"""
 abstract type BaseOptimisationEstimator <: AbstractOptimisationEstimator end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for portfolio optimisation estimators that produce portfolio weights.
+
+Subtype `OptimisationEstimator` to implement concrete portfolio optimisers. All optimisers that can be invoked with `optimise` should subtype this.
+
+# Related Types
+
+  - [`NonFiniteAllocationOptimisationEstimator`](@ref)
+  - [`AbstractOptimisationEstimator`](@ref)
+"""
 abstract type OptimisationEstimator <: AbstractOptimisationEstimator end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for portfolio optimisation estimators that produce continuous (non-integer) portfolio weights.
+
+# Related Types
+
+  - [`OptimisationEstimator`](@ref)
+  - [`NaiveOptimisationEstimator`](@ref)
+  - [`ClusteringOptimisationEstimator`](@ref)
+"""
 abstract type NonFiniteAllocationOptimisationEstimator <: OptimisationEstimator end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for optimisation algorithms used by portfolio optimisers.
+
+# Related Types
+
+  - [`AbstractAlgorithm`](@ref)
+"""
 abstract type OptimisationAlgorithm <: AbstractAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for portfolio optimisation result types.
+
+All concrete optimisation result types should subtype `OptimisationResult`.
+
+# Related Types
+
+  - [`NonFiniteAllocationOptimisationResult`](@ref)
+  - [`OptimisationReturnCode`](@ref)
+"""
 abstract type OptimisationResult <: AbstractResult end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for continuous (non-integer allocation) optimisation results.
+
+# Related Types
+
+  - [`OptimisationResult`](@ref)
+  - [`NaiveOptimisationResult`](@ref)
+  - [`HierarchicalResult`](@ref)
+  - [`MeanRiskResult`](@ref)
+"""
 abstract type NonFiniteAllocationOptimisationResult <: OptimisationResult end
+"""
+    const VecOpt = AbstractVector{<:NonFiniteAllocationOptimisationResult}
+
+Alias for a vector of non-finite allocation optimisation results.
+
+Represents a collection of [`NonFiniteAllocationOptimisationResult`](@ref) objects.
+
+# Related
+
+  - [`NonFiniteAllocationOptimisationResult`](@ref)
+  - [`OptE_Opt`](@ref)
+"""
 const VecOpt = AbstractVector{<:NonFiniteAllocationOptimisationResult}
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for optimisation return codes.
+
+Concrete subtypes indicate whether an optimisation succeeded or failed.
+
+# Related Types
+
+  - [`OptimisationSuccess`](@ref)
+  - [`OptimisationFailure`](@ref)
+"""
 abstract type OptimisationReturnCode <: AbstractResult end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for intermediate optimisation model results.
+
+# Related Types
+
+  - [`OptimisationResult`](@ref)
+"""
 abstract type OptimisationModelResult <: AbstractResult end
+"""
+    const OptE_Opt = Union{<:NonFiniteAllocationOptimisationEstimator,
+                           <:NonFiniteAllocationOptimisationResult}
+
+Alias for a non-finite allocation optimisation estimator or result.
+
+Matches either a [`NonFiniteAllocationOptimisationEstimator`](@ref) (specifying an optimiser configuration) or a [`NonFiniteAllocationOptimisationResult`](@ref) (a pre-computed result). Used for dispatch in cross-validation and optimisation workflows that accept either form.
+
+# Related
+
+  - [`NonFiniteAllocationOptimisationEstimator`](@ref)
+  - [`NonFiniteAllocationOptimisationResult`](@ref)
+  - [`VecOptE_Opt`](@ref)
+"""
 const OptE_Opt = Union{<:NonFiniteAllocationOptimisationEstimator,
                        <:NonFiniteAllocationOptimisationResult}
+"""
+    assert_special_nco_requirements(opt)
+
+Assert that the optimiser meets special requirements for Nested Clustered Optimisation (NCO).
+
+The default implementation does nothing. Overridden for estimators (e.g. [`Stacking`](@ref)) that have requirements which must be validated before NCO can proceed.
+
+# Arguments
+
+  - `opt`: Optimisation estimator, result, or vector thereof.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`NestedClustered`](@ref)
+  - [`Stacking`](@ref)
+"""
 function assert_special_nco_requirements(::OptE_Opt)
     return nothing
 end
 function factory(opt::OptE_Opt, ::Any)
     return opt
 end
+"""
+    needs_previous_weights(opt)
+
+Return `true` if the optimiser requires the previous period's weights.
+
+The default returns `false`. Overridden for optimisers that contain turnover constraints, tracking error constraints, or other time-dependent components that require the previous optimisation's weights.
+
+# Arguments
+
+  - `opt`: Optimisation estimator, result, risk measure, fee structure, or vector thereof.
+
+# Returns
+
+  - `Bool`: `true` if previous weights are needed.
+
+# Related
+
+  - [`is_time_dependent`](@ref)
+  - [`JuMPOptimiser`](@ref)
+"""
 function needs_previous_weights(::OptE_Opt)
     return false
 end
 #! Start: Overload these for all estimators which can use time-dependent constraints.
+"""
+    is_time_dependent(opt)
+
+Return `true` if the optimiser has time-dependent constraints or objectives.
+
+The default returns `false`. Overridden for estimators that must be updated between periods (e.g. when constraints depend on the current time step).
+
+# Arguments
+
+  - `opt`: Optimisation estimator, result, or vector thereof.
+
+# Returns
+
+  - `Bool`: `true` if the estimator is time-dependent.
+
+# Related
+
+  - [`update_time_dependent_estimator`](@ref)
+  - [`needs_previous_weights`](@ref)
+"""
 function is_time_dependent(::OptE_Opt)
     return false
 end
+"""
+    update_time_dependent_estimator(opt, args...)
+
+Update the estimator for the current time period.
+
+The default returns the estimator unchanged. Overridden for estimators that need to be updated between periods (e.g. sliding window constraints, time-varying parameters).
+
+# Arguments
+
+  - `opt`: Optimisation estimator or result.
+  - `args...`: Additional arguments (e.g. current period index, returns data).
+
+# Returns
+
+  - Updated estimator.
+
+# Related
+
+  - [`is_time_dependent`](@ref)
+  - [`path_fit_and_predict`](@ref)
+"""
 function update_time_dependent_estimator(opt::OptE_Opt, args...)
     return opt
 end
 #! End: Overload these for all estimators which can use time-dependent constraints.
+"""
+    const VecOptE_Opt = AbstractVector{<:OptE_Opt}
+
+Alias for a vector of optimisation estimators or results.
+
+Represents a collection of [`OptE_Opt`](@ref) objects for batch processing.
+
+# Related
+
+  - [`OptE_Opt`](@ref)
+"""
 const VecOptE_Opt = AbstractVector{<:OptE_Opt}
 function factory(opt::VecOptE_Opt, args...)
     return [factory(opti, args...) for opti in opt]
@@ -44,12 +275,95 @@ end
 function update_time_dependent_estimator(opt::VecOptE_Opt, args...)
     return [update_time_dependent_estimator(opti, args...) for opti in opt]
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for JuMP-based weight finaliser formulations.
+
+Defines the interface for norm types used when adjusting portfolio weights to satisfy bounds via a JuMP model.
+
+# Related Types
+
+  - [`RelativeErrorWeightFinaliser`](@ref)
+  - [`SquaredRelativeErrorWeightFinaliser`](@ref)
+  - [`AbsoluteErrorWeightFinaliser`](@ref)
+  - [`SquaredAbsoluteErrorWeightFinaliser`](@ref)
+  - [`JuMPWeightFinaliser`](@ref)
+"""
 abstract type JuMPWeightFinaliserFormulation <: AbstractAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Minimises the L1 norm of relative weight deviations when enforcing weight bounds.
+"""
 struct RelativeErrorWeightFinaliser <: JuMPWeightFinaliserFormulation end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Minimises the L2 norm (squared) of relative weight deviations when enforcing weight bounds.
+"""
 struct SquaredRelativeErrorWeightFinaliser <: JuMPWeightFinaliserFormulation end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Minimises the L1 norm of absolute weight deviations when enforcing weight bounds.
+"""
 struct AbsoluteErrorWeightFinaliser <: JuMPWeightFinaliserFormulation end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Minimises the L2 norm (squared) of absolute weight deviations when enforcing weight bounds.
+"""
 struct SquaredAbsoluteErrorWeightFinaliser <: JuMPWeightFinaliserFormulation end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for weight finaliser strategies.
+
+A `WeightFinaliser` enforces weight bounds after the optimisation has produced unconstrained weights.
+
+# Related Types
+
+  - [`IterativeWeightFinaliser`](@ref)
+  - [`JuMPWeightFinaliser`](@ref)
+"""
 abstract type WeightFinaliser <: AbstractAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Iteratively projects weights into the feasible region defined by weight bounds.
+
+`IterativeWeightFinaliser` repeatedly clips and redistributes portfolio weights until they satisfy the given lower and upper bounds, or the maximum number of iterations `iter` is reached.
+
+# Fields
+
+  - `iter`: Maximum number of iterations.
+
+# Constructors
+
+    IterativeWeightFinaliser(;
+        iter::Integer = 100
+    ) -> IterativeWeightFinaliser
+
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - `iter > 0`.
+
+# Examples
+
+```jldoctest
+julia> IterativeWeightFinaliser()
+IterativeWeightFinaliser
+  iter ┴ Int64: 100
+```
+
+# Related
+
+  - [`WeightFinaliser`](@ref)
+  - [`JuMPWeightFinaliser`](@ref)
+"""
 @concrete struct IterativeWeightFinaliser <: WeightFinaliser
     iter
     function IterativeWeightFinaliser(iter::Integer)
@@ -60,6 +374,42 @@ end
 function IterativeWeightFinaliser(; iter::Integer = 100)
     return IterativeWeightFinaliser(iter)
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Uses a JuMP optimisation model to enforce weight bounds.
+
+`JuMPWeightFinaliser` solves a small optimisation problem to find the closest feasible weights (in the sense of the chosen error formulation) that satisfy the given bounds. Falls back to [`IterativeWeightFinaliser`](@ref) if the JuMP model fails.
+
+# Fields
+
+  - `slv`: Solver or vector of solvers for the JuMP model.
+  - `sc`: Scale factor applied to constraints.
+  - `so`: Scale factor applied to the objective.
+  - `alg`: Error formulation (L1/L2 relative or absolute).
+
+# Constructors
+
+    JuMPWeightFinaliser(;
+        slv::Slv_VecSlv,
+        sc::Number = 1.0,
+        so::Number = 1.0,
+        alg::JuMPWeightFinaliserFormulation = RelativeErrorWeightFinaliser()
+    ) -> JuMPWeightFinaliser
+
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - If `slv` is a `VecSlv`: `!isempty(slv)`.
+  - `sc > 0`, `so > 0`.
+
+# Related
+
+  - [`WeightFinaliser`](@ref)
+  - [`IterativeWeightFinaliser`](@ref)
+  - [`JuMPWeightFinaliserFormulation`](@ref)
+"""
 @concrete struct JuMPWeightFinaliser <: WeightFinaliser
     slv
     sc
@@ -79,6 +429,26 @@ function JuMPWeightFinaliser(; slv::Slv_VecSlv, sc::Number = 1.0, so::Number = 1
                              alg::JuMPWeightFinaliserFormulation = RelativeErrorWeightFinaliser())
     return JuMPWeightFinaliser(slv, sc, so, alg)
 end
+"""
+    set_clustering_weight_finaliser_alg!(model, ...)
+
+Set the clustering weight finalisation algorithm on the JuMP model.
+
+Configures how cluster-level weights are finalised in the hierarchical optimisation model, applying the specified weight finaliser.
+
+# Arguments
+
+  - `model`: JuMP model.
+  - Additional clustering and finaliser parameters.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`ClusteringOptimisationEstimator`](@ref)
+"""
 function set_clustering_weight_finaliser_alg!(model::JuMP.Model,
                                               ::RelativeErrorWeightFinaliser, wi::VecNum)
     wi[iszero.(wi)] .= eps(eltype(wi))
@@ -127,6 +497,29 @@ function set_clustering_weight_finaliser_alg!(model::JuMP.Model,
     JuMP.@objective(model, Min, so * t)
     return nothing
 end
+"""
+    opt_weight_bounds(wf, wb, w)
+
+Compute optimised weight bounds from the finaliser, bounds, and current weights.
+
+Adjusts the weight bounds based on the weight finaliser algorithm and the current weight allocation, used in hierarchical weight allocation.
+
+# Arguments
+
+  - `wf`: Weight finaliser algorithm.
+  - `wb`: Weight bounds.
+  - `w`: Current portfolio weights.
+
+# Returns
+
+  - Updated weight bounds.
+
+# Related
+
+  - [`WeightBounds`](@ref)
+  - [`JuMPWeightFinaliser`](@ref)
+  - [`IterativeWeightFinaliser`](@ref)
+"""
 function opt_weight_bounds(wf::JuMPWeightFinaliser, wb::WeightBounds, wi::VecNum)
     lb = wb.lb
     ub = wb.ub
@@ -184,6 +577,30 @@ function opt_weight_bounds(wf::IterativeWeightFinaliser, wb::WeightBounds, w::Ve
     end
     return w
 end
+"""
+    finalise_weight_bounds(wf::WeightFinaliser, wb::WeightBounds, w::VecNum)
+
+Apply weight finalisation to enforce bounds and determine the optimisation return code.
+
+Runs [`opt_weight_bounds`](@ref) with the given finaliser and bounds, then returns a success or failure return code based on whether all weights are finite.
+
+# Arguments
+
+  - `wf::WeightFinaliser`: Weight finaliser algorithm.
+  - `wb::WeightBounds`: Weight bounds configuration.
+  - `w::VecNum`: Portfolio weights to finalise.
+
+# Returns
+
+  - `(retcode, w)`: Tuple of return code and adjusted weights.
+
+# Related
+
+  - [`WeightFinaliser`](@ref)
+  - [`WeightBounds`](@ref)
+  - [`OptimisationSuccess`](@ref)
+  - [`OptimisationFailure`](@ref)
+"""
 function finalise_weight_bounds(wf::WeightFinaliser, wb::WeightBounds, w::VecNum)
     w = opt_weight_bounds(wf, wb, w)
     retcode = if !any(!isfinite, w)
@@ -193,27 +610,131 @@ function finalise_weight_bounds(wf::WeightFinaliser, wb::WeightBounds, w::VecNum
     end
     return retcode, w
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Indicates that a portfolio optimisation completed successfully.
+
+# Fields
+
+  - `res`: Optional result or message from the solver (default: `nothing`).
+
+# Related
+
+  - [`OptimisationReturnCode`](@ref)
+  - [`OptimisationFailure`](@ref)
+"""
 @concrete struct OptimisationSuccess <: OptimisationReturnCode
     res
 end
 function OptimisationSuccess(; res = nothing)
     return OptimisationSuccess(res)
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Indicates that a portfolio optimisation failed.
+
+# Fields
+
+  - `res`: Optional error message or diagnostic information (default: `nothing`).
+
+# Related
+
+  - [`OptimisationReturnCode`](@ref)
+  - [`OptimisationSuccess`](@ref)
+"""
 @concrete struct OptimisationFailure <: OptimisationReturnCode
     res
 end
 function OptimisationFailure(; res = nothing)
     return OptimisationFailure(res)
 end
+"""
+    opt_view(opt, i, args...)
+
+Return a view or subset of an optimisation estimator for a given cluster index `i`.
+
+Default fallback returns the estimator unchanged. Overridden for composite estimators (e.g. [`JuMPOptimiser`](@ref), [`HierarchicalRiskParity`](@ref)) to slice all sub-estimators for the `i`-th cluster.
+
+# Arguments
+
+  - `opt`: Optimisation estimator or result.
+  - `i`: Cluster or asset index.
+  - `args...`: Additional arguments (e.g. asset returns matrix).
+
+# Returns
+
+  - Sliced or unchanged optimisation estimator.
+
+# Related
+
+  - [`JuMPOptimiser`](@ref)
+  - [`NestedClustered`](@ref)
+"""
 function opt_view(opt::AbstractOptimisationEstimator, args...)
     return opt
 end
 function opt_view(opt::VecOptE, args...)
     return [opt_view(opti, args...) for opti in opt]
 end
+"""
+    optimise(opt::OptimisationEstimator, args...; kwargs...) -> OptimisationResult
+    optimise(or::OptimisationResult, args...; kwargs...) -> OptimisationResult
+
+Run portfolio optimisation using the given estimator `opt` and return an [`OptimisationResult`](@ref).
+
+If `opt` returns an [`OptimisationFailure`](@ref), the fallback estimator is tried automatically until either a successful result is obtained or all fallbacks are exhausted.
+
+Passing an [`OptimisationResult`](@ref) directly returns it unchanged (pass-through method).
+
+# Arguments
+
+  - `opt`: Optimisation estimator (e.g. a [`JuMPOptimisationEstimator`](@ref) subtype).
+  - `args...`: Additional positional arguments forwarded to the concrete optimiser.
+  - `kwargs...`: Additional keyword arguments forwarded to the concrete optimiser.
+
+# Returns
+
+  - [`OptimisationResult`](@ref): The optimisation result.
+
+# Related
+
+  - [`OptimisationEstimator`](@ref)
+  - [`OptimisationResult`](@ref)
+  - [`OptimisationSuccess`](@ref)
+  - [`OptimisationFailure`](@ref)
+"""
 function optimise(or::OptimisationResult, args...; kwargs...)
     return or
 end
+"""
+    _optimise(opt, rd, args...; dims, str_names, save, kwargs...)
+
+Internal dispatch function for portfolio optimisation.
+
+Called by [`optimise`](@ref) to perform the actual optimisation. Each optimisation estimator type implements its own overload. Returns the estimator-specific result type.
+
+# Arguments
+
+  - `opt`: Optimisation estimator (e.g. [`MeanRisk`](@ref), [`RiskBudgeting`](@ref), etc.).
+  - `rd::ReturnsResult`: Returns data.
+  - `dims::Int`: Observation dimension.
+  - `str_names::Bool`: Whether to use string names in the JuMP model.
+  - `save::Bool`: Whether to save the JuMP model in the result.
+  - `kwargs...`: Additional keyword arguments.
+
+# Returns
+
+  - Estimator-specific optimisation result.
+
+# Related
+
+  - [`optimise`](@ref)
+  - [`MeanRisk`](@ref)
+  - [`RiskBudgeting`](@ref)
+  - [`NearOptimalCentering`](@ref)
+"""
 function _optimise end
 function optimise(opt::OptimisationEstimator, args...; kwargs...)
     fb = Tuple{OptimisationEstimator, OptimisationResult}[]

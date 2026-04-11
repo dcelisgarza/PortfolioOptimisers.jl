@@ -28,11 +28,71 @@ All concrete and/or abstract types representing the results of phylogeny-based c
   - [`AbstractConstraintResult`](@ref)
 """
 abstract type AbstractPhylogenyConstraintResult <: AbstractConstraintResult end
+"""
+    const PlCE_PlC = Union{<:AbstractPhylogenyConstraintEstimator,
+                           <:AbstractPhylogenyConstraintResult}
+
+Alias for a phylogeny constraint estimator or result.
+
+Matches either a [`AbstractPhylogenyConstraintEstimator`](@ref) or a [`AbstractPhylogenyConstraintResult`](@ref). Used internally for dispatch in phylogeny-based constraint generation.
+
+# Related
+
+  - [`AbstractPhylogenyConstraintEstimator`](@ref)
+  - [`AbstractPhylogenyConstraintResult`](@ref)
+"""
 const PlCE_PlC = Union{<:AbstractPhylogenyConstraintEstimator,
                        <:AbstractPhylogenyConstraintResult}
+"""
+    const VecPlCE_PlC = AbstractVector{<:PlCE_PlC}
+
+Alias for a vector of phylogeny constraint estimators or results.
+
+Represents a collection of [`PlCE_PlC`](@ref) objects, enabling batch processing of multiple phylogeny-based constraint estimators or results.
+
+# Related
+
+  - [`PlCE_PlC`](@ref)
+"""
 const VecPlCE_PlC = AbstractVector{<:PlCE_PlC}
+"""
+    const PlCE_PhC_VecPlCE_PlC = Union{<:PlCE_PlC, <:VecPlCE_PlC}
+
+Alias for a single or vector of phylogeny constraint estimators or results.
+
+Matches either a single [`PlCE_PlC`](@ref) or a vector of them ([`VecPlCE_PlC`](@ref)). Used internally for dispatch on phylogeny-based constraint generation that accepts one or many constraints.
+
+# Related
+
+  - [`PlCE_PlC`](@ref)
+  - [`VecPlCE_PlC`](@ref)
+"""
 const PlCE_PhC_VecPlCE_PlC = Union{<:PlCE_PlC, <:VecPlCE_PlC}
+"""
+    const VecPlC = AbstractVector{<:AbstractPhylogenyConstraintResult}
+
+Alias for a vector of phylogeny constraint results.
+
+Represents a collection of [`AbstractPhylogenyConstraintResult`](@ref) objects.
+
+# Related
+
+  - [`AbstractPhylogenyConstraintResult`](@ref)
+  - [`PlC_VecPlC`](@ref)
+"""
 const VecPlC = AbstractVector{<:AbstractPhylogenyConstraintResult}
+"""
+    const PlC_VecPlC = Union{<:AbstractPhylogenyConstraintResult, <:VecPlC}
+
+Alias for a single or vector of phylogeny constraint results.
+
+Matches either a single [`AbstractPhylogenyConstraintResult`](@ref) or a vector of them ([`VecPlC`](@ref)).
+
+# Related
+
+  - [`AbstractPhylogenyConstraintResult`](@ref)
+  - [`VecPlC`](@ref)
+"""
 const PlC_VecPlC = Union{<:AbstractPhylogenyConstraintResult, <:VecPlC}
 """
 $(DocStringExtensions.TYPEDEF)
@@ -108,6 +168,18 @@ function SemiDefinitePhylogenyEstimator(; pl::NwE_PlM_ClE_Cl = NetworkEstimator(
                                         p::Number = 0.05)
     return SemiDefinitePhylogenyEstimator(pl, p)
 end
+"""
+    const MatNum_PhRMatNum = Union{<:PhylogenyResult{<:MatNum}, <:MatNum}
+
+Alias for a phylogeny result wrapping a numeric matrix or a numeric matrix directly.
+
+Used internally to accept either a [`PhylogenyResult`](@ref) containing a numeric matrix or a plain numeric matrix as a constraint matrix input.
+
+# Related
+
+  - [`PhylogenyResult`](@ref)
+  - [`MatNum`](@ref)
+"""
 const MatNum_PhRMatNum = Union{<:PhylogenyResult{<:MatNum}, <:MatNum}
 """
 $(DocStringExtensions.TYPEDEF)
@@ -144,6 +216,9 @@ SemiDefinitePhylogeny
 
 # Related
 
+  - [`set_sdp_constraints!`](@ref)
+  - [`set_sdp_frc_constraints!`](@ref)
+  - [`set_sdp_phylogeny_constraints!`](@ref)
   - [`SemiDefinitePhylogenyEstimator`](@ref)
   - [`AbstractPhylogenyConstraintResult`](@ref)
   - [`phylogeny_constraints`](@ref)
@@ -374,6 +449,8 @@ IntegerPhylogeny
 
 # Related
 
+  - [`set_iplg_constraints!`](@ref)
+  - [`mip_constraints`](@ref)
   - [`IntegerPhylogenyEstimator`](@ref)
   - [`AbstractPhylogenyConstraintResult`](@ref)
   - [`phylogeny_constraints`](@ref)
@@ -452,6 +529,18 @@ end
 function phylogeny_constraints(plcs::VecPlCE_PlC, args...; kwargs...)
     return [phylogeny_constraints(plc, args...; kwargs...) for plc in plcs]
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for all centrality-based constraint types in `PortfolioOptimisers.jl`.
+
+All concrete types implementing centrality-based portfolio constraints should be subtypes of `AbstractCentralityConstraint`.
+
+# Related
+
+  - [`CentralityConstraint`](@ref)
+  - [`AbstractConstraintEstimator`](@ref)
+"""
 abstract type AbstractCentralityConstraint <: AbstractConstraintEstimator end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -531,8 +620,44 @@ function CentralityConstraint(; A::CentralityEstimator = CentralityEstimator(),
                               B::Num_VecToScaM = MinValue(), comp::ComparisonOperator = <=)
     return CentralityConstraint(A, B, comp)
 end
+"""
+    const VecCC = AbstractVector{<:CentralityConstraint}
+
+Alias for a vector of [`CentralityConstraint`](@ref) objects.
+
+Represents a collection of centrality-based portfolio constraints.
+
+# Related
+
+  - [`CentralityConstraint`](@ref)
+  - [`CC_VecCC`](@ref)
+"""
 const VecCC = AbstractVector{<:CentralityConstraint}
+"""
+    const CC_VecCC = Union{<:CentralityConstraint, <:VecCC}
+
+Alias for a single or vector of [`CentralityConstraint`](@ref) objects.
+
+Matches either a single [`CentralityConstraint`](@ref) or a vector of them ([`VecCC`](@ref)).
+
+# Related
+
+  - [`CentralityConstraint`](@ref)
+  - [`VecCC`](@ref)
+"""
 const CC_VecCC = Union{<:CentralityConstraint, <:VecCC}
+"""
+    const Lc_CC_VecCC = Union{<:CC_VecCC, <:LinearConstraint}
+
+Alias for a centrality constraint or linear constraint.
+
+Matches either a [`CentralityConstraint`](@ref), a vector of them, or a [`LinearConstraint`](@ref). Used for dispatch in centrality-based constraint generation that also accepts linear constraints.
+
+# Related
+
+  - [`CC_VecCC`](@ref)
+  - [`LinearConstraint`](@ref)
+"""
 const Lc_CC_VecCC = Union{<:CC_VecCC, <:LinearConstraint}
 """
     centrality_constraints(ccs::CC_VecCC,

@@ -2,9 +2,9 @@
 
 ```@docs
 LinearModel
-fit(tgt::LinearModel, X::MatNum, y::VecNum)
+StatsAPI.fit(tgt::LinearModel, X::MatNum, y::VecNum)
 GeneralisedLinearModel
-fit(tgt::GeneralisedLinearModel, X::MatNum, y::VecNum)
+StatsAPI.fit(tgt::GeneralisedLinearModel, X::MatNum, y::VecNum)
 AIC
 AICC
 BIC

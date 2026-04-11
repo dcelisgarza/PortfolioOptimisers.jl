@@ -674,6 +674,30 @@ function robust_cor(ce::StatsBase.CovarianceEstimator, X::MatNum,
     end
     =#
 end
+"""
+    moment_window_and_weights(X, w, args...; dims = 1, kwargs...)
+
+Apply the observation window and resolve weights for moment estimation.
+
+Slices `X` to the last `window` observations (if provided) and resolves the observation weights, returning the windowed data and finalised weights.
+
+# Arguments
+
+  - `X`: Data matrix or vector.
+  - `w`: Observation weights ([`ObsWeights`](@ref) or `nothing`).
+  - `args...`: Additional arguments (e.g., window size).
+  - `dims`: Observation dimension (default `1`).
+  - `kwargs...`: Additional keyword arguments.
+
+# Returns
+
+  - `(X_windowed, w_resolved)`: Tuple of windowed data and resolved weights.
+
+# Related
+
+  - [`get_window`](@ref)
+  - [`get_observation_weights`](@ref)
+"""
 function moment_window_and_weights(X::MatNum, w::Option{<:ObsWeights}, args...; dims = dims,
                                    kwargs...)
     w = get_observation_weights(w, X; dims = dims, kwargs...)

@@ -38,6 +38,19 @@ Represents solver settings as either a single solver attribute, or a collection 
   - [`set_solver_attributes`](@ref)
 """
 const SlvSettings = Union{<:Pair, <:Dict_VecPair}
+"""
+    const SlvKeys = Union{<:AbstractString, <:JuMP.MOI.AbstractModelAttribute}
+
+Alias for JuMP solver attribute keys.
+
+Matches either a string key or a `JuMP.MOI.AbstractModelAttribute` instance. Used internally for validating and applying solver settings to JuMP models.
+
+# Related
+
+  - [`SlvSettings`](@ref)
+  - [`Solver`](@ref)
+  - [`set_solver_attributes`](@ref)
+"""
 const SlvKeys = Union{<:AbstractString, <:JuMP.MOI.AbstractModelAttribute}
 """
 $(DocStringExtensions.TYPEDEF)
@@ -126,7 +139,7 @@ Alias for a vector of `Solver` objects.
 
 Represents a collection of solver configurations to be used in JuMP-based optimisation routines. Enables sequential or fallback solver strategies by passing multiple solver setups.
 
-# Related Types
+# Related
 
   - [`Solver`](@ref)
 """
@@ -138,7 +151,7 @@ Alias for a single `Solver` or a vector of `Solver` objects.
 
 Represents either a single solver configuration or a collection of solver configurations for JuMP-based optimisation routines. Enables flexible dispatch for optimisation functions that accept one or multiple solvers.
 
-# Related Types
+# Related
 
   - [`Solver`](@ref)
   - [`VecSlv`](@ref)

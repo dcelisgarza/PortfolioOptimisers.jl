@@ -337,6 +337,9 @@ Turnover
 
 # Related
 
+  - [`set_turnover_constraints!`](@ref)
+  - [`_set_turnover_constraints!`](@ref)
+  - [`set_turnover_fees!`](@ref)
   - [`TurnoverEstimator`](@ref)
   - [`AbstractResult`](@ref)
   - [`VecNum`](@ref)
@@ -576,7 +579,7 @@ const TnE_Tn_VecTnE_Tn = Union{<:TnE_Tn, <:VecTnE_Tn}
     turnover_constraints(tn::VecTnE_Tn, sets::AssetSets; datatype::DataType = Float64,
                          strict::Bool = false)
 
-Broadcasts [`threshold_constraints`](@ref) over the vector.
+Broadcasts [`turnover_constraints`](@ref) over the vector.
 
 Provides a uniform interface for processing multiple constraint estimators simultaneously.
 

@@ -1,3 +1,27 @@
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Add turnover risk constraints to `model`.
+
+Introduces a scalar variable `turnover_risk` and the L1-norm cone constraint
+`[sc * turnover_risk; sc * (w - benchmark * k)] in NormOneCone(1 + N)` where `benchmark`
+is the reference weight vector from `r.w`.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - $(arg_dict[:ci])
+  - `r::TurnoverRiskMeasure`: Turnover risk measure instance carrying the benchmark weights.
+  - $(arg_dict[:opt_rjumpe])
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`set_risk_bounds_and_expression!`](@ref)
+"""
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::TurnoverRiskMeasure,
                                opt::RiskJuMPOptimisationEstimator, ::AbstractPriorResult,
                                args...; kwargs...)

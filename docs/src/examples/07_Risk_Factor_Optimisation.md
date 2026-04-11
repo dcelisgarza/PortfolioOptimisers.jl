@@ -66,7 +66,7 @@ rd = prices_to_returns(X, F)
 1. [`EmpiricalPrior`](@ref): Computes the expected returns vector and covariance matrix from the empirical data.
 2. [`FactorPrior`](@ref): Computes the expected returns vector and covariance matrix using a factor model.
 3. [`HighOrderPriorEstimator`](@ref): Computes the expected returns vector and covariance matrix using the low order prior estimator provided, plus the coskewness and/or cokurtosis using the computed expected returns vector.
-4. [`HighOrderFactorPriorEstimator`]-(@ref): Computes the expected returns vector and covariance matrix, plus the coskewness and/or cokurtosis using a factor model.
+4. [`HighOrderFactorPriorEstimator`](@ref): Computes the expected returns vector and covariance matrix, plus the coskewness and/or cokurtosis using a factor model.
 
 Priors whos names don't start with the prefix `High` return [`LowOrderPrior`](@ref), while those that do return [`HighOrderPrior`](@ref) objects.
 

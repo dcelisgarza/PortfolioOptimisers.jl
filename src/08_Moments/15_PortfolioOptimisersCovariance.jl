@@ -59,6 +59,25 @@ function PortfolioOptimisersCovariance(; ce::StatsBase.CovarianceEstimator = Cov
                                        mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing())
     return PortfolioOptimisersCovariance(ce, mp)
 end
+"""
+    factory(ce::PortfolioOptimisersCovariance, w::ObsWeights) -> PortfolioOptimisersCovariance
+
+Return a new [`PortfolioOptimisersCovariance`](@ref) estimator with observation weights `w` applied to the underlying covariance estimator.
+
+# Arguments
+
+  - $(arg_dict[:ce])
+  - $(arg_dict[:ow])
+
+# Returns
+
+  - $(ret_dict[:ce])
+
+# Related
+
+  - [`PortfolioOptimisersCovariance`](@ref)
+  - [`factory`](@ref)
+"""
 function factory(ce::PortfolioOptimisersCovariance, w::ObsWeights)
     return PortfolioOptimisersCovariance(; ce = factory(ce.ce, w), mp = ce.mp)
 end
@@ -142,6 +161,41 @@ function Statistics.cor(ce::PortfolioOptimisersCovariance, X::MatNum; dims = 1, 
     matrix_processing!(ce.mp, rho, X; kwargs...)
     return rho
 end
+"""
+    find_uncorrelated_indices(X::MatNum;
+                              ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
+                              t::Number = 0.95, absolute::Bool = false,
+                              measure::VectorToScalarMeasure = MeanValue())
+
+Find indices of a maximally uncorrelated subset of assets from a data matrix.
+
+This function identifies a subset of asset columns in `X` such that no two assets in the subset have a pairwise (absolute) correlation exceeding the threshold `t`. When two assets are too correlated, the one with the higher summary correlation measure (across all assets) is removed. The function returns the indices of the remaining uncorrelated assets.
+
+# Arguments
+
+  - `X`: Data matrix of asset returns (observations × assets).
+  - `ce`: Covariance estimator used to compute the correlation matrix.
+  - `t`: Correlation threshold above which two assets are considered too correlated.
+  - `absolute`: If `true`, the absolute value of the correlation is used for comparison.
+  - `measure`: Summary measure applied to each column of the correlation matrix (e.g., mean) to decide which asset to remove when two are too correlated.
+
+# Returns
+
+  - `idx::Vector{Int}`: Indices of assets that form a maximally uncorrelated subset.
+
+# Details
+
+  - Computes the (absolute) correlation matrix for all assets.
+  - Identifies pairs of assets with correlation at or above `t`, sorted from most to least correlated.
+  - For each correlated pair (not yet removed), removes the asset with the higher summary correlation value. If both assets have equal summary values, both are removed.
+  - Returns the indices of assets not in the removed set.
+
+# Related
+
+  - [`PortfolioOptimisersCovariance`](@ref)
+  - [`VectorToScalarMeasure`](@ref)
+  - [`MeanValue`](@ref)
+"""
 function find_uncorrelated_indices(X::MatNum;
                                    ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
                                    t::Number = 0.95, absolute::Bool = false,

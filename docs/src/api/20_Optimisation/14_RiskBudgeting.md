@@ -1,1 +1,18 @@
 # Risk budgeting
+
+```@docs
+RiskBudgetingResult
+ProcessedFactorRiskBudgetingAttributes
+ProcessedAssetRiskBudgetingAttributes
+RiskBudgetingFormulation
+LogRiskBudgeting
+MixedIntegerRiskBudgeting
+RiskBudgetingAlgorithm
+AssetRiskBudgeting
+FactorRiskBudgeting
+RiskBudgeting
+risk_budgeting_algorithm_view(r::AssetRiskBudgeting, i)
+risk_budgeting_algorithm_view(r::FactorRiskBudgeting, i)
+set_risk_budgeting_constraints!
+set_rb_mip_w!
+```

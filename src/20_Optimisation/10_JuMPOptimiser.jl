@@ -1,3 +1,15 @@
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Intermediate result type storing processed optimisation attributes for `JuMPOptimiser`.
+
+Used internally to pass processed constraints, bounds, and other data between optimisation stages.
+
+# Related
+
+  - [`JuMPOptimiser`](@ref)
+  - [`MeanRisk`](@ref)
+"""
 @concrete struct ProcessedJuMPOptimiserAttributes <: AbstractResult
     pr
     wb
@@ -18,6 +30,25 @@
     plr
     ret
 end
+"""
+    assert_finite_nonnegative_real_or_vec(val)
+
+Assert that a value is a finite, non-negative real number or vector of such.
+
+Throws an `ArgCheck` error if `val` contains non-finite or negative elements.
+
+# Arguments
+
+  - `val`: Scalar or vector to validate.
+
+# Returns
+
+  - `nothing` on success.
+
+# Related
+
+  - [`JuMPOptimiser`](@ref)
+"""
 function assert_finite_nonnegative_real_or_vec(val::Number)
     @argcheck(isfinite(val))
     @argcheck(val > zero(val))
@@ -29,6 +60,108 @@ function assert_finite_nonnegative_real_or_vec(val::VecNum)
     @argcheck(all(x -> zero(x) <= x, val))
     return nothing
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Main JuMP-based portfolio optimiser configuration.
+
+`JuMPOptimiser` collects all the inputs needed to formulate and solve a JuMP-based portfolio optimisation problem: prior estimator, solver, constraints, bounds, fees, tracking, regularisation, and more. It is intended to be passed to a higher-level optimiser such as [`MeanRisk`](@ref) or [`RiskBudgeting`](@ref).
+
+# Fields
+
+  - `pe`: Prior estimator or prior result.
+  - `slv`: Solver or vector of solvers.
+  - `wb`: Weight bounds estimator or bounds.
+  - `bgt`: Budget constraint (total weight sum). If a `Number`: the portfolio weights must sum to this value. If a `BudgetCostEstimator`: the budget is computed from asset-level data. Cannot be used together with `sbgt`.
+  - `sbgt`: Short-sale budget constraint range. If provided, `bgt` must not be a `BudgetCostEstimator`.
+  - `lt`: Long threshold estimator or threshold.
+  - `st`: Short threshold estimator or threshold.
+  - `lcse`: Linear constraint estimator or constraint(s).
+  - `cte`: Centring constraint estimator or constraint(s).
+  - `gcarde`: Grouped cardinality constraint estimator.
+  - `sgcarde`: Sub-grouped cardinality constraint estimator(s).
+  - `smtx`: Sub-group constraint matrix or estimator.
+  - `sgmtx`: Sub-grouped constraint matrix or estimator.
+  - `slt`: Sub-group long threshold.
+  - `sst`: Sub-group short threshold.
+  - `sglt`: Sub-grouped long threshold.
+  - `sgst`: Sub-grouped short threshold.
+  - `tn`: Turnover constraint estimator or constraints.
+  - `fees`: Fee estimator or fee structure.
+  - `sets`: Asset sets (required when any estimator-typed constraint is provided).
+  - `tr`: Tracking error constraint(s).
+  - `ple`: Placeholder constraints.
+  - `ret`: Returns estimator for JuMP models.
+  - `sca`: Scalariser for combining multiple risk measures.
+  - `ccnt`: Custom JuMP constraint.
+  - `cobj`: Custom JuMP objective.
+  - `sc`: Constraint scale factor.
+  - `so`: Objective scale factor.
+  - `ss`: Optional scalar shrinkage parameter.
+  - `card`: Global cardinality constraint (maximum number of non-zero weights).
+  - `scard`: Sub-group cardinality constraint(s).
+  - `nea`: Minimum number of effective assets.
+  - `l1`: L1 regularisation coefficient.
+  - `l2`: L2 regularisation coefficient.
+  - `linf`: L∞ regularisation coefficient.
+  - `lp`: Lp regularisation specification(s).
+  - `brt`: If `true`, uses bootstrap returns.
+  - `cle_pr`: If `true`, passes the prior result to the clustering estimator.
+  - `strict`: If `true`, strictly enforces weight bounds.
+
+# Constructors
+
+    JuMPOptimiser(;
+        pe::PrE_Pr = EmpiricalPrior(),
+        slv::Slv_VecSlv,
+        wb::Option{<:WbE_Wb} = WeightBounds(),
+        bgt::Option{<:Num_BgtCE} = 1.0,
+        sbgt::Option{<:Num_BgtRg} = nothing,
+        lt::Option{<:BtE_Bt} = nothing,
+        st::Option{<:BtE_Bt} = nothing,
+        lcse::Option{<:LcE_Lc_VecLcE_Lc} = nothing,
+        cte::Option{<:Lc_CC_VecCC} = nothing,
+        gcarde::Option{<:LcE_Lc} = nothing,
+        sgcarde::Option{<:LcE_Lc_VecLcE_Lc} = nothing,
+        smtx::Option{<:MatNum_ASetMatE_VecMatNum_ASetMatE} = nothing,
+        sgmtx::Option{<:MatNum_ASetMatE_VecMatNum_ASetMatE} = nothing,
+        slt::Option{<:BtE_Bt_VecOptBtE_Bt} = nothing,
+        sst::Option{<:BtE_Bt_VecOptBtE_Bt} = nothing,
+        sglt::Option{<:BtE_Bt_VecOptBtE_Bt} = nothing,
+        sgst::Option{<:BtE_Bt_VecOptBtE_Bt} = nothing,
+        tn::Option{<:TnE_Tn_VecTnE_Tn} = nothing,
+        fees::Option{<:FeesE_Fees} = nothing,
+        sets::Option{<:AssetSets} = nothing,
+        tr::Option{<:Tr_VecTr} = nothing,
+        ple::Option{<:PlCE_PhC_VecPlCE_PlC} = nothing,
+        ret::JuMPReturnsEstimator = ArithmeticReturn(),
+        sca::NonHierarchicalScalariser = SumScalariser(),
+        ccnt::Option{<:CustomJuMPConstraint} = nothing,
+        cobj::Option{<:CustomJuMPObjective} = nothing,
+        sc::Number = 1,
+        so::Number = 1,
+        ss::Option{<:Number} = nothing,
+        card::Option{<:Integer} = nothing,
+        scard::Option{<:Int_VecInt} = nothing,
+        nea::Option{<:Number} = nothing,
+        l1::Option{<:Number} = nothing,
+        l2::Option{<:Number} = nothing,
+        linf::Option{<:Number} = nothing,
+        lp::Option{LpReg_VecLpReg} = nothing,
+        brt::Bool = false,
+        cle_pr::Bool = true,
+        strict::Bool = false
+    ) -> JuMPOptimiser
+
+Keywords correspond to the struct's fields.
+
+# Related
+
+  - [`BaseJuMPOptimisationEstimator`](@ref)
+  - [`MeanRisk`](@ref)
+  - [`RiskBudgeting`](@ref)
+  - [`RelaxedRiskBudgeting`](@ref)
+"""
 @concrete struct JuMPOptimiser <: BaseJuMPOptimisationEstimator
     pe
     slv
@@ -362,6 +495,28 @@ function opt_view(opt::JuMPOptimiser, i, X::MatNum)
                          lp = opt.lp, brt = opt.brt, cle_pr = opt.cle_pr,
                          strict = opt.strict)
 end
+"""
+    processed_jump_optimiser_attributes(opt, rd; kwargs...)
+
+Compute and process all optimiser attributes from a JuMP optimiser and returns data.
+
+Internal function that applies the `factory` transform and resolves view slices for all estimator fields of `opt` given the returns data `rd`.
+
+# Arguments
+
+  - `opt`: [`JuMPOptimiser`](@ref) configuration.
+  - `rd`: [`ReturnsResult`](@ref) data.
+  - `kwargs...`: Additional keyword arguments.
+
+# Returns
+
+  - Named tuple of processed attributes.
+
+# Related
+
+  - [`JuMPOptimiser`](@ref)
+  - [`processed_jump_optimiser`](@ref)
+"""
 function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResult;
                                              dims::Int = 1)
     rd = returns_result_picker(rd, opt.brt)
@@ -410,11 +565,54 @@ function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResu
                                             smtx, sgmtx, slt, sst, sglt, sgst, tn, fees,
                                             plr, ret)
 end
+"""
+    no_bounds_optimiser(opt, args...)
+
+Create a version of the JuMP optimiser with bounds removed for unbounded sub-problems.
+
+Internal helper used in risk frontier construction sub-problems. Strips weight and risk bounds from `opt` so the sub-problem is unconstrained.
+
+# Arguments
+
+  - `opt`: [`JuMPOptimiser`](@ref) configuration.
+  - `args...`: Additional arguments.
+
+# Returns
+
+  - [`JuMPOptimiser`](@ref) without bounds.
+
+# Related
+
+  - [`no_bounds_returns_estimator`](@ref)
+  - [`JuMPOptimiser`](@ref)
+"""
 function no_bounds_optimiser(opt::JuMPOptimiser, args...)
     pnames = Tuple(setdiff(propertynames(opt), (:ret,)))
     return JuMPOptimiser(; ret = no_bounds_returns_estimator(opt.ret, args...),
                          NamedTuple{pnames}(getproperty.(opt, pnames))...)
 end
+"""
+    processed_jump_optimiser(opt, rd; dims = 1)
+
+Build a fully processed `JuMPOptimiser` from raw configuration and returns data.
+
+Applies all factories and view slices, returning an updated `JuMPOptimiser` ready for solving.
+
+# Arguments
+
+  - `opt`: [`JuMPOptimiser`](@ref) configuration.
+  - `rd`: [`ReturnsResult`](@ref) data.
+  - `dims`: Observation dimension.
+
+# Returns
+
+  - Processed [`JuMPOptimiser`](@ref).
+
+# Related
+
+  - [`JuMPOptimiser`](@ref)
+  - [`processed_jump_optimiser_attributes`](@ref)
+"""
 function processed_jump_optimiser(opt::JuMPOptimiser, rd::ReturnsResult; dims::Int = 1)
     (; pr, wb, lt, st, lcsr, ctr, gcardr, sgcardr, smtx, sgmtx, slt, sst, sglt, sgst, tn, fees, plr, ret) = processed_jump_optimiser_attributes(opt,
                                                                                                                                                 rd;

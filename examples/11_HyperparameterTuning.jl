@@ -61,9 +61,9 @@ slv = [Solver(; name = :clarabel1, solver = Clarabel.Optimizer,
 #=
 ## 2. Hyper parameter tuning
 
-For this tutorial we will use the [`Stacking`]-(@ref) estimator, but the hyper parameter tuning works for every optimisation estimator. All you need is to use the right propertynames and indexing to access the parameters you want to tune. They use Julia's built-in parsing to create the lenses used by [`Accessors.jl`](https://github.com/JuliaObjects/Accessors.jl) to update the immutable estimators.
+For this tutorial we will use the [`Stacking`](@ref) estimator, but the hyper parameter tuning works for every optimisation estimator. All you need is to use the right propertynames and indexing to access the parameters you want to tune. They use Julia's built-in parsing to create the lenses used by [`Accessors.jl`](https://github.com/JuliaObjects/Accessors.jl) to update the immutable estimators.
 
-The parameter tuning uses a scoring function, a scoring metric (a risk measure), and an appropriate cross validation estimator. Only estimators which have a 1 to 1 ratio of training to test sets can be used, so only [`KFold`](@ref) and [`WalkForwardEstimator`]-(@ref) and their results can be used. This may be expanded in the future, using a similar technique for choosing the best path similarly to how it's done for the [`NestedClusters`]-(@ref) and [`Stacking`]-(@ref) estimators.
+The parameter tuning uses a scoring function, a scoring metric (a risk measure), and an appropriate cross validation estimator. Only estimators which have a 1 to 1 ratio of training to test sets can be used, so only [`KFold`](@ref) and [`WalkForwardEstimator`](@ref) and their results can be used. This may be expanded in the future, using a similar technique for choosing the best path similarly to how it's done for the [`NestedClustered`](@ref) and [`Stacking`](@ref) estimators.
 =#
 
 opt = JuMPOptimiser(; slv = slv)

@@ -449,6 +449,25 @@ function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:BodnarOkhrinP
     beta = (one(alpha) - alpha) * w / u
     return alpha * mu + beta * b
 end
+"""
+    factory(ce::ShrunkExpectedReturns, w::ObsWeights) -> ShrunkExpectedReturns
+
+Return a new [`ShrunkExpectedReturns`](@ref) estimator with observation weights `w` applied to the underlying mean and covariance estimators.
+
+# Arguments
+
+  - `ce`: Shrunk expected returns estimator.
+  - $(arg_dict[:ow])
+
+# Returns
+
+  - `me::ShrunkExpectedReturns`: Updated estimator with weights applied.
+
+# Related
+
+  - [`ShrunkExpectedReturns`](@ref)
+  - [`factory`](@ref)
+"""
 function factory(ce::ShrunkExpectedReturns, w::ObsWeights)
     return ShrunkExpectedReturns(; me = factory(ce.me, w), ce = factory(ce.ce, w),
                                  alg = ce.alg)

@@ -1,38 +1,203 @@
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for all cross-validation estimators in `PortfolioOptimisers.jl`.
+
+# Related
+
+  - [`CrossValidationResult`](@ref)
+  - [`OptimisationCrossValidationEstimator`](@ref)
+  - [`NonOptimisationCrossValidationEstimator`](@ref)
+"""
 abstract type CrossValidationEstimator <: AbstractEstimator end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for all cross-validation result types in `PortfolioOptimisers.jl`.
+
+# Related
+
+  - [`CrossValidationEstimator`](@ref)
+  - [`OptimisationCrossValidationResult`](@ref)
+"""
 abstract type CrossValidationResult <: AbstractResult end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for all cross-validation algorithm types.
+"""
 abstract type CrossValidationAlgorithm <: AbstractAlgorithm end
 function Base.split(res::CrossValidationResult, args...)
     return res
 end
+"""
+    const CVER = Union{<:CrossValidationEstimator, <:CrossValidationResult}
+
+Union of all cross-validation estimators and result types.
+"""
 const CVER = Union{<:CrossValidationEstimator, <:CrossValidationResult}
+"""
+$(DocStringExtensions.TYPEDEF)
 
+Abstract supertype for cross-validation estimators used in portfolio optimisation.
+Subtypes implement different splitting strategies (sequential or non-sequential) for
+out-of-sample testing of optimisation pipelines.
+
+# Related
+
+  - [`CrossValidationEstimator`](@ref)
+  - [`SequentialCrossValidationEstimator`](@ref)
+  - [`NonSequentialCrossValidationEstimator`](@ref)
+"""
 abstract type OptimisationCrossValidationEstimator <: CrossValidationEstimator end
-abstract type SequentialCrossValidationEstimator <: OptimisationCrossValidationEstimator end
-abstract type NonSequentialCrossValidationEstimator <: OptimisationCrossValidationEstimator end
+"""
+$(DocStringExtensions.TYPEDEF)
 
+Abstract supertype for sequential optimisation cross-validation estimators. Sequential
+schemes produce time-ordered, non-overlapping folds (e.g. walk-forward).
+
+# Related
+
+  - [`OptimisationCrossValidationEstimator`](@ref)
+"""
+abstract type SequentialCrossValidationEstimator <: OptimisationCrossValidationEstimator end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for non-sequential optimisation cross-validation estimators. Non-
+sequential schemes may produce randomly sampled or combinatorial folds.
+
+# Related
+
+  - [`OptimisationCrossValidationEstimator`](@ref)
+"""
+abstract type NonSequentialCrossValidationEstimator <: OptimisationCrossValidationEstimator end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for all optimisation cross-validation result types.
+
+# Related
+
+  - [`CrossValidationResult`](@ref)
+  - [`SequentialCrossValidationResult`](@ref)
+  - [`NonSequentialCrossValidationResult`](@ref)
+"""
 abstract type OptimisationCrossValidationResult <: CrossValidationResult end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for sequential optimisation cross-validation results.
+
+# Related
+
+  - [`OptimisationCrossValidationResult`](@ref)
+"""
 abstract type SequentialCrossValidationResult <: OptimisationCrossValidationResult end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for non-sequential optimisation cross-validation results.
+
+# Related
+
+  - [`OptimisationCrossValidationResult`](@ref)
+"""
 abstract type NonSequentialCrossValidationResult <: OptimisationCrossValidationResult end
+"""
+    const OptCVER
+
+Union of all optimisation cross-validation estimators and results.
+"""
 const OptCVER = Union{<:OptimisationCrossValidationEstimator,
                       <:OptimisationCrossValidationResult}
 
+"""
+    const NonSeqCVER
+
+Union of all non-sequential cross-validation estimators and results.
+"""
 const NonSeqCVER = Union{<:NonSequentialCrossValidationEstimator,
                          <:NonSequentialCrossValidationResult}
+"""
+    const SeqCVER
+
+Union of all sequential cross-validation estimators and results.
+"""
 const SeqCVER = Union{<:SequentialCrossValidationEstimator,
                       <:SequentialCrossValidationResult}
+"""
+$(DocStringExtensions.TYPEDEF)
 
+Abstract supertype for cross-validation estimators used in non-optimisation contexts
+(e.g. resampling for hierarchical clustering or phylogeny methods).
+
+# Related
+
+  - [`CrossValidationEstimator`](@ref)
+"""
 abstract type NonOptimisationCrossValidationEstimator <: CrossValidationEstimator end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for sequential non-optimisation cross-validation estimators.
+"""
 abstract type NonOptimisationSequentialCrossValidationEstimator <:
               NonOptimisationCrossValidationEstimator end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for non-sequential non-optimisation cross-validation estimators.
+"""
 abstract type NonOptimisationNonSequentialCrossValidationEstimator <:
               NonOptimisationCrossValidationEstimator end
+"""
+$(DocStringExtensions.TYPEDEF)
 
+Abstract supertype for result types produced by non-optimisation cross-validation
+routines.
+"""
 abstract type NonOptimisationCrossValidationResult <: CrossValidationResult end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for sequential non-optimisation cross-validation result types.
+"""
 abstract type NonOptimisationSequentialCrossValidationResult <:
               NonOptimisationCrossValidationResult end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for non-sequential non-optimisation cross-validation result types.
+"""
 abstract type NonOptimisationNonSequentialCrossValidationResult <:
               NonOptimisationCrossValidationResult end
+"""
+$(DocStringExtensions.TYPEDEF)
 
+Stores the portfolio returns data associated with a cross-validation prediction. Packages
+asset returns, factor returns, benchmark returns, timestamps, and investment vehicle
+information for use in prediction result types.
+
+# Fields
+
+  - `nx`: Asset names (`nothing` or vector of strings).
+  - `X`: Asset returns vector or vector of vectors.
+  - `nf`: Factor names (`nothing` or vector of strings).
+  - `F`: Factor returns matrix (`nothing` or matrix).
+  - `nb`: Benchmark names (`nothing` or vector of strings).
+  - `B`: Benchmark returns vector or vector of vectors.
+  - `ts`: Timestamps (`nothing` or vector of dates).
+  - `iv`: Investment vehicle returns (`nothing`, vector of numbers, or vector of vectors).
+  - `ivpa`: Investment vehicle per-asset allocation (`nothing`, scalar, or vector).
+
+# Related
+
+  - [`PredictionResult`](@ref)
+  - [`MultiPeriodPredictionResult`](@ref)
+  - [`PredictionResult`](@ref)
+  - [`MultiPeriodPredictionResult`](@ref)
+"""
 @concrete struct PredictionReturnsResult <: AbstractReturnsResult
     nx
     X
@@ -115,7 +280,41 @@ function PredictionReturnsResult(; nx::Option{<:VecStr} = nothing,
                                  ivpa::Option{<:Num_VecNum} = nothing)
     return PredictionReturnsResult(nx, X, nf, F, nb, B, ts, iv, ivpa)
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for all prediction result types in `PortfolioOptimisers.jl`.
+
+All concrete prediction result types from cross-validation should subtype `AbstractPredictionResult`.
+
+# Related
+
+  - [`PredictionResult`](@ref)
+  - [`MultiPeriodPredictionResult`](@ref)
+  - [`PopulationPredictionResult`](@ref)
+"""
 abstract type AbstractPredictionResult <: AbstractResult end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Stores the result of a single cross-validation fold prediction. Pairs an optimisation
+result with the returns data from the test period.
+
+# Fields
+
+  - `res::NonFiniteAllocationOptimisationResult`: Optimisation result from the training fold.
+  - `rd::PredictionReturnsResult`: Returns data from the test fold.
+
+# Related
+
+  - [`MultiPeriodPredictionResult`](@ref)
+  - [`PopulationPredictionResult`](@ref)
+  - [`predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)`](@ref)
+  - [`fit_predict`](@ref)
+  - [`MultiPeriodPredictionResult`](@ref)
+  - [`PopulationPredictionResult`](@ref)
+  - [`PredictionReturnsResult`](@ref)
+"""
 @concrete struct PredictionResult <: AbstractPredictionResult
     res
     rd
@@ -128,8 +327,49 @@ function PredictionResult(; res::NonFiniteAllocationOptimisationResult,
                           rd::PredictionReturnsResult)
     return PredictionResult(res, rd)
 end
+"""
+    const VecPredRes = AbstractVector{<:PredictionResult}
+
+Alias for a vector of single-fold prediction results.
+
+Represents a collection of [`PredictionResult`](@ref) objects from cross-validation folds.
+
+# Related
+
+  - [`PredictionResult`](@ref)
+  - [`VecVecPredRes`](@ref)
+"""
 const VecPredRes = AbstractVector{<:PredictionResult}
+"""
+    const VecVecPredRes = AbstractVector{<:VecPredRes}
+
+Alias for a vector of vectors of prediction results.
+
+Represents the outer collection of cross-validation paths, where each inner vector contains prediction results from a single path.
+
+# Related
+
+  - [`VecPredRes`](@ref)
+  - [`CombinatorialCrossValidation`](@ref)
+"""
 const VecVecPredRes = AbstractVector{<:VecPredRes}
+"""
+    _prediction_expected_risk(r, X; kwargs...)
+
+Compute the expected risk for a prediction result's returns.
+
+Internal helper that dispatches on whether `X` is a plain vector or a vector of vectors.
+
+# Arguments
+
+  - `r`: Risk measure.
+  - `X`: Returns vector or vector of vectors.
+  - `kwargs...`: Additional keyword arguments passed to [`expected_risk`](@ref).
+
+# Returns
+
+  - Expected risk value(s).
+"""
 function _prediction_expected_risk(r::AbstractBaseRiskMeasure, X::VecNum; kwargs...)
     return expected_risk(r, SingletonVector{Int}(), reshape(X, :, 1); kwargs...)
 end
@@ -140,6 +380,22 @@ end
 function expected_risk(r::AbstractBaseRiskMeasure, pred::PredictionResult; kwargs...)
     return _prediction_expected_risk(r, pred.rd.X, kwargs...)
 end
+"""
+    mapreduce_RetMtx(rd, sym = :X)
+
+Concatenate return matrices from a vector of `PredictionReturnsResult` objects.
+
+Internal helper that vertically concatenates the field `sym` across all elements of `rd`. Handles both single-asset (vector) and multi-asset (vector of vectors) return data.
+
+# Arguments
+
+  - `rd`: Vector of [`PredictionReturnsResult`](@ref) objects.
+  - `sym`: Symbol of the field to extract (default `:X`).
+
+# Returns
+
+  - Concatenated return matrix or vector of vectors.
+"""
 function mapreduce_RetMtx(rd::AbstractVector{<:PredictionReturnsResult{<:Any, <:VecNum}},
                           sym = :X)
     return mapreduce(x -> getproperty(x, sym), vcat, rd)
@@ -153,6 +409,29 @@ function mapreduce_RetMtx(rd::AbstractVector{<:PredictionReturnsResult{<:Any, <:
     end
     return X
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Stores predictions from multiple cross-validation folds as a single combined result.
+Concatenates the test-period returns from all folds into an aggregated
+[`PredictionReturnsResult`](@ref).
+
+# Fields
+
+  - `pred::VecPredRes`: Individual fold predictions.
+  - `mrd::PredictionReturnsResult`: Aggregated returns from all test folds.
+  - `id`: Identifier for this multi-period result (e.g. path index).
+
+# Related
+
+  - [`PredictionResult`](@ref)
+  - [`PopulationPredictionResult`](@ref)
+  - [`predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)`](@ref)
+  - [`sort_by_measure`](@ref)
+  - [`PredictionResult`](@ref)
+  - [`PopulationPredictionResult`](@ref)
+  - [`PredictionReturnsResult`](@ref)
+"""
 @concrete struct MultiPeriodPredictionResult <: AbstractPredictionResult
     pred
     mrd
@@ -178,6 +457,18 @@ function MultiPeriodPredictionResult(;
                                      id::Any = nothing)
     return MultiPeriodPredictionResult(pred, id)
 end
+"""
+    const VecMPredRes = AbstractVector{<:MultiPeriodPredictionResult}
+
+Alias for a vector of multi-period prediction results.
+
+Represents a collection of [`MultiPeriodPredictionResult`](@ref) objects.
+
+# Related
+
+  - [`MultiPeriodPredictionResult`](@ref)
+  - [`PredRes_MultiPredRes`](@ref)
+"""
 const VecMPredRes = AbstractVector{<:MultiPeriodPredictionResult}
 function Base.getproperty(mpred::MultiPeriodPredictionResult, sym::Symbol)
     return if sym == :res
@@ -193,8 +484,53 @@ function expected_risk(r::AbstractBaseRiskMeasure, mpred::MultiPeriodPredictionR
     X = mpred.mrd.X
     return _prediction_expected_risk(r, X; kwargs...)
 end
+"""
+    const PredRes_MultiPredRes = Union{<:PredictionResult, <:MultiPeriodPredictionResult}
+
+Alias for a single-fold or multi-period prediction result.
+
+Matches either a [`PredictionResult`](@ref) or a [`MultiPeriodPredictionResult`](@ref).
+
+# Related
+
+  - [`PredictionResult`](@ref)
+  - [`MultiPeriodPredictionResult`](@ref)
+  - [`VecPredRes_MultiPredRes`](@ref)
+"""
 const PredRes_MultiPredRes = Union{<:PredictionResult, <:MultiPeriodPredictionResult}
+"""
+    const VecPredRes_MultiPredRes = AbstractVector{<:PredRes_MultiPredRes}
+
+Alias for a vector of single-fold or multi-period prediction results.
+
+Represents a collection of [`PredRes_MultiPredRes`](@ref) elements.
+
+# Related
+
+  - [`PredRes_MultiPredRes`](@ref)
+"""
 const VecPredRes_MultiPredRes = AbstractVector{<:PredRes_MultiPredRes}
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Stores a collection of multi-period prediction results produced by a population-based
+cross-validation scheme (e.g. [`MultipleRandomised`](@ref)). Each element of `pred`
+represents one random asset-subset path.
+
+# Fields
+
+  - `pred::VecPredRes_MultiPredRes`: Collection of single or multi-period predictions.
+
+# Related
+
+  - [`PredictionResult`](@ref)
+  - [`MultiPeriodPredictionResult`](@ref)
+  - [`sort_by_measure`](@ref)
+  - [`PredictionResult`](@ref)
+  - [`MultiPeriodPredictionResult`](@ref)
+  - [`sort_by_measure`](@ref)
+  - [`MultipleRandomised`](@ref)
+"""
 @concrete struct PopulationPredictionResult <: AbstractPredictionResult
     pred
     function PopulationPredictionResult(pred::VecPredRes_MultiPredRes)
@@ -213,12 +549,58 @@ function expected_risk(r::AbstractBaseRiskMeasure, ppred::PopulationPredictionRe
                        kwargs...)
     return expected_risk(r, ppred.pred; kwargs...)
 end
+"""
+    sort_by_measure(ppred::PopulationPredictionResult, r::AbstractBaseRiskMeasure; kwargs...)
+
+Sort the successful paths in a [`PopulationPredictionResult`](@ref) by their expected
+risk under `r`. Paths where any fold returned a non-success retcode are excluded.
+
+# Arguments
+
+  - `ppred::PopulationPredictionResult`: Population prediction to sort.
+  - `r::AbstractBaseRiskMeasure`: Risk measure used for ranking.
+
+# Returns
+
+  - `Vector{MultiPeriodPredictionResult}`: Sorted vector of successful path predictions.
+
+# Related
+
+  - [`PopulationPredictionResult`](@ref)
+  - [`expected_risk`](@ref)
+  - [`PopulationPredictionResult`](@ref)
+  - [`expected_risk`](@ref)
+"""
 function sort_by_measure(ppred::PopulationPredictionResult, r::AbstractBaseRiskMeasure;
                          kwargs...)
     pred = filter(x -> all(y -> isa(y.res.retcode, OptimisationSuccess), x.pred),
                   ppred.pred)
     return sort(pred; by = x -> expected_risk(r, x; kwargs...), rev = bigger_is_better(r))
 end
+"""
+    quantile_by_measure(ppred::PopulationPredictionResult, r::AbstractBaseRiskMeasure, q::Real;
+                        r_kwargs::NamedTuple = (;), q_kwargs::NamedTuple = (;))
+
+Select the successful path in `ppred` whose expected risk under `r` is closest to the `q`-th quantile of the risk distribution across all successful paths.
+
+# Arguments
+
+  - `ppred::PopulationPredictionResult`: Population prediction result.
+  - `r::AbstractBaseRiskMeasure`: Risk measure for computing path risks.
+  - `q::Real`: Quantile level in `[0, 1]`.
+  - `r_kwargs::NamedTuple = (;)`: Keyword arguments forwarded to `expected_risk`.
+  - `q_kwargs::NamedTuple = (;)`: Keyword arguments forwarded to `Statistics.quantile`.
+
+# Returns
+
+  - [`MultiPeriodPredictionResult`](@ref): The path closest to the `q`-th quantile.
+
+# Related
+
+  - [`sort_by_measure`](@ref)
+  - [`PopulationPredictionResult`](@ref)
+  - [`expected_risk`](@ref)
+"""
 function quantile_by_measure(ppred::PopulationPredictionResult, r::AbstractBaseRiskMeasure,
                              q::Real; r_kwargs::NamedTuple = (;),
                              q_kwargs::NamedTuple = (;))
@@ -240,6 +622,28 @@ function quantile_by_measure(ppred::PopulationPredictionResult, r::AbstractBaseR
     # idx = max(1, round(Int, Statistics.quantile(1:length(sorted_predictions), q)))
     # return sorted_predictions[idx]
 end
+"""
+    reconstruct_rd(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult, X)
+
+Reconstruct a `PredictionReturnsResult` from an optimisation result and returns data.
+
+Computes benchmark, investment vehicle, and per-asset allocation data from the optimisation result weights and the original returns data.
+
+# Arguments
+
+  - `res::NonFiniteAllocationOptimisationResult`: Fitted optimisation result.
+  - `rd::ReturnsResult`: Original returns data.
+  - `X`: Portfolio returns (vector or vector of vectors).
+
+# Returns
+
+  - [`PredictionReturnsResult`](@ref) with updated benchmark and investment vehicle data.
+
+# Related
+
+  - [`predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)`](@ref)
+  - [`PredictionReturnsResult`](@ref)
+"""
 function reconstruct_rd(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult,
                         X::VecNum)
     nb = rd.nb
@@ -289,26 +693,108 @@ function reconstruct_rd(res::NonFiniteAllocationOptimisationResult, rd::ReturnsR
     return PredictionReturnsResult(; nx = rd.nx, X = X, nf = rd.nf, F = rd.F, nb = nb,
                                    B = B, ts = rd.ts, iv = iv, ivpa = ivpa)
 end
-function predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)
+"""
+    predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)
+    predict(res, rd, test_idx, cols = :)
+    predict(res, rd, test_idxs::VecVecInt, cols = :)
+
+Apply an optimisation result `res` to returns data `rd` to produce a
+[`PredictionResult`](@ref) or a vector of prediction results.
+
+When `test_idx` is provided, only the rows (observations) indexed by `test_idx` (and
+optionally columns `cols`) of `rd` are used for the prediction.
+
+# Arguments
+
+  - `res::NonFiniteAllocationOptimisationResult`: Fitted optimisation result.
+  - `rd::ReturnsResult`: Returns data for the prediction period.
+  - `test_idx`: Observation index or vector of observation indices for the test fold.
+  - `cols`: Column selector. Defaults to `:` (all assets).
+
+# Returns
+
+  - [`PredictionResult`](@ref) or vector of [`PredictionResult`](@ref).
+
+# Related
+
+  - [`fit_predict`](@ref)
+  - [`PredictionResult`](@ref)
+  - [`MultiPeriodPredictionResult`](@ref)
+  - [`fit_predict`](@ref)
+  - [`fit_and_predict`](@ref)
+  - [`PredictionResult`](@ref)
+"""
+function StatsAPI.predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)
     X = calc_net_returns(res, rd.X)
     rd = reconstruct_rd(res, rd, X)
     return PredictionResult(; res = res, rd = rd)
 end
+"""
+    fit_predict(opt, rd::ReturnsResult)
+
+Fit optimisation estimator `opt` on returns data `rd` and immediately produce a
+[`PredictionResult`](@ref) for the same data.
+
+# Arguments
+
+  - `opt`: Optimisation estimator or result.
+  - `rd::ReturnsResult`: Returns data.
+
+# Returns
+
+  - [`PredictionResult`](@ref).
+
+# Related
+
+  - [`predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)`](@ref)
+  - [`PredictionResult`](@ref)
+  - [`fit_and_predict`](@ref)
+"""
 function fit_predict(opt::OptE_Opt, rd::ReturnsResult)
     res = optimise(opt, rd)
     return predict(res, rd)
 end
-function predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult,
-                 test_idx::VecInt, cols = :)
+function StatsAPI.predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult,
+                          test_idx::VecInt, cols = :)
     rdi = returns_result_view(rd, test_idx, cols)
     X = calc_net_returns(res, rdi.X)
     rdi = reconstruct_rd(res, rdi, X)
     return PredictionResult(; res = res, rd = rdi)
 end
-function predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult,
-                 test_idxs::VecVecInt, cols = :)
+function StatsAPI.predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult,
+                          test_idxs::VecVecInt, cols = :)
     return [predict(res, rd, test_idx, cols) for test_idx in test_idxs]
 end
+"""
+    fit_and_predict(opt, rd::ReturnsResult, cv::NonSeqCVER; cols, ex, id) -> MultiPeriodPredictionResult
+    fit_and_predict(opt, rd::ReturnsResult; train_idx, test_idx, cols) -> PredictionResult
+    fit_and_predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult; test_idx, cols) -> PredictionResult
+
+Fit an optimisation estimator on training data and predict on test data using cross-validation.
+
+The three-argument method (`opt`, `rd`, `cv`) performs full cross-validated prediction over all folds of `cv`.
+The two-argument methods operate on a single pre-defined train/test split or on a pre-existing result.
+
+# Arguments
+
+  - `opt`: Optimisation estimator or an existing optimisation result.
+  - `rd::ReturnsResult`: Full returns data.
+  - `cv::NonSeqCVER`: Non-sequential cross-validation estimator (e.g. [`KFold`](@ref) or [`CombinatorialCrossValidation`](@ref)).
+  - `train_idx::VecInt`: Training indices.
+  - `test_idx`: Test indices (vector or vector of vectors).
+  - `cols`: Column selector (default `:` for all assets).
+
+# Returns
+
+  - [`MultiPeriodPredictionResult`](@ref) or [`PredictionResult`](@ref).
+
+# Related
+
+  - [`predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)`](@ref)
+  - [`optimise`](@ref)
+  - [`KFold`](@ref)
+  - [`CombinatorialCrossValidation`](@ref)
+"""
 function fit_and_predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult;
                          test_idx::VecInt_VecVecInt, cols = :, kwargs...)
     return predict(res, rd, test_idx, cols)
@@ -323,6 +809,31 @@ function fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator, rd::Retu
     res = optimise(opt, rd_train)
     return predict(res, rd, test_idx, cols)
 end
+"""
+    sort_predictions!(res::Union{test_idx, CrossValidationResult}, pred::VecPredRes) -> VecPredRes
+
+Sort prediction results to match the order of test indices.
+
+Reorders `predictions` so that they align with the original time ordering of `test_idx`.
+
+# Arguments
+
+  - `res`:
+
+      + `::VecVecInt`: Vector of test index vectors.
+      + `::CrossValidationResult`: Cross validation result object, uses the test indices stored in `res.test_idx`.
+
+  - `pred`: Vector of prediction results.
+
+# Returns
+
+  - Sorted predictions vector.
+
+# Related
+
+  - [`fit_and_predict`](@ref)
+  - [`path_fit_and_predict`](@ref)
+"""
 function sort_predictions!(test_idx::VecVecInt, predictions::VecPredRes)
     @argcheck(all(x -> allunique(x), test_idx), "Test indices must be unique.")
     idx = sortperm(test_idx; by = x -> x[1])

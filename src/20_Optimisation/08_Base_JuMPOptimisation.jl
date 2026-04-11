@@ -1,16 +1,137 @@
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for base JuMP-based portfolio optimisation estimators.
+
+These are configuration-level types (e.g., `JuMPOptimiser`) that define the optimisation problem setup for JuMP-based optimisers.
+
+# Related Types
+
+  - [`BaseOptimisationEstimator`](@ref)
+  - [`JuMPOptimiser`](@ref)
+"""
 abstract type BaseJuMPOptimisationEstimator <: BaseOptimisationEstimator end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for JuMP-based portfolio optimisation estimators.
+
+JuMP optimisers formulate and solve portfolio optimisation problems using mathematical programming via the JuMP.jl framework.
+
+# Related Types
+
+  - [`NonFiniteAllocationOptimisationEstimator`](@ref)
+  - [`RiskJuMPOptimisationEstimator`](@ref)
+  - [`MeanRisk`](@ref)
+"""
 abstract type JuMPOptimisationEstimator <: NonFiniteAllocationOptimisationEstimator end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for risk-based JuMP portfolio optimisation estimators.
+
+Subtype `RiskJuMPOptimisationEstimator` to implement optimisers that minimise or constrain risk measures as the primary objective.
+
+# Related Types
+
+  - [`JuMPOptimisationEstimator`](@ref)
+  - [`MeanRisk`](@ref)
+  - [`RiskBudgeting`](@ref)
+"""
 abstract type RiskJuMPOptimisationEstimator <: JuMPOptimisationEstimator end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for portfolio objective functions.
+
+Subtype `ObjectiveFunction` to implement portfolio optimisation objectives such as minimum risk, maximum return, or maximum Sharpe ratio.
+
+# Related Types
+
+  - [`MinimumRisk`](@ref)
+  - [`MaximumReturn`](@ref)
+  - [`MaximumRatio`](@ref)
+  - [`MaximumUtility`](@ref)
+"""
 abstract type ObjectiveFunction <: AbstractEstimator end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for JuMP-based returns estimators used in optimisation models.
+
+`JuMPReturnsEstimator` types define how expected returns are incorporated into JuMP models.
+
+# Related Types
+
+  - [`ArithmeticReturn`](@ref)
+  - [`LogarithmicReturn`](@ref)
+"""
 abstract type JuMPReturnsEstimator <: AbstractEstimator end
 function factory(r::JuMPReturnsEstimator, args...; kwargs...)
     return r
 end
+"""
+    jump_returns_view(r, args...; kwargs...)
+
+Get a view or subset of JuMP returns estimator for slicing.
+
+Returns the estimator sliced for a given asset cluster or returns it unchanged.
+
+# Arguments
+
+  - `r`: JuMP returns estimator.
+  - `args...`: Additional arguments (index, etc.).
+  - `kwargs...`: Additional keyword arguments.
+
+# Returns
+
+  - Sliced or unchanged returns estimator.
+
+# Related
+
+  - [`JuMPReturnsEstimator`](@ref)
+"""
 function jump_returns_view(r::JuMPReturnsEstimator, args...; kwargs...)
     return r
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for JuMP constraint estimators.
+
+Subtype `JuMPConstraintEstimator` to implement custom constraints or objectives for JuMP-based portfolio optimisers.
+
+# Related Types
+
+  - [`CustomJuMPConstraint`](@ref)
+  - [`CustomJuMPObjective`](@ref)
+"""
 abstract type JuMPConstraintEstimator <: AbstractConstraintEstimator end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for custom JuMP constraint implementations.
+
+Implement `add_custom_constraint!` to define custom JuMP model constraints.
+
+# Related Types
+
+  - [`JuMPConstraintEstimator`](@ref)
+  - [`CustomJuMPObjective`](@ref)
+"""
 abstract type CustomJuMPConstraint <: JuMPConstraintEstimator end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for custom JuMP objective implementations.
+
+Implement `add_custom_objective_term!` to add custom terms to the JuMP model objective.
+
+# Related Types
+
+  - [`JuMPConstraintEstimator`](@ref)
+  - [`CustomJuMPConstraint`](@ref)
+"""
 abstract type CustomJuMPObjective <: JuMPConstraintEstimator end
 function needs_previous_weights(::CustomJuMPConstraint)
     return false
@@ -18,24 +139,122 @@ end
 function needs_previous_weights(::CustomJuMPObjective)
     return false
 end
+"""
+    custom_constraint_view(cc, args...; kwargs...)
+
+Get a view or subset of a custom JuMP constraint for slicing.
+
+Returns `nothing` if no custom constraint is provided, or the constraint unchanged otherwise. Used in hierarchical optimisation to propagate custom constraints per cluster.
+
+# Arguments
+
+  - `cc`: Custom JuMP constraint or `nothing`.
+  - `args...`: Additional arguments.
+  - `kwargs...`: Additional keyword arguments.
+
+# Returns
+
+  - Constraint or `nothing`.
+
+# Related
+
+  - [`CustomJuMPConstraint`](@ref)
+"""
 function custom_constraint_view(::Nothing, args...; kwargs...)
     return nothing
 end
 function custom_constraint_view(::CustomJuMPConstraint, args...; kwargs...)
     return nothing
 end
+"""
+    custom_objective_view(co, args...; kwargs...)
+
+Get a view or subset of a custom JuMP objective term for slicing.
+
+Returns `nothing` if no custom objective is provided, or the objective unchanged otherwise.
+
+# Arguments
+
+  - `co`: Custom JuMP objective or `nothing`.
+  - `args...`: Additional arguments.
+  - `kwargs...`: Additional keyword arguments.
+
+# Returns
+
+  - Objective or `nothing`.
+
+# Related
+
+  - [`CustomJuMPObjective`](@ref)
+"""
 function custom_objective_view(::Nothing, args...; kwargs...)
     return nothing
 end
 function custom_objective_view(::CustomJuMPObjective, args...; kwargs...)
     return nothing
 end
+"""
+    add_custom_objective_term!(args...; kwargs...)
+
+Add a custom objective term to the JuMP model.
+
+No-op fallback. Override this method for subtypes of [`CustomJuMPObjective`](@ref) to add custom penalty or reward terms to the JuMP model objective.
+
+# Arguments
+
+  - `args...`: JuMP model and custom objective type (ignored in fallback).
+  - `kwargs...`: Additional keyword arguments.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`CustomJuMPObjective`](@ref)
+  - [`add_custom_constraint!`](@ref)
+"""
 function add_custom_objective_term!(args...; kwargs...)
     return nothing
 end
+"""
+    add_custom_constraint!(args...; kwargs...)
+
+Add a custom constraint to the JuMP model.
+
+No-op fallback. Override this method for subtypes of [`CustomJuMPConstraint`](@ref) to add custom constraints to the JuMP model.
+
+# Arguments
+
+  - `args...`: JuMP model and custom constraint type (ignored in fallback).
+  - `kwargs...`: Additional keyword arguments.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`CustomJuMPConstraint`](@ref)
+  - [`add_custom_objective_term!`](@ref)
+"""
 function add_custom_constraint!(args...; kwargs...)
     return nothing
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Stores the solution (portfolio weights) from a JuMP optimisation model.
+
+# Fields
+
+  - `w`: Optimal portfolio weights (non-empty array of numbers).
+
+# Related
+
+  - [`OptimisationModelResult`](@ref)
+  - [`JuMPOptimisationEstimator`](@ref)
+"""
 @concrete struct JuMPOptimisationSolution <: OptimisationModelResult
     w
     function JuMPOptimisationSolution(w::ArrNum)
@@ -46,6 +265,25 @@ end
 function JuMPOptimisationSolution(; w::ArrNum)
     return JuMPOptimisationSolution(w)
 end
+"""
+    set_model_scales!(model::JuMP.Model, so::Number, sc::Number)
+
+Register objective scale `so` and constraint scale `sc` as named expressions in the JuMP model.
+
+# Arguments
+
+  - `model::JuMP.Model`: JuMP optimisation model.
+  - `so::Number`: Objective scale factor.
+  - `sc::Number`: Constraint scale factor.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`JuMPOptimiser`](@ref)
+"""
 function set_model_scales!(model::JuMP.Model, so::Number, sc::Number)
     JuMP.@expressions(model, begin
                           so, so
@@ -53,6 +291,28 @@ function set_model_scales!(model::JuMP.Model, so::Number, sc::Number)
                       end)
     return nothing
 end
+"""
+    set_initial_w!(args...)
+    set_initial_w!(w::VecNum, wi::VecNum)
+
+Set initial (warm-start) values for portfolio weight variables in the JuMP model.
+
+The no-op fallback does nothing when `wi` is not provided. The two-argument method sets JuMP start values for each weight variable.
+
+# Arguments
+
+  - `w::VecNum`: Vector of JuMP weight variables.
+  - `wi::VecNum`: Vector of initial weight values.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`set_w!`](@ref)
+  - [`JuMPOptimiser`](@ref)
+"""
 function set_initial_w!(args...)
     return nothing
 end
@@ -61,11 +321,54 @@ function set_initial_w!(w::VecNum, wi::VecNum)
     JuMP.set_start_value.(w, wi)
     return nothing
 end
+"""
+    set_w!(model::JuMP.Model, X::MatNum, wi::Option{<:VecNum_VecVecNum})
+
+Create portfolio weight variables in the JuMP model and optionally set initial values.
+
+Registers a vector of weight variables `w` of length `size(X, 2)` in the model. If `wi` is provided, sets the initial values via [`set_initial_w!`](@ref).
+
+# Arguments
+
+  - `model::JuMP.Model`: JuMP optimisation model.
+  - `X::MatNum`: Asset returns matrix (shape: observations × assets).
+  - `wi`: Optional initial weight values.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`set_initial_w!`](@ref)
+  - [`JuMPOptimiser`](@ref)
+"""
 function set_w!(model::JuMP.Model, X::MatNum, wi::Option{<:VecNum_VecVecNum})
     JuMP.@variable(model, w[1:size(X, 2)])
     set_initial_w!(w, wi)
     return nothing
 end
+"""
+    process_model(model, retcode)
+
+Extract the solution from an optimised JuMP model based on the return code.
+
+On success, extracts the optimised weights from the model. On failure, returns an empty solution.
+
+# Arguments
+
+  - `model`: Optimised JuMP model.
+  - `retcode`: Optimisation return code ([`OptimisationSuccess`](@ref) or [`OptimisationFailure`](@ref)).
+
+# Returns
+
+  - Solution object.
+
+# Related
+
+  - [`OptimisationSuccess`](@ref)
+  - [`OptimisationFailure`](@ref)
+"""
 function process_model(model::JuMP.Model, ::OptimisationSuccess)
     k = JuMP.value(model[:k])
     ik = !iszero(k) ? inv(k) : 1
@@ -117,6 +420,27 @@ function optimise_JuMP_model!(model::JuMP.Model, opt::JuMPOptimisationEstimator,
     end
     return retcode, process_model(model, retcode)
 end
+"""
+    set_portfolio_returns!(model::JuMP.Model, X::MatNum)
+
+Compute and register portfolio returns expression `X * w` in the JuMP model.
+
+If the expression already exists in the model, returns it directly (idempotent).
+
+# Arguments
+
+  - `model::JuMP.Model`: JuMP optimisation model.
+  - `X::MatNum`: Asset returns matrix.
+
+# Returns
+
+  - The portfolio returns expression.
+
+# Related
+
+  - [`set_net_portfolio_returns!`](@ref)
+  - [`JuMPOptimiser`](@ref)
+"""
 function set_portfolio_returns!(model::JuMP.Model, X::MatNum)
     if haskey(model, :X)
         return model[:X]
@@ -125,6 +449,27 @@ function set_portfolio_returns!(model::JuMP.Model, X::MatNum)
     JuMP.@expression(model, X, X * w)
     return X
 end
+"""
+    set_net_portfolio_returns!(model::JuMP.Model, X::MatNum)
+
+Compute and register net portfolio returns (after fees) in the JuMP model.
+
+Calls [`set_portfolio_returns!`](@ref) and subtracts fees if present.
+
+# Arguments
+
+  - `model::JuMP.Model`: JuMP optimisation model.
+  - `X::MatNum`: Asset returns matrix.
+
+# Returns
+
+  - The net portfolio returns expression.
+
+# Related
+
+  - [`set_portfolio_returns!`](@ref)
+  - [`JuMPOptimiser`](@ref)
+"""
 function set_net_portfolio_returns!(model::JuMP.Model, X::MatNum)
     if haskey(model, :net_X)
         return model[:net_X]
@@ -138,6 +483,27 @@ function set_net_portfolio_returns!(model::JuMP.Model, X::MatNum)
     end
     return net_X
 end
+"""
+    set_portfolio_returns_plus_one!(model::JuMP.Model, X::MatNum)
+
+Compute and register portfolio gross returns `X .+ 1` in the JuMP model.
+
+Used in drawdown and logarithmic return computations.
+
+# Arguments
+
+  - `model::JuMP.Model`: JuMP optimisation model.
+  - `X::MatNum`: Portfolio returns expression.
+
+# Returns
+
+  - The gross returns expression `X .+ 1`.
+
+# Related
+
+  - [`set_portfolio_drawdowns_plus_one!`](@ref)
+  - [`set_portfolio_returns!`](@ref)
+"""
 function set_portfolio_returns_plus_one!(model::JuMP.Model, X::MatNum)
     if haskey(model, :Xap1)
         return model[:Xap1]
@@ -145,6 +511,26 @@ function set_portfolio_returns_plus_one!(model::JuMP.Model, X::MatNum)
     JuMP.@expression(model, Xap1, X .+ one(eltype(X)))
     return Xap1
 end
+"""
+    set_portfolio_drawdowns_plus_one!(model::JuMP.Model, X::MatNum)
+
+Compute and register absolute drawdowns plus one in the JuMP model.
+
+Computes `absolute_drawdown_arr(X) .+ 1` and registers it in the model.
+
+# Arguments
+
+  - `model::JuMP.Model`: JuMP optimisation model.
+  - `X::MatNum`: Portfolio returns expression.
+
+# Returns
+
+  - The drawdowns-plus-one expression.
+
+# Related
+
+  - [`set_portfolio_returns_plus_one!`](@ref)
+"""
 function set_portfolio_drawdowns_plus_one!(model::JuMP.Model, X::MatNum)
     if haskey(model, :ddap1)
         return model[:ddap1]

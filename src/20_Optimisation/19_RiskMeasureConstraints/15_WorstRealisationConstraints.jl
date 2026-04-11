@@ -1,3 +1,25 @@
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Introduce the worst-realisation risk variable and constraint to `model`.
+
+Creates a scalar variable `wr_risk` and adds `sc * (wr_risk .+ net_X) >= 0` so that
+`wr_risk` upper-bounds the negative of every portfolio return. Returns the existing variable
+if already present.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - `X::MatNum`: Asset returns matrix (`T × N`).
+
+# Returns
+
+  - `wr_risk`: JuMP scalar variable for the worst-realisation risk.
+
+# Related
+
+  - [`set_risk_constraints!`](@ref)
+"""
 function set_wr_risk_expression!(model::JuMP.Model, X::MatNum)
     if haskey(model, :wr_risk)
         return model[:wr_risk]
@@ -8,6 +30,30 @@ function set_wr_risk_expression!(model::JuMP.Model, X::MatNum)
     JuMP.@constraint(model, cwr, sc * (wr_risk .+ net_X) >= 0)
     return wr_risk
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Add worst-realisation risk constraints to `model`.
+
+Delegates to [`set_wr_risk_expression!`](@ref) to create `wr_risk`, then calls
+[`set_risk_bounds_and_expression!`](@ref). Returns the existing expression if already present.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - `r::WorstRealisation`: Worst-realisation risk measure instance.
+  - $(arg_dict[:opt_rjumpe])
+  - $(arg_dict[:pr_X])
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`set_wr_risk_expression!`](@ref)
+  - [`set_risk_bounds_and_expression!`](@ref)
+"""
 function set_risk_constraints!(model::JuMP.Model, ::Any, r::WorstRealisation,
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; kwargs...)

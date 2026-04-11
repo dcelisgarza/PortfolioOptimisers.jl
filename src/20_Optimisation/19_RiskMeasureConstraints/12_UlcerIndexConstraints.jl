@@ -1,3 +1,28 @@
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Add Ulcer Index risk constraints to `model`.
+
+Introduces a scalar variable `uci` and the SOC constraint
+`[sc * uci; sc * dd[2:T+1]] in SecondOrderCone()`, then defines
+`uci_risk = uci / sqrt(T)`. Returns the existing expression if already present.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - `r::UlcerIndex`: Ulcer index risk measure instance.
+  - $(arg_dict[:opt_rjumpe])
+  - $(arg_dict[:pr_X])
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`set_drawdown_constraints!`](@ref)
+  - [`set_risk_bounds_and_expression!`](@ref)
+"""
 function set_risk_constraints!(model::JuMP.Model, ::Any, r::UlcerIndex,
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; kwargs...)

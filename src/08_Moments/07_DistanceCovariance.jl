@@ -67,10 +67,51 @@ function DistanceCovariance(; metric::Distances.Metric = Distances.Euclidean(),
                             ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())
     return DistanceCovariance(metric, args, kwargs, w, ex)
 end
+"""
+    factory(ce::DistanceCovariance, w::ObsWeights) -> DistanceCovariance
+
+Return a new [`DistanceCovariance`](@ref) estimator with observation weights `w`.
+
+# Arguments
+
+  - $(arg_dict[:ce])
+  - $(arg_dict[:ow])
+
+# Returns
+
+  - $(ret_dict[:ce])
+
+# Related
+
+  - [`DistanceCovariance`](@ref)
+  - [`factory`](@ref)
+"""
 function factory(ce::DistanceCovariance, w::ObsWeights)
     return DistanceCovariance(; metric = ce.metric, args = ce.args, kwargs = ce.kwargs,
                               w = w, ex = ce.ex)
 end
+"""
+    calc_pairwise_dists(ce::DistanceCovariance, v1, v2, w)
+
+Compute pairwise distance matrices between two vectors using the configured metric.
+
+Internal helper used in distance correlation computation. Handles weighted and unweighted cases.
+
+# Arguments
+
+  - `ce`: [`DistanceCovariance`](@ref) estimator with metric configuration.
+  - `v1`, `v2`: Data vectors.
+  - `w`: Observation weights (`nothing` for unweighted, `StatsBase.AbstractWeights` for weighted).
+
+# Returns
+
+  - Tuple of pairwise distance matrices `(D1, D2)`.
+
+# Related
+
+  - [`DistanceCovariance`](@ref)
+  - [`cor_distance`](@ref)
+"""
 function calc_pairwise_dists(ce::DistanceCovariance, v1::VecNum, v2::VecNum, ::Nothing)
     return Distances.pairwise(ce.metric, v1, ce.args...; ce.kwargs...),
            Distances.pairwise(ce.metric, v2, ce.args...; ce.kwargs...)

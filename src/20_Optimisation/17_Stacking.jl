@@ -1,4 +1,37 @@
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for stacking-based portfolio optimisation estimators.
+
+# Related Types
+
+  - [`NonFiniteAllocationOptimisationEstimator`](@ref)
+  - [`Stacking`](@ref)
+"""
 abstract type BaseStackingOptimisationEstimator <: NonFiniteAllocationOptimisationEstimator end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Result type for Stacking portfolio optimisation.
+
+# Fields
+
+  - `oe`: Type of the optimisation estimator that produced this result.
+  - `pr`: Prior result used in optimisation.
+  - `wb`: Weight bounds applied.
+  - `fees`: Fee structure applied (or `nothing`).
+  - `resi`: Inner optimisation results.
+  - `reso`: Outer optimisation result.
+  - `cv`: Cross-validation result (or `nothing`).
+  - `retcode`: Overall return code.
+  - `w`: Final aggregated portfolio weights.
+  - `fb`: Fallback result.
+
+# Related
+
+  - [`Stacking`](@ref)
+  - [`NonFiniteAllocationOptimisationResult`](@ref)
+"""
 @concrete struct StackingResult <: NonFiniteAllocationOptimisationResult
     oe
     pr
@@ -15,6 +48,60 @@ function factory(res::StackingResult, fb::Option{<:OptE_Opt})
     return StackingResult(res.oe, res.pr, res.wb, res.fees, res.resi, res.reso, res.cv,
                           res.retcode, res.w, fb)
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Stacking portfolio optimiser.
+
+`Stacking` implements a stacking (model combination) approach to portfolio optimisation. It applies multiple inner optimisers (`opti`) to the data, then combines their outputs with a single outer optimiser (`opto`) to produce a final portfolio. Optionally, cross-validation can be used to weight the inner optimisers' contributions.
+
+# Fields
+
+  - `pe`: Prior estimator or prior result.
+  - `wb`: Weight bounds estimator or bounds.
+  - `fees`: Fee estimator or fee structure.
+  - `sets`: Asset sets.
+  - `scale`: Optional scaling vector for inner optimiser weights (length must match `opti`).
+  - `opti`: Vector of inner portfolio optimisers.
+  - `opto`: Outer portfolio optimiser combining inner results.
+  - `cv`: Cross-validation configuration for weighting inner optimisers.
+  - `wf`: Weight finaliser for enforcing bounds.
+  - `ex`: FLoops executor for parallelism.
+  - `fb`: Fallback optimiser.
+  - `brt`: If `true`, uses bootstrap returns.
+  - `strict`: If `true`, strictly enforces weight bounds.
+
+# Constructors
+
+    Stacking(;
+        pe::PrE_Pr = EmpiricalPrior(),
+        wb::Option{<:WbE_Wb} = nothing,
+        fees::Option{<:FeesE_Fees} = nothing,
+        sets::Option{<:AssetSets} = nothing,
+        scale::Option{<:VecNum} = nothing,
+        opti::VecOptE_Opt,
+        opto::NonFiniteAllocationOptimisationEstimator,
+        cv::Option{<:OptimisationCrossValidation} = nothing,
+        wf::WeightFinaliser = IterativeWeightFinaliser(),
+        ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
+        fb::Option{<:OptE_Opt} = nothing,
+        brt::Bool = false,
+        strict::Bool = false
+    ) -> Stacking
+
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - `!isempty(opti)`.
+  - If `scale` is provided: `length(scale) == length(opti)` and all elements are finite.
+
+# Related
+
+  - [`BaseStackingOptimisationEstimator`](@ref)
+  - [`NestedClustered`](@ref)
+  - [`StackingResult`](@ref)
+"""
 @concrete struct Stacking <: BaseStackingOptimisationEstimator
     pe
     wb

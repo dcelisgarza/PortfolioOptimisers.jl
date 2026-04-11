@@ -125,7 +125,27 @@ function LinearConstraint(; ineq::Option{<:PartialLinearConstraint} = nothing,
                           eq::Option{<:PartialLinearConstraint} = nothing)
     return LinearConstraint(ineq, eq)
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Alias for an abstract vector of [`LinearConstraint`](@ref) elements.
+
+# Related
+
+  - [`LinearConstraint`](@ref)
+  - [`Lc_VecLc`](@ref)
+"""
 const VecLc = AbstractVector{<:LinearConstraint}
+"""
+    const Lc_VecLc = Union{<:LinearConstraint, <:VecLc}
+
+Alias for a union of a single [`LinearConstraint`](@ref) or a vector of them.
+
+# Related
+
+  - [`LinearConstraint`](@ref)
+  - [`VecLc`](@ref)
+"""
 const Lc_VecLc = Union{<:LinearConstraint, <:VecLc}
 function Base.getproperty(obj::LinearConstraint, sym::Symbol)
     return if sym == :A_ineq
@@ -190,7 +210,27 @@ Structured result for standard linear constraint equation parsing.
                                                                                      eqn)
     end
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Alias for an abstract vector of [`ParsingResult`](@ref) elements.
+
+# Related
+
+  - [`ParsingResult`](@ref)
+  - [`PR_VecPR`](@ref)
+"""
 const VecPR = AbstractVector{<:ParsingResult}
+"""
+    const PR_VecPR = Union{<:ParsingResult, <:VecPR}
+
+Alias for a union of a single [`ParsingResult`](@ref) or a vector of them.
+
+# Related
+
+  - [`ParsingResult`](@ref)
+  - [`VecPR`](@ref)
+"""
 const PR_VecPR = Union{<:ParsingResult, <:VecPR}
 """
 $(DocStringExtensions.TYPEDEF)
@@ -199,12 +239,12 @@ Container for asset set and group information used in constraint generation.
 
 `AssetSets` provides a unified interface for specifying the asset universe and any groupings or partitions of assets. It is used throughout constraint generation and estimator routines to expand group references, map group names to asset lists, and validate asset membership.
 
-If a key in `dict` starts with the same value as `key`, it means that the corresponding group must have the same length as the asset universe, `dict[key]`. This is useful for defining partitions of the asset universe, for example when using [`asset_sets_matrix`]-(@ref) with [`NestedClustered`]-(@ref).
+If a key in `dict` starts with the same value as `key`, it means that the corresponding group must have the same length as the asset universe, `dict[key]`. This is useful for defining partitions of the asset universe, for example when using [`asset_sets_matrix`](@ref) with [`NestedClustered`](@ref).
 
 # Fields
 
-  - `key`: The key in `dict` that identifies the primary list of assets. Groups prefixed by this `key` followed by an `_` must have the same length as `dict[key]` as their lengths are preserved across views, enabling the use of constraints even in [`NestedClustered`]-(@ref) optimisations. For example if `key` is `mykey`, sets prefixed by `mykey_` must have the same length and corresponding order as `dict[key]`. For example if we want to define the asset industries we can create a key-value pair with key "mykey_industries", where the entry corresponds to the industry of the asset in the same position in `dict[key]`.
-  - `ukey`: The key prefix used for asset sets with unique entries. If present, there must be an equivalently named group prefixed by `key` followed by an `_` that follows the above rule, as that group will be used to find each of the unique entries matching each asset for the view. For example assuming `ukey` is `myuniquekey` if we want to use the above example but create a constraint which uses the sets of industries found in `dict["mykey_industries"]` we can create a key-value pair with key `myuniquekey_industries` whose values are the unique entries of `dict["mykey_industries"]`. This uniqueness will be propagated across views, which lets us define constraints on the unique entries even in [`NestedClustered`]-(@ref) optimisations.
+  - `key`: The key in `dict` that identifies the primary list of assets. Groups prefixed by this `key` followed by an `_` must have the same length as `dict[key]` as their lengths are preserved across views, enabling the use of constraints even in [`NestedClustered`](@ref) optimisations. For example if `key` is `mykey`, sets prefixed by `mykey_` must have the same length and corresponding order as `dict[key]`. For example if we want to define the asset industries we can create a key-value pair with key "mykey_industries", where the entry corresponds to the industry of the asset in the same position in `dict[key]`.
+  - `ukey`: The key prefix used for asset sets with unique entries. If present, there must be an equivalently named group prefixed by `key` followed by an `_` that follows the above rule, as that group will be used to find each of the unique entries matching each asset for the view. For example assuming `ukey` is `myuniquekey` if we want to use the above example but create a constraint which uses the sets of industries found in `dict["mykey_industries"]` we can create a key-value pair with key `myuniquekey_industries` whose values are the unique entries of `dict["mykey_industries"]`. This uniqueness will be propagated across views, which lets us define constraints on the unique entries even in [`NestedClustered`](@ref) optimisations.
   - `dict`: A dictionary mapping group names (or asset set names) to vectors of asset identifiers.
 
 # Constructors
@@ -920,6 +960,21 @@ function parse_equation(eqn::AbstractString; ops1::Tuple = ("==", "<=", ">="),
     _rethrow_parse_error(rexpr, :rhs)
     return _parse_equation(lexpr, opstr, rexpr, datatype)
 end
+"""
+    _has_invalid_plus(expr)
+
+Check whether a Julia expression contains an invalid `+` operator in a constraint context.
+
+Internal helper used during linear constraint parsing to detect unsupported `+` operator usage in constraint expressions.
+
+# Arguments
+
+  - `expr`: Julia expression to check.
+
+# Returns
+
+  - `Bool`: `true` if the expression contains an invalid `+`, `false` otherwise.
+"""
 function _has_invalid_plus(expr)
     if !(isa(expr, Expr) && expr.head == :call)
         return false
@@ -1274,10 +1329,59 @@ end
 function LinearConstraintEstimator(; val::EqnType, key::Option{<:AbstractString} = nothing)
     return LinearConstraintEstimator(val, key)
 end
+"""
+    const LcE_Lc = Union{<:LinearConstraintEstimator, <:LinearConstraint}
+
+Alias for a union of linear constraint estimator and linear constraint types.
+
+# Related
+
+  - [`LinearConstraintEstimator`](@ref)
+  - [`LinearConstraint`](@ref)
+"""
 const LcE_Lc = Union{<:LinearConstraintEstimator, <:LinearConstraint}
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Alias for an abstract vector of [`LcE_Lc`](@ref) elements.
+
+# Related
+
+  - [`LcE_Lc`](@ref)
+"""
 const VecLcE_Lc = AbstractVector{<:LcE_Lc}
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Alias for an abstract vector of [`LinearConstraintEstimator`](@ref) elements.
+
+# Related
+
+  - [`LinearConstraintEstimator`](@ref)
+  - [`LcE_VecLcE`](@ref)
+"""
 const VecLcE = AbstractVector{<:LinearConstraintEstimator}
+"""
+    const LcE_Lc_VecLcE_Lc = Union{<:LcE_Lc, <:VecLcE_Lc}
+
+Alias for a union of [`LcE_Lc`](@ref) or a vector of them.
+
+# Related
+
+  - [`LcE_Lc`](@ref)
+  - [`VecLcE_Lc`](@ref)
+"""
 const LcE_Lc_VecLcE_Lc = Union{<:LcE_Lc, <:VecLcE_Lc}
+"""
+    const LcE_VecLcE = Union{<:LinearConstraintEstimator, <:VecLcE}
+
+Alias for a union of a single [`LinearConstraintEstimator`](@ref) or a vector of them.
+
+# Related
+
+  - [`LinearConstraintEstimator`](@ref)
+  - [`VecLcE`](@ref)
+"""
 const LcE_VecLcE = Union{<:LinearConstraintEstimator, <:VecLcE}
 """
     linear_constraints(lcs::Option{<:LinearConstraint}, args...; kwargs...)

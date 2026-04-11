@@ -72,6 +72,25 @@ function EquilibriumExpectedReturns(;
                                     w::Option{<:VecNum} = nothing, l::Number = 1)
     return EquilibriumExpectedReturns(ce, w, l)
 end
+"""
+    factory(ce::EquilibriumExpectedReturns, w::ObsWeights) -> EquilibriumExpectedReturns
+
+Return a new [`EquilibriumExpectedReturns`](@ref) estimator with observation weights `w` applied to the underlying covariance estimator.
+
+# Arguments
+
+  - `ce`: Equilibrium expected returns estimator.
+  - $(arg_dict[:ow])
+
+# Returns
+
+  - `me::EquilibriumExpectedReturns`: Updated estimator with weights applied.
+
+# Related
+
+  - [`EquilibriumExpectedReturns`](@ref)
+  - [`factory`](@ref)
+"""
 function factory(ce::EquilibriumExpectedReturns, w::ObsWeights)
     return EquilibriumExpectedReturns(; ce = factory(ce.ce, w), w = ce.w, l = ce.l)
 end

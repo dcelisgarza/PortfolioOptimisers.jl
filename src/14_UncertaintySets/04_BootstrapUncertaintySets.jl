@@ -5,7 +5,7 @@ Abstract type for estimators that construct uncertainty sets using bootstrap met
 
 Subtypes implement specific bootstrap algorithms (e.g., stationary, circular, moving block) to estimate uncertainty sets for risk or prior statistics.
 
-# Related Types
+# Related
 
   - [`ARCHUncertaintySet`](@ref)
 """
@@ -17,7 +17,7 @@ Abstract type for bootstrap algorithms used in constructing uncertainty sets for
 
 Subtypes implement specific bootstrap methods using [`archpy`](https://pypi.org/project/arch/).
 
-# Related Types
+# Related
 
   - [`StationaryBootstrap`](@ref)
   - [`CircularBootstrap`](@ref)
@@ -29,7 +29,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Bootstrap algorithm for constructing uncertainty sets using a [stationary bootstrap](https://bashtage.github.io/arch/bootstrap/generated/arch.bootstrap.StationaryBootstrap.html#arch.bootstrap.StationaryBootstrap) in time series data.
 
-# Related Types
+# Related
 
   - [`ARCHBootstrapSet`](@ref)
   - [`CircularBootstrap`](@ref)
@@ -41,7 +41,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Bootstrap algorithm for constructing uncertainty sets using a [circular bootstrap](https://bashtage.github.io/arch/bootstrap/generated/arch.bootstrap.CircularBlockBootstrap.html#arch.bootstrap.CircularBlockBootstrap) in time series data.
 
-# Related Types
+# Related
 
   - [`ARCHBootstrapSet`](@ref)
   - [`StationaryBootstrap`](@ref)
@@ -53,7 +53,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Bootstrap algorithm for constructing uncertainty sets using a [moving bootstrap](https://bashtage.github.io/arch/bootstrap/generated/arch.bootstrap.MovingBlockBootstrap.html#arch.bootstrap.MovingBlockBootstrap) in time series data.
 
-# Related Types
+# Related
 
   - [`ARCHBootstrapSet`](@ref)
   - [`StationaryBootstrap`](@ref)

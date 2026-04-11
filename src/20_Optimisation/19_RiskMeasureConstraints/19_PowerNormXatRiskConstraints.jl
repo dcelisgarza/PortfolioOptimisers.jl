@@ -1,3 +1,32 @@
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Add Power-Norm Value-at-Risk, PNVaR range, or Power-Norm Drawdown-at-Risk constraints to
+`model`.
+
+Each overload uses power cone constraints (`PowerCone`) parameterised by `r.p` (or `r.pa`,
+`r.pb` for the range variant) to encode the power-norm VaR. Auxiliary non-negative variables
+`pvar_w` and `pvar_v` encode per-observation exceedances, and a scalar `pvar_t` aggregates
+the total. The range variant introduces separate lower and upper tail variables. The drawdown
+variant operates on the drawdown path.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - $(arg_dict[:ci])
+  - $(arg_dict[:r_risk])
+  - $(arg_dict[:opt_rjumpe])
+  - $(arg_dict[:pr_X])
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`set_drawdown_constraints!`](@ref)
+  - [`set_risk_bounds_and_expression!`](@ref)
+"""
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::PowerNormValueatRisk,
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; kwargs...)
@@ -48,6 +77,31 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::PowerNormValueatRis
     set_risk_bounds_and_expression!(model, opt, pvar_risk, r.settings, key)
     return pvar_risk
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Add JuMP risk constraints for `PowerNormValueatRiskRange` to `model`.
+
+Introduces variables and power-cone constraints to encode the range between a lower and
+upper power-norm value-at-risk, parameterised by `r.pa` and `r.pb`.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - $(arg_dict[:ci])
+  - `r::PowerNormValueatRiskRange`: The power-norm VaR range risk measure.
+  - $(arg_dict[:opt_rjumpe])
+  - $(arg_dict[:pr])
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`PowerNormValueatRiskRange`](@ref)
+  - [`set_risk_constraints!`](@ref)
+"""
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::PowerNormValueatRiskRange,
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; kwargs...)
@@ -144,6 +198,31 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::PowerNormValueatRis
     set_risk_bounds_and_expression!(model, opt, pvar_range_risk, r.settings, key)
     return pvar_range_risk
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Add JuMP risk constraints for `PowerNormDrawdownatRisk` to `model`.
+
+Introduces variables and power-cone constraints to encode the power-norm drawdown-at-risk,
+computed over the drawdown path of portfolio returns.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - $(arg_dict[:ci])
+  - `r::PowerNormDrawdownatRisk`: The power-norm drawdown-at-risk risk measure.
+  - $(arg_dict[:opt_rjumpe])
+  - $(arg_dict[:pr])
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`PowerNormDrawdownatRisk`](@ref)
+  - [`set_risk_constraints!`](@ref)
+"""
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::PowerNormDrawdownatRisk,
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; kwargs...)

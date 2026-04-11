@@ -32,7 +32,7 @@ using Roots: Roots
 using SimpleWeightedGraphs: SimpleWeightedGraphs
 using SparseArrays: SparseArrays
 using Statistics: Statistics, mean, std, var, cor, cov
-using StatsAPI: StatsAPI
+using StatsAPI: StatsAPI, predict
 using StatsBase: StatsBase
 using TimeSeries: TimeSeries
 

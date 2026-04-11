@@ -1,4 +1,40 @@
+"""
+    const Sd_Var = Union{<:StandardDeviation, <:Variance}
+
+Alias for a standard deviation or variance risk measure.
+
+Used in the Schur Complement HRP to accept either risk measure type for computing naive portfolio risk.
+
+# Related
+
+  - [`StandardDeviation`](@ref)
+  - [`Variance`](@ref)
+  - [`SchurComplementParams`](@ref)
+"""
 const Sd_Var = Union{<:StandardDeviation, <:Variance}
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Result type returned by [`SchurComplementHierarchicalRiskParity`](@ref) optimisation.
+
+Stores the optimisation estimator, prior result, weight bounds, clustering result, Schur complement scaling parameter, return code, optimised weights, and optional fallback estimator.
+
+# Fields
+
+  - `oe`: Optimisation estimator used.
+  - `pr`: Prior result containing asset moments.
+  - `wb`: Weight bounds estimator.
+  - `clr`: Clustering result.
+  - `gamma`: Schur complement scaling parameter.
+  - `retcode`: Optimisation return code.
+  - `w`: Optimised asset weights.
+  - `fb`: Optional fallback optimisation estimator.
+
+# Related
+
+  - [`SchurComplementHierarchicalRiskParity`](@ref)
+  - [`NonFiniteAllocationOptimisationResult`](@ref)
+"""
 @concrete struct SchurComplementHierarchicalRiskParityResult <:
                  NonFiniteAllocationOptimisationResult
     oe
@@ -14,8 +50,60 @@ function factory(res::SchurComplementHierarchicalRiskParityResult, fb::Option{<:
     return SchurComplementHierarchicalRiskParityResult(res.oe, res.pr, res.wb, res.clr,
                                                        res.gamma, res.retcode, res.w, fb)
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for Schur Complement algorithm variants.
+
+# Related Types
+
+  - [`NonMonotonicSchurComplement`](@ref)
+  - [`MonotonicSchurComplement`](@ref)
+"""
 abstract type SchurComplementAlgorithm <: AbstractAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Non-monotonic Schur Complement algorithm variant for SCHRP.
+
+Uses the raw Schur complement formula without monotonicity correction.
+
+# Related Types
+
+  - [`SchurComplementAlgorithm`](@ref)
+  - [`MonotonicSchurComplement`](@ref)
+"""
 struct NonMonotonicSchurComplement <: SchurComplementAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Monotonic Schur Complement algorithm variant for SCHRP.
+
+Applies a bisection-based correction to ensure the Schur complement allocation factor ``\\gamma`` is monotonically increasing with cluster risk, controlled by convergence tolerance `tol` and maximum iterations `iter`.
+
+# Fields
+
+  - `N`: Number of bisection steps.
+  - `tol`: Convergence tolerance.
+  - `iter`: Maximum iterations (or `nothing` for no limit).
+  - `strict`: If `true`, raises an error if convergence is not achieved.
+
+# Constructors
+
+    MonotonicSchurComplement(;
+        N::Integer = 10,
+        tol::Number = 1e-4,
+        iter::Option{<:Integer} = nothing,
+        strict::Bool = false
+    ) -> MonotonicSchurComplement
+
+Keywords correspond to the struct's fields.
+
+# Related Types
+
+  - [`SchurComplementAlgorithm`](@ref)
+  - [`NonMonotonicSchurComplement`](@ref)
+"""
 @concrete struct MonotonicSchurComplement <: SchurComplementAlgorithm
     N
     tol
@@ -36,6 +124,42 @@ function MonotonicSchurComplement(; N::Integer = 10, tol::Number = 1e-4,
                                   iter::Option{<:Integer} = nothing, strict::Bool = false)
     return MonotonicSchurComplement(N, tol, iter, strict)
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Parameters for the Schur Complement step of SCHRP.
+
+`SchurComplementParams` collects the risk measure, initial allocation factor ``\\gamma``, positive-definite matrix correction, and monotonicity algorithm used in the Schur Complement Hierarchical Risk Parity optimisation.
+
+# Fields
+
+  - `r`: Risk measure (`Variance` or `StandardDeviation`) used for intra-cluster risk.
+  - `gamma`: Initial allocation factor (``0 \\leq \\gamma \\leq 1``).
+  - `pdm`: Positive definite matrix correction method.
+  - `alg`: Schur Complement algorithm variant.
+  - `flag`: If `true`, uses the Schur Complement inversion; if `false`, uses the direct Schur inverse.
+
+# Constructors
+
+    SchurComplementParams(;
+        r::Sd_Var = Variance(),
+        gamma::Number = 0.5,
+        pdm::Option{<:Posdef} = Posdef(),
+        alg::SchurComplementAlgorithm = MonotonicSchurComplement(),
+        flag::Bool = true
+    ) -> SchurComplementParams
+
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - `0 <= gamma <= 1`.
+
+# Related
+
+  - [`SchurComplementHierarchicalRiskParity`](@ref)
+  - [`SchurComplementAlgorithm`](@ref)
+"""
 @concrete struct SchurComplementParams <: AbstractAlgorithm
     r
     gamma
@@ -58,13 +182,184 @@ function SchurComplementParams(; r::Sd_Var = Variance(), gamma::Number = 0.5,
                                flag::Bool = true)
     return SchurComplementParams(r, gamma, pdm, alg, flag)
 end
+"""
+    const VecScP = AbstractVector{<:SchurComplementParams}
+
+Alias for a vector of Schur complement parameters.
+
+Represents a collection of [`SchurComplementParams`](@ref) objects, used when different cluster levels have different Schur complement configurations.
+
+# Related
+
+  - [`SchurComplementParams`](@ref)
+  - [`ScP_VecScP`](@ref)
+"""
 const VecScP = AbstractVector{<:SchurComplementParams}
+"""
+    const ScP_VecScP = Union{<:SchurComplementParams, <:VecScP}
+
+Alias for a single or vector of Schur complement parameters.
+
+Matches either a single [`SchurComplementParams`](@ref) or a vector of them ([`VecScP`](@ref)).
+
+# Related
+
+  - [`SchurComplementParams`](@ref)
+  - [`VecScP`](@ref)
+"""
 const ScP_VecScP = Union{<:SchurComplementParams, <:VecScP}
+"""
+    schur_complement_params_view(sp, i, X)
+
+Get a view or subset of Schur complement parameters for cluster index `i`.
+
+Returns a [`SchurComplementParams`](@ref) with the risk measure sliced for the given cluster index. Used internally when iterating over cluster levels.
+
+# Arguments
+
+  - `sp`: [`SchurComplementParams`](@ref) or vector thereof.
+  - `i`: Cluster index or range.
+  - `X`: Data matrix (used for slicing risk measures).
+
+# Returns
+
+  - Sliced [`SchurComplementParams`](@ref).
+
+# Related
+
+  - [`SchurComplementParams`](@ref)
+  - [`SchurComplementHierarchicalRiskParity`](@ref)
+"""
 function schur_complement_params_view(sp::SchurComplementParams, i, X::MatNum)
     r = risk_measure_view(sp.r, i, X)
     return SchurComplementParams(; r = r, gamma = sp.gamma, pdm = sp.pdm, alg = sp.alg,
                                  flag = sp.flag)
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Schur Complement Hierarchical Risk Parity (SCHRP) portfolio optimiser.
+
+`SchurComplementHierarchicalRiskParity` extends HRP by using the Schur complement of the covariance matrix to more accurately decompose inter-cluster risk when allocating portfolio weights across the dendrogram.
+
+# Fields
+
+  - `opt`: Base hierarchical optimiser configuration.
+  - `params`: Schur Complement parameters (single or vector).
+  - `fb`: Fallback optimiser.
+
+# Constructors
+
+    SchurComplementHierarchicalRiskParity(;
+        opt::HierarchicalOptimiser = HierarchicalOptimiser(),
+        params::ScP_VecScP = SchurComplementParams(),
+        fb::Option{<:OptE_Opt} = nothing
+    ) -> SchurComplementHierarchicalRiskParity
+
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - If `params` is a vector: `!isempty(params)`.
+
+# Examples
+
+```jldoctest
+julia> SchurComplementHierarchicalRiskParity()
+SchurComplementHierarchicalRiskParity
+     opt ┼ HierarchicalOptimiser
+         │       pe ┼ EmpiricalPrior
+         │          │        ce ┼ PortfolioOptimisersCovariance
+         │          │           │   ce ┼ Covariance
+         │          │           │      │    me ┼ SimpleExpectedReturns
+         │          │           │      │       │   w ┴ nothing
+         │          │           │      │    ce ┼ GeneralCovariance
+         │          │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+         │          │           │      │       │    w ┴ nothing
+         │          │           │      │   alg ┴ Full()
+         │          │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
+         │          │           │      │     pdm ┼ Posdef
+         │          │           │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+         │          │           │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+         │          │           │      │      dn ┼ nothing
+         │          │           │      │      dt ┼ nothing
+         │          │           │      │     alg ┼ nothing
+         │          │           │      │   order ┴ DenoiseDetoneAlg()
+         │          │        me ┼ SimpleExpectedReturns
+         │          │           │   w ┴ nothing
+         │          │   horizon ┴ nothing
+         │      cle ┼ ClustersEstimator
+         │          │    ce ┼ PortfolioOptimisersCovariance
+         │          │       │   ce ┼ Covariance
+         │          │       │      │    me ┼ SimpleExpectedReturns
+         │          │       │      │       │   w ┴ nothing
+         │          │       │      │    ce ┼ GeneralCovariance
+         │          │       │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+         │          │       │      │       │    w ┴ nothing
+         │          │       │      │   alg ┴ Full()
+         │          │       │   mp ┼ DenoiseDetoneAlgMatrixProcessing
+         │          │       │      │     pdm ┼ Posdef
+         │          │       │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+         │          │       │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+         │          │       │      │      dn ┼ nothing
+         │          │       │      │      dt ┼ nothing
+         │          │       │      │     alg ┼ nothing
+         │          │       │      │   order ┴ DenoiseDetoneAlg()
+         │          │    de ┼ Distance
+         │          │       │   power ┼ nothing
+         │          │       │     alg ┴ CanonicalDistance()
+         │          │   alg ┼ HClustAlgorithm
+         │          │       │   linkage ┴ Symbol: :ward
+         │          │   onc ┼ OptimalNumberClusters
+         │          │       │   max_k ┼ nothing
+         │          │       │     alg ┼ SecondOrderDifference
+         │          │       │         │   alg ┼ StandardisedValue
+         │          │       │         │       │   mv ┼ MeanValue
+         │          │       │         │       │      │   w ┴ nothing
+         │          │       │         │       │   sv ┼ StdValue
+         │          │       │         │       │      │           w ┼ nothing
+         │          │       │         │       │      │   corrected ┴ Bool: true
+         │      slv ┼ nothing
+         │       wb ┼ WeightBounds
+         │          │   lb ┼ Float64: 0.0
+         │          │   ub ┴ Float64: 1.0
+         │     fees ┼ nothing
+         │     sets ┼ nothing
+         │       wf ┼ IterativeWeightFinaliser
+         │          │   iter ┴ Int64: 100
+         │      brt ┼ Bool: false
+         │   cle_pr ┼ Bool: true
+         │   strict ┴ Bool: false
+  params ┼ SchurComplementParams
+         │       r ┼ Variance
+         │         │   settings ┼ RiskMeasureSettings
+         │         │            │   scale ┼ Float64: 1.0
+         │         │            │      ub ┼ nothing
+         │         │            │     rke ┴ Bool: true
+         │         │      sigma ┼ nothing
+         │         │       chol ┼ nothing
+         │         │         rc ┼ nothing
+         │         │        alg ┴ SquaredSOCRiskExpr()
+         │   gamma ┼ Float64: 0.5
+         │     pdm ┼ Posdef
+         │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+         │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+         │     alg ┼ MonotonicSchurComplement
+         │         │        N ┼ Int64: 10
+         │         │      tol ┼ Float64: 0.0001
+         │         │     iter ┼ nothing
+         │         │   strict ┴ Bool: false
+         │    flag ┴ Bool: true
+      fb ┴ nothing
+```
+
+# Related
+
+  - [`ClusteringOptimisationEstimator`](@ref)
+  - [`HierarchicalRiskParity`](@ref)
+  - [`HierarchicalEqualRiskContribution`](@ref)
+  - [`SchurComplementParams`](@ref)
+"""
 @concrete struct SchurComplementHierarchicalRiskParity <: ClusteringOptimisationEstimator
     opt
     params
@@ -98,6 +393,26 @@ function opt_view(sh::SchurComplementHierarchicalRiskParity, i, X::MatNum)
     params = schur_complement_params_view(sh.params, i, X)
     return SchurComplementHierarchicalRiskParity(; opt = opt, params = params, fb = sh.fb)
 end
+"""
+    symmetric_step_up_matrix(n1::Integer, n2::Integer)
+
+Construct a symmetric step-up matrix for Schur complement augmentation.
+
+Builds a matrix that maps between cluster levels of sizes `n1` and `n2`. Requires `|n1 - n2| <= 1`.
+
+# Arguments
+
+  - `n1`: Number of rows (one cluster level size).
+  - `n2`: Number of columns (adjacent cluster level size).
+
+# Returns
+
+  - A numeric matrix of size `n1 × n2`.
+
+# Related
+
+  - [`schur_augmentation`](@ref)
+"""
 function symmetric_step_up_matrix(n1::Integer, n2::Integer)
     @argcheck(abs(n1 - n2) <= 1)
 
@@ -116,6 +431,29 @@ function symmetric_step_up_matrix(n1::Integer, n2::Integer)
     end
     return m
 end
+"""
+    schur_augmentation(A, B, C, gamma)
+
+Apply the Schur complement augmentation to a risk sub-matrix.
+
+Computes the augmented matrix `A - gamma * B * inv(C) * B'` and applies a step-up matrix correction. Used internally in the SCHRP algorithm to decompose inter-cluster risk.
+
+# Arguments
+
+  - `A`: Intra-cluster covariance sub-matrix.
+  - `B`: Off-diagonal cross-cluster covariance sub-matrix.
+  - `C`: Inter-cluster covariance sub-matrix.
+  - `gamma`: Schur complement scaling parameter.
+
+# Returns
+
+  - Augmented matrix.
+
+# Related
+
+  - [`SchurComplementParams`](@ref)
+  - [`symmetric_step_up_matrix`](@ref)
+"""
 function schur_augmentation(A::MatNum, B::MatNum, C::MatNum, gamma::Number)
     Na = size(A, 1)
     Nc = size(C, 1)
@@ -128,6 +466,28 @@ function schur_augmentation(A::MatNum, B::MatNum, C::MatNum, gamma::Number)
     A_aug = r \ A_aug
     return (A_aug + transpose(A_aug)) / 2
 end
+"""
+    naive_portfolio_risk(r, sigma)
+
+Compute the naive (inverse-volatility) portfolio risk for a given risk measure.
+
+Returns the portfolio risk when weights are set to the inverse-variance or inverse-volatility allocation (i.e., `w = 1/diag(sigma)`, normalised to sum to one). Dispatches on the risk measure type.
+
+# Arguments
+
+  - `r`: Risk measure ([`Variance`](@ref) or [`StandardDeviation`](@ref)).
+  - `sigma`: Covariance matrix.
+
+# Returns
+
+  - Scalar portfolio risk.
+
+# Related
+
+  - [`Variance`](@ref)
+  - [`StandardDeviation`](@ref)
+  - [`schur_complement_weights`](@ref)
+"""
 function naive_portfolio_risk(::Variance, sigma::MatNum)
     w = inv.(LinearAlgebra.diag(sigma))
     w ./= sum(w)
@@ -138,6 +498,28 @@ function naive_portfolio_risk(::StandardDeviation, sigma::MatNum)
     w ./= sum(w)
     return sqrt(LinearAlgebra.dot(w, sigma, w))
 end
+"""
+    schur_complement_weights(pr, items, ...)
+
+Compute HRP/HERC weights using the Schur complement method.
+
+Allocates weights across cluster levels using the Schur complement of the covariance matrix, providing more accurate inter-cluster risk decomposition than naive HRP.
+
+# Arguments
+
+  - `pr`: Prior result containing asset moments.
+  - `items`: Vector of vectors of asset indices per cluster level.
+  - Additional parameters from `SchurComplementParams`.
+
+# Returns
+
+  - Portfolio weight vector.
+
+# Related
+
+  - [`SchurComplementHierarchicalRiskParity`](@ref)
+  - [`schur_augmentation`](@ref)
+"""
 function schur_complement_weights(pr::AbstractPriorResult, items::VecVecInt,
                                   wb::WeightBounds,
                                   params::SchurComplementParams{<:Any, <:Any, <:Any,
@@ -194,6 +576,29 @@ function schur_complement_weights(pr::AbstractPriorResult, items::VecVecInt,
     end
     return w, gamma
 end
+"""
+    schur_complement_binary_search(objective, lgamma, hgamma, ...)
+
+Binary search for the optimal Schur complement scaling parameter γ.
+
+Performs binary search in the interval `[lgamma, hgamma]` to find the γ value that satisfies the monotonicity condition for the Schur complement HRP.
+
+# Arguments
+
+  - `objective`: Function to evaluate monotonicity.
+  - `lgamma`: Lower bound for γ search.
+  - `hgamma`: Upper bound for γ search.
+  - Additional tolerance and iteration parameters.
+
+# Returns
+
+  - Optimal γ value.
+
+# Related
+
+  - [`MonotonicSchurComplement`](@ref)
+  - [`SchurComplementHierarchicalRiskParity`](@ref)
+"""
 function schur_complement_binary_search(objective::Function, lgamma::Number, hgamma::Number,
                                         lrisk::Number, tol::Number = 1e-4,
                                         iter::Option{<:Integer} = nothing,

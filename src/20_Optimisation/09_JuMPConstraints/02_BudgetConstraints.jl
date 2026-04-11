@@ -1,10 +1,94 @@
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for all budget constraint estimators.
+
+# Related
+
+  - [`BudgetEstimator`](@ref)
+  - [`BudgetCostEstimator`](@ref)
+  - [`BudgetRange`](@ref)
+"""
 abstract type BudgetConstraintEstimator <: JuMPConstraintEstimator end
+"""
+    const Num_BgtCE = Union{<:Number, <:BudgetConstraintEstimator}
+
+Union of scalar budget values and [`BudgetConstraintEstimator`](@ref) instances.
+"""
 const Num_BgtCE = Union{<:Number, <:BudgetConstraintEstimator}
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for estimators that specify the portfolio budget range (sum of
+weights).
+
+# Related
+
+  - [`BudgetRange`](@ref)
+"""
 abstract type BudgetEstimator <: BudgetConstraintEstimator end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for estimators that specify transaction cost budgets.
+
+# Related
+
+  - [`BudgetCosts`](@ref)
+  - [`BudgetMarketImpact`](@ref)
+"""
 abstract type BudgetCostEstimator <: BudgetConstraintEstimator end
+"""
+    set_budget_costs!(args...)
+
+Set transaction cost budget constraints in the JuMP model.
+
+No-op fallback when no cost budget is specified.
+
+# Arguments
+
+  - `args...`: Arguments (ignored).
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`set_long_short_budget_constraints!`](@ref)
+"""
 function set_budget_costs!(args...)
     return nothing
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Specifies the portfolio budget constraint as a closed interval ``[\\mathrm{lb}, \\mathrm{ub}]``
+on the sum of weights. At least one of `lb` or `ub` must be provided.
+
+# Fields
+
+  - `lb::Option{<:Number}`: Lower bound on the sum of weights. Defaults to `1.0`.
+  - `ub::Option{<:Number}`: Upper bound on the sum of weights. Defaults to `1.0`.
+
+# Constructors
+
+    BudgetRange(; lb::Option{<:Number} = 1.0, ub::Option{<:Number} = 1.0) -> BudgetRange
+
+## Validation
+
+  - At least one of `lb`, `ub` must not be `nothing`.
+  - `lb` and `ub` must be finite.
+  - `lb <= ub` when both are provided.
+
+# Related
+
+  - [`BudgetCosts`](@ref)
+  - [`BudgetMarketImpact`](@ref)
+  - [`set_weight_constraints!`](@ref)
+  - [`BudgetCosts`](@ref)
+  - [`BudgetMarketImpact`](@ref)
+"""
 @concrete struct BudgetRange <: BudgetEstimator
     lb
     ub
@@ -27,13 +111,117 @@ end
 function BudgetRange(; lb::Option{<:Number} = 1.0, ub::Option{<:Number} = 1.0)
     return BudgetRange(lb, ub)
 end
+"""
+    const Num_BgtRg = Union{<:Number, <:BudgetRange}
+
+Alias for a scalar budget value or budget range.
+
+Matches either a plain number (fixed budget, e.g. `1.0`) or a [`BudgetRange`](@ref) (interval budget constraint). Used for dispatch in budget constraint generation.
+
+# Related
+
+  - [`BudgetRange`](@ref)
+  - [`set_long_short_budget_constraints!`](@ref)
+"""
 const Num_BgtRg = Union{<:Number, <:BudgetRange}
+"""
+    budget_view(bgt, i)
+
+Get a view or subset of the budget constraint for index `i`.
+
+For scalar or [`BudgetRange`](@ref) inputs, returns the input unchanged (budget applies to all assets).
+
+# Arguments
+
+  - `bgt`: Budget value, [`BudgetRange`](@ref), or `nothing`.
+  - `i`: Index (ignored for scalar/range budgets).
+
+# Returns
+
+  - The budget unchanged, or `nothing`.
+
+# Related
+
+  - [`BudgetRange`](@ref)
+  - [`set_long_short_budget_constraints!`](@ref)
+"""
 function budget_view(bgt::Num_BgtRg, ::Any)
     return bgt
 end
+"""
+    set_budget_constraints!(args...)
+    set_budget_constraints!(model::JuMP.Model, val::Number, w::VecNum)
+    set_budget_constraints!(model::JuMP.Model, bgt::BudgetRange, w::VecNum)
+    set_budget_constraints!(model::JuMP.Model, bgt::BudgetCosts, w::VecNum)
+    set_budget_constraints!(model::JuMP.Model, bgt::BudgetMarketImpact, w::VecNum)
+
+Add budget constraints to the JuMP optimisation model.
+
+The fall-through method does nothing. The concrete methods add the appropriate portfolio budget constraint based on the type of budget specification provided.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - `val::Number`: Fixed budget scalar.
+  - `bgt`: Budget constraint specification ([`BudgetRange`](@ref), [`BudgetCosts`](@ref), or [`BudgetMarketImpact`](@ref)).
+  - `w`: Portfolio weight vector.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`BudgetRange`](@ref)
+  - [`BudgetCosts`](@ref)
+  - [`BudgetMarketImpact`](@ref)
+  - [`set_weight_constraints!`](@ref)
+"""
 function set_budget_constraints!(args...)
     return nothing
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Budget constraint that accounts for linear transaction costs. Models the portfolio
+budget as:
+
+```math
+\\boldsymbol{v}_p^\\intercal \\boldsymbol{w}_p + \\boldsymbol{v}_n^\\intercal \\boldsymbol{w}_n
+\\in [\\mathrm{lb}, \\mathrm{ub}]
+```
+
+where ``\\boldsymbol{w}_p``, ``\\boldsymbol{w}_n`` are the positive and negative weight
+increments, and ``\\boldsymbol{v}_p``, ``\\boldsymbol{v}_n`` are the corresponding
+cost coefficients.
+
+# Fields
+
+  - `bgt::Num_BgtRg`: Budget target or range.
+  - `w::VecNum`: Initial portfolio weights (current holdings).
+  - `vp::Num_VecNum`: Cost coefficients for positive weight changes. Non-negative.
+  - `vn::Num_VecNum`: Cost coefficients for negative weight changes. Non-negative.
+  - `up::Num_VecNum`: Upper limit on positive weight changes. Non-negative.
+  - `un::Num_VecNum`: Upper limit on negative weight changes. Non-negative.
+
+# Constructors
+
+    BudgetCosts(;
+        bgt::Num_BgtRg = 1.0,
+        w::VecNum,
+        vp::Num_VecNum = 1.0,
+        vn::Num_VecNum = 1.0,
+        up::Num_VecNum = 1.0,
+        un::Num_VecNum = 1.0
+    ) -> BudgetCosts
+
+# Related
+
+  - [`BudgetRange`](@ref)
+  - [`BudgetMarketImpact`](@ref)
+  - [`BudgetRange`](@ref)
+  - [`BudgetMarketImpact`](@ref)
+"""
 @concrete struct BudgetCosts <: BudgetCostEstimator
     bgt
     w
@@ -88,6 +276,30 @@ function budget_view(bgt::BudgetCosts, i)
     un = nothing_scalar_array_view(bgt.un, i)
     return BudgetCosts(; bgt = bgt.bgt, w = w, vp = vp, vn = vn, up = up, un = un)
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Budget constraint that accounts for non-linear (power-law) market impact costs. Extends
+[`BudgetCosts`](@ref) with a `beta` exponent controlling the concavity of the market
+impact function.
+
+# Fields
+
+  - `bgt::Num_BgtRg`: Budget target or range.
+  - `w::VecNum`: Initial portfolio weights.
+  - `vp::Num_VecNum`: Cost coefficients for positive weight changes. Non-negative.
+  - `vn::Num_VecNum`: Cost coefficients for negative weight changes. Non-negative.
+  - `up::Num_VecNum`: Upper limit on positive weight changes. Non-negative.
+  - `un::Num_VecNum`: Upper limit on negative weight changes. Non-negative.
+  - `beta::Number`: Market impact exponent in `(0, 1]`.
+
+# Related
+
+  - [`BudgetRange`](@ref)
+  - [`BudgetCosts`](@ref)
+  - [`BudgetRange`](@ref)
+  - [`BudgetCosts`](@ref)
+"""
 @concrete struct BudgetMarketImpact <: BudgetCostEstimator
     bgt
     w
@@ -161,6 +373,26 @@ function set_budget_constraints!(model::JuMP.Model, bgt::BudgetRange, w::VecNum)
     end
     return nothing
 end
+"""
+    set_long_short_budget_constraints!(args...)
+
+Set budget constraints for long and short portfolio positions in the JuMP model.
+
+Various overloads handle different budget types (fixed, range), dispatching on the presence or absence of long/short budget configurations.
+
+# Arguments
+
+  - `args...`: JuMP model and budget parameters.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`BudgetRange`](@ref)
+  - [`set_cost_budget_constraints!`](@ref)
+"""
 function set_long_short_budget_constraints!(args...)
     return nothing
 end
@@ -292,6 +524,30 @@ function set_long_short_budget_constraints!(model::JuMP.Model, bgt::BudgetRange,
     end
     return nothing
 end
+"""
+    set_cost_budget_constraints!(model, vp, vn, val_or_bgt, w)
+
+Set cost-budget constraints in the JuMP model.
+
+Various overloads handle different cost types (fixed value or [`BudgetRange`](@ref)).
+
+# Arguments
+
+  - `model`: JuMP optimisation model.
+  - `vp`: Positive cost vector or scalar.
+  - `vn`: Negative cost vector or scalar.
+  - `val_or_bgt`: Fixed budget value or [`BudgetRange`](@ref).
+  - `w`: Portfolio weight vector.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`set_budget_costs!`](@ref)
+  - [`set_long_short_budget_constraints!`](@ref)
+"""
 function set_cost_budget_constraints!(model::JuMP.Model, vp::Num_VecNum, vn::Num_VecNum,
                                       val::Number, w::VecNum)
     k = model[:k]

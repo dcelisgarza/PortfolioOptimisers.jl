@@ -26,6 +26,18 @@ All concrete and/or abstract types representing the output of regression-based m
   - [`AbstractRegressionEstimator`](@ref)
 """
 abstract type AbstractRegressionResult <: AbstractResult end
+"""
+    const RegE_Reg = Union{<:AbstractRegressionResult, <:AbstractRegressionEstimator}
+
+Alias for a regression result or estimator.
+
+Matches either an [`AbstractRegressionResult`](@ref) (pre-computed regression result) or an [`AbstractRegressionEstimator`](@ref) (regression specification). Used for dispatch in factor model and regression-based risk routines.
+
+# Related
+
+  - [`AbstractRegressionResult`](@ref)
+  - [`AbstractRegressionEstimator`](@ref)
+"""
 const RegE_Reg = Union{<:AbstractRegressionResult, <:AbstractRegressionEstimator}
 """
 $(DocStringExtensions.TYPEDEF)
@@ -127,6 +139,25 @@ end
 function LinearModel(; kwargs::NamedTuple = (;))
     return LinearModel(kwargs)
 end
+"""
+    factory(re::LinearModel, w::ObsWeights) -> LinearModel
+
+Return a new [`LinearModel`](@ref) regression target with observation weights `w` added to the keyword arguments.
+
+# Arguments
+
+  - `re`: Linear model regression target.
+  - $(arg_dict[:ow])
+
+# Returns
+
+  - `re::LinearModel`: Updated regression target with weights included in `kwargs`.
+
+# Related
+
+  - [`LinearModel`](@ref)
+  - [`factory`](@ref)
+"""
 function factory(re::LinearModel, w::ObsWeights)
     return LinearModel(; kwargs = (; re.kwargs..., weights = w))
 end
@@ -135,7 +166,7 @@ end
 
 Fit a standard linear regression model using a [`LinearModel`](@ref) regression target.
 
-This method dispatches to `StatsAPI.fit` with the `GLM.LinearModel` type, passing the design matrix `X`, response vector `y`, and any keyword arguments stored in `tgt.kwargs`. It enables flexible configuration of the underlying linear model fitting routine within the `PortfolioOptimisers.jl` regression estimation framework.
+This method dispatches to `StatsAPI.fit` with the `GLM.LinearModel` type, passing the design matrix `X`, response vector `y`, and any keyword arguments stored in `tgt.kwargs`. It enables flexible configuration of the underlying linear model fitting routine within the `ssion estimation framework.
 
 # Arguments
 
@@ -210,6 +241,25 @@ function GeneralisedLinearModel(; args::Tuple = (Distributions.Normal(),),
                                 kwargs::NamedTuple = (;))
     return GeneralisedLinearModel(args, kwargs)
 end
+"""
+    factory(re::GeneralisedLinearModel, w::ObsWeights) -> GeneralisedLinearModel
+
+Return a new [`GeneralisedLinearModel`](@ref) regression target with observation weights `w` added to the keyword arguments.
+
+# Arguments
+
+  - `re`: Generalised linear model regression target.
+  - $(arg_dict[:ow])
+
+# Returns
+
+  - `re::GeneralisedLinearModel`: Updated regression target with weights included in `kwargs`.
+
+# Related
+
+  - [`GeneralisedLinearModel`](@ref)
+  - [`factory`](@ref)
+"""
 function factory(re::GeneralisedLinearModel, w::ObsWeights)
     return GeneralisedLinearModel(; args = re.args, kwargs = (; re.kwargs..., weights = w))
 end
@@ -401,6 +451,26 @@ end
 function regression_criterion_func(::AdjustedRSquared)
     return GLM.adjr2
 end
+"""
+    regression_threshold(alg)
+
+Return the threshold value for stepwise regression selection criteria.
+
+Returns the threshold value associated with a stepwise regression criterion. Dispatches on the criterion type to return either a minimum or maximum value.
+
+# Arguments
+
+  - `alg`: Stepwise regression criterion.
+
+# Returns
+
+  - Threshold value.
+
+# Related
+
+  - [`AbstractMinValStepwiseRegressionCriterion`](@ref)
+  - [`AbstractMaxValStepwiseRegressionCriteria`](@ref)
+"""
 function regression_threshold(::AbstractMinValStepwiseRegressionCriterion)
     return Inf
 end

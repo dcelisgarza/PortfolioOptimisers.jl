@@ -1,3 +1,23 @@
+"""
+    coskewness_residuals(X, me)
+
+Compute the coskewness residuals from asset return data.
+
+Internal helper that demeans `X` using the expected returns from `me` and returns the residual return matrix used in coskewness estimation.
+
+# Arguments
+
+  - `X`: Asset return matrix (observations × assets).
+  - `me`: Expected returns estimator.
+
+# Returns
+
+  - Residual return matrix.
+
+# Related
+
+  - [`cokurtosis_residuals`](@ref)
+"""
 function coskewness_residuals(X::MatNum, me::AbstractExpectedReturnsEstimator)
     N = size(X, 2)
     N2 = N^2
@@ -7,6 +27,27 @@ function coskewness_residuals(X::MatNum, me::AbstractExpectedReturnsEstimator)
     sk_err[idx] .= vec(Statistics.mean(me, X3; dims = 1))
     return sk_err
 end
+"""
+    cokurtosis_residuals(sigma, X, me)
+
+Compute the cokurtosis residuals from the covariance matrix and return data.
+
+Internal helper that standardises `X` using the covariance matrix `sigma` and expected returns from `me`, returning the standardised residual matrix used in cokurtosis estimation.
+
+# Arguments
+
+  - `sigma`: Covariance matrix.
+  - `X`: Asset return matrix (observations × assets).
+  - `me`: Expected returns estimator.
+
+# Returns
+
+  - Standardised residual matrix.
+
+# Related
+
+  - [`coskewness_residuals`](@ref)
+"""
 function cokurtosis_residuals(sigma::MatNum, X::MatNum,
                               me::AbstractExpectedReturnsEstimator,
                               ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())
@@ -62,6 +103,115 @@ function cokurtosis_residuals(sigma::MatNum, X::MatNum,
     end
     return kt_res
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Represents the High Order Factor Prior Estimator.
+
+`HighOrderFactorPriorEstimator` extends a low-order factor prior with coskewness and cokurtosis moments estimated from a factor model. It supports error correction of higher-order moments using residuals from the factor regression.
+
+# Fields
+
+  - `pe`: Low-order factor prior estimator (the base estimator providing mean and covariance).
+  - `kte`: Cokurtosis estimator. If `nothing`, cokurtosis is not estimated.
+  - `ske`: Coskewness estimator. If `nothing`, coskewness is not estimated.
+  - `ex`: FLoops executor controlling parallelism for the cokurtosis residuals computation.
+  - `rsd`: If `true`, corrects the higher-order moments using factor regression residuals.
+
+# Constructors
+
+    HighOrderFactorPriorEstimator(;
+        pe::AbstractLowOrderPriorEstimator_F_AF = FactorPrior(),
+        kte::Option{<:CokurtosisEstimator} = Cokurtosis(; alg = Full()),
+        ske::Option{<:CoskewnessEstimator} = Coskewness(; alg = Full()),
+        ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
+        rsd::Bool = true
+    ) -> HighOrderFactorPriorEstimator
+
+Keywords correspond to the struct's fields.
+
+# Examples
+
+```jldoctest
+julia> HighOrderFactorPriorEstimator()
+HighOrderFactorPriorEstimator
+   pe ┼ FactorPrior
+      │    pe ┼ EmpiricalPrior
+      │       │        ce ┼ PortfolioOptimisersCovariance
+      │       │           │   ce ┼ Covariance
+      │       │           │      │    me ┼ SimpleExpectedReturns
+      │       │           │      │       │   w ┴ nothing
+      │       │           │      │    ce ┼ GeneralCovariance
+      │       │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+      │       │           │      │       │    w ┴ nothing
+      │       │           │      │   alg ┴ Full()
+      │       │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
+      │       │           │      │     pdm ┼ Posdef
+      │       │           │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+      │       │           │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+      │       │           │      │      dn ┼ nothing
+      │       │           │      │      dt ┼ nothing
+      │       │           │      │     alg ┼ nothing
+      │       │           │      │   order ┴ DenoiseDetoneAlg()
+      │       │        me ┼ SimpleExpectedReturns
+      │       │           │   w ┴ nothing
+      │       │   horizon ┴ nothing
+      │    mp ┼ DenoiseDetoneAlgMatrixProcessing
+      │       │     pdm ┼ Posdef
+      │       │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+      │       │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+      │       │      dn ┼ nothing
+      │       │      dt ┼ nothing
+      │       │     alg ┼ nothing
+      │       │   order ┴ DenoiseDetoneAlg()
+      │    re ┼ StepwiseRegression
+      │       │   crit ┼ PValue
+      │       │        │   t ┴ Float64: 0.05
+      │       │    alg ┼ Forward()
+      │       │    tgt ┼ LinearModel
+      │       │        │   kwargs ┴ @NamedTuple{}: NamedTuple()
+      │    ve ┼ SimpleVariance
+      │       │          me ┼ SimpleExpectedReturns
+      │       │             │   w ┴ nothing
+      │       │           w ┼ nothing
+      │       │   corrected ┴ Bool: true
+      │   rsd ┴ Bool: true
+  kte ┼ Cokurtosis
+      │    me ┼ SimpleExpectedReturns
+      │       │   w ┴ nothing
+      │    mp ┼ DenoiseDetoneAlgMatrixProcessing
+      │       │     pdm ┼ Posdef
+      │       │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+      │       │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+      │       │      dn ┼ nothing
+      │       │      dt ┼ nothing
+      │       │     alg ┼ nothing
+      │       │   order ┴ DenoiseDetoneAlg()
+      │   alg ┴ Full()
+  ske ┼ Coskewness
+      │    me ┼ SimpleExpectedReturns
+      │       │   w ┴ nothing
+      │    mp ┼ DenoiseDetoneAlgMatrixProcessing
+      │       │     pdm ┼ Posdef
+      │       │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+      │       │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+      │       │      dn ┼ nothing
+      │       │      dt ┼ nothing
+      │       │     alg ┼ nothing
+      │       │   order ┴ DenoiseDetoneAlg()
+      │   alg ┴ Full()
+   ex ┼ Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
+  rsd ┴ Bool: true
+```
+
+# Related
+
+  - [`AbstractHighOrderPriorEstimator_F`](@ref)
+  - [`FactorPrior`](@ref)
+  - [`CokurtosisEstimator`](@ref)
+  - [`CoskewnessEstimator`](@ref)
+  - [`HighOrderPrior`](@ref)
+"""
 @concrete struct HighOrderFactorPriorEstimator <: AbstractHighOrderPriorEstimator_F
     pe
     kte

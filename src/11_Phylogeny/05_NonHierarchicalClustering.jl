@@ -1,9 +1,44 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
+K-means clustering algorithm configuration for non-hierarchical clustering in `PortfolioOptimisers.jl`.
+
+`KMeansAlgorithm` is a composable clustering algorithm type that specifies the use of the k-means algorithm (via [`Clustering.kmeans`](https://juliastats.org/Clustering.jl/stable/api/#Clustering.kmeans)) for constructing non-hierarchical clusterings from a distance matrix.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    KMeansAlgorithm(;
+        rng::Random.AbstractRNG = Random.default_rng(),
+        seed::Option{<:Integer} = nothing,
+        kwargs::NamedTuple = (;)
+    ) -> KMeansAlgorithm
+
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - If `kwargs` contains `weights`, it must be a non-empty `AbstractVector`.
+
+# Examples
+
+```jldoctest
+julia> KMeansAlgorithm()
+KMeansAlgorithm
+     rng ┼ Random.TaskLocalRNG: Random.TaskLocalRNG()
+    seed ┼ nothing
+  kwargs ┴ @NamedTuple{}: NamedTuple()
+```
+
+# Related
+
+  - [`AbstractNonHierarchicalClusteringAlgorithm`](@ref)
+  - [`ClustersEstimator`](@ref)
+  - [`clusterise`](@ref)
+  - [`Clustering.kmeans`](https://juliastats.org/Clustering.jl/stable/api/#Clustering.kmeans)
 """
 @concrete struct KMeansAlgorithm <: AbstractNonHierarchicalClusteringAlgorithm
     "$(field_dict[:rng])"
@@ -29,6 +64,27 @@ function factory(alg::KMeansAlgorithm, w::StatsBase.AbstractWeights)
     return KMeansAlgorithm(; rng = alg.rng, seed = alg.seed,
                            kwargs = (; alg.kwargs..., weights = w))
 end
+"""
+    _get_k_clusters_from_alg(alg, D, k)
+
+Assign observations to `k` clusters using the specified clustering algorithm and distance matrix.
+
+Internal function used by non-hierarchical clustering estimators.
+
+# Arguments
+
+  - `alg`: Clustering algorithm (e.g., [`KMeansAlgorithm`](@ref)).
+  - `D`: Pairwise distance matrix.
+  - `k`: Number of clusters.
+
+# Returns
+
+  - Cluster assignments.
+
+# Related
+
+  - [`KMeansAlgorithm`](@ref)
+"""
 function _get_k_clusters_from_alg(alg::KMeansAlgorithm, D::MatNum, k::Integer)
     if !isnothing(alg.seed)
         Random.seed!(alg.rng, alg.seed)

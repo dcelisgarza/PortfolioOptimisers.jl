@@ -1,3 +1,27 @@
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Result type for Nested Clustered Optimisation.
+
+# Fields
+
+  - `oe`: Type of the optimisation estimator that produced this result.
+  - `pr`: Prior result used in optimisation.
+  - `clr`: Clustering result.
+  - `wb`: Weight bounds applied.
+  - `fees`: Fee structure applied (or `nothing`).
+  - `resi`: Inner (intra-cluster) optimisation results.
+  - `reso`: Outer (inter-cluster) optimisation result.
+  - `cv`: Cross-validation result (or `nothing`).
+  - `retcode`: Overall optimisation return code.
+  - `w`: Final aggregated portfolio weights.
+  - `fb`: Fallback result.
+
+# Related
+
+  - [`NestedClustered`](@ref)
+  - [`NonFiniteAllocationOptimisationResult`](@ref)
+"""
 @concrete struct NestedClusteredResult <: NonFiniteAllocationOptimisationResult
     oe
     pr
@@ -15,10 +39,48 @@ function factory(res::NestedClusteredResult, fb::Option{<:OptE_Opt})
     return NestedClusteredResult(res.oe, res.pr, res.clr, res.wb, res.fees, res.resi,
                                  res.reso, res.cv, res.retcode, res.w, fb)
 end
+"""
+    assert_internal_optimiser(opt)
+
+Assert that the inner (cluster-level) optimiser is valid for use in NCO.
+
+Checks that the inner optimiser does not use pre-computed prior results or regression results, since these must be re-estimated for each cluster during NCO.
+
+# Arguments
+
+  - `opt`: Inner optimisation estimator.
+
+# Returns
+
+  - `nothing` on success; throws `ArgCheck` error otherwise.
+
+# Related
+
+  - [`NestedClustered`](@ref)
+"""
 function assert_internal_optimiser(opt::ClusteringOptimisationEstimator)
     @argcheck(!isa(opt.opt.cle, AbstractClusteringResult))
     return nothing
 end
+"""
+    assert_rc_variance(opt)
+
+Assert that the optimiser does not use variance risk contribution for NCO outer optimisation.
+
+Checks that risk budgeting-based JuMP optimisers do not use variance for risk contribution when used as the outer optimiser in NCO.
+
+# Arguments
+
+  - `opt`: Optimisation estimator.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`NestedClustered`](@ref)
+"""
 function assert_rc_variance(::Any)
     return nothing
 end
@@ -33,6 +95,25 @@ function assert_rc_variance(opt::RiskJuMPOptimisationEstimator)
     end
     return nothing
 end
+"""
+    assert_rc_pl(opt)
+
+Assert that the optimiser does not use phylogeny risk contribution for NCO outer optimisation.
+
+Checks that factor risk contribution optimisers do not use phylogeny-based constraints when used as the outer optimiser in NCO.
+
+# Arguments
+
+  - `opt`: Optimisation estimator.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`NestedClustered`](@ref)
+"""
 function assert_rc_pl(::Any)
     return nothing
 end
@@ -64,10 +145,26 @@ function assert_internal_optimiser(opt::VecOptE_Opt)
     assert_internal_optimiser.(opt)
     return nothing
 end
+"""
+    assert_external_optimiser(opt)
+
+Assert that the outer optimiser is valid for use in NCO.
+
+Checks that the outer optimiser does not use pre-computed prior results, regression results, or unsupported variance/phylogeny risk contribution configurations.
+
+# Arguments
+
+  - `opt`: Outer optimisation estimator.
+
+# Returns
+
+  - `nothing` on success; throws `ArgCheck` error otherwise.
+
+# Related
+
+  - [`NestedClustered`](@ref)
+"""
 function assert_external_optimiser(opt::ClusteringOptimisationEstimator)
-    #! Maybe results can be allowed with a warning. This goes for other stuff like bounds and threshold vectors. And then the optimisation can throw a domain error when it comes to using them.
-    @argcheck(!isa(opt.opt.pe, AbstractPriorResult))
-    @argcheck(!isa(opt.opt.cle, AbstractClusteringResult))
     assert_internal_optimiser(opt)
     return nothing
 end
@@ -77,6 +174,18 @@ function assert_external_optimiser(opt::JuMPOptimisationEstimator)
     assert_internal_optimiser(opt)
     return nothing
 end
+"""
+    const RiskBudgetingOptimiser = Union{<:RiskBudgeting, <:RelaxedRiskBudgeting}
+
+Alias for risk budgeting JuMP optimisers.
+
+Matches either [`RiskBudgeting`](@ref) or [`RelaxedRiskBudgeting`](@ref). Used for dispatch in NCO validation and constraint generation.
+
+# Related
+
+  - [`RiskBudgeting`](@ref)
+  - [`RelaxedRiskBudgeting`](@ref)
+"""
 const RiskBudgetingOptimiser = Union{<:RiskBudgeting, <:RelaxedRiskBudgeting}
 function assert_external_optimiser(opt::RiskBudgetingOptimiser)
     #! Maybe results can be allowed with a warning. This goes for other stuff like bounds and threshold vectors. And then the optimisation can throw a domain error when it comes to using them.
@@ -98,6 +207,58 @@ function assert_external_optimiser(opt::VecOptE_Opt)
     assert_external_optimiser.(opt)
     return nothing
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Nested Clustered Optimisation (NCO) portfolio optimiser.
+
+`NestedClustered` implements the Nested Clustered Optimisation algorithm. It first clusters assets, then solves a within-cluster (inner) optimisation for each cluster independently, and finally solves an across-cluster (outer) optimisation to combine the cluster portfolios into a final portfolio.
+
+# Fields
+
+  - `pe`: Prior estimator or prior result.
+  - `cle`: Clustering estimator or clustering result.
+  - `wb`: Weight bounds estimator or bounds.
+  - `fees`: Fee estimator or fee structure.
+  - `sets`: Asset sets.
+  - `opti`: Inner (intra-cluster) portfolio optimiser.
+  - `opto`: Outer (inter-cluster) portfolio optimiser.
+  - `cv`: Cross-validation configuration for model selection.
+  - `wf`: Weight finaliser for enforcing bounds.
+  - `ex`: FLoops executor for parallelism.
+  - `fb`: Fallback optimiser.
+  - `brt`: If `true`, uses bootstrap returns.
+  - `cle_pr`: If `true`, passes the prior result to the clustering estimator.
+  - `strict`: If `true`, strictly enforces weight bounds.
+
+# Constructors
+
+    NestedClustered(;
+        pe::PrE_Pr = EmpiricalPrior(),
+        cle::ClE_Cl = ClustersEstimator(),
+        wb::Option{<:WbE_Wb} = WeightBounds(),
+        fees::Option{<:FeesE_Fees} = nothing,
+        sets::Option{<:AssetSets} = nothing,
+        opti::NonFiniteAllocationOptimisationEstimator,
+        opto::NonFiniteAllocationOptimisationEstimator = opti,
+        cv::Option{<:OptimisationCrossValidation} = nothing,
+        wf::WeightFinaliser = IterativeWeightFinaliser(),
+        ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
+        fb::Option{<:OptE_Opt} = nothing,
+        brt::Bool = false,
+        cle_pr::Bool = true,
+        strict::Bool = false
+    ) -> NestedClustered
+
+Keywords correspond to the struct's fields.
+
+# Related
+
+  - [`ClusteringOptimisationEstimator`](@ref)
+  - [`HierarchicalRiskParity`](@ref)
+  - [`Stacking`](@ref)
+  - [`NestedClusteredResult`](@ref)
+"""
 @concrete struct NestedClustered <: ClusteringOptimisationEstimator
     pe
     cle
@@ -208,6 +369,29 @@ function opt_view(nco::NestedClustered, i, X::MatNum)
                            fb = nco.fb, brt = nco.brt, cle_pr = nco.cle_pr,
                            strict = nco.strict)
 end
+"""
+    outer_optimisation_finaliser(wb, wf, w_inner, w_outer)
+
+Finalise outer optimisation weights for the NCO algorithm.
+
+Combines inner cluster weights `w_inner` with outer portfolio weights `w_outer`, applying weight bounds `wb` and finalisation algorithm `wf`.
+
+# Arguments
+
+  - `wb`: Weight bounds (optional).
+  - `wf`: Weight finaliser.
+  - `w_inner`: Inner (within-cluster) weights.
+  - `w_outer`: Outer (across-cluster) weights.
+
+# Returns
+
+  - Final combined portfolio weights.
+
+# Related
+
+  - [`NestedClustered`](@ref)
+  - [`WeightBounds`](@ref)
+"""
 function outer_optimisation_finaliser(wb::Option{<:WeightBounds}, wf::WeightFinaliser,
                                       resi::VecOpt,
                                       rcos::AbstractVector{<:OptimisationReturnCode},
@@ -273,6 +457,27 @@ function predict_outer_nco_estimator_returns(nco::NestedClustered, rd::ReturnsRe
     return ReturnsResult(; nx = ["_$i" for i in 1:size(wi, 2)], X = X, nf = rd.nf, F = rd.F,
                          nb = nb, B = B, ts = rd.ts, iv = iv, ivpa = ivpa)
 end
+"""
+    rebuild_returns_result(rd, predictions)
+
+Reconstruct a returns result from cross-validation predictions.
+
+Combines individual fold predictions from `predictions` into a new `ReturnsResult` corresponding to the original data layout.
+
+# Arguments
+
+  - `rd`: Original [`ReturnsResult`](@ref).
+  - `predictions`: Vector of [`MultiPeriodPredictionResult`](@ref) objects from cross-validation.
+
+# Returns
+
+  - Rebuilt [`ReturnsResult`](@ref).
+
+# Related
+
+  - [`NestedClustered`](@ref)
+  - [`MultiPeriodPredictionResult`](@ref)
+"""
 function rebuild_returns_result(rd::ReturnsResult, predictions::VecMPredRes)
     N = length(predictions)
     nb = rd.nb

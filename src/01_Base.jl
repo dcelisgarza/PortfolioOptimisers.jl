@@ -216,7 +216,35 @@ const arg_dict = Dict(
                       :add_bridges => "`add_bridges`: The `add_bridges` keyword argument in [`set_optimizer`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.set_optimizer).",#
                       # RNG
                       :rng => "`rng`: Random number generator.",#
-                      :seed => "`seed`: Seed for the random number generator.")
+                      :seed => "`seed`: Seed for the random number generator.",
+                      # JuMP Optimisation
+                      :model => "`model::JuMP.Model`: The JuMP optimisation model.",
+                      :opt_rjumpe => "`opt::RiskJuMPOptimisationEstimator`: Risk-based optimisation estimator.",
+                      :opt_jumpe => "`opt::JuMPOptimisationEstimator`: JuMP optimisation estimator.",
+                      :ci => "`i`: Constraint index for unique variable and constraint naming.",
+                      :key_sym => "`key::Symbol`: Symbol used to name constraints or expressions in the model.",
+                      :wb_arg => "`wb::WeightBounds`: Weight bound specification containing lower and upper bounds.",
+                      :ss_arg => "`ss::Option{<:Number}`: Big-M scaling constant (computed via [`get_mip_ss`](@ref) when `nothing`).",
+                      :lt_arg => "`lt::Option{<:Threshold}`: Long-side minimum-holding threshold.",
+                      :st_arg => "`st::Option{<:Threshold}`: Short-side minimum-holding threshold.",
+                      :lt_flag_arg => "`lt_flag::Bool`: Whether to apply the long-side threshold.",
+                      :st_flag_arg => "`st_flag::Bool`: Whether to apply the short-side threshold.",
+                      :miprb_flag_arg => "`miprb_flag::Bool`: Whether to add MIP rebalancing constraints.",
+                      :il_arg => "`il`: Long binary (or continuous relaxation) indicator variable.",
+                      :is_arg => "`is`: Short binary (or continuous relaxation) indicator variable.",
+                      :smtx_arg => "`smtx::Option{<:MatNum}`: Selection matrix mapping assets to sub-groups.",
+                      :r_risk => "`r`: Risk measure instance.",
+                      :pr_X => "`pr::AbstractPriorResult`: Prior result containing the returns matrix `X`.",
+                      :pr_sigma => "`pr::AbstractPriorResult`: Prior result containing the covariance matrix `sigma`.",
+                      :pl_opt => "`pl`: Optional phylogeny constraints.",
+                      :fees_opt => "`fees`: Optional fees structure.")
+"""
+    field_dict
+
+Derived dictionary mapping argument keys to field description strings, used for `\$(FIELDS)`-style docstring interpolation.
+
+Each entry is derived from [`arg_dict`](@ref) by stripping the leading parameter name prefix (everything up to and including the first `:`).
+"""
 const field_dict = Dict(key => strip(val[(findfirst(":", val)[1] + 1):end])
                         for (key, val) in arg_dict)
 """
@@ -270,6 +298,13 @@ ret_dict = Dict(:mu => "`mu::ArrNum`: Expected returns vector `features x 1` if 
                 :varnum => "`vr::Number`: Variance of `X`",
                 :algw => "`alg`: New algorithm instance of the same type as the argument, with the new weights applied.",
                 :alg => "`alg`: The original algorithm instance.")
+"""
+    math_dict
+
+Dictionary of mathematical notation descriptions used for docstring interpolation throughout `PortfolioOptimisers.jl`.
+
+Keys are symbols that identify mathematical variables or subscripts; values are LaTeX-formatted strings suitable for embedding in docstrings.
+"""
 math_dict = Dict(:Xv => "``\\boldsymbol{X}``: Data vector `observations × 1`.",#
                  :tgt => "``t``: Target value, usually the unweighted (or weighted) expected value ``E[\\boldsymbol{X}]``.",#
                  :A => "``\\mathbf{A}``: Constraint coefficient matrix.",#
@@ -323,6 +358,18 @@ Result types encapsulate the outcomes of estimators. This makes dispatch and usa
   - [`AbstractAlgorithm`](@ref)
 """
 abstract type AbstractResult end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for dynamically computed observation weight estimators.
+
+`DynamicAbstractWeights` subtypes are used when observation weights must be computed from data (rather than supplied directly as a numeric vector). They are passed to estimators that accept an `ObsWeights` argument and evaluated at fit time.
+
+# Related
+
+  - [`ObsWeights`](@ref)
+  - [`AbstractEstimator`](@ref)
+"""
 abstract type DynamicAbstractWeights <: AbstractEstimator end
 """
     define_pretty_show(T, flag::Bool = true)
@@ -981,7 +1028,41 @@ Alias for a union of an abstract string or an abstract vector.
   - [`Str_Expr`](@ref)
 """
 const Str_Vec = Union{<:AbstractString, <:AbstractVector}
+"""
+    const ObsWeights = Union{<:DynamicAbstractWeights, <:StatsBase.AbstractWeights}
+
+Union type for observation weights accepted by estimators.
+
+Accepts either a [`DynamicAbstractWeights`](@ref) subtype (weights computed from data at fit time) or a `StatsBase.AbstractWeights` instance (pre-computed numeric weights).
+
+# Related
+
+  - [`DynamicAbstractWeights`](@ref)
+  - [`get_observation_weights`](@ref)
+"""
 const ObsWeights = Union{<:DynamicAbstractWeights, <:StatsBase.AbstractWeights}
+"""
+    get_observation_weights(w, args...; kwargs...)
+
+Get the observation weights for statistical estimation.
+
+Returns `nothing` for dynamic or unspecified weights (allowing estimators to compute them), or the provided weight vector directly.
+
+# Arguments
+
+  - `w`: Observation weights ([`DynamicAbstractWeights`](@ref), a plain vector, or `nothing`).
+  - `args...`: Additional arguments (ignored).
+  - `kwargs...`: Additional keyword arguments.
+
+# Returns
+
+  - `nothing` or the provided weight vector.
+
+# Related
+
+  - [`ObsWeights`](@ref)
+  - [`validate_observation_weights`](@ref)
+"""
 function get_observation_weights(::Option{<:DynamicAbstractWeights}, args...; kwargs...)
     return nothing
 end
@@ -1168,7 +1249,7 @@ Validate that the input value is non-empty and finite.
       + `::VecPair`: `!isempty(val)`, `any(isfinite, getindex.(val, 2))`.
       + `::ArrNum`: `!isempty(val)`, `any(isfinite, val)`.
       + `::Pair`: `isfinite(val[2])`.
-      + `::Number`: `isfinite(val).
+      + `::Number`: `isfinite(val)`.
       + `args...`: Always passes.
 
 # Related
@@ -1210,6 +1291,26 @@ end
 function assert_nonempty_finite_val(args...)
     return nothing
 end
+"""
+    validate_observation_weights(w)
+
+Validate that observation weights are normalised (sum to 1).
+
+Checks that `StatsBase.AbstractWeights` sum to approximately 1.0. The no-op fallback does nothing for other types.
+
+# Arguments
+
+  - `w`: Observation weights or any other type.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`ObsWeights`](@ref)
+  - [`get_observation_weights`](@ref)
+"""
 function validate_observation_weights(args...)
     return nothing
 end

@@ -53,7 +53,7 @@ This section is under active development so any [`<name>`]-(@ref) lacks docstrin
 
 - Prices to returns [`prices_to_returns`](@ref) and [`ReturnsResult`](@ref)
 - Find complete indices [`find_complete_indices`](@ref)
-- Find uncorrelated indices [`find_uncorrelated_indices`]-(@ref)
+- Find uncorrelated indices [`find_uncorrelated_indices`](@ref)
 
 ### Matrix processing
 
@@ -109,7 +109,7 @@ Overloads `Statistics.mean`.
     - Grand Mean [`GrandMean`](@ref)
     - Volatility Weighted [`VolatilityWeighted`](@ref)
     - Mean Squared Error [`MeanSquaredError`](@ref)
-- Standard deviation expected returns [`StandardDeviationExpectedReturns`]-(@ref)
+- Standard deviation expected returns [`StandardDeviationExpectedReturns`](@ref)
 
 #### [Variance and standard deviation](@id readme-variance)
 
@@ -164,11 +164,11 @@ Overloads `Statistics.cov` and `Statistics.cor`.
 - Denoised covariance with custom covariance estimator [`DenoiseCovariance`](@ref)
 - Detoned covariance with custom covariance estimator [`DetoneCovariance`](@ref)
 - Custom processed covariance with custom covariance estimator [`ProcessedCovariance`](@ref)
-- ::: details Implied volatility with custom covariance and matrix processing estimators, and implied volatility algorithms [`ImpliedVolatility`]-(@ref)
-  - Premium [`ImpliedVolatilityPremium`]-(@ref)
-  - Regression [`ImpliedVolatilityRegression`]-(@ref)
+- ::: details Implied volatility with custom covariance and matrix processing estimators, and implied volatility algorithms [`ImpliedVolatility`](@ref)
+  - Premium [`ImpliedVolatilityPremium`](@ref)
+  - Regression [`ImpliedVolatilityRegression`](@ref)
 - Covariance with custom covariance estimator and matrix processing pipeline [`PortfolioOptimisersCovariance`](@ref)
-- Correlation covariance [`CorrelationCovariance`]-(@ref)
+- Correlation covariance [`CorrelationCovariance`](@ref)
 
 #### [Coskewness](@id readme-coskewness)
 
@@ -224,13 +224,13 @@ Phylogeny constraints and clustering optimisations make use of clustering algori
 ##### Hierarchical
 
 - Hierarchical clustering [`HClustAlgorithm`](@ref)
-- Direct Bubble Hierarchical Trees [`DBHT`](@ref) and Local Global sparsification of the covariance matrix [`LoGo`](@ref), [`logo!`](@ref), and [`logo`]-(@ref)
+- Direct Bubble Hierarchical Trees [`DBHT`](@ref) and Local Global sparsification of the covariance matrix [`LoGo`](@ref), [`logo!`](@ref), and [`logo`](@ref)
 
 ##### Non-hierarchical
 
-Non-hierarchical clustering algorithms are incompatible with hierarchical clustering optimisations, but they can be used for phylogeny constraints and [`NestedClustered`]-(@ref) optimisations.
+Non-hierarchical clustering algorithms are incompatible with hierarchical clustering optimisations, but they can be used for phylogeny constraints and [`NestedClustered`](@ref) optimisations.
 
-- K-means clustering [`KMeansAlgorithm`]-(@ref)
+- K-means clustering [`KMeansAlgorithm`](@ref)
 
 #### Networks
 
@@ -291,7 +291,7 @@ Many optimisations and constraints use prior statistics computed via [`prior`](@
   - Opinion pooling [`OpinionPoolingPrior`](@ref)
 - ::: details High order prior [`HighOrderPrior`](@ref)
   - High order [`HighOrderPriorEstimator`](@ref)
-  - High order factor model [`HighOrderFactorPriorEstimator`]-(@ref)
+  - High order factor model [`HighOrderFactorPriorEstimator`](@ref)
 
 ### Uncertainty sets
 
@@ -351,10 +351,10 @@ The error can be computed using different algorithms using [`norm_tracking`](@re
   - L1-norm [`L1Tracking`](@ref)
   - L2-norm [`L2Tracking`](@ref)
   - L2-norm squared [`SquaredL2Tracking`](@ref)
-  - Lp-norm [`LpTracking`]-(@ref)
-  - L-Inf-norm [`LInfTracking`]-(@ref)
+  - Lp-norm [`LpTracking`](@ref)
+  - L-Inf-norm [`LInfTracking`](@ref)
 
-It is also possible to track the error in with risk measures [`RiskTrackingError`]-(@ref) using [`WeightsTracking`](@ref), which allows for two approaches.
+It is also possible to track the error in with risk measures [`RiskTrackingError`](@ref) using [`WeightsTracking`](@ref), which allows for two approaches.
 
 - Dependent variable tracking [`DependentVariableTracking`](@ref)
 - Independent variable tracking [`IndependentVariableTracking`](@ref)
@@ -401,7 +401,7 @@ These are all subtypes of [`RiskMeasure`](@ref), and are supported by all optimi
   - ::: details Square root kurtosis [`SOCRiskExpr`](@ref)
     - Full [`Full`](@ref)
     - Semi [`Semi`](@ref)
-- ::: details Negative skewness [`NegativeSkewness`]-(@ref)
+- ::: details Negative skewness [`NegativeSkewness`](@ref)
   - ::: details Squared negative skewness
     - ::: details Full and semi-skewness are supported in traditional optimisers via the `sk` and `V` fields. Risk calculation uses
       - Full [`Full`](@ref)
@@ -410,34 +410,34 @@ These are all subtypes of [`RiskMeasure`](@ref), and are supported by all optimi
       - Quadratic risk expression [`QuadRiskExpr`](@ref)
       - Squared second order cone [`SquaredSOCRiskExpr`](@ref)
     - Square root negative skewness [`SOCRiskExpr`](@ref)
-- ::: details Value at Risk [`ValueatRisk`]-(@ref)
+- ::: details Value at Risk [`ValueatRisk`](@ref)
   - ::: details Traditional optimisation formulations
-    - Exact MIP formulation [`MIPValueatRisk`]-(@ref)
-    - Approximate distribution based [`DistributionValueatRisk`]-(@ref)
-- ::: details Value at Risk Range [`ValueatRiskRange`]-(@ref)
+    - Exact MIP formulation [`MIPValueatRisk`](@ref)
+    - Approximate distribution based [`DistributionValueatRisk`](@ref)
+- ::: details Value at Risk Range [`ValueatRiskRange`](@ref)
   - ::: details Traditional optimisation formulations
-    - Exact MIP formulation [`MIPValueatRisk`]-(@ref)
-    - Approximate distribution based [`DistributionValueatRisk`]-(@ref)
-- Drawdown at Risk [`DrawdownatRisk`]-(@ref)
-- Conditional Value at Risk [`ConditionalValueatRisk`]-(@ref)
-- Distributionally Robust Conditional Value at Risk [`DistributionallyRobustConditionalValueatRisk`]-(@ref) (same as conditional value at risk when used in non-traditional optimisation)
-- Conditional Value at Risk Range [`ConditionalValueatRiskRange`]-(@ref)
-- Distributionally Robust Conditional Value at Risk Range [`DistributionallyRobustConditionalValueatRiskRange`]-(@ref) (same as conditional value at risk range when used in non-traditional optimisation)
-- Conditional Drawdown at Risk [`ConditionalDrawdownatRisk`]-(@ref)
-- Distributionally Robust Conditional Drawdown at Risk [`DistributionallyRobustConditionalDrawdownatRisk`]-(@ref)(same as conditional drawdown at risk when used in non-traditional optimisation)
-- Entropic Value at Risk [`EntropicValueatRisk`]-(@ref)
-- Entropic Value at Risk Range [`EntropicValueatRiskRange`]-(@ref)
-- Entropic Drawdown at Risk [`EntropicDrawdownatRisk`]-(@ref)
-- Relativistic Value at Risk [`RelativisticValueatRisk`]-(@ref)
-- Relativistic Value at Risk Range [`RelativisticValueatRiskRange`]-(@ref)
-- Relativistic Drawdown at Risk [`RelativisticDrawdownatRisk`]-(@ref)
+    - Exact MIP formulation [`MIPValueatRisk`](@ref)
+    - Approximate distribution based [`DistributionValueatRisk`](@ref)
+- Drawdown at Risk [`DrawdownatRisk`](@ref)
+- Conditional Value at Risk [`ConditionalValueatRisk`](@ref)
+- Distributionally Robust Conditional Value at Risk [`DistributionallyRobustConditionalValueatRisk`](@ref) (same as conditional value at risk when used in non-traditional optimisation)
+- Conditional Value at Risk Range [`ConditionalValueatRiskRange`](@ref)
+- Distributionally Robust Conditional Value at Risk Range [`DistributionallyRobustConditionalValueatRiskRange`](@ref) (same as conditional value at risk range when used in non-traditional optimisation)
+- Conditional Drawdown at Risk [`ConditionalDrawdownatRisk`](@ref)
+- Distributionally Robust Conditional Drawdown at Risk [`DistributionallyRobustConditionalDrawdownatRisk`](@ref)(same as conditional drawdown at risk when used in non-traditional optimisation)
+- Entropic Value at Risk [`EntropicValueatRisk`](@ref)
+- Entropic Value at Risk Range [`EntropicValueatRiskRange`](@ref)
+- Entropic Drawdown at Risk [`EntropicDrawdownatRisk`](@ref)
+- Relativistic Value at Risk [`RelativisticValueatRisk`](@ref)
+- Relativistic Value at Risk Range [`RelativisticValueatRiskRange`](@ref)
+- Relativistic Drawdown at Risk [`RelativisticDrawdownatRisk`](@ref)
 - ::: details Ordered Weights Array
   - ::: details Risk measures
-    - Ordered Weights Array risk measure [`OrderedWeightsArray`]-(@ref)
-    - Ordered Weights Array range risk measure [`OrderedWeightsArrayRange`]-(@ref)
+    - Ordered Weights Array risk measure [`OrderedWeightsArray`](@ref)
+    - Ordered Weights Array range risk measure [`OrderedWeightsArrayRange`](@ref)
   - ::: details Traditional optimisation formulations
-    - Exact [`ExactOrderedWeightsArray`]-(@ref)
-    - Approximate [`ApproxOrderedWeightsArray`]-(@ref)
+    - Exact [`ExactOrderedWeightsArray`](@ref)
+    - Approximate [`ApproxOrderedWeightsArray`](@ref)
   - ::: details Array functions
     - Gini Mean Difference [`owa_gmd`](@ref)
     - Worst Realisation [`owa_wr`](@ref)
@@ -452,37 +452,37 @@ These are all subtypes of [`RiskMeasure`](@ref), and are supported by all optimi
       - Linear Moment [`owa_l_moment`](@ref)
       - ::: details Linear Moment Convex Risk Measure [`owa_l_moment_crm`](@ref)
         - ::: details L-moment combination formulations
-          - ::: details Maximum Entropy [`MaximumEntropy`]-(@ref)
-            - Exponential Cone Entropy [`ExponentialConeEntropy`]-(@ref)
-            - Relative Entropy [`RelativeEntropy`]-(@ref)
-          - Minimum Squared Distance [`MinimumSquaredDistance`]-(@ref)
-          - Minimum Sum Squares [`MinimumSumSquares`]-(@ref)
-- Average Drawdown [`AverageDrawdown`]-(@ref)
-- Ulcer Index [`UlcerIndex`]-(@ref)
-- Maximum Drawdown [`MaximumDrawdown`]-(@ref)
-- ::: details Brownian Distance Variance [`BrownianDistanceVariance`]-(@ref)
+          - ::: details Maximum Entropy [`MaximumEntropy`](@ref)
+            - Exponential Cone Entropy [`ExponentialConeEntropy`](@ref)
+            - Relative Entropy [`RelativeEntropy`](@ref)
+          - Minimum Squared Distance [`MinimumSquaredDistance`](@ref)
+          - Minimum Sum Squares [`MinimumSumSquares`](@ref)
+- Average Drawdown [`AverageDrawdown`](@ref)
+- Ulcer Index [`UlcerIndex`](@ref)
+- Maximum Drawdown [`MaximumDrawdown`](@ref)
+- ::: details Brownian Distance Variance [`BrownianDistanceVariance`](@ref)
   - ::: details Traditional optimisation formulations
     - ::: details Distance matrix constraint formulations
-      - Norm one cone Brownian distance variance [`NormOneConeBrownianDistanceVariance`]-(@ref)
-      - Inequality Brownian distance variance [`IneqBrownianDistanceVariance`]-(@ref)
+      - Norm one cone Brownian distance variance [`NormOneConeBrownianDistanceVariance`](@ref)
+      - Inequality Brownian distance variance [`IneqBrownianDistanceVariance`](@ref)
     - ::: details Risk formulation
       - Quadratic risk expression [`QuadRiskExpr`](@ref)
       - Rotated second order cone [`RSOCRiskExpr`](@ref)
-- Worst Realisation [`WorstRealisation`]-(@ref)
-- Range [`Range`]-(@ref)
-- Turnover Risk Measure [`TurnoverRiskMeasure`]-(@ref)
-- ::: details Tracking Risk Measure [`TrackingRiskMeasure`]-(@ref)
+- Worst Realisation [`WorstRealisation`](@ref)
+- Range [`Range`](@ref)
+- Turnover Risk Measure [`TurnoverRiskMeasure`](@ref)
+- ::: details Tracking Risk Measure [`TrackingRiskMeasure`](@ref)
   - L1-norm [`L1Tracking`](@ref)
   - L2-norm [`L2Tracking`](@ref)
   - L2-norm squared [`SquaredL2Tracking`](@ref)
-  - Lp-norm [`LpTracking`]-(@ref)
-  - L-Inf-norm [`LInfTracking`]-(@ref)
+  - Lp-norm [`LpTracking`](@ref)
+  - L-Inf-norm [`LInfTracking`](@ref)
 - ::: details Risk Tracking Risk Measure
   - Dependent variable tracking [`DependentVariableTracking`](@ref)
   - Independent variable tracking [`IndependentVariableTracking`](@ref)
-- Power Norm Value at Risk [`PowerNormValueatRisk`]-(@ref)
-- Power Norm Value at Risk Range [`PowerNormValueatRiskRange`]-(@ref)
-- Power Norm Drawdown at Risk [`PowerNormDrawdownatRisk`]-(@ref)
+- Power Norm Value at Risk [`PowerNormValueatRisk`](@ref)
+- Power Norm Value at Risk Range [`PowerNormValueatRiskRange`](@ref)
+- Power Norm Drawdown at Risk [`PowerNormDrawdownatRisk`](@ref)
 
 #### Risk measures for hierarchical optimisation
 
@@ -497,104 +497,104 @@ These are all subtypes of [`HierarchicalRiskMeasure`](@ref), and are only suppor
   - ::: details Standardised fourth moment [`StandardisedHighOrderMoment`](@ref) and [`FourthMoment`](@ref)
     - Full [`Full`](@ref)
     - Semi [`Semi`](@ref)
-- Relative Drawdown at Risk [`RelativeDrawdownatRisk`]-(@ref)
-- Relative Conditional Drawdown at Risk [`RelativeConditionalDrawdownatRisk`]-(@ref)
-- Relative Entropic Drawdown at Risk [`RelativeEntropicDrawdownatRisk`]-(@ref)
-- Relative Relativistic Drawdown at Risk [`RelativeRelativisticDrawdownatRisk`]-(@ref)
-- Relative Average Drawdown [`RelativeAverageDrawdown`]-(@ref)
-- Relative Ulcer Index [`RelativeUlcerIndex`]-(@ref)
-- Relative Maximum Drawdown [`RelativeMaximumDrawdown`]-(@ref)
-- Relative Power Norm Drawdown at Risk [`RelativePowerNormDrawdownatRisk`]-(@ref)
-- Risk Ratio Risk Measure [`RiskRatioRiskMeasure`]-(@ref)
-- Equal Risk Measure [`EqualRiskMeasure`]-(@ref)
-- Median Absolute Deviation [`MedianAbsoluteDeviation`]-(@ref)
+- Relative Drawdown at Risk [`RelativeDrawdownatRisk`](@ref)
+- Relative Conditional Drawdown at Risk [`RelativeConditionalDrawdownatRisk`](@ref)
+- Relative Entropic Drawdown at Risk [`RelativeEntropicDrawdownatRisk`](@ref)
+- Relative Relativistic Drawdown at Risk [`RelativeRelativisticDrawdownatRisk`](@ref)
+- Relative Average Drawdown [`RelativeAverageDrawdown`](@ref)
+- Relative Ulcer Index [`RelativeUlcerIndex`](@ref)
+- Relative Maximum Drawdown [`RelativeMaximumDrawdown`](@ref)
+- Relative Power Norm Drawdown at Risk [`RelativePowerNormDrawdownatRisk`](@ref)
+- Risk Ratio Risk Measure [`RiskRatioRiskMeasure`](@ref)
+- Equal Risk Measure [`EqualRiskMeasure`](@ref)
+- Median Absolute Deviation [`MedianAbsoluteDeviation`](@ref)
 
 #### Non-optimisation risk measures
 
 These risk measures are unsuitable for optimisation because they can return negative values. However, they can be used for performance metrics.
 
-- Mean Return [`MeanReturn`]-(@ref)
+- Mean Return [`MeanReturn`](@ref)
 - Third Central Moment [`ThirdCentralMoment`]-@(ref)
-- Skewness [`Skewness`]-(@ref)
+- Skewness [`Skewness`](@ref)
 - Return Risk Measure [`ExpectedReturn`](@ref)
 - Return Risk Ratio Risk Measure [`ExpectedReturnRiskRatio`](@ref)
 
 ### Performance metrics
 
-- Expected risk [`expected_risk`]-(@ref)
-- Number of effective assets [`number_effective_assets`]-(@ref)
+- Expected risk [`expected_risk`](@ref)
+- Number of effective assets [`number_effective_assets`](@ref)
 - ::: details Risk contribution
-  - Asset risk contribution [`risk_contribution`]-(@ref)
-  - Factor risk contribution [`factor_risk_contribution`]-(@ref)
+  - Asset risk contribution [`risk_contribution`](@ref)
+  - Factor risk contribution [`factor_risk_contribution`](@ref)
 - ::: details Expected return [`expected_return`](@ref)
-  - Arithmetic [`ArithmeticReturn`]-(@ref)
-  - Logarithmic [`LogarithmicReturn`]-(@ref)
+  - Arithmetic [`ArithmeticReturn`](@ref)
+  - Logarithmic [`LogarithmicReturn`](@ref)
 - Expected risk-adjusted return ratio [`expected_ratio`](@ref) and [`expected_risk_ret_ratio`](@ref)
 - Expected risk-adjusted ratio information criterion [`expected_sric`](@ref) and [`expected_risk_ret_sric`](@ref)
 - Brinson performance attribution [`brinson_attribution`](@ref)
 
 ### Portfolio optimisation
 
-Optimisations are implemented via [`optimise`]-(@ref). Optimisations consume an estimator and return a result.
+Optimisations are implemented via [`optimise`](@ref). Optimisations consume an estimator and return a result.
 
 #### Naive
 
-These return a [`NaiveOptimisationResult`]-(@ref).
+These return a [`NaiveOptimisationResult`](@ref).
 
-- Inverse Volatility [`InverseVolatility`]-(@ref)
-- Equal Weighted [`EqualWeighted`]-(@ref)
-- Random (Dirichlet) [`RandomWeighted`]-(@ref)
+- Inverse Volatility [`InverseVolatility`](@ref)
+- Equal Weighted [`EqualWeighted`](@ref)
+- Random (Dirichlet) [`RandomWeighted`](@ref)
 
 ##### Naive optimisation features
 
 - Weight bounds [`WeightBoundsEstimator`](@ref), [`UniformValues`](@ref), and [`WeightBounds`](@ref)
 - ::: details Weight finalisers
-  - Iterative Weight Finaliser [`IterativeWeightFinaliser`]-(@ref)
-  - ::: details JuMP Weight Finaliser [`JuMPWeightFinaliser`]-(@ref)
-    - Relative Error Weight Finaliser [`RelativeErrorWeightFinaliser`]-(@ref)
-    - Squared Relative Error Weight Finaliser [`SquaredRelativeErrorWeightFinaliser`]-(@ref)
-    - Absolute Error Weight Finaliser [`AbsoluteErrorWeightFinaliser`]-(@ref)
-    - Squared Absolute Error Weight Finaliser [`SquaredAbsoluteErrorWeightFinaliser`]-(@ref)
+  - Iterative Weight Finaliser [`IterativeWeightFinaliser`](@ref)
+  - ::: details JuMP Weight Finaliser [`JuMPWeightFinaliser`](@ref)
+    - Relative Error Weight Finaliser [`RelativeErrorWeightFinaliser`](@ref)
+    - Squared Relative Error Weight Finaliser [`SquaredRelativeErrorWeightFinaliser`](@ref)
+    - Absolute Error Weight Finaliser [`AbsoluteErrorWeightFinaliser`](@ref)
+    - Squared Absolute Error Weight Finaliser [`SquaredAbsoluteErrorWeightFinaliser`](@ref)
 
 #### Traditional
 
-These optimisations are implemented as `JuMP` problems and make use of [`JuMPOptimiser`]-(@ref), which encodes all supported constraints.
+These optimisations are implemented as `JuMP` problems and make use of [`JuMPOptimiser`](@ref), which encodes all supported constraints.
 
 ##### Objective function optimisations
 
 These optimisations support a variety of objective functions.
 
 - ::: details Objective functions
-  - Minimum risk [`MinimumRisk`]-(@ref)
-  - Maximum utility [`MaximumUtility`]-(@ref)
-  - Maximum return over risk ratio [`MaximumRatio`]-(@ref)
-  - Maximum return [`MaximumReturn`]-(@ref)
-- ::: details Exclusive to [`MeanRisk`]-(@ref) and [`NearOptimalCentering`]-(@ref)
+  - Minimum risk [`MinimumRisk`](@ref)
+  - Maximum utility [`MaximumUtility`](@ref)
+  - Maximum return over risk ratio [`MaximumRatio`](@ref)
+  - Maximum return [`MaximumReturn`](@ref)
+- ::: details Exclusive to [`MeanRisk`](@ref) and [`NearOptimalCentering`](@ref)
   - ::: details N-dimensional Pareto fronts [`Frontier`](@ref)
     - Return based
     - Risk based
 - ::: details Optimisation estimators
-  - Mean-Risk [`MeanRisk`]-(@ref) returns a [`MeanRiskResult`]-(@ref)
-  - Near Optimal Centering [`NearOptimalCentering`]-(@ref) returns a [`NearOptimalCenteringResult`]-(@ref)
-  - Factor Risk Contribution [`FactorRiskContribution`]-(@ref) returns a [`FactorRiskContributionResult`]-(@ref)
+  - Mean-Risk [`MeanRisk`](@ref) returns a [`MeanRiskResult`](@ref)
+  - Near Optimal Centering [`NearOptimalCentering`](@ref) returns a [`NearOptimalCenteringResult`](@ref)
+  - Factor Risk Contribution [`FactorRiskContribution`](@ref) returns a [`FactorRiskContributionResult`](@ref)
 
 ##### Risk budgeting optimisations
 
 These optimisations attempt to achieve weight values according to a risk budget vector. This vector can be provided on a per asset or per factor basis.
 
 - ::: details Budget targets
-  - Asset risk budgeting [`AssetRiskBudgeting`]-(@ref)
-  - Factor risk budgeting [`FactorRiskBudgeting`]-(@ref)
+  - Asset risk budgeting [`AssetRiskBudgeting`](@ref)
+  - Factor risk budgeting [`FactorRiskBudgeting`](@ref)
 - ::: details Optimisation estimators
-  - Risk Budgeting [`RiskBudgeting`]-(@ref) returns a [`RiskBudgetingResult`]-(@ref)
-  - ::: details Relaxed Risk Budgeting [`RelaxedRiskBudgeting`]-(@ref) returns a [`RiskBudgetingResult`]-(@ref)
-    - Basic [`BasicRelaxedRiskBudgeting`]-(@ref)
-    - Regularised [`RegularisedRelaxedRiskBudgeting`]-(@ref)
-    - Regularised and penalised [`RegularisedPenalisedRelaxedRiskBudgeting`]-(@ref)
+  - Risk Budgeting [`RiskBudgeting`](@ref) returns a [`RiskBudgetingResult`](@ref)
+  - ::: details Relaxed Risk Budgeting [`RelaxedRiskBudgeting`](@ref) returns a [`RiskBudgetingResult`](@ref)
+    - Basic [`BasicRelaxedRiskBudgeting`](@ref)
+    - Regularised [`RegularisedRelaxedRiskBudgeting`](@ref)
+    - Regularised and penalised [`RegularisedPenalisedRelaxedRiskBudgeting`](@ref)
 
 ##### Traditional optimisation features
 
-- Custom objective penalty [`CustomJuMPObjective`]-(@ref)
+- Custom objective penalty [`CustomJuMPObjective`](@ref)
 - Weight bounds [`WeightBoundsEstimator`](@ref), [`UniformValues`](@ref), and [`WeightBounds`](@ref)
 - ::: details Budget
   - ::: details Directionality
@@ -602,7 +602,7 @@ These optimisations attempt to achieve weight values according to a risk budget 
     - Short
   - ::: details Type
     - Exact
-    - Range [`BudgetRange`]-(@ref)
+    - Range [`BudgetRange`](@ref)
 - ::: details Threshold [`ThresholdEstimator`](@ref) and [`Threshold`](@ref)
   - ::: details Directionality
     - Long
@@ -622,10 +622,10 @@ These optimisations attempt to achieve weight values according to a risk budget 
 - Tracking error(s) [`TrackingError`](@ref)
 - Phylogen(y/ies) [`IntegerPhylogenyEstimator`](@ref) and [`SemiDefinitePhylogenyEstimator`](@ref)
 - ::: details Portfolio returns
-  - ::: details Arithmetic returns [`ArithmeticReturn`]-(@ref)
+  - ::: details Arithmetic returns [`ArithmeticReturn`](@ref)
     - Uncertainty set [`BoxUncertaintySet`](@ref), [`BoxUncertaintySetAlgorithm`](@ref), [`EllipsoidalUncertaintySet`](@ref), and [`EllipsoidalUncertaintySetAlgorithm`](@ref)
     - Custom expected returns vector
-  - Logarithmic returns [`LogarithmicReturn`]-(@ref)
+  - Logarithmic returns [`LogarithmicReturn`](@ref)
 - ::: details Risk vector scalarisation
   - Weighted sum [`SumScalariser`](@ref)
   - Maximum value [`MaxScalariser`](@ref)
@@ -635,7 +635,7 @@ These optimisations attempt to achieve weight values according to a risk budget 
 - ::: details Regularisation penalty
   - L1
   - L2
-  - Lp [`LpRegularisation`]-(@ref)
+  - Lp [`LpRegularisation`](@ref)
   - L-Inf
 
 #### [Clustering optimisation](@id readme-clustering-opt)
@@ -646,8 +646,8 @@ Clustering optimisations make use of asset relationships to either minimise the 
 
 These optimisations minimise risk by hierarchically splitting the asset universe into subsets, computing the risk of each subset, and combining them according to their hierarchy.
 
-- Hierarchical Risk Parity [`HierarchicalRiskParity`]-(@ref) returns a [`HierarchicalResult`]-(@ref)
-- Hierarchical Equal Risk Contribution [`HierarchicalEqualRiskContribution`]-(@ref) returns a [`HierarchicalResult`]-(@ref)
+- Hierarchical Risk Parity [`HierarchicalRiskParity`](@ref) returns a [`HierarchicalResult`](@ref)
+- Hierarchical Equal Risk Contribution [`HierarchicalEqualRiskContribution`](@ref) returns a [`HierarchicalResult`](@ref)
 
 ###### Hierarchical clustering optimisation features
 
@@ -658,30 +658,30 @@ These optimisations minimise risk by hierarchically splitting the asset universe
   - Maximum value [`MaxScalariser`](@ref)
   - Log-sum-exp [`LogSumExpScalariser`](@ref)
 - ::: details Weight finalisers
-  - Iterative Weight Finaliser [`IterativeWeightFinaliser`]-(@ref)
-  - ::: details JuMP Weight Finaliser [`JuMPWeightFinaliser`]-(@ref)
-    - Relative Error Weight Finaliser [`RelativeErrorWeightFinaliser`]-(@ref)
-    - Squared Relative Error Weight Finaliser [`SquaredRelativeErrorWeightFinaliser`]-(@ref)
-    - Absolute Error Weight Finaliser [`AbsoluteErrorWeightFinaliser`]-(@ref)
-    - Squared Absolute Error Weight Finaliser [`SquaredAbsoluteErrorWeightFinaliser`]-(@ref)
+  - Iterative Weight Finaliser [`IterativeWeightFinaliser`](@ref)
+  - ::: details JuMP Weight Finaliser [`JuMPWeightFinaliser`](@ref)
+    - Relative Error Weight Finaliser [`RelativeErrorWeightFinaliser`](@ref)
+    - Squared Relative Error Weight Finaliser [`SquaredRelativeErrorWeightFinaliser`](@ref)
+    - Absolute Error Weight Finaliser [`AbsoluteErrorWeightFinaliser`](@ref)
+    - Squared Absolute Error Weight Finaliser [`SquaredAbsoluteErrorWeightFinaliser`](@ref)
 
 ##### Schur complementary optimisation
 
 Schur complementary hierarchical risk parity provides a bridge between mean variance optimisation and hierarchical risk parity by using an interpolation parameter. It converges to hierarchical risk parity, and approximates mean variance by adjusting this parameter. It uses the Schur complement to adjust the weights of a portfolio according to how much more useful information is gained by assigning more weight to a group of assets.
 
-- Schur Complementary Hierarchical Risk Parity [`SchurComplementHierarchicalRiskParity`]-(@ref) returns a [`SchurComplementHierarchicalRiskParityResult`]-(@ref)
+- Schur Complementary Hierarchical Risk Parity [`SchurComplementHierarchicalRiskParity`](@ref) returns a [`SchurComplementHierarchicalRiskParityResult`](@ref)
 
 ###### Schur complementary optimisation features
 
 - Weight bounds [`WeightBoundsEstimator`](@ref), [`UniformValues`](@ref), and [`WeightBounds`](@ref)
 - Fees [`FeesEstimator`](@ref) and [`Fees`](@ref)
 - ::: details Weight finalisers
-  - Iterative Weight Finaliser [`IterativeWeightFinaliser`]-(@ref)
-  - ::: details JuMP Weight Finaliser [`JuMPWeightFinaliser`]-(@ref)
-    - Relative Error Weight Finaliser [`RelativeErrorWeightFinaliser`]-(@ref)
-    - Squared Relative Error Weight Finaliser [`SquaredRelativeErrorWeightFinaliser`]-(@ref)
-    - Absolute Error Weight Finaliser [`AbsoluteErrorWeightFinaliser`]-(@ref)
-    - Squared Absolute Error Weight Finaliser [`SquaredAbsoluteErrorWeightFinaliser`]-(@ref)
+  - Iterative Weight Finaliser [`IterativeWeightFinaliser`](@ref)
+  - ::: details JuMP Weight Finaliser [`JuMPWeightFinaliser`](@ref)
+    - Relative Error Weight Finaliser [`RelativeErrorWeightFinaliser`](@ref)
+    - Squared Relative Error Weight Finaliser [`SquaredRelativeErrorWeightFinaliser`](@ref)
+    - Absolute Error Weight Finaliser [`AbsoluteErrorWeightFinaliser`](@ref)
+    - Squared Absolute Error Weight Finaliser [`SquaredAbsoluteErrorWeightFinaliser`](@ref)
 
 ##### Nested clusters optimisation
 
@@ -694,7 +694,7 @@ From here there are two options:
 
 This matrix of predicted returns is then used by the outer optimisation estimator to generate an optimisation of the synthetic assets. This produces a `C × 1` vector, essentially optimising a portfolio of asset clusters. The final weights are the product of the original `N × C` matrix of asset weights per cluster by the `C × 1` vector of optimal synthetic asset weights to produce the final `N × 1` vector of asset weights.
 
-- Nested Clustered [`NestedClustered`]-(@ref) returns a [`NestedClusteredResult`]-(@ref)
+- Nested Clustered [`NestedClustered`](@ref) returns a [`NestedClusteredResult`](@ref)
 
 ##### Nested clusters optimisation features
 
@@ -702,19 +702,19 @@ This matrix of predicted returns is then used by the outer optimisation estimato
 - Weight bounds [`WeightBoundsEstimator`](@ref), [`UniformValues`](@ref), and [`WeightBounds`](@ref)
 - Fees [`FeesEstimator`](@ref) and [`Fees`](@ref)
 - ::: details Weight finalisers
-  - Iterative Weight Finaliser [`IterativeWeightFinaliser`]-(@ref)
-  - ::: details JuMP Weight Finaliser [`JuMPWeightFinaliser`]-(@ref)
-    - Relative Error Weight Finaliser [`RelativeErrorWeightFinaliser`]-(@ref)
-    - Squared Relative Error Weight Finaliser [`SquaredRelativeErrorWeightFinaliser`]-(@ref)
-    - Absolute Error Weight Finaliser [`AbsoluteErrorWeightFinaliser`]-(@ref)
-    - Squared Absolute Error Weight Finaliser [`SquaredAbsoluteErrorWeightFinaliser`]-(@ref)
+  - Iterative Weight Finaliser [`IterativeWeightFinaliser`](@ref)
+  - ::: details JuMP Weight Finaliser [`JuMPWeightFinaliser`](@ref)
+    - Relative Error Weight Finaliser [`RelativeErrorWeightFinaliser`](@ref)
+    - Squared Relative Error Weight Finaliser [`SquaredRelativeErrorWeightFinaliser`](@ref)
+    - Absolute Error Weight Finaliser [`AbsoluteErrorWeightFinaliser`](@ref)
+    - Squared Absolute Error Weight Finaliser [`SquaredAbsoluteErrorWeightFinaliser`](@ref)
 - Cross validation predictor for the outer estimator
 
 #### Ensemble optimisation
 
 This works similarly to the Nested Clustered estimator, only instead of breaking the asset universe into subsets, a list of inner estimators is provided. The procedure is then exactly the same as the nested clusters optimisation, only instead of an `N × C` matrix of asset weights where each column corresponds to a subset of assets, each column corresponds to a completely independent and isolated inner estimator, which also means there is no enforced sparsity pattern on this matrix.
 
-- Stacking [`Stacking`]-(@ref) returns a [`StackingResult`]-(@ref)
+- Stacking [`Stacking`](@ref) returns a [`StackingResult`](@ref)
 
 ##### Ensemble optimisation features
 
@@ -722,19 +722,19 @@ This works similarly to the Nested Clustered estimator, only instead of breaking
 - Fees [`FeesEstimator`](@ref) and [`Fees`](@ref)
 - Weight bounds [`WeightBoundsEstimator`](@ref), [`UniformValues`](@ref), and [`WeightBounds`](@ref)
 - ::: details Weight finalisers
-  - Iterative Weight Finaliser [`IterativeWeightFinaliser`]-(@ref)
-  - ::: details JuMP Weight Finaliser [`JuMPWeightFinaliser`]-(@ref)
-    - Relative Error Weight Finaliser [`RelativeErrorWeightFinaliser`]-(@ref)
-    - Squared Relative Error Weight Finaliser [`SquaredRelativeErrorWeightFinaliser`]-(@ref)
-    - Absolute Error Weight Finaliser [`AbsoluteErrorWeightFinaliser`]-(@ref)
-    - Squared Absolute Error Weight Finaliser [`SquaredAbsoluteErrorWeightFinaliser`]-(@ref)
+  - Iterative Weight Finaliser [`IterativeWeightFinaliser`](@ref)
+  - ::: details JuMP Weight Finaliser [`JuMPWeightFinaliser`](@ref)
+    - Relative Error Weight Finaliser [`RelativeErrorWeightFinaliser`](@ref)
+    - Squared Relative Error Weight Finaliser [`SquaredRelativeErrorWeightFinaliser`](@ref)
+    - Absolute Error Weight Finaliser [`AbsoluteErrorWeightFinaliser`](@ref)
+    - Squared Absolute Error Weight Finaliser [`SquaredAbsoluteErrorWeightFinaliser`](@ref)
 - Cross validation predictor for the outer estimator
 
 #### Subset resampling optimisation
 
-This optimiser takes ideas from [`MultipleRandomised`]-(@ref) cross validation to randomly sample the asset universe and optimise each sample individually using a given optimiser. The final asset weights are the average weight per asset across all samples, if an asset does not appear in a sample, it is taken to be zero.
+This optimiser takes ideas from [`MultipleRandomised`](@ref) cross validation to randomly sample the asset universe and optimise each sample individually using a given optimiser. The final asset weights are the average weight per asset across all samples, if an asset does not appear in a sample, it is taken to be zero.
 
-- [`SubsetResampling`]-(@ref) returns a [`SubsetResamplingResult`]-(@ref)
+- [`SubsetResampling`](@ref) returns a [`SubsetResamplingResult`](@ref)
 
 ##### Subset resampling optimisation features
 
@@ -742,37 +742,37 @@ This optimiser takes ideas from [`MultipleRandomised`]-(@ref) cross validation t
 - Fees [`FeesEstimator`](@ref) and [`Fees`](@ref)
 - Weight bounds [`WeightBoundsEstimator`](@ref), [`UniformValues`](@ref), and [`WeightBounds`](@ref)
 - ::: details Weight finalisers
-  - Iterative Weight Finaliser [`IterativeWeightFinaliser`]-(@ref)
-  - ::: details JuMP Weight Finaliser [`JuMPWeightFinaliser`]-(@ref)
-    - Relative Error Weight Finaliser [`RelativeErrorWeightFinaliser`]-(@ref)
-    - Squared Relative Error Weight Finaliser [`SquaredRelativeErrorWeightFinaliser`]-(@ref)
-    - Absolute Error Weight Finaliser [`AbsoluteErrorWeightFinaliser`]-(@ref)
-    - Squared Absolute Error Weight Finaliser [`SquaredAbsoluteErrorWeightFinaliser`]-(@ref)
+  - Iterative Weight Finaliser [`IterativeWeightFinaliser`](@ref)
+  - ::: details JuMP Weight Finaliser [`JuMPWeightFinaliser`](@ref)
+    - Relative Error Weight Finaliser [`RelativeErrorWeightFinaliser`](@ref)
+    - Squared Relative Error Weight Finaliser [`SquaredRelativeErrorWeightFinaliser`](@ref)
+    - Absolute Error Weight Finaliser [`AbsoluteErrorWeightFinaliser`](@ref)
+    - Squared Absolute Error Weight Finaliser [`SquaredAbsoluteErrorWeightFinaliser`](@ref)
 
 #### Finite allocation optimisation
 
 Unlike all other estimators, finite allocation does not yield an "optimal" value, but rather the optimal attainable solution based on a finite amount of capital. They use the result of other estimations, the latest prices, and a cash amount.
 
-- ::: details Discrete (MIP) [`DiscreteAllocation`]-(@ref)
+- ::: details Discrete (MIP) [`DiscreteAllocation`](@ref)
   - ::: details Weight finalisers
-    - Iterative Weight Finaliser [`IterativeWeightFinaliser`]-(@ref)
-    - ::: details JuMP Weight Finaliser [`JuMPWeightFinaliser`]-(@ref)
-      - Relative Error Weight Finaliser [`RelativeErrorWeightFinaliser`]-(@ref)
-      - Squared Relative Error Weight Finaliser [`SquaredRelativeErrorWeightFinaliser`]-(@ref)
-      - Absolute Error Weight Finaliser [`AbsoluteErrorWeightFinaliser`]-(@ref)
-      - Squared Absolute Error Weight Finaliser [`SquaredAbsoluteErrorWeightFinaliser`]-(@ref)
+    - Iterative Weight Finaliser [`IterativeWeightFinaliser`](@ref)
+    - ::: details JuMP Weight Finaliser [`JuMPWeightFinaliser`](@ref)
+      - Relative Error Weight Finaliser [`RelativeErrorWeightFinaliser`](@ref)
+      - Squared Relative Error Weight Finaliser [`SquaredRelativeErrorWeightFinaliser`](@ref)
+      - Absolute Error Weight Finaliser [`AbsoluteErrorWeightFinaliser`](@ref)
+      - Squared Absolute Error Weight Finaliser [`SquaredAbsoluteErrorWeightFinaliser`](@ref)
 - Greedy [`GreedyAllocation`]
 
 ### Cross validation
 
-- Prediction on unseen data [`PredictionReturnsResult`]-(@ref), [`PredictionResult`]-(@ref), [`MultiPeriodPredictionResult`]-(@ref), [`PopulationPredictionResult`]-(@ref) via [`predict`]-(@ref), [`fit_and_predict`]-(@ref)
-- Prediction scoring via [`PredictionCrossValScorer`]-(@ref), [`NearestQuantilePrediction`]-(@ref), and [`quantile_by_measure`]-(@ref)
-- ::: details Cross validation estimators used via [`split`]-(@ref) and [`cross_val_predict`]-(@ref)
-  - K-Fold [`KFold`](@ref) returns a [`KFoldResult`]-(@ref)
-  - Combinatorial [`CombinatorialCrossValidation`](@ref) returns a [`CombinatorialCrossValidationResult`]-(@ref)
-  - ::: details Walk forward [`WalkForward`]-(@ref) return a [`WalkForwardResult`]-(@ref)
+- Prediction on unseen data [`PredictionReturnsResult`](@ref), [`PredictionResult`](@ref), [`MultiPeriodPredictionResult`](@ref), [`PopulationPredictionResult`](@ref) via [`predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)`](@ref), [`fit_and_predict`](@ref)
+- Prediction scoring via [`PredictionCrossValScorer`](@ref), [`NearestQuantilePrediction`](@ref), and [`quantile_by_measure`](@ref)
+- ::: details Cross validation estimators used via [`split`](@ref) and [`fit_and_predict`](@ref)
+  - K-Fold [`KFold`](@ref) returns a [`KFoldResult`](@ref)
+  - Combinatorial [`CombinatorialCrossValidation`](@ref) returns a [`CombinatorialCrossValidationResult`](@ref)
+  - ::: details Walk forward [`WalkForwardEstimator`](@ref) return a [`WalkForwardResult`](@ref)
     - Index-based [`IndexWalkForward`](@ref), [`DateWalkForward`](@ref)
-  - Multiple randomised [`MultipleRandomised`]-(@ref) returns a [`MultipleRandomisedResult`]-(@ref)
+  - Multiple randomised [`MultipleRandomised`](@ref) returns a [`MultipleRandomisedResult`](@ref)
 - ::: details Hyperparameter tuning via [`search_cross_validation`](@ref).
   - Grid search cross validation [`GridSearchCrossValidation`](@ref)
   - Randomised search cross validation [`RandomisedSearchCrossValidation`](@ref)
@@ -782,18 +782,18 @@ Unlike all other estimators, finite allocation does not yield an "optimal" value
 Visualising the results is quite a useful way of summarising the portfolio characteristics or evolution. To this extent we provide a few plotting functions with more to come.
 
 - ::: details Simple or compound cumulative returns.
-  - Portfolio [`plot_ptf_cumulative_returns`]-(@ref).
-  - Assets [`plot_asset_cumulative_returns`]-(@ref).
+  - Portfolio [`plot_ptf_cumulative_returns`](@ref).
+  - Assets [`plot_asset_cumulative_returns`](@ref).
 - ::: details Portfolio composition.
-  - Single portfolio [`plot_composition`]-(@ref).
+  - Single portfolio [`plot_composition`](@ref).
   - ::: details Multi portfolio.
-    - Stacked bar [`plot_stacked_bar_composition`]-(@ref).
-    - Stacked area [`plot_stacked_area_composition`]-(@ref).
+    - Stacked bar [`plot_stacked_bar_composition`](@ref).
+    - Stacked area [`plot_stacked_area_composition`](@ref).
 - ::: details Risk contribution.
-  - Asset risk contribution [`plot_risk_contribution`]-(@ref).
-  - Factor risk contribution [`plot_factor_risk_contribution`]-(@ref).
-- Asset dendrogram [`plot_dendrogram`]-(@ref).
-- Asset clusters + optional dendrogram [`plot_clusters`]-(@ref).
-- Simple or compound drawdowns [`plot_drawdowns`]-(@ref).
-- Portfolio returns histogram + density [`plot_histogram`]-(@ref).
-- 2/3D risk measure scatter plots [`plot_measures`]-(@ref).
+  - Asset risk contribution [`plot_risk_contribution`](@ref).
+  - Factor risk contribution [`plot_factor_risk_contribution`](@ref).
+- Asset dendrogram [`plot_dendrogram`](@ref).
+- Asset clusters + optional dendrogram [`plot_clusters`](@ref).
+- Simple or compound drawdowns [`plot_drawdowns`](@ref).
+- Portfolio returns histogram + density [`plot_histogram`](@ref).
+- 2/3D risk measure scatter plots [`plot_measures`](@ref).

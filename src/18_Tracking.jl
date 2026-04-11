@@ -220,6 +220,29 @@ L1Tracking()
   - [`norm_tracking`](@ref)
 """
 struct L1Tracking <: NormTracking end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+L-p norm tracking error estimator.
+
+Computes the Lp-norm of the difference between portfolio and benchmark returns: ``\\lvert\\mathbf{X} \\boldsymbol{w} - \\boldsymbol{b}\\rvert_p``.
+
+# Fields
+
+  - `p`: The p-norm exponent (default 3).
+  - `ddof`: Degrees of freedom correction for the mean (default 0).
+
+# Constructors
+
+    LpTracking(; p::Number = 3, ddof::Integer = 0) -> LpTracking
+
+# Related
+
+  - [`NormTracking`](@ref)
+  - [`L1Tracking`](@ref)
+  - [`L2Tracking`](@ref)
+  - [`LInfTracking`](@ref)
+"""
 @concrete struct LpTracking <: NormTracking
     p
     ddof
@@ -231,6 +254,29 @@ end
 function LpTracking(; p::Number = 3, ddof::Integer = 0)
     return LpTracking(p, ddof)
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+L-infinity norm (maximum absolute deviation) tracking error estimator.
+
+Computes the L∞-norm (maximum absolute deviation) of the difference between portfolio and benchmark returns.
+
+# Fields
+
+  - `ddof`: Degrees of freedom correction for the mean (default 0).
+  - `pos`: If `true`, uses the positive part of the maximum deviation (default `true`).
+
+# Constructors
+
+    LInfTracking(; ddof::Integer = 0, pos::Bool = true) -> LInfTracking
+
+# Related
+
+  - [`NormTracking`](@ref)
+  - [`LpTracking`](@ref)
+  - [`L1Tracking`](@ref)
+  - [`L2Tracking`](@ref)
+"""
 @concrete struct LInfTracking <: NormTracking
     ddof
     pos
@@ -798,6 +844,7 @@ TrackingError
 
 # Related
 
+  - [`set_tracking_error_constraints!`](@ref)
   - [`AbstractTracking`](@ref)
   - [`WeightsTracking`](@ref)
   - [`ReturnsTracking`](@ref)

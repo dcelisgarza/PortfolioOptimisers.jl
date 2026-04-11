@@ -1,3 +1,30 @@
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Add Entropic Value-at-Risk, EVaR range, or Entropic Drawdown-at-Risk constraints to `model`.
+
+Each overload uses exponential cone constraints (`ExponentialCone`) to encode the cumulant
+generating function bound. Scalar variables `t`, `z`, and per-observation variables `u` are
+introduced. `EVaR` and `EDaR` encode the single-tail bound; the range variant encodes both a
+lower and upper exponential cone.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - $(arg_dict[:ci])
+  - $(arg_dict[:r_risk])
+  - $(arg_dict[:opt_rjumpe])
+  - $(arg_dict[:pr_X])
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`set_drawdown_constraints!`](@ref)
+  - [`set_risk_bounds_and_expression!`](@ref)
+"""
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::EntropicValueatRisk,
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; kwargs...)
@@ -34,6 +61,31 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::EntropicValueatRisk
     set_risk_bounds_and_expression!(model, opt, evar_risk, r.settings, key)
     return evar_risk
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Add JuMP risk constraints for `EntropicValueatRiskRange` (EVaR range) to `model`.
+
+Introduces two sets of exponential cone variables for the lower-tail and upper-tail EVaR
+expressions and computes their difference as the range risk.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - $(arg_dict[:ci])
+  - `r::EntropicValueatRiskRange`: The EVaR range risk measure.
+  - $(arg_dict[:opt_rjumpe])
+  - $(arg_dict[:pr_X])
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`EntropicValueatRiskRange`](@ref)
+  - [`set_risk_constraints!`](@ref)
+"""
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::EntropicValueatRiskRange,
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; kwargs...)
@@ -118,6 +170,32 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::EntropicValueatRisk
     set_risk_bounds_and_expression!(model, opt, evar_risk_range, r.settings, key)
     return evar_risk_range
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Add JuMP risk constraints for `EntropicDrawdownatRisk` (EDaR) to `model`.
+
+Uses exponential cone constraints applied to the drawdown series to encode the entropic
+drawdown-at-risk at confidence level `r.alpha`.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - $(arg_dict[:ci])
+  - `r::EntropicDrawdownatRisk`: The EDaR risk measure.
+  - $(arg_dict[:opt_rjumpe])
+  - $(arg_dict[:pr_X])
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`EntropicDrawdownatRisk`](@ref)
+  - [`set_drawdown_constraints!`](@ref)
+  - [`set_risk_constraints!`](@ref)
+"""
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::EntropicDrawdownatRisk,
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; kwargs...)

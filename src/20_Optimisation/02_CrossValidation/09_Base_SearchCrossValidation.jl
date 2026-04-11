@@ -4,6 +4,20 @@
 Cross-validations compatible with search-based hyperparameter tuning.
 """
 const SearchCV = Union{<:KFold, <:KFoldResult, <:WalkForwardEstimator, <:WalkForwardResult}
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for all search-based cross-validation estimators in `PortfolioOptimisers.jl`.
+
+Subtypes implement hyperparameter search strategies (e.g. grid search, randomised search) that use cross-validation to select the best estimator configuration.
+
+# Related
+
+  - [`GridSearchCrossValidation`](@ref)
+  - [`RandomisedSearchCrossValidation`](@ref)
+  - [`AbstractSearchCrossValidationResult`](@ref)
+  - [`SearchCV`](@ref)
+"""
 abstract type AbstractSearchCrossValidationEstimator <: AbstractEstimator end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -15,6 +29,18 @@ Abstract result type for search-based cross-validation routines. Serves as the p
   - Subtypes must store the optimal estimator, test and train scores, parameter grid, and selected index.
 """
 abstract type AbstractSearchCrossValidationResult <: AbstractResult end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for all search-based cross-validation algorithm types.
+
+Subtypes define the strategy used to select the best hyperparameter combination from the search results (e.g. selecting by highest mean score).
+
+# Related
+
+  - [`AbstractSearchCrossValidationEstimator`](@ref)
+  - [`SearchCrossValidationResult`](@ref)
+"""
 abstract type AbstractSearchCrossValidationAlgorithm <: AbstractAlgorithm end
 """
     abstract type CrossValidationSearchScorer <: AbstractEstimator
@@ -60,6 +86,30 @@ abstract type CrossValidationSearchScorer <: AbstractEstimator end
 Union type for search cross-validation scoring strategies. Accepts either a subtype of `CrossValidationSearchScorer` or a plain function that accepts a matrix and returns an integer.
 """
 const CrossValSearchScorer = Union{<:CrossValidationSearchScorer, <:Function}
+"""
+$(DocStringExtensions.TYPEDEF)
+
+A [`CrossValidationSearchScorer`](@ref) that selects the parameter set with the highest mean score across cross-validation splits.
+
+When called with a score matrix (rows = CV splits, columns = parameter sets), it returns the column index with the largest mean score.
+
+# Examples
+
+```jldoctest
+julia> scorer = PortfolioOptimisers.HighestMeanScore();
+
+julia> scores = [0.5 0.8; 0.6 0.7];
+
+julia> scorer(scores)
+2
+```
+
+# Related
+
+  - [`CrossValidationSearchScorer`](@ref)
+  - [`CrossValSearchScorer`](@ref)
+  - [`SearchCrossValidationResult`](@ref)
+"""
 struct HighestMeanScore <: CrossValidationSearchScorer end
 function (s::HighestMeanScore)(X::MatNum; dims::Integer = 1)
     return argmax(dropdims(mean(X; dims = dims); dims = dims))
@@ -129,8 +179,8 @@ Fits a portfolio optimisation estimator on training data, scores it on test and 
 
   - [`SearchCrossValidationResult`](@ref)
   - [`expected_risk`](@ref)
-  - [`predict`]-(@ref)
-  - [`NonFiniteAllocationOptimisationEstimator`]-(@ref)
+  - [`predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)`](@ref)
+  - [`NonFiniteAllocationOptimisationEstimator`](@ref)
 
 # Examples
 """
@@ -139,7 +189,7 @@ function fit_and_score(opt::NonFiniteAllocationOptimisationEstimator,
                        train_idx::VecInt, test_idx::VecInt)
     rd_train = returns_result_view(rd, train_idx, :)
     res = optimise(opt, rd_train)
-    test_pred = predict(res, rd, test_idx)
+    test_pred = StatsAPI.predict(res, rd, test_idx)
     r = scv.r
     sign = ifelse(bigger_is_better(r), 1, -1)
     test_score = sign * expected_risk(scv.r, test_pred; scv.kwargs...)
@@ -150,12 +200,71 @@ function fit_and_score(opt::NonFiniteAllocationOptimisationEstimator,
     end
     return test_score, train_score
 end
-# Base case: bare symbol → PropertyLens
+"""
+    _expr_to_lens(ex::Symbol)
+
+Convert a bare symbol into a `PropertyLens` for field access.
+
+Base case for the lens-building recursion: a bare symbol maps directly to an `Accessors.PropertyLens`.
+
+# Arguments
+
+  - `ex::Symbol`: A field name symbol.
+
+# Returns
+
+  - `Accessors.PropertyLens` for the symbol.
+
+# Related
+
+  - [`_expr_to_lens_chain`](@ref)
+  - [`parse_lens`](@ref)
+"""
 _expr_to_lens(ex::Symbol) = Accessors.PropertyLens(ex)
-# Evaluate literal index nodes in the AST (no runtime eval needed)
+"""
+    _eval_index(x)
+
+Evaluate a literal index node in the AST without runtime `eval`.
+
+Converts integer, symbol, or vector expression AST nodes to concrete index values for use in `Accessors.IndexLens`.
+
+# Arguments
+
+  - `x::Integer`: An integer index.
+  - `x::Symbol`: A symbolic index.
+  - `ex::Expr`: A vector expression (`:vect` head).
+
+# Returns
+
+  - The evaluated index value.
+
+# Related
+
+  - [`_expr_to_lens_chain`](@ref)
+"""
 _eval_index(x::Integer) = x
-_eval_index(x::Symbol)  = x
-_eval_index(ex::Expr)   = ex.head === :vect ? [_eval_index(a) for a in ex.args] : error("Unsupported index expression: $ex")
+_eval_index(x::Symbol) = x
+_eval_index(ex::Expr)  = ex.head === :vect ? [_eval_index(a) for a in ex.args] : error("Unsupported index expression: $ex")
+"""
+    _expr_to_lens_chain(ex)
+
+Convert a Julia expression to a chain of lens accessors.
+
+Internal helper for parsing hyperparameter key strings into composable Accessors.jl lenses.
+
+# Arguments
+
+  - `ex`: Julia expression representing a field access chain.
+
+# Returns
+
+  - Composed lens.
+
+# Related
+
+  - [`parse_lens`](@ref)
+  - [`_expr_to_lens`](@ref)
+"""
 function _expr_to_lens_chain(ex)
     optics = Union{Accessors.PropertyLens, Accessors.IndexLens}[]
     while ex isa Expr
@@ -173,6 +282,27 @@ function _expr_to_lens_chain(ex)
     push!(optics, Accessors.PropertyLens(ex))  # base case: Symbol
     return foldl(∘, optics)
 end
+"""
+    parse_lens(key::AbstractString)
+
+Parse a hyperparameter key string into an Accessors.jl lens.
+
+Converts a dotted string path (e.g., `"opt.pe.ce"`) into a composable lens for getting and setting nested fields of an estimator object.
+
+# Arguments
+
+  - `key`: Dotted field path string.
+
+# Returns
+
+  - Composed Accessors.jl lens.
+
+# Related
+
+  - [`_expr_to_lens_chain`](@ref)
+  - [`GridSearchCrossValidation`](@ref)
+  - [`RandomisedSearchCrossValidation`](@ref)
+"""
 function parse_lens(key::AbstractString)
     return _expr_to_lens_chain(Meta.parse(key))
 end

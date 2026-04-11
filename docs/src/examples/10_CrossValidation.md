@@ -8,7 +8,7 @@ EditURL = "../../../examples/10_CrossValidation.jl"
 
 Cross validation is a powerful technique to evaluate the performance of a model on unseen data. In this example, we will showcase the different cross validation methods available in PortfolioOptimisers.jl and how to use them to evaluate the performance of our portfolio optimization models.
 
-Cross validation can be used as a standalone method to evaluate the performance of a model, or it can be used in conjunction with other techniques like hyperparameter tuning or model selection. They can also be used in [`NestedClustered`]-(@ref) and [`Stacking`]-(@ref) optimisation estimators to optimise the outer estimator on the out-of-sample performance of the inner estimators.
+Cross validation can be used as a standalone method to evaluate the performance of a model, or it can be used in conjunction with other techniques like hyperparameter tuning or model selection. They can also be used in [`NestedClustered`](@ref) and [`Stacking`](@ref) optimisation estimators to optimise the outer estimator on the out-of-sample performance of the inner estimators.
 
 This example will only focus on showcasing the different cross validation methods, with examples on how to use them and what metrics can be computed. Further analysis like plots or grid searches have not been implemented yet, but are the top priority of future development.
 
@@ -71,7 +71,7 @@ slv = [Solver(; name = :clarabel1, solver = Clarabel.Optimizer,
 nothing #hide
 ````
 
-For this tutorial we will use the basic [`MeanRisk`]-(@ref) estimator, but the cross validation works for all optimisation estimators, even when computing pareto fronts.
+For this tutorial we will use the basic [`MeanRisk`](@ref) estimator, but the cross validation works for all optimisation estimators, even when computing pareto fronts.
 
 ````@example 10_CrossValidation
 mr = MeanRisk(; opt = JuMPOptimiser(; slv = slv))
@@ -89,7 +89,7 @@ The [`KFold`](@ref) indices can be generated independently of the optimisation. 
 kfold = KFold(; n = 5)
 ````
 
-For demonstration purposes we can generate the splits using the [`split`]-(@ref) method. This is not necessary as the cross validation will generate them internally.
+For demonstration purposes we can generate the splits using the [`split`](@ref) method. This is not necessary as the cross validation will generate them internally.
 
 ````@example 10_CrossValidation
 kfold_res = split(kfold, rd)
@@ -104,19 +104,19 @@ Let's perform the cross validation.
 kfold_pred = cross_val_predict(mr, rd, kfold)
 ````
 
-The result is a [`MultiPeriodPredictionResult`]-(@ref) object, which is a wrapper for a vector of [`PredictionResult`]-(@ref) objects, one for each fold. Each [`PredictionResult`]-(@ref) contains the optimisation result based on the training set, and a [`PredictionReturnsResult`]-(@ref) containing the predicted returns result of the optimised portfolio evaluated on its corresponding test set.
+The result is a [`MultiPeriodPredictionResult`](@ref) object, which is a wrapper for a vector of [`PredictionResult`](@ref) objects, one for each fold. Each [`PredictionResult`](@ref) contains the optimisation result based on the training set, and a [`PredictionReturnsResult`](@ref) containing the predicted returns result of the optimised portfolio evaluated on its corresponding test set.
 
-We can individually access the result of each fold by indexing into the `pred` field of the [`MultiPeriodPredictionResult`]-(@ref) object, but we can also directly access via the accessing the `mrd` and `mres` properties, which stand for multi-rd and multi-res. `mrd` concatenates the predicted returns into a single [`PredictionReturnsResult`]-(@ref). Since the embargo and purged sizes are zero, the timestamps of the predicted returns should be the same as the timestamps of the original returns result.
+We can individually access the result of each fold by indexing into the `pred` field of the [`MultiPeriodPredictionResult`](@ref) object, but we can also directly access via the accessing the `mrd` and `mres` properties, which stand for multi-rd and multi-res. `mrd` concatenates the predicted returns into a single [`PredictionReturnsResult`](@ref). Since the embargo and purged sizes are zero, the timestamps of the predicted returns should be the same as the timestamps of the original returns result.
 
 ````@example 10_CrossValidation
 println("isequal(kfold_pred.mrd.ts, rd.ts) = $(isequal(kfold_pred.mrd.ts, rd.ts))")
 ````
 
-We can also compute performance metrics (risk measures) on the predicted returns. However, we can only use risk measures that use the returns series as an input. This means [`StandardDeviation`]-(@ref), [`NegativeSkewness`]-(@ref), [`TurnoverRiskMeasure`]-(@ref), [`TrackingRiskMeasure`]-(@ref) with [`WeightsTracking`](@ref), [`Variance`]-(@ref), [`UncertaintySetVariance`]-(@ref), [`EqualRiskMeasure`]-(@ref), [`ExpectedReturn`]-(@ref) and [`ExpectedReturnRiskRatio`]-(@ref), as well as any risk measure that uses any of these cannot be used. But there are ways around this, for example:
+We can also compute performance metrics (risk measures) on the predicted returns. However, we can only use risk measures that use the returns series as an input. This means [`StandardDeviation`](@ref), [`NegativeSkewness`](@ref), [`TurnoverRiskMeasure`](@ref), [`TrackingRiskMeasure`](@ref) with [`WeightsTracking`](@ref), [`Variance`](@ref), [`UncertaintySetVariance`](@ref), [`EqualRiskMeasure`](@ref), [`ExpectedReturn`](@ref) and [`ExpectedReturnRiskRatio`](@ref), as well as any risk measure that uses any of these cannot be used. But there are ways around this, for example:
 
-- For the variance and standard deviation, we can use [`LowOrderMoment`]-(@ref) with the appropriate algorithms.
-- For [`NegativeSkewness`]-(@ref) we can use [`HighOrderMoment`]-(@ref), or [`Skewness`]-(@ref).
-- For [`ExpectedReturn`]-(@ref) and [`ExpectedReturnRiskRatio`]-(@ref) we can use [`MeanReturn`]-(@ref) and [`MeanReturnRiskRatio`]-(@ref) respectively.
+- For the variance and standard deviation, we can use [`LowOrderMoment`](@ref) with the appropriate algorithms.
+- For [`NegativeSkewness`](@ref) we can use [`HighOrderMoment`](@ref), or [`Skewness`](@ref).
+- For [`ExpectedReturn`](@ref) and [`ExpectedReturnRiskRatio`](@ref) we can use [`MeanReturn`](@ref) and [`MeanReturnRiskRatio`](@ref) respectively.
 
 Here we will compute the variance.
 
@@ -160,7 +160,7 @@ We can now perform the cross validation.
 cfold_pred = cross_val_predict(mr, rd, cfold)
 ````
 
-We can see that there are indeed 66 predictions. Each is a valid representative of the out-of-sample performance of the model. However, for evaluating the performance, we can use a sample or the median of the predictions. The median is a good representative of the performance, as it is not affected by outliers, and it is a good measure of central tendency. We can do this with custom function, or a functor of a subtype of [`PredictionScorer`]-(@ref). We've implemented a simple one called [`NearestQuantilePrediction`]-(@ref) which takes the prediction with the nearest quantile to the desired quantile of the distribution of predictions, it defaults to the median.
+We can see that there are indeed 66 predictions. Each is a valid representative of the out-of-sample performance of the model. However, for evaluating the performance, we can use a sample or the median of the predictions. The median is a good representative of the performance, as it is not affected by outliers, and it is a good measure of central tendency. We can do this with custom function, or a functor of a subtype of [`PredictionScorer`](@ref). We've implemented a simple one called [`NearestQuantilePrediction`](@ref) which takes the prediction with the nearest quantile to the desired quantile of the distribution of predictions, it defaults to the median.
 
 We will use the risk return ratio of the variance as our performance metric. The paths are sorted according to their expected risk, return based risk measures sort them based on descending order, while true risk measures sort them in ascending order.
 
@@ -331,7 +331,7 @@ pretty_table(hcat(DataFrame(:tickers => rd.nx),
 
 The splits are different to the index walkforward method, so the weights are also different, but we can see there's not too much variation. That's because the training periods are roughly the same. However, the turnover constraint also helps in stabilising the weights.
 
-There is another cross validation method called [`MultipleRandomised`]-(@ref) which uses a walk forward estimator, but also randomly samples the asset universe. Since it is more complex to analyse and understand, we will cover it in a future example.
+There is another cross validation method called [`MultipleRandomised`](@ref) which uses a walk forward estimator, but also randomly samples the asset universe. Since it is more complex to analyse and understand, we will cover it in a future example.
 
 ---
 

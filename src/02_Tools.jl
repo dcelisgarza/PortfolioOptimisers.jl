@@ -198,7 +198,8 @@ end
 """
     nothing_scalar_array_view(
         x::Union{Nothing, <:Number, <:Pair, <:VecPair, <:Dict,
-                 AbstractEstimatorValueAlgorithm},
+                 <:AbstractEstimatorValueAlgorithm,
+                 <:DynamicAbstractWeights},
         ::Any
     ) -> x
     nothing_scalar_array_view(x::AbstractVector, i) -> view(x, i)
@@ -220,7 +221,7 @@ Utility for safely viewing into possibly `nothing`, scalar, or array values.
 
   - `x`: Input value.
 
-      + `::Union{Nothing, <:Number, <:Pair, <:VecPair, <:Dict}`: Returns `x` unchanged.
+      + `::Union{Nothing, <:Number, <:Pair, <:VecPair, <:Dict, <:AbstractEstimatorValueAlgorithm, <:DynamicAbstractWeights}`: Returns `x` unchanged.
       + `::AbstractVector`: Returns `view(x, i)`.
       + `::VecScalar`: Returns `VecScalar(; v = view(x.v, i), s = x.s)`.
       + `::AbstractMatrix`: Returns `view(x, i, i)`.
@@ -264,6 +265,27 @@ function nothing_scalar_array_view(x::AbstractVector{<:Union{<:AbstractVector,
                                    i)
     return [nothing_scalar_array_view(xi, i) for xi in x]
 end
+"""
+    get_window(window, X, dims = 1)
+
+Get the row/observation window index range for a data array.
+
+Returns the index range corresponding to the last `window` observations (or all observations for `nothing`/`Colon`). Handles integer window sizes, vector index ranges, and `nothing`/`Colon` to mean "use all data".
+
+# Arguments
+
+  - `window`: Number of observations, index vector, `nothing`, or `Colon`.
+  - `X`: Data matrix or vector.
+  - `dims`: Observation dimension (default `1`).
+
+# Returns
+
+  - Index range or `Colon`.
+
+# Related
+
+  - [`moment_window_and_weights`](@ref)
+"""
 function get_window(::Option{<:Colon}, args...)
     return Colon()
 end
@@ -316,9 +338,11 @@ function nothing_scalar_array_view_odd_order(x::AbstractMatrix, i, j)
 end
 """
     nothing_scalar_array_getindex(
-        x::Union{Nothing, <:Number, <:Pair, <:VecPair, <:Dict},
+        x::Union{Nothing, <:Number, <:Pair, <:VecPair, <:Dict,
+                 <:AbstractEstimatorValueAlgorithm,
+                 <:DynamicAbstractWeights},
         ::Any
-    ) -> Union{Nothing, <:Number, <:Pair, <:VecPair, <:Dict} -> x
+    ) -> x
     nothing_scalar_array_getindex(x::AbstractVector, i) -> x[i]
     nothing_scalar_array_getindex(x::VecScalar, i) -> VecScalar(; v = x.v[i], s = x.s)
     nothing_scalar_array_getindex(x::AbstractMatrix, i) -> x[i, i]
@@ -338,11 +362,11 @@ Utility for safely viewing into possibly `nothing`, scalar, or array values.
 
   - `x`: Input value.
 
-      + `::Union{Nothing, <:Number, <:Pair, <:VecPair, <:Dict}`: Returns `x` unchanged.
-      + `::AbstractVector`: Returns `view(x, i)`.
-      + `::VecScalar`: Returns `VecScalar(; v = view(x.v, i), s = x.s)`.
-      + `::AbstractVector{<:Union{<:AbstractVector, <:AbstractMatrix, <:VecScalar}}`: Returns a vector of views for each element in `x`.
-      + `::AbstractMatrix`: Returns `view(x, i, i)`.
+      + `::Union{Nothing, <:Number, <:Pair, <:VecPair, <:Dict, <:AbstractEstimatorValueAlgorithm, <:DynamicAbstractWeights}`: Returns `x` unchanged.
+      + `::AbstractVector`: Returns `x[i]`.
+      + `::VecScalar`: Returns `VecScalar(; v = x.v[i], s = x.s)`.
+      + `::AbstractVector{<:Union{<:AbstractVector, <:AbstractMatrix, <:VecScalar}}`: Returns a vector of elements indexed by `i`.
+      + `::AbstractMatrix`: Returns `x[i, i]`.
 
 # Examples
 

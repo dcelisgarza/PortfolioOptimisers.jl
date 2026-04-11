@@ -1,0 +1,5 @@
+# Windowed Cokurtosis
+
+```@docs
+WindowedCokurtosis
+```

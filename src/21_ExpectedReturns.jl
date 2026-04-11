@@ -28,9 +28,9 @@ Compute the expected portfolio return using the specified return estimator.
 
 # Related
 
-  - [`ArithmeticReturn`]-(@ref)
-  - [`LogarithmicReturn`]-(@ref)
-  - [`JuMPReturnsEstimator`]-(@ref)
+  - [`ArithmeticReturn`](@ref)
+  - [`LogarithmicReturn`](@ref)
+  - [`JuMPReturnsEstimator`](@ref)
   - [`AbstractPriorResult`](@ref)
   - [`VecNum`](@ref)
   - [`VecVecNum`](@ref)
@@ -88,7 +88,7 @@ Compute the expected risk-adjusted return ratio for a portfolio.
 # Related
 
   - [`AbstractBaseRiskMeasure`](@ref)
-  - [`JuMPReturnsEstimator`]-(@ref)
+  - [`JuMPReturnsEstimator`](@ref)
   - [`VecNum`](@ref)
   - [`AbstractPriorResult`](@ref)
   - [`Option`](@ref)
@@ -132,7 +132,7 @@ Compute expected risk, expected return, and risk-adjusted return ratio for a por
 # Related
 
   - [`AbstractBaseRiskMeasure`](@ref)
-  - [`JuMPReturnsEstimator`]-(@ref)
+  - [`JuMPReturnsEstimator`](@ref)
   - [`VecNum`](@ref)
   - [`AbstractPriorResult`](@ref)
   - [`Option`](@ref)
@@ -174,7 +174,7 @@ Compute the risk-adjusted ratio information criterion (SRIC) for a portfolio.
 # Related
 
   - [`AbstractBaseRiskMeasure`](@ref)
-  - [`JuMPReturnsEstimator`]-(@ref)
+  - [`JuMPReturnsEstimator`](@ref)
   - [`VecNum`](@ref)
   - [`AbstractPriorResult`](@ref)
   - [`Option`](@ref)
@@ -218,7 +218,7 @@ Compute expected risk, expected return, and SRIC for a portfolio.
 # Related
 
   - [`AbstractBaseRiskMeasure`](@ref)
-  - [`JuMPReturnsEstimator`]-(@ref)
+  - [`JuMPReturnsEstimator`](@ref)
   - [`VecNum`](@ref)
   - [`AbstractPriorResult`](@ref)
   - [`Option`](@ref)
@@ -264,7 +264,7 @@ ExpectedReturn
 
 # Related
 
-  - [`JuMPReturnsEstimator`]-(@ref)
+  - [`JuMPReturnsEstimator`](@ref)
   - [`ExpectedReturnRiskRatio`](@ref)
   - [`expected_return`](@ref)
   - [`expected_risk`](@ref)
@@ -386,7 +386,7 @@ ExpectedReturnRiskRatio
 
 # Related
 
-  - [`JuMPReturnsEstimator`]-(@ref)
+  - [`JuMPReturnsEstimator`](@ref)
   - [`AbstractBaseRiskMeasure`](@ref)
   - [`expected_ratio`](@ref)
   - [`expected_risk`](@ref)
@@ -475,8 +475,31 @@ end
 function needs_previous_weights(r::ExpectedReturnRiskRatio)
     return needs_previous_weights(r.rk)
 end
+"""
+    const PerfRM = Union{...}
+
+Union of performance risk measures used to compute portfolio performance metrics (returns and return/risk ratios).
+
+# Related
+
+  - [`MeanReturn`](@ref)
+  - [`MeanReturnRiskRatio`](@ref)
+  - [`ExpectedReturn`](@ref)
+  - [`ExpectedReturnRiskRatio`](@ref)
+"""
 const PerfRM = Union{<:MeanReturn, <:MeanReturnRiskRatio, <:ExpectedReturn,
                      <:ExpectedReturnRiskRatio}
+"""
+    const PrRM = Union{<:ExpectedReturn, <:ExpectedReturnRiskRatio}
+
+Union of prior-based return risk measures that are incompatible with [`PredictionResult`](@ref) inputs and require the use of [`MeanReturn`](@ref) or [`MeanReturnRiskRatio`](@ref) instead.
+
+# Related
+
+  - [`ExpectedReturn`](@ref)
+  - [`ExpectedReturnRiskRatio`](@ref)
+  - [`PerfRM`](@ref)
+"""
 const PrRM = Union{<:ExpectedReturn, <:ExpectedReturnRiskRatio}
 function bigger_is_better(::PerfRM)
     return true

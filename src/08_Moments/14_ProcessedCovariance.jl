@@ -1,5 +1,5 @@
 """
-    ProcessedCovariance
+$(DocStringExtensions.TYPEDEF)
 
 A covariance estimator that applies a custom matrix processing algorithm and positive definite projection to the output of another covariance estimator. This type enables flexible post-processing of covariance matrices by first computing a base covariance, then applying a user-specified matrix processing algorithm and positive definiteness correction in sequence.
 

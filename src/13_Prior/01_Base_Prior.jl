@@ -137,7 +137,32 @@ Abstract supertype for high order prior estimators.
   - [`prior`](@ref)
 """
 abstract type AbstractHighOrderPriorEstimator <: AbstractPriorEstimator end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+High order prior estimator using factor returns.
+
+`AbstractHighOrderPriorEstimator_F` is the base type for estimators that compute high order moments (such as coskewness and cokurtosis) requiring both asset and factor returns data. All concrete factor-based high order prior estimators should subtype this type.
+
+# Related
+
+  - [`AbstractHighOrderPriorEstimator`](@ref)
+  - [`AbstractLowOrderPriorEstimator_F`](@ref)
+  - [`AbstractHiLoOrderPriorEstimator_F`](@ref)
+  - [`prior`](@ref)
+"""
 abstract type AbstractHighOrderPriorEstimator_F <: AbstractHighOrderPriorEstimator end
+"""
+    const AbstractHiLoOrderPriorEstimator_F = Union{<:AbstractLowOrderPriorEstimator_F,
+                                                    <:AbstractHighOrderPriorEstimator_F}
+
+Alias for a union of low-order and high-order factor prior estimator types.
+
+# Related
+
+  - [`AbstractLowOrderPriorEstimator_F`](@ref)
+  - [`AbstractHighOrderPriorEstimator_F`](@ref)
+"""
 const AbstractHiLoOrderPriorEstimator_F = Union{<:AbstractLowOrderPriorEstimator_F,
                                                 <:AbstractHighOrderPriorEstimator_F}
 """
@@ -154,7 +179,27 @@ Abstract supertype for all prior result types.
   - [`AbstractResult`](@ref)
 """
 abstract type AbstractPriorResult <: AbstractResult end
+"""
+    const PrE_Pr = Union{<:AbstractPriorEstimator, <:AbstractPriorResult}
+
+Alias for a union of prior estimator and prior result types.
+
+# Related
+
+  - [`AbstractPriorEstimator`](@ref)
+  - [`AbstractPriorResult`](@ref)
+"""
 const PrE_Pr = Union{<:AbstractPriorEstimator, <:AbstractPriorResult}
+"""
+    const Pr_RR = Union{<:AbstractPriorResult, <:ReturnsResult}
+
+Alias for a union of prior result and returns result types.
+
+# Related
+
+  - [`AbstractPriorResult`](@ref)
+  - [`ReturnsResult`](@ref)
+"""
 const Pr_RR = Union{<:AbstractPriorResult, <:ReturnsResult}
 """
     prior(pr::AbstractPriorEstimator, rd::ReturnsResult; kwargs...)
@@ -211,6 +256,28 @@ Propagate or pass through prior result objects.
 function prior(pr::AbstractPriorResult, args...; kwargs...)
     return pr
 end
+"""
+    prior_view(pr, args...; kwargs...)
+
+Get a view or subset of a prior estimator or result for slicing.
+
+Returns the prior unchanged for estimators (they are not sliceable), or returns a sliced prior result for a given cluster or asset index. Used in hierarchical optimisation to provide cluster-specific priors.
+
+# Arguments
+
+  - `pr`: Prior estimator or result.
+  - `args...`: Additional arguments (index, etc.).
+  - `kwargs...`: Additional keyword arguments.
+
+# Returns
+
+  - Sliced prior result or unchanged estimator.
+
+# Related
+
+  - [`AbstractPriorEstimator`](@ref)
+  - [`LowOrderPrior`](@ref)
+"""
 function prior_view(pr::AbstractPriorEstimator, args...; kwargs...)
     return pr
 end

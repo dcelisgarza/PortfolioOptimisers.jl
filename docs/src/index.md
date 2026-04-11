@@ -164,21 +164,21 @@ slv = Solver(; name = :clarabel1, solver = Clarabel.Optimizer,
              check_sol = (; allow_local = true, allow_almost = true))
 ```
 
-`PortfolioOptimisers.jl` implements a number of optimisation types as estimators. All the ones which use mathematical optimisation require a [`JuMPOptimiser`]-(@ref) structure which defines general solver constraints. This structure in turn requires an instance (or vector) of [`Solver`](@ref).
+`PortfolioOptimisers.jl` implements a number of optimisation types as estimators. All the ones which use mathematical optimisation require a [`JuMPOptimiser`](@ref) structure which defines general solver constraints. This structure in turn requires an instance (or vector) of [`Solver`](@ref).
 
 ```@example 0_index
 opt = JuMPOptimiser(; slv = slv);
 nothing # hide
 ```
 
-Here we will use the traditional Mean-Risk [`MeanRisk`]-(@ref) optimisation estimator, which defaults to the Markowitz optimisation (minimum risk mean-variance optimisation).
+Here we will use the traditional Mean-Risk [`MeanRisk`](@ref) optimisation estimator, which defaults to the Markowitz optimisation (minimum risk mean-variance optimisation).
 
 ```@example 0_index
 # Vanilla (Markowitz) mean risk optimisation.
 mr = MeanRisk(; opt = opt)
 ```
 
-As you can see, there are *a lot* of fields in this structure, which correspond to a wide variety of optimisation constraints. We will explore these in the [examples](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/00_Examples). For now, we will perform the optimisation via [`optimise`]-(@ref).
+As you can see, there are *a lot* of fields in this structure, which correspond to a wide variety of optimisation constraints. We will explore these in the [examples](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/00_Examples). For now, we will perform the optimisation via [`optimise`](@ref).
 
 ```@example 0_index
 # Perform the optimisation, res.w contains the optimal weights.
@@ -187,7 +187,7 @@ res = optimise(mr, rd)
 
 The solution lives in the `sol` field, but the weights can be accessed via the `w` property.
 
-`PortfolioOptimisers.jl` also has the capability to perform finite allocations, which is useful for those of us without infinite money. There are two ways to do so, a greedy algorithm [`GreedyAllocation`]-(@ref) that does not guarantee optimality but is fast and always converges, and a discrete allocation [`DiscreteAllocation`]-(@ref) which uses mixed-integer programming (MIP) and requires a capable solver.
+`PortfolioOptimisers.jl` also has the capability to perform finite allocations, which is useful for those of us without infinite money. There are two ways to do so, a greedy algorithm [`GreedyAllocation`](@ref) that does not guarantee optimality but is fast and always converges, and a discrete allocation [`DiscreteAllocation`](@ref) which uses mixed-integer programming (MIP) and requires a capable solver.
 
 Here we will use the latter.
 

@@ -1,3 +1,25 @@
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Result type for Risk Budgeting portfolio optimisation.
+
+# Fields
+
+  - `oe`: Type of the optimisation estimator that produced this result.
+  - `pa`: Processed optimisation attributes.
+  - `prb`: Processed risk budgeting attributes.
+  - `retcode`: Optimisation return code.
+  - `sol`: JuMP model solution.
+  - `model`: The JuMP model.
+  - `fb`: Fallback result.
+
+The `w` property is forwarded from `sol.w`.
+
+# Related
+
+  - [`RiskBudgeting`](@ref)
+  - [`NonFiniteAllocationOptimisationResult`](@ref)
+"""
 @concrete struct RiskBudgetingResult <: NonFiniteAllocationOptimisationResult
     oe
     pa
@@ -23,18 +45,111 @@ function Base.getproperty(r::RiskBudgetingResult, sym::Symbol)
         getfield(r, sym)
     end
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Processed factor risk budgeting attributes for intermediate computations.
+
+# Related
+
+  - [`RiskBudgeting`](@ref)
+  - [`FactorRiskBudgeting`](@ref)
+"""
 @concrete struct ProcessedFactorRiskBudgetingAttributes <: AbstractResult
     rkb
     b1
     rr
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Processed asset risk budgeting attributes for intermediate computations.
+
+# Related
+
+  - [`RiskBudgeting`](@ref)
+  - [`AssetRiskBudgeting`](@ref)
+"""
 @concrete struct ProcessedAssetRiskBudgetingAttributes <: AbstractResult
     rkb
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for risk budgeting optimisation formulations.
+
+# Related Types
+
+  - [`LogRiskBudgeting`](@ref)
+  - [`MixedIntegerRiskBudgeting`](@ref)
+"""
 abstract type RiskBudgetingFormulation <: OptimisationAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Log-barrier formulation for Risk Budgeting.
+
+Uses a logarithmic objective to enforce the risk budget constraints in a smooth, continuous optimisation formulation.
+
+# Related Types
+
+  - [`RiskBudgetingFormulation`](@ref)
+  - [`MixedIntegerRiskBudgeting`](@ref)
+"""
 struct LogRiskBudgeting <: RiskBudgetingFormulation end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Mixed-integer formulation for Risk Budgeting.
+
+Uses binary variables and big-M constraints to enforce the risk budget constraints, enabling exact cardinality control.
+
+# Related Types
+
+  - [`RiskBudgetingFormulation`](@ref)
+  - [`LogRiskBudgeting`](@ref)
+"""
 struct MixedIntegerRiskBudgeting <: RiskBudgetingFormulation end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for risk budgeting algorithm specifications.
+
+# Related Types
+
+  - [`AssetRiskBudgeting`](@ref)
+  - [`FactorRiskBudgeting`](@ref)
+"""
 abstract type RiskBudgetingAlgorithm <: OptimisationAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Asset-level Risk Budgeting algorithm.
+
+`AssetRiskBudgeting` specifies the risk budget as a vector of asset-level risk targets, optionally grouped by asset sets.
+
+# Fields
+
+  - `rkb`: Risk budget estimator or risk budget constraints.
+  - `sets`: Asset sets (required when `rkb` is a `RiskBudgetEstimator`).
+  - `alg`: Risk budgeting formulation.
+
+# Constructors
+
+    AssetRiskBudgeting(;
+        rkb::Option{<:RkbE_Rkb} = nothing,
+        sets::Option{<:AssetSets} = nothing,
+        alg::RiskBudgetingFormulation = LogRiskBudgeting()
+    ) -> AssetRiskBudgeting
+
+Keywords correspond to the struct's fields.
+
+# Related
+
+  - [`RiskBudgetingAlgorithm`](@ref)
+  - [`FactorRiskBudgeting`](@ref)
+  - [`RiskBudgeting`](@ref)
+"""
 @concrete struct AssetRiskBudgeting <: RiskBudgetingAlgorithm
     rkb
     sets
@@ -52,11 +167,64 @@ function AssetRiskBudgeting(; rkb::Option{<:RkbE_Rkb} = nothing,
                             alg::RiskBudgetingFormulation = LogRiskBudgeting())
     return AssetRiskBudgeting(rkb, sets, alg)
 end
+"""
+    risk_budgeting_algorithm_view(r, i)
+
+Return a view or subset of a risk budgeting algorithm for cluster index `i`.
+
+Used in hierarchical optimisation to slice risk budget and asset set configurations for each cluster.
+
+# Arguments
+
+  - `r`: Risk budgeting algorithm ([`AssetRiskBudgeting`](@ref) or [`FactorRiskBudgeting`](@ref)).
+  - `i`: Cluster or asset index.
+
+# Returns
+
+  - Sliced risk budgeting algorithm.
+
+# Related
+
+  - [`AssetRiskBudgeting`](@ref)
+  - [`FactorRiskBudgeting`](@ref)
+  - [`RiskBudgeting`](@ref)
+"""
 function risk_budgeting_algorithm_view(r::AssetRiskBudgeting, i)
     rkb = risk_budget_view(r.rkb, i)
     sets = asset_sets_view(r.sets, i)
     return AssetRiskBudgeting(; rkb = rkb, sets = sets, alg = r.alg)
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Factor-level Risk Budgeting algorithm.
+
+`FactorRiskBudgeting` specifies the risk budget at the factor level, using a factor model regression to decompose risk across factors and an idiosyncratic component.
+
+# Fields
+
+  - `re`: Regression estimator for factor loadings.
+  - `rkb`: Risk budget estimator or risk budget constraints.
+  - `sets`: Asset sets (required when `rkb` is a `RiskBudgetEstimator`).
+  - `flag`: If `true`, includes the idiosyncratic component in the budget.
+
+# Constructors
+
+    FactorRiskBudgeting(;
+        re::RegE_Reg = StepwiseRegression(),
+        rkb::Option{<:RkbE_Rkb} = nothing,
+        sets::Option{<:AssetSets} = nothing,
+        flag::Bool = true
+    ) -> FactorRiskBudgeting
+
+Keywords correspond to the struct's fields.
+
+# Related
+
+  - [`RiskBudgetingAlgorithm`](@ref)
+  - [`AssetRiskBudgeting`](@ref)
+  - [`RiskBudgeting`](@ref)
+"""
 @concrete struct FactorRiskBudgeting <: RiskBudgetingAlgorithm
     re
     rkb
@@ -75,10 +243,69 @@ function FactorRiskBudgeting(; re::RegE_Reg = StepwiseRegression(),
                              sets::Option{<:AssetSets} = nothing, flag::Bool = true)
     return FactorRiskBudgeting(re, rkb, sets, flag)
 end
+"""
+    risk_budgeting_algorithm_view(r::FactorRiskBudgeting, i)
+
+Return a view of a `FactorRiskBudgeting` algorithm for cluster index `i`.
+
+Slices the regression estimator for the given cluster while keeping the risk budget, asset sets, and idiosyncratic flag unchanged.
+
+# Arguments
+
+  - `r::FactorRiskBudgeting`: Factor-level risk budgeting algorithm.
+  - `i`: Cluster or asset index.
+
+# Returns
+
+  - `FactorRiskBudgeting` with the regression estimator sliced to cluster `i`.
+
+# Related
+
+  - [`risk_budgeting_algorithm_view`](@ref)
+  - [`FactorRiskBudgeting`](@ref)
+  - [`AssetRiskBudgeting`](@ref)
+"""
 function risk_budgeting_algorithm_view(r::FactorRiskBudgeting, i)
     re = regression_view(r.re, i)
     return FactorRiskBudgeting(; re = re, rkb = r.rkb, sets = r.sets, flag = r.flag)
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Risk Budgeting (RB) portfolio optimiser.
+
+`RiskBudgeting` allocates portfolio weights so that each asset (or factor) contributes a specified fraction of the total portfolio risk. It uses a logarithmic or mixed-integer formulation and can be combined with any risk measure.
+
+# Fields
+
+  - `opt`: JuMP optimiser configuration.
+  - `r`: Risk measure or vector of risk measures.
+  - `rba`: Risk budgeting algorithm (`AssetRiskBudgeting` or `FactorRiskBudgeting`).
+  - `wi`: Initial weights for warm-starting.
+  - `fb`: Fallback optimiser.
+
+# Constructors
+
+    RiskBudgeting(;
+        opt::JuMPOptimiser = JuMPOptimiser(),
+        r::RM_VecRM = Variance(),
+        rba::RiskBudgetingAlgorithm = AssetRiskBudgeting(),
+        wi::Option{<:VecNum} = nothing,
+        fb::Option{<:OptE_Opt} = nothing
+    ) -> RiskBudgeting
+
+Keywords correspond to the struct's fields.
+
+# Related
+
+  - [`scalarise_risk_expression!`](@ref)
+  - [`set_risk_constraints!`](@ref)
+  - [`RiskJuMPOptimisationEstimator`](@ref)
+  - [`MeanRisk`](@ref)
+  - [`RelaxedRiskBudgeting`](@ref)
+  - [`AssetRiskBudgeting`](@ref)
+  - [`FactorRiskBudgeting`](@ref)
+"""
 @concrete struct RiskBudgeting <: RiskJuMPOptimisationEstimator
     opt
     r
@@ -121,6 +348,28 @@ function opt_view(rb::RiskBudgeting, i, X::MatNum)
     wi = nothing_scalar_array_view(rb.wi, i)
     return RiskBudgeting(; opt = opt, r = r, rba = rba, wi = wi, fb = rb.fb)
 end
+"""
+    _set_risk_budgeting_constraints!(model, rb, ...)
+
+Internal function to set risk budgeting constraints in the JuMP model.
+
+Configures the equality constraints ensuring each asset's marginal risk contribution equals its budget target.
+
+# Arguments
+
+  - `model`: JuMP model.
+  - `rb`: [`RiskBudgeting`](@ref) optimiser configuration.
+  - Additional risk and budget parameters.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`RiskBudgeting`](@ref)
+  - [`_set_mip_risk_budgeting_constraints!`](@ref)
+"""
 function _set_risk_budgeting_constraints!(model::JuMP.Model, rb::RiskBudgeting,
                                           w::VecJuMPScalar; strict::Bool = false)
     N = length(w)
@@ -140,6 +389,31 @@ function _set_risk_budgeting_constraints!(model::JuMP.Model, rb::RiskBudgeting,
                       end)
     return rkb
 end
+"""
+    set_risk_budgeting_constraints!(model, rb, pr, wb, args...)
+
+Add risk budgeting constraints and weight variables to the JuMP model.
+
+Dispatches based on the risk budgeting algorithm and formulation. Sets up weight variables, logarithmic risk budget constraints, and weight bounds for the specified formulation (log, MIP, or factor-based).
+
+# Arguments
+
+  - `model::JuMP.Model`: JuMP optimisation model.
+  - `rb::RiskBudgeting`: Risk budgeting estimator configuration.
+  - `pr::AbstractPriorResult`: Prior result with asset moments.
+  - `wb::WeightBounds`: Weight bounds configuration.
+  - `args...`: Additional arguments (e.g. returns data for factor risk budgeting).
+
+# Returns
+
+  - Processed risk budgeting attributes.
+
+# Related
+
+  - [`RiskBudgeting`](@ref)
+  - [`AssetRiskBudgeting`](@ref)
+  - [`FactorRiskBudgeting`](@ref)
+"""
 function set_risk_budgeting_constraints!(model::JuMP.Model,
                                          rb::RiskBudgeting{<:Any, <:Any,
                                                            <:AssetRiskBudgeting{<:Any,
@@ -163,6 +437,27 @@ function set_risk_budgeting_constraints!(model::JuMP.Model,
     return ProcessedFactorRiskBudgetingAttributes(rkb, b1, rr)
 end
 ###########
+"""
+    set_rb_mip_w!(model::JuMP.Model, X::MatNum)
+
+Create long and short weight variables for MIP risk budgeting in the JuMP model.
+
+Registers long `lw`, short `sw` weight variables and the derived expressions `w = lw - sw` and `w_obj = lw + sw`.
+
+# Arguments
+
+  - `model::JuMP.Model`: JuMP optimisation model.
+  - `X::MatNum`: Asset returns matrix (used to determine number of assets).
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`set_risk_budgeting_constraints!`](@ref)
+  - [`RiskBudgeting`](@ref)
+"""
 function set_rb_mip_w!(model::JuMP.Model, X::MatNum)
     N = size(X, 2)
     JuMP.@variables(model, begin
@@ -175,6 +470,28 @@ function set_rb_mip_w!(model::JuMP.Model, X::MatNum)
                       end)
     return nothing
 end
+"""
+    _set_mip_risk_budgeting_constraints!(model, rb, ...)
+
+Internal function to set mixed-integer risk budgeting constraints in the JuMP model.
+
+Configures binary variable constraints for MIP-based risk budgeting, where each asset's inclusion is a binary decision variable.
+
+# Arguments
+
+  - `model`: JuMP model.
+  - `rb`: [`RiskBudgeting`](@ref) optimiser configuration.
+  - Additional parameters.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`_set_risk_budgeting_constraints!`](@ref)
+  - [`RiskBudgeting`](@ref)
+"""
 function _set_mip_risk_budgeting_constraints!(model::JuMP.Model, rb::RiskBudgeting,
                                               w::VecJuMPScalar, w_obj::VecJuMPScalar;
                                               strict::Bool = false)

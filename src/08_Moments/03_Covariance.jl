@@ -328,7 +328,7 @@ Compute the covariance matrix using a [`Covariance`](@ref) estimator.
 
 # Returns
 
-  - $(arg_dict[:sigma])
+  - $(ret_dict[:sigma])
 
 # Related
 
@@ -378,7 +378,7 @@ Compute the correlation matrix using a [`Covariance`](@ref) estimator.
 
 # Returns
 
-  - $(arg_dict[:rho])
+  - $(ret_dict[:rho])
 
 # Related
 

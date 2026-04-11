@@ -119,6 +119,10 @@ Threshold
 
 # Related
 
+  - [`short_mip_threshold_constraints`](@ref)
+  - [`short_smip_threshold_constraints`](@ref)
+  - [`mip_constraints`](@ref)
+  - [`set_mip_constraints!`](@ref)
   - [`ThresholdEstimator`](@ref)
   - [`threshold_constraints`](@ref)
   - [`AbstractConstraintResult`](@ref)
@@ -133,11 +137,93 @@ end
 function Threshold(; val::Num_VecNum)
     return Threshold(val)
 end
+"""
+    const BtE_Bt = Union{<:Threshold, <:ThresholdEstimator}
+
+Alias for a threshold constraint result or estimator.
+
+Matches either a [`Threshold`](@ref) result or a [`ThresholdEstimator`](@ref). Used internally for dispatch in threshold constraint generation.
+
+# Related
+
+  - [`Threshold`](@ref)
+  - [`ThresholdEstimator`](@ref)
+  - [`threshold_constraints`](@ref)
+"""
 const BtE_Bt = Union{<:Threshold, <:ThresholdEstimator}
+"""
+    const VecOptBtE_Bt = AbstractVector{<:Option{<:BtE_Bt}}
+
+Alias for a vector of optional threshold estimators or results.
+
+Represents a collection of optional [`BtE_Bt`](@ref) elements (threshold estimators or results, or `nothing`).
+
+# Related
+
+  - [`BtE_Bt`](@ref)
+  - [`BtE_Bt_VecOptBtE_Bt`](@ref)
+"""
 const VecOptBtE_Bt = AbstractVector{<:Option{<:BtE_Bt}}
+"""
+    const BtE_Bt_VecOptBtE_Bt = Union{<:BtE_Bt, <:VecOptBtE_Bt}
+
+Alias for a single or vector of optional threshold estimators or results.
+
+Matches either a single [`BtE_Bt`](@ref) or a vector of optional ones.
+
+# Related
+
+  - [`BtE_Bt`](@ref)
+  - [`VecOptBtE_Bt`](@ref)
+"""
 const BtE_Bt_VecOptBtE_Bt = Union{<:BtE_Bt, <:VecOptBtE_Bt}
+"""
+    const VecOptBt = AbstractVector{<:Option{<:Threshold}}
+
+Alias for a vector of optional threshold results.
+
+Represents a collection of optional [`Threshold`](@ref) elements.
+
+# Related
+
+  - [`Threshold`](@ref)
+  - [`Bt_VecOptBt`](@ref)
+"""
 const VecOptBt = AbstractVector{<:Option{<:Threshold}}
+"""
+    const Bt_VecOptBt = Union{<:Threshold, <:VecOptBt}
+
+Alias for a single threshold result or a vector of optional threshold results.
+
+Matches either a single [`Threshold`](@ref) or a vector of optional [`Threshold`](@ref) objects.
+
+# Related
+
+  - [`Threshold`](@ref)
+  - [`VecOptBt`](@ref)
+"""
 const Bt_VecOptBt = Union{<:Threshold, <:VecOptBt}
+"""
+    threshold_view(t, i)
+
+Get a view or subset of threshold constraints for asset index `i`.
+
+Returns a view of the threshold for the specified index. If `t` is `nothing`, returns `nothing`. Handles all threshold types.
+
+# Arguments
+
+  - `t`: Threshold object, estimator, vector thereof, or `nothing`.
+  - `i`: Asset index or range to slice.
+
+# Returns
+
+  - Sliced threshold or `nothing`.
+
+# Related
+
+  - [`Threshold`](@ref)
+  - [`ThresholdEstimator`](@ref)
+"""
 function threshold_view(::Nothing, ::Any)
     return nothing
 end

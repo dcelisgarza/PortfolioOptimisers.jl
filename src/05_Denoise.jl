@@ -29,26 +29,28 @@ We can create a dummy denoising estimator as follows:
 ```jldoctest
 julia> struct MyDenoiseEstimator <: PortfolioOptimisers.AbstractDenoiseEstimator end
 
-julia> function PortfolioOptimisers.denoise!(dn::MyDenoiseEstimator, X::PortfolioOptimisers.MatNum)
+julia> function PortfolioOptimisers.denoise!(dn::MyDenoiseEstimator, X::PortfolioOptimisers.MatNum,
+                                             q::Number)
            # Implement your in-place denoising estimator here.
            println("Denoising matrix in-place...")
            return X
        end
 
-julia> function PortfolioOptimisers.denoise(dn::MyDenoiseEstimator, X::PortfolioOptimisers.MatNum)
+julia> function PortfolioOptimisers.denoise(dn::MyDenoiseEstimator, X::PortfolioOptimisers.MatNum,
+                                            q::Number)
            X = copy(X)
            println("Copy X...")
-           denoise!(dn, X)
+           denoise!(dn, X, q)
            return X
        end
 
-julia> denoise!(MyDenoiseEstimator(), [1.0 2.0; 2.0 1.0])
+julia> denoise!(MyDenoiseEstimator(), [1.0 2.0; 2.0 1.0], 2.0)
 Denoising matrix in-place...
 2×2 Matrix{Float64}:
  1.0  2.0
  2.0  1.0
 
-julia> denoise(MyDenoiseEstimator(), [1.0 2.0; 2.0 1.0])
+julia> denoise(MyDenoiseEstimator(), [1.0 2.0; 2.0 1.0], 2.0)
 Copy X...
 Denoising matrix in-place...
 2×2 Matrix{Float64}:
