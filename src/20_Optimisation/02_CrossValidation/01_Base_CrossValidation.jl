@@ -309,7 +309,7 @@ result with the returns data from the test period.
 
   - [`MultiPeriodPredictionResult`](@ref)
   - [`PopulationPredictionResult`](@ref)
-  - [`predict`](@ref)
+  - [`predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)`](@ref)
   - [`fit_predict`](@ref)
   - [`MultiPeriodPredictionResult`](@ref)
   - [`PopulationPredictionResult`](@ref)
@@ -426,7 +426,7 @@ Concatenates the test-period returns from all folds into an aggregated
 
   - [`PredictionResult`](@ref)
   - [`PopulationPredictionResult`](@ref)
-  - [`predict`](@ref)
+  - [`predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)`](@ref)
   - [`sort_by_measure`](@ref)
   - [`PredictionResult`](@ref)
   - [`PopulationPredictionResult`](@ref)
@@ -641,7 +641,7 @@ Computes benchmark, investment vehicle, and per-asset allocation data from the o
 
 # Related
 
-  - [`predict`](@ref)
+  - [`predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)`](@ref)
   - [`PredictionReturnsResult`](@ref)
 """
 function reconstruct_rd(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult,
@@ -746,9 +746,8 @@ Fit optimisation estimator `opt` on returns data `rd` and immediately produce a
 
 # Related
 
-  - [`predict`](@ref)
+  - [`predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)`](@ref)
   - [`PredictionResult`](@ref)
-  - [`predict`](@ref)
   - [`fit_and_predict`](@ref)
 """
 function fit_predict(opt::OptE_Opt, rd::ReturnsResult)
@@ -791,7 +790,7 @@ The two-argument methods operate on a single pre-defined train/test split or on 
 
 # Related
 
-  - [`predict`](@ref)
+  - [`predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)`](@ref)
   - [`optimise`](@ref)
   - [`KFold`](@ref)
   - [`CombinatorialCrossValidation`](@ref)

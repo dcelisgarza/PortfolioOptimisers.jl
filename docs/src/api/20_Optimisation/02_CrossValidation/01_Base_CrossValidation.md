@@ -24,7 +24,7 @@ PredictionReturnsResult
 PredictionResult
 MultiPeriodPredictionResult
 PopulationPredictionResult
-predict
+predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)
 fit_predict
 sort_by_measure
 quantile_by_measure
