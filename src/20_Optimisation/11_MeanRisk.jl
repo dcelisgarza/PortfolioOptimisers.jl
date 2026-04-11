@@ -76,7 +76,7 @@ Keywords correspond to the struct's fields.
 # Examples
 
 ```jldoctest
-julia> MeanRisk(; opt = JuMPOptimiser(; slv = Clarabel.Optimizer))
+julia> MeanRisk(; opt = JuMPOptimiser(; slv = Solver()))
 MeanRisk
   opt ┼ JuMPOptimiser
       │        pe ┼ EmpiricalPrior
