@@ -19,7 +19,7 @@ This method extracts the diagonal of the covariance matrix returned by `Statisti
 # Related
 
   - [`AbstractCovarianceEstimator`](@ref)
-  - [`Statistics.std(ce::AbstractCovarianceEstimator, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
+  - [`std(ce::AbstractCovarianceEstimator, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
 """
 function Statistics.var(ce::AbstractCovarianceEstimator, X::MatNum; dims::Int = 1,
                         kwargs...)
@@ -47,7 +47,7 @@ This method extracts the diagonal of the covariance matrix returned by `Statisti
 # Related
 
   - [`AbstractCovarianceEstimator`](@ref)
-  - [`Statistics.var(ce::AbstractCovarianceEstimator, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
+  - [`var(ce::AbstractCovarianceEstimator, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
 """
 function Statistics.std(ce::AbstractCovarianceEstimator, X::MatNum; dims::Int = 1,
                         kwargs...)

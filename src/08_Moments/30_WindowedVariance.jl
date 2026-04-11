@@ -93,7 +93,7 @@ This method selects a window of observations from `X`, applies observation weigh
 # Related
 
   - [`WindowedVariance`](@ref)
-  - [`Statistics.std(ce::WindowedVariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
+  - [`std(ce::WindowedVariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
 """
 function Statistics.var(ce::WindowedVariance, X::MatNum; dims::Int = 1, mean = nothing,
                         kwargs...)
@@ -121,7 +121,7 @@ This method selects a window of observations from the vector `X`, applies observ
 # Related
 
   - [`WindowedVariance`](@ref)
-  - [`Statistics.var(ce::WindowedVariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
+  - [`var(ce::WindowedVariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
 """
 function Statistics.var(ce::WindowedVariance, X::VecNum; mean = nothing)
     X, w = moment_window_and_weights(X, ce.w, ce.window)
@@ -151,7 +151,7 @@ This method selects a window of observations from `X`, applies observation weigh
 # Related
 
   - [`WindowedVariance`](@ref)
-  - [`Statistics.var(ce::WindowedVariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
+  - [`var(ce::WindowedVariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
 """
 function Statistics.std(ce::WindowedVariance, X::MatNum; dims::Int = 1, mean = nothing,
                         kwargs...)

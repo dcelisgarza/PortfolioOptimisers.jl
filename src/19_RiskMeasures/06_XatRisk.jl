@@ -373,9 +373,9 @@ ValueatRiskRange
      alpha ┼ Float64: 0.05
       beta ┼ Float64: 0.05
          w ┼ nothing
-       alg ┴ MIPValueatRisk
-            b ┼ nothing
-            s ┴ nothing
+       alg ┼ MIPValueatRisk
+           │   b ┼ nothing
+           │   s ┴ nothing
 ```
 
 # Related
