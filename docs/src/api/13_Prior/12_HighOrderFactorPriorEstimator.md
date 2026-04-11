@@ -2,5 +2,6 @@
 
 ```@docs
 AbstractHighOrderPriorEstimator_F
+AbstractHiLoOrderPriorEstimator_F
 HighOrderFactorPriorEstimator
 ```

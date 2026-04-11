@@ -811,7 +811,7 @@ function fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator, rd::Retu
     return predict(res, rd, test_idx, cols)
 end
 """
-    sort_predictions!(test_idx, predictions)
+    sort_predictions!(res::Union{test_idx, CrossValidationResult}, pred::VecPredRes) -> VecPredRes
 
 Sort prediction results to match the order of test indices.
 
@@ -819,8 +819,12 @@ Reorders `predictions` so that they align with the original time ordering of `te
 
 # Arguments
 
-  - `test_idx::VecVecInt`: Vector of test index vectors.
-  - `predictions::VecPredRes`: Vector of prediction results.
+  - `res`:
+
+      + `::VecVecInt`: Vector of test index vectors.
+      + `::CrossValidationResult`: Cross validation result object, uses the test indices stored in `res.test_idx`.
+
+  - `pred`: Vector of prediction results.
 
 # Returns
 

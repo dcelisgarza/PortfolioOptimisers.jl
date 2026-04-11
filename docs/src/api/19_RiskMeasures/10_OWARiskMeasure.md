@@ -11,6 +11,7 @@ SquaredOrderedWeightsArrayAlgorithm
 UnionAllSOCRiskExpr
 UnionSOCRiskExpr
 UnionRSOCSOCRiskExpr
+EntropyFormulation
 ExponentialConeEntropy
 RelativeEntropy
 MaximumEntropy

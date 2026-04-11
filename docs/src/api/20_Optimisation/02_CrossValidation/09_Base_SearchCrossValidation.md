@@ -10,6 +10,8 @@ AbstractSearchCrossValidationResult
 AbstractSearchCrossValidationAlgorithm
 SearchCrossValidationResult
 fit_and_score
+parse_lens
 _expr_to_lens
 _eval_index
+_expr_to_lens_chain
 ```

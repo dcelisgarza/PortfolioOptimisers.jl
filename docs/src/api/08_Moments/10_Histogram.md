@@ -7,6 +7,7 @@ Scott
 HacineGharbiRavier
 AbstractBins
 AstroPyBins
+Int_Bin
 get_bin_width_func
 calc_num_bins
 calc_hist_data

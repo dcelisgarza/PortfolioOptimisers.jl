@@ -27,6 +27,7 @@ assert_special_nco_requirements(::OptE_Opt)
 needs_previous_weights(::OptE_Opt)
 is_time_dependent(::OptE_Opt)
 update_time_dependent_estimator(opt::OptE_Opt, args...)
+opt_weight_bounds
 finalise_weight_bounds
 _optimise
 opt_view(opt::AbstractOptimisationEstimator, args...)
