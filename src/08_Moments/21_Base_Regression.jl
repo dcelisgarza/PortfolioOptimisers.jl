@@ -127,7 +127,7 @@ LinearModel
 
   - [`AbstractRegressionTarget`](@ref)
   - [`GeneralisedLinearModel`](@ref)
-  - [`StatsAPI.fit(::LinearModel, ::MatNum, ::VecNum)`](@ref)
+  - [`fit(::LinearModel, ::MatNum, ::VecNum)`](@ref)
 """
 @concrete struct LinearModel <: AbstractRegressionTarget
     "Keyword arguments passed to `fit(GLM.LinearModel, X, y; kwargs...)`."
@@ -166,7 +166,7 @@ end
 
 Fit a standard linear regression model using a [`LinearModel`](@ref) regression target.
 
-This method dispatches to `StatsAPI.fit` with the `GLM.LinearModel` type, passing the design matrix `X`, response vector `y`, and any keyword arguments stored in `tgt.kwargs`. It enables flexible configuration of the underlying linear model fitting routine within the `PortfolioOptimisers.jl` regression estimation framework.
+This method dispatches to `StatsAPI.fit` with the `GLM.LinearModel` type, passing the design matrix `X`, response vector `y`, and any keyword arguments stored in `tgt.kwargs`. It enables flexible configuration of the underlying linear model fitting routine within the `ssion estimation framework.
 
 # Arguments
 
@@ -226,7 +226,7 @@ GeneralisedLinearModel
 
   - [`AbstractRegressionTarget`](@ref)
   - [`LinearModel`](@ref)
-  - [`StatsAPI.fit(::GeneralisedLinearModel, ::MatNum, ::VecNum)`](@ref)
+  - [`fit(::GeneralisedLinearModel, ::MatNum, ::VecNum)`](@ref)
 """
 @concrete struct GeneralisedLinearModel <: AbstractRegressionTarget
     "Positional arguments passed to `fit(GLM.GeneralizedLinearModel, X, y, args...; kwargs...)`."
@@ -669,4 +669,4 @@ function regression(re::AbstractRegressionEstimator, rd::ReturnsResult)
 end
 
 export regression, Regression, LinearModel, GeneralisedLinearModel, AIC, AICC, BIC,
-       RSquared, AdjustedRSquared
+       RSquared, AdjustedRSquared, fit
