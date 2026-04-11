@@ -90,7 +90,7 @@ The Maximum Entropy algorithm seeks the OWA weights that maximize entropy, resul
 
 Where:
 
-  - ``\\mathcal{K}_{\\text{noc}} \\coloneqq \\left\\{\\left(t,\\,x\\right) \\in \\mathbb{R}^n : t \\geq \\lVert x \\rVert_{1}\\right = \\sum\\limits_{i} \\lvert x_{i} \\rvert\\}``: Is the norm one cone, which enforces each entry of ``\\boldsymbol{\\psi}`` is the absolute value of each entry of ``\\boldsymbol{\\theta}``.
+  - ``\\mathcal{K}_{\\text{noc}} \\coloneqq \\left\\{\\left(t,\\,x\\right) \\in \\mathbb{R}^n : t \\geq \\lVert x \\rVert_{1} = \\sum\\limits_{i} \\lvert x_{i} \\rvert\\right\\}``: Is the norm one cone, which enforces each entry of ``\\boldsymbol{\\psi}`` is the absolute value of each entry of ``\\boldsymbol{\\theta}``.
   - ``\\phi_{k}``: Is the risk aversion coefficient for the `k`-th order moment.
   - ``\\phi_{\\text{max}}``: Is the maximum risk aversion coefficient.
   - ``T``: Is the total number of observations.

@@ -69,7 +69,7 @@ function factory(ce::CorrelationCovariance, w::ObsWeights)
     return CorrelationCovariance(; ce = factory(ce.ce, w))
 end
 """
-    Statistics.cov(ce::CorrelationCovariance, X::AbstractMatrix{<:Real}; dims::Int = 1,
+    Statistics.cov(ce::CorrelationCovariance, X::MatNum; dims::Int = 1,
                    kwargs...)
 
 Compute the correlation matrix using the underlying estimator.
@@ -90,14 +90,13 @@ This method delegates to `Statistics.cor(ce.ce, X; dims = dims, kwargs...)`, ret
 # Related
 
   - [`CorrelationCovariance`](@ref)
-  - [`cor(ce::CorrelationCovariance, X::AbstractMatrix{<:Real}; dims::Int = 1, kwargs...)`](@ref)
+  - [`cor(ce::CorrelationCovariance, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
 """
-function Statistics.cov(ce::CorrelationCovariance, X::AbstractMatrix{<:Real}; dims::Int = 1,
-                        kwargs...)
+function Statistics.cov(ce::CorrelationCovariance, X::MatNum; dims::Int = 1, kwargs...)
     return Statistics.cor(ce.ce, X; dims = dims, kwargs...)
 end
 """
-    Statistics.cor(ce::CorrelationCovariance, X::AbstractMatrix{<:Real}; dims::Int = 1,
+    Statistics.cor(ce::CorrelationCovariance, X::MatNum; dims::Int = 1,
                    kwargs...)
 
 Compute the correlation matrix using the underlying estimator.
@@ -118,10 +117,9 @@ This method delegates to `Statistics.cor(ce.ce, X; dims = dims, kwargs...)`.
 # Related
 
   - [`CorrelationCovariance`](@ref)
-  - [`cov(ce::CorrelationCovariance, X::AbstractMatrix{<:Real}; dims::Int = 1, kwargs...)`](@ref)
+  - [`cov(ce::CorrelationCovariance, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
 """
-function Statistics.cor(ce::CorrelationCovariance, X::AbstractMatrix{<:Real}; dims::Int = 1,
-                        kwargs...)
+function Statistics.cor(ce::CorrelationCovariance, X::MatNum; dims::Int = 1, kwargs...)
     return Statistics.cor(ce.ce, X; dims = dims, kwargs...)
 end
 
