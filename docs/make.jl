@@ -1,6 +1,6 @@
 using PortfolioOptimisers
 using Documenter, DocumenterTools, DocumenterCitations, Literate, StatsPlots, GraphRecipes,
-      Handcalcs, StatsBase, DocumenterVitepress, Dates, JuMP
+      Handcalcs, StatsBase, DocumenterVitepress, Dates, JuMP, StatsAPI
 
 exported_symbols = names(PortfolioOptimisers)
 all_symbols = names(PortfolioOptimisers; all = true)

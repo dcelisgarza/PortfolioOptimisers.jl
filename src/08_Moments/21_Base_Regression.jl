@@ -127,7 +127,7 @@ LinearModel
 
   - [`AbstractRegressionTarget`](@ref)
   - [`GeneralisedLinearModel`](@ref)
-  - [`fit(::LinearModel, ::MatNum, ::VecNum)`](@ref)
+  - [`StatsAPI.fit(::LinearModel, ::MatNum, ::VecNum)`](@ref)
 """
 @concrete struct LinearModel <: AbstractRegressionTarget
     "Keyword arguments passed to `fit(GLM.LinearModel, X, y; kwargs...)`."
@@ -226,7 +226,7 @@ GeneralisedLinearModel
 
   - [`AbstractRegressionTarget`](@ref)
   - [`LinearModel`](@ref)
-  - [`fit(::GeneralisedLinearModel, ::MatNum, ::VecNum)`](@ref)
+  - [`StatsAPI.fit(::GeneralisedLinearModel, ::MatNum, ::VecNum)`](@ref)
 """
 @concrete struct GeneralisedLinearModel <: AbstractRegressionTarget
     "Positional arguments passed to `fit(GLM.GeneralizedLinearModel, X, y, args...; kwargs...)`."
@@ -669,4 +669,4 @@ function regression(re::AbstractRegressionEstimator, rd::ReturnsResult)
 end
 
 export regression, Regression, LinearModel, GeneralisedLinearModel, AIC, AICC, BIC,
-       RSquared, AdjustedRSquared, fit
+       RSquared, AdjustedRSquared
