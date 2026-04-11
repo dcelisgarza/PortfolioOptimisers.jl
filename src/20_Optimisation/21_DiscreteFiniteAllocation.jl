@@ -75,13 +75,22 @@ Keywords correspond to the struct's fields.
 # Examples
 
 ```jldoctest
-julia> DiscreteAllocation(; slv = HiGHS.Optimizer)
+julia> DiscreteAllocation(; slv = Solver())
 DiscreteAllocation
-  slv ┼ HiGHS.Optimizer
-  sc ┼ Int64: 1
-  so ┼ Int64: 1
-  wf ┼ AbsoluteErrorWeightFinaliser
-  fb ┴ GreedyAllocation
+  slv ┼ Solver
+      │          name ┼ String: ""
+      │        solver ┼ nothing
+      │      settings ┼ nothing
+      │     check_sol ┼ @NamedTuple{}: NamedTuple()
+      │   add_bridges ┴ Bool: true
+   sc ┼ Int64: 1
+   so ┼ Int64: 1
+   wf ┼ AbsoluteErrorWeightFinaliser()
+   fb ┼ GreedyAllocation
+      │     unit ┼ Int64: 1
+      │     args ┼ Tuple{}: ()
+      │   kwargs ┼ @NamedTuple{}: NamedTuple()
+      │       fb ┴ nothing
 ```
 
 # Related

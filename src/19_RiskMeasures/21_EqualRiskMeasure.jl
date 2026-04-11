@@ -40,8 +40,8 @@ Returns the equal risk contribution for a weight vector `w`.
 ```jldoctest
 julia> EqualRiskMeasure()
 EqualRiskMeasure
-  settings ┴ HierarchicalRiskMeasureSettings
-               scale ┴ Float64: 1.0
+  settings ┼ HierarchicalRiskMeasureSettings
+           │   scale ┴ Float64: 1.0
 ```
 
 # Related

@@ -46,10 +46,10 @@ Computes the Maximum Drawdown of a portfolio returns vector `x`.
 ```jldoctest
 julia> MaximumDrawdown()
 MaximumDrawdown
-  settings ┴ RiskMeasureSettings
-               scale ┼ Float64: 1.0
-                  ub ┼ nothing
-                 rke ┴ Bool: true
+  settings ┼ RiskMeasureSettings
+           │   scale ┼ Float64: 1.0
+           │      ub ┼ nothing
+           │     rke ┴ Bool: true
 ```
 
 # Related
@@ -121,8 +121,8 @@ Computes the Relative Maximum Drawdown of a portfolio returns vector `x`.
 ```jldoctest
 julia> RelativeMaximumDrawdown()
 RelativeMaximumDrawdown
-  settings ┴ HierarchicalRiskMeasureSettings
-               scale ┴ Float64: 1.0
+  settings ┼ HierarchicalRiskMeasureSettings
+           │   scale ┴ Float64: 1.0
 ```
 
 # Related

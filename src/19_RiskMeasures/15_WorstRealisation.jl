@@ -38,10 +38,10 @@ Computes the Worst Realisation of a portfolio returns vector `x`.
 ```jldoctest
 julia> WorstRealisation()
 WorstRealisation
-  settings ┴ RiskMeasureSettings
-               scale ┼ Float64: 1.0
-                  ub ┼ nothing
-                 rke ┴ Bool: true
+  settings ┼ RiskMeasureSettings
+           │   scale ┼ Float64: 1.0
+           │      ub ┼ nothing
+           │     rke ┴ Bool: true
 ```
 
 # Related

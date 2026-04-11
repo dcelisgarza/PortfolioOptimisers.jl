@@ -135,10 +135,72 @@ Keywords correspond to the struct's fields.
 ```jldoctest
 julia> HighOrderFactorPriorEstimator()
 HighOrderFactorPriorEstimator
-  pe ┼ FactorPrior
+   pe ┼ FactorPrior
+      │    pe ┼ EmpiricalPrior
+      │       │        ce ┼ PortfolioOptimisersCovariance
+      │       │           │   ce ┼ Covariance
+      │       │           │      │    me ┼ SimpleExpectedReturns
+      │       │           │      │       │   w ┴ nothing
+      │       │           │      │    ce ┼ GeneralCovariance
+      │       │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+      │       │           │      │       │    w ┴ nothing
+      │       │           │      │   alg ┴ Full()
+      │       │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
+      │       │           │      │     pdm ┼ Posdef
+      │       │           │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+      │       │           │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+      │       │           │      │      dn ┼ nothing
+      │       │           │      │      dt ┼ nothing
+      │       │           │      │     alg ┼ nothing
+      │       │           │      │   order ┴ DenoiseDetoneAlg()
+      │       │        me ┼ SimpleExpectedReturns
+      │       │           │   w ┴ nothing
+      │       │   horizon ┴ nothing
+      │    mp ┼ DenoiseDetoneAlgMatrixProcessing
+      │       │     pdm ┼ Posdef
+      │       │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+      │       │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+      │       │      dn ┼ nothing
+      │       │      dt ┼ nothing
+      │       │     alg ┼ nothing
+      │       │   order ┴ DenoiseDetoneAlg()
+      │    re ┼ StepwiseRegression
+      │       │   crit ┼ PValue
+      │       │        │   t ┴ Float64: 0.05
+      │       │    alg ┼ Forward()
+      │       │    tgt ┼ LinearModel
+      │       │        │   kwargs ┴ @NamedTuple{}: NamedTuple()
+      │    ve ┼ SimpleVariance
+      │       │          me ┼ SimpleExpectedReturns
+      │       │             │   w ┴ nothing
+      │       │           w ┼ nothing
+      │       │   corrected ┴ Bool: true
+      │   rsd ┴ Bool: true
   kte ┼ Cokurtosis
+      │    me ┼ SimpleExpectedReturns
+      │       │   w ┴ nothing
+      │    mp ┼ DenoiseDetoneAlgMatrixProcessing
+      │       │     pdm ┼ Posdef
+      │       │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+      │       │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+      │       │      dn ┼ nothing
+      │       │      dt ┼ nothing
+      │       │     alg ┼ nothing
+      │       │   order ┴ DenoiseDetoneAlg()
+      │   alg ┴ Full()
   ske ┼ Coskewness
-  ex ┼ ThreadedEx
+      │    me ┼ SimpleExpectedReturns
+      │       │   w ┴ nothing
+      │    mp ┼ DenoiseDetoneAlgMatrixProcessing
+      │       │     pdm ┼ Posdef
+      │       │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+      │       │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+      │       │      dn ┼ nothing
+      │       │      dt ┼ nothing
+      │       │     alg ┼ nothing
+      │       │   order ┴ DenoiseDetoneAlg()
+      │   alg ┴ Full()
+   ex ┼ Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
   rsd ┴ Bool: true
 ```
 

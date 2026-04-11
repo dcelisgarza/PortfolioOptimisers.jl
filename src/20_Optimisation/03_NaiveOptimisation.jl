@@ -100,13 +100,35 @@ Keywords correspond to the struct's fields.
 ```jldoctest
 julia> InverseVolatility()
 InverseVolatility
-  pe ┼ EmpiricalPrior
-  wb ┼ WeightBounds
-  sets ┼ nothing
-  wf ┼ IterativeWeightFinaliser
-  fb ┼ nothing
-  sq ┼ Bool: false
-  brt ┼ Bool: false
+      pe ┼ EmpiricalPrior
+         │        ce ┼ PortfolioOptimisersCovariance
+         │           │   ce ┼ Covariance
+         │           │      │    me ┼ SimpleExpectedReturns
+         │           │      │       │   w ┴ nothing
+         │           │      │    ce ┼ GeneralCovariance
+         │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+         │           │      │       │    w ┴ nothing
+         │           │      │   alg ┴ Full()
+         │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
+         │           │      │     pdm ┼ Posdef
+         │           │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+         │           │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+         │           │      │      dn ┼ nothing
+         │           │      │      dt ┼ nothing
+         │           │      │     alg ┼ nothing
+         │           │      │   order ┴ DenoiseDetoneAlg()
+         │        me ┼ SimpleExpectedReturns
+         │           │   w ┴ nothing
+         │   horizon ┴ nothing
+      wb ┼ WeightBounds
+         │   lb ┼ Float64: 0.0
+         │   ub ┴ Float64: 1.0
+    sets ┼ nothing
+      wf ┼ IterativeWeightFinaliser
+         │   iter ┴ Int64: 100
+      fb ┼ nothing
+      sq ┼ Bool: false
+     brt ┼ Bool: false
   strict ┴ Bool: false
 ```
 
@@ -215,10 +237,13 @@ Keywords correspond to the struct's fields.
 ```jldoctest
 julia> EqualWeighted()
 EqualWeighted
-  wb ┼ WeightBounds
-  sets ┼ nothing
-  wf ┼ IterativeWeightFinaliser
-  fb ┼ nothing
+      wb ┼ WeightBounds
+         │   lb ┼ Float64: 0.0
+         │   ub ┴ Float64: 1.0
+    sets ┼ nothing
+      wf ┼ IterativeWeightFinaliser
+         │   iter ┴ Int64: 100
+      fb ┼ nothing
   strict ┴ Bool: false
 ```
 
@@ -326,13 +351,14 @@ Keywords correspond to the struct's fields.
 ```jldoctest
 julia> RandomWeighted()
 RandomWeighted
-  alpha ┼ Int64: 1
-  rng ┼ ...
-  seed ┼ nothing
-  wb ┼ nothing
-  sets ┼ nothing
-  wf ┼ IterativeWeightFinaliser
-  fb ┼ nothing
+   alpha ┼ Int64: 1
+     rng ┼ Random.TaskLocalRNG: Random.TaskLocalRNG()
+    seed ┼ nothing
+      wb ┼ nothing
+    sets ┼ nothing
+      wf ┼ IterativeWeightFinaliser
+         │   iter ┴ Int64: 100
+      fb ┼ nothing
   strict ┴ Bool: false
 ```
 

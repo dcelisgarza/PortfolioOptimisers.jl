@@ -104,14 +104,66 @@ Keywords correspond to the struct's fields.
 ```jldoctest
 julia> HierarchicalOptimiser()
 HierarchicalOptimiser
-  pe ┼ EmpiricalPrior
-  cle ┼ ClustersEstimator
-  slv ┼ nothing
-  wb ┼ WeightBounds
-  fees ┼ nothing
-  sets ┼ nothing
-  wf ┼ IterativeWeightFinaliser
-  brt ┼ Bool: false
+      pe ┼ EmpiricalPrior
+         │        ce ┼ PortfolioOptimisersCovariance
+         │           │   ce ┼ Covariance
+         │           │      │    me ┼ SimpleExpectedReturns
+         │           │      │       │   w ┴ nothing
+         │           │      │    ce ┼ GeneralCovariance
+         │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+         │           │      │       │    w ┴ nothing
+         │           │      │   alg ┴ Full()
+         │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
+         │           │      │     pdm ┼ Posdef
+         │           │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+         │           │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+         │           │      │      dn ┼ nothing
+         │           │      │      dt ┼ nothing
+         │           │      │     alg ┼ nothing
+         │           │      │   order ┴ DenoiseDetoneAlg()
+         │        me ┼ SimpleExpectedReturns
+         │           │   w ┴ nothing
+         │   horizon ┴ nothing
+     cle ┼ ClustersEstimator
+         │    ce ┼ PortfolioOptimisersCovariance
+         │       │   ce ┼ Covariance
+         │       │      │    me ┼ SimpleExpectedReturns
+         │       │      │       │   w ┴ nothing
+         │       │      │    ce ┼ GeneralCovariance
+         │       │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+         │       │      │       │    w ┴ nothing
+         │       │      │   alg ┴ Full()
+         │       │   mp ┼ DenoiseDetoneAlgMatrixProcessing
+         │       │      │     pdm ┼ Posdef
+         │       │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+         │       │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+         │       │      │      dn ┼ nothing
+         │       │      │      dt ┼ nothing
+         │       │      │     alg ┼ nothing
+         │       │      │   order ┴ DenoiseDetoneAlg()
+         │    de ┼ Distance
+         │       │   power ┼ nothing
+         │       │     alg ┴ CanonicalDistance()
+         │   alg ┼ HClustAlgorithm
+         │       │   linkage ┴ Symbol: :ward
+         │   onc ┼ OptimalNumberClusters
+         │       │   max_k ┼ nothing
+         │       │     alg ┼ SecondOrderDifference
+         │       │         │   alg ┼ StandardisedValue
+         │       │         │       │   mv ┼ MeanValue
+         │       │         │       │      │   w ┴ nothing
+         │       │         │       │   sv ┼ StdValue
+         │       │         │       │      │           w ┼ nothing
+         │       │         │       │      │   corrected ┴ Bool: true
+     slv ┼ nothing
+      wb ┼ WeightBounds
+         │   lb ┼ Float64: 0.0
+         │   ub ┴ Float64: 1.0
+    fees ┼ nothing
+    sets ┼ nothing
+      wf ┼ IterativeWeightFinaliser
+         │   iter ┴ Int64: 100
+     brt ┼ Bool: false
   cle_pr ┼ Bool: true
   strict ┴ Bool: false
 ```

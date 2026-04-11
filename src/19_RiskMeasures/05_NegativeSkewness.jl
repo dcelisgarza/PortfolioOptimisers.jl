@@ -75,9 +75,16 @@ NegativeSkewness
            │      ub ┼ nothing
            │     rke ┴ Bool: true
         mp ┼ DenoiseDetoneAlgMatrixProcessing
+           │     pdm ┼ Posdef
+           │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+           │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+           │      dn ┼ nothing
+           │      dt ┼ nothing
+           │     alg ┼ nothing
+           │   order ┴ DenoiseDetoneAlg()
         sk ┼ nothing
          V ┼ nothing
-       alg ┼ SOCRiskExpr
+       alg ┼ SOCRiskExpr()
     window ┴ nothing
 ```
 

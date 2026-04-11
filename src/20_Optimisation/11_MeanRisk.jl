@@ -79,10 +79,86 @@ Keywords correspond to the struct's fields.
 julia> MeanRisk(; opt = JuMPOptimiser(; slv = Clarabel.Optimizer))
 MeanRisk
   opt ┼ JuMPOptimiser
-  r ┼ Variance
-  obj ┼ MinimumRisk
-  wi ┼ nothing
-  fb ┴ nothing
+      │        pe ┼ EmpiricalPrior
+      │           │        ce ┼ PortfolioOptimisersCovariance
+      │           │           │   ce ┼ Covariance
+      │           │           │      │    me ┼ SimpleExpectedReturns
+      │           │           │      │       │   w ┴ nothing
+      │           │           │      │    ce ┼ GeneralCovariance
+      │           │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+      │           │           │      │       │    w ┴ nothing
+      │           │           │      │   alg ┴ Full()
+      │           │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
+      │           │           │      │     pdm ┼ Posdef
+      │           │           │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+      │           │           │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+      │           │           │      │      dn ┼ nothing
+      │           │           │      │      dt ┼ nothing
+      │           │           │      │     alg ┼ nothing
+      │           │           │      │   order ┴ DenoiseDetoneAlg()
+      │           │        me ┼ SimpleExpectedReturns
+      │           │           │   w ┴ nothing
+      │           │   horizon ┴ nothing
+      │       slv ┼ Solver
+      │           │          name ┼ String: ""
+      │           │        solver ┼ nothing
+      │           │      settings ┼ nothing
+      │           │     check_sol ┼ @NamedTuple{}: NamedTuple()
+      │           │   add_bridges ┴ Bool: true
+      │        wb ┼ WeightBounds
+      │           │   lb ┼ Float64: 0.0
+      │           │   ub ┴ Float64: 1.0
+      │       bgt ┼ Float64: 1.0
+      │      sbgt ┼ nothing
+      │        lt ┼ nothing
+      │        st ┼ nothing
+      │      lcse ┼ nothing
+      │       cte ┼ nothing
+      │    gcarde ┼ nothing
+      │   sgcarde ┼ nothing
+      │      smtx ┼ nothing
+      │     sgmtx ┼ nothing
+      │       slt ┼ nothing
+      │       sst ┼ nothing
+      │      sglt ┼ nothing
+      │      sgst ┼ nothing
+      │        tn ┼ nothing
+      │      fees ┼ nothing
+      │      sets ┼ nothing
+      │        tr ┼ nothing
+      │       ple ┼ nothing
+      │       ret ┼ ArithmeticReturn
+      │           │   ucs ┼ nothing
+      │           │    lb ┼ nothing
+      │           │    mu ┴ nothing
+      │       sca ┼ SumScalariser()
+      │      ccnt ┼ nothing
+      │      cobj ┼ nothing
+      │        sc ┼ Int64: 1
+      │        so ┼ Int64: 1
+      │        ss ┼ nothing
+      │      card ┼ nothing
+      │     scard ┼ nothing
+      │       nea ┼ nothing
+      │        l1 ┼ nothing
+      │        l2 ┼ nothing
+      │      linf ┼ nothing
+      │        lp ┼ nothing
+      │       brt ┼ Bool: false
+      │    cle_pr ┼ Bool: true
+      │    strict ┴ Bool: false
+    r ┼ Variance
+      │   settings ┼ RiskMeasureSettings
+      │            │   scale ┼ Float64: 1.0
+      │            │      ub ┼ nothing
+      │            │     rke ┴ Bool: true
+      │      sigma ┼ nothing
+      │       chol ┼ nothing
+      │         rc ┼ nothing
+      │        alg ┴ SquaredSOCRiskExpr()
+  obj ┼ MinimumRisk()
+   wi ┼ nothing
+   fb ┴ nothing
 ```
 
 # Related

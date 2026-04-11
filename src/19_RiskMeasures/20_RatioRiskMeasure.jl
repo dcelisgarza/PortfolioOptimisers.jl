@@ -34,10 +34,20 @@ julia> RiskRatioRiskMeasure()
 RiskRatioRiskMeasure
   r1 ┼ Variance
      │   settings ┼ RiskMeasureSettings
-     │             ...
-  r2 ┴ ConditionalValueatRisk
-       settings ┼ RiskMeasureSettings
-                 ...
+     │            │   scale ┼ Float64: 1.0
+     │            │      ub ┼ nothing
+     │            │     rke ┴ Bool: true
+     │      sigma ┼ nothing
+     │       chol ┼ nothing
+     │         rc ┼ nothing
+     │        alg ┴ SquaredSOCRiskExpr()
+  r2 ┼ ConditionalValueatRisk
+     │   settings ┼ RiskMeasureSettings
+     │            │   scale ┼ Float64: 1.0
+     │            │      ub ┼ nothing
+     │            │     rke ┴ Bool: true
+     │      alpha ┼ Float64: 0.05
+     │          w ┴ nothing
 ```
 
 # Related

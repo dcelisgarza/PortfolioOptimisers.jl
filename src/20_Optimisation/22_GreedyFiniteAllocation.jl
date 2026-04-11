@@ -61,10 +61,10 @@ Keywords correspond to the struct's fields.
 ```jldoctest
 julia> GreedyAllocation()
 GreedyAllocation
-  unit ┼ Int64: 1
-  args ┼ ()
-  kwargs ┼ NamedTuple()
-  fb ┴ nothing
+    unit ┼ Int64: 1
+    args ┼ Tuple{}: ()
+  kwargs ┼ @NamedTuple{}: NamedTuple()
+      fb ┴ nothing
 ```
 
 # Related

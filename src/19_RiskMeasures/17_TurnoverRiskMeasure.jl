@@ -52,7 +52,7 @@ TurnoverRiskMeasure
            │   scale ┼ Float64: 1.0
            │      ub ┼ nothing
            │     rke ┴ Bool: true
-         w ┼ [0.5, 0.5]
+         w ┼ Vector{Float64}: [0.5, 0.5]
      fixed ┴ Bool: false
 ```
 

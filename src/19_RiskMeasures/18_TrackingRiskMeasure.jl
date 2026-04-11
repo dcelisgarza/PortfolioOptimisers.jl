@@ -123,14 +123,16 @@ Computes the Tracking Error of a portfolio weight vector `w`.
 # Examples
 
 ```jldoctest
-julia> TrackingRiskMeasure(; tr = ReturnsTracking(; b = zeros(100)))
+julia> TrackingRiskMeasure(; tr = ReturnsTracking(; w = [0.1, -0.2, 0.3]))
 TrackingRiskMeasure
   settings ┼ RiskMeasureSettings
            │   scale ┼ Float64: 1.0
            │      ub ┼ nothing
            │     rke ┴ Bool: true
         tr ┼ ReturnsTracking
-       alg ┴ L2Tracking
+           │   w ┴ Vector{Float64}: [0.1, -0.2, 0.3]
+       alg ┼ L2Tracking
+           │   ddof ┴ Int64: 1
 ```
 
 # Related
@@ -247,8 +249,19 @@ RiskTrackingRiskMeasure
            │      ub ┼ nothing
            │     rke ┴ Bool: true
         tr ┼ WeightsTracking
+           │    fees ┼ nothing
+           │       w ┼ Vector{Float64}: [0.5, 0.5]
+           │   fixed ┴ Bool: false
          r ┼ Variance
-       alg ┴ IndependentVariableTracking
+           │   settings ┼ RiskMeasureSettings
+           │            │   scale ┼ Int64: 1
+           │            │      ub ┼ nothing
+           │            │     rke ┴ Bool: false
+           │      sigma ┼ nothing
+           │       chol ┼ nothing
+           │         rc ┼ nothing
+           │        alg ┴ SquaredSOCRiskExpr()
+       alg ┴ IndependentVariableTracking()
 ```
 
 # Related

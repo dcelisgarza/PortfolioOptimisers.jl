@@ -38,10 +38,10 @@ Computes the Range of a portfolio returns vector `x`.
 ```jldoctest
 julia> Range()
 Range
-  settings ┴ RiskMeasureSettings
-               scale ┼ Float64: 1.0
-                  ub ┼ nothing
-                 rke ┴ Bool: true
+  settings ┼ RiskMeasureSettings
+           │   scale ┼ Float64: 1.0
+           │      ub ┼ nothing
+           │     rke ┴ Bool: true
 ```
 
 # Related

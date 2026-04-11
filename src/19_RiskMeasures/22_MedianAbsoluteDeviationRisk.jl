@@ -109,7 +109,7 @@ MedianAbsoluteDeviation
   settings ┼ HierarchicalRiskMeasureSettings
            │   scale ┴ Float64: 1.0
          w ┼ nothing
-        mu ┼ MedianCentering
+        mu ┼ MedianCentering()
       flag ┴ Bool: true
 ```
 

@@ -141,10 +141,10 @@ Keywords correspond to the struct's fields.
 ```jldoctest
 julia> DistributionValueatRisk()
 DistributionValueatRisk
-    mu ┼ nothing
- sigma ┼ nothing
-  chol ┼ nothing
-  dist ┴ Normal{Float64}(μ=0.0, σ=1.0)
+     mu ┼ nothing
+  sigma ┼ nothing
+   chol ┼ nothing
+   dist ┴ Distributions.Normal{Float64}: Distributions.Normal{Float64}(μ=0.0, σ=1.0)
 ```
 
 # Related
@@ -255,9 +255,9 @@ ValueatRisk
            │     rke ┴ Bool: true
      alpha ┼ Float64: 0.05
          w ┼ nothing
-       alg ┴ MIPValueatRisk
-            b ┼ nothing
-            s ┴ nothing
+       alg ┼ MIPValueatRisk
+           │   b ┼ nothing
+           │   s ┴ nothing
 ```
 
 # Related

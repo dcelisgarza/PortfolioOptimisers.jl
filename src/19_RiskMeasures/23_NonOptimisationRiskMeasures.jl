@@ -201,7 +201,7 @@ Computes the third central moment of the portfolio returns.
 ```jldoctest
 julia> ThirdCentralMoment()
 ThirdCentralMoment
-  w ┼ nothing
+   w ┼ nothing
   mu ┴ nothing
 ```
 
@@ -279,7 +279,11 @@ Computes the skewness of the portfolio returns.
 julia> Skewness()
 Skewness
   ve ┼ SimpleVariance
-  w ┼ nothing
+     │          me ┼ SimpleExpectedReturns
+     │             │   w ┴ nothing
+     │           w ┼ nothing
+     │   corrected ┴ Bool: true
+   w ┼ nothing
   mu ┴ nothing
 ```
 

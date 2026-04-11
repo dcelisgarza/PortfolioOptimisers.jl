@@ -110,8 +110,8 @@ BrownianDistanceVariance
            │   scale ┼ Float64: 1.0
            │      ub ┼ nothing
            │     rke ┴ Bool: true
-      alg1 ┼ QuadRiskExpr
-      alg2 ┴ NormOneConeBrownianDistanceVariance
+      alg1 ┼ QuadRiskExpr()
+      alg2 ┴ NormOneConeBrownianDistanceVariance()
 ```
 
 # Related

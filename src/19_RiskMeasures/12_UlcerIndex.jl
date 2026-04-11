@@ -46,10 +46,10 @@ Computes the Ulcer Index of a portfolio returns vector `x`.
 ```jldoctest
 julia> UlcerIndex()
 UlcerIndex
-  settings ┴ RiskMeasureSettings
-               scale ┼ Float64: 1.0
-                  ub ┼ nothing
-                 rke ┴ Bool: true
+  settings ┼ RiskMeasureSettings
+           │   scale ┼ Float64: 1.0
+           │      ub ┼ nothing
+           │     rke ┴ Bool: true
 ```
 
 # Related
@@ -121,8 +121,8 @@ Computes the Relative Ulcer Index of a portfolio returns vector `x`.
 ```jldoctest
 julia> RelativeUlcerIndex()
 RelativeUlcerIndex
-  settings ┴ HierarchicalRiskMeasureSettings
-               scale ┴ Float64: 1.0
+  settings ┼ HierarchicalRiskMeasureSettings
+           │   scale ┴ Float64: 1.0
 ```
 
 # Related
