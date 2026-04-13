@@ -680,7 +680,7 @@ function opt_view(opt::VecOptE, args...)
 end
 """
     optimise(opt::OptimisationEstimator, args...; kwargs...) -> OptimisationResult
-    optimise(or::OptimisationResult, args...; kwargs...) -> OptimisationResult
+    optimise(opt::OptimisationResult, args...; kwargs...) -> OptimisationResult
 
 Run portfolio optimisation using the given estimator `opt` and return an [`OptimisationResult`](@ref).
 
@@ -691,8 +691,8 @@ Passing an [`OptimisationResult`](@ref) directly returns it unchanged (pass-thro
 # Arguments
 
   - `opt`: Optimisation estimator (e.g. a [`JuMPOptimisationEstimator`](@ref) subtype).
-  - `args...`: Additional positional arguments forwarded to the concrete optimiser.
-  - `kwargs...`: Additional keyword arguments forwarded to the concrete optimiser.
+  - $(arg_dict[:ignargs])
+  - $(arg_dict[:ignkwargs])
 
 # Returns
 
@@ -705,8 +705,8 @@ Passing an [`OptimisationResult`](@ref) directly returns it unchanged (pass-thro
   - [`OptimisationSuccess`](@ref)
   - [`OptimisationFailure`](@ref)
 """
-function optimise(or::OptimisationResult, args...; kwargs...)
-    return or
+function optimise(opt::OptimisationResult, args...; kwargs...)
+    return opt
 end
 """
     _optimise(opt, rd, args...; dims, str_names, save, kwargs...)
@@ -736,6 +736,17 @@ Called by [`optimise`](@ref) to perform the actual optimisation. Each optimisati
   - [`NearOptimalCentering`](@ref)
 """
 function _optimise end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+High level optimisation function that wraps around estimator-specific optimisation functions. This takes care of fallback methods if the primary optimisation fails. It returns the first successful optimisation result but stores all fallback results in the `fb` field of the result.
+
+# Arguments
+
+  - `opt::OptimisationEstimator`: The optimisation estimator to use.
+  - $(arg_dict[:optargs])
+  - $(arg_dict[:optkwargs])
+"""
 function optimise(opt::OptimisationEstimator, args...; kwargs...)
     fb = Tuple{OptimisationEstimator, OptimisationResult}[]
     current_opt = opt

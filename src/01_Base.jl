@@ -237,7 +237,11 @@ const arg_dict = Dict(
                       :pr_X => "`pr::AbstractPriorResult`: Prior result containing the returns matrix `X`.",
                       :pr_sigma => "`pr::AbstractPriorResult`: Prior result containing the covariance matrix `sigma`.",
                       :pl_opt => "`pl`: Optional phylogeny constraints.",
-                      :fees_opt => "`fees`: Optional fees structure.")
+                      :fees_opt => "`fees`: Optional fees structure.",
+                      :optargs => "`args`: Additional positional arguments passed to the optimisation function.",
+                      :optkwargs => "`kwargs`: Additional keyword arguments passed to the optimisation function.",
+                      :ignargs => "`args`: Additional positional arguments (ignored).",
+                      :ignkwargs => "`kwargs`: Additional keyword arguments (ignored).")
 """
     field_dict
 

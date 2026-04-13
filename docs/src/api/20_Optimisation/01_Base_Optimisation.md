@@ -20,7 +20,9 @@ SquaredAbsoluteErrorWeightFinaliser
 WeightFinaliser
 IterativeWeightFinaliser
 JuMPWeightFinaliser
-optimise
+_optimise
+optimise(opt::OptimisationResult, args...; kwargs...)
+optimise(opt::OptimisationEstimator, args...; kwargs...)
 calc_net_returns(res::NonFiniteAllocationOptimisationResult, X::MatNum,
                           fees::Option{<:Fees} = nothing)
 assert_special_nco_requirements(::OptE_Opt)
@@ -29,6 +31,5 @@ is_time_dependent(::OptE_Opt)
 update_time_dependent_estimator(opt::OptE_Opt, args...)
 opt_weight_bounds
 finalise_weight_bounds
-_optimise
 opt_view(opt::AbstractOptimisationEstimator, args...)
 ```
