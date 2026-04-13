@@ -379,7 +379,7 @@
                                817:927, 928:1008]
 
         cv = IndexWalkForward(137, 111; reduce_test = true, purged_size = 13,
-                              expend_train = true)
+                              expand_train = true)
         (; train_idx, test_idx) = split(cv, rd)
         N = n_splits(cv, rd)
         @test length(train_idx) == length(test_idx) == N
@@ -458,7 +458,7 @@
                                631:694, 695:758, 759:820, 821:882, 883:946, 947:1008]
 
         cv = DateWalkForward(12, 3; period = Month(1), adjuster = ldm, previous = true,
-                             purged_size = 17, reduce_test = true, expend_train = true)
+                             purged_size = 17, reduce_test = true, expand_train = true)
         (; train_idx, test_idx) = split(cv, rd)
         N = n_splits(cv, rd)
         @test length(train_idx) == length(test_idx) == N
@@ -486,7 +486,7 @@
 
         cv = DateWalkForward(Day(23), 13; period = Month(1), adjuster = ldm,
                              previous = true, purged_size = 17, reduce_test = true,
-                             expend_train = true)
+                             expand_train = true)
         (; train_idx, test_idx) = split(cv, rd)
         N = n_splits(cv, rd)
         @test length(train_idx) == length(test_idx) == N

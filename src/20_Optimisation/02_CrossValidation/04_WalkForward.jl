@@ -70,7 +70,7 @@ Implements index-based walk-forward cross-validation for time series, supporting
   - `train_size`: Number of observations in each training set.
   - `test_size`: Number of observations in each test set.
   - `purged_size`: Number of observations to exclude from the end of each train set adjacent to a test set.
-  - `expend_train`: If true, training set always starts from the beginning; otherwise, uses a rolling window.
+  - `expand_train`: If true, training set always starts from the beginning; otherwise, uses a rolling window.
   - `reduce_test`: If true, reduces the last test set to fit remaining data; otherwise, drops incomplete test sets.
 
 # Constructors
@@ -79,7 +79,7 @@ Implements index-based walk-forward cross-validation for time series, supporting
         train_size::Integer,
         test_size::Integer;
         purged_size::Integer = 0,
-        expend_train::Bool = false,
+        expand_train::Bool = false,
         reduce_test::Bool = false,
     ) -> IndexWalkForward
 
@@ -93,12 +93,12 @@ Positional and keyword arguments correspond to the struct's fields.
 # Examples
 
 ```jldoctest
-julia> IndexWalkForward(100, 20; purged_size = 5, expend_train = true, reduce_test = false)
+julia> IndexWalkForward(100, 20; purged_size = 5, expand_train = true, reduce_test = false)
 IndexWalkForward
     train_size ┼ Int64: 100
      test_size ┼ Int64: 20
    purged_size ┼ Int64: 5
-  expend_train ┼ Bool: true
+  expand_train ┼ Bool: true
    reduce_test ┴ Bool: false
 ```
 
@@ -112,22 +112,22 @@ IndexWalkForward
     train_size
     test_size
     purged_size
-    expend_train
+    expand_train
     reduce_test
     function IndexWalkForward(train_size::Integer, test_size::Integer, purged_size::Integer,
-                              expend_train::Bool, reduce_test::Bool)
+                              expand_train::Bool, reduce_test::Bool)
         assert_nonempty_nonneg_finite_val(test_size, :test_size)
         assert_nonempty_nonneg_finite_val(train_size, :train_size)
         assert_nonempty_nonneg_finite_val(purged_size, :purged_size)
         return new{typeof(train_size), typeof(test_size), typeof(purged_size),
-                   typeof(expend_train), typeof(reduce_test)}(train_size, test_size,
-                                                              purged_size, expend_train,
+                   typeof(expand_train), typeof(reduce_test)}(train_size, test_size,
+                                                              purged_size, expand_train,
                                                               reduce_test)
     end
 end
 function IndexWalkForward(train_size::Integer, test_size::Integer; purged_size::Integer = 0,
-                          expend_train::Bool = false, reduce_test::Bool = false)
-    return IndexWalkForward(train_size, test_size, purged_size, expend_train, reduce_test)
+                          expand_train::Bool = false, reduce_test::Bool = false)
+    return IndexWalkForward(train_size, test_size, purged_size, expand_train, reduce_test)
 end
 """
     Base.split(iwf::IndexWalkForward, rd::ReturnsResult) -> WalkForwardResult
@@ -151,7 +151,7 @@ indices. Each fold advances the test window by `test_size` observations.
   - [`n_splits`](@ref)
 """
 function Base.split(iwf::IndexWalkForward, rd::ReturnsResult)
-    (; train_size, test_size, purged_size, expend_train, reduce_test) = iwf
+    (; train_size, test_size, purged_size, expand_train, reduce_test) = iwf
     T = size(rd.X, 1)
     @argcheck(train_size + purged_size < T)
     idx = 1:T
@@ -164,7 +164,7 @@ function Base.split(iwf::IndexWalkForward, rd::ReturnsResult)
         end
         test_end = test_start + test_size
         train_end = test_start - purged_size
-        train_start = expend_train ? 1 : train_end - train_size + 1
+        train_start = expand_train ? 1 : train_end - train_size + 1
         if test_end > T
             if !reduce_test
                 break
@@ -277,7 +277,7 @@ Implements date-based walk-forward cross-validation for time series, supporting 
   - `purged_size`: Number of observations to exclude from the end of each train set adjacent to a test set.
   - `adjuster`: Function or estimator to adjust the date range (e.g., for business days).
   - `previous`: If true, allows test indices to use previous available date if exact match not found, else use the next available date.
-  - `expend_train`: If true, training set always starts from the beginning; otherwise, uses a rolling window.
+  - `expand_train`: If true, training set always starts from the beginning; otherwise, uses a rolling window.
   - `reduce_test`: If true, reduces the last test set to fit remaining data; otherwise, drops incomplete test sets.
 
 # Constructors
@@ -290,7 +290,7 @@ Implements date-based walk-forward cross-validation for time series, supporting 
         purged_size::Integer = 0,
         adjuster::DateAdjType = identity,
         previous::Bool = false,
-        expend_train::Bool = false,
+        expand_train::Bool = false,
         reduce_test::Bool = false,
     ) -> DateWalkForward
 
@@ -304,7 +304,7 @@ Positional and keyword arguments correspond to the struct's fields.
 # Examples
 
 ```jldoctest
-julia> DateWalkForward(252, 21; period = Dates.Day(1), purged_size = 5, expend_train = true)
+julia> DateWalkForward(252, 21; period = Dates.Day(1), purged_size = 5, expand_train = true)
 DateWalkForward
      train_size ┼ Int64: 252
       test_size ┼ Int64: 21
@@ -313,7 +313,7 @@ DateWalkForward
     purged_size ┼ Int64: 5
        adjuster ┼ typeof(identity): identity
        previous ┼ Bool: false
-   expend_train ┼ Bool: true
+   expand_train ┼ Bool: true
     reduce_test ┴ Bool: false
 ```
 
@@ -331,13 +331,13 @@ DateWalkForward
     purged_size
     adjuster
     previous
-    expend_train
+    expand_train
     reduce_test
     function DateWalkForward(train_size::IntPeriodDateRange, test_size::Integer,
                              period::DatesUnionPeriod,
                              period_offset::Option{<:DatesUnionPeriod},
                              purged_size::Integer, adjuster::DateAdjType, previous::Bool,
-                             expend_train::Bool, reduce_test::Bool)
+                             expand_train::Bool, reduce_test::Bool)
         assert_nonempty_nonneg_finite_val(test_size, :test_size)
         if isa(train_size, Integer)
             assert_nonempty_nonneg_finite_val(train_size, :train_size)
@@ -345,14 +345,14 @@ DateWalkForward
         assert_nonempty_nonneg_finite_val(purged_size, :purged_size)
         return new{typeof(train_size), typeof(test_size), typeof(period),
                    typeof(period_offset), typeof(purged_size), typeof(adjuster),
-                   typeof(previous), typeof(expend_train), typeof(reduce_test)}(train_size,
+                   typeof(previous), typeof(expand_train), typeof(reduce_test)}(train_size,
                                                                                 test_size,
                                                                                 period,
                                                                                 period_offset,
                                                                                 purged_size,
                                                                                 adjuster,
                                                                                 previous,
-                                                                                expend_train,
+                                                                                expand_train,
                                                                                 reduce_test)
     end
 end
@@ -360,10 +360,10 @@ function DateWalkForward(train_size::IntPeriodDateRange, test_size::Integer;
                          period::DatesUnionPeriod = Dates.Day(1),
                          period_offset::Option{<:DatesUnionPeriod} = nothing,
                          purged_size::Integer = 0, adjuster::DateAdjType = identity,
-                         previous::Bool = false, expend_train::Bool = false,
+                         previous::Bool = false, expand_train::Bool = false,
                          reduce_test::Bool = false)
     return DateWalkForward(train_size, test_size, period, period_offset, purged_size,
-                           adjuster, previous, expend_train, reduce_test)
+                           adjuster, previous, expand_train, reduce_test)
 end
 """
     Base.split(dwf::DateWalkForward{<:Integer}, rd::ReturnsResult) -> WalkForwardResult
@@ -392,7 +392,7 @@ to the `period` date range and advanced by `test_size` steps at a time.
 """
 function Base.split(dwf::DateWalkForward{<:Integer}, rd::ReturnsResult)
     @argcheck(!isnothing(rd.ts), IsNothingError)
-    (; train_size, test_size, period, period_offset, purged_size, adjuster, previous, expend_train, reduce_test) = dwf
+    (; train_size, test_size, period, period_offset, purged_size, adjuster, previous, expand_train, reduce_test) = dwf
     T = size(rd.X, 1)
     ts = rd.ts
     ti = ts[1]
@@ -433,7 +433,7 @@ function Base.split(dwf::DateWalkForward{<:Integer}, rd::ReturnsResult)
         else
             push!(test_indices, idx[i + train_size]:(idx[i + train_size + test_size] - 1))
         end
-        train_start = expend_train ? 1 : idx[i]
+        train_start = expand_train ? 1 : idx[i]
         push!(train_indices, train_start:(idx[i + train_size] - purged_size - 1))
         i += test_size
     end
@@ -542,7 +542,7 @@ subtracting `train_size` from the split date, allowing calendar-based window len
 """
 function Base.split(dwf::DateWalkForward{<:Any}, rd::ReturnsResult)
     @argcheck(!isnothing(rd.ts), IsNothingError)
-    (; train_size, test_size, period, period_offset, purged_size, adjuster, previous, expend_train, reduce_test) = dwf
+    (; train_size, test_size, period, period_offset, purged_size, adjuster, previous, expand_train, reduce_test) = dwf
     T = size(rd.X, 1)
     ts = rd.ts
     ti = ts[1]
@@ -591,7 +591,7 @@ function Base.split(dwf::DateWalkForward{<:Any}, rd::ReturnsResult)
         else
             push!(test_indices, idx[i]:(idx[i + test_size] - purged_size - 1))
         end
-        train_start = expend_train ? 1 : train_idx[i]
+        train_start = expand_train ? 1 : train_idx[i]
         push!(train_indices, train_start:(idx[i] - 1))
         i += test_size
     end
