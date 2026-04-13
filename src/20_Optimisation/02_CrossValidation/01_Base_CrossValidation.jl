@@ -752,7 +752,7 @@ Fit optimisation estimator `opt` on returns data `rd` and immediately produce a
 """
 function fit_predict(opt::OptE_Opt, rd::ReturnsResult)
     res = optimise(opt, rd)
-    return predict(res, rd)
+    return StatsAPI.predict(res, rd)
 end
 function StatsAPI.predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult,
                           test_idx::VecInt, cols = :)
@@ -763,7 +763,7 @@ function StatsAPI.predict(res::NonFiniteAllocationOptimisationResult, rd::Return
 end
 function StatsAPI.predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult,
                           test_idxs::VecVecInt, cols = :)
-    return [predict(res, rd, test_idx, cols) for test_idx in test_idxs]
+    return [StatsAPI.predict(res, rd, test_idx, cols) for test_idx in test_idxs]
 end
 """
     fit_and_predict(opt, rd::ReturnsResult, cv::NonSeqCVER; cols, ex, id) -> MultiPeriodPredictionResult

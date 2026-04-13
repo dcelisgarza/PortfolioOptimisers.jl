@@ -60,6 +60,7 @@ Subset Resampling portfolio optimiser.
   - `wb`: Weight bounds estimator or bounds.
   - `fees`: Fee estimator or fee structure.
   - `sets`: Asset sets.
+  - `scale`: Optional scaling vector for inner optimiser weights (length must match `opti`).
   - `opt`: Base portfolio optimiser applied to each subset.
   - `wf`: Weight finaliser for enforcing bounds.
   - `ex`: FLoops executor for parallelism.
@@ -79,6 +80,7 @@ Subset Resampling portfolio optimiser.
         wb::Option{<:WbE_Wb} = nothing,
         fees::Option{<:FeesE_Fees} = nothing,
         sets::Option{<:AssetSets} = nothing,
+        scale::Option{<:VecNum} = nothing,
         opt::NonFiniteAllocationOptimisationEstimator,
         wf::WeightFinaliser = IterativeWeightFinaliser(),
         ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
@@ -105,6 +107,7 @@ Keywords correspond to the struct's fields.
     wb
     fees
     sets
+    scale
     opt
     wf
     ex
@@ -117,13 +120,14 @@ Keywords correspond to the struct's fields.
     brt
     strict
     function SubsetResampling(pe::PrE_Pr, wb::Option{<:WbE_Wb}, fees::Option{<:FeesE_Fees},
-                              sets::Option{<:AssetSets},
+                              sets::Option{<:AssetSets}, scale::Option{<:VecNum},
                               opt::NonFiniteAllocationOptimisationEstimator,
                               wf::WeightFinaliser, ex::FLoops.Transducers.Executor,
                               subset_size::SubsetSizeE, n_subsets::NumberSubsetsE,
                               max_comb::Integer, rng::Random.AbstractRNG,
                               seed::Option{<:Integer}, fb::Option{<:OptE_Opt}, brt::Bool,
                               strict::Bool)
+        assert_nonempty_gt0_finite_val(scale, :scale)
         assert_internal_optimiser(opt)
         if isa(wb, WeightBoundsEstimator)
             @argcheck(!isnothing(sets))
@@ -140,16 +144,19 @@ Keywords correspond to the struct's fields.
             assert_nonempty_nonneg_finite_val(n_subsets - 2, "n_subsets - 2")
         end
         assert_nonempty_gt0_finite_val(max_comb, :max_comb)
-        return new{typeof(pe), typeof(wb), typeof(fees), typeof(sets), typeof(opt),
-                   typeof(wf), typeof(ex), typeof(subset_size), typeof(n_subsets),
-                   typeof(max_comb), typeof(rng), typeof(seed), typeof(fb), typeof(brt),
-                   typeof(strict)}(pe, wb, fees, sets, opt, wf, ex, subset_size, n_subsets,
-                                   max_comb, rng, seed, fb, brt, strict)
+        return new{typeof(pe), typeof(wb), typeof(fees), typeof(sets), typeof(scale),
+                   typeof(opt), typeof(wf), typeof(ex), typeof(subset_size),
+                   typeof(n_subsets), typeof(max_comb), typeof(rng), typeof(seed),
+                   typeof(fb), typeof(brt), typeof(strict)}(pe, wb, fees, sets, scale, opt,
+                                                            wf, ex, subset_size, n_subsets,
+                                                            max_comb, rng, seed, fb, brt,
+                                                            strict)
     end
 end
 function SubsetResampling(; pe::PrE_Pr = EmpiricalPrior(), wb::Option{<:WbE_Wb} = nothing,
                           fees::Option{<:FeesE_Fees} = nothing,
                           sets::Option{<:AssetSets} = nothing,
+                          scale::Option{<:VecNum} = nothing,
                           opt::NonFiniteAllocationOptimisationEstimator,
                           wf::WeightFinaliser = IterativeWeightFinaliser(),
                           ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
@@ -159,7 +166,7 @@ function SubsetResampling(; pe::PrE_Pr = EmpiricalPrior(), wb::Option{<:WbE_Wb} 
                           seed::Option{<:Integer} = nothing,
                           fb::Option{<:OptE_Opt} = nothing, brt::Bool = false,
                           strict::Bool = false)
-    return SubsetResampling(pe, wb, fees, sets, opt, wf, ex, subset_size, n_subsets,
+    return SubsetResampling(pe, wb, fees, sets, scale, opt, wf, ex, subset_size, n_subsets,
                             max_comb, rng, seed, fb, brt, strict)
 end
 function assert_external_optimiser(opt::SubsetResampling)
@@ -179,9 +186,10 @@ function factory(sr::SubsetResampling, w::AbstractVector)
     opt = factory(sr.opt, w)
     fb = factory(sr.fb, w)
     return SubsetResampling(; pe = sr.pe, wb = sr.wb, fees = fees, sets = sr.sets,
-                            opt = opt, wf = sr.wf, ex = sr.ex, subset_size = sr.subset_size,
-                            n_subsets = sr.n_subsets, max_comb = sr.max_comb, rng = sr.rng,
-                            seed = sr.seed, fb = fb, brt = sr.brt, strict = sr.strict)
+                            scale = sr.scale, opt = opt, wf = sr.wf, ex = sr.ex,
+                            subset_size = sr.subset_size, n_subsets = sr.n_subsets,
+                            max_comb = sr.max_comb, rng = sr.rng, seed = sr.seed, fb = fb,
+                            brt = sr.brt, strict = sr.strict)
 end
 function opt_view(sr::SubsetResampling, i, X::MatNum)
     X = isa(sr.pe, AbstractPriorResult) ? sr.pe.X : X
@@ -190,8 +198,8 @@ function opt_view(sr::SubsetResampling, i, X::MatNum)
     fees = fees_view(sr.fees, i)
     sets = asset_sets_view(sr.sets, i)
     opt = opt_view(sr.opt, i, X)
-    return SubsetResampling(; pe = pe, wb = wb, fees = fees, sets = sets, opt = opt,
-                            wf = sr.wf, ex = sr.ex, subset_size = sr.subset_size,
+    return SubsetResampling(; pe = pe, wb = wb, fees = fees, sets = sets, scale = sr.scale,
+                            opt = opt, wf = sr.wf, ex = sr.ex, subset_size = sr.subset_size,
                             n_subsets = sr.n_subsets, max_comb = sr.max_comb, rng = sr.rng,
                             seed = sr.seed, fb = sr.fb, brt = sr.brt, strict = sr.strict)
 end
@@ -219,7 +227,7 @@ Combines optimised weights from multiple asset subsets, averaging over subsets t
 """
 function subset_resampling_finaliser(N::Integer, n_subsets::Integer, asset_idx::MatNum,
                                      wb::Option{<:WeightBounds}, wf::WeightFinaliser,
-                                     ress::VecOpt, ::VecNum)
+                                     ress::VecOpt, ::VecNum, ::Nothing)
     w = zeros(eltype(ress[1].w), N)
     for i in 1:n_subsets
         idx = view(asset_idx, :, i)
@@ -231,7 +239,7 @@ function subset_resampling_finaliser(N::Integer, n_subsets::Integer, asset_idx::
 end
 function subset_resampling_finaliser(N::Integer, n_subsets::Integer, asset_idx::MatNum,
                                      wb::Option{<:WeightBounds}, wf::WeightFinaliser,
-                                     ress::VecOpt, ws::VecVecNum)
+                                     ress::VecOpt, ws::VecVecNum, ::Nothing)
     M = length(ws)
     w = [zeros(eltype(ress[1].w[i]), N) for i in 1:M]
     for i in 1:n_subsets
@@ -246,6 +254,36 @@ function subset_resampling_finaliser(N::Integer, n_subsets::Integer, asset_idx::
     retcode_w = [finalise_weight_bounds(wf, wb, wi) for wi in w]
     return map(x -> x[1], retcode_w), map(x -> x[2], retcode_w)
 end
+function subset_resampling_finaliser(N::Integer, n_subsets::Integer, asset_idx::MatNum,
+                                     wb::Option{<:WeightBounds}, wf::WeightFinaliser,
+                                     ress::VecOpt, ::VecNum, scale::VecNum)
+    w = zeros(eltype(ress[1].w), N)
+    for i in 1:n_subsets
+        idx = view(asset_idx, :, i)
+        w[idx] .+= scale[i] * ress[i].w
+    end
+    w /= sum(scale)
+    retcode, w = finalise_weight_bounds(wf, wb, w)
+    return retcode, w
+end
+function subset_resampling_finaliser(N::Integer, n_subsets::Integer, asset_idx::MatNum,
+                                     wb::Option{<:WeightBounds}, wf::WeightFinaliser,
+                                     ress::VecOpt, ws::VecVecNum, scale::VecNum)
+    M = length(ws)
+    w = [zeros(eltype(ress[1].w[i]), N) for i in 1:M]
+    for i in 1:n_subsets
+        idx = view(asset_idx, :, i)
+        for j in 1:M
+            w[j][idx] .+= scale[i] * ress[i].w[j]
+        end
+    end
+    denom = sum(scale)
+    for j in 1:M
+        w[j] /= denom
+    end
+    retcode_w = [finalise_weight_bounds(wf, wb, wi) for wi in w]
+    return map(x -> x[1], retcode_w), map(x -> x[2], retcode_w)
+end
 function _optimise(sr::SubsetResampling, rd::ReturnsResult; dims::Int = 1,
                    branchorder::Symbol = :optimal, str_names::Bool = false,
                    save::Bool = true, kwargs...)
@@ -256,6 +294,9 @@ function _optimise(sr::SubsetResampling, rd::ReturnsResult; dims::Int = 1,
     (; subset_size, n_subsets, max_comb, rng, seed) = sr
     subset_size = get_subset_size(subset_size, pr)
     n_subsets = get_n_subsets(n_subsets, pr)
+    if !isnothing(sr.scale)
+        @argcheck(length(sr.scale) == n_subsets)
+    end
     n_comb = binomial(N, subset_size)
     @argcheck(n_subsets <= n_comb,
               "n_subsets = $n_subsets must not be greater than `binomial(assets, subset_size) = n_comb => binomial($N, $subset_size) = $n_comb`.")
@@ -274,7 +315,7 @@ function _optimise(sr::SubsetResampling, rd::ReturnsResult; dims::Int = 1,
     wb = weight_bounds_constraints(sr.wb, sr.sets; N = N, strict = sr.strict,
                                    datatype = eltype(X))
     retcode, w = subset_resampling_finaliser(N, n_subsets, asset_idx, wb, sr.wf, ress,
-                                             ress[1].w)
+                                             ress[1].w, sr.scale)
     return SubsetResamplingResult(typeof(sr), pr, wb, fees, ress, asset_idx, retcode, w,
                                   nothing)
 end
