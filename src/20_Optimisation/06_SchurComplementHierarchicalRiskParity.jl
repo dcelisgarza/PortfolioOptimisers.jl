@@ -710,6 +710,17 @@ function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:AbstractVe
     return SchurComplementHierarchicalRiskParityResult(typeof(sh), pr, wb, clr, gammas,
                                                        retcode, w, nothing)
 end
+"""
+    optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:Any, Nothing},
+             rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...) -> HierarchicalResult
+
+# Arguments
+
+  - `sh`: The Schur complement hierarchical risk parity optimiser to use.
+  - $(arg_dict[:rd]) If `isa(hrp.opt.pe, AbstractPriorResult)`, `rd` is not necessary if doing a standalone optimisation, but may be required/desired by fallbacks and/or clusterisation.
+  - `dims`: The dimension along which observations advance in time.
+  - `kwargs`: Additional keyword arguments passed to the optimisation function.
+"""
 function optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:Any, Nothing},
                   rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)
     return _optimise(sh, rd; dims = dims, kwargs...)

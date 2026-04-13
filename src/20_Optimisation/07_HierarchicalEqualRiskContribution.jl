@@ -746,6 +746,21 @@ function _optimise(hec::HierarchicalEqualRiskContribution,
     retcode, w = finalise_weight_bounds(hec.opt.wf, wb, w / sum(w))
     return HierarchicalResult(typeof(hec), pr, clr, wb, fees, retcode, w, nothing)
 end
+"""
+    optimise(hec::HierarchicalEqualRiskContribution{
+                     <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, Nothing
+                 },
+            rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
+            branchorder::Symbol = :optimal, kwargs...) -> HierarchicalResult
+
+# Arguments
+
+  - `hec`: The hierarchical equal risk contribution optimiser to use.
+  - $(arg_dict[:rd]) If `isa(hec.opt.pe, AbstractPriorResult)`, `rd` is not necessary if doing a standalone optimisation, but may be required/desired by fallbacks and/or clusterisation.
+  - `dims`: The dimension along which observations advance in time.
+  - `branchorder`: The branch order to use for the clusterisation, this optimisation can use non-optimal branch orders, which make the clustering faster but the dendrogram won't be as nice.
+  - `kwargs`: Additional keyword arguments passed to the optimisation function.
+"""
 function optimise(hec::HierarchicalEqualRiskContribution{<:Any, <:Any, <:Any, <:Any, <:Any,
                                                          <:Any, Nothing},
                   rd::ReturnsResult = ReturnsResult(); dims::Int = 1,

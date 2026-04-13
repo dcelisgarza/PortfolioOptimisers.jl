@@ -324,7 +324,8 @@ function _optimise(rrb::RelaxedRiskBudgeting, rd::ReturnsResult = ReturnsResult(
                    dims::Int = 1, str_names::Bool = false, save::Bool = true, kwargs...)
     (; pr, wb, lt, st, lcsr, ctr, gcardr, sgcardr, smtx, slt, sst, sgmtx, sglt, sgst, plr, tn, fees, ret) = processed_jump_optimiser_attributes(rrb.opt,
                                                                                                                                                 rd;
-                                                                                                                                                dims = dims)
+                                                                                                                                                dims = dims,
+                                                                                                                                                kwargs...)
     model = JuMP.Model()
     JuMP.set_string_names_on_creation(model, str_names)
     set_model_scales!(model, rrb.opt.sc, rrb.opt.so)
@@ -356,6 +357,20 @@ function _optimise(rrb::RelaxedRiskBudgeting, rd::ReturnsResult = ReturnsResult(
                                                                 tn, fees, plr, ret), prb,
                                retcode, sol, ifelse(save, model, nothing), nothing)
 end
+"""
+    optimise(rrb::RelaxedRiskBudgeting{<:Any, <:Any, <:Any, <:Any, Nothing},
+             rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
+             str_names::Bool = false, save::Bool = true, kwargs...) -> RiskBudgetingResult
+
+# Arguments
+
+  - `rrb`: The relaxed risk budgeting optimiser to use.
+  - $(arg_dict[:rd]) If `isa(hec.opt.pe, AbstractPriorResult)`, `rd` is not necessary if doing a standalone optimisation, but may be required/desired by fallbacks and/or clusterisation.
+  - `dims`: The dimension along which observations advance in time.
+  - `str_names`: Whether to use string names for the assets in the optimisation.
+  - `save`: Whether to save the JuMP model in the optimisation result.
+  - `kwargs`: Additional keyword arguments passed to the optimisation function.
+"""
 function optimise(rrb::RelaxedRiskBudgeting{<:Any, <:Any, <:Any, <:Any, Nothing},
                   rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
                   str_names::Bool = false, save::Bool = true, kwargs...)

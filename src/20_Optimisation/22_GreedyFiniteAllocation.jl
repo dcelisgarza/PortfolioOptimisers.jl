@@ -225,6 +225,21 @@ function _optimise(ga::GreedyAllocation, w::VecNum, p::VecNum, cash::Number = 1e
     return GreedyAllocationResult(typeof(ga), OptimisationSuccess(nothing), view(res, :, 1),
                                   view(res, :, 2), view(res, :, 3), lcash, nothing)
 end
+"""
+    optimise(ga::GreedyAllocation{<:Any, <:Any, <:Any, Nothing}, w::VecNum, p::VecNum,
+             cash::Number = 1e6, T::Option{<:Number} = nothing,
+             fees::Option{<:Fees} = nothing; kwargs...) -> GreedyAllocationResult
+
+# Arguments
+
+  - `da`: The discrete allocation optimiser to use.
+  - $(arg_dict[:pw])
+  - `p`: The prices of the assets in the same order as `w`.
+  - `cash`: The initial cash balance.
+  - `T`: The time horizon for the optimisation. Used to adjust the initial cash balance according to the fees charged on the portfolio for the time horizon.
+  - `fees`: The fees to apply to the portfolio.
+  - `kwargs`: Additional keyword arguments passed to the optimisation function.
+"""
 function optimise(ga::GreedyAllocation{<:Any, <:Any, <:Any, Nothing}, w::VecNum, p::VecNum,
                   cash::Number = 1e6, T::Option{<:Number} = nothing,
                   fees::Option{<:Fees} = nothing; kwargs...)

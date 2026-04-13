@@ -278,6 +278,23 @@ function _optimise(sr::SubsetResampling, rd::ReturnsResult; dims::Int = 1,
     return SubsetResamplingResult(typeof(sr), pr, wb, fees, ress, asset_idx, retcode, w,
                                   nothing)
 end
+"""
+    optimise(sr::SubsetResampling{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
+                     <:Any, <:Any, <:Any, <:Any, <:Any, Nothing
+                 }, rd::ReturnsResult;
+             dims::Int = 1, branchorder::Symbol = :optimal, str_names::Bool = false,
+             save::Bool = true, kwargs...) -> SubsetResamplingResult
+
+# Arguments
+
+  - `sr`: The subset resampling optimiser to use.
+  - $(arg_dict[:rd])
+  - `dims`: The dimension along which observations advance in time.
+  - `branchorder`: Passed to the internal optimiser. The branch order to use for the clusterisation.
+  - `str_names`: Passed to the internal optimiser. Whether to use string names for the assets in the optimisation.
+  - `save`: Passed to the internal optimiser. Whether to save the JuMP model in the optimisation result.
+  - `kwargs`: Additional keyword arguments passed to the optimisation function.
+"""
 function optimise(sr::SubsetResampling{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                        <:Any, <:Any, <:Any, <:Any, <:Any, Nothing},
                   rd::ReturnsResult = ReturnsResult(); dims::Int = 1,

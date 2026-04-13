@@ -378,6 +378,17 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:VecOptRM},
     retcode, w = finalise_weight_bounds(hrp.opt.wf, wb, w / sum(w))
     return HierarchicalResult(typeof(hrp), pr, clr, wb, fees, retcode, w, nothing)
 end
+"""
+    optimise(hrp::HierarchicalRiskParity{<:Any, <:Any, <:Any, <:Nothing},
+             rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...) -> HierarchicalResult
+
+# Arguments
+
+  - `hrp`: The hierarchical risk parity optimiser to use.
+  - $(arg_dict[:rd]) If `isa(hrp.opt.pe, AbstractPriorResult)`, `rd` is not necessary if doing a standalone optimisation, but may be required/desired by fallbacks and/or clusterisation.
+  - `dims`: The dimension along which observations advance in time.
+  - `kwargs`: Additional keyword arguments passed to the optimisation function.
+"""
 function optimise(hrp::HierarchicalRiskParity{<:Any, <:Any, <:Any, <:Nothing},
                   rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)
     return _optimise(hrp, rd; dims = dims, kwargs...)

@@ -241,7 +241,8 @@ const arg_dict = Dict(
                       :optargs => "`args`: Additional positional arguments passed to the optimisation function.",
                       :optkwargs => "`kwargs`: Additional keyword arguments passed to the optimisation function.",
                       :ignargs => "`args`: Additional positional arguments (ignored).",
-                      :ignkwargs => "`kwargs`: Additional keyword arguments (ignored).")
+                      :ignkwargs => "`kwargs`: Additional keyword arguments (ignored).",
+                      :rd=>"`rd::ReturnsResult`: The returns result to use.")
 """
     field_dict
 

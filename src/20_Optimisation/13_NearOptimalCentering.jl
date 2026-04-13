@@ -438,7 +438,7 @@ Solves the minimum-risk, optimal-objective, and maximum-risk sub-problems (unles
   - [`near_optimal_centering_risks`](@ref)
 """
 function near_optimal_centering_setup(noc::NearOptimalCentering, rd::ReturnsResult;
-                                      dims::Int = 1)
+                                      dims::Int = 1, kwargs...)
     w_min = noc.w_min
     w_opt = noc.w_opt
     w_max = noc.w_max
@@ -450,7 +450,7 @@ function near_optimal_centering_setup(noc::NearOptimalCentering, rd::ReturnsResu
     w_max_retcode = OptimisationSuccess(nothing)
     unconstrained = isa(noc.alg, UnconstrainedNearOptimalCentering)
     r = noc.r
-    opt = processed_jump_optimiser(noc.opt, rd; dims = dims)
+    opt = processed_jump_optimiser(noc.opt, rd; dims = dims, kwargs...)
     if w_min_flag || w_max_flag || unconstrained
         nb_r = no_bounds_risk_measure(r, Val(noc.ucs_flag))
         nb_opt = no_bounds_optimiser(opt, noc.ucs_flag)
@@ -892,7 +892,8 @@ function _optimise(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, 
                    str_names::Bool = false, save::Bool = true, kwargs...)
     (; w_opt, rk_opt, rt_opt, r, opt, w_min_retcode, w_opt_retcode, w_max_retcode) = near_optimal_centering_setup(noc,
                                                                                                                   rd;
-                                                                                                                  dims = dims)
+                                                                                                                  dims = dims,
+                                                                                                                  kwargs...)
     model = JuMP.Model()
     JuMP.set_string_names_on_creation(model, str_names)
     set_model_scales!(model, opt.sc, opt.so)
@@ -926,7 +927,8 @@ function _optimise(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, 
                    str_names::Bool = false, save::Bool = true, kwargs...)
     (; w_opt, rk_opt, rt_opt, r, opt, rt_min, rt_max, w_min, w_max, w_min_retcode, w_opt_retcode, w_max_retcode) = near_optimal_centering_setup(noc,
                                                                                                                                                 rd;
-                                                                                                                                                dims = dims)
+                                                                                                                                                dims = dims,
+                                                                                                                                                kwargs...)
     model = JuMP.Model()
     JuMP.set_string_names_on_creation(model, str_names)
     set_model_scales!(model, opt.sc, opt.so)
@@ -971,6 +973,22 @@ function _optimise(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, 
                                       noc_retcode, retcode, sol,
                                       ifelse(save, model, nothing), nothing)
 end
+"""
+    optimise(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
+                      <:Any, <:Any, <:Any, <:Any, <:Any, Nothing
+                  },
+             rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
+             str_names::Bool = false, save::Bool = true, kwargs...) -> NearOptimalCenteringResult
+
+# Arguments
+
+  - `noc`: The near optimal centering optimiser to use.
+  - $(arg_dict[:rd]) If `isa(hec.opt.pe, AbstractPriorResult)`, `rd` is not necessary if doing a standalone optimisation, but may be required/desired by fallbacks and/or clusterisation.
+  - `dims`: The dimension along which observations advance in time.
+  - `str_names`: Whether to use string names for the assets in the optimisation.
+  - `save`: Whether to save the JuMP model in the optimisation result.
+  - `kwargs`: Additional keyword arguments passed to the optimisation function.
+"""
 function optimise(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                             <:Any, <:Any, <:Any, <:Any, <:Any, Nothing},
                   rd::ReturnsResult = ReturnsResult(); dims::Int = 1,

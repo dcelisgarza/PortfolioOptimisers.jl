@@ -436,7 +436,6 @@ function set_risk_budgeting_constraints!(model::JuMP.Model,
     set_weight_constraints!(model, wb, rb.opt.bgt, rb.opt.sbgt)
     return ProcessedFactorRiskBudgetingAttributes(rkb, b1, rr)
 end
-###########
 """
     set_rb_mip_w!(model::JuMP.Model, X::MatNum)
 
@@ -526,12 +525,12 @@ function set_risk_budgeting_constraints!(model::JuMP.Model,
     set_weight_constraints!(model, wb, rb.opt.bgt, rb.opt.sbgt)
     return ProcessedAssetRiskBudgetingAttributes(rkb)
 end
-###########
 function _optimise(rb::RiskBudgeting, rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
                    str_names::Bool = false, save::Bool = true, kwargs...)
     (; pr, wb, lt, st, lcsr, ctr, gcardr, sgcardr, smtx, slt, sst, sgmtx, sglt, sgst, plr, tn, fees, ret) = processed_jump_optimiser_attributes(rb.opt,
                                                                                                                                                 rd;
-                                                                                                                                                dims = dims)
+                                                                                                                                                dims = dims,
+                                                                                                                                                kwargs...)
     model = JuMP.Model()
     JuMP.set_string_names_on_creation(model, str_names)
     set_model_scales!(model, rb.opt.sc, rb.opt.so)
@@ -565,6 +564,20 @@ function _optimise(rb::RiskBudgeting, rd::ReturnsResult = ReturnsResult(); dims:
                                                                 tn, fees, plr, ret), prb,
                                retcode, sol, ifelse(save, model, nothing), nothing)
 end
+"""
+    optimise(rb::RiskBudgeting{<:Any, <:Any, <:Any, <:Any, Nothing},
+             rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
+             str_names::Bool = false, save::Bool = true, kwargs...) -> RiskBudgetingResult
+
+# Arguments
+
+  - `rb`: The risk budgeting optimiser to use.
+  - $(arg_dict[:rd]) If `isa(hec.opt.pe, AbstractPriorResult)`, `rd` is not necessary if doing a standalone optimisation, but may be required/desired by fallbacks and/or clusterisation.
+  - `dims`: The dimension along which observations advance in time.
+  - `str_names`: Whether to use string names for the assets in the optimisation.
+  - `save`: Whether to save the JuMP model in the optimisation result.
+  - `kwargs`: Additional keyword arguments passed to the optimisation function.
+"""
 function optimise(rb::RiskBudgeting{<:Any, <:Any, <:Any, <:Any, Nothing},
                   rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
                   str_names::Bool = false, save::Bool = true, kwargs...)

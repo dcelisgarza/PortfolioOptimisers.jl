@@ -542,7 +542,8 @@ function _optimise(mr::MeanRisk, rd::ReturnsResult = ReturnsResult(); dims::Int 
                    str_names::Bool = false, save::Bool = true, kwargs...)
     (; pr, wb, lt, st, lcsr, ctr, gcardr, sgcardr, smtx, slt, sst, sgmtx, sglt, sgst, plr, tn, fees, ret) = processed_jump_optimiser_attributes(mr.opt,
                                                                                                                                                 rd;
-                                                                                                                                                dims = dims)
+                                                                                                                                                dims = dims,
+                                                                                                                                                kwargs...)
     model = JuMP.Model()
     JuMP.set_string_names_on_creation(model, str_names)
     set_model_scales!(model, mr.opt.sc, mr.opt.so)
@@ -576,6 +577,20 @@ function _optimise(mr::MeanRisk, rd::ReturnsResult = ReturnsResult(); dims::Int 
                                                            plr, ret), retcode, sol,
                           ifelse(save, model, nothing), nothing)
 end
+"""
+    optimise(mr::MeanRisk{<:Any, <:Any, <:Any, <:Any, Nothing},
+             rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
+             str_names::Bool = false, save::Bool = true, kwargs...) -> MeanRiskResult
+
+# Arguments
+
+  - `mr`: The mean risk optimiser to use.
+  - $(arg_dict[:rd]) If `isa(hec.opt.pe, AbstractPriorResult)`, `rd` is not necessary if doing a standalone optimisation, but may be required/desired by fallbacks and/or clusterisation.
+  - `dims`: The dimension along which observations advance in time.
+  - `str_names`: Whether to use string names for the assets in the optimisation.
+  - `save`: Whether to save the JuMP model in the optimisation result.
+  - `kwargs`: Additional keyword arguments passed to the optimisation function.
+"""
 function optimise(mr::MeanRisk{<:Any, <:Any, <:Any, <:Any, Nothing},
                   rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
                   str_names::Bool = false, save::Bool = true, kwargs...)

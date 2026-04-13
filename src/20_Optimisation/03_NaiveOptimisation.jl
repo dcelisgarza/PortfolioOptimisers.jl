@@ -197,6 +197,17 @@ function _optimise(iv::InverseVolatility, rd::ReturnsResult = ReturnsResult();
     retcode, w = finalise_weight_bounds(iv.wf, wb, w)
     return NaiveOptimisationResult(typeof(iv), pr, wb, retcode, w, nothing)
 end
+"""
+    optimise(iv::InverseVolatility{<:Any, <:Any, <:Any, <:Any, Nothing},
+             rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...) -> NaiveOptimisationResult
+
+# Arguments
+
+  - `iv`: The inverse volatility optimiser to use.
+  - $(arg_dict[:rd]) If `isa(iv.pe, AbstractPriorResult)`, `rd` is not necessary.
+  - `dims`: The dimension along which observations advance in time.
+  - `kwargs`: Additional keyword arguments passed to the optimisation function.
+"""
 function optimise(iv::InverseVolatility{<:Any, <:Any, <:Any, <:Any, Nothing},
                   rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)
     return _optimise(iv, rd; dims = dims, kwargs...)
@@ -297,8 +308,19 @@ function _optimise(ew::EqualWeighted, rd::ReturnsResult; dims::Int = 1, kwargs..
     retcode, w = finalise_weight_bounds(ew.wf, wb, w)
     return NaiveOptimisationResult(typeof(ew), nothing, wb, retcode, w, nothing)
 end
-function optimise(ew::EqualWeighted{<:Any, <:Any, <:Any, Nothing},
-                  rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)
+"""
+    optimise(ew::EqualWeighted{<:Any, <:Any, <:Any, Nothing},
+             rd::ReturnsResult; dims::Int = 1, kwargs...) -> NaiveOptimisationResult
+
+# Arguments
+
+  - `ew`: The equal-weighted optimiser to use.
+  - $(arg_dict[:rd]) Used to know how many assets there are.
+  - `dims`: The dimension along which observations advance in time.
+  - `kwargs`: Additional keyword arguments passed to the optimisation function.
+"""
+function optimise(ew::EqualWeighted{<:Any, <:Any, <:Any, Nothing}, rd::ReturnsResult;
+                  dims::Int = 1, kwargs...)
     return _optimise(ew, rd; dims = dims, kwargs...)
 end
 """
@@ -434,8 +456,19 @@ function _optimise(rw::RandomWeighted, rd::ReturnsResult; dims::Int = 1, kwargs.
     retcode, w = finalise_weight_bounds(rw.wf, wb, w)
     return NaiveOptimisationResult(typeof(rw), nothing, wb, retcode, w, nothing)
 end
+"""
+    optimise(rw::RandomWeighted{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, Nothing},
+             rd::ReturnsResult; dims::Int = 1, kwargs...) -> NaiveOptimisationResult
+
+# Arguments
+
+  - `rw`: The random-weighted optimiser to use.
+  - $(arg_dict[:rd]) Used to know how many assets there are.
+  - `dims`: The dimension along which observations advance in time.
+  - `kwargs`: Additional keyword arguments passed to the optimisation function.
+"""
 function optimise(rw::RandomWeighted{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, Nothing},
-                  rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)
+                  rd::ReturnsResult; dims::Int = 1, kwargs...)
     return _optimise(rw, rd; dims = dims, kwargs...)
 end
 

@@ -197,7 +197,8 @@ function _optimise(frc::FactorRiskContribution, rd::ReturnsResult = ReturnsResul
                    dims::Int = 1, str_names::Bool = false, save::Bool = true, kwargs...)
     (; pr, wb, lt, st, lcsr, ctr, gcardr, sgcardr, smtx, slt, sst, sgmtx, sglt, sgst, plr, tn, fees, ret) = processed_jump_optimiser_attributes(frc.opt,
                                                                                                                                                 rd;
-                                                                                                                                                dims = dims)
+                                                                                                                                                dims = dims,
+                                                                                                                                                kwargs...)
     model = JuMP.Model()
     JuMP.set_string_names_on_creation(model, str_names)
     set_model_scales!(model, frc.opt.sc, frc.opt.so)
@@ -220,7 +221,7 @@ function _optimise(frc::FactorRiskContribution, rd::ReturnsResult = ReturnsResul
     set_risk_constraints!(model, frc.r, frc, pr, plr, fees, b1; rd = rd)
     scalarise_risk_expression!(model, frc.opt.sca)
     set_return_constraints!(model, ret, frc.obj, pr; rd = rd)
-    frc_plr = phylogeny_constraints(frc.frc_ple, rd.F)
+    frc_plr = phylogeny_constraints(frc.frc_ple, rd.F, kwargs...)
     set_sdp_frc_phylogeny_constraints!(model, frc_plr)
     add_custom_constraint!(model, frc.opt.ccnt, frc, pr)
     set_portfolio_objective_function!(model, frc.obj, ret, frc.opt.cobj, frc, pr)
@@ -235,6 +236,22 @@ function _optimise(frc::FactorRiskContribution, rd::ReturnsResult = ReturnsResul
                                         rr, frc_plr, retcode, sol,
                                         ifelse(save, model, nothing), nothing)
 end
+"""
+    optimise(frc::FactorRiskContribution{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
+                      <:Any, <:Any, Nothing
+                  },
+             rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
+             str_names::Bool = false, save::Bool = true, kwargs...) -> FactorRiskContributionResult
+
+# Arguments
+
+  - `frc`: The factor risk contribution optimiser to use.
+  - $(arg_dict[:rd]) If `isa(hec.opt.pe, AbstractPriorResult)`, `rd` is not necessary if doing a standalone optimisation, but may be required/desired by fallbacks and/or clusterisation.
+  - `dims`: The dimension along which observations advance in time.
+  - `str_names`: Whether to use string names for the assets in the optimisation.
+  - `save`: Whether to save the JuMP model in the optimisation result.
+  - `kwargs`: Additional keyword arguments passed to the optimisation function.
+"""
 function optimise(frc::FactorRiskContribution{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                               <:Any, <:Any, Nothing},
                   rd::ReturnsResult = ReturnsResult(); dims::Int = 1,

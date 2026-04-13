@@ -296,6 +296,23 @@ function _optimise(st::Stacking, rd::ReturnsResult; dims::Int = 1,
     retcode, w = outer_optimisation_finaliser(wb, st.wf, resi, reso.retcode, reso.w, wi)
     return StackingResult(typeof(st), pr, wb, fees, resi, reso, st.cv, retcode, w, nothing)
 end
+"""
+    optimise(st::Stacking{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
+                     <:Any, <:Any, Nothing
+                 }, rd::ReturnsResult;
+             dims::Int = 1, branchorder::Symbol = :optimal, str_names::Bool = false,
+             save::Bool = true, kwargs...) -> StackingResult
+
+# Arguments
+
+  - `nco`: The nested clustered optimiser to use.
+  - $(arg_dict[:rd])
+  - `dims`: The dimension along which observations advance in time.
+  - `branchorder`: Passed to the inner and outer optimisers. The branch order to use for the clusterisation.
+  - `str_names`: Passed to the inner and outer optimisers. Whether to use string names for the assets in the optimisation.
+  - `save`: Passed to the inner and outer optimisers. Whether to save the JuMP model in the optimisation result.
+  - `kwargs`: Additional keyword arguments passed to the optimisation function.
+"""
 function optimise(st::Stacking{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                <:Any, <:Any, Nothing}, rd::ReturnsResult; dims::Int = 1,
                   branchorder::Symbol = :optimal, str_names::Bool = false,

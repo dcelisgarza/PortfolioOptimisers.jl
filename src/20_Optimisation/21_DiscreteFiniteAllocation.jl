@@ -307,6 +307,24 @@ function _optimise(da::DiscreteAllocation, w::VecNum, p::VecNum, cash::Number = 
                                     lcash, ifelse(save, smodel, nothing),
                                     ifelse(save, lmodel, nothing), nothing)
 end
+"""
+    optimise(da::DiscreteAllocation{<:Any, <:Any, <:Any, Nothing}, w::VecNum,
+             p::VecNum, cash::Number = 1e6, T::Option{<:Number} = nothing,
+             fees::Option{<:Fees} = nothing; str_names::Bool = false,
+             save::Bool = true, kwargs...) -> DiscreteAllocationResult
+
+# Arguments
+
+  - `da`: The discrete allocation optimiser to use.
+  - $(arg_dict[:pw])
+  - `p`: The prices of the assets in the same order as `w`.
+  - `cash`: The initial cash balance.
+  - `T`: The time horizon for the optimisation. Used to adjust the initial cash balance according to the fees charged on the portfolio for the time horizon.
+  - `fees`: The fees to apply to the portfolio.
+  - `str_names`: Whether to use string names for the assets in the optimisation.
+  - `save`: Whether to save the JuMP model in the optimisation result.
+  - `kwargs`: Additional keyword arguments passed to the optimisation function.
+"""
 function optimise(da::DiscreteAllocation{<:Any, <:Any, <:Any, Nothing}, w::VecNum,
                   p::VecNum, cash::Number = 1e6, T::Option{<:Number} = nothing,
                   fees::Option{<:Fees} = nothing; str_names::Bool = false,

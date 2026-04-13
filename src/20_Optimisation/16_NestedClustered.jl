@@ -584,6 +584,23 @@ function _optimise(nco::NestedClustered, rd::ReturnsResult; dims::Int = 1,
     return NestedClusteredResult(typeof(nco), pr, clr, wb, fees, resi, reso, nco.cv,
                                  retcode, w, nothing)
 end
+"""
+    optimise(nco::NestedClustered{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
+                      <:Any, <:Any, <:Any, Nothing
+                  }, rd::ReturnsResult;
+             dims::Int = 1, branchorder::Symbol = :optimal, str_names::Bool = false,
+             save::Bool = true, kwargs...) -> NestedClusteredResult
+
+# Arguments
+
+  - `nco`: The nested clustered optimiser to use.
+  - $(arg_dict[:rd])
+  - `dims`: The dimension along which observations advance in time.
+  - `branchorder`: Passed to the inner and outer optimisers. If this optimiser uses hierarchical clustering, this applies to the clusterisation. The branch order to use for the clusterisation.
+  - `str_names`: Passed to the inner and outer optimisers. Whether to use string names for the assets in the optimisation.
+  - `save`: Passed to the inner and outer optimisers. Whether to save the JuMP model in the optimisation result.
+  - `kwargs`: Additional keyword arguments passed to the optimisation function.
+"""
 function optimise(nco::NestedClustered{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                        <:Any, <:Any, <:Any, Nothing}, rd::ReturnsResult;
                   dims::Int = 1, branchorder::Symbol = :optimal, str_names::Bool = false,

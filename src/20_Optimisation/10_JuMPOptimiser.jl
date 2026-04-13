@@ -518,7 +518,7 @@ Internal function that applies the `factory` transform and resolves view slices 
   - [`processed_jump_optimiser`](@ref)
 """
 function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResult;
-                                             dims::Int = 1)
+                                             dims::Int = 1, kwargs...)
     rd = returns_result_picker(rd, opt.brt)
     pr = prior(opt.pe, rd; dims = dims)
     X = pr.X
@@ -529,7 +529,7 @@ function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResu
     st = threshold_constraints(opt.st, opt.sets; datatype = datatype, strict = opt.strict)
     lcsr = linear_constraints(opt.lcse, opt.sets; datatype = datatype, strict = opt.strict)
     ctr = centrality_constraints(opt.cte, pr; iv = rd.iv, ivpa = rd.ivpa, rd = rd,
-                                 cle_pr = opt.cle_pr)
+                                 cle_pr = opt.cle_pr, kwargs...)
     gcardr = linear_constraints(opt.gcarde, opt.sets; datatype = Int, strict = opt.strict)
     sgcardr = linear_constraints(opt.sgcarde, opt.sets; datatype = Int, strict = opt.strict)
     if opt.smtx === opt.sgmtx
@@ -559,7 +559,7 @@ function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResu
     tn = turnover_constraints(opt.tn, opt.sets; datatype = datatype, strict = opt.strict)
     fees = fees_constraints(opt.fees, opt.sets; datatype = datatype, strict = opt.strict)
     plr = phylogeny_constraints(opt.ple, pr; iv = rd.iv, ivpa = rd.ivpa, rd = rd,
-                                cle_pr = opt.cle_pr)
+                                cle_pr = opt.cle_pr, kwargs...)
     ret = factory(opt.ret, pr)
     return ProcessedJuMPOptimiserAttributes(pr, wb, lt, st, lcsr, ctr, gcardr, sgcardr,
                                             smtx, sgmtx, slt, sst, sglt, sgst, tn, fees,
@@ -613,10 +613,12 @@ Applies all factories and view slices, returning an updated `JuMPOptimiser` read
   - [`JuMPOptimiser`](@ref)
   - [`processed_jump_optimiser_attributes`](@ref)
 """
-function processed_jump_optimiser(opt::JuMPOptimiser, rd::ReturnsResult; dims::Int = 1)
+function processed_jump_optimiser(opt::JuMPOptimiser, rd::ReturnsResult; dims::Int = 1,
+                                  kwargs...)
     (; pr, wb, lt, st, lcsr, ctr, gcardr, sgcardr, smtx, sgmtx, slt, sst, sglt, sgst, tn, fees, plr, ret) = processed_jump_optimiser_attributes(opt,
                                                                                                                                                 rd;
-                                                                                                                                                dims = dims)
+                                                                                                                                                dims = dims,
+                                                                                                                                                kwargs...)
     return JuMPOptimiser(; pe = pr, slv = opt.slv, wb = wb, bgt = opt.bgt, sbgt = opt.sbgt,
                          lt = lt, st = st, lcse = lcsr, cte = ctr, gcarde = gcardr,
                          sgcarde = sgcardr, smtx = smtx, sgmtx = sgmtx, slt = slt,
