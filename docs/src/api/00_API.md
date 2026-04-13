@@ -584,6 +584,9 @@ These optimisations attempt to achieve weight values according to a risk budget 
 
 - ::: details Budget targets
   - Asset risk budgeting [`AssetRiskBudgeting`](@ref)
+  - ::: details Fromulations
+    - Log-barrier risk budgeting [`LogRiskBudgeting`](@ref)
+    - MIP asset risk bugeting [`MixedIntegerRiskBudgeting`](@ref)
   - Factor risk budgeting [`FactorRiskBudgeting`](@ref)
 - ::: details Optimisation estimators
   - Risk Budgeting [`RiskBudgeting`](@ref) returns a [`RiskBudgetingResult`](@ref)

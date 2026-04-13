@@ -89,7 +89,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Log-barrier formulation for Risk Budgeting.
 
-Uses a logarithmic objective to enforce the risk budget constraints in a smooth, continuous optimisation formulation.
+Uses a logarithmic objective to enforce the risk budget constraints. This can only produce positive weights.
 
 # Related Types
 
@@ -102,7 +102,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Mixed-integer formulation for Risk Budgeting.
 
-Uses binary variables and big-M constraints to enforce the risk budget constraints, enabling exact cardinality control.
+Uses binary variables and big-M constraints to enforce the risk budget constraints. This can find the minimal risk portfolio which meets the risk budgeting constraints by exploring all possible sign combinations of weights. This can be very expensive for large universes.
 
 # Related Types
 
