@@ -74,6 +74,8 @@ MultiEstValType
 EstValType
 PairGSCV
 DictGSCV
+GSCVKey
+RSCVVal
 MultiGSCVValType
 VecMultiGSCVValType
 MultiGSCVValType_VecMultiGSCVValType

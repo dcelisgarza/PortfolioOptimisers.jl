@@ -72,21 +72,51 @@ GridSearchCrossValidation
     ex
     train_score
     kwargs
-    function GridSearchCrossValidation(p::MultiGSCVValType_VecMultiGSCVValType,
+    function GridSearchCrossValidation(p::Union{<:AbstractVector{<:Pair{<:Any,
+                                                                        <:AbstractVector}},
+                                                <:AbstractVector{<:AbstractVector{<:Pair{<:Any,
+                                                                                         <:AbstractVector}}},
+                                                <:AbstractDict{<:Any, <:AbstractVector},
+                                                <:AbstractVector{<:AbstractDict{<:Any,
+                                                                                <:AbstractVector}}},
                                        cv::SearchCV, r::AbstractBaseRiskMeasure,
                                        scorer::CrossValSearchScorer,
                                        ex::FLoops.Transducers.Executor, train_score::Bool,
                                        kwargs::NamedTuple)
         @argcheck(!isempty(p), IsEmptyError)
-        if isa(p, VecMultiGSCVValType)
+        p_flag = isa(p, AbstractVector{<:Pair})
+        d_flag = isa(p, AbstractDict)
+        vp_flag = isa(p, AbstractVector{<:AbstractVector{<:Pair}})
+        vd_flag = isa(p, AbstractVector{<:AbstractDict})
+        if p_flag
+            @argcheck(all(x -> isa(x[1], GSCVKey), p))
+        elseif d_flag
+            @argcheck(all(x -> isa(x, GSCVKey), keys(p)))
+        elseif vp_flag || vd_flag
             @argcheck(all(!isempty, p), IsEmptyError)
+            if vp_flag
+                for _p in p
+                    @argcheck(all(x -> isa(x[1], GSCVKey), _p))
+                end
+            end
+            if vd_flag
+                for _p in p
+                    @argcheck(all(x -> isa(x, GSCVKey), keys(_p)))
+                end
+            end
         end
         return new{typeof(p), typeof(cv), typeof(r), typeof(scorer), typeof(ex),
                    typeof(train_score), typeof(kwargs)}(p, cv, r, scorer, ex, train_score,
                                                         kwargs)
     end
 end
-function GridSearchCrossValidation(p::MultiGSCVValType_VecMultiGSCVValType;
+function GridSearchCrossValidation(p::Union{<:AbstractVector{<:Pair{<:Any,
+                                                                    <:AbstractVector}},
+                                            <:AbstractVector{<:AbstractVector{<:Pair{<:Any,
+                                                                                     <:AbstractVector}}},
+                                            <:AbstractDict{<:Any, <:AbstractVector},
+                                            <:AbstractVector{<:AbstractDict{<:Any,
+                                                                            <:AbstractVector}}};
                                    cv::SearchCV = KFold(),
                                    r::AbstractBaseRiskMeasure = ConditionalValueatRisk(),
                                    scorer::CrossValSearchScorer = HighestMeanScore(),
@@ -114,19 +144,19 @@ Converts the input vector of `key => values` pairs into a grid of Accessors.jl l
   - [`parse_lens`](@ref)
   - [`GridSearchCrossValidation`](@ref)
 """
-function lens_val_grid(estval::AbstractVector{<:Pair{<:String, <:AbstractVector}})
+function lens_val_grid(estval::AbstractVector{<:Pair{<:Any, <:AbstractVector}})
     vals = vec(collect(Iterators.product(map(x -> x[2], estval)...)))
     lenses = fill(map(x -> parse_lens(x[1]), estval), length(vals))
     return lenses, vals
 end
-function lens_val_grid(estval::AbstractDict{<:String, <:AbstractVector})
+function lens_val_grid(estval::AbstractDict{<:Any, <:AbstractVector})
     vals = vec(collect(Iterators.product(values(estval)...)))
     lenses = fill(map(x -> parse_lens(x), collect(keys(estval))), length(vals))
     return lenses, vals
 end
-function lens_val_grid(estvals::AbstractVector{<:Union{<:AbstractVector{<:Pair{<:String,
+function lens_val_grid(estvals::AbstractVector{<:Union{<:AbstractVector{<:Pair{<:Any,
                                                                                <:AbstractVector}},
-                                                       <:AbstractDict{<:String,
+                                                       <:AbstractDict{<:Any,
                                                                       <:AbstractVector}}})
     lenses_vals = [lens_val_grid(estval) for estval in estvals]
     lenses = mapreduce(x -> x[1], vcat, lenses_vals)

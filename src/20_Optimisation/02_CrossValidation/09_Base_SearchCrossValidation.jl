@@ -306,5 +306,12 @@ Converts a dotted string path (e.g., `"opt.pe.ce"`) into a composable lens for g
 function parse_lens(key::AbstractString)
     return _expr_to_lens_chain(Meta.parse(key))
 end
+function parse_lens(key::Union{Expr, Symbol})
+    return _expr_to_lens_chain(key)
+end
+function parse_lens(key::Union{<:ComposedFunction, <:Accessors.PropertyLens,
+                               <:Accessors.IndexLens})
+    return key
+end
 
 export SearchCrossValidationResult, HighestMeanScore

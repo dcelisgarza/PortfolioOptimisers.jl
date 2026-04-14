@@ -1,6 +1,6 @@
 @safetestset "Cross Validation" begin
     using Test, PortfolioOptimisers, DataFrames, TimeSeries, CSV, Clarabel, Dates,
-          StableRNGs, Distributions, OrderedCollections
+          StableRNGs, Distributions, OrderedCollections, Accessors
     rd = prices_to_returns(TimeArray(CSV.File(joinpath(@__DIR__, "./assets/SP500.csv.gz"));
                                      timestamp = :Date)[(end - 252 * 4):end],
                            TimeArray(CSV.File(joinpath(@__DIR__, "./assets/Factors.csv.gz"));
@@ -749,12 +749,15 @@
                                                              stop = 0.0007, length = 3)],
                                   ["opti[1].opt.l2" => range(; start = 0.0004,
                                                              stop = 0.0007, length = 3)],
-                                  ["opti[2].opt.l1" => range(; start = 0.0009,
-                                                             stop = 0.0012, length = 3)],
-                                  ["opti[2]" => [MeanRisk(; opt = opt,
-                                                          obj = MaximumUtility()),
-                                                 MeanRisk(; opt = opt,
-                                                          obj = MaximumRatio())]]])
+                                  [PropertyLens(:l1) ∘ PropertyLens(:opt) ∘ IndexLens(2) ∘ PropertyLens(:opti) => range(;
+                                                                                                                        start = 0.0009,
+                                                                                                                        stop = 0.0012,
+                                                                                                                        length = 3)],
+                                  [:(opti[2]) => [MeanRisk(; opt = opt,
+                                                           obj = MaximumUtility()),
+                                                  MeanRisk(; opt = opt,
+                                                           obj = MaximumRatio())]]]);
+
         gs_cv = GridSearchCrossValidation(p; r = r)
         gs_res1 = search_cross_validation(mr, gs_cv, rd)
         rs_cv1 = RandomisedSearchCrossValidation(p; rng = StableRNG(42), r = r)
@@ -767,12 +770,14 @@
                                                                  stop = 0.0007, length = 3)),
                                   Dict("opti[1].opt.l2" => range(; start = 0.0004,
                                                                  stop = 0.0007, length = 3)),
-                                  Dict("opti[2].opt.l1" => range(; start = 0.0009,
-                                                                 stop = 0.0012, length = 3)),
-                                  Dict("opti[2]" => [MeanRisk(; opt = opt,
-                                                              obj = MaximumUtility()),
-                                                     MeanRisk(; opt = opt,
-                                                              obj = MaximumRatio())])])
+                                  Dict(PropertyLens(:l1) ∘ PropertyLens(:opt) ∘ IndexLens(2) ∘ PropertyLens(:opti) => range(;
+                                                                                                                            start = 0.0009,
+                                                                                                                            stop = 0.0012,
+                                                                                                                            length = 3)),
+                                  Dict(:(opti[2]) => [MeanRisk(; opt = opt,
+                                                               obj = MaximumUtility()),
+                                                      MeanRisk(; opt = opt,
+                                                               obj = MaximumRatio())])])
         rs_cv2 = RandomisedSearchCrossValidation(p; rng = StableRNG(42), r = r)
         rs_res2 = search_cross_validation(mr, rs_cv2, rd)
         rev = rs_res2.val_grid[rs_res2.idx] != rs_res1.val_grid[rs_res1.idx]

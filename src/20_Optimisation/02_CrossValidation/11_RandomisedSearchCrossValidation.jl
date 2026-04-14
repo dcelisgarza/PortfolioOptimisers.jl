@@ -90,14 +90,10 @@ RandomisedSearchCrossValidation
     seed
     train_score
     kwargs
-    function RandomisedSearchCrossValidation(p::Union{<:AbstractVector{<:Pair{<:AbstractString,
-                                                                              <:Any}},
-                                                      <:AbstractVector{<:AbstractVector{<:Pair{<:AbstractString,
-                                                                                               <:Any}}},
-                                                      <:AbstractDict{<:AbstractString,
-                                                                     <:Any},
-                                                      <:AbstractVector{<:AbstractDict{<:AbstractString,
-                                                                                      <:Any}}},
+    function RandomisedSearchCrossValidation(p::Union{<:AbstractVector{<:Pair},
+                                                      <:AbstractVector{<:AbstractVector{<:Pair}},
+                                                      <:AbstractDict,
+                                                      <:AbstractVector{<:AbstractDict}},
                                              cv::SearchCV, r::AbstractBaseRiskMeasure,
                                              scorer::CrossValSearchScorer,
                                              ex::FLoops.Transducers.Executor,
@@ -110,27 +106,23 @@ RandomisedSearchCrossValidation
         vp_flag = isa(p, AbstractVector{<:AbstractVector{<:Pair}})
         vd_flag = isa(p, AbstractVector{<:AbstractDict})
         if p_flag
-            @argcheck(all(x -> isa(x[2],
-                                   Union{<:AbstractVector, <:Distributions.Distribution}),
-                          p))
+            @argcheck(all(x -> isa(x[1], GSCVKey), p))
+            @argcheck(all(x -> isa(x[2], RSCVVal), p))
         elseif d_flag
-            @argcheck(all(x -> isa(x, Union{<:AbstractVector, <:Distributions.Distribution}),
-                          values(p)))
+            @argcheck(all(x -> isa(x, GSCVKey), keys(p)))
+            @argcheck(all(x -> isa(x, RSCVVal), values(p)))
         elseif vp_flag || vd_flag
             @argcheck(all(!isempty, p), IsEmptyError)
             if vp_flag
                 for _p in p
-                    @argcheck(all(x -> isa(x[2],
-                                           Union{<:AbstractVector,
-                                                 <:Distributions.Distribution}), _p))
+                    @argcheck(all(x -> isa(x[1], GSCVKey), _p))
+                    @argcheck(all(x -> isa(x[2], RSCVVal), _p))
                 end
             end
             if vd_flag
                 for _p in p
-                    @argcheck(all(x -> isa(x,
-                                           Union{<:AbstractVector,
-                                                 <:Distributions.Distribution}),
-                                  values(_p)))
+                    @argcheck(all(x -> isa(x, GSCVKey), keys(_p)))
+                    @argcheck(all(x -> isa(x, RSCVVal), values(_p)))
                 end
             end
         end
@@ -141,13 +133,10 @@ RandomisedSearchCrossValidation
                                    kwargs)
     end
 end
-function RandomisedSearchCrossValidation(p::Union{<:AbstractVector{<:Pair{<:AbstractString,
-                                                                          <:Any}},
-                                                  <:AbstractVector{<:AbstractVector{<:Pair{<:AbstractString,
-                                                                                           <:Any}}},
-                                                  <:AbstractDict{<:AbstractString, <:Any},
-                                                  <:AbstractVector{<:AbstractDict{<:AbstractString,
-                                                                                  <:Any}}};
+function RandomisedSearchCrossValidation(p::Union{<:AbstractVector{<:Pair},
+                                                  <:AbstractVector{<:AbstractVector{<:Pair}},
+                                                  <:AbstractDict,
+                                                  <:AbstractVector{<:AbstractDict}};
                                          cv::SearchCV = KFold(),
                                          r::AbstractBaseRiskMeasure = ConditionalValueatRisk(),
                                          scorer::CrossValSearchScorer = HighestMeanScore(),
@@ -183,7 +172,7 @@ Samples `n_iter` random parameter combinations from the provided distributions o
   - [`RandomisedSearchCrossValidation`](@ref)
   - [`parse_lens`](@ref)
 """
-function make_p_grid(p::Pair{<:AbstractString}, n_iter::Integer, rng::Random.AbstractRNG,
+function make_p_grid(p::Pair, n_iter::Integer, rng::Random.AbstractRNG,
                      replace::Bool = false)
     vals = if isa(p[2], Distributions.Distribution)
         rand(rng, p[2], n_iter)
@@ -192,19 +181,15 @@ function make_p_grid(p::Pair{<:AbstractString}, n_iter::Integer, rng::Random.Abs
     end
     return Pair(p[1], vals)
 end
-function make_p_grid(ps::AbstractVector{<:Pair{<:AbstractString, <:Any}}, n_iter::Integer,
-                     rng::Random.AbstractRNG)
+function make_p_grid(ps::AbstractVector{<:Pair}, n_iter::Integer, rng::Random.AbstractRNG)
     replace = any(x -> isa(x[2], Distributions.Distribution), ps)
     return concrete_typed_array([make_p_grid(p, n_iter, rng, replace) for p in ps])
 end
-function make_p_grid(ps::AbstractDict{<:AbstractString, <:Any}, n_iter::Integer,
-                     rng::Random.AbstractRNG)
+function make_p_grid(ps::AbstractDict, n_iter::Integer, rng::Random.AbstractRNG)
     replace = any(x -> isa(x[2], Distributions.Distribution), ps)
     return Dict(make_p_grid(key => val, n_iter, rng, replace) for (key, val) in ps)
 end
-function make_p_grid(pss::AbstractVector{<:Union{<:AbstractDict{<:AbstractString, <:Any},
-                                                 <:AbstractVector{<:Pair{<:AbstractString,
-                                                                         <:Any}}}},
+function make_p_grid(pss::AbstractVector{<:Union{<:AbstractDict, <:AbstractVector{<:Pair}}},
                      n_iter::Integer, rng::Random.AbstractRNG)
     return concrete_typed_array([make_p_grid(ps, n_iter, rng) for ps in pss])
 end

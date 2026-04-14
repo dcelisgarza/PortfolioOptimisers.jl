@@ -721,6 +721,31 @@ const PairStrNum = Pair{<:AbstractString, <:Number}
 """
 $(DocStringExtensions.TYPEDEF)
 
+Alias for a key type used in grid search cross-validation, which can be an abstract string, an expression, a symbol, a composed function, or an accessor lens.
+
+# Related
+
+  - [`PairGSCV`](@ref)
+  - [`DictGSCV`](@ref)
+  - [`MultiGSCVValType`](@ref)
+"""
+const GSCVKey = Union{<:AbstractString, Expr, Symbol, <:ComposedFunction,
+                      <:Accessors.PropertyLens, <:Accessors.IndexLens}
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Alias for a value type used in randomised search cross-validation, which can be an abstract vector or a distribution.
+
+# Related
+
+  - [`PairGSCV`](@ref)
+  - [`DictGSCV`](@ref)
+  - [`MultiGSCVValType`](@ref)
+"""
+const RSCVVal = Union{<:AbstractVector, <:Distributions.Distribution}
+"""
+$(DocStringExtensions.TYPEDEF)
+
 Alias for a pair consisting of an abstract string and an abstract vector.
 
 # Related
@@ -728,7 +753,7 @@ Alias for a pair consisting of an abstract string and an abstract vector.
   - [`DictGSCV`](@ref)
   - [`MultiGSCVValType`](@ref)
 """
-const PairGSCV = Pair{<:AbstractString, <:AbstractVector}
+const PairGSCV = Pair{<:GSCVKey, <:AbstractVector}
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -750,7 +775,7 @@ Alias for an abstract dictionary with string keys and abstract vector values.
   - [`PairGSCV`](@ref)
   - [`MultiGSCVValType`](@ref)
 """
-const DictGSCV = AbstractDict{<:AbstractString, <:AbstractVector}
+const DictGSCV = AbstractDict{<:GSCVKey, <:AbstractVector}
 """
     const MultiEstValType = Union{<:DictStrNum, <:AbstractVector{<:PairStrNum}}
 
