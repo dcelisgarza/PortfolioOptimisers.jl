@@ -1,6 +1,6 @@
 @safetestset "Cross Validation" begin
     using Test, PortfolioOptimisers, DataFrames, TimeSeries, CSV, Clarabel, Dates,
-          StableRNGs, Distributions, OrderedCollections
+          StableRNGs, Distributions, OrderedCollections, Accessors
     rd = prices_to_returns(TimeArray(CSV.File(joinpath(@__DIR__, "./assets/SP500.csv.gz"));
                                      timestamp = :Date)[(end - 252 * 4):end],
                            TimeArray(CSV.File(joinpath(@__DIR__, "./assets/Factors.csv.gz"));
@@ -379,7 +379,7 @@
                                817:927, 928:1008]
 
         cv = IndexWalkForward(137, 111; reduce_test = true, purged_size = 13,
-                              expend_train = true)
+                              expand_train = true)
         (; train_idx, test_idx) = split(cv, rd)
         N = n_splits(cv, rd)
         @test length(train_idx) == length(test_idx) == N
@@ -458,7 +458,7 @@
                                631:694, 695:758, 759:820, 821:882, 883:946, 947:1008]
 
         cv = DateWalkForward(12, 3; period = Month(1), adjuster = ldm, previous = true,
-                             purged_size = 17, reduce_test = true, expend_train = true)
+                             purged_size = 17, reduce_test = true, expand_train = true)
         (; train_idx, test_idx) = split(cv, rd)
         N = n_splits(cv, rd)
         @test length(train_idx) == length(test_idx) == N
@@ -486,7 +486,7 @@
 
         cv = DateWalkForward(Day(23), 13; period = Month(1), adjuster = ldm,
                              previous = true, purged_size = 17, reduce_test = true,
-                             expend_train = true)
+                             expand_train = true)
         (; train_idx, test_idx) = split(cv, rd)
         N = n_splits(cv, rd)
         @test length(train_idx) == length(test_idx) == N
@@ -509,7 +509,8 @@
         train0, test0 = res.train_idx, res.test_idx
 
         cv = MultipleRandomised(IndexWalkForward(127, 171); rng = StableRNG(666), seed = 69)
-        (; train_idx, test_idx, asset_idx, path_ids) = split(cv, rd)
+        cv_res = split(cv, rd)
+        (; train_idx, test_idx, asset_idx, path_ids) = cv_res
 
         N = n_splits(cv.cv, rd)
         @test length(train_idx) == length(train_idx) == cv.n_subsets * N
@@ -520,10 +521,13 @@
             @test all(path_ids[idx] .== i)
             @test all(length.(asset_idx[idx]) .== cv.subset_size)
         end
+        @test n_splits(cv, rd) == n_splits(cv_res) == length(path_ids)
 
         cv = MultipleRandomised(IndexWalkForward(127, 171); rng = StableRNG(666), seed = 42,
                                 n_subsets = 5, subset_size = 7, window_size = 321)
-        (; train_idx, test_idx, asset_idx, path_ids) = split(cv, rd)
+        cv_res = split(cv, rd)
+        (; train_idx, test_idx, asset_idx, path_ids) = cv_res
+        @test n_splits(cv, rd) == n_splits(cv_res) == length(path_ids)
 
         cv2 = MultipleRandomised(IndexWalkForward(127, 171); rng = StableRNG(666),
                                  seed = 42, n_subsets = x -> 5,
@@ -565,6 +569,36 @@
         @test all(length.(asset_idx) .== cv.subset_size)
         @test unique(asset_idx) != asset_idx
         @test unique.(asset_idx) == asset_idx
+
+        function ldm(x)
+            val = lastdayofmonth.(x)
+            while !isempty(val)
+                if val[end] > x[end]
+                    val = val[1:(end - 1)]
+                else
+                    break
+                end
+            end
+            return val
+        end
+        cv = MultipleRandomised(DateWalkForward(12, 3; period = Month(1), adjuster = ldm);
+                                rng = StableRNG(666), seed = 69)
+        cv_res = split(cv, rd)
+        (; train_idx, test_idx, asset_idx, path_ids) = cv_res
+        @test n_splits(cv, rd) == n_splits(cv_res) == length(path_ids)
+
+        cv = MultipleRandomised(DateWalkForward(12, 3; period = Month(1), adjuster = ldm);
+                                rng = StableRNG(666), seed = 42, n_subsets = 5,
+                                subset_size = 7, window_size = 336)
+        @test_throws IsEmptyError split(cv, rd)
+
+        cv = MultipleRandomised(DateWalkForward(12, 3; period = Month(1), adjuster = ldm);
+                                rng = StableRNG(666), seed = 42, n_subsets = 5,
+                                subset_size = 7, window_size = 340)
+        cv_res = split(cv, rd)
+        (; train_idx, test_idx, asset_idx, path_ids) = cv_res
+        @test_throws ArgumentError n_splits(cv, rd)
+        @test n_splits(cv_res) == length(path_ids)
     end
     @testset "Cross val predict" begin
         w0 = fill(inv(size(rd.X, 2)), size(rd.X, 2))
@@ -715,12 +749,15 @@
                                                              stop = 0.0007, length = 3)],
                                   ["opti[1].opt.l2" => range(; start = 0.0004,
                                                              stop = 0.0007, length = 3)],
-                                  ["opti[2].opt.l1" => range(; start = 0.0009,
-                                                             stop = 0.0012, length = 3)],
-                                  ["opti[2]" => [MeanRisk(; opt = opt,
-                                                          obj = MaximumUtility()),
-                                                 MeanRisk(; opt = opt,
-                                                          obj = MaximumRatio())]]])
+                                  [PropertyLens(:l1) ∘ PropertyLens(:opt) ∘ IndexLens(2) ∘ PropertyLens(:opti) => range(;
+                                                                                                                        start = 0.0009,
+                                                                                                                        stop = 0.0012,
+                                                                                                                        length = 3)],
+                                  [:(opti[2]) => [MeanRisk(; opt = opt,
+                                                           obj = MaximumUtility()),
+                                                  MeanRisk(; opt = opt,
+                                                           obj = MaximumRatio())]]]);
+
         gs_cv = GridSearchCrossValidation(p; r = r)
         gs_res1 = search_cross_validation(mr, gs_cv, rd)
         rs_cv1 = RandomisedSearchCrossValidation(p; rng = StableRNG(42), r = r)
@@ -733,12 +770,14 @@
                                                                  stop = 0.0007, length = 3)),
                                   Dict("opti[1].opt.l2" => range(; start = 0.0004,
                                                                  stop = 0.0007, length = 3)),
-                                  Dict("opti[2].opt.l1" => range(; start = 0.0009,
-                                                                 stop = 0.0012, length = 3)),
-                                  Dict("opti[2]" => [MeanRisk(; opt = opt,
-                                                              obj = MaximumUtility()),
-                                                     MeanRisk(; opt = opt,
-                                                              obj = MaximumRatio())])])
+                                  Dict(PropertyLens(:l1) ∘ PropertyLens(:opt) ∘ IndexLens(2) ∘ PropertyLens(:opti) => range(;
+                                                                                                                            start = 0.0009,
+                                                                                                                            stop = 0.0012,
+                                                                                                                            length = 3)),
+                                  Dict(:(opti[2]) => [MeanRisk(; opt = opt,
+                                                               obj = MaximumUtility()),
+                                                      MeanRisk(; opt = opt,
+                                                               obj = MaximumRatio())])])
         rs_cv2 = RandomisedSearchCrossValidation(p; rng = StableRNG(42), r = r)
         rs_res2 = search_cross_validation(mr, rs_cv2, rd)
         rev = rs_res2.val_grid[rs_res2.idx] != rs_res1.val_grid[rs_res1.idx]

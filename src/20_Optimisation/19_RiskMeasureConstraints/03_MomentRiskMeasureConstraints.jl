@@ -1,3 +1,27 @@
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Compute the target return used as the reference level for lower/upper moment risk constraints.
+
+Dispatches on the type of `r.mu`: when `nothing`, uses the prior mean vector `mu`; when a
+`VecNum`, uses `r.mu`; when a `VecScalar`, combines the vector and scalar parts with `k`;
+when a scalar `Number`, scales it by `k`.
+
+# Arguments
+
+  - `r::LoHiOrderMoment`: Risk measure carrying the target specification.
+  - `w`: Portfolio weight vector.
+  - `mu::VecNum`: Prior mean return vector.
+  - `k`: Leverage/scale variable from the model.
+
+# Returns
+
+  - The scalar target return used as the lower moment reference.
+
+# Related
+
+  - [`set_risk_constraints!`](@ref)
+"""
 function calc_risk_constraint_target(::LoHiOrderMoment{<:Any, <:Any, Nothing, <:Any},
                                      w::VecNum, mu::VecNum, args...)
     return LinearAlgebra.dot(w, mu)
@@ -14,6 +38,35 @@ function calc_risk_constraint_target(r::LoHiOrderMoment{<:Any, <:Any, <:Number, 
                                      ::Any, ::Any, k)
     return r.mu * k
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Add first lower moment, mean absolute deviation, or second moment risk constraints to `model`.
+
+Each overload introduces auxiliary non-negative variables (semi-deviations or lower
+exceedances) for `T` observations, computes an observation-weighted mean, and adds an
+inequality constraint linking the auxiliary variables to the portfolio returns minus the
+target. The second-moment overload additionally supports full and lower-half formulations and
+multiple variance encodings via [`set_second_moment_risk!`](@ref).
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - $(arg_dict[:ci])
+  - `r::LowOrderMoment`: Risk measure instance.
+  - $(arg_dict[:opt_rjumpe])
+  - `pr::AbstractPriorResult`: Prior result containing `X` (returns matrix) and `mu`.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`calc_risk_constraint_target`](@ref)
+  - [`set_second_moment_risk!`](@ref)
+  - [`set_risk_bounds_and_expression!`](@ref)
+"""
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::LowOrderMoment{<:Any, <:Any, <:Any, <:FirstLowerMoment},
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
@@ -27,6 +80,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     T = length(net_X)
     flm = model[Symbol(:flm_, i)] = JuMP.@variable(model, [1:T], lower_bound = 0)
     wi = nothing_scalar_array_selector(r.w, pr.w)
+    wi = get_observation_weights(wi, net_X)
     flm_risk = model[key] = if isnothing(wi)
         JuMP.@expression(model, Statistics.mean(flm))
     else
@@ -36,6 +90,34 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     set_risk_bounds_and_expression!(model, opt, flm_risk, r.settings, key)
     return flm_risk
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Add JuMP risk constraints for `LowOrderMoment` with `MeanAbsoluteDeviation` semi-deviation
+to `model`.
+
+Introduces auxiliary `mad` variables and adds constraints encoding the mean absolute
+deviation of portfolio returns relative to the target benchmark. Registers the risk
+expression and upper-bound constraint.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - $(arg_dict[:ci])
+  - `r::LowOrderMoment{<:Any, <:Any, <:Any, <:MeanAbsoluteDeviation}`: The MAD risk measure.
+  - $(arg_dict[:opt_rjumpe])
+  - $(arg_dict[:pr])
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`LowOrderMoment`](@ref)
+  - [`MeanAbsoluteDeviation`](@ref)
+  - [`set_risk_constraints!`](@ref)
+"""
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::LowOrderMoment{<:Any, <:Any, <:Any,
                                                  <:MeanAbsoluteDeviation},
@@ -50,6 +132,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     T = length(net_X)
     mad = model[Symbol(:mad_, i)] = JuMP.@variable(model, [1:T], lower_bound = 0)
     wi = nothing_scalar_array_selector(r.w, pr.w)
+    wi = get_observation_weights(wi, net_X)
     mad_risk = model[Symbol(:mad_risk_, i)] = if isnothing(wi)
         JuMP.@expression(model, 2 * Statistics.mean(mad))
     else
@@ -59,6 +142,36 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     set_risk_bounds_and_expression!(model, opt, mad_risk, r.settings, key)
     return mad_risk
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Build the second-moment risk JuMP expression in one of four encodings.
+
+The `QuadRiskExpr` overload encodes variance as a quadratic dot product. The `RSOCRiskExpr`
+overload uses a rotated second-order cone to encode the squared norm. The `SquaredSOCRiskExpr`
+overload squares an existing SOC variable. The `SOCRiskExpr` overload returns the SOC
+variable directly (standard deviation form). All methods return the risk expression and a
+scaling factor.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - $(arg_dict[:ci])
+  - `factor::Number`: Variance correction factor (e.g. `1 / (T - 1)`).
+  - `second_moment`: Return deviation vector or matrix.
+  - $(arg_dict[:key_sym])
+  - `keyt`, `keyc`: Symbols for the auxiliary variable and its constraint.
+  - `tsecond_moment`: Pre-existing SOC variable (used by SquaredSOC/SOC overloads).
+
+# Returns
+
+  - A 2-tuple `(r_expr, factor)` of the risk JuMP expression and its scaling factor.
+
+# Related
+
+  - [`set_risk_constraints!`](@ref)
+  - [`second_moment_bound_val`](@ref)
+"""
 function set_second_moment_risk!(model::JuMP.Model, ::QuadRiskExpr, ::Any, factor::Number,
                                  second_moment, key::Symbol, args...)
     return model[key] = JuMP.@expression(model,
@@ -89,6 +202,29 @@ function set_second_moment_risk!(model::JuMP.Model, ::SOCRiskExpr, i::Any, facto
     factor = sqrt(factor)
     return model[key] = JuMP.@expression(model, factor * tsecond_moment), factor
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Convert an upper-bound value to the appropriate scale for the second-moment bounding variable.
+
+Scales `ub` by `inv(factor)` and, when the formulation is not `SOCRiskExpr`, applies a
+square-root transformation to convert from variance to standard-deviation units. Returns
+`nothing` when `ub` is `nothing`.
+
+# Arguments
+
+  - `alg::SecondMomentFormulation`: Second-moment risk formulation (e.g. `SOCRiskExpr`).
+  - `ub`: Upper bound value (scalar, vector, `Frontier`, or `nothing`).
+  - `factor::Number`: Variance correction factor.
+
+# Returns
+
+  - The rescaled upper bound, or `nothing` when `ub` is `nothing`.
+
+# Related
+
+  - [`set_second_moment_risk!`](@ref)
+"""
 function second_moment_bound_val(alg::SecondMomentFormulation, ub::Frontier, factor::Number)
     return _Frontier(; N = ub.N, factor = inv(factor), flag = isa(alg, SOCRiskExpr))
 end
@@ -101,6 +237,34 @@ end
 function second_moment_bound_val(::Any, ::Nothing, ::Any)
     return nothing
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Add JuMP risk constraints for `LowOrderMoment` with `SecondMoment` (semi-variance /
+semi-deviation) to `model`.
+
+Introduces a `sqrt_second_moment` variable and adds SOC or quadratic constraints encoding
+the second central moment of portfolio returns relative to the target benchmark. Registers
+the risk expression and upper-bound constraint.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - $(arg_dict[:ci])
+  - `r::LowOrderMoment{<:Any, <:Any, <:Any, <:SecondMoment}`: The second-moment risk measure.
+  - $(arg_dict[:opt_rjumpe])
+  - $(arg_dict[:pr])
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`LowOrderMoment`](@ref)
+  - [`SecondMoment`](@ref)
+  - [`set_risk_constraints!`](@ref)
+"""
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::LowOrderMoment{<:Any, <:Any, <:Any, <:SecondMoment},
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
@@ -127,6 +291,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                                                               tgt) >= 0)
     end
     wi = nothing_scalar_array_selector(r.w, pr.w)
+    wi = get_observation_weights(wi, net_X)
     second_moment_risk, factor = if isnothing(wi)
         factor = StatsBase.varcorrection(T, r.alg.ve.corrected)
         set_second_moment_risk!(model, r.alg.alg2, i, factor, second_moment, key,

@@ -1,11 +1,5 @@
 """
-    struct ClusterNode{tid, tl, tr, td, tcnt} <: AbstractResult
-        id::tid
-        left::tl
-        right::tr
-        height::td
-        level::tcnt
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Node type for representing clusters in a hierarchical clustering tree.
 
@@ -19,13 +13,17 @@ Node type for representing clusters in a hierarchical clustering tree.
   - `height`: Height of the node in the tree.
   - `level`: Level of the node in the tree.
 
-# Constructor
+# Constructors
 
-    ClusterNode(id, left::Option{<:ClusterNode} = nothing,
-                right::Option{<:ClusterNode} = nothing, height::Number = 0.0,
-                level::Int = 1)
+    ClusterNode(
+        id,
+        left::Option{<:ClusterNode} = nothing,
+        right::Option{<:ClusterNode} = nothing,
+        height::Number = 0.0,
+        level::Int = 1
+    ) -> ClusterNode
 
-Positional and keyword arguments correspond to the fields above. The `level` is automatically computed based on the levels of child nodes if they exist.
+Arguments correspond to the struct's fields. The `level` is automatically computed based on the levels of child nodes if they exist.
 
 # Examples
 
@@ -61,6 +59,19 @@ struct ClusterNode{tid, tl, tr, td, tcnt} <: AbstractResult
                                                                                            ilevel)
     end
 end
+"""
+    const VecClN = AbstractVector{<:ClusterNode}
+
+Alias for a vector of [`ClusterNode`](@ref) objects.
+
+Represents an ordered collection of cluster nodes, typically used in hierarchical tree traversal and linkage computation.
+
+# Related
+
+  - [`ClusterNode`](@ref)
+  - [`to_tree`](@ref)
+  - [`pre_order`](@ref)
+"""
 const VecClN = AbstractVector{<:ClusterNode}
 """
     is_leaf(a::ClusterNode)
@@ -92,7 +103,7 @@ function is_leaf(a::ClusterNode)
     return isnothing(a.left)
 end
 """
-    abstract type AbstractPreorderBy <: AbstractAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all preorder traversal strategies in `PortfolioOptimisers.jl`.
 
@@ -105,7 +116,7 @@ All concrete and/or abstract types implementing specific preorder traversal logi
 """
 abstract type AbstractPreorderBy <: AbstractAlgorithm end
 """
-    struct PreorderTreeByID <: AbstractPreorderBy end
+$(DocStringExtensions.TYPEDEF)
 
 Preorder traversal strategy that visits nodes by their ID.
 
@@ -353,9 +364,9 @@ end
     optimal_number_clusters(onc::OptimalNumberClusters{<:Any, <:Integer}, res::Hclust,
                             args...)
     optimal_number_clusters(onc::OptimalNumberClusters{<:Any, <:SecondOrderDifference},
-                            res::Hclust, dist::MatNum)
+                            res::Hclust, D::MatNum)
     optimal_number_clusters(onc::OptimalNumberClusters{<:Any, <:SilhouetteScore},
-                            res::Hclust, dist::MatNum)
+                            res::Hclust, D::MatNum)
 
 Select the optimal number of clusters for a hierarchical clustering tree.
 
@@ -371,7 +382,7 @@ This function applies the specified optimal number of clusters estimator (`onc`)
 
   - `clustering`: Hierarchical clustering object.
 
-  - `dist`: Distance matrix used for clustering.
+  - `D`: Distance matrix used for clustering.
 
 # Returns
 
@@ -441,35 +452,35 @@ function optimal_number_clusters(onc::OptimalNumberClusters{<:Any, <:Integer},
     return k
 end
 function optimal_number_clusters(onc::OptimalNumberClusters{<:Any, <:SecondOrderDifference},
-                                 res::Clustering.Hclust, dist::MatNum)
-    N = size(dist, 1)
+                                 res::Clustering.Hclust, D::MatNum)
+    N = size(D, 1)
     max_k = isnothing(onc.max_k) ? floor(Int, sqrt(N)) : onc.max_k
     c1 = min(min(floor(Int, sqrt(N)), max_k) + 2, N)
     cluster_lvls = [Clustering.cutree(res; k = k) for k in 1:c1]
     measure_alg = onc.alg.alg
-    W_list = Vector{eltype(dist)}(undef, c1)
-    W_list[1] = typemin(eltype(dist))
+    W_list = Vector{eltype(D)}(undef, c1)
+    W_list[1] = typemin(eltype(D))
     for i in 2:c1
         lvl = cluster_lvls[i]
         c2 = maximum(unique(lvl))
-        D_list = Vector{eltype(dist)}(undef, c2)
+        D_list = Vector{eltype(D)}(undef, c2)
         for j in 1:c2
             cluster = lvl .== j
-            cluster_dist = dist[cluster, cluster]
-            if isempty(cluster_dist)
+            cluster_D = D[cluster, cluster]
+            if isempty(cluster_D)
                 continue
             end
-            M = size(cluster_dist, 1)
-            C_list = Vector{eltype(dist)}(undef, Int(M * (M - 1) / 2))
+            M = size(cluster_D, 1)
+            C_list = Vector{eltype(D)}(undef, Int(M * (M - 1) / 2))
             k = 1
             for col in 1:M
                 for row in (col + 1):M
-                    C_list[k] = cluster_dist[row, col]
+                    C_list[k] = cluster_D[row, col]
                     k += 1
                 end
             end
             D_list[j] = if isone(k)
-                zero(eltype(dist))
+                zero(eltype(D))
             else
                 vec_to_real_measure(measure_alg, C_list)
             end
@@ -484,16 +495,16 @@ function optimal_number_clusters(onc::OptimalNumberClusters{<:Any, <:SecondOrder
     end
 end
 function optimal_number_clusters(onc::OptimalNumberClusters{<:Any, <:SilhouetteScore},
-                                 res::Clustering.Hclust, dist::MatNum)
-    N = size(dist, 1)
+                                 res::Clustering.Hclust, D::MatNum)
+    N = size(D, 1)
     max_k = isnothing(onc.max_k) ? floor(Int, sqrt(N)) : onc.max_k
     c1 = min(floor(Int, sqrt(N)), max_k)
     cluster_lvls = [Clustering.cutree(res; k = i) for i in 1:c1]
     measure_alg = onc.alg.alg
-    W_list = Vector{eltype(dist)}(undef, c1)
-    W_list[1] = typemin(eltype(dist))
+    W_list = Vector{eltype(D)}(undef, c1)
+    W_list[1] = typemin(eltype(D))
     for i in 2:c1
-        sl = Clustering.silhouettes(cluster_lvls[i], dist)
+        sl = Clustering.silhouettes(cluster_lvls[i], D)
         W_list[i] = vec_to_real_measure(measure_alg, sl)
     end
     return valid_k_clusters(res, W_list)

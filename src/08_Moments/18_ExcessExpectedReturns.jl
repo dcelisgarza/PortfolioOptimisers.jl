@@ -1,8 +1,5 @@
 """
-    struct ExcessExpectedReturns{T1, T2} <: AbstractShrunkExpectedReturnsEstimator
-        me::T1
-        rf::T2
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Container type for excess expected returns estimators.
 
@@ -10,15 +7,16 @@ Container type for excess expected returns estimators.
 
 # Fields
 
-  - `me`: Mean estimator for expected returns.
-  - `rf`: Risk-free rate to subtract from expected returns.
+$(DocStringExtensions.FIELDS)
 
-# Constructor
+# Constructors
 
-    ExcessExpectedReturns(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
-                          rf::Number = 0.0)
+    ExcessExpectedReturns(;
+        me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
+        rf::Number = 0.0
+    ) -> ExcessExpectedReturns
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 
@@ -26,8 +24,7 @@ Keyword arguments correspond to the fields above.
 julia> ExcessExpectedReturns()
 ExcessExpectedReturns
   me ┼ SimpleExpectedReturns
-     │     w ┼ nothing
-     │   idx ┴ nothing
+     │   w ┴ nothing
   rf ┴ Float64: 0.0
 ```
 
@@ -37,7 +34,9 @@ ExcessExpectedReturns
   - [`AbstractExpectedReturnsEstimator`](@ref)
 """
 @concrete struct ExcessExpectedReturns <: AbstractShrunkExpectedReturnsEstimator
+    "$(field_dict[:me])"
     me
+    "$(field_dict[:rf])"
     rf
     function ExcessExpectedReturns(me::AbstractExpectedReturnsEstimator, rf::Number)
         return new{typeof(me), typeof(rf)}(me, rf)
@@ -48,7 +47,26 @@ function ExcessExpectedReturns(;
                                rf::Number = 0.0)
     return ExcessExpectedReturns(me, rf)
 end
-function factory(me::ExcessExpectedReturns, w::StatsBase.AbstractWeights)
+"""
+    factory(me::ExcessExpectedReturns, w::ObsWeights) -> ExcessExpectedReturns
+
+Return a new [`ExcessExpectedReturns`](@ref) estimator with observation weights `w` applied to the underlying mean estimator.
+
+# Arguments
+
+  - `me`: Excess expected returns estimator.
+  - $(arg_dict[:ow])
+
+# Returns
+
+  - `me::ExcessExpectedReturns`: Updated estimator with weights applied.
+
+# Related
+
+  - [`ExcessExpectedReturns`](@ref)
+  - [`factory`](@ref)
+"""
+function factory(me::ExcessExpectedReturns, w::ObsWeights)
     return ExcessExpectedReturns(; me = factory(me.me, w), rf = me.rf)
 end
 """

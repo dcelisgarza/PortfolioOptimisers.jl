@@ -24,12 +24,7 @@ function turnover_view(::Nothing, ::Any)
     return nothing
 end
 """
-    struct TurnoverEstimator{T1, T2, T3, T4} <: AbstractEstimator
-        w::T1
-        val::T2
-        dval::T3
-        fixed::T4
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Estimator for turnover portfolio constraints.
 
@@ -44,9 +39,14 @@ This estimator can be converted into a concrete [`Turnover`](@ref) constraint us
   - `dval`: Default turnover value for assets not specified in `val`.
   - `fixed`: Boolean indicating whether the estimator is fixed (does not update with new weights) or variable (updates with new weights).
 
-# Constructor
+# Constructors
 
-    TurnoverEstimator(; w::VecNum, val::EstValType, dval::Option{<:Number} = nothing, fixed::Bool = false)
+    TurnoverEstimator(;
+        w::VecNum,
+        val::EstValType,
+        dval::Option{<:Number} = nothing,
+        fixed::Bool = false
+    ) -> TurnoverEstimator
 
 ## Validation
 
@@ -270,11 +270,7 @@ function turnover_constraints(tn::TurnoverEstimator, sets::AssetSets;
                                            strict = strict), fixed = tn.fixed)
 end
 """
-    struct Turnover{T1, T2, T3} <: AbstractResult
-        w::T1
-        val::T2
-        fixed::T3
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Container for turnover portfolio constraints.
 
@@ -304,11 +300,15 @@ Where:
 
   - `fixed`: Boolean indicating whether the turnover constraint is fixed (does not update with new weights) or variable (updates with new weights).
 
-# Constructor
+# Constructors
 
-    Turnover(; w::VecNum, val::Num_VecNum = 0.0, fixed::Bool = false)
+    Turnover(;
+        w::VecNum,
+        val::Num_VecNum = 0.0,
+        fixed::Bool = false
+    ) -> Turnover
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 
@@ -337,6 +337,9 @@ Turnover
 
 # Related
 
+  - [`set_turnover_constraints!`](@ref)
+  - [`_set_turnover_constraints!`](@ref)
+  - [`set_turnover_fees!`](@ref)
   - [`TurnoverEstimator`](@ref)
   - [`AbstractResult`](@ref)
   - [`VecNum`](@ref)
@@ -576,7 +579,7 @@ const TnE_Tn_VecTnE_Tn = Union{<:TnE_Tn, <:VecTnE_Tn}
     turnover_constraints(tn::VecTnE_Tn, sets::AssetSets; datatype::DataType = Float64,
                          strict::Bool = false)
 
-Broadcasts [`threshold_constraints`](@ref) over the vector.
+Broadcasts [`turnover_constraints`](@ref) over the vector.
 
 Provides a uniform interface for processing multiple constraint estimators simultaneously.
 

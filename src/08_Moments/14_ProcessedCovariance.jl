@@ -1,23 +1,21 @@
 """
-    ProcessedCovariance
+$(DocStringExtensions.TYPEDEF)
 
 A covariance estimator that applies a custom matrix processing algorithm and positive definite projection to the output of another covariance estimator. This type enables flexible post-processing of covariance matrices by first computing a base covariance, then applying a user-specified matrix processing algorithm and positive definiteness correction in sequence.
 
 # Fields
 
-  - `ce`: The underlying covariance estimator to be processed.
-  - `alg`: The matrix processing algorithm to apply to the covariance matrix.
-  - `pdm`: The positive definite matrix projection method.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
-```julia
-ProcessedCovariance(; ce::AbstractCovarianceEstimator = Covariance(),
-                    alg::Option{<:AbstractMatrixProcessingAlgorithm} = nothing,
-                    pdm::Option{<:Posdef} = Posdef())
-```
+    ProcessedCovariance(;
+        ce::StatsBase.CovarianceEstimator = Covariance(),
+        alg::Option{<:AbstractMatrixProcessingAlgorithm} = nothing,
+        pdm::Option{<:Posdef} = Posdef(),
+    ) -> ProcessedCovariance
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 
@@ -26,12 +24,10 @@ julia> ProcessedCovariance()
 ProcessedCovariance
    ce ┼ Covariance
       │    me ┼ SimpleExpectedReturns
-      │       │     w ┼ nothing
-      │       │   idx ┴ nothing
+      │       │   w ┴ nothing
       │    ce ┼ GeneralCovariance
-      │       │    ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-      │       │     w ┼ nothing
-      │       │   idx ┴ nothing
+      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+      │       │    w ┴ nothing
       │   alg ┴ Full()
   alg ┼ nothing
   pdm ┼ Posdef
@@ -46,21 +42,24 @@ ProcessedCovariance
   - [`Posdef`](@ref)
 """
 @concrete struct ProcessedCovariance <: AbstractCovarianceEstimator
+    "$(field_dict[:ce])"
     ce
+    "$(field_dict[:mpa])"
     alg
+    "$(field_dict[:pdm])"
     pdm
-    function ProcessedCovariance(ce::AbstractCovarianceEstimator,
+    function ProcessedCovariance(ce::StatsBase.CovarianceEstimator,
                                  alg::Option{<:AbstractMatrixProcessingAlgorithm},
                                  pdm::Option{<:Posdef})
         return new{typeof(ce), typeof(alg), typeof(pdm)}(ce, alg, pdm)
     end
 end
-function ProcessedCovariance(; ce::AbstractCovarianceEstimator = Covariance(),
+function ProcessedCovariance(; ce::StatsBase.CovarianceEstimator = Covariance(),
                              alg::Option{<:AbstractMatrixProcessingAlgorithm} = nothing,
                              pdm::Option{<:Posdef} = Posdef())
     return ProcessedCovariance(ce, alg, pdm)
 end
-function factory(ce::ProcessedCovariance, w::StatsBase.AbstractWeights)
+function factory(ce::ProcessedCovariance, w::ObsWeights)
     return ProcessedCovariance(; ce = factory(ce.ce, w), alg = ce.alg, pdm = ce.pdm)
 end
 """

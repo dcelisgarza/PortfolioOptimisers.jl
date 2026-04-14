@@ -1,12 +1,58 @@
+"""
+    set_l1_regularisation!(args...)
+
+No-op fallback for L1 regularisation setup.
+
+Called when no L1 regularisation is configured. Returns `nothing`.
+
+# Related
+
+  - [`LpRegularisation`](@ref)
+  - [`set_lp_regularisation!`](@ref)
+"""
 function set_l1_regularisation!(args...)
     return nothing
 end
+"""
+    set_l2_regularisation!(args...)
+
+No-op fallback for L2 regularisation setup.
+
+Called when no L2 regularisation is configured. Returns `nothing`.
+
+# Related
+
+  - [`LpRegularisation`](@ref)
+  - [`set_lp_regularisation!`](@ref)
+"""
 function set_l2_regularisation!(args...)
     return nothing
 end
+"""
+    set_lp_regularisation!(args...)
+
+No-op fallback for Lp regularisation setup.
+
+Called when no Lp regularisation is configured. Returns `nothing`.
+
+# Related
+
+  - [`LpRegularisation`](@ref)
+"""
 function set_lp_regularisation!(args...)
     return nothing
 end
+"""
+    set_linf_regularisation!(args...)
+
+No-op fallback for L∞ regularisation setup.
+
+Called when no L∞ regularisation is configured. Returns `nothing`.
+
+# Related
+
+  - [`LpRegularisation`](@ref)
+"""
 function set_linf_regularisation!(args...)
     return nothing
 end
@@ -29,7 +75,41 @@ function set_l2_regularisation!(model::JuMP.Model, l2_val::Number)
     add_to_objective_penalty!(model, l2)
     return nothing
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for all portfolio weight regularisation estimators.
+
+# Related
+
+  - [`LpRegularisation`](@ref)
+"""
 abstract type AbstractRegularisationEstimator <: AbstractEstimator end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Lp-norm regularisation term added to the optimisation objective:
+
+```math
+\\text{penalty} = \\mathrm{val} \\cdot \\left( \\sum_{i=1}^N |w_i|^p \\right)^{1/p}
+```
+
+Penalises concentrated portfolios by encouraging weight smoothness for ``p > 1``.
+
+# Fields
+
+  - `p::Number`: Lp norm exponent. Must satisfy `p > 1` and be finite.
+  - `val::Number`: Penalty coefficient. Must be positive and finite.
+
+# Constructors
+
+    LpRegularisation(; p::Number = 3, val::Number = 1e-3) -> LpRegularisation
+
+# Related
+
+  - [`AbstractRegularisationEstimator`](@ref)
+  - [`AbstractRegularisationEstimator`](@ref)
+"""
 @concrete struct LpRegularisation <: AbstractRegularisationEstimator
     p
     val
@@ -43,7 +123,32 @@ end
 function LpRegularisation(; p::Number = 3, val::Number = 1e-3)
     return LpRegularisation(p, val)
 end
+"""
+    const VecLpReg = AbstractVector{<:LpRegularisation}
+
+Alias for a vector of [`LpRegularisation`](@ref) objects.
+
+Represents a collection of Lp-norm regularisation terms to be added to the optimisation objective.
+
+# Related
+
+  - [`LpRegularisation`](@ref)
+  - [`LpReg_VecLpReg`](@ref)
+"""
 const VecLpReg = AbstractVector{<:LpRegularisation}
+"""
+    const LpReg_VecLpReg = Union{<:LpRegularisation, <:VecLpReg}
+
+Alias for a single or vector of Lp regularisation terms.
+
+Matches either a single [`LpRegularisation`](@ref) or a vector of them ([`VecLpReg`](@ref)).
+
+# Related
+
+  - [`LpRegularisation`](@ref)
+  - [`VecLpReg`](@ref)
+  - [`set_lp_regularisation!`](@ref)
+"""
 const LpReg_VecLpReg = Union{<:LpRegularisation, <:VecLpReg}
 function set_lp_regularisation!(model::JuMP.Model, lps::LpReg_VecLpReg)
     w = model[:w]

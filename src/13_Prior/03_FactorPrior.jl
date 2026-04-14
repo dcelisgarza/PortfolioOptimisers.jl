@@ -1,11 +1,5 @@
 """
-    struct FactorPrior{T1, T2, T3, T4, T5} <: AbstractLowOrderPriorEstimator_F
-        pe::T1
-        mp::T2
-        re::T3
-        ve::T4
-        rsd::T5
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Factor-based prior estimator for asset returns.
 
@@ -19,14 +13,17 @@ Factor-based prior estimator for asset returns.
   - `ve`: Variance estimator for residuals.
   - `rsd`: Boolean flag to add residual variance to posterior covariance.
 
-# Constructor
+# Constructors
 
-    FactorPrior(; pe::AbstractLowOrderPriorEstimator_A_AF = EmpiricalPrior(),
-                mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing(),
-                re::AbstractRegressionEstimator = StepwiseRegression(),
-                ve::AbstractVarianceEstimator = SimpleVariance(), rsd::Bool = true)
+    FactorPrior(;
+        pe::AbstractLowOrderPriorEstimator_A_AF = EmpiricalPrior(),
+        mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing(),
+        re::AbstractRegressionEstimator = StepwiseRegression(),
+        ve::AbstractVarianceEstimator = SimpleVariance(),
+        rsd::Bool = true
+    ) -> FactorPrior
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 
@@ -37,12 +34,10 @@ FactorPrior
       │        ce ┼ PortfolioOptimisersCovariance
       │           │   ce ┼ Covariance
       │           │      │    me ┼ SimpleExpectedReturns
-      │           │      │       │     w ┼ nothing
-      │           │      │       │   idx ┴ nothing
+      │           │      │       │   w ┴ nothing
       │           │      │    ce ┼ GeneralCovariance
-      │           │      │       │    ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-      │           │      │       │     w ┼ nothing
-      │           │      │       │   idx ┴ nothing
+      │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+      │           │      │       │    w ┴ nothing
       │           │      │   alg ┴ Full()
       │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
       │           │      │     pdm ┼ Posdef
@@ -53,8 +48,7 @@ FactorPrior
       │           │      │     alg ┼ nothing
       │           │      │   order ┴ DenoiseDetoneAlg()
       │        me ┼ SimpleExpectedReturns
-      │           │     w ┼ nothing
-      │           │   idx ┴ nothing
+      │           │   w ┴ nothing
       │   horizon ┴ nothing
    mp ┼ DenoiseDetoneAlgMatrixProcessing
       │     pdm ┼ Posdef
@@ -72,8 +66,7 @@ FactorPrior
       │        │   kwargs ┴ @NamedTuple{}: NamedTuple()
    ve ┼ SimpleVariance
       │          me ┼ SimpleExpectedReturns
-      │             │     w ┼ nothing
-      │             │   idx ┴ nothing
+      │             │   w ┴ nothing
       │           w ┼ nothing
       │   corrected ┴ Bool: true
   rsd ┴ Bool: true
@@ -111,7 +104,7 @@ function FactorPrior(; pe::AbstractLowOrderPriorEstimator_A_AF = EmpiricalPrior(
                      ve::AbstractVarianceEstimator = SimpleVariance(), rsd::Bool = true)
     return FactorPrior(pe, mp, re, ve, rsd)
 end
-function factory(pe::FactorPrior, w::StatsBase.AbstractWeights)
+function factory(pe::FactorPrior, w::ObsWeights)
     return FactorPrior(; pe = factory(pe.pe, w), mp = pe.mp, re = factory(pe.re, w),
                        ve = factory(pe.ve, w), rsd = pe.rsd)
 end

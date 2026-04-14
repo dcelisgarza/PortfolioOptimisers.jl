@@ -1,34 +1,25 @@
 """
-    struct GeneralCovariance{T1, T2, T3} <: AbstractCovarianceEstimator
-        ce::T1
-        w::T2
-        idx::T3
-    end
+$(DocStringExtensions.TYPEDEF)
 
-A flexible covariance estimator for `PortfolioOptimisers.jl` supporting arbitrary covariance estimators and optional observation weights.
-
-`GeneralCovariance` allows users to specify both the covariance estimation method and optional observation weights.
+A simple wrapper around a [`StatsBase.CovarianceEstimator`](https://juliastats.org/StatsBase.jl/stable/cov/#StatsBase.CovarianceEstimator), optional [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/), and an optional index. It uses ideas from SCIML to simplify the standard API of [`StatsBase.cov`](https://juliastats.org/StatsBase.jl/stable/cov/#StatsBase.cov).
 
 # Fields
 
-  - `ce`: Covariance estimator.
-  - `w`: Optional weights for each observation. If `nothing`, the estimator is unweighted.
-  - `idx`: Optional indices of the observations to use for estimation. If `nothing`, all observations are used.
+$(DocStringExtensions.FIELDS)
 
-# Constructor
+# Constructors
 
     GeneralCovariance(;
-                      ce::StatsBase.CovarianceEstimator = StatsBase.SimpleCovariance(;
-                                                                                     corrected = true),
-                      w::Option{<:StatsBase.AbstractWeights} = nothing,
-                      idx::Option{<:VecInt} = nothing)
+        ce::StatsBase.CovarianceEstimator = StatsBase.SimpleCovariance(;
+            corrected = true),
+        w::Option{<:ObsWeights} = nothing
+    ) -> GeneralCovariance
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - If `w` is not `nothing`, `!isempty(w)`.
-  - If `idx` is not `nothing`, `!isempty(idx)` and all indices are positive integers.
+  - $(val_dict[:oow])
 
 # Details
 
@@ -37,17 +28,15 @@ Keyword arguments correspond to the fields above.
 # Examples
 
 ```jldoctest
-julia> gwc = GeneralCovariance()
+julia> GeneralCovariance()
 GeneralCovariance
-   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-    w ┼ nothing
-  idx ┴ nothing
+  ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+   w ┴ nothing
 
-julia> gwc = GeneralCovariance(; w = StatsBase.Weights([0.1, 0.2, 0.7]))
+julia> GeneralCovariance(; w = StatsBase.Weights([0.1, 0.2, 0.7]))
 GeneralCovariance
-   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-    w ┼ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.1, 0.2, 0.7]
-  idx ┴ nothing
+  ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+   w ┴ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.1, 0.2, 0.7]
 ```
 
 # Related
@@ -59,42 +48,49 @@ GeneralCovariance
   - [`cov(ce::GeneralCovariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
 """
 @concrete struct GeneralCovariance <: AbstractCovarianceEstimator
+    "$(field_dict[:ce])"
     ce
+    "$(field_dict[:oow])"
     w
-    idx
-    function GeneralCovariance(ce::StatsBase.CovarianceEstimator,
-                               w::Option{<:StatsBase.AbstractWeights},
-                               idx::Option{<:VecInt})
-        assert_nonempty_finite_val(w, :w)
-        assert_nonempty_gt0_finite_val(idx, :idx)
-        return new{typeof(ce), typeof(w), typeof(idx)}(ce, w, idx)
+    function GeneralCovariance(ce::StatsBase.CovarianceEstimator, w::Option{<:ObsWeights})
+        validate_observation_weights(w)
+        return new{typeof(ce), typeof(w)}(ce, w)
     end
 end
 function GeneralCovariance(;
                            ce::StatsBase.CovarianceEstimator = StatsBase.SimpleCovariance(;
                                                                                           corrected = true),
-                           w::Option{<:StatsBase.AbstractWeights} = nothing,
-                           idx::Option{<:VecInt} = nothing)
-    return GeneralCovariance(ce, w, idx)
+                           w::Option{<:ObsWeights} = nothing)
+    return GeneralCovariance(ce, w)
 end
 """
-    Statistics.cov(ce::GeneralCovariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)
+    Statistics.cov(
+        ce::GeneralCovariance,
+        X::MatNum;
+        dims::Int = 1,
+        mean = nothing,
+        kwargs...
+    ) -> MatNum
 
 Compute the covariance matrix using a [`GeneralCovariance`](@ref) estimator.
 
-This method dispatches to [`robust_cov`](@ref), using the specified covariance estimator and optional observation weights stored in `ce`. If no weights are provided, the unweighted covariance is computed; otherwise, the weighted covariance is used.
+This method dispatches to the appropriate [`robust_cov`](@ref) depending on `ce.w`, which computes the covariance matrix using `ce.ce`.
 
 # Arguments
 
-  - `ce`: Covariance estimator containing the method and optional weights.
-  - `X`: Data matrix (observations × assets).
+  - $(arg_dict[:ce])
+  - $(arg_dict[:X])
   - $(arg_dict[:dims])
-  - `mean`: Optional mean vector to use for centering.
+  - $(arg_dict[:omean])
   - `kwargs...`: Additional keyword arguments passed to [`robust_cov`](@ref).
 
 # Returns
 
-  - `sigma::MatNum`: Covariance matrix.
+  - $(ret_dict[:sigma])
+
+# Details
+
+  - Calls [`robust_cov`](@ref) with the appropriate covariance estimator.
 
 # Related
 
@@ -103,17 +99,8 @@ This method dispatches to [`robust_cov`](@ref), using the specified covariance e
   - [`robust_cov`](@ref)
   - [`cor(ce::GeneralCovariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
 """
-function Statistics.cov(ce::GeneralCovariance{<:Any, <:Any, Nothing}, X::MatNum;
-                        dims::Int = 1, mean = nothing, kwargs...)
-    return if isnothing(ce.w)
-        robust_cov(ce.ce, X; dims = dims, mean = mean, kwargs...)
-    else
-        robust_cov(ce.ce, X, ce.w; dims = dims, mean = mean, kwargs...)
-    end
-end
-function Statistics.cov(ce::GeneralCovariance{<:Any, <:Any, <:VecInt}, X::MatNum;
-                        dims::Int = 1, mean = nothing, kwargs...)
-    X = view(X, ce.idx, :)
+function Statistics.cov(ce::GeneralCovariance, X::MatNum; dims::Int = 1, mean = nothing,
+                        kwargs...)
     return if isnothing(ce.w)
         robust_cov(ce.ce, X; dims = dims, mean = mean, kwargs...)
     else
@@ -121,23 +108,33 @@ function Statistics.cov(ce::GeneralCovariance{<:Any, <:Any, <:VecInt}, X::MatNum
     end
 end
 """
-    Statistics.cor(ce::GeneralCovariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)
+    Statistics.cor(
+        ce::GeneralCovariance,
+        X::MatNum;
+        dims::Int = 1,
+        mean = nothing,
+        kwargs...
+    ) -> MatNum
 
 Compute the correlation matrix using a [`GeneralCovariance`](@ref) estimator.
 
-This method dispatches to [`robust_cor`](@ref), using the specified covariance estimator and optional observation weights stored in `ce`. If no weights are provided, the unweighted correlation is computed; otherwise, the weighted correlation is used.
+This method dispatches to the appropriate [`robust_cor`](@ref) depending on `ce.w`, which computes the correlation matrix using `ce.ce`.
 
 # Arguments
 
-  - `ce`: Covariance estimator containing the method and optional weights.
-  - `X`: Data matrix (observations × assets).
+  - $(arg_dict[:ce])
+  - $(arg_dict[:X])
   - $(arg_dict[:dims])
-  - `mean`: Optional mean vector to use for centering.
+  - $(arg_dict[:omean])
   - `kwargs...`: Additional keyword arguments passed to [`robust_cor`](@ref).
 
 # Returns
 
-  - `rho::MatNum`: Correlation matrix.
+  - $(ret_dict[:rho])
+
+# Details
+
+  - Calls [`robust_cor`](@ref) with the appropriate covariance estimator.
 
 # Related
 
@@ -146,36 +143,45 @@ This method dispatches to [`robust_cor`](@ref), using the specified covariance e
   - [`robust_cor`](@ref)
   - [`cov(ce::GeneralCovariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
 """
-function Statistics.cor(ce::GeneralCovariance{<:Any, <:Any, Nothing}, X::MatNum;
-                        dims::Int = 1, mean = nothing, kwargs...)
-    if isnothing(ce.w)
+function Statistics.cor(ce::GeneralCovariance, X::MatNum; dims::Int = 1, mean = nothing,
+                        kwargs...)
+    w = get_observation_weights(ce.w, X; dims = dims, kwargs...)
+    if isnothing(w)
         robust_cor(ce.ce, X; dims = dims, mean = mean, kwargs...)
     else
-        robust_cor(ce.ce, X, ce.w; dims = dims, mean = mean, kwargs...)
-    end
-end
-function Statistics.cor(ce::GeneralCovariance{<:Any, <:Any, <:VecInt}, X::MatNum;
-                        dims::Int = 1, mean = nothing, kwargs...)
-    X = view(X, ce.idx, :)
-    return if isnothing(ce.w)
-        robust_cor(ce.ce, X; dims = dims, mean = mean, kwargs...)
-    else
-        robust_cor(ce.ce, X, ce.w; dims = dims, mean = mean, kwargs...)
+        robust_cor(ce.ce, X, w; dims = dims, mean = mean, kwargs...)
     end
 end
 """
-    factory(ce::GeneralCovariance, w::StatsBase.AbstractWeights)
+    factory(
+        ce::GeneralCovariance,
+        w::ObsWeights
+    ) -> GeneralCovariance
 
 Return a new `GeneralCovariance` estimator with observation weights `w`.
 
 # Arguments
 
-  - `ce`: A `GeneralCovariance` estimator.
+  - $(arg_dict[:ce])
   - $(arg_dict[:ow])
 
 # Returns
 
-  - `ce::GeneralCovariance`: A new estimator with the same covariance estimator and observation weights `w`.
+  - $(ret_dict[:ce])
+
+# Examples
+
+```jldoctest
+julia> ce = GeneralCovariance()
+GeneralCovariance
+  ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+   w ┴ nothing
+
+julia> factory(ce, StatsBase.Weights([0.1, 0.2, 0.7]))
+GeneralCovariance
+  ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+   w ┴ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.1, 0.2, 0.7]
+```
 
 # Related
 
@@ -183,33 +189,29 @@ Return a new `GeneralCovariance` estimator with observation weights `w`.
   - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
   - [`factory`](@ref)
 """
-function factory(ce::GeneralCovariance, w::StatsBase.AbstractWeights)
-    return GeneralCovariance(; ce = factory(ce.ce, w), w = w, idx = ce.idx)
+function factory(ce::GeneralCovariance, w::ObsWeights)
+    return GeneralCovariance(; ce = factory(ce.ce, w), w = w)
 end
 """
-    struct Covariance{T1, T2, T3} <: AbstractCovarianceEstimator
-        me::T1
-        ce::T2
-        alg::T3
-    end
+$(DocStringExtensions.TYPEDEF)
 
-A flexible container type for configuring and applying joint expected returns and covariance estimation in `PortfolioOptimisers.jl`.
+A flexible container type for covariance estimation in `PortfolioOptimisers.jl`.
 
-`Covariance` encapsulates all components required for estimating the mean vector and covariance matrix of asset returns, including the expected returns estimator, the covariance estimator, and the moment algorithm.
+`Covariance` encapsulates all components required for estimating the covariance matrix of asset returns, including the expected returns estimator for centering the data, the covariance estimator, and the moment algorithm.
 
 # Fields
 
-  - `me`: Expected returns estimator.
-  - `ce`: Covariance estimator.
-  - `alg`: Moment algorithm.
+$(DocStringExtensions.FIELDS)
 
-# Constructor
+# Constructors
 
-    Covariance(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
-               ce::StatsBase.CovarianceEstimator = GeneralCovariance(),
-               alg::AbstractMomentAlgorithm = Full())
+    Covariance(;
+        me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
+        ce::StatsBase.CovarianceEstimator = GeneralCovariance(),
+        alg::AbstractMomentAlgorithm = Full()
+    ) -> Covariance
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 
@@ -217,12 +219,10 @@ Keyword arguments correspond to the fields above.
 julia> Covariance()
 Covariance
    me ┼ SimpleExpectedReturns
-      │     w ┼ nothing
-      │   idx ┴ nothing
+      │   w ┴ nothing
    ce ┼ GeneralCovariance
-      │    ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-      │     w ┼ nothing
-      │   idx ┴ nothing
+      │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+      │    w ┴ nothing
   alg ┴ Full()
 ```
 
@@ -235,8 +235,11 @@ Covariance
   - [`Semi`](@ref)
 """
 @concrete struct Covariance <: AbstractCovarianceEstimator
+    "$(field_dict[:me])"
     me
+    "$(field_dict[:ce])"
     ce
+    "$(field_dict[:malg])"
     alg
     function Covariance(me::AbstractExpectedReturnsEstimator,
                         ce::StatsBase.CovarianceEstimator, alg::AbstractMomentAlgorithm)
@@ -249,7 +252,10 @@ function Covariance(; me::AbstractExpectedReturnsEstimator = SimpleExpectedRetur
     return Covariance(me, ce, alg)
 end
 """
-    factory(ce::Covariance, w::StatsBase.AbstractWeights)
+    factory(
+        ce::Covariance,
+        w::ObsWeights
+    ) -> Covariance
 
 Return a new `Covariance` estimator with observation weights `w` applied to both the expected returns and covariance estimators.
 
@@ -260,20 +266,13 @@ Return a new `Covariance` estimator with observation weights `w` applied to both
 
 # Returns
 
-  - `ce::Covariance`: New estimator with weights applied to both the mean and covariance estimators.
+  - $(ret_dict[:ce])
 
 # Details
 
-  - Applies weights to both the expected returns estimator `ce.me` and the covariance estimator `ce.ce`.
+  - Calls `factory(ce.me, w)` and `factory(ce.ce, w)` to propagate the weights to the mean and covariance estimators.
   - Preserves the moment algorithm `ce.alg` from the original estimator.
   - Enables weighted estimation for both mean and covariance in portfolio workflows.
-
-# Related
-
-  - [`Covariance`](@ref)
-  - [`GeneralCovariance`](@ref)
-  - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
-  - [`factory`](@ref)
 
 # Examples
 
@@ -281,52 +280,55 @@ Return a new `Covariance` estimator with observation weights `w` applied to both
 julia> ce = Covariance()
 Covariance
    me ┼ SimpleExpectedReturns
-      │     w ┼ nothing
-      │   idx ┴ nothing
+      │   w ┴ nothing
    ce ┼ GeneralCovariance
-      │    ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-      │     w ┼ nothing
-      │   idx ┴ nothing
+      │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+      │    w ┴ nothing
   alg ┴ Full()
 
 julia> ce_w = factory(ce, StatsBase.Weights([0.2, 0.3, 0.5]))
 Covariance
    me ┼ SimpleExpectedReturns
-      │     w ┼ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.3, 0.5]
-      │   idx ┴ nothing
+      │   w ┴ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.3, 0.5]
    ce ┼ GeneralCovariance
-      │    ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-      │     w ┼ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.3, 0.5]
-      │   idx ┴ nothing
+      │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+      │    w ┴ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.3, 0.5]
   alg ┴ Full()
 ```
+
+# Related
+
+  - [`Covariance`](@ref)
+  - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
+  - [`factory`](@ref)
 """
-function factory(ce::Covariance, w::StatsBase.AbstractWeights)
+function factory(ce::Covariance, w::ObsWeights)
     return Covariance(; me = factory(ce.me, w), ce = factory(ce.ce, w), alg = ce.alg)
 end
 """
-    Statistics.cov(ce::Covariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)
+    Statistics.cov(
+        ce::Covariance,
+        X::MatNum;
+        dims::Int = 1,
+        mean = nothing,
+        kwargs...
+    ) -> MatNum
 
 Compute the covariance matrix using a [`Covariance`](@ref) estimator.
 
 # Arguments
 
-  - `ce`: Covariance estimator.
-
+  - $(arg_dict[:ce])
       + `ce::Covariance{<:Any, <:Any, <:Full}`: Covariance estimator with [`Full`](@ref) moment algorithm.
       + `ce::Covariance{<:Any, <:Any, <:Semi}`: Covariance estimator with [`Semi`](@ref) moment algorithm.
-
-  - `X`: Data matrix (observations × assets).
-
+  - $(arg_dict[:X])
   - $(arg_dict[:dims])
-
-  - `mean`: Optional mean vector for centering. If not provided, computed using `ce.me`.
-
+  - $(arg_dict[:omean]) If not provided, computed using `ce.me`.
   - `kwargs...`: Additional keyword arguments passed to the underlying covariance estimator.
 
 # Returns
 
-  - `sigma::MatNum`: Covariance matrix.
+  - $(ret_dict[:sigma])
 
 # Related
 
@@ -349,28 +351,34 @@ function Statistics.cov(ce::Covariance{<:Any, <:Any, <:Semi}, X::MatNum; dims::I
     return Statistics.cov(ce.ce, X; dims = dims, mean = zero(eltype(X)), kwargs...)
 end
 """
-    Statistics.cor(ce::Covariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)
+    Statistics.cor(
+        ce::Covariance,
+        X::MatNum;
+        dims::Int = 1,
+        mean = nothing,
+        kwargs...
+    ) -> MatNum
 
 Compute the correlation matrix using a [`Covariance`](@ref) estimator.
 
 # Arguments
 
-  - `ce`: Covariance estimator.
+  - $(arg_dict[:ce])
 
       + `ce::Covariance{<:Any, <:Any, <:Full}`: Covariance estimator with [`Full`](@ref) moment algorithm.
       + `ce::Covariance{<:Any, <:Any, <:Semi}`: Covariance estimator with [`Semi`](@ref) moment algorithm.
 
-  - `X`: Data matrix (observations × assets).
+  - $(arg_dict[:X])
 
   - $(arg_dict[:dims])
 
-  - `mean`: Optional mean vector for centering. If not provided, computed using `ce.me`.
+  - $(arg_dict[:omean]) If not provided, computed using `ce.me`.
 
   - `kwargs...`: Additional keyword arguments passed to the underlying correlation estimator.
 
 # Returns
 
-  - `rho::MatNum`: Correlation matrix.
+  - $(ret_dict[:rho])
 
 # Related
 

@@ -1,4 +1,27 @@
+"""
+    const MatNum_Pr = Union{<:MatNum, <:AbstractPriorResult, <:ReturnsResult}
+
+Union of matrix-like types accepted as the data argument in [`risk_contribution`](@ref) and related functions.
+
+# Related
+
+  - [`MatNum`](@ref)
+  - [`AbstractPriorResult`](@ref)
+  - [`ReturnsResult`](@ref)
+"""
 const MatNum_Pr = Union{<:MatNum, <:AbstractPriorResult, <:ReturnsResult}
+"""
+    const ERkNetRet = Union{...}
+
+Union of risk measures whose expected risk is computed on net returns (returns after fees).
+
+These risk measures receive the net-returns vector `calc_net_returns(w, X, fees)` as their sole argument.
+
+# Related
+
+  - [`expected_risk`](@ref)
+  - [`calc_net_returns`](@ref)
+"""
 const ERkNetRet = Union{<:WorstRealisation, <:ValueatRisk, <:ValueatRiskRange,
                         <:ConditionalValueatRisk,
                         <:DistributionallyRobustConditionalValueatRisk,
@@ -17,17 +40,87 @@ const ERkNetRet = Union{<:WorstRealisation, <:ValueatRisk, <:ValueatRiskRange,
                         <:OrderedWeightsArrayRange, <:BrownianDistanceVariance,
                         <:MeanReturn, <:PowerNormValueatRisk, <:PowerNormValueatRiskRange,
                         <:PowerNormDrawdownatRisk, <:RelativePowerNormDrawdownatRisk}
+"""
+    const ERkwXFees = Union{...}
+
+Union of risk measures whose expected risk depends on both weights, returns matrix, and fees.
+
+These risk measures are called as `r(w, X, fees)`.
+
+# Related
+
+  - [`expected_risk`](@ref)
+  - [`LowOrderMoment`](@ref)
+  - [`HighOrderMoment`](@ref)
+  - [`TrackingRiskMeasure`](@ref)
+"""
 const ERkwXFees = Union{<:LowOrderMoment, <:HighOrderMoment, <:TrackingRiskMeasure,
                         <:RiskTrackingRiskMeasure, <:Kurtosis, <:ThirdCentralMoment,
                         <:Skewness, <:MedianAbsoluteDeviation}
+"""
+    const ERkX = Union{<:ERkNetRet, <:ERkwXFees}
+
+Union of all risk measures that require the returns matrix `X` (and optionally fees) for expected risk computation.
+
+# Related
+
+  - [`ERkNetRet`](@ref)
+  - [`ERkwXFees`](@ref)
+  - [`expected_risk`](@ref)
+"""
 const ERkX = Union{<:ERkNetRet, <:ERkwXFees}
+"""
+    const ERkw = Union{...}
+
+Union of risk measures whose expected risk depends only on portfolio weights.
+
+These risk measures are called as `r(w)`.
+
+# Related
+
+  - [`expected_risk`](@ref)
+  - [`StandardDeviation`](@ref)
+  - [`Variance`](@ref)
+"""
 const ERkw = Union{<:StandardDeviation, <:NegativeSkewness, <:TurnoverRiskMeasure,
                    <:Variance, <:UncertaintySetVariance, <:EqualRiskMeasure}
+"""
+    const TnTrRM = Union{<:TurnoverRiskMeasure, <:TrRM}
+
+Union of turnover and tracking risk measures used to update previous-weight dependent factories.
+
+# Related
+
+  - [`TurnoverRiskMeasure`](@ref)
+  - [`TrRM`](@ref)
+"""
 const TnTrRM = Union{<:TurnoverRiskMeasure, <:TrRM}
+"""
+    const SlvRM = Union{...}
+
+Union of solver-based risk measures (entropic and relativistic families) that require an iterative solver for expected risk computation.
+
+# Related
+
+  - [`expected_risk`](@ref)
+  - [`EntropicValueatRisk`](@ref)
+  - [`RelativisticValueatRisk`](@ref)
+"""
 const SlvRM = Union{<:EntropicValueatRisk, <:EntropicValueatRiskRange,
                     <:EntropicDrawdownatRisk, <:RelativeEntropicDrawdownatRisk,
                     <:RelativisticValueatRisk, <:RelativisticValueatRiskRange,
                     <:RelativisticDrawdownatRisk, <:RelativeRelativisticDrawdownatRisk}
+"""
+    const RkRatioRM = Union{<:RiskRatioRiskMeasure, <:NonOptimisationRiskRatioRiskMeasure}
+
+Union of all risk-ratio risk measures, where the expected risk is defined as the ratio of two component risk values.
+
+# Related
+
+  - [`RiskRatioRiskMeasure`](@ref)
+  - [`NonOptimisationRiskRatioRiskMeasure`](@ref)
+  - [`expected_risk`](@ref)
+"""
 const RkRatioRM = Union{<:RiskRatioRiskMeasure, <:NonOptimisationRiskRatioRiskMeasure}
 function expected_risk(r::ERkNetRet, w::VecNum, X::MatNum, fees::Option{<:Fees} = nothing;
                        kwargs...)
@@ -61,9 +154,78 @@ end
 function expected_risk(r::AbstractBaseRiskMeasure, w::VecVecNum, args...; kwargs...)
     return [expected_risk(r, wi, args...; kwargs...) for wi in w]
 end
+"""
+    number_effective_assets(w::VecNum)
+
+Compute the effective number of assets (Herfindahl-Hirschman inverse index):
+
+```math
+N_{\\mathrm{eff}} = \\frac{1}{\\sum_i w_i^2}
+```
+
+Returns the number of equally-weighted assets that would produce the same level of
+concentration as the given weight vector `w`.
+
+# Arguments
+
+  - `w::VecNum`: Portfolio weight vector.
+
+# Returns
+
+  - `Number`: Effective number of assets.
+
+# Related
+
+  - [`set_number_effective_assets!`](@ref)
+  - [`EqualRiskMeasure`](@ref)
+  - [`risk_contribution`](@ref)
+  - [`EqualRiskMeasure`](@ref)
+"""
 function number_effective_assets(w::VecNum)
     return inv(LinearAlgebra.dot(w, w))
 end
+"""
+    risk_contribution(
+        r::AbstractBaseRiskMeasure,
+        w::VecNum,
+        X::MatNum_Pr,
+        fees::Option{<:Fees} = nothing;
+        delta::Number = 1e-6,
+        marginal::Bool = false,
+        kwargs...
+    ) -> Vector
+
+Compute the risk contribution of each asset to the total portfolio risk using numerical differentiation.
+
+The risk contribution of asset ``i`` is defined as:
+
+```math
+\\mathrm{RC}_i = w_i \\cdot \\frac{\\partial \\rho(\\boldsymbol{w})}{\\partial w_i}\\,,
+```
+
+where the partial derivative is approximated by a two-sided finite difference with step size `delta`. When `marginal = true`, the weighting by ``w_i`` is omitted (i.e., only the marginal risk ``\\partial \\rho / \\partial w_i`` is returned).
+
+# Arguments
+
+  - `r::AbstractBaseRiskMeasure`: Risk measure to differentiate.
+  - `w::VecNum`: Portfolio weights vector.
+  - `X::MatNum_Pr`: Asset returns matrix or prior result.
+  - `fees::Option{<:Fees}`: Optional fee structure.
+
+# Keyword Arguments
+
+  - `delta::Number = 1e-6`: Finite difference step size.
+  - `marginal::Bool = false`: If `true`, returns marginal risk contributions (without ``w_i`` weighting).
+
+# Returns
+
+  - `Vector`: Risk contributions (or marginal risks) for each asset.
+
+# Related
+
+  - [`expected_risk`](@ref)
+  - [`factor_risk_contribution`](@ref)
+"""
 function risk_contribution(r::AbstractBaseRiskMeasure, w::VecNum, X::MatNum_Pr,
                            fees::Option{<:Fees} = nothing; delta::Number = 1e-6,
                            marginal::Bool = false, kwargs...)
@@ -89,6 +251,50 @@ function risk_contribution(r::AbstractBaseRiskMeasure, w::VecNum, X::MatNum_Pr,
     end
     return rc
 end
+"""
+    factor_risk_contribution(
+        r::AbstractBaseRiskMeasure,
+        w::VecNum,
+        X::MatNum_Pr,
+        fees::Option{<:Fees} = nothing;
+        re::RegE_Reg = StepwiseRegression(),
+        rd::ReturnsResult = ReturnsResult(),
+        delta::Number = 1e-6,
+        kwargs...
+    ) -> Vector
+
+Compute the risk contribution of each factor (and the idiosyncratic component) to the total portfolio risk using a factor regression.
+
+The factor risk contributions partition total portfolio risk into factor-specific components using the Brinson attribution framework:
+
+```math
+\\mathrm{FRC}_k = (\\mathbf{B}^\\intercal \\boldsymbol{w})_k \\cdot (\\mathbf{B}^{-\\intercal} \\nabla \\rho)_k\\,,
+```
+
+where ``\\mathbf{B}`` is the factor loading matrix estimated by regression.
+
+# Arguments
+
+  - `r::AbstractBaseRiskMeasure`: Risk measure to decompose.
+  - `w::VecNum`: Portfolio weights vector.
+  - `X::MatNum_Pr`: Asset returns matrix or prior result.
+  - `fees::Option{<:Fees}`: Optional fee structure.
+
+# Keyword Arguments
+
+  - `re::RegE_Reg = StepwiseRegression()`: Regression estimator for factor loadings.
+  - `rd::ReturnsResult = ReturnsResult()`: Returns result providing factor data.
+  - `delta::Number = 1e-6`: Finite difference step size.
+
+# Returns
+
+  - `Vector`: Risk contributions for each factor, with the last element being the idiosyncratic (off-factor) contribution.
+
+# Related
+
+  - [`risk_contribution`](@ref)
+  - [`expected_risk`](@ref)
+"""
 function factor_risk_contribution(r::AbstractBaseRiskMeasure, w::VecNum, X::MatNum_Pr,
                                   fees::Option{<:Fees} = nothing;
                                   re::RegE_Reg = StepwiseRegression(),

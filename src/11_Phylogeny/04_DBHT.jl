@@ -1,5 +1,5 @@
 """
-    abstract type DBHTRootMethod <: AbstractAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all Direct Bubble Hierarchy Tree (DBHT) root selection methods in `PortfolioOptimisers.jl`.
 
@@ -11,7 +11,7 @@ Abstract supertype for all Direct Bubble Hierarchy Tree (DBHT) root selection me
 """
 abstract type DBHTRootMethod <: AbstractAlgorithm end
 """
-    struct UniqueRoot <: DBHTRootMethod end
+$(DocStringExtensions.TYPEDEF)
 
 A DBHT root selection method that enforces a unique root in the hierarchy.
 
@@ -23,7 +23,7 @@ A DBHT root selection method that enforces a unique root in the hierarchy.
 """
 struct UniqueRoot <: DBHTRootMethod end
 """
-    struct EqualRoot <: DBHTRootMethod end
+$(DocStringExtensions.TYPEDEF)
 
 A DBHT root selection method that creates a root from the adjacency tree of all root candidates. This can be used to represent multiple equally plausible roots in the DBHT hierarchy.
 
@@ -35,7 +35,7 @@ A DBHT root selection method that creates a root from the adjacency tree of all 
 """
 struct EqualRoot <: DBHTRootMethod end
 """
-    abstract type AbstractSimilarityMatrixAlgorithm <: AbstractAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all similarity matrix algorithms used in the creation of Planar Maximally Filtered Graph (PMFG) used in [`DBHT`](@ref) and [`LoGo`](@ref) methods.
 
@@ -49,7 +49,7 @@ Abstract supertype for all similarity matrix algorithms used in the creation of 
 """
 abstract type AbstractSimilarityMatrixAlgorithm <: AbstractAlgorithm end
 """
-    struct MaximumDistanceSimilarity <: AbstractSimilarityMatrixAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Similarity matrix algorithm using the maximum distance transformation.
 
@@ -70,7 +70,7 @@ where `S` is the similarity, `\\mathbf{D}` the distance matrix, and each subscri
 """
 struct MaximumDistanceSimilarity <: AbstractSimilarityMatrixAlgorithm end
 """
-    struct ExponentialSimilarity <: AbstractSimilarityMatrixAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Similarity matrix algorithm using the exponential transformation.
 
@@ -91,10 +91,7 @@ where `S` is the similarity, `\\mathbf{D}` the distance matrix, and each subscri
 """
 struct ExponentialSimilarity <: AbstractSimilarityMatrixAlgorithm end
 """
-    struct GeneralExponentialSimilarity{T1, T2} <: AbstractSimilarityMatrixAlgorithm
-        coef::T1
-        power::T2
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Similarity matrix algorithm using a generalised exponential transformation.
 
@@ -108,27 +105,29 @@ where `S` is the similarity, `\\mathbf{D}` the distance matrix, ``c`` a scale fa
 
 # Fields
 
-  - `coef`: Non-negative scaling coefficient.
-  - `power`: Non-negative exponent applied to the distance matrix.
+$(DocStringExtensions.FIELDS)
 
-# Constructor
+# Constructors
 
-    GeneralExponentialSimilarity(; coef::Number = 1.0, power::Number = 1.0)
+    GeneralExponentialSimilarity(;
+        coef::Number = 1.0,
+        power::Number = 1.0
+    ) -> GeneralExponentialSimilarity
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `coef > 0`.
-  - `power > 0`.
+  - $(val_dict[:dbhtcoef])
+  - $(val_dict[:dbhtpower])
 
 # Examples
 
 ```jldoctest
 julia> GeneralExponentialSimilarity()
 GeneralExponentialSimilarity
-   coef ┼ Float64: 1.0
-  power ┴ Float64: 1.0
+   coef ┼ Int64: 1
+  power ┴ Int64: 1
 ```
 
 # Related
@@ -139,7 +138,9 @@ GeneralExponentialSimilarity
   - [`dbht_similarity`](@ref)
 """
 @concrete struct GeneralExponentialSimilarity <: AbstractSimilarityMatrixAlgorithm
+    "$(field_dict[:dbhtcoef])"
     coef
+    "$(field_dict[:dbhtpower])"
     power
     function GeneralExponentialSimilarity(coef::Number, power::Number)
         @argcheck(zero(coef) < coef, DomainError)
@@ -147,7 +148,7 @@ GeneralExponentialSimilarity
         return new{typeof(coef), typeof(power)}(coef, power)
     end
 end
-function GeneralExponentialSimilarity(; coef::Number = 1.0, power::Number = 1.0)
+function GeneralExponentialSimilarity(; coef::Number = 1, power::Number = 1)
     return GeneralExponentialSimilarity(coef, power)
 end
 """
@@ -192,10 +193,7 @@ function dbht_similarity(se::GeneralExponentialSimilarity; D::MatNum, kwargs...)
     return exp.(-coef * D .^ power)
 end
 """
-    struct DBHT{T1, T2} <: AbstractHierarchicalClusteringAlgorithm
-        sim::T1
-        root::T2
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Direct Bubble Hierarchical Tree (DBHT) clustering algorithm configuration.
 
@@ -203,15 +201,16 @@ Direct Bubble Hierarchical Tree (DBHT) clustering algorithm configuration.
 
 # Fields
 
-  - `sim`: Similarity matrix algorithm.
-  - `root`: Root selection method.
+$(DocStringExtensions.FIELDS)
 
-# Constructor
+# Constructors
 
-    DBHT(; sim::AbstractSimilarityMatrixAlgorithm = MaximumDistanceSimilarity(),
-         root::DBHTRootMethod = UniqueRoot())
+    DBHT(;
+        sim::AbstractSimilarityMatrixAlgorithm = MaximumDistanceSimilarity(),
+        root::DBHTRootMethod = UniqueRoot()
+    ) -> DBHT
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 
@@ -224,7 +223,7 @@ DBHT
 
 # Related
 
-  - [`AbstractHierarchicalClusteringAlgorithm`]-(@ref)
+  - [`AbstractHierarchicalClusteringAlgorithm`](@ref)
   - [`AbstractSimilarityMatrixAlgorithm`](@ref)
   - [`DBHTRootMethod`](@ref)
   - [`MaximumDistanceSimilarity`](@ref)
@@ -234,7 +233,9 @@ DBHT
   - [`EqualRoot`](@ref)
 """
 @concrete struct DBHT <: AbstractHierarchicalClusteringAlgorithm
+    "$(field_dict[:sim])"
     sim
+    "$(field_dict[:root])"
     root
     function DBHT(sim::AbstractSimilarityMatrixAlgorithm, root::DBHTRootMethod)
         return new{typeof(sim), typeof(root)}(sim, root)
@@ -673,7 +674,7 @@ This function constructs the parent index vector (`Pred`) for each 3-clique, giv
 
 # Arguments
 
-  - `M`: `N×Nc` binary matrix of node-to-3-clique memberships, where `M[i, n] = 1` if node `i` belongs to 3-clique `n`.
+  - `M`: `N × Nc` binary matrix of node-to-3-clique memberships, where `M[i, n] = 1` if node `i` belongs to 3-clique `n`.
 
 # Details
 
@@ -684,7 +685,7 @@ This function constructs the parent index vector (`Pred`) for each 3-clique, giv
 
 # Returns
 
-  - `Pred::Vector{Int}`: `Nc×1` vector of predicted parent indices for each 3-clique. `Pred[n] = 0` indicates a root clique.
+  - `Pred::Vector{Int}`: `NC × 1` vector of predicted parent indices for each 3-clique. `Pred[n] = 0` indicates a root clique.
 
 # Related
 
@@ -767,8 +768,8 @@ This function constructs the bubble hierarchy tree and the bubble membership mat
 
 # Arguments
 
-  - `Pred`: `Nc×1` vector of predicted parent indices for each 3-clique, as returned by [`BuildHierarchy`](@ref).
-  - `Sb`: `Nc×1` vector indicating the size of the separating set for each 3-clique (`Sb[n] ≠ 0` means clique `n` is separating).
+  - `Pred`: `NC × 1` vector of predicted parent indices for each 3-clique, as returned by [`BuildHierarchy`](@ref).
+  - `Sb`: `NC × 1` vector indicating the size of the separating set for each 3-clique (`Sb[n] ≠ 0` means clique `n` is separating).
 
 # Details
 
@@ -1022,7 +1023,7 @@ This function assigns directions to each separating 3-clique in the undirected b
   - `Rpm`: `N × N` sparse weighted adjacency matrix of the PMFG.
   - `Hb`: Undirected bubble tree of the PMFG (as from [`BubbleHierarchy`](@ref)).
   - `Mb`: `Nc×Nb` bubble membership matrix for 3-cliques. `Mb[n, bi] = 1` indicates 3-clique `n` belongs to bubble `bi`.
-  - `Mv`: `N×Nb` bubble membership matrix for vertices. `Mv[n, bi] = 1` means vertex `n` is a vertex of bubble `bi`.
+  - `Mv`: `N × Nb` bubble membership matrix for vertices. `Mv[n, bi] = 1` means vertex `n` is a vertex of bubble `bi`.
   - `CliqList`: `Nc×3` matrix. Each row lists the three vertices of a 3-clique in the MPG.
 
 # Details
@@ -1105,7 +1106,7 @@ This function assigns each vertex to a cluster based on the directed bubble hier
   - `Dpm`: `N × N` shortest path lengths matrix of the PMFG.
   - `Hb`: Undirected bubble tree of the PMFG (from [`BubbleHierarchy`](@ref)).
   - `Mb`: `Nc×Nb` bubble membership matrix for 3-cliques. `Mb[n, bi] = 1` indicates 3-clique `n` belongs to bubble `bi`.
-  - `Mv`: `N×Nb` bubble membership matrix for vertices. `Mv[n, bi] = 1` means vertex `n` is a vertex of bubble `bi`.
+  - `Mv`: `N × Nb` bubble membership matrix for vertices. `Mv[n, bi] = 1` means vertex `n` is a vertex of bubble `bi`.
   - `CliqList`: `Nc×3` matrix. Each row lists the three vertices of a 3-clique in the MPG.
 
 # Details
@@ -1118,7 +1119,7 @@ This function assigns each vertex to a cluster based on the directed bubble hier
 
 # Returns
 
-  - `Adjv::SparseMatrixCSC{Int, Int}`: `N×Nk` cluster membership matrix for vertices for non-discrete clustering via the bubble topology. `Adjv[n, k] = 1` indicates cluster membership of vertex `n` to the `k`-th non-discrete cluster.
+  - `Adjv::SparseMatrixCSC{Int, Int}`: `N × Nk` cluster membership matrix for vertices for non-discrete clustering via the bubble topology. `Adjv[n, k] = 1` indicates cluster membership of vertex `n` to the `k`-th non-discrete cluster.
   - `Tc::Vector{Int}`: `N × 1` cluster membership vector. `Tc[n] = k` indicates cluster membership of vertex `n` to the `k`-th discrete cluster.
 
 # Related
@@ -1192,7 +1193,7 @@ This function determines the bubble membership of each vertex, resolving ambigui
 # Arguments
 
   - `Rpm`: `N × N` sparse weighted adjacency matrix of the PMFG.
-  - `Mv`: `N×Nb` bubble membership matrix for vertices. `Mv[n, bi] = 1` means vertex `n` is a vertex of bubble `bi`.
+  - `Mv`: `N × Nb` bubble membership matrix for vertices. `Mv[n, bi] = 1` means vertex `n` is a vertex of bubble `bi`.
   - `Mc`: Matrix indicating bubbles that coincide with clusters.
 
 # Details
@@ -1203,7 +1204,7 @@ This function determines the bubble membership of each vertex, resolving ambigui
 
 # Returns
 
-  - `Mvv::Matrix{Int}`: `N×Nb` matrix where `Mvv[n, bi] = 1` if vertex `n` is assigned to bubble `bi`.
+  - `Mvv::Matrix{Int}`: `N × Nb` matrix where `Mvv[n, bi] = 1` if vertex `n` is assigned to bubble `bi`.
 
 # Related
 
@@ -1387,15 +1388,15 @@ This function builds a hierarchical clustering (dendrogram) by first constructin
   - `Rpm`: `N × N` sparse weighted adjacency matrix of the PMFG.
   - `Dpm`: `N × N` shortest path lengths matrix of the PMFG.
   - `Tc`: `N × 1` cluster membership vector. `Tc[n] = k` indicates cluster membership of vertex `n` to the `k`-th discrete cluster.
-  - `Mv`: `N×Nb` bubble membership matrix. `Mv[n, bi] = 1` means vertex `n` is a vertex of bubble `bi`.
+  - `Mv`: `N × Nb` bubble membership matrix. `Mv[n, bi] = 1` means vertex `n` is a vertex of bubble `bi`.
 
 # Details
 
-    - For each cluster, the function identifies the bubbles that coincide with the cluster and assigns each vertex to a specific bubble using [`BubbleMember`](@ref).
-    - It constructs intra-bubble and intra-cluster linkages using [`build_link_and_dendro`](@ref).
-    - After intra-cluster linkage, it merges clusters to form the global hierarchy using inter-cluster linkage steps.
-    - The resulting linkage matrix can be converted to a format compatible with [`Clustering.Hclust`](https://juliastats.org/Clustering.jl/stable/hclust.html#Clustering.Hclust) using [`turn_into_Hclust_merges`](@ref).
-    - Used internally by DBHT clustering routines for dendrogram construction.
+  - For each cluster, the function identifies the bubbles that coincide with the cluster and assigns each vertex to a specific bubble using [`BubbleMember`](@ref).
+  - It constructs intra-bubble and intra-cluster linkages using [`build_link_and_dendro`](@ref).
+  - After intra-cluster linkage, it merges clusters to form the global hierarchy using inter-cluster linkage steps.
+  - The resulting linkage matrix can be converted to a format compatible with [`Clustering.Hclust`](https://juliastats.org/Clustering.jl/stable/hclust.html#Clustering.Hclust) using [`turn_into_Hclust_merges`](@ref).
+  - Used internally by DBHT clustering routines for dendrogram construction.
 
 # Returns
 
@@ -1562,7 +1563,7 @@ This function implements the full DBHT clustering pipeline: it constructs a Plan
   - `Rpm::SparseMatrixCSC{<:Number, Int}`: `N × N` adjacency matrix of the Planar Maximally Filtered Graph (PMFG).
   - `Adjv::SparseMatrixCSC{Int, Int}`: Bubble cluster membership matrix from [`BubbleCluster8s`](@ref).
   - `Dpm::Matrix{<:Number}`: `N × N` shortest path length matrix of the PMFG.
-  - `Mv::SparseMatrixCSC{Int, Int}`: `N×Nb` bubble membership matrix. `Mv[n, bi] = 1` means vertex `n` is a vertex of bubble `bi`.
+  - `Mv::SparseMatrixCSC{Int, Int}`: `N × Nb` bubble membership matrix. `Mv[n, bi] = 1` means vertex `n` is a vertex of bubble `bi`.
   - `Z::Matrix{<:Number}`: `(N-1)×3` linkage matrix in Matlab format.
   - `Z_hclust::Clustering.Hclust`: Dendrogram in [`Clustering.Hclust`](https://juliastats.org/Clustering.jl/stable/hclust.html#Clustering.Hclust) format.
 
@@ -1762,7 +1763,7 @@ function logo!(::Nothing, args...; kwargs...)
     return nothing
 end
 """
-    abstract type InverseMatrixSparsificationAlgorithm <: AbstractMatrixProcessingAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all inverse matrix sparsification algorithms in `PortfolioOptimisers.jl`.
 
@@ -1773,11 +1774,7 @@ Abstract supertype for all inverse matrix sparsification algorithms in `Portfoli
 """
 abstract type InverseMatrixSparsificationAlgorithm <: AbstractMatrixProcessingAlgorithm end
 """
-    struct LoGo{T1, T2, T3} <: InverseMatrixSparsificationAlgorithm
-        dist::T1
-        sim::T2
-        pdm::T3
-    end
+$(DocStringExtensions.TYPEDEF)
 
 LoGo (Local-Global) sparse inverse covariance estimation algorithm.
 
@@ -1785,30 +1782,30 @@ LoGo (Local-Global) sparse inverse covariance estimation algorithm.
 
 # Fields
 
-  - `dist`: Distance matrix estimator.
-  - `sim`: Similarity matrix algorithm.
-  - `pdm`: Optional Positive definite matrix estimator. If provided, ensures the output is positive definite.
+$(DocStringExtensions.FIELDS)
 
-# Constructor
+# Constructors
 
-    LoGo(; dist::AbstractDistanceEstimator = Distance(; alg = CanonicalDistance()),
-         sim::AbstractSimilarityMatrixAlgorithm = MaximumDistanceSimilarity(),
-         pdm::Option{<:Posdef} = Posdef())
+    LoGo(;
+        de::AbstractDistanceEstimator = Distance(; alg = CanonicalDistance()),
+        sim::AbstractSimilarityMatrixAlgorithm = MaximumDistanceSimilarity(),
+        pdm::Option{<:Posdef} = Posdef()
+    ) -> LoGo
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 
 ```jldoctest
 julia> LoGo()
 LoGo
-  dist ┼ Distance
-       │   power ┼ nothing
-       │     alg ┴ CanonicalDistance()
-   sim ┼ MaximumDistanceSimilarity()
-   pdm ┼ Posdef
-       │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-       │   kwargs ┴ @NamedTuple{}: NamedTuple()
+   de ┼ Distance
+      │   power ┼ nothing
+      │     alg ┴ CanonicalDistance()
+  sim ┼ MaximumDistanceSimilarity()
+  pdm ┼ Posdef
+      │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+      │   kwargs ┴ @NamedTuple{}: NamedTuple()
 ```
 
 # Related
@@ -1821,30 +1818,48 @@ LoGo
   - [`GeneralExponentialSimilarity`](@ref)
 """
 @concrete struct LoGo <: InverseMatrixSparsificationAlgorithm
-    dist
+    "$(field_dict[:de])"
+    de
+    "$(field_dict[:sim])"
     sim
+    "$(field_dict[:pdm])"
     pdm
-    function LoGo(dist::AbstractDistanceEstimator, sim::AbstractSimilarityMatrixAlgorithm,
+    function LoGo(de::AbstractDistanceEstimator, sim::AbstractSimilarityMatrixAlgorithm,
                   pdm::Option{<:Posdef} = Posdef())
-        return new{typeof(dist), typeof(sim), typeof(pdm)}(dist, sim, pdm)
+        return new{typeof(de), typeof(sim), typeof(pdm)}(de, sim, pdm)
     end
 end
-function LoGo(; dist::AbstractDistanceEstimator = Distance(; alg = CanonicalDistance()),
+function LoGo(; de::AbstractDistanceEstimator = Distance(; alg = CanonicalDistance()),
               sim::AbstractSimilarityMatrixAlgorithm = MaximumDistanceSimilarity(),
               pdm::Option{<:Posdef} = Posdef())
-    return LoGo(dist, sim, pdm)
+    return LoGo(de, sim, pdm)
 end
+"""
+    const DVarInfo_DDVarInfo = Union{<:Distance{<:Any, <:VariationInfoDistance},
+                                     <:DistanceDistance{<:Any, <:VariationInfoDistance, <:Any,
+                                                        <:Any, <:Any}}
+
+Alias for distance types using variation of information metrics.
+
+Matches either a [`VariationInfoDistance`](@ref)-based [`Distance`](@ref) or a [`VariationInfoDistance`](@ref)-based [`DistanceDistance`](@ref). Used for dispatch in DBHT-based phylogeny computation.
+
+# Related
+
+  - [`VariationInfoDistance`](@ref)
+  - [`Distance`](@ref)
+  - [`DistanceDistance`](@ref)
+"""
 const DVarInfo_DDVarInfo = Union{<:Distance{<:Any, <:VariationInfoDistance},
                                  <:DistanceDistance{<:Any, <:VariationInfoDistance, <:Any,
                                                     <:Any, <:Any}}
 """
-    LoGo_dist_assert(dist::AbstractDistanceEstimator, sigma::MatNum, X::MatNum)
+    LoGo_dist_assert(de::AbstractDistanceEstimator, sigma::MatNum, X::MatNum)
 
 Validate compatibility of the distance estimator and covariance matrix for LoGo sparse inverse covariance estimation by checking `size(sigma, 1) == size(X, 2)`.
 
 # Arguments
 
-  - `dist`: Distance estimator, typically a subtype of `AbstractDistanceEstimator`.
+  - `de`: Distance estimator, typically a subtype of `AbstractDistanceEstimator`.
   - `sigma`: Covariance matrix (`N × N`).
   - `X`: Data matrix (`T × N` or `N × T`).
 
@@ -1905,8 +1920,8 @@ This method implements the LoGo algorithm for sparse inverse covariance estimati
 
 # Validation
 
-    - `size(sigma, 1) == size(sigma, 2)`.
-    - `size(sigma, 1) == size(X, 2)`.
+  - `size(sigma, 1) == size(sigma, 2)`.
+  - `size(sigma, 1) == size(X, 2)`.
 
 # Returns
 
@@ -1923,7 +1938,7 @@ This method implements the LoGo algorithm for sparse inverse covariance estimati
 """
 function logo!(je::LoGo, sigma::MatNum, X::MatNum; dims::Int = 1, kwargs...)
     assert_matrix_issquare(sigma, :sigma)
-    LoGo_dist_assert(je.dist, sigma, X)
+    LoGo_dist_assert(je.de, sigma, X)
     s = LinearAlgebra.diag(sigma)
     iscov = any(!isone, s)
     S = if iscov
@@ -1932,13 +1947,37 @@ function logo!(je::LoGo, sigma::MatNum, X::MatNum; dims::Int = 1, kwargs...)
     else
         sigma
     end
-    D = distance(je.dist, S, X; dims = dims, kwargs...)
+    D = distance(je.de, S, X; dims = dims, kwargs...)
     S = dbht_similarity(je.sim; S = S, D = D)
     separators, cliques = PMFG_T2s(S, 4)[3:4]
     sigma .= J_LoGo(sigma, separators, cliques) \ LinearAlgebra.I
     posdef!(je.pdm, sigma)
     return nothing
 end
+"""
+    logo(je::LoGo, sigma::MatNum, X::MatNum; dims::Int = 1, kwargs...) -> MatNum
+
+Apply the LoGo (Local-Global) transformation to the covariance matrix and return the result as a new matrix.
+
+This is the non-mutating variant of [`logo!`](@ref). It copies `sigma` before applying the transformation.
+
+# Arguments
+
+  - `je::LoGo`: LoGo algorithm configuration.
+  - `sigma::MatNum`: Covariance matrix to transform (not mutated).
+  - `X::MatNum`: Returns data matrix.
+  - `dims::Int = 1`: Observation dimension.
+
+# Returns
+
+  - New matrix with LoGo transformation applied.
+
+# Related
+
+  - [`logo!`](@ref)
+  - [`LoGo`](@ref)
+  - [`J_LoGo`](@ref)
+"""
 function logo(je::LoGo, sigma::MatNum, X::MatNum; dims::Int = 1, kwargs...)
     sigma = copy(sigma)
     logo!(je, sigma, X; dims = dims, kwargs...)

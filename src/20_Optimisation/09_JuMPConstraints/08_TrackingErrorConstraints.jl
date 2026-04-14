@@ -1,3 +1,42 @@
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Add tracking error constraints to the JuMP optimisation model.
+
+The fall-through method does nothing. Concrete methods dispatch on the tracking algorithm type:
+
+  - [`L1Tracking`](@ref): Enforces `‖net_X - wb * k‖₁ ≤ err * T` via NormOneCone.
+  - [`L2Tracking`](@ref) / [`SquaredL2Tracking`](@ref): Enforces a scaled L2 norm via SecondOrderCone.
+  - [`LpTracking`](@ref): Enforces a scaled Lp norm via power cone.
+  - [`LInfTracking`](@ref): Enforces `‖net_X - wb * k‖_∞ ≤ err * scale` via NormInfinityCone.
+  - [`IndependentVariableTracking`](@ref): Substitutes `w - wb` for `w` and applies the chosen risk constraint.
+  - [`DependentVariableTracking`](@ref): Constrains the absolute difference between portfolio risk and benchmark risk.
+
+The collection method iterates over all tracking errors in `tres`.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - `i::Integer`: Constraint index for generating unique variable and constraint names.
+  - `pr::AbstractPriorResult`: Prior result providing the return matrix `X`.
+  - `tr`: Tracking error specification.
+  - `opt`: Optimisation estimator (required for risk-based tracking variants).
+  - $(arg_dict[:pl_opt])
+  - $(arg_dict[:fees_opt])
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`TrackingError`](@ref)
+  - [`RiskTrackingError`](@ref)
+  - [`L1Tracking`](@ref)
+  - [`L2Tracking`](@ref)
+  - [`LpTracking`](@ref)
+  - [`LInfTracking`](@ref)
+"""
 function set_tracking_error_constraints!(args...; kwargs...)
     return nothing
 end

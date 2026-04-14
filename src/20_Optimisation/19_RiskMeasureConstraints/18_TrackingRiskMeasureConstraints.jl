@@ -1,3 +1,36 @@
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Add tracking risk constraints to `model`.
+
+The `L1Tracking` overload uses an L1-norm cone. The `L2Tracking` / `SquaredL2Tracking`
+overload uses an SOC. The `LpTracking` overload uses power cones parameterised by `r.alg.p`.
+The `LInfTracking` overload uses an infinity-norm cone. The independent-variable overload
+shifts the weight vector by a benchmark before delegating to [`set_triv_risk_constraints!`](@ref).
+The dependent-variable overload computes a benchmark risk and adds an L1-norm cone on the
+risk difference via [`set_trdv_risk_constraints!`](@ref).
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - $(arg_dict[:ci])
+  - `r`: Tracking risk measure instance.
+  - $(arg_dict[:opt_rjumpe])
+  - $(arg_dict[:pr_X])
+  - $(arg_dict[:pl_opt])
+  - $(arg_dict[:fees_opt])
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`set_tracking_risk!`](@ref)
+  - [`set_risk_tr_constraints!`](@ref)
+  - [`set_triv_risk_constraints!`](@ref)
+  - [`set_trdv_risk_constraints!`](@ref)
+"""
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::TrackingRiskMeasure{<:Any, <:Any, <:L1Tracking},
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
@@ -21,6 +54,32 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     set_risk_bounds_and_expression!(model, opt, tracking_risk, r.settings, key)
     return tracking_risk
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Finalise the L2 or squared-L2 tracking risk expression and apply bounds.
+
+The `L2Tracking` overload calls [`set_risk_bounds_and_expression!`](@ref) directly with the
+SOC variable. The `SquaredL2Tracking` overload squares it and applies a sqrt-converted upper
+bound to the original SOC variable.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - `r::TrackingRiskMeasure`: Tracking risk measure instance.
+  - $(arg_dict[:opt_rjumpe])
+  - `tracking_risk::JuMP.AbstractJuMPScalar`: Normalised tracking-risk SOC variable.
+  - $(arg_dict[:key_sym])
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`set_risk_constraints!`](@ref)
+  - [`variance_risk_bounds_val`](@ref)
+"""
 function set_tracking_risk!(model::JuMP.Model,
                             r::TrackingRiskMeasure{<:Any, <:Any, <:L2Tracking},
                             opt::RiskJuMPOptimisationEstimator,
@@ -38,6 +97,34 @@ function set_tracking_risk!(model::JuMP.Model,
     set_risk_expression!(model, qtracking_risk, r.settings.scale, r.settings.rke)
     return qtracking_risk
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Add JuMP risk constraints for `TrackingRiskMeasure` with `L2Tracking` or
+`SquaredL2Tracking` to `model`.
+
+Introduces a scalar variable and an SOC constraint to encode the L2 (root mean squared)
+tracking error between portfolio and benchmark returns.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - $(arg_dict[:ci])
+  - `r::TrackingRiskMeasure{<:Any, <:Any, <:Union{<:L2Tracking, <:SquaredL2Tracking}}`:
+    The tracking risk measure.
+  - $(arg_dict[:opt_rjumpe])
+  - $(arg_dict[:pr])
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`TrackingRiskMeasure`](@ref)
+  - [`L2Tracking`](@ref)
+  - [`set_risk_constraints!`](@ref)
+"""
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::TrackingRiskMeasure{<:Any, <:Any,
                                                       <:Union{<:L2Tracking,
@@ -63,6 +150,32 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                                            JuMP.SecondOrderCone())
     return set_tracking_risk!(model, r, opt, tracking_risk, key)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Add JuMP risk constraints for `TrackingRiskMeasure` with `LpTracking` to `model`.
+
+Introduces a scalar variable and power-cone constraints to encode the Lp-norm tracking
+error between portfolio and benchmark returns, scaled by `(T - ddof)^(1/p)`.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - $(arg_dict[:ci])
+  - `r::TrackingRiskMeasure{<:Any, <:Any, <:LpTracking}`: The tracking risk measure.
+  - $(arg_dict[:opt_rjumpe])
+  - $(arg_dict[:pr])
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`TrackingRiskMeasure`](@ref)
+  - [`LpTracking`](@ref)
+  - [`set_risk_constraints!`](@ref)
+"""
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::TrackingRiskMeasure{<:Any, <:Any, <:LpTracking},
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
@@ -104,6 +217,32 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     set_risk_bounds_and_expression!(model, opt, tracking_risk, r.settings, key)
     return tracking_risk
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Add JuMP risk constraints for `TrackingRiskMeasure` with `LInfTracking` to `model`.
+
+Introduces a scalar variable and an infinity-norm cone constraint to encode the L∞-norm
+(maximum) tracking error between portfolio and benchmark returns, scaled by `T - ddof`.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - $(arg_dict[:ci])
+  - `r::TrackingRiskMeasure{<:Any, <:Any, <:LInfTracking}`: The tracking risk measure.
+  - $(arg_dict[:opt_rjumpe])
+  - $(arg_dict[:pr])
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`TrackingRiskMeasure`](@ref)
+  - [`LInfTracking`](@ref)
+  - [`set_risk_constraints!`](@ref)
+"""
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::TrackingRiskMeasure{<:Any, <:Any, <:LInfTracking},
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
@@ -128,6 +267,31 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     set_risk_bounds_and_expression!(model, opt, tracking_risk, r.settings, key)
     return tracking_risk
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Dispatch to indexed [`set_risk_constraints!`](@ref) for a single measure or iterate over a
+vector of measures, using a name prefix `key` for unique constraint naming.
+
+# Arguments
+
+  - `key`: Name prefix for unique constraint symbols.
+  - $(arg_dict[:model])
+  - `r`: A [`RiskMeasure`](@ref) or a vector of risk measures.
+  - $(arg_dict[:opt_jumpe])
+  - $(arg_dict[:pr])
+  - $(arg_dict[:pl_opt])
+  - $(arg_dict[:fees_opt])
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`set_risk_constraints!`](@ref)
+  - [`set_triv_risk_constraints!`](@ref)
+"""
 function set_risk_tr_constraints!(key::Any, model::JuMP.Model, r::RiskMeasure,
                                   opt::JuMPOptimisationEstimator, pr::AbstractPriorResult,
                                   pl::Option{<:PlC_VecPlC}, fees::Option{<:Fees}, args...;
@@ -145,6 +309,35 @@ function set_risk_tr_constraints!(key::Any, model::JuMP.Model, rs::VecRM,
     end
     return nothing
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Set risk constraints for independent-variable tracking, saving and restoring any global
+singleton model state that would conflict with the nested solve.
+
+Stashes existing model-level expressions and constraints (e.g., `net_X`, `dd`, `wr_risk`,
+SDP matrices) with `old` prefixes, calls [`set_risk_tr_constraints!`](@ref) with the
+`triv_i_` naming prefix, then restores the original state.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - $(arg_dict[:ci])
+  - `r::RiskMeasure`: Inner risk measure.
+  - $(arg_dict[:opt_rjumpe])
+  - $(arg_dict[:pr])
+  - $(arg_dict[:pl_opt])
+  - $(arg_dict[:fees_opt])
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`set_risk_tr_constraints!`](@ref)
+  - [`set_trdv_risk_constraints!`](@ref)
+"""
 function set_triv_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMeasure,
                                     opt::RiskJuMPOptimisationEstimator,
                                     pr::AbstractPriorResult, pl::Option{<:PlC_VecPlC},
@@ -487,6 +680,38 @@ function set_triv_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMeasure,
     end
     return risk_expr
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Add JuMP risk constraints for `RiskTrackingRiskMeasure` with `IndependentVariableTracking`
+to `model`.
+
+Shifts the portfolio weight vector by the benchmark weights, delegates to
+[`set_triv_risk_constraints!`](@ref) to compute the inner risk expression on the adjusted
+weights, then applies risk bounds and expression registration.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - $(arg_dict[:ci])
+  - `r::RiskTrackingRiskMeasure{<:Any, <:Any, <:Any, <:IndependentVariableTracking}`:
+    The risk-tracking risk measure.
+  - $(arg_dict[:opt_rjumpe])
+  - $(arg_dict[:pr])
+  - $(arg_dict[:pl_opt])
+  - $(arg_dict[:fees_opt])
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`RiskTrackingRiskMeasure`](@ref)
+  - [`IndependentVariableTracking`](@ref)
+  - [`set_triv_risk_constraints!`](@ref)
+  - [`set_risk_constraints!`](@ref)
+"""
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::RiskTrackingRiskMeasure{<:Any, <:Any, <:Any,
                                                           <:IndependentVariableTracking},
@@ -509,6 +734,36 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     set_risk_bounds_and_expression!(model, opt, tracking_risk, r.settings, key)
     return tracking_risk
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Set risk constraints for dependent-variable tracking, saving and restoring variance-related
+model state.
+
+Stashes existing SDP matrices (`W`, `Au`, `E`) and variance flags, calls
+[`set_risk_tr_constraints!`](@ref) with the `trdv_i_` naming prefix, then restores the
+original state. This ensures the inner risk measure's variance constraints do not interfere
+with the outer model.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - $(arg_dict[:ci])
+  - `r::RiskMeasure`: Inner risk measure.
+  - $(arg_dict[:opt_rjumpe])
+  - $(arg_dict[:pr])
+  - $(arg_dict[:pl_opt])
+  - $(arg_dict[:fees_opt])
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`set_risk_tr_constraints!`](@ref)
+  - [`set_triv_risk_constraints!`](@ref)
+"""
 function set_trdv_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMeasure,
                                     opt::RiskJuMPOptimisationEstimator,
                                     pr::AbstractPriorResult, pl::Option{<:PlC_VecPlC},
@@ -625,6 +880,39 @@ function set_trdv_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMeasure,
     end
     return risk_expr
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Add JuMP risk constraints for `RiskTrackingRiskMeasure` with `DependentVariableTracking`
+to `model`.
+
+Computes the benchmark's expected risk value, delegates to
+[`set_trdv_risk_constraints!`](@ref) to compute the inner risk expression, then adds an
+L1-norm cone constraint on the difference between the portfolio's risk expression and the
+benchmark's expected risk, scaled by the allocation variable `k`.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - $(arg_dict[:ci])
+  - `r::RiskTrackingRiskMeasure{<:Any, <:Any, <:Any, <:DependentVariableTracking}`:
+    The risk-tracking risk measure.
+  - $(arg_dict[:opt_rjumpe])
+  - $(arg_dict[:pr])
+  - $(arg_dict[:pl_opt])
+  - $(arg_dict[:fees_opt])
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`RiskTrackingRiskMeasure`](@ref)
+  - [`DependentVariableTracking`](@ref)
+  - [`set_trdv_risk_constraints!`](@ref)
+  - [`set_risk_constraints!`](@ref)
+"""
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::RiskTrackingRiskMeasure{<:Any, <:Any, <:Any,
                                                           <:DependentVariableTracking},

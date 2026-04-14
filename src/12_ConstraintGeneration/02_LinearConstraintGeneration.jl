@@ -1,28 +1,25 @@
 """
-    struct PartialLinearConstraint{T1, T2} <: AbstractConstraintResult
-        A::T1
-        B::T2
-    end
+$(DocStringExtensions.TYPEDEF)
 
-Container for a set of linear constraints (either equality or inequality) in the form `A * x = B` or `A * x ≤ B`.
-
-`PartialLinearConstraint` stores the coefficient matrix `A` and right-hand side vector `B` for a group of linear constraints. This type is used internally by [`LinearConstraint`](@ref) to represent either the equality or inequality constraints in a portfolio optimisation problem.
+`PartialLinearConstraint` stores the coefficient matrix `A` and right-hand side vector `B` for a group of linear constraints. It can represent equality or inequality constraints depending on whether the instance is stored in the `eq` or `ineq` fields of [`LinearConstraint`](@ref).
 
 # Fields
 
-  - `A`: Coefficient matrix of the linear constraints.
-  - `B`: Right-hand side vector of the linear constraints.
+$(DocStringExtensions.FIELDS)
 
-# Constructor
+# Constructors
 
-    PartialLinearConstraint(; A::MatNum, B::VecNum)
+    PartialLinearConstraint(;
+        A::MatNum,
+        B::VecNum
+    ) -> PartialLinearConstraint
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `!isempty(A)`.
-  - `!isempty(B)`.
+  - $(val_dict[:A])
+  - $(val_dict[:B])
 
 # Examples
 
@@ -39,7 +36,9 @@ PartialLinearConstraint
   - [`LinearConstraintEstimator`](@ref)
 """
 @concrete struct PartialLinearConstraint <: AbstractConstraintResult
+    "$(field_dict[:A])"
     A
+    "$(field_dict[:B])"
     B
     function PartialLinearConstraint(A::MatNum, B::VecNum)
         @argcheck(!isempty(A), IsEmptyError)
@@ -51,30 +50,42 @@ function PartialLinearConstraint(; A::MatNum, B::VecNum)
     return PartialLinearConstraint(A, B)
 end
 """
-    struct LinearConstraint{T1, T2} <: AbstractConstraintResult
-        ineq::T1
-        eq::T2
-    end
+$(DocStringExtensions.TYPEDEF)
 
-Container for a set of linear constraints, separating inequality and equality constraints.
+`LinearConstraint` holds both the inequality and equality constraints for a portfolio optimisation problem, each represented by a [`PartialLinearConstraint`](@ref).
 
-`LinearConstraint` holds both the inequality and equality constraints for a portfolio optimisation problem, each represented as a [`PartialLinearConstraint`](@ref). This type is used to encapsulate all linear constraints in a unified structure, enabling composable and modular constraint handling.
+```math
+\\begin{align}
+  \\mathbf{A}_\\text{ineq} \\boldsymbol{x} &\\leq \\boldsymbol{B}_\\text{ineq} \\\\
+  \\mathbf{A}_\\text{eq} \\boldsymbol{x} &= \\boldsymbol{B}_\\text{eq}
+
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:A])
+  - $(math_dict[:B])
+  - $(math_dict[:ineq])
+  - $(math_dict[:eq])
+  - $(math_dict[:x])
 
 # Fields
 
-  - `ineq`: Inequality constraints, as a [`PartialLinearConstraint`](@ref) or `nothing`.
-  - `eq`: Equality constraints, as a [`PartialLinearConstraint`](@ref) or `nothing`.
+$(DocStringExtensions.FIELDS)
 
-# Constructor
+# Constructors
 
-    LinearConstraint(; ineq::Option{<:PartialLinearConstraint} = nothing,
-                     eq::Option{<:PartialLinearConstraint} = nothing)
+    LinearConstraint(;
+        ineq::Option{<:PartialLinearConstraint} = nothing,
+        eq::Option{<:PartialLinearConstraint} = nothing
+    ) -> LinearConstraint
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `!(isnothing(ineq) && isnothing(eq))`, i.e. they cannot both be `nothing` at the same time.
+  - $(val_dict[:eqineq])
 
 # Examples
 
@@ -99,7 +110,9 @@ LinearConstraint
   - [`LinearConstraintEstimator`](@ref)
 """
 @concrete struct LinearConstraint <: AbstractConstraintResult
+    "$(field_dict[:ineq])"
     ineq
+    "$(field_dict[:eq])"
     eq
     function LinearConstraint(ineq::Option{<:PartialLinearConstraint},
                               eq::Option{<:PartialLinearConstraint})
@@ -112,7 +125,27 @@ function LinearConstraint(; ineq::Option{<:PartialLinearConstraint} = nothing,
                           eq::Option{<:PartialLinearConstraint} = nothing)
     return LinearConstraint(ineq, eq)
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Alias for an abstract vector of [`LinearConstraint`](@ref) elements.
+
+# Related
+
+  - [`LinearConstraint`](@ref)
+  - [`Lc_VecLc`](@ref)
+"""
 const VecLc = AbstractVector{<:LinearConstraint}
+"""
+    const Lc_VecLc = Union{<:LinearConstraint, <:VecLc}
+
+Alias for a union of a single [`LinearConstraint`](@ref) or a vector of them.
+
+# Related
+
+  - [`LinearConstraint`](@ref)
+  - [`VecLc`](@ref)
+"""
 const Lc_VecLc = Union{<:LinearConstraint, <:VecLc}
 function Base.getproperty(obj::LinearConstraint, sym::Symbol)
     return if sym == :A_ineq
@@ -128,7 +161,7 @@ function Base.getproperty(obj::LinearConstraint, sym::Symbol)
     end
 end
 """
-    abstract type AbstractParsingResult <: AbstractConstraintResult end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all equation parsing result types in `PortfolioOptimisers.jl`.
 
@@ -141,13 +174,7 @@ All concrete and/or abstract types representing parsing results should be subtyp
 """
 abstract type AbstractParsingResult <: AbstractConstraintResult end
 """
-    struct ParsingResult{T1, T2, T3, T4, T5} <: AbstractParsingResult
-        vars::T1
-        coef::T2
-        op::T3
-        rhs::T4
-        eqn::T5
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Structured result for standard linear constraint equation parsing.
 
@@ -183,33 +210,52 @@ Structured result for standard linear constraint equation parsing.
                                                                                      eqn)
     end
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Alias for an abstract vector of [`ParsingResult`](@ref) elements.
+
+# Related
+
+  - [`ParsingResult`](@ref)
+  - [`PR_VecPR`](@ref)
+"""
 const VecPR = AbstractVector{<:ParsingResult}
+"""
+    const PR_VecPR = Union{<:ParsingResult, <:VecPR}
+
+Alias for a union of a single [`ParsingResult`](@ref) or a vector of them.
+
+# Related
+
+  - [`ParsingResult`](@ref)
+  - [`VecPR`](@ref)
+"""
 const PR_VecPR = Union{<:ParsingResult, <:VecPR}
 """
-    struct AssetSets{T1, T2, T3} <: AbstractEstimator
-        key::T1
-        ukey::T2
-        dict::T3
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Container for asset set and group information used in constraint generation.
 
 `AssetSets` provides a unified interface for specifying the asset universe and any groupings or partitions of assets. It is used throughout constraint generation and estimator routines to expand group references, map group names to asset lists, and validate asset membership.
 
-If a key in `dict` starts with the same value as `key`, it means that the corresponding group must have the same length as the asset universe, `dict[key]`. This is useful for defining partitions of the asset universe, for example when using [`asset_sets_matrix`]-(@ref) with [`NestedClustered`]-(@ref).
+If a key in `dict` starts with the same value as `key`, it means that the corresponding group must have the same length as the asset universe, `dict[key]`. This is useful for defining partitions of the asset universe, for example when using [`asset_sets_matrix`](@ref) with [`NestedClustered`](@ref).
 
 # Fields
 
-  - `key`: The key in `dict` that identifies the primary list of assets. Groups prefixed by this `key` followed by an `_` must have the same length as `dict[key]` as their lengths are preserved across views, enabling the use of constraints even in [`NestedClustered`]-(@ref) optimisations. For example if `key` is `mykey`, sets prefixed by `mykey_` must have the same length and corresponding order as `dict[key]`. For example if we want to define the asset industries we can create a key-value pair with key "mykey_industries", where the entry corresponds to the industry of the asset in the same position in `dict[key]`.
-  - `ukey`: The key prefix used for asset sets with unique entries. If present, there must be an equivalently named group prefixed by `key` followed by an `_` that follows the above rule, as that group will be used to find each of the unique entries matching each asset for the view. For example assuming `ukey` is `myuniquekey` if we want to use the above example but create a constraint which uses the sets of industries found in `dict["mykey_industries"]` we can create a key-value pair with key `myuniquekey_industries` whose values are the unique entries of `dict["mykey_industries"]`. This uniqueness will be propagated across views, which lets us define constraints on the unique entries even in [`NestedClustered`]-(@ref) optimisations.
+  - `key`: The key in `dict` that identifies the primary list of assets. Groups prefixed by this `key` followed by an `_` must have the same length as `dict[key]` as their lengths are preserved across views, enabling the use of constraints even in [`NestedClustered`](@ref) optimisations. For example if `key` is `mykey`, sets prefixed by `mykey_` must have the same length and corresponding order as `dict[key]`. For example if we want to define the asset industries we can create a key-value pair with key "mykey_industries", where the entry corresponds to the industry of the asset in the same position in `dict[key]`.
+  - `ukey`: The key prefix used for asset sets with unique entries. If present, there must be an equivalently named group prefixed by `key` followed by an `_` that follows the above rule, as that group will be used to find each of the unique entries matching each asset for the view. For example assuming `ukey` is `myuniquekey` if we want to use the above example but create a constraint which uses the sets of industries found in `dict["mykey_industries"]` we can create a key-value pair with key `myuniquekey_industries` whose values are the unique entries of `dict["mykey_industries"]`. This uniqueness will be propagated across views, which lets us define constraints on the unique entries even in [`NestedClustered`](@ref) optimisations.
   - `dict`: A dictionary mapping group names (or asset set names) to vectors of asset identifiers.
 
-# Constructor
+# Constructors
 
-    AssetSets(; key::AbstractString = "nx", ukey::AbstractString = "ux",
-              dict::AbstractDict{<:AbstractString, <:Any})
+    AssetSets(;
+        key::AbstractString = "nx",
+        ukey::AbstractString = "ux",
+        dict::AbstractDict{<:AbstractString, <:Any}
+    ) -> AssetSets
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 
@@ -476,7 +522,7 @@ function estimator_to_val(val::VecNum, sets::AssetSets, ::Any = nothing,
     return val
 end
 """
-    struct UniformValues <: AbstractEstimatorValueAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Custom weight bounds constraint for uniformly distributing asset weights, `1/N` for lower bounds and `1` for upper bounds, where `N` is the number of assets.
 
@@ -565,10 +611,10 @@ Expand and collect all terms from a Julia expression representing a linear const
 
 # Details
 
-    - Calls [`_collect_terms!`](@ref) internally with an initial coefficient of `1.0` and an empty vector.
-    - Numeric constants are collected as `(coefficient, nothing)`.
-    - Variables are collected as `(coefficient, variable_name)`.
-    - Arithmetic expressions are recursively expanded and collected.
+  - Calls [`_collect_terms!`](@ref) internally with an initial coefficient of `1.0` and an empty vector.
+  - Numeric constants are collected as `(coefficient, nothing)`.
+  - Variables are collected as `(coefficient, variable_name)`.
+  - Arithmetic expressions are recursively expanded and collected.
 
 # Returns
 
@@ -678,9 +724,9 @@ Format a single term in a linear constraint equation as a string.
 
 # Details
 
-    - If `coeff == 1`, returns `"\$var"` (no explicit coefficient).
-    - If `coeff == -1`, returns `"-\$(var)"` (no explicit coefficient).
-    - Otherwise, returns `"\$(coeff)*\$(var)"`.
+  - If `coeff == 1`, returns `"\$var"` (no explicit coefficient).
+  - If `coeff == -1`, returns `"-\$(var)"` (no explicit coefficient).
+  - Otherwise, returns `"\$(coeff)*\$(var)"`.
 
 # Returns
 
@@ -914,6 +960,21 @@ function parse_equation(eqn::AbstractString; ops1::Tuple = ("==", "<=", ">="),
     _rethrow_parse_error(rexpr, :rhs)
     return _parse_equation(lexpr, opstr, rexpr, datatype)
 end
+"""
+    _has_invalid_plus(expr)
+
+Check whether a Julia expression contains an invalid `+` operator in a constraint context.
+
+Internal helper used during linear constraint parsing to detect unsupported `+` operator usage in constraint expressions.
+
+# Arguments
+
+  - `expr`: Julia expression to check.
+
+# Returns
+
+  - `Bool`: `true` if the expression contains an invalid `+`, `false` otherwise.
+"""
 function _has_invalid_plus(expr)
     if !(isa(expr, Expr) && expr.head == :call)
         return false
@@ -968,8 +1029,8 @@ This function takes a [`ParsingResult`](@ref) containing variable names (which m
 
 # Validation
 
-    - `bl_flag` can only be `true` if both `ep_flag` and `rho_flag` are `false`.
-    - `rho_flag` can only be `true` if `ep_flag` is also `true`.
+  - `bl_flag` can only be `true` if both `ep_flag` and `rho_flag` are `false`.
+  - `rho_flag` can only be `true` if `ep_flag` is also `true`.
 
 # Details
 
@@ -1205,10 +1266,7 @@ function get_linear_constraints(lcs::PR_VecPR, sets::AssetSets,
     end
 end
 """
-    struct LinearConstraintEstimator{T1, T2} <: AbstractConstraintEstimator
-        val::T1
-        key::T2
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Container for one or more linear constraint equations to be parsed and converted into constraint matrices.
 
@@ -1217,11 +1275,14 @@ Container for one or more linear constraint equations to be parsed and converted
   - `val`: A single equation as an `AbstractString` or `Expr`, or a vector of such equations.
   - `key`: (Optional) Key in the [`AssetSets`](@ref) to specify the asset universe for constraint generation. When provided, takes precedence over `key` field of [`AssetSets`](@ref).
 
-# Constructor
+# Constructors
 
-    LinearConstraintEstimator(; val::EqnType, key::Option{<:AbstractString} = nothing)
+    LinearConstraintEstimator(;
+        val::EqnType,
+        key::Option{<:AbstractString} = nothing
+    ) -> LinearConstraintEstimator
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 
@@ -1268,10 +1329,59 @@ end
 function LinearConstraintEstimator(; val::EqnType, key::Option{<:AbstractString} = nothing)
     return LinearConstraintEstimator(val, key)
 end
+"""
+    const LcE_Lc = Union{<:LinearConstraintEstimator, <:LinearConstraint}
+
+Alias for a union of linear constraint estimator and linear constraint types.
+
+# Related
+
+  - [`LinearConstraintEstimator`](@ref)
+  - [`LinearConstraint`](@ref)
+"""
 const LcE_Lc = Union{<:LinearConstraintEstimator, <:LinearConstraint}
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Alias for an abstract vector of [`LcE_Lc`](@ref) elements.
+
+# Related
+
+  - [`LcE_Lc`](@ref)
+"""
 const VecLcE_Lc = AbstractVector{<:LcE_Lc}
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Alias for an abstract vector of [`LinearConstraintEstimator`](@ref) elements.
+
+# Related
+
+  - [`LinearConstraintEstimator`](@ref)
+  - [`LcE_VecLcE`](@ref)
+"""
 const VecLcE = AbstractVector{<:LinearConstraintEstimator}
+"""
+    const LcE_Lc_VecLcE_Lc = Union{<:LcE_Lc, <:VecLcE_Lc}
+
+Alias for a union of [`LcE_Lc`](@ref) or a vector of them.
+
+# Related
+
+  - [`LcE_Lc`](@ref)
+  - [`VecLcE_Lc`](@ref)
+"""
 const LcE_Lc_VecLcE_Lc = Union{<:LcE_Lc, <:VecLcE_Lc}
+"""
+    const LcE_VecLcE = Union{<:LinearConstraintEstimator, <:VecLcE}
+
+Alias for a union of a single [`LinearConstraintEstimator`](@ref) or a vector of them.
+
+# Related
+
+  - [`LinearConstraintEstimator`](@ref)
+  - [`VecLcE`](@ref)
+"""
 const LcE_VecLcE = Union{<:LinearConstraintEstimator, <:VecLcE}
 """
     linear_constraints(lcs::Option{<:LinearConstraint}, args...; kwargs...)

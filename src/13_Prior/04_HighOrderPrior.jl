@@ -55,6 +55,27 @@ function block_vec_pq(A::MatNum, p::Integer, q::Integer)
     return A_vec
 end
 # COV_EXCL_START
+"""
+    duplication_matrix(n::Int, diag::Bool = true)
+
+Construct the duplication matrix for a symmetric matrix of size `n × n`.
+
+The duplication matrix `D` maps the vech (half-vectorisation) of a symmetric matrix to its full vec. Used internally in coskewness and cokurtosis computation.
+
+# Arguments
+
+  - `n`: Size of the symmetric matrix.
+  - `diag`: Whether to include the diagonal elements.
+
+# Returns
+
+  - Sparse duplication matrix.
+
+# Related
+
+  - [`elimination_matrix`](@ref)
+  - [`summation_matrix`](@ref)
+"""
 function duplication_matrix(n::Int, diag::Bool = true)
     m = div(n * (n + 1), 2)
     nsq = n^2
@@ -111,6 +132,27 @@ function duplication_matrix(n::Int, diag::Bool = true)
         SparseArrays.sparse(filtered_rows, filtered_cols, 1, nsq, m)
     end
 end
+"""
+    elimination_matrix(n::Int, diag::Bool = true)
+
+Construct the elimination matrix for a symmetric matrix of size `n × n`.
+
+The elimination matrix `L` extracts the unique (lower triangular) elements of a symmetric matrix. Used internally in coskewness and cokurtosis computation.
+
+# Arguments
+
+  - `n`: Size of the symmetric matrix.
+  - `diag`: Whether to include the diagonal elements.
+
+# Returns
+
+  - Sparse elimination matrix.
+
+# Related
+
+  - [`duplication_matrix`](@ref)
+  - [`summation_matrix`](@ref)
+"""
 function elimination_matrix(n::Int, diag::Bool = true)
     nsq = n^2
     r = 1
@@ -138,6 +180,27 @@ function elimination_matrix(n::Int, diag::Bool = true)
 
     return SparseArrays.sparse(1:m, v, 1, m, nsq)
 end
+"""
+    summation_matrix(n::Int, diag::Bool = true)
+
+Construct the summation matrix for a symmetric matrix of size `n × n`.
+
+The summation matrix `S` adds up contributions from both triangular halves of a symmetric matrix. Used internally in coskewness and cokurtosis computation.
+
+# Arguments
+
+  - `n`: Size of the symmetric matrix.
+  - `diag`: Whether to include the diagonal elements.
+
+# Returns
+
+  - Sparse summation matrix.
+
+# Related
+
+  - [`duplication_matrix`](@ref)
+  - [`elimination_matrix`](@ref)
+"""
 function summation_matrix(n::Int, diag::Bool = true)
     nsq = n^2
     r = 0
@@ -188,7 +251,7 @@ end
 
 Construct duplication, elimination, and summation matrices for symmetric matrix vectorisation.
 
-`dup_elim_sum_matrices` returns the duplication matrix `D`, elimination matrix `L`, and summation matrix `S` for symmetric matrices of size `n × n`. These matrices are used in higher-order moment computations, tensor manipulations, and efficient vectorisation of symmetric matrices in portfolio analytics.
+`dup_elim_sum_matrices` returns the duplication matrix `D`, elimination matrix `L`, and summation matrix `S` for symmetric matrices of size `N × N`. These matrices are used in higher-order moment computations, tensor manipulations, and efficient vectorisation of symmetric matrices in portfolio analytics.
 
 # Arguments
 
@@ -196,9 +259,9 @@ Construct duplication, elimination, and summation matrices for symmetric matrix 
 
 # Returns
 
-    - `D::SparseMatrixCSC{Int64, Int64}`: Duplication matrix (`n^2 × m`), where `m = n(n+1)/2`.
-    - `L::SparseMatrixCSC{Int64, Int64}`: Elimination matrix (`m × n^2`).
-    - `S::SparseMatrixCSC{Int64, Int64}`: Summation matrix (`m × n^2`).
+  - `D::SparseMatrixCSC{Int64, Int64}`: Duplication matrix (`n^2 × m`), where `m = n(n+1)/2`.
+  - `L::SparseMatrixCSC{Int64, Int64}`: Elimination matrix (`m × n^2`).
+  - `S::SparseMatrixCSC{Int64, Int64}`: Summation matrix (`m × n^2`).
 
 # Validation
 
@@ -277,6 +340,27 @@ function dup_elim_sum_matrices(n::Int)
 
     return d, l, s
 end
+"""
+    dup_elim_sum_view(args...)
+
+Get a view of the duplication, elimination, and summation matrices for a given dimension.
+
+Internal helper used in high-order moment estimation. Returns the precomputed matrices for the given size, or computes them on demand.
+
+# Arguments
+
+  - `args...`: Matrix and dimension arguments.
+
+# Returns
+
+  - Tuple of (duplication, elimination, summation) matrices.
+
+# Related
+
+  - [`duplication_matrix`](@ref)
+  - [`elimination_matrix`](@ref)
+  - [`summation_matrix`](@ref)
+"""
 function dup_elim_sum_view(args...)
     return nothing, nothing, nothing
 end
@@ -310,11 +394,7 @@ function Base.getproperty(obj::HighOrderPrior, sym::Symbol)
     end
 end
 """
-    struct HighOrderPriorEstimator{T1, T2, T3} <: AbstractHighOrderPriorEstimator
-        pe::T1
-        kte::T2
-        ske::T3
-    end
+$(DocStringExtensions.TYPEDEF)
 
 High order prior estimator for asset returns.
 
@@ -326,15 +406,19 @@ High order prior estimator for asset returns.
   - `kte`: Cokurtosis estimator (`CokurtosisEstimator` or `Nothing`).
   - `ske`: Coskewness estimator (`CoskewnessEstimator` or `Nothing`).
 
-# Constructor
+# Constructors
 
-    HighOrderPriorEstimator(; pe::AbstractLowOrderPriorEstimator_A_F_AF = EmpiricalPrior(),
-                            kte::Option{<:CokurtosisEstimator} = Cokurtosis(;
-                                                                                    alg = Full()),
-                            ske::Option{<:CoskewnessEstimator} = Coskewness(;
-                                                                                    alg = Full()))
+    HighOrderPriorEstimator(;
+        pe::AbstractLowOrderPriorEstimator_A_F_AF = EmpiricalPrior(),
+        kte::Option{<:CokurtosisEstimator} = Cokurtosis(;
+            alg = Full()
+        ),
+        ske::Option{<:CoskewnessEstimator} = Coskewness(;
+            alg = Full()
+        )
+    ) -> HighOrderPriorEstimator
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 
@@ -345,12 +429,10 @@ HighOrderPriorEstimator
       │        ce ┼ PortfolioOptimisersCovariance
       │           │   ce ┼ Covariance
       │           │      │    me ┼ SimpleExpectedReturns
-      │           │      │       │     w ┼ nothing
-      │           │      │       │   idx ┴ nothing
+      │           │      │       │   w ┴ nothing
       │           │      │    ce ┼ GeneralCovariance
-      │           │      │       │    ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-      │           │      │       │     w ┼ nothing
-      │           │      │       │   idx ┴ nothing
+      │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+      │           │      │       │    w ┴ nothing
       │           │      │   alg ┴ Full()
       │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
       │           │      │     pdm ┼ Posdef
@@ -361,13 +443,11 @@ HighOrderPriorEstimator
       │           │      │     alg ┼ nothing
       │           │      │   order ┴ DenoiseDetoneAlg()
       │        me ┼ SimpleExpectedReturns
-      │           │     w ┼ nothing
-      │           │   idx ┴ nothing
+      │           │   w ┴ nothing
       │   horizon ┴ nothing
   kte ┼ Cokurtosis
       │    me ┼ SimpleExpectedReturns
-      │       │     w ┼ nothing
-      │       │   idx ┴ nothing
+      │       │   w ┴ nothing
       │    mp ┼ DenoiseDetoneAlgMatrixProcessing
       │       │     pdm ┼ Posdef
       │       │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
@@ -379,8 +459,7 @@ HighOrderPriorEstimator
       │   alg ┴ Full()
   ske ┼ Coskewness
       │    me ┼ SimpleExpectedReturns
-      │       │     w ┼ nothing
-      │       │   idx ┴ nothing
+      │       │   w ┴ nothing
       │    mp ┼ DenoiseDetoneAlgMatrixProcessing
       │       │     pdm ┼ Posdef
       │       │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
@@ -422,7 +501,7 @@ function HighOrderPriorEstimator(;
                                                                                  alg = Full()))
     return HighOrderPriorEstimator(pe, kte, ske)
 end
-function factory(pe::HighOrderPriorEstimator, w::StatsBase.AbstractWeights)
+function factory(pe::HighOrderPriorEstimator, w::ObsWeights)
     return HighOrderPriorEstimator(; pe = factory(pe.pe, w), kte = factory(pe.kte, w),
                                    ske = factory(pe.ske, w))
 end

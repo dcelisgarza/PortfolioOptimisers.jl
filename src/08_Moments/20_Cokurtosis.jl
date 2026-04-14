@@ -1,5 +1,5 @@
 """
-    abstract type CokurtosisEstimator <: AbstractEstimator end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all cokurtosis estimators in `PortfolioOptimisers.jl`.
 
@@ -12,11 +12,7 @@ All concrete and/or abstract types implementing cokurtosis estimation algorithms
 """
 abstract type CokurtosisEstimator <: AbstractEstimator end
 """
-    struct Cokurtosis{T1, T2, T3} <: CokurtosisEstimator
-        me::T1
-        mp::T2
-        alg::T3
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Container type for cokurtosis estimators.
 
@@ -24,17 +20,17 @@ Container type for cokurtosis estimators.
 
 # Fields
 
-  - `me`: Mean estimator for expected returns.
-  - `mp`: Matrix processing estimator for cokurtosis tensors.
-  - `alg`: Moment algorithm.
+$(DocStringExtensions.FIELDS)
 
-# Constructor
+# Constructors
 
-    Cokurtosis(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
-               mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing(),
-               alg::AbstractMomentAlgorithm = Full())
+    Cokurtosis(;
+        me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
+        mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing(),
+        alg::AbstractMomentAlgorithm = Full()
+    ) -> Cokurtosis
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 
@@ -42,8 +38,7 @@ Keyword arguments correspond to the fields above.
 julia> Cokurtosis()
 Cokurtosis
    me ┼ SimpleExpectedReturns
-      │     w ┼ nothing
-      │   idx ┴ nothing
+      │   w ┴ nothing
    mp ┼ DenoiseDetoneAlgMatrixProcessing
       │     pdm ┼ Posdef
       │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
@@ -63,8 +58,11 @@ Cokurtosis
   - [`AbstractMomentAlgorithm`](@ref)
 """
 @concrete struct Cokurtosis <: CokurtosisEstimator
+    "$(field_dict[:me])"
     me
+    "$(field_dict[:mp])"
     mp
+    "$(field_dict[:malg])"
     alg
     function Cokurtosis(me::AbstractExpectedReturnsEstimator,
                         mp::AbstractMatrixProcessingEstimator, alg::AbstractMomentAlgorithm)
@@ -76,8 +74,27 @@ function Cokurtosis(; me::AbstractExpectedReturnsEstimator = SimpleExpectedRetur
                     alg::AbstractMomentAlgorithm = Full())
     return Cokurtosis(me, mp, alg)
 end
-function factory(ce::Cokurtosis, w::StatsBase.AbstractWeights)
-    return Cokurtosis(; me = factory(ce.me, w), mp = ce.mp, alg = ce.alg)
+"""
+    factory(ke::Cokurtosis, w::ObsWeights) -> Cokurtosis
+
+Return a new [`Cokurtosis`](@ref) estimator with observation weights `w` applied to the underlying mean estimator.
+
+# Arguments
+
+  - `ke`: Cokurtosis estimator.
+  - $(arg_dict[:ow])
+
+# Returns
+
+  - `ke::Cokurtosis`: Updated estimator with weights applied.
+
+# Related
+
+  - [`Cokurtosis`](@ref)
+  - [`factory`](@ref)
+"""
+function factory(ke::Cokurtosis, w::ObsWeights)
+    return Cokurtosis(; me = factory(ke.me, w), mp = ke.mp, alg = ke.alg)
 end
 """
     _cokurtosis(X::MatNum, mp::AbstractMatrixProcessingEstimator)

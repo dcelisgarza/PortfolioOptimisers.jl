@@ -1,3 +1,137 @@
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Hierarchical Equal Risk Contribution (HERC) portfolio optimiser.
+
+`HierarchicalEqualRiskContribution` implements the Hierarchical Equal Risk Contribution algorithm. It clusters assets, then allocates weights so that each cluster contributes equally to total portfolio risk (using `ro`), and within each cluster, assets are weighted by inverse intra-cluster risk (using `ri`).
+
+# Fields
+
+  - `opt`: Base hierarchical optimiser configuration.
+  - `ri`: Intra-cluster risk measure or vector of risk measures.
+  - `ro`: Inter-cluster risk measure or vector of risk measures.
+  - `scai`: Scalariser for combining intra-cluster risk measures.
+  - `scao`: Scalariser for combining inter-cluster risk measures.
+  - `ex`: FLoops executor for parallelism.
+  - `fb`: Fallback optimiser.
+
+# Constructors
+
+    HierarchicalEqualRiskContribution(;
+        opt::HierarchicalOptimiser = HierarchicalOptimiser(),
+        ri::OptRM_VecOptRM = Variance(),
+        ro::OptRM_VecOptRM = ri,
+        scai::Scalariser = SumScalariser(),
+        scao::Scalariser = scai,
+        ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
+        fb::Option{<:OptE_Opt} = nothing
+    ) -> HierarchicalEqualRiskContribution
+
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - If `ri` or `ro` is a vector: `!isempty(ri)` / `!isempty(ro)`.
+
+# Examples
+
+```jldoctest
+julia> HierarchicalEqualRiskContribution()
+HierarchicalEqualRiskContribution
+   opt ┼ HierarchicalOptimiser
+       │       pe ┼ EmpiricalPrior
+       │          │        ce ┼ PortfolioOptimisersCovariance
+       │          │           │   ce ┼ Covariance
+       │          │           │      │    me ┼ SimpleExpectedReturns
+       │          │           │      │       │   w ┴ nothing
+       │          │           │      │    ce ┼ GeneralCovariance
+       │          │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+       │          │           │      │       │    w ┴ nothing
+       │          │           │      │   alg ┴ Full()
+       │          │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
+       │          │           │      │     pdm ┼ Posdef
+       │          │           │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+       │          │           │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+       │          │           │      │      dn ┼ nothing
+       │          │           │      │      dt ┼ nothing
+       │          │           │      │     alg ┼ nothing
+       │          │           │      │   order ┴ DenoiseDetoneAlg()
+       │          │        me ┼ SimpleExpectedReturns
+       │          │           │   w ┴ nothing
+       │          │   horizon ┴ nothing
+       │      cle ┼ ClustersEstimator
+       │          │    ce ┼ PortfolioOptimisersCovariance
+       │          │       │   ce ┼ Covariance
+       │          │       │      │    me ┼ SimpleExpectedReturns
+       │          │       │      │       │   w ┴ nothing
+       │          │       │      │    ce ┼ GeneralCovariance
+       │          │       │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+       │          │       │      │       │    w ┴ nothing
+       │          │       │      │   alg ┴ Full()
+       │          │       │   mp ┼ DenoiseDetoneAlgMatrixProcessing
+       │          │       │      │     pdm ┼ Posdef
+       │          │       │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+       │          │       │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+       │          │       │      │      dn ┼ nothing
+       │          │       │      │      dt ┼ nothing
+       │          │       │      │     alg ┼ nothing
+       │          │       │      │   order ┴ DenoiseDetoneAlg()
+       │          │    de ┼ Distance
+       │          │       │   power ┼ nothing
+       │          │       │     alg ┴ CanonicalDistance()
+       │          │   alg ┼ HClustAlgorithm
+       │          │       │   linkage ┴ Symbol: :ward
+       │          │   onc ┼ OptimalNumberClusters
+       │          │       │   max_k ┼ nothing
+       │          │       │     alg ┼ SecondOrderDifference
+       │          │       │         │   alg ┼ StandardisedValue
+       │          │       │         │       │   mv ┼ MeanValue
+       │          │       │         │       │      │   w ┴ nothing
+       │          │       │         │       │   sv ┼ StdValue
+       │          │       │         │       │      │           w ┼ nothing
+       │          │       │         │       │      │   corrected ┴ Bool: true
+       │      slv ┼ nothing
+       │       wb ┼ WeightBounds
+       │          │   lb ┼ Float64: 0.0
+       │          │   ub ┴ Float64: 1.0
+       │     fees ┼ nothing
+       │     sets ┼ nothing
+       │       wf ┼ IterativeWeightFinaliser
+       │          │   iter ┴ Int64: 100
+       │      brt ┼ Bool: false
+       │   cle_pr ┼ Bool: true
+       │   strict ┴ Bool: false
+    ri ┼ Variance
+       │   settings ┼ RiskMeasureSettings
+       │            │   scale ┼ Float64: 1.0
+       │            │      ub ┼ nothing
+       │            │     rke ┴ Bool: true
+       │      sigma ┼ nothing
+       │       chol ┼ nothing
+       │         rc ┼ nothing
+       │        alg ┴ SquaredSOCRiskExpr()
+    ro ┼ Variance
+       │   settings ┼ RiskMeasureSettings
+       │            │   scale ┼ Float64: 1.0
+       │            │      ub ┼ nothing
+       │            │     rke ┴ Bool: true
+       │      sigma ┼ nothing
+       │       chol ┼ nothing
+       │         rc ┼ nothing
+       │        alg ┴ SquaredSOCRiskExpr()
+  scai ┼ SumScalariser()
+  scao ┼ SumScalariser()
+    ex ┼ Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
+    fb ┴ nothing
+```
+
+# Related
+
+  - [`ClusteringOptimisationEstimator`](@ref)
+  - [`HierarchicalRiskParity`](@ref)
+  - [`SchurComplementHierarchicalRiskParity`](@ref)
+  - [`HierarchicalOptimiser`](@ref)
+"""
 @concrete struct HierarchicalEqualRiskContribution <: ClusteringOptimisationEstimator
     opt
     ri
@@ -59,6 +193,33 @@ function opt_view(hec::HierarchicalEqualRiskContribution, i, X::MatNum)
     return HierarchicalEqualRiskContribution(; ri = ri, ro = ro, opt = opt, scai = hec.scai,
                                              scao = hec.scao, ex = hec.ex, fb = hec.fb)
 end
+"""
+    herc_scalarised_risk_o!(scalariser, wk, roku, rkbo, cl, ros, X, fees)
+
+Compute and accumulate the scalarised outer (inter-cluster) HERC risk in-place.
+
+Updates `rkbo` with inverse-risk weights for cluster `cl` and accumulates the scaled risk contribution using the given scalariser strategy.
+
+# Arguments
+
+  - `scalariser`: Scalarisation strategy ([`SumScalariser`](@ref), [`MaxScalariser`](@ref), [`MinScalariser`](@ref), or [`LogSumExpScalariser`](@ref)).
+  - `wk`: Cluster weight vector.
+  - `roku`: Unitary outer risk vector or matrix.
+  - `rkbo`: Outer risk buffer vector (modified in-place).
+  - `cl`: Cluster asset indices.
+  - `ros`: Vector of outer risk measures.
+  - `X`: Return matrix.
+  - `fees`: Optional fees.
+
+# Returns
+
+  - Scalarised outer cluster risk scalar.
+
+# Related
+
+  - [`HierarchicalEqualRiskContribution`](@ref)
+  - [`herc_scalarised_risk_i!`](@ref)
+"""
 function herc_scalarised_risk_o!(::SumScalariser, wk::VecNum, roku::VecNum, rkbo::VecNum,
                                  cl::VecInt, ros::VecOptRM, X::MatNum, fees::Option{<:Fees})
     crisk = zero(eltype(X))
@@ -157,6 +318,32 @@ function herc_scalarised_risk_o!(sca::LogSumExpScalariser, ::VecNum, roku::MatNu
     end
     return LogExpFunctions.logsumexp(crisk) / sca.gamma
 end
+"""
+    herc_scalarised_risk_i!(scalariser, wk, riku, cl, ris, X, fees)
+
+Compute the scalarised inner (intra-cluster) HERC risk for cluster `cl`.
+
+Aggregates inner risk measures across the assets in cluster `cl` using the given scalariser, returning the per-asset risk vector used for intra-cluster weight allocation.
+
+# Arguments
+
+  - `scalariser`: Scalarisation strategy ([`SumScalariser`](@ref), [`MaxScalariser`](@ref), [`MinScalariser`](@ref), or [`LogSumExpScalariser`](@ref)).
+  - `wk`: Cluster weight vector.
+  - `riku`: Unitary inner risk vector or matrix.
+  - `cl`: Cluster asset indices.
+  - `ris`: Vector of inner risk measures.
+  - `X`: Return matrix.
+  - `fees`: Optional fees.
+
+# Returns
+
+  - Per-asset inner risk vector for assets in `cl`.
+
+# Related
+
+  - [`HierarchicalEqualRiskContribution`](@ref)
+  - [`herc_scalarised_risk_o!`](@ref)
+"""
 function herc_scalarised_risk_i!(::SumScalariser, wk::VecNum, riku::VecNum, cl::VecInt,
                                  ris::VecOptRM, X::MatNum, fees::Option{<:Fees})
     risk = zeros(eltype(X), length(cl), 2)
@@ -267,6 +454,29 @@ function herc_scalarised_risk_i!(sca::LogSumExpScalariser, wk::VecNum, riku::Mat
     end
     return LogExpFunctions.logsumexp(view(risk, :, 2:N); dims = 2) / sca.gamma
 end
+"""
+    herc_risk(hec, pr, cls)
+
+Compute per-cluster risk contributions for HERC weight allocation.
+
+Evaluates the inner and outer risk measures for all clusters in `cls`, returning the risk arrays needed to allocate intra- and inter-cluster weights.
+
+# Arguments
+
+  - `hec`: [`HierarchicalEqualRiskContribution`](@ref) optimiser instance.
+  - `pr`: Prior result containing asset moments and return data.
+  - `cls`: Vector of vectors of asset indices per cluster.
+
+# Returns
+
+  - `(riku, roku)`: Inner and outer per-asset risk arrays.
+
+# Related
+
+  - [`HierarchicalEqualRiskContribution`](@ref)
+  - [`herc_scalarised_risk_i!`](@ref)
+  - [`herc_scalarised_risk_o!`](@ref)
+"""
 function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:OptimisationRiskMeasure,
                                                           <:OptimisationRiskMeasure, <:Any,
                                                           <:Any, <:FLoops.SequentialEx},
@@ -536,6 +746,21 @@ function _optimise(hec::HierarchicalEqualRiskContribution,
     retcode, w = finalise_weight_bounds(hec.opt.wf, wb, w / sum(w))
     return HierarchicalResult(typeof(hec), pr, clr, wb, fees, retcode, w, nothing)
 end
+"""
+    optimise(hec::HierarchicalEqualRiskContribution{
+                     <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, Nothing
+                 },
+            rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
+            branchorder::Symbol = :optimal, kwargs...) -> HierarchicalResult
+
+# Arguments
+
+  - `hec`: The hierarchical equal risk contribution optimiser to use.
+  - $(arg_dict[:rd]) If `isa(hec.opt.pe, AbstractPriorResult)`, `rd` is not necessary if doing a standalone optimisation, but may be required/desired by fallbacks and/or clusterisation.
+  - `dims`: The dimension along which observations advance in time.
+  - `branchorder`: The branch order to use for the clusterisation, this optimisation can use non-optimal branch orders, which make the clustering faster but the dendrogram won't be as nice.
+  - `kwargs`: Additional keyword arguments passed to the optimisation function.
+"""
 function optimise(hec::HierarchicalEqualRiskContribution{<:Any, <:Any, <:Any, <:Any, <:Any,
                                                          <:Any, Nothing},
                   rd::ReturnsResult = ReturnsResult(); dims::Int = 1,

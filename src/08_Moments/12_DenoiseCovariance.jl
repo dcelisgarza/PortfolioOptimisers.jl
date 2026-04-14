@@ -1,30 +1,21 @@
 """
-    struct DenoiseCovariance{T1, T2, T3} <: AbstractCovarianceEstimator
-        ce::T1
-        dn::T2
-        pdm::T3
-        function DenoiseCovariance(ce::AbstractCovarianceEstimator, dn::Denoise,
-                                   pdm::Option{<:Posdef})
-            return new{typeof(ce), typeof(dn), typeof(pdm)}(ce, dn, pdm)
-        end
-    end
+$(DocStringExtensions.TYPEDEF)
 
 A covariance estimator that applies a denoising algorithm and positive definite projection to the output of another covariance estimator. This type enables robust estimation of covariance matrices by first computing a base covariance, then applying denoising and positive definiteness corrections in sequence.
 
 # Fields
 
-  - `ce`: The underlying covariance estimator to be denoised.
-  - `dn`: The denoising algorithm to apply to the covariance matrix.
-  - `pdm`: The positive definite matrix projection method.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
-```julia
-DenoiseCovariance(; ce::AbstractCovarianceEstimator; dn::Denoise = Denoise(),
-                  pdm::Option{<:Posdef} = Posdef())
-```
+    DenoiseCovariance(;
+        ce::StatsBase.CovarianceEstimator,
+        dn::Denoise = Denoise(),
+        pdm::Option{<:Posdef} = Posdef(),
+    ) -> DenoiseCovariance
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 
@@ -33,24 +24,22 @@ julia> DenoiseCovariance()
 DenoiseCovariance
    ce ┼ Covariance
       │    me ┼ SimpleExpectedReturns
-      │       │     w ┼ nothing
-      │       │   idx ┴ nothing
+      │       │   w ┴ nothing
       │    ce ┼ GeneralCovariance
-      │       │    ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-      │       │     w ┼ nothing
-      │       │   idx ┴ nothing
+      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+      │       │    w ┴ nothing
       │   alg ┴ Full()
    dn ┼ Denoise
+      │      pdm ┼ Posdef
+      │          │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+      │          │   kwargs ┴ @NamedTuple{}: NamedTuple()
       │      alg ┼ ShrunkDenoise
       │          │   alpha ┴ Float64: 0.0
       │     args ┼ Tuple{}: ()
       │   kwargs ┼ @NamedTuple{}: NamedTuple()
       │   kernel ┼ typeof(AverageShiftedHistograms.Kernels.gaussian): AverageShiftedHistograms.Kernels.gaussian
       │        m ┼ Int64: 10
-      │        n ┼ Int64: 1000
-      │      pdm ┼ Posdef
-      │          │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-      │          │   kwargs ┴ @NamedTuple{}: NamedTuple()
+      │        n ┴ Int64: 1000
   pdm ┼ Posdef
       │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
       │   kwargs ┴ @NamedTuple{}: NamedTuple()
@@ -63,19 +52,41 @@ DenoiseCovariance
   - [`Posdef`](@ref)
 """
 @concrete struct DenoiseCovariance <: AbstractCovarianceEstimator
+    "$(field_dict[:ce])"
     ce
+    "$(field_dict[:dn])"
     dn
+    "$(field_dict[:pdm])"
     pdm
-    function DenoiseCovariance(ce::AbstractCovarianceEstimator, dn::Denoise,
+    function DenoiseCovariance(ce::StatsBase.CovarianceEstimator, dn::Denoise,
                                pdm::Option{<:Posdef})
         return new{typeof(ce), typeof(dn), typeof(pdm)}(ce, dn, pdm)
     end
 end
-function DenoiseCovariance(; ce::AbstractCovarianceEstimator = Covariance(),
+function DenoiseCovariance(; ce::StatsBase.CovarianceEstimator = Covariance(),
                            dn::Denoise = Denoise(), pdm::Option{<:Posdef} = Posdef())
     return DenoiseCovariance(ce, dn, pdm)
 end
-function factory(ce::DenoiseCovariance, w::StatsBase.AbstractWeights)
+"""
+    factory(ce::DenoiseCovariance, w::ObsWeights) -> DenoiseCovariance
+
+Return a new [`DenoiseCovariance`](@ref) estimator with observation weights `w` applied to the underlying covariance estimator.
+
+# Arguments
+
+  - $(arg_dict[:ce])
+  - $(arg_dict[:ow])
+
+# Returns
+
+  - $(ret_dict[:ce])
+
+# Related
+
+  - [`DenoiseCovariance`](@ref)
+  - [`factory`](@ref)
+"""
+function factory(ce::DenoiseCovariance, w::ObsWeights)
     return DenoiseCovariance(; ce = factory(ce.ce, w), dn = ce.dn, pdm = ce.pdm)
 end
 """

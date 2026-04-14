@@ -1,9 +1,5 @@
 """
-    struct DeltaUncertaintySet{T1, T2, T3} <: AbstractUncertaintySetEstimator
-        pe::T1
-        dmu::T2
-        dsigma::T3
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Estimator for box uncertainty sets using delta bounds on mean and covariance statistics in portfolio optimisation.
 
@@ -13,12 +9,15 @@ Estimator for box uncertainty sets using delta bounds on mean and covariance sta
   - `dmu`: Delta bound for expected returns (mean).
   - `dsigma`: Delta bound for covariance.
 
-# Constructor
+# Constructors
 
-    DeltaUncertaintySet(; pe::AbstractLowOrderPriorEstimator = EmpiricalPrior(), dmu::Number = 0.1,
-                        dsigma::Number = 0.1)
+    DeltaUncertaintySet(;
+        pe::AbstractLowOrderPriorEstimator = EmpiricalPrior(),
+        dmu::Number = 0.1,
+        dsigma::Number = 0.1
+    ) -> DeltaUncertaintySet
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 
@@ -34,12 +33,10 @@ DeltaUncertaintySet
          │        ce ┼ PortfolioOptimisersCovariance
          │           │   ce ┼ Covariance
          │           │      │    me ┼ SimpleExpectedReturns
-         │           │      │       │     w ┼ nothing
-         │           │      │       │   idx ┴ nothing
+         │           │      │       │   w ┴ nothing
          │           │      │    ce ┼ GeneralCovariance
-         │           │      │       │    ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-         │           │      │       │     w ┼ nothing
-         │           │      │       │   idx ┴ nothing
+         │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+         │           │      │       │    w ┴ nothing
          │           │      │   alg ┴ Full()
          │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
          │           │      │     pdm ┼ Posdef
@@ -50,8 +47,7 @@ DeltaUncertaintySet
          │           │      │     alg ┼ nothing
          │           │      │   order ┴ DenoiseDetoneAlg()
          │        me ┼ SimpleExpectedReturns
-         │           │     w ┼ nothing
-         │           │   idx ┴ nothing
+         │           │   w ┴ nothing
          │   horizon ┴ nothing
      dmu ┼ Float64: 0.1
   dsigma ┴ Float64: 0.1

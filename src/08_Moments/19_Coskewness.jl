@@ -1,5 +1,5 @@
 """
-    abstract type CoskewnessEstimator <: AbstractEstimator end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all coskewness estimators in `PortfolioOptimisers.jl`.
 
@@ -12,11 +12,7 @@ All concrete and/or abstract types implementing coskewness estimation algorithms
 """
 abstract type CoskewnessEstimator <: AbstractEstimator end
 """
-    struct Coskewness{T1, T2, T3} <: CoskewnessEstimator
-        me::T1
-        mp::T2
-        alg::T3
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Container type for coskewness estimators.
 
@@ -24,17 +20,17 @@ Container type for coskewness estimators.
 
 # Fields
 
-  - `me`: Mean estimator for expected returns.
-  - `mp`: Matrix processing estimator for coskewness tensors.
-  - `alg`: Moment algorithm.
+$(DocStringExtensions.FIELDS)
 
-# Constructor
+# Constructors
 
-    Coskewness(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
-               mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing(),
-               alg::AbstractMomentAlgorithm = Full())
+    Coskewness(;
+        me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
+        mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing(),
+        alg::AbstractMomentAlgorithm = Full()
+    ) -> Coskewness
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 
@@ -42,8 +38,7 @@ Keyword arguments correspond to the fields above.
 julia> Coskewness()
 Coskewness
    me ┼ SimpleExpectedReturns
-      │     w ┼ nothing
-      │   idx ┴ nothing
+      │   w ┴ nothing
    mp ┼ DenoiseDetoneAlgMatrixProcessing
       │     pdm ┼ Posdef
       │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
@@ -63,8 +58,11 @@ Coskewness
   - [`AbstractMomentAlgorithm`](@ref)
 """
 @concrete struct Coskewness <: CoskewnessEstimator
+    "$(field_dict[:me])"
     me
+    "$(field_dict[:mp])"
     mp
+    "$(field_dict[:malg])"
     alg
     function Coskewness(me::AbstractExpectedReturnsEstimator,
                         mp::AbstractMatrixProcessingEstimator, alg::AbstractMomentAlgorithm)
@@ -76,8 +74,27 @@ function Coskewness(; me::AbstractExpectedReturnsEstimator = SimpleExpectedRetur
                     alg::AbstractMomentAlgorithm = Full())
     return Coskewness(me, mp, alg)
 end
-function factory(ce::Coskewness, w::StatsBase.AbstractWeights)
-    return Coskewness(; me = factory(ce.me, w), mp = ce.mp, alg = ce.alg)
+"""
+    factory(ske::Coskewness, w::ObsWeights) -> Coskewness
+
+Return a new [`Coskewness`](@ref) estimator with observation weights `w` applied to the underlying mean estimator.
+
+# Arguments
+
+  - `ske`: Coskewness estimator.
+  - $(arg_dict[:ow])
+
+# Returns
+
+  - `ske::Coskewness`: Updated estimator with weights applied.
+
+# Related
+
+  - [`Coskewness`](@ref)
+  - [`factory`](@ref)
+"""
+function factory(ske::Coskewness, w::ObsWeights)
+    return Coskewness(; me = factory(ske.me, w), mp = ske.mp, alg = ske.alg)
 end
 """
     negative_spectral_coskewness(cskew::MatNum, X::MatNum,

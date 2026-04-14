@@ -1,7 +1,5 @@
 """
-    struct PValue{T1} <: AbstractStepwiseRegressionCriterion
-        t::T1
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Stepwise regression criterion based on p-value thresholding.
 
@@ -9,17 +7,19 @@ Stepwise regression criterion based on p-value thresholding.
 
 # Fields
 
-  - `t`: The p-value threshold for variable inclusion.
+$(DocStringExtensions.FIELDS)
 
-# Constructor
+# Constructors
 
-    PValue(; t::Number = 0.05)
+    PValue(;
+        t::Number = 0.05
+    ) -> PValue
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `0 < t < 1`.
+  - $(val_dict[:t])
 
 # Examples
 
@@ -35,6 +35,7 @@ PValue
   - [`StepwiseRegression`](@ref)
 """
 @concrete struct PValue <: AbstractStepwiseRegressionCriterion
+    "$(field_dict[:t])"
     t
     function PValue(t::Number)
         @argcheck(zero(t) < t < one(t), DomainError("0 < t < 1 must hold. Got\nt => $t"))
@@ -45,7 +46,7 @@ function PValue(; t::Number = 0.05)
     return PValue(t)
 end
 """
-    struct Forward <: AbstractStepwiseRegressionAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Stepwise regression algorithm: forward selection.
 
@@ -59,7 +60,7 @@ Stepwise regression algorithm: forward selection.
 """
 struct Forward <: AbstractStepwiseRegressionAlgorithm end
 """
-    struct Backward <: AbstractStepwiseRegressionAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Stepwise regression algorithm: backward elimination.
 
@@ -73,11 +74,7 @@ Stepwise regression algorithm: backward elimination.
 """
 struct Backward <: AbstractStepwiseRegressionAlgorithm end
 """
-    struct StepwiseRegression{T1, T2, T3} <: AbstractRegressionEstimator
-        crit::T1
-        alg::T2
-        tgt::T3
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Estimator for stepwise regression-based moment estimation.
 
@@ -89,13 +86,15 @@ Estimator for stepwise regression-based moment estimation.
   - `alg`: Stepwise algorithm.
   - `tgt`: Regression target type.
 
-# Constructor
+# Constructors
 
-    StepwiseRegression(; crit::AbstractStepwiseRegressionCriterion = PValue(),
-                       alg::AbstractStepwiseRegressionAlgorithm = Forward(),
-                       tgt::AbstractRegressionTarget = LinearModel())
+    StepwiseRegression(;
+        crit::AbstractStepwiseRegressionCriterion = PValue(),
+        alg::AbstractStepwiseRegressionAlgorithm = Forward(),
+        tgt::AbstractRegressionTarget = LinearModel()
+    ) -> StepwiseRegression
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 
@@ -116,12 +115,21 @@ StepwiseRegression
   - [`AbstractRegressionTarget`](@ref)
 """
 @concrete struct StepwiseRegression <: AbstractRegressionEstimator
+    "$(field_dict[:crit])"
     crit
+    "$(field_dict[:realg])"
     alg
+    "$(field_dict[:retgt])"
     tgt
     function StepwiseRegression(crit::AbstractStepwiseRegressionCriterion,
                                 alg::AbstractStepwiseRegressionAlgorithm,
                                 tgt::AbstractRegressionTarget)
+        if haskey(tgt.kwargs, :weights)
+            @argcheck(isa(tgt.kwargs.weights, ObsWeights), TypeError)
+            if isa(tgt.kwargs.weights, AbstractVector)
+                @argcheck(!isempty(tgt.kwargs.weights), IsEmptyError)
+            end
+        end
         return new{typeof(crit), typeof(alg), typeof(tgt)}(crit, alg, tgt)
     end
 end
@@ -130,7 +138,7 @@ function StepwiseRegression(; crit::AbstractStepwiseRegressionCriterion = PValue
                             tgt::AbstractRegressionTarget = LinearModel())
     return StepwiseRegression(crit, alg, tgt)
 end
-function factory(re::StepwiseRegression, w::StatsBase.AbstractWeights)
+function factory(re::StepwiseRegression, w::ObsWeights)
     return StepwiseRegression(; crit = re.crit, alg = re.alg, tgt = factory(re.tgt, w))
 end
 """
@@ -214,11 +222,8 @@ This method implements forward selection for stepwise regression, where variable
 # Related
 
   - [`StepwiseRegression`](@ref)
-
   - [`PValue`](@ref)
-
   - [`Forward`](@ref)
-
   - [`add_best_feature_after_pval_failure!`](@ref)
 """
 function _regression(re::StepwiseRegression{<:PValue, <:Forward}, x::VecNum, F::MatNum)

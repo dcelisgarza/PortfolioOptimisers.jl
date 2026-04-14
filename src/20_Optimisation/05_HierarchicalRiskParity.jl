@@ -1,3 +1,120 @@
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Hierarchical Risk Parity (HRP) portfolio optimiser.
+
+`HierarchicalRiskParity` implements the Hierarchical Risk Parity algorithm of López de Prado (2016). It clusters assets using hierarchical clustering, then allocates weights by recursively bisecting the dendrogram and applying inverse-risk weighting within each cluster.
+
+# Fields
+
+  - `opt`: Base hierarchical optimiser configuration (prior, clustering, bounds, fees, etc.).
+  - `r`: Risk measure or vector of risk measures used to define the inter-cluster risk budget.
+  - `sca`: Scalariser for combining multiple risk measures.
+  - `fb`: Fallback optimiser.
+
+# Constructors
+
+    HierarchicalRiskParity(;
+        opt::HierarchicalOptimiser = HierarchicalOptimiser(),
+        r::OptRM_VecOptRM = Variance(),
+        sca::Scalariser = SumScalariser(),
+        fb::Option{<:OptE_Opt} = nothing
+    ) -> HierarchicalRiskParity
+
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - If `r` is a vector: `!isempty(r)`.
+
+# Examples
+
+```jldoctest
+julia> HierarchicalRiskParity()
+HierarchicalRiskParity
+  opt ┼ HierarchicalOptimiser
+      │       pe ┼ EmpiricalPrior
+      │          │        ce ┼ PortfolioOptimisersCovariance
+      │          │           │   ce ┼ Covariance
+      │          │           │      │    me ┼ SimpleExpectedReturns
+      │          │           │      │       │   w ┴ nothing
+      │          │           │      │    ce ┼ GeneralCovariance
+      │          │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+      │          │           │      │       │    w ┴ nothing
+      │          │           │      │   alg ┴ Full()
+      │          │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
+      │          │           │      │     pdm ┼ Posdef
+      │          │           │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+      │          │           │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+      │          │           │      │      dn ┼ nothing
+      │          │           │      │      dt ┼ nothing
+      │          │           │      │     alg ┼ nothing
+      │          │           │      │   order ┴ DenoiseDetoneAlg()
+      │          │        me ┼ SimpleExpectedReturns
+      │          │           │   w ┴ nothing
+      │          │   horizon ┴ nothing
+      │      cle ┼ ClustersEstimator
+      │          │    ce ┼ PortfolioOptimisersCovariance
+      │          │       │   ce ┼ Covariance
+      │          │       │      │    me ┼ SimpleExpectedReturns
+      │          │       │      │       │   w ┴ nothing
+      │          │       │      │    ce ┼ GeneralCovariance
+      │          │       │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+      │          │       │      │       │    w ┴ nothing
+      │          │       │      │   alg ┴ Full()
+      │          │       │   mp ┼ DenoiseDetoneAlgMatrixProcessing
+      │          │       │      │     pdm ┼ Posdef
+      │          │       │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+      │          │       │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+      │          │       │      │      dn ┼ nothing
+      │          │       │      │      dt ┼ nothing
+      │          │       │      │     alg ┼ nothing
+      │          │       │      │   order ┴ DenoiseDetoneAlg()
+      │          │    de ┼ Distance
+      │          │       │   power ┼ nothing
+      │          │       │     alg ┴ CanonicalDistance()
+      │          │   alg ┼ HClustAlgorithm
+      │          │       │   linkage ┴ Symbol: :ward
+      │          │   onc ┼ OptimalNumberClusters
+      │          │       │   max_k ┼ nothing
+      │          │       │     alg ┼ SecondOrderDifference
+      │          │       │         │   alg ┼ StandardisedValue
+      │          │       │         │       │   mv ┼ MeanValue
+      │          │       │         │       │      │   w ┴ nothing
+      │          │       │         │       │   sv ┼ StdValue
+      │          │       │         │       │      │           w ┼ nothing
+      │          │       │         │       │      │   corrected ┴ Bool: true
+      │      slv ┼ nothing
+      │       wb ┼ WeightBounds
+      │          │   lb ┼ Float64: 0.0
+      │          │   ub ┴ Float64: 1.0
+      │     fees ┼ nothing
+      │     sets ┼ nothing
+      │       wf ┼ IterativeWeightFinaliser
+      │          │   iter ┴ Int64: 100
+      │      brt ┼ Bool: false
+      │   cle_pr ┼ Bool: true
+      │   strict ┴ Bool: false
+    r ┼ Variance
+      │   settings ┼ RiskMeasureSettings
+      │            │   scale ┼ Float64: 1.0
+      │            │      ub ┼ nothing
+      │            │     rke ┴ Bool: true
+      │      sigma ┼ nothing
+      │       chol ┼ nothing
+      │         rc ┼ nothing
+      │        alg ┴ SquaredSOCRiskExpr()
+  sca ┼ SumScalariser()
+   fb ┴ nothing
+```
+
+# Related
+
+  - [`ClusteringOptimisationEstimator`](@ref)
+  - [`HierarchicalOptimiser`](@ref)
+  - [`HierarchicalEqualRiskContribution`](@ref)
+  - [`SchurComplementHierarchicalRiskParity`](@ref)
+"""
 @concrete struct HierarchicalRiskParity <: ClusteringOptimisationEstimator
     opt
     r
@@ -34,6 +151,29 @@ function opt_view(hrp::HierarchicalRiskParity, i, X::MatNum)
     opt = opt_view(hrp.opt, i)
     return HierarchicalRiskParity(; r = r, opt = opt, sca = hrp.sca, fb = hrp.fb)
 end
+"""
+    split_factor_weight_constraints(alpha, wb, w, ...)
+
+Split and scale factor weight constraints for hierarchical risk parity.
+
+Distributes the weight constraints across clusters based on the hierarchical factor `alpha` and the current weight allocation `w`.
+
+# Arguments
+
+  - `alpha`: Hierarchical scaling factor.
+  - `wb`: Weight bounds.
+  - `w`: Current portfolio weights.
+  - Additional parameters.
+
+# Returns
+
+  - Tuple of updated weight bounds for each cluster.
+
+# Related
+
+  - [`HierarchicalRiskParity`](@ref)
+  - [`WeightBounds`](@ref)
+"""
 function split_factor_weight_constraints(alpha::Number, wb::WeightBounds, w::VecNum,
                                          lc::VecNum, rc::VecNum)
     lb = wb.lb
@@ -91,6 +231,34 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:OptimisationRiskMeasure}
     retcode, w = finalise_weight_bounds(hrp.opt.wf, wb, w / sum(w))
     return HierarchicalResult(typeof(hrp), pr, clr, wb, fees, retcode, w, nothing)
 end
+"""
+    hrp_scalarised_risk(scalariser, wu, wk, rku, lc, rc, rs, X, fees)
+
+Compute the scalarised HRP left/right cluster risk for weight allocation.
+
+Aggregates risk measures across clusters using a scalariser (sum, max, min, or log-sum-exp), returning the left and right cluster risks used to allocate weights in HRP.
+
+# Arguments
+
+  - `scalariser`: Scalarisation strategy ([`SumScalariser`](@ref), [`MaxScalariser`](@ref), [`MinScalariser`](@ref), or [`LogSumExpScalariser`](@ref)).
+  - `wu`: Unitary weight matrix (pre-allocated buffer).
+  - `wk`: Cluster weight vector.
+  - `rku`: Unitary risk vector.
+  - `lc`: Left cluster asset indices.
+  - `rc`: Right cluster asset indices.
+  - `rs`: Vector of risk measures.
+  - `X`: Return matrix.
+  - `fees`: Optional fees.
+
+# Returns
+
+  - `(lrisk, rrisk)`: Left and right cluster risk scalars.
+
+# Related
+
+  - [`HierarchicalRiskParity`](@ref)
+  - [`herc_scalarised_risk_i!`](@ref)
+"""
 function hrp_scalarised_risk(::SumScalariser, wu::MatNum, wk::VecNum, rku::VecNum,
                              lc::VecNum, rc::VecNum, rs::VecOptRM, X::MatNum,
                              fees::Option{<:Fees})
@@ -210,6 +378,17 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:VecOptRM},
     retcode, w = finalise_weight_bounds(hrp.opt.wf, wb, w / sum(w))
     return HierarchicalResult(typeof(hrp), pr, clr, wb, fees, retcode, w, nothing)
 end
+"""
+    optimise(hrp::HierarchicalRiskParity{<:Any, <:Any, <:Any, <:Nothing},
+             rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...) -> HierarchicalResult
+
+# Arguments
+
+  - `hrp`: The hierarchical risk parity optimiser to use.
+  - $(arg_dict[:rd]) If `isa(hrp.opt.pe, AbstractPriorResult)`, `rd` is not necessary if doing a standalone optimisation, but may be required/desired by fallbacks and/or clusterisation.
+  - `dims`: The dimension along which observations advance in time.
+  - `kwargs`: Additional keyword arguments passed to the optimisation function.
+"""
 function optimise(hrp::HierarchicalRiskParity{<:Any, <:Any, <:Any, <:Nothing},
                   rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)
     return _optimise(hrp, rd; dims = dims, kwargs...)

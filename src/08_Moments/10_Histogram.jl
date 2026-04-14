@@ -1,5 +1,5 @@
 """
-    abstract type AbstractBins <: AbstractAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all histogram binning algorithms.
 
@@ -14,9 +14,21 @@ Abstract supertype for all histogram binning algorithms.
   - [`HacineGharbiRavier`](@ref)
 """
 abstract type AbstractBins <: AbstractAlgorithm end
+"""
+    const Int_Bin = Union{<:AbstractBins, <:Integer}
+
+Alias for a histogram binning algorithm or an integer number of bins.
+
+Matches either an [`AbstractBins`](@ref) algorithm (auto-selecting bin counts) or a plain `Integer` (fixed number of bins). Used in histogram-based mutual information and variation of information calculations.
+
+# Related
+
+  - [`AbstractBins`](@ref)
+  - [`mutual_variation_info`](@ref)
+"""
 const Int_Bin = Union{<:AbstractBins, <:Integer}
 """
-    abstract type AstroPyBins <: AbstractBins end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all histogram binning algorithms implemented using AstroPy's bin width selection methods.
 
@@ -31,7 +43,7 @@ Abstract supertype for all histogram binning algorithms implemented using AstroP
 """
 abstract type AstroPyBins <: AbstractBins end
 """
-    struct Knuth <: AstroPyBins end
+$(DocStringExtensions.TYPEDEF)
 
 Histogram binning algorithm using Knuth's rule.
 
@@ -47,7 +59,7 @@ Histogram binning algorithm using Knuth's rule.
 """
 struct Knuth <: AstroPyBins end
 """
-    struct FreedmanDiaconis <: AstroPyBins end
+$(DocStringExtensions.TYPEDEF)
 
 Histogram binning algorithm using the Freedman-Diaconis rule.
 
@@ -63,7 +75,7 @@ Histogram binning algorithm using the Freedman-Diaconis rule.
 """
 struct FreedmanDiaconis <: AstroPyBins end
 """
-    struct Scott <: AstroPyBins end
+$(DocStringExtensions.TYPEDEF)
 
 Histogram binning algorithm using Scott's rule.
 
@@ -79,7 +91,7 @@ Histogram binning algorithm using Scott's rule.
 """
 struct Scott <: AstroPyBins end
 """
-    struct HacineGharbiRavier <: AbstractBins end
+$(DocStringExtensions.TYPEDEF)
 
 Histogram binning algorithm using the Hacine-Gharbi–Ravier rule.
 
@@ -372,6 +384,26 @@ function variation_info(X::MatNum, bins::Int_Bin = HacineGharbiRavier(),
     return var_mtx
 end
 # COV_EXCL_START
+"""
+    mutual_variation_info(X::MatNum, bins::Int_Bin = Knuth(), normalise::Bool = true)
+
+Compute the pairwise mutual information and variation of information matrices from a data matrix.
+
+# Arguments
+
+  - `X`: Data matrix of shape `(T, N)` (observations × assets).
+  - `bins`: Binning algorithm or integer number of bins for histogram computation.
+  - `normalise`: If `true`, normalises the mutual information and variation of information.
+
+# Returns
+
+  - `(mut_mtx, var_mtx)`: Tuple of symmetric matrices for mutual information and variation of information.
+
+# Related
+
+  - [`Int_Bin`](@ref)
+  - [`AbstractBins`](@ref)
+"""
 function mutual_variation_info(X::MatNum, bins::Int_Bin = Knuth(), normalise::Bool = true)
     T, N = size(X)
     mut_mtx = Matrix{eltype(X)}(undef, N, N)

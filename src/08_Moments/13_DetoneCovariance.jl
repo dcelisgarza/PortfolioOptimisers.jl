@@ -1,26 +1,21 @@
 """
-    struct DetoneCovariance{T1, T2, T3} <: AbstractCovarianceEstimator
-        ce::T1
-        dt::T2
-        pdm::T3
-    end
+$(DocStringExtensions.TYPEDEF)
 
 A covariance estimator that applies a detoning algorithm and positive definite projection to the output of another covariance estimator. This type enables robust estimation of covariance matrices by first computing a base covariance, then applying detoning and positive definiteness corrections in sequence.
 
 # Fields
 
-  - `ce`: The underlying covariance estimator to be detoned.
-  - `dt`: The detoning algorithm to apply to the covariance matrix.
-  - `pdm`: The positive definite matrix projection method.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
-```julia
-DetoneCovariance(; ce::AbstractCovarianceEstimator = Covariance(), dt::Detone = Detone(),
-                 pdm::Option{<:Posdef} = Posdef())
-```
+    DetoneCovariance(;
+        ce::StatsBase.CovarianceEstimator = Covariance(),
+        dt::Detone = Detone(),
+        pdm::Option{<:Posdef} = Posdef(),
+    ) -> DetoneCovariance
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 
@@ -29,18 +24,16 @@ julia> DetoneCovariance()
 DetoneCovariance
    ce ┼ Covariance
       │    me ┼ SimpleExpectedReturns
-      │       │     w ┼ nothing
-      │       │   idx ┴ nothing
+      │       │   w ┴ nothing
       │    ce ┼ GeneralCovariance
-      │       │    ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-      │       │     w ┼ nothing
-      │       │   idx ┴ nothing
+      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+      │       │    w ┴ nothing
       │   alg ┴ Full()
    dt ┼ Detone
-      │     n ┼ Int64: 1
       │   pdm ┼ Posdef
       │       │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
       │       │   kwargs ┴ @NamedTuple{}: NamedTuple()
+      │     n ┴ Int64: 1
   pdm ┼ Posdef
       │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
       │   kwargs ┴ @NamedTuple{}: NamedTuple()
@@ -53,19 +46,41 @@ DetoneCovariance
   - [`Posdef`](@ref)
 """
 @concrete struct DetoneCovariance <: AbstractCovarianceEstimator
+    "$(field_dict[:ce])"
     ce
+    "$(field_dict[:dt])"
     dt
+    "$(field_dict[:pdm])"
     pdm
-    function DetoneCovariance(ce::AbstractCovarianceEstimator, dt::Detone,
+    function DetoneCovariance(ce::StatsBase.CovarianceEstimator, dt::Detone,
                               pdm::Option{<:Posdef})
         return new{typeof(ce), typeof(dt), typeof(pdm)}(ce, dt, pdm)
     end
 end
-function DetoneCovariance(; ce::AbstractCovarianceEstimator = Covariance(),
+function DetoneCovariance(; ce::StatsBase.CovarianceEstimator = Covariance(),
                           dt::Detone = Detone(), pdm::Option{<:Posdef} = Posdef())
     return DetoneCovariance(ce, dt, pdm)
 end
-function factory(ce::DetoneCovariance, w::StatsBase.AbstractWeights)
+"""
+    factory(ce::DetoneCovariance, w::ObsWeights) -> DetoneCovariance
+
+Return a new [`DetoneCovariance`](@ref) estimator with observation weights `w` applied to the underlying covariance estimator.
+
+# Arguments
+
+  - $(arg_dict[:ce])
+  - $(arg_dict[:ow])
+
+# Returns
+
+  - $(ret_dict[:ce])
+
+# Related
+
+  - [`DetoneCovariance`](@ref)
+  - [`factory`](@ref)
+"""
+function factory(ce::DetoneCovariance, w::ObsWeights)
     return DetoneCovariance(; ce = factory(ce.ce, w), dt = ce.dt, pdm = ce.pdm)
 end
 """

@@ -1,13 +1,5 @@
 """
-    struct BlackLittermanPrior{T1, T2, T3, T4, T5, T6, T7} <: AbstractLowOrderPriorEstimator_AF
-        pe::T1
-        mp::T2
-        views::T3
-        sets::T4
-        views_conf::T5
-        rf::T6
-        tau::T7
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Black-Litterman prior estimator for asset returns.
 
@@ -23,18 +15,21 @@ Black-Litterman prior estimator for asset returns.
   - `rf`: Risk-free rate.
   - `tau`: Blending parameter. When computing the prior if `nothing`, defaults to `1/T` where `T` is the number of observations.
 
-# Constructor
+# Constructors
 
     BlackLittermanPrior(;
-                        pe::AbstractLowOrderPriorEstimator_A_F_AF = EmpiricalPrior(;
-                                                                                   me = EquilibriumExpectedReturns()),
-                        mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing(),
-                        views::Lc_BLV,
-                        sets::Option{<:AssetSets} = nothing,
-                        views_conf::Option{<:Num_VecNum} = nothing,
-                        rf::Number = 0.0, tau::Option{<:Number} = nothing)
+        pe::AbstractLowOrderPriorEstimator_A_F_AF = EmpiricalPrior(;
+            me = EquilibriumExpectedReturns()
+        ),
+        mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing(),
+        views::Lc_BLV,
+        sets::Option{<:AssetSets} = nothing,
+        views_conf::Option{<:Num_VecNum} = nothing,
+        rf::Number = 0.0,
+        tau::Option{<:Number} = nothing
+    ) -> BlackLittermanPrior
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 
@@ -53,12 +48,10 @@ BlackLittermanPrior
              │        ce ┼ PortfolioOptimisersCovariance
              │           │   ce ┼ Covariance
              │           │      │    me ┼ SimpleExpectedReturns
-             │           │      │       │     w ┼ nothing
-             │           │      │       │   idx ┴ nothing
+             │           │      │       │   w ┴ nothing
              │           │      │    ce ┼ GeneralCovariance
-             │           │      │       │    ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-             │           │      │       │     w ┼ nothing
-             │           │      │       │   idx ┴ nothing
+             │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+             │           │      │       │    w ┴ nothing
              │           │      │   alg ┴ Full()
              │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
              │           │      │     pdm ┼ Posdef
@@ -72,12 +65,10 @@ BlackLittermanPrior
              │           │   ce ┼ PortfolioOptimisersCovariance
              │           │      │   ce ┼ Covariance
              │           │      │      │    me ┼ SimpleExpectedReturns
-             │           │      │      │       │     w ┼ nothing
-             │           │      │      │       │   idx ┴ nothing
+             │           │      │      │       │   w ┴ nothing
              │           │      │      │    ce ┼ GeneralCovariance
-             │           │      │      │       │    ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-             │           │      │      │       │     w ┼ nothing
-             │           │      │      │       │   idx ┴ nothing
+             │           │      │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+             │           │      │      │       │    w ┴ nothing
              │           │      │      │   alg ┴ Full()
              │           │      │   mp ┼ DenoiseDetoneAlgMatrixProcessing
              │           │      │      │     pdm ┼ Posdef
@@ -161,7 +152,7 @@ function Base.getproperty(obj::BlackLittermanPrior, sym::Symbol)
         getfield(obj, sym)
     end
 end
-function factory(pe::BlackLittermanPrior, w::StatsBase.AbstractWeights)
+function factory(pe::BlackLittermanPrior, w::ObsWeights)
     return BlackLittermanPrior(; pe = factory(pe.pe, w), mp = pe.mp, views = pe.views,
                                sets = pe.sets, views_conf = pe.views_conf, rf = pe.rf,
                                tau = pe.tau)

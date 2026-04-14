@@ -97,22 +97,22 @@
         @test_throws DomainError Denoise(; m = 1)
         @test_throws DomainError Denoise(; n = 1)
 
-        de = Denoise()
-        @test de.alg == ShrunkDenoise()
-        @test de.args == Tuple{}()
-        @test de.kwargs == NamedTuple{}()
-        @test de.kernel === AverageShiftedHistograms.Kernels.gaussian
-        @test de.m == 10
-        @test de.n == 1000
+        dn = Denoise()
+        @test dn.alg == ShrunkDenoise()
+        @test dn.args == Tuple{}()
+        @test dn.kwargs == NamedTuple{}()
+        @test dn.kernel === AverageShiftedHistograms.Kernels.gaussian
+        @test dn.m == 10
+        @test dn.n == 1000
 
-        de = Denoise(; alg = FixedDenoise(), args = (1,), kwargs = (foo = 2,),
+        dn = Denoise(; alg = FixedDenoise(), args = (1,), kwargs = (foo = 2,),
                      kernel = AverageShiftedHistograms.Kernels.logistic, m = 5, n = 20)
-        @test de.alg == FixedDenoise()
-        @test de.args == (1,)
-        @test de.kwargs == (foo = 2,)
-        @test de.kernel === AverageShiftedHistograms.Kernels.logistic
-        @test de.m == 5
-        @test de.n == 20
+        @test dn.alg == FixedDenoise()
+        @test dn.args == (1,)
+        @test dn.kwargs == (foo = 2,)
+        @test dn.kernel === AverageShiftedHistograms.Kernels.logistic
+        @test dn.m == 5
+        @test dn.n == 20
     end
     @testset "Detone" begin
         @test_throws DomainError Detone(; n = 0)

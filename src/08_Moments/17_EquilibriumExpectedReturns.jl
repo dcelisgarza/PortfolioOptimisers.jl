@@ -1,9 +1,5 @@
 """
-    struct EquilibriumExpectedReturns{T1, T2, T3} <: AbstractShrunkExpectedReturnsEstimator
-        ce::T1
-        w::T2
-        l::T3
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Container type for equilibrium expected returns estimators.
 
@@ -11,21 +7,21 @@ Container type for equilibrium expected returns estimators.
 
 # Fields
 
-  - `ce`: Covariance estimator.
-  - `w`: Equilibrium portfolio weights. If `nothing`, uses equal weights.
-  - `l`: Risk aversion parameter.
+$(DocStringExtensions.FIELDS)
 
-# Constructor
+# Constructors
 
     EquilibriumExpectedReturns(;
-                               ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
-                               w::Option{<:VecNum} = nothing, l::Number = 1)
+        ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
+        w::Option{<:VecNum} = nothing,
+        l::Number = 1
+    ) -> EquilibriumExpectedReturns
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - If `w` is not `nothing`, `!isempty(w)`.
+  - $(val_dict[:oow])
 
 # Examples
 
@@ -35,12 +31,10 @@ EquilibriumExpectedReturns
   ce ┼ PortfolioOptimisersCovariance
      │   ce ┼ Covariance
      │      │    me ┼ SimpleExpectedReturns
-     │      │       │     w ┼ nothing
-     │      │       │   idx ┴ nothing
+     │      │       │   w ┴ nothing
      │      │    ce ┼ GeneralCovariance
-     │      │       │    ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-     │      │       │     w ┼ nothing
-     │      │       │   idx ┴ nothing
+     │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+     │      │       │    w ┴ nothing
      │      │   alg ┴ Full()
      │   mp ┼ DenoiseDetoneAlgMatrixProcessing
      │      │     pdm ┼ Posdef
@@ -61,8 +55,11 @@ EquilibriumExpectedReturns
   - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
 """
 @concrete struct EquilibriumExpectedReturns <: AbstractShrunkExpectedReturnsEstimator
+    "$(field_dict[:ce])"
     ce
+    "$(field_dict[:eqw])"
     w
+    "$(field_dict[:l])"
     l
     function EquilibriumExpectedReturns(ce::StatsBase.CovarianceEstimator,
                                         w::Option{<:VecNum}, l::Number)
@@ -75,7 +72,26 @@ function EquilibriumExpectedReturns(;
                                     w::Option{<:VecNum} = nothing, l::Number = 1)
     return EquilibriumExpectedReturns(ce, w, l)
 end
-function factory(ce::EquilibriumExpectedReturns, w::StatsBase.AbstractWeights)
+"""
+    factory(ce::EquilibriumExpectedReturns, w::ObsWeights) -> EquilibriumExpectedReturns
+
+Return a new [`EquilibriumExpectedReturns`](@ref) estimator with observation weights `w` applied to the underlying covariance estimator.
+
+# Arguments
+
+  - `ce`: Equilibrium expected returns estimator.
+  - $(arg_dict[:ow])
+
+# Returns
+
+  - `me::EquilibriumExpectedReturns`: Updated estimator with weights applied.
+
+# Related
+
+  - [`EquilibriumExpectedReturns`](@ref)
+  - [`factory`](@ref)
+"""
+function factory(ce::EquilibriumExpectedReturns, w::ObsWeights)
     return EquilibriumExpectedReturns(; ce = factory(ce.ce, w), w = ce.w, l = ce.l)
 end
 """

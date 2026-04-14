@@ -1,5 +1,53 @@
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for base clustering optimisation estimators.
+
+These are intermediate configuration types used in hierarchical/clustering optimisation pipelines.
+
+# Related Types
+
+  - [`BaseOptimisationEstimator`](@ref)
+  - [`HierarchicalOptimiser`](@ref)
+"""
 abstract type BaseClusteringOptimisationEstimator <: BaseOptimisationEstimator end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for clustering-based portfolio optimisation estimators.
+
+Clustering optimisation estimators use asset clustering to decompose the portfolio optimisation problem. Subtypes include HRP, HERC, and SCHRP.
+
+# Related Types
+
+  - [`NonFiniteAllocationOptimisationEstimator`](@ref)
+  - [`HierarchicalRiskParity`](@ref)
+  - [`HierarchicalEqualRiskContribution`](@ref)
+  - [`SchurComplementHierarchicalRiskParity`](@ref)
+"""
 abstract type ClusteringOptimisationEstimator <: NonFiniteAllocationOptimisationEstimator end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Result type for hierarchical (clustering-based) portfolio optimisation.
+
+# Fields
+
+  - `oe`: Type of the optimisation estimator that produced this result.
+  - `pr`: Prior result used in optimisation.
+  - `clr`: Clustering result.
+  - `wb`: Weight bounds applied.
+  - `fees`: Fee structure applied (or `nothing`).
+  - `retcode`: Optimisation return code.
+  - `w`: Optimal portfolio weights vector.
+  - `fb`: Fallback result (if a fallback optimiser was used).
+
+# Related
+
+  - [`NonFiniteAllocationOptimisationResult`](@ref)
+  - [`HierarchicalRiskParity`](@ref)
+  - [`HierarchicalEqualRiskContribution`](@ref)
+"""
 @concrete struct HierarchicalResult <: NonFiniteAllocationOptimisationResult
     oe
     pr
@@ -14,6 +62,119 @@ function factory(res::HierarchicalResult, fb::Option{<:OptE_Opt})
     return HierarchicalResult(res.oe, res.pr, res.clr, res.wb, res.fees, res.retcode, res.w,
                               fb)
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Base configuration for hierarchical clustering-based portfolio optimisers.
+
+`HierarchicalOptimiser` combines a prior estimator, a clustering estimator, and weight bound/fee specifications to provide a reusable base configuration for hierarchical optimisers (HRP, HERC, SCHRP, etc.).
+
+# Fields
+
+  - `pe`: Prior estimator or prior result.
+  - `cle`: Hierarchical clustering estimator or clustering result.
+  - `slv`: Solver or vector of solvers (for risk measures requiring conic optimisation).
+  - `wb`: Weight bounds estimator or bounds.
+  - `fees`: Fee estimator or fee structure.
+  - `sets`: Asset sets.
+  - `wf`: Weight finaliser for enforcing bounds.
+  - `brt`: If `true`, uses bootstrap returns.
+  - `cle_pr`: If `true`, passes the prior result to the clustering estimator.
+  - `strict`: If `true`, strictly enforces weight bounds.
+
+# Constructors
+
+    HierarchicalOptimiser(;
+        pe::PrE_Pr = EmpiricalPrior(),
+        cle::HClE_HCl = ClustersEstimator(),
+        slv::Option{<:Slv_VecSlv} = nothing,
+        wb::Option{<:WbE_Wb} = WeightBounds(),
+        fees::Option{<:FeesE_Fees} = nothing,
+        sets::Option{<:AssetSets} = nothing,
+        wf::WeightFinaliser = IterativeWeightFinaliser(),
+        brt::Bool = false,
+        cle_pr::Bool = true,
+        strict::Bool = false
+    ) -> HierarchicalOptimiser
+
+Keywords correspond to the struct's fields.
+
+# Examples
+
+```jldoctest
+julia> HierarchicalOptimiser()
+HierarchicalOptimiser
+      pe ┼ EmpiricalPrior
+         │        ce ┼ PortfolioOptimisersCovariance
+         │           │   ce ┼ Covariance
+         │           │      │    me ┼ SimpleExpectedReturns
+         │           │      │       │   w ┴ nothing
+         │           │      │    ce ┼ GeneralCovariance
+         │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+         │           │      │       │    w ┴ nothing
+         │           │      │   alg ┴ Full()
+         │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
+         │           │      │     pdm ┼ Posdef
+         │           │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+         │           │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+         │           │      │      dn ┼ nothing
+         │           │      │      dt ┼ nothing
+         │           │      │     alg ┼ nothing
+         │           │      │   order ┴ DenoiseDetoneAlg()
+         │        me ┼ SimpleExpectedReturns
+         │           │   w ┴ nothing
+         │   horizon ┴ nothing
+     cle ┼ ClustersEstimator
+         │    ce ┼ PortfolioOptimisersCovariance
+         │       │   ce ┼ Covariance
+         │       │      │    me ┼ SimpleExpectedReturns
+         │       │      │       │   w ┴ nothing
+         │       │      │    ce ┼ GeneralCovariance
+         │       │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+         │       │      │       │    w ┴ nothing
+         │       │      │   alg ┴ Full()
+         │       │   mp ┼ DenoiseDetoneAlgMatrixProcessing
+         │       │      │     pdm ┼ Posdef
+         │       │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+         │       │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+         │       │      │      dn ┼ nothing
+         │       │      │      dt ┼ nothing
+         │       │      │     alg ┼ nothing
+         │       │      │   order ┴ DenoiseDetoneAlg()
+         │    de ┼ Distance
+         │       │   power ┼ nothing
+         │       │     alg ┴ CanonicalDistance()
+         │   alg ┼ HClustAlgorithm
+         │       │   linkage ┴ Symbol: :ward
+         │   onc ┼ OptimalNumberClusters
+         │       │   max_k ┼ nothing
+         │       │     alg ┼ SecondOrderDifference
+         │       │         │   alg ┼ StandardisedValue
+         │       │         │       │   mv ┼ MeanValue
+         │       │         │       │      │   w ┴ nothing
+         │       │         │       │   sv ┼ StdValue
+         │       │         │       │      │           w ┼ nothing
+         │       │         │       │      │   corrected ┴ Bool: true
+     slv ┼ nothing
+      wb ┼ WeightBounds
+         │   lb ┼ Float64: 0.0
+         │   ub ┴ Float64: 1.0
+    fees ┼ nothing
+    sets ┼ nothing
+      wf ┼ IterativeWeightFinaliser
+         │   iter ┴ Int64: 100
+     brt ┼ Bool: false
+  cle_pr ┼ Bool: true
+  strict ┴ Bool: false
+```
+
+# Related
+
+  - [`BaseClusteringOptimisationEstimator`](@ref)
+  - [`HierarchicalRiskParity`](@ref)
+  - [`HierarchicalEqualRiskContribution`](@ref)
+  - [`SchurComplementHierarchicalRiskParity`](@ref)
+"""
 @concrete struct HierarchicalOptimiser <: BaseClusteringOptimisationEstimator
     pe
     cle
@@ -72,6 +233,28 @@ function opt_view(hco::HierarchicalOptimiser, i)
                                  fees = fees, wf = hco.wf, sets = sets, brt = hco.brt,
                                  cle_pr = hco.cle_pr, strict = hco.strict)
 end
+"""
+    unitary_expected_risks(r, X, ...)
+
+Compute the expected risk for unitary (equal-weight) portfolios within each cluster.
+
+Returns a vector of risk values, one per cluster, where each risk is computed for the equal-weight portfolio within that cluster.
+
+# Arguments
+
+  - `r`: Risk measure.
+  - `X`: Asset return matrix.
+  - Additional cluster and weight parameters.
+
+# Returns
+
+  - Vector of expected risk values per cluster.
+
+# Related
+
+  - [`unitary_expected_risks!`](@ref)
+  - [`HierarchicalEqualRiskContribution`](@ref)
+"""
 function unitary_expected_risks(r::OptimisationRiskMeasure, X::MatNum,
                                 fees::Option{<:Fees} = nothing)
     wk = zeros(eltype(X), size(X, 2))
@@ -83,6 +266,29 @@ function unitary_expected_risks(r::OptimisationRiskMeasure, X::MatNum,
     end
     return rk
 end
+"""
+    unitary_expected_risks!(wk, rk, r, ...)
+
+Compute and store the expected risk for each cluster's unitary portfolio in-place.
+
+Fills `rk` with the expected risk for the equal-weight portfolio within each cluster, and `wk` with the corresponding weights.
+
+# Arguments
+
+  - `wk`: Output weight vector (in-place).
+  - `rk`: Output risk vector (in-place).
+  - `r`: Risk measure.
+  - Additional cluster and weight parameters.
+
+# Returns
+
+  - `nothing` (fills `wk` and `rk` in-place).
+
+# Related
+
+  - [`unitary_expected_risks`](@ref)
+  - [`HierarchicalEqualRiskContribution`](@ref)
+"""
 function unitary_expected_risks!(wk::VecNum, rk::VecNum, r::OptimisationRiskMeasure,
                                  X::MatNum, fees::Option{<:Fees} = nothing)
     fill!(rk, zero(eltype(X)))

@@ -1,8 +1,5 @@
 """
-    struct BlackLittermanViews{T1, T2} <: AbstractResult
-        P::T1
-        Q::T2
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Container for Black-Litterman investor views in canonical matrix form.
 
@@ -13,11 +10,14 @@ Container for Black-Litterman investor views in canonical matrix form.
   - `P`: Matrix of view coefficients, where each row represents a view and each column corresponds to an asset.
   - `Q`: Vector of expected returns or values for each view.
 
-# Constructor
+# Constructors
 
-    BlackLittermanViews(; P::MatNum, Q::VecNum)
+    BlackLittermanViews(;
+        P::MatNum,
+        Q::VecNum
+    ) -> BlackLittermanViews
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 
@@ -50,6 +50,16 @@ end
 function BlackLittermanViews(; P::MatNum, Q::VecNum)
     return BlackLittermanViews(P, Q)
 end
+"""
+    const Lc_BLV = Union{<:LinearConstraintEstimator, <:BlackLittermanViews}
+
+Alias for a union of linear constraint estimator and Black-Litterman views types.
+
+# Related
+
+  - [`LinearConstraintEstimator`](@ref)
+  - [`BlackLittermanViews`](@ref)
+"""
 const Lc_BLV = Union{<:LinearConstraintEstimator, <:BlackLittermanViews}
 """
     get_black_litterman_views(lcs::PR_VecPR,

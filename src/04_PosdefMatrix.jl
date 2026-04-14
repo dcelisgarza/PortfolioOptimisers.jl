@@ -1,5 +1,5 @@
 """
-    abstract type AbstractPosdefEstimator <: AbstractEstimator end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all positive definite matrix estimator types in `PortfolioOptimisers.jl`.
 
@@ -9,8 +9,8 @@ All concrete and/or abstract types that implement positive definite matrix proje
 
 In order to implement a new positive definite matrix estimator which will work seamlessly with the library, subtype `AbstractPosdefEstimator` with all necessary parameters as part of the struct, and implement the following methods:
 
-  - `posdef!(pdm::AbstractPosdefEstimator, X::MatNum)`: In-place projection of a matrix to the nearest positive definite matrix.
-  - `posdef(pdm::AbstractPosdefEstimator, X::MatNum)`: Optional out-of-place projection of a matrix to the nearest positive definite matrix.
+  - `posdef!(pdm::AbstractPosdefEstimator, X::MatNum) -> MatNum`: In-place projection of a matrix to the nearest positive definite matrix.
+  - `posdef(pdm::AbstractPosdefEstimator, X::MatNum) -> MatNum`: Optional out-of-place projection of a matrix to the nearest positive definite matrix.
 
 ## Arguments
 
@@ -64,10 +64,7 @@ Projecting to positive definite matrix in-place...
 """
 abstract type AbstractPosdefEstimator <: AbstractEstimator end
 """
-    struct Posdef{T1, T2} <: AbstractPosdefEstimator
-        alg::T1
-        kwargs::T2
-    end
+$(DocStringExtensions.TYPEDEF)
 
 A concrete estimator type for projecting a matrix to the nearest positive definite matrix, typically used for co-moment matrices.
 
@@ -75,14 +72,16 @@ A concrete estimator type for projecting a matrix to the nearest positive defini
 
 # Fields
 
-  - `alg`: The algorithm used for the nearest correlation matrix projection.
-  - `kwargs`: A named tuple of keyword arguments to be passed to the algorithm.
+$(DocStringExtensions.FIELDS)
 
-# Constructor
+# Constructors
 
-    Posdef(; alg::Any = NearestCorrelationMatrix.Newton, kwargs::NamedTuple = (;))
+    Posdef(;
+        alg::Any = NearestCorrelationMatrix.Newton,
+        kwargs::NamedTuple = (;),
+    ) -> Posdef
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 
@@ -101,7 +100,9 @@ Posdef
   - [`NearestCorrelationMatrix.jl`](https://github.com/adknudson/NearestCorrelationMatrix.jl)
 """
 @concrete struct Posdef <: AbstractPosdefEstimator
+    "The algorithm used for the nearest correlation matrix projection."
     alg
+    "A named tuple of keyword arguments to be passed to the algorithm."
     kwargs
     function Posdef(alg::Any, kwargs::NamedTuple)
         return new{typeof(alg), typeof(kwargs)}(alg, kwargs)
@@ -111,8 +112,7 @@ function Posdef(; alg::Any = NearestCorrelationMatrix.Newton, kwargs::NamedTuple
     return Posdef(alg, kwargs)
 end
 """
-    posdef!(pdm::Posdef, X::MatNum)
-    posdef!(::Nothing, X::MatNum)
+    posdef!(pdm::Option{<:Posdef}, X::MatNum) -> MatNum
 
 In-place projection of a matrix to the nearest positive definite matrix using the specified estimator.
 
@@ -123,18 +123,27 @@ For matrices without unit diagonal, the function converts them into correlation 
   - $(arg_dict[:opdm])
 
       + `::Posdef`: The algorithm specified in `pdm.alg` is used to project `X` to the nearest PD matrix. If `X` is already positive definite, it is left unchanged.
-      + `::Nothing`: No-op, returns X.
+      + `::Nothing`: No-op.
 
   - $(arg_dict[:sigrhoX])
+
+# Validation
+
+  - `X` is validated with [`assert_matrix_issquare`](@ref).
 
 # Returns
 
   - `X::MatNum`: The input matrix `X` modified in-place.
 
-# Validation
+# Details
 
-  - `X` is validated with [`assert_matrix_issquare`](@ref).
-  - If the matrix cannot be made positive definite, a warning is emitted.
+  - If `pdm` is `::Nothing`, or `X` is already positive definite, the function returns `X` without modification.
+  - If `X` is already positive definite, it is left unchanged.
+  - If `X` is not a correlation matrix, it is converted to one before applying the algorithm.
+  - Calls `NearestCorrelationMatrix.nearest_cor!(X, pdm.alg; pdm.kwargs...)` to perform the projection.
+  - If the algorithm fails to converge, a warning is emitted.
+  - If `X` is not a correlation matrix, it is converted back.
+  - Returns `X`.
 
 # Examples
 
@@ -186,8 +195,7 @@ function posdef!(pdm::Posdef, X::MatNum)
     return X
 end
 """
-    posdef(pdm::Posdef, X::MatNum)
-    posdef(::Nothing, X::MatNum)
+    posdef(pdm::Option{<:Posdef}, X::MatNum) -> MatNum
 
 Out-of-place version of [`posdef!`](@ref).
 

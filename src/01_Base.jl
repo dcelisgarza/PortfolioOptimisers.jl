@@ -1,4 +1,324 @@
 """
+    arg_dict = Dict(
+                 # Weight vectors.
+                 :pw => "`w`: Portfolio weights vector.",
+                 :ow => "`w`: Observation weights vector.",
+                 :oow => "`w`: Optional observation weights vector.",
+                 # Matrix processing.
+                 :pdm => "`pdm`: Positive definite matrix estimator.",
+                 :dn => "`dn`: Matrix denoising estimator.",
+                 :dt => "`dt`: Matrix detoning estimator.",
+                 :mp => "`mp`: Matrix processing estimator.",
+                 # Moments.
+                 :me => "`me`: Expected returns estimator.",
+                 :ce => "`ce`: Covariance estimator.",
+                 :ve => "`ve`: Variance estimator.",
+                 :ske => "`ske`: Coskewness estimator.",
+                 :kte => "`kte`: Cokurtosis estimator.",
+                 :de => "`de`: Distance matrix estimator.",
+                 # Priors.
+                 :pe => "`pe`: Prior estimator.",
+                 :pr => "`pr`: Prior result.",
+                 :per => "`pe`: Prior estimator or result.",
+                 # Phylogeny.
+                 :cle => "`cle`: Clusters estimator.",
+                 :clr => "`clr`: Clusters result.",
+                 :cler => "`cle`: Clusters estimator or result.",
+                 :ple => "`pl`: Phylogeny estimator.",
+                 :plr => "`pl`: Phylogeny result.",
+                 :pler => "`pl`: Phylogeny estimator or result.",
+                 :nte => "`pl`: Network estimator.",
+                 :ntr => "`pl`: Network result.",
+                 :nter => "`pl`: Network estimator or result.",
+                 :cte => "`cte`: Centrality estimator.",
+                 :cta => "`ct`: Centrality algorithm.",
+                 :ctr => "`ct`: Centrality result.",
+                 :cter => "`ct`: Centrality estimator or result.",
+                 # Turnover.
+                 :tne => "`tn`: Turnover estimator.",
+                 :tnr => "`tn`: Turnover result.",
+                 :tner => "`tn`: Turnover estimator or result.",
+                 :tnes => "`tn`: Turnover estimator(s).",
+                 :tnrs => "`tn`: Turnover result(s).",
+                 :tners => "`tn`: Turnover estimator(s) or result(s).",
+                 # Tracking.
+                 :tre => "`tr`: Tracking error estimator.",
+                 :trr => "`tr`: Tracking error result.",
+                 :trer => "`tr`: Tracking error estimator or result.",
+                 :tres => "`tr`: Tracking error estimator(s).",
+                 :trrs => "`tr`: Tracking error result(s).",
+                 :trers => "`tr`: Tracking error estimator(s) or result(s).",
+                 # Weight bounds.
+                 :wbe => "`wb`: Weight bounds estimator.",
+                 :wbr => "`wb`: Weight bounds result.",
+                 :wber => "`wb`: Weight bounds estimator or result.",
+                 # Fees.
+                 :feese => "`fees`: Fees estimator.",
+                 :feesr => "`fees`: Fees result.",
+                 :feeser => "`fees`: Fees estimator or result.")
+
+This dictionary contains the arg_dict terms and their corresponding descriptions used in the documentation of `PortfolioOptimisers.jl`.
+"""
+const arg_dict = Dict(
+                      # Weight vectors.
+                      :pw => "`w`: Portfolio weights vector `assets × 1`.",#
+                      :ow => "`w`: Observation weights vector `observations × 1`.",#
+                      :oow => "`w`: Optional observation weights vector `observations × 1`. If `nothing`, the computation is unweighted.",#
+                      :eqw => "`eqw`: Equilibrium weights vector `features × 1`.",#
+                      # Matrix processing.
+                      :pdm => "`pdm`: Positive definite matrix estimator.",
+                      :opdm => "`pdm`: Optional positive definite matrix estimator.",
+                      :dn => "`dn`: Matrix denoising estimator.",
+                      :odn => "`dn`: Optional matrix denoising estimator.",
+                      :dna => "`dna`: Matrix denoising algorithm.",
+                      :dt => "`dt`: Matrix detoning estimator.",
+                      :odt => "`dt`: Optional matrix detoning estimator.",
+                      :mp => "`mp`: Matrix processing estimator.",
+                      :omp => "`mp`: Optional matrix processing estimator.",
+                      :mpa => "`mpa`: Matrix processing algorithm.",
+                      # Moments.
+                      :me => "`me`: Expected returns estimator.",
+                      :ome => "`me`: Optional expected returns estimator. It is not needed when used on a vector. If `nothing` and used on a matrix, defaults to [`SimpleExpectedReturns`](@ref).",
+                      :ce => "`ce`: Covariance estimator.",#
+                      :ve => "`ve`: Variance estimator.",#
+                      :ske => "`ske`: Coskewness estimator.",
+                      :kte => "`kte`: Cokurtosis estimator.",
+                      :de => "`de`: Distance matrix estimator.",
+                      :oidx => "`oidx`: Optional indices of the observations to use for estimation `Y × 1` where `Y <= observations`. If `nothing`, all observations are used.",
+                      :malg => "`alg`: Moment algorithm.",
+                      :corrected => "`corrected`: Whether to apply Bessel's correction.",#
+                      :mutgt => "`tgt`: Shrinkage target.",#
+                      :metric => "`metric`: Distance metric used for pairwise computations.",#
+                      :metric_args => "`args`: Additional positional arguments for the distance metric.",#
+                      :metric_kwargs => "`kwargs`: Additional keyword arguments for the distance metric.",#
+                      :t => "`t`: Threshold value.",#
+                      ## Regression
+                      :M => "`M`: Main coefficient (loadings) matrix `assets × factors`.",#
+                      :L => "`L`: Reduced dimensionsionality coefficient (loadings) matrix `assets × reduced_dimensions`.",#
+                      :b => "`b`: Regression intercept vector.",#
+                      :crit => "`crit`: Feature selection criterion.",#
+                      :realg => "`alg`: Regression algorithm.",#
+                      :retgt => "`tgt`: Regression model target.",#
+                      :dretgt => "`retgt`: Regression model target.",#
+                      :drtgt => "`drtgt`: Dimension reduction target.",
+                      ## Gerber
+                      :gerbalg => "`alg`: Gerber covariance algorithm.",#
+                      :gerbce => "`ce`: Gerber covariance estimator.",#
+                      :stdarr => "`sd`: Standard deviation vector of `X`, shaped to be consistent with `X`.",#
+                      :c1 => "`c1`: Zone of confusion parameter.",#
+                      :c2 => "`c2`: Zone of indecision lower bound.",#
+                      :c3 => "`c3`: Zone of indecision upper bound.",#
+                      :sbn => "`n`: Exponent parameter for the Smyth-Broby kernel.",#
+                      :sbalg => "`alg`: Smyth-Broby covariance algorithm.",#
+                      ## Mutual and var info
+                      :bins => "`bins`: Binning algorithm or fixed number of bins.",#
+                      :normalise => "`normalise`: Whether to normalise the mutual and/or variation of information calculation.",#
+                      ## Distance
+                      :dopower => "`power`: Optional matrix exponent.",#
+                      :dalg => "`alg`: Distance algorithm.",#
+                      :dmetric => "`metric`: Distance metric used for the distances of distances computations.",#
+                      :dmetric_args => "`args`: Additional positional arguments for the distances of distances metric.",#
+                      :dmetric_kwargs => "`kwargs`: Additional keyword arguments for the distances of distances metric.",#
+                      # Priors.
+                      :pe  => "`pe`: Prior estimator.",#
+                      :pr  => "`pr`: Prior result.",#
+                      :per => "`pr`: Prior estimator or result.",#
+                      # Phylogeny.
+                      :cle => "`cle`: Clusters estimator.",#
+                      :clr => "`clr`: Clusters result.",#
+                      :cler => "`clr`: Clusters estimator or result.",#
+                      :ple => "`ple`: Phylogeny estimator.",#
+                      :plr => "`plr`: Phylogeny result.",#
+                      :pler => "`pl`: Phylogeny estimator or result.",#
+                      :nte => "`nte`: Network estimator.",#
+                      :ntr => "`pl`: Network result.",#
+                      :nter => "`pl`: Network estimator or result.",#
+                      :cte => "`cte`: Centrality estimator.",#
+                      :cta => "`ct`: Centrality algorithm.",#
+                      :ctr => "`ct`: Centrality result.",#
+                      :cter => "`ct`: Centrality estimator or result.",#
+                      :ctargs => "`args`: Positional arguments for the centrality function.",#
+                      :ctkwargs => "`kwargs`: Keyword arguments for the centrality function.",#
+                      :treeargs => "`args`: Positional arguments for the centrality function.",#
+                      :treekwargs => "`kwargs`: Keyword arguments for the centrality function.",#
+                      :ntalg => "`alg`: Tree or similarity matrix algorithm.",#
+                      :ntn => "`n`: Number of steps to take in the network for deciding adjacency.",#
+                      :clres => "`res`: Clustering result.",#
+                      :S => "`S`: Similarity matrix",#
+                      :D => "`D`: Distance matrix",#
+                      :ck => "`k`: Optimal number of clusters.",#
+                      :vsalg => "`alg`: The measure used to evaluate clustering quality.",#
+                      :max_k => "`max_k`: Maximum number of clusters to consider. If `nothing`, computed as the `floor(Int, sqrt(features))`.",#
+                      :kalg => "`alg`: Algorithm for selecting the optimal number of clusters. If an integer, defines the number of clusters directly.",#
+                      :clalg => "`alg`: Clustering algorithm.",#
+                      :onc => "`onc`: Optimal number of clusters estimator.",#
+                      :phX_Xv => "`X`: Phylogeny matrix or vector.",#
+                      :pler => "`pl`: Network estimator, phylogeny result, clustering estimator, or clustering result.",#
+                      ## DBHT
+                      :dbhtpower => "`power`: Exponent for the the distance matrix when computing the similarity matrix.",#
+                      :dbhtcoef => "`coef`: Coefficient for the the distance matrix when computing the similarity matrix.",#
+                      :sim => "`sim`: Similarity matrix algorithm.",#
+                      :root => "`root`: Root selection method.",#
+                      # Constraints
+                      :A => "`A`: Linear constraint coefficient matrix.",#
+                      :B => "`B`: Linear constraint response vector.",#
+                      :eq => "`eq`: Optional equality constraints.",#
+                      :ineq => "`ineq`: Optional inequality constraints.",#
+                      # Turnover.
+                      :tne => "`tn`: Turnover estimator.",#
+                      :tnr => "`tn`: Turnover result.",
+                      :tner => "`tn`: Turnover estimator or result.",
+                      :tnes => "`tn`: Turnover estimator(s).",
+                      :tnrs => "`tn`: Turnover result(s).",
+                      :tners => "`tn`: Turnover estimator(s) or result(s).",
+                      # Tracking.
+                      :tre => "`tr`: Tracking error estimator.",
+                      :trr => "`tr`: Tracking error result.",
+                      :trer => "`tr`: Tracking error estimator or result.",
+                      :tres => "`tr`: Tracking error estimator(s).",
+                      :trrs => "`tr`: Tracking error result(s).",
+                      :trers => "`tr`: Tracking error estimator(s) or result(s).",
+                      # Weight bounds.
+                      :wbe => "`wb`: Weight bounds estimator.",
+                      :wbr => "`wb`: Weight bounds result.",
+                      :wber => "`wb`: Weight bounds estimator or result.",
+                      # Fees.
+                      :feese => "`fees`: Fees estimator.",#
+                      :feesr => "`fees`: Fees result.",
+                      :feeser => "`fees`: Fees estimator or result.",
+                      # Stats.
+                      :sigma => "`sigma`: Covariance matrix `features × features`.",#
+                      :mu => "`mu`: Expected returns vector `features × 1`.",#
+                      :rho => "`rho`: Correlation matrix `features × features`.",
+                      :sigrho => "`sigma`: Covariance-like or correlation-like matrix `features × features`.",
+                      :sigrhoX => "`X`: Covariance-like or correlation-like matrix `features × features`.",
+                      :kt => "`kt`: Cokurtosis matrix `features^2 × features^2`.",#
+                      :sk => "`sk`: Coskewness matrix `features × features^2`.",#
+                      :V => "`V`: Sum of the negative spectral slices of the cokurtosis matrix `features × features`.",
+                      :X => "`X`: Data matrix `observations × features` if the `dims` keyword does not exist or `dims = 1`, `features × observations` when `dims = 2`.",#
+                      :F => "`F`: Data matrix `observations × factors` if the `dims` keyword does not exist or `dims = 1`, `factors × observations` when `dims = 2`.",#
+                      :Xv => "`X`: Data vector `observations × 1`.",#
+                      :dims => "`dims`: Dimension along which to perform the computation.",#
+                      :omean => "`mean`: Optional mean value to use for centering.",
+                      :stdvec => "`sd`: Vector of standard deviations for each asset.",#
+                      :ex => "`ex`: Parallel execution strategy.",#
+                      :alpha => "`alpha`: Quantile level for the lower tail.",#
+                      :beta => "`beta`: Quantile level for the upper tail.",#
+                      :l => "`l`: Risk aversion parameter.",#
+                      :rf => "`rf`: Risk-free rate.",#
+                      # Errors
+                      :msg => "`msg`: Error message describing the condition that triggered the exception.",#
+                      # Solver
+                      :name => "`name`: Symbol or string identifier for logging purposes.",#
+                      :solver => "`solver`: The `optimizer_factory` in [`set_optimizer`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.set_optimizer).",#
+                      :settings => "`settings`: Optional solver-specific settings used in [`set_attribute`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.set_attribute).",#
+                      :check_sol => "`check_sol`: Named tuple of solution for keyword arguments in [`assert_is_solved_and_feasible`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.assert_is_solved_and_feasible).",#
+                      :add_bridges => "`add_bridges`: The `add_bridges` keyword argument in [`set_optimizer`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.set_optimizer).",#
+                      # RNG
+                      :rng => "`rng`: Random number generator.",#
+                      :seed => "`seed`: Seed for the random number generator.",
+                      # JuMP Optimisation
+                      :model => "`model::JuMP.Model`: The JuMP optimisation model.",
+                      :opt_rjumpe => "`opt::RiskJuMPOptimisationEstimator`: Risk-based optimisation estimator.",
+                      :opt_jumpe => "`opt::JuMPOptimisationEstimator`: JuMP optimisation estimator.",
+                      :ci => "`i`: Constraint index for unique variable and constraint naming.",
+                      :key_sym => "`key::Symbol`: Symbol used to name constraints or expressions in the model.",
+                      :wb_arg => "`wb::WeightBounds`: Weight bound specification containing lower and upper bounds.",
+                      :ss_arg => "`ss::Option{<:Number}`: Big-M scaling constant (computed via [`get_mip_ss`](@ref) when `nothing`).",
+                      :lt_arg => "`lt::Option{<:Threshold}`: Long-side minimum-holding threshold.",
+                      :st_arg => "`st::Option{<:Threshold}`: Short-side minimum-holding threshold.",
+                      :lt_flag_arg => "`lt_flag::Bool`: Whether to apply the long-side threshold.",
+                      :st_flag_arg => "`st_flag::Bool`: Whether to apply the short-side threshold.",
+                      :miprb_flag_arg => "`miprb_flag::Bool`: Whether to add MIP rebalancing constraints.",
+                      :il_arg => "`il`: Long binary (or continuous relaxation) indicator variable.",
+                      :is_arg => "`is`: Short binary (or continuous relaxation) indicator variable.",
+                      :smtx_arg => "`smtx::Option{<:MatNum}`: Selection matrix mapping assets to sub-groups.",
+                      :r_risk => "`r`: Risk measure instance.",
+                      :pr_X => "`pr::AbstractPriorResult`: Prior result containing the returns matrix `X`.",
+                      :pr_sigma => "`pr::AbstractPriorResult`: Prior result containing the covariance matrix `sigma`.",
+                      :pl_opt => "`pl`: Optional phylogeny constraints.",
+                      :fees_opt => "`fees`: Optional fees structure.",
+                      :optargs => "`args`: Additional positional arguments passed to the optimisation function.",
+                      :optkwargs => "`kwargs`: Additional keyword arguments passed to the optimisation function.",
+                      :ignargs => "`args`: Additional positional arguments (ignored).",
+                      :ignkwargs => "`kwargs`: Additional keyword arguments (ignored).",
+                      :rd=>"`rd::ReturnsResult`: The returns result to use.")
+"""
+    field_dict
+
+Derived dictionary mapping argument keys to field description strings, used for `\$(FIELDS)`-style docstring interpolation.
+
+Each entry is derived from [`arg_dict`](@ref) by stripping the leading parameter name prefix (everything up to and including the first `:`).
+"""
+const field_dict = Dict(key => strip(val[(findfirst(":", val)[1] + 1):end])
+                        for (key, val) in arg_dict)
+"""
+    val_dict = Dict(:oow => "If `w` is not `nothing`, `!isempty(w)`.")
+
+Validation rules for certain arg_dict terms used in the documentation of `PortfolioOptimisers.jl`.
+"""
+val_dict = Dict(:oow => "If `w` is not `nothing`, `!isempty(w)`.",
+                :oidx => "If `idx` is not `nothing`, `!isempty(idx)` and all indices are positive integers.",
+                :t => "`0 < t < 1`.",#
+                :c1 => "`0 < c1 <= 1`.",#
+                :c2 => "`0 < c2 <= 1`.",#
+                :c3c2 => "`c3 > c2`.",#
+                :dims => "`dims in (1, 2)`.",#
+                :alpha => "`0 < alpha < 1`.",#
+                :beta => "`0 < beta < 1`.",#
+                :bins => "If `bins` is an integer, `bins > 0`.",#
+                :dopower => "If `power` is not `nothing`, `power >= 1`.",#
+                :settings => "If not `nothing`, `!isempty(settings)`.",#
+                :S => "`!isempty(S)`.",#
+                :D => "`!isempty(D)`.",#
+                :ck => "`k >= 1`.",#
+                :S_D => "size(S) == size(D)`.",#
+                :max_k => "If `max_k` is not `nothing`, `max_k >= 1`.",#
+                :kalg => "If `alg` is not `nothing`, `alg >= 1`.",#
+                :dbhtpower => "`power > 0`.",#
+                :dbhtcoef => "`coef > 0`.", :Xe => "`!isempty(X)`.",#
+                :phX_Xv => "`If `X` is a `MatNum`:\n    + Must be symmetric, `LinearAlgebra.issymmetric(X)`\n    + Must have zero diagonal, `all(iszero, LinearAlgebra.diag(X))`.",#
+                :ntn => "`n >= 1`.",#
+                :A => "`!isempty(A)`.",#
+                :B => "`!isempty(B)`.",#
+                :eqineq => "Both `eq` and `ineq` cannot be `nothing` at the same time, `!(isnothing(ineq) && isnothing(eq))`.")
+
+"""
+Dictionary containing return value descriptions for common parameters used in `PortfolioOptimisers.jl`.
+"""
+ret_dict = Dict(:mu => "`mu::ArrNum`: Expected returns vector `features x 1` if the `dims` keyword does not exist or `dims = 2`, `1 x features` if `dims = 1`.",#
+                :sigma => "`sigma::MatNum`: Covariance matrix `features x features`.",#
+                :rho => "`rho::MatNum`: Correlation matrix `features x features`.",#
+                :sigrho => "`sigrho::MatNum`: Covariance/correlation matrix `features x features`.",#
+                :sk => "`sk::MatNum`: Coskewness matrix `features x features`.",#
+                :kt => "`kt::MatNum`: Cokurtosis matrix `features x features`.",#
+                :me => "`me`: New expected returns estimator of the same type as the argument, with the appropriate weights applied.",#
+                :ce => "`ce`: New covariance estimator of the same type as the argument, with the new weights applied.",#
+                :ve => "`ve`: New variance estimator of the same type as the argument, with the new weights applied.",
+                :stdvar => "`res::ArrNum`: Variance or standard deviation vector of `X`, reshaped to be consistent with the dimension along which the value is computed.",#
+                :stdvarnum => "`res::Number`: Variance or standard deviation `X`",#
+                :stdarr => "`sd::ArrNum`: Standard deviation vector of `X`, reshaped to be consistent with the dimension along which the value is computed.",
+                :vararr => "`vr::ArrNum`: Variance vector of `X`, reshaped to be consistent with the dimension along which the value is computed.",
+                :stdnum => "`vr::Number`: Standard deviation of `X`",
+                :varnum => "`vr::Number`: Variance of `X`",
+                :algw => "`alg`: New algorithm instance of the same type as the argument, with the new weights applied.",
+                :alg => "`alg`: The original algorithm instance.")
+"""
+    math_dict
+
+Dictionary of mathematical notation descriptions used for docstring interpolation throughout `PortfolioOptimisers.jl`.
+
+Keys are symbols that identify mathematical variables or subscripts; values are LaTeX-formatted strings suitable for embedding in docstrings.
+"""
+math_dict = Dict(:Xv => "``\\boldsymbol{X}``: Data vector `observations × 1`.",#
+                 :tgt => "``t``: Target value, usually the unweighted (or weighted) expected value ``E[\\boldsymbol{X}]``.",#
+                 :A => "``\\mathbf{A}``: Constraint coefficient matrix.",#
+                 :B => "``\\boldsymbol{B}``: Constraint response vector.",#
+                 :x => "``\\boldsymbol{x}``: Constrained variable.",
+                 :ineq => "``\\text{ineq}``: Subscript for inequality constraints.",#
+                 :eq => "``\\text{eq}``: Subscript for equality constraints.")
+
+"""
 $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all estimator types in `PortfolioOptimisers.jl`.
@@ -43,6 +363,19 @@ Result types encapsulate the outcomes of estimators. This makes dispatch and usa
   - [`AbstractAlgorithm`](@ref)
 """
 abstract type AbstractResult end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for dynamically computed observation weight estimators.
+
+`DynamicAbstractWeights` subtypes are used when observation weights must be computed from data (rather than supplied directly as a numeric vector). They are passed to estimators that accept an `ObsWeights` argument and evaluated at fit time.
+
+# Related
+
+  - [`ObsWeights`](@ref)
+  - [`AbstractEstimator`](@ref)
+"""
+abstract type DynamicAbstractWeights <: AbstractEstimator end
 """
     define_pretty_show(T, flag::Bool = true)
 
@@ -207,7 +540,7 @@ Stacktrace:
   - [`IsNonFiniteError`](@ref)
 """
 @concrete struct IsNothingError <: PortfolioOptimisersError
-    "error message describing the condition that triggered the exception."
+    "$(field_dict[:msg])"
     msg
 end
 """
@@ -242,7 +575,7 @@ Stacktrace:
   - [`IsNonFiniteError`](@ref)
 """
 @concrete struct IsEmptyError <: PortfolioOptimisersError
-    "error message describing the condition that triggered the exception."
+    "$(field_dict[:msg])"
     msg
 end
 """
@@ -277,7 +610,7 @@ Stacktrace:
   - [`IsEmptyError`](@ref)
 """
 @concrete struct IsNonFiniteError <: PortfolioOptimisersError
-    "error message describing the condition that triggered the exception."
+    "$(field_dict[:msg])"
     msg
 end
 function Base.showerror(io::IO, err::PortfolioOptimisersError)
@@ -388,6 +721,31 @@ const PairStrNum = Pair{<:AbstractString, <:Number}
 """
 $(DocStringExtensions.TYPEDEF)
 
+Alias for a key type used in grid search cross-validation, which can be an abstract string, an expression, a symbol, a composed function, or an accessor lens.
+
+# Related
+
+  - [`PairGSCV`](@ref)
+  - [`DictGSCV`](@ref)
+  - [`MultiGSCVValType`](@ref)
+"""
+const GSCVKey = Union{<:AbstractString, Expr, Symbol, <:ComposedFunction,
+                      <:Accessors.PropertyLens, <:Accessors.IndexLens}
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Alias for a value type used in randomised search cross-validation, which can be an abstract vector or a distribution.
+
+# Related
+
+  - [`PairGSCV`](@ref)
+  - [`DictGSCV`](@ref)
+  - [`MultiGSCVValType`](@ref)
+"""
+const RSCVVal = Union{<:AbstractVector, <:Distributions.Distribution}
+"""
+$(DocStringExtensions.TYPEDEF)
+
 Alias for a pair consisting of an abstract string and an abstract vector.
 
 # Related
@@ -395,7 +753,7 @@ Alias for a pair consisting of an abstract string and an abstract vector.
   - [`DictGSCV`](@ref)
   - [`MultiGSCVValType`](@ref)
 """
-const PairGSCV = Pair{<:AbstractString, <:AbstractVector}
+const PairGSCV = Pair{<:GSCVKey, <:AbstractVector}
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -417,7 +775,7 @@ Alias for an abstract dictionary with string keys and abstract vector values.
   - [`PairGSCV`](@ref)
   - [`MultiGSCVValType`](@ref)
 """
-const DictGSCV = AbstractDict{<:AbstractString, <:AbstractVector}
+const DictGSCV = AbstractDict{<:GSCVKey, <:AbstractVector}
 """
     const MultiEstValType = Union{<:DictStrNum, <:AbstractVector{<:PairStrNum}}
 
@@ -701,6 +1059,323 @@ Alias for a union of an abstract string or an abstract vector.
 """
 const Str_Vec = Union{<:AbstractString, <:AbstractVector}
 """
+    const ObsWeights = Union{<:DynamicAbstractWeights, <:StatsBase.AbstractWeights}
+
+Union type for observation weights accepted by estimators.
+
+Accepts either a [`DynamicAbstractWeights`](@ref) subtype (weights computed from data at fit time) or a `StatsBase.AbstractWeights` instance (pre-computed numeric weights).
+
+# Related
+
+  - [`DynamicAbstractWeights`](@ref)
+  - [`get_observation_weights`](@ref)
+"""
+const ObsWeights = Union{<:DynamicAbstractWeights, <:StatsBase.AbstractWeights}
+"""
+    get_observation_weights(w, args...; kwargs...)
+
+Get the observation weights for statistical estimation.
+
+Returns `nothing` for dynamic or unspecified weights (allowing estimators to compute them), or the provided weight vector directly.
+
+# Arguments
+
+  - `w`: Observation weights ([`DynamicAbstractWeights`](@ref), a plain vector, or `nothing`).
+  - `args...`: Additional arguments (ignored).
+  - `kwargs...`: Additional keyword arguments.
+
+# Returns
+
+  - `nothing` or the provided weight vector.
+
+# Related
+
+  - [`ObsWeights`](@ref)
+  - [`validate_observation_weights`](@ref)
+"""
+function get_observation_weights(::Option{<:DynamicAbstractWeights}, args...; kwargs...)
+    return nothing
+end
+function get_observation_weights(w::VecNum, args...; kwargs...)
+    return w
+end
+"""
+    assert_nonempty_nonneg_finite_val(
+        val::Union{<:AbstractDict, <:VecPair, <:ArrNum, Pair, Number},
+        val_sym::Union{Symbol,<:AbstractString} = :val
+    )
+    assert_nonempty_nonneg_finite_val(args...)
+
+Validate that the input value is non-empty, non-negative and finite.
+
+# Arguments
+
+  - `val`: Input value to validate.
+  - `val_sym`: Symbolic name used in the error messages.
+
+# Returns
+
+  - `nothing`.
+
+# Details
+
+  - `val`: Input value to validate.
+
+      + `::AbstractDict`: `!isempty(val)`, `any(isfinite, values(val))`, `all(x -> x >= 0, values(val))`.
+      + `::VecPair`: `!isempty(val)`, `any(isfinite, getindex.(val, 2))`, `all(x -> x[2] >= 0, val)`.
+      + `::ArrNum`: `!isempty(val)`, `any(isfinite, val)`, `all(x -> x >= 0, val)`.
+      + `::Pair`: `isfinite(val[2])` and `val[2] >= 0`.
+      + `::Number`: `isfinite(val)` and `val >= 0`.
+      + `args...`: Always passes.
+
+# Related
+
+  - [`assert_nonempty_finite_val`](@ref)
+  - [`assert_nonempty_gt0_finite_val`](@ref)
+"""
+function assert_nonempty_nonneg_finite_val(val::AbstractDict, val_sym::Sym_Str = :val)
+    @argcheck(!isempty(val),
+              IsEmptyError("!isempty($val_sym) must hold. Got\n!isempty($val_sym) => $(isempty(val))"))
+    @argcheck(any(isfinite, values(val)),
+              DomainError("any(isfinite, values($val_sym)) must hold. Got\nany(isfinite, values($val_sym)) => $(any(isfinite, values(val)))"))
+    @argcheck(all(x -> zero(x) <= x, values(val)),
+              DomainError("all(x -> 0 <= x, values($val_sym)) must hold. Got\nall(x -> 0 <= x, values($val_sym)) => $(all(x -> zero(x) <= x, values(val)))"))
+    return nothing
+end
+function assert_nonempty_nonneg_finite_val(val::VecPair, val_sym::Sym_Str = :val)
+    @argcheck(!isempty(val),
+              IsEmptyError("!isempty($val_sym) must hold. Got\n!isempty($val_sym) => $(isempty(val))"))
+    @argcheck(any(isfinite, getindex.(val, 2)),
+              DomainError("any(isfinite, getindex.($val_sym, 2)) must hold. Got\nany(isfinite, getindex.($val_sym, 2)) => $(any(isfinite, getindex.(val, 2)))"))
+    @argcheck(all(x -> zero(x[2]) <= x[2], val),
+              DomainError("all(x -> 0 <= x[2], $val_sym) must hold. Got\nall(x -> 0 <= x[2], $val_sym) => $(all(x -> zero(x[2]) <= x[2], val))"))
+    return nothing
+end
+function assert_nonempty_nonneg_finite_val(val::ArrNum, val_sym::Sym_Str = :val)
+    @argcheck(!isempty(val),
+              IsEmptyError("!isempty($val_sym) must hold. Got\n!isempty($val_sym) => $(isempty(val))"))
+    @argcheck(any(isfinite, val),
+              DomainError("any(isfinite, $val_sym) must hold. Got\nany(isfinite, $val_sym) => $(any(isfinite, val))"))
+    @argcheck(all(x -> zero(x) <= x, val),
+              DomainError("all(x -> 0 <= x, $val_sym) must hold. Got\nall(x -> 0 <= x, $val_sym) => $(all(x -> zero(x) <= x, val))"))
+    return nothing
+end
+function assert_nonempty_nonneg_finite_val(val::Pair, val_sym::Sym_Str = :val)
+    @argcheck(isfinite(val[2]),
+              DomainError("isfinite($val_sym[2]) must hold. Got\nisfinite($val_sym[2]) => $(isfinite(val[2]))"))
+    @argcheck(zero(val[2]) <= val[2],
+              DomainError("0 <= $(val[2]) must hold. Got\n$(val[2]) => $(val[2])"))
+    return nothing
+end
+function assert_nonempty_nonneg_finite_val(val::Number, val_sym::Sym_Str = :val)
+    @argcheck(isfinite(val),
+              DomainError("isfinite($val_sym) must hold. Got\nisfinite($val_sym) => $(isfinite(val))"))
+    @argcheck(zero(val) <= val, DomainError("0 <= $(val) must hold. Got\n$(val) => $(val)"))
+    return nothing
+end
+function assert_nonempty_nonneg_finite_val(args...)
+    return nothing
+end
+"""
+    assert_nonempty_gt0_finite_val(
+        val::Union{<:AbstractDict, <:VecPair, <:ArrNum, Pair, Number},
+        val_sym::Union{Symbol,<:AbstractString} = :val
+    )
+    assert_nonempty_gt0_finite_val(args...)
+
+Validate that the input value is non-empty, greater than zero, and finite.
+
+# Arguments
+
+  - `val`: Input value to validate.
+  - `val_sym`: Symbolic name used in the error messages.
+
+# Returns
+
+  - `nothing`.
+
+# Details
+
+  - `val`: Input value to validate.
+
+      + `::AbstractDict`: `!isempty(val)`, `any(isfinite, values(val))`, `all(x -> x > 0, values(val))`.
+      + `::VecPair`: `!isempty(val)`, `any(isfinite, getindex.(val, 2))`, `all(x -> x[2] > 0, val)`.
+      + `::ArrNum`: `!isempty(val)`, `any(isfinite, val)`, `all(x -> x > 0, val)`.
+      + `::Pair`: `isfinite(val[2])` and `val[2] > 0`.
+      + `::Number`: `isfinite(val)` and `val > 0`.
+      + `args...`: Always passes.
+
+# Related
+
+  - [`assert_nonempty_nonneg_finite_val`](@ref)
+  - [`assert_nonempty_finite_val`](@ref)
+"""
+function assert_nonempty_gt0_finite_val(val::AbstractDict, val_sym::Sym_Str = :val)
+    @argcheck(!isempty(val),
+              IsEmptyError("!isempty($val_sym) must hold. Got\n!isempty($val_sym) => $(isempty(val))"))
+    @argcheck(any(isfinite, values(val)),
+              DomainError("any(isfinite, values($val_sym)) must hold. Got\nany(isfinite, values($val_sym)) => $(any(isfinite, values(val)))"))
+    @argcheck(all(x -> zero(x) < x, values(val)),
+              DomainError("all(x -> 0 < x, values($val_sym)) must hold. Got\nall(x -> 0 < x, values($val_sym)) => $(all(x -> zero(x) < x, values(val)))"))
+    return nothing
+end
+function assert_nonempty_gt0_finite_val(val::VecPair, val_sym::Sym_Str = :val)
+    @argcheck(!isempty(val),
+              IsEmptyError("!isempty($val_sym) must hold. Got\n!isempty($val_sym) => $(isempty(val))"))
+    @argcheck(any(isfinite, getindex.(val, 2)),
+              DomainError("any(isfinite, getindex.($val_sym, 2)) must hold. Got\nany(isfinite, getindex.($val_sym, 2)) => $(any(isfinite, getindex.(val, 2)))"))
+    @argcheck(all(x -> zero(x[2]) < x[2], val),
+              DomainError("all(x -> 0 < x[2], $val_sym) must hold. Got\nall(x -> 0 < x[2], $val_sym) => $(all(x -> zero(x[2]) < x[2], val))"))
+    return nothing
+end
+function assert_nonempty_gt0_finite_val(val::ArrNum, val_sym::Sym_Str = :val)
+    @argcheck(!isempty(val),
+              IsEmptyError("!isempty($val_sym) must hold. Got\n!isempty($val_sym) => $(isempty(val))"))
+    @argcheck(any(isfinite, val),
+              DomainError("any(isfinite, $val_sym) must hold. Got\nany(isfinite, $val_sym) => $(any(isfinite, val))"))
+    @argcheck(all(x -> zero(x) < x, val),
+              DomainError("all(x -> 0 < x, $val_sym) must hold. Got\nall(x -> 0 < x, $val_sym) => $(all(x -> zero(x) < x, val))"))
+    return nothing
+end
+function assert_nonempty_gt0_finite_val(val::Pair, val_sym::Sym_Str = :val)
+    @argcheck(isfinite(val[2]),
+              DomainError("isfinite($val_sym[2]) must hold. Got\nisfinite($val_sym[2]) => $(isfinite(val[2]))"))
+    @argcheck(zero(val[2]) < val[2],
+              DomainError("0 < $(val[2]) must hold. Got\n$(val[2]) => $(val[2])"))
+    return nothing
+end
+function assert_nonempty_gt0_finite_val(val::Number, val_sym::Sym_Str = :val)
+    @argcheck(isfinite(val),
+              DomainError("isfinite($val_sym) must hold. Got\nisfinite($val_sym) => $(isfinite(val))"))
+    @argcheck(zero(val) < val, DomainError("0 < $(val) must hold. Got\n$(val) => $(val)"))
+    return nothing
+end
+function assert_nonempty_gt0_finite_val(args...)
+    return nothing
+end
+"""
+    assert_nonempty_finite_val(
+        val::Union{<:AbstractDict, <:VecPair, <:ArrNum, Pair, Number},
+        val_sym::Union{Symbol,<:AbstractString} = :val
+    )
+    assert_nonempty_finite_val(args...)
+
+Validate that the input value is non-empty and finite.
+
+# Arguments
+
+  - `val`: Input value to validate.
+  - `val_sym`: Symbolic name used in the error messages.
+
+# Returns
+
+  - `nothing`.
+
+# Details
+
+  - `val`: Input value to validate.
+
+      + `::AbstractDict`: `!isempty(val)`, `any(isfinite, values(val))`.
+      + `::VecPair`: `!isempty(val)`, `any(isfinite, getindex.(val, 2))`.
+      + `::ArrNum`: `!isempty(val)`, `any(isfinite, val)`.
+      + `::Pair`: `isfinite(val[2])`.
+      + `::Number`: `isfinite(val)`.
+      + `args...`: Always passes.
+
+# Related
+
+  - [`assert_nonempty_nonneg_finite_val`](@ref)
+  - [`assert_nonempty_gt0_finite_val`](@ref)
+"""
+function assert_nonempty_finite_val(val::AbstractDict, val_sym::Sym_Str = :val)
+    @argcheck(!isempty(val),
+              IsEmptyError("!isempty($val_sym) must hold. Got\n!isempty($val_sym) => $(isempty(val))"))
+    @argcheck(any(isfinite, values(val)),
+              DomainError("any(isfinite, values($val_sym)) must hold. Got\nany(isfinite, values($val_sym)) => $(any(isfinite, values(val)))"))
+    return nothing
+end
+function assert_nonempty_finite_val(val::VecPair, val_sym::Sym_Str = :val)
+    @argcheck(!isempty(val),
+              IsEmptyError("!isempty($val_sym) must hold. Got\n!isempty($val_sym) => $(isempty(val))"))
+    @argcheck(any(isfinite, getindex.(val, 2)),
+              DomainError("any(isfinite, getindex.($val_sym, 2)) must hold. Got\nany(isfinite, getindex.($val_sym, 2)) => $(any(isfinite, getindex.(val, 2)))"))
+    return nothing
+end
+function assert_nonempty_finite_val(val::ArrNum, val_sym::Sym_Str = :val)
+    @argcheck(!isempty(val),
+              IsEmptyError("!isempty($val_sym) must hold. Got\n!isempty($val_sym) => $(isempty(val))"))
+    @argcheck(any(isfinite, val),
+              DomainError("any(isfinite, $val_sym) must hold. Got\nany(isfinite, $val_sym) => $(any(isfinite, val))"))
+    return nothing
+end
+function assert_nonempty_finite_val(val::Pair, val_sym::Sym_Str = :val)
+    @argcheck(isfinite(val[2]),
+              DomainError("isfinite($val_sym[2]) must hold. Got\nisfinite($val_sym[2]) => $(isfinite(val[2]))"))
+    return nothing
+end
+function assert_nonempty_finite_val(val::Number, val_sym::Sym_Str = :val)
+    @argcheck(isfinite(val),
+              DomainError("isfinite($val_sym) must hold. Got\nisfinite($val_sym) => $(isfinite(val))"))
+    return nothing
+end
+function assert_nonempty_finite_val(args...)
+    return nothing
+end
+"""
+    validate_observation_weights(w)
+
+Validate that observation weights are normalised (sum to 1).
+
+Checks that `StatsBase.AbstractWeights` sum to approximately 1.0. The no-op fallback does nothing for other types.
+
+# Arguments
+
+  - `w`: Observation weights or any other type.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`ObsWeights`](@ref)
+  - [`get_observation_weights`](@ref)
+"""
+function validate_observation_weights(args...)
+    return nothing
+end
+function validate_observation_weights(w::StatsBase.AbstractWeights)
+    assert_nonempty_nonneg_finite_val(w, :w)
+    return nothing
+end
+"""
+    assert_matrix_issquare(X::MatNum, X_sym::Symbol = :X)
+
+Assert that the input matrix is square.
+
+# Arguments
+
+  - `X`: Input matrix to validate.
+  - `X_sym`: Symbolic name used in error messages.
+
+# Returns
+
+  - `nothing`.
+
+# Validation
+
+  - `size(X, 1) == size(X, 2)`.
+
+# Details
+
+  - Throws `DimensionMismatch` if the check fails.
+"""
+function assert_matrix_issquare(X::MatNum, X_sym::Symbol = :X)
+    @argcheck(size(X, 1) == size(X, 2),
+              DimensionMismatch("size($X_sym, 1) == size($X_sym, 2) must hold. Got\nsize($X_sym, 1) => $(size(X, 1))\nsize($X_sym, 2) => $(size(X, 2))."))
+    return nothing
+end
+"""
 $(DocStringExtensions.TYPEDEF)
 
 Represents a composite result containing a vector and a scalar in `PortfolioOptimisers.jl`.
@@ -713,9 +1388,12 @@ $(DocStringExtensions.FIELDS)
 
 # Constructors
 
-    VecScalar(; v::VecNum, s::Number)
+    VecScalar(;
+        v::VecNum,
+        s::Number
+    ) -> VecScalar
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 
@@ -762,7 +1440,7 @@ Alias for a union of a numeric type, a vector of numeric types, or a `VecScalar`
 """
 const Num_VecNum_VecScalar = Union{<:Num_VecNum, <:VecScalar}
 """
-    const Num_ArrNum_VecScalar = Union{<:Num_ArrNum, <:VecScalar}
+    const Num_ArrNum_VecScalar_DynWeights = Union{<:Num_ArrNum, <:VecScalar, <:DynamicAbstractWeights}
 
 Alias for a union of a numeric type, an array of numeric types, or a `VecScalar` result.
 
@@ -771,7 +1449,8 @@ Alias for a union of a numeric type, an array of numeric types, or a `VecScalar`
   - [`Num_ArrNum`](@ref)
   - [`VecScalar`](@ref)
 """
-const Num_ArrNum_VecScalar = Union{<:Num_ArrNum, <:VecScalar}
+const Num_ArrNum_VecScalar_DynWeights = Union{<:Num_ArrNum, <:VecScalar,
+                                              <:DynamicAbstractWeights}
 
 """
 $(DocStringExtensions.TYPEDEF)
@@ -792,161 +1471,5 @@ function Base.getindex(A::SingletonVector, i::Int)
 end
 Base.:*(M::Matrix, ::SingletonVector) = dropdims(M; dims = 2)
 Base.size(::SingletonVector) = (1,)
-"""
-    arg_dict = Dict(
-                 # Weight vectors.
-                 :pw => "`w`: Portfolio weights vector.",
-                 :ow => "`w`: Observation weights vector.",
-                 :oow => "`w`: Optional observation weights vector.",
-                 # Matrix processing.
-                 :pdm => "`pdm`: Positive definite matrix estimator.",
-                 :dn => "`dn`: Matrix denoising estimator.",
-                 :dt => "`dt`: Matrix detoning estimator.",
-                 :mp => "`mp`: Matrix processing estimator.",
-                 # Moments.
-                 :me => "`me`: Expected returns estimator.",
-                 :ce => "`ce`: Covariance estimator.",
-                 :ve => "`ve`: Variance estimator.",
-                 :ske => "`ske`: Coskewness estimator.",
-                 :kte => "`kte`: Cokurtosis estimator.",
-                 :de => "`de`: Distance matrix estimator.",
-                 # Priors.
-                 :pe => "`pe`: Prior estimator.",
-                 :pr => "`pr`: Prior result.",
-                 :per => "`pe`: Prior estimator or result.",
-                 # Phylogeny.
-                 :cle => "`cle`: Clusters estimator.",
-                 :clr => "`clr`: Clusters result.",
-                 :cler => "`cle`: Clusters estimator or result.",
-                 :ple => "`pl`: Phylogeny estimator.",
-                 :plr => "`pl`: Phylogeny result.",
-                 :pler => "`pl`: Phylogeny estimator or result.",
-                 :nte => "`pl`: Network estimator.",
-                 :ntr => "`pl`: Network result.",
-                 :nter => "`pl`: Network estimator or result.",
-                 :cte => "`cte`: Centrality estimator.",
-                 :cta => "`ct`: Centrality algorithm.",
-                 :ctr => "`ct`: Centrality result.",
-                 :cter => "`ct`: Centrality estimator or result.",
-                 # Turnover.
-                 :tne => "`tn`: Turnover estimator.",
-                 :tnr => "`tn`: Turnover result.",
-                 :tner => "`tn`: Turnover estimator or result.",
-                 :tnes => "`tn`: Turnover estimator(s).",
-                 :tnrs => "`tn`: Turnover result(s).",
-                 :tners => "`tn`: Turnover estimator(s) or result(s).",
-                 # Tracking.
-                 :tre => "`tr`: Tracking error estimator.",
-                 :trr => "`tr`: Tracking error result.",
-                 :trer => "`tr`: Tracking error estimator or result.",
-                 :tres => "`tr`: Tracking error estimator(s).",
-                 :trrs => "`tr`: Tracking error result(s).",
-                 :trers => "`tr`: Tracking error estimator(s) or result(s).",
-                 # Weight bounds.
-                 :wbe => "`wb`: Weight bounds estimator.",
-                 :wbr => "`wb`: Weight bounds result.",
-                 :wber => "`wb`: Weight bounds estimator or result.",
-                 # Fees.
-                 :feese => "`fees`: Fees estimator.",
-                 :feesr => "`fees`: Fees result.",
-                 :feeser => "`fees`: Fees estimator or result.")
-
-This dictionary contains the arg_dict terms and their corresponding descriptions used in the documentation of `PortfolioOptimisers.jl`.
-"""
-const arg_dict = Dict(
-                      # Weight vectors.
-                      :pw => "`w`: Portfolio weights vector.",
-                      :ow => "`w`: Observation weights vector.",
-                      :oow => "`w`: Optional observation weights vector.",
-                      # Matrix processing.
-                      :pdm => "`pdm`: Positive definite matrix estimator.",
-                      :opdm => "`pdm`: Optional positive definite matrix estimator.",
-                      :dn => "`dn`: Matrix denoising estimator.",
-                      :odn => "`dn`: Optional matrix denoising estimator.",
-                      :dna => "`dna`: Matrix denoising algorithm.",
-                      :dt => "`dt`: Matrix detoning estimator.",
-                      :odt => "`dt`: Optional matrix detoning estimator.",
-                      :mp => "`mp`: Matrix processing estimator.",
-                      :omp => "`mp`: Optional matrix processing estimator.",
-                      :mpa => "`mpa`: Matrix processing algorithm.",
-                      # Moments.
-                      :me => "`me`: Expected returns estimator.",
-                      :nme => "`nme`: New expected returns estimator with the appropriate weights applied.",
-                      :ce => "`ce`: Covariance estimator.",#
-                      :nce => "`ce`: New covariance estimator with the appropriate weights applied.",
-                      :ve => "`ve`: Variance estimator.",#
-                      :nve => "`ve`: New variance estimator with the appropriate weights applied.",#
-                      :ske => "`ske`: Coskewness estimator.",
-                      :kte => "`kte`: Cokurtosis estimator.",
-                      :de => "`de`: Distance matrix estimator.",
-                      # Priors.
-                      :pe => "`pe`: Prior estimator.",#
-                      :pr => "`pr`: Prior result.",#
-                      :per => "`pr`: Prior estimator or result.",
-                      # Phylogeny.
-                      :cle => "`cle`: Clusters estimator.",#
-                      :clr => "`clr`: Clusters result.",#
-                      :cler => "`clr`: Clusters estimator or result.",#
-                      :ple => "`ple`: Phylogeny estimator.",#
-                      :plr => "`plr`: Phylogeny result.",
-                      :pler => "`pl`: Phylogeny estimator or result.",
-                      :nte => "`nte`: Network estimator.",#
-                      :ntr => "`pl`: Network result.",
-                      :nter => "`pl`: Network estimator or result.",
-                      :cte => "`cte`: Centrality estimator.",#
-                      :cta => "`ct`: Centrality algorithm.",
-                      :ctr => "`ct`: Centrality result.",
-                      :cter => "`ct`: Centrality estimator or result.",
-                      # Turnover.
-                      :tne => "`tn`: Turnover estimator.",#
-                      :tnr => "`tn`: Turnover result.",
-                      :tner => "`tn`: Turnover estimator or result.",
-                      :tnes => "`tn`: Turnover estimator(s).",
-                      :tnrs => "`tn`: Turnover result(s).",
-                      :tners => "`tn`: Turnover estimator(s) or result(s).",
-                      # Tracking.
-                      :tre => "`tr`: Tracking error estimator.",
-                      :trr => "`tr`: Tracking error result.",
-                      :trer => "`tr`: Tracking error estimator or result.",
-                      :tres => "`tr`: Tracking error estimator(s).",
-                      :trrs => "`tr`: Tracking error result(s).",
-                      :trers => "`tr`: Tracking error estimator(s) or result(s).",
-                      # Weight bounds.
-                      :wbe => "`wb`: Weight bounds estimator.",
-                      :wbr => "`wb`: Weight bounds result.",
-                      :wber => "`wb`: Weight bounds estimator or result.",
-                      # Fees.
-                      :feese => "`fees`: Fees estimator.",#
-                      :feesr => "`fees`: Fees result.",
-                      :feeser => "`fees`: Fees estimator or result.",
-                      # Stats.
-                      :sigma => "`sigma`: Covariance matrix.",#
-                      :mu => "`mu`: Expected returns vector.",#
-                      :rho => "`rho`: Correlation matrix.",
-                      :sigrho => "`sigma`: Covariance-like or correlation-like matrix.",
-                      :sigrhoX => "`X`: Covariance-like or correlation-like matrix.",
-                      :kt => "`kt`: Cokurtosis matrix.",#
-                      :sk => "`sk`: Coskewness matrix.",#
-                      :V => "`V`: Sum of the negative spectral slices of the cokurtosis matrix",
-                      :X => "`X`: Data matrix.",#
-                      :F => "`F`: Data matrix.",#
-                      :Xv => "`X`: Data vector.",#
-                      :dims => "`dims`: Dimensions along which to perform the computation.")
-const field_dict = Dict(key=>strip(val[(findfirst(":", val)[1] + 1):end])
-                        for (key, val) in arg_dict)
-"""
-    val_dict = Dict(:oow => "If `w` is not `nothing`, `!isempty(w)`.")
-
-Validation rules for certain arg_dict terms used in the documentation of `PortfolioOptimisers.jl`.
-"""
-val_dict = Dict(:oow => "If `w` is not `nothing`, `!isempty(w)`.")
-
-"""
-Dictionary containing return value descriptions for common parameters used in `PortfolioOptimisers.jl`.
-"""
-ret_dict = Dict(:mu => "`mu::ArrNum`: Expected returns vector.",
-                :sigma => "`sigma::MatNum`: Covariance matrix.",
-                :sk => "`sk::MatNum`: Coskewness matrix.",
-                :kt => "`kt::MatNum`: Cokurtosis matrix.")
 
 export IsEmptyError, IsNothingError, IsNonFiniteError, VecScalar

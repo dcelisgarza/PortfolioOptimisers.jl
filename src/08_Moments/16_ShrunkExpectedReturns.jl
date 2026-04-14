@@ -1,5 +1,5 @@
 """
-    abstract type AbstractShrunkExpectedReturnsEstimator <: AbstractExpectedReturnsEstimator end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all shrunk expected returns estimators in `PortfolioOptimisers.jl`.
 
@@ -12,7 +12,7 @@ All concrete and/or abstract types implementing shrinkage-based expected returns
 """
 abstract type AbstractShrunkExpectedReturnsEstimator <: AbstractExpectedReturnsEstimator end
 """
-    abstract type AbstractShrunkExpectedReturnsAlgorithm <: AbstractExpectedReturnsAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all shrinkage algorithms for expected returns estimation.
 
@@ -27,7 +27,7 @@ All concrete and/or abstract types implementing specific shrinkage algorithms (e
 """
 abstract type AbstractShrunkExpectedReturnsAlgorithm <: AbstractExpectedReturnsAlgorithm end
 """
-    abstract type AbstractShrunkExpectedReturnsTarget <: AbstractExpectedReturnsAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all shrinkage targets used in expected returns estimation.
 
@@ -41,7 +41,7 @@ Concrete types implementing specific shrinkage targets (e.g., grand mean, volati
 """
 abstract type AbstractShrunkExpectedReturnsTarget <: AbstractExpectedReturnsAlgorithm end
 """
-    struct GrandMean <: AbstractShrunkExpectedReturnsTarget end
+$(DocStringExtensions.TYPEDEF)
 
 Shrinkage target representing the grand mean of expected returns.
 
@@ -54,7 +54,7 @@ Shrinkage target representing the grand mean of expected returns.
 """
 struct GrandMean <: AbstractShrunkExpectedReturnsTarget end
 """
-    struct VolatilityWeighted <: AbstractShrunkExpectedReturnsTarget end
+$(DocStringExtensions.TYPEDEF)
 
 Shrinkage target representing the volatility-weighted mean of expected returns.
 
@@ -67,7 +67,7 @@ Shrinkage target representing the volatility-weighted mean of expected returns.
 """
 struct VolatilityWeighted <: AbstractShrunkExpectedReturnsTarget end
 """
-    struct MeanSquaredError <: AbstractShrunkExpectedReturnsTarget end
+$(DocStringExtensions.TYPEDEF)
 
 Shrinkage target representing the mean squared error of expected returns.
 
@@ -80,9 +80,7 @@ Shrinkage target representing the mean squared error of expected returns.
 """
 struct MeanSquaredError <: AbstractShrunkExpectedReturnsTarget end
 """
-    struct JamesStein{T1} <: AbstractShrunkExpectedReturnsAlgorithm
-        tgt::T1
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Shrinkage algorithm implementing the James-Stein estimator for expected returns.
 
@@ -90,13 +88,15 @@ Shrinkage algorithm implementing the James-Stein estimator for expected returns.
 
 # Fields
 
-  - `tgt`: The shrinkage target type.
+$(DocStringExtensions.FIELDS)
 
-# Constructor
+# Constructors
 
-    JamesStein(; tgt::AbstractShrunkExpectedReturnsTarget = GrandMean())
+    JamesStein(;
+        tgt::AbstractShrunkExpectedReturnsTarget = GrandMean()
+    ) -> JamesStein
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 
@@ -114,6 +114,7 @@ JamesStein
   - [`BodnarOkhrinParolya`](@ref)
 """
 @concrete struct JamesStein <: AbstractShrunkExpectedReturnsAlgorithm
+    "$(field_dict[:mutgt])"
     tgt
     function JamesStein(tgt::AbstractShrunkExpectedReturnsTarget)
         return new{typeof(tgt)}(tgt)
@@ -123,9 +124,7 @@ function JamesStein(; tgt::AbstractShrunkExpectedReturnsTarget = GrandMean())
     return JamesStein(tgt)
 end
 """
-    struct BayesStein{T1} <: AbstractShrunkExpectedReturnsAlgorithm
-        tgt::T1
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Shrinkage algorithm implementing the Bayes-Stein estimator for expected returns.
 
@@ -133,13 +132,15 @@ Shrinkage algorithm implementing the Bayes-Stein estimator for expected returns.
 
 # Fields
 
-  - `tgt`: The shrinkage target type.
+$(DocStringExtensions.FIELDS)
 
-# Constructor
+# Constructors
 
-    BayesStein(; tgt::AbstractShrunkExpectedReturnsTarget = GrandMean())
+    BayesStein(;
+        tgt::AbstractShrunkExpectedReturnsTarget = GrandMean()
+    ) -> BayesStein
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 
@@ -157,6 +158,7 @@ BayesStein
   - [`BodnarOkhrinParolya`](@ref)
 """
 @concrete struct BayesStein <: AbstractShrunkExpectedReturnsAlgorithm
+    "$(field_dict[:mutgt])"
     tgt
     function BayesStein(tgt::AbstractShrunkExpectedReturnsTarget)
         return new{typeof(tgt)}(tgt)
@@ -166,9 +168,7 @@ function BayesStein(; tgt::AbstractShrunkExpectedReturnsTarget = GrandMean())
     return BayesStein(tgt)
 end
 """
-    struct BodnarOkhrinParolya{T1} <: AbstractShrunkExpectedReturnsAlgorithm
-        tgt::T1
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Shrinkage algorithm implementing the Bodnar-Okhrin-Parolya estimator for expected returns.
 
@@ -176,13 +176,15 @@ Shrinkage algorithm implementing the Bodnar-Okhrin-Parolya estimator for expecte
 
 # Fields
 
-  - `tgt`: The shrinkage target type.
+$(DocStringExtensions.FIELDS)
 
-# Constructor
+# Constructors
 
-    BodnarOkhrinParolya(; tgt::AbstractShrunkExpectedReturnsTarget = GrandMean())
+    BodnarOkhrinParolya(;
+        tgt::AbstractShrunkExpectedReturnsTarget = GrandMean()
+    ) -> BodnarOkhrinParolya
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 
@@ -200,6 +202,7 @@ BodnarOkhrinParolya
   - [`BayesStein`](@ref)
 """
 @concrete struct BodnarOkhrinParolya <: AbstractShrunkExpectedReturnsAlgorithm
+    "$(field_dict[:mutgt])"
     tgt
     function BodnarOkhrinParolya(tgt::AbstractShrunkExpectedReturnsTarget)
         return new{typeof(tgt)}(tgt)
@@ -209,11 +212,7 @@ function BodnarOkhrinParolya(; tgt::AbstractShrunkExpectedReturnsTarget = GrandM
     return BodnarOkhrinParolya(tgt)
 end
 """
-    struct ShrunkExpectedReturns{T1, T2, T3} <: AbstractShrunkExpectedReturnsEstimator
-        me::T1
-        ce::T2
-        alg::T3
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Container type for shrinkage-based expected returns estimators.
 
@@ -221,17 +220,17 @@ Container type for shrinkage-based expected returns estimators.
 
 # Fields
 
-  - `me`: Mean estimator for expected returns.
-  - `ce`: Covariance estimator.
-  - `alg`: Shrinkage algorithm (e.g., James-Stein, Bayes-Stein).
+$(DocStringExtensions.FIELDS)
 
-# Constructor
+# Constructors
 
-    ShrunkExpectedReturns(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
-                          ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
-                          alg::AbstractShrunkExpectedReturnsAlgorithm = JamesStein())
+    ShrunkExpectedReturns(;
+        me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
+        ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
+        alg::AbstractShrunkExpectedReturnsAlgorithm = JamesStein()
+    ) -> ShrunkExpectedReturns
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 
@@ -239,17 +238,14 @@ Keyword arguments correspond to the fields above.
 julia> ShrunkExpectedReturns()
 ShrunkExpectedReturns
    me ┼ SimpleExpectedReturns
-      │     w ┼ nothing
-      │   idx ┴ nothing
+      │   w ┴ nothing
    ce ┼ PortfolioOptimisersCovariance
       │   ce ┼ Covariance
       │      │    me ┼ SimpleExpectedReturns
-      │      │       │     w ┼ nothing
-      │      │       │   idx ┴ nothing
+      │      │       │   w ┴ nothing
       │      │    ce ┼ GeneralCovariance
-      │      │       │    ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-      │      │       │     w ┼ nothing
-      │      │       │   idx ┴ nothing
+      │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+      │      │       │    w ┴ nothing
       │      │   alg ┴ Full()
       │   mp ┼ DenoiseDetoneAlgMatrixProcessing
       │      │     pdm ┼ Posdef
@@ -271,8 +267,11 @@ ShrunkExpectedReturns
   - [`AbstractShrunkExpectedReturnsAlgorithm`](@ref)
 """
 @concrete struct ShrunkExpectedReturns <: AbstractShrunkExpectedReturnsEstimator
+    "$(field_dict[:me])"
     me
+    "$(field_dict[:ce])"
     ce
+    "Expected returns shrinkage algorithm."
     alg
     function ShrunkExpectedReturns(me::AbstractExpectedReturnsEstimator,
                                    ce::StatsBase.CovarianceEstimator,
@@ -450,7 +449,26 @@ function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:BodnarOkhrinP
     beta = (one(alpha) - alpha) * w / u
     return alpha * mu + beta * b
 end
-function factory(ce::ShrunkExpectedReturns, w::StatsBase.AbstractWeights)
+"""
+    factory(ce::ShrunkExpectedReturns, w::ObsWeights) -> ShrunkExpectedReturns
+
+Return a new [`ShrunkExpectedReturns`](@ref) estimator with observation weights `w` applied to the underlying mean and covariance estimators.
+
+# Arguments
+
+  - `ce`: Shrunk expected returns estimator.
+  - $(arg_dict[:ow])
+
+# Returns
+
+  - `me::ShrunkExpectedReturns`: Updated estimator with weights applied.
+
+# Related
+
+  - [`ShrunkExpectedReturns`](@ref)
+  - [`factory`](@ref)
+"""
+function factory(ce::ShrunkExpectedReturns, w::ObsWeights)
     return ShrunkExpectedReturns(; me = factory(ce.me, w), ce = factory(ce.ce, w),
                                  alg = ce.alg)
 end

@@ -1,6 +1,51 @@
+"""
+$(DocStringExtensions.TYPEDEF)
+
+K-means clustering algorithm configuration for non-hierarchical clustering in `PortfolioOptimisers.jl`.
+
+`KMeansAlgorithm` is a composable clustering algorithm type that specifies the use of the k-means algorithm (via [`Clustering.kmeans`](https://juliastats.org/Clustering.jl/stable/api/#Clustering.kmeans)) for constructing non-hierarchical clusterings from a distance matrix.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    KMeansAlgorithm(;
+        rng::Random.AbstractRNG = Random.default_rng(),
+        seed::Option{<:Integer} = nothing,
+        kwargs::NamedTuple = (;)
+    ) -> KMeansAlgorithm
+
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - If `kwargs` contains `weights`, it must be a non-empty `AbstractVector`.
+
+# Examples
+
+```jldoctest
+julia> KMeansAlgorithm()
+KMeansAlgorithm
+     rng ┼ Random.TaskLocalRNG: Random.TaskLocalRNG()
+    seed ┼ nothing
+  kwargs ┴ @NamedTuple{}: NamedTuple()
+```
+
+# Related
+
+  - [`AbstractNonHierarchicalClusteringAlgorithm`](@ref)
+  - [`ClustersEstimator`](@ref)
+  - [`clusterise`](@ref)
+  - [`Clustering.kmeans`](https://juliastats.org/Clustering.jl/stable/api/#Clustering.kmeans)
+"""
 @concrete struct KMeansAlgorithm <: AbstractNonHierarchicalClusteringAlgorithm
+    "$(field_dict[:rng])"
     rng
+    "$(field_dict[:seed])"
     seed
+    "Keyword arguments for [`Clustering.kmeans`](https://juliastats.org/Clustering.jl/stable/api/#Clustering.kmeans)."
     kwargs
     function KMeansAlgorithm(rng::Random.AbstractRNG, seed::Option{<:Integer},
                              kwargs::NamedTuple)
@@ -19,18 +64,38 @@ function factory(alg::KMeansAlgorithm, w::StatsBase.AbstractWeights)
     return KMeansAlgorithm(; rng = alg.rng, seed = alg.seed,
                            kwargs = (; alg.kwargs..., weights = w))
 end
-function _get_k_clusters_from_alg(alg::KMeansAlgorithm, dist::MatNum, k::Integer)
+"""
+    _get_k_clusters_from_alg(alg, D, k)
+
+Assign observations to `k` clusters using the specified clustering algorithm and distance matrix.
+
+Internal function used by non-hierarchical clustering estimators.
+
+# Arguments
+
+  - `alg`: Clustering algorithm (e.g., [`KMeansAlgorithm`](@ref)).
+  - `D`: Pairwise distance matrix.
+  - `k`: Number of clusters.
+
+# Returns
+
+  - Cluster assignments.
+
+# Related
+
+  - [`KMeansAlgorithm`](@ref)
+"""
+function _get_k_clusters_from_alg(alg::KMeansAlgorithm, D::MatNum, k::Integer)
     if !isnothing(alg.seed)
         Random.seed!(alg.rng, alg.seed)
     end
-    return Clustering.kmeans(dist, k; alg.kwargs...)
+    return Clustering.kmeans(D, k; alg.kwargs...)
 end
 function optimal_number_clusters(onc::OptimalNumberClusters{<:Any, <:Integer},
-                                 alg::AbstractNonHierarchicalClusteringAlgorithm,
-                                 dist::MatNum)
+                                 alg::AbstractNonHierarchicalClusteringAlgorithm, D::MatNum)
     k = onc.alg
     max_k = onc.max_k
-    N = size(dist, 1)
+    N = size(D, 1)
     if isnothing(max_k)
         max_k = floor(Int, sqrt(N))
     end
@@ -38,19 +103,18 @@ function optimal_number_clusters(onc::OptimalNumberClusters{<:Any, <:Integer},
     if k > max_k
         k = max_k
     end
-    res = _get_k_clusters_from_alg(alg, dist, k)
+    res = _get_k_clusters_from_alg(alg, D, k)
     return res, k
 end
 function optimal_number_clusters(onc::OptimalNumberClusters{<:Any, <:SecondOrderDifference},
-                                 alg::AbstractNonHierarchicalClusteringAlgorithm,
-                                 dist::MatNum)
-    N = size(dist, 1)
+                                 alg::AbstractNonHierarchicalClusteringAlgorithm, D::MatNum)
+    N = size(D, 1)
     max_k = isnothing(onc.max_k) ? floor(Int, sqrt(N)) : onc.max_k
     c1 = min(min(floor(Int, sqrt(N)), max_k) + 2, N)
-    cluster_lvls = [_get_k_clusters_from_alg(alg, dist, k) for k in 1:c1]
+    cluster_lvls = [_get_k_clusters_from_alg(alg, D, k) for k in 1:c1]
     measure_alg = onc.alg.alg
-    W_list = Vector{eltype(dist)}(undef, c1)
-    W_list[1] = typemin(eltype(dist))
+    W_list = Vector{eltype(D)}(undef, c1)
+    W_list[1] = typemin(eltype(D))
     for i in 2:c1
         costs = cluster_lvls[i].costs
         W_list[i] = vec_to_real_measure(measure_alg, costs)
@@ -64,16 +128,15 @@ function optimal_number_clusters(onc::OptimalNumberClusters{<:Any, <:SecondOrder
     return cluster_lvls[k], k
 end
 function optimal_number_clusters(onc::OptimalNumberClusters{<:Any, <:SilhouetteScore},
-                                 alg::AbstractNonHierarchicalClusteringAlgorithm,
-                                 dist::MatNum)
-    N = size(dist, 1)
+                                 alg::AbstractNonHierarchicalClusteringAlgorithm, D::MatNum)
+    N = size(D, 1)
     max_k = isnothing(onc.max_k) ? floor(Int, sqrt(N)) : onc.max_k
     c1 = min(floor(Int, sqrt(N)), max_k)
-    cluster_lvls = [_get_k_clusters_from_alg(alg, dist, k) for k in 1:c1]
+    cluster_lvls = [_get_k_clusters_from_alg(alg, D, k) for k in 1:c1]
     measure_alg = onc.alg.alg
-    W_list = Vector{eltype(dist)}(undef, c1)
+    W_list = Vector{eltype(D)}(undef, c1)
     for i in 2:c1
-        sl = Clustering.silhouettes(cluster_lvls[i], dist)
+        sl = Clustering.silhouettes(cluster_lvls[i], D)
         W_list[i] = vec_to_real_measure(measure_alg, sl)
     end
     k = all(!isfinite, W_list) ? length(W_list) : argmax(W_list)

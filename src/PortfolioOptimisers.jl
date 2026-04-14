@@ -32,9 +32,18 @@ using Roots: Roots
 using SimpleWeightedGraphs: SimpleWeightedGraphs
 using SparseArrays: SparseArrays
 using Statistics: Statistics, mean, std, var, cor, cov
-using StatsAPI: StatsAPI
+using StatsAPI: StatsAPI, predict
 using StatsBase: StatsBase
 using TimeSeries: TimeSeries
+
+#=
+# Turn readme into PortfolioOptimisers' docs.
+@doc let
+    path = joinpath(dirname(@__DIR__), "docs/src/index.md")
+    include_dependency(path)
+    read(path, String)
+end PortfolioOptimisers
+=#
 
 #=
 # Programmatically include source files
@@ -86,6 +95,11 @@ include("08_Moments/24_ImpliedVolatility.jl")
 include("08_Moments/25_CorrelationCovariance.jl")
 include("08_Moments/26_AbstractCovarianceVariance.jl")
 include("08_Moments/27_StandardDeviationExpectedReturns.jl")
+include("08_Moments/28_WindowedExpectedReturns.jl")
+include("08_Moments/29_WindowedCovariance.jl")
+include("08_Moments/30_WindowedVariance.jl")
+include("08_Moments/31_WindowedCoskewness.jl")
+include("08_Moments/32_WindowedCokurtosis.jl")
 include("09_Distance/01_Base_Distance.jl")
 include("09_Distance/02_Distance.jl")
 include("09_Distance/03_DistanceDistance.jl")

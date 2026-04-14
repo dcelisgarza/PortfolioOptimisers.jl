@@ -1,4 +1,52 @@
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Expected returns estimator that returns the asset standard deviations.
+
+`StandardDeviationExpectedReturns` computes "expected returns" as the standard deviation of each asset, as estimated by the underlying covariance estimator. This can be useful in certain risk-based portfolio construction approaches where the expected return proxy is the asset's volatility.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    StandardDeviationExpectedReturns(;
+        ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance()
+    ) -> StandardDeviationExpectedReturns
+
+Keywords correspond to the struct's fields.
+
+# Examples
+
+```jldoctest
+julia> StandardDeviationExpectedReturns()
+StandardDeviationExpectedReturns
+  ce ┼ PortfolioOptimisersCovariance
+     │   ce ┼ Covariance
+     │      │    me ┼ SimpleExpectedReturns
+     │      │       │   w ┴ nothing
+     │      │    ce ┼ GeneralCovariance
+     │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+     │      │       │    w ┴ nothing
+     │      │   alg ┴ Full()
+     │   mp ┼ DenoiseDetoneAlgMatrixProcessing
+     │      │     pdm ┼ Posdef
+     │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+     │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+     │      │      dn ┼ nothing
+     │      │      dt ┼ nothing
+     │      │     alg ┼ nothing
+     │      │   order ┴ DenoiseDetoneAlg()
+```
+
+# Related
+
+  - [`AbstractExpectedReturnsEstimator`](@ref)
+  - [`PortfolioOptimisersCovariance`](@ref)
+"""
 @concrete struct StandardDeviationExpectedReturns <: AbstractExpectedReturnsEstimator
+    "$(field_dict[:ce])"
     ce
     function StandardDeviationExpectedReturns(ce::StatsBase.CovarianceEstimator)
         return new{typeof(ce)}(ce)
@@ -8,9 +56,51 @@ function StandardDeviationExpectedReturns(;
                                           ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance())
     return StandardDeviationExpectedReturns(ce)
 end
-function factory(ce::StandardDeviationExpectedReturns, w::StatsBase.AbstractWeights)
+"""
+    factory(ce::StandardDeviationExpectedReturns, w::ObsWeights) -> StandardDeviationExpectedReturns
+
+Return a new [`StandardDeviationExpectedReturns`](@ref) estimator with observation weights `w` applied to the underlying covariance estimator.
+
+# Arguments
+
+  - `ce`: Standard deviation expected returns estimator.
+  - $(arg_dict[:ow])
+
+# Returns
+
+  - `me::StandardDeviationExpectedReturns`: Updated estimator with weights applied.
+
+# Related
+
+  - [`StandardDeviationExpectedReturns`](@ref)
+  - [`factory`](@ref)
+"""
+function factory(ce::StandardDeviationExpectedReturns, w::ObsWeights)
     return StandardDeviationExpectedReturns(; ce = factory(ce.ce, w))
 end
+"""
+    Statistics.mean(me::StandardDeviationExpectedReturns, X::AbstractMatrix{<:Real};
+                    dims::Int = 1, kwargs...)
+
+Compute expected returns as the standard deviation of each asset.
+
+This method returns the standard deviation vector of `X` as estimated by the covariance estimator `me.ce`.
+
+# Arguments
+
+  - `me`: Standard deviation expected returns estimator.
+  - `X`: Data matrix of asset returns (observations × assets).
+  - $(arg_dict[:dims])
+  - `kwargs...`: Additional keyword arguments passed to the covariance estimator.
+
+# Returns
+
+  - `mu::Matrix{<:Number}`: Standard deviation vector, shaped as `(1, N)` if `dims == 1` or `(N, 1)` if `dims == 2`.
+
+# Related
+
+  - [`StandardDeviationExpectedReturns`](@ref)
+"""
 function Statistics.mean(me::StandardDeviationExpectedReturns, X::AbstractMatrix{<:Real};
                          dims::Int = 1, kwargs...)
     return Statistics.std(me.ce, X; dims = dims, kwargs...)

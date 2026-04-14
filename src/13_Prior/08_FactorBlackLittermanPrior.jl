@@ -1,20 +1,5 @@
 """
-    struct FactorBlackLittermanPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13} <:
-           AbstractLowOrderPriorEstimator_F
-        pe::T1
-        f_mp::T2
-        mp::T3
-        re::T4
-        ve::T5
-        views::T6
-        sets::T7
-        views_conf::T8
-        w::T9
-        rf::T10
-        l::T11
-        tau::T12
-        rsd::T13
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Factor Black-Litterman prior estimator for asset returns.
 
@@ -36,21 +21,25 @@ Factor Black-Litterman prior estimator for asset returns.
   - `tau`: Blending parameter. When computing the prior, if `nothing`, defaults to `1/T` where `T` is the number of observations.
   - `rsd`: Boolean flag to include residual variance in posterior covariance.
 
-# Constructor
+# Constructors
 
-    FactorBlackLittermanPrior(; pe::AbstractLowOrderPriorEstimator_A_AF = EmpiricalPrior(),
-                              f_mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing(),
-                              mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing(),
-                              re::AbstractRegressionEstimator = StepwiseRegression(),
-                              ve::AbstractVarianceEstimator = SimpleVariance(),
-                              views::Lc_BLV,
-                              sets::Option{<:AssetSets} = nothing,
-                              views_conf::Option{<:Num_VecNum} = nothing,
-                              w::Option{<:StatsBase.AbstractWeights} = nothing, rf::Number = 0.0,
-                              l::Option{<:Number} = nothing,
-                              tau::Option{<:Number} = nothing, rsd::Bool = true)
+    FactorBlackLittermanPrior(;
+        pe::AbstractLowOrderPriorEstimator_A_AF = EmpiricalPrior(),
+        f_mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing(),
+        mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing(),
+        re::AbstractRegressionEstimator = StepwiseRegression(),
+        ve::AbstractVarianceEstimator = SimpleVariance(),
+        views::Lc_BLV,
+        sets::Option{<:AssetSets} = nothing,
+        views_conf::Option{<:Num_VecNum} = nothing,
+        w::Option{<:ObsWeights} = nothing,
+        rf::Number = 0.0,
+        l::Option{<:Number} = nothing,
+        tau::Option{<:Number} = nothing,
+        rsd::Bool = true
+    ) -> FactorBlackLittermanPrior
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 
@@ -73,12 +62,10 @@ FactorBlackLittermanPrior
              │        ce ┼ PortfolioOptimisersCovariance
              │           │   ce ┼ Covariance
              │           │      │    me ┼ SimpleExpectedReturns
-             │           │      │       │     w ┼ nothing
-             │           │      │       │   idx ┴ nothing
+             │           │      │       │   w ┴ nothing
              │           │      │    ce ┼ GeneralCovariance
-             │           │      │       │    ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-             │           │      │       │     w ┼ nothing
-             │           │      │       │   idx ┴ nothing
+             │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+             │           │      │       │    w ┴ nothing
              │           │      │   alg ┴ Full()
              │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
              │           │      │     pdm ┼ Posdef
@@ -89,8 +76,7 @@ FactorBlackLittermanPrior
              │           │      │     alg ┼ nothing
              │           │      │   order ┴ DenoiseDetoneAlg()
              │        me ┼ SimpleExpectedReturns
-             │           │     w ┼ nothing
-             │           │   idx ┴ nothing
+             │           │   w ┴ nothing
              │   horizon ┴ nothing
         f_mp ┼ DenoiseDetoneAlgMatrixProcessing
              │     pdm ┼ Posdef
@@ -116,8 +102,7 @@ FactorBlackLittermanPrior
              │        │   kwargs ┴ @NamedTuple{}: NamedTuple()
           ve ┼ SimpleVariance
              │          me ┼ SimpleExpectedReturns
-             │             │     w ┼ nothing
-             │             │   idx ┴ nothing
+             │             │   w ┴ nothing
              │           w ┼ nothing
              │   corrected ┴ Bool: true
        views ┼ LinearConstraintEstimator
@@ -194,7 +179,7 @@ function FactorBlackLittermanPrior(;
     return FactorBlackLittermanPrior(pe, f_mp, mp, re, ve, views, sets, views_conf, w, rf,
                                      l, tau, rsd)
 end
-function factory(pe::FactorBlackLittermanPrior, w::StatsBase.AbstractWeights)
+function factory(pe::FactorBlackLittermanPrior, w::ObsWeights)
     return FactorBlackLittermanPrior(; pe = factory(pe.pe, w), f_mp = pe.f_mp, mp = pe.mp,
                                      re = factory(pe.re, w), ve = factory(pe.ve, w),
                                      views = pe.views, sets = pe.sets,

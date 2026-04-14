@@ -1,5 +1,5 @@
 """
-    abstract type SecondMomentFormulation <: AbstractAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for optimisation formulations of second moment risk measures in `PortfolioOptimisers.jl`.
 
@@ -13,7 +13,7 @@ Abstract supertype for optimisation formulations of second moment risk measures 
 """
 abstract type SecondMomentFormulation <: AbstractAlgorithm end
 """
-    abstract type VarianceFormulation <: SecondMomentFormulation end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for optimisation formulations of variance-based risk measures in `PortfolioOptimisers.jl`.
 
@@ -24,7 +24,7 @@ Abstract supertype for optimisation formulations of variance-based risk measures
 """
 abstract type VarianceFormulation <: SecondMomentFormulation end
 """
-    struct QuadRiskExpr <: VarianceFormulation end
+$(DocStringExtensions.TYPEDEF)
 
 Direct quadratic risk expression optimisation formulation for variance-like risk measures. The risk measure is implemented using an explicitly quadratic form. This can be in two ways.
 
@@ -65,7 +65,7 @@ Where:
 """
 struct QuadRiskExpr <: VarianceFormulation end
 """
-    struct SquaredSOCRiskExpr <: VarianceFormulation end
+$(DocStringExtensions.TYPEDEF)
 
 Squared second-order cone risk expression optimisation formulation for applicable risk measures. The risk measure is implemented using the square of a variable constrained by a second order cone.
 
@@ -78,7 +78,7 @@ Squared second-order cone risk expression optimisation formulation for applicabl
 """
 struct SquaredSOCRiskExpr <: VarianceFormulation end
 """
-    struct RSOCRiskExpr <: SecondMomentFormulation end
+$(DocStringExtensions.TYPEDEF)
 
 Rotated second-order cone risk expression optimisation formulation for applicable risk measures. The risk measure using a variable constrained to be in a rotated second order cone representing the sum of squares.
 
@@ -91,7 +91,7 @@ Rotated second-order cone risk expression optimisation formulation for applicabl
 """
 struct RSOCRiskExpr <: SecondMomentFormulation end
 """
-    struct SOCRiskExpr <: SecondMomentFormulation end
+$(DocStringExtensions.TYPEDEF)
 
 Second-order cone risk expression optimisation formulation for applicable risk measures. The risk measure is implemented using a variable constrained by a second order cone.
 
@@ -104,15 +104,34 @@ Second-order cone risk expression optimisation formulation for applicable risk m
   - [`RSOCRiskExpr`](@ref)
 """
 struct SOCRiskExpr <: SecondMomentFormulation end
+"""
+    const NSkeQuadFormulations
+
+Union type of quadratic OWA risk expression formulations for the Negative Skewness risk measure.
+
+Specifically: `Union{<:QuadRiskExpr, <:SquaredSOCRiskExpr}`.
+
+# Related
+
+  - [`QuadRiskExpr`](@ref)
+  - [`SquaredSOCRiskExpr`](@ref)
+  - [`NegativeSkewness`](@ref)
+"""
 const NSkeQuadFormulations = Union{<:QuadRiskExpr, <:SquaredSOCRiskExpr}
+"""
+    const QuadSecondMomentFormulations = Union{<:NSkeQuadFormulations, <:RSOCRiskExpr}
+
+Union of quadratic and RSOC formulations for second-moment (variance-based) risk expressions.
+
+# Related
+
+  - [`NSkeQuadFormulations`](@ref)
+  - [`RSOCRiskExpr`](@ref)
+  - [`Variance`](@ref)
+"""
 const QuadSecondMomentFormulations = Union{<:NSkeQuadFormulations, <:RSOCRiskExpr}
 """
-    struct Variance{T1, T2, T3, T4} <: RiskMeasure
-        settings::T1
-        sigma::T2
-        rc::T3
-        alg::T4
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Represents the portfolio variance using a covariance matrix.
 
@@ -125,12 +144,14 @@ Represents the portfolio variance using a covariance matrix.
 
 # Constructors
 
-    Variance(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-             sigma::Option{<:MatNum} = nothing,
-             rc::Option{<:LcE_Lc} = nothing,
-             alg::VarianceFormulation = SquaredSOCRiskExpr())
+    Variance(;
+        settings::RiskMeasureSettings = RiskMeasureSettings(),
+        sigma::Option{<:MatNum} = nothing,
+        rc::Option{<:LcE_Lc} = nothing,
+        alg::VarianceFormulation = SquaredSOCRiskExpr(),
+    ) -> Variance
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 
@@ -219,6 +240,9 @@ julia> r(w)
 
 # Related
 
+  - [`set_risk_constraints!`](@ref)
+  - [`set_risk_constraints!`](@ref)
+  - [`scalarise_risk_expression!`](@ref)
   - [`RiskMeasureSettings`](@ref)
   - [`VarianceFormulation`](@ref)
   - [`QuadRiskExpr`](@ref)
@@ -301,10 +325,7 @@ function risk_measure_view(r::Variance, i, args...)
                     alg = r.alg)
 end
 """
-    struct StandardDeviation{T1, T2} <: RiskMeasure
-        settings::T1
-        sigma::T2
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Represents the portfolio standard deviation using a covariance matrix. It is the square root of the variance.
 
@@ -315,10 +336,12 @@ Represents the portfolio standard deviation using a covariance matrix. It is the
 
 # Constructors
 
-    StandardDeviation(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                       sigma::Option{<:MatNum} = nothing)
+    StandardDeviation(;
+        settings::RiskMeasureSettings = RiskMeasureSettings(),
+        sigma::Option{<:MatNum} = nothing,
+    ) -> StandardDeviation
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 
@@ -449,7 +472,7 @@ function risk_measure_view(r::StandardDeviation, i, args...)
     return StandardDeviation(; settings = r.settings, sigma = sigma, chol = chol)
 end
 """
-    struct UncertaintySetVariance{T1, T2, T3} <: RiskMeasure
+$(DocStringExtensions.TYPEDEF)
 
 Represents the variance risk measure under uncertainty sets. Works the same way as the [`Variance`](@ref) risk measure but allows specifying uncertainty set estimators or results. These are only used in `JuMP`-based optimisations because they dictate how the variance is formulated as an optimisation problem. By encapsulating the uncertainty set estimator or result, enables the use of multiple uncertainty set variances in the same optimisation model.
 
@@ -461,11 +484,13 @@ Represents the variance risk measure under uncertainty sets. Works the same way 
 
 # Constructors
 
-    UncertaintySetVariance(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                           ucs::Option{<:UcSE_UcS} = NormalUncertaintySet(),
-                           sigma::Option{<:MatNum} = nothing)
+    UncertaintySetVariance(;
+        settings::RiskMeasureSettings = RiskMeasureSettings(),
+        ucs::Option{<:UcSE_UcS} = NormalUncertaintySet(),
+        sigma::Option{<:MatNum} = nothing,
+    ) -> UncertaintySetVariance
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 
@@ -547,7 +572,7 @@ Where:
 
   - ``\\sigma``: Variable representing the portfolio's variance of the variance.
 
-  - ``\\mathbf{G}``: Suitable factorisation of the `N^2×N^2` covariance of the covariance matrix of the uncertainty set, such as the square root matrix, or the Cholesky factorisation.
+  - ``\\mathbf{G}``: Suitable factorisation of the `N^2 × N^2` covariance of the covariance matrix of the uncertainty set, such as the square root matrix, or the Cholesky factorisation.
 
   - ``k``: Scalar variable/constant.
 
@@ -596,35 +621,33 @@ UncertaintySetVariance
            │      ub ┼ nothing
            │     rke ┴ Bool: true
        ucs ┼ NormalUncertaintySet
-           │      pe ┼ EmpiricalPrior
-           │         │        ce ┼ PortfolioOptimisersCovariance
-           │         │           │   ce ┼ Covariance
-           │         │           │      │    me ┼ SimpleExpectedReturns
-           │         │           │      │       │     w ┼ nothing
-           │         │           │      │       │   idx ┴ nothing
-           │         │           │      │    ce ┼ GeneralCovariance
-           │         │           │      │       │    ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-           │         │           │      │       │     w ┼ nothing
-           │         │           │      │       │   idx ┴ nothing
-           │         │           │      │   alg ┴ Full()
-           │         │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
-           │         │           │      │     pdm ┼ Posdef
-           │         │           │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-           │         │           │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
-           │         │           │      │      dn ┼ nothing
-           │         │           │      │      dt ┼ nothing
-           │         │           │      │     alg ┼ nothing
-           │         │           │      │   order ┴ DenoiseDetoneAlg()
-           │         │        me ┼ SimpleExpectedReturns
-           │         │           │     w ┼ nothing
-           │         │           │   idx ┴ nothing
-           │         │   horizon ┴ nothing
-           │     alg ┼ BoxUncertaintySetAlgorithm()
-           │   n_sim ┼ Int64: 3000
-           │       q ┼ Float64: 0.05
-           │     rng ┼ Random.TaskLocalRNG: Random.TaskLocalRNG()
-           │    seed ┼ nothing
-           │     ens ┴ nothing
+           │       pe ┼ EmpiricalPrior
+           │          │        ce ┼ PortfolioOptimisersCovariance
+           │          │           │   ce ┼ Covariance
+           │          │           │      │    me ┼ SimpleExpectedReturns
+           │          │           │      │       │   w ┴ nothing
+           │          │           │      │    ce ┼ GeneralCovariance
+           │          │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+           │          │           │      │       │    w ┴ nothing
+           │          │           │      │   alg ┴ Full()
+           │          │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
+           │          │           │      │     pdm ┼ Posdef
+           │          │           │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+           │          │           │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+           │          │           │      │      dn ┼ nothing
+           │          │           │      │      dt ┼ nothing
+           │          │           │      │     alg ┼ nothing
+           │          │           │      │   order ┴ DenoiseDetoneAlg()
+           │          │        me ┼ SimpleExpectedReturns
+           │          │           │   w ┴ nothing
+           │          │   horizon ┴ nothing
+           │      alg ┼ BoxUncertaintySetAlgorithm()
+           │    n_sim ┼ Int64: 3000
+           │        q ┼ Float64: 0.05
+           │      rng ┼ Random.TaskLocalRNG: Random.TaskLocalRNG()
+           │     seed ┼ nothing
+           │      ens ┼ nothing
+           │   kwargs ┴ @NamedTuple{}: NamedTuple()
      sigma ┴ 3×3 Matrix{Float64}
 
 julia> r(w)
@@ -660,6 +683,27 @@ end
 function (r::UncertaintySetVariance)(w::VecNum)
     return LinearAlgebra.dot(w, r.sigma, w)
 end
+"""
+    _no_bounds_risk_measure(r, flag)
+
+Return a version of the risk measure stripped of bounds for unbounded optimisation sub-problems.
+
+Internal helper used in frontier construction sub-problems where bounds are temporarily removed.
+
+# Arguments
+
+  - `r`: Risk measure.
+  - `flag`: Flag controlling which bounds to remove.
+
+# Returns
+
+  - Risk measure without bounds.
+
+# Related
+
+  - [`UncertaintySetVariance`](@ref)
+  - [`_no_bounds_no_risk_expr_risk_measure`](@ref)
+"""
 function _no_bounds_risk_measure(r::UncertaintySetVariance, ::Union{Val{true}, Nothing})
     return UncertaintySetVariance(;
                                   settings = RiskMeasureSettings(; rke = r.settings.rke,
@@ -676,6 +720,27 @@ function no_bounds_risk_measure(r::UncertaintySetVariance,
                                 flag::Union{Val{false}, Val{true}, Nothing} = nothing)
     return _no_bounds_risk_measure(r, flag)
 end
+"""
+    _no_bounds_no_risk_expr_risk_measure(r, flag)
+
+Return a version of the risk measure with neither bounds nor risk expressions for unbounded sub-problems.
+
+Internal helper used in frontier sub-problems that require removing all risk expression constraints.
+
+# Arguments
+
+  - `r`: Risk measure.
+  - `flag`: Flag controlling configuration.
+
+# Returns
+
+  - Simplified risk measure.
+
+# Related
+
+  - [`_no_bounds_risk_measure`](@ref)
+  - [`UncertaintySetVariance`](@ref)
+"""
 function _no_bounds_no_risk_expr_risk_measure(r::UncertaintySetVariance,
                                               ::Union{Val{true}, Nothing})
     return UncertaintySetVariance(;

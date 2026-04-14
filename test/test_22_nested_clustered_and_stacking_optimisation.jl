@@ -426,17 +426,19 @@
                                                                opt = jopto)]),
                          opto = MeanRisk(; opt = jopto)),
                 NestedClustered(;
-                                cle = ClustersEstimator(onc = OptimalNumberClusters(alg = 3)),
-                                opti = SubsetResampling(rng = StableRNG(100), seed = 42,
+                                cle = ClustersEstimator(;
+                                                        onc = OptimalNumberClusters(;
+                                                                                    alg = 3)),
+                                opti = SubsetResampling(; rng = StableRNG(100), seed = 42,
                                                         pe = pr,
                                                         opt = MeanRisk(; opt = jopti)),
-                                opto = SubsetResampling(rng = StableRNG(100), seed = 42,
+                                opto = SubsetResampling(; rng = StableRNG(100), seed = 42,
                                                         opt = MeanRisk(; opt = jopto))),
                 Stacking(;
-                         opti = [SubsetResampling(rng = StableRNG(100), seed = 42, pe = pr,
-                                                  opt = MeanRisk(; opt = jopti)),
+                         opti = [SubsetResampling(; rng = StableRNG(100), seed = 42,
+                                                  pe = pr, opt = MeanRisk(; opt = jopti)),
                                  MeanRisk(; opt = jopti), InverseVolatility()],
-                         opto = SubsetResampling(rng = StableRNG(100), seed = 42,
+                         opto = SubsetResampling(; rng = StableRNG(100), seed = 42,
                                                  opt = MeanRisk(; opt = jopto)))]
         df = CSV.read(joinpath(@__DIR__, "./assets/NestedClustered.csv.gz"), DataFrame)
         for (i, opt) in enumerate(opts)
@@ -455,6 +457,19 @@
                                                         opti = RiskBudgeting(; opt = jopti),
                                                         opto = RiskBudgeting(; opt = jopto)),
                                         rd).w, res.w)
+
+                @test isapprox(optimise(NestedClustered(; cle = clr,
+                                                        opti = RiskBudgeting(;
+                                                                             rba = AssetRiskBudgeting(;
+                                                                                                      sets = sets,
+                                                                                                      alg = LogRiskBudgeting(z = ones(Int,
+                                                                                                                                      size(rd.X,
+                                                                                                                                           2))),
+                                                                                                      rkb = RiskBudgetEstimator(;
+                                                                                                                                val = UniformValues())),
+                                                                             opt = jopti),
+                                                        opto = RiskBudgeting(; opt = jopto)),
+                                        rd).w, res.w, rtol = 5e-5)
             end
             rtol = if i in (2, 16)
                 5e-5
@@ -654,18 +669,19 @@
                        rd)
         if Sys.isapple()
             @test isapprox(res.w,
-                           [0.0, 0.0, 0.051854523007294866, 0.011033389567670873, 0.0, 0.0,
-                            0.07030782696231126, 0.2198705472548145, 0.05699012244257908,
-                            0.2092228790692725, 0.0, 0.1927255532623544,
-                            0.003576866465534528, 0.05051771646875929, 0.0, 0.0, 0.0, 0.0,
-                            0.09783965575457014, 0.036060919744838785], rtol = 1e-6)
+                           [0.0, 0.0, 0.004821476046698469, 0.0010258936044387464, 0.0, 0.0,
+                            0.006537279371877492, 0.18088433701440654, 0.005298988291077931,
+                            0.3472528756459372, 0.0, 0.2402405305712111,
+                            0.00033257997539444, 0.05000349773341354, 0.03242526200848679,
+                            0.0, 0.0, 0.0, 0.1278243058653844, 0.0033529738716733854],
+                           rtol = 1e-6)
         else
             @test isapprox(res.w,
-                           [0.0, 0.0, 0.006267884141799684, 0.001333654298425877, 0.0, 0.0,
-                            0.00849841610922681, 0.2559468706509382, 0.006888646620986406,
-                            0.332010132045738, 0.012848008808692803, 0.18630483035994777,
-                            0.00043235157314059193, 0.0, 0.05415387056873924, 0.0, 0.0, 0.0,
-                            0.1309564929335754, 0.004358841888789314], rtol = 1e-6)
+                           [0.0, 0.0, 0.005602412808720073, 0.0011920580781122523, 0.0, 0.0,
+                            0.007596125612252459, 0.2375180560536035, 0.006157267937796995,
+                            0.3435374666842433, 0.011940000819969961, 0.20302112082396714,
+                            0.0003864481117456734, 0.0, 0.04878243497008711, 0.0, 0.0, 0.0,
+                            0.1303705514595793, 0.0038960566399224694], rtol = 1e-6)
         end
 
         res = optimise(NestedClustered(; cle = clr,
@@ -677,11 +693,11 @@
                                                        opt = JuMPOptimiser(; slv = mip_slv))),
                        rd)
         @test isapprox(res.w,
-                       [-2.7985157472133174e-12, 0.0, 0.0, 0.0, 0.0, 0.0,
-                        -1.2318015713110941e-12, 0.28242029275575126, 0.0,
-                        0.02931887332131044, 0.13207557497903177, 0.16273751543512763, 0.0,
-                        0.2317781853397863, 0.0, 0.0, 0.0, 0.09184252058354601,
-                        0.06982703759186153, -2.384995406974934e-12], rtol = 1e-6)
+                       [0.0012234700209226132, 0.0, 0.0, 0.0, 0.0, 0.0,
+                        0.0005385255722520739, 0.281628194040886, 0.0, 0.029236643246224468,
+                        0.13170514517674964, 0.16228108868342814, 0.0, 0.23112812156090545,
+                        0.0, 0.0, 0.0, 0.09158493164822426, 0.06963119505448694,
+                        0.0010426849959224247], rtol = 1e-6)
 
         resa = optimise(NestedClustered(; cle = clr,
                                         opti = MeanRisk(;
@@ -720,11 +736,11 @@
                                                        opt = JuMPOptimiser(; slv = mip_slv))),
                        rd)
         @test isapprox(res.w,
-                       [0.00021291916555926592, 0.0, 0.0, 5.5408927202656446e-5, 0.0,
-                        0.0003984089957155221, 0.0011652514635827125, 0.0,
-                        0.0027426935765460327, 0.19285907078399256, 0.16395289846398542,
-                        0.0, 0.0, 0.3005703890586406, 0.0, 0.0, 0.0, 0.0,
-                        0.3351918342458703, 0.0028511253189049007], rtol = 1e-6)
+                       [0.00021148772894721179, 0.0, 0.0, 5.503641791343221e-5, 0.0,
+                        0.0003957305274730832, 0.0011574175816340929, 0.0,
+                        0.002724254691574924, 0.19286877092707, 0.16396114472674364, 0.0,
+                        0.0, 0.3005855067078481, 0.0, 0.0, 0.0, 0.0, 0.3352086932338209,
+                        0.0028319574569745654], rtol = 1e-6)
 
         resa = optimise(NestedClustered(; cle = clr,
                                         opti = MeanRisk(;

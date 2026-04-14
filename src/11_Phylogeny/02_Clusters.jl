@@ -1,5 +1,5 @@
 """
-    abstract type AbstractClustersEstimator <: AbstractPhylogenyEstimator end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all clustering estimator types in `PortfolioOptimisers.jl`.
 
@@ -12,7 +12,7 @@ All concrete and/or abstract types implementing clustering-based estimation algo
 """
 abstract type AbstractClustersEstimator <: AbstractPhylogenyEstimator end
 """
-    abstract type AbstractClustersAlgorithm <: AbstractPhylogenyAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all clustering algorithm types in `PortfolioOptimisers.jl`.
 
@@ -27,10 +27,35 @@ abstract type AbstractClustersAlgorithm <: AbstractPhylogenyAlgorithm end
 function factory(alg::AbstractClustersAlgorithm, args...; kwargs...)
     return alg
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for all hierarchical clustering algorithm types in `PortfolioOptimisers.jl`.
+
+All concrete and/or abstract types implementing hierarchical clustering algorithms (such as hierarchical agglomerative clustering or DBHT) should be subtypes of `AbstractHierarchicalClusteringAlgorithm`.
+
+# Related
+
+  - [`AbstractClustersAlgorithm`](@ref)
+  - [`HClustAlgorithm`](@ref)
+  - [`DBHT`](@ref)
+"""
 abstract type AbstractHierarchicalClusteringAlgorithm <: AbstractClustersAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for all non-hierarchical clustering algorithm types in `PortfolioOptimisers.jl`.
+
+All concrete and/or abstract types implementing non-hierarchical clustering algorithms (such as k-means) should be subtypes of `AbstractNonHierarchicalClusteringAlgorithm`.
+
+# Related
+
+  - [`AbstractClustersAlgorithm`](@ref)
+  - [`KMeansAlgorithm`](@ref)
+"""
 abstract type AbstractNonHierarchicalClusteringAlgorithm <: AbstractClustersAlgorithm end
 """
-    abstract type AbstractOptimalNumberClustersEstimator <: AbstractEstimator end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all optimal number of clusters estimator types in `PortfolioOptimisers.jl`.
 
@@ -42,7 +67,7 @@ All concrete and/or abstract types implementing algorithms to estimate the optim
 """
 abstract type AbstractOptimalNumberClustersEstimator <: AbstractEstimator end
 """
-    abstract type AbstractOptimalNumberClustersAlgorithm <: AbstractAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all optimal number of clusters algorithm types in `PortfolioOptimisers.jl`.
 
@@ -53,9 +78,21 @@ All concrete and/or abstract types implementing specific algorithms for determin
   - [`AbstractOptimalNumberClustersEstimator`](@ref)
 """
 abstract type AbstractOptimalNumberClustersAlgorithm <: AbstractAlgorithm end
+"""
+    const Int_ONC = Union{<:Integer, <:AbstractOptimalNumberClustersAlgorithm}
+
+Alias for an integer or optimal number of clusters algorithm.
+
+Matches either a plain integer (specifying the number of clusters directly) or an [`AbstractOptimalNumberClustersAlgorithm`](@ref) (which determines the optimal number automatically).
+
+# Related
+
+  - [`AbstractOptimalNumberClustersAlgorithm`](@ref)
+  - [`OptimalNumberClusters`](@ref)
+"""
 const Int_ONC = Union{<:Integer, <:AbstractOptimalNumberClustersAlgorithm}
 """
-    abstract type AbstractClusteringResult <: AbstractPhylogenyResult end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all clustering result types in `PortfolioOptimisers.jl`.
 
@@ -67,14 +104,21 @@ All concrete and/or abstract types representing the result of a clustering estim
   - [`AbstractClustersAlgorithm`](@ref)
 """
 abstract type AbstractClusteringResult <: AbstractPhylogenyResult end
+"""
+    const ClTypes = Union{<:Clustering.ClusteringResult, <:Clustering.Hclust}
+
+Alias for clustering result types from the Clustering.jl package.
+
+Matches either a `Clustering.ClusteringResult` or `Clustering.Hclust`. Used internally to accept output from the Clustering.jl library for both flat and hierarchical clustering results.
+
+# Related
+
+  - [`Clusters`](@ref)
+  - [`ClustersEstimator`](@ref)
+"""
 const ClTypes = Union{<:Clustering.ClusteringResult, <:Clustering.Hclust}
 """
-    struct Clusters{T1, T2, T3, T4} <: AbstractClusteringResult
-        res::T1
-        S::T2
-        D::T3
-        k::T4
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Result type for hierarchical clustering in `PortfolioOptimisers.jl`.
 
@@ -82,24 +126,25 @@ Result type for hierarchical clustering in `PortfolioOptimisers.jl`.
 
 # Fields
 
-  - `clustering`: The hierarchical clustering object.
-  - `S`: Similarity matrix used for clustering.
-  - `D`: Distance matrix used for clustering.
-  - `k`: Number of clusters.
+$(DocStringExtensions.FIELDS)
 
-# Constructor
+# Constructors
 
-    Clusters(; res::Clustering.Hclust, S::MatNum,
-                           D::MatNum, k::Integer)
+    Clusters(;
+        res::ClTypes,
+        S::MatNum,
+        D::MatNum,
+        k::Integer
+    ) -> Clusters
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `!isempty(S)`.
-  - `!isempty(D)`.
-  - `size(S) == size(D)`.
-  - `k ≥ 1`.
+  - $(val_dict[:S])
+  - $(val_dict[:D])
+  - $(val_dict[:S_D])
+  - $(val_dict[:ck])
 
 # Related
 
@@ -107,9 +152,13 @@ Keyword arguments correspond to the fields above.
   - [`ClustersEstimator`](@ref)
 """
 @concrete struct Clusters <: AbstractClusteringResult
+    "$(field_dict[:clres])"
     res
+    "$(field_dict[:S])"
     S
+    "$(field_dict[:D])"
     D
+    "$(field_dict[:ck])"
     k
     function Clusters(res::ClTypes, S::MatNum, D::MatNum, k::Integer)
         @argcheck(!isempty(S), IsEmptyError)
@@ -147,9 +196,7 @@ function clusterise(cle::AbstractClusteringResult, args...; kwargs...)
     return cle
 end
 """
-    struct SecondOrderDifference{T1} <: AbstractOptimalNumberClustersAlgorithm
-        alg::T1
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Algorithm type for estimating the optimal number of clusters using the second-order difference method.
 
@@ -157,13 +204,15 @@ The `SecondOrderDifference` algorithm selects the optimal number of clusters by 
 
 # Fields
 
-  - `alg`: The vector-to-scalar measure used to evaluate clustering quality.
+$(DocStringExtensions.FIELDS)
 
-# Constructor
+# Constructors
 
-    SecondOrderDifference(; alg::VectorToScalarMeasure = StandardisedValue())
+    SecondOrderDifference(;
+        alg::Num_VecToScaM = StandardisedValue()
+    ) -> SecondOrderDifference
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 
@@ -185,22 +234,20 @@ SecondOrderDifference
   - [`VectorToScalarMeasure`](@ref)
 """
 @concrete struct SecondOrderDifference <: AbstractOptimalNumberClustersAlgorithm
+    "$(field_dict[:vsalg])"
     alg
-    function SecondOrderDifference(alg::VectorToScalarMeasure)
+    function SecondOrderDifference(alg::Num_VecToScaM)
         return new{typeof(alg)}(alg)
     end
 end
-function SecondOrderDifference(; alg::VectorToScalarMeasure = StandardisedValue())
+function SecondOrderDifference(; alg::Num_VecToScaM = StandardisedValue())
     return SecondOrderDifference(alg)
 end
 function factory(alg::SecondOrderDifference, w::StatsBase.AbstractWeights)
     return SecondOrderDifference(; alg = factory(alg.alg, w))
 end
 """
-    struct SilhouetteScore{T1, T2} <: AbstractOptimalNumberClustersAlgorithm
-        alg::T1
-        metric::T2
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Algorithm type for estimating the optimal number of clusters using the standardised silhouette score.
 
@@ -208,28 +255,27 @@ Algorithm type for estimating the optimal number of clusters using the standardi
 
 # Fields
 
-  - `alg`: The vector-to-scalar measure used to evaluate clustering quality.
-  - `metric`: The distance metric used for silhouette calculation from [`Distances.jl`](https://github.com/JuliaStats/Distances.jl), or `nothing` for the default.
+$(DocStringExtensions.FIELDS)
 
-# Constructor
+# Constructors
 
-    SilhouetteScore(; alg::VectorToScalarMeasure = StandardisedValue(),
-                     metric::Option{<:Distances.SemiMetric} = nothing)
+    SilhouetteScore(;
+        alg::Num_VecToScaM = StandardisedValue()
+    ) -> SilhouetteScore
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 
 ```jldoctest
 julia> SilhouetteScore()
 SilhouetteScore
-     alg ┼ StandardisedValue
-         │   mv ┼ MeanValue
-         │      │   w ┴ nothing
-         │   sv ┼ StdValue
-         │      │           w ┼ nothing
-         │      │   corrected ┴ Bool: true
-  metric ┴ nothing
+  alg ┼ StandardisedValue
+      │   mv ┼ MeanValue
+      │      │   w ┴ nothing
+      │   sv ┼ StdValue
+      │      │           w ┼ nothing
+      │      │   corrected ┴ Bool: true
 ```
 
 # Related
@@ -240,25 +286,20 @@ SilhouetteScore
   - [`Distances.jl`](https://github.com/JuliaStats/Distances.jl)
 """
 @concrete struct SilhouetteScore <: AbstractOptimalNumberClustersAlgorithm
+    "$(field_dict[:vsalg])"
     alg
-    metric
-    function SilhouetteScore(alg::VectorToScalarMeasure,
-                             metric::Option{<:Distances.SemiMetric})
-        return new{typeof(alg), typeof(metric)}(alg, metric)
+    function SilhouetteScore(alg::Num_VecToScaM)
+        return new{typeof(alg)}(alg)
     end
 end
-function SilhouetteScore(; alg::VectorToScalarMeasure = StandardisedValue(),
-                         metric::Option{<:Distances.SemiMetric} = nothing)
-    return SilhouetteScore(alg, metric)
+function SilhouetteScore(; alg::Num_VecToScaM = StandardisedValue())
+    return SilhouetteScore(alg)
 end
 function factory(alg::SilhouetteScore, w::StatsBase.AbstractWeights)
-    return SilhouetteScore(; alg = factory(alg.alg, w), metric = alg.metric)
+    return SilhouetteScore(; alg = factory(alg.alg, w))
 end
 """
-    struct OptimalNumberClusters{T1, T2} <: AbstractOptimalNumberClustersEstimator
-        max_k::T1
-        alg::T2
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Estimator type for selecting the optimal number of clusters in `PortfolioOptimisers.jl`.
 
@@ -266,20 +307,21 @@ Estimator type for selecting the optimal number of clusters in `PortfolioOptimis
 
 # Fields
 
-  - `max_k`: Maximum number of clusters to consider. If `nothing`, computed as the `sqrt(N)`, where `N` is the number of assets.
-  - `alg`: Algorithm for selecting the optimal number of clusters. If an integer, defines the number of clusters directly.
+$(DocStringExtensions.FIELDS)
 
-# Constructor
+# Constructors
 
-    OptimalNumberClusters(; max_k::Option{<:Integer} = nothing,
-                          alg::Int_ONC = SecondOrderDifference())
+    OptimalNumberClusters(;
+        max_k::Option{<:Integer} = nothing,
+        alg::Int_ONC = SecondOrderDifference()
+    ) -> OptimalNumberClusters
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `max_k >= 1`.
-  - If `alg` is an integer, `alg >= 1`.
+  - $(val_dict[:max_k])
+  - $(val_dict[:kalg])
 
 # Examples
 
@@ -302,7 +344,9 @@ OptimalNumberClusters
   - [`AbstractOptimalNumberClustersAlgorithm`](@ref)
 """
 @concrete struct OptimalNumberClusters <: AbstractOptimalNumberClustersEstimator
+    "$(field_dict[:max_k])"
     max_k
+    "$(field_dict[:kalg])"
     alg
     function OptimalNumberClusters(max_k::Option{<:Integer}, alg::Int_ONC)
         if !isnothing(max_k)
@@ -322,9 +366,7 @@ function factory(onc::OptimalNumberClusters, w::StatsBase.AbstractWeights)
     return OptimalNumberClusters(; max_k = onc.max_k, alg = factory(onc.alg, w))
 end
 """
-    struct HClustAlgorithm{T1} <: AbstractHierarchicalClusteringAlgorithm
-        linkage::T1
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Algorithm type for hierarchical clustering in `PortfolioOptimisers.jl`.
 
@@ -332,13 +374,15 @@ Algorithm type for hierarchical clustering in `PortfolioOptimisers.jl`.
 
 # Fields
 
-  - `linkage`: Linkage method for hierarchical clustering from [`Clustering.jl`](https://juliastats.org/Clustering.jl/stable/hclust.html).
+$(DocStringExtensions.FIELDS)
 
-# Constructor
+# Constructors
 
-    HClustAlgorithm(; linkage::Symbol = :ward)
+    HClustAlgorithm(;
+        linkage::Symbol = :ward
+    ) -> HClustAlgorithm
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 
@@ -350,10 +394,11 @@ HClustAlgorithm
 
 # Related
 
-  - [`AbstractHierarchicalClusteringAlgorithm`]-(@ref)
+  - [`AbstractHierarchicalClusteringAlgorithm`](@ref)
   - [`ClustersEstimator`](@ref)
 """
 @concrete struct HClustAlgorithm <: AbstractHierarchicalClusteringAlgorithm
+    "Linkage method for hierarchical clustering from [`Clustering.jl`](https://juliastats.org/Clustering.jl/stable/hclust.html)."
     linkage
     function HClustAlgorithm(linkage::Symbol)
         return new{typeof(linkage)}(linkage)
@@ -363,12 +408,7 @@ function HClustAlgorithm(; linkage::Symbol = :ward)
     return HClustAlgorithm(linkage)
 end
 """
-    struct ClustersEstimator{T1, T2, T3, T4} <: AbstractClustersEstimator
-        ce::T1
-        de::T2
-        alg::T3
-        onc::T4
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Estimator type for clustering in `PortfolioOptimisers.jl`.
 
@@ -376,19 +416,18 @@ Estimator type for clustering in `PortfolioOptimisers.jl`.
 
 # Fields
 
-  - `ce`: Covariance estimator.
-  - `de`: Distance estimator.
-  - `alg`: Clustering algorithm.
-  - `onc`: Optimal number of clusters estimator.
+$(DocStringExtensions.FIELDS)
 
-# Constructor
+# Constructors
 
-    ClustersEstimator(; ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
-                        de::AbstractDistanceEstimator = Distance(; alg = CanonicalDistance()),
-                        alg::AbstractClustersAlgorithm = HClustAlgorithm(),
-                        onc::AbstractOptimalNumberClustersEstimator = OptimalNumberClusters())
+    ClustersEstimator(;
+        ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
+        de::AbstractDistanceEstimator = Distance(; alg = CanonicalDistance()),
+        alg::AbstractClustersAlgorithm = HClustAlgorithm(),
+        onc::AbstractOptimalNumberClustersEstimator = OptimalNumberClusters()
+    ) -> ClustersEstimator
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 
@@ -398,12 +437,10 @@ ClustersEstimator
    ce ┼ PortfolioOptimisersCovariance
       │   ce ┼ Covariance
       │      │    me ┼ SimpleExpectedReturns
-      │      │       │     w ┼ nothing
-      │      │       │   idx ┴ nothing
+      │      │       │   w ┴ nothing
       │      │    ce ┼ GeneralCovariance
-      │      │       │    ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-      │      │       │     w ┼ nothing
-      │      │       │   idx ┴ nothing
+      │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+      │      │       │    w ┴ nothing
       │      │   alg ┴ Full()
       │   mp ┼ DenoiseDetoneAlgMatrixProcessing
       │      │     pdm ┼ Posdef
@@ -432,13 +469,17 @@ ClustersEstimator
 # Related
 
   - [`AbstractClustersEstimator`](@ref)
-  - [`AbstractHierarchicalClusteringAlgorithm`]-(@ref)
+  - [`AbstractHierarchicalClusteringAlgorithm`](@ref)
   - [`AbstractOptimalNumberClustersEstimator`](@ref)
 """
 @concrete struct ClustersEstimator <: AbstractClustersEstimator
+    "$(field_dict[:ce])"
     ce
+    "$(field_dict[:de])"
     de
+    "$(field_dict[:clalg])"
     alg
+    "$(field_dict[:onc])"
     onc
     function ClustersEstimator(ce::StatsBase.CovarianceEstimator,
                                de::AbstractDistanceEstimator,
@@ -459,10 +500,38 @@ function factory(cle::ClustersEstimator, w::StatsBase.AbstractWeights)
     return ClustersEstimator(; ce = factory(cle.ce, w), de = cle.de, alg = cle.alg,
                              onc = cle.onc)
 end
+"""
+    const HClE_HCl = Union{<:ClustersEstimator{<:Any, <:Any,
+                                               <:AbstractHierarchicalClusteringAlgorithm,
+                                               <:Any},
+                           <:Clusters{<:Clustering.Hclust, <:Any, <:Any, <:Any}}
+
+Alias for a hierarchical clustering estimator or result.
+
+Matches either a [`ClustersEstimator`](@ref) parameterised with a hierarchical clustering algorithm, or a [`Clusters`](@ref) result wrapping a `Clustering.Hclust`. Used internally for dispatch in hierarchical clustering workflows.
+
+# Related
+
+  - [`ClustersEstimator`](@ref)
+  - [`AbstractHierarchicalClusteringAlgorithm`](@ref)
+  - [`Clusters`](@ref)
+"""
 const HClE_HCl = Union{<:ClustersEstimator{<:Any, <:Any,
                                            <:AbstractHierarchicalClusteringAlgorithm,
                                            <:Any},
                        <:Clusters{<:Clustering.Hclust, <:Any, <:Any, <:Any}}
+"""
+    const ClE_Cl = Union{<:AbstractClustersEstimator, <:AbstractClusteringResult}
+
+Alias for a clustering estimator or result.
+
+Matches either an [`AbstractClustersEstimator`](@ref) or an [`AbstractClusteringResult`](@ref). Used for dispatch in phylogeny and network estimation workflows that accept either form.
+
+# Related
+
+  - [`AbstractClustersEstimator`](@ref)
+  - [`AbstractClusteringResult`](@ref)
+"""
 const ClE_Cl = Union{<:AbstractClustersEstimator, <:AbstractClusteringResult}
 
 export Clusters, clusterise, SecondOrderDifference, SilhouetteScore, OptimalNumberClusters,

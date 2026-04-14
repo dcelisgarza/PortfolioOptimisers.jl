@@ -6,6 +6,8 @@
 L2Tracking
 SquaredL2Tracking
 L1Tracking
+LpTracking
+LInfTracking
 IndependentVariableTracking
 DependentVariableTracking
 WeightsTracking

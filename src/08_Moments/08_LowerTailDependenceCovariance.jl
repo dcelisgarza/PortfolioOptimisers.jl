@@ -1,9 +1,5 @@
 """
-    struct LowerTailDependenceCovariance{T1, T2, T3} <: AbstractCovarianceEstimator
-        ve::T1
-        alpha::T2
-        ex::T3
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Lower tail dependence covariance estimator.
 
@@ -11,20 +7,21 @@ Lower tail dependence covariance estimator.
 
 # Fields
 
-  - `ve`: Variance estimator used to compute marginal standard deviations.
-  - `alpha`: Quantile level for the 5% lower tail.
-  - `ex`: Parallel execution strategy.
+$(DocStringExtensions.FIELDS)
 
-# Constructor
+# Constructors
 
-    LowerTailDependenceCovariance(; ve::AbstractVarianceEstimator = SimpleVariance(), alpha::Number = 0.05,
-                  ex::FLoops.Transducers.Executor = ThreadedEx())
+    LowerTailDependenceCovariance(;
+        ve::AbstractVarianceEstimator = SimpleVariance(),
+        alpha::Number = 0.05,
+        ex::FLoops.Transducers.Executor = ThreadedEx()
+    ) -> LowerTailDependenceCovariance
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `0 < alpha < 1`.
+  - $(val_dict[:alpha])
 
 # Examples
 
@@ -33,8 +30,7 @@ julia> LowerTailDependenceCovariance()
 LowerTailDependenceCovariance
      ve ┼ SimpleVariance
         │          me ┼ SimpleExpectedReturns
-        │             │     w ┼ nothing
-        │             │   idx ┴ nothing
+        │             │   w ┴ nothing
         │           w ┼ nothing
         │   corrected ┴ Bool: true
   alpha ┼ Float64: 0.05
@@ -49,8 +45,11 @@ LowerTailDependenceCovariance
   - [`FLoops.Transducers.Executor`](https://juliafolds2.github.io/FLoops.jl/dev/tutorials/parallel/#tutorials-ex)
 """
 @concrete struct LowerTailDependenceCovariance <: AbstractCovarianceEstimator
+    "$(field_dict[:ve])"
     ve
+    "$(field_dict[:alpha])"
     alpha
+    "$(field_dict[:ex])"
     ex
     function LowerTailDependenceCovariance(ve::AbstractVarianceEstimator, alpha::Number,
                                            ex::FLoops.Transducers.Executor)
@@ -64,7 +63,26 @@ function LowerTailDependenceCovariance(; ve::AbstractVarianceEstimator = SimpleV
                                        ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())
     return LowerTailDependenceCovariance(ve, alpha, ex)
 end
-function factory(ce::LowerTailDependenceCovariance, w::StatsBase.AbstractWeights)
+"""
+    factory(ce::LowerTailDependenceCovariance, w::ObsWeights) -> LowerTailDependenceCovariance
+
+Return a new [`LowerTailDependenceCovariance`](@ref) estimator with observation weights `w` applied to the underlying variance estimator.
+
+# Arguments
+
+  - $(arg_dict[:ce])
+  - $(arg_dict[:ow])
+
+# Returns
+
+  - $(ret_dict[:ce])
+
+# Related
+
+  - [`LowerTailDependenceCovariance`](@ref)
+  - [`factory`](@ref)
+"""
+function factory(ce::LowerTailDependenceCovariance, w::ObsWeights)
     return LowerTailDependenceCovariance(; ve = factory(ce.ve, w), alpha = ce.alpha,
                                          ex = ce.ex)
 end
@@ -103,15 +121,18 @@ function lower_tail_dependence(X::MatNum, alpha::Number = 0.05,
     k = ceil(Int, T * alpha)
     rho = Matrix{eltype(X)}(undef, N, N)
     if k > 0
+        Xs = copy(X)
+        mask = falses(T, N)
+        for i in axes(Xs, 2)
+            #! Use the weighted ValueatRisk formulation to account for observation weights
+            partialsort!(view(Xs, :, i), k)
+        end
         mv = sqrt(eps(eltype(X)))
         FLoops.@floop ex for j in axes(X, 2)
             xj = view(X, :, j)
-            v = sort(xj)[k]
-            maskj = xj .<= v
+            mask[:, j] .= xj .<= Xs[k, j]
             for i in 1:j
-                xi = view(X, :, i)
-                u = sort(xi)[k]
-                ltd = sum(xi .<= u .&& maskj) / k
+                ltd = count(view(mask, :, i) .&& view(mask, :, j)) / k
                 rho[j, i] = rho[i, j] = clamp(ltd, mv, one(eltype(X)))
             end
         end
@@ -186,9 +207,9 @@ function Statistics.cov(ce::LowerTailDependenceCovariance, X::MatNum; dims::Int 
     if dims == 2
         X = transpose(X)
     end
-    std_vec = Statistics.std(ce.ve, X; dims = 1, kwargs...)
+    sd = Statistics.std(ce.ve, X; dims = 1, kwargs...)
     sigma = lower_tail_dependence(X, ce.alpha, ce.ex)
-    return StatsBase.cor2cov!(sigma, std_vec)
+    return StatsBase.cor2cov!(sigma, sd)
 end
 
 export LowerTailDependenceCovariance

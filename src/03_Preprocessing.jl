@@ -1,5 +1,5 @@
 """
-    abstract type AbstractReturnsResult <: AbstractResult end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all returns result types in `PortfolioOptimisers.jl`.
 
@@ -12,8 +12,7 @@ All concrete and/or types representing the result of returns calculations should
 """
 abstract type AbstractReturnsResult <: AbstractResult end
 """
-    _check_names_and_returns_matrix(names::Option{<:VecStr}, mat::Option{<:MatNum},
-                                    names_sym::Symbol, mat_sym::Symbol)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
 Validate that asset or factor names and their corresponding returns matrix are provided and consistent.
 
@@ -39,9 +38,6 @@ Validate that asset or factor names and their corresponding returns matrix are p
 # Related
 
   - [`ReturnsResult`](@ref)
-  - [`Option`](@ref)
-  - [`VecStr`](@ref)
-  - [`MatNum`](@ref)
 """
 function _check_names_and_returns_matrix(names::Option{<:VecStr}, mat::Option{<:MatNum},
                                          names_sym::Symbol, mat_sym::Symbol)
@@ -58,15 +54,7 @@ function _check_names_and_returns_matrix(names::Option{<:VecStr}, mat::Option{<:
     return nothing
 end
 """
-    struct ReturnsResult{T1, T2, T3, T4, T5, T6, T7} <: AbstractReturnsResult
-        nx::T1
-        X::T2
-        nf::T3
-        F::T4
-        ts::T5
-        iv::T6
-        ivpa::T7
-    end
+$(DocStringExtensions.TYPEDEF)
 
 A flexible container type for storing the results of asset and factor returns calculations in `PortfolioOptimisers.jl`.
 
@@ -76,28 +64,33 @@ It supports both asset and factor returns, as well as optional time series and i
 
 # Fields
 
-  - `nx`: Names or identifiers of asset columns (assets × 1).
-  - `X`: Asset returns matrix (observations × assets).
-  - `nf`: Names or identifiers of factor columns (factors × 1).
-  - `F`: Factor returns matrix (observations × factors).
-  - `ts`: Optional timestamps for each observation (observations × 1).
-  - `iv`: Implied volatilities matrix (observations × assets).
-  - `ivpa`: Implied volatility risk premium adjustment, if a vector (assets × 1).
+$(DocStringExtensions.FIELDS)
 
-# Constructor
+# Constructors
 
-    ReturnsResult(; nx::Option{<:VecStr} = nothing, X::Option{<:MatNum} = nothing,
-                  nf::Option{<:VecStr} = nothing, F::Option{<:MatNum} = nothing,
-                  ts::Option{<:VecDate} = nothing, iv::Option{<:MatNum} = nothing,
-                  ivpa::Option{<:Num_VecNum} = nothing)
+    ReturnsResult(;
+        nx::Option{<:VecStr} = nothing,
+        X::Option{<:MatNum} = nothing,
+        nf::Option{<:VecStr} = nothing,
+        F::Option{<:MatNum} = nothing,
+        nb::Option{<:VecStr} = nothing,
+        B::Option{<:VecNum_MatNum} = nothing,
+        ts::Option{<:VecDate} = nothing,
+        iv::Option{<:MatNum} = nothing,
+        ivpa::Option{<:Num_VecNum} = nothing,
+    ) -> ReturnsResult
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 
   - If `nx` or `X` is not `nothing`, `!isempty(nx)`, `!isempty(X)`, and `length(nx) == size(X, 2)`.
-  - If `nf` or `F` is not `nothing`, `!isempty(nf)`, `!isempty(F)`, and `length(nf) == size(F, 2)`, and `size(X, 1) == size(F, 1)`.
+  - If `nf` or `F` is not `nothing`, `!isempty(nf)`, `!isempty(F)`, `length(nf) == size(F, 2)`, and `size(X, 1) == size(F, 1)`.
+  - If `nb` or `B` is not `nothing` and `B` is a matrix: `!isempty(nb)`, `!isempty(B)`, and `length(nb) == size(B, 2)`.
+  - If `nb` or `B` is not `nothing` and `B` is a vector: `length(nb) == 1`.
+  - If `X` and `B` are not `nothing`: if `B` is a vector, `size(X, 1) == size(B, 1)`; if `B` is a matrix, `size(X) == size(B)`.
   - If `ts` is not `nothing`, `!isempty(ts)`, and `length(ts) == size(X, 1)`.
+  - If `ts` and `B` are not `nothing`: `length(ts) == size(B, 1)`.
   - If `iv` is not `nothing`, `!isempty(iv)`, `all(x -> x >= 0, iv)`, `size(iv) == size(X)`.
   - If `ivpa` is not `nothing`, `all(x -> x >= 0, ivpa)`, `all(x -> isfinite(x), ivpa)`; if a vector, `length(ivpa) == size(iv, 2)`.
 
@@ -128,14 +121,23 @@ ReturnsResult
   - [`Num_VecNum`](@ref)
 """
 @concrete struct ReturnsResult <: AbstractReturnsResult
+    "Names or identifiers of asset columns (assets × 1)."
     nx
+    "Asset returns matrix (observations × assets)."
     X
+    "Names or identifiers of factor columns (factors × 1)."
     nf
+    "Factor returns matrix (observations × factors)."
     F
+    "Names or identifiers of benchmark columns (observations × 1) or (observations × assets)."
     nb
+    "Benchmark prices (observations × 1) or (observations × assets)."
     B
+    "Optional timestamps for each observation (observations × 1)."
     ts
+    "Implied volatilities matrix (observations × assets)."
     iv
+    "Implied volatility risk premium adjustment, if a vector (assets × 1)."
     ivpa
     function ReturnsResult(nx::Option{<:VecStr}, X::Option{<:MatNum}, nf::Option{<:VecStr},
                            F::Option{<:MatNum}, nb::Option{<:VecStr},
@@ -191,14 +193,14 @@ function ReturnsResult(; nx::Option{<:VecStr} = nothing, X::Option{<:MatNum} = n
     return ReturnsResult(nx, X, nf, F, nb, B, ts, iv, ivpa)
 end
 """
-    returns_result_view(rd::ReturnsResult, i)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
-Return a view of the `ReturnsResult` object for the asset or factor at index `i`.
+Return a view of the `ReturnsResult` object for the assets at indices `i`.
 
 # Arguments
 
   - `rd`: A `ReturnsResult` object containing asset and/or factor returns.
-  - `i`: Index of the asset or factor to view.
+  - `i`: Indices of the assets to view.
 
 # Returns
 
@@ -206,7 +208,7 @@ Return a view of the `ReturnsResult` object for the asset or factor at index `i`
 
 # Details
 
-  - Extracts the asset name, returns, implied volatility, and risk premium adjustment for index `i`.
+  - Extracts the asset name, returns, implied volatility, and risk premium adjustment for indices `i`.
   - Preserves factor, timestamp, and other fields from the original object.
   - Returns `nothing` for fields that are not present.
 
@@ -257,15 +259,21 @@ function returns_result_view(rd::ReturnsResult, i)
                          iv = iv, ivpa = ivpa)
 end
 """
-    returns_result_view(rd::ReturnsResult, i, j)
+    returns_result_view(
+                        rd::ReturnsResult,
+                        i,
+                        j,
+                        k = :
+    ) -> ReturnsResult
 
-Return a view of the `ReturnsResult` object for the asset or factor at index `j` and observation(s) at index `i`.
+Return a view of the `ReturnsResult` object for assets at indices `j`, observations at indices `i`, and factors at indices `k`.
 
 # Arguments
 
   - `rd`: A `ReturnsResult` object containing asset and/or factor returns.
   - `i`: Index or indices of the observation(s) to view.
   - `j`: Index or indices of the assets to view.
+  - `k`: Index or indices of the factors to view.
 
 # Returns
 
@@ -273,9 +281,10 @@ Return a view of the `ReturnsResult` object for the asset or factor at index `j`
 
 # Details
 
-  - Extracts the asset name, returns, implied volatility, and risk premium adjustment for index `j` and observation(s) `i`.
-  - Preserves factor names and returns for the selected observation(s).
-  - Preserves timestamps for the selected observation(s).
+  - Extracts the asset name, returns, implied volatility, and risk premium adjustment for indices `j` and observation(s) `i`.
+  - Extracts the factor names and returns for indices `k` and observations `i`.
+  - Preserves factor names and returns for the selected observations.
+  - Preserves timestamps for the selected observations.
   - Returns `nothing` for fields that are not present in the original object.
 
 # Related
@@ -307,7 +316,7 @@ function returns_result_view(rd::ReturnsResult, i, j, k = :)
                          ivpa = ivpa)
 end
 """
-returns_result_picker(rd::ReturnsResult, brt::Bool)
+    returns_result_picker(rd::ReturnsResult, brt::Bool) -> ReturnsResult
 
 Return a `ReturnsResult` appropriate for benchmark-tracking optimisations.
 
@@ -322,19 +331,14 @@ This helper inspects the `ReturnsResult`'s benchmark field `B` and the boolean f
 
   - `rd::ReturnsResult`:
 
-      + If `isnothing(B)` or `brt` is `false` returns the input `rd`.
-
-      + If `!isnothing(B)` and `brt` is `true`:
-
-          * When `B` is a vector (`VecNum`), returns a new `ReturnsResult` with `X = rd.X .- rd.B`.
-          * When `B` is a matrix (`MatNum`), returns a new `ReturnsResult` with `X = rd.X - rd.B`.
+      + If `brt` is `true` and a benchmark `B` is present: A new `ReturnsResult` with adjusted asset returns
+      + Otherwise: The `rd` is returned unchanged.
 
 # Details
 
-  - Subtraction is not done in-place: when an adjustment is required a new `ReturnsResult`
-    is returned leaving the original `rd` unmodified.
-  - For vector benchmarks (`VecNum`) subtraction uses broadcasting (`X .- B`) to subtract the
-    per-observation benchmark from each asset column (common for single benchmark tracking).
+  - When an adjustment is required and `B` is present, a new `ReturnsResult` is returned leaving the original `rd` unmodified.
+  - If no adjustment is required or `B` is `nothing`, the original `ReturnsResult` is returned unchanged.
+  - For vector benchmarks (`VecNum`) subtraction uses broadcasting (`X .- B`) to subtract the per-observation benchmark from each asset column (index tracking).
   - For matrix benchmarks (`MatNum`) subtraction uses matrix subtraction (`X - B`).
   - Other fields (`nx`, `nf`, `F`, `ts`, `iv`, `ivpa`) are preserved in the returned object.
 
@@ -405,14 +409,20 @@ function returns_result_picker(rd::ReturnsResult{<:Any, <:MatNum, <:Any, <:Any, 
     end
 end
 """
-    prices_to_returns(X::TimeSeries.TimeArray; F::Option{TimeSeries.TimeArray} = nothing;
-                      B::Option{<:TimeSeries.TimeArray} = nothing,
-                      iv::Option{<:TimeSeries.TimeArray} = nothing,
-                      ivpa::Option{<:Num_VecNum} = nothing, ret_method::Symbol = :simple,
-                      padding::Bool = false, missing_col_percent::Number = 1.0,
-                      missing_row_percent::Option{<:Number} = 1.0, collapse_args::Tuple = (),
-                      map_func::Option{<:Function} = nothing, join_method::Symbol = :outer,
-                      impute_method::Option{<:Impute.Imputor} = nothing)
+    prices_to_returns(
+        X::TimeSeries.TimeArray,
+        F::Option{<:TimeSeries.TimeArray} = nothing;
+        B::Option{<:TimeSeries.TimeArray} = nothing,
+        iv::Option{<:TimeSeries.TimeArray} = nothing,
+        ivpa::Option{<:Num_VecNum} = nothing,
+        ret_method::Symbol = :simple, padding::Bool = false,
+        missing_col_percent::Number = 1.0,
+        missing_row_percent::Option{<:Number} = 1.0,
+        collapse_args::Tuple = (),
+        map_func::Option{<:Function} = nothing,
+        join_method::Symbol = :outer,
+        impute_method::Option{<:Impute.Imputor} = nothing
+    ) -> ReturnsResult
 
 Convert price data (and optionally factor data) in `TimeSeries.TimeArray` format to returns, with flexible handling of missing data, imputation, and optional implied volatility information.
 
@@ -605,7 +615,7 @@ function prices_to_returns(X::TimeSeries.TimeArray,
                          ivpa = ivpa)
 end
 """
-    find_complete_indices(X::AbstractMatrix; dims::Int = 1)
+    find_complete_indices(X::AbstractMatrix; dims::Int = 1) -> VecInt
 
 Return the indices of columns (or rows) in matrix `X` that do not contain any missing or NaN values.
 
@@ -616,13 +626,13 @@ This function scans the specified dimension of the input matrix and returns the 
   - $(arg_dict[:X])
   - $(arg_dict[:dims])
 
-# Returns
-
-  - `res::VecInt`: Indices of columns (or rows) in `X` that are complete.
-
 # Validation
 
   - `dims in (1, 2)`.
+
+# Returns
+
+  - `res::VecInt`: Indices of columns (or rows) in `X` that are complete.
 
 # Details
 
@@ -645,7 +655,7 @@ Int64[]
 
 # Related
 
-  - [`find_uncorrelated_indices`]-(@ref)
+  - [`find_uncorrelated_indices`](@ref)
   - [`prices_to_returns`](@ref)
 """
 function find_complete_indices(X::AbstractMatrix; dims::Int = 1)

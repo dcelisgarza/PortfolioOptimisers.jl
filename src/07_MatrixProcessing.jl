@@ -1,5 +1,5 @@
 """
-    abstract type AbstractMatrixProcessingEstimator <: AbstractEstimator end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all matrix processing estimator types in `PortfolioOptimisers.jl`.
 
@@ -9,8 +9,8 @@ All concrete and/or abstract types that implement matrix processing routines---s
 
 In order to implement a new matrix processing estimator which will work seamlessly with the library, subtype `AbstractMatrixProcessingEstimator` with all necessary parameters as part of the struct, and implement the following methods:
 
-  - `matrix_processing!(mp::AbstractMatrixProcessingEstimator, sigma::MatNum, X::MatNum, args...; kwargs...)`: In-place processing of a covariance or correlation matrix.
-  - `matrix_processing(mp::AbstractMatrixProcessingEstimator, sigma::MatNum, X::MatNum, args...; kwargs...)`: Optional out-of-place processing of a covariance or correlation matrix.
+  - `matrix_processing!(mp::AbstractMatrixProcessingEstimator, sigma::MatNum, X::MatNum, args...; kwargs...) -> MatNum`: In-place processing of a covariance or correlation matrix.
+  - `matrix_processing(mp::AbstractMatrixProcessingEstimator, sigma::MatNum, X::MatNum, args...; kwargs...) -> MatNum`: Optional out-of-place processing of a covariance or correlation matrix.
 
 ## Arguments
 
@@ -69,7 +69,7 @@ Processing matrix in-place...
 """
 abstract type AbstractMatrixProcessingEstimator <: AbstractEstimator end
 """
-    abstract type AbstractMatrixProcessingAlgorithm <: AbstractAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all matrix processing algorithm types in `PortfolioOptimisers.jl`.
 
@@ -79,8 +79,8 @@ All concrete and/or abstract types that implement a specific matrix processing a
 
 In order to implement a new matrix processing algorithm that works with the current matrix processing estimator, subtype `AbstractMatrixProcessingAlgorithm`, with all necessary parameters as part of the struct, and implement the following methods:
 
-  - `matrix_processing_algorithm!(mpa::AbstractMatrixProcessingAlgorithm, sigma::MatNum, args...; kwargs...)`: In-place application of a custom matrix processing algorithm.
-  - `matrix_processing_algorithm(mpa::AbstractMatrixProcessingAlgorithm, sigma::MatNum, args...; kwargs...)`: Optional out-of-place application of a custom matrix processing algorithm.
+  - `matrix_processing_algorithm!(mpa::AbstractMatrixProcessingAlgorithm, sigma::MatNum, args...; kwargs...) -> MatNum`: In-place application of a custom matrix processing algorithm.
+  - `matrix_processing_algorithm(mpa::AbstractMatrixProcessingAlgorithm, sigma::MatNum, args...; kwargs...) -> MatNum`: Optional out-of-place application of a custom matrix processing algorithm.
 
 ## Arguments
 
@@ -140,7 +140,7 @@ Applying custom matrix processing algorithm in-place...
 """
 abstract type AbstractMatrixProcessingAlgorithm <: AbstractAlgorithm end
 """
-    abstract type AbstractMatrixProcessingOrder <: AbstractAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for matrix processing order types in `PortfolioOptimisers.jl`.
 
@@ -148,7 +148,7 @@ All concrete and/or abstract types that specify the order of matrix processing s
 
 # Interfaces
 
-Given that these are meant to be used by matrix processing estimators, there are no specific methods that need to be implemented for this abstract type. However, it serves as a marker for dispatching and organizing different matrix processing orders within the library. The interfaces should be defined at the level of the matrix processing estimator that utilises these orders.
+Given that these are meant to be used by matrix processing estimators, there are no specific methods that need to be implemented for this abstract type. However, it serves as a marker for dispatching and organising different matrix processing orders within the library. The interfaces should be defined at the level of the matrix processing estimator that utilises these orders.
 
 # Related Types
 
@@ -161,7 +161,7 @@ Given that these are meant to be used by matrix processing estimators, there are
 """
 abstract type AbstractMatrixProcessingOrder <: AbstractAlgorithm end
 """
-    struct DenoiseDetoneAlg <: AbstractMatrixProcessingOrder end
+$(DocStringExtensions.TYPEDEF)
 
 Matrix processing order: Denoising → Detoning → Custom Algorithm.
 
@@ -178,7 +178,7 @@ Matrix processing order: Denoising → Detoning → Custom Algorithm.
 """
 struct DenoiseDetoneAlg <: AbstractMatrixProcessingOrder end
 """
-    struct DenoiseAlgDetone <: AbstractMatrixProcessingOrder end
+$(DocStringExtensions.TYPEDEF)
 
 Matrix processing order: Denoising → Custom Algorithm → Detoning.
 
@@ -195,7 +195,7 @@ Matrix processing order: Denoising → Custom Algorithm → Detoning.
 """
 struct DenoiseAlgDetone <: AbstractMatrixProcessingOrder end
 """
-    struct DetoneDenoiseAlg <: AbstractMatrixProcessingOrder end
+$(DocStringExtensions.TYPEDEF)
 
 Matrix processing order: Detoning → Denoising → Custom Algorithm.
 
@@ -212,7 +212,7 @@ Matrix processing order: Detoning → Denoising → Custom Algorithm.
 """
 struct DetoneDenoiseAlg <: AbstractMatrixProcessingOrder end
 """
-    struct DetoneAlgDenoise <: AbstractMatrixProcessingOrder end
+$(DocStringExtensions.TYPEDEF)
 
 Matrix processing order: Detoning → Custom Algorithm → Denoising.
 
@@ -229,7 +229,7 @@ Matrix processing order: Detoning → Custom Algorithm → Denoising.
 """
 struct DetoneAlgDenoise <: AbstractMatrixProcessingOrder end
 """
-    struct AlgDenoiseDetone <: AbstractMatrixProcessingOrder end
+$(DocStringExtensions.TYPEDEF)
 
 Matrix processing order: Custom Algorithm → Denoising → Detoning.
 
@@ -246,7 +246,7 @@ Matrix processing order: Custom Algorithm → Denoising → Detoning.
 """
 struct AlgDenoiseDetone <: AbstractMatrixProcessingOrder end
 """
-    struct AlgDetoneDenoise <: AbstractMatrixProcessingOrder end
+$(DocStringExtensions.TYPEDEF)
 
 Matrix processing order: Custom Algorithm → Detoning → Denoising.
 
@@ -271,7 +271,7 @@ These methods are called internally when no matrix processing algorithm is speci
 
 # Arguments
 
-  - `::Nothing`: Indicates that no algorithm is not `nothing`.
+  - `::Nothing`: Indicates that no matrix processing algorithm is specified.
   - `args...`: Additional positional arguments (ignored).
   - `kwargs...`: Additional keyword arguments (ignored).
 
@@ -301,13 +301,7 @@ function matrix_processing_algorithm(::Nothing, sigma::MatNum, args...; kwargs..
     return sigma
 end
 """
-    struct DenoiseDetoneAlgMatrixProcessing{T1, T2, T3, T4, T5} <: AbstractMatrixProcessingEstimator
-        pdm::T1
-        dn::T2
-        dt::T3
-        alg::T4
-        order::T5
-    end
+$(DocStringExtensions.TYPEDEF)
 
 A flexible container type for configuring and applying matrix processing routines in `PortfolioOptimisers.jl`.
 
@@ -315,21 +309,19 @@ A flexible container type for configuring and applying matrix processing routine
 
 # Fields
 
-  - $(arg_dict[:opdm])
-  - $(arg_dict[:odn])
-  - $(arg_dict[:odt])
-  - `alg`: Optional custom matrix processing algorithm.
-  - `order`: Specifies the order in which denoising, detoning, and custom algorithm steps are applied.
+$(DocStringExtensions.FIELDS)
 
-# Constructor
+# Constructors
 
-    DenoiseDetoneAlgMatrixProcessing(; pdm::Option{<:Posdef} = Posdef(),
-                                     dn::Option{<:Denoise} = nothing,
-                                     dt::Option{<:Detone} = nothing,
-                                     alg::Option{<:AbstractMatrixProcessingAlgorithm} = nothing,
-                                     order::AbstractMatrixProcessingOrder = DenoiseDetoneAlg())
+    DenoiseDetoneAlgMatrixProcessing(;
+        pdm::Option{<:Posdef} = Posdef(),
+        dn::Option{<:Denoise} = nothing,
+        dt::Option{<:Detone} = nothing,
+        alg::Option{<:AbstractMatrixProcessingAlgorithm} = nothing,
+        order::AbstractMatrixProcessingOrder = DenoiseDetoneAlg()
+    ) -> DenoiseDetoneAlgMatrixProcessing
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 
@@ -350,21 +342,21 @@ DenoiseDetoneAlgMatrixProcessing
         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
         │   kwargs ┴ @NamedTuple{}: NamedTuple()
      dn ┼ Denoise
+        │      pdm ┼ Posdef
+        │          │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+        │          │   kwargs ┴ @NamedTuple{}: NamedTuple()
         │      alg ┼ ShrunkDenoise
         │          │   alpha ┴ Float64: 0.0
         │     args ┼ Tuple{}: ()
         │   kwargs ┼ @NamedTuple{}: NamedTuple()
         │   kernel ┼ typeof(AverageShiftedHistograms.Kernels.gaussian): AverageShiftedHistograms.Kernels.gaussian
         │        m ┼ Int64: 10
-        │        n ┼ Int64: 1000
-        │      pdm ┼ Posdef
-        │          │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-        │          │   kwargs ┴ @NamedTuple{}: NamedTuple()
+        │        n ┴ Int64: 1000
      dt ┼ Detone
-        │     n ┼ Int64: 2
         │   pdm ┼ Posdef
         │       │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
         │       │   kwargs ┴ @NamedTuple{}: NamedTuple()
+        │     n ┴ Int64: 2
     alg ┼ nothing
   order ┴ DenoiseDetoneAlg()
 ```
@@ -386,10 +378,15 @@ DenoiseDetoneAlgMatrixProcessing
   - [mpdist](@cite) V. A. Marčenko and L. A. Pastur. *Distribution of eigenvalues for some sets of random matrices*. Mathematics of the USSR-Sbornik 1, 457 (1967).
 """
 @concrete struct DenoiseDetoneAlgMatrixProcessing <: AbstractMatrixProcessingEstimator
+    "$(field_dict[:opdm])"
     pdm
+    "$(field_dict[:odn])"
     dn
+    "$(field_dict[:odt])"
     dt
+    "Optional custom matrix processing algorithm."
     alg
+    "Specifies the order in which denoising, detoning, and custom algorithm steps are applied."
     order
     function DenoiseDetoneAlgMatrixProcessing(pdm::Option{<:Posdef}, dn::Option{<:Denoise},
                                               dt::Option{<:Detone},
@@ -408,41 +405,13 @@ function DenoiseDetoneAlgMatrixProcessing(; pdm::Option{<:Posdef} = Posdef(),
     return DenoiseDetoneAlgMatrixProcessing(pdm, dn, dt, alg, order)
 end
 """
-    matrix_processing!(mp::AbstractMatrixProcessingEstimator, sigma::MatNum, X::MatNum, args...;
-                       kwargs...)
-    matrix_processing!(::Nothing, sigma::MatNum, args...; kwargs...)
-
-No-op fallback for in-place processing of a covariance or correlation matrix.
-
-# Arguments
-
-  - $(arg_dict[:omp])
-  - $(arg_dict[:sigrho])
-  - $(arg_dict[:X])
-  - `args...`: Additional positional arguments passed to custom algorithms.
-  - `kwargs...`: Additional keyword arguments passed to custom algorithms.
-
-# Returns
-
-  - `sigma::MatNum`: The input matrix `sigma` is modified in-place.
-
-# Related
-
-  - [`matrix_processing`](@ref)
-  - [`DenoiseDetoneAlgMatrixProcessing`](@ref)
-  - [`posdef!`](@ref)
-  - [`denoise!`](@ref)
-  - [`detone!`](@ref)
-  - [`matrix_processing_algorithm!`](@ref)
-  - [`AbstractMatrixProcessingEstimator`](@ref)
-  - [`MatNum`](@ref)
-"""
-function matrix_processing!(::Nothing, sigma::MatNum, args...; kwargs...)
-    return sigma
-end
-"""
-    matrix_processing!(mp::DenoiseDetoneAlgMatrixProcessing, sigma::MatNum, X::MatNum, args...;
-                       kwargs...)
+    matrix_processing!(
+        mp::Option{<:DenoiseDetoneAlgMatrixProcessing},
+        sigma::MatNum,
+        X::MatNum,
+        args...;
+        kwargs...
+    ) -> MatNum
 
 In-place matrix processing pipeline using the `DenoiseDetoneAlg` order.
 
@@ -451,6 +420,8 @@ This method applies a sequence of matrix processing steps to the input covarianc
 # Arguments
 
   - $(arg_dict[:omp])
+      + `::DenoiseDetoneAlgMatrixProcessing`: The specified matrix processing estimator is applied to `X` in-place.
+      + `::Nothing`: No-op.
   - $(arg_dict[:sigrho])
   - $(arg_dict[:X])
   - `args...`: Additional positional arguments passed to custom algorithms.
@@ -462,6 +433,7 @@ This method applies a sequence of matrix processing steps to the input covarianc
 
 # Details
 
+  - If `mp` is `nothing`, the function returns `sigma` without modification.
   - Applies positive definiteness enforcement using `mp.pdm`.
   - Applies denoising using `mp.dn` and the ratio `T / N` from `X`.
   - Applies detoning using `mp.dt`.
@@ -527,6 +499,9 @@ julia> matrix_processing!(DenoiseDetoneAlgMatrixProcessing(; dt = Detone()), sig
   - [mlp1](@cite) M. M. De Prado. *Machine learning for asset managers* (Cambridge University Press, 2020). Chapter 2.
   - [mpdist](@cite) V. A. Marčenko and L. A. Pastur. *Distribution of eigenvalues for some sets of random matrices*. Mathematics of the USSR-Sbornik 1, 457 (1967).
 """
+function matrix_processing!(::Nothing, sigma::MatNum, args...; kwargs...)
+    return sigma
+end
 function matrix_processing!(mp::DenoiseDetoneAlgMatrixProcessing{<:Any, <:Any, <:Any, <:Any,
                                                                  <:DenoiseDetoneAlg},
                             sigma::MatNum, X::MatNum, args...; kwargs...)
@@ -588,9 +563,13 @@ function matrix_processing!(mp::DenoiseDetoneAlgMatrixProcessing{<:Any, <:Any, <
     return sigma
 end
 """
-    matrix_processing(mp::AbstractMatrixProcessingEstimator, sigma::MatNum, X::MatNum, args...;
-                      kwargs...)
-    matrix_processing(::Nothing, args...; kwargs...)
+    matrix_processing(
+        mp::Option{<:AbstractMatrixProcessingEstimator},
+        sigma::MatNum,
+        X::MatNum,
+        args...;
+        kwargs...
+    ) -> MatNum
 
 Out-of-place version of [`matrix_processing!`](@ref).
 

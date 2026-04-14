@@ -1,5 +1,9 @@
 """
-    factory(ce::StatsBase.CovarianceEstimator, args...; kwargs...)
+    factory(
+        ce::StatsBase.CovarianceEstimator,
+        args...;
+        kwargs...
+    ) -> StatsBase.CovarianceEstimator
 
 Fallback for covariance estimator factory methods.
 
@@ -23,7 +27,7 @@ function factory(ce::StatsBase.CovarianceEstimator, args...; kwargs...)
     return ce
 end
 """
-    abstract type AbstractCovarianceEstimator <: StatsBase.CovarianceEstimator end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all covariance estimator types in `PortfolioOptimisers.jl`.
 
@@ -35,8 +39,8 @@ In order to implement a new covariance estimator which will work seamlessly with
 
 ## Covariance and correlation
 
-  - `Statistics.cov(ce::AbstractCovarianceEstimator, X::MatNum; kwargs...)`: Covariance matrix estimation.
-  - `Statistics.cor(ce::AbstractCovarianceEstimator, X::MatNum; kwargs...)`: Correlation matrix estimation.
+  - `Statistics.cov(ce::AbstractCovarianceEstimator, X::MatNum; kwargs...) -> MatNum`: Covariance matrix estimation.
+  - `Statistics.cor(ce::AbstractCovarianceEstimator, X::MatNum; kwargs...) -> MatNum`: Correlation matrix estimation.
 
 ### Arguments
 
@@ -46,11 +50,11 @@ In order to implement a new covariance estimator which will work seamlessly with
 
 ### Returns
 
-  - `sigma::MatNum`: Covariance matrix.
+  - $(ret_dict[:sigrho])
 
 ## Factory
 
-  - `factory(ce::AbstractCovarianceEstimator, w::StatsBase.AbstractWeights)`: Factory method for creating instances of the estimator with new observation weights.
+  - `PortfolioOptimisers.factory(ce::AbstractCovarianceEstimator, w::PortfolioOptimisers.ObsWeights) -> AbstractCovarianceEstimator`: Factory method for creating instances of the estimator with new observation weights.
 
 ### Arguments
 
@@ -59,7 +63,7 @@ In order to implement a new covariance estimator which will work seamlessly with
 
 ### Returns
 
-  - $(arg_dict[:nce])
+  - $(ret_dict[:ce])
 
 # Examples
 
@@ -68,24 +72,22 @@ We can create a dummy covariance estimator as follows:
 ```jldoctest
 julia> struct MyCovarianceEstimator{T1} <: PortfolioOptimisers.AbstractCovarianceEstimator
            w::T1
-           function MyCovarianceEstimator(w::PortfolioOptimisers.Option{<:StatsBase.AbstractWeights})
-               if !isnothing(w) && isempty(w)
-                   throw(IsEmptyError("`w` cannot be an empty weights object"))
-               end
+           function MyCovarianceEstimator(w::PortfolioOptimisers.Option{<:PortfolioOptimisers.ObsWeights})
+               PortfolioOptimisers.validate_observation_weights(w)
                return new{typeof(w)}(w)
            end
        end
 
 julia> function MyCovarianceEstimator(;
-                                      w::PortfolioOptimisers.Option{<:StatsBase.AbstractWeights} = nothing)
+                                      w::PortfolioOptimisers.Option{<:PortfolioOptimisers.ObsWeights} = nothing)
            return MyCovarianceEstimator(w)
        end
 MyCovarianceEstimator
 
-julia> function factory(::MyCovarianceEstimator, w::StatsBase.AbstractWeights)
+julia> function PortfolioOptimisers.factory(::MyCovarianceEstimator,
+                                            w::PortfolioOptimisers.ObsWeights)
            return MyCovarianceEstimator(; w = w)
        end
-factory (generic function with 1 method)
 
 julia> function Statistics.cov(est::MyCovarianceEstimator, X::PortfolioOptimisers.MatNum;
                                dims::Int = 1, kwargs...)
@@ -128,6 +130,10 @@ julia> cor(MyCovarianceEstimator(), [1.0 2.0; 0.3 0.7; 0.5 1.1])
  1.0       0.998274  0.999315
  0.998274  1.0       0.999764
  0.999315  0.999764  1.0
+
+julia> PortfolioOptimisers.factory(MyCovarianceEstimator(), StatsBase.Weights([1, 2, 3]))
+MyCovarianceEstimator
+  w ┴ StatsBase.Weights{Int64, Int64, Vector{Int64}}: [1, 2, 3]
 ```
 
 # Related
@@ -137,7 +143,7 @@ julia> cor(MyCovarianceEstimator(), [1.0 2.0; 0.3 0.7; 0.5 1.1])
 """
 abstract type AbstractCovarianceEstimator <: StatsBase.CovarianceEstimator end
 """
-    abstract type AbstractVarianceEstimator <: AbstractCovarianceEstimator end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all variance estimator types in `PortfolioOptimisers.jl`.
 
@@ -149,10 +155,10 @@ In order to implement a new covariance estimator which will work seamlessly with
 
 ## Variance and standard deviation
 
-  - `Statistics.var(ve::AbstractVarianceEstimator, X::MatNum; kwargs...)`: Variance estimation.
-  - `Statistics.std(ve::AbstractVarianceEstimator, X::MatNum; kwargs...)`: Standard deviation estimation.
-  - `Statistics.var(ve::AbstractVarianceEstimator, X::VecNum; kwargs...)`: Variance estimation.
-  - `Statistics.std(ve::AbstractVarianceEstimator, X::VecNum; kwargs...)`: Standard deviation estimation.
+  - `Statistics.var(ve::AbstractVarianceEstimator, X::MatNum; kwargs...) -> ArrNum`: Variance estimation.
+  - `Statistics.std(ve::AbstractVarianceEstimator, X::MatNum; kwargs...) -> ArrNum`: Standard deviation estimation.
+  - `Statistics.var(ve::AbstractVarianceEstimator, X::VecNum; kwargs...) -> Num`: Variance estimation.
+  - `Statistics.std(ve::AbstractVarianceEstimator, X::VecNum; kwargs...) -> Num`: Standard deviation estimation.
 
 ### Arguments
 
@@ -169,15 +175,15 @@ In order to implement a new covariance estimator which will work seamlessly with
 
   - $(arg_dict[:X])
 
-      + `val::MatNum`: Variance or standard deviation vector of `X`, reshaped to be consistent with the dimension along which the value is computed.
+      + $(ret_dict[:stdvar])
 
   - $(arg_dict[:Xv])
 
-      + `val::VecNum`: Variance or standard deviation of `X`.
+      + $(ret_dict[:stdvarnum])
 
 ## Factory
 
-  - `factory(ve::AbstractVarianceEstimator, w::StatsBase.AbstractWeights)`: Factory method for creating instances of the estimator with new observation weights.
+  - `PortfolioOptimisers.factory(ve::AbstractVarianceEstimator, w::PortfolioOptimisers.ObsWeights) -> AbstractVarianceEstimator`: Factory method for creating instances of the estimator with new observation weights.
 
 ### Arguments
 
@@ -186,7 +192,7 @@ In order to implement a new covariance estimator which will work seamlessly with
 
 ### Returns
 
-  - $(arg_dict[:nve])
+  - $(ret_dict[:ve])
 
 # Examples
 
@@ -195,24 +201,22 @@ We can create a dummy variance estimator as follows:
 ```jldoctest
 julia> struct MyVarianceEstimator{T1} <: PortfolioOptimisers.AbstractVarianceEstimator
            w::T1
-           function MyVarianceEstimator(w::PortfolioOptimisers.Option{<:StatsBase.AbstractWeights})
-               if !isnothing(w) && isempty(w)
-                   throw(IsEmptyError("`w` cannot be an empty weights object"))
-               end
+           function MyVarianceEstimator(w::PortfolioOptimisers.Option{<:PortfolioOptimisers.ObsWeights})
+               PortfolioOptimisers.validate_observation_weights(w)
                return new{typeof(w)}(w)
            end
        end
 
 julia> function MyVarianceEstimator(;
-                                    w::PortfolioOptimisers.Option{<:StatsBase.AbstractWeights} = nothing)
+                                    w::PortfolioOptimisers.Option{<:PortfolioOptimisers.ObsWeights} = nothing)
            return MyVarianceEstimator(w)
        end
 MyVarianceEstimator
 
-julia> function factory(::MyVarianceEstimator, w::StatsBase.AbstractWeights)
+julia> function PortfolioOptimisers.factory(::MyVarianceEstimator,
+                                            w::PortfolioOptimisers.ObsWeights)
            return MyVarianceEstimator(; w = w)
        end
-factory (generic function with 1 method)
 
 julia> function Statistics.var(est::MyVarianceEstimator, X::PortfolioOptimisers.MatNum;
                                dims::Int = 1, kwargs...)
@@ -261,6 +265,10 @@ julia> var(MyVarianceEstimator(), [1.0 2.0; 0.3 0.7; 0.5 1.1])
 julia> std(MyVarianceEstimator(), [1.0 2.0; 0.3 0.7; 0.5 1.1])
 1×3 Matrix{Float64}:
  2.23607  0.761577  1.2083
+
+julia> PortfolioOptimisers.factory(MyVarianceEstimator(), StatsBase.Weights([1, 2, 3]))
+MyVarianceEstimator
+  w ┴ StatsBase.Weights{Int64, Int64, Vector{Int64}}: [1, 2, 3]
 ```
 
 # Related
@@ -270,7 +278,7 @@ julia> std(MyVarianceEstimator(), [1.0 2.0; 0.3 0.7; 0.5 1.1])
 abstract type AbstractVarianceEstimator <: AbstractCovarianceEstimator end
 @define_pretty_show(AbstractCovarianceEstimator)
 """
-    abstract type AbstractExpectedReturnsEstimator <: AbstractEstimator end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all expected returns estimator types in `PortfolioOptimisers.jl`.
 
@@ -282,30 +290,30 @@ In order to implement a new expected returns estimator which will work seamlessl
 
 ## Expected returns
 
-  - `Statistics.mean(me::AbstractExpectedReturnsEstimator, X::MatNum; kwargs...)`: Expected returns estimation.
+  - `Statistics.mean(me::AbstractExpectedReturnsEstimator, X::MatNum; kwargs...) -> ArrNum`: Expected returns estimation.
 
 ### Arguments
 
-    - $(arg_dict[:me])
-    - $(arg_dict[:X])
-    - `kwargs...`: Additional keyword arguments passed to the mean estimator.
+  - $(arg_dict[:me])
+  - $(arg_dict[:X])
+  - `kwargs...`: Additional keyword arguments passed to the mean estimator.
 
 ### Returns
 
-    - `val::VecNum`: Expected returns vector of `X`, reshaped to be consistent with the dimension along which the value is computed.
+  - $(ret_dict[:mu])
 
 ## Factory
 
-  - `factory(me::AbstractExpectedReturnsEstimator, w::StatsBase.AbstractWeights)`: Factory method for creating instances of the estimator with new observation weights.
+  - `PortfolioOptimisers.factory(me::AbstractExpectedReturnsEstimator, w::PortfolioOptimisers.ObsWeights) -> AbstractExpectedReturnsEstimator`: Factory method for creating instances of the estimator with new observation weights.
 
 ### Arguments
 
-    - $(arg_dict[:me])
-    - $(arg_dict[:ow])
+  - $(arg_dict[:me])
+  - $(arg_dict[:ow])
 
 ### Returns
 
-    - $(arg_dict[:nme])
+  - $(ret_dict[:me])
 
 # Examples
 
@@ -313,24 +321,22 @@ In order to implement a new expected returns estimator which will work seamlessl
 julia> struct MyExpectedReturnsEstimator{T1} <:
               PortfolioOptimisers.AbstractExpectedReturnsEstimator
            w::T1
-           function MyExpectedReturnsEstimator(w::PortfolioOptimisers.Option{<:StatsBase.AbstractWeights})
-               if !isnothing(w) && isempty(w)
-                   throw(IsEmptyError("`w` cannot be an empty weights object"))
-               end
+           function MyExpectedReturnsEstimator(w::PortfolioOptimisers.Option{<:PortfolioOptimisers.ObsWeights})
+               PortfolioOptimisers.validate_observation_weights(w)
                return new{typeof(w)}(w)
            end
        end
 
 julia> function MyExpectedReturnsEstimator(;
-                                           w::PortfolioOptimisers.Option{<:StatsBase.AbstractWeights} = nothing)
+                                           w::PortfolioOptimisers.Option{<:PortfolioOptimisers.ObsWeights} = nothing)
            return MyExpectedReturnsEstimator(w)
        end
 MyExpectedReturnsEstimator
 
-julia> function factory(::MyExpectedReturnsEstimator, w::StatsBase.AbstractWeights)
+julia> function PortfolioOptimisers.factory(::MyExpectedReturnsEstimator,
+                                            w::PortfolioOptimisers.ObsWeights)
            return MyExpectedReturnsEstimator(; w = w)
        end
-factory (generic function with 1 method)
 
 julia> function Statistics.mean(est::MyExpectedReturnsEstimator, X::PortfolioOptimisers.MatNum;
                                 dims::Int = 1, kwargs...)
@@ -351,6 +357,10 @@ julia> mean(MyExpectedReturnsEstimator(), [1.0 2.0; 0.3 0.7; 0.5 1.1]; dims = 2)
  1.5
  0.5
  0.8
+
+julia> PortfolioOptimisers.factory(MyExpectedReturnsEstimator(), StatsBase.Weights([1, 2, 3]))
+MyExpectedReturnsEstimator
+  w ┴ StatsBase.Weights{Int64, Int64, Vector{Int64}}: [1, 2, 3]
 ```
 
 # Related
@@ -360,7 +370,7 @@ julia> mean(MyExpectedReturnsEstimator(), [1.0 2.0; 0.3 0.7; 0.5 1.1]; dims = 2)
 """
 abstract type AbstractExpectedReturnsEstimator <: AbstractEstimator end
 """
-    abstract type AbstractExpectedReturnsAlgorithm <: AbstractAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all expected returns algorithm types in `PortfolioOptimisers.jl`.
 
@@ -368,7 +378,7 @@ All concrete and/or abstract types that implement a specific algorithm used by a
 
 # Interfaces
 
-Given that these are meant to be used by expected returns estimators, there are no specific methods that need to be implemented for this abstract type. However, it serves as a marker for dispatching and organizing different expected returns algorithms within the library. The interfaces should be defined at the level of the expected returns estimator that utilises these algorithms.
+Given that these are meant to be used by expected returns estimators, there are no specific methods that need to be implemented for this abstract type. However, it serves as a marker for dispatching and organising different expected returns algorithms within the library. The interfaces should be defined at the level of the expected returns estimator that utilises these algorithms.
 
 # Related
 
@@ -377,7 +387,7 @@ Given that these are meant to be used by expected returns estimators, there are 
 """
 abstract type AbstractExpectedReturnsAlgorithm <: AbstractAlgorithm end
 """
-    abstract type AbstractMomentAlgorithm <: AbstractAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all moment algorithm types in `PortfolioOptimisers.jl`.
 
@@ -385,7 +395,7 @@ All concrete and/or abstract types that implement a specific algorithm for momen
 
 # Interfaces
 
-Given that these are meant to be used by covariance estimators, there are no specific methods that need to be implemented for this abstract type. However, it serves as a marker for dispatching and organizing different moment algorithms within the library. The interfaces should be defined at the level of the covariance estimator that utilises these algorithms.
+Given that these are meant to be used by covariance estimators, there are no specific methods that need to be implemented for this abstract type. However, it serves as a marker for dispatching and organising different moment algorithms within the library. The interfaces should be defined at the level of the covariance estimator that utilises these algorithms.
 
 # Related
 
@@ -394,9 +404,22 @@ Given that these are meant to be used by covariance estimators, there are no spe
 """
 abstract type AbstractMomentAlgorithm <: AbstractAlgorithm end
 """
-    struct Full <: AbstractMomentAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
-`Full` is used to indicate that all available data points are included in the moment estimation process.
+`Full` is used to indicate that all deviations are included in the moment estimation process.
+
+When computing the full moments, the expression of deviation used is the following:
+
+```math
+\\begin{align}
+\\boldsymbol{D} &= \\boldsymbol{X} - t
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:Xv])
+  - $(math_dict[:tgt])
 
 # Related
 
@@ -405,9 +428,20 @@ abstract type AbstractMomentAlgorithm <: AbstractAlgorithm end
 """
 struct Full <: AbstractMomentAlgorithm end
 """
-    struct Semi <: AbstractMomentAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
-`Semi` is used for semi-moment estimators, where only observations below the mean (i.e., negative deviations) are considered.
+`Semi` is used for semi-moment estimators, where only observations below the a target are considered.
+
+```math
+\\begin{align}
+\\boldsymbol{D} &= \\min\\left(\\boldsymbol{X} - t,\\, 0\\right)
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:Xv])
+  - $(math_dict[:tgt])
 
 # Related
 
@@ -416,8 +450,14 @@ struct Full <: AbstractMomentAlgorithm end
 """
 struct Semi <: AbstractMomentAlgorithm end
 """
-    robust_cov(ce::StatsBase.CovarianceEstimator, X::MatNum, [w::StatsBase.AbstractWeights];
-               dims::Int = 1, mean = nothing, kwargs...)
+    robust_cov(
+        ce::StatsBase.CovarianceEstimator,
+        X::MatNum,
+        [w::StatsBase.AbstractWeights];
+        dims::Int = 1,
+        mean = nothing,
+        kwargs...
+    ) -> MatNum
 
 Compute the covariance matrix robustly using the specified covariance estimator `ce`, data matrix `X`, and optional weights vector `w`.
 
@@ -427,17 +467,17 @@ Compute the covariance matrix robustly using the specified covariance estimator 
   - $(arg_dict[:X])
   - $(arg_dict[:oow])
   - $(arg_dict[:dims])
-  - `mean`: Optional mean array to use for centering.
+  - $(arg_dict[:omean])
   - `kwargs...`: Additional keyword arguments passed to `cov`.
 
 # Returns
 
-  - `sigma::MatNum`: Covariance matrix.
+  - $(ret_dict[:sigma])
 
 # Details
 
   - This function attempts to compute the optionally weighted covariance matrix using the provided estimator and keyword arguments.
-  - If an error occurs (e.g., due to unsupported keyword arguments), it retries with a reduced set of arguments for compatibility. This ensures robust covariance estimation across different estimator types.
+  - If an error occurs (e.g., due to unsupported keyword arguments), it retries with a reduced set of arguments for compatibility.
 
 # Related
 
@@ -448,9 +488,18 @@ Compute the covariance matrix robustly using the specified covariance estimator 
 function robust_cov(ce::StatsBase.CovarianceEstimator, X::MatNum; dims::Int = 1,
                     mean = nothing, kwargs...)
     return try
-        Statistics.cov(ce, X; dims = dims, mean = mean, kwargs...)
+        try
+            Statistics.cov(ce, X; dims = dims, mean = mean, kwargs...)
+        catch
+            Statistics.cov(ce, X; dims = dims, mean = mean)
+        end
     catch
-        Statistics.cov(ce, X; dims = dims, mean = mean)
+        X = Matrix(X)
+        try
+            Statistics.cov(ce, X; dims = dims, mean = mean, kwargs...)
+        catch
+            Statistics.cov(ce, X; dims = dims, mean = mean)
+        end
     end
     #=
     return if hasmethod(cov, (typeof(ce), typeof(X)), (:dims, :mean, :my_kwargs))
@@ -463,9 +512,18 @@ end
 function robust_cov(ce::StatsBase.CovarianceEstimator, X::MatNum,
                     w::StatsBase.AbstractWeights; dims::Int = 1, mean = nothing, kwargs...)
     return try
-        Statistics.cov(ce, X, w; dims = dims, mean = mean, kwargs...)
+        try
+            Statistics.cov(ce, X, w; dims = dims, mean = mean, kwargs...)
+        catch
+            Statistics.cov(ce, X, w; dims = dims, mean = mean)
+        end
     catch
-        Statistics.cov(ce, X, w; dims = dims, mean = mean)
+        X = Matrix(X)
+        try
+            Statistics.cov(ce, X, w; dims = dims, mean = mean, kwargs...)
+        catch
+            Statistics.cov(ce, X, w; dims = dims, mean = mean)
+        end
     end
     #=
     return if hasmethod(cov, (typeof(ce), typeof(X), typeof(w)), (:dims, :mean, :my_kwargs))
@@ -476,8 +534,14 @@ function robust_cov(ce::StatsBase.CovarianceEstimator, X::MatNum,
     =#
 end
 """
-    robust_cor(ce::StatsBase.CovarianceEstimator, X::MatNum, [w::StatsBase.AbstractWeights];
-               dims::Int = 1, mean = nothing, kwargs...)
+    robust_cor(
+        ce::StatsBase.CovarianceEstimator,
+        X::MatNum,
+        [w::StatsBase.AbstractWeights];
+        dims::Int = 1,
+        mean = nothing,
+        kwargs...
+    ) -> MatNum
 
 Compute the correlation matrix robustly using the specified covariance estimator `ce`, data matrix `X`, and optional weights vector `w`.
 
@@ -487,18 +551,18 @@ Compute the correlation matrix robustly using the specified covariance estimator
   - $(arg_dict[:X])
   - $(arg_dict[:oow])
   - $(arg_dict[:dims])
-  - `mean`: Optional mean array to use for centering.
+  - $(arg_dict[:omean])
   - `kwargs...`: Additional keyword arguments passed to `cor`.
 
 # Returns
 
-  - `rho::MatNum`: Correlation matrix.
+  - $(ret_dict[:rho])
 
 # Details
 
   - This function attempts to compute the optionally weighted correlation matrix using the provided estimator and keyword arguments.
-  - If an error occurs, it falls back to computing the optionally weighted covariance matrix and then converts it to a correlation matrix.
-  - If that also errors, it tries again with [`robust_cov`](@ref) and converts the result to a correlation matrix. This ensures robust correlation estimation across different estimator types.
+  - If an error occurs (e.g., due to unsupported keyword arguments), it retries with a reduced set of arguments for compatibility.
+  - If that also errors, it tries again with [`robust_cov`](@ref) and converts the result to a correlation matrix.
 
 # Related
 
@@ -510,18 +574,37 @@ function robust_cor(ce::StatsBase.CovarianceEstimator, X::MatNum; dims::Int = 1,
                     mean = nothing, kwargs...)
     return try
         try
-            Statistics.cor(ce, X; dims = dims, mean = mean, kwargs...)
+            try
+                Statistics.cor(ce, X; dims = dims, mean = mean, kwargs...)
+            catch
+                Statistics.cor(ce, X; dims = dims, mean = mean)
+            end
         catch
-            Statistics.cor(ce, X; dims = dims, mean = mean)
+            sigma = robust_cov(ce, X; dims = dims, mean = mean, kwargs...)
+            if ismutable(sigma)
+                StatsBase.cov2cor!(sigma, sqrt.(LinearAlgebra.diag(sigma)))
+            else
+                sigma = StatsBase.cov2cor(Matrix(sigma))
+            end
+            sigma
         end
     catch
-        sigma = robust_cov(ce, X; dims = dims, mean = mean, kwargs...)
-        if ismutable(sigma)
-            StatsBase.cov2cor!(sigma, sqrt.(LinearAlgebra.diag(sigma)))
-        else
-            sigma = StatsBase.cov2cor(Matrix(sigma))
+        X = Matrix(X)
+        try
+            try
+                Statistics.cor(ce, X; dims = dims, mean = mean, kwargs...)
+            catch
+                Statistics.cor(ce, X; dims = dims, mean = mean)
+            end
+        catch
+            sigma = robust_cov(ce, X; dims = dims, mean = mean, kwargs...)
+            if ismutable(sigma)
+                StatsBase.cov2cor!(sigma, sqrt.(LinearAlgebra.diag(sigma)))
+            else
+                sigma = StatsBase.cov2cor(Matrix(sigma))
+            end
+            sigma
         end
-        sigma
     end
     #=
     return if hasmethod(cor, (typeof(ce), typeof(X)), (:dims, :mean, :my_kwargs))
@@ -543,18 +626,37 @@ function robust_cor(ce::StatsBase.CovarianceEstimator, X::MatNum,
                     w::StatsBase.AbstractWeights; dims::Int = 1, mean = nothing, kwargs...)
     return try
         try
-            Statistics.cor(ce, X, w; dims = dims, mean = mean, kwargs...)
+            try
+                Statistics.cor(ce, X, w; dims = dims, mean = mean, kwargs...)
+            catch
+                Statistics.cor(ce, X, w; dims = dims, mean = mean)
+            end
         catch
-            Statistics.cor(ce, X, w; dims = dims, mean = mean)
+            sigma = robust_cov(ce, X, w; dims = dims, mean = mean, kwargs...)
+            if ismutable(sigma)
+                StatsBase.cov2cor!(sigma, sqrt.(LinearAlgebra.diag(sigma)))
+            else
+                sigma = StatsBase.cov2cor(Matrix(sigma))
+            end
+            sigma
         end
     catch
-        sigma = robust_cov(ce, X, w; dims = dims, mean = mean, kwargs...)
-        if ismutable(sigma)
-            StatsBase.cov2cor!(sigma, sqrt.(LinearAlgebra.diag(sigma)))
-        else
-            sigma = StatsBase.cov2cor(Matrix(sigma))
+        X = Matrix(X)
+        try
+            try
+                Statistics.cor(ce, X, w; dims = dims, mean = mean, kwargs...)
+            catch
+                Statistics.cor(ce, X, w; dims = dims, mean = mean)
+            end
+        catch
+            sigma = robust_cov(ce, X, w; dims = dims, mean = mean, kwargs...)
+            if ismutable(sigma)
+                StatsBase.cov2cor!(sigma, sqrt.(LinearAlgebra.diag(sigma)))
+            else
+                sigma = StatsBase.cov2cor(Matrix(sigma))
+            end
+            sigma
         end
-        sigma
     end
     #=
     return if hasmethod(cor, (typeof(ce), typeof(X), typeof(w)), (:dims, :mean, :my_kwargs))
@@ -571,6 +673,55 @@ function robust_cor(ce::StatsBase.CovarianceEstimator, X::MatNum,
         sigma
     end
     =#
+end
+"""
+    moment_window_and_weights(X, w, args...; dims = 1, kwargs...)
+
+Apply the observation window and resolve weights for moment estimation.
+
+Slices `X` to the last `window` observations (if provided) and resolves the observation weights, returning the windowed data and finalised weights.
+
+# Arguments
+
+  - `X`: Data matrix or vector.
+  - `w`: Observation weights ([`ObsWeights`](@ref) or `nothing`).
+  - `args...`: Additional arguments (e.g., window size).
+  - `dims`: Observation dimension (default `1`).
+  - `kwargs...`: Additional keyword arguments.
+
+# Returns
+
+  - `(X_windowed, w_resolved)`: Tuple of windowed data and resolved weights.
+
+# Related
+
+  - [`get_window`](@ref)
+  - [`get_observation_weights`](@ref)
+"""
+function moment_window_and_weights(X::MatNum, w::Option{<:ObsWeights}, args...; dims = dims,
+                                   kwargs...)
+    w = get_observation_weights(w, X; dims = dims, kwargs...)
+    return X, w
+end
+function moment_window_and_weights(X::VecNum, w::Option{<:ObsWeights}, args...; kwargs...)
+    w = get_observation_weights(w, X; kwargs...)
+    return X, w
+end
+function moment_window_and_weights(X::MatNum, w::Option{<:ObsWeights}, window::Int_VecInt;
+                                   dims::Int = 1, kwargs...)
+    idx = get_window(window, X, dims)
+    X = isone(dims) ? view(X, idx, :) : view(X, :, idx)
+    w = nothing_scalar_array_getindex(w, idx)
+    w = get_observation_weights(w, X; dims = dims, kwargs...)
+    return X, w
+end
+function moment_window_and_weights(X::VecNum, w::Option{<:ObsWeights}, window::Int_VecInt,
+                                   kwargs...)
+    idx = get_window(window, X)
+    X = view(X, idx)
+    w = nothing_scalar_array_getindex(w, idx)
+    w = get_observation_weights(w, X; kwargs...)
+    return X, w
 end
 
 export Full, Semi

@@ -1,12 +1,5 @@
 """
-    struct RhoParsingResult{T1, T2, T3, T4, T5, T6} <: AbstractParsingResult
-        vars::T1
-        coef::T2
-        op::T3
-        rhs::T4
-        eqn::T5
-        ij::T6
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Structured result for correlation view constraint equation parsing.
 
@@ -50,7 +43,7 @@ Structured result for correlation view constraint equation parsing.
     end
 end
 """
-    abstract type AbstractEntropyPoolingOptimiser <: AbstractEstimator end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for entropy pooling optimisers.
 
@@ -65,7 +58,7 @@ Abstract supertype for entropy pooling optimisers.
 """
 abstract type AbstractEntropyPoolingOptimiser <: AbstractEstimator end
 """
-    abstract type AbstractEntropyPoolingAlgorithm <: AbstractAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for entropy pooling algorithms.
 
@@ -80,7 +73,7 @@ Abstract supertype for entropy pooling algorithms.
 """
 abstract type AbstractEntropyPoolingAlgorithm <: AbstractAlgorithm end
 """
-    struct H0_EntropyPooling <: AbstractEntropyPoolingAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 One-shot entropy pooling. It sets and optimises all the constraints simultaneously. This introduces bias in the posterior probabilities, but is faster.
 
@@ -92,7 +85,7 @@ One-shot entropy pooling. It sets and optimises all the constraints simultaneous
 """
 struct H0_EntropyPooling <: AbstractEntropyPoolingAlgorithm end
 """
-    struct H1_EntropyPooling <: AbstractEntropyPoolingAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Uses the initial probabilities to optimise the posterior probabilities at every step. This reduces bias in the posterior probabilities, but is slower.
 
@@ -104,7 +97,7 @@ Uses the initial probabilities to optimise the posterior probabilities at every 
 """
 struct H1_EntropyPooling <: AbstractEntropyPoolingAlgorithm end
 """
-    struct H2_EntropyPooling <: AbstractEntropyPoolingAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Uses the previous step's probabilities to optimise the next step's probabilities. This is faster but may introduce bias.
 
@@ -115,9 +108,19 @@ Uses the previous step's probabilities to optimise the next step's probabilities
   - [`H1_EntropyPooling`](@ref)
 """
 struct H2_EntropyPooling <: AbstractEntropyPoolingAlgorithm end
+"""
+    const StagedEP = Union{<:H1_EntropyPooling, <:H2_EntropyPooling}
+
+Alias for a union of staged entropy pooling algorithm types.
+
+# Related
+
+  - [`H1_EntropyPooling`](@ref)
+  - [`H2_EntropyPooling`](@ref)
+"""
 const StagedEP = Union{<:H1_EntropyPooling, <:H2_EntropyPooling}
 """
-    abstract type AbstractEntropyPoolingOptAlgorithm <: AbstractAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for entropy pooling optimisation algorithms.
 
@@ -133,7 +136,7 @@ Abstract supertype for entropy pooling optimisation algorithms.
 """
 abstract type AbstractEntropyPoolingOptAlgorithm <: AbstractAlgorithm end
 """
-    struct LogEntropyPooling <: AbstractEntropyPoolingOptAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Logarithmic entropy pooling optimisation algorithm.
 
@@ -148,7 +151,7 @@ Logarithmic entropy pooling optimisation algorithm.
 """
 struct LogEntropyPooling <: AbstractEntropyPoolingOptAlgorithm end
 """
-    struct ExpEntropyPooling <: AbstractEntropyPoolingOptAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Exponential entropy pooling optimisation algorithm.
 
@@ -163,10 +166,7 @@ Exponential entropy pooling optimisation algorithm.
 """
 struct ExpEntropyPooling <: AbstractEntropyPoolingOptAlgorithm end
 """
-    struct CVaREntropyPooling{T1, T2} <: AbstractEntropyPoolingOptimiser
-        args::T1
-        kwargs::T2
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Conditional Value-at-Risk (CVaR) entropy pooling optimiser.
 
@@ -177,11 +177,14 @@ Conditional Value-at-Risk (CVaR) entropy pooling optimiser.
   - `args`: Tuple of arguments passed to the root-finding algorithm (e.g., `Roots.Brent()`).
   - `kwargs`: Named tuple of keyword arguments for the root-finding algorithm.
 
-# Constructor
+# Constructors
 
-    CVaREntropyPooling(; args::Tuple = (Roots.Brent(),), kwargs::NamedTuple = (;))
+    CVaREntropyPooling(;
+        args::Tuple = (Roots.Brent(),),
+        kwargs::NamedTuple = (;)
+    ) -> CVaREntropyPooling
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 
@@ -211,13 +214,7 @@ function CVaREntropyPooling(; args::Tuple = (Roots.Brent(),), kwargs::NamedTuple
     return CVaREntropyPooling(args, kwargs)
 end
 """
-    struct OptimEntropyPooling{T1, T2, T3, T4, T5} <: AbstractEntropyPoolingOptimiser
-        args::T1
-        kwargs::T2
-        sc1::T3
-        sc2::T4
-        alg::T5
-    end
+$(DocStringExtensions.TYPEDEF)
 
 [`Optim.jl`](https://github.com/JuliaNLSolvers/Optim.jl)-based entropy pooling optimiser.
 
@@ -231,13 +228,17 @@ end
   - `sc2`: Slack parameter for relaxing fixed equality constraint penalties so that they can be satisfied more easily.
   - `alg`: Entropy pooling optimisation algorithm.
 
-# Constructor
+# Constructors
 
-    OptimEntropyPooling(; args::Tuple = (), kwargs::NamedTuple = (;), sc1::Number = 1,
-                        sc2::Number = 1e3,
-                        alg::AbstractEntropyPoolingOptAlgorithm = ExpEntropyPooling())
+    OptimEntropyPooling(;
+        args::Tuple = (),
+        kwargs::NamedTuple = (;),
+        sc1::Number = 1,
+        sc2::Number = 1e3,
+        alg::AbstractEntropyPoolingOptAlgorithm = ExpEntropyPooling()
+    ) -> OptimEntropyPooling
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 
@@ -288,13 +289,7 @@ function OptimEntropyPooling(; args::Tuple = (), kwargs::NamedTuple = (;), sc1::
     return OptimEntropyPooling(args, kwargs, sc1, sc2, alg)
 end
 """
-    struct JuMPEntropyPooling{T1, T2, T3, T4, T5} <: AbstractEntropyPoolingOptimiser
-        slv::T1
-        sc1::T2
-        sc2::T3
-        so::T4
-        alg::T5
-    end
+$(DocStringExtensions.TYPEDEF)
 
 [`JuMP.jl`](https://github.com/jump-dev/JuMP.jl)-based entropy pooling optimiser.
 
@@ -308,13 +303,17 @@ end
   - `so`: Scaling parameter for the objective expression.
   - `alg`: Entropy pooling optimisation algorithm.
 
-# Constructor
+# Constructors
 
-    JuMPEntropyPooling(; slv::Slv_VecSlv, sc1::Number = 1,
-                       sc2::Number = 1e5, so::Number = 1,
-                       alg::AbstractEntropyPoolingOptAlgorithm = ExpEntropyPooling())
+    JuMPEntropyPooling(;
+        slv::Slv_VecSlv,
+        sc1::Number = 1,
+        sc2::Number = 1e5,
+        so::Number = 1,
+        alg::AbstractEntropyPoolingOptAlgorithm = ExpEntropyPooling()
+    ) -> JuMPEntropyPooling
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 
@@ -374,27 +373,19 @@ function JuMPEntropyPooling(; slv::Slv_VecSlv, sc1::Number = 1, sc2::Number = 1e
                             alg::AbstractEntropyPoolingOptAlgorithm = ExpEntropyPooling())
     return JuMPEntropyPooling(slv, sc1, sc2, so, alg)
 end
+"""
+    const NonCVaREP = Union{<:OptimEntropyPooling, <:JuMPEntropyPooling}
+
+Alias for a union of non-CVaR entropy pooling algorithm types.
+
+# Related
+
+  - [`OptimEntropyPooling`](@ref)
+  - [`JuMPEntropyPooling`](@ref)
+"""
 const NonCVaREP = Union{<:OptimEntropyPooling, <:JuMPEntropyPooling}
 """
-    struct EntropyPoolingPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15,
-                               T16} <: AbstractLowOrderPriorEstimator_AF
-        pe::T1
-        mu_views::T2
-        var_views::T3
-        cvar_views::T4
-        sigma_views::T5
-        sk_views::T6
-        kt_views::T7
-        rho_views::T8
-        var_alpha::T9
-        cvar_alpha::T10
-        sets::T11
-        ds_opt::T12
-        dm_opt::T13
-        opt::T14
-        w::T15
-        alg::T16
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Entropy pooling prior estimator for asset returns.
 
@@ -419,25 +410,28 @@ Entropy pooling prior estimator for asset returns.
   - `w`: Prior weights.
   - `alg`: Entropy pooling algorithm.
 
-# Constructor
+# Constructors
 
-    EntropyPoolingPrior(; pe::AbstractLowOrderPriorEstimator_A_F_AF = EmpiricalPrior(),
-                        mu_views::Option{<:LinearConstraintEstimator} = nothing,
-                        var_views::Option{<:LinearConstraintEstimator} = nothing,
-                        cvar_views::Option{<:LinearConstraintEstimator} = nothing,
-                        sigma_views::Option{<:LinearConstraintEstimator} = nothing,
-                        sk_views::Option{<:LinearConstraintEstimator} = nothing,
-                        kt_views::Option{<:LinearConstraintEstimator} = nothing,
-                        rho_views::Option{<:LinearConstraintEstimator} = nothing,
-                        var_alpha::Number = 0.05, cvar_alpha::Number = 0.05,
-                        sets::Option{<:AssetSets} = nothing,
-                        ds_opt::Option{<:CVaREntropyPooling} = nothing,
-                        dm_opt::Option{<:OptimEntropyPooling} = nothing,
-                        opt::NonCVaREP = OptimEntropyPooling(),
-                        w::Option{<:StatsBase.ProbabilityWeights} = nothing,
-                        alg::AbstractEntropyPoolingAlgorithm = H1_EntropyPooling())
+    EntropyPoolingPrior(;
+        pe::AbstractLowOrderPriorEstimator_A_F_AF = EmpiricalPrior(),
+        mu_views::Option{<:LinearConstraintEstimator} = nothing,
+        var_views::Option{<:LinearConstraintEstimator} = nothing,
+        cvar_views::Option{<:LinearConstraintEstimator} = nothing,
+        sigma_views::Option{<:LinearConstraintEstimator} = nothing,
+        sk_views::Option{<:LinearConstraintEstimator} = nothing,
+        kt_views::Option{<:LinearConstraintEstimator} = nothing,
+        rho_views::Option{<:LinearConstraintEstimator} = nothing,
+        var_alpha::Number = 0.05,
+        cvar_alpha::Number = 0.05,
+        sets::Option{<:AssetSets} = nothing,
+        ds_opt::Option{<:CVaREntropyPooling} = nothing,
+        dm_opt::Option{<:OptimEntropyPooling} = nothing,
+        opt::NonCVaREP = OptimEntropyPooling(),
+        w::Option{<:StatsBase.ProbabilityWeights} = nothing,
+        alg::AbstractEntropyPoolingAlgorithm = H1_EntropyPooling()
+    ) -> EntropyPoolingPrior
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 
@@ -464,12 +458,10 @@ EntropyPoolingPrior
               │        ce ┼ PortfolioOptimisersCovariance
               │           │   ce ┼ Covariance
               │           │      │    me ┼ SimpleExpectedReturns
-              │           │      │       │     w ┼ nothing
-              │           │      │       │   idx ┴ nothing
+              │           │      │       │   w ┴ nothing
               │           │      │    ce ┼ GeneralCovariance
-              │           │      │       │    ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-              │           │      │       │     w ┼ nothing
-              │           │      │       │   idx ┴ nothing
+              │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+              │           │      │       │    w ┴ nothing
               │           │      │   alg ┴ Full()
               │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
               │           │      │     pdm ┼ Posdef
@@ -480,8 +472,7 @@ EntropyPoolingPrior
               │           │      │     alg ┼ nothing
               │           │      │   order ┴ DenoiseDetoneAlg()
               │        me ┼ SimpleExpectedReturns
-              │           │     w ┼ nothing
-              │           │   idx ┴ nothing
+              │           │   w ┴ nothing
               │   horizon ┴ nothing
      mu_views ┼ LinearConstraintEstimator
               │   val ┼ Vector{String}: ["A == 0.03", "B + C == 0.04"]
@@ -635,8 +626,17 @@ function Base.getproperty(obj::EntropyPoolingPrior, sym::Symbol)
         getfield(obj, sym)
     end
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Alias for an abstract vector of [`EntropyPoolingPrior`](@ref) elements.
+
+# Related
+
+  - [`EntropyPoolingPrior`](@ref)
+"""
 const VecEP = AbstractVector{<:EntropyPoolingPrior}
-function factory(pe::EntropyPoolingPrior, w::StatsBase.AbstractWeights)
+function factory(pe::EntropyPoolingPrior, w::ObsWeights)
     return EntropyPoolingPrior(; pe = factory(pe.pe, w), mu_views = pe.mu_views,
                                var_views = pe.var_views, cvar_views = pe.cvar_views,
                                sigma_views = pe.sigma_views, sk_views = pe.sk_views,
@@ -1341,7 +1341,7 @@ function entropy_pooling(w::VecNum, epc::AbstractDict,
 end
 """
     ep_cvar_views_solve!(cvar_views::Nothing, epc::AbstractDict, ::Any, ::Any, ::Number,
-                         w::StatsBase.AbstractWeights, opt::AbstractEntropyPoolingOptimiser, ::Any, ::Any;
+                         w::StatsBase.ProbabilityWeights, opt::AbstractEntropyPoolingOptimiser, ::Any, ::Any;
                          kwargs...)
 
 Solve entropy pooling views when no CVaR views are specified.
@@ -1374,7 +1374,7 @@ Solve entropy pooling views when no CVaR views are specified.
   - [`EntropyPoolingPrior`](@ref)
 """
 function ep_cvar_views_solve!(cvar_views::Nothing, epc::AbstractDict, ::Any, ::Any, ::Any,
-                              w::StatsBase.AbstractWeights,
+                              w::StatsBase.ProbabilityWeights,
                               opt::AbstractEntropyPoolingOptimiser, ::Any, ::Any; kwargs...)
     return entropy_pooling(w, epc, opt)
 end
@@ -1410,7 +1410,7 @@ end
 """
     ep_cvar_views_solve!(cvar_views::LinearConstraintEstimator, epc::AbstractDict,
                          pr::AbstractPriorResult, sets::AssetSets, alpha::Number,
-                         w::StatsBase.AbstractWeights, opt::AbstractEntropyPoolingOptimiser,
+                         w::StatsBase.ProbabilityWeights, opt::AbstractEntropyPoolingOptimiser,
                          ds_opt::Option{<:CVaREntropyPooling},
                          dm_opt::Option{<:OptimEntropyPooling}; strict::Bool = false)
 
@@ -1453,7 +1453,7 @@ Solve the entropy pooling problem with Conditional Value-at-Risk (CVaR) view con
 """
 function ep_cvar_views_solve!(cvar_views::LinearConstraintEstimator, epc::AbstractDict,
                               pr::AbstractPriorResult, sets::AssetSets, alpha::Number,
-                              w::StatsBase.AbstractWeights,
+                              w::StatsBase.ProbabilityWeights,
                               opt::AbstractEntropyPoolingOptimiser,
                               ds_opt::Option{<:CVaREntropyPooling},
                               dm_opt::Option{<:OptimEntropyPooling}; strict::Bool = false)

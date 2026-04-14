@@ -1,5 +1,5 @@
 """
-    abstract type OpinionPoolingAlgorithm <: AbstractAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for opinion pooling algorithms.
 
@@ -13,7 +13,7 @@ Abstract supertype for opinion pooling algorithms.
 """
 abstract type OpinionPoolingAlgorithm <: AbstractAlgorithm end
 """
-    struct LinearOpinionPooling <: OpinionPoolingAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Linear opinion pooling algorithm for consensus prior estimation.
 
@@ -34,7 +34,7 @@ Linear opinion pooling algorithm for consensus prior estimation.
 """
 struct LinearOpinionPooling <: OpinionPoolingAlgorithm end
 """
-    struct LogarithmicOpinionPooling <: OpinionPoolingAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Logarithmic opinion pooling algorithm for consensus prior estimation.
 
@@ -55,15 +55,7 @@ Logarithmic opinion pooling algorithm for consensus prior estimation.
 """
 struct LogarithmicOpinionPooling <: OpinionPoolingAlgorithm end
 """
-    struct OpinionPoolingPrior{T1, T2, T3, T4, T5, T6, T7} <: AbstractLowOrderPriorEstimator_AF
-        pes::T1
-        pe1::T2
-        pe2::T3
-        p::T4
-        w::T5
-        alg::T6
-        ex::T7
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Opinion pooling prior estimator for asset returns.
 
@@ -79,11 +71,19 @@ Opinion pooling prior estimator for asset returns.
   - `alg`: Opinion pooling algorithm.
   - `ex`: Parallel execution strategy.
 
-# Constructor
+# Constructors
 
-    OpinionPoolingPrior(; pes, pe1, pe2, p, w, alg, ex)
+    OpinionPoolingPrior(;
+        pes::VecEP,
+        pe1::Option{<:AbstractLowOrderPriorEstimator_A_F_AF} = nothing,
+        pe2::AbstractLowOrderPriorEstimator_A_F_AF = EmpiricalPrior(),
+        p::Option{<:Number} = nothing,
+        w::Option{<:VecNum} = nothing,
+        alg::OpinionPoolingAlgorithm = LinearOpinionPooling(),
+        ex::FLoops.Transducers.Executor = FLoops.Transducers.ThreadedEx()
+    ) -> OpinionPoolingPrior
 
-Keyword arguments correspond to the fields above. All arguments are validated for type and value consistency.
+Keywords correspond to the struct's fields. All arguments are validated for type and value consistency.
 
 ## Validation
 
@@ -111,17 +111,15 @@ julia> OpinionPoolingPrior(;
                                                                                            val = ["A == 0.05",
                                                                                                   "B + C >= 0.06"]))])
 OpinionPoolingPrior
-  pes ┼ EntropyPoolingPrior{EmpiricalPrior{PortfolioOptimisersCovariance{Covariance{SimpleExpectedReturns{Nothing, Nothing}, GeneralCovariance{StatsBase.SimpleCovariance, Nothing, Nothing}, Full}, DenoiseDetoneAlgMatrixProcessing{Posdef{UnionAll, @NamedTuple{}}, Nothing, Nothing, Nothing, DenoiseDetoneAlg}}, SimpleExpectedReturns{Nothing, Nothing}, Nothing}, LinearConstraintEstimator{Vector{String}, Nothing}, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, AssetSets{String, String, Dict{String, Vector{String}}}, Nothing, Nothing, OptimEntropyPooling{Tuple{}, @NamedTuple{}, Int64, Float64, ExpEntropyPooling}, Nothing, H1_EntropyPooling}[EntropyPoolingPrior
+  pes ┼ EntropyPoolingPrior{EmpiricalPrior{PortfolioOptimisersCovariance{Covariance{SimpleExpectedReturns{Nothing}, GeneralCovariance{StatsBase.SimpleCovariance, Nothing}, Full}, DenoiseDetoneAlgMatrixProcessing{Posdef{UnionAll, @NamedTuple{}}, Nothing, Nothing, Nothing, DenoiseDetoneAlg}}, SimpleExpectedReturns{Nothing}, Nothing}, LinearConstraintEstimator{Vector{String}, Nothing}, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, AssetSets{String, String, Dict{String, Vector{String}}}, Nothing, Nothing, OptimEntropyPooling{Tuple{}, @NamedTuple{}, Int64, Float64, ExpEntropyPooling}, Nothing, H1_EntropyPooling}[EntropyPoolingPrior
       │            pe ┼ EmpiricalPrior
       │               │        ce ┼ PortfolioOptimisersCovariance
       │               │           │   ce ┼ Covariance
       │               │           │      │    me ┼ SimpleExpectedReturns
-      │               │           │      │       │     w ┼ nothing
-      │               │           │      │       │   idx ┴ nothing
+      │               │           │      │       │   w ┴ nothing
       │               │           │      │    ce ┼ GeneralCovariance
-      │               │           │      │       │    ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-      │               │           │      │       │     w ┼ nothing
-      │               │           │      │       │   idx ┴ nothing
+      │               │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+      │               │           │      │       │    w ┴ nothing
       │               │           │      │   alg ┴ Full()
       │               │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
       │               │           │      │     pdm ┼ Posdef
@@ -132,8 +130,7 @@ OpinionPoolingPrior
       │               │           │      │     alg ┼ nothing
       │               │           │      │   order ┴ DenoiseDetoneAlg()
       │               │        me ┼ SimpleExpectedReturns
-      │               │           │     w ┼ nothing
-      │               │           │   idx ┴ nothing
+      │               │           │   w ┴ nothing
       │               │   horizon ┴ nothing
       │      mu_views ┼ LinearConstraintEstimator
       │               │   val ┼ Vector{String}: ["A == 0.03", "B + C == 0.04"]
@@ -165,12 +162,10 @@ OpinionPoolingPrior
       │               │        ce ┼ PortfolioOptimisersCovariance
       │               │           │   ce ┼ Covariance
       │               │           │      │    me ┼ SimpleExpectedReturns
-      │               │           │      │       │     w ┼ nothing
-      │               │           │      │       │   idx ┴ nothing
+      │               │           │      │       │   w ┴ nothing
       │               │           │      │    ce ┼ GeneralCovariance
-      │               │           │      │       │    ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-      │               │           │      │       │     w ┼ nothing
-      │               │           │      │       │   idx ┴ nothing
+      │               │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+      │               │           │      │       │    w ┴ nothing
       │               │           │      │   alg ┴ Full()
       │               │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
       │               │           │      │     pdm ┼ Posdef
@@ -181,8 +176,7 @@ OpinionPoolingPrior
       │               │           │      │     alg ┼ nothing
       │               │           │      │   order ┴ DenoiseDetoneAlg()
       │               │        me ┼ SimpleExpectedReturns
-      │               │           │     w ┼ nothing
-      │               │           │   idx ┴ nothing
+      │               │           │   w ┴ nothing
       │               │   horizon ┴ nothing
       │      mu_views ┼ LinearConstraintEstimator
       │               │   val ┼ Vector{String}: ["A == 0.05", "B + C >= 0.06"]
@@ -215,12 +209,10 @@ OpinionPoolingPrior
       │        ce ┼ PortfolioOptimisersCovariance
       │           │   ce ┼ Covariance
       │           │      │    me ┼ SimpleExpectedReturns
-      │           │      │       │     w ┼ nothing
-      │           │      │       │   idx ┴ nothing
+      │           │      │       │   w ┴ nothing
       │           │      │    ce ┼ GeneralCovariance
-      │           │      │       │    ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-      │           │      │       │     w ┼ nothing
-      │           │      │       │   idx ┴ nothing
+      │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+      │           │      │       │    w ┴ nothing
       │           │      │   alg ┴ Full()
       │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
       │           │      │     pdm ┼ Posdef
@@ -231,8 +223,7 @@ OpinionPoolingPrior
       │           │      │     alg ┼ nothing
       │           │      │   order ┴ DenoiseDetoneAlg()
       │        me ┼ SimpleExpectedReturns
-      │           │     w ┼ nothing
-      │           │   idx ┴ nothing
+      │           │   w ┴ nothing
       │   horizon ┴ nothing
     p ┼ nothing
     w ┼ nothing

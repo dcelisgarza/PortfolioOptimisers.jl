@@ -1,5 +1,5 @@
 """
-    abstract type AbstractDetoneEstimator <: AbstractEstimator end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all detoning estimators in `PortfolioOptimisers.jl`.
 
@@ -9,8 +9,8 @@ All concrete and/or abstract types representing detoning estimators should be su
 
 In order to implement a new detoning estimator which will work seamlessly with the library, subtype `AbstractDetoneEstimator` with all necessary parameters as part of the struct, and implement the following methods:
 
-  - `detone!(dt::AbstractDetoneEstimator, X::MatNum)`: In-place detoning.
-  - `detone(dt::AbstractDetoneEstimator, X::MatNum)`: Optional out-of-place detoning.
+  - `detone!(dt::AbstractDetoneEstimator, X::MatNum) -> MatNum`: In-place detoning.
+  - `detone(dt::AbstractDetoneEstimator, X::MatNum) -> MatNum`: Optional out-of-place detoning.
 
 ## Arguments
 
@@ -63,10 +63,7 @@ Detoning matrix in-place...
 """
 abstract type AbstractDetoneEstimator <: AbstractEstimator end
 """
-    struct Detone{T1, T2} <: AbstractDetoneEstimator
-        n::T1
-        pdm::T2
-    end
+$(DocStringExtensions.TYPEDEF)
 
 A concrete detoning estimator for removing the largest `n` principal components (market modes) from a covariance or correlation matrix in [`detone!`](@ref) and [`detone`](@ref).
 
@@ -76,14 +73,16 @@ Detoned matrices may not be suitable for non-clustering optimisations because it
 
 # Fields
 
-  - `n`: Number of leading principal components to remove.
-  - $(arg_dict[:opdm])
+$(DocStringExtensions.FIELDS)
 
-# Constructor
+# Constructors
 
-    Detone(; n::Integer = 1, pdm::Option{<:Posdef} = Posdef())
+    Detone(;
+        pdm::Option{<:Posdef} = Posdef(),
+        n::Integer = 1,
+    ) -> Detone
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 
@@ -94,10 +93,10 @@ Keyword arguments correspond to the fields above.
 ```jldoctest
 julia> Detone(; n = 2)
 Detone
-    n ┼ Int64: 2
   pdm ┼ Posdef
       │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
       │   kwargs ┴ @NamedTuple{}: NamedTuple()
+    n ┴ Int64: 2
 ```
 
 # Related
@@ -110,19 +109,20 @@ Detone
   - [mlp1](@cite) M. M. De Prado. *Machine learning for asset managers* (Cambridge University Press, 2020). Chapter 2.
 """
 @concrete struct Detone <: AbstractDetoneEstimator
-    n
+    "$(field_dict[:opdm])"
     pdm
-    function Detone(n::Integer, pdm::Option{<:Posdef} = Posdef())
+    "Number of leading principal components to remove."
+    n
+    function Detone(pdm::Option{<:Posdef}, n::Integer)
         @argcheck(zero(n) < n, DomainError)
-        return new{typeof(n), typeof(pdm)}(n, pdm)
+        return new{typeof(pdm), typeof(n)}(pdm, n)
     end
 end
-function Detone(; n::Integer = 1, pdm::Option{<:Posdef} = Posdef())
-    return Detone(n, pdm)
+function Detone(; pdm::Option{<:Posdef} = Posdef(), n::Integer = 1)
+    return Detone(pdm, n)
 end
 """
-    detone!(dt::Detone, X::MatNum)
-    detone!(::Nothing, X::MatNum)
+    detone!(dt::Option{<:Detone}, X::MatNum) -> MatNum
 
 In-place removal of the top `n` principal components (market modes) from a covariance or correlation matrix.
 
@@ -133,17 +133,27 @@ For matrices without unit diagonal, the function converts them into correlation 
   - $(arg_dict[:odt])
 
       + `::Detone`: The top `n` principal components are removed from `X` in-place.
-      + `::Nothing`: No-op and returns `nothing`.
+      + `::Nothing`: No-op.
 
   - $(arg_dict[:sigrhoX])
+
+# Validation
+
+  - `0 < dt.n <= size(X, 2)`.
 
 # Returns
 
   - `X::MatNum`: The input matrix `X` is modified in-place.
 
-# Validation
+# Details
 
-  - `0 < dt.n <= size(X, 2)`.
+  - Asserts the number of elements to remove is within the valid range.
+  - If `X` is not a correlation matrix, it is converted to one before applying the algorithm.
+  - Performs an eigenvector decomposition of `X`.
+  - Removes the top `n` principal components (market modes) from the eigenvalues and eigenvectors of `X`.
+  - Reconstructs the correlation matrix `X` in-place from the modified eigenvalues `vals` and eigenvectors `vecs`.
+  - If `X` was not originally a correlation matrix, it is converted back.
+  - Returns `X`.
 
 # Examples
 
@@ -186,8 +196,8 @@ julia> detone!(Detone(), X)
 function detone!(::Nothing, X::MatNum)
     return X
 end
-function detone!(de::Detone, X::MatNum)
-    n = de.n
+function detone!(dt::Detone, X::MatNum)
+    n = dt.n
     @argcheck(zero(n) < n <= size(X, 2),
               DomainError("0 < n <= size(X, 2) must hold. Got\nn => $n\nsize(X, 2) => $(size(X, 2))."))
     n -= 1
@@ -202,15 +212,14 @@ function detone!(de::Detone, X::MatNum)
     vecs = vecs[:, (end - n):end]
     X .-= vecs * vals * transpose(vecs)
     X .= StatsBase.cov2cor(X)
-    posdef!(de.pdm, X)
+    posdef!(dt.pdm, X)
     if iscov
         StatsBase.cor2cov!(X, s)
     end
     return X
 end
 """
-    detone(dt::Detone, X::MatNum)
-    detone(::Nothing, X::MatNum)
+    detone(dt::Option{<:Detone}, X::MatNum)
 
 Out-of-place version of [`detone!`](@ref).
 
@@ -229,9 +238,9 @@ Out-of-place version of [`detone!`](@ref).
 function detone(::Nothing, X::MatNum)
     return X
 end
-function detone(de::Detone, X::MatNum)
+function detone(dt::Detone, X::MatNum)
     X = copy(X)
-    detone!(de, X)
+    detone!(dt, X)
     return X
 end
 

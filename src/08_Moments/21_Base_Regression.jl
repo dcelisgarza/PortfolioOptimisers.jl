@@ -1,5 +1,5 @@
 """
-    abstract type AbstractRegressionEstimator <: AbstractEstimator end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all regression estimator types in `PortfolioOptimisers.jl`.
 
@@ -13,7 +13,7 @@ All concrete and/or abstract types implementing regression estimation algorithms
 """
 abstract type AbstractRegressionEstimator <: AbstractEstimator end
 """
-    abstract type AbstractRegressionResult <: AbstractResult end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all regression result types in `PortfolioOptimisers.jl`.
 
@@ -26,9 +26,21 @@ All concrete and/or abstract types representing the output of regression-based m
   - [`AbstractRegressionEstimator`](@ref)
 """
 abstract type AbstractRegressionResult <: AbstractResult end
+"""
+    const RegE_Reg = Union{<:AbstractRegressionResult, <:AbstractRegressionEstimator}
+
+Alias for a regression result or estimator.
+
+Matches either an [`AbstractRegressionResult`](@ref) (pre-computed regression result) or an [`AbstractRegressionEstimator`](@ref) (regression specification). Used for dispatch in factor model and regression-based risk routines.
+
+# Related
+
+  - [`AbstractRegressionResult`](@ref)
+  - [`AbstractRegressionEstimator`](@ref)
+"""
 const RegE_Reg = Union{<:AbstractRegressionResult, <:AbstractRegressionEstimator}
 """
-    abstract type AbstractRegressionAlgorithm <: AbstractAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all regression algorithm types in `PortfolioOptimisers.jl`.
 
@@ -46,7 +58,7 @@ These types are used to specify the algorithm when constructing a regression est
 """
 abstract type AbstractRegressionAlgorithm <: AbstractAlgorithm end
 """
-    abstract type AbstractStepwiseRegressionAlgorithm <: AbstractRegressionAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all stepwise regression algorithm types in `PortfolioOptimisers.jl`.
 
@@ -60,7 +72,7 @@ All concrete and/or abstract types implementing stepwise regression algorithms s
 """
 abstract type AbstractStepwiseRegressionAlgorithm <: AbstractRegressionAlgorithm end
 """
-    abstract type AbstractStepwiseRegressionCriterion <: AbstractRegressionAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all stepwise regression criterion types in `PortfolioOptimisers.jl`.
 
@@ -73,7 +85,7 @@ All concrete and/or abstract types representing criteria for stepwise regression
 """
 abstract type AbstractStepwiseRegressionCriterion <: AbstractRegressionAlgorithm end
 """
-    abstract type AbstractRegressionTarget <: AbstractRegressionAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all regression target types in `PortfolioOptimisers.jl`.
 
@@ -85,9 +97,7 @@ All concrete and/or abstract types representing regression targets (such as line
 """
 abstract type AbstractRegressionTarget <: AbstractRegressionAlgorithm end
 """
-    struct LinearModel{T1} <: AbstractRegressionTarget
-        kwargs::T1
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Regression target type for standard linear models in `PortfolioOptimisers.jl`.
 
@@ -95,13 +105,15 @@ Regression target type for standard linear models in `PortfolioOptimisers.jl`.
 
 # Fields
 
-  - `kwargs`: Keyword arguments to be passed to the linear model fitting routine (e.g., options for the solver or regularisation).
+$(DocStringExtensions.FIELDS)
 
-# Constructor
+# Constructors
 
-    LinearModel(; kwargs::NamedTuple = (;))
+    LinearModel(;
+        kwargs::NamedTuple = (;)
+    ) -> LinearModel
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 
@@ -118,6 +130,7 @@ LinearModel
   - [`StatsAPI.fit(::LinearModel, ::MatNum, ::VecNum)`](@ref)
 """
 @concrete struct LinearModel <: AbstractRegressionTarget
+    "Keyword arguments passed to `fit(GLM.LinearModel, X, y; kwargs...)`."
     kwargs
     function LinearModel(kwargs::NamedTuple)
         return new{typeof(kwargs)}(kwargs)
@@ -126,7 +139,26 @@ end
 function LinearModel(; kwargs::NamedTuple = (;))
     return LinearModel(kwargs)
 end
-function factory(re::LinearModel, w::StatsBase.AbstractWeights)
+"""
+    factory(re::LinearModel, w::ObsWeights) -> LinearModel
+
+Return a new [`LinearModel`](@ref) regression target with observation weights `w` added to the keyword arguments.
+
+# Arguments
+
+  - `re`: Linear model regression target.
+  - $(arg_dict[:ow])
+
+# Returns
+
+  - `re::LinearModel`: Updated regression target with weights included in `kwargs`.
+
+# Related
+
+  - [`LinearModel`](@ref)
+  - [`factory`](@ref)
+"""
+function factory(re::LinearModel, w::ObsWeights)
     return LinearModel(; kwargs = (; re.kwargs..., weights = w))
 end
 """
@@ -134,7 +166,7 @@ end
 
 Fit a standard linear regression model using a [`LinearModel`](@ref) regression target.
 
-This method dispatches to `StatsAPI.fit` with the `GLM.LinearModel` type, passing the design matrix `X`, response vector `y`, and any keyword arguments stored in `tgt.kwargs`. It enables flexible configuration of the underlying linear model fitting routine within the `PortfolioOptimisers.jl` regression estimation framework.
+This method dispatches to `StatsAPI.fit` with the `GLM.LinearModel` type, passing the design matrix `X`, response vector `y`, and any keyword arguments stored in `tgt.kwargs`. It enables flexible configuration of the underlying linear model fitting routine within the `ssion estimation framework.
 
 # Arguments
 
@@ -152,13 +184,17 @@ This method dispatches to `StatsAPI.fit` with the `GLM.LinearModel` type, passin
   - [`GLM.LinearModel`](https://juliastats.org/GLM.jl/stable/api/#GLM.LinearModel)
 """
 function StatsAPI.fit(tgt::LinearModel, X::MatNum, y::VecNum)
-    return StatsAPI.fit(GLM.LinearModel, X, y; tgt.kwargs...)
+    kwargs = if haskey(tgt.kwargs, :weights) &&
+                isa(tgt.kwargs.weights, DynamicAbstractWeights)
+        w = get_observation_weights(tgt.kwargs.weights, X)
+        (; tgt.kwargs..., weights = w)
+    else
+        tgt.kwargs
+    end
+    return StatsAPI.fit(GLM.LinearModel, X, y; kwargs...)
 end
 """
-    struct GeneralisedLinearModel{T1, T2} <: AbstractRegressionTarget
-        args::T1
-        kwargs::T2
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Regression target type for generalised linear models (GLMs) in `PortfolioOptimisers.jl`.
 
@@ -166,14 +202,16 @@ Regression target type for generalised linear models (GLMs) in `PortfolioOptimis
 
 # Fields
 
-  - `args`: Positional arguments to be passed to the GLM fitting routine (e.g., distribution and link).
-  - `kwargs`: Keyword arguments for the GLM fitting routine (e.g., solver options, regularisation).
+$(DocStringExtensions.FIELDS)
 
-# Constructor
+# Constructors
 
-    GeneralisedLinearModel(; args::Tuple = (Normal(),), kwargs::NamedTuple = (;))
+    GeneralisedLinearModel(;
+        args::Tuple = (Normal(),),
+        kwargs::NamedTuple = (;)
+    ) -> GeneralisedLinearModel
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 
@@ -191,7 +229,9 @@ GeneralisedLinearModel
   - [`StatsAPI.fit(::GeneralisedLinearModel, ::MatNum, ::VecNum)`](@ref)
 """
 @concrete struct GeneralisedLinearModel <: AbstractRegressionTarget
+    "Positional arguments passed to `fit(GLM.GeneralizedLinearModel, X, y, args...; kwargs...)`."
     args
+    "Keyword arguments passed to `fit(GLM.GeneralizedLinearModel, X, y, args...; kwargs...)`."
     kwargs
     function GeneralisedLinearModel(args::Tuple, kwargs::NamedTuple)
         return new{typeof(args), typeof(kwargs)}(args, kwargs)
@@ -201,7 +241,26 @@ function GeneralisedLinearModel(; args::Tuple = (Distributions.Normal(),),
                                 kwargs::NamedTuple = (;))
     return GeneralisedLinearModel(args, kwargs)
 end
-function factory(re::GeneralisedLinearModel, w::StatsBase.AbstractWeights)
+"""
+    factory(re::GeneralisedLinearModel, w::ObsWeights) -> GeneralisedLinearModel
+
+Return a new [`GeneralisedLinearModel`](@ref) regression target with observation weights `w` added to the keyword arguments.
+
+# Arguments
+
+  - `re`: Generalised linear model regression target.
+  - $(arg_dict[:ow])
+
+# Returns
+
+  - `re::GeneralisedLinearModel`: Updated regression target with weights included in `kwargs`.
+
+# Related
+
+  - [`GeneralisedLinearModel`](@ref)
+  - [`factory`](@ref)
+"""
+function factory(re::GeneralisedLinearModel, w::ObsWeights)
     return GeneralisedLinearModel(; args = re.args, kwargs = (; re.kwargs..., weights = w))
 end
 """
@@ -227,10 +286,17 @@ This method dispatches to `StatsAPI.fit` with the `GLM.GeneralizedLinearModel` t
   - [`GLM.GeneralizedLinearModel`](https://juliastats.org/GLM.jl/stable/examples/#Probit-regression)
 """
 function StatsAPI.fit(tgt::GeneralisedLinearModel, X::MatNum, y::VecNum)
-    return StatsAPI.fit(GLM.GeneralizedLinearModel, X, y, tgt.args...; tgt.kwargs...)
+    kwargs = if haskey(tgt.kwargs, :weights) &&
+                isa(tgt.kwargs.weights, DynamicAbstractWeights)
+        w = get_observation_weights(tgt.kwargs.weights, X)
+        (; tgt.kwargs..., weights = w)
+    else
+        tgt.kwargs
+    end
+    return StatsAPI.fit(GLM.GeneralizedLinearModel, X, y, tgt.args...; kwargs...)
 end
 """
-    abstract type AbstractMinMaxValStepwiseRegressionCriterion <: AbstractStepwiseRegressionCriterion end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all stepwise regression criteria in `PortfolioOptimisers.jl` where model fit is evaluated by either minimising or maximising the criterion value.
 
@@ -244,8 +310,7 @@ All concrete and/or abstract types representing stepwise regression criteria (su
 abstract type AbstractMinMaxValStepwiseRegressionCriterion <:
               AbstractStepwiseRegressionCriterion end
 """
-    abstract type AbstractMinValStepwiseRegressionCriterion <:
-                  AbstractMinMaxValStepwiseRegressionCriterion end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all stepwise regression criteria where lower values indicate better model fit in `PortfolioOptimisers.jl`.
 
@@ -261,8 +326,7 @@ All concrete and/or abstract types implementing minimisation-based stepwise regr
 abstract type AbstractMinValStepwiseRegressionCriterion <:
               AbstractMinMaxValStepwiseRegressionCriterion end
 """
-    abstract type AbstractMaxValStepwiseRegressionCriteria <:
-                  AbstractMinMaxValStepwiseRegressionCriterion end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all stepwise regression criteria where higher values indicate better model fit in `PortfolioOptimisers.jl`.
 
@@ -277,7 +341,7 @@ All concrete and/or abstract types implementing maximisation-based stepwise regr
 abstract type AbstractMaxValStepwiseRegressionCriteria <:
               AbstractMinMaxValStepwiseRegressionCriterion end
 """
-    struct AIC <: AbstractMinValStepwiseRegressionCriterion end
+$(DocStringExtensions.TYPEDEF)
 
 Akaike Information Criterion (AIC) for stepwise regression in `PortfolioOptimisers.jl`.
 
@@ -292,7 +356,7 @@ Akaike Information Criterion (AIC) for stepwise regression in `PortfolioOptimise
 """
 struct AIC <: AbstractMinValStepwiseRegressionCriterion end
 """
-    struct AICC <: AbstractMinValStepwiseRegressionCriterion end
+$(DocStringExtensions.TYPEDEF)
 
 Corrected Akaike Information Criterion (AICC) for stepwise regression in `PortfolioOptimisers.jl`.
 
@@ -307,7 +371,7 @@ Corrected Akaike Information Criterion (AICC) for stepwise regression in `Portfo
 """
 struct AICC <: AbstractMinValStepwiseRegressionCriterion end
 """
-    struct BIC <: AbstractMinValStepwiseRegressionCriterion end
+$(DocStringExtensions.TYPEDEF)
 
 Bayesian Information Criterion (BIC) for stepwise regression in `PortfolioOptimisers.jl`.
 
@@ -322,7 +386,7 @@ Bayesian Information Criterion (BIC) for stepwise regression in `PortfolioOptimi
 """
 struct BIC <: AbstractMinValStepwiseRegressionCriterion end
 """
-    struct RSquared <: AbstractMaxValStepwiseRegressionCriteria end
+$(DocStringExtensions.TYPEDEF)
 
 Coefficient of determination (R²) for stepwise regression in `PortfolioOptimisers.jl`.
 
@@ -336,7 +400,7 @@ Coefficient of determination (R²) for stepwise regression in `PortfolioOptimise
 """
 struct RSquared <: AbstractMaxValStepwiseRegressionCriteria end
 """
-    struct AdjustedRSquared <: AbstractMaxValStepwiseRegressionCriteria end
+$(DocStringExtensions.TYPEDEF)
 
 Adjusted coefficient of determination (Adjusted R²) for stepwise regression in `PortfolioOptimisers.jl`.
 
@@ -387,6 +451,26 @@ end
 function regression_criterion_func(::AdjustedRSquared)
     return GLM.adjr2
 end
+"""
+    regression_threshold(alg)
+
+Return the threshold value for stepwise regression selection criteria.
+
+Returns the threshold value associated with a stepwise regression criterion. Dispatches on the criterion type to return either a minimum or maximum value.
+
+# Arguments
+
+  - `alg`: Stepwise regression criterion.
+
+# Returns
+
+  - Threshold value.
+
+# Related
+
+  - [`AbstractMinValStepwiseRegressionCriterion`](@ref)
+  - [`AbstractMaxValStepwiseRegressionCriteria`](@ref)
+"""
 function regression_threshold(::AbstractMinValStepwiseRegressionCriterion)
     return Inf
 end
@@ -394,11 +478,7 @@ function regression_threshold(::AbstractMaxValStepwiseRegressionCriteria)
     return -Inf
 end
 """
-    struct Regression{T1, T2, T3} <: AbstractRegressionResult
-        M::T1
-        L::T2
-        b::T3
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Container type for regression results in `PortfolioOptimisers.jl`.
 
@@ -406,16 +486,17 @@ Container type for regression results in `PortfolioOptimisers.jl`.
 
 # Fields
 
-  - `M`: Main coefficient matrix (e.g., regression weights or loadings).
-  - `L`: Optional auxiliary matrix for recovering lost dimensions in dimensionality reduction regressions.
-  - `b`: Optional intercept vector.
+$(DocStringExtensions.FIELDS)
 
-# Constructor
+# Constructors
 
-    Regression(; M::MatNum, L::Option{<:MatNum} = nothing,
-               b::Option{<:VecNum} = nothing)
+    Regression(;
+        M::MatNum,
+        L::Option{<:MatNum} = nothing,
+        b::Option{<:VecNum} = nothing
+    ) -> Regression
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 
@@ -438,8 +519,11 @@ Regression
   - [`AbstractRegressionResult`](@ref)
 """
 @concrete struct Regression <: AbstractRegressionResult
+    "$(arg_dict[:M])"
     M
+    "$(arg_dict[:L])"
     L
+    "$(arg_dict[:b])"
     b
     function Regression(M::MatNum, L::Option{<:MatNum}, b::Option{<:VecNum})
         @argcheck(!isempty(M), IsEmptyError)

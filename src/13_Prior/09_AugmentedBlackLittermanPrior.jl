@@ -1,21 +1,5 @@
 """
-    struct AugmentedBlackLittermanPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13,
-                                        T14} <: AbstractLowOrderPriorEstimator_F
-        a_pe::T1
-        f_pe::T2
-        mp::T3
-        re::T4
-        a_views::T5
-        f_views::T6
-        a_sets::T7
-        f_sets::T8
-        a_views_conf::T9
-        f_views_conf::T10
-        w::T11
-        rf::T12
-        l::T13
-        tau::T14
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Augmented Black-Litterman prior estimator for asset returns.
 
@@ -38,23 +22,26 @@ Augmented Black-Litterman prior estimator for asset returns.
   - `l`: Optional leverage parameter.
   - `tau`: Blending parameter. When computing the prior, if `nothing`, defaults to `1/T` where `T` is the number of observations.
 
-# Constructor
+# Constructors
 
-    AugmentedBlackLittermanPrior(; a_pe::AbstractLowOrderPriorEstimator_A_AF = EmpiricalPrior(),
-                                 f_pe::AbstractLowOrderPriorEstimator_A_AF = EmpiricalPrior(),
-                                 mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing(),
-                                 re::AbstractRegressionEstimator = StepwiseRegression(),
-                                 a_views::Lc_BLV,
-                                 f_views::Lc_BLV,
-                                 a_sets::Option{<:AssetSets} = nothing,
-                                 f_sets::Option{<:AssetSets} = nothing,
-                                 a_views_conf::Option{<:Num_VecNum} = nothing,
-                                 f_views_conf::Option{<:Num_VecNum} = nothing,
-                                 w::Option{<:VecNum} = nothing, rf::Number = 0.0,
-                                 l::Option{<:Number} = nothing,
-                                 tau::Option{<:Number} = nothing)
+    AugmentedBlackLittermanPrior(;
+        a_pe::AbstractLowOrderPriorEstimator_A_AF = EmpiricalPrior(),
+        f_pe::AbstractLowOrderPriorEstimator_A_AF = EmpiricalPrior(),
+        mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing(),
+        re::AbstractRegressionEstimator = StepwiseRegression(),
+        a_views::Lc_BLV,
+        f_views::Lc_BLV,
+        a_sets::Option{<:AssetSets} = nothing,
+        f_sets::Option{<:AssetSets} = nothing,
+        a_views_conf::Option{<:Num_VecNum} = nothing,
+        f_views_conf::Option{<:Num_VecNum} = nothing,
+        w::Option{<:VecNum} = nothing,
+        rf::Number = 0.0,
+        l::Option{<:Number} = nothing,
+        tau::Option{<:Number} = nothing
+    ) -> AugmentedBlackLittermanPrior
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 
@@ -84,12 +71,10 @@ AugmentedBlackLittermanPrior
                │        ce ┼ PortfolioOptimisersCovariance
                │           │   ce ┼ Covariance
                │           │      │    me ┼ SimpleExpectedReturns
-               │           │      │       │     w ┼ nothing
-               │           │      │       │   idx ┴ nothing
+               │           │      │       │   w ┴ nothing
                │           │      │    ce ┼ GeneralCovariance
-               │           │      │       │    ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-               │           │      │       │     w ┼ nothing
-               │           │      │       │   idx ┴ nothing
+               │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+               │           │      │       │    w ┴ nothing
                │           │      │   alg ┴ Full()
                │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
                │           │      │     pdm ┼ Posdef
@@ -100,19 +85,16 @@ AugmentedBlackLittermanPrior
                │           │      │     alg ┼ nothing
                │           │      │   order ┴ DenoiseDetoneAlg()
                │        me ┼ SimpleExpectedReturns
-               │           │     w ┼ nothing
-               │           │   idx ┴ nothing
+               │           │   w ┴ nothing
                │   horizon ┴ nothing
           f_pe ┼ EmpiricalPrior
                │        ce ┼ PortfolioOptimisersCovariance
                │           │   ce ┼ Covariance
                │           │      │    me ┼ SimpleExpectedReturns
-               │           │      │       │     w ┼ nothing
-               │           │      │       │   idx ┴ nothing
+               │           │      │       │   w ┴ nothing
                │           │      │    ce ┼ GeneralCovariance
-               │           │      │       │    ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-               │           │      │       │     w ┼ nothing
-               │           │      │       │   idx ┴ nothing
+               │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+               │           │      │       │    w ┴ nothing
                │           │      │   alg ┴ Full()
                │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
                │           │      │     pdm ┼ Posdef
@@ -123,8 +105,7 @@ AugmentedBlackLittermanPrior
                │           │      │     alg ┼ nothing
                │           │      │   order ┴ DenoiseDetoneAlg()
                │        me ┼ SimpleExpectedReturns
-               │           │     w ┼ nothing
-               │           │   idx ┴ nothing
+               │           │   w ┴ nothing
                │   horizon ┴ nothing
             mp ┼ DenoiseDetoneAlgMatrixProcessing
                │     pdm ┼ Posdef
@@ -244,7 +225,7 @@ function AugmentedBlackLittermanPrior(;
     return AugmentedBlackLittermanPrior(a_pe, f_pe, mp, re, a_views, f_views, a_sets,
                                         f_sets, a_views_conf, f_views_conf, w, rf, l, tau)
 end
-function factory(pe::AugmentedBlackLittermanPrior, w::StatsBase.AbstractWeights)
+function factory(pe::AugmentedBlackLittermanPrior, w::ObsWeights)
     return AugmentedBlackLittermanPrior(; a_pe = factory(pe.a_pe, w),
                                         f_pe = factory(pe.f_pe, w), mp = pe.mp,
                                         re = factory(pe.re, w), a_views = pe.a_views,

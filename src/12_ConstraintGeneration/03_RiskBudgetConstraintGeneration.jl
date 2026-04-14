@@ -1,7 +1,5 @@
 """
-    struct RiskBudget{T1} <: AbstractConstraintResult
-        val::T1
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Container for the result of a risk budget constraint.
 
@@ -11,11 +9,13 @@ Container for the result of a risk budget constraint.
 
   - `val`: Vector of risk budget allocations (typically `VecNum`).
 
-# Constructor
+# Constructors
 
-    RiskBudget(; val::VecNum)
+    RiskBudget(;
+        val::VecNum
+    ) -> RiskBudget
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 
@@ -47,6 +47,27 @@ end
 function RiskBudget(; val::Num_VecNum)
     return RiskBudget(val)
 end
+"""
+    risk_budget_view(rb, i)
+
+Get a view or subset of risk budget constraints for asset cluster index `i`.
+
+Returns `nothing` for `nothing` inputs, the budget unchanged for estimators, or a sliced budget for [`RiskBudget`](@ref) results.
+
+# Arguments
+
+  - `rb`: Risk budget, estimator, or `nothing`.
+  - `i`: Cluster or asset index.
+
+# Returns
+
+  - Sliced risk budget or unchanged value.
+
+# Related
+
+  - [`RiskBudget`](@ref)
+  - [`RiskBudgetEstimator`](@ref)
+"""
 function risk_budget_view(::Nothing, args...)
     return nothing
 end
@@ -55,9 +76,7 @@ function risk_budget_view(rb::RiskBudget, i)
     return RiskBudget(; val = val)
 end
 """
-    struct RiskBudgetEstimator{T1} <: AbstractConstraintEstimator
-        val::T1
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Container for a risk budget allocation mapping or vector.
 
@@ -67,11 +86,13 @@ Container for a risk budget allocation mapping or vector.
 
   - `val`: A dictionary, pair, or vector of pairs mapping asset or group names to risk budget values.
 
-# Constructor
+# Constructors
 
-    RiskBudgetEstimator(; val::EstValType)
+    RiskBudgetEstimator(;
+        val::EstValType
+    ) -> RiskBudgetEstimator
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 
@@ -109,6 +130,19 @@ end
 function RiskBudgetEstimator(; val::EstValType, dval::Option{<:Number} = nothing)
     return RiskBudgetEstimator(val, dval)
 end
+"""
+    const RkbE_Rkb = Union{<:RiskBudgetEstimator, <:RiskBudget}
+
+Alias for a risk budget estimator or result.
+
+Matches either a [`RiskBudgetEstimator`](@ref) (specifying how to generate risk budget constraints) or a [`RiskBudget`](@ref) result (a pre-computed risk budget allocation). Used internally to accept either form in constraint generation dispatch.
+
+# Related
+
+  - [`RiskBudgetEstimator`](@ref)
+  - [`RiskBudget`](@ref)
+  - [`risk_budget_constraints`](@ref)
+"""
 const RkbE_Rkb = Union{<:RiskBudgetEstimator, <:RiskBudget}
 function risk_budget_view(rb::RiskBudgetEstimator, ::Any)
     return rb
@@ -119,11 +153,11 @@ end
 
 No-op fallback for risk budget constraint generation.
 
-This method returns a uniform risk budget allocation when no explicit risk budget is not `nothing`. It creates a [`RiskBudget`](@ref) with equal weights summing to one, using the specified number of assets `N` and numeric type `datatype`. This is useful as a default in workflows where a risk budget is optional or omitted.
+This method returns a uniform risk budget allocation when no explicit risk budget is specified (`nothing`). It creates a [`RiskBudget`](@ref) with equal weights summing to one, using the specified number of assets `N` and numeric type `datatype`. This is useful as a default in workflows where a risk budget is optional or omitted.
 
 # Arguments
 
-  - `::Nothing`: Indicates that no risk budget is not `nothing`.
+  - `::Nothing`: Indicates that no explicit risk budget is specified.
   - `args...`: Additional positional arguments (ignored).
   - `N::Number`: Number of assets (required).
   - `datatype::DataType`: Numeric type for the risk budget vector.

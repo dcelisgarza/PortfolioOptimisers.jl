@@ -1,5 +1,5 @@
 """
-    abstract type AbstractTracking <: AbstractResult end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all tracking result types in `PortfolioOptimisers.jl`.
 
@@ -41,7 +41,7 @@ Union type for a single tracking result or a vector of tracking results.
 """
 const Tr_VecTr = Union{<:AbstractTracking, <:VecTr}
 """
-    abstract type AbstractTrackingAlgorithm <: AbstractAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all tracking algorithm types in `PortfolioOptimisers.jl`.
 
@@ -59,7 +59,7 @@ function needs_previous_weights(::AbstractTrackingAlgorithm)
     return false
 end
 """
-    abstract type TrackingFormulation <: AbstractAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all tracking formulation algorithm types in `PortfolioOptimisers.jl`.
 
@@ -76,7 +76,7 @@ All concrete and/or abstract types representing tracking formulation algorithms 
 """
 abstract type TrackingFormulation <: AbstractAlgorithm end
 """
-    abstract type NormTracking <: TrackingFormulation end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all norm-based tracking formulation algorithms in `PortfolioOptimisers.jl`.
 
@@ -91,7 +91,7 @@ All concrete and/or abstract types representing norm-based tracking algorithms (
 """
 abstract type NormTracking <: TrackingFormulation end
 """
-    abstract type VariableTracking <: TrackingFormulation end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all variable-based tracking formulation algorithms in `PortfolioOptimisers.jl`.
 
@@ -105,9 +105,7 @@ All concrete and/or abstract types representing variable-based tracking algorith
 """
 abstract type VariableTracking <: TrackingFormulation end
 """
-    struct L2Tracking{T1} <: NormTracking
-        ddof::T1
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Second-order cone (SOC) norm-based tracking formulation.
 
@@ -117,9 +115,11 @@ Second-order cone (SOC) norm-based tracking formulation.
 
   - `ddof`: Degrees of freedom adjustment.
 
-# Constructor
+# Constructors
 
-    L2Tracking(; ddof::Integer = 1)
+    L2Tracking(;
+        ddof::Integer = 1
+    ) -> L2Tracking
 
 ## Validation
 
@@ -151,9 +151,7 @@ function L2Tracking(; ddof::Integer = 1)
     return L2Tracking(ddof)
 end
 """
-    struct SquaredL2Tracking{T1} <: NormTracking
-        ddof::T1
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Second-order cone (SOC) squared norm-based tracking formulation.
 
@@ -165,9 +163,9 @@ Second-order cone (SOC) squared norm-based tracking formulation.
 
 # Constructors
 
-```julia
-SquaredL2Tracking(; ddof::Integer = 1)
-```
+    SquaredL2Tracking(;
+        ddof::Integer = 1,
+    ) -> SquaredL2Tracking
 
   - `ddof`: Sets the degrees of freedom adjustment.
 
@@ -201,7 +199,7 @@ function SquaredL2Tracking(; ddof::Integer = 1)
     return SquaredL2Tracking(ddof)
 end
 """
-    struct L1Tracking <: NormTracking end
+$(DocStringExtensions.TYPEDEF)
 
 Norm-one (NOC) tracking formulation.
 
@@ -222,6 +220,29 @@ L1Tracking()
   - [`norm_tracking`](@ref)
 """
 struct L1Tracking <: NormTracking end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+L-p norm tracking error estimator.
+
+Computes the Lp-norm of the difference between portfolio and benchmark returns: ``\\lvert\\mathbf{X} \\boldsymbol{w} - \\boldsymbol{b}\\rvert_p``.
+
+# Fields
+
+  - `p`: The p-norm exponent (default 3).
+  - `ddof`: Degrees of freedom correction for the mean (default 0).
+
+# Constructors
+
+    LpTracking(; p::Number = 3, ddof::Integer = 0) -> LpTracking
+
+# Related
+
+  - [`NormTracking`](@ref)
+  - [`L1Tracking`](@ref)
+  - [`L2Tracking`](@ref)
+  - [`LInfTracking`](@ref)
+"""
 @concrete struct LpTracking <: NormTracking
     p
     ddof
@@ -233,6 +254,29 @@ end
 function LpTracking(; p::Number = 3, ddof::Integer = 0)
     return LpTracking(p, ddof)
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+L-infinity norm (maximum absolute deviation) tracking error estimator.
+
+Computes the L∞-norm (maximum absolute deviation) of the difference between portfolio and benchmark returns.
+
+# Fields
+
+  - `ddof`: Degrees of freedom correction for the mean (default 0).
+  - `pos`: If `true`, uses the positive part of the maximum deviation (default `true`).
+
+# Constructors
+
+    LInfTracking(; ddof::Integer = 0, pos::Bool = true) -> LInfTracking
+
+# Related
+
+  - [`NormTracking`](@ref)
+  - [`LpTracking`](@ref)
+  - [`L1Tracking`](@ref)
+  - [`L2Tracking`](@ref)
+"""
 @concrete struct LInfTracking <: NormTracking
     ddof
     pos
@@ -318,7 +362,7 @@ function norm_tracking(f::LInfTracking, a, b, T::Option{<:Number} = nothing)
     return LinearAlgebra.norm(a - b, p) / factor
 end
 """
-    struct IndependentVariableTracking <: VariableTracking end
+$(DocStringExtensions.TYPEDEF)
 
 Independent variable-based tracking formulation.
 
@@ -331,7 +375,7 @@ Independent variable-based tracking formulation.
 """
 struct IndependentVariableTracking <: VariableTracking end
 """
-    struct DependentVariableTracking <: VariableTracking end
+$(DocStringExtensions.TYPEDEF)
 
 Dependent variable-based tracking formulation.
 
@@ -375,11 +419,7 @@ function tracking_view(::Nothing, ::Any)
     return nothing
 end
 """
-    struct WeightsTracking{T1, T2, T3} <: AbstractTrackingAlgorithm
-        fees::T1
-        w::T2
-        fixed::T3
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Asset weights-based tracking algorithm.
 
@@ -391,9 +431,13 @@ Asset weights-based tracking algorithm.
   - `w`: Portfolio weights (vector of real numbers).
   - `fixed`: Boolean indicating whether the algorithm is fixed (does not update with new weights) or variable (updates with new weights).
 
-# Constructor
+# Constructors
 
-    WeightsTracking(; fees::Option{<:Fees} = nothing, w::VecNum, fixed::Bool = false)
+    WeightsTracking(;
+        fees::Option{<:Fees} = nothing,
+        w::VecNum,
+        fixed::Bool = false
+    ) -> WeightsTracking
 
 ## Validation
 
@@ -617,9 +661,7 @@ function tracking_benchmark(tr::WeightsTracking, X::MatNum)
     return calc_net_returns(tr.w, X, tr.fees)
 end
 """
-    struct ReturnsTracking{T1} <: AbstractTrackingAlgorithm
-        w::T1
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Returns-based tracking algorithm.
 
@@ -629,9 +671,11 @@ Returns-based tracking algorithm.
 
   - `w`: Benchmark portfolio returns (vector of real numbers).
 
-# Constructor
+# Constructors
 
-    ReturnsTracking(; w::VecNum)
+    ReturnsTracking(;
+        w::VecNum
+    ) -> ReturnsTracking
 
 ## Validation
 
@@ -758,11 +802,7 @@ function factory(tr::ReturnsTracking, ::Any)
     return tr
 end
 """
-    struct TrackingError{T1, T2, T3} <: AbstractTracking
-        tr::T1
-        err::T2
-        alg::T3
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Tracking error result type.
 
@@ -774,10 +814,13 @@ Tracking error result type.
   - `err`: Tracking error value.
   - `alg`: Tracking formulation algorithm.
 
-# Constructor
+# Constructors
 
-    TrackingError(; tr::AbstractTrackingAlgorithm, err::Number = 0.0,
-                  alg::NormTracking = L2Tracking())
+    TrackingError(;
+        tr::AbstractTrackingAlgorithm,
+        err::Number = 0.0,
+        alg::NormTracking = L2Tracking()
+    ) -> TrackingError
 
 ## Validation
 
@@ -801,6 +844,7 @@ TrackingError
 
 # Related
 
+  - [`set_tracking_error_constraints!`](@ref)
   - [`AbstractTracking`](@ref)
   - [`WeightsTracking`](@ref)
   - [`ReturnsTracking`](@ref)

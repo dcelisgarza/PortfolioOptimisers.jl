@@ -1,4 +1,42 @@
 # https://portfoliooptimizationbook.com/slides/slides-index-tracking.pdf
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Represents the Risk Tracking Error configuration for benchmark weight tracking.
+
+`RiskTrackingError` specifies that tracking error against a benchmark should be measured as a risk quantity (rather than a norm). It wraps a `WeightsTracking` benchmark, a risk measure `r`, a scalar error tolerance `err`, and a tracking algorithm `alg`.
+
+# Fields
+
+  - `tr`: Benchmark weights tracking specification.
+  - `r`: Risk measure used to compute the tracking error.
+  - `err`: Scalar error tolerance (non-negative finite number).
+  - `alg`: Tracking algorithm (`IndependentVariableTracking` or `DependentVariableTracking`).
+
+# Constructors
+
+    RiskTrackingError(;
+        tr::WeightsTracking,
+        r::AbstractBaseRiskMeasure = StandardDeviation(),
+        err::Number = 0.0,
+        alg::VariableTracking = IndependentVariableTracking()
+    ) -> RiskTrackingError
+
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - `err` is validated with [`assert_nonempty_nonneg_finite_val`](@ref).
+
+# Related
+
+  - [`set_tracking_error_constraints!`](@ref)
+  - [`TrackingRiskMeasure`](@ref)
+  - [`RiskTrackingRiskMeasure`](@ref)
+  - [`WeightsTracking`](@ref)
+  - [`IndependentVariableTracking`](@ref)
+  - [`DependentVariableTracking`](@ref)
+"""
 @concrete struct RiskTrackingError <: AbstractTracking
     tr
     r
@@ -37,6 +75,75 @@ function factory(tr::RiskTrackingError, w::VecNum)
     return RiskTrackingError(; tr = factory(tr.tr, w), r = factory(tr.r, w), err = tr.err,
                              alg = tr.alg)
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Represents the Tracking Error risk measure.
+
+`TrackingRiskMeasure` penalises portfolio deviation from a benchmark by computing a norm of the difference between portfolio returns and a benchmark return series or benchmark weights. The tracking error can be defined using returns-based or weights-based benchmarks, and the norm is configurable.
+
+# Mathematical Definition
+
+Let ``\\boldsymbol{x}`` be the portfolio returns series, ``\\boldsymbol{b}`` the benchmark returns, and ``N_T`` the number of observations. The ``L^2`` tracking error is:
+
+```math
+\\mathrm{TE}(\\boldsymbol{w}) = \\sqrt{\\frac{1}{N_T}\\lVert \\boldsymbol{x} - \\boldsymbol{b} \\rVert_2^2}\\,.
+```
+
+Other norms can be selected via the `alg` field.
+
+# Fields
+
+  - `settings`: Risk measure configuration.
+  - `tr`: Tracking algorithm specifying the benchmark (weights- or returns-based).
+  - `alg`: Norm type for the tracking error (`L2Tracking`, `SquaredL2Tracking`, etc.).
+
+# Constructors
+
+    TrackingRiskMeasure(;
+        settings::RiskMeasureSettings = RiskMeasureSettings(),
+        tr::AbstractTrackingAlgorithm,
+        alg::NormTracking = L2Tracking()
+    ) -> TrackingRiskMeasure
+
+Keywords correspond to the struct's fields.
+
+# Functor
+
+    (r::TrackingRiskMeasure)(w::VecNum, X::MatNum, fees = nothing)
+
+Computes the Tracking Error of a portfolio weight vector `w`.
+
+## Arguments
+
+  - `w::VecNum`: Portfolio weights vector.
+  - `X::MatNum`: Asset returns matrix (``T \\times N``).
+  - `fees`: Optional fee structure.
+
+# Examples
+
+```jldoctest
+julia> TrackingRiskMeasure(; tr = ReturnsTracking(; w = [0.1, -0.2, 0.3]))
+TrackingRiskMeasure
+  settings ┼ RiskMeasureSettings
+           │   scale ┼ Float64: 1.0
+           │      ub ┼ nothing
+           │     rke ┴ Bool: true
+        tr ┼ ReturnsTracking
+           │   w ┴ Vector{Float64}: [0.1, -0.2, 0.3]
+       alg ┼ L2Tracking
+           │   ddof ┴ Int64: 1
+```
+
+# Related
+
+  - [`RiskMeasure`](@ref)
+  - [`RiskMeasureSettings`](@ref)
+  - [`TurnoverRiskMeasure`](@ref)
+  - [`RiskTrackingRiskMeasure`](@ref)
+  - [`AbstractTrackingAlgorithm`](@ref)
+  - [`NormTracking`](@ref)
+"""
 @concrete struct TrackingRiskMeasure <: RiskMeasure
     settings
     tr
@@ -76,6 +183,97 @@ end
 function factory(r::TrackingRiskMeasure, ::Any, ::Any, ::Any, w::VecNum, args...; kwargs...)
     return factory(r, w)
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Represents the Risk Tracking risk measure.
+
+`RiskTrackingRiskMeasure` computes the deviation of portfolio risk from a benchmark portfolio risk, using any base risk measure. Two modes are supported:
+
+  - **Independent** (`IndependentVariableTracking`): computes the risk of the weight difference ``\\boldsymbol{w} - \\boldsymbol{w}_b``.
+  - **Dependent** (`DependentVariableTracking`): computes the absolute difference between the portfolio risk and the benchmark risk.
+
+# Mathematical Definition
+
+**Independent mode:**
+
+```math
+\\mathrm{RkTrack}_{\\mathrm{indep}}(\\boldsymbol{w}) = \\rho(\\boldsymbol{w} - \\boldsymbol{w}_b)\\,,
+```
+
+**Dependent mode:**
+
+```math
+\\mathrm{RkTrack}_{\\mathrm{dep}}(\\boldsymbol{w}) = |\\rho(\\boldsymbol{w}) - \\rho(\\boldsymbol{w}_b)|\\,,
+```
+
+where ``\\boldsymbol{w}_b`` are the benchmark weights and ``\\rho`` is the chosen risk measure.
+
+# Fields
+
+  - `settings`: Risk measure configuration.
+  - `tr`: Benchmark weights tracking specification.
+  - `r`: Risk measure for computing the tracking deviation.
+  - `alg`: Tracking mode (`IndependentVariableTracking` or `DependentVariableTracking`).
+
+# Constructors
+
+    RiskTrackingRiskMeasure(;
+        settings::RiskMeasureSettings = RiskMeasureSettings(),
+        tr::WeightsTracking,
+        r::AbstractBaseRiskMeasure = Variance(),
+        alg::VariableTracking = IndependentVariableTracking()
+    ) -> RiskTrackingRiskMeasure
+
+Keywords correspond to the struct's fields.
+
+# Functor
+
+    (r::RiskTrackingRiskMeasure)(w::VecNum, X::MatNum, fees = nothing)
+
+Computes the Risk Tracking deviation of a portfolio weight vector `w`.
+
+## Arguments
+
+  - `w::VecNum`: Portfolio weights vector.
+  - `X::MatNum`: Asset returns matrix (``T \\times N``).
+  - `fees`: Optional fee structure.
+
+# Examples
+
+```jldoctest
+julia> RiskTrackingRiskMeasure(; tr = WeightsTracking(; w = [0.5, 0.5]))
+RiskTrackingRiskMeasure
+  settings ┼ RiskMeasureSettings
+           │   scale ┼ Float64: 1.0
+           │      ub ┼ nothing
+           │     rke ┴ Bool: true
+        tr ┼ WeightsTracking
+           │    fees ┼ nothing
+           │       w ┼ Vector{Float64}: [0.5, 0.5]
+           │   fixed ┴ Bool: false
+         r ┼ Variance
+           │   settings ┼ RiskMeasureSettings
+           │            │   scale ┼ Int64: 1
+           │            │      ub ┼ nothing
+           │            │     rke ┴ Bool: false
+           │      sigma ┼ nothing
+           │       chol ┼ nothing
+           │         rc ┼ nothing
+           │        alg ┴ SquaredSOCRiskExpr()
+       alg ┴ IndependentVariableTracking()
+```
+
+# Related
+
+  - [`RiskMeasure`](@ref)
+  - [`RiskMeasureSettings`](@ref)
+  - [`TrackingRiskMeasure`](@ref)
+  - [`TurnoverRiskMeasure`](@ref)
+  - [`WeightsTracking`](@ref)
+  - [`IndependentVariableTracking`](@ref)
+  - [`DependentVariableTracking`](@ref)
+"""
 @concrete struct RiskTrackingRiskMeasure <: RiskMeasure
     settings
     tr
@@ -128,6 +326,16 @@ function factory(r::RiskTrackingRiskMeasure, w::VecNum)
     return RiskTrackingRiskMeasure(; settings = r.settings, tr = factory(r.tr, w),
                                    r = factory(r.r, w), alg = r.alg)
 end
+"""
+    const TrRM = Union{<:TrackingRiskMeasure, <:RiskTrackingRiskMeasure}
+
+Union of tracking risk measures used for dispatch on factory methods and expected risk computations.
+
+# Related
+
+  - [`TrackingRiskMeasure`](@ref)
+  - [`RiskTrackingRiskMeasure`](@ref)
+"""
 const TrRM = Union{<:TrackingRiskMeasure, <:RiskTrackingRiskMeasure}
 
 export TrackingRiskMeasure, RiskTrackingRiskMeasure, RiskTrackingError

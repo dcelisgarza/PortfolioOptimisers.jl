@@ -1,9 +1,5 @@
 """
-    struct EmpiricalPrior{T1, T2, T3} <: AbstractLowOrderPriorEstimator_A
-        ce::T1
-        me::T2
-        horizon::T3
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Empirical prior estimator for asset returns.
 
@@ -15,13 +11,15 @@ Empirical prior estimator for asset returns.
   - `me`: Expected returns estimator.
   - `horizon`: Optional investment horizon.
 
-# Constructor
+# Constructors
 
-    EmpiricalPrior(; ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
-                   me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
-                   horizon::Option{<:Number} = nothing)
+    EmpiricalPrior(;
+        ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
+        me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
+        horizon::Option{<:Number} = nothing
+    ) -> EmpiricalPrior
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 
@@ -35,12 +33,10 @@ EmpiricalPrior
        ce ┼ PortfolioOptimisersCovariance
           │   ce ┼ Covariance
           │      │    me ┼ SimpleExpectedReturns
-          │      │       │     w ┼ nothing
-          │      │       │   idx ┴ nothing
+          │      │       │   w ┴ nothing
           │      │    ce ┼ GeneralCovariance
-          │      │       │    ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-          │      │       │     w ┼ nothing
-          │      │       │   idx ┴ nothing
+          │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+          │      │       │    w ┴ nothing
           │      │   alg ┴ Full()
           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
           │      │     pdm ┼ Posdef
@@ -51,8 +47,7 @@ EmpiricalPrior
           │      │     alg ┼ nothing
           │      │   order ┴ DenoiseDetoneAlg()
        me ┼ SimpleExpectedReturns
-          │     w ┼ nothing
-          │   idx ┴ nothing
+          │   w ┴ nothing
   horizon ┴ nothing
 ```
 
@@ -83,7 +78,7 @@ function EmpiricalPrior(;
                         horizon::Option{<:Number} = nothing)
     return EmpiricalPrior(ce, me, horizon)
 end
-function factory(pe::EmpiricalPrior, w::StatsBase.AbstractWeights)
+function factory(pe::EmpiricalPrior, w::ObsWeights)
     return EmpiricalPrior(; me = factory(pe.me, w), ce = factory(pe.ce, w),
                           horizon = pe.horizon)
 end

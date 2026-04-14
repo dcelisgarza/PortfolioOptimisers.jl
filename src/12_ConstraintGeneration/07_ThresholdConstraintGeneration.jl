@@ -1,9 +1,5 @@
 """
-    struct ThresholdEstimator{T1, T2, T3} <: AbstractConstraintEstimator
-        val::T1
-        key::T2
-        dval::T3
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Estimator for buy-in threshold portfolio constraints.
 
@@ -15,10 +11,13 @@ Estimator for buy-in threshold portfolio constraints.
   - `key`: (Optional) Key in the [`AssetSets`](@ref) to specify the asset universe for constraint generation. When provided, takes precedence over `key` field of [`AssetSets`](@ref).
   - `dval`: Default threshold value applied to assets not explicitly specified in `val`.
 
-# Constructor
+# Constructors
 
-    ThresholdEstimator(; val::EstValType, dval::Option{<:Number} = nothing,
-                             key::Option{<:AbstractString} = nothing)
+    ThresholdEstimator(;
+        val::EstValType,
+        dval::Option{<:Number} = nothing,
+        key::Option{<:AbstractString} = nothing
+    ) -> ThresholdEstimator
 
 ## Validation
 
@@ -86,9 +85,7 @@ function ThresholdEstimator(; val::EstValType, key::Option{<:AbstractString} = n
     return ThresholdEstimator(val, key, dval)
 end
 """
-    struct Threshold{T1} <: AbstractConstraintResult
-        val::T1
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Container for buy-in threshold portfolio constraints.
 
@@ -98,9 +95,11 @@ Container for buy-in threshold portfolio constraints.
 
   - `val`: Scalar or vector of threshold values for portfolio weights.
 
-# Constructor
+# Constructors
 
-    Threshold(; val::Num_VecNum)
+    Threshold(;
+        val::Num_VecNum
+    ) -> Threshold
 
 ## Validation
 
@@ -120,6 +119,10 @@ Threshold
 
 # Related
 
+  - [`short_mip_threshold_constraints`](@ref)
+  - [`short_smip_threshold_constraints`](@ref)
+  - [`mip_constraints`](@ref)
+  - [`set_mip_constraints!`](@ref)
   - [`ThresholdEstimator`](@ref)
   - [`threshold_constraints`](@ref)
   - [`AbstractConstraintResult`](@ref)
@@ -134,11 +137,93 @@ end
 function Threshold(; val::Num_VecNum)
     return Threshold(val)
 end
+"""
+    const BtE_Bt = Union{<:Threshold, <:ThresholdEstimator}
+
+Alias for a threshold constraint result or estimator.
+
+Matches either a [`Threshold`](@ref) result or a [`ThresholdEstimator`](@ref). Used internally for dispatch in threshold constraint generation.
+
+# Related
+
+  - [`Threshold`](@ref)
+  - [`ThresholdEstimator`](@ref)
+  - [`threshold_constraints`](@ref)
+"""
 const BtE_Bt = Union{<:Threshold, <:ThresholdEstimator}
+"""
+    const VecOptBtE_Bt = AbstractVector{<:Option{<:BtE_Bt}}
+
+Alias for a vector of optional threshold estimators or results.
+
+Represents a collection of optional [`BtE_Bt`](@ref) elements (threshold estimators or results, or `nothing`).
+
+# Related
+
+  - [`BtE_Bt`](@ref)
+  - [`BtE_Bt_VecOptBtE_Bt`](@ref)
+"""
 const VecOptBtE_Bt = AbstractVector{<:Option{<:BtE_Bt}}
+"""
+    const BtE_Bt_VecOptBtE_Bt = Union{<:BtE_Bt, <:VecOptBtE_Bt}
+
+Alias for a single or vector of optional threshold estimators or results.
+
+Matches either a single [`BtE_Bt`](@ref) or a vector of optional ones.
+
+# Related
+
+  - [`BtE_Bt`](@ref)
+  - [`VecOptBtE_Bt`](@ref)
+"""
 const BtE_Bt_VecOptBtE_Bt = Union{<:BtE_Bt, <:VecOptBtE_Bt}
+"""
+    const VecOptBt = AbstractVector{<:Option{<:Threshold}}
+
+Alias for a vector of optional threshold results.
+
+Represents a collection of optional [`Threshold`](@ref) elements.
+
+# Related
+
+  - [`Threshold`](@ref)
+  - [`Bt_VecOptBt`](@ref)
+"""
 const VecOptBt = AbstractVector{<:Option{<:Threshold}}
+"""
+    const Bt_VecOptBt = Union{<:Threshold, <:VecOptBt}
+
+Alias for a single threshold result or a vector of optional threshold results.
+
+Matches either a single [`Threshold`](@ref) or a vector of optional [`Threshold`](@ref) objects.
+
+# Related
+
+  - [`Threshold`](@ref)
+  - [`VecOptBt`](@ref)
+"""
 const Bt_VecOptBt = Union{<:Threshold, <:VecOptBt}
+"""
+    threshold_view(t, i)
+
+Get a view or subset of threshold constraints for asset index `i`.
+
+Returns a view of the threshold for the specified index. If `t` is `nothing`, returns `nothing`. Handles all threshold types.
+
+# Arguments
+
+  - `t`: Threshold object, estimator, vector thereof, or `nothing`.
+  - `i`: Asset index or range to slice.
+
+# Returns
+
+  - Sliced threshold or `nothing`.
+
+# Related
+
+  - [`Threshold`](@ref)
+  - [`ThresholdEstimator`](@ref)
+"""
 function threshold_view(::Nothing, ::Any)
     return nothing
 end

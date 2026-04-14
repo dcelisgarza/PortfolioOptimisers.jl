@@ -1,16 +1,5 @@
 """
-    struct FeesEstimator{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10} <: AbstractEstimator
-        tn::T1
-        l::T2
-        s::T3
-        fl::T4
-        fs::T5
-        dl::T6
-        ds::T7
-        dfl::T8
-        dfs::T9
-        kwargs::T10
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Estimator for portfolio transaction fees constraints.
 
@@ -35,15 +24,22 @@ This estimator can be converted into a concrete [`Fees`](@ref) constraint using 
   - `dfs`: Default short fixed fees.
   - `kwargs`: Named tuple of keyword arguments for deciding how small an asset weight has to be before being considered zero.
 
-# Constructor
+# Constructors
 
-    FeesEstimator(; tn::Option{<:TnE_Tn} = nothing, l::Option{<:EstValType} = nothing,
-                  s::Option{<:EstValType} = nothing, fl::Option{<:EstValType} = nothing,
-                  fs::Option{<:EstValType} = nothing, dl::Option{<:Number} = nothing,
-                  ds::Option{<:Number} = nothing, dfl::Option{<:Number} = nothing,
-                  dfs::Option{<:Number} = nothing, kwargs::NamedTuple = (; atol = 1e-8))
+    FeesEstimator(;
+        tn::Option{<:TnE_Tn} = nothing,
+        l::Option{<:EstValType} = nothing,
+        s::Option{<:EstValType} = nothing,
+        fl::Option{<:EstValType} = nothing,
+        fs::Option{<:EstValType} = nothing,
+        dl::Option{<:Number} = nothing,
+        ds::Option{<:Number} = nothing,
+        dfl::Option{<:Number} = nothing,
+        dfs::Option{<:Number} = nothing,
+        kwargs::NamedTuple = (; atol = 1e-8)
+    ) -> FeesEstimator
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 
@@ -213,14 +209,7 @@ function fees_view(fees::FeesEstimator, i)
                          ds = fees.ds, dfl = fees.dfl, dfs = fees.dfs, kwargs = fees.kwargs)
 end
 """
-    struct Fees{T1, T2, T3, T4, T5, T6} <: AbstractResult
-        tn::T1
-        l::T2
-        s::T3
-        fl::T4
-        fs::T5
-        kwargs::T6
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Container for portfolio transaction fee constraints.
 
@@ -303,11 +292,16 @@ Where:
   - `fs`: Short fixed fees.
   - `kwargs`: Named tuple of keyword arguments for deciding how small an asset weight has to be before being considered zero.
 
-# Constructor
+# Constructors
 
-    Fees(; tn::Option{<:Turnover} = nothing, l::Option{<:Num_VecNum} = nothing,
-         s::Option{<:Num_VecNum} = nothing, fl::Option{<:Num_VecNum} = nothing,
-         fs::Option{<:Num_VecNum} = nothing, kwargs::NamedTuple = (; atol = 1e-8))
+    Fees(;
+        tn::Option{<:Turnover} = nothing,
+        l::Option{<:Num_VecNum} = nothing,
+        s::Option{<:Num_VecNum} = nothing,
+        fl::Option{<:Num_VecNum} = nothing,
+        fs::Option{<:Num_VecNum} = nothing,
+        kwargs::NamedTuple = (; atol = 1e-8)
+    ) -> Fees
 
 ## Validation
 
@@ -332,6 +326,11 @@ Fees
 
 # Related
 
+  - [`add_to_fees!`](@ref)
+  - [`set_non_fixed_fees!`](@ref)
+  - [`set_long_non_fixed_fees!`](@ref)
+  - [`set_short_non_fixed_fees!`](@ref)
+  - [`set_turnover_fees!`](@ref)
   - [`FeesEstimator`](@ref)
   - [`Option`](@ref)
   - [`Turnover`](@ref)
@@ -983,14 +982,13 @@ end
 """
     calc_fees(w::VecNum, fees::Fees)
 
-Compute total fees for portfolio weights and prices.
+Compute total fees for portfolio weights.
 
 Sums proportional, fixed, and turnover fees for all assets.
 
 # Arguments
 
   - `w`: Portfolio weights.
-  - `p`: Asset prices.
   - `fees`: [`Fees`](@ref) structure.
 
 # Returns
@@ -1339,14 +1337,13 @@ end
 """
     calc_asset_fees(w::VecNum, fees::Fees)
 
-Compute total per asset fees for portfolio weights and prices.
+Compute total per asset fees for portfolio weights.
 
 Sums proportional, fixed, and turnover fees for all assets.
 
 # Arguments
 
   - `w`: Portfolio weights.
-  - `p`: Asset prices.
   - `fees`: [`Fees`](@ref) structure.
 
 # Returns

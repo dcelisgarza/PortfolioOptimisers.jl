@@ -1,13 +1,5 @@
 """
-    struct NormalUncertaintySet{T1, T2, T3, T4, T5, T6, T7} <: AbstractUncertaintySetEstimator
-        pe::T1
-        alg::T2
-        n_sim::T3
-        q::T4
-        rng::T5
-        seed::T6
-        ens::T7
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Estimator for box or ellipsoidal uncertainty sets under the assumption of normally distributed returns in portfolio optimisation.
 
@@ -20,16 +12,22 @@ Estimator for box or ellipsoidal uncertainty sets under the assumption of normal
   - `rng`: Random number generator for simulation.
   - `seed`: Optional random seed for reproducibility.
   - `ens`: Optional effective number of scenarios used for scaling the uncertainty sets.
+  - `kwargs`: Additional keyword arguments to pass on to [`Statistics.quantile`](https://docs.julialang.org/en/v1/stdlib/Statistics/#Statistics.quantile).
 
 # Constructors
 
-    NormalUncertaintySet(; pe::AbstractLowOrderPriorEstimator = EmpiricalPrior(),
-                         alg::AbstractUncertaintySetAlgorithm = BoxUncertaintySetAlgorithm(),
-                         n_sim::Integer = 3_000, q::Number = 0.05,
-                         rng::Random.AbstractRNG = Random.default_rng(),
-                         seed::Option{<:Integer} = nothing, ens::Option{<:Number} = nothing)
+    NormalUncertaintySet(;
+        pe::AbstractLowOrderPriorEstimator = EmpiricalPrior(),
+        alg::AbstractUncertaintySetAlgorithm = BoxUncertaintySetAlgorithm(),
+        n_sim::Integer = 3_000,
+        q::Number = 0.05,
+        rng::Random.AbstractRNG = Random.default_rng(),
+        seed::Option{<:Integer} = nothing,
+        ens::Option{<:Number} = nothing,
+        kwargs::NamedTuple = (;),
+    ) -> NormalUncertaintySet
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 
@@ -41,35 +39,33 @@ Keyword arguments correspond to the fields above.
 ```jldoctest
 julia> NormalUncertaintySet()
 NormalUncertaintySet
-     pe ┼ EmpiricalPrior
-        │        ce ┼ PortfolioOptimisersCovariance
-        │           │   ce ┼ Covariance
-        │           │      │    me ┼ SimpleExpectedReturns
-        │           │      │       │     w ┼ nothing
-        │           │      │       │   idx ┴ nothing
-        │           │      │    ce ┼ GeneralCovariance
-        │           │      │       │    ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-        │           │      │       │     w ┼ nothing
-        │           │      │       │   idx ┴ nothing
-        │           │      │   alg ┴ Full()
-        │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
-        │           │      │     pdm ┼ Posdef
-        │           │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-        │           │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
-        │           │      │      dn ┼ nothing
-        │           │      │      dt ┼ nothing
-        │           │      │     alg ┼ nothing
-        │           │      │   order ┴ DenoiseDetoneAlg()
-        │        me ┼ SimpleExpectedReturns
-        │           │     w ┼ nothing
-        │           │   idx ┴ nothing
-        │   horizon ┴ nothing
-    alg ┼ BoxUncertaintySetAlgorithm()
-  n_sim ┼ Int64: 3000
-      q ┼ Float64: 0.05
-    rng ┼ Random.TaskLocalRNG: Random.TaskLocalRNG()
-   seed ┼ nothing
-    ens ┴ nothing
+      pe ┼ EmpiricalPrior
+         │        ce ┼ PortfolioOptimisersCovariance
+         │           │   ce ┼ Covariance
+         │           │      │    me ┼ SimpleExpectedReturns
+         │           │      │       │   w ┴ nothing
+         │           │      │    ce ┼ GeneralCovariance
+         │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+         │           │      │       │    w ┴ nothing
+         │           │      │   alg ┴ Full()
+         │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
+         │           │      │     pdm ┼ Posdef
+         │           │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+         │           │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+         │           │      │      dn ┼ nothing
+         │           │      │      dt ┼ nothing
+         │           │      │     alg ┼ nothing
+         │           │      │   order ┴ DenoiseDetoneAlg()
+         │        me ┼ SimpleExpectedReturns
+         │           │   w ┴ nothing
+         │   horizon ┴ nothing
+     alg ┼ BoxUncertaintySetAlgorithm()
+   n_sim ┼ Int64: 3000
+       q ┼ Float64: 0.05
+     rng ┼ Random.TaskLocalRNG: Random.TaskLocalRNG()
+    seed ┼ nothing
+     ens ┼ nothing
+  kwargs ┴ @NamedTuple{}: NamedTuple()
 ```
 
 # Related
@@ -88,14 +84,17 @@ NormalUncertaintySet
     rng
     seed
     ens
+    kwargs
     function NormalUncertaintySet(pe::AbstractLowOrderPriorEstimator,
                                   alg::AbstractUncertaintySetAlgorithm, n_sim::Integer,
                                   q::Number, rng::Random.AbstractRNG,
-                                  seed::Option{<:Integer}, ens::Option{<:Number})
+                                  seed::Option{<:Integer}, ens::Option{<:Number},
+                                  kwargs::NamedTuple)
         @argcheck(zero(n_sim) < n_sim)
         @argcheck(zero(q) < q < one(q))
         return new{typeof(pe), typeof(alg), typeof(n_sim), typeof(q), typeof(rng),
-                   typeof(seed), typeof(ens)}(pe, alg, n_sim, q, rng, seed, ens)
+                   typeof(seed), typeof(ens), typeof(kwargs)}(pe, alg, n_sim, q, rng, seed,
+                                                              ens, kwargs)
     end
 end
 function NormalUncertaintySet(; pe::AbstractLowOrderPriorEstimator = EmpiricalPrior(),
@@ -103,8 +102,8 @@ function NormalUncertaintySet(; pe::AbstractLowOrderPriorEstimator = EmpiricalPr
                               n_sim::Integer = 3_000, q::Number = 0.05,
                               rng::Random.AbstractRNG = Random.default_rng(),
                               seed::Option{<:Integer} = nothing,
-                              ens::Option{<:Number} = nothing)
-    return NormalUncertaintySet(pe, alg, n_sim, q, rng, seed, ens)
+                              ens::Option{<:Number} = nothing, kwargs::NamedTuple = (;))
+    return NormalUncertaintySet(pe, alg, n_sim, q, rng, seed, ens, kwargs)
 end
 """
     commutation_matrix(X::MatNum)
@@ -162,6 +161,26 @@ function commutation_matrix(X::MatNum)
     data = range(1, 1; length = mn)
     return SparseArrays.sparse(row, col, data, mn, mn)
 end
+"""
+    choose_scaling_parameter(ue, pr)
+
+Select the scaling parameter for a normal uncertainty set from the prior result.
+
+Internal helper that extracts the appropriate scaling parameter from `ue` given the prior result `pr`. Dispatches on the uncertainty set and prior types.
+
+# Arguments
+
+  - `ue`: [`NormalUncertaintySet`](@ref) estimator.
+  - `pr`: Prior result.
+
+# Returns
+
+  - Scaling parameter value.
+
+# Related
+
+  - [`NormalUncertaintySet`](@ref)
+"""
 function choose_scaling_parameter(ue::NormalUncertaintySet, pr::LowOrderPrior)
     return if !isnothing(ue.ens)
         ue.ens
@@ -225,9 +244,10 @@ function ucs(ue::NormalUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:Any
     sigma_u = Matrix{eltype(sigma)}(undef, N, N)
     for j in 1:N
         for i in j:N
-            sigma_ij = getindex.(sigmas[:], i, j)
-            sigma_l[j, i] = sigma_l[i, j] = Statistics.quantile(sigma_ij, q)
-            sigma_u[j, i] = sigma_u[i, j] = Statistics.quantile(sigma_ij, one(q) - q)
+            sigma_ij = getindex.(sigmas, i, j)
+            sigma_l[j, i] = sigma_l[i, j] = Statistics.quantile(sigma_ij, q; ue.kwargs...)
+            sigma_u[j, i] = sigma_u[i, j] = Statistics.quantile(sigma_ij, one(q) - q;
+                                                                ue.kwargs...)
         end
     end
     posdef!(ue.pe.ce.mp.pdm, sigma_l)
@@ -339,9 +359,10 @@ function sigma_ucs(ue::NormalUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm,
     sigma_u = Matrix{eltype(sigma)}(undef, N, N)
     for j in 1:N
         for i in j:N
-            sigma_ij = getindex.(sigmas[:], i, j)
-            sigma_l[j, i] = sigma_l[i, j] = Statistics.quantile(sigma_ij, q)
-            sigma_u[j, i] = sigma_u[i, j] = Statistics.quantile(sigma_ij, one(q) - q)
+            sigma_ij = getindex.(sigmas, i, j)
+            sigma_l[j, i] = sigma_l[i, j] = Statistics.quantile(sigma_ij, q; ue.kwargs...)
+            sigma_u[j, i] = sigma_u[i, j] = Statistics.quantile(sigma_ij, one(q) - q;
+                                                                ue.kwargs...)
         end
     end
     posdef!(ue.pe.ce.mp.pdm, sigma_l)

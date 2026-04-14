@@ -1,5 +1,5 @@
 """
-    abstract type RankCovarianceEstimator <: AbstractCovarianceEstimator end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all rank-based covariance estimators in `PortfolioOptimisers.jl`.
 
@@ -13,9 +13,7 @@ All concrete and/or abstract types implementing rank-based covariance estimation
 """
 abstract type RankCovarianceEstimator <: AbstractCovarianceEstimator end
 """
-    struct KendallCovariance{T1} <: RankCovarianceEstimator
-        ve::T1
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Robust covariance estimator based on Kendall's tau rank correlation.
 
@@ -23,13 +21,15 @@ Robust covariance estimator based on Kendall's tau rank correlation.
 
 # Fields
 
-  - `ve`: Variance estimator used to compute marginal standard deviations.
+$(DocStringExtensions.FIELDS)
 
-# Constructor
+# Constructors
 
-    KendallCovariance(; ve::AbstractVarianceEstimator = SimpleVariance())
+    KendallCovariance(;
+        ve::AbstractVarianceEstimator = SimpleVariance()
+    ) -> KendallCovariance
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 
@@ -38,8 +38,7 @@ julia> KendallCovariance()
 KendallCovariance
   ve ┼ SimpleVariance
      │          me ┼ SimpleExpectedReturns
-     │             │     w ┼ nothing
-     │             │   idx ┴ nothing
+     │             │   w ┴ nothing
      │           w ┼ nothing
      │   corrected ┴ Bool: true
 ```
@@ -52,6 +51,7 @@ KendallCovariance
   - [`SimpleVariance`](@ref)
 """
 @concrete struct KendallCovariance <: RankCovarianceEstimator
+    "$(field_dict[:ve])"
     ve
     function KendallCovariance(ve::AbstractVarianceEstimator)
         return new{typeof(ve)}(ve)
@@ -126,14 +126,12 @@ function Statistics.cov(ce::KendallCovariance, X::MatNum; dims::Int = 1, kwargs.
     if dims == 2
         X = transpose(X)
     end
-    std_vec = Statistics.std(ce.ve, X; dims = 1, kwargs...)
+    sd = Statistics.std(ce.ve, X; dims = 1, kwargs...)
     sigma = StatsBase.corkendall(X)
-    return StatsBase.cor2cov!(sigma, std_vec)
+    return StatsBase.cor2cov!(sigma, sd)
 end
 """
-    struct SpearmanCovariance{T1} <: RankCovarianceEstimator
-        ve::T1
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Robust covariance estimator based on Spearman's rho rank correlation.
 
@@ -141,13 +139,15 @@ Robust covariance estimator based on Spearman's rho rank correlation.
 
 # Fields
 
-  - `ve`: Variance estimator used to compute marginal standard deviations.
+$(DocStringExtensions.FIELDS)
 
-# Constructor
+# Constructors
 
-    SpearmanCovariance(; ve::AbstractVarianceEstimator = SimpleVariance())
+    SpearmanCovariance(;
+        ve::AbstractVarianceEstimator = SimpleVariance()
+    ) -> SpearmanCovariance
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 
@@ -156,8 +156,7 @@ julia> SpearmanCovariance()
 SpearmanCovariance
   ve ┼ SimpleVariance
      │          me ┼ SimpleExpectedReturns
-     │             │     w ┼ nothing
-     │             │   idx ┴ nothing
+     │             │   w ┴ nothing
      │           w ┼ nothing
      │   corrected ┴ Bool: true
 ```
@@ -170,6 +169,7 @@ SpearmanCovariance
   - [`SimpleVariance`](@ref)
 """
 @concrete struct SpearmanCovariance <: RankCovarianceEstimator
+    "$(field_dict[:ve])"
     ve
     function SpearmanCovariance(ve::AbstractVarianceEstimator)
         return new{typeof(ve)}(ve)
@@ -244,13 +244,13 @@ function Statistics.cov(ce::SpearmanCovariance, X::MatNum; dims::Int = 1, kwargs
     if dims == 2
         X = transpose(X)
     end
-    std_vec = Statistics.std(ce.ve, X; dims = 1, kwargs...)
+    sd = Statistics.std(ce.ve, X; dims = 1, kwargs...)
     sigma = StatsBase.corspearman(X)
-    return StatsBase.cor2cov!(sigma, std_vec)
+    return StatsBase.cor2cov!(sigma, sd)
 end
 for ce in traverse_concrete_subtypes(RankCovarianceEstimator)
     eval(quote
-             function factory(ce::$(ce), w::StatsBase.AbstractWeights)
+             function factory(ce::$(ce), w::ObsWeights)
                  return $(ce)(; ve = factory(ce.ve, w))
              end
          end)

@@ -1,3 +1,24 @@
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Result type for Mean-Risk portfolio optimisation.
+
+# Fields
+
+  - `oe`: Type of the optimisation estimator that produced this result.
+  - `pa`: Processed optimisation attributes.
+  - `retcode`: Optimisation return code.
+  - `sol`: Optimisation solution (or vector of solutions for the efficient frontier).
+  - `model`: The JuMP model used for optimisation.
+  - `fb`: Fallback result (if a fallback optimiser was used).
+
+The `w` property is forwarded from `sol.w`.
+
+# Related
+
+  - [`NonFiniteAllocationOptimisationResult`](@ref)
+  - [`MeanRisk`](@ref)
+"""
 @concrete struct MeanRiskResult <: NonFiniteAllocationOptimisationResult
     oe
     pa
@@ -20,6 +41,144 @@ function Base.getproperty(r::MeanRiskResult, sym::Symbol)
         getfield(r, sym)
     end
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Mean-Risk portfolio optimiser.
+
+`MeanRisk` formulates and solves a mean-risk portfolio optimisation problem using JuMP. It can optimise a wide variety of objective functions (minimum risk, maximum return, maximum Sharpe ratio, maximum utility) subject to risk, weight, cardinality, and custom constraints.
+
+# Fields
+
+  - `opt`: JuMP optimiser configuration (prior, solver, constraints, bounds, fees, etc.).
+  - `r`: Risk measure or vector of risk measures.
+  - `obj`: Portfolio objective function.
+  - `wi`: Initial portfolio weights for warm-starting the solver (or `nothing`).
+  - `fb`: Fallback optimiser.
+
+# Constructors
+
+    MeanRisk(;
+        opt::JuMPOptimiser = JuMPOptimiser(),
+        r::RM_VecRM = Variance(),
+        obj::ObjectiveFunction = MinimumRisk(),
+        wi::Option{<:VecNum} = nothing,
+        fb::Option{<:OptE_Opt} = nothing
+    ) -> MeanRisk
+
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - If `r` is a vector: `!isempty(r)`.
+  - If `wi` is provided: `!isempty(wi)`.
+
+# Examples
+
+```jldoctest
+julia> MeanRisk(; opt = JuMPOptimiser(; slv = Solver()))
+MeanRisk
+  opt ┼ JuMPOptimiser
+      │        pe ┼ EmpiricalPrior
+      │           │        ce ┼ PortfolioOptimisersCovariance
+      │           │           │   ce ┼ Covariance
+      │           │           │      │    me ┼ SimpleExpectedReturns
+      │           │           │      │       │   w ┴ nothing
+      │           │           │      │    ce ┼ GeneralCovariance
+      │           │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+      │           │           │      │       │    w ┴ nothing
+      │           │           │      │   alg ┴ Full()
+      │           │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
+      │           │           │      │     pdm ┼ Posdef
+      │           │           │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+      │           │           │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+      │           │           │      │      dn ┼ nothing
+      │           │           │      │      dt ┼ nothing
+      │           │           │      │     alg ┼ nothing
+      │           │           │      │   order ┴ DenoiseDetoneAlg()
+      │           │        me ┼ SimpleExpectedReturns
+      │           │           │   w ┴ nothing
+      │           │   horizon ┴ nothing
+      │       slv ┼ Solver
+      │           │          name ┼ String: ""
+      │           │        solver ┼ nothing
+      │           │      settings ┼ nothing
+      │           │     check_sol ┼ @NamedTuple{}: NamedTuple()
+      │           │   add_bridges ┴ Bool: true
+      │        wb ┼ WeightBounds
+      │           │   lb ┼ Float64: 0.0
+      │           │   ub ┴ Float64: 1.0
+      │       bgt ┼ Float64: 1.0
+      │      sbgt ┼ nothing
+      │        lt ┼ nothing
+      │        st ┼ nothing
+      │      lcse ┼ nothing
+      │       cte ┼ nothing
+      │    gcarde ┼ nothing
+      │   sgcarde ┼ nothing
+      │      smtx ┼ nothing
+      │     sgmtx ┼ nothing
+      │       slt ┼ nothing
+      │       sst ┼ nothing
+      │      sglt ┼ nothing
+      │      sgst ┼ nothing
+      │        tn ┼ nothing
+      │      fees ┼ nothing
+      │      sets ┼ nothing
+      │        tr ┼ nothing
+      │       ple ┼ nothing
+      │       ret ┼ ArithmeticReturn
+      │           │   ucs ┼ nothing
+      │           │    lb ┼ nothing
+      │           │    mu ┴ nothing
+      │       sca ┼ SumScalariser()
+      │      ccnt ┼ nothing
+      │      cobj ┼ nothing
+      │        sc ┼ Int64: 1
+      │        so ┼ Int64: 1
+      │        ss ┼ nothing
+      │      card ┼ nothing
+      │     scard ┼ nothing
+      │       nea ┼ nothing
+      │        l1 ┼ nothing
+      │        l2 ┼ nothing
+      │      linf ┼ nothing
+      │        lp ┼ nothing
+      │       brt ┼ Bool: false
+      │    cle_pr ┼ Bool: true
+      │    strict ┴ Bool: false
+    r ┼ Variance
+      │   settings ┼ RiskMeasureSettings
+      │            │   scale ┼ Float64: 1.0
+      │            │      ub ┼ nothing
+      │            │     rke ┴ Bool: true
+      │      sigma ┼ nothing
+      │       chol ┼ nothing
+      │         rc ┼ nothing
+      │        alg ┴ SquaredSOCRiskExpr()
+  obj ┼ MinimumRisk()
+   wi ┼ nothing
+   fb ┴ nothing
+```
+
+# Related
+
+  - [`scalarise_risk_expression!`](@ref)
+  - [`set_risk_constraints!`](@ref)
+  - [`ArithmeticReturn`](@ref)
+  - [`LogarithmicReturn`](@ref)
+  - [`MinimumRisk`](@ref)
+  - [`MaximumUtility`](@ref)
+  - [`MaximumRatio`](@ref)
+  - [`MaximumReturn`](@ref)
+  - [`BudgetRange`](@ref)
+  - [`LpRegularisation`](@ref)
+  - [`RiskJuMPOptimisationEstimator`](@ref)
+  - [`JuMPOptimiser`](@ref)
+  - [`MeanRiskResult`](@ref)
+  - [`ObjectiveFunction`](@ref)
+  - [`RiskMeasure`](@ref)
+"""
 @concrete struct MeanRisk <: RiskJuMPOptimisationEstimator
     opt
     r
@@ -61,14 +220,92 @@ function opt_view(mr::MeanRisk, i, X::MatNum)
     wi = nothing_scalar_array_view(mr.wi, i)
     return MeanRisk(; opt = opt, r = r, obj = mr.obj, wi = wi, fb = mr.fb)
 end
+"""
+    solve_mean_risk!(model, mr, ret, pr, ::Val{false}, ::Val{false}, args...)
+    solve_mean_risk!(model, mr, ret, pr, ::Val{true}, ::Val{false}, fees)
+    solve_mean_risk!(model, mr, ret, pr, ::Val{false}, ::Val{true}, fees)
+    solve_mean_risk!(model, mr, ret, pr, ::Val{true}, ::Val{true}, fees)
+
+Solve the Mean-Risk optimisation problem.
+
+Dispatches based on whether a return frontier and/or risk frontier sweep is requested (controlled by `Val` arguments). Single-point, return-frontier, risk-frontier, and combined sweeps are all handled.
+
+# Arguments
+
+  - `model::JuMP.Model`: JuMP optimisation model.
+  - `mr::MeanRisk`: MeanRisk estimator configuration.
+  - `ret::JuMPReturnsEstimator`: Returns estimator.
+  - `pr::AbstractPriorResult`: Prior result with asset moments.
+  - `::Val{bool}`: Whether to do a return frontier sweep.
+  - `::Val{bool}`: Whether to do a risk frontier sweep.
+  - `fees`: Optional fees configuration.
+
+# Returns
+
+  - `(retcode, sol)` or `(retcodes, sols)` depending on the sweep mode.
+
+# Related
+
+  - [`MeanRisk`](@ref)
+  - [`compute_ret_lbs`](@ref)
+  - [`compute_risk_ubs`](@ref)
+"""
 function solve_mean_risk!(model::JuMP.Model, mr::MeanRisk, ret::JuMPReturnsEstimator,
                           pr::AbstractPriorResult, ::Val{false}, ::Val{false}, args...)
     set_portfolio_objective_function!(model, mr.obj, ret, mr.opt.cobj, mr, pr)
     return optimise_JuMP_model!(model, mr, eltype(pr.X))
 end
+"""
+    compute_ret_lbs(lbs, args...)
+
+Compute the return lower bounds for the efficient frontier sweep.
+
+Dispatches based on the type of `lbs`: if a pre-computed vector of lower bounds is provided, returns it directly. If a `Frontier` specification is given, solves the minimum and maximum return sub-problems and constructs a range of bounds.
+
+# Arguments
+
+  - `lbs`: Pre-computed return bounds vector (`VecNum`) or `Frontier` configuration.
+  - `args...`: Additional arguments (model, optimiser, prior, etc.) needed when `lbs` is a `Frontier`.
+
+# Returns
+
+  - Vector or range of return lower bounds for frontier sweep.
+
+# Related
+
+  - [`MeanRisk`](@ref)
+  - [`NearOptimalCentering`](@ref)
+  - [`solve_mean_risk!`](@ref)
+"""
 function compute_ret_lbs(lbs::VecNum, args...)
     return lbs
 end
+"""
+    compute_ret_lbs(lbs::Frontier, model::JuMP.Model, mr::MeanRisk, ret::JuMPReturnsEstimator, pr::AbstractPriorResult, fees::Option{<:Fees})
+
+Compute return lower bounds for a `MeanRisk` efficient frontier sweep by solving minimum and maximum return sub-problems.
+
+Solves the minimum-risk and maximum-return portfolios, then constructs a uniformly spaced range of `lbs.N` return targets spanning the two extremes.
+
+# Arguments
+
+  - `lbs::Frontier`: Frontier configuration specifying the number of points.
+  - `model::JuMP.Model`: JuMP optimisation model.
+  - `mr::MeanRisk`: MeanRisk estimator configuration.
+  - `ret::JuMPReturnsEstimator`: Returns estimator.
+  - `pr::AbstractPriorResult`: Prior result with asset moments.
+  - `fees::Option{<:Fees}`: Optional fees configuration.
+
+# Returns
+
+  - Range of return lower bounds for the frontier sweep.
+
+# Related
+
+  - [`compute_ret_lbs`](@ref)
+  - [`MeanRisk`](@ref)
+  - [`solve_mean_risk!`](@ref)
+"""
 function compute_ret_lbs(lbs::Frontier, model::JuMP.Model, mr::MeanRisk,
                          ret::JuMPReturnsEstimator, pr::AbstractPriorResult,
                          fees::Option{<:Fees} = nothing)
@@ -106,6 +343,28 @@ function solve_mean_risk!(model::JuMP.Model, mr::MeanRisk, ret::JuMPReturnsEstim
     end
     return retcodes, sols
 end
+"""
+    _rebuild_risk_frontier(pr, fees, ...)
+
+Internal helper to rebuild the risk frontier from a prior result.
+
+Recomputes the risk range used for the efficient frontier given updated prior information and fee structures.
+
+# Arguments
+
+  - `pr`: Prior result with asset moments.
+  - `fees`: Optional fees configuration.
+  - Additional parameters.
+
+# Returns
+
+  - Tuple of risk bound values for the frontier.
+
+# Related
+
+  - [`rebuild_risk_frontier`](@ref)
+  - [`MeanRisk`](@ref)
+"""
 function _rebuild_risk_frontier(pr::AbstractPriorResult, fees::Option{<:Fees},
                                 r::RiskMeasure, risk_frontier::VecPair, w_min::VecNum,
                                 w_max::VecNum, i::Integer = 1)
@@ -121,6 +380,28 @@ function _rebuild_risk_frontier(pr::AbstractPriorResult, fees::Option{<:Fees},
     ub = range(rk_min, rk_max; length = N)
     return risk_frontier[i].first => (risk_frontier[1].second[1], ub)
 end
+"""
+    rebuild_risk_frontier(model, mr, ...)
+
+Rebuild the efficient frontier risk bounds from a solved JuMP model.
+
+Extracts and recomputes risk bound values from the optimised model for use in subsequent frontier sweeps.
+
+# Arguments
+
+  - `model`: Solved JuMP model.
+  - `mr`: MeanRisk optimiser configuration.
+  - Additional parameters.
+
+# Returns
+
+  - Updated risk bounds for the frontier.
+
+# Related
+
+  - [`MeanRisk`](@ref)
+  - [`_rebuild_risk_frontier`](@ref)
+"""
 function rebuild_risk_frontier(model::JuMP.Model,
                                mr::MeanRisk{<:Any, <:AbstractVector, <:Any, <:Any},
                                ret::JuMPReturnsEstimator, pr::AbstractPriorResult,
@@ -157,6 +438,29 @@ function rebuild_risk_frontier(model::JuMP.Model, mr::MeanRisk{<:Any, <:Any, <:A
     r = factory(mr.r, pr, mr.opt.slv)
     return (_rebuild_risk_frontier(pr, fees, r, risk_frontier, sol_min.w, sol_max.w),)
 end
+"""
+    compute_risk_ubs(model, opt, ...)
+
+Compute or rebuild risk upper bounds for the efficient frontier sweep.
+
+Extracts the risk frontier from the model and rebuilds any frontier bounds that have not yet been computed as numeric vectors.
+
+# Arguments
+
+  - `model::JuMP.Model`: JuMP optimisation model containing the risk frontier.
+  - `opt`: Optimiser configuration.
+  - Additional arguments (prior, fees, weights, etc.).
+
+# Returns
+
+  - Updated risk frontier vector of pairs.
+
+# Related
+
+  - [`MeanRisk`](@ref)
+  - [`NearOptimalCentering`](@ref)
+  - [`solve_mean_risk!`](@ref)
+"""
 function compute_risk_ubs(model::JuMP.Model, mr::MeanRisk, ret::JuMPReturnsEstimator,
                           pr::AbstractPriorResult, fees::Option{<:Fees})
     risk_frontier = model[:risk_frontier]
@@ -238,7 +542,8 @@ function _optimise(mr::MeanRisk, rd::ReturnsResult = ReturnsResult(); dims::Int 
                    str_names::Bool = false, save::Bool = true, kwargs...)
     (; pr, wb, lt, st, lcsr, ctr, gcardr, sgcardr, smtx, slt, sst, sgmtx, sglt, sgst, plr, tn, fees, ret) = processed_jump_optimiser_attributes(mr.opt,
                                                                                                                                                 rd;
-                                                                                                                                                dims = dims)
+                                                                                                                                                dims = dims,
+                                                                                                                                                kwargs...)
     model = JuMP.Model()
     JuMP.set_string_names_on_creation(model, str_names)
     set_model_scales!(model, mr.opt.sc, mr.opt.so)
@@ -272,6 +577,20 @@ function _optimise(mr::MeanRisk, rd::ReturnsResult = ReturnsResult(); dims::Int 
                                                            plr, ret), retcode, sol,
                           ifelse(save, model, nothing), nothing)
 end
+"""
+    optimise(mr::MeanRisk{<:Any, <:Any, <:Any, <:Any, Nothing},
+             rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
+             str_names::Bool = false, save::Bool = true, kwargs...) -> MeanRiskResult
+
+# Arguments
+
+  - `mr`: The mean risk optimiser to use.
+  - $(arg_dict[:rd]) If `isa(hec.opt.pe, AbstractPriorResult)`, `rd` is not necessary if doing a standalone optimisation, but may be required/desired by fallbacks and/or clusterisation.
+  - `dims`: The dimension along which observations advance in time.
+  - `str_names`: Whether to use string names for the assets in the optimisation.
+  - `save`: Whether to save the JuMP model in the optimisation result.
+  - `kwargs`: Additional keyword arguments passed to the optimisation function.
+"""
 function optimise(mr::MeanRisk{<:Any, <:Any, <:Any, <:Any, Nothing},
                   rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
                   str_names::Bool = false, save::Bool = true, kwargs...)

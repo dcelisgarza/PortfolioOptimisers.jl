@@ -1,23 +1,23 @@
 """
-    abstract type BootstrapUncertaintySetEstimator <: AbstractUncertaintySetEstimator end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract type for estimators that construct uncertainty sets using bootstrap methods in portfolio optimisation.
 
 Subtypes implement specific bootstrap algorithms (e.g., stationary, circular, moving block) to estimate uncertainty sets for risk or prior statistics.
 
-# Related Types
+# Related
 
   - [`ARCHUncertaintySet`](@ref)
 """
 abstract type BootstrapUncertaintySetEstimator <: AbstractUncertaintySetEstimator end
 """
-    abstract type ARCHBootstrapSet <: AbstractAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract type for bootstrap algorithms used in constructing uncertainty sets for time series data in portfolio optimisation.
 
 Subtypes implement specific bootstrap methods using [`archpy`](https://pypi.org/project/arch/).
 
-# Related Types
+# Related
 
   - [`StationaryBootstrap`](@ref)
   - [`CircularBootstrap`](@ref)
@@ -25,11 +25,11 @@ Subtypes implement specific bootstrap methods using [`archpy`](https://pypi.org/
 """
 abstract type ARCHBootstrapSet <: AbstractAlgorithm end
 """
-    struct StationaryBootstrap <: ARCHBootstrapSet end
+$(DocStringExtensions.TYPEDEF)
 
 Bootstrap algorithm for constructing uncertainty sets using a [stationary bootstrap](https://bashtage.github.io/arch/bootstrap/generated/arch.bootstrap.StationaryBootstrap.html#arch.bootstrap.StationaryBootstrap) in time series data.
 
-# Related Types
+# Related
 
   - [`ARCHBootstrapSet`](@ref)
   - [`CircularBootstrap`](@ref)
@@ -37,11 +37,11 @@ Bootstrap algorithm for constructing uncertainty sets using a [stationary bootst
 """
 struct StationaryBootstrap <: ARCHBootstrapSet end
 """
-    struct CircularBootstrap <: ARCHBootstrapSet end
+$(DocStringExtensions.TYPEDEF)
 
 Bootstrap algorithm for constructing uncertainty sets using a [circular bootstrap](https://bashtage.github.io/arch/bootstrap/generated/arch.bootstrap.CircularBlockBootstrap.html#arch.bootstrap.CircularBlockBootstrap) in time series data.
 
-# Related Types
+# Related
 
   - [`ARCHBootstrapSet`](@ref)
   - [`StationaryBootstrap`](@ref)
@@ -49,11 +49,11 @@ Bootstrap algorithm for constructing uncertainty sets using a [circular bootstra
 """
 struct CircularBootstrap <: ARCHBootstrapSet end
 """
-    struct MovingBootstrap <: ARCHBootstrapSet end
+$(DocStringExtensions.TYPEDEF)
 
 Bootstrap algorithm for constructing uncertainty sets using a [moving bootstrap](https://bashtage.github.io/arch/bootstrap/generated/arch.bootstrap.MovingBlockBootstrap.html#arch.bootstrap.MovingBlockBootstrap) in time series data.
 
-# Related Types
+# Related
 
   - [`ARCHBootstrapSet`](@ref)
   - [`StationaryBootstrap`](@ref)
@@ -102,15 +102,7 @@ function bootstrap_func(::MovingBootstrap, block_size, X, seed)
                                                                       seed = seed)
 end
 """
-    struct ARCHUncertaintySet{T1, T2, T3, T4, T5, T6, T7} <: BootstrapUncertaintySetEstimator
-        pe::T1
-        alg::T2
-        n_sim::T3
-        block_size::T4
-        q::T5
-        seed::T6
-        bootstrap::T7
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Estimator for box or ellipsoidal uncertainty sets using bootstrap methods for time series data in portfolio optimisation.
 
@@ -123,16 +115,22 @@ Estimator for box or ellipsoidal uncertainty sets using bootstrap methods for ti
   - `q`: Quantile or confidence level for uncertainty set bounds.
   - `seed`: Optional random seed for reproducibility.
   - `bootstrap`: Bootstrap algorithm type.
+  - `kwargs`: Additional keyword arguments to pass on to [`Statistics.quantile`](https://docs.julialang.org/en/v1/stdlib/Statistics/#Statistics.quantile).
 
 # Constructors
 
-    ARCHUncertaintySet(; pe::AbstractLowOrderPriorEstimator = EmpiricalPrior(),
-                       alg::AbstractUncertaintySetAlgorithm = BoxUncertaintySetAlgorithm(),
-                       n_sim::Integer = 3_000, block_size::Integer = 3, q::Number = 0.05,
-                       seed::Option{<:Integer} = nothing,
-                       bootstrap::ARCHBootstrapSet = StationaryBootstrap())
+    ARCHUncertaintySet(;
+        pe::AbstractLowOrderPriorEstimator = EmpiricalPrior(),
+        alg::AbstractUncertaintySetAlgorithm = BoxUncertaintySetAlgorithm(),
+        n_sim::Integer = 3_000,
+        block_size::Integer = 3,
+        q::Number = 0.05,
+        seed::Option{<:Integer} = nothing,
+        bootstrap::ARCHBootstrapSet = StationaryBootstrap(),
+        kwargs::NamedTuple = (;),
+    ) -> ARCHUncertaintySet
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 
@@ -149,12 +147,10 @@ ARCHUncertaintySet
              │        ce ┼ PortfolioOptimisersCovariance
              │           │   ce ┼ Covariance
              │           │      │    me ┼ SimpleExpectedReturns
-             │           │      │       │     w ┼ nothing
-             │           │      │       │   idx ┴ nothing
+             │           │      │       │   w ┴ nothing
              │           │      │    ce ┼ GeneralCovariance
-             │           │      │       │    ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-             │           │      │       │     w ┼ nothing
-             │           │      │       │   idx ┴ nothing
+             │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+             │           │      │       │    w ┴ nothing
              │           │      │   alg ┴ Full()
              │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
              │           │      │     pdm ┼ Posdef
@@ -165,15 +161,15 @@ ARCHUncertaintySet
              │           │      │     alg ┼ nothing
              │           │      │   order ┴ DenoiseDetoneAlg()
              │        me ┼ SimpleExpectedReturns
-             │           │     w ┼ nothing
-             │           │   idx ┴ nothing
+             │           │   w ┴ nothing
              │   horizon ┴ nothing
          alg ┼ BoxUncertaintySetAlgorithm()
        n_sim ┼ Int64: 3000
   block_size ┼ Int64: 3
            q ┼ Float64: 0.05
         seed ┼ nothing
-   bootstrap ┴ StationaryBootstrap()
+   bootstrap ┼ StationaryBootstrap()
+      kwargs ┴ @NamedTuple{}: NamedTuple()
 ```
 
 # Related
@@ -194,24 +190,27 @@ ARCHUncertaintySet
     q
     seed
     bootstrap
+    kwargs
     function ARCHUncertaintySet(pe::AbstractLowOrderPriorEstimator,
                                 alg::AbstractUncertaintySetAlgorithm, n_sim::Integer,
                                 block_size::Integer, q::Number, seed::Option{<:Integer},
-                                bootstrap::ARCHBootstrapSet)
+                                bootstrap::ARCHBootstrapSet, kwargs::NamedTuple)
         @argcheck(n_sim > zero(n_sim))
         @argcheck(block_size > zero(block_size))
         @argcheck(zero(q) < q < one(q))
         return new{typeof(pe), typeof(alg), typeof(n_sim), typeof(block_size), typeof(q),
-                   typeof(seed), typeof(bootstrap)}(pe, alg, n_sim, block_size, q, seed,
-                                                    bootstrap)
+                   typeof(seed), typeof(bootstrap), typeof(kwargs)}(pe, alg, n_sim,
+                                                                    block_size, q, seed,
+                                                                    bootstrap, kwargs)
     end
 end
 function ARCHUncertaintySet(; pe::AbstractLowOrderPriorEstimator = EmpiricalPrior(),
                             alg::AbstractUncertaintySetAlgorithm = BoxUncertaintySetAlgorithm(),
                             n_sim::Integer = 3_000, block_size::Integer = 3,
                             q::Number = 0.05, seed::Option{<:Integer} = nothing,
-                            bootstrap::ARCHBootstrapSet = StationaryBootstrap())
-    return ARCHUncertaintySet(pe, alg, n_sim, block_size, q, seed, bootstrap)
+                            bootstrap::ARCHBootstrapSet = StationaryBootstrap(),
+                            kwargs::NamedTuple = (;))
+    return ARCHUncertaintySet(pe, alg, n_sim, block_size, q, seed, bootstrap, kwargs)
 end
 """
     bootstrap_generator(ue::ARCHUncertaintySet, X::MatNum; kwargs...)
@@ -302,7 +301,7 @@ Generates bootstrap samples of covariance matrices for time series data using th
 
 # Returns
 
-    - `sigmas::Array{<:Number, 3}`: Array of bootstrapped covariance matrices (`size(X, 2) × size(X, 2) × ue.n_sim`).
+  - `sigmas::Array{<:Number, 3}`: Array of bootstrapped covariance matrices (`size(X, 2) × size(X, 2) × ue.n_sim`).
 
 # Details
 
@@ -375,12 +374,13 @@ function ucs(ue::ARCHUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:Any, 
     sigma_u = Matrix{eltype(X)}(undef, N, N)
     for j in 1:N
         mu_j = mus[j, :]
-        mu_l[j] = Statistics.quantile(mu_j, q)
-        mu_u[j] = Statistics.quantile(mu_j, one(q) - q)
+        mu_l[j] = Statistics.quantile(mu_j, q; ue.kwargs...)
+        mu_u[j] = Statistics.quantile(mu_j, one(q) - q; ue.kwargs...)
         for i in j:N
             sigma_ij = sigmas[i, j, :]
-            sigma_l[j, i] = sigma_l[i, j] = Statistics.quantile(sigma_ij, q)
-            sigma_u[j, i] = sigma_u[i, j] = Statistics.quantile(sigma_ij, one(q) - q)
+            sigma_l[j, i] = sigma_l[i, j] = Statistics.quantile(sigma_ij, q; ue.kwargs...)
+            sigma_u[j, i] = sigma_u[i, j] = Statistics.quantile(sigma_ij, one(q) - q;
+                                                                ue.kwargs...)
         end
     end
     return BoxUncertaintySet(; lb = mu_l, ub = mu_u),
@@ -432,8 +432,8 @@ function mu_ucs(ue::ARCHUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:An
     mu_u = Vector{eltype(X)}(undef, N)
     for j in 1:N
         mu_j = mus[j, :]
-        mu_l[j] = Statistics.quantile(mu_j, q)
-        mu_u[j] = Statistics.quantile(mu_j, one(q) - q)
+        mu_l[j] = Statistics.quantile(mu_j, q; ue.kwargs...)
+        mu_u[j] = Statistics.quantile(mu_j, one(q) - q; ue.kwargs...)
     end
     return BoxUncertaintySet(; lb = mu_l, ub = mu_u)
 end
@@ -484,8 +484,9 @@ function sigma_ucs(ue::ARCHUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <
     for j in 1:N
         for i in j:N
             sigma_ij = sigmas[i, j, :]
-            sigma_l[j, i] = sigma_l[i, j] = Statistics.quantile(sigma_ij, q)
-            sigma_u[j, i] = sigma_u[i, j] = Statistics.quantile(sigma_ij, one(q) - q)
+            sigma_l[j, i] = sigma_l[i, j] = Statistics.quantile(sigma_ij, q; ue.kwargs...)
+            sigma_u[j, i] = sigma_u[i, j] = Statistics.quantile(sigma_ij, one(q) - q;
+                                                                ue.kwargs...)
         end
     end
     return BoxUncertaintySet(; lb = sigma_l, ub = sigma_u)

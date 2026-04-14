@@ -1,1 +1,14 @@
 # Conditional X at Risk
+
+```@docs
+ConditionalValueatRisk
+DistributionallyRobustConditionalValueatRisk
+RMCVaR
+ConditionalValueatRiskRange
+DistributionallyRobustConditionalValueatRiskRange
+RMCVaRRg
+ConditionalDrawdownatRisk
+DistributionallyRobustConditionalDrawdownatRisk
+RMCDaR
+RelativeConditionalDrawdownatRisk
+```

@@ -1,7 +1,5 @@
 """
-    struct AssetSetsMatrixEstimator{T1} <: AbstractConstraintEstimator
-        val::T1
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Estimator for constructing asset set membership matrices from asset groupings.
 
@@ -11,11 +9,13 @@ Estimator for constructing asset set membership matrices from asset groupings.
 
   - `val`: The key or group name to extract from the asset sets.
 
-# Constructor
+# Constructors
 
-    AssetSetsMatrixEstimator(; val::AbstractString)
+    AssetSetsMatrixEstimator(;
+        val::AbstractString
+    ) -> AssetSetsMatrixEstimator
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 
@@ -41,7 +41,7 @@ julia> asset_sets_matrix(est, sets)
 # Related
 
   - [`AssetSets`](@ref)
-  - [`asset_sets_matrix`]-(@ref)
+  - [`asset_sets_matrix`](@ref)
   - [`AbstractConstraintEstimator`](@ref)
 """
 @concrete struct AssetSetsMatrixEstimator <: AbstractConstraintEstimator
@@ -54,8 +54,45 @@ end
 function AssetSetsMatrixEstimator(; val::AbstractString)
     return AssetSetsMatrixEstimator(val)
 end
+"""
+    const MatNum_ASetMatE = Union{<:AssetSetsMatrixEstimator, <:MatNum}
+
+Alias for an asset sets matrix estimator or a numeric matrix.
+
+Matches either an [`AssetSetsMatrixEstimator`](@ref) or a plain numeric matrix. Used internally in constraint generation that accepts a pre-computed membership matrix or an estimator.
+
+# Related
+
+  - [`AssetSetsMatrixEstimator`](@ref)
+  - [`MatNum`](@ref)
+  - [`asset_sets_matrix`](@ref)
+"""
 const MatNum_ASetMatE = Union{<:AssetSetsMatrixEstimator, <:MatNum}
+"""
+    const VecMatNum_ASetMatE = AbstractVector{<:MatNum_ASetMatE}
+
+Alias for a vector of asset sets matrix estimators or numeric matrices.
+
+Represents a collection of [`MatNum_ASetMatE`](@ref) elements, enabling batch processing.
+
+# Related
+
+  - [`MatNum_ASetMatE`](@ref)
+  - [`MatNum_ASetMatE_VecMatNum_ASetMatE`](@ref)
+"""
 const VecMatNum_ASetMatE = AbstractVector{<:MatNum_ASetMatE}
+"""
+    const MatNum_ASetMatE_VecMatNum_ASetMatE = Union{<:MatNum_ASetMatE, <:VecMatNum_ASetMatE}
+
+Alias for a single or vector of asset sets matrix estimators or numeric matrices.
+
+Matches either a single [`MatNum_ASetMatE`](@ref) or a vector of them. Used for dispatch in asset set matrix operations that accept one or many estimators or matrices.
+
+# Related
+
+  - [`MatNum_ASetMatE`](@ref)
+  - [`VecMatNum_ASetMatE`](@ref)
+"""
 const MatNum_ASetMatE_VecMatNum_ASetMatE = Union{<:MatNum_ASetMatE, <:VecMatNum_ASetMatE}
 """
     asset_sets_matrix(smtx::AbstractString, sets::AssetSets)
@@ -101,7 +138,6 @@ julia> asset_sets_matrix("nx_sector", sets)
 
   - [`AssetSets`](@ref)
   - [`AssetSetsMatrixEstimator`](@ref)
-  - [`asset_sets_matrix_view`]-(@ref)
 """
 function asset_sets_matrix(smtx::AbstractString, sets::AssetSets)
     @argcheck(haskey(sets.dict, smtx), KeyError("key $smtx not found in `sets.dict`"))
@@ -135,7 +171,7 @@ This method returns the input matrix `smtx` unchanged. It is used as a fallback 
 
   - [`AssetSets`](@ref)
   - [`AssetSetsMatrixEstimator`](@ref)
-  - [`asset_sets_matrix`]-(@ref)
+  - [`asset_sets_matrix`](@ref)
 """
 function asset_sets_matrix(smtx::Option{<:MatNum}, args...)
     return smtx
@@ -151,7 +187,7 @@ It is used for type stability and to provide a uniform interface for processing 
 
 # Related
 
-  - [`asset_sets_matrix`]-(@ref)
+  - [`asset_sets_matrix`](@ref)
 """
 function asset_sets_matrix(smtx::AssetSetsMatrixEstimator, sets::AssetSets)
     return asset_sets_matrix(smtx.val, sets)
@@ -160,13 +196,35 @@ end
     asset_sets_matrix(smtx::VecMatNum_ASetMatE,
                       sets::AssetSets)
 
-Broadcasts [`asset_sets_matrix`]-(@ref) over the vector.
+Broadcasts [`asset_sets_matrix`](@ref) over the vector.
 
 Provides a uniform interface for processing multiple constraint estimators simulatneously.
 """
 function asset_sets_matrix(smtx::VecMatNum_ASetMatE, sets::AssetSets)
     return [asset_sets_matrix(smtxi, sets) for smtxi in smtx]
 end
+"""
+    asset_sets_matrix_view(smtx, i; kwargs...)
+
+Get a column view or subset of an asset sets membership matrix for asset index `i`.
+
+Returns a column view for matrix inputs, the estimator unchanged for estimator inputs, or processes vectors element-wise.
+
+# Arguments
+
+  - `smtx`: Asset sets matrix, estimator, or vector thereof.
+  - `i`: Asset index or range to slice.
+  - `kwargs...`: Additional keyword arguments.
+
+# Returns
+
+  - Column view of the matrix, or the estimator unchanged.
+
+# Related
+
+  - [`asset_sets_matrix`](@ref)
+  - [`AssetSetsMatrixEstimator`](@ref)
+"""
 function asset_sets_matrix_view(smtx::MatNum, i; kwargs...)
     return view(smtx, :, i)
 end

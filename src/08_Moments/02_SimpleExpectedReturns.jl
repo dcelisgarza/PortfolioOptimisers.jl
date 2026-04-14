@@ -1,42 +1,36 @@
 """
-    struct SimpleExpectedReturns{T1, T2} <: AbstractExpectedReturnsEstimator
-        w::T1
-        idx::T2
-    end
+$(DocStringExtensions.TYPEDEF)
 
 A simple expected returns estimator for `PortfolioOptimisers.jl`, representing the sample mean with optional observation weights.
 
-`SimpleExpectedReturns` is the standard estimator for computing expected returns as the (possibly weighted) mean of asset returns. It supports both unweighted and weighted mean estimation by storing an optional weights vector.
+`SimpleExpectedReturns` is the standard estimator for computing expected returns as the possibly weighted mean of asset returns.
 
 # Fields
 
-  - `w`: Optional weights for each observation. If `nothing`, the unweighted mean is computed.
-  - `idx`: Optional indices of the observations to use for estimation. If `nothing`, all observations are used.
+$(DocStringExtensions.FIELDS)
 
-# Constructor
+# Constructors
 
-    SimpleExpectedReturns(; w::Option{<:StatsBase.AbstractWeights} = nothing,
-                           idx::Option{<:VecInt} = nothing)
+    SimpleExpectedReturns(;
+        w::Option{<:ObsWeights} = nothing
+    ) -> SimpleExpectedReturns
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 
-    - $(val_dict[:oow])
-    - If `idx` is not `nothing`, `!isempty(idx)` and all indices are positive integers.
+  - $(val_dict[:oow])
 
 # Examples
 
 ```jldoctest
 julia> SimpleExpectedReturns()
 SimpleExpectedReturns
-    w ┼ nothing
-  idx ┴ nothing
+  w ┴ nothing
 
 julia> SimpleExpectedReturns(; w = StatsBase.Weights([0.5, 0.5]))
 SimpleExpectedReturns
-    w ┼ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.5, 0.5]
-  idx ┴ nothing
+  w ┴ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.5, 0.5]
 ```
 
 # Related
@@ -47,25 +41,27 @@ SimpleExpectedReturns
   - [`mean(me::SimpleExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
 """
 @concrete struct SimpleExpectedReturns <: AbstractExpectedReturnsEstimator
+    "$(field_dict[:oow])"
     w
-    idx
-    function SimpleExpectedReturns(w::Option{<:StatsBase.AbstractWeights},
-                                   idx::Option{<:VecInt})
-        assert_nonempty_finite_val(w, :w)
-        assert_nonempty_gt0_finite_val(idx, :idx)
-        return new{typeof(w), typeof(idx)}(w, idx)
+    function SimpleExpectedReturns(w::Option{<:ObsWeights})
+        validate_observation_weights(w)
+        return new{typeof(w)}(w)
     end
 end
-function SimpleExpectedReturns(; w::Option{<:StatsBase.AbstractWeights} = nothing,
-                               idx::Option{<:VecInt} = nothing)
-    return SimpleExpectedReturns(w, idx)
+function SimpleExpectedReturns(; w::Option{<:ObsWeights} = nothing)
+    return SimpleExpectedReturns(w)
 end
 """
-    Statistics.mean(me::SimpleExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)
+    Statistics.mean(
+        me::SimpleExpectedReturns,
+        X::MatNum;
+        dims::Int = 1,
+        kwargs...
+    ) -> ArrNum
 
 Compute the mean of asset returns using a [`SimpleExpectedReturns`](@ref) estimator.
 
-This method computes the expected returns as the sample mean of the input data `X`, optionally using observation weights stored in the estimator. If no weights are provided, the unweighted mean is computed.
+This method computes the expected returns as the sample mean of the input data `X` according to `ce`.
 
 # Arguments
 
@@ -76,7 +72,7 @@ This method computes the expected returns as the sample mean of the input data `
 
 # Returns
 
-  - `mu::VecNum`: The expected returns vector.
+  - $(ret_dict[:mu])
 
 # Examples
 
@@ -85,8 +81,7 @@ julia> X = [0.01 0.02; 0.03 0.04];
 
 julia> ser = SimpleExpectedReturns()
 SimpleExpectedReturns
-    w ┼ nothing
-  idx ┴ nothing
+  w ┴ nothing
 
 julia> mean(ser, X)
 1×2 Matrix{Float64}:
@@ -94,8 +89,7 @@ julia> mean(ser, X)
 
 julia> serw = SimpleExpectedReturns(; w = StatsBase.Weights([0.2, 0.8]))
 SimpleExpectedReturns
-    w ┼ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.8]
-  idx ┴ nothing
+  w ┴ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.8]
 
 julia> mean(serw, X)
 1×2 Matrix{Float64}:
@@ -109,25 +103,19 @@ julia> mean(serw, X)
   - [`VecNum`](@ref)
   - [`Statistics.mean`](https://juliastats.org/StatsBase.jl/stable/scalarstats/#Statistics.mean)
 """
-function Statistics.mean(me::SimpleExpectedReturns{<:Any, Nothing}, X::MatNum;
-                         dims::Int = 1, kwargs...)
-    return if isnothing(me.w)
+function Statistics.mean(me::SimpleExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)
+    w = get_observation_weights(me.w, X; dims = dims, kwargs...)
+    return if isnothing(w)
         Statistics.mean(X; dims = dims)
     else
-        Statistics.mean(X, me.w; dims = dims)
-    end
-end
-function Statistics.mean(me::SimpleExpectedReturns{<:Any, <:VecInt}, X::MatNum;
-                         dims::Int = 1, kwargs...)
-    X = view(X, me.idx, :)
-    return if isnothing(me.w)
-        Statistics.mean(X; dims = dims)
-    else
-        Statistics.mean(X, me.w; dims = dims)
+        Statistics.mean(X, w; dims = dims)
     end
 end
 """
-    factory(me::SimpleExpectedReturns, w::StatsBase.AbstractWeights)
+    factory(
+        me::SimpleExpectedReturns,
+        w::ObsWeights
+    ) -> SimpleExpectedReturns
 
 Create a new `SimpleExpectedReturns` estimator with observation weights `w`.
 
@@ -140,16 +128,27 @@ This function constructs a new [`SimpleExpectedReturns`](@ref) object, replacing
 
 # Returns
 
-  - `me::SimpleExpectedReturns`: New estimator with observation weights `w`.
+  - $(ret_dict[:me])
+
+# Examples
+
+```jldoctest
+julia> me = SimpleExpectedReturns()
+SimpleExpectedReturns
+  w ┴ nothing
+
+julia> factory(me, StatsBase.Weights([0.1, 0.2, 0.7]))
+SimpleExpectedReturns
+  w ┴ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.1, 0.2, 0.7]
+```
 
 # Related
 
   - [`SimpleExpectedReturns`](@ref)
   - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
-  - [`mean(me::SimpleExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
 """
-function factory(me::SimpleExpectedReturns, w::StatsBase.AbstractWeights)
-    return SimpleExpectedReturns(; w = w, idx = me.idx)
+function factory(::SimpleExpectedReturns, w::ObsWeights)
+    return SimpleExpectedReturns(; w = w)
 end
 
 export SimpleExpectedReturns, mean

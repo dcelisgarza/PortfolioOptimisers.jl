@@ -1,8 +1,5 @@
 """
-    struct Distance{T1, T2} <: AbstractDistanceEstimator
-        power::T1
-        alg::T2
-    end
+$(DocStringExtensions.TYPEDEF)
 
 If power is not `nothing`, computes the generalised distance estimator.
 
@@ -20,19 +17,20 @@ where ``_{g}d`` is the generalised distance, ``d`` is the base distance computed
 
 # Fields
 
-  - `power`: Optional integer power to which the base correlation or distance matrix is raised.
-  - `alg`: The base distance algorithm.
+$(DocStringExtensions.FIELDS)
 
-# Constructor
+# Constructors
 
-    Distance(; power::Option{<:Integer} = nothing,
-             alg::AbstractDistanceAlgorithm = SimpleDistance())
+    Distance(;
+        power::Option{<:Integer} = nothing,
+        alg::AbstractDistanceAlgorithm = SimpleDistance()
+    ) -> Distance
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - If `power` is not `nothing`, then `power >= 1`.
+  - $(val_dict[:dopower])
 
 # Examples
 
@@ -55,7 +53,9 @@ Distance
   - [`VariationInfoDistance`](@ref)
 """
 @concrete struct Distance <: AbstractDistanceEstimator
+    "$(field_dict[:dopower])"
     power
+    "$(field_dict[:dalg])"
     alg
     function Distance(power::Option{<:Integer}, alg::AbstractDistanceAlgorithm)
         if !isnothing(power)
@@ -96,7 +96,7 @@ This method computes the correlation matrix using the provided covariance estima
 
 # Returns
 
-  - `dist::Matrix{<:Number}`: Matrix of pairwise distances.
+  - `D::Matrix{<:Number}`: Matrix of pairwise distances.
 
 # Related
 
@@ -157,6 +157,22 @@ function distance(de::Distance{<:Any, <:CanonicalDistance},
     return distance(Distance(; power = de.power, alg = SimpleDistance()), ce, X;
                     dims = dims, kwargs...)
 end
+"""
+    const LTDCov_AllInternalLTDCov = Union{<:LowerTailDependenceCovariance,
+                                           <:PortfolioOptimisersCovariance{<:LowerTailDependenceCovariance},
+                                           <:DenoiseCovariance{<:LowerTailDependenceCovariance},
+                                           <:DetoneCovariance{<:LowerTailDependenceCovariance},
+                                           <:ProcessedCovariance{<:LowerTailDependenceCovariance}}
+
+Alias for all internal lower tail dependence covariance estimator types.
+
+Matches [`LowerTailDependenceCovariance`](@ref) or any wrapper around it (e.g., `PortfolioOptimisersCovariance`, `DenoiseCovariance`, `DetoneCovariance`, `ProcessedCovariance`). Used internally for dispatch in distance computation.
+
+# Related
+
+  - [`LowerTailDependenceCovariance`](@ref)
+  - [`DistCov_AllInternalDistCov`](@ref)
+"""
 const LTDCov_AllInternalLTDCov = Union{<:LowerTailDependenceCovariance,
                                        <:PortfolioOptimisersCovariance{<:LowerTailDependenceCovariance},
                                        <:DenoiseCovariance{<:LowerTailDependenceCovariance},
@@ -179,7 +195,7 @@ Compute the log-distance matrix from a Lower Tail Dependence (LTD) covariance es
 
 # Returns
 
-  - `dist::Matrix{<:Number}`: Matrix of pairwise log-distances.
+  - `D::Matrix{<:Number}`: Matrix of pairwise log-distances.
 
 # Related
 
@@ -217,7 +233,7 @@ Compute the variation of information (VI) distance matrix from a data matrix.
 
 # Returns
 
-  - `dist::Matrix{<:Number}`: Matrix of pairwise variation of information distances.
+  - `D::Matrix{<:Number}`: Matrix of pairwise variation of information distances.
 
 # Details
 
@@ -273,7 +289,7 @@ If the input `rho` is a covariance matrix, it is converted to a correlation matr
 
 # Returns
 
-  - `dist::Matrix{<:Number}`: Matrix of pairwise Euclidean distances.
+  - `D::Matrix{<:Number}`: Matrix of pairwise Euclidean distances.
 
 # Details
 
@@ -402,7 +418,7 @@ Compute and return the correlation and distance matrices. The distance matrix de
 # Returns
 
   - `rho::Matrix{<:Number}`: Correlation matrix.
-  - `dist::Matrix{<:Number}`: Distance matrix.
+  - `D::Matrix{<:Number}`: Distance matrix.
 
 # Related
 
@@ -500,6 +516,21 @@ function cor_and_dist(de::Distance{<:Any, <:CanonicalDistance}, ce::MutualInfoCo
                                                              normalise = ce.normalise)), ce,
                         X; dims = dims, kwargs...)
 end
+"""
+    const AllInternalMutualInfoCov = Union{<:PortfolioOptimisersCovariance{<:MutualInfoCovariance},
+                                           <:DenoiseCovariance{<:MutualInfoCovariance},
+                                           <:DetoneCovariance{<:MutualInfoCovariance},
+                                           <:ProcessedCovariance{<:MutualInfoCovariance}}
+
+Alias for all internal mutual information covariance wrapper types.
+
+Matches any wrapper type around [`MutualInfoCovariance`](@ref). Used internally for dispatch in canonical distance computation.
+
+# Related
+
+  - [`MutualInfoCovariance`](@ref)
+  - [`DistCov_AllInternalDistCov`](@ref)
+"""
 const AllInternalMutualInfoCov = Union{<:PortfolioOptimisersCovariance{<:MutualInfoCovariance},
                                        <:DenoiseCovariance{<:MutualInfoCovariance},
                                        <:DetoneCovariance{<:MutualInfoCovariance},
@@ -516,6 +547,22 @@ function cor_and_dist(de::Distance{<:Any, <:CanonicalDistance},
     return cor_and_dist(Distance(; power = de.power, alg = LogDistance()), ce, X;
                         dims = dims, kwargs...)
 end
+"""
+    const DistCov_AllInternalDistCov = Union{<:DistanceCovariance,
+                                             <:PortfolioOptimisersCovariance{<:DistanceCovariance},
+                                             <:DenoiseCovariance{<:DistanceCovariance},
+                                             <:DetoneCovariance{<:DistanceCovariance},
+                                             <:ProcessedCovariance{<:DistanceCovariance}}
+
+Alias for all internal distance covariance estimator types.
+
+Matches [`DistanceCovariance`](@ref) or any wrapper around it. Used internally for dispatch in canonical distance computation.
+
+# Related
+
+  - [`DistanceCovariance`](@ref)
+  - [`LTDCov_AllInternalLTDCov`](@ref)
+"""
 const DistCov_AllInternalDistCov = Union{<:DistanceCovariance,
                                          <:PortfolioOptimisersCovariance{<:DistanceCovariance},
                                          <:DenoiseCovariance{<:DistanceCovariance},
@@ -552,7 +599,7 @@ Compute the canonical distance matrix using the covariance estimator and data ma
 
 # Returns
 
-  - `dist::Matrix{<:Number}`: Matrix of pairwise canonical distances.
+  - `D::Matrix{<:Number}`: Matrix of pairwise canonical distances.
 
 # Related
 

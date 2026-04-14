@@ -1,5 +1,5 @@
 """
-    abstract type MomentMeasureAlgorithm <: AbstractAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all moment-based risk measure algorithms in `PortfolioOptimisers.jl`.
 
@@ -12,7 +12,7 @@ Defines the interface for algorithms that compute portfolio risk using statistic
 """
 abstract type MomentMeasureAlgorithm <: AbstractAlgorithm end
 """
-    abstract type LowOrderMomentMeasureAlgorithm <: MomentMeasureAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all low-order moment-based risk measure algorithms in `PortfolioOptimisers.jl`.
 
@@ -24,7 +24,7 @@ Defines the interface for algorithms that compute portfolio risk using low-order
 """
 abstract type LowOrderMomentMeasureAlgorithm <: MomentMeasureAlgorithm end
 """
-    abstract type UnstandardisedLowOrderMomentMeasureAlgorithm <: LowOrderMomentMeasureAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for low-order moment risk measure algorithms that are not standardised by the variance in `PortfolioOptimisers.jl`.
 
@@ -40,7 +40,7 @@ function factory(alg::MomentMeasureAlgorithm, args...; kwargs...)
     return alg
 end
 """
-    struct FirstLowerMoment <: UnstandardisedLowOrderMomentMeasureAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Represents the first lower moment risk measure algorithm in `PortfolioOptimisers.jl`.
 
@@ -54,7 +54,7 @@ Computes portfolio risk using the first lower moment, which is the negative mean
 """
 struct FirstLowerMoment <: UnstandardisedLowOrderMomentMeasureAlgorithm end
 """
-    struct MeanAbsoluteDeviation <: UnstandardisedLowOrderMomentMeasureAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Represents the mean absolute deviation risk measure algorithm in `PortfolioOptimisers.jl`.
 
@@ -68,11 +68,7 @@ Computes portfolio risk as the mean of the absolute deviations of the returns se
 """
 struct MeanAbsoluteDeviation <: UnstandardisedLowOrderMomentMeasureAlgorithm end
 """
-    struct SecondMoment{T1, T2, T3} <: LowOrderMomentMeasureAlgorithm
-        ve::T1
-        alg1::T2
-        alg2::T3
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Represents a second moment (variance or standard deviation) risk measure algorithm in `PortfolioOptimisers.jl`.
 
@@ -86,11 +82,13 @@ Computes portfolio risk using the second central (full) or lower (semi) moment o
 
 # Constructors
 
-    SecondMoment(; ve::AbstractVarianceEstimator = SimpleVariance(; me = nothing),
-                 alg1::AbstractMomentAlgorithm = Full(),
-                 alg2::SecondMomentFormulation = SquaredSOCRiskExpr())
+    SecondMoment(;
+        ve::AbstractVarianceEstimator = SimpleVariance(; me = nothing),
+        alg1::AbstractMomentAlgorithm = Full(),
+        alg2::SecondMomentFormulation = SquaredSOCRiskExpr(),
+    ) -> SecondMoment
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 
@@ -126,11 +124,11 @@ function SecondMoment(; ve::AbstractVarianceEstimator = SimpleVariance(; me = no
                       alg2::SecondMomentFormulation = SquaredSOCRiskExpr())
     return SecondMoment(ve, alg1, alg2)
 end
-function factory(alg::SecondMoment, w::StatsBase.AbstractWeights)
+function factory(alg::SecondMoment, w::ObsWeights)
     return SecondMoment(; ve = factory(alg.ve, w), alg1 = alg.alg1, alg2 = alg.alg2)
 end
 """
-    abstract type HighOrderMomentMeasureAlgorithm <: MomentMeasureAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all high-order moment-based risk measure algorithms in `PortfolioOptimisers.jl`.
 
@@ -143,7 +141,7 @@ Defines the interface for algorithms that compute portfolio risk using high-orde
 """
 abstract type HighOrderMomentMeasureAlgorithm <: MomentMeasureAlgorithm end
 """
-    abstract type UnstandardisedHighOrderMomentMeasureAlgorithm <: HighOrderMomentMeasureAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for high-order moment risk measure algorithms that are not standardised by the variance in `PortfolioOptimisers.jl`.
 
@@ -157,7 +155,7 @@ Defines the interface for algorithms that compute portfolio risk using high-orde
 abstract type UnstandardisedHighOrderMomentMeasureAlgorithm <:
               HighOrderMomentMeasureAlgorithm end
 """
-    struct ThirdLowerMoment <: UnstandardisedHighOrderMomentMeasureAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Represents the unstandardised semi-skewness risk measure algorithm in `PortfolioOptimisers.jl`.
 
@@ -171,9 +169,7 @@ Computes portfolio risk using the third lower moment (unstandardised semi-skewne
 """
 struct ThirdLowerMoment <: UnstandardisedHighOrderMomentMeasureAlgorithm end
 """
-    struct FourthMoment{T1} <: UnstandardisedHighOrderMomentMeasureAlgorithm
-        alg::T1
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Represents the unstandardised fourth moment (kurtosis or semi-kurtosis) risk measure algorithm in `PortfolioOptimisers.jl`.
 
@@ -185,9 +181,11 @@ Computes portfolio risk using the fourth central (full) or lower (semi) moment o
 
 # Constructors
 
-    FourthMoment(; alg::AbstractMomentAlgorithm = Full())
+    FourthMoment(;
+        alg::AbstractMomentAlgorithm = Full(),
+    ) -> FourthMoment
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 
@@ -212,10 +210,7 @@ function FourthMoment(; alg::AbstractMomentAlgorithm = Full())
     return FourthMoment(alg)
 end
 """
-    struct StandardisedHighOrderMoment{T1, T2} <: HighOrderMomentMeasureAlgorithm
-        ve::T1
-        alg::T2
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Represents a standardised high-order moment risk measure algorithm in `PortfolioOptimisers.jl`.
 
@@ -229,10 +224,11 @@ Computes portfolio risk using a high-order moment algorithm (such as semi-skewne
 # Constructors
 
     StandardisedHighOrderMoment(;
-                                ve::AbstractVarianceEstimator = SimpleVariance(; me = nothing),
-                                alg::UnstandardisedHighOrderMomentMeasureAlgorithm = ThirdLowerMoment())
+        ve::AbstractVarianceEstimator = SimpleVariance(; me = nothing),
+        alg::UnstandardisedHighOrderMomentMeasureAlgorithm = ThirdLowerMoment(),
+    ) -> StandardisedHighOrderMoment
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 
@@ -266,16 +262,11 @@ function StandardisedHighOrderMoment(;
                                      alg::UnstandardisedHighOrderMomentMeasureAlgorithm = ThirdLowerMoment())
     return StandardisedHighOrderMoment(ve, alg)
 end
-function factory(alg::StandardisedHighOrderMoment, w::StatsBase.AbstractWeights)
+function factory(alg::StandardisedHighOrderMoment, w::ObsWeights)
     return StandardisedHighOrderMoment(; ve = factory(alg.ve, w), alg = alg.alg)
 end
 """
-    struct LowOrderMoment{T1, T2, T3, T4} <: RiskMeasure
-        settings::T1
-        w::T2
-        mu::T3
-        alg::T4
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Represents a low-order moment risk measure in `PortfolioOptimisers.jl`.
 
@@ -290,12 +281,14 @@ Computes portfolio risk using a low-order moment algorithm (such as first lower 
 
 # Constructors
 
-    LowOrderMoment(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                   w::Option{<:StatsBase.AbstractWeights} = nothing,
-                   mu::Option{<:Num_VecNum_VecScalar} = nothing,
-                   alg::LowOrderMomentMeasureAlgorithm = FirstLowerMoment())
+    LowOrderMoment(;
+        settings::RiskMeasureSettings = RiskMeasureSettings(),
+        w::Option{<:ObsWeights} = nothing,
+        mu::Option{<:Num_VecNum_VecScalar} = nothing,
+        alg::LowOrderMomentMeasureAlgorithm = FirstLowerMoment(),
+    ) -> LowOrderMoment
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 
@@ -622,8 +615,7 @@ LowOrderMoment
     w
     mu
     alg
-    function LowOrderMoment(settings::RiskMeasureSettings,
-                            w::Option{<:StatsBase.AbstractWeights},
+    function LowOrderMoment(settings::RiskMeasureSettings, w::Option{<:ObsWeights},
                             mu::Option{<:Num_VecNum_VecScalar},
                             alg::LowOrderMomentMeasureAlgorithm)
         if isa(mu, VecNum)
@@ -640,18 +632,13 @@ LowOrderMoment
     end
 end
 function LowOrderMoment(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                        w::Option{<:StatsBase.AbstractWeights} = nothing,
+                        w::Option{<:ObsWeights} = nothing,
                         mu::Option{<:Num_VecNum_VecScalar} = nothing,
                         alg::LowOrderMomentMeasureAlgorithm = FirstLowerMoment())
     return LowOrderMoment(settings, w, mu, alg)
 end
 """
-    struct HighOrderMoment{T1, T2, T3, T4} <: HierarchicalRiskMeasure
-        settings::T1
-        w::T2
-        mu::T3
-        alg::T4
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Represents a high-order moment risk measure in `PortfolioOptimisers.jl`.
 
@@ -666,12 +653,14 @@ Computes portfolio risk using a high-order moment algorithm (such as semi-skewne
 
 # Constructors
 
-    HighOrderMoment(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                    w::Option{<:StatsBase.AbstractWeights} = nothing,
-                    mu::Option{<:Num_VecNum_VecScalar} = nothing,
-                    alg::HighOrderMomentMeasureAlgorithm = ThirdLowerMoment())
+    HighOrderMoment(;
+        settings::RiskMeasureSettings = RiskMeasureSettings(),
+        w::Option{<:ObsWeights} = nothing,
+        mu::Option{<:Num_VecNum_VecScalar} = nothing,
+        alg::HighOrderMomentMeasureAlgorithm = ThirdLowerMoment(),
+    ) -> HighOrderMoment
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 
@@ -776,8 +765,7 @@ HighOrderMoment
     w
     mu
     alg
-    function HighOrderMoment(settings::RiskMeasureSettings,
-                             w::Option{<:StatsBase.AbstractWeights},
+    function HighOrderMoment(settings::RiskMeasureSettings, w::Option{<:ObsWeights},
                              mu::Option{<:Num_VecNum_VecScalar},
                              alg::HighOrderMomentMeasureAlgorithm)
         if isa(mu, VecNum)
@@ -786,19 +774,30 @@ HighOrderMoment
         elseif isa(mu, Number)
             @argcheck(isfinite(mu))
         end
-        if !isnothing(w)
-            @argcheck(!isempty(w))
-        end
+        validate_observation_weights(w)
         return new{typeof(settings), typeof(w), typeof(mu), typeof(alg)}(settings, w, mu,
                                                                          alg)
     end
 end
 function HighOrderMoment(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                         w::Option{<:StatsBase.AbstractWeights} = nothing,
+                         w::Option{<:ObsWeights} = nothing,
                          mu::Option{<:Num_VecNum_VecScalar} = nothing,
                          alg::HighOrderMomentMeasureAlgorithm = ThirdLowerMoment())
     return HighOrderMoment(settings, w, mu, alg)
 end
+"""
+    const LoHiOrderMoment{T1, T2, T3, T4} = Union{...}
+
+Parameterised union of [`LowOrderMoment`](@ref) and [`HighOrderMoment`](@ref) sharing the same type parameters.
+
+Used for unified dispatch on moment-target calculation methods.
+
+# Related
+
+  - [`LowOrderMoment`](@ref)
+  - [`HighOrderMoment`](@ref)
+  - [`calc_moment_target`](@ref)
+"""
 const LoHiOrderMoment{T1, T2, T3, T4} = Union{<:LowOrderMoment{T1, T2, T3, T4},
                                               <:HighOrderMoment{T1, T2, T3, T4}}
 """
@@ -967,24 +966,26 @@ function calc_deviations_vec(r::LoHiOrderMoment, w::VecNum, X::MatNum,
     tgt = calc_moment_target(r, w, x)
     return x .- tgt
 end
-function (r::LowOrderMoment{<:Any, <:Any, <:Any, <:FirstLowerMoment})(w::VecNum, X::MatNum,
-                                                                      fees::Option{<:Fees} = nothing)
+function (r::LowOrderMoment{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any,
+                            <:FirstLowerMoment})(w::VecNum, X::MatNum,
+                                                 fees::Option{<:Fees} = nothing)
     val = min.(calc_deviations_vec(r, w, X, fees), zero(eltype(X)))
     return isnothing(r.w) ? -Statistics.mean(val) : -Statistics.mean(val, r.w)
 end
-function (r::LowOrderMoment{<:Any, <:Any, <:Any, <:MeanAbsoluteDeviation})(w::VecNum,
-                                                                           X::MatNum,
-                                                                           fees::Option{<:Fees} = nothing)
+function (r::LowOrderMoment{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any,
+                            <:MeanAbsoluteDeviation})(w::VecNum, X::MatNum,
+                                                      fees::Option{<:Fees} = nothing)
     val = abs.(calc_deviations_vec(r, w, X, fees))
     return isnothing(r.w) ? Statistics.mean(val) : Statistics.mean(val, r.w)
 end
-function (r::HighOrderMoment{<:Any, <:Any, <:Any, <:ThirdLowerMoment})(w::VecNum, X::MatNum,
-                                                                       fees::Option{<:Fees} = nothing)
+function (r::HighOrderMoment{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any,
+                             <:ThirdLowerMoment})(w::VecNum, X::MatNum,
+                                                  fees::Option{<:Fees} = nothing)
     val = min.(calc_deviations_vec(r, w, X, fees), zero(eltype(X)))
     val .= val .^ 3
     return isnothing(r.w) ? -Statistics.mean(val) : -Statistics.mean(val, r.w)
 end
-function (r::HighOrderMoment{<:Any, <:Any, <:Any,
+function (r::HighOrderMoment{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any,
                              <:StandardisedHighOrderMoment{<:Any, <:ThirdLowerMoment}})(w::VecNum,
                                                                                         X::MatNum,
                                                                                         fees::Option{<:Fees} = nothing)
@@ -994,49 +995,49 @@ function (r::HighOrderMoment{<:Any, <:Any, <:Any,
     res = isnothing(r.w) ? -Statistics.mean(val) : -Statistics.mean(val, r.w)
     return res / (sigma * sqrt(sigma))
 end
-function (r::LowOrderMoment{<:Any, <:Any, <:Any,
+function (r::LowOrderMoment{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any,
                             <:SecondMoment{<:Any, <:Semi, <:SOCRiskExpr}})(w::VecNum,
                                                                            X::MatNum,
                                                                            fees::Option{<:Fees} = nothing)
     val = min.(calc_deviations_vec(r, w, X, fees), zero(eltype(X)))
     return Statistics.std(r.alg.ve, val; mean = zero(eltype(val)))
 end
-function (r::LowOrderMoment{<:Any, <:Any, <:Any,
+function (r::LowOrderMoment{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any,
                             <:SecondMoment{<:Any, <:Semi, <:QuadSecondMomentFormulations}})(w::VecNum,
                                                                                             X::MatNum,
                                                                                             fees::Option{<:Fees} = nothing)
     val = min.(calc_deviations_vec(r, w, X, fees), zero(eltype(X)))
     return Statistics.var(r.alg.ve, val; mean = zero(eltype(val)))
 end
-function (r::LowOrderMoment{<:Any, <:Any, <:Any,
+function (r::LowOrderMoment{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any,
                             <:SecondMoment{<:Any, <:Full, <:SOCRiskExpr}})(w::VecNum,
                                                                            X::MatNum,
                                                                            fees::Option{<:Fees} = nothing)
     val = calc_deviations_vec(r, w, X, fees)
     return Statistics.std(r.alg.ve, val; mean = zero(eltype(val)))
 end
-function (r::LowOrderMoment{<:Any, <:Any, <:Any,
+function (r::LowOrderMoment{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any,
                             <:SecondMoment{<:Any, <:Full, <:QuadSecondMomentFormulations}})(w::VecNum,
                                                                                             X::MatNum,
                                                                                             fees::Option{<:Fees} = nothing)
     val = calc_deviations_vec(r, w, X, fees)
     return Statistics.var(r.alg.ve, val; mean = zero(eltype(val)))
 end
-function (r::HighOrderMoment{<:Any, <:Any, <:Any, <:FourthMoment{<:Semi}})(w::VecNum,
-                                                                           X::MatNum,
-                                                                           fees::Option{<:Fees} = nothing)
+function (r::HighOrderMoment{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any,
+                             <:FourthMoment{<:Semi}})(w::VecNum, X::MatNum,
+                                                      fees::Option{<:Fees} = nothing)
     val = min.(calc_deviations_vec(r, w, X, fees), zero(eltype(X)))
     val .= val .^ 4
     return isnothing(r.w) ? Statistics.mean(val) : Statistics.mean(val, r.w)
 end
-function (r::HighOrderMoment{<:Any, <:Any, <:Any, <:FourthMoment{<:Full}})(w::VecNum,
-                                                                           X::MatNum,
-                                                                           fees::Option{<:Fees} = nothing)
+function (r::HighOrderMoment{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any,
+                             <:FourthMoment{<:Full}})(w::VecNum, X::MatNum,
+                                                      fees::Option{<:Fees} = nothing)
     val = calc_deviations_vec(r, w, X, fees)
     val .= val .^ 4
     return isnothing(r.w) ? Statistics.mean(val) : Statistics.mean(val, r.w)
 end
-function (r::HighOrderMoment{<:Any, <:Any, <:Any,
+function (r::HighOrderMoment{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any,
                              <:StandardisedHighOrderMoment{<:Any, <:FourthMoment{<:Semi}}})(w::VecNum,
                                                                                             X::MatNum,
                                                                                             fees::Option{<:Fees} = nothing)
@@ -1046,7 +1047,7 @@ function (r::HighOrderMoment{<:Any, <:Any, <:Any,
     res = isnothing(r.w) ? Statistics.mean(val) : Statistics.mean(val, r.w)
     return res / sigma^2
 end
-function (r::HighOrderMoment{<:Any, <:Any, <:Any,
+function (r::HighOrderMoment{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any,
                              <:StandardisedHighOrderMoment{<:Any, <:FourthMoment{<:Full}}})(w::VecNum,
                                                                                             X::MatNum,
                                                                                             fees::Option{<:Fees} = nothing)
@@ -1055,6 +1056,18 @@ function (r::HighOrderMoment{<:Any, <:Any, <:Any,
     val .= val .^ 4
     res = isnothing(r.w) ? Statistics.mean(val) : Statistics.mean(val, r.w)
     return res / sigma^2
+end
+function (r::LowOrderMoment{<:Any, <:DynamicAbstractWeights, <:Any, <:Any})(w::VecNum,
+                                                                            X::MatNum,
+                                                                            fees::Option{<:Fees} = nothing)
+    return LowOrderMoment(; settings = r.settings, alg = r.alg,
+                          w = get_observation_weights(r.w, X), mu = r.mu)(w, X, fees)
+end
+function (r::HighOrderMoment{<:Any, <:DynamicAbstractWeights, <:Any, <:Any})(w::VecNum,
+                                                                             X::MatNum,
+                                                                             fees::Option{<:Fees} = nothing)
+    return HighOrderMoment(; settings = r.settings, alg = r.alg,
+                           w = get_observation_weights(r.w, X), mu = r.mu)(w, X, fees)
 end
 for rt in (LowOrderMoment, HighOrderMoment)
     eval(quote

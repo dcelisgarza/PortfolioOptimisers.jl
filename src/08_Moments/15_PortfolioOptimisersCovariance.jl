@@ -1,8 +1,5 @@
 """
-    struct PortfolioOptimisersCovariance{T1, T2} <: AbstractCovarianceEstimator
-        ce::T1
-        mp::T2
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Composite covariance estimator with post-processing.
 
@@ -10,15 +7,16 @@ Composite covariance estimator with post-processing.
 
 # Fields
 
-  - `ce`: The underlying covariance estimator.
-  - `mp`: Matrix post-processing estimator.
+$(DocStringExtensions.FIELDS)
 
-# Constructor
+# Constructors
 
-    PortfolioOptimisersCovariance(; ce::AbstractCovarianceEstimator = Covariance(),
-                                  mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing())
+    PortfolioOptimisersCovariance(;
+        ce::StatsBase.CovarianceEstimator = Covariance(),
+        mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing()
+    ) -> PortfolioOptimisersCovariance
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 
@@ -27,12 +25,10 @@ julia> PortfolioOptimisersCovariance()
 PortfolioOptimisersCovariance
   ce ┼ Covariance
      │    me ┼ SimpleExpectedReturns
-     │       │     w ┼ nothing
-     │       │   idx ┴ nothing
+     │       │   w ┴ nothing
      │    ce ┼ GeneralCovariance
-     │       │    ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-     │       │     w ┼ nothing
-     │       │   idx ┴ nothing
+     │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+     │       │    w ┴ nothing
      │   alg ┴ Full()
   mp ┼ DenoiseDetoneAlgMatrixProcessing
      │     pdm ┼ Posdef
@@ -50,18 +46,39 @@ PortfolioOptimisersCovariance
   - [`AbstractMatrixProcessingEstimator`](@ref)
 """
 @concrete struct PortfolioOptimisersCovariance <: AbstractCovarianceEstimator
+    "$(field_dict[:ce])"
     ce
+    "$(field_dict[:mp])"
     mp
-    function PortfolioOptimisersCovariance(ce::AbstractCovarianceEstimator,
+    function PortfolioOptimisersCovariance(ce::StatsBase.CovarianceEstimator,
                                            mp::AbstractMatrixProcessingEstimator)
         return new{typeof(ce), typeof(mp)}(ce, mp)
     end
 end
-function PortfolioOptimisersCovariance(; ce::AbstractCovarianceEstimator = Covariance(),
+function PortfolioOptimisersCovariance(; ce::StatsBase.CovarianceEstimator = Covariance(),
                                        mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing())
     return PortfolioOptimisersCovariance(ce, mp)
 end
-function factory(ce::PortfolioOptimisersCovariance, w::StatsBase.AbstractWeights)
+"""
+    factory(ce::PortfolioOptimisersCovariance, w::ObsWeights) -> PortfolioOptimisersCovariance
+
+Return a new [`PortfolioOptimisersCovariance`](@ref) estimator with observation weights `w` applied to the underlying covariance estimator.
+
+# Arguments
+
+  - $(arg_dict[:ce])
+  - $(arg_dict[:ow])
+
+# Returns
+
+  - $(ret_dict[:ce])
+
+# Related
+
+  - [`PortfolioOptimisersCovariance`](@ref)
+  - [`factory`](@ref)
+"""
+function factory(ce::PortfolioOptimisersCovariance, w::ObsWeights)
     return PortfolioOptimisersCovariance(; ce = factory(ce.ce, w), mp = ce.mp)
 end
 """
@@ -144,22 +161,61 @@ function Statistics.cor(ce::PortfolioOptimisersCovariance, X::MatNum; dims = 1, 
     matrix_processing!(ce.mp, rho, X; kwargs...)
     return rho
 end
+"""
+    find_uncorrelated_indices(X::MatNum;
+                              ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
+                              t::Number = 0.95, absolute::Bool = false,
+                              measure::VectorToScalarMeasure = MeanValue())
+
+Find indices of a maximally uncorrelated subset of assets from a data matrix.
+
+This function identifies a subset of asset columns in `X` such that no two assets in the subset have a pairwise (absolute) correlation exceeding the threshold `t`. When two assets are too correlated, the one with the higher summary correlation measure (across all assets) is removed. The function returns the indices of the remaining uncorrelated assets.
+
+# Arguments
+
+  - `X`: Data matrix of asset returns (observations × assets).
+  - `ce`: Covariance estimator used to compute the correlation matrix.
+  - `t`: Correlation threshold above which two assets are considered too correlated.
+  - `absolute`: If `true`, the absolute value of the correlation is used for comparison.
+  - `measure`: Summary measure applied to each column of the correlation matrix (e.g., mean) to decide which asset to remove when two are too correlated.
+
+# Returns
+
+  - `idx::Vector{Int}`: Indices of assets that form a maximally uncorrelated subset.
+
+# Details
+
+  - Computes the (absolute) correlation matrix for all assets.
+  - Identifies pairs of assets with correlation at or above `t`, sorted from most to least correlated.
+  - For each correlated pair (not yet removed), removes the asset with the higher summary correlation value. If both assets have equal summary values, both are removed.
+  - Returns the indices of assets not in the removed set.
+
+# Related
+
+  - [`PortfolioOptimisersCovariance`](@ref)
+  - [`VectorToScalarMeasure`](@ref)
+  - [`MeanValue`](@ref)
+"""
 function find_uncorrelated_indices(X::MatNum;
                                    ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
-                                   t::Number = 0.95, absolute::Bool = false)
+                                   t::Number = 0.95, absolute::Bool = false,
+                                   measure::VectorToScalarMeasure = MeanValue())
     N = size(X, 2)
     rho = !absolute ? Statistics.cor(ce, X) : abs.(Statistics.cor(ce, X))
-    mean_rho = Statistics.mean(rho; dims = 1)
+    summary_rho = [vec_to_real_measure(measure, x) for x in eachcol(rho)]
     tril_idx = findall(LinearAlgebra.tril!(trues(size(rho)), -1))
-    candidate_idx = findall(rho[tril_idx] .>= t)
+    candidate_idx = findall(x -> x >= t, rho[tril_idx])
     candidate_idx = candidate_idx[sortperm(rho[tril_idx][candidate_idx]; rev = true)]
     to_remove = sizehint!(Set{Int}(), div(length(candidate_idx), 2))
     for idx in candidate_idx
         i, j = tril_idx[idx][1], tril_idx[idx][2]
         if i ∉ to_remove && j ∉ to_remove
-            if mean_rho[i] > mean_rho[j]
+            if summary_rho[i] > summary_rho[j]
                 push!(to_remove, i)
+            elseif summary_rho[i] < summary_rho[j]
+                push!(to_remove, j)
             else
+                push!(to_remove, i)
                 push!(to_remove, j)
             end
         end
@@ -167,4 +223,4 @@ function find_uncorrelated_indices(X::MatNum;
     return setdiff(1:N, to_remove)
 end
 
-export PortfolioOptimisersCovariance
+export PortfolioOptimisersCovariance, find_uncorrelated_indices

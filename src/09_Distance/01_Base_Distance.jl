@@ -1,5 +1,5 @@
 """
-    abstract type AbstractDistanceEstimator <: AbstractEstimator end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all distance estimator types in `PortfolioOptimisers.jl`.
 
@@ -14,7 +14,7 @@ All concrete and/or abstract  types implementing distance-based estimation algor
 """
 abstract type AbstractDistanceEstimator <: AbstractEstimator end
 """
-    abstract type AbstractDistanceAlgorithm <: AbstractAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all distance algorithm types in `PortfolioOptimisers.jl`.
 
@@ -34,7 +34,7 @@ All concrete and/or abstract types implementing specific distance-based algorith
 """
 abstract type AbstractDistanceAlgorithm <: AbstractAlgorithm end
 """
-    struct SimpleDistance <: AbstractDistanceAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Simple distance algorithm for portfolio optimization.
 
@@ -55,7 +55,7 @@ where ``d`` is the distance, ``\\rho`` is the correlation coefficient, and each 
 """
 struct SimpleDistance <: AbstractDistanceAlgorithm end
 """
-    struct SimpleAbsoluteDistance <: AbstractDistanceAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Simple absolute distance algorithm for portfolio optimization.
 
@@ -76,7 +76,7 @@ where ``d`` is the distance, ``\\rho`` is the correlation coefficient, and each 
 """
 struct SimpleAbsoluteDistance <: AbstractDistanceAlgorithm end
 """
-    struct LogDistance <: AbstractDistanceAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Logarithmic distance algorithm for portfolio optimization.
 
@@ -97,7 +97,7 @@ where ``d`` is the distance, ``\\rho`` is the correlation coefficient, and each 
 """
 struct LogDistance <: AbstractDistanceAlgorithm end
 """
-    struct CorrelationDistance <: AbstractDistanceAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Correlation distance algorithm for portfolio optimization.
 
@@ -118,10 +118,7 @@ where ``d`` is the distance, ``\\rho`` is the correlation coefficient, and each 
 """
 struct CorrelationDistance <: AbstractDistanceAlgorithm end
 """
-    struct VariationInfoDistance{T1, T2} <: AbstractDistanceAlgorithm
-        bins::T1
-        normalise::T2
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Variation of Information (VI) distance algorithm for portfolio optimization.
 
@@ -129,19 +126,20 @@ Variation of Information (VI) distance algorithm for portfolio optimization.
 
 # Fields
 
-  - `bins`: Binning strategy or number of bins. If an integer, must be strictly positive.
-  - `normalise`: Whether to normalise the VI distance to the range [0, 1].
+$(DocStringExtensions.FIELDS)
 
-# Constructor
+# Constructors
 
-    VariationInfoDistance(; bins::Int_Bin = HacineGharbiRavier(),
-                          normalise::Bool = true)
+    VariationInfoDistance(;
+        bins::Int_Bin = HacineGharbiRavier(),
+        normalise::Bool = true
+    ) -> VariationInfoDistance
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - If `bins` is an integer, `bins > 0`.
+  - $(val_dict[:bins])
 
 # Examples
 
@@ -159,7 +157,9 @@ VariationInfoDistance
   - [`cor_and_dist`](@ref)
 """
 @concrete struct VariationInfoDistance <: AbstractDistanceAlgorithm
+    "$(field_dict[:bins])"
     bins
+    "$(field_dict[:normalise])"
     normalise
     function VariationInfoDistance(bins::Int_Bin, normalise::Bool)
         if isa(bins, Integer)
@@ -173,7 +173,7 @@ function VariationInfoDistance(; bins::Int_Bin = HacineGharbiRavier(),
     return VariationInfoDistance(bins, normalise)
 end
 """
-    struct CanonicalDistance <: AbstractDistanceAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Canonical distance algorithm for portfolio optimization.
 

@@ -1,5 +1,5 @@
 """
-    abstract type AbstractPriorEstimator <: AbstractEstimator end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all prior estimators.
 
@@ -13,7 +13,7 @@ Abstract supertype for all prior estimators.
 """
 abstract type AbstractPriorEstimator <: AbstractEstimator end
 """
-    abstract type AbstractLowOrderPriorEstimator <: AbstractPriorEstimator end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for low order prior estimators.
 
@@ -28,7 +28,7 @@ Abstract supertype for low order prior estimators.
 """
 abstract type AbstractLowOrderPriorEstimator <: AbstractPriorEstimator end
 """
-    abstract type AbstractLowOrderPriorEstimator_A <: AbstractLowOrderPriorEstimator end
+$(DocStringExtensions.TYPEDEF)
 
 Low order prior estimator using only asset returns.
 
@@ -42,7 +42,7 @@ Low order prior estimator using only asset returns.
 """
 abstract type AbstractLowOrderPriorEstimator_A <: AbstractLowOrderPriorEstimator end
 """
-    abstract type AbstractLowOrderPriorEstimator_F <: AbstractLowOrderPriorEstimator end
+$(DocStringExtensions.TYPEDEF)
 
 Low order prior estimator using factor returns.
 
@@ -56,7 +56,7 @@ Low order prior estimator using factor returns.
 """
 abstract type AbstractLowOrderPriorEstimator_F <: AbstractLowOrderPriorEstimator end
 """
-    abstract type AbstractLowOrderPriorEstimator_AF <: AbstractLowOrderPriorEstimator end
+$(DocStringExtensions.TYPEDEF)
 
 Low order prior estimator using both asset and factor returns.
 
@@ -124,7 +124,7 @@ const AbstractLowOrderPriorEstimator_A_F_AF = Union{<:AbstractLowOrderPriorEstim
                                                     <:AbstractLowOrderPriorEstimator_F,
                                                     <:AbstractLowOrderPriorEstimator_AF}
 """
-    abstract type AbstractHighOrderPriorEstimator <: AbstractPriorEstimator end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for high order prior estimators.
 
@@ -137,11 +137,36 @@ Abstract supertype for high order prior estimators.
   - [`prior`](@ref)
 """
 abstract type AbstractHighOrderPriorEstimator <: AbstractPriorEstimator end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+High order prior estimator using factor returns.
+
+`AbstractHighOrderPriorEstimator_F` is the base type for estimators that compute high order moments (such as coskewness and cokurtosis) requiring both asset and factor returns data. All concrete factor-based high order prior estimators should subtype this type.
+
+# Related
+
+  - [`AbstractHighOrderPriorEstimator`](@ref)
+  - [`AbstractLowOrderPriorEstimator_F`](@ref)
+  - [`AbstractHiLoOrderPriorEstimator_F`](@ref)
+  - [`prior`](@ref)
+"""
 abstract type AbstractHighOrderPriorEstimator_F <: AbstractHighOrderPriorEstimator end
+"""
+    const AbstractHiLoOrderPriorEstimator_F = Union{<:AbstractLowOrderPriorEstimator_F,
+                                                    <:AbstractHighOrderPriorEstimator_F}
+
+Alias for a union of low-order and high-order factor prior estimator types.
+
+# Related
+
+  - [`AbstractLowOrderPriorEstimator_F`](@ref)
+  - [`AbstractHighOrderPriorEstimator_F`](@ref)
+"""
 const AbstractHiLoOrderPriorEstimator_F = Union{<:AbstractLowOrderPriorEstimator_F,
                                                 <:AbstractHighOrderPriorEstimator_F}
 """
-    abstract type AbstractPriorResult <: AbstractResult end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all prior result types.
 
@@ -154,7 +179,27 @@ Abstract supertype for all prior result types.
   - [`AbstractResult`](@ref)
 """
 abstract type AbstractPriorResult <: AbstractResult end
+"""
+    const PrE_Pr = Union{<:AbstractPriorEstimator, <:AbstractPriorResult}
+
+Alias for a union of prior estimator and prior result types.
+
+# Related
+
+  - [`AbstractPriorEstimator`](@ref)
+  - [`AbstractPriorResult`](@ref)
+"""
 const PrE_Pr = Union{<:AbstractPriorEstimator, <:AbstractPriorResult}
+"""
+    const Pr_RR = Union{<:AbstractPriorResult, <:ReturnsResult}
+
+Alias for a union of prior result and returns result types.
+
+# Related
+
+  - [`AbstractPriorResult`](@ref)
+  - [`ReturnsResult`](@ref)
+"""
 const Pr_RR = Union{<:AbstractPriorResult, <:ReturnsResult}
 """
     prior(pr::AbstractPriorEstimator, rd::ReturnsResult; kwargs...)
@@ -211,6 +256,28 @@ Propagate or pass through prior result objects.
 function prior(pr::AbstractPriorResult, args...; kwargs...)
     return pr
 end
+"""
+    prior_view(pr, args...; kwargs...)
+
+Get a view or subset of a prior estimator or result for slicing.
+
+Returns the prior unchanged for estimators (they are not sliceable), or returns a sliced prior result for a given cluster or asset index. Used in hierarchical optimisation to provide cluster-specific priors.
+
+# Arguments
+
+  - `pr`: Prior estimator or result.
+  - `args...`: Additional arguments (index, etc.).
+  - `kwargs...`: Additional keyword arguments.
+
+# Returns
+
+  - Sliced prior result or unchanged estimator.
+
+# Related
+
+  - [`AbstractPriorEstimator`](@ref)
+  - [`LowOrderPrior`](@ref)
+"""
 function prior_view(pr::AbstractPriorEstimator, args...; kwargs...)
     return pr
 end
@@ -452,21 +519,7 @@ function centrality_constraints(ccs::CC_VecCC, pr::Pr_RR;
     return centrality_constraints(ccs, X; kwargs...)
 end
 """
-    struct LowOrderPrior{T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12} <:
-           AbstractPriorResult
-        X::T1
-        mu::T2
-        sigma::T3
-        chol::T4
-        w::T5
-        ens::T6
-        kld::T7
-        ow::T8
-        rr::T9
-        f_mu::T10
-        f_sigma::T11
-        f_w::T12
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Container type for low order prior results in `PortfolioOptimisers.jl`.
 
@@ -487,20 +540,24 @@ Container type for low order prior results in `PortfolioOptimisers.jl`.
   - `f_sigma`: Factor covariance matrix.
   - `f_w`: Factor weights.
 
-# Constructor
+# Constructors
 
-    LowOrderPrior(; X::MatNum, mu::VecNum, sigma::MatNum,
-                  chol::Option{<:MatNum} = nothing,
-                  w::Option{<:StatsBase.AbstractWeights} = nothing,
-                  ens::Option{<:Number} = nothing,
-                  kld::Option{<:Num_VecNum} = nothing,
-                  ow::Option{<:VecNum} = nothing,
-                  rr::Option{<:Regression} = nothing,
-                  f_mu::Option{<:VecNum} = nothing,
-                  f_sigma::Option{<:MatNum} = nothing,
-                  f_w::Option{<:VecNum} = nothing)
+    LowOrderPrior(;
+        X::MatNum,
+        mu::VecNum,
+        sigma::MatNum,
+        chol::Option{<:MatNum} = nothing,
+        w::Option{<:ObsWeights} = nothing,
+        ens::Option{<:Number} = nothing,
+        kld::Option{<:Num_VecNum} = nothing,
+        ow::Option{<:VecNum} = nothing,
+        rr::Option{<:Regression} = nothing,
+        f_mu::Option{<:VecNum} = nothing,
+        f_sigma::Option{<:MatNum} = nothing,
+        f_w::Option{<:VecNum} = nothing
+    ) -> LowOrderPrior
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 
@@ -555,7 +612,7 @@ LowOrderPrior
     f_sigma
     f_w
     function LowOrderPrior(X::MatNum, mu::VecNum, sigma::MatNum, chol::Option{<:MatNum},
-                           w::Option{<:StatsBase.AbstractWeights}, ens::Option{<:Number},
+                           w::Option{<:ObsWeights}, ens::Option{<:Number},
                            kld::Option{<:Num_VecNum}, ow::Option{<:VecNum},
                            rr::Option{<:Regression}, f_mu::Option{<:VecNum},
                            f_sigma::Option{<:MatNum}, f_w::Option{<:VecNum})
@@ -564,8 +621,8 @@ LowOrderPrior
         @argcheck(!isempty(sigma))
         assert_matrix_issquare(sigma, :sigma)
         @argcheck(size(X, 2) == length(mu) == size(sigma, 1))
-        if !isnothing(w)
-            @argcheck(!isempty(w))
+        validate_observation_weights(w)
+        if isa(w, StatsBase.AbstractWeights)
             @argcheck(length(w) == size(X, 1))
         end
         if isa(kld, VecNum)
@@ -602,8 +659,7 @@ LowOrderPrior
     end
 end
 function LowOrderPrior(; X::MatNum, mu::VecNum, sigma::MatNum,
-                       chol::Option{<:MatNum} = nothing,
-                       w::Option{<:StatsBase.AbstractWeights} = nothing,
+                       chol::Option{<:MatNum} = nothing, w::Option{<:ObsWeights} = nothing,
                        ens::Option{<:Number} = nothing, kld::Option{<:Num_VecNum} = nothing,
                        ow::Option{<:VecNum} = nothing, rr::Option{<:Regression} = nothing,
                        f_mu::Option{<:VecNum} = nothing,
@@ -618,15 +674,7 @@ function prior_view(pr::LowOrderPrior, i)
                          f_mu = pr.f_mu, f_sigma = pr.f_sigma, f_w = pr.f_w)
 end
 """
-    struct HighOrderPrior{T1, T2, T3, T4, T5, T6, T7} <: AbstractPriorResult
-        pr::T1
-        kt::T2
-        L2::T3
-        S2::T4
-        sk::T5
-        V::T6
-        skmp::T7
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Container type for high order prior results in `PortfolioOptimisers.jl`.
 
@@ -642,16 +690,19 @@ Container type for high order prior results in `PortfolioOptimisers.jl`.
   - `V`: Negative quadratic skewness matrix.
   - `skmp`: Matrix processing estimator for post-processing quadratic skewness.
 
-# Constructor
+# Constructors
 
-    HighOrderPrior(; pr::AbstractPriorResult, kt::Option{<:MatNum} = nothing,
-                   L2::Option{<:MatNum} = nothing,
-                   S2::Option{<:MatNum} = nothing,
-                   sk::Option{<:MatNum} = nothing,
-                   V::Option{<:MatNum} = nothing,
-                   skmp::Option{<:AbstractMatrixProcessingEstimator} = DenoiseDetoneAlgMatrixProcessing())
+    HighOrderPrior(;
+        pr::AbstractPriorResult,
+        kt::Option{<:MatNum} = nothing,
+        L2::Option{<:MatNum} = nothing,
+        S2::Option{<:MatNum} = nothing,
+        sk::Option{<:MatNum} = nothing,
+        V::Option{<:MatNum} = nothing,
+        skmp::Option{<:AbstractMatrixProcessingEstimator} = DenoiseDetoneAlgMatrixProcessing()
+    ) -> HighOrderPrior
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 

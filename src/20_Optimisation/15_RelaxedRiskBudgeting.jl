@@ -1,6 +1,70 @@
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for relaxed risk budgeting algorithm variants.
+
+# Related Types
+
+  - [`BasicRelaxedRiskBudgeting`](@ref)
+  - [`RegularisedRelaxedRiskBudgeting`](@ref)
+  - [`RegularisedPenalisedRelaxedRiskBudgeting`](@ref)
+"""
 abstract type RelaxedRiskBudgetingAlgorithm <: OptimisationAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Basic Relaxed Risk Budgeting formulation.
+
+Uses the basic Second Order Cone (SOC) relaxation of the risk budgeting problem without additional regularisation.
+
+# Related Types
+
+  - [`RelaxedRiskBudgetingAlgorithm`](@ref)
+  - [`RegularisedRelaxedRiskBudgeting`](@ref)
+"""
 struct BasicRelaxedRiskBudgeting <: RelaxedRiskBudgetingAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Regularised Relaxed Risk Budgeting formulation.
+
+Extends the basic SOC formulation with a regularisation term to improve numerical stability.
+
+# Related Types
+
+  - [`RelaxedRiskBudgetingAlgorithm`](@ref)
+  - [`BasicRelaxedRiskBudgeting`](@ref)
+  - [`RegularisedPenalisedRelaxedRiskBudgeting`](@ref)
+"""
 struct RegularisedRelaxedRiskBudgeting <: RelaxedRiskBudgetingAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Regularised and penalised Relaxed Risk Budgeting formulation.
+
+Extends the regularised formulation with a penalty on deviations from target risk budgets, controlled by parameter `p`.
+
+# Fields
+
+  - `p`: Penalty parameter (positive finite number).
+
+# Constructors
+
+    RegularisedPenalisedRelaxedRiskBudgeting(;
+        p::Number = 1.0
+    ) -> RegularisedPenalisedRelaxedRiskBudgeting
+
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - `isfinite(p)` and `p > 0`.
+
+# Related Types
+
+  - [`RelaxedRiskBudgetingAlgorithm`](@ref)
+  - [`RegularisedRelaxedRiskBudgeting`](@ref)
+"""
 @concrete struct RegularisedPenalisedRelaxedRiskBudgeting <: RelaxedRiskBudgetingAlgorithm
     p
     function RegularisedPenalisedRelaxedRiskBudgeting(p::Number)
@@ -11,6 +75,39 @@ end
 function RegularisedPenalisedRelaxedRiskBudgeting(; p::Number = 1.0)
     return RegularisedPenalisedRelaxedRiskBudgeting(p)
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Relaxed Risk Budgeting (RRB) portfolio optimiser.
+
+`RelaxedRiskBudgeting` implements a relaxed formulation of the risk budgeting problem using a Second Order Cone constraint on the portfolio variance. Unlike [`RiskBudgeting`](@ref), it does not require a logarithmic or mixed-integer formulation, making it computationally more tractable.
+
+# Fields
+
+  - `opt`: JuMP optimiser configuration.
+  - `rba`: Risk budgeting algorithm.
+  - `wi`: Initial weights for warm-starting.
+  - `alg`: Relaxed risk budgeting algorithm variant.
+  - `fb`: Fallback optimiser.
+
+# Constructors
+
+    RelaxedRiskBudgeting(;
+        opt::JuMPOptimiser = JuMPOptimiser(),
+        rba::RiskBudgetingAlgorithm = AssetRiskBudgeting(),
+        wi::Option{<:VecNum} = nothing,
+        alg::RelaxedRiskBudgetingAlgorithm = BasicRelaxedRiskBudgeting(),
+        fb::Option{<:OptE_Opt} = nothing
+    ) -> RelaxedRiskBudgeting
+
+Keywords correspond to the struct's fields.
+
+# Related
+
+  - [`JuMPOptimisationEstimator`](@ref)
+  - [`RiskBudgeting`](@ref)
+  - [`RelaxedRiskBudgetingAlgorithm`](@ref)
+"""
 @concrete struct RelaxedRiskBudgeting <: JuMPOptimisationEstimator
     opt
     rba
@@ -51,6 +148,30 @@ function opt_view(rrb::RelaxedRiskBudgeting, i, X::MatNum)
     wi = nothing_scalar_array_view(rrb.wi, i)
     return RelaxedRiskBudgeting(; opt = opt, rba = rba, wi = wi, alg = rrb.alg, fb = rrb.fb)
 end
+"""
+    set_relaxed_risk_budgeting_alg_constraints!(alg, model, w, sigma, chol)
+
+Add algorithm-specific second-order cone constraints for Relaxed Risk Budgeting.
+
+Dispatches based on the RRB algorithm variant. Adds second-order cone constraints implementing the basic, regularised, or regularised-penalised RRB formulation.
+
+# Arguments
+
+  - `alg`: RRB algorithm ([`BasicRelaxedRiskBudgeting`](@ref), [`RegularisedRelaxedRiskBudgeting`](@ref), or [`RegularisedPenalisedRelaxedRiskBudgeting`](@ref)).
+  - `model::JuMP.Model`: JuMP optimisation model.
+  - `w::VecJuMPScalar`: Portfolio weight variables.
+  - `sigma::MatNum`: Covariance matrix.
+  - `chol::Option{<:MatNum}`: Optional pre-computed Cholesky factor.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`RelaxedRiskBudgeting`](@ref)
+  - [`set_relaxed_risk_budgeting_constraints!`](@ref)
+"""
 function set_relaxed_risk_budgeting_alg_constraints!(::BasicRelaxedRiskBudgeting,
                                                      model::JuMP.Model, w::VecJuMPScalar,
                                                      sigma::MatNum,
@@ -101,6 +222,27 @@ function set_relaxed_risk_budgeting_alg_constraints!(alg::RegularisedPenalisedRe
                       end)
     return nothing
 end
+"""
+    _set_relaxed_risk_budgeting_constraints!(model, ...)
+
+Internal function to set relaxed risk budgeting constraints in the JuMP model.
+
+Configures inequality constraints for the relaxed risk budgeting formulation, allowing small deviations from exact budget targets.
+
+# Arguments
+
+  - `model`: JuMP model.
+  - Additional relaxed risk budgeting parameters.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`RelaxedRiskBudgeting`](@ref)
+  - [`_set_risk_budgeting_constraints!`](@ref)
+"""
 function _set_relaxed_risk_budgeting_constraints!(model::JuMP.Model,
                                                   rrb::RelaxedRiskBudgeting,
                                                   w::VecJuMPScalar, sigma::MatNum,
@@ -128,6 +270,30 @@ function _set_relaxed_risk_budgeting_constraints!(model::JuMP.Model,
     set_relaxed_risk_budgeting_alg_constraints!(rrb.alg, model, w, sigma, chol)
     return rkb
 end
+"""
+    set_relaxed_risk_budgeting_constraints!(model, rrb, pr, wb, args...)
+
+Add Relaxed Risk Budgeting (RRB) constraints and weight variables to the JuMP model.
+
+Dispatches based on the risk budgeting algorithm type. Configures weight variables, budget constraints, second-order cone constraints, and weight bounds.
+
+# Arguments
+
+  - `model::JuMP.Model`: JuMP optimisation model.
+  - `rrb::RelaxedRiskBudgeting`: RRB estimator configuration.
+  - `pr::AbstractPriorResult`: Prior result with asset moments.
+  - `wb::WeightBounds`: Weight bounds configuration.
+  - `args...`: Additional arguments (e.g. returns data for factor risk budgeting).
+
+# Returns
+
+  - Processed risk budgeting attributes.
+
+# Related
+
+  - [`RelaxedRiskBudgeting`](@ref)
+  - [`set_relaxed_risk_budgeting_alg_constraints!`](@ref)
+"""
 function set_relaxed_risk_budgeting_constraints!(model::JuMP.Model,
                                                  rrb::RelaxedRiskBudgeting{<:Any,
                                                                            <:FactorRiskBudgeting,
@@ -158,7 +324,8 @@ function _optimise(rrb::RelaxedRiskBudgeting, rd::ReturnsResult = ReturnsResult(
                    dims::Int = 1, str_names::Bool = false, save::Bool = true, kwargs...)
     (; pr, wb, lt, st, lcsr, ctr, gcardr, sgcardr, smtx, slt, sst, sgmtx, sglt, sgst, plr, tn, fees, ret) = processed_jump_optimiser_attributes(rrb.opt,
                                                                                                                                                 rd;
-                                                                                                                                                dims = dims)
+                                                                                                                                                dims = dims,
+                                                                                                                                                kwargs...)
     model = JuMP.Model()
     JuMP.set_string_names_on_creation(model, str_names)
     set_model_scales!(model, rrb.opt.sc, rrb.opt.so)
@@ -190,6 +357,20 @@ function _optimise(rrb::RelaxedRiskBudgeting, rd::ReturnsResult = ReturnsResult(
                                                                 tn, fees, plr, ret), prb,
                                retcode, sol, ifelse(save, model, nothing), nothing)
 end
+"""
+    optimise(rrb::RelaxedRiskBudgeting{<:Any, <:Any, <:Any, <:Any, Nothing},
+             rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
+             str_names::Bool = false, save::Bool = true, kwargs...) -> RiskBudgetingResult
+
+# Arguments
+
+  - `rrb`: The relaxed risk budgeting optimiser to use.
+  - $(arg_dict[:rd]) If `isa(hec.opt.pe, AbstractPriorResult)`, `rd` is not necessary if doing a standalone optimisation, but may be required/desired by fallbacks and/or clusterisation.
+  - `dims`: The dimension along which observations advance in time.
+  - `str_names`: Whether to use string names for the assets in the optimisation.
+  - `save`: Whether to save the JuMP model in the optimisation result.
+  - `kwargs`: Additional keyword arguments passed to the optimisation function.
+"""
 function optimise(rrb::RelaxedRiskBudgeting{<:Any, <:Any, <:Any, <:Any, Nothing},
                   rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
                   str_names::Bool = false, save::Bool = true, kwargs...)

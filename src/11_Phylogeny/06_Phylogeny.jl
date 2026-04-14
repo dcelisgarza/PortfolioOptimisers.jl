@@ -1,7 +1,5 @@
 """
-    struct PhylogenyResult{T} <: AbstractPhylogenyResult
-        X::T
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Container type for phylogeny matrix or vector results in `PortfolioOptimisers.jl`.
 
@@ -9,22 +7,20 @@ Container type for phylogeny matrix or vector results in `PortfolioOptimisers.jl
 
 # Fields
 
-  - `X`: The phylogeny matrix or centrality vector.
+$(DocStringExtensions.FIELDS)
 
-# Constructor
+# Constructors
 
-    PhylogenyResult(; X::ArrNum)
+    PhylogenyResult(;
+        X::ArrNum
+    ) -> PhylogenyResult
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `!isempty(X)`.
-
-  - If `X` is a `MatNum`:
-
-      + Must be symmetric, `LinearAlgebra.issymmetric(X) == true`.
-      + Must have zero diagonal, `all(iszero, LinearAlgebra.diag(X)) == true`.
+  - $(val_dict[:Xe]).
+  - $(val_dict[:phX_Xv])
 
 # Examples
 
@@ -45,6 +41,7 @@ PhylogenyResult
   - [`centrality_vector`](@ref)
 """
 @concrete struct PhylogenyResult <: AbstractPhylogenyResult
+    "$(field_dict[:phX_Xv])"
     X
     function PhylogenyResult(X::ArrNum)
         @argcheck(!isempty(X), IsEmptyError)
@@ -129,7 +126,7 @@ function centrality_vector(plr::PhylogenyResult{<:VecNum}, args...; kwargs...)
     return plr
 end
 """
-    abstract type AbstractCentralityAlgorithm <: AbstractPhylogenyAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all centrality algorithm types in `PortfolioOptimisers.jl` from [`Graphs.jl`](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/).
 
@@ -154,10 +151,7 @@ function centrality_vector(plr::PhylogenyResult{<:MatNum}, ct::AbstractCentralit
     return PhylogenyResult(; X = calc_centrality(ct, G))
 end
 """
-    struct BetweennessCentrality{T1, T2} <: AbstractCentralityAlgorithm
-        args::T1
-        kwargs::T2
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Centrality algorithm type for betweenness centrality in `PortfolioOptimisers.jl`.
 
@@ -165,14 +159,16 @@ Centrality algorithm type for betweenness centrality in `PortfolioOptimisers.jl`
 
 # Fields
 
-  - `args`: Positional arguments for the centrality computation.
-  - `kwargs`: Keyword arguments for the centrality computation.
+$(DocStringExtensions.FIELDS)
 
-# Constructor
+# Constructors
 
-    BetweennessCentrality(; args::Tuple = (), kwargs::NamedTuple = (;))
+    BetweennessCentrality(;
+        args::Tuple = (),
+        kwargs::NamedTuple = (;)
+    ) -> BetweennessCentrality
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 
@@ -189,7 +185,9 @@ BetweennessCentrality
   - [`Graphs.betweenness_centrality`](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.betweenness_centrality)
 """
 @concrete struct BetweennessCentrality <: AbstractCentralityAlgorithm
+    "$(field_dict[:ctargs])"
     args
+    "$(field_dict[:ctkwargs])"
     kwargs
     function BetweennessCentrality(args::Tuple, kwargs::NamedTuple)
         return new{typeof(args), typeof(kwargs)}(args, kwargs)
@@ -199,10 +197,7 @@ function BetweennessCentrality(; args::Tuple = (), kwargs::NamedTuple = (;))
     return BetweennessCentrality(args, kwargs)
 end
 """
-    struct ClosenessCentrality{T1, T2} <: AbstractCentralityAlgorithm
-        args::T1
-        kwargs::T2
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Centrality algorithm type for closeness centrality in `PortfolioOptimisers.jl`.
 
@@ -210,14 +205,16 @@ Centrality algorithm type for closeness centrality in `PortfolioOptimisers.jl`.
 
 # Fields
 
-  - `args`: Positional arguments for the centrality computation.
-  - `kwargs`: Keyword arguments for the centrality computation.
+$(DocStringExtensions.FIELDS)
 
-# Constructor
+# Constructors
 
-    ClosenessCentrality(; args::Tuple = (), kwargs::NamedTuple = (;))
+    ClosenessCentrality(;
+        args::Tuple = (),
+        kwargs::NamedTuple = (;)
+    ) -> ClosenessCentrality
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 
@@ -234,7 +231,9 @@ ClosenessCentrality
   - [`Graphs.closeness_centrality`](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.closeness_centrality)
 """
 @concrete struct ClosenessCentrality <: AbstractCentralityAlgorithm
+    "$(field_dict[:ctargs])"
     args
+    "$(field_dict[:ctkwargs])"
     kwargs
     function ClosenessCentrality(args::Tuple, kwargs::NamedTuple)
         return new{typeof(args), typeof(kwargs)}(args, kwargs)
@@ -244,10 +243,7 @@ function ClosenessCentrality(; args::Tuple = (), kwargs::NamedTuple = (;))
     return ClosenessCentrality(args, kwargs)
 end
 """
-    struct DegreeCentrality{T1, T2} <: AbstractCentralityAlgorithm
-        kind::T1
-        kwargs::T2
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Centrality algorithm type for degree centrality in `PortfolioOptimisers.jl`.
 
@@ -255,14 +251,16 @@ Centrality algorithm type for degree centrality in `PortfolioOptimisers.jl`.
 
 # Fields
 
-  - `kind`: Degree type (0: total, 1: in-degree, 2: out-degree).
-  - `kwargs`: Keyword arguments for the centrality computation.
+$(DocStringExtensions.FIELDS)
 
-# Constructor
+# Constructors
 
-    DegreeCentrality(; kind::Integer = 0, kwargs::NamedTuple = (;))
+    DegreeCentrality(;
+        kind::Integer = 0,
+        kwargs::NamedTuple = (;)
+    ) -> DegreeCentrality
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 
@@ -283,7 +281,9 @@ DegreeCentrality
   - [`Graphs._degree_centrality`](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.degree_centrality-Tuple%7BAbstractGraph%7D)
 """
 @concrete struct DegreeCentrality <: AbstractCentralityAlgorithm
+    "Degree type (0: total, 1: in-degree, 2: out-degree)."
     kind
+    "$(field_dict[:ctkwargs])"
     kwargs
     function DegreeCentrality(kind::Integer, kwargs::NamedTuple)
         @argcheck(kind in 0:2)
@@ -294,7 +294,7 @@ function DegreeCentrality(; kind::Integer = 0, kwargs::NamedTuple = (;))
     return DegreeCentrality(kind, kwargs)
 end
 """
-    struct EigenvectorCentrality <: AbstractCentralityAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Centrality algorithm type for [eigenvector centrality](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.eigenvector_centrality-Tuple%7BAbstractGraph%7D) in `PortfolioOptimisers.jl`.
 
@@ -307,9 +307,7 @@ Centrality algorithm type for [eigenvector centrality](https://juliagraphs.org/G
 """
 struct EigenvectorCentrality <: AbstractCentralityAlgorithm end
 """
-    struct KatzCentrality{T1} <: AbstractCentralityAlgorithm
-        alpha::T1
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Centrality algorithm type for Katz centrality in `PortfolioOptimisers.jl`.
 
@@ -317,13 +315,15 @@ Centrality algorithm type for Katz centrality in `PortfolioOptimisers.jl`.
 
 # Fields
 
-  - `alpha`: Attenuation factor for Katz centrality.
+$(DocStringExtensions.FIELDS)
 
-# Constructor
+# Constructors
 
-    KatzCentrality(; alpha::Number = 0.3)
+    KatzCentrality(;
+        alpha::Number = 0.3
+    ) -> KatzCentrality
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 
@@ -339,6 +339,7 @@ KatzCentrality
   - [`Graphs.katz_centrality`](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.katz_centrality)
 """
 @concrete struct KatzCentrality <: AbstractCentralityAlgorithm
+    "Attenuation factor for Katz centrality."
     alpha
     function KatzCentrality(alpha::Number)
         return new{typeof(alpha)}(alpha)
@@ -348,11 +349,7 @@ function KatzCentrality(; alpha::Number = 0.3)
     return KatzCentrality(alpha)
 end
 """
-    struct Pagerank{T1, T2, T3} <: AbstractCentralityAlgorithm
-        n::T1
-        alpha::T2
-        epsilon::T3
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Centrality algorithm type for PageRank in `PortfolioOptimisers.jl`.
 
@@ -360,15 +357,17 @@ Centrality algorithm type for PageRank in `PortfolioOptimisers.jl`.
 
 # Fields
 
-  - `n`: Number of iterations (must be > 0).
-  - `alpha`: Damping factor (must be in (0, 1)).
-  - `epsilon`: Convergence tolerance (must be > 0).
+$(DocStringExtensions.FIELDS)
 
-# Constructor
+# Constructors
 
-    Pagerank(; alpha::Number = 0.85, n::Integer = 100, epsilon::Number = 1e-6)
+    Pagerank(;
+        alpha::Number = 0.85,
+        n::Integer = 100,
+        epsilon::Number = 1e-6
+    ) -> Pagerank
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 
@@ -392,8 +391,11 @@ Pagerank
   - [`Graphs.pagerank`](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.pagerank-Union%7BTuple%7BAbstractGraph%7BU%7D%7D,%20Tuple%7BU%7D,%20Tuple%7BAbstractGraph%7BU%7D,%20Any%7D,%20Tuple%7BAbstractGraph%7BU%7D,%20Any,%20Integer%7D,%20Tuple%7BAbstractGraph%7BU%7D,%20Any,%20Integer,%20Any%7D%7D%20where%20U%3C:Integer)
 """
 @concrete struct Pagerank <: AbstractCentralityAlgorithm
+    "Number of iterations."
     n
+    "Damping factor."
     alpha
+    "Convergence threshold."
     epsilon
     function Pagerank(n::Integer, alpha::Number, epsilon::Number)
         @argcheck(0 < n, DomainError)
@@ -407,7 +409,7 @@ function Pagerank(; n::Integer = 100, alpha::Number = 0.85, epsilon::Number = 1e
     return Pagerank(n, alpha, epsilon)
 end
 """
-    struct RadialityCentrality <: AbstractCentralityAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Centrality algorithm type for [radiality centrality](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.radiality_centrality-Tuple%7BAbstractGraph%7D) in `PortfolioOptimisers.jl`.
 
@@ -420,10 +422,7 @@ Centrality algorithm type for [radiality centrality](https://juliagraphs.org/Gra
 """
 struct RadialityCentrality <: AbstractCentralityAlgorithm end
 """
-    struct StressCentrality{T1, T2} <: AbstractCentralityAlgorithm
-        args::T1
-        kwargs::T2
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Centrality algorithm type for [stress centrality](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.stress_centrality) in `PortfolioOptimisers.jl`.
 
@@ -431,14 +430,16 @@ Centrality algorithm type for [stress centrality](https://juliagraphs.org/Graphs
 
 # Fields
 
-  - `args`: Positional arguments for the centrality computation.
-  - `kwargs`: Keyword arguments for the centrality computation.
+$(DocStringExtensions.FIELDS)
 
-# Constructor
+# Constructors
 
-    StressCentrality(; args::Tuple = (), kwargs::NamedTuple = (;))
+    StressCentrality(;
+        args::Tuple = (),
+        kwargs::NamedTuple = (;)
+    ) -> StressCentrality
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 
@@ -455,7 +456,9 @@ StressCentrality
   - [`Graphs.stress_centrality`](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.stress_centrality)
 """
 @concrete struct StressCentrality <: AbstractCentralityAlgorithm
+    "$(field_dict[:ctargs])"
     args
+    "$(field_dict[:ctkwargs])"
     kwargs
     function StressCentrality(args::Tuple, kwargs::NamedTuple)
         return new{typeof(args), typeof(kwargs)}(args, kwargs)
@@ -527,7 +530,7 @@ function calc_centrality(ct::StressCentrality, g::Graphs.AbstractGraph)
     return Graphs.stress_centrality(g, ct.args...; ct.kwargs...)
 end
 """
-    abstract type AbstractTreeType <: AbstractPhylogenyAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all minimum spanning tree (MST) algorithm types in `PortfolioOptimisers.jl`.
 
@@ -540,12 +543,22 @@ All concrete and/or abstract types implementing specific MST algorithms (e.g., K
   - [`PrimTree`](@ref)
 """
 abstract type AbstractTreeType <: AbstractPhylogenyAlgorithm end
+"""
+    const Tree_SimMat = Union{<:AbstractSimilarityMatrixAlgorithm, <:AbstractTreeType}
+
+Alias for a tree or similarity matrix algorithm.
+
+Matches either an [`AbstractSimilarityMatrixAlgorithm`](@ref) or an [`AbstractTreeType`](@ref). Used for dispatch in phylogeny estimation where either a spanning tree or a similarity matrix approach may be used.
+
+# Related
+
+  - [`AbstractSimilarityMatrixAlgorithm`](@ref)
+  - [`AbstractTreeType`](@ref)
+  - [`NetworkEstimator`](@ref)
+"""
 const Tree_SimMat = Union{<:AbstractSimilarityMatrixAlgorithm, <:AbstractTreeType}
 """
-    struct KruskalTree{T1, T2} <: AbstractTreeType
-        args::T1
-        kwargs::T2
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Algorithm type for Kruskal's minimum spanning tree (MST) in `PortfolioOptimisers.jl`.
 
@@ -553,14 +566,16 @@ Algorithm type for Kruskal's minimum spanning tree (MST) in `PortfolioOptimisers
 
 # Fields
 
-  - `args`: Positional arguments for the MST computation.
-  - `kwargs`: Keyword arguments for the MST computation.
+$(DocStringExtensions.FIELDS)
 
-# Constructor
+# Constructors
 
-    KruskalTree(; args::Tuple = (), kwargs::NamedTuple = (;))
+    KruskalTree(;
+        args::Tuple = (),
+        kwargs::NamedTuple = (;)
+    ) -> KruskalTree
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 
@@ -577,7 +592,9 @@ KruskalTree
   - [`Graphs.kruskal_mst`](https://juliagraphs.org/Graphs.jl/stable/algorithms/spanningtrees/#Graphs.kruskal_mst)
 """
 @concrete struct KruskalTree <: AbstractTreeType
+    "$(field_dict[:treeargs])"
     args
+    "$(field_dict[:treekwargs])"
     kwargs
     function KruskalTree(args::Tuple, kwargs::NamedTuple)
         return new{typeof(args), typeof(kwargs)}(args, kwargs)
@@ -587,10 +604,7 @@ function KruskalTree(; args::Tuple = (), kwargs::NamedTuple = (;))
     return KruskalTree(args, kwargs)
 end
 """
-    struct BoruvkaTree{T1, T2} <: AbstractTreeType
-        args::T1
-        kwargs::T2
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Algorithm type for Boruvka's minimum spanning tree (MST) in `PortfolioOptimisers.jl`.
 
@@ -598,14 +612,16 @@ Algorithm type for Boruvka's minimum spanning tree (MST) in `PortfolioOptimisers
 
 # Fields
 
-  - `args`: Positional arguments for the MST computation.
-  - `kwargs`: Keyword arguments for the MST computation.
+$(DocStringExtensions.FIELDS)
 
-# Constructor
+# Constructors
 
-    BoruvkaTree(; args::Tuple = (), kwargs::NamedTuple = (;))
+    BoruvkaTree(;
+        args::Tuple = (),
+        kwargs::NamedTuple = (;)
+    ) -> BoruvkaTree
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 
@@ -622,7 +638,9 @@ BoruvkaTree
   - [`Graphs.boruvka_mst`](https://juliagraphs.org/Graphs.jl/stable/algorithms/spanningtrees/#Graphs.boruvka_mst)
 """
 @concrete struct BoruvkaTree <: AbstractTreeType
+    "$(field_dict[:treeargs])"
     args
+    "$(field_dict[:treekwargs])"
     kwargs
     function BoruvkaTree(args::Tuple, kwargs::NamedTuple)
         return new{typeof(args), typeof(kwargs)}(args, kwargs)
@@ -632,10 +650,7 @@ function BoruvkaTree(; args::Tuple = (), kwargs::NamedTuple = (;))
     return BoruvkaTree(args, kwargs)
 end
 """
-    struct PrimTree{T1, T2} <: AbstractTreeType
-        args::T1
-        kwargs::T2
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Algorithm type for Prim's minimum spanning tree (MST) in `PortfolioOptimisers.jl`.
 
@@ -643,14 +658,16 @@ Algorithm type for Prim's minimum spanning tree (MST) in `PortfolioOptimisers.jl
 
 # Fields
 
-  - `args`: Positional arguments for the MST computation.
-  - `kwargs`: Keyword arguments for the MST computation.
+$(DocStringExtensions.FIELDS)
 
-# Constructor
+# Constructors
 
-    PrimTree(; args::Tuple = (), kwargs::NamedTuple = (;))
+    PrimTree(;
+        args::Tuple = (),
+        kwargs::NamedTuple = (;)
+    ) -> PrimTree
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 
@@ -667,7 +684,9 @@ PrimTree
   - [`Graphs.prim_mst`](https://juliagraphs.org/Graphs.jl/stable/algorithms/spanningtrees/#Graphs.prim_mst)
 """
 @concrete struct PrimTree <: AbstractTreeType
+    "$(field_dict[:treeargs])"
     args
+    "$(field_dict[:treekwargs])"
     kwargs
     function PrimTree(args::Tuple, kwargs::NamedTuple)
         return new{typeof(args), typeof(kwargs)}(args, kwargs)
@@ -713,7 +732,7 @@ function calc_mst(ct::PrimTree, g::Graphs.AbstractGraph)
     return Graphs.prim_mst(g, ct.args...; ct.kwargs...)
 end
 """
-    abstract type AbstractNetworkEstimator <: AbstractPhylogenyEstimator end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all network estimator types in `PortfolioOptimisers.jl`.
 
@@ -725,17 +744,51 @@ All concrete and/or abstract types implementing network-based estimation algorit
   - [`AbstractCentralityEstimator`](@ref)
 """
 abstract type AbstractNetworkEstimator <: AbstractPhylogenyEstimator end
+"""
+    const NwE_Pl_ClE_Cl = Union{<:AbstractNetworkEstimator, <:PhylogenyResult, <:ClE_Cl}
+
+Alias for a network estimator, phylogeny result, or clustering estimator/result.
+
+Used internally for dispatch in phylogeny and network estimation workflows that accept any of these forms.
+
+# Related
+
+  - [`AbstractNetworkEstimator`](@ref)
+  - [`PhylogenyResult`](@ref)
+  - [`ClE_Cl`](@ref)
+"""
 const NwE_Pl_ClE_Cl = Union{<:AbstractNetworkEstimator, <:PhylogenyResult, <:ClE_Cl}
+"""
+    const NwE_PlM_ClE_Cl = Union{<:AbstractNetworkEstimator,
+                                 <:PhylogenyResult{<:AbstractMatrix}, <:ClE_Cl}
+
+Alias for a network estimator, matrix-phylogeny result, or clustering estimator/result.
+
+Similar to [`NwE_Pl_ClE_Cl`](@ref) but restricts `PhylogenyResult` to those wrapping an `AbstractMatrix`.
+
+# Related
+
+  - [`AbstractNetworkEstimator`](@ref)
+  - [`PhylogenyResult`](@ref)
+  - [`ClE_Cl`](@ref)
+"""
 const NwE_PlM_ClE_Cl = Union{<:AbstractNetworkEstimator,
                              <:PhylogenyResult{<:AbstractMatrix}, <:ClE_Cl}
+"""
+    const NwE_ClE_Cl = Union{<:AbstractNetworkEstimator, <:ClE_Cl}
+
+Alias for a network estimator or clustering estimator/result.
+
+Used for dispatch in phylogeny workflows that accept either a network estimator or a clustering estimator/result.
+
+# Related
+
+  - [`AbstractNetworkEstimator`](@ref)
+  - [`ClE_Cl`](@ref)
+"""
 const NwE_ClE_Cl = Union{<:AbstractNetworkEstimator, <:ClE_Cl}
 """
-    struct NetworkEstimator{T1, T2, T3, T4} <: AbstractNetworkEstimator
-        ce::T1
-        de::T2
-        alg::T3
-        n::T4
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Estimator type for network-based phylogeny analysis in `PortfolioOptimisers.jl`.
 
@@ -743,19 +796,22 @@ Estimator type for network-based phylogeny analysis in `PortfolioOptimisers.jl`.
 
 # Fields
 
-  - `ce`: Covariance estimator.
-  - `de`: Distance estimator.
-  - `alg`: Tree or similarity matrix algorithm.
-  - `n`: NetworkEstimator depth parameter.
+$(DocStringExtensions.FIELDS)
 
-# Constructor
+# Constructors
 
-    NetworkEstimator(; ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
-                     de::AbstractDistanceEstimator = Distance(; alg = CanonicalDistance()),
-                     alg::Tree_SimMat = KruskalTree(),
-                     n::Integer = 1)
+    NetworkEstimator(;
+        ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
+        de::AbstractDistanceEstimator = Distance(; alg = CanonicalDistance()),
+        alg::Tree_SimMat = KruskalTree(),
+        n::Integer = 1
+    ) -> NetworkEstimator
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - $(val_dict[:ntn])
 
 # Examples
 
@@ -765,12 +821,10 @@ NetworkEstimator
    ce ┼ PortfolioOptimisersCovariance
       │   ce ┼ Covariance
       │      │    me ┼ SimpleExpectedReturns
-      │      │       │     w ┼ nothing
-      │      │       │   idx ┴ nothing
+      │      │       │   w ┴ nothing
       │      │    ce ┼ GeneralCovariance
-      │      │       │    ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-      │      │       │     w ┼ nothing
-      │      │       │   idx ┴ nothing
+      │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+      │      │       │    w ┴ nothing
       │      │   alg ┴ Full()
       │   mp ┼ DenoiseDetoneAlgMatrixProcessing
       │      │     pdm ┼ Posdef
@@ -796,12 +850,17 @@ NetworkEstimator
   - [`AbstractSimilarityMatrixAlgorithm`](@ref)
 """
 @concrete struct NetworkEstimator <: AbstractNetworkEstimator
+    "$(field_dict[:ce])"
     ce
+    "$(field_dict[:de])"
     de
+    "$(field_dict[:ntalg])"
     alg
+    "$(field_dict[:ntn])"
     n
     function NetworkEstimator(ce::StatsBase.CovarianceEstimator,
                               de::AbstractDistanceEstimator, alg::Tree_SimMat, n::Integer)
+        @argcheck(n >= one(n))
         return new{typeof(ce), typeof(de), typeof(alg), typeof(n)}(ce, de, alg, n)
     end
 end
@@ -813,7 +872,7 @@ function NetworkEstimator(;
     return NetworkEstimator(ce, de, alg, n)
 end
 """
-    abstract type AbstractCentralityEstimator <: AbstractEstimator end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all centrality estimator types in `PortfolioOptimisers.jl`.
 
@@ -826,10 +885,7 @@ All concrete and/or abstract types implementing centrality-based estimation algo
 """
 abstract type AbstractCentralityEstimator <: AbstractEstimator end
 """
-    struct CentralityEstimator{T1, T2} <: AbstractCentralityEstimator
-        pl::T1
-        ct::T2
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Estimator type for centrality-based analysis in `PortfolioOptimisers.jl`.
 
@@ -837,16 +893,16 @@ Estimator type for centrality-based analysis in `PortfolioOptimisers.jl`.
 
 # Fields
 
-  - `pl`: NetworkEstimator estimator.
-  - `ct`: Centrality algorithm.
+$(DocStringExtensions.FIELDS)
 
-# Constructor
+# Constructors
 
     CentralityEstimator(;
-                        pl::NwE_Pl_ClE_Cl = NetworkEstimator(),
-                        ct::AbstractCentralityAlgorithm = DegreeCentrality())
+        pl::NwE_Pl_ClE_Cl = NetworkEstimator(),
+        ct::AbstractCentralityAlgorithm = DegreeCentrality()
+    ) -> CentralityEstimator
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 
@@ -857,12 +913,10 @@ CentralityEstimator
      │    ce ┼ PortfolioOptimisersCovariance
      │       │   ce ┼ Covariance
      │       │      │    me ┼ SimpleExpectedReturns
-     │       │      │       │     w ┼ nothing
-     │       │      │       │   idx ┴ nothing
+     │       │      │       │   w ┴ nothing
      │       │      │    ce ┼ GeneralCovariance
-     │       │      │       │    ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-     │       │      │       │     w ┼ nothing
-     │       │      │       │   idx ┴ nothing
+     │       │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+     │       │      │       │    w ┴ nothing
      │       │      │   alg ┴ Full()
      │       │   mp ┼ DenoiseDetoneAlgMatrixProcessing
      │       │      │     pdm ┼ Posdef
@@ -890,7 +944,9 @@ CentralityEstimator
   - [`AbstractCentralityAlgorithm`](@ref)
 """
 @concrete struct CentralityEstimator <: AbstractCentralityEstimator
+    "$(field_dict[:pler])"
     pl
+    "$(field_dict[:cta])"
     ct
     function CentralityEstimator(pl::NwE_Pl_ClE_Cl, ct::AbstractCentralityAlgorithm)
         return new{typeof(pl), typeof(ct)}(pl, ct)

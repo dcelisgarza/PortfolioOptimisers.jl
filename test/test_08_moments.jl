@@ -97,12 +97,9 @@
         @test me.me.w === ew
         @test me.rf == me0.rf
 
-        @test isapprox(mean(SimpleExpectedReturns(; idx = ((252 - 100):252)), rd.X),
-                       mean(SimpleExpectedReturns(), rd.X[((end - 100):end), :]))
-
-        me = factory(SimpleExpectedReturns(; idx = ((252 - 100):252)), ew)
-        @test me.idx == ((252 - 100):252)
-        @test me.w === ew
+        me0 = factory(WindowedExpectedReturns(; window = 50), ew)
+        me = factory(me0.me, ew[(end - 49):end])
+        @test mean(me0, rd.X) == mean(me, rd.X[(end - 49):end, :])
     end
     @testset "Covariance Estimators" begin
         ces = [Covariance(; alg = Full()),
@@ -135,10 +132,7 @@
                                 ve = SimpleVariance(; me = SimpleExpectedReturns(; w = ew),
                                                     corrected = false, w = ew)),
                GerberCovariance(; alg = StandardisedGerber0()),
-               GerberCovariance(;
-                                alg = StandardisedGerber0(;
-                                                          me = SimpleExpectedReturns(;
-                                                                                     w = ew)),
+               GerberCovariance(; alg = StandardisedGerber0(),
                                 ve = SimpleVariance(; me = SimpleExpectedReturns(; w = ew),
                                                     corrected = false, w = ew)),
                GerberCovariance(; alg = Gerber1()),
@@ -147,14 +141,12 @@
                GerberCovariance(; alg = StandardisedGerber2()),
                SmythBrobyCovariance(; alg = SmythBroby0()),
                SmythBrobyCovariance(; alg = SmythBroby0(),
-                                    me = SimpleExpectedReturns(; w = ew),
                                     ve = SimpleVariance(;
                                                         me = SimpleExpectedReturns(;
                                                                                    w = ew),
                                                         corrected = false, w = ew)),
                SmythBrobyCovariance(; alg = StandardisedSmythBroby0()),
                SmythBrobyCovariance(; alg = StandardisedSmythBroby0(),
-                                    me = SimpleExpectedReturns(; w = ew),
                                     ve = SimpleVariance(;
                                                         me = SimpleExpectedReturns(;
                                                                                    w = ew),
@@ -242,6 +234,8 @@
         @test isapprox(var(SimpleVariance(; w = ew, corrected = false), rd.X; dims = 1),
                        std(SimpleVariance(; w = ew, corrected = false), rd.X; dims = 1) .^
                        2)
+        @test std(SimpleVariance(), rd.X) == std(SimpleVariance(; me = nothing), rd.X)
+        @test var(SimpleVariance(), rd.X) == var(SimpleVariance(; me = nothing), rd.X)
 
         ce0 = PortfolioOptimisersCovariance(;
                                             ce = GerberCovariance(; alg = Gerber2(),
@@ -277,7 +271,6 @@
         @test ce.mp === ce0.mp
         @test ce.ce.ve.w === ew
         @test ce.ce.ve.me.w === ew
-        @test ce.ce.alg.me.w === ew
 
         ce0 = PortfolioOptimisersCovariance(;
                                             ce = SmythBrobyCovariance(; alg = SmythBroby2(),
@@ -286,10 +279,8 @@
                                                                       n = 3))
         ce = PortfolioOptimisers.factory(ce0, ew)
         @test !(ce.ce.ve === ce0.ce.ve)
-        @test !(ce.ce.me === ce0.ce.me)
         @test ce.ce.ve.w === ew
         @test ce.ce.ve.me.w === ew
-        @test ce.ce.me.w === ew
         @test ce.ce.pdm === ce0.ce.pdm
         @test ce.ce.t == ce0.ce.t
         @test ce.ce.c1 == ce0.ce.c1
@@ -313,7 +304,7 @@
                                             ce = DistanceCovariance(; args = (3,),
                                                                     kwargs = (; foo = 5)))
         ce = PortfolioOptimisers.factory(ce0, ew)
-        @test ce.ce.dist === ce0.ce.dist
+        @test ce.ce.metric === ce0.ce.metric
         @test ce.ce.args === ce0.ce.args
         @test ce.ce.kwargs === ce0.ce.kwargs
         @test ce.ce.ex === ce0.ce.ex
@@ -403,18 +394,67 @@
         @test isapprox(cor(ProcessedCovariance(; alg = LoGo()), rd.X),
                        cor(ProcessedCovariance(; alg = LoGo()), rd.X'; dims = 2))
 
-        @test isapprox(cov(GeneralCovariance(; idx = ((252 - 100):252)), rd.X),
-                       cov(GeneralCovariance(), rd.X[((end - 100):end), :]))
+        ce0 = factory(WindowedCovariance(;
+                                         ce = PortfolioOptimisersCovariance(;
+                                                                            ce = GeneralCovariance(;
+                                                                                                   ce = SimpleCovariance(;
+                                                                                                                         corrected = false))),
+                                         window = 50), ew)
+        ce = factory(ce0.ce, ew[(end - 49):end])
+        @test isapprox(cov(ce0, rd.X[(end - 49):end, :]), cov(ce, rd.X[(end - 49):end, :]))
+        @test isapprox(cor(ce0, rd.X[(end - 49):end, :]), cor(ce, rd.X[(end - 49):end, :]))
 
-        @test isapprox(cor(GeneralCovariance(; idx = ((252 - 100):252)), rd.X),
-                       cor(GeneralCovariance(), rd.X[((end - 100):end), :]))
+        ce0 = factory(WindowedCovariance(;
+                                         ce = PortfolioOptimisersCovariance(;
+                                                                            ce = GeneralCovariance(;
+                                                                                                   ce = SimpleCovariance(;
+                                                                                                                         corrected = false)))),
+                      ew)
+        ce = factory(ce0.ce, ew)
+        @test isapprox(cov(ce0, rd.X), cov(ce, rd.X))
+        @test isapprox(cor(ce0, rd.X), cor(ce, rd.X))
 
-        ce0 = PortfolioOptimisersCovariance(;
-                                            ce = Covariance(;
-                                                            ce = GeneralCovariance(;
-                                                                                   idx = 300:305)))
-        ce = PortfolioOptimisers.factory(ce0, ew)
-        @test ce.ce.ce.idx === 300:305
+        ce0 = factory(WindowedVariance(; ce = SimpleVariance(; corrected = false),
+                                       window = 50), ew)
+        ce = factory(ce0.ce, ew[(end - 49):end])
+        @test isapprox(var(ce0, rd.X[(end - 49):end, :]), var(ce, rd.X[(end - 49):end, :]))
+        @test isapprox(std(ce0, rd.X[(end - 49):end, :]), std(ce, rd.X[(end - 49):end, :]))
+        @test isapprox(var(ce0, rd.X[(end - 49):end, 1]), var(ce, rd.X[(end - 49):end, 1]))
+        @test isapprox(std(ce0, rd.X[(end - 49):end, 2]), std(ce, rd.X[(end - 49):end, 2]))
+
+        ce0 = factory(WindowedVariance(; ce = SimpleVariance(; corrected = false)), ew)
+        ce = factory(ce0.ce, ew)
+        @test isapprox(var(ce0, rd.X), var(ce, rd.X))
+        @test isapprox(std(ce0, rd.X), std(ce, rd.X))
+        @test isapprox(var(ce0, rd.X[:, 1]), var(ce, rd.X[:, 1]))
+        @test isapprox(std(ce0, rd.X[:, 2]), std(ce, rd.X[:, 2]))
+
+        ce0 = factory(WindowedVariance(;
+                                       ce = SimpleVariance(; me = nothing,
+                                                           corrected = false), window = 50),
+                      ew)
+        ce = factory(ce0.ce, ew[(end - 49):end])
+        @test isapprox(var(ce0, rd.X[(end - 49):end, :]; mean = zeros(1, size(rd.X, 2))),
+                       var(ce, rd.X[(end - 49):end, :]; mean = zeros(1, size(rd.X, 2))))
+        @test isapprox(std(ce0, rd.X[(end - 49):end, :]; mean = zeros(1, size(rd.X, 2))),
+                       std(ce, rd.X[(end - 49):end, :]; mean = zeros(1, size(rd.X, 2))))
+        @test isapprox(var(ce0, rd.X[(end - 49):end, 1]; mean = 0),
+                       var(ce, rd.X[(end - 49):end, 1]; mean = 0))
+        @test isapprox(std(ce0, rd.X[(end - 49):end, 2]; mean = 0),
+                       std(ce, rd.X[(end - 49):end, 2]; mean = 0))
+
+        ce0 = factory(WindowedVariance(;
+                                       ce = SimpleVariance(; me = nothing,
+                                                           corrected = false)), ew)
+        ce = factory(ce0.ce, ew)
+        @test isapprox(var(ce0, rd.X; mean = zeros(1, size(rd.X, 2))),
+                       var(ce, rd.X; mean = zeros(1, size(rd.X, 2))))
+        @test isapprox(std(ce0, rd.X; mean = zeros(1, size(rd.X, 2))),
+                       std(ce, rd.X; mean = zeros(1, size(rd.X, 2))))
+        @test isapprox(var(ce0, rd.X[:, 1]; mean = 0), var(ce, rd.X[:, 1]; mean = 0))
+        @test isapprox(std(ce0, rd.X[:, 2]; mean = 0), std(ce, rd.X[:, 2]; mean = 0))
+
+        @test find_uncorrelated_indices(rd.X; t = 0.5) == [4, 6, 12, 16, 17, 19]
     end
     @testset "Regression" begin
         res = [StepwiseRegression(; alg = Forward()),
@@ -468,6 +508,13 @@
         sk = PortfolioOptimisers.factory(sk0, ew)
         @test sk.me.w === ew
         @test sk.alg === sk0.alg
+
+        ske0 = factory(WindowedCoskewness(; window = 50), ew)
+        ske = factory(ske0.ske, ew[(end - 49):end])
+        sk0, V0 = coskewness(ske0, rd.X[(end - 49):end, :])
+        sk, V = coskewness(ske, rd.X[(end - 49):end, :])
+        @test isapprox(sk0, sk)
+        @test isapprox(V0, V)
     end
     @testset "Cokurtosis" begin
         ktes = [Cokurtosis(; alg = Full()), Cokurtosis(; alg = Semi())]
@@ -486,6 +533,11 @@
         kt = PortfolioOptimisers.factory(kt0, ew)
         @test kt.me.w === ew
         @test kt.alg === kt0.alg
+
+        kte0 = factory(WindowedCokurtosis(; window = 50), ew)
+        kte = factory(kte0.ke, ew[(end - 49):end])
+        @test isapprox(cokurtosis(kte0, rd.X[(end - 49):end, :]),
+                       cokurtosis(kte, rd.X[(end - 49):end, :]))
     end
     @testset "Distance" begin
         des = [Distance(; alg = SimpleAbsoluteDistance()),

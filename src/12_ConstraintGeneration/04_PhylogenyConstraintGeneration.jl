@@ -1,5 +1,5 @@
 """
-    abstract type AbstractPhylogenyConstraintEstimator <: AbstractConstraintEstimator end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all phylogeny-based constraint estimators in `PortfolioOptimisers.jl`.
 
@@ -14,7 +14,7 @@ All concrete and/or abstract types representing phylogeny-based constraint estim
 """
 abstract type AbstractPhylogenyConstraintEstimator <: AbstractConstraintEstimator end
 """
-    abstract type AbstractPhylogenyConstraintResult <: AbstractConstraintResult end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all phylogeny-based constraint result types in `PortfolioOptimisers.jl`.
 
@@ -28,17 +28,74 @@ All concrete and/or abstract types representing the results of phylogeny-based c
   - [`AbstractConstraintResult`](@ref)
 """
 abstract type AbstractPhylogenyConstraintResult <: AbstractConstraintResult end
+"""
+    const PlCE_PlC = Union{<:AbstractPhylogenyConstraintEstimator,
+                           <:AbstractPhylogenyConstraintResult}
+
+Alias for a phylogeny constraint estimator or result.
+
+Matches either a [`AbstractPhylogenyConstraintEstimator`](@ref) or a [`AbstractPhylogenyConstraintResult`](@ref). Used internally for dispatch in phylogeny-based constraint generation.
+
+# Related
+
+  - [`AbstractPhylogenyConstraintEstimator`](@ref)
+  - [`AbstractPhylogenyConstraintResult`](@ref)
+"""
 const PlCE_PlC = Union{<:AbstractPhylogenyConstraintEstimator,
                        <:AbstractPhylogenyConstraintResult}
+"""
+    const VecPlCE_PlC = AbstractVector{<:PlCE_PlC}
+
+Alias for a vector of phylogeny constraint estimators or results.
+
+Represents a collection of [`PlCE_PlC`](@ref) objects, enabling batch processing of multiple phylogeny-based constraint estimators or results.
+
+# Related
+
+  - [`PlCE_PlC`](@ref)
+"""
 const VecPlCE_PlC = AbstractVector{<:PlCE_PlC}
+"""
+    const PlCE_PhC_VecPlCE_PlC = Union{<:PlCE_PlC, <:VecPlCE_PlC}
+
+Alias for a single or vector of phylogeny constraint estimators or results.
+
+Matches either a single [`PlCE_PlC`](@ref) or a vector of them ([`VecPlCE_PlC`](@ref)). Used internally for dispatch on phylogeny-based constraint generation that accepts one or many constraints.
+
+# Related
+
+  - [`PlCE_PlC`](@ref)
+  - [`VecPlCE_PlC`](@ref)
+"""
 const PlCE_PhC_VecPlCE_PlC = Union{<:PlCE_PlC, <:VecPlCE_PlC}
+"""
+    const VecPlC = AbstractVector{<:AbstractPhylogenyConstraintResult}
+
+Alias for a vector of phylogeny constraint results.
+
+Represents a collection of [`AbstractPhylogenyConstraintResult`](@ref) objects.
+
+# Related
+
+  - [`AbstractPhylogenyConstraintResult`](@ref)
+  - [`PlC_VecPlC`](@ref)
+"""
 const VecPlC = AbstractVector{<:AbstractPhylogenyConstraintResult}
+"""
+    const PlC_VecPlC = Union{<:AbstractPhylogenyConstraintResult, <:VecPlC}
+
+Alias for a single or vector of phylogeny constraint results.
+
+Matches either a single [`AbstractPhylogenyConstraintResult`](@ref) or a vector of them ([`VecPlC`](@ref)).
+
+# Related
+
+  - [`AbstractPhylogenyConstraintResult`](@ref)
+  - [`VecPlC`](@ref)
+"""
 const PlC_VecPlC = Union{<:AbstractPhylogenyConstraintResult, <:VecPlC}
 """
-    struct SemiDefinitePhylogenyEstimator{T1, T2} <: AbstractPhylogenyConstraintEstimator
-        pl::T1
-        p::T2
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Estimator for generating semi-definite phylogeny-based constraints in `PortfolioOptimisers.jl`.
 
@@ -49,11 +106,12 @@ Estimator for generating semi-definite phylogeny-based constraints in `Portfolio
   - `pl`: Phylogeny or clustering estimator.
   - `p`: Non-negative penalty parameter for the constraint.
 
-# Constructor
+# Constructors
 
     SemiDefinitePhylogenyEstimator(;
-                                   pl::NwE_PlM_ClE_Cl = NetworkEstimator(),
-                                   p::Number = 0.05)
+        pl::NwE_PlM_ClE_Cl = NetworkEstimator(),
+        p::Number = 0.05
+    ) -> SemiDefinitePhylogenyEstimator
 
 ## Validation
 
@@ -68,12 +126,10 @@ SemiDefinitePhylogenyEstimator
      │    ce ┼ PortfolioOptimisersCovariance
      │       │   ce ┼ Covariance
      │       │      │    me ┼ SimpleExpectedReturns
-     │       │      │       │     w ┼ nothing
-     │       │      │       │   idx ┴ nothing
+     │       │      │       │   w ┴ nothing
      │       │      │    ce ┼ GeneralCovariance
-     │       │      │       │    ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-     │       │      │       │     w ┼ nothing
-     │       │      │       │   idx ┴ nothing
+     │       │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+     │       │      │       │    w ┴ nothing
      │       │      │   alg ┴ Full()
      │       │   mp ┼ DenoiseDetoneAlgMatrixProcessing
      │       │      │     pdm ┼ Posdef
@@ -112,12 +168,21 @@ function SemiDefinitePhylogenyEstimator(; pl::NwE_PlM_ClE_Cl = NetworkEstimator(
                                         p::Number = 0.05)
     return SemiDefinitePhylogenyEstimator(pl, p)
 end
+"""
+    const MatNum_PhRMatNum = Union{<:PhylogenyResult{<:MatNum}, <:MatNum}
+
+Alias for a phylogeny result wrapping a numeric matrix or a numeric matrix directly.
+
+Used internally to accept either a [`PhylogenyResult`](@ref) containing a numeric matrix or a plain numeric matrix as a constraint matrix input.
+
+# Related
+
+  - [`PhylogenyResult`](@ref)
+  - [`MatNum`](@ref)
+"""
 const MatNum_PhRMatNum = Union{<:PhylogenyResult{<:MatNum}, <:MatNum}
 """
-    struct SemiDefinitePhylogeny{T1, T2} <: AbstractPhylogenyConstraintResult
-        A::T1
-        p::T2
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Container for the result of semi-definite phylogeny-based constraint generation.
 
@@ -128,10 +193,12 @@ Container for the result of semi-definite phylogeny-based constraint generation.
   - `A`: Phylogeny matrix encoding a relationship graph.
   - `p`: Non-negative penalty parameter controlling the strength of the constraint.
 
-# Constructor
+# Constructors
 
     SemiDefinitePhylogeny(;
-                          A::MatNum_PhRMatNum, p::Number = 0.05)
+        A::MatNum_PhRMatNum,
+        p::Number = 0.05
+    ) -> SemiDefinitePhylogeny
 
 ## Validation
 
@@ -149,6 +216,9 @@ SemiDefinitePhylogeny
 
 # Related
 
+  - [`set_sdp_constraints!`](@ref)
+  - [`set_sdp_frc_constraints!`](@ref)
+  - [`set_sdp_phylogeny_constraints!`](@ref)
   - [`SemiDefinitePhylogenyEstimator`](@ref)
   - [`AbstractPhylogenyConstraintResult`](@ref)
   - [`phylogeny_constraints`](@ref)
@@ -256,11 +326,7 @@ function validate_length_integer_phylogeny_constraint_B(args...)
     return nothing
 end
 """
-    struct IntegerPhylogenyEstimator{T1, T2, T3} <: AbstractPhylogenyConstraintEstimator
-        pl::T1
-        B::T2
-        scale::T3
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Estimator for generating integer phylogeny-based constraints in `PortfolioOptimisers.jl`.
 
@@ -272,12 +338,13 @@ Estimator for generating integer phylogeny-based constraints in `PortfolioOptimi
   - `B`: Non-negative integer or vector of integers specifying group sizes or allocations.
   - `scale`: Non-negative big-M parameter for the MIP formulation.
 
-# Constructor
+# Constructors
 
     IntegerPhylogenyEstimator(;
-                              pl::NwE_PlM_ClE_Cl = NetworkEstimator(),
-                              B::Int_VecInt = 1,
-                              scale::Number = 100_000.0)
+        pl::NwE_PlM_ClE_Cl = NetworkEstimator(),
+        B::Int_VecInt = 1,
+        scale::Number = 100_000.0
+    ) -> IntegerPhylogenyEstimator
 
 ## Validation
 
@@ -294,12 +361,10 @@ IntegerPhylogenyEstimator
         │    ce ┼ PortfolioOptimisersCovariance
         │       │   ce ┼ Covariance
         │       │      │    me ┼ SimpleExpectedReturns
-        │       │      │       │     w ┼ nothing
-        │       │      │       │   idx ┴ nothing
+        │       │      │       │   w ┴ nothing
         │       │      │    ce ┼ GeneralCovariance
-        │       │      │       │    ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-        │       │      │       │     w ┼ nothing
-        │       │      │       │   idx ┴ nothing
+        │       │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+        │       │      │       │    w ┴ nothing
         │       │      │   alg ┴ Full()
         │       │   mp ┼ DenoiseDetoneAlgMatrixProcessing
         │       │      │     pdm ┼ Posdef
@@ -344,11 +409,7 @@ function IntegerPhylogenyEstimator(; pl::NwE_PlM_ClE_Cl = NetworkEstimator(),
     return IntegerPhylogenyEstimator(pl, B, scale)
 end
 """
-    struct IntegerPhylogeny{T1, T2, T3} <: AbstractPhylogenyConstraintResult
-        A::T1
-        B::T2
-        scale::T3
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Container for the result of integer phylogeny-based constraint generation.
 
@@ -360,12 +421,13 @@ Container for the result of integer phylogeny-based constraint generation.
   - `B`: Non-negative integer or vector of integers specifying group sizes or allocations.
   - `scale`: Non-negative scaling parameter (big-M) for the constraint.
 
-# Constructor
+# Constructors
 
     IntegerPhylogeny(;
-                     A::MatNum_PhRMatNum,
-                     B::Int_VecInt = 1,
-                     scale::Number = 100_000.0)
+        A::MatNum_PhRMatNum,
+        B::Int_VecInt = 1,
+        scale::Number = 100_000.0
+    ) -> IntegerPhylogeny
 
 ## Validation
 
@@ -387,6 +449,8 @@ IntegerPhylogeny
 
 # Related
 
+  - [`set_iplg_constraints!`](@ref)
+  - [`mip_constraints`](@ref)
   - [`IntegerPhylogenyEstimator`](@ref)
   - [`AbstractPhylogenyConstraintResult`](@ref)
   - [`phylogeny_constraints`](@ref)
@@ -465,13 +529,21 @@ end
 function phylogeny_constraints(plcs::VecPlCE_PlC, args...; kwargs...)
     return [phylogeny_constraints(plc, args...; kwargs...) for plc in plcs]
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for all centrality-based constraint types in `PortfolioOptimisers.jl`.
+
+All concrete types implementing centrality-based portfolio constraints should be subtypes of `AbstractCentralityConstraint`.
+
+# Related
+
+  - [`CentralityConstraint`](@ref)
+  - [`AbstractConstraintEstimator`](@ref)
+"""
 abstract type AbstractCentralityConstraint <: AbstractConstraintEstimator end
 """
-    struct CentralityConstraint{T1, T2, T3} <: AbstractCentralityConstraint
-        A::T1
-        B::T2
-        comp::T3
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Estimator for generating centrality-based portfolio constraints.
 
@@ -483,11 +555,13 @@ Estimator for generating centrality-based portfolio constraints.
   - `B`: Number value or reduction measure.
   - `comp`: Comparison operator.
 
-# Constructor
+# Constructors
 
-    CentralityConstraint(; A::CentralityEstimator = CentralityEstimator(),
-                         B::Num_VecToScaM = MinValue(),
-                         comp::ComparisonOperator = <=)
+    CentralityConstraint(;
+        A::CentralityEstimator = CentralityEstimator(),
+        B::Num_VecToScaM = MinValue(),
+        comp::ComparisonOperator = <=
+    ) -> CentralityConstraint
 
 # Examples
 
@@ -499,12 +573,10 @@ CentralityConstraint
        │      │    ce ┼ PortfolioOptimisersCovariance
        │      │       │   ce ┼ Covariance
        │      │       │      │    me ┼ SimpleExpectedReturns
-       │      │       │      │       │     w ┼ nothing
-       │      │       │      │       │   idx ┴ nothing
+       │      │       │      │       │   w ┴ nothing
        │      │       │      │    ce ┼ GeneralCovariance
-       │      │       │      │       │    ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-       │      │       │      │       │     w ┼ nothing
-       │      │       │      │       │   idx ┴ nothing
+       │      │       │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+       │      │       │      │       │    w ┴ nothing
        │      │       │      │   alg ┴ Full()
        │      │       │   mp ┼ DenoiseDetoneAlgMatrixProcessing
        │      │       │      │     pdm ┼ Posdef
@@ -548,8 +620,44 @@ function CentralityConstraint(; A::CentralityEstimator = CentralityEstimator(),
                               B::Num_VecToScaM = MinValue(), comp::ComparisonOperator = <=)
     return CentralityConstraint(A, B, comp)
 end
+"""
+    const VecCC = AbstractVector{<:CentralityConstraint}
+
+Alias for a vector of [`CentralityConstraint`](@ref) objects.
+
+Represents a collection of centrality-based portfolio constraints.
+
+# Related
+
+  - [`CentralityConstraint`](@ref)
+  - [`CC_VecCC`](@ref)
+"""
 const VecCC = AbstractVector{<:CentralityConstraint}
+"""
+    const CC_VecCC = Union{<:CentralityConstraint, <:VecCC}
+
+Alias for a single or vector of [`CentralityConstraint`](@ref) objects.
+
+Matches either a single [`CentralityConstraint`](@ref) or a vector of them ([`VecCC`](@ref)).
+
+# Related
+
+  - [`CentralityConstraint`](@ref)
+  - [`VecCC`](@ref)
+"""
 const CC_VecCC = Union{<:CentralityConstraint, <:VecCC}
+"""
+    const Lc_CC_VecCC = Union{<:CC_VecCC, <:LinearConstraint}
+
+Alias for a centrality constraint or linear constraint.
+
+Matches either a [`CentralityConstraint`](@ref), a vector of them, or a [`LinearConstraint`](@ref). Used for dispatch in centrality-based constraint generation that also accepts linear constraints.
+
+# Related
+
+  - [`CC_VecCC`](@ref)
+  - [`LinearConstraint`](@ref)
+"""
 const Lc_CC_VecCC = Union{<:CC_VecCC, <:LinearConstraint}
 """
     centrality_constraints(ccs::CC_VecCC,

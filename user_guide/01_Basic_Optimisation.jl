@@ -41,7 +41,7 @@ Naive optimisers use very basic algorithms that offer robustness and diversifica
 
 #### 2.1.1 Inverse volatility
 
-[`InverseVolatility`]-(@ref) uses the diagonal of the prior covariance to set the asset weights. If the property `sq` is set to `true`, the weights are the inverse of each entry in the diagonal, else it is the inverse of the square root of each entry in the diagonal.
+[`InverseVolatility`](@ref) uses the diagonal of the prior covariance to set the asset weights. If the property `sq` is set to `true`, the weights are the inverse of each entry in the diagonal, else it is the inverse of the square root of each entry in the diagonal.
 =#
 
 ## Get the variance from the prior covariance.
@@ -68,7 +68,7 @@ pretty_table(DataFrame([rd.nx ress[1].w inv_vol ress[2].w inv_var],
 #=
 #### 2.1.2 Equal weighted
 
-[`EqualWeighted`]-(@ref) assigns equal weights to all assets.
+[`EqualWeighted`](@ref) assigns equal weights to all assets.
 =#
 
 res = optimise(EqualWeighted(), rd)
@@ -78,7 +78,7 @@ pretty_table(DataFrame([rd.nx res.w], ["assets", "Weights"]); formatters = [resf
 #=
 #### 2.1.3 Random weighted
 
-[`RandomWeighted`]-(@ref) assigns weights according to a [`Dirichlet`](https://juliastats.org/Distributions.jl/latest/multivariate/#Distributions.Dirichlet) distribution. The `alpha` keyword argument is forwarded to the Dirichlet distribution to control its shape. It's also possible to control the random number generator using the `rng` and `seed` keyword arguments.
+[`RandomWeighted`](@ref) assigns weights according to a [`Dirichlet`](https://juliastats.org/Distributions.jl/latest/multivariate/#Distributions.Dirichlet) distribution. The `alpha` keyword argument is forwarded to the Dirichlet distribution to control its shape. It's also possible to control the random number generator using the `rng` and `seed` keyword arguments.
 =#
 
 res = optimise(RandomWeighted(; alpha = 1, rng = StableRNG(696), seed = 66420), rd)
@@ -90,7 +90,7 @@ pretty_table(DataFrame([rd.nx res.w], ["assets", "Weights"]); formatters = [resf
 
 JuMP-based optimisers implement traditional mathematical optimisation algorithms using `JuMP`. As such, they are the most flexible when it comes to constraints, and for those which accept them, objective functions. Most risk measures are also compatible with these. There are a few risk measures exclusively compatible with clustering optimisations, and a few others which are incompatible for use in optimisations.
 
-All JuMP-based optimisers require an instance of [`JuMPOptimiser`]-(@ref) with a JuMP-compatible [`Solver`](@ref), or vector of solvers. Other than optimisation-specific constraints, general constraints are applied at the level of the [`JuMPOptimiser`]-(@ref). Problem feasibility depends on the specific constraints and the provided solver's support for constraint types and ability to solve the problem.
+All JuMP-based optimisers require an instance of [`JuMPOptimiser`](@ref) with a JuMP-compatible [`Solver`](@ref), or vector of solvers. Other than optimisation-specific constraints, general constraints are applied at the level of the [`JuMPOptimiser`](@ref). Problem feasibility depends on the specific constraints and the provided solver's support for constraint types and ability to solve the problem.
 
 If using open-source solvers, we recommend [`Clarabel`](https://github.com/oxfordcontrol/Clarabel.jl) when not using MIP constraints. When using MIP constraints, [`Pajarito`](https://github.com/jump-dev/Pajarito.jl) with [`Clarabel`](https://github.com/oxfordcontrol/Clarabel.jl) as the continuous solver and [`HiGHS`](https://github.com/jump-dev/HiGHS.jl) as the MIP one works very well. This makes it possible to solve problems with exotic constraint combinations.
 =#
@@ -122,7 +122,7 @@ slv = [Solver(; name = :clarabel1, solver = Clarabel.Optimizer,
 #=
 #### 2.2.1 Mean risk
 
-[`MeanRisk`]-(@ref) is the traditional portfolio optimisation problem. It seeks to minimise the risk with respect to a target return, or maximise the return with respect to a target risk. It supports four objective functions via the `obj` keyword which defaults to [`MinimumRisk`]-(@ref), the risk measure(s) are specified with the `r` keyword which defaults to [`Variance`](@ref).
+[`MeanRisk`](@ref) is the traditional portfolio optimisation problem. It seeks to minimise the risk with respect to a target return, or maximise the return with respect to a target risk. It supports four objective functions via the `obj` keyword which defaults to [`MinimumRisk`](@ref), the risk measure(s) are specified with the `r` keyword which defaults to [`Variance`](@ref).
 =#
 
 ## We'll use the same optimiser for all mean risk objectives
@@ -146,7 +146,7 @@ ress = optimise.([mr1, mr2, mr3, mr4], rd);
 #=
 `PortfolioOptimisers.jl` provides users with the ability to use multiple risk measures per optimisation, which means that some risk measure have to keep certain internal statistics to be able to compute the risk.
 
-The [`MeanRisk`]-(@ref) optimiser defaults to the variance so we will use that to compute the risk statistics. We've used the same prior statistics [`EmpiricalPrior`](@ref) estimator, and portfolio returns [`ArithmeticReturn`]-(@ref) estimator for all objectives. So we only need to get the ones in the first result.
+The [`MeanRisk`](@ref) optimiser defaults to the variance so we will use that to compute the risk statistics. We've used the same prior statistics [`EmpiricalPrior`](@ref) estimator, and portfolio returns [`ArithmeticReturn`](@ref) estimator for all objectives. So we only need to get the ones in the first result.
 
 Since the package's structs are all immutable, we provide factory functions that create risk measures with the appropriate internal statistics. This enables programmatic construction of risk measures, manual construction is also possible by directly using the risk measure's constructor.
 =#
@@ -182,9 +182,9 @@ pretty_table(hcat(DataFrame(:Stat => ["Std", "Return", "Return/Std"]),
 #=
 #### 2.2.2 Factor risk contribution
 
-The [`FactorRiskContribution`]-(@ref) is a more complex estimator that requires more setup. It accepts objective functions, but can also define risk contributions per factor for the variance risk measure. The minimum risk optimisation will follow the risk contribution constraints the closest. With enough data and assets, it can be quite exact up to the user-provided convergence settings for the solvers used.
+The [`FactorRiskContribution`](@ref) is a more complex estimator that requires more setup. It accepts objective functions, but can also define risk contributions per factor for the variance risk measure. The minimum risk optimisation will follow the risk contribution constraints the closest. With enough data and assets, it can be quite exact up to the user-provided convergence settings for the solvers used.
 
-It is compatible with other risk measures, but only the variance can take risk contribution constraints. Without them, or when using other risk measures, it is largely the same as the [`MeanRisk`]-(@ref) estimator.
+It is compatible with other risk measures, but only the variance can take risk contribution constraints. Without them, or when using other risk measures, it is largely the same as the [`MeanRisk`](@ref) estimator.
 
 We need to provide an instance of [`AssetSets`](@ref) via the `sets` keyword defining the sets of factors and their relationships. This way, the estimator can generate the linear constraints by parsing user-provided equations.
 
@@ -231,7 +231,7 @@ frc4 = FactorRiskContribution(; r = r, obj = MaximumReturn(), sets = sets, opt =
 ress = optimise.([frc1, frc2, frc3, frc4], rd);
 
 #=
-We can display the results and factor risk contributions [`factor_risk_contribution`]-(@ref), but we have to normalise them using their sum. Again we use the factory function to set the appropriate internal parameters. The last entry in the risk contribution is the regression intercept.
+We can display the results and factor risk contributions [`factor_risk_contribution`](@ref), but we have to normalise them using their sum. Again we use the factory function to set the appropriate internal parameters. The last entry in the risk contribution is the regression intercept.
 =#
 
 ## Generate the risk measure with the right covariance matrix
@@ -255,9 +255,9 @@ pretty_table(hcat(DataFrame(:factors => [rd.nf; "Intercept"]),
 #=
 #### 2.2.3 Near optimal centering
 
-[`NearOptimalCentering`]-(@ref) is a way to smear an optimal portfolio within a region around the point of optimality. The size of this region can be tuned by the user via the `bins` keyword, or automatically decided based on the number of observations and assets (default). This makes the portfolio more robust to estimation error and more diversified. It is not compatible with risk measures which produce quadratic risk expressions, so the risk measure keyword `r` defaults to [`StandardDeviation`](@ref).
+[`NearOptimalCentering`](@ref) is a way to smear an optimal portfolio within a region around the point of optimality. The size of this region can be tuned by the user via the `bins` keyword, or automatically decided based on the number of observations and assets (default). This makes the portfolio more robust to estimation error and more diversified. It is not compatible with risk measures which produce quadratic risk expressions, so the risk measure keyword `r` defaults to [`StandardDeviation`](@ref).
 
-There are two variants, defined by the `alg` keyword, one which applies all constraints to the inner [`MeanRisk`]-(@ref) optimisation and leaves the near optimal portfolio to fall where it may [`UnconstrainedNearOptimalCentering`]-(@ref), meaning the constraints will not be satisfied by the near optimal portfolio. The second variant applies the constraints to the near optimal portfolio as well [`ConstrainedNearOptimalCentering`]-(@ref).
+There are two variants, defined by the `alg` keyword, one which applies all constraints to the inner [`MeanRisk`](@ref) optimisation and leaves the near optimal portfolio to fall where it may [`UnconstrainedNearOptimalCentering`](@ref), meaning the constraints will not be satisfied by the near optimal portfolio. The second variant applies the constraints to the near optimal portfolio as well [`ConstrainedNearOptimalCentering`](@ref).
 =#
 
 ## We'll use the standard deviation risk measure, risk measures
@@ -318,7 +318,7 @@ pretty_table(hcat(DataFrame(:Stat => ["Std", "Return", "Return/Std"]),
 #=
 #### 2.2.4 Risk budgeting
 
-[`RiskBudgeting`]-(@ref) provides a way to allocate risk across assets or factors via the `rba` keyword according to a user-defined risk budgeting vector provided via the `rkb` keyword of [`AssetRiskBudgeting`]-(@ref) and [`FactorRiskBudgeting`]-(@ref) risk budgeting algorithms. The risk budget vectors do not have to be normalised. The risk being budgeted depends on the risk measures used. This does not support objective functions, the optimisation is solely focused on achieving the risk budgeting as closely as possible. It is compatible with the same risk measures as [`MeanRisk`]-(@ref).
+[`RiskBudgeting`](@ref) provides a way to allocate risk across assets or factors via the `rba` keyword according to a user-defined risk budgeting vector provided via the `rkb` keyword of [`AssetRiskBudgeting`](@ref) and [`FactorRiskBudgeting`](@ref) risk budgeting algorithms. The risk budget vectors do not have to be normalised. The risk being budgeted depends on the risk measures used. This does not support objective functions, the optimisation is solely focused on achieving the risk budgeting as closely as possible. It is compatible with the same risk measures as [`MeanRisk`](@ref).
 
 ##### 2.2.4.1 Asset risk budgeting
 
@@ -433,7 +433,7 @@ pretty_table(hcat(DataFrame(:factors => [rd.nf; "Intercept"]),
 #=
 #### 2.2.5 Relaxed risk budgeting
 
-[`RelaxedRiskBudgeting`]-(@ref) provides a way to allocate risk across assets or factors according to a user-defined risk budgeting vector, which does not have to be normalised. They are provided in the same way as for [`RiskBudgeting`]-(@ref), it does not accept risk measures as it's only available for the variance, and it will not follow the risk budget as closely.
+[`RelaxedRiskBudgeting`](@ref) provides a way to allocate risk across assets or factors according to a user-defined risk budgeting vector, which does not have to be normalised. They are provided in the same way as for [`RiskBudgeting`](@ref), it does not accept risk measures as it's only available for the variance, and it will not follow the risk budget as closely.
 
 There are three variants, basic, regularised, and regularised and penalised. Since the asset and factor versions are the same as before we will only show the different relaxed risk budgeting algorithms.
 =#
@@ -498,13 +498,13 @@ pretty_table(hcat(DataFrame(:assets => rd.nx),
 #=
 ### 2.3 Clustering optimisers
 
-Clustering based optimisers use the relationship structure between assets. The weights are a function of the risks associated with those structures. Aside from the [`NestedClusters`]-(@ref) estimator, they all use an instance of [`HierarchicalOptimiser`]-(@ref) which defines common parameters for all clustering optimisers. [`HierarchicalOptimiser`]-(@ref) does not require a solver to be specified via the `slv` keyword unless the clustering optimisation estimator uses a risk measure that requires one.
+Clustering based optimisers use the relationship structure between assets. The weights are a function of the risks associated with those structures. Aside from the [`NestedClustered`](@ref) estimator, they all use an instance of [`HierarchicalOptimiser`](@ref) which defines common parameters for all clustering optimisers. [`HierarchicalOptimiser`](@ref) does not require a solver to be specified via the `slv` keyword unless the clustering optimisation estimator uses a risk measure that requires one.
 
 #### 2.3.1 Hierarchical risk parity
 
-The [`HierarchicalRiskParity`]-(@ref) estimator uses the hierarchical structure of the assets to iteratively partition the assets into smaller and smaller clusters until reaching a leaf node. The weights are computed as a function of the risk between left and right cluster at each partition level. This accepts the same risk measures as JuMP based optimisers, plus some extra ones for which there are no traditional optimisation formulations.
+The [`HierarchicalRiskParity`](@ref) estimator uses the hierarchical structure of the assets to iteratively partition the assets into smaller and smaller clusters until reaching a leaf node. The weights are computed as a function of the risk between left and right cluster at each partition level. This accepts the same risk measures as JuMP based optimisers, plus some extra ones for which there are no traditional optimisation formulations.
 
-The [`HierarchicalOptimiser`]-(@ref) can be specified via the `opt` keyword, and the risk measure can be specified via the `r` keyword which defaults to the [`Variance`](@ref).
+The [`HierarchicalOptimiser`](@ref) can be specified via the `opt` keyword, and the risk measure can be specified via the `r` keyword which defaults to the [`Variance`](@ref).
 =#
 
 ## Hierarchical risk parity
@@ -536,11 +536,11 @@ pretty_table(DataFrame(:Stat => ["Std", "Return", "Return/Std"],
 #=
 #### 2.3.2 Schur complement hierarchical risk parity
 
-The [`SchurComplementHierarchicalRiskParity`]-(@ref) estimator works similarly to [`HierarchicalRiskParity`]-(@ref), but uses the Schur complement to decide whether or not to include more information into the risk calculation. It is only available for the variance and standard deviation because it relies on the Schur complement.
+The [`SchurComplementHierarchicalRiskParity`](@ref) estimator works similarly to [`HierarchicalRiskParity`](@ref), but uses the Schur complement to decide whether or not to include more information into the risk calculation. It is only available for the variance and standard deviation because it relies on the Schur complement.
 
-It serves almost as an interpolation between the classic mean variance optimisation and hierarchical risk parity. It has a `params` keyword which allows users to specify an instance, or vector of instances of [`SchurComplementParams`]-(@ref) which specify the risk measure, the "interpolation" parameter `gamma ∈ [0, 1]`, and whether the algorithm should be kept monotonic in risk as `gamma` increases (default).
+It serves almost as an interpolation between the classic mean variance optimisation and hierarchical risk parity. It has a `params` keyword which allows users to specify an instance, or vector of instances of [`SchurComplementParams`](@ref) which specify the risk measure, the "interpolation" parameter `gamma ∈ [0, 1]`, and whether the algorithm should be kept monotonic in risk as `gamma` increases (default).
 
-When `gamma` is `0`, it reduces to the [`HierarchicalRiskParity`]-(@ref) estimator, the closer it is to `1` the closer it is to the classic mean variance optimisation. It's worth noting that there are values of `gamma` for which the Schur augmented matrix may not be positive definite, as it cannot add any more risk information beyond a certain point. So if one wants `gamma` to be large, one should use [`NonMonotonicSchurComplement`]-(@ref) and make sure to disable the positive definite projection in the `pdm` keyword of [`SchurComplementParams`]-(@ref).
+When `gamma` is `0`, it reduces to the [`HierarchicalRiskParity`](@ref) estimator, the closer it is to `1` the closer it is to the classic mean variance optimisation. It's worth noting that there are values of `gamma` for which the Schur augmented matrix may not be positive definite, as it cannot add any more risk information beyond a certain point. So if one wants `gamma` to be large, one should use [`NonMonotonicSchurComplement`](@ref) and make sure to disable the positive definite projection in the `pdm` keyword of [`SchurComplementParams`](@ref).
 =#
 
 ## We can also use the standard deviation
@@ -605,9 +605,9 @@ pretty_table(hcat(DataFrame(:Stat => ["Std", "Return", "Return/Std"]),
 #=
 #### 2.3.3 Hierarchical equal risk contribution
 
-The [`HierarchicalEqualRiskContribution`]-(@ref) estimator uses the hierarchical structure of the assets as well as a score of clustering quality to iteratively break up the asset universe into left and right clusters up until the optimal number of clusters according to the score. Each cluster is treated as a synthetic asset for which the risk is computed. The weight of each cluster is computed based on the risk it represents with respect to the cluster on the other side. The risks of each asset in the cluster are also computed, and the weights computed off of these. The per-asset weights are multiplied by the weight associated with the cluster as a whole. This is repeated for every clustering level until the optimal number of clusters is reached.
+The [`HierarchicalEqualRiskContribution`](@ref) estimator uses the hierarchical structure of the assets as well as a score of clustering quality to iteratively break up the asset universe into left and right clusters up until the optimal number of clusters according to the score. Each cluster is treated as a synthetic asset for which the risk is computed. The weight of each cluster is computed based on the risk it represents with respect to the cluster on the other side. The risks of each asset in the cluster are also computed, and the weights computed off of these. The per-asset weights are multiplied by the weight associated with the cluster as a whole. This is repeated for every clustering level until the optimal number of clusters is reached.
 
-The [`HierarchicalOptimiser`]-(@ref) is specified via the `opt` keyword. Since this optimiser breaks up the assets into intra- and inter-cluster optimisations, it's possible to provide inner and outer risk measures via the `ri` and `ro` keywords, both default to the [`Variance`](@ref).
+The [`HierarchicalOptimiser`](@ref) is specified via the `opt` keyword. Since this optimiser breaks up the assets into intra- and inter-cluster optimisations, it's possible to provide inner and outer risk measures via the `ri` and `ro` keywords, both default to the [`Variance`](@ref).
 
 This optimiser got its name from the fact that the original formulation assigned equal weights to the assets within each cluster, while the outer optimisation used the variance. This is a generalization of that formulation.
 =#
@@ -652,13 +652,13 @@ pretty_table(hcat(DataFrame(:Stat => ["Std", "Return", "Return/Std"]),
 #=
 #### 2.3.4 Nested clustered
 
-The [`NestedClustered`]-(@ref) optimiser uses the same idea as the [`HierarchicalEqualRiskContribution`]-(@ref), where the optimisation process is split into inner and outer optimisations using the same scoring system for finding the optimal number of clusters. However, unlike [`HierarchicalEqualRiskContribution`]-(@ref), the intra- and inter-cluster optimisations are completely independent. It is possible to provide any non-finite allocation optimisation estimator for the inner and outer estimators independently via the keywords `opti` and `opto` respectively. This means it inherits the requirements for the inner and outer estimators respectively.
+The [`NestedClustered`](@ref) optimiser uses the same idea as the [`HierarchicalEqualRiskContribution`](@ref), where the optimisation process is split into inner and outer optimisations using the same scoring system for finding the optimal number of clusters. However, unlike [`HierarchicalEqualRiskContribution`](@ref), the intra- and inter-cluster optimisations are completely independent. It is possible to provide any non-finite allocation optimisation estimator for the inner and outer estimators independently via the keywords `opti` and `opto` respectively. This means it inherits the requirements for the inner and outer estimators respectively.
 
-It is also possible to optimise the outer estimator by using cross-validation via the `cv` keyword. If provided, a cross-validation prediction is applied to the inner estimators, yielding a predicted returns series for each cluster. The returns vector for each cluster is then taken as the returns vector for a synthetic asset. These are placed into a matrix which is used to optimise the outer estimator. When not using a cross-validation approach, the returns of the synthetic assets are computed directly by multiplying the original returns matrix by an `N×C` matrix, where `N` is the number of assets and `C` is the number of clusters. This weights matrix contains the inner weights of the assets in each cluster, if an asset is not in a cluster, its weight in the corresponding column is 0.
+It is also possible to optimise the outer estimator by using cross-validation via the `cv` keyword. If provided, a cross-validation prediction is applied to the inner estimators, yielding a predicted returns series for each cluster. The returns vector for each cluster is then taken as the returns vector for a synthetic asset. These are placed into a matrix which is used to optimise the outer estimator. When not using a cross-validation approach, the returns of the synthetic assets are computed directly by multiplying the original returns matrix by an `N × C` matrix, where `N` is the number of assets and `C` is the number of clusters. This weights matrix contains the inner weights of the assets in each cluster, if an asset is not in a cluster, its weight in the corresponding column is 0.
 
-The outer optimisation is performed using the synthetic asset returns matrix using the `opto` estimator. The final weights are computed by multiplying the `N×C` inner weights matrix by the `C×1` outer weights vector, where `N` is the number of assets and `C` is the number of clusters.
+The outer optimisation is performed using the synthetic asset returns matrix using the `opto` estimator. The final weights are computed by multiplying the `N × C` inner weights matrix by the `C × 1` outer weights vector, where `N` is the number of assets and `C` is the number of clusters.
 
-[`NestedClustered`]-(@ref) can take any non finite allocation optimiser as the inner or outer optimiser.
+[`NestedClustered`](@ref) can take any non finite allocation optimiser as the inner or outer optimiser.
 =#
 
 ## We'll use the same optimiser for all optimisations
@@ -681,7 +681,7 @@ nco3 = NestedClustered(;
 ress = optimise.([nco1, nco2, nco3], rd);
 
 #=
-We can compute some risk characteristics and visualise the results. We can see how the analogous optimisation to the original version of [`HierarchicalEqualRiskContribution`]-(@ref) has a similar behaviour, where all assets within a cluster have the same weight as each other.
+We can compute some risk characteristics and visualise the results. We can see how the analogous optimisation to the original version of [`HierarchicalEqualRiskContribution`](@ref) has a similar behaviour, where all assets within a cluster have the same weight as each other.
 =#
 
 ## All priors are the same so we can use the first one
@@ -711,13 +711,13 @@ pretty_table(hcat(DataFrame(:Stat => ["Std", "Return", "Return/Std"]),
 #=
 ### 2.4 Stacking
 
-The [`Stacking`]-(@ref) optimiser uses a similar approach to [`NestedClustered`]-(@ref), but instead of using a single inner estimator, it uses a vector of estimators, inheriting the requirements of each estimator being used.
+The [`Stacking`](@ref) optimiser uses a similar approach to [`NestedClustered`](@ref), but instead of using a single inner estimator, it uses a vector of estimators, inheriting the requirements of each estimator being used.
 
-The inner weights matrix is constructed by horizontally concatenating the weights returned by optimising each inner estimator. The returns series used in the outer optimisation can be computed using the same approaches as in [`NestedClustered`]-(@ref). The final weights are also computed the same way. It is also possible to provide a vector of weights by which to scale the weights of each inner estimator in order to bias the computation of the outer returns series in favour or against a particular estimator.
+The inner weights matrix is constructed by horizontally concatenating the weights returned by optimising each inner estimator. The returns series used in the outer optimisation can be computed using the same approaches as in [`NestedClustered`](@ref). The final weights are also computed the same way. It is also possible to provide a vector of weights by which to scale the weights of each inner estimator in order to bias the computation of the outer returns series in favour or against a particular estimator.
 
-[`Stacking`]-(@ref) can take any non finite allocation optimiser as the inner or outer optimiser.
+[`Stacking`](@ref) can take any non finite allocation optimiser as the inner or outer optimiser.
 
-The keywords for the inner and outer optimisers are the same as [`NestedClustered`]-(@ref).
+The keywords for the inner and outer optimisers are the same as [`NestedClustered`](@ref).
 =#
 
 ## We'll use the same optimiser
@@ -757,9 +757,9 @@ pretty_table(DataFrame(:Stat => ["Std", "Return", "Return/Std"],
 #=
 ### 2.5 Subset resampling
 
-The [`SubsetResampling`]-(@ref) optimiser takes a given number of random asset subsets and optimises those subsets using the given optimiser. The final asset weights are the average weight per asset across all samples, if an asset does not appear in a sample, it is taken to be zero. It is possible to provide a `subset_size` keyword can be a float in `(0, 1)`, in which case it specifies a proportion of the data to use in each subset, or an integer which directly specifies subset size. It is also possible to provide a `n_subsets` keyword to specify the number of subsets to use.
+The [`SubsetResampling`](@ref) optimiser takes a given number of random asset subsets and optimises those subsets using the given optimiser. The final asset weights are the average weight per asset across all samples, if an asset does not appear in a sample, it is taken to be zero. It is possible to provide a `subset_size` keyword can be a float in `(0, 1)`, in which case it specifies a proportion of the data to use in each subset, or an integer which directly specifies subset size. It is also possible to provide a `n_subsets` keyword to specify the number of subsets to use.
 
-In essence, this is almost an interpolation between the optimiser provided, and the [`EqualWeighted`]-(@ref) optimiser. If `subset_size` is `1`, and `n_subsets` is equal to the number of assets, the optimiser is equivalent to the [`EqualWeighted`]-(@ref) optimiser.
+In essence, this is almost an interpolation between the optimiser provided, and the [`EqualWeighted`](@ref) optimiser. If `subset_size` is `1`, and `n_subsets` is equal to the number of assets, the optimiser is equivalent to the [`EqualWeighted`](@ref) optimiser.
 
 The samples are unique and drawn without replacement.
 =#

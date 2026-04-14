@@ -1,5 +1,5 @@
 """
-    abstract type DimensionReductionTarget <: AbstractRegressionAlgorithm end
+$(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all dimension reduction regression algorithm targets in `PortfolioOptimisers.jl`.
 
@@ -15,13 +15,35 @@ These types are used to specify the dimension reduction method when constructing
   - [`AbstractRegressionAlgorithm`](@ref)
 """
 abstract type DimensionReductionTarget <: AbstractRegressionAlgorithm end
+"""
+    factory(drtgt::DimensionReductionTarget, args...; kwargs...) -> DimensionReductionTarget
+
+No-op factory for [`DimensionReductionTarget`](@ref) subtypes. Returns the target unchanged.
+
+Dimension reduction targets (such as [`PCA`](@ref) and [`PPCA`](@ref)) do not depend on observation weights, so this method returns `drtgt` unchanged. This allows generic code to call `factory` on dimension reduction targets without special-casing.
+
+# Arguments
+
+  - `drtgt`: Dimension reduction target.
+  - `args...`: Additional arguments (ignored).
+  - `kwargs...`: Additional keyword arguments (ignored).
+
+# Returns
+
+  - `drtgt`: The input dimension reduction target, unchanged.
+
+# Related
+
+  - [`DimensionReductionTarget`](@ref)
+  - [`PCA`](@ref)
+  - [`PPCA`](@ref)
+  - [`factory`](@ref)
+"""
 function factory(drtgt::DimensionReductionTarget, args...; kwargs...)
     return drtgt
 end
 """
-    struct PCA{T1} <: DimensionReductionTarget
-        kwargs::T1
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Principal Component Analysis (PCA) dimension reduction target.
 
@@ -29,13 +51,15 @@ Principal Component Analysis (PCA) dimension reduction target.
 
 # Fields
 
-  - `kwargs`: Keyword arguments for [`MultivariateStats.fit`](https://juliastats.org/MultivariateStats.jl/stable/pca/#StatsAPI.fit).
+$(DocStringExtensions.FIELDS)
 
-# Constructor
+# Constructors
 
-    PCA(; kwargs::NamedTuple = ())
+    PCA(;
+        kwargs::NamedTuple = (;)
+    ) -> PCA
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 
@@ -52,6 +76,7 @@ PCA
   - [`PPCA`](@ref)
 """
 @concrete struct PCA <: DimensionReductionTarget
+    "Keyword arguments passed to `fit(MultivariateStats.PCA, X; kwargs...)`"
     kwargs
     function PCA(kwargs::NamedTuple)
         return new{typeof(kwargs)}(kwargs)
@@ -86,9 +111,7 @@ function StatsAPI.fit(drtgt::PCA, X::MatNum)
     return StatsAPI.fit(MultivariateStats.PCA, X; drtgt.kwargs...)
 end
 """
-    struct PPCA{T1} <: DimensionReductionTarget
-        kwargs::T1
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Probabilistic Principal Component Analysis (PPCA) dimension reduction target.
 
@@ -96,13 +119,15 @@ Probabilistic Principal Component Analysis (PPCA) dimension reduction target.
 
 # Fields
 
-  - `kwargs`: Keyword arguments for [`MultivariateStats.fit`](https://juliastats.org/MultivariateStats.jl/stable/pca/#StatsAPI.fit).
+$(DocStringExtensions.FIELDS)
 
-# Constructor
+# Constructors
 
-    PPCA(; kwargs::NamedTuple = ())
+    PPCA(;
+        kwargs::NamedTuple = (),
+    ) -> PPCA
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 
@@ -119,6 +144,7 @@ PPCA
   - [`PCA`](@ref)
 """
 @concrete struct PPCA <: DimensionReductionTarget
+    "Keyword arguments passed to `fit(MultivariateStats.PPCA, X; kwargs...)`"
     kwargs
     function PPCA(kwargs::NamedTuple)
         return new{typeof(kwargs)}(kwargs)
@@ -153,12 +179,7 @@ function StatsAPI.fit(drtgt::PPCA, X::MatNum)
     return StatsAPI.fit(MultivariateStats.PPCA, X; drtgt.kwargs...)
 end
 """
-    struct DimensionReductionRegression{T1, T2, T3, T4} <: AbstractRegressionEstimator
-        me::T1
-        ve::T2
-        drtgt::T3
-        retgt::T4
-    end
+$(DocStringExtensions.TYPEDEF)
 
 Estimator for dimension reduction regression-based moment estimation.
 
@@ -166,33 +187,26 @@ Estimator for dimension reduction regression-based moment estimation.
 
 # Fields
 
-  - `me`: Expected returns estimator.
-  - `ve`: Variance estimator.
-  - `drtgt`: Dimension reduction target.
-  - `retgt`: Regression target type.
+$(DocStringExtensions.FIELDS)
 
-# Constructor
+# Constructors
 
     DimensionReductionRegression(;
-                                 me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
-                                 ve::AbstractVarianceEstimator = SimpleVariance(),
-                                 drtgt::DimensionReductionTarget = PCA(),
-                                 retgt::AbstractRegressionTarget = LinearModel())
+        ve::AbstractVarianceEstimator = SimpleVariance(),
+        drtgt::DimensionReductionTarget = PCA(),
+        retgt::AbstractRegressionTarget = LinearModel()
+    ) -> DimensionReductionRegression
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 
 ```jldoctest
 julia> DimensionReductionRegression()
 DimensionReductionRegression
-     me ┼ SimpleExpectedReturns
-        │     w ┼ nothing
-        │   idx ┴ nothing
      ve ┼ SimpleVariance
         │          me ┼ SimpleExpectedReturns
-        │             │     w ┼ nothing
-        │             │   idx ┴ nothing
+        │             │   w ┴ nothing
         │           w ┼ nothing
         │   corrected ┴ Bool: true
   drtgt ┼ PCA
@@ -210,31 +224,31 @@ DimensionReductionRegression
   - [`AbstractRegressionTarget`](@ref)
 """
 @concrete struct DimensionReductionRegression <: AbstractRegressionEstimator
-    me
+    "$(field_dict[:ve])"
     ve
+    "$(field_dict[:drtgt])"
     drtgt
+    "$(field_dict[:dretgt])"
     retgt
-    function DimensionReductionRegression(me::AbstractExpectedReturnsEstimator,
-                                          ve::AbstractVarianceEstimator,
+    function DimensionReductionRegression(ve::AbstractVarianceEstimator,
                                           drtgt::DimensionReductionTarget,
                                           retgt::AbstractRegressionTarget)
         if haskey(retgt.kwargs, :weights)
-            @argcheck(isa(retgt.kwargs.weights, StatsBase.AbstractWeights), TypeError)
-            @argcheck(!isempty(retgt.kwargs.weights), IsEmptyError)
+            @argcheck(isa(retgt.kwargs.weights, ObsWeights), TypeError)
+            if isa(retgt.kwargs.weights, AbstractVector)
+                @argcheck(!isempty(retgt.kwargs.weights), IsEmptyError)
+            end
         end
-        return new{typeof(me), typeof(ve), typeof(drtgt), typeof(retgt)}(me, ve, drtgt,
-                                                                         retgt)
+        return new{typeof(ve), typeof(drtgt), typeof(retgt)}(ve, drtgt, retgt)
     end
 end
-function DimensionReductionRegression(;
-                                      me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
-                                      ve::AbstractVarianceEstimator = SimpleVariance(),
+function DimensionReductionRegression(; ve::AbstractVarianceEstimator = SimpleVariance(),
                                       drtgt::DimensionReductionTarget = PCA(),
                                       retgt::AbstractRegressionTarget = LinearModel())
-    return DimensionReductionRegression(me, ve, drtgt, retgt)
+    return DimensionReductionRegression(ve, drtgt, retgt)
 end
-function factory(re::DimensionReductionRegression, w::StatsBase.AbstractWeights)
-    return DimensionReductionRegression(; me = factory(re.me, w), ve = factory(re.ve, w),
+function factory(re::DimensionReductionRegression, w::ObsWeights)
+    return DimensionReductionRegression(; ve = factory(re.ve, w),
                                         drtgt = factory(re.drtgt, w),
                                         retgt = factory(re.retgt, w))
 end
@@ -362,7 +376,8 @@ function regression(re::DimensionReductionRegression, X::MatNum, F::MatNum)
     rows = size(X, 2)
     rr = zeros(promote_type(eltype(F), eltype(X)), rows, cols)
     f1, Vp = prep_dim_red_reg(re.drtgt, F)
-    mu = Statistics.mean(re.me, F; dims = 1)
+    me = ifelse(isnothing(re.ve.me), SimpleExpectedReturns(), re.ve.me)
+    mu = Statistics.mean(me, F; dims = 1)
     sigma = vec(Statistics.std(re.ve, F; dims = 1))
     mu = vec(mu)
     for i in axes(rr, 1)

@@ -18,4 +18,12 @@ Scalariser
 NonHierarchicalScalariser
 HierarchicalScalariser
 nothing_scalar_array_selector
+VecBaseRM
+VecOptRM
+OptRM_VecOptRM
+VecRM
+RM_VecRM
+RkRtBounds
+Front_NumVec
+bigger_is_better
 ```

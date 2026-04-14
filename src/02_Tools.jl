@@ -1,252 +1,4 @@
 """
-    assert_nonempty_nonneg_finite_val(
-        val::Union{<:AbstractDict, <:VecPair, <:ArrNum, Pair, Number},
-        val_sym::Union{Symbol,<:AbstractString} = :val
-    ) -> nothing
-    assert_nonempty_nonneg_finite_val(args...) -> nothing
-
-Validate that the input value is non-empty, non-negative and finite.
-
-# Arguments
-
-  - `val`: Input value to validate.
-  - `val_sym`: Symbolic name used in the error messages.
-
-# Details
-
-  - `val`: Input value to validate.
-
-      + `::AbstractDict`: `!isempty(val)`, `any(isfinite, values(val))`, `all(x -> x >= 0, values(val))`.
-      + `::VecPair`: `!isempty(val)`, `any(isfinite, getindex.(val, 2))`, `all(x -> x[2] >= 0, val)`.
-      + `::ArrNum`: `!isempty(val)`, `any(isfinite, val)`, `all(x -> x >= 0, val)`.
-      + `::Pair`: `isfinite(val[2])` and `val[2] >= 0`.
-      + `::Number`: `isfinite(val)` and `val >= 0`.
-      + `args...`: Always passes.
-
-# Related
-
-  - [`assert_nonempty_finite_val`](@ref)
-  - [`assert_nonempty_gt0_finite_val`](@ref)
-"""
-function assert_nonempty_nonneg_finite_val(val::AbstractDict,
-                                           val_sym::Union{Symbol, <:AbstractString} = :val)
-    @argcheck(!isempty(val),
-              IsEmptyError("!isempty($val_sym) must hold. Got\n!isempty($val_sym) => $(isempty(val))"))
-    @argcheck(any(isfinite, values(val)),
-              DomainError("any(isfinite, values($val_sym)) must hold. Got\nany(isfinite, values($val_sym)) => $(any(isfinite, values(val)))"))
-    @argcheck(all(x -> zero(x) <= x, values(val)),
-              DomainError("all(x -> 0 <= x, values($val_sym)) must hold. Got\nall(x -> 0 <= x, values($val_sym)) => $(all(x -> zero(x) <= x, values(val)))"))
-    return nothing
-end
-function assert_nonempty_nonneg_finite_val(val::VecPair,
-                                           val_sym::Union{Symbol, <:AbstractString} = :val)
-    @argcheck(!isempty(val),
-              IsEmptyError("!isempty($val_sym) must hold. Got\n!isempty($val_sym) => $(isempty(val))"))
-    @argcheck(any(isfinite, getindex.(val, 2)),
-              DomainError("any(isfinite, getindex.($val_sym, 2)) must hold. Got\nany(isfinite, getindex.($val_sym, 2)) => $(any(isfinite, getindex.(val, 2)))"))
-    @argcheck(all(x -> zero(x[2]) <= x[2], val),
-              DomainError("all(x -> 0 <= x[2], $val_sym) must hold. Got\nall(x -> 0 <= x[2], $val_sym) => $(all(x -> zero(x[2]) <= x[2], val))"))
-    return nothing
-end
-function assert_nonempty_nonneg_finite_val(val::ArrNum,
-                                           val_sym::Union{Symbol, <:AbstractString} = :val)
-    @argcheck(!isempty(val),
-              IsEmptyError("!isempty($val_sym) must hold. Got\n!isempty($val_sym) => $(isempty(val))"))
-    @argcheck(any(isfinite, val),
-              DomainError("any(isfinite, $val_sym) must hold. Got\nany(isfinite, $val_sym) => $(any(isfinite, val))"))
-    @argcheck(all(x -> zero(x) <= x, val),
-              DomainError("all(x -> 0 <= x, $val_sym) must hold. Got\nall(x -> 0 <= x, $val_sym) => $(all(x -> zero(x) <= x, val))"))
-    return nothing
-end
-function assert_nonempty_nonneg_finite_val(val::Pair,
-                                           val_sym::Union{Symbol, <:AbstractString} = :val)
-    @argcheck(isfinite(val[2]),
-              DomainError("isfinite($val_sym[2]) must hold. Got\nisfinite($val_sym[2]) => $(isfinite(val[2]))"))
-    @argcheck(zero(val[2]) <= val[2],
-              DomainError("0 <= $(val[2]) must hold. Got\n$(val[2]) => $(val[2])"))
-    return nothing
-end
-function assert_nonempty_nonneg_finite_val(val::Number,
-                                           val_sym::Union{Symbol, <:AbstractString} = :val)
-    @argcheck(isfinite(val),
-              DomainError("isfinite($val_sym) must hold. Got\nisfinite($val_sym) => $(isfinite(val))"))
-    @argcheck(zero(val) <= val, DomainError("0 <= $(val) must hold. Got\n$(val) => $(val)"))
-    return nothing
-end
-function assert_nonempty_nonneg_finite_val(args...)
-    return nothing
-end
-"""
-    assert_nonempty_gt0_finite_val(
-        val::Union{<:AbstractDict, <:VecPair, <:ArrNum, Pair, Number},
-        val_sym::Union{Symbol,<:AbstractString} = :val
-    ) -> nothing
-    assert_nonempty_gt0_finite_val(args...) -> nothing
-
-Validate that the input value is non-empty, greater than zero, and finite.
-
-# Arguments
-
-  - `val`: Input value to validate.
-  - `val_sym`: Symbolic name used in the error messages.
-
-# Details
-
-  - `val`: Input value to validate.
-
-      + `::AbstractDict`: `!isempty(val)`, `any(isfinite, values(val))`, `all(x -> x > 0, values(val))`.
-      + `::VecPair`: `!isempty(val)`, `any(isfinite, getindex.(val, 2))`, `all(x -> x[2] > 0, val)`.
-      + `::ArrNum`: `!isempty(val)`, `any(isfinite, val)`, `all(x -> x > 0, val)`.
-      + `::Pair`: `isfinite(val[2])` and `val[2] > 0`.
-      + `::Number`: `isfinite(val)` and `val > 0`.
-      + `args...`: Always passes.
-
-# Related
-
-  - [`assert_nonempty_nonneg_finite_val`](@ref)
-  - [`assert_nonempty_finite_val`](@ref)
-"""
-function assert_nonempty_gt0_finite_val(val::AbstractDict,
-                                        val_sym::Union{Symbol, <:AbstractString} = :val)
-    @argcheck(!isempty(val),
-              IsEmptyError("!isempty($val_sym) must hold. Got\n!isempty($val_sym) => $(isempty(val))"))
-    @argcheck(any(isfinite, values(val)),
-              DomainError("any(isfinite, values($val_sym)) must hold. Got\nany(isfinite, values($val_sym)) => $(any(isfinite, values(val)))"))
-    @argcheck(all(x -> zero(x) < x, values(val)),
-              DomainError("all(x -> 0 < x, values($val_sym)) must hold. Got\nall(x -> 0 < x, values($val_sym)) => $(all(x -> zero(x) < x, values(val)))"))
-    return nothing
-end
-function assert_nonempty_gt0_finite_val(val::VecPair,
-                                        val_sym::Union{Symbol, <:AbstractString} = :val)
-    @argcheck(!isempty(val),
-              IsEmptyError("!isempty($val_sym) must hold. Got\n!isempty($val_sym) => $(isempty(val))"))
-    @argcheck(any(isfinite, getindex.(val, 2)),
-              DomainError("any(isfinite, getindex.($val_sym, 2)) must hold. Got\nany(isfinite, getindex.($val_sym, 2)) => $(any(isfinite, getindex.(val, 2)))"))
-    @argcheck(all(x -> zero(x[2]) < x[2], val),
-              DomainError("all(x -> 0 < x[2], $val_sym) must hold. Got\nall(x -> 0 < x[2], $val_sym) => $(all(x -> zero(x[2]) < x[2], val))"))
-    return nothing
-end
-function assert_nonempty_gt0_finite_val(val::ArrNum,
-                                        val_sym::Union{Symbol, <:AbstractString} = :val)
-    @argcheck(!isempty(val),
-              IsEmptyError("!isempty($val_sym) must hold. Got\n!isempty($val_sym) => $(isempty(val))"))
-    @argcheck(any(isfinite, val),
-              DomainError("any(isfinite, $val_sym) must hold. Got\nany(isfinite, $val_sym) => $(any(isfinite, val))"))
-    @argcheck(all(x -> zero(x) < x, val),
-              DomainError("all(x -> 0 < x, $val_sym) must hold. Got\nall(x -> 0 < x, $val_sym) => $(all(x -> zero(x) < x, val))"))
-    return nothing
-end
-function assert_nonempty_gt0_finite_val(val::Pair,
-                                        val_sym::Union{Symbol, <:AbstractString} = :val)
-    @argcheck(isfinite(val[2]),
-              DomainError("isfinite($val_sym[2]) must hold. Got\nisfinite($val_sym[2]) => $(isfinite(val[2]))"))
-    @argcheck(zero(val[2]) < val[2],
-              DomainError("0 < $(val[2]) must hold. Got\n$(val[2]) => $(val[2])"))
-    return nothing
-end
-function assert_nonempty_gt0_finite_val(val::Number,
-                                        val_sym::Union{Symbol, <:AbstractString} = :val)
-    @argcheck(isfinite(val),
-              DomainError("isfinite($val_sym) must hold. Got\nisfinite($val_sym) => $(isfinite(val))"))
-    @argcheck(zero(val) < val, DomainError("0 < $(val) must hold. Got\n$(val) => $(val)"))
-    return nothing
-end
-function assert_nonempty_gt0_finite_val(args...)
-    return nothing
-end
-"""
-    assert_nonempty_finite_val(
-        val::Union{<:AbstractDict, <:VecPair, <:ArrNum, Pair, Number},
-        val_sym::Union{Symbol,<:AbstractString} = :val
-    ) -> nothing
-    assert_nonempty_finite_val(args...) -> nothing
-
-Validate that the input value is non-empty and finite.
-
-# Arguments
-
-  - `val`: Input value to validate.
-  - `val_sym`: Symbolic name used in the error messages.
-
-# Details
-
-  - `val`: Input value to validate.
-
-      + `::AbstractDict`: `!isempty(val)`, `any(isfinite, values(val))`.
-      + `::VecPair`: `!isempty(val)`, `any(isfinite, getindex.(val, 2))`.
-      + `::ArrNum`: `!isempty(val)`, `any(isfinite, val)`.
-      + `::Pair`: `isfinite(val[2])`.
-      + `::Number`: `isfinite(val).
-      + `args...`: Always passes.
-
-# Related
-
-  - [`assert_nonempty_nonneg_finite_val`](@ref)
-  - [`assert_nonempty_gt0_finite_val`](@ref)
-"""
-function assert_nonempty_finite_val(val::AbstractDict,
-                                    val_sym::Union{Symbol, <:AbstractString} = :val)
-    @argcheck(!isempty(val),
-              IsEmptyError("!isempty($val_sym) must hold. Got\n!isempty($val_sym) => $(isempty(val))"))
-    @argcheck(any(isfinite, values(val)),
-              DomainError("any(isfinite, values($val_sym)) must hold. Got\nany(isfinite, values($val_sym)) => $(any(isfinite, values(val)))"))
-    return nothing
-end
-function assert_nonempty_finite_val(val::VecPair,
-                                    val_sym::Union{Symbol, <:AbstractString} = :val)
-    @argcheck(!isempty(val),
-              IsEmptyError("!isempty($val_sym) must hold. Got\n!isempty($val_sym) => $(isempty(val))"))
-    @argcheck(any(isfinite, getindex.(val, 2)),
-              DomainError("any(isfinite, getindex.($val_sym, 2)) must hold. Got\nany(isfinite, getindex.($val_sym, 2)) => $(any(isfinite, getindex.(val, 2)))"))
-    return nothing
-end
-function assert_nonempty_finite_val(val::ArrNum,
-                                    val_sym::Union{Symbol, <:AbstractString} = :val)
-    @argcheck(!isempty(val),
-              IsEmptyError("!isempty($val_sym) must hold. Got\n!isempty($val_sym) => $(isempty(val))"))
-    @argcheck(any(isfinite, val),
-              DomainError("any(isfinite, $val_sym) must hold. Got\nany(isfinite, $val_sym) => $(any(isfinite, val))"))
-    return nothing
-end
-function assert_nonempty_finite_val(val::Pair,
-                                    val_sym::Union{Symbol, <:AbstractString} = :val)
-    @argcheck(isfinite(val[2]),
-              DomainError("isfinite($val_sym[2]) must hold. Got\nisfinite($val_sym[2]) => $(isfinite(val[2]))"))
-    return nothing
-end
-function assert_nonempty_finite_val(val::Number,
-                                    val_sym::Union{Symbol, <:AbstractString} = :val)
-    @argcheck(isfinite(val),
-              DomainError("isfinite($val_sym) must hold. Got\nisfinite($val_sym) => $(isfinite(val))"))
-    return nothing
-end
-function assert_nonempty_finite_val(args...)
-    return nothing
-end
-"""
-    assert_matrix_issquare(X::MatNum, X_sym::Symbol = :X) -> nothing
-
-Assert that the input matrix is square.
-
-# Arguments
-
-  - `X`: Input matrix to validate.
-  - `X_sym`: Symbolic name used in error messages.
-
-# Validation
-
-  - `size(X, 1) == size(X, 2)`.
-
-# Details
-
-  - Throws `DimensionMismatch` if the check fails.
-"""
-function assert_matrix_issquare(X::MatNum, X_sym::Symbol = :X)
-    @argcheck(size(X, 1) == size(X, 2),
-              DimensionMismatch("size($X_sym, 1) == size($X_sym, 2) must hold. Got\nsize($X_sym, 1) => $(size(X, 1))\nsize($X_sym, 2) => $(size(X, 2))."))
-    return nothing
-end
-"""
     ⊗(A::ArrNum, B::ArrNum) -> Matrix{promote_type(eltype(A), eltype(B))}
 
 Tensor product of two arrays. Returns a matrix of size `(length(A), length(B))` where each element is the product of elements from `A` and `B`.
@@ -412,6 +164,10 @@ Efficient scalar and vector dot product utility.
   - If one argument is a `Union{<:Number, <:JuMP.AbstractJuMPScalar}` and the other an `VecNum`, returns the scalar times the sum of the vector.
   - If both arguments are `VecNum`s, returns their `dot` product.
 
+# Returns
+
+  - `res::Number`: The resulting scalar.
+
 # Examples
 
 ```jldoctest
@@ -442,9 +198,10 @@ end
 """
     nothing_scalar_array_view(
         x::Union{Nothing, <:Number, <:Pair, <:VecPair, <:Dict,
-                AbstractEstimatorValueAlgorithm},
+                 <:AbstractEstimatorValueAlgorithm,
+                 <:DynamicAbstractWeights},
         ::Any
-    ) -> typeof(x)
+    ) -> x
     nothing_scalar_array_view(x::AbstractVector, i) -> view(x, i)
     nothing_scalar_array_view(x::VecScalar, i) -> VecScalar(; v = view(x.v, i), s = x.s)
     nothing_scalar_array_view(x::AbstractMatrix, i) -> view(x, i, i)
@@ -459,6 +216,16 @@ Utility for safely viewing into possibly `nothing`, scalar, or array values.
 
   - `x`: Input value.
   - `i`: Index or indices to view.
+
+# Returns
+
+  - `x`: Input value.
+
+      + `::Union{Nothing, <:Number, <:Pair, <:VecPair, <:Dict, <:AbstractEstimatorValueAlgorithm, <:DynamicAbstractWeights}`: Returns `x` unchanged.
+      + `::AbstractVector`: Returns `view(x, i)`.
+      + `::VecScalar`: Returns `VecScalar(; v = view(x.v, i), s = x.s)`.
+      + `::AbstractMatrix`: Returns `view(x, i, i)`.
+      + `::AbstractVector{<:Union{<:AbstractVector, <:AbstractMatrix, <:VecScalar}}`: Returns a vector of views for each element in `x`.
 
 # Examples
 
@@ -480,7 +247,8 @@ julia> PortfolioOptimisers.nothing_scalar_array_view([[1, 2], [3, 4]], 1)
 ```
 """
 function nothing_scalar_array_view(x::Union{Nothing, <:Number, <:Pair, <:VecPair, <:Dict,
-                                            <:AbstractEstimatorValueAlgorithm}, ::Any)
+                                            <:AbstractEstimatorValueAlgorithm,
+                                            <:DynamicAbstractWeights}, ::Any)
     return x
 end
 function nothing_scalar_array_view(x::AbstractVector, i)
@@ -498,7 +266,44 @@ function nothing_scalar_array_view(x::AbstractVector{<:Union{<:AbstractVector,
     return [nothing_scalar_array_view(xi, i) for xi in x]
 end
 """
-    nothing_scalar_array_view_odd_order(::Nothing, i, j) -> nothing
+    get_window(window, X, dims = 1)
+
+Get the row/observation window index range for a data array.
+
+Returns the index range corresponding to the last `window` observations (or all observations for `nothing`/`Colon`). Handles integer window sizes, vector index ranges, and `nothing`/`Colon` to mean "use all data".
+
+# Arguments
+
+  - `window`: Number of observations, index vector, `nothing`, or `Colon`.
+  - `X`: Data matrix or vector.
+  - `dims`: Observation dimension (default `1`).
+
+# Returns
+
+  - Index range or `Colon`.
+
+# Related
+
+  - [`moment_window_and_weights`](@ref)
+"""
+function get_window(::Option{<:Colon}, args...)
+    return Colon()
+end
+function get_window(window::Integer, X::MatNum, dims::Int = 1)
+    stop = lastindex(X, dims)
+    start = firstindex(X, dims)
+    return max(1, stop - window + 1):stop
+end
+function get_window(window::Integer, X::VecNum, args...)
+    stop = lastindex(X)
+    start = firstindex(X)
+    return max(1, stop - window + 1):stop
+end
+function get_window(window::VecInt, args...)
+    return window
+end
+"""
+    nothing_scalar_array_view_odd_order(::Nothing, i, j)
     nothing_scalar_array_view_odd_order(x::AbstractMatrix, i, j) -> view(x, i, j)
 
 Utility for safely viewing or indexing into possibly `nothing` or array values with two indices.
@@ -510,6 +315,10 @@ Utility for safely viewing or indexing into possibly `nothing` or array values w
 
   - `x`: Input value.
   - `i`, `j`: Indices to view.
+
+# Returns
+
+  - The corresponding view or `nothing`.
 
 # Examples
 
@@ -528,11 +337,19 @@ function nothing_scalar_array_view_odd_order(x::AbstractMatrix, i, j)
     return view(x, i, j)
 end
 """
-    nothing_scalar_array_getindex(x::Union{Nothing, <:Number, <:Pair, <:VecPair, <:Dict}, ::Any) -> Union{Nothing, <:Number, <:Pair, <:VecPair, <:Dict}
+    nothing_scalar_array_getindex(
+        x::Union{Nothing, <:Number, <:Pair, <:VecPair, <:Dict,
+                 <:AbstractEstimatorValueAlgorithm,
+                 <:DynamicAbstractWeights},
+        ::Any
+    ) -> x
     nothing_scalar_array_getindex(x::AbstractVector, i) -> x[i]
     nothing_scalar_array_getindex(x::VecScalar, i) -> VecScalar(; v = x.v[i], s = x.s)
-    nothing_scalar_array_getindex(x::AbstractVector{<:Union{<:AbstractVector, <:VecScalar}}, i) -> [nothing_scalar_array_getindex(xi, i) for xi in x]
     nothing_scalar_array_getindex(x::AbstractMatrix, i) -> x[i, i]
+    nothing_scalar_array_getindex(
+        x::AbstractVector{<:Union{<:AbstractVector, <:AbstractMatrix, <:VecScalar}},
+        i
+    ) -> [nothing_scalar_array_getindex(xi, i) for xi in x]
 
 Utility for safely viewing into possibly `nothing`, scalar, or array values.
 
@@ -545,11 +362,11 @@ Utility for safely viewing into possibly `nothing`, scalar, or array values.
 
   - `x`: Input value.
 
-      + `::Union{Nothing, <:Number, <:Pair, <:VecPair, <:Dict}`: Returns `x` unchanged.
-      + `::AbstractVector`: Returns `view(x, i)`.
-      + `::VecScalar`: Returns `VecScalar(; v = view(x.v, i), s = x.s)`.
-      + `::AbstractVector{<:Union{<:AbstractVector, <:VecScalar}}`: Returns a vector of views for each element in `x`.
-      + `::AbstractMatrix`: Returns `view(x, i, i)`.
+      + `::Union{Nothing, <:Number, <:Pair, <:VecPair, <:Dict, <:AbstractEstimatorValueAlgorithm, <:DynamicAbstractWeights}`: Returns `x` unchanged.
+      + `::AbstractVector`: Returns `x[i]`.
+      + `::VecScalar`: Returns `VecScalar(; v = x.v[i], s = x.s)`.
+      + `::AbstractVector{<:Union{<:AbstractVector, <:AbstractMatrix, <:VecScalar}}`: Returns a vector of elements indexed by `i`.
+      + `::AbstractMatrix`: Returns `x[i, i]`.
 
 # Examples
 
@@ -571,7 +388,8 @@ julia> PortfolioOptimisers.nothing_scalar_array_getindex([[1, 2], [3, 4]], 1)
 ```
 """
 function nothing_scalar_array_getindex(x::Union{Nothing, <:Number, <:Pair, <:VecPair,
-                                                <:Dict}, ::Any)
+                                                <:Dict, <:AbstractEstimatorValueAlgorithm,
+                                                <:DynamicAbstractWeights}, ::Any)
     return x
 end
 function nothing_scalar_array_getindex(x::AbstractVector, i)
@@ -580,15 +398,16 @@ end
 function nothing_scalar_array_getindex(x::VecScalar, i)
     return VecScalar(; v = x.v[i], s = x.s)
 end
-function nothing_scalar_array_getindex(x::AbstractVector{<:Union{<:AbstractVector,
-                                                                 <:VecScalar}}, i)
-    return [xi[i] for xi in x]
-end
 function nothing_scalar_array_getindex(x::AbstractMatrix, i)
     return x[i, i]
 end
+function nothing_scalar_array_getindex(x::AbstractVector{<:Union{<:AbstractVector,
+                                                                 <:AbstractMatrix,
+                                                                 <:VecScalar}}, i)
+    return [nothing_scalar_array_getindex(xi, i) for xi in x]
+end
 """
-    nothing_scalar_array_getindex_odd_order(::Nothing, i, j) -> nothing
+    nothing_scalar_array_getindex_odd_order(::Nothing, i, j)
     nothing_scalar_array_getindex_odd_order(x::AbstractMatrix, i, j) -> x[i, j]
 
 Utility for safely viewing or indexing into possibly `nothing` or array values with two indices.
@@ -600,6 +419,10 @@ Utility for safely viewing or indexing into possibly `nothing` or array values w
 
   - `x`: Input value.
   - `i`, `j`: Indices to view.
+
+# Returns
+
+  - The corresponding matrix index or `nothing`.
 
 # Examples
 
@@ -658,6 +481,10 @@ Recursively traverse all subtypes of the given abstract type `t` and collect all
   - `t`: An abstract type whose subtypes will be traversed.
   - `ctarr`: Optional An array to collect the concrete types. If not provided, a new empty array is created.
 
+# Returns
+
+  - `types::Vector{Any}`: An array containing all concrete struct types that are subtypes (direct or indirect) of `types`.
+
 # Examples
 
 ```julia
@@ -700,7 +527,7 @@ This is useful for converting arrays with abstract element types to arrays with 
 
 # Returns
 
-  - `A_new::Array{Union{...}}`: A new array with the same shape as `A`, but with a concrete element type inferred from the elements of `A`.
+  - `A_new::Vector{Union{...}}`: A new array with the same shape as `A`, but with a concrete element type inferred from the elements of `A`.
 
 # Examples
 
@@ -730,6 +557,10 @@ Defining methods which dispatch on the first argument allows for a consistent fa
   - `a`: Indicates no object should be constructed.
   - `args...`: Arbitrary positional arguments (ignored).
   - `kwargs...`: Arbitrary keyword arguments (ignored).
+
+# Returns
+
+  - `a`: The input unchanged.
 
 # Related
 
@@ -803,9 +634,11 @@ $(DocStringExtensions.FIELDS)
 
 # Constructors
 
-    MeanValue(; w::Option{<:StatsBase.AbstractWeights} = nothing)
+    MeanValue(;
+        w::Option{<:ObsWeights} = nothing,
+    ) -> MeanValue
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 
@@ -829,14 +662,12 @@ julia> PortfolioOptimisers.vec_to_real_measure(MeanValue(), [1.2, 3.4, 0.7])
 @concrete struct MeanValue <: VectorToScalarMeasure
     "$(field_dict[:oow])"
     w
-    function MeanValue(w::Option{<:StatsBase.AbstractWeights})
-        if !isnothing(w)
-            @argcheck(!isempty(w), IsEmptyError)
-        end
+    function MeanValue(w::Option{<:ObsWeights})
+        validate_observation_weights(w)
         return new{typeof(w)}(w)
     end
 end
-function MeanValue(; w::Option{<:StatsBase.AbstractWeights} = nothing)
+function MeanValue(; w::Option{<:ObsWeights} = nothing)
     return MeanValue(w)
 end
 """
@@ -848,6 +679,10 @@ Construct a `MeanValue` instance with observation weights `w`.
 
   - `mv`: Instance to update.
   - $(arg_dict[:ow])
+
+# Returns
+
+  - `mv::MeanValue`: A new `MeanValue` with observation weights `w`.
 
 # Examples
 
@@ -862,7 +697,7 @@ MeanValue
   - [`MeanValue`](@ref)
   - [`factory`](@ref)
 """
-function factory(::MeanValue, w::StatsBase.AbstractWeights)
+function factory(::MeanValue, w::ObsWeights)
     return MeanValue(; w = w)
 end
 """
@@ -876,9 +711,11 @@ $(DocStringExtensions.FIELDS)
 
 # Constructors
 
-    MedianValue(; w::Option{<:StatsBase.AbstractWeights} = nothing)
+    MedianValue(;
+        w::Option{<:ObsWeights} = nothing,
+    ) -> MedianValue
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 
@@ -902,14 +739,12 @@ julia> PortfolioOptimisers.vec_to_real_measure(MedianValue(), [1.2, 3.4, 0.7])
 @concrete struct MedianValue <: VectorToScalarMeasure
     "$(field_dict[:oow])"
     w
-    function MedianValue(w::Option{<:StatsBase.AbstractWeights})
-        if !isnothing(w)
-            @argcheck(!isempty(w), IsEmptyError)
-        end
+    function MedianValue(w::Option{<:ObsWeights})
+        validate_observation_weights(w)
         return new{typeof(w)}(w)
     end
 end
-function MedianValue(; w::Option{<:StatsBase.AbstractWeights} = nothing)
+function MedianValue(; w::Option{<:ObsWeights} = nothing)
     return MedianValue(w)
 end
 """
@@ -921,6 +756,10 @@ Constructs a `MedianValue` instance with observation weights `w`.
 
   - `mv`: Instance to update.
   - $(arg_dict[:ow])
+
+# Returns
+
+  - `mdv::MedianValue`: A new `MedianValue` with observation weights `w`.
 
 # Examples
 
@@ -935,7 +774,7 @@ MedianValue
   - [`MedianValue`](@ref)
   - [`factory`](@ref)
 """
-function factory(::MedianValue, w::StatsBase.AbstractWeights)
+function factory(::MedianValue, w::ObsWeights)
     return MedianValue(; w = w)
 end
 """
@@ -970,9 +809,12 @@ $(DocStringExtensions.FIELDS)
 
 # Constructors
 
-    StdValue(; w::Option{<:StatsBase.AbstractWeights} = nothing, corrected::Bool = true)
+    StdValue(;
+        w::Option{<:ObsWeights} = nothing,
+        corrected::Bool = true,
+    ) -> StdValue
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 
@@ -996,17 +838,14 @@ julia> PortfolioOptimisers.vec_to_real_measure(StdValue(), [1.2, 3.4, 0.7])
 @concrete struct StdValue <: VectorToScalarMeasure
     "$(field_dict[:oow])"
     w
-    "Indicates whether to use Bessel's correction (`true` for sample standard deviation, `false` for population)."
+    "$(field_dict[:corrected])"
     corrected
-    function StdValue(w::Option{<:StatsBase.AbstractWeights}, corrected::Bool)
-        if !isnothing(w)
-            @argcheck(!isempty(w), IsEmptyError)
-        end
+    function StdValue(w::Option{<:ObsWeights}, corrected::Bool)
+        validate_observation_weights(w)
         return new{typeof(w), typeof(corrected)}(w, corrected)
     end
 end
-function StdValue(; w::Option{<:StatsBase.AbstractWeights} = nothing,
-                  corrected::Bool = true)
+function StdValue(; w::Option{<:ObsWeights} = nothing, corrected::Bool = true)
     return StdValue(w, corrected)
 end
 """
@@ -1018,6 +857,10 @@ Constructs a `StdValue` instance with observation weights `w`.
 
   - `sv`: Instance to update.
   - $(arg_dict[:ow])
+
+# Returns
+
+  - `sv::StdValue`: A new `StdValue` with observation weights `w`.
 
 # Examples
 
@@ -1033,7 +876,7 @@ StdValue
   - [`StdValue`](@ref)
   - [`factory`](@ref)
 """
-function factory(sv::StdValue, w::StatsBase.AbstractWeights)
+function factory(sv::StdValue, w::ObsWeights)
     return StdValue(; w = w, corrected = sv.corrected)
 end
 """
@@ -1047,9 +890,12 @@ $(DocStringExtensions.FIELDS)
 
 # Constructors
 
-    VarValue(; w::Option{<:StatsBase.AbstractWeights} = nothing, corrected::Bool = true)
+    VarValue(;
+        w::Option{<:ObsWeights} = nothing,
+        corrected::Bool = true,
+    ) -> VarValue
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 ## Validation
 
@@ -1075,15 +921,12 @@ julia> PortfolioOptimisers.vec_to_real_measure(VarValue(), [1.2, 3.4, 0.7])
     w
     "Indicates whether to use Bessel's correction (`true` for sample standard deviation, `false` for population)."
     corrected
-    function VarValue(w::Option{<:StatsBase.AbstractWeights}, corrected::Bool)
-        if !isnothing(w)
-            @argcheck(!isempty(w), IsEmptyError)
-        end
+    function VarValue(w::Option{<:ObsWeights}, corrected::Bool)
+        validate_observation_weights(w)
         return new{typeof(w), typeof(corrected)}(w, corrected)
     end
 end
-function VarValue(; w::Option{<:StatsBase.AbstractWeights} = nothing,
-                  corrected::Bool = true)
+function VarValue(; w::Option{<:ObsWeights} = nothing, corrected::Bool = true)
     return VarValue(w, corrected)
 end
 """
@@ -1095,6 +938,10 @@ Constructs a `VarValue` instance with observation weights `w`.
 
   - `vv`: Instance to update.
   - $(arg_dict[:ow])
+
+# Returns
+
+  - `vv::VarValue`: A new `VarValue` with observation weights `w`.
 
 # Examples
 
@@ -1110,7 +957,7 @@ VarValue
   - [`VarValue`](@ref)
   - [`factory`](@ref)
 """
-function factory(vv::VarValue, w::StatsBase.AbstractWeights)
+function factory(vv::VarValue, w::ObsWeights)
     return VarValue(; w = w, corrected = vv.corrected)
 end
 """
@@ -1184,9 +1031,12 @@ $(DocStringExtensions.FIELDS)
 
 # Constructors
 
-    StandardisedValue(; mv::MeanValue = MeanValue(), sv::StdValue = StdValue())
+    StandardisedValue(;
+        mv::MeanValue = MeanValue(),
+        sv::StdValue = StdValue(),
+    ) -> StandardisedValue
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 
@@ -1225,6 +1075,10 @@ Construct a `StandardisedValue` instance with observation weights `w` for both `
   - `msv`: Instance to update.
   - $(arg_dict[:ow])
 
+# Returns
+
+  - `msv::StandardisedValue`: A new `StandardisedValue` with observation weights `w` applied to both `mv` and `sv`.
+
 # Examples
 
 ```jldoctest
@@ -1244,11 +1098,11 @@ StandardisedValue
   - [`StdValue`](@ref)
   - [`factory`](@ref)
 """
-function factory(msv::StandardisedValue, w::StatsBase.AbstractWeights)
+function factory(msv::StandardisedValue, w::ObsWeights)
     return StandardisedValue(; mv = factory(msv.mv, w), sv = factory(msv.sv, w))
 end
 """
-    vec_to_real_measure(measure::Num_VecToScaM, val::VecNum) -> score::Number
+    vec_to_real_measure(measure::Num_VecToScaM, val::VecNum) -> Number
 
 Reduce a vector of real values to a single real value using a specified measure.
 

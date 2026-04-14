@@ -154,7 +154,7 @@ In this example we have tuned the weight of the negative skewness to demonstrate
 
 We will use the heirarchical equal risk contribution optimisation, precomputing the clustering results using the direct bubble hierarchy tree algorithm.
 
-The [`HierarchicalEqualRiskContribution`]-(@ref) optimisation estimator accepts inner and outer risk measures and inner and outer scalarisers.
+The [`HierarchicalEqualRiskContribution`](@ref) optimisation estimator accepts inner and outer risk measures and inner and outer scalarisers.
 
 ````@example 06_Multiple_Risk_Measures
 clr = clusterise(ClustersEstimator(; alg = DBHT()), pr.X)
@@ -233,7 +233,7 @@ pretty_table(DataFrame(:assets => rd.nx, :variance => results[1].w,
                        :log_sum_exp => results[6].w); formatters = [resfmt])
 ````
 
-Note how the max scalariser produced the same weights as the negative skewness and the min scalariser produced the same weights as the variance. This is because in all cases, the same the value of the negative skewness was greater than that of the variance. A similar behaviour can be observed with other clustering optimisers. [`NearOptimalCentering`]-(@ref) can also have unintuitive behaviour when computing the risk bounds with an effective frontier [`MaxScalariser`](@ref) and [`MinScalariser`](@ref) due to the fact that each point in the efficient frontier can have a different risk measure dominating the others.
+Note how the max scalariser produced the same weights as the negative skewness and the min scalariser produced the same weights as the variance. This is because in all cases, the same the value of the negative skewness was greater than that of the variance. A similar behaviour can be observed with other clustering optimisers. [`NearOptimalCentering`](@ref) can also have unintuitive behaviour when computing the risk bounds with an effective frontier [`MaxScalariser`](@ref) and [`MinScalariser`](@ref) due to the fact that each point in the efficient frontier can have a different risk measure dominating the others.
 
 ---
 

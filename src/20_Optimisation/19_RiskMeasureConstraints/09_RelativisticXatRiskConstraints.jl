@@ -1,3 +1,31 @@
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Add Relativistic Value-at-Risk, RLVaR range, or Relativistic Drawdown-at-Risk constraints to
+`model`.
+
+Each overload uses power cone constraints (`PowerCone`) to encode the Tsallis entropy-based
+risk measure parameterised by `kappa`. Auxiliary variables `t`, `z`, `omega`, `psi`,
+`theta`, and `epsilon` are introduced. The range variant encodes both a lower-tail and
+upper-tail relativistic expression.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - $(arg_dict[:ci])
+  - `r`: Risk measure instance with fields `alpha` and `kappa`.
+  - $(arg_dict[:opt_rjumpe])
+  - $(arg_dict[:pr_X])
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`set_drawdown_constraints!`](@ref)
+  - [`set_risk_bounds_and_expression!`](@ref)
+"""
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::RelativisticValueatRisk,
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; kwargs...)
@@ -24,6 +52,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::RelativisticValueat
     iopk = inv(opk)
     iomk = inv(omk)
     wi = nothing_scalar_array_selector(r.w, pr.w)
+    wi = get_observation_weights(wi, net_X)
     rlvar_risk = model[key] = if isnothing(wi)
         iat = inv(alpha * T)
         lnk = (iat^kappa - iat^(-kappa)) * ik2
@@ -71,6 +100,31 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::RelativisticValueat
     set_risk_bounds_and_expression!(model, opt, rlvar_risk, r.settings, key)
     return rlvar_risk
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Add JuMP risk constraints for `RelativisticValueatRiskRange` (RLVaR range) to `model`.
+
+Uses power cone constraints for both lower-tail and upper-tail Tsallis entropy-based
+risk measures parameterised by `kappa`, then computes their difference as the range risk.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - $(arg_dict[:ci])
+  - `r::RelativisticValueatRiskRange`: The RLVaR range risk measure.
+  - $(arg_dict[:opt_rjumpe])
+  - $(arg_dict[:pr_X])
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`RelativisticValueatRiskRange`](@ref)
+  - [`set_risk_constraints!`](@ref)
+"""
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::RelativisticValueatRiskRange,
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; kwargs...)
@@ -102,6 +156,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::RelativisticValueat
     ik2_a = inv(2 * kappa_a)
     ik2_b = inv(2 * kappa_b)
     wi = nothing_scalar_array_selector(r.w, pr.w)
+    wi = get_observation_weights(wi, net_X)
     rlvar_risk_l, rlvar_risk_h = model[Symbol(:rlvar_risk_l_, i)], model[Symbol(:rlvar_risk_h_, i)] = if isnothing(wi)
         iat = inv(alpha * T)
         ibt = inv(beta * T)
@@ -209,6 +264,32 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::RelativisticValueat
     set_risk_bounds_and_expression!(model, opt, rlvar_range_risk, r.settings, key)
     return rlvar_range_risk
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Add JuMP risk constraints for `RelativisticDrawdownatRisk` (RLDaR) to `model`.
+
+Uses power cone constraints applied to the drawdown series to encode the relativistic
+drawdown-at-risk parameterised by `kappa` at confidence level `r.alpha`.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - $(arg_dict[:ci])
+  - `r::RelativisticDrawdownatRisk`: The RLDaR risk measure.
+  - $(arg_dict[:opt_rjumpe])
+  - $(arg_dict[:pr_X])
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`RelativisticDrawdownatRisk`](@ref)
+  - [`set_drawdown_constraints!`](@ref)
+  - [`set_risk_constraints!`](@ref)
+"""
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::RelativisticDrawdownatRisk,
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; kwargs...)
@@ -237,6 +318,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::RelativisticDrawdow
                                                                                                                                                                                                                                                                                               [1:T]
                                                                                                                                                                                                                                                                                           end)
     wi = nothing_scalar_array_selector(r.w, pr.w)
+    wi = get_observation_weights(wi, pr.X)
     rldar_risk = model[key] = if isnothing(wi)
         iat = inv(alpha * T)
         lnk = (iat^kappa - iat^(-kappa)) * ik2

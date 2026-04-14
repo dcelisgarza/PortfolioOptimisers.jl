@@ -1,3 +1,31 @@
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Add conditional risk constraints (CVaR, DRCVaR, CDaR, and their range/DR variants) to `model`.
+
+Each overload introduces auxiliary non-negative exceedance variables and constructs the
+appropriate weighted-sum CVaR (or CDaR) expression. The distributionally robust variants add
+infinity-norm cone constraints to handle distributional ambiguity over an `r.r`-radius ball.
+Range variants compute the difference between lower-tail and upper-tail conditional
+risk expressions.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - $(arg_dict[:ci])
+  - $(arg_dict[:r_risk])
+  - $(arg_dict[:opt_rjumpe])
+  - $(arg_dict[:pr_X])
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`set_drawdown_constraints!`](@ref)
+  - [`set_risk_bounds_and_expression!`](@ref)
+"""
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::ConditionalValueatRisk,
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; kwargs...)
@@ -12,6 +40,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::ConditionalValueatR
                                                                                             (lower_bound = 0)
                                                                                         end)
     wi = nothing_scalar_array_selector(r.w, pr.w)
+    wi = get_observation_weights(wi, net_X)
     cvar_risk = model[key] = if isnothing(wi)
         iat = inv(r.alpha * T)
         JuMP.@expression(model, var + sum(z_cvar) * iat)
@@ -23,6 +52,31 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::ConditionalValueatR
     set_risk_bounds_and_expression!(model, opt, cvar_risk, r.settings, key)
     return cvar_risk
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Add JuMP risk constraints for `ConditionalValueatRiskRange` to `model`.
+
+Introduces lower-tail and upper-tail CVaR variables and auxiliary exceedance variables,
+then computes the CVaR range as their difference.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - $(arg_dict[:ci])
+  - `r::ConditionalValueatRiskRange`: The CVaR range risk measure.
+  - $(arg_dict[:opt_rjumpe])
+  - $(arg_dict[:pr_X])
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`ConditionalValueatRiskRange`](@ref)
+  - [`set_risk_constraints!`](@ref)
+"""
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::ConditionalValueatRiskRange,
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; kwargs...)
@@ -40,6 +94,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::ConditionalValueatR
                                                                                                                                                                               (upper_bound = 0)
                                                                                                                                                                           end)
     wi = nothing_scalar_array_selector(r.w, pr.w)
+    wi = get_observation_weights(wi, net_X)
     cvar_risk_l, cvar_risk_h = if isnothing(wi)
         iat = inv(r.alpha * T)
         ibt = inv(r.beta * T)
@@ -85,6 +140,32 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::ConditionalValueatR
     set_risk_bounds_and_expression!(model, opt, cvar_range_risk, r.settings, key)
     return cvar_range_risk
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Add JuMP risk constraints for `DistributionallyRobustConditionalValueatRisk` (DR-CVaR)
+to `model`.
+
+Adds an infinity-norm cone constraint over an `r.r`-radius Wasserstein ambiguity ball and
+auxiliary exceedance variables to encode the distributionally robust CVaR.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - $(arg_dict[:ci])
+  - `r::DistributionallyRobustConditionalValueatRisk`: The DR-CVaR risk measure.
+  - $(arg_dict[:opt_rjumpe])
+  - $(arg_dict[:pr_X])
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`DistributionallyRobustConditionalValueatRisk`](@ref)
+  - [`set_risk_constraints!`](@ref)
+"""
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::DistributionallyRobustConditionalValueatRisk,
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
@@ -172,6 +253,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                                                                                                                                                                                                                            0
                                                                                                                                                                                                                                        end)
     wi = nothing_scalar_array_selector(r.w, pr.w)
+    wi = get_observation_weights(wi, net_X)
     drcvar_risk = model[key] = if isnothing(wi)
         JuMP.@expression(model, radius * lb + Statistics.mean(s))
     else
@@ -180,6 +262,32 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     set_risk_bounds_and_expression!(model, opt, drcvar_risk, r.settings, key)
     return drcvar_risk
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Add JuMP risk constraints for `DistributionallyRobustConditionalValueatRiskRange`
+(DR-CVaR range) to `model`.
+
+Encodes both lower-tail and upper-tail distributionally robust CVaR expressions using
+Wasserstein ambiguity ball constraints, then computes their difference as the range risk.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - $(arg_dict[:ci])
+  - `r::DistributionallyRobustConditionalValueatRiskRange`: The DR-CVaR range risk measure.
+  - $(arg_dict[:opt_rjumpe])
+  - $(arg_dict[:pr_X])
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`DistributionallyRobustConditionalValueatRiskRange`](@ref)
+  - [`set_risk_constraints!`](@ref)
+"""
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::DistributionallyRobustConditionalValueatRiskRange,
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
@@ -336,6 +444,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    0
                                                                                                                                                                                                                                                                                                                                                                                                                                                                                end)
     wi = nothing_scalar_array_selector(r.w, pr.w)
+    wi = get_observation_weights(wi, net_X)
     drcvar_risk_l, drcvar_risk_h = model[Symbol(:drcvar_risk_l_, i)], model[Symbol(:drcvar_risk_h_, i)] = if isnothing(wi)
         JuMP.@expressions(model, begin
                               radius_l * lb_l + Statistics.mean(s_l)
@@ -351,6 +460,32 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     set_risk_bounds_and_expression!(model, opt, drcvar_risk_range, r.settings, key)
     return drcvar_risk_range
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Add JuMP risk constraints for `ConditionalDrawdownatRisk` (CDaR) to `model`.
+
+Introduces a drawdown-at-risk variable and non-negative exceedance variables over the
+drawdown series. The CDaR risk expression is the expected shortfall over drawdowns.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - $(arg_dict[:ci])
+  - `r::ConditionalDrawdownatRisk`: The CDaR risk measure.
+  - $(arg_dict[:opt_rjumpe])
+  - $(arg_dict[:pr_X])
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`ConditionalDrawdownatRisk`](@ref)
+  - [`set_drawdown_constraints!`](@ref)
+  - [`set_risk_constraints!`](@ref)
+"""
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::ConditionalDrawdownatRisk,
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; kwargs...)
@@ -366,6 +501,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::ConditionalDrawdown
                                                                                             (lower_bound = 0)
                                                                                         end)
     wi = nothing_scalar_array_selector(r.w, pr.w)
+    wi = get_observation_weights(wi, pr.X)
     cdar_risk = model[key] = if isnothing(wi)
         iat = inv(r.alpha * T)
         JuMP.@expression(model, dar + sum(z_cdar) * iat)
@@ -380,6 +516,33 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::ConditionalDrawdown
     set_risk_bounds_and_expression!(model, opt, cdar_risk, r.settings, key)
     return cdar_risk
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Add JuMP risk constraints for `DistributionallyRobustConditionalDrawdownatRisk`
+(DR-CDaR) to `model`.
+
+Encodes a distributionally robust CDaR using Wasserstein ambiguity ball constraints
+applied to the drawdown series.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - $(arg_dict[:ci])
+  - `r::DistributionallyRobustConditionalDrawdownatRisk`: The DR-CDaR risk measure.
+  - $(arg_dict[:opt_rjumpe])
+  - $(arg_dict[:pr_X])
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`DistributionallyRobustConditionalDrawdownatRisk`](@ref)
+  - [`set_drawdown_constraints!`](@ref)
+  - [`set_risk_constraints!`](@ref)
+"""
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::DistributionallyRobustConditionalDrawdownatRisk,
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
@@ -469,6 +632,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                                                                                                                                                                                                                            0
                                                                                                                                                                                                                                        end)
     wi = nothing_scalar_array_selector(r.w, pr.w)
+    wi = get_observation_weights(wi, pr.X)
     drcdar_risk = model[key] = if isnothing(wi)
         JuMP.@expression(model, radius * lb + Statistics.mean(s))
     else

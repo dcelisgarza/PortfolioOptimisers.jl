@@ -1,11 +1,5 @@
 """
-    struct DistanceCovariance{T1, T2, T3, T4, T5} <: AbstractCovarianceEstimator
-        dist::T1
-        args::T2
-        kwargs::T3
-        w::T4
-        ex::T5
-    end
+$(DocStringExtensions.TYPEDEF)
 
 A flexible container type for configuring and applying distance-based covariance estimators in `PortfolioOptimisers.jl`.
 
@@ -13,26 +7,26 @@ A flexible container type for configuring and applying distance-based covariance
 
 # Fields
 
-  - `dist`: Distance metric used for pairwise computations.
-  - `args`: Additional positional arguments for the distance metric.
-  - `kwargs`: Additional keyword arguments for the distance metric.
-  - `w`: Optional weights for observations.
-  - `ex`: Parallel execution strategy.
+$(DocStringExtensions.FIELDS)
 
-# Constructor
+# Constructors
 
-    DistanceCovariance(; dist::Distances.Metric = Distances.Euclidean(), args::Tuple = (),
-                       kwargs::NamedTuple = (;), w::Option{<:StatsBase.AbstractWeights} = nothing,
-                       ex::FLoops.Transducers.Executor = ThreadedEx())
+    DistanceCovariance(;
+        metric::Distances.Metric = Distances.Euclidean(),
+        args::Tuple = (),
+        kwargs::NamedTuple = (;),
+        w::Option{<:ObsWeights} = nothing,
+        ex::FLoops.Transducers.Executor = ThreadedEx()
+    ) -> DistanceCovariance
 
-Keyword arguments correspond to the fields above.
+Keywords correspond to the struct's fields.
 
 # Examples
 
 ```jldoctest
 julia> DistanceCovariance()
 DistanceCovariance
-    dist ┼ Distances.Euclidean: Distances.Euclidean(0.0)
+  metric ┼ Distances.Euclidean: Distances.Euclidean(0.0)
     args ┼ Tuple{}: ()
   kwargs ┼ @NamedTuple{}: NamedTuple()
        w ┼ nothing
@@ -47,29 +41,85 @@ DistanceCovariance
   - [`FLoops.Transducers.Executor`](https://juliafolds2.github.io/FLoops.jl/dev/tutorials/parallel/#tutorials-ex)
 """
 @concrete struct DistanceCovariance <: AbstractCovarianceEstimator
-    dist
+    "$(arg_dict[:metric])"
+    metric
+    "$(arg_dict[:metric_args])"
     args
+    "$(arg_dict[:metric_kwargs])"
     kwargs
+    "$(arg_dict[:oow])"
     w
+    "$(arg_dict[:ex])"
     ex
-    function DistanceCovariance(dist::Distances.Metric, args::Tuple, kwargs::NamedTuple,
-                                w::Option{<:StatsBase.AbstractWeights},
-                                ex::FLoops.Transducers.Executor)
-        return new{typeof(dist), typeof(args), typeof(kwargs), typeof(w), typeof(ex)}(dist,
-                                                                                      args,
-                                                                                      kwargs,
-                                                                                      w, ex)
+    function DistanceCovariance(metric::Distances.Metric, args::Tuple, kwargs::NamedTuple,
+                                w::Option{<:ObsWeights}, ex::FLoops.Transducers.Executor)
+        validate_observation_weights(w)
+        return new{typeof(metric), typeof(args), typeof(kwargs), typeof(w), typeof(ex)}(metric,
+                                                                                        args,
+                                                                                        kwargs,
+                                                                                        w,
+                                                                                        ex)
     end
 end
-function DistanceCovariance(; dist::Distances.Metric = Distances.Euclidean(),
+function DistanceCovariance(; metric::Distances.Metric = Distances.Euclidean(),
                             args::Tuple = (), kwargs::NamedTuple = (;),
-                            w::Option{<:StatsBase.AbstractWeights} = nothing,
+                            w::Option{<:ObsWeights} = nothing,
                             ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())
-    return DistanceCovariance(dist, args, kwargs, w, ex)
+    return DistanceCovariance(metric, args, kwargs, w, ex)
 end
-function factory(ce::DistanceCovariance, w::StatsBase.AbstractWeights)
-    return DistanceCovariance(; dist = ce.dist, args = ce.args, kwargs = ce.kwargs, w = w,
-                              ex = ce.ex)
+"""
+    factory(ce::DistanceCovariance, w::ObsWeights) -> DistanceCovariance
+
+Return a new [`DistanceCovariance`](@ref) estimator with observation weights `w`.
+
+# Arguments
+
+  - $(arg_dict[:ce])
+  - $(arg_dict[:ow])
+
+# Returns
+
+  - $(ret_dict[:ce])
+
+# Related
+
+  - [`DistanceCovariance`](@ref)
+  - [`factory`](@ref)
+"""
+function factory(ce::DistanceCovariance, w::ObsWeights)
+    return DistanceCovariance(; metric = ce.metric, args = ce.args, kwargs = ce.kwargs,
+                              w = w, ex = ce.ex)
+end
+"""
+    calc_pairwise_dists(ce::DistanceCovariance, v1, v2, w)
+
+Compute pairwise distance matrices between two vectors using the configured metric.
+
+Internal helper used in distance correlation computation. Handles weighted and unweighted cases.
+
+# Arguments
+
+  - `ce`: [`DistanceCovariance`](@ref) estimator with metric configuration.
+  - `v1`, `v2`: Data vectors.
+  - `w`: Observation weights (`nothing` for unweighted, `StatsBase.AbstractWeights` for weighted).
+
+# Returns
+
+  - Tuple of pairwise distance matrices `(D1, D2)`.
+
+# Related
+
+  - [`DistanceCovariance`](@ref)
+  - [`cor_distance`](@ref)
+"""
+function calc_pairwise_dists(ce::DistanceCovariance, v1::VecNum, v2::VecNum, ::Nothing)
+    return Distances.pairwise(ce.metric, v1, ce.args...; ce.kwargs...),
+           Distances.pairwise(ce.metric, v2, ce.args...; ce.kwargs...)
+end
+function calc_pairwise_dists(ce::DistanceCovariance, v1::VecNum, v2::VecNum,
+                             w::StatsBase.AbstractWeights)
+    return Distances.pairwise(ce.metric, v1 ⊙ w, ce.args...; ce.kwargs...),
+           Distances.pairwise(ce.metric, v2 ⊙ w, ce.args...; ce.kwargs...)
 end
 """
     cor_distance(ce::DistanceCovariance, v1::VecNum, v2::VecNum)
@@ -104,18 +154,13 @@ This function computes the distance correlation between `v1` and `v2` using the 
   - [`DistanceCovariance`](@ref)
   - [`cor_distance(ce::DistanceCovariance, X::MatNum)`](@ref)
 """
-function cor_distance(ce::DistanceCovariance, v1::VecNum, v2::VecNum)
+function cor_distance(ce::DistanceCovariance, v1::VecNum, v2::VecNum,
+                      w::Option{<:StatsBase.AbstractWeights} = nothing)
     N = length(v1)
     @argcheck(1 < N, DimensionMismatch("1 < length(v1) must hold. Got\nlength(v1) => $N"))
     @argcheck(N == length(v2), DimensionMismatch)
     N2 = N^2
-    a, b = if isnothing(ce.w)
-        Distances.pairwise(ce.dist, v1, ce.args...; ce.kwargs...),
-        Distances.pairwise(ce.dist, v2, ce.args...; ce.kwargs...)
-    else
-        Distances.pairwise(ce.dist, v1 ⊙ ce.w, ce.args...; ce.kwargs...),
-        Distances.pairwise(ce.dist, v2 ⊙ ce.w, ce.args...; ce.kwargs...)
-    end
+    a, b = calc_pairwise_dists(ce, v1, v2, w)
     mu_a1, mu_b1 = Statistics.mean(a; dims = 1), Statistics.mean(b; dims = 1)
     mu_a2, mu_b2 = Statistics.mean(a; dims = 2), Statistics.mean(b; dims = 2)
     mu_a3, mu_b3 = Statistics.mean(a), Statistics.mean(b)
@@ -152,13 +197,14 @@ This function computes the distance correlation between each pair of columns in 
   - [`DistanceCovariance`](@ref)
   - [`cor_distance(ce::DistanceCovariance, v1::VecNum, v2::VecNum)`](@ref)
 """
-function cor_distance(ce::DistanceCovariance, X::MatNum)
+function cor_distance(ce::DistanceCovariance, X::MatNum,
+                      w::Option{<:StatsBase.AbstractWeights} = nothing)
     N = size(X, 2)
     rho = Matrix{eltype(X)}(undef, N, N)
     FLoops.@floop ce.ex for j in axes(X, 2)
         xj = view(X, :, j)
         for i in 1:j
-            rho[j, i] = rho[i, j] = cor_distance(ce, view(X, :, i), xj)
+            rho[j, i] = rho[i, j] = cor_distance(ce, view(X, :, i), xj, w)
         end
     end
     return rho
@@ -188,7 +234,7 @@ Compute the pairwise distance correlation matrix for all columns in a data matri
 ```jldoctest
 julia> ce = DistanceCovariance()
 DistanceCovariance
-    dist ┼ Distances.Euclidean: Distances.Euclidean(0.0)
+  metric ┼ Distances.Euclidean: Distances.Euclidean(0.0)
     args ┼ Tuple{}: ()
   kwargs ┼ @NamedTuple{}: NamedTuple()
        w ┼ nothing
@@ -213,7 +259,8 @@ function Statistics.cor(ce::DistanceCovariance, X::MatNum; dims::Int = 1, kwargs
     if dims == 2
         X = transpose(X)
     end
-    return cor_distance(ce, X)
+    w = get_observation_weights(ce.w, X)
+    return cor_distance(ce, X, w)
 end
 """
     cov_distance(ce::DistanceCovariance, v1::VecNum, v2::VecNum)
@@ -248,18 +295,13 @@ This function computes the distance covariance between `v1` and `v2` using the s
   - [`DistanceCovariance`](@ref)
   - [`cov_distance(ce::DistanceCovariance, X::MatNum)`](@ref)
 """
-function cov_distance(ce::DistanceCovariance, v1::VecNum, v2::VecNum)
+function cov_distance(ce::DistanceCovariance, v1::VecNum, v2::VecNum,
+                      w::Option{<:StatsBase.AbstractWeights} = nothing)
     N = length(v1)
     @argcheck(1 < N, DimensionMismatch("1 < length(v1) must hold. Got\nlength(v1) => $N"))
     @argcheck(N == length(v2), DimensionMismatch)
     N2 = N^2
-    a, b = if isnothing(ce.w)
-        Distances.pairwise(ce.dist, v1, ce.args...; ce.kwargs...),
-        Distances.pairwise(ce.dist, v2, ce.args...; ce.kwargs...)
-    else
-        Distances.pairwise(ce.dist, v1 ⊙ ce.w, ce.args...; ce.kwargs...),
-        Distances.pairwise(ce.dist, v2 ⊙ ce.w, ce.args...; ce.kwargs...)
-    end
+    a, b = calc_pairwise_dists(ce, v1, v2, w)
     mu_a1, mu_b1 = Statistics.mean(a; dims = 1), Statistics.mean(b; dims = 1)
     mu_a2, mu_b2 = Statistics.mean(a; dims = 2), Statistics.mean(b; dims = 2)
     mu_a3, mu_b3 = Statistics.mean(a), Statistics.mean(b)
@@ -294,13 +336,14 @@ This function computes the distance covariance between each pair of columns in `
   - [`DistanceCovariance`](@ref)
   - [`cov_distance(ce::DistanceCovariance, v1::VecNum, v2::VecNum)`](@ref)
 """
-function cov_distance(ce::DistanceCovariance, X::MatNum)
+function cov_distance(ce::DistanceCovariance, X::MatNum,
+                      w::Option{<:StatsBase.AbstractWeights} = nothing)
     N = size(X, 2)
     rho = Matrix{eltype(X)}(undef, N, N)
     FLoops.@floop ce.ex for j in axes(X, 2)
         xj = view(X, :, j)
         for i in 1:j
-            rho[j, i] = rho[i, j] = cov_distance(ce, view(X, :, i), xj)
+            rho[j, i] = rho[i, j] = cov_distance(ce, view(X, :, i), xj, w)
         end
     end
     return rho
@@ -330,7 +373,7 @@ Compute the pairwise distance covariance matrix for all columns in a data matrix
 ```jldoctest
 julia> ce = DistanceCovariance()
 DistanceCovariance
-    dist ┼ Distances.Euclidean: Distances.Euclidean(0.0)
+  metric ┼ Distances.Euclidean: Distances.Euclidean(0.0)
     args ┼ Tuple{}: ()
   kwargs ┼ @NamedTuple{}: NamedTuple()
        w ┼ nothing
@@ -355,7 +398,8 @@ function Statistics.cov(ce::DistanceCovariance, X::MatNum; dims::Int = 1, kwargs
     if dims == 2
         X = transpose(X)
     end
-    return cov_distance(ce, X)
+    w = get_observation_weights(ce.w, X)
+    return cov_distance(ce, X, w)
 end
 
 export DistanceCovariance
