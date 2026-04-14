@@ -457,6 +457,19 @@
                                                         opti = RiskBudgeting(; opt = jopti),
                                                         opto = RiskBudgeting(; opt = jopto)),
                                         rd).w, res.w)
+
+                @test isapprox(optimise(NestedClustered(; cle = clr,
+                                                        opti = RiskBudgeting(;
+                                                                             rba = AssetRiskBudgeting(;
+                                                                                                      sets = sets,
+                                                                                                      alg = LogRiskBudgeting(z = ones(Int,
+                                                                                                                                      size(rd.X,
+                                                                                                                                           2))),
+                                                                                                      rkb = RiskBudgetEstimator(;
+                                                                                                                                val = UniformValues())),
+                                                                             opt = jopti),
+                                                        opto = RiskBudgeting(; opt = jopto)),
+                                        rd).w, res.w, rtol = 5e-5)
             end
             rtol = if i in (2, 16)
                 5e-5

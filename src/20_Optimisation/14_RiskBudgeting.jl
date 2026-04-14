@@ -85,18 +85,46 @@ Abstract supertype for risk budgeting optimisation formulations.
 """
 abstract type RiskBudgetingFormulation <: OptimisationAlgorithm end
 """
+risk_budgeting_formulation_view(::RiskBudgetingFormulation, args...) -> nothing
+"""
+function risk_budgeting_formulation_view(::RiskBudgetingFormulation, args...)
+    return nothing
+end
+"""
 $(DocStringExtensions.TYPEDEF)
 
 Log-barrier formulation for Risk Budgeting.
 
-Uses a logarithmic objective to enforce the risk budget constraints. This can only produce positive weights.
+Uses a logarithmic objective to enforce the risk budget constraints. Can provide an optional orthant vector to allow for negative weights in specific assets.
+
+# Arguments
+
+  - `z::Option{<:VecInt}`: Optional orthant vector defining which asset can have negative weights. If nothing all assets will have positive weights.
 
 # Related Types
 
   - [`RiskBudgetingFormulation`](@ref)
   - [`MixedIntegerRiskBudgeting`](@ref)
 """
-struct LogRiskBudgeting <: RiskBudgetingFormulation end
+@concrete struct LogRiskBudgeting{T} <: RiskBudgetingFormulation
+    z::T
+    function LogRiskBudgeting(z::Option{<:VecInt})
+        if !isnothing(z)
+            @argcheck(!isempty(z))
+            @argcheck(all(x->abs(x) == 1, z))
+        end
+        return new{typeof(z)}(z)
+    end
+end
+function LogRiskBudgeting(; z::Option{<:VecInt} = nothing)
+    return LogRiskBudgeting(z)
+end
+function risk_budgeting_formulation_view(alg::LogRiskBudgeting{Nothing}, i)
+    return alg
+end
+function risk_budgeting_formulation_view(alg::LogRiskBudgeting{<:VecInt}, i)
+    return LogRiskBudgeting(; z = view(alg.z, i))
+end
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -192,7 +220,8 @@ Used in hierarchical optimisation to slice risk budget and asset set configurati
 function risk_budgeting_algorithm_view(r::AssetRiskBudgeting, i)
     rkb = risk_budget_view(r.rkb, i)
     sets = asset_sets_view(r.sets, i)
-    return AssetRiskBudgeting(; rkb = rkb, sets = sets, alg = r.alg)
+    alg = risk_budgeting_formulation_view(r.alg, i)
+    return AssetRiskBudgeting(; rkb = rkb, sets = sets, alg = alg)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -368,7 +397,6 @@ Configures the equality constraints ensuring each asset's marginal risk contribu
 # Related
 
   - [`RiskBudgeting`](@ref)
-  - [`_set_mip_risk_budgeting_constraints!`](@ref)
 """
 function _set_risk_budgeting_constraints!(model::JuMP.Model, rb::RiskBudgeting,
                                           w::VecJuMPScalar; strict::Bool = false)
@@ -418,12 +446,33 @@ function set_risk_budgeting_constraints!(model::JuMP.Model,
                                          rb::RiskBudgeting{<:Any, <:Any,
                                                            <:AssetRiskBudgeting{<:Any,
                                                                                 <:Any,
-                                                                                <:LogRiskBudgeting},
+                                                                                <:LogRiskBudgeting{Nothing}},
                                                            <:Any}, pr::AbstractPriorResult,
                                          wb::WeightBounds, args...)
     set_w!(model, pr.X, rb.wi)
     rkb = _set_risk_budgeting_constraints!(model, rb, model[:w]; strict = rb.opt.strict)
     set_weight_constraints!(model, wb, rb.opt.bgt, nothing, true)
+    return ProcessedAssetRiskBudgetingAttributes(rkb)
+end
+function set_risk_budgeting_constraints!(model::JuMP.Model,
+                                         rb::RiskBudgeting{<:Any, <:Any,
+                                                           <:AssetRiskBudgeting{<:Any,
+                                                                                <:Any,
+                                                                                <:LogRiskBudgeting{<:VecInt}},
+                                                           <:Any}, pr::AbstractPriorResult,
+                                         wb::WeightBounds, args...)
+    set_w!(model, pr.X, rb.wi)
+    z = rb.rba.alg.z
+    @argcheck(length(z) == length(model[:w]))
+    w = z .* model[:w]
+    rkb = _set_risk_budgeting_constraints!(model, rb, w; strict = rb.opt.strict)
+    sc = model[:sc]
+    k = model[:k]
+    JuMP.@constraints(model, begin
+                          mipcrkb, sc * (sum(w) - k) >= 0
+                          orthcrkb, sc * w >= 0
+                      end)
+    set_weight_constraints!(model, wb, rb.opt.bgt, rb.opt.sbgt)
     return ProcessedAssetRiskBudgetingAttributes(rkb)
 end
 function set_risk_budgeting_constraints!(model::JuMP.Model,
@@ -469,49 +518,6 @@ function set_rb_mip_w!(model::JuMP.Model, X::MatNum)
                       end)
     return nothing
 end
-"""
-    _set_mip_risk_budgeting_constraints!(model, rb, ...)
-
-Internal function to set mixed-integer risk budgeting constraints in the JuMP model.
-
-Configures binary variable constraints for MIP-based risk budgeting, where each asset's inclusion is a binary decision variable.
-
-# Arguments
-
-  - `model`: JuMP model.
-  - `rb`: [`RiskBudgeting`](@ref) optimiser configuration.
-  - Additional parameters.
-
-# Returns
-
-  - `nothing`.
-
-# Related
-
-  - [`_set_risk_budgeting_constraints!`](@ref)
-  - [`RiskBudgeting`](@ref)
-"""
-function _set_mip_risk_budgeting_constraints!(model::JuMP.Model, rb::RiskBudgeting,
-                                              w::VecJuMPScalar, w_obj::VecJuMPScalar;
-                                              strict::Bool = false)
-    N = length(w)
-    rkb = risk_budget_constraints(rb.rba.rkb, rb.rba.sets; N = N, strict = strict)
-    rb = rkb.val
-    @argcheck(length(rb) == N)
-    sc = model[:sc]
-    JuMP.@variables(model, begin
-                        k
-                        log_w[1:N]
-                    end)
-    JuMP.@constraints(model,
-                      begin
-                          clog_w[i = 1:N],
-                          [sc * log_w[i], sc, sc * w_obj[i]] in JuMP.MOI.ExponentialCone()
-                          crkb, sc * LinearAlgebra.dot(rb, log_w) >= 0
-                          mipcrkb, sc * (sum(w) - k) >= 0
-                      end)
-    return rkb
-end
 function set_risk_budgeting_constraints!(model::JuMP.Model,
                                          rb::RiskBudgeting{<:Any, <:Any,
                                                            <:AssetRiskBudgeting{<:Any,
@@ -520,8 +526,11 @@ function set_risk_budgeting_constraints!(model::JuMP.Model,
                                                            <:Any}, pr::AbstractPriorResult,
                                          wb::WeightBounds, args...)
     set_rb_mip_w!(model, pr.X)
-    rkb = _set_mip_risk_budgeting_constraints!(model, rb, model[:w], model[:w_obj];
-                                               strict = rb.opt.strict)
+    rkb = _set_risk_budgeting_constraints!(model, rb, model[:w_obj]; strict = rb.opt.strict)
+    w = model[:w]
+    sc = model[:sc]
+    k = model[:k]
+    JuMP.@constraint(model, mipcrkb, sc * (sum(w) - k) >= 0)
     set_weight_constraints!(model, wb, rb.opt.bgt, rb.opt.sbgt)
     return ProcessedAssetRiskBudgetingAttributes(rkb)
 end

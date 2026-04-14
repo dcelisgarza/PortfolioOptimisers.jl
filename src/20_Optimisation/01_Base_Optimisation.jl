@@ -797,8 +797,8 @@ function expected_risk(r::AbstractBaseRiskMeasure, res::OptimisationResult,
         pr
     elseif isnothing(pr) && hasproperty(res, :pr)
         res.pr
-    elseif isnothing(pr) && hasproperty(res, :opt) && hasproperty(res.opt, :pr)
-        res.opt.pr
+    elseif isnothing(pr) && hasproperty(res, :pa) && hasproperty(res.pa, :pr)
+        res.pa.pr
     else
         throw(ArgumentError("`res` is a $(Base.typename(typeof(res)).wrapper), which does not have a valid `res.pr` or `res.opt.pr` field, please provide `pr` or a data matrix as an argument"))
     end

@@ -521,6 +521,34 @@
                         10.963933763939947], rtol = 5e-4)
 
         rb = RiskBudgeting(; r = r, opt = opt,
+                           rba = AssetRiskBudgeting(;
+                                                    alg = LogRiskBudgeting(z = [-1, -1, -1,
+                                                                                -1, 1, -1,
+                                                                                1, 1, 1, 1])))
+        res1 = optimise(rb, rd2)
+        idx = isone.(rb.rba.alg.z)
+        @test all(res1.w[idx] .>= 0)
+        @test all(res1.w[.!idx] .< 0)
+        v1 = minimum(rkc)
+        v2 = maximum(rkc)
+        @test isapprox(v2 / v1, 1; rtol = 5e-4)
+        @test isapprox(res.w/sum(res.w), res1.w/sum(res1.w), rtol = 1e-3)
+
+        rb = RiskBudgeting(; r = r, opt = opt,
+                           rba = AssetRiskBudgeting(;
+                                                    alg = LogRiskBudgeting(z = [-1, 1, -1,
+                                                                                1, -1, 1,
+                                                                                -1, 1, -1,
+                                                                                1])))
+        res1 = optimise(rb, rd2)
+        idx = isone.(rb.rba.alg.z)
+        @test all(res1.w[idx] .>= 0)
+        @test all(res1.w[.!idx] .< 0)
+        v1 = minimum(rkc)
+        v2 = maximum(rkc)
+        @test isapprox(v2 / v1, 1; rtol = 5e-4)
+
+        rb = RiskBudgeting(; r = r, opt = opt,
                            rba = AssetRiskBudgeting(; alg = MixedIntegerRiskBudgeting(),
                                                     rkb = RiskBudget(; val = 1:10)))
         res = optimise(rb, rd2)
@@ -535,6 +563,14 @@
                         -3.5475446827000723, 5.25869258317521, -3.557616841873538,
                         3.737346772646009, 3.54749774747547, 1.626855992937381,
                         3.665078207675533], rtol = 5e-4)
+
+        rb = RiskBudgeting(; r = r, opt = opt,
+                           rba = AssetRiskBudgeting(; rkb = RiskBudget(; val = 1:10),
+                                                    alg = LogRiskBudgeting(z = [-1, -1, -1,
+                                                                                -1, 1, -1,
+                                                                                1, 1, 1, 1])))
+        res1 = optimise(rb, rd2)
+        @test isapprox(res.w/sum(res.w), res1.w/sum(res1.w), rtol = 5e-4)
 
         opt = JuMPOptimiser(; pe = pr2, slv = mip_slv, sbgt = nothing, bgt = nothing,
                             wb = nothing,
