@@ -379,4 +379,5 @@ function do_process(a::MyConcreteCustomProcess2, b::Real, c::Integer)
     do_algorithm(a.alg, c)
     return nothing
 end
+
 ```
