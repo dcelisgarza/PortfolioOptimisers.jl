@@ -40,3 +40,5 @@ The same should be done when referencing specific methods of functions. For exam
 
 [`my_function(a::Int, b::Int, args...; kwargs...)`](@ref)
 [`my_function(a::Tuple{Float64, <:Real}, b::Float64, args...; kwargs...)`](@ref)
+
+These references can be placed inside standard markdown (including inside docstrings themselves).
