@@ -681,7 +681,14 @@ end
         args...;
         dims = dims,
         kwargs...
-    ) -> (typeof)
+    ) -> (VecNum_MatNum, Option{<:StatsBase.AbstractWeights})
+    moment_window_and_weights(
+        X::VecNum_MatNum,
+        w::Option{<:ObsWeights},
+        window::Int_VecInt;
+        dims = dims,
+        kwargs...
+    ) -> (VecNum_MatNum, Option{<:StatsBase.AbstractWeights})
 
 Apply the observation window and resolve weights for moment estimation.
 
@@ -689,15 +696,28 @@ Slices `X` to the last `window` observations (if provided) and resolves the obse
 
 # Arguments
 
-  - `X`: Data matrix or vector.
-  - `w`: Observation weights ([`ObsWeights`](@ref) or `nothing`).
-  - `args...`: Additional arguments (e.g., window size).
-  - `dims`: Observation dimension (default `1`).
-  - `kwargs...`: Additional keyword arguments.
+  - $(arg_dict[:X_Xv])
+  - $(arg_dict[:oow])
+  - Either:
+      + $(arg_dict[:ignargs])
+      + $(arg_dict[:window])
+  - $(arg_dict[:dims]) Ignored if `X` is a vector.
+  - $(arg_dict[:ignkwargs])
 
 # Returns
 
-  - `(X_windowed, w_resolved)`: Tuple of windowed data and resolved weights.
+  - `X::VecNum_MatNum`: Appropriately windowed data matrix.
+  - `w::Option{<:StatsBase.AbstractWeights}`: Resolved and appropriately windowed weights.
+
+# Details
+
+  - If `window` is provided:
+      + Calls [`get_window`](@ref) on `X`.
+      + Gets the appropriate view of `X` given its type, the resolved value of `window`, and the value of `dims`.
+      + Calls [`nothing_scalar_array_getindex`](@ref) on `w` to resolve the windowed weights.
+  - If no `window` is provided:
+      + Calls [`get_observation_weights`](@ref) on `w` to resolve the weights.
+  - Returns the appropriate `X` and `w`.
 
 # Related
 

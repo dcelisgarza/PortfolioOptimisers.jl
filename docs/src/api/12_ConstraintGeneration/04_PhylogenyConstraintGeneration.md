@@ -12,5 +12,4 @@ AbstractPhylogenyConstraintEstimator
 AbstractPhylogenyConstraintResult
 _validate_length_integer_phylogeny_constraint_B
 validate_length_integer_phylogeny_constraint_B
-vec_to_real_measure
 ```

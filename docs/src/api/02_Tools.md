@@ -10,6 +10,7 @@ We strive to be as type-stable, inferrable, and immutable as possible in order t
 traverse_concrete_subtypes
 concrete_typed_array
 factory(::Nothing, args...; kwargs...)
+get_window
 ```
 
 ## Mathematical functions
@@ -59,4 +60,5 @@ ProdValue
 ModeValue
 StandardisedValue
 factory(msv::StandardisedValue, w::StatsBase.AbstractWeights)
+vec_to_real_measure
 ```

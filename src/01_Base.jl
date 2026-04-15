@@ -159,6 +159,12 @@ const arg_dict = Dict(
                       :dbhtcoef => "`coef`: Coefficient for the the distance matrix when computing the similarity matrix.",#
                       :sim => "`sim`: Similarity matrix algorithm.",#
                       :root => "`root`: Root selection method.",#
+                      # Estimators
+                      :sets => "`sets`: Sets used to map estimator values to features.",#
+                      :val => "`val`: Default value to use for the estimator. If `nothing`, the estimator provides the default value.",#
+                      :ekey => "`key`: Key to specify the asset universe in `sets.dict`. If `nothing`, the key is taken from `sets.key`.",#
+                      :datatype => "`datatype`: Data type to use for the result in case `val` is `nothing`.",#
+                      :strict => "`strict`: Whether to throw an error if `sets` does not contain the desired value in `sets.dict[key]`.",#
                       # Constraints
                       :A => "`A`: Linear constraint coefficient matrix.",#
                       :B => "`B`: Linear constraint response vector.",#
@@ -198,6 +204,7 @@ const arg_dict = Dict(
                       :X => "`X`: Data matrix `observations × features` if the `dims` keyword does not exist or `dims = 1`, `features × observations` when `dims = 2`.",#
                       :F => "`F`: Data matrix `observations × factors` if the `dims` keyword does not exist or `dims = 1`, `factors × observations` when `dims = 2`.",#
                       :Xv => "`X`: Data vector `observations × 1`.",#
+                      :X_Xv => "`X`: Data matrix or vector.",#
                       :dims => "`dims`: Dimension along which to perform the computation.",#
                       :omean => "`mean`: Optional mean value to use for centering.",
                       :stdvec => "`sd`: Vector of standard deviations for each asset.",#
@@ -242,7 +249,8 @@ const arg_dict = Dict(
                       :optkwargs => "`kwargs`: Additional keyword arguments passed to the optimisation function.",
                       :ignargs => "`args`: Additional positional arguments (ignored).",
                       :ignkwargs => "`kwargs`: Additional keyword arguments (ignored).",
-                      :rd=>"`rd::ReturnsResult`: The returns result to use.")
+                      :rd => "`rd`: The returns result to use.",
+                      :window => "`window`: Observation window.")
 """
     field_dict
 
@@ -370,10 +378,90 @@ Abstract supertype for dynamically computed observation weight estimators.
 
 `DynamicAbstractWeights` subtypes are used when observation weights must be computed from data (rather than supplied directly as a numeric vector). They are passed to estimators that accept an `ObsWeights` argument and evaluated at fit time.
 
+# Interfaces
+
+In order to implement a new dynamic observation weight estimator which will work seamlessly with the library, subtype `DynamicAbstractWeights` with all necessary parameters struct, and implement the following methods:
+
+  - `get_observation_weights(w::DynamicAbstractWeights, X::VecNum; kwargs...) -> StatsBase.AbstractWeights`: Returns observation weights for a 1D vector `X`.
+  - `get_observation_weights(w::DynamicAbstractWeights, X::MatNum; dims::Int = 1, kwargs...) -> StatsBase.AbstractWeights`: Returns observation weights for a 2D matrix `X`, with `dims` specifying the dimension along which to compute weights.
+
+## Arguments
+
+  - `w`: Subtype of `DynamicAbstractWeights` with all necessary parameters.
+  - $(arg_dict[:X_Xv])
+  - `dims`: Dimension along which to compute weights for a 2D matrix `X`.
+  - `kwargs...`: Additional keyword arguments passed to the weight computation function.
+
+## Returns
+
+  - `w::StatsBase.AbstractWeights`: Observation weights for the input data `X`.
+
+# Examples
+
+We can create a dummy dynamic observation weight estimator as follows:
+
+```jldoctest
+julia> struct MyWeights{T} <: PortfolioOptimisers.DynamicAbstractWeights
+           half_life::T
+           function MyWeights(half_life::Integer)
+               if half_life < one(half_life)
+                   throw(ArgumentError("half_life must be a positive integer"))
+               end
+               return new{typeof(half_life)}(half_life)
+           end
+       end
+
+julia> function MyWeights(; half_life::Integer = 5)
+           return MyWeights(half_life)
+       end
+MyWeights
+
+julia> function PortfolioOptimisers.get_observation_weights(w::PortfolioOptimisers.DynamicAbstractWeights,
+                                                            X::PortfolioOptimisers.VecNum;
+                                                            kwargs...)
+           lambda = 2^(-inv(w.half_life))
+           return eweights(1:length(X), lambda; scale = true)
+       end
+
+julia> function PortfolioOptimisers.get_observation_weights(w::PortfolioOptimisers.DynamicAbstractWeights,
+                                                            X::PortfolioOptimisers.MatNum;
+                                                            dims::Int = 1, kwargs...)
+           lambda = 2^(-inv(w.half_life))
+           return eweights(1:size(X, dims), lambda; scale = true)
+       end
+
+julia> PortfolioOptimisers.get_observation_weights(MyWeights(), 1:10)
+10-element StatsBase.Weights{Float64, Float64, Vector{Float64}}:
+ 1.0207079199119523e-8
+ 7.88499313633082e-8
+ 6.091176089370138e-7
+ 4.705448122809607e-6
+ 3.63496994859362e-5
+ 0.00028080229942667527
+ 0.002169204490777577
+ 0.016757156662950766
+ 0.12944943670387588
+ 1.0
+
+julia> PortfolioOptimisers.get_observation_weights(MyWeights(), ones(3, 10); dims = 2)
+10-element StatsBase.Weights{Float64, Float64, Vector{Float64}}:
+ 1.0207079199119523e-8
+ 7.88499313633082e-8
+ 6.091176089370138e-7
+ 4.705448122809607e-6
+ 3.63496994859362e-5
+ 0.00028080229942667527
+ 0.002169204490777577
+ 0.016757156662950766
+ 0.12944943670387588
+ 1.0
+```
+
 # Related
 
   - [`ObsWeights`](@ref)
   - [`AbstractEstimator`](@ref)
+  - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
 """
 abstract type DynamicAbstractWeights <: AbstractEstimator end
 """
@@ -836,9 +924,60 @@ Abstract supertype for all estimator value algorithm types in `PortfolioOptimise
 
 Subtypes of `AbstractEstimatorValueAlgorithm` implement algorithms for computing constraint result values. These are used to extend or modify the behavior of estimators in a composable and modular fashion.
 
+# Interfaces
+
+In order to implement a new estimator value algorithm which will work seamlessly with the library, subtype `AbstractEstimatorValueAlgorithm` with all necessary parameters struct, and implement the following method:
+
+  - `estimator_to_val(alg::AbstractEstimatorValueAlgorithm, sets::AssetSets, val::Option{<:Number} = nothing, key::Option{<:AbstractString} = nothing; datatype::DataType = Float64, strict::Bool = false) -> Num_VecNum`: Converts an estimator value dictionary to a numeric or vector of numeric value. Usually this should compute some version of:
+      + `val = ifelse(isnothing(val), <default value use with datatype element type>, val)`: Computes the default value to use if `val` is `nothing`.
+      + `nx = sets.dict[ifelse(isnothing(key), sets.key, key)]`: Gets the universe to use for mapping values to features.
+
+## Arguments
+
+  - `alg`: Concrete subtype of `AbstractEstimatorValueAlgorithm`.
+  - $(arg_dict[:sets])
+  - $(arg_dict[:val])
+  - $(arg_dict[:ekey])
+  - $(arg_dict[:datatype])
+  - $(arg_dict[:strict])
+
+# Returns
+
+  - `val::Num_VecNum`: The numeric or vector of numeric value.
+
+# Examples
+
+We can create a dummy estimator value algorithm as follows:
+
+```jldoctests
+julia> struct MyIncreasingValue <: PortfolioOptimisers.AbstractEstimatorValueAlgorithm end
+
+julia> function PortfolioOptimisers.estimator_to_val(alg::PortfolioOptimisers.AbstractEstimatorValueAlgorithm,
+                                                     sets::AssetSets,
+                                                     val::PortfolioOptimisers.Option{<:Number} = nothing,
+                                                     key::PortfolioOptimisers.Option{<:AbstractString} = nothing;
+                                                     datatype::DataType = Float64,
+                                                     strict::Bool = false)
+           val = ifelse(isnothing(val), zero(datatype), val)
+           nx = sets.dict[ifelse(isnothing(key), sets.key, key)]
+           arr = ((1 - val):(length(nx) - val))
+           return arr
+       end
+
+julia> sets = AssetSets(; dict = Dict("nx" => ["sha", "bis", "man"]))
+AssetSets
+   key ┼ String: "nx"
+  ukey ┼ String: "ux"
+  dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["sha", "bis", "man"])
+
+julia> estimator_to_val(MyIncreasingValue(), sets)
+1.0:1.0:3.0
+```
+
 # Related
 
   - [`EstValType`](@ref)
+  - [`estimator_to_val`](@ref)
 """
 abstract type AbstractEstimatorValueAlgorithm <: AbstractAlgorithm end
 """
