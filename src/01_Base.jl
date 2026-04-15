@@ -952,8 +952,7 @@ We can create a dummy estimator value algorithm as follows:
 ```jldoctests
 julia> struct MyIncreasingValue <: PortfolioOptimisers.AbstractEstimatorValueAlgorithm end
 
-julia> function PortfolioOptimisers.estimator_to_val(alg::PortfolioOptimisers.AbstractEstimatorValueAlgorithm,
-                                                     sets::AssetSets,
+julia> function PortfolioOptimisers.estimator_to_val(alg::MyIncreasingValue, sets::AssetSets,
                                                      val::PortfolioOptimisers.Option{<:Number} = nothing,
                                                      key::PortfolioOptimisers.Option{<:AbstractString} = nothing;
                                                      datatype::DataType = Float64,
