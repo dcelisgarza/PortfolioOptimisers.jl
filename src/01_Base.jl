@@ -431,7 +431,7 @@ julia> function PortfolioOptimisers.get_observation_weights(w::PortfolioOptimise
        end
 
 julia> PortfolioOptimisers.get_observation_weights(MyWeights(), 1:10)
-10-element StatsBase.Weights{Float64, Float64, Vector{Float64}}:
+10-element Weights{Float64, Float64, Vector{Float64}}:
  1.0207079199119523e-8
  7.88499313633082e-8
  6.091176089370138e-7
@@ -444,7 +444,7 @@ julia> PortfolioOptimisers.get_observation_weights(MyWeights(), 1:10)
  1.0
 
 julia> PortfolioOptimisers.get_observation_weights(MyWeights(), ones(3, 10); dims = 2)
-10-element StatsBase.Weights{Float64, Float64, Vector{Float64}}:
+10-element Weights{Float64, Float64, Vector{Float64}}:
  1.0207079199119523e-8
  7.88499313633082e-8
  6.091176089370138e-7
