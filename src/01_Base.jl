@@ -63,7 +63,7 @@ const arg_dict = Dict(
                       # Weight vectors.
                       :pw => "`w`: Portfolio weights vector `assets × 1`.",#
                       :ow => "`w`: Observation weights vector `observations × 1`.",#
-                      :oow => "`w`: Optional observation weights vector `observations × 1`. If `nothing`, the computation is unweighted.",#
+                      :oow => "`w`: Optional observation weights vector `observations × 1`, or a concrete subtype of [`DynamicAbstractWeights`](@ref). If `nothing`, the computation is unweighted.",#
                       :eqw => "`eqw`: Equilibrium weights vector `features × 1`.",#
                       # Matrix processing.
                       :pdm => "`pdm`: Positive definite matrix estimator.",
@@ -1072,26 +1072,27 @@ Accepts either a [`DynamicAbstractWeights`](@ref) subtype (weights computed from
 """
 const ObsWeights = Union{<:DynamicAbstractWeights, <:StatsBase.AbstractWeights}
 """
-    get_observation_weights(w, args...; kwargs...)
+    get_observation_weights(
+        w::Option{<:ObsWeights},
+        args...;
+        kwargs...
+    ) -> Option{<:VecNum}
 
 Get the observation weights for statistical estimation.
 
-Returns `nothing` for dynamic or unspecified weights (allowing estimators to compute them), or the provided weight vector directly.
-
 # Arguments
 
-  - `w`: Observation weights ([`DynamicAbstractWeights`](@ref), a plain vector, or `nothing`).
-  - `args...`: Additional arguments (ignored).
-  - `kwargs...`: Additional keyword arguments.
+  - $(arg_dict[:oow])
+  - $(arg_dict[:ignargs])
+  - $(arg_dict[:ignkwargs])
 
 # Returns
 
-  - `nothing` or the provided weight vector.
+  - `w::Option{<:VecNum}`: The observation weights, or `nothing` for when `w` is [`DynamicAbstractWeights`](@ref) or `nothing`.
 
 # Related
 
   - [`ObsWeights`](@ref)
-  - [`validate_observation_weights`](@ref)
 """
 function get_observation_weights(::Option{<:DynamicAbstractWeights}, args...; kwargs...)
     return nothing
@@ -1319,33 +1320,6 @@ function assert_nonempty_finite_val(val::Number, val_sym::Sym_Str = :val)
     return nothing
 end
 function assert_nonempty_finite_val(args...)
-    return nothing
-end
-"""
-    validate_observation_weights(w)
-
-Validate that observation weights are normalised (sum to 1).
-
-Checks that `StatsBase.AbstractWeights` sum to approximately 1.0. The no-op fallback does nothing for other types.
-
-# Arguments
-
-  - `w`: Observation weights or any other type.
-
-# Returns
-
-  - `nothing`.
-
-# Related
-
-  - [`ObsWeights`](@ref)
-  - [`get_observation_weights`](@ref)
-"""
-function validate_observation_weights(args...)
-    return nothing
-end
-function validate_observation_weights(w::StatsBase.AbstractWeights)
-    assert_nonempty_nonneg_finite_val(w, :w)
     return nothing
 end
 """

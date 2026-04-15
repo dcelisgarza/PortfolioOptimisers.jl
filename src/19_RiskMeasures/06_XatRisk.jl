@@ -277,7 +277,7 @@ ValueatRisk
     function ValueatRisk(settings::RiskMeasureSettings, alpha::Number,
                          w::Option{<:ObsWeights}, alg::ValueatRiskFormulation)
         @argcheck(zero(alpha) < alpha < one(alpha))
-        validate_observation_weights(w)
+        assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(settings), typeof(alpha), typeof(w), typeof(alg)}(settings, alpha,
                                                                             w, alg)
     end
@@ -395,7 +395,7 @@ ValueatRiskRange
                               w::Option{<:ObsWeights}, alg::ValueatRiskFormulation)
         @argcheck(zero(alpha) < alpha < one(alpha))
         @argcheck(zero(beta) < beta < one(beta))
-        validate_observation_weights(w)
+        assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(settings), typeof(alpha), typeof(beta), typeof(w), typeof(alg)}(settings,
                                                                                           alpha,
                                                                                           beta,
@@ -536,7 +536,7 @@ DrawdownatRisk
                             w::Option{<:ObsWeights}, b::Option{<:Number},
                             s::Option{<:Number})
         @argcheck(zero(alpha) < alpha < one(alpha))
-        validate_observation_weights(w)
+        assert_nonempty_nonneg_finite_val(w, :w)
         bflag = !isnothing(b)
         sflag = !isnothing(s)
         if bflag
@@ -690,7 +690,7 @@ RelativeDrawdownatRisk
     function RelativeDrawdownatRisk(settings::HierarchicalRiskMeasureSettings,
                                     alpha::Number, w::Option{<:ObsWeights})
         @argcheck(zero(alpha) < alpha < one(alpha))
-        validate_observation_weights(w)
+        assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(settings), typeof(alpha), typeof(w)}(settings, alpha, w)
     end
 end

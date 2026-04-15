@@ -621,7 +621,7 @@ LowOrderPrior
         @argcheck(!isempty(sigma))
         assert_matrix_issquare(sigma, :sigma)
         @argcheck(size(X, 2) == length(mu) == size(sigma, 1))
-        validate_observation_weights(w)
+        assert_nonempty_nonneg_finite_val(w, :w)
         if isa(w, StatsBase.AbstractWeights)
             @argcheck(length(w) == size(X, 1))
         end

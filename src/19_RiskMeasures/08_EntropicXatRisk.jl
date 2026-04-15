@@ -142,7 +142,7 @@ EntropicValueatRisk
             @argcheck(!isempty(slv))
         end
         @argcheck(zero(alpha) < alpha < one(alpha))
-        validate_observation_weights(w)
+        assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(settings), typeof(slv), typeof(alpha), typeof(w)}(settings, slv,
                                                                             alpha, w)
     end
@@ -216,7 +216,7 @@ Keywords correspond to the struct's fields.
         end
         @argcheck(zero(alpha) < alpha < one(alpha))
         @argcheck(zero(beta) < beta < one(beta))
-        validate_observation_weights(w)
+        assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(settings), typeof(slv), typeof(alpha), typeof(beta), typeof(w)}(settings,
                                                                                           slv,
                                                                                           alpha,
@@ -328,7 +328,7 @@ EntropicDrawdownatRisk
             @argcheck(!isempty(slv))
         end
         @argcheck(zero(alpha) < alpha < one(alpha))
-        validate_observation_weights(w)
+        assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(settings), typeof(slv), typeof(alpha), typeof(w)}(settings, slv,
                                                                             alpha, w)
     end
@@ -428,7 +428,7 @@ RelativeEntropicDrawdownatRisk
             @argcheck(!isempty(slv))
         end
         @argcheck(zero(alpha) < alpha < one(alpha))
-        validate_observation_weights(w)
+        assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(settings), typeof(slv), typeof(alpha), typeof(w)}(settings, slv,
                                                                             alpha, w)
     end

@@ -10,6 +10,7 @@
 AbstractEstimator
 AbstractAlgorithm
 AbstractResult
+DynamicAbstractWeights
 ```
 
 ## Pretty printing
@@ -21,14 +22,15 @@ AbstractResult
 has_pretty_show_method
 ```
 
-## Utility types
+## Utilities
 
-Custom types are the bread and butter of `PorfolioOptimisers.jl`, the following types non-specific and used throughout the library.
+Custom types are the bread and butter of `PorfolioOptimisers.jl`, the following types and utilities are non-specific and used throughout the library.
 
 ```@docs
 VecScalar
 AbstractEstimatorValueAlgorithm
 SingletonVector
+get_observation_weights
 ```
 
 ## Error types
@@ -95,6 +97,7 @@ VecDate
 Dict_Vec
 Sym_Str
 Str_Vec
+ObsWeights
 Num_VecNum_VecScalar
 Num_ArrNum_VecScalar_DynWeights
 ```

@@ -44,7 +44,7 @@ SimpleExpectedReturns
     "$(field_dict[:oow])"
     w
     function SimpleExpectedReturns(w::Option{<:ObsWeights})
-        validate_observation_weights(w)
+        assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(w)}(w)
     end
 end

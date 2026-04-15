@@ -38,7 +38,7 @@ Keywords correspond to the struct's fields.
     window
     function WindowedCovariance(ce::StatsBase.CovarianceEstimator, w::Option{<:ObsWeights},
                                 window::Option{<:Int_VecInt})
-        validate_observation_weights(w)
+        assert_nonempty_nonneg_finite_val(w, :w)
         assert_nonempty_nonneg_finite_val(window, :window)
         return new{typeof(ce), typeof(w), typeof(window)}(ce, w, window)
     end

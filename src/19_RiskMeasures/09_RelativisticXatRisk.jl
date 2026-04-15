@@ -204,7 +204,7 @@ RelativisticValueatRisk
         end
         @argcheck(zero(alpha) < alpha < one(alpha))
         @argcheck(zero(kappa) < kappa < one(kappa))
-        validate_observation_weights(w)
+        assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(settings), typeof(slv), typeof(alpha), typeof(kappa), typeof(w)}(settings,
                                                                                            slv,
                                                                                            alpha,
@@ -317,7 +317,7 @@ RelativisticValueatRiskRange
         @argcheck(zero(kappa_a) < kappa_a < one(kappa_a))
         @argcheck(zero(beta) < beta < one(beta))
         @argcheck(zero(kappa_b) < kappa_b < one(kappa_b))
-        validate_observation_weights(w)
+        assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(settings), typeof(slv), typeof(alpha), typeof(kappa_a),
                    typeof(beta), typeof(kappa_b), typeof(w)}(settings, slv, alpha, kappa_a,
                                                              beta, kappa_b, w)
@@ -435,7 +435,7 @@ RelativisticDrawdownatRisk
         end
         @argcheck(zero(alpha) < alpha < one(alpha))
         @argcheck(zero(kappa) < kappa < one(kappa))
-        validate_observation_weights(w)
+        assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(settings), typeof(slv), typeof(alpha), typeof(kappa), typeof(w)}(settings,
                                                                                            slv,
                                                                                            alpha,
@@ -545,7 +545,7 @@ RelativeRelativisticDrawdownatRisk
         end
         @argcheck(zero(alpha) < alpha < one(alpha))
         @argcheck(zero(kappa) < kappa < one(kappa))
-        validate_observation_weights(w)
+        assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(settings), typeof(slv), typeof(alpha), typeof(kappa), typeof(w)}(settings,
                                                                                            slv,
                                                                                            alpha,

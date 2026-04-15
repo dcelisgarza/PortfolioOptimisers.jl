@@ -152,7 +152,7 @@ PowerNormValueatRisk
         end
         @argcheck(zero(alpha) < alpha < one(alpha))
         @argcheck(p >= one(p))
-        validate_observation_weights(w)
+        assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(settings), typeof(slv), typeof(alpha), typeof(p), typeof(w)}(settings,
                                                                                        slv,
                                                                                        alpha,
@@ -264,7 +264,7 @@ PowerNormValueatRiskRange
         @argcheck(zero(beta) < beta < one(beta))
         @argcheck(pa > one(pa))
         @argcheck(pb > one(pb))
-        validate_observation_weights(w)
+        assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(settings), typeof(slv), typeof(alpha), typeof(beta), typeof(pa),
                    typeof(pb), typeof(w)}(settings, slv, alpha, beta, pa, pb, w)
     end
@@ -382,7 +382,7 @@ PowerNormDrawdownatRisk
         end
         @argcheck(zero(alpha) < alpha < one(alpha))
         @argcheck(p >= one(p))
-        validate_observation_weights(w)
+        assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(settings), typeof(slv), typeof(alpha), typeof(p), typeof(w)}(settings,
                                                                                        slv,
                                                                                        alpha,
@@ -491,7 +491,7 @@ RelativePowerNormDrawdownatRisk
         end
         @argcheck(zero(alpha) < alpha < one(alpha))
         @argcheck(p >= one(p))
-        validate_observation_weights(w)
+        assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(settings), typeof(slv), typeof(alpha), typeof(p), typeof(w)}(settings,
                                                                                        slv,
                                                                                        alpha,

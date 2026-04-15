@@ -663,7 +663,7 @@ julia> PortfolioOptimisers.vec_to_real_measure(MeanValue(), [1.2, 3.4, 0.7])
     "$(field_dict[:oow])"
     w
     function MeanValue(w::Option{<:ObsWeights})
-        validate_observation_weights(w)
+        assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(w)}(w)
     end
 end
@@ -740,7 +740,7 @@ julia> PortfolioOptimisers.vec_to_real_measure(MedianValue(), [1.2, 3.4, 0.7])
     "$(field_dict[:oow])"
     w
     function MedianValue(w::Option{<:ObsWeights})
-        validate_observation_weights(w)
+        assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(w)}(w)
     end
 end
@@ -841,7 +841,7 @@ julia> PortfolioOptimisers.vec_to_real_measure(StdValue(), [1.2, 3.4, 0.7])
     "$(field_dict[:corrected])"
     corrected
     function StdValue(w::Option{<:ObsWeights}, corrected::Bool)
-        validate_observation_weights(w)
+        assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(w), typeof(corrected)}(w, corrected)
     end
 end
@@ -922,7 +922,7 @@ julia> PortfolioOptimisers.vec_to_real_measure(VarValue(), [1.2, 3.4, 0.7])
     "Indicates whether to use Bessel's correction (`true` for sample standard deviation, `false` for population)."
     corrected
     function VarValue(w::Option{<:ObsWeights}, corrected::Bool)
-        validate_observation_weights(w)
+        assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(w), typeof(corrected)}(w, corrected)
     end
 end

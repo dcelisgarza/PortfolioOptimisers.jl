@@ -53,7 +53,7 @@ DistanceCovariance
     ex
     function DistanceCovariance(metric::Distances.Metric, args::Tuple, kwargs::NamedTuple,
                                 w::Option{<:ObsWeights}, ex::FLoops.Transducers.Executor)
-        validate_observation_weights(w)
+        assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(metric), typeof(args), typeof(kwargs), typeof(w), typeof(ex)}(metric,
                                                                                         args,
                                                                                         kwargs,

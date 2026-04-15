@@ -134,7 +134,7 @@ MedianAbsoluteDeviation
         elseif isa(mu, Number)
             @argcheck(isfinite(mu))
         end
-        validate_observation_weights(w)
+        assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(settings), typeof(w), typeof(mu), typeof(flag)}(settings, w, mu,
                                                                           flag)
     end

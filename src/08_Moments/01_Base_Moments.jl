@@ -73,7 +73,7 @@ We can create a dummy covariance estimator as follows:
 julia> struct MyCovarianceEstimator{T1} <: PortfolioOptimisers.AbstractCovarianceEstimator
            w::T1
            function MyCovarianceEstimator(w::PortfolioOptimisers.Option{<:PortfolioOptimisers.ObsWeights})
-               PortfolioOptimisers.validate_observation_weights(w)
+               PortfolioOptimisers.assert_nonempty_nonneg_finite_val(w, :w)
                return new{typeof(w)}(w)
            end
        end
@@ -202,7 +202,7 @@ We can create a dummy variance estimator as follows:
 julia> struct MyVarianceEstimator{T1} <: PortfolioOptimisers.AbstractVarianceEstimator
            w::T1
            function MyVarianceEstimator(w::PortfolioOptimisers.Option{<:PortfolioOptimisers.ObsWeights})
-               PortfolioOptimisers.validate_observation_weights(w)
+               PortfolioOptimisers.assert_nonempty_nonneg_finite_val(w, :w)
                return new{typeof(w)}(w)
            end
        end
@@ -322,7 +322,7 @@ julia> struct MyExpectedReturnsEstimator{T1} <:
               PortfolioOptimisers.AbstractExpectedReturnsEstimator
            w::T1
            function MyExpectedReturnsEstimator(w::PortfolioOptimisers.Option{<:PortfolioOptimisers.ObsWeights})
-               PortfolioOptimisers.validate_observation_weights(w)
+               PortfolioOptimisers.assert_nonempty_nonneg_finite_val(w, :w)
                return new{typeof(w)}(w)
            end
        end
@@ -675,7 +675,13 @@ function robust_cor(ce::StatsBase.CovarianceEstimator, X::MatNum,
     =#
 end
 """
-    moment_window_and_weights(X, w, args...; dims = 1, kwargs...)
+    moment_window_and_weights(
+        X::VecNum_MatNum,
+        w::Option{<:ObsWeights},
+        args...;
+        dims = dims,
+        kwargs...
+    ) -> (typeof)
 
 Apply the observation window and resolve weights for moment estimation.
 

@@ -93,7 +93,7 @@ julia> struct MyUnstandardisedGerberCovarianceAlg{T} <:
               PortfolioOptimisers.UnstandardisedGerberCovarianceAlgorithm
            w::T
            function MyUnstandardisedGerberCovarianceAlg(w::PortfolioOptimisers.Option{<:PortfolioOptimisers.ObsWeights})
-               PortfolioOptimisers.validate_observation_weights(w)
+               PortfolioOptimisers.assert_nonempty_nonneg_finite_val(w, :w)
                return new{typeof(w)}(w)
            end
        end
@@ -208,7 +208,7 @@ julia> struct MyStandardisedGerberCovarianceAlg{T} <:
               PortfolioOptimisers.StandardisedGerberCovarianceAlgorithm
            w::T
            function MyStandardisedGerberCovarianceAlg(w::PortfolioOptimisers.Option{<:PortfolioOptimisers.ObsWeights})
-               PortfolioOptimisers.validate_observation_weights(w)
+               PortfolioOptimisers.assert_nonempty_nonneg_finite_val(w, :w)
                return new{typeof(w)}(w)
            end
        end
