@@ -71,7 +71,7 @@ function factory(ce::WindowedVariance, w::ObsWeights)
     return WindowedVariance(; ce = factory(ce.ce, w), w = w, window = ce.window)
 end
 """
-    Statistics.var(ce::WindowedVariance, X::MatNum; dims::Int = 1, mean = nothing,
+    Statistics.var(ce::WindowedVariance, X::MatNum; dims::Int = 1, mean = nothing, iv::Option{<:MatNum} = nothing,
                    kwargs...)
 
 Compute the variance vector using a rolling or indexed observation window (matrix input).
@@ -84,6 +84,7 @@ This method selects a window of observations from `X`, applies observation weigh
   - `X`: Data matrix of asset returns (observations × assets).
   - $(arg_dict[:dims])
   - `mean`: Optional pre-computed mean passed to the underlying estimator.
+  - $(arg_dict[:oiv])
   - `kwargs...`: Additional keyword arguments passed to the underlying estimator.
 
 # Returns
@@ -96,10 +97,14 @@ This method selects a window of observations from `X`, applies observation weigh
   - [`std(ce::WindowedVariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
 """
 function Statistics.var(ce::WindowedVariance, X::MatNum; dims::Int = 1, mean = nothing,
-                        kwargs...)
-    X, w = moment_window_and_weights(X, ce.w, ce.window; dims = dims, kwargs...)
+                        iv::Option{<:MatNum} = nothing, kwargs...)
+    window = get_window(ce.window, X, dims)
+    X, w = moment_window_and_weights(X, ce.w, window; dims = dims, kwargs...)
     ce = factory(ce.ce, w)
-    return Statistics.var(ce, X; dims = dims, mean = mean, kwargs...)
+    if !isnothing(iv) && isa(window, VecInt)
+        iv = isone(dims) ? view(iv, window, :) : view(iv, :, window)
+    end
+    return Statistics.var(ce, X; dims = dims, mean = mean, iv = iv, kwargs...)
 end
 """
     Statistics.var(ce::WindowedVariance, X::VecNum; mean = nothing)
@@ -124,13 +129,13 @@ This method selects a window of observations from the vector `X`, applies observ
   - [`var(ce::WindowedVariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
 """
 function Statistics.var(ce::WindowedVariance, X::VecNum; mean = nothing)
-    X, w = moment_window_and_weights(X, ce.w, ce.window)
+    window = get_window(ce.window, X)
+    X, w = moment_window_and_weights(X, ce.w, window)
     ce = factory(ce.ce, w)
     return Statistics.var(ce, X; mean = mean)
 end
 """
-    Statistics.std(ce::WindowedVariance, X::MatNum; dims::Int = 1, mean = nothing,
-                   kwargs...)
+    Statistics.std(ce::WindowedVariance, X::MatNum; dims::Int = 1, mean = nothing, iv::Option{<:MatNum} = nothing, kwargs...)
 
 Compute the standard deviation vector using a rolling or indexed observation window (matrix input).
 
@@ -142,6 +147,7 @@ This method selects a window of observations from `X`, applies observation weigh
   - `X`: Data matrix of asset returns (observations × assets).
   - $(arg_dict[:dims])
   - `mean`: Optional pre-computed mean passed to the underlying estimator.
+  - $(arg_dict[:oiv])
   - `kwargs...`: Additional keyword arguments passed to the underlying estimator.
 
 # Returns
@@ -154,10 +160,14 @@ This method selects a window of observations from `X`, applies observation weigh
   - [`var(ce::WindowedVariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
 """
 function Statistics.std(ce::WindowedVariance, X::MatNum; dims::Int = 1, mean = nothing,
-                        kwargs...)
-    X, w = moment_window_and_weights(X, ce.w, ce.window; dims = dims, kwargs...)
+                        iv::Option{<:MatNum} = nothing, kwargs...)
+    window = get_window(ce.window, X, dims)
+    X, w = moment_window_and_weights(X, ce.w, window; dims = dims, kwargs...)
     ce = factory(ce.ce, w)
-    return Statistics.std(ce, X; dims = dims, mean = mean, kwargs...)
+    if !isnothing(iv) && isa(window, VecInt)
+        iv = isone(dims) ? view(iv, window, :) : view(iv, :, window)
+    end
+    return Statistics.std(ce, X; dims = dims, mean = mean, iv = iv, kwargs...)
 end
 """
     Statistics.std(ce::WindowedVariance, X::VecNum; mean = nothing)
@@ -182,7 +192,8 @@ This method selects a window of observations from the vector `X`, applies observ
   - [`Statistics.std(ce::WindowedVariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
 """
 function Statistics.std(ce::WindowedVariance, X::VecNum; mean = nothing)
-    X, w = moment_window_and_weights(X, ce.w, ce.window)
+    window = get_window(ce.window, X)
+    X, w = moment_window_and_weights(X, ce.w, window)
     ce = factory(ce.ce, w)
     return Statistics.std(ce, X; mean = mean)
 end

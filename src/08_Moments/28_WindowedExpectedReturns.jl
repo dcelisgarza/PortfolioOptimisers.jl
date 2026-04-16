@@ -72,7 +72,7 @@ function factory(me::WindowedExpectedReturns, w::ObsWeights)
     return WindowedExpectedReturns(; me = factory(me.me, w), w = w, window = me.window)
 end
 """
-    Statistics.mean(me::WindowedExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)
+    Statistics.mean(me::WindowedExpectedReturns, X::MatNum; dims::Int = 1, iv::Option{<:MatNum} = nothing, kwargs...)
 
 Compute expected returns using a rolling or indexed observation window.
 
@@ -83,6 +83,7 @@ This method selects a window of observations from `X` (and applies observation w
   - `me`: Windowed expected returns estimator.
   - `X`: Data matrix of asset returns (observations × assets).
   - $(arg_dict[:dims])
+  - $(arg_dict[:oiv])
   - `kwargs...`: Additional keyword arguments passed to the underlying estimator.
 
 # Returns
@@ -93,10 +94,15 @@ This method selects a window of observations from `X` (and applies observation w
 
   - [`WindowedExpectedReturns`](@ref)
 """
-function Statistics.mean(me::WindowedExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)
-    X, w = moment_window_and_weights(X, me.w, me.window; dims = dims, kwargs...)
+function Statistics.mean(me::WindowedExpectedReturns, X::MatNum; dims::Int = 1,
+                         iv::Option{<:MatNum} = nothing, kwargs...)
+    window = get_window(me.window, X, dims)
+    X, w = moment_window_and_weights(X, me.w, window; dims = dims, kwargs...)
     me = factory(me.me, w)
-    return Statistics.mean(me, X; dims = dims, kwargs...)
+    if !isnothing(iv) && isa(window, VecInt)
+        iv = isone(dims) ? view(iv, window, :) : view(iv, :, window)
+    end
+    return Statistics.mean(me, X; dims = dims, iv = iv, kwargs...)
 end
 
 export WindowedExpectedReturns

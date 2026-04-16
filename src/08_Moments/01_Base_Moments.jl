@@ -685,7 +685,7 @@ end
     moment_window_and_weights(
         X::VecNum_MatNum,
         w::Option{<:ObsWeights},
-        window::Int_VecInt;
+        window::VecInt;
         dims = dims,
         kwargs...
     ) -> (VecNum_MatNum, Option{<:StatsBase.AbstractWeights})
@@ -712,8 +712,7 @@ Slices `X` to the last `window` observations (if provided) and resolves the obse
 # Details
 
   - If `window` is provided:
-      + Calls [`get_window`](@ref) on `X`.
-      + Gets the appropriate view of `X` given its type, the resolved value of `window`, and the value of `dims`.
+      + Gets the appropriate view of `X` given its type and the value of `dims`.
       + Calls [`nothing_scalar_array_getindex`](@ref) on `w` to resolve the windowed weights.
   - If no `window` is provided:
       + Calls [`get_observation_weights`](@ref) on `w` to resolve the weights.
@@ -733,19 +732,17 @@ function moment_window_and_weights(X::VecNum, w::Option{<:ObsWeights}, args...; 
     w = get_observation_weights(w, X; kwargs...)
     return X, w
 end
-function moment_window_and_weights(X::MatNum, w::Option{<:ObsWeights}, window::Int_VecInt;
+function moment_window_and_weights(X::MatNum, w::Option{<:ObsWeights}, window::VecInt;
                                    dims::Int = 1, kwargs...)
-    idx = get_window(window, X, dims)
-    X = isone(dims) ? view(X, idx, :) : view(X, :, idx)
-    w = nothing_scalar_array_getindex(w, idx)
+    X = isone(dims) ? view(X, window, :) : view(X, :, window)
+    w = nothing_scalar_array_getindex(w, window)
     w = get_observation_weights(w, X; dims = dims, kwargs...)
     return X, w
 end
-function moment_window_and_weights(X::VecNum, w::Option{<:ObsWeights}, window::Int_VecInt,
+function moment_window_and_weights(X::VecNum, w::Option{<:ObsWeights}, window::VecInt;
                                    kwargs...)
-    idx = get_window(window, X)
-    X = view(X, idx)
-    w = nothing_scalar_array_getindex(w, idx)
+    X = view(X, window)
+    w = nothing_scalar_array_getindex(w, window)
     w = get_observation_weights(w, X; kwargs...)
     return X, w
 end

@@ -92,6 +92,8 @@ const arg_dict = Dict(
                       :metric_args => "`args`: Additional positional arguments for the distance metric.",#
                       :metric_kwargs => "`kwargs`: Additional keyword arguments for the distance metric.",#
                       :t => "`t`: Threshold value.",#
+                      :iv => "`iv`: Implied volatility matrix.",
+                      :oiv => "`iv`: Optional implied volatility matrix. Used if any internal covariance estimator is an instance of [`ImpliedVolatility`](@ref).",#
                       ## Regression
                       :M => "`M`: Main coefficient (loadings) matrix `assets × factors`.",#
                       :L => "`L`: Reduced dimensionsionality coefficient (loadings) matrix `assets × reduced_dimensions`.",#
