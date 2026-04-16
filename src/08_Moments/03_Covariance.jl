@@ -53,7 +53,7 @@ GeneralCovariance
     "$(field_dict[:oow])"
     w
     function GeneralCovariance(ce::StatsBase.CovarianceEstimator, w::Option{<:ObsWeights})
-        validate_observation_weights(w)
+        assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(ce), typeof(w)}(ce, w)
     end
 end

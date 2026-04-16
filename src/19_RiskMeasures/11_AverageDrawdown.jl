@@ -74,7 +74,7 @@ AverageDrawdown
     settings
     w
     function AverageDrawdown(settings::RiskMeasureSettings, w::Option{<:ObsWeights})
-        validate_observation_weights(w)
+        assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(settings), typeof(w)}(settings, w)
     end
 end
@@ -157,7 +157,7 @@ RelativeAverageDrawdown
     w
     function RelativeAverageDrawdown(settings::HierarchicalRiskMeasureSettings,
                                      w::Option{<:ObsWeights})
-        validate_observation_weights(w)
+        assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(settings), typeof(w)}(settings, w)
     end
 end

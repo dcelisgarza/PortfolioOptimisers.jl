@@ -38,7 +38,7 @@ Keywords correspond to the struct's fields.
     window
     function WindowedCokurtosis(ke::Cokurtosis, w::Option{<:ObsWeights},
                                 window::Option{<:Int_VecInt})
-        validate_observation_weights(w)
+        assert_nonempty_nonneg_finite_val(w, :w)
         assert_nonempty_nonneg_finite_val(window, :window)
         return new{typeof(ke), typeof(w), typeof(window)}(ke, w, window)
     end
@@ -71,7 +71,7 @@ function factory(ke::WindowedCokurtosis, w::ObsWeights)
     return WindowedCokurtosis(; ke = factory(ke.ke, w), w = w, window = ke.window)
 end
 """
-    cokurtosis(ke::WindowedCokurtosis, X::MatNum; dims::Int = 1, kwargs...)
+    cokurtosis(ke::WindowedCokurtosis, X::MatNum; dims::Int = 1, iv::Option{<:MatNum} = nothing, kwargs...)
 
 Compute the cokurtosis tensor using a rolling or indexed observation window.
 
@@ -82,6 +82,7 @@ This method selects a window of observations from `X` (and applies observation w
   - `ke`: Windowed cokurtosis estimator.
   - `X`: Data matrix of asset returns (observations × assets).
   - $(arg_dict[:dims])
+  - $(arg_dict[:oiv])
   - `kwargs...`: Additional keyword arguments passed to the underlying estimator.
 
 # Returns
@@ -94,10 +95,15 @@ This method selects a window of observations from `X` (and applies observation w
   - [`Cokurtosis`](@ref)
   - [`cokurtosis`](@ref)
 """
-function cokurtosis(ke::WindowedCokurtosis, X::MatNum; dims::Int = 1, kwargs...)
-    X, w = moment_window_and_weights(X, ke.w, ke.window; dims = dims, kwargs...)
+function cokurtosis(ke::WindowedCokurtosis, X::MatNum; dims::Int = 1,
+                    iv::Option{<:MatNum} = nothing, kwargs...)
+    window = get_window(ke.window, X, dims)
+    X, w = moment_window_and_weights(X, ke.w, window; dims = dims, kwargs...)
     ke = factory(ke.ke, w)
-    return cokurtosis(ke, X; dims = dims, kwargs...)
+    if !isnothing(iv) && isa(window, VecInt)
+        iv = isone(dims) ? view(iv, window, :) : view(iv, :, window)
+    end
+    return cokurtosis(ke, X; dims = dims, iv = iv, kwargs...)
 end
 
 export WindowedCokurtosis

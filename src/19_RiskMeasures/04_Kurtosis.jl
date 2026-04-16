@@ -105,7 +105,7 @@ Kurtosis
         elseif isa(mu, Number)
             @argcheck(isfinite(mu))
         end
-        validate_observation_weights(w)
+        assert_nonempty_nonneg_finite_val(w, :w)
         if kt_flag
             @argcheck(!isempty(kt))
             assert_matrix_issquare(kt, :kt)

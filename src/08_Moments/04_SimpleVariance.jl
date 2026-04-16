@@ -59,7 +59,7 @@ SimpleVariance
     corrected
     function SimpleVariance(me::Option{<:AbstractExpectedReturnsEstimator},
                             w::Option{<:ObsWeights}, corrected::Bool)
-        validate_observation_weights(w)
+        assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(me), typeof(w), typeof(corrected)}(me, w, corrected)
     end
 end

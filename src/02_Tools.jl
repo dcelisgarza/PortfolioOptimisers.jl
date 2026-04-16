@@ -266,7 +266,10 @@ function nothing_scalar_array_view(x::AbstractVector{<:Union{<:AbstractVector,
     return [nothing_scalar_array_view(xi, i) for xi in x]
 end
 """
-    get_window(window, X, dims = 1)
+    get_window(::Option{<:Colon}, args...) -> Option{<:Colon}
+    get_window(window::Integer, X::MatNum, dims::Int = 1) -> VecInt
+    get_window(window::Integer, X::VecNum, args...) -> VecInt
+    get_window(window::VecInt, args...) -> VecInt
 
 Get the row/observation window index range for a data array.
 
@@ -274,13 +277,15 @@ Returns the index range corresponding to the last `window` observations (or all 
 
 # Arguments
 
-  - `window`: Number of observations, index vector, `nothing`, or `Colon`.
-  - `X`: Data matrix or vector.
-  - `dims`: Observation dimension (default `1`).
+  - $(arg_dict[:window])
+      + `::Option{<:Colon}`: Returns the argument.
+      + `::Integer`: Returns the last `window` observations.
+  - $(arg_dict[:X_Xv])
+  - $(arg_dict[:dims])
 
 # Returns
 
-  - Index range or `Colon`.
+  - `window::Option{Union{Colon, <:VecInt}}`: The window index range.
 
 # Related
 
@@ -663,7 +668,7 @@ julia> PortfolioOptimisers.vec_to_real_measure(MeanValue(), [1.2, 3.4, 0.7])
     "$(field_dict[:oow])"
     w
     function MeanValue(w::Option{<:ObsWeights})
-        validate_observation_weights(w)
+        assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(w)}(w)
     end
 end
@@ -740,7 +745,7 @@ julia> PortfolioOptimisers.vec_to_real_measure(MedianValue(), [1.2, 3.4, 0.7])
     "$(field_dict[:oow])"
     w
     function MedianValue(w::Option{<:ObsWeights})
-        validate_observation_weights(w)
+        assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(w)}(w)
     end
 end
@@ -841,7 +846,7 @@ julia> PortfolioOptimisers.vec_to_real_measure(StdValue(), [1.2, 3.4, 0.7])
     "$(field_dict[:corrected])"
     corrected
     function StdValue(w::Option{<:ObsWeights}, corrected::Bool)
-        validate_observation_weights(w)
+        assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(w), typeof(corrected)}(w, corrected)
     end
 end
@@ -922,7 +927,7 @@ julia> PortfolioOptimisers.vec_to_real_measure(VarValue(), [1.2, 3.4, 0.7])
     "Indicates whether to use Bessel's correction (`true` for sample standard deviation, `false` for population)."
     corrected
     function VarValue(w::Option{<:ObsWeights}, corrected::Bool)
-        validate_observation_weights(w)
+        assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(w), typeof(corrected)}(w, corrected)
     end
 end

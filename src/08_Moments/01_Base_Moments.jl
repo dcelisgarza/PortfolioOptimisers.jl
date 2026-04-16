@@ -73,7 +73,7 @@ We can create a dummy covariance estimator as follows:
 julia> struct MyCovarianceEstimator{T1} <: PortfolioOptimisers.AbstractCovarianceEstimator
            w::T1
            function MyCovarianceEstimator(w::PortfolioOptimisers.Option{<:PortfolioOptimisers.ObsWeights})
-               PortfolioOptimisers.validate_observation_weights(w)
+               PortfolioOptimisers.assert_nonempty_nonneg_finite_val(w, :w)
                return new{typeof(w)}(w)
            end
        end
@@ -202,7 +202,7 @@ We can create a dummy variance estimator as follows:
 julia> struct MyVarianceEstimator{T1} <: PortfolioOptimisers.AbstractVarianceEstimator
            w::T1
            function MyVarianceEstimator(w::PortfolioOptimisers.Option{<:PortfolioOptimisers.ObsWeights})
-               PortfolioOptimisers.validate_observation_weights(w)
+               PortfolioOptimisers.assert_nonempty_nonneg_finite_val(w, :w)
                return new{typeof(w)}(w)
            end
        end
@@ -322,7 +322,7 @@ julia> struct MyExpectedReturnsEstimator{T1} <:
               PortfolioOptimisers.AbstractExpectedReturnsEstimator
            w::T1
            function MyExpectedReturnsEstimator(w::PortfolioOptimisers.Option{<:PortfolioOptimisers.ObsWeights})
-               PortfolioOptimisers.validate_observation_weights(w)
+               PortfolioOptimisers.assert_nonempty_nonneg_finite_val(w, :w)
                return new{typeof(w)}(w)
            end
        end
@@ -675,7 +675,20 @@ function robust_cor(ce::StatsBase.CovarianceEstimator, X::MatNum,
     =#
 end
 """
-    moment_window_and_weights(X, w, args...; dims = 1, kwargs...)
+    moment_window_and_weights(
+        X::VecNum_MatNum,
+        w::Option{<:ObsWeights},
+        args...;
+        dims = dims,
+        kwargs...
+    ) -> (VecNum_MatNum, Option{<:StatsBase.AbstractWeights})
+    moment_window_and_weights(
+        X::VecNum_MatNum,
+        w::Option{<:ObsWeights},
+        window::VecInt;
+        dims = dims,
+        kwargs...
+    ) -> (VecNum_MatNum, Option{<:StatsBase.AbstractWeights})
 
 Apply the observation window and resolve weights for moment estimation.
 
@@ -683,15 +696,27 @@ Slices `X` to the last `window` observations (if provided) and resolves the obse
 
 # Arguments
 
-  - `X`: Data matrix or vector.
-  - `w`: Observation weights ([`ObsWeights`](@ref) or `nothing`).
-  - `args...`: Additional arguments (e.g., window size).
-  - `dims`: Observation dimension (default `1`).
-  - `kwargs...`: Additional keyword arguments.
+  - $(arg_dict[:X_Xv])
+  - $(arg_dict[:oow])
+  - Either:
+      + $(arg_dict[:ignargs])
+      + $(arg_dict[:window])
+  - $(arg_dict[:dims]) Ignored if `X` is a vector.
+  - $(arg_dict[:ignkwargs])
 
 # Returns
 
-  - `(X_windowed, w_resolved)`: Tuple of windowed data and resolved weights.
+  - `X::VecNum_MatNum`: Appropriately windowed data matrix.
+  - `w::Option{<:StatsBase.AbstractWeights}`: Resolved and appropriately windowed weights.
+
+# Details
+
+  - If `window` is provided:
+      + Gets the appropriate view of `X` given its type and the value of `dims`.
+      + Calls [`nothing_scalar_array_getindex`](@ref) on `w` to resolve the windowed weights.
+  - If no `window` is provided:
+      + Calls [`get_observation_weights`](@ref) on `w` to resolve the weights.
+  - Returns the appropriate `X` and `w`.
 
 # Related
 
@@ -707,19 +732,17 @@ function moment_window_and_weights(X::VecNum, w::Option{<:ObsWeights}, args...; 
     w = get_observation_weights(w, X; kwargs...)
     return X, w
 end
-function moment_window_and_weights(X::MatNum, w::Option{<:ObsWeights}, window::Int_VecInt;
+function moment_window_and_weights(X::MatNum, w::Option{<:ObsWeights}, window::VecInt;
                                    dims::Int = 1, kwargs...)
-    idx = get_window(window, X, dims)
-    X = isone(dims) ? view(X, idx, :) : view(X, :, idx)
-    w = nothing_scalar_array_getindex(w, idx)
+    X = isone(dims) ? view(X, window, :) : view(X, :, window)
+    w = nothing_scalar_array_getindex(w, window)
     w = get_observation_weights(w, X; dims = dims, kwargs...)
     return X, w
 end
-function moment_window_and_weights(X::VecNum, w::Option{<:ObsWeights}, window::Int_VecInt,
+function moment_window_and_weights(X::VecNum, w::Option{<:ObsWeights}, window::VecInt;
                                    kwargs...)
-    idx = get_window(window, X)
-    X = view(X, idx)
-    w = nothing_scalar_array_getindex(w, idx)
+    X = view(X, window)
+    w = nothing_scalar_array_getindex(w, window)
     w = get_observation_weights(w, X; kwargs...)
     return X, w
 end

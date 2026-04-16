@@ -38,7 +38,7 @@ Keywords correspond to the struct's fields.
     window
     function WindowedCovariance(ce::StatsBase.CovarianceEstimator, w::Option{<:ObsWeights},
                                 window::Option{<:Int_VecInt})
-        validate_observation_weights(w)
+        assert_nonempty_nonneg_finite_val(w, :w)
         assert_nonempty_nonneg_finite_val(window, :window)
         return new{typeof(ce), typeof(w), typeof(window)}(ce, w, window)
     end
@@ -72,7 +72,7 @@ function factory(ce::WindowedCovariance, w::ObsWeights)
     return WindowedCovariance(; ce = factory(ce.ce, w), w = w, window = ce.window)
 end
 """
-    Statistics.cov(ce::WindowedCovariance, X::MatNum; dims::Int = 1, mean = nothing,
+    Statistics.cov(ce::WindowedCovariance, X::MatNum; dims::Int = 1, mean = nothing, iv::Option{<:MatNum} = nothing,
                    kwargs...)
 
 Compute the covariance matrix using a rolling or indexed observation window.
@@ -85,6 +85,7 @@ This method selects a window of observations from `X` (and applies observation w
   - `X`: Data matrix of asset returns (observations × assets).
   - $(arg_dict[:dims])
   - `mean`: Optional pre-computed mean passed to the underlying estimator.
+  - $(arg_dict[:oiv])
   - `kwargs...`: Additional keyword arguments passed to the underlying estimator.
 
 # Returns
@@ -97,13 +98,17 @@ This method selects a window of observations from `X` (and applies observation w
   - [`cor(ce::WindowedCovariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
 """
 function Statistics.cov(ce::WindowedCovariance, X::MatNum; dims::Int = 1, mean = nothing,
-                        kwargs...)
-    X, w = moment_window_and_weights(X, ce.w, ce.window; dims = dims, kwargs...)
+                        iv::Option{<:MatNum} = nothing, kwargs...)
+    window = get_window(ce.window, X, dims)
+    X, w = moment_window_and_weights(X, ce.w, window; dims = dims, kwargs...)
     ce = factory(ce.ce, w)
-    return Statistics.cov(ce, X; dims = dims, mean = mean, kwargs...)
+    if !isnothing(iv) && isa(window, VecInt)
+        iv = isone(dims) ? view(iv, window, :) : view(iv, :, window)
+    end
+    return Statistics.cov(ce, X; dims = dims, mean = mean, iv = iv, kwargs...)
 end
 """
-    Statistics.cor(ce::WindowedCovariance, X::MatNum; dims::Int = 1, mean = nothing,
+    Statistics.cor(ce::WindowedCovariance, X::MatNum; dims::Int = 1, mean = nothing, iv::Option{<:MatNum} = nothing,
                    kwargs...)
 
 Compute the correlation matrix using a rolling or indexed observation window.
@@ -116,6 +121,7 @@ This method selects a window of observations from `X` (and applies observation w
   - `X`: Data matrix of asset returns (observations × assets).
   - $(arg_dict[:dims])
   - `mean`: Optional pre-computed mean passed to the underlying estimator.
+  - $(arg_dict[:oiv])
   - `kwargs...`: Additional keyword arguments passed to the underlying estimator.
 
 # Returns
@@ -127,11 +133,15 @@ This method selects a window of observations from `X` (and applies observation w
   - [`WindowedCovariance`](@ref)
   - [`cov(ce::WindowedCovariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
 """
-function Statistics.cor(ce::WindowedCovariance, X::MatNum; dims::Int = 1, mean = nothing,
-                        kwargs...)
-    X, w = moment_window_and_weights(X, ce.w, ce.window; dims = dims, kwargs...)
+function Statistics.cor(ce::WindowedCovariance, X::MatNum; dims::Int = 1,
+                        iv::Option{<:MatNum} = nothing, kwargs...)
+    window = get_window(ce.window, X, dims)
+    X, w = moment_window_and_weights(X, ce.w, window; dims = dims, kwargs...)
     ce = factory(ce.ce, w)
-    return Statistics.cor(ce, X; dims = dims, mean = mean, kwargs...)
+    if !isnothing(iv) && isa(window, VecInt)
+        iv = isone(dims) ? view(iv, window, :) : view(iv, :, window)
+    end
+    return Statistics.cor(ce, X; dims = dims, iv = iv, kwargs...)
 end
 
 export WindowedCovariance

@@ -67,7 +67,7 @@ MeanReturn
     w
     flag
     function MeanReturn(w::Option{<:ObsWeights}, flag::Bool)
-        validate_observation_weights(w)
+        assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(w), typeof(flag)}(w, flag)
     end
 end
@@ -214,7 +214,7 @@ ThirdCentralMoment
     w
     mu
     function ThirdCentralMoment(w::Option{<:ObsWeights}, mu::Option{<:Num_VecNum_VecScalar})
-        validate_observation_weights(w)
+        assert_nonempty_nonneg_finite_val(w, :w)
         if isa(mu, VecNum)
             @argcheck(!isempty(mu))
         end
@@ -299,7 +299,7 @@ Skewness
     mu
     function Skewness(ve::AbstractVarianceEstimator, w::Option{<:ObsWeights},
                       mu::Option{<:Num_VecNum_VecScalar})
-        validate_observation_weights(w)
+        assert_nonempty_nonneg_finite_val(w, :w)
         if isa(mu, VecNum)
             @argcheck(!isempty(mu))
         end

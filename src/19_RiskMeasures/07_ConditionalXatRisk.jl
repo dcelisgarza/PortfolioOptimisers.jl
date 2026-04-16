@@ -79,7 +79,7 @@ ConditionalValueatRisk
     function ConditionalValueatRisk(settings::RiskMeasureSettings, alpha::Number,
                                     w::Option{<:ObsWeights})
         @argcheck(zero(alpha) < alpha < one(alpha))
-        validate_observation_weights(w)
+        assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(settings), typeof(alpha), typeof(w)}(settings, alpha, w)
     end
 end
@@ -314,7 +314,7 @@ ConditionalValueatRiskRange
                                          beta::Number, w::Option{<:ObsWeights})
         @argcheck(zero(alpha) < alpha < one(alpha))
         @argcheck(zero(beta) < beta < one(beta))
-        validate_observation_weights(w)
+        assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(settings), typeof(alpha), typeof(beta), typeof(w)}(settings,
                                                                              alpha, beta, w)
     end
@@ -434,7 +434,7 @@ DistributionallyRobustConditionalValueatRiskRange
         @argcheck(r_a > zero(r_a))
         @argcheck(l_b > zero(l_b))
         @argcheck(r_b > zero(r_b))
-        validate_observation_weights(w)
+        assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(settings), typeof(alpha), typeof(l_a), typeof(r_a), typeof(beta),
                    typeof(l_b), typeof(r_b), typeof(w)}(settings, alpha, l_a, r_a, beta,
                                                         l_b, r_b, w)
@@ -612,7 +612,7 @@ ConditionalDrawdownatRisk
     function ConditionalDrawdownatRisk(settings::RiskMeasureSettings, alpha::Number,
                                        w::Option{<:ObsWeights})
         @argcheck(zero(alpha) < alpha < one(alpha))
-        validate_observation_weights(w)
+        assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(settings), typeof(alpha), typeof(w)}(settings, alpha, w)
     end
 end
@@ -705,7 +705,7 @@ DistributionallyRobustConditionalDrawdownatRisk
         @argcheck(zero(alpha) < alpha < one(alpha))
         @argcheck(l > zero(l))
         @argcheck(r > zero(r))
-        validate_observation_weights(w)
+        assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(settings), typeof(alpha), typeof(l), typeof(r), typeof(w)}(settings,
                                                                                      alpha,
                                                                                      l, r,
@@ -841,7 +841,7 @@ RelativeConditionalDrawdownatRisk
     function RelativeConditionalDrawdownatRisk(settings::HierarchicalRiskMeasureSettings,
                                                alpha::Number, w::Option{<:ObsWeights})
         @argcheck(zero(alpha) < alpha < one(alpha))
-        validate_observation_weights(w)
+        assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(settings), typeof(alpha), typeof(w)}(settings, alpha, w)
     end
 end

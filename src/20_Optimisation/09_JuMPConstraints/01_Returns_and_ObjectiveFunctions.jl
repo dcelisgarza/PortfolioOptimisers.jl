@@ -137,7 +137,7 @@ Optionally supports observation weights and a lower bound on the portfolio retur
     w
     lb
     function LogarithmicReturn(w::Option{<:ObsWeights}, lb::Option{<:RkRtBounds})
-        validate_observation_weights(w)
+        assert_nonempty_nonneg_finite_val(w, :w)
         if isa(lb, Number)
             @argcheck(isfinite(lb))
         elseif isa(lb, VecNum)
