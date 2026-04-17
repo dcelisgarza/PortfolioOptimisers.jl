@@ -266,20 +266,19 @@ function nothing_scalar_array_view(x::AbstractVector{<:Union{<:AbstractVector,
     return [nothing_scalar_array_view(xi, i) for xi in x]
 end
 """
-    get_window(::Option{<:Colon}, args...) -> Option{<:Colon}
+    get_window(window::Option{<:Colon}, args...) -> Option{<:Colon}
     get_window(window::Integer, X::MatNum, dims::Int = 1) -> VecInt
     get_window(window::Integer, X::VecNum, args...) -> VecInt
     get_window(window::VecInt, args...) -> VecInt
 
-Get the row/observation window index range for a data array.
-
-Returns the index range corresponding to the last `window` observations (or all observations for `nothing`/`Colon`). Handles integer window sizes, vector index ranges, and `nothing`/`Colon` to mean "use all data".
+Get the observation window index range for a data array.
 
 # Arguments
 
   - $(arg_dict[:window])
       + `::Option{<:Colon}`: Returns the argument.
-      + `::Integer`: Returns the last `window` observations.
+      + `::Integer`: Returns the last `window` observations. This operation is safe, so it doesn't error if `window` is larger than the number of observations.
+      + `::VecInt`: Returns the `window` argument.
   - $(arg_dict[:X_Xv])
   - $(arg_dict[:dims])
 
@@ -295,14 +294,14 @@ function get_window(::Option{<:Colon}, args...)
     return Colon()
 end
 function get_window(window::Integer, X::MatNum, dims::Int = 1)
-    stop = lastindex(X, dims)
     start = firstindex(X, dims)
-    return max(1, stop - window + 1):stop
+    stop = lastindex(X, dims)
+    return max(start, stop - window + 1):stop
 end
 function get_window(window::Integer, X::VecNum, args...)
-    stop = lastindex(X)
     start = firstindex(X)
-    return max(1, stop - window + 1):stop
+    stop = lastindex(X)
+    return max(start, stop - window + 1):stop
 end
 function get_window(window::VecInt, args...)
     return window
