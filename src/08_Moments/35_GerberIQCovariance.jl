@@ -2,7 +2,6 @@
 abstract type BaseGerberIQCovariance <: BaseGerberCovariance end
 abstract type GerberIQCovarianceAlgorithm <: AbstractMomentAlgorithm end
 abstract type GerberIQCovarianceCTransformAlg <: AbstractMomentAlgorithm end
-const GerberIQCovarianceCTransform = Union{Function, <:GerberIQCovarianceCTransformAlg}
 """
 ```
             4 ┬─────┰───────────┬───────────┬───────────┰─────┐
@@ -203,60 +202,84 @@ dcn ─┤     -3 ┾━━━━━╋━━━━━╋━━━━━┥     
     end
 end
 @concrete struct GerberIQCovariance <: BaseGerberIQCovariance
-    r0
+    ve
+    me
     c
     t
     e
     y
     alg
-    function GerberIQCovariance(r0::Number, c::Number, t::Number, e::Number, y::Number,
-                                alg::GerberIQCovarianceAlgorithm)
-        assert_nonempty_nonneg_finite_val(r0, :r0)
+    sca
+    ex
+    function GerberIQCovariance(ve::StatsBase.CovarianceEstimator,
+                                me::Option{<:AbstractExpectedReturnsEstimator}, c::Number,
+                                t::Number, e::Number, y::Number,
+                                alg::GerberIQCovarianceAlgorithm,
+                                sca::Option{<:Num_VecToScaM},
+                                ex::FLoops.Transducers.Executor)
         assert_nonempty_nonneg_finite_val(c, :c)
         assert_nonempty_nonneg_finite_val(t, :t)
         assert_nonempty_nonneg_finite_val(e, :e)
         assert_nonempty_nonneg_finite_val(y, :y)
-        return new{typeof(r0), typeof(c), typeof(t), typeof(e), typeof(y), typeof(alg)}(r0,
-                                                                                        c,
-                                                                                        t,
-                                                                                        e,
-                                                                                        y,
-                                                                                        alg)
+        return new{typeof(ve), typeof(me), typeof(c), typeof(t), typeof(e), typeof(y),
+                   typeof(alg), typeof(sca), typeof(ex)}(ve, me, c, t, e, y, alg, sca, ex)
     end
 end
 function get_M(c::Number, t::Number, X::MatNum)
     window = get_window(t, X)
     return -c .<= view(X, window, :) .<= c
 end
-#! Assume X is already transformed
-function gerber_IQ(c::Number, t::Number, e::Number, y::Number,
-                   alg::GerberIQCovarianceAlgorithm, std_vec::VecNum, X::MatNum,
-                   f::Union{Function, <:GerberIQCovarianceCTransformAlg} = (x, y, z) -> x)
+function transform_c(c::Number, sdi::Number, sdj::Number, args...)
+    return c
+end
+function transform_c(c::Number, sdi::Number, sdj::Number, scaler::Num_VecToScaM)
+    return c * vec_to_real_measure(scaler, (sdi, sdj))
+end
+function gerber_rho(Xi::VecNum, Xj::VecNum, E::BitVector, t::Number, e::Number, y::Number)
+    return T = length(E)
+end
+function Statistics.cor(ce::GerberIQCovariance, X::MatNum; dims::Int = 1, mean = nothing,
+                        kwargs...)
+    @argcheck(dims in (1, 2))
+    if dims == 2
+        X = transpose(X)
+    end
+    me = ifelse(isnothing(ce.ve.me), SimpleExpectedReturns(), ce.ve.me)
+    mu = isnothing(mean) ? Statistics.mean(me, X; dims = 1, kwargs...) : mean
+    sd = Statistics.std(ce.ve, X; dims = 1, mean = mu, kwargs...)
+    idx = iszero.(sd)
+    sd[idx] .= eps(eltype(X))
+    X = (X .- mu) ⊘ sd
+    sigma = gerber_IQ(ce, X, sd)
+    return StatsBase.cor2cov!(sigma, sd)
+end
+#! Assume X is already transformed with r0
+function gerber_IQ(X::MatNum, sd::VecNum)
     window = get_window(t, X)
     X = view(X, window, :)
-    T, N = size(X)
+    r0 = find_data_centre(r0, X)
+    X = X .- r0
+    X = view(X, window, :)
+    T = size(X, 1)
     Mj = falses(T)
     Mi = falses(T)
-    Eu = falses(T)
-    Ei = falses(T)
+    Eb = falses(T)
+    Eo = falses(T)
     rho = similar(X)
     for j in axes(X, 2)
         xj = view(X, :, j)
         for i in 1:j
             xi = view(X, :, i)
-            # Transform c with std_vec if needed
-            ct = f(c, std_vec[i], std_vec[j])
+            ct = transform_c(c, sd[i], sd[j], scaler)
             Mj .= -ct .<= xj .<= ct
             Mi .= -ct .<= xi .<= ct
-            if i != j
-                Eu .= .!(Mj .| Mi)
-                Ei .= .!(Mj .& Mi)
-                rho[i, j] = rho[j, i] = val
-            else
-                Mi .= Mj
-                Eu .= Ei .= .!Mj
-                rho[i, j] = val
-            end
+            Eb .= .!(Mj .| Mi)
+            Eo .= .!(Mj .& Mi)
+            Xbi = view(X, Eb, i)
+            Xbj = view(X, Eb, j)
+            Xoi = view(X, Eo, i)
+            Xoj = view(X, Eo, j)
+            # rho[i, j] = rho[j, i] = val
         end
     end
     return nothing

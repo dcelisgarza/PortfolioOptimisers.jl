@@ -1139,48 +1139,64 @@ julia> PortfolioOptimisers.vec_to_real_measure(0.9, [1.2, 3.4, 0.7])
 function vec_to_real_measure(::MinValue, val::VecNum; kwargs...)
     return minimum(val)
 end
-function vec_to_real_measure(mv::MeanValue, val::VecNum; kwargs...)
+function vec_to_real_measure(::MinValue, val::Tuple{Vararg{<:Number}}; kwargs...)
+    return min(val)
+end
+function vec_to_real_measure(mv::MeanValue, val::Union{<:VecNum, Tuple{Vararg{<:Number}}};
+                             kwargs...)
     return isnothing(mv.w) ? Statistics.mean(val) : Statistics.mean(val, mv.w)
 end
-function vec_to_real_measure(mdv::MedianValue, val::VecNum; kwargs...)
+function vec_to_real_measure(mdv::MedianValue,
+                             val::Union{<:VecNum, Tuple{Vararg{<:Number}}}; kwargs...)
     return isnothing(mdv.w) ? Statistics.median(val) : Statistics.median(val, mdv.w)
 end
 function vec_to_real_measure(::MaxValue, val::VecNum; kwargs...)
     return maximum(val)
 end
-function vec_to_real_measure(val::Number, ::VecNum; kwargs...)
+function vec_to_real_measure(::MaxValue, val::Tuple{Vararg{<:Number}}; kwargs...)
+    return max(val)
+end
+function vec_to_real_measure(val::Number, ::Union{<:VecNum, Tuple{Vararg{<:Number}}};
+                             kwargs...)
     return val
 end
-function vec_to_real_measure(sv::StdValue, val::VecNum; kwargs...)
+function vec_to_real_measure(sv::StdValue, val::Union{<:VecNum, Tuple{Vararg{<:Number}}};
+                             kwargs...)
     return if isnothing(sv.w)
         Statistics.std(val; corrected = sv.corrected, kwargs...)
     else
         Statistics.std(val, sv.w; corrected = sv.corrected, kwargs...)
     end
 end
-function vec_to_real_measure(vv::VarValue, val::VecNum; kwargs...)
+function vec_to_real_measure(vv::VarValue, val::Union{<:VecNum, Tuple{Vararg{<:Number}}};
+                             kwargs...)
     return if isnothing(vv.w)
         Statistics.var(val; corrected = vv.corrected, kwargs...)
     else
         Statistics.var(val, vv.w; corrected = vv.corrected, kwargs...)
     end
 end
-function vec_to_real_measure(msv::StandardisedValue, val::VecNum; kwargs...)
+function vec_to_real_measure(msv::StandardisedValue,
+                             val::Union{<:VecNum, Tuple{Vararg{<:Number}}}; kwargs...)
     m = vec_to_real_measure(msv.mv, val)
     s = vec_to_real_measure(msv.sv, val; mean = m)
     s = ifelse(iszero(s), sqrt(eps(eltype(s))), s)
     return m / s
 end
-function vec_to_real_measure(::SumValue, val::VecNum; kwargs...)
+function vec_to_real_measure(::SumValue, val::Union{<:VecNum, Tuple{Vararg{<:Number}}};
+                             kwargs...)
     return sum(val)
 end
-function vec_to_real_measure(::ProdValue, val::VecNum; kwargs...)
+function vec_to_real_measure(::ProdValue, val::Union{<:VecNum, Tuple{Vararg{<:Number}}};
+                             kwargs...)
     return prod(val)
 end
-function vec_to_real_measure(::ModeValue, val::VecNum; kwargs...)
+function vec_to_real_measure(::ModeValue, val::Union{<:VecNum, Tuple{Vararg{<:Number}}};
+                             kwargs...)
     return StatsBase.mode(val)
 end
-function vec_to_real_measure(f::Function, val::VecNum; kwargs...)
+function vec_to_real_measure(f::Function, val::Union{<:VecNum, Tuple{Vararg{<:Number}}};
+                             kwargs...)
     return f(val)
 end
 
