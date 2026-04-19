@@ -131,14 +131,14 @@
                GerberCovariance(; alg = Gerber0(),
                                 ve = SimpleVariance(; me = SimpleExpectedReturns(; w = ew),
                                                     corrected = false, w = ew)),
-               GerberCovariance(; alg = StandardisedGerber0()),
-               GerberCovariance(; alg = StandardisedGerber0(),
+               GerberCovariance(; alg = Gerber0(), me = SimpleExpectedReturns(;)),
+               GerberCovariance(; alg = Gerber0(), me = SimpleExpectedReturns(; w = ew),
                                 ve = SimpleVariance(; me = SimpleExpectedReturns(; w = ew),
                                                     corrected = false, w = ew)),
                GerberCovariance(; alg = Gerber1()),
-               GerberCovariance(; alg = StandardisedGerber1()),
+               GerberCovariance(; alg = Gerber1(), me = SimpleExpectedReturns()),
                GerberCovariance(; alg = Gerber2()),
-               GerberCovariance(; alg = StandardisedGerber2()),
+               GerberCovariance(; alg = Gerber2(), me = SimpleExpectedReturns()),
                SmythBrobyCovariance(; alg = SmythBroby0()),
                SmythBrobyCovariance(; alg = SmythBroby0(),
                                     ve = SimpleVariance(;
@@ -239,9 +239,11 @@
 
         ce0 = PortfolioOptimisersCovariance(;
                                             ce = GerberCovariance(; alg = Gerber2(),
+                                                                  me = SimpleExpectedReturns(;),
                                                                   t = 0.1))
         ce = PortfolioOptimisers.factory(ce0, ew)
         @test !(ce.ce.ve === ce0.ce.ve)
+        @test !(ce.ce.me === ce0.ce.me)
         @test ce.ce.pdm === ce0.ce.pdm
         @test ce.ce.alg === ce0.ce.alg
         @test ce.ce.t == ce0.ce.t
@@ -251,26 +253,16 @@
         @test ce.mp === ce0.mp
         @test isapprox(cov(GerberCovariance(; alg = Gerber0()), rd.X),
                        cov(GerberCovariance(; alg = Gerber0()), rd.X'; dims = 2))
-        @test isapprox(cov(GerberCovariance(; alg = StandardisedGerber0()), rd.X),
-                       cov(GerberCovariance(; alg = StandardisedGerber0()), rd.X';
-                           dims = 2))
+        @test isapprox(cov(GerberCovariance(; alg = Gerber0(),
+                                            me = SimpleExpectedReturns()), rd.X),
+                       cov(GerberCovariance(; alg = Gerber0(),
+                                            me = SimpleExpectedReturns()), rd.X'; dims = 2))
         @test isapprox(cor(GerberCovariance(; alg = Gerber0()), rd.X),
                        cor(GerberCovariance(; alg = Gerber0()), rd.X'; dims = 2))
-        @test isapprox(cor(GerberCovariance(; alg = StandardisedGerber0()), rd.X),
-                       cor(GerberCovariance(; alg = StandardisedGerber0()), rd.X';
-                           dims = 2))
-
-        ce0 = PortfolioOptimisersCovariance(;
-                                            ce = GerberCovariance(;
-                                                                  alg = StandardisedGerber0(),
-                                                                  t = 0.2))
-        ce = PortfolioOptimisers.factory(ce0, ew)
-        @test !(ce.ce.ve === ce0.ce.ve)
-        @test ce.ce.pdm === ce0.ce.pdm
-        @test ce.ce.t == ce0.ce.t
-        @test ce.mp === ce0.mp
-        @test ce.ce.ve.w === ew
-        @test ce.ce.ve.me.w === ew
+        @test isapprox(cor(GerberCovariance(; alg = Gerber0(),
+                                            me = SimpleExpectedReturns()), rd.X),
+                       cor(GerberCovariance(; alg = Gerber0(),
+                                            me = SimpleExpectedReturns()), rd.X'; dims = 2))
 
         ce0 = PortfolioOptimisersCovariance(;
                                             ce = SmythBrobyCovariance(; alg = SmythBroby2(),

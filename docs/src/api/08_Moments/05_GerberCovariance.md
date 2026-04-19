@@ -11,8 +11,6 @@ These serve as the scaffolding for defining Gerber covariance estimators and alg
 ```@docs
 BaseGerberCovariance
 GerberCovarianceAlgorithm
-UnstandardisedGerberCovarianceAlgorithm
-StandardisedGerberCovarianceAlgorithm
 ```
 
 ## Concrete Gerber covariance implementations
@@ -23,19 +21,11 @@ These define the concrete implementations of the Gerber covariance estimators an
 Gerber0
 Gerber1
 Gerber2
-StandardisedGerber0
-StandardisedGerber1
-StandardisedGerber2
 GerberCovariance
 factory(ce::GerberCovariance, w::StatsBase.AbstractWeights)
-gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber0}, X::MatNum, sd::ArrNum)
-gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:StandardisedGerber0}, X::MatNum)
-gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber1}, X::MatNum, sd::ArrNum)
-gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:StandardisedGerber1}, X::MatNum)
-gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Gerber2}, X::MatNum, sd::ArrNum)
-gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:StandardisedGerber2}, X::MatNum)
-cov(ce::GerberCovariance{<:Any, <:Any, <:Any,
-                        <:UnstandardisedGerberCovarianceAlgorithm}, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)
-cor(ce::GerberCovariance{<:Any, <:Any, <:Any,
-                        <:UnstandardisedGerberCovarianceAlgorithm}, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)
+gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Any, <:Gerber0}, X::MatNum, sd::ArrNum)
+gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Any, <:Gerber1}, X::MatNum, sd::ArrNum)
+gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Any, <:Gerber2}, X::MatNum, sd::ArrNum)
+cov(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Any}, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)
+cor(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Any}, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)
 ```

@@ -237,6 +237,7 @@ $(DocStringExtensions.FIELDS)
 
     SmythBrobyCovariance(;
         ve::StatsBase.CovarianceEstimator = SimpleVariance(),
+        me::Option{AbstractExpectedReturnsEstimator} = nothing,
         pdm::Option{<:Posdef} = Posdef(),
         t::Number = 0.5,
         c1::Number = 0.5,
@@ -304,6 +305,8 @@ SmythBrobyCovariance
 @concrete struct SmythBrobyCovariance <: BaseSmythBrobyCovariance
     "$(field_dict[:ve])"
     ve
+    "Optional $(lowercase(field_dict[:me])) Used for optionally centering the returns."
+    me
     "$(field_dict[:pdm])"
     pdm
     "$(field_dict[:t])"
@@ -320,9 +323,10 @@ SmythBrobyCovariance
     alg
     "$(field_dict[:ex])"
     ex
-    function SmythBrobyCovariance(ve::StatsBase.CovarianceEstimator, pdm::Option{<:Posdef},
-                                  t::Number, c1::Number, c2::Number, c3::Number, n::Number,
-                                  alg::SmythBrobyCovarianceAlgorithm,
+    function SmythBrobyCovariance(ve::StatsBase.CovarianceEstimator,
+                                  me::Option{<:AbstractExpectedReturnsEstimator},
+                                  pdm::Option{<:Posdef}, t::Number, c1::Number, c2::Number,
+                                  c3::Number, n::Number, alg::SmythBrobyCovarianceAlgorithm,
                                   ex::FLoops.Transducers.Executor)
         @argcheck(zero(t) < t < one(t), DomainError("0 < t < 1 must hold. Got\nt => $t"))
         @argcheck(zero(c1) < c1 <= one(c1),
@@ -330,17 +334,19 @@ SmythBrobyCovariance
         @argcheck(zero(c2) < c2 <= one(c2),
                   DomainError("0 < c2 <= 1 must hold. Got\nc2 => $c2"))
         @argcheck(c2 < c3, DomainError)
-        return new{typeof(ve), typeof(pdm), typeof(t), typeof(c1), typeof(c2), typeof(c3),
-                   typeof(n), typeof(alg), typeof(ex)}(ve, pdm, t, c1, c2, c3, n, alg, ex)
+        return new{typeof(ve), typeof(me), typeof(pdm), typeof(t), typeof(c1), typeof(c2),
+                   typeof(c3), typeof(n), typeof(alg), typeof(ex)}(ve, me, pdm, t, c1, c2,
+                                                                   c3, n, alg, ex)
     end
 end
 function SmythBrobyCovariance(; ve::StatsBase.CovarianceEstimator = SimpleVariance(),
+                              me::Option{<:AbstractExpectedReturnsEstimator} = nothing,
                               pdm::Option{<:Posdef} = Posdef(), t::Number = 0.5,
                               c1::Number = 0.5, c2::Number = 0.5, c3::Number = 4,
                               n::Number = 2,
                               alg::SmythBrobyCovarianceAlgorithm = SmythBrobyGerber1(),
                               ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())
-    return SmythBrobyCovariance(ve, pdm, t, c1, c2, c3, n, alg, ex)
+    return SmythBrobyCovariance(ve, me, pdm, t, c1, c2, c3, n, alg, ex)
 end
 """
     factory(ce::SmythBrobyCovariance, w::ObsWeights) -> SmythBrobyCovariance

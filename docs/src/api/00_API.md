@@ -125,15 +125,10 @@ Overloads `Statistics.cov` and `Statistics.cor`.
 - ::: details Covariance with custom covariance estimator [`Covariance`](@ref)
   - Full [`Full`](@ref)
   - Semi [`Semi`](@ref)
-- ::: details Gerber covariances with custom variance estimator [`GerberCovariance`](@ref)
-  - ::: details Unstandardised algorithms
-    - Gerber 0 [`Gerber0`](@ref)
-    - Gerber 1 [`Gerber1`](@ref)
-    - Gerber 2 [`Gerber2`](@ref)
-  - ::: details Standardised algorithms (Z-transforms the data beforehand) with custom expected returns estimator
-    - Gerber 0 [`StandardisedGerber0`](@ref)
-    - Gerber 1 [`StandardisedGerber1`](@ref)
-    - Gerber 2 [`StandardisedGerber2`](@ref)
+- ::: details Gerber covariances with custom variance and demeaning estimator [`GerberCovariance`](@ref)
+  - Gerber 0 [`Gerber0`](@ref)
+  - Gerber 1 [`Gerber1`](@ref)
+  - Gerber 2 [`Gerber2`](@ref)
 - ::: details Smyth-Broby extension of Gerber covariances with custom expected returns and variance estimators [`SmythBrobyCovariance`](@ref)
   - ::: details Unstandardised algorithms
     - Smyth-Broby 0 [`SmythBroby0`](@ref)
