@@ -79,7 +79,7 @@ function factory(ce::StandardDeviationExpectedReturns, w::ObsWeights)
     return StandardDeviationExpectedReturns(; ce = factory(ce.ce, w))
 end
 """
-    Statistics.mean(me::StandardDeviationExpectedReturns, X::AbstractMatrix{<:Real};
+    Statistics.mean(me::StandardDeviationExpectedReturns, X::MatNum;
                     dims::Int = 1, kwargs...)
 
 Compute expected returns as the standard deviation of each asset.
@@ -101,8 +101,8 @@ This method returns the standard deviation vector of `X` as estimated by the cov
 
   - [`StandardDeviationExpectedReturns`](@ref)
 """
-function Statistics.mean(me::StandardDeviationExpectedReturns, X::AbstractMatrix{<:Real};
-                         dims::Int = 1, kwargs...)
+function Statistics.mean(me::StandardDeviationExpectedReturns, X::MatNum; dims::Int = 1,
+                         kwargs...)
     return Statistics.std(me.ce, X; dims = dims, kwargs...)
 end
 
@@ -187,7 +187,7 @@ function factory(ce::VarianceExpectedReturns, w::ObsWeights)
     return VarianceExpectedReturns(; ce = factory(ce.ce, w))
 end
 """
-    Statistics.mean(me::VarianceExpectedReturns, X::AbstractMatrix{<:Real};
+    Statistics.mean(me::VarianceExpectedReturns, X::MatNum;
                     dims::Int = 1, kwargs...)
 
 Compute expected returns as the variance of each asset.
@@ -209,8 +209,7 @@ This method returns the standard deviation vector of `X` as estimated by the cov
 
   - [`VarianceExpectedReturns`](@ref)
 """
-function Statistics.mean(me::VarianceExpectedReturns, X::AbstractMatrix{<:Real};
-                         dims::Int = 1, kwargs...)
+function Statistics.mean(me::VarianceExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)
     return Statistics.std(me.ce, X; dims = dims, kwargs...)
 end
 

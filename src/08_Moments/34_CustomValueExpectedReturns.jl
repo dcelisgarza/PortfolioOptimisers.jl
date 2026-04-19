@@ -12,7 +12,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     CustomValueExpectedReturns(;
-        w::Option{<:ObsWeights} = nothing
+        val::Number = 0.0
     ) -> CustomValueExpectedReturns
 
 Keywords correspond to the struct's fields.
@@ -46,39 +46,17 @@ CustomValueExpectedReturns
   - [`PortfolioOptimisersCovariance`](@ref)
 """
 @concrete struct CustomValueExpectedReturns <: AbstractExpectedReturnsEstimator
-    "$(field_dict[:oow])"
-    w
-    function CustomValueExpectedReturns(w::Option{<:ObsWeights})
-        return new{typeof(w)}(w)
+    "Custom value."
+    val
+    function CustomValueExpectedReturns(val::Number)
+        return new{typeof(val)}(val)
     end
 end
-function CustomValueExpectedReturns(; w::Option{<:ObsWeights} = nothing)
-    return CustomValueExpectedReturns(w)
+function CustomValueExpectedReturns(; val::Number = 0.0)
+    return CustomValueExpectedReturns(val)
 end
 """
-    factory(ce::CustomValueExpectedReturns, w::ObsWeights) -> CustomValueExpectedReturns
-
-    Return a new [`CustomValueExpectedReturns`](@ref) estimator with observation weights `w` applied to the underlying covariance estimator.
-
-# Arguments
-
-  - `ce`: Median expected returns estimator.
-  - $(arg_dict[:ow])
-
-# Returns
-
-  - `me::CustomValueExpectedReturns`: Updated estimator with weights applied.
-
-# Related
-
-  - [`CustomValueExpectedReturns`](@ref)
-  - [`factory`](@ref)
-"""
-function factory(::CustomValueExpectedReturns, w::ObsWeights)
-    return CustomValueExpectedReturns(; w = w)
-end
-"""
-    Statistics.mean(me::CustomValueExpectedReturns, X::AbstractMatrix{<:Real};
+    Statistics.mean(me::CustomValueExpectedReturns, X::MatNum;
                     dims::Int = 1, kwargs...)
 
 Compute expected returns as the Median of each asset.
@@ -100,22 +78,10 @@ This method returns the Median vector of `X` as estimated by the covariance esti
 
   - [`CustomValueExpectedReturns`](@ref)
 """
-function Statistics.mean(me::CustomValueExpectedReturns{Nothing}, X::AbstractMatrix{<:Real};
-                         dims::Int = 1, kwargs...)
-    return Statistics.median(X; dims = dims)
-end
-function Statistics.mean(me::CustomValueExpectedReturns{<:ObsWeights},
-                         X::AbstractMatrix{<:Real}; dims::Int = 1, kwargs...)
-    @argcheck(dims ∈ (1, 2))
-    if dims == 2
-        X = transpose(X)
-    end
-    w = get_observation_weights(me.w, X)
-    Y = Vector{eltype(X)}(undef, size(X, 2))
-    for i in axes(X, 2)
-        Y[i] = Statistics.median(view(X, :, i), w)
-    end
-    return insertdims(Y; dims = dims)
+function Statistics.mean(me::CustomValueExpectedReturns, X::MatNum; dims::Int = 1,
+                         kwargs...)
+    @argcheck(dims in (1, 2))
+    return insertdims(fill(me.val, size(X, setdiff((1, 2), (dims,)))); dims = dims)
 end
 
 export CustomValueExpectedReturns

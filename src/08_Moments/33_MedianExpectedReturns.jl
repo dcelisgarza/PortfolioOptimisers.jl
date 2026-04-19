@@ -78,7 +78,7 @@ function factory(::MedianExpectedReturns, w::ObsWeights)
     return MedianExpectedReturns(; w = w)
 end
 """
-    Statistics.mean(me::MedianExpectedReturns, X::AbstractMatrix{<:Real};
+    Statistics.mean(me::MedianExpectedReturns, X::MatNum;
                     dims::Int = 1, kwargs...)
 
 Compute expected returns as the median of each asset.
@@ -100,12 +100,12 @@ This method returns the median vector of `X` as estimated by the covariance esti
 
   - [`MedianExpectedReturns`](@ref)
 """
-function Statistics.mean(me::MedianExpectedReturns{Nothing}, X::AbstractMatrix{<:Real};
-                         dims::Int = 1, kwargs...)
+function Statistics.mean(me::MedianExpectedReturns{Nothing}, X::MatNum; dims::Int = 1,
+                         kwargs...)
     return Statistics.median(X; dims = dims)
 end
-function Statistics.mean(me::MedianExpectedReturns{<:ObsWeights}, X::AbstractMatrix{<:Real};
-                         dims::Int = 1, kwargs...)
+function Statistics.mean(me::MedianExpectedReturns{<:ObsWeights}, X::MatNum; dims::Int = 1,
+                         kwargs...)
     @argcheck(dims ∈ (1, 2))
     if dims == 2
         X = transpose(X)
