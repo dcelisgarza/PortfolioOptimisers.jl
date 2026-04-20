@@ -218,7 +218,7 @@ GerberCovariance
 """
 function factory(ce::GerberCovariance, w::ObsWeights)
     return GerberCovariance(; ve = factory(ce.ve, w), me = factory(ce.me, w), pdm = ce.pdm,
-                            t = ce.t, alg = factory(ce.alg, w), ex = ce.ex)
+                            t = ce.t, alg = factory(ce.alg, w))
 end
 """
     gerber(
