@@ -238,8 +238,10 @@ SmythBrobyCovariance
                                   pdm::Option{<:Posdef}, c1::Number, c2::Number, c3::Number,
                                   n::Number, alg::SmythBrobyCovarianceAlgorithm,
                                   ex::FLoops.Transducers.Executor)
-        @argcheck(zero(c1) < c1 <= one(c1))
-        @argcheck(c2 < c3, DomainError)
+        assert_nonempty_nonneg_finite_val(c1, :c1)
+        assert_nonempty_nonneg_finite_val(c2, :c2)
+        assert_nonempty_nonneg_finite_val(c3, :c3)
+        @argcheck(c2 < c3)
         return new{typeof(ve), typeof(me), typeof(pdm), typeof(c1), typeof(c2), typeof(c3),
                    typeof(n), typeof(alg), typeof(ex)}(ve, me, pdm, c1, c2, c3, n, alg, ex)
     end

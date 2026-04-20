@@ -37,6 +37,13 @@ abstract type GerberIQCovarianceCTransformAlg <: AbstractMomentAlgorithm end
         return new{typeof(d), typeof(n)}(d, n)
     end
 end
+function BasicGerberIQ(; d::Number = 0.5, n::Number = 0.5)
+    return BasicGerberIQ(d, n)
+end
+function gerber_iq_assert_c_d(c::Number, alg::BasicGerberIQ)
+    @argcheck(c < alg.d)
+    return nothing
+end
 """
 ```
                          ddn                     dcp
@@ -201,6 +208,13 @@ dcn ─┤     -3 ┾━━━━━╋━━━━━╋━━━━━┥     
                                                                        n19, n20, n21)
     end
 end
+function gerber_iq_assert_c_d(c::Number, alg::Union{<:PartialGerberIQ, <:FullGerberIQ})
+    @argcheck(c < alg.dcp)
+    @argcheck(c < alg.dcn)
+    @argcheck(c < alg.ddp)
+    @argcheck(c < alg.ddn)
+    return nothing
+end
 @concrete struct GerberIQCovariance <: BaseGerberIQCovariance
     ve
     me
@@ -212,12 +226,12 @@ end
     sca
     ex
     function GerberIQCovariance(ve::StatsBase.CovarianceEstimator,
-                                me::Option{<:AbstractExpectedReturnsEstimator}, c::Number,
-                                t::Number, e::Number, y::Number,
-                                alg::GerberIQCovarianceAlgorithm,
+                                me::AbstractExpectedReturnsEstimator, c::Number, t::Number,
+                                e::Number, y::Number, alg::GerberIQCovarianceAlgorithm,
                                 sca::Option{<:Num_VecToScaM},
                                 ex::FLoops.Transducers.Executor)
         assert_nonempty_nonneg_finite_val(c, :c)
+        gerber_iq_assert_c_d(c, alg)
         assert_nonempty_nonneg_finite_val(t, :t)
         assert_nonempty_nonneg_finite_val(e, :e)
         assert_nonempty_nonneg_finite_val(y, :y)
@@ -244,43 +258,22 @@ function Statistics.cor(ce::GerberIQCovariance, X::MatNum; dims::Int = 1, mean =
     if dims == 2
         X = transpose(X)
     end
-    me = ifelse(isnothing(ce.ve.me), SimpleExpectedReturns(), ce.ve.me)
-    mu = isnothing(mean) ? Statistics.mean(me, X; dims = 1, kwargs...) : mean
-    sd = Statistics.std(ce.ve, X; dims = 1, mean = mu, kwargs...)
-    idx = iszero.(sd)
-    sd[idx] .= eps(eltype(X))
-    X = (X .- mu) ⊘ sd
-    sigma = gerber_IQ(ce, X, sd)
+    X = demean_returns(X, ce.me; dims = 1, kwargs...) ./
+        Statistics.std(ce.ve, X; dims = 1, kwargs...)
+    return gerber_IQ(ce, X)
+end
+function Statistics.cov(ce::GerberIQCovariance, X::MatNum; dims::Int = 1, mean = nothing,
+                        kwargs...)
+    @argcheck(dims in (1, 2))
+    if dims == 2
+        X = transpose(X)
+    end
+    sd = Statistics.std(ce.ve, X; dims = 1, kwargs...)
+    X = demean_returns(X, ce.me; dims = 1, kwargs...) ./ sd
+    sigma = gerber_IQ(ce, X)
     return StatsBase.cor2cov!(sigma, sd)
 end
 #! Assume X is already transformed with r0
-function gerber_IQ(X::MatNum, sd::VecNum)
-    window = get_window(t, X)
-    X = view(X, window, :)
-    r0 = find_data_centre(r0, X)
-    X = X .- r0
-    X = view(X, window, :)
-    T = size(X, 1)
-    Mj = falses(T)
-    Mi = falses(T)
-    Eb = falses(T)
-    Eo = falses(T)
-    rho = similar(X)
-    for j in axes(X, 2)
-        xj = view(X, :, j)
-        for i in 1:j
-            xi = view(X, :, i)
-            ct = transform_c(c, sd[i], sd[j], scaler)
-            Mj .= -ct .<= xj .<= ct
-            Mi .= -ct .<= xi .<= ct
-            Eb .= .!(Mj .| Mi)
-            Eo .= .!(Mj .& Mi)
-            Xbi = view(X, Eb, i)
-            Xbj = view(X, Eb, j)
-            Xoi = view(X, Eo, i)
-            Xoj = view(X, Eo, j)
-            # rho[i, j] = rho[j, i] = val
-        end
-    end
+function gerber_IQ(ce::GerberIQCovariance, X::MatNum)
     return nothing
 end

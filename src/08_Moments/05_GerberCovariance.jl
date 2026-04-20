@@ -149,7 +149,7 @@ Keywords correspond to the struct's fields.
     function GerberCovariance(ve::StatsBase.CovarianceEstimator,
                               me::AbstractExpectedReturnsEstimator, pdm::Option{<:Posdef},
                               t::Number, alg::GerberCovarianceAlgorithm)
-        @argcheck(zero(t) < t < one(t), DomainError("0 < t < 1 must hold. Got\nt => $t"))
+        assert_nonempty_finite_val(t, :t)
         return new{typeof(ve), typeof(me), typeof(pdm), typeof(t), typeof(alg)}(ve, me, pdm,
                                                                                 t, alg)
     end
