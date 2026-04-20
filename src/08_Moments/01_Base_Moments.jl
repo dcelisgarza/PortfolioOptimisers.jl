@@ -746,14 +746,9 @@ function moment_window_and_weights(X::VecNum, w::Option{<:ObsWeights}, window::V
     w = get_observation_weights(w, X; kwargs...)
     return X, w
 end
-function demean_returns(X::MatNum, ::Nothing; dims::Int = 1)
-    return X
-end
-function demean_returns(X::MatNum, me::AbstractExpectedReturnsEstimator; dims::Int = 1)
-    return X .- Statistics.mean(me, X; dims = dims)
-end
-function demean_returns(X::MatNum, mu::AbstractArray; kwargs...)
-    return X .- mu
+function demean_returns(X::MatNum, me::AbstractExpectedReturnsEstimator; dims::Int = 1,
+                        kwargs...)
+    return X .- Statistics.mean(me, X; dims = dims, kwargs...)
 end
 
 export Full, Semi

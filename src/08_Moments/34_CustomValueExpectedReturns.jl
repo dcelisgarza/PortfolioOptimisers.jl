@@ -81,7 +81,7 @@ This method returns the Median vector of `X` as estimated by the covariance esti
 function Statistics.mean(me::CustomValueExpectedReturns, X::MatNum; dims::Int = 1,
                          kwargs...)
     @argcheck(dims in (1, 2))
-    return insertdims(fill(me.val, size(X, setdiff((1, 2), (dims,)))); dims = dims)
+    return insertdims(fill(me.val, size(X, setdiff((1, 2), (dims,))[1])); dims = dims)
 end
 
 export CustomValueExpectedReturns

@@ -108,6 +108,7 @@ $(DocStringExtensions.FIELDS)
 
     GerberCovariance(;
         ve::StatsBase.CovarianceEstimator = SimpleVariance(),
+        me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns()
         pdm::Option{<:Posdef} = Posdef(),
         t::Number = 0.5,
         alg::GerberCovarianceAlgorithm = Gerber1()
@@ -137,7 +138,7 @@ Keywords correspond to the struct's fields.
 @concrete struct GerberCovariance <: BaseGerberCovariance
     "$(field_dict[:ve])"
     ve
-    "Optional $(lowercase(field_dict[:me])) Used for optionally centering the returns."
+    "$(field_dict[:me]) Used for centering the returns."
     me
     "$(field_dict[:pdm])"
     pdm
@@ -146,19 +147,78 @@ Keywords correspond to the struct's fields.
     "$(field_dict[:gerbalg])"
     alg
     function GerberCovariance(ve::StatsBase.CovarianceEstimator,
-                              me::Option{<:AbstractExpectedReturnsEstimator},
-                              pdm::Option{<:Posdef}, t::Number,
-                              alg::GerberCovarianceAlgorithm)
+                              me::AbstractExpectedReturnsEstimator, pdm::Option{<:Posdef},
+                              t::Number, alg::GerberCovarianceAlgorithm)
         @argcheck(zero(t) < t < one(t), DomainError("0 < t < 1 must hold. Got\nt => $t"))
         return new{typeof(ve), typeof(me), typeof(pdm), typeof(t), typeof(alg)}(ve, me, pdm,
                                                                                 t, alg)
     end
 end
 function GerberCovariance(; ve::StatsBase.CovarianceEstimator = SimpleVariance(),
-                          me::Option{<:AbstractExpectedReturnsEstimator} = nothing,
+                          me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
                           pdm::Option{<:Posdef} = Posdef(), t::Number = 0.5,
                           alg::GerberCovarianceAlgorithm = Gerber1())
     return GerberCovariance(ve, me, pdm, t, alg)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a new `GerberCovariance` estimator with the specified observation weights.
+
+# Arguments
+
+  - $(arg_dict[:ce])
+  - $(arg_dict[:oow])
+
+# Returns
+
+  - $(ret_dict[:ce])
+
+# Details
+
+  - Calls `factory(ce.alg, w)` to update the algorithm (current algorithms do not use weights, this for future proofing).
+  - Calls `factory(ce.ve, w)` to update the variance estimator.
+  - Preserves the other fields of the original estimator.
+
+# Examples
+
+```jldoctest
+julia> ce = GerberCovariance()
+GerberCovariance
+   ve ┼ SimpleVariance
+      │          me ┼ SimpleExpectedReturns
+      │             │   w ┴ nothing
+      │           w ┼ nothing
+      │   corrected ┴ Bool: true
+  pdm ┼ Posdef
+      │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+      │   kwargs ┴ @NamedTuple{}: NamedTuple()
+    t ┼ Float64: 0.5
+  alg ┴ Gerber1()
+
+julia> factory(ce, StatsBase.Weights([0.1, 0.2, 0.7]))
+GerberCovariance
+   ve ┼ SimpleVariance
+      │          me ┼ SimpleExpectedReturns
+      │             │   w ┴ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.1, 0.2, 0.7]
+      │           w ┼ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.1, 0.2, 0.7]
+      │   corrected ┴ Bool: true
+  pdm ┼ Posdef
+      │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+      │   kwargs ┴ @NamedTuple{}: NamedTuple()
+    t ┼ Float64: 0.5
+  alg ┴ Gerber1()
+```
+
+# Related
+
+  - [`GerberCovariance`](@ref)
+  - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
+  - [`factory`](@ref)
+"""
+function factory(ce::GerberCovariance, w::ObsWeights)
+    return GerberCovariance(; ve = factory(ce.ve, w), me = factory(ce.me, w), pdm = ce.pdm,
+                            t = ce.t, alg = factory(ce.alg, w), ex = ce.ex)
 end
 """
     gerber(
@@ -378,14 +438,13 @@ Compute the Gerber correlation matrix using the algorithm specified in `ce.alg`.
 
   - [gerber](@cite) Gerber, Sander and Markowitz, Harry and Ernst, Philip and Miao, Yinsen and Name, No and Sargen, Paul, *The Gerber Statistic: A Robust Co-Movement Measure for Portfolio Optimization* (July 4, 2021). Available at SSRN: https://ssrn.com/abstract=3880054 or http://dx.doi.org/10.2139/ssrn.3880054
 """
-function Statistics.cor(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Any}, X::MatNum;
-                        dims::Int = 1, kwargs...)
+function Statistics.cor(ce::GerberCovariance, X::MatNum; dims::Int = 1, kwargs...)
     @argcheck(dims in (1, 2))
     if dims == 2
         X = transpose(X)
     end
     sd = Statistics.std(ce.ve, X; dims = 1, kwargs...)
-    X = demean_returns(X, ce.me; dims = 1)
+    X = demean_returns(X, ce.me; dims = 1, kwargs...)
     return gerber(ce, X, sd)
 end
 """
@@ -432,76 +491,15 @@ Compute the Gerber covariance matrix using the algorithm specified in `ce.alg`.
 
   - [gerber](@cite) Gerber, Sander and Markowitz, Harry and Ernst, Philip and Miao, Yinsen and Name, No and Sargen, Paul, *The Gerber Statistic: A Robust Co-Movement Measure for Portfolio Optimization* (July 4, 2021). Available at SSRN: https://ssrn.com/abstract=3880054 or http://dx.doi.org/10.2139/ssrn.3880054
 """
-function Statistics.cov(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Any}, X::MatNum;
-                        dims::Int = 1, kwargs...)
+function Statistics.cov(ce::GerberCovariance, X::MatNum; dims::Int = 1, kwargs...)
     @argcheck(dims in (1, 2))
     if dims == 2
         X = transpose(X)
     end
     sd = Statistics.std(ce.ve, X; dims = 1, kwargs...)
-    X = demean_returns(X, ce.me; dims = 1)
+    X = demean_returns(X, ce.me; dims = 1, kwargs...)
     sigma = gerber(ce, X, sd)
     return StatsBase.cor2cov!(sigma, sd)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Return a new `GerberCovariance` estimator with the specified observation weights.
-
-# Arguments
-
-  - $(arg_dict[:ce])
-  - $(arg_dict[:oow])
-
-# Returns
-
-  - $(ret_dict[:ce])
-
-# Details
-
-  - Calls `factory(ce.alg, w)` to update the algorithm (current algorithms do not use weights, this for future proofing).
-  - Calls `factory(ce.ve, w)` to update the variance estimator.
-  - Preserves the other fields of the original estimator.
-
-# Examples
-
-```jldoctest
-julia> ce = GerberCovariance()
-GerberCovariance
-   ve ┼ SimpleVariance
-      │          me ┼ SimpleExpectedReturns
-      │             │   w ┴ nothing
-      │           w ┼ nothing
-      │   corrected ┴ Bool: true
-  pdm ┼ Posdef
-      │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-      │   kwargs ┴ @NamedTuple{}: NamedTuple()
-    t ┼ Float64: 0.5
-  alg ┴ Gerber1()
-
-julia> factory(ce, StatsBase.Weights([0.1, 0.2, 0.7]))
-GerberCovariance
-   ve ┼ SimpleVariance
-      │          me ┼ SimpleExpectedReturns
-      │             │   w ┴ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.1, 0.2, 0.7]
-      │           w ┼ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.1, 0.2, 0.7]
-      │   corrected ┴ Bool: true
-  pdm ┼ Posdef
-      │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-      │   kwargs ┴ @NamedTuple{}: NamedTuple()
-    t ┼ Float64: 0.5
-  alg ┴ Gerber1()
-```
-
-# Related
-
-  - [`GerberCovariance`](@ref)
-  - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
-  - [`factory`](@ref)
-"""
-function factory(ce::GerberCovariance, w::ObsWeights)
-    return GerberCovariance(; ve = factory(ce.ve, w), me = factory(ce.me, w), pdm = ce.pdm,
-                            t = ce.t, alg = factory(ce.alg, w),)
 end
 
 export GerberCovariance, Gerber0, Gerber1, Gerber2
