@@ -1,7 +1,6 @@
 # https://papers.ssrn.com/sol3/papers.cfm?abstract_id=4986939
 abstract type BaseGerberIQCovariance <: BaseGerberCovariance end
 abstract type GerberIQCovarianceAlgorithm <: AbstractMomentAlgorithm end
-abstract type GerberIQCovarianceCTransformAlg <: AbstractMomentAlgorithm end
 """
 ```
             4 ┬─────┰───────────┬───────────┬───────────┰─────┐
@@ -40,8 +39,8 @@ end
 function BasicGerberIQ(; d::Number = 0.5, n::Number = 0.5)
     return BasicGerberIQ(d, n)
 end
-function gerber_iq_assert_c_d(c::Number, alg::BasicGerberIQ)
-    @argcheck(c < alg.d)
+function gerber_iq_assert_c_d(c::Number, kind::BasicGerberIQ)
+    @argcheck(c < kind.d)
     return nothing
 end
 """
@@ -208,35 +207,38 @@ dcn ─┤     -3 ┾━━━━━╋━━━━━╋━━━━━┥     
                                                                        n19, n20, n21)
     end
 end
-function gerber_iq_assert_c_d(c::Number, alg::Union{<:PartialGerberIQ, <:FullGerberIQ})
-    @argcheck(c < alg.dcp)
-    @argcheck(c < alg.dcn)
-    @argcheck(c < alg.ddp)
-    @argcheck(c < alg.ddn)
+function gerber_iq_assert_c_d(c::Number, kind::Union{<:PartialGerberIQ, <:FullGerberIQ})
+    @argcheck(c < kind.dcp)
+    @argcheck(c < kind.dcn)
+    @argcheck(c < kind.ddp)
+    @argcheck(c < kind.ddn)
     return nothing
 end
 @concrete struct GerberIQCovariance <: BaseGerberIQCovariance
     ve
     me
+    pdm
     c
     t
     e
     y
+    kind
     alg
-    sca
     ex
     function GerberIQCovariance(ve::StatsBase.CovarianceEstimator,
-                                me::AbstractExpectedReturnsEstimator, c::Number, t::Number,
-                                e::Number, y::Number, alg::GerberIQCovarianceAlgorithm,
-                                sca::Option{<:Num_VecToScaM},
+                                me::AbstractExpectedReturnsEstimator, pdm::Option{<:Posdef},
+                                c::Number, t::Number, e::Number, y::Number,
+                                kind::GerberIQCovarianceAlgorithm,
+                                alg::GerberCovarianceAlgorithm,
                                 ex::FLoops.Transducers.Executor)
         assert_nonempty_nonneg_finite_val(c, :c)
-        gerber_iq_assert_c_d(c, alg)
+        gerber_iq_assert_c_d(c, kind)
         assert_nonempty_nonneg_finite_val(t, :t)
         assert_nonempty_nonneg_finite_val(e, :e)
         assert_nonempty_nonneg_finite_val(y, :y)
-        return new{typeof(ve), typeof(me), typeof(c), typeof(t), typeof(e), typeof(y),
-                   typeof(alg), typeof(sca), typeof(ex)}(ve, me, c, t, e, y, alg, sca, ex)
+        return new{typeof(ve), typeof(me), typeof(pdm), typeof(c), typeof(t), typeof(e),
+                   typeof(y), typeof(kind), typeof(alg), typeof(ex)}(ve, me, pdm, c, t, e,
+                                                                     y, kind, alg, ex)
     end
 end
 function get_M(c::Number, t::Number, X::MatNum)
@@ -273,7 +275,110 @@ function Statistics.cov(ce::GerberIQCovariance, X::MatNum; dims::Int = 1, mean =
     sigma = gerber_IQ(ce, X)
     return StatsBase.cor2cov!(sigma, sd)
 end
-#! Assume X is already transformed with r0
-function gerber_IQ(ce::GerberIQCovariance, X::MatNum)
-    return nothing
+function squeeze_noise(xi, xj, axi, axj, kind::BasicGerberIQ) end
+function gerber_IQ(ce::GerberIQCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
+                                          <:Any, <:Gerber0}, X::MatNum)
+    T, N = size(X)
+    rho = Matrix{eltype(X)}(undef, N, N)
+    c = ce.c
+    kind = ce.kind
+    FLoops.@floop ce.ex for j in axes(X, 2)
+        for i in 1:j
+            neg = zero(eltype(X))
+            pos = zero(eltype(X))
+            for k in 1:T
+                xi = X[k, i]
+                xj = X[k, j]
+                axi = abs(xi)
+                axj = abs(xj)
+                if axi < c && axj < c
+                    continue
+                end
+                if axi >= c && axj >= c && xi * xj > zero(xi)
+                    pos += squeeze_noise(xi, xj, axi, axj, kind)
+                elseif axi >= c && axj >= c && xi * xj < zero(xi)
+                    neg += squeeze_noise(xi, xj, axi, axj, kind)
+                end
+                den = (pos + neg)
+                rho[j, i] = rho[i, j] = if !iszero(den)
+                    (pos - neg) / den
+                else
+                    zero(eltype(X))
+                end
+            end
+        end
+    end
+    posdef!(ce.pdm, rho)
+    return rho
+end
+function gerber_IQ(ce::GerberIQCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
+                                          <:Any, <:Gerber1}, X::MatNum)
+    T, N = size(X)
+    rho = Matrix{eltype(X)}(undef, N, N)
+    c = ce.c
+    kind = ce.kind
+    FLoops.@floop ce.ex for j in axes(X, 2)
+        for i in 1:j
+            neg = zero(eltype(X))
+            pos = zero(eltype(X))
+            nn = zero(eltype(X))
+            for k in 1:T
+                xi = X[k, i]
+                xj = X[k, j]
+                axi = abs(xi)
+                axj = abs(xj)
+                if axi < c && axj < c
+                    continue
+                end
+                if axi >= c && axj >= c && xi * xj > zero(xi)
+                    pos += squeeze_noise(xi, xj, axi, axj, kind)
+                elseif axi >= c && axj >= c && xi * xj < zero(xi)
+                    neg += squeeze_noise(xi, xj, axi, axj, kind)
+                else
+                    nn += squeeze_noise(xi, xj, axi, axj, kind)
+                end
+                den = (pos + neg + nn)
+                rho[j, i] = rho[i, j] = if !iszero(den)
+                    (pos - neg) / den
+                else
+                    zero(eltype(X))
+                end
+            end
+        end
+    end
+    posdef!(ce.pdm, rho)
+    return rho
+end
+function gerber_IQ(ce::GerberIQCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
+                                          <:Any, <:Gerber2}, X::MatNum)
+    #! Needs to scale ce.kind
+    T, N = size(X)
+    rho = Matrix{eltype(X)}(undef, N, N)
+    c = ce.c
+    kind = ce.kind
+    FLoops.@floop ce.ex for j in axes(X, 2)
+        for i in 1:j
+            neg = zero(eltype(X))
+            pos = zero(eltype(X))
+            for k in 1:T
+                xi = X[k, i]
+                xj = X[k, j]
+                axi = abs(xi)
+                axj = abs(xj)
+                if axi < c && axj < c
+                    continue
+                end
+                if axi >= c && axj >= c && xi * xj > zero(xi)
+                    pos += squeeze_noise(xi, xj, axi, axj, kind)
+                elseif axi >= c && axj >= c && xi * xj < zero(xi)
+                    neg += squeeze_noise(xi, xj, axi, axj, kind)
+                end
+                rho[j, i] = rho[i, j] = (pos - neg)
+            end
+        end
+    end
+    h = sqrt.(LinearAlgebra.diag(rho))
+    rho .= LinearAlgebra.Symmetric(rho ⊘ (h * transpose(h)), :U)
+    posdef!(ce.pdm, rho)
+    return rho
 end
