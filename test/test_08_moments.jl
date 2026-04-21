@@ -179,48 +179,48 @@
         @test ce.ce.ce.ce.w === ew
         @test ce.ce.ce.me.w === ew
 
-        @test isapprox(df[!, 40],
+        @test isapprox(df[!, 36],
                        vec(cov(PortfolioOptimisersCovariance(;
                                                              mp = DenoiseDetoneAlgMatrixProcessing(;
                                                                                                    dn = Denoise(;
                                                                                                                 alg = SpectralDenoise()))),
                                rd.X)))
-        @test isapprox(df[!, 41],
+        @test isapprox(df[!, 37],
                        vec(cov(PortfolioOptimisersCovariance(;
                                                              mp = DenoiseDetoneAlgMatrixProcessing(;
                                                                                                    dt = Detone())),
                                rd.X)))
-        @test isapprox(df[!, 41],
+        @test isapprox(df[!, 37],
                        vec(cov(PortfolioOptimisersCovariance(;
                                                              mp = DenoiseDetoneAlgMatrixProcessing(;
                                                                                                    order = DenoiseAlgDetone(),
                                                                                                    dt = Detone())),
                                rd.X)))
-        @test isapprox(df[!, 41],
+        @test isapprox(df[!, 37],
                        vec(cov(PortfolioOptimisersCovariance(;
                                                              mp = DenoiseDetoneAlgMatrixProcessing(;
                                                                                                    order = DetoneDenoiseAlg(),
                                                                                                    dt = Detone())),
                                rd.X)))
-        @test isapprox(df[!, 41],
+        @test isapprox(df[!, 37],
                        vec(cov(PortfolioOptimisersCovariance(;
                                                              mp = DenoiseDetoneAlgMatrixProcessing(;
                                                                                                    order = DetoneAlgDenoise(),
                                                                                                    dt = Detone())),
                                rd.X)))
-        @test isapprox(df[!, 41],
+        @test isapprox(df[!, 37],
                        vec(cov(PortfolioOptimisersCovariance(;
                                                              mp = DenoiseDetoneAlgMatrixProcessing(;
                                                                                                    order = AlgDenoiseDetone(),
                                                                                                    dt = Detone())),
                                rd.X)))
-        @test isapprox(df[!, 41],
+        @test isapprox(df[!, 37],
                        vec(cov(PortfolioOptimisersCovariance(;
                                                              mp = DenoiseDetoneAlgMatrixProcessing(;
                                                                                                    order = AlgDetoneDenoise(),
                                                                                                    dt = Detone())),
                                rd.X)))
-        @test isapprox(df[!, 42],
+        @test isapprox(df[!, 38],
                        vec(cov(PortfolioOptimisersCovariance(;
                                                              mp = DenoiseDetoneAlgMatrixProcessing(;
                                                                                                    alg = LoGo())),
@@ -235,13 +235,13 @@
         ce0 = PortfolioOptimisersCovariance(;
                                             ce = GerberCovariance(; alg = Gerber2(),
                                                                   me = SimpleExpectedReturns(;),
-                                                                  t = 0.1))
+                                                                  c1 = 0.1))
         ce = PortfolioOptimisers.factory(ce0, ew)
         @test !(ce.ce.ve === ce0.ce.ve)
         @test !(ce.ce.me === ce0.ce.me)
         @test ce.ce.pdm === ce0.ce.pdm
         @test ce.ce.alg === ce0.ce.alg
-        @test ce.ce.t == ce0.ce.t
+        @test ce.ce.c1 == ce0.ce.c1
         @test ce.mp === ce0.mp
         @test ce.ce.ve.w === ew
         @test ce.ce.ve.me.w === ew
@@ -564,8 +564,9 @@
     @testset "Canonical Distance" begin
         ces = [Covariance(; alg = Full()), SpearmanCovariance(), KendallCovariance(),
                MutualInfoCovariance(), DistanceCovariance(),
-               LowerTailDependenceCovariance(), GerberCovariance(), SmythBrobyCovariance(),
-               MutualInfoCovariance(; bins = 3)]
+               LowerTailDependenceCovariance(),
+               GerberCovariance(; me = CustomValueExpectedReturns()),
+               SmythBrobyCovariance(), MutualInfoCovariance(; bins = 3)]
         df = CSV.read(joinpath(@__DIR__, "./assets/CanonicalDistance.csv.gz"), DataFrame)
         de = Distance(; alg = CanonicalDistance())
         deg = Distance(; power = 1, alg = CanonicalDistance())

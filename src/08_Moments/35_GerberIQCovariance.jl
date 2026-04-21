@@ -200,63 +200,6 @@ dcn ─┤     -3 ┾━━━━━╋━━━━━╋━━━━━┿━�
                    dcn               2c                ddp
 ```
 """
-function gerber_iq_weight(xi::Number, xj::Number, axi::Number, axj::Number,
-                          kind::PartialGerberIQ)
-    (; dcp, dcn, ddp, ddn, n1, n2, n3, n4, n5, n6, n7, n8, n9, n10, n11, n12, n13, n14, n15, n16, n17, n18, n19, n20, n21) = kind
-    dp1 = max(dcp, ddp)
-    dp2 = min(dcp, ddp)
-    dn1 = min(dcn, ddn)
-    dn2 = max(dcn, ddn)
-    return if dp1 <= xi && dp1 <= xj
-        n11
-    elseif dp1 <= xi && dp2 <= xj < dp1 || dp1 <= xj && dp2 <= xi < dp1
-        n14
-    elseif dp1 <= xi && zero(xj) < xj < dp2 || dp1 <= xj && zero(xi) < xi < dp2
-        n15
-    elseif dp1 <= xi && -dn1 < xj < zero(xj) || dp1 <= xj && -dn1 < xi < zero(xi)
-        n18
-    elseif dp1 <= xi && -dn2 < xj <= -dn1 || dp1 <= xj && -dn2 < xi <= -dn1
-        n19
-    elseif dp1 <= xi && xj <= -dn2 || dp1 <= xj && xi <= -dn2
-        n13
-    elseif dp2 <= xi < dp1 && dp2 <= xj < dp1
-        n4
-    elseif dp2 <= xi < dp1 && zero(xj) < xj < dp2 || dp2 <= xj < dp1 && zero(xi) < xi < dp2
-        n7
-    elseif dp2 <= xi < dp1 && -dn1 < xj < zero(xj) ||
-           dp2 <= xj < dp1 && -dn1 < xi < zero(xi)
-        n9
-    elseif dp2 <= xi < dp1 && -dn2 < xj <= -dn1 || dp2 <= xj < dp1 && -dn2 < xi <= -dn1
-        n6
-    elseif dp2 <= xi < dp1 && xj <= -dn2 || dp2 <= xj < dp1 && xi <= -dn2
-        n20
-    elseif zero(xi) < xi < dp2 && zero(xj) < xj < dp2
-        n1
-    elseif zero(xi) < xi < dp2 && -dn1 < xj < zero(xj) ||
-           zero(xj) < xj < dp2 && -dn1 < xi < zero(xi)
-        n3
-    elseif zero(xi) < xi < dp2 && -dn2 < xj <= -dn1 ||
-           zero(xj) < xj < dp2 && -dn2 < xi <= -dn1
-        n10
-    elseif zero(xi) < xi < dp2 && xj <= -dn2 || zero(xi) < xi < dp2 && xj <= -dn2
-        n21
-    elseif -dn1 < xi < zero(xi) && -dn1 < xj < zero(xj)
-        n2
-    elseif -dn1 < xi < zero(xi) && -dn2 < xj <= -dn1 ||
-           -dn1 < xj < zero(xj) && -dn2 < xi <= -dn1
-        n8
-    elseif -dn1 < xi < zero(xi) && xj <= -dn2 || -dn1 < xj < zero(xj) && xi <= -dn2
-        n16
-    elseif -dn2 < xi <= -dn1 && -dn2 < xj <= -dn1
-        n5
-    elseif -dn2 < xi <= -dn1 && xj <= -dn2 || -dn2 < xj <= -dn1 && xj <= -dn2
-        n17
-    elseif xi <= -dn2 && xj <= -dn2
-        n12
-    else
-        zero(xi)
-    end
-end
 @concrete struct FullGerberIQ <: GerberIQCovarianceAlgorithm
     dcp
     dcn
@@ -344,6 +287,63 @@ function clamp_gerber_iq_n(alg::FullGerberIQ, ::Gerber2)
                         n8 = n8, n9 = alg.n9, n10 = alg.n10, n11 = n11, n12 = n12,
                         n13 = alg.n13, n14 = n14, n15 = alg.n15, n16 = alg.n16, n17 = n17,
                         n18 = alg.n18, n19 = alg.n19, n20 = alg.n20, n21 = alg.n21)
+end
+function gerber_iq_weight(xi::Number, xj::Number, axi::Number, axj::Number,
+                          kind::FullGerberIQ)
+    (; dcp, dcn, ddp, ddn, n1, n2, n3, n4, n5, n6, n7, n8, n9, n10, n11, n12, n13, n14, n15, n16, n17, n18, n19, n20, n21) = kind
+    dp1 = max(dcp, ddp)
+    dp2 = min(dcp, ddp)
+    dn1 = min(dcn, ddn)
+    dn2 = max(dcn, ddn)
+    return if dp1 <= xi && dp1 <= xj
+        n11
+    elseif dp1 <= xi && dp2 <= xj < dp1 || dp1 <= xj && dp2 <= xi < dp1
+        n14
+    elseif dp1 <= xi && zero(xj) < xj < dp2 || dp1 <= xj && zero(xi) < xi < dp2
+        n15
+    elseif dp1 <= xi && -dn1 < xj < zero(xj) || dp1 <= xj && -dn1 < xi < zero(xi)
+        n18
+    elseif dp1 <= xi && -dn2 < xj <= -dn1 || dp1 <= xj && -dn2 < xi <= -dn1
+        n19
+    elseif dp1 <= xi && xj <= -dn2 || dp1 <= xj && xi <= -dn2
+        n13
+    elseif dp2 <= xi < dp1 && dp2 <= xj < dp1
+        n4
+    elseif dp2 <= xi < dp1 && zero(xj) < xj < dp2 || dp2 <= xj < dp1 && zero(xi) < xi < dp2
+        n7
+    elseif dp2 <= xi < dp1 && -dn1 < xj < zero(xj) ||
+           dp2 <= xj < dp1 && -dn1 < xi < zero(xi)
+        n9
+    elseif dp2 <= xi < dp1 && -dn2 < xj <= -dn1 || dp2 <= xj < dp1 && -dn2 < xi <= -dn1
+        n6
+    elseif dp2 <= xi < dp1 && xj <= -dn2 || dp2 <= xj < dp1 && xi <= -dn2
+        n20
+    elseif zero(xi) < xi < dp2 && zero(xj) < xj < dp2
+        n1
+    elseif zero(xi) < xi < dp2 && -dn1 < xj < zero(xj) ||
+           zero(xj) < xj < dp2 && -dn1 < xi < zero(xi)
+        n3
+    elseif zero(xi) < xi < dp2 && -dn2 < xj <= -dn1 ||
+           zero(xj) < xj < dp2 && -dn2 < xi <= -dn1
+        n10
+    elseif zero(xi) < xi < dp2 && xj <= -dn2 || zero(xi) < xi < dp2 && xj <= -dn2
+        n21
+    elseif -dn1 < xi < zero(xi) && -dn1 < xj < zero(xj)
+        n2
+    elseif -dn1 < xi < zero(xi) && -dn2 < xj <= -dn1 ||
+           -dn1 < xj < zero(xj) && -dn2 < xi <= -dn1
+        n8
+    elseif -dn1 < xi < zero(xi) && xj <= -dn2 || -dn1 < xj < zero(xj) && xi <= -dn2
+        n16
+    elseif -dn2 < xi <= -dn1 && -dn2 < xj <= -dn1
+        n5
+    elseif -dn2 < xi <= -dn1 && xj <= -dn2 || -dn2 < xj <= -dn1 && xj <= -dn2
+        n17
+    elseif xi <= -dn2 && xj <= -dn2
+        n12
+    else
+        zero(xi)
+    end
 end
 @concrete struct GerberIQCovariance <: BaseGerberIQCovariance
     ve
