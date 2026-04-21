@@ -262,16 +262,14 @@
         ce0 = PortfolioOptimisersCovariance(;
                                             ce = SmythBrobyCovariance(; alg = SmythBroby2(),
                                                                       me = SimpleExpectedReturns(),
-                                                                      t = 0.1, c1 = 0.6,
-                                                                      c2 = 0.2, c3 = 2.2,
-                                                                      n = 3))
+                                                                      c1 = 0.6, c2 = 0.2,
+                                                                      c3 = 2.2, n = 3))
         ce = PortfolioOptimisers.factory(ce0, ew)
         @test !(ce.ce.ve === ce0.ce.ve)
         @test !(ce.ce.me === ce0.ce.me)
         @test ce.ce.ve.w === ew
         @test ce.ce.ve.me.w === ew
         @test ce.ce.pdm === ce0.ce.pdm
-        @test ce.ce.t == ce0.ce.t
         @test ce.ce.c1 == ce0.ce.c1
         @test ce.ce.c2 == ce0.ce.c2
         @test ce.ce.c3 == ce0.ce.c3

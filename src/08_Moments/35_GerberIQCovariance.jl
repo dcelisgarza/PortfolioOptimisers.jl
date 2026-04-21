@@ -70,7 +70,7 @@ end
         return new{typeof(d), typeof(n)}(d, n)
     end
 end
-function BasicGerberIQ(; d::Number = 2, n::Number = 0.5)
+function BasicGerberIQ(; d::Number = 2.0, n::Number = 0.5)
     return BasicGerberIQ(d, n)
 end
 function gerber_iq_assert_c_d(c::Number, kind::BasicGerberIQ)
@@ -156,12 +156,21 @@ dcn ─┤     -3 ┾━━━━━╋━━━━━━━━━━━┿━�
                                                         n5, n6, n7, n8, n9, n10)
     end
 end
+function PartialGerberIQ(; dcp::Number = 2.0, dcn::Number = 2.0, ddp::Number = 2.0,
+                         ddn::Number = 2.0, n1::Number = 0.5, n2::Number = 0.5,
+                         n3::Number = sqrt(n1 * n2), n4::Number = 1.0, n5::Number = 1.0,
+                         n6::Number = 1.0, n7::Number = sqrt(n1 * n4),
+                         n8::Number = sqrt(n2 * n5), n9::Number = sqrt(n3 * n6),
+                         n10::Number = sqrt(n3 * n6))
+    return PartialGerberIQ(dcp, dcn, ddp, ddn, n1, n2, n3, n4, n5, n6, n7, n8, n9, n10)
+end
 function clamp_gerber_iq_n(alg::PartialGerberIQ, ::Gerber2)
-    (; n1, n2, n4, n5, n7, n8) = alg
+    (; n1, n2, n3, n4, n5, n7, n8) = alg
+    n3 = min(n3, sqrt(n1 * n2))
     n7 = min(n7, sqrt(n1 * n4))
     n8 = min(n8, sqrt(n2 * n5))
     return PartialGerberIQ(; dcp = alg.dcp, dcn = alg.dcn, ddp = alg.ddp, ddn = alg.ddn,
-                           n1 = n1, n2 = n2, n3 = alg.n3, n4 = n4, n5 = n5, n6 = alg.n6,
+                           n1 = n1, n2 = n2, n3 = n3, n4 = n4, n5 = n5, n6 = alg.n6,
                            n7 = n7, n8 = n8, n9 = alg.n9, n10 = alg.n10)
 end
 function gerber_iq_weight(xi::Number, xj::Number, axi::Number, axj::Number, sc::Number,
@@ -293,6 +302,20 @@ dcn ─┤     -3 ┾━━━━━╋━━━━━╋━━━━━┿━�
                                                                        n19, n20, n21)
     end
 end
+function FullGerberIQ(; dcp::Number = 2.0, dcn::Number = 2.0, ddp::Number = 2.0,
+                      ddn::Number = 2.0, n1::Number = 0.5, n2::Number = 0.5,
+                      n3::Number = 0.5, n4::Number = 0.75, n5::Number = 0.75,
+                      n6::Number = 0.75, n7::Number = sqrt(n1 * n4),
+                      n8::Number = sqrt(n2 * n5), n9::Number = sqrt(n3 * n6),
+                      n10::Number = sqrt(n3 * n6), n11::Number = 1.0, n12::Number = 1.0,
+                      n13::Number = 1.0, n14::Number = sqrt(n4 * n11),
+                      n15::Number = sqrt(n7 * n14), n17::Number = sqrt(n5 * n12),
+                      n16::Number = sqrt(n8 * n17), n19::Number = sqrt(n13 * n6),
+                      n18::Number = sqrt(n19 * n9), n20::Number = sqrt(n13 * n6),
+                      n21::Number = sqrt(n10 * n20))
+    return FullGerberIQ(dcp, dcn, ddp, ddn, n1, n2, n3, n4, n5, n6, n7, n8, n9, n10, n11,
+                        n12, n13, n14, n15, n16, n17, n18, n19, n20, n21)
+end
 function gerber_iq_assert_c_d(c::Number, kind::Union{<:PartialGerberIQ, <:FullGerberIQ})
     @argcheck(c < kind.dcp)
     @argcheck(c < kind.dcn)
@@ -384,7 +407,7 @@ end
     ex
     function GerberIQCovariance(ve::StatsBase.CovarianceEstimator,
                                 me::AbstractExpectedReturnsEstimator, pdm::Option{<:Posdef},
-                                c::Number, t::Option{<:GerberIQTau}, e::Number,
+                                c::Number, t::Option{<:GerberIQTau}, e::Integer,
                                 y::Option{<:GerberIQGamma}, sc::Option{<:GerberIQScaler},
                                 kind::GerberIQCovarianceAlgorithm,
                                 alg::GerberCovarianceAlgorithm,
@@ -406,6 +429,22 @@ end
                                                                                  kind, alg,
                                                                                  ex)
     end
+end
+function GerberIQCovariance(; ve::StatsBase.CovarianceEstimator = SimpleVariance(),
+                            me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
+                            pdm::Option{<:Posdef} = Posdef(), c::Number = 0.5,
+                            t::Option{<:GerberIQTau} = nothing, e::Integer = 0,
+                            y::Option{<:GerberIQGamma} = nothing,
+                            sc::Option{<:GerberIQScaler} = nothing,
+                            kind::GerberIQCovarianceAlgorithm = BasicGerberIQ(),
+                            alg::GerberCovarianceAlgorithm = Gerber1(),
+                            ex::FLoops.Transducers.Executor = FLoops.Transducers.ThreadedEx())
+    return GerberIQCovariance(ve, me, pdm, c, t, e, y, sc, kind, alg, ex)
+end
+function factory(ce::GerberIQCovariance, w::ObsWeights)
+    return GerberIQCovariance(; ve = factory(ce.ve, w), me = factory(ce.me, w),
+                              pdm = ce.pdm, c = ce.c, t = ce.t, e = ce.e, y = ce.y,
+                              sc = ce.sc, kind = ce.kind, alg = ce.alg, ex = ce.ex)
 end
 function gerber_iq_decay(T::Integer, t::Integer, k::Integer, e::Number, y::Number)
     m = T - (t + k)
@@ -561,4 +600,4 @@ function Statistics.cov(ce::GerberIQCovariance, X::MatNum; dims::Int = 1, mean =
     return StatsBase.cor2cov!(sigma, sd)
 end
 
-export BasicGerberIQ
+export BasicGerberIQ, PartialGerberIQ, FullGerberIQ, GerberIQCovariance
