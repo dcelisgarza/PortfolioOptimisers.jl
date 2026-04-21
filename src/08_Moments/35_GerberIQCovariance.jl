@@ -6,14 +6,34 @@ function clamp_gerber_iq_n(kind::GerberIQCovarianceAlgorithm, args...)
 end
 abstract type GerberIQTauEstimator <: AbstractEstimator end
 const GerberIQTau = Union{<:Integer, Function, <:GerberIQTauEstimator}
-function gerber_iq_tau(t::Integer, T::Integer)
-    return T - t
+function gerber_iq_tau(t::Integer, X::MatNum)
+    return size(X, 1) - t
 end
-function gerber_iq_tau(t::Function, T::Integer)
-    return t(T)::Integer
+function gerber_iq_tau(t::Function, X::MatNum)
+    return t(X)::Integer
 end
-function gerber_iq_tau(::Option{<:GerberIQTauEstimator}, T::Integer)
-    return T - 1
+function gerber_iq_tau(::Option{<:GerberIQTauEstimator}, X::MatNum)
+    T, N = size(X)
+    return round(Int, T - T / N)
+end
+abstract type GerberIQGammaEstimator <: AbstractEstimator end
+const GerberIQGamma = Union{<:Number, Function, <:GerberIQGammaEstimator}
+function gerber_iq_gamma(y::Real, X::MatNum)
+    return y
+end
+function gerber_iq_gamma(y::Function, X::MatNum)
+    return y(X)::Number
+end
+function gerber_iq_gamma(::Option{<:GerberIQGammaEstimator}, X::MatNum)
+    return log(2) / size(X, 2)
+end
+abstract type GerberIQScalerEstimator <: AbstractEstimator end
+const GerberIQScaler = Union{Function, <:GerberIQScalerEstimator}
+function gerber_iq_scaling(::Option{<:GerberIQScalerEstimator})
+    return (x, y) -> (x + y) / 2
+end
+function gerber_iq_scaling(sca::Function)
+    return sca
 end
 """
 ```
@@ -50,16 +70,17 @@ end
         return new{typeof(d), typeof(n)}(d, n)
     end
 end
-function BasicGerberIQ(; d::Number = 0.5, n::Number = 0.5)
+function BasicGerberIQ(; d::Number = 2, n::Number = 0.5)
     return BasicGerberIQ(d, n)
 end
 function gerber_iq_assert_c_d(c::Number, kind::BasicGerberIQ)
     @argcheck(c < kind.d)
     return nothing
 end
-function gerber_iq_weight(xi::Number, xj::Number, axi::Number, axj::Number,
+function gerber_iq_weight(xi::Number, xj::Number, axi::Number, axj::Number, sc::Number,
                           kind::BasicGerberIQ)
     (; d, n) = kind
+    d *= sc
     return if axi < d && axj < d
         n
     elseif axi >= d && axj >= d
@@ -143,9 +164,13 @@ function clamp_gerber_iq_n(alg::PartialGerberIQ, ::Gerber2)
                            n1 = n1, n2 = n2, n3 = alg.n3, n4 = n4, n5 = n5, n6 = alg.n6,
                            n7 = n7, n8 = n8, n9 = alg.n9, n10 = alg.n10)
 end
-function gerber_iq_weight(xi::Number, xj::Number, axi::Number, axj::Number,
+function gerber_iq_weight(xi::Number, xj::Number, axi::Number, axj::Number, sc::Number,
                           kind::PartialGerberIQ)
     (; dcp, dcn, ddp, ddn, n1, n2, n3, n4, n5, n6, n7, n8, n9, n10) = kind
+    dcp *= sc
+    dcn *= sc
+    ddp *= sc
+    ddn *= sc
     return if dcp <= xi && dcp <= xj
         n4
     elseif dcp <= xi && zero(xj) < xj < dcp || dcp <= xj && zero(xi) < xi < dcp
@@ -288,13 +313,13 @@ function clamp_gerber_iq_n(alg::FullGerberIQ, ::Gerber2)
                         n13 = alg.n13, n14 = n14, n15 = alg.n15, n16 = alg.n16, n17 = n17,
                         n18 = alg.n18, n19 = alg.n19, n20 = alg.n20, n21 = alg.n21)
 end
-function gerber_iq_weight(xi::Number, xj::Number, axi::Number, axj::Number,
+function gerber_iq_weight(xi::Number, xj::Number, axi::Number, axj::Number, sc::Number,
                           kind::FullGerberIQ)
     (; dcp, dcn, ddp, ddn, n1, n2, n3, n4, n5, n6, n7, n8, n9, n10, n11, n12, n13, n14, n15, n16, n17, n18, n19, n20, n21) = kind
-    dp1 = max(dcp, ddp)
-    dp2 = min(dcp, ddp)
-    dn1 = min(dcn, ddn)
-    dn2 = max(dcn, ddn)
+    dp1 = max(dcp, ddp) * sc
+    dp2 = min(dcp, ddp) * sc
+    dn1 = min(dcn, ddn) * sc
+    dn2 = max(dcn, ddn) * sc
     return if dp1 <= xi && dp1 <= xj
         n11
     elseif dp1 <= xi && dp2 <= xj < dp1 || dp1 <= xj && dp2 <= xi < dp1
@@ -353,12 +378,14 @@ end
     t
     e
     y
+    sc
     kind
     alg
     ex
     function GerberIQCovariance(ve::StatsBase.CovarianceEstimator,
                                 me::AbstractExpectedReturnsEstimator, pdm::Option{<:Posdef},
-                                c::Number, t::Option{<:GerberIQTau}, e::Number, y::Number,
+                                c::Number, t::Option{<:GerberIQTau}, e::Number,
+                                y::Option{<:GerberIQGamma}, sc::Option{<:GerberIQScaler},
                                 kind::GerberIQCovarianceAlgorithm,
                                 alg::GerberCovarianceAlgorithm,
                                 ex::FLoops.Transducers.Executor)
@@ -368,11 +395,16 @@ end
             assert_nonempty_nonneg_finite_val(t, :t)
         end
         assert_nonempty_nonneg_finite_val(e, :e)
-        assert_nonempty_nonneg_finite_val(y, :y)
+        if isa(y, Number)
+            assert_nonempty_nonneg_finite_val(y, :y)
+        end
         kind = clamp_gerber_iq_n(kind, alg)
         return new{typeof(ve), typeof(me), typeof(pdm), typeof(c), typeof(t), typeof(e),
-                   typeof(y), typeof(kind), typeof(alg), typeof(ex)}(ve, me, pdm, c, t, e,
-                                                                     y, kind, alg, ex)
+                   typeof(y), typeof(sc), typeof(kind), typeof(alg), typeof(ex)}(ve, me,
+                                                                                 pdm, c, t,
+                                                                                 e, y, sc,
+                                                                                 kind, alg,
+                                                                                 ex)
     end
 end
 function gerber_iq_decay(T::Integer, t::Integer, k::Integer, e::Number, y::Number)
@@ -380,20 +412,25 @@ function gerber_iq_decay(T::Integer, t::Integer, k::Integer, e::Number, y::Numbe
     return exp(-y * max(0, m - e))
 end
 function gerber_IQ_delta(xi::Number, xj::Number, axi::Number, axj::Number, T::Integer,
-                         t::Integer, k::Integer, e::Number, y::Number,
+                         t::Integer, k::Integer, e::Number, y::Number, sc::Number,
                          kind::GerberIQCovarianceAlgorithm)
-    w = gerber_iq_weight(xi, xj, axi, axj, kind)
+    w = gerber_iq_weight(xi, xj, axi, axj, sc, kind)
     p = gerber_iq_decay(T, k, t, e, y)
     return w * p
 end
 function gerber_IQ(ce::GerberIQCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                          <:Any, <:Gerber0}, X::MatNum)
+                                          <:Any, <:Gerber0}, X::MatNum, sd::VecNum)
     T, N = size(X)
     rho = Matrix{eltype(X)}(undef, N, N)
-    (; c, t, e, y, kind, ex) = ce
+    (; c, t, e, y, sc, kind, ex) = ce
     t = gerber_iq_tau(t, T)
+    scaler = gerber_iq_scaling(sc)
     FLoops.@floop ex for j in axes(X, 2)
+        sdj = sd[j]
         for i in 1:j
+            sdi = sd[i]
+            scij = scaler(sdi, sdj)
+            cij = scij * c
             neg = zero(eltype(X))
             pos = zero(eltype(X))
             for k in 1:T
@@ -401,13 +438,13 @@ function gerber_IQ(ce::GerberIQCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:A
                 xj = X[k, j]
                 axi = abs(xi)
                 axj = abs(xj)
-                if axi < c && axj < c
+                if axi < cij && axj < cij
                     continue
                 end
-                if axi >= c && axj >= c && xi * xj > zero(xi)
-                    pos += gerber_IQ_delta(xi, xj, axi, axj, T, t, k, e, y, kind)
-                elseif axi >= c && axj >= c && xi * xj < zero(xi)
-                    neg += gerber_IQ_delta(xi, xj, axi, axj, T, t, k, e, y, kind)
+                if axi >= cij && axj >= cij && xi * xj > zero(xi)
+                    pos += gerber_IQ_delta(xi, xj, axi, axj, T, t, k, e, y, scij, kind)
+                elseif axi >= cij && axj >= cij && xi * xj < zero(xi)
+                    neg += gerber_IQ_delta(xi, xj, axi, axj, T, t, k, e, y, scij, kind)
                 end
                 den = (pos + neg)
                 rho[j, i] = rho[i, j] = if !iszero(den)
@@ -422,13 +459,18 @@ function gerber_IQ(ce::GerberIQCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:A
     return rho
 end
 function gerber_IQ(ce::GerberIQCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                          <:Any, <:Gerber1}, X::MatNum)
+                                          <:Any, <:Gerber1}, X::MatNum, sd::VecNum)
     T, N = size(X)
     rho = Matrix{eltype(X)}(undef, N, N)
-    (; c, t, e, y, kind, ex) = ce
+    (; c, t, e, y, sc, kind, ex) = ce
     t = gerber_iq_tau(t, T)
+    scaler = gerber_iq_scaling(sc)
     FLoops.@floop ex for j in axes(X, 2)
+        sdj = sd[j]
         for i in 1:j
+            sdi = sd[i]
+            scij = scaler(sdi, sdj)
+            cij = scij * c
             neg = zero(eltype(X))
             pos = zero(eltype(X))
             nn = zero(eltype(X))
@@ -437,15 +479,15 @@ function gerber_IQ(ce::GerberIQCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:A
                 xj = X[k, j]
                 axi = abs(xi)
                 axj = abs(xj)
-                if axi < c && axj < c
+                if axi < cij && axj < cij
                     continue
                 end
-                if axi >= c && axj >= c && xi * xj > zero(xi)
-                    pos += gerber_IQ_delta(xi, xj, axi, axj, T, t, k, e, y, kind)
-                elseif axi >= c && axj >= c && xi * xj < zero(xi)
-                    neg += gerber_IQ_delta(xi, xj, axi, axj, T, t, k, e, y, kind)
+                if axi >= cij && axj >= cij && xi * xj > zero(xi)
+                    pos += gerber_IQ_delta(xi, xj, axi, axj, T, t, k, e, y, scij, kind)
+                elseif axi >= cij && axj >= cij && xi * xj < zero(xi)
+                    neg += gerber_IQ_delta(xi, xj, axi, axj, T, t, k, e, y, scij, kind)
                 else
-                    nn += gerber_IQ_delta(xi, xj, axi, axj, T, t, k, e, y, kind)
+                    nn += gerber_IQ_delta(xi, xj, axi, axj, T, t, k, e, y, scij, kind)
                 end
                 den = (pos + neg + nn)
                 rho[j, i] = rho[i, j] = if !iszero(den)
@@ -460,14 +502,19 @@ function gerber_IQ(ce::GerberIQCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:A
     return rho
 end
 function gerber_IQ(ce::GerberIQCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                          <:Any, <:Gerber2}, X::MatNum)
+                                          <:Any, <:Gerber2}, X::MatNum, sd::VecNum)
     #! Needs to scale ce.kind
     T, N = size(X)
     rho = Matrix{eltype(X)}(undef, N, N)
-    (; c, t, e, y, kind, ex) = ce
+    (; c, t, e, y, sc, kind, ex) = ce
     t = gerber_iq_tau(t, T)
+    scaler = gerber_iq_scaling(sc)
     FLoops.@floop ex for j in axes(X, 2)
+        sdj = sd[j]
         for i in 1:j
+            sdi = sd[i]
+            scij = scaler(sdi, sdj)
+            cij = scij * c
             neg = zero(eltype(X))
             pos = zero(eltype(X))
             for k in 1:T
@@ -475,13 +522,13 @@ function gerber_IQ(ce::GerberIQCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:A
                 xj = X[k, j]
                 axi = abs(xi)
                 axj = abs(xj)
-                if axi < c && axj < c
+                if axi < cij && axj < cij
                     continue
                 end
-                if axi >= c && axj >= c && xi * xj > zero(xi)
-                    pos += gerber_IQ_delta(xi, xj, axi, axj, T, t, k, e, y, kind)
-                elseif axi >= c && axj >= c && xi * xj < zero(xi)
-                    neg += gerber_IQ_delta(xi, xj, axi, axj, T, t, k, e, y, kind)
+                if axi >= cij && axj >= cij && xi * xj > zero(xi)
+                    pos += gerber_IQ_delta(xi, xj, axi, axj, T, t, k, e, y, scij, kind)
+                elseif axi >= cij && axj >= cij && xi * xj < zero(xi)
+                    neg += gerber_IQ_delta(xi, xj, axi, axj, T, t, k, e, y, scij, kind)
                 end
                 rho[j, i] = rho[i, j] = (pos - neg)
             end
@@ -498,9 +545,9 @@ function Statistics.cor(ce::GerberIQCovariance, X::MatNum; dims::Int = 1, mean =
     if dims == 2
         X = transpose(X)
     end
-    X = demean_returns(X, ce.me; dims = 1, kwargs...) ./
-        Statistics.std(ce.ve, X; dims = 1, kwargs...)
-    return gerber_IQ(ce, X)
+    sd = Statistics.std(ce.ve, X; dims = 1, kwargs...)
+    X = demean_returns(X, ce.me; dims = 1, kwargs...)
+    return gerber_IQ(ce, X, sd)
 end
 function Statistics.cov(ce::GerberIQCovariance, X::MatNum; dims::Int = 1, mean = nothing,
                         kwargs...)
@@ -509,7 +556,9 @@ function Statistics.cov(ce::GerberIQCovariance, X::MatNum; dims::Int = 1, mean =
         X = transpose(X)
     end
     sd = Statistics.std(ce.ve, X; dims = 1, kwargs...)
-    X = demean_returns(X, ce.me; dims = 1, kwargs...) ./ sd
-    sigma = gerber_IQ(ce, X)
+    X = demean_returns(X, ce.me; dims = 1, kwargs...)
+    sigma = gerber_IQ(ce, X, sd)
     return StatsBase.cor2cov!(sigma, sd)
 end
+
+export BasicGerberIQ

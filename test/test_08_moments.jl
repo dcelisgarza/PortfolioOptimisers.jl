@@ -235,13 +235,13 @@
         ce0 = PortfolioOptimisersCovariance(;
                                             ce = GerberCovariance(; alg = Gerber2(),
                                                                   me = SimpleExpectedReturns(;),
-                                                                  c1 = 0.1))
+                                                                  t = 0.1))
         ce = PortfolioOptimisers.factory(ce0, ew)
         @test !(ce.ce.ve === ce0.ce.ve)
         @test !(ce.ce.me === ce0.ce.me)
         @test ce.ce.pdm === ce0.ce.pdm
         @test ce.ce.alg === ce0.ce.alg
-        @test ce.ce.c1 == ce0.ce.c1
+        @test ce.ce.t == ce0.ce.t
         @test ce.mp === ce0.mp
         @test ce.ce.ve.w === ew
         @test ce.ce.ve.me.w === ew
