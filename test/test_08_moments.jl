@@ -443,112 +443,36 @@
 
         @test find_uncorrelated_indices(rd.X; t = 0.5) == [4, 6, 12, 16, 17, 19]
 
-        #=
-        sigma0 = cor(KendallCovariance(), rd.X);
+        ce0 = GerberIQCovariance(; me = CustomValueExpectedReturns(), c = 0.5,
+                                 kind = BasicGerberIQ(; n = 1), y = 0, alg = Gerber0(),
+                                 sc = AssetVolatilityGerberIQScaler())
+        sigma0 = cor(ce0, rd.X)
 
-        ce = GerberIQCovariance(; c = 0, kind = BasicGerberIQ(; n = 1), t = 1000, y = 0,
-                                alg = Gerber0())
-        sigma1 = cor(ce, rd.X);
+        ce1 = GerberCovariance(; me = CustomValueExpectedReturns(), alg = Gerber0(),
+                               t = 0.5)
+        sigma1 = cor(ce1, rd.X)
 
-        ce = GerberIQCovariance(; c = 0, kind = BasicGerberIQ(; n = 1), t = 1000, y = 0,
-                                alg = Gerber1())
-        sigma2 = cor(ce, rd.X);
+        @test isapprox(sigma0, sigma1)
 
-        ce = GerberIQCovariance(; c = 0, kind = BasicGerberIQ(; n = 1), t = 1000, y = 0,
-                                alg = Gerber2())
-        sigma3 = cor(ce, rd.X);
+        ce0 = GerberIQCovariance(; me = CustomValueExpectedReturns(), c = 0.5,
+                                 kind = BasicGerberIQ(; n = 1), y = 0, alg = Gerber1(),
+                                 sc = AssetVolatilityGerberIQScaler())
+        sigma0 = cor(ce0, rd.X)
 
-        sigma4 = kendalltau_matrix(rd.X ; variant = :tau_c);
+        ce1 = GerberCovariance(; me = CustomValueExpectedReturns(), alg = Gerber1(),
+                               t = 0.5)
+        sigma1 = cor(ce1, rd.X)
+        @test isapprox(sigma0, sigma1)
 
-        function kendalltau_matrix(X::AbstractMatrix; variant::Symbol = :tau_b)
-            n, p = size(X)
-            if p == 0
-                return Array{Float64}(undef, 0, 0)
-            end
-            if n < 2
-                # No pairs -> return NaN matrix (or identity? we choose NaN to indicate undefined)
-                return fill(NaN, p, p)
-            end
+        ce0 = GerberIQCovariance(; me = CustomValueExpectedReturns(), c = 0.5,
+                                 kind = BasicGerberIQ(; n = 1), y = 0, alg = Gerber2(),
+                                 sc = AssetVolatilityGerberIQScaler())
+        sigma0 = cor(ce0, rd.X)
 
-            # Precompute tied-pair counts for tau-b (saves recomputing per pair)
-            function tied_pairs_count(v::AbstractVector)
-                counts = Dict{Any, Int}()
-                for val in v
-                    counts[val] = get(counts, val, 0) + 1
-                end
-                s = 0.0
-                for (_, m) in counts
-                    s += m * (m - 1) / 2
-                end
-                return s
-            end
-
-            if variant == :tau_b
-                tie_counts = [tied_pairs_count(view(X, :, j)) for j in 1:p]
-            end
-
-            # helper to count concordant and discordant pairs between two vectors
-            function count_C_D(x::AbstractVector, y::AbstractVector)
-                C = 0
-                D = 0
-                @inbounds for i in 1:(n - 1)
-                    xi = x[i]
-                    yi = y[i]
-                    for j in (i + 1):n
-                        dx = xi - x[j]
-                        dy = yi - y[j]
-                        if dx == 0 || dy == 0
-                            # println("yes")
-                            continue
-                        end
-                        # multiply signs: >0 => concordant, <0 => discordant
-                        s = sign(dx) * sign(dy)
-                        if s > 0
-                            C += 1
-                        elseif s < 0
-                            D += 1
-                        end
-                    end
-                end
-                return C, D
-            end
-
-            n0 = n * (n - 1) / 2
-            R = Array{Float64}(undef, p, p)
-
-            for i in 1:p
-                R[i, i] = 1.0
-                xi = view(X, :, i)
-                for j in (i + 1):p
-                    yj = view(X, :, j)
-                    C, D = count_C_D(xi, yj)
-                    num = C - D
-                    if variant == :tau_a
-                        tau = num / n0
-                    elseif variant == :tau_c
-                        tau = num / (C + D)
-                    elseif variant == :tau_b
-                        n1 = tie_counts[i]
-                        n2 = tie_counts[j]
-                        denom_part1 = n0 - n1
-                        denom_part2 = n0 - n2
-                        denom = denom_part1 * denom_part2
-                        if denom <= 0
-                            tau = NaN
-                        else
-                            tau = num / sqrt(denom)
-                        end
-                    else
-                        error("Unsupported variant: $variant. Use :tau_a or :tau_b")
-                    end
-                    R[i, j] = tau
-                    R[j, i] = tau
-                end
-            end
-
-            return R
-        end
-        =#
+        ce1 = GerberCovariance(; me = CustomValueExpectedReturns(), alg = Gerber2(),
+                               t = 0.5)
+        sigma1 = cor(ce1, rd.X)
+        @test isapprox(sigma0, sigma1)
     end
     @testset "Regression" begin
         res = [StepwiseRegression(; alg = Forward()),
