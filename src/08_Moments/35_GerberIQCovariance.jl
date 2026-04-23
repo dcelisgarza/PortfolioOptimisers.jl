@@ -5,12 +5,12 @@ function clamp_gerber_iq_n(kind::GerberIQCovarianceAlgorithm, args...)
     return kind
 end
 abstract type GerberIQTauEpsEstimator <: AbstractEstimator end
-const GerberIQTauEps = Union{<:Integer, Function, <:GerberIQTauEpsEstimator}
-function gerber_iq_tau_eps(t::Integer, ::MatNum)
+const GerberIQTauEps = Union{<:Number, Function, <:GerberIQTauEpsEstimator}
+function gerber_iq_tau_eps(t::Number, ::MatNum)
     return t
 end
 function gerber_iq_tau_eps(t::Function, X::MatNum)
-    return t(X)::Integer
+    return t(X)
 end
 function gerber_iq_tau_eps(::Option{<:GerberIQTauEpsEstimator}, X::MatNum)
     T, N = size(X)
@@ -18,11 +18,11 @@ function gerber_iq_tau_eps(::Option{<:GerberIQTauEpsEstimator}, X::MatNum)
 end
 abstract type GerberIQGammaEstimator <: AbstractEstimator end
 const GerberIQGamma = Union{<:Number, Function, <:GerberIQGammaEstimator}
-function gerber_iq_gamma(y::Real, ::MatNum)
+function gerber_iq_gamma(y::Number, ::MatNum)
     return y
 end
 function gerber_iq_gamma(y::Function, X::MatNum)
-    return y(X)::Number
+    return y(X)
 end
 function gerber_iq_gamma(::Option{<:GerberIQGammaEstimator}, X::MatNum)
     return log(2) / size(X, 2)
@@ -42,8 +42,8 @@ function gerber_iq_scaling(sca::Function, sdi::Number, sdj::Number)
 end
 abstract type GerberIQDecayEstimator <: AbstractEstimator end
 const GerberIQDecay = Union{Function, <:GerberIQDecayEstimator}
-function gerber_iq_decay(::Option{<:GerberIQDecay}, T::Integer, t::Integer, k::Integer,
-                         e::Integer, y::Number)
+function gerber_iq_decay(::Option{<:GerberIQDecay}, T::Number, t::Number, k::Number,
+                         e::Number, y::Number)
     m = T - (t + k)
     return exp(-y * max(0, m - e))
 end
@@ -86,7 +86,7 @@ function BasicGerberIQ(; d::Number = 2.0, n::Number = 0.5)
     return BasicGerberIQ(d, n)
 end
 function gerber_iq_assert_c_d(c::Number, kind::BasicGerberIQ)
-    @argcheck(c < kind.d)
+    @argcheck(c <= kind.d)
     return nothing
 end
 function gerber_iq_weight(xi::Number, xj::Number, axi::Number, axj::Number, sci::Number,
@@ -169,10 +169,10 @@ dcn ─┤     -3 ┾━━━━━╋━━━━━━━━━━━┿━�
                                                         n5, n6, n7, n8, n9, n10)
     end
 end
-function PartialGerberIQ(; dcp::Number = 2.0, dcn::Number = 2.0, ddp::Number = 2.0,
-                         ddn::Number = 2.0, n1::Number = 0.5, n2::Number = 0.5,
-                         n3::Number = sqrt(n1 * n2), n4::Number = 1.0, n5::Number = 1.0,
-                         n6::Number = 1.0, n7::Number = sqrt(n1 * n4),
+function PartialGerberIQ(; dcp::Number = 2.0, dcn::Number = dcp, ddp::Number = dcp,
+                         ddn::Number = dcp, n1::Number = 0.5, n2::Number = n1,
+                         n3::Number = sqrt(n1 * n2), n4::Number = 1.0, n5::Number = n4,
+                         n6::Number = n4, n7::Number = sqrt(n1 * n4),
                          n8::Number = sqrt(n2 * n5), n9::Number = sqrt(n3 * n6),
                          n10::Number = sqrt(n3 * n6))
     return PartialGerberIQ(dcp, dcn, ddp, ddn, n1, n2, n3, n4, n5, n6, n7, n8, n9, n10)
@@ -319,25 +319,24 @@ dcn ─┤     -3 ┾━━━━━╋━━━━━╋━━━━━┿━�
                                                                        n19, n20, n21)
     end
 end
-function FullGerberIQ(; dcp::Number = 2.0, dcn::Number = 2.0, ddp::Number = 2.0,
-                      ddn::Number = 2.0, n1::Number = 0.5, n2::Number = 0.5,
-                      n3::Number = 0.5, n4::Number = 0.75, n5::Number = 0.75,
-                      n6::Number = 0.75, n7::Number = sqrt(n1 * n4),
-                      n8::Number = sqrt(n2 * n5), n9::Number = sqrt(n3 * n6),
-                      n10::Number = sqrt(n3 * n6), n11::Number = 1.0, n12::Number = 1.0,
-                      n13::Number = 1.0, n14::Number = sqrt(n4 * n11),
-                      n15::Number = sqrt(n7 * n14), n17::Number = sqrt(n5 * n12),
-                      n16::Number = sqrt(n8 * n17), n19::Number = sqrt(n6 * n13),
-                      n18::Number = sqrt(n9 * n19), n20::Number = sqrt(n6 * n13),
-                      n21::Number = sqrt(n10 * n20))
+function FullGerberIQ(; dcp::Number = 2.0, dcn::Number = dcp, ddp::Number = dcp,
+                      ddn::Number = dcp, n1::Number = 0.5, n2::Number = n1, n3::Number = n1,
+                      n4::Number = 0.75, n5::Number = n4, n6::Number = n4,
+                      n7::Number = sqrt(n1 * n4), n8::Number = sqrt(n2 * n5),
+                      n9::Number = sqrt(n3 * n6), n10::Number = sqrt(n3 * n6),
+                      n11::Number = 1.0, n12::Number = n11, n13::Number = n11,
+                      n14::Number = sqrt(n4 * n11), n15::Number = sqrt(n7 * n14),
+                      n17::Number = sqrt(n5 * n12), n16::Number = sqrt(n8 * n17),
+                      n19::Number = sqrt(n6 * n13), n18::Number = sqrt(n9 * n19),
+                      n20::Number = sqrt(n6 * n13), n21::Number = sqrt(n10 * n20))
     return FullGerberIQ(dcp, dcn, ddp, ddn, n1, n2, n3, n4, n5, n6, n7, n8, n9, n10, n11,
                         n12, n13, n14, n15, n16, n17, n18, n19, n20, n21)
 end
 function gerber_iq_assert_c_d(c::Number, kind::Union{<:PartialGerberIQ, <:FullGerberIQ})
-    @argcheck(c < kind.dcp)
-    @argcheck(c < kind.dcn)
-    @argcheck(c < kind.ddp)
-    @argcheck(c < kind.ddn)
+    @argcheck(c <= kind.dcp)
+    @argcheck(c <= kind.dcn)
+    @argcheck(c <= kind.ddp)
+    @argcheck(c <= kind.ddn)
     return nothing
 end
 function clamp_gerber_iq_n(alg::FullGerberIQ, ::Gerber2)
@@ -440,10 +439,10 @@ end
                                 ex::FLoops.Transducers.Executor)
         assert_nonempty_nonneg_finite_val(c, :c)
         gerber_iq_assert_c_d(c, kind)
-        if isa(t, Integer)
+        if isa(t, Number)
             assert_nonempty_nonneg_finite_val(t, :t)
         end
-        if isa(e, Integer)
+        if isa(e, Number)
             assert_nonempty_nonneg_finite_val(e, :e)
         end
         if isa(y, Number)
@@ -485,7 +484,7 @@ function factory(ce::GerberIQCovariance, w::ObsWeights)
                               ex = ce.ex)
 end
 function gerber_IQ_delta(xi::Number, xj::Number, axi::Number, axj::Number,
-                         decay::Option{<:GerberIQDecay}, T::Integer, t::Integer, k::Integer,
+                         decay::Option{<:GerberIQDecay}, T::Integer, t::Number, k::Number,
                          e::Number, y::Number, sci::Number, scj::Number,
                          kind::GerberIQCovarianceAlgorithm)
     w = gerber_iq_weight(xi, xj, axi, axj, sci, scj, kind)
@@ -501,7 +500,7 @@ function gerber_IQ(ce::GerberIQCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:A
     t = gerber_iq_tau_eps(t, X)
     e = gerber_iq_tau_eps(e, X)
     y = gerber_iq_gamma(y, X)
-    let t = t, y = y
+    let t = t, e = e, y = y
         FLoops.@floop ex for j in axes(X, 2)
             sdj = sd[j]
             for i in 1:j
@@ -547,7 +546,7 @@ function gerber_IQ(ce::GerberIQCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:A
     t = gerber_iq_tau_eps(t, X)
     e = gerber_iq_tau_eps(e, X)
     y = gerber_iq_gamma(y, X)
-    let t = t, y = y
+    let t = t, e = e, y = y
         FLoops.@floop ex for j in axes(X, 2)
             sdj = sd[j]
             for i in 1:j
@@ -597,7 +596,7 @@ function gerber_IQ(ce::GerberIQCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:A
     t = gerber_iq_tau_eps(t, X)
     e = gerber_iq_tau_eps(e, X)
     y = gerber_iq_gamma(y, X)
-    let t = t, y = y, e = e
+    let t = t, e = e, y = y
         FLoops.@floop ex for j in axes(X, 2)
             sdj = sd[j]
             for i in 1:j

@@ -384,7 +384,7 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
                     neg += sb_delta(ari, arj, n)
                 end
             end
-            den = (pos + neg)
+            den = pos + neg
             rho[j, i] = rho[i, j] = if !iszero(den)
                 (pos - neg) / den
             else
@@ -471,7 +471,7 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
                     nn += sb_delta(ari, arj, n)
                 end
             end
-            den = (pos + neg + nn)
+            den = pos + neg + nn
             rho[j, i] = rho[i, j] = if !iszero(den)
                 (pos - neg) / den
             else
@@ -645,7 +645,7 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
             end
             tpos = pos * cpos
             tneg = neg * cneg
-            den = (tpos + tneg)
+            den = tpos + tneg
             rho[j, i] = rho[i, j] = if !iszero(den)
                 (tpos - tneg) / den
             else
@@ -742,7 +742,7 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
             tpos = pos * cpos
             tneg = neg * cneg
             tnn = nn * cnn
-            den = (tpos + tneg + tnn)
+            den = tpos + tneg + tnn
             rho[j, i] = rho[i, j] = if !iszero(den)
                 (tpos - tneg) / den
             else
@@ -914,7 +914,7 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
                     neg += 1
                 end
             end
-            den = (pos + neg)
+            den = pos + neg
             rho[j, i] = rho[i, j] = if !iszero(den)
                 (pos - neg) / den
             else
@@ -1002,7 +1002,7 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
                     nn += 1
                 end
             end
-            den = (pos + neg + nn)
+            den = pos + neg + nn
             rho[j, i] = rho[i, j] = if !iszero(den)
                 (pos - neg) / den
             else

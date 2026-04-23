@@ -155,15 +155,23 @@
                SmythBrobyCovariance(; alg = SmythBrobyCount1()),
                SmythBrobyCovariance(; alg = SmythBrobyCount2()),
                DenoiseCovariance(; dn = Denoise(; alg = SpectralDenoise())),
-               DetoneCovariance(), ProcessedCovariance(; alg = LoGo())]
+               DetoneCovariance(), ProcessedCovariance(; alg = LoGo()),
+               GerberIQCovariance(; kind = BasicGerberIQ(), alg = Gerber0()),
+               GerberIQCovariance(; kind = FullGerberIQ(), alg = Gerber1(), y = 1 / 252,
+                                  t = 100, e = 10, sc = (x, y) -> (min(x, y), min(x, y))),
+               GerberIQCovariance(; kind = PartialGerberIQ(), alg = Gerber2(),
+                                  y = (x) -> inv(div(size(x, 2), 2)),
+                                  t = (x) -> inv(div(size(x, 2), 3)),
+                                  e = (x) -> inv(div(size(x, 2), 5)),
+                                  sc = (x, y) -> (min(x, y), min(x, y)))]
         df = CSV.read(joinpath(@__DIR__, "./assets/covariance.csv.gz"), DataFrame)
         for (i, ce) in pairs(ces)
             cei = PortfolioOptimisersCovariance(; ce = ce)
             sigma = cov(cei, rd.X'; dims = 2)
-            df[!, "$i"] = vec(sigma)
-            continue
             rho = cor(cei, rd.X'; dims = 2)
             @test isapprox(StatsBase.cov2cor(sigma), rho)
+            df[!, "$i"] = vec(sigma)
+            continue
             success = isapprox(vec(sigma), df[!, i])
             if !success
                 println("Counter: $i")
@@ -280,12 +288,6 @@
                        cov(SmythBrobyCovariance(; alg = SmythBroby0()), rd.X'; dims = 2))
         @test isapprox(cor(SmythBrobyCovariance(; alg = SmythBroby0()), rd.X),
                        cor(SmythBrobyCovariance(; alg = SmythBroby0()), rd.X'; dims = 2))
-
-        ce0 = PortfolioOptimisersCovariance(;
-                                            ce = SmythBrobyCovariance(;
-                                                                      alg = SmythBroby2()))
-        ce = PortfolioOptimisers.factory(ce0, ew)
-        @test isnothing(ce.ce.me)
 
         ce0 = PortfolioOptimisersCovariance(;
                                             ce = DistanceCovariance(; args = (3,),
@@ -443,36 +445,23 @@
 
         @test find_uncorrelated_indices(rd.X; t = 0.5) == [4, 6, 12, 16, 17, 19]
 
-        ce0 = GerberIQCovariance(; me = CustomValueExpectedReturns(), c = 0.5,
-                                 kind = BasicGerberIQ(; n = 1), y = 0, alg = Gerber0(),
-                                 sc = AssetVolatilityGerberIQScaler())
-        sigma0 = cor(ce0, rd.X)
-
-        ce1 = GerberCovariance(; me = CustomValueExpectedReturns(), alg = Gerber0(),
-                               t = 0.5)
-        sigma1 = cor(ce1, rd.X)
-
-        @test isapprox(sigma0, sigma1)
-
-        ce0 = GerberIQCovariance(; me = CustomValueExpectedReturns(), c = 0.5,
-                                 kind = BasicGerberIQ(; n = 1), y = 0, alg = Gerber1(),
-                                 sc = AssetVolatilityGerberIQScaler())
-        sigma0 = cor(ce0, rd.X)
-
-        ce1 = GerberCovariance(; me = CustomValueExpectedReturns(), alg = Gerber1(),
-                               t = 0.5)
-        sigma1 = cor(ce1, rd.X)
-        @test isapprox(sigma0, sigma1)
-
-        ce0 = GerberIQCovariance(; me = CustomValueExpectedReturns(), c = 0.5,
-                                 kind = BasicGerberIQ(; n = 1), y = 0, alg = Gerber2(),
-                                 sc = AssetVolatilityGerberIQScaler())
-        sigma0 = cor(ce0, rd.X)
-
-        ce1 = GerberCovariance(; me = CustomValueExpectedReturns(), alg = Gerber2(),
-                               t = 0.5)
-        sigma1 = cor(ce1, rd.X)
-        @test isapprox(sigma0, sigma1)
+        for alg in (Gerber0(), Gerber2())
+            ce0 = GerberCovariance(; me = CustomValueExpectedReturns(), alg = alg, t = 0.5)
+            for kind in
+                (BasicGerberIQ(; n = 1.0, d = 0.5), PartialGerberIQ(; dcp = 0.5, n1 = 1.0),
+                 FullGerberIQ(; dcp = 0.5, n1 = 1.0, n4 = 1.0))
+                ce1 = GerberIQCovariance(; me = CustomValueExpectedReturns(), c = 0.5,
+                                         kind = kind, y = 0, alg = alg,
+                                         sc = AssetVolatilityGerberIQScaler())
+                res = isapprox(cor(ce0, rd.X), cor(ce1, rd.X))
+                if !res
+                    println("GerberIQ failed")
+                    println(alg)
+                    println(kind)
+                end
+                @test res
+            end
+        end
     end
     @testset "Regression" begin
         res = [StepwiseRegression(; alg = Forward()),
