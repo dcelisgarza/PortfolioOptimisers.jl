@@ -30,7 +30,7 @@ These types are used to specify the algorithm when constructing a [`GerberCovari
 
 # Interfaces
 
-If moving away from the already established Gerber covariance algorithms, you must follow [`AbstractCovarianceEstimator`](@ref) to implement the entire chain. Else you can follow the instructions and examples in [`GerberCovarianceAlgorithm`](@ref) and [`StandardisedGerberCovarianceAlgorithm`](@ref).
+If moving away from the already established Gerber covariance algorithms, you must follow [`AbstractCovarianceEstimator`](@ref) to implement the entire chain. Else you can follow the instructions and examples in [`GerberCovarianceAlgorithm`](@ref).
 
 # Related
 
@@ -190,6 +190,8 @@ GerberCovariance
       │             │   w ┴ nothing
       │           w ┼ nothing
       │   corrected ┴ Bool: true
+   me ┼ SimpleExpectedReturns
+      │   w ┴ nothing
   pdm ┼ Posdef
       │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
       │   kwargs ┴ @NamedTuple{}: NamedTuple()
@@ -203,6 +205,8 @@ GerberCovariance
       │             │   w ┴ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.1, 0.2, 0.7]
       │           w ┼ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.1, 0.2, 0.7]
       │   corrected ┴ Bool: true
+   me ┼ SimpleExpectedReturns
+      │   w ┴ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.1, 0.2, 0.7]
   pdm ┼ Posdef
       │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
       │   kwargs ┴ @NamedTuple{}: NamedTuple()

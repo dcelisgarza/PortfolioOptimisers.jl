@@ -1,11 +1,77 @@
 # https://papers.ssrn.com/sol3/papers.cfm?abstract_id=4986939
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for all Gerber Information Quality covariance estimators in `PortfolioOptimisers.jl`.
+
+All concrete and/or abstract types implementing Gerber Information Quality covariance estimation algorithms should be subtypes of `BaseGerberIQCovariance`.
+
+# Related
+
+  - [`GerberIQCovariance`](@ref)
+"""
 abstract type BaseGerberIQCovariance <: BaseGerberCovariance end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for all Gerber Information Quality covariance estimation algorithms in `PortfolioOptimisers.jl`.
+
+All concrete and/or abstract types implementing Gerber Information Quality covariance estimation algorithms should be subtypes of `GerberIQCovarianceAlgorithm`.
+
+# Related
+
+  - [`GerberIQCovariance`](@ref)
+"""
 abstract type GerberIQCovarianceAlgorithm <: AbstractMomentAlgorithm end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+No-op for Gerber Information Quality covariance estimation algorithms that do not need their noise suppression parameters clamped.
+"""
 function clamp_gerber_iq_n(kind::GerberIQCovarianceAlgorithm, args...)
     return kind
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for all temporal lookback and delay Gerber Information Quality parameter estimators in `PortfolioOptimisers.jl`.
+
+All concrete and/or abstract types implementing Gerber Information Quality parameter estimators should be subtypes of `GerberIQTauEpsEstimator`.
+
+# Related
+
+  - [`GerberIQCovariance`](@ref)
+"""
 abstract type GerberIQTauEpsEstimator <: AbstractEstimator end
+"""
+    const GerberIQTauEps = Union{<:Number, Function, <:GerberIQTauEpsEstimator}
+
+A type alias for the union of `Number`, `Function`, and `GerberIQTauEpsEstimator` used for Gerber Information Quality lookback and delay parameter definitions.
+
+# Related
+
+  - [`GerberIQCovariance`](@ref)
+"""
 const GerberIQTauEps = Union{<:Number, Function, <:GerberIQTauEpsEstimator}
+"""
+    gerber_iq_tau_eps(t::Number, ::MatNum)
+    gerber_iq_tau_eps(t::Function, X::MatNum)
+    gerber_iq_tau_eps(t::Option{<:GerberIQTauEpsEstimator}, X::MatNum)
+
+Evaluates the Gerber Information Quality lookback and delay parameter `t` at `X`, returning a `Number`.
+
+# Arguments
+
+  - `t`: The lookback parameter for use in the decay equation.
+      + `::Number`: Use the number as-is.
+      + `::Function`: A function which takes the data matrix `X` as an argument and returns a `Number`.
+      + `::Option{<:GerberIQTauEpsEstimator}`: Fallback returning `round(Int, T - T / N)`, where `T` and `N` are the number of rows and columns of `X` respectively.
+  - $(arg_dict[:X])
+
+# Returns
+
+  - `tau::Number`: The lookback parameter for use in the decay equation.
+"""
 function gerber_iq_tau_eps(t::Number, ::MatNum)
     return t
 end
@@ -417,8 +483,11 @@ function gerber_iq_weight(xi::Number, xj::Number, axi::Number, axj::Number, sci:
     end
 end
 @concrete struct GerberIQCovariance <: BaseGerberIQCovariance
+    "$(field_dict[:ve])"
     ve
+    "$(field_dict[:me])"
     me
+    "$(field_dict[:pdm])"
     pdm
     c
     decay

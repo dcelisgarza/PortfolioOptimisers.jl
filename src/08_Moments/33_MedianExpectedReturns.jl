@@ -20,24 +20,13 @@ Keywords correspond to the struct's fields.
 # Examples
 
 ```jldoctest
-julia> MedianExpectedReturns()
+julia> me = MedianExpectedReturns()
 MedianExpectedReturns
-  ce ┼ PortfolioOptimisersCovariance
-     │   ce ┼ Covariance
-     │      │    me ┼ SimpleExpectedReturns
-     │      │       │   w ┴ nothing
-     │      │    ce ┼ GeneralCovariance
-     │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-     │      │       │    w ┴ nothing
-     │      │   alg ┴ Full()
-     │   mp ┼ DenoiseDetoneAlgMatrixProcessing
-     │      │     pdm ┼ Posdef
-     │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-     │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
-     │      │      dn ┼ nothing
-     │      │      dt ┼ nothing
-     │      │     alg ┼ nothing
-     │      │   order ┴ DenoiseDetoneAlg()
+  w ┴ nothing
+
+julia> factory(me, StatsBase.Weights([0.1, 0.2, 0.7]))
+MedianExpectedReturns
+  w ┴ Weights{Float64, Float64, Vector{Float64}}: [0.1, 0.2, 0.7]
 ```
 
 # Related

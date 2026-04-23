@@ -22,22 +22,7 @@ Keywords correspond to the struct's fields.
 ```jldoctest
 julia> CustomValueExpectedReturns()
 CustomValueExpectedReturns
-  ce ┼ PortfolioOptimisersCovariance
-     │   ce ┼ Covariance
-     │      │    me ┼ SimpleExpectedReturns
-     │      │       │   w ┴ nothing
-     │      │    ce ┼ GeneralCovariance
-     │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-     │      │       │    w ┴ nothing
-     │      │   alg ┴ Full()
-     │   mp ┼ DenoiseDetoneAlgMatrixProcessing
-     │      │     pdm ┼ Posdef
-     │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-     │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
-     │      │      dn ┼ nothing
-     │      │      dt ┼ nothing
-     │      │     alg ┼ nothing
-     │      │   order ┴ DenoiseDetoneAlg()
+  val ┴ Float64: 0.0
 ```
 
 # Related
