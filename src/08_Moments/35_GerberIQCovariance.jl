@@ -54,15 +54,15 @@ A type alias for the union of `Number`, `Function`, and `GerberIQTauEpsEstimator
 """
 const GerberIQTauEps = Union{<:Number, Function, <:GerberIQTauEpsEstimator}
 """
-    gerber_iq_tau_eps(t::Number, ::MatNum)
-    gerber_iq_tau_eps(t::Function, X::MatNum)
-    gerber_iq_tau_eps(t::Option{<:GerberIQTauEpsEstimator}, X::MatNum)
+    gerber_iq_tau_eps(t::Number, ::MatNum) -> Number
+    gerber_iq_tau_eps(t::Function, X::MatNum) -> Number
+    gerber_iq_tau_eps(t::Option{<:GerberIQTauEpsEstimator}, X::MatNum) -> Number
 
-Evaluates the Gerber Information Quality lookback and delay parameter `t` at `X`, returning a `Number`.
+Computes or returns the Gerber Information Quality lookback or delay parameter `t`, potentially using `X` as an input.
 
 # Arguments
 
-  - `t`: The lookback parameter for use in the decay equation.
+  - `t`: The lookback parameter estimator, function or value for use in the decay equation.
       + `::Number`: Use the number as-is.
       + `::Function`: A function which takes the data matrix `X` as an argument and returns a `Number`.
       + `::Option{<:GerberIQTauEpsEstimator}`: Fallback returning `round(Int, T - T / N)`, where `T` and `N` are the number of rows and columns of `X` respectively.
@@ -82,8 +82,47 @@ function gerber_iq_tau_eps(::Option{<:GerberIQTauEpsEstimator}, X::MatNum)
     T, N = size(X)
     return round(Int, T - T / N)
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for Gerber IQ estimators for tuning the strength of the lookback decay.
+
+All concrete and/or abstract types implementing Gerber Information Quality parameter estimators should be subtypes of `GerberIQGammaEstimator`.
+
+# Related
+
+  - [`GerberIQCovariance`](@ref)
+"""
 abstract type GerberIQGammaEstimator <: AbstractEstimator end
+"""
+    const GerberIQGamma = Union{<:Number, Function, <:GerberIQGammaEstimator}
+
+A type alias for the union of `Number`, `Function`, and `GerberIQGammaEstimator` used for Gerber Information Quality temporal decay parameter definitions.
+
+# Related
+
+    - [`GerberIQCovariance`](@ref)
+"""
 const GerberIQGamma = Union{<:Number, Function, <:GerberIQGammaEstimator}
+"""
+    gerber_iq_gamma(y::Number, ::MatNum) -> Number
+    gerber_iq_gamma(y::Function, X::MatNum) -> Number
+    gerber_iq_gamma(y::Option{<:GerberIQGammaEstimator}, X::MatNum) -> Number
+
+Computes or returns the Gerber Information Quality decay strength parameter `y`, potentially using `X` as an input.
+
+# Arguments
+
+  - `y`: The decay strength parameter estimator, function or value for use in the decay equation.
+      + `::Number`: Use the number as-is.
+      + `::Function`: A function which takes the data matrix `X` as an argument and returns a `Number`.
+      + `::Option{<:GerberIQGammaEstimator}`: Fallback returning `log(2) / size(X, 2)`.
+  - $(arg_dict[:X])
+
+# Returns
+
+  - `gamma::Number`: The decay strength parameter for use in the decay equation.
+"""
 function gerber_iq_gamma(y::Number, ::MatNum)
     return y
 end
@@ -93,9 +132,59 @@ end
 function gerber_iq_gamma(::Option{<:GerberIQGammaEstimator}, X::MatNum)
     return log(2) / size(X, 2)
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for Gerber IQ estimators for scaling the threshold parameters for defining significant co-movements.
+
+All concrete and/or abstract types implementing threshold scalers for Gerber Information Quality parameter estimators should be subtypes of `GerberIQScalerEstimator`.
+
+# Related
+
+  - [`GerberIQCovariance`](@ref)
+"""
 abstract type GerberIQScalerEstimator <: AbstractEstimator end
+"""
+    const GerberIQScaler = Union{Function, <:GerberIQScalerEstimator}
+
+A type alias for the union of `Function`, and `GerberIQScalerEstimator` used for scaling the threshold parameters for defining significant co-movements in Gerber Information Quality.
+
+# Related
+
+    - [`GerberIQCovariance`](@ref)
+"""
 const GerberIQScaler = Union{Function, <:GerberIQScalerEstimator}
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Scales the threshold parameters using the individual asset volatilities.
+
+# Related
+
+    - [`GerberIQScalerEstimator`](@ref)
+    - [`GerberIQCovariance`](@ref)
+    - [`gerber_iq_scaling`](@ref)
+"""
 struct AssetVolatilityGerberIQScaler <: GerberIQScalerEstimator end
+"""
+    gerber_iq_scaling(sca::AssetVolatilityGerberIQScaler, sdi::Number, sdj::Number) -> (Number, Number)
+    gerber_iq_scaling(sca::Function, sdi::Number, sdj::Number) -> (Number, Number)
+    gerber_iq_scaling(sca::Option{<:GerberIQScalerEstimator}, sdi::Number, sdj::Number) -> (Number, Number)
+
+Computes or returns the threshold scaling parameters for defining significant co-movements in Gerber Information Quality.
+
+# Arguments
+
+    - `y`: The decay strength parameter for use in the decay equation.
+        + `::Number`: Use the number as-is.
+        + `::Function`: A function which takes the data matrix `X` as an argument and returns a `(Number, Number)` tuple.
+        + `::Option{<:GerberIQScalerEstimator}`: Fallback returning a 2-element tuple of the mean `sdi` and `sdj`.
+    - $(arg_dict[:X])
+
+# Returns
+
+    - `gamma::Number`: The decay strength parameter for use in the decay equation.
+"""
 function gerber_iq_scaling(::AssetVolatilityGerberIQScaler, sdi::Number, sdj::Number)
     return sdi, sdj
 end
@@ -106,6 +195,17 @@ end
 function gerber_iq_scaling(sca::Function, sdi::Number, sdj::Number)
     return sca(sdi, sdj)
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for Gerber IQ estimators for scaling the threshold parameters for defining significant co-movements.
+
+All concrete and/or abstract types implementing threshold scalers for Gerber Information Quality parameter estimators should be subtypes of `GerberIQDecayEstimator`.
+
+# Related
+
+  - [`GerberIQCovariance`](@ref)
+"""
 abstract type GerberIQDecayEstimator <: AbstractEstimator end
 const GerberIQDecay = Union{Function, <:GerberIQDecayEstimator}
 function gerber_iq_decay(::Option{<:GerberIQDecay}, T::Number, t::Number, k::Number,

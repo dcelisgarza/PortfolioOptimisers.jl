@@ -3,6 +3,6 @@
     all_names = Base.undocumented_names(PortfolioOptimisers; private = true)
     public_names = Base.undocumented_names(PortfolioOptimisers; private = false)
     private_names = setdiff(all_names, public_names)
-    @test length(public_names) == 2
-    @test length(private_names) == 20
+    @test length(public_names) == 1
+    @test length(private_names) == 7
 end
