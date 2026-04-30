@@ -26,7 +26,7 @@ MedianExpectedReturns
 
 julia> factory(me, StatsBase.Weights([0.1, 0.2, 0.7]))
 MedianExpectedReturns
-  w ┴ Weights{Float64, Float64, Vector{Float64}}: [0.1, 0.2, 0.7]
+  w ┴ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.1, 0.2, 0.7]
 ```
 
 # Related

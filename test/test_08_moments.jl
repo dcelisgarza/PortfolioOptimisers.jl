@@ -157,12 +157,17 @@
                DenoiseCovariance(; dn = Denoise(; alg = SpectralDenoise())),
                DetoneCovariance(), ProcessedCovariance(; alg = LoGo()),
                GerberIQCovariance(; kind = BasicGerberIQ(), alg = Gerber0()),
-               GerberIQCovariance(; kind = FullGerberIQ(), alg = Gerber1(), y = 1 / 252,
-                                  t = 100, e = 10, sc = (x, y) -> (min(x, y), min(x, y))),
+               GerberIQCovariance(; kind = FullGerberIQ(), alg = Gerber1(),
+                                  decay = ExpGerberIQDecay(; y = 1 / 252, t = 100, e = 10),
+                                  sc = (x, y) -> (min(x, y), min(x, y))),
                GerberIQCovariance(; kind = PartialGerberIQ(), alg = Gerber2(),
-                                  y = (x) -> inv(div(size(x, 2), 2)),
-                                  t = (x) -> inv(div(size(x, 2), 3)),
-                                  e = (x) -> inv(div(size(x, 2), 5)),
+                                  decay = ExpGerberIQDecay(;
+                                                           y = (x) -> inv(div(size(x, 2),
+                                                                              2)),
+                                                           t = (x) -> inv(div(size(x, 2),
+                                                                              3)),
+                                                           e = (x) -> inv(div(size(x, 2),
+                                                                              5))),
                                   sc = (x, y) -> (min(x, y), min(x, y)))]
         df = CSV.read(joinpath(@__DIR__, "./assets/covariance.csv.gz"), DataFrame)
         for (i, ce) in pairs(ces)
@@ -451,8 +456,8 @@
                 (BasicGerberIQ(; n = 1.0, d = 0.5), PartialGerberIQ(; dcp = 0.5, n1 = 1.0),
                  FullGerberIQ(; dcp = 0.5, n1 = 1.0, n4 = 1.0))
                 ce1 = GerberIQCovariance(; me = CustomValueExpectedReturns(), c = 0.5,
-                                         kind = kind, y = 0, alg = alg,
-                                         sc = AssetVolatilityGerberIQScaler())
+                                         kind = kind, decay = ExpGerberIQDecay(; y = 0),
+                                         alg = alg, sc = AssetVolatilityGerberIQScaler())
                 res = isapprox(cor(ce0, rd.X), cor(ce1, rd.X))
                 if !res
                     println("GerberIQ failed")

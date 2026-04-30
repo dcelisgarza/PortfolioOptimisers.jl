@@ -14,4 +14,7 @@ GerberIQScalerEstimator
 GerberIQScaler
 AssetVolatilityGerberIQScaler
 gerber_iq_scaling
+GerberIQDecayEstimator
+ExpGerberIQDecay
+regenerate_decay
 ```

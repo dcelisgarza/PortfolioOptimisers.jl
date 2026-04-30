@@ -202,18 +202,232 @@ Abstract supertype for Gerber IQ estimators for scaling the threshold parameters
 
 All concrete and/or abstract types implementing threshold scalers for Gerber Information Quality parameter estimators should be subtypes of `GerberIQDecayEstimator`.
 
+# Interfaces
+
+In order to implement a new Gerber IQ decay estimator which will work seamlessly with the library, subtype `GerberIQDecayEstimator` with all necessary parameters as part of the struct, and implement the following methods:
+
+## Regenerate Decay
+
+  - `PortfolioOptimisers.regenerate_decay(decay::GerberIQDecayEstimator, X::AbstractMatrix) -> GerberIQDecayEstimator`: Fallback for automatically computing the decay parameters based on the input data `X`.
+
+### Arguments
+
+  - `decay`: The decay estimator to regenerate.
+  - $(arg_dict[:X])
+
+### Returns
+
+  - `decay::GerberIQDecayEstimator`: A new concrete instance of the subtype of `GerberIQDecayEstimator` with the decay parameters generated from the input data `X`.
+
+## Functor
+
+  - `(decay::GerberIQDecayEstimator)(T::Number, k::Number) -> Number`: Evaluate the decay estimator for observation `k` out of `T`.
+
+### Arguments
+
+  - `T::Number`: The total number of observations.
+  - `k::Number`: The current observation index.
+
+### Returns
+
+  - `d::Number`: The decay value for observation `k` out of `T`.
+
+# Examples
+
+We can create a dummy Gerber IQ decay estimator as follows:
+
+```jldoctest
+julia> function GaussianDecay(; a::Union{Nothing, <:Number} = nothing)
+           return GaussianDecay(a)
+       end
+struct GaussianDecay{T} <: PortfolioOptimisers.GerberIQDecayEstimator
+       a::T
+       function GaussianDecay(a::Union{Nothing, <:Number})
+           if isa(a, Number)
+               @assert(a >= 0)
+           end
+           new{typeof(a)}(a)
+       end
+ end
+
+julia> function PortfolioOptimisers.regenerate_decay(decay::GaussianDecay{<:Number},
+                                                     ::AbstractMatrix)
+           return decay
+       end
+GaussianDecay
+
+julia> function PortfolioOptimisers.regenerate_decay(decay::GaussianDecay{Nothing},
+                                                     X::AbstractMatrix)
+           T = size(X, 1)
+           return GaussianDecay(; a = inv(log(T)))
+       end
+regenerate_decay (generic function with 1 method)
+
+julia> function (decay::GaussianDecay)(T::Number, k::Number)
+           m = T - k + 1
+           return exp(-m^2 / (2 * decay.a^2))
+       end
+regenerate_decay (generic function with 2 methods)
+
+julia> cor(GerberIQCovariance(; decay = GaussianDecay()), [1.0 2.0; 0.3 0.7; 0.5 1.1])
+
+julia> cov(GerberIQCovariance(; decay = GaussianDecay()), [1.0 2.0; 0.3 0.7; 0.5 1.1])
+2×2 Matrix{Float64}:
+1.0  1.0
+1.0  1.0
+```
+
 # Related
 
   - [`GerberIQCovariance`](@ref)
+  - [`regenerate_decay`](@ref)
 """
 abstract type GerberIQDecayEstimator <: AbstractEstimator end
-const GerberIQDecay = Union{Function, <:GerberIQDecayEstimator}
-function gerber_iq_decay(::Option{<:GerberIQDecay}, T::Number, t::Number, k::Number,
-                         e::Number, y::Number)
-    m = T - (t + k)
-    return exp(-y * max(0, m - e))
+"""
+$(DocStringExtensions.TYPEDEF)
+
+A concrete type for exponential Gerber IQ temporal decay.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    ExpGerberIQDecay(t::Option{<:GerberIQTauEps} = nothing,
+                     e::Option{<:GerberIQTauEps} = nothing,
+                     y::Option{<:GerberIQGamma} = nothing)
+
+Keywords correspond to the struct's fields.
+
+# Functors
+
+    (decay::ExpGerberIQDecay)(T::Number, k::Number) -> Number
+
+Implements the exponential decay for Gerber IQ covariance.
+
+!!! Warning
+
+    The functor is not meant to be called directly unless all parameters are numeric. Otherwise, call [`regenerate_decay`](@ref) first.
+
+```math
+\\begin{align}
+m &= T - (t + k)\\\\
+d &= \\exp\\left[-y \\max(0, m - e)\\right]
+\\end{align}
+```
+
+Where:
+
+  - ``T``: Is the number of observations.
+  - ``k``: Is the time index.
+  - ``m``: Is the effective index within the lookback period.
+  - ``t``: Parameter in the instance of [`ExpGerberIQDecay`](@ref).
+  - ``e``: Parameter in the instance of [`ExpGerberIQDecay`](@ref).
+  - ``y``: Parameter in the instance of [`ExpGerberIQDecay`](@ref).
+  - ``d``: Is the decay factor.
+
+## Arguments
+
+  - `T`: Number of observations.
+  - `k`: Time index.
+
+## Returns
+
+  - `d`: The decay factor.
+
+# Examples
+
+```jldoctest
+julia> ExpGerberIQDecay()
+ExpGerberIQDecay
+  t ┼ nothing
+  e ┼ nothing
+  y ┴ nothing
+```
+
+# Related
+
+  - [`GerberIQDecayEstimator`](@ref)
+  - [`GerberIQCovariance`](@ref)
+  - [`regenerate_decay`](@ref)
+"""
+@concrete struct ExpGerberIQDecay <: GerberIQDecayEstimator
+    "Lookback period for the decay."
+    t
+    "Waiting period before the decay starts."
+    e
+    "Decay rate parameter."
+    y
+    function ExpGerberIQDecay(t::Option{<:GerberIQTauEps}, e::Option{<:GerberIQTauEps},
+                              y::Option{<:GerberIQGamma})
+        if isa(t, Number)
+            assert_nonempty_nonneg_finite_val(t, :t)
+        end
+        if isa(e, Number)
+            assert_nonempty_nonneg_finite_val(e, :e)
+        end
+        if isa(y, Number)
+            assert_nonempty_nonneg_finite_val(y, :y)
+        end
+        return new{typeof(t), typeof(e), typeof(y)}(t, e, y)
+    end
+end
+function ExpGerberIQDecay(; t::Option{<:GerberIQTauEps} = nothing,
+                          e::Option{<:GerberIQTauEps} = nothing,
+                          y::Option{<:GerberIQGamma} = nothing)
+    return ExpGerberIQDecay(t, e, y)
+end
+function (decay::ExpGerberIQDecay)(T::Number, k::Number)
+    m = T - (decay.t + k)
+    return exp(-decay.y * max(0, m - decay.e))
 end
 """
+    regenerate_decay(decay::GerberIQDecayEstimator, X::AbstractMatrix) -> ExpGerberIQDecay
+
+Fallback for automatically setting the decay parameters `t`, `e`, and `y` based on the input data `X`. Custom subtypes of [`GerberIQDecayEstimator`](@ref) should implement this method, else they default to the fallback.
+
+# Arguments
+
+  - `decay`: The decay estimator to regenerate.
+  - $(arg_dict[:X])
+
+# Returns
+
+  - `decay::ExpGerberIQDecay`: With parameters based on `X`.
+
+# Details
+
+  - Calls [`gerber_iq_tau_eps`](@ref) to set `t` and `e`.
+  - Calls [`gerber_iq_gamma`](@ref) to set `y`.
+  - Returns a new [`ExpGerberIQDecay`](@ref) with the regenerated parameters.
+
+# Related
+
+  - [`GerberIQDecayEstimator`](@ref)
+  - [`ExpGerberIQDecay`](@ref)
+  - [`gerber_iq_tau_eps`](@ref)
+  - [`gerber_iq_gamma`](@ref)
+"""
+function regenerate_decay(decay::ExpGerberIQDecay{<:Number, <:Number, <:Number},
+                          ::AbstractMatrix)
+    return decay
+end
+function regenerate_decay(decay::GerberIQDecayEstimator, X::AbstractMatrix)
+    t = gerber_iq_tau_eps(decay.t, X)
+    e = gerber_iq_tau_eps(decay.e, X)
+    y = gerber_iq_gamma(decay.y, X)
+    return ExpGerberIQDecay(; t = t, e = e, y = y)
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Implements the basic Gerber IQ covariance template. Divides the comovement data into regions and applies the co-movement compression to co-movements falling within each region. Co-movements within the dashed regions may or may not be included depending on the GerberIQ algorithm used. Co-movements within the central region are always ignored.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
 ```
             4 ┬─────┰───────────┬─────┬─────┬───────────┰─────┐
      ┌────    │  1  ┃    n^2    ╎     │     ╎    n^2    ┃  1  │
@@ -240,7 +454,9 @@ end
 ```
 """
 @concrete struct BasicGerberIQ <: GerberIQCovarianceAlgorithm
+    "Significance threshold parameter."
     d
+    "Comovement compression parameter."
     n
     function BasicGerberIQ(d::Number, n::Number)
         assert_nonempty_gt0_finite_val(d, :d)
@@ -591,85 +807,54 @@ end
     pdm
     c
     decay
-    t
-    e
-    y
     sc
     kind
     alg
     ex
     function GerberIQCovariance(ve::StatsBase.CovarianceEstimator,
                                 me::AbstractExpectedReturnsEstimator, pdm::Option{<:Posdef},
-                                c::Number, decay::Option{<:GerberIQDecay},
-                                t::Option{<:GerberIQTauEps}, e::Option{<:GerberIQTauEps},
-                                y::Option{<:GerberIQGamma}, sc::Option{<:GerberIQScaler},
+                                c::Number, decay::GerberIQDecayEstimator,
+                                sc::Option{<:GerberIQScaler},
                                 kind::GerberIQCovarianceAlgorithm,
                                 alg::GerberCovarianceAlgorithm,
                                 ex::FLoops.Transducers.Executor)
         assert_nonempty_nonneg_finite_val(c, :c)
         gerber_iq_assert_c_d(c, kind)
-        if isa(t, Number)
-            assert_nonempty_nonneg_finite_val(t, :t)
-        end
-        if isa(e, Number)
-            assert_nonempty_nonneg_finite_val(e, :e)
-        end
-        if isa(y, Number)
-            assert_nonempty_nonneg_finite_val(y, :y)
-        end
         kind = clamp_gerber_iq_n(kind, alg)
-        return new{typeof(ve), typeof(me), typeof(pdm), typeof(c), typeof(decay), typeof(t),
-                   typeof(e), typeof(y), typeof(sc), typeof(kind), typeof(alg), typeof(ex)}(ve,
-                                                                                            me,
-                                                                                            pdm,
-                                                                                            c,
-                                                                                            decay,
-                                                                                            t,
-                                                                                            e,
-                                                                                            y,
-                                                                                            sc,
-                                                                                            kind,
-                                                                                            alg,
-                                                                                            ex)
+        return new{typeof(ve), typeof(me), typeof(pdm), typeof(c), typeof(decay),
+                   typeof(sc), typeof(kind), typeof(alg), typeof(ex)}(ve, me, pdm, c, decay,
+                                                                      sc, kind, alg, ex)
     end
 end
 function GerberIQCovariance(; ve::StatsBase.CovarianceEstimator = SimpleVariance(),
                             me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
                             pdm::Option{<:Posdef} = Posdef(), c::Number = 0.5,
-                            decay::Option{<:GerberIQDecay} = nothing,
-                            t::Option{<:GerberIQTauEps} = nothing,
-                            e::Option{<:GerberIQTauEps} = nothing,
-                            y::Option{<:GerberIQGamma} = nothing,
+                            decay::GerberIQDecayEstimator = ExpGerberIQDecay(),
                             sc::Option{<:GerberIQScaler} = nothing,
                             kind::GerberIQCovarianceAlgorithm = BasicGerberIQ(),
                             alg::GerberCovarianceAlgorithm = Gerber1(),
                             ex::FLoops.Transducers.Executor = FLoops.Transducers.ThreadedEx())
-    return GerberIQCovariance(ve, me, pdm, c, decay, t, e, y, sc, kind, alg, ex)
+    return GerberIQCovariance(ve, me, pdm, c, decay, sc, kind, alg, ex)
 end
 function factory(ce::GerberIQCovariance, w::ObsWeights)
     return GerberIQCovariance(; ve = factory(ce.ve, w), me = factory(ce.me, w),
-                              pdm = ce.pdm, c = ce.c, decay = ce.decay, t = ce.t, e = ce.e,
-                              y = ce.y, sc = ce.sc, kind = ce.kind, alg = ce.alg,
-                              ex = ce.ex)
+                              pdm = ce.pdm, c = ce.c, decay = ce.decay, sc = ce.sc,
+                              kind = ce.kind, alg = ce.alg, ex = ce.ex)
 end
 function gerber_IQ_delta(xi::Number, xj::Number, axi::Number, axj::Number,
-                         decay::Option{<:GerberIQDecay}, T::Integer, t::Number, k::Number,
-                         e::Number, y::Number, sci::Number, scj::Number,
-                         kind::GerberIQCovarianceAlgorithm)
+                         decay::GerberIQDecayEstimator, T::Integer, k::Number, sci::Number,
+                         scj::Number, kind::GerberIQCovarianceAlgorithm)
     w = gerber_iq_weight(xi, xj, axi, axj, sci, scj, kind)
-    p = gerber_iq_decay(decay, T, t, k, e, y)
+    p = decay(T, k)
     return w * p
 end
 function gerber_IQ(ce::GerberIQCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                          <:Any, <:Any, <:Any, <:Gerber0}, X::MatNum,
-                   sd::ArrNum)
+                                          <:Gerber0}, X::MatNum, sd::ArrNum)
     T, N = size(X)
     rho = Matrix{eltype(X)}(undef, N, N)
-    (; c, decay, t, e, y, sc, kind, ex) = ce
-    t = gerber_iq_tau_eps(t, X)
-    e = gerber_iq_tau_eps(e, X)
-    y = gerber_iq_gamma(y, X)
-    let t = t, e = e, y = y
+    (; c, decay, sc, kind, ex) = ce
+    decay = regenerate_decay(decay, X)
+    let decay = decay
         FLoops.@floop ex for j in axes(X, 2)
             sdj = sd[j]
             for i in 1:j
@@ -687,11 +872,11 @@ function gerber_IQ(ce::GerberIQCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:A
                         continue
                     end
                     if axi >= ci && axj >= cj && xi * xj > zero(xi)
-                        pos += gerber_IQ_delta(xi, xj, axi, axj, decay, T, t, k, e, y, sci,
-                                               scj, kind)
+                        pos += gerber_IQ_delta(xi, xj, axi, axj, decay, T, k, sci, scj,
+                                               kind)
                     elseif axi >= ci && axj >= cj && xi * xj < zero(xi)
-                        neg += gerber_IQ_delta(xi, xj, axi, axj, decay, T, t, k, e, y, sci,
-                                               scj, kind)
+                        neg += gerber_IQ_delta(xi, xj, axi, axj, decay, T, k, sci, scj,
+                                               kind)
                     end
                 end
                 den = (pos + neg)
@@ -707,15 +892,12 @@ function gerber_IQ(ce::GerberIQCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:A
     return rho
 end
 function gerber_IQ(ce::GerberIQCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                          <:Any, <:Any, <:Any, <:Gerber1}, X::MatNum,
-                   sd::ArrNum)
+                                          <:Gerber1}, X::MatNum, sd::ArrNum)
     T, N = size(X)
     rho = Matrix{eltype(X)}(undef, N, N)
-    (; c, decay, t, e, y, sc, kind, ex) = ce
-    t = gerber_iq_tau_eps(t, X)
-    e = gerber_iq_tau_eps(e, X)
-    y = gerber_iq_gamma(y, X)
-    let t = t, e = e, y = y
+    (; c, decay, sc, kind, ex) = ce
+    decay = regenerate_decay(decay, X)
+    let decay = decay
         FLoops.@floop ex for j in axes(X, 2)
             sdj = sd[j]
             for i in 1:j
@@ -734,14 +916,13 @@ function gerber_IQ(ce::GerberIQCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:A
                         continue
                     end
                     if axi >= ci && axj >= cj && xi * xj > zero(xi)
-                        pos += gerber_IQ_delta(xi, xj, axi, axj, decay, T, t, k, e, y, sci,
-                                               scj, kind)
+                        pos += gerber_IQ_delta(xi, xj, axi, axj, decay, T, k, sci, scj,
+                                               kind)
                     elseif axi >= ci && axj >= cj && xi * xj < zero(xi)
-                        neg += gerber_IQ_delta(xi, xj, axi, axj, decay, T, t, k, e, y, sci,
-                                               scj, kind)
+                        neg += gerber_IQ_delta(xi, xj, axi, axj, decay, T, k, sci, scj,
+                                               kind)
                     else
-                        nn += gerber_IQ_delta(xi, xj, axi, axj, decay, T, t, k, e, y, sci,
-                                              scj, kind)
+                        nn += gerber_IQ_delta(xi, xj, axi, axj, decay, T, k, sci, scj, kind)
                     end
                 end
                 den = (pos + neg + nn)
@@ -757,15 +938,12 @@ function gerber_IQ(ce::GerberIQCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:A
     return rho
 end
 function gerber_IQ(ce::GerberIQCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                          <:Any, <:Any, <:Any, <:Gerber2}, X::MatNum,
-                   sd::ArrNum)
+                                          <:Gerber2}, X::MatNum, sd::ArrNum)
     T, N = size(X)
     rho = Matrix{eltype(X)}(undef, N, N)
-    (; c, decay, t, e, y, sc, kind, ex) = ce
-    t = gerber_iq_tau_eps(t, X)
-    e = gerber_iq_tau_eps(e, X)
-    y = gerber_iq_gamma(y, X)
-    let t = t, e = e, y = y
+    (; c, decay, sc, kind, ex) = ce
+    decay = regenerate_decay(decay, X)
+    let decay = decay
         FLoops.@floop ex for j in axes(X, 2)
             sdj = sd[j]
             for i in 1:j
@@ -783,11 +961,11 @@ function gerber_IQ(ce::GerberIQCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:A
                         continue
                     end
                     if axi >= ci && axj >= cj && xi * xj > zero(xi)
-                        pos += gerber_IQ_delta(xi, xj, axi, axj, decay, T, t, k, e, y, sci,
-                                               scj, kind)
+                        pos += gerber_IQ_delta(xi, xj, axi, axj, decay, T, k, sci, scj,
+                                               kind)
                     elseif axi >= ci && axj >= cj && xi * xj < zero(xi)
-                        neg += gerber_IQ_delta(xi, xj, axi, axj, decay, T, t, k, e, y, sci,
-                                               scj, kind)
+                        neg += gerber_IQ_delta(xi, xj, axi, axj, decay, T, k, sci, scj,
+                                               kind)
                     end
                 end
                 rho[j, i] = rho[i, j] = (pos - neg)
@@ -822,4 +1000,4 @@ function Statistics.cov(ce::GerberIQCovariance, X::MatNum; dims::Int = 1, mean =
 end
 
 export AssetVolatilityGerberIQScaler, BasicGerberIQ, PartialGerberIQ, FullGerberIQ,
-       GerberIQCovariance
+       ExpGerberIQDecay, GerberIQCovariance
