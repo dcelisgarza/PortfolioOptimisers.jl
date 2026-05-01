@@ -4,9 +4,9 @@
 BaseGerberIQCovariance
 GerberIQCovarianceAlgorithm
 clamp_gerber_iq_n
-GerberIQTauEpsEstimator
-GerberIQTauEps
-gerber_iq_tau_eps
+GerberIQEpsEstimator
+GerberIQEps
+gerber_iq_eps
 GerberIQGammaEstimator
 GerberIQGamma
 gerber_iq_gamma

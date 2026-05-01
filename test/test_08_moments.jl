@@ -158,15 +158,15 @@
                DetoneCovariance(), ProcessedCovariance(; alg = LoGo()),
                GerberIQCovariance(; kind = BasicGerberIQ(), alg = Gerber0()),
                GerberIQCovariance(; kind = FullGerberIQ(), alg = Gerber1(),
-                                  decay = ExpGerberIQDecay(; y = 1 / 252, t = 100, e = 10),
+                                  decay = ExpGerberIQDecay(; y = 1 / 252, e = 110),
                                   sc = (x, y) -> (min(x, y), min(x, y))),
                GerberIQCovariance(; kind = PartialGerberIQ(), alg = Gerber2(),
                                   decay = ExpGerberIQDecay(;
                                                            y = (x) -> inv(div(size(x, 2),
                                                                               2)),
-                                                           t = (x) -> inv(div(size(x, 2),
-                                                                              3)),
                                                            e = (x) -> inv(div(size(x, 2),
+                                                                              3)) +
+                                                                      inv(div(size(x, 2),
                                                                               5))),
                                   sc = (x, y) -> (min(x, y), min(x, y)))]
         df = CSV.read(joinpath(@__DIR__, "./assets/covariance.csv.gz"), DataFrame)
@@ -175,8 +175,6 @@
             sigma = cov(cei, rd.X'; dims = 2)
             rho = cor(cei, rd.X'; dims = 2)
             @test isapprox(StatsBase.cov2cor(sigma), rho)
-            df[!, "$i"] = vec(sigma)
-            continue
             success = isapprox(vec(sigma), df[!, i])
             if !success
                 println("Counter: $i")

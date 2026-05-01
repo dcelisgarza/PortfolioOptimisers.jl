@@ -36,49 +36,49 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all temporal lookback and delay Gerber Information Quality parameter estimators in `PortfolioOptimisers.jl`.
 
-All concrete and/or abstract types implementing Gerber Information Quality parameter estimators should be subtypes of `GerberIQTauEpsEstimator`.
+All concrete and/or abstract types implementing Gerber Information Quality parameter estimators should be subtypes of `GerberIQEpsEstimator`.
 
 # Related
 
   - [`GerberIQCovariance`](@ref)
 """
-abstract type GerberIQTauEpsEstimator <: AbstractEstimator end
+abstract type GerberIQEpsEstimator <: AbstractEstimator end
 """
-    const GerberIQTauEps = Union{<:Number, Function, <:GerberIQTauEpsEstimator}
+    const GerberIQEps = Union{<:Number, Function, <:GerberIQEpsEstimator}
 
-A type alias for the union of `Number`, `Function`, and `GerberIQTauEpsEstimator` used for Gerber Information Quality lookback and delay parameter definitions.
+A type alias for the union of `Number`, `Function`, and `GerberIQEpsEstimator` used for Gerber Information Quality lookback and delay parameter definitions.
 
 # Related
 
   - [`GerberIQCovariance`](@ref)
 """
-const GerberIQTauEps = Union{<:Number, Function, <:GerberIQTauEpsEstimator}
+const GerberIQEps = Union{<:Number, Function, <:GerberIQEpsEstimator}
 """
-    gerber_iq_tau_eps(t::Number, ::MatNum) -> Number
-    gerber_iq_tau_eps(t::Function, X::MatNum) -> Number
-    gerber_iq_tau_eps(t::Option{<:GerberIQTauEpsEstimator}, X::MatNum) -> Number
+    gerber_iq_eps(e::Number, ::MatNum) -> Number
+    gerber_iq_eps(e::Function, X::MatNum) -> Number
+    gerber_iq_eps(e::Option{<:GerberIQEpsEstimator}, X::MatNum) -> Number
 
-Computes or returns the Gerber Information Quality lookback or delay parameter `t`, potentially using `X` as an input.
+Computes or returns the Gerber Information Quality delay parameter `e`, potentially using `X` as an input.
 
 # Arguments
 
-  - `t`: The lookback parameter estimator, function or value for use in the decay equation.
+  - `e`: The delay parameter estimator, function or value for use in the decay equation.
       + `::Number`: Use the number as-is.
       + `::Function`: A function which takes the data matrix `X` as an argument and returns a `Number`.
-      + `::Option{<:GerberIQTauEpsEstimator}`: Fallback returning `round(Int, T - T / N)`, where `T` and `N` are the number of rows and columns of `X` respectively.
+      + `::Option{<:GerberIQEpsEstimator}`: Fallback returning `round(Int, T - T / N)`, where `T` and `N` are the number of rows and columns of `X` respectively.
   - $(arg_dict[:X])
 
 # Returns
 
   - `tau::Number`: The lookback parameter for use in the decay equation.
 """
-function gerber_iq_tau_eps(t::Number, ::MatNum)
+function gerber_iq_eps(t::Number, ::MatNum)
     return t
 end
-function gerber_iq_tau_eps(t::Function, X::MatNum)
+function gerber_iq_eps(t::Function, X::MatNum)
     return t(X)
 end
-function gerber_iq_tau_eps(::Option{<:GerberIQTauEpsEstimator}, X::MatNum)
+function gerber_iq_eps(::Option{<:GerberIQEpsEstimator}, X::MatNum)
     T, N = size(X)
     return round(Int, T - T / N)
 end
@@ -294,8 +294,7 @@ $(DocStringExtensions.FIELDS)
 
 # Constructors
 
-    ExpGerberIQDecay(t::Option{<:GerberIQTauEps} = nothing,
-                     e::Option{<:GerberIQTauEps} = nothing,
+    ExpGerberIQDecay(e::Option{<:GerberIQEps} = nothing,
                      y::Option{<:GerberIQGamma} = nothing)
 
 Keywords correspond to the struct's fields.
@@ -322,7 +321,6 @@ Where:
   - ``T``: Is the number of observations.
   - ``k``: Is the time index.
   - ``m``: Is the effective index within the lookback period.
-  - ``t``: Parameter in the instance of [`ExpGerberIQDecay`](@ref).
   - ``e``: Parameter in the instance of [`ExpGerberIQDecay`](@ref).
   - ``y``: Parameter in the instance of [`ExpGerberIQDecay`](@ref).
   - ``d``: Is the decay factor.
@@ -340,7 +338,6 @@ Where:
 
 ```jldoctest
 julia> ExpGerberIQDecay()
-ExpGerberIQDecay
   t ┼ nothing
   e ┼ nothing
   y ┴ nothing
@@ -353,39 +350,32 @@ ExpGerberIQDecay
   - [`regenerate_decay`](@ref)
 """
 @concrete struct ExpGerberIQDecay <: GerberIQDecayEstimator
-    "Lookback period for the decay."
-    t
     "Waiting period before the decay starts."
     e
     "Decay rate parameter."
     y
-    function ExpGerberIQDecay(t::Option{<:GerberIQTauEps}, e::Option{<:GerberIQTauEps},
-                              y::Option{<:GerberIQGamma})
-        if isa(t, Number)
-            assert_nonempty_nonneg_finite_val(t, :t)
-        end
+    function ExpGerberIQDecay(e::Option{<:GerberIQEps}, y::Option{<:GerberIQGamma})
         if isa(e, Number)
             assert_nonempty_nonneg_finite_val(e, :e)
         end
         if isa(y, Number)
             assert_nonempty_nonneg_finite_val(y, :y)
         end
-        return new{typeof(t), typeof(e), typeof(y)}(t, e, y)
+        return new{typeof(e), typeof(y)}(e, y)
     end
 end
-function ExpGerberIQDecay(; t::Option{<:GerberIQTauEps} = nothing,
-                          e::Option{<:GerberIQTauEps} = nothing,
+function ExpGerberIQDecay(; e::Option{<:GerberIQEps} = nothing,
                           y::Option{<:GerberIQGamma} = nothing)
-    return ExpGerberIQDecay(t, e, y)
+    return ExpGerberIQDecay(e, y)
 end
 function (decay::ExpGerberIQDecay)(T::Number, k::Number)
-    m = T - (decay.t + k)
+    m = T - k
     return exp(-decay.y * max(0, m - decay.e))
 end
 """
     regenerate_decay(decay::GerberIQDecayEstimator, X::AbstractMatrix) -> ExpGerberIQDecay
 
-Fallback for automatically setting the decay parameters `t`, `e`, and `y` based on the input data `X`. Custom subtypes of [`GerberIQDecayEstimator`](@ref) should implement this method, else they default to the fallback.
+Fallback for automatically setting the decay parameters `e`, and `y` based on the input data `X`. Custom subtypes of [`GerberIQDecayEstimator`](@ref) should implement this method, else they default to the fallback.
 
 # Arguments
 
@@ -398,7 +388,7 @@ Fallback for automatically setting the decay parameters `t`, `e`, and `y` based 
 
 # Details
 
-  - Calls [`gerber_iq_tau_eps`](@ref) to set `t` and `e`.
+  - Calls [`gerber_iq_eps`](@ref) to set and `e`.
   - Calls [`gerber_iq_gamma`](@ref) to set `y`.
   - Returns a new [`ExpGerberIQDecay`](@ref) with the regenerated parameters.
 
@@ -406,18 +396,17 @@ Fallback for automatically setting the decay parameters `t`, `e`, and `y` based 
 
   - [`GerberIQDecayEstimator`](@ref)
   - [`ExpGerberIQDecay`](@ref)
-  - [`gerber_iq_tau_eps`](@ref)
+  - [`gerber_iq_eps`](@ref)
   - [`gerber_iq_gamma`](@ref)
 """
-function regenerate_decay(decay::ExpGerberIQDecay{<:Number, <:Number, <:Number},
+function regenerate_decay(decay::ExpGerberIQDecay{<:Number, <:Number},
                           ::AbstractMatrix)
     return decay
 end
 function regenerate_decay(decay::GerberIQDecayEstimator, X::AbstractMatrix)
-    t = gerber_iq_tau_eps(decay.t, X)
-    e = gerber_iq_tau_eps(decay.e, X)
+    e = gerber_iq_eps(decay.e, X)
     y = gerber_iq_gamma(decay.y, X)
-    return ExpGerberIQDecay(; t = t, e = e, y = y)
+    return ExpGerberIQDecay(; e = e, y = y)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -436,8 +425,19 @@ Keywords correspond to the struct's fields.
 
 # Validation
 
-  - `d` is validated via [`assert_nonempty_gt0_finite_val`](@ref).
+  - `d` is validated via [`assert_nonempty_nonneg_finite_val`](@ref).
   - `0 <= n <= 1`.
+
+# Details
+
+The diagram shows a visual representation of the regions defined by `BasicGerberIQ`. In this case `c = 1` and `d = 3`.
+
+  - The dashed lines indicate the limits of the areas where movements are considered small.
+  - Only the [`Gerber1`](@ref) algorithm takes these regions into account as part of the neutral count.
+  - The region where co-movements are considered insignificant in both axes are always ignored.
+  - Single weight lines indicate zero delimiters.
+  - The double weight lines indicate areas where movements are considered significant.
+  - Co-movements within each region are weighed according to their labels.
 
 ```
             4 ┬─────┰───────────┬─────┬─────┬───────────┰─────┐
@@ -470,7 +470,7 @@ Keywords correspond to the struct's fields.
     "Comovement compression parameter."
     n
     function BasicGerberIQ(d::Number, n::Number)
-        assert_nonempty_gt0_finite_val(d, :d)
+        assert_nonempty_nonneg_finite_val(d, :d)
         @argcheck(zero(n) <= n <= one(n))
         return new{typeof(d), typeof(n)}(d, n)
     end
@@ -481,12 +481,48 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Asserts that `c <= kind.d`, where `c` is the small movement threshold.
+Asserts that `c <= kind.d`, where `c` is the small movement threshold and `d` the significance threshold parameter of [`BasicGerberIQ`](@ref).
+
+# Arguments
+
+  - `c`: Small movement threshold.
+  - `d`: Significant movement threshold.
+
+# Related
+
+  - [`BasicGerberIQ`](@ref)
+  - [`GerberIQCovarianceAlgorithm`](@ref)
 """
 function gerber_iq_assert_c_d(c::Number, kind::BasicGerberIQ)
     @argcheck(c <= kind.d)
     return nothing
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Computes the weight for a co-movement according to the region it falls into from the [`BasicGerberIQ`](@ref) template.
+
+# Arguments
+
+  - `xi`: Return of asset `i`.
+  - `xj`: Return of asset `j`.
+  - `axi`: Absolute return of asset `i`.
+  - `axj`: Absolute return of asset `j`.
+  - `sci`: Standard deviation of asset `i`.
+  - `scj`: Standard deviation of asset `j`.
+  - `kind`: [`BasicGerberIQ`](@ref) instance.
+
+# Returns
+
+  - `res::Number`: Co-movement weight.
+
+
+
+# Related
+
+  - [`BasicGerberIQ`](@ref)
+  - [`GerberIQCovarianceAlgorithm`](@ref)
+"""
 function gerber_iq_weight(xi::Number, xj::Number, axi::Number, axj::Number, sci::Number,
                           scj::Number, kind::BasicGerberIQ)
     (; d, n) = kind
@@ -547,10 +583,10 @@ dcn ─┤     -3 ┾━━━━━╋━━━━━━━━━━━┿━�
     function PartialGerberIQ(dcp::Number, dcn::Number, ddp::Number, ddn::Number, n1::Number,
                              n2::Number, n3::Number, n4::Number, n5::Number, n6::Number,
                              n7::Number, n8::Number, n9::Number, n10::Number)
-        assert_nonempty_gt0_finite_val(dcp, :dcp)
-        assert_nonempty_gt0_finite_val(dcn, :dcn)
-        assert_nonempty_gt0_finite_val(ddp, :ddp)
-        assert_nonempty_gt0_finite_val(ddn, :ddn)
+        assert_nonempty_nonneg_finite_val(dcp, :dcp)
+        assert_nonempty_nonneg_finite_val(dcn, :dcn)
+        assert_nonempty_nonneg_finite_val(ddp, :ddp)
+        assert_nonempty_nonneg_finite_val(ddn, :ddn)
         @argcheck(zero(n1) <= n1 <= one(n1))
         @argcheck(zero(n2) <= n2 <= one(n2))
         @argcheck(zero(n3) <= n3 <= one(n3))
@@ -680,10 +716,10 @@ dcn ─┤     -3 ┾━━━━━╋━━━━━╋━━━━━┿━�
                           n7::Number, n8::Number, n9::Number, n10::Number, n11::Number,
                           n12::Number, n13::Number, n14::Number, n15::Number, n16::Number,
                           n17::Number, n18::Number, n19::Number, n20::Number, n21::Number)
-        assert_nonempty_gt0_finite_val(dcp, :dcp)
-        assert_nonempty_gt0_finite_val(dcn, :dcn)
-        assert_nonempty_gt0_finite_val(ddp, :ddp)
-        assert_nonempty_gt0_finite_val(ddn, :ddn)
+        assert_nonempty_nonneg_finite_val(dcp, :dcp)
+        assert_nonempty_nonneg_finite_val(dcn, :dcn)
+        assert_nonempty_nonneg_finite_val(ddp, :ddp)
+        assert_nonempty_nonneg_finite_val(ddn, :ddn)
         @argcheck(zero(n1) <= n1 <= one(n1))
         @argcheck(zero(n2) <= n2 <= one(n2))
         @argcheck(zero(n3) <= n3 <= one(n3))
@@ -854,7 +890,7 @@ function GerberIQCovariance(; ve::StatsBase.CovarianceEstimator = SimpleVariance
 end
 function factory(ce::GerberIQCovariance, w::ObsWeights)
     return GerberIQCovariance(; ve = factory(ce.ve, w), me = factory(ce.me, w),
-                              pdm = ce.pdm, c = ce.c, decay = ce.decay, sc = ce.sc,
+                              pdm = ce.pdm, c = ce.c, decay = factory(ce.decay, w), sc = ce.sc,
                               kind = ce.kind, alg = ce.alg, ex = ce.ex)
 end
 function gerber_IQ_delta(xi::Number, xj::Number, axi::Number, axj::Number,
