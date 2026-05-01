@@ -17,4 +17,6 @@ gerber_iq_scaling
 GerberIQDecayEstimator
 ExpGerberIQDecay
 regenerate_decay
+BasicGerberIQ
+gerber_iq_assert_c_d
 ```

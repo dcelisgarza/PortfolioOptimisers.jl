@@ -428,6 +428,17 @@ Implements the basic Gerber IQ covariance template. Divides the comovement data 
 
 $(DocStringExtensions.FIELDS)
 
+# Constructors
+
+    BasicGerberIQ(; d::Number = 2.0, n::Number = 0.5)
+
+Keywords correspond to the struct's fields.
+
+# Validation
+
+  - `d` is validated via [`assert_nonempty_gt0_finite_val`](@ref).
+  - `0 <= n <= 1`.
+
 ```
             4 ┬─────┰───────────┬─────┬─────┬───────────┰─────┐
      ┌────    │  1  ┃    n^2    ╎     │     ╎    n^2    ┃  1  │
@@ -467,6 +478,11 @@ end
 function BasicGerberIQ(; d::Number = 2.0, n::Number = 0.5)
     return BasicGerberIQ(d, n)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Asserts that `c <= kind.d`, where `c` is the small movement threshold.
+"""
 function gerber_iq_assert_c_d(c::Number, kind::BasicGerberIQ)
     @argcheck(c <= kind.d)
     return nothing
