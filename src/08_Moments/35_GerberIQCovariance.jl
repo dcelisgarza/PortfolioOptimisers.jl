@@ -9,6 +9,10 @@ All concrete and/or abstract types implementing Gerber Information Quality covar
 # Related
 
   - [`GerberIQCovariance`](@ref)
+
+# References
+
+  - [gerber2025squeezing](@cite)  Gerber, Sander and Smyth, William and Markowitz, Harry and Miao, Yinsen and Ernst, Philip and Sargen, Paul, *Squeezing Financial Noise: A Novel Approach to Covariance Matrix Estimation* (December 01, 2025). Available at SSRN: https://ssrn.com/abstract=4986939 or http://dx.doi.org/10.2139/ssrn.4986939
 """
 abstract type BaseGerberIQCovariance <: BaseGerberCovariance end
 """
@@ -21,6 +25,10 @@ All concrete and/or abstract types implementing Gerber Information Quality covar
 # Related
 
   - [`GerberIQCovariance`](@ref)
+
+# References
+
+  - [gerber2025squeezing](@cite)  Gerber, Sander and Smyth, William and Markowitz, Harry and Miao, Yinsen and Ernst, Philip and Sargen, Paul, *Squeezing Financial Noise: A Novel Approach to Covariance Matrix Estimation* (December 01, 2025). Available at SSRN: https://ssrn.com/abstract=4986939 or http://dx.doi.org/10.2139/ssrn.4986939
 """
 abstract type GerberIQCovarianceAlgorithm <: AbstractMomentAlgorithm end
 """
@@ -41,6 +49,10 @@ All concrete and/or abstract types implementing Gerber Information Quality param
 # Related
 
   - [`GerberIQCovariance`](@ref)
+
+# References
+
+  - [gerber2025squeezing](@cite)  Gerber, Sander and Smyth, William and Markowitz, Harry and Miao, Yinsen and Ernst, Philip and Sargen, Paul, *Squeezing Financial Noise: A Novel Approach to Covariance Matrix Estimation* (December 01, 2025). Available at SSRN: https://ssrn.com/abstract=4986939 or http://dx.doi.org/10.2139/ssrn.4986939
 """
 abstract type GerberIQEpsEstimator <: AbstractEstimator end
 """
@@ -51,6 +63,10 @@ A type alias for the union of `Number`, `Function`, and `GerberIQEpsEstimator` u
 # Related
 
   - [`GerberIQCovariance`](@ref)
+
+# References
+
+  - [gerber2025squeezing](@cite)  Gerber, Sander and Smyth, William and Markowitz, Harry and Miao, Yinsen and Ernst, Philip and Sargen, Paul, *Squeezing Financial Noise: A Novel Approach to Covariance Matrix Estimation* (December 01, 2025). Available at SSRN: https://ssrn.com/abstract=4986939 or http://dx.doi.org/10.2139/ssrn.4986939
 """
 const GerberIQEps = Union{<:Number, Function, <:GerberIQEpsEstimator}
 """
@@ -71,6 +87,10 @@ Computes or returns the Gerber Information Quality delay parameter `e`, potentia
 # Returns
 
   - `tau::Number`: The lookback parameter for use in the decay equation.
+
+# References
+
+  - [gerber2025squeezing](@cite)  Gerber, Sander and Smyth, William and Markowitz, Harry and Miao, Yinsen and Ernst, Philip and Sargen, Paul, *Squeezing Financial Noise: A Novel Approach to Covariance Matrix Estimation* (December 01, 2025). Available at SSRN: https://ssrn.com/abstract=4986939 or http://dx.doi.org/10.2139/ssrn.4986939
 """
 function gerber_iq_eps(t::Number, ::MatNum)
     return t
@@ -92,6 +112,10 @@ All concrete and/or abstract types implementing Gerber Information Quality param
 # Related
 
   - [`GerberIQCovariance`](@ref)
+
+# References
+
+  - [gerber2025squeezing](@cite)  Gerber, Sander and Smyth, William and Markowitz, Harry and Miao, Yinsen and Ernst, Philip and Sargen, Paul, *Squeezing Financial Noise: A Novel Approach to Covariance Matrix Estimation* (December 01, 2025). Available at SSRN: https://ssrn.com/abstract=4986939 or http://dx.doi.org/10.2139/ssrn.4986939
 """
 abstract type GerberIQGammaEstimator <: AbstractEstimator end
 """
@@ -101,7 +125,11 @@ A type alias for the union of `Number`, `Function`, and `GerberIQGammaEstimator`
 
 # Related
 
-    - [`GerberIQCovariance`](@ref)
+  - [`GerberIQCovariance`](@ref)
+
+# References
+
+  - [gerber2025squeezing](@cite)  Gerber, Sander and Smyth, William and Markowitz, Harry and Miao, Yinsen and Ernst, Philip and Sargen, Paul, *Squeezing Financial Noise: A Novel Approach to Covariance Matrix Estimation* (December 01, 2025). Available at SSRN: https://ssrn.com/abstract=4986939 or http://dx.doi.org/10.2139/ssrn.4986939
 """
 const GerberIQGamma = Union{<:Number, Function, <:GerberIQGammaEstimator}
 """
@@ -122,6 +150,10 @@ Computes or returns the Gerber Information Quality decay strength parameter `y`,
 # Returns
 
   - `gamma::Number`: The decay strength parameter for use in the decay equation.
+
+# References
+
+  - [gerber2025squeezing](@cite)  Gerber, Sander and Smyth, William and Markowitz, Harry and Miao, Yinsen and Ernst, Philip and Sargen, Paul, *Squeezing Financial Noise: A Novel Approach to Covariance Matrix Estimation* (December 01, 2025). Available at SSRN: https://ssrn.com/abstract=4986939 or http://dx.doi.org/10.2139/ssrn.4986939
 """
 function gerber_iq_gamma(y::Number, ::MatNum)
     return y
@@ -142,6 +174,10 @@ All concrete and/or abstract types implementing threshold scalers for Gerber Inf
 # Related
 
   - [`GerberIQCovariance`](@ref)
+
+# References
+
+  - [gerber2025squeezing](@cite)  Gerber, Sander and Smyth, William and Markowitz, Harry and Miao, Yinsen and Ernst, Philip and Sargen, Paul, *Squeezing Financial Noise: A Novel Approach to Covariance Matrix Estimation* (December 01, 2025). Available at SSRN: https://ssrn.com/abstract=4986939 or http://dx.doi.org/10.2139/ssrn.4986939
 """
 abstract type GerberIQScalerEstimator <: AbstractEstimator end
 """
@@ -151,7 +187,11 @@ A type alias for the union of `Function`, and `GerberIQScalerEstimator` used for
 
 # Related
 
-    - [`GerberIQCovariance`](@ref)
+  - [`GerberIQCovariance`](@ref)
+
+# References
+
+  - [gerber2025squeezing](@cite)  Gerber, Sander and Smyth, William and Markowitz, Harry and Miao, Yinsen and Ernst, Philip and Sargen, Paul, *Squeezing Financial Noise: A Novel Approach to Covariance Matrix Estimation* (December 01, 2025). Available at SSRN: https://ssrn.com/abstract=4986939 or http://dx.doi.org/10.2139/ssrn.4986939
 """
 const GerberIQScaler = Union{Function, <:GerberIQScalerEstimator}
 """
@@ -161,9 +201,13 @@ Scales the threshold parameters using the individual asset volatilities.
 
 # Related
 
-    - [`GerberIQScalerEstimator`](@ref)
-    - [`GerberIQCovariance`](@ref)
-    - [`gerber_iq_scaling`](@ref)
+  - [`GerberIQScalerEstimator`](@ref)
+  - [`GerberIQCovariance`](@ref)
+  - [`gerber_iq_scaling`](@ref)
+
+# References
+
+  - [gerber2025squeezing](@cite)  Gerber, Sander and Smyth, William and Markowitz, Harry and Miao, Yinsen and Ernst, Philip and Sargen, Paul, *Squeezing Financial Noise: A Novel Approach to Covariance Matrix Estimation* (December 01, 2025). Available at SSRN: https://ssrn.com/abstract=4986939 or http://dx.doi.org/10.2139/ssrn.4986939
 """
 struct AssetVolatilityGerberIQScaler <: GerberIQScalerEstimator end
 """
@@ -175,15 +219,19 @@ Computes or returns the threshold scaling parameters for defining significant co
 
 # Arguments
 
-    - `y`: The decay strength parameter for use in the decay equation.
-        + `::Number`: Use the number as-is.
-        + `::Function`: A function which takes the data matrix `X` as an argument and returns a `(Number, Number)` tuple.
-        + `::Option{<:GerberIQScalerEstimator}`: Fallback returning a 2-element tuple of the mean `sdi` and `sdj`.
-    - $(arg_dict[:X])
+  - `y`: The decay strength parameter for use in the decay equation.
+      + `::Number`: Use the number as-is.
+      + `::Function`: A function which takes the data matrix `X` as an argument and returns a `(Number, Number)` tuple.
+      + `::Option{<:GerberIQScalerEstimator}`: Fallback returning a 2-element tuple of the mean `sdi` and `sdj`.
+  - $(arg_dict[:X])
 
 # Returns
 
-    - `gamma::Number`: The decay strength parameter for use in the decay equation.
+  - `gamma::Number`: The decay strength parameter for use in the decay equation.
+
+# References
+
+  - [gerber2025squeezing](@cite)  Gerber, Sander and Smyth, William and Markowitz, Harry and Miao, Yinsen and Ernst, Philip and Sargen, Paul, *Squeezing Financial Noise: A Novel Approach to Covariance Matrix Estimation* (December 01, 2025). Available at SSRN: https://ssrn.com/abstract=4986939 or http://dx.doi.org/10.2139/ssrn.4986939
 """
 function gerber_iq_scaling(::AssetVolatilityGerberIQScaler, sdi::Number, sdj::Number)
     return sdi, sdj
@@ -281,6 +329,10 @@ julia> cov(GerberIQCovariance(; decay = GaussianDecay()), [1.0 2.0; 0.3 0.7; 0.5
 
   - [`GerberIQCovariance`](@ref)
   - [`regenerate_decay`](@ref)
+
+# References
+
+  - [gerber2025squeezing](@cite)  Gerber, Sander and Smyth, William and Markowitz, Harry and Miao, Yinsen and Ernst, Philip and Sargen, Paul, *Squeezing Financial Noise: A Novel Approach to Covariance Matrix Estimation* (December 01, 2025). Available at SSRN: https://ssrn.com/abstract=4986939 or http://dx.doi.org/10.2139/ssrn.4986939
 """
 abstract type GerberIQDecayEstimator <: AbstractEstimator end
 """
@@ -311,16 +363,14 @@ Implements the exponential decay for Gerber IQ covariance.
 
 ```math
 \\begin{align}
-m &= T - (t + k)\\\\
-d &= \\exp\\left[-y \\max(0, m - e)\\right]
+d &= \\exp\\left[-y \\max(0, T - k - e)\\right]
 \\end{align}
 ```
 
 Where:
 
   - ``T``: Is the number of observations.
-  - ``k``: Is the time index.
-  - ``m``: Is the effective index within the lookback period.
+  - ``k``: Is the current index.
   - ``e``: Parameter in the instance of [`ExpGerberIQDecay`](@ref).
   - ``y``: Parameter in the instance of [`ExpGerberIQDecay`](@ref).
   - ``d``: Is the decay factor.
@@ -328,7 +378,7 @@ Where:
 ## Arguments
 
   - `T`: Number of observations.
-  - `k`: Time index.
+  - `k`: Current time index.
 
 ## Returns
 
@@ -338,7 +388,6 @@ Where:
 
 ```jldoctest
 julia> ExpGerberIQDecay()
-  t ┼ nothing
   e ┼ nothing
   y ┴ nothing
 ```
@@ -348,6 +397,10 @@ julia> ExpGerberIQDecay()
   - [`GerberIQDecayEstimator`](@ref)
   - [`GerberIQCovariance`](@ref)
   - [`regenerate_decay`](@ref)
+
+# References
+
+  - [gerber2025squeezing](@cite)  Gerber, Sander and Smyth, William and Markowitz, Harry and Miao, Yinsen and Ernst, Philip and Sargen, Paul, *Squeezing Financial Noise: A Novel Approach to Covariance Matrix Estimation* (December 01, 2025). Available at SSRN: https://ssrn.com/abstract=4986939 or http://dx.doi.org/10.2139/ssrn.4986939
 """
 @concrete struct ExpGerberIQDecay <: GerberIQDecayEstimator
     "Waiting period before the decay starts."
@@ -369,8 +422,7 @@ function ExpGerberIQDecay(; e::Option{<:GerberIQEps} = nothing,
     return ExpGerberIQDecay(e, y)
 end
 function (decay::ExpGerberIQDecay)(T::Number, k::Number)
-    m = T - k
-    return exp(-decay.y * max(0, m - decay.e))
+    return exp(-decay.y * max(0, T - k - decay.e))
 end
 """
     regenerate_decay(decay::GerberIQDecayEstimator, X::AbstractMatrix) -> ExpGerberIQDecay
@@ -396,11 +448,15 @@ Fallback for automatically setting the decay parameters `e`, and `y` based on th
 
   - [`GerberIQDecayEstimator`](@ref)
   - [`ExpGerberIQDecay`](@ref)
+  - [`GerberIQCovariance`](@ref)
   - [`gerber_iq_eps`](@ref)
   - [`gerber_iq_gamma`](@ref)
+
+# References
+
+  - [gerber2025squeezing](@cite)  Gerber, Sander and Smyth, William and Markowitz, Harry and Miao, Yinsen and Ernst, Philip and Sargen, Paul, *Squeezing Financial Noise: A Novel Approach to Covariance Matrix Estimation* (December 01, 2025). Available at SSRN: https://ssrn.com/abstract=4986939 or http://dx.doi.org/10.2139/ssrn.4986939
 """
-function regenerate_decay(decay::ExpGerberIQDecay{<:Number, <:Number},
-                          ::AbstractMatrix)
+function regenerate_decay(decay::ExpGerberIQDecay{<:Number, <:Number}, ::AbstractMatrix)
     return decay
 end
 function regenerate_decay(decay::GerberIQDecayEstimator, X::AbstractMatrix)
@@ -434,7 +490,7 @@ The diagram shows a visual representation of the regions defined by `BasicGerber
 
   - The dashed lines indicate the limits of the areas where movements are considered small.
   - Only the [`Gerber1`](@ref) algorithm takes these regions into account as part of the neutral count.
-  - The region where co-movements are considered insignificant in both axes are always ignored.
+  - The region where co-movements are considered insignificant in both axes (square around r0) are always ignored.
   - Single weight lines indicate zero delimiters.
   - The double weight lines indicate areas where movements are considered significant.
   - Co-movements within each region are weighed according to their labels.
@@ -463,6 +519,15 @@ The diagram shows a visual representation of the regions defined by `BasicGerber
                  └──┬──┘        └─────┬─────┘        └──┬──┘
                     d                2c                 d
 ```
+
+# Related
+
+  - [`GerberIQCovarianceAlgorithm`](@ref)
+  - [`GerberIQCovariance`](@ref)
+
+# References
+
+  - [gerber2025squeezing](@cite)  Gerber, Sander and Smyth, William and Markowitz, Harry and Miao, Yinsen and Ernst, Philip and Sargen, Paul, *Squeezing Financial Noise: A Novel Approach to Covariance Matrix Estimation* (December 01, 2025). Available at SSRN: https://ssrn.com/abstract=4986939 or http://dx.doi.org/10.2139/ssrn.4986939
 """
 @concrete struct BasicGerberIQ <: GerberIQCovarianceAlgorithm
     "Significance threshold parameter."
@@ -492,6 +557,11 @@ Asserts that `c <= kind.d`, where `c` is the small movement threshold and `d` th
 
   - [`BasicGerberIQ`](@ref)
   - [`GerberIQCovarianceAlgorithm`](@ref)
+  - [`GerberIQCovariance`](@ref)
+
+# References
+
+  - [gerber2025squeezing](@cite)  Gerber, Sander and Smyth, William and Markowitz, Harry and Miao, Yinsen and Ernst, Philip and Sargen, Paul, *Squeezing Financial Noise: A Novel Approach to Covariance Matrix Estimation* (December 01, 2025). Available at SSRN: https://ssrn.com/abstract=4986939 or http://dx.doi.org/10.2139/ssrn.4986939
 """
 function gerber_iq_assert_c_d(c::Number, kind::BasicGerberIQ)
     @argcheck(c <= kind.d)
@@ -516,12 +586,15 @@ Computes the weight for a co-movement according to the region it falls into from
 
   - `res::Number`: Co-movement weight.
 
-
-
 # Related
 
   - [`BasicGerberIQ`](@ref)
   - [`GerberIQCovarianceAlgorithm`](@ref)
+  - [`GerberIQCovariance`](@ref)
+
+# References
+
+  - [gerber2025squeezing](@cite)  Gerber, Sander and Smyth, William and Markowitz, Harry and Miao, Yinsen and Ernst, Philip and Sargen, Paul, *Squeezing Financial Noise: A Novel Approach to Covariance Matrix Estimation* (December 01, 2025). Available at SSRN: https://ssrn.com/abstract=4986939 or http://dx.doi.org/10.2139/ssrn.4986939
 """
 function gerber_iq_weight(xi::Number, xj::Number, axi::Number, axj::Number, sci::Number,
                           scj::Number, kind::BasicGerberIQ)
@@ -537,6 +610,27 @@ function gerber_iq_weight(xi::Number, xj::Number, axi::Number, axj::Number, sci:
     end
 end
 """
+$(DocStringExtensions.TYPEDEF)
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    PartialGerberIQ(; dcp::Number = 2.0, dcn::Number = dcp, ddp::Number = dcp,
+                      ddn::Number = dcp, n1::Number = 0.5, n2::Number = n1,
+                      n3::Number = sqrt(n1 * n2), n4::Number = 1.0, n5::Number = n4,
+                      n6::Number = n4, n7::Number = sqrt(n1 * n4),
+                      n8::Number = sqrt(n2 * n5), n9::Number = sqrt(n3 * n6),
+                      n10::Number = sqrt(n3 * n6))
+
+Keywords correspond to the struct's fields.
+
+# Validation
+
+# Details
+
 ```
                          ddn                     dcp
                        ┌──┴──┐                 ┌──┴──┐
@@ -564,21 +658,44 @@ dcn ─┤     -3 ┾━━━━━╋━━━━━━━━━━━┿━�
                  └──┬──┘        └─────┬─────┘        └──┬──┘
                    dcn               2c                ddp
 ```
+
+# Related
+
+  - [`GerberIQCovarianceAlgorithm`](@ref)
+  - [`GerberIQCovariance`](@ref)
+
+# References
+
+  - [gerber2025squeezing](@cite)  Gerber, Sander and Smyth, William and Markowitz, Harry and Miao, Yinsen and Ernst, Philip and Sargen, Paul, *Squeezing Financial Noise: A Novel Approach to Covariance Matrix Estimation* (December 01, 2025). Available at SSRN: https://ssrn.com/abstract=4986939 or http://dx.doi.org/10.2139/ssrn.4986939
 """
 @concrete struct PartialGerberIQ <: GerberIQCovarianceAlgorithm
+    "Positive concordant movement threshold parameter."
     dcp
+    "Negative concordant movement threshold parameter."
     dcn
+    "Discordant movement threshold parameter, positive in `r_i`, negative in `r_j`."
     ddp
+    "Discordant movement threshold parameter, negative in `r_i`, positive in `r_j`."
     ddn
+    "Noise suppression parameter for small positive concordant movements."
     n1
+    "Noise suppression parameter for small negative concordant movements."
     n2
+    "Noise suppression parameter for small discordant movements."
     n3
+    "Noise suppression parameter for large positive concordant movements."
     n4
+    "Noise suppression parameter for large negative concordant movements."
     n5
+    "Noise suppression parameter for large discordant movements."
     n6
+    "Noise suppression parameter for positive concordant movements where one axis has a large movement and the other is small."
     n7
+    "Noise suppression parameter for negative concordant movements where one axis has a large movement and the other is small."
     n8
+    "Noise suppression parameter for discordant movements where one axis has a large movement and the other is small for the region between `ddn` and zero."
     n9
+    "Noise suppression parameter for discordant movements where one axis has a large movement and the other is small for the region between `ddp` and zero."
     n10
     function PartialGerberIQ(dcp::Number, dcn::Number, ddp::Number, ddn::Number, n1::Number,
                              n2::Number, n3::Number, n4::Number, n5::Number, n6::Number,
@@ -611,6 +728,11 @@ function PartialGerberIQ(; dcp::Number = 2.0, dcn::Number = dcp, ddp::Number = d
                          n10::Number = sqrt(n3 * n6))
     return PartialGerberIQ(dcp, dcn, ddp, ddn, n1, n2, n3, n4, n5, n6, n7, n8, n9, n10)
 end
+"""
+# References
+
+  - [gerber2025squeezing](@cite)  Gerber, Sander and Smyth, William and Markowitz, Harry and Miao, Yinsen and Ernst, Philip and Sargen, Paul, *Squeezing Financial Noise: A Novel Approach to Covariance Matrix Estimation* (December 01, 2025). Available at SSRN: https://ssrn.com/abstract=4986939 or http://dx.doi.org/10.2139/ssrn.4986939
+"""
 function clamp_gerber_iq_n(alg::PartialGerberIQ, ::Gerber2)
     (; n1, n2, n3, n4, n5, n7, n8) = alg
     n3 = min(n3, sqrt(n1 * n2))
@@ -620,6 +742,11 @@ function clamp_gerber_iq_n(alg::PartialGerberIQ, ::Gerber2)
                            n1 = n1, n2 = n2, n3 = n3, n4 = n4, n5 = n5, n6 = alg.n6,
                            n7 = n7, n8 = n8, n9 = alg.n9, n10 = alg.n10)
 end
+"""
+# References
+
+  - [gerber2025squeezing](@cite)  Gerber, Sander and Smyth, William and Markowitz, Harry and Miao, Yinsen and Ernst, Philip and Sargen, Paul, *Squeezing Financial Noise: A Novel Approach to Covariance Matrix Estimation* (December 01, 2025). Available at SSRN: https://ssrn.com/abstract=4986939 or http://dx.doi.org/10.2139/ssrn.4986939
+"""
 function gerber_iq_weight(xi::Number, xj::Number, axi::Number, axj::Number, sci::Number,
                           scj::Number, kind::PartialGerberIQ)
     (; dcp, dcn, ddp, ddn, n1, n2, n3, n4, n5, n6, n7, n8, n9, n10) = kind
@@ -684,6 +811,10 @@ dcn ─┤     -3 ┾━━━━━╋━━━━━╋━━━━━┿━�
                  └──┬──┘        └─────┬─────┘        └──┬──┘
                    dcn               2c                ddp
 ```
+
+# References
+
+  - [gerber2025squeezing](@cite)  Gerber, Sander and Smyth, William and Markowitz, Harry and Miao, Yinsen and Ernst, Philip and Sargen, Paul, *Squeezing Financial Noise: A Novel Approach to Covariance Matrix Estimation* (December 01, 2025). Available at SSRN: https://ssrn.com/abstract=4986939 or http://dx.doi.org/10.2139/ssrn.4986939
 """
 @concrete struct FullGerberIQ <: GerberIQCovarianceAlgorithm
     dcp
@@ -766,6 +897,11 @@ function FullGerberIQ(; dcp::Number = 2.0, dcn::Number = dcp, ddp::Number = dcp,
     return FullGerberIQ(dcp, dcn, ddp, ddn, n1, n2, n3, n4, n5, n6, n7, n8, n9, n10, n11,
                         n12, n13, n14, n15, n16, n17, n18, n19, n20, n21)
 end
+"""
+# References
+
+  - [gerber2025squeezing](@cite)  Gerber, Sander and Smyth, William and Markowitz, Harry and Miao, Yinsen and Ernst, Philip and Sargen, Paul, *Squeezing Financial Noise: A Novel Approach to Covariance Matrix Estimation* (December 01, 2025). Available at SSRN: https://ssrn.com/abstract=4986939 or http://dx.doi.org/10.2139/ssrn.4986939
+"""
 function gerber_iq_assert_c_d(c::Number, kind::Union{<:PartialGerberIQ, <:FullGerberIQ})
     @argcheck(c <= kind.dcp)
     @argcheck(c <= kind.dcn)
@@ -773,6 +909,11 @@ function gerber_iq_assert_c_d(c::Number, kind::Union{<:PartialGerberIQ, <:FullGe
     @argcheck(c <= kind.ddn)
     return nothing
 end
+"""
+# References
+
+  - [gerber2025squeezing](@cite)  Gerber, Sander and Smyth, William and Markowitz, Harry and Miao, Yinsen and Ernst, Philip and Sargen, Paul, *Squeezing Financial Noise: A Novel Approach to Covariance Matrix Estimation* (December 01, 2025). Available at SSRN: https://ssrn.com/abstract=4986939 or http://dx.doi.org/10.2139/ssrn.4986939
+"""
 function clamp_gerber_iq_n(alg::FullGerberIQ, ::Gerber2)
     (; n1, n2, n3, n4, n5, n7, n8, n11, n12, n14, n17) = alg
     n3 = min(n3, sqrt(n1 * n2))
@@ -786,6 +927,11 @@ function clamp_gerber_iq_n(alg::FullGerberIQ, ::Gerber2)
                         n13 = alg.n13, n14 = n14, n15 = alg.n15, n16 = alg.n16, n17 = n17,
                         n18 = alg.n18, n19 = alg.n19, n20 = alg.n20, n21 = alg.n21)
 end
+"""
+# References
+
+  - [gerber2025squeezing](@cite)  Gerber, Sander and Smyth, William and Markowitz, Harry and Miao, Yinsen and Ernst, Philip and Sargen, Paul, *Squeezing Financial Noise: A Novel Approach to Covariance Matrix Estimation* (December 01, 2025). Available at SSRN: https://ssrn.com/abstract=4986939 or http://dx.doi.org/10.2139/ssrn.4986939
+"""
 function gerber_iq_weight(xi::Number, xj::Number, axi::Number, axj::Number, sci::Number,
                           scj::Number, kind::FullGerberIQ)
     (; dcp, dcn, ddp, ddn, n1, n2, n3, n4, n5, n6, n7, n8, n9, n10, n11, n12, n13, n14, n15, n16, n17, n18, n19, n20, n21) = kind
@@ -888,11 +1034,21 @@ function GerberIQCovariance(; ve::StatsBase.CovarianceEstimator = SimpleVariance
                             ex::FLoops.Transducers.Executor = FLoops.Transducers.ThreadedEx())
     return GerberIQCovariance(ve, me, pdm, c, decay, sc, kind, alg, ex)
 end
+"""
+# References
+
+  - [gerber2025squeezing](@cite)  Gerber, Sander and Smyth, William and Markowitz, Harry and Miao, Yinsen and Ernst, Philip and Sargen, Paul, *Squeezing Financial Noise: A Novel Approach to Covariance Matrix Estimation* (December 01, 2025). Available at SSRN: https://ssrn.com/abstract=4986939 or http://dx.doi.org/10.2139/ssrn.4986939
+"""
 function factory(ce::GerberIQCovariance, w::ObsWeights)
     return GerberIQCovariance(; ve = factory(ce.ve, w), me = factory(ce.me, w),
-                              pdm = ce.pdm, c = ce.c, decay = factory(ce.decay, w), sc = ce.sc,
-                              kind = ce.kind, alg = ce.alg, ex = ce.ex)
+                              pdm = ce.pdm, c = ce.c, decay = factory(ce.decay, w),
+                              sc = ce.sc, kind = ce.kind, alg = ce.alg, ex = ce.ex)
 end
+"""
+# References
+
+  - [gerber2025squeezing](@cite)  Gerber, Sander and Smyth, William and Markowitz, Harry and Miao, Yinsen and Ernst, Philip and Sargen, Paul, *Squeezing Financial Noise: A Novel Approach to Covariance Matrix Estimation* (December 01, 2025). Available at SSRN: https://ssrn.com/abstract=4986939 or http://dx.doi.org/10.2139/ssrn.4986939
+"""
 function gerber_IQ_delta(xi::Number, xj::Number, axi::Number, axj::Number,
                          decay::GerberIQDecayEstimator, T::Integer, k::Number, sci::Number,
                          scj::Number, kind::GerberIQCovarianceAlgorithm)
@@ -900,6 +1056,11 @@ function gerber_IQ_delta(xi::Number, xj::Number, axi::Number, axj::Number,
     p = decay(T, k)
     return w * p
 end
+"""
+# References
+
+  - [gerber2025squeezing](@cite)  Gerber, Sander and Smyth, William and Markowitz, Harry and Miao, Yinsen and Ernst, Philip and Sargen, Paul, *Squeezing Financial Noise: A Novel Approach to Covariance Matrix Estimation* (December 01, 2025). Available at SSRN: https://ssrn.com/abstract=4986939 or http://dx.doi.org/10.2139/ssrn.4986939
+"""
 function gerber_IQ(ce::GerberIQCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                           <:Gerber0}, X::MatNum, sd::ArrNum)
     T, N = size(X)
@@ -943,6 +1104,11 @@ function gerber_IQ(ce::GerberIQCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:A
     posdef!(ce.pdm, rho)
     return rho
 end
+"""
+# References
+
+  - [gerber2025squeezing](@cite)  Gerber, Sander and Smyth, William and Markowitz, Harry and Miao, Yinsen and Ernst, Philip and Sargen, Paul, *Squeezing Financial Noise: A Novel Approach to Covariance Matrix Estimation* (December 01, 2025). Available at SSRN: https://ssrn.com/abstract=4986939 or http://dx.doi.org/10.2139/ssrn.4986939
+"""
 function gerber_IQ(ce::GerberIQCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                           <:Gerber1}, X::MatNum, sd::ArrNum)
     T, N = size(X)
@@ -989,6 +1155,11 @@ function gerber_IQ(ce::GerberIQCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:A
     posdef!(ce.pdm, rho)
     return rho
 end
+"""
+# References
+
+  - [gerber2025squeezing](@cite)  Gerber, Sander and Smyth, William and Markowitz, Harry and Miao, Yinsen and Ernst, Philip and Sargen, Paul, *Squeezing Financial Noise: A Novel Approach to Covariance Matrix Estimation* (December 01, 2025). Available at SSRN: https://ssrn.com/abstract=4986939 or http://dx.doi.org/10.2139/ssrn.4986939
+"""
 function gerber_IQ(ce::GerberIQCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                           <:Gerber2}, X::MatNum, sd::ArrNum)
     T, N = size(X)
@@ -1029,6 +1200,11 @@ function gerber_IQ(ce::GerberIQCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:A
     posdef!(ce.pdm, rho)
     return rho
 end
+"""
+# References
+
+  - [gerber2025squeezing](@cite)  Gerber, Sander and Smyth, William and Markowitz, Harry and Miao, Yinsen and Ernst, Philip and Sargen, Paul, *Squeezing Financial Noise: A Novel Approach to Covariance Matrix Estimation* (December 01, 2025). Available at SSRN: https://ssrn.com/abstract=4986939 or http://dx.doi.org/10.2139/ssrn.4986939
+"""
 function Statistics.cor(ce::GerberIQCovariance, X::MatNum; dims::Int = 1, mean = nothing,
                         kwargs...)
     @argcheck(dims in (1, 2))
@@ -1039,6 +1215,11 @@ function Statistics.cor(ce::GerberIQCovariance, X::MatNum; dims::Int = 1, mean =
     X = demean_returns(X, ce.me; dims = 1, kwargs...)
     return gerber_IQ(ce, X, sd)
 end
+"""
+# References
+
+  - [gerber2025squeezing](@cite)  Gerber, Sander and Smyth, William and Markowitz, Harry and Miao, Yinsen and Ernst, Philip and Sargen, Paul, *Squeezing Financial Noise: A Novel Approach to Covariance Matrix Estimation* (December 01, 2025). Available at SSRN: https://ssrn.com/abstract=4986939 or http://dx.doi.org/10.2139/ssrn.4986939
+"""
 function Statistics.cov(ce::GerberIQCovariance, X::MatNum; dims::Int = 1, mean = nothing,
                         kwargs...)
     @argcheck(dims in (1, 2))
