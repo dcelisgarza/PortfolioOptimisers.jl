@@ -294,24 +294,25 @@ In order to implement a new Gerber IQ decay estimator which will work seamlessly
 We can create a dummy Gerber IQ decay estimator as follows:
 
 ```jldoctest
-julia> function GaussianDecay(; a::Union{Nothing, <:Number} = nothing)
-           return GaussianDecay(a)
-       end
-struct GaussianDecay{T} <: PortfolioOptimisers.GerberIQDecayEstimator
-       a::T
-       function GaussianDecay(a::Union{Nothing, <:Number})
-           if isa(a, Number)
-               @assert(a >= 0)
+julia> struct GaussianDecay{T} <: PortfolioOptimisers.GerberIQDecayEstimator
+           a::T
+           function GaussianDecay(a::Union{Nothing, <:Number})
+               if isa(a, Number)
+                   @assert(a >= 0)
+               end
+               new{typeof(a)}(a)
            end
-           new{typeof(a)}(a)
-       end
- end
+      end
+
+ julia> function GaussianDecay(; a::Union{Nothing, <:Number} = nothing)
+            return GaussianDecay(a)
+        end
+GaussianDecay
 
 julia> function PortfolioOptimisers.regenerate_decay(decay::GaussianDecay{<:Number},
                                                      ::AbstractMatrix)
            return decay
        end
-GaussianDecay
 
 julia> function PortfolioOptimisers.regenerate_decay(decay::GaussianDecay{Nothing},
                                                      X::AbstractMatrix)
@@ -397,6 +398,7 @@ Where:
 
 ```jldoctest
 julia> ExpGerberIQDecay()
+ExpGerberIQDecay
   e ┼ nothing
   y ┴ nothing
 ```
@@ -1093,7 +1095,7 @@ function FullGerberIQ(; dp1::Number = 2.0, dp2::Number = dp1, dn1::Number = dp1,
                         n12, n13, n14, n15, n16, n17, n18, n19, n20, n21)
 end
 """
-$(DocStringExtensions.TYPEDSIGNATURES)
+    gerber_iq_assert_c_d(c::Number, kind::Union{<:PartialGerberIQ, <:FullGerberIQ}) -> Nothing
 
 Asserts that all `c <= kind.d**`, where `c` is the small movement threshold and `d**` are the significance threshold parameters of [`PartialGerberIQ`](@ref) or [`FullGerberIQ`](@ref).
 
@@ -1113,11 +1115,18 @@ Asserts that all `c <= kind.d**`, where `c` is the small movement threshold and 
 
   - [gerber2025squeezing](@cite)  Gerber, Sander and Smyth, William and Markowitz, Harry and Miao, Yinsen and Ernst, Philip and Sargen, Paul, *Squeezing Financial Noise: A Novel Approach to Covariance Matrix Estimation* (December 01, 2025). Available at SSRN: https://ssrn.com/abstract=4986939 or http://dx.doi.org/10.2139/ssrn.4986939
 """
-function gerber_iq_assert_c_d(c::Number, kind::Union{<:PartialGerberIQ, <:FullGerberIQ})
+function gerber_iq_assert_c_d(c::Number, kind::PartialGerberIQ)
     @argcheck(c <= kind.dcp)
     @argcheck(c <= kind.dcn)
     @argcheck(c <= kind.ddp)
     @argcheck(c <= kind.ddn)
+    return nothing
+end
+function gerber_iq_assert_c_d(c::Number, kind::FullGerberIQ)
+    @argcheck(c <= kind.dp1)
+    @argcheck(c <= kind.dp2)
+    @argcheck(c <= kind.dn1)
+    @argcheck(c <= kind.dn2)
     return nothing
 end
 """

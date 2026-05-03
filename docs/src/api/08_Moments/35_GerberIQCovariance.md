@@ -21,7 +21,6 @@ BasicGerberIQ
 PartialGerberIQ
 FullGerberIQ
 gerber_iq_assert_c_d
-clamp_gerber_iq_n
 gerber_iq_weight
 GerberIQCovariance
 factory(ce::GerberIQCovariance, w::ObsWeights)
