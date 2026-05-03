@@ -178,6 +178,7 @@ Return a new `GerberCovariance` estimator with the specified observation weights
 
   - Calls `factory(ce.alg, w)` to update the algorithm (current algorithms do not use weights, this for future proofing).
   - Calls `factory(ce.ve, w)` to update the variance estimator.
+  - Calls `factory(ce.me, w)` to update the expected returns estimator.
   - Preserves the other fields of the original estimator.
 
 # Examples

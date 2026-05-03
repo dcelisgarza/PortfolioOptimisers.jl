@@ -35,6 +35,15 @@ abstract type GerberIQCovarianceAlgorithm <: AbstractMomentAlgorithm end
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 No-op for Gerber Information Quality covariance estimation algorithms that do not need their noise suppression parameters clamped.
+
+# Returns
+
+  - `kind`: The input `kind` instance.
+
+# Related
+
+  - [`GerberIQCovariance`](@ref)
+  - [`GerberIQCovarianceAlgorithm`](@ref)
 """
 function clamp_gerber_iq_n(kind::GerberIQCovarianceAlgorithm, args...)
     return kind
@@ -92,11 +101,11 @@ Computes or returns the Gerber Information Quality delay parameter `e`, potentia
 
   - [gerber2025squeezing](@cite)  Gerber, Sander and Smyth, William and Markowitz, Harry and Miao, Yinsen and Ernst, Philip and Sargen, Paul, *Squeezing Financial Noise: A Novel Approach to Covariance Matrix Estimation* (December 01, 2025). Available at SSRN: https://ssrn.com/abstract=4986939 or http://dx.doi.org/10.2139/ssrn.4986939
 """
-function gerber_iq_eps(t::Number, ::MatNum)
-    return t
+function gerber_iq_eps(e::Number, ::MatNum)
+    return e
 end
-function gerber_iq_eps(t::Function, X::MatNum)
-    return t(X)
+function gerber_iq_eps(e::Function, X::MatNum)
+    return e(X)
 end
 function gerber_iq_eps(::Option{<:GerberIQEpsEstimator}, X::MatNum)
     T, N = size(X)
@@ -520,6 +529,15 @@ The diagram shows a visual representation of the regions defined by `BasicGerber
                     d                2c                 d
 ```
 
+# Examples
+
+```jldoctest
+julia> BasicGerberIQ()
+BasicGerberIQ
+  d ┼ Float64: 2.0
+  n ┴ Float64: 0.5
+```
+
 # Related
 
   - [`GerberIQCovarianceAlgorithm`](@ref)
@@ -551,7 +569,7 @@ Asserts that `c <= kind.d`, where `c` is the small movement threshold and `d` th
 # Arguments
 
   - `c`: Small movement threshold.
-  - `d`: Significant movement threshold.
+  - `kind`: [`BasicGerberIQ`](@ref) instance.
 
 # Related
 
@@ -620,7 +638,7 @@ $(DocStringExtensions.FIELDS)
 
     PartialGerberIQ(; dcp::Number = 2.0, dcn::Number = dcp, ddp::Number = dcp,
                       ddn::Number = dcp, n1::Number = 0.5, n2::Number = n1,
-                      n3::Number = sqrt(n1 * n2), n4::Number = 1.0, n5::Number = n4,
+                      n3::Number = n1, n4::Number = 1.0, n5::Number = n4,
                       n6::Number = n4, n7::Number = sqrt(n1 * n4),
                       n8::Number = sqrt(n2 * n5), n9::Number = sqrt(n3 * n6),
                       n10::Number = sqrt(n3 * n6))
@@ -669,6 +687,27 @@ dcn ─┤     -3 ┾━━━━━╋━━━━━━━━━━━┿━�
                  │     │        │           │        │     │
                  └──┬──┘        └─────┬─────┘        └──┬──┘
                    dcn               2c                ddp
+```
+
+# Examples
+
+```jldoctest
+julia> PartialGerberIQ()
+PartialGerberIQ
+  dcp ┼ Float64: 2.0
+  dcn ┼ Float64: 2.0
+  ddp ┼ Float64: 2.0
+  ddn ┼ Float64: 2.0
+   n1 ┼ Float64: 0.5
+   n2 ┼ Float64: 0.5
+   n3 ┼ Float64: 0.5
+   n4 ┼ Float64: 1.0
+   n5 ┼ Float64: 1.0
+   n6 ┼ Float64: 1.0
+   n7 ┼ Float64: 0.7071067811865476
+   n8 ┼ Float64: 0.7071067811865476
+   n9 ┼ Float64: 0.7071067811865476
+  n10 ┴ Float64: 0.7071067811865476
 ```
 
 # Related
@@ -734,7 +773,7 @@ dcn ─┤     -3 ┾━━━━━╋━━━━━━━━━━━┿━�
 end
 function PartialGerberIQ(; dcp::Number = 2.0, dcn::Number = dcp, ddp::Number = dcp,
                          ddn::Number = dcp, n1::Number = 0.5, n2::Number = n1,
-                         n3::Number = sqrt(n1 * n2), n4::Number = 1.0, n5::Number = n4,
+                         n3::Number = n1, n4::Number = 1.0, n5::Number = n4,
                          n6::Number = n4, n7::Number = sqrt(n1 * n4),
                          n8::Number = sqrt(n2 * n5), n9::Number = sqrt(n3 * n6),
                          n10::Number = sqrt(n3 * n6))
@@ -753,6 +792,7 @@ Clamps the values of the off-diagonal elements of the covariance matrix for the 
 # Details
 
   - Clamps off-diagonal elements to be at most equal to the geometric mean of its adjacent diagonal elements.
+  - This affects `n7` and `n8`.
 
 # Related
 
@@ -765,12 +805,11 @@ Clamps the values of the off-diagonal elements of the covariance matrix for the 
   - [gerber2025squeezing](@cite)  Gerber, Sander and Smyth, William and Markowitz, Harry and Miao, Yinsen and Ernst, Philip and Sargen, Paul, *Squeezing Financial Noise: A Novel Approach to Covariance Matrix Estimation* (December 01, 2025). Available at SSRN: https://ssrn.com/abstract=4986939 or http://dx.doi.org/10.2139/ssrn.4986939
 """
 function clamp_gerber_iq_n(alg::PartialGerberIQ, ::Gerber2)
-    (; n1, n2, n3, n4, n5, n7, n8) = alg
-    n3 = min(n3, sqrt(n1 * n2))
+    (; n1, n2, n4, n5, n7, n8) = alg
     n7 = min(n7, sqrt(n1 * n4))
     n8 = min(n8, sqrt(n2 * n5))
     return PartialGerberIQ(; dcp = alg.dcp, dcn = alg.dcn, ddp = alg.ddp, ddn = alg.ddn,
-                           n1 = n1, n2 = n2, n3 = n3, n4 = n4, n5 = n5, n6 = alg.n6,
+                           n1 = n1, n2 = n2, n3 = alg.n3, n4 = n4, n5 = n5, n6 = alg.n6,
                            n7 = n7, n8 = n8, n9 = alg.n9, n10 = alg.n10)
 end
 """
@@ -847,8 +886,8 @@ $(DocStringExtensions.FIELDS)
 
 # Constructors
 
-    FullGerberIQ(; dcp::Number = 2.0, dcn::Number = dcp, ddp::Number = dcp,
-                   ddn::Number = dcp, n1::Number = 0.5, n2::Number = n1, n3::Number = n1,
+    FullGerberIQ(; dp1::Number = 2.0, dp2::Number = dp1, dn1::Number = dp1,
+                   dn2::Number = dp1, n1::Number = 0.5, n2::Number = n1, n3::Number = n1,
                    n4::Number = 0.75, n5::Number = n4, n6::Number = n4,
                    n7::Number = sqrt(n1 * n4), n8::Number = sqrt(n2 * n5),
                    n9::Number = sqrt(n3 * n6), n10::Number = sqrt(n3 * n6),
@@ -867,7 +906,7 @@ Keywords correspond to the struct's fields.
 
 # Details
 
-The diagram shows a visual representation of the regions defined by `PartialGerberIQ`. In this case `c = 1`, `dcp = 2`, `ddn = 2`, `ddp = 3`, and `dcn = 3`. In the full version the limits are allowed to cross over the zero line. Thus, the constructor ensures `ddp >= dcp` and `` by swapping values if necessary
+The diagram shows a visual representation of the regions defined by `PartialGerberIQ`. In this case `c = 1`, `dp2 = 2`, `dn2 = 2`, `dp1 = 3`, and `dn1 = 3`. In this version, the limits are allowed to cross over the zero line. Thus, the constructor ensures `dp1 >= dp2` and `dn1 >= dn2` by swapping values if necessary to ensure consistency.
 
   - The dashed lines indicate the limits of the areas where movements are considered small.
   - Only the [`Gerber1`](@ref) algorithm takes these regions into account as part of the neutral count.
@@ -877,14 +916,14 @@ The diagram shows a visual representation of the regions defined by `PartialGerb
   - Co-movements within each region are weighed according to their labels.
 
 ```
-                         ddn                     dcp
+                         dn2                     dp2
                        ┌──┴──┐                 ┌──┴──┐
                        │     │                 │     │
             4 ┬─────┰─────┰─────┬─────┬─────┬─────┰─────┰─────┐
      ┌────    │ n13 ┃ n19 ┃ n18 ╎     │     ╎ n15 ┃ n14 ┃ n11 │
-ddp ─┤      3 ┾━━━━━╋━━━━━╋━━━━━┿━━━━━┿━━━━━┿━━━━━╋━━━━━╋━━━━━┥
+dp1 ─┤      3 ┾━━━━━╋━━━━━╋━━━━━┿━━━━━┿━━━━━┿━━━━━╋━━━━━╋━━━━━┥
      └────    │ n20 ┃ n6  ┃ n9  ╎     │     ╎ n7  ┃ n4  ┃ n14 │ ────┐
-            2 ┾━━━━━╋━━━━━╋━━━━━┿━━━━━┿━━━━━┿━━━━━╋━━━━━╋━━━━━┥     ├─ dcp
+            2 ┾━━━━━╋━━━━━╋━━━━━┿━━━━━┿━━━━━┿━━━━━╋━━━━━╋━━━━━┥     ├─ dp2
               │ n21 ┃ n10 ┃ n3  ╎     │     ╎ n1  ┃ n7  ┃ n15 │ ────┘
      ┌────  1 ┼╌╌╌╌╌╂╌╌╌╌╌╂╌╌╌╌╌┼╌╌╌╌╌┴╌╌╌╌╌┼╌╌╌╌╌╂╌╌╌╌╌╂╌╌╌╌╌┤
      │        │     ┃     ┃     ╎           ╎     ┃     ┃     │
@@ -892,16 +931,48 @@ ddp ─┤      3 ┾━━━━━╋━━━━━╋━━━━━┿━�
      │        │     ┃     ┃     ╎           ╎     ┃     ┃     │
      └──── -1 ┼╌╌╌╌╌╂╌╌╌╌╌╂╌╌╌╌╌┼╌╌╌╌╌┬╌╌╌╌╌┼╌╌╌╌╌╂╌╌╌╌╌╂╌╌╌╌╌┤
               │ n16 ┃ n8  ┃ n2  ╎     │     ╎ n3  ┃ n9  ┃ n18 │ ────┐
-           -2 ┾━━━━━╋━━━━━╋━━━━━┿━━━━━┿━━━━━┿━━━━━╋━━━━━╋━━━━━┥     ├─ ddn
+           -2 ┾━━━━━╋━━━━━╋━━━━━┿━━━━━┿━━━━━┿━━━━━╋━━━━━╋━━━━━┥     ├─ dn2
      ┌────    │ n17 ┃ n5  ┃ n8  ╎     │     ╎ n10 ┃ n6  ┃ n19 │ ────┘
-dcn ─┤     -3 ┾━━━━━╋━━━━━╋━━━━━┿━━━━━┿━━━━━┿━━━━━╋━━━━━╋━━━━━┥
+dn1 ─┤     -3 ┾━━━━━╋━━━━━╋━━━━━┿━━━━━┿━━━━━┿━━━━━╋━━━━━╋━━━━━┥
      └────    │ n12 ┃ n17 ┃ n16 ╎     │     ╎ n21 ┃ n20 ┃ n13 │
            -4 ┼─────╀─────╀─────┼─────┼─────┼─────╀─────╀─────┤
              -4    -3    -2    -1     0     1     2     3     4
                                      r_i
                  │     │        │           │        │     │
                  └──┬──┘        └─────┬─────┘        └──┬──┘
-                   dcn               2c                ddp
+                   dn1               2c                dp1
+```
+
+# Examples
+
+```jldoctest
+julia> FullGerberIQ()
+FullGerberIQ
+  dp1 ┼ Float64: 2.0
+  dp2 ┼ Float64: 2.0
+  dn1 ┼ Float64: 2.0
+  dn2 ┼ Float64: 2.0
+   n1 ┼ Float64: 0.5
+   n2 ┼ Float64: 0.5
+   n3 ┼ Float64: 0.5
+   n4 ┼ Float64: 0.75
+   n5 ┼ Float64: 0.75
+   n6 ┼ Float64: 0.75
+   n7 ┼ Float64: 0.6123724356957945
+   n8 ┼ Float64: 0.6123724356957945
+   n9 ┼ Float64: 0.6123724356957945
+  n10 ┼ Float64: 0.6123724356957945
+  n11 ┼ Float64: 1.0
+  n12 ┼ Float64: 1.0
+  n13 ┼ Float64: 1.0
+  n14 ┼ Float64: 0.8660254037844386
+  n15 ┼ Float64: 0.7282376575609851
+  n16 ┼ Float64: 0.7282376575609851
+  n17 ┼ Float64: 0.8660254037844386
+  n18 ┼ Float64: 0.7282376575609851
+  n19 ┼ Float64: 0.8660254037844386
+  n20 ┼ Float64: 0.8660254037844386
+  n21 ┴ Float64: 0.7282376575609851
 ```
 
 # Related
@@ -914,40 +985,67 @@ dcn ─┤     -3 ┾━━━━━╋━━━━━╋━━━━━┿━�
   - [gerber2025squeezing](@cite)  Gerber, Sander and Smyth, William and Markowitz, Harry and Miao, Yinsen and Ernst, Philip and Sargen, Paul, *Squeezing Financial Noise: A Novel Approach to Covariance Matrix Estimation* (December 01, 2025). Available at SSRN: https://ssrn.com/abstract=4986939 or http://dx.doi.org/10.2139/ssrn.4986939
 """
 @concrete struct FullGerberIQ <: GerberIQCovarianceAlgorithm
-    dcp
-    dcn
-    ddp
-    ddn
+    "Threshold for larger positive co-movements."
+    dp1
+    "Threshold for smaller positive co-movements."
+    dp2
+    "Threshold for larger negative co-movements."
+    dn1
+    "Threshold for smaller negative co-movements."
+    dn2
+    "Threshold for small positive concordant co-movements."
     n1
+    "Threshold for small negative concordant co-movements."
     n2
+    "Threshold for small discordant co-movements."
     n3
+    "Threshold for moderate positive concordant co-movements."
     n4
+    "Threshold for moderate negative concordant co-movements."
     n5
+    "Threshold for moderate discordant co-movements."
     n6
+    "Threshold for small and moderate positive concordant co-movements."
     n7
+    "Threshold for small and moderate negative concordant co-movements."
     n8
+    "Threshold for small and moderate discordant co-movements."
     n9
+    "Threshold for moderate and small discordant co-movements."
     n10
+    "Threshold for large positive concordant co-movements."
     n11
+    "Threshold for large negative concordant co-movements."
     n12
+    "Threshold for large discordant co-movements."
     n13
+    "Threshold for moderate and large positive concordant co-movements."
     n14
+    "Threshold for small and large positive concordant co-movements."
     n15
+    "Threshold for small and large negative concordant co-movements."
     n16
+    "Threshold for moderate and large positive concordant co-movements."
     n17
+    "Threshold for small and large discordant co-movements."
     n18
+    "Threshold for moderate and large discordant co-movements."
     n19
+    "Threshold for large and moderate discordant co-movements."
     n20
+    "Threshold for large and small discordant co-movements."
     n21
-    function FullGerberIQ(dcp::Number, dcn::Number, ddp::Number, ddn::Number, n1::Number,
+    function FullGerberIQ(dp1::Number, dp2::Number, dn1::Number, dn2::Number, n1::Number,
                           n2::Number, n3::Number, n4::Number, n5::Number, n6::Number,
                           n7::Number, n8::Number, n9::Number, n10::Number, n11::Number,
                           n12::Number, n13::Number, n14::Number, n15::Number, n16::Number,
                           n17::Number, n18::Number, n19::Number, n20::Number, n21::Number)
-        assert_nonempty_nonneg_finite_val(dcp, :dcp)
-        assert_nonempty_nonneg_finite_val(dcn, :dcn)
-        assert_nonempty_nonneg_finite_val(ddp, :ddp)
-        assert_nonempty_nonneg_finite_val(ddn, :ddn)
+        assert_nonempty_nonneg_finite_val(dp1, :dp1)
+        assert_nonempty_nonneg_finite_val(dp2, :dp2)
+        assert_nonempty_nonneg_finite_val(dn1, :dn1)
+        assert_nonempty_nonneg_finite_val(dn2, :dn2)
+        dp2, dp1 = extrema((dp1, dp2))
+        dn2, dn1 = extrema((dn1, dn2))
         @argcheck(zero(n1) <= n1 <= one(n1))
         @argcheck(zero(n2) <= n2 <= one(n2))
         @argcheck(zero(n3) <= n3 <= one(n3))
@@ -969,11 +1067,11 @@ dcn ─┤     -3 ┾━━━━━╋━━━━━╋━━━━━┿━�
         @argcheck(zero(n19) <= n19 <= one(n19))
         @argcheck(zero(n20) <= n20 <= one(n20))
         @argcheck(zero(n21) <= n21 <= one(n21))
-        return new{typeof(dcp), typeof(dcn), typeof(ddp), typeof(ddn), typeof(n1),
+        return new{typeof(dp1), typeof(dp2), typeof(dn1), typeof(dn2), typeof(n1),
                    typeof(n2), typeof(n3), typeof(n4), typeof(n5), typeof(n6), typeof(n7),
                    typeof(n8), typeof(n9), typeof(n10), typeof(n11), typeof(n12),
                    typeof(n13), typeof(n14), typeof(n15), typeof(n16), typeof(n17),
-                   typeof(n18), typeof(n19), typeof(n20), typeof(n21)}(dcp, dcn, ddp, ddn,
+                   typeof(n18), typeof(n19), typeof(n20), typeof(n21)}(dp1, dp2, dn1, dn2,
                                                                        n1, n2, n3, n4, n5,
                                                                        n6, n7, n8, n9, n10,
                                                                        n11, n12, n13, n14,
@@ -981,8 +1079,8 @@ dcn ─┤     -3 ┾━━━━━╋━━━━━╋━━━━━┿━�
                                                                        n19, n20, n21)
     end
 end
-function FullGerberIQ(; dcp::Number = 2.0, dcn::Number = dcp, ddp::Number = dcp,
-                      ddn::Number = dcp, n1::Number = 0.5, n2::Number = n1, n3::Number = n1,
+function FullGerberIQ(; dp1::Number = 2.0, dp2::Number = dp1, dn1::Number = dp1,
+                      dn2::Number = dp1, n1::Number = 0.5, n2::Number = n1, n3::Number = n1,
                       n4::Number = 0.75, n5::Number = n4, n6::Number = n4,
                       n7::Number = sqrt(n1 * n4), n8::Number = sqrt(n2 * n5),
                       n9::Number = sqrt(n3 * n6), n10::Number = sqrt(n3 * n6),
@@ -991,10 +1089,26 @@ function FullGerberIQ(; dcp::Number = 2.0, dcn::Number = dcp, ddp::Number = dcp,
                       n17::Number = sqrt(n5 * n12), n16::Number = sqrt(n8 * n17),
                       n19::Number = sqrt(n6 * n13), n18::Number = sqrt(n9 * n19),
                       n20::Number = sqrt(n6 * n13), n21::Number = sqrt(n10 * n20))
-    return FullGerberIQ(dcp, dcn, ddp, ddn, n1, n2, n3, n4, n5, n6, n7, n8, n9, n10, n11,
+    return FullGerberIQ(dp1, dp2, dn1, dn2, n1, n2, n3, n4, n5, n6, n7, n8, n9, n10, n11,
                         n12, n13, n14, n15, n16, n17, n18, n19, n20, n21)
 end
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Asserts that all `c <= kind.d**`, where `c` is the small movement threshold and `d**` are the significance threshold parameters of [`PartialGerberIQ`](@ref) or [`FullGerberIQ`](@ref).
+
+# Arguments
+
+  - `c`: Small movement threshold.
+  - `kind`: Instance of [`PartialGerberIQ`](@ref) or [`FullGerberIQ`](@ref).
+
+# Related
+
+  - [`PartialGerberIQ`](@ref)
+  - [`FullGerberIQ`](@ref)
+  - [`GerberIQCovarianceAlgorithm`](@ref)
+  - [`GerberIQCovariance`](@ref)
+
 # References
 
   - [gerber2025squeezing](@cite)  Gerber, Sander and Smyth, William and Markowitz, Harry and Miao, Yinsen and Ernst, Philip and Sargen, Paul, *Squeezing Financial Noise: A Novel Approach to Covariance Matrix Estimation* (December 01, 2025). Available at SSRN: https://ssrn.com/abstract=4986939 or http://dx.doi.org/10.2139/ssrn.4986939
@@ -1007,27 +1121,46 @@ function gerber_iq_assert_c_d(c::Number, kind::Union{<:PartialGerberIQ, <:FullGe
     return nothing
 end
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Clamps the values of the off-diagonal elements of the covariance matrix for the [`FullGerberIQ`](@ref) template when using the [`Gerber2`](@ref) algorithm to ensure positive definiteness.
+
+# Arguments
+
+  - `alg`: Instance of [`FullGerberIQ`](@ref).
+  - `::Gerber2`: Instance of [`Gerber2`](@ref).
+
+# Details
+
+  - Clamps off-diagonal elements to be at most equal to the geometric mean of its adjacent diagonal elements.
+  - This affects `n7`, `n8`, `n14`, and `n17`.
+
+# Related
+
+  - [`FullGerberIQ`](@ref)
+  - [`Gerber2`](@ref)
+  - [`GerberIQCovariance`](@ref)
+
 # References
 
   - [gerber2025squeezing](@cite)  Gerber, Sander and Smyth, William and Markowitz, Harry and Miao, Yinsen and Ernst, Philip and Sargen, Paul, *Squeezing Financial Noise: A Novel Approach to Covariance Matrix Estimation* (December 01, 2025). Available at SSRN: https://ssrn.com/abstract=4986939 or http://dx.doi.org/10.2139/ssrn.4986939
 """
 function clamp_gerber_iq_n(alg::FullGerberIQ, ::Gerber2)
-    (; n1, n2, n3, n4, n5, n7, n8, n11, n12, n14, n17) = alg
-    n3 = min(n3, sqrt(n1 * n2))
+    (; n1, n2, n4, n5, n7, n8, n11, n12, n14, n17) = alg
     n7 = min(n7, sqrt(n1 * n4))
     n8 = min(n8, sqrt(n2 * n5))
     n14 = min(n14, sqrt(n4 * n11))
     n17 = min(n17, sqrt(n5 * n12))
-    return FullGerberIQ(; dcp = alg.dcp, dcn = alg.dcn, ddp = alg.ddp, ddn = alg.ddn,
-                        n1 = n1, n2 = n2, n3 = n3, n4 = n4, n5 = n5, n6 = alg.n6, n7 = n7,
-                        n8 = n8, n9 = alg.n9, n10 = alg.n10, n11 = n11, n12 = n12,
+    return FullGerberIQ(; dp1 = alg.dp1, dp2 = alg.dp2, ddp = alg.dn1, ddn = alg.dn2,
+                        n1 = n1, n2 = n2, n3 = alg.n3, n4 = n4, n5 = n5, n6 = alg.n6,
+                        n7 = n7, n8 = n8, n9 = alg.n9, n10 = alg.n10, n11 = n11, n12 = n12,
                         n13 = alg.n13, n14 = n14, n15 = alg.n15, n16 = alg.n16, n17 = n17,
                         n18 = alg.n18, n19 = alg.n19, n20 = alg.n20, n21 = alg.n21)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Computes the weight for a co-movement according to the region it falls into from the [`PartialGerberIQ`](@ref) template.
+Computes the weight for a co-movement according to the region it falls into from the [`FullGerberIQ`](@ref) template.
 
 # Arguments
 
@@ -1037,7 +1170,7 @@ Computes the weight for a co-movement according to the region it falls into from
   - `axj`: Absolute return of asset `j` (unused).
   - `sci`: Scaling for movement of asset `i`.
   - `scj`: Scaling for movement of asset `j`.
-  - `kind`: Instance of [`PartialGerberIQ`](@ref).
+  - `kind`: Instance of [`FullGerberIQ`](@ref).
 
 # Returns
 
@@ -1045,7 +1178,7 @@ Computes the weight for a co-movement according to the region it falls into from
 
 # Related
 
-  - [`PartialGerberIQ`](@ref)
+  - [`FullGerberIQ`](@ref)
   - [`GerberIQCovarianceAlgorithm`](@ref)
   - [`GerberIQCovariance`](@ref)
 
@@ -1055,19 +1188,15 @@ Computes the weight for a co-movement according to the region it falls into from
 """
 function gerber_iq_weight(xi::Number, xj::Number, axi::Number, axj::Number, sci::Number,
                           scj::Number, kind::FullGerberIQ)
-    (; dcp, dcn, ddp, ddn, n1, n2, n3, n4, n5, n6, n7, n8, n9, n10, n11, n12, n13, n14, n15, n16, n17, n18, n19, n20, n21) = kind
-    _dp1 = max(dcp, ddp)
-    _dp2 = min(dcp, ddp)
-    _dn1 = min(dcn, ddn)
-    _dn2 = max(dcn, ddn)
-    dp1i = _dp1 * sci
-    dp2i = _dp2 * sci
-    dn1i = _dn1 * sci
-    dn2i = _dn2 * sci
-    dp1j = _dp1 * scj
-    dp2j = _dp2 * scj
-    dn1j = _dn1 * scj
-    dn2j = _dn2 * scj
+    (; dp1, dp2, dn1, dn2, n1, n2, n3, n4, n5, n6, n7, n8, n9, n10, n11, n12, n13, n14, n15, n16, n17, n18, n19, n20, n21) = kind
+    dp1i = dp1 * sci
+    dp2i = dp2 * sci
+    dn1i = dn1 * sci
+    dn2i = dn2 * sci
+    dp1j = dp1 * scj
+    dp2j = dp2 * scj
+    dn1j = dn1 * scj
+    dn2j = dn2 * scj
     zro = zero(xi)
     return if dp1i <= xi && dp1j <= xj
         n11
@@ -1117,6 +1246,38 @@ function gerber_iq_weight(xi::Number, xj::Number, axi::Number, axj::Number, sci:
         zro
     end
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+A flexible container type for configuring and applying Gerber Information Quality covariance estimators in `PortfolioOptimisers.jl`.
+
+`GerberIQCovariance` encapsulates all components required for Gerber Information Quality based covariance or correlation estimation.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    GerberIQCovariance(; ve::StatsBase.CovarianceEstimator = SimpleVariance(),
+                         me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
+                         pdm::Option{<:Posdef} = Posdef(), c::Number = 0.5,
+                         decay::GerberIQDecayEstimator = ExpGerberIQDecay(),
+                         sc::Option{<:GerberIQScaler} = nothing,
+                         kind::GerberIQCovarianceAlgorithm = BasicGerberIQ(),
+                         alg::GerberCovarianceAlgorithm = Gerber1(),
+                         ex::FLoops.Transducers.Executor = FLoops.Transducers.ThreadedEx())
+
+Keywords correspond to the struct's fields.
+
+## Validation
+
+# Related
+
+# References
+
+  - [gerber2025squeezing](@cite)  Gerber, Sander and Smyth, William and Markowitz, Harry and Miao, Yinsen and Ernst, Philip and Sargen, Paul, *Squeezing Financial Noise: A Novel Approach to Covariance Matrix Estimation* (December 01, 2025). Available at SSRN: https://ssrn.com/abstract=4986939 or http://dx.doi.org/10.2139/ssrn.4986939
+"""
 @concrete struct GerberIQCovariance <: BaseGerberIQCovariance
     "$(field_dict[:ve])"
     ve
@@ -1124,11 +1285,17 @@ end
     me
     "$(field_dict[:pdm])"
     pdm
+    "Small co-movement threshold."
     c
+    "Temporal decay rate estimator for past observations [`GerberIQDecayEstimator`](@ref)."
     decay
+    "Threshold scaling factor estimator for co-movement thresholds [`GerberIQScaler`](@ref)."
     sc
+    "Gerber IQ covariance kind for squeezing co-movement noise [`GerberIQCovarianceAlgorithm`](@ref)."
     kind
+    "$(field_dict[:gerbalg])"
     alg
+    "$(field_dict[:ex])."
     ex
     function GerberIQCovariance(ve::StatsBase.CovarianceEstimator,
                                 me::AbstractExpectedReturnsEstimator, pdm::Option{<:Posdef},
@@ -1156,6 +1323,77 @@ function GerberIQCovariance(; ve::StatsBase.CovarianceEstimator = SimpleVariance
     return GerberIQCovariance(ve, me, pdm, c, decay, sc, kind, alg, ex)
 end
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a new [`GerberIQCovariance`](@ref) estimator with the specified observation weights.
+
+# Arguments
+
+  - $(arg_dict[:ce])
+  - $(arg_dict[:oow])
+
+# Returns
+
+  - $(ret_dict[:ce])
+
+# Details
+
+  - Calls `factory(ce.alg, w)` to update the algorithm (current algorithms do not use weights, this for future proofing).
+  - Calls `factory(ce.ve, w)` to update the variance estimator.
+  - Calls `factory(ce.me, w)` to update the expected returns estimator.
+  - Calls `factory(ce.decay, w)` to update the decay estimator (current decay estimators do not use weights, this for future proofing).
+  - Preserves the other fields of the original estimator.
+
+# Examples
+
+```jldoctest
+julia> ce = GerberIQCovariance()
+GerberIQCovariance
+     ve ┼ SimpleVariance
+        │          me ┼ SimpleExpectedReturns
+        │             │   w ┴ nothing
+        │           w ┼ nothing
+        │   corrected ┴ Bool: true
+     me ┼ SimpleExpectedReturns
+        │   w ┴ nothing
+    pdm ┼ Posdef
+        │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+        │   kwargs ┴ @NamedTuple{}: NamedTuple()
+      c ┼ Float64: 0.5
+  decay ┼ ExpGerberIQDecay
+        │   e ┼ nothing
+        │   y ┴ nothing
+     sc ┼ nothing
+   kind ┼ BasicGerberIQ
+        │   d ┼ Float64: 2.0
+        │   n ┴ Float64: 0.5
+    alg ┼ Gerber1()
+     ex ┴ Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
+
+julia> factory(ce, StatsBase.Weights([1, 2, 3]))
+GerberIQCovariance
+     ve ┼ SimpleVariance
+        │          me ┼ SimpleExpectedReturns
+        │             │   w ┴ StatsBase.Weights{Int64, Int64, Vector{Int64}}: [1, 2, 3]
+        │           w ┼ StatsBase.Weights{Int64, Int64, Vector{Int64}}: [1, 2, 3]
+        │   corrected ┴ Bool: true
+     me ┼ SimpleExpectedReturns
+        │   w ┴ StatsBase.Weights{Int64, Int64, Vector{Int64}}: [1, 2, 3]
+    pdm ┼ Posdef
+        │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+        │   kwargs ┴ @NamedTuple{}: NamedTuple()
+      c ┼ Float64: 0.5
+  decay ┼ ExpGerberIQDecay
+        │   e ┼ nothing
+        │   y ┴ nothing
+     sc ┼ nothing
+   kind ┼ BasicGerberIQ
+        │   d ┼ Float64: 2.0
+        │   n ┴ Float64: 0.5
+    alg ┼ Gerber1()
+     ex ┴ Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
+```
+
 # References
 
   - [gerber2025squeezing](@cite)  Gerber, Sander and Smyth, William and Markowitz, Harry and Miao, Yinsen and Ernst, Philip and Sargen, Paul, *Squeezing Financial Noise: A Novel Approach to Covariance Matrix Estimation* (December 01, 2025). Available at SSRN: https://ssrn.com/abstract=4986939 or http://dx.doi.org/10.2139/ssrn.4986939
@@ -1163,7 +1401,8 @@ end
 function factory(ce::GerberIQCovariance, w::ObsWeights)
     return GerberIQCovariance(; ve = factory(ce.ve, w), me = factory(ce.me, w),
                               pdm = ce.pdm, c = ce.c, decay = factory(ce.decay, w),
-                              sc = ce.sc, kind = ce.kind, alg = ce.alg, ex = ce.ex)
+                              sc = ce.sc, kind = ce.kind, alg = factory(ce.alg, w),
+                              ex = ce.ex)
 end
 """
 # References

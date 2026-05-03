@@ -23,4 +23,12 @@ FullGerberIQ
 gerber_iq_assert_c_d
 clamp_gerber_iq_n
 gerber_iq_weight
+GerberIQCovariance
+factory(ce::GerberIQCovariance, w::ObsWeights)
+gerber_IQ_delta
+gerber_IQ
+cor(ce::GerberIQCovariance, X::MatNum; dims::Int = 1, mean = nothing,
+                        kwargs...)
+cov(ce::GerberIQCovariance, X::MatNum; dims::Int = 1, mean = nothing,
+                        kwargs...)
 ```
