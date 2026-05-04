@@ -1236,7 +1236,7 @@ function gerber_iq_weight(xi::Number, xj::Number, axi::Number, axj::Number, sci:
         n3
     elseif zro < xi < dp2i && -dn2j < xj <= -dn1j || zro < xj < dp2j && -dn2i < xi <= -dn1i
         n10
-    elseif zro < xi < dp2i && xj <= -dn2j || zro < xi < dp2i && xj <= -dn2j
+    elseif zro < xi < dp2i && xj <= -dn2j || zro < xj < dp2j && xi <= -dn2i
         n21
     elseif -dn1i < xi < zro && -dn1j < xj < zro
         n2
@@ -1247,7 +1247,7 @@ function gerber_iq_weight(xi::Number, xj::Number, axi::Number, axj::Number, sci:
         n16
     elseif -dn2i < xi <= -dn1i && -dn2j < xj <= -dn1j
         n5
-    elseif -dn2i < xi <= -dn1i && xj <= -dn2j || -dn2j < xj <= -dn1j && xj <= -dn2j
+    elseif -dn2i < xi <= -dn1i && xj <= -dn2j || -dn2j < xj <= -dn1j && xi <= -dn2i
         n17
     elseif xi <= -dn2i && xj <= -dn2j
         n12
@@ -1638,7 +1638,7 @@ function gerber_IQ(ce::GerberIQCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:A
     return rho
 end
 """
-Statistics.cor(ce::GerberIQCovariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...) -> MatNum
+Statistics.cor(ce::GerberIQCovariance, X::MatNum; dims::Int = 1, kwargs...) -> MatNum
 
 Compute the Gerber IQ correlation matrix.
 
@@ -1653,8 +1653,6 @@ This method computes the Gerber IQ correlation matrix for the input data matrix 
   - `X`: Data matrix (observations × assets).
 
   - $(arg_dict[:dims])
-
-  - `mean`: Optional mean vector for centering. If not provided, computed using `ce.me`.
 
   - `kwargs...`: Additional keyword arguments passed to the mean and standard deviation estimators.
 
@@ -1678,8 +1676,7 @@ This method computes the Gerber IQ correlation matrix for the input data matrix 
 
   - [gerber2025squeezing](@cite)  Gerber, Sander and Smyth, William and Markowitz, Harry and Miao, Yinsen and Ernst, Philip and Sargen, Paul, *Squeezing Financial Noise: A Novel Approach to Covariance Matrix Estimation* (December 01, 2025). Available at SSRN: https://ssrn.com/abstract=4986939 or http://dx.doi.org/10.2139/ssrn.4986939
 """
-function Statistics.cor(ce::GerberIQCovariance, X::MatNum; dims::Int = 1, mean = nothing,
-                        kwargs...)
+function Statistics.cor(ce::GerberIQCovariance, X::MatNum; dims::Int = 1, kwargs...)
     @argcheck(dims in (1, 2))
     if dims == 2
         X = transpose(X)
@@ -1689,7 +1686,7 @@ function Statistics.cor(ce::GerberIQCovariance, X::MatNum; dims::Int = 1, mean =
     return gerber_IQ(ce, X, sd)
 end
 """
-Statistics.cov(ce::GerberIQCovariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...) -> MatNum
+Statistics.cov(ce::GerberIQCovariance, X::MatNum; dims::Int = 1, kwargs...) -> MatNum
 
 Compute the Gerber IQ covariance matrix.
 
@@ -1704,8 +1701,6 @@ This method computes the Gerber IQ covariance matrix for the input data matrix `
   - `X`: Data matrix (observations × assets).
 
   - $(arg_dict[:dims])
-
-  - `mean`: Optional mean vector for centering. If not provided, computed using `ce.me`.
 
   - `kwargs...`: Additional keyword arguments passed to the mean and standard deviation estimators.
 
@@ -1723,14 +1718,13 @@ This method computes the Gerber IQ covariance matrix for the input data matrix `
   - [`GerberIQCovarianceAlgorithm`](@ref)
   - [`demean_returns`](@ref)
   - [`gerber_IQ`](@ref)
-  - [`cor(ce::GerberIQCovariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
+  - [`cor(ce::GerberIQCovariance, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
 
 # References
 
   - [gerber2025squeezing](@cite)  Gerber, Sander and Smyth, William and Markowitz, Harry and Miao, Yinsen and Ernst, Philip and Sargen, Paul, *Squeezing Financial Noise: A Novel Approach to Covariance Matrix Estimation* (December 01, 2025). Available at SSRN: https://ssrn.com/abstract=4986939 or http://dx.doi.org/10.2139/ssrn.4986939
 """
-function Statistics.cov(ce::GerberIQCovariance, X::MatNum; dims::Int = 1, mean = nothing,
-                        kwargs...)
+function Statistics.cov(ce::GerberIQCovariance, X::MatNum; dims::Int = 1, kwargs...)
     @argcheck(dims in (1, 2))
     if dims == 2
         X = transpose(X)

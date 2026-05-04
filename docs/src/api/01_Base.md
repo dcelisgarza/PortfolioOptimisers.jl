@@ -69,6 +69,7 @@ MatNum
 ArrNum
 VecNum_MatNum
 Num_VecNum
+Func_Num_VecNum
 Num_ArrNum
 PairStrNum
 DictStrNum

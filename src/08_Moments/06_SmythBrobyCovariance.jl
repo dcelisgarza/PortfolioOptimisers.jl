@@ -1106,7 +1106,7 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
     return rho
 end
 """
-    Statistics.cor(ce::SmythBrobyCovariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)
+    Statistics.cor(ce::SmythBrobyCovariance, X::MatNum; dims::Int = 1, kwargs...)
 
 Compute the Smyth-Broby correlation matrix.
 
@@ -1121,8 +1121,6 @@ This method computes the Smyth-Broby correlation matrix for the input data matri
   - `X`: Data matrix (observations × assets).
 
   - $(arg_dict[:dims])
-
-  - `mean`: Optional mean vector for centering. If not provided, computed using `ce.me`.
 
   - `kwargs...`: Additional keyword arguments passed to the mean and standard deviation estimators.
 
@@ -1139,10 +1137,9 @@ This method computes the Smyth-Broby correlation matrix for the input data matri
   - [`SmythBrobyCovariance`](@ref)
   - [`SmythBrobyCovarianceAlgorithm`](@ref)
   - [`smythbroby`](@ref)
-  - [`cov(ce::SmythBrobyCovariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
+  - [`cov(ce::SmythBrobyCovariance, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
 """
-function Statistics.cor(ce::SmythBrobyCovariance, X::MatNum; dims::Int = 1, mean = nothing,
-                        kwargs...)
+function Statistics.cor(ce::SmythBrobyCovariance, X::MatNum; dims::Int = 1, kwargs...)
     @argcheck(dims in (1, 2))
     if dims == 2
         X = transpose(X)
@@ -1185,10 +1182,9 @@ This method computes the Smyth-Broby covariance matrix for the input data matrix
   - [`SmythBrobyCovariance`](@ref)
   - [`SmythBrobyCovarianceAlgorithm`](@ref)
   - [`smythbroby`](@ref)
-  - [`cov(ce::SmythBrobyCovariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
+  - [`cov(ce::SmythBrobyCovariance, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
 """
-function Statistics.cov(ce::SmythBrobyCovariance, X::MatNum; dims::Int = 1, mean = nothing,
-                        kwargs...)
+function Statistics.cov(ce::SmythBrobyCovariance, X::MatNum; dims::Int = 1, kwargs...)
     @argcheck(dims in (1, 2))
     if dims == 2
         X = transpose(X)

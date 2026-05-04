@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Expected returns estimator that returns the asset Medians.
 
-`CustomValueExpectedReturns` computes "expected returns" as the Median of each asset, as estimated by the underlying covariance estimator. This can be useful in certain risk-based portfolio construction approaches where the expected return proxy is the asset's volatility.
+`CustomValueExpectedReturns` computes "expected returns" as a custom value for each asset.
 
 # Fields
 
@@ -12,7 +12,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     CustomValueExpectedReturns(;
-        val::Number = 0.0
+        val::Num_VecNum = 0.0
     ) -> CustomValueExpectedReturns
 
 Keywords correspond to the struct's fields.
@@ -33,11 +33,14 @@ CustomValueExpectedReturns
 @concrete struct CustomValueExpectedReturns <: AbstractExpectedReturnsEstimator
     "Custom value."
     val
-    function CustomValueExpectedReturns(val::Number)
+    function CustomValueExpectedReturns(val::Func_Num_VecNum)
+        if isa(val, VecNum)
+            @argcheck(!isempty(val))
+        end
         return new{typeof(val)}(val)
     end
 end
-function CustomValueExpectedReturns(; val::Number = 0.0)
+function CustomValueExpectedReturns(; val::Func_Num_VecNum = 0.0)
     return CustomValueExpectedReturns(val)
 end
 """
@@ -50,23 +53,33 @@ This method returns the Median vector of `X` as estimated by the covariance esti
 
 # Arguments
 
-  - `me`: Median expected returns estimator.
+  - `me`: Custom value expected returns estimator.
   - `X`: Data matrix of asset returns (observations × assets).
   - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the covariance estimator.
 
 # Returns
 
-  - `mu::Matrix{<:Number}`: Median vector, shaped as `(1, N)` if `dims == 1` or `(N, 1)` if `dims == 2`.
+  - `mu::Matrix{<:Num_VecNum}`: Median vector, shaped as `(1, N)` if `dims == 1` or `(N, 1)` if `dims == 2`.
 
 # Related
 
   - [`CustomValueExpectedReturns`](@ref)
 """
-function Statistics.mean(me::CustomValueExpectedReturns, X::MatNum; dims::Int = 1,
+function Statistics.mean(me::CustomValueExpectedReturns{<:Number}, X::MatNum; dims::Int = 1,
                          kwargs...)
     @argcheck(dims in (1, 2))
     return insertdims(fill(me.val, size(X, setdiff((1, 2), (dims,))[1])); dims = dims)
+end
+function Statistics.mean(me::CustomValueExpectedReturns{<:VecNum}, X::MatNum; dims::Int = 1,
+                         kwargs...)
+    @argcheck(dims in (1, 2))
+    return insertdims(me.val; dims = dims)
+end
+function Statistics.mean(me::CustomValueExpectedReturns{<:Function}, X::MatNum;
+                         dims::Int = 1, kwargs...)
+    @argcheck(dims in (1, 2))
+    return me.val(X; dims = dims, kwargs...)
 end
 
 export CustomValueExpectedReturns

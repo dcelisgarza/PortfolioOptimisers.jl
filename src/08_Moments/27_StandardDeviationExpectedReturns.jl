@@ -192,18 +192,18 @@ end
 
 Compute expected returns as the variance of each asset.
 
-This method returns the standard deviation vector of `X` as estimated by the covariance estimator `me.ce`.
+This method returns the variance vector of `X` as estimated by the covariance estimator `me.ce`.
 
 # Arguments
 
-  - `me`: Standard deviation expected returns estimator.
+  - `me`: Variance expected returns estimator.
   - `X`: Data matrix of asset returns (observations × assets).
   - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the covariance estimator.
 
 # Returns
 
-  - `mu::Matrix{<:Number}`: Standard deviation vector, shaped as `(1, N)` if `dims == 1` or `(N, 1)` if `dims == 2`.
+  - `mu::Matrix{<:Number}`: Variance vector, shaped as `(1, N)` if `dims == 1` or `(N, 1)` if `dims == 2`.
 
 # Related
 

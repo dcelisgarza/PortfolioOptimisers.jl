@@ -747,16 +747,17 @@ function moment_window_and_weights(X::VecNum, w::Option{<:ObsWeights}, window::V
     return X, w
 end
 """
-    demean_returns(X::MatNum, me::AbstractExpectedReturnsEstimator; dims::Int = 1,
+    demean_returns(X::MatNum, me::AbstractExpectedReturnsEstimator; dims::Int = 1, mean = nothing,
                    kwargs...) -> MatNum
 
-Demeans the returns in `X` using the expected returns estimator `me`.
+Demeans the returns in `X` using the expected returns estimator `me` or if provided, a `mean` array.
 
 # Arguments
 
   - $(arg_dict[:X])
   - $(arg_dict[:me])
   - $(arg_dict[:dims])
+  - $(arg_dict[:omean])
   - `kwargs...`: Additional keyword arguments for the expected returns estimator.
 
 # Returns
@@ -768,8 +769,9 @@ Demeans the returns in `X` using the expected returns estimator `me`.
   - [`AbstractExpectedReturnsEstimator`](@ref)
 """
 function demean_returns(X::MatNum, me::AbstractExpectedReturnsEstimator; dims::Int = 1,
-                        kwargs...)
-    return X .- Statistics.mean(me, X; dims = dims, kwargs...)
+                        mean = nothing, kwargs...)
+    mu = ifelse(isnothing(mean), Statistics.mean(me, X; dims = dims, kwargs...), mean)
+    return X .- mu
 end
 
 export Full, Semi

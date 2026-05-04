@@ -1136,11 +1136,9 @@ julia> PortfolioOptimisers.vec_to_real_measure(0.9, [1.2, 3.4, 0.7])
   - [`VectorToScalarMeasure`](@ref)
   - [`Num_VecToScaM`](@ref)
 """
-function vec_to_real_measure(::MinValue, val::VecNum; kwargs...)
+function vec_to_real_measure(::MinValue,
+                             val::Union{<:VecNum, NTuple{N, <:Number} where {N}}; kwargs...)
     return minimum(val)
-end
-function vec_to_real_measure(::MinValue, val::NTuple{N, <:Number} where {N}; kwargs...)
-    return min(val)
 end
 function vec_to_real_measure(mv::MeanValue,
                              val::Union{<:VecNum, NTuple{N, <:Number} where {N}}; kwargs...)
@@ -1150,11 +1148,9 @@ function vec_to_real_measure(mdv::MedianValue,
                              val::Union{<:VecNum, NTuple{N, <:Number} where {N}}; kwargs...)
     return isnothing(mdv.w) ? Statistics.median(val) : Statistics.median(val, mdv.w)
 end
-function vec_to_real_measure(::MaxValue, val::VecNum; kwargs...)
+function vec_to_real_measure(::MaxValue,
+                             val::Union{<:VecNum, NTuple{N, <:Number} where {N}}; kwargs...)
     return maximum(val)
-end
-function vec_to_real_measure(::MaxValue, val::NTuple{N, <:Number} where {N}; kwargs...)
-    return max(val)
 end
 function vec_to_real_measure(val::Number, ::Union{<:VecNum, NTuple{N, <:Number} where {N}};
                              kwargs...)

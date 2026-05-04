@@ -787,6 +787,17 @@ Alias for a union of a numeric type or an abstract vector of numeric types.
 """
 const Num_VecNum = Union{<:Number, <:VecNum}
 """
+    const Func_Num_VecNum = Union{<:Function, <:Num_VecNum}
+
+Alias for a union of a function type or a numeric type or an abstract vector of numeric types.
+
+# Related
+
+  - [`Num_VecNum`](@ref)
+"""
+const Func_Num_VecNum = Union{<:Function, <:Num_VecNum}
+
+"""
     const Num_ArrNum = Union{<:Number, <:ArrNum}
 
 Alias for a union of a numeric type or an abstract array of numeric types.
