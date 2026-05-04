@@ -452,7 +452,7 @@
             ce0 = GerberCovariance(; me = CustomValueExpectedReturns(), alg = alg, t = 0.5)
             for kind in
                 (BasicGerberIQ(; n = 1.0, d = 0.5), PartialGerberIQ(; dcp = 0.5, n1 = 1.0),
-                 FullGerberIQ(; dcp = 0.5, n1 = 1.0, n4 = 1.0))
+                 FullGerberIQ(; dp1 = 0.5, n1 = 1.0, n4 = 1.0))
                 ce1 = GerberIQCovariance(; me = CustomValueExpectedReturns(), c = 0.5,
                                          kind = kind, decay = ExpGerberIQDecay(; y = 0),
                                          alg = alg, sc = AssetVolatilityGerberIQScaler())

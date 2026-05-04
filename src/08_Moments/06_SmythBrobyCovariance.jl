@@ -1122,7 +1122,7 @@ This method computes the Smyth-Broby correlation matrix for the input data matri
 
   - $(arg_dict[:dims])
 
-  - `mean`: Optional mean vector for centering. If not provided, computed using `ce.ve.me`.
+  - `mean`: Optional mean vector for centering. If not provided, computed using `ce.me`.
 
   - `kwargs...`: Additional keyword arguments passed to the mean and standard deviation estimators.
 
@@ -1168,7 +1168,7 @@ This method computes the Smyth-Broby covariance matrix for the input data matrix
 
   - $(arg_dict[:dims])
 
-  - `mean`: Optional mean vector for centering. If not provided, computed using `ce.ve.me`.
+  - `mean`: Optional mean vector for centering. If not provided, computed using `ce.me`.
 
   - `kwargs...`: Additional keyword arguments passed to the mean and standard deviation estimators.
 

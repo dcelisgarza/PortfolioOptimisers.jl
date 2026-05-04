@@ -300,13 +300,13 @@ julia> struct GaussianDecay{T} <: PortfolioOptimisers.GerberIQDecayEstimator
                if isa(a, Number)
                    @assert(a >= 0)
                end
-               new{typeof(a)}(a)
+               return new{typeof(a)}(a)
            end
-      end
+       end
 
- julia> function GaussianDecay(; a::Union{Nothing, <:Number} = nothing)
-            return GaussianDecay(a)
-        end
+julia> function GaussianDecay(; a::Union{Nothing, <:Number} = nothing)
+           return GaussianDecay(a)
+       end
 GaussianDecay
 
 julia> function PortfolioOptimisers.regenerate_decay(decay::GaussianDecay{<:Number},
@@ -319,20 +319,21 @@ julia> function PortfolioOptimisers.regenerate_decay(decay::GaussianDecay{Nothin
            T = size(X, 1)
            return GaussianDecay(; a = inv(log(T)))
        end
-regenerate_decay (generic function with 1 method)
 
 julia> function (decay::GaussianDecay)(T::Number, k::Number)
            m = T - k + 1
            return exp(-m^2 / (2 * decay.a^2))
        end
-regenerate_decay (generic function with 2 methods)
 
 julia> cor(GerberIQCovariance(; decay = GaussianDecay()), [1.0 2.0; 0.3 0.7; 0.5 1.1])
+2×2 Matrix{Float64}:
+ 1.0  1.0
+ 1.0  1.0
 
 julia> cov(GerberIQCovariance(; decay = GaussianDecay()), [1.0 2.0; 0.3 0.7; 0.5 1.1])
 2×2 Matrix{Float64}:
-1.0  1.0
-1.0  1.0
+ 0.13      0.240069
+ 0.240069  0.443333
 ```
 
 # Related
@@ -1414,6 +1415,40 @@ function factory(ce::GerberIQCovariance, w::ObsWeights)
                               ex = ce.ex)
 end
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Computes the Gerber IQ statistic for a single co-movement.
+
+# Arguments
+
+  - `xi`: Return for asset `i`.
+  - `xj`: Return for asset `j`.
+  - `axi`: Absolute return for asset `i`.
+  - `axj`: Absolute return for asset `j`.
+  - `decay`: The decay estimator for the Gerber IQ statistic.
+  - `T`: The number of observations.
+  - `k`: The current observation.
+  - `sci`: Scaling factor for asset `i`.
+  - `scj`: Scaling factor for asset `j`.
+  - `kind`: The Gerber IQ co-movement template.
+
+# Returns
+
+  - `rho::Number`: The Gerber IQ statistic.
+
+# Details
+
+  - Calls [`gerber_iq_weight`](@ref) to compute the Gerber IQ weight.
+  - Calls the functor of `decay` to compute the decay factor.
+  - Returns the product of them both.
+
+# Related
+
+  - [`gerber_iq_weight`](@ref)
+  - [`GerberIQDecayEstimator`](@ref)
+  - [`GerberIQCovarianceAlgorithm`](@ref)
+  - [`GerberIQCovariance`](@ref)
+
 # References
 
   - [gerber2025squeezing](@cite)  Gerber, Sander and Smyth, William and Markowitz, Harry and Miao, Yinsen and Ernst, Philip and Sargen, Paul, *Squeezing Financial Noise: A Novel Approach to Covariance Matrix Estimation* (December 01, 2025). Available at SSRN: https://ssrn.com/abstract=4986939 or http://dx.doi.org/10.2139/ssrn.4986939
@@ -1426,6 +1461,50 @@ function gerber_IQ_delta(xi::Number, xj::Number, axi::Number, axj::Number,
     return w * p
 end
 """
+    gerber_IQ(
+        ce::GerberIQCovariance,
+        X::MatNum,
+        sd::ArrNum
+    ) -> MatNum
+
+Computes the Gerber IQ statistic matrix using the numerator and denominator structure according to whichever [`GerberIQCovarianceAlgorithm`](@ref) is used in `ce.alg`.
+
+# Arguments
+
+  - $(arg_dict[:ce])
+  - $(arg_dict[:X])
+  - $(arg_dict[:stdarr])
+
+# Returns
+
+  - $(arg_dict[:rho])
+
+# Details
+
+ 1. Calls [`regenerate_decay`](@ref).
+ 2. For each pair of assets `(i, j)`, iterate over all observations.
+ 3. For every pair at each observation computes the scaling factor for each asset with [`gerber_iq_scaling`](@ref), as well as counters for concordant `pos`, discordant `neg`, and---for [`Gerber1`](@ref)---neutral `nn` counters are initialised to zero.
+ 4. If the absolute value of the returns of both assets is less than its respective scaled threshold `ce.c`, the observation is skipped.
+ 5. If the absolute return of both assets is greater than its respective scaled threshold `ce.c`.
+    a. If the movement is concordant (both returns have the same sign), the concordant counter is incremented according to [`gerber_IQ_delta`](@ref).
+    b. If the movement is discordant (both returns have different signs), the discordant counter is incremented according to [`gerber_IQ_delta`](@ref).
+    c. For [`Gerber1`](@ref), if the neither of the previous conditions are met, it means only one of the absolute returns is greater than its respective scaled `ce.c`, so the neutral counter is incremented.
+ 6. For each [`GerberCovarianceAlgorithm`](@ref), the GerberIQ statistics is computed as follows:
+    a. [`Gerber0`](@ref): `(pos - neg) / (pos + neg)`
+    b. [`Gerber1`](@ref): `(pos - neg) / (pos + neg + nn)`
+    c. [`Gerber2`](@ref): The numerator is computes as when using [`Gerber0`](@ref), but the resulting matrix is standardised by dividing each element by the geometric mean of the corresponding diagonal elements.
+
+# Related
+
+  - [`GerberIQCovariance`](@ref)
+  - [`Gerber0`](@ref)
+  - [`Gerber1`](@ref)
+  - [`Gerber2`](@ref)
+  - [`gerber_IQ_delta`](@ref)
+  - [`regenerate_decay`](@ref)
+  - [`cor(ce::GerberIQCovariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
+  - [`cov(ce::GerberIQCovariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
+
 # References
 
   - [gerber2025squeezing](@cite)  Gerber, Sander and Smyth, William and Markowitz, Harry and Miao, Yinsen and Ernst, Philip and Sargen, Paul, *Squeezing Financial Noise: A Novel Approach to Covariance Matrix Estimation* (December 01, 2025). Available at SSRN: https://ssrn.com/abstract=4986939 or http://dx.doi.org/10.2139/ssrn.4986939
@@ -1473,11 +1552,6 @@ function gerber_IQ(ce::GerberIQCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:A
     posdef!(ce.pdm, rho)
     return rho
 end
-"""
-# References
-
-  - [gerber2025squeezing](@cite)  Gerber, Sander and Smyth, William and Markowitz, Harry and Miao, Yinsen and Ernst, Philip and Sargen, Paul, *Squeezing Financial Noise: A Novel Approach to Covariance Matrix Estimation* (December 01, 2025). Available at SSRN: https://ssrn.com/abstract=4986939 or http://dx.doi.org/10.2139/ssrn.4986939
-"""
 function gerber_IQ(ce::GerberIQCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                           <:Gerber1}, X::MatNum, sd::ArrNum)
     T, N = size(X)
@@ -1524,11 +1598,6 @@ function gerber_IQ(ce::GerberIQCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:A
     posdef!(ce.pdm, rho)
     return rho
 end
-"""
-# References
-
-  - [gerber2025squeezing](@cite)  Gerber, Sander and Smyth, William and Markowitz, Harry and Miao, Yinsen and Ernst, Philip and Sargen, Paul, *Squeezing Financial Noise: A Novel Approach to Covariance Matrix Estimation* (December 01, 2025). Available at SSRN: https://ssrn.com/abstract=4986939 or http://dx.doi.org/10.2139/ssrn.4986939
-"""
 function gerber_IQ(ce::GerberIQCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                           <:Gerber2}, X::MatNum, sd::ArrNum)
     T, N = size(X)
@@ -1570,6 +1639,42 @@ function gerber_IQ(ce::GerberIQCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:A
     return rho
 end
 """
+Statistics.cor(ce::GerberIQCovariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...) -> MatNum
+
+Compute the Gerber IQ correlation matrix.
+
+This method computes the Gerber IQ correlation matrix for the input data matrix `X`. The mean and standard deviation vectors are computed using the estimator's expected returns and variance estimators. The Gerber IQ correlation is then computed via [`gerber_IQ`](@ref).
+
+# Arguments
+
+  - `ce`: Gerber IQ covariance estimator.
+
+      + `ce::GerberIQCovariance`: Compute the unstandardised Gerber IQ correlation matrix.
+
+  - `X`: Data matrix (observations × assets).
+
+  - $(arg_dict[:dims])
+
+  - `mean`: Optional mean vector for centering. If not provided, computed using `ce.me`.
+
+  - `kwargs...`: Additional keyword arguments passed to the mean and standard deviation estimators.
+
+# Returns
+
+  - `rho::MatNum`: The Gerber IQ correlation matrix.
+
+# Validation
+
+  - `dims` is either `1` or `2`.
+
+# Related
+
+  - [`GerberIQCovariance`](@ref)
+  - [`GerberIQCovarianceAlgorithm`](@ref)
+  - [`demean_returns`](@ref)
+  - [`gerber_IQ`](@ref)
+  - [`cov(ce::GerberIQCovariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
+
 # References
 
   - [gerber2025squeezing](@cite)  Gerber, Sander and Smyth, William and Markowitz, Harry and Miao, Yinsen and Ernst, Philip and Sargen, Paul, *Squeezing Financial Noise: A Novel Approach to Covariance Matrix Estimation* (December 01, 2025). Available at SSRN: https://ssrn.com/abstract=4986939 or http://dx.doi.org/10.2139/ssrn.4986939
@@ -1585,6 +1690,42 @@ function Statistics.cor(ce::GerberIQCovariance, X::MatNum; dims::Int = 1, mean =
     return gerber_IQ(ce, X, sd)
 end
 """
+Statistics.cov(ce::GerberIQCovariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...) -> MatNum
+
+Compute the Gerber IQ covariance matrix.
+
+This method computes the Gerber IQ covariance matrix for the input data matrix `X`. The mean and standard deviation vectors are computed using the estimator's expected returns and variance estimators. The Gerber IQ correlation is then computed via [`gerber_IQ`](@ref).
+
+# Arguments
+
+  - `ce`: Gerber IQ covariance estimator.
+
+      + `ce::GerberIQCovariance`: Compute the Gerber IQ covariance matrix.
+
+  - `X`: Data matrix (observations × assets).
+
+  - $(arg_dict[:dims])
+
+  - `mean`: Optional mean vector for centering. If not provided, computed using `ce.me`.
+
+  - `kwargs...`: Additional keyword arguments passed to the mean and standard deviation estimators.
+
+# Returns
+
+  - `sigma::MatNum`: The Gerber IQ covariance matrix.
+
+# Validation
+
+  - `dims` is either `1` or `2`.
+
+# Related
+
+  - [`GerberIQCovariance`](@ref)
+  - [`GerberIQCovarianceAlgorithm`](@ref)
+  - [`demean_returns`](@ref)
+  - [`gerber_IQ`](@ref)
+  - [`cor(ce::GerberIQCovariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
+
 # References
 
   - [gerber2025squeezing](@cite)  Gerber, Sander and Smyth, William and Markowitz, Harry and Miao, Yinsen and Ernst, Philip and Sargen, Paul, *Squeezing Financial Noise: A Novel Approach to Covariance Matrix Estimation* (December 01, 2025). Available at SSRN: https://ssrn.com/abstract=4986939 or http://dx.doi.org/10.2139/ssrn.4986939

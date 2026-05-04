@@ -746,6 +746,27 @@ function moment_window_and_weights(X::VecNum, w::Option{<:ObsWeights}, window::V
     w = get_observation_weights(w, X; kwargs...)
     return X, w
 end
+"""
+    demean_returns(X::MatNum, me::AbstractExpectedReturnsEstimator; dims::Int = 1,
+                   kwargs...) -> MatNum
+
+Demeans the returns in `X` using the expected returns estimator `me`.
+
+# Arguments
+
+  - $(arg_dict[:X])
+  - $(arg_dict[:me])
+  - $(arg_dict[:dims])
+  - `kwargs...`: Additional keyword arguments for the expected returns estimator.
+
+# Returns
+
+  - `MatNum`: The demeaned returns matrix.
+
+# Related
+
+  - [`AbstractExpectedReturnsEstimator`](@ref)
+"""
 function demean_returns(X::MatNum, me::AbstractExpectedReturnsEstimator; dims::Int = 1,
                         kwargs...)
     return X .- Statistics.mean(me, X; dims = dims, kwargs...)
