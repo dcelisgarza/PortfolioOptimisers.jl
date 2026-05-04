@@ -1161,7 +1161,7 @@ function clamp_gerber_iq_n(alg::FullGerberIQ, ::Gerber2)
     n8 = min(n8, sqrt(n2 * n5))
     n14 = min(n14, sqrt(n4 * n11))
     n17 = min(n17, sqrt(n5 * n12))
-    return FullGerberIQ(; dp1 = alg.dp1, dp2 = alg.dp2, ddp = alg.dn1, ddn = alg.dn2,
+    return FullGerberIQ(; dp1 = alg.dp1, dp2 = alg.dp2, dn1 = alg.dn1, dn2 = alg.dn2,
                         n1 = n1, n2 = n2, n3 = alg.n3, n4 = n4, n5 = n5, n6 = alg.n6,
                         n7 = n7, n8 = n8, n9 = alg.n9, n10 = alg.n10, n11 = n11, n12 = n12,
                         n13 = alg.n13, n14 = n14, n15 = alg.n15, n16 = alg.n16, n17 = n17,
