@@ -79,7 +79,7 @@ This method returns the median vector of `X` as estimated by the covariance esti
   - `me`: Median expected returns estimator.
   - `X`: Data matrix of asset returns (observations × assets).
   - $(arg_dict[:dims])
-  - `kwargs...`: Additional keyword arguments passed to the covariance estimator.
+  - $(arg_dict[:ignkwargs])
 
 # Returns
 

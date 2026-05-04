@@ -9,9 +9,9 @@ SmythBrobyGerber1
 SmythBrobyGerber2
 SmythBrobyCovariance
 cov(ce::SmythBrobyCovariance, X::MatNum; dims::Int = 1,
-                        mean = nothing, kwargs...)
+                       kwargs...)
 cor(ce::SmythBrobyCovariance, X::MatNum; dims::Int = 1,
-                        mean = nothing, kwargs...)
+                       kwargs...)
 BaseSmythBrobyCovariance
 SmythBrobyCovarianceAlgorithm
 sb_delta

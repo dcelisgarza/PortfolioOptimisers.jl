@@ -31,7 +31,7 @@ CustomValueExpectedReturns
   - [`PortfolioOptimisersCovariance`](@ref)
 """
 @concrete struct CustomValueExpectedReturns <: AbstractExpectedReturnsEstimator
-    "Custom value."
+    "Custom value.\n  - If a scalar, all assets are assigned this value.\n    - If a vector, each element corresponds to an asset.\n    - If a function, it is evaluated for each asset from `X` using passed through `kwargs`."
     val
     function CustomValueExpectedReturns(val::Func_Num_VecNum)
         if isa(val, VecNum)
@@ -47,20 +47,18 @@ end
     Statistics.mean(me::CustomValueExpectedReturns, X::MatNum;
                     dims::Int = 1, kwargs...)
 
-Compute expected returns as the Median of each asset.
-
-This method returns the Median vector of `X` as estimated by the covariance estimator `me.ce`.
+Compute expected returns as custom values.
 
 # Arguments
 
   - `me`: Custom value expected returns estimator.
   - `X`: Data matrix of asset returns (observations × assets).
   - $(arg_dict[:dims])
-  - `kwargs...`: Additional keyword arguments passed to the covariance estimator.
+  - `kwargs...`: Additional keyword arguments.
 
 # Returns
 
-  - `mu::Matrix{<:Num_VecNum}`: Median vector, shaped as `(1, N)` if `dims == 1` or `(N, 1)` if `dims == 2`.
+  - `mu::Matrix{<:Num_VecNum}`: Expected returns vector, shaped as `(1, N)` if `dims == 1` or `(N, 1)` if `dims == 2`.
 
 # Related
 
@@ -74,6 +72,7 @@ end
 function Statistics.mean(me::CustomValueExpectedReturns{<:VecNum}, X::MatNum; dims::Int = 1,
                          kwargs...)
     @argcheck(dims in (1, 2))
+    @argcheck(length(me.val) == size(X, setdiff((1, 2), (dims,))[1]))
     return insertdims(me.val; dims = dims)
 end
 function Statistics.mean(me::CustomValueExpectedReturns{<:Function}, X::MatNum;

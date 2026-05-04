@@ -280,7 +280,7 @@ function factory(ce::SmythBrobyCovariance, w::ObsWeights)
                                 alg = factory(ce.alg, w), ex = ce.ex)
 end
 """
-    sb_delta(ri::Number, rj::Number, n::Number)
+    sb_delta(ri::Number, rj::Number, n::Number) -> Number
 
 Smyth-Broby kernel function for covariance and correlation computation.
 
@@ -295,7 +295,6 @@ This function computes the kernel value for a pair of asset returns, applying th
 # Returns
 
   - `score::Number`: The computed score for the pair `(xi, xj)`.
-  - `vote::Int`: The vote for the pair `(xi, xj)`, where `1` indicates a significant co-movement and `0` indicates an insignificant one.
 
 # Details
 
