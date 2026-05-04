@@ -66,6 +66,13 @@
         @test me.ce.ce.me.w === ew
         @test me.ce.ce.ce.w === ew
 
+        me0 = VarianceExpectedReturns()
+        @test isapprox(mean(me0, rd.X), var(me0.ce, rd.X))
+        @test isapprox(mean(me0, rd.X), std(me0.ce, rd.X) .^ 2)
+        me = PortfolioOptimisers.factory(VarianceExpectedReturns(), ew)
+        @test me.ce.ce.me.w === ew
+        @test me.ce.ce.ce.w === ew
+
         me0 = ShrunkExpectedReturns(;
                                     ce = PortfolioOptimisersCovariance(;
                                                                        ce = Covariance(;
@@ -100,6 +107,15 @@
         me0 = factory(WindowedExpectedReturns(; window = 50), ew)
         me = factory(me0.me, ew[(end - 49):end])
         @test mean(me0, rd.X) == mean(me, rd.X[(end - 49):end, :])
+
+        me0 = factory(WindowedExpectedReturns(; window = 1:50,
+                                              me = MedianExpectedReturns()), ew)
+        me = factory(me0.me, ew[1:50])
+        @test mean(me0, rd.X) ==
+              mean(me, rd.X[1:50, :]) ==
+              reduce(hcat, [median(Xi, ew[1:50]) for Xi in eachcol(rd.X[1:50, :])])
+
+        @test mean(MedianExpectedReturns(), rd.X) == median(rd.X, dims = 1)
     end
     @testset "Covariance Estimators" begin
         ces = [Covariance(; alg = Full()),

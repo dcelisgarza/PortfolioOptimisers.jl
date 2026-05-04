@@ -210,7 +210,7 @@ This method returns the standard deviation vector of `X` as estimated by the cov
   - [`VarianceExpectedReturns`](@ref)
 """
 function Statistics.mean(me::VarianceExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)
-    return Statistics.std(me.ce, X; dims = dims, kwargs...)
+    return Statistics.var(me.ce, X; dims = dims, kwargs...)
 end
 
 export StandardDeviationExpectedReturns, VarianceExpectedReturns
