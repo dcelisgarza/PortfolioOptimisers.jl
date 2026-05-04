@@ -112,7 +112,7 @@
                                               me = MedianExpectedReturns()), ew)
         me = factory(me0.me, ew[1:50])
         @test mean(me0, rd.X) ==
-              mean(me, rd.X[1:50, :]) ==
+              reshape(mean(me, rd.X[1:50, :]', dims = 2), 1, :) ==
               reduce(hcat, [median(Xi, ew[1:50]) for Xi in eachcol(rd.X[1:50, :])])
 
         @test mean(MedianExpectedReturns(), rd.X) == median(rd.X, dims = 1)
