@@ -56,7 +56,7 @@ Compute expected returns as custom values.
 
 # Returns
 
-  - `mu::Matrix{<:Num_VecNum}`: Expected returns vector, shaped as `(1, N)` if `dims == 1` or `(N, 1)` if `dims == 2`.
+  - `mu::Matrix{<:Number}`: Expected returns matrix, shaped as `(1, N)` if `dims == 1` or `(N, 1)` if `dims == 2`.
 
 # Related
 
