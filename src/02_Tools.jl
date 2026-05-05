@@ -276,7 +276,7 @@ Get the observation window index range for a data array.
 # Arguments
 
   - $(arg_dict[:window])
-      + `::Option{<:Colon}`: Returns the argument.
+      + `::Option{<:Colon}`: Returns `Colon()`.
       + `::Integer`: Returns the last `window` observations. This operation is safe, so it doesn't error if `window` is larger than the number of observations.
       + `::VecInt`: Returns the `window` argument.
   - $(arg_dict[:X_Xv])

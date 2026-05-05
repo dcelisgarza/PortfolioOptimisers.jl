@@ -1679,7 +1679,7 @@ This method computes the Gerber IQ correlation matrix for the input data matrix 
   - [`GerberIQCovarianceAlgorithm`](@ref)
   - [`demean_returns`](@ref)
   - [`gerber_IQ`](@ref)
-  - [`cov(ce::GerberIQCovariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
+  - [`cov(ce::GerberIQCovariance, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
 
 # References
 

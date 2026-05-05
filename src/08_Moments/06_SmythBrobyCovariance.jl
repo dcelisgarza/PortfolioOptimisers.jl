@@ -29,7 +29,7 @@ abstract type SmythBrobyCovarianceAlgorithm <: AbstractMomentAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Implements the original Smyth-Broby covariance algorithm (unstandardised variant).
+Implements the original Smyth-Broby covariance algorithm.
 
 # Related
 
@@ -42,7 +42,7 @@ struct SmythBroby0 <: SmythBrobyCovarianceAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Implements the first variant of the Smyth-Broby covariance algorithm (unstandardised).
+Implements the first variant of the Smyth-Broby covariance algorithm.
 
 # Related
 
@@ -55,7 +55,7 @@ struct SmythBroby1 <: SmythBrobyCovarianceAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Implements the second variant of the Smyth-Broby covariance algorithm (unstandardised).
+Implements the second variant of the Smyth-Broby covariance algorithm.
 
 # Related
 
@@ -68,7 +68,7 @@ struct SmythBroby2 <: SmythBrobyCovarianceAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Implements the original Gerber-style variant of the Smyth-Broby covariance algorithm (unstandardised).
+Implements the original Smyth-Broby covariance algorithm scaled by vote counts.
 
 # Related
 
@@ -81,7 +81,7 @@ struct SmythBrobyGerber0 <: SmythBrobyCovarianceAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Implements the first Gerber-style variant of the Smyth-Broby covariance algorithm (unstandardised).
+Implements the first variant of the Smyth-Broby covariance algorithm scaled by vote counts.
 
 # Related
 
@@ -94,7 +94,7 @@ struct SmythBrobyGerber1 <: SmythBrobyCovarianceAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Implements the second Gerber-style variant of the Smyth-Broby covariance algorithm (unstandardised).
+Implements the second variant of the Smyth-Broby covariance algorithm scaled by vote counts.
 
 # Related
 
@@ -107,7 +107,7 @@ struct SmythBrobyGerber2 <: SmythBrobyCovarianceAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Implements the original Smyth-Broby covariance algorithm (unstandardised variant).
+Implements the original Smyth-Broby covariance algorithm using vote counts only.
 
 # Related
 
@@ -120,7 +120,7 @@ struct SmythBrobyCount0 <: SmythBrobyCovarianceAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Implements the original Smyth-Broby covariance algorithm (unstandardised variant).
+Implements the first variant of the Smyth-Broby covariance algorithm using vote counts only.
 
 # Related
 
@@ -133,7 +133,7 @@ struct SmythBrobyCount1 <: SmythBrobyCovarianceAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Implements the original Smyth-Broby covariance algorithm (unstandardised variant).
+Implements the second variant of the Smyth-Broby covariance algorithm using vote counts only.
 
 # Related
 
@@ -315,7 +315,7 @@ end
                                         <:Any, <:SmythBroby0}, X::MatNum, mu::ArrNum,
                sd::ArrNum)
 
-Implements the original Smyth-Broby covariance/correlation algorithm (unstandardised variant).
+Implements the original Smyth-Broby covariance/correlation algorithm.
 
 This method computes the Smyth-Broby correlation or covariance matrix for the input data matrix `X` using the original `SmythBroby0` algorithm. The computation is based on thresholding the data, applying the Smyth-Broby kernel, and aggregating positive and negative co-movements.
 
@@ -488,7 +488,7 @@ end
                                         <:Any, <:SmythBroby2}, X::MatNum, mu::ArrNum,
                sd::ArrNum)
 
-Implements the second variant of the Smyth-Broby covariance/correlation algorithm (unstandardised).
+Implements the second variant of the Smyth-Broby covariance/correlation algorithm.
 
 This method computes the Smyth-Broby correlation or covariance matrix for the input data matrix `X` using the `SmythBroby2` algorithm. The computation is based on thresholding the data, applying the Smyth-Broby kernel, and aggregating positive and negative co-movements. The resulting matrix is then standardised by the geometric mean of its diagonal elements.
 
@@ -572,7 +572,7 @@ end
                                         <:Any, <:SmythBrobyGerber0}, X::MatNum,
                mu::ArrNum, sd::ArrNum)
 
-Implements the original Gerber-style variant of the Smyth-Broby covariance/correlation algorithm (unstandardised).
+Implements the original Gerber-style variant of the Smyth-Broby covariance/correlation algorithm.
 
 This method computes the Smyth-Broby correlation or covariance matrix for the input data matrix `X` using the `SmythBrobyGerber0` algorithm. The computation is based on thresholding the data, applying the Smyth-Broby kernel, and aggregating positive and negative co-movements, with additional weighting by the count of co-movements.
 
@@ -664,7 +664,7 @@ end
                                         <:Any, <:SmythBrobyGerber1}, X::MatNum,
                mu::ArrNum, sd::ArrNum)
 
-Implements the first Gerber-style variant of the Smyth-Broby covariance/correlation algorithm (unstandardised).
+Implements the first Gerber-style variant of the Smyth-Broby covariance/correlation algorithm.
 
 This method computes the Smyth-Broby correlation or covariance matrix for the input data matrix `X` using the `SmythBrobyGerber1` algorithm. The computation is based on thresholding the data, applying the Smyth-Broby kernel, and aggregating positive, negative, and neutral co-movements, with additional weighting by the count of co-movements.
 
@@ -762,7 +762,7 @@ end
                                         <:Any, <:SmythBrobyGerber2}, X::MatNum,
                mu::ArrNum, sd::ArrNum)
 
-Implements the second Gerber-style variant of the Smyth-Broby covariance/correlation algorithm (unstandardised).
+Implements the second Gerber-style variant of the Smyth-Broby covariance/correlation algorithm.
 
 This method computes the Smyth-Broby correlation or covariance matrix for the input data matrix `X` using the `SmythBrobyGerber2` algorithm. The computation is based on thresholding the data, applying the Smyth-Broby kernel, and aggregating positive and negative co-movements, with additional weighting by the count of co-movements. The resulting matrix is then standardised by the geometric mean of its diagonal elements.
 
@@ -850,7 +850,7 @@ end
                                         <:Any, <:SmythBrobyCount0}, X::MatNum,
                mu::ArrNum, sd::ArrNum)
 
-Implements the original Gerber-style variant of the Smyth-Broby covariance/correlation algorithm (unstandardised).
+Implements the original Gerber-style variant of the Smyth-Broby covariance/correlation algorithm.
 
 This method computes the Smyth-Broby correlation or covariance matrix for the input data matrix `X` using the `SmythBrobyGerber0` algorithm. The computation is based on thresholding the data, applying the Smyth-Broby kernel, and aggregating positive and negative co-movements, with additional weighting by the count of co-movements.
 
@@ -936,7 +936,7 @@ end
                                         <:Any, <:SmythBrobyCount1}, X::MatNum,
                 mu::ArrNum, sd::ArrNum)
 
-Implements the first Gerber-style variant of the Smyth-Broby covariance/correlation algorithm (unstandardised).
+Implements the first Gerber-style variant of the Smyth-Broby covariance/correlation algorithm.
 
 This method computes the Smyth-Broby correlation or covariance matrix for the input data matrix `X` using the `SmythBrobyGerber1` algorithm. The computation is based on thresholding the data, applying the Smyth-Broby kernel, and aggregating positive, negative, and neutral co-movements, with additional weighting by the count of co-movements.
 
@@ -1025,7 +1025,7 @@ end
                                         <:Any, <:SmythBrobyCount2}, X::MatNum,
                 mu::ArrNum, sd::ArrNum)
 
-Implements the second Gerber-style variant of the Smyth-Broby covariance/correlation algorithm (unstandardised).
+Implements the second Gerber-style variant of the Smyth-Broby covariance/correlation algorithm.
 
 This method computes the Smyth-Broby correlation or covariance matrix for the input data matrix `X` using the `SmythBrobyGerber2` algorithm. The computation is based on thresholding the data, applying the Smyth-Broby kernel, and aggregating positive and negative co-movements, with additional weighting by the count of co-movements. The resulting matrix is then standardised by the geometric mean of its diagonal elements.
 
