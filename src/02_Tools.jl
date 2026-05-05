@@ -1140,13 +1140,27 @@ function vec_to_real_measure(::MinValue,
                              val::Union{<:VecNum, NTuple{N, <:Number} where {N}}; kwargs...)
     return minimum(val)
 end
-function vec_to_real_measure(mv::MeanValue,
+function vec_to_real_measure(mv::MeanValue{Nothing},
                              val::Union{<:VecNum, NTuple{N, <:Number} where {N}}; kwargs...)
-    return isnothing(mv.w) ? Statistics.mean(val) : Statistics.mean(val, mv.w)
+    return Statistics.mean(val)
 end
-function vec_to_real_measure(mdv::MedianValue,
+function vec_to_real_measure(mv::MeanValue{<:ObsWeights}, val::VecNum; kwargs...)
+    return Statistics.mean(val, mv.w)
+end
+function vec_to_real_measure(mv::MeanValue{<:ObsWeights},
+                             val::NTuple{N, <:Number} where {N}; kwargs...)
+    return Statistics.mean(collect(val), mv.w)
+end
+function vec_to_real_measure(mdv::MedianValue{Nothing},
                              val::Union{<:VecNum, NTuple{N, <:Number} where {N}}; kwargs...)
-    return isnothing(mdv.w) ? Statistics.median(val) : Statistics.median(val, mdv.w)
+    return Statistics.median(val)
+end
+function vec_to_real_measure(mdv::MedianValue{<:ObsWeights}, val::VecNum; kwargs...)
+    return Statistics.median(val, mdv.w)
+end
+function vec_to_real_measure(mdv::MedianValue{<:ObsWeights},
+                             val::NTuple{N, <:Number} where {N}; kwargs...)
+    return Statistics.median(collect(val), mdv.w)
 end
 function vec_to_real_measure(::MaxValue,
                              val::Union{<:VecNum, NTuple{N, <:Number} where {N}}; kwargs...)
@@ -1156,21 +1170,27 @@ function vec_to_real_measure(val::Number, ::Union{<:VecNum, NTuple{N, <:Number} 
                              kwargs...)
     return val
 end
-function vec_to_real_measure(sv::StdValue,
+function vec_to_real_measure(sv::StdValue{Nothing},
                              val::Union{<:VecNum, NTuple{N, <:Number} where {N}}; kwargs...)
-    return if isnothing(sv.w)
-        Statistics.std(val; corrected = sv.corrected, kwargs...)
-    else
-        Statistics.std(val, sv.w; corrected = sv.corrected, kwargs...)
-    end
+    return Statistics.std(val; corrected = sv.corrected, kwargs...)
 end
-function vec_to_real_measure(vv::VarValue,
+function vec_to_real_measure(sv::StdValue{<:ObsWeights}, val::VecNum; kwargs...)
+    return Statistics.std(val, sv.w; corrected = sv.corrected, kwargs...)
+end
+function vec_to_real_measure(sv::StdValue{<:ObsWeights}, val::NTuple{N, <:Number} where {N};
+                             kwargs...)
+    return Statistics.std(collect(val), sv.w; corrected = sv.corrected, kwargs...)
+end
+function vec_to_real_measure(vv::VarValue{Nothing},
                              val::Union{<:VecNum, NTuple{N, <:Number} where {N}}; kwargs...)
-    return if isnothing(vv.w)
-        Statistics.var(val; corrected = vv.corrected, kwargs...)
-    else
-        Statistics.var(val, vv.w; corrected = vv.corrected, kwargs...)
-    end
+    return Statistics.var(val; corrected = vv.corrected, kwargs...)
+end
+function vec_to_real_measure(vv::VarValue{<:ObsWeights}, val::VecNum; kwargs...)
+    return Statistics.var(val, vv.w; corrected = vv.corrected, kwargs...)
+end
+function vec_to_real_measure(vv::VarValue{<:ObsWeights}, val::NTuple{N, <:Number} where {N};
+                             kwargs...)
+    return Statistics.var(collect(val), vv.w; corrected = vv.corrected, kwargs...)
 end
 function vec_to_real_measure(msv::StandardisedValue,
                              val::Union{<:VecNum, NTuple{N, <:Number} where {N}}; kwargs...)

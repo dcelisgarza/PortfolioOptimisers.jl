@@ -450,6 +450,7 @@ function Statistics.cor(ce::GerberCovariance, X::MatNum; dims::Int = 1, kwargs..
         X = transpose(X)
     end
     sd = Statistics.std(ce.ve, X; dims = 1, kwargs...)
+    sd .= max.(sd, eps(eltype(sd)))
     X = demean_returns(X, ce.me; dims = 1, kwargs...)
     return gerber(ce, X, sd)
 end
@@ -504,6 +505,7 @@ function Statistics.cov(ce::GerberCovariance, X::MatNum; dims::Int = 1, kwargs..
         X = transpose(X)
     end
     sd = Statistics.std(ce.ve, X; dims = 1, kwargs...)
+    sd .= max.(sd, eps(eltype(sd)))
     X = demean_returns(X, ce.me; dims = 1, kwargs...)
     sigma = gerber(ce, X, sd)
     return StatsBase.cor2cov!(sigma, sd)

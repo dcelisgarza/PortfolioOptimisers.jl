@@ -228,6 +228,7 @@ Computes or returns the threshold scaling parameters for defining significant co
 # Arguments
 
   - `sca`: The scaling estimator to use.
+
       + `::AssetVolatilityGerberIQScaler`: Returns the input `sdi` and `sdj` as-is. This lets each asset scale according to its own volatility.
       + `::Option{<:GerberIQScalerEstimator}`: Fallback returning the mean of `sdi` and `sdj` twice so each asset is scaled according to the mean of the two asset volatilities. Overloading this with a custom [`GerberIQScalerEstimator`](@ref) allows for custom scaling behavior.
       + `::Function`: Custom scaling function that takes `sdi` and `sdj` as arguments and returns the scaled values.
@@ -1690,6 +1691,7 @@ function Statistics.cor(ce::GerberIQCovariance, X::MatNum; dims::Int = 1, kwargs
         X = transpose(X)
     end
     sd = Statistics.std(ce.ve, X; dims = 1, kwargs...)
+    sd .= max.(sd, eps(eltype(sd)))
     X = demean_returns(X, ce.me; dims = 1, kwargs...)
     return gerber_IQ(ce, X, sd)
 end
@@ -1738,6 +1740,7 @@ function Statistics.cov(ce::GerberIQCovariance, X::MatNum; dims::Int = 1, kwargs
         X = transpose(X)
     end
     sd = Statistics.std(ce.ve, X; dims = 1, kwargs...)
+    sd .= max.(sd, eps(eltype(sd)))
     X = demean_returns(X, ce.me; dims = 1, kwargs...)
     sigma = gerber_IQ(ce, X, sd)
     return StatsBase.cor2cov!(sigma, sd)
