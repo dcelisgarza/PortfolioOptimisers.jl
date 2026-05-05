@@ -1,9 +1,7 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Expected returns estimator that returns the asset medians.
-
-`MedianExpectedReturns` computes "expected returns" as the median of each asset, as estimated by the underlying covariance estimator. This can be useful in certain risk-based portfolio construction approaches where the expected return proxy is the asset's volatility.
+Expected returns estimator that returns the optionally weighted asset medians.
 
 # Fields
 
