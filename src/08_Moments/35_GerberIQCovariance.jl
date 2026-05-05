@@ -1475,7 +1475,7 @@ end
         sd::ArrNum
     ) -> MatNum
 
-Computes the Gerber IQ statistic matrix using the numerator and denominator structure according to whichever [`GerberIQCovarianceAlgorithm`](@ref) is used in `ce.alg`.
+Computes the Gerber IQ statistic matrix using noise compression template in `ce.kind` and numerator/denominator definition according to `ce.alg`.
 
 # Arguments
 
@@ -1510,8 +1510,8 @@ Computes the Gerber IQ statistic matrix using the numerator and denominator stru
   - [`Gerber2`](@ref)
   - [`gerber_IQ_delta`](@ref)
   - [`regenerate_decay`](@ref)
-  - [`cor(ce::GerberIQCovariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
-  - [`cov(ce::GerberIQCovariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
+  - [`cor(ce::GerberIQCovariance, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
+  - [`cov(ce::GerberIQCovariance, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
 
 # References
 

@@ -160,7 +160,6 @@ $(DocStringExtensions.FIELDS)
         ve::StatsBase.CovarianceEstimator = SimpleVariance(),
         me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
         pdm::Option{<:Posdef} = Posdef(),
-        t::Number = 0.5,
         c1::Number = 0.5,
         c2::Number = 0.5,
         c3::Number = 4,
