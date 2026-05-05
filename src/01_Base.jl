@@ -269,7 +269,7 @@ Validation rules for certain arg_dict terms used in the documentation of `Portfo
 """
 val_dict = Dict(:oow => "If `w` is not `nothing`, `!isempty(w)`.",
                 :oidx => "If `idx` is not `nothing`, `!isempty(idx)` and all indices are positive integers.",
-                :t => "`0 < t < 1`.",#
+                :t => "`0 <= t`.",#
                 :c1 => "`0 < c1 <= 1`.",#
                 :c2 => "`0 < c2 <= 1`.",#
                 :c3c2 => "`c3 > c2`.",#

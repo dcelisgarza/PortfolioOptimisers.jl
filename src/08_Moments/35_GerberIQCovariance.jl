@@ -1641,7 +1641,7 @@ function gerber_IQ(ce::GerberIQCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:A
             end
         end
     end
-    h = sqrt.(LinearAlgebra.diag(rho))
+    h = max.(sqrt.(LinearAlgebra.diag(rho)), sqrt(eps(eltype(rho))))
     rho .= LinearAlgebra.Symmetric(rho ⊘ (h * transpose(h)), :U)
     posdef!(ce.pdm, rho)
     return rho

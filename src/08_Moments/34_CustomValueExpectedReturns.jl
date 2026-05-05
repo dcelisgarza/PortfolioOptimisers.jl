@@ -33,7 +33,7 @@ CustomValueExpectedReturns
     val
     function CustomValueExpectedReturns(val::Func_Num_VecNum)
         if isa(val, VecNum)
-            @argcheck(!isempty(val))
+            @argcheck(!isempty(val), IsEmptyError)
         end
         return new{typeof(val)}(val)
     end

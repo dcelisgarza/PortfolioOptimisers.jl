@@ -562,7 +562,7 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
             rho[j, i] = rho[i, j] = pos - neg
         end
     end
-    h = sqrt.(LinearAlgebra.diag(rho))
+    h = max.(sqrt.(LinearAlgebra.diag(rho)), sqrt(eps(eltype(rho))))
     rho .= LinearAlgebra.Symmetric(rho ⊘ (h * transpose(h)), :U)
     posdef!(ce.pdm, rho)
     return rho
@@ -840,7 +840,7 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
             rho[j, i] = rho[i, j] = pos * cpos - neg * cneg
         end
     end
-    h = sqrt.(LinearAlgebra.diag(rho))
+    h = max.(sqrt.(LinearAlgebra.diag(rho)), sqrt(eps(eltype(rho))))
     rho .= LinearAlgebra.Symmetric(rho ⊘ (h * transpose(h)), :U)
     posdef!(ce.pdm, rho)
     return rho
@@ -1099,7 +1099,7 @@ function smythbroby(ce::SmythBrobyCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, 
             rho[j, i] = rho[i, j] = pos - neg
         end
     end
-    h = sqrt.(LinearAlgebra.diag(rho))
+    h = max.(sqrt.(LinearAlgebra.diag(rho)), sqrt(eps(eltype(rho))))
     rho .= LinearAlgebra.Symmetric(rho ⊘ (h * transpose(h)), :U)
     posdef!(ce.pdm, rho)
     return rho
@@ -1149,7 +1149,7 @@ function Statistics.cor(ce::SmythBrobyCovariance, X::MatNum; dims::Int = 1, kwar
     return smythbroby(ce, X, mu, sd)
 end
 """
-    Statistics.cov(ce::SmythBrobyCovariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)
+    Statistics.cov(ce::SmythBrobyCovariance, X::MatNum; dims::Int = 1, kwargs...)
 
 Compute the Smyth-Broby covariance matrix.
 
