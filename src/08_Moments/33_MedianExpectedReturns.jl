@@ -47,7 +47,7 @@ end
 """
     factory(ce::MedianExpectedReturns, w::ObsWeights) -> MedianExpectedReturns
 
-    Return a new [`MedianExpectedReturns`](@ref) estimator with observation weights `w` applied to the underlying covariance estimator.
+Return a new [`MedianExpectedReturns`](@ref) estimator with observation weights `w`.
 
 # Arguments
 

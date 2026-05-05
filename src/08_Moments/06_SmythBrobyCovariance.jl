@@ -1144,6 +1144,7 @@ function Statistics.cor(ce::SmythBrobyCovariance, X::MatNum; dims::Int = 1, kwar
         X = transpose(X)
     end
     sd = Statistics.std(ce.ve, X; dims = 1, kwargs...)
+    sd .= max.(sd, eps(eltype(sd)))
     mu = Statistics.mean(ce.me, X; dims = 1, kwargs...)
     return smythbroby(ce, X, mu, sd)
 end
@@ -1189,6 +1190,7 @@ function Statistics.cov(ce::SmythBrobyCovariance, X::MatNum; dims::Int = 1, kwar
         X = transpose(X)
     end
     sd = Statistics.std(ce.ve, X; dims = 1, kwargs...)
+    sd .= max.(sd, eps(eltype(sd)))
     mu = Statistics.mean(ce.me, X; dims = 1, kwargs...)
     sigma = smythbroby(ce, X, mu, sd)
     return StatsBase.cor2cov!(sigma, sd)
