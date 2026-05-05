@@ -22,7 +22,7 @@ Gerber0
 Gerber1
 Gerber2
 GerberCovariance
-factory(ce::GerberCovariance, w::StatsBase.AbstractWeights)
+factory(ce::GerberCovariance, w::ObsWeights)
 gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Any, <:Gerber0}, X::MatNum, sd::ArrNum)
 gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Any, <:Gerber1}, X::MatNum, sd::ArrNum)
 gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Any, <:Gerber2}, X::MatNum, sd::ArrNum)

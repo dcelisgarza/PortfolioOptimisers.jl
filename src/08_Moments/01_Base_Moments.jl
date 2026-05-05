@@ -111,7 +111,7 @@ julia> function Statistics.cor(est::MyCovarianceEstimator, X::PortfolioOptimiser
            if dims == 2
                X = X'
            end
-           w = ifelse(isnothing(est.w), StatsBase.fweights(fill(1.0, size(X, 1))), est.w)
+           w = isnothing(est.w) ? StatsBase.fweights(fill(1.0, size(X, 1))) : est.w
            X = X .* w
            sigma = X * X'
            d = LinearAlgebra.diag(sigma)
@@ -226,7 +226,7 @@ julia> function Statistics.var(est::MyVarianceEstimator, X::PortfolioOptimisers.
            if dims == 2
                X = X'
            end
-           w = ifelse(isnothing(est.w), StatsBase.fweights(fill(1.0, size(X, 1))), est.w)
+           w = isnothing(est.w) ? StatsBase.fweights(fill(1.0, size(X, 1))) : est.w
            X = X .* w
            sigma = LinearAlgebra.diag(X * X')
            return isone(dims) ? reshape(sigma, 1, :) : reshape(sigma, :, 2)
@@ -240,20 +240,20 @@ julia> function Statistics.std(est::MyVarianceEstimator, X::PortfolioOptimisers.
            if dims == 2
                X = X'
            end
-           w = ifelse(isnothing(est.w), StatsBase.fweights(fill(1.0, size(X, 1))), est.w)
+           w = isnothing(est.w) ? StatsBase.fweights(fill(1.0, size(X, 1))) : est.w
            X = X .* w
            sigma = sqrt.(LinearAlgebra.diag(X * X'))
            return isone(dims) ? reshape(sigma, 1, :) : reshape(sigma, :, 1)
        end
 
 julia> function Statistics.var(est::MyVarianceEstimator, X::PortfolioOptimisers.VecNum; kwargs...)
-           w = ifelse(isnothing(est.w), StatsBase.fweights(fill(1.0, size(X, 1))), est.w)
+           w = isnothing(est.w) ? StatsBase.fweights(fill(1.0, size(X, 1))) : est.w
            X = X .* w
            return mean(LinearAlgebra.diag(X' * X))
        end
 
 julia> function Statistics.std(est::MyVarianceEstimator, X::PortfolioOptimisers.VecNum; kwargs...)
-           w = ifelse(isnothing(est.w), StatsBase.fweights(fill(1.0, size(X, 1))), est.w)
+           w = isnothing(est.w) ? StatsBase.fweights(fill(1.0, size(X, 1))) : est.w
            X = X .* w
            return sqrt(mean(LinearAlgebra.diag(X' * X)))
        end
@@ -346,7 +346,7 @@ julia> function Statistics.mean(est::MyExpectedReturnsEstimator, X::PortfolioOpt
            if dims == 2
                X = X'
            end
-           w = ifelse(isnothing(est.w), fill(one(eltype(X)), size(X, 1)), est.w)
+           w = isnothing(est.w) ? fill(one(eltype(X)), size(X, 1)) : est.w
            X = X .* w
            mu = sum(X; dims = 1) / sum(w)
            return isone(dims) ? reshape(mu, 1, :) : reshape(mu, :, 1)
@@ -770,7 +770,7 @@ Demeans the returns in `X` using the expected returns estimator `me` or if provi
 """
 function demean_returns(X::MatNum, me::AbstractExpectedReturnsEstimator; dims::Int = 1,
                         mean = nothing, kwargs...)
-    mu = ifelse(isnothing(mean), Statistics.mean(me, X; dims = dims, kwargs...), mean)
+    mu = isnothing(mean) ? Statistics.mean(me, X; dims = dims, kwargs...) : mean
     return X .- mu
 end
 

@@ -227,15 +227,15 @@ Computes or returns the threshold scaling parameters for defining significant co
 
 # Arguments
 
-  - `y`: The decay strength parameter for use in the decay equation.
-      + `::Number`: Use the number as-is.
-      + `::Function`: A function which takes the data matrix `X` as an argument and returns a `(Number, Number)` tuple.
-      + `::Option{<:GerberIQScalerEstimator}`: Fallback returning a 2-element tuple of the mean `sdi` and `sdj`.
-  - $(arg_dict[:X])
+  - `sca`: The scaling estimator to use.
+      + `::AssetVolatilityGerberIQScaler`: Returns the input `sdi` and `sdj` as-is. This lets each asset scale according to its own volatility.
+      + `::Option{<:GerberIQScalerEstimator}`: Fallback returning the mean of `sdi` and `sdj` twice so each asset is scaled according to the mean of the two asset volatilities. Overloading this with a custom [`GerberIQScalerEstimator`](@ref) allows for custom scaling behavior.
+      + `::Function`: Custom scaling function that takes `sdi` and `sdj` as arguments and returns the scaled values.
 
 # Returns
 
-  - `gamma::Number`: The decay strength parameter for use in the decay equation.
+  - `scai::Number`: The scaled value for `sdi`.
+  - `scaj::Number`: The scaled value for `sdj`.
 
 # References
 
@@ -436,13 +436,16 @@ function (decay::ExpGerberIQDecay)(T::Number, k::Number)
     return exp(-decay.y * max(0, T - k - decay.e))
 end
 """
+    regenerate_decay(decay::ExpGerberIQDecay, X::AbstractMatrix) -> ExpGerberIQDecay
     regenerate_decay(decay::GerberIQDecayEstimator, X::AbstractMatrix) -> ExpGerberIQDecay
 
-Fallback for automatically setting the decay parameters `e`, and `y` based on the input data `X`. Custom subtypes of [`GerberIQDecayEstimator`](@ref) should implement this method, else they default to the fallback.
+Automatically sets the decay parameters based on the input data `X`.
 
 # Arguments
 
   - `decay`: The decay estimator to regenerate.
+      + `::ExpGerberIQDecay`: If both parameters are numeric, returns the input, otherwise returns a new [`ExpGerberIQDecay`](@ref) with the regenerated parameters.
+      + `::GerberIQDecayEstimator`: Fallback for automatically setting the decay parameters `e`, and `y` based on the input data `X`, using [`gerber_iq_eps`](@ref) and [`gerber_iq_gamma`](@ref) with `nothing` as the first input. Custom subtypes of [`GerberIQDecayEstimator`](@ref) should implement this method, else they default to the fallback.
   - $(arg_dict[:X])
 
 # Returns
@@ -470,9 +473,14 @@ Fallback for automatically setting the decay parameters `e`, and `y` based on th
 function regenerate_decay(decay::ExpGerberIQDecay{<:Number, <:Number}, ::AbstractMatrix)
     return decay
 end
-function regenerate_decay(decay::GerberIQDecayEstimator, X::AbstractMatrix)
+function regenerate_decay(decay::ExpGerberIQDecay{<:Any, <:Any}, X::AbstractMatrix)
     e = gerber_iq_eps(decay.e, X)
     y = gerber_iq_gamma(decay.y, X)
+    return ExpGerberIQDecay(; e = e, y = y)
+end
+function regenerate_decay(decay::GerberIQDecayEstimator, X::AbstractMatrix)
+    e = gerber_iq_eps(nothing, X)
+    y = gerber_iq_gamma(nothing, X)
     return ExpGerberIQDecay(; e = e, y = y)
 end
 """

@@ -1,9 +1,7 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Expected returns estimator that returns the asset Medians.
-
-`CustomValueExpectedReturns` computes "expected returns" as a custom value for each asset.
+Expected returns estimator that returns custom values for each asset.
 
 # Fields
 

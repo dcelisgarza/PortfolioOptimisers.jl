@@ -428,7 +428,7 @@ Compute the Gerber correlation matrix using the algorithm specified in `ce.alg`.
 # Details
 
   - Computes the standard deviation vector for each asset using the estimator's variance estimator.
-  - If using a standardised algorithm, Z-transforms the data prior to Gerber correlation computation.
+  - Demeans the returns with `ce.me` and [`demean_returns`](@ref).
   - Computes the Gerber correlation matrix using the Gerber algorithm in `ce.alg`.
 
 # Related
@@ -437,6 +437,7 @@ Compute the Gerber correlation matrix using the algorithm specified in `ce.alg`.
   - [`gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Any, <:Gerber0}, X::MatNum, sd::ArrNum)`](@ref)
   - [`gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Any, <:Gerber1}, X::MatNum, sd::ArrNum)`](@ref)
   - [`gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Any, <:Gerber2}, X::MatNum, sd::ArrNum)`](@ref)
+  - [`demean_returns`](@ref)
   - [`cov(ce::GerberCovariance, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
 
 # References
@@ -480,7 +481,7 @@ Compute the Gerber covariance matrix using the algorithm specified in `ce.alg`.
 # Details
 
   - Computes the standard deviation vector for each asset using the estimator's variance estimator.
-  - If using a standardised algorithm, Z-transforms the data prior to Gerber correlation computation.
+  - Demeans the returns with `ce.me` and [`demean_returns`](@ref).
   - Computes the Gerber correlation matrix using the Gerber algorithm in `ce.alg`.
   - Rescales the Gerber correlation matrix to a covariance matrix by multiplying with the standard deviation vector outer product.
 
@@ -490,6 +491,7 @@ Compute the Gerber covariance matrix using the algorithm specified in `ce.alg`.
   - [`gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Any, <:Gerber0}, X::MatNum, sd::ArrNum)`](@ref)
   - [`gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Any, <:Gerber1}, X::MatNum, sd::ArrNum)`](@ref)
   - [`gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Any, <:Gerber2}, X::MatNum, sd::ArrNum)`](@ref)
+  - [`demean_returns`](@ref)
   - [`cor(ce::GerberCovariance, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
 
 # References
