@@ -402,12 +402,12 @@ end
 
 Implements the first variant of the Smyth-Broby covariance/correlation algorithm.
 
-This method computes the Smyth-Broby correlation or covariance matrix for the input data matrix `X` using the original `SmythBroby1` algorithm. The computation is performed on data that has already been Z-transformed (mean-centered and standardised), and is based on thresholding the data, applying the Smyth-Broby kernel, and aggregating positive and negative co-movements.
+This method computes the Smyth-Broby correlation or covariance matrix for the input data matrix `X` using the original `SmythBroby1` algorithm. The computation is based on thresholding the data, applying the Smyth-Broby kernel, and aggregating positive, negative, and neutral co-movements.
 
 # Arguments
 
   - `ce`: Smyth-Broby covariance estimator configured with the `SmythBroby1` algorithm.
-  - `X`: Z-transformed data matrix (observations × assets).
+  - $(arg_dict[:X])
 
 # Returns
 
@@ -418,7 +418,7 @@ This method computes the Smyth-Broby correlation or covariance matrix for the in
 The algorithm proceeds as follows:
 
  1. For each pair of assets `(i, j)`, iterate over all observations.
- 2. For each observation, use the Z-transformed returns for assets `i` and `j`.
+ 2. For each observation, use the returns for assets `i` and `j`.
  3. Apply the threshold to classify joint positive, negative, and neutral co-movements.
  4. Use the `sb_delta` kernel to accumulate positive (`pos`), negative (`neg`), and neutral (`nn`) contributions.
  5. The correlation is computed as `(pos - neg) / (pos + neg + nn)` if the denominator is nonzero, otherwise zero.
