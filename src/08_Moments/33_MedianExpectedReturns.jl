@@ -72,7 +72,9 @@ end
 
 Compute expected returns as the median of each asset.
 
-This method returns the median vector of `X` as estimated by the covariance estimator `me.ce`.
+This method returns the median of each asset across observations in `X`. If `me.w` is `nothing`,
+the median is computed directly with `Statistics.median(X; dims = dims)`. Otherwise, the method
+computes a weighted median for each asset using the observation weights `w`.
 
 # Arguments
 
