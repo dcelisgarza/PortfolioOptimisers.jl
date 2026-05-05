@@ -108,7 +108,7 @@ $(DocStringExtensions.FIELDS)
 
     GerberCovariance(;
         ve::StatsBase.CovarianceEstimator = SimpleVariance(),
-        me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns()
+        me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
         pdm::Option{<:Posdef} = Posdef(),
         t::Number = 0.5,
         alg::GerberCovarianceAlgorithm = Gerber1()
