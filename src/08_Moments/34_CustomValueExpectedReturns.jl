@@ -10,7 +10,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     CustomValueExpectedReturns(;
-        val::Num_VecNum = 0.0
+        val::Func_Num_VecNum = 0.0
     ) -> CustomValueExpectedReturns
 
 Keywords correspond to the struct's fields.
