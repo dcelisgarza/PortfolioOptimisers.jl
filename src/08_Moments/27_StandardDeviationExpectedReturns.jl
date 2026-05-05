@@ -111,7 +111,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Expected returns estimator that returns the asset variances.
 
-`VarianceExpectedReturns` computes "expected returns" as the variance of each asset, as estimated by the underlying covariance estimator. This can be useful in certain risk-based portfolio construction approaches where the expected return proxy is the asset's volatility.
+`VarianceExpectedReturns` computes "expected returns" as the variance of each asset, as estimated by the underlying covariance estimator. This can be useful in certain risk-based portfolio construction approaches where the expected return proxy is the asset's variance. Variance is the square of volatility (standard deviation).
 
 # Fields
 
