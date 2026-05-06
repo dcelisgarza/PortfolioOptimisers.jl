@@ -118,7 +118,7 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - $(val_dict[:t])
+  - $(val_dict[:gerbt])
 
 # Related
 

@@ -1485,7 +1485,7 @@ Computes the Gerber IQ statistic matrix using noise compression template in `ce.
 
 # Returns
 
-  - $(arg_dict[:rho])
+  - $(ret_dict[:rho])
 
 # Details
 
