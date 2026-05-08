@@ -136,6 +136,13 @@ Overloads `Statistics.cov` and `Statistics.cor`.
   - Smyth-Broby-Gerber 0 [`SmythBrobyGerber0`](@ref)
   - Smyth-Broby-Gerber 1 [`SmythBrobyGerber1`](@ref)
   - Smyth-Broby-Gerber 2 [`SmythBrobyGerber2`](@ref)
+  - Smyth-Broby-Count 0 [`SmythBrobyCount0`](@ref)
+  - Smyth-Broby-Count 1 [`SmythBrobyCount1`](@ref)
+  - Smyth-Broby-Count 2 [`SmythBrobyCount2`](@ref)
+- ::: details Gerber Information Quality [`GerberIQCovariance`](@ref) with custom variance, demeaning, temporal decay and numerator + denominator estimators
+  - Basic template [`BasicGerberIQ`](@ref)
+  - Partial template [`PartialGerberIQ`](@ref)
+  - Full template [`FullGerberIQ`](@ref)
 - Distance covariance with custom distance estimator via [`Distances.jl`](https://github.com/JuliaStats/Distances.jl) [`DistanceCovariance`](@ref)
 - Lower Tail Dependence covariance [`LowerTailDependenceCovariance`](@ref)
 - ::: details Rank covariances
