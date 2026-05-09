@@ -269,6 +269,7 @@ Validation rules for certain arg_dict terms used in the documentation of `Portfo
 """
 val_dict = Dict(:oow => "If `w` is not `nothing`, `!isempty(w)`.",
                 :oidx => "If `idx` is not `nothing`, `!isempty(idx)` and all indices are positive integers.",
+                :gerbt => "`0 <= t`.",#
                 :t => "`0 < t < 1`.",#
                 :c1 => "`0 < c1 <= 1`.",#
                 :c2 => "`0 < c2 <= 1`.",#
@@ -786,6 +787,17 @@ Alias for a union of a numeric type or an abstract vector of numeric types.
   - [`ArrNum`](@ref)
 """
 const Num_VecNum = Union{<:Number, <:VecNum}
+"""
+    const Func_Num_VecNum = Union{<:Function, <:Num_VecNum}
+
+Alias for a union of a function type or a numeric type or an abstract vector of numeric types.
+
+# Related
+
+  - [`Num_VecNum`](@ref)
+"""
+const Func_Num_VecNum = Union{<:Function, <:Num_VecNum}
+
 """
     const Num_ArrNum = Union{<:Number, <:ArrNum}
 

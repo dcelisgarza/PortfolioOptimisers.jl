@@ -79,7 +79,7 @@ function factory(ce::StandardDeviationExpectedReturns, w::ObsWeights)
     return StandardDeviationExpectedReturns(; ce = factory(ce.ce, w))
 end
 """
-    Statistics.mean(me::StandardDeviationExpectedReturns, X::AbstractMatrix{<:Real};
+    Statistics.mean(me::StandardDeviationExpectedReturns, X::MatNum;
                     dims::Int = 1, kwargs...)
 
 Compute expected returns as the standard deviation of each asset.
@@ -101,9 +101,116 @@ This method returns the standard deviation vector of `X` as estimated by the cov
 
   - [`StandardDeviationExpectedReturns`](@ref)
 """
-function Statistics.mean(me::StandardDeviationExpectedReturns, X::AbstractMatrix{<:Real};
-                         dims::Int = 1, kwargs...)
+function Statistics.mean(me::StandardDeviationExpectedReturns, X::MatNum; dims::Int = 1,
+                         kwargs...)
     return Statistics.std(me.ce, X; dims = dims, kwargs...)
 end
 
-export StandardDeviationExpectedReturns
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Expected returns estimator that returns the asset variances.
+
+`VarianceExpectedReturns` computes "expected returns" as the variance of each asset, as estimated by the underlying covariance estimator. This can be useful in certain risk-based portfolio construction approaches where the expected return proxy is the asset's variance. Variance is the square of volatility (standard deviation).
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    VarianceExpectedReturns(;
+        ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance()
+    ) -> VarianceExpectedReturns
+
+Keywords correspond to the struct's fields.
+
+# Examples
+
+```jldoctest
+julia> VarianceExpectedReturns()
+VarianceExpectedReturns
+  ce ┼ PortfolioOptimisersCovariance
+     │   ce ┼ Covariance
+     │      │    me ┼ SimpleExpectedReturns
+     │      │       │   w ┴ nothing
+     │      │    ce ┼ GeneralCovariance
+     │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+     │      │       │    w ┴ nothing
+     │      │   alg ┴ Full()
+     │   mp ┼ DenoiseDetoneAlgMatrixProcessing
+     │      │     pdm ┼ Posdef
+     │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+     │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+     │      │      dn ┼ nothing
+     │      │      dt ┼ nothing
+     │      │     alg ┼ nothing
+     │      │   order ┴ DenoiseDetoneAlg()
+```
+
+# Related
+
+  - [`AbstractExpectedReturnsEstimator`](@ref)
+  - [`PortfolioOptimisersCovariance`](@ref)
+"""
+@concrete struct VarianceExpectedReturns <: AbstractExpectedReturnsEstimator
+    "$(field_dict[:ce])"
+    ce
+    function VarianceExpectedReturns(ce::StatsBase.CovarianceEstimator)
+        return new{typeof(ce)}(ce)
+    end
+end
+function VarianceExpectedReturns(;
+                                 ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance())
+    return VarianceExpectedReturns(ce)
+end
+"""
+    factory(ce::VarianceExpectedReturns, w::ObsWeights) -> VarianceExpectedReturns
+
+Return a new [`VarianceExpectedReturns`](@ref) estimator with observation weights `w` applied to the underlying covariance estimator.
+
+# Arguments
+
+  - `ce`: variance expected returns estimator.
+  - $(arg_dict[:ow])
+
+# Returns
+
+  - `me::VarianceExpectedReturns`: Updated estimator with weights applied.
+
+# Related
+
+  - [`VarianceExpectedReturns`](@ref)
+  - [`factory`](@ref)
+"""
+function factory(ce::VarianceExpectedReturns, w::ObsWeights)
+    return VarianceExpectedReturns(; ce = factory(ce.ce, w))
+end
+"""
+    Statistics.mean(me::VarianceExpectedReturns, X::MatNum;
+                    dims::Int = 1, kwargs...)
+
+Compute expected returns as the variance of each asset.
+
+This method returns the variance vector of `X` as estimated by the covariance estimator `me.ce`.
+
+# Arguments
+
+  - `me`: Variance expected returns estimator.
+  - `X`: Data matrix of asset returns (observations × assets).
+  - $(arg_dict[:dims])
+  - `kwargs...`: Additional keyword arguments passed to the covariance estimator.
+
+# Returns
+
+  - `mu::Matrix{<:Number}`: Variance vector, shaped as `(1, N)` if `dims == 1` or `(N, 1)` if `dims == 2`.
+
+# Related
+
+  - [`VarianceExpectedReturns`](@ref)
+"""
+function Statistics.mean(me::VarianceExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)
+    return Statistics.var(me.ce, X; dims = dims, kwargs...)
+end
+
+export StandardDeviationExpectedReturns, VarianceExpectedReturns

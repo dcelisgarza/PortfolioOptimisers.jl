@@ -16,6 +16,7 @@ factory(ce::StatsBase.CovarianceEstimator, args...)
 robust_cov
 robust_cor
 moment_window_and_weights
+demean_returns
 ```
 
 ## Full and semi moments

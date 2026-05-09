@@ -266,20 +266,19 @@ function nothing_scalar_array_view(x::AbstractVector{<:Union{<:AbstractVector,
     return [nothing_scalar_array_view(xi, i) for xi in x]
 end
 """
-    get_window(::Option{<:Colon}, args...) -> Option{<:Colon}
+    get_window(window::Option{<:Colon}, args...) -> Option{<:Colon}
     get_window(window::Integer, X::MatNum, dims::Int = 1) -> VecInt
     get_window(window::Integer, X::VecNum, args...) -> VecInt
     get_window(window::VecInt, args...) -> VecInt
 
-Get the row/observation window index range for a data array.
-
-Returns the index range corresponding to the last `window` observations (or all observations for `nothing`/`Colon`). Handles integer window sizes, vector index ranges, and `nothing`/`Colon` to mean "use all data".
+Get the observation window index range for a data array.
 
 # Arguments
 
   - $(arg_dict[:window])
-      + `::Option{<:Colon}`: Returns the argument.
-      + `::Integer`: Returns the last `window` observations.
+      + `::Option{<:Colon}`: Returns `Colon()`.
+      + `::Integer`: Returns the last `window` observations. This operation is safe, so it doesn't error if `window` is larger than the number of observations.
+      + `::VecInt`: Returns the `window` argument.
   - $(arg_dict[:X_Xv])
   - $(arg_dict[:dims])
 
@@ -295,14 +294,14 @@ function get_window(::Option{<:Colon}, args...)
     return Colon()
 end
 function get_window(window::Integer, X::MatNum, dims::Int = 1)
-    stop = lastindex(X, dims)
     start = firstindex(X, dims)
-    return max(1, stop - window + 1):stop
+    stop = lastindex(X, dims)
+    return max(start, stop - window + 1):stop
 end
 function get_window(window::Integer, X::VecNum, args...)
-    stop = lastindex(X)
     start = firstindex(X)
-    return max(1, stop - window + 1):stop
+    stop = lastindex(X)
+    return max(start, stop - window + 1):stop
 end
 function get_window(window::VecInt, args...)
     return window
@@ -1137,51 +1136,83 @@ julia> PortfolioOptimisers.vec_to_real_measure(0.9, [1.2, 3.4, 0.7])
   - [`VectorToScalarMeasure`](@ref)
   - [`Num_VecToScaM`](@ref)
 """
-function vec_to_real_measure(::MinValue, val::VecNum; kwargs...)
+function vec_to_real_measure(::MinValue,
+                             val::Union{<:VecNum, NTuple{N, <:Number} where {N}}; kwargs...)
     return minimum(val)
 end
-function vec_to_real_measure(mv::MeanValue, val::VecNum; kwargs...)
-    return isnothing(mv.w) ? Statistics.mean(val) : Statistics.mean(val, mv.w)
+function vec_to_real_measure(mv::MeanValue{Nothing},
+                             val::Union{<:VecNum, NTuple{N, <:Number} where {N}}; kwargs...)
+    return Statistics.mean(val)
 end
-function vec_to_real_measure(mdv::MedianValue, val::VecNum; kwargs...)
-    return isnothing(mdv.w) ? Statistics.median(val) : Statistics.median(val, mdv.w)
+function vec_to_real_measure(mv::MeanValue{<:ObsWeights}, val::VecNum; kwargs...)
+    return Statistics.mean(val, mv.w)
 end
-function vec_to_real_measure(::MaxValue, val::VecNum; kwargs...)
+function vec_to_real_measure(mv::MeanValue{<:ObsWeights},
+                             val::NTuple{N, <:Number} where {N}; kwargs...)
+    return Statistics.mean(collect(val), mv.w)
+end
+function vec_to_real_measure(mdv::MedianValue{Nothing},
+                             val::Union{<:VecNum, NTuple{N, <:Number} where {N}}; kwargs...)
+    return Statistics.median(val)
+end
+function vec_to_real_measure(mdv::MedianValue{<:ObsWeights}, val::VecNum; kwargs...)
+    return Statistics.median(val, mdv.w)
+end
+function vec_to_real_measure(mdv::MedianValue{<:ObsWeights},
+                             val::NTuple{N, <:Number} where {N}; kwargs...)
+    return Statistics.median(collect(val), mdv.w)
+end
+function vec_to_real_measure(::MaxValue,
+                             val::Union{<:VecNum, NTuple{N, <:Number} where {N}}; kwargs...)
     return maximum(val)
 end
-function vec_to_real_measure(val::Number, ::VecNum; kwargs...)
+function vec_to_real_measure(val::Number, ::Union{<:VecNum, NTuple{N, <:Number} where {N}};
+                             kwargs...)
     return val
 end
-function vec_to_real_measure(sv::StdValue, val::VecNum; kwargs...)
-    return if isnothing(sv.w)
-        Statistics.std(val; corrected = sv.corrected, kwargs...)
-    else
-        Statistics.std(val, sv.w; corrected = sv.corrected, kwargs...)
-    end
+function vec_to_real_measure(sv::StdValue{Nothing},
+                             val::Union{<:VecNum, NTuple{N, <:Number} where {N}}; kwargs...)
+    return Statistics.std(val; corrected = sv.corrected, kwargs...)
 end
-function vec_to_real_measure(vv::VarValue, val::VecNum; kwargs...)
-    return if isnothing(vv.w)
-        Statistics.var(val; corrected = vv.corrected, kwargs...)
-    else
-        Statistics.var(val, vv.w; corrected = vv.corrected, kwargs...)
-    end
+function vec_to_real_measure(sv::StdValue{<:ObsWeights}, val::VecNum; kwargs...)
+    return Statistics.std(val, sv.w; corrected = sv.corrected, kwargs...)
 end
-function vec_to_real_measure(msv::StandardisedValue, val::VecNum; kwargs...)
+function vec_to_real_measure(sv::StdValue{<:ObsWeights}, val::NTuple{N, <:Number} where {N};
+                             kwargs...)
+    return Statistics.std(collect(val), sv.w; corrected = sv.corrected, kwargs...)
+end
+function vec_to_real_measure(vv::VarValue{Nothing},
+                             val::Union{<:VecNum, NTuple{N, <:Number} where {N}}; kwargs...)
+    return Statistics.var(val; corrected = vv.corrected, kwargs...)
+end
+function vec_to_real_measure(vv::VarValue{<:ObsWeights}, val::VecNum; kwargs...)
+    return Statistics.var(val, vv.w; corrected = vv.corrected, kwargs...)
+end
+function vec_to_real_measure(vv::VarValue{<:ObsWeights}, val::NTuple{N, <:Number} where {N};
+                             kwargs...)
+    return Statistics.var(collect(val), vv.w; corrected = vv.corrected, kwargs...)
+end
+function vec_to_real_measure(msv::StandardisedValue,
+                             val::Union{<:VecNum, NTuple{N, <:Number} where {N}}; kwargs...)
     m = vec_to_real_measure(msv.mv, val)
     s = vec_to_real_measure(msv.sv, val; mean = m)
     s = ifelse(iszero(s), sqrt(eps(eltype(s))), s)
     return m / s
 end
-function vec_to_real_measure(::SumValue, val::VecNum; kwargs...)
+function vec_to_real_measure(::SumValue,
+                             val::Union{<:VecNum, NTuple{N, <:Number} where {N}}; kwargs...)
     return sum(val)
 end
-function vec_to_real_measure(::ProdValue, val::VecNum; kwargs...)
+function vec_to_real_measure(::ProdValue,
+                             val::Union{<:VecNum, NTuple{N, <:Number} where {N}}; kwargs...)
     return prod(val)
 end
-function vec_to_real_measure(::ModeValue, val::VecNum; kwargs...)
+function vec_to_real_measure(::ModeValue,
+                             val::Union{<:VecNum, NTuple{N, <:Number} where {N}}; kwargs...)
     return StatsBase.mode(val)
 end
-function vec_to_real_measure(f::Function, val::VecNum; kwargs...)
+function vec_to_real_measure(f::Function,
+                             val::Union{<:VecNum, NTuple{N, <:Number} where {N}}; kwargs...)
     return f(val)
 end
 

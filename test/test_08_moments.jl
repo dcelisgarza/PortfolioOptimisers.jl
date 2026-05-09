@@ -66,6 +66,13 @@
         @test me.ce.ce.me.w === ew
         @test me.ce.ce.ce.w === ew
 
+        me0 = VarianceExpectedReturns()
+        @test isapprox(mean(me0, rd.X), var(me0.ce, rd.X))
+        @test isapprox(mean(me0, rd.X), std(me0.ce, rd.X) .^ 2)
+        me = PortfolioOptimisers.factory(VarianceExpectedReturns(), ew)
+        @test me.ce.ce.me.w === ew
+        @test me.ce.ce.ce.w === ew
+
         me0 = ShrunkExpectedReturns(;
                                     ce = PortfolioOptimisersCovariance(;
                                                                        ce = Covariance(;
@@ -100,6 +107,15 @@
         me0 = factory(WindowedExpectedReturns(; window = 50), ew)
         me = factory(me0.me, ew[(end - 49):end])
         @test mean(me0, rd.X) == mean(me, rd.X[(end - 49):end, :])
+
+        me0 = factory(WindowedExpectedReturns(; window = 1:50,
+                                              me = MedianExpectedReturns()), ew)
+        me = factory(me0.me, ew[1:50])
+        @test mean(me0, rd.X) ==
+              reshape(mean(me, rd.X[1:50, :]', dims = 2), 1, :) ==
+              reduce(hcat, [median(Xi, ew[1:50]) for Xi in eachcol(rd.X[1:50, :])])
+
+        @test mean(MedianExpectedReturns(), rd.X) == median(rd.X, dims = 1)
     end
     @testset "Covariance Estimators" begin
         ces = [Covariance(; alg = Full()),
@@ -127,42 +143,48 @@
                                                                                    w = ew),
                                                         corrected = false, w = ew)),
                DistanceCovariance(), DistanceCovariance(; w = ew),
-               LowerTailDependenceCovariance(), GerberCovariance(; alg = Gerber0()),
-               GerberCovariance(; alg = Gerber0(),
+               LowerTailDependenceCovariance(),
+               GerberCovariance(; alg = Gerber0(), me = CustomValueExpectedReturns()),
+               GerberCovariance(; alg = Gerber0(), me = CustomValueExpectedReturns(),
                                 ve = SimpleVariance(; me = SimpleExpectedReturns(; w = ew),
                                                     corrected = false, w = ew)),
-               GerberCovariance(; alg = StandardisedGerber0()),
-               GerberCovariance(; alg = StandardisedGerber0(),
+               GerberCovariance(; alg = Gerber0(), me = SimpleExpectedReturns(;)),
+               GerberCovariance(; alg = Gerber0(), me = SimpleExpectedReturns(; w = ew),
                                 ve = SimpleVariance(; me = SimpleExpectedReturns(; w = ew),
                                                     corrected = false, w = ew)),
+               GerberCovariance(; alg = Gerber1(), me = CustomValueExpectedReturns()),
                GerberCovariance(; alg = Gerber1()),
-               GerberCovariance(; alg = StandardisedGerber1()),
+               GerberCovariance(; alg = Gerber2(), me = CustomValueExpectedReturns()),
                GerberCovariance(; alg = Gerber2()),
-               GerberCovariance(; alg = StandardisedGerber2()),
                SmythBrobyCovariance(; alg = SmythBroby0()),
                SmythBrobyCovariance(; alg = SmythBroby0(),
                                     ve = SimpleVariance(;
                                                         me = SimpleExpectedReturns(;
                                                                                    w = ew),
                                                         corrected = false, w = ew)),
-               SmythBrobyCovariance(; alg = StandardisedSmythBroby0()),
-               SmythBrobyCovariance(; alg = StandardisedSmythBroby0(),
-                                    ve = SimpleVariance(;
-                                                        me = SimpleExpectedReturns(;
-                                                                                   w = ew),
-                                                        corrected = false, w = ew)),
                SmythBrobyCovariance(; alg = SmythBroby1()),
-               SmythBrobyCovariance(; alg = StandardisedSmythBroby1()),
                SmythBrobyCovariance(; alg = SmythBroby2()),
-               SmythBrobyCovariance(; alg = StandardisedSmythBroby2()),
                SmythBrobyCovariance(; alg = SmythBrobyGerber0()),
-               SmythBrobyCovariance(; alg = StandardisedSmythBrobyGerber0()),
                SmythBrobyCovariance(; alg = SmythBrobyGerber1()),
-               SmythBrobyCovariance(; alg = StandardisedSmythBrobyGerber1()),
                SmythBrobyCovariance(; alg = SmythBrobyGerber2()),
-               SmythBrobyCovariance(; alg = StandardisedSmythBrobyGerber2()),
+               SmythBrobyCovariance(; alg = SmythBrobyCount0()),
+               SmythBrobyCovariance(; alg = SmythBrobyCount1()),
+               SmythBrobyCovariance(; alg = SmythBrobyCount2()),
                DenoiseCovariance(; dn = Denoise(; alg = SpectralDenoise())),
-               DetoneCovariance(), ProcessedCovariance(; alg = LoGo())]
+               DetoneCovariance(), ProcessedCovariance(; alg = LoGo()),
+               GerberIQCovariance(; kind = BasicGerberIQ(), alg = Gerber0()),
+               GerberIQCovariance(; kind = FullGerberIQ(), alg = Gerber1(),
+                                  decay = ExpGerberIQDecay(; y = 1 / 252, e = 110),
+                                  sc = (x, y) -> (min(x, y), min(x, y))),
+               GerberIQCovariance(; kind = PartialGerberIQ(), alg = Gerber2(),
+                                  decay = ExpGerberIQDecay(;
+                                                           y = (x) -> inv(div(size(x, 2),
+                                                                              2)),
+                                                           e = (x) -> inv(div(size(x, 2),
+                                                                              3)) +
+                                                                      inv(div(size(x, 2),
+                                                                              5))),
+                                  sc = (x, y) -> (min(x, y), min(x, y)))]
         df = CSV.read(joinpath(@__DIR__, "./assets/covariance.csv.gz"), DataFrame)
         for (i, ce) in pairs(ces)
             cei = PortfolioOptimisersCovariance(; ce = ce)
@@ -184,48 +206,48 @@
         @test ce.ce.ce.ce.w === ew
         @test ce.ce.ce.me.w === ew
 
-        @test isapprox(df[!, 40],
+        @test isapprox(df[!, 36],
                        vec(cov(PortfolioOptimisersCovariance(;
                                                              mp = DenoiseDetoneAlgMatrixProcessing(;
                                                                                                    dn = Denoise(;
                                                                                                                 alg = SpectralDenoise()))),
                                rd.X)))
-        @test isapprox(df[!, 41],
+        @test isapprox(df[!, 37],
                        vec(cov(PortfolioOptimisersCovariance(;
                                                              mp = DenoiseDetoneAlgMatrixProcessing(;
                                                                                                    dt = Detone())),
                                rd.X)))
-        @test isapprox(df[!, 41],
+        @test isapprox(df[!, 37],
                        vec(cov(PortfolioOptimisersCovariance(;
                                                              mp = DenoiseDetoneAlgMatrixProcessing(;
                                                                                                    order = DenoiseAlgDetone(),
                                                                                                    dt = Detone())),
                                rd.X)))
-        @test isapprox(df[!, 41],
+        @test isapprox(df[!, 37],
                        vec(cov(PortfolioOptimisersCovariance(;
                                                              mp = DenoiseDetoneAlgMatrixProcessing(;
                                                                                                    order = DetoneDenoiseAlg(),
                                                                                                    dt = Detone())),
                                rd.X)))
-        @test isapprox(df[!, 41],
+        @test isapprox(df[!, 37],
                        vec(cov(PortfolioOptimisersCovariance(;
                                                              mp = DenoiseDetoneAlgMatrixProcessing(;
                                                                                                    order = DetoneAlgDenoise(),
                                                                                                    dt = Detone())),
                                rd.X)))
-        @test isapprox(df[!, 41],
+        @test isapprox(df[!, 37],
                        vec(cov(PortfolioOptimisersCovariance(;
                                                              mp = DenoiseDetoneAlgMatrixProcessing(;
                                                                                                    order = AlgDenoiseDetone(),
                                                                                                    dt = Detone())),
                                rd.X)))
-        @test isapprox(df[!, 41],
+        @test isapprox(df[!, 37],
                        vec(cov(PortfolioOptimisersCovariance(;
                                                              mp = DenoiseDetoneAlgMatrixProcessing(;
                                                                                                    order = AlgDetoneDenoise(),
                                                                                                    dt = Detone())),
                                rd.X)))
-        @test isapprox(df[!, 42],
+        @test isapprox(df[!, 38],
                        vec(cov(PortfolioOptimisersCovariance(;
                                                              mp = DenoiseDetoneAlgMatrixProcessing(;
                                                                                                    alg = LoGo())),
@@ -239,9 +261,11 @@
 
         ce0 = PortfolioOptimisersCovariance(;
                                             ce = GerberCovariance(; alg = Gerber2(),
+                                                                  me = SimpleExpectedReturns(;),
                                                                   t = 0.1))
         ce = PortfolioOptimisers.factory(ce0, ew)
         @test !(ce.ce.ve === ce0.ce.ve)
+        @test !(ce.ce.me === ce0.ce.me)
         @test ce.ce.pdm === ce0.ce.pdm
         @test ce.ce.alg === ce0.ce.alg
         @test ce.ce.t == ce0.ce.t
@@ -251,38 +275,28 @@
         @test ce.mp === ce0.mp
         @test isapprox(cov(GerberCovariance(; alg = Gerber0()), rd.X),
                        cov(GerberCovariance(; alg = Gerber0()), rd.X'; dims = 2))
-        @test isapprox(cov(GerberCovariance(; alg = StandardisedGerber0()), rd.X),
-                       cov(GerberCovariance(; alg = StandardisedGerber0()), rd.X';
-                           dims = 2))
+        @test isapprox(cov(GerberCovariance(; alg = Gerber0(),
+                                            me = SimpleExpectedReturns()), rd.X),
+                       cov(GerberCovariance(; alg = Gerber0(),
+                                            me = SimpleExpectedReturns()), rd.X'; dims = 2))
         @test isapprox(cor(GerberCovariance(; alg = Gerber0()), rd.X),
                        cor(GerberCovariance(; alg = Gerber0()), rd.X'; dims = 2))
-        @test isapprox(cor(GerberCovariance(; alg = StandardisedGerber0()), rd.X),
-                       cor(GerberCovariance(; alg = StandardisedGerber0()), rd.X';
-                           dims = 2))
-
-        ce0 = PortfolioOptimisersCovariance(;
-                                            ce = GerberCovariance(;
-                                                                  alg = StandardisedGerber0(),
-                                                                  t = 0.2))
-        ce = PortfolioOptimisers.factory(ce0, ew)
-        @test !(ce.ce.ve === ce0.ce.ve)
-        @test ce.ce.pdm === ce0.ce.pdm
-        @test ce.ce.t == ce0.ce.t
-        @test ce.mp === ce0.mp
-        @test ce.ce.ve.w === ew
-        @test ce.ce.ve.me.w === ew
+        @test isapprox(cor(GerberCovariance(; alg = Gerber0(),
+                                            me = SimpleExpectedReturns()), rd.X),
+                       cor(GerberCovariance(; alg = Gerber0(),
+                                            me = SimpleExpectedReturns()), rd.X'; dims = 2))
 
         ce0 = PortfolioOptimisersCovariance(;
                                             ce = SmythBrobyCovariance(; alg = SmythBroby2(),
-                                                                      t = 0.1, c1 = 0.6,
-                                                                      c2 = 0.2, c3 = 2.2,
-                                                                      n = 3))
+                                                                      me = SimpleExpectedReturns(),
+                                                                      c1 = 0.6, c2 = 0.2,
+                                                                      c3 = 2.2, n = 3))
         ce = PortfolioOptimisers.factory(ce0, ew)
         @test !(ce.ce.ve === ce0.ce.ve)
+        @test !(ce.ce.me === ce0.ce.me)
         @test ce.ce.ve.w === ew
         @test ce.ce.ve.me.w === ew
         @test ce.ce.pdm === ce0.ce.pdm
-        @test ce.ce.t == ce0.ce.t
         @test ce.ce.c1 == ce0.ce.c1
         @test ce.ce.c2 == ce0.ce.c2
         @test ce.ce.c3 == ce0.ce.c3
@@ -291,14 +305,8 @@
         @test ce.ce.alg === ce0.ce.alg
         @test isapprox(cov(SmythBrobyCovariance(; alg = SmythBroby0()), rd.X),
                        cov(SmythBrobyCovariance(; alg = SmythBroby0()), rd.X'; dims = 2))
-        @test isapprox(cov(SmythBrobyCovariance(; alg = StandardisedSmythBroby0()), rd.X),
-                       cov(SmythBrobyCovariance(; alg = StandardisedSmythBroby0()), rd.X';
-                           dims = 2))
         @test isapprox(cor(SmythBrobyCovariance(; alg = SmythBroby0()), rd.X),
                        cor(SmythBrobyCovariance(; alg = SmythBroby0()), rd.X'; dims = 2))
-        @test isapprox(cor(SmythBrobyCovariance(; alg = StandardisedSmythBroby0()), rd.X),
-                       cor(SmythBrobyCovariance(; alg = StandardisedSmythBroby0()), rd.X';
-                           dims = 2))
 
         ce0 = PortfolioOptimisersCovariance(;
                                             ce = DistanceCovariance(; args = (3,),
@@ -455,6 +463,24 @@
         @test isapprox(std(ce0, rd.X[:, 2]; mean = 0), std(ce, rd.X[:, 2]; mean = 0))
 
         @test find_uncorrelated_indices(rd.X; t = 0.5) == [4, 6, 12, 16, 17, 19]
+
+        for alg in (Gerber0(), Gerber2())
+            ce0 = GerberCovariance(; me = CustomValueExpectedReturns(), alg = alg, t = 0.5)
+            for kind in
+                (BasicGerberIQ(; n = 1.0, d = 0.5), PartialGerberIQ(; dcp = 0.5, n1 = 1.0),
+                 FullGerberIQ(; dp1 = 0.5, n1 = 1.0, n4 = 1.0))
+                ce1 = GerberIQCovariance(; me = CustomValueExpectedReturns(), c = 0.5,
+                                         kind = kind, decay = ExpGerberIQDecay(; y = 0),
+                                         alg = alg, sc = AssetVolatilityGerberIQScaler())
+                res = isapprox(cor(ce0, rd.X), cor(ce1, rd.X))
+                if !res
+                    println("GerberIQ failed")
+                    println(alg)
+                    println(kind)
+                end
+                @test res
+            end
+        end
     end
     @testset "Regression" begin
         res = [StepwiseRegression(; alg = Forward()),
@@ -575,8 +601,9 @@
     @testset "Canonical Distance" begin
         ces = [Covariance(; alg = Full()), SpearmanCovariance(), KendallCovariance(),
                MutualInfoCovariance(), DistanceCovariance(),
-               LowerTailDependenceCovariance(), GerberCovariance(), SmythBrobyCovariance(),
-               MutualInfoCovariance(; bins = 3)]
+               LowerTailDependenceCovariance(),
+               GerberCovariance(; me = CustomValueExpectedReturns()),
+               SmythBrobyCovariance(), MutualInfoCovariance(; bins = 3)]
         df = CSV.read(joinpath(@__DIR__, "./assets/CanonicalDistance.csv.gz"), DataFrame)
         de = Distance(; alg = CanonicalDistance())
         deg = Distance(; power = 1, alg = CanonicalDistance())
