@@ -84,11 +84,23 @@ end
 end
 function process_observation!(cache::RegimeAdjustedVarianceCache,
                               ce::RegimeAdjustedExpWeightedVariance, X::VecNum,
-                              estimation_mask::Union{<:Colon, <:AbstractVector{<:Bool}},
-                              active_mask::Union{<:Colon, <:AbstractVector{<:Bool}})
+                              estimation_mask::Option{<:AbstractVector{<:Bool}},
+                              active_mask::Option{<:AbstractVector{<:Bool}})
     finite_mask = isfinite(X)
-    valid = isa(active_mask, Colon) ? Colon() : (finite_mask .& active_mask)
+    valid = isnothing(active_mask) ? finite_mask : (finite_mask .& active_mask)
+    old_obs_count = copy(cache.obs_count)
 
+    if !isnothing(active_mask)
+        newly_inactive = .!active_mask .& cache.active
+        if any(newly_inactive)
+            cache.variance[newly_inactive] .= zero(eltype(cache.variance))
+            cache.obs_count[newly_inactive] .= 0
+            # more stuff
+        end
+        cache.active .= active_mask
+    else
+        cache.active .= true
+    end
     return nothing
 end
 function Statistics.var(ce::RegimeAdjustedExpWeightedVariance, X::MatNum; dims::Int = 1,
@@ -98,21 +110,23 @@ function Statistics.var(ce::RegimeAdjustedExpWeightedVariance, X::MatNum; dims::
     @argcheck(dims in (1, 2))
     est_flag = !isnothing(estimation_mask)
     act_flag = !isnothing(active_mask)
-    itr, v = ifelse(isone(dims), (eachrow, (x, y) -> view(x, :, y)),
-                    (eachcol, (x, y) -> view(x, y, :)))
+    itr, v = ifelse(isone(dims), (eachrow, (x, y) -> view(x, y, :)),
+                    (eachcol, (x, y) -> view(x, :, y)))
     if est_flag
         @argcheck(size(X) == size(estimation_mask))
-    else
-        estimation_mask = Iterators.repeated(Colon(), size(X, dims))
     end
     if act_flag
         @argcheck(size(X) == size(active_mask))
-        active_mask = Iterators.repeated(Colon(), size(X, dims))
     end
     N = size(X, setdiff((1, 2), (dims,))[1])
     cache = RegimeAdjustedVarianceCache(zeros(eltype(X), N), trues(N), zeros(eltype(X), N),
                                         SpecialFunctions.digamma(0.5) + log(2),
                                         sqrt(2 * inv(pi)), nothing, 0)
+    for (i, Xi) in enumerate(itr(X))
+        emi = est_flag ? v(estimation_mask, i) : nothing
+        ami = act_flag ? v(active_mask, i) : nothing
+        process_observation!(cache, ce, X, emi, ami)
+    end
 
     return itr, estimation_mask, active_mask, cache
 end
