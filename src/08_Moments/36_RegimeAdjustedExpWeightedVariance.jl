@@ -73,7 +73,7 @@ function RegimeAdjustedExpWeightedVariance(; decay::Number = exp2(-inv(40.0)),
                                              regime_decay, regime_min_obs, regime_lohi_mult,
                                              min_val)
 end
-@concrete struct RegimeAdjustedVarianceCache
+@concrete struct RegimeAdjustedVarianceCache <: AbstractResult
     variance
     active
     obs_count
@@ -82,9 +82,10 @@ end
     regime_state
     n_regime_obs
 end
-function process_observation!(ce::RegimeAdjustedExpWeightedVariance, X::VecNum,
-                             estimation_mask::Union{<:Colon, <:AbstractVector{<:Bool}},
-                             active_mask::Union{<:Colon, <:AbstractVector{<:Bool}})
+function process_observation!(cache::RegimeAdjustedVarianceCache,
+                              ce::RegimeAdjustedExpWeightedVariance, X::VecNum,
+                              estimation_mask::Union{<:Colon, <:AbstractVector{<:Bool}},
+                              active_mask::Union{<:Colon, <:AbstractVector{<:Bool}})
     finite_mask = isfinite(X)
     valid = isa(active_mask, Colon) ? Colon() : (finite_mask .& active_mask)
 
@@ -108,8 +109,12 @@ function Statistics.var(ce::RegimeAdjustedExpWeightedVariance, X::MatNum; dims::
         @argcheck(size(X) == size(active_mask))
         active_mask = Iterators.repeated(Colon(), size(X, dims))
     end
+    N = size(X, setdiff((1, 2), (dims,))[1])
+    cache = RegimeAdjustedVarianceCache(zeros(eltype(X), N), trues(N), zeros(eltype(X), N),
+                                        SpecialFunctions.digamma(0.5) + log(2),
+                                        sqrt(2 * inv(pi)), nothing, 0)
 
-    return itr, estimation_mask, active_mask
+    return itr, estimation_mask, active_mask, cache
 end
 
 export LogRegimeAdjusted, FirstMomentRegimeAdjusted, RootMeanSquaredAdjusted,
