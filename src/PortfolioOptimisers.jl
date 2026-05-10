@@ -31,6 +31,7 @@ using Random: Random
 using Roots: Roots
 using SimpleWeightedGraphs: SimpleWeightedGraphs
 using SparseArrays: SparseArrays
+using SpecialFunctions: SpecialFunctions
 using Statistics: Statistics, mean, std, var, cor, cov
 using StatsAPI: StatsAPI, predict
 using StatsBase: StatsBase

@@ -59,10 +59,12 @@ function RegimeAdjustedExpWeightedVariance(; decay::Number = exp2(-inv(40.0)),
                                                                         inv(log2(inv(decay))))),
                                            hac_lags::Option{<:Integer} = nothing,
                                            regime_method::RegimeAdjustedMethod = FirstMomentRegimeAdjusted(),
-                                           regime_decay::Number = exp2(-2/inv(log2(inv(decay)))),
+                                           regime_decay::Number = exp2(-2 /
+                                                                       inv(log2(inv(decay)))),
                                            regime_min_obs::Integer = round(Int,
                                                                            max(1,
-                                                                               inv(log2(inv(decay)))/2)),
+                                                                               inv(log2(inv(decay))) /
+                                                                               2)),
                                            regime_lohi_mult::Option{<:Tuple{<:Number,
                                                                             <:Number}} = (0.7,
                                                                                           1.6),
@@ -71,13 +73,32 @@ function RegimeAdjustedExpWeightedVariance(; decay::Number = exp2(-inv(40.0)),
                                              regime_decay, regime_min_obs, regime_lohi_mult,
                                              min_val)
 end
+@concrete struct RegimeAdjustedVarianceCache
+    variance
+    active
+    obs_count
+    kappa
+    e_abs_z
+    regime_state
+    n_regime_obs
+end
+function process_observation!(ce::RegimeAdjustedExpWeightedVariance, X::VecNum,
+                             estimation_mask::Union{<:Colon, <:AbstractVector{<:Bool}},
+                             active_mask::Union{<:Colon, <:AbstractVector{<:Bool}})
+    finite_mask = isfinite(X)
+    valid = isa(active_mask, Colon) ? Colon() : (finite_mask .& active_mask)
+
+    return nothing
+end
 function Statistics.var(ce::RegimeAdjustedExpWeightedVariance, X::MatNum; dims::Int = 1,
-                        mean = nothing, estimation_mask::Option{<:Union{<:BitMatrix, <:AbstractMatrix{<:Bool}}} = nothing,
-                        active_mask::Option{<:Union{<:BitMatrix, <:AbstractMatrix{<:Bool}}} = nothing, kwargs...)
+                        mean = nothing,
+                        estimation_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
+                        active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
     @argcheck(dims in (1, 2))
     est_flag = !isnothing(estimation_mask)
     act_flag = !isnothing(active_mask)
-    itr, v = ifelse(isone(dims), (eachrow, (x, y) -> view(x, :, y)), (eachcol, (x, y) -> view(x, y, :)))
+    itr, v = ifelse(isone(dims), (eachrow, (x, y) -> view(x, :, y)),
+                    (eachcol, (x, y) -> view(x, y, :)))
     if est_flag
         @argcheck(size(X) == size(estimation_mask))
     else
@@ -87,6 +108,7 @@ function Statistics.var(ce::RegimeAdjustedExpWeightedVariance, X::MatNum; dims::
         @argcheck(size(X) == size(active_mask))
         active_mask = Iterators.repeated(Colon(), size(X, dims))
     end
+
     return itr, estimation_mask, active_mask
 end
 
