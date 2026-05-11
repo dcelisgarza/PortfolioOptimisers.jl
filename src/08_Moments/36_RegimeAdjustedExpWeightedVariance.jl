@@ -245,7 +245,30 @@ function Statistics.var(ce::RegimeAdjustedExpWeightedVariance, X::MatNum; dims::
         process_observation!(cache, ce, Xi, emi, ami)
     end
 
-    return itr, estimation_mask, active_mask, cache
+    variance = copy(cache.variance)
+    correction = ones(eltype(variance), length(variance))
+    correction[cache.obs_count .> zero(eltype(cache.obs_count))] .= inv.(max.(one(ce.decay) .-
+                                                                              ce.decay .^
+                                                                              cache.obs_count,
+                                                                              eps(eltype(variance))))
+    variance .*= correction
+    not_ready = .!cache.active .| (cache.obs_count .< ce.min_obs)
+
+    if any(not_ready)
+        variance[not_ready] .= NaN
+    end
+
+    if !ce.centred && any(.!cache.active)
+        cache.location[.!cache.active] .= NaN
+    end
+
+    factor = if cache.n_regime_obs < ce.regime_min_obs
+        one(eltype(X))
+    else
+        regime_multiplier(ce.regime_method, cache.regime_state)
+    end
+
+    return variance * factor^2
 end
 
 export LogRegimeAdjusted, FirstMomentRegimeAdjusted, RootMeanSquaredAdjusted,
