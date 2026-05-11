@@ -10,6 +10,7 @@ using Clustering: Clustering, assignments
 using Combinatorics: Combinatorics
 using ConcreteStructs: @concrete
 using DataFrames: DataFrames
+using DataStructures: DataStructures
 using Dates: Dates
 using Distances: Distances
 using Distributions: Distributions

@@ -78,14 +78,29 @@ function RegimeAdjustedExpWeightedVariance(; decay::Number = exp2(-inv(40.0)),
                                              min_val, centred)
 end
 @concrete struct RegimeAdjustedVarianceCache <: AbstractResult
+    ret_buffer
     variance
+    z2
     location
     obs_count
+    old_obs_count
     active
     kappa
     e_abs_z
     regime_state
     n_regime_obs
+end
+function hac_squared_returns(cache::RegimeAdjustedVarianceCache,
+                             ce::RegimeAdjustedExpWeightedVariance, X::VecNum,
+                             finite_mask::AbstractVector{<:Bool})
+    X2 = X .^ 2
+    if !isnothing(cache.ret_buffer)
+        return X2
+    end
+
+    for (i, X_old) in enumerate(reverse(cache.ret_buffer))
+    end
+    return nothing
 end
 function process_observation!(cache::RegimeAdjustedVarianceCache,
                               ce::RegimeAdjustedExpWeightedVariance, X::VecNum,
@@ -112,17 +127,28 @@ function process_observation!(cache::RegimeAdjustedVarianceCache,
         return nothing
     end
 
-    old_obs_count = copy(cache.obs_count)
+    copyto!(cache.old_obs_count, cache.obs_count)
 
     Xi = if ce.centred
         X
     else
-        loc = replace(cache.location, NaN => 0.0)
+        loc = replace(cache.location, NaN => zero(eltype(cache.location)))
         cache.location[valid] = ce.decay * view(loc, valid) +
-                                (1 - ce.decay) * view(X, valid)
-        X .- loc
+                                (one(eltype(cache.location)) - ce.decay) * view(X, valid)
+        X - loc
     end
 
+    ready = valid .& (cache.old_obs_count .>= ce.min_obs)
+    fill!(cache.z2, NaN)
+    var_idx = ready .& (cache.variance .>= ce.min_val)
+    if any(var_idx)
+        factor = inv.(max.(one(ce.decay) .- ce.decay .^ cache.old_obs_count[var_idx],
+                           eps(ce.decay)))
+        var_corrected = view(cache.variance, var_idx) * factor
+        cache.z2[var_idx] = view(Xi, var_idx) .^ 2 / var_corrected
+    end
+
+    X2 = hac_squared_returns(cache, ce, Xi, valid)
     return nothing
 end
 function Statistics.var(ce::RegimeAdjustedExpWeightedVariance, X::MatNum; dims::Int = 1,
@@ -141,9 +167,14 @@ function Statistics.var(ce::RegimeAdjustedExpWeightedVariance, X::MatNum; dims::
         @argcheck(size(X) == size(active_mask))
     end
     N = size(X, setdiff((1, 2), (dims,))[1])
-    cache = RegimeAdjustedVarianceCache(zeros(eltype(X), N),
+
+    cache = RegimeAdjustedVarianceCache(if isnothing(ce.hac_lags)
+                                            nothing
+                                        else
+                                            DataStructures.Deque{Vector{eltype(X)}}(ce.hac_lags)
+                                        end, zeros(eltype(X), N), fill(NaN, N),
                                         ce.centred ? zeros(eltype(X), N) : fill(NaN, N),
-                                        zeros(eltype(X), N), trues(N),
+                                        zeros(Int, N), zeros(Int, N), trues(N),
                                         SpecialFunctions.digamma(0.5) + log(2),
                                         sqrt(2 * inv(pi)), nothing, 0)
     for (i, Xi) in enumerate(itr(X))
