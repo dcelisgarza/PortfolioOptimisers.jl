@@ -1,18 +1,31 @@
 abstract type RegimeAdjustedMethod <: AbstractEstimator end
 @concrete struct LogRegimeAdjusted <: RegimeAdjustedMethod
-    val
-    function LogRegimeAdjusted(val::Number)
-        assert_nonempty_nonneg_finite_val(val, :val)
-        return new{typeof(val)}(val)
+    x
+    y
+    kappa
+    function LogRegimeAdjusted(x::Number, y::Number)
+        assert_nonempty_nonneg_finite_val(x, :x)
+        assert_nonempty_nonneg_finite_val(y, :y)
+        kappa = SpecialFunctions.digamma(x) + log(y)
+        return new{typeof(x), typeof(y), typeof(kappa)}(x, y, kappa)
     end
 end
-function LogRegimeAdjusted(; val::Number = 0.5)
-    return LogRegimeAdjusted(val)
+function LogRegimeAdjusted(; x::Number = 0.5, y::Number = 2.0)
+    return LogRegimeAdjusted(x, y)
 end
-struct FirstMomentRegimeAdjusted <: RegimeAdjustedMethod end
+@concrete struct FirstMomentRegimeAdjusted <: RegimeAdjustedMethod
+    x
+    function FirstMomentRegimeAdjusted(x::Number)
+        assert_nonempty_nonneg_finite_val(x, :x)
+        return new{typeof(x)}(x)
+    end
+end
+function FirstMomentRegimeAdjusted(; x::Number = sqrt(2 * inv(pi)))
+    return FirstMomentRegimeAdjusted(x)
+end
 struct RootMeanSquaredAdjusted <: RegimeAdjustedMethod end
 function regime_multiplier(method::LogRegimeAdjusted, regime_state::Number)
-    return exp(method.val * regime_state)
+    return exp(method.x * regime_state)
 end
 function regime_multiplier(::FirstMomentRegimeAdjusted, regime_state::Number)
     return regime_state
@@ -80,33 +93,49 @@ end
 @concrete struct RegimeAdjustedVarianceCache <: AbstractResult
     ret_buffer
     variance
+    X2
+    X_old_i
     z2
     location
     obs_count
     old_obs_count
     active
-    kappa
-    e_abs_z
     regime_state
     n_regime_obs
 end
-function hac_squared_returns(cache::RegimeAdjustedVarianceCache,
-                             ce::RegimeAdjustedExpWeightedVariance, X::VecNum,
-                             finite_mask::AbstractVector{<:Bool})
-    X2 = X .^ 2
-    if !isnothing(cache.ret_buffer)
-        return X2
+function get_regime_state(::RootMeanSquaredAdjusted, z2_valid::VecNum, ::Any)
+    return Statistics.mean(z2_valid)
+end
+function get_regime_state(method::FirstMomentRegimeAdjusted, z2_valid::VecNum, ::Any)
+    return Statistics.mean(sqrt.(max.(z2_valid, zero(eltype(z2_valid))))) / method.x
+end
+function get_regime_state(method::LogRegimeAdjusted, z2_valid::VecNum,
+                          min_val::Number = sqrt(eps(eltype(z2_valid))))
+    log_z2 = log.(max.(z2_valid, min_val))
+    return Statistics.mean(log_z2) - method.kappa
+end
+function hac_squared_returns!(cache::RegimeAdjustedVarianceCache,
+                              ce::RegimeAdjustedExpWeightedVariance, X::VecNum,
+                              finite_mask::AbstractVector{<:Bool})
+    copyto!(cache.X2, X .^ 2)
+    if isnothing(cache.ret_buffer) || isempty(cache.ret_buffer)
+        return cache.X2
     end
 
-    for (i, X_old) in enumerate(reverse(cache.ret_buffer))
+    for (i, X_old) in enumerate(Iterators.reverse(cache.ret_buffer))
+        wi = one(eltype(X)) - i / (ce.hac_lags + 1)
+        cache.X_old_i .= replace(X_old, NaN => zero(eltype(X_old)))
+        cache.X2 .+= 2 * wi * X .* cache.X_old_i
     end
-    return nothing
+    cache.X2[finite_mask] .= max.(view(cache.X2, finite_mask), zero(eltype(cache.X2)))
+
+    return cache.X2
 end
 function process_observation!(cache::RegimeAdjustedVarianceCache,
                               ce::RegimeAdjustedExpWeightedVariance, X::VecNum,
                               estimation_mask::Option{<:AbstractVector{<:Bool}},
                               active_mask::Option{<:AbstractVector{<:Bool}})
-    finite_mask = isfinite(X)
+    finite_mask = isfinite.(X)
     valid = isnothing(active_mask) ? finite_mask : (finite_mask .& active_mask)
 
     if !isnothing(active_mask)
@@ -138,21 +167,54 @@ function process_observation!(cache::RegimeAdjustedVarianceCache,
         X - loc
     end
 
-    ready = valid .& (cache.old_obs_count .>= ce.min_obs)
+    regime_mask = valid .& (cache.old_obs_count .>= ce.min_obs)
     fill!(cache.z2, NaN)
-    var_idx = ready .& (cache.variance .>= ce.min_val)
+    var_idx = regime_mask .& (cache.variance .>= ce.min_val)
     if any(var_idx)
         factor = inv.(max.(one(ce.decay) .- ce.decay .^ cache.old_obs_count[var_idx],
                            eps(ce.decay)))
-        var_corrected = view(cache.variance, var_idx) * factor
-        cache.z2[var_idx] = view(Xi, var_idx) .^ 2 / var_corrected
+        var_corrected = view(cache.variance, var_idx) .* factor
+        cache.z2[var_idx] = view(Xi, var_idx) .^ 2 ./ var_corrected
     end
 
-    X2 = hac_squared_returns(cache, ce, Xi, valid)
+    X2 = hac_squared_returns!(cache, ce, Xi, valid)
+    cache.variance[valid] .= ce.decay * view(cache.variance, valid) +
+                             (one(ce.decay) - ce.decay) * view(X2, valid)
+    cache.obs_count[valid] .+= 1
+
+    if !isnothing(cache.ret_buffer)
+        X_new = copy(Xi)
+        X_new[.!valid] .= NaN
+        push!(cache.ret_buffer, X_new)
+    end
+
+    if !isnothing(estimation_mask)
+        regime_mask .&= estimation_mask
+    end
+
+    if !any(regime_mask)
+        return nothing
+    end
+
+    z2_valid = filter(!isnan, view(cache.z2, regime_mask))
+    if isempty(z2_valid)
+        return nothing
+    end
+
+    regime_state = get_regime_state(ce.regime_method, z2_valid, ce.min_val)
+
+    Accessors.@reset cache.regime_state = if isnothing(cache.regime_state)
+        regime_state
+    else
+        ce.regime_decay * cache.regime_state +
+        (one(eltype(ce.regime_decay)) - ce.regime_decay) * regime_state
+    end
+
+    Accessors.@reset cache.n_regime_obs += 1
+
     return nothing
 end
 function Statistics.var(ce::RegimeAdjustedExpWeightedVariance, X::MatNum; dims::Int = 1,
-                        mean = nothing,
                         estimation_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
                         active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
     @argcheck(dims in (1, 2))
@@ -171,16 +233,16 @@ function Statistics.var(ce::RegimeAdjustedExpWeightedVariance, X::MatNum; dims::
     cache = RegimeAdjustedVarianceCache(if isnothing(ce.hac_lags)
                                             nothing
                                         else
-                                            DataStructures.Deque{Vector{eltype(X)}}(ce.hac_lags)
-                                        end, zeros(eltype(X), N), fill(NaN, N),
+                                            DataStructures.CircularBuffer{Vector{eltype(X)}}(ce.hac_lags)
+                                        end, zeros(eltype(X), N), zeros(eltype(X), N),
+                                        zeros(eltype(X), N), fill(NaN, N),
                                         ce.centred ? zeros(eltype(X), N) : fill(NaN, N),
-                                        zeros(Int, N), zeros(Int, N), trues(N),
-                                        SpecialFunctions.digamma(0.5) + log(2),
-                                        sqrt(2 * inv(pi)), nothing, 0)
+                                        zeros(Int, N), zeros(Int, N), trues(N), nothing,
+                                        zero(eltype(X)))
     for (i, Xi) in enumerate(itr(X))
         emi = est_flag ? v(estimation_mask, i) : nothing
         ami = act_flag ? v(active_mask, i) : nothing
-        process_observation!(cache, ce, X, emi, ami)
+        process_observation!(cache, ce, Xi, emi, ami)
     end
 
     return itr, estimation_mask, active_mask, cache
