@@ -29,6 +29,7 @@ end
     regime_min_obs
     regime_lohi_mult
     min_val
+    centred
     function RegimeAdjustedExpWeightedVariance(decay::Number, min_obs::Integer,
                                                hac_lags::Option{<:Integer},
                                                regime_method::RegimeAdjustedMethod,
@@ -36,7 +37,7 @@ end
                                                regime_min_obs::Integer,
                                                regime_lohi_mult::Option{<:Tuple{<:Number,
                                                                                 <:Number}},
-                                               min_val::Number)
+                                               min_val::Number, centred::Bool)
         assert_nonempty_gt0_finite_val(decay, :decay)
         assert_nonempty_gt0_finite_val(min_obs, :min_obs)
         assert_nonempty_gt0_finite_val(regime_min_obs, :regime_min_obs)
@@ -49,8 +50,10 @@ end
         end
         return new{typeof(decay), typeof(min_obs), typeof(hac_lags), typeof(regime_method),
                    typeof(regime_decay), typeof(regime_min_obs), typeof(regime_lohi_mult),
-                   typeof(min_val)}(decay, min_obs, hac_lags, regime_method, regime_decay,
-                                    regime_min_obs, regime_lohi_mult, min_val)
+                   typeof(min_val), typeof(centred)}(decay, min_obs, hac_lags,
+                                                     regime_method, regime_decay,
+                                                     regime_min_obs, regime_lohi_mult,
+                                                     min_val, centred)
     end
 end
 function RegimeAdjustedExpWeightedVariance(; decay::Number = exp2(-inv(40.0)),
@@ -68,15 +71,17 @@ function RegimeAdjustedExpWeightedVariance(; decay::Number = exp2(-inv(40.0)),
                                            regime_lohi_mult::Option{<:Tuple{<:Number,
                                                                             <:Number}} = (0.7,
                                                                                           1.6),
-                                           min_val::Number = sqrt(eps()))
+                                           min_val::Number = sqrt(eps()),
+                                           centred::Bool = false)
     return RegimeAdjustedExpWeightedVariance(decay, min_obs, hac_lags, regime_method,
                                              regime_decay, regime_min_obs, regime_lohi_mult,
-                                             min_val)
+                                             min_val, centred)
 end
 @concrete struct RegimeAdjustedVarianceCache <: AbstractResult
     variance
-    active
+    location
     obs_count
+    active
     kappa
     e_abs_z
     regime_state
@@ -88,19 +93,36 @@ function process_observation!(cache::RegimeAdjustedVarianceCache,
                               active_mask::Option{<:AbstractVector{<:Bool}})
     finite_mask = isfinite(X)
     valid = isnothing(active_mask) ? finite_mask : (finite_mask .& active_mask)
-    old_obs_count = copy(cache.obs_count)
 
     if !isnothing(active_mask)
         newly_inactive = .!active_mask .& cache.active
         if any(newly_inactive)
             cache.variance[newly_inactive] .= zero(eltype(cache.variance))
             cache.obs_count[newly_inactive] .= 0
-            # more stuff
+            if !ce.centred
+                cache.location[newly_inactive] .= NaN
+            end
         end
         cache.active .= active_mask
     else
         cache.active .= true
     end
+
+    if !any(valid)
+        return nothing
+    end
+
+    old_obs_count = copy(cache.obs_count)
+
+    Xi = if ce.centred
+        X
+    else
+        loc = replace(cache.location, NaN => 0.0)
+        cache.location[valid] = ce.decay * view(loc, valid) +
+                                (1 - ce.decay) * view(X, valid)
+        X .- loc
+    end
+
     return nothing
 end
 function Statistics.var(ce::RegimeAdjustedExpWeightedVariance, X::MatNum; dims::Int = 1,
@@ -119,7 +141,9 @@ function Statistics.var(ce::RegimeAdjustedExpWeightedVariance, X::MatNum; dims::
         @argcheck(size(X) == size(active_mask))
     end
     N = size(X, setdiff((1, 2), (dims,))[1])
-    cache = RegimeAdjustedVarianceCache(zeros(eltype(X), N), trues(N), zeros(eltype(X), N),
+    cache = RegimeAdjustedVarianceCache(zeros(eltype(X), N),
+                                        ce.centred ? zeros(eltype(X), N) : fill(NaN, N),
+                                        zeros(eltype(X), N), trues(N),
                                         SpecialFunctions.digamma(0.5) + log(2),
                                         sqrt(2 * inv(pi)), nothing, 0)
     for (i, Xi) in enumerate(itr(X))
