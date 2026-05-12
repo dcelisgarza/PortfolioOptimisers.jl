@@ -1014,28 +1014,6 @@ Alias for a union of numeric, vector of numeric, matrix of numeric, string-numbe
 const EstValType = Union{<:Num_VecNum, <:MatNum, <:PairStrNum, <:MultiEstValType,
                          <:AbstractEstimatorValueAlgorithm}
 """
-    const VecEstValType = AbstractVector{<:EstValType}
-
-Alias for an abstract vector of [`EstValType`](@ref).
-
-# Related
-
-  - [`EstValType`](@ref)
-"""
-const VecEstValType = AbstractVector{<:EstValType}
-"""
-    const EstValType_VecEstValType = Union{<:EstValType, <:VecEstValType}
-
-Alias for a union of [`EstValType`](@ref) or [`VecEstValType`](@ref).
-
-# Related
-
-  - [`EstValType`](@ref)
-  - [`VecEstValType`](@ref)
-"""
-const EstValType_VecEstValType = Union{<:EstValType, <:VecEstValType}
-
-"""
     const Str_Expr = Union{<:AbstractString, Expr}
 
 Alias for a union of abstract string or Julia expression.
