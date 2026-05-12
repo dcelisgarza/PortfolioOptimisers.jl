@@ -587,14 +587,6 @@ function estimator_to_val(::UniformValues, sets::AssetSets, ::Any = nothing,
     return range(; start = iN, stop = iN, length = N)
 end
 """
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Calls [`estimator_to_val`](@ref) on each element of `val`.
-"""
-function estimator_to_val(val::VecEstValType, args...; kwargs...)
-    return [estimator_to_val(v, args...; kwargs...) for v in val]
-end
-"""
     _eval_numeric_functions(expr)
 
 Recursively evaluate numeric functions and constants in a Julia expression.
