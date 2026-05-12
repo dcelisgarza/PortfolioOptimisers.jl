@@ -71,6 +71,27 @@ function factory(ce::WindowedVariance, w::ObsWeights)
     return WindowedVariance(; ce = factory(ce.ce, w), w = w, window = ce.window)
 end
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Gets the view of the covariance estimator for the `i`-th element(s).
+
+# Arguments
+
+  - $(arg_dict[:ce])
+  - `i`: Index or indices to view.
+
+# Returns
+
+  - $(ret_dict[:cev])
+
+# Related
+
+  - [`WindowedVariance`](@ref)
+"""
+function moment_view(ce::WindowedVariance, i)
+    return WindowedVariance(; ce = moment_view(ce.ce, i), w = ce.w, window = ce.window)
+end
+"""
     Statistics.var(ce::WindowedVariance, X::MatNum; dims::Int = 1, mean = nothing, iv::Option{<:MatNum} = nothing,
                    kwargs...)
 

@@ -12,7 +12,12 @@ AbstractExpectedReturnsAlgorithm
 AbstractMomentAlgorithm
 AbstractCovarianceEstimator
 AbstractVarianceEstimator
+moment_view(ce::StatsBase.Covariance, args...)
 factory(ce::StatsBase.CovarianceEstimator, args...)
+moment_view(me::AbstractExpectedReturnsEstimator, args...)
+factory(me::AbstractExpectedReturnsEstimator, args...; kwargs...)
+me_alg_view(alg::AbstractExpectedReturnsAlgorithm, args...)
+factory(alg::AbstractExpectedReturnsAlgorithm, args...; kwargs...)
 robust_cov
 robust_cor
 moment_window_and_weights

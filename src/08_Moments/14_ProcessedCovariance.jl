@@ -63,6 +63,27 @@ function factory(ce::ProcessedCovariance, w::ObsWeights)
     return ProcessedCovariance(; ce = factory(ce.ce, w), alg = ce.alg, pdm = ce.pdm)
 end
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Gets the view of the covariance estimator for the `i`-th element(s).
+
+# Arguments
+
+  - $(arg_dict[:ce])
+  - `i`: Index or indices to view.
+
+# Returns
+
+  - $(ret_dict[:cev])
+
+# Related
+
+  - [`ProcessedCovariance`](@ref)
+"""
+function moment_view(ce::ProcessedCovariance, i)
+    return ProcessedCovariance(; ce = moment_view(ce.ce, i), alg = ce.alg, pdm = ce.pdm)
+end
+"""
     Statistics.cov(ce::ProcessedCovariance, X::MatNum; dims = 1, kwargs...)
 
 Compute the processed and positive definite projected covariance matrix for the data matrix `X` using the specified `ProcessedCovariance` estimator.

@@ -156,6 +156,27 @@ function factory(ce::ImpliedVolatility, w::ObsWeights)
     return ImpliedVolatility(; ce = factory(ce.ce, w), mp = ce.mp)
 end
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Gets the view of the covariance estimator for the `i`-th element(s).
+
+# Arguments
+
+  - $(arg_dict[:ce])
+  - `i`: Index or indices to view.
+
+# Returns
+
+  - $(ret_dict[:cev])
+
+# Related
+
+  - [`ImpliedVolatility`](@ref)
+"""
+function moment_view(ce::ImpliedVolatility, i)
+    return ImpliedVolatility(; ce = moment_view(ce.ce, i), mp = ce.mp)
+end
+"""
     realised_vol(ce::AbstractVarianceEstimator, X::MatNum, ws::Integer,
                  chunk::Option{<:Integer} = nothing, T::Option{<:Integer} = nothing,
                  N::Option{<:Integer} = nothing)

@@ -71,6 +71,28 @@ function factory(ske::WindowedCoskewness, w::ObsWeights)
     return WindowedCoskewness(; ske = factory(ske.ske, w), w = w, window = ske.window)
 end
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Gets the view of the coskewness estimator for the `i`-th element(s).
+
+# Arguments
+
+  - $(arg_dict[:ske])
+  - `i`: Index or indices to view.
+
+# Returns
+
+  - $(ret_dict[:skev])
+
+# Related
+
+  - [`WindowedCoskewness`](@ref)
+"""
+function moment_view(ske::WindowedCoskewness, i)
+    return WindowedCoskewness(; ske = moment_view(ske.ske, i), w = ske.w,
+                              window = ske.window)
+end
+"""
     coskewness(ske::WindowedCoskewness, X::MatNum; dims::Int = 1, iv::Option{<:MatNum} = nothing, kwargs...)
 
 Compute the coskewness tensor and processed matrix using a rolling or indexed observation window.

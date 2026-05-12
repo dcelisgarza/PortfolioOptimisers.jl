@@ -84,6 +84,27 @@ function factory(ce::DetoneCovariance, w::ObsWeights)
     return DetoneCovariance(; ce = factory(ce.ce, w), dt = ce.dt, pdm = ce.pdm)
 end
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Gets the view of the covariance estimator for the `i`-th element(s).
+
+# Arguments
+
+  - $(arg_dict[:ce])
+  - `i`: Index or indices to view.
+
+# Returns
+
+  - $(ret_dict[:cev])
+
+# Related
+
+  - [`DetoneCovariance`](@ref)
+"""
+function moment_view(ce::DetoneCovariance, i)
+    return DetoneCovariance(; ce = moment_view(ce.ce, i), dt = ce.dt, pdm = ce.pdm)
+end
+"""
     Statistics.cov(ce::DetoneCovariance, X::MatNum; dims = 1, kwargs...)
 
 Compute the detoned and positive definite projected covariance matrix for the data matrix `X` using the specified `DetoneCovariance` estimator.

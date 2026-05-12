@@ -82,6 +82,7 @@ function factory(pe::EmpiricalPrior, w::ObsWeights)
     return EmpiricalPrior(; me = factory(pe.me, w), ce = factory(pe.ce, w),
                           horizon = pe.horizon)
 end
+#! define prior_view for all priors.
 """
     prior(pe::EmpiricalPrior{<:Any, <:Any, Nothing}, X::MatNum, args...; dims::Int = 1,
           kwargs...)

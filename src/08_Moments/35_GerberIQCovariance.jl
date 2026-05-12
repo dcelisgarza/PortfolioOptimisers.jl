@@ -1425,6 +1425,29 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
+Gets the view of the covariance estimator for the `i`-th element(s).
+
+# Arguments
+
+  - $(arg_dict[:ce])
+  - `i`: Index or indices to view.
+
+# Returns
+
+  - $(ret_dict[:cev])
+
+# Related
+
+  - [`GerberIQCovariance`](@ref)
+"""
+function moment_view(ce::GerberIQCovariance, i)
+    return GerberIQCovariance(; ve = moment_view(ce.ve, i), me = moment_view(ce.me, i),
+                              pdm = ce.pdm, c = ce.c, decay = ce.decay, sc = ce.sc,
+                              kind = ce.kind, alg = ce.alg, ex = ce.ex)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
 Computes the Gerber IQ statistic for a single co-movement.
 
 # Arguments

@@ -69,6 +69,27 @@ function factory(ce::CorrelationCovariance, w::ObsWeights)
     return CorrelationCovariance(; ce = factory(ce.ce, w))
 end
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Gets the view of the covariance estimator for the `i`-th element(s).
+
+# Arguments
+
+  - $(arg_dict[:ce])
+  - `i`: Index or indices to view.
+
+# Returns
+
+  - $(ret_dict[:cev])
+
+# Related
+
+  - [`CorrelationCovariance`](@ref)
+"""
+function moment_view(ce::CorrelationCovariance, i)
+    return CorrelationCovariance(; ce = moment_view(ce.ce, i))
+end
+"""
     Statistics.cov(ce::CorrelationCovariance, X::MatNum; dims::Int = 1,
                    kwargs...)
 

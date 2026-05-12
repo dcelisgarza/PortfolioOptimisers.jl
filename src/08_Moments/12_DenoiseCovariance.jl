@@ -90,6 +90,27 @@ function factory(ce::DenoiseCovariance, w::ObsWeights)
     return DenoiseCovariance(; ce = factory(ce.ce, w), dn = ce.dn, pdm = ce.pdm)
 end
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Gets the view of the covariance estimator for the `i`-th element(s).
+
+# Arguments
+
+  - $(arg_dict[:ce])
+  - `i`: Index or indices to view.
+
+# Returns
+
+  - $(ret_dict[:cev])
+
+# Related
+
+  - [`DenoiseCovariance`](@ref)
+"""
+function moment_view(ce::DenoiseCovariance, i)
+    return DenoiseCovariance(; ce = moment_view(ce.ce, i), dn = ce.dn, pdm = ce.pdm)
+end
+"""
     Statistics.cov(ce::DenoiseCovariance, X::MatNum; dims = 1, kwargs...)
 
 Compute the denoised and positive definite projected covariance matrix for the data matrix `X` using the specified `DenoiseCovariance` estimator.

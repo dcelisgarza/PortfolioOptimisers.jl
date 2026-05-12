@@ -82,6 +82,27 @@ function factory(ce::PortfolioOptimisersCovariance, w::ObsWeights)
     return PortfolioOptimisersCovariance(; ce = factory(ce.ce, w), mp = ce.mp)
 end
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Gets the view of the covariance estimator for the `i`-th element(s).
+
+# Arguments
+
+  - $(arg_dict[:ce])
+  - `i`: Index or indices to view.
+
+# Returns
+
+  - $(ret_dict[:cev])
+
+# Related
+
+  - [`PortfolioOptimisersCovariance`](@ref)
+"""
+function moment_view(ce::PortfolioOptimisersCovariance, i)
+    return PortfolioOptimisersCovariance(; ce = moment_view(ce.ce, i), mp = ce.mp)
+end
+"""
     Statistics.cov(ce::PortfolioOptimisersCovariance, X::MatNum; dims = 1, kwargs...)
 
 Compute the covariance matrix with post-processing using a [`PortfolioOptimisersCovariance`](@ref) estimator.

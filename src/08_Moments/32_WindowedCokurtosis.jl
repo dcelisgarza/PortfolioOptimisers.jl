@@ -71,6 +71,28 @@ function factory(ke::WindowedCokurtosis, w::ObsWeights)
     return WindowedCokurtosis(; ke = factory(ke.ke, w), w = w, window = ke.window)
 end
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Gets the view of the coskewness estimator for the `i`-th element(s).
+
+# Arguments
+
+  - $(arg_dict[:kte])
+  - `i`: Index or indices to view.
+
+# Returns
+
+  - $(ret_dict[:ktev])
+
+# Related
+
+  - [`WindowedCokurtosis`](@ref)
+"""
+function moment_view(kte::WindowedCokurtosis, i)
+    return WindowedCokurtosis(; kte = moment_view(kte.kte, i), w = kte.w,
+                              window = kte.window)
+end
+"""
     cokurtosis(ke::WindowedCokurtosis, X::MatNum; dims::Int = 1, iv::Option{<:MatNum} = nothing, kwargs...)
 
 Compute the cokurtosis tensor using a rolling or indexed observation window.

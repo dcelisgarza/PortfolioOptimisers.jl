@@ -252,6 +252,10 @@ function factory(re::DimensionReductionRegression, w::ObsWeights)
                                         drtgt = factory(re.drtgt, w),
                                         retgt = factory(re.retgt, w))
 end
+function regression_view(re::DimensionReductionRegression, i)
+    return DimensionReductionRegression(; ve = moment_view(re.ve, i), drtgt = re.drtgt,
+                                        retgt = re.retgt)
+end
 """
     prep_dim_red_reg(drtgt::DimensionReductionTarget, X::MatNum)
 

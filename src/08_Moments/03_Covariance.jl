@@ -193,6 +193,27 @@ function factory(ce::GeneralCovariance, w::ObsWeights)
     return GeneralCovariance(; ce = factory(ce.ce, w), w = w)
 end
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Gets the view of the covariance estimator for the `i`-th element(s).
+
+# Arguments
+
+  - $(arg_dict[:ce])
+  - `i`: Index or indices to view.
+
+# Returns
+
+  - $(ret_dict[:cev])
+
+# Related
+
+  - [`GeneralCovariance`](@ref)
+"""
+function moment_view(ce::GeneralCovariance, i)
+    return GeneralCovariance(; ce = moment_view(ce.ce, i), w = ce.w)
+end
+"""
 $(DocStringExtensions.TYPEDEF)
 
 A flexible container type for covariance estimation in `PortfolioOptimisers.jl`.
@@ -304,6 +325,28 @@ Covariance
 """
 function factory(ce::Covariance, w::ObsWeights)
     return Covariance(; me = factory(ce.me, w), ce = factory(ce.ce, w), alg = ce.alg)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Gets the view of the covariance estimator for the `i`-th element(s).
+
+# Arguments
+
+  - $(arg_dict[:ce])
+  - `i`: Index or indices to view.
+
+# Returns
+
+  - $(ret_dict[:cev])
+
+# Related
+
+  - [`Covariance`](@ref)
+"""
+function moment_view(ce::Covariance, i)
+    return Covariance(; me = moment_view(ce.me, i), ce = moment_view(ce.ce, i),
+                      alg = ce.alg)
 end
 """
     Statistics.cov(

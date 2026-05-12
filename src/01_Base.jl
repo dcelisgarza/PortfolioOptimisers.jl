@@ -302,10 +302,15 @@ ret_dict = Dict(:mu => "`mu::ArrNum`: Expected returns vector `features x 1` if 
                 :rho => "`rho::MatNum`: Correlation matrix `features x features`.",#
                 :sigrho => "`sigrho::MatNum`: Covariance/correlation matrix `features x features`.",#
                 :sk => "`sk::MatNum`: Coskewness matrix `features x features`.",#
-                :kt => "`kt::MatNum`: Cokurtosis matrix `features x features`.",#
+                :kte => "`kte::MatNum`: Cokurtosis matrix `features x features`.",#
                 :me => "`me`: New expected returns estimator of the same type as the argument, with the appropriate weights applied.",#
+                :mev => "`mev`: New expected returns estimator of the same type as the argument, for the new view.",#
                 :ce => "`ce`: New covariance estimator of the same type as the argument, with the new weights applied.",#
-                :ve => "`ve`: New variance estimator of the same type as the argument, with the new weights applied.",
+                :cev => "`ce`: New covariance estimator of the same type as the argument, for the new view.",#
+                :ve => "`ve`: New variance estimator of the same type as the argument, with the new weights applied.",#
+                :vev => "`ve`: New variance estimator of the same type as the argument, for the new view.",#
+                :skev => "`skev`: New coskewness estimator of the same type as the argument, for the new view.",#
+                :ktev => "`kev`: New cokurtosis estimator of the same type as the argument, for the new view.",#
                 :stdvar => "`res::ArrNum`: Variance or standard deviation vector of `X`, reshaped to be consistent with the dimension along which the value is computed.",#
                 :stdvarnum => "`res::Number`: Variance or standard deviation `X`",#
                 :stdarr => "`sd::ArrNum`: Standard deviation vector of `X`, reshaped to be consistent with the dimension along which the value is computed.",
@@ -994,10 +999,10 @@ julia> estimator_to_val(MyIncreasingValue(), sets)
 """
 abstract type AbstractEstimatorValueAlgorithm <: AbstractAlgorithm end
 """
-    const EstValType = Union{<:Num_VecNum, <:PairStrNum, <:MultiEstValType,
+    const EstValType = Union{<:Num_VecNum, <:MatNum, <:PairStrNum, <:MultiEstValType,
                              <:AbstractEstimatorValueAlgorithm}
 
-Alias for a union of numeric, vector of numeric, string-number pair, or multi-estimator value types.
+Alias for a union of numeric, vector of numeric, matrix of numeric, string-number pair, or multi-estimator value types.
 
 # Related
 
@@ -1006,8 +1011,30 @@ Alias for a union of numeric, vector of numeric, string-number pair, or multi-es
   - [`MultiEstValType`](@ref)
   - [`AbstractEstimatorValueAlgorithm`](@ref)
 """
-const EstValType = Union{<:Num_VecNum, <:PairStrNum, <:MultiEstValType,
+const EstValType = Union{<:Num_VecNum, <:MatNum, <:PairStrNum, <:MultiEstValType,
                          <:AbstractEstimatorValueAlgorithm}
+"""
+    const VecEstValType = AbstractVector{<:EstValType}
+
+Alias for an abstract vector of [`EstValType`](@ref).
+
+# Related
+
+  - [`EstValType`](@ref)
+"""
+const VecEstValType = AbstractVector{<:EstValType}
+"""
+    const EstValType_VecEstValType = Union{<:EstValType, <:VecEstValType}
+
+Alias for a union of [`EstValType`](@ref) or [`VecEstValType`](@ref).
+
+# Related
+
+  - [`EstValType`](@ref)
+  - [`VecEstValType`](@ref)
+"""
+const EstValType_VecEstValType = Union{<:EstValType, <:VecEstValType}
+
 """
     const Str_Expr = Union{<:AbstractString, Expr}
 

@@ -85,6 +85,28 @@ function factory(ce::MutualInfoCovariance, w::ObsWeights)
                                 normalise = ce.normalise)
 end
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Gets the view of the covariance estimator for the `i`-th element(s).
+
+# Arguments
+
+  - $(arg_dict[:ce])
+  - `i`: Index or indices to view.
+
+# Returns
+
+  - $(ret_dict[:cev])
+
+# Related
+
+  - [`MutualInfoCovariance`](@ref)
+"""
+function moment_view(ce::MutualInfoCovariance, i)
+    return MutualInfoCovariance(; ve = moment_view(ce.ve, i), bins = ce.bins,
+                                normalise = ce.normalise)
+end
+"""
     Statistics.cor(ce::MutualInfoCovariance, X::MatNum; dims::Int = 1, kwargs...)
 
 Compute the mutual information (MI) correlation matrix using a [`MutualInfoCovariance`](@ref) estimator.

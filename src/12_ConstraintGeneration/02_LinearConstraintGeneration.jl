@@ -522,6 +522,43 @@ function estimator_to_val(val::VecNum, sets::AssetSets, ::Any = nothing,
     return val
 end
 """
+    estimator_to_val(val::MatNum, sets::AssetSets, ::Any = nothing,
+                     key::Option{<:AbstractString} = nothing; dims::Int = 2, kwargs...)
+
+Return a numeric matrix for asset/group estimators, validating length against asset universe.
+
+This method checks that size of `dims` of the input matrix `val` matches the length of the asset universe in `sets`, and returns it unchanged if valid. It is used as a fast path for workflows where the value vector is already constructed and requires only defensive validation.
+
+# Arguments
+
+  - `val`: Numeric matrix to be mapped to assets/groups.
+  - `sets`: [`AssetSets`](@ref) containing the asset universe and group definitions.
+  - `::Any`: Fill value for API consistency (ignored).
+  - `key`: (Optional) Key in the [`AssetSets`](@ref) to specify the asset universe for constraint generation. When provided, takes precedence over `key` field of [`AssetSets`](@ref).
+  - `dims`: Dimension along which to validate the matrix size.
+  - `kwargs...`: Additional keyword arguments (ignored).
+
+# Returns
+
+  - `val::VecNum`: The input vector, unchanged.
+
+# Validation
+
+  - `size(val, dims) == length(sets.dict[ifelse(isnothing(key), sets.key, key)]`.
+
+# Related
+
+  - [`estimator_to_val`](@ref)
+  - [`AssetSets`](@ref)
+  - [`group_to_val!`](@ref)
+"""
+function estimator_to_val(val::MatNum, sets::AssetSets, ::Any = nothing,
+                          key::Option{<:AbstractString} = nothing; dims::Int = 2, kwargs...)
+    @argcheck(size(val, dims) == length(sets.dict[ifelse(isnothing(key), sets.key, key)]),
+              DimensionMismatch)
+    return val
+end
+"""
 $(DocStringExtensions.TYPEDEF)
 
 Custom weight bounds constraint for uniformly distributing asset weights, `1/N` for lower bounds and `1` for upper bounds, where `N` is the number of assets.
@@ -548,6 +585,14 @@ function estimator_to_val(::UniformValues, sets::AssetSets, ::Any = nothing,
     N = length(sets.dict[ifelse(isnothing(key), sets.key, key)])
     iN = datatype(inv(N))
     return range(; start = iN, stop = iN, length = N)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Calls [`estimator_to_val`](@ref) on each element of `val`.
+"""
+function estimator_to_val(val::VecEstValType, args...; kwargs...)
+    return [estimator_to_val(v, args...; kwargs...) for v in val]
 end
 """
     _eval_numeric_functions(expr)
@@ -934,11 +979,12 @@ ParsingResult
     op ┼ String: "<="
    rhs ┼ Float64: 1.0
    eqn ┴ SubString{String}: "w_A + 2.0*w_B <= 1.0"
-```
+```    # 1. Identify the comparison operator
 
 # Related
 
   - [`ParsingResult`](@ref)
+```
 """
 function parse_equation(eqn::AbstractString; ops1::Tuple = ("==", "<=", ">="),
                         datatype::DataType = Float64, kwargs...)

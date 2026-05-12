@@ -87,6 +87,28 @@ function factory(ce::LowerTailDependenceCovariance, w::ObsWeights)
                                          ex = ce.ex)
 end
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Gets the view of the covariance estimator for the `i`-th element(s).
+
+# Arguments
+
+  - $(arg_dict[:ce])
+  - `i`: Index or indices to view.
+
+# Returns
+
+  - $(ret_dict[:cev])
+
+# Related
+
+  - [`LowerTailDependenceCovariance`](@ref)
+"""
+function moment_view(ce::LowerTailDependenceCovariance, i)
+    return LowerTailDependenceCovariance(; ve = moment_view(ce.ve, i), alpha = ce.alpha,
+                                         ex = ce.ex)
+end
+"""
     lower_tail_dependence(X::MatNum; alpha::Number = 0.05,
                           ex::FLoops.Transducers.Executor = SequentialEx())
 

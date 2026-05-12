@@ -279,6 +279,29 @@ function factory(ce::SmythBrobyCovariance, w::ObsWeights)
                                 alg = factory(ce.alg, w), ex = ce.ex)
 end
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Gets the view of the covariance estimator for the `i`-th element(s).
+
+# Arguments
+
+  - $(arg_dict[:ce])
+  - `i`: Index or indices to view.
+
+# Returns
+
+  - $(ret_dict[:cev])
+
+# Related
+
+  - [`SmythBrobyCovariance`](@ref)
+"""
+function moment_view(ce::SmythBrobyCovariance, i)
+    return SmythBrobyCovariance(; ve = moment_view(ce.ve, i), me = moment_view(ce.me, i),
+                                pdm = ce.pdm, c1 = ce.c1, c2 = ce.c2, c3 = ce.c3, n = ce.n,
+                                alg = ce.alg, ex = ce.ex)
+end
+"""
     sb_delta(ri::Number, rj::Number, n::Number) -> Number
 
 Smyth-Broby kernel function for covariance and correlation computation.

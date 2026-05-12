@@ -226,6 +226,28 @@ function factory(ce::GerberCovariance, w::ObsWeights)
                             t = ce.t, alg = factory(ce.alg, w))
 end
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Gets the view of the covariance estimator for the `i`-th element(s).
+
+# Arguments
+
+  - $(arg_dict[:ce])
+  - `i`: Index or indices to view.
+
+# Returns
+
+  - $(ret_dict[:cev])
+
+# Related
+
+  - [`GerberCovariance`](@ref)
+"""
+function moment_view(ce::GerberCovariance, i)
+    return GerberCovariance(; ve = moment_view(ce.ve, i), me = moment_view(ce.me, i),
+                            pdm = ce.pdm, t = ce.t, alg = ce.alg)
+end
+"""
     gerber(
         ce::GerberCovariance{<:Any, <:Any, <:Any, <:Any, <:Gerber0},
         X::MatNum,

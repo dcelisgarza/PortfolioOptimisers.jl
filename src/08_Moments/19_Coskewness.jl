@@ -97,6 +97,27 @@ function factory(ske::Coskewness, w::ObsWeights)
     return Coskewness(; me = factory(ske.me, w), mp = ske.mp, alg = ske.alg)
 end
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Gets the view of the coskewness estimator for the `i`-th element(s).
+
+# Arguments
+
+  - $(arg_dict[:ske])
+  - `i`: Index or indices to view.
+
+# Returns
+
+  - $(ret_dict[:skev])
+
+# Related
+
+  - [`Coskewness`](@ref)
+"""
+function moment_view(ske::Coskewness, i)
+    return Coskewness(; me = moment_view(ske.me, i), mp = ske.mp, alg = ske.alg)
+end
+"""
     negative_spectral_coskewness(cskew::MatNum, X::MatNum,
                  mp::AbstractMatrixProcessingEstimator)
 

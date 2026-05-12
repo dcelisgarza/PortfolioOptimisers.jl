@@ -72,6 +72,28 @@ function factory(me::WindowedExpectedReturns, w::ObsWeights)
     return WindowedExpectedReturns(; me = factory(me.me, w), w = w, window = me.window)
 end
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Gets the view of the expected returns estimator for the `i`-th element(s).
+
+# Arguments
+
+  - $(arg_dict[:me])
+  - `i`: Index or indices to view.
+
+# Returns
+
+  - $(ret_dict[:mev])
+
+# Related
+
+  - [`WindowedExpectedReturns`](@ref)
+"""
+function moment_view(me::WindowedExpectedReturns, i)
+    return WindowedExpectedReturns(; me = moment_view(me.me, i), w = me.w,
+                                   window = me.window)
+end
+"""
     Statistics.mean(me::WindowedExpectedReturns, X::MatNum; dims::Int = 1, iv::Option{<:MatNum} = nothing, kwargs...)
 
 Compute expected returns using a rolling or indexed observation window.
