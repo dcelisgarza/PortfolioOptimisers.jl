@@ -177,7 +177,7 @@ function factory(pe::BayesianBlackLittermanPrior, w::ObsWeights)
 end
 function prior_view(pr::BayesianBlackLittermanPrior, i)
     return BayesianBlackLittermanPrior(; pe = prior_view(pr.pe, i), mp = pr.mp,
-                                       views = pr.views, sets = asset_sets_view(pr.sets, i),
+                                       views = pr.views, sets = pr.sets,
                                        views_conf = pr.views_conf, rf = pr.rf, tau = pr.tau)
 end
 function Base.getproperty(obj::BayesianBlackLittermanPrior, sym::Symbol)
@@ -245,10 +245,11 @@ function prior(pe::BayesianBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int 
     posterior_X, prior_sigma, f_mu, f_sigma, rr = prior_result.X, prior_result.sigma,
                                                   prior_result.f_mu, prior_result.f_sigma,
                                                   prior_result.rr
-    (; P, Q) = black_litterman_views(pe.views, pe.sets; datatype = eltype(posterior_X),
-                                     strict = strict)
+    (; P, Q, excl) = black_litterman_views(pe.views, pe.sets;
+                                           datatype = eltype(posterior_X), strict = strict)
     tau = isnothing(pe.tau) ? inv(size(F, 1)) : pe.tau
-    f_omega = tau * calc_omega(pe.views_conf, P, f_sigma)
+    views_conf = remove_excl_views(pe.views_conf, excl)
+    f_omega = tau * calc_omega(views_conf, P, f_sigma)
     (; b, M) = rr
     sigma_hat = f_sigma \ LinearAlgebra.I + transpose(P) * (f_omega \ P)
     mu_hat = sigma_hat \ (f_sigma \ f_mu + transpose(P) * (f_omega \ Q))

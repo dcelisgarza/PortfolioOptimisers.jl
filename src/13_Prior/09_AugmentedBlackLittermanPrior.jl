@@ -326,14 +326,16 @@ function prior(pe::AugmentedBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int
     rr = regression(pe.re, X, F)
     (; b, M) = rr
     posterior_X = F * transpose(M) .+ transpose(b)
-    (; P, Q) = black_litterman_views(pe.a_views, pe.a_sets; datatype = eltype(posterior_X),
-                                     strict = strict)
+    (; P, Q, excl) = black_litterman_views(pe.a_views, pe.a_sets;
+                                           datatype = eltype(posterior_X), strict = strict)
     f_views = black_litterman_views(pe.f_views, pe.f_sets; datatype = eltype(posterior_X),
                                     strict = strict)
-    f_P, f_Q = f_views.P, f_views.Q
+    f_P, f_Q, f_excl = f_views.P, f_views.Q, f_views.excl
     tau = isnothing(pe.tau) ? inv(size(X, 1)) : pe.tau
-    a_omega = tau * calc_omega(pe.a_views_conf, P, a_prior_sigma)
-    f_omega = tau * calc_omega(pe.f_views_conf, f_P, f_prior_sigma)
+    a_views_conf = remove_excl_views(pe.a_views_conf, excl)
+    f_views_conf = remove_excl_views(pe.f_views_conf, f_excl)
+    a_omega = tau * calc_omega(a_views_conf, P, a_prior_sigma)
+    f_omega = tau * calc_omega(f_views_conf, f_P, f_prior_sigma)
     aug_prior_sigma = hcat(vcat(a_prior_sigma, f_prior_sigma * transpose(M)),
                            vcat(M * f_prior_sigma, f_prior_sigma))
     aug_P = hcat(vcat(P, zeros(size(f_P, 1), size(P, 2))),

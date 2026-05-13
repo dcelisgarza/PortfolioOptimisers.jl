@@ -240,6 +240,15 @@ function vanilla_posteriors(tau::Number, rf::Number, prior_mu::VecNum, prior_sig
     posterior_sigma = prior_sigma + tau * prior_sigma - v1 * (v2 \ transpose(v1))
     return posterior_mu, posterior_sigma
 end
+function remove_excl_views(views_conf::Option{<:Number}, args...)
+    return views_conf
+end
+function remove_excl_views(views_conf::VecNum, ::Nothing)
+    return views_conf
+end
+function remove_excl_views(views_conf::VecNum, excl::VecInt)
+    return nothing_scalar_array_view(views_conf, setdiff(1:length(views_conf), excl))
+end
 """
     prior(pe::BlackLittermanPrior, X::MatNum;
           F::Option{<:MatNum} = nothing, dims::Int = 1, strict::Bool = false,
@@ -297,10 +306,11 @@ function prior(pe::BlackLittermanPrior, X::MatNum, F::Option{<:MatNum} = nothing
     @argcheck(length(pe.sets.dict[pe.sets.key]) == size(X, 2))
     prior_model = prior(pe.pe, X, F; strict = strict, kwargs...)
     posterior_X, prior_mu, prior_sigma = prior_model.X, prior_model.mu, prior_model.sigma
-    (; P, Q) = black_litterman_views(pe.views, pe.sets; datatype = eltype(posterior_X),
-                                     strict = strict)
+    (; P, Q, excl) = black_litterman_views(pe.views, pe.sets;
+                                           datatype = eltype(posterior_X), strict = strict)
     tau = isnothing(pe.tau) ? inv(size(X, 1)) : pe.tau
-    omega = tau * calc_omega(pe.views_conf, P, prior_sigma)
+    views_conf = remove_excl_views(pe.views_conf, excl)
+    omega = tau * calc_omega(views_conf, P, prior_sigma)
     posterior_mu, posterior_sigma = vanilla_posteriors(tau, pe.rf, prior_mu, prior_sigma,
                                                        omega, P, Q)
     matrix_processing!(pe.mp, posterior_sigma, posterior_X; kwargs...)

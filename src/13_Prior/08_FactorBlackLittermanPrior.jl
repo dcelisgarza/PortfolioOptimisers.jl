@@ -266,10 +266,11 @@ function prior(pe::FactorBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int = 
     rr = regression(pe.re, X, F)
     (; b, M) = rr
     posterior_X = F * transpose(M) .+ transpose(b)
-    (; P, Q) = black_litterman_views(pe.views, pe.sets; datatype = eltype(posterior_X),
-                                     strict = strict)
+    (; P, Q, excl) = black_litterman_views(pe.views, pe.sets;
+                                           datatype = eltype(posterior_X), strict = strict)
     tau = isnothing(pe.tau) ? inv(size(X, 1)) : pe.tau
-    omega = tau * calc_omega(pe.views_conf, P, prior_sigma)
+    views_conf = remove_excl_views(pe.views_conf, excl)
+    omega = tau * calc_omega(views_conf, P, prior_sigma)
     prior_mu = if !isnothing(pe.l)
         w = if !isnothing(pe.w)
             @argcheck(length(pe.w) == size(X, 2))

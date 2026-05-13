@@ -565,7 +565,8 @@ function _optimise(nco::NestedClustered, rd::ReturnsResult; dims::Int = 1,
     wi = zeros(eltype(X), size(X, 2), clr.k)
     opti = nco.opti
     resi = Vector{NonFiniteAllocationOptimisationResult}(undef, clr.k)
-    FLoops.@floop nco.ex for (i, cl) in pairs(cls)
+    # FLoops.@floop nco.ex
+    for (i, cl) in pairs(cls)
         optic = opt_view(opti, cl, X)
         rdc = returns_result_view(rd, cl)
         res = optimise(optic, rdc; dims = dims, branchorder = branchorder,
