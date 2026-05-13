@@ -175,6 +175,14 @@ function factory(pe::BayesianBlackLittermanPrior, w::ObsWeights)
                                        views = pe.views, sets = pe.sets,
                                        views_conf = pe.views_conf, rf = pe.rf, tau = pe.tau)
 end
+function prior_view(pr::BayesianBlackLittermanPrior, i)
+    return BayesianBlackLittermanPrior(; pe = prior_view(pr.pe, i), mp = pr.mp,
+                                       views = nothing_scalar_array_view(pr.views, i),
+                                       sets = asset_sets_view(pr.sets, i),
+                                       views_conf = nothing_scalar_array_view(pr.views_conf,
+                                                                              i),
+                                       rf = pr.rf, tau = pr.tau)
+end
 function Base.getproperty(obj::BayesianBlackLittermanPrior, sym::Symbol)
     return if sym == :me
         obj.pe.me

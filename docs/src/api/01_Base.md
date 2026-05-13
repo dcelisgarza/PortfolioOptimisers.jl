@@ -75,7 +75,6 @@ PairStrNum
 DictStrNum
 MultiEstValType
 EstValType
-EstValType_VecEstValType
 PairGSCV
 DictGSCV
 GSCVKey

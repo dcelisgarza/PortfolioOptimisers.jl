@@ -199,7 +199,7 @@ end
     nothing_scalar_array_view(
         x::Union{Nothing, <:Number, <:Pair, <:VecPair, <:Dict,
                  <:AbstractEstimatorValueAlgorithm,
-                 <:DynamicAbstractWeights},
+                 <:DynamicAbstractWeights, <:AbstractEstimator, <:AbstractAlgorithm},
         ::Any
     ) -> x
     nothing_scalar_array_view(x::AbstractVector, i) -> view(x, i)
@@ -221,7 +221,7 @@ Utility for safely viewing into possibly `nothing`, scalar, or array values.
 
   - `x`: Input value.
 
-      + `::Union{Nothing, <:Number, <:Pair, <:VecPair, <:Dict, <:AbstractEstimatorValueAlgorithm, <:DynamicAbstractWeights}`: Returns `x` unchanged.
+      + `::Union{Nothing, <:Number, <:Pair, <:VecPair, <:Dict, <:AbstractEstimatorValueAlgorithm, <:DynamicAbstractWeights, , <:AbstractEstimator, <:AbstractAlgorithm}`: Returns `x` unchanged.
       + `::AbstractVector`: Returns `view(x, i)`.
       + `::VecScalar`: Returns `VecScalar(; v = view(x.v, i), s = x.s)`.
       + `::AbstractMatrix`: Returns `view(x, i, i)`.
@@ -248,7 +248,8 @@ julia> PortfolioOptimisers.nothing_scalar_array_view([[1, 2], [3, 4]], 1)
 """
 function nothing_scalar_array_view(x::Union{Nothing, <:Number, <:Pair, <:VecPair, <:Dict,
                                             <:AbstractEstimatorValueAlgorithm,
-                                            <:DynamicAbstractWeights}, ::Any)
+                                            <:DynamicAbstractWeights, <:AbstractEstimator,
+                                            <:AbstractAlgorithm}, ::Any)
     return x
 end
 function nothing_scalar_array_view(x::AbstractVector, i)

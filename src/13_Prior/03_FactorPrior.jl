@@ -108,6 +108,10 @@ function factory(pe::FactorPrior, w::ObsWeights)
     return FactorPrior(; pe = factory(pe.pe, w), mp = pe.mp, re = factory(pe.re, w),
                        ve = factory(pe.ve, w), rsd = pe.rsd)
 end
+function prior_view(pe::FactorPrior, i)
+    return FactorPrior(; pe = pe.pe, mp = pe.mp, re = regression_view(pe.re, i),
+                       ve = moment_view(pe.ve, i), rsd = pe.rsd)
+end
 function Base.getproperty(obj::FactorPrior, sym::Symbol)
     return if sym == :me
         obj.pe.me
