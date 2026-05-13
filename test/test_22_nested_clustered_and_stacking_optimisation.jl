@@ -462,7 +462,8 @@
                                                         opti = RiskBudgeting(;
                                                                              rba = AssetRiskBudgeting(;
                                                                                                       sets = sets,
-                                                                                                      alg = LogRiskBudgeting(z = ones(Int,
+                                                                                                      alg = LogRiskBudgeting(;
+                                                                                                                             z = ones(Int,
                                                                                                                                       size(rd.X,
                                                                                                                                            2))),
                                                                                                       rkb = RiskBudgetEstimator(;
@@ -816,5 +817,40 @@
             find_tol(Matrix(df), reduce(hcat, res.w))
         end
         @test success
+    end
+    # @testset "Prior views" begin
+    pes = [EmpiricalPrior(), FactorPrior(),
+           FactorPrior(; re = DimensionReductionRegression()), HighOrderPriorEstimator(),
+           HighOrderFactorPriorEstimator(),
+           HighOrderFactorPriorEstimator(;
+                                         pe = FactorPrior(;
+                                                          re = DimensionReductionRegression())),
+           BlackLittermanPrior(; sets = sets, tau = 1 / size(rd.X, 1),
+                               views = LinearConstraintEstimator(;
+                                                                 val = ["AAPL == 0.00002",
+                                                                        "BAC == CVX",
+                                                                        "WMT == group2",
+                                                                        "RRC-group1 == 0.0005"])),
+           BayesianBlackLittermanPrior(; pe = FactorPrior(; pe = EmpiricalPrior(;)),
+                                       sets = fsets, tau = 1 / size(rd.X, 1),
+                                       views = LinearConstraintEstimator(;
+                                                                         val = ["MTUM == 0.0001",
+                                                                                "QUAL - USMV == -0.0003"])),
+           BlackLittermanPrior(; sets = sets, tau = 1 / size(rd.X, 1),
+                               views_conf = [0.05, 0.2, 0.5, 0.9],
+                               views = LinearConstraintEstimator(;
+                                                                 val = ["AAPL == 0.00002",
+                                                                        "BAC == CVX",
+                                                                        "WMT == group2",
+                                                                        "RRC-group1 == 0.0005"])),
+           BlackLittermanPrior(; sets = sets, tau = 1 / size(rd.X, 1), views_conf = 0.05,
+                               views = LinearConstraintEstimator(; val = "AAPL == 0.00002"))]
+    jopti = JuMPOptimiser(; pe = pr, slv = slv, sets = sets)
+    jopto = JuMPOptimiser(; slv = slv)
+    hopti = HierarchicalOptimiser(; pe = pr, slv = slv)
+    hopto = HierarchicalOptimiser(; slv = slv)
+    resi = optimise(MeanRisk(; opt = jopto), rd)
+    opts = NestedClustered(; cle = clr, opti = MeanRisk(; opt = jopti),
+                           opto = MeanRisk(; opt = jopto))
     end
 end

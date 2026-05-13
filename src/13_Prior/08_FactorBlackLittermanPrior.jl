@@ -190,8 +190,7 @@ function prior_view(pe::FactorBlackLittermanPrior, i)
     return FactorPrior(; pe = pe.pe, f_mp = pe.f_mp, mp = pe.mp,
                        re = regression_view(pe.re, i), ve = moment_view(pe.ve, i),
                        views = pe.views, sets = pe.sets, views_conf = pe.views_conf,
-                       w = nothing_scalar_array_view(pe.w, i), rf = pe.rf, l = pe.l,
-                       tau = pe.tau, rsd = pe.rsd)
+                       w = pe.w, rf = pe.rf, l = pe.l, tau = pe.tau, rsd = pe.rsd)
 end
 function Base.getproperty(obj::FactorBlackLittermanPrior, sym::Symbol)
     return if sym == :me

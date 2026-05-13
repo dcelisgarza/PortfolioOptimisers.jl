@@ -158,11 +158,9 @@ function factory(pe::BlackLittermanPrior, w::ObsWeights)
                                tau = pe.tau)
 end
 function prior_view(pr::BlackLittermanPrior, i)
-    return BlackLittermanPrior(; pe = prior_view(pr.pe, i), mp = pr.mp,
-                               views = nothing_scalar_array_view(pr.views, i),
+    return BlackLittermanPrior(; pe = prior_view(pr.pe, i), mp = pr.mp, views = pr.views,
                                sets = asset_sets_view(pr.sets, i),
-                               views_conf = nothing_scalar_array_view(pr.views_conf, i),
-                               rf = pr.rf, tau = pr.tau)
+                               views_conf = pr.views_conf, rf = pr.rf, tau = pr.tau)
 end
 """
     calc_omega(views_conf::Option{<:Num_VecNum}, P::MatNum,

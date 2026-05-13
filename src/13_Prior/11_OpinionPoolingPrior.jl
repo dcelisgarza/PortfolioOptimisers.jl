@@ -276,7 +276,7 @@ function OpinionPoolingPrior(; pes::VecEP,
 end
 function factory(pe::OpinionPoolingPrior, w::ObsWeights)
     return OpinionPoolingPrior(; pes = factory(pe.pes, w), pe1 = factory(pe.pe1, w),
-                               pe2 = factory(pe.pe2, w), p = pe.p, w = w, alg = pe.alg,
+                               pe2 = factory(pe.pe2, w), p = pe.p, w = pe.w, alg = pe.alg,
                                ex = pe.ex)
 end
 function prior_view(pe::OpinionPoolingPrior, i)
