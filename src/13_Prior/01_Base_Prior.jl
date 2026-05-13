@@ -278,7 +278,7 @@ Returns the prior unchanged for estimators (they are not sliceable), or returns 
   - [`AbstractPriorEstimator`](@ref)
   - [`LowOrderPrior`](@ref)
 """
-function prior_view(pr::AbstractPriorEstimator, args...; kwargs...)
+function prior_view(pr::Option{<:AbstractPriorEstimator}, args...; kwargs...)
     return pr
 end
 function prior_view(pr::AbstractVector{<:Union{<:AbstractPriorResult,
