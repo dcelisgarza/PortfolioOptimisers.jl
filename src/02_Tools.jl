@@ -578,6 +578,10 @@ function factory(a::Union{Nothing, <:AbstractEstimator, <:AbstractAlgorithm,
                           <:AbstractResult}, args...; kwargs...)
     return a
 end
+function factory(a::AbstractVector{<:Union{<:AbstractEstimator, <:AbstractAlgorithm,
+                                           <:AbstractResult}}, args...; kwargs...)
+    return [factory(ai, args...; kwargs...) for ai in a]
+end
 """
 $(DocStringExtensions.TYPEDEF)
 

@@ -645,6 +645,15 @@ function factory(pe::EntropyPoolingPrior, w::ObsWeights)
                                sets = pe.sets, ds_opt = pe.ds_opt, dm_opt = pe.dm_opt,
                                opt = pe.opt, w = w, alg = pe.alg)
 end
+function prior_view(pe::EntropyPoolingPrior, i)
+    return EntropyPoolingPrior(; pe = prior_view(pe.pe, i), mu_views = pe.mu_views,
+                               var_views = pe.var_views, cvar_views = pe.cvar_views,
+                               sigma_views = pe.sigma_views, sk_views = pe.sk_views,
+                               kt_views = pe.kt_views, rho_views = pe.rho_views,
+                               var_alpha = pe.var_alpha, cvar_alpha = pe.cvar_alpha,
+                               sets = asset_sets_view(pe.sets, i), ds_opt = pe.ds_opt,
+                               dm_opt = pe.dm_opt, opt = pe.opt, w = pe.w, alg = pe.alg)
+end
 """
     add_ep_constraint!(epc::AbstractDict, lhs::MatNum, rhs::VecNum, key::Symbol)
 

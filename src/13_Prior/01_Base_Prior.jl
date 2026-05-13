@@ -281,6 +281,11 @@ Returns the prior unchanged for estimators (they are not sliceable), or returns 
 function prior_view(pr::AbstractPriorEstimator, args...; kwargs...)
     return pr
 end
+function prior_view(pr::AbstractVector{<:Union{<:AbstractPriorResult,
+                                               <:AbstractPriorEstimator}}, args...;
+                    kwargs...)
+    return pr
+end
 """
     clusterise(cle::AbstractClustersEstimator, pr::AbstractPriorResult; kwargs...)
 

@@ -234,6 +234,19 @@ function factory(pe::AugmentedBlackLittermanPrior, w::ObsWeights)
                                         f_views_conf = pe.f_views_conf, w = pe.w,
                                         rf = pe.rf, l = pe.l, tau = pe.tau)
 end
+function prior_view(pe::AugmentedBlackLittermanPrior, i)
+    return AugmentedBlackLittermanPrior(; a_pe = prior_view(pe.a_pe, i), f_pe = pe.f_pe,
+                                        mp = pe.mp, re = regression_view(pe.re, i),
+                                        a_views = nothing_scalar_array_view(pe.a_views, i),
+                                        f_views = pe.f_views,
+                                        a_sets = asset_sets_view(pe.a_sets, i),
+                                        f_sets = pe.f_sets,
+                                        a_views_conf = nothing_scalar_array_view(pe.a_views_conf,
+                                                                                 i),
+                                        f_views_conf = pe.f_views_conf,
+                                        w = nothing_scalar_array_view(pe.w, i), rf = pe.rf,
+                                        l = pe.l, tau = pe.tau)
+end
 function Base.getproperty(obj::AugmentedBlackLittermanPrior, sym::Symbol)
     return if sym == :me
         obj.a_pe.me
