@@ -281,7 +281,8 @@ function assert_bl_views_conf(views_conf::VecNum, val::EqnType)::Nothing
     @argcheck(all(x -> zero(x) < x < one(x), views_conf))
     return nothing
 end
-function assert_bl_views_conf(views_conf::Num_VecNum, views::LinearConstraintEstimator)::Nothing
+function assert_bl_views_conf(views_conf::Num_VecNum,
+                              views::LinearConstraintEstimator)::Nothing
     return assert_bl_views_conf(views_conf, views.val)
 end
 function assert_bl_views_conf(views_conf::Num_VecNum, views::BlackLittermanViews)::Nothing

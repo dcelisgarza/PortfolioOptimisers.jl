@@ -1291,7 +1291,8 @@ Validate that the input value is non-empty, non-negative and finite.
   - [`assert_nonempty_finite_val`](@ref)
   - [`assert_nonempty_gt0_finite_val`](@ref)
 """
-function assert_nonempty_nonneg_finite_val(val::AbstractDict, val_sym::Sym_Str = :val)::Nothing
+function assert_nonempty_nonneg_finite_val(val::AbstractDict,
+                                           val_sym::Sym_Str = :val)::Nothing
     @argcheck(!isempty(val),
               IsEmptyError("!isempty($val_sym) must hold. Got\n!isempty($val_sym) => $(isempty(val))"))
     @argcheck(any(isfinite, values(val)),
