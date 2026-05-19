@@ -37,21 +37,41 @@ All tests must pass. If any test fails:
 3. Fix failures caused by your changes.
 4. Report pre-existing failures to the user and ask whether to proceed.
 
-## Step 3 — Verify doctests
+## Step 3 — Run doctests
 
-Doctests are run as part of the test suite. If a doctest fails:
+Doctests are **not** run by `] test` — they are a separate step. Run them from the repository root:
+
+```bash
+julia --color=yes --project=docs -e '
+  using Pkg
+  Pkg.develop(PackageSpec(path=pwd()))
+  Pkg.instantiate()'
+```
+
+Then:
+
+```bash
+julia --color=yes --project=docs -e '
+  using Documenter: DocMeta, doctest
+  using PortfolioOptimisers
+  DocMeta.setdocmeta!(PortfolioOptimisers, :DocTestSetup, :(using PortfolioOptimisers, StatsBase, Statistics, LinearAlgebra, Dates, Distributions, StableRNGs, TimeSeries); recursive=true)
+  doctest(PortfolioOptimisers)'
+```
+
+All doctests must pass. If a doctest fails:
 
 - Check that the `jldoctest` block matches the actual output of `@define_pretty_show`.
 - Confirm that field names, types, and default values match what is defined in the struct.
-- Update the doctest to match the current output exactly.
+- Update the doctest to match the current output exactly, then re-run.
 
 ## Step 4 — Confirm readiness
 
-Once both pre-commit and tests pass with no failures, report the result to the user:
+Once all three steps pass with no failures, report the result to the user:
 
 ```text
 pre-commit run -a  ✓  All N hooks passed.
 ] test             ✓  All N tests passed.
+doctest            ✓  All doctests passed.
 ```
 
 The changes are ready to commit.

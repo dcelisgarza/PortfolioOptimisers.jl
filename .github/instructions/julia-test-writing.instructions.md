@@ -138,4 +138,4 @@ When adding new functionality:
  5. Test each dispatch variant for functions with multiple methods.
  6. Test composability with other estimators where applicable.
  7. Test result passthrough where applicable.
- 8. Run tests locally before committing: `] activate .` then `] test`.
+ 8. Run pre-commit checks, tests, and doctests before committing following `.github/prompts/pre-commit-and-test.prompt.md`. Note: doctests are **not** run by `] test` — they require a separate step.

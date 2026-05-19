@@ -10,7 +10,7 @@ Follow these steps to add a new estimator to PortfolioOptimisers.jl. Read the re
 Read the following to understand patterns and conventions:
 
 - `.github/instructions/julia-source-code.instructions.md`
-- `.github/instructions/API-docstrings.instructions.md`
+- `.github/instructions/julia-docstrings.instructions.md`
 - `.github/instructions/julia-return-types.instructions.md`
 - A similar existing estimator file in `src/` as a reference.
 
@@ -125,7 +125,7 @@ MyEstimator
 
 ## Step 8 — Write tests
 
-Create or extend a `test/test-*.jl` file following `.github/instructions/test-writing.instructions.md`:
+Create or extend a `test/test-*.jl` file following `.github/instructions/julia-test-writing.instructions.md`:
 
 1. Test constructor validation (all `@argcheck` conditions).
 2. Test normal usage with valid inputs.
@@ -136,17 +136,6 @@ Create or extend a `test/test-*.jl` file following `.github/instructions/test-wr
 
 ## Step 9 — Final checks
 
-Run:
+Run the full pre-commit, test, and doctest suite following `.github/prompts/pre-commit-and-test.prompt.md`.
 
-```bash
-pre-commit run -a
-```
-
-Then in Julia:
-
-```julia-repl
-julia> ] activate .
-julia> ] test
-```
-
-All checks and tests must pass before committing.
+All three steps must pass before committing.

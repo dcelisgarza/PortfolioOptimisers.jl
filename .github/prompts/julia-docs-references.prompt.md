@@ -1,5 +1,5 @@
 ---
-agent: ask
+agent: agent
 description: Add docstrings to markdown files.
 ---
 
