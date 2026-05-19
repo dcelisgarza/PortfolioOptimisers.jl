@@ -5,7 +5,7 @@ on:
     branches:
       - main
       - dev*
-      - agents*
+      - agents/*
     tags: ["*"]
   pull_request:
     branches:
