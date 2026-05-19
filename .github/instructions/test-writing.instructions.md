@@ -64,12 +64,78 @@ applyTo: "test/test-*.jl"
 - Use descriptive names for test sets and individual tests.
 - Keep tests isolated - each test should be independent.
 
+## Testing Multiple Dispatch Methods
+
+When a function has several dispatch variants (e.g., different algorithm types), test each variant explicitly:
+
+```julia
+@testset "Full vs Semi algorithm dispatch" begin
+    X = rand(50, 4)
+    ce_full = Covariance(; alg = Full())
+    ce_semi = Covariance(; alg = Semi())
+    sigma_full = Statistics.cov(ce_full, X)
+    sigma_semi = Statistics.cov(ce_semi, X)
+    @test size(sigma_full) == (4, 4)
+    @test size(sigma_semi) == (4, 4)
+    @test sigma_full != sigma_semi  # different algorithms should differ
+end
+```
+
+## Testing Composability
+
+Test that nested/composed estimators produce correct results when combined:
+
+```julia
+@testset "Composed estimator" begin
+    X = rand(50, 4)
+    ce = PortfolioOptimisersCovariance(; ce = Covariance(; alg = Semi()))
+    sigma = Statistics.cov(ce, X)
+    @test size(sigma) == (4, 4)
+    @test LinearAlgebra.isposdef(sigma)
+end
+```
+
+## Testing Result Passthrough
+
+For result types that pass through unchanged (i.e., `f(::AbstractResult, args...) = result`), test that the passthrough is a no-op:
+
+```julia
+@testset "Prior result passthrough" begin
+    X = rand(50, 4)
+    pr = prior(EmpiricalPrior(), X)
+    @test prior(pr) === pr   # result passed to prior returns itself
+end
+```
+
+## Testing `factory` and `moment_view`
+
+When an estimator implements `factory` (for observation weights) or `moment_view` (for slicing), test both:
+
+```julia
+@testset "factory propagates weights" begin
+    ce = Covariance()
+    w = StatsBase.Weights([0.2, 0.3, 0.5])
+    ce_w = factory(ce, w)
+    @test ce_w.me.w == w
+    @test ce_w.ce.w == w
+end
+
+@testset "moment_view slices correctly" begin
+    ce = Covariance()
+    ce_v = moment_view(ce, 1:3)
+    @test ce_v isa Covariance
+end
+```
+
 ## Adding New Tests
 
 When adding new functionality:
 
  1. Create a new test file `test-<feature>.jl` or add to existing test file.
- 2. Use `@safetestset` for top-level organization.
+ 2. Use `@safetestset` for top-level organisation.
  3. Test both success and failure cases.
  4. Verify all validation logic works correctly.
- 5. Run tests locally before committing: `] activate .` then `] test`.
+ 5. Test each dispatch variant for functions with multiple methods.
+ 6. Test composability with other estimators where applicable.
+ 7. Test result passthrough where applicable.
+ 8. Run tests locally before committing: `] activate .` then `] test`.

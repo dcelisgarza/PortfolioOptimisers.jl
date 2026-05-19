@@ -585,10 +585,10 @@ Overloading this method to return `true` indicates that type already has a custo
 
   - [`@define_pretty_show`](@ref)
 """
-has_pretty_show_method(::Any) = false
-has_pretty_show_method(::JuMP.Model) = true
-has_pretty_show_method(::Clustering.Hclust) = true
-has_pretty_show_method(::Clustering.KmeansResult) = true
+has_pretty_show_method(::Any)::Bool = false
+has_pretty_show_method(::JuMP.Model)::Bool = true
+has_pretty_show_method(::Clustering.Hclust)::Bool = true
+has_pretty_show_method(::Clustering.KmeansResult)::Bool = true
 @define_pretty_show(Union{<:AbstractEstimator, <:AbstractAlgorithm, <:AbstractResult})
 """
 $(DocStringExtensions.TYPEDEF)
@@ -1291,7 +1291,7 @@ Validate that the input value is non-empty, non-negative and finite.
   - [`assert_nonempty_finite_val`](@ref)
   - [`assert_nonempty_gt0_finite_val`](@ref)
 """
-function assert_nonempty_nonneg_finite_val(val::AbstractDict, val_sym::Sym_Str = :val)
+function assert_nonempty_nonneg_finite_val(val::AbstractDict, val_sym::Sym_Str = :val)::Nothing
     @argcheck(!isempty(val),
               IsEmptyError("!isempty($val_sym) must hold. Got\n!isempty($val_sym) => $(isempty(val))"))
     @argcheck(any(isfinite, values(val)),
@@ -1300,7 +1300,7 @@ function assert_nonempty_nonneg_finite_val(val::AbstractDict, val_sym::Sym_Str =
               DomainError("all(x -> 0 <= x, values($val_sym)) must hold. Got\nall(x -> 0 <= x, values($val_sym)) => $(all(x -> zero(x) <= x, values(val)))"))
     return nothing
 end
-function assert_nonempty_nonneg_finite_val(val::VecPair, val_sym::Sym_Str = :val)
+function assert_nonempty_nonneg_finite_val(val::VecPair, val_sym::Sym_Str = :val)::Nothing
     @argcheck(!isempty(val),
               IsEmptyError("!isempty($val_sym) must hold. Got\n!isempty($val_sym) => $(isempty(val))"))
     @argcheck(any(isfinite, getindex.(val, 2)),
@@ -1309,7 +1309,7 @@ function assert_nonempty_nonneg_finite_val(val::VecPair, val_sym::Sym_Str = :val
               DomainError("all(x -> 0 <= x[2], $val_sym) must hold. Got\nall(x -> 0 <= x[2], $val_sym) => $(all(x -> zero(x[2]) <= x[2], val))"))
     return nothing
 end
-function assert_nonempty_nonneg_finite_val(val::ArrNum, val_sym::Sym_Str = :val)
+function assert_nonempty_nonneg_finite_val(val::ArrNum, val_sym::Sym_Str = :val)::Nothing
     @argcheck(!isempty(val),
               IsEmptyError("!isempty($val_sym) must hold. Got\n!isempty($val_sym) => $(isempty(val))"))
     @argcheck(any(isfinite, val),
@@ -1318,20 +1318,20 @@ function assert_nonempty_nonneg_finite_val(val::ArrNum, val_sym::Sym_Str = :val)
               DomainError("all(x -> 0 <= x, $val_sym) must hold. Got\nall(x -> 0 <= x, $val_sym) => $(all(x -> zero(x) <= x, val))"))
     return nothing
 end
-function assert_nonempty_nonneg_finite_val(val::Pair, val_sym::Sym_Str = :val)
+function assert_nonempty_nonneg_finite_val(val::Pair, val_sym::Sym_Str = :val)::Nothing
     @argcheck(isfinite(val[2]),
               DomainError("isfinite($val_sym[2]) must hold. Got\nisfinite($val_sym[2]) => $(isfinite(val[2]))"))
     @argcheck(zero(val[2]) <= val[2],
               DomainError("0 <= $(val[2]) must hold. Got\n$(val[2]) => $(val[2])"))
     return nothing
 end
-function assert_nonempty_nonneg_finite_val(val::Number, val_sym::Sym_Str = :val)
+function assert_nonempty_nonneg_finite_val(val::Number, val_sym::Sym_Str = :val)::Nothing
     @argcheck(isfinite(val),
               DomainError("isfinite($val_sym) must hold. Got\nisfinite($val_sym) => $(isfinite(val))"))
     @argcheck(zero(val) <= val, DomainError("0 <= $(val) must hold. Got\n$(val) => $(val)"))
     return nothing
 end
-function assert_nonempty_nonneg_finite_val(args...)
+function assert_nonempty_nonneg_finite_val(args...)::Nothing
     return nothing
 end
 """
@@ -1368,7 +1368,7 @@ Validate that the input value is non-empty, greater than zero, and finite.
   - [`assert_nonempty_nonneg_finite_val`](@ref)
   - [`assert_nonempty_finite_val`](@ref)
 """
-function assert_nonempty_gt0_finite_val(val::AbstractDict, val_sym::Sym_Str = :val)
+function assert_nonempty_gt0_finite_val(val::AbstractDict, val_sym::Sym_Str = :val)::Nothing
     @argcheck(!isempty(val),
               IsEmptyError("!isempty($val_sym) must hold. Got\n!isempty($val_sym) => $(isempty(val))"))
     @argcheck(any(isfinite, values(val)),
@@ -1377,7 +1377,7 @@ function assert_nonempty_gt0_finite_val(val::AbstractDict, val_sym::Sym_Str = :v
               DomainError("all(x -> 0 < x, values($val_sym)) must hold. Got\nall(x -> 0 < x, values($val_sym)) => $(all(x -> zero(x) < x, values(val)))"))
     return nothing
 end
-function assert_nonempty_gt0_finite_val(val::VecPair, val_sym::Sym_Str = :val)
+function assert_nonempty_gt0_finite_val(val::VecPair, val_sym::Sym_Str = :val)::Nothing
     @argcheck(!isempty(val),
               IsEmptyError("!isempty($val_sym) must hold. Got\n!isempty($val_sym) => $(isempty(val))"))
     @argcheck(any(isfinite, getindex.(val, 2)),
@@ -1386,7 +1386,7 @@ function assert_nonempty_gt0_finite_val(val::VecPair, val_sym::Sym_Str = :val)
               DomainError("all(x -> 0 < x[2], $val_sym) must hold. Got\nall(x -> 0 < x[2], $val_sym) => $(all(x -> zero(x[2]) < x[2], val))"))
     return nothing
 end
-function assert_nonempty_gt0_finite_val(val::ArrNum, val_sym::Sym_Str = :val)
+function assert_nonempty_gt0_finite_val(val::ArrNum, val_sym::Sym_Str = :val)::Nothing
     @argcheck(!isempty(val),
               IsEmptyError("!isempty($val_sym) must hold. Got\n!isempty($val_sym) => $(isempty(val))"))
     @argcheck(any(isfinite, val),
@@ -1395,20 +1395,20 @@ function assert_nonempty_gt0_finite_val(val::ArrNum, val_sym::Sym_Str = :val)
               DomainError("all(x -> 0 < x, $val_sym) must hold. Got\nall(x -> 0 < x, $val_sym) => $(all(x -> zero(x) < x, val))"))
     return nothing
 end
-function assert_nonempty_gt0_finite_val(val::Pair, val_sym::Sym_Str = :val)
+function assert_nonempty_gt0_finite_val(val::Pair, val_sym::Sym_Str = :val)::Nothing
     @argcheck(isfinite(val[2]),
               DomainError("isfinite($val_sym[2]) must hold. Got\nisfinite($val_sym[2]) => $(isfinite(val[2]))"))
     @argcheck(zero(val[2]) < val[2],
               DomainError("0 < $(val[2]) must hold. Got\n$(val[2]) => $(val[2])"))
     return nothing
 end
-function assert_nonempty_gt0_finite_val(val::Number, val_sym::Sym_Str = :val)
+function assert_nonempty_gt0_finite_val(val::Number, val_sym::Sym_Str = :val)::Nothing
     @argcheck(isfinite(val),
               DomainError("isfinite($val_sym) must hold. Got\nisfinite($val_sym) => $(isfinite(val))"))
     @argcheck(zero(val) < val, DomainError("0 < $(val) must hold. Got\n$(val) => $(val)"))
     return nothing
 end
-function assert_nonempty_gt0_finite_val(args...)
+function assert_nonempty_gt0_finite_val(args...)::Nothing
     return nothing
 end
 """
@@ -1445,38 +1445,38 @@ Validate that the input value is non-empty and finite.
   - [`assert_nonempty_nonneg_finite_val`](@ref)
   - [`assert_nonempty_gt0_finite_val`](@ref)
 """
-function assert_nonempty_finite_val(val::AbstractDict, val_sym::Sym_Str = :val)
+function assert_nonempty_finite_val(val::AbstractDict, val_sym::Sym_Str = :val)::Nothing
     @argcheck(!isempty(val),
               IsEmptyError("!isempty($val_sym) must hold. Got\n!isempty($val_sym) => $(isempty(val))"))
     @argcheck(any(isfinite, values(val)),
               DomainError("any(isfinite, values($val_sym)) must hold. Got\nany(isfinite, values($val_sym)) => $(any(isfinite, values(val)))"))
     return nothing
 end
-function assert_nonempty_finite_val(val::VecPair, val_sym::Sym_Str = :val)
+function assert_nonempty_finite_val(val::VecPair, val_sym::Sym_Str = :val)::Nothing
     @argcheck(!isempty(val),
               IsEmptyError("!isempty($val_sym) must hold. Got\n!isempty($val_sym) => $(isempty(val))"))
     @argcheck(any(isfinite, getindex.(val, 2)),
               DomainError("any(isfinite, getindex.($val_sym, 2)) must hold. Got\nany(isfinite, getindex.($val_sym, 2)) => $(any(isfinite, getindex.(val, 2)))"))
     return nothing
 end
-function assert_nonempty_finite_val(val::ArrNum, val_sym::Sym_Str = :val)
+function assert_nonempty_finite_val(val::ArrNum, val_sym::Sym_Str = :val)::Nothing
     @argcheck(!isempty(val),
               IsEmptyError("!isempty($val_sym) must hold. Got\n!isempty($val_sym) => $(isempty(val))"))
     @argcheck(any(isfinite, val),
               DomainError("any(isfinite, $val_sym) must hold. Got\nany(isfinite, $val_sym) => $(any(isfinite, val))"))
     return nothing
 end
-function assert_nonempty_finite_val(val::Pair, val_sym::Sym_Str = :val)
+function assert_nonempty_finite_val(val::Pair, val_sym::Sym_Str = :val)::Nothing
     @argcheck(isfinite(val[2]),
               DomainError("isfinite($val_sym[2]) must hold. Got\nisfinite($val_sym[2]) => $(isfinite(val[2]))"))
     return nothing
 end
-function assert_nonempty_finite_val(val::Number, val_sym::Sym_Str = :val)
+function assert_nonempty_finite_val(val::Number, val_sym::Sym_Str = :val)::Nothing
     @argcheck(isfinite(val),
               DomainError("isfinite($val_sym) must hold. Got\nisfinite($val_sym) => $(isfinite(val))"))
     return nothing
 end
-function assert_nonempty_finite_val(args...)
+function assert_nonempty_finite_val(args...)::Nothing
     return nothing
 end
 """
@@ -1501,7 +1501,7 @@ Assert that the input matrix is square.
 
   - Throws `DimensionMismatch` if the check fails.
 """
-function assert_matrix_issquare(X::MatNum, X_sym::Symbol = :X)
+function assert_matrix_issquare(X::MatNum, X_sym::Symbol = :X)::Nothing
     @argcheck(size(X, 1) == size(X, 2),
               DimensionMismatch("size($X_sym, 1) == size($X_sym, 2) must hold. Got\nsize($X_sym, 1) => $(size(X, 1))\nsize($X_sym, 2) => $(size(X, 2))."))
     return nothing

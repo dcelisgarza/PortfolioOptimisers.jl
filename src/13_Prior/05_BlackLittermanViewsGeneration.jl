@@ -265,14 +265,14 @@ Validate Black-Litterman view confidence specification.
 
   - [`BlackLittermanViews`](@ref)
 """
-function assert_bl_views_conf(::Nothing, args...)
+function assert_bl_views_conf(::Nothing, args...)::Nothing
     return nothing
 end
-function assert_bl_views_conf(views_conf::Number, ::EqnType)
+function assert_bl_views_conf(views_conf::Number, ::EqnType)::Nothing
     @argcheck(zero(views_conf) < views_conf < one(views_conf))
     return nothing
 end
-function assert_bl_views_conf(views_conf::VecNum, val::EqnType)
+function assert_bl_views_conf(views_conf::VecNum, val::EqnType)::Nothing
     if isa(val, AbstractVector)
         @argcheck(length(val) == length(views_conf))
     else
@@ -281,10 +281,10 @@ function assert_bl_views_conf(views_conf::VecNum, val::EqnType)
     @argcheck(all(x -> zero(x) < x < one(x), views_conf))
     return nothing
 end
-function assert_bl_views_conf(views_conf::Num_VecNum, views::LinearConstraintEstimator)
+function assert_bl_views_conf(views_conf::Num_VecNum, views::LinearConstraintEstimator)::Nothing
     return assert_bl_views_conf(views_conf, views.val)
 end
-function assert_bl_views_conf(views_conf::Num_VecNum, views::BlackLittermanViews)
+function assert_bl_views_conf(views_conf::Num_VecNum, views::BlackLittermanViews)::Nothing
     return @argcheck(length(views_conf) == length(views.Q))
 end
 

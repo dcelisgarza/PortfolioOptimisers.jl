@@ -49,12 +49,12 @@ Throws an `ArgCheck` error if `val` contains non-finite or negative elements.
 
   - [`JuMPOptimiser`](@ref)
 """
-function assert_finite_nonnegative_real_or_vec(val::Number)
+function assert_finite_nonnegative_real_or_vec(val::Number)::Nothing
     @argcheck(isfinite(val))
     @argcheck(val > zero(val))
     return nothing
 end
-function assert_finite_nonnegative_real_or_vec(val::VecNum)
+function assert_finite_nonnegative_real_or_vec(val::VecNum)::Nothing
     @argcheck(any(isfinite, val))
     @argcheck(any(x -> x > zero(x), val))
     @argcheck(all(x -> zero(x) <= x, val))

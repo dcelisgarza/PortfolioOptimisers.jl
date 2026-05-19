@@ -170,7 +170,7 @@ The default implementation does nothing. Overridden for estimators (e.g. [`Stack
   - [`NestedClustered`](@ref)
   - [`Stacking`](@ref)
 """
-function assert_special_nco_requirements(::OptE_Opt)
+function assert_special_nco_requirements(::OptE_Opt)::Nothing
     return nothing
 end
 function factory(opt::OptE_Opt, ::Any)
@@ -263,7 +263,7 @@ const VecOptE_Opt = AbstractVector{<:OptE_Opt}
 function factory(opt::VecOptE_Opt, args...)
     return [factory(opti, args...) for opti in opt]
 end
-function assert_special_nco_requirements(opt::VecOptE_Opt)
+function assert_special_nco_requirements(opt::VecOptE_Opt)::Nothing
     return assert_special_nco_requirements.(opt)
 end
 function needs_previous_weights(opt::VecOptE_Opt)
@@ -763,10 +763,10 @@ function optimise(opt::OptimisationEstimator, args...; kwargs...)
     end
     return isempty(fb) ? res : factory(res, fb)
 end
-function assert_internal_optimiser(::NonFiniteAllocationOptimisationResult)
+function assert_internal_optimiser(::NonFiniteAllocationOptimisationResult)::Nothing
     return nothing
 end
-function assert_external_optimiser(::NonFiniteAllocationOptimisationResult)
+function assert_external_optimiser(::NonFiniteAllocationOptimisationResult)::Nothing
     return nothing
 end
 """

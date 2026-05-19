@@ -253,7 +253,7 @@ Propagate or pass through prior result objects.
   - [`AbstractPriorResult`](@ref)
   - [`prior`](@ref)
 """
-function prior(pr::AbstractPriorResult, args...; kwargs...)
+function prior(pr::AbstractPriorResult, args...; kwargs...)::AbstractPriorResult
     return pr
 end
 """

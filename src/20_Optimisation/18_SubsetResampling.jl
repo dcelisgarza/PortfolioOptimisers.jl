@@ -169,11 +169,11 @@ function SubsetResampling(; pe::PrE_Pr = EmpiricalPrior(), wb::Option{<:WbE_Wb} 
     return SubsetResampling(pe, wb, fees, sets, scale, opt, wf, ex, subset_size, n_subsets,
                             max_comb, rng, seed, fb, brt, strict)
 end
-function assert_external_optimiser(opt::SubsetResampling)
+function assert_external_optimiser(opt::SubsetResampling)::Nothing
     @argcheck(!isa(opt.pe, AbstractPriorResult))
     return assert_external_optimiser(opt.opt)
 end
-function assert_internal_optimiser(opt::SubsetResampling)
+function assert_internal_optimiser(opt::SubsetResampling)::Nothing
     return assert_internal_optimiser(opt.opt)
 end
 function needs_previous_weights(opt::SubsetResampling)

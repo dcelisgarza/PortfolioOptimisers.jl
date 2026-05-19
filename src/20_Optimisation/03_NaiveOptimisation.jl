@@ -16,10 +16,10 @@ abstract type NaiveOptimisationEstimator <: NonFiniteAllocationOptimisationEstim
 function needs_previous_weights(opt::NaiveOptimisationEstimator)
     return needs_previous_weights(opt.fb)
 end
-function assert_internal_optimiser(::NaiveOptimisationEstimator)
+function assert_internal_optimiser(::NaiveOptimisationEstimator)::Nothing
     return nothing
 end
-function assert_external_optimiser(::NaiveOptimisationEstimator)
+function assert_external_optimiser(::NaiveOptimisationEstimator)::Nothing
     return nothing
 end
 """
@@ -177,7 +177,7 @@ function opt_view(opt::InverseVolatility, i, args...)
     return InverseVolatility(; pe = pe, wb = wb, sets = sets, wf = opt.wf, fb = opt.fb,
                              sq = opt.sq, brt = opt.brt, strict = opt.strict)
 end
-function assert_external_optimiser(opt::InverseVolatility)
+function assert_external_optimiser(opt::InverseVolatility)::Nothing
     #! Maybe results can be allowed with a warning. This goes for other stuff like bounds and threshold vectors. And then the optimisation can throw a domain error when it comes to using them.
     @argcheck(!isa(opt.pe, AbstractPriorResult))
     assert_internal_optimiser(opt)

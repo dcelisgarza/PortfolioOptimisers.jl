@@ -154,10 +154,10 @@ function Stacking(; pe::PrE_Pr = EmpiricalPrior(), wb::Option{<:WbE_Wb} = nothin
                   fb::Option{<:OptE_Opt} = nothing, brt::Bool = false, strict::Bool = false)
     return Stacking(pe, wb, fees, sets, scale, opti, opto, cv, wf, ex, fb, brt, strict)
 end
-function assert_special_nco_requirements(opt::Stacking)
+function assert_special_nco_requirements(opt::Stacking)::Nothing
     @argcheck(!any(x -> isa(x, NonFiniteAllocationOptimisationResult), opt.opti))
 end
-function assert_external_optimiser(opt::Stacking)
+function assert_external_optimiser(opt::Stacking)::Nothing
     #! Maybe results can be allowed with a warning. This goes for other stuff like bounds and threshold vectors. And then the optimisation can throw a domain error when it comes to using them.
     @argcheck(!isa(opt.pe, AbstractPriorResult))
     assert_external_optimiser(opt.opto)
@@ -166,7 +166,7 @@ function assert_external_optimiser(opt::Stacking)
     end
     return nothing
 end
-function assert_internal_optimiser(opt::Stacking)
+function assert_internal_optimiser(opt::Stacking)::Nothing
     assert_external_optimiser(opt.opto)
     if !(opt.opti === opt.opto)
         assert_internal_optimiser(opt.opti)
