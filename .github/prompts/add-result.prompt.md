@@ -84,9 +84,9 @@ end
 
 Result types typically do not need an inner constructor with validation unless the struct could be constructed independently outside the producing function. Most validation is done in the producing estimator/function.
 
-## Step 3 — Implement the passthrough method
+## Step 3 — Implement passthrough and interface methods
 
-Add a passthrough method to the consuming function so that a result can be re-used directly:
+Add any necessary passthrough, and interface methods. For example, if `my_function` should support the passthrough pattern for this result:
 
 ```julia
 """
@@ -114,6 +114,11 @@ function my_function(result::AbstractMyResult, args...; kwargs...)::AbstractMyRe
 end
 ```
 
+Common interface methods to implement include:
+
+- `factory(est::MyAlgorithm, w::ObsWeights)::MyAlgorithm` — returns a copy with observation weights propagated.
+- `*_view(est::MyAlgorithm, i)::MyAlgorithm` — returns a sliced view.
+
 ## Step 4 — Update the producing function's return type annotation
 
 If `my_function(est::MyEstimator, ...)` is not yet annotated:
@@ -125,7 +130,7 @@ function my_function(est::MyEstimator, X::MatNum; kwargs...)::MyResult
 end
 ```
 
-## Step 5 — Add `field_dict` entries if needed
+## Step 5 — Add `*_dict` entries if needed
 
 Add any missing entries to the dictionaries in `src/01_Base.jl`.
 

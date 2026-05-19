@@ -92,7 +92,7 @@ end
 Implement all methods required by the abstract supertype's `# Interfaces` section. Common ones include:
 
 - `factory(est::MyEstimator, w::ObsWeights)::MyEstimator` — returns a copy with observation weights propagated.
-- `moment_view(est::MyEstimator, i)::MyEstimator` — returns a sliced view for windowed estimation.
+- `*_view(est::MyEstimator, i)::MyEstimator` — returns a sliced view.
 - The domain-specific computation function (e.g., `Statistics.cov`, `prior`, `denoise!`).
 
 Write a docstring for every method.

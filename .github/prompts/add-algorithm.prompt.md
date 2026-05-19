@@ -135,7 +135,7 @@ function MyAlgorithm(; param::Real = 0.5)
 end
 ````
 
-## Step 3 — Implement the dispatch method
+## Step 3 — Implement the dispatch and interface methods
 
 Write the method that the estimator calls internally when it holds this algorithm:
 
@@ -164,11 +164,16 @@ function my_algorithm_function(::MyAlgorithm, arg::Type)::ReturnType
 end
 ```
 
+Common interface methods to implement include:
+
+- `factory(est::MyAlgorithm, w::ObsWeights)::MyAlgorithm` — returns a copy with observation weights propagated.
+- `*_view(est::MyAlgorithm, i)::MyAlgorithm` — returns a sliced view.
+
 ## Step 4 — Add return type annotations
 
 - Annotate the dispatch method with `::ReturnType` if it always returns the same concrete type.
 
-## Step 5 — Add `arg_dict` / `field_dict` entries if needed
+## Step 5 — Add `*_dict` entries if needed
 
 Add any missing entries to the dictionaries in `src/01_Base.jl`.
 
