@@ -39,7 +39,7 @@ MedianExpectedReturns
         return new{typeof(w)}(w)
     end
 end
-function MedianExpectedReturns(; w::Option{<:ObsWeights} = nothing)
+function MedianExpectedReturns(; w::Option{<:ObsWeights} = nothing)::MedianExpectedReturns
     return MedianExpectedReturns(w)
 end
 """
@@ -61,7 +61,7 @@ Return a new [`MedianExpectedReturns`](@ref) estimator with observation weights 
   - [`MedianExpectedReturns`](@ref)
   - [`factory`](@ref)
 """
-function factory(::MedianExpectedReturns, w::ObsWeights)
+function factory(::MedianExpectedReturns, w::ObsWeights)::MedianExpectedReturns
     return MedianExpectedReturns(; w = w)
 end
 """

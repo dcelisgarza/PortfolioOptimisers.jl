@@ -60,7 +60,7 @@ end
 function ImpliedVolatilityRegression(; ve::AbstractVarianceEstimator = SimpleVariance(),
                                      ws::Number = 20,
                                      #  crit::AbstractStepwiseRegressionCriterion = RSquared(),
-                                     re::AbstractRegressionTarget = LinearModel())
+                                     re::AbstractRegressionTarget = LinearModel())::ImpliedVolatilityRegression
     return ImpliedVolatilityRegression(ve, ws, re)
 end
 """
@@ -130,7 +130,7 @@ end
 function ImpliedVolatility(; ce::StatsBase.CovarianceEstimator = Covariance(),
                            mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing(),
                            alg::ImpliedVolatilityAlgorithm = ImpliedVolatilityRegression(),
-                           af::Number = 252)
+                           af::Number = 252)::ImpliedVolatility
     return ImpliedVolatility(ce, mp, alg, af)
 end
 """
@@ -152,7 +152,7 @@ Return a new [`ImpliedVolatility`](@ref) estimator with observation weights `w` 
   - [`ImpliedVolatility`](@ref)
   - [`factory`](@ref)
 """
-function factory(ce::ImpliedVolatility, w::ObsWeights)
+function factory(ce::ImpliedVolatility, w::ObsWeights)::ImpliedVolatility
     return ImpliedVolatility(; ce = factory(ce.ce, w), mp = ce.mp)
 end
 """
@@ -173,7 +173,7 @@ Gets the view of the covariance estimator for the `i`-th element(s).
 
   - [`ImpliedVolatility`](@ref)
 """
-function moment_view(ce::ImpliedVolatility, i)
+function moment_view(ce::ImpliedVolatility, i)::ImpliedVolatility
     return ImpliedVolatility(; ce = moment_view(ce.ce, i), mp = ce.mp)
 end
 """

@@ -52,7 +52,7 @@ PhylogenyResult
         return new{typeof(X)}(X)
     end
 end
-function PhylogenyResult(; X::ArrNum)
+function PhylogenyResult(; X::ArrNum)::PhylogenyResult
     return PhylogenyResult(X)
 end
 """
@@ -193,7 +193,8 @@ BetweennessCentrality
         return new{typeof(args), typeof(kwargs)}(args, kwargs)
     end
 end
-function BetweennessCentrality(; args::Tuple = (), kwargs::NamedTuple = (;))
+function BetweennessCentrality(; args::Tuple = (),
+                               kwargs::NamedTuple = (;))::BetweennessCentrality
     return BetweennessCentrality(args, kwargs)
 end
 """
@@ -239,7 +240,8 @@ ClosenessCentrality
         return new{typeof(args), typeof(kwargs)}(args, kwargs)
     end
 end
-function ClosenessCentrality(; args::Tuple = (), kwargs::NamedTuple = (;))
+function ClosenessCentrality(; args::Tuple = (),
+                             kwargs::NamedTuple = (;))::ClosenessCentrality
     return ClosenessCentrality(args, kwargs)
 end
 """
@@ -290,7 +292,7 @@ DegreeCentrality
         return new{typeof(kind), typeof(kwargs)}(kind, kwargs)
     end
 end
-function DegreeCentrality(; kind::Integer = 0, kwargs::NamedTuple = (;))
+function DegreeCentrality(; kind::Integer = 0, kwargs::NamedTuple = (;))::DegreeCentrality
     return DegreeCentrality(kind, kwargs)
 end
 """
@@ -345,7 +347,7 @@ KatzCentrality
         return new{typeof(alpha)}(alpha)
     end
 end
-function KatzCentrality(; alpha::Number = 0.3)
+function KatzCentrality(; alpha::Number = 0.3)::KatzCentrality
     return KatzCentrality(alpha)
 end
 """
@@ -405,7 +407,8 @@ Pagerank
         return new{typeof(n), typeof(alpha), typeof(epsilon)}(n, alpha, epsilon)
     end
 end
-function Pagerank(; n::Integer = 100, alpha::Number = 0.85, epsilon::Number = 1e-6)
+function Pagerank(; n::Integer = 100, alpha::Number = 0.85,
+                  epsilon::Number = 1e-6)::Pagerank
     return Pagerank(n, alpha, epsilon)
 end
 """
@@ -464,7 +467,7 @@ StressCentrality
         return new{typeof(args), typeof(kwargs)}(args, kwargs)
     end
 end
-function StressCentrality(; args::Tuple = (), kwargs::NamedTuple = (;))
+function StressCentrality(; args::Tuple = (), kwargs::NamedTuple = (;))::StressCentrality
     return StressCentrality(args, kwargs)
 end
 """
@@ -600,7 +603,7 @@ KruskalTree
         return new{typeof(args), typeof(kwargs)}(args, kwargs)
     end
 end
-function KruskalTree(; args::Tuple = (), kwargs::NamedTuple = (;))
+function KruskalTree(; args::Tuple = (), kwargs::NamedTuple = (;))::KruskalTree
     return KruskalTree(args, kwargs)
 end
 """
@@ -646,7 +649,7 @@ BoruvkaTree
         return new{typeof(args), typeof(kwargs)}(args, kwargs)
     end
 end
-function BoruvkaTree(; args::Tuple = (), kwargs::NamedTuple = (;))
+function BoruvkaTree(; args::Tuple = (), kwargs::NamedTuple = (;))::BoruvkaTree
     return BoruvkaTree(args, kwargs)
 end
 """

@@ -135,7 +135,7 @@ BrownianDistanceVariance
 end
 function BrownianDistanceVariance(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                                   alg1::BDVarRkFormulations = QuadRiskExpr(),
-                                  alg2::BrownianDistanceVarianceFormulation = NormOneConeBrownianDistanceVariance())
+                                  alg2::BrownianDistanceVarianceFormulation = NormOneConeBrownianDistanceVariance())::BrownianDistanceVariance
     return BrownianDistanceVariance(settings, alg1, alg2)
 end
 function (::BrownianDistanceVariance)(x::VecNum)

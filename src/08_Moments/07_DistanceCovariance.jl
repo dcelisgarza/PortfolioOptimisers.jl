@@ -64,7 +64,7 @@ end
 function DistanceCovariance(; metric::Distances.Metric = Distances.Euclidean(),
                             args::Tuple = (), kwargs::NamedTuple = (;),
                             w::Option{<:ObsWeights} = nothing,
-                            ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())
+                            ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())::DistanceCovariance
     return DistanceCovariance(metric, args, kwargs, w, ex)
 end
 """
@@ -86,7 +86,7 @@ Return a new [`DistanceCovariance`](@ref) estimator with observation weights `w`
   - [`DistanceCovariance`](@ref)
   - [`factory`](@ref)
 """
-function factory(ce::DistanceCovariance, w::ObsWeights)
+function factory(ce::DistanceCovariance, w::ObsWeights)::DistanceCovariance
     return DistanceCovariance(; metric = ce.metric, args = ce.args, kwargs = ce.kwargs,
                               w = w, ex = ce.ex)
 end

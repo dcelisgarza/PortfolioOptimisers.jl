@@ -52,7 +52,7 @@ KFold
                                                                          embargo_size)
     end
 end
-function KFold(; n::Integer = 5, purged_size::Integer = 0, embargo_size::Integer = 0)
+function KFold(; n::Integer = 5, purged_size::Integer = 0, embargo_size::Integer = 0)::KFold
     return KFold(n, purged_size, embargo_size)
 end
 """
@@ -83,7 +83,7 @@ Stores the train and test index vectors for each fold.
         return new{typeof(train_idx), typeof(test_idx)}(train_idx, test_idx)
     end
 end
-function KFoldResult(; train_idx::VecVecInt, test_idx::VecVecInt)
+function KFoldResult(; train_idx::VecVecInt, test_idx::VecVecInt)::KFoldResult
     return KFoldResult(train_idx, test_idx)
 end
 """

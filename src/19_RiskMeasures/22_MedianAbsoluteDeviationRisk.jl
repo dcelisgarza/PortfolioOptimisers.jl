@@ -142,17 +142,19 @@ end
 function MedianAbsoluteDeviation(;
                                  settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
                                  w::Option{<:ObsWeights} = nothing,
-                                 mu::MedAbsDevMu = MedianCentering(), flag::Bool = true)
+                                 mu::MedAbsDevMu = MedianCentering(),
+                                 flag::Bool = true)::MedianAbsoluteDeviation
     return MedianAbsoluteDeviation(settings, w, mu, flag)
 end
-function factory(r::MedianAbsoluteDeviation, pr::AbstractPriorResult, args...; kwargs...)
+function factory(r::MedianAbsoluteDeviation, pr::AbstractPriorResult, args...;
+                 kwargs...)::MedianAbsoluteDeviation
     w = nothing_scalar_array_selector(r.w, pr.w)
     return MedianAbsoluteDeviation(; settings = r.settings, w = w, mu = r.mu, flag = r.flag)
 end
 function nothing_scalar_array_view(x::MedianCenteringFunction, ::Any)
     return x
 end
-function risk_measure_view(r::MedianAbsoluteDeviation, i, args...)
+function risk_measure_view(r::MedianAbsoluteDeviation, i, args...)::MedianAbsoluteDeviation
     mu = nothing_scalar_array_view(r.mu, i)
     return MedianAbsoluteDeviation(; settings = r.settings, w = r.w, mu = mu, flag = r.flag)
 end

@@ -167,15 +167,17 @@ function BayesianBlackLittermanPrior(;
                                      mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing(),
                                      views::Lc_BLV, sets::Option{<:AssetSets} = nothing,
                                      views_conf::Option{<:Num_VecNum} = nothing,
-                                     rf::Number = 0.0, tau::Option{<:Number} = nothing)
+                                     rf::Number = 0.0,
+                                     tau::Option{<:Number} = nothing)::BayesianBlackLittermanPrior
     return BayesianBlackLittermanPrior(pe, mp, views, sets, views_conf, rf, tau)
 end
-function factory(pe::BayesianBlackLittermanPrior, w::ObsWeights)
+function factory(pe::BayesianBlackLittermanPrior,
+                 w::ObsWeights)::BayesianBlackLittermanPrior
     return BayesianBlackLittermanPrior(; pe = factory(pe.pe, w), mp = pe.mp,
                                        views = pe.views, sets = pe.sets,
                                        views_conf = pe.views_conf, rf = pe.rf, tau = pe.tau)
 end
-function prior_view(pr::BayesianBlackLittermanPrior, i)
+function prior_view(pr::BayesianBlackLittermanPrior, i)::BayesianBlackLittermanPrior
     return BayesianBlackLittermanPrior(; pe = prior_view(pr.pe, i), mp = pr.mp,
                                        views = pr.views, sets = pr.sets,
                                        views_conf = pr.views_conf, rf = pr.rf, tau = pr.tau)

@@ -137,7 +137,7 @@ MaximumEntropy
         return new{typeof(alg)}(alg)
     end
 end
-function MaximumEntropy(; alg::EntropyFormulation = RelativeEntropy())
+function MaximumEntropy(; alg::EntropyFormulation = RelativeEntropy())::MaximumEntropy
     return MaximumEntropy(alg)
 end
 """
@@ -261,7 +261,8 @@ struct MinimumSquaredDistance{__T_alg} <: SquaredOrderedWeightsArrayAlgorithm{__
         return new{typeof(alg)}(alg)
     end
 end
-function MinimumSquaredDistance(; alg::UnionAllSOCRiskExpr = SOCRiskExpr())
+function MinimumSquaredDistance(;
+                                alg::UnionAllSOCRiskExpr = SOCRiskExpr())::MinimumSquaredDistance
     return MinimumSquaredDistance(alg)
 end
 """
@@ -333,7 +334,7 @@ struct MinimumSumSquares{__T_alg} <: SquaredOrderedWeightsArrayAlgorithm{__T_alg
         return new{typeof(alg)}(alg)
     end
 end
-function MinimumSumSquares(; alg::UnionAllSOCRiskExpr = SOCRiskExpr())
+function MinimumSumSquares(; alg::UnionAllSOCRiskExpr = SOCRiskExpr())::MinimumSumSquares
     return MinimumSumSquares(alg)
 end
 """
@@ -406,7 +407,8 @@ NormalisedConstantRelativeRiskAversion
         return new{typeof(g)}(g)
     end
 end
-function NormalisedConstantRelativeRiskAversion(; g::Number = 0.5)
+function NormalisedConstantRelativeRiskAversion(;
+                                                g::Number = 0.5)::NormalisedConstantRelativeRiskAversion
     return NormalisedConstantRelativeRiskAversion(g)
 end
 """
@@ -497,7 +499,7 @@ OWAJuMP
 end
 function OWAJuMP(; slv::Slv_VecSlv = Solver(), max_phi::Number = 0.5, sc::Number = 1.0,
                  so::Number = 1.0,
-                 alg::AbstractOrderedWeightsArrayAlgorithm = MaximumEntropy())
+                 alg::AbstractOrderedWeightsArrayAlgorithm = MaximumEntropy())::OWAJuMP
     return OWAJuMP(slv, max_phi, sc, so, alg)
 end
 """

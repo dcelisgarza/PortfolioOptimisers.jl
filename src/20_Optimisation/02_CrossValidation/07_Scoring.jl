@@ -97,7 +97,7 @@ prediction.
 end
 function NearestQuantilePrediction(; r::AbstractBaseRiskMeasure = ConditionalValueatRisk(),
                                    q::Real = 0.5, r_kwargs::NamedTuple = (;),
-                                   q_kwargs::NamedTuple = (;))
+                                   q_kwargs::NamedTuple = (;))::NearestQuantilePrediction
     return NearestQuantilePrediction(r, q, r_kwargs, q_kwargs)
 end
 function (s::NearestQuantilePrediction)(ppred::PopulationPredictionResult)

@@ -221,11 +221,12 @@ function AugmentedBlackLittermanPrior(;
                                       f_views_conf::Option{<:Num_VecNum} = nothing,
                                       w::Option{<:VecNum} = nothing, rf::Number = 0.0,
                                       l::Option{<:Number} = nothing,
-                                      tau::Option{<:Number} = nothing)
+                                      tau::Option{<:Number} = nothing)::AugmentedBlackLittermanPrior
     return AugmentedBlackLittermanPrior(a_pe, f_pe, mp, re, a_views, f_views, a_sets,
                                         f_sets, a_views_conf, f_views_conf, w, rf, l, tau)
 end
-function factory(pe::AugmentedBlackLittermanPrior, w::ObsWeights)
+function factory(pe::AugmentedBlackLittermanPrior,
+                 w::ObsWeights)::AugmentedBlackLittermanPrior
     return AugmentedBlackLittermanPrior(; a_pe = factory(pe.a_pe, w),
                                         f_pe = factory(pe.f_pe, w), mp = pe.mp,
                                         re = factory(pe.re, w), a_views = pe.a_views,
@@ -234,7 +235,7 @@ function factory(pe::AugmentedBlackLittermanPrior, w::ObsWeights)
                                         f_views_conf = pe.f_views_conf, w = pe.w,
                                         rf = pe.rf, l = pe.l, tau = pe.tau)
 end
-function prior_view(pe::AugmentedBlackLittermanPrior, i)
+function prior_view(pe::AugmentedBlackLittermanPrior, i)::AugmentedBlackLittermanPrior
     return AugmentedBlackLittermanPrior(; a_pe = prior_view(pe.a_pe, i), f_pe = pe.f_pe,
                                         mp = pe.mp, re = regression_view(pe.re, i),
                                         a_views = pe.a_views, f_views = pe.f_views,

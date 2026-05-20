@@ -60,7 +60,7 @@ end
 function GeneralCovariance(;
                            ce::StatsBase.CovarianceEstimator = StatsBase.SimpleCovariance(;
                                                                                           corrected = true),
-                           w::Option{<:ObsWeights} = nothing)
+                           w::Option{<:ObsWeights} = nothing)::GeneralCovariance
     return GeneralCovariance(ce, w)
 end
 """
@@ -189,7 +189,7 @@ GeneralCovariance
   - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
   - [`factory`](@ref)
 """
-function factory(ce::GeneralCovariance, w::ObsWeights)
+function factory(ce::GeneralCovariance, w::ObsWeights)::GeneralCovariance
     return GeneralCovariance(; ce = factory(ce.ce, w), w = w)
 end
 """
@@ -210,7 +210,7 @@ Gets the view of the covariance estimator for the `i`-th element(s).
 
   - [`GeneralCovariance`](@ref)
 """
-function moment_view(ce::GeneralCovariance, i)
+function moment_view(ce::GeneralCovariance, i)::GeneralCovariance
     return GeneralCovariance(; ce = moment_view(ce.ce, i), w = ce.w)
 end
 """
@@ -269,7 +269,7 @@ Covariance
 end
 function Covariance(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
                     ce::StatsBase.CovarianceEstimator = GeneralCovariance(),
-                    alg::AbstractMomentAlgorithm = Full())
+                    alg::AbstractMomentAlgorithm = Full())::Covariance
     return Covariance(me, ce, alg)
 end
 """
@@ -323,7 +323,7 @@ Covariance
   - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
   - [`factory`](@ref)
 """
-function factory(ce::Covariance, w::ObsWeights)
+function factory(ce::Covariance, w::ObsWeights)::Covariance
     return Covariance(; me = factory(ce.me, w), ce = factory(ce.ce, w), alg = ce.alg)
 end
 """
@@ -344,7 +344,7 @@ Gets the view of the covariance estimator for the `i`-th element(s).
 
   - [`Covariance`](@ref)
 """
-function moment_view(ce::Covariance, i)
+function moment_view(ce::Covariance, i)::Covariance
     return Covariance(; me = moment_view(ce.me, i), ce = moment_view(ce.ce, i),
                       alg = ce.alg)
 end

@@ -271,15 +271,15 @@ function OpinionPoolingPrior(; pes::VecEP,
                              pe2::AbstractLowOrderPriorEstimator_A_F_AF = EmpiricalPrior(),
                              p::Option{<:Number} = nothing, w::Option{<:VecNum} = nothing,
                              alg::OpinionPoolingAlgorithm = LinearOpinionPooling(),
-                             ex::FLoops.Transducers.Executor = FLoops.Transducers.ThreadedEx())
+                             ex::FLoops.Transducers.Executor = FLoops.Transducers.ThreadedEx())::OpinionPoolingPrior
     return OpinionPoolingPrior(pes, pe1, pe2, p, w, alg, ex)
 end
-function factory(pe::OpinionPoolingPrior, w::ObsWeights)
+function factory(pe::OpinionPoolingPrior, w::ObsWeights)::OpinionPoolingPrior
     return OpinionPoolingPrior(; pes = factory(pe.pes, w), pe1 = factory(pe.pe1, w),
                                pe2 = factory(pe.pe2, w), p = pe.p, w = pe.w, alg = pe.alg,
                                ex = pe.ex)
 end
-function prior_view(pe::OpinionPoolingPrior, i)
+function prior_view(pe::OpinionPoolingPrior, i)::OpinionPoolingPrior
     return OpinionPoolingPrior(; pes = prior_view(pe.pes, i), pe1 = prior_view(pe.pe1, i),
                                pe2 = prior_view(pe.pe2, i), p = pe.p, w = pe.w,
                                alg = pe.alg, ex = pe.ex)

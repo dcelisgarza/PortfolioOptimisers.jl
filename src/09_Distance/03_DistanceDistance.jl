@@ -74,7 +74,7 @@ end
 function DistanceDistance(; metric::Distances.Metric = Distances.Euclidean(),
                           args::Tuple = (), kwargs::NamedTuple = (;),
                           power::Option{<:Integer} = nothing,
-                          alg::AbstractDistanceAlgorithm = SimpleDistance())
+                          alg::AbstractDistanceAlgorithm = SimpleDistance())::DistanceDistance
     return DistanceDistance(metric, args, kwargs, power, alg)
 end
 """

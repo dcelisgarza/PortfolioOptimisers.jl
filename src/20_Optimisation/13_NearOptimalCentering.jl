@@ -213,7 +213,7 @@ function NearOptimalCentering(; opt::JuMPOptimiser = JuMPOptimiser(),
                               w_max::Option{<:VecNum} = nothing,
                               w_max_ini::Option{<:VecNum} = nothing, ucs_flag::Bool = true,
                               alg::NearOptimalCenteringAlgorithm = UnconstrainedNearOptimalCentering(),
-                              fb::Option{<:OptE_Opt} = nothing)
+                              fb::Option{<:OptE_Opt} = nothing)::NearOptimalCentering
     return NearOptimalCentering(opt, r, obj, bins, w_min, w_min_ini, w_opt, w_opt_ini,
                                 w_max, w_max_ini, ucs_flag, alg, fb)
 end
@@ -222,7 +222,7 @@ function needs_previous_weights(opt::NearOptimalCentering)
             needs_previous_weights(opt.r) ||
             needs_previous_weights(opt.fb))
 end
-function factory(noc::NearOptimalCentering, w::AbstractVector)
+function factory(noc::NearOptimalCentering, w::AbstractVector)::NearOptimalCentering
     opt = factory(noc.opt, w)
     r = factory(noc.r, w)
     fb = factory(noc.fb, w)
@@ -232,7 +232,7 @@ function factory(noc::NearOptimalCentering, w::AbstractVector)
                                 w_max = noc.w_max, w_max_ini = noc.w_max_ini,
                                 ucs_flag = noc.ucs_flag, alg = noc.alg, fb = fb)
 end
-function opt_view(noc::NearOptimalCentering, i, X::MatNum)
+function opt_view(noc::NearOptimalCentering, i, X::MatNum)::NearOptimalCentering
     X = isa(noc.opt.pe, AbstractPriorResult) ? noc.opt.pe.X : X
     opt = opt_view(noc.opt, i, X)
     r = risk_measure_view(noc.r, i, X)

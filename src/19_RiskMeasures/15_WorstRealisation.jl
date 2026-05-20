@@ -57,7 +57,8 @@ WorstRealisation
         return new{typeof(settings)}(settings)
     end
 end
-function WorstRealisation(; settings::RiskMeasureSettings = RiskMeasureSettings())
+function WorstRealisation(;
+                          settings::RiskMeasureSettings = RiskMeasureSettings())::WorstRealisation
     return WorstRealisation(settings)
 end
 function (::WorstRealisation)(x::VecNum)

@@ -101,14 +101,15 @@ end
 function FactorPrior(; pe::AbstractLowOrderPriorEstimator_A_AF = EmpiricalPrior(),
                      mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing(),
                      re::AbstractRegressionEstimator = StepwiseRegression(),
-                     ve::AbstractVarianceEstimator = SimpleVariance(), rsd::Bool = true)
+                     ve::AbstractVarianceEstimator = SimpleVariance(),
+                     rsd::Bool = true)::FactorPrior
     return FactorPrior(pe, mp, re, ve, rsd)
 end
-function factory(pe::FactorPrior, w::ObsWeights)
+function factory(pe::FactorPrior, w::ObsWeights)::FactorPrior
     return FactorPrior(; pe = factory(pe.pe, w), mp = pe.mp, re = factory(pe.re, w),
                        ve = factory(pe.ve, w), rsd = pe.rsd)
 end
-function prior_view(pe::FactorPrior, i)
+function prior_view(pe::FactorPrior, i)::FactorPrior
     return FactorPrior(; pe = pe.pe, mp = pe.mp, re = regression_view(pe.re, i),
                        ve = moment_view(pe.ve, i), rsd = pe.rsd)
 end

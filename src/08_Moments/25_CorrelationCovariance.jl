@@ -43,7 +43,8 @@ CorrelationCovariance
         return new{typeof(ce)}(ce)
     end
 end
-function CorrelationCovariance(; ce::StatsBase.CovarianceEstimator = Covariance())
+function CorrelationCovariance(;
+                               ce::StatsBase.CovarianceEstimator = Covariance())::CorrelationCovariance
     return CorrelationCovariance(ce)
 end
 """
@@ -65,7 +66,7 @@ Return a new [`CorrelationCovariance`](@ref) estimator with observation weights 
   - [`CorrelationCovariance`](@ref)
   - [`factory`](@ref)
 """
-function factory(ce::CorrelationCovariance, w::ObsWeights)
+function factory(ce::CorrelationCovariance, w::ObsWeights)::CorrelationCovariance
     return CorrelationCovariance(; ce = factory(ce.ce, w))
 end
 """
@@ -86,7 +87,7 @@ Gets the view of the covariance estimator for the `i`-th element(s).
 
   - [`CorrelationCovariance`](@ref)
 """
-function moment_view(ce::CorrelationCovariance, i)
+function moment_view(ce::CorrelationCovariance, i)::CorrelationCovariance
     return CorrelationCovariance(; ce = moment_view(ce.ce, i))
 end
 """

@@ -102,7 +102,8 @@ function NormalUncertaintySet(; pe::AbstractLowOrderPriorEstimator = EmpiricalPr
                               n_sim::Integer = 3_000, q::Number = 0.05,
                               rng::Random.AbstractRNG = Random.default_rng(),
                               seed::Option{<:Integer} = nothing,
-                              ens::Option{<:Number} = nothing, kwargs::NamedTuple = (;))
+                              ens::Option{<:Number} = nothing,
+                              kwargs::NamedTuple = (;))::NormalUncertaintySet
     return NormalUncertaintySet(pe, alg, n_sim, q, rng, seed, ens, kwargs)
 end
 """

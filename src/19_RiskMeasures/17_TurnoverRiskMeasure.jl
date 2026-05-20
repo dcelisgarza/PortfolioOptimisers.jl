@@ -72,7 +72,7 @@ TurnoverRiskMeasure
     end
 end
 function TurnoverRiskMeasure(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                             w::VecNum, fixed::Bool = false)
+                             w::VecNum, fixed::Bool = false)::TurnoverRiskMeasure
     return TurnoverRiskMeasure(settings, w, fixed)
 end
 function (r::TurnoverRiskMeasure)(w::VecNum)
@@ -85,7 +85,7 @@ end
 function needs_previous_weights(r::TurnoverRiskMeasure)
     return !r.fixed
 end
-function factory(r::TurnoverRiskMeasure, w::VecNum)
+function factory(r::TurnoverRiskMeasure, w::VecNum)::TurnoverRiskMeasure
     return if r.fixed
         r
     else
@@ -93,7 +93,7 @@ function factory(r::TurnoverRiskMeasure, w::VecNum)
     end
 end
 function factory(r::TurnoverRiskMeasure, ::Any, ::Any, ::Any, w::Option{<:VecNum} = nothing,
-                 args...; kwargs...)
+                 args...; kwargs...)::TurnoverRiskMeasure
     return factory(r, w)
 end
 

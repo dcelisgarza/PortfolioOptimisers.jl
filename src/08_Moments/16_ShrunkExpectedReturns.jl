@@ -120,7 +120,7 @@ JamesStein
         return new{typeof(tgt)}(tgt)
     end
 end
-function JamesStein(; tgt::AbstractShrunkExpectedReturnsTarget = GrandMean())
+function JamesStein(; tgt::AbstractShrunkExpectedReturnsTarget = GrandMean())::JamesStein
     return JamesStein(tgt)
 end
 """
@@ -164,7 +164,7 @@ BayesStein
         return new{typeof(tgt)}(tgt)
     end
 end
-function BayesStein(; tgt::AbstractShrunkExpectedReturnsTarget = GrandMean())
+function BayesStein(; tgt::AbstractShrunkExpectedReturnsTarget = GrandMean())::BayesStein
     return BayesStein(tgt)
 end
 """
@@ -208,7 +208,8 @@ BodnarOkhrinParolya
         return new{typeof(tgt)}(tgt)
     end
 end
-function BodnarOkhrinParolya(; tgt::AbstractShrunkExpectedReturnsTarget = GrandMean())
+function BodnarOkhrinParolya(;
+                             tgt::AbstractShrunkExpectedReturnsTarget = GrandMean())::BodnarOkhrinParolya
     return BodnarOkhrinParolya(tgt)
 end
 """
@@ -282,7 +283,7 @@ end
 function ShrunkExpectedReturns(;
                                me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
                                ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
-                               alg::AbstractShrunkExpectedReturnsAlgorithm = JamesStein())
+                               alg::AbstractShrunkExpectedReturnsAlgorithm = JamesStein())::ShrunkExpectedReturns
     return ShrunkExpectedReturns(me, ce, alg)
 end
 """
@@ -468,7 +469,7 @@ Return a new [`ShrunkExpectedReturns`](@ref) estimator with observation weights 
   - [`ShrunkExpectedReturns`](@ref)
   - [`factory`](@ref)
 """
-function factory(me::ShrunkExpectedReturns, w::ObsWeights)
+function factory(me::ShrunkExpectedReturns, w::ObsWeights)::ShrunkExpectedReturns
     return ShrunkExpectedReturns(; me = factory(me.me, w), ce = factory(me.ce, w),
                                  alg = me.alg)
 end
@@ -490,7 +491,7 @@ Gets the view of the expected returns estimator for the `i`-th element(s).
 
   - [`ShrunkExpectedReturns`](@ref)
 """
-function moment_view(me::ShrunkExpectedReturns, i)
+function moment_view(me::ShrunkExpectedReturns, i)::ShrunkExpectedReturns
     return ShrunkExpectedReturns(; me = moment_view(me.me, i), ce = moment_view(me.ce, i),
                                  alg = me_alg_view(me.alg, i))
 end

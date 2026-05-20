@@ -79,7 +79,7 @@ AverageDrawdown
     end
 end
 function AverageDrawdown(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                         w::Option{<:ObsWeights} = nothing)
+                         w::Option{<:ObsWeights} = nothing)::AverageDrawdown
     return AverageDrawdown(settings, w)
 end
 function (r::AverageDrawdown)(x::VecNum)
@@ -163,7 +163,7 @@ RelativeAverageDrawdown
 end
 function RelativeAverageDrawdown(;
                                  settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
-                                 w::Option{<:ObsWeights} = nothing)
+                                 w::Option{<:ObsWeights} = nothing)::RelativeAverageDrawdown
     return RelativeAverageDrawdown(settings, w)
 end
 function (r::RelativeAverageDrawdown)(x::VecNum)

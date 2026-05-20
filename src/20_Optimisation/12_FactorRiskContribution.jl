@@ -124,7 +124,7 @@ function FactorRiskContribution(; opt::JuMPOptimiser = JuMPOptimiser(),
                                 frc_ple::Option{<:PlCE_PhC_VecPlCE_PlC} = nothing,
                                 sets::Option{<:AssetSets} = nothing,
                                 wi::Option{<:VecNum} = nothing, flag::Bool = false,
-                                fb::Option{<:OptE_Opt} = nothing)
+                                fb::Option{<:OptE_Opt} = nothing)::FactorRiskContribution
     return FactorRiskContribution(opt, re, r, obj, frc_ple, sets, wi, flag, fb)
 end
 function needs_previous_weights(opt::FactorRiskContribution)
@@ -132,7 +132,7 @@ function needs_previous_weights(opt::FactorRiskContribution)
             needs_previous_weights(opt.r) ||
             needs_previous_weights(opt.fb))
 end
-function factory(frc::FactorRiskContribution, w::AbstractVector)
+function factory(frc::FactorRiskContribution, w::AbstractVector)::FactorRiskContribution
     opt = factory(frc.opt, w)
     r = factory(frc.r, w)
     fb = factory(frc.fb, w)
@@ -140,7 +140,7 @@ function factory(frc::FactorRiskContribution, w::AbstractVector)
                                   frc_ple = frc.frc_ple, sets = frc.sets, wi = frc.wi,
                                   flag = frc.flag, fb = fb)
 end
-function opt_view(frc::FactorRiskContribution, i, X::MatNum)
+function opt_view(frc::FactorRiskContribution, i, X::MatNum)::FactorRiskContribution
     X = isa(frc.opt.pe, AbstractPriorResult) ? frc.opt.pe.X : X
     opt = opt_view(frc.opt, i, X)
     re = regression_view(frc.re, i)

@@ -213,18 +213,19 @@ function HierarchicalOptimiser(; pe::PrE_Pr = EmpiricalPrior(),
                                fees::Option{<:FeesE_Fees} = nothing,
                                sets::Option{<:AssetSets} = nothing,
                                wf::WeightFinaliser = IterativeWeightFinaliser(),
-                               brt::Bool = false, cle_pr::Bool = true, strict::Bool = false)
+                               brt::Bool = false, cle_pr::Bool = true,
+                               strict::Bool = false)::HierarchicalOptimiser
     return HierarchicalOptimiser(pe, cle, slv, wb, fees, sets, wf, brt, cle_pr, strict)
 end
 function needs_previous_weights(opt::HierarchicalOptimiser)
     return needs_previous_weights(opt.fees)
 end
-function factory(opt::HierarchicalOptimiser, w::AbstractVector)
+function factory(opt::HierarchicalOptimiser, w::AbstractVector)::HierarchicalOptimiser
     return HierarchicalOptimiser(; pe = opt.pe, cle = opt.cle, slv = opt.slv, wb = opt.wb,
                                  fees = factory(opt.fees, w), sets = opt.sets, wf = opt.wf,
                                  brt = opt.brt, cle_pr = opt.cle_pr, strict = opt.strict)
 end
-function opt_view(hco::HierarchicalOptimiser, i)
+function opt_view(hco::HierarchicalOptimiser, i)::HierarchicalOptimiser
     pe = prior_view(hco.pe, i)
     wb = weight_bounds_view(hco.wb, i)
     fees = fees_view(hco.fees, i)

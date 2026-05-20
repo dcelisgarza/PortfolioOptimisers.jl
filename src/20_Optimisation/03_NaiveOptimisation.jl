@@ -51,7 +51,8 @@ Result type for naive portfolio optimisation estimators.
     w
     fb
 end
-function factory(res::NaiveOptimisationResult, fb::Option{<:OptE_Opt})
+function factory(res::NaiveOptimisationResult,
+                 fb::Option{<:OptE_Opt})::NaiveOptimisationResult
     return NaiveOptimisationResult(res.oe, res.pr, res.wb, res.retcode, res.w, fb)
 end
 """
@@ -162,15 +163,15 @@ function InverseVolatility(; pe::PrE_Pr = EmpiricalPrior(),
                            sets::Option{<:AssetSets} = nothing,
                            wf::WeightFinaliser = IterativeWeightFinaliser(),
                            fb::Option{<:OptE_Opt} = nothing, sq::Bool = false,
-                           brt::Bool = false, strict::Bool = false)
+                           brt::Bool = false, strict::Bool = false)::InverseVolatility
     return InverseVolatility(pe, wb, sets, wf, fb, sq, brt, strict)
 end
-function factory(opt::InverseVolatility, w::AbstractVector)
+function factory(opt::InverseVolatility, w::AbstractVector)::InverseVolatility
     return InverseVolatility(; pe = opt.pe, wb = opt.wb, sets = opt.sets, wf = opt.wf,
                              fb = factory(opt.fb, w), sq = opt.sq, brt = opt.brt,
                              strict = opt.strict)
 end
-function opt_view(opt::InverseVolatility, i, args...)
+function opt_view(opt::InverseVolatility, i, args...)::InverseVolatility
     pe = prior_view(opt.pe, i)
     wb = weight_bounds_view(opt.wb, i)
     sets = asset_sets_view(opt.sets, i)
@@ -209,7 +210,8 @@ end
   - `kwargs`: Additional keyword arguments passed to the optimisation function.
 """
 function optimise(iv::InverseVolatility{<:Any, <:Any, <:Any, <:Any, Nothing},
-                  rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)
+                  rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
+                  kwargs...)::NaiveOptimisationResult
     return _optimise(iv, rd; dims = dims, kwargs...)
 end
 """
@@ -284,14 +286,15 @@ end
 function EqualWeighted(; wb::Option{<:WbE_Wb} = WeightBounds(),
                        sets::Option{<:AssetSets} = nothing,
                        wf::WeightFinaliser = IterativeWeightFinaliser(),
-                       fb::Option{<:OptE_Opt} = nothing, strict::Bool = false)
+                       fb::Option{<:OptE_Opt} = nothing,
+                       strict::Bool = false)::EqualWeighted
     return EqualWeighted(wb, sets, wf, fb, strict)
 end
-function factory(opt::EqualWeighted, w::AbstractVector)
+function factory(opt::EqualWeighted, w::AbstractVector)::EqualWeighted
     return EqualWeighted(; wb = opt.wb, sets = opt.sets, wf = opt.wf,
                          fb = factory(opt.fb, w), strict = opt.strict)
 end
-function opt_view(opt::EqualWeighted, i, args...)
+function opt_view(opt::EqualWeighted, i, args...)::EqualWeighted
     wb = weight_bounds_view(opt.wb, i)
     sets = asset_sets_view(opt.sets, i)
     return EqualWeighted(; wb = wb, sets = sets, wf = opt.wf, fb = opt.fb,
@@ -320,7 +323,7 @@ end
   - `kwargs`: Additional keyword arguments passed to the optimisation function.
 """
 function optimise(ew::EqualWeighted{<:Any, <:Any, <:Any, Nothing}, rd::ReturnsResult;
-                  dims::Int = 1, kwargs...)
+                  dims::Int = 1, kwargs...)::NaiveOptimisationResult
     return _optimise(ew, rd; dims = dims, kwargs...)
 end
 """
@@ -419,15 +422,16 @@ function RandomWeighted(; alpha::Num_VecNum = 1,
                         seed::Option{<:Integer} = nothing, wb::Option{<:WbE_Wb} = nothing,
                         sets::Option{<:AssetSets} = nothing,
                         wf::WeightFinaliser = IterativeWeightFinaliser(),
-                        fb::Option{<:OptE_Opt} = nothing, strict::Bool = false)
+                        fb::Option{<:OptE_Opt} = nothing,
+                        strict::Bool = false)::RandomWeighted
     return RandomWeighted(alpha, rng, seed, wb, sets, wf, fb, strict)
 end
-function factory(opt::RandomWeighted, w::AbstractVector)
+function factory(opt::RandomWeighted, w::AbstractVector)::RandomWeighted
     return RandomWeighted(; alpha = opt.alpha, rng = opt.rng, seed = opt.seed, wb = opt.wb,
                           sets = opt.sets, wf = opt.wf, fb = factory(opt.fb, w),
                           strict = opt.strict)
 end
-function opt_view(opt::RandomWeighted, i, args...)
+function opt_view(opt::RandomWeighted, i, args...)::RandomWeighted
     wb = weight_bounds_view(opt.wb, i)
     sets = asset_sets_view(opt.sets, i)
     alpha = nothing_scalar_array_view(opt.alpha, i)
@@ -468,7 +472,7 @@ end
   - `kwargs`: Additional keyword arguments passed to the optimisation function.
 """
 function optimise(rw::RandomWeighted{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, Nothing},
-                  rd::ReturnsResult; dims::Int = 1, kwargs...)
+                  rd::ReturnsResult; dims::Int = 1, kwargs...)::NaiveOptimisationResult
     return _optimise(rw, rd; dims = dims, kwargs...)
 end
 

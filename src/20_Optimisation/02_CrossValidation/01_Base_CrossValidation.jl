@@ -277,7 +277,7 @@ function PredictionReturnsResult(; nx::Option{<:VecStr} = nothing,
                                  B::Option{<:VecNum_VecVecNum} = nothing,
                                  ts::Option{<:VecDate} = nothing,
                                  iv::Option{<:VecNum_VecVecNum} = nothing,
-                                 ivpa::Option{<:Num_VecNum} = nothing)
+                                 ivpa::Option{<:Num_VecNum} = nothing)::PredictionReturnsResult
     return PredictionReturnsResult(nx, X, nf, F, nb, B, ts, iv, ivpa)
 end
 """
@@ -324,7 +324,7 @@ result with the returns data from the test period.
     end
 end
 function PredictionResult(; res::NonFiniteAllocationOptimisationResult,
-                          rd::PredictionReturnsResult)
+                          rd::PredictionReturnsResult)::PredictionResult
     return PredictionResult(res, rd)
 end
 """
@@ -454,7 +454,7 @@ Concatenates the test-period returns from all folds into an aggregated
 end
 function MultiPeriodPredictionResult(;
                                      pred::VecPredRes = Vector{PredictionResult}(undef, 0),
-                                     id::Any = nothing)
+                                     id::Any = nothing)::MultiPeriodPredictionResult
     return MultiPeriodPredictionResult(pred, id)
 end
 """
@@ -539,7 +539,7 @@ represents one random asset-subset path.
 end
 function PopulationPredictionResult(;
                                     pred::VecPredRes_MultiPredRes = Vector{<:PredRes_MultiPredRes}(undef,
-                                                                                                   0))
+                                                                                                   0))::PopulationPredictionResult
     return PopulationPredictionResult(pred)
 end
 function expected_risk(r::AbstractBaseRiskMeasure, preds::VecMPredRes; kwargs...)

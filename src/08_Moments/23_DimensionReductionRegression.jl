@@ -82,7 +82,7 @@ PCA
         return new{typeof(kwargs)}(kwargs)
     end
 end
-function PCA(; kwargs::NamedTuple = (;))
+function PCA(; kwargs::NamedTuple = (;))::PCA
     return PCA(kwargs)
 end
 """
@@ -150,7 +150,7 @@ PPCA
         return new{typeof(kwargs)}(kwargs)
     end
 end
-function PPCA(; kwargs::NamedTuple = (;))
+function PPCA(; kwargs::NamedTuple = (;))::PPCA
     return PPCA(kwargs)
 end
 """
@@ -244,15 +244,16 @@ DimensionReductionRegression
 end
 function DimensionReductionRegression(; ve::AbstractVarianceEstimator = SimpleVariance(),
                                       drtgt::DimensionReductionTarget = PCA(),
-                                      retgt::AbstractRegressionTarget = LinearModel())
+                                      retgt::AbstractRegressionTarget = LinearModel())::DimensionReductionRegression
     return DimensionReductionRegression(ve, drtgt, retgt)
 end
-function factory(re::DimensionReductionRegression, w::ObsWeights)
+function factory(re::DimensionReductionRegression,
+                 w::ObsWeights)::DimensionReductionRegression
     return DimensionReductionRegression(; ve = factory(re.ve, w),
                                         drtgt = factory(re.drtgt, w),
                                         retgt = factory(re.retgt, w))
 end
-function regression_view(re::DimensionReductionRegression, i)
+function regression_view(re::DimensionReductionRegression, i)::DimensionReductionRegression
     return DimensionReductionRegression(; ve = moment_view(re.ve, i), drtgt = re.drtgt,
                                         retgt = re.retgt)
 end

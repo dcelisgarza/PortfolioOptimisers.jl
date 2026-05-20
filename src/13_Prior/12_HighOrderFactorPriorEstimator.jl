@@ -234,14 +234,15 @@ function HighOrderFactorPriorEstimator(;
                                        ske::Option{<:CoskewnessEstimator} = Coskewness(;
                                                                                        alg = Full()),
                                        ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
-                                       rsd::Bool = true)
+                                       rsd::Bool = true)::HighOrderFactorPriorEstimator
     return HighOrderFactorPriorEstimator(pe, kte, ske, ex, rsd)
 end
-function factory(pe::HighOrderFactorPriorEstimator, w::ObsWeights)
+function factory(pe::HighOrderFactorPriorEstimator,
+                 w::ObsWeights)::HighOrderFactorPriorEstimator
     return HighOrderFactorPriorEstimator(; pe = factory(pe.pe, w), kte = factory(pe.kte, w),
                                          ske = factory(pe.ske, w), ex = pe.ex, rsd = pe.rsd)
 end
-function prior_view(pe::HighOrderFactorPriorEstimator, i)
+function prior_view(pe::HighOrderFactorPriorEstimator, i)::HighOrderFactorPriorEstimator
     return HighOrderFactorPriorEstimator(; pe = prior_view(pe.pe, i), kte = pe.kte,
                                          ske = pe.ske, ex = pe.ex, rsd = pe.rsd)
 end

@@ -175,11 +175,12 @@ function FactorBlackLittermanPrior(;
                                    views_conf::Option{<:Num_VecNum} = nothing,
                                    w::Option{<:VecNum} = nothing, rf::Number = 0.0,
                                    l::Option{<:Number} = nothing,
-                                   tau::Option{<:Number} = nothing, rsd::Bool = true)
+                                   tau::Option{<:Number} = nothing,
+                                   rsd::Bool = true)::FactorBlackLittermanPrior
     return FactorBlackLittermanPrior(pe, f_mp, mp, re, ve, views, sets, views_conf, w, rf,
                                      l, tau, rsd)
 end
-function factory(pe::FactorBlackLittermanPrior, w::ObsWeights)
+function factory(pe::FactorBlackLittermanPrior, w::ObsWeights)::FactorBlackLittermanPrior
     return FactorBlackLittermanPrior(; pe = factory(pe.pe, w), f_mp = pe.f_mp, mp = pe.mp,
                                      re = factory(pe.re, w), ve = factory(pe.ve, w),
                                      views = pe.views, sets = pe.sets,

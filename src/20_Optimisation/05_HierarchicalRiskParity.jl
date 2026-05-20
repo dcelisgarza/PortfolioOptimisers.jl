@@ -131,7 +131,7 @@ end
 function HierarchicalRiskParity(; opt::HierarchicalOptimiser = HierarchicalOptimiser(),
                                 r::OptRM_VecOptRM = Variance(),
                                 sca::Scalariser = SumScalariser(),
-                                fb::Option{<:OptE_Opt} = nothing)
+                                fb::Option{<:OptE_Opt} = nothing)::HierarchicalRiskParity
     return HierarchicalRiskParity(opt, r, sca, fb)
 end
 function needs_previous_weights(opt::HierarchicalRiskParity)
@@ -139,13 +139,13 @@ function needs_previous_weights(opt::HierarchicalRiskParity)
             needs_previous_weights(opt.r) ||
             needs_previous_weights(opt.fb))
 end
-function factory(hrp::HierarchicalRiskParity, w::AbstractVector)
+function factory(hrp::HierarchicalRiskParity, w::AbstractVector)::HierarchicalRiskParity
     opt = factory(hrp.opt, w)
     r = factory(hrp.r, w)
     fb = factory(hrp.fb, w)
     return HierarchicalRiskParity(; opt = opt, r = r, sca = hrp.sca, fb = fb)
 end
-function opt_view(hrp::HierarchicalRiskParity, i, X::MatNum)
+function opt_view(hrp::HierarchicalRiskParity, i, X::MatNum)::HierarchicalRiskParity
     X = isa(hrp.opt.pe, AbstractPriorResult) ? hrp.opt.pe.X : X
     r = risk_measure_view(hrp.r, i, X)
     opt = opt_view(hrp.opt, i)

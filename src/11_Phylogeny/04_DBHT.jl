@@ -148,7 +148,8 @@ GeneralExponentialSimilarity
         return new{typeof(coef), typeof(power)}(coef, power)
     end
 end
-function GeneralExponentialSimilarity(; coef::Number = 1, power::Number = 1)
+function GeneralExponentialSimilarity(; coef::Number = 1,
+                                      power::Number = 1)::GeneralExponentialSimilarity
     return GeneralExponentialSimilarity(coef, power)
 end
 """
@@ -242,7 +243,7 @@ DBHT
     end
 end
 function DBHT(; sim::AbstractSimilarityMatrixAlgorithm = MaximumDistanceSimilarity(),
-              root::DBHTRootMethod = UniqueRoot())
+              root::DBHTRootMethod = UniqueRoot())::DBHT
     return DBHT(sim, root)
 end
 """

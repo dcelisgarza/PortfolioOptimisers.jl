@@ -159,13 +159,14 @@ SemiDefinitePhylogenyEstimator
 @concrete struct SemiDefinitePhylogenyEstimator <: AbstractPhylogenyConstraintEstimator
     pl
     p
-    function SemiDefinitePhylogenyEstimator(pl::NwE_PlM_ClE_Cl, p::Number)
+    function SemiDefinitePhylogenyEstimator(pl::NwE_PlM_ClE_Cl,
+                                            p::Number)::SemiDefinitePhylogenyEstimator
         @argcheck(p >= zero(p), DomainError("`p` must be non-negative:\np => $p"))
         return new{typeof(pl), typeof(p)}(pl, p)
     end
 end
 function SemiDefinitePhylogenyEstimator(; pl::NwE_PlM_ClE_Cl = NetworkEstimator(),
-                                        p::Number = 0.05)
+                                        p::Number = 0.05)::SemiDefinitePhylogenyEstimator
     return SemiDefinitePhylogenyEstimator(pl, p)
 end
 """
@@ -226,17 +227,19 @@ SemiDefinitePhylogeny
 @concrete struct SemiDefinitePhylogeny <: AbstractPhylogenyConstraintResult
     A
     p
-    function SemiDefinitePhylogeny(A::MatNum, p::Number)
+    function SemiDefinitePhylogeny(A::MatNum, p::Number)::SemiDefinitePhylogeny
         @argcheck(all(iszero, LinearAlgebra.diag(A)))
         @argcheck(LinearAlgebra.issymmetric(A))
         @argcheck(p >= zero(p))
         return new{typeof(A), typeof(p)}(A, p)
     end
 end
-function SemiDefinitePhylogeny(A::PhylogenyResult{<:MatNum}, p::Number)
+function SemiDefinitePhylogeny(A::PhylogenyResult{<:MatNum},
+                               p::Number)::SemiDefinitePhylogeny
     return SemiDefinitePhylogeny(A.X, p)
 end
-function SemiDefinitePhylogeny(; A::MatNum_PhRMatNum, p::Number = 0.05)
+function SemiDefinitePhylogeny(; A::MatNum_PhRMatNum,
+                               p::Number = 0.05)::SemiDefinitePhylogeny
     return SemiDefinitePhylogeny(A, p)
 end
 """
@@ -274,12 +277,12 @@ This function is used internally to ensure that the number of groups or allocati
   - [`validate_length_integer_phylogeny_constraint_B`](@ref)
   - [`IntegerPhylogenyEstimator`](@ref)
 """
-function _validate_length_integer_phylogeny_constraint_B(alg::Integer, B::VecNum)
+function _validate_length_integer_phylogeny_constraint_B(alg::Integer, B::VecNum)::Nothing
     @argcheck(length(B) <= alg,
               DomainError("`length(B) <= alg`:\nlength(B) => $(length(B))\nalg => $(alg)"))
     return nothing
 end
-function _validate_length_integer_phylogeny_constraint_B(args...)
+function _validate_length_integer_phylogeny_constraint_B(args...)::Nothing
     return nothing
 end
 """
@@ -396,7 +399,8 @@ IntegerPhylogenyEstimator
     pl
     B
     scale
-    function IntegerPhylogenyEstimator(pl::NwE_PlM_ClE_Cl, B::Int_VecInt, scale::Number)
+    function IntegerPhylogenyEstimator(pl::NwE_PlM_ClE_Cl, B::Int_VecInt,
+                                       scale::Number)::IntegerPhylogenyEstimator
         assert_nonempty_nonneg_finite_val(B, :B)
         if isa(B, VecInt)
             validate_length_integer_phylogeny_constraint_B(pl, B)
@@ -405,7 +409,8 @@ IntegerPhylogenyEstimator
     end
 end
 function IntegerPhylogenyEstimator(; pl::NwE_PlM_ClE_Cl = NetworkEstimator(),
-                                   B::Int_VecInt = 1, scale::Number = 100_000.0)
+                                   B::Int_VecInt = 1,
+                                   scale::Number = 100_000.0)::IntegerPhylogenyEstimator
     return IntegerPhylogenyEstimator(pl, B, scale)
 end
 """
@@ -459,7 +464,7 @@ IntegerPhylogeny
     A
     B
     scale
-    function IntegerPhylogeny(A::MatNum, B::Int_VecInt, scale::Number)
+    function IntegerPhylogeny(A::MatNum, B::Int_VecInt, scale::Number)::IntegerPhylogeny
         @argcheck(all(iszero, LinearAlgebra.diag(A)))
         @argcheck(LinearAlgebra.issymmetric(A))
         A = unique(A + LinearAlgebra.I; dims = 1)
@@ -470,11 +475,12 @@ IntegerPhylogeny
         return new{typeof(A), typeof(B), typeof(scale)}(A, B, scale)
     end
 end
-function IntegerPhylogeny(A::PhylogenyResult{<:MatNum}, B::Int_VecInt, scale::Number)
+function IntegerPhylogeny(A::PhylogenyResult{<:MatNum}, B::Int_VecInt,
+                          scale::Number)::IntegerPhylogeny
     return IntegerPhylogeny(A.X, B, scale)
 end
 function IntegerPhylogeny(; A::MatNum_PhRMatNum, B::Int_VecInt = 1,
-                          scale::Number = 100_000.0)
+                          scale::Number = 100_000.0)::IntegerPhylogeny
     return IntegerPhylogeny(A, B, scale)
 end
 """

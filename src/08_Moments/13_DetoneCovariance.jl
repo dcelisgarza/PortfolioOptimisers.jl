@@ -58,7 +58,8 @@ DetoneCovariance
     end
 end
 function DetoneCovariance(; ce::StatsBase.CovarianceEstimator = Covariance(),
-                          dt::Detone = Detone(), pdm::Option{<:Posdef} = Posdef())
+                          dt::Detone = Detone(),
+                          pdm::Option{<:Posdef} = Posdef())::DetoneCovariance
     return DetoneCovariance(ce, dt, pdm)
 end
 """
@@ -80,7 +81,7 @@ Return a new [`DetoneCovariance`](@ref) estimator with observation weights `w` a
   - [`DetoneCovariance`](@ref)
   - [`factory`](@ref)
 """
-function factory(ce::DetoneCovariance, w::ObsWeights)
+function factory(ce::DetoneCovariance, w::ObsWeights)::DetoneCovariance
     return DetoneCovariance(; ce = factory(ce.ce, w), dt = ce.dt, pdm = ce.pdm)
 end
 """
@@ -101,7 +102,7 @@ Gets the view of the covariance estimator for the `i`-th element(s).
 
   - [`DetoneCovariance`](@ref)
 """
-function moment_view(ce::DetoneCovariance, i)
+function moment_view(ce::DetoneCovariance, i)::DetoneCovariance
     return DetoneCovariance(; ce = moment_view(ce.ce, i), dt = ce.dt, pdm = ce.pdm)
 end
 """

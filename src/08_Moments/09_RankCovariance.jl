@@ -57,7 +57,8 @@ KendallCovariance
         return new{typeof(ve)}(ve)
     end
 end
-function KendallCovariance(; ve::AbstractVarianceEstimator = SimpleVariance())
+function KendallCovariance(;
+                           ve::AbstractVarianceEstimator = SimpleVariance())::KendallCovariance
     return KendallCovariance(ve)
 end
 """
@@ -175,7 +176,8 @@ SpearmanCovariance
         return new{typeof(ve)}(ve)
     end
 end
-function SpearmanCovariance(; ve::AbstractVarianceEstimator = SimpleVariance())
+function SpearmanCovariance(;
+                            ve::AbstractVarianceEstimator = SimpleVariance())::SpearmanCovariance
     return SpearmanCovariance(ve)
 end
 """

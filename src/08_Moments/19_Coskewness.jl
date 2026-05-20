@@ -71,7 +71,7 @@ Coskewness
 end
 function Coskewness(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
                     mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing(),
-                    alg::AbstractMomentAlgorithm = Full())
+                    alg::AbstractMomentAlgorithm = Full())::Coskewness
     return Coskewness(me, mp, alg)
 end
 """
@@ -93,7 +93,7 @@ Return a new [`Coskewness`](@ref) estimator with observation weights `w` applied
   - [`Coskewness`](@ref)
   - [`factory`](@ref)
 """
-function factory(ske::Coskewness, w::ObsWeights)
+function factory(ske::Coskewness, w::ObsWeights)::Coskewness
     return Coskewness(; me = factory(ske.me, w), mp = ske.mp, alg = ske.alg)
 end
 """
@@ -114,7 +114,7 @@ Gets the view of the coskewness estimator for the `i`-th element(s).
 
   - [`Coskewness`](@ref)
 """
-function moment_view(ske::Coskewness, i)
+function moment_view(ske::Coskewness, i)::Coskewness
     return Coskewness(; me = moment_view(ske.me, i), mp = ske.mp, alg = ske.alg)
 end
 """

@@ -84,7 +84,8 @@ ConditionalValueatRisk
     end
 end
 function ConditionalValueatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                                alpha::Number = 0.05, w::Option{<:ObsWeights} = nothing)
+                                alpha::Number = 0.05,
+                                w::Option{<:ObsWeights} = nothing)::ConditionalValueatRisk
     return ConditionalValueatRisk(settings, alpha, w)
 end
 """
@@ -188,7 +189,7 @@ function DistributionallyRobustConditionalValueatRisk(;
                                                       settings::RiskMeasureSettings = RiskMeasureSettings(),
                                                       alpha::Number = 0.05, l::Number = 1.0,
                                                       r::Number = 0.02,
-                                                      w::Option{<:ObsWeights} = nothing)
+                                                      w::Option{<:ObsWeights} = nothing)::DistributionallyRobustConditionalValueatRisk
     return DistributionallyRobustConditionalValueatRisk(settings, alpha, l, r, w)
 end
 """
@@ -322,11 +323,11 @@ end
 function ConditionalValueatRiskRange(;
                                      settings::RiskMeasureSettings = RiskMeasureSettings(),
                                      alpha::Number = 0.05, beta::Number = 0.05,
-                                     w::Option{<:ObsWeights} = nothing)
+                                     w::Option{<:ObsWeights} = nothing)::ConditionalValueatRiskRange
     return ConditionalValueatRiskRange(settings, alpha, beta, w)
 end
 function factory(r::ConditionalValueatRiskRange, pr::AbstractPriorResult, args...;
-                 kwargs...)
+                 kwargs...)::ConditionalValueatRiskRange
     w = nothing_scalar_array_selector(r.w, pr.w)
     return ConditionalValueatRiskRange(; settings = r.settings, alpha = r.alpha,
                                        beta = r.beta, w = w)
@@ -448,12 +449,13 @@ function DistributionallyRobustConditionalValueatRiskRange(;
                                                            beta::Number = 0.05,
                                                            l_b::Number = 1.0,
                                                            r_b::Number = 0.02,
-                                                           w::Option{<:ObsWeights} = nothing)
+                                                           w::Option{<:ObsWeights} = nothing)::DistributionallyRobustConditionalValueatRiskRange
     return DistributionallyRobustConditionalValueatRiskRange(settings, alpha, l_a, r_a,
                                                              beta, l_b, r_b, w)
 end
 function factory(r::DistributionallyRobustConditionalValueatRiskRange,
-                 pr::AbstractPriorResult, args...; kwargs...)
+                 pr::AbstractPriorResult, args...;
+                 kwargs...)::DistributionallyRobustConditionalValueatRiskRange
     w = nothing_scalar_array_selector(r.w, pr.w)
     return DistributionallyRobustConditionalValueatRiskRange(; settings = r.settings,
                                                              alpha = r.alpha, l_a = r.l_a,
@@ -617,7 +619,8 @@ ConditionalDrawdownatRisk
     end
 end
 function ConditionalDrawdownatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                                   alpha::Number = 0.05, w::Option{<:ObsWeights} = nothing)
+                                   alpha::Number = 0.05,
+                                   w::Option{<:ObsWeights} = nothing)::ConditionalDrawdownatRisk
     return ConditionalDrawdownatRisk(settings, alpha, w)
 end
 """
@@ -716,7 +719,7 @@ function DistributionallyRobustConditionalDrawdownatRisk(;
                                                          settings::RiskMeasureSettings = RiskMeasureSettings(),
                                                          alpha::Number = 0.05,
                                                          l::Number = 1.0, r::Number = 0.02,
-                                                         w::Option{<:ObsWeights} = nothing)
+                                                         w::Option{<:ObsWeights} = nothing)::DistributionallyRobustConditionalDrawdownatRisk
     return DistributionallyRobustConditionalDrawdownatRisk(settings, alpha, l, r, w)
 end
 """
@@ -848,7 +851,7 @@ end
 function RelativeConditionalDrawdownatRisk(;
                                            settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
                                            alpha::Number = 0.05,
-                                           w::Option{<:ObsWeights} = nothing)
+                                           w::Option{<:ObsWeights} = nothing)::RelativeConditionalDrawdownatRisk
     return RelativeConditionalDrawdownatRisk(settings, alpha, w)
 end
 function (r::RelativeConditionalDrawdownatRisk{<:Any, <:Any, Nothing})(x::VecNum)

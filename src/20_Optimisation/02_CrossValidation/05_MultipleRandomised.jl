@@ -187,7 +187,8 @@ identifier for each fold.
     end
 end
 function MultipleRandomisedResult(; train_idx::VecVecInt, test_idx::VecVecInt,
-                                  asset_idx::VecVecInt, path_ids::VecInt)
+                                  asset_idx::VecVecInt,
+                                  path_ids::VecInt)::MultipleRandomisedResult
     return MultipleRandomisedResult(train_idx, test_idx, asset_idx, path_ids)
 end
 function n_splits(mre::MultipleRandomised, rd::ReturnsResult)

@@ -278,7 +278,8 @@ Returns the prior unchanged for estimators (they are not sliceable), or returns 
   - [`AbstractPriorEstimator`](@ref)
   - [`LowOrderPrior`](@ref)
 """
-function prior_view(pr::Option{<:AbstractPriorEstimator}, args...; kwargs...)
+function prior_view(pr::Option{<:AbstractPriorEstimator}, args...;
+                    kwargs...)::Option{<:AbstractPriorEstimator}
     return pr
 end
 function prior_view(pr::AbstractVector{<:Union{<:AbstractPriorResult,
@@ -668,10 +669,11 @@ function LowOrderPrior(; X::MatNum, mu::VecNum, sigma::MatNum,
                        ens::Option{<:Number} = nothing, kld::Option{<:Num_VecNum} = nothing,
                        ow::Option{<:VecNum} = nothing, rr::Option{<:Regression} = nothing,
                        f_mu::Option{<:VecNum} = nothing,
-                       f_sigma::Option{<:MatNum} = nothing, f_w::Option{<:VecNum} = nothing)
+                       f_sigma::Option{<:MatNum} = nothing,
+                       f_w::Option{<:VecNum} = nothing)::LowOrderPrior
     return LowOrderPrior(X, mu, sigma, chol, w, ens, kld, ow, rr, f_mu, f_sigma, f_w)
 end
-function prior_view(pr::LowOrderPrior, i)
+function prior_view(pr::LowOrderPrior, i)::LowOrderPrior
     chol = isnothing(pr.chol) ? nothing : view(pr.chol, :, i)
     return LowOrderPrior(; X = view(pr.X, :, i), mu = view(pr.mu, i),
                          sigma = view(pr.sigma, i, i), chol = chol, w = pr.w, ens = pr.ens,
@@ -832,7 +834,8 @@ function HighOrderPrior(; pr::AbstractPriorResult, kt::Option{<:MatNum} = nothin
                         skmp::Option{<:AbstractMatrixProcessingEstimator} = nothing,
                         f_kt::Option{<:MatNum} = nothing,
                         # chol_kt::Option{<:MatNum} = nothing,
-                        f_sk::Option{<:MatNum} = nothing, f_V::Option{<:MatNum} = nothing)
+                        f_sk::Option{<:MatNum} = nothing,
+                        f_V::Option{<:MatNum} = nothing)::HighOrderPrior
     return HighOrderPrior(pr, kt, L2, S2, sk, V, skmp, f_kt, #chol_kt,
                           f_sk, f_V)
 end

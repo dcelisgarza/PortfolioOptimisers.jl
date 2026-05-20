@@ -58,7 +58,8 @@ MutualInfoCovariance
     end
 end
 function MutualInfoCovariance(; ve::AbstractVarianceEstimator = SimpleVariance(),
-                              bins::Int_Bin = HacineGharbiRavier(), normalise::Bool = true)
+                              bins::Int_Bin = HacineGharbiRavier(),
+                              normalise::Bool = true)::MutualInfoCovariance
     return MutualInfoCovariance(ve, bins, normalise)
 end
 """
@@ -80,7 +81,7 @@ Return a new [`MutualInfoCovariance`](@ref) estimator with observation weights `
   - [`MutualInfoCovariance`](@ref)
   - [`factory`](@ref)
 """
-function factory(ce::MutualInfoCovariance, w::ObsWeights)
+function factory(ce::MutualInfoCovariance, w::ObsWeights)::MutualInfoCovariance
     return MutualInfoCovariance(; ve = factory(ce.ve, w), bins = ce.bins,
                                 normalise = ce.normalise)
 end
@@ -102,7 +103,7 @@ Gets the view of the covariance estimator for the `i`-th element(s).
 
   - [`MutualInfoCovariance`](@ref)
 """
-function moment_view(ce::MutualInfoCovariance, i)
+function moment_view(ce::MutualInfoCovariance, i)::MutualInfoCovariance
     return MutualInfoCovariance(; ve = moment_view(ce.ve, i), bins = ce.bins,
                                 normalise = ce.normalise)
 end

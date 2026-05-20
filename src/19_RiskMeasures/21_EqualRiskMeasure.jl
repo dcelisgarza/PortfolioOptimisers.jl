@@ -59,7 +59,7 @@ EqualRiskMeasure
     end
 end
 function EqualRiskMeasure(;
-                          settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings())
+                          settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings())::EqualRiskMeasure
     return EqualRiskMeasure(settings)
 end
 function (::EqualRiskMeasure)(w::VecNum)

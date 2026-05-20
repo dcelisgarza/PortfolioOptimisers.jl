@@ -71,7 +71,7 @@ ThresholdEstimator
     key
     dval
     function ThresholdEstimator(val::EstValType, key::Option{<:AbstractString} = nothing,
-                                dval::Option{<:Number} = nothing)
+                                dval::Option{<:Number} = nothing)::ThresholdEstimator
         assert_nonempty_nonneg_finite_val(val, :val)
         assert_nonempty_nonneg_finite_val(dval, :dval)
         if !isnothing(key)
@@ -81,7 +81,7 @@ ThresholdEstimator
     end
 end
 function ThresholdEstimator(; val::EstValType, key::Option{<:AbstractString} = nothing,
-                            dval::Option{<:Number} = nothing)
+                            dval::Option{<:Number} = nothing)::ThresholdEstimator
     return ThresholdEstimator(val, key, dval)
 end
 """
@@ -129,12 +129,12 @@ Threshold
 """
 @concrete struct Threshold <: AbstractConstraintResult
     val
-    function Threshold(val::Num_VecNum)
+    function Threshold(val::Num_VecNum)::Threshold
         assert_nonempty_nonneg_finite_val(val)
         return new{typeof(val)}(val)
     end
 end
-function Threshold(; val::Num_VecNum)
+function Threshold(; val::Num_VecNum)::Threshold
     return Threshold(val)
 end
 """
@@ -224,14 +224,14 @@ Returns a view of the threshold for the specified index. If `t` is `nothing`, re
   - [`Threshold`](@ref)
   - [`ThresholdEstimator`](@ref)
 """
-function threshold_view(::Nothing, ::Any)
+function threshold_view(::Nothing, ::Any)::Nothing
     return nothing
 end
-function threshold_view(t::ThresholdEstimator, i)
+function threshold_view(t::ThresholdEstimator, i)::ThresholdEstimator
     return ThresholdEstimator(; val = nothing_scalar_array_view(t.val, i), dval = t.dval,
                               key = t.key)
 end
-function threshold_view(t::Threshold, i)
+function threshold_view(t::Threshold, i)::Threshold
     return Threshold(; val = nothing_scalar_array_view(t.val, i))
 end
 function threshold_view(t::VecOptBtE_Bt, i)
@@ -271,7 +271,8 @@ julia> threshold_constraints(nothing)
   - [`Threshold`](@ref)
   - [`threshold_constraints`](@ref)
 """
-function threshold_constraints(t::Option{<:Threshold}, args...; kwargs...)
+function threshold_constraints(t::Option{<:Threshold}, args...;
+                               kwargs...)::Option{<:Threshold}
     return t
 end
 """
@@ -318,7 +319,8 @@ Threshold
   - [`AssetSets`](@ref)
 """
 function threshold_constraints(t::ThresholdEstimator, sets::AssetSets;
-                               datatype::DataType = Float64, strict::Bool = false)
+                               datatype::DataType = Float64,
+                               strict::Bool = false)::Threshold
     return Threshold(;
                      val = estimator_to_val(t.val, sets, t.dval, t.key; datatype = datatype,
                                             strict = strict))

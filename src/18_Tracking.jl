@@ -55,7 +55,7 @@ All concrete and/or abstract types representing tracking algorithms (such as wei
   - [`TrackingError`](@ref)
 """
 abstract type AbstractTrackingAlgorithm <: AbstractAlgorithm end
-function needs_previous_weights(::AbstractTrackingAlgorithm)
+function needs_previous_weights(::AbstractTrackingAlgorithm)::Bool
     return false
 end
 """
@@ -142,12 +142,12 @@ L2Tracking
 """
 @concrete struct L2Tracking <: NormTracking
     ddof
-    function L2Tracking(ddof::Integer)
+    function L2Tracking(ddof::Integer)::L2Tracking
         assert_nonempty_nonneg_finite_val(ddof, :ddof)
         return new{typeof(ddof)}(ddof)
     end
 end
-function L2Tracking(; ddof::Integer = 1)
+function L2Tracking(; ddof::Integer = 1)::L2Tracking
     return L2Tracking(ddof)
 end
 """
@@ -190,12 +190,12 @@ SquaredL2Tracking
 """
 @concrete struct SquaredL2Tracking <: NormTracking
     ddof
-    function SquaredL2Tracking(ddof::Integer)
+    function SquaredL2Tracking(ddof::Integer)::SquaredL2Tracking
         assert_nonempty_nonneg_finite_val(ddof, :ddof)
         return new{typeof(ddof)}(ddof)
     end
 end
-function SquaredL2Tracking(; ddof::Integer = 1)
+function SquaredL2Tracking(; ddof::Integer = 1)::SquaredL2Tracking
     return SquaredL2Tracking(ddof)
 end
 """
@@ -246,12 +246,12 @@ Computes the Lp-norm of the difference between portfolio and benchmark returns: 
 @concrete struct LpTracking <: NormTracking
     p
     ddof
-    function LpTracking(p::Number, ddof::Integer)
+    function LpTracking(p::Number, ddof::Integer)::LpTracking
         assert_nonempty_nonneg_finite_val(ddof, :ddof)
         return new{typeof(p), typeof(ddof)}(p, ddof)
     end
 end
-function LpTracking(; p::Number = 3, ddof::Integer = 0)
+function LpTracking(; p::Number = 3, ddof::Integer = 0)::LpTracking
     return LpTracking(p, ddof)
 end
 """
@@ -280,12 +280,12 @@ Computes the L∞-norm (maximum absolute deviation) of the difference between po
 @concrete struct LInfTracking <: NormTracking
     ddof
     pos
-    function LInfTracking(ddof::Integer, pos::Bool)
+    function LInfTracking(ddof::Integer, pos::Bool)::LInfTracking
         assert_nonempty_nonneg_finite_val(ddof, :ddof)
         return new{typeof(ddof), typeof(pos)}(ddof, pos)
     end
 end
-function LInfTracking(; ddof::Integer = 0, pos::Bool = true)
+function LInfTracking(; ddof::Integer = 0, pos::Bool = true)::LInfTracking
     return LInfTracking(ddof, pos)
 end
 """
@@ -415,7 +415,7 @@ Used as a fallback method for missing tracking constraints or estimators, ensuri
   - [`WeightsTracking`](@ref)
   - [`ReturnsTracking`](@ref)
 """
-function tracking_view(::Nothing, ::Any)
+function tracking_view(::Nothing, ::Any)::Nothing
     return nothing
 end
 """
@@ -466,15 +466,16 @@ WeightsTracking
     fees
     w
     fixed
-    function WeightsTracking(fees::Option{<:Fees}, w::VecNum, fixed::Bool)
+    function WeightsTracking(fees::Option{<:Fees}, w::VecNum, fixed::Bool)::WeightsTracking
         assert_nonempty_finite_val(w, :w)
         return new{typeof(fees), typeof(w), typeof(fixed)}(fees, w, fixed)
     end
 end
-function WeightsTracking(; fees::Option{<:Fees} = nothing, w::VecNum, fixed::Bool = false)
+function WeightsTracking(; fees::Option{<:Fees} = nothing, w::VecNum,
+                         fixed::Bool = false)::WeightsTracking
     return WeightsTracking(fees, w, fixed)
 end
-function needs_previous_weights(tr::WeightsTracking)
+function needs_previous_weights(tr::WeightsTracking)::Bool
     return !tr.fixed
 end
 """

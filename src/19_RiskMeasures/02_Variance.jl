@@ -260,7 +260,7 @@ julia> r(w)
     alg
     function Variance(settings::RiskMeasureSettings, sigma::Option{<:MatNum},
                       chol::Option{<:MatNum}, rc::Option{<:LcE_Lc},
-                      alg::VarianceFormulation)
+                      alg::VarianceFormulation)::Variance
         if isa(sigma, MatNum)
             @argcheck(!isempty(sigma))
             assert_matrix_issquare(sigma, :sigma)
@@ -278,7 +278,7 @@ end
 function Variance(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                   sigma::Option{<:MatNum} = nothing, chol::Option{<:MatNum} = nothing,
                   rc::Option{<:LcE_Lc} = nothing,
-                  alg::VarianceFormulation = SquaredSOCRiskExpr())
+                  alg::VarianceFormulation = SquaredSOCRiskExpr())::Variance
     return Variance(settings, sigma, chol, rc, alg)
 end
 function (r::Variance)(w::VecNum)
@@ -310,7 +310,7 @@ Create an instance of [`Variance`](@ref) by selecting the covariance matrix from
   - [`Variance`](@ref)
   - [`nothing_scalar_array_selector`](@ref)
 """
-function factory(r::Variance, pr::AbstractPriorResult, args...; kwargs...)
+function factory(r::Variance, pr::AbstractPriorResult, args...; kwargs...)::Variance
     sigma = nothing_scalar_array_selector(r.sigma, pr.sigma)
     chol = nothing_scalar_array_selector(r.chol, pr.chol)
     return Variance(; settings = r.settings, sigma = sigma, chol = chol, rc = r.rc,
@@ -416,7 +416,7 @@ julia> r(w)
     sigma
     chol
     function StandardDeviation(settings::RiskMeasureSettings, sigma::Option{<:MatNum},
-                               chol::Option{<:MatNum})
+                               chol::Option{<:MatNum})::StandardDeviation
         if isa(sigma, MatNum)
             @argcheck(!isempty(sigma))
             assert_matrix_issquare(sigma, :sigma)
@@ -429,7 +429,7 @@ julia> r(w)
 end
 function StandardDeviation(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                            sigma::Option{<:MatNum} = nothing,
-                           chol::Option{<:MatNum} = nothing)
+                           chol::Option{<:MatNum} = nothing)::StandardDeviation
     return StandardDeviation(settings, sigma, chol)
 end
 function (r::StandardDeviation)(w::VecNum)
@@ -461,7 +461,8 @@ Create an instance of [`StandardDeviation`](@ref) by selecting the covariance ma
   - [`StandardDeviation`](@ref)
   - [`nothing_scalar_array_selector`](@ref)
 """
-function factory(r::StandardDeviation, pr::AbstractPriorResult, args...; kwargs...)
+function factory(r::StandardDeviation, pr::AbstractPriorResult, args...;
+                 kwargs...)::StandardDeviation
     sigma = nothing_scalar_array_selector(r.sigma, pr.sigma)
     chol = nothing_scalar_array_selector(r.chol, pr.chol)
     return StandardDeviation(; settings = r.settings, sigma = sigma, chol = chol)

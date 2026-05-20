@@ -151,7 +151,8 @@ function Stacking(; pe::PrE_Pr = EmpiricalPrior(), wb::Option{<:WbE_Wb} = nothin
                   cv::Option{<:OptimisationCrossValidation} = nothing,
                   wf::WeightFinaliser = IterativeWeightFinaliser(),
                   ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
-                  fb::Option{<:OptE_Opt} = nothing, brt::Bool = false, strict::Bool = false)
+                  fb::Option{<:OptE_Opt} = nothing, brt::Bool = false,
+                  strict::Bool = false)::Stacking
     return Stacking(pe, wb, fees, sets, scale, opti, opto, cv, wf, ex, fb, brt, strict)
 end
 function assert_special_nco_requirements(opt::Stacking)::Nothing
@@ -180,7 +181,7 @@ function needs_previous_weights(opt::Stacking)
             needs_previous_weights(opt.opto) ||
             needs_previous_weights(opt.fb))
 end
-function factory(st::Stacking, w::AbstractVector)
+function factory(st::Stacking, w::AbstractVector)::Stacking
     fees = factory(st.fees, w)
     opti = factory(st.opti, w)
     opto = factory(st.opto, w)
@@ -189,7 +190,7 @@ function factory(st::Stacking, w::AbstractVector)
                     opti = opti, opto = opto, cv = st.cv, wf = st.wf, ex = st.ex, fb = fb,
                     brt = st.brt, strict = st.strict)
 end
-function opt_view(st::Stacking, i, X::MatNum)
+function opt_view(st::Stacking, i, X::MatNum)::Stacking
     X = isa(st.pe, AbstractPriorResult) ? st.pe.X : X
     pe = prior_view(st.pe, i)
     wb = weight_bounds_view(st.wb, i)

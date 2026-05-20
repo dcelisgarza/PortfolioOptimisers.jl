@@ -214,7 +214,8 @@ RelativisticValueatRisk
 end
 function RelativisticValueatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                                  slv::Option{<:Slv_VecSlv} = nothing, alpha::Number = 0.05,
-                                 kappa::Number = 0.3, w::Option{<:ObsWeights} = nothing)
+                                 kappa::Number = 0.3,
+                                 w::Option{<:ObsWeights} = nothing)::RelativisticValueatRisk
     return RelativisticValueatRisk(settings, slv, alpha, kappa, w)
 end
 function (r::RelativisticValueatRisk)(x::VecNum)
@@ -328,14 +329,15 @@ function RelativisticValueatRiskRange(;
                                       slv::Option{<:Slv_VecSlv} = nothing,
                                       alpha::Number = 0.05, kappa_a::Number = 0.3,
                                       beta::Number = 0.05, kappa_b::Number = 0.3,
-                                      w::Option{<:ObsWeights} = nothing)
+                                      w::Option{<:ObsWeights} = nothing)::RelativisticValueatRiskRange
     return RelativisticValueatRiskRange(settings, slv, alpha, kappa_a, beta, kappa_b, w)
 end
 function (r::RelativisticValueatRiskRange)(x::VecNum)
     return RRM(x, r.slv, r.alpha, r.kappa_a, r.w) + RRM(-x, r.slv, r.beta, r.kappa_b, r.w)
 end
 function factory(r::RelativisticValueatRiskRange, pr::AbstractPriorResult,
-                 slv::Option{<:Slv_VecSlv}, args...; kwargs...)
+                 slv::Option{<:Slv_VecSlv}, args...;
+                 kwargs...)::RelativisticValueatRiskRange
     slv = solver_selector(r.slv, slv)
     return RelativisticValueatRiskRange(; settings = r.settings, alpha = r.alpha,
                                         kappa_a = r.kappa_a, beta = r.beta,
@@ -446,7 +448,7 @@ end
 function RelativisticDrawdownatRisk(; settings = RiskMeasureSettings(),
                                     slv::Option{<:Slv_VecSlv} = nothing,
                                     alpha::Number = 0.05, kappa::Number = 0.3,
-                                    w::Option{<:ObsWeights} = nothing)
+                                    w::Option{<:ObsWeights} = nothing)::RelativisticDrawdownatRisk
     return RelativisticDrawdownatRisk(settings, slv, alpha, kappa, w)
 end
 function (r::RelativisticDrawdownatRisk)(x::VecNum)
@@ -557,7 +559,7 @@ function RelativeRelativisticDrawdownatRisk(;
                                             settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
                                             slv::Option{<:Slv_VecSlv} = nothing,
                                             alpha::Number = 0.05, kappa::Number = 0.3,
-                                            w::Option{<:ObsWeights} = nothing)
+                                            w::Option{<:ObsWeights} = nothing)::RelativeRelativisticDrawdownatRisk
     return RelativeRelativisticDrawdownatRisk(settings, slv, alpha, kappa, w)
 end
 function (r::RelativeRelativisticDrawdownatRisk)(x::VecNum)

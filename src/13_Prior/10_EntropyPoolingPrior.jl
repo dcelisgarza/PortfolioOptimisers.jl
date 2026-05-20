@@ -210,7 +210,8 @@ CVaREntropyPooling
         return new{typeof(args), typeof(kwargs)}(args, kwargs)
     end
 end
-function CVaREntropyPooling(; args::Tuple = (Roots.Brent(),), kwargs::NamedTuple = (;))
+function CVaREntropyPooling(; args::Tuple = (Roots.Brent(),),
+                            kwargs::NamedTuple = (;))::CVaREntropyPooling
     return CVaREntropyPooling(args, kwargs)
 end
 """
@@ -285,7 +286,7 @@ OptimEntropyPooling
 end
 function OptimEntropyPooling(; args::Tuple = (), kwargs::NamedTuple = (;), sc1::Number = 1,
                              sc2::Number = 1e3,
-                             alg::AbstractEntropyPoolingOptAlgorithm = ExpEntropyPooling())
+                             alg::AbstractEntropyPoolingOptAlgorithm = ExpEntropyPooling())::OptimEntropyPooling
     return OptimEntropyPooling(args, kwargs, sc1, sc2, alg)
 end
 """
@@ -370,7 +371,7 @@ JuMPEntropyPooling
 end
 function JuMPEntropyPooling(; slv::Slv_VecSlv, sc1::Number = 1, sc2::Number = 1e5,
                             so::Number = 1,
-                            alg::AbstractEntropyPoolingOptAlgorithm = ExpEntropyPooling())
+                            alg::AbstractEntropyPoolingOptAlgorithm = ExpEntropyPooling())::JuMPEntropyPooling
     return JuMPEntropyPooling(slv, sc1, sc2, so, alg)
 end
 """
@@ -612,7 +613,7 @@ function EntropyPoolingPrior(; pe::AbstractLowOrderPriorEstimator_A_F_AF = Empir
                              dm_opt::Option{<:OptimEntropyPooling} = nothing,
                              opt::NonCVaREP = OptimEntropyPooling(),
                              w::Option{<:StatsBase.ProbabilityWeights} = nothing,
-                             alg::AbstractEntropyPoolingAlgorithm = H1_EntropyPooling())
+                             alg::AbstractEntropyPoolingAlgorithm = H1_EntropyPooling())::EntropyPoolingPrior
     return EntropyPoolingPrior(pe, mu_views, var_views, cvar_views, sigma_views, sk_views,
                                kt_views, rho_views, var_alpha, cvar_alpha, sets, ds_opt,
                                dm_opt, opt, w, alg)
@@ -636,7 +637,7 @@ Alias for an abstract vector of [`EntropyPoolingPrior`](@ref) elements.
   - [`EntropyPoolingPrior`](@ref)
 """
 const VecEP = AbstractVector{<:EntropyPoolingPrior}
-function factory(pe::EntropyPoolingPrior, w::ObsWeights)
+function factory(pe::EntropyPoolingPrior, w::ObsWeights)::EntropyPoolingPrior
     return EntropyPoolingPrior(; pe = factory(pe.pe, w), mu_views = pe.mu_views,
                                var_views = pe.var_views, cvar_views = pe.cvar_views,
                                sigma_views = pe.sigma_views, sk_views = pe.sk_views,
@@ -645,7 +646,7 @@ function factory(pe::EntropyPoolingPrior, w::ObsWeights)
                                sets = pe.sets, ds_opt = pe.ds_opt, dm_opt = pe.dm_opt,
                                opt = pe.opt, w = w, alg = pe.alg)
 end
-function prior_view(pe::EntropyPoolingPrior, i)
+function prior_view(pe::EntropyPoolingPrior, i)::EntropyPoolingPrior
     return EntropyPoolingPrior(; pe = prior_view(pe.pe, i), mu_views = pe.mu_views,
                                var_views = pe.var_views, cvar_views = pe.cvar_views,
                                sigma_views = pe.sigma_views, sk_views = pe.sk_views,

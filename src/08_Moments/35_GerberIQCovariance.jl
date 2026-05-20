@@ -430,7 +430,7 @@ ExpGerberIQDecay
     end
 end
 function ExpGerberIQDecay(; e::Option{<:GerberIQEps} = nothing,
-                          y::Option{<:GerberIQGamma} = nothing)
+                          y::Option{<:GerberIQGamma} = nothing)::ExpGerberIQDecay
     return ExpGerberIQDecay(e, y)
 end
 function (decay::ExpGerberIQDecay)(T::Number, k::Number)
@@ -569,7 +569,7 @@ BasicGerberIQ
         return new{typeof(d), typeof(n)}(d, n)
     end
 end
-function BasicGerberIQ(; d::Number = 2.0, n::Number = 0.5)
+function BasicGerberIQ(; d::Number = 2.0, n::Number = 0.5)::BasicGerberIQ
     return BasicGerberIQ(d, n)
 end
 """
@@ -787,7 +787,7 @@ function PartialGerberIQ(; dcp::Number = 2.0, dcn::Number = dcp, ddp::Number = d
                          n3::Number = n1, n4::Number = 1.0, n5::Number = n4,
                          n6::Number = n4, n7::Number = sqrt(n1 * n4),
                          n8::Number = sqrt(n2 * n5), n9::Number = sqrt(n3 * n6),
-                         n10::Number = sqrt(n3 * n6))
+                         n10::Number = sqrt(n3 * n6))::PartialGerberIQ
     return PartialGerberIQ(dcp, dcn, ddp, ddn, n1, n2, n3, n4, n5, n6, n7, n8, n9, n10)
 end
 """

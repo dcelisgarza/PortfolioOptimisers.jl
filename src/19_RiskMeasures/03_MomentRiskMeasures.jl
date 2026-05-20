@@ -36,7 +36,7 @@ Defines the interface for algorithms that compute portfolio risk using low-order
   - [`MeanAbsoluteDeviation`](@ref)
 """
 abstract type UnstandardisedLowOrderMomentMeasureAlgorithm <: LowOrderMomentMeasureAlgorithm end
-function factory(alg::MomentMeasureAlgorithm, args...; kwargs...)
+function factory(alg::MomentMeasureAlgorithm, args...; kwargs...)::MomentMeasureAlgorithm
     return alg
 end
 """
@@ -121,10 +121,10 @@ SecondMoment
 end
 function SecondMoment(; ve::AbstractVarianceEstimator = SimpleVariance(; me = nothing),
                       alg1::AbstractMomentAlgorithm = Full(),
-                      alg2::SecondMomentFormulation = SquaredSOCRiskExpr())
+                      alg2::SecondMomentFormulation = SquaredSOCRiskExpr())::SecondMoment
     return SecondMoment(ve, alg1, alg2)
 end
-function factory(alg::SecondMoment, w::ObsWeights)
+function factory(alg::SecondMoment, w::ObsWeights)::SecondMoment
     return SecondMoment(; ve = factory(alg.ve, w), alg1 = alg.alg1, alg2 = alg.alg2)
 end
 """
@@ -206,7 +206,7 @@ FourthMoment
         return new{typeof(alg)}(alg)
     end
 end
-function FourthMoment(; alg::AbstractMomentAlgorithm = Full())
+function FourthMoment(; alg::AbstractMomentAlgorithm = Full())::FourthMoment
     return FourthMoment(alg)
 end
 """
@@ -259,10 +259,11 @@ end
 function StandardisedHighOrderMoment(;
                                      ve::AbstractVarianceEstimator = SimpleVariance(;
                                                                                     me = nothing),
-                                     alg::UnstandardisedHighOrderMomentMeasureAlgorithm = ThirdLowerMoment())
+                                     alg::UnstandardisedHighOrderMomentMeasureAlgorithm = ThirdLowerMoment())::StandardisedHighOrderMoment
     return StandardisedHighOrderMoment(ve, alg)
 end
-function factory(alg::StandardisedHighOrderMoment, w::ObsWeights)
+function factory(alg::StandardisedHighOrderMoment,
+                 w::ObsWeights)::StandardisedHighOrderMoment
     return StandardisedHighOrderMoment(; ve = factory(alg.ve, w), alg = alg.alg)
 end
 """
@@ -634,7 +635,7 @@ end
 function LowOrderMoment(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                         w::Option{<:ObsWeights} = nothing,
                         mu::Option{<:Num_VecNum_VecScalar} = nothing,
-                        alg::LowOrderMomentMeasureAlgorithm = FirstLowerMoment())
+                        alg::LowOrderMomentMeasureAlgorithm = FirstLowerMoment())::LowOrderMoment
     return LowOrderMoment(settings, w, mu, alg)
 end
 """
@@ -782,7 +783,7 @@ end
 function HighOrderMoment(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                          w::Option{<:ObsWeights} = nothing,
                          mu::Option{<:Num_VecNum_VecScalar} = nothing,
-                         alg::HighOrderMomentMeasureAlgorithm = ThirdLowerMoment())
+                         alg::HighOrderMomentMeasureAlgorithm = ThirdLowerMoment())::HighOrderMoment
     return HighOrderMoment(settings, w, mu, alg)
 end
 """

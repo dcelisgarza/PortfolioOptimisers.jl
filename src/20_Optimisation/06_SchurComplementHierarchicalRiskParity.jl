@@ -121,7 +121,8 @@ Keywords correspond to the struct's fields.
     end
 end
 function MonotonicSchurComplement(; N::Integer = 10, tol::Number = 1e-4,
-                                  iter::Option{<:Integer} = nothing, strict::Bool = false)
+                                  iter::Option{<:Integer} = nothing,
+                                  strict::Bool = false)::MonotonicSchurComplement
     return MonotonicSchurComplement(N, tol, iter, strict)
 end
 """
@@ -179,7 +180,7 @@ end
 function SchurComplementParams(; r::Sd_Var = Variance(), gamma::Number = 0.5,
                                pdm::Option{<:Posdef} = Posdef(),
                                alg::SchurComplementAlgorithm = MonotonicSchurComplement(),
-                               flag::Bool = true)
+                               flag::Bool = true)::SchurComplementParams
     return SchurComplementParams(r, gamma, pdm, alg, flag)
 end
 """
@@ -376,18 +377,20 @@ end
 function SchurComplementHierarchicalRiskParity(;
                                                opt::HierarchicalOptimiser = HierarchicalOptimiser(),
                                                params::ScP_VecScP = SchurComplementParams(),
-                                               fb::Option{<:OptE_Opt} = nothing)
+                                               fb::Option{<:OptE_Opt} = nothing)::SchurComplementHierarchicalRiskParity
     return SchurComplementHierarchicalRiskParity(opt, params, fb)
 end
 function needs_previous_weights(opt::SchurComplementHierarchicalRiskParity)
     return (needs_previous_weights(opt.opt) || needs_previous_weights(opt.fb))
 end
-function factory(sh::SchurComplementHierarchicalRiskParity, w::AbstractVector)
+function factory(sh::SchurComplementHierarchicalRiskParity,
+                 w::AbstractVector)::SchurComplementHierarchicalRiskParity
     opt = factory(sh.opt, w)
     fb = factory(sh.fb, w)
     return SchurComplementHierarchicalRiskParity(; opt = opt, params = sh.params, fb = fb)
 end
-function opt_view(sh::SchurComplementHierarchicalRiskParity, i, X::MatNum)
+function opt_view(sh::SchurComplementHierarchicalRiskParity, i,
+                  X::MatNum)::SchurComplementHierarchicalRiskParity
     X = isa(sh.opt.pe, AbstractPriorResult) ? sh.opt.pe.X : X
     opt = opt_view(sh.opt, i)
     params = schur_complement_params_view(sh.params, i, X)

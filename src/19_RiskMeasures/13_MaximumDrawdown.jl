@@ -66,7 +66,8 @@ MaximumDrawdown
         return new{typeof(settings)}(settings)
     end
 end
-function MaximumDrawdown(; settings::RiskMeasureSettings = RiskMeasureSettings())
+function MaximumDrawdown(;
+                         settings::RiskMeasureSettings = RiskMeasureSettings())::MaximumDrawdown
     return MaximumDrawdown(settings)
 end
 function (::MaximumDrawdown)(x::VecNum)
@@ -139,7 +140,7 @@ RelativeMaximumDrawdown
     end
 end
 function RelativeMaximumDrawdown(;
-                                 settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings())
+                                 settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings())::RelativeMaximumDrawdown
     return RelativeMaximumDrawdown(settings)
 end
 function (::RelativeMaximumDrawdown)(x::VecNum)

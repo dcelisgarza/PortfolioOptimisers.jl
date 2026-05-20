@@ -189,7 +189,7 @@ function ReturnsResult(; nx::Option{<:VecStr} = nothing, X::Option{<:MatNum} = n
                        nf::Option{<:VecStr} = nothing, F::Option{<:MatNum} = nothing,
                        nb::Option{<:VecStr} = nothing, B::Option{<:VecNum_MatNum} = nothing,
                        ts::Option{<:VecDate} = nothing, iv::Option{<:MatNum} = nothing,
-                       ivpa::Option{<:Num_VecNum} = nothing)
+                       ivpa::Option{<:Num_VecNum} = nothing)::ReturnsResult
     return ReturnsResult(nx, X, nf, F, nb, B, ts, iv, ivpa)
 end
 """

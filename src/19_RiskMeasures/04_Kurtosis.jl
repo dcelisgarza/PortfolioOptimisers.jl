@@ -127,7 +127,7 @@ function Kurtosis(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                   mu::Option{<:Num_VecNum_VecScalar} = nothing,
                   kt::Option{<:MatNum} = nothing, N::Option{<:Integer} = nothing,
                   alg1::AbstractMomentAlgorithm = Full(),
-                  alg2::SecondMomentFormulation = SOCRiskExpr())
+                  alg2::SecondMomentFormulation = SOCRiskExpr())::Kurtosis
     return Kurtosis(settings, w, mu, kt, N, alg1, alg2)
 end
 function calc_moment_target(::Kurtosis{<:Any, Nothing, Nothing, <:Any, <:Any, <:Any, <:Any},
@@ -190,21 +190,21 @@ function (r::Kurtosis{<:Any, <:DynamicAbstractWeights, <:Any, <:Any, <:Any, <:Se
     return Kurtosis(; settings = r.settings, w = get_observation_weights(r.w, X), mu = r.mu,
                     kt = r.kt, N = r.N, alg1 = r.alg1, alg2 = r.alg2)(w, X, fees)
 end
-function factory(r::Kurtosis, pr::HighOrderPrior, args...; kwargs...)
+function factory(r::Kurtosis, pr::HighOrderPrior, args...; kwargs...)::Kurtosis
     w = nothing_scalar_array_selector(r.w, pr.w)
     mu = nothing_scalar_array_selector(r.mu, pr.mu)
     kt = nothing_scalar_array_selector(r.kt, pr.kt)
     return Kurtosis(; settings = r.settings, w = w, mu = mu, kt = kt, N = r.N,
                     alg1 = r.alg1, alg2 = r.alg2)
 end
-function factory(r::Kurtosis, pr::LowOrderPrior, args...; kwargs...)
+function factory(r::Kurtosis, pr::LowOrderPrior, args...; kwargs...)::Kurtosis
     w = nothing_scalar_array_selector(r.w, pr.w)
     mu = nothing_scalar_array_selector(r.mu, pr.mu)
     kt = nothing_scalar_array_selector(r.kt, nothing)
     return Kurtosis(; settings = r.settings, w = w, mu = mu, kt = kt, N = r.N,
                     alg1 = r.alg1, alg2 = r.alg2)
 end
-function risk_measure_view(r::Kurtosis, i, args...)
+function risk_measure_view(r::Kurtosis, i, args...)::Kurtosis
     mu = r.mu
     kt = r.kt
     j = nothing

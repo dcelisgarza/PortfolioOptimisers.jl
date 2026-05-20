@@ -149,7 +149,7 @@ EntropicValueatRisk
 end
 function EntropicValueatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                              slv::Option{<:Slv_VecSlv} = nothing, alpha::Number = 0.05,
-                             w::Option{<:ObsWeights} = nothing)
+                             w::Option{<:ObsWeights} = nothing)::EntropicValueatRisk
     return EntropicValueatRisk(settings, slv, alpha, w)
 end
 function (r::EntropicValueatRisk)(x::VecNum)
@@ -226,14 +226,15 @@ Keywords correspond to the struct's fields.
 end
 function EntropicValueatRiskRange(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                                   slv::Option{<:Slv_VecSlv} = nothing, alpha::Number = 0.05,
-                                  beta::Number = 0.05, w::Option{<:ObsWeights} = nothing)
+                                  beta::Number = 0.05,
+                                  w::Option{<:ObsWeights} = nothing)::EntropicValueatRiskRange
     return EntropicValueatRiskRange(settings, slv, alpha, beta, w)
 end
 function (r::EntropicValueatRiskRange)(x::VecNum)
     return ERM(x, r.slv, r.alpha, r.w) + ERM(-x, r.slv, r.beta, r.w)
 end
 function factory(r::EntropicValueatRiskRange, pr::AbstractPriorResult,
-                 slv::Option{<:Slv_VecSlv}, args...; kwargs...)
+                 slv::Option{<:Slv_VecSlv}, args...; kwargs...)::EntropicValueatRiskRange
     w = nothing_scalar_array_selector(r.w, pr.w)
     slv = solver_selector(r.slv, slv)
     return EntropicValueatRiskRange(; settings = r.settings, slv = slv, alpha = r.alpha,
@@ -335,7 +336,7 @@ EntropicDrawdownatRisk
 end
 function EntropicDrawdownatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                                 slv::Option{<:Slv_VecSlv} = nothing, alpha::Number = 0.05,
-                                w::Option{<:ObsWeights} = nothing)
+                                w::Option{<:ObsWeights} = nothing)::EntropicDrawdownatRisk
     return EntropicDrawdownatRisk(settings, slv, alpha, w)
 end
 function (r::EntropicDrawdownatRisk)(x::VecNum)
@@ -437,7 +438,7 @@ function RelativeEntropicDrawdownatRisk(;
                                         settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
                                         slv::Option{<:Slv_VecSlv} = nothing,
                                         alpha::Number = 0.05,
-                                        w::Option{<:ObsWeights} = nothing)
+                                        w::Option{<:ObsWeights} = nothing)::RelativeEntropicDrawdownatRisk
     return RelativeEntropicDrawdownatRisk(settings, slv, alpha, w)
 end
 function (r::RelativeEntropicDrawdownatRisk)(x::VecNum)

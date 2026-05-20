@@ -275,7 +275,7 @@ ExpectedReturn
         return new{typeof(rt)}(rt)
     end
 end
-function ExpectedReturn(; rt::JuMPReturnsEstimator = ArithmeticReturn())
+function ExpectedReturn(; rt::JuMPReturnsEstimator = ArithmeticReturn())::ExpectedReturn
     return ExpectedReturn(rt)
 end
 """
@@ -308,7 +308,7 @@ This function creates a new [`ExpectedReturn`](@ref) instance by updating the in
   - [`factory`](@ref)
   - [`factory`](@ref)
 """
-function factory(r::ExpectedReturn, args...; kwargs...)
+function factory(r::ExpectedReturn, args...; kwargs...)::ExpectedReturn
     rt = factory(r.rt, args...; kwargs...)
     return ExpectedReturn(; rt = rt)
 end
@@ -401,7 +401,8 @@ ExpectedReturnRiskRatio
     end
 end
 function ExpectedReturnRiskRatio(; rt::JuMPReturnsEstimator = ArithmeticReturn(),
-                                 rk::AbstractBaseRiskMeasure = Variance(), rf::Number = 0.0)
+                                 rk::AbstractBaseRiskMeasure = Variance(),
+                                 rf::Number = 0.0)::ExpectedReturnRiskRatio
     return ExpectedReturnRiskRatio(rt, rk, rf)
 end
 """
@@ -433,7 +434,7 @@ This function creates a new [`ExpectedReturnRiskRatio`](@ref) instance by updati
   - [`ExpectedReturnRiskRatio`](@ref)
   - [`AbstractPriorResult`](@ref)
 """
-function factory(r::ExpectedReturnRiskRatio, args...; kwargs...)
+function factory(r::ExpectedReturnRiskRatio, args...; kwargs...)::ExpectedReturnRiskRatio
     rt = factory(r.rt, args...; kwargs...)
     rk = factory(r.rk, args...; kwargs...)
     return ExpectedReturnRiskRatio(; rt = rt, rk = rk, rf = r.rf)

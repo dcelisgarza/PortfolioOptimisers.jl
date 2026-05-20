@@ -66,7 +66,7 @@ UlcerIndex
         return new{typeof(settings)}(settings)
     end
 end
-function UlcerIndex(; settings::RiskMeasureSettings = RiskMeasureSettings())
+function UlcerIndex(; settings::RiskMeasureSettings = RiskMeasureSettings())::UlcerIndex
     return UlcerIndex(settings)
 end
 function (::UlcerIndex)(x::VecNum)
@@ -139,7 +139,7 @@ RelativeUlcerIndex
     end
 end
 function RelativeUlcerIndex(;
-                            settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings())
+                            settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings())::RelativeUlcerIndex
     return RelativeUlcerIndex(settings)
 end
 function (::RelativeUlcerIndex)(x::VecNum)

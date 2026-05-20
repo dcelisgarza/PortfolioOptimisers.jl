@@ -67,12 +67,12 @@ julia> PortfolioOptimisers.comparison_sign_ineq_flag(>=)
 
   - [`ComparisonOperator`](@ref)
 """
-function comparison_sign_ineq_flag(::typeof(==))
+function comparison_sign_ineq_flag(::typeof(==))::Tuple{Int, Bool}
     return 1, false
 end
-function comparison_sign_ineq_flag(::typeof(<=))
+function comparison_sign_ineq_flag(::typeof(<=))::Tuple{Int, Bool}
     return 1, true
 end
-function comparison_sign_ineq_flag(::typeof(>=))
+function comparison_sign_ineq_flag(::typeof(>=))::Tuple{Int, Bool}
     return -1, true
 end

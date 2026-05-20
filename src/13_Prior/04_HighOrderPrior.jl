@@ -472,14 +472,14 @@ function HighOrderPriorEstimator(;
                                  kte::Option{<:CokurtosisEstimator} = Cokurtosis(;
                                                                                  alg = Full()),
                                  ske::Option{<:CoskewnessEstimator} = Coskewness(;
-                                                                                 alg = Full()))
+                                                                                 alg = Full()))::HighOrderPriorEstimator
     return HighOrderPriorEstimator(pe, kte, ske)
 end
-function factory(pe::HighOrderPriorEstimator, w::ObsWeights)
+function factory(pe::HighOrderPriorEstimator, w::ObsWeights)::HighOrderPriorEstimator
     return HighOrderPriorEstimator(; pe = factory(pe.pe, w), kte = factory(pe.kte, w),
                                    ske = factory(pe.ske, w))
 end
-function prior_view(pr::HighOrderPriorEstimator, i)
+function prior_view(pr::HighOrderPriorEstimator, i)::HighOrderPriorEstimator
     return HighOrderPriorEstimator(; pe = prior_view(pr.pe, i),
                                    kte = moment_view(pr.kte, i),
                                    ske = moment_view(pr.ske, i))

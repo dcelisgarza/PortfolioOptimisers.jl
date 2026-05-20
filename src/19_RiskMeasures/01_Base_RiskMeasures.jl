@@ -15,7 +15,7 @@ All concrete risk measures can be used as functors (callable structs) to compute
   - [`HierarchicalRiskMeasure`](@ref)
 """
 abstract type AbstractBaseRiskMeasure <: AbstractEstimator end
-function needs_previous_weights(::AbstractBaseRiskMeasure)
+function needs_previous_weights(::AbstractBaseRiskMeasure)::Bool
     return false
 end
 """
@@ -33,7 +33,7 @@ The default implementation returns `false` (lower risk is better) for all [`Abst
 
   - [`AbstractBaseRiskMeasure`](@ref)
 """
-function bigger_is_better(::AbstractBaseRiskMeasure)
+function bigger_is_better(::AbstractBaseRiskMeasure)::Bool
     return false
 end
 """
@@ -48,7 +48,7 @@ Alias for an abstract vector of [`AbstractBaseRiskMeasure`](@ref) elements.
   - [`VecRM`](@ref)
 """
 const VecBaseRM = AbstractVector{<:AbstractBaseRiskMeasure}
-function needs_previous_weights(r::VecBaseRM)
+function needs_previous_weights(r::VecBaseRM)::Bool
     return any(needs_previous_weights.(r))
 end
 """
@@ -218,14 +218,14 @@ Frontier
     N
     factor
     flag
-    function Frontier(N::Integer, factor::Number = 1, flag::Bool = true)
+    function Frontier(N::Integer, factor::Number = 1, flag::Bool = true)::Frontier
         @argcheck(N > zero(N))
         @argcheck(isfinite(factor))
         @argcheck(factor > zero(factor))
         return new{typeof(N), typeof(factor), typeof(flag)}(N, factor, flag)
     end
 end
-function Frontier(; N::Integer = 20)
+function Frontier(; N::Integer = 20)::Frontier
     return Frontier(N, 1, true)
 end
 """
@@ -327,14 +327,15 @@ RiskMeasureSettings
     scale
     ub
     rke
-    function RiskMeasureSettings(scale::Number, ub::Option{<:RkRtBounds}, rke::Bool)
+    function RiskMeasureSettings(scale::Number, ub::Option{<:RkRtBounds},
+                                 rke::Bool)::RiskMeasureSettings
         assert_nonempty_nonneg_finite_val(ub, :ub)
         @argcheck(isfinite(scale))
         return new{typeof(scale), typeof(ub), typeof(rke)}(scale, ub, rke)
     end
 end
 function RiskMeasureSettings(; scale::Number = 1.0, ub::Option{<:RkRtBounds} = nothing,
-                             rke::Bool = true)
+                             rke::Bool = true)::RiskMeasureSettings
     return RiskMeasureSettings(scale, ub, rke)
 end
 """
@@ -376,12 +377,13 @@ HierarchicalRiskMeasureSettings
 """
 @concrete struct HierarchicalRiskMeasureSettings <: AbstractRiskMeasureSettings
     scale
-    function HierarchicalRiskMeasureSettings(scale::Number)
+    function HierarchicalRiskMeasureSettings(scale::Number)::HierarchicalRiskMeasureSettings
         @argcheck(isfinite(scale))
         return new{typeof(scale)}(scale)
     end
 end
-function HierarchicalRiskMeasureSettings(; scale::Number = 1.0)
+function HierarchicalRiskMeasureSettings(;
+                                         scale::Number = 1.0)::HierarchicalRiskMeasureSettings
     return HierarchicalRiskMeasureSettings(scale)
 end
 function factory(rs::AbstractBaseRiskMeasure, args...; kwargs...)
@@ -411,7 +413,8 @@ Returns the risk measure sliced for the given cluster or asset index. Used inter
 
   - [`AbstractBaseRiskMeasure`](@ref)
 """
-function risk_measure_view(rs::AbstractBaseRiskMeasure, ::Any, ::Any)
+function risk_measure_view(rs::AbstractBaseRiskMeasure, ::Any,
+                           ::Any)::AbstractBaseRiskMeasure
     return rs
 end
 function risk_measure_view(rs::VecBaseRM, i, X::MatNum)

@@ -44,7 +44,7 @@ Stores the train and test index vectors for each fold of the walk-forward cross-
         return new{typeof(train_idx), typeof(test_idx)}(train_idx, test_idx)
     end
 end
-function WalkForwardResult(; train_idx::VecVecInt, test_idx::VecVecInt)
+function WalkForwardResult(; train_idx::VecVecInt, test_idx::VecVecInt)::WalkForwardResult
     return WalkForwardResult(train_idx, test_idx)
 end
 """

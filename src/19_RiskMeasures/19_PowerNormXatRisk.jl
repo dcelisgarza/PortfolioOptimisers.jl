@@ -161,7 +161,8 @@ PowerNormValueatRisk
 end
 function PowerNormValueatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                               slv::Option{<:Slv_VecSlv} = nothing, alpha::Number = 0.05,
-                              p::Number = 2.0, w::Option{<:ObsWeights} = nothing)
+                              p::Number = 2.0,
+                              w::Option{<:ObsWeights} = nothing)::PowerNormValueatRisk
     return PowerNormValueatRisk(settings, slv, alpha, p, w)
 end
 function (r::PowerNormValueatRisk)(x::VecNum)
@@ -273,14 +274,14 @@ function PowerNormValueatRiskRange(; settings::RiskMeasureSettings = RiskMeasure
                                    slv::Option{<:Slv_VecSlv} = nothing,
                                    alpha::Number = 0.05, beta::Number = 0.05,
                                    pa::Number = 2.0, pb::Number = 2.0,
-                                   w::Option{<:ObsWeights} = nothing)
+                                   w::Option{<:ObsWeights} = nothing)::PowerNormValueatRiskRange
     return PowerNormValueatRiskRange(settings, slv, alpha, beta, pa, pb, w)
 end
 function (r::PowerNormValueatRiskRange)(x::VecNum)
     return PRM(x, r.slv, r.alpha, r.pa, r.w) + PRM(-x, r.slv, r.beta, r.pb, r.w)
 end
 function factory(r::PowerNormValueatRiskRange, pr::AbstractPriorResult,
-                 slv::Option{<:Slv_VecSlv}, args...; kwargs...)
+                 slv::Option{<:Slv_VecSlv}, args...; kwargs...)::PowerNormValueatRiskRange
     w = nothing_scalar_array_selector(r.w, pr.w)
     slv = solver_selector(r.slv, slv)
     return PowerNormValueatRiskRange(; settings = r.settings, slv = slv, alpha = r.alpha,
@@ -391,7 +392,8 @@ PowerNormDrawdownatRisk
 end
 function PowerNormDrawdownatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                                  slv::Option{<:Slv_VecSlv} = nothing, alpha::Number = 0.05,
-                                 p::Number = 2.0, w::Option{<:ObsWeights} = nothing)
+                                 p::Number = 2.0,
+                                 w::Option{<:ObsWeights} = nothing)::PowerNormDrawdownatRisk
     return PowerNormDrawdownatRisk(settings, slv, alpha, p, w)
 end
 function (r::PowerNormDrawdownatRisk)(x::VecNum)
@@ -502,7 +504,7 @@ function RelativePowerNormDrawdownatRisk(;
                                          settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
                                          slv::Option{<:Slv_VecSlv} = nothing,
                                          alpha::Number = 0.05, p::Number = 2.0,
-                                         w::Option{<:ObsWeights} = nothing)
+                                         w::Option{<:ObsWeights} = nothing)::RelativePowerNormDrawdownatRisk
     return RelativePowerNormDrawdownatRisk(settings, slv, alpha, p, w)
 end
 function (r::RelativePowerNormDrawdownatRisk)(x::VecNum)

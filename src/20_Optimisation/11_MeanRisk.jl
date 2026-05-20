@@ -199,7 +199,7 @@ MeanRisk
 end
 function MeanRisk(; opt::JuMPOptimiser = JuMPOptimiser(), r::RM_VecRM = Variance(),
                   obj::ObjectiveFunction = MinimumRisk(), wi::Option{<:VecNum} = nothing,
-                  fb::Option{<:OptE_Opt} = nothing)
+                  fb::Option{<:OptE_Opt} = nothing)::MeanRisk
     return MeanRisk(opt, r, obj, wi, fb)
 end
 function needs_previous_weights(opt::MeanRisk)
@@ -207,13 +207,13 @@ function needs_previous_weights(opt::MeanRisk)
             needs_previous_weights(opt.r) ||
             needs_previous_weights(opt.fb))
 end
-function factory(mr::MeanRisk, w::AbstractVector)
+function factory(mr::MeanRisk, w::AbstractVector)::MeanRisk
     opt = factory(mr.opt, w)
     r = factory(mr.r, w)
     fb = factory(mr.fb, w)
     return MeanRisk(; opt = opt, r = r, obj = mr.obj, wi = mr.wi, fb = fb)
 end
-function opt_view(mr::MeanRisk, i, X::MatNum)
+function opt_view(mr::MeanRisk, i, X::MatNum)::MeanRisk
     X = isa(mr.opt.pe, AbstractPriorResult) ? mr.opt.pe.X : X
     opt = opt_view(mr.opt, i, X)
     r = risk_measure_view(mr.r, i, X)

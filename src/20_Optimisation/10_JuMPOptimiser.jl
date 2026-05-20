@@ -422,7 +422,7 @@ function JuMPOptimiser(; pe::PrE_Pr = EmpiricalPrior(), slv::Slv_VecSlv,
                        nea::Option{<:Number} = nothing, l1::Option{<:Number} = nothing,
                        l2::Option{<:Number} = nothing, linf::Option{<:Number} = nothing,
                        lp::Option{<:LpReg_VecLpReg} = nothing, brt::Bool = false,
-                       cle_pr::Bool = true, strict::Bool = false)
+                       cle_pr::Bool = true, strict::Bool = false)::JuMPOptimiser
     return JuMPOptimiser(pe, slv, wb, bgt, sbgt, lt, st, lcse, cte, gcarde, sgcarde, smtx,
                          sgmtx, slt, sst, sglt, sgst, tn, fees, sets, tr, ple, ret, sca,
                          ccnt, cobj, sc, so, ss, card, scard, nea, l1, l2, linf, lp, brt,
@@ -435,7 +435,7 @@ function needs_previous_weights(opt::JuMPOptimiser)
             needs_previous_weights(opt.ccnt) ||
             needs_previous_weights(opt.cobj))
 end
-function factory(opt::JuMPOptimiser, w::AbstractVector)
+function factory(opt::JuMPOptimiser, w::AbstractVector)::JuMPOptimiser
     tn = factory(opt.tn, w)
     fees = factory(opt.fees, w)
     tr = factory(opt.tr, w)
@@ -452,7 +452,7 @@ function factory(opt::JuMPOptimiser, w::AbstractVector)
                          l1 = opt.l1, l2 = opt.l2, linf = opt.linf, lp = opt.lp,
                          brt = opt.brt, cle_pr = opt.cle_pr, strict = opt.strict)
 end
-function opt_view(opt::JuMPOptimiser, i, X::MatNum)
+function opt_view(opt::JuMPOptimiser, i, X::MatNum)::JuMPOptimiser
     X = isa(opt.pe, AbstractPriorResult) ? opt.pe.X : X
     pe = prior_view(opt.pe, i)
     wb = weight_bounds_view(opt.wb, i)

@@ -140,7 +140,7 @@ function BlackLittermanPrior(;
                              mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing(),
                              views::Lc_BLV, sets::Option{<:AssetSets} = nothing,
                              views_conf::Option{<:Num_VecNum} = nothing, rf::Number = 0.0,
-                             tau::Option{<:Number} = nothing)
+                             tau::Option{<:Number} = nothing)::BlackLittermanPrior
     return BlackLittermanPrior(pe, mp, views, sets, views_conf, rf, tau)
 end
 function Base.getproperty(obj::BlackLittermanPrior, sym::Symbol)
@@ -152,12 +152,12 @@ function Base.getproperty(obj::BlackLittermanPrior, sym::Symbol)
         getfield(obj, sym)
     end
 end
-function factory(pe::BlackLittermanPrior, w::ObsWeights)
+function factory(pe::BlackLittermanPrior, w::ObsWeights)::BlackLittermanPrior
     return BlackLittermanPrior(; pe = factory(pe.pe, w), mp = pe.mp, views = pe.views,
                                sets = pe.sets, views_conf = pe.views_conf, rf = pe.rf,
                                tau = pe.tau)
 end
-function prior_view(pr::BlackLittermanPrior, i)
+function prior_view(pr::BlackLittermanPrior, i)::BlackLittermanPrior
     return BlackLittermanPrior(; pe = prior_view(pr.pe, i), mp = pr.mp, views = pr.views,
                                sets = asset_sets_view(pr.sets, i),
                                views_conf = pr.views_conf, rf = pr.rf, tau = pr.tau)

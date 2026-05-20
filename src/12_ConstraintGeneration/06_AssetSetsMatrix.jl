@@ -46,12 +46,12 @@ julia> asset_sets_matrix(est, sets)
 """
 @concrete struct AssetSetsMatrixEstimator <: AbstractConstraintEstimator
     val
-    function AssetSetsMatrixEstimator(val::AbstractString)
+    function AssetSetsMatrixEstimator(val::AbstractString)::AssetSetsMatrixEstimator
         @argcheck(!isempty(val))
         return new{typeof(val)}(val)
     end
 end
-function AssetSetsMatrixEstimator(; val::AbstractString)
+function AssetSetsMatrixEstimator(; val::AbstractString)::AssetSetsMatrixEstimator
     return AssetSetsMatrixEstimator(val)
 end
 """
@@ -139,7 +139,7 @@ julia> asset_sets_matrix("nx_sector", sets)
   - [`AssetSets`](@ref)
   - [`AssetSetsMatrixEstimator`](@ref)
 """
-function asset_sets_matrix(smtx::AbstractString, sets::AssetSets)
+function asset_sets_matrix(smtx::AbstractString, sets::AssetSets)::BitMatrix
     @argcheck(haskey(sets.dict, smtx), KeyError("key $smtx not found in `sets.dict`"))
     all_sets = sets.dict[smtx]
     @argcheck(length(sets.dict[sets.key]) == length(all_sets),
@@ -173,7 +173,7 @@ This method returns the input matrix `smtx` unchanged. It is used as a fallback 
   - [`AssetSetsMatrixEstimator`](@ref)
   - [`asset_sets_matrix`](@ref)
 """
-function asset_sets_matrix(smtx::Option{<:MatNum}, args...)
+function asset_sets_matrix(smtx::Option{<:MatNum}, args...)::Option{<:MatNum}
     return smtx
 end
 """
@@ -189,7 +189,7 @@ It is used for type stability and to provide a uniform interface for processing 
 
   - [`asset_sets_matrix`](@ref)
 """
-function asset_sets_matrix(smtx::AssetSetsMatrixEstimator, sets::AssetSets)
+function asset_sets_matrix(smtx::AssetSetsMatrixEstimator, sets::AssetSets)::BitMatrix
     return asset_sets_matrix(smtx.val, sets)
 end
 """
@@ -228,7 +228,8 @@ Returns a column view for matrix inputs, the estimator unchanged for estimator i
 function asset_sets_matrix_view(smtx::MatNum, i; kwargs...)
     return view(smtx, :, i)
 end
-function asset_sets_matrix_view(smtx::Option{<:AssetSetsMatrixEstimator}, ::Any; kwargs...)
+function asset_sets_matrix_view(smtx::Option{<:AssetSetsMatrixEstimator}, ::Any;
+                                kwargs...)::Option{<:AssetSetsMatrixEstimator}
     return smtx
 end
 function asset_sets_matrix_view(smtx::VecMatNum_ASetMatE, i; kwargs...)

@@ -68,7 +68,7 @@ CombinatorialCrossValidation
 end
 function CombinatorialCrossValidation(; n_folds::Integer = 10, n_test_folds::Integer = 8,
                                       purged_size::Integer = 0, embargo_size::Integer = 0,
-                                      warn_comb::Integer = 100_000)
+                                      warn_comb::Integer = 100_000)::CombinatorialCrossValidation
     return CombinatorialCrossValidation(n_folds, n_test_folds, purged_size, embargo_size,
                                         warn_comb)
 end
@@ -108,7 +108,7 @@ Stores the train index vectors, nested test index vectors (one per path), and a 
     end
 end
 function CombinatorialCrossValidationResult(; train_idx::VecVecInt, test_idx::VecVecVecInt,
-                                            path_ids::AbstractMatrix{<:Integer})
+                                            path_ids::AbstractMatrix{<:Integer})::CombinatorialCrossValidationResult
     return CombinatorialCrossValidationResult(train_idx, test_idx, path_ids)
 end
 """

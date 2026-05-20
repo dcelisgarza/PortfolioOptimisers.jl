@@ -38,7 +38,8 @@ CustomValueExpectedReturns
         return new{typeof(val)}(val)
     end
 end
-function CustomValueExpectedReturns(; val::Func_Num_VecNum = 0.0)
+function CustomValueExpectedReturns(;
+                                    val::Func_Num_VecNum = 0.0)::CustomValueExpectedReturns
     return CustomValueExpectedReturns(val)
 end
 """

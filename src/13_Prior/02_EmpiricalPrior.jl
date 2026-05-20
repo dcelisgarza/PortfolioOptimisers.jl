@@ -75,14 +75,14 @@ end
 function EmpiricalPrior(;
                         ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
                         me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
-                        horizon::Option{<:Number} = nothing)
+                        horizon::Option{<:Number} = nothing)::EmpiricalPrior
     return EmpiricalPrior(ce, me, horizon)
 end
-function factory(pe::EmpiricalPrior, w::ObsWeights)
+function factory(pe::EmpiricalPrior, w::ObsWeights)::EmpiricalPrior
     return EmpiricalPrior(; me = factory(pe.me, w), ce = factory(pe.ce, w),
                           horizon = pe.horizon)
 end
-function prior_view(pe::EmpiricalPrior, i)
+function prior_view(pe::EmpiricalPrior, i)::EmpiricalPrior
     return EmpiricalPrior(; me = moment_view(pe.me, i), ce = moment_view(pe.ce, i),
                           horizon = pe.horizon)
 end

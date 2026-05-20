@@ -262,7 +262,7 @@ Stores the solution (portfolio weights) from a JuMP optimisation model.
         return new{typeof(w)}(w)
     end
 end
-function JuMPOptimisationSolution(; w::ArrNum)
+function JuMPOptimisationSolution(; w::ArrNum)::JuMPOptimisationSolution
     return JuMPOptimisationSolution(w)
 end
 """

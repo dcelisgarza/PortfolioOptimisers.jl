@@ -209,7 +209,7 @@ function ARCHUncertaintySet(; pe::AbstractLowOrderPriorEstimator = EmpiricalPrio
                             n_sim::Integer = 3_000, block_size::Integer = 3,
                             q::Number = 0.05, seed::Option{<:Integer} = nothing,
                             bootstrap::ARCHBootstrapSet = StationaryBootstrap(),
-                            kwargs::NamedTuple = (;))
+                            kwargs::NamedTuple = (;))::ARCHUncertaintySet
     return ARCHUncertaintySet(pe, alg, n_sim, block_size, q, seed, bootstrap, kwargs)
 end
 """

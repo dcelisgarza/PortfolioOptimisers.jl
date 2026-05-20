@@ -57,7 +57,7 @@ Range
         return new{typeof(settings)}(settings)
     end
 end
-function Range(; settings::RiskMeasureSettings = RiskMeasureSettings())
+function Range(; settings::RiskMeasureSettings = RiskMeasureSettings())::Range
     return Range(settings)
 end
 function (::Range)(x::VecNum)

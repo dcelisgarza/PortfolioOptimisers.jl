@@ -162,7 +162,7 @@ function HierarchicalEqualRiskContribution(;
                                            scai::Scalariser = SumScalariser(),
                                            scao::Scalariser = scai,
                                            ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
-                                           fb::Option{<:OptE_Opt} = nothing)
+                                           fb::Option{<:OptE_Opt} = nothing)::HierarchicalEqualRiskContribution
     return HierarchicalEqualRiskContribution(opt, ri, ro, scai, scao, ex, fb)
 end
 function needs_previous_weights(opt::HierarchicalEqualRiskContribution)
@@ -171,7 +171,8 @@ function needs_previous_weights(opt::HierarchicalEqualRiskContribution)
             needs_previous_weights(opt.ro) ||
             needs_previous_weights(opt.fb))
 end
-function factory(hec::HierarchicalEqualRiskContribution, w::AbstractVector)
+function factory(hec::HierarchicalEqualRiskContribution,
+                 w::AbstractVector)::HierarchicalEqualRiskContribution
     opt = factory(hec.opt, w)
     ri = factory(hec.ri, w)
     ro = factory(hec.ro, w)
@@ -179,7 +180,8 @@ function factory(hec::HierarchicalEqualRiskContribution, w::AbstractVector)
     return HierarchicalEqualRiskContribution(; opt = opt, ri = ri, ro = ro, scai = hec.scai,
                                              scao = hec.scao, ex = hec.ex, fb = fb)
 end
-function opt_view(hec::HierarchicalEqualRiskContribution, i, X::MatNum)
+function opt_view(hec::HierarchicalEqualRiskContribution, i,
+                  X::MatNum)::HierarchicalEqualRiskContribution
     X = isa(hec.opt.pe, AbstractPriorResult) ? hec.opt.pe.X : X
     ri = hec.ri
     ro = hec.ro

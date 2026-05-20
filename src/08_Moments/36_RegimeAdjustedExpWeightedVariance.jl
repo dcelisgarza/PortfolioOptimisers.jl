@@ -10,7 +10,7 @@ abstract type RegimeAdjustedMethod <: AbstractEstimator end
         return new{typeof(x), typeof(y), typeof(kappa)}(x, y, kappa)
     end
 end
-function LogRegimeAdjusted(; x::Number = 0.5, y::Number = 2.0)
+function LogRegimeAdjusted(; x::Number = 0.5, y::Number = 2.0)::LogRegimeAdjusted
     return LogRegimeAdjusted(x, y)
 end
 @concrete struct FirstMomentRegimeAdjusted <: RegimeAdjustedMethod
@@ -20,7 +20,8 @@ end
         return new{typeof(x)}(x)
     end
 end
-function FirstMomentRegimeAdjusted(; x::Number = sqrt(2 * inv(pi)))
+function FirstMomentRegimeAdjusted(;
+                                   x::Number = sqrt(2 * inv(pi)))::FirstMomentRegimeAdjusted
     return FirstMomentRegimeAdjusted(x)
 end
 struct RootMeanSquaredAdjusted <: RegimeAdjustedMethod end
@@ -85,7 +86,7 @@ function RegimeAdjustedExpWeightedVariance(; decay::Number = exp2(-inv(40.0)),
                                                                             <:Number}} = (0.7,
                                                                                           1.6),
                                            min_val::Number = sqrt(eps()),
-                                           centred::Bool = false)
+                                           centred::Bool = false)::RegimeAdjustedExpWeightedVariance
     return RegimeAdjustedExpWeightedVariance(decay, min_obs, hac_lags, regime_method,
                                              regime_decay, regime_min_obs, regime_lohi_mult,
                                              min_val, centred)

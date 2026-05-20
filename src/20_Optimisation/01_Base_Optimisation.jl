@@ -371,7 +371,7 @@ IterativeWeightFinaliser
         return new{typeof(iter)}(iter)
     end
 end
-function IterativeWeightFinaliser(; iter::Integer = 100)
+function IterativeWeightFinaliser(; iter::Integer = 100)::IterativeWeightFinaliser
     return IterativeWeightFinaliser(iter)
 end
 """
@@ -426,7 +426,7 @@ Keywords correspond to the struct's fields.
     end
 end
 function JuMPWeightFinaliser(; slv::Slv_VecSlv, sc::Number = 1.0, so::Number = 1.0,
-                             alg::JuMPWeightFinaliserFormulation = RelativeErrorWeightFinaliser())
+                             alg::JuMPWeightFinaliserFormulation = RelativeErrorWeightFinaliser())::JuMPWeightFinaliser
     return JuMPWeightFinaliser(slv, sc, so, alg)
 end
 """

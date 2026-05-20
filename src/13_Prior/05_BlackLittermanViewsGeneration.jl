@@ -56,7 +56,8 @@ BlackLittermanViews
         return new{typeof(P), typeof(Q), typeof(excl)}(P, Q, excl)
     end
 end
-function BlackLittermanViews(; P::MatNum, Q::VecNum, excl::Option{<:VecInt} = nothing)
+function BlackLittermanViews(; P::MatNum, Q::VecNum,
+                             excl::Option{<:VecInt} = nothing)::BlackLittermanViews
     return BlackLittermanViews(P, Q, excl)
 end
 """

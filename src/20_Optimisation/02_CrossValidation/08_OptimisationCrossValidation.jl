@@ -34,7 +34,7 @@ cross-validation pipeline.
     end
 end
 function OptimisationCrossValidation(; cv::OptCVER = KFold(),
-                                     scorer::Option{<:PredictionCrossValScorer} = nothing)
+                                     scorer::Option{<:PredictionCrossValScorer} = nothing)::OptimisationCrossValidation
     return OptimisationCrossValidation(cv, scorer)
 end
 """

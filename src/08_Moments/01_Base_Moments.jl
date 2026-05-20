@@ -17,7 +17,8 @@ No-op fallback for getting the view of a covariance estimator.
   - [`AbstractCovarianceEstimator`](@ref)
   - [`StatsBase.CovarianceEstimator`](https://juliastats.org/StatsBase.jl/stable/cov/)
 """
-function moment_view(ce::StatsBase.CovarianceEstimator, args...)
+function moment_view(ce::StatsBase.CovarianceEstimator,
+                     args...)::StatsBase.CovarianceEstimator
     return ce
 end
 """
@@ -45,7 +46,8 @@ Fallback for covariance estimator factory methods.
   - [`AbstractCovarianceEstimator`](@ref)
   - [`StatsBase.CovarianceEstimator`](https://juliastats.org/StatsBase.jl/stable/cov/)
 """
-function factory(ce::StatsBase.CovarianceEstimator, args...; kwargs...)
+function factory(ce::StatsBase.CovarianceEstimator, args...;
+                 kwargs...)::StatsBase.CovarianceEstimator
     return ce
 end
 """
@@ -411,7 +413,8 @@ Fallback for abstract expected returns estimator factory methods.
     - [`factory`](@ref)
     - [`AbstractExpectedReturnsEstimator`](@ref)
 """
-function factory(me::AbstractExpectedReturnsEstimator, args...; kwargs...)
+function factory(me::AbstractExpectedReturnsEstimator, args...;
+                 kwargs...)::AbstractExpectedReturnsEstimator
     return me
 end
 """
@@ -432,7 +435,8 @@ No-op fallback for getting the view of a an expected returns estimator.
 
     - [`AbstractExpectedReturnsEstimator`](@ref)
 """
-function moment_view(me::AbstractExpectedReturnsEstimator, args...)
+function moment_view(me::AbstractExpectedReturnsEstimator,
+                     args...)::AbstractExpectedReturnsEstimator
     return me
 end
 """
@@ -472,7 +476,8 @@ Fallback for abstract expected returns algorithm factory methods.
     - [`factory`](@ref)
     - [`AbstractExpectedReturnsAlgorithm`](@ref)
 """
-function factory(alg::AbstractExpectedReturnsAlgorithm, args...; kwargs...)
+function factory(alg::AbstractExpectedReturnsAlgorithm, args...;
+                 kwargs...)::AbstractExpectedReturnsAlgorithm
     return alg
 end
 """
@@ -493,7 +498,8 @@ No-op fallback for getting the view of a expected returns algorithm.
 
     - [`AbstractExpectedReturnsAlgorithm`](@ref)
 """
-function me_alg_view(alg::AbstractExpectedReturnsAlgorithm, args...)
+function me_alg_view(alg::AbstractExpectedReturnsAlgorithm,
+                     args...)::AbstractExpectedReturnsAlgorithm
     return alg
 end
 """

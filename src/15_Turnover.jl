@@ -20,7 +20,7 @@ Used as a fallback method for missing turnover constraints or estimators, ensuri
   - [`Turnover`](@ref)
   - [`turnover_constraints`](@ref)
 """
-function turnover_view(::Nothing, ::Any)
+function turnover_view(::Nothing, ::Any)::Nothing
     return nothing
 end
 """
@@ -80,7 +80,7 @@ TurnoverEstimator
     dval
     fixed
     function TurnoverEstimator(w::VecNum, val::EstValType, dval::Option{<:Number},
-                               fixed::Bool)
+                               fixed::Bool)::TurnoverEstimator
         assert_nonempty_finite_val(w, :w)
         assert_nonempty_nonneg_finite_val(val)
         if !isnothing(dval)
@@ -90,7 +90,7 @@ TurnoverEstimator
     end
 end
 function TurnoverEstimator(; w::VecNum, val::EstValType, dval::Option{<:Number} = nothing,
-                           fixed::Bool = false)
+                           fixed::Bool = false)::TurnoverEstimator
     return TurnoverEstimator(w, val, dval, fixed)
 end
 """
@@ -146,7 +146,7 @@ TurnoverEstimator
   - [`turnover_constraints`](@ref)
   - [`nothing_scalar_array_view`](@ref)
 """
-function turnover_view(tn::TurnoverEstimator, i)
+function turnover_view(tn::TurnoverEstimator, i)::TurnoverEstimator
     w = view(tn.w, i)
     val = nothing_scalar_array_view(tn.val, i)
     return TurnoverEstimator(; w = w, val = val, dval = tn.dval, fixed = tn.fixed)
@@ -212,7 +212,7 @@ TurnoverEstimator
   - [`factory(tn::Turnover, w::VecNum)`](@ref)
   - [`turnover_constraints`](@ref)
 """
-function factory(tn::TurnoverEstimator, w::VecNum)
+function factory(tn::TurnoverEstimator, w::VecNum)::TurnoverEstimator
     return if tn.fixed
         tn
     else
@@ -264,7 +264,7 @@ Turnover
   - [`turnover_constraints`](@ref)
 """
 function turnover_constraints(tn::TurnoverEstimator, sets::AssetSets;
-                              datatype::DataType = Float64, strict::Bool = false)
+                              datatype::DataType = Float64, strict::Bool = false)::Turnover
     return Turnover(; w = tn.w,
                     val = estimator_to_val(tn.val, sets, tn.dval; datatype = datatype,
                                            strict = strict), fixed = tn.fixed)
@@ -352,7 +352,7 @@ Turnover
     w
     val
     fixed
-    function Turnover(w::VecNum, val::Num_VecNum, fixed::Bool)
+    function Turnover(w::VecNum, val::Num_VecNum, fixed::Bool)::Turnover
         assert_nonempty_finite_val(w, :w)
         assert_nonempty_nonneg_finite_val(val)
         if isa(val, VecNum)
@@ -361,7 +361,7 @@ Turnover
         return new{typeof(w), typeof(val), typeof(fixed)}(w, val, fixed)
     end
 end
-function Turnover(; w::VecNum, val::Num_VecNum = 0.0, fixed::Bool = false)
+function Turnover(; w::VecNum, val::Num_VecNum = 0.0, fixed::Bool = false)::Turnover
     return Turnover(w, val, fixed)
 end
 """
@@ -412,7 +412,7 @@ Turnover
   - [`turnover_constraints`](@ref)
   - [`nothing_scalar_array_view`](@ref)
 """
-function turnover_view(tn::Turnover, i)
+function turnover_view(tn::Turnover, i)::Turnover
     w = view(tn.w, i)
     val = nothing_scalar_array_view(tn.val, i)
     return Turnover(; w = w, val = val, fixed = tn.fixed)
@@ -467,7 +467,7 @@ Turnover
   - [`TurnoverEstimator`](@ref)
   - [`turnover_constraints`](@ref)
 """
-function factory(tn::Turnover, w::VecNum)
+function factory(tn::Turnover, w::VecNum)::Turnover
     return tn.fixed ? tn : Turnover(; w = w, val = tn.val, fixed = tn.fixed)
 end
 """
@@ -505,7 +505,8 @@ Turnover
   - [`Turnover`](@ref)
   - [`Option`](@ref)
 """
-function turnover_constraints(tn::Option{<:Turnover}, args...; kwargs...)
+function turnover_constraints(tn::Option{<:Turnover}, args...;
+                              kwargs...)::Option{<:Turnover}
     return tn
 end
 """

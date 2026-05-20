@@ -71,7 +71,7 @@ DeltaUncertaintySet
     end
 end
 function DeltaUncertaintySet(; pe::AbstractLowOrderPriorEstimator = EmpiricalPrior(),
-                             dmu::Number = 0.1, dsigma::Number = 0.1)
+                             dmu::Number = 0.1, dsigma::Number = 0.1)::DeltaUncertaintySet
     return DeltaUncertaintySet(pe, dmu, dsigma)
 end
 """

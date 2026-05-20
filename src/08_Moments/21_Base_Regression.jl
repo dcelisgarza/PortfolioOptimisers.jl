@@ -136,7 +136,7 @@ LinearModel
         return new{typeof(kwargs)}(kwargs)
     end
 end
-function LinearModel(; kwargs::NamedTuple = (;))
+function LinearModel(; kwargs::NamedTuple = (;))::LinearModel
     return LinearModel(kwargs)
 end
 """
@@ -158,7 +158,7 @@ Return a new [`LinearModel`](@ref) regression target with observation weights `w
   - [`LinearModel`](@ref)
   - [`factory`](@ref)
 """
-function factory(re::LinearModel, w::ObsWeights)
+function factory(re::LinearModel, w::ObsWeights)::LinearModel
     return LinearModel(; kwargs = (; re.kwargs..., weights = w))
 end
 """
@@ -238,7 +238,7 @@ GeneralisedLinearModel
     end
 end
 function GeneralisedLinearModel(; args::Tuple = (Distributions.Normal(),),
-                                kwargs::NamedTuple = (;))
+                                kwargs::NamedTuple = (;))::GeneralisedLinearModel
     return GeneralisedLinearModel(args, kwargs)
 end
 """
@@ -260,7 +260,7 @@ Return a new [`GeneralisedLinearModel`](@ref) regression target with observation
   - [`GeneralisedLinearModel`](@ref)
   - [`factory`](@ref)
 """
-function factory(re::GeneralisedLinearModel, w::ObsWeights)
+function factory(re::GeneralisedLinearModel, w::ObsWeights)::GeneralisedLinearModel
     return GeneralisedLinearModel(; args = re.args, kwargs = (; re.kwargs..., weights = w))
 end
 """
@@ -538,7 +538,7 @@ Regression
     end
 end
 function Regression(; M::MatNum, L::Option{<:MatNum} = nothing,
-                    b::Option{<:VecNum} = nothing)
+                    b::Option{<:VecNum} = nothing)::Regression
     return Regression(M, L, b)
 end
 function Base.getproperty(re::Regression{<:Any, Nothing, <:Any}, sym::Symbol)
@@ -591,7 +591,7 @@ Regression
 
   - [`Regression`](@ref)
 """
-function regression_view(re::Regression, i)
+function regression_view(re::Regression, i)::Regression
     return Regression(; M = view(re.M, i, :),
                       L = isnothing(re.L) ? nothing : view(re.L, i, :), b = view(re.b, i))
 end

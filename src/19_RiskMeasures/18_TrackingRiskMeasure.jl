@@ -52,7 +52,7 @@ end
 function RiskTrackingError(; tr::WeightsTracking,
                            r::AbstractBaseRiskMeasure = StandardDeviation(),
                            err::Number = 0.0,
-                           alg::VariableTracking = IndependentVariableTracking())
+                           alg::VariableTracking = IndependentVariableTracking())::RiskTrackingError
     return RiskTrackingError(tr, r, err, alg)
 end
 function tracking_view(::Nothing, args...)
@@ -63,7 +63,7 @@ function tracking_view(tr::RiskTrackingError, i, X::MatNum)
                              r = risk_measure_view(tr.r, i, X), err = tr.err, alg = tr.alg)
 end
 function factory(tr::RiskTrackingError, pr::AbstractPriorResult, slv::Any, ucs::Any,
-                 w::Option{<:VecNum} = nothing, args...; kwargs...)
+                 w::Option{<:VecNum} = nothing, args...; kwargs...)::RiskTrackingError
     return RiskTrackingError(; tr = factory(tr.tr, w),
                              r = factory(tr.r, pr, slv, ucs, w, args...; kwargs...),
                              err = tr.err, alg = tr.alg)
@@ -71,7 +71,7 @@ end
 function needs_previous_weights(tr::RiskTrackingError)
     return (needs_previous_weights(tr.tr) || needs_previous_weights(tr.r))
 end
-function factory(tr::RiskTrackingError, w::VecNum)
+function factory(tr::RiskTrackingError, w::VecNum)::RiskTrackingError
     return RiskTrackingError(; tr = factory(tr.tr, w), r = factory(tr.r, w), err = tr.err,
                              alg = tr.alg)
 end
@@ -155,7 +155,7 @@ TrackingRiskMeasure
 end
 function TrackingRiskMeasure(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                              tr::AbstractTrackingAlgorithm,
-                             alg::NormTracking = L2Tracking())
+                             alg::NormTracking = L2Tracking())::TrackingRiskMeasure
     return TrackingRiskMeasure(settings, tr, alg)
 end
 function (r::TrackingRiskMeasure)(w::VecNum, X::MatNum, fees::Option{<:Fees} = nothing)
