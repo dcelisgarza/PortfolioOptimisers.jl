@@ -95,7 +95,7 @@ Matches either a single [`MatNum_ASetMatE`](@ref) or a vector of them. Used for 
 """
 const MatNum_ASetMatE_VecMatNum_ASetMatE = Union{<:MatNum_ASetMatE, <:VecMatNum_ASetMatE}
 """
-    asset_sets_matrix(smtx::AbstractString, sets::AssetSets)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
 Construct a binary asset-group membership matrix from asset set groupings.
 
@@ -139,7 +139,7 @@ julia> asset_sets_matrix("nx_sector", sets)
   - [`AssetSets`](@ref)
   - [`AssetSetsMatrixEstimator`](@ref)
 """
-function asset_sets_matrix(smtx::AbstractString, sets::AssetSets)::BitMatrix
+function asset_sets_matrix(smtx::AbstractString, sets::AssetSets)
     @argcheck(haskey(sets.dict, smtx), KeyError("key $smtx not found in `sets.dict`"))
     all_sets = sets.dict[smtx]
     @argcheck(length(sets.dict[sets.key]) == length(all_sets),
