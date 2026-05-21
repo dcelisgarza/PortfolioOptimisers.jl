@@ -182,11 +182,7 @@ Structured result for standard linear constraint equation parsing.
 
 # Fields
 
-  - `vars`: Vector of variable names as strings.
-  - `coef`: Vector of coefficients.
-  - `op`: The comparison operator as a string.
-  - `rhs`: The right-hand side value.
-  - `eqn`: The formatted equation string.
+$(DocStringExtensions.FIELDS)
 
 # Related
 
@@ -195,10 +191,15 @@ Structured result for standard linear constraint equation parsing.
   - [`RhoParsingResult`](@ref)
 """
 @concrete struct ParsingResult <: AbstractParsingResult
+    "$(field_dict[:vars])"
     vars
+    "$(field_dict[:coef_c])"
     coef
+    "$(field_dict[:op])"
     op
+    "$(field_dict[:rhs])"
     rhs
+    "$(field_dict[:eqn])"
     eqn
     function ParsingResult(vars::VecStr, coef::VecNum, op::AbstractString, rhs::Number,
                            eqn::AbstractString)::ParsingResult
@@ -241,11 +242,11 @@ Container for asset set and group information used in constraint generation.
 
 If a key in `dict` starts with the same value as `key`, it means that the corresponding group must have the same length as the asset universe, `dict[key]`. This is useful for defining partitions of the asset universe, for example when using [`asset_sets_matrix`](@ref) with [`NestedClustered`](@ref).
 
+If a key in `dict` starts with the same value as `ukey`, it identifies a unique-entry group variant. The corresponding `key`-prefixed group must exist in `dict` with the same length as the asset universe, and is used to match each asset to a unique entry from the `ukey`-prefixed group. This enables constraint generation using unique entries even in [`NestedClustered`](@ref) optimisations.
+
 # Fields
 
-  - `key`: The key in `dict` that identifies the primary list of assets. Groups prefixed by this `key` followed by an `_` must have the same length as `dict[key]` as their lengths are preserved across views, enabling the use of constraints even in [`NestedClustered`](@ref) optimisations. For example if `key` is `mykey`, sets prefixed by `mykey_` must have the same length and corresponding order as `dict[key]`. For example if we want to define the asset industries we can create a key-value pair with key "mykey_industries", where the entry corresponds to the industry of the asset in the same position in `dict[key]`.
-  - `ukey`: The key prefix used for asset sets with unique entries. If present, there must be an equivalently named group prefixed by `key` followed by an `_` that follows the above rule, as that group will be used to find each of the unique entries matching each asset for the view. For example assuming `ukey` is `myuniquekey` if we want to use the above example but create a constraint which uses the sets of industries found in `dict["mykey_industries"]` we can create a key-value pair with key `myuniquekey_industries` whose values are the unique entries of `dict["mykey_industries"]`. This uniqueness will be propagated across views, which lets us define constraints on the unique entries even in [`NestedClustered`](@ref) optimisations.
-  - `dict`: A dictionary mapping group names (or asset set names) to vectors of asset identifiers.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -284,8 +285,11 @@ AssetSets
   - [`linear_constraints`](@ref)
 """
 @concrete struct AssetSets <: AbstractEstimator
+    "$(field_dict[:as_key])"
     key
+    "$(field_dict[:as_ukey])"
     ukey
+    "$(field_dict[:dict])"
     dict
     function AssetSets(key::AbstractString, ukey::AbstractString,
                        dict::AbstractDict{<:AbstractString, <:Any})::AssetSets
@@ -1312,8 +1316,7 @@ Container for one or more linear constraint equations to be parsed and converted
 
 # Fields
 
-  - `val`: A single equation as an `AbstractString` or `Expr`, or a vector of such equations.
-  - `key`: (Optional) Key in the [`AssetSets`](@ref) to specify the asset universe for constraint generation. When provided, takes precedence over `key` field of [`AssetSets`](@ref).
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -1353,7 +1356,9 @@ LinearConstraint
   - [`linear_constraints`](@ref)
 """
 @concrete struct LinearConstraintEstimator <: AbstractConstraintEstimator
+    "$(field_dict[:lce_val])"
     val
+    "$(field_dict[:ekey])"
     key
     function LinearConstraintEstimator(val::EqnType,
                                        key::Option{<:AbstractString} = nothing)::LinearConstraintEstimator

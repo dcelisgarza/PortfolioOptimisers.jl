@@ -7,7 +7,7 @@ Container for the result of a risk budget constraint.
 
 # Fields
 
-  - `val`: Vector of risk budget allocations (typically `VecNum`).
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -37,6 +37,7 @@ RiskBudget
   - [`AbstractConstraintResult`](@ref)
 """
 @concrete struct RiskBudget <: AbstractConstraintResult
+    "$(field_dict[:rkb_val])"
     val
     function RiskBudget(val::VecNum)::RiskBudget
         @argcheck(!isempty(val))
@@ -84,7 +85,7 @@ Container for a risk budget allocation mapping or vector.
 
 # Fields
 
-  - `val`: A dictionary, pair, or vector of pairs mapping asset or group names to risk budget values.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -119,7 +120,9 @@ RiskBudgetEstimator
   - [`AssetSets`](@ref)
 """
 @concrete struct RiskBudgetEstimator <: AbstractConstraintEstimator
+    "$(field_dict[:rkbe_val])"
     val
+    "$(field_dict[:dval])"
     dval
     function RiskBudgetEstimator(val::EstValType,
                                  dval::Option{<:Number})::RiskBudgetEstimator

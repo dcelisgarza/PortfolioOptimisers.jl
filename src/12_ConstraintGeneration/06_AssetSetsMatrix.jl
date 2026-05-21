@@ -7,7 +7,7 @@ Estimator for constructing asset set membership matrices from asset groupings.
 
 # Fields
 
-  - `val`: The key or group name to extract from the asset sets.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -45,6 +45,7 @@ julia> asset_sets_matrix(est, sets)
   - [`AbstractConstraintEstimator`](@ref)
 """
 @concrete struct AssetSetsMatrixEstimator <: AbstractConstraintEstimator
+    "$(field_dict[:asets_val])"
     val
     function AssetSetsMatrixEstimator(val::AbstractString)::AssetSetsMatrixEstimator
         @argcheck(!isempty(val))

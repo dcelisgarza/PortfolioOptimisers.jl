@@ -79,8 +79,7 @@ Container for lower and upper portfolio weight bounds.
 
 # Fields
 
-  - `lb`: Lower bound(s) for portfolio weights.
-  - `ub`: Upper bound(s) for portfolio weights.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -122,7 +121,9 @@ WeightBounds
   - [`weight_bounds_constraints`](@ref)
 """
 @concrete struct WeightBounds <: AbstractConstraintResult
+    "$(field_dict[:lb])"
     lb
+    "$(field_dict[:ub])"
     ub
     function WeightBounds(lb::Option{<:Num_VecNum}, ub::Option{<:Num_VecNum})::WeightBounds
         validate_bounds(lb, ub)
@@ -147,10 +148,7 @@ Estimator for portfolio weight bounds constraints.
 
 # Fields
 
-  - `lb`: Lower bound(s) for portfolio weights.
-  - `ub`: Upper bound(s) for portfolio weights.
-  - `dlb`: Default lower bound applied to assets when no specific lower bound is specified.
-  - `dub`: Default upper bound applied to assets when no specific upper bound is specified.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -195,9 +193,13 @@ WeightBoundsEstimator
   - [`weight_bounds_constraints`](@ref)
 """
 @concrete struct WeightBoundsEstimator <: AbstractConstraintEstimator
+    "$(field_dict[:lb])"
     lb
+    "$(field_dict[:ub])"
     ub
+    "$(field_dict[:dlb])"
     dlb
+    "$(field_dict[:dub])"
     dub
     function WeightBoundsEstimator(lb::Option{<:EstValType}, ub::Option{<:EstValType},
                                    dlb::Option{<:Number} = nothing,

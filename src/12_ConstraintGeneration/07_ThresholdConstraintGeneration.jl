@@ -7,9 +7,7 @@ Estimator for buy-in threshold portfolio constraints.
 
 # Fields
 
-  - `val`: Asset-specific threshold values, as a dictionary, pair, or vector of pairs.
-  - `key`: (Optional) Key in the [`AssetSets`](@ref) to specify the asset universe for constraint generation. When provided, takes precedence over `key` field of [`AssetSets`](@ref).
-  - `dval`: Default threshold value applied to assets not explicitly specified in `val`.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -67,8 +65,11 @@ ThresholdEstimator
   - [`AbstractConstraintEstimator`](@ref)
 """
 @concrete struct ThresholdEstimator <: AbstractConstraintEstimator
+    "$(field_dict[:thr_val])"
     val
+    "$(field_dict[:ekey])"
     key
+    "$(field_dict[:dval])"
     dval
     function ThresholdEstimator(val::EstValType, key::Option{<:AbstractString} = nothing,
                                 dval::Option{<:Number} = nothing)::ThresholdEstimator
@@ -93,7 +94,7 @@ Container for buy-in threshold portfolio constraints.
 
 # Fields
 
-  - `val`: Scalar or vector of threshold values for portfolio weights.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -128,6 +129,7 @@ Threshold
   - [`AbstractConstraintResult`](@ref)
 """
 @concrete struct Threshold <: AbstractConstraintResult
+    "$(field_dict[:thr_res_val])"
     val
     function Threshold(val::Num_VecNum)::Threshold
         assert_nonempty_nonneg_finite_val(val)

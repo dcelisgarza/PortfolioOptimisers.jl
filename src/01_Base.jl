@@ -587,7 +587,23 @@ const arg_dict = Dict(
                       :max_phi => "`max_phi`: Maximum allowed value for any OWA weight.",#
                       :w1_owa => "`w1`: Optional first OWA weight vector.",#
                       :w2_owa => "`w2`: Optional second OWA weight vector.",#
-                      :owa_w => "`w`: Optional OWA weight vector.")
+                      :owa_w => "`w`: Optional OWA weight vector.",#
+                      # Constraint generation.
+                      :rkb_val => "`val`: Vector of risk budget allocations.",#
+                      :rkbe_val => "`val`: Mapping of names to risk budget values.",#
+                      :as_key => "`key`: Key in `dict` identifying the primary asset list.",#
+                      :as_ukey => "`ukey`: Key prefix for unique-entry group variants in `dict`.",#
+                      :p_phylo => "`p`: Non-negative penalty parameter for the phylogeny constraint.",#
+                      :A_phylo => "`A`: Phylogeny constraint matrix.",#
+                      :B_phylo => "`B`: Group sizes or allocations vector.",#
+                      :scale_phylo => "`scale`: Non-negative big-M scaling factor for the MIP formulation.",#
+                      :cc_A => "`A`: Centrality estimator.",#
+                      :cc_B => "`B`: Centrality threshold or reduction measure.",#
+                      :cc_comp => "`comp`: Comparison operator for the centrality constraint.",#
+                      :lce_val => "`val`: Constraint equation(s) to parse.",#
+                      :asets_val => "`val`: Group name key for asset set membership matrix extraction.",#
+                      :thr_val => "`val`: Asset-specific threshold value(s).",#
+                      :thr_res_val => "`val`: Threshold value(s) for portfolio weights.")
 """
     field_dict
 
