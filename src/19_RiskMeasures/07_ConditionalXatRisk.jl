@@ -21,9 +21,7 @@ Equivalently, it is the expected loss conditional on exceeding the VaR:
 
 # Fields
 
-  - `settings`: Risk measure configuration.
-  - `alpha`: Significance level for the lower tail.
-  - `w`: Optional observation weights.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -73,8 +71,11 @@ ConditionalValueatRisk
   - [`ConditionalDrawdownatRisk`](@ref)
 """
 @concrete struct ConditionalValueatRisk <: RiskMeasure
+    "$(field_dict[:settings_rm])"
     settings
+    "$(field_dict[:alpha])"
     alpha
+    "$(field_dict[:oow])"
     w
     function ConditionalValueatRisk(settings::RiskMeasureSettings, alpha::Number,
                                     w::Option{<:ObsWeights})
@@ -105,11 +106,7 @@ The DR-CVaR with Wasserstein ambiguity parameter ``l`` and radius ``r`` is a rob
 
 # Fields
 
-  - `settings`: Risk measure configuration.
-  - `alpha`: Significance level for the lower tail.
-  - `l`: Wasserstein ambiguity parameter (radius scale factor).
-  - `r`: Wasserstein radius parameter.
-  - `w`: Optional observation weights.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -164,10 +161,15 @@ DistributionallyRobustConditionalValueatRisk
   - [`DistributionallyRobustConditionalDrawdownatRisk`](@ref)
 """
 @concrete struct DistributionallyRobustConditionalValueatRisk <: RiskMeasure
+    "$(field_dict[:settings_rm])"
     settings
+    "$(field_dict[:alpha])"
     alpha
+    "$(field_dict[:l_wass])"
     l
+    "$(field_dict[:r_wass])"
     r
+    "$(field_dict[:oow])"
     w
     function DistributionallyRobustConditionalValueatRisk(settings::RiskMeasureSettings,
                                                           alpha::Number, l::Number,
@@ -252,10 +254,7 @@ where ``\\mathrm{CVaR}_{\\alpha}(\\boldsymbol{x})`` captures the lower-tail expe
 
 # Fields
 
-  - `settings`: Risk measure configuration.
-  - `alpha`: Significance level for the lower tail.
-  - `beta`: Significance level for the upper tail.
-  - `w`: Optional observation weights.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -307,9 +306,13 @@ ConditionalValueatRiskRange
   - [`DistributionallyRobustConditionalValueatRiskRange`](@ref)
 """
 @concrete struct ConditionalValueatRiskRange <: RiskMeasure
+    "$(field_dict[:settings_rm])"
     settings
+    "$(field_dict[:alpha])"
     alpha
+    "$(field_dict[:beta])"
     beta
+    "$(field_dict[:oow])"
     w
     function ConditionalValueatRiskRange(settings::RiskMeasureSettings, alpha::Number,
                                          beta::Number, w::Option{<:ObsWeights})
@@ -349,14 +352,7 @@ where each DR-CVaR uses its own Wasserstein ambiguity parameters ``(l_a, r_a)`` 
 
 # Fields
 
-  - `settings`: Risk measure configuration.
-  - `alpha`: Significance level for the lower tail.
-  - `l_a`: Wasserstein ambiguity scale factor for the lower tail.
-  - `r_a`: Wasserstein radius for the lower tail.
-  - `beta`: Significance level for the upper tail.
-  - `l_b`: Wasserstein ambiguity scale factor for the upper tail.
-  - `r_b`: Wasserstein radius for the upper tail.
-  - `w`: Optional observation weights.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -416,13 +412,21 @@ DistributionallyRobustConditionalValueatRiskRange
   - [`DistributionallyRobustConditionalValueatRisk`](@ref)
 """
 @concrete struct DistributionallyRobustConditionalValueatRiskRange <: RiskMeasure
+    "$(field_dict[:settings_rm])"
     settings
+    "$(field_dict[:alpha])"
     alpha
+    "$(field_dict[:l_a])"
     l_a
+    "$(field_dict[:r_a])"
     r_a
+    "$(field_dict[:beta])"
     beta
+    "$(field_dict[:l_b])"
     l_b
+    "$(field_dict[:r_b])"
     r_b
+    "$(field_dict[:oow])"
     w
     function DistributionallyRobustConditionalValueatRiskRange(settings::RiskMeasureSettings,
                                                                alpha::Number, l_a::Number,
@@ -557,9 +561,7 @@ The CDaR is the CVaR of the drawdown series ``\\boldsymbol{d} = (d_1, \\ldots, d
 
 # Fields
 
-  - `settings`: Risk measure configuration.
-  - `alpha`: Significance level for the lower tail.
-  - `w`: Optional observation weights.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -608,8 +610,11 @@ ConditionalDrawdownatRisk
   - [`RelativeConditionalDrawdownatRisk`](@ref)
 """
 @concrete struct ConditionalDrawdownatRisk <: RiskMeasure
+    "$(field_dict[:settings_rm])"
     settings
+    "$(field_dict[:alpha])"
     alpha
+    "$(field_dict[:oow])"
     w
     function ConditionalDrawdownatRisk(settings::RiskMeasureSettings, alpha::Number,
                                        w::Option{<:ObsWeights})
@@ -638,11 +643,7 @@ Represents the Distributionally Robust Conditional Drawdown-at-Risk (DR-CDaR) ri
 
 # Fields
 
-  - `settings`: Risk measure configuration.
-  - `alpha`: Significance level for the lower tail.
-  - `l`: Wasserstein ambiguity scale factor.
-  - `r`: Wasserstein radius parameter.
-  - `w`: Optional observation weights.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -696,10 +697,15 @@ DistributionallyRobustConditionalDrawdownatRisk
   - [`DistributionallyRobustConditionalValueatRisk`](@ref)
 """
 @concrete struct DistributionallyRobustConditionalDrawdownatRisk <: RiskMeasure
+    "$(field_dict[:settings_rm])"
     settings
+    "$(field_dict[:alpha])"
     alpha
+    "$(field_dict[:l_wass])"
     l
+    "$(field_dict[:r_wass])"
     r
+    "$(field_dict[:oow])"
     w
     function DistributionallyRobustConditionalDrawdownatRisk(settings::RiskMeasureSettings,
                                                              alpha::Number, l::Number,
@@ -790,9 +796,7 @@ The Relative CDaR is the CVaR of the relative drawdown series ``\\boldsymbol{rd}
 
 # Fields
 
-  - `settings`: Hierarchical risk measure configuration.
-  - `alpha`: Significance level for the lower tail.
-  - `w`: Optional observation weights.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -838,8 +842,11 @@ RelativeConditionalDrawdownatRisk
   - [`RelativeDrawdownatRisk`](@ref)
 """
 @concrete struct RelativeConditionalDrawdownatRisk <: HierarchicalRiskMeasure
+    "$(field_dict[:settings_rm])"
     settings
+    "$(field_dict[:alpha])"
     alpha
+    "$(field_dict[:oow])"
     w
     function RelativeConditionalDrawdownatRisk(settings::HierarchicalRiskMeasureSettings,
                                                alpha::Number, w::Option{<:ObsWeights})

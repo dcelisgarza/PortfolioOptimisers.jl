@@ -299,6 +299,8 @@ const arg_dict = Dict(
                       :f_mu => "`f_mu`: Factor expected returns vector.",#
                       :f_sigma => "`f_sigma`: Factor covariance matrix.",#
                       :f_w => "`f_w`: Factor weights vector.",#
+                      :op_w => "`ow`: Opinion pooling weights.",#
+                      :reg_rr => "`rr`: Regression result.",#
                       # Prior estimators.
                       :horizon => "`horizon`: Optional investment horizon for log-normalising returns. If `nothing`, returns are not adjusted.",#
                       :tau => "`tau`: Blending parameter controlling the weight given to the prior relative to the views.",#
@@ -358,6 +360,7 @@ const arg_dict = Dict(
                       :q_bs => "`q`: Quantile parameter for uncertainty set computation.",#
                       :bootstrap => "`bootstrap`: Bootstrap algorithm.",#
                       :ucs => "`ucs`: Uncertainty set.",#
+                      :ucsa => "`alg`: Uncertainty set algorithm.",#
                       # Constraint generation.
                       :dval => "`dval`: Default value for assets not specified in `val`.",#
                       :ukey => "`ukey`: Universe key identifying the full set of assets.",#
@@ -577,7 +580,14 @@ const arg_dict = Dict(
                       :l_retcode => "`l_retcode`: Return code for the long allocation sub-problem.",#
                       :s_retcode => "`s_retcode`: Return code for the short allocation sub-problem.",#
                       # Risk budgeting.
-                      :prb => "`prb`: Processed risk budgeting configuration.")
+                      :prb => "`prb`: Processed risk budgeting configuration.",#
+                      :l_wass => "`l`: Wasserstein ambiguity scale factor.",#
+                      :r_wass => "`r`: Wasserstein radius parameter.",#
+                      :g_rm => "`g`: Risk aversion parameter.",#
+                      :max_phi => "`max_phi`: Maximum allowed value for any OWA weight.",#
+                      :w1_owa => "`w1`: Optional first OWA weight vector.",#
+                      :w2_owa => "`w2`: Optional second OWA weight vector.",#
+                      :owa_w => "`w`: Optional OWA weight vector.")
 """
     field_dict
 

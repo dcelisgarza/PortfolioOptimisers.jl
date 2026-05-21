@@ -51,8 +51,7 @@ Mixed-integer programming (MIP) formulation for Value-at-Risk.
 
 # Fields
 
-  - `b`: Optional big-M upper bound for the binary variable formulation. Must be positive and strictly greater than `s` if both are provided.
-  - `s`: Optional small-M lower bound for the binary variable formulation. Must be positive and strictly less than `b` if both are provided.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -86,7 +85,9 @@ MIPValueatRisk
   - [`Option`](@ref)
 """
 @concrete struct MIPValueatRisk <: ValueatRiskFormulation
+    "$(field_dict[:b_mip])"
     b
+    "$(field_dict[:s_mip])"
     s
     function MIPValueatRisk(b::Option{<:Number}, s::Option{<:Number})
         bflag = !isnothing(b)
@@ -116,10 +117,7 @@ Distribution-based formulation for Value-at-Risk.
 
 # Fields
 
-  - `mu`: Optional expected returns vector. If `nothing`, uses prior result.
-  - `sigma`: Optional covariance matrix. If `nothing`, uses prior result.
-  - `chol`: Optional Cholesky factorisation of the covariance matrix. If `nothing`, uses prior result.
-  - `dist`: Probability distribution to use for Value-at-Risk computation.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -157,9 +155,13 @@ DistributionValueatRisk
   - [`Option`](@ref)
 """
 @concrete struct DistributionValueatRisk <: ValueatRiskFormulation
+    "$(field_dict[:mu_rm])"
     mu
+    "$(field_dict[:sigma])"
     sigma
+    "$(field_dict[:chol])"
     chol
+    "$(field_dict[:dist])"
     dist
     function DistributionValueatRisk(mu::Option{<:VecNum}, sigma::Option{<:MatNum},
                                      chol::Option{<:MatNum},
@@ -217,10 +219,7 @@ For observation-weighted samples with weight vector ``\\boldsymbol{w}`` summing 
 
 # Fields
 
-  - `settings`: Risk measure configuration.
-  - `alpha`: Significance level for the lower tail (e.g., `0.05` for 95% VaR).
-  - `w`: Optional observation weights.
-  - `alg`: Formulation algorithm for computing VaR.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -274,9 +273,13 @@ ValueatRisk
   - [`ValueatRiskRange`](@ref)
 """
 @concrete struct ValueatRisk <: RiskMeasure
+    "$(field_dict[:settings_rm])"
     settings
+    "$(field_dict[:alpha])"
     alpha
+    "$(field_dict[:oow])"
     w
+    "$(field_dict[:alg])"
     alg
     function ValueatRisk(settings::RiskMeasureSettings, alpha::Number,
                          w::Option{<:ObsWeights}, alg::ValueatRiskFormulation)
@@ -331,11 +334,7 @@ where ``\\mathrm{VaR}_{\\alpha}(\\boldsymbol{x})`` captures the lower-tail loss 
 
 # Fields
 
-  - `settings`: Risk measure configuration.
-  - `alpha`: Significance level for the lower tail.
-  - `beta`: Significance level for the upper tail.
-  - `w`: Optional observation weights.
-  - `alg`: Formulation algorithm for computing VaR.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -390,10 +389,15 @@ ValueatRiskRange
   - [`ConditionalValueatRiskRange`](@ref)
 """
 @concrete struct ValueatRiskRange <: RiskMeasure
+    "$(field_dict[:settings_rm])"
     settings
+    "$(field_dict[:alpha])"
     alpha
+    "$(field_dict[:beta])"
     beta
+    "$(field_dict[:oow])"
     w
+    "$(field_dict[:alg])"
     alg
     function ValueatRiskRange(settings::RiskMeasureSettings, alpha::Number, beta::Number,
                               w::Option{<:ObsWeights}, alg::ValueatRiskFormulation)
@@ -473,11 +477,7 @@ The Drawdown-at-Risk at level ``\\alpha`` is the ``\\lceil \\alpha T \\rceil``-t
 
 # Fields
 
-  - `settings`: Risk measure configuration.
-  - `alpha`: Significance level for the lower tail.
-  - `w`: Optional observation weights.
-  - `b`: Optional big-M upper bound for the binary variable formulation in `JuMP` models.
-  - `s`: Optional small-M lower bound for the binary variable formulation in `JuMP` models.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -532,10 +532,15 @@ DrawdownatRisk
   - [`RelativeDrawdownatRisk`](@ref)
 """
 @concrete struct DrawdownatRisk <: RiskMeasure
+    "$(field_dict[:settings_rm])"
     settings
+    "$(field_dict[:alpha])"
     alpha
+    "$(field_dict[:oow])"
     w
+    "$(field_dict[:b_mip])"
     b
+    "$(field_dict[:s_mip])"
     s
     function DrawdownatRisk(settings::RiskMeasureSettings, alpha::Number,
                             w::Option{<:ObsWeights}, b::Option{<:Number},
@@ -643,13 +648,9 @@ where ``rd_{(k)}`` is the ``k``-th smallest relative drawdown.
 
 # Fields
 
-  - `settings`: Hierarchical risk measure configuration.
-  - `alpha`: Significance level for the lower tail.
-  - `w`: Optional observation weights.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
-
-    RelativeDrawdownatRisk(;
         settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
         alpha::Number = 0.05,
         w::Option{<:ObsWeights} = nothing
@@ -691,8 +692,11 @@ RelativeDrawdownatRisk
   - [`RelativeConditionalDrawdownatRisk`](@ref)
 """
 @concrete struct RelativeDrawdownatRisk <: HierarchicalRiskMeasure
+    "$(field_dict[:settings_rm])"
     settings
+    "$(field_dict[:alpha])"
     alpha
+    "$(field_dict[:oow])"
     w
     function RelativeDrawdownatRisk(settings::HierarchicalRiskMeasureSettings,
                                     alpha::Number, w::Option{<:ObsWeights})
