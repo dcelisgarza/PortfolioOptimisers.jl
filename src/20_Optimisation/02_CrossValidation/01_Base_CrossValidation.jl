@@ -181,15 +181,7 @@ information for use in prediction result types.
 
 # Fields
 
-  - `nx`: Asset names (`nothing` or vector of strings).
-  - `X`: Asset returns vector or vector of vectors.
-  - `nf`: Factor names (`nothing` or vector of strings).
-  - `F`: Factor returns matrix (`nothing` or matrix).
-  - `nb`: Benchmark names (`nothing` or vector of strings).
-  - `B`: Benchmark returns vector or vector of vectors.
-  - `ts`: Timestamps (`nothing` or vector of dates).
-  - `iv`: Investment vehicle returns (`nothing`, vector of numbers, or vector of vectors).
-  - `ivpa`: Investment vehicle per-asset allocation (`nothing`, scalar, or vector).
+$(DocStringExtensions.FIELDS)
 
 # Related
 
@@ -199,14 +191,23 @@ information for use in prediction result types.
   - [`MultiPeriodPredictionResult`](@ref)
 """
 @concrete struct PredictionReturnsResult <: AbstractReturnsResult
+    "$(field_dict[:pred_nx])"
     nx
+    "$(field_dict[:X])"
     X
+    "$(field_dict[:pred_nf])"
     nf
+    "$(field_dict[:F])"
     F
+    "$(field_dict[:pred_nb])"
     nb
+    "$(field_dict[:pred_B])"
     B
+    "$(field_dict[:ts])"
     ts
+    "$(field_dict[:iv_ret])"
     iv
+    "$(field_dict[:ivpa])"
     ivpa
     function PredictionReturnsResult(nx::Option{<:VecStr}, X::Option{<:VecNum_VecVecNum},
                                      nf::Option{<:VecStr}, F::Option{<:MatNum},
@@ -302,8 +303,7 @@ result with the returns data from the test period.
 
 # Fields
 
-  - `res::NonFiniteAllocationOptimisationResult`: Optimisation result from the training fold.
-  - `rd::PredictionReturnsResult`: Returns data from the test fold.
+$(DocStringExtensions.FIELDS)
 
 # Related
 
@@ -311,12 +311,12 @@ result with the returns data from the test period.
   - [`PopulationPredictionResult`](@ref)
   - [`predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)`](@ref)
   - [`fit_predict`](@ref)
-  - [`MultiPeriodPredictionResult`](@ref)
-  - [`PopulationPredictionResult`](@ref)
   - [`PredictionReturnsResult`](@ref)
 """
 @concrete struct PredictionResult <: AbstractPredictionResult
+    "$(field_dict[:pred_res])"
     res
+    "$(field_dict[:rd])"
     rd
     function PredictionResult(res::NonFiniteAllocationOptimisationResult,
                               rd::PredictionReturnsResult)
@@ -418,9 +418,7 @@ Concatenates the test-period returns from all folds into an aggregated
 
 # Fields
 
-  - `pred::VecPredRes`: Individual fold predictions.
-  - `mrd::PredictionReturnsResult`: Aggregated returns from all test folds.
-  - `id`: Identifier for this multi-period result (e.g. path index).
+$(DocStringExtensions.FIELDS)
 
 # Related
 
@@ -428,13 +426,14 @@ Concatenates the test-period returns from all folds into an aggregated
   - [`PopulationPredictionResult`](@ref)
   - [`predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)`](@ref)
   - [`sort_by_measure`](@ref)
-  - [`PredictionResult`](@ref)
-  - [`PopulationPredictionResult`](@ref)
   - [`PredictionReturnsResult`](@ref)
 """
 @concrete struct MultiPeriodPredictionResult <: AbstractPredictionResult
+    "$(field_dict[:pred])"
     pred
+    "$(field_dict[:mrd])"
     mrd
+    "$(field_dict[:id_pred])"
     id
     function MultiPeriodPredictionResult(pred::VecPredRes, id::Any)
         rd = getfield.(pred, :rd)
@@ -519,19 +518,17 @@ represents one random asset-subset path.
 
 # Fields
 
-  - `pred::VecPredRes_MultiPredRes`: Collection of single or multi-period predictions.
+$(DocStringExtensions.FIELDS)
 
 # Related
 
   - [`PredictionResult`](@ref)
   - [`MultiPeriodPredictionResult`](@ref)
   - [`sort_by_measure`](@ref)
-  - [`PredictionResult`](@ref)
-  - [`MultiPeriodPredictionResult`](@ref)
-  - [`sort_by_measure`](@ref)
   - [`MultipleRandomised`](@ref)
 """
 @concrete struct PopulationPredictionResult <: AbstractPredictionResult
+    "$(field_dict[:pred])"
     pred
     function PopulationPredictionResult(pred::VecPredRes_MultiPredRes)
         return new{typeof(pred)}(pred)

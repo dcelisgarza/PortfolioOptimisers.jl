@@ -57,10 +57,7 @@ quantile across the population.
 
 # Fields
 
-  - `r::AbstractBaseRiskMeasure`: Risk measure used to evaluate each prediction.
-  - `q::Real`: Target quantile in `[0, 1]`.
-  - `r_kwargs::NamedTuple`: Keyword arguments passed to the risk measure.
-  - `q_kwargs::NamedTuple`: Keyword arguments passed to `quantile`.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -85,9 +82,13 @@ prediction.
   - [`ConditionalValueatRisk`](@ref)
 """
 @concrete struct NearestQuantilePrediction <: PredictionScorer
+    "$(field_dict[:r])"
     r
+    "$(field_dict[:q_scorer])"
     q
+    "$(field_dict[:r_kwargs])"
     r_kwargs
+    "$(field_dict[:q_kwargs])"
     q_kwargs
     function NearestQuantilePrediction(r::AbstractBaseRiskMeasure, q::Real,
                                        r_kwargs::NamedTuple, q_kwargs::NamedTuple)

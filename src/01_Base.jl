@@ -407,8 +407,14 @@ const arg_dict = Dict(
                       :pos => "`pos`: Whether to consider only positive deviations.",#
                       # Turnover.
                       :w_tn => "`w`: Current portfolio weights vector.",#
+                      :w_ref => "`w`: Reference portfolio weights vector.",#
                       :w_bm_ret => "`w`: Benchmark portfolio returns vector.",#
                       :fixed => "`fixed`: Whether the estimator is fixed and does not update with new weights.",#
+                      # Tracking specification.
+                      :tr_spec => "`tr`: Benchmark tracking specification.",#
+                      # Power norm parameters.
+                      :pa_rm => "`pa`: Power norm parameter for the lower tail.",#
+                      :pb_rm => "`pb`: Power norm parameter for the upper tail.",#
                       # Fees.
                       :tn_fees => "`tn`: Turnover estimator or result.",#
                       :l_fees => "`l`: Long proportional fees.",#
@@ -503,6 +509,23 @@ const arg_dict = Dict(
                       :val_grid => "`val_grid`: Grid values for each parameter.",#
                       :opt_cv => "`opt`: Optimal estimator found by cross-validation.",#
                       :idx_cv => "`idx`: Index of the optimal parameter configuration.",#
+                      :asset_idx => "`asset_idx`: Asset column indices per fold.",#
+                      :q_scorer => "`q`: Target quantile for scoring.",#
+                      :r_kwargs => "`r_kwargs`: Keyword arguments passed to the risk measure.",#
+                      :q_kwargs => "`q_kwargs`: Keyword arguments passed to `quantile`.",#
+                      :p_cv => "`p`: Hyperparameter search grid.",#
+                      # Prediction result fields.
+                      :pred_nx => "`nx`: Asset name vector.",#
+                      :pred_nf => "`nf`: Factor name vector.",#
+                      :pred_nb => "`nb`: Benchmark name vector.",#
+                      :pred_B => "`B`: Benchmark returns.",#
+                      :ts => "`ts`: Timestamp vector.",#
+                      :iv_ret => "`iv`: Investment vehicle returns.",#
+                      :ivpa => "`ivpa`: Investment vehicle per-asset allocation.",#
+                      :pred_res => "`res`: Optimisation result from the training fold.",#
+                      :pred => "`pred`: Collection of fold predictions.",#
+                      :mrd => "`mrd`: Aggregated multi-period returns result.",#
+                      :id_pred => "`id`: Path or fold identifier.",#
                       # Allocation.
                       :shares => "`shares`: Number of shares allocated per asset.",#
                       :cost_alloc => "`cost`: Cost of the allocation.",#
@@ -611,7 +634,9 @@ const arg_dict = Dict(
                       :epoptalg => "`alg`: Entropy pooling optimisation algorithm.",#
                       :ep_w => "`w`: Prior observation probability weights. If `nothing`, uniform weights are used.",#
                       # Opinion pooling.
-                      :opalg => "`alg`: Opinion pooling algorithm."#
+                      :opalg => "`alg`: Opinion pooling algorithm.",#
+                      # Non-optimisation risk measures.
+                      :rt_mean => "`rt`: Mean return estimator.",#
                       )
 """
     field_dict
