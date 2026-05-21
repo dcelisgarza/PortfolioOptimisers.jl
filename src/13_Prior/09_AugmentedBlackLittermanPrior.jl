@@ -7,20 +7,7 @@ Augmented Black-Litterman prior estimator for asset returns.
 
 # Fields
 
-  - `a_pe`: Asset prior estimator.
-  - `f_pe`: Factor prior estimator.
-  - `mp`: Matrix post-processing estimator.
-  - `re`: Regression estimator for factor loadings.
-  - `a_views`: Asset views estimator or views object.
-  - `f_views`: Factor views estimator or views object.
-  - `a_sets`: Asset sets.
-  - `f_sets`: Factor sets.
-  - `a_views_conf`: Asset view confidence(s).
-  - `f_views_conf`: Factor view confidence(s).
-  - `w`: Optional weights for assets.
-  - `rf`: Risk-free rate.
-  - `l`: Optional leverage parameter.
-  - `tau`: Blending parameter. When computing the prior, if `nothing`, defaults to `1/T` where `T` is the number of observations.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -153,19 +140,33 @@ AugmentedBlackLittermanPrior
   - [`prior`](@ref)
 """
 @concrete struct AugmentedBlackLittermanPrior <: AbstractLowOrderPriorEstimator_F
+    "$(field_dict[:a_pe])"
     a_pe
+    "$(field_dict[:f_pe])"
     f_pe
+    "$(field_dict[:mp])"
     mp
+    "$(field_dict[:re])"
     re
+    "$(field_dict[:a_views])"
     a_views
+    "$(field_dict[:f_views])"
     f_views
+    "$(field_dict[:a_sets])"
     a_sets
+    "$(field_dict[:f_sets])"
     f_sets
+    "$(field_dict[:a_views_conf])"
     a_views_conf
+    "$(field_dict[:f_views_conf])"
     f_views_conf
+    "$(field_dict[:eqw])"
     w
+    "$(field_dict[:rf])"
     rf
+    "$(field_dict[:l])"
     l
+    "$(field_dict[:tau])"
     tau
     function AugmentedBlackLittermanPrior(a_pe::AbstractLowOrderPriorEstimator_A_AF,
                                           f_pe::AbstractLowOrderPriorEstimator_A_AF,

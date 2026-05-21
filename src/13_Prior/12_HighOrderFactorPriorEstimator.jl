@@ -112,11 +112,7 @@ Represents the High Order Factor Prior Estimator.
 
 # Fields
 
-  - `pe`: Low-order factor prior estimator (the base estimator providing mean and covariance).
-  - `kte`: Cokurtosis estimator. If `nothing`, cokurtosis is not estimated.
-  - `ske`: Coskewness estimator. If `nothing`, coskewness is not estimated.
-  - `ex`: FLoops executor controlling parallelism for the cokurtosis residuals computation.
-  - `rsd`: If `true`, corrects the higher-order moments using factor regression residuals.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -213,10 +209,15 @@ HighOrderFactorPriorEstimator
   - [`HighOrderPrior`](@ref)
 """
 @concrete struct HighOrderFactorPriorEstimator <: AbstractHighOrderPriorEstimator_F
+    "$(field_dict[:pe])"
     pe
+    "$(field_dict[:kte])"
     kte
+    "$(field_dict[:ske])"
     ske
+    "$(field_dict[:ex])"
     ex
+    "$(field_dict[:rsd])"
     rsd
     function HighOrderFactorPriorEstimator(pe::AbstractLowOrderPriorEstimator_F_AF,
                                            kte::Option{<:CokurtosisEstimator},

@@ -603,7 +603,16 @@ const arg_dict = Dict(
                       :lce_val => "`val`: Constraint equation(s) to parse.",#
                       :asets_val => "`val`: Group name key for asset set membership matrix extraction.",#
                       :thr_val => "`val`: Asset-specific threshold value(s).",#
-                      :thr_res_val => "`val`: Threshold value(s) for portfolio weights.")
+                      :thr_res_val => "`val`: Threshold value(s) for portfolio weights.",#
+                      # Entropy pooling.
+                      :sc1 => "`sc1`: Scaling parameter for the objective function.",#
+                      :sc2 => "`sc2`: Scaling parameter for constraint penalties.",#
+                      :epalg => "`alg`: Entropy pooling algorithm.",#
+                      :epoptalg => "`alg`: Entropy pooling optimisation algorithm.",#
+                      :ep_w => "`w`: Prior observation probability weights. If `nothing`, uniform weights are used.",#
+                      # Opinion pooling.
+                      :opalg => "`alg`: Opinion pooling algorithm."#
+                      )
 """
     field_dict
 
