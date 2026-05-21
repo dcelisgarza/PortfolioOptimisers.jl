@@ -30,12 +30,7 @@ Let ``\\boldsymbol{w}`` be the portfolio weight vector and ``\\mathbf{V}`` the n
 
 # Fields
 
-  - `settings`: Risk measure configuration.
-  - `mp`: Matrix processing estimator applied to the coskewness matrix.
-  - `sk`: Pre-computed coskewness matrix (``N \\times N^2``). If `nothing`, it is computed from the prior.
-  - `V`: Pre-computed negative spectral coskewness matrix (``N \\times N``). If `nothing`, it is computed from `sk`.
-  - `alg`: Optimisation formulation (`SOCRiskExpr` or a `NSkeQuadFormulations` subtype).
-  - `window`: Rolling window index or indices for time-series slicing.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -98,11 +93,17 @@ NegativeSkewness
   - [`SOCRiskExpr`](@ref)
 """
 @concrete struct NegativeSkewness <: RiskMeasure
+    "$(field_dict[:settings_rm])"
     settings
+    "$(field_dict[:mp])"
     mp
+    "$(field_dict[:sk])"
     sk
+    "$(field_dict[:V])"
     V
+    "$(field_dict[:alg])"
     alg
+    "$(field_dict[:window])"
     window
     function NegativeSkewness(settings::RiskMeasureSettings,
                               mp::AbstractMatrixProcessingEstimator, sk::Option{<:MatNum},

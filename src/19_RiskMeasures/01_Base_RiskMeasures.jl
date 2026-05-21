@@ -7,7 +7,7 @@ Defines the interface for risk measure types, which quantify portfolio risk usin
 
 All concrete risk measures can be used as functors (callable structs) to compute their associated risk quantity.
 
-# Related Types
+# Related
 
   - [`NonOptimisationRiskMeasure`](@ref)
   - [`OptimisationRiskMeasure`](@ref)
@@ -58,7 +58,7 @@ Abstract supertype for risk measures that are not intended for use in portfolio 
 
 These risk measures are typically used for analysis, reporting, or diagnostics, and are not designed to be included as objectives or constraints in optimisation problems. Subtype this when implementing a risk measure that should not be selectable by optimisation algorithms.
 
-# Related Types
+# Related
 
   - [`AbstractBaseRiskMeasure`](@ref)
   - [`OptimisationRiskMeasure`](@ref)
@@ -73,7 +73,7 @@ Abstract supertype for risk measures that are intended for use in portfolio opti
 
 All concrete risk measures that can be used as objectives or constraints in optimisation problems should subtype `OptimisationRiskMeasure`. This ensures compatibility with the optimisation framework and enables composability with other estimators and algorithms.
 
-# Related Types
+# Related
 
   - [`RiskMeasure`](@ref)
   - [`HierarchicalRiskMeasure`](@ref)
@@ -111,7 +111,7 @@ Abstract supertype for standard risk measures used in portfolio optimisation.
 
 Subtype `RiskMeasure` to implement concrete risk measures that quantify portfolio risk and can be used as objectives or constraints in optimisation problems. This type ensures compatibility with the optimisation framework and enables composability with other estimators and algorithms.
 
-# Related Types
+# Related
 
   - [`OptimisationRiskMeasure`](@ref)
   - [`HierarchicalRiskMeasure`](@ref)
@@ -147,7 +147,7 @@ Abstract supertype for hierarchical risk measures used in portfolio optimisation
 
 Subtype `HierarchicalRiskMeasure` to implement risk measures that operate on hierarchical or clustered portfolio structures. These measures are designed for use as objectives or constraints in optimisation problems that leverage asset clustering, hierarchical risk parity, or similar techniques.
 
-# Related Types
+# Related
 
   - [`OptimisationRiskMeasure`](@ref)
   - [`RiskMeasure`](@ref)
@@ -160,7 +160,7 @@ Abstract supertype for all risk measure settings in `PortfolioOptimisers.jl`.
 
 Defines the interface for settings types that configure the behavior of risk measure estimators. All concrete risk measure settings types should subtype `AbstractRiskMeasureSettings` to ensure consistency and composability within the optimisation framework.
 
-# Related Types
+# Related
 
   - [`RiskMeasureSettings`](@ref)
   - [`HierarchicalRiskMeasureSettings`](@ref)
@@ -173,9 +173,7 @@ Defines the number of points on the efficient frontier (Pareto Front).
 
 # Fields
 
-  - `N`: Number of points on the efficient frontier.
-  - `factor`: Scaling factor, used to normalise moment-based risk measures.
-  - `flag`: Boolean flag indicating whether to use the risk measure value as-is (`true`) or apply a square root (`false`).
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -215,8 +213,11 @@ Frontier
   - [`RiskMeasureSettings`](@ref)
 """
 @concrete struct Frontier <: AbstractAlgorithm
+    "$(field_dict[:N_fr])"
     N
+    "$(field_dict[:factor_fr])"
     factor
+    "$(field_dict[:flag_fr])"
     flag
     function Frontier(N::Integer, factor::Number = 1, flag::Bool = true)::Frontier
         @argcheck(N > zero(N))
@@ -287,9 +288,7 @@ Encapsulates scaling, upper bounds, and risk evaluation flags for risk measures 
 
 # Fields
 
-  - `scale`: Scaling factor applied to the risk measure.
-  - `ub`: Upper bound(s) for the risk measure.
-  - `rke`: Boolean flag indicating whether or not to include the risk measure in the `JuMP` model's risk expression. If `false`, a risk measure can be used to constrain the risk of an optimisation, without including it in the risk expression.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -324,8 +323,11 @@ RiskMeasureSettings
   - [`HierarchicalRiskMeasureSettings`](@ref)
 """
 @concrete struct RiskMeasureSettings <: AbstractRiskMeasureSettings
+    "$(field_dict[:scale_rm])"
     scale
+    "$(field_dict[:ub_rms])"
     ub
+    "$(field_dict[:rke])"
     rke
     function RiskMeasureSettings(scale::Number, ub::Option{<:RkRtBounds},
                                  rke::Bool)::RiskMeasureSettings
@@ -347,7 +349,7 @@ Used for `HierarchicalRiskMeasure`, where it is impossible to set a risk upper b
 
 # Fields
 
-  - `scale`: Scaling factor applied to the hierarchical risk measure.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -376,6 +378,7 @@ HierarchicalRiskMeasureSettings
   - [`RiskMeasureSettings`](@ref)
 """
 @concrete struct HierarchicalRiskMeasureSettings <: AbstractRiskMeasureSettings
+    "$(field_dict[:scale_rm])"
     scale
     function HierarchicalRiskMeasureSettings(scale::Number)::HierarchicalRiskMeasureSettings
         @argcheck(isfinite(scale))
@@ -427,7 +430,7 @@ Abstract supertype for scalarisation strategies used to combine multiple risk me
 
 Subtype `Scalariser` to implement different methods for aggregating risk measures. These strategies are used in portfolio optimisation routines that require a single risk value from multiple risk measures.
 
-# Related Types
+# Related
 
   - [`NonHierarchicalScalariser`](@ref)
   - [`HierarchicalScalariser`](@ref)
@@ -440,7 +443,7 @@ Abstract supertype for scalarisation strategies that combine multiple risk measu
 
 Subtype `NonHierarchicalScalariser` to implement aggregation methods that work with all optimisation estimators.
 
-# Related Types
+# Related
 
   - [`SumScalariser`](@ref)
   - [`MaxScalariser`](@ref)
@@ -456,7 +459,7 @@ Abstract supertype for scalarisation strategies that combine multiple risk measu
 
 Subtype `HierarchicalScalariser` to implement aggregation methods that only work with hierarchical optimisation estimators.
 
-# Related Types
+# Related
 
   - [`MinScalariser`](@ref)
   - [`Scalariser`](@ref)
@@ -578,7 +581,7 @@ Where:
 
 # Fields
 
-  - `gamma`: Positive parameter controlling the interpolation between the weighted sum and the maximum functions.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -610,6 +613,7 @@ LogSumExpScalariser
   - [`HierarchicalRiskMeasureSettings`](@ref)
 """
 @concrete struct LogSumExpScalariser <: NonHierarchicalScalariser
+    "$(field_dict[:gamma])"
     gamma
     function LogSumExpScalariser(gamma::Number)
         @argcheck(gamma > zero(gamma))

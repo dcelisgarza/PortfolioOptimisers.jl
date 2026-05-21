@@ -52,10 +52,47 @@
                  :wbe => "`wb`: Weight bounds estimator.",
                  :wbr => "`wb`: Weight bounds result.",
                  :wber => "`wb`: Weight bounds estimator or result.",
+                 :wb => "`wb`: Weight bounds.",
                  # Fees.
                  :feese => "`fees`: Fees estimator.",
                  :feesr => "`fees`: Fees result.",
-                 :feeser => "`fees`: Fees estimator or result.")
+                 :feeser => "`fees`: Fees estimator or result.",
+                 :fees => "`fees`: Fees estimator or result.",
+                 # Optimiser config.
+                 :opt => "`opt`: `JuMP` optimiser configuration.",
+                 :kwargs => "`kwargs`: Additional keyword arguments.",
+                 # Index.
+                 :idx => "`idx`: Index vector.",
+                 # Risk measure.
+                 :r => "`r`: Risk measure or vector of risk measures.",
+                 # Returns estimator.
+                 :ret => "`ret`: Returns estimator for `JuMP` models.",
+                 # Turnover constraint.
+                 :tn => "`tn`: Turnover constraint estimator.",
+                 # Tracking constraint.
+                 :tr => "`tr`: Tracking error constraint estimator.",
+                 # Near optimal centering result fields.
+                 :w_opt => "`w_opt`: Optimal portfolio weights.",
+                 :w_max => "`w_max`: Maximum-risk portfolio weights.",
+                 :w_min => "`w_min`: Minimum-risk portfolio weights.",
+                 :w_opt_ini => "`w_opt_ini`: Initial weights for the optimal sub-problem.",
+                 :w_max_ini => "`w_max_ini`: Initial weights for the maximum-risk sub-problem.",
+                 :w_min_ini => "`w_min_ini`: Initial weights for the minimum-risk sub-problem.",
+                 :w_opt_retcode => "`w_opt_retcode`: Return code for the optimal-objective sub-problem.",
+                 :w_max_retcode => "`w_max_retcode`: Return code for the maximum-risk sub-problem.",
+                 :w_min_retcode => "`w_min_retcode`: Return code for the minimum-risk sub-problem.",
+                 :rt_opt => "`rt_opt`: Optimal return target.",
+                 :rt_max => "`rt_max`: Maximum return target.",
+                 :rt_min => "`rt_min`: Minimum return target.",
+                 :rk_opt => "`rk_opt`: Optimal risk target.",
+                 :noc_retcode => "`noc_retcode`: Return code for the near-optimal centering sub-problem.",
+                 # Discrete allocation result fields.
+                 :l_model => "`l_model`: `JuMP` model for the long allocation.",
+                 :s_model => "`s_model`: `JuMP` model for the short allocation.",
+                 :l_retcode => "`l_retcode`: Return code for the long allocation sub-problem.",
+                 :s_retcode => "`s_retcode`: Return code for the short allocation sub-problem.",
+                 # Risk budgeting.
+                 :prb => "`prb`: Processed risk budgeting configuration.")
 
 This dictionary contains the arg_dict terms and their corresponding descriptions used in the documentation of `PortfolioOptimisers.jl`.
 """
@@ -252,7 +289,295 @@ const arg_dict = Dict(
                       :ignargs => "`args`: Additional positional arguments (ignored).",
                       :ignkwargs => "`kwargs`: Additional keyword arguments (ignored).",
                       :rd => "`rd`: The returns result to use.",
-                      :window => "`window`: Observation window.")
+                      :window => "`window`: Observation window.",
+                      # Prior results.
+                      :chol => "`chol`: Cholesky factorisation of the covariance matrix.",#
+                      :w_prior => "`w`: Portfolio weights vector used in prior computation.",#
+                      :ens => "`ens`: Effective sample size.",#
+                      :kld => "`kld`: Kullback-Leibler divergence.",#
+                      :rr => "`rr`: Returns result.",#
+                      :f_mu => "`f_mu`: Factor expected returns vector.",#
+                      :f_sigma => "`f_sigma`: Factor covariance matrix.",#
+                      :f_w => "`f_w`: Factor weights vector.",#
+                      # Prior estimators.
+                      :horizon => "`horizon`: Optional investment horizon for log-normalising returns. If `nothing`, returns are not adjusted.",#
+                      :tau => "`tau`: Blending parameter controlling the weight given to the prior relative to the views.",#
+                      :views => "`views`: Views estimator or result.",#
+                      :views_conf => "`views_conf`: Views confidence estimator or result.",#
+                      :a_pe => "`a_pe`: Asset prior estimator.",#
+                      :f_pe => "`f_pe`: Factor prior estimator.",#
+                      :a_views => "`a_views`: Asset views estimator or result.",#
+                      :f_views => "`f_views`: Factor views estimator or result.",#
+                      :a_sets => "`a_sets`: Asset sets.",#
+                      :f_sets => "`f_sets`: Factor sets.",#
+                      :a_views_conf => "`a_views_conf`: Asset views confidence estimator or result.",#
+                      :f_views_conf => "`f_views_conf`: Factor views confidence estimator or result.",#
+                      :rsd => "`rsd`: Whether to include residual variance in the posterior covariance.",#
+                      :f_mp => "`f_mp`: Factor matrix processing estimator.",#
+                      :re => "`re`: Regression estimator.",#
+                      :pes => "`pes`: Vector of prior estimators.",#
+                      :pe1 => "`pe1`: Pre-processing prior estimator.",#
+                      :pe2 => "`pe2`: Post-processing prior estimator.",#
+                      :p_pool => "`p`: Opinion pooling blending parameter.",#
+                      # Entropy pooling.
+                      :mu_views => "`mu_views`: Expected returns views estimator or result.",#
+                      :var_views => "`var_views`: Variance views estimator or result.",#
+                      :cvar_views => "`cvar_views`: Conditional value-at-risk views estimator or result.",#
+                      :sigma_views => "`sigma_views`: Covariance views estimator or result.",#
+                      :sk_views => "`sk_views`: Coskewness views estimator or result.",#
+                      :kt_views => "`kt_views`: Cokurtosis views estimator or result.",#
+                      :rho_views => "`rho_views`: Correlation views estimator or result.",#
+                      :var_alpha => "`var_alpha`: Quantile level for variance views.",#
+                      :cvar_alpha => "`cvar_alpha`: Quantile level for conditional value-at-risk views.",#
+                      :ds_opt => "`ds_opt`: Dual sigma optimisation estimator.",#
+                      :dm_opt => "`dm_opt`: Dual mean optimisation estimator.",#
+                      :opt_ep => "`opt`: Entropy pooling optimisation estimator.",#
+                      # Black-Litterman views.
+                      :P => "`P`: Views loading matrix `views × assets`.",#
+                      :Q => "`Q`: Views values vector `views × 1`.",#
+                      :excl => "`excl`: Indices of views to exclude.",#
+                      # High order priors.
+                      :f_kt => "`f_kt`: Factor cokurtosis matrix.",#
+                      :f_sk => "`f_sk`: Factor coskewness matrix.",#
+                      :f_V => "`f_V`: Factor sum of negative spectral slices of the cokurtosis matrix.",#
+                      :skmp => "`skmp`: Coskewness matrix processing estimator.",#
+                      :L2 => "`L2`: Second-order factor loading matrix.",#
+                      :S2 => "`S2`: Second-order factor covariance matrix.",#
+                      # Uncertainty sets.
+                      :lb => "`lb`: Lower bound.",#
+                      :ub => "`ub`: Upper bound.",#
+                      :dmu => "`dmu`: Uncertainty bound for expected returns.",#
+                      :dsigma => "`dsigma`: Uncertainty bound for covariance.",#
+                      :dist => "`dist`: Probability distribution.",#
+                      :k_ucs => "`k`: Uncertainty set scaling parameter.",#
+                      :class_ucs => "`class`: Uncertainty set class.",#
+                      :method_ucs => "`method`: Ellipsoidal uncertainty set estimation method.",#
+                      :diagonal => "`diagonal`: Whether to use only the diagonal of the covariance matrix.",#
+                      :n_sim => "`n_sim`: Number of simulation samples.",#
+                      :block_size => "`block_size`: Block size for bootstrap sampling.",#
+                      :q_bs => "`q`: Quantile parameter for uncertainty set computation.",#
+                      :bootstrap => "`bootstrap`: Bootstrap algorithm.",#
+                      :ucs => "`ucs`: Uncertainty set.",#
+                      # Constraint generation.
+                      :dval => "`dval`: Default value for assets not specified in `val`.",#
+                      :ukey => "`ukey`: Universe key identifying the full set of assets.",#
+                      :dict => "`dict`: Dictionary mapping group identifiers to asset labels.",#
+                      :vars => "`vars`: Variable names in the parsed constraint expression.",#
+                      :coef_c => "`coef`: Coefficients corresponding to the constraint variables.",#
+                      :op => "`op`: Comparison operator (`==`, `<=`, or `>=`).",#
+                      :rhs => "`rhs`: Right-hand side value of the constraint.",#
+                      :eqn => "`eqn`: Formatted string representation of the constraint equation.",#
+                      :ij => "`ij`: Pair of asset indices for correlation-based constraints.",#
+                      :comp => "`comp`: Constraint comparison type.",#
+                      :scale_c => "`scale`: Scaling factor applied to constraint coefficients.",#
+                      # Risk measure settings.
+                      :settings_rm => "`settings`: Risk measure settings.",#
+                      :scale_rm => "`scale`: Scaling factor applied to the risk measure.",#
+                      :ub_rms => "`ub`: Upper bound(s) for the risk measure. Can be a scalar, vector, or [`Frontier`](@ref).",#
+                      :rke => "`rke`: Whether to include the risk measure value in the `JuMP` risk expression.",#
+                      # Frontier.
+                      :N_fr => "`N`: Number of points on the efficient frontier.",#
+                      :factor_fr => "`factor`: Scaling factor for the efficient frontier range.",#
+                      :flag_fr => "`flag`: Whether to sweep the frontier from minimum to maximum.",#
+                      # Risk measure fields.
+                      :rc => "`rc`: Risk contribution constraint.",#
+                      :alg => "`alg`: Risk measure optimisation formulation algorithm.",#
+                      :alg1 => "`alg1`: First algorithm variant.",#
+                      :alg2 => "`alg2`: Second algorithm variant.",#
+                      :N_kt => "`N`: Optional number of eigenvalues per asset for the approximate cokurtosis formulation.",#
+                      :kappa => "`kappa`: Relativistic deformation parameter.",#
+                      :kappa_a => "`kappa_a`: Relativistic deformation parameter for the lower tail.",#
+                      :kappa_b => "`kappa_b`: Relativistic deformation parameter for the upper tail.",#
+                      :l_a => "`l_a`: Risk aversion parameter for the lower tail.",#
+                      :r_a => "`r_a`: Radius parameter for the lower tail.",#
+                      :l_b => "`l_b`: Risk aversion parameter for the upper tail.",#
+                      :r_b => "`r_b`: Radius parameter for the upper tail.",#
+                      :gamma => "`gamma`: Log-sum-exp scalariser smoothing parameter.",#
+                      :b_mip => "`b`: Big-M upper bound for MIP formulations.",#
+                      :s_mip => "`s`: Small-M lower bound for MIP formulations.",#
+                      :slv => "`slv`: Solver or vector of solvers.",#
+                      :p_rm => "`p`: Power or order parameter.",#
+                      :mu_rm => "`mu`: Optional mean for centering.",#
+                      :w_rm => "`w`: Optional portfolio weights.",#
+                      :ddof => "`ddof`: Degrees-of-freedom correction.",#
+                      :flag => "`flag`: Algorithm selection flag.",#
+                      :pos => "`pos`: Whether to consider only positive deviations.",#
+                      # Turnover.
+                      :w_tn => "`w`: Current portfolio weights vector.",#
+                      :w_bm_ret => "`w`: Benchmark portfolio returns vector.",#
+                      :fixed => "`fixed`: Whether the estimator is fixed and does not update with new weights.",#
+                      # Fees.
+                      :tn_fees => "`tn`: Turnover estimator or result.",#
+                      :l_fees => "`l`: Long proportional fees.",#
+                      :s_fees => "`s`: Short proportional fees.",#
+                      :fl => "`fl`: Long fixed fees.",#
+                      :fs => "`fs`: Short fixed fees.",#
+                      :dl => "`dl`: Default long proportional fee.",#
+                      :ds => "`ds`: Default short proportional fee.",#
+                      :dfl => "`dfl`: Default long fixed fee.",#
+                      :dfs => "`dfs`: Default short fixed fee.",#
+                      :kwargs_fee => "`kwargs`: Named tuple of keyword arguments for fee computation.",#
+                      # Optimisation results.
+                      :oe => "`oe`: Type of the optimisation estimator that produced this result.",#
+                      :pa => "`pa`: Processed optimisation attributes.",#
+                      :retcode => "`retcode`: Optimisation return code.",#
+                      :sol => "`sol`: Optimisation solution.",#
+                      :fb => "`fb`: Fallback result or estimator.",#
+                      # Optimiser fields.
+                      :opt_jmp => "`opt`: `JuMP` optimiser configuration.",#
+                      :r_opt => "`r`: Risk measure or vector of risk measures.",#
+                      :obj => "`obj`: Portfolio objective function.",#
+                      :wi => "`wi`: Initial portfolio weights for warm-starting the solver.",#
+                      :sca => "`sca`: Scalariser for combining multiple risk measures.",#
+                      :wb_jmp => "`wb`: Weight bounds estimator or weight bounds.",#
+                      :bgt => "`bgt`: Portfolio budget constraint.",#
+                      :sbgt => "`sbgt`: Short-sale budget constraint.",#
+                      :lt => "`lt`: Long-side minimum holding threshold.",#
+                      :st => "`st`: Short-side minimum holding threshold.",#
+                      :lcse => "`lcse`: Linear constraint set estimator(s).",#
+                      :gcarde => "`gcarde`: Grouped cardinality constraint estimator.",#
+                      :sgcarde => "`sgcarde`: Sub-grouped cardinality constraint estimator(s).",#
+                      :smtx => "`smtx`: Sub-group selection matrix or estimator.",#
+                      :sgmtx => "`sgmtx`: Sub-grouped selection matrix or estimator.",#
+                      :slt => "`slt`: Sub-group long threshold.",#
+                      :sst => "`sst`: Sub-group short threshold.",#
+                      :sglt => "`sglt`: Sub-grouped long threshold.",#
+                      :sgst => "`sgst`: Sub-grouped short threshold.",#
+                      :tn_jmp => "`tn`: Turnover constraint estimator(s).",#
+                      :fees_jmp => "`fees`: Fee estimator or fee structure.",#
+                      :tr_jmp => "`tr`: Tracking error constraint(s).",#
+                      :ple => "`ple`: Phylogeny constraint estimator(s).",#
+                      :ret_jmp => "`ret`: Returns estimator for the `JuMP` model.",#
+                      :ccnt => "`ccnt`: Custom `JuMP` constraint.",#
+                      :cobj => "`cobj`: Custom `JuMP` objective.",#
+                      :sc => "`sc`: Constraint scale factor.",#
+                      :so => "`so`: Objective scale factor.",#
+                      :ss => "`ss`: Optional scalar shrinkage parameter.",#
+                      :card => "`card`: Global cardinality constraint.",#
+                      :scard => "`scard`: Sub-group cardinality constraint(s).",#
+                      :nea => "`nea`: Minimum number of effective assets.",#
+                      :l1 => "`l1`: L1 regularisation coefficient.",#
+                      :l2 => "`l2`: L2 regularisation coefficient.",#
+                      :linf => "`linf`: L∞ regularisation coefficient.",#
+                      :lp => "`lp`: Lp regularisation specification(s).",#
+                      :brt => "`brt`: Whether to use bootstrap returns.",#
+                      :cle_pr => "`cle_pr`: Whether to pass the prior result to the clustering estimator.",#
+                      :wf => "`wf`: Weight finaliser.",#
+                      :rkb => "`rkb`: Risk budget estimator or result.",#
+                      :rba => "`rba`: Risk budget algorithm.",#
+                      :resi => "`resi`: Inner optimisation results.",#
+                      :reso => "`reso`: Outer optimisation results.",#
+                      :opti => "`opti`: Inner optimiser.",#
+                      :opto => "`opto`: Outer optimiser.",#
+                      # Cross-validation.
+                      :n_folds => "`n`: Number of folds.",#
+                      :n_test_folds => "`n_test_folds`: Number of test folds.",#
+                      :purged_size => "`purged_size`: Number of observations to purge between train and test sets.",#
+                      :embargo_size => "`embargo_size`: Number of observations to embargo after the test set.",#
+                      :train_idx => "`train_idx`: Training set indices.",#
+                      :test_idx => "`test_idx`: Test set indices.",#
+                      :train_size => "`train_size`: Training window size.",#
+                      :test_size => "`test_size`: Test window size.",#
+                      :period => "`period`: Time period for date-based walk-forward cross-validation.",#
+                      :period_offset => "`period_offset`: Offset applied to the walk-forward period.",#
+                      :adjuster => "`adjuster`: Function for adjusting walk-forward dates.",#
+                      :previous => "`previous`: Whether to include the previous period in the training window.",#
+                      :expand_train => "`expand_train`: Whether to expand the training window over time.",#
+                      :reduce_test => "`reduce_test`: Whether to allow the last test window to be smaller.",#
+                      :subset_size => "`subset_size`: Size of each random subset.",#
+                      :n_subsets => "`n_subsets`: Number of random subsets.",#
+                      :max_comb => "`max_comb`: Maximum number of unique asset subsets.",#
+                      :window_size => "`window_size`: Rolling window size for randomised cross-validation.",#
+                      :n_iter => "`n_iter`: Number of random iterations.",#
+                      :cv => "`cv`: Cross-validation estimator.",#
+                      :scorer => "`scorer`: Scoring function.",#
+                      :train_score => "`train_score`: Whether to also compute the training set score.",#
+                      :warn_comb => "`warn_comb`: Whether to warn when the number of combinations exceeds `max_comb`.",#
+                      :path_ids => "`path_ids`: Path identifiers for cross-validation splits.",#
+                      :train_scores => "`train_scores`: Training set scores.",#
+                      :test_scores => "`test_scores`: Test set scores.",#
+                      :lens_grid => "`lens_grid`: Grid lengths for each parameter.",#
+                      :val_grid => "`val_grid`: Grid values for each parameter.",#
+                      :opt_cv => "`opt`: Optimal estimator found by cross-validation.",#
+                      :idx_cv => "`idx`: Index of the optimal parameter configuration.",#
+                      # Allocation.
+                      :shares => "`shares`: Number of shares allocated per asset.",#
+                      :cost_alloc => "`cost`: Cost of the allocation.",#
+                      :cash_alloc => "`cash`: Remaining uninvested cash after allocation.",#
+                      :unit => "`unit`: Minimum purchase unit (e.g., price per share or lot size).",#
+                      :sc_alloc => "`sc`: Constraint check named tuple for the allocation solver.",#
+                      :so_alloc => "`so`: Objective settings for the allocation solver.",#
+                      :wf_alloc => "`wf`: Weight finaliser for the allocation result.",#
+                      # Cluster node.
+                      :id_node => "`id`: Node identifier.",#
+                      :left_node => "`left`: Left child node.",#
+                      :right_node => "`right`: Right child node.",#
+                      :height_node => "`height`: Height of the node in the dendrogram.",#
+                      :level_node => "`level`: Level of the node in the hierarchical structure.",#
+                      # Other.
+                      :linkage => "`linkage`: Hierarchical clustering linkage method.",#
+                      :dlb => "`dlb`: Default lower bound.",#
+                      :dub => "`dub`: Default upper bound.",#
+                      :err => "`err`: Tracking error tolerance.",#
+                      :tralg => "`alg`: Tracking formulation algorithm.",#
+                      :rt => "`rt`: Returns estimator.",#
+                      :rk => "`rk`: Risk measure for ratio computation.",#
+                      :ohf => "`ohf`: Whether to compute the ratio only for long positions.",#
+                      :r1 => "`r1`: First risk measure.",#
+                      :r2 => "`r2`: Second risk measure.",#
+                      :ri => "`ri`: Inner risk measure.",#
+                      :ro => "`ro`: Outer risk measure.",#
+                      :scai => "`scai`: Inner scalariser.",#
+                      :scao => "`scao`: Outer scalariser.",#
+                      :params => "`params`: Schur complement decomposition parameters.",#
+                      :gamma_schur => "`gamma`: Schur complement decomposition parameter.",#
+                      :z => "`z`: Regularisation coefficient for log risk budgeting.",#
+                      :tol => "`tol`: Convergence tolerance.",#
+                      :iter => "`iter`: Maximum number of iterations.",#
+                      :w_opt_noc => "`w_opt`: Optimal portfolio weights.",#
+                      :w_min_noc => "`w_min`: Minimum risk portfolio weights.",#
+                      :w_max_noc => "`w_max`: Maximum return portfolio weights.",#
+                      :ucs_flag => "`ucs_flag`: Whether to use the uncertainty set.",#
+                      :slv_alloc => "`slv`: Solver or vector of solvers for the allocation problem.",#
+                      # Optimiser config.
+                      :opt => "`opt`: `JuMP` optimiser configuration.",#
+                      :kwargs => "`kwargs`: Additional keyword arguments.",#
+                      # Index.
+                      :idx => "`idx`: Index vector.",#
+                      # Risk measure.
+                      :r => "`r`: Risk measure or vector of risk measures.",#
+                      # Returns estimator.
+                      :ret => "`ret`: Returns estimator for `JuMP` models.",#
+                      # Weight bounds.
+                      :wb => "`wb`: Weight bounds.",#
+                      # Turnover.
+                      :tn => "`tn`: Turnover constraint estimator.",#
+                      # Tracking.
+                      :tr => "`tr`: Tracking error constraint estimator.",#
+                      # Fees.
+                      :fees => "`fees`: Fees estimator or result.",#
+                      # Near optimal centering result fields.
+                      :w_opt => "`w_opt`: Optimal portfolio weights.",#
+                      :w_max => "`w_max`: Maximum-risk portfolio weights.",#
+                      :w_min => "`w_min`: Minimum-risk portfolio weights.",#
+                      :w_opt_ini => "`w_opt_ini`: Initial weights for the optimal sub-problem.",#
+                      :w_max_ini => "`w_max_ini`: Initial weights for the maximum-risk sub-problem.",#
+                      :w_min_ini => "`w_min_ini`: Initial weights for the minimum-risk sub-problem.",#
+                      :w_opt_retcode => "`w_opt_retcode`: Return code for the optimal-objective sub-problem.",#
+                      :w_max_retcode => "`w_max_retcode`: Return code for the maximum-risk sub-problem.",#
+                      :w_min_retcode => "`w_min_retcode`: Return code for the minimum-risk sub-problem.",#
+                      :rt_opt => "`rt_opt`: Optimal return target.",#
+                      :rt_max => "`rt_max`: Maximum return target.",#
+                      :rt_min => "`rt_min`: Minimum return target.",#
+                      :rk_opt => "`rk_opt`: Optimal risk target.",#
+                      :noc_retcode => "`noc_retcode`: Return code for the near-optimal centering sub-problem.",#
+                      # Discrete allocation result fields.
+                      :l_model => "`l_model`: `JuMP` model for the long allocation.",#
+                      :s_model => "`s_model`: `JuMP` model for the short allocation.",#
+                      :l_retcode => "`l_retcode`: Return code for the long allocation sub-problem.",#
+                      :s_retcode => "`s_retcode`: Return code for the short allocation sub-problem.",#
+                      # Risk budgeting.
+                      :prb => "`prb`: Processed risk budgeting configuration.")
 """
     field_dict
 
