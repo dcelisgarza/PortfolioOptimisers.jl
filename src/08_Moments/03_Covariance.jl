@@ -23,7 +23,7 @@ Keywords correspond to the struct's fields.
 
 # Details
 
-  - `ce` can be used to specify ny subtype of `StatsBase.CovarianceEstimator`. This allows users to leverage packages such as [`CovarianceEstimation.jl`](https://github.com/mateuszbaran/CovarianceEstimation.jl), which implement custom covariance estimators.
+  - `ce` can be used to specify any subtype of `StatsBase.CovarianceEstimator`. This allows users to leverage packages such as [`CovarianceEstimation.jl`](https://github.com/mateuszbaran/CovarianceEstimation.jl), which implement custom covariance estimators.
 
 # Examples
 

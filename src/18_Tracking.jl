@@ -113,7 +113,7 @@ Second-order cone (SOC) norm-based tracking formulation.
 
 # Fields
 
-  - `ddof`: Degrees of freedom adjustment.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -141,6 +141,7 @@ L2Tracking
   - [`norm_tracking`](@ref)
 """
 @concrete struct L2Tracking <: NormTracking
+    "$(field_dict[:ddof])"
     ddof
     function L2Tracking(ddof::Integer)::L2Tracking
         assert_nonempty_nonneg_finite_val(ddof, :ddof)
@@ -159,15 +160,13 @@ Second-order cone (SOC) squared norm-based tracking formulation.
 
 # Fields
 
-  - `ddof`: Degrees of freedom adjustment for scaling.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
     SquaredL2Tracking(;
         ddof::Integer = 1,
     ) -> SquaredL2Tracking
-
-  - `ddof`: Sets the degrees of freedom adjustment.
 
 ## Validation
 
@@ -189,6 +188,7 @@ SquaredL2Tracking
   - [`norm_tracking`](@ref)
 """
 @concrete struct SquaredL2Tracking <: NormTracking
+    "$(field_dict[:ddof])"
     ddof
     function SquaredL2Tracking(ddof::Integer)::SquaredL2Tracking
         assert_nonempty_nonneg_finite_val(ddof, :ddof)
@@ -229,8 +229,7 @@ Computes the Lp-norm of the difference between portfolio and benchmark returns: 
 
 # Fields
 
-  - `p`: The p-norm exponent (default 3).
-  - `ddof`: Degrees of freedom correction for the mean (default 0).
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -244,7 +243,9 @@ Computes the Lp-norm of the difference between portfolio and benchmark returns: 
   - [`LInfTracking`](@ref)
 """
 @concrete struct LpTracking <: NormTracking
+    "$(field_dict[:p_rm])"
     p
+    "$(field_dict[:ddof])"
     ddof
     function LpTracking(p::Number, ddof::Integer)::LpTracking
         assert_nonempty_nonneg_finite_val(ddof, :ddof)
@@ -263,8 +264,7 @@ Computes the L∞-norm (maximum absolute deviation) of the difference between po
 
 # Fields
 
-  - `ddof`: Degrees of freedom correction for the mean (default 0).
-  - `pos`: If `true`, uses the positive part of the maximum deviation (default `true`).
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -278,7 +278,9 @@ Computes the L∞-norm (maximum absolute deviation) of the difference between po
   - [`L2Tracking`](@ref)
 """
 @concrete struct LInfTracking <: NormTracking
+    "$(field_dict[:ddof])"
     ddof
+    "$(field_dict[:pos])"
     pos
     function LInfTracking(ddof::Integer, pos::Bool)::LInfTracking
         assert_nonempty_nonneg_finite_val(ddof, :ddof)
@@ -427,9 +429,7 @@ Asset weights-based tracking algorithm.
 
 # Fields
 
-  - `fees`: Optional fees estimator or result to apply to the weights tracking.
-  - `w`: Portfolio weights (vector of real numbers).
-  - `fixed`: Boolean indicating whether the algorithm is fixed (does not update with new weights) or variable (updates with new weights).
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -463,8 +463,11 @@ WeightsTracking
   - [`tracking_benchmark`](@ref)
 """
 @concrete struct WeightsTracking <: AbstractTrackingAlgorithm
+    "$(field_dict[:fees])"
     fees
+    "$(field_dict[:w_tn])"
     w
+    "$(field_dict[:fixed])"
     fixed
     function WeightsTracking(fees::Option{<:Fees}, w::VecNum, fixed::Bool)::WeightsTracking
         assert_nonempty_finite_val(w, :w)
@@ -670,7 +673,7 @@ Returns-based tracking algorithm.
 
 # Fields
 
-  - `w`: Benchmark portfolio returns (vector of real numbers).
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -698,6 +701,7 @@ ReturnsTracking
   - [`tracking_benchmark`](@ref)
 """
 @concrete struct ReturnsTracking <: AbstractTrackingAlgorithm
+    "$(field_dict[:w_bm_ret])"
     w
     function ReturnsTracking(w::VecNum)
         assert_nonempty_finite_val(w, :w)
@@ -811,9 +815,7 @@ Tracking error result type.
 
 # Fields
 
-  - `tr`: Tracking algorithm object.
-  - `err`: Tracking error value.
-  - `alg`: Tracking formulation algorithm.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -854,8 +856,11 @@ TrackingError
   - [`L1Tracking`](@ref)
 """
 @concrete struct TrackingError <: AbstractTracking
+    "$(field_dict[:tr])"
     tr
+    "$(field_dict[:err])"
     err
+    "$(field_dict[:tralg])"
     alg
     function TrackingError(tr::AbstractTrackingAlgorithm, err::Number, alg::NormTracking)
         assert_nonempty_nonneg_finite_val(err, :err)

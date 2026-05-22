@@ -5,14 +5,7 @@ Estimator for box or ellipsoidal uncertainty sets under the assumption of normal
 
 # Fields
 
-  - `pe`: Prior estimator used to compute mean and covariance statistics.
-  - `alg`: Uncertainty set algorithm (box or ellipsoidal).
-  - `n_sim`: Number of simulations for uncertainty set estimation.
-  - `q`: Quantile or confidence level for uncertainty set bounds.
-  - `rng`: Random number generator for simulation.
-  - `seed`: Optional random seed for reproducibility.
-  - `ens`: Optional effective number of scenarios used for scaling the uncertainty sets.
-  - `kwargs`: Additional keyword arguments to pass on to [`Statistics.quantile`](https://docs.julialang.org/en/v1/stdlib/Statistics/#Statistics.quantile).
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -77,13 +70,21 @@ NormalUncertaintySet
   - [`EllipsoidalUncertaintySetAlgorithm`](@ref)
 """
 @concrete struct NormalUncertaintySet <: AbstractUncertaintySetEstimator
+    "$(field_dict[:pe])"
     pe
+    "$(field_dict[:ucsa])"
     alg
+    "$(field_dict[:n_sim])"
     n_sim
+    "$(field_dict[:q_bs])"
     q
+    "$(field_dict[:rng])"
     rng
+    "$(field_dict[:seed])"
     seed
+    "$(field_dict[:ens])"
     ens
+    "$(field_dict[:kwargs])"
     kwargs
     function NormalUncertaintySet(pe::AbstractLowOrderPriorEstimator,
                                   alg::AbstractUncertaintySetAlgorithm, n_sim::Integer,

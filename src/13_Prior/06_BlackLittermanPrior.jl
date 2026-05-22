@@ -7,13 +7,7 @@ Black-Litterman prior estimator for asset returns.
 
 # Fields
 
-  - `pe`: Prior estimator.
-  - `mp`: Matrix post-processing estimator.
-  - `views`: Views estimator or views object.
-  - `sets`: Asset sets.
-  - `views_conf`: View confidence(s).
-  - `rf`: Risk-free rate.
-  - `tau`: Blending parameter. When computing the prior if `nothing`, defaults to `1/T` where `T` is the number of observations.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -111,12 +105,19 @@ BlackLittermanPrior
   - [`prior`](@ref)
 """
 @concrete struct BlackLittermanPrior <: AbstractLowOrderPriorEstimator_AF
+    "$(field_dict[:pe])"
     pe
+    "$(field_dict[:mp])"
     mp
+    "$(field_dict[:views])"
     views
+    "$(field_dict[:sets])"
     sets
+    "$(field_dict[:views_conf])"
     views_conf
+    "$(field_dict[:rf])"
     rf
+    "$(field_dict[:tau])"
     tau
     function BlackLittermanPrior(pe::AbstractLowOrderPriorEstimator_A_F_AF,
                                  mp::AbstractMatrixProcessingEstimator, views::Lc_BLV,

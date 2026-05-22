@@ -92,7 +92,16 @@
                  :l_retcode => "`l_retcode`: Return code for the long allocation sub-problem.",
                  :s_retcode => "`s_retcode`: Return code for the short allocation sub-problem.",
                  # Risk budgeting.
-                 :prb => "`prb`: Processed risk budgeting configuration.")
+                 :prb => "`prb`: Processed risk budgeting configuration.",
+                 :sq => "`sq`: Whether to use variance instead of volatility in the inverse weighting.",
+                 :wfalg => "`alg`: Weight finaliser error formulation algorithm.",
+                 :res_retcode => "`res`: Optional result or message from the solver.",
+                 :N_msc => "`N`: Number of bisection steps for the monotonic Schur complement.",
+                 :alpha_dirichlet => "`alpha`: Dirichlet concentration parameter.",
+                 :opt_hier => "`opt`: Base hierarchical optimiser configuration.",
+                 :strict_opt => "`strict`: Whether to strictly enforce weight bounds.",
+                 :strict_conv => "`strict`: Whether to raise an error if convergence is not achieved.",
+                 :schalg => "`alg`: Schur complement algorithm variant.")
 
 This dictionary contains the arg_dict terms and their corresponding descriptions used in the documentation of `PortfolioOptimisers.jl`.
 """
@@ -125,6 +134,7 @@ const arg_dict = Dict(
                       :malg => "`alg`: Moment algorithm.",
                       :corrected => "`corrected`: Whether to apply Bessel's correction.",#
                       :mutgt => "`tgt`: Shrinkage target.",#
+                      :me_shrink_alg => "`alg`: Expected returns shrinkage algorithm.",#
                       :metric => "`metric`: Distance metric used for pairwise computations.",#
                       :metric_args => "`args`: Additional positional arguments for the distance metric.",#
                       :metric_kwargs => "`kwargs`: Additional keyword arguments for the distance metric.",#
@@ -637,6 +647,43 @@ const arg_dict = Dict(
                       :opalg => "`alg`: Opinion pooling algorithm.",#
                       # Non-optimisation risk measures.
                       :rt_mean => "`rt`: Mean return estimator.",#
+                      # Regime adjusted estimators.
+                      :decay => "`decay`: Exponential decay factor for the exponentially weighted estimator.",#
+                      :min_obs => "`min_obs`: Minimum number of observations required before the estimator produces a valid result.",#
+                      :hac_lags => "`hac_lags`: Optional number of lags for Heteroskedasticity and Autocorrelation Consistent (HAC) kernel correction of squared returns. If `nothing`, no HAC correction is applied.",#
+                      :regime_method => "`regime_method`: Regime adjustment method used to compute the per-observation regime state.",#
+                      :regime_decay => "`regime_decay`: Exponential decay factor for smoothing the regime state.",#
+                      :regime_min_obs => "`regime_min_obs`: Minimum number of regime observations required before the regime multiplier is applied.",#
+                      :regime_lohi_mult => "`regime_lohi_mult`: Optional `(lo, hi)` tuple bounding the regime multiplier range. If `nothing`, no clamping is applied.",#
+                      :min_val => "`min_val`: Minimum threshold to prevent division by zero or degenerate estimates.",#
+                      :centred => "`centred`: Whether to treat the returns as pre-centred (mean zero). If `false`, the location is estimated online.",#
+                      :ra_x => "`x`: Shape parameter of the log regime adjustment.",#
+                      :ra_y => "`y`: Scale parameter of the log regime adjustment.",#
+                      :ra_kappa => "`kappa`: Precomputed normalisation constant `digamma(x) + log(y)` for the log regime adjustment.",#
+                      :ra_norm_x => "`x`: First-moment normalisation constant for the regime adjustment.",#
+                      :ret_buffer => "`ret_buffer`: Optional circular buffer of recent centred returns for HAC kernel correction.",#
+                      :ra_variance => "`variance`: Running per-asset variance vector.",#
+                      :ra_X2 => "`X2`: Working array for current (possibly HAC-adjusted) squared returns.",#
+                      :ra_X_old_i => "`X_old_i`: Working array for lagged centred returns.",#
+                      :ra_z2 => "`z2`: Standardised squared innovations used for regime state computation.",#
+                      :ra_location => "`location`: Exponentially smoothed location (mean) vector.",#
+                      :obs_count => "`obs_count`: Per-asset count of observations processed.",#
+                      :old_obs_count => "`old_obs_count`: Per-asset observation count from the previous step.",#
+                      :ra_active => "`active`: Boolean mask indicating which assets are currently active.",#
+                      :regime_state => "`regime_state`: Current smoothed regime state value.",#
+                      :n_regime_obs => "`n_regime_obs`: Number of observations used to update the regime state.",#
+                      :cor_decay => "`cor_decay`: Exponential decay factor for the correlation smoother.",#
+                      :regime_target => "`regime_target`: Target structure for the regime-adjusted covariance update.",#
+                      :ra_w => "`w`: Optional portfolio weights vector for the portfolio target. If `nothing`, equal weights are used.",#
+                      :sq => "`sq`: Whether to use variance instead of volatility in the inverse weighting.",#
+                      :wfalg => "`alg`: Weight finaliser error formulation algorithm.",#
+                      :res_retcode => "`res`: Optional result or message from the solver.",#
+                      :N_msc => "`N`: Number of bisection steps for the monotonic Schur complement.",#
+                      :alpha_dirichlet => "`alpha`: Dirichlet concentration parameter.",#
+                      :opt_hier => "`opt`: Base hierarchical optimiser configuration.",#
+                      :strict_opt => "`strict`: Whether to strictly enforce weight bounds.",#
+                      :strict_conv => "`strict`: Whether to raise an error if convergence is not achieved.",#
+                      :schalg => "`alg`: Schur complement algorithm variant.",#
                       )
 """
     field_dict
@@ -677,7 +724,15 @@ val_dict = Dict(:oow => "If `w` is not `nothing`, `!isempty(w)`.",
                 :ntn => "`n >= 1`.",#
                 :A => "`!isempty(A)`.",#
                 :B => "`!isempty(B)`.",#
-                :eqineq => "Both `eq` and `ineq` cannot be `nothing` at the same time, `!(isnothing(ineq) && isnothing(eq))`.")
+                :eqineq => "Both `eq` and `ineq` cannot be `nothing` at the same time, `!(isnothing(ineq) && isnothing(eq))`.",
+                :decay => "`decay > 0`.",#
+                :min_obs => "`min_obs > 0`.",#
+                :hac_lags => "If `hac_lags` is not `nothing`, `hac_lags > 0`.",#
+                :regime_min_obs => "`regime_min_obs > 0`.",#
+                :regime_lohi_mult => "If `regime_lohi_mult` is not `nothing`, `0 < regime_lohi_mult[1] < regime_lohi_mult[2]`.",#
+                :ra_x => "`x` is valid",#
+                :ra_y => "`y` is valid",#
+                :ra_norm_x => "`x` is valid")
 
 """
 Dictionary containing return value descriptions for common parameters used in `PortfolioOptimisers.jl`.

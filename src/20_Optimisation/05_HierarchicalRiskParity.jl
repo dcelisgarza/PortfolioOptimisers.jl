@@ -7,10 +7,7 @@ Hierarchical Risk Parity (HRP) portfolio optimiser.
 
 # Fields
 
-  - `opt`: Base hierarchical optimiser configuration (prior, clustering, bounds, fees, etc.).
-  - `r`: Risk measure or vector of risk measures used to define the inter-cluster risk budget.
-  - `sca`: Scalariser for combining multiple risk measures.
-  - `fb`: Fallback optimiser.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -116,9 +113,13 @@ HierarchicalRiskParity
   - [`SchurComplementHierarchicalRiskParity`](@ref)
 """
 @concrete struct HierarchicalRiskParity <: ClusteringOptimisationEstimator
+    "$(field_dict[:opt_hier])"
     opt
+    "$(field_dict[:r])"
     r
+    "$(field_dict[:sca])"
     sca
+    "$(field_dict[:fb])"
     fb
     function HierarchicalRiskParity(opt::HierarchicalOptimiser, r::OptRM_VecOptRM,
                                     sca::Scalariser, fb::Option{<:OptE_Opt})

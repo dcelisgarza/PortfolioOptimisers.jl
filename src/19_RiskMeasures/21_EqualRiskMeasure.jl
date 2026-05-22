@@ -15,7 +15,7 @@ For a portfolio of ``N`` assets with weights ``\\boldsymbol{w} \\in \\mathbb{R}^
 
 # Fields
 
-  - `settings`: Hierarchical risk measure configuration.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -53,6 +53,7 @@ EqualRiskMeasure
   - [`RiskRatioRiskMeasure`](@ref)
 """
 @concrete struct EqualRiskMeasure <: HierarchicalRiskMeasure
+    "$(field_dict[:settings_rm])"
     settings
     function EqualRiskMeasure(settings::HierarchicalRiskMeasureSettings)
         return new{typeof(settings)}(settings)

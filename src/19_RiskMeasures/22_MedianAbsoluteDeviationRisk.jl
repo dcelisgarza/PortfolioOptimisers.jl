@@ -67,10 +67,7 @@ When `flag = true` (default), the result is scaled by a consistency factor ``(\\
 
 # Fields
 
-  - `settings`: Hierarchical risk measure configuration.
-  - `w`: Optional observation weights.
-  - `mu`: Centre of the deviation (centering function, scalar, vector, or `VecScalar`).
-  - `flag`: If `true`, applies the consistency correction factor.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -121,9 +118,13 @@ MedianAbsoluteDeviation
   - [`MeanCentering`](@ref)
 """
 @concrete struct MedianAbsoluteDeviation <: HierarchicalRiskMeasure
+    "$(field_dict[:settings_rm])"
     settings
+    "$(field_dict[:w_rm])"
     w
+    "$(field_dict[:mu_rm])"
     mu
+    "$(field_dict[:flag])"
     flag
     function MedianAbsoluteDeviation(settings::HierarchicalRiskMeasureSettings,
                                      w::Option{<:ObsWeights}, mu::MedAbsDevMu,

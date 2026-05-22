@@ -272,7 +272,7 @@ ShrunkExpectedReturns
     me
     "$(field_dict[:ce])"
     ce
-    "Expected returns shrinkage algorithm."
+    "$(field_dict[:me_shrink_alg])"
     alg
     function ShrunkExpectedReturns(me::AbstractExpectedReturnsEstimator,
                                    ce::StatsBase.CovarianceEstimator,
@@ -376,7 +376,7 @@ This method applies a shrinkage algorithm to the sample expected returns, pullin
       + `BayesStein`: A Bayesian formula involving the centered mean and inverse covariance.
       + `BodnarOkhrinParolya`: A Bayesian formula involving the target mean, mean and inverse covariance.
 
-  - ReturnsResult the shrunk mean vector.
+  - Returns the shrunk mean vector.
 
 # Related
 

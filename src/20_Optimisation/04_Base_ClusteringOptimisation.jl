@@ -5,7 +5,7 @@ Abstract supertype for base clustering optimisation estimators.
 
 These are intermediate configuration types used in hierarchical/clustering optimisation pipelines.
 
-# Related Types
+# Related
 
   - [`BaseOptimisationEstimator`](@ref)
   - [`HierarchicalOptimiser`](@ref)
@@ -18,7 +18,7 @@ Abstract supertype for clustering-based portfolio optimisation estimators.
 
 Clustering optimisation estimators use asset clustering to decompose the portfolio optimisation problem. Subtypes include HRP, HERC, and SCHRP.
 
-# Related Types
+# Related
 
   - [`NonFiniteAllocationOptimisationEstimator`](@ref)
   - [`HierarchicalRiskParity`](@ref)
@@ -33,14 +33,7 @@ Result type for hierarchical (clustering-based) portfolio optimisation.
 
 # Fields
 
-  - `oe`: Type of the optimisation estimator that produced this result.
-  - `pr`: Prior result used in optimisation.
-  - `clr`: Clustering result.
-  - `wb`: Weight bounds applied.
-  - `fees`: Fee structure applied (or `nothing`).
-  - `retcode`: Optimisation return code.
-  - `w`: Optimal portfolio weights vector.
-  - `fb`: Fallback result (if a fallback optimiser was used).
+$(DocStringExtensions.FIELDS)
 
 # Related
 
@@ -49,13 +42,21 @@ Result type for hierarchical (clustering-based) portfolio optimisation.
   - [`HierarchicalEqualRiskContribution`](@ref)
 """
 @concrete struct HierarchicalResult <: NonFiniteAllocationOptimisationResult
+    "$(field_dict[:oe])"
     oe
+    "$(field_dict[:pr])"
     pr
+    "$(field_dict[:clr])"
     clr
+    "$(field_dict[:wb])"
     wb
+    "$(field_dict[:fees])"
     fees
+    "$(field_dict[:retcode])"
     retcode
+    "$(field_dict[:pw])"
     w
+    "$(field_dict[:fb])"
     fb
 end
 function factory(res::HierarchicalResult, fb::Option{<:OptE_Opt})
@@ -71,16 +72,7 @@ Base configuration for hierarchical clustering-based portfolio optimisers.
 
 # Fields
 
-  - `pe`: Prior estimator or prior result.
-  - `cle`: Hierarchical clustering estimator or clustering result.
-  - `slv`: Solver or vector of solvers (for risk measures requiring conic optimisation).
-  - `wb`: Weight bounds estimator or bounds.
-  - `fees`: Fee estimator or fee structure.
-  - `sets`: Asset sets.
-  - `wf`: Weight finaliser for enforcing bounds.
-  - `brt`: If `true`, uses bootstrap returns.
-  - `cle_pr`: If `true`, passes the prior result to the clustering estimator.
-  - `strict`: If `true`, strictly enforces weight bounds.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -176,15 +168,25 @@ HierarchicalOptimiser
   - [`SchurComplementHierarchicalRiskParity`](@ref)
 """
 @concrete struct HierarchicalOptimiser <: BaseClusteringOptimisationEstimator
+    "$(field_dict[:pe])"
     pe
+    "$(field_dict[:cle])"
     cle
+    "$(field_dict[:slv])"
     slv
+    "$(field_dict[:wb])"
     wb
+    "$(field_dict[:fees])"
     fees
+    "$(field_dict[:sets])"
     sets
+    "$(field_dict[:wf])"
     wf
+    "$(field_dict[:brt])"
     brt
+    "$(field_dict[:cle_pr])"
     cle_pr
+    "$(field_dict[:strict_opt])"
     strict
     function HierarchicalOptimiser(pe::PrE_Pr, cle::HClE_HCl, slv::Option{<:Slv_VecSlv},
                                    wb::Option{<:WbE_Wb}, fees::Option{<:FeesE_Fees},
