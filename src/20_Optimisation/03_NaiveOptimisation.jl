@@ -40,7 +40,8 @@ Positional arguments correspond to the struct's fields.
 # Examples
 
 ```jldoctest
-julia> NaiveOptimisationResult(InverseVolatility, nothing, nothing, OptimisationSuccess(), [0.5, 0.5], nothing)
+julia> NaiveOptimisationResult(InverseVolatility, nothing, nothing, OptimisationSuccess(),
+                               [0.5, 0.5], nothing)
 NaiveOptimisationResult
        oe ┼ UnionAll: InverseVolatility
        pr ┼ nothing

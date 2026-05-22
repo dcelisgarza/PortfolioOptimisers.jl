@@ -651,6 +651,7 @@ where ``rd_{(k)}`` is the ``k``-th smallest relative drawdown.
 $(DocStringExtensions.FIELDS)
 
 # Constructors
+
         settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
         alpha::Number = 0.05,
         w::Option{<:ObsWeights} = nothing

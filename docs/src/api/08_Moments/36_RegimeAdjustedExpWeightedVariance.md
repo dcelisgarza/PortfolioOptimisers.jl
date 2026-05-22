@@ -8,4 +8,5 @@ LogRegimeAdjusted
 FirstMomentRegimeAdjusted
 RootMeanSquaredAdjusted
 RegimeAdjustedExpWeightedVariance
+regime_multiplier
 ```

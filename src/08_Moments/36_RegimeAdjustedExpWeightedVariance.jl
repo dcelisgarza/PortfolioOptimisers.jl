@@ -81,9 +81,9 @@ and cannot be set directly.
 ```jldoctest
 julia> LogRegimeAdjusted()
 LogRegimeAdjusted
-  x ┼ 0.5
-  y ┼ 2.0
-  kappa ┴ -1.2703628454614782
+      x ┼ Float64: 0.5
+      y ┼ Float64: 2.0
+  kappa ┴ Float64: -1.2703628454614782
 ```
 
 ## Related
@@ -140,7 +140,7 @@ Keywords correspond to the struct's fields.
 ```jldoctest
 julia> FirstMomentRegimeAdjusted()
 FirstMomentRegimeAdjusted
-  x ┴ 0.7978845608028654
+  x ┴ Float64: 0.7978845608028654
 ```
 
 ## Related

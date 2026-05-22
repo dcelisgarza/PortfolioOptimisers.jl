@@ -8,4 +8,5 @@ MahalanobisTarget
 DiagonalTarget
 PortfolioTarget
 RegimeAdjustedExpWeightedCovariance
+min_active_assets
 ```

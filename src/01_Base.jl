@@ -683,8 +683,7 @@ const arg_dict = Dict(
                       :opt_hier => "`opt`: Base hierarchical optimiser configuration.",#
                       :strict_opt => "`strict`: Whether to strictly enforce weight bounds.",#
                       :strict_conv => "`strict`: Whether to raise an error if convergence is not achieved.",#
-                      :schalg => "`alg`: Schur complement algorithm variant.",#
-                      )
+                      :schalg => "`alg`: Schur complement algorithm variant.")
 """
     field_dict
 

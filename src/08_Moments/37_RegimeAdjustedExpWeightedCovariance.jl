@@ -230,10 +230,13 @@ true
         if !isnothing(hac_lags)
             assert_nonempty_gt0_finite_val(hac_lags, :hac_lags)
         end
-        return new{typeof(decay), typeof(cor_decay), typeof(hac_lags), typeof(regime_method),
-                   typeof(regime_decay), typeof(regime_target)}(decay, cor_decay, hac_lags,
-                                                                regime_method, regime_decay,
-                                                                regime_target)
+        return new{typeof(decay), typeof(cor_decay), typeof(hac_lags),
+                   typeof(regime_method), typeof(regime_decay), typeof(regime_target)}(decay,
+                                                                                       cor_decay,
+                                                                                       hac_lags,
+                                                                                       regime_method,
+                                                                                       regime_decay,
+                                                                                       regime_target)
     end
 end
 function RegimeAdjustedExpWeightedCovariance(; decay::Number = exp2(-inv(40.0)),
