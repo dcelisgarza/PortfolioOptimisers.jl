@@ -250,5 +250,5 @@ function RegimeAdjustedExpWeightedCovariance(; decay::Number = exp2(-inv(40.0)),
                                                regime_decay, regime_target)
 end
 
-export RegimeAdjustedTarget, MahalanobisTarget, DiagonalTarget, PortfolioTarget,
-       RegimeAdjustedExpWeightedCovariance
+# export RegimeAdjustedTarget, MahalanobisTarget, DiagonalTarget, PortfolioTarget,
+#       RegimeAdjustedExpWeightedCovariance
