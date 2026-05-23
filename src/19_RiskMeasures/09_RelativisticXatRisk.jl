@@ -132,11 +132,7 @@ where ``\\mathcal{K}_{\\mathrm{pow}}(p) = \\{(a,b,c) : a^p b^{1-p} \\geq |c|,\\,
 
 # Fields
 
-  - `settings`: Risk measure configuration.
-  - `slv`: Solver or vector of solvers for the conic optimisation.
-  - `alpha`: Significance level for the lower tail.
-  - `kappa`: Deformation parameter ``\\kappa \\in (0, 1)``.
-  - `w`: Optional observation weights.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -191,10 +187,15 @@ RelativisticValueatRisk
   - [`RelativisticDrawdownatRisk`](@ref)
 """
 @concrete struct RelativisticValueatRisk <: RiskMeasure
+    "$(field_dict[:settings_rm])"
     settings
+    "$(field_dict[:slv])"
     slv
+    "$(field_dict[:alpha])"
     alpha
+    "$(field_dict[:kappa])"
     kappa
+    "$(field_dict[:oow])"
     w
     function RelativisticValueatRisk(settings::RiskMeasureSettings,
                                      slv::Option{<:Slv_VecSlv}, alpha::Number,
@@ -236,13 +237,7 @@ Represents the Relativistic Value-at-Risk Range (RVaR Range) risk measure.
 
 # Fields
 
-  - `settings`: Risk measure configuration.
-  - `slv`: Solver or vector of solvers for the conic optimisation.
-  - `alpha`: Significance level for the lower tail.
-  - `kappa_a`: Deformation parameter for the lower-tail RVaR.
-  - `beta`: Significance level for the upper tail.
-  - `kappa_b`: Deformation parameter for the upper-tail RVaR.
-  - `w`: Optional observation weights.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -300,12 +295,19 @@ RelativisticValueatRiskRange
   - [`EntropicValueatRiskRange`](@ref)
 """
 @concrete struct RelativisticValueatRiskRange <: RiskMeasure
+    "$(field_dict[:settings_rm])"
     settings
+    "$(field_dict[:slv])"
     slv
+    "$(field_dict[:alpha])"
     alpha
+    "$(field_dict[:kappa_a])"
     kappa_a
+    "$(field_dict[:beta])"
     beta
+    "$(field_dict[:kappa_b])"
     kappa_b
+    "$(field_dict[:oow])"
     w
     function RelativisticValueatRiskRange(settings::RiskMeasureSettings,
                                           slv::Option{<:Slv_VecSlv}, alpha::Number,
@@ -366,11 +368,7 @@ The Relativistic Drawdown-at-Risk is the RVaR of the drawdown series:
 
 # Fields
 
-  - `settings`: Risk measure configuration.
-  - `slv`: Solver or vector of solvers for the conic optimisation.
-  - `alpha`: Significance level for the lower tail.
-  - `kappa`: Deformation parameter ``\\kappa \\in (0, 1)``.
-  - `w`: Optional observation weights.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -425,10 +423,15 @@ RelativisticDrawdownatRisk
   - [`RelativeRelativisticDrawdownatRisk`](@ref)
 """
 @concrete struct RelativisticDrawdownatRisk <: RiskMeasure
+    "$(field_dict[:settings_rm])"
     settings
+    "$(field_dict[:slv])"
     slv
+    "$(field_dict[:alpha])"
     alpha
+    "$(field_dict[:kappa])"
     kappa
+    "$(field_dict[:oow])"
     w
     function RelativisticDrawdownatRisk(settings, slv::Option{<:Slv_VecSlv}, alpha::Number,
                                         kappa::Number, w::Option{<:ObsWeights})
@@ -478,11 +481,7 @@ The Relative Relativistic Drawdown-at-Risk is the RVaR of the relative drawdown 
 
 # Fields
 
-  - `settings`: Hierarchical risk measure configuration.
-  - `slv`: Solver or vector of solvers for the conic optimisation.
-  - `alpha`: Significance level for the lower tail.
-  - `kappa`: Deformation parameter ``\\kappa \\in (0, 1)``.
-  - `w`: Optional observation weights.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -534,10 +533,15 @@ RelativeRelativisticDrawdownatRisk
   - [`RelativeEntropicDrawdownatRisk`](@ref)
 """
 @concrete struct RelativeRelativisticDrawdownatRisk <: HierarchicalRiskMeasure
+    "$(field_dict[:settings_rm])"
     settings
+    "$(field_dict[:slv])"
     slv
+    "$(field_dict[:alpha])"
     alpha
+    "$(field_dict[:kappa])"
     kappa
+    "$(field_dict[:oow])"
     w
     function RelativeRelativisticDrawdownatRisk(settings::HierarchicalRiskMeasureSettings,
                                                 slv::Option{<:Slv_VecSlv}, alpha::Number,

@@ -22,8 +22,7 @@ Stores the train and test index vectors for each fold of the walk-forward cross-
 
 # Fields
 
-  - `train_idx`: Vector of training index ranges for each fold.
-  - `test_idx`: Vector of testing index ranges for each fold.
+$(DocStringExtensions.FIELDS)
 
 # Related
 
@@ -33,7 +32,9 @@ Stores the train and test index vectors for each fold of the walk-forward cross-
   - [`SequentialCrossValidationResult`](@ref)
 """
 @concrete struct WalkForwardResult <: SequentialCrossValidationResult
+    "$(field_dict[:train_idx])"
     train_idx
+    "$(field_dict[:test_idx])"
     test_idx
     function WalkForwardResult(train_idx::VecVecInt, test_idx::VecVecInt)
         @argcheck(!isempty(train_idx),
@@ -67,11 +68,7 @@ Implements index-based walk-forward cross-validation for time series, supporting
 
 # Fields
 
-  - `train_size`: Number of observations in each training set.
-  - `test_size`: Number of observations in each test set.
-  - `purged_size`: Number of observations to exclude from the end of each train set adjacent to a test set.
-  - `expand_train`: If true, training set always starts from the beginning; otherwise, uses a rolling window.
-  - `reduce_test`: If true, reduces the last test set to fit remaining data; otherwise, drops incomplete test sets.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -109,10 +106,15 @@ IndexWalkForward
   - [`n_splits`](@ref)
 """
 @concrete struct IndexWalkForward <: WalkForwardEstimator
+    "$(field_dict[:train_size])"
     train_size
+    "$(field_dict[:test_size])"
     test_size
+    "$(field_dict[:purged_size])"
     purged_size
+    "$(field_dict[:expand_train])"
     expand_train
+    "$(field_dict[:reduce_test])"
     reduce_test
     function IndexWalkForward(train_size::Integer, test_size::Integer, purged_size::Integer,
                               expand_train::Bool, reduce_test::Bool)
@@ -270,15 +272,7 @@ Implements date-based walk-forward cross-validation for time series, supporting 
 
 # Fields
 
-  - `train_size`: Number of periods or length of training window (integer or date period).
-  - `test_size`: Number of observations in each test set.
-  - `period`: Step size for each split.
-  - `period_offset`: Optional offset to shift the split dates.
-  - `purged_size`: Number of observations to exclude from the end of each train set adjacent to a test set.
-  - `adjuster`: Function or estimator to adjust the date range (e.g., for business days).
-  - `previous`: If true, allows test indices to use previous available date if exact match not found, else use the next available date.
-  - `expand_train`: If true, training set always starts from the beginning; otherwise, uses a rolling window.
-  - `reduce_test`: If true, reduces the last test set to fit remaining data; otherwise, drops incomplete test sets.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -324,14 +318,23 @@ DateWalkForward
   - [`n_splits`](@ref)
 """
 @concrete struct DateWalkForward <: WalkForwardEstimator
+    "$(field_dict[:train_size])"
     train_size
+    "$(field_dict[:test_size])"
     test_size
+    "$(field_dict[:period])"
     period
+    "$(field_dict[:period_offset])"
     period_offset
+    "$(field_dict[:purged_size])"
     purged_size
+    "$(field_dict[:adjuster])"
     adjuster
+    "$(field_dict[:previous])"
     previous
+    "$(field_dict[:expand_train])"
     expand_train
+    "$(field_dict[:reduce_test])"
     reduce_test
     function DateWalkForward(train_size::IntPeriodDateRange, test_size::Integer,
                              period::DatesUnionPeriod,

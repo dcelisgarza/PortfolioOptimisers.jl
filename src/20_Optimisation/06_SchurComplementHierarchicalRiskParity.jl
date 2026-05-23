@@ -21,14 +21,7 @@ Stores the optimisation estimator, prior result, weight bounds, clustering resul
 
 # Fields
 
-  - `oe`: Optimisation estimator used.
-  - `pr`: Prior result containing asset moments.
-  - `wb`: Weight bounds estimator.
-  - `clr`: Clustering result.
-  - `gamma`: Schur complement scaling parameter.
-  - `retcode`: Optimisation return code.
-  - `w`: Optimised asset weights.
-  - `fb`: Optional fallback optimisation estimator.
+$(DocStringExtensions.FIELDS)
 
 # Related
 
@@ -37,13 +30,21 @@ Stores the optimisation estimator, prior result, weight bounds, clustering resul
 """
 @concrete struct SchurComplementHierarchicalRiskParityResult <:
                  NonFiniteAllocationOptimisationResult
+    "$(field_dict[:oe])"
     oe
+    "$(field_dict[:pr])"
     pr
+    "$(field_dict[:wb])"
     wb
+    "$(field_dict[:clr])"
     clr
+    "$(field_dict[:gamma_schur])"
     gamma
+    "$(field_dict[:retcode])"
     retcode
+    "$(field_dict[:pw])"
     w
+    "$(field_dict[:fb])"
     fb
 end
 function factory(res::SchurComplementHierarchicalRiskParityResult, fb::Option{<:OptE_Opt})
@@ -55,7 +56,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for Schur Complement algorithm variants.
 
-# Related Types
+# Related
 
   - [`NonMonotonicSchurComplement`](@ref)
   - [`MonotonicSchurComplement`](@ref)
@@ -68,7 +69,7 @@ Non-monotonic Schur Complement algorithm variant for SCHRP.
 
 Uses the raw Schur complement formula without monotonicity correction.
 
-# Related Types
+# Related
 
   - [`SchurComplementAlgorithm`](@ref)
   - [`MonotonicSchurComplement`](@ref)
@@ -83,10 +84,7 @@ Applies a bisection-based correction to ensure the Schur complement allocation f
 
 # Fields
 
-  - `N`: Number of bisection steps.
-  - `tol`: Convergence tolerance.
-  - `iter`: Maximum iterations (or `nothing` for no limit).
-  - `strict`: If `true`, raises an error if convergence is not achieved.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -99,15 +97,19 @@ Applies a bisection-based correction to ensure the Schur complement allocation f
 
 Keywords correspond to the struct's fields.
 
-# Related Types
+# Related
 
   - [`SchurComplementAlgorithm`](@ref)
   - [`NonMonotonicSchurComplement`](@ref)
 """
 @concrete struct MonotonicSchurComplement <: SchurComplementAlgorithm
+    "$(field_dict[:N_msc])"
     N
+    "$(field_dict[:tol])"
     tol
+    "$(field_dict[:iter])"
     iter
+    "$(field_dict[:strict_conv])"
     strict
     function MonotonicSchurComplement(N::Integer, tol::Number, iter::Option{<:Integer},
                                       strict::Bool)
@@ -134,11 +136,7 @@ Parameters for the Schur Complement step of SCHRP.
 
 # Fields
 
-  - `r`: Risk measure (`Variance` or `StandardDeviation`) used for intra-cluster risk.
-  - `gamma`: Initial allocation factor (``0 \\leq \\gamma \\leq 1``).
-  - `pdm`: Positive definite matrix correction method.
-  - `alg`: Schur Complement algorithm variant.
-  - `flag`: If `true`, uses the Schur Complement inversion; if `false`, uses the direct Schur inverse.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -162,10 +160,15 @@ Keywords correspond to the struct's fields.
   - [`SchurComplementAlgorithm`](@ref)
 """
 @concrete struct SchurComplementParams <: AbstractAlgorithm
+    "$(field_dict[:r])"
     r
+    "$(field_dict[:gamma_schur])"
     gamma
+    "$(field_dict[:pdm])"
     pdm
+    "$(field_dict[:schalg])"
     alg
+    "$(field_dict[:flag])"
     flag
     function SchurComplementParams(r::Sd_Var, gamma::Number, pdm::Option{<:Posdef},
                                    alg::SchurComplementAlgorithm, flag::Bool)
@@ -245,9 +248,7 @@ Schur Complement Hierarchical Risk Parity (SCHRP) portfolio optimiser.
 
 # Fields
 
-  - `opt`: Base hierarchical optimiser configuration.
-  - `params`: Schur Complement parameters (single or vector).
-  - `fb`: Fallback optimiser.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -362,8 +363,11 @@ SchurComplementHierarchicalRiskParity
   - [`SchurComplementParams`](@ref)
 """
 @concrete struct SchurComplementHierarchicalRiskParity <: ClusteringOptimisationEstimator
+    "$(field_dict[:opt_hier])"
     opt
+    "$(field_dict[:params])"
     params
+    "$(field_dict[:fb])"
     fb
     function SchurComplementHierarchicalRiskParity(opt::HierarchicalOptimiser,
                                                    params::ScP_VecScP,

@@ -7,13 +7,7 @@ Computes portfolio risk as the square root of the fourth central moment (kurtosi
 
 # Fields
 
-  - `settings`: Risk measure configuration.
-  - `w`: Optional vector of observation weights.
-  - `mu`: Optional expected returns value, vector, or `VecScalar` for the moment target, via [`calc_moment_target`](@ref). If `nothing` it is computed from the returns series using the optional weights in `w`.
-  - `kt`: Optional cokurtosis (fourth moment) matrix that overrides the prior `kt` when provided.
-  - `N`: Optional integer specifying the number of eigenvalues per asset to use from the cokurtosis matrix in an approximate formulation. If `nothing`, the exact formulation is used.
-  - `alg1`: Moment algorithm specifying whether to use all or only downside deviations.
-  - `alg2`: Specifies the `JuMP` formulation used to encode the risk measure.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -86,12 +80,19 @@ Kurtosis
   - [`LowOrderPrior`](@ref)
 """
 @concrete struct Kurtosis <: RiskMeasure
+    "$(field_dict[:settings_rm])"
     settings
+    "$(field_dict[:w_rm])"
     w
+    "$(field_dict[:mu_rm])"
     mu
+    "$(field_dict[:kt])"
     kt
+    "$(field_dict[:N_kt])"
     N
+    "$(field_dict[:alg1])"
     alg1
+    "$(field_dict[:alg2])"
     alg2
     function Kurtosis(settings::RiskMeasureSettings, w::Option{<:ObsWeights},
                       mu::Option{<:Num_VecNum_VecScalar}, kt::Option{<:MatNum},

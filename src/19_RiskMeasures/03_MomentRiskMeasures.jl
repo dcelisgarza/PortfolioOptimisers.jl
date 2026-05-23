@@ -76,9 +76,7 @@ Computes portfolio risk using the second central (full) or lower (semi) moment o
 
 # Fields
 
-  - `ve`: Variance estimator used to compute the second moment.
-  - `alg1`: Moment algorithm specifying whether to use all deviations or only downside deviations.
-  - `alg2`: Second moment formulation specifying the optimisation formulation.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -111,8 +109,11 @@ SecondMoment
   - [`SecondMomentFormulation`](@ref)
 """
 @concrete struct SecondMoment <: LowOrderMomentMeasureAlgorithm
+    "$(field_dict[:ve])"
     ve
+    "$(field_dict[:alg1])"
     alg1
+    "$(field_dict[:alg2])"
     alg2
     function SecondMoment(ve::AbstractVarianceEstimator, alg1::AbstractMomentAlgorithm,
                           alg2::SecondMomentFormulation)
@@ -177,7 +178,7 @@ Computes portfolio risk using the fourth central (full) or lower (semi) moment o
 
 # Fields
 
-  - `alg`: Moment algorithm specifying whether to use all deviations or only downside deviations.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -201,6 +202,7 @@ FourthMoment
   - [`AbstractMomentAlgorithm`](@ref)
 """
 @concrete struct FourthMoment <: UnstandardisedHighOrderMomentMeasureAlgorithm
+    "$(field_dict[:malg])"
     alg
     function FourthMoment(alg::AbstractMomentAlgorithm)
         return new{typeof(alg)}(alg)
@@ -218,8 +220,7 @@ Computes portfolio risk using a high-order moment algorithm (such as semi-skewne
 
 # Fields
 
-  - `ve`: Variance estimator used for standardisation.
-  - `alg`: Unstandardised high-order moment algorithm used to compute the risk measure.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -249,7 +250,9 @@ StandardisedHighOrderMoment
   - [`UnstandardisedHighOrderMomentMeasureAlgorithm`](@ref)
 """
 @concrete struct StandardisedHighOrderMoment <: HighOrderMomentMeasureAlgorithm
+    "$(field_dict[:ve])"
     ve
+    "$(field_dict[:malg])"
     alg
     function StandardisedHighOrderMoment(ve::AbstractVarianceEstimator,
                                          alg::UnstandardisedHighOrderMomentMeasureAlgorithm)
@@ -275,10 +278,7 @@ Computes portfolio risk using a low-order moment algorithm (such as first lower 
 
 # Fields
 
-  - `settings`: Risk measure configuration.
-  - `w`: Optional vector of observation weights.
-  - `mu`: Optional target scalar, vector, or `VecScalar` value for moment calculation that overrides the prior `mu` when provided. Also used to compute the moment target, via [`calc_moment_target`](@ref). If `nothing` it is computed from the returns series using the optional weights in `w`.
-  - `alg`: Low-order moment risk measure algorithm.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -612,9 +612,13 @@ LowOrderMoment
   - [`SOCRiskExpr`](@ref)
 """
 @concrete struct LowOrderMoment <: RiskMeasure
+    "$(field_dict[:settings_rm])"
     settings
+    "$(field_dict[:w_rm])"
     w
+    "$(field_dict[:mu_rm])"
     mu
+    "$(field_dict[:malg])"
     alg
     function LowOrderMoment(settings::RiskMeasureSettings, w::Option{<:ObsWeights},
                             mu::Option{<:Num_VecNum_VecScalar},
@@ -647,10 +651,7 @@ Computes portfolio risk using a high-order moment algorithm (such as semi-skewne
 
 # Fields
 
-  - `settings`: Risk measure configuration.
-  - `w`: Optional vector of observation weights.
-  - `mu`: Optional target scalar, vector, or `VecScalar` value for moment calculation that overrides the prior `mu` when provided. Also used to compute the moment target, via [`calc_moment_target`](@ref). If `nothing` it is computed from the returns series using the optional weights in `w`.
-  - `alg`: High-order moment risk measure algorithm.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -762,9 +763,13 @@ HighOrderMoment
   - [`StandardisedHighOrderMoment`](@ref)
 """
 @concrete struct HighOrderMoment <: HierarchicalRiskMeasure
+    "$(field_dict[:settings_rm])"
     settings
+    "$(field_dict[:w_rm])"
     w
+    "$(field_dict[:mu_rm])"
     mu
+    "$(field_dict[:malg])"
     alg
     function HighOrderMoment(settings::RiskMeasureSettings, w::Option{<:ObsWeights},
                              mu::Option{<:Num_VecNum_VecScalar},

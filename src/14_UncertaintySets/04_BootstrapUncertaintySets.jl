@@ -108,14 +108,7 @@ Estimator for box or ellipsoidal uncertainty sets using bootstrap methods for ti
 
 # Fields
 
-  - `pe`: Prior estimator used to compute expected returns and covariance statistics.
-  - `alg`: Uncertainty set algorithm.
-  - `n_sim`: Number of bootstrap simulations for uncertainty set estimation.
-  - `block_size`: Size of blocks for bootstrap resampling.
-  - `q`: Quantile or confidence level for uncertainty set bounds.
-  - `seed`: Optional random seed for reproducibility.
-  - `bootstrap`: Bootstrap algorithm type.
-  - `kwargs`: Additional keyword arguments to pass on to [`Statistics.quantile`](https://docs.julialang.org/en/v1/stdlib/Statistics/#Statistics.quantile).
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -183,13 +176,21 @@ ARCHUncertaintySet
   - [`EllipsoidalUncertaintySet`](@ref)
 """
 @concrete struct ARCHUncertaintySet <: BootstrapUncertaintySetEstimator
+    "$(field_dict[:pe])"
     pe
+    "$(field_dict[:ucsa])"
     alg
+    "$(field_dict[:n_sim])"
     n_sim
+    "$(field_dict[:block_size])"
     block_size
+    "$(field_dict[:q_bs])"
     q
+    "$(field_dict[:seed])"
     seed
+    "$(field_dict[:bootstrap])"
     bootstrap
+    "$(field_dict[:kwargs])"
     kwargs
     function ARCHUncertaintySet(pe::AbstractLowOrderPriorEstimator,
                                 alg::AbstractUncertaintySetAlgorithm, n_sim::Integer,

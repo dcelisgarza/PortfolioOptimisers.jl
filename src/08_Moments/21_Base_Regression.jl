@@ -166,7 +166,7 @@ end
 
 Fit a standard linear regression model using a [`LinearModel`](@ref) regression target.
 
-This method dispatches to `StatsAPI.fit` with the `GLM.LinearModel` type, passing the design matrix `X`, response vector `y`, and any keyword arguments stored in `tgt.kwargs`. It enables flexible configuration of the underlying linear model fitting routine within the `ssion estimation framework.
+This method dispatches to `StatsAPI.fit` with the `GLM.LinearModel` type, passing the design matrix `X`, response vector `y`, and any keyword arguments stored in `tgt.kwargs`. It enables flexible configuration of the underlying linear model fitting routine within the regression estimation framework.
 
 # Arguments
 

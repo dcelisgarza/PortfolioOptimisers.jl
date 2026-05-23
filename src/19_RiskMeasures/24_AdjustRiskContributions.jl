@@ -2,8 +2,8 @@
     const SquaredRiskMeasures
 
 Union of risk measures whose expected risk is a squared quantity. When computing risk
-contributions via finite differences the raw gradient value is halved to account for the
-square.
+contributions via finite differences, the library halves the raw gradient value to account
+for the square.
 """
 const SquaredRiskMeasures = Union{<:Variance, <:BrownianDistanceVariance,
                                   <:UncertaintySetVariance,
@@ -35,7 +35,7 @@ const QuadExpressionRiskMeasures = Union{<:Variance, <:BrownianDistanceVariance,
     const CubedRiskMeasures
 
 Union of risk measures whose expected risk is a cubed quantity. When computing risk
-contributions via finite differences the raw gradient value is divided by three.
+contributions via finite differences, the library divides the raw gradient value by three.
 """
 const CubedRiskMeasures = Union{<:ThirdCentralMoment, <:Skewness,
                                 <:HighOrderMoment{<:Any, <:Any, <:Any, <:ThirdLowerMoment},
@@ -46,7 +46,8 @@ const CubedRiskMeasures = Union{<:ThirdCentralMoment, <:Skewness,
     const FourthPowerRiskMeasures
 
 Union of risk measures whose expected risk is a fourth-power quantity. When computing
-risk contributions via finite differences the raw gradient value is multiplied by 0.25.
+risk contributions via finite differences, the library multiplies the raw gradient value
+by 0.25.
 """
 const FourthPowerRiskMeasures = Union{<:HighOrderMoment{<:Any, <:Any, <:Any,
                                                         <:FourthMoment},

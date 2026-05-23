@@ -7,19 +7,7 @@ Factor Black-Litterman prior estimator for asset returns.
 
 # Fields
 
-  - `pe`: Asset prior estimator.
-  - `f_mp`: Matrix post-processing estimator for the factor prior.
-  - `mp`: Matrix post-processing estimator for the posterior.
-  - `re`: Regression estimator for factor loadings.
-  - `ve`: Variance estimator for residuals.
-  - `views`: Views estimator or views object.
-  - `sets`: Asset sets.
-  - `views_conf`: View confidence(s).
-  - `w`: Optional weights for assets.
-  - `rf`: Risk-free rate.
-  - `l`: Optional leverage parameter.
-  - `tau`: Blending parameter. When computing the prior, if `nothing`, defaults to `1/T` where `T` is the number of observations.
-  - `rsd`: Boolean flag to include residual variance in posterior covariance.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -130,18 +118,31 @@ FactorBlackLittermanPrior
   - [`prior`](@ref)
 """
 @concrete struct FactorBlackLittermanPrior <: AbstractLowOrderPriorEstimator_F
+    "$(field_dict[:pe])"
     pe
+    "$(field_dict[:f_mp])"
     f_mp
+    "$(field_dict[:mp])"
     mp
+    "$(field_dict[:re])"
     re
+    "$(field_dict[:ve])"
     ve
+    "$(field_dict[:views])"
     views
+    "$(field_dict[:sets])"
     sets
+    "$(field_dict[:views_conf])"
     views_conf
+    "$(field_dict[:w_rm])"
     w
+    "$(field_dict[:rf])"
     rf
+    "$(field_dict[:l])"
     l
+    "$(field_dict[:tau])"
     tau
+    "$(field_dict[:rsd])"
     rsd
     function FactorBlackLittermanPrior(pe::AbstractLowOrderPriorEstimator_A_AF,
                                        f_mp::AbstractMatrixProcessingEstimator,

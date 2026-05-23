@@ -5,7 +5,7 @@ Abstract supertype for base JuMP-based portfolio optimisation estimators.
 
 These are configuration-level types (e.g., `JuMPOptimiser`) that define the optimisation problem setup for JuMP-based optimisers.
 
-# Related Types
+# Related
 
   - [`BaseOptimisationEstimator`](@ref)
   - [`JuMPOptimiser`](@ref)
@@ -18,7 +18,7 @@ Abstract supertype for JuMP-based portfolio optimisation estimators.
 
 JuMP optimisers formulate and solve portfolio optimisation problems using mathematical programming via the JuMP.jl framework.
 
-# Related Types
+# Related
 
   - [`NonFiniteAllocationOptimisationEstimator`](@ref)
   - [`RiskJuMPOptimisationEstimator`](@ref)
@@ -32,7 +32,7 @@ Abstract supertype for risk-based JuMP portfolio optimisation estimators.
 
 Subtype `RiskJuMPOptimisationEstimator` to implement optimisers that minimise or constrain risk measures as the primary objective.
 
-# Related Types
+# Related
 
   - [`JuMPOptimisationEstimator`](@ref)
   - [`MeanRisk`](@ref)
@@ -46,7 +46,7 @@ Abstract supertype for portfolio objective functions.
 
 Subtype `ObjectiveFunction` to implement portfolio optimisation objectives such as minimum risk, maximum return, or maximum Sharpe ratio.
 
-# Related Types
+# Related
 
   - [`MinimumRisk`](@ref)
   - [`MaximumReturn`](@ref)
@@ -61,7 +61,7 @@ Abstract supertype for JuMP-based returns estimators used in optimisation models
 
 `JuMPReturnsEstimator` types define how expected returns are incorporated into JuMP models.
 
-# Related Types
+# Related
 
   - [`ArithmeticReturn`](@ref)
   - [`LogarithmicReturn`](@ref)
@@ -101,7 +101,7 @@ Abstract supertype for JuMP constraint estimators.
 
 Subtype `JuMPConstraintEstimator` to implement custom constraints or objectives for JuMP-based portfolio optimisers.
 
-# Related Types
+# Related
 
   - [`CustomJuMPConstraint`](@ref)
   - [`CustomJuMPObjective`](@ref)
@@ -114,7 +114,7 @@ Abstract supertype for custom JuMP constraint implementations.
 
 Implement `add_custom_constraint!` to define custom JuMP model constraints.
 
-# Related Types
+# Related
 
   - [`JuMPConstraintEstimator`](@ref)
   - [`CustomJuMPObjective`](@ref)
@@ -127,7 +127,7 @@ Abstract supertype for custom JuMP objective implementations.
 
 Implement `add_custom_objective_term!` to add custom terms to the JuMP model objective.
 
-# Related Types
+# Related
 
   - [`JuMPConstraintEstimator`](@ref)
   - [`CustomJuMPConstraint`](@ref)
@@ -248,7 +248,7 @@ Stores the solution (portfolio weights) from a JuMP optimisation model.
 
 # Fields
 
-  - `w`: Optimal portfolio weights (non-empty array of numbers).
+$(DocStringExtensions.FIELDS)
 
 # Related
 
@@ -256,6 +256,7 @@ Stores the solution (portfolio weights) from a JuMP optimisation model.
   - [`JuMPOptimisationEstimator`](@ref)
 """
 @concrete struct JuMPOptimisationSolution <: OptimisationModelResult
+    "$(field_dict[:pw])"
     w
     function JuMPOptimisationSolution(w::ArrNum)
         @argcheck(!isempty(w))

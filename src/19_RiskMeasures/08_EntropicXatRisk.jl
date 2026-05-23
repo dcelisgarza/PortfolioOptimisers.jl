@@ -77,10 +77,7 @@ where ``K_{\\exp} = \\{(a, b, c) : b\\, e^{a/b} \\leq c,\\, b > 0\\}`` is the ex
 
 # Fields
 
-  - `settings`: Risk measure configuration.
-  - `slv`: Solver or vector of solvers for the conic optimisation.
-  - `alpha`: Significance level for the lower tail.
-  - `w`: Optional observation weights.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -132,9 +129,13 @@ EntropicValueatRisk
   - [`EntropicDrawdownatRisk`](@ref)
 """
 @concrete struct EntropicValueatRisk <: RiskMeasure
+    "$(field_dict[:settings_rm])"
     settings
+    "$(field_dict[:slv])"
     slv
+    "$(field_dict[:alpha])"
     alpha
+    "$(field_dict[:oow])"
     w
     function EntropicValueatRisk(settings::RiskMeasureSettings, slv::Option{<:Slv_VecSlv},
                                  alpha::Number, w::Option{<:ObsWeights})
@@ -172,11 +173,7 @@ where ``\\mathrm{EVaR}_{\\alpha}(\\boldsymbol{x})`` captures the lower-tail entr
 
 # Fields
 
-  - `settings`: Risk measure configuration.
-  - `slv`: Solver or vector of solvers for the conic optimisation.
-  - `alpha`: Significance level for the lower tail.
-  - `beta`: Significance level for the upper tail.
-  - `w`: Optional observation weights.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -203,10 +200,15 @@ Keywords correspond to the struct's fields.
   - [`EntropicValueatRisk`](@ref)
 """
 @concrete struct EntropicValueatRiskRange <: RiskMeasure
+    "$(field_dict[:settings_rm])"
     settings
+    "$(field_dict[:slv])"
     slv
+    "$(field_dict[:alpha])"
     alpha
+    "$(field_dict[:beta])"
     beta
+    "$(field_dict[:oow])"
     w
     function EntropicValueatRiskRange(settings::RiskMeasureSettings,
                                       slv::Option{<:Slv_VecSlv}, alpha::Number,
@@ -263,10 +265,7 @@ The EDaR is the EVaR of the drawdown series:
 
 # Fields
 
-  - `settings`: Risk measure configuration.
-  - `slv`: Solver or vector of solvers for the conic optimisation.
-  - `alpha`: Significance level for the lower tail.
-  - `w`: Optional observation weights.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -318,9 +317,13 @@ EntropicDrawdownatRisk
   - [`RelativeEntropicDrawdownatRisk`](@ref)
 """
 @concrete struct EntropicDrawdownatRisk <: RiskMeasure
+    "$(field_dict[:settings_rm])"
     settings
+    "$(field_dict[:slv])"
     slv
+    "$(field_dict[:alpha])"
     alpha
+    "$(field_dict[:oow])"
     w
     function EntropicDrawdownatRisk(settings::RiskMeasureSettings,
                                     slv::Option{<:Slv_VecSlv}, alpha::Number,
@@ -366,10 +369,7 @@ The Relative EDaR is the EVaR of the relative drawdown series:
 
 # Fields
 
-  - `settings`: Hierarchical risk measure configuration.
-  - `slv`: Solver or vector of solvers for the conic optimisation.
-  - `alpha`: Significance level for the lower tail.
-  - `w`: Optional observation weights.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -418,9 +418,13 @@ RelativeEntropicDrawdownatRisk
   - [`RelativeRelativisticDrawdownatRisk`](@ref)
 """
 @concrete struct RelativeEntropicDrawdownatRisk <: HierarchicalRiskMeasure
+    "$(field_dict[:settings_rm])"
     settings
+    "$(field_dict[:slv])"
     slv
+    "$(field_dict[:alpha])"
     alpha
+    "$(field_dict[:oow])"
     w
     function RelativeEntropicDrawdownatRisk(settings::HierarchicalRiskMeasureSettings,
                                             slv::Option{<:Slv_VecSlv}, alpha::Number,

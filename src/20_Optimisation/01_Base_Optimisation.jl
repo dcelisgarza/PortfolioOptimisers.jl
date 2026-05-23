@@ -31,7 +31,7 @@ Abstract supertype for base portfolio optimisation estimators.
 
 `BaseOptimisationEstimator` is the parent for all internal optimiser components that configure the optimisation problem but are not directly invokable as top-level optimisers.
 
-# Related Types
+# Related
 
   - [`AbstractOptimisationEstimator`](@ref)
   - [`OptimisationEstimator`](@ref)
@@ -44,7 +44,7 @@ Abstract supertype for portfolio optimisation estimators that produce portfolio 
 
 Subtype `OptimisationEstimator` to implement concrete portfolio optimisers. All optimisers that can be invoked with `optimise` should subtype this.
 
-# Related Types
+# Related
 
   - [`NonFiniteAllocationOptimisationEstimator`](@ref)
   - [`AbstractOptimisationEstimator`](@ref)
@@ -55,7 +55,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for portfolio optimisation estimators that produce continuous (non-integer) portfolio weights.
 
-# Related Types
+# Related
 
   - [`OptimisationEstimator`](@ref)
   - [`NaiveOptimisationEstimator`](@ref)
@@ -67,7 +67,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for optimisation algorithms used by portfolio optimisers.
 
-# Related Types
+# Related
 
   - [`AbstractAlgorithm`](@ref)
 """
@@ -79,7 +79,7 @@ Abstract supertype for portfolio optimisation result types.
 
 All concrete optimisation result types should subtype `OptimisationResult`.
 
-# Related Types
+# Related
 
   - [`NonFiniteAllocationOptimisationResult`](@ref)
   - [`OptimisationReturnCode`](@ref)
@@ -90,7 +90,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for continuous (non-integer allocation) optimisation results.
 
-# Related Types
+# Related
 
   - [`OptimisationResult`](@ref)
   - [`NaiveOptimisationResult`](@ref)
@@ -118,7 +118,7 @@ Abstract supertype for optimisation return codes.
 
 Concrete subtypes indicate whether an optimisation succeeded or failed.
 
-# Related Types
+# Related
 
   - [`OptimisationSuccess`](@ref)
   - [`OptimisationFailure`](@ref)
@@ -129,7 +129,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for intermediate optimisation model results.
 
-# Related Types
+# Related
 
   - [`OptimisationResult`](@ref)
 """
@@ -282,7 +282,7 @@ Abstract supertype for JuMP-based weight finaliser formulations.
 
 Defines the interface for norm types used when adjusting portfolio weights to satisfy bounds via a JuMP model.
 
-# Related Types
+# Related
 
   - [`RelativeErrorWeightFinaliser`](@ref)
   - [`SquaredRelativeErrorWeightFinaliser`](@ref)
@@ -295,24 +295,100 @@ abstract type JuMPWeightFinaliserFormulation <: AbstractAlgorithm end
 $(DocStringExtensions.TYPEDEF)
 
 Minimises the L1 norm of relative weight deviations when enforcing weight bounds.
+
+# Constructors
+
+    RelativeErrorWeightFinaliser() -> RelativeErrorWeightFinaliser
+
+# Examples
+
+```jldoctest
+julia> RelativeErrorWeightFinaliser()
+RelativeErrorWeightFinaliser()
+```
+
+# Related
+
+  - [`JuMPWeightFinaliserFormulation`](@ref)
+  - [`SquaredRelativeErrorWeightFinaliser`](@ref)
+  - [`AbsoluteErrorWeightFinaliser`](@ref)
+  - [`SquaredAbsoluteErrorWeightFinaliser`](@ref)
+  - [`JuMPWeightFinaliser`](@ref)
 """
 struct RelativeErrorWeightFinaliser <: JuMPWeightFinaliserFormulation end
 """
 $(DocStringExtensions.TYPEDEF)
 
 Minimises the L2 norm (squared) of relative weight deviations when enforcing weight bounds.
+
+# Constructors
+
+    SquaredRelativeErrorWeightFinaliser() -> SquaredRelativeErrorWeightFinaliser
+
+# Examples
+
+```jldoctest
+julia> SquaredRelativeErrorWeightFinaliser()
+SquaredRelativeErrorWeightFinaliser()
+```
+
+# Related
+
+  - [`JuMPWeightFinaliserFormulation`](@ref)
+  - [`RelativeErrorWeightFinaliser`](@ref)
+  - [`AbsoluteErrorWeightFinaliser`](@ref)
+  - [`SquaredAbsoluteErrorWeightFinaliser`](@ref)
+  - [`JuMPWeightFinaliser`](@ref)
 """
 struct SquaredRelativeErrorWeightFinaliser <: JuMPWeightFinaliserFormulation end
 """
 $(DocStringExtensions.TYPEDEF)
 
 Minimises the L1 norm of absolute weight deviations when enforcing weight bounds.
+
+# Constructors
+
+    AbsoluteErrorWeightFinaliser() -> AbsoluteErrorWeightFinaliser
+
+# Examples
+
+```jldoctest
+julia> AbsoluteErrorWeightFinaliser()
+AbsoluteErrorWeightFinaliser()
+```
+
+# Related
+
+  - [`JuMPWeightFinaliserFormulation`](@ref)
+  - [`RelativeErrorWeightFinaliser`](@ref)
+  - [`SquaredRelativeErrorWeightFinaliser`](@ref)
+  - [`SquaredAbsoluteErrorWeightFinaliser`](@ref)
+  - [`JuMPWeightFinaliser`](@ref)
 """
 struct AbsoluteErrorWeightFinaliser <: JuMPWeightFinaliserFormulation end
 """
 $(DocStringExtensions.TYPEDEF)
 
 Minimises the L2 norm (squared) of absolute weight deviations when enforcing weight bounds.
+
+# Constructors
+
+    SquaredAbsoluteErrorWeightFinaliser() -> SquaredAbsoluteErrorWeightFinaliser
+
+# Examples
+
+```jldoctest
+julia> SquaredAbsoluteErrorWeightFinaliser()
+SquaredAbsoluteErrorWeightFinaliser()
+```
+
+# Related
+
+  - [`JuMPWeightFinaliserFormulation`](@ref)
+  - [`RelativeErrorWeightFinaliser`](@ref)
+  - [`SquaredRelativeErrorWeightFinaliser`](@ref)
+  - [`AbsoluteErrorWeightFinaliser`](@ref)
+  - [`JuMPWeightFinaliser`](@ref)
 """
 struct SquaredAbsoluteErrorWeightFinaliser <: JuMPWeightFinaliserFormulation end
 """
@@ -322,7 +398,7 @@ Abstract supertype for weight finaliser strategies.
 
 A `WeightFinaliser` enforces weight bounds after the optimisation has produced unconstrained weights.
 
-# Related Types
+# Related
 
   - [`IterativeWeightFinaliser`](@ref)
   - [`JuMPWeightFinaliser`](@ref)
@@ -337,7 +413,7 @@ Iteratively projects weights into the feasible region defined by weight bounds.
 
 # Fields
 
-  - `iter`: Maximum number of iterations.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -365,6 +441,7 @@ IterativeWeightFinaliser
   - [`JuMPWeightFinaliser`](@ref)
 """
 @concrete struct IterativeWeightFinaliser <: WeightFinaliser
+    "$(field_dict[:iter])"
     iter
     function IterativeWeightFinaliser(iter::Integer)
         @argcheck(iter > 0)
@@ -383,10 +460,7 @@ Uses a JuMP optimisation model to enforce weight bounds.
 
 # Fields
 
-  - `slv`: Solver or vector of solvers for the JuMP model.
-  - `sc`: Scale factor applied to constraints.
-  - `so`: Scale factor applied to the objective.
-  - `alg`: Error formulation (L1/L2 relative or absolute).
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -404,6 +478,22 @@ Keywords correspond to the struct's fields.
   - If `slv` is a `VecSlv`: `!isempty(slv)`.
   - `sc > 0`, `so > 0`.
 
+# Examples
+
+```jldoctest
+julia> JuMPWeightFinaliser(; slv = Solver())
+JuMPWeightFinaliser
+  slv ┼ Solver
+      │          name ┼ String: ""
+      │        solver ┼ nothing
+      │      settings ┼ nothing
+      │     check_sol ┼ @NamedTuple{}: NamedTuple()
+      │   add_bridges ┴ Bool: true
+   sc ┼ Float64: 1.0
+   so ┼ Float64: 1.0
+  alg ┴ RelativeErrorWeightFinaliser()
+```
+
 # Related
 
   - [`WeightFinaliser`](@ref)
@@ -411,9 +501,13 @@ Keywords correspond to the struct's fields.
   - [`JuMPWeightFinaliserFormulation`](@ref)
 """
 @concrete struct JuMPWeightFinaliser <: WeightFinaliser
+    "$(field_dict[:slv])"
     slv
+    "$(field_dict[:sc])"
     sc
+    "$(field_dict[:so])"
     so
+    "$(field_dict[:wfalg])"
     alg
     function JuMPWeightFinaliser(slv::Slv_VecSlv, sc::Number, so::Number,
                                  alg::JuMPWeightFinaliserFormulation)
@@ -617,7 +711,21 @@ Indicates that a portfolio optimisation completed successfully.
 
 # Fields
 
-  - `res`: Optional result or message from the solver (default: `nothing`).
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    OptimisationSuccess(; res = nothing) -> OptimisationSuccess
+
+Keywords correspond to the struct's fields.
+
+# Examples
+
+```jldoctest
+julia> OptimisationSuccess()
+OptimisationSuccess
+  res ┴ nothing
+```
 
 # Related
 
@@ -625,6 +733,7 @@ Indicates that a portfolio optimisation completed successfully.
   - [`OptimisationFailure`](@ref)
 """
 @concrete struct OptimisationSuccess <: OptimisationReturnCode
+    "$(field_dict[:res_retcode])"
     res
 end
 function OptimisationSuccess(; res = nothing)
@@ -637,7 +746,21 @@ Indicates that a portfolio optimisation failed.
 
 # Fields
 
-  - `res`: Optional error message or diagnostic information (default: `nothing`).
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    OptimisationFailure(; res = nothing) -> OptimisationFailure
+
+Keywords correspond to the struct's fields.
+
+# Examples
+
+```jldoctest
+julia> OptimisationFailure()
+OptimisationFailure
+  res ┴ nothing
+```
 
 # Related
 
@@ -645,6 +768,7 @@ Indicates that a portfolio optimisation failed.
   - [`OptimisationSuccess`](@ref)
 """
 @concrete struct OptimisationFailure <: OptimisationReturnCode
+    "$(field_dict[:res_retcode])"
     res
 end
 function OptimisationFailure(; res = nothing)

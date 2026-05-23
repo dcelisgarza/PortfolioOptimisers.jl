@@ -7,11 +7,7 @@ Factor-based prior estimator for asset returns.
 
 # Fields
 
-  - `pe`: Factor prior estimator.
-  - `mp`: Matrix post-processing estimator.
-  - `re`: Regression estimator.
-  - `ve`: Variance estimator for residuals.
-  - `rsd`: Boolean flag to add residual variance to posterior covariance.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -85,10 +81,15 @@ FactorPrior
   - [`prior`](@ref)
 """
 @concrete struct FactorPrior <: AbstractLowOrderPriorEstimator_F
+    "$(field_dict[:pe])"
     pe
+    "$(field_dict[:mp])"
     mp
+    "$(field_dict[:re])"
     re
+    "$(field_dict[:ve])"
     ve
+    "$(field_dict[:rsd])"
     rsd
     function FactorPrior(pe::AbstractLowOrderPriorEstimator_A_AF,
                          mp::AbstractMatrixProcessingEstimator,

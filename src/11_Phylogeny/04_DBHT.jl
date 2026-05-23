@@ -1189,7 +1189,7 @@ end
 
 Assign each vertex to a specific bubble in the bubble hierarchy.
 
-This function determines the bubble membership of each vertex, resolving ambiguities when a vertex could belong to multiple bubbles. Assignment is based on the strength of connections (edge weights) between the vertex and each candidate bubble.
+This function determines the bubble membership of each vertex, resolving ambiguities when a vertex may belong to multiple bubbles. Assignment is based on the strength of connections (edge weights) between the vertex and each candidate bubble.
 
 # Arguments
 
@@ -1200,7 +1200,7 @@ This function determines the bubble membership of each vertex, resolving ambigui
 # Details
 
   - Vertices belonging to a single bubble are assigned directly.
-  - For vertices that could belong to multiple bubbles, assignment is made to the bubble with the strongest normalized connection (fraction of edge weights).
+  - For vertices that may belong to multiple bubbles, assignment is made to the bubble with the strongest normalized connection (fraction of edge weights).
   - Used internally for intra- and inter-cluster hierarchy construction in DBHT clustering.
 
 # Returns

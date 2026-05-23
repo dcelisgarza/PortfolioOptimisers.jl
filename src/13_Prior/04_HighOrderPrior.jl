@@ -376,9 +376,7 @@ High order prior estimator for asset returns.
 
 # Fields
 
-  - `pe`: Low order prior estimator (`AbstractLowOrderPriorEstimator_A_F_AF`).
-  - `kte`: Cokurtosis estimator (`CokurtosisEstimator` or `Nothing`).
-  - `ske`: Coskewness estimator (`CoskewnessEstimator` or `Nothing`).
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -458,8 +456,11 @@ HighOrderPriorEstimator
   - [`prior`](@ref)
 """
 @concrete struct HighOrderPriorEstimator <: AbstractHighOrderPriorEstimator
+    "$(field_dict[:pe])"
     pe
+    "$(field_dict[:kte])"
     kte
+    "$(field_dict[:ske])"
     ske
     function HighOrderPriorEstimator(pe::AbstractLowOrderPriorEstimator_A_F_AF,
                                      kte::Option{<:CokurtosisEstimator},

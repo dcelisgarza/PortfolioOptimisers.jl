@@ -7,7 +7,7 @@ Estimator for constructing asset set membership matrices from asset groupings.
 
 # Fields
 
-  - `val`: The key or group name to extract from the asset sets.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -45,6 +45,7 @@ julia> asset_sets_matrix(est, sets)
   - [`AbstractConstraintEstimator`](@ref)
 """
 @concrete struct AssetSetsMatrixEstimator <: AbstractConstraintEstimator
+    "$(field_dict[:asets_val])"
     val
     function AssetSetsMatrixEstimator(val::AbstractString)::AssetSetsMatrixEstimator
         @argcheck(!isempty(val))
@@ -173,7 +174,7 @@ This method returns the input matrix `smtx` unchanged. It is used as a fallback 
   - [`AssetSetsMatrixEstimator`](@ref)
   - [`asset_sets_matrix`](@ref)
 """
-function asset_sets_matrix(smtx::Option{<:MatNum}, args...)::Option{<:MatNum}
+function asset_sets_matrix(smtx::Option{<:MatNum}, args...)
     return smtx
 end
 """
@@ -189,7 +190,7 @@ It is used for type stability and to provide a uniform interface for processing 
 
   - [`asset_sets_matrix`](@ref)
 """
-function asset_sets_matrix(smtx::AssetSetsMatrixEstimator, sets::AssetSets)::BitMatrix
+function asset_sets_matrix(smtx::AssetSetsMatrixEstimator, sets::AssetSets)
     return asset_sets_matrix(smtx.val, sets)
 end
 """

@@ -533,18 +533,7 @@ Container type for low order prior results in `PortfolioOptimisers.jl`.
 
 # Fields
 
-  - `X`: Asset returns matrix.
-  - `mu`: Mean vector.
-  - `sigma`: Covariance matrix.
-  - `chol`: Cholesky factorisation of the factor-adjusted covariance matrix. Factor models sparsify the covariance matrix, so using their smaller, sparser Cholesky factor makes for more numerically stable and efficient optimisations.
-  - `w`: Asset weights.
-  - `ens`: Effective number of scenarios.
-  - `kld`: Kullback-Leibler divergence.
-  - `ow`: Opinion pooling weights.
-  - `rr`: Regression result.
-  - `f_mu`: Factor mean vector.
-  - `f_sigma`: Factor covariance matrix.
-  - `f_w`: Factor weights.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -605,17 +594,29 @@ LowOrderPrior
   - [`HighOrderPrior`](@ref)
 """
 @concrete struct LowOrderPrior <: AbstractPriorResult
+    "$(field_dict[:X])"
     X
+    "$(field_dict[:mu])"
     mu
+    "$(field_dict[:sigma])"
     sigma
+    "$(field_dict[:chol])"
     chol
+    "$(field_dict[:w_prior])"
     w
+    "$(field_dict[:ens])"
     ens
+    "$(field_dict[:kld])"
     kld
+    "$(field_dict[:op_w])"
     ow
+    "$(field_dict[:reg_rr])"
     rr
+    "$(field_dict[:f_mu])"
     f_mu
+    "$(field_dict[:f_sigma])"
     f_sigma
+    "$(field_dict[:f_w])"
     f_w
     function LowOrderPrior(X::MatNum, mu::VecNum, sigma::MatNum, chol::Option{<:MatNum},
                            w::Option{<:ObsWeights}, ens::Option{<:Number},
@@ -689,13 +690,7 @@ Container type for high order prior results in `PortfolioOptimisers.jl`.
 
 # Fields
 
-  - `pr`: Prior result for low order moments.
-  - `kt`: Cokurtosis tensor.
-  - `L2`: Elimination matrix.
-  - `S2`: Summation matrix.
-  - `sk`: Coskewness tensor.
-  - `V`: Negative quadratic skewness matrix.
-  - `skmp`: Matrix processing estimator for post-processing quadratic skewness.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -760,16 +755,26 @@ HighOrderPrior
   - [`prior`](@ref)
 """
 @concrete struct HighOrderPrior <: AbstractPriorResult
+    "$(field_dict[:pr])"
     pr
+    "$(field_dict[:kt])"
     kt
+    "$(field_dict[:L2])"
     L2
+    "$(field_dict[:S2])"
     S2
+    "$(field_dict[:sk])"
     sk
+    "$(field_dict[:V])"
     V
+    "$(field_dict[:skmp])"
     skmp
+    "$(field_dict[:f_kt])"
     f_kt
     # chol_kt
+    "$(field_dict[:f_sk])"
     f_sk
+    "$(field_dict[:f_V])"
     f_V
     function HighOrderPrior(pr::AbstractPriorResult, kt::Option{<:MatNum},
                             L2::Option{<:MatNum}, S2::Option{<:MatNum},

@@ -121,12 +121,7 @@ Result type for search-based cross-validation routines. Stores the optimal estim
 
 # Fields
 
-  - `opt`: Optimal estimator instance after search.
-  - `test_scores`: Matrix of test scores for each parameter set and CV split.
-  - `train_scores`: Matrix of training scores for each parameter set and CV split (or `nothing` if not recorded).
-  - `lens_grid`: Vector of lens objects for parameter access.
-  - `val_grid`: Vector of parameter values for each configuration.
-  - `idx`: Index of the selected optimal parameter set.
+$(DocStringExtensions.FIELDS)
 
 # Examples
 
@@ -138,11 +133,17 @@ Result type for search-based cross-validation routines. Stores the optimal estim
   - [`fit_and_score`](@ref)
 """
 @concrete struct SearchCrossValidationResult <: AbstractSearchCrossValidationResult
+    "$(field_dict[:opt_cv])"
     opt
+    "$(field_dict[:test_scores])"
     test_scores
+    "$(field_dict[:train_scores])"
     train_scores
+    "$(field_dict[:lens_grid])"
     lens_grid
+    "$(field_dict[:val_grid])"
     val_grid
+    "$(field_dict[:idx_cv])"
     idx
 end
 """

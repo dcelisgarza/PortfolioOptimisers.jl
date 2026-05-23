@@ -13,7 +13,7 @@ Represents the Worst Realisation risk measure.
 
 # Fields
 
-  - `settings`: Risk measure configuration.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -52,6 +52,7 @@ WorstRealisation
   - [`ValueatRisk`](@ref)
 """
 @concrete struct WorstRealisation <: RiskMeasure
+    "$(field_dict[:settings_rm])"
     settings
     function WorstRealisation(settings::RiskMeasureSettings)
         return new{typeof(settings)}(settings)

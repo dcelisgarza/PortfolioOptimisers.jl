@@ -34,10 +34,7 @@ This estimator can be converted into a concrete [`Turnover`](@ref) constraint us
 
 # Fields
 
-  - `w`: Vector of current portfolio weights.
-  - `val`: Asset-specific turnover values, as a dictionary, pair, or vector of pairs.
-  - `dval`: Default turnover value for assets not specified in `val`.
-  - `fixed`: Boolean indicating whether the estimator is fixed (does not update with new weights) or variable (updates with new weights).
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -75,9 +72,13 @@ TurnoverEstimator
   - [`turnover_constraints`](@ref)
 """
 @concrete struct TurnoverEstimator <: AbstractEstimator
+    "$(field_dict[:w_tn])"
     w
+    "$(field_dict[:val])"
     val
+    "$(field_dict[:dval])"
     dval
+    "$(field_dict[:fixed])"
     fixed
     function TurnoverEstimator(w::VecNum, val::EstValType, dval::Option{<:Number},
                                fixed::Bool)::TurnoverEstimator
@@ -291,14 +292,7 @@ Where:
 
 # Fields
 
-  - `w`: Vector of benchmark portfolio weights.
-
-  - `val`: Scalar or vector of turnover constraint values. Scalar values are broadcast to all assets.
-
-      + When used as a constraint, this value is used to constrain the maximum allowed turnover per asset.
-      + When used in [`Fees`](@ref), this value represents the turnover fee per asset.
-
-  - `fixed`: Boolean indicating whether the turnover constraint is fixed (does not update with new weights) or variable (updates with new weights).
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -349,8 +343,11 @@ Turnover
   - [`turnover_view`](@ref)
 """
 @concrete struct Turnover <: AbstractResult
+    "$(field_dict[:w_tn])"
     w
+    "$(field_dict[:val])"
     val
+    "$(field_dict[:fixed])"
     fixed
     function Turnover(w::VecNum, val::Num_VecNum, fixed::Bool)::Turnover
         assert_nonempty_finite_val(w, :w)

@@ -13,7 +13,7 @@ Represents the Range risk measure.
 
 # Fields
 
-  - `settings`: Risk measure configuration.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -52,6 +52,7 @@ Range
   - [`ValueatRiskRange`](@ref)
 """
 @concrete struct Range <: RiskMeasure
+    "$(field_dict[:settings_rm])"
     settings
     function Range(settings::RiskMeasureSettings)
         return new{typeof(settings)}(settings)

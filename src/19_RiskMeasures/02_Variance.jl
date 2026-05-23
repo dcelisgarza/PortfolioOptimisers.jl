@@ -137,10 +137,7 @@ Represents the portfolio variance using a covariance matrix.
 
 # Fields
 
-  - `settings`: Risk measure configuration.
-  - `sigma`: Optional covariance matrix that overrides the prior covariance when provided. Also used to compute the risk represented by a vector.
-  - `rc`: Optional specification of risk contribution constraints.
-  - `alg`: The optimisation formulation used to represent the variance risk expression.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -253,10 +250,15 @@ julia> r(w)
   - [`expected_risk`](@ref)
 """
 @concrete struct Variance <: RiskMeasure
+    "$(field_dict[:settings_rm])"
     settings
+    "$(field_dict[:sigma])"
     sigma
+    "$(field_dict[:chol])"
     chol
+    "$(field_dict[:rc])"
     rc
+    "$(field_dict[:alg])"
     alg
     function Variance(settings::RiskMeasureSettings, sigma::Option{<:MatNum},
                       chol::Option{<:MatNum}, rc::Option{<:LcE_Lc},
@@ -331,8 +333,7 @@ Represents the portfolio standard deviation using a covariance matrix. It is the
 
 # Fields
 
-  - `settings`: Risk measure configuration.
-  - `sigma`: Optional covariance matrix that overrides the prior covariance when provided. Also used to compute the risk represented by a vector.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -412,8 +413,11 @@ julia> r(w)
   - [`expected_risk`](@ref)
 """
 @concrete struct StandardDeviation <: RiskMeasure
+    "$(field_dict[:settings_rm])"
     settings
+    "$(field_dict[:sigma])"
     sigma
+    "$(field_dict[:chol])"
     chol
     function StandardDeviation(settings::RiskMeasureSettings, sigma::Option{<:MatNum},
                                chol::Option{<:MatNum})::StandardDeviation
@@ -479,9 +483,7 @@ Represents the variance risk measure under uncertainty sets. Works the same way 
 
 # Fields
 
-  - `settings`: Risk measure configuration.
-  - `ucs`: Uncertainty set estimator or result that defines the uncertainty model for the variance calculation.
-  - `sigma`: Optional covariance matrix that overrides the prior covariance when provided. Also used to compute the risk represented by a vector.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -665,8 +667,11 @@ julia> r(w)
   - [`expected_risk`](@ref)
 """
 @concrete struct UncertaintySetVariance <: RiskMeasure
+    "$(field_dict[:settings_rm])"
     settings
+    "$(field_dict[:ucs])"
     ucs
+    "$(field_dict[:sigma])"
     sigma
     function UncertaintySetVariance(settings::RiskMeasureSettings, ucs::Option{<:UcSE_UcS},
                                     sigma::Option{<:MatNum})

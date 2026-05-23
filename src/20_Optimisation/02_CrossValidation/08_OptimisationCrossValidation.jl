@@ -6,10 +6,7 @@ cross-validation pipeline.
 
 # Fields
 
-  - `cv::OptCVER`: Cross-validation scheme (e.g. [`KFold`](@ref) or
-    [`WalkForwardEstimator`](@ref)).
-  - `scorer::Option{<:PredictionCrossValScorer}`: Optional scorer used to select a
-    single prediction from the cross-validation results. Defaults to `nothing`.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -26,7 +23,9 @@ cross-validation pipeline.
   - [`NearestQuantilePrediction`](@ref)
 """
 @concrete struct OptimisationCrossValidation <: AbstractEstimator
+    "$(field_dict[:cv])"
     cv
+    "$(field_dict[:scorer])"
     scorer
     function OptimisationCrossValidation(cv::OptCVER,
                                          scorer::Option{<:PredictionCrossValScorer})

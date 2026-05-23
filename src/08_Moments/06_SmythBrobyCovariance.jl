@@ -111,10 +111,10 @@ Implements the original Smyth-Broby covariance algorithm using vote counts only.
 
 # Related
 
-    - [`SmythBrobyCovarianceAlgorithm`](@ref)
-    - [`SmythBrobyCovariance`](@ref)
-    - [`SmythBrobyCount1`](@ref)
-    - [`SmythBrobyCount2`](@ref)
+  - [`SmythBrobyCovarianceAlgorithm`](@ref)
+  - [`SmythBrobyCovariance`](@ref)
+  - [`SmythBrobyCount1`](@ref)
+  - [`SmythBrobyCount2`](@ref)
 """
 struct SmythBrobyCount0 <: SmythBrobyCovarianceAlgorithm end
 """
@@ -124,10 +124,10 @@ Implements the first variant of the Smyth-Broby covariance algorithm using vote 
 
 # Related
 
-    - [`SmythBrobyCovarianceAlgorithm`](@ref)
-    - [`SmythBrobyCovariance`](@ref)
-    - [`SmythBrobyCount0`](@ref)
-    - [`SmythBrobyCount2`](@ref)
+  - [`SmythBrobyCovarianceAlgorithm`](@ref)
+  - [`SmythBrobyCovariance`](@ref)
+  - [`SmythBrobyCount0`](@ref)
+  - [`SmythBrobyCount2`](@ref)
 """
 struct SmythBrobyCount1 <: SmythBrobyCovarianceAlgorithm end
 """
@@ -137,10 +137,10 @@ Implements the second variant of the Smyth-Broby covariance algorithm using vote
 
 # Related
 
-    - [`SmythBrobyCovarianceAlgorithm`](@ref)
-    - [`SmythBrobyCovariance`](@ref)
-    - [`SmythBrobyCount0`](@ref)
-    - [`SmythBrobyCount1`](@ref)
+  - [`SmythBrobyCovarianceAlgorithm`](@ref)
+  - [`SmythBrobyCovariance`](@ref)
+  - [`SmythBrobyCount0`](@ref)
+  - [`SmythBrobyCount1`](@ref)
 """
 struct SmythBrobyCount2 <: SmythBrobyCovarianceAlgorithm end
 """

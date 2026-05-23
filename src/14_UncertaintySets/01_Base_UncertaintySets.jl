@@ -351,8 +351,7 @@ U^{\\text{box}}_{\\mathbf{\\Sigma}} &= \\left\\{ \\mathbf{\\Sigma}\\, \\vert\\, 
 
 # Fields
 
-  - `lb`: Lower bound array for the uncertainty set.
-  - `ub`: Upper bound array for the uncertainty set.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -385,7 +384,9 @@ BoxUncertaintySet
   - [`EllipsoidalUncertaintySet`](@ref)
 """
 @concrete struct BoxUncertaintySet <: AbstractUncertaintySetResult
+    "$(field_dict[:lb])"
     lb
+    "$(field_dict[:ub])"
     ub
     function BoxUncertaintySet(lb::ArrNum, ub::ArrNum)
         @argcheck(!isempty(lb))
@@ -410,7 +411,7 @@ Algorithm for computing the scaling parameter `k` for ellipsoidal uncertainty se
 
 # Fields
 
-  - `kwargs`: Named tuple of keyword arguments for quantile calculation.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -440,6 +441,7 @@ NormalKUncertaintyAlgorithm
   - [`k_ucs`](@ref)
 """
 @concrete struct NormalKUncertaintyAlgorithm <: AbstractUncertaintyKAlgorithm
+    "$(field_dict[:kwargs])"
     kwargs
     function NormalKUncertaintyAlgorithm(kwargs::NamedTuple)
         return new{typeof(kwargs)}(kwargs)
@@ -535,8 +537,7 @@ Ellipsoidal uncertainty sets model uncertainty by specifying an ellipsoidal regi
 
 # Fields
 
-  - `method`: Algorithm or value used to determine the scaling parameter for the ellipsoidal.
-  - `diagonal`: Indicates whether to use only the diagonal elements of the covariance matrix.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -565,7 +566,9 @@ EllipsoidalUncertaintySetAlgorithm
   - [`BoxUncertaintySetAlgorithm`](@ref)
 """
 @concrete struct EllipsoidalUncertaintySetAlgorithm <: AbstractUncertaintySetAlgorithm
+    "$(field_dict[:method_ucs])"
     method
+    "$(field_dict[:diagonal])"
     diagonal
     function EllipsoidalUncertaintySetAlgorithm(method::Num_UcSK, diagonal::Bool)
         return new{typeof(method), typeof(diagonal)}(method, diagonal)
@@ -630,9 +633,7 @@ U^{\\text{ellip}}_{\\mathbf{\\Sigma}} &= \\left\\{ \\mathbf{\\Sigma}\\, \\vert\\
 
 # Fields
 
-  - `sigma`: Covariance matrix for the uncertainty set.
-  - `k`: Scaling parameter for the ellipsoidal.
-  - `class`: Identifier for the type of ellipsoidal uncertainty set (e.g., mean or covariance).
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -668,8 +669,11 @@ EllipsoidalUncertaintySet
   - [`k_ucs`](@ref)
 """
 @concrete struct EllipsoidalUncertaintySet <: AbstractUncertaintySetResult
+    "$(field_dict[:sigma])"
     sigma
+    "$(field_dict[:k_ucs])"
     k
+    "$(field_dict[:class_ucs])"
     class
     function EllipsoidalUncertaintySet(sigma::MatNum, k::Number,
                                        class::AbstractEllipsoidalUncertaintySetResultClass)

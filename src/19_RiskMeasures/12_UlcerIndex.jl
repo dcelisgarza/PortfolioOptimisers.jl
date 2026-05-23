@@ -21,7 +21,7 @@ The Ulcer Index is:
 
 # Fields
 
-  - `settings`: Risk measure configuration.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -61,6 +61,7 @@ UlcerIndex
   - [`RelativeUlcerIndex`](@ref)
 """
 @concrete struct UlcerIndex <: RiskMeasure
+    "$(field_dict[:settings_rm])"
     settings
     function UlcerIndex(settings::RiskMeasureSettings)
         return new{typeof(settings)}(settings)
@@ -96,7 +97,7 @@ The Relative Ulcer Index is:
 
 # Fields
 
-  - `settings`: Hierarchical risk measure configuration.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -133,6 +134,7 @@ RelativeUlcerIndex
   - [`RelativeAverageDrawdown`](@ref)
 """
 @concrete struct RelativeUlcerIndex <: HierarchicalRiskMeasure
+    "$(field_dict[:settings_rm])"
     settings
     function RelativeUlcerIndex(settings::HierarchicalRiskMeasureSettings)
         return new{typeof(settings)}(settings)

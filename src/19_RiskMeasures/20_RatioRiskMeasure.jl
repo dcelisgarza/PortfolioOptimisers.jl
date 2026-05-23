@@ -15,8 +15,7 @@ where ``r_1`` and ``r_2`` are any two optimisation risk measures.
 
 # Fields
 
-  - `r1`: Numerator risk measure.
-  - `r2`: Denominator risk measure.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -57,7 +56,9 @@ RiskRatioRiskMeasure
   - [`NonOptimisationRiskRatioRiskMeasure`](@ref)
 """
 @concrete struct RiskRatioRiskMeasure <: HierarchicalRiskMeasure
+    "$(field_dict[:r1])"
     r1
+    "$(field_dict[:r2])"
     r2
     function RiskRatioRiskMeasure(r1::OptimisationRiskMeasure, r2::OptimisationRiskMeasure)
         return new{typeof(r1), typeof(r2)}(r1, r2)
@@ -92,8 +93,7 @@ where ``r_1`` and ``r_2`` are any two base risk measures.
 
 # Fields
 
-  - `r1`: Numerator risk measure.
-  - `r2`: Denominator risk measure.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -111,7 +111,9 @@ Keywords correspond to the struct's fields.
   - [`RiskRatioRiskMeasure`](@ref)
 """
 @concrete struct NonOptimisationRiskRatioRiskMeasure <: NonOptimisationRiskMeasure
+    "$(field_dict[:r1])"
     r1
+    "$(field_dict[:r2])"
     r2
     function NonOptimisationRiskRatioRiskMeasure(r1::AbstractBaseRiskMeasure,
                                                  r2::AbstractBaseRiskMeasure)

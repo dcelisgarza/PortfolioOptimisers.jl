@@ -7,9 +7,7 @@ Container for Black-Litterman investor views in canonical matrix form.
 
 # Fields
 
-  - `P`: Matrix of view coefficients, where each row represents a view and each column corresponds to an asset.
-  - `Q`: Vector of expected returns or values for each view.
-  - `excl`: Optional vector of indices for views that were excluded during construction due to issues such as referencing unknown assets or having zero coefficients.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -42,8 +40,11 @@ BlackLittermanViews
   - [`black_litterman_views`](@ref)
 """
 @concrete struct BlackLittermanViews <: AbstractResult
+    "$(field_dict[:P])"
     P
+    "$(field_dict[:Q])"
     Q
+    "$(field_dict[:excl])"
     excl
     function BlackLittermanViews(P::MatNum, Q::VecNum, excl::Option{<:VecInt})
         @argcheck(!isempty(P))

@@ -59,6 +59,25 @@ function ProcessedCovariance(; ce::StatsBase.CovarianceEstimator = Covariance(),
                              pdm::Option{<:Posdef} = Posdef())::ProcessedCovariance
     return ProcessedCovariance(ce, alg, pdm)
 end
+"""
+    factory(ce::ProcessedCovariance, w::ObsWeights) -> ProcessedCovariance
+
+Return a new [`ProcessedCovariance`](@ref) estimator with observation weights `w` applied to the underlying covariance estimator.
+
+# Arguments
+
+  - $(arg_dict[:ce])
+  - $(arg_dict[:ow])
+
+# Returns
+
+  - $(ret_dict[:ce])
+
+# Related
+
+  - [`ProcessedCovariance`](@ref)
+  - [`factory`](@ref)
+"""
 function factory(ce::ProcessedCovariance, w::ObsWeights)::ProcessedCovariance
     return ProcessedCovariance(; ce = factory(ce.ce, w), alg = ce.alg, pdm = ce.pdm)
 end

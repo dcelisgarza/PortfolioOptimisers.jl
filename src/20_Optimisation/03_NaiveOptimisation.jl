@@ -5,7 +5,7 @@ Abstract supertype for naive (heuristic) portfolio optimisation estimators.
 
 Naive optimisers compute portfolio weights directly from statistical properties of asset returns (e.g., volatility or equal weights) without solving an optimisation problem.
 
-# Related Types
+# Related
 
   - [`NonFiniteAllocationOptimisationEstimator`](@ref)
   - [`InverseVolatility`](@ref)
@@ -29,12 +29,28 @@ Result type for naive portfolio optimisation estimators.
 
 # Fields
 
-  - `oe`: Type of the optimisation estimator that produced this result.
-  - `pr`: Prior result used in optimisation (or `nothing`).
-  - `wb`: Weight bounds applied.
-  - `retcode`: Optimisation return code (`OptimisationSuccess` or `OptimisationFailure`).
-  - `w`: Optimal portfolio weights vector.
-  - `fb`: Fallback result (if a fallback optimiser was used).
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    NaiveOptimisationResult(oe, pr, wb, retcode, w, fb) -> NaiveOptimisationResult
+
+Positional arguments correspond to the struct's fields.
+
+# Examples
+
+```jldoctest
+julia> NaiveOptimisationResult(InverseVolatility, nothing, nothing, OptimisationSuccess(),
+                               [0.5, 0.5], nothing)
+NaiveOptimisationResult
+       oe ┼ UnionAll: InverseVolatility
+       pr ┼ nothing
+       wb ┼ nothing
+  retcode ┼ OptimisationSuccess
+          │   res ┴ nothing
+        w ┼ Vector{Float64}: [0.5, 0.5]
+       fb ┴ nothing
+```
 
 # Related
 
@@ -44,11 +60,17 @@ Result type for naive portfolio optimisation estimators.
   - [`RandomWeighted`](@ref)
 """
 @concrete struct NaiveOptimisationResult <: NonFiniteAllocationOptimisationResult
+    "$(field_dict[:oe])"
     oe
+    "$(field_dict[:pr])"
     pr
+    "$(field_dict[:wb])"
     wb
+    "$(field_dict[:retcode])"
     retcode
+    "$(field_dict[:pw])"
     w
+    "$(field_dict[:fb])"
     fb
 end
 function factory(res::NaiveOptimisationResult,
@@ -72,14 +94,7 @@ where ``\\sigma_i`` is the standard deviation (or variance when `sq = true`) of 
 
 # Fields
 
-  - `pe`: Prior estimator or prior result for computing asset covariance.
-  - `wb`: Weight bounds estimator or bounds.
-  - `sets`: Asset sets (required when `wb` is a `WeightBoundsEstimator`).
-  - `wf`: Weight finaliser for enforcing bounds.
-  - `fb`: Fallback optimiser (used if this optimiser fails).
-  - `sq`: If `true`, weights are inversely proportional to variance rather than volatility.
-  - `brt`: If `true`, uses bootstrap returns instead of the original returns.
-  - `strict`: If `true`, strictly enforces weight bounds.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -140,13 +155,21 @@ InverseVolatility
   - [`RandomWeighted`](@ref)
 """
 @concrete struct InverseVolatility <: NaiveOptimisationEstimator
+    "$(field_dict[:pe])"
     pe
+    "$(field_dict[:wb])"
     wb
+    "$(field_dict[:sets])"
     sets
+    "$(field_dict[:wf])"
     wf
+    "$(field_dict[:fb])"
     fb
+    "$(field_dict[:sq])"
     sq
+    "$(field_dict[:brt])"
     brt
+    "$(field_dict[:strict_opt])"
     strict
     function InverseVolatility(pe::PrE_Pr, wb::Option{<:WbE_Wb}, sets::Option{<:AssetSets},
                                wf::WeightFinaliser, fb::Option{<:OptE_Opt}, sq::Bool,
@@ -202,6 +225,8 @@ end
     optimise(iv::InverseVolatility{<:Any, <:Any, <:Any, <:Any, Nothing},
              rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...) -> NaiveOptimisationResult
 
+Run the inverse volatility portfolio optimisation.
+
 # Arguments
 
   - `iv`: The inverse volatility optimiser to use.
@@ -227,11 +252,7 @@ w_i = \\frac{1}{N} \\quad \\forall i\\,.
 
 # Fields
 
-  - `wb`: Weight bounds estimator or bounds.
-  - `sets`: Asset sets (required when `wb` is a `WeightBoundsEstimator`).
-  - `wf`: Weight finaliser for enforcing bounds.
-  - `fb`: Fallback optimiser.
-  - `strict`: If `true`, strictly enforces weight bounds.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -267,10 +288,15 @@ EqualWeighted
   - [`RandomWeighted`](@ref)
 """
 @concrete struct EqualWeighted <: NaiveOptimisationEstimator
+    "$(field_dict[:wb])"
     wb
+    "$(field_dict[:sets])"
     sets
+    "$(field_dict[:wf])"
     wf
+    "$(field_dict[:fb])"
     fb
+    "$(field_dict[:strict_opt])"
     strict
     function EqualWeighted(wb::Option{<:WbE_Wb}, sets::Option{<:AssetSets},
                            wf::WeightFinaliser, fb::Option{<:OptE_Opt}, strict::Bool)
@@ -315,6 +341,8 @@ end
     optimise(ew::EqualWeighted{<:Any, <:Any, <:Any, Nothing},
              rd::ReturnsResult; dims::Int = 1, kwargs...) -> NaiveOptimisationResult
 
+Run the equal-weighted portfolio optimisation.
+
 # Arguments
 
   - `ew`: The equal-weighted optimiser to use.
@@ -343,14 +371,7 @@ where ``\\boldsymbol{\\alpha}`` is a scalar or vector concentration parameter. L
 
 # Fields
 
-  - `alpha`: Dirichlet concentration parameter (scalar or vector, all positive).
-  - `rng`: Random number generator.
-  - `seed`: Optional seed for the RNG.
-  - `wb`: Weight bounds estimator or bounds.
-  - `sets`: Asset sets.
-  - `wf`: Weight finaliser for enforcing bounds.
-  - `fb`: Fallback optimiser.
-  - `strict`: If `true`, strictly enforces weight bounds.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -394,13 +415,21 @@ RandomWeighted
   - [`EqualWeighted`](@ref)
 """
 @concrete struct RandomWeighted <: NaiveOptimisationEstimator
+    "$(field_dict[:alpha_dirichlet])"
     alpha
+    "$(field_dict[:rng])"
     rng
+    "$(field_dict[:seed])"
     seed
+    "$(field_dict[:wb])"
     wb
+    "$(field_dict[:sets])"
     sets
+    "$(field_dict[:wf])"
     wf
+    "$(field_dict[:fb])"
     fb
+    "$(field_dict[:strict_opt])"
     strict
     function RandomWeighted(alpha::Num_VecNum, rng::Random.AbstractRNG,
                             seed::Option{<:Integer}, wb::Option{<:WbE_Wb},
@@ -463,6 +492,8 @@ end
 """
     optimise(rw::RandomWeighted{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, Nothing},
              rd::ReturnsResult; dims::Int = 1, kwargs...) -> NaiveOptimisationResult
+
+Run the random-weighted portfolio optimisation.
 
 # Arguments
 

@@ -5,10 +5,7 @@ Implements combinatorial non-sequential cross-validation with purging and embarg
 
 # Fields
 
-  - `n_folds`: Number of folds to split the data into.
-  - `n_test_folds`: Number of folds to use as test set in each split.
-  - `purged_size`: Number of observations to exclude from the start/end of each train set adjacent to a test set.
-  - `embargo_size`: Number of observations to exclude from the start of each train set after a test set.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -48,9 +45,13 @@ CombinatorialCrossValidation
   - [`n_splits`](@ref)
 """
 @concrete struct CombinatorialCrossValidation <: NonSequentialCrossValidationEstimator
+    "$(field_dict[:n_folds])"
     n_folds
+    "$(field_dict[:n_test_folds])"
     n_test_folds
+    "$(field_dict[:purged_size])"
     purged_size
+    "$(field_dict[:embargo_size])"
     embargo_size
     function CombinatorialCrossValidation(n_folds::Integer, n_test_folds::Integer,
                                           purged_size::Integer, embargo_size::Integer,
@@ -81,9 +82,7 @@ Stores the train index vectors, nested test index vectors (one per path), and a 
 
 # Fields
 
-  - `train_idx`: Vector of training index ranges for each split.
-  - `test_idx`: Vector of vectors of testing index ranges (one per path per split).
-  - `path_ids`: Matrix mapping fold indices to path indices.
+$(DocStringExtensions.FIELDS)
 
 # Related
 
@@ -92,8 +91,11 @@ Stores the train index vectors, nested test index vectors (one per path), and a 
   - [`n_splits`](@ref)
 """
 @concrete struct CombinatorialCrossValidationResult <: NonSequentialCrossValidationResult
+    "$(field_dict[:train_idx])"
     train_idx
+    "$(field_dict[:test_idx])"
     test_idx
+    "$(field_dict[:path_ids])"
     path_ids
     function CombinatorialCrossValidationResult(train_idx::VecVecInt,
                                                 test_idx::VecVecVecInt,

@@ -7,9 +7,7 @@ Empirical prior estimator for asset returns.
 
 # Fields
 
-  - `ce`: Covariance estimator.
-  - `me`: Expected returns estimator.
-  - `horizon`: Optional investment horizon.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -61,8 +59,11 @@ EmpiricalPrior
   - [`prior`](@ref)
 """
 @concrete struct EmpiricalPrior <: AbstractLowOrderPriorEstimator_A
+    "$(field_dict[:ce])"
     ce
+    "$(field_dict[:me])"
     me
+    "$(field_dict[:horizon])"
     horizon
     function EmpiricalPrior(ce::StatsBase.CovarianceEstimator,
                             me::AbstractExpectedReturnsEstimator, horizon::Option{<:Number})
