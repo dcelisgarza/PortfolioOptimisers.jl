@@ -7,6 +7,14 @@ Creates a scalar variable `wr_risk` and adds `sc * (wr_risk .+ net_X) >= 0` so t
 `wr_risk` upper-bounds the negative of every portfolio return. Returns the existing variable
 if already present.
 
+# Summary Statistics
+
+```math
+\\mathrm{WR}(\\boldsymbol{w}) = \\max_{t} (-\\hat{r}_t) = -\\min_{t} \\hat{r}_t
+```
+
+where ``\\hat{r}_t = \\boldsymbol{x}_t^\\intercal \\boldsymbol{w}`` is the net portfolio return at time ``t``.
+
 # Arguments
 
   - $(arg_dict[:model])

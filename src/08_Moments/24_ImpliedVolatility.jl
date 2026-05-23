@@ -274,6 +274,12 @@ end
 
 Predict realised volatilities by scaling the latest implied volatility row by the premium adjustment factor.
 
+# Summary Statistics
+
+```math
+\\hat{\\sigma}_i = \\frac{\\mathrm{iv}_{T,i}}{\\mathrm{ivpa}_i}
+```
+
 # Arguments
 
   - `::ImpliedVolatilityPremium`: Implied volatility premium algorithm.
@@ -299,6 +305,20 @@ end
 Predict realised volatilities using a regression model fitted on implied and realised volatility.
 
 For each asset, this function fits a regression model relating lagged implied volatility and lagged realised volatility (computed from rolling windows of `X`) to the next-period realised volatility. The fitted model is then used to predict the next-period realised volatility from the most recent data.
+
+# Summary Statistics
+
+For asset ``i``, fit the log-linear model over windows ``t = 1, \\ldots, T-1``:
+
+```math
+\\ln \\hat{\\sigma}^{\\mathrm{rv}}_{t+1,i} = \\beta_0 + \\beta_1 \\ln \\sigma^{\\mathrm{iv}}_{t,i} + \\beta_2 \\ln \\hat{\\sigma}^{\\mathrm{rv}}_{t,i} + \\varepsilon_t
+```
+
+then predict:
+
+```math
+\\hat{\\sigma}^{\\mathrm{rv}}_{T+1,i} = \\exp\\!\\left(\\hat{\\beta}_0 + \\hat{\\beta}_1 \\ln \\sigma^{\\mathrm{iv}}_{T,i} + \\hat{\\beta}_2 \\ln \\hat{\\sigma}^{\\mathrm{rv}}_{T,i}\\right)
+```
 
 # Arguments
 
@@ -363,6 +383,14 @@ end
 Compute the covariance matrix using implied volatility scaling.
 
 This method computes the correlation matrix of `X` using the base estimator in `ce`, then predicts realised volatilities from `iv` using the implied volatility algorithm in `ce.alg`. The predicted realised volatilities are used to convert the correlation matrix to a covariance matrix, which is then post-processed by the matrix processing estimator `ce.mp`.
+
+# Summary Statistics
+
+```math
+\\hat{\\mathbf{\\Sigma}} = \\mathrm{diag}(\\hat{\\boldsymbol{\\sigma}}) \\hat{\\boldsymbol{\\rho}} \\,\\mathrm{diag}(\\hat{\\boldsymbol{\\sigma}})
+```
+
+where ``\\hat{\\boldsymbol{\\rho}} = \\operatorname{cor}(\\mathbf{X})`` and ``\\hat{\\boldsymbol{\\sigma}}`` are the predicted realised volatilities from ``\\mathbf{iv} / \\sqrt{\\mathrm{af}}``.
 
 # Arguments
 

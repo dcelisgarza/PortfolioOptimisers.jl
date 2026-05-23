@@ -135,6 +135,26 @@ Compute factor-based prior moments for asset returns using a factor model.
 
 `prior` estimates the mean and covariance of asset returns using the specified factor prior estimator, regression, and matrix post-processing. The factor returns matrix `F` is used to compute factor moments, which are then mapped to asset space via regression. Optionally, residual variance is added to the posterior covariance for robust estimation. The result is returned as a [`LowOrderPrior`](@ref) object.
 
+# Summary Statistics
+
+The factor model maps factor moments to asset space via the loadings matrix ``\\mathbf{B}`` (with intercepts ``\\boldsymbol{\\alpha}``):
+
+```math
+\\hat{\\boldsymbol{\\mu}} = \\mathbf{B} \\hat{\\boldsymbol{f}} + \\boldsymbol{\\alpha}
+```
+
+```math
+\\hat{\\mathbf{\\Sigma}} = \\mathbf{B} \\mathbf{\\Sigma}_f \\mathbf{B}^\\intercal + \\mathbf{\\Sigma}_\\varepsilon
+```
+
+Where:
+
+  - ``\\mathbf{B}``: ``N \\times K`` factor loadings matrix.
+  - ``\\hat{\\boldsymbol{f}}``: ``K \\times 1`` vector of factor expected returns.
+  - ``\\boldsymbol{\\alpha}``: ``N \\times 1`` vector of regression intercepts.
+  - ``\\mathbf{\\Sigma}_f``: ``K \\times K`` factor covariance matrix.
+  - ``\\mathbf{\\Sigma}_\\varepsilon``: ``N \\times N`` diagonal matrix of residual variances (when `rsd = true`).
+
 # Arguments
 
   - `pe`: Factor prior estimator.

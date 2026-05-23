@@ -62,6 +62,14 @@ Add weight bound constraints to the JuMP optimisation model.
 
 The fall-through method does nothing. The concrete method adds lower-bound and upper-bound constraints on the portfolio weight vector `w`, handles long-short decomposition when negative bounds are present via `lw`/`sw` variables, and delegates budget constraints to [`set_budget_constraints!`](@ref).
 
+# Summary Statistics
+
+```math
+k \\boldsymbol{\\ell} \\leq \\boldsymbol{w} \\leq k \\boldsymbol{u}
+```
+
+where ``\\boldsymbol{\\ell}`` and ``\\boldsymbol{u}`` are the lower and upper bound vectors from `wb`, and ``k`` is the budget scaling variable.
+
 # Arguments
 
   - $(arg_dict[:model])
@@ -157,6 +165,14 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 Add linear inequality and equality weight constraints to the JuMP optimisation model.
 
 The fall-through method does nothing. The concrete method iterates over the collection of [`LinearConstraint`](@ref) objects `lcms` and adds `A * w ≤ k * B` (inequality) and `A * w = k * B` (equality) constraints for each entry.
+
+# Summary Statistics
+
+```math
+\\mathbf{A}_{\\mathrm{ineq}} \\boldsymbol{w} \\leq k \\boldsymbol{B}_{\\mathrm{ineq}}, \\qquad \\mathbf{A}_{\\mathrm{eq}} \\boldsymbol{w} = k \\boldsymbol{B}_{\\mathrm{eq}}
+```
+
+where ``k`` is the budget scaling variable.
 
 # Arguments
 

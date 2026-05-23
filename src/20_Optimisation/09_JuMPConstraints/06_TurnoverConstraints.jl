@@ -30,6 +30,15 @@ Add a single turnover constraint for a [`Turnover`](@ref) object to the JuMP opt
 
 Introduces auxiliary variable `t_tn_i`, expression `tn_i = w - wb * k`, and enforces `‖w - wb‖₁ ≤ val * k` via NormOneCone constraints.
 
+# Summary Statistics
+
+```math
+\\boldsymbol{t}_{tn} \\geq |\\boldsymbol{w} - \\boldsymbol{w}_b k|, \\qquad
+\\boldsymbol{t}_{tn} \\leq \\boldsymbol{v} k
+```
+
+where ``\\boldsymbol{w}`` is the portfolio weight vector, ``\\boldsymbol{w}_b`` is the benchmark weight vector, ``k`` is a budget scaling variable, and ``\\boldsymbol{v}`` is the per-asset turnover limit vector.
+
 # Arguments
 
   - $(arg_dict[:model])

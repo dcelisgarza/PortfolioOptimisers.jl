@@ -124,6 +124,22 @@ Internal helper for cokurtosis computation.
 
 `_cokurtosis` computes the cokurtosis tensor for the input data matrix and applies matrix processing using the specified estimator.
 
+# Summary Statistics
+
+Let ``\\mathbf{X}`` be the ``T \\times N`` matrix of demeaned returns. Define the ``T \\times N^2`` matrix ``\\mathbf{Z}`` with rows:
+
+```math
+\\mathbf{Z}_{t,\\cdot} = (\\boldsymbol{1}^\\intercal \\otimes \\boldsymbol{x}_t^\\intercal) \\odot (\\boldsymbol{x}_t^\\intercal \\otimes \\boldsymbol{1}^\\intercal)
+```
+
+The ``N^2 \\times N^2`` cokurtosis tensor is:
+
+```math
+\\hat{\\mathbf{K}} = \\frac{1}{T} \\mathbf{Z}^\\intercal \\mathbf{Z}
+```
+
+Where ``\\otimes`` is the Kronecker product and ``\\odot`` is element-wise multiplication.
+
 # Arguments
 
   - `X`: Data matrix (observations × assets).

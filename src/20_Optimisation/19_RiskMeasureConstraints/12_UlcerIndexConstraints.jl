@@ -7,6 +7,14 @@ Introduces a scalar variable `uci` and the SOC constraint
 `[sc * uci; sc * dd[2:T+1]] in SecondOrderCone()`, then defines
 `uci_risk = uci / sqrt(T)`. Returns the existing expression if already present.
 
+# Summary Statistics
+
+```math
+\\mathrm{UCI}(\\boldsymbol{w}) = \\frac{\\|\\boldsymbol{dd}\\|_2}{\\sqrt{T}} = \\sqrt{\\frac{1}{T}\\sum_{t=1}^T dd_t^2}
+```
+
+where ``dd_t`` is the portfolio drawdown at time ``t``.
+
 # Arguments
 
   - $(arg_dict[:model])

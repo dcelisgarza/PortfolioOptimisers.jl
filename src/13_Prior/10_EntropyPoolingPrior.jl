@@ -1079,6 +1079,20 @@ Solve the dual of the exponential entropy pooling formulation using Optim.jl.
 
 `entropy_pooling` computes posterior probabilities by minimising the exponential divergence between prior and posterior weights, subject to moment and view constraints. The optimisation is performed using [`Optim.jl`](https://github.com/JuliaNLSolvers/Optim.jl), supporting box constraints and slack variables for relaxed equality constraints. This method is used internally by [`EntropyPoolingPrior`](@ref) when the optimiser is an [`OptimEntropyPooling`](@ref).
 
+# Summary Statistics
+
+The dual of the entropy pooling KL divergence problem is solved for Lagrange multipliers ``\\boldsymbol{x}``. The dual objective (for `ExpEntropyPooling`) is:
+
+```math
+\\min_{\\boldsymbol{x}} \\; \\boldsymbol{x}^\\intercal \\boldsymbol{b} + \\sum_{t=1}^{T} q_t \\exp\\!\\left(-\\boldsymbol{x}^\\intercal \\mathbf{A}_{\\cdot t} - 1\\right)
+```
+
+The optimal posterior weights recover as:
+
+```math
+p_t^* = q_t \\exp\\!\\left(-\\boldsymbol{x}^{*\\intercal} \\mathbf{A}_{\\cdot t} - 1\\right)
+```
+
 # Arguments
 
   - `w`: Prior weights (length = number of observations).
@@ -2066,6 +2080,16 @@ Compute entropy pooling prior moments for asset returns with iterative constrain
 
 `prior` estimates the mean and covariance of asset returns using the entropy pooling framework, supporting iterative constraint enforcement via the `H1_EntropyPooling` and `H2_EntropyPooling` algorithms. It integrates moment and view constraints (mean, variance, CVaR, skewness, kurtosis, correlation), flexible confidence specification, and composable optimisation algorithms. The method iteratively applies constraints, updating prior weights and moments at each step, and ensures that higher moment views do not inadvertently alter lower moments.
 
+# Summary Statistics
+
+Entropy pooling finds posterior weights ``\\boldsymbol{p}`` by minimising the Kullback-Leibler divergence from the prior ``\\boldsymbol{q}``:
+
+```math
+\\min_{\\boldsymbol{p}} \\sum_{t=1}^{T} p_t \\ln\\!\\frac{p_t}{q_t} \\quad \\text{s.t.} \\quad \\mathbf{A}_{\\mathrm{eq}} \\boldsymbol{p} = \\boldsymbol{b}_{\\mathrm{eq}}, \\quad \\mathbf{A}_{\\mathrm{ineq}} \\boldsymbol{p} \\leq \\boldsymbol{b}_{\\mathrm{ineq}}, \\quad \\boldsymbol{p} \\geq \\boldsymbol{0}, \\quad \\boldsymbol{1}^\\intercal \\boldsymbol{p} = 1
+```
+
+Posterior moments are then computed as probability-weighted sample statistics using ``\\boldsymbol{p}^*``.
+
 # Arguments
 
   - `pe`: Entropy pooling prior estimator with iterative algorithm .
@@ -2196,6 +2220,14 @@ end
 Compute entropy pooling prior moments for asset returns with single-shot constraint enforcement.
 
 `prior` estimates the mean and covariance of asset returns using the entropy pooling framework, enforcing all moment and view constraints in a single optimisation step via the `H0_EntropyPooling` algorithm. This approach is fast but may distort lower moments when higher moment views are present, as all constraints are applied simultaneously.
+
+# Summary Statistics
+
+Entropy pooling finds posterior weights ``\\boldsymbol{p}`` by minimising the Kullback-Leibler divergence from the prior ``\\boldsymbol{q}`` subject to all constraints simultaneously:
+
+```math
+\\min_{\\boldsymbol{p}} \\sum_{t=1}^{T} p_t \\ln\\!\\frac{p_t}{q_t} \\quad \\text{s.t.} \\quad \\mathbf{A}_{\\mathrm{eq}} \\boldsymbol{p} = \\boldsymbol{b}_{\\mathrm{eq}}, \\quad \\mathbf{A}_{\\mathrm{ineq}} \\boldsymbol{p} \\leq \\boldsymbol{b}_{\\mathrm{ineq}}, \\quad \\boldsymbol{p} \\geq \\boldsymbol{0}, \\quad \\boldsymbol{1}^\\intercal \\boldsymbol{p} = 1
+```
 
 # Arguments
 

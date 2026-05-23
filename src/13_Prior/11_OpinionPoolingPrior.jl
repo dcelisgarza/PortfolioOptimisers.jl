@@ -347,6 +347,22 @@ Compute the consensus posterior return distribution from individual prior distri
   - For `LogarithmicOpinionPooling`, computes the weighted geometric mean of the individual prior weights: `w = exp.(log.(pw) * ow - LogExpFunctions.logsumexp(log.(pw) * ow))`.
   - Used internally by [`OpinionPoolingPrior`](@ref) to form the consensus prior distribution.
 
+# Summary Statistics
+
+Let ``\\boldsymbol{\\alpha}`` be the opinion probabilities and ``\\mathbf{P}`` the ``T \\times K`` matrix of scenario weights for ``K`` experts:
+
+Linear (weighted arithmetic mean):
+
+```math
+\\boldsymbol{p}^* = \\mathbf{P} \\boldsymbol{\\alpha}
+```
+
+Logarithmic (weighted geometric mean, normalised):
+
+```math
+\\log p_t^* \\propto \\sum_{k=1}^{K} \\alpha_k \\log p_{tk}, \\qquad p_t^* = \\frac{\\exp\\!\\left(\\sum_k \\alpha_k \\log p_{tk}\\right)}{\\sum_{s} \\exp\\!\\left(\\sum_k \\alpha_k \\log p_{sk}\\right)}
+```
+
 # Related
 
   - [`OpinionPoolingPrior`](@ref)

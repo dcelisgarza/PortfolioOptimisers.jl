@@ -1,0 +1,17 @@
+{
+  "vscode-remote-control.allowedCommands": [
+    "vscode.open",
+    "workbench.action.files.openFile",
+    "workbench.action.files.save",
+    "workbench.action.files.saveAll",
+    "workbench.action.findInFiles",
+    "workbench.action.gotoLine",
+    "workbench.action.quickOpen",
+    "workbench.action.reloadWindow",
+    "workbench.action.showAllSymbols",
+    "workbench.action.terminal.focus",
+    "workbench.action.terminal.new",
+    "workbench.action.terminal.sendSequence"
+  ],
+  "vscode-remote-control.requireConfirmation": false
+}

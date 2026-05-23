@@ -105,6 +105,16 @@ HierarchicalRiskParity
    fb ┴ nothing
 ```
 
+# Summary Statistics
+
+At each bisection step, the algorithm splits cluster ``C`` into sub-clusters ``C_1`` and ``C_2`` and allocates weights proportional to inverse portfolio risk:
+
+```math
+\\alpha = \\frac{\\tilde{\\rho}(C_2)}{\\tilde{\\rho}(C_1) + \\tilde{\\rho}(C_2)}, \\qquad \\boldsymbol{w}_{C_1} \\leftarrow \\alpha \\, \\boldsymbol{w}_C, \\quad \\boldsymbol{w}_{C_2} \\leftarrow (1 - \\alpha) \\, \\boldsymbol{w}_C
+```
+
+where ``\\tilde{\\rho}(C)`` is the risk of the quasi-diagonal sub-portfolio restricted to the assets in cluster ``C``.
+
 # Related
 
   - [`ClusteringOptimisationEstimator`](@ref)

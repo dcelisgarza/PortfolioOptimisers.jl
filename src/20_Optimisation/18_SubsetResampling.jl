@@ -78,6 +78,16 @@ $(DocStringExtensions.FIELDS)
 
 Keywords correspond to the struct's fields.
 
+# Summary Statistics
+
+Draw ``M`` random subsets ``S_1, \\ldots, S_M`` of assets (size ``\\lfloor s \\cdot N \\rfloor``). Optimise on each:
+
+```math
+\\boldsymbol{w}^* = \\frac{1}{M} \\sum_{m=1}^{M} \\boldsymbol{e}_{S_m}(\\boldsymbol{w}_{S_m})
+```
+
+where ``\\boldsymbol{e}_{S_m}`` embeds the subset weights back into the full ``N``-asset space (zero-filling excluded assets).
+
 # Related
 
   - [`BaseSubsetResamplingOptimisationEstimator`](@ref)

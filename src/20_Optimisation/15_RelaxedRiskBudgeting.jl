@@ -100,6 +100,16 @@ $(DocStringExtensions.FIELDS)
 
 Keywords correspond to the struct's fields.
 
+# Summary Statistics
+
+The Relaxed Risk Budgeting (RRB) formulation replaces the non-convex risk-parity constraint with a second-order cone (SOC) relaxation. Let ``\\mathbf{G}`` be the Cholesky factor of ``\\mathbf{\\Sigma}`` (so ``\\mathbf{G}^\\intercal\\mathbf{G} = \\mathbf{\\Sigma}``). Introduce auxiliary variables ``\\boldsymbol{\\zeta} = \\mathbf{\\Sigma}\\boldsymbol{w}``, ``\\psi \\geq 0``, ``\\gamma \\geq 0``:
+
+```math
+\\min_{\\boldsymbol{w},\\psi,\\gamma,\\boldsymbol{\\zeta}} \\; \\psi - \\gamma \\quad \\text{s.t.} \\quad \\boldsymbol{\\zeta} = \\mathbf{\\Sigma}\\boldsymbol{w}, \\quad \\begin{pmatrix} w_i + \\zeta_i \\\\ 2\\gamma\\sqrt{b_i} \\\\ w_i - \\zeta_i \\end{pmatrix} \\in \\mathcal{K}_{\\mathrm{SOC}}, \\; \\forall i
+```
+
+The risk cone constraint (basic variant): ``(\\psi,\\, \\mathbf{G}\\boldsymbol{w}) \\in \\mathcal{K}_{\\mathrm{SOC}}``, i.e. ``\\psi \\geq \\|\\mathbf{G}\\boldsymbol{w}\\|_2 = \\sqrt{\\boldsymbol{w}^\\intercal\\mathbf{\\Sigma}\\boldsymbol{w}}``.
+
 # Related
 
   - [`JuMPOptimisationEstimator`](@ref)

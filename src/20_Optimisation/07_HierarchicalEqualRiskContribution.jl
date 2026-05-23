@@ -119,6 +119,22 @@ HierarchicalEqualRiskContribution
     fb ┴ nothing
 ```
 
+# Summary Statistics
+
+Let ``K`` be the number of clusters. The inter-cluster (outer) step assigns equal risk contribution across all clusters using risk measure ``\\rho_o``:
+
+```math
+w_{C_k} = \\frac{\\tilde{\\rho}_o(C_k)^{-1}}{\\sum_{j=1}^{K} \\tilde{\\rho}_o(C_j)^{-1}}
+```
+
+Within each cluster ``C_k``, the intra-cluster (inner) step assigns weights proportional to inverse intra-cluster risk ``\\rho_i``:
+
+```math
+w_i \\propto \\tilde{\\rho}_i(\\{i\\})^{-1}, \\quad i \\in C_k, \\qquad \\sum_{i \\in C_k} w_i = w_{C_k}
+```
+
+where ``\\tilde{\\rho}`` denotes the quasi-diagonal cluster portfolio risk.
+
 # Related
 
   - [`ClusteringOptimisationEstimator`](@ref)

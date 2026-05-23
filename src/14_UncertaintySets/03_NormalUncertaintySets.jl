@@ -199,6 +199,22 @@ end
 
 Constructs box uncertainty sets for mean and covariance statistics under the assumption of normally distributed returns.
 
+# Summary Statistics
+
+Simulates ``M`` covariance matrices ``\\hat{\\mathbf{\\Sigma}}^{(m)} \\sim \\mathrm{Wishart}(T,\\, \\hat{\\mathbf{\\Sigma}}/T)`` and computes element-wise quantile bounds:
+
+```math
+(\\mathbf{\\Sigma}_{lb})_{ij} = Q_{q/2}\\!\\left(\\hat{\\Sigma}^{(m)}_{ij}\\right), \\qquad
+(\\mathbf{\\Sigma}_{ub})_{ij} = Q_{1-q/2}\\!\\left(\\hat{\\Sigma}^{(m)}_{ij}\\right)
+```
+
+Mean bounds use the normal complementary quantile ``z_{q/2} = \\Phi^{-1}(1-q/2)``:
+
+```math
+\\boldsymbol{\\mu}_{lb} = \\boldsymbol{0}, \\qquad
+\\mu_{ub,i} = 2 z_{q/2} \\sqrt{(\\hat{\\mathbf{\\Sigma}}/T)_{ii}}
+```
+
 # Arguments
 
   - `ue`: Normal uncertainty set estimator.
@@ -268,6 +284,15 @@ end
 
 Constructs a box uncertainty set for expected returns under the assumption of normally distributed returns.
 
+# Summary Statistics
+
+```math
+\\boldsymbol{\\mu}_{lb} = \\boldsymbol{0}, \\qquad
+\\mu_{ub,i} = 2 \\Phi^{-1}\\!\\left(1 - \\tfrac{q}{2}\\right) \\sqrt{(\\hat{\\mathbf{\\Sigma}}/T)_{ii}}
+```
+
+where ``T`` is the effective sample size.
+
 # Arguments
 
   - `ue`: Normal uncertainty set estimator.
@@ -314,6 +339,15 @@ end
               F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
 
 Constructs a box uncertainty set for covariance under the assumption of normally distributed returns.
+
+# Summary Statistics
+
+Simulates ``M`` matrices ``\\hat{\\mathbf{\\Sigma}}^{(m)} \\sim \\mathrm{Wishart}(T,\\,\\hat{\\mathbf{\\Sigma}}/T)`` and takes element-wise quantiles:
+
+```math
+(\\mathbf{\\Sigma}_{lb})_{ij} = Q_{q/2}\\!\\left(\\hat{\\Sigma}^{(m)}_{ij}\\right), \\qquad
+(\\mathbf{\\Sigma}_{ub})_{ij} = Q_{1-q/2}\\!\\left(\\hat{\\Sigma}^{(m)}_{ij}\\right)
+```
 
 # Arguments
 
@@ -379,6 +413,25 @@ end
         F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
 
 Constructs ellipsoidal uncertainty sets for expected returns and covariance statistics under the assumption of normally distributed returns.
+
+# Summary Statistics
+
+Ellipsoidal sets centred at the prior estimates with asymptotic covariances:
+
+```math
+\\mathbf{\\Sigma}_{\\mu} = \\hat{\\mathbf{\\Sigma}} / T, \\qquad
+\\mathbf{\\Sigma}_{\\Sigma} = T (\\mathbf{I} + \\mathbf{K})(\\mathbf{\\Sigma}_{\\mu} \\otimes \\mathbf{\\Sigma}_{\\mu})
+```
+
+where ``\\mathbf{K}`` is the commutation matrix. The scaling ``k`` is fitted empirically from simulated samples ``\\hat{\\boldsymbol{\\mu}}^{(m)} \\sim \\mathcal{N}(\\hat{\\boldsymbol{\\mu}}, \\hat{\\mathbf{\\Sigma}})`` and ``\\hat{\\mathbf{\\Sigma}}^{(m)} \\sim \\mathrm{Wishart}(T, \\mathbf{\\Sigma}_{\\mu})``:
+
+```math
+\\mathcal{E}_{\\mu} = \\left\\{\\boldsymbol{\\mu} : (\\boldsymbol{\\mu} - \\hat{\\boldsymbol{\\mu}})^{\\intercal} \\mathbf{\\Sigma}_{\\mu}^{-1} (\\boldsymbol{\\mu} - \\hat{\\boldsymbol{\\mu}}) \\leq k_{\\mu}^2 \\right\\}
+```
+
+```math
+\\mathcal{E}_{\\Sigma} = \\left\\{\\mathbf{\\Sigma} : \\left\\| \\mathbf{\\Sigma}_{\\Sigma}^{-1/2} \\operatorname{vec}(\\mathbf{\\Sigma} - \\hat{\\mathbf{\\Sigma}}) \\right\\|_2 \\leq k_{\\Sigma} \\right\\}
+```
 
 # Arguments
 
@@ -453,6 +506,23 @@ end
         F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
 
 Constructs ellipsoidal uncertainty sets for expected returns and covariance statistics using the chi-squared scaling algorithm under the assumption of normally distributed returns.
+
+# Summary Statistics
+
+Asymptotic covariances are the same as the normal-``k`` variant:
+
+```math
+\\mathbf{\\Sigma}_{\\mu} = \\hat{\\mathbf{\\Sigma}} / T, \\qquad
+\\mathbf{\\Sigma}_{\\Sigma} = T (\\mathbf{I} + \\mathbf{K})(\\mathbf{\\Sigma}_{\\mu} \\otimes \\mathbf{\\Sigma}_{\\mu})
+```
+
+The scaling ``k`` is the chi-squared quantile:
+
+```math
+k_{\\mu} = \\sqrt{\\chi^2_{N,\\,1-q}}, \\qquad k_{\\Sigma} = \\sqrt{\\chi^2_{N^2,\\,1-q}}
+```
+
+where ``N`` is the number of assets.
 
 # Arguments
 

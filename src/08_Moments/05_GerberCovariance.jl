@@ -256,6 +256,29 @@ end
 
 Implements the original Gerber correlation algorithm.
 
+# Summary Statistics
+
+Let ``\\mathbf{U}, \\mathbf{D} \\in \\{0,1\\}^{T \\times N}`` be indicator matrices with:
+
+```math
+U_{ti} = \\mathbf{1}[x_{ti} \\geq t \\, \\sigma_i], \\quad D_{ti} = \\mathbf{1}[x_{ti} \\leq -t \\, \\sigma_i]
+```
+
+Define ``\\mathbf{H} = \\mathbf{U} - \\mathbf{D}`` and ``\\mathbf{V} = \\mathbf{U} + \\mathbf{D}``. The Gerber0 correlation is:
+
+```math
+\\hat{\\boldsymbol{\\rho}} = \\left(\\mathbf{H}^\\intercal \\mathbf{H}\\right) \\oslash \\left(\\mathbf{V}^\\intercal \\mathbf{V}\\right)
+```
+
+Where:
+
+  - ``x_{ti}``: Return of asset ``i`` at time ``t``.
+  - ``t``: Threshold parameter.
+  - ``\\sigma_i``: Standard deviation of asset ``i``.
+  - ``T``: Number of observations.
+  - ``N``: Number of assets.
+  - ``\\oslash``: Element-wise division.
+
 # Arguments
 
   - $(arg_dict[:gerbce]). Configured with the `Gerber0` algorithm.
@@ -312,6 +335,30 @@ end
     ) -> MatNum
 
 Implements the first variant of the Gerber correlation algorithm.
+
+# Summary Statistics
+
+Let ``\\mathbf{U}, \\mathbf{D}, \\mathbf{N} \\in \\{0,1\\}^{T \\times N}`` be indicator matrices with:
+
+```math
+U_{ti} = \\mathbf{1}[x_{ti} \\geq t \\, \\sigma_i], \\quad D_{ti} = \\mathbf{1}[x_{ti} \\leq -t \\, \\sigma_i], \\quad N_{ti} = \\mathbf{1}[{-t\\sigma_i < x_{ti} < t\\sigma_i}]
+```
+
+Define ``\\mathbf{H} = \\mathbf{U} - \\mathbf{D}``. The Gerber1 correlation is:
+
+```math
+\\hat{\\boldsymbol{\\rho}} = \\left(\\mathbf{H}^\\intercal \\mathbf{H}\\right) \\oslash \\left(T \\boldsymbol{1}\\boldsymbol{1}^\\intercal - \\mathbf{N}^\\intercal \\mathbf{N}\\right)
+```
+
+Where:
+
+  - ``x_{ti}``: Return of asset ``i`` at time ``t``.
+  - ``t``: Threshold parameter.
+  - ``\\sigma_i``: Standard deviation of asset ``i``.
+  - ``T``: Number of observations.
+  - ``N``: Number of assets.
+  - ``\\oslash``: Element-wise division.
+  - ``\\boldsymbol{1}``: Vector of ones.
 
 # Arguments
 
@@ -371,6 +418,28 @@ end
     ) -> MatNum
 
 Implements the second variant of the Gerber correlation algorithm.
+
+# Summary Statistics
+
+Let ``\\mathbf{U}, \\mathbf{D} \\in \\{0,1\\}^{T \\times N}`` be indicator matrices with:
+
+```math
+U_{ti} = \\mathbf{1}[x_{ti} \\geq t \\, \\sigma_i], \\quad D_{ti} = \\mathbf{1}[x_{ti} \\leq -t \\, \\sigma_i]
+```
+
+Define ``\\mathbf{H} = (\\mathbf{U} - \\mathbf{D})^\\intercal (\\mathbf{U} - \\mathbf{D})`` and ``\\boldsymbol{h} = \\sqrt{\\mathrm{diag}(\\mathbf{H})}``. The Gerber2 correlation is:
+
+```math
+\\hat{\\boldsymbol{\\rho}} = \\mathbf{H} \\oslash (\\boldsymbol{h} \\boldsymbol{h}^\\intercal)
+```
+
+Where:
+
+  - ``x_{ti}``: Return of asset ``i`` at time ``t``.
+  - ``t``: Threshold parameter.
+  - ``\\sigma_i``: Standard deviation of asset ``i``.
+  - ``\\mathrm{diag}(\\cdot)``: Diagonal of a matrix.
+  - ``\\oslash``: Element-wise division.
 
 # Arguments
 

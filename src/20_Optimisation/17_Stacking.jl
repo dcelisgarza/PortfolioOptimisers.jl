@@ -81,6 +81,16 @@ Keywords correspond to the struct's fields.
   - `!isempty(opti)`.
   - If `scale` is provided: `length(scale) == length(opti)` and all elements are finite.
 
+# Summary Statistics
+
+Let ``K`` inner optimisers produce weight vectors ``\\boldsymbol{w}_1, \\ldots, \\boldsymbol{w}_K``. Stack them as rows of a returns proxy matrix and pass to outer optimiser ``\\mathrm{opto}``:
+
+```math
+\\boldsymbol{w}^* = \\mathrm{opto}\\!\\left(\\sum_{k=1}^{K} s_k \\boldsymbol{W}_k\\right)
+```
+
+where ``s_k`` are optional scale factors and ``\\boldsymbol{W}_k`` is the returns matrix weighted by ``\\boldsymbol{w}_k``.
+
 # Related
 
   - [`BaseStackingOptimisationEstimator`](@ref)

@@ -10,6 +10,20 @@ Each overload uses power cone constraints (`PowerCone`) parameterised by `r.p` (
 the total. The range variant introduces separate lower and upper tail variables. The drawdown
 variant operates on the drawdown path.
 
+# Summary Statistics
+
+Power-Norm Value-at-Risk:
+
+```math
+\\mathrm{PNVaR}_{\\alpha,p}(\\boldsymbol{w}) = \\eta + \\frac{1}{\\alpha T^{1/p}} t, \\qquad \\sum_{t=1}^T v_t \\leq t
+```
+
+```math
+(w_t,\\, \\eta + \\hat{r}_t,\\, v_t) \\in \\mathcal{K}_{1/p} \\quad \\forall\\, t,\\quad w_t \\geq 0
+```
+
+where ``\\mathcal{K}_{1/p}`` is the power cone with exponent ``1/p``.
+
 # Arguments
 
   - $(arg_dict[:model])

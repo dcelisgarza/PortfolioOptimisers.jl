@@ -159,6 +159,23 @@ MeanRisk
    fb ┴ nothing
 ```
 
+# Summary Statistics
+
+The general mean-risk optimisation problem is:
+
+```math
+\\min_{\\boldsymbol{w} \\in \\mathcal{W}} \\; f(\\boldsymbol{w}) \\quad \\text{s.t. constraints}
+```
+
+Objective ``f`` depends on [`ObjectiveFunction`](@ref):
+
+  - [`MinimumRisk`](@ref): ``f(\\boldsymbol{w}) = \\rho(\\boldsymbol{w})``
+  - [`MaximumReturn`](@ref): ``f(\\boldsymbol{w}) = -\\hat{\\boldsymbol{\\mu}}^\\intercal \\boldsymbol{w}``
+  - [`MaximumUtility`](@ref): ``f(\\boldsymbol{w}) = -\\hat{\\boldsymbol{\\mu}}^\\intercal \\boldsymbol{w} + \\lambda \\rho(\\boldsymbol{w})``
+  - [`MaximumRatio`](@ref) (Sharpe): ``f(\\boldsymbol{w}) = -(\\hat{\\boldsymbol{\\mu}}^\\intercal \\boldsymbol{w} - r_f) / \\rho(\\boldsymbol{w})``
+
+where ``\\rho(\\boldsymbol{w})`` is the portfolio risk measure and ``\\mathcal{W}`` is the feasible weight set.
+
 # Related
 
   - [`scalarise_risk_expression!`](@ref)

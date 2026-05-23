@@ -134,6 +134,12 @@ $(DocStringExtensions.TYPEDEF)
 
 A denoising algorithm that sets the smallest `num_factors` eigenvalues of a covariance or correlation matrix to zero, effectively removing the principal components relating to random noise according to random matrix theory-based approaches.
 
+Let ``\\mathbf{V}`` be the eigenvector matrix and ``\\boldsymbol{\\lambda}`` the eigenvalues sorted ascending. For ``k`` noise eigenvalues (``\\lambda_i \\leq \\lambda_+``):
+
+```math
+\\tilde{\\mathbf{X}} = \\mathbf{V}_{\\mathrm{signal}} \\, \\mathrm{Diag}(\\boldsymbol{\\lambda}_{\\mathrm{signal}}) \\, \\mathbf{V}_{\\mathrm{signal}}^\\intercal
+```
+
 # Examples
 
 ```jldoctest
@@ -158,6 +164,12 @@ $(DocStringExtensions.TYPEDEF)
 
 A denoising algorithm that replaces the smallest `num_factors` eigenvalues of a covariance or correlation matrix with their average, effectively averaging the principal components relating to random noise according to random matrix theory-based approaches.
 
+Noise eigenvalues ``\\{\\lambda_i : \\lambda_i \\leq \\lambda_+\\}`` are replaced by their mean ``\\bar{\\lambda}_\\text{noise}``:
+
+```math
+\\tilde{\\lambda}_i = \\begin{cases} \\bar{\\lambda}_\\text{noise} & \\lambda_i \\leq \\lambda_+ \\\\ \\lambda_i & \\lambda_i > \\lambda_+ \\end{cases}
+```
+
 # Examples
 
 ```jldoctest
@@ -181,6 +193,12 @@ struct FixedDenoise <: AbstractDenoiseAlgorithm end
 $(DocStringExtensions.TYPEDEF)
 
 A denoising algorithm that shrinks the smallest `num_factors` eigenvalues of a covariance or correlation matrix towards their diagonal, controlled by the shrinkage parameter `alpha`. This approach interpolates between no shrinkage (`alpha = 0`) and full shrinkage (`alpha = 1`), providing a flexible way to regularize noisy eigenvalues.
+
+Noise eigenvalues are shrunk towards the diagonal of the correlation matrix:
+
+```math
+\\tilde{\\lambda}_i = (1 - \\alpha) \\lambda_i + \\alpha \\, X_{ii}, \\quad \\lambda_i \\leq \\lambda_+, \\quad \\alpha \\in [0, 1]
+```
 
 # Fields
 
@@ -500,6 +518,15 @@ For matrices without unit diagonal, the function converts them into correlation 
   - If `X` is not a correlation matrix, it is converted to one before applying the algorithm.
   - Performs an eigenvector decomposition of `X`.
   - Uses the Marčenko-Pastur distribution to compute the maximum feasable noise eigenvalue.
+
+The Marčenko-Pastur upper bound for noise eigenvalues (for effective sample ratio ``q = T/N``):
+
+```math
+\\lambda_{+} = \\sigma^2 \\left(1 + \\frac{1}{\\sqrt{q}}\\right)^2
+```
+
+Eigenvalues ``\\lambda \\leq \\lambda_+`` are classified as noise and processed by `dn.alg`.
+
   - Applies the denoising algorithm to `X` in `dn.alg` via [`_denoise!`](@ref) to the eigenvalues which are below this value.
   - Applies the positive definite projection to `X` in `dn.pdm` via [`denoise!`](@ref).
   - If `X` was not originally a correlation matrix, it is converted back.

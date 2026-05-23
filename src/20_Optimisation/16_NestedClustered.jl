@@ -236,6 +236,14 @@ $(DocStringExtensions.FIELDS)
 
 Keywords correspond to the struct's fields.
 
+# Summary Statistics
+
+Let clusters ``C_1, \\ldots, C_K`` partition the ``N`` assets. The NCO algorithm:
+
+ 1. **Inner**: for each cluster ``k``, solve ``\\boldsymbol{w}_{C_k} = \\mathrm{opti}(\\mathbf{X}_{C_k})`` (sub-portfolio weights within ``C_k``).
+ 2. **Outer**: form a ``T \\times K`` synthetic returns matrix from cluster portfolios and solve ``\\boldsymbol{a} = \\mathrm{opto}(\\mathbf{X}_{\\mathrm{cluster}})`` (allocation across clusters).
+ 3. **Combine**: ``w_i = a_k \\cdot w_{C_k, i}`` for ``i \\in C_k``.
+
 # Related
 
   - [`ClusteringOptimisationEstimator`](@ref)

@@ -333,6 +333,19 @@ end
 
 Constructs box uncertainty sets for expected returns and covariance statistics using bootstrap resampling for time series data.
 
+# Summary Statistics
+
+Generate ``M`` bootstrap samples, compute ``\\hat{\\boldsymbol{\\mu}}^{(m)}`` and ``\\hat{\\mathbf{\\Sigma}}^{(m)}``, then take element-wise quantile bounds:
+
+```math
+\\mu_{lb,i} = Q_{q/2}\\!\\left(\\hat{\\mu}^{(m)}_i\\right), \\qquad \\mu_{ub,i} = Q_{1-q/2}\\!\\left(\\hat{\\mu}^{(m)}_i\\right)
+```
+
+```math
+(\\mathbf{\\Sigma}_{lb})_{ij} = Q_{q/2}\\!\\left(\\hat{\\Sigma}^{(m)}_{ij}\\right), \\qquad
+(\\mathbf{\\Sigma}_{ub})_{ij} = Q_{1-q/2}\\!\\left(\\hat{\\Sigma}^{(m)}_{ij}\\right)
+```
+
 # Arguments
 
   - `ue`: ARCH uncertainty set estimator.
@@ -394,6 +407,12 @@ end
 
 Constructs a box uncertainty set for expected returns using bootstrap resampling for time series data.
 
+# Summary Statistics
+
+```math
+\\mu_{lb,i} = Q_{q/2}\\!\\left(\\hat{\\mu}^{(m)}_i\\right), \\qquad \\mu_{ub,i} = Q_{1-q/2}\\!\\left(\\hat{\\mu}^{(m)}_i\\right)
+```
+
 # Arguments
 
   - `ue`: ARCH uncertainty set estimator.
@@ -444,6 +463,13 @@ end
               F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
 
 Constructs a box uncertainty set for covariance using bootstrap resampling for time series data.
+
+# Summary Statistics
+
+```math
+(\\mathbf{\\Sigma}_{lb})_{ij} = Q_{q/2}\\!\\left(\\hat{\\Sigma}^{(m)}_{ij}\\right), \\qquad
+(\\mathbf{\\Sigma}_{ub})_{ij} = Q_{1-q/2}\\!\\left(\\hat{\\Sigma}^{(m)}_{ij}\\right)
+```
 
 # Arguments
 
@@ -498,6 +524,25 @@ end
         F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
 
 Constructs ellipsoidal uncertainty sets for expected returns and covariance statistics using bootstrap resampling for time series data.
+
+# Summary Statistics
+
+Compute bootstrap deviations ``\\boldsymbol{\\delta}_{\\mu}^{(m)} = \\hat{\\boldsymbol{\\mu}}^{(m)} - \\hat{\\boldsymbol{\\mu}}`` and ``\\boldsymbol{\\delta}_{\\Sigma}^{(m)} = \\operatorname{vec}(\\hat{\\mathbf{\\Sigma}}^{(m)} - \\hat{\\mathbf{\\Sigma}})``. Fit empirical covariances:
+
+```math
+\\mathbf{\\Sigma}_{\\mu} = \\operatorname{Cov}\\!\\left(\\boldsymbol{\\delta}_{\\mu}^{(m)}\\right), \\qquad
+\\mathbf{\\Sigma}_{\\Sigma} = \\operatorname{Cov}\\!\\left(\\boldsymbol{\\delta}_{\\Sigma}^{(m)}\\right)
+```
+
+Then form ellipsoidal sets:
+
+```math
+\\mathcal{E}_{\\mu} = \\left\\{\\boldsymbol{\\mu} : (\\boldsymbol{\\mu} - \\hat{\\boldsymbol{\\mu}})^{\\intercal} \\mathbf{\\Sigma}_{\\mu}^{-1} (\\boldsymbol{\\mu} - \\hat{\\boldsymbol{\\mu}}) \\leq k_{\\mu}^2\\right\\}
+```
+
+```math
+\\mathcal{E}_{\\Sigma} = \\left\\{\\mathbf{\\Sigma} : \\left\\|\\mathbf{\\Sigma}_{\\Sigma}^{-1/2} \\operatorname{vec}(\\mathbf{\\Sigma} - \\hat{\\mathbf{\\Sigma}})\\right\\|_2 \\leq k_{\\Sigma}\\right\\}
+```
 
 # Arguments
 
@@ -563,6 +608,13 @@ end
 
 Constructs an ellipsoidal uncertainty set for expected returns using bootstrap resampling for time series data.
 
+# Summary Statistics
+
+```math
+\\mathbf{\\Sigma}_{\\mu} = \\operatorname{Cov}\\!\\left(\\hat{\\boldsymbol{\\mu}}^{(m)} - \\hat{\\boldsymbol{\\mu}}\\right), \\qquad
+\\mathcal{E}_{\\mu} = \\left\\{\\boldsymbol{\\mu} : (\\boldsymbol{\\mu} - \\hat{\\boldsymbol{\\mu}})^{\\intercal} \\mathbf{\\Sigma}_{\\mu}^{-1} (\\boldsymbol{\\mu} - \\hat{\\boldsymbol{\\mu}}) \\leq k_{\\mu}^2\\right\\}
+```
+
 # Arguments
 
   - `ue`: ARCH uncertainty set estimator. Contains prior estimator, ellipsoidal algorithm, simulation parameters, block size, quantile, seed, and bootstrap type.
@@ -617,6 +669,13 @@ end
               F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
 
 Constructs an ellipsoidal uncertainty set for covariance using bootstrap resampling for time series data.
+
+# Summary Statistics
+
+```math
+\\mathbf{\\Sigma}_{\\Sigma} = \\operatorname{Cov}\\!\\left(\\operatorname{vec}(\\hat{\\mathbf{\\Sigma}}^{(m)} - \\hat{\\mathbf{\\Sigma}})\\right), \\qquad
+\\mathcal{E}_{\\Sigma} = \\left\\{\\mathbf{\\Sigma} : \\left\\|\\mathbf{\\Sigma}_{\\Sigma}^{-1/2} \\operatorname{vec}(\\mathbf{\\Sigma} - \\hat{\\mathbf{\\Sigma}})\\right\\|_2 \\leq k_{\\Sigma}\\right\\}
+```
 
 # Arguments
 

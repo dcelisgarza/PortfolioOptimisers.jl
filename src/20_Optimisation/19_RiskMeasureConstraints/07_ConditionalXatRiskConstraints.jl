@@ -9,6 +9,16 @@ infinity-norm cone constraints to handle distributional ambiguity over an `r.r`-
 Range variants compute the difference between lower-tail and upper-tail conditional
 risk expressions.
 
+# Summary Statistics
+
+Rockafellar-Uryasev CVaR linearisation:
+
+```math
+\\mathrm{CVaR}_\\alpha(\\boldsymbol{w}) = \\mathrm{VaR} + \\frac{1}{\\alpha T} \\sum_{t=1}^T z_t, \\qquad z_t \\geq -\\hat{r}_t - \\mathrm{VaR},\\quad z_t \\geq 0
+```
+
+where ``\\hat{r}_t = \\boldsymbol{x}_t^\\intercal \\boldsymbol{w}`` is the net portfolio return at time ``t``.
+
 # Arguments
 
   - $(arg_dict[:model])

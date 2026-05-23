@@ -261,6 +261,51 @@ function Base.getproperty(obj::HighOrderFactorPriorEstimator, sym::Symbol)
         getfield(obj, sym)
     end
 end
+"""
+    prior(pe::HighOrderFactorPriorEstimator, X::MatNum, F::MatNum; dims::Int = 1,
+          kwargs...)
+
+Compute high order factor prior moments for asset returns using a factor model.
+
+`prior` estimates the mean, covariance, coskewness, and cokurtosis of asset returns using a factor model with residual error correction. It first computes low order moments via the embedded factor prior, then maps factor higher-order moments to asset space via the Kronecker product of the factor loadings, optionally adding residual corrections.
+
+# Summary Statistics
+
+Factor cokurtosis and coskewness are mapped to asset space via the loadings matrix ``\\mathbf{B}`` (with Kronecker product ``\\otimes``):
+
+```math
+\\hat{\\mathbf{K}} = (\\mathbf{B} \\otimes \\mathbf{B}) \\hat{\\mathbf{K}}_f (\\mathbf{B} \\otimes \\mathbf{B})^\\intercal + \\hat{\\mathbf{K}}_\\varepsilon
+```
+
+```math
+\\hat{\\mathbf{S}} = \\mathbf{B} \\hat{\\mathbf{S}}_f (\\mathbf{B} \\otimes \\mathbf{B})^\\intercal + \\hat{\\mathbf{S}}_\\varepsilon
+```
+
+Where ``\\hat{\\mathbf{K}}_\\varepsilon`` and ``\\hat{\\mathbf{S}}_\\varepsilon`` are residual cokurtosis and coskewness corrections (when `rsd = true`).
+
+# Arguments
+
+  - `pe`: High order factor prior estimator.
+  - `X`: Asset returns matrix (observations × assets).
+  - `F`: Factor returns matrix (observations × factors).
+  - $(arg_dict[:dims])
+  - `kwargs...`: Additional keyword arguments passed to underlying estimators.
+
+# Returns
+
+  - `pr::HighOrderPrior`: Result object containing asset returns, mean, covariance, coskewness tensor, cokurtosis tensor, and factor moments.
+
+# Validation
+
+  - `dims in (1, 2)`.
+
+# Related
+
+  - [`HighOrderFactorPriorEstimator`](@ref)
+  - [`HighOrderPrior`](@ref)
+  - [`FactorPrior`](@ref)
+  - [`prior`](@ref)
+"""
 function prior(pe::HighOrderFactorPriorEstimator, X::MatNum, F::MatNum; dims::Int = 1,
                kwargs...)
     @argcheck(dims in (1, 2))

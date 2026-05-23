@@ -111,6 +111,14 @@ Second-order cone (SOC) norm-based tracking formulation.
 
 `L2Tracking` implements a norm-based tracking error formulation using the Euclidean (L2) norm, scaled by the square root of the number of assets minus the degrees of freedom (`ddof`). This is commonly used for tracking error constraints and objectives in portfolio optimisation.
 
+# Summary Statistics
+
+```math
+\\mathrm{TE}_{L_2}(\\boldsymbol{a},\\boldsymbol{b}) = \\frac{\\|\\boldsymbol{a} - \\boldsymbol{b}\\|_2}{\\sqrt{T - d}}
+```
+
+where ``\\boldsymbol{a}`` is the portfolio weight or return vector, ``\\boldsymbol{b}`` is the benchmark vector, ``T`` is the number of observations, and ``d`` is `ddof`. When ``T`` is not provided the denominator is 1.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -157,6 +165,14 @@ $(DocStringExtensions.TYPEDEF)
 Second-order cone (SOC) squared norm-based tracking formulation.
 
 `SquaredL2Tracking` implements a norm-based tracking error formulation using the squared Euclidean (L2) norm, scaled by the number of assets minus the degrees of freedom (`ddof`). This is commonly used for tracking error constraints and objectives in portfolio optimisation where squared error is preferred.
+
+# Summary Statistics
+
+```math
+\\mathrm{TE}_{L_2^2}(\\boldsymbol{a},\\boldsymbol{b}) = \\frac{\\|\\boldsymbol{a} - \\boldsymbol{b}\\|_2^2}{T - d}
+```
+
+where ``\\boldsymbol{a}`` is the portfolio weight or return vector, ``\\boldsymbol{b}`` is the benchmark vector, ``T`` is the number of observations, and ``d`` is `ddof`. When ``T`` is not provided the denominator is 1.
 
 # Fields
 
@@ -205,6 +221,14 @@ Norm-one (NOC) tracking formulation.
 
 `L1Tracking` implements a norm-based tracking error formulation using the L1 (norm-one) distance between portfolio and benchmark weights. This is commonly used for tracking error constraints and objectives in portfolio optimisation where sparsity or absolute deviations are preferred.
 
+# Summary Statistics
+
+```math
+\\mathrm{TE}_{L_1}(\\boldsymbol{a},\\boldsymbol{b}) = \\frac{\\|\\boldsymbol{a} - \\boldsymbol{b}\\|_1}{T}
+```
+
+where ``\\boldsymbol{a}`` is the portfolio weight or return vector, ``\\boldsymbol{b}`` is the benchmark vector, and ``T`` is the number of observations. When ``T`` is not provided the denominator is 1.
+
 # Examples
 
 ```jldoctest
@@ -226,6 +250,14 @@ $(DocStringExtensions.TYPEDEF)
 L-p norm tracking error estimator.
 
 Computes the Lp-norm of the difference between portfolio and benchmark returns: ``\\lvert\\mathbf{X} \\boldsymbol{w} - \\boldsymbol{b}\\rvert_p``.
+
+# Summary Statistics
+
+```math
+\\mathrm{TE}_{L_p}(\\boldsymbol{a},\\boldsymbol{b}) = \\frac{\\|\\boldsymbol{a} - \\boldsymbol{b}\\|_p}{(T - d)^{1/p}}
+```
+
+where ``\\boldsymbol{a}`` is the portfolio weight or return vector, ``\\boldsymbol{b}`` is the benchmark vector, ``T`` is the number of observations, ``d`` is `ddof`, and ``p`` is the norm order. When ``T`` is not provided the denominator is 1.
 
 # Fields
 
@@ -261,6 +293,14 @@ $(DocStringExtensions.TYPEDEF)
 L-infinity norm (maximum absolute deviation) tracking error estimator.
 
 Computes the L∞-norm (maximum absolute deviation) of the difference between portfolio and benchmark returns.
+
+# Summary Statistics
+
+```math
+\\mathrm{TE}_{L_\\infty}(\\boldsymbol{a},\\boldsymbol{b}) = \\frac{\\|\\boldsymbol{a} - \\boldsymbol{b}\\|_\\infty}{T - d}
+```
+
+where ``\\boldsymbol{a}`` is the portfolio weight or return vector, ``\\boldsymbol{b}`` is the benchmark vector, ``T`` is the number of observations, and ``d`` is `ddof`. When ``T`` is not provided the denominator is 1. `pos = true` uses ``+\\infty``, `pos = false` uses ``-\\infty``.
 
 # Fields
 
@@ -300,6 +340,16 @@ end
 Compute the norm-based tracking error between portfolio and benchmark weights.
 
 `norm_tracking` computes the tracking error using either the Euclidean (L2) norm for [`L2Tracking`](@ref), squared Euclidean (L2) norm for [`SquaredL2Tracking`](@ref), or the L1 (norm-one) distance for [`L1Tracking`](@ref). The error is optionally scaled by the number of assets and degrees of freedom for SOC, or by the number of assets for NOC.
+
+# Summary Statistics
+
+```math
+\\mathrm{TE}_{L_2} = \\frac{\\|a - b\\|_2}{\\sqrt{T - d}}, \\qquad
+\\mathrm{TE}_{L_2^2} = \\frac{\\|a - b\\|_2^2}{T - d}, \\qquad
+\\mathrm{TE}_{L_1} = \\frac{\\|a - b\\|_1}{T}, \\qquad
+\\mathrm{TE}_{L_p} = \\frac{\\|a - b\\|_p}{(T-d)^{1/p}}, \\qquad
+\\mathrm{TE}_{L_\\infty} = \\frac{\\|a - b\\|_\\infty}{T - d}
+```
 
 # Arguments
 

@@ -105,6 +105,22 @@ For `StandardDeviation`, adds a scalar variable `sd_risk_i` and the SOC constrai
 appropriate variance formulation (SDP, SOC-squared, or quadratic) and also applies any
 risk-contribution constraints.
 
+# Summary Statistics
+
+Standard deviation:
+
+```math
+\\hat{\\sigma}(\\boldsymbol{w}) = \\|\\mathbf{G}\\boldsymbol{w}\\|_2
+```
+
+SDP variance:
+
+```math
+\\hat{\\sigma}^2(\\boldsymbol{w}) = \\mathrm{tr}(\\boldsymbol{\\Sigma}\\mathbf{W})
+```
+
+where ``\\mathbf{G}`` is the upper Cholesky factor of ``\\boldsymbol{\\Sigma}`` and ``\\mathbf{W}`` is the SDP matrix variable.
+
 # Arguments
 
   - $(arg_dict[:model])

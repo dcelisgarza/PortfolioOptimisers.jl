@@ -121,6 +121,16 @@ $(DocStringExtensions.FIELDS)
 
 Keywords correspond to the struct's fields.
 
+# Summary Statistics
+
+Let ``\\boldsymbol{w}_{\\min}``, ``\\boldsymbol{w}_{\\mathrm{opt}}``, and ``\\boldsymbol{w}_{\\max}`` be the minimum-risk, user-optimal, and maximum-risk portfolios. The NOC solves:
+
+```math
+\\max_{\\boldsymbol{w} \\in \\mathcal{W}} \\; \\min\\left\\{\\frac{\\boldsymbol{w} - \\boldsymbol{w}_{\\min}}{\\boldsymbol{w}_{\\mathrm{opt}} - \\boldsymbol{w}_{\\min}},\\; \\frac{\\boldsymbol{w}_{\\max} - \\boldsymbol{w}}{\\boldsymbol{w}_{\\max} - \\boldsymbol{w}_{\\mathrm{opt}}}\\right\\}
+```
+
+yielding a portfolio centrally located within the near-optimal region, robust to small perturbations of the objective.
+
 # Related
 
   - [`scalarise_risk_expression!`](@ref)

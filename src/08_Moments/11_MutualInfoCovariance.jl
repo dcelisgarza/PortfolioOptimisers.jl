@@ -5,6 +5,15 @@ Covariance estimator based on mutual information.
 
 `MutualInfoCovariance` implements a robust covariance estimator that uses mutual information (MI) to capture both linear and nonlinear dependencies between asset returns. This estimator is particularly useful for identifying complex relationships that are not detected by traditional correlation-based methods. The MI matrix is optionally normalised and then rescaled by marginal standard deviations to produce a covariance matrix.
 
+# Summary Statistics
+
+```math
+\\hat{\\boldsymbol{\\rho}}_{ij} = \\mathrm{MI}(X_i,\\, X_j), \\qquad
+\\hat{\\mathbf{\\Sigma}}_{ij} = \\hat{\\boldsymbol{\\rho}}_{ij}\\,\\hat{\\sigma}_i\\,\\hat{\\sigma}_j
+```
+
+where ``\\mathrm{MI}(X_i, X_j)`` is the (optionally normalised) mutual information between assets ``i`` and ``j``, and ``\\hat{\\sigma}_i`` are marginal standard deviations from the variance estimator `ve`.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)

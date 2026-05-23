@@ -308,6 +308,21 @@ Smyth-Broby kernel function for covariance and correlation computation.
 
 This function computes the kernel value for a pair of asset returns, applying the Smyth-Broby logic for zones of confusion and indecision. It is used to aggregate positive and negative co-movements in Smyth-Broby covariance algorithms. It assumes the returns are centered around zero.
 
+# Summary Statistics
+
+```math
+\\kappa(r_i, r_j) = \\sqrt{(1 + |r_i|)(1 + |r_j|)}, \\quad \\gamma(r_i, r_j) = |r_i - r_j|
+```
+
+```math
+\\delta(r_i, r_j, n) = \\frac{\\kappa(r_i, r_j)}{1 + \\gamma(r_i, r_j)^n}
+```
+
+Where:
+
+  - ``r_i, r_j``: Absolute standardised returns for assets ``i`` and ``j``.
+  - ``n``: Exponent parameter controlling kernel sharpness.
+
 # Arguments
 
   - `ri`: Absolute standardised return for asset `i`.
@@ -340,6 +355,20 @@ end
 Implements the original Smyth-Broby covariance/correlation algorithm.
 
 This method computes the Smyth-Broby correlation or covariance matrix for the input data matrix `X` using the original `SmythBroby0` algorithm. The computation is based on thresholding the data, applying the Smyth-Broby kernel, and aggregating positive and negative co-movements.
+
+# Summary Statistics
+
+For each pair ``(i, j)`` and observations ``t = 1, \\ldots, T``, classify using thresholds ``c_1 \\sigma_i`` and ``c_2 \\leq |\\tilde{r}_{ti}| \\leq c_3``:
+
+```math
+\\text{pos} = \\sum_t \\delta(|\\tilde{r}_{ti}|, |\\tilde{r}_{tj}|, n) \\cdot \\mathbf{1}[\\tilde{r}_{ti} \\, \\tilde{r}_{tj} > 0], \\quad \\text{neg} = \\sum_t \\delta(|\\tilde{r}_{ti}|, |\\tilde{r}_{tj}|, n) \\cdot \\mathbf{1}[\\tilde{r}_{ti} \\, \\tilde{r}_{tj} < 0]
+```
+
+```math
+\\hat{\\rho}_{ij} = \\frac{\\text{pos} - \\text{neg}}{\\text{pos} + \\text{neg}}
+```
+
+Where ``\\tilde{r}_{ti} = (x_{ti} - \\mu_i) / \\sigma_i`` are the standardised centered returns.
 
 # Arguments
 

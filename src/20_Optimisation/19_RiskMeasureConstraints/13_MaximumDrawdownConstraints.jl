@@ -7,6 +7,14 @@ Introduces a scalar variable `mdd_risk` and the constraint
 `sc * (mdd_risk .- dd[2:T+1]) >= 0` so that `mdd_risk` upper-bounds every drawdown
 observation. Returns the existing expression if already present.
 
+# Summary Statistics
+
+```math
+\\mathrm{MDD}(\\boldsymbol{w}) = \\max_{t=1,\\ldots,T} dd_t
+```
+
+where ``dd_t`` is the portfolio drawdown at time ``t``.
+
 # Arguments
 
   - $(arg_dict[:model])

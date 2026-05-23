@@ -48,6 +48,16 @@ end
 
 Compute expected returns as custom values.
 
+# Summary Statistics
+
+Returns a user-supplied constant, vector, or function result as the expected returns:
+
+```math
+\\hat{\\mu}_j = v_j, \\quad j = 1, \\ldots, N
+```
+
+Where ``v_j`` is the ``j``-th element of the custom value `me.val` (broadcast from a scalar, taken directly from a vector, or evaluated from a callable).
+
 # Arguments
 
   - `me`: Custom value expected returns estimator.

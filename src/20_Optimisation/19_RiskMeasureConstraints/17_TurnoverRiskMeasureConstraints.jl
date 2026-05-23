@@ -7,6 +7,14 @@ Introduces a scalar variable `turnover_risk` and the L1-norm cone constraint
 `[sc * turnover_risk; sc * (w - benchmark * k)] in NormOneCone(1 + N)` where `benchmark`
 is the reference weight vector from `r.w`.
 
+# Summary Statistics
+
+```math
+\\mathrm{Turnover}(\\boldsymbol{w}) = \\|\\boldsymbol{w} - \\boldsymbol{w}_b k\\|_1
+```
+
+where ``\\boldsymbol{w}_b`` is the benchmark weight vector and ``k`` is the budget scaling variable.
+
 # Arguments
 
   - $(arg_dict[:model])

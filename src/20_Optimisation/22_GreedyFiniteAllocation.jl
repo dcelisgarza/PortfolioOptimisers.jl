@@ -37,6 +37,23 @@ Greedy Allocation portfolio optimiser.
 
 `GreedyAllocation` converts continuous portfolio weights to discrete share quantities using a greedy two-pass allocation: first round shares to the nearest `unit` multiple, then iteratively buy remaining shares with leftover cash in order of largest weight.
 
+# Summary Statistics
+
+```math
+x_i^{(0)} = \\mathrm{round}\\!\\left(\\frac{w_i C}{p_i \\cdot \\mathrm{unit}}\\right) \\cdot \\mathrm{unit}, \\qquad
+r^{(0)} = C - \\boldsymbol{x}^{(0)\\intercal} \\boldsymbol{p}
+```
+
+Then iteratively while ``r > 0``:
+
+```math
+i^* = \\underset{i:\\, p_i \\leq r}{\\arg\\max}\\; w_i, \\qquad
+x_{i^*} \\leftarrow x_{i^*} + \\mathrm{unit}, \\qquad
+r \\leftarrow r - p_{i^*} \\cdot \\mathrm{unit}
+```
+
+where ``\\boldsymbol{w}`` is the target weight vector, ``\\boldsymbol{p}`` is the asset price vector, ``C`` is available cash.
+
 $(DocStringExtensions.FIELDS)
 
 # Constructors

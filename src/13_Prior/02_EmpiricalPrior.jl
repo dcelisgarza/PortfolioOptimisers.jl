@@ -95,6 +95,16 @@ Compute empirical prior moments for asset returns (no horizon adjustment).
 
 `prior` estimates the mean and covariance of asset returns using the specified empirical prior estimator, without log-normalisation or scaling for investment horizon. The mean and covariance are computed using the estimators stored in `pe`, and returned in a [`LowOrderPrior`](@ref) result.
 
+# Summary Statistics
+
+The empirical prior directly estimates first and second moments from the sample:
+
+```math
+\\hat{\\boldsymbol{\\mu}} = \\frac{1}{T} \\sum_{t=1}^{T} \\mathbf{x}_t, \\qquad \\hat{\\mathbf{\\Sigma}} = \\frac{1}{T-1} \\sum_{t=1}^{T} (\\mathbf{x}_t - \\hat{\\boldsymbol{\\mu}})(\\mathbf{x}_t - \\hat{\\boldsymbol{\\mu}})^\\intercal
+```
+
+Where ``\\mathbf{x}_t`` is the ``N \\times 1`` vector of asset returns at time ``t`` and ``T`` is the number of observations.
+
 # Arguments
 
   - `pe`: Empirical prior estimator.
@@ -134,6 +144,20 @@ end
 Compute empirical prior moments for asset returns with investment horizon adjustment.
 
 `prior` estimates the mean and covariance of asset returns using the specified empirical prior estimator, applying log-normalisation and scaling for the investment horizon. The asset returns are log-transformed, moments are computed using the estimators stored in `pe`, and then rescaled according to the investment horizon. The final mean and covariance are transformed back to arithmetic returns and returned in a [`LowOrderPrior`](@ref) result.
+
+# Summary Statistics
+
+Log-returns are computed and scaled by the investment horizon ``h``, then converted back to arithmetic returns:
+
+```math
+\\tilde{\\boldsymbol{\\mu}} = h \\cdot \\hat{\\boldsymbol{\\mu}}_{\\log}, \\qquad \\tilde{\\mathbf{\\Sigma}} = h \\cdot \\hat{\\mathbf{\\Sigma}}_{\\log}
+```
+
+```math
+\\hat{\\mu}_i = \\exp\\!\\left(\\tilde{\\mu}_i + \\tfrac{1}{2}\\tilde{\\sigma}_{ii}\\right) - 1, \\qquad \\hat{\\sigma}_{ij} = (\\hat{\\mu}_i + 1)(\\hat{\\mu}_j + 1)\\left(\\exp(\\tilde{\\sigma}_{ij}) - 1\\right)
+```
+
+Where ``\\hat{\\boldsymbol{\\mu}}_{\\log}`` and ``\\hat{\\mathbf{\\Sigma}}_{\\log}`` are the sample mean and covariance of log-returns ``\\log(1 + x_t)``.
 
 # Arguments
 

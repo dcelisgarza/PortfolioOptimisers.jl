@@ -68,6 +68,16 @@ Compute the Kendall's tau rank correlation matrix using a [`KendallCovariance`](
 
 This method computes the pairwise Kendall's tau rank correlation matrix for the input data matrix `X`. Kendall's tau measures the monotonic association between pairs of asset returns and is robust to outliers and non-Gaussian data.
 
+# Summary Statistics
+
+For two asset return series ``(x_1, \\ldots, x_T)`` and ``(y_1, \\ldots, y_T)``, Kendall's ``\\tau`` is:
+
+```math
+\\hat{\\tau}_{ij} = \\frac{C - D}{\\binom{T}{2}}
+```
+
+where ``C`` is the number of concordant pairs and ``D`` is the number of discordant pairs among all ``\\binom{T}{2}`` pairs of observations. A pair ``(t, s)`` is concordant if ``(x_t - x_s)(y_t - y_s) > 0`` and discordant if ``(x_t - x_s)(y_t - y_s) < 0``.
+
 # Arguments
 
   - `ce`: Kendall's tau-based covariance estimator.
@@ -186,6 +196,16 @@ end
 Compute the Spearman's rho rank correlation matrix using a [`SpearmanCovariance`](@ref) estimator.
 
 This method computes the pairwise Spearman's rho rank correlation matrix for the input data matrix `X`. Spearman's rho measures the monotonic association between pairs of asset returns and is robust to outliers and non-Gaussian data.
+
+# Summary Statistics
+
+Spearman's ``\\rho`` is the Pearson correlation of the rank-transformed data. Let ``\\mathrm{rk}(x_t)`` denote the rank of observation ``x_t`` among ``x_1, \\ldots, x_T``:
+
+```math
+\\hat{\\rho}^S_{ij} = 1 - \\frac{6 \\sum_{t=1}^{T} d_t^2}{T(T^2 - 1)}, \\quad d_t = \\mathrm{rk}(x_{ti}) - \\mathrm{rk}(x_{tj})
+```
+
+Where ``T`` is the number of observations, ``x_{ti}`` is the return of asset ``i`` at time ``t``, and ``d_t`` is the difference of ranks at time ``t``.
 
 # Arguments
 

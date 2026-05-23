@@ -82,6 +82,43 @@ Compute the standard deviation using a [`SimpleVariance`](@ref) estimator for a 
 
 This method computes the standard deviation of the input matrix `X` using the configuration specified in `ve`.
 
+# Summary Statistics
+
+Unweighted:
+
+```math
+\\hat{\\sigma}_j = \\sqrt{\\hat{\\sigma}^2_j}
+```
+
+where, for `corrected = true`:
+
+```math
+\\hat{\\sigma}^2_j = \\frac{1}{T-1} \\sum_{t=1}^{T} (r_{tj} - \\hat{\\mu}_j)^2
+```
+
+and for `corrected = false`:
+
+```math
+\\hat{\\sigma}^2_j = \\frac{1}{T} \\sum_{t=1}^{T} (r_{tj} - \\hat{\\mu}_j)^2
+```
+
+Weighted:
+
+```math
+\\hat{\\sigma}^2_j = \\frac{\\sum_{t=1}^{T} w_t (r_{tj} - \\hat{\\mu}_j)^2}{\\sum_{t=1}^{T} w_t - c}
+```
+
+where ``c = 1`` if `corrected = true`, else ``c = 0``.
+
+Where:
+
+  - ``\\hat{\\sigma}^2_j``: Estimated variance of asset ``j``.
+  - ``r_{tj}``: Return of asset ``j`` at time ``t``.
+  - ``\\hat{\\mu}_j``: Estimated mean of asset ``j``.
+  - ``T``: Number of observations.
+  - ``w_t``: Observation weight at time ``t``.
+  - ``c``: Bias correction factor.
+
 # Arguments
 
   - $(arg_dict[:ve])
@@ -223,6 +260,37 @@ end
 Compute the variance using a [`SimpleVariance`](@ref) estimator for a matrix.
 
 This method computes the variance of the input matrix `X` using the configuration specified in `ve`.
+
+# Summary Statistics
+
+Unweighted, for `corrected = true`:
+
+```math
+\\hat{\\sigma}^2_j = \\frac{1}{T-1} \\sum_{t=1}^{T} (r_{tj} - \\hat{\\mu}_j)^2
+```
+
+Unweighted, for `corrected = false`:
+
+```math
+\\hat{\\sigma}^2_j = \\frac{1}{T} \\sum_{t=1}^{T} (r_{tj} - \\hat{\\mu}_j)^2
+```
+
+Weighted:
+
+```math
+\\hat{\\sigma}^2_j = \\frac{\\sum_{t=1}^{T} w_t (r_{tj} - \\hat{\\mu}_j)^2}{\\sum_{t=1}^{T} w_t - c}
+```
+
+where ``c = 1`` if `corrected = true`, else ``c = 0``.
+
+Where:
+
+  - ``\\hat{\\sigma}^2_j``: Estimated variance of asset ``j``.
+  - ``r_{tj}``: Return of asset ``j`` at time ``t``.
+  - ``\\hat{\\mu}_j``: Estimated mean of asset ``j``.
+  - ``T``: Number of observations.
+  - ``w_t``: Observation weight at time ``t``.
+  - ``c``: Bias correction factor.
 
 # Arguments
 

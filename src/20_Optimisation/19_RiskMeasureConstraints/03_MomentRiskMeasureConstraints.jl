@@ -49,6 +49,22 @@ inequality constraint linking the auxiliary variables to the portfolio returns m
 target. The second-moment overload additionally supports full and lower-half formulations and
 multiple variance encodings via [`set_second_moment_risk!`](@ref).
 
+# Summary Statistics
+
+First lower moment / semi-deviation:
+
+```math
+\\mathrm{FLM}(\\boldsymbol{w}) = \\frac{1}{T}\\sum_{t=1}^T z_t, \\qquad z_t \\geq \\boldsymbol{\\mu}^\\intercal \\boldsymbol{w} - \\hat{r}_t,\\quad z_t \\geq 0
+```
+
+Mean absolute deviation:
+
+```math
+\\mathrm{MAD}(\\boldsymbol{w}) = \\frac{1}{T}\\sum_{t=1}^T z_t, \\qquad z_t \\geq |\\hat{r}_t - \\boldsymbol{\\mu}^\\intercal \\boldsymbol{w}|,\\quad z_t \\geq 0
+```
+
+where ``\\hat{r}_t = \\boldsymbol{x}_t^\\intercal \\boldsymbol{w}`` is the net portfolio return at time ``t``.
+
 # Arguments
 
   - $(arg_dict[:model])

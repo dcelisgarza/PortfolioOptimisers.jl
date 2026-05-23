@@ -8,6 +8,22 @@ empirical quantile. The distribution overloads use closed-form z-scores computed
 [`compute_value_at_risk_z`](@ref) / [`compute_value_at_risk_cz`](@ref) and add an SOC
 constraint. The `DrawdownatRisk` overload applies the MIP approach to the drawdown series.
 
+# Summary Statistics
+
+Empirical (MIP) VaR:
+
+```math
+z_t \\in \\{0,1\\}, \\quad \\sum_t z_t \\leq \\alpha T, \\quad \\mathrm{VaR} \\geq -\\hat{r}_t - b\\,z_t \\quad \\forall\\, t
+```
+
+Parametric VaR (Normal/t/Laplace):
+
+```math
+\\mathrm{VaR}_\\alpha(\\boldsymbol{w}) = -\\boldsymbol{\\mu}^\\intercal \\boldsymbol{w} + z_\\alpha \\|\\mathbf{G}\\boldsymbol{w}\\|_2
+```
+
+where ``z_\\alpha`` is the distribution quantile at level ``\\alpha`` and ``\\mathbf{G}`` is the Cholesky factor of the covariance.
+
 # Arguments
 
   - $(arg_dict[:model])

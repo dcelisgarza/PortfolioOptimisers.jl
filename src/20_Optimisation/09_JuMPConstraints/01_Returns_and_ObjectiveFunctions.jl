@@ -663,6 +663,22 @@ Add uncertainty-set-robust return constraints to the JuMP model.
 
 Dispatches based on the uncertainty set type. For `BoxUncertaintySet`, uses a norm-1 cone constraint. For `EllipsoidalUncertaintySet`, uses a second-order cone constraint.
 
+# Summary Statistics
+
+Box uncertainty set (worst-case return):
+
+```math
+\\hat{r}(\\boldsymbol{w}) = \\boldsymbol{\\mu}^\\intercal \\boldsymbol{w} - \\boldsymbol{\\Delta}^\\intercal |\\boldsymbol{w}|, \\qquad \\boldsymbol{\\Delta} = \\frac{\\boldsymbol{u} - \\boldsymbol{\\ell}}{2}
+```
+
+Ellipsoidal uncertainty set (worst-case return):
+
+```math
+\\hat{r}(\\boldsymbol{w}) = \\boldsymbol{\\mu}^\\intercal \\boldsymbol{w} - \\kappa \\|\\mathbf{G}\\boldsymbol{w}\\|_2
+```
+
+where ``\\boldsymbol{\\ell}``, ``\\boldsymbol{u}`` are the box uncertainty bounds, ``\\kappa`` is the ellipsoidal radius, and ``\\mathbf{G}`` is the upper Cholesky factor of the uncertainty set covariance.
+
 # Arguments
 
   - `model::JuMP.Model`: JuMP optimisation model.

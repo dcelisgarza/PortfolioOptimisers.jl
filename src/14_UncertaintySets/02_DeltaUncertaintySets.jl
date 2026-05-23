@@ -81,6 +81,20 @@ end
 
 Constructs box uncertainty sets for mean and covariance statistics using delta bounds from a prior estimator.
 
+# Summary Statistics
+
+Given prior mean ``\\hat{\\boldsymbol{\\mu}}`` and covariance ``\\hat{\\mathbf{\\Sigma}}``, the box bounds are:
+
+```math
+\\boldsymbol{\\mu}_{lb} = \\boldsymbol{0}, \\qquad \\boldsymbol{\\mu}_{ub} = 2 \\delta_{\\mu} |\\hat{\\boldsymbol{\\mu}}|
+```
+
+```math
+\\mathbf{\\Sigma}_{lb} = \\hat{\\mathbf{\\Sigma}} - \\delta_{\\sigma} |\\hat{\\mathbf{\\Sigma}}|, \\qquad \\mathbf{\\Sigma}_{ub} = \\hat{\\mathbf{\\Sigma}} + \\delta_{\\sigma} |\\hat{\\mathbf{\\Sigma}}|
+```
+
+where ``|\\cdot|`` denotes element-wise absolute value.
+
 # Arguments
 
   - `ue`: Delta uncertainty set estimator. Provides delta bounds and prior estimator.
@@ -124,6 +138,12 @@ end
 
 Constructs a box uncertainty set for expected returns (mean) using delta bounds from a prior estimator.
 
+# Summary Statistics
+
+```math
+\\boldsymbol{\\mu}_{lb} = \\boldsymbol{0}, \\qquad \\boldsymbol{\\mu}_{ub} = 2 \\delta_{\\mu} |\\hat{\\boldsymbol{\\mu}}|
+```
+
 # Arguments
 
   - `ue`: Delta uncertainty set estimator. Provides delta bounds and prior estimator.
@@ -162,6 +182,12 @@ end
               F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
 
 Constructs a box uncertainty set for covariance using delta bounds from a prior estimator.
+
+# Summary Statistics
+
+```math
+\\mathbf{\\Sigma}_{lb} = \\hat{\\mathbf{\\Sigma}} - \\delta_{\\sigma} |\\hat{\\mathbf{\\Sigma}}|, \\qquad \\mathbf{\\Sigma}_{ub} = \\hat{\\mathbf{\\Sigma}} + \\delta_{\\sigma} |\\hat{\\mathbf{\\Sigma}}|
+```
 
 # Arguments
 

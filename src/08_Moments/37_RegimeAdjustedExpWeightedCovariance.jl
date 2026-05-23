@@ -169,6 +169,24 @@ Maintains separate exponentially weighted running means for the covariance and t
 correlation, combining them at each step. After processing all observations, the result is
 scaled by the squared regime multiplier derived from the smoothed regime state.
 
+# Summary Statistics
+
+EWM covariance update (decay ``\\lambda``) and correlation (decay ``\\lambda_c``):
+
+```math
+C_{ij,t} = \\lambda C_{ij,t-1} + (1-\\lambda)(r_{i,t}-\\bar{r}_i)(r_{j,t}-\\bar{r}_j)
+```
+
+```math
+\\rho_{ij,t} = \\lambda_c \\rho_{ij,t-1} + (1-\\lambda_c)\\frac{(r_{i,t}-\\bar{r}_i)(r_{j,t}-\\bar{r}_j)}{\\sqrt{v_{i,t} v_{j,t}}}
+```
+
+The regime state ``s_t`` is smoothed from ``z_t^2`` using `regime_decay`. Final covariance:
+
+```math
+\\hat{\\Sigma}_{ij} = \\mathrm{mult}(s_T)^2 \\cdot \\rho_{ij,T}\\sqrt{v_{i,T} v_{j,T}}
+```
+
 # Fields
 
 $(DocStringExtensions.FIELDS)

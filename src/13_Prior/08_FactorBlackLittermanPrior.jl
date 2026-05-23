@@ -216,6 +216,20 @@ Compute factor Black-Litterman prior moments for asset returns.
 
 `prior` estimates the mean and covariance of asset returns using the factor-based Black-Litterman model, combining an asset prior estimator, matrix post-processing for factors and assets, regression and variance estimators, user or algorithmic views, asset sets, view confidences, weights, risk-free rate, leverage, blending parameter `tau`, and a residual variance flag. This method supports both direct and constraint-based views, flexible confidence specification, and matrix processing, and incorporates factor regression and residual adjustment for posterior inference.
 
+# Summary Statistics
+
+Black-Litterman views are applied directly to the factor space, updating factor moments ``(\\boldsymbol{\\Pi}_f, \\mathbf{\\Sigma}_f)`` via the standard BL equations, then asset posteriors are reconstructed through the loadings matrix:
+
+```math
+\\hat{\\boldsymbol{\\mu}} = \\mathbf{B} \\hat{\\boldsymbol{\\mu}}_{f,BL} + \\boldsymbol{\\alpha}
+```
+
+```math
+\\hat{\\mathbf{\\Sigma}} = \\mathbf{B} \\hat{\\mathbf{\\Sigma}}_{f,BL} \\mathbf{B}^\\intercal + \\mathbf{\\Sigma}_\\varepsilon
+```
+
+Where ``\\hat{\\boldsymbol{\\mu}}_{f,BL}`` and ``\\hat{\\mathbf{\\Sigma}}_{f,BL}`` are the Black-Litterman posterior factor mean and covariance, ``\\mathbf{B}`` is the ``N \\times K`` factor loadings matrix, and ``\\mathbf{\\Sigma}_\\varepsilon`` is the diagonal residual variance matrix (when `rsd = true`).
+
 # Arguments
 
   - `pe`: Factor Black-Litterman prior estimator.

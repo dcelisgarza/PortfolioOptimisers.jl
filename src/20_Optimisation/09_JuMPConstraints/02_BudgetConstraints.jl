@@ -160,6 +160,26 @@ Add budget constraints to the JuMP optimisation model.
 
 The fall-through method does nothing. The concrete methods add the appropriate portfolio budget constraint based on the type of budget specification provided.
 
+# Summary Statistics
+
+Fixed / range:
+
+```math
+k \\cdot \\mathrm{lb} \\leq \\sum_i w_i \\leq k \\cdot \\mathrm{ub}
+```
+
+Linear cost budget ([`BudgetCosts`](@ref)):
+
+```math
+\\sum_i w_i + \\boldsymbol{v}_p^\\intercal \\boldsymbol{w}_p + \\boldsymbol{v}_n^\\intercal \\boldsymbol{w}_n \\in [k\\,\\mathrm{lb},\\; k\\,\\mathrm{ub}]
+```
+
+Power-law market-impact budget ([`BudgetMarketImpact`](@ref)):
+
+```math
+\\sum_i w_i + \\boldsymbol{v}_p^\\intercal \\boldsymbol{w}_p^\\beta + \\boldsymbol{v}_n^\\intercal \\boldsymbol{w}_n^\\beta \\in [k\\,\\mathrm{lb},\\; k\\,\\mathrm{ub}]
+```
+
 # Arguments
 
   - $(arg_dict[:model])

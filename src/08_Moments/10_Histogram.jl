@@ -284,6 +284,16 @@ Compute the intrinsic mutual information from a joint histogram.
 
 This function computes the mutual information between two variables given their joint histogram matrix `X`. It is used as a core step in information-theoretic measures such as mutual information and variation of information.
 
+# Summary Statistics
+
+Given the joint histogram ``\\mathbf{X}`` (unnormalised counts), with marginals ``p_i = \\sum_j X_{ij} / n`` and ``p_j = \\sum_i X_{ij} / n``:
+
+```math
+\\hat{I}(X; Y) = \\sum_{i,j:\\, X_{ij} > 0} \\frac{X_{ij}}{n} \\log\\!\\left(\\frac{X_{ij} / n}{p_i \\, p_j}\\right)
+```
+
+Where ``n = \\sum_{i,j} X_{ij}`` is the total count.
+
 # Arguments
 
   - `X`: Joint histogram matrix.
@@ -335,6 +345,20 @@ end
 Compute the variation of information (VI) matrix for a set of variables.
 
 This function computes the pairwise variation of information between all columns of the data matrix `X`, using histogram-based entropy and mutual information estimates. VI quantifies the amount of information lost and gained when moving from one variable to another, and is a true metric on the space of discrete distributions.
+
+# Summary Statistics
+
+Let ``H(X)``, ``H(Y)`` denote the marginal Shannon entropies and ``I(X;Y)`` the mutual information. The variation of information is:
+
+```math
+\\mathrm{VI}(X, Y) = H(X) + H(Y) - 2\\,I(X;Y)
+```
+
+When `normalise = true`, it is divided by the joint entropy ``H(X,Y) = H(X) + H(Y) - I(X;Y)``:
+
+```math
+\\widetilde{\\mathrm{VI}}(X, Y) = \\frac{H(X) + H(Y) - 2\\,I(X;Y)}{H(X) + H(Y) - I(X;Y)}
+```
 
 # Arguments
 
@@ -452,6 +476,20 @@ end
 Compute the mutual information (MI) matrix for a set of variables.
 
 This function computes the pairwise mutual information between all columns of the data matrix `X`, using histogram-based entropy and mutual information estimates. MI quantifies the amount of shared information between pairs of variables, and is widely used in information-theoretic analysis of dependencies.
+
+# Summary Statistics
+
+Mutual information between assets ``i`` and ``j``:
+
+```math
+I(X_i; X_j) = H(X_i) + H(X_j) - H(X_i, X_j) = \\sum_{x,y} p(x,y) \\log\\frac{p(x,y)}{p(x)\\,p(y)}
+```
+
+When `normalise = true`, the MI is normalised by the minimum marginal entropy:
+
+```math
+\\tilde{I}(X_i; X_j) = \\frac{I(X_i; X_j)}{\\min\\bigl(H(X_i),\\, H(X_j)\\bigr)}
+```
 
 # Arguments
 

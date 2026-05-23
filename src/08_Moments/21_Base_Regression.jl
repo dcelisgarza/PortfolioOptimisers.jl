@@ -347,6 +347,12 @@ Akaike Information Criterion (AIC) for stepwise regression in `PortfolioOptimise
 
 `AIC` is a minimisation-based criterion used to evaluate model quality in stepwise regression algorithms. Lower values indicate better model fit, penalising model complexity to avoid overfitting.
 
+```math
+\\mathrm{AIC} = 2k - 2\\ln\\hat{L}
+```
+
+where ``k`` is the number of parameters and ``\\hat{L}`` is the maximum likelihood.
+
 # Related
 
   - [`AbstractMinValStepwiseRegressionCriterion`](@ref)
@@ -361,6 +367,12 @@ $(DocStringExtensions.TYPEDEF)
 Corrected Akaike Information Criterion (AICC) for stepwise regression in `PortfolioOptimisers.jl`.
 
 `AICC` is a minimisation-based criterion similar to AIC, but includes a correction for small sample sizes. Lower values indicate better model fit, balancing fit and complexity.
+
+```math
+\\mathrm{AICC} = \\mathrm{AIC} + \\frac{2k(k+1)}{T - k - 1}
+```
+
+where ``T`` is the sample size and ``k`` is the number of parameters.
 
 # Related
 
@@ -377,6 +389,10 @@ Bayesian Information Criterion (BIC) for stepwise regression in `PortfolioOptimi
 
 `BIC` is a minimisation-based criterion used to evaluate model quality in stepwise regression algorithms. It penalises model complexity more strongly than AIC. Lower values indicate better model fit.
 
+```math
+\\mathrm{BIC} = k\\ln T - 2\\ln\\hat{L}
+```
+
 # Related
 
   - [`AbstractMinValStepwiseRegressionCriterion`](@ref)
@@ -392,6 +408,10 @@ Coefficient of determination (R²) for stepwise regression in `PortfolioOptimise
 
 `RSquared` is a maximisation-based criterion used to evaluate model quality in stepwise regression algorithms. Higher values indicate better model fit, representing the proportion of variance explained by the model.
 
+```math
+R^2 = 1 - \\frac{\\mathrm{SS}_{\\mathrm{res}}}{\\mathrm{SS}_{\\mathrm{tot}}} = 1 - \\frac{\\sum_t (y_t - \\hat{y}_t)^2}{\\sum_t (y_t - \\bar{y})^2}
+```
+
 # Related
 
   - [`AbstractMaxValStepwiseRegressionCriteria`](@ref)
@@ -405,6 +425,12 @@ $(DocStringExtensions.TYPEDEF)
 Adjusted coefficient of determination (Adjusted R²) for stepwise regression in `PortfolioOptimisers.jl`.
 
 `AdjustedRSquared` is a maximisation-based criterion that adjusts R² for the number of predictors in the model, providing a more accurate measure of model quality when comparing models with different numbers of predictors.
+
+```math
+\\bar{R}^2 = 1 - (1 - R^2) \\frac{T - 1}{T - k - 1}
+```
+
+where ``k`` is the number of predictors and ``T`` is the sample size.
 
 # Related
 

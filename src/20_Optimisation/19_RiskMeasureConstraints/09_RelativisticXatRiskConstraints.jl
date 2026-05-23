@@ -9,6 +9,16 @@ risk measure parameterised by `kappa`. Auxiliary variables `t`, `z`, `omega`, `p
 `theta`, and `epsilon` are introduced. The range variant encodes both a lower-tail and
 upper-tail relativistic expression.
 
+# Summary Statistics
+
+Relativistic Value-at-Risk (Damian et al. 2023):
+
+```math
+\\mathrm{RLVaR}_{\\alpha,\\kappa}(\\boldsymbol{w}) = t + c_{\\kappa}(\\alpha)\\, z + \\sum_{t=1}^T (\\psi_t + \\theta_t), \\qquad c_{\\kappa}(\\alpha) = \\frac{(\\alpha T)^\\kappa - (\\alpha T)^{-\\kappa}}{2\\kappa}
+```
+
+encoded via power cones ``\\mathcal{K}_{1/(1+\\kappa)}`` and ``\\mathcal{K}_{1/(1-\\kappa)}``.
+
 # Arguments
 
   - $(arg_dict[:model])

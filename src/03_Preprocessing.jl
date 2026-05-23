@@ -426,6 +426,19 @@ end
 
 Convert price data (and optionally factor data) in `TimeSeries.TimeArray` format to returns, with flexible handling of missing data, imputation, and optional implied volatility information.
 
+# Summary Statistics
+
+Returns are computed from prices ``P_{t,i}`` as:
+
+```math
+r_{t,i} = \\begin{cases}
+(P_{t,i} - P_{t-1,i}) / P_{t-1,i} & \\text{simple} \\\\
+\\ln(P_{t,i} / P_{t-1,i}) & \\text{log}
+\\end{cases}
+```
+
+If a benchmark ``B_{t,i}`` is provided, excess returns are used: ``\\tilde{r}_{t,i} = r_{t,i} - b_{t,i}``.
+
 # Arguments
 
   - `X`: Asset price data (observations × assets).
@@ -676,6 +689,7 @@ end
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 !!! note
+
     Not implemented yet, still unexported.
 """
 function select_k_extremes(X::MatNum) end

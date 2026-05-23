@@ -5,6 +5,39 @@ Represents the square root kurtosis risk measure in `PortfolioOptimisers.jl`.
 
 Computes portfolio risk as the square root of the fourth central moment (kurtosis) of the return distribution, optionally using custom weights, expected returns, and a kurtosis (fourth moment) matrix. This risk measure can be evaluated using either the full or semi (downside) deviations, depending on the algorithm provided.
 
+# Mathematical Definition
+
+Let ``\\boldsymbol{x} = \\mathbf{X} \\boldsymbol{w}`` be the ``T \\times 1`` vector of portfolio returns, and let ``\\mu`` be the chosen centre (mean, weighted mean, or user-supplied value). Define the centred deviations:
+
+```math
+\\delta_t = x_t - \\mu\\,.
+```
+
+The square-root kurtosis (full moment) is:
+
+```math
+\\mathrm{Kurt}(\\boldsymbol{w}) = \\sqrt{\\frac{1}{T} \\sum_{t=1}^{T} \\delta_t^4}\\,.
+```
+
+Equivalently, using the ``N^2 \\times N^2`` cokurtosis matrix ``\\hat{\\mathbf{K}}`` and the Kronecker product ``\\otimes``:
+
+```math
+\\mathrm{Kurt}(\\boldsymbol{w}) = \\sqrt[4]{(\\boldsymbol{w}^\\intercal \\otimes \\boldsymbol{w}^\\intercal)\\, \\hat{\\mathbf{K}}\\, (\\boldsymbol{w} \\otimes \\boldsymbol{w})}\\,.
+```
+
+For the semi (downside) variant, only non-positive deviations contribute:
+
+```math
+\\mathrm{SKurt}(\\boldsymbol{w}) = \\sqrt{\\frac{1}{T} \\sum_{t=1}^{T} \\min(\\delta_t, 0)^4}\\,.
+```
+
+Where:
+
+  - ``\\boldsymbol{w}``: ``N \\times 1`` asset weights vector.
+  - ``\\mathbf{X}``: ``T \\times N`` asset returns matrix.
+  - ``\\hat{\\mathbf{K}}``: ``N^2 \\times N^2`` cokurtosis matrix.
+  - ``\\otimes``: Kronecker product.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)

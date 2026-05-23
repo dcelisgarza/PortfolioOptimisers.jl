@@ -8,6 +8,20 @@ generating function bound. Scalar variables `t`, `z`, and per-observation variab
 introduced. `EVaR` and `EDaR` encode the single-tail bound; the range variant encodes both a
 lower and upper exponential cone.
 
+# Summary Statistics
+
+Entropic Value-at-Risk via exponential cone (Ahmadi-Javid 2012):
+
+```math
+\\mathrm{EVaR}_\\alpha(\\boldsymbol{w}) = t - z \\ln(\\alpha T), \\qquad \\sum_{t=1}^T u_t \\leq z
+```
+
+```math
+(-\\hat{r}_t - t,\\; z,\\; u_t) \\in \\mathcal{K}_{\\exp} \\quad \\forall\\, t
+```
+
+where ``\\mathcal{K}_{\\exp} = \\{(a,b,c) : b e^{a/b} \\leq c,\\, b > 0\\}`` is the exponential cone.
+
 # Arguments
 
   - $(arg_dict[:model])

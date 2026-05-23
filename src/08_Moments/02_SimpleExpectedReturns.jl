@@ -63,6 +63,27 @@ Compute the mean of asset returns using a [`SimpleExpectedReturns`](@ref) estima
 
 This method computes the expected returns as the sample mean of the input data `X` according to `ce`.
 
+# Summary Statistics
+
+Unweighted:
+
+```math
+\\hat{\\mu}_j = \\frac{1}{T} \\sum_{t=1}^{T} r_{tj}
+```
+
+Weighted:
+
+```math
+\\hat{\\mu}_j = \\frac{\\sum_{t=1}^{T} w_t \\, r_{tj}}{\\sum_{t=1}^{T} w_t}
+```
+
+Where:
+
+  - ``\\hat{\\boldsymbol{\\mu}}``: `N × 1` vector of estimated expected returns.
+  - ``r_{tj}``: Return of asset ``j`` at time ``t``.
+  - ``T``: Number of observations.
+  - ``w_t``: Observation weight at time ``t``.
+
 # Arguments
 
   - $(arg_dict[:me])

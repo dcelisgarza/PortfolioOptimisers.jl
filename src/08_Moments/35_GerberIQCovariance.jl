@@ -1516,6 +1516,25 @@ end
 
 Computes the Gerber IQ statistic matrix using noise compression template in `ce.kind` and numerator/denominator definition according to `ce.alg`.
 
+# Summary Statistics
+
+For each asset pair ``(i,j)`` accumulate weighted concordant and discordant counts:
+
+```math
+H_{ij}^{+} = \\sum_{k=1}^{T} w_{ij,k} \\cdot d_k \\cdot \\mathbf{1}[\\text{concordant}], \\qquad
+H_{ij}^{-} = \\sum_{k=1}^{T} w_{ij,k} \\cdot d_k \\cdot \\mathbf{1}[\\text{discordant}]
+```
+
+where ``w_{ij,k}`` is the region weight from the IQ template, ``d_k = \\exp[-y \\max(0, T-k-e)]`` is the temporal decay, and co-movements with both ``|r_{i,k}| < c\\,\\sigma_i`` and ``|r_{j,k}| < c\\,\\sigma_j`` are skipped. GerberIQ correlation:
+
+```math
+\\rho_{ij} = \\begin{cases}
+(H_{ij}^{+} - H_{ij}^{-}) / (H_{ij}^{+} + H_{ij}^{-}) & \\text{Gerber0} \\\\
+(H_{ij}^{+} - H_{ij}^{-}) / (H_{ij}^{+} + H_{ij}^{-} + H_{ij}^{0}) & \\text{Gerber1} \\\\
+\\rho^{\\mathrm{G0}}_{ij} / \\sqrt{\\rho^{\\mathrm{G0}}_{ii}\\,\\rho^{\\mathrm{G0}}_{jj}} & \\text{Gerber2}
+\\end{cases}
+```
+
 # Arguments
 
   - $(arg_dict[:ce])

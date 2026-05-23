@@ -40,6 +40,14 @@ exact OWA risk. The approximate overloads use the Wasserstein-based approximatio
 cone constraints parameterised by `r.alg.p`. Range variants compute the difference between
 two OWA expressions (e.g. tail-Gini range).
 
+# Summary Statistics
+
+```math
+\\mathrm{OWA}(\\boldsymbol{w}) = \\boldsymbol{\\omega}^\\intercal \\mathrm{sort}(\\hat{\\boldsymbol{r}}), \\qquad \\hat{r}_t = \\boldsymbol{x}_t^\\intercal \\boldsymbol{w}
+```
+
+where ``\\boldsymbol{\\omega}`` is the OWA weight vector and ``\\mathrm{sort}(\\hat{\\boldsymbol{r}})`` sorts the portfolio returns in ascending order.
+
 # Arguments
 
   - $(arg_dict[:model])

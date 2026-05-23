@@ -151,6 +151,15 @@ For matrices without unit diagonal, the function converts them into correlation 
   - If `X` is not a correlation matrix, it is converted to one before applying the algorithm.
   - Performs an eigenvector decomposition of `X`.
   - Removes the top `n` principal components (market modes) from the eigenvalues and eigenvectors of `X`.
+
+The detoned matrix removes the ``n`` largest eigenmodes:
+
+```math
+\\tilde{\\mathbf{X}} = \\mathbf{X} - \\sum_{k=N-n+1}^{N} \\lambda_k \\boldsymbol{v}_k \\boldsymbol{v}_k^\\intercal
+```
+
+where ``\\lambda_k`` and ``\\boldsymbol{v}_k`` are the ``k``-th (largest) eigenvalue and eigenvector of ``\\mathbf{X}``.
+
   - Reconstructs the correlation matrix `X` in-place from the modified eigenvalues `vals` and eigenvectors `vecs`.
   - If `X` was not originally a correlation matrix, it is converted back.
   - Returns `X`.

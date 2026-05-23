@@ -52,10 +52,15 @@ $(DocStringExtensions.TYPEDEF)
 Regime adjustment method that scales variance exponentially with the smoothed log-deviation
 of standardised squared returns from its expected value under stationarity.
 
-The regime state `s` is defined as `mean(log(max(z², ε))) - κ`, where
-`κ = digamma(x) + log(y)` is the stationary expectation of `log(z²)` under a
-``\\chi^2(1)`` distribution scaled by `y`, and `ε` is a small positive threshold.
-The variance multiplier is `exp(x * s)`.
+The regime state ``s`` is defined as ``\\bar{s} = \\frac{1}{T}\\sum_t \\ln\\max(z_t^2, \\varepsilon) - \\kappa``, where
+``\\kappa = \\psi(x) + \\ln y`` (``\\psi`` = digamma) is the stationary expectation of ``\\ln z^2`` under a
+``\\chi^2(1)`` distribution scaled by ``y``, and ``\\varepsilon`` is a small positive threshold.
+
+```math
+\\kappa = \\psi(x) + \\ln y, \\qquad
+s = \\frac{1}{T}\\sum_{t} \\ln\\!\\max(z_t^2, \\varepsilon) - \\kappa, \\qquad
+\\mathrm{mult} = \\exp(x \\cdot s)
+```
 
 # Fields
 
@@ -116,8 +121,13 @@ $(DocStringExtensions.TYPEDEF)
 Regime adjustment method that scales variance by the ratio of the mean absolute deviation
 of standardised returns to the first-moment normalisation constant `x`.
 
-The regime state `s` is defined as `mean(sqrt(max(z², 0))) / x`, where `z²` are the
-standardised squared returns. The variance multiplier is `s` directly.
+The regime state ``s`` and multiplier are:
+
+```math
+s = \\frac{1}{x} \\cdot \\frac{1}{T}\\sum_t \\sqrt{\\max(z_t^2, 0)}, \\qquad \\mathrm{mult} = s
+```
+
+where ``x = \\sqrt{2/\\pi}`` is the expected value of ``|z|`` for a standard normal ``z``.
 
 # Fields
 
@@ -168,8 +178,9 @@ $(DocStringExtensions.TYPEDEF)
 Regime adjustment method that scales variance by the square root of the mean of the
 standardised squared returns.
 
-The regime state `s` is defined as `mean(z²)` and the variance multiplier is
-`sqrt(max(s, 0))`.
+```math
+s = \\frac{1}{T}\\sum_t z_t^2, \\qquad \\mathrm{mult} = \\sqrt{\\max(s, 0)}
+```
 
 ## Related
 
@@ -254,6 +265,32 @@ At each observation, it updates a running exponentially weighted variance and co
 a standardised squared innovation `z²`. After accumulating enough observations, it
 smooths a regime state using `regime_decay`, then scales the final variance by
 `regime_multiplier(regime_method, regime_state)²`.
+
+# Summary Statistics
+
+EWM variance update (decay ``\\lambda``):
+
+```math
+v_t = \\lambda v_{t-1} + (1 - \\lambda)(r_t - \\bar{r})^2
+```
+
+Standardised innovation:
+
+```math
+z_t^2 = (r_t - \\bar{r})^2 / v_t
+```
+
+Regime state smoothed with `regime_decay` ``\\lambda_r``:
+
+```math
+s_t = \\lambda_r s_{t-1} + (1 - \\lambda_r) \\cdot g(z_t^2)
+```
+
+where ``g`` is defined by the [`RegimeAdjustedMethod`](@ref). Final variance:
+
+```math
+\\hat{\\sigma}^2 = \\mathrm{mult}(s_T)^2 \\cdot v_T
+```
 
 # Fields
 
