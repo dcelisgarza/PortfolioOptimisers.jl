@@ -50,9 +50,10 @@ Matches either an [`AbstractPhylogenyEstimator`](@ref) or an [`AbstractPhylogeny
   - [`AbstractPhylogenyResult`](@ref)
 """
 const PlE_Pl = Union{<:AbstractPhylogenyEstimator, <:AbstractPhylogenyResult}
-function factory(pl::PlE_Pl, args...; kwargs...)
+function factory(pl::PlE_Pl, args...; kwargs...)::PlE_Pl
     return pl
 end
-function factory(alg::AbstractPhylogenyAlgorithm, args...; kwargs...)
+function factory(alg::AbstractPhylogenyAlgorithm, args...;
+                 kwargs...)::AbstractPhylogenyAlgorithm
     return alg
 end

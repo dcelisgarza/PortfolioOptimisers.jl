@@ -65,7 +65,8 @@ SimpleVariance
 end
 function SimpleVariance(;
                         me::Option{<:AbstractExpectedReturnsEstimator} = SimpleExpectedReturns(),
-                        w::Option{<:ObsWeights} = nothing, corrected::Bool = true)
+                        w::Option{<:ObsWeights} = nothing,
+                        corrected::Bool = true)::SimpleVariance
     return SimpleVariance(me, w, corrected)
 end
 """
@@ -386,8 +387,29 @@ SimpleVariance
   - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
   - [`factory`](@ref)
 """
-function factory(ve::SimpleVariance, w::ObsWeights)
+function factory(ve::SimpleVariance, w::ObsWeights)::SimpleVariance
     return SimpleVariance(; me = factory(ve.me, w), w = w, corrected = ve.corrected)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Gets the view of the simple variance for the `i`-th element(s).
+
+# Arguments
+
+  - $(arg_dict[:ve])
+  - `i`: Index or indices to view.
+
+# Returns
+
+  - $(ret_dict[:vev])
+
+# Related
+
+  - [`SimpleVariance`](@ref)
+"""
+function moment_view(ve::SimpleVariance, i)::SimpleVariance
+    return SimpleVariance(; me = moment_view(ve.me, i), w = ve.w, corrected = ve.corrected)
 end
 
 export SimpleVariance, var, std

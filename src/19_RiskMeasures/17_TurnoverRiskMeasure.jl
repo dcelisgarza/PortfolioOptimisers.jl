@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Represents the Turnover risk measure.
 
-`TurnoverRiskMeasure` penalises portfolio rebalancing by measuring the ``L^1`` distance between the new portfolio weights and a reference weight vector. It is used to control trading costs or limit portfolio drift.
+`TurnoverRiskMeasure` penalises portfolio rebalancing by measuring the ``L^1`` distance between the new portfolio weights and a reference weight vector. It controls trading costs and limits portfolio drift.
 
 # Mathematical Definition
 
@@ -15,9 +15,7 @@ Let ``\\boldsymbol{w}`` be the new portfolio weights and ``\\boldsymbol{w}_0`` t
 
 # Fields
 
-  - `settings`: Risk measure configuration.
-  - `w`: Reference weight vector (previous or benchmark portfolio weights).
-  - `fixed`: If `true`, the reference weights are fixed and not updated between optimisations. If `false`, the reference weights are updated to the previous optimisation result.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -63,8 +61,11 @@ TurnoverRiskMeasure
   - [`TrackingRiskMeasure`](@ref)
 """
 @concrete struct TurnoverRiskMeasure <: RiskMeasure
+    "$(field_dict[:settings_rm])"
     settings
+    "$(field_dict[:w_ref])"
     w
+    "$(field_dict[:fixed])"
     fixed
     function TurnoverRiskMeasure(settings::RiskMeasureSettings, w::VecNum, fixed::Bool)
         @argcheck(!isempty(w))
@@ -72,7 +73,7 @@ TurnoverRiskMeasure
     end
 end
 function TurnoverRiskMeasure(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                             w::VecNum, fixed::Bool = false)
+                             w::VecNum, fixed::Bool = false)::TurnoverRiskMeasure
     return TurnoverRiskMeasure(settings, w, fixed)
 end
 function (r::TurnoverRiskMeasure)(w::VecNum)
@@ -85,7 +86,7 @@ end
 function needs_previous_weights(r::TurnoverRiskMeasure)
     return !r.fixed
 end
-function factory(r::TurnoverRiskMeasure, w::VecNum)
+function factory(r::TurnoverRiskMeasure, w::VecNum)::TurnoverRiskMeasure
     return if r.fixed
         r
     else
@@ -93,7 +94,7 @@ function factory(r::TurnoverRiskMeasure, w::VecNum)
     end
 end
 function factory(r::TurnoverRiskMeasure, ::Any, ::Any, ::Any, w::Option{<:VecNum} = nothing,
-                 args...; kwargs...)
+                 args...; kwargs...)::TurnoverRiskMeasure
     return factory(r, w)
 end
 

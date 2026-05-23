@@ -7,7 +7,7 @@ Estimator for constructing asset set membership matrices from asset groupings.
 
 # Fields
 
-  - `val`: The key or group name to extract from the asset sets.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -45,13 +45,14 @@ julia> asset_sets_matrix(est, sets)
   - [`AbstractConstraintEstimator`](@ref)
 """
 @concrete struct AssetSetsMatrixEstimator <: AbstractConstraintEstimator
+    "$(field_dict[:asets_val])"
     val
-    function AssetSetsMatrixEstimator(val::AbstractString)
+    function AssetSetsMatrixEstimator(val::AbstractString)::AssetSetsMatrixEstimator
         @argcheck(!isempty(val))
         return new{typeof(val)}(val)
     end
 end
-function AssetSetsMatrixEstimator(; val::AbstractString)
+function AssetSetsMatrixEstimator(; val::AbstractString)::AssetSetsMatrixEstimator
     return AssetSetsMatrixEstimator(val)
 end
 """
@@ -95,7 +96,7 @@ Matches either a single [`MatNum_ASetMatE`](@ref) or a vector of them. Used for 
 """
 const MatNum_ASetMatE_VecMatNum_ASetMatE = Union{<:MatNum_ASetMatE, <:VecMatNum_ASetMatE}
 """
-    asset_sets_matrix(smtx::AbstractString, sets::AssetSets)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
 Construct a binary asset-group membership matrix from asset set groupings.
 
@@ -228,7 +229,8 @@ Returns a column view for matrix inputs, the estimator unchanged for estimator i
 function asset_sets_matrix_view(smtx::MatNum, i; kwargs...)
     return view(smtx, :, i)
 end
-function asset_sets_matrix_view(smtx::Option{<:AssetSetsMatrixEstimator}, ::Any; kwargs...)
+function asset_sets_matrix_view(smtx::Option{<:AssetSetsMatrixEstimator}, ::Any;
+                                kwargs...)::Option{<:AssetSetsMatrixEstimator}
     return smtx
 end
 function asset_sets_matrix_view(smtx::VecMatNum_ASetMatE, i; kwargs...)

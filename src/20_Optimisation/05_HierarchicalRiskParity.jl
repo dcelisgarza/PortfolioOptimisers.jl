@@ -7,10 +7,7 @@ Hierarchical Risk Parity (HRP) portfolio optimiser.
 
 # Fields
 
-  - `opt`: Base hierarchical optimiser configuration (prior, clustering, bounds, fees, etc.).
-  - `r`: Risk measure or vector of risk measures used to define the inter-cluster risk budget.
-  - `sca`: Scalariser for combining multiple risk measures.
-  - `fb`: Fallback optimiser.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -116,9 +113,13 @@ HierarchicalRiskParity
   - [`SchurComplementHierarchicalRiskParity`](@ref)
 """
 @concrete struct HierarchicalRiskParity <: ClusteringOptimisationEstimator
+    "$(field_dict[:opt_hier])"
     opt
+    "$(field_dict[:r])"
     r
+    "$(field_dict[:sca])"
     sca
+    "$(field_dict[:fb])"
     fb
     function HierarchicalRiskParity(opt::HierarchicalOptimiser, r::OptRM_VecOptRM,
                                     sca::Scalariser, fb::Option{<:OptE_Opt})
@@ -131,7 +132,7 @@ end
 function HierarchicalRiskParity(; opt::HierarchicalOptimiser = HierarchicalOptimiser(),
                                 r::OptRM_VecOptRM = Variance(),
                                 sca::Scalariser = SumScalariser(),
-                                fb::Option{<:OptE_Opt} = nothing)
+                                fb::Option{<:OptE_Opt} = nothing)::HierarchicalRiskParity
     return HierarchicalRiskParity(opt, r, sca, fb)
 end
 function needs_previous_weights(opt::HierarchicalRiskParity)
@@ -139,13 +140,13 @@ function needs_previous_weights(opt::HierarchicalRiskParity)
             needs_previous_weights(opt.r) ||
             needs_previous_weights(opt.fb))
 end
-function factory(hrp::HierarchicalRiskParity, w::AbstractVector)
+function factory(hrp::HierarchicalRiskParity, w::AbstractVector)::HierarchicalRiskParity
     opt = factory(hrp.opt, w)
     r = factory(hrp.r, w)
     fb = factory(hrp.fb, w)
     return HierarchicalRiskParity(; opt = opt, r = r, sca = hrp.sca, fb = fb)
 end
-function opt_view(hrp::HierarchicalRiskParity, i, X::MatNum)
+function opt_view(hrp::HierarchicalRiskParity, i, X::MatNum)::HierarchicalRiskParity
     X = isa(hrp.opt.pe, AbstractPriorResult) ? hrp.opt.pe.X : X
     r = risk_measure_view(hrp.r, i, X)
     opt = opt_view(hrp.opt, i)

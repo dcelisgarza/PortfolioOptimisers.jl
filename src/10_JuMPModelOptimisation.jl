@@ -112,7 +112,7 @@ Solver
     "$(field_dict[:add_bridges])"
     add_bridges
     function Solver(name::Sym_Str, solver::Any, settings::Option{<:SlvSettings},
-                    check_sol::NamedTuple, add_bridges::Bool)
+                    check_sol::NamedTuple, add_bridges::Bool)::Solver
         if isa(settings, Dict_VecPair)
             @argcheck(!isempty(settings), IsEmptyError)
             if isa(settings, AbstractVector)
@@ -129,7 +129,7 @@ Solver
 end
 function Solver(; name::Sym_Str = "", solver::Any = nothing,
                 settings::Option{<:SlvSettings} = nothing, check_sol::NamedTuple = (;),
-                add_bridges::Bool = true)
+                add_bridges::Bool = true)::Solver
     return Solver(name, solver, settings, check_sol, add_bridges)
 end
 """
@@ -195,14 +195,14 @@ JuMPResult
     trials
     "Boolean indicating whether optimisation succeeded."
     success
-    function JuMPResult(trials::AbstractDict, success::Bool)
+    function JuMPResult(trials::AbstractDict, success::Bool)::JuMPResult
         if !success
             @warn("Model could not be solved satisfactorily.\n$trials")
         end
         return new{typeof(trials), typeof(success)}(trials, success)
     end
 end
-function JuMPResult(; trials::AbstractDict, success::Bool)
+function JuMPResult(; trials::AbstractDict, success::Bool)::JuMPResult
     return JuMPResult(trials, success)
 end
 """
@@ -220,7 +220,7 @@ This is a generic fallback that does nothing if no model or settings are provide
 
   - `nothing`.
 """
-function set_solver_attributes(args...)
+function set_solver_attributes(args...)::Nothing
     return nothing
 end
 """
@@ -245,7 +245,7 @@ Iterates over the provided settings and applies each as a solver attribute.
   - [`set_attribute`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.set_attribute)
   - [`Dict_VecPair`](@ref)
 """
-function set_solver_attributes(model::JuMP.Model, settings::Dict_VecPair)
+function set_solver_attributes(model::JuMP.Model, settings::Dict_VecPair)::Nothing
     for (k, v) in settings
         JuMP.set_attribute(model, k, v)
     end
@@ -270,7 +270,7 @@ Set a single solver attribute on a JuMP model.
   - [`JuMP.Model`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.Model)
   - [`set_attribute`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.set_attribute)
 """
-function set_solver_attributes(model::JuMP.Model, settings::Pair)
+function set_solver_attributes(model::JuMP.Model, settings::Pair)::Nothing
     JuMP.set_attribute(model, settings...)
     return nothing
 end

@@ -169,7 +169,7 @@ VariationInfoDistance
     end
 end
 function VariationInfoDistance(; bins::Int_Bin = HacineGharbiRavier(),
-                               normalise::Bool = true)
+                               normalise::Bool = true)::VariationInfoDistance
     return VariationInfoDistance(bins, normalise)
 end
 """

@@ -157,9 +157,10 @@ Before completing any task or creating a pull request, **ALWAYS**:
 
  1. **Run pre-commit checks**: `pre-commit run -a` - All checks must pass.
  2. **Run tests**: Activate environment and run tests in Julia REPL - All tests must pass.
- 3. **Verify changes**: Ensure all file changes align with the task requirements.
- 4. **Update documentation**: If adding new features, update relevant docstrings and docs.
- 5. **Check code quality**: Ensure code follows established patterns and conventions.
+ 3. **Run doctests**: Doctests are separate from `] test` — run them via the `docs` project environment (see `.github/prompts/pre-commit-and-test.prompt.md` for the exact commands).
+ 4. **Verify changes**: Ensure all file changes align with the task requirements.
+ 5. **Update documentation**: If adding new features, update relevant docstrings and docs.
+ 6. **Check code quality**: Ensure code follows established patterns and conventions.
 
 * * *
 

@@ -5,16 +5,7 @@ Randomised search cross-validation estimator for portfolio optimisation. Samples
 
 # Fields
 
-  - `p`: Parameter grid, supporting vectors, dictionaries, or distributions for random sampling. If all parameters in a grid are vectors they are sampled uniformly without replacement, if at least one of them is a distribution they are sampled with replacement. When sampling without replacement the sampling is performed up until the list of candidates is exhausted. If a vector of grids, each grid is sampled independently and then they're all concatenated.
-  - `cv`: Cross-validation splitter.
-  - `r`: Risk measure used for scoring.
-  - `scorer`: Scoring function to select optimal parameter set.
-  - `ex`: Parallel execution strategy.
-  - `n_iter`: Number of random parameter sets to sample.
-  - `rng`: Random number generator for reproducibility.
-  - `seed`: Optional seed for RNG.
-  - `train_score`: Whether to record training scores.
-  - `kwargs`: Additional keyword arguments for customisation.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -80,15 +71,25 @@ RandomisedSearchCrossValidation
   - [`CrossValSearchScorer`](@ref)
 """
 @concrete struct RandomisedSearchCrossValidation <: AbstractSearchCrossValidationEstimator
+    "$(field_dict[:p_cv])"
     p
+    "$(field_dict[:cv])"
     cv
+    "$(field_dict[:r])"
     r
+    "$(field_dict[:scorer])"
     scorer
+    "$(field_dict[:ex])"
     ex
+    "$(field_dict[:n_iter])"
     n_iter
+    "$(field_dict[:rng])"
     rng
+    "$(field_dict[:seed])"
     seed
+    "$(field_dict[:train_score])"
     train_score
+    "$(field_dict[:kwargs])"
     kwargs
     function RandomisedSearchCrossValidation(p::Union{<:AbstractVector{<:Pair},
                                                       <:AbstractVector{<:AbstractVector{<:Pair}},

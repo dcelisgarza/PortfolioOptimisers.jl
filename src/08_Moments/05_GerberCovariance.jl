@@ -157,7 +157,7 @@ end
 function GerberCovariance(; ve::StatsBase.CovarianceEstimator = SimpleVariance(),
                           me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
                           pdm::Option{<:Posdef} = Posdef(), t::Number = 0.5,
-                          alg::GerberCovarianceAlgorithm = Gerber1())
+                          alg::GerberCovarianceAlgorithm = Gerber1())::GerberCovariance
     return GerberCovariance(ve, me, pdm, t, alg)
 end
 """
@@ -221,9 +221,31 @@ GerberCovariance
   - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
   - [`factory`](@ref)
 """
-function factory(ce::GerberCovariance, w::ObsWeights)
+function factory(ce::GerberCovariance, w::ObsWeights)::GerberCovariance
     return GerberCovariance(; ve = factory(ce.ve, w), me = factory(ce.me, w), pdm = ce.pdm,
                             t = ce.t, alg = factory(ce.alg, w))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Gets the view of the covariance estimator for the `i`-th element(s).
+
+# Arguments
+
+  - $(arg_dict[:ce])
+  - `i`: Index or indices to view.
+
+# Returns
+
+  - $(ret_dict[:cev])
+
+# Related
+
+  - [`GerberCovariance`](@ref)
+"""
+function moment_view(ce::GerberCovariance, i)::GerberCovariance
+    return GerberCovariance(; ve = moment_view(ce.ve, i), me = moment_view(ce.me, i),
+                            pdm = ce.pdm, t = ce.t, alg = ce.alg)
 end
 """
     gerber(

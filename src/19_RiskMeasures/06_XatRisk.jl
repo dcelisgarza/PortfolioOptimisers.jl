@@ -14,7 +14,7 @@ All concrete and/or abstract types representing the formulation for computing Va
   - [`ValueatRiskRange`](@ref)
 """
 abstract type ValueatRiskFormulation <: AbstractAlgorithm end
-function factory(alg::ValueatRiskFormulation, args...; kwargs...)
+function factory(alg::ValueatRiskFormulation, args...; kwargs...)::ValueatRiskFormulation
     return alg
 end
 """
@@ -38,7 +38,8 @@ Returns the formulation unchanged (for non-distribution types) or sliced (for di
   - [`ValueatRiskFormulation`](@ref)
   - [`DistributionValueatRisk`](@ref)
 """
-function valueat_risk_formulation_view(r::ValueatRiskFormulation, args...)
+function valueat_risk_formulation_view(r::ValueatRiskFormulation,
+                                       args...)::ValueatRiskFormulation
     return r
 end
 """
@@ -50,8 +51,7 @@ Mixed-integer programming (MIP) formulation for Value-at-Risk.
 
 # Fields
 
-  - `b`: Optional big-M upper bound for the binary variable formulation. Must be positive and strictly greater than `s` if both are provided.
-  - `s`: Optional small-M lower bound for the binary variable formulation. Must be positive and strictly less than `b` if both are provided.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -85,7 +85,9 @@ MIPValueatRisk
   - [`Option`](@ref)
 """
 @concrete struct MIPValueatRisk <: ValueatRiskFormulation
+    "$(field_dict[:b_mip])"
     b
+    "$(field_dict[:s_mip])"
     s
     function MIPValueatRisk(b::Option{<:Number}, s::Option{<:Number})
         bflag = !isnothing(b)
@@ -102,7 +104,8 @@ MIPValueatRisk
         return new{typeof(b), typeof(s)}(b, s)
     end
 end
-function MIPValueatRisk(; b::Option{<:Number} = nothing, s::Option{<:Number} = nothing)
+function MIPValueatRisk(; b::Option{<:Number} = nothing,
+                        s::Option{<:Number} = nothing)::MIPValueatRisk
     return MIPValueatRisk(b, s)
 end
 """
@@ -114,10 +117,7 @@ Distribution-based formulation for Value-at-Risk.
 
 # Fields
 
-  - `mu`: Optional expected returns vector. If `nothing`, uses prior result.
-  - `sigma`: Optional covariance matrix. If `nothing`, uses prior result.
-  - `chol`: Optional Cholesky factorisation of the covariance matrix. If `nothing`, uses prior result.
-  - `dist`: Probability distribution to use for Value-at-Risk computation.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -155,9 +155,13 @@ DistributionValueatRisk
   - [`Option`](@ref)
 """
 @concrete struct DistributionValueatRisk <: ValueatRiskFormulation
+    "$(field_dict[:mu_rm])"
     mu
+    "$(field_dict[:sigma])"
     sigma
+    "$(field_dict[:chol])"
     chol
+    "$(field_dict[:dist])"
     dist
     function DistributionValueatRisk(mu::Option{<:VecNum}, sigma::Option{<:MatNum},
                                      chol::Option{<:MatNum},
@@ -179,16 +183,18 @@ end
 function DistributionValueatRisk(; mu::Option{<:VecNum} = nothing,
                                  sigma::Option{<:MatNum} = nothing,
                                  chol::Option{<:MatNum} = nothing,
-                                 dist::Distributions.Distribution = Distributions.Normal())
+                                 dist::Distributions.Distribution = Distributions.Normal())::DistributionValueatRisk
     return DistributionValueatRisk(mu, sigma, chol, dist)
 end
-function factory(alg::DistributionValueatRisk, pr::AbstractPriorResult, args...; kwargs...)
+function factory(alg::DistributionValueatRisk, pr::AbstractPriorResult, args...;
+                 kwargs...)::DistributionValueatRisk
     mu = nothing_scalar_array_selector(alg.mu, pr.mu)
     sigma = nothing_scalar_array_selector(alg.sigma, pr.sigma)
     chol = nothing_scalar_array_selector(alg.chol, pr.chol)
     return DistributionValueatRisk(; mu = mu, sigma = sigma, chol = chol, dist = alg.dist)
 end
-function valueat_risk_formulation_view(alg::DistributionValueatRisk, i)
+function valueat_risk_formulation_view(alg::DistributionValueatRisk,
+                                       i)::DistributionValueatRisk
     mu = nothing_scalar_array_view(alg.mu, i)
     sigma = nothing_scalar_array_view(alg.sigma, i)
     chol = isnothing(alg.chol) ? nothing : view(alg.chol, :, i)
@@ -213,10 +219,7 @@ For observation-weighted samples with weight vector ``\\boldsymbol{w}`` summing 
 
 # Fields
 
-  - `settings`: Risk measure configuration.
-  - `alpha`: Significance level for the lower tail (e.g., `0.05` for 95% VaR).
-  - `w`: Optional observation weights.
-  - `alg`: Formulation algorithm for computing VaR.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -270,9 +273,13 @@ ValueatRisk
   - [`ValueatRiskRange`](@ref)
 """
 @concrete struct ValueatRisk <: RiskMeasure
+    "$(field_dict[:settings_rm])"
     settings
+    "$(field_dict[:alpha])"
     alpha
+    "$(field_dict[:oow])"
     w
+    "$(field_dict[:alg])"
     alg
     function ValueatRisk(settings::RiskMeasureSettings, alpha::Number,
                          w::Option{<:ObsWeights}, alg::ValueatRiskFormulation)
@@ -284,15 +291,15 @@ ValueatRisk
 end
 function ValueatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                      alpha::Number = 0.05, w::Option{<:ObsWeights} = nothing,
-                     alg::ValueatRiskFormulation = MIPValueatRisk())
+                     alg::ValueatRiskFormulation = MIPValueatRisk())::ValueatRisk
     return ValueatRisk(settings, alpha, w, alg)
 end
-function factory(r::ValueatRisk, pr::AbstractPriorResult, args...; kwargs...)
+function factory(r::ValueatRisk, pr::AbstractPriorResult, args...; kwargs...)::ValueatRisk
     w = nothing_scalar_array_selector(r.w, pr.w)
     alg = factory(r.alg, pr, args...; kwargs...)
     return ValueatRisk(; settings = r.settings, alpha = r.alpha, w = w, alg = alg)
 end
-function risk_measure_view(r::ValueatRisk, i, args...)
+function risk_measure_view(r::ValueatRisk, i, args...)::ValueatRisk
     alg = valueat_risk_formulation_view(r.alg, i)
     return ValueatRisk(; settings = r.settings, alpha = r.alpha, w = r.w, alg = alg)
 end
@@ -327,11 +334,7 @@ where ``\\mathrm{VaR}_{\\alpha}(\\boldsymbol{x})`` captures the lower-tail loss 
 
 # Fields
 
-  - `settings`: Risk measure configuration.
-  - `alpha`: Significance level for the lower tail.
-  - `beta`: Significance level for the upper tail.
-  - `w`: Optional observation weights.
-  - `alg`: Formulation algorithm for computing VaR.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -386,10 +389,15 @@ ValueatRiskRange
   - [`ConditionalValueatRiskRange`](@ref)
 """
 @concrete struct ValueatRiskRange <: RiskMeasure
+    "$(field_dict[:settings_rm])"
     settings
+    "$(field_dict[:alpha])"
     alpha
+    "$(field_dict[:beta])"
     beta
+    "$(field_dict[:oow])"
     w
+    "$(field_dict[:alg])"
     alg
     function ValueatRiskRange(settings::RiskMeasureSettings, alpha::Number, beta::Number,
                               w::Option{<:ObsWeights}, alg::ValueatRiskFormulation)
@@ -406,16 +414,17 @@ end
 function ValueatRiskRange(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                           alpha::Number = 0.05, beta::Number = 0.05,
                           w::Option{<:ObsWeights} = nothing,
-                          alg::ValueatRiskFormulation = MIPValueatRisk())
+                          alg::ValueatRiskFormulation = MIPValueatRisk())::ValueatRiskRange
     return ValueatRiskRange(settings, alpha, beta, w, alg)
 end
-function factory(r::ValueatRiskRange, pr::AbstractPriorResult, args...; kwargs...)
+function factory(r::ValueatRiskRange, pr::AbstractPriorResult, args...;
+                 kwargs...)::ValueatRiskRange
     w = nothing_scalar_array_selector(r.w, pr.w)
     alg = factory(r.alg, pr, args...; kwargs...)
     return ValueatRiskRange(; settings = r.settings, alpha = r.alpha, beta = r.beta, w = w,
                             alg = alg)
 end
-function risk_measure_view(r::ValueatRiskRange, i, args...)
+function risk_measure_view(r::ValueatRiskRange, i, args...)::ValueatRiskRange
     alg = valueat_risk_formulation_view(r.alg, i)
     return ValueatRiskRange(; settings = r.settings, alpha = r.alpha, beta = r.beta,
                             w = r.w, alg = alg)
@@ -468,11 +477,7 @@ The Drawdown-at-Risk at level ``\\alpha`` is the ``\\lceil \\alpha T \\rceil``-t
 
 # Fields
 
-  - `settings`: Risk measure configuration.
-  - `alpha`: Significance level for the lower tail.
-  - `w`: Optional observation weights.
-  - `b`: Optional big-M upper bound for the binary variable formulation in `JuMP` models.
-  - `s`: Optional small-M lower bound for the binary variable formulation in `JuMP` models.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -527,10 +532,15 @@ DrawdownatRisk
   - [`RelativeDrawdownatRisk`](@ref)
 """
 @concrete struct DrawdownatRisk <: RiskMeasure
+    "$(field_dict[:settings_rm])"
     settings
+    "$(field_dict[:alpha])"
     alpha
+    "$(field_dict[:oow])"
     w
+    "$(field_dict[:b_mip])"
     b
+    "$(field_dict[:s_mip])"
     s
     function DrawdownatRisk(settings::RiskMeasureSettings, alpha::Number,
                             w::Option{<:ObsWeights}, b::Option{<:Number},
@@ -556,10 +566,12 @@ DrawdownatRisk
 end
 function DrawdownatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                         alpha::Number = 0.05, w::Option{<:ObsWeights} = nothing,
-                        b::Option{<:Number} = nothing, s::Option{<:Number} = nothing)
+                        b::Option{<:Number} = nothing,
+                        s::Option{<:Number} = nothing)::DrawdownatRisk
     return DrawdownatRisk(settings, alpha, w, b, s)
 end
-function factory(r::DrawdownatRisk, pr::AbstractPriorResult, args...; kwargs...)
+function factory(r::DrawdownatRisk, pr::AbstractPriorResult, args...;
+                 kwargs...)::DrawdownatRisk
     w = nothing_scalar_array_selector(r.w, pr.w)
     return DrawdownatRisk(; settings = r.settings, alpha = r.alpha, w = w, b = r.b, s = r.s)
 end
@@ -636,13 +648,10 @@ where ``rd_{(k)}`` is the ``k``-th smallest relative drawdown.
 
 # Fields
 
-  - `settings`: Hierarchical risk measure configuration.
-  - `alpha`: Significance level for the lower tail.
-  - `w`: Optional observation weights.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
-    RelativeDrawdownatRisk(;
         settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
         alpha::Number = 0.05,
         w::Option{<:ObsWeights} = nothing
@@ -684,8 +693,11 @@ RelativeDrawdownatRisk
   - [`RelativeConditionalDrawdownatRisk`](@ref)
 """
 @concrete struct RelativeDrawdownatRisk <: HierarchicalRiskMeasure
+    "$(field_dict[:settings_rm])"
     settings
+    "$(field_dict[:alpha])"
     alpha
+    "$(field_dict[:oow])"
     w
     function RelativeDrawdownatRisk(settings::HierarchicalRiskMeasureSettings,
                                     alpha::Number, w::Option{<:ObsWeights})
@@ -696,10 +708,12 @@ RelativeDrawdownatRisk
 end
 function RelativeDrawdownatRisk(;
                                 settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
-                                alpha::Number = 0.05, w::Option{<:ObsWeights} = nothing)
+                                alpha::Number = 0.05,
+                                w::Option{<:ObsWeights} = nothing)::RelativeDrawdownatRisk
     return RelativeDrawdownatRisk(settings, alpha, w)
 end
-function factory(r::RelativeDrawdownatRisk, pr::AbstractPriorResult, args...; kwargs...)
+function factory(r::RelativeDrawdownatRisk, pr::AbstractPriorResult, args...;
+                 kwargs...)::RelativeDrawdownatRisk
     w = nothing_scalar_array_selector(r.w, pr.w)
     return RelativeDrawdownatRisk(; settings = r.settings, alpha = r.alpha, w = w)
 end

@@ -7,20 +7,7 @@ Augmented Black-Litterman prior estimator for asset returns.
 
 # Fields
 
-  - `a_pe`: Asset prior estimator.
-  - `f_pe`: Factor prior estimator.
-  - `mp`: Matrix post-processing estimator.
-  - `re`: Regression estimator for factor loadings.
-  - `a_views`: Asset views estimator or views object.
-  - `f_views`: Factor views estimator or views object.
-  - `a_sets`: Asset sets.
-  - `f_sets`: Factor sets.
-  - `a_views_conf`: Asset view confidence(s).
-  - `f_views_conf`: Factor view confidence(s).
-  - `w`: Optional weights for assets.
-  - `rf`: Risk-free rate.
-  - `l`: Optional leverage parameter.
-  - `tau`: Blending parameter. When computing the prior, if `nothing`, defaults to `1/T` where `T` is the number of observations.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -153,19 +140,33 @@ AugmentedBlackLittermanPrior
   - [`prior`](@ref)
 """
 @concrete struct AugmentedBlackLittermanPrior <: AbstractLowOrderPriorEstimator_F
+    "$(field_dict[:a_pe])"
     a_pe
+    "$(field_dict[:f_pe])"
     f_pe
+    "$(field_dict[:mp])"
     mp
+    "$(field_dict[:re])"
     re
+    "$(field_dict[:a_views])"
     a_views
+    "$(field_dict[:f_views])"
     f_views
+    "$(field_dict[:a_sets])"
     a_sets
+    "$(field_dict[:f_sets])"
     f_sets
+    "$(field_dict[:a_views_conf])"
     a_views_conf
+    "$(field_dict[:f_views_conf])"
     f_views_conf
+    "$(field_dict[:eqw])"
     w
+    "$(field_dict[:rf])"
     rf
+    "$(field_dict[:l])"
     l
+    "$(field_dict[:tau])"
     tau
     function AugmentedBlackLittermanPrior(a_pe::AbstractLowOrderPriorEstimator_A_AF,
                                           f_pe::AbstractLowOrderPriorEstimator_A_AF,
@@ -221,11 +222,12 @@ function AugmentedBlackLittermanPrior(;
                                       f_views_conf::Option{<:Num_VecNum} = nothing,
                                       w::Option{<:VecNum} = nothing, rf::Number = 0.0,
                                       l::Option{<:Number} = nothing,
-                                      tau::Option{<:Number} = nothing)
+                                      tau::Option{<:Number} = nothing)::AugmentedBlackLittermanPrior
     return AugmentedBlackLittermanPrior(a_pe, f_pe, mp, re, a_views, f_views, a_sets,
                                         f_sets, a_views_conf, f_views_conf, w, rf, l, tau)
 end
-function factory(pe::AugmentedBlackLittermanPrior, w::ObsWeights)
+function factory(pe::AugmentedBlackLittermanPrior,
+                 w::ObsWeights)::AugmentedBlackLittermanPrior
     return AugmentedBlackLittermanPrior(; a_pe = factory(pe.a_pe, w),
                                         f_pe = factory(pe.f_pe, w), mp = pe.mp,
                                         re = factory(pe.re, w), a_views = pe.a_views,
@@ -233,6 +235,16 @@ function factory(pe::AugmentedBlackLittermanPrior, w::ObsWeights)
                                         f_sets = pe.f_sets, a_views_conf = pe.a_views_conf,
                                         f_views_conf = pe.f_views_conf, w = pe.w,
                                         rf = pe.rf, l = pe.l, tau = pe.tau)
+end
+function prior_view(pe::AugmentedBlackLittermanPrior, i)::AugmentedBlackLittermanPrior
+    return AugmentedBlackLittermanPrior(; a_pe = prior_view(pe.a_pe, i), f_pe = pe.f_pe,
+                                        mp = pe.mp, re = regression_view(pe.re, i),
+                                        a_views = pe.a_views, f_views = pe.f_views,
+                                        a_sets = asset_sets_view(pe.a_sets, i),
+                                        f_sets = pe.f_sets, a_views_conf = pe.a_views_conf,
+                                        f_views_conf = pe.f_views_conf,
+                                        w = nothing_scalar_array_view(pe.w, i), rf = pe.rf,
+                                        l = pe.l, tau = pe.tau)
 end
 function Base.getproperty(obj::AugmentedBlackLittermanPrior, sym::Symbol)
     return if sym == :me
@@ -316,14 +328,16 @@ function prior(pe::AugmentedBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int
     rr = regression(pe.re, X, F)
     (; b, M) = rr
     posterior_X = F * transpose(M) .+ transpose(b)
-    (; P, Q) = black_litterman_views(pe.a_views, pe.a_sets; datatype = eltype(posterior_X),
-                                     strict = strict)
+    (; P, Q, excl) = black_litterman_views(pe.a_views, pe.a_sets;
+                                           datatype = eltype(posterior_X), strict = strict)
     f_views = black_litterman_views(pe.f_views, pe.f_sets; datatype = eltype(posterior_X),
                                     strict = strict)
-    f_P, f_Q = f_views.P, f_views.Q
+    f_P, f_Q, f_excl = f_views.P, f_views.Q, f_views.excl
     tau = isnothing(pe.tau) ? inv(size(X, 1)) : pe.tau
-    a_omega = tau * calc_omega(pe.a_views_conf, P, a_prior_sigma)
-    f_omega = tau * calc_omega(pe.f_views_conf, f_P, f_prior_sigma)
+    a_views_conf = remove_excl_views(pe.a_views_conf, excl)
+    f_views_conf = remove_excl_views(pe.f_views_conf, f_excl)
+    a_omega = tau * calc_omega(a_views_conf, P, a_prior_sigma)
+    f_omega = tau * calc_omega(f_views_conf, f_P, f_prior_sigma)
     aug_prior_sigma = hcat(vcat(a_prior_sigma, f_prior_sigma * transpose(M)),
                            vcat(M * f_prior_sigma, f_prior_sigma))
     aug_P = hcat(vcat(P, zeros(size(f_P, 1), size(P, 2))),

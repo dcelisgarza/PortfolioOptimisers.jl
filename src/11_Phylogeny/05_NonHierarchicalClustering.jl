@@ -57,10 +57,11 @@ KMeansAlgorithm
     end
 end
 function KMeansAlgorithm(; rng::Random.AbstractRNG = Random.default_rng(),
-                         seed::Option{<:Integer} = nothing, kwargs::NamedTuple = (;))
+                         seed::Option{<:Integer} = nothing,
+                         kwargs::NamedTuple = (;))::KMeansAlgorithm
     return KMeansAlgorithm(rng, seed, kwargs)
 end
-function factory(alg::KMeansAlgorithm, w::StatsBase.AbstractWeights)
+function factory(alg::KMeansAlgorithm, w::StatsBase.AbstractWeights)::KMeansAlgorithm
     return KMeansAlgorithm(; rng = alg.rng, seed = alg.seed,
                            kwargs = (; alg.kwargs..., weights = w))
 end

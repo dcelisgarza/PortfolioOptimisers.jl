@@ -40,13 +40,13 @@ PartialLinearConstraint
     A
     "$(field_dict[:B])"
     B
-    function PartialLinearConstraint(A::MatNum, B::VecNum)
+    function PartialLinearConstraint(A::MatNum, B::VecNum)::PartialLinearConstraint
         @argcheck(!isempty(A), IsEmptyError)
         @argcheck(!isempty(B), IsEmptyError)
         return new{typeof(A), typeof(B)}(A, B)
     end
 end
-function PartialLinearConstraint(; A::MatNum, B::VecNum)
+function PartialLinearConstraint(; A::MatNum, B::VecNum)::PartialLinearConstraint
     return PartialLinearConstraint(A, B)
 end
 """
@@ -115,14 +115,14 @@ LinearConstraint
     "$(field_dict[:eq])"
     eq
     function LinearConstraint(ineq::Option{<:PartialLinearConstraint},
-                              eq::Option{<:PartialLinearConstraint})
+                              eq::Option{<:PartialLinearConstraint})::LinearConstraint
         @argcheck(!(isnothing(ineq) && isnothing(eq)),
                   IsNothingError("ineq and eq cannot both be nothing. Got\nisnothing(ineq) => $(isnothing(ineq))\nisnothing(eq) => $(isnothing(eq))"))
         return new{typeof(ineq), typeof(eq)}(ineq, eq)
     end
 end
 function LinearConstraint(; ineq::Option{<:PartialLinearConstraint} = nothing,
-                          eq::Option{<:PartialLinearConstraint} = nothing)
+                          eq::Option{<:PartialLinearConstraint} = nothing)::LinearConstraint
     return LinearConstraint(ineq, eq)
 end
 """
@@ -182,11 +182,7 @@ Structured result for standard linear constraint equation parsing.
 
 # Fields
 
-  - `vars`: Vector of variable names as strings.
-  - `coef`: Vector of coefficients.
-  - `op`: The comparison operator as a string.
-  - `rhs`: The right-hand side value.
-  - `eqn`: The formatted equation string.
+$(DocStringExtensions.FIELDS)
 
 # Related
 
@@ -195,13 +191,18 @@ Structured result for standard linear constraint equation parsing.
   - [`RhoParsingResult`](@ref)
 """
 @concrete struct ParsingResult <: AbstractParsingResult
+    "$(field_dict[:vars])"
     vars
+    "$(field_dict[:coef_c])"
     coef
+    "$(field_dict[:op])"
     op
+    "$(field_dict[:rhs])"
     rhs
+    "$(field_dict[:eqn])"
     eqn
     function ParsingResult(vars::VecStr, coef::VecNum, op::AbstractString, rhs::Number,
-                           eqn::AbstractString)
+                           eqn::AbstractString)::ParsingResult
         @argcheck(length(vars) == length(coef), DimensionMismatch)
         return new{typeof(vars), typeof(coef), typeof(op), typeof(rhs), typeof(eqn)}(vars,
                                                                                      coef,
@@ -241,11 +242,11 @@ Container for asset set and group information used in constraint generation.
 
 If a key in `dict` starts with the same value as `key`, it means that the corresponding group must have the same length as the asset universe, `dict[key]`. This is useful for defining partitions of the asset universe, for example when using [`asset_sets_matrix`](@ref) with [`NestedClustered`](@ref).
 
+If a key in `dict` starts with the same value as `ukey`, it identifies a unique-entry group variant. The corresponding `key`-prefixed group must exist in `dict` with the same length as the asset universe, and is used to match each asset to a unique entry from the `ukey`-prefixed group. This enables constraint generation using unique entries even in [`NestedClustered`](@ref) optimisations.
+
 # Fields
 
-  - `key`: The key in `dict` that identifies the primary list of assets. Groups prefixed by this `key` followed by an `_` must have the same length as `dict[key]` as their lengths are preserved across views, enabling the use of constraints even in [`NestedClustered`](@ref) optimisations. For example if `key` is `mykey`, sets prefixed by `mykey_` must have the same length and corresponding order as `dict[key]`. For example if we want to define the asset industries we can create a key-value pair with key "mykey_industries", where the entry corresponds to the industry of the asset in the same position in `dict[key]`.
-  - `ukey`: The key prefix used for asset sets with unique entries. If present, there must be an equivalently named group prefixed by `key` followed by an `_` that follows the above rule, as that group will be used to find each of the unique entries matching each asset for the view. For example assuming `ukey` is `myuniquekey` if we want to use the above example but create a constraint which uses the sets of industries found in `dict["mykey_industries"]` we can create a key-value pair with key `myuniquekey_industries` whose values are the unique entries of `dict["mykey_industries"]`. This uniqueness will be propagated across views, which lets us define constraints on the unique entries even in [`NestedClustered`](@ref) optimisations.
-  - `dict`: A dictionary mapping group names (or asset set names) to vectors of asset identifiers.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -284,11 +285,14 @@ AssetSets
   - [`linear_constraints`](@ref)
 """
 @concrete struct AssetSets <: AbstractEstimator
+    "$(field_dict[:as_key])"
     key
+    "$(field_dict[:as_ukey])"
     ukey
+    "$(field_dict[:dict])"
     dict
     function AssetSets(key::AbstractString, ukey::AbstractString,
-                       dict::AbstractDict{<:AbstractString, <:Any})
+                       dict::AbstractDict{<:AbstractString, <:Any})::AssetSets
         @argcheck(!isempty(dict), IsEmptyError)
         @argcheck(haskey(dict, key), KeyError)
         @argcheck(key !== ukey, ValueError)
@@ -307,10 +311,10 @@ AssetSets
     end
 end
 function AssetSets(; key::AbstractString = "nx", ukey::AbstractString = "ux",
-                   dict::AbstractDict{<:AbstractString, <:Any})
+                   dict::AbstractDict{<:AbstractString, <:Any})::AssetSets
     return AssetSets(key, ukey, dict)
 end
-function asset_sets_view(sets::AssetSets, i)
+function asset_sets_view(sets::AssetSets, i)::AssetSets
     key = sets.key
     ukey = sets.ukey
     dict = typeof(sets.dict)()
@@ -334,7 +338,7 @@ No-op fallback for indexing `nothing` asset sets.
 
   - `nothing`.
 """
-function asset_sets_view(::Nothing, ::Any)
+function asset_sets_view(::Nothing, ::Any)::Nothing
     return nothing
 end
 """
@@ -370,7 +374,7 @@ Set values in a vector for all assets belonging to a specified group.
   - [`AssetSets`](@ref)
 """
 function group_to_val!(nx::VecStr, sdict::AbstractDict, key::Any, val::Number,
-                       dict::EstValType, arr::VecNum, strict::Bool)
+                       dict::EstValType, arr::VecNum, strict::Bool)::Nothing
     assets = get(sdict, key, nothing)
     if isnothing(assets)
         msg = "$(key) is not in $(keys(sdict)) or in sets.dict[nx] = $nx.\n$(dict)"
@@ -482,7 +486,7 @@ This method returns the input value `val` as-is, without modification or mapping
   - [`group_to_val!`](@ref)
   - [`AssetSets`](@ref)
 """
-function estimator_to_val(val::Option{<:Number}, args...; kwargs...)
+function estimator_to_val(val::Option{<:Number}, args...; kwargs...)::Option{<:Number}
     return val
 end
 """
@@ -518,6 +522,43 @@ This method checks that the input vector `val` matches the length of the asset u
 function estimator_to_val(val::VecNum, sets::AssetSets, ::Any = nothing,
                           key::Option{<:AbstractString} = nothing; kwargs...)
     @argcheck(length(val) == length(sets.dict[ifelse(isnothing(key), sets.key, key)]),
+              DimensionMismatch)
+    return val
+end
+"""
+    estimator_to_val(val::MatNum, sets::AssetSets, ::Any = nothing,
+                     key::Option{<:AbstractString} = nothing; dims::Int = 2, kwargs...)
+
+Return a numeric matrix for asset/group estimators, validating length against asset universe.
+
+This method checks that size of `dims` of the input matrix `val` matches the length of the asset universe in `sets`, and returns it unchanged if valid. It is used as a fast path for workflows where the value vector is already constructed and requires only defensive validation.
+
+# Arguments
+
+  - `val`: Numeric matrix to be mapped to assets/groups.
+  - `sets`: [`AssetSets`](@ref) containing the asset universe and group definitions.
+  - `::Any`: Fill value for API consistency (ignored).
+  - `key`: (Optional) Key in the [`AssetSets`](@ref) to specify the asset universe for constraint generation. When provided, takes precedence over `key` field of [`AssetSets`](@ref).
+  - `dims`: Dimension along which to validate the matrix size.
+  - `kwargs...`: Additional keyword arguments (ignored).
+
+# Returns
+
+  - `val::VecNum`: The input vector, unchanged.
+
+# Validation
+
+  - `size(val, dims) == length(sets.dict[ifelse(isnothing(key), sets.key, key)]`.
+
+# Related
+
+  - [`estimator_to_val`](@ref)
+  - [`AssetSets`](@ref)
+  - [`group_to_val!`](@ref)
+"""
+function estimator_to_val(val::MatNum, sets::AssetSets, ::Any = nothing,
+                          key::Option{<:AbstractString} = nothing; dims::Int = 2, kwargs...)
+    @argcheck(size(val, dims) == length(sets.dict[ifelse(isnothing(key), sets.key, key)]),
               DimensionMismatch)
     return val
 end
@@ -737,7 +778,7 @@ Format a single term in a linear constraint equation as a string.
   - [`_parse_equation`](@ref)
   - [`ParsingResult`](@ref)
 """
-function _format_term(coeff, var)
+function _format_term(coeff, var)::String
     return if isone(coeff)
         "$var"
     elseif isone(-coeff)
@@ -777,14 +818,14 @@ Internal utility for error handling during equation parsing.
   - [`parse_equation`](@ref)
   - [`_parse_equation`](@ref)
 """
-function _rethrow_parse_error(::Any, side = :lhs)
+function _rethrow_parse_error(::Any, side = :lhs)::Nothing
     return nothing
 end
-function _rethrow_parse_error(::Nothing, side = :lhs)
+function _rethrow_parse_error(::Nothing, side = :lhs)::Nothing
     @warn("$(side) of equation is empy, assuming zero")
     return nothing
 end
-function _rethrow_parse_error(expr::Expr, side = :lhs)
+function _rethrow_parse_error(expr::Expr, side = :lhs)::Nothing
     @argcheck(expr.head != :incomplete,
               Meta.ParseError("$side is an incomplete expression.\n$expr"))
     return nothing
@@ -821,7 +862,8 @@ Parse and canonicalise a linear constraint equation from Julia expressions.
   - [`ParsingResult`](@ref)
   - [`parse_equation`](@ref)
 """
-function _parse_equation(lhs, opstr::AbstractString, rhs, datatype::DataType = Float64)
+function _parse_equation(lhs, opstr::AbstractString, rhs,
+                         datatype::DataType = Float64)::ParsingResult
     # 3. Evaluate numeric functions on both sides
     lexpr = _eval_numeric_functions(lhs)
     _rethrow_parse_error(lexpr, :lhs)
@@ -934,14 +976,15 @@ ParsingResult
     op ┼ String: "<="
    rhs ┼ Float64: 1.0
    eqn ┴ SubString{String}: "w_A + 2.0*w_B <= 1.0"
-```
+```    # 1. Identify the comparison operator
 
 # Related
 
   - [`ParsingResult`](@ref)
+```
 """
 function parse_equation(eqn::AbstractString; ops1::Tuple = ("==", "<=", ">="),
-                        datatype::DataType = Float64, kwargs...)
+                        datatype::DataType = Float64, kwargs...)::ParsingResult
     @argcheck(!occursin("++", eqn),
               Meta.ParseError("Invalid operator '++' detected in equation."))
     # 1. Identify the comparison operator
@@ -975,7 +1018,7 @@ Internal helper used during linear constraint parsing to detect unsupported `+` 
 
   - `Bool`: `true` if the expression contains an invalid `+`, `false` otherwise.
 """
-function _has_invalid_plus(expr)
+function _has_invalid_plus(expr)::Bool
     if !(isa(expr, Expr) && expr.head == :call)
         return false
     end
@@ -988,7 +1031,7 @@ function _has_invalid_plus(expr)
     return any(_has_invalid_plus(arg) for arg in expr.args[2:end] if isa(arg, Expr))
 end
 function parse_equation(expr::Expr; ops2::Tuple = (:call, :(==), :(<=), :(>=)),
-                        datatype::DataType = Float64, kwargs...)
+                        datatype::DataType = Float64, kwargs...)::ParsingResult
     # Recursively check for invalid "++" pattern in the expression tree
     @argcheck(!_has_invalid_plus(expr),
               Meta.ParseError("Invalid operator pattern '++' detected in equation expression:\n$expr"))
@@ -1073,7 +1116,8 @@ ParsingResult
   - [`parse_equation`](@ref)
 """
 function replace_group_by_assets(res::ParsingResult, sets::AssetSets, bl_flag::Bool = false,
-                                 ep_flag::Bool = false, rho_flag::Bool = false)
+                                 ep_flag::Bool = false,
+                                 rho_flag::Bool = false)::ParsingResult
     @argcheck(!(bl_flag && (rho_flag || ep_flag)),
               ArgumentError("bl_flag can only be true if ep_flag and rho_flag are false. Got\nbl_flag => $(bl_flag)\nep_flag => $(ep_flag)\nrho_flag => $(rho_flag)."))
     @argcheck(!(rho_flag && !ep_flag),
@@ -1272,8 +1316,7 @@ Container for one or more linear constraint equations to be parsed and converted
 
 # Fields
 
-  - `val`: A single equation as an `AbstractString` or `Expr`, or a vector of such equations.
-  - `key`: (Optional) Key in the [`AssetSets`](@ref) to specify the asset universe for constraint generation. When provided, takes precedence over `key` field of [`AssetSets`](@ref).
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -1313,10 +1356,12 @@ LinearConstraint
   - [`linear_constraints`](@ref)
 """
 @concrete struct LinearConstraintEstimator <: AbstractConstraintEstimator
+    "$(field_dict[:lce_val])"
     val
+    "$(field_dict[:ekey])"
     key
     function LinearConstraintEstimator(val::EqnType,
-                                       key::Option{<:AbstractString} = nothing)
+                                       key::Option{<:AbstractString} = nothing)::LinearConstraintEstimator
         if isa(val, Str_Vec)
             @argcheck(!isempty(val))
         end
@@ -1326,7 +1371,8 @@ LinearConstraint
         return new{typeof(val), typeof(key)}(val, key)
     end
 end
-function LinearConstraintEstimator(; val::EqnType, key::Option{<:AbstractString} = nothing)
+function LinearConstraintEstimator(; val::EqnType,
+                                   key::Option{<:AbstractString} = nothing)::LinearConstraintEstimator
     return LinearConstraintEstimator(val, key)
 end
 """
@@ -1406,7 +1452,8 @@ This method is used to pass through an already constructed [`LinearConstraint`](
   - [`PartialLinearConstraint`](@ref)
   - [`linear_constraints`](@ref)
 """
-function linear_constraints(lcs::Option{<:LinearConstraint}, args...; kwargs...)
+function linear_constraints(lcs::Option{<:LinearConstraint}, args...;
+                            kwargs...)::Option{<:LinearConstraint}
     return lcs
 end
 """
@@ -1471,7 +1518,7 @@ function linear_constraints(eqn::EqnType, sets::AssetSets,
                             ops1::Tuple = ("==", "<=", ">="),
                             ops2::Tuple = (:call, :(==), :(<=), :(>=)),
                             datatype::DataType = Float64, strict::Bool = false,
-                            bl_flag::Bool = false)
+                            bl_flag::Bool = false)::Option{<:LinearConstraint}
     lcs = parse_equation(eqn; ops1 = ops1, ops2 = ops2, datatype = datatype)
     lcs = replace_group_by_assets(lcs, sets, bl_flag)
     return get_linear_constraints(lcs, sets, key; datatype = datatype, strict = strict)
@@ -1495,7 +1542,7 @@ It is used for type stability and to provide a uniform interface for processing 
 """
 function linear_constraints(lcs::LinearConstraintEstimator, sets::AssetSets;
                             datatype::DataType = Float64, strict::Bool = false,
-                            bl_flag::Bool = false)
+                            bl_flag::Bool = false)::Option{<:LinearConstraint}
     return linear_constraints(lcs.val, sets, lcs.key; datatype = datatype, strict = strict,
                               bl_flag = bl_flag)
 end

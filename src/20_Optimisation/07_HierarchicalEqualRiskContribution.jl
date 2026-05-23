@@ -7,13 +7,7 @@ Hierarchical Equal Risk Contribution (HERC) portfolio optimiser.
 
 # Fields
 
-  - `opt`: Base hierarchical optimiser configuration.
-  - `ri`: Intra-cluster risk measure or vector of risk measures.
-  - `ro`: Inter-cluster risk measure or vector of risk measures.
-  - `scai`: Scalariser for combining intra-cluster risk measures.
-  - `scao`: Scalariser for combining inter-cluster risk measures.
-  - `ex`: FLoops executor for parallelism.
-  - `fb`: Fallback optimiser.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -133,12 +127,19 @@ HierarchicalEqualRiskContribution
   - [`HierarchicalOptimiser`](@ref)
 """
 @concrete struct HierarchicalEqualRiskContribution <: ClusteringOptimisationEstimator
+    "$(field_dict[:opt_hier])"
     opt
+    "$(field_dict[:ri])"
     ri
+    "$(field_dict[:ro])"
     ro
+    "$(field_dict[:scai])"
     scai
+    "$(field_dict[:scao])"
     scao
+    "$(field_dict[:ex])"
     ex
+    "$(field_dict[:fb])"
     fb
     function HierarchicalEqualRiskContribution(opt::HierarchicalOptimiser,
                                                ri::OptRM_VecOptRM, ro::OptRM_VecOptRM,
@@ -162,7 +163,7 @@ function HierarchicalEqualRiskContribution(;
                                            scai::Scalariser = SumScalariser(),
                                            scao::Scalariser = scai,
                                            ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
-                                           fb::Option{<:OptE_Opt} = nothing)
+                                           fb::Option{<:OptE_Opt} = nothing)::HierarchicalEqualRiskContribution
     return HierarchicalEqualRiskContribution(opt, ri, ro, scai, scao, ex, fb)
 end
 function needs_previous_weights(opt::HierarchicalEqualRiskContribution)
@@ -171,7 +172,8 @@ function needs_previous_weights(opt::HierarchicalEqualRiskContribution)
             needs_previous_weights(opt.ro) ||
             needs_previous_weights(opt.fb))
 end
-function factory(hec::HierarchicalEqualRiskContribution, w::AbstractVector)
+function factory(hec::HierarchicalEqualRiskContribution,
+                 w::AbstractVector)::HierarchicalEqualRiskContribution
     opt = factory(hec.opt, w)
     ri = factory(hec.ri, w)
     ro = factory(hec.ro, w)
@@ -179,7 +181,8 @@ function factory(hec::HierarchicalEqualRiskContribution, w::AbstractVector)
     return HierarchicalEqualRiskContribution(; opt = opt, ri = ri, ro = ro, scai = hec.scai,
                                              scao = hec.scao, ex = hec.ex, fb = fb)
 end
-function opt_view(hec::HierarchicalEqualRiskContribution, i, X::MatNum)
+function opt_view(hec::HierarchicalEqualRiskContribution, i,
+                  X::MatNum)::HierarchicalEqualRiskContribution
     X = isa(hec.opt.pe, AbstractPriorResult) ? hec.opt.pe.X : X
     ri = hec.ri
     ro = hec.ro

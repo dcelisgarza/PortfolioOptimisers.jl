@@ -103,8 +103,7 @@ Estimator for generating semi-definite phylogeny-based constraints in `Portfolio
 
 # Fields
 
-  - `pl`: Phylogeny or clustering estimator.
-  - `p`: Non-negative penalty parameter for the constraint.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -157,15 +156,18 @@ SemiDefinitePhylogenyEstimator
   - [`phylogeny_constraints`](@ref)
 """
 @concrete struct SemiDefinitePhylogenyEstimator <: AbstractPhylogenyConstraintEstimator
+    "$(field_dict[:pler])"
     pl
+    "$(field_dict[:p_phylo])"
     p
-    function SemiDefinitePhylogenyEstimator(pl::NwE_PlM_ClE_Cl, p::Number)
+    function SemiDefinitePhylogenyEstimator(pl::NwE_PlM_ClE_Cl,
+                                            p::Number)::SemiDefinitePhylogenyEstimator
         @argcheck(p >= zero(p), DomainError("`p` must be non-negative:\np => $p"))
         return new{typeof(pl), typeof(p)}(pl, p)
     end
 end
 function SemiDefinitePhylogenyEstimator(; pl::NwE_PlM_ClE_Cl = NetworkEstimator(),
-                                        p::Number = 0.05)
+                                        p::Number = 0.05)::SemiDefinitePhylogenyEstimator
     return SemiDefinitePhylogenyEstimator(pl, p)
 end
 """
@@ -190,8 +192,7 @@ Container for the result of semi-definite phylogeny-based constraint generation.
 
 # Fields
 
-  - `A`: Phylogeny matrix encoding a relationship graph.
-  - `p`: Non-negative penalty parameter controlling the strength of the constraint.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -224,19 +225,23 @@ SemiDefinitePhylogeny
   - [`phylogeny_constraints`](@ref)
 """
 @concrete struct SemiDefinitePhylogeny <: AbstractPhylogenyConstraintResult
+    "$(field_dict[:A_phylo])"
     A
+    "$(field_dict[:p_phylo])"
     p
-    function SemiDefinitePhylogeny(A::MatNum, p::Number)
+    function SemiDefinitePhylogeny(A::MatNum, p::Number)::SemiDefinitePhylogeny
         @argcheck(all(iszero, LinearAlgebra.diag(A)))
         @argcheck(LinearAlgebra.issymmetric(A))
         @argcheck(p >= zero(p))
         return new{typeof(A), typeof(p)}(A, p)
     end
 end
-function SemiDefinitePhylogeny(A::PhylogenyResult{<:MatNum}, p::Number)
+function SemiDefinitePhylogeny(A::PhylogenyResult{<:MatNum},
+                               p::Number)::SemiDefinitePhylogeny
     return SemiDefinitePhylogeny(A.X, p)
 end
-function SemiDefinitePhylogeny(; A::MatNum_PhRMatNum, p::Number = 0.05)
+function SemiDefinitePhylogeny(; A::MatNum_PhRMatNum,
+                               p::Number = 0.05)::SemiDefinitePhylogeny
     return SemiDefinitePhylogeny(A, p)
 end
 """
@@ -274,12 +279,12 @@ This function is used internally to ensure that the number of groups or allocati
   - [`validate_length_integer_phylogeny_constraint_B`](@ref)
   - [`IntegerPhylogenyEstimator`](@ref)
 """
-function _validate_length_integer_phylogeny_constraint_B(alg::Integer, B::VecNum)
+function _validate_length_integer_phylogeny_constraint_B(alg::Integer, B::VecNum)::Nothing
     @argcheck(length(B) <= alg,
               DomainError("`length(B) <= alg`:\nlength(B) => $(length(B))\nalg => $(alg)"))
     return nothing
 end
-function _validate_length_integer_phylogeny_constraint_B(args...)
+function _validate_length_integer_phylogeny_constraint_B(args...)::Nothing
     return nothing
 end
 """
@@ -334,9 +339,7 @@ Estimator for generating integer phylogeny-based constraints in `PortfolioOptimi
 
 # Fields
 
-  - `pl`: Phylogeny or clustering estimator.
-  - `B`: Non-negative integer or vector of integers specifying group sizes or allocations.
-  - `scale`: Non-negative big-M parameter for the MIP formulation.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -393,10 +396,14 @@ IntegerPhylogenyEstimator
   - [`phylogeny_constraints`](@ref)
 """
 @concrete struct IntegerPhylogenyEstimator <: AbstractPhylogenyConstraintEstimator
+    "$(field_dict[:pler])"
     pl
+    "$(field_dict[:B_phylo])"
     B
+    "$(field_dict[:scale_phylo])"
     scale
-    function IntegerPhylogenyEstimator(pl::NwE_PlM_ClE_Cl, B::Int_VecInt, scale::Number)
+    function IntegerPhylogenyEstimator(pl::NwE_PlM_ClE_Cl, B::Int_VecInt,
+                                       scale::Number)::IntegerPhylogenyEstimator
         assert_nonempty_nonneg_finite_val(B, :B)
         if isa(B, VecInt)
             validate_length_integer_phylogeny_constraint_B(pl, B)
@@ -405,7 +412,8 @@ IntegerPhylogenyEstimator
     end
 end
 function IntegerPhylogenyEstimator(; pl::NwE_PlM_ClE_Cl = NetworkEstimator(),
-                                   B::Int_VecInt = 1, scale::Number = 100_000.0)
+                                   B::Int_VecInt = 1,
+                                   scale::Number = 100_000.0)::IntegerPhylogenyEstimator
     return IntegerPhylogenyEstimator(pl, B, scale)
 end
 """
@@ -417,9 +425,7 @@ Container for the result of integer phylogeny-based constraint generation.
 
 # Fields
 
-  - `A`: Phylogeny matrix encoding asset relationships.
-  - `B`: Non-negative integer or vector of integers specifying group sizes or allocations.
-  - `scale`: Non-negative scaling parameter (big-M) for the constraint.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -456,10 +462,13 @@ IntegerPhylogeny
   - [`phylogeny_constraints`](@ref)
 """
 @concrete struct IntegerPhylogeny <: AbstractPhylogenyConstraintResult
+    "$(field_dict[:A_phylo])"
     A
+    "$(field_dict[:B_phylo])"
     B
+    "$(field_dict[:scale_phylo])"
     scale
-    function IntegerPhylogeny(A::MatNum, B::Int_VecInt, scale::Number)
+    function IntegerPhylogeny(A::MatNum, B::Int_VecInt, scale::Number)::IntegerPhylogeny
         @argcheck(all(iszero, LinearAlgebra.diag(A)))
         @argcheck(LinearAlgebra.issymmetric(A))
         A = unique(A + LinearAlgebra.I; dims = 1)
@@ -470,11 +479,12 @@ IntegerPhylogeny
         return new{typeof(A), typeof(B), typeof(scale)}(A, B, scale)
     end
 end
-function IntegerPhylogeny(A::PhylogenyResult{<:MatNum}, B::Int_VecInt, scale::Number)
+function IntegerPhylogeny(A::PhylogenyResult{<:MatNum}, B::Int_VecInt,
+                          scale::Number)::IntegerPhylogeny
     return IntegerPhylogeny(A.X, B, scale)
 end
 function IntegerPhylogeny(; A::MatNum_PhRMatNum, B::Int_VecInt = 1,
-                          scale::Number = 100_000.0)
+                          scale::Number = 100_000.0)::IntegerPhylogeny
     return IntegerPhylogeny(A, B, scale)
 end
 """
@@ -485,7 +495,7 @@ Generate phylogeny-based portfolio constraints from an estimator or result.
 
 `phylogeny_constraints` constructs constraint objects based on phylogenetic, res, or network structures among assets. It supports both semi-definite and integer constraint forms, accepting either an estimator (which wraps a phylogeny or clustering model and penalty parameters) or a precomputed result. If `plc` is `nothing`, returns `nothing`.
 
-If a vector broadcasts the function over each element, returning a vector of constraint results.
+If `plcs` is a vector, this method broadcasts over each element, returning a vector of constraint results.
 
 # Arguments
 
@@ -551,9 +561,7 @@ Estimator for generating centrality-based portfolio constraints.
 
 # Fields
 
-  - `A`: Centrality estimator.
-  - `B`: Number value or reduction measure.
-  - `comp`: Comparison operator.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -608,8 +616,11 @@ CentralityConstraint
   - [`centrality_constraints`](@ref)
 """
 @concrete struct CentralityConstraint <: AbstractCentralityConstraint
+    "$(field_dict[:cc_A])"
     A
+    "$(field_dict[:cc_B])"
     B
+    "$(field_dict[:cc_comp])"
     comp
     function CentralityConstraint(A::CentralityEstimator, B::Num_VecToScaM,
                                   comp::ComparisonOperator)
@@ -665,7 +676,7 @@ const Lc_CC_VecCC = Union{<:CC_VecCC, <:LinearConstraint}
 
 Generate centrality-based linear constraints from one or more `CentralityConstraint` estimators.
 
-`centrality_constraints` constructs linear constraints for portfolio optimisation based on asset centrality measures within a phylogeny or network structure. It accepts one or more [`CentralityConstraint`](@ref) estimators, computes centrality vectors for the given data matrix `X`, applies the specified reduction measure or t, and assembles the resulting constraints into a [`LinearConstraint`](@ref) object.
+`centrality_constraints` constructs linear constraints for portfolio optimisation based on asset centrality measures within a phylogeny or network structure. It accepts one or more [`CentralityConstraint`](@ref) estimators, computes centrality vectors for the given data matrix `X`, applies the specified reduction measure or threshold, and assembles the resulting constraints into a [`LinearConstraint`](@ref) object.
 
 # Arguments
 

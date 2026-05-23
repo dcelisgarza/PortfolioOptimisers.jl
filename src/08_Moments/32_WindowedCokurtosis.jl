@@ -45,7 +45,7 @@ Keywords correspond to the struct's fields.
 end
 function WindowedCokurtosis(; ke::Cokurtosis = Cokurtosis(),
                             w::Option{<:ObsWeights} = nothing,
-                            window::Option{<:Int_VecInt} = nothing)
+                            window::Option{<:Int_VecInt} = nothing)::WindowedCokurtosis
     return WindowedCokurtosis(ke, w, window)
 end
 """
@@ -67,8 +67,30 @@ Return a new [`WindowedCokurtosis`](@ref) estimator with observation weights `w`
   - [`WindowedCokurtosis`](@ref)
   - [`factory`](@ref)
 """
-function factory(ke::WindowedCokurtosis, w::ObsWeights)
+function factory(ke::WindowedCokurtosis, w::ObsWeights)::WindowedCokurtosis
     return WindowedCokurtosis(; ke = factory(ke.ke, w), w = w, window = ke.window)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Gets the view of the coskewness estimator for the `i`-th element(s).
+
+# Arguments
+
+  - $(arg_dict[:kte])
+  - `i`: Index or indices to view.
+
+# Returns
+
+  - $(ret_dict[:ktev])
+
+# Related
+
+  - [`WindowedCokurtosis`](@ref)
+"""
+function moment_view(kte::WindowedCokurtosis, i)::WindowedCokurtosis
+    return WindowedCokurtosis(; kte = moment_view(kte.kte, i), w = kte.w,
+                              window = kte.window)
 end
 """
     cokurtosis(ke::WindowedCokurtosis, X::MatNum; dims::Int = 1, iv::Option{<:MatNum} = nothing, kwargs...)

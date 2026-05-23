@@ -67,10 +67,7 @@ When `flag = true` (default), the result is scaled by a consistency factor ``(\\
 
 # Fields
 
-  - `settings`: Hierarchical risk measure configuration.
-  - `w`: Optional observation weights.
-  - `mu`: Centre of the deviation (centering function, scalar, vector, or `VecScalar`).
-  - `flag`: If `true`, applies the consistency correction factor.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -121,9 +118,13 @@ MedianAbsoluteDeviation
   - [`MeanCentering`](@ref)
 """
 @concrete struct MedianAbsoluteDeviation <: HierarchicalRiskMeasure
+    "$(field_dict[:settings_rm])"
     settings
+    "$(field_dict[:w_rm])"
     w
+    "$(field_dict[:mu_rm])"
     mu
+    "$(field_dict[:flag])"
     flag
     function MedianAbsoluteDeviation(settings::HierarchicalRiskMeasureSettings,
                                      w::Option{<:ObsWeights}, mu::MedAbsDevMu,
@@ -142,17 +143,19 @@ end
 function MedianAbsoluteDeviation(;
                                  settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
                                  w::Option{<:ObsWeights} = nothing,
-                                 mu::MedAbsDevMu = MedianCentering(), flag::Bool = true)
+                                 mu::MedAbsDevMu = MedianCentering(),
+                                 flag::Bool = true)::MedianAbsoluteDeviation
     return MedianAbsoluteDeviation(settings, w, mu, flag)
 end
-function factory(r::MedianAbsoluteDeviation, pr::AbstractPriorResult, args...; kwargs...)
+function factory(r::MedianAbsoluteDeviation, pr::AbstractPriorResult, args...;
+                 kwargs...)::MedianAbsoluteDeviation
     w = nothing_scalar_array_selector(r.w, pr.w)
     return MedianAbsoluteDeviation(; settings = r.settings, w = w, mu = r.mu, flag = r.flag)
 end
 function nothing_scalar_array_view(x::MedianCenteringFunction, ::Any)
     return x
 end
-function risk_measure_view(r::MedianAbsoluteDeviation, i, args...)
+function risk_measure_view(r::MedianAbsoluteDeviation, i, args...)::MedianAbsoluteDeviation
     mu = nothing_scalar_array_view(r.mu, i)
     return MedianAbsoluteDeviation(; settings = r.settings, w = r.w, mu = mu, flag = r.flag)
 end

@@ -79,11 +79,7 @@ where ``\\mathcal{K}_{\\mathrm{pow}}(p') = \\{(a,b,c) : a^{p'} b^{1-p'} \\geq |c
 
 # Fields
 
-  - `settings`: Risk measure configuration.
-  - `slv`: Solver or vector of solvers for the conic optimisation.
-  - `alpha`: Significance level for the lower tail.
-  - `p`: Power parameter (``p \\geq 1``).
-  - `w`: Optional observation weights.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -139,10 +135,15 @@ PowerNormValueatRisk
   - [`PowerNormDrawdownatRisk`](@ref)
 """
 @concrete struct PowerNormValueatRisk <: RiskMeasure
+    "$(field_dict[:settings_rm])"
     settings
+    "$(field_dict[:slv])"
     slv
+    "$(field_dict[:alpha])"
     alpha
+    "$(field_dict[:p_rm])"
     p
+    "$(field_dict[:w_rm])"
     w
     function PowerNormValueatRisk(settings::RiskMeasureSettings, slv::Option{<:Slv_VecSlv},
                                   alpha::Number, p::Number,
@@ -161,7 +162,8 @@ PowerNormValueatRisk
 end
 function PowerNormValueatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                               slv::Option{<:Slv_VecSlv} = nothing, alpha::Number = 0.05,
-                              p::Number = 2.0, w::Option{<:ObsWeights} = nothing)
+                              p::Number = 2.0,
+                              w::Option{<:ObsWeights} = nothing)::PowerNormValueatRisk
     return PowerNormValueatRisk(settings, slv, alpha, p, w)
 end
 function (r::PowerNormValueatRisk)(x::VecNum)
@@ -182,13 +184,7 @@ Represents the Power Norm Value-at-Risk Range (PNVaRRange) risk measure.
 
 # Fields
 
-  - `settings`: Risk measure configuration.
-  - `slv`: Solver or vector of solvers for the conic optimisation.
-  - `alpha`: Significance level for the lower tail.
-  - `beta`: Significance level for the upper tail.
-  - `pa`: Power norm parameter for the lower tail (``p_a > 1``).
-  - `pb`: Power norm parameter for the upper tail (``p_b > 1``).
-  - `w`: Optional observation weights.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -246,12 +242,19 @@ PowerNormValueatRiskRange
   - [`EntropicValueatRiskRange`](@ref)
 """
 @concrete struct PowerNormValueatRiskRange <: RiskMeasure
+    "$(field_dict[:settings_rm])"
     settings
+    "$(field_dict[:slv])"
     slv
+    "$(field_dict[:alpha])"
     alpha
+    "$(field_dict[:beta])"
     beta
+    "$(field_dict[:pa_rm])"
     pa
+    "$(field_dict[:pb_rm])"
     pb
+    "$(field_dict[:w_rm])"
     w
     function PowerNormValueatRiskRange(settings::RiskMeasureSettings,
                                        slv::Option{<:Slv_VecSlv}, alpha::Number,
@@ -273,14 +276,14 @@ function PowerNormValueatRiskRange(; settings::RiskMeasureSettings = RiskMeasure
                                    slv::Option{<:Slv_VecSlv} = nothing,
                                    alpha::Number = 0.05, beta::Number = 0.05,
                                    pa::Number = 2.0, pb::Number = 2.0,
-                                   w::Option{<:ObsWeights} = nothing)
+                                   w::Option{<:ObsWeights} = nothing)::PowerNormValueatRiskRange
     return PowerNormValueatRiskRange(settings, slv, alpha, beta, pa, pb, w)
 end
 function (r::PowerNormValueatRiskRange)(x::VecNum)
     return PRM(x, r.slv, r.alpha, r.pa, r.w) + PRM(-x, r.slv, r.beta, r.pb, r.w)
 end
 function factory(r::PowerNormValueatRiskRange, pr::AbstractPriorResult,
-                 slv::Option{<:Slv_VecSlv}, args...; kwargs...)
+                 slv::Option{<:Slv_VecSlv}, args...; kwargs...)::PowerNormValueatRiskRange
     w = nothing_scalar_array_selector(r.w, pr.w)
     slv = solver_selector(r.slv, slv)
     return PowerNormValueatRiskRange(; settings = r.settings, slv = slv, alpha = r.alpha,
@@ -309,11 +312,7 @@ The Power Norm Drawdown-at-Risk is the PNVaR of the drawdown series:
 
 # Fields
 
-  - `settings`: Risk measure configuration.
-  - `slv`: Solver or vector of solvers for the conic optimisation.
-  - `alpha`: Significance level for the lower tail.
-  - `p`: Power parameter (``p \\geq 1``).
-  - `w`: Optional observation weights.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -369,10 +368,15 @@ PowerNormDrawdownatRisk
   - [`RelativePowerNormDrawdownatRisk`](@ref)
 """
 @concrete struct PowerNormDrawdownatRisk <: RiskMeasure
+    "$(field_dict[:settings_rm])"
     settings
+    "$(field_dict[:slv])"
     slv
+    "$(field_dict[:alpha])"
     alpha
+    "$(field_dict[:p_rm])"
     p
+    "$(field_dict[:w_rm])"
     w
     function PowerNormDrawdownatRisk(settings::RiskMeasureSettings,
                                      slv::Option{<:Slv_VecSlv}, alpha::Number, p::Number,
@@ -391,7 +395,8 @@ PowerNormDrawdownatRisk
 end
 function PowerNormDrawdownatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                                  slv::Option{<:Slv_VecSlv} = nothing, alpha::Number = 0.05,
-                                 p::Number = 2.0, w::Option{<:ObsWeights} = nothing)
+                                 p::Number = 2.0,
+                                 w::Option{<:ObsWeights} = nothing)::PowerNormDrawdownatRisk
     return PowerNormDrawdownatRisk(settings, slv, alpha, p, w)
 end
 function (r::PowerNormDrawdownatRisk)(x::VecNum)
@@ -421,11 +426,7 @@ The Relative Power Norm Drawdown-at-Risk is the PNVaR of the relative drawdown s
 
 # Fields
 
-  - `settings`: Hierarchical risk measure configuration.
-  - `slv`: Solver or vector of solvers for the conic optimisation.
-  - `alpha`: Significance level for the lower tail.
-  - `p`: Power parameter (``p \\geq 1``).
-  - `w`: Optional observation weights.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -478,10 +479,15 @@ RelativePowerNormDrawdownatRisk
   - [`RelativeEntropicDrawdownatRisk`](@ref)
 """
 @concrete struct RelativePowerNormDrawdownatRisk <: HierarchicalRiskMeasure
+    "$(field_dict[:settings_rm])"
     settings
+    "$(field_dict[:slv])"
     slv
+    "$(field_dict[:alpha])"
     alpha
+    "$(field_dict[:p_rm])"
     p
+    "$(field_dict[:w_rm])"
     w
     function RelativePowerNormDrawdownatRisk(settings::HierarchicalRiskMeasureSettings,
                                              slv::Option{<:Slv_VecSlv}, alpha::Number,
@@ -502,7 +508,7 @@ function RelativePowerNormDrawdownatRisk(;
                                          settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
                                          slv::Option{<:Slv_VecSlv} = nothing,
                                          alpha::Number = 0.05, p::Number = 2.0,
-                                         w::Option{<:ObsWeights} = nothing)
+                                         w::Option{<:ObsWeights} = nothing)::RelativePowerNormDrawdownatRisk
     return RelativePowerNormDrawdownatRisk(settings, slv, alpha, p, w)
 end
 function (r::RelativePowerNormDrawdownatRisk)(x::VecNum)

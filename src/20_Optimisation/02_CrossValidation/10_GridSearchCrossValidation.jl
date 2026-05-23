@@ -5,13 +5,7 @@ Performs grid search cross-validation for portfolio optimisation estimators. Ite
 
 # Fields
 
-  - `p`: Parameter grid for optimisation.
-  - `cv`: Cross-validation splitter (e.g., KFold).
-  - `r`: Risk measure used for scoring (e.g., ConditionalValueatRisk).
-  - `scorer`: Scoring function to select optimal parameter set.
-  - `ex`: Parallel execution strategy (e.g., FLoops.ThreadedEx).
-  - `train_score`: Whether to record training scores.
-  - `kwargs`: Additional keyword arguments for customisation.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -65,12 +59,19 @@ GridSearchCrossValidation
   - [`search_cross_validation`](@ref)
 """
 @concrete struct GridSearchCrossValidation <: AbstractSearchCrossValidationEstimator
+    "$(field_dict[:p_cv])"
     p
+    "$(field_dict[:cv])"
     cv
+    "$(field_dict[:r])"
     r
+    "$(field_dict[:scorer])"
     scorer
+    "$(field_dict[:ex])"
     ex
+    "$(field_dict[:train_score])"
     train_score
+    "$(field_dict[:kwargs])"
     kwargs
     function GridSearchCrossValidation(p::Union{<:AbstractVector{<:Pair{<:Any,
                                                                         <:AbstractVector}},

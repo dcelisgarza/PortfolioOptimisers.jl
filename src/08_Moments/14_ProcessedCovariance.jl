@@ -56,11 +56,51 @@ ProcessedCovariance
 end
 function ProcessedCovariance(; ce::StatsBase.CovarianceEstimator = Covariance(),
                              alg::Option{<:AbstractMatrixProcessingAlgorithm} = nothing,
-                             pdm::Option{<:Posdef} = Posdef())
+                             pdm::Option{<:Posdef} = Posdef())::ProcessedCovariance
     return ProcessedCovariance(ce, alg, pdm)
 end
-function factory(ce::ProcessedCovariance, w::ObsWeights)
+"""
+    factory(ce::ProcessedCovariance, w::ObsWeights) -> ProcessedCovariance
+
+Return a new [`ProcessedCovariance`](@ref) estimator with observation weights `w` applied to the underlying covariance estimator.
+
+# Arguments
+
+  - $(arg_dict[:ce])
+  - $(arg_dict[:ow])
+
+# Returns
+
+  - $(ret_dict[:ce])
+
+# Related
+
+  - [`ProcessedCovariance`](@ref)
+  - [`factory`](@ref)
+"""
+function factory(ce::ProcessedCovariance, w::ObsWeights)::ProcessedCovariance
     return ProcessedCovariance(; ce = factory(ce.ce, w), alg = ce.alg, pdm = ce.pdm)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Gets the view of the covariance estimator for the `i`-th element(s).
+
+# Arguments
+
+  - $(arg_dict[:ce])
+  - `i`: Index or indices to view.
+
+# Returns
+
+  - $(ret_dict[:cev])
+
+# Related
+
+  - [`ProcessedCovariance`](@ref)
+"""
+function moment_view(ce::ProcessedCovariance, i)::ProcessedCovariance
+    return ProcessedCovariance(; ce = moment_view(ce.ce, i), alg = ce.alg, pdm = ce.pdm)
 end
 """
     Statistics.cov(ce::ProcessedCovariance, X::MatNum; dims = 1, kwargs...)

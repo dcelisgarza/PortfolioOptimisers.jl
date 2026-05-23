@@ -7,13 +7,7 @@ Computes portfolio risk as the square root of the fourth central moment (kurtosi
 
 # Fields
 
-  - `settings`: Risk measure configuration.
-  - `w`: Optional vector of observation weights.
-  - `mu`: Optional expected returns value, vector, or `VecScalar` for the moment target, via [`calc_moment_target`](@ref). If `nothing` it is computed from the returns series using the optional weights in `w`.
-  - `kt`: Optional cokurtosis (fourth moment) matrix that overrides the prior `kt` when provided.
-  - `N`: Optional integer specifying the number of eigenvalues per asset to use from the cokurtosis matrix in an approximate formulation. If `nothing`, the exact formulation is used.
-  - `alg1`: Moment algorithm specifying whether to use all or only downside deviations.
-  - `alg2`: Specifies the `JuMP` formulation used to encode the risk measure.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -86,12 +80,19 @@ Kurtosis
   - [`LowOrderPrior`](@ref)
 """
 @concrete struct Kurtosis <: RiskMeasure
+    "$(field_dict[:settings_rm])"
     settings
+    "$(field_dict[:w_rm])"
     w
+    "$(field_dict[:mu_rm])"
     mu
+    "$(field_dict[:kt])"
     kt
+    "$(field_dict[:N_kt])"
     N
+    "$(field_dict[:alg1])"
     alg1
+    "$(field_dict[:alg2])"
     alg2
     function Kurtosis(settings::RiskMeasureSettings, w::Option{<:ObsWeights},
                       mu::Option{<:Num_VecNum_VecScalar}, kt::Option{<:MatNum},
@@ -127,7 +128,7 @@ function Kurtosis(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                   mu::Option{<:Num_VecNum_VecScalar} = nothing,
                   kt::Option{<:MatNum} = nothing, N::Option{<:Integer} = nothing,
                   alg1::AbstractMomentAlgorithm = Full(),
-                  alg2::SecondMomentFormulation = SOCRiskExpr())
+                  alg2::SecondMomentFormulation = SOCRiskExpr())::Kurtosis
     return Kurtosis(settings, w, mu, kt, N, alg1, alg2)
 end
 function calc_moment_target(::Kurtosis{<:Any, Nothing, Nothing, <:Any, <:Any, <:Any, <:Any},
@@ -190,21 +191,21 @@ function (r::Kurtosis{<:Any, <:DynamicAbstractWeights, <:Any, <:Any, <:Any, <:Se
     return Kurtosis(; settings = r.settings, w = get_observation_weights(r.w, X), mu = r.mu,
                     kt = r.kt, N = r.N, alg1 = r.alg1, alg2 = r.alg2)(w, X, fees)
 end
-function factory(r::Kurtosis, pr::HighOrderPrior, args...; kwargs...)
+function factory(r::Kurtosis, pr::HighOrderPrior, args...; kwargs...)::Kurtosis
     w = nothing_scalar_array_selector(r.w, pr.w)
     mu = nothing_scalar_array_selector(r.mu, pr.mu)
     kt = nothing_scalar_array_selector(r.kt, pr.kt)
     return Kurtosis(; settings = r.settings, w = w, mu = mu, kt = kt, N = r.N,
                     alg1 = r.alg1, alg2 = r.alg2)
 end
-function factory(r::Kurtosis, pr::LowOrderPrior, args...; kwargs...)
+function factory(r::Kurtosis, pr::LowOrderPrior, args...; kwargs...)::Kurtosis
     w = nothing_scalar_array_selector(r.w, pr.w)
     mu = nothing_scalar_array_selector(r.mu, pr.mu)
     kt = nothing_scalar_array_selector(r.kt, nothing)
     return Kurtosis(; settings = r.settings, w = w, mu = mu, kt = kt, N = r.N,
                     alg1 = r.alg1, alg2 = r.alg2)
 end
-function risk_measure_view(r::Kurtosis, i, args...)
+function risk_measure_view(r::Kurtosis, i, args...)::Kurtosis
     mu = r.mu
     kt = r.kt
     j = nothing

@@ -43,12 +43,12 @@ SimpleExpectedReturns
 @concrete struct SimpleExpectedReturns <: AbstractExpectedReturnsEstimator
     "$(field_dict[:oow])"
     w
-    function SimpleExpectedReturns(w::Option{<:ObsWeights})
+    function SimpleExpectedReturns(w::Option{<:ObsWeights})::SimpleExpectedReturns
         assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(w)}(w)
     end
 end
-function SimpleExpectedReturns(; w::Option{<:ObsWeights} = nothing)
+function SimpleExpectedReturns(; w::Option{<:ObsWeights} = nothing)::SimpleExpectedReturns
     return SimpleExpectedReturns(w)
 end
 """
@@ -147,7 +147,7 @@ SimpleExpectedReturns
   - [`SimpleExpectedReturns`](@ref)
   - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
 """
-function factory(::SimpleExpectedReturns, w::ObsWeights)
+function factory(::SimpleExpectedReturns, w::ObsWeights)::SimpleExpectedReturns
     return SimpleExpectedReturns(; w = w)
 end
 

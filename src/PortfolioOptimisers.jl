@@ -10,6 +10,7 @@ using Clustering: Clustering, assignments
 using Combinatorics: Combinatorics
 using ConcreteStructs: @concrete
 using DataFrames: DataFrames
+using DataStructures: DataStructures
 using Dates: Dates
 using Distances: Distances
 using Distributions: Distributions
@@ -31,6 +32,7 @@ using Random: Random
 using Roots: Roots
 using SimpleWeightedGraphs: SimpleWeightedGraphs
 using SparseArrays: SparseArrays
+using SpecialFunctions: SpecialFunctions
 using Statistics: Statistics, mean, std, var, cor, cov
 using StatsAPI: StatsAPI, predict
 using StatsBase: StatsBase
@@ -103,6 +105,8 @@ include("08_Moments/32_WindowedCokurtosis.jl")
 include("08_Moments/33_MedianExpectedReturns.jl")
 include("08_Moments/34_CustomValueExpectedReturns.jl")
 include("08_Moments/35_GerberIQCovariance.jl")
+include("08_Moments/36_RegimeAdjustedExpWeightedVariance.jl")
+include("08_Moments/37_RegimeAdjustedExpWeightedCovariance.jl")
 include("09_Distance/01_Base_Distance.jl")
 include("09_Distance/02_Distance.jl")
 include("09_Distance/03_DistanceDistance.jl")

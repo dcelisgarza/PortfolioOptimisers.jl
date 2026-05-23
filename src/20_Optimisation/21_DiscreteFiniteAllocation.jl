@@ -119,7 +119,7 @@ DiscreteAllocation
 end
 function DiscreteAllocation(; slv::Slv_VecSlv, sc::Number = 1, so::Number = 1,
                             wf::JuMPWeightFinaliserFormulation = AbsoluteErrorWeightFinaliser(),
-                            fb::Option{<:FOptE_FOpt} = GreedyAllocation())
+                            fb::Option{<:FOptE_FOpt} = GreedyAllocation())::DiscreteAllocation
     return DiscreteAllocation(slv, sc, so, wf, fb)
 end
 """

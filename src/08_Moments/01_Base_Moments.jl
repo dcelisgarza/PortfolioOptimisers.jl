@@ -1,4 +1,27 @@
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+No-op fallback for getting the view of a covariance estimator.
+
+# Arguments
+
+  - $(arg_dict[:ce])
+  - `args...`: Optional arguments (ignored).
+
+# Returns
+
+  - `ce::StatsBase.CovarianceEstimator`: The original covariance estimator.
+
+# Related
+
+  - [`AbstractCovarianceEstimator`](@ref)
+  - [`StatsBase.CovarianceEstimator`](https://juliastats.org/StatsBase.jl/stable/cov/)
+"""
+function moment_view(ce::StatsBase.CovarianceEstimator,
+                     args...)::StatsBase.CovarianceEstimator
+    return ce
+end
+"""
     factory(
         ce::StatsBase.CovarianceEstimator,
         args...;
@@ -23,7 +46,8 @@ Fallback for covariance estimator factory methods.
   - [`AbstractCovarianceEstimator`](@ref)
   - [`StatsBase.CovarianceEstimator`](https://juliastats.org/StatsBase.jl/stable/cov/)
 """
-function factory(ce::StatsBase.CovarianceEstimator, args...; kwargs...)
+function factory(ce::StatsBase.CovarianceEstimator, args...;
+                 kwargs...)::StatsBase.CovarianceEstimator
     return ce
 end
 """
@@ -370,6 +394,52 @@ MyExpectedReturnsEstimator
 """
 abstract type AbstractExpectedReturnsEstimator <: AbstractEstimator end
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Fallback for abstract expected returns estimator factory methods.
+
+# Arguments
+
+  - $(arg_dict[:me])
+  - `args...`: Optional arguments (ignored).
+  - `kwargs...`: Optional keyword arguments (ignored).
+
+# Returns
+
+  - `me::AbstractExpectedReturnsEstimator`: The original expected returns estimator.
+
+# Related
+
+  - [`factory`](@ref)
+  - [`AbstractExpectedReturnsEstimator`](@ref)
+"""
+function factory(me::AbstractExpectedReturnsEstimator, args...;
+                 kwargs...)::AbstractExpectedReturnsEstimator
+    return me
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+No-op fallback for getting the view of an expected returns estimator.
+
+# Arguments
+
+  - $(arg_dict[:me])
+  - `args...`: Optional arguments (ignored).
+
+# Returns
+
+  - `me::AbstractExpectedReturnsEstimator`: The original expected returns estimator.
+
+# Related
+
+  - [`AbstractExpectedReturnsEstimator`](@ref)
+"""
+function moment_view(me::AbstractExpectedReturnsEstimator,
+                     args...)::AbstractExpectedReturnsEstimator
+    return me
+end
+"""
 $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all expected returns algorithm types in `PortfolioOptimisers.jl`.
@@ -386,6 +456,52 @@ Given that these are meant to be used by expected returns estimators, there are 
   - [`AbstractExpectedReturnsEstimator`](@ref)
 """
 abstract type AbstractExpectedReturnsAlgorithm <: AbstractAlgorithm end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Fallback for abstract expected returns algorithm factory methods.
+
+# Arguments
+
+  - `alg`: The expected returns algorithm.
+  - `args...`: Optional arguments (ignored).
+  - `kwargs...`: Optional keyword arguments (ignored).
+
+# Returns
+
+  - `alg::AbstractExpectedReturnsAlgorithm`: The original expected returns algorithm.
+
+# Related
+
+  - [`factory`](@ref)
+  - [`AbstractExpectedReturnsAlgorithm`](@ref)
+"""
+function factory(alg::AbstractExpectedReturnsAlgorithm, args...;
+                 kwargs...)::AbstractExpectedReturnsAlgorithm
+    return alg
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+No-op fallback for getting the view of an expected returns algorithm.
+
+# Arguments
+
+  - `alg`: The expected returns algorithm.
+  - `args...`: Optional arguments (ignored).
+
+# Returns
+
+  - `alg::AbstractExpectedReturnsAlgorithm`: The original expected returns algorithm.
+
+# Related
+
+  - [`AbstractExpectedReturnsAlgorithm`](@ref)
+"""
+function me_alg_view(alg::AbstractExpectedReturnsAlgorithm,
+                     args...)::AbstractExpectedReturnsAlgorithm
+    return alg
+end
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -430,7 +546,7 @@ struct Full <: AbstractMomentAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-`Semi` is used for semi-moment estimators, where only observations below the a target are considered.
+`Semi` is used for semi-moment estimators, where only observations below a target are considered.
 
 ```math
 \\begin{align}

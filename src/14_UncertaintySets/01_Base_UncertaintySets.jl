@@ -124,7 +124,8 @@ Returns the argument unchanged. This is a no-op function used to handle cases wh
   - [`BoxUncertaintySet`](@ref)
   - [`EllipsoidalUncertaintySet`](@ref)
 """
-function mu_ucs(uc::Option{<:AbstractUncertaintySetResult}, args...; kwargs...)
+function mu_ucs(uc::Option{<:AbstractUncertaintySetResult}, args...;
+                kwargs...)::Option{<:AbstractUncertaintySetResult}
     return uc
 end
 """
@@ -149,7 +150,8 @@ Returns the argument unchanged. This is a no-op function used to handle cases wh
   - [`BoxUncertaintySet`](@ref)
   - [`EllipsoidalUncertaintySet`](@ref)
 """
-function sigma_ucs(uc::Option{<:AbstractUncertaintySetResult}, args...; kwargs...)
+function sigma_ucs(uc::Option{<:AbstractUncertaintySetResult}, args...;
+                   kwargs...)::Option{<:AbstractUncertaintySetResult}
     return uc
 end
 """
@@ -178,13 +180,13 @@ Based on the argument types, returns one of the following:
   - [`AbstractUncertaintySetEstimator`](@ref)
   - [`factory`](@ref)
 """
-function ucs_selector(::Nothing, ::Nothing)
+function ucs_selector(::Nothing, ::Nothing)::Nothing
     return nothing
 end
-function ucs_selector(risk_ucs::UcSE_UcS, ::Any)
+function ucs_selector(risk_ucs::UcSE_UcS, ::Any)::UcSE_UcS
     return risk_ucs
 end
-function ucs_selector(::Nothing, prior_ucs::UcSE_UcS)
+function ucs_selector(::Nothing, prior_ucs::UcSE_UcS)::UcSE_UcS
     return prior_ucs
 end
 """
@@ -209,7 +211,8 @@ Returns the uncertainty set sliced for the given index, or unchanged for estimat
   - [`BoxUncertaintySet`](@ref)
   - [`EllipsoidalUncertaintySet`](@ref)
 """
-function ucs_view(risk_ucs::Option{<:AbstractUncertaintySetEstimator}, ::Any)
+function ucs_view(risk_ucs::Option{<:AbstractUncertaintySetEstimator},
+                  ::Any)::Option{<:AbstractUncertaintySetEstimator}
     return risk_ucs
 end
 """
@@ -348,8 +351,7 @@ U^{\\text{box}}_{\\mathbf{\\Sigma}} &= \\left\\{ \\mathbf{\\Sigma}\\, \\vert\\, 
 
 # Fields
 
-  - `lb`: Lower bound array for the uncertainty set.
-  - `ub`: Upper bound array for the uncertainty set.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -382,7 +384,9 @@ BoxUncertaintySet
   - [`EllipsoidalUncertaintySet`](@ref)
 """
 @concrete struct BoxUncertaintySet <: AbstractUncertaintySetResult
+    "$(field_dict[:lb])"
     lb
+    "$(field_dict[:ub])"
     ub
     function BoxUncertaintySet(lb::ArrNum, ub::ArrNum)
         @argcheck(!isempty(lb))
@@ -391,13 +395,13 @@ BoxUncertaintySet
         return new{typeof(lb), typeof(ub)}(lb, ub)
     end
 end
-function BoxUncertaintySet(; lb::ArrNum, ub::ArrNum)
+function BoxUncertaintySet(; lb::ArrNum, ub::ArrNum)::BoxUncertaintySet
     return BoxUncertaintySet(lb, ub)
 end
-function ucs_view(risk_ucs::BoxUncertaintySet{<:VecNum, <:VecNum}, i)
+function ucs_view(risk_ucs::BoxUncertaintySet{<:VecNum, <:VecNum}, i)::BoxUncertaintySet
     return BoxUncertaintySet(; lb = view(risk_ucs.lb, i), ub = view(risk_ucs.ub, i))
 end
-function ucs_view(risk_ucs::BoxUncertaintySet{<:MatNum, <:MatNum}, i)
+function ucs_view(risk_ucs::BoxUncertaintySet{<:MatNum, <:MatNum}, i)::BoxUncertaintySet
     return BoxUncertaintySet(; lb = view(risk_ucs.lb, i, i), ub = view(risk_ucs.ub, i, i))
 end
 """
@@ -407,7 +411,7 @@ Algorithm for computing the scaling parameter `k` for ellipsoidal uncertainty se
 
 # Fields
 
-  - `kwargs`: Named tuple of keyword arguments for quantile calculation.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -437,12 +441,14 @@ NormalKUncertaintyAlgorithm
   - [`k_ucs`](@ref)
 """
 @concrete struct NormalKUncertaintyAlgorithm <: AbstractUncertaintyKAlgorithm
+    "$(field_dict[:kwargs])"
     kwargs
     function NormalKUncertaintyAlgorithm(kwargs::NamedTuple)
         return new{typeof(kwargs)}(kwargs)
     end
 end
-function NormalKUncertaintyAlgorithm(; kwargs::NamedTuple = (;))
+function NormalKUncertaintyAlgorithm(;
+                                     kwargs::NamedTuple = (;))::NormalKUncertaintyAlgorithm
     return NormalKUncertaintyAlgorithm(kwargs)
 end
 """
@@ -520,7 +526,7 @@ end
 function k_ucs(::ChiSqKUncertaintyAlgorithm, q::Number, X::ArrNum, args...)
     return sqrt(Distributions.cquantile(Distributions.Chisq(size(X, 1)), q))
 end
-function k_ucs(type::Number, args...)
+function k_ucs(type::Number, args...)::Number
     return type
 end
 """
@@ -531,8 +537,7 @@ Ellipsoidal uncertainty sets model uncertainty by specifying an ellipsoidal regi
 
 # Fields
 
-  - `method`: Algorithm or value used to determine the scaling parameter for the ellipsoidal.
-  - `diagonal`: Indicates whether to use only the diagonal elements of the covariance matrix.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -561,7 +566,9 @@ EllipsoidalUncertaintySetAlgorithm
   - [`BoxUncertaintySetAlgorithm`](@ref)
 """
 @concrete struct EllipsoidalUncertaintySetAlgorithm <: AbstractUncertaintySetAlgorithm
+    "$(field_dict[:method_ucs])"
     method
+    "$(field_dict[:diagonal])"
     diagonal
     function EllipsoidalUncertaintySetAlgorithm(method::Num_UcSK, diagonal::Bool)
         return new{typeof(method), typeof(diagonal)}(method, diagonal)
@@ -569,7 +576,7 @@ EllipsoidalUncertaintySetAlgorithm
 end
 function EllipsoidalUncertaintySetAlgorithm(;
                                             method::Num_UcSK = ChiSqKUncertaintyAlgorithm(),
-                                            diagonal::Bool = true)
+                                            diagonal::Bool = true)::EllipsoidalUncertaintySetAlgorithm
     return EllipsoidalUncertaintySetAlgorithm(method, diagonal)
 end
 """
@@ -626,9 +633,7 @@ U^{\\text{ellip}}_{\\mathbf{\\Sigma}} &= \\left\\{ \\mathbf{\\Sigma}\\, \\vert\\
 
 # Fields
 
-  - `sigma`: Covariance matrix for the uncertainty set.
-  - `k`: Scaling parameter for the ellipsoidal.
-  - `class`: Identifier for the type of ellipsoidal uncertainty set (e.g., mean or covariance).
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -664,8 +669,11 @@ EllipsoidalUncertaintySet
   - [`k_ucs`](@ref)
 """
 @concrete struct EllipsoidalUncertaintySet <: AbstractUncertaintySetResult
+    "$(field_dict[:sigma])"
     sigma
+    "$(field_dict[:k_ucs])"
     k
+    "$(field_dict[:class_ucs])"
     class
     function EllipsoidalUncertaintySet(sigma::MatNum, k::Number,
                                        class::AbstractEllipsoidalUncertaintySetResultClass)
@@ -676,17 +684,19 @@ EllipsoidalUncertaintySet
     end
 end
 function EllipsoidalUncertaintySet(; sigma::MatNum, k::Number,
-                                   class::AbstractEllipsoidalUncertaintySetResultClass)
+                                   class::AbstractEllipsoidalUncertaintySetResultClass)::EllipsoidalUncertaintySet
     return EllipsoidalUncertaintySet(sigma, k, class)
 end
 function ucs_view(risk_ucs::EllipsoidalUncertaintySet{<:MatNum, <:Any,
-                                                      <:SigmaEllipsoidalUncertaintySet}, i)
+                                                      <:SigmaEllipsoidalUncertaintySet},
+                  i)::EllipsoidalUncertaintySet
     i = fourth_moment_index_generator(floor(Int, sqrt(size(risk_ucs.sigma, 1))), i)
     return EllipsoidalUncertaintySet(; sigma = view(risk_ucs.sigma, i, i), k = risk_ucs.k,
                                      class = risk_ucs.class)
 end
 function ucs_view(risk_ucs::EllipsoidalUncertaintySet{<:MatNum, <:Any,
-                                                      <:MuEllipsoidalUncertaintySet}, i)
+                                                      <:MuEllipsoidalUncertaintySet},
+                  i)::EllipsoidalUncertaintySet
     return EllipsoidalUncertaintySet(; sigma = view(risk_ucs.sigma, i, i), k = risk_ucs.k,
                                      class = risk_ucs.class)
 end

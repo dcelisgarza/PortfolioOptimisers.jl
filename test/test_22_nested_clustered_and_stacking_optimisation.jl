@@ -167,6 +167,7 @@
                                                      "Consumer_Discretionary", "Energy",
                                                      "Industrials", "Healthcare",
                                                      "Consumer_Staples"]))
+    fsets = AssetSets(; dict = Dict("nx" => rd.nf))
     pr = prior(HighOrderPriorEstimator(), rd)
     rr = regression(DimensionReductionRegression(), rd)
     clr = clusterise(ClustersEstimator(), pr)
@@ -462,7 +463,8 @@
                                                         opti = RiskBudgeting(;
                                                                              rba = AssetRiskBudgeting(;
                                                                                                       sets = sets,
-                                                                                                      alg = LogRiskBudgeting(z = ones(Int,
+                                                                                                      alg = LogRiskBudgeting(;
+                                                                                                                             z = ones(Int,
                                                                                                                                       size(rd.X,
                                                                                                                                            2))),
                                                                                                       rkb = RiskBudgetEstimator(;
@@ -816,5 +818,58 @@
             find_tol(Matrix(df), reduce(hcat, res.w))
         end
         @test success
+    end
+    @testset "Prior views" begin
+        pes = [EmpiricalPrior(), FactorPrior(),
+               FactorPrior(; re = DimensionReductionRegression()),
+               HighOrderPriorEstimator(), HighOrderFactorPriorEstimator(),
+               HighOrderFactorPriorEstimator(;
+                                             pe = FactorPrior(;
+                                                              re = DimensionReductionRegression())),
+               BlackLittermanPrior(; sets = sets, tau = 1 / size(rd.X, 1),
+                                   views = LinearConstraintEstimator(;
+                                                                     val = ["AAPL == 0.00002",
+                                                                            "BAC == CVX",
+                                                                            "WMT == group2",
+                                                                            "RRC-group1 == 0.0005"])),
+               BayesianBlackLittermanPrior(; pe = FactorPrior(; pe = EmpiricalPrior(;)),
+                                           sets = fsets, tau = 1 / size(rd.X, 1),
+                                           views = LinearConstraintEstimator(;
+                                                                             val = ["MTUM == 0.0001",
+                                                                                    "QUAL - USMV == -0.0003"])),
+               BlackLittermanPrior(; sets = sets, tau = 1 / size(rd.X, 1),
+                                   views_conf = [0.05, 0.2, 0.5, 0.9],
+                                   views = LinearConstraintEstimator(;
+                                                                     val = ["AAPL == 0.00002",
+                                                                            "BAC == CVX",
+                                                                            "WMT == group2",
+                                                                            "RRC-group1 == 0.0005"]))]
+        prs = prior.(pes, rd)
+
+        jopto = JuMPOptimiser(; slv = slv)
+        jopties = [JuMPOptimiser(; pe = pe, slv = slv, sets = sets) for pe in pes]
+        joptirs = [JuMPOptimiser(; pe = pr, slv = slv, sets = sets) for pr in prs]
+        for (i, (joptir, joptie)) in enumerate(zip(joptirs, jopties))
+            res1 = optimise(NestedClustered(; cle = clr, opti = MeanRisk(; opt = joptir),
+                                            opto = MeanRisk(; opt = jopto)), rd)
+            res2 = optimise(NestedClustered(; cle = clr, opti = MeanRisk(; opt = joptie),
+                                            opto = MeanRisk(; opt = jopto)), rd)
+
+            rtol = if i in (2, 3, 5, 6)
+                5e-4
+            elseif i == 7
+                1e-3
+            elseif i == 9
+                5e-3
+            else
+                1e-6
+            end
+            res = isapprox(res1.w, res2.w; rtol = rtol)
+            if !res
+                println("Failed iteration: $i")
+                find_tol(res1.w, res2.w)
+            end
+            @test res
+        end
     end
 end

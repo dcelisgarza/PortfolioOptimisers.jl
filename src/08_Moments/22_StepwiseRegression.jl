@@ -42,7 +42,7 @@ PValue
         return new{typeof(t)}(t)
     end
 end
-function PValue(; t::Number = 0.05)
+function PValue(; t::Number = 0.05)::PValue
     return PValue(t)
 end
 """
@@ -135,10 +135,10 @@ StepwiseRegression
 end
 function StepwiseRegression(; crit::AbstractStepwiseRegressionCriterion = PValue(),
                             alg::AbstractStepwiseRegressionAlgorithm = Forward(),
-                            tgt::AbstractRegressionTarget = LinearModel())
+                            tgt::AbstractRegressionTarget = LinearModel())::StepwiseRegression
     return StepwiseRegression(crit, alg, tgt)
 end
-function factory(re::StepwiseRegression, w::ObsWeights)
+function factory(re::StepwiseRegression, w::ObsWeights)::StepwiseRegression
     return StepwiseRegression(; crit = re.crit, alg = re.alg, tgt = factory(re.tgt, w))
 end
 """

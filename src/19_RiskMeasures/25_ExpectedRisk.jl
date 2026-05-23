@@ -203,7 +203,7 @@ The risk contribution of asset ``i`` is defined as:
 \\mathrm{RC}_i = w_i \\cdot \\frac{\\partial \\rho(\\boldsymbol{w})}{\\partial w_i}\\,,
 ```
 
-where the partial derivative is approximated by a two-sided finite difference with step size `delta`. When `marginal = true`, the weighting by ``w_i`` is omitted (i.e., only the marginal risk ``\\partial \\rho / \\partial w_i`` is returned).
+where the partial derivative is approximated using a two-sided finite difference with step size `delta`. When `marginal = true`, the function omits the weighting by ``w_i`` (i.e., only the marginal risk ``\\partial \\rho / \\partial w_i`` is returned).
 
 # Arguments
 

@@ -7,13 +7,7 @@ Black-Litterman prior estimator for asset returns.
 
 # Fields
 
-  - `pe`: Prior estimator.
-  - `mp`: Matrix post-processing estimator.
-  - `views`: Views estimator or views object.
-  - `sets`: Asset sets.
-  - `views_conf`: View confidence(s).
-  - `rf`: Risk-free rate.
-  - `tau`: Blending parameter. When computing the prior if `nothing`, defaults to `1/T` where `T` is the number of observations.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -111,12 +105,19 @@ BlackLittermanPrior
   - [`prior`](@ref)
 """
 @concrete struct BlackLittermanPrior <: AbstractLowOrderPriorEstimator_AF
+    "$(field_dict[:pe])"
     pe
+    "$(field_dict[:mp])"
     mp
+    "$(field_dict[:views])"
     views
+    "$(field_dict[:sets])"
     sets
+    "$(field_dict[:views_conf])"
     views_conf
+    "$(field_dict[:rf])"
     rf
+    "$(field_dict[:tau])"
     tau
     function BlackLittermanPrior(pe::AbstractLowOrderPriorEstimator_A_F_AF,
                                  mp::AbstractMatrixProcessingEstimator, views::Lc_BLV,
@@ -140,7 +141,7 @@ function BlackLittermanPrior(;
                              mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing(),
                              views::Lc_BLV, sets::Option{<:AssetSets} = nothing,
                              views_conf::Option{<:Num_VecNum} = nothing, rf::Number = 0.0,
-                             tau::Option{<:Number} = nothing)
+                             tau::Option{<:Number} = nothing)::BlackLittermanPrior
     return BlackLittermanPrior(pe, mp, views, sets, views_conf, rf, tau)
 end
 function Base.getproperty(obj::BlackLittermanPrior, sym::Symbol)
@@ -152,10 +153,15 @@ function Base.getproperty(obj::BlackLittermanPrior, sym::Symbol)
         getfield(obj, sym)
     end
 end
-function factory(pe::BlackLittermanPrior, w::ObsWeights)
+function factory(pe::BlackLittermanPrior, w::ObsWeights)::BlackLittermanPrior
     return BlackLittermanPrior(; pe = factory(pe.pe, w), mp = pe.mp, views = pe.views,
                                sets = pe.sets, views_conf = pe.views_conf, rf = pe.rf,
                                tau = pe.tau)
+end
+function prior_view(pr::BlackLittermanPrior, i)::BlackLittermanPrior
+    return BlackLittermanPrior(; pe = prior_view(pr.pe, i), mp = pr.mp, views = pr.views,
+                               sets = asset_sets_view(pr.sets, i),
+                               views_conf = pr.views_conf, rf = pr.rf, tau = pr.tau)
 end
 """
     calc_omega(views_conf::Option{<:Num_VecNum}, P::MatNum,
@@ -235,6 +241,15 @@ function vanilla_posteriors(tau::Number, rf::Number, prior_mu::VecNum, prior_sig
     posterior_sigma = prior_sigma + tau * prior_sigma - v1 * (v2 \ transpose(v1))
     return posterior_mu, posterior_sigma
 end
+function remove_excl_views(views_conf::Option{<:Number}, args...)
+    return views_conf
+end
+function remove_excl_views(views_conf::VecNum, ::Nothing)
+    return views_conf
+end
+function remove_excl_views(views_conf::VecNum, excl::VecInt)
+    return nothing_scalar_array_view(views_conf, setdiff(1:length(views_conf), excl))
+end
 """
     prior(pe::BlackLittermanPrior, X::MatNum;
           F::Option{<:MatNum} = nothing, dims::Int = 1, strict::Bool = false,
@@ -292,10 +307,11 @@ function prior(pe::BlackLittermanPrior, X::MatNum, F::Option{<:MatNum} = nothing
     @argcheck(length(pe.sets.dict[pe.sets.key]) == size(X, 2))
     prior_model = prior(pe.pe, X, F; strict = strict, kwargs...)
     posterior_X, prior_mu, prior_sigma = prior_model.X, prior_model.mu, prior_model.sigma
-    (; P, Q) = black_litterman_views(pe.views, pe.sets; datatype = eltype(posterior_X),
-                                     strict = strict)
+    (; P, Q, excl) = black_litterman_views(pe.views, pe.sets;
+                                           datatype = eltype(posterior_X), strict = strict)
     tau = isnothing(pe.tau) ? inv(size(X, 1)) : pe.tau
-    omega = tau * calc_omega(pe.views_conf, P, prior_sigma)
+    views_conf = remove_excl_views(pe.views_conf, excl)
+    omega = tau * calc_omega(views_conf, P, prior_sigma)
     posterior_mu, posterior_sigma = vanilla_posteriors(tau, pe.rf, prior_mu, prior_sigma,
                                                        omega, P, Q)
     matrix_processing!(pe.mp, posterior_sigma, posterior_X; kwargs...)

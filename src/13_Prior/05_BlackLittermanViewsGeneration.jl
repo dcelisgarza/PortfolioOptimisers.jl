@@ -7,14 +7,14 @@ Container for Black-Litterman investor views in canonical matrix form.
 
 # Fields
 
-  - `P`: Matrix of view coefficients, where each row represents a view and each column corresponds to an asset.
-  - `Q`: Vector of expected returns or values for each view.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
     BlackLittermanViews(;
         P::MatNum,
-        Q::VecNum
+        Q::VecNum,
+        excl::Option{<:VecInt} = nothing
     ) -> BlackLittermanViews
 
 Keywords correspond to the struct's fields.
@@ -23,14 +23,16 @@ Keywords correspond to the struct's fields.
 
   - `!isempty(P)` and `!isempty(Q)`.
   - `size(P, 1) == length(Q)`.
+  - If `excl` is provided, `!isempty(excl)` and `length(excl) <= length(Q)`.
 
 # Examples
 
 ```jldoctest
 julia> BlackLittermanViews(; P = [1 2 3 4; 5 6 7 8], Q = [9; 10])
 BlackLittermanViews
-  P ┼ 2×4 Matrix{Int64}
-  Q ┴ Vector{Int64}: [9, 10]
+     P ┼ 2×4 Matrix{Int64}
+     Q ┼ Vector{Int64}: [9, 10]
+  excl ┴ nothing
 ```
 
 # Related
@@ -38,17 +40,26 @@ BlackLittermanViews
   - [`black_litterman_views`](@ref)
 """
 @concrete struct BlackLittermanViews <: AbstractResult
+    "$(field_dict[:P])"
     P
+    "$(field_dict[:Q])"
     Q
-    function BlackLittermanViews(P::MatNum, Q::VecNum)
+    "$(field_dict[:excl])"
+    excl
+    function BlackLittermanViews(P::MatNum, Q::VecNum, excl::Option{<:VecInt})
         @argcheck(!isempty(P))
         @argcheck(!isempty(Q))
         @argcheck(size(P, 1) == length(Q))
-        return new{typeof(P), typeof(Q)}(P, Q)
+        if !isnothing(excl)
+            @argcheck(!isempty(excl))
+            @argcheck(length(excl) <= length(Q))
+        end
+        return new{typeof(P), typeof(Q), typeof(excl)}(P, Q, excl)
     end
 end
-function BlackLittermanViews(; P::MatNum, Q::VecNum)
-    return BlackLittermanViews(P, Q)
+function BlackLittermanViews(; P::MatNum, Q::VecNum,
+                             excl::Option{<:VecInt} = nothing)::BlackLittermanViews
+    return BlackLittermanViews(P, Q, excl)
 end
 """
     const Lc_BLV = Union{<:LinearConstraintEstimator, <:BlackLittermanViews}
@@ -97,8 +108,9 @@ julia> lcs = parse_equation(["A + B == 0.05", "C == 0.02"]);
 
 julia> PortfolioOptimisers.get_black_litterman_views(lcs, sets)
 BlackLittermanViews
-  P ┼ 2×3 LinearAlgebra.Transpose{Float64, Matrix{Float64}}
-  Q ┴ Vector{Float64}: [0.05, 0.02]
+     P ┼ 2×3 LinearAlgebra.Transpose{Float64, Matrix{Float64}}
+     Q ┼ Vector{Float64}: [0.05, 0.02]
+  excl ┴ nothing
 ```
 
 # Related
@@ -114,9 +126,10 @@ function get_black_litterman_views(lcs::PR_VecPR, sets::AssetSets;
     end
     P = Vector{datatype}(undef, 0)
     Q = Vector{datatype}(undef, 0)
+    excl = Vector{Int}(undef, 0)
     nx = sets.dict[sets.key]
     At = Vector{datatype}(undef, length(nx))
-    for lc in lcs
+    for (i, lc) in enumerate(lcs)
         fill!(At, zero(eltype(At)))
         for (v, c) in zip(lc.vars, lc.coef)
             Ai = (nx .== v)
@@ -133,6 +146,7 @@ function get_black_litterman_views(lcs::PR_VecPR, sets::AssetSets;
                 throw(ArgumentError(msg))
             else
                 @warn(msg)
+                push!(excl, i)
                 continue
             end
         end
@@ -141,7 +155,7 @@ function get_black_litterman_views(lcs::PR_VecPR, sets::AssetSets;
     end
     return if !isempty(P)
         P = transpose(reshape(P, length(nx), :))
-        BlackLittermanViews(; P = P, Q = Q)
+        BlackLittermanViews(; P = P, Q = Q, excl = isempty(excl) ? nothing : excl)
     else
         nothing
     end
@@ -182,15 +196,17 @@ julia> sets = AssetSets(; key = "nx", dict = Dict("nx" => ["A", "B", "C"]));
 
 julia> black_litterman_views(["A + B == 0.05", "C == 0.02"], sets)
 BlackLittermanViews
-  P ┼ 2×3 LinearAlgebra.Transpose{Float64, Matrix{Float64}}
-  Q ┴ Vector{Float64}: [0.05, 0.02]
+     P ┼ 2×3 LinearAlgebra.Transpose{Float64, Matrix{Float64}}
+     Q ┼ Vector{Float64}: [0.05, 0.02]
+  excl ┴ nothing
 
 julia> lce = LinearConstraintEstimator(; val = ["A == 0.03", "B + C == 0.04"]);
 
 julia> black_litterman_views(lce, sets)
 BlackLittermanViews
-  P ┼ 2×3 LinearAlgebra.Transpose{Float64, Matrix{Float64}}
-  Q ┴ Vector{Float64}: [0.03, 0.04]
+     P ┼ 2×3 LinearAlgebra.Transpose{Float64, Matrix{Float64}}
+     Q ┼ Vector{Float64}: [0.03, 0.04]
+  excl ┴ nothing
 ```
 
 # Related
@@ -251,14 +267,14 @@ Validate Black-Litterman view confidence specification.
 
   - [`BlackLittermanViews`](@ref)
 """
-function assert_bl_views_conf(::Nothing, args...)
+function assert_bl_views_conf(::Nothing, args...)::Nothing
     return nothing
 end
-function assert_bl_views_conf(views_conf::Number, ::EqnType)
+function assert_bl_views_conf(views_conf::Number, ::EqnType)::Nothing
     @argcheck(zero(views_conf) < views_conf < one(views_conf))
     return nothing
 end
-function assert_bl_views_conf(views_conf::VecNum, val::EqnType)
+function assert_bl_views_conf(views_conf::VecNum, val::EqnType)::Nothing
     if isa(val, AbstractVector)
         @argcheck(length(val) == length(views_conf))
     else
@@ -267,10 +283,11 @@ function assert_bl_views_conf(views_conf::VecNum, val::EqnType)
     @argcheck(all(x -> zero(x) < x < one(x), views_conf))
     return nothing
 end
-function assert_bl_views_conf(views_conf::Num_VecNum, views::LinearConstraintEstimator)
+function assert_bl_views_conf(views_conf::Num_VecNum,
+                              views::LinearConstraintEstimator)::Nothing
     return assert_bl_views_conf(views_conf, views.val)
 end
-function assert_bl_views_conf(views_conf::Num_VecNum, views::BlackLittermanViews)
+function assert_bl_views_conf(views_conf::Num_VecNum, views::BlackLittermanViews)::Nothing
     return @argcheck(length(views_conf) == length(views.Q))
 end
 

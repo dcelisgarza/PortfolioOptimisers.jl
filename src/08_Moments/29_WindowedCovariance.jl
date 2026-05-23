@@ -46,7 +46,7 @@ end
 function WindowedCovariance(;
                             ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
                             w::Option{<:ObsWeights} = nothing,
-                            window::Option{<:Int_VecInt} = nothing)
+                            window::Option{<:Int_VecInt} = nothing)::WindowedCovariance
     return WindowedCovariance(ce, w, window)
 end
 """
@@ -68,8 +68,29 @@ Return a new [`WindowedCovariance`](@ref) estimator with observation weights `w`
   - [`WindowedCovariance`](@ref)
   - [`factory`](@ref)
 """
-function factory(ce::WindowedCovariance, w::ObsWeights)
+function factory(ce::WindowedCovariance, w::ObsWeights)::WindowedCovariance
     return WindowedCovariance(; ce = factory(ce.ce, w), w = w, window = ce.window)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Gets the view of the covariance estimator for the `i`-th element(s).
+
+# Arguments
+
+  - $(arg_dict[:ce])
+  - `i`: Index or indices to view.
+
+# Returns
+
+  - $(ret_dict[:cev])
+
+# Related
+
+  - [`WindowedCovariance`](@ref)
+"""
+function moment_view(ce::WindowedCovariance, i)::WindowedCovariance
+    return WindowedCovariance(; ce = moment_view(ce.ce, i), w = ce.w, window = ce.window)
 end
 """
     Statistics.cov(ce::WindowedCovariance, X::MatNum; dims::Int = 1, mean = nothing, iv::Option{<:MatNum} = nothing,

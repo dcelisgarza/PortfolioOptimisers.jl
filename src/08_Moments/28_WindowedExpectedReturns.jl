@@ -46,7 +46,7 @@ end
 function WindowedExpectedReturns(;
                                  me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
                                  w::Option{<:ObsWeights} = nothing,
-                                 window::Option{<:Int_VecInt} = nothing)
+                                 window::Option{<:Int_VecInt} = nothing)::WindowedExpectedReturns
     return WindowedExpectedReturns(me, w, window)
 end
 """
@@ -68,8 +68,30 @@ Return a new [`WindowedExpectedReturns`](@ref) estimator with observation weight
   - [`WindowedExpectedReturns`](@ref)
   - [`factory`](@ref)
 """
-function factory(me::WindowedExpectedReturns, w::ObsWeights)
+function factory(me::WindowedExpectedReturns, w::ObsWeights)::WindowedExpectedReturns
     return WindowedExpectedReturns(; me = factory(me.me, w), w = w, window = me.window)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Gets the view of the expected returns estimator for the `i`-th element(s).
+
+# Arguments
+
+  - $(arg_dict[:me])
+  - `i`: Index or indices to view.
+
+# Returns
+
+  - $(ret_dict[:mev])
+
+# Related
+
+  - [`WindowedExpectedReturns`](@ref)
+"""
+function moment_view(me::WindowedExpectedReturns, i)::WindowedExpectedReturns
+    return WindowedExpectedReturns(; me = moment_view(me.me, i), w = me.w,
+                                   window = me.window)
 end
 """
     Statistics.mean(me::WindowedExpectedReturns, X::MatNum; dims::Int = 1, iv::Option{<:MatNum} = nothing, kwargs...)

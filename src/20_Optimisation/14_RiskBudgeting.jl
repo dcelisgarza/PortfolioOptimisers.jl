@@ -116,7 +116,7 @@ Uses a logarithmic objective to enforce the risk budget constraints. Can provide
         return new{typeof(z)}(z)
     end
 end
-function LogRiskBudgeting(; z::Option{<:VecInt} = nothing)
+function LogRiskBudgeting(; z::Option{<:VecInt} = nothing)::LogRiskBudgeting
     return LogRiskBudgeting(z)
 end
 function risk_budgeting_formulation_view(alg::LogRiskBudgeting{Nothing}, i)
@@ -192,7 +192,7 @@ Keywords correspond to the struct's fields.
 end
 function AssetRiskBudgeting(; rkb::Option{<:RkbE_Rkb} = nothing,
                             sets::Option{<:AssetSets} = nothing,
-                            alg::RiskBudgetingFormulation = LogRiskBudgeting())
+                            alg::RiskBudgetingFormulation = LogRiskBudgeting())::AssetRiskBudgeting
     return AssetRiskBudgeting(rkb, sets, alg)
 end
 """
@@ -269,7 +269,8 @@ Keywords correspond to the struct's fields.
 end
 function FactorRiskBudgeting(; re::RegE_Reg = StepwiseRegression(),
                              rkb::Option{<:RkbE_Rkb} = nothing,
-                             sets::Option{<:AssetSets} = nothing, flag::Bool = true)
+                             sets::Option{<:AssetSets} = nothing,
+                             flag::Bool = true)::FactorRiskBudgeting
     return FactorRiskBudgeting(re, rkb, sets, flag)
 end
 """
@@ -355,7 +356,8 @@ Keywords correspond to the struct's fields.
 end
 function RiskBudgeting(; opt::JuMPOptimiser = JuMPOptimiser(), r::RM_VecRM = Variance(),
                        rba::RiskBudgetingAlgorithm = AssetRiskBudgeting(),
-                       wi::Option{<:VecNum} = nothing, fb::Option{<:OptE_Opt} = nothing)
+                       wi::Option{<:VecNum} = nothing,
+                       fb::Option{<:OptE_Opt} = nothing)::RiskBudgeting
     return RiskBudgeting(opt, r, rba, wi, fb)
 end
 function needs_previous_weights(opt::RiskBudgeting)
@@ -363,13 +365,13 @@ function needs_previous_weights(opt::RiskBudgeting)
             needs_previous_weights(opt.r) ||
             needs_previous_weights(opt.fb))
 end
-function factory(rb::RiskBudgeting, w::AbstractVector)
+function factory(rb::RiskBudgeting, w::AbstractVector)::RiskBudgeting
     opt = factory(rb.opt, w)
     r = factory(rb.r, w)
     fb = factory(rb.fb, w)
     return RiskBudgeting(; opt = opt, r = r, rba = rb.rba, wi = rb.wi, fb = fb)
 end
-function opt_view(rb::RiskBudgeting, i, X::MatNum)
+function opt_view(rb::RiskBudgeting, i, X::MatNum)::RiskBudgeting
     X = isa(rb.opt.pe, AbstractPriorResult) ? rb.opt.pe.X : X
     opt = opt_view(rb.opt, i, X)
     r = risk_measure_view(rb.r, i, X)

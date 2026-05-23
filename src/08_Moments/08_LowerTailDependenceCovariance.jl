@@ -60,7 +60,7 @@ LowerTailDependenceCovariance
 end
 function LowerTailDependenceCovariance(; ve::AbstractVarianceEstimator = SimpleVariance(),
                                        alpha::Number = 0.05,
-                                       ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())
+                                       ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())::LowerTailDependenceCovariance
     return LowerTailDependenceCovariance(ve, alpha, ex)
 end
 """
@@ -82,8 +82,31 @@ Return a new [`LowerTailDependenceCovariance`](@ref) estimator with observation 
   - [`LowerTailDependenceCovariance`](@ref)
   - [`factory`](@ref)
 """
-function factory(ce::LowerTailDependenceCovariance, w::ObsWeights)
+function factory(ce::LowerTailDependenceCovariance,
+                 w::ObsWeights)::LowerTailDependenceCovariance
     return LowerTailDependenceCovariance(; ve = factory(ce.ve, w), alpha = ce.alpha,
+                                         ex = ce.ex)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Gets the view of the covariance estimator for the `i`-th element(s).
+
+# Arguments
+
+  - $(arg_dict[:ce])
+  - `i`: Index or indices to view.
+
+# Returns
+
+  - $(ret_dict[:cev])
+
+# Related
+
+  - [`LowerTailDependenceCovariance`](@ref)
+"""
+function moment_view(ce::LowerTailDependenceCovariance, i)::LowerTailDependenceCovariance
+    return LowerTailDependenceCovariance(; ve = moment_view(ce.ve, i), alpha = ce.alpha,
                                          ex = ce.ex)
 end
 """

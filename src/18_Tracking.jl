@@ -55,7 +55,7 @@ All concrete and/or abstract types representing tracking algorithms (such as wei
   - [`TrackingError`](@ref)
 """
 abstract type AbstractTrackingAlgorithm <: AbstractAlgorithm end
-function needs_previous_weights(::AbstractTrackingAlgorithm)
+function needs_previous_weights(::AbstractTrackingAlgorithm)::Bool
     return false
 end
 """
@@ -113,7 +113,7 @@ Second-order cone (SOC) norm-based tracking formulation.
 
 # Fields
 
-  - `ddof`: Degrees of freedom adjustment.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -141,13 +141,14 @@ L2Tracking
   - [`norm_tracking`](@ref)
 """
 @concrete struct L2Tracking <: NormTracking
+    "$(field_dict[:ddof])"
     ddof
-    function L2Tracking(ddof::Integer)
+    function L2Tracking(ddof::Integer)::L2Tracking
         assert_nonempty_nonneg_finite_val(ddof, :ddof)
         return new{typeof(ddof)}(ddof)
     end
 end
-function L2Tracking(; ddof::Integer = 1)
+function L2Tracking(; ddof::Integer = 1)::L2Tracking
     return L2Tracking(ddof)
 end
 """
@@ -159,15 +160,13 @@ Second-order cone (SOC) squared norm-based tracking formulation.
 
 # Fields
 
-  - `ddof`: Degrees of freedom adjustment for scaling.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
     SquaredL2Tracking(;
         ddof::Integer = 1,
     ) -> SquaredL2Tracking
-
-  - `ddof`: Sets the degrees of freedom adjustment.
 
 ## Validation
 
@@ -189,13 +188,14 @@ SquaredL2Tracking
   - [`norm_tracking`](@ref)
 """
 @concrete struct SquaredL2Tracking <: NormTracking
+    "$(field_dict[:ddof])"
     ddof
-    function SquaredL2Tracking(ddof::Integer)
+    function SquaredL2Tracking(ddof::Integer)::SquaredL2Tracking
         assert_nonempty_nonneg_finite_val(ddof, :ddof)
         return new{typeof(ddof)}(ddof)
     end
 end
-function SquaredL2Tracking(; ddof::Integer = 1)
+function SquaredL2Tracking(; ddof::Integer = 1)::SquaredL2Tracking
     return SquaredL2Tracking(ddof)
 end
 """
@@ -229,8 +229,7 @@ Computes the Lp-norm of the difference between portfolio and benchmark returns: 
 
 # Fields
 
-  - `p`: The p-norm exponent (default 3).
-  - `ddof`: Degrees of freedom correction for the mean (default 0).
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -244,14 +243,16 @@ Computes the Lp-norm of the difference between portfolio and benchmark returns: 
   - [`LInfTracking`](@ref)
 """
 @concrete struct LpTracking <: NormTracking
+    "$(field_dict[:p_rm])"
     p
+    "$(field_dict[:ddof])"
     ddof
-    function LpTracking(p::Number, ddof::Integer)
+    function LpTracking(p::Number, ddof::Integer)::LpTracking
         assert_nonempty_nonneg_finite_val(ddof, :ddof)
         return new{typeof(p), typeof(ddof)}(p, ddof)
     end
 end
-function LpTracking(; p::Number = 3, ddof::Integer = 0)
+function LpTracking(; p::Number = 3, ddof::Integer = 0)::LpTracking
     return LpTracking(p, ddof)
 end
 """
@@ -263,8 +264,7 @@ Computes the L∞-norm (maximum absolute deviation) of the difference between po
 
 # Fields
 
-  - `ddof`: Degrees of freedom correction for the mean (default 0).
-  - `pos`: If `true`, uses the positive part of the maximum deviation (default `true`).
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -278,14 +278,16 @@ Computes the L∞-norm (maximum absolute deviation) of the difference between po
   - [`L2Tracking`](@ref)
 """
 @concrete struct LInfTracking <: NormTracking
+    "$(field_dict[:ddof])"
     ddof
+    "$(field_dict[:pos])"
     pos
-    function LInfTracking(ddof::Integer, pos::Bool)
+    function LInfTracking(ddof::Integer, pos::Bool)::LInfTracking
         assert_nonempty_nonneg_finite_val(ddof, :ddof)
         return new{typeof(ddof), typeof(pos)}(ddof, pos)
     end
 end
-function LInfTracking(; ddof::Integer = 0, pos::Bool = true)
+function LInfTracking(; ddof::Integer = 0, pos::Bool = true)::LInfTracking
     return LInfTracking(ddof, pos)
 end
 """
@@ -415,7 +417,7 @@ Used as a fallback method for missing tracking constraints or estimators, ensuri
   - [`WeightsTracking`](@ref)
   - [`ReturnsTracking`](@ref)
 """
-function tracking_view(::Nothing, ::Any)
+function tracking_view(::Nothing, ::Any)::Nothing
     return nothing
 end
 """
@@ -427,9 +429,7 @@ Asset weights-based tracking algorithm.
 
 # Fields
 
-  - `fees`: Optional fees estimator or result to apply to the weights tracking.
-  - `w`: Portfolio weights (vector of real numbers).
-  - `fixed`: Boolean indicating whether the algorithm is fixed (does not update with new weights) or variable (updates with new weights).
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -463,18 +463,22 @@ WeightsTracking
   - [`tracking_benchmark`](@ref)
 """
 @concrete struct WeightsTracking <: AbstractTrackingAlgorithm
+    "$(field_dict[:fees])"
     fees
+    "$(field_dict[:w_tn])"
     w
+    "$(field_dict[:fixed])"
     fixed
-    function WeightsTracking(fees::Option{<:Fees}, w::VecNum, fixed::Bool)
+    function WeightsTracking(fees::Option{<:Fees}, w::VecNum, fixed::Bool)::WeightsTracking
         assert_nonempty_finite_val(w, :w)
         return new{typeof(fees), typeof(w), typeof(fixed)}(fees, w, fixed)
     end
 end
-function WeightsTracking(; fees::Option{<:Fees} = nothing, w::VecNum, fixed::Bool = false)
+function WeightsTracking(; fees::Option{<:Fees} = nothing, w::VecNum,
+                         fixed::Bool = false)::WeightsTracking
     return WeightsTracking(fees, w, fixed)
 end
-function needs_previous_weights(tr::WeightsTracking)
+function needs_previous_weights(tr::WeightsTracking)::Bool
     return !tr.fixed
 end
 """
@@ -669,7 +673,7 @@ Returns-based tracking algorithm.
 
 # Fields
 
-  - `w`: Benchmark portfolio returns (vector of real numbers).
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -697,6 +701,7 @@ ReturnsTracking
   - [`tracking_benchmark`](@ref)
 """
 @concrete struct ReturnsTracking <: AbstractTrackingAlgorithm
+    "$(field_dict[:w_bm_ret])"
     w
     function ReturnsTracking(w::VecNum)
         assert_nonempty_finite_val(w, :w)
@@ -810,9 +815,7 @@ Tracking error result type.
 
 # Fields
 
-  - `tr`: Tracking algorithm object.
-  - `err`: Tracking error value.
-  - `alg`: Tracking formulation algorithm.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -853,8 +856,11 @@ TrackingError
   - [`L1Tracking`](@ref)
 """
 @concrete struct TrackingError <: AbstractTracking
+    "$(field_dict[:tr])"
     tr
+    "$(field_dict[:err])"
     err
+    "$(field_dict[:tralg])"
     alg
     function TrackingError(tr::AbstractTrackingAlgorithm, err::Number, alg::NormTracking)
         assert_nonempty_nonneg_finite_val(err, :err)

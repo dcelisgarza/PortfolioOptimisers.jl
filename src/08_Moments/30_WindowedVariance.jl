@@ -45,7 +45,7 @@ Keywords correspond to the struct's fields.
 end
 function WindowedVariance(; ce::AbstractVarianceEstimator = SimpleVariance(),
                           w::Option{<:ObsWeights} = nothing,
-                          window::Option{<:Int_VecInt} = nothing)
+                          window::Option{<:Int_VecInt} = nothing)::WindowedVariance
     return WindowedVariance(ce, w, window)
 end
 """
@@ -67,8 +67,29 @@ Return a new [`WindowedVariance`](@ref) estimator with observation weights `w` a
   - [`WindowedVariance`](@ref)
   - [`factory`](@ref)
 """
-function factory(ce::WindowedVariance, w::ObsWeights)
+function factory(ce::WindowedVariance, w::ObsWeights)::WindowedVariance
     return WindowedVariance(; ce = factory(ce.ce, w), w = w, window = ce.window)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Gets the view of the covariance estimator for the `i`-th element(s).
+
+# Arguments
+
+  - $(arg_dict[:ce])
+  - `i`: Index or indices to view.
+
+# Returns
+
+  - $(ret_dict[:cev])
+
+# Related
+
+  - [`WindowedVariance`](@ref)
+"""
+function moment_view(ce::WindowedVariance, i)::WindowedVariance
+    return WindowedVariance(; ce = moment_view(ce.ce, i), w = ce.w, window = ce.window)
 end
 """
     Statistics.var(ce::WindowedVariance, X::MatNum; dims::Int = 1, mean = nothing, iv::Option{<:MatNum} = nothing,

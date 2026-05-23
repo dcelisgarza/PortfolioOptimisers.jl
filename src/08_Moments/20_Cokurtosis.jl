@@ -71,30 +71,51 @@ Cokurtosis
 end
 function Cokurtosis(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
                     mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing(),
-                    alg::AbstractMomentAlgorithm = Full())
+                    alg::AbstractMomentAlgorithm = Full())::Cokurtosis
     return Cokurtosis(me, mp, alg)
 end
 """
-    factory(ke::Cokurtosis, w::ObsWeights) -> Cokurtosis
+    factory(kte::Cokurtosis, w::ObsWeights) -> Cokurtosis
 
 Return a new [`Cokurtosis`](@ref) estimator with observation weights `w` applied to the underlying mean estimator.
 
 # Arguments
 
-  - `ke`: Cokurtosis estimator.
+  - `kte`: Cokurtosis estimator.
   - $(arg_dict[:ow])
 
 # Returns
 
-  - `ke::Cokurtosis`: Updated estimator with weights applied.
+  - `kte::Cokurtosis`: Updated estimator with weights applied.
 
 # Related
 
   - [`Cokurtosis`](@ref)
   - [`factory`](@ref)
 """
-function factory(ke::Cokurtosis, w::ObsWeights)
-    return Cokurtosis(; me = factory(ke.me, w), mp = ke.mp, alg = ke.alg)
+function factory(kte::Cokurtosis, w::ObsWeights)::Cokurtosis
+    return Cokurtosis(; me = factory(kte.me, w), mp = kte.mp, alg = kte.alg)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Gets the view of the cokurtosis estimator for the `i`-th element(s).
+
+# Arguments
+
+  - $(arg_dict[:kte])
+  - `i`: Index or indices to view.
+
+# Returns
+
+  - $(ret_dict[:ktev])
+
+# Related
+
+  - [`Cokurtosis`](@ref)
+"""
+function moment_view(kte::Cokurtosis, i)::Cokurtosis
+    return Cokurtosis(; me = moment_view(kte.me, i), mp = kte.mp, alg = kte.alg)
 end
 """
     _cokurtosis(X::MatNum, mp::AbstractMatrixProcessingEstimator)
@@ -127,7 +148,7 @@ function _cokurtosis(X::MatNum, mp::AbstractMatrixProcessingEstimator)
     return ckurt
 end
 """
-    cokurtosis(ke::Option{<:Cokurtosis}, X::MatNum; dims::Int = 1,
+    cokurtosis(kte::Option{<:Cokurtosis}, X::MatNum; dims::Int = 1,
                mean = nothing, kwargs...)
 
 Compute the cokurtosis tensor for a dataset.
@@ -136,11 +157,11 @@ This method computes the cokurtosis tensor using the estimator's mean and matrix
 
 # Arguments
 
-  - `ke`: Cokurtosis estimator.
+  - `kte`: Cokurtosis estimator.
 
-      + `ke::Cokurtosis{<:Any, <:Any, <:Full}`: Cokurtosis estimator with [`Full`](@ref) moment algorithm.
-      + `ke::Cokurtosis{<:Any, <:Any, <:Semi}`: Cokurtosis estimator with [`Semi`](@ref) moment algorithm.
-      + `ke::Nothing`: No-op, returns `nothing`.
+      + `kte::Cokurtosis{<:Any, <:Any, <:Full}`: Cokurtosis estimator with [`Full`](@ref) moment algorithm.
+      + `kte::Cokurtosis{<:Any, <:Any, <:Semi}`: Cokurtosis estimator with [`Semi`](@ref) moment algorithm.
+      + `kte::Nothing`: No-op, returns `nothing`.
 
   - `X`: Data matrix (observations × assets).
 
@@ -180,25 +201,25 @@ julia> cokurtosis(Cokurtosis(), X)
   - [`Cokurtosis`](@ref)
   - [`_cokurtosis`](@ref)
 """
-function cokurtosis(ke::Cokurtosis{<:Any, <:Any, <:Full}, X::MatNum; dims::Int = 1,
+function cokurtosis(kte::Cokurtosis{<:Any, <:Any, <:Full}, X::MatNum; dims::Int = 1,
                     mean = nothing, kwargs...)
     @argcheck(dims in (1, 2))
     if dims == 2
         X = transpose(X)
     end
-    mu = isnothing(mean) ? Statistics.mean(ke.me, X; kwargs...) : mean
+    mu = isnothing(mean) ? Statistics.mean(kte.me, X; kwargs...) : mean
     X = X .- mu
-    return _cokurtosis(X, ke.mp)
+    return _cokurtosis(X, kte.mp)
 end
-function cokurtosis(ke::Cokurtosis{<:Any, <:Any, <:Semi}, X::MatNum; dims::Int = 1,
+function cokurtosis(kte::Cokurtosis{<:Any, <:Any, <:Semi}, X::MatNum; dims::Int = 1,
                     mean = nothing, kwargs...)
     @argcheck(dims in (1, 2))
     if dims == 2
         X = transpose(X)
     end
-    mu = isnothing(mean) ? Statistics.mean(ke.me, X; kwargs...) : mean
+    mu = isnothing(mean) ? Statistics.mean(kte.me, X; kwargs...) : mean
     X = min.(X .- mu, zero(eltype(X)))
-    return _cokurtosis(X, ke.mp)
+    return _cokurtosis(X, kte.mp)
 end
 function cokurtosis(::Nothing, args...; kwargs...)
     return nothing

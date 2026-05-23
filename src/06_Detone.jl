@@ -193,7 +193,7 @@ julia> detone!(Detone(), X)
 
   - [mlp1](@cite) M. M. De Prado. *Machine learning for asset managers* (Cambridge University Press, 2020). Chapter 2.
 """
-function detone!(::Nothing, X::MatNum)
+function detone!(::Nothing, X::MatNum)::MatNum
     return X
 end
 function detone!(dt::Detone, X::MatNum)
@@ -235,7 +235,7 @@ Out-of-place version of [`detone!`](@ref).
 
   - [mlp1](@cite) M. M. De Prado. *Machine learning for asset managers* (Cambridge University Press, 2020). Chapter 2.
 """
-function detone(::Nothing, X::MatNum)
+function detone(::Nothing, X::MatNum)::MatNum
     return X
 end
 function detone(dt::Detone, X::MatNum)

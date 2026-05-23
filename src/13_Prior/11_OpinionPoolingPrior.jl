@@ -63,13 +63,7 @@ Opinion pooling prior estimator for asset returns.
 
 # Fields
 
-  - `pes`: Vector of prior estimators to be pooled.
-  - `pe1`: Optional pre-processing prior estimator.
-  - `pe2`: Post-processing prior estimator.
-  - `p`: Penalty parameter for penalising opinions which deviate from the consensus.
-  - `w`: Vector of opinion probabilities.
-  - `alg`: Opinion pooling algorithm.
-  - `ex`: Parallel execution strategy.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -239,12 +233,19 @@ OpinionPoolingPrior
   - [`prior`](@ref)
 """
 @concrete struct OpinionPoolingPrior <: AbstractLowOrderPriorEstimator_AF
+    "$(field_dict[:pes])"
     pes
+    "$(field_dict[:pe1])"
     pe1
+    "$(field_dict[:pe2])"
     pe2
+    "$(field_dict[:p_pool])"
     p
+    "$(field_dict[:op_w])"
     w
+    "$(field_dict[:opalg])"
     alg
+    "$(field_dict[:ex])"
     ex
     function OpinionPoolingPrior(pes::VecEP,
                                  pe1::Option{<:AbstractLowOrderPriorEstimator_A_F_AF},
@@ -271,8 +272,18 @@ function OpinionPoolingPrior(; pes::VecEP,
                              pe2::AbstractLowOrderPriorEstimator_A_F_AF = EmpiricalPrior(),
                              p::Option{<:Number} = nothing, w::Option{<:VecNum} = nothing,
                              alg::OpinionPoolingAlgorithm = LinearOpinionPooling(),
-                             ex::FLoops.Transducers.Executor = FLoops.Transducers.ThreadedEx())
+                             ex::FLoops.Transducers.Executor = FLoops.Transducers.ThreadedEx())::OpinionPoolingPrior
     return OpinionPoolingPrior(pes, pe1, pe2, p, w, alg, ex)
+end
+function factory(pe::OpinionPoolingPrior, w::ObsWeights)::OpinionPoolingPrior
+    return OpinionPoolingPrior(; pes = factory(pe.pes, w), pe1 = factory(pe.pe1, w),
+                               pe2 = factory(pe.pe2, w), p = pe.p, w = pe.w, alg = pe.alg,
+                               ex = pe.ex)
+end
+function prior_view(pe::OpinionPoolingPrior, i)::OpinionPoolingPrior
+    return OpinionPoolingPrior(; pes = prior_view(pe.pes, i), pe1 = prior_view(pe.pe1, i),
+                               pe2 = prior_view(pe.pe2, i), p = pe.p, w = pe.w,
+                               alg = pe.alg, ex = pe.ex)
 end
 """
     robust_probabilities(ow::VecNum, args...)

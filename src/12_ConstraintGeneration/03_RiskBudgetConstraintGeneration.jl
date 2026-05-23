@@ -7,7 +7,7 @@ Container for the result of a risk budget constraint.
 
 # Fields
 
-  - `val`: Vector of risk budget allocations (typically `VecNum`).
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -37,14 +37,15 @@ RiskBudget
   - [`AbstractConstraintResult`](@ref)
 """
 @concrete struct RiskBudget <: AbstractConstraintResult
+    "$(field_dict[:rkb_val])"
     val
-    function RiskBudget(val::VecNum)
+    function RiskBudget(val::VecNum)::RiskBudget
         @argcheck(!isempty(val))
         @argcheck(all(x -> zero(x) <= x, val))
         return new{typeof(val)}(val)
     end
 end
-function RiskBudget(; val::Num_VecNum)
+function RiskBudget(; val::Num_VecNum)::RiskBudget
     return RiskBudget(val)
 end
 """
@@ -68,10 +69,10 @@ Returns `nothing` for `nothing` inputs, the budget unchanged for estimators, or 
   - [`RiskBudget`](@ref)
   - [`RiskBudgetEstimator`](@ref)
 """
-function risk_budget_view(::Nothing, args...)
+function risk_budget_view(::Nothing, args...)::Nothing
     return nothing
 end
-function risk_budget_view(rb::RiskBudget, i)
+function risk_budget_view(rb::RiskBudget, i)::RiskBudget
     val = nothing_scalar_array_view(rb.val, i)
     return RiskBudget(; val = val)
 end
@@ -84,7 +85,7 @@ Container for a risk budget allocation mapping or vector.
 
 # Fields
 
-  - `val`: A dictionary, pair, or vector of pairs mapping asset or group names to risk budget values.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -119,15 +120,19 @@ RiskBudgetEstimator
   - [`AssetSets`](@ref)
 """
 @concrete struct RiskBudgetEstimator <: AbstractConstraintEstimator
+    "$(field_dict[:rkbe_val])"
     val
+    "$(field_dict[:dval])"
     dval
-    function RiskBudgetEstimator(val::EstValType, dval::Option{<:Number})
+    function RiskBudgetEstimator(val::EstValType,
+                                 dval::Option{<:Number})::RiskBudgetEstimator
         assert_nonempty_nonneg_finite_val(val)
         assert_nonempty_nonneg_finite_val(dval)
         return new{typeof(val), typeof(dval)}(val, dval)
     end
 end
-function RiskBudgetEstimator(; val::EstValType, dval::Option{<:Number} = nothing)
+function RiskBudgetEstimator(; val::EstValType,
+                             dval::Option{<:Number} = nothing)::RiskBudgetEstimator
     return RiskBudgetEstimator(val, dval)
 end
 """
@@ -144,7 +149,7 @@ Matches either a [`RiskBudgetEstimator`](@ref) (specifying how to generate risk 
   - [`risk_budget_constraints`](@ref)
 """
 const RkbE_Rkb = Union{<:RiskBudgetEstimator, <:RiskBudget}
-function risk_budget_view(rb::RiskBudgetEstimator, ::Any)
+function risk_budget_view(rb::RiskBudgetEstimator, ::Any)::RiskBudgetEstimator
     return rb
 end
 """
@@ -180,7 +185,7 @@ RiskBudget
   - [`RiskBudget`](@ref)
   - [`risk_budget_constraints`](@ref)
 """
-function risk_budget_constraints(::Nothing, args...; N::Integer, kwargs...)
+function risk_budget_constraints(::Nothing, args...; N::Integer, kwargs...)::RiskBudget
     iN = inv(N)
     return RiskBudget(; val = range(iN, iN; length = N))
 end
@@ -214,7 +219,7 @@ RiskBudget
   - [`RiskBudget`](@ref)
   - [`risk_budget_constraints`](@ref)
 """
-function risk_budget_constraints(rb::RiskBudget, args...; kwargs...)
+function risk_budget_constraints(rb::RiskBudget, args...; kwargs...)::RiskBudget
     return rb
 end
 """
@@ -263,7 +268,7 @@ RiskBudget
 """
 function risk_budget_constraints(rb::EstValType, sets::AssetSets,
                                  dval::Option{<:Number} = nothing; strict::Bool = false,
-                                 kwargs...)
+                                 kwargs...)::RiskBudget
     if isnothing(dval)
         dval = inv(length(sets.dict[sets.key]))
     end
@@ -285,7 +290,7 @@ It is used for type stability and to provide a uniform interface for processing 
   - [`risk_budget_constraints`](@ref)
 """
 function risk_budget_constraints(rb::RiskBudgetEstimator, sets::AssetSets;
-                                 strict::Bool = false, kwargs...)
+                                 strict::Bool = false, kwargs...)::RiskBudget
     return risk_budget_constraints(rb.val, sets, rb.dval; strict = strict, kwargs...)
 end
 # const VecRkbE = AbstractVector{<:RiskBudgetEstimator}

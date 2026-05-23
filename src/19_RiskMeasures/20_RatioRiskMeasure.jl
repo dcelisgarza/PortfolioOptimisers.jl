@@ -15,8 +15,7 @@ where ``r_1`` and ``r_2`` are any two optimisation risk measures.
 
 # Fields
 
-  - `r1`: Numerator risk measure.
-  - `r2`: Denominator risk measure.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -57,22 +56,24 @@ RiskRatioRiskMeasure
   - [`NonOptimisationRiskRatioRiskMeasure`](@ref)
 """
 @concrete struct RiskRatioRiskMeasure <: HierarchicalRiskMeasure
+    "$(field_dict[:r1])"
     r1
+    "$(field_dict[:r2])"
     r2
     function RiskRatioRiskMeasure(r1::OptimisationRiskMeasure, r2::OptimisationRiskMeasure)
         return new{typeof(r1), typeof(r2)}(r1, r2)
     end
 end
 function RiskRatioRiskMeasure(; r1::OptimisationRiskMeasure = Variance(),
-                              r2::OptimisationRiskMeasure = ConditionalValueatRisk())
+                              r2::OptimisationRiskMeasure = ConditionalValueatRisk())::RiskRatioRiskMeasure
     return RiskRatioRiskMeasure(r1, r2)
 end
-function factory(r::RiskRatioRiskMeasure, args...; kwargs...)
+function factory(r::RiskRatioRiskMeasure, args...; kwargs...)::RiskRatioRiskMeasure
     r1 = factory(r.r1, args...; kwargs...)
     r2 = factory(r.r2, args...; kwargs...)
     return RiskRatioRiskMeasure(; r1 = r1, r2 = r2)
 end
-function factory(r::RiskRatioRiskMeasure, w::VecNum)
+function factory(r::RiskRatioRiskMeasure, w::VecNum)::RiskRatioRiskMeasure
     return RiskRatioRiskMeasure(; r1 = factory(r.r1, w), r2 = factory(r.r2, w))
 end
 """
@@ -92,8 +93,7 @@ where ``r_1`` and ``r_2`` are any two base risk measures.
 
 # Fields
 
-  - `r1`: Numerator risk measure.
-  - `r2`: Denominator risk measure.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -111,7 +111,9 @@ Keywords correspond to the struct's fields.
   - [`RiskRatioRiskMeasure`](@ref)
 """
 @concrete struct NonOptimisationRiskRatioRiskMeasure <: NonOptimisationRiskMeasure
+    "$(field_dict[:r1])"
     r1
+    "$(field_dict[:r2])"
     r2
     function NonOptimisationRiskRatioRiskMeasure(r1::AbstractBaseRiskMeasure,
                                                  r2::AbstractBaseRiskMeasure)
@@ -119,10 +121,11 @@ Keywords correspond to the struct's fields.
     end
 end
 function NonOptimisationRiskRatioRiskMeasure(; r1::AbstractBaseRiskMeasure = Variance(),
-                                             r2::AbstractBaseRiskMeasure = ConditionalValueatRisk())
+                                             r2::AbstractBaseRiskMeasure = ConditionalValueatRisk())::NonOptimisationRiskRatioRiskMeasure
     return NonOptimisationRiskRatioRiskMeasure(r1, r2)
 end
-function factory(r::NonOptimisationRiskRatioRiskMeasure, args...; kwargs...)
+function factory(r::NonOptimisationRiskRatioRiskMeasure, args...;
+                 kwargs...)::NonOptimisationRiskRatioRiskMeasure
     r1 = factory(r.r1, args...; kwargs...)
     r2 = factory(r.r2, args...; kwargs...)
     return NonOptimisationRiskRatioRiskMeasure(; r1 = r1, r2 = r2)

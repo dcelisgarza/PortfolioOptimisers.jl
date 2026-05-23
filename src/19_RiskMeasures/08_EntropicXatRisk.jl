@@ -77,10 +77,7 @@ where ``K_{\\exp} = \\{(a, b, c) : b\\, e^{a/b} \\leq c,\\, b > 0\\}`` is the ex
 
 # Fields
 
-  - `settings`: Risk measure configuration.
-  - `slv`: Solver or vector of solvers for the conic optimisation.
-  - `alpha`: Significance level for the lower tail.
-  - `w`: Optional observation weights.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -132,9 +129,13 @@ EntropicValueatRisk
   - [`EntropicDrawdownatRisk`](@ref)
 """
 @concrete struct EntropicValueatRisk <: RiskMeasure
+    "$(field_dict[:settings_rm])"
     settings
+    "$(field_dict[:slv])"
     slv
+    "$(field_dict[:alpha])"
     alpha
+    "$(field_dict[:oow])"
     w
     function EntropicValueatRisk(settings::RiskMeasureSettings, slv::Option{<:Slv_VecSlv},
                                  alpha::Number, w::Option{<:ObsWeights})
@@ -149,7 +150,7 @@ EntropicValueatRisk
 end
 function EntropicValueatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                              slv::Option{<:Slv_VecSlv} = nothing, alpha::Number = 0.05,
-                             w::Option{<:ObsWeights} = nothing)
+                             w::Option{<:ObsWeights} = nothing)::EntropicValueatRisk
     return EntropicValueatRisk(settings, slv, alpha, w)
 end
 function (r::EntropicValueatRisk)(x::VecNum)
@@ -172,11 +173,7 @@ where ``\\mathrm{EVaR}_{\\alpha}(\\boldsymbol{x})`` captures the lower-tail entr
 
 # Fields
 
-  - `settings`: Risk measure configuration.
-  - `slv`: Solver or vector of solvers for the conic optimisation.
-  - `alpha`: Significance level for the lower tail.
-  - `beta`: Significance level for the upper tail.
-  - `w`: Optional observation weights.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -203,10 +200,15 @@ Keywords correspond to the struct's fields.
   - [`EntropicValueatRisk`](@ref)
 """
 @concrete struct EntropicValueatRiskRange <: RiskMeasure
+    "$(field_dict[:settings_rm])"
     settings
+    "$(field_dict[:slv])"
     slv
+    "$(field_dict[:alpha])"
     alpha
+    "$(field_dict[:beta])"
     beta
+    "$(field_dict[:oow])"
     w
     function EntropicValueatRiskRange(settings::RiskMeasureSettings,
                                       slv::Option{<:Slv_VecSlv}, alpha::Number,
@@ -226,14 +228,15 @@ Keywords correspond to the struct's fields.
 end
 function EntropicValueatRiskRange(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                                   slv::Option{<:Slv_VecSlv} = nothing, alpha::Number = 0.05,
-                                  beta::Number = 0.05, w::Option{<:ObsWeights} = nothing)
+                                  beta::Number = 0.05,
+                                  w::Option{<:ObsWeights} = nothing)::EntropicValueatRiskRange
     return EntropicValueatRiskRange(settings, slv, alpha, beta, w)
 end
 function (r::EntropicValueatRiskRange)(x::VecNum)
     return ERM(x, r.slv, r.alpha, r.w) + ERM(-x, r.slv, r.beta, r.w)
 end
 function factory(r::EntropicValueatRiskRange, pr::AbstractPriorResult,
-                 slv::Option{<:Slv_VecSlv}, args...; kwargs...)
+                 slv::Option{<:Slv_VecSlv}, args...; kwargs...)::EntropicValueatRiskRange
     w = nothing_scalar_array_selector(r.w, pr.w)
     slv = solver_selector(r.slv, slv)
     return EntropicValueatRiskRange(; settings = r.settings, slv = slv, alpha = r.alpha,
@@ -262,10 +265,7 @@ The EDaR is the EVaR of the drawdown series:
 
 # Fields
 
-  - `settings`: Risk measure configuration.
-  - `slv`: Solver or vector of solvers for the conic optimisation.
-  - `alpha`: Significance level for the lower tail.
-  - `w`: Optional observation weights.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -317,9 +317,13 @@ EntropicDrawdownatRisk
   - [`RelativeEntropicDrawdownatRisk`](@ref)
 """
 @concrete struct EntropicDrawdownatRisk <: RiskMeasure
+    "$(field_dict[:settings_rm])"
     settings
+    "$(field_dict[:slv])"
     slv
+    "$(field_dict[:alpha])"
     alpha
+    "$(field_dict[:oow])"
     w
     function EntropicDrawdownatRisk(settings::RiskMeasureSettings,
                                     slv::Option{<:Slv_VecSlv}, alpha::Number,
@@ -335,7 +339,7 @@ EntropicDrawdownatRisk
 end
 function EntropicDrawdownatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                                 slv::Option{<:Slv_VecSlv} = nothing, alpha::Number = 0.05,
-                                w::Option{<:ObsWeights} = nothing)
+                                w::Option{<:ObsWeights} = nothing)::EntropicDrawdownatRisk
     return EntropicDrawdownatRisk(settings, slv, alpha, w)
 end
 function (r::EntropicDrawdownatRisk)(x::VecNum)
@@ -365,10 +369,7 @@ The Relative EDaR is the EVaR of the relative drawdown series:
 
 # Fields
 
-  - `settings`: Hierarchical risk measure configuration.
-  - `slv`: Solver or vector of solvers for the conic optimisation.
-  - `alpha`: Significance level for the lower tail.
-  - `w`: Optional observation weights.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -417,9 +418,13 @@ RelativeEntropicDrawdownatRisk
   - [`RelativeRelativisticDrawdownatRisk`](@ref)
 """
 @concrete struct RelativeEntropicDrawdownatRisk <: HierarchicalRiskMeasure
+    "$(field_dict[:settings_rm])"
     settings
+    "$(field_dict[:slv])"
     slv
+    "$(field_dict[:alpha])"
     alpha
+    "$(field_dict[:oow])"
     w
     function RelativeEntropicDrawdownatRisk(settings::HierarchicalRiskMeasureSettings,
                                             slv::Option{<:Slv_VecSlv}, alpha::Number,
@@ -437,7 +442,7 @@ function RelativeEntropicDrawdownatRisk(;
                                         settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
                                         slv::Option{<:Slv_VecSlv} = nothing,
                                         alpha::Number = 0.05,
-                                        w::Option{<:ObsWeights} = nothing)
+                                        w::Option{<:ObsWeights} = nothing)::RelativeEntropicDrawdownatRisk
     return RelativeEntropicDrawdownatRisk(settings, slv, alpha, w)
 end
 function (r::RelativeEntropicDrawdownatRisk)(x::VecNum)

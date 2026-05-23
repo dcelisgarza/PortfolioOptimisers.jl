@@ -57,7 +57,8 @@ KendallCovariance
         return new{typeof(ve)}(ve)
     end
 end
-function KendallCovariance(; ve::AbstractVarianceEstimator = SimpleVariance())
+function KendallCovariance(;
+                           ve::AbstractVarianceEstimator = SimpleVariance())::KendallCovariance
     return KendallCovariance(ve)
 end
 """
@@ -175,7 +176,8 @@ SpearmanCovariance
         return new{typeof(ve)}(ve)
     end
 end
-function SpearmanCovariance(; ve::AbstractVarianceEstimator = SimpleVariance())
+function SpearmanCovariance(;
+                            ve::AbstractVarianceEstimator = SimpleVariance())::SpearmanCovariance
     return SpearmanCovariance(ve)
 end
 """
@@ -252,6 +254,9 @@ for ce in traverse_concrete_subtypes(RankCovarianceEstimator)
     eval(quote
              function factory(ce::$(ce), w::ObsWeights)
                  return $(ce)(; ve = factory(ce.ve, w))
+             end
+             function moment_view(ce::$(ce), i)
+                 return $(ce)(; ve = moment_view(ce.ve, i))
              end
          end)
 end

@@ -367,32 +367,6 @@ end
 function dup_elim_sum_view(::MatNum, n)
     return dup_elim_sum_matrices(n)
 end
-function prior_view(pr::HighOrderPrior, i)
-    idx = fourth_moment_index_generator(length(pr.mu), i)
-    kt = pr.kt
-    L2, S2 = dup_elim_sum_view(kt, length(i))[2:3]
-    sk = pr.sk
-    skmp = pr.skmp
-    sk = nothing_scalar_array_view_odd_order(sk, i, idx)
-    if !isnothing(sk)
-        V = negative_spectral_coskewness(sk, view(pr.X, :, i), skmp)
-    else
-        V = nothing
-    end
-    return HighOrderPrior(; pr = prior_view(pr.pr, i),
-                          kt = nothing_scalar_array_view(kt, idx), L2 = L2, S2 = S2,
-                          sk = sk, V = V, skmp = skmp, f_kt = pr.f_kt, f_sk = pr.f_sk,
-                          f_V = pr.f_V)
-end
-function Base.getproperty(obj::HighOrderPrior, sym::Symbol)
-    return if sym in propertynames(obj)
-        getfield(obj, sym)
-    elseif sym in propertynames(obj.pr)
-        getproperty(obj.pr, sym)
-    else
-        getfield(obj, sym)
-    end
-end
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -402,9 +376,7 @@ High order prior estimator for asset returns.
 
 # Fields
 
-  - `pe`: Low order prior estimator (`AbstractLowOrderPriorEstimator_A_F_AF`).
-  - `kte`: Cokurtosis estimator (`CokurtosisEstimator` or `Nothing`).
-  - `ske`: Coskewness estimator (`CoskewnessEstimator` or `Nothing`).
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -484,8 +456,11 @@ HighOrderPriorEstimator
   - [`prior`](@ref)
 """
 @concrete struct HighOrderPriorEstimator <: AbstractHighOrderPriorEstimator
+    "$(field_dict[:pe])"
     pe
+    "$(field_dict[:kte])"
     kte
+    "$(field_dict[:ske])"
     ske
     function HighOrderPriorEstimator(pe::AbstractLowOrderPriorEstimator_A_F_AF,
                                      kte::Option{<:CokurtosisEstimator},
@@ -498,12 +473,17 @@ function HighOrderPriorEstimator(;
                                  kte::Option{<:CokurtosisEstimator} = Cokurtosis(;
                                                                                  alg = Full()),
                                  ske::Option{<:CoskewnessEstimator} = Coskewness(;
-                                                                                 alg = Full()))
+                                                                                 alg = Full()))::HighOrderPriorEstimator
     return HighOrderPriorEstimator(pe, kte, ske)
 end
-function factory(pe::HighOrderPriorEstimator, w::ObsWeights)
+function factory(pe::HighOrderPriorEstimator, w::ObsWeights)::HighOrderPriorEstimator
     return HighOrderPriorEstimator(; pe = factory(pe.pe, w), kte = factory(pe.kte, w),
                                    ske = factory(pe.ske, w))
+end
+function prior_view(pr::HighOrderPriorEstimator, i)::HighOrderPriorEstimator
+    return HighOrderPriorEstimator(; pe = prior_view(pr.pe, i),
+                                   kte = moment_view(pr.kte, i),
+                                   ske = moment_view(pr.ske, i))
 end
 function Base.getproperty(obj::HighOrderPriorEstimator, sym::Symbol)
     return if sym == :me

@@ -100,7 +100,7 @@ Where:
 
 # Fields
 
-  - `alg`: Entropy formulation to use.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -132,12 +132,13 @@ MaximumEntropy
   - [owa2](@cite) D. Cajas. *Higher order moment portfolio optimization with L-moments*. Available at SSRN 4393155 (2023).
 """
 @concrete struct MaximumEntropy <: AbstractOrderedWeightsArrayAlgorithm
+    "$(field_dict[:alg])"
     alg
     function MaximumEntropy(alg::EntropyFormulation)
         return new{typeof(alg)}(alg)
     end
 end
-function MaximumEntropy(; alg::EntropyFormulation = RelativeEntropy())
+function MaximumEntropy(; alg::EntropyFormulation = RelativeEntropy())::MaximumEntropy
     return MaximumEntropy(alg)
 end
 """
@@ -224,7 +225,7 @@ Where:
 
 # Fields
 
-  - `alg`: Second-order cone risk expression to use.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -256,12 +257,14 @@ The `MinimumSquaredDistance` algorithm can be configured to use different second
   - [owa2](@cite) D. Cajas. *Higher order moment portfolio optimization with L-moments*. Available at SSRN 4393155 (2023).
 """
 struct MinimumSquaredDistance{__T_alg} <: SquaredOrderedWeightsArrayAlgorithm{__T_alg}
+    "$(field_dict[:alg])"
     alg::__T_alg
     function MinimumSquaredDistance(alg::UnionAllSOCRiskExpr)
         return new{typeof(alg)}(alg)
     end
 end
-function MinimumSquaredDistance(; alg::UnionAllSOCRiskExpr = SOCRiskExpr())
+function MinimumSquaredDistance(;
+                                alg::UnionAllSOCRiskExpr = SOCRiskExpr())::MinimumSquaredDistance
     return MinimumSquaredDistance(alg)
 end
 """
@@ -296,7 +299,7 @@ Where:
 
 # Fields
 
-  - `alg`: Second-order cone risk expression to use.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -328,12 +331,13 @@ The `MinimumSumSquares` algorithm can be configured to use different second-orde
   - [owa2](@cite) D. Cajas. *Higher order moment portfolio optimization with L-moments*. Available at SSRN 4393155 (2023).
 """
 struct MinimumSumSquares{__T_alg} <: SquaredOrderedWeightsArrayAlgorithm{__T_alg}
+    "$(field_dict[:alg])"
     alg::__T_alg
     function MinimumSumSquares(alg::UnionAllSOCRiskExpr)
         return new{typeof(alg)}(alg)
     end
 end
-function MinimumSumSquares(; alg::UnionAllSOCRiskExpr = SOCRiskExpr())
+function MinimumSumSquares(; alg::UnionAllSOCRiskExpr = SOCRiskExpr())::MinimumSumSquares
     return MinimumSumSquares(alg)
 end
 """
@@ -367,7 +371,7 @@ Where:
 
 # Fields
 
-  - `g`: Risk aversion parameter.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -400,13 +404,15 @@ NormalisedConstantRelativeRiskAversion
 """
 @concrete struct NormalisedConstantRelativeRiskAversion <:
                  AbstractOrderedWeightsArrayEstimator
+    "$(field_dict[:g_rm])"
     g
     function NormalisedConstantRelativeRiskAversion(g::Number)
         @argcheck(zero(g) < g < one(g), DomainError("0 < g < 1 must hold. Got\ng => $g"))
         return new{typeof(g)}(g)
     end
 end
-function NormalisedConstantRelativeRiskAversion(; g::Number = 0.5)
+function NormalisedConstantRelativeRiskAversion(;
+                                                g::Number = 0.5)::NormalisedConstantRelativeRiskAversion
     return NormalisedConstantRelativeRiskAversion(g)
 end
 """
@@ -418,11 +424,7 @@ Estimator type for OWA weights using JuMP-based optimization.
 
 # Fields
 
-  - `slv`: Solver or vector of solvers to use.
-  - `max_phi`: Maximum allowed value for any OWA weight.
-  - `sc`: Scaling parameter for constraints.
-  - `so`: Scaling parameter for the objective.
-  - `alg`: Algorithm for OWA weight estimation.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -474,10 +476,15 @@ OWAJuMP
   - [owa2](@cite) D. Cajas. *Higher order moment portfolio optimization with L-moments*. Available at SSRN 4393155 (2023).
 """
 @concrete struct OWAJuMP <: AbstractOrderedWeightsArrayEstimator
+    "$(field_dict[:slv])"
     slv
+    "$(field_dict[:max_phi])"
     max_phi
+    "$(field_dict[:sc])"
     sc
+    "$(field_dict[:so])"
     so
+    "$(field_dict[:alg])"
     alg
     function OWAJuMP(slv::Slv_VecSlv, max_phi::Number, sc::Number, so::Number,
                      alg::AbstractOrderedWeightsArrayAlgorithm)
@@ -497,7 +504,7 @@ OWAJuMP
 end
 function OWAJuMP(; slv::Slv_VecSlv = Solver(), max_phi::Number = 0.5, sc::Number = 1.0,
                  so::Number = 1.0,
-                 alg::AbstractOrderedWeightsArrayAlgorithm = MaximumEntropy())
+                 alg::AbstractOrderedWeightsArrayAlgorithm = MaximumEntropy())::OWAJuMP
     return OWAJuMP(slv, max_phi, sc, so, alg)
 end
 """
@@ -1233,7 +1240,7 @@ OWA formulation that approximates OWA weights using a set of p-norm parameters.
 
 # Fields
 
-  - `p`: Vector of p-norm parameters used for the approximation. Each value must be greater than one.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -1248,6 +1255,7 @@ OWA formulation that approximates OWA weights using a set of p-norm parameters.
   - [`OrderedWeightsArray`](@ref)
 """
 @concrete struct ApproxOrderedWeightsArray <: OrderedWeightsArrayFormulation
+    "$(field_dict[:p_rm])"
     p
     function ApproxOrderedWeightsArray(p::VecNum)
         @argcheck(!isempty(p))
@@ -1267,9 +1275,7 @@ Computes portfolio risk as a linear combination of sorted portfolio returns usin
 
 # Fields
 
-  - `settings`: Risk measure settings.
-  - `w`: Optional vector of OWA weights. If `nothing`, the GMD weights are used.
-  - `alg`: OWA formulation algorithm used to compute weights when not provided.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -1288,8 +1294,11 @@ Computes portfolio risk as a linear combination of sorted portfolio returns usin
   - [`RiskMeasureSettings`](@ref)
 """
 @concrete struct OrderedWeightsArray <: RiskMeasure
+    "$(field_dict[:settings_rm])"
     settings
+    "$(field_dict[:owa_w])"
     w
+    "$(field_dict[:alg])"
     alg
     function OrderedWeightsArray(settings::RiskMeasureSettings, w::Option{<:VecNum},
                                  alg::OrderedWeightsArrayFormulation)
@@ -1317,10 +1326,7 @@ Computes portfolio risk as the difference between two OWA linear combinations of
 
 # Fields
 
-  - `settings`: Risk measure settings.
-  - `w1`: Optional first OWA weight vector (for the long side). If `nothing`, TG weights are used.
-  - `w2`: Optional second OWA weight vector (for the short side). If `nothing`, the reverse of `w1` is used.
-  - `alg`: OWA formulation algorithm.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -1341,9 +1347,13 @@ Computes portfolio risk as the difference between two OWA linear combinations of
   - [`RiskMeasureSettings`](@ref)
 """
 @concrete struct OrderedWeightsArrayRange <: RiskMeasure
+    "$(field_dict[:settings_rm])"
     settings
+    "$(field_dict[:w1_owa])"
     w1
+    "$(field_dict[:w2_owa])"
     w2
+    "$(field_dict[:alg])"
     alg
     function OrderedWeightsArrayRange(settings::RiskMeasureSettings, w1::Option{<:VecNum},
                                       w2::Option{<:VecNum},

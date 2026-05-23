@@ -53,7 +53,7 @@ StandardDeviationExpectedReturns
     end
 end
 function StandardDeviationExpectedReturns(;
-                                          ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance())
+                                          ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance())::StandardDeviationExpectedReturns
     return StandardDeviationExpectedReturns(ce)
 end
 """
@@ -75,8 +75,31 @@ Return a new [`StandardDeviationExpectedReturns`](@ref) estimator with observati
   - [`StandardDeviationExpectedReturns`](@ref)
   - [`factory`](@ref)
 """
-function factory(ce::StandardDeviationExpectedReturns, w::ObsWeights)
+function factory(ce::StandardDeviationExpectedReturns,
+                 w::ObsWeights)::StandardDeviationExpectedReturns
     return StandardDeviationExpectedReturns(; ce = factory(ce.ce, w))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Gets the view of the expected returns estimator for the `i`-th element(s).
+
+# Arguments
+
+  - $(arg_dict[:me])
+  - `i`: Index or indices to view.
+
+# Returns
+
+  - $(ret_dict[:mev])
+
+# Related
+
+  - [`StandardDeviationExpectedReturns`](@ref)
+"""
+function moment_view(me::StandardDeviationExpectedReturns,
+                     i)::StandardDeviationExpectedReturns
+    return StandardDeviationExpectedReturns(; me = moment_view(me.ce, i))
 end
 """
     Statistics.mean(me::StandardDeviationExpectedReturns, X::MatNum;
@@ -161,7 +184,7 @@ VarianceExpectedReturns
     end
 end
 function VarianceExpectedReturns(;
-                                 ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance())
+                                 ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance())::VarianceExpectedReturns
     return VarianceExpectedReturns(ce)
 end
 """
@@ -183,8 +206,29 @@ Return a new [`VarianceExpectedReturns`](@ref) estimator with observation weight
   - [`VarianceExpectedReturns`](@ref)
   - [`factory`](@ref)
 """
-function factory(ce::VarianceExpectedReturns, w::ObsWeights)
+function factory(ce::VarianceExpectedReturns, w::ObsWeights)::VarianceExpectedReturns
     return VarianceExpectedReturns(; ce = factory(ce.ce, w))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Gets the view of the expected returns estimator for the `i`-th element(s).
+
+# Arguments
+
+  - $(arg_dict[:me])
+  - `i`: Index or indices to view.
+
+# Returns
+
+  - $(ret_dict[:mev])
+
+# Related
+
+  - [`VarianceExpectedReturns`](@ref)
+"""
+function moment_view(me::VarianceExpectedReturns, i)::VarianceExpectedReturns
+    return VarianceExpectedReturns(; me = moment_view(me.ce, i))
 end
 """
     Statistics.mean(me::VarianceExpectedReturns, X::MatNum;

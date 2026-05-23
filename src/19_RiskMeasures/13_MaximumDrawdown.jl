@@ -21,7 +21,7 @@ The Maximum Drawdown is the most negative value in the drawdown series:
 
 # Fields
 
-  - `settings`: Risk measure configuration.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -61,12 +61,14 @@ MaximumDrawdown
   - [`RelativeMaximumDrawdown`](@ref)
 """
 @concrete struct MaximumDrawdown <: RiskMeasure
+    "$(field_dict[:settings_rm])"
     settings
     function MaximumDrawdown(settings::RiskMeasureSettings)
         return new{typeof(settings)}(settings)
     end
 end
-function MaximumDrawdown(; settings::RiskMeasureSettings = RiskMeasureSettings())
+function MaximumDrawdown(;
+                         settings::RiskMeasureSettings = RiskMeasureSettings())::MaximumDrawdown
     return MaximumDrawdown(settings)
 end
 function (::MaximumDrawdown)(x::VecNum)
@@ -96,7 +98,7 @@ The Relative Maximum Drawdown is:
 
 # Fields
 
-  - `settings`: Hierarchical risk measure configuration.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -133,13 +135,14 @@ RelativeMaximumDrawdown
   - [`RelativeAverageDrawdown`](@ref)
 """
 @concrete struct RelativeMaximumDrawdown <: HierarchicalRiskMeasure
+    "$(field_dict[:settings_rm])"
     settings
     function RelativeMaximumDrawdown(settings::HierarchicalRiskMeasureSettings)
         return new{typeof(settings)}(settings)
     end
 end
 function RelativeMaximumDrawdown(;
-                                 settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings())
+                                 settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings())::RelativeMaximumDrawdown
     return RelativeMaximumDrawdown(settings)
 end
 function (::RelativeMaximumDrawdown)(x::VecNum)

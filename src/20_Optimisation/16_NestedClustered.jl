@@ -58,7 +58,7 @@ Checks that the inner optimiser does not use pre-computed prior results or regre
 
   - [`NestedClustered`](@ref)
 """
-function assert_internal_optimiser(opt::ClusteringOptimisationEstimator)
+function assert_internal_optimiser(opt::ClusteringOptimisationEstimator)::Nothing
     @argcheck(!isa(opt.opt.cle, AbstractClusteringResult))
     return nothing
 end
@@ -81,10 +81,10 @@ Checks that risk budgeting-based JuMP optimisers do not use variance for risk co
 
   - [`NestedClustered`](@ref)
 """
-function assert_rc_variance(::Any)
+function assert_rc_variance(::Any)::Nothing
     return nothing
 end
-function assert_rc_variance(opt::RiskJuMPOptimisationEstimator)
+function assert_rc_variance(opt::RiskJuMPOptimisationEstimator)::Nothing
     if isa(opt.r, Variance)
         @argcheck(!isa(opt.r.rc, LinearConstraint),
                   "`rc` cannot be a `LinearConstraint` because there is no way to only consider items from a specific group and because this would break factor risk contribution")
@@ -114,16 +114,16 @@ Checks that factor risk contribution optimisers do not use phylogeny-based const
 
   - [`NestedClustered`](@ref)
 """
-function assert_rc_pl(::Any)
+function assert_rc_pl(::Any)::Nothing
     return nothing
 end
-function assert_rc_pl(opt::FactorRiskContribution)
+function assert_rc_pl(opt::FactorRiskContribution)::Nothing
     @argcheck(!isa(opt.frc_ple, AbstractPhylogenyConstraintResult) ||
               isa(opt.frc_ple, AbstractVector) &&
               !any(x -> isa(x, AbstractPhylogenyConstraintResult), opt.frc_ple))
     return nothing
 end
-function assert_internal_optimiser(opt::JuMPOptimisationEstimator)
+function assert_internal_optimiser(opt::JuMPOptimisationEstimator)::Nothing
     assert_rc_variance(opt)
     assert_rc_pl(opt)
     @argcheck(!(isa(opt.opt.lcse, LinearConstraint) ||
@@ -141,7 +141,7 @@ function assert_internal_optimiser(opt::JuMPOptimisationEstimator)
               !any(x -> isa(x, AbstractPhylogenyConstraintResult), opt.opt.ple))
     return nothing
 end
-function assert_internal_optimiser(opt::VecOptE_Opt)
+function assert_internal_optimiser(opt::VecOptE_Opt)::Nothing
     assert_internal_optimiser.(opt)
     return nothing
 end
@@ -164,11 +164,11 @@ Checks that the outer optimiser does not use pre-computed prior results, regress
 
   - [`NestedClustered`](@ref)
 """
-function assert_external_optimiser(opt::ClusteringOptimisationEstimator)
+function assert_external_optimiser(opt::ClusteringOptimisationEstimator)::Nothing
     assert_internal_optimiser(opt)
     return nothing
 end
-function assert_external_optimiser(opt::JuMPOptimisationEstimator)
+function assert_external_optimiser(opt::JuMPOptimisationEstimator)::Nothing
     #! Maybe results can be allowed with a warning. This goes for other stuff like bounds and threshold vectors. And then the optimisation can throw a domain error when it comes to using them.
     @argcheck(!isa(opt.opt.pe, AbstractPriorResult))
     assert_internal_optimiser(opt)
@@ -187,7 +187,7 @@ Matches either [`RiskBudgeting`](@ref) or [`RelaxedRiskBudgeting`](@ref). Used f
   - [`RelaxedRiskBudgeting`](@ref)
 """
 const RiskBudgetingOptimiser = Union{<:RiskBudgeting, <:RelaxedRiskBudgeting}
-function assert_external_optimiser(opt::RiskBudgetingOptimiser)
+function assert_external_optimiser(opt::RiskBudgetingOptimiser)::Nothing
     #! Maybe results can be allowed with a warning. This goes for other stuff like bounds and threshold vectors. And then the optimisation can throw a domain error when it comes to using them.
     @argcheck(!isa(opt.opt.pe, AbstractPriorResult))
     if isa(opt.rba, FactorRiskBudgeting)
@@ -196,14 +196,14 @@ function assert_external_optimiser(opt::RiskBudgetingOptimiser)
     assert_internal_optimiser(opt)
     return nothing
 end
-function assert_external_optimiser(opt::FactorRiskContribution)
+function assert_external_optimiser(opt::FactorRiskContribution)::Nothing
     #! Maybe results can be allowed with a warning. This goes for other stuff like bounds and threshold vectors. And then the optimisation can throw a domain error when it comes to using them.
     @argcheck(!isa(opt.opt.pe, AbstractPriorResult))
     @argcheck(!isa(opt.re, AbstractRegressionResult))
     assert_internal_optimiser(opt)
     return nothing
 end
-function assert_external_optimiser(opt::VecOptE_Opt)
+function assert_external_optimiser(opt::VecOptE_Opt)::Nothing
     assert_external_optimiser.(opt)
     return nothing
 end
@@ -319,7 +319,7 @@ function NestedClustered(; pe::PrE_Pr = EmpiricalPrior(), cle::ClE_Cl = Clusters
     return NestedClustered(pe, cle, wb, fees, sets, opti, opto, cv, wf, ex, fb, brt, cle_pr,
                            strict)
 end
-function assert_internal_optimiser(opt::NestedClustered)
+function assert_internal_optimiser(opt::NestedClustered)::Nothing
     @argcheck(!isa(opt.cle, AbstractClusteringResult))
     assert_external_optimiser(opt.opto)
     if !(opt.opti === opt.opto)
@@ -327,7 +327,7 @@ function assert_internal_optimiser(opt::NestedClustered)
     end
     return nothing
 end
-function assert_external_optimiser(opt::NestedClustered)
+function assert_external_optimiser(opt::NestedClustered)::Nothing
     #! Maybe results can be allowed with a warning. This goes for other stuff like bounds and threshold vectors. And then the optimisation can throw a domain error when it comes to using them.
     @argcheck(!isa(opt.pe, AbstractPriorResult))
     @argcheck(!isa(opt.cle, AbstractClusteringResult))
@@ -565,7 +565,8 @@ function _optimise(nco::NestedClustered, rd::ReturnsResult; dims::Int = 1,
     wi = zeros(eltype(X), size(X, 2), clr.k)
     opti = nco.opti
     resi = Vector{NonFiniteAllocationOptimisationResult}(undef, clr.k)
-    FLoops.@floop nco.ex for (i, cl) in pairs(cls)
+    # FLoops.@floop nco.ex
+    for (i, cl) in pairs(cls)
         optic = opt_view(opti, cl, X)
         rdc = returns_result_view(rd, cl)
         res = optimise(optic, rdc; dims = dims, branchorder = branchorder,

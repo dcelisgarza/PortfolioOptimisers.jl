@@ -44,7 +44,7 @@ ExcessExpectedReturns
 end
 function ExcessExpectedReturns(;
                                me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
-                               rf::Number = 0.0)
+                               rf::Number = 0.0)::ExcessExpectedReturns
     return ExcessExpectedReturns(me, rf)
 end
 """
@@ -66,8 +66,29 @@ Return a new [`ExcessExpectedReturns`](@ref) estimator with observation weights 
   - [`ExcessExpectedReturns`](@ref)
   - [`factory`](@ref)
 """
-function factory(me::ExcessExpectedReturns, w::ObsWeights)
+function factory(me::ExcessExpectedReturns, w::ObsWeights)::ExcessExpectedReturns
     return ExcessExpectedReturns(; me = factory(me.me, w), rf = me.rf)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Gets the view of the expected returns estimator for the `i`-th element(s).
+
+# Arguments
+
+  - $(arg_dict[:me])
+  - `i`: Index or indices to view.
+
+# Returns
+
+  - $(ret_dict[:mev])
+
+# Related
+
+  - [`ExcessExpectedReturns`](@ref)
+"""
+function moment_view(me::ExcessExpectedReturns, i)::ExcessExpectedReturns
+    return ExcessExpectedReturns(; me = moment_view(me.me, i), rf = me.rf)
 end
 """
     Statistics.mean(me::ExcessExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)

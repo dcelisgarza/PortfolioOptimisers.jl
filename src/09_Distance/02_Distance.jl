@@ -65,7 +65,7 @@ Distance
     end
 end
 function Distance(; power::Option{<:Integer} = nothing,
-                  alg::AbstractDistanceAlgorithm = SimpleDistance())
+                  alg::AbstractDistanceAlgorithm = SimpleDistance())::Distance
     return Distance(power, alg)
 end
 """

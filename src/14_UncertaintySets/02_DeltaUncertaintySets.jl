@@ -5,9 +5,7 @@ Estimator for box uncertainty sets using delta bounds on mean and covariance sta
 
 # Fields
 
-  - `pe`: Prior estimator used to compute mean and covariance statistics.
-  - `dmu`: Delta bound for expected returns (mean).
-  - `dsigma`: Delta bound for covariance.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -60,8 +58,11 @@ DeltaUncertaintySet
   - [`AbstractPriorEstimator`](@ref)
 """
 @concrete struct DeltaUncertaintySet <: AbstractUncertaintySetEstimator
+    "$(field_dict[:pe])"
     pe
+    "$(field_dict[:dmu])"
     dmu
+    "$(field_dict[:dsigma])"
     dsigma
     function DeltaUncertaintySet(pe::AbstractLowOrderPriorEstimator, dmu::Number,
                                  dsigma::Number)
@@ -71,7 +72,7 @@ DeltaUncertaintySet
     end
 end
 function DeltaUncertaintySet(; pe::AbstractLowOrderPriorEstimator = EmpiricalPrior(),
-                             dmu::Number = 0.1, dsigma::Number = 0.1)
+                             dmu::Number = 0.1, dsigma::Number = 0.1)::DeltaUncertaintySet
     return DeltaUncertaintySet(pe, dmu, dsigma)
 end
 """

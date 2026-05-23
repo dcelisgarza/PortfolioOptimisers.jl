@@ -148,7 +148,8 @@ GeneralExponentialSimilarity
         return new{typeof(coef), typeof(power)}(coef, power)
     end
 end
-function GeneralExponentialSimilarity(; coef::Number = 1, power::Number = 1)
+function GeneralExponentialSimilarity(; coef::Number = 1,
+                                      power::Number = 1)::GeneralExponentialSimilarity
     return GeneralExponentialSimilarity(coef, power)
 end
 """
@@ -242,7 +243,7 @@ DBHT
     end
 end
 function DBHT(; sim::AbstractSimilarityMatrixAlgorithm = MaximumDistanceSimilarity(),
-              root::DBHTRootMethod = UniqueRoot())
+              root::DBHTRootMethod = UniqueRoot())::DBHT
     return DBHT(sim, root)
 end
 """
@@ -1188,7 +1189,7 @@ end
 
 Assign each vertex to a specific bubble in the bubble hierarchy.
 
-This function determines the bubble membership of each vertex, resolving ambiguities when a vertex could belong to multiple bubbles. Assignment is based on the strength of connections (edge weights) between the vertex and each candidate bubble.
+This function determines the bubble membership of each vertex, resolving ambiguities when a vertex may belong to multiple bubbles. Assignment is based on the strength of connections (edge weights) between the vertex and each candidate bubble.
 
 # Arguments
 
@@ -1199,7 +1200,7 @@ This function determines the bubble membership of each vertex, resolving ambigui
 # Details
 
   - Vertices belonging to a single bubble are assigned directly.
-  - For vertices that could belong to multiple bubbles, assignment is made to the bubble with the strongest normalized connection (fraction of edge weights).
+  - For vertices that may belong to multiple bubbles, assignment is made to the bubble with the strongest normalized connection (fraction of edge weights).
   - Used internally for intra- and inter-cluster hierarchy construction in DBHT clustering.
 
 # Returns

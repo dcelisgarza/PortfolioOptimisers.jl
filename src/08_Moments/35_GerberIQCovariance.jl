@@ -430,7 +430,7 @@ ExpGerberIQDecay
     end
 end
 function ExpGerberIQDecay(; e::Option{<:GerberIQEps} = nothing,
-                          y::Option{<:GerberIQGamma} = nothing)
+                          y::Option{<:GerberIQGamma} = nothing)::ExpGerberIQDecay
     return ExpGerberIQDecay(e, y)
 end
 function (decay::ExpGerberIQDecay)(T::Number, k::Number)
@@ -569,7 +569,7 @@ BasicGerberIQ
         return new{typeof(d), typeof(n)}(d, n)
     end
 end
-function BasicGerberIQ(; d::Number = 2.0, n::Number = 0.5)
+function BasicGerberIQ(; d::Number = 2.0, n::Number = 0.5)::BasicGerberIQ
     return BasicGerberIQ(d, n)
 end
 """
@@ -787,7 +787,7 @@ function PartialGerberIQ(; dcp::Number = 2.0, dcn::Number = dcp, ddp::Number = d
                          n3::Number = n1, n4::Number = 1.0, n5::Number = n4,
                          n6::Number = n4, n7::Number = sqrt(n1 * n4),
                          n8::Number = sqrt(n2 * n5), n9::Number = sqrt(n3 * n6),
-                         n10::Number = sqrt(n3 * n6))
+                         n10::Number = sqrt(n3 * n6))::PartialGerberIQ
     return PartialGerberIQ(dcp, dcn, ddp, ddn, n1, n2, n3, n4, n5, n6, n7, n8, n9, n10)
 end
 """
@@ -1421,6 +1421,29 @@ function factory(ce::GerberIQCovariance, w::ObsWeights)
                               pdm = ce.pdm, c = ce.c, decay = factory(ce.decay, w),
                               sc = ce.sc, kind = ce.kind, alg = factory(ce.alg, w),
                               ex = ce.ex)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Gets the view of the covariance estimator for the `i`-th element(s).
+
+# Arguments
+
+  - $(arg_dict[:ce])
+  - `i`: Index or indices to view.
+
+# Returns
+
+  - $(ret_dict[:cev])
+
+# Related
+
+  - [`GerberIQCovariance`](@ref)
+"""
+function moment_view(ce::GerberIQCovariance, i)
+    return GerberIQCovariance(; ve = moment_view(ce.ve, i), me = moment_view(ce.me, i),
+                              pdm = ce.pdm, c = ce.c, decay = ce.decay, sc = ce.sc,
+                              kind = ce.kind, alg = ce.alg, ex = ce.ex)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

@@ -111,10 +111,10 @@ Implements the original Smyth-Broby covariance algorithm using vote counts only.
 
 # Related
 
-    - [`SmythBrobyCovarianceAlgorithm`](@ref)
-    - [`SmythBrobyCovariance`](@ref)
-    - [`SmythBrobyCount1`](@ref)
-    - [`SmythBrobyCount2`](@ref)
+  - [`SmythBrobyCovarianceAlgorithm`](@ref)
+  - [`SmythBrobyCovariance`](@ref)
+  - [`SmythBrobyCount1`](@ref)
+  - [`SmythBrobyCount2`](@ref)
 """
 struct SmythBrobyCount0 <: SmythBrobyCovarianceAlgorithm end
 """
@@ -124,10 +124,10 @@ Implements the first variant of the Smyth-Broby covariance algorithm using vote 
 
 # Related
 
-    - [`SmythBrobyCovarianceAlgorithm`](@ref)
-    - [`SmythBrobyCovariance`](@ref)
-    - [`SmythBrobyCount0`](@ref)
-    - [`SmythBrobyCount2`](@ref)
+  - [`SmythBrobyCovarianceAlgorithm`](@ref)
+  - [`SmythBrobyCovariance`](@ref)
+  - [`SmythBrobyCount0`](@ref)
+  - [`SmythBrobyCount2`](@ref)
 """
 struct SmythBrobyCount1 <: SmythBrobyCovarianceAlgorithm end
 """
@@ -137,10 +137,10 @@ Implements the second variant of the Smyth-Broby covariance algorithm using vote
 
 # Related
 
-    - [`SmythBrobyCovarianceAlgorithm`](@ref)
-    - [`SmythBrobyCovariance`](@ref)
-    - [`SmythBrobyCount0`](@ref)
-    - [`SmythBrobyCount1`](@ref)
+  - [`SmythBrobyCovarianceAlgorithm`](@ref)
+  - [`SmythBrobyCovariance`](@ref)
+  - [`SmythBrobyCount0`](@ref)
+  - [`SmythBrobyCount1`](@ref)
 """
 struct SmythBrobyCount2 <: SmythBrobyCovarianceAlgorithm end
 """
@@ -251,7 +251,7 @@ function SmythBrobyCovariance(; ve::StatsBase.CovarianceEstimator = SimpleVarian
                               pdm::Option{<:Posdef} = Posdef(), c1::Number = 0.5,
                               c2::Number = 0.5, c3::Number = 4, n::Number = 2,
                               alg::SmythBrobyCovarianceAlgorithm = SmythBrobyGerber1(),
-                              ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())
+                              ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())::SmythBrobyCovariance
     return SmythBrobyCovariance(ve, me, pdm, c1, c2, c3, n, alg, ex)
 end
 """
@@ -273,10 +273,33 @@ Return a new [`SmythBrobyCovariance`](@ref) estimator with observation weights `
   - [`SmythBrobyCovariance`](@ref)
   - [`factory`](@ref)
 """
-function factory(ce::SmythBrobyCovariance, w::ObsWeights)
+function factory(ce::SmythBrobyCovariance, w::ObsWeights)::SmythBrobyCovariance
     return SmythBrobyCovariance(; ve = factory(ce.ve, w), me = factory(ce.me, w),
                                 pdm = ce.pdm, c1 = ce.c1, c2 = ce.c2, c3 = ce.c3, n = ce.n,
                                 alg = factory(ce.alg, w), ex = ce.ex)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Gets the view of the covariance estimator for the `i`-th element(s).
+
+# Arguments
+
+  - $(arg_dict[:ce])
+  - `i`: Index or indices to view.
+
+# Returns
+
+  - $(ret_dict[:cev])
+
+# Related
+
+  - [`SmythBrobyCovariance`](@ref)
+"""
+function moment_view(ce::SmythBrobyCovariance, i)::SmythBrobyCovariance
+    return SmythBrobyCovariance(; ve = moment_view(ce.ve, i), me = moment_view(ce.me, i),
+                                pdm = ce.pdm, c1 = ce.c1, c2 = ce.c2, c3 = ce.c3, n = ce.n,
+                                alg = ce.alg, ex = ce.ex)
 end
 """
     sb_delta(ri::Number, rj::Number, n::Number) -> Number

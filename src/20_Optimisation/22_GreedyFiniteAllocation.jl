@@ -85,7 +85,7 @@ GreedyAllocation
     end
 end
 function GreedyAllocation(; unit::Number = 1, args::Tuple = (), kwargs::NamedTuple = (;),
-                          fb::Option{<:FOptE_FOpt} = nothing)
+                          fb::Option{<:FOptE_FOpt} = nothing)::GreedyAllocation
     return GreedyAllocation(unit, args, kwargs, fb)
 end
 """

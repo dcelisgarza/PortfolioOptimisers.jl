@@ -120,7 +120,7 @@ JamesStein
         return new{typeof(tgt)}(tgt)
     end
 end
-function JamesStein(; tgt::AbstractShrunkExpectedReturnsTarget = GrandMean())
+function JamesStein(; tgt::AbstractShrunkExpectedReturnsTarget = GrandMean())::JamesStein
     return JamesStein(tgt)
 end
 """
@@ -164,7 +164,7 @@ BayesStein
         return new{typeof(tgt)}(tgt)
     end
 end
-function BayesStein(; tgt::AbstractShrunkExpectedReturnsTarget = GrandMean())
+function BayesStein(; tgt::AbstractShrunkExpectedReturnsTarget = GrandMean())::BayesStein
     return BayesStein(tgt)
 end
 """
@@ -208,7 +208,8 @@ BodnarOkhrinParolya
         return new{typeof(tgt)}(tgt)
     end
 end
-function BodnarOkhrinParolya(; tgt::AbstractShrunkExpectedReturnsTarget = GrandMean())
+function BodnarOkhrinParolya(;
+                             tgt::AbstractShrunkExpectedReturnsTarget = GrandMean())::BodnarOkhrinParolya
     return BodnarOkhrinParolya(tgt)
 end
 """
@@ -271,7 +272,7 @@ ShrunkExpectedReturns
     me
     "$(field_dict[:ce])"
     ce
-    "Expected returns shrinkage algorithm."
+    "$(field_dict[:me_shrink_alg])"
     alg
     function ShrunkExpectedReturns(me::AbstractExpectedReturnsEstimator,
                                    ce::StatsBase.CovarianceEstimator,
@@ -282,7 +283,7 @@ end
 function ShrunkExpectedReturns(;
                                me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
                                ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
-                               alg::AbstractShrunkExpectedReturnsAlgorithm = JamesStein())
+                               alg::AbstractShrunkExpectedReturnsAlgorithm = JamesStein())::ShrunkExpectedReturns
     return ShrunkExpectedReturns(me, ce, alg)
 end
 """
@@ -375,7 +376,7 @@ This method applies a shrinkage algorithm to the sample expected returns, pullin
       + `BayesStein`: A Bayesian formula involving the centered mean and inverse covariance.
       + `BodnarOkhrinParolya`: A Bayesian formula involving the target mean, mean and inverse covariance.
 
-  - ReturnsResult the shrunk mean vector.
+  - Returns the shrunk mean vector.
 
 # Related
 
@@ -456,7 +457,7 @@ Return a new [`ShrunkExpectedReturns`](@ref) estimator with observation weights 
 
 # Arguments
 
-  - `ce`: Shrunk expected returns estimator.
+  - `me`: Shrunk expected returns estimator.
   - $(arg_dict[:ow])
 
 # Returns
@@ -468,9 +469,31 @@ Return a new [`ShrunkExpectedReturns`](@ref) estimator with observation weights 
   - [`ShrunkExpectedReturns`](@ref)
   - [`factory`](@ref)
 """
-function factory(ce::ShrunkExpectedReturns, w::ObsWeights)
-    return ShrunkExpectedReturns(; me = factory(ce.me, w), ce = factory(ce.ce, w),
-                                 alg = ce.alg)
+function factory(me::ShrunkExpectedReturns, w::ObsWeights)::ShrunkExpectedReturns
+    return ShrunkExpectedReturns(; me = factory(me.me, w), ce = factory(me.ce, w),
+                                 alg = me.alg)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Gets the view of the expected returns estimator for the `i`-th element(s).
+
+# Arguments
+
+  - $(arg_dict[:me])
+  - `i`: Index or indices to view.
+
+# Returns
+
+  - $(ret_dict[:mev])
+
+# Related
+
+  - [`ShrunkExpectedReturns`](@ref)
+"""
+function moment_view(me::ShrunkExpectedReturns, i)::ShrunkExpectedReturns
+    return ShrunkExpectedReturns(; me = moment_view(me.me, i), ce = moment_view(me.ce, i),
+                                 alg = me_alg_view(me.alg, i))
 end
 
 export GrandMean, VolatilityWeighted, MeanSquaredError, JamesStein, BayesStein,
