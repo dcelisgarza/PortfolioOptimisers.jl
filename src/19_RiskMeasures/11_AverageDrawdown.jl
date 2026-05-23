@@ -23,8 +23,7 @@ For observation-weighted samples, the weighted mean is used instead.
 
 # Fields
 
-  - `settings`: Risk measure configuration.
-  - `w`: Optional observation weights.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -71,7 +70,9 @@ AverageDrawdown
   - [`RelativeAverageDrawdown`](@ref)
 """
 @concrete struct AverageDrawdown <: RiskMeasure
+    "$(field_dict[:settings_rm])"
     settings
+    "$(field_dict[:w_rm])"
     w
     function AverageDrawdown(settings::RiskMeasureSettings, w::Option{<:ObsWeights})
         assert_nonempty_nonneg_finite_val(w, :w)
@@ -79,7 +80,7 @@ AverageDrawdown
     end
 end
 function AverageDrawdown(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                         w::Option{<:ObsWeights} = nothing)
+                         w::Option{<:ObsWeights} = nothing)::AverageDrawdown
     return AverageDrawdown(settings, w)
 end
 function (r::AverageDrawdown)(x::VecNum)
@@ -109,8 +110,7 @@ The Relative Average Drawdown is:
 
 # Fields
 
-  - `settings`: Hierarchical risk measure configuration.
-  - `w`: Optional observation weights.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -153,7 +153,9 @@ RelativeAverageDrawdown
   - [`RelativeMaximumDrawdown`](@ref)
 """
 @concrete struct RelativeAverageDrawdown <: HierarchicalRiskMeasure
+    "$(field_dict[:settings_rm])"
     settings
+    "$(field_dict[:w_rm])"
     w
     function RelativeAverageDrawdown(settings::HierarchicalRiskMeasureSettings,
                                      w::Option{<:ObsWeights})
@@ -163,7 +165,7 @@ RelativeAverageDrawdown
 end
 function RelativeAverageDrawdown(;
                                  settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
-                                 w::Option{<:ObsWeights} = nothing)
+                                 w::Option{<:ObsWeights} = nothing)::RelativeAverageDrawdown
     return RelativeAverageDrawdown(settings, w)
 end
 function (r::RelativeAverageDrawdown)(x::VecNum)

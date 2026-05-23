@@ -7,12 +7,7 @@ Structured result for correlation view constraint equation parsing.
 
 # Fields
 
-  - `vars`: Vector of variable names as strings.
-  - `coef`: Vector of coefficients.
-  - `op`: The comparison operator as a string.
-  - `rhs`: The right-hand side value.
-  - `eqn`: The formatted equation string.
-  - `ij`: Tuple or vector of asset index pairs for correlation views.
+$(DocStringExtensions.FIELDS)
 
 # Details
 
@@ -27,11 +22,17 @@ Structured result for correlation view constraint equation parsing.
   - [`replace_prior_views`](@ref)
 """
 @concrete struct RhoParsingResult <: AbstractParsingResult
+    "$(field_dict[:vars])"
     vars
+    "$(field_dict[:coef_c])"
     coef
+    "$(field_dict[:op])"
     op
+    "$(field_dict[:rhs])"
     rhs
+    "$(field_dict[:eqn])"
     eqn
+    "$(field_dict[:ij])"
     ij
     function RhoParsingResult(vars::VecStr, coef::VecNum, op::AbstractString, rhs::Number,
                               eqn::AbstractString,
@@ -174,8 +175,7 @@ Conditional Value-at-Risk (CVaR) entropy pooling optimiser.
 
 # Fields
 
-  - `args`: Tuple of arguments passed to the root-finding algorithm (e.g., `Roots.Brent()`).
-  - `kwargs`: Named tuple of keyword arguments for the root-finding algorithm.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -204,13 +204,16 @@ CVaREntropyPooling
   - [`Roots.jl`](https://github.com/JuliaMath/Roots.jl)
 """
 @concrete struct CVaREntropyPooling <: AbstractEntropyPoolingOptimiser
+    "$(field_dict[:optargs])"
     args
+    "$(field_dict[:optkwargs])"
     kwargs
     function CVaREntropyPooling(args::Tuple, kwargs::NamedTuple)
         return new{typeof(args), typeof(kwargs)}(args, kwargs)
     end
 end
-function CVaREntropyPooling(; args::Tuple = (Roots.Brent(),), kwargs::NamedTuple = (;))
+function CVaREntropyPooling(; args::Tuple = (Roots.Brent(),),
+                            kwargs::NamedTuple = (;))::CVaREntropyPooling
     return CVaREntropyPooling(args, kwargs)
 end
 """
@@ -222,11 +225,7 @@ $(DocStringExtensions.TYPEDEF)
 
 # Fields
 
-  - `args`: Tuple of arguments passed to the [`Optim.jl`](https://github.com/JuliaNLSolvers/Optim.jl) solver.
-  - `kwargs`: Named tuple of keyword arguments for the [`Optim.jl`](https://github.com/JuliaNLSolvers/Optim.jl) solver.
-  - `sc1`: Scaling parameter for the objective function.
-  - `sc2`: Slack parameter for relaxing fixed equality constraint penalties so that they can be satisfied more easily.
-  - `alg`: Entropy pooling optimisation algorithm.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -268,10 +267,15 @@ OptimEntropyPooling
   - [`Optim.jl`](https://github.com/JuliaNLSolvers/Optim.jl)
 """
 @concrete struct OptimEntropyPooling <: AbstractEntropyPoolingOptimiser
+    "$(field_dict[:optargs])"
     args
+    "$(field_dict[:optkwargs])"
     kwargs
+    "$(field_dict[:sc1])"
     sc1
+    "$(field_dict[:sc2])"
     sc2
+    "$(field_dict[:epoptalg])"
     alg
     function OptimEntropyPooling(args::Tuple, kwargs::NamedTuple, sc1::Number, sc2::Number,
                                  alg::AbstractEntropyPoolingOptAlgorithm)
@@ -285,7 +289,7 @@ OptimEntropyPooling
 end
 function OptimEntropyPooling(; args::Tuple = (), kwargs::NamedTuple = (;), sc1::Number = 1,
                              sc2::Number = 1e3,
-                             alg::AbstractEntropyPoolingOptAlgorithm = ExpEntropyPooling())
+                             alg::AbstractEntropyPoolingOptAlgorithm = ExpEntropyPooling())::OptimEntropyPooling
     return OptimEntropyPooling(args, kwargs, sc1, sc2, alg)
 end
 """
@@ -297,11 +301,7 @@ $(DocStringExtensions.TYPEDEF)
 
 # Fields
 
-  - `slv`: Solver object or vector of solvers for JuMP.jl.
-  - `sc1`: Scaling parameter for the objective function.
-  - `sc2`: Scaling parameter for constraint penalties.
-  - `so`: Scaling parameter for the objective expression.
-  - `alg`: Entropy pooling optimisation algorithm.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -350,10 +350,15 @@ JuMPEntropyPooling
   - [`JuMP.jl`](https://github.com/jump-dev/JuMP.jl)
 """
 @concrete struct JuMPEntropyPooling <: AbstractEntropyPoolingOptimiser
+    "$(field_dict[:slv])"
     slv
+    "$(field_dict[:sc1])"
     sc1
+    "$(field_dict[:sc2])"
     sc2
+    "$(field_dict[:so])"
     so
+    "$(field_dict[:epoptalg])"
     alg
     function JuMPEntropyPooling(slv::Slv_VecSlv, sc1::Number, sc2::Number, so::Number,
                                 alg::AbstractEntropyPoolingOptAlgorithm)
@@ -370,7 +375,7 @@ JuMPEntropyPooling
 end
 function JuMPEntropyPooling(; slv::Slv_VecSlv, sc1::Number = 1, sc2::Number = 1e5,
                             so::Number = 1,
-                            alg::AbstractEntropyPoolingOptAlgorithm = ExpEntropyPooling())
+                            alg::AbstractEntropyPoolingOptAlgorithm = ExpEntropyPooling())::JuMPEntropyPooling
     return JuMPEntropyPooling(slv, sc1, sc2, so, alg)
 end
 """
@@ -393,22 +398,7 @@ Entropy pooling prior estimator for asset returns.
 
 # Fields
 
-  - `pe`: Prior estimator for asset returns.
-  - `mu_views`: Mean view constraints.
-  - `sigma_views`: Variance view constraints.
-  - `cvar_views`: CVaR view constraints.
-  - `sigma_views`: Covariance view constraints.
-  - `sk_views`: Skewness view constraints.
-  - `kt_views`: Kurtosis view constraints.
-  - `rho_views`: Correlation view constraints.
-  - `var_alpha`: Confidence level for VaR (Value at Risk) views.
-  - `cvar_alpha`: Confidence level for CVaR (Conditional Value at Risk) views.
-  - `sets`: Asset sets.
-  - `ds_opt`: CVaR entropy pooling optimiser.
-  - `dm_opt`: Optim.jl-based entropy pooling optimiser.
-  - `opt`: Main entropy pooling optimiser.
-  - `w`: Prior weights.
-  - `alg`: Entropy pooling algorithm.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -515,21 +505,37 @@ EntropyPoolingPrior
   - [`AbstractEntropyPoolingAlgorithm`](@ref)
 """
 @concrete struct EntropyPoolingPrior <: AbstractLowOrderPriorEstimator_AF
+    "$(field_dict[:pe])"
     pe
+    "$(field_dict[:mu_views])"
     mu_views
+    "$(field_dict[:var_views])"
     var_views
+    "$(field_dict[:cvar_views])"
     cvar_views
+    "$(field_dict[:sigma_views])"
     sigma_views
+    "$(field_dict[:sk_views])"
     sk_views
+    "$(field_dict[:kt_views])"
     kt_views
+    "$(field_dict[:rho_views])"
     rho_views
+    "$(field_dict[:var_alpha])"
     var_alpha
+    "$(field_dict[:cvar_alpha])"
     cvar_alpha
+    "$(field_dict[:sets])"
     sets
+    "$(field_dict[:ds_opt])"
     ds_opt
+    "$(field_dict[:dm_opt])"
     dm_opt
+    "$(field_dict[:opt_ep])"
     opt
+    "$(field_dict[:ep_w])"
     w
+    "$(field_dict[:epalg])"
     alg
     function EntropyPoolingPrior(pe::AbstractLowOrderPriorEstimator_A_F_AF,
                                  mu_views::Option{<:LinearConstraintEstimator},
@@ -612,7 +618,7 @@ function EntropyPoolingPrior(; pe::AbstractLowOrderPriorEstimator_A_F_AF = Empir
                              dm_opt::Option{<:OptimEntropyPooling} = nothing,
                              opt::NonCVaREP = OptimEntropyPooling(),
                              w::Option{<:StatsBase.ProbabilityWeights} = nothing,
-                             alg::AbstractEntropyPoolingAlgorithm = H1_EntropyPooling())
+                             alg::AbstractEntropyPoolingAlgorithm = H1_EntropyPooling())::EntropyPoolingPrior
     return EntropyPoolingPrior(pe, mu_views, var_views, cvar_views, sigma_views, sk_views,
                                kt_views, rho_views, var_alpha, cvar_alpha, sets, ds_opt,
                                dm_opt, opt, w, alg)
@@ -636,7 +642,7 @@ Alias for an abstract vector of [`EntropyPoolingPrior`](@ref) elements.
   - [`EntropyPoolingPrior`](@ref)
 """
 const VecEP = AbstractVector{<:EntropyPoolingPrior}
-function factory(pe::EntropyPoolingPrior, w::ObsWeights)
+function factory(pe::EntropyPoolingPrior, w::ObsWeights)::EntropyPoolingPrior
     return EntropyPoolingPrior(; pe = factory(pe.pe, w), mu_views = pe.mu_views,
                                var_views = pe.var_views, cvar_views = pe.cvar_views,
                                sigma_views = pe.sigma_views, sk_views = pe.sk_views,
@@ -645,7 +651,7 @@ function factory(pe::EntropyPoolingPrior, w::ObsWeights)
                                sets = pe.sets, ds_opt = pe.ds_opt, dm_opt = pe.dm_opt,
                                opt = pe.opt, w = w, alg = pe.alg)
 end
-function prior_view(pe::EntropyPoolingPrior, i)
+function prior_view(pe::EntropyPoolingPrior, i)::EntropyPoolingPrior
     return EntropyPoolingPrior(; pe = prior_view(pe.pe, i), mu_views = pe.mu_views,
                                var_views = pe.var_views, cvar_views = pe.cvar_views,
                                sigma_views = pe.sigma_views, sk_views = pe.sk_views,

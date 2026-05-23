@@ -45,7 +45,7 @@ Keywords correspond to the struct's fields.
 end
 function WindowedCoskewness(; ske::CoskewnessEstimator = Coskewness(),
                             w::Option{<:ObsWeights} = nothing,
-                            window::Option{<:Int_VecInt} = nothing)
+                            window::Option{<:Int_VecInt} = nothing)::WindowedCoskewness
     return WindowedCoskewness(ske, w, window)
 end
 """
@@ -67,7 +67,7 @@ Return a new [`WindowedCoskewness`](@ref) estimator with observation weights `w`
   - [`WindowedCoskewness`](@ref)
   - [`factory`](@ref)
 """
-function factory(ske::WindowedCoskewness, w::ObsWeights)
+function factory(ske::WindowedCoskewness, w::ObsWeights)::WindowedCoskewness
     return WindowedCoskewness(; ske = factory(ske.ske, w), w = w, window = ske.window)
 end
 """
@@ -88,7 +88,7 @@ Gets the view of the coskewness estimator for the `i`-th element(s).
 
   - [`WindowedCoskewness`](@ref)
 """
-function moment_view(ske::WindowedCoskewness, i)
+function moment_view(ske::WindowedCoskewness, i)::WindowedCoskewness
     return WindowedCoskewness(; ske = moment_view(ske.ske, i), w = ske.w,
                               window = ske.window)
 end

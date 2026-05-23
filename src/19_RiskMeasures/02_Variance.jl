@@ -137,10 +137,7 @@ Represents the portfolio variance using a covariance matrix.
 
 # Fields
 
-  - `settings`: Risk measure configuration.
-  - `sigma`: Optional covariance matrix that overrides the prior covariance when provided. Also used to compute the risk represented by a vector.
-  - `rc`: Optional specification of risk contribution constraints.
-  - `alg`: The optimisation formulation used to represent the variance risk expression.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -253,14 +250,19 @@ julia> r(w)
   - [`expected_risk`](@ref)
 """
 @concrete struct Variance <: RiskMeasure
+    "$(field_dict[:settings_rm])"
     settings
+    "$(field_dict[:sigma])"
     sigma
+    "$(field_dict[:chol])"
     chol
+    "$(field_dict[:rc])"
     rc
+    "$(field_dict[:alg])"
     alg
     function Variance(settings::RiskMeasureSettings, sigma::Option{<:MatNum},
                       chol::Option{<:MatNum}, rc::Option{<:LcE_Lc},
-                      alg::VarianceFormulation)
+                      alg::VarianceFormulation)::Variance
         if isa(sigma, MatNum)
             @argcheck(!isempty(sigma))
             assert_matrix_issquare(sigma, :sigma)
@@ -278,7 +280,7 @@ end
 function Variance(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                   sigma::Option{<:MatNum} = nothing, chol::Option{<:MatNum} = nothing,
                   rc::Option{<:LcE_Lc} = nothing,
-                  alg::VarianceFormulation = SquaredSOCRiskExpr())
+                  alg::VarianceFormulation = SquaredSOCRiskExpr())::Variance
     return Variance(settings, sigma, chol, rc, alg)
 end
 function (r::Variance)(w::VecNum)
@@ -310,7 +312,7 @@ Create an instance of [`Variance`](@ref) by selecting the covariance matrix from
   - [`Variance`](@ref)
   - [`nothing_scalar_array_selector`](@ref)
 """
-function factory(r::Variance, pr::AbstractPriorResult, args...; kwargs...)
+function factory(r::Variance, pr::AbstractPriorResult, args...; kwargs...)::Variance
     sigma = nothing_scalar_array_selector(r.sigma, pr.sigma)
     chol = nothing_scalar_array_selector(r.chol, pr.chol)
     return Variance(; settings = r.settings, sigma = sigma, chol = chol, rc = r.rc,
@@ -331,8 +333,7 @@ Represents the portfolio standard deviation using a covariance matrix. It is the
 
 # Fields
 
-  - `settings`: Risk measure configuration.
-  - `sigma`: Optional covariance matrix that overrides the prior covariance when provided. Also used to compute the risk represented by a vector.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -412,11 +413,14 @@ julia> r(w)
   - [`expected_risk`](@ref)
 """
 @concrete struct StandardDeviation <: RiskMeasure
+    "$(field_dict[:settings_rm])"
     settings
+    "$(field_dict[:sigma])"
     sigma
+    "$(field_dict[:chol])"
     chol
     function StandardDeviation(settings::RiskMeasureSettings, sigma::Option{<:MatNum},
-                               chol::Option{<:MatNum})
+                               chol::Option{<:MatNum})::StandardDeviation
         if isa(sigma, MatNum)
             @argcheck(!isempty(sigma))
             assert_matrix_issquare(sigma, :sigma)
@@ -429,7 +433,7 @@ julia> r(w)
 end
 function StandardDeviation(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                            sigma::Option{<:MatNum} = nothing,
-                           chol::Option{<:MatNum} = nothing)
+                           chol::Option{<:MatNum} = nothing)::StandardDeviation
     return StandardDeviation(settings, sigma, chol)
 end
 function (r::StandardDeviation)(w::VecNum)
@@ -461,7 +465,8 @@ Create an instance of [`StandardDeviation`](@ref) by selecting the covariance ma
   - [`StandardDeviation`](@ref)
   - [`nothing_scalar_array_selector`](@ref)
 """
-function factory(r::StandardDeviation, pr::AbstractPriorResult, args...; kwargs...)
+function factory(r::StandardDeviation, pr::AbstractPriorResult, args...;
+                 kwargs...)::StandardDeviation
     sigma = nothing_scalar_array_selector(r.sigma, pr.sigma)
     chol = nothing_scalar_array_selector(r.chol, pr.chol)
     return StandardDeviation(; settings = r.settings, sigma = sigma, chol = chol)
@@ -478,9 +483,7 @@ Represents the variance risk measure under uncertainty sets. Works the same way 
 
 # Fields
 
-  - `settings`: Risk measure configuration.
-  - `ucs`: Uncertainty set estimator or result that defines the uncertainty model for the variance calculation.
-  - `sigma`: Optional covariance matrix that overrides the prior covariance when provided. Also used to compute the risk represented by a vector.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -664,8 +667,11 @@ julia> r(w)
   - [`expected_risk`](@ref)
 """
 @concrete struct UncertaintySetVariance <: RiskMeasure
+    "$(field_dict[:settings_rm])"
     settings
+    "$(field_dict[:ucs])"
     ucs
+    "$(field_dict[:sigma])"
     sigma
     function UncertaintySetVariance(settings::RiskMeasureSettings, ucs::Option{<:UcSE_UcS},
                                     sigma::Option{<:MatNum})

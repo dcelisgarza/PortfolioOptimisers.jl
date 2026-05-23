@@ -77,9 +77,7 @@ where ``\\lVert \\cdot \\rVert_F`` denotes the Frobenius norm.
 
 # Fields
 
-  - `settings`: Risk measure configuration.
-  - `alg1`: Second-moment formulation used for the quadratic term in optimisation.
-  - `alg2`: Brownian distance variance formulation for the linear absolute-value constraint.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -124,8 +122,11 @@ BrownianDistanceVariance
   - [`RSOCRiskExpr`](@ref)
 """
 @concrete struct BrownianDistanceVariance <: RiskMeasure
+    "$(field_dict[:settings_rm])"
     settings
+    "$(field_dict[:alg1])"
     alg1
+    "$(field_dict[:alg2])"
     alg2
     function BrownianDistanceVariance(settings::RiskMeasureSettings,
                                       alg1::BDVarRkFormulations,
@@ -135,7 +136,7 @@ BrownianDistanceVariance
 end
 function BrownianDistanceVariance(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                                   alg1::BDVarRkFormulations = QuadRiskExpr(),
-                                  alg2::BrownianDistanceVarianceFormulation = NormOneConeBrownianDistanceVariance())
+                                  alg2::BrownianDistanceVarianceFormulation = NormOneConeBrownianDistanceVariance())::BrownianDistanceVariance
     return BrownianDistanceVariance(settings, alg1, alg2)
 end
 function (::BrownianDistanceVariance)(x::VecNum)

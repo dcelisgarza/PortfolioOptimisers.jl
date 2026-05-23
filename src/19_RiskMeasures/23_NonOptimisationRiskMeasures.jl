@@ -23,8 +23,7 @@ For observation-weighted samples, the weighted mean is used instead.
 
 # Fields
 
-  - `w`: Optional observation weights.
-  - `flag`: If `true`, log-transforms returns before averaging.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -64,14 +63,16 @@ MeanReturn
   - [`MeanReturnRiskRatio`](@ref)
 """
 @concrete struct MeanReturn <: NonOptimisationRiskMeasure
+    "$(field_dict[:w_rm])"
     w
+    "$(field_dict[:flag])"
     flag
     function MeanReturn(w::Option{<:ObsWeights}, flag::Bool)
         assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(w), typeof(flag)}(w, flag)
     end
 end
-function MeanReturn(; w::Option{<:ObsWeights} = nothing, flag::Bool = false)
+function MeanReturn(; w::Option{<:ObsWeights} = nothing, flag::Bool = false)::MeanReturn
     return MeanReturn(w, flag)
 end
 function (r::MeanReturn)(x::VecNum)
@@ -80,11 +81,11 @@ function (r::MeanReturn)(x::VecNum)
     end
     return isnothing(r.w) ? Statistics.mean(x) : Statistics.mean(x, r.w)
 end
-function factory(r::MeanReturn, pr::AbstractPriorResult, args...)
+function factory(r::MeanReturn, pr::AbstractPriorResult, args...)::MeanReturn
     w = nothing_scalar_array_selector(r.w, pr.w)
     return MeanReturn(; w = w, flag = r.flag)
 end
-function risk_measure_view(r::MeanReturn, ::Any, args...)
+function risk_measure_view(r::MeanReturn, ::Any, args...)::MeanReturn
     return r
 end
 """
@@ -104,9 +105,7 @@ where ``\\bar{x}`` is the mean return (computed by `rt`), ``r_f`` is the risk-fr
 
 # Fields
 
-  - `rt`: Mean return estimator.
-  - `rk`: Risk measure for the denominator.
-  - `rf`: Risk-free rate.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -125,8 +124,11 @@ Keywords correspond to the struct's fields.
   - [`AbstractBaseRiskMeasure`](@ref)
 """
 @concrete struct MeanReturnRiskRatio <: NonOptimisationRiskMeasure
+    "$(field_dict[:rt_mean])"
     rt
+    "$(field_dict[:rk])"
     rk
+    "$(field_dict[:rf])"
     rf
     function MeanReturnRiskRatio(rt::MeanReturn, rk::AbstractBaseRiskMeasure, rf::Number)
         return new{typeof(rt), typeof(rk), typeof(rf)}(rt, rk, rf)
@@ -134,15 +136,15 @@ Keywords correspond to the struct's fields.
 end
 function MeanReturnRiskRatio(; rt::MeanReturn = MeanReturn(),
                              rk::AbstractBaseRiskMeasure = ConditionalValueatRisk(),
-                             rf::Number = 0.0)
+                             rf::Number = 0.0)::MeanReturnRiskRatio
     return MeanReturnRiskRatio(rt, rk, rf)
 end
-function factory(r::MeanReturnRiskRatio, args...; kwargs...)
+function factory(r::MeanReturnRiskRatio, args...; kwargs...)::MeanReturnRiskRatio
     rt = factory(r.rt, args...)
     rk = factory(r.rk, args...; kwargs...)
     return MeanReturnRiskRatio(; rt = rt, rk = rk, rf = r.rf)
 end
-function factory(r::MeanReturnRiskRatio, w::VecNum)
+function factory(r::MeanReturnRiskRatio, w::VecNum)::MeanReturnRiskRatio
     return MeanReturnRiskRatio(; rt = r.rt, rk = factory(r.rk, w), rf = r.rf)
 end
 function needs_previous_weights(r::MeanReturnRiskRatio)
@@ -167,8 +169,7 @@ For observation-weighted samples, the weighted mean is used.
 
 # Fields
 
-  - `w`: Optional observation weights.
-  - `mu`: Centre (centering value, vector, or `VecScalar`).
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -211,7 +212,9 @@ ThirdCentralMoment
   - [`Skewness`](@ref)
 """
 @concrete struct ThirdCentralMoment <: NonOptimisationRiskMeasure
+    "$(field_dict[:w_rm])"
     w
+    "$(field_dict[:mu_rm])"
     mu
     function ThirdCentralMoment(w::Option{<:ObsWeights}, mu::Option{<:Num_VecNum_VecScalar})
         assert_nonempty_nonneg_finite_val(w, :w)
@@ -222,7 +225,7 @@ ThirdCentralMoment
     end
 end
 function ThirdCentralMoment(; w::Option{<:ObsWeights} = nothing,
-                            mu::Option{<:Num_VecNum_VecScalar} = nothing)
+                            mu::Option{<:Num_VecNum_VecScalar} = nothing)::ThirdCentralMoment
     return ThirdCentralMoment(w, mu)
 end
 """
@@ -242,9 +245,7 @@ Let ``\\mu`` be the specified centre, ``\\delta_t = x_t - \\mu``, and ``\\sigma`
 
 # Fields
 
-  - `ve`: Variance estimator for computing ``\\sigma``.
-  - `w`: Optional observation weights.
-  - `mu`: Centre (centering value, vector, or `VecScalar`).
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -294,8 +295,11 @@ Skewness
   - [`AbstractVarianceEstimator`](@ref)
 """
 @concrete struct Skewness <: NonOptimisationRiskMeasure
+    "$(field_dict[:ve])"
     ve
+    "$(field_dict[:w_rm])"
     w
+    "$(field_dict[:mu_rm])"
     mu
     function Skewness(ve::AbstractVarianceEstimator, w::Option{<:ObsWeights},
                       mu::Option{<:Num_VecNum_VecScalar})
@@ -308,7 +312,7 @@ Skewness
 end
 function Skewness(; ve::AbstractVarianceEstimator = SimpleVariance(),
                   w::Option{<:ObsWeights} = nothing,
-                  mu::Option{<:Num_VecNum_VecScalar} = nothing)
+                  mu::Option{<:Num_VecNum_VecScalar} = nothing)::Skewness
     return Skewness(ve, w, mu)
 end
 """

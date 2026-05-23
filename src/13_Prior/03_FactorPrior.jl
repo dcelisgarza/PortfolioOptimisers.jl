@@ -7,11 +7,7 @@ Factor-based prior estimator for asset returns.
 
 # Fields
 
-  - `pe`: Factor prior estimator.
-  - `mp`: Matrix post-processing estimator.
-  - `re`: Regression estimator.
-  - `ve`: Variance estimator for residuals.
-  - `rsd`: Boolean flag to add residual variance to posterior covariance.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -85,10 +81,15 @@ FactorPrior
   - [`prior`](@ref)
 """
 @concrete struct FactorPrior <: AbstractLowOrderPriorEstimator_F
+    "$(field_dict[:pe])"
     pe
+    "$(field_dict[:mp])"
     mp
+    "$(field_dict[:re])"
     re
+    "$(field_dict[:ve])"
     ve
+    "$(field_dict[:rsd])"
     rsd
     function FactorPrior(pe::AbstractLowOrderPriorEstimator_A_AF,
                          mp::AbstractMatrixProcessingEstimator,
@@ -101,14 +102,15 @@ end
 function FactorPrior(; pe::AbstractLowOrderPriorEstimator_A_AF = EmpiricalPrior(),
                      mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing(),
                      re::AbstractRegressionEstimator = StepwiseRegression(),
-                     ve::AbstractVarianceEstimator = SimpleVariance(), rsd::Bool = true)
+                     ve::AbstractVarianceEstimator = SimpleVariance(),
+                     rsd::Bool = true)::FactorPrior
     return FactorPrior(pe, mp, re, ve, rsd)
 end
-function factory(pe::FactorPrior, w::ObsWeights)
+function factory(pe::FactorPrior, w::ObsWeights)::FactorPrior
     return FactorPrior(; pe = factory(pe.pe, w), mp = pe.mp, re = factory(pe.re, w),
                        ve = factory(pe.ve, w), rsd = pe.rsd)
 end
-function prior_view(pe::FactorPrior, i)
+function prior_view(pe::FactorPrior, i)::FactorPrior
     return FactorPrior(; pe = pe.pe, mp = pe.mp, re = regression_view(pe.re, i),
                        ve = moment_view(pe.ve, i), rsd = pe.rsd)
 end

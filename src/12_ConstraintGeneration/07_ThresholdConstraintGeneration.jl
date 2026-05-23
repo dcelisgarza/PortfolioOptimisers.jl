@@ -7,9 +7,7 @@ Estimator for buy-in threshold portfolio constraints.
 
 # Fields
 
-  - `val`: Asset-specific threshold values, as a dictionary, pair, or vector of pairs.
-  - `key`: (Optional) Key in the [`AssetSets`](@ref) to specify the asset universe for constraint generation. When provided, takes precedence over `key` field of [`AssetSets`](@ref).
-  - `dval`: Default threshold value applied to assets not explicitly specified in `val`.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -67,11 +65,14 @@ ThresholdEstimator
   - [`AbstractConstraintEstimator`](@ref)
 """
 @concrete struct ThresholdEstimator <: AbstractConstraintEstimator
+    "$(field_dict[:thr_val])"
     val
+    "$(field_dict[:ekey])"
     key
+    "$(field_dict[:dval])"
     dval
     function ThresholdEstimator(val::EstValType, key::Option{<:AbstractString} = nothing,
-                                dval::Option{<:Number} = nothing)
+                                dval::Option{<:Number} = nothing)::ThresholdEstimator
         assert_nonempty_nonneg_finite_val(val, :val)
         assert_nonempty_nonneg_finite_val(dval, :dval)
         if !isnothing(key)
@@ -81,7 +82,7 @@ ThresholdEstimator
     end
 end
 function ThresholdEstimator(; val::EstValType, key::Option{<:AbstractString} = nothing,
-                            dval::Option{<:Number} = nothing)
+                            dval::Option{<:Number} = nothing)::ThresholdEstimator
     return ThresholdEstimator(val, key, dval)
 end
 """
@@ -93,7 +94,7 @@ Container for buy-in threshold portfolio constraints.
 
 # Fields
 
-  - `val`: Scalar or vector of threshold values for portfolio weights.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -128,13 +129,14 @@ Threshold
   - [`AbstractConstraintResult`](@ref)
 """
 @concrete struct Threshold <: AbstractConstraintResult
+    "$(field_dict[:thr_res_val])"
     val
-    function Threshold(val::Num_VecNum)
+    function Threshold(val::Num_VecNum)::Threshold
         assert_nonempty_nonneg_finite_val(val)
         return new{typeof(val)}(val)
     end
 end
-function Threshold(; val::Num_VecNum)
+function Threshold(; val::Num_VecNum)::Threshold
     return Threshold(val)
 end
 """
@@ -224,14 +226,14 @@ Returns a view of the threshold for the specified index. If `t` is `nothing`, re
   - [`Threshold`](@ref)
   - [`ThresholdEstimator`](@ref)
 """
-function threshold_view(::Nothing, ::Any)
+function threshold_view(::Nothing, ::Any)::Nothing
     return nothing
 end
-function threshold_view(t::ThresholdEstimator, i)
+function threshold_view(t::ThresholdEstimator, i)::ThresholdEstimator
     return ThresholdEstimator(; val = nothing_scalar_array_view(t.val, i), dval = t.dval,
                               key = t.key)
 end
-function threshold_view(t::Threshold, i)
+function threshold_view(t::Threshold, i)::Threshold
     return Threshold(; val = nothing_scalar_array_view(t.val, i))
 end
 function threshold_view(t::VecOptBtE_Bt, i)
@@ -271,7 +273,8 @@ julia> threshold_constraints(nothing)
   - [`Threshold`](@ref)
   - [`threshold_constraints`](@ref)
 """
-function threshold_constraints(t::Option{<:Threshold}, args...; kwargs...)
+function threshold_constraints(t::Option{<:Threshold}, args...;
+                               kwargs...)::Option{<:Threshold}
     return t
 end
 """
@@ -318,7 +321,8 @@ Threshold
   - [`AssetSets`](@ref)
 """
 function threshold_constraints(t::ThresholdEstimator, sets::AssetSets;
-                               datatype::DataType = Float64, strict::Bool = false)
+                               datatype::DataType = Float64,
+                               strict::Bool = false)::Threshold
     return Threshold(;
                      val = estimator_to_val(t.val, sets, t.dval, t.key; datatype = datatype,
                                             strict = strict))

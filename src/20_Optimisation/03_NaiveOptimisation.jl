@@ -5,7 +5,7 @@ Abstract supertype for naive (heuristic) portfolio optimisation estimators.
 
 Naive optimisers compute portfolio weights directly from statistical properties of asset returns (e.g., volatility or equal weights) without solving an optimisation problem.
 
-# Related Types
+# Related
 
   - [`NonFiniteAllocationOptimisationEstimator`](@ref)
   - [`InverseVolatility`](@ref)
@@ -16,10 +16,10 @@ abstract type NaiveOptimisationEstimator <: NonFiniteAllocationOptimisationEstim
 function needs_previous_weights(opt::NaiveOptimisationEstimator)
     return needs_previous_weights(opt.fb)
 end
-function assert_internal_optimiser(::NaiveOptimisationEstimator)
+function assert_internal_optimiser(::NaiveOptimisationEstimator)::Nothing
     return nothing
 end
-function assert_external_optimiser(::NaiveOptimisationEstimator)
+function assert_external_optimiser(::NaiveOptimisationEstimator)::Nothing
     return nothing
 end
 """
@@ -29,12 +29,28 @@ Result type for naive portfolio optimisation estimators.
 
 # Fields
 
-  - `oe`: Type of the optimisation estimator that produced this result.
-  - `pr`: Prior result used in optimisation (or `nothing`).
-  - `wb`: Weight bounds applied.
-  - `retcode`: Optimisation return code (`OptimisationSuccess` or `OptimisationFailure`).
-  - `w`: Optimal portfolio weights vector.
-  - `fb`: Fallback result (if a fallback optimiser was used).
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    NaiveOptimisationResult(oe, pr, wb, retcode, w, fb) -> NaiveOptimisationResult
+
+Positional arguments correspond to the struct's fields.
+
+# Examples
+
+```jldoctest
+julia> NaiveOptimisationResult(InverseVolatility, nothing, nothing, OptimisationSuccess(),
+                               [0.5, 0.5], nothing)
+NaiveOptimisationResult
+       oe ┼ UnionAll: InverseVolatility
+       pr ┼ nothing
+       wb ┼ nothing
+  retcode ┼ OptimisationSuccess
+          │   res ┴ nothing
+        w ┼ Vector{Float64}: [0.5, 0.5]
+       fb ┴ nothing
+```
 
 # Related
 
@@ -44,14 +60,21 @@ Result type for naive portfolio optimisation estimators.
   - [`RandomWeighted`](@ref)
 """
 @concrete struct NaiveOptimisationResult <: NonFiniteAllocationOptimisationResult
+    "$(field_dict[:oe])"
     oe
+    "$(field_dict[:pr])"
     pr
+    "$(field_dict[:wb])"
     wb
+    "$(field_dict[:retcode])"
     retcode
+    "$(field_dict[:pw])"
     w
+    "$(field_dict[:fb])"
     fb
 end
-function factory(res::NaiveOptimisationResult, fb::Option{<:OptE_Opt})
+function factory(res::NaiveOptimisationResult,
+                 fb::Option{<:OptE_Opt})::NaiveOptimisationResult
     return NaiveOptimisationResult(res.oe, res.pr, res.wb, res.retcode, res.w, fb)
 end
 """
@@ -71,14 +94,7 @@ where ``\\sigma_i`` is the standard deviation (or variance when `sq = true`) of 
 
 # Fields
 
-  - `pe`: Prior estimator or prior result for computing asset covariance.
-  - `wb`: Weight bounds estimator or bounds.
-  - `sets`: Asset sets (required when `wb` is a `WeightBoundsEstimator`).
-  - `wf`: Weight finaliser for enforcing bounds.
-  - `fb`: Fallback optimiser (used if this optimiser fails).
-  - `sq`: If `true`, weights are inversely proportional to variance rather than volatility.
-  - `brt`: If `true`, uses bootstrap returns instead of the original returns.
-  - `strict`: If `true`, strictly enforces weight bounds.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -139,13 +155,21 @@ InverseVolatility
   - [`RandomWeighted`](@ref)
 """
 @concrete struct InverseVolatility <: NaiveOptimisationEstimator
+    "$(field_dict[:pe])"
     pe
+    "$(field_dict[:wb])"
     wb
+    "$(field_dict[:sets])"
     sets
+    "$(field_dict[:wf])"
     wf
+    "$(field_dict[:fb])"
     fb
+    "$(field_dict[:sq])"
     sq
+    "$(field_dict[:brt])"
     brt
+    "$(field_dict[:strict_opt])"
     strict
     function InverseVolatility(pe::PrE_Pr, wb::Option{<:WbE_Wb}, sets::Option{<:AssetSets},
                                wf::WeightFinaliser, fb::Option{<:OptE_Opt}, sq::Bool,
@@ -162,22 +186,22 @@ function InverseVolatility(; pe::PrE_Pr = EmpiricalPrior(),
                            sets::Option{<:AssetSets} = nothing,
                            wf::WeightFinaliser = IterativeWeightFinaliser(),
                            fb::Option{<:OptE_Opt} = nothing, sq::Bool = false,
-                           brt::Bool = false, strict::Bool = false)
+                           brt::Bool = false, strict::Bool = false)::InverseVolatility
     return InverseVolatility(pe, wb, sets, wf, fb, sq, brt, strict)
 end
-function factory(opt::InverseVolatility, w::AbstractVector)
+function factory(opt::InverseVolatility, w::AbstractVector)::InverseVolatility
     return InverseVolatility(; pe = opt.pe, wb = opt.wb, sets = opt.sets, wf = opt.wf,
                              fb = factory(opt.fb, w), sq = opt.sq, brt = opt.brt,
                              strict = opt.strict)
 end
-function opt_view(opt::InverseVolatility, i, args...)
+function opt_view(opt::InverseVolatility, i, args...)::InverseVolatility
     pe = prior_view(opt.pe, i)
     wb = weight_bounds_view(opt.wb, i)
     sets = asset_sets_view(opt.sets, i)
     return InverseVolatility(; pe = pe, wb = wb, sets = sets, wf = opt.wf, fb = opt.fb,
                              sq = opt.sq, brt = opt.brt, strict = opt.strict)
 end
-function assert_external_optimiser(opt::InverseVolatility)
+function assert_external_optimiser(opt::InverseVolatility)::Nothing
     #! Maybe results can be allowed with a warning. This goes for other stuff like bounds and threshold vectors. And then the optimisation can throw a domain error when it comes to using them.
     @argcheck(!isa(opt.pe, AbstractPriorResult))
     assert_internal_optimiser(opt)
@@ -201,6 +225,8 @@ end
     optimise(iv::InverseVolatility{<:Any, <:Any, <:Any, <:Any, Nothing},
              rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...) -> NaiveOptimisationResult
 
+Run the inverse volatility portfolio optimisation.
+
 # Arguments
 
   - `iv`: The inverse volatility optimiser to use.
@@ -209,7 +235,8 @@ end
   - `kwargs`: Additional keyword arguments passed to the optimisation function.
 """
 function optimise(iv::InverseVolatility{<:Any, <:Any, <:Any, <:Any, Nothing},
-                  rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)
+                  rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
+                  kwargs...)::NaiveOptimisationResult
     return _optimise(iv, rd; dims = dims, kwargs...)
 end
 """
@@ -225,11 +252,7 @@ w_i = \\frac{1}{N} \\quad \\forall i\\,.
 
 # Fields
 
-  - `wb`: Weight bounds estimator or bounds.
-  - `sets`: Asset sets (required when `wb` is a `WeightBoundsEstimator`).
-  - `wf`: Weight finaliser for enforcing bounds.
-  - `fb`: Fallback optimiser.
-  - `strict`: If `true`, strictly enforces weight bounds.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -265,10 +288,15 @@ EqualWeighted
   - [`RandomWeighted`](@ref)
 """
 @concrete struct EqualWeighted <: NaiveOptimisationEstimator
+    "$(field_dict[:wb])"
     wb
+    "$(field_dict[:sets])"
     sets
+    "$(field_dict[:wf])"
     wf
+    "$(field_dict[:fb])"
     fb
+    "$(field_dict[:strict_opt])"
     strict
     function EqualWeighted(wb::Option{<:WbE_Wb}, sets::Option{<:AssetSets},
                            wf::WeightFinaliser, fb::Option{<:OptE_Opt}, strict::Bool)
@@ -284,14 +312,15 @@ end
 function EqualWeighted(; wb::Option{<:WbE_Wb} = WeightBounds(),
                        sets::Option{<:AssetSets} = nothing,
                        wf::WeightFinaliser = IterativeWeightFinaliser(),
-                       fb::Option{<:OptE_Opt} = nothing, strict::Bool = false)
+                       fb::Option{<:OptE_Opt} = nothing,
+                       strict::Bool = false)::EqualWeighted
     return EqualWeighted(wb, sets, wf, fb, strict)
 end
-function factory(opt::EqualWeighted, w::AbstractVector)
+function factory(opt::EqualWeighted, w::AbstractVector)::EqualWeighted
     return EqualWeighted(; wb = opt.wb, sets = opt.sets, wf = opt.wf,
                          fb = factory(opt.fb, w), strict = opt.strict)
 end
-function opt_view(opt::EqualWeighted, i, args...)
+function opt_view(opt::EqualWeighted, i, args...)::EqualWeighted
     wb = weight_bounds_view(opt.wb, i)
     sets = asset_sets_view(opt.sets, i)
     return EqualWeighted(; wb = wb, sets = sets, wf = opt.wf, fb = opt.fb,
@@ -312,6 +341,8 @@ end
     optimise(ew::EqualWeighted{<:Any, <:Any, <:Any, Nothing},
              rd::ReturnsResult; dims::Int = 1, kwargs...) -> NaiveOptimisationResult
 
+Run the equal-weighted portfolio optimisation.
+
 # Arguments
 
   - `ew`: The equal-weighted optimiser to use.
@@ -320,7 +351,7 @@ end
   - `kwargs`: Additional keyword arguments passed to the optimisation function.
 """
 function optimise(ew::EqualWeighted{<:Any, <:Any, <:Any, Nothing}, rd::ReturnsResult;
-                  dims::Int = 1, kwargs...)
+                  dims::Int = 1, kwargs...)::NaiveOptimisationResult
     return _optimise(ew, rd; dims = dims, kwargs...)
 end
 """
@@ -340,14 +371,7 @@ where ``\\boldsymbol{\\alpha}`` is a scalar or vector concentration parameter. L
 
 # Fields
 
-  - `alpha`: Dirichlet concentration parameter (scalar or vector, all positive).
-  - `rng`: Random number generator.
-  - `seed`: Optional seed for the RNG.
-  - `wb`: Weight bounds estimator or bounds.
-  - `sets`: Asset sets.
-  - `wf`: Weight finaliser for enforcing bounds.
-  - `fb`: Fallback optimiser.
-  - `strict`: If `true`, strictly enforces weight bounds.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -391,13 +415,21 @@ RandomWeighted
   - [`EqualWeighted`](@ref)
 """
 @concrete struct RandomWeighted <: NaiveOptimisationEstimator
+    "$(field_dict[:alpha_dirichlet])"
     alpha
+    "$(field_dict[:rng])"
     rng
+    "$(field_dict[:seed])"
     seed
+    "$(field_dict[:wb])"
     wb
+    "$(field_dict[:sets])"
     sets
+    "$(field_dict[:wf])"
     wf
+    "$(field_dict[:fb])"
     fb
+    "$(field_dict[:strict_opt])"
     strict
     function RandomWeighted(alpha::Num_VecNum, rng::Random.AbstractRNG,
                             seed::Option{<:Integer}, wb::Option{<:WbE_Wb},
@@ -419,15 +451,16 @@ function RandomWeighted(; alpha::Num_VecNum = 1,
                         seed::Option{<:Integer} = nothing, wb::Option{<:WbE_Wb} = nothing,
                         sets::Option{<:AssetSets} = nothing,
                         wf::WeightFinaliser = IterativeWeightFinaliser(),
-                        fb::Option{<:OptE_Opt} = nothing, strict::Bool = false)
+                        fb::Option{<:OptE_Opt} = nothing,
+                        strict::Bool = false)::RandomWeighted
     return RandomWeighted(alpha, rng, seed, wb, sets, wf, fb, strict)
 end
-function factory(opt::RandomWeighted, w::AbstractVector)
+function factory(opt::RandomWeighted, w::AbstractVector)::RandomWeighted
     return RandomWeighted(; alpha = opt.alpha, rng = opt.rng, seed = opt.seed, wb = opt.wb,
                           sets = opt.sets, wf = opt.wf, fb = factory(opt.fb, w),
                           strict = opt.strict)
 end
-function opt_view(opt::RandomWeighted, i, args...)
+function opt_view(opt::RandomWeighted, i, args...)::RandomWeighted
     wb = weight_bounds_view(opt.wb, i)
     sets = asset_sets_view(opt.sets, i)
     alpha = nothing_scalar_array_view(opt.alpha, i)
@@ -460,6 +493,8 @@ end
     optimise(rw::RandomWeighted{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, Nothing},
              rd::ReturnsResult; dims::Int = 1, kwargs...) -> NaiveOptimisationResult
 
+Run the random-weighted portfolio optimisation.
+
 # Arguments
 
   - `rw`: The random-weighted optimiser to use.
@@ -468,7 +503,7 @@ end
   - `kwargs`: Additional keyword arguments passed to the optimisation function.
 """
 function optimise(rw::RandomWeighted{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, Nothing},
-                  rd::ReturnsResult; dims::Int = 1, kwargs...)
+                  rd::ReturnsResult; dims::Int = 1, kwargs...)::NaiveOptimisationResult
     return _optimise(rw, rd; dims = dims, kwargs...)
 end
 

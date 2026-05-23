@@ -77,8 +77,8 @@ end
     no_bounds_risk_measure(r, flag = nothing)
 
 Return a copy of risk measure `r` with its upper-bound constraint removed while
-preserving all other settings. Hierarchical risk measures are returned unchanged.
-For vectors of risk measures, applies element-wise.
+preserving all other settings. For hierarchical risk measures, returns the input
+unchanged. For vectors of risk measures, applies element-wise.
 
 # Arguments
 
@@ -101,8 +101,8 @@ end
     no_bounds_no_risk_expr_risk_measure(r, flag = nothing)
 
 Return a copy of risk measure `r` with both its upper-bound constraint and its risk
-expression flag disabled. Hierarchical risk measures are returned unchanged. For vectors
-of risk measures, applies element-wise.
+expression flag disabled. For hierarchical risk measures, returns the input unchanged.
+For vectors of risk measures, applies element-wise.
 
 # Arguments
 
@@ -125,8 +125,8 @@ end
     no_risk_expr_risk_measure(r)
 
 Return a copy of risk measure `r` with its risk expression flag disabled while
-preserving its upper-bound constraint. Hierarchical risk measures are returned unchanged.
-For vectors of risk measures, applies element-wise.
+preserving its upper-bound constraint. For hierarchical risk measures, returns the
+input unchanged. For vectors of risk measures, applies element-wise.
 
 # Arguments
 

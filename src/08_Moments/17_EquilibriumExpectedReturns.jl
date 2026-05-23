@@ -69,7 +69,8 @@ EquilibriumExpectedReturns
 end
 function EquilibriumExpectedReturns(;
                                     ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
-                                    w::Option{<:VecNum} = nothing, l::Number = 1)
+                                    w::Option{<:VecNum} = nothing,
+                                    l::Number = 1)::EquilibriumExpectedReturns
     return EquilibriumExpectedReturns(ce, w, l)
 end
 """
@@ -91,7 +92,7 @@ Return a new [`EquilibriumExpectedReturns`](@ref) estimator with observation wei
   - [`EquilibriumExpectedReturns`](@ref)
   - [`factory`](@ref)
 """
-function factory(me::EquilibriumExpectedReturns, w::ObsWeights)
+function factory(me::EquilibriumExpectedReturns, w::ObsWeights)::EquilibriumExpectedReturns
     return EquilibriumExpectedReturns(; ce = factory(me.ce, w), w = me.w, l = me.l)
 end
 """
@@ -112,7 +113,7 @@ Gets the view of the expected returns estimator for the `i`-th element(s).
 
   - [`EquilibriumExpectedReturns`](@ref)
 """
-function moment_view(me::EquilibriumExpectedReturns, i)
+function moment_view(me::EquilibriumExpectedReturns, i)::EquilibriumExpectedReturns
     return EquilibriumExpectedReturns(; ce = moment_view(me.ce, i),
                                       w = nothing_scalar_array_view(me.w, i), l = me.l)
 end

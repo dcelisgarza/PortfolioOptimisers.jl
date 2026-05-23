@@ -159,7 +159,7 @@ end
 function get_bin_width_func(::Scott)
     return PythonCall.pyimport("astropy.stats").scott_bin_width
 end
-function get_bin_width_func(::Union{<:HacineGharbiRavier, <:Integer})
+function get_bin_width_func(::Union{<:HacineGharbiRavier, <:Integer})::Nothing
     return nothing
 end
 """

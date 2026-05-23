@@ -165,15 +165,15 @@ function SubsetResampling(; pe::PrE_Pr = EmpiricalPrior(), wb::Option{<:WbE_Wb} 
                           rng::Random.AbstractRNG = Random.default_rng(),
                           seed::Option{<:Integer} = nothing,
                           fb::Option{<:OptE_Opt} = nothing, brt::Bool = false,
-                          strict::Bool = false)
+                          strict::Bool = false)::SubsetResampling
     return SubsetResampling(pe, wb, fees, sets, scale, opt, wf, ex, subset_size, n_subsets,
                             max_comb, rng, seed, fb, brt, strict)
 end
-function assert_external_optimiser(opt::SubsetResampling)
+function assert_external_optimiser(opt::SubsetResampling)::Nothing
     @argcheck(!isa(opt.pe, AbstractPriorResult))
     return assert_external_optimiser(opt.opt)
 end
-function assert_internal_optimiser(opt::SubsetResampling)
+function assert_internal_optimiser(opt::SubsetResampling)::Nothing
     return assert_internal_optimiser(opt.opt)
 end
 function needs_previous_weights(opt::SubsetResampling)
@@ -181,7 +181,7 @@ function needs_previous_weights(opt::SubsetResampling)
             needs_previous_weights(opt.opt) ||
             needs_previous_weights(opt.fb))
 end
-function factory(sr::SubsetResampling, w::AbstractVector)
+function factory(sr::SubsetResampling, w::AbstractVector)::SubsetResampling
     fees = factory(sr.fees, w)
     opt = factory(sr.opt, w)
     fb = factory(sr.fb, w)
@@ -191,7 +191,7 @@ function factory(sr::SubsetResampling, w::AbstractVector)
                             max_comb = sr.max_comb, rng = sr.rng, seed = sr.seed, fb = fb,
                             brt = sr.brt, strict = sr.strict)
 end
-function opt_view(sr::SubsetResampling, i, X::MatNum)
+function opt_view(sr::SubsetResampling, i, X::MatNum)::SubsetResampling
     X = isa(sr.pe, AbstractPriorResult) ? sr.pe.X : X
     pe = prior_view(sr.pe, i)
     wb = weight_bounds_view(sr.wb, i)

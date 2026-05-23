@@ -56,7 +56,7 @@ PortfolioOptimisersCovariance
     end
 end
 function PortfolioOptimisersCovariance(; ce::StatsBase.CovarianceEstimator = Covariance(),
-                                       mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing())
+                                       mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing())::PortfolioOptimisersCovariance
     return PortfolioOptimisersCovariance(ce, mp)
 end
 """
@@ -78,7 +78,8 @@ Return a new [`PortfolioOptimisersCovariance`](@ref) estimator with observation 
   - [`PortfolioOptimisersCovariance`](@ref)
   - [`factory`](@ref)
 """
-function factory(ce::PortfolioOptimisersCovariance, w::ObsWeights)
+function factory(ce::PortfolioOptimisersCovariance,
+                 w::ObsWeights)::PortfolioOptimisersCovariance
     return PortfolioOptimisersCovariance(; ce = factory(ce.ce, w), mp = ce.mp)
 end
 """
@@ -99,7 +100,7 @@ Gets the view of the covariance estimator for the `i`-th element(s).
 
   - [`PortfolioOptimisersCovariance`](@ref)
 """
-function moment_view(ce::PortfolioOptimisersCovariance, i)
+function moment_view(ce::PortfolioOptimisersCovariance, i)::PortfolioOptimisersCovariance
     return PortfolioOptimisersCovariance(; ce = moment_view(ce.ce, i), mp = ce.mp)
 end
 """

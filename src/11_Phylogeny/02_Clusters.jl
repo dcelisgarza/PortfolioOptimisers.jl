@@ -168,7 +168,7 @@ Keywords correspond to the struct's fields.
         return new{typeof(res), typeof(S), typeof(D), typeof(k)}(res, S, D, k)
     end
 end
-function Clusters(; res::ClTypes, S::MatNum, D::MatNum, k::Integer)
+function Clusters(; res::ClTypes, S::MatNum, D::MatNum, k::Integer)::Clusters
     return Clusters(res, S, D, k)
 end
 """
@@ -240,10 +240,12 @@ SecondOrderDifference
         return new{typeof(alg)}(alg)
     end
 end
-function SecondOrderDifference(; alg::Num_VecToScaM = StandardisedValue())
+function SecondOrderDifference(;
+                               alg::Num_VecToScaM = StandardisedValue())::SecondOrderDifference
     return SecondOrderDifference(alg)
 end
-function factory(alg::SecondOrderDifference, w::StatsBase.AbstractWeights)
+function factory(alg::SecondOrderDifference,
+                 w::StatsBase.AbstractWeights)::SecondOrderDifference
     return SecondOrderDifference(; alg = factory(alg.alg, w))
 end
 """
@@ -292,10 +294,10 @@ SilhouetteScore
         return new{typeof(alg)}(alg)
     end
 end
-function SilhouetteScore(; alg::Num_VecToScaM = StandardisedValue())
+function SilhouetteScore(; alg::Num_VecToScaM = StandardisedValue())::SilhouetteScore
     return SilhouetteScore(alg)
 end
-function factory(alg::SilhouetteScore, w::StatsBase.AbstractWeights)
+function factory(alg::SilhouetteScore, w::StatsBase.AbstractWeights)::SilhouetteScore
     return SilhouetteScore(; alg = factory(alg.alg, w))
 end
 """
@@ -359,10 +361,11 @@ OptimalNumberClusters
     end
 end
 function OptimalNumberClusters(; max_k::Option{<:Integer} = nothing,
-                               alg::Int_ONC = SecondOrderDifference())
+                               alg::Int_ONC = SecondOrderDifference())::OptimalNumberClusters
     return OptimalNumberClusters(max_k, alg)
 end
-function factory(onc::OptimalNumberClusters, w::StatsBase.AbstractWeights)
+function factory(onc::OptimalNumberClusters,
+                 w::StatsBase.AbstractWeights)::OptimalNumberClusters
     return OptimalNumberClusters(; max_k = onc.max_k, alg = factory(onc.alg, w))
 end
 """
@@ -404,7 +407,7 @@ HClustAlgorithm
         return new{typeof(linkage)}(linkage)
     end
 end
-function HClustAlgorithm(; linkage::Symbol = :ward)
+function HClustAlgorithm(; linkage::Symbol = :ward)::HClustAlgorithm
     return HClustAlgorithm(linkage)
 end
 """
@@ -493,10 +496,10 @@ function ClustersEstimator(;
                            de::AbstractDistanceEstimator = Distance(;
                                                                     alg = CanonicalDistance()),
                            alg::AbstractClustersAlgorithm = HClustAlgorithm(),
-                           onc::AbstractOptimalNumberClustersEstimator = OptimalNumberClusters())
+                           onc::AbstractOptimalNumberClustersEstimator = OptimalNumberClusters())::ClustersEstimator
     return ClustersEstimator(ce, de, alg, onc)
 end
-function factory(cle::ClustersEstimator, w::StatsBase.AbstractWeights)
+function factory(cle::ClustersEstimator, w::StatsBase.AbstractWeights)::ClustersEstimator
     return ClustersEstimator(; ce = factory(cle.ce, w), de = cle.de, alg = cle.alg,
                              onc = cle.onc)
 end

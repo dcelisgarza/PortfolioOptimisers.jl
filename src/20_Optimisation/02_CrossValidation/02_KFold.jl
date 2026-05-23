@@ -5,9 +5,7 @@ Implements non-sequential k-fold cross-validation with optional purging and emba
 
 # Fields
 
-  - `n`: Number of folds to split the data into.
-  - `purged_size`: Number of observations to exclude from the start/end of each train set adjacent to a test set.
-  - `embargo_size`: Number of observations to exclude from the start of each train set after a test set.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -41,8 +39,11 @@ KFold
   - [`n_splits`](@ref)
 """
 @concrete struct KFold <: NonSequentialCrossValidationEstimator
+    "$(field_dict[:n_folds])"
     n
+    "$(field_dict[:purged_size])"
     purged_size
+    "$(field_dict[:embargo_size])"
     embargo_size
     function KFold(n::Integer, purged_size::Integer, embargo_size::Integer)
         assert_nonempty_gt0_finite_val(n, :n)
@@ -52,7 +53,7 @@ KFold
                                                                          embargo_size)
     end
 end
-function KFold(; n::Integer = 5, purged_size::Integer = 0, embargo_size::Integer = 0)
+function KFold(; n::Integer = 5, purged_size::Integer = 0, embargo_size::Integer = 0)::KFold
     return KFold(n, purged_size, embargo_size)
 end
 """
@@ -64,8 +65,7 @@ Stores the train and test index vectors for each fold.
 
 # Fields
 
-  - `train_idx`: Vector of training index ranges for each fold.
-  - `test_idx`: Vector of testing index ranges for each fold.
+$(DocStringExtensions.FIELDS)
 
 # Related
 
@@ -74,7 +74,9 @@ Stores the train and test index vectors for each fold.
   - [`n_splits`](@ref)
 """
 @concrete struct KFoldResult <: NonSequentialCrossValidationResult
+    "$(field_dict[:train_idx])"
     train_idx
+    "$(field_dict[:test_idx])"
     test_idx
     function KFoldResult(train_idx::VecVecInt, test_idx::VecVecInt)
         @argcheck(!isempty(train_idx))
@@ -83,7 +85,7 @@ Stores the train and test index vectors for each fold.
         return new{typeof(train_idx), typeof(test_idx)}(train_idx, test_idx)
     end
 end
-function KFoldResult(; train_idx::VecVecInt, test_idx::VecVecInt)
+function KFoldResult(; train_idx::VecVecInt, test_idx::VecVecInt)::KFoldResult
     return KFoldResult(train_idx, test_idx)
 end
 """

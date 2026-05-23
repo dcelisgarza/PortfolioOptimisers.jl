@@ -13,16 +13,7 @@ This estimator can be converted into a concrete [`Fees`](@ref) constraint using 
 
 # Fields
 
-  - `tn`: Turnover estimator or result.
-  - `l`: Long proportional fees.
-  - `s`: Short proportional fees.
-  - `fl`: Long fixed fees.
-  - `fs`: Short fixed fees.
-  - `dl`: Default long proportional fees.
-  - `ds`: Default short proportional fees.
-  - `dfl`: Default long fixed fees.
-  - `dfs`: Default short fixed fees.
-  - `kwargs`: Named tuple of keyword arguments for deciding how small an asset weight has to be before being considered zero.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -80,22 +71,32 @@ FeesEstimator
   - [`fees_constraints`](@ref)
 """
 @concrete struct FeesEstimator <: AbstractEstimator
+    "$(field_dict[:tn_fees])"
     tn
+    "$(field_dict[:l_fees])"
     l
+    "$(field_dict[:s_fees])"
     s
+    "$(field_dict[:fl])"
     fl
+    "$(field_dict[:fs])"
     fs
+    "$(field_dict[:dl])"
     dl
+    "$(field_dict[:ds])"
     ds
+    "$(field_dict[:dfl])"
     dfl
+    "$(field_dict[:dfs])"
     dfs
+    "$(field_dict[:kwargs_fee])"
     kwargs
     function FeesEstimator(tn::Option{<:TnE_Tn}, l::Option{<:EstValType},
                            s::Option{<:EstValType}, fl::Option{<:EstValType},
                            fs::Option{<:EstValType}, dl::Option{<:Number} = nothing,
                            ds::Option{<:Number} = nothing, dfl::Option{<:Number} = nothing,
                            dfs::Option{<:Number} = nothing,
-                           kwargs::NamedTuple = (; atol = 1e-8))
+                           kwargs::NamedTuple = (; atol = 1e-8))::FeesEstimator
         assert_nonempty_nonneg_finite_val(l, :l)
         assert_nonempty_nonneg_finite_val(s, :s)
         assert_nonempty_nonneg_finite_val(fl, :fl)
@@ -116,7 +117,7 @@ function FeesEstimator(; tn::Option{<:TnE_Tn} = nothing, l::Option{<:EstValType}
                        fs::Option{<:EstValType} = nothing, dl::Option{<:Number} = nothing,
                        ds::Option{<:Number} = nothing, dfl::Option{<:Number} = nothing,
                        dfs::Option{<:Number} = nothing,
-                       kwargs::NamedTuple = (; atol = 1e-8))
+                       kwargs::NamedTuple = (; atol = 1e-8))::FeesEstimator
     return FeesEstimator(tn, l, s, fl, fs, dl, ds, dfl, dfs, kwargs)
 end
 """
@@ -199,7 +200,7 @@ FeesEstimator
   - [`turnover_view`](@ref)
   - [`nothing_scalar_array_view`](@ref)
 """
-function fees_view(fees::FeesEstimator, i)
+function fees_view(fees::FeesEstimator, i)::FeesEstimator
     tn = turnover_view(fees.tn, i)
     l = nothing_scalar_array_view(fees.l, i)
     s = nothing_scalar_array_view(fees.s, i)
@@ -285,12 +286,7 @@ Where:
 
 # Fields
 
-  - `tn`: Turnover constraint result.
-  - `l`: Long proportional fees.
-  - `s`: Short proportional fees.
-  - `fl`: Long fixed fees.
-  - `fs`: Short fixed fees.
-  - `kwargs`: Named tuple of keyword arguments for deciding how small an asset weight has to be before being considered zero.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -343,15 +339,21 @@ Fees
   - [`calc_net_returns`](@ref)
 """
 @concrete struct Fees <: AbstractResult
+    "$(field_dict[:tnr])"
     tn
+    "$(field_dict[:l_fees])"
     l
+    "$(field_dict[:s_fees])"
     s
+    "$(field_dict[:fl])"
     fl
+    "$(field_dict[:fs])"
     fs
+    "$(field_dict[:kwargs_fee])"
     kwargs
     function Fees(tn::Option{<:Turnover}, l::Option{<:Num_VecNum}, s::Option{<:Num_VecNum},
                   fl::Option{<:Num_VecNum}, fs::Option{<:Num_VecNum},
-                  kwargs::NamedTuple = (; atol = 1e-8))
+                  kwargs::NamedTuple = (; atol = 1e-8))::Fees
         assert_nonempty_nonneg_finite_val(l, :l)
         assert_nonempty_nonneg_finite_val(s, :s)
         assert_nonempty_nonneg_finite_val(fl, :fl)
@@ -362,7 +364,8 @@ Fees
 end
 function Fees(; tn::Option{<:Turnover} = nothing, l::Option{<:Num_VecNum} = nothing,
               s::Option{<:Num_VecNum} = nothing, fl::Option{<:Num_VecNum} = nothing,
-              fs::Option{<:Num_VecNum} = nothing, kwargs::NamedTuple = (; atol = 1e-8))
+              fs::Option{<:Num_VecNum} = nothing,
+              kwargs::NamedTuple = (; atol = 1e-8))::Fees
     return Fees(tn, l, s, fl, fs, kwargs)
 end
 """
@@ -455,7 +458,7 @@ Fees
   - [`AssetSets`](@ref)
 """
 function fees_constraints(fees::FeesEstimator, sets::AssetSets;
-                          datatype::DataType = Float64, strict::Bool = false)
+                          datatype::DataType = Float64, strict::Bool = false)::Fees
     return Fees(;
                 tn = turnover_constraints(fees.tn, sets; datatype = datatype,
                                           strict = strict),
@@ -513,7 +516,7 @@ julia> fees_constraints(nothing)
   - [`Fees`](@ref)
   - [`Option`](@ref)
 """
-function fees_constraints(fees::Option{<:Fees}, args...; kwargs...)
+function fees_constraints(fees::Option{<:Fees}, args...; kwargs...)::Option{<:Fees}
     return fees
 end
 """
@@ -538,7 +541,7 @@ This method is used as a fallback for missing fee estimators or constraints, ens
   - [`Fees`](@ref)
   - [`fees_view`](@ref)
 """
-function fees_view(::Nothing, ::Any)
+function fees_view(::Nothing, ::Any)::Nothing
     return nothing
 end
 """
@@ -608,7 +611,7 @@ Fees
   - [`turnover_view`](@ref)
   - [`nothing_scalar_array_view`](@ref)
 """
-function fees_view(fees::Fees, i)
+function fees_view(fees::Fees, i)::Fees
     tn = turnover_view(fees.tn, i)
     l = nothing_scalar_array_view(fees.l, i)
     s = nothing_scalar_array_view(fees.s, i)
@@ -681,7 +684,7 @@ Fees
   - [`factory(tn::Turnover, w::VecNum)`](@ref)
   - [`fees_constraints`](@ref)
 """
-function factory(fees::Fees, w::VecNum)
+function factory(fees::Fees, w::VecNum)::Fees
     return Fees(; tn = factory(fees.tn, w), l = fees.l, s = fees.s, fl = fees.fl,
                 fs = fees.fs, kwargs = fees.kwargs)
 end

@@ -314,7 +314,7 @@ Denoise
     "Number of points in the range of eigenvalues used in the [AverageShiftedHistograms.ash](https://github.com/joshday/AverageShiftedHistograms.jl) density estimation."
     n
     function Denoise(pdm::Option{<:Posdef}, alg::AbstractDenoiseAlgorithm, args::Tuple,
-                     kwargs::NamedTuple, kernel, m::Integer, n::Integer)
+                     kwargs::NamedTuple, kernel, m::Integer, n::Integer)::Denoise
         @argcheck(1 < m, DomainError)
         @argcheck(1 < n, DomainError)
         return new{typeof(pdm), typeof(alg), typeof(args), typeof(kwargs), typeof(kernel),
@@ -325,7 +325,7 @@ function Denoise(; pdm::Option{<:Posdef} = Posdef(),
                  alg::AbstractDenoiseAlgorithm = ShrunkDenoise(), args::Tuple = (),
                  kwargs::NamedTuple = (;),
                  kernel = AverageShiftedHistograms.Kernels.gaussian, m::Integer = 10,
-                 n::Integer = 1000)
+                 n::Integer = 1000)::Denoise
     return Denoise(pdm, alg, args, kwargs, kernel, m, n)
 end
 """
@@ -548,7 +548,7 @@ julia> denoise!(Denoise(), X, 10 / 5)
   - [mlp1](@cite) M. M. De Prado. *Machine learning for asset managers* (Cambridge University Press, 2020). Chapter 2.
   - [mpdist](@cite) V. A. Marčenko and L. A. Pastur. *Distribution of eigenvalues for some sets of random matrices*. Mathematics of the USSR-Sbornik 1, 457 (1967).
 """
-function denoise!(::Nothing, X::MatNum, args...)
+function denoise!(::Nothing, X::MatNum, args...)::MatNum
     return X
 end
 function denoise!(dn::Denoise, X::MatNum, q::Number)
@@ -591,7 +591,7 @@ Out-of-place version of [`denoise!`](@ref).
   - [mlp1](@cite) M. M. De Prado. *Machine learning for asset managers* (Cambridge University Press, 2020). Chapter 2.
   - [mpdist](@cite) V. A. Marčenko and L. A. Pastur. *Distribution of eigenvalues for some sets of random matrices*. Mathematics of the USSR-Sbornik 1, 457 (1967).
 """
-function denoise(::Nothing, X::MatNum, args...)
+function denoise(::Nothing, X::MatNum, args...)::MatNum
     return X
 end
 function denoise(dn::Denoise, X::MatNum, q::Number)

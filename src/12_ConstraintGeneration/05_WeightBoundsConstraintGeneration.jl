@@ -14,36 +14,36 @@ Checks that all lower bound values are less than or equal to corresponding upper
 
   - `nothing`.
 """
-function validate_bounds(lb::Number, ub::Number)
+function validate_bounds(lb::Number, ub::Number)::Nothing
     @argcheck(lb <= ub)
     return nothing
 end
-function validate_bounds(lb::VecNum, ub::Number)
+function validate_bounds(lb::VecNum, ub::Number)::Nothing
     @argcheck(!isempty(lb))
     @argcheck(all(x -> x <= ub, lb))
     return nothing
 end
-function validate_bounds(lb::Number, ub::VecNum)
+function validate_bounds(lb::Number, ub::VecNum)::Nothing
     @argcheck(!isempty(ub))
     @argcheck(all(x -> lb <= x, ub))
     return nothing
 end
-function validate_bounds(lb::VecNum, ub::VecNum)
+function validate_bounds(lb::VecNum, ub::VecNum)::Nothing
     @argcheck(!isempty(lb))
     @argcheck(!isempty(ub))
     @argcheck(length(lb) == length(ub))
     @argcheck(all(map((x, y) -> x <= y, lb, ub)))
     return nothing
 end
-function validate_bounds(lb::VecNum, ::Any)
+function validate_bounds(lb::VecNum, ::Any)::Nothing
     @argcheck(!isempty(lb))
     return nothing
 end
-function validate_bounds(::Any, ub::VecNum)
+function validate_bounds(::Any, ub::VecNum)::Nothing
     @argcheck(!isempty(ub))
     return nothing
 end
-function validate_bounds(args...)
+function validate_bounds(args...)::Nothing
     return nothing
 end
 """
@@ -67,7 +67,7 @@ Returns a view of the weight bounds for the specified asset index `i`. If `wb` i
   - [`WeightBounds`](@ref)
   - [`WeightBoundsEstimator`](@ref)
 """
-function weight_bounds_view(::Nothing, ::Any)
+function weight_bounds_view(::Nothing, ::Any)::Nothing
     return nothing
 end
 """
@@ -79,8 +79,7 @@ Container for lower and upper portfolio weight bounds.
 
 # Fields
 
-  - `lb`: Lower bound(s) for portfolio weights.
-  - `ub`: Upper bound(s) for portfolio weights.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -122,17 +121,20 @@ WeightBounds
   - [`weight_bounds_constraints`](@ref)
 """
 @concrete struct WeightBounds <: AbstractConstraintResult
+    "$(field_dict[:lb])"
     lb
+    "$(field_dict[:ub])"
     ub
-    function WeightBounds(lb::Option{<:Num_VecNum}, ub::Option{<:Num_VecNum})
+    function WeightBounds(lb::Option{<:Num_VecNum}, ub::Option{<:Num_VecNum})::WeightBounds
         validate_bounds(lb, ub)
         return new{typeof(lb), typeof(ub)}(lb, ub)
     end
 end
-function WeightBounds(; lb::Option{<:Num_VecNum} = 0.0, ub::Option{<:Num_VecNum} = 1.0)
+function WeightBounds(; lb::Option{<:Num_VecNum} = 0.0,
+                      ub::Option{<:Num_VecNum} = 1.0)::WeightBounds
     return WeightBounds(lb, ub)
 end
-function weight_bounds_view(wb::WeightBounds, i)
+function weight_bounds_view(wb::WeightBounds, i)::WeightBounds
     lb = nothing_scalar_array_view(wb.lb, i)
     ub = nothing_scalar_array_view(wb.ub, i)
     return WeightBounds(; lb = lb, ub = ub)
@@ -146,10 +148,7 @@ Estimator for portfolio weight bounds constraints.
 
 # Fields
 
-  - `lb`: Lower bound(s) for portfolio weights.
-  - `ub`: Upper bound(s) for portfolio weights.
-  - `dlb`: Default lower bound applied to assets when no specific lower bound is specified.
-  - `dub`: Default upper bound applied to assets when no specific upper bound is specified.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -194,13 +193,17 @@ WeightBoundsEstimator
   - [`weight_bounds_constraints`](@ref)
 """
 @concrete struct WeightBoundsEstimator <: AbstractConstraintEstimator
+    "$(field_dict[:lb])"
     lb
+    "$(field_dict[:ub])"
     ub
+    "$(field_dict[:dlb])"
     dlb
+    "$(field_dict[:dub])"
     dub
     function WeightBoundsEstimator(lb::Option{<:EstValType}, ub::Option{<:EstValType},
                                    dlb::Option{<:Number} = nothing,
-                                   dub::Option{<:Number} = nothing)
+                                   dub::Option{<:Number} = nothing)::WeightBoundsEstimator
         if isa(lb, Dict_Vec)
             @argcheck(!isempty(lb), IsEmptyError)
         end
@@ -222,10 +225,10 @@ end
 function WeightBoundsEstimator(; lb::Option{<:EstValType} = nothing,
                                ub::Option{<:EstValType} = nothing,
                                dlb::Option{<:Number} = nothing,
-                               dub::Option{<:Number} = nothing)
+                               dub::Option{<:Number} = nothing)::WeightBoundsEstimator
     return WeightBoundsEstimator(lb, ub, dlb, dub)
 end
-function weight_bounds_view(wb::WeightBoundsEstimator, i)
+function weight_bounds_view(wb::WeightBoundsEstimator, i)::WeightBoundsEstimator
     lb = nothing_scalar_array_view(wb.lb, i)
     ub = nothing_scalar_array_view(wb.ub, i)
     return wb = WeightBoundsEstimator(; lb = lb, ub = ub, dlb = wb.dlb, dub = wb.dub)
@@ -292,7 +295,7 @@ WeightBounds
 """
 function weight_bounds_constraints(wb::WeightBoundsEstimator, sets::AssetSets;
                                    strict::Bool = false, datatype::DataType = Float64,
-                                   kwargs...)
+                                   kwargs...)::WeightBounds
     return WeightBounds(;
                         lb = estimator_to_val(wb.lb, sets,
                                               ifelse(isnothing(wb.dlb), zero(datatype),
@@ -461,7 +464,7 @@ WeightBounds
   - [`WeightBoundsEstimator`](@ref)
 """
 function weight_bounds_constraints(wb::WeightBounds{<:Any, <:Any}, args...; N::Integer = 0,
-                                   kwargs...)
+                                   kwargs...)::WeightBounds
     return WeightBounds(; lb = weight_bounds_constraints_side(wb.lb, N, -Inf),
                         ub = weight_bounds_constraints_side(wb.ub, N, Inf))
 end
@@ -499,7 +502,8 @@ WeightBounds
   - [`weight_bounds_constraints_side`](@ref)
   - [`weight_bounds_constraints`](@ref)
 """
-function weight_bounds_constraints(wb::WeightBounds{<:VecNum, <:VecNum}, args...; kwargs...)
+function weight_bounds_constraints(wb::WeightBounds{<:VecNum, <:VecNum}, args...;
+                                   kwargs...)::WeightBounds
     return wb
 end
 """
@@ -540,7 +544,8 @@ WeightBounds
   - [`WeightBoundsEstimator`](@ref)
   - [`weight_bounds_constraints_side`](@ref)
 """
-function weight_bounds_constraints(wb::Nothing, args...; N::Integer = 0, kwargs...)
+function weight_bounds_constraints(wb::Nothing, args...; N::Integer = 0,
+                                   kwargs...)::WeightBounds
     return WeightBounds(; lb = fill(-Inf, N), ub = fill(Inf, N))
 end
 

@@ -72,7 +72,8 @@ Keywords correspond to the struct's fields.
         return new{typeof(p)}(p)
     end
 end
-function RegularisedPenalisedRelaxedRiskBudgeting(; p::Number = 1.0)
+function RegularisedPenalisedRelaxedRiskBudgeting(;
+                                                  p::Number = 1.0)::RegularisedPenalisedRelaxedRiskBudgeting
     return RegularisedPenalisedRelaxedRiskBudgeting(p)
 end
 """
@@ -129,19 +130,19 @@ function RelaxedRiskBudgeting(; opt::JuMPOptimiser = JuMPOptimiser(),
                               rba::RiskBudgetingAlgorithm = AssetRiskBudgeting(),
                               wi::Option{<:VecNum} = nothing,
                               alg::RelaxedRiskBudgetingAlgorithm = BasicRelaxedRiskBudgeting(),
-                              fb::Option{<:OptE_Opt} = nothing)
+                              fb::Option{<:OptE_Opt} = nothing)::RelaxedRiskBudgeting
     return RelaxedRiskBudgeting(opt, rba, wi, alg, fb)
 end
 function needs_previous_weights(opt::RelaxedRiskBudgeting)
     return (needs_previous_weights(opt.opt) || needs_previous_weights(opt.fb))
 end
-function factory(rrb::RelaxedRiskBudgeting, w::AbstractVector)
+function factory(rrb::RelaxedRiskBudgeting, w::AbstractVector)::RelaxedRiskBudgeting
     opt = factory(rrb.opt, w)
     fb = factory(rrb.fb, w)
     return RelaxedRiskBudgeting(; opt = opt, rba = rrb.rba, wi = rrb.wi, alg = rrb.alg,
                                 fb = fb)
 end
-function opt_view(rrb::RelaxedRiskBudgeting, i, X::MatNum)
+function opt_view(rrb::RelaxedRiskBudgeting, i, X::MatNum)::RelaxedRiskBudgeting
     X = isa(rrb.opt.pe, AbstractPriorResult) ? rrb.opt.pe.X : X
     opt = opt_view(rrb.opt, i, X)
     rba = risk_budgeting_algorithm_view(rrb.rba, i)

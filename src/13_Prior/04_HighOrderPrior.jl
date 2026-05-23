@@ -376,9 +376,7 @@ High order prior estimator for asset returns.
 
 # Fields
 
-  - `pe`: Low order prior estimator (`AbstractLowOrderPriorEstimator_A_F_AF`).
-  - `kte`: Cokurtosis estimator (`CokurtosisEstimator` or `Nothing`).
-  - `ske`: Coskewness estimator (`CoskewnessEstimator` or `Nothing`).
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -458,8 +456,11 @@ HighOrderPriorEstimator
   - [`prior`](@ref)
 """
 @concrete struct HighOrderPriorEstimator <: AbstractHighOrderPriorEstimator
+    "$(field_dict[:pe])"
     pe
+    "$(field_dict[:kte])"
     kte
+    "$(field_dict[:ske])"
     ske
     function HighOrderPriorEstimator(pe::AbstractLowOrderPriorEstimator_A_F_AF,
                                      kte::Option{<:CokurtosisEstimator},
@@ -472,14 +473,14 @@ function HighOrderPriorEstimator(;
                                  kte::Option{<:CokurtosisEstimator} = Cokurtosis(;
                                                                                  alg = Full()),
                                  ske::Option{<:CoskewnessEstimator} = Coskewness(;
-                                                                                 alg = Full()))
+                                                                                 alg = Full()))::HighOrderPriorEstimator
     return HighOrderPriorEstimator(pe, kte, ske)
 end
-function factory(pe::HighOrderPriorEstimator, w::ObsWeights)
+function factory(pe::HighOrderPriorEstimator, w::ObsWeights)::HighOrderPriorEstimator
     return HighOrderPriorEstimator(; pe = factory(pe.pe, w), kte = factory(pe.kte, w),
                                    ske = factory(pe.ske, w))
 end
-function prior_view(pr::HighOrderPriorEstimator, i)
+function prior_view(pr::HighOrderPriorEstimator, i)::HighOrderPriorEstimator
     return HighOrderPriorEstimator(; pe = prior_view(pr.pe, i),
                                    kte = moment_view(pr.kte, i),
                                    ske = moment_view(pr.ske, i))

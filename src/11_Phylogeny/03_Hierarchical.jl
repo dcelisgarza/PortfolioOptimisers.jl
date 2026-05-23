@@ -7,11 +7,7 @@ Node type for representing clusters in a hierarchical clustering tree.
 
 # Fields
 
-  - `id`: Unique identifier for the node.
-  - `left`: Left child node.
-  - `right`: Right child node.
-  - `height`: Height of the node in the tree.
-  - `level`: Level of the node in the tree.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -43,10 +39,15 @@ ClusterNode
   - [`pre_order`](@ref)
 """
 struct ClusterNode{tid, tl, tr, td, tcnt} <: AbstractResult
+    "$(field_dict[:id_node])"
     id::tid
+    "$(field_dict[:left_node])"
     left::tl
+    "$(field_dict[:right_node])"
     right::tr
+    "$(field_dict[:height_node])"
     height::td
+    "$(field_dict[:level_node])"
     level::tcnt
     function ClusterNode(id, left::Option{<:ClusterNode} = nothing,
                          right::Option{<:ClusterNode} = nothing, height::Number = 0.0,

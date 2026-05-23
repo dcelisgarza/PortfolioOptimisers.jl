@@ -7,13 +7,7 @@ Black-Litterman prior estimator for asset returns.
 
 # Fields
 
-  - `pe`: Prior estimator.
-  - `mp`: Matrix post-processing estimator.
-  - `views`: Views estimator or views object.
-  - `sets`: Asset sets.
-  - `views_conf`: View confidence(s).
-  - `rf`: Risk-free rate.
-  - `tau`: Blending parameter. When computing the prior if `nothing`, defaults to `1/T` where `T` is the number of observations.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -111,12 +105,19 @@ BlackLittermanPrior
   - [`prior`](@ref)
 """
 @concrete struct BlackLittermanPrior <: AbstractLowOrderPriorEstimator_AF
+    "$(field_dict[:pe])"
     pe
+    "$(field_dict[:mp])"
     mp
+    "$(field_dict[:views])"
     views
+    "$(field_dict[:sets])"
     sets
+    "$(field_dict[:views_conf])"
     views_conf
+    "$(field_dict[:rf])"
     rf
+    "$(field_dict[:tau])"
     tau
     function BlackLittermanPrior(pe::AbstractLowOrderPriorEstimator_A_F_AF,
                                  mp::AbstractMatrixProcessingEstimator, views::Lc_BLV,
@@ -140,7 +141,7 @@ function BlackLittermanPrior(;
                              mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing(),
                              views::Lc_BLV, sets::Option{<:AssetSets} = nothing,
                              views_conf::Option{<:Num_VecNum} = nothing, rf::Number = 0.0,
-                             tau::Option{<:Number} = nothing)
+                             tau::Option{<:Number} = nothing)::BlackLittermanPrior
     return BlackLittermanPrior(pe, mp, views, sets, views_conf, rf, tau)
 end
 function Base.getproperty(obj::BlackLittermanPrior, sym::Symbol)
@@ -152,12 +153,12 @@ function Base.getproperty(obj::BlackLittermanPrior, sym::Symbol)
         getfield(obj, sym)
     end
 end
-function factory(pe::BlackLittermanPrior, w::ObsWeights)
+function factory(pe::BlackLittermanPrior, w::ObsWeights)::BlackLittermanPrior
     return BlackLittermanPrior(; pe = factory(pe.pe, w), mp = pe.mp, views = pe.views,
                                sets = pe.sets, views_conf = pe.views_conf, rf = pe.rf,
                                tau = pe.tau)
 end
-function prior_view(pr::BlackLittermanPrior, i)
+function prior_view(pr::BlackLittermanPrior, i)::BlackLittermanPrior
     return BlackLittermanPrior(; pe = prior_view(pr.pe, i), mp = pr.mp, views = pr.views,
                                sets = asset_sets_view(pr.sets, i),
                                views_conf = pr.views_conf, rf = pr.rf, tau = pr.tau)

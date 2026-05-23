@@ -4,14 +4,11 @@ $(DocStringExtensions.TYPEDEF)
 
 Represents the Risk Tracking Error configuration for benchmark weight tracking.
 
-`RiskTrackingError` specifies that tracking error against a benchmark should be measured as a risk quantity (rather than a norm). It wraps a `WeightsTracking` benchmark, a risk measure `r`, a scalar error tolerance `err`, and a tracking algorithm `alg`.
+`RiskTrackingError` specifies tracking error measurement against a benchmark as a risk quantity (rather than a norm). It wraps a `WeightsTracking` benchmark, a risk measure `r`, a scalar error tolerance `err`, and a tracking algorithm `alg`.
 
 # Fields
 
-  - `tr`: Benchmark weights tracking specification.
-  - `r`: Risk measure used to compute the tracking error.
-  - `err`: Scalar error tolerance (non-negative finite number).
-  - `alg`: Tracking algorithm (`IndependentVariableTracking` or `DependentVariableTracking`).
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -38,9 +35,13 @@ Keywords correspond to the struct's fields.
   - [`DependentVariableTracking`](@ref)
 """
 @concrete struct RiskTrackingError <: AbstractTracking
+    "$(field_dict[:tr_spec])"
     tr
+    "$(field_dict[:r_risk])"
     r
+    "$(field_dict[:err])"
     err
+    "$(field_dict[:tralg])"
     alg
     function RiskTrackingError(tr::WeightsTracking, r::AbstractBaseRiskMeasure, err::Number,
                                alg::VariableTracking)
@@ -52,7 +53,7 @@ end
 function RiskTrackingError(; tr::WeightsTracking,
                            r::AbstractBaseRiskMeasure = StandardDeviation(),
                            err::Number = 0.0,
-                           alg::VariableTracking = IndependentVariableTracking())
+                           alg::VariableTracking = IndependentVariableTracking())::RiskTrackingError
     return RiskTrackingError(tr, r, err, alg)
 end
 function tracking_view(::Nothing, args...)
@@ -63,7 +64,7 @@ function tracking_view(tr::RiskTrackingError, i, X::MatNum)
                              r = risk_measure_view(tr.r, i, X), err = tr.err, alg = tr.alg)
 end
 function factory(tr::RiskTrackingError, pr::AbstractPriorResult, slv::Any, ucs::Any,
-                 w::Option{<:VecNum} = nothing, args...; kwargs...)
+                 w::Option{<:VecNum} = nothing, args...; kwargs...)::RiskTrackingError
     return RiskTrackingError(; tr = factory(tr.tr, w),
                              r = factory(tr.r, pr, slv, ucs, w, args...; kwargs...),
                              err = tr.err, alg = tr.alg)
@@ -71,7 +72,7 @@ end
 function needs_previous_weights(tr::RiskTrackingError)
     return (needs_previous_weights(tr.tr) || needs_previous_weights(tr.r))
 end
-function factory(tr::RiskTrackingError, w::VecNum)
+function factory(tr::RiskTrackingError, w::VecNum)::RiskTrackingError
     return RiskTrackingError(; tr = factory(tr.tr, w), r = factory(tr.r, w), err = tr.err,
                              alg = tr.alg)
 end
@@ -80,7 +81,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Represents the Tracking Error risk measure.
 
-`TrackingRiskMeasure` penalises portfolio deviation from a benchmark by computing a norm of the difference between portfolio returns and a benchmark return series or benchmark weights. The tracking error can be defined using returns-based or weights-based benchmarks, and the norm is configurable.
+`TrackingRiskMeasure` penalises portfolio deviation from a benchmark by computing a norm of the difference between portfolio returns and a benchmark return series or benchmark weights. The tracking error is defined using returns-based or weights-based benchmarks, and the norm is configurable.
 
 # Mathematical Definition
 
@@ -94,9 +95,7 @@ Other norms can be selected via the `alg` field.
 
 # Fields
 
-  - `settings`: Risk measure configuration.
-  - `tr`: Tracking algorithm specifying the benchmark (weights- or returns-based).
-  - `alg`: Norm type for the tracking error (`L2Tracking`, `SquaredL2Tracking`, etc.).
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -145,8 +144,11 @@ TrackingRiskMeasure
   - [`NormTracking`](@ref)
 """
 @concrete struct TrackingRiskMeasure <: RiskMeasure
+    "$(field_dict[:settings_rm])"
     settings
+    "$(field_dict[:tr_spec])"
     tr
+    "$(field_dict[:tralg])"
     alg
     function TrackingRiskMeasure(settings::RiskMeasureSettings,
                                  tr::AbstractTrackingAlgorithm, alg::NormTracking)
@@ -155,7 +157,7 @@ TrackingRiskMeasure
 end
 function TrackingRiskMeasure(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                              tr::AbstractTrackingAlgorithm,
-                             alg::NormTracking = L2Tracking())
+                             alg::NormTracking = L2Tracking())::TrackingRiskMeasure
     return TrackingRiskMeasure(settings, tr, alg)
 end
 function (r::TrackingRiskMeasure)(w::VecNum, X::MatNum, fees::Option{<:Fees} = nothing)
@@ -211,10 +213,7 @@ where ``\\boldsymbol{w}_b`` are the benchmark weights and ``\\rho`` is the chose
 
 # Fields
 
-  - `settings`: Risk measure configuration.
-  - `tr`: Benchmark weights tracking specification.
-  - `r`: Risk measure for computing the tracking deviation.
-  - `alg`: Tracking mode (`IndependentVariableTracking` or `DependentVariableTracking`).
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -275,9 +274,13 @@ RiskTrackingRiskMeasure
   - [`DependentVariableTracking`](@ref)
 """
 @concrete struct RiskTrackingRiskMeasure <: RiskMeasure
+    "$(field_dict[:settings_rm])"
     settings
+    "$(field_dict[:tr_spec])"
     tr
+    "$(field_dict[:r_risk])"
     r
+    "$(field_dict[:tralg])"
     alg
     function RiskTrackingRiskMeasure(settings::RiskMeasureSettings, tr::WeightsTracking,
                                      r::AbstractBaseRiskMeasure, alg::VariableTracking)

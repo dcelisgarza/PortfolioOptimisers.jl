@@ -104,11 +104,12 @@ Posdef
     alg
     "A named tuple of keyword arguments to be passed to the algorithm."
     kwargs
-    function Posdef(alg::Any, kwargs::NamedTuple)
+    function Posdef(alg::Any, kwargs::NamedTuple)::Posdef
         return new{typeof(alg), typeof(kwargs)}(alg, kwargs)
     end
 end
-function Posdef(; alg::Any = NearestCorrelationMatrix.Newton, kwargs::NamedTuple = (;))
+function Posdef(; alg::Any = NearestCorrelationMatrix.Newton,
+                kwargs::NamedTuple = (;))::Posdef
     return Posdef(alg, kwargs)
 end
 """
@@ -171,7 +172,7 @@ true
   - [`Posdef`](@ref)
   - [`MatNum`](@ref)
 """
-function posdef!(::Nothing, X::MatNum)
+function posdef!(::Nothing, X::MatNum)::MatNum
     return X
 end
 function posdef!(pdm::Posdef, X::MatNum)
@@ -205,7 +206,7 @@ Out-of-place version of [`posdef!`](@ref).
   - [`Posdef`](@ref)
   - [`MatNum`](@ref)
 """
-function posdef(::Nothing, X::MatNum)
+function posdef(::Nothing, X::MatNum)::MatNum
     return X
 end
 function posdef(pdm::Posdef, X::MatNum)

@@ -71,7 +71,7 @@ Cokurtosis
 end
 function Cokurtosis(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
                     mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing(),
-                    alg::AbstractMomentAlgorithm = Full())
+                    alg::AbstractMomentAlgorithm = Full())::Cokurtosis
     return Cokurtosis(me, mp, alg)
 end
 """
@@ -93,7 +93,7 @@ Return a new [`Cokurtosis`](@ref) estimator with observation weights `w` applied
   - [`Cokurtosis`](@ref)
   - [`factory`](@ref)
 """
-function factory(kte::Cokurtosis, w::ObsWeights)
+function factory(kte::Cokurtosis, w::ObsWeights)::Cokurtosis
     return Cokurtosis(; me = factory(kte.me, w), mp = kte.mp, alg = kte.alg)
 end
 """
@@ -114,7 +114,7 @@ Gets the view of the cokurtosis estimator for the `i`-th element(s).
 
   - [`Cokurtosis`](@ref)
 """
-function moment_view(kte::Cokurtosis, i)
+function moment_view(kte::Cokurtosis, i)::Cokurtosis
     return Cokurtosis(; me = moment_view(kte.me, i), mp = kte.mp, alg = kte.alg)
 end
 """

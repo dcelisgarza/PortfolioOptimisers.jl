@@ -7,13 +7,7 @@ Bayesian Black-Litterman prior estimator for asset returns.
 
 # Fields
 
-  - `pe`: Factor prior estimator.
-  - `mp`: Matrix post-processing estimator.
-  - `views`: Views estimator or views object.
-  - `sets`: Asset sets.
-  - `views_conf`: View confidence(s).
-  - `rf`: Risk-free rate.
-  - `tau`: Blending parameter. When computing the prior, if `nothing`, defaults to `1/T` where `T` is the number of factor observations.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -137,12 +131,19 @@ BayesianBlackLittermanPrior
   - [`prior`](@ref)
 """
 @concrete struct BayesianBlackLittermanPrior <: AbstractLowOrderPriorEstimator_F
+    "$(field_dict[:pe])"
     pe
+    "$(field_dict[:mp])"
     mp
+    "$(field_dict[:views])"
     views
+    "$(field_dict[:sets])"
     sets
+    "$(field_dict[:views_conf])"
     views_conf
+    "$(field_dict[:rf])"
     rf
+    "$(field_dict[:tau])"
     tau
     function BayesianBlackLittermanPrior(pe::AbstractLowOrderPriorEstimator_F_AF,
                                          mp::AbstractMatrixProcessingEstimator,
@@ -167,15 +168,17 @@ function BayesianBlackLittermanPrior(;
                                      mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing(),
                                      views::Lc_BLV, sets::Option{<:AssetSets} = nothing,
                                      views_conf::Option{<:Num_VecNum} = nothing,
-                                     rf::Number = 0.0, tau::Option{<:Number} = nothing)
+                                     rf::Number = 0.0,
+                                     tau::Option{<:Number} = nothing)::BayesianBlackLittermanPrior
     return BayesianBlackLittermanPrior(pe, mp, views, sets, views_conf, rf, tau)
 end
-function factory(pe::BayesianBlackLittermanPrior, w::ObsWeights)
+function factory(pe::BayesianBlackLittermanPrior,
+                 w::ObsWeights)::BayesianBlackLittermanPrior
     return BayesianBlackLittermanPrior(; pe = factory(pe.pe, w), mp = pe.mp,
                                        views = pe.views, sets = pe.sets,
                                        views_conf = pe.views_conf, rf = pe.rf, tau = pe.tau)
 end
-function prior_view(pr::BayesianBlackLittermanPrior, i)
+function prior_view(pr::BayesianBlackLittermanPrior, i)::BayesianBlackLittermanPrior
     return BayesianBlackLittermanPrior(; pe = prior_view(pr.pe, i), mp = pr.mp,
                                        views = pr.views, sets = pr.sets,
                                        views_conf = pr.views_conf, rf = pr.rf, tau = pr.tau)

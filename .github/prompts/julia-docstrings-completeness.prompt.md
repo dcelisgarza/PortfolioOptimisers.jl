@@ -1,5 +1,5 @@
 ---
-agent: ask
+agent: agent
 description: Check API docs completeness.
 ---
 

@@ -64,7 +64,8 @@ DenoiseCovariance
     end
 end
 function DenoiseCovariance(; ce::StatsBase.CovarianceEstimator = Covariance(),
-                           dn::Denoise = Denoise(), pdm::Option{<:Posdef} = Posdef())
+                           dn::Denoise = Denoise(),
+                           pdm::Option{<:Posdef} = Posdef())::DenoiseCovariance
     return DenoiseCovariance(ce, dn, pdm)
 end
 """
@@ -86,7 +87,7 @@ Return a new [`DenoiseCovariance`](@ref) estimator with observation weights `w` 
   - [`DenoiseCovariance`](@ref)
   - [`factory`](@ref)
 """
-function factory(ce::DenoiseCovariance, w::ObsWeights)
+function factory(ce::DenoiseCovariance, w::ObsWeights)::DenoiseCovariance
     return DenoiseCovariance(; ce = factory(ce.ce, w), dn = ce.dn, pdm = ce.pdm)
 end
 """
@@ -107,7 +108,7 @@ Gets the view of the covariance estimator for the `i`-th element(s).
 
   - [`DenoiseCovariance`](@ref)
 """
-function moment_view(ce::DenoiseCovariance, i)
+function moment_view(ce::DenoiseCovariance, i)::DenoiseCovariance
     return DenoiseCovariance(; ce = moment_view(ce.ce, i), dn = ce.dn, pdm = ce.pdm)
 end
 """
