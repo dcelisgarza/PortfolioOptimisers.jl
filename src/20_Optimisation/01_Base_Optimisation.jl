@@ -894,7 +894,13 @@ function assert_external_optimiser(::NonFiniteAllocationOptimisationResult)::Not
     return nothing
 end
 """
-fees takes precedence over res.fees if both are provided
+    calc_net_returns(
+        res::NonFiniteAllocationOptimisationResult,
+        X::MatNum,
+        fees::Option{<:Fees} = nothing
+    )
+
+Compute net returns for a [`NonFiniteAllocationOptimisationResult`](@ref). `fees` takes precedence over `res.fees` if both are provided. Delegates to [`calc_net_returns(w, X, fees)`](@ref).
 """
 function calc_net_returns(res::NonFiniteAllocationOptimisationResult, X::MatNum,
                           fees::Option{<:Fees} = nothing)

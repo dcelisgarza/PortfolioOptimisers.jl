@@ -5,14 +5,7 @@ Result type for Factor Risk Contribution portfolio optimisation.
 
 # Fields
 
-  - `oe`: Type of the optimisation estimator that produced this result.
-  - `pa`: Processed optimisation attributes.
-  - `rr`: Regression result used for factor decomposition.
-  - `frc_plr`: Factor risk contribution placeholder result.
-  - `retcode`: Optimisation return code.
-  - `sol`: JuMP model solution.
-  - `model`: The JuMP model.
-  - `fb`: Fallback result.
+$(DocStringExtensions.FIELDS)
 
 The `w` property is forwarded from `sol.w`.
 
@@ -22,19 +15,32 @@ The `w` property is forwarded from `sol.w`.
   - [`NonFiniteAllocationOptimisationResult`](@ref)
 """
 @concrete struct FactorRiskContributionResult <: NonFiniteAllocationOptimisationResult
+    "$(field_dict[:oe])"
     oe
+    "$(field_dict[:pa])"
     pa
+    "$(field_dict[:reg_rr])"
     rr
+    "Factor risk contribution placeholder result."
     frc_plr
+    "$(field_dict[:retcode])"
     retcode
+    "$(field_dict[:sol])"
     sol
+    "$(field_dict[:model])"
     model
+    "$(field_dict[:fb])"
     fb
 end
 function factory(res::FactorRiskContributionResult, fb::Option{<:OptE_Opt})
     return FactorRiskContributionResult(res.oe, res.pa, res.rr, res.frc_plr, res.retcode,
                                         res.sol, res.model, fb)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Access properties of [`FactorRiskContributionResult`](@ref). Virtual property `:w` extracts portfolio weights from `sol`; other unknown properties forward to `r.rr` then `r.pa`.
+"""
 function Base.getproperty(r::FactorRiskContributionResult, sym::Symbol)
     return if sym == :w
         !isa(r.sol, AbstractVector) ? getfield(r.sol, :w) : getfield.(r.sol, :w)
@@ -57,15 +63,7 @@ Factor Risk Contribution (FRC) portfolio optimiser.
 
 # Fields
 
-  - `opt`: JuMP optimiser configuration.
-  - `re`: Regression estimator for computing factor loadings.
-  - `r`: Risk measure or vector of risk measures.
-  - `obj`: Portfolio objective function.
-  - `frc_ple`: Factor risk contribution placeholder constraints.
-  - `sets`: Asset sets.
-  - `wi`: Initial weights for warm-starting.
-  - `flag`: If `true`, uses the full factor regression decomposition; if `false`, uses a simplified approach.
-  - `fb`: Fallback optimiser.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -91,14 +89,23 @@ Keywords correspond to the struct's fields.
   - [`factor_risk_contribution`](@ref)
 """
 @concrete struct FactorRiskContribution <: RiskJuMPOptimisationEstimator
+    "$(field_dict[:opt_jmp])"
     opt
+    "$(field_dict[:re])"
     re
+    "$(field_dict[:r_opt])"
     r
+    "$(field_dict[:obj])"
     obj
+    "Factor risk contribution placeholder constraints."
     frc_ple
+    "$(field_dict[:sets])"
     sets
+    "$(field_dict[:wi])"
     wi
+    "$(field_dict[:flag])"
     flag
+    "$(field_dict[:fb])"
     fb
     function FactorRiskContribution(opt::JuMPOptimiser, re::RegE_Reg, r::RM_VecRM,
                                     obj::ObjectiveFunction,

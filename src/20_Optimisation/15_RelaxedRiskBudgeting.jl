@@ -46,7 +46,7 @@ Extends the regularised formulation with a penalty on deviations from target ris
 
 # Fields
 
-  - `p`: Penalty parameter (positive finite number).
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -66,6 +66,7 @@ Keywords correspond to the struct's fields.
   - [`RegularisedRelaxedRiskBudgeting`](@ref)
 """
 @concrete struct RegularisedPenalisedRelaxedRiskBudgeting <: RelaxedRiskBudgetingAlgorithm
+    "$(field_dict[:p_rm])"
     p
     function RegularisedPenalisedRelaxedRiskBudgeting(p::Number)
         @argcheck(isfinite(p) && p > zero(p))
@@ -85,11 +86,7 @@ Relaxed Risk Budgeting (RRB) portfolio optimiser.
 
 # Fields
 
-  - `opt`: JuMP optimiser configuration.
-  - `rba`: Risk budgeting algorithm.
-  - `wi`: Initial weights for warm-starting.
-  - `alg`: Relaxed risk budgeting algorithm variant.
-  - `fb`: Fallback optimiser.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -110,10 +107,15 @@ Keywords correspond to the struct's fields.
   - [`RelaxedRiskBudgetingAlgorithm`](@ref)
 """
 @concrete struct RelaxedRiskBudgeting <: JuMPOptimisationEstimator
+    "$(field_dict[:opt_jmp])"
     opt
+    "$(field_dict[:rba])"
     rba
+    "$(field_dict[:wi])"
     wi
+    "Relaxed risk budgeting algorithm variant."
     alg
+    "$(field_dict[:fb])"
     fb
     function RelaxedRiskBudgeting(opt::JuMPOptimiser, rba::RiskBudgetingAlgorithm,
                                   wi::Option{<:VecNum}, alg::RelaxedRiskBudgetingAlgorithm,

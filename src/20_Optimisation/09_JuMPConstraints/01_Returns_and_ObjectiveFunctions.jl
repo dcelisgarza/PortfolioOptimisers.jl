@@ -9,9 +9,7 @@ on the portfolio return.
 
 # Fields
 
-  - `ucs`: Optional ellipsoidal uncertainty set on the mean return.
-  - `lb`: Optional lower bound on the portfolio return (scalar or vector).
-  - `mu`: Optional mean return override (scalar or vector).
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -29,8 +27,11 @@ on the portfolio return.
   - [`JuMPReturnsEstimator`](@ref)
 """
 @concrete struct ArithmeticReturn <: JuMPReturnsEstimator
+    "$(field_dict[:ucs])"
     ucs
+    "$(field_dict[:lb])"
     lb
+    "$(field_dict[:mu])"
     mu
     function ArithmeticReturn(ucs::Option{<:UcSE_UcS}, lb::Option{<:RkRtBounds},
                               mu::Option{<:Num_VecNum})
@@ -116,8 +117,7 @@ Optionally supports observation weights and a lower bound on the portfolio retur
 
 # Fields
 
-  - `w`: Optional observation weights.
-  - `lb`: Optional lower bound on the portfolio return (scalar or vector).
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -134,7 +134,9 @@ Optionally supports observation weights and a lower bound on the portfolio retur
   - [`JuMPReturnsEstimator`](@ref)
 """
 @concrete struct LogarithmicReturn <: JuMPReturnsEstimator
+    "$(field_dict[:oow])"
     w
+    "$(field_dict[:lb])"
     lb
     function LogarithmicReturn(w::Option{<:ObsWeights}, lb::Option{<:RkRtBounds})
         assert_nonempty_nonneg_finite_val(w, :w)
@@ -171,6 +173,11 @@ function AKelly(; formulation::VarianceFormulation = SOC(),
     end
     return AKelly(formulation, a_rc, b_rc)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Set properties of [`AKelly`](@ref) with validation. When setting `:a_rc` or `:b_rc`, checks that the new value is consistent with the existing constraint matrix dimensions.
+"""
 function Base.setproperty!(obj::AKelly, sym::Symbol, val)
     if sym == :a_rc
         if !isnothing(val) && !isnothing(obj.b_rc) && !isempty(val) && !isempty(obj.b_rc)
@@ -347,7 +354,7 @@ where ``l`` is the risk-aversion coefficient and ``R`` is the portfolio risk.
 
 # Fields
 
-  - `l::Number`: Risk-aversion coefficient. Must be non-negative. Defaults to `2`.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -363,6 +370,7 @@ where ``l`` is the risk-aversion coefficient and ``R`` is the portfolio risk.
   - [`ObjectiveFunction`](@ref)
 """
 @concrete struct MaximumUtility <: ObjectiveFunction
+    "$(field_dict[:l])"
     l
     function MaximumUtility(l::Number)
         @argcheck(l >= zero(l))
@@ -385,9 +393,7 @@ where ``r_f`` is the risk-free rate and ``R`` is the portfolio risk.
 
 # Fields
 
-  - `rf::Number`: Risk-free rate. Defaults to `0.0`.
-  - `ohf::Option{<:Number}`: Optional objective homogenisation factor used internally
-    for numerical stability. Defaults to `nothing` (auto-determined).
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -404,7 +410,9 @@ where ``r_f`` is the risk-free rate and ``R`` is the portfolio risk.
   - [`ObjectiveFunction`](@ref)
 """
 @concrete struct MaximumRatio <: ObjectiveFunction
+    "$(field_dict[:rf])"
     rf
+    "Optional objective homogenisation factor for numerical stability of the ratio problem. Defaults to `nothing` (auto-determined)."
     ohf
     function MaximumRatio(rf::Number, ohf::Option{<:Number})
         if !isnothing(ohf)

@@ -183,6 +183,11 @@ function prior_view(pr::BayesianBlackLittermanPrior, i)::BayesianBlackLittermanP
                                        views = pr.views, sets = pr.sets,
                                        views_conf = pr.views_conf, rf = pr.rf, tau = pr.tau)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Access properties of [`BayesianBlackLittermanPrior`](@ref). Exposes `:me` and `:ce` from the embedded prior estimator `obj.pe` for transparent access.
+"""
 function Base.getproperty(obj::BayesianBlackLittermanPrior, sym::Symbol)
     return if sym == :me
         obj.pe.me

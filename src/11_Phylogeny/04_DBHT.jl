@@ -1320,12 +1320,16 @@ function LinkageFunction(d::MatNum, labelvec::VecNum)
     return PairLink, dvu
 end
 """
-```
-build_link_and_dendro(rg::AbstractRange, dpm::MatNum,
-                      LabelVec::VecNum, LabelVec1::VecNum,
-                      LabelVec2::VecNum, V::VecNum,
-                      nc::Number, Z::MatNum)
-```
+    build_link_and_dendro(
+        rg::AbstractRange,
+        dpm::MatNum,
+        LabelVec::VecNum,
+        LabelVec1::VecNum,
+        LabelVec2::VecNum,
+        V::VecNum,
+        nc::Number,
+        Z::MatNum
+    )
 
 Iteratively construct the linkage matrix for a bubble or cluster.
 
@@ -1375,10 +1379,12 @@ function build_link_and_dendro(rg::AbstractRange, dpm::MatNum, LabelVec::VecNum,
     return Z, nc, LabelVec1
 end
 """
-```
-HierarchyConstruct4s(Rpm::MatNum, Dpm::MatNum,
-                     Tc::VecNum, Mv::MatNum)
-```
+    HierarchyConstruct4s(
+        Rpm::MatNum,
+        Dpm::MatNum,
+        Tc::VecNum,
+        Mv::MatNum
+    )
 
 Constructs the intra- and inter-cluster hierarchy by utilizing the Bubble Hierarchy structure of a Maximal Planar Graph, specifically a Planar Maximally Filtered Graph (PMFG).
 

@@ -3,19 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Result type for Nested Clustered Optimisation.
 
-# Fields
-
-  - `oe`: Type of the optimisation estimator that produced this result.
-  - `pr`: Prior result used in optimisation.
-  - `clr`: Clustering result.
-  - `wb`: Weight bounds applied.
-  - `fees`: Fee structure applied (or `nothing`).
-  - `resi`: Inner (intra-cluster) optimisation results.
-  - `reso`: Outer (inter-cluster) optimisation result.
-  - `cv`: Cross-validation result (or `nothing`).
-  - `retcode`: Overall optimisation return code.
-  - `w`: Final aggregated portfolio weights.
-  - `fb`: Fallback result.
+$(DocStringExtensions.FIELDS)
 
 # Related
 
@@ -23,16 +11,27 @@ Result type for Nested Clustered Optimisation.
   - [`NonFiniteAllocationOptimisationResult`](@ref)
 """
 @concrete struct NestedClusteredResult <: NonFiniteAllocationOptimisationResult
+    "$(field_dict[:oe])"
     oe
+    "$(field_dict[:pr])"
     pr
+    "$(field_dict[:clr])"
     clr
+    "$(field_dict[:wb])"
     wb
+    "$(field_dict[:fees])"
     fees
+    "$(field_dict[:resi])"
     resi
+    "$(field_dict[:reso])"
     reso
+    "$(field_dict[:cv])"
     cv
+    "$(field_dict[:retcode])"
     retcode
+    "Final aggregated portfolio weights."
     w
+    "$(field_dict[:fb])"
     fb
 end
 function factory(res::NestedClusteredResult, fb::Option{<:OptE_Opt})
@@ -214,22 +213,7 @@ Nested Clustered Optimisation (NCO) portfolio optimiser.
 
 `NestedClustered` implements the Nested Clustered Optimisation algorithm. It first clusters assets, then solves a within-cluster (inner) optimisation for each cluster independently, and finally solves an across-cluster (outer) optimisation to combine the cluster portfolios into a final portfolio.
 
-# Fields
-
-  - `pe`: Prior estimator or prior result.
-  - `cle`: Clustering estimator or clustering result.
-  - `wb`: Weight bounds estimator or bounds.
-  - `fees`: Fee estimator or fee structure.
-  - `sets`: Asset sets.
-  - `opti`: Inner (intra-cluster) portfolio optimiser.
-  - `opto`: Outer (inter-cluster) portfolio optimiser.
-  - `cv`: Cross-validation configuration for model selection.
-  - `wf`: Weight finaliser for enforcing bounds.
-  - `ex`: FLoops executor for parallelism.
-  - `fb`: Fallback optimiser.
-  - `brt`: If `true`, uses bootstrap returns.
-  - `cle_pr`: If `true`, passes the prior result to the clustering estimator.
-  - `strict`: If `true`, strictly enforces weight bounds.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -260,19 +244,33 @@ Keywords correspond to the struct's fields.
   - [`NestedClusteredResult`](@ref)
 """
 @concrete struct NestedClustered <: ClusteringOptimisationEstimator
+    "$(field_dict[:pe])"
     pe
+    "$(field_dict[:cle])"
     cle
+    "$(field_dict[:wb_jmp])"
     wb
+    "$(field_dict[:feese])"
     fees
+    "$(field_dict[:sets])"
     sets
+    "$(field_dict[:opti])"
     opti
+    "$(field_dict[:opto])"
     opto
+    "$(field_dict[:cv])"
     cv
+    "$(field_dict[:wf])"
     wf
+    "$(field_dict[:ex])"
     ex
+    "$(field_dict[:fb])"
     fb
+    "$(field_dict[:brt])"
     brt
+    "$(field_dict[:cle_pr])"
     cle_pr
+    "$(field_dict[:strict_opt])"
     strict
     function NestedClustered(pe::PrE_Pr, cle::ClE_Cl, wb::Option{<:WbE_Wb},
                              fees::Option{<:FeesE_Fees}, sets::Option{<:AssetSets},
@@ -424,7 +422,17 @@ function outer_optimisation_finaliser(wb::Option{<:WeightBounds}, wf::WeightFina
     return retcode, w
 end
 """
-Overload this using nco.cv for custom cross-validation prediction
+    predict_outer_nco_estimator_returns(
+        nco::NestedClustered,
+        rd::ReturnsResult,
+        pr::AbstractPriorResult,
+        fees::Option{<:Fees},
+        wi::MatNum,
+        resi::VecOpt,
+        cls::VecVecInt
+    )
+
+Predict outer portfolio returns for [`NestedClustered`](@ref) optimisation. Overload this using `nco.cv` for custom cross-validation prediction.
 """
 function predict_outer_nco_estimator_returns(nco::NestedClustered, rd::ReturnsResult,
                                              pr::AbstractPriorResult, fees::Option{<:Fees},

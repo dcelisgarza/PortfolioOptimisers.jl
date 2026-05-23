@@ -3,15 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Result type for Risk Budgeting portfolio optimisation.
 
-# Fields
-
-  - `oe`: Type of the optimisation estimator that produced this result.
-  - `pa`: Processed optimisation attributes.
-  - `prb`: Processed risk budgeting attributes.
-  - `retcode`: Optimisation return code.
-  - `sol`: JuMP model solution.
-  - `model`: The JuMP model.
-  - `fb`: Fallback result.
+$(DocStringExtensions.FIELDS)
 
 The `w` property is forwarded from `sol.w`.
 
@@ -21,17 +13,29 @@ The `w` property is forwarded from `sol.w`.
   - [`NonFiniteAllocationOptimisationResult`](@ref)
 """
 @concrete struct RiskBudgetingResult <: NonFiniteAllocationOptimisationResult
+    "$(field_dict[:oe])"
     oe
+    "$(field_dict[:pa])"
     pa
+    "$(field_dict[:prb])"
     prb
+    "$(field_dict[:retcode])"
     retcode
+    "$(field_dict[:sol])"
     sol
+    "$(field_dict[:model])"
     model
+    "$(field_dict[:fb])"
     fb
 end
 function factory(res::RiskBudgetingResult, fb::Option{<:OptE_Opt})
     return RiskBudgetingResult(res.oe, res.pa, res.prb, res.retcode, res.sol, res.model, fb)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Access properties of [`RiskBudgetingResult`](@ref). Virtual property `:w` extracts portfolio weights from `sol`; other unknown properties forward to `r.prb` then `r.pa`.
+"""
 function Base.getproperty(r::RiskBudgetingResult, sym::Symbol)
     return if sym == :w
         r.sol.w
@@ -85,7 +89,9 @@ Abstract supertype for risk budgeting optimisation formulations.
 """
 abstract type RiskBudgetingFormulation <: OptimisationAlgorithm end
 """
-risk_budgeting_formulation_view(::RiskBudgetingFormulation, args...) -> nothing
+    risk_budgeting_formulation_view(::RiskBudgetingFormulation, args...) -> nothing
+
+Default fallback for risk budgeting formulation view. Returns `nothing` for formulations that do not require view slicing.
 """
 function risk_budgeting_formulation_view(::RiskBudgetingFormulation, args...)
     return nothing
@@ -158,9 +164,7 @@ Asset-level Risk Budgeting algorithm.
 
 # Fields
 
-  - `rkb`: Risk budget estimator or risk budget constraints.
-  - `sets`: Asset sets (required when `rkb` is a `RiskBudgetEstimator`).
-  - `alg`: Risk budgeting formulation.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -179,8 +183,11 @@ Keywords correspond to the struct's fields.
   - [`RiskBudgeting`](@ref)
 """
 @concrete struct AssetRiskBudgeting <: RiskBudgetingAlgorithm
+    "$(field_dict[:rkb])"
     rkb
+    "$(field_dict[:sets])"
     sets
+    "$(field_dict[:rba])"
     alg
     function AssetRiskBudgeting(rkb::Option{<:RkbE_Rkb}, sets::Option{<:AssetSets},
                                 alg::RiskBudgetingFormulation)
@@ -232,10 +239,7 @@ Factor-level Risk Budgeting algorithm.
 
 # Fields
 
-  - `re`: Regression estimator for factor loadings.
-  - `rkb`: Risk budget estimator or risk budget constraints.
-  - `sets`: Asset sets (required when `rkb` is a `RiskBudgetEstimator`).
-  - `flag`: If `true`, includes the idiosyncratic component in the budget.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -255,9 +259,13 @@ Keywords correspond to the struct's fields.
   - [`RiskBudgeting`](@ref)
 """
 @concrete struct FactorRiskBudgeting <: RiskBudgetingAlgorithm
+    "$(field_dict[:re])"
     re
+    "$(field_dict[:rkb])"
     rkb
+    "$(field_dict[:sets])"
     sets
+    "$(field_dict[:flag])"
     flag
     function FactorRiskBudgeting(re::RegE_Reg, rkb::Option{<:RkbE_Rkb},
                                  sets::Option{<:AssetSets}, flag::Bool)
@@ -308,11 +316,7 @@ Risk Budgeting (RB) portfolio optimiser.
 
 # Fields
 
-  - `opt`: JuMP optimiser configuration.
-  - `r`: Risk measure or vector of risk measures.
-  - `rba`: Risk budgeting algorithm (`AssetRiskBudgeting` or `FactorRiskBudgeting`).
-  - `wi`: Initial weights for warm-starting.
-  - `fb`: Fallback optimiser.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -337,10 +341,15 @@ Keywords correspond to the struct's fields.
   - [`FactorRiskBudgeting`](@ref)
 """
 @concrete struct RiskBudgeting <: RiskJuMPOptimisationEstimator
+    "$(field_dict[:opt_jmp])"
     opt
+    "$(field_dict[:r_opt])"
     r
+    "$(field_dict[:rba])"
     rba
+    "$(field_dict[:wi])"
     wi
+    "$(field_dict[:fb])"
     fb
     function RiskBudgeting(opt::JuMPOptimiser, r::RM_VecRM, rba::RiskBudgetingAlgorithm,
                            wi::Option{<:VecNum}, fb::Option{<:OptE_Opt})

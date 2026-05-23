@@ -82,9 +82,7 @@ Estimator for stepwise regression-based moment estimation.
 
 # Fields
 
-  - `crit`: Criterion for variable selection.
-  - `alg`: Stepwise algorithm.
-  - `tgt`: Regression target type.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 

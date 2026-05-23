@@ -861,6 +861,11 @@ function prior_view(pr::HighOrderPrior, i)
                           sk = sk, V = V, skmp = skmp, f_kt = pr.f_kt, f_sk = pr.f_sk,
                           f_V = pr.f_V)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Access properties of [`HighOrderPrior`](@ref). Forwards unknown property names to the embedded `obj.pr` prior, allowing transparent access to low-order moment fields.
+"""
 function Base.getproperty(obj::HighOrderPrior, sym::Symbol)
     return if sym in propertynames(obj)
         getfield(obj, sym)

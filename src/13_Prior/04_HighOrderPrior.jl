@@ -485,6 +485,11 @@ function prior_view(pr::HighOrderPriorEstimator, i)::HighOrderPriorEstimator
                                    kte = moment_view(pr.kte, i),
                                    ske = moment_view(pr.ske, i))
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Access properties of [`HighOrderPriorEstimator`](@ref). Exposes `:me` and `:ce` from the embedded prior estimator `obj.pe` for transparent access.
+"""
 function Base.getproperty(obj::HighOrderPriorEstimator, sym::Symbol)
     return if sym == :me
         obj.pe.me

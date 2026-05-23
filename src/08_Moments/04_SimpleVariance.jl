@@ -129,6 +129,11 @@ function Statistics.std(ve::SimpleVariance, X::MatNum; dims::Int = 1, mean = not
         Statistics.std(X, w, dims; corrected = ve.corrected, mean = mu)
     end
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+`SimpleVariance{Nothing}` overload of [`std(ve::SimpleVariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref). Uses [`SimpleExpectedReturns`](@ref) to compute the mean when none is provided, ignoring the `me` field.
+"""
 function Statistics.std(ve::SimpleVariance{Nothing}, X::MatNum; dims::Int = 1,
                         mean = nothing, kwargs...)
     mu = if isnothing(mean)
@@ -266,6 +271,11 @@ function Statistics.var(ve::SimpleVariance, X::MatNum; dims::Int = 1, mean = not
         Statistics.var(X, w, dims; corrected = ve.corrected, mean = mu)
     end
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+`SimpleVariance{Nothing}` overload of [`var(ve::SimpleVariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref). Uses [`SimpleExpectedReturns`](@ref) to compute the mean when none is provided, ignoring the `me` field.
+"""
 function Statistics.var(ve::SimpleVariance{Nothing}, X::MatNum; dims::Int = 1,
                         mean = nothing, kwargs...)
     me = SimpleExpectedReturns()

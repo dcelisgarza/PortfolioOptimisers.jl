@@ -387,6 +387,11 @@ function Statistics.cov(ce::Covariance{<:Any, <:Any, <:Full}, X::MatNum; dims::I
     mu = isnothing(mean) ? Statistics.mean(ce.me, X; dims = dims, kwargs...) : mean
     return Statistics.cov(ce.ce, X; dims = dims, mean = mu, kwargs...)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+[`Semi`](@ref) variant of [`cov(ce::Covariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref). Clips de-meaned returns to zero before computing the covariance matrix, capturing only downside co-movements.
+"""
 function Statistics.cov(ce::Covariance{<:Any, <:Any, <:Semi}, X::MatNum; dims::Int = 1,
                         mean = nothing, kwargs...)
     mu = isnothing(mean) ? Statistics.mean(ce.me, X; dims = dims, kwargs...) : mean
@@ -437,6 +442,11 @@ function Statistics.cor(ce::Covariance{<:Any, <:Any, <:Full}, X::MatNum; dims::I
     mu = isnothing(mean) ? Statistics.mean(ce.me, X; dims = dims, kwargs...) : mean
     return Statistics.cor(ce.ce, X; dims = dims, mean = mu, kwargs...)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+[`Semi`](@ref) variant of [`cor(ce::Covariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref). Clips de-meaned returns to zero before computing the correlation matrix, capturing only downside co-movements.
+"""
 function Statistics.cor(ce::Covariance{<:Any, <:Any, <:Semi}, X::MatNum; dims::Int = 1,
                         mean = nothing, kwargs...)
     mu = isnothing(mean) ? Statistics.mean(ce.me, X; dims = dims, kwargs...) : mean

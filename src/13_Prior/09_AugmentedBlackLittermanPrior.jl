@@ -246,6 +246,11 @@ function prior_view(pe::AugmentedBlackLittermanPrior, i)::AugmentedBlackLitterma
                                         w = nothing_scalar_array_view(pe.w, i), rf = pe.rf,
                                         l = pe.l, tau = pe.tau)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Access properties of [`AugmentedBlackLittermanPrior`](@ref). Exposes `:me`, `:ce` from the asset prior `obj.a_pe` and `:f_me`, `:f_ce` from the factor prior `obj.f_pe` for transparent access.
+"""
 function Base.getproperty(obj::AugmentedBlackLittermanPrior, sym::Symbol)
     return if sym == :me
         obj.a_pe.me

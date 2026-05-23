@@ -114,6 +114,11 @@ function prior_view(pe::FactorPrior, i)::FactorPrior
     return FactorPrior(; pe = pe.pe, mp = pe.mp, re = regression_view(pe.re, i),
                        ve = moment_view(pe.ve, i), rsd = pe.rsd)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Access properties of [`FactorPrior`](@ref). Exposes `:me` and `:ce` from the embedded asset prior estimator `obj.pe` for transparent access.
+"""
 function Base.getproperty(obj::FactorPrior, sym::Symbol)
     return if sym == :me
         obj.pe.me

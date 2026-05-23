@@ -541,6 +541,11 @@ function Regression(; M::MatNum, L::Option{<:MatNum} = nothing,
                     b::Option{<:VecNum} = nothing)::Regression
     return Regression(M, L, b)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Access properties of `Regression` when `L` is `Nothing`. Returns `M` when `sym == :L`, falling back to `M` as the loadings matrix.
+"""
 function Base.getproperty(re::Regression{<:Any, Nothing, <:Any}, sym::Symbol)
     return if sym == :L
         getfield(re, :M)
@@ -548,6 +553,11 @@ function Base.getproperty(re::Regression{<:Any, Nothing, <:Any}, sym::Symbol)
         getfield(re, sym)
     end
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Access properties of `Regression` when `L` is a matrix. Returns the stored `L` field when `sym == :L`.
+"""
 function Base.getproperty(re::Regression{<:Any, <:MatNum, <:Any}, sym::Symbol)
     return if sym == :L
         getfield(re, :L)

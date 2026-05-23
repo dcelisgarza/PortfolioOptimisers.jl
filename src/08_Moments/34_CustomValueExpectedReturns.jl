@@ -68,12 +68,22 @@ function Statistics.mean(me::CustomValueExpectedReturns{<:Number}, X::MatNum; di
     @argcheck(dims in (1, 2))
     return insertdims(fill(me.val, size(X, setdiff((1, 2), (dims,))[1])); dims = dims)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Vector overload of [`mean(me::CustomValueExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)`](@ref). Returns the stored vector `me.val` reshaped to match `dims`.
+"""
 function Statistics.mean(me::CustomValueExpectedReturns{<:VecNum}, X::MatNum; dims::Int = 1,
                          kwargs...)
     @argcheck(dims in (1, 2))
     @argcheck(length(me.val) == size(X, setdiff((1, 2), (dims,))[1]))
     return insertdims(me.val; dims = dims)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Function overload of [`mean(me::CustomValueExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)`](@ref). Delegates to the callable `me.val` with the same arguments.
+"""
 function Statistics.mean(me::CustomValueExpectedReturns{<:Function}, X::MatNum;
                          dims::Int = 1, kwargs...)
     @argcheck(dims in (1, 2))

@@ -144,6 +144,11 @@ function BlackLittermanPrior(;
                              tau::Option{<:Number} = nothing)::BlackLittermanPrior
     return BlackLittermanPrior(pe, mp, views, sets, views_conf, rf, tau)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Access properties of [`BlackLittermanPrior`](@ref). Exposes `:me` and `:ce` from the embedded prior estimator `obj.pe` for transparent access.
+"""
 function Base.getproperty(obj::BlackLittermanPrior, sym::Symbol)
     return if sym == :me
         obj.pe.me
@@ -241,12 +246,45 @@ function vanilla_posteriors(tau::Number, rf::Number, prior_mu::VecNum, prior_sig
     posterior_sigma = prior_sigma + tau * prior_sigma - v1 * (v2 \ transpose(v1))
     return posterior_mu, posterior_sigma
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Remove excluded views from `views_conf`.
+
+Returns `views_conf` unchanged when `excl` is `nothing` or `views_conf` is scalar. Filters `views_conf` by removing indices in `excl` when both are vectors.
+
+# Related
+
+  - [`BlackLittermanPrior`](@ref)
+"""
 function remove_excl_views(views_conf::Option{<:Number}, args...)
     return views_conf
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Remove excluded views from `views_conf`.
+
+Returns `views_conf` unchanged (no exclusions).
+
+# Related
+
+  - [`BlackLittermanPrior`](@ref)
+"""
 function remove_excl_views(views_conf::VecNum, ::Nothing)
     return views_conf
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Remove excluded views from `views_conf`.
+
+Returns a view of `views_conf` with indices in `excl` removed.
+
+# Related
+
+  - [`BlackLittermanPrior`](@ref)
+"""
 function remove_excl_views(views_conf::VecNum, excl::VecInt)
     return nothing_scalar_array_view(views_conf, setdiff(1:length(views_conf), excl))
 end

@@ -1148,16 +1148,31 @@ Stacktrace:
     "$(field_dict[:msg])"
     msg
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Print human-readable representation of `PortfolioOptimisersError` subtypes to `io`, stripping parametric type suffixes.
+"""
 function Base.showerror(io::IO, err::PortfolioOptimisersError)
     name = string(typeof(err))
     name = name[1:(findfirst(x -> (x == '{' || x == '('), name) - 1)]
     return print(io, "$name: $(err.msg)")
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Make estimators, algorithms, and results behave as length-1 iterables, returning the object itself on the first iteration and `nothing` thereafter.
+"""
 function Base.iterate(obj::Union{<:AbstractEstimator, <:AbstractAlgorithm,
                                  <:AbstractResult}, state = 1)
     return state > 1 ? nothing : (obj, state + 1)
 end
 Base.length(::Union{<:AbstractEstimator, <:AbstractAlgorithm, <:AbstractResult}) = 1
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Index into estimators, algorithms, and results as length-1 containers. Only index `1` is valid; any other index throws `BoundsError`.
+"""
 function Base.getindex(obj::Union{<:AbstractEstimator, <:AbstractAlgorithm,
                                   <:AbstractResult}, i::Int)
     return i == 1 ? obj : throw(BoundsError(obj, i))
@@ -2037,6 +2052,11 @@ function SingletonVector()
     return SingletonVector{Int}()
 end
 Base.length(::SingletonVector) = 1
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Index into `SingletonVector`, returning `1` for index `1` and throwing `BoundsError` for any other index.
+"""
 function Base.getindex(A::SingletonVector, i::Int)
     return isone(i) ? 1 : throw(BoundsError(A, i))
 end

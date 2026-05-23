@@ -69,45 +69,7 @@ Main JuMP-based portfolio optimiser configuration.
 
 # Fields
 
-  - `pe`: Prior estimator or prior result.
-  - `slv`: Solver or vector of solvers.
-  - `wb`: Weight bounds estimator or bounds.
-  - `bgt`: Budget constraint (total weight sum). If a `Number`: the portfolio weights must sum to this value. If a `BudgetCostEstimator`: the budget is computed from asset-level data. Cannot be used together with `sbgt`.
-  - `sbgt`: Short-sale budget constraint range. If provided, `bgt` must not be a `BudgetCostEstimator`.
-  - `lt`: Long threshold estimator or threshold.
-  - `st`: Short threshold estimator or threshold.
-  - `lcse`: Linear constraint estimator or constraint(s).
-  - `cte`: Centring constraint estimator or constraint(s).
-  - `gcarde`: Grouped cardinality constraint estimator.
-  - `sgcarde`: Sub-grouped cardinality constraint estimator(s).
-  - `smtx`: Sub-group constraint matrix or estimator.
-  - `sgmtx`: Sub-grouped constraint matrix or estimator.
-  - `slt`: Sub-group long threshold.
-  - `sst`: Sub-group short threshold.
-  - `sglt`: Sub-grouped long threshold.
-  - `sgst`: Sub-grouped short threshold.
-  - `tn`: Turnover constraint estimator or constraints.
-  - `fees`: Fee estimator or fee structure.
-  - `sets`: Asset sets (required when any estimator-typed constraint is provided).
-  - `tr`: Tracking error constraint(s).
-  - `ple`: Placeholder constraints.
-  - `ret`: Returns estimator for JuMP models.
-  - `sca`: Scalariser for combining multiple risk measures.
-  - `ccnt`: Custom JuMP constraint.
-  - `cobj`: Custom JuMP objective.
-  - `sc`: Constraint scale factor.
-  - `so`: Objective scale factor.
-  - `ss`: Optional scalar shrinkage parameter.
-  - `card`: Global cardinality constraint (maximum number of non-zero weights).
-  - `scard`: Sub-group cardinality constraint(s).
-  - `nea`: Minimum number of effective assets.
-  - `l1`: L1 regularisation coefficient.
-  - `l2`: L2 regularisation coefficient.
-  - `linf`: L∞ regularisation coefficient.
-  - `lp`: Lp regularisation specification(s).
-  - `brt`: If `true`, uses bootstrap returns.
-  - `cle_pr`: If `true`, passes the prior result to the clustering estimator.
-  - `strict`: If `true`, strictly enforces weight bounds.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -163,44 +125,83 @@ Keywords correspond to the struct's fields.
   - [`RelaxedRiskBudgeting`](@ref)
 """
 @concrete struct JuMPOptimiser <: BaseJuMPOptimisationEstimator
+    "$(field_dict[:pe])"
     pe
+    "$(field_dict[:slv])"
     slv
+    "$(field_dict[:wb_jmp])"
     wb
+    "$(field_dict[:bgt])"
     bgt
+    "$(field_dict[:sbgt])"
     sbgt
+    "$(field_dict[:lt])"
     lt
+    "$(field_dict[:st])"
     st
+    "$(field_dict[:lcse])"
     lcse
+    "Centring constraint estimator or constraint(s)."
     cte
+    "$(field_dict[:gcarde])"
     gcarde
+    "$(field_dict[:sgcarde])"
     sgcarde
+    "$(field_dict[:smtx])"
     smtx
+    "$(field_dict[:sgmtx])"
     sgmtx
+    "$(field_dict[:slt])"
     slt
+    "$(field_dict[:sst])"
     sst
+    "$(field_dict[:sglt])"
     sglt
+    "$(field_dict[:sgst])"
     sgst
+    "$(field_dict[:tn_jmp])"
     tn
+    "$(field_dict[:fees_jmp])"
     fees
+    "$(field_dict[:sets])"
     sets
+    "$(field_dict[:tr_jmp])"
     tr
+    "$(field_dict[:ple])"
     ple
+    "$(field_dict[:ret_jmp])"
     ret
+    "$(field_dict[:sca])"
     sca
+    "$(field_dict[:ccnt])"
     ccnt
+    "$(field_dict[:cobj])"
     cobj
+    "$(field_dict[:sc])"
     sc
+    "$(field_dict[:so])"
     so
+    "$(field_dict[:ss])"
     ss
+    "$(field_dict[:card])"
     card
+    "$(field_dict[:scard])"
     scard
+    "$(field_dict[:nea])"
     nea
+    "$(field_dict[:l1])"
     l1
+    "$(field_dict[:l2])"
     l2
+    "$(field_dict[:linf])"
     linf
+    "$(field_dict[:lp])"
     lp
+    "$(field_dict[:brt])"
     brt
+    "$(field_dict[:cle_pr])"
     cle_pr
+    "$(field_dict[:strict_opt])"
     strict
     function JuMPOptimiser(pe::PrE_Pr, slv::Slv_VecSlv, wb::Option{<:WbE_Wb},
                            bgt::Option{<:Num_BgtCE}, sbgt::Option{<:Num_BgtRg},

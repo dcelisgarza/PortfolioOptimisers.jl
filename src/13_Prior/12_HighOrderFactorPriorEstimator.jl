@@ -247,6 +247,11 @@ function prior_view(pe::HighOrderFactorPriorEstimator, i)::HighOrderFactorPriorE
     return HighOrderFactorPriorEstimator(; pe = prior_view(pe.pe, i), kte = pe.kte,
                                          ske = pe.ske, ex = pe.ex, rsd = pe.rsd)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Access properties of [`HighOrderFactorPriorEstimator`](@ref). Exposes `:me` and `:ce` from the embedded prior estimator `obj.pe` for transparent access.
+"""
 function Base.getproperty(obj::HighOrderFactorPriorEstimator, sym::Symbol)
     return if sym == :me
         obj.pe.me

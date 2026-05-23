@@ -27,6 +27,11 @@ $(DocStringExtensions.TYPEDEF)
 Abstract supertype for all cross-validation algorithm types.
 """
 abstract type CrossValidationAlgorithm <: AbstractAlgorithm end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Identity split for [`CrossValidationResult`](@ref). Returns the result unchanged, used as a no-op fallback when splitting is not applicable.
+"""
 function Base.split(res::CrossValidationResult, args...)
     return res
 end
@@ -469,6 +474,11 @@ Represents a collection of [`MultiPeriodPredictionResult`](@ref) objects.
   - [`PredRes_MultiPredRes`](@ref)
 """
 const VecMPredRes = AbstractVector{<:MultiPeriodPredictionResult}
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Access properties of [`MultiPeriodPredictionResult`](@ref). Virtual properties `:res` and `:rd` broadcast over the inner `pred` vector, collecting per-fold results and relative drawdowns.
+"""
 function Base.getproperty(mpred::MultiPeriodPredictionResult, sym::Symbol)
     return if sym == :res
         getfield.(getfield(mpred, :pred), :res)

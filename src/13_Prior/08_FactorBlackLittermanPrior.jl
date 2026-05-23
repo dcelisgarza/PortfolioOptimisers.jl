@@ -194,6 +194,11 @@ function prior_view(pe::FactorBlackLittermanPrior, i)
                        views = pe.views, sets = pe.sets, views_conf = pe.views_conf,
                        w = pe.w, rf = pe.rf, l = pe.l, tau = pe.tau, rsd = pe.rsd)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Access properties of [`FactorBlackLittermanPrior`](@ref). Exposes `:me` and `:ce` from the embedded prior estimator `obj.pe` for transparent access.
+"""
 function Base.getproperty(obj::FactorBlackLittermanPrior, sym::Symbol)
     return if sym == :me
         obj.pe.me

@@ -68,8 +68,7 @@ on the sum of weights. At least one of `lb` or `ub` must be provided.
 
 # Fields
 
-  - `lb::Option{<:Number}`: Lower bound on the sum of weights. Defaults to `1.0`.
-  - `ub::Option{<:Number}`: Upper bound on the sum of weights. Defaults to `1.0`.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -90,7 +89,9 @@ on the sum of weights. At least one of `lb` or `ub` must be provided.
   - [`BudgetMarketImpact`](@ref)
 """
 @concrete struct BudgetRange <: BudgetEstimator
+    "$(field_dict[:lb])"
     lb
+    "$(field_dict[:ub])"
     ub
     function BudgetRange(lb::Option{<:Number}, ub::Option{<:Number})
         lb_flag = isnothing(lb)
@@ -197,12 +198,7 @@ cost coefficients.
 
 # Fields
 
-  - `bgt::Num_BgtRg`: Budget target or range.
-  - `w::VecNum`: Initial portfolio weights (current holdings).
-  - `vp::Num_VecNum`: Cost coefficients for positive weight changes. Non-negative.
-  - `vn::Num_VecNum`: Cost coefficients for negative weight changes. Non-negative.
-  - `up::Num_VecNum`: Upper limit on positive weight changes. Non-negative.
-  - `un::Num_VecNum`: Upper limit on negative weight changes. Non-negative.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -223,11 +219,17 @@ cost coefficients.
   - [`BudgetMarketImpact`](@ref)
 """
 @concrete struct BudgetCosts <: BudgetCostEstimator
+    "Budget target or range."
     bgt
+    "$(field_dict[:pw])"
     w
+    "Cost coefficients for positive weight changes. Non-negative."
     vp
+    "Cost coefficients for negative weight changes. Non-negative."
     vn
+    "Upper limit on positive weight changes. Non-negative."
     up
+    "Upper limit on negative weight changes. Non-negative."
     un
     function BudgetCosts(bgt::Num_BgtRg, w::VecNum, vp::Num_VecNum, vn::Num_VecNum,
                          up::Num_VecNum, un::Num_VecNum)
@@ -285,13 +287,7 @@ impact function.
 
 # Fields
 
-  - `bgt::Num_BgtRg`: Budget target or range.
-  - `w::VecNum`: Initial portfolio weights.
-  - `vp::Num_VecNum`: Cost coefficients for positive weight changes. Non-negative.
-  - `vn::Num_VecNum`: Cost coefficients for negative weight changes. Non-negative.
-  - `up::Num_VecNum`: Upper limit on positive weight changes. Non-negative.
-  - `un::Num_VecNum`: Upper limit on negative weight changes. Non-negative.
-  - `beta::Number`: Market impact exponent in `(0, 1]`.
+$(DocStringExtensions.FIELDS)
 
 # Related
 
@@ -301,12 +297,19 @@ impact function.
   - [`BudgetCosts`](@ref)
 """
 @concrete struct BudgetMarketImpact <: BudgetCostEstimator
+    "Budget target or range."
     bgt
+    "$(field_dict[:pw])"
     w
+    "Cost coefficients for positive weight changes. Non-negative."
     vp
+    "Cost coefficients for negative weight changes. Non-negative."
     vn
+    "Upper limit on positive weight changes. Non-negative."
     up
+    "Upper limit on negative weight changes. Non-negative."
     un
+    "Market impact exponent in `(0, 1]`."
     beta
     function BudgetMarketImpact(bgt::Num_BgtRg, w::VecNum, vp::Num_VecNum, vn::Num_VecNum,
                                 up::Num_VecNum, un::Num_VecNum, beta::Number)

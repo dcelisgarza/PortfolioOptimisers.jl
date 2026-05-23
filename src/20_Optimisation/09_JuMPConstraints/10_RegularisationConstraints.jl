@@ -98,8 +98,7 @@ Penalises concentrated portfolios by encouraging weight smoothness for ``p > 1``
 
 # Fields
 
-  - `p::Number`: Lp norm exponent. Must satisfy `p > 1` and be finite.
-  - `val::Number`: Penalty coefficient. Must be positive and finite.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -111,7 +110,9 @@ Penalises concentrated portfolios by encouraging weight smoothness for ``p > 1``
   - [`AbstractRegularisationEstimator`](@ref)
 """
 @concrete struct LpRegularisation <: AbstractRegularisationEstimator
+    "$(field_dict[:p_rm])"
     p
+    "$(field_dict[:val])"
     val
     function LpRegularisation(p::Number, val::Number)
         @argcheck(isfinite(p), IsNonFiniteError)

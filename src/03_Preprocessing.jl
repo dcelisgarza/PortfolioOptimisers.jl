@@ -673,8 +673,9 @@ function find_complete_indices(X::AbstractMatrix; dims::Int = 1)
     return setdiff(1:N, to_remove)
 end
 """
-!!! note
+$(DocStringExtensions.TYPEDSIGNATURES)
 
+!!! note
     Not implemented yet, still unexported.
 """
 function select_k_extremes(X::MatNum) end

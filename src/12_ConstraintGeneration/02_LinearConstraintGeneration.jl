@@ -147,6 +147,11 @@ Alias for a union of a single [`LinearConstraint`](@ref) or a vector of them.
   - [`VecLc`](@ref)
 """
 const Lc_VecLc = Union{<:LinearConstraint, <:VecLc}
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Access flattened constraint matrices from a [`LinearConstraint`](@ref). Virtual properties `:A_ineq`, `:B_ineq`, `:A_eq`, `:B_eq` extract the corresponding sub-matrices from `obj.ineq` and `obj.eq`, returning `nothing` when the relevant constraint set is absent.
+"""
 function Base.getproperty(obj::LinearConstraint, sym::Symbol)
     return if sym == :A_ineq
         isnothing(obj.ineq) ? nothing : obj.ineq.A

@@ -3,14 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Result type for Mean-Risk portfolio optimisation.
 
-# Fields
-
-  - `oe`: Type of the optimisation estimator that produced this result.
-  - `pa`: Processed optimisation attributes.
-  - `retcode`: Optimisation return code.
-  - `sol`: Optimisation solution (or vector of solutions for the efficient frontier).
-  - `model`: The JuMP model used for optimisation.
-  - `fb`: Fallback result (if a fallback optimiser was used).
+$(DocStringExtensions.FIELDS)
 
 The `w` property is forwarded from `sol.w`.
 
@@ -20,16 +13,27 @@ The `w` property is forwarded from `sol.w`.
   - [`MeanRisk`](@ref)
 """
 @concrete struct MeanRiskResult <: NonFiniteAllocationOptimisationResult
+    "$(field_dict[:oe])"
     oe
+    "$(field_dict[:pa])"
     pa
+    "$(field_dict[:retcode])"
     retcode
+    "$(field_dict[:sol])"
     sol
+    "$(field_dict[:model])"
     model
+    "$(field_dict[:fb])"
     fb
 end
 function factory(res::MeanRiskResult, fb::Option{<:OptE_Opt})
     return MeanRiskResult(res.oe, res.pa, res.retcode, res.sol, res.model, fb)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Access properties of [`MeanRiskResult`](@ref). Virtual property `:w` extracts portfolio weights from `sol`; other unknown properties forward to `r.pa`.
+"""
 function Base.getproperty(r::MeanRiskResult, sym::Symbol)
     return if sym == :w
         !isa(r.sol, AbstractVector) ? getfield(r.sol, :w) : getfield.(r.sol, :w)
@@ -48,13 +52,7 @@ Mean-Risk portfolio optimiser.
 
 `MeanRisk` formulates and solves a mean-risk portfolio optimisation problem using JuMP. It can optimise a wide variety of objective functions (minimum risk, maximum return, maximum Sharpe ratio, maximum utility) subject to risk, weight, cardinality, and custom constraints.
 
-# Fields
-
-  - `opt`: JuMP optimiser configuration (prior, solver, constraints, bounds, fees, etc.).
-  - `r`: Risk measure or vector of risk measures.
-  - `obj`: Portfolio objective function.
-  - `wi`: Initial portfolio weights for warm-starting the solver (or `nothing`).
-  - `fb`: Fallback optimiser.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -180,10 +178,15 @@ MeanRisk
   - [`RiskMeasure`](@ref)
 """
 @concrete struct MeanRisk <: RiskJuMPOptimisationEstimator
+    "$(field_dict[:opt_jmp])"
     opt
+    "$(field_dict[:r_opt])"
     r
+    "$(field_dict[:obj])"
     obj
+    "$(field_dict[:wi])"
     wi
+    "$(field_dict[:fb])"
     fb
     function MeanRisk(opt::JuMPOptimiser, r::RM_VecRM, obj::ObjectiveFunction,
                       wi::Option{<:VecNum}, fb::Option{<:OptE_Opt})

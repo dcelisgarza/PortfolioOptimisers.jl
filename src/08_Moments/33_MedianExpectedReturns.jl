@@ -93,6 +93,11 @@ function Statistics.mean(me::MedianExpectedReturns{Nothing}, X::MatNum; dims::In
                          kwargs...)
     return Statistics.median(X; dims = dims)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Weighted-median overload of [`mean(me::MedianExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)`](@ref). Computes per-asset weighted median using the [`ObsWeights`](@ref) stored in `me.w`.
+"""
 function Statistics.mean(me::MedianExpectedReturns{<:ObsWeights}, X::MatNum; dims::Int = 1,
                          kwargs...)
     @argcheck(dims ∈ (1, 2))

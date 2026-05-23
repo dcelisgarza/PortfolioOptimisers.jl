@@ -641,6 +641,8 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
+Implements a partial Gerber Information Quality covariance template with independently configurable asymmetric significance thresholds for concordant and discordant co-movements.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -890,6 +892,8 @@ function gerber_iq_weight(xi::Number, xj::Number, axi::Number, axj::Number, sci:
 end
 """
 $(DocStringExtensions.TYPEDEF)
+
+Implements a full Gerber Information Quality covariance template with fine-grained asymmetric thresholds, supporting finer region classification between two positive and two negative movement magnitude classes.
 
 # Fields
 
@@ -1290,7 +1294,19 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
+  - `c >= 0`: `c` must be non-negative.
+  - `c <= kind.d` (or equivalent for the chosen `kind`): via [`gerber_iq_assert_c_d`](@ref).
+
 # Related
+
+  - [`BaseGerberIQCovariance`](@ref)
+  - [`GerberIQCovarianceAlgorithm`](@ref)
+  - [`GerberIQDecayEstimator`](@ref)
+  - [`GerberIQScaler`](@ref)
+  - [`GerberCovarianceAlgorithm`](@ref)
+  - [`gerber_IQ`](@ref)
+  - [`cor(ce::GerberIQCovariance, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
+  - [`cov(ce::GerberIQCovariance, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
 
 # References
 
@@ -1670,7 +1686,12 @@ function gerber_IQ(ce::GerberIQCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:A
     return rho
 end
 """
-Statistics.cor(ce::GerberIQCovariance, X::MatNum; dims::Int = 1, kwargs...) -> MatNum
+    Statistics.cor(
+        ce::GerberIQCovariance,
+        X::MatNum;
+        dims::Int = 1,
+        kwargs...
+    ) -> MatNum
 
 Compute the Gerber IQ correlation matrix.
 
@@ -1719,7 +1740,12 @@ function Statistics.cor(ce::GerberIQCovariance, X::MatNum; dims::Int = 1, kwargs
     return gerber_IQ(ce, X, sd)
 end
 """
-Statistics.cov(ce::GerberIQCovariance, X::MatNum; dims::Int = 1, kwargs...) -> MatNum
+    Statistics.cov(
+        ce::GerberIQCovariance,
+        X::MatNum;
+        dims::Int = 1,
+        kwargs...
+    ) -> MatNum
 
 Compute the Gerber IQ covariance matrix.
 

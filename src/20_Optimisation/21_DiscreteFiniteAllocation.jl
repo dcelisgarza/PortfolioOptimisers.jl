@@ -3,19 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Result type for Discrete Allocation portfolio optimisation.
 
-# Fields
-
-  - `oe`: Type of the optimisation estimator that produced this result.
-  - `retcode`: Overall optimisation return code.
-  - `s_retcode`: Return code for the short allocation sub-problem.
-  - `l_retcode`: Return code for the long allocation sub-problem.
-  - `shares`: Vector of shares (integer quantities) for each asset.
-  - `cost`: Total cost of the allocated shares.
-  - `w`: Realised portfolio weights.
-  - `cash`: Remaining uninvested cash.
-  - `s_model`: JuMP model for the short allocation.
-  - `l_model`: JuMP model for the long allocation.
-  - `fb`: Fallback result.
+$(DocStringExtensions.FIELDS)
 
 # Related
 
@@ -23,16 +11,27 @@ Result type for Discrete Allocation portfolio optimisation.
   - [`FiniteAllocationOptimisationResult`](@ref)
 """
 @concrete struct DiscreteAllocationResult <: FiniteAllocationOptimisationResult
+    "$(field_dict[:oe])"
     oe
+    "$(field_dict[:retcode])"
     retcode
+    "$(field_dict[:s_retcode])"
     s_retcode
+    "$(field_dict[:l_retcode])"
     l_retcode
+    "$(field_dict[:shares])"
     shares
+    "$(field_dict[:cost_alloc])"
     cost
+    "Realised portfolio weights."
     w
+    "$(field_dict[:cash_alloc])"
     cash
+    "$(field_dict[:s_model])"
     s_model
+    "$(field_dict[:l_model])"
     l_model
+    "$(field_dict[:fb])"
     fb
 end
 function factory(res::DiscreteAllocationResult, fb::Option{<:FOptE_FOpt})
@@ -47,13 +46,7 @@ Discrete Allocation portfolio optimiser.
 
 `DiscreteAllocation` allocates a portfolio by solving a Mixed-Integer Programming (MIP) problem to find the optimal number of shares for each asset, minimising the deviation between the target continuous weights and the realised discrete allocation.
 
-# Fields
-
-  - `slv`: MIP solver or vector of solvers.
-  - `sc`: Constraint scale factor.
-  - `so`: Objective scale factor.
-  - `wf`: Weight error formulation (L1/L2 relative or absolute).
-  - `fb`: Fallback allocator (default: `GreedyAllocation()`).
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -100,10 +93,15 @@ DiscreteAllocation
   - [`DiscreteAllocationResult`](@ref)
 """
 @concrete struct DiscreteAllocation <: FiniteAllocationOptimisationEstimator
+    "$(field_dict[:slv])"
     slv
+    "$(field_dict[:sc])"
     sc
+    "$(field_dict[:so])"
     so
+    "$(field_dict[:wf])"
     wf
+    "$(field_dict[:fb])"
     fb
     function DiscreteAllocation(slv::Slv_VecSlv, sc::Number, so::Number,
                                 wf::JuMPWeightFinaliserFormulation,

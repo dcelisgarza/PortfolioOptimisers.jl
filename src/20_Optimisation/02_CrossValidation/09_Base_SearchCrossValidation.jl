@@ -43,7 +43,7 @@ Subtypes define the strategy used to select the best hyperparameter combination 
 """
 abstract type AbstractSearchCrossValidationAlgorithm <: AbstractAlgorithm end
 """
-    abstract type CrossValidationSearchScorer <: AbstractEstimator
+$(DocStringExtensions.TYPEDEF)
 
 Defines the interface for scoring strategies used in search cross-validation. Implementations select the optimal parameter set based on cross-validation scores.
 

@@ -405,6 +405,11 @@ function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:JamesStein}, 
             T
     return (one(alpha) - alpha) * mu + alpha * b
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+[`BayesStein`](@ref) overload of [`mean(me::ShrunkExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)`](@ref). Shrinks sample returns toward the target using a Bayesian formula with inverse covariance weighting.
+"""
 function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:BayesStein}, X::MatNum;
                          dims::Int = 1, kwargs...)
     mu = Statistics.mean(me.me, X; dims = dims, kwargs...)
@@ -423,6 +428,11 @@ function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:BayesStein}, 
     alpha = (N + 2) / ((N + 2) + T * LinearAlgebra.dot(mb, isigma, mb))
     return (one(alpha) - alpha) * mu + alpha * b
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+[`BodnarOkhrinParolya`](@ref) overload of [`mean(me::ShrunkExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)`](@ref). Shrinks sample returns toward the target using the Bodnar-Okhrin-Parolya formula, designed for robust high-dimensional estimation.
+"""
 function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:BodnarOkhrinParolya},
                          X::MatNum; dims::Int = 1, kwargs...)
     mu = Statistics.mean(me.me, X; dims = dims, kwargs...)
