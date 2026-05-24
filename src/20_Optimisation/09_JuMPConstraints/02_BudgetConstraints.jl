@@ -160,7 +160,7 @@ Add budget constraints to the JuMP optimisation model.
 
 The fall-through method does nothing. The concrete methods add the appropriate portfolio budget constraint based on the type of budget specification provided.
 
-# Summary Statistics
+# Mathematical definition
 
 Fixed / range:
 

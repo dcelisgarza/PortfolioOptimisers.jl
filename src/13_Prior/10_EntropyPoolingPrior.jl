@@ -1079,7 +1079,7 @@ Solve the dual of the exponential entropy pooling formulation using Optim.jl.
 
 `entropy_pooling` computes posterior probabilities by minimising the exponential divergence between prior and posterior weights, subject to moment and view constraints. The optimisation is performed using [`Optim.jl`](https://github.com/JuliaNLSolvers/Optim.jl), supporting box constraints and slack variables for relaxed equality constraints. This method is used internally by [`EntropyPoolingPrior`](@ref) when the optimiser is an [`OptimEntropyPooling`](@ref).
 
-# Summary Statistics
+# Mathematical definition
 
 The dual of the entropy pooling KL divergence problem is solved for Lagrange multipliers ``\\boldsymbol{x}``. The dual objective (for `ExpEntropyPooling`) is:
 
@@ -2080,7 +2080,7 @@ Compute entropy pooling prior moments for asset returns with iterative constrain
 
 `prior` estimates the mean and covariance of asset returns using the entropy pooling framework, supporting iterative constraint enforcement via the `H1_EntropyPooling` and `H2_EntropyPooling` algorithms. It integrates moment and view constraints (mean, variance, CVaR, skewness, kurtosis, correlation), flexible confidence specification, and composable optimisation algorithms. The method iteratively applies constraints, updating prior weights and moments at each step, and ensures that higher moment views do not inadvertently alter lower moments.
 
-# Summary Statistics
+# Mathematical definition
 
 Entropy pooling finds posterior weights ``\\boldsymbol{p}`` by minimising the Kullback-Leibler divergence from the prior ``\\boldsymbol{q}``:
 
@@ -2221,7 +2221,7 @@ Compute entropy pooling prior moments for asset returns with single-shot constra
 
 `prior` estimates the mean and covariance of asset returns using the entropy pooling framework, enforcing all moment and view constraints in a single optimisation step via the `H0_EntropyPooling` algorithm. This approach is fast but may distort lower moments when higher moment views are present, as all constraints are applied simultaneously.
 
-# Summary Statistics
+# Mathematical definition
 
 Entropy pooling finds posterior weights ``\\boldsymbol{p}`` by minimising the Kullback-Leibler divergence from the prior ``\\boldsymbol{q}`` subject to all constraints simultaneously:
 

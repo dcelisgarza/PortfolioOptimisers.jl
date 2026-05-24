@@ -199,7 +199,7 @@ end
 
 Constructs box uncertainty sets for mean and covariance statistics under the assumption of normally distributed returns.
 
-# Summary Statistics
+# Mathematical definition
 
 Simulates ``M`` covariance matrices ``\\hat{\\mathbf{\\Sigma}}^{(m)} \\sim \\mathrm{Wishart}(T,\\, \\hat{\\mathbf{\\Sigma}}/T)`` and computes element-wise quantile bounds:
 
@@ -284,7 +284,7 @@ end
 
 Constructs a box uncertainty set for expected returns under the assumption of normally distributed returns.
 
-# Summary Statistics
+# Mathematical definition
 
 ```math
 \\boldsymbol{\\mu}_{lb} = \\boldsymbol{0}, \\qquad
@@ -340,7 +340,7 @@ end
 
 Constructs a box uncertainty set for covariance under the assumption of normally distributed returns.
 
-# Summary Statistics
+# Mathematical definition
 
 Simulates ``M`` matrices ``\\hat{\\mathbf{\\Sigma}}^{(m)} \\sim \\mathrm{Wishart}(T,\\,\\hat{\\mathbf{\\Sigma}}/T)`` and takes element-wise quantiles:
 
@@ -414,7 +414,7 @@ end
 
 Constructs ellipsoidal uncertainty sets for expected returns and covariance statistics under the assumption of normally distributed returns.
 
-# Summary Statistics
+# Mathematical definition
 
 Ellipsoidal sets centred at the prior estimates with asymptotic covariances:
 
@@ -507,7 +507,7 @@ end
 
 Constructs ellipsoidal uncertainty sets for expected returns and covariance statistics using the chi-squared scaling algorithm under the assumption of normally distributed returns.
 
-# Summary Statistics
+# Mathematical definition
 
 Asymptotic covariances are the same as the normal-``k`` variant:
 

@@ -109,7 +109,7 @@ Compute expected returns as the standard deviation of each asset.
 
 This method returns the standard deviation vector of `X` as estimated by the covariance estimator `me.ce`.
 
-# Summary Statistics
+# Mathematical definition
 
 ```math
 \\hat{\\mu}_j = \\hat{\\sigma}_j = \\sqrt{\\frac{1}{T-c} \\sum_{t=1}^{T} w_t (r_{tj} - \\hat{\\mu}_j^{(0)})^2}

@@ -294,7 +294,7 @@ Compute the shrinkage target vector for expected returns estimation.
 
 `target_mean` computes the target vector toward which expected returns are shrunk, based on the specified shrinkage target type. This function is used internally by shrinkage estimators such as James-Stein, Bayes-Stein, and Bodnar-Okhrin-Parolya.
 
-# Summary Statistics
+# Mathematical definition
 
 **`GrandMean`**: each target element is the grand mean of sample expected returns:
 
@@ -376,7 +376,7 @@ Compute shrunk expected returns using the specified estimator.
 
 This method applies a shrinkage algorithm to the sample expected returns, pulling them toward a specified target to reduce estimation error, especially in high-dimensional settings.
 
-# Summary Statistics
+# Mathematical definition
 
 James-Stein shrinkage of sample expected returns toward target ``\\boldsymbol{b}``:
 
@@ -463,7 +463,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 [`BayesStein`](@ref) overload of [`mean(me::ShrunkExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)`](@ref). Shrinks sample returns toward the target using a Bayesian formula with inverse covariance weighting.
 
-# Summary Statistics
+# Mathematical definition
 
 Bayes-Stein shrinkage intensity:
 
@@ -496,7 +496,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 [`BodnarOkhrinParolya`](@ref) overload of [`mean(me::ShrunkExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)`](@ref). Shrinks sample returns toward the target using the Bodnar-Okhrin-Parolya formula, designed for robust high-dimensional estimation.
 
-# Summary Statistics
+# Mathematical definition
 
 Define scalars:
 

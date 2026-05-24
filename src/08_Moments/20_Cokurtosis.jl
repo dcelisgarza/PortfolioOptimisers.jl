@@ -124,7 +124,7 @@ Internal helper for cokurtosis computation.
 
 `_cokurtosis` computes the cokurtosis tensor for the input data matrix and applies matrix processing using the specified estimator.
 
-# Summary Statistics
+# Mathematical definition
 
 Let ``\\mathbf{X}`` be the ``T \\times N`` matrix of demeaned returns. Define the ``T \\times N^2`` matrix ``\\mathbf{Z}`` with rows:
 

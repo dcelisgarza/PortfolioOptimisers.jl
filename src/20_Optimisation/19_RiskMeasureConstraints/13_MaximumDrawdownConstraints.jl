@@ -7,7 +7,7 @@ Introduces a scalar variable `mdd_risk` and the constraint
 `sc * (mdd_risk .- dd[2:T+1]) >= 0` so that `mdd_risk` upper-bounds every drawdown
 observation. Returns the existing expression if already present.
 
-# Summary Statistics
+# Mathematical definition
 
 ```math
 \\mathrm{MDD}(\\boldsymbol{w}) = \\max_{t=1,\\ldots,T} dd_t

@@ -426,7 +426,7 @@ end
 
 Convert price data (and optionally factor data) in `TimeSeries.TimeArray` format to returns, with flexible handling of missing data, imputation, and optional implied volatility information.
 
-# Summary Statistics
+# Mathematical definition
 
 Returns are computed from prices ``P_{t,i}`` as:
 

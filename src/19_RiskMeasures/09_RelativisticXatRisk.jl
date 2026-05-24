@@ -110,7 +110,7 @@ Represents the Relativistic Value-at-Risk (RVaR) risk measure.
 
 `RelativisticValueatRisk` is a coherent risk measure generalising EVaR via the Tsallis (``\\kappa``-deformed) entropy. It is parametrised by a deformation parameter ``\\kappa \\in (0, 1)`` and reduces to EVaR in the limit ``\\kappa \\to 0``. It is solved via a conic programme.
 
-# Mathematical Definition
+# Mathematical definition
 
 Define the ``\\kappa``-logarithm ``\\ell_\\kappa(u) = \\frac{u^\\kappa - u^{-\\kappa}}{2\\kappa}``. The RVaR is:
 
@@ -229,7 +229,7 @@ Represents the Relativistic Value-at-Risk Range (RVaR Range) risk measure.
 
 `RelativisticValueatRiskRange` computes the sum of the lower-tail RVaR (at level `alpha` with deformation `kappa_a`) and the upper-tail RVaR (at level `beta` with deformation `kappa_b`).
 
-# Mathematical Definition
+# Mathematical definition
 
 ```math
 \\mathrm{RVaRRange}_{\\alpha,\\kappa_a,\\beta,\\kappa_b}(\\boldsymbol{x}) = \\mathrm{RVaR}_{\\alpha,\\kappa_a}(\\boldsymbol{x}) + \\mathrm{RVaR}_{\\beta,\\kappa_b}(-\\boldsymbol{x})\\,.
@@ -352,7 +352,7 @@ Represents the Relativistic Drawdown-at-Risk (RDDaR) risk measure.
 
 `RelativisticDrawdownatRisk` applies the Relativistic Value-at-Risk framework to the absolute drawdown series of portfolio returns.
 
-# Mathematical Definition
+# Mathematical definition
 
 Define the absolute drawdown series:
 
@@ -465,7 +465,7 @@ Represents the Relative Relativistic Drawdown-at-Risk (Relative RDDaR) risk meas
 
 `RelativeRelativisticDrawdownatRisk` applies the Relativistic Value-at-Risk framework to the relative (compounded) drawdown series of portfolio returns.
 
-# Mathematical Definition
+# Mathematical definition
 
 Define the compounded wealth process and relative drawdown series:
 

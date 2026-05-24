@@ -10,7 +10,7 @@ shifts the weight vector by a benchmark before delegating to [`set_triv_risk_con
 The dependent-variable overload computes a benchmark risk and adds an L1-norm cone on the
 risk difference via [`set_trdv_risk_constraints!`](@ref).
 
-# Summary Statistics
+# Mathematical definition
 
 ```math
 \\mathrm{TR}_p(\\boldsymbol{w}) = \\frac{\\|\\mathbf{X}\\boldsymbol{w} - \\boldsymbol{b}\\,k\\|_p}{c_p}

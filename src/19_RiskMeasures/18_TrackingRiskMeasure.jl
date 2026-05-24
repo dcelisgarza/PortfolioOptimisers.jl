@@ -83,7 +83,7 @@ Represents the Tracking Error risk measure.
 
 `TrackingRiskMeasure` penalises portfolio deviation from a benchmark by computing a norm of the difference between portfolio returns and a benchmark return series or benchmark weights. The tracking error is defined using returns-based or weights-based benchmarks, and the norm is configurable.
 
-# Mathematical Definition
+# Mathematical definition
 
 Let ``\\boldsymbol{x}`` be the portfolio returns series, ``\\boldsymbol{b}`` the benchmark returns, and ``N_T`` the number of observations. The ``L^2`` tracking error is:
 
@@ -195,7 +195,7 @@ Represents the Risk Tracking risk measure.
   - **Independent** (`IndependentVariableTracking`): computes the risk of the weight difference ``\\boldsymbol{w} - \\boldsymbol{w}_b``.
   - **Dependent** (`DependentVariableTracking`): computes the absolute difference between the portfolio risk and the benchmark risk.
 
-# Mathematical Definition
+# Mathematical definition
 
 **Independent mode:**
 

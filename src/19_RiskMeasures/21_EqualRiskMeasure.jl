@@ -5,7 +5,7 @@ Represents the Equal Risk Measure for hierarchical portfolio optimisation.
 
 `EqualRiskMeasure` assigns an equal risk contribution to each asset by returning the reciprocal of the number of assets. It is used in equal-risk-contribution (ERC) strategies.
 
-# Mathematical Definition
+# Mathematical definition
 
 For a portfolio of ``N`` assets with weights ``\\boldsymbol{w} \\in \\mathbb{R}^N``:
 

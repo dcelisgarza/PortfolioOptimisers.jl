@@ -9,7 +9,7 @@ risk measure parameterised by `kappa`. Auxiliary variables `t`, `z`, `omega`, `p
 `theta`, and `epsilon` are introduced. The range variant encodes both a lower-tail and
 upper-tail relativistic expression.
 
-# Summary Statistics
+# Mathematical definition
 
 Relativistic Value-at-Risk (Damian et al. 2023):
 

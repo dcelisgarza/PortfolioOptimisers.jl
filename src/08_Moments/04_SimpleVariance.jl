@@ -82,7 +82,7 @@ Compute the standard deviation using a [`SimpleVariance`](@ref) estimator for a 
 
 This method computes the standard deviation of the input matrix `X` using the configuration specified in `ve`.
 
-# Summary Statistics
+# Mathematical definition
 
 Unweighted:
 
@@ -261,7 +261,7 @@ Compute the variance using a [`SimpleVariance`](@ref) estimator for a matrix.
 
 This method computes the variance of the input matrix `X` using the configuration specified in `ve`.
 
-# Summary Statistics
+# Mathematical definition
 
 Unweighted, for `corrected = true`:
 

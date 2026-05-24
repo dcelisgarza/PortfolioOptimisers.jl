@@ -5,7 +5,7 @@ Add an effective number of assets constraint to the JuMP optimisation model.
 
 The fall-through method does nothing. The concrete method introduces an auxiliary variable `nea` and enforces `‖w‖₂ ≤ nea` via a SecondOrderCone constraint, combined with `nea * √val ≤ k`. This is equivalent to requiring the effective number of assets to be at least `val`.
 
-# Summary Statistics
+# Mathematical definition
 
 ```math
 \\mathrm{nea} \\geq \\|\\boldsymbol{w}\\|_2, \\qquad \\mathrm{nea} \\cdot \\sqrt{\\mathrm{val}} \\leq k

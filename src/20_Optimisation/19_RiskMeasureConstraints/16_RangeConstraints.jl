@@ -8,7 +8,7 @@ introduces a best-realisation variable `br_risk` with constraint
 `sc * (br_risk .+ net_X) <= 0`, and defines `range_risk = wr_risk - br_risk`. Returns the
 existing expression if already present.
 
-# Summary Statistics
+# Mathematical definition
 
 ```math
 \\mathrm{Range}(\\boldsymbol{w}) = \\max_t(-\\hat{r}_t) - \\min_t(-\\hat{r}_t) = \\mathrm{WR} - \\mathrm{BR}

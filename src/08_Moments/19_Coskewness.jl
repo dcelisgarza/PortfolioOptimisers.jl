@@ -170,7 +170,7 @@ Internal helper for coskewness computation.
 
 `_coskewness` computes the coskewness tensor and applies matrix processing. Used internally by coskewness estimators.
 
-# Summary Statistics
+# Mathematical definition
 
 Let ``\\mathbf{Y}`` be the ``T \\times N`` matrix of demeaned returns. Define ``\\boldsymbol{z}_t = \\boldsymbol{y}_t \\otimes \\boldsymbol{y}_t`` (Kronecker-style element-wise product). The ``N \\times N^2`` coskewness tensor is:
 

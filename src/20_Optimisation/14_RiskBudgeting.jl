@@ -117,7 +117,7 @@ Uses a logarithmic objective to enforce the risk budget constraints. Can provide
     function LogRiskBudgeting(z::Option{<:VecInt})
         if !isnothing(z)
             @argcheck(!isempty(z))
-            @argcheck(all(x->abs(x) == 1, z))
+            @argcheck(all(x -> abs(x) == 1, z))
         end
         return new{typeof(z)}(z)
     end
@@ -330,7 +330,7 @@ $(DocStringExtensions.FIELDS)
 
 Keywords correspond to the struct's fields.
 
-# Summary Statistics
+# Mathematical definition
 
 Risk budgeting allocates weights so that each asset ``i`` contributes a target fraction ``b_i`` of total portfolio risk:
 

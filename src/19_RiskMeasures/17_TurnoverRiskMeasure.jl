@@ -5,7 +5,7 @@ Represents the Turnover risk measure.
 
 `TurnoverRiskMeasure` penalises portfolio rebalancing by measuring the ``L^1`` distance between the new portfolio weights and a reference weight vector. It controls trading costs and limits portfolio drift.
 
-# Mathematical Definition
+# Mathematical definition
 
 Let ``\\boldsymbol{w}`` be the new portfolio weights and ``\\boldsymbol{w}_0`` the reference (previous or target) weights:
 

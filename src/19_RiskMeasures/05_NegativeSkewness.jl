@@ -17,7 +17,7 @@ Represents the Negative Skewness risk measure.
 
 `NegativeSkewness` quantifies the portfolio's exposure to negative asymmetry in returns by computing a quadratic or SOC (second-order cone) form of the coskewness matrix. It penalises portfolio constructions that exhibit heavy left-tail behaviour.
 
-# Mathematical Definition
+# Mathematical definition
 
 Let ``\\boldsymbol{w}`` be the portfolio weight vector and ``\\mathbf{V}`` the negative semi-definite coskewness matrix (spectral decomposition of the negative part of the sample coskewness tensor). The Negative Skewness risk measure is:
 

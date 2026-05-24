@@ -124,7 +124,7 @@ Compute equilibrium expected returns from a covariance estimator, weights, and r
 
 This method computes equilibrium expected returns as `λ * Σ * w`, where `λ` is the risk aversion parameter, `Σ` is the covariance matrix, and `w` are the equilibrium weights. If `w` is not provided in the estimator, equal weights are used.
 
-# Summary Statistics
+# Mathematical definition
 
 ```math
 \\hat{\\boldsymbol{\\mu}}_{\\text{eq}} = \\lambda \\, \\hat{\\mathbf{\\Sigma}} \\, \\boldsymbol{w}

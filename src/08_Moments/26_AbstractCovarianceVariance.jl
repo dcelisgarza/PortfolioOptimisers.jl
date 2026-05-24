@@ -5,7 +5,7 @@ Compute the variance vector from the diagonal of the covariance matrix.
 
 This method extracts the diagonal of the covariance matrix returned by `Statistics.cov(ce, X; dims = dims, kwargs...)` and reshapes it into a row or column vector depending on `dims`.
 
-# Summary Statistics
+# Mathematical definition
 
 ```math
 \\hat{\\sigma}_i^2 = \\hat{\\mathbf{\\Sigma}}_{ii}
@@ -41,7 +41,7 @@ Compute the standard deviation vector from the diagonal of the covariance matrix
 
 This method extracts the diagonal of the covariance matrix returned by `Statistics.cov(ce, X; dims = dims, kwargs...)`, takes the element-wise square root, and reshapes it into a row or column vector depending on `dims`.
 
-# Summary Statistics
+# Mathematical definition
 
 ```math
 \\hat{\\sigma}_i = \\sqrt{\\hat{\\mathbf{\\Sigma}}_{ii}}

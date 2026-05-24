@@ -61,7 +61,7 @@ Factor Risk Contribution (FRC) portfolio optimiser.
 
 `FactorRiskContribution` allocates portfolio weights so that each factor (and the idiosyncratic component) contributes a target proportion to the total portfolio risk. It combines factor regression with a JuMP-based risk budgeting optimisation.
 
-# Summary Statistics
+# Mathematical definition
 
 Factor model:
 

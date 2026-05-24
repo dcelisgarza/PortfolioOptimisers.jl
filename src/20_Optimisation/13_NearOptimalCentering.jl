@@ -121,7 +121,7 @@ $(DocStringExtensions.FIELDS)
 
 Keywords correspond to the struct's fields.
 
-# Summary Statistics
+# Mathematical definition
 
 Let ``\\boldsymbol{w}_{\\min}``, ``\\boldsymbol{w}_{\\mathrm{opt}}``, and ``\\boldsymbol{w}_{\\max}`` be the minimum-risk, user-optimal, and maximum-risk portfolios. The NOC solves:
 

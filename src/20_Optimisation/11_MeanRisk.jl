@@ -159,7 +159,7 @@ MeanRisk
    fb ┴ nothing
 ```
 
-# Summary Statistics
+# Mathematical definition
 
 The general mean-risk optimisation problem is:
 

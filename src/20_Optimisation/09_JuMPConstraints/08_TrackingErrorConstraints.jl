@@ -14,7 +14,7 @@ The fall-through method does nothing. Concrete methods dispatch on the tracking 
 
 The collection method iterates over all tracking errors in `tres`.
 
-# Summary Statistics
+# Mathematical definition
 
 ```math
 t_{te} \\geq \\|\\mathbf{X}\\boldsymbol{w} - \\boldsymbol{b} k\\|_p \\cdot c_p^{-1}, \\qquad t_{te} \\leq \\mathrm{err} \\cdot k

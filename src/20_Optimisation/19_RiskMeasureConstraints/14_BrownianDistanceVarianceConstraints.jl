@@ -9,7 +9,7 @@ The `NormOneConeBrownianDistanceVariance` overload adds per-element L1-norm cone
 `IneqBrownianDistanceVariance` overload adds global non-negativity constraints on `Dt - Dx`
 and `Dt + Dx`.
 
-# Summary Statistics
+# Mathematical definition
 
 ```math
 D_t(i,j) \\geq |\\hat{r}_i - \\hat{r}_j|, \\qquad \\mathrm{BDV}(\\boldsymbol{w}) = \\frac{1}{T^2}\\sum_{i,j} D_t(i,j)^2 - \\left(\\frac{1}{T^2}\\sum_{i,j} D_t(i,j)\\right)^2

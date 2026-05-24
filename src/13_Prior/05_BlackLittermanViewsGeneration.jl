@@ -5,7 +5,7 @@ Container for Black-Litterman investor views in canonical matrix form.
 
 `BlackLittermanViews` stores the views matrix `P` and the expected returns vector `Q` for use in Black-Litterman prior construction and related portfolio optimisation routines. The matrix `P` encodes the linear relationships between assets for each view, while `Q` specifies the expected value for each view.
 
-# Summary Statistics
+# Mathematical definition
 
 ```math
 \\mathbf{P}\\,\\boldsymbol{\\mu} = \\boldsymbol{q}, \\qquad \\boldsymbol{\\Omega} = \\mathrm{diag}(\\tau\\,\\mathbf{P}\\boldsymbol{\\Sigma}\\mathbf{P}^{\\intercal})

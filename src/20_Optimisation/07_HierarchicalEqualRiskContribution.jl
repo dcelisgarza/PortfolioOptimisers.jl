@@ -119,7 +119,7 @@ HierarchicalEqualRiskContribution
     fb ┴ nothing
 ```
 
-# Summary Statistics
+# Mathematical definition
 
 Let ``K`` be the number of clusters. The inter-cluster (outer) step assigns equal risk contribution across all clusters using risk measure ``\\rho_o``:
 

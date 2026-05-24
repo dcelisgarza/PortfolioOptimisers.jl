@@ -68,7 +68,7 @@ Compute the Kendall's tau rank correlation matrix using a [`KendallCovariance`](
 
 This method computes the pairwise Kendall's tau rank correlation matrix for the input data matrix `X`. Kendall's tau measures the monotonic association between pairs of asset returns and is robust to outliers and non-Gaussian data.
 
-# Summary Statistics
+# Mathematical definition
 
 For two asset return series ``(x_1, \\ldots, x_T)`` and ``(y_1, \\ldots, y_T)``, Kendall's ``\\tau`` is:
 
@@ -197,7 +197,7 @@ Compute the Spearman's rho rank correlation matrix using a [`SpearmanCovariance`
 
 This method computes the pairwise Spearman's rho rank correlation matrix for the input data matrix `X`. Spearman's rho measures the monotonic association between pairs of asset returns and is robust to outliers and non-Gaussian data.
 
-# Summary Statistics
+# Mathematical definition
 
 Spearman's ``\\rho`` is the Pearson correlation of the rank-transformed data. Let ``\\mathrm{rk}(x_t)`` denote the rank of observation ``x_t`` among ``x_1, \\ldots, x_T``:
 

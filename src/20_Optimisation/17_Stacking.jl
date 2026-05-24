@@ -81,7 +81,7 @@ Keywords correspond to the struct's fields.
   - `!isempty(opti)`.
   - If `scale` is provided: `length(scale) == length(opti)` and all elements are finite.
 
-# Summary Statistics
+# Mathematical definition
 
 Let ``K`` inner optimisers produce weight vectors ``\\boldsymbol{w}_1, \\ldots, \\boldsymbol{w}_K``. Stack them as rows of a returns proxy matrix and pass to outer optimiser ``\\mathrm{opto}``:
 

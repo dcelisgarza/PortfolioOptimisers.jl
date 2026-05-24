@@ -355,7 +355,7 @@ SchurComplementHierarchicalRiskParity
       fb ┴ nothing
 ```
 
-# Summary Statistics
+# Mathematical definition
 
 When splitting cluster ``C`` with sub-clusters ``C_1`` and ``C_2``, the Schur complement of the covariance partitioned as ``\\mathbf{\\Sigma}_{C} = \\begin{pmatrix} \\mathbf{\\Sigma}_{11} & \\mathbf{\\Sigma}_{12} \\\\ \\mathbf{\\Sigma}_{21} & \\mathbf{\\Sigma}_{22} \\end{pmatrix}`` is:
 

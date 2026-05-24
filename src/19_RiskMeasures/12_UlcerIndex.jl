@@ -5,7 +5,7 @@ Represents the Ulcer Index risk measure.
 
 `UlcerIndex` measures the depth and duration of drawdowns in portfolio returns. It is defined as the root-mean-square of the absolute drawdown series, capturing both the magnitude and persistence of losses.
 
-# Mathematical Definition
+# Mathematical definition
 
 Define the absolute drawdown series:
 
@@ -81,7 +81,7 @@ Represents the Relative Ulcer Index risk measure for hierarchical optimisation.
 
 `RelativeUlcerIndex` applies the Ulcer Index framework to the relative (compounded) drawdown series.
 
-# Mathematical Definition
+# Mathematical definition
 
 Define the relative drawdown series:
 

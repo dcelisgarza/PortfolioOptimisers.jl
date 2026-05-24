@@ -304,7 +304,7 @@ Fit a regression model in reduced-dimensional space and recover coefficients in 
 
 This function fits a regression model (as specified by `retgt`) to the response vector `y` using the projected feature matrix `x1` (typically obtained from a dimension reduction method such as PCA or PPCA). It then transforms the estimated coefficients from the reduced space back to the original feature space using the projection matrix `Vp` and rescales them by the standard deviations `sigma`. The intercept is adjusted to account for the mean of `y` and the means of the original features.
 
-# Summary Statistics
+# Mathematical definition
 
 ```math
 \\hat{y} = \\hat{\\beta}_0 + \\mathbf{x}_1 \\hat{\\boldsymbol{\\beta}}_{\\mathrm{pc}}, \\qquad

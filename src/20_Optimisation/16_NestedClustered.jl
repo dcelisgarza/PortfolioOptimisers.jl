@@ -236,7 +236,7 @@ $(DocStringExtensions.FIELDS)
 
 Keywords correspond to the struct's fields.
 
-# Summary Statistics
+# Mathematical definition
 
 Let clusters ``C_1, \\ldots, C_K`` partition the ``N`` assets. The NCO algorithm:
 

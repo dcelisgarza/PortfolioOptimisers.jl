@@ -333,7 +333,7 @@ end
 
 Constructs box uncertainty sets for expected returns and covariance statistics using bootstrap resampling for time series data.
 
-# Summary Statistics
+# Mathematical definition
 
 Generate ``M`` bootstrap samples, compute ``\\hat{\\boldsymbol{\\mu}}^{(m)}`` and ``\\hat{\\mathbf{\\Sigma}}^{(m)}``, then take element-wise quantile bounds:
 
@@ -407,7 +407,7 @@ end
 
 Constructs a box uncertainty set for expected returns using bootstrap resampling for time series data.
 
-# Summary Statistics
+# Mathematical definition
 
 ```math
 \\mu_{lb,i} = Q_{q/2}\\!\\left(\\hat{\\mu}^{(m)}_i\\right), \\qquad \\mu_{ub,i} = Q_{1-q/2}\\!\\left(\\hat{\\mu}^{(m)}_i\\right)
@@ -464,7 +464,7 @@ end
 
 Constructs a box uncertainty set for covariance using bootstrap resampling for time series data.
 
-# Summary Statistics
+# Mathematical definition
 
 ```math
 (\\mathbf{\\Sigma}_{lb})_{ij} = Q_{q/2}\\!\\left(\\hat{\\Sigma}^{(m)}_{ij}\\right), \\qquad
@@ -525,7 +525,7 @@ end
 
 Constructs ellipsoidal uncertainty sets for expected returns and covariance statistics using bootstrap resampling for time series data.
 
-# Summary Statistics
+# Mathematical definition
 
 Compute bootstrap deviations ``\\boldsymbol{\\delta}_{\\mu}^{(m)} = \\hat{\\boldsymbol{\\mu}}^{(m)} - \\hat{\\boldsymbol{\\mu}}`` and ``\\boldsymbol{\\delta}_{\\Sigma}^{(m)} = \\operatorname{vec}(\\hat{\\mathbf{\\Sigma}}^{(m)} - \\hat{\\mathbf{\\Sigma}})``. Fit empirical covariances:
 
@@ -608,7 +608,7 @@ end
 
 Constructs an ellipsoidal uncertainty set for expected returns using bootstrap resampling for time series data.
 
-# Summary Statistics
+# Mathematical definition
 
 ```math
 \\mathbf{\\Sigma}_{\\mu} = \\operatorname{Cov}\\!\\left(\\hat{\\boldsymbol{\\mu}}^{(m)} - \\hat{\\boldsymbol{\\mu}}\\right), \\qquad
@@ -670,7 +670,7 @@ end
 
 Constructs an ellipsoidal uncertainty set for covariance using bootstrap resampling for time series data.
 
-# Summary Statistics
+# Mathematical definition
 
 ```math
 \\mathbf{\\Sigma}_{\\Sigma} = \\operatorname{Cov}\\!\\left(\\operatorname{vec}(\\hat{\\mathbf{\\Sigma}}^{(m)} - \\hat{\\mathbf{\\Sigma}})\\right), \\qquad

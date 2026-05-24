@@ -166,7 +166,7 @@ to build `N` eigen-directions and encodes kurtosis via SOC and equality constrai
 The `LowOrderPrior` overload unconditionally throws an `ArgumentError` since kurtosis
 estimation requires a high-order prior.
 
-# Summary Statistics
+# Mathematical definition
 
 ```math
 \\sqrt{\\mathrm{Kurt}(\\boldsymbol{w})} = \\|\\mathbf{G}_{kt}(\\boldsymbol{w} \\otimes \\boldsymbol{w})\\|_2, \\qquad \\mathbf{G}_{kt} = \\mathrm{chol}(\\mathbf{S}_2 \\mathbf{K} \\mathbf{S}_2^\\intercal)

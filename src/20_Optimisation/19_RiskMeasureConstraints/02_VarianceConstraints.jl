@@ -105,7 +105,7 @@ For `StandardDeviation`, adds a scalar variable `sd_risk_i` and the SOC constrai
 appropriate variance formulation (SDP, SOC-squared, or quadratic) and also applies any
 risk-contribution constraints.
 
-# Summary Statistics
+# Mathematical definition
 
 Standard deviation:
 

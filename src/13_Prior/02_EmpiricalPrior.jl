@@ -95,7 +95,7 @@ Compute empirical prior moments for asset returns (no horizon adjustment).
 
 `prior` estimates the mean and covariance of asset returns using the specified empirical prior estimator, without log-normalisation or scaling for investment horizon. The mean and covariance are computed using the estimators stored in `pe`, and returned in a [`LowOrderPrior`](@ref) result.
 
-# Summary Statistics
+# Mathematical definition
 
 The empirical prior directly estimates first and second moments from the sample:
 
@@ -145,7 +145,7 @@ Compute empirical prior moments for asset returns with investment horizon adjust
 
 `prior` estimates the mean and covariance of asset returns using the specified empirical prior estimator, applying log-normalisation and scaling for the investment horizon. The asset returns are log-transformed, moments are computed using the estimators stored in `pe`, and then rescaled according to the investment horizon. The final mean and covariance are transformed back to arithmetic returns and returned in a [`LowOrderPrior`](@ref) result.
 
-# Summary Statistics
+# Mathematical definition
 
 Log-returns are computed and scaled by the investment horizon ``h``, then converted back to arithmetic returns:
 

@@ -506,7 +506,7 @@ Compute high order prior moments for asset returns using a composite estimator.
 
 `prior` estimates the mean, covariance, coskewness, and cokurtosis of asset returns using the specified high order prior estimator. It first computes low order moments (mean and covariance) using the embedded prior estimator, then computes coskewness and cokurtosis tensors using the provided coskewness and cokurtosis estimators. Optionally, factor returns `F` can be provided for factor-based estimation. The result is returned as a [`HighOrderPrior`](@ref) object.
 
-# Summary Statistics
+# Mathematical definition
 
 In addition to the first and second moments, the high order estimator computes:
 

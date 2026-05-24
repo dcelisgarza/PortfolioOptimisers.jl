@@ -97,7 +97,7 @@ Compute excess expected returns by subtracting the risk-free rate.
 
 This method applies the mean estimator to the data and subtracts the risk-free rate from the resulting expected returns.
 
-# Summary Statistics
+# Mathematical definition
 
 ```math
 \\hat{\\boldsymbol{\\mu}}_{\\text{excess}} = \\hat{\\boldsymbol{\\mu}} - r_f \\boldsymbol{1}

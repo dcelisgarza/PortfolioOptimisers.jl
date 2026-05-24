@@ -23,7 +23,7 @@ The `SumScalariser` method sums all entries into a linear or quadratic expressio
 to encode a log-sum-exp scalarisation. The `MaxScalariser` method introduces a variable and
 linear constraints to encode the maximum over all entries.
 
-# Summary Statistics
+# Mathematical definition
 
 ```math
 \\mathcal{R}_{\\mathrm{sum}} = \\sum_k \\mathcal{R}_k, \\qquad
@@ -273,7 +273,7 @@ Creates the `dd` variable array (length `T + 1`) together with three constraints
 (drawdown recurrence relation). Returns the `dd` array; returns the existing one if already
 present in `model`.
 
-# Summary Statistics
+# Mathematical definition
 
 Drawdown recurrence:
 

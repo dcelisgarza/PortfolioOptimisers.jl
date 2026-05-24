@@ -107,7 +107,7 @@ creates a scalar variable, adds the SOC constraint `[sc * nskew_risk; sc * G * w
 and dispatches to [`set_negative_skewness_risk!`](@ref) for bounding. The `LowOrderPrior`
 overload unconditionally throws an `ArgumentError`.
 
-# Summary Statistics
+# Mathematical definition
 
 ```math
 \\mathrm{NSkew}(\\boldsymbol{w}) = \\|\\mathbf{G}_V \\boldsymbol{w}\\|_2, \\qquad \\mathbf{G}_V = \\mathrm{chol}(\\mathbf{V})

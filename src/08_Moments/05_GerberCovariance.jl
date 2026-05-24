@@ -256,7 +256,7 @@ end
 
 Implements the original Gerber correlation algorithm.
 
-# Summary Statistics
+# Mathematical definition
 
 Let ``\\mathbf{U}, \\mathbf{D} \\in \\{0,1\\}^{T \\times N}`` be indicator matrices with:
 
@@ -336,7 +336,7 @@ end
 
 Implements the first variant of the Gerber correlation algorithm.
 
-# Summary Statistics
+# Mathematical definition
 
 Let ``\\mathbf{U}, \\mathbf{D}, \\mathbf{N} \\in \\{0,1\\}^{T \\times N}`` be indicator matrices with:
 
@@ -419,7 +419,7 @@ end
 
 Implements the second variant of the Gerber correlation algorithm.
 
-# Summary Statistics
+# Mathematical definition
 
 Let ``\\mathbf{U}, \\mathbf{D} \\in \\{0,1\\}^{T \\times N}`` be indicator matrices with:
 

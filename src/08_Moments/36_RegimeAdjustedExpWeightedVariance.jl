@@ -266,7 +266,7 @@ a standardised squared innovation `z²`. After accumulating enough observations,
 smooths a regime state using `regime_decay`, then scales the final variance by
 `regime_multiplier(regime_method, regime_state)²`.
 
-# Summary Statistics
+# Mathematical definition
 
 EWM variance update (decay ``\\lambda``):
 

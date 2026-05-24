@@ -308,7 +308,7 @@ Smyth-Broby kernel function for covariance and correlation computation.
 
 This function computes the kernel value for a pair of asset returns, applying the Smyth-Broby logic for zones of confusion and indecision. It is used to aggregate positive and negative co-movements in Smyth-Broby covariance algorithms. It assumes the returns are centered around zero.
 
-# Summary Statistics
+# Mathematical definition
 
 ```math
 \\kappa(r_i, r_j) = \\sqrt{(1 + |r_i|)(1 + |r_j|)}, \\quad \\gamma(r_i, r_j) = |r_i - r_j|
@@ -356,7 +356,7 @@ Implements the original Smyth-Broby covariance/correlation algorithm.
 
 This method computes the Smyth-Broby correlation or covariance matrix for the input data matrix `X` using the original `SmythBroby0` algorithm. The computation is based on thresholding the data, applying the Smyth-Broby kernel, and aggregating positive and negative co-movements.
 
-# Summary Statistics
+# Mathematical definition
 
 For each pair ``(i, j)`` and observations ``t = 1, \\ldots, T``, classify using thresholds ``c_1 \\sigma_i`` and ``c_2 \\leq |\\tilde{r}_{ti}| \\leq c_3``:
 

@@ -207,7 +207,7 @@ Represents the Value-at-Risk (VaR) risk measure.
 
 `ValueatRisk` quantifies the maximum expected loss at a given confidence level `alpha` over a specified time horizon. It can be computed using empirical quantiles (weighted or unweighted) or via a parametric distribution.
 
-# Mathematical Definition
+# Mathematical definition
 
 Let ``\\boldsymbol{x} = (x_1, \\ldots, x_T)^\\intercal`` be the portfolio returns vector and ``x_{(k)}`` the ``k``-th order statistic (``k``-th smallest value). The empirical VaR at significance level ``\\alpha`` is:
 
@@ -324,7 +324,7 @@ Represents the Value-at-Risk Range risk measure.
 
 `ValueatRiskRange` computes the difference between the lower-tail Value-at-Risk (at level `alpha`) and the upper-tail Value-at-Risk (at level `beta`), measuring the spread between downside and upside tail risks.
 
-# Mathematical Definition
+# Mathematical definition
 
 ```math
 \\mathrm{VaRRange}_{\\alpha,\\beta}(\\boldsymbol{x}) = \\mathrm{VaR}_{\\alpha}(\\boldsymbol{x}) - \\mathrm{VaR}_{\\beta}(-\\boldsymbol{x})\\,,
@@ -461,7 +461,7 @@ Represents the Drawdown-at-Risk (DaR) risk measure.
 
 `DrawdownatRisk` quantifies the maximum drawdown not exceeded at a given confidence level `alpha`. It operates on absolute drawdowns computed from the portfolio returns series.
 
-# Mathematical Definition
+# Mathematical definition
 
 Define the cumulative wealth process and absolute drawdown at time ``t``:
 
@@ -630,7 +630,7 @@ Represents the Relative Drawdown-at-Risk risk measure for hierarchical optimisat
 
 `RelativeDrawdownatRisk` quantifies the maximum relative (compounded) drawdown not exceeded at a given confidence level `alpha`. It operates on relative drawdowns computed from the portfolio returns series.
 
-# Mathematical Definition
+# Mathematical definition
 
 Define the compounded wealth process and relative drawdown at time ``t``:
 

@@ -169,7 +169,7 @@ Maintains separate exponentially weighted running means for the covariance and t
 correlation, combining them at each step. After processing all observations, the result is
 scaled by the squared regime multiplier derived from the smoothed regime state.
 
-# Summary Statistics
+# Mathematical definition
 
 EWM covariance update (decay ``\\lambda``) and correlation (decay ``\\lambda_c``):
 

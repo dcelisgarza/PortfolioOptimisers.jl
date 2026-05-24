@@ -1516,7 +1516,7 @@ end
 
 Computes the Gerber IQ statistic matrix using noise compression template in `ce.kind` and numerator/denominator definition according to `ce.alg`.
 
-# Summary Statistics
+# Mathematical definition
 
 For each asset pair ``(i,j)`` accumulate weighted concordant and discordant counts:
 

@@ -105,7 +105,7 @@ HierarchicalRiskParity
    fb ┴ nothing
 ```
 
-# Summary Statistics
+# Mathematical definition
 
 At each bisection step, the algorithm splits cluster ``C`` into sub-clusters ``C_1`` and ``C_2`` and allocates weights proportional to inverse portfolio risk:
 

@@ -7,7 +7,7 @@ Introduces a scalar variable `uci` and the SOC constraint
 `[sc * uci; sc * dd[2:T+1]] in SecondOrderCone()`, then defines
 `uci_risk = uci / sqrt(T)`. Returns the existing expression if already present.
 
-# Summary Statistics
+# Mathematical definition
 
 ```math
 \\mathrm{UCI}(\\boldsymbol{w}) = \\frac{\\|\\boldsymbol{dd}\\|_2}{\\sqrt{T}} = \\sqrt{\\frac{1}{T}\\sum_{t=1}^T dd_t^2}

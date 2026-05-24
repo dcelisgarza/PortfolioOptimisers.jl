@@ -78,7 +78,7 @@ $(DocStringExtensions.FIELDS)
 
 Keywords correspond to the struct's fields.
 
-# Summary Statistics
+# Mathematical definition
 
 Draw ``M`` random subsets ``S_1, \\ldots, S_M`` of assets (size ``\\lfloor s \\cdot N \\rfloor``). Optimise on each:
 

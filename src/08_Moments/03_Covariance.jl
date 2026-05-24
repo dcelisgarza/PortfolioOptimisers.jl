@@ -359,7 +359,7 @@ end
 
 Compute the covariance matrix using a [`Covariance`](@ref) estimator.
 
-# Summary Statistics
+# Mathematical definition
 
 Full covariance:
 
@@ -434,7 +434,7 @@ end
 
 Compute the correlation matrix using a [`Covariance`](@ref) estimator.
 
-# Summary Statistics
+# Mathematical definition
 
 ```math
 \\hat{\\mathbf{P}}_{ij} = \\frac{\\hat{\\mathbf{\\Sigma}}_{ij}}{\\hat{\\sigma}_i \\hat{\\sigma}_j}

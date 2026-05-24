@@ -5,7 +5,7 @@ Augmented Black-Litterman prior estimator for asset returns.
 
 `AugmentedBlackLittermanPrior` is a low order prior estimator that computes the mean and covariance of asset returns using an augmented Black-Litterman model. It combines asset and factor prior estimators, matrix post-processing, regression and variance estimators, asset and factor views, asset and factor sets, view confidences, weights, risk-free rate, leverage, and a blending parameter `tau`. This estimator supports both direct and constraint-based views, flexible confidence specification, and matrix processing, and incorporates joint asset-factor Bayesian updating for posterior inference.
 
-# Summary Statistics
+# Mathematical definition
 
 Factor model linking assets and factors via regression:
 

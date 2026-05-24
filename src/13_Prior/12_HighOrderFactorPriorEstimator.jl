@@ -269,7 +269,7 @@ Compute high order factor prior moments for asset returns using a factor model.
 
 `prior` estimates the mean, covariance, coskewness, and cokurtosis of asset returns using a factor model with residual error correction. It first computes low order moments via the embedded factor prior, then maps factor higher-order moments to asset space via the Kronecker product of the factor loadings, optionally adding residual corrections.
 
-# Summary Statistics
+# Mathematical definition
 
 Factor cokurtosis and coskewness are mapped to asset space via the loadings matrix ``\\mathbf{B}`` (with Kronecker product ``\\otimes``):
 

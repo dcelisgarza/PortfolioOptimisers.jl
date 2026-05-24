@@ -117,7 +117,7 @@ Compute the lower tail dependence matrix for a set of asset returns.
 
 The lower tail dependence (LTD) between two assets quantifies the probability that both assets experience returns in their respective lower tails (i.e., joint drawdowns or adverse events), given a specified quantile level `alpha`. This function estimates the LTD matrix for all pairs of assets in the input matrix `X`, which is particularly useful for risk management and stress testing.
 
-# Summary Statistics
+# Mathematical definition
 
 For a quantile level ``\\alpha \\in (0,1)`` and ``k = \\lceil T \\alpha \\rceil``, let ``\\hat{q}_i`` denote the empirical ``\\alpha``-quantile of asset ``i`` (the ``k``-th order statistic). The lower tail dependence between assets ``i`` and ``j`` is estimated as:
 

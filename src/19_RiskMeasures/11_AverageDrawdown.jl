@@ -5,7 +5,7 @@ Represents the Average Drawdown risk measure.
 
 `AverageDrawdown` computes the mean of the absolute drawdown series of the portfolio returns. It provides a measure of the average magnitude of drawdowns over the sample period.
 
-# Mathematical Definition
+# Mathematical definition
 
 Define the absolute drawdown series:
 
@@ -94,7 +94,7 @@ Represents the Relative Average Drawdown risk measure for hierarchical optimisat
 
 `RelativeAverageDrawdown` computes the mean of the relative (compounded) drawdown series of the portfolio returns.
 
-# Mathematical Definition
+# Mathematical definition
 
 Define the compounded wealth process and relative drawdown series:
 

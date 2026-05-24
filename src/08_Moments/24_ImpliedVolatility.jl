@@ -274,7 +274,7 @@ end
 
 Predict realised volatilities by scaling the latest implied volatility row by the premium adjustment factor.
 
-# Summary Statistics
+# Mathematical definition
 
 ```math
 \\hat{\\sigma}_i = \\frac{\\mathrm{iv}_{T,i}}{\\mathrm{ivpa}_i}
@@ -306,7 +306,7 @@ Predict realised volatilities using a regression model fitted on implied and rea
 
 For each asset, this function fits a regression model relating lagged implied volatility and lagged realised volatility (computed from rolling windows of `X`) to the next-period realised volatility. The fitted model is then used to predict the next-period realised volatility from the most recent data.
 
-# Summary Statistics
+# Mathematical definition
 
 For asset ``i``, fit the log-linear model over windows ``t = 1, \\ldots, T-1``:
 
@@ -384,7 +384,7 @@ Compute the covariance matrix using implied volatility scaling.
 
 This method computes the correlation matrix of `X` using the base estimator in `ce`, then predicts realised volatilities from `iv` using the implied volatility algorithm in `ce.alg`. The predicted realised volatilities are used to convert the correlation matrix to a covariance matrix, which is then post-processed by the matrix processing estimator `ce.mp`.
 
-# Summary Statistics
+# Mathematical definition
 
 ```math
 \\hat{\\mathbf{\\Sigma}} = \\mathrm{diag}(\\hat{\\boldsymbol{\\sigma}}) \\hat{\\boldsymbol{\\rho}} \\,\\mathrm{diag}(\\hat{\\boldsymbol{\\sigma}})

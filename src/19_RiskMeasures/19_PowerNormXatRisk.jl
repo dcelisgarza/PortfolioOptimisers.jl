@@ -67,7 +67,7 @@ Represents the Power Norm Value-at-Risk (PNVaR) risk measure.
 
 `PowerNormValueatRisk` is a coherent risk measure that generalises EVaR by replacing the exponential moment-generating function with a power-norm. It is parametrised by a power ``p \\geq 1`` and a significance level ``\\alpha``, and is solved via a conic programme.
 
-# Mathematical Definition
+# Mathematical definition
 
 The PNVaR at level ``\\alpha`` with power ``p`` is:
 
@@ -176,7 +176,7 @@ Represents the Power Norm Value-at-Risk Range (PNVaRRange) risk measure.
 
 `PowerNormValueatRiskRange` computes the sum of the lower-tail PNVaR (at level `alpha` with power `pa`) and the upper-tail PNVaR (at level `beta` with power `pb`).
 
-# Mathematical Definition
+# Mathematical definition
 
 ```math
 \\mathrm{PNVaRRange}_{\\alpha,p_a,\\beta,p_b}(\\boldsymbol{x}) = \\mathrm{PNVaR}_{\\alpha,p_a}(\\boldsymbol{x}) + \\mathrm{PNVaR}_{\\beta,p_b}(-\\boldsymbol{x})\\,.
@@ -296,7 +296,7 @@ Represents the Power Norm Drawdown-at-Risk (PNDDaR) risk measure.
 
 `PowerNormDrawdownatRisk` applies the Power Norm Value-at-Risk framework to the absolute drawdown series of portfolio returns.
 
-# Mathematical Definition
+# Mathematical definition
 
 Define the absolute drawdown series:
 
@@ -410,7 +410,7 @@ Represents the Relative Power Norm Drawdown-at-Risk (Relative PNDDaR) risk measu
 
 `RelativePowerNormDrawdownatRisk` applies the Power Norm Value-at-Risk framework to the relative (compounded) drawdown series of portfolio returns.
 
-# Mathematical Definition
+# Mathematical definition
 
 Define the relative drawdown series:
 

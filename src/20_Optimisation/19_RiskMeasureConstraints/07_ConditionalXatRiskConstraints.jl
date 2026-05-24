@@ -9,7 +9,7 @@ infinity-norm cone constraints to handle distributional ambiguity over an `r.r`-
 Range variants compute the difference between lower-tail and upper-tail conditional
 risk expressions.
 
-# Summary Statistics
+# Mathematical definition
 
 Rockafellar-Uryasev CVaR linearisation:
 

@@ -84,7 +84,7 @@ Inverse Volatility portfolio optimiser.
 
 `InverseVolatility` allocates portfolio weights inversely proportional to each asset's volatility (standard deviation). Optionally, `sq = true` uses variance instead.
 
-# Mathematical Definition
+# Mathematical definition
 
 ```math
 w_i = \\frac{1 / \\sigma_i}{\\sum_{j=1}^N 1 / \\sigma_j}\\,,
@@ -361,7 +361,7 @@ Random-weighted portfolio optimiser.
 
 `RandomWeighted` draws portfolio weights at random from a Dirichlet distribution with concentration parameter `alpha`. This can be used for simulation, benchmarking, or stress-testing.
 
-# Mathematical Definition
+# Mathematical definition
 
 ```math
 \\boldsymbol{w} \\sim \\mathrm{Dirichlet}(\\boldsymbol{\\alpha})\\,,

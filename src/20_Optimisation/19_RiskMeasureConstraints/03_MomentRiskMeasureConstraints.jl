@@ -49,7 +49,7 @@ inequality constraint linking the auxiliary variables to the portfolio returns m
 target. The second-moment overload additionally supports full and lower-half formulations and
 multiple variance encodings via [`set_second_moment_risk!`](@ref).
 
-# Summary Statistics
+# Mathematical definition
 
 First lower moment / semi-deviation:
 

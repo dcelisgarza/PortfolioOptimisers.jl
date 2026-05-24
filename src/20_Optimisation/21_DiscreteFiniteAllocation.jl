@@ -46,7 +46,7 @@ Discrete Allocation portfolio optimiser.
 
 `DiscreteAllocation` allocates a portfolio by solving a Mixed-Integer Programming (MIP) problem to find the optimal number of shares for each asset, minimising the deviation between the target continuous weights and the realised discrete allocation.
 
-# Summary Statistics
+# Mathematical definition
 
 Default (absolute error) MIP formulation:
 

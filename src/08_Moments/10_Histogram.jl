@@ -284,7 +284,7 @@ Compute the intrinsic mutual information from a joint histogram.
 
 This function computes the mutual information between two variables given their joint histogram matrix `X`. It is used as a core step in information-theoretic measures such as mutual information and variation of information.
 
-# Summary Statistics
+# Mathematical definition
 
 Given the joint histogram ``\\mathbf{X}`` (unnormalised counts), with marginals ``p_i = \\sum_j X_{ij} / n`` and ``p_j = \\sum_i X_{ij} / n``:
 
@@ -346,7 +346,7 @@ Compute the variation of information (VI) matrix for a set of variables.
 
 This function computes the pairwise variation of information between all columns of the data matrix `X`, using histogram-based entropy and mutual information estimates. VI quantifies the amount of information lost and gained when moving from one variable to another, and is a true metric on the space of discrete distributions.
 
-# Summary Statistics
+# Mathematical definition
 
 Let ``H(X)``, ``H(Y)`` denote the marginal Shannon entropies and ``I(X;Y)`` the mutual information. The variation of information is:
 
@@ -477,7 +477,7 @@ Compute the mutual information (MI) matrix for a set of variables.
 
 This function computes the pairwise mutual information between all columns of the data matrix `X`, using histogram-based entropy and mutual information estimates. MI quantifies the amount of shared information between pairs of variables, and is widely used in information-theoretic analysis of dependencies.
 
-# Summary Statistics
+# Mathematical definition
 
 Mutual information between assets ``i`` and ``j``:
 

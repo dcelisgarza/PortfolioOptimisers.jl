@@ -55,7 +55,7 @@ Represents the Median Absolute Deviation (MAD) risk measure for hierarchical por
 
 `MedianAbsoluteDeviation` computes the median (or mean) absolute deviation of portfolio returns about a specified centre, providing a robust alternative to variance for measuring dispersion.
 
-# Mathematical Definition
+# Mathematical definition
 
 Let ``\\mu`` be the chosen centre (median or mean of returns, or a user-supplied value). Define the deviations ``\\delta_t = x_t - \\mu``. The MAD is:
 

@@ -6,7 +6,7 @@ Add average drawdown risk constraints to `model`.
 Calls [`set_drawdown_constraints!`](@ref) to ensure drawdown variables exist, then creates
 an observation-weighted mean of the drawdown path as the risk expression.
 
-# Summary Statistics
+# Mathematical definition
 
 ```math
 \\mathrm{ADD}(\\boldsymbol{w}) = \\frac{1}{T}\\sum_{t=1}^T dd_t

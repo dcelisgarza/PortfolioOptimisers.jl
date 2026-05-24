@@ -5,7 +5,7 @@ Represents the Maximum Drawdown risk measure.
 
 `MaximumDrawdown` computes the largest peak-to-trough decline in the cumulative portfolio returns. It captures the worst-case loss from a previous high.
 
-# Mathematical Definition
+# Mathematical definition
 
 Define the absolute drawdown series:
 
@@ -82,7 +82,7 @@ Represents the Relative Maximum Drawdown risk measure for hierarchical optimisat
 
 `RelativeMaximumDrawdown` computes the maximum of the relative (compounded) drawdown series.
 
-# Mathematical Definition
+# Mathematical definition
 
 Define the relative drawdown series:
 

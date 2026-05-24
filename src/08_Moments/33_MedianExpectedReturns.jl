@@ -74,7 +74,7 @@ This method returns the median of each asset across observations in `X`. If `me.
 the median is computed directly with `Statistics.median(X; dims = dims)`. Otherwise, the method
 computes a weighted median for each asset using the observation weights `w`.
 
-# Summary Statistics
+# Mathematical definition
 
 ```math
 \\hat{\\mu}_j = \\mathrm{median}(r_{1j}, r_{2j}, \\ldots, r_{Tj})

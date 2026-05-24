@@ -176,7 +176,7 @@ Compute the Black-Litterman view uncertainty matrix `Ω`.
 
 This method constructs the view uncertainty matrix `Ω` for the Black-Litterman model when no explicit view confidences are provided (`views_conf = nothing`). The uncertainty for each view is set to the variance of the projected prior covariance, i.e., `Ω = LinearAlgebra.diag(P * Σ * P')`, where `P` is the view matrix and `Σ` is the prior covariance matrix.
 
-# Summary Statistics
+# Mathematical definition
 
 Let ``\\mathbf{P}`` be the ``K \\times N`` view matrix and ``\\mathbf{\\Sigma}`` the ``N \\times N`` prior covariance. The view uncertainty matrix for each `views_conf` variant:
 
@@ -233,7 +233,7 @@ Compute the Black-Litterman posterior mean and covariance for asset returns.
 
 `vanilla_posteriors` implements the standard Black-Litterman update equations, combining the prior mean and covariance with user or algorithmic views. The function returns the posterior mean and covariance matrix, incorporating the blending parameter `tau`, risk-free rate `rf`, view uncertainty matrix `omega`, view matrix `P`, and view returns vector `Q`.
 
-# Summary Statistics
+# Mathematical definition
 
 Let ``\\boldsymbol{\\Pi}`` be the prior mean, ``\\mathbf{\\Sigma}`` the prior covariance, ``\\tau`` the scaling parameter, ``\\mathbf{P}`` the view matrix, ``\\boldsymbol{q}`` the view vector, and ``\\mathbf{\\Omega}`` the view uncertainty matrix:
 
@@ -325,7 +325,7 @@ Compute the Black-Litterman prior moments for asset returns.
 
 `prior` estimates the mean and covariance of asset returns using the Black-Litterman model, combining a prior estimator, matrix post-processing, user or algorithmic views, asset sets, view confidences, risk-free rate, and blending parameter `tau`. The method supports both direct and constraint-based views, flexible confidence specification, and matrix processing.
 
-# Summary Statistics
+# Mathematical definition
 
 The Black-Litterman posterior distribution combines the prior ``(\\boldsymbol{\\Pi}, \\tau \\mathbf{\\Sigma})`` with investor views ``(\\mathbf{P}, \\boldsymbol{q}, \\mathbf{\\Omega})``:
 

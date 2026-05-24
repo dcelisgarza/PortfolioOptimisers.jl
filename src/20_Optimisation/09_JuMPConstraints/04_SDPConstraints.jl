@@ -5,7 +5,7 @@ Add a positive semidefinite (PSD) constraint to the JuMP optimisation model for 
 
 Creates a symmetric matrix variable `W` and enforces that the bordered matrix `[W w; wᵀ k]` lies in the PSD cone. Returns immediately if `W` already exists in `model`.
 
-# Summary Statistics
+# Mathematical definition
 
 ```math
 \\mathbf{M} = \\begin{bmatrix} \\mathbf{W} & \\boldsymbol{w} \\\\ \\boldsymbol{w}^\\intercal & k \\end{bmatrix} \\succeq 0

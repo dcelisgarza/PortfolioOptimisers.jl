@@ -10,7 +10,7 @@ Each overload uses power cone constraints (`PowerCone`) parameterised by `r.p` (
 the total. The range variant introduces separate lower and upper tail variables. The drawdown
 variant operates on the drawdown path.
 
-# Summary Statistics
+# Mathematical definition
 
 Power-Norm Value-at-Risk:
 

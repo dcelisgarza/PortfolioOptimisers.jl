@@ -663,7 +663,7 @@ Add uncertainty-set-robust return constraints to the JuMP model.
 
 Dispatches based on the uncertainty set type. For `BoxUncertaintySet`, uses a norm-1 cone constraint. For `EllipsoidalUncertaintySet`, uses a second-order cone constraint.
 
-# Summary Statistics
+# Mathematical definition
 
 Box uncertainty set (worst-case return):
 

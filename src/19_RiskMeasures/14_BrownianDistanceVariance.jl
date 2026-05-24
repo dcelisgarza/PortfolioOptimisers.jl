@@ -59,7 +59,7 @@ Represents the Brownian Distance Variance (BDVar) risk measure.
 
 `BrownianDistanceVariance` measures dependence between portfolio returns and a reference using the Brownian (distance) covariance framework. It captures non-linear dependence and is zero if and only if the returns are independent of the reference.
 
-# Mathematical Definition
+# Mathematical definition
 
 Given a portfolio returns vector ``\\boldsymbol{x} = (x_1, \\ldots, x_T)^\\intercal``, define the pairwise absolute distance matrix:
 

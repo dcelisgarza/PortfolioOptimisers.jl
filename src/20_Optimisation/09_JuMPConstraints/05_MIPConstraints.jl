@@ -48,7 +48,7 @@ Add MIP-compatible weight bound constraints using binary selection variables.
 
 The fall-through method does nothing when `wb` is `nothing`. The concrete method adds `w ≥ is ⊙ lb` and `w ≤ il ⊙ ub` constraints when the respective finite bounds are present.
 
-# Summary Statistics
+# Mathematical definition
 
 ```math
 \\boldsymbol{i}_s \\odot \\boldsymbol{\\ell} \\leq \\boldsymbol{w} \\leq \\boldsymbol{i}_l \\odot \\boldsymbol{u}
@@ -97,7 +97,7 @@ Add MIP binary selection variables and threshold constraints for long-short port
 
 Creates `ilb`/`isb` binary indicator variables (or their continuous relaxations `ilf`/`isf` when `k` is a JuMP variable), enforces that each asset is either long or short but not both (`ilb + isb ≤ 1`), and applies long/short minimum-holding threshold and rebalancing constraints based on the flags provided.
 
-# Summary Statistics
+# Mathematical definition
 
 Mutual-exclusivity and big-M linearisation:
 
@@ -212,7 +212,7 @@ Add long-only MIP binary indicator variable and associated constraints to the Ju
 
 Creates binary variable `ib[i]` per asset indicating whether the asset is held. When `k` is a JuMP variable, introduces continuous relaxation `ibf` with big-M linking constraints. Optionally applies minimum-holding threshold, fixed-fee, and rebalancing constraints.
 
-# Summary Statistics
+# Mathematical definition
 
 Big-M linearisation of ``ibf_i = ib_i \\cdot k``:
 

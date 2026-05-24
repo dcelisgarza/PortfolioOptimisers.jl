@@ -128,7 +128,7 @@ Compute the distance correlation between two vectors using a configured [`Distan
 
 This function computes the distance correlation between `v1` and `v2` using the specified distance metric, optional weights, and any additional arguments or keyword arguments provided in the estimator. The computation follows the standard distance correlation procedure, centering the pairwise distance matrices and normalizing the result.
 
-# Summary Statistics
+# Mathematical definition
 
 Let ``a_{kl} = d(v_{1k}, v_{1l})`` and ``b_{kl} = d(v_{2k}, v_{2l})`` be pairwise distance matrices. Define doubly-centered versions:
 
@@ -289,7 +289,7 @@ Compute the distance covariance between two vectors using a configured [`Distanc
 
 This function computes the distance covariance between `v1` and `v2` using the specified distance metric, optional weights, and any additional arguments or keyword arguments provided in the estimator. The computation follows the standard distance covariance procedure, centering the pairwise distance matrices and aggregating the result.
 
-# Summary Statistics
+# Mathematical definition
 
 Using the same doubly-centered matrices ``\\mathbf{A}`` and ``\\mathbf{B}`` as in [`cor_distance`](@ref):
 

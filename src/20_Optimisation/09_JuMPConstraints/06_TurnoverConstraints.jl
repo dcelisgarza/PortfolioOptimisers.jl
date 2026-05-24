@@ -30,7 +30,7 @@ Add a single turnover constraint for a [`Turnover`](@ref) object to the JuMP opt
 
 Introduces auxiliary variable `t_tn_i`, expression `tn_i = w - wb * k`, and enforces `‖w - wb‖₁ ≤ val * k` via NormOneCone constraints.
 
-# Summary Statistics
+# Mathematical definition
 
 ```math
 \\boldsymbol{t}_{tn} \\geq |\\boldsymbol{w} - \\boldsymbol{w}_b k|, \\qquad

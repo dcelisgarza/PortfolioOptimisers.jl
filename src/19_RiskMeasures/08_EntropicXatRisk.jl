@@ -59,7 +59,7 @@ Represents the Entropic Value-at-Risk (EVaR) risk measure.
 
 `EntropicValueatRisk` is a coherent risk measure based on the Chernoff bound. It is an upper bound for both CVaR and VaR and is computed by solving a conic optimisation problem via an external solver.
 
-# Mathematical Definition
+# Mathematical definition
 
 The EVaR is defined via the Chernoff bound as the tightest exponential upper bound on VaR and CVaR:
 
@@ -163,7 +163,7 @@ Represents the Entropic Value-at-Risk Range (EVaR Range) risk measure.
 
 `EntropicValueatRiskRange` computes the difference between the lower-tail EVaR (at level `alpha`) and the upper-tail EVaR (at level `beta`).
 
-# Mathematical Definition
+# Mathematical definition
 
 ```math
 \\mathrm{EVaRRange}_{\\alpha,\\beta}(\\boldsymbol{x}) = \\mathrm{EVaR}_{\\alpha}(\\boldsymbol{x}) + \\mathrm{EVaR}_{\\beta}(-\\boldsymbol{x})\\,,
@@ -249,7 +249,7 @@ Represents the Entropic Drawdown-at-Risk (EDaR) risk measure.
 
 `EntropicDrawdownatRisk` applies the Entropic Value-at-Risk framework to the absolute drawdown series of portfolio returns. It is a coherent risk measure providing an upper bound on both the Drawdown-at-Risk and Conditional Drawdown-at-Risk.
 
-# Mathematical Definition
+# Mathematical definition
 
 Define the absolute drawdown series:
 
@@ -353,7 +353,7 @@ Represents the Relative Entropic Drawdown-at-Risk (Relative EDaR) risk measure f
 
 `RelativeEntropicDrawdownatRisk` applies the Entropic Value-at-Risk framework to the relative (compounded) drawdown series of portfolio returns.
 
-# Mathematical Definition
+# Mathematical definition
 
 Define the compounded wealth process and relative drawdown series:
 

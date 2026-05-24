@@ -5,7 +5,7 @@ Represents the square root kurtosis risk measure in `PortfolioOptimisers.jl`.
 
 Computes portfolio risk as the square root of the fourth central moment (kurtosis) of the return distribution, optionally using custom weights, expected returns, and a kurtosis (fourth moment) matrix. This risk measure can be evaluated using either the full or semi (downside) deviations, depending on the algorithm provided.
 
-# Mathematical Definition
+# Mathematical definition
 
 Let ``\\boldsymbol{x} = \\mathbf{X} \\boldsymbol{w}`` be the ``T \\times 1`` vector of portfolio returns, and let ``\\mu`` be the chosen centre (mean, weighted mean, or user-supplied value). Define the centred deviations:
 

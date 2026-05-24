@@ -7,7 +7,7 @@ Creates a scalar variable `wr_risk` and adds `sc * (wr_risk .+ net_X) >= 0` so t
 `wr_risk` upper-bounds the negative of every portfolio return. Returns the existing variable
 if already present.
 
-# Summary Statistics
+# Mathematical definition
 
 ```math
 \\mathrm{WR}(\\boldsymbol{w}) = \\max_{t} (-\\hat{r}_t) = -\\min_{t} \\hat{r}_t

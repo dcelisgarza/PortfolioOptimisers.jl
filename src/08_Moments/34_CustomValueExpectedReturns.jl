@@ -48,7 +48,7 @@ end
 
 Compute expected returns as custom values.
 
-# Summary Statistics
+# Mathematical definition
 
 Returns a user-supplied constant, vector, or function result as the expected returns:
 

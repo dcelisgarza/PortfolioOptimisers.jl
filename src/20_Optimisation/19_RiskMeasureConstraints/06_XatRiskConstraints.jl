@@ -8,7 +8,7 @@ empirical quantile. The distribution overloads use closed-form z-scores computed
 [`compute_value_at_risk_z`](@ref) / [`compute_value_at_risk_cz`](@ref) and add an SOC
 constraint. The `DrawdownatRisk` overload applies the MIP approach to the drawdown series.
 
-# Summary Statistics
+# Mathematical definition
 
 Empirical (MIP) VaR:
 

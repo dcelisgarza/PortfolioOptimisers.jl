@@ -5,7 +5,7 @@ Represents a simple mean return measure for use in non-optimisation contexts.
 
 `MeanReturn` computes the arithmetic (or geometric, when `flag = true`) mean of portfolio returns. It is used as the numerator in risk-adjusted performance ratios such as `MeanReturnRiskRatio`.
 
-# Mathematical Definition
+# Mathematical definition
 
 For `flag = false` (arithmetic mean):
 
@@ -95,7 +95,7 @@ Represents a mean return to risk ratio measure.
 
 `MeanReturnRiskRatio` computes the ratio of the mean portfolio return (minus a risk-free rate) to a risk measure, used for performance analysis and comparison. It generalises the Sharpe ratio by allowing any risk measure in the denominator.
 
-# Mathematical Definition
+# Mathematical definition
 
 ```math
 \\mathrm{MRRR}(\\boldsymbol{x}) = \\frac{\\bar{x} - r_f}{\\rho(\\boldsymbol{x})}\\,,
@@ -157,7 +157,7 @@ Represents the Third Central Moment risk measure.
 
 `ThirdCentralMoment` computes the third central moment of portfolio returns about a specified centre. It is used as a measure of the asymmetry (skewness) of the return distribution in higher-order portfolio optimisation.
 
-# Mathematical Definition
+# Mathematical definition
 
 Let ``\\mu`` be the specified centre and ``\\delta_t = x_t - \\mu`` the centred deviations. The third central moment is:
 
@@ -235,7 +235,7 @@ Represents the standardised Skewness risk measure.
 
 `Skewness` computes the third standardised central moment (skewness) of portfolio returns. Negative skewness indicates a return distribution with a heavier left tail.
 
-# Mathematical Definition
+# Mathematical definition
 
 Let ``\\mu`` be the specified centre, ``\\delta_t = x_t - \\mu``, and ``\\sigma`` the standard deviation of returns. The skewness is:
 

@@ -63,7 +63,7 @@ Compute the mean of asset returns using a [`SimpleExpectedReturns`](@ref) estima
 
 This method computes the expected returns as the sample mean of the input data `X` according to `ce`.
 
-# Summary Statistics
+# Mathematical definition
 
 Unweighted:
 

@@ -5,7 +5,7 @@ Represents a risk ratio risk measure for hierarchical portfolio optimisation.
 
 `RiskRatioRiskMeasure` computes the ratio of two risk measures, enabling the construction of risk-adjusted performance metrics for use in hierarchical optimisation routines.
 
-# Mathematical Definition
+# Mathematical definition
 
 ```math
 \\mathrm{RiskRatio}(\\boldsymbol{x}) = \\frac{r_1(\\boldsymbol{x})}{r_2(\\boldsymbol{x})}\\,,
@@ -83,7 +83,7 @@ Represents a non-optimisation risk ratio measure.
 
 `NonOptimisationRiskRatioRiskMeasure` computes the ratio of two risk measures for analysis or reporting purposes. Unlike `RiskRatioRiskMeasure`, it is not intended for use as an objective or constraint in optimisation routines.
 
-# Mathematical Definition
+# Mathematical definition
 
 ```math
 \\mathrm{RiskRatio}(\\boldsymbol{x}) = \\frac{r_1(\\boldsymbol{x})}{r_2(\\boldsymbol{x})}\\,,

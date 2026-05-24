@@ -5,7 +5,7 @@ Represents the Worst Realisation risk measure.
 
 `WorstRealisation` returns the maximum loss (i.e., the negative minimum return) over all observed scenarios. It is the most conservative risk measure, capturing the single worst outcome in the sample.
 
-# Mathematical Definition
+# Mathematical definition
 
 ```math
 \\mathrm{WR}(\\boldsymbol{x}) = -\\min_{1 \\leq t \\leq T} x_t\\,.

@@ -5,7 +5,7 @@ Represents the Conditional Value-at-Risk (CVaR) risk measure, also known as Expe
 
 `ConditionalValueatRisk` computes the expected loss given that the loss exceeds the Value-at-Risk at level `alpha`. It provides a coherent risk measure for tail risk quantification.
 
-# Mathematical Definition
+# Mathematical definition
 
 Let ``\\boldsymbol{x} = (x_1, \\ldots, x_T)^\\intercal`` be the portfolio returns vector. The CVaR (also known as Expected Shortfall) at level ``\\alpha`` is the expected loss in the worst ``\\alpha`` fraction of scenarios:
 
@@ -96,7 +96,7 @@ Represents the Distributionally Robust Conditional Value-at-Risk (DR-CVaR) risk 
 
 `DistributionallyRobustConditionalValueatRisk` is a robust variant of CVaR that accounts for distributional uncertainty using Wasserstein ambiguity sets. It provides robustness against model misspecification in the tails of the return distribution.
 
-# Mathematical Definition
+# Mathematical definition
 
 The DR-CVaR with Wasserstein ambiguity parameter ``l`` and radius ``r`` is a robust upper bound on CVaR under distributional uncertainty within a Wasserstein ball of radius ``r``:
 
@@ -244,7 +244,7 @@ Represents the Conditional Value-at-Risk Range (CVaR Range) risk measure.
 
 `ConditionalValueatRiskRange` computes the difference between the lower-tail CVaR (at level `alpha`) and the upper-tail CVaR (at level `beta`), measuring the spread between downside and upside expected tail risks.
 
-# Mathematical Definition
+# Mathematical definition
 
 ```math
 \\mathrm{CVaRRange}_{\\alpha,\\beta}(\\boldsymbol{x}) = \\mathrm{CVaR}_{\\alpha}(\\boldsymbol{x}) - \\mathrm{CVaR}_{\\beta}(-\\boldsymbol{x})\\,,
@@ -342,7 +342,7 @@ Represents the Distributionally Robust Conditional Value-at-Risk Range (DR-CVaR 
 
 `DistributionallyRobustConditionalValueatRiskRange` computes the difference between the lower-tail DR-CVaR (at level `alpha`) and the upper-tail DR-CVaR (at level `beta`), with separate Wasserstein ambiguity parameters for each tail.
 
-# Mathematical Definition
+# Mathematical definition
 
 ```math
 \\mathrm{DR\\text{-}CVaRRange}(\\boldsymbol{x}) = \\mathrm{DR\\text{-}CVaR}_{\\alpha, l_a, r_a}(\\boldsymbol{x}) - \\mathrm{DR\\text{-}CVaR}_{\\beta, l_b, r_b}(-\\boldsymbol{x})\\,,
@@ -545,7 +545,7 @@ Represents the Conditional Drawdown-at-Risk (CDaR) risk measure, also known as E
 
 `ConditionalDrawdownatRisk` computes the expected drawdown given that the drawdown exceeds the Drawdown-at-Risk at level `alpha`. It provides a coherent risk measure for drawdown tail risk.
 
-# Mathematical Definition
+# Mathematical definition
 
 Define the absolute drawdown series:
 
@@ -635,7 +635,7 @@ Represents the Distributionally Robust Conditional Drawdown-at-Risk (DR-CDaR) ri
 
 `DistributionallyRobustConditionalDrawdownatRisk` is a robust variant of CDaR that accounts for distributional uncertainty using Wasserstein ambiguity sets, applied to drawdown sequences.
 
-# Mathematical Definition
+# Mathematical definition
 
 ```math
 \\mathrm{DR\\text{-}CDaR}_{\\alpha, l, r}(\\boldsymbol{x}) = \\mathrm{CDaR}_{\\alpha}(\\boldsymbol{x}) + l \\cdot r\\,.
@@ -780,7 +780,7 @@ Represents the Relative Conditional Drawdown-at-Risk risk measure for hierarchic
 
 `RelativeConditionalDrawdownatRisk` computes the expected relative (compounded) drawdown given that the drawdown exceeds the Relative Drawdown-at-Risk at level `alpha`.
 
-# Mathematical Definition
+# Mathematical definition
 
 Define the compounded wealth process and relative drawdown series:
 

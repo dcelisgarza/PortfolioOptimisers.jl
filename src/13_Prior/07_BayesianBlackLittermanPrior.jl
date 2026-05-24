@@ -205,7 +205,7 @@ Compute Bayesian Black-Litterman prior moments for asset returns.
 
 `prior` estimates the mean and covariance of asset returns using the Bayesian Black-Litterman model, combining a factor prior estimator, matrix post-processing, user or algorithmic views, asset sets, view confidences, risk-free rate, and blending parameter `tau`. This method supports both direct and constraint-based views, flexible confidence specification, and matrix processing, and incorporates Bayesian updating for posterior inference.
 
-# Summary Statistics
+# Mathematical definition
 
 The Bayesian Black-Litterman model updates the prior ``(\\boldsymbol{\\Pi}, \\mathbf{\\Sigma}/T)`` with views:
 

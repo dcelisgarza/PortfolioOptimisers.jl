@@ -5,7 +5,7 @@ No-op fallback for L1 regularisation setup.
 
 Called when no L1 regularisation is configured. Returns `nothing`.
 
-# Summary Statistics
+# Mathematical definition
 
 ```math
 \\text{penalty} = \\lambda_1 \\|\\boldsymbol{w}\\|_1
@@ -26,7 +26,7 @@ No-op fallback for L2 regularisation setup.
 
 Called when no L2 regularisation is configured. Returns `nothing`.
 
-# Summary Statistics
+# Mathematical definition
 
 ```math
 \\text{penalty} = \\lambda_2 \\|\\boldsymbol{w}\\|_2
@@ -61,7 +61,7 @@ No-op fallback for L∞ regularisation setup.
 
 Called when no L∞ regularisation is configured. Returns `nothing`.
 
-# Summary Statistics
+# Mathematical definition
 
 ```math
 \\text{penalty} = \\lambda_\\infty \\|\\boldsymbol{w}\\|_\\infty

@@ -38,7 +38,7 @@ Add a turnover-based transaction fee expression to the JuMP optimisation model.
 
 The fall-through method does nothing. The concrete method computes `val' * |w - wt|` via NormOneCone constraints and accumulates the result into the model's `:fees` expression via [`add_to_fees!`](@ref).
 
-# Summary Statistics
+# Mathematical definition
 
 ```math
 t_{ftn,i} \\geq |w_i - w_{t,i}\\, k|, \\qquad f_{tn} = \\boldsymbol{v}^\\intercal \\boldsymbol{t}_{ftn}
@@ -117,7 +117,7 @@ Add proportional long-side fee expression to the JuMP optimisation model.
 
 The fall-through method does nothing. The concrete method adds `fl' * lw` to the model's `:fees` expression via [`add_to_fees!`](@ref).
 
-# Summary Statistics
+# Mathematical definition
 
 ```math
 f_l = \\boldsymbol{f}_l^\\intercal \\boldsymbol{lw}
@@ -151,7 +151,7 @@ Add proportional short-side fee expression to the JuMP optimisation model.
 
 The fall-through method does nothing. The concrete method adds `fs' * sw` to the model's `:fees` expression via [`add_to_fees!`](@ref). Does nothing when no short-weight variable `:sw` exists in the model.
 
-# Summary Statistics
+# Mathematical definition
 
 ```math
 f_s = \\boldsymbol{f}_s^\\intercal \\boldsymbol{sw}

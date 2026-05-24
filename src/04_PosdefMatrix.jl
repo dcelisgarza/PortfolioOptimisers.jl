@@ -119,7 +119,7 @@ In-place projection of a matrix to the nearest positive definite matrix using th
 
 For matrices without unit diagonal, the function converts them into correlation matrices i.e. matrices with unit diagonal, applies the algorithm, and rescales them back.
 
-# Summary Statistics
+# Mathematical definition
 
 Solves the nearest correlation matrix problem:
 
