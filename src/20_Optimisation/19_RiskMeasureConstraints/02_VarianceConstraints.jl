@@ -110,14 +110,31 @@ risk-contribution constraints.
 Standard deviation:
 
 ```math
-\\hat{\\sigma}(\\boldsymbol{w}) = \\|\\mathbf{G}\\boldsymbol{w}\\|_2
+\\begin{align}
+\\hat{\\sigma}(\\boldsymbol{w}) &= \\|\\mathbf{G}\\boldsymbol{w}\\|_2\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``\\hat{\\sigma}(\\boldsymbol{w})``: Portfolio standard deviation.
+  - ``\\mathbf{G}``: Upper Cholesky factor of the covariance matrix ``\\boldsymbol{\\Sigma}``.
+  - $(math_dict[:w_port])
 
 SDP variance:
 
 ```math
-\\hat{\\sigma}^2(\\boldsymbol{w}) = \\mathrm{tr}(\\boldsymbol{\\Sigma}\\mathbf{W})
+\\begin{align}
+\\hat{\\sigma}^2(\\boldsymbol{w}) &= \\mathrm{tr}(\\boldsymbol{\\Sigma}\\mathbf{W})\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``\\hat{\\sigma}^2(\\boldsymbol{w})``: Portfolio variance (SDP formulation).
+  - ``\\mathbf{W} = \\boldsymbol{w}\\boldsymbol{w}^\\intercal``: Outer product of portfolio weights.
+  - ``\\boldsymbol{\\Sigma}``: Covariance matrix.
+  - ``\\mathrm{tr}(\\cdot)``: Matrix trace operator.
 
 where ``\\mathbf{G}`` is the upper Cholesky factor of ``\\boldsymbol{\\Sigma}`` and ``\\mathbf{W}`` is the SDP matrix variable.
 

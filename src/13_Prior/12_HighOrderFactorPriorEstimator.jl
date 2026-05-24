@@ -274,14 +274,27 @@ Compute high order factor prior moments for asset returns using a factor model.
 Factor cokurtosis and coskewness are mapped to asset space via the loadings matrix ``\\mathbf{B}`` (with Kronecker product ``\\otimes``):
 
 ```math
-\\hat{\\mathbf{K}} = (\\mathbf{B} \\otimes \\mathbf{B}) \\hat{\\mathbf{K}}_f (\\mathbf{B} \\otimes \\mathbf{B})^\\intercal + \\hat{\\mathbf{K}}_\\varepsilon
+\\begin{align}
+\\hat{\\mathbf{K}} &= (\\mathbf{B} \\otimes \\mathbf{B}) \\hat{\\mathbf{K}}_f (\\mathbf{B} \\otimes \\mathbf{B})^\\intercal + \\hat{\\mathbf{K}}_\\varepsilon\\,.
+\\end{align}
 ```
 
 ```math
-\\hat{\\mathbf{S}} = \\mathbf{B} \\hat{\\mathbf{S}}_f (\\mathbf{B} \\otimes \\mathbf{B})^\\intercal + \\hat{\\mathbf{S}}_\\varepsilon
+\\begin{align}
+\\hat{\\mathbf{S}} &= \\mathbf{B} \\hat{\\mathbf{S}}_f (\\mathbf{B} \\otimes \\mathbf{B})^\\intercal + \\hat{\\mathbf{S}}_\\varepsilon\\,.
+\\end{align}
 ```
 
-Where ``\\hat{\\mathbf{K}}_\\varepsilon`` and ``\\hat{\\mathbf{S}}_\\varepsilon`` are residual cokurtosis and coskewness corrections (when `rsd = true`).
+Where:
+
+  - ``\\hat{\\mathbf{K}}``: ``N^2 \\times N^2`` asset cokurtosis matrix.
+  - ``\\hat{\\mathbf{S}}``: ``N \\times N^2`` asset coskewness matrix.
+  - ``\\mathbf{B}``: ``N \\times K`` factor loadings matrix.
+  - ``\\hat{\\mathbf{K}}_f``: ``K^2 \\times K^2`` factor cokurtosis matrix.
+  - ``\\hat{\\mathbf{S}}_f``: ``K \\times K^2`` factor coskewness matrix.
+  - ``\\hat{\\mathbf{K}}_\\varepsilon``: Residual cokurtosis correction (when `rsd = true`).
+  - ``\\hat{\\mathbf{S}}_\\varepsilon``: Residual coskewness correction (when `rsd = true`).
+  - ``\\otimes``: Kronecker product.
 
 # Arguments
 

@@ -769,9 +769,26 @@ math_dict = Dict(:Xv => "``\\boldsymbol{X}``: Data vector `observations × 1`.",
                  :tgt => "``t``: Target value, usually the unweighted (or weighted) expected value ``E[\\boldsymbol{X}]``.",#
                  :A => "``\\mathbf{A}``: Constraint coefficient matrix.",#
                  :B => "``\\boldsymbol{B}``: Constraint response vector.",#
-                 :x => "``\\boldsymbol{x}``: Constrained variable.",
+                 :x => "``\\boldsymbol{x}``: Constrained variable.",#
                  :ineq => "``\\text{ineq}``: Subscript for inequality constraints.",#
-                 :eq => "``\\text{eq}``: Subscript for equality constraints.")
+                 :eq => "``\\text{eq}``: Subscript for equality constraints.",#
+                 # Portfolio returns and dimensions.
+                 :xret => "``\\boldsymbol{x}``: Portfolio returns vector ``T \\times 1``.",#
+                 :T => "``T``: Number of observations.",#
+                 :N => "``N``: Number of assets.",#
+                 # Risk measure parameters.
+                 :alpha_rm => "``\\alpha``: Significance level (left tail probability), ``\\alpha \\in (0, 1)``.",#
+                 :w_port => "``\\boldsymbol{w}``: Portfolio weights vector ``N \\times 1``.",#
+                 # Absolute drawdown series.
+                 :ct => "``c_t``: Cumulative simple portfolio return at period ``t``.",#
+                 :dtdd => "``d_t \\leq 0``: Absolute drawdown at period ``t``.",#
+                 # Relative drawdown series.
+                 :Ct => "``C_t``: Compound wealth process at period ``t``.",#
+                 :rdt => "``rd_t \\leq 0``: Relative drawdown at period ``t``.",#
+                 # JuMP optimisation variables.
+                 :k_budget => "``k``: Budget scaling / homogenisation variable.",#
+                 :mu_er => "``\\boldsymbol{\\mu}``: Expected returns vector ``N \\times 1``.",#
+                 :R_w => "``R(\\boldsymbol{w})``: Portfolio risk.")
 
 """
 $(DocStringExtensions.TYPEDEF)

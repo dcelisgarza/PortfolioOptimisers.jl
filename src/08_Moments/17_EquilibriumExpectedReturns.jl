@@ -127,7 +127,9 @@ This method computes equilibrium expected returns as `λ * Σ * w`, where `λ` i
 # Mathematical definition
 
 ```math
-\\hat{\\boldsymbol{\\mu}}_{\\text{eq}} = \\lambda \\, \\hat{\\mathbf{\\Sigma}} \\, \\boldsymbol{w}
+\\begin{align}
+\\hat{\\boldsymbol{\\mu}}_{\\text{eq}} &= \\lambda \\, \\hat{\\mathbf{\\Sigma}} \\, \\boldsymbol{w}\\,.
+\\end{align}
 ```
 
 Where:

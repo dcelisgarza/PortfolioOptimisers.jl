@@ -43,8 +43,18 @@ two OWA expressions (e.g. tail-Gini range).
 # Mathematical definition
 
 ```math
-\\mathrm{OWA}(\\boldsymbol{w}) = \\boldsymbol{\\omega}^\\intercal \\mathrm{sort}(\\hat{\\boldsymbol{r}}), \\qquad \\hat{r}_t = \\boldsymbol{x}_t^\\intercal \\boldsymbol{w}
+\\begin{align}
+\\mathrm{OWA}(\\boldsymbol{w}) &= \\boldsymbol{\\omega}^\\intercal \\mathrm{sort}(\\hat{\\boldsymbol{r}})\\,, \\\\
+\\hat{r}_t &= \\boldsymbol{x}_t^\\intercal \\boldsymbol{w}\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``\\mathrm{OWA}(\\boldsymbol{w})``: Ordered Weighted Average risk measure.
+  - ``\\boldsymbol{\\omega}``: OWA weight vector.
+  - ``\\hat{\\boldsymbol{r}}``: Vector of portfolio returns at each time step.
+  - ``\\hat{r}_t = \\boldsymbol{x}_t^\\intercal \\boldsymbol{w}``: Portfolio return at time ``t``.
 
 where ``\\boldsymbol{\\omega}`` is the OWA weight vector and ``\\mathrm{sort}(\\hat{\\boldsymbol{r}})`` sorts the portfolio returns in ascending order.
 

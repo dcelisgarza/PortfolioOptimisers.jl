@@ -87,28 +87,39 @@ This method computes the standard deviation of the input matrix `X` using the co
 Unweighted:
 
 ```math
-\\hat{\\sigma}_j = \\sqrt{\\hat{\\sigma}^2_j}
+\\begin{align}
+\\hat{\\sigma}_j &= \\sqrt{\\hat{\\sigma}^2_j}\\,.
+\\end{align}
 ```
 
-where, for `corrected = true`:
+Where:
+
+  - ``\\hat{\\sigma}_j``: Standard deviation of asset ``j``.
+  - ``\\hat{\\sigma}^2_j``: Variance of asset ``j``.
+
+For `corrected = true`:
 
 ```math
-\\hat{\\sigma}^2_j = \\frac{1}{T-1} \\sum_{t=1}^{T} (r_{tj} - \\hat{\\mu}_j)^2
+\\begin{align}
+\\hat{\\sigma}^2_j &= \\frac{1}{T-1} \\sum_{t=1}^{T} (r_{tj} - \\hat{\\mu}_j)^2\\,.
+\\end{align}
 ```
 
-and for `corrected = false`:
+For `corrected = false`:
 
 ```math
-\\hat{\\sigma}^2_j = \\frac{1}{T} \\sum_{t=1}^{T} (r_{tj} - \\hat{\\mu}_j)^2
+\\begin{align}
+\\hat{\\sigma}^2_j &= \\frac{1}{T} \\sum_{t=1}^{T} (r_{tj} - \\hat{\\mu}_j)^2\\,.
+\\end{align}
 ```
 
 Weighted:
 
 ```math
-\\hat{\\sigma}^2_j = \\frac{\\sum_{t=1}^{T} w_t (r_{tj} - \\hat{\\mu}_j)^2}{\\sum_{t=1}^{T} w_t - c}
+\\begin{align}
+\\hat{\\sigma}^2_j &= \\frac{\\sum_{t=1}^{T} w_t (r_{tj} - \\hat{\\mu}_j)^2}{\\sum_{t=1}^{T} w_t - c}\\,.
+\\end{align}
 ```
-
-where ``c = 1`` if `corrected = true`, else ``c = 0``.
 
 Where:
 
@@ -263,25 +274,29 @@ This method computes the variance of the input matrix `X` using the configuratio
 
 # Mathematical definition
 
-Unweighted, for `corrected = true`:
+Unweighted, `corrected = true`:
 
 ```math
-\\hat{\\sigma}^2_j = \\frac{1}{T-1} \\sum_{t=1}^{T} (r_{tj} - \\hat{\\mu}_j)^2
+\\begin{align}
+\\hat{\\sigma}^2_j &= \\frac{1}{T-1} \\sum_{t=1}^{T} (r_{tj} - \\hat{\\mu}_j)^2\\,.
+\\end{align}
 ```
 
-Unweighted, for `corrected = false`:
+Unweighted, `corrected = false`:
 
 ```math
-\\hat{\\sigma}^2_j = \\frac{1}{T} \\sum_{t=1}^{T} (r_{tj} - \\hat{\\mu}_j)^2
+\\begin{align}
+\\hat{\\sigma}^2_j &= \\frac{1}{T} \\sum_{t=1}^{T} (r_{tj} - \\hat{\\mu}_j)^2\\,.
+\\end{align}
 ```
 
 Weighted:
 
 ```math
-\\hat{\\sigma}^2_j = \\frac{\\sum_{t=1}^{T} w_t (r_{tj} - \\hat{\\mu}_j)^2}{\\sum_{t=1}^{T} w_t - c}
+\\begin{align}
+\\hat{\\sigma}^2_j &= \\frac{\\sum_{t=1}^{T} w_t (r_{tj} - \\hat{\\mu}_j)^2}{\\sum_{t=1}^{T} w_t - c}\\,.
+\\end{align}
 ```
-
-where ``c = 1`` if `corrected = true`, else ``c = 0``.
 
 Where:
 

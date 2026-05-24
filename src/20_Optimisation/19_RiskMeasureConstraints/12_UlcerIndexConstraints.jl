@@ -10,8 +10,17 @@ Introduces a scalar variable `uci` and the SOC constraint
 # Mathematical definition
 
 ```math
-\\mathrm{UCI}(\\boldsymbol{w}) = \\frac{\\|\\boldsymbol{dd}\\|_2}{\\sqrt{T}} = \\sqrt{\\frac{1}{T}\\sum_{t=1}^T dd_t^2}
+\\begin{align}
+\\mathrm{UCI}(\\boldsymbol{w}) &= \\frac{\\|\\boldsymbol{dd}\\|_2}{\\sqrt{T}} = \\sqrt{\\frac{1}{T}\\sum_{t=1}^T dd_t^2}\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``\\mathrm{UCI}(\\boldsymbol{w})``: Ulcer index.
+  - ``\\boldsymbol{dd}``: Drawdown vector.
+  - $(math_dict[:T])
+  - ``dd_t``: Portfolio drawdown at time ``t``.
 
 where ``dd_t`` is the portfolio drawdown at time ``t``.
 

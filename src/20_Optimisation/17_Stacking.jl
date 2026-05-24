@@ -86,10 +86,18 @@ Keywords correspond to the struct's fields.
 Let ``K`` inner optimisers produce weight vectors ``\\boldsymbol{w}_1, \\ldots, \\boldsymbol{w}_K``. Stack them as rows of a returns proxy matrix and pass to outer optimiser ``\\mathrm{opto}``:
 
 ```math
-\\boldsymbol{w}^* = \\mathrm{opto}\\!\\left(\\sum_{k=1}^{K} s_k \\boldsymbol{W}_k\\right)
+\\begin{align}
+\\boldsymbol{w}^* &= \\mathrm{opto}\\!\\left(\\sum_{k=1}^{K} s_k \\boldsymbol{W}_k\\right)\\,.
+\\end{align}
 ```
 
-where ``s_k`` are optional scale factors and ``\\boldsymbol{W}_k`` is the returns matrix weighted by ``\\boldsymbol{w}_k``.
+Where:
+
+  - ``\\boldsymbol{w}^*``: Final stacked portfolio weights.
+  - ``K``: Number of inner optimisers.
+  - ``s_k``: Optional scale factor for inner optimiser ``k``.
+  - ``\\boldsymbol{W}_k``: Returns proxy matrix weighted by inner-optimiser weights ``\\boldsymbol{w}_k``.
+  - ``\\mathrm{opto}``: Outer optimiser applied to the aggregated returns proxy.
 
 # Related
 

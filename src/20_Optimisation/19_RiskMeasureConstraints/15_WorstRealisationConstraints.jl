@@ -10,8 +10,15 @@ if already present.
 # Mathematical definition
 
 ```math
-\\mathrm{WR}(\\boldsymbol{w}) = \\max_{t} (-\\hat{r}_t) = -\\min_{t} \\hat{r}_t
+\\begin{align}
+\\mathrm{WR}(\\boldsymbol{w}) &= \\max_{t} (-\\hat{r}_t) = -\\min_{t} \\hat{r}_t\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``\\mathrm{WR}(\\boldsymbol{w})``: Worst realisation.
+  - ``\\hat{r}_t = \\boldsymbol{x}_t^\\intercal \\boldsymbol{w}``: Portfolio return at time ``t``.
 
 where ``\\hat{r}_t = \\boldsymbol{x}_t^\\intercal \\boldsymbol{w}`` is the net portfolio return at time ``t``.
 

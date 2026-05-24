@@ -10,8 +10,17 @@ Represents the Turnover risk measure.
 Let ``\\boldsymbol{w}`` be the new portfolio weights and ``\\boldsymbol{w}_0`` the reference (previous or target) weights:
 
 ```math
-\\mathrm{Turnover}(\\boldsymbol{w}) = \\lVert \\boldsymbol{w}_0 - \\boldsymbol{w} \\rVert_1 = \\sum_{i=1}^{N} |w_{0,i} - w_i|\\,.
+\\begin{align}
+\\mathrm{Turnover}(\\boldsymbol{w}) &= \\lVert \\boldsymbol{w}_0 - \\boldsymbol{w} \\rVert_1 = \\sum_{i=1}^{N} |w_{0,i} - w_i|\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``\\mathrm{Turnover}(\\boldsymbol{w})``: Portfolio turnover.
+  - $(math_dict[:w_port])
+  - ``\\boldsymbol{w}_0``: Reference (previous or target) portfolio weights vector ``N \\times 1``.
+  - $(math_dict[:N])
 
 # Fields
 

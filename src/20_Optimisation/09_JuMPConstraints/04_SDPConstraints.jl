@@ -8,11 +8,18 @@ Creates a symmetric matrix variable `W` and enforces that the bordered matrix `[
 # Mathematical definition
 
 ```math
-\\mathbf{M} = \\begin{bmatrix} \\mathbf{W} & \\boldsymbol{w} \\\\ \\boldsymbol{w}^\\intercal & k \\end{bmatrix} \\succeq 0
-\\quad \\Leftrightarrow \\quad \\mathbf{W} \\succeq \\frac{\\boldsymbol{w}\\boldsymbol{w}^\\intercal}{k}
+\\begin{align}
+\\mathbf{M} &= \\begin{bmatrix} \\mathbf{W} & \\boldsymbol{w} \\\\ \\boldsymbol{w}^\\intercal & k \\end{bmatrix} \\succeq 0 \\\\
+&\\quad\\Leftrightarrow\\quad \\mathbf{W} \\succeq \\frac{\\boldsymbol{w}\\boldsymbol{w}^\\intercal}{k}\\,.
+\\end{align}
 ```
 
-where ``\\mathbf{W}`` is a symmetric matrix variable, ``\\boldsymbol{w}`` is the portfolio weight vector, and ``k`` is the budget scaling variable.
+Where:
+
+  - ``\\mathbf{M}``: Bordered positive semidefinite matrix.
+  - ``\\mathbf{W}``: Symmetric ``N \\times N`` matrix variable.
+  - $(math_dict[:w_port])
+  - $(math_dict[:k_budget])
 
 # Arguments
 

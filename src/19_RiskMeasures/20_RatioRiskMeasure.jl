@@ -8,10 +8,17 @@ Represents a risk ratio risk measure for hierarchical portfolio optimisation.
 # Mathematical definition
 
 ```math
-\\mathrm{RiskRatio}(\\boldsymbol{x}) = \\frac{r_1(\\boldsymbol{x})}{r_2(\\boldsymbol{x})}\\,,
+\\begin{align}
+\\mathrm{RiskRatio}(\\boldsymbol{x}) &= \\frac{r_1(\\boldsymbol{x})}{r_2(\\boldsymbol{x})}\\,.
+\\end{align}
 ```
 
-where ``r_1`` and ``r_2`` are any two optimisation risk measures.
+Where:
+
+  - ``\\mathrm{RiskRatio}(\\boldsymbol{x})``: Risk ratio of the portfolio.
+  - $(math_dict[:xret])
+  - ``r_1``: First (numerator) optimisation risk measure.
+  - ``r_2``: Second (denominator) optimisation risk measure.
 
 # Fields
 
@@ -86,10 +93,17 @@ Represents a non-optimisation risk ratio measure.
 # Mathematical definition
 
 ```math
-\\mathrm{RiskRatio}(\\boldsymbol{x}) = \\frac{r_1(\\boldsymbol{x})}{r_2(\\boldsymbol{x})}\\,,
+\\begin{align}
+\\mathrm{RiskRatio}(\\boldsymbol{x}) &= \\frac{r_1(\\boldsymbol{x})}{r_2(\\boldsymbol{x})}\\,.
+\\end{align}
 ```
 
-where ``r_1`` and ``r_2`` are any two base risk measures.
+Where:
+
+  - ``\\mathrm{RiskRatio}(\\boldsymbol{x})``: Risk ratio of the portfolio.
+  - $(math_dict[:xret])
+  - ``r_1``: First (numerator) base risk measure.
+  - ``r_2``: Second (denominator) base risk measure.
 
 # Fields
 

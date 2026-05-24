@@ -73,10 +73,17 @@ This method computes the pairwise Kendall's tau rank correlation matrix for the 
 For two asset return series ``(x_1, \\ldots, x_T)`` and ``(y_1, \\ldots, y_T)``, Kendall's ``\\tau`` is:
 
 ```math
-\\hat{\\tau}_{ij} = \\frac{C - D}{\\binom{T}{2}}
+\\begin{align}
+\\hat{\\tau}_{ij} &= \\frac{C - D}{\\binom{T}{2}}\\,.
+\\end{align}
 ```
 
-where ``C`` is the number of concordant pairs and ``D`` is the number of discordant pairs among all ``\\binom{T}{2}`` pairs of observations. A pair ``(t, s)`` is concordant if ``(x_t - x_s)(y_t - y_s) > 0`` and discordant if ``(x_t - x_s)(y_t - y_s) < 0``.
+Where:
+
+  - ``\\hat{\\tau}_{ij}``: Kendall's ``\\tau`` rank correlation between assets ``i`` and ``j``.
+  - ``C``: Number of concordant pairs; a pair ``(t, s)`` is concordant if ``(x_t - x_s)(y_t - y_s) > 0``.
+  - ``D``: Number of discordant pairs; a pair ``(t, s)`` is discordant if ``(x_t - x_s)(y_t - y_s) < 0``.
+  - $(math_dict[:T])
 
 # Arguments
 
@@ -202,10 +209,18 @@ This method computes the pairwise Spearman's rho rank correlation matrix for the
 Spearman's ``\\rho`` is the Pearson correlation of the rank-transformed data. Let ``\\mathrm{rk}(x_t)`` denote the rank of observation ``x_t`` among ``x_1, \\ldots, x_T``:
 
 ```math
-\\hat{\\rho}^S_{ij} = 1 - \\frac{6 \\sum_{t=1}^{T} d_t^2}{T(T^2 - 1)}, \\quad d_t = \\mathrm{rk}(x_{ti}) - \\mathrm{rk}(x_{tj})
+\\begin{align}
+\\hat{\\rho}^S_{ij} &= 1 - \\frac{6 \\sum_{t=1}^{T} d_t^2}{T(T^2 - 1)}, \\quad d_t = \\mathrm{rk}(x_{ti}) - \\mathrm{rk}(x_{tj})\\,.
+\\end{align}
 ```
 
-Where ``T`` is the number of observations, ``x_{ti}`` is the return of asset ``i`` at time ``t``, and ``d_t`` is the difference of ranks at time ``t``.
+Where:
+
+  - ``\\hat{\\rho}^S_{ij}``: Spearman's ``\\rho`` rank correlation between assets ``i`` and ``j``.
+  - $(math_dict[:T])
+  - ``x_{ti}``: Return of asset ``i`` at time ``t``.
+  - ``d_t``: Difference in ranks between assets ``i`` and ``j`` at time ``t``.
+  - ``\\mathrm{rk}(\\cdot)``: Rank function.
 
 # Arguments
 

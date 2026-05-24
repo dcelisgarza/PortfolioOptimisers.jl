@@ -8,11 +8,20 @@ The fall-through method does nothing. The concrete method introduces an auxiliar
 # Mathematical definition
 
 ```math
-\\mathrm{nea} \\geq \\|\\boldsymbol{w}\\|_2, \\qquad \\mathrm{nea} \\cdot \\sqrt{\\mathrm{val}} \\leq k
-\\quad \\Leftrightarrow \\quad \\mathrm{ENA}(\\boldsymbol{w}) = \\frac{1}{\\|\\boldsymbol{w}\\|_2^2} \\geq \\mathrm{val}
+\\begin{align}
+\\mathrm{nea} \\geq \\|\\boldsymbol{w}\\|_2\\,, \\\\
+\\mathrm{nea} \\cdot \\sqrt{\\mathrm{val}} \\leq k
+\\quad \\Leftrightarrow \\quad \\mathrm{ENA}(\\boldsymbol{w}) &= \\frac{1}{\\|\\boldsymbol{w}\\|_2^2} \\geq \\mathrm{val}\\,.
+\\end{align}
 ```
 
-where ``\\mathrm{ENA}(\\boldsymbol{w})`` is the effective number of assets, ``k`` is the budget scaling variable, and `val` is the minimum required effective number of assets.
+Where:
+
+  - ``\\mathrm{nea}``: Auxiliary variable upper-bounding ``\\|\\boldsymbol{w}\\|_2``.
+  - $(math_dict[:w_port])
+  - $(math_dict[:k_budget])
+  - ``\\mathrm{ENA}(\\boldsymbol{w})``: Effective number of assets.
+  - ``\\mathrm{val}``: Minimum required effective number of assets.
 
 # Arguments
 

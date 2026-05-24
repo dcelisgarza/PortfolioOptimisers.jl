@@ -431,11 +431,18 @@ Convert price data (and optionally factor data) in `TimeSeries.TimeArray` format
 Returns are computed from prices ``P_{t,i}`` as:
 
 ```math
-r_{t,i} = \\begin{cases}
+\\begin{align}
+r_{t,i} &= \\begin{cases}
 (P_{t,i} - P_{t-1,i}) / P_{t-1,i} & \\text{simple} \\\\
 \\ln(P_{t,i} / P_{t-1,i}) & \\text{log}
-\\end{cases}
+\\end{cases}\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``r_{t,i}``: Return of asset ``i`` at time ``t``.
+  - ``P_{t,i}``: Price of asset ``i`` at time ``t``.
 
 If a benchmark ``B_{t,i}`` is provided, excess returns are used: ``\\tilde{r}_{t,i} = r_{t,i} - b_{t,i}``.
 

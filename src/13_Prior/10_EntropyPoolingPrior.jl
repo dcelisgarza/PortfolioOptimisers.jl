@@ -1084,14 +1084,27 @@ Solve the dual of the exponential entropy pooling formulation using Optim.jl.
 The dual of the entropy pooling KL divergence problem is solved for Lagrange multipliers ``\\boldsymbol{x}``. The dual objective (for `ExpEntropyPooling`) is:
 
 ```math
-\\min_{\\boldsymbol{x}} \\; \\boldsymbol{x}^\\intercal \\boldsymbol{b} + \\sum_{t=1}^{T} q_t \\exp\\!\\left(-\\boldsymbol{x}^\\intercal \\mathbf{A}_{\\cdot t} - 1\\right)
+\\begin{align}
+\\underset{\\boldsymbol{x}}{\\min} &\\; \\boldsymbol{x}^\\intercal \\boldsymbol{b} + \\sum_{t=1}^{T} q_t \\exp\\!\\left(-\\boldsymbol{x}^\\intercal \\mathbf{A}_{\\cdot t} - 1\\right)\\,.
+\\end{align}
 ```
 
 The optimal posterior weights recover as:
 
 ```math
-p_t^* = q_t \\exp\\!\\left(-\\boldsymbol{x}^{*\\intercal} \\mathbf{A}_{\\cdot t} - 1\\right)
+\\begin{align}
+p_t^* &= q_t \\exp\\!\\left(-\\boldsymbol{x}^{*\\intercal} \\mathbf{A}_{\\cdot t} - 1\\right)\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``\\boldsymbol{x}``: Lagrange multipliers (dual variables).
+  - ``\\boldsymbol{b}``: Right-hand side constraint vector.
+  - ``\\mathbf{A}_{\\cdot t}``: ``t``-th column of the constraint matrix ``\\mathbf{A}``.
+  - ``q_t``: Prior weight for scenario ``t``.
+  - ``p_t^*``: Optimal posterior weight for scenario ``t``.
+  - $(math_dict[:T])
 
 # Arguments
 
@@ -2085,8 +2098,18 @@ Compute entropy pooling prior moments for asset returns with iterative constrain
 Entropy pooling finds posterior weights ``\\boldsymbol{p}`` by minimising the Kullback-Leibler divergence from the prior ``\\boldsymbol{q}``:
 
 ```math
-\\min_{\\boldsymbol{p}} \\sum_{t=1}^{T} p_t \\ln\\!\\frac{p_t}{q_t} \\quad \\text{s.t.} \\quad \\mathbf{A}_{\\mathrm{eq}} \\boldsymbol{p} = \\boldsymbol{b}_{\\mathrm{eq}}, \\quad \\mathbf{A}_{\\mathrm{ineq}} \\boldsymbol{p} \\leq \\boldsymbol{b}_{\\mathrm{ineq}}, \\quad \\boldsymbol{p} \\geq \\boldsymbol{0}, \\quad \\boldsymbol{1}^\\intercal \\boldsymbol{p} = 1
+\\begin{align}
+\\underset{\\boldsymbol{p}}{\\min} &\\sum_{t=1}^{T} p_t \\ln\\!\\frac{p_t}{q_t} \\quad \\text{s.t.} \\quad \\mathbf{A}_{\\mathrm{eq}} \\boldsymbol{p} = \\boldsymbol{b}_{\\mathrm{eq}}, \\quad \\mathbf{A}_{\\mathrm{ineq}} \\boldsymbol{p} \\leq \\boldsymbol{b}_{\\mathrm{ineq}}, \\quad \\boldsymbol{p} \\geq \\boldsymbol{0}, \\quad \\boldsymbol{1}^\\intercal \\boldsymbol{p} = 1\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``\\boldsymbol{p}``: ``T \\times 1`` posterior weight vector.
+  - ``\\boldsymbol{q}``: ``T \\times 1`` prior weight vector.
+  - ``\\mathbf{A}_{\\mathrm{eq}}``, ``\\boldsymbol{b}_{\\mathrm{eq}}``: Equality constraint matrix and vector.
+  - ``\\mathbf{A}_{\\mathrm{ineq}}``, ``\\boldsymbol{b}_{\\mathrm{ineq}}``: Inequality constraint matrix and vector.
+  - $(math_dict[:T])
 
 Posterior moments are then computed as probability-weighted sample statistics using ``\\boldsymbol{p}^*``.
 
@@ -2226,8 +2249,18 @@ Compute entropy pooling prior moments for asset returns with single-shot constra
 Entropy pooling finds posterior weights ``\\boldsymbol{p}`` by minimising the Kullback-Leibler divergence from the prior ``\\boldsymbol{q}`` subject to all constraints simultaneously:
 
 ```math
-\\min_{\\boldsymbol{p}} \\sum_{t=1}^{T} p_t \\ln\\!\\frac{p_t}{q_t} \\quad \\text{s.t.} \\quad \\mathbf{A}_{\\mathrm{eq}} \\boldsymbol{p} = \\boldsymbol{b}_{\\mathrm{eq}}, \\quad \\mathbf{A}_{\\mathrm{ineq}} \\boldsymbol{p} \\leq \\boldsymbol{b}_{\\mathrm{ineq}}, \\quad \\boldsymbol{p} \\geq \\boldsymbol{0}, \\quad \\boldsymbol{1}^\\intercal \\boldsymbol{p} = 1
+\\begin{align}
+\\underset{\\boldsymbol{p}}{\\min} &\\sum_{t=1}^{T} p_t \\ln\\!\\frac{p_t}{q_t} \\quad \\text{s.t.} \\quad \\mathbf{A}_{\\mathrm{eq}} \\boldsymbol{p} = \\boldsymbol{b}_{\\mathrm{eq}}, \\quad \\mathbf{A}_{\\mathrm{ineq}} \\boldsymbol{p} \\leq \\boldsymbol{b}_{\\mathrm{ineq}}, \\quad \\boldsymbol{p} \\geq \\boldsymbol{0}, \\quad \\boldsymbol{1}^\\intercal \\boldsymbol{p} = 1\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``\\boldsymbol{p}``: ``T \\times 1`` posterior weight vector.
+  - ``\\boldsymbol{q}``: ``T \\times 1`` prior weight vector.
+  - ``\\mathbf{A}_{\\mathrm{eq}}``, ``\\boldsymbol{b}_{\\mathrm{eq}}``: Equality constraint matrix and vector.
+  - ``\\mathbf{A}_{\\mathrm{ineq}}``, ``\\boldsymbol{b}_{\\mathrm{ineq}}``: Inequality constraint matrix and vector.
+  - $(math_dict[:T])
 
 # Arguments
 

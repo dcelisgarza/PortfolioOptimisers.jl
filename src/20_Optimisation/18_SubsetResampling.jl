@@ -83,10 +83,19 @@ Keywords correspond to the struct's fields.
 Draw ``M`` random subsets ``S_1, \\ldots, S_M`` of assets (size ``\\lfloor s \\cdot N \\rfloor``). Optimise on each:
 
 ```math
-\\boldsymbol{w}^* = \\frac{1}{M} \\sum_{m=1}^{M} \\boldsymbol{e}_{S_m}(\\boldsymbol{w}_{S_m})
+\\begin{align}
+\\boldsymbol{w}^* &= \\frac{1}{M} \\sum_{m=1}^{M} \\boldsymbol{e}_{S_m}(\\boldsymbol{w}_{S_m})\\,.
+\\end{align}
 ```
 
-where ``\\boldsymbol{e}_{S_m}`` embeds the subset weights back into the full ``N``-asset space (zero-filling excluded assets).
+Where:
+
+  - ``\\boldsymbol{w}^*``: Final averaged portfolio weights.
+  - ``M``: Number of random subsets.
+  - ``S_m``: ``m``-th randomly drawn asset subset (size ``\\lfloor s \\cdot N \\rfloor``).
+  - ``\\boldsymbol{w}_{S_m}``: Optimal weights from the optimiser applied to subset ``S_m``.
+  - ``\\boldsymbol{e}_{S_m}(\\cdot)``: Embedding operator that places subset weights into full ``N``-asset space (zero-filling excluded assets).
+  - ``N``: Total number of assets.
 
 # Related
 

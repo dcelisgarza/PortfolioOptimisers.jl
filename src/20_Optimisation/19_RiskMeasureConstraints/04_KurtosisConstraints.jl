@@ -169,8 +169,20 @@ estimation requires a high-order prior.
 # Mathematical definition
 
 ```math
-\\sqrt{\\mathrm{Kurt}(\\boldsymbol{w})} = \\|\\mathbf{G}_{kt}(\\boldsymbol{w} \\otimes \\boldsymbol{w})\\|_2, \\qquad \\mathbf{G}_{kt} = \\mathrm{chol}(\\mathbf{S}_2 \\mathbf{K} \\mathbf{S}_2^\\intercal)
+\\begin{align}
+\\sqrt{\\mathrm{Kurt}(\\boldsymbol{w})} &= \\|\\mathbf{G}_{kt}(\\boldsymbol{w} \\otimes \\boldsymbol{w})\\|_2\\,, \\\\
+\\mathbf{G}_{kt} &= \\mathrm{chol}(\\mathbf{S}_2 \\mathbf{K} \\mathbf{S}_2^\\intercal)\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``\\mathrm{Kurt}(\\boldsymbol{w})``: Portfolio kurtosis risk measure.
+  - ``\\mathbf{G}_{kt}``: Cholesky factor of the projected co-kurtosis matrix.
+  - ``\\mathbf{K}``: Co-kurtosis matrix.
+  - ``\\mathbf{S}_2``: Duplication matrix.
+  - $(math_dict[:w_port])
+  - ``\\otimes``: Kronecker product.
 
 where ``\\mathbf{K}`` is the co-kurtosis matrix and ``\\mathbf{S}_2`` is the duplication matrix.
 

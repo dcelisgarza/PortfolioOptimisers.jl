@@ -11,8 +11,17 @@ existing expression if already present.
 # Mathematical definition
 
 ```math
-\\mathrm{Range}(\\boldsymbol{w}) = \\max_t(-\\hat{r}_t) - \\min_t(-\\hat{r}_t) = \\mathrm{WR} - \\mathrm{BR}
+\\begin{align}
+\\mathrm{Range}(\\boldsymbol{w}) &= \\max_t(-\\hat{r}_t) - \\min_t(-\\hat{r}_t) = \\mathrm{WR} - \\mathrm{BR}\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``\\mathrm{Range}(\\boldsymbol{w})``: Return range.
+  - ``\\mathrm{WR} = -\\min_t \\hat{r}_t``: Worst realisation.
+  - ``\\mathrm{BR} = \\max_t \\hat{r}_t``: Best realisation.
+  - ``\\hat{r}_t = \\boldsymbol{x}_t^\\intercal \\boldsymbol{w}``: Portfolio return at time ``t``.
 
 where ``\\mathrm{WR} = -\\min_t \\hat{r}_t`` and ``\\mathrm{BR} = -\\max_t \\hat{r}_t``.
 

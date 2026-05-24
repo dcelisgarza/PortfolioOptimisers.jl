@@ -354,14 +354,27 @@ Let ``\\boldsymbol{\\alpha}`` be the opinion probabilities and ``\\mathbf{P}`` t
 Linear (weighted arithmetic mean):
 
 ```math
-\\boldsymbol{p}^* = \\mathbf{P} \\boldsymbol{\\alpha}
+\\begin{align}
+\\boldsymbol{p}^* &= \\mathbf{P} \\boldsymbol{\\alpha}\\,.
+\\end{align}
 ```
 
 Logarithmic (weighted geometric mean, normalised):
 
 ```math
-\\log p_t^* \\propto \\sum_{k=1}^{K} \\alpha_k \\log p_{tk}, \\qquad p_t^* = \\frac{\\exp\\!\\left(\\sum_k \\alpha_k \\log p_{tk}\\right)}{\\sum_{s} \\exp\\!\\left(\\sum_k \\alpha_k \\log p_{sk}\\right)}
+\\begin{align}
+\\log p_t^* \\propto \\sum_{k&=1}^{K} \\alpha_k \\log p_{tk}\\,, \\\\
+p_t^* &= \\frac{\\exp\\!\\left(\\sum_k \\alpha_k \\log p_{tk}\\right)}{\\sum_{s} \\exp\\!\\left(\\sum_k \\alpha_k \\log p_{sk}\\right)}\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``\\boldsymbol{p}^*``: ``T \\times 1`` pooled posterior weight vector.
+  - ``\\mathbf{P}``: ``T \\times K`` matrix of scenario weights for ``K`` experts.
+  - ``\\boldsymbol{\\alpha}``: ``K \\times 1`` opinion probability vector (weights summing to 1).
+  - ``p_{tk}``: Scenario weight for scenario ``t`` from expert ``k``.
+  - $(math_dict[:T])
 
 # Related
 

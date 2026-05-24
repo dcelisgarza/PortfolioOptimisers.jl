@@ -164,7 +164,9 @@ MeanRisk
 The general mean-risk optimisation problem is:
 
 ```math
-\\min_{\\boldsymbol{w} \\in \\mathcal{W}} \\; f(\\boldsymbol{w}) \\quad \\text{s.t. constraints}
+\\begin{align}
+\\underset{\\boldsymbol{w}}{\\min} \\; f(\\boldsymbol{w}) \\quad \\text{s.t.} \\quad \\boldsymbol{w} \\in \\mathcal{W}\\,.
+\\end{align}
 ```
 
 Objective ``f`` depends on [`ObjectiveFunction`](@ref):
@@ -174,7 +176,15 @@ Objective ``f`` depends on [`ObjectiveFunction`](@ref):
   - [`MaximumUtility`](@ref): ``f(\\boldsymbol{w}) = -\\hat{\\boldsymbol{\\mu}}^\\intercal \\boldsymbol{w} + \\lambda \\rho(\\boldsymbol{w})``
   - [`MaximumRatio`](@ref) (Sharpe): ``f(\\boldsymbol{w}) = -(\\hat{\\boldsymbol{\\mu}}^\\intercal \\boldsymbol{w} - r_f) / \\rho(\\boldsymbol{w})``
 
-where ``\\rho(\\boldsymbol{w})`` is the portfolio risk measure and ``\\mathcal{W}`` is the feasible weight set.
+Where:
+
+  - ``\\boldsymbol{w}``: Portfolio weight vector.
+  - ``\\mathcal{W}``: Feasible weight set defined by portfolio constraints.
+  - ``f(\\boldsymbol{w})``: Objective function (depends on [`ObjectiveFunction`](@ref)).
+  - ``\\rho(\\boldsymbol{w})``: Portfolio risk measure.
+  - ``\\hat{\\boldsymbol{\\mu}}``: Estimated expected return vector.
+  - ``\\lambda``: Risk aversion parameter.
+  - ``r_f``: Risk-free rate.
 
 # Related
 

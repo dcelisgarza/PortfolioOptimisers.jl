@@ -54,11 +54,12 @@ $(DocStringExtensions.TYPEDEF)
 
 `LinearConstraint` holds both the inequality and equality constraints for a portfolio optimisation problem, each represented by a [`PartialLinearConstraint`](@ref).
 
+# Mathematical definition
+
 ```math
 \\begin{align}
   \\mathbf{A}_\\text{ineq} \\boldsymbol{x} &\\leq \\boldsymbol{B}_\\text{ineq} \\\\
-  \\mathbf{A}_\\text{eq} \\boldsymbol{x} &= \\boldsymbol{B}_\\text{eq}
-
+  \\mathbf{A}_\\text{eq} \\boldsymbol{x} &= \\boldsymbol{B}_\\text{eq}\\,.
 \\end{align}
 ```
 

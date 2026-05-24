@@ -128,6 +128,25 @@ In-place removal of the top `n` principal components (market modes) from a covar
 
 For matrices without unit diagonal, the function converts them into correlation matrices i.e. matrices with unit diagonal, applies the algorithm, and rescales them back.
 
+# Mathematical definition
+
+The detoned matrix removes the ``n`` largest eigenmodes:
+
+```math
+\\begin{align}
+\\tilde{\\mathbf{X}} &= \\mathbf{X} - \\sum_{k=N-n+1}^{N} \\lambda_k \\boldsymbol{v}_k \\boldsymbol{v}_k^\\intercal\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\tilde{\\mathbf{X}}``: Detoned matrix.
+  - ``\\mathbf{X}``: Original correlation or covariance matrix.
+  - ``\\lambda_k``: ``k``-th largest eigenvalue of ``\\mathbf{X}``.
+  - ``\\boldsymbol{v}_k``: ``k``-th largest eigenvector of ``\\mathbf{X}``.
+  - ``n``: Number of eigenmodes (market modes) to remove.
+  - $(math_dict[:N])
+
 # Arguments
 
   - $(arg_dict[:odt])
@@ -151,15 +170,6 @@ For matrices without unit diagonal, the function converts them into correlation 
   - If `X` is not a correlation matrix, it is converted to one before applying the algorithm.
   - Performs an eigenvector decomposition of `X`.
   - Removes the top `n` principal components (market modes) from the eigenvalues and eigenvectors of `X`.
-
-The detoned matrix removes the ``n`` largest eigenmodes:
-
-```math
-\\tilde{\\mathbf{X}} = \\mathbf{X} - \\sum_{k=N-n+1}^{N} \\lambda_k \\boldsymbol{v}_k \\boldsymbol{v}_k^\\intercal
-```
-
-where ``\\lambda_k`` and ``\\boldsymbol{v}_k`` are the ``k``-th (largest) eigenvalue and eigenvector of ``\\mathbf{X}``.
-
   - Reconstructs the correlation matrix `X` in-place from the modified eigenvalues `vals` and eigenvectors `vecs`.
   - If `X` was not originally a correlation matrix, it is converted back.
   - Returns `X`.

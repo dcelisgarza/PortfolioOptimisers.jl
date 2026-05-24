@@ -66,16 +66,31 @@ Factor Risk Contribution (FRC) portfolio optimiser.
 Factor model:
 
 ```math
-\\boldsymbol{r}_i = \\alpha_i + \\mathbf{F} \\boldsymbol{\\beta}_i + \\boldsymbol{\\varepsilon}_i
+\\begin{align}
+\\boldsymbol{r}_i &= \\alpha_i + \\mathbf{F} \\boldsymbol{\\beta}_i + \\boldsymbol{\\varepsilon}_i\\,.
+\\end{align}
 ```
 
 Factor risk contribution for factor ``k``:
 
 ```math
-RC_k = \\beta_{k,\\boldsymbol{w}} \\cdot \\frac{\\partial \\mathcal{R}(\\boldsymbol{w})}{\\partial \\beta_{k,\\boldsymbol{w}}}, \\qquad \\beta_{k,\\boldsymbol{w}} = \\boldsymbol{w}^\\intercal \\boldsymbol{\\beta}_k
+\\begin{align}
+RC_k &= \\beta_{k,\\boldsymbol{w}} \\cdot \\frac{\\partial \\mathcal{R}(\\boldsymbol{w})}{\\partial \\beta_{k,\\boldsymbol{w}}}\\,, \\\\
+\\beta_{k,\\boldsymbol{w}} &= \\boldsymbol{w}^\\intercal \\boldsymbol{\\beta}_k\\,.
+\\end{align}
 ```
 
-where ``\\mathbf{F}`` is the factor returns matrix, ``\\boldsymbol{\\beta}_i`` are factor loadings for asset ``i``, ``\\mathcal{R}`` is the portfolio risk measure, and ``RC_k`` is the risk contribution of factor ``k``.
+Where:
+
+  - ``\\boldsymbol{r}_i``: Return vector of asset ``i``.
+  - ``\\alpha_i``: Intercept (idiosyncratic return) for asset ``i``.
+  - ``\\mathbf{F}``: Factor returns matrix.
+  - ``\\boldsymbol{\\beta}_i``: Factor loading vector for asset ``i``.
+  - ``\\boldsymbol{\\varepsilon}_i``: Idiosyncratic residual for asset ``i``.
+  - ``RC_k``: Risk contribution of factor ``k``.
+  - ``\\beta_{k,\\boldsymbol{w}}``: Portfolio-level exposure to factor ``k``.
+  - ``\\mathcal{R}(\\boldsymbol{w})``: Portfolio risk measure.
+  - ``\\boldsymbol{w}``: Portfolio weight vector.
 
 # Fields
 

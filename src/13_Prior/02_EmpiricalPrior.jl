@@ -100,10 +100,18 @@ Compute empirical prior moments for asset returns (no horizon adjustment).
 The empirical prior directly estimates first and second moments from the sample:
 
 ```math
-\\hat{\\boldsymbol{\\mu}} = \\frac{1}{T} \\sum_{t=1}^{T} \\mathbf{x}_t, \\qquad \\hat{\\mathbf{\\Sigma}} = \\frac{1}{T-1} \\sum_{t=1}^{T} (\\mathbf{x}_t - \\hat{\\boldsymbol{\\mu}})(\\mathbf{x}_t - \\hat{\\boldsymbol{\\mu}})^\\intercal
+\\begin{align}
+\\hat{\\boldsymbol{\\mu}} &= \\frac{1}{T} \\sum_{t=1}^{T} \\boldsymbol{x}_t\\,, \\\\
+\\hat{\\mathbf{\\Sigma}} &= \\frac{1}{T-1} \\sum_{t=1}^{T} (\\boldsymbol{x}_t - \\hat{\\boldsymbol{\\mu}})(\\boldsymbol{x}_t - \\hat{\\boldsymbol{\\mu}})^\\intercal\\,.
+\\end{align}
 ```
 
-Where ``\\mathbf{x}_t`` is the ``N \\times 1`` vector of asset returns at time ``t`` and ``T`` is the number of observations.
+Where:
+
+  - ``\\hat{\\boldsymbol{\\mu}}``: ``N \\times 1`` sample mean vector.
+  - ``\\hat{\\mathbf{\\Sigma}}``: ``N \\times N`` sample covariance matrix.
+  - ``\\boldsymbol{x}_t``: ``N \\times 1`` vector of asset returns at time ``t``.
+  - $(math_dict[:T])
 
 # Arguments
 
@@ -150,14 +158,26 @@ Compute empirical prior moments for asset returns with investment horizon adjust
 Log-returns are computed and scaled by the investment horizon ``h``, then converted back to arithmetic returns:
 
 ```math
-\\tilde{\\boldsymbol{\\mu}} = h \\cdot \\hat{\\boldsymbol{\\mu}}_{\\log}, \\qquad \\tilde{\\mathbf{\\Sigma}} = h \\cdot \\hat{\\mathbf{\\Sigma}}_{\\log}
+\\begin{align}
+\\tilde{\\boldsymbol{\\mu}} &= h \\cdot \\hat{\\boldsymbol{\\mu}}_{\\log}\\,, \\\\
+\\tilde{\\mathbf{\\Sigma}} &= h \\cdot \\hat{\\mathbf{\\Sigma}}_{\\log}\\,.
+\\end{align}
 ```
 
 ```math
-\\hat{\\mu}_i = \\exp\\!\\left(\\tilde{\\mu}_i + \\tfrac{1}{2}\\tilde{\\sigma}_{ii}\\right) - 1, \\qquad \\hat{\\sigma}_{ij} = (\\hat{\\mu}_i + 1)(\\hat{\\mu}_j + 1)\\left(\\exp(\\tilde{\\sigma}_{ij}) - 1\\right)
+\\begin{align}
+\\hat{\\mu}_i &= \\exp\\!\\left(\\tilde{\\mu}_i + \\tfrac{1}{2}\\tilde{\\sigma}_{ii}\\right) - 1\\,, \\\\
+\\hat{\\sigma}_{ij} &= (\\hat{\\mu}_i + 1)(\\hat{\\mu}_j + 1)\\left(\\exp(\\tilde{\\sigma}_{ij}) - 1\\right)\\,.
+\\end{align}
 ```
 
-Where ``\\hat{\\boldsymbol{\\mu}}_{\\log}`` and ``\\hat{\\mathbf{\\Sigma}}_{\\log}`` are the sample mean and covariance of log-returns ``\\log(1 + x_t)``.
+Where:
+
+  - ``\\tilde{\\boldsymbol{\\mu}}``, ``\\tilde{\\mathbf{\\Sigma}}``: Horizon-scaled log-return mean and covariance.
+  - ``h``: Investment horizon.
+  - ``\\hat{\\boldsymbol{\\mu}}_{\\log}``, ``\\hat{\\mathbf{\\Sigma}}_{\\log}``: Sample mean and covariance of log-returns ``\\log(1 + x_t)``.
+  - ``\\hat{\\mu}_i``: Arithmetic mean return for asset ``i``.
+  - ``\\hat{\\sigma}_{ij}``: Arithmetic covariance between assets ``i`` and ``j``.
 
 # Arguments
 

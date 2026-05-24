@@ -38,13 +38,18 @@ $(DocStringExtensions.TYPEDEF)
 
 Simple distance algorithm for portfolio optimization.
 
+# Mathematical definition
+
 ```math
 \\begin{align}
     d_{i,\\,j} &= \\sqrt{\\dfrac{1 - \\rho_{i,\\,j}}{2}}\\,,
 \\end{align}
 ```
 
-where ``d`` is the distance, ``\\rho`` is the correlation coefficient, and each subscript denotes an asset.
+Where:
+
+  - ``d_{i,\\,j}``: Pairwise distance between assets ``i`` and ``j``.
+  - ``\\rho_{i,\\,j}``: Pairwise correlation coefficient between assets ``i`` and ``j``.
 
 # Related
 
@@ -59,13 +64,18 @@ $(DocStringExtensions.TYPEDEF)
 
 Simple absolute distance algorithm for portfolio optimization.
 
+# Mathematical definition
+
 ```math
 \\begin{align}
     d_{i,\\,j} &= \\sqrt{1 - \\lvert\\rho_{i,\\,j}\\rvert}\\,,
 \\end{align}
 ```
 
-where ``d`` is the distance, ``\\rho`` is the correlation coefficient, and each subscript denotes an asset.
+Where:
+
+  - ``d_{i,\\,j}``: Pairwise distance between assets ``i`` and ``j``.
+  - ``\\rho_{i,\\,j}``: Pairwise correlation coefficient between assets ``i`` and ``j``.
 
 # Related
 
@@ -80,13 +90,18 @@ $(DocStringExtensions.TYPEDEF)
 
 Logarithmic distance algorithm for portfolio optimization.
 
+# Mathematical definition
+
 ```math
 \\begin{align}
     d_{i,\\,j} &= -\\log{\\lvert\\rho_{i,\\,j}\\rvert}\\,,
 \\end{align}
 ```
 
-where ``d`` is the distance, ``\\rho`` is the correlation coefficient, and each subscript denotes an asset.
+Where:
+
+  - ``d_{i,\\,j}``: Pairwise distance between assets ``i`` and ``j``.
+  - ``\\rho_{i,\\,j}``: Pairwise correlation coefficient between assets ``i`` and ``j``.
 
 # Related
 
@@ -101,13 +116,18 @@ $(DocStringExtensions.TYPEDEF)
 
 Correlation distance algorithm for portfolio optimization.
 
+# Mathematical definition
+
 ```math
 \\begin{align}
     d_{i,\\,j} &= \\sqrt{1 - \\rho_{i,\\,j}}\\,,
 \\end{align}
 ```
 
-where ``d`` is the distance, ``\\rho`` is the correlation coefficient, and each subscript denotes an asset.
+Where:
+
+  - ``d_{i,\\,j}``: Pairwise distance between assets ``i`` and ``j``.
+  - ``\\rho_{i,\\,j}``: Pairwise correlation coefficient between assets ``i`` and ``j``.
 
 # Related
 

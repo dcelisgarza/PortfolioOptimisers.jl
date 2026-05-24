@@ -13,14 +13,35 @@ constraint. The `DrawdownatRisk` overload applies the MIP approach to the drawdo
 Empirical (MIP) VaR:
 
 ```math
-z_t \\in \\{0,1\\}, \\quad \\sum_t z_t \\leq \\alpha T, \\quad \\mathrm{VaR} \\geq -\\hat{r}_t - b\\,z_t \\quad \\forall\\, t
+\\begin{align}
+z_t &\\in \\{0,1\\}, \\quad \\sum_t z_t \\leq \\alpha T, \\quad \\mathrm{VaR} \\geq -\\hat{r}_t - b\\,z_t \\quad \\forall\\, t\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``z_t \\in \\{0,1\\}``: Binary indicator for tail losses.
+  - $(math_dict[:alpha_rm])
+  - $(math_dict[:T])
+  - ``\\mathrm{VaR}``: Value-at-Risk variable.
+  - ``\\hat{r}_t``: Portfolio return at time ``t``.
+  - ``b``: Big-M constant.
 
 Parametric VaR (Normal/t/Laplace):
 
 ```math
-\\mathrm{VaR}_\\alpha(\\boldsymbol{w}) = -\\boldsymbol{\\mu}^\\intercal \\boldsymbol{w} + z_\\alpha \\|\\mathbf{G}\\boldsymbol{w}\\|_2
+\\begin{align}
+\\mathrm{VaR}_\\alpha(\\boldsymbol{w}) &= -\\boldsymbol{\\mu}^\\intercal \\boldsymbol{w} + z_\\alpha \\|\\mathbf{G}\\boldsymbol{w}\\|_2\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``\\mathrm{VaR}_\\alpha(\\boldsymbol{w})``: Parametric Value-at-Risk.
+  - ``\\boldsymbol{\\mu}``: Expected returns vector.
+  - $(math_dict[:w_port])
+  - ``z_\\alpha``: Distribution quantile at level ``\\alpha``.
+  - ``\\mathbf{G}``: Cholesky factor of the covariance matrix.
 
 where ``z_\\alpha`` is the distribution quantile at level ``\\alpha`` and ``\\mathbf{G}`` is the Cholesky factor of the covariance.
 

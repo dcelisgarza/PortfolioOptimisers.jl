@@ -68,20 +68,30 @@ This method computes the expected returns as the sample mean of the input data `
 Unweighted:
 
 ```math
-\\hat{\\mu}_j = \\frac{1}{T} \\sum_{t=1}^{T} r_{tj}
-```
-
-Weighted:
-
-```math
-\\hat{\\mu}_j = \\frac{\\sum_{t=1}^{T} w_t \\, r_{tj}}{\\sum_{t=1}^{T} w_t}
+\\begin{align}
+\\hat{\\mu}_j &= \\frac{1}{T} \\sum_{t=1}^{T} r_{tj}\\,.
+\\end{align}
 ```
 
 Where:
 
-  - ``\\hat{\\boldsymbol{\\mu}}``: `N × 1` vector of estimated expected returns.
+  - ``\\hat{\\boldsymbol{\\mu}}``: ``N \\times 1`` vector of estimated expected returns.
   - ``r_{tj}``: Return of asset ``j`` at time ``t``.
-  - ``T``: Number of observations.
+  - $(math_dict[:T])
+
+Weighted:
+
+```math
+\\begin{align}
+\\hat{\\mu}_j &= \\frac{\\sum_{t=1}^{T} w_t \\, r_{tj}}{\\sum_{t=1}^{T} w_t}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\hat{\\boldsymbol{\\mu}}``: ``N \\times 1`` vector of estimated expected returns.
+  - ``r_{tj}``: Return of asset ``j`` at time ``t``.
+  - $(math_dict[:T])
   - ``w_t``: Observation weight at time ``t``.
 
 # Arguments

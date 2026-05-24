@@ -51,14 +51,25 @@ Discrete Allocation portfolio optimiser.
 Default (absolute error) MIP formulation:
 
 ```math
-\\begin{aligned}
-\\underset{\\boldsymbol{x} \\in \\mathbb{Z}_{\\geq 0}^N}{\\min} \\quad & u + r \\\\
-\\text{s.t.} \\quad & u \\geq \\|\\boldsymbol{w} C - \\boldsymbol{x} \\odot \\boldsymbol{p}\\|_1 \\\\
-                   & r = C - \\boldsymbol{x}^\\intercal \\boldsymbol{p} \\geq 0
-\\end{aligned}
+\\begin{align}
+\\underset{\\boldsymbol{x} \\in \\mathbb{Z}_{\\geq 0}^N}{\\min} \\quad & u + r\\,, \\\\
+\\text{s.t.} \\quad & u \\geq \\|\\boldsymbol{w} C - \\boldsymbol{x} \\odot \\boldsymbol{p}\\|_1\\,, \\\\
+& r = C - \\boldsymbol{x}^\\intercal \\boldsymbol{p} \\geq 0\\,.
+\\end{align}
 ```
 
-where ``\\boldsymbol{w}`` is the target weight vector, ``\\boldsymbol{p}`` is the asset price vector, ``C`` is available cash, ``\\boldsymbol{x}`` is the integer share vector, ``u`` is the L1 tracking error, and ``r`` is residual cash. The weight finaliser `wf` controls which norm/error is used.
+Where:
+
+  - ``\\boldsymbol{x}``: Integer share vector.
+  - ``u``: L1 tracking error auxiliary variable.
+  - ``r``: Residual cash.
+  - ``\\boldsymbol{w}``: Target weight vector.
+  - ``C``: Available cash.
+  - ``\\boldsymbol{p}``: Asset price vector.
+  - ``\\odot``: Element-wise (Hadamard) product.
+  - ``N``: Number of assets.
+
+The weight finaliser `wf` controls which norm/error is used.
 
 $(DocStringExtensions.FIELDS)
 

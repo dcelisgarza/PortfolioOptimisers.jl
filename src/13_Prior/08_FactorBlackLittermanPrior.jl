@@ -221,14 +221,26 @@ Compute factor Black-Litterman prior moments for asset returns.
 Black-Litterman views are applied directly to the factor space, updating factor moments ``(\\boldsymbol{\\Pi}_f, \\mathbf{\\Sigma}_f)`` via the standard BL equations, then asset posteriors are reconstructed through the loadings matrix:
 
 ```math
-\\hat{\\boldsymbol{\\mu}} = \\mathbf{B} \\hat{\\boldsymbol{\\mu}}_{f,BL} + \\boldsymbol{\\alpha}
+\\begin{align}
+\\hat{\\boldsymbol{\\mu}} &= \\mathbf{B} \\hat{\\boldsymbol{\\mu}}_{f,BL} + \\boldsymbol{\\alpha}\\,.
+\\end{align}
 ```
 
 ```math
-\\hat{\\mathbf{\\Sigma}} = \\mathbf{B} \\hat{\\mathbf{\\Sigma}}_{f,BL} \\mathbf{B}^\\intercal + \\mathbf{\\Sigma}_\\varepsilon
+\\begin{align}
+\\hat{\\mathbf{\\Sigma}} &= \\mathbf{B} \\hat{\\mathbf{\\Sigma}}_{f,BL} \\mathbf{B}^\\intercal + \\mathbf{\\Sigma}_\\varepsilon\\,.
+\\end{align}
 ```
 
-Where ``\\hat{\\boldsymbol{\\mu}}_{f,BL}`` and ``\\hat{\\mathbf{\\Sigma}}_{f,BL}`` are the Black-Litterman posterior factor mean and covariance, ``\\mathbf{B}`` is the ``N \\times K`` factor loadings matrix, and ``\\mathbf{\\Sigma}_\\varepsilon`` is the diagonal residual variance matrix (when `rsd = true`).
+Where:
+
+  - ``\\hat{\\boldsymbol{\\mu}}``: ``N \\times 1`` posterior asset mean vector.
+  - ``\\hat{\\mathbf{\\Sigma}}``: ``N \\times N`` posterior asset covariance matrix.
+  - ``\\hat{\\boldsymbol{\\mu}}_{f,BL}``: ``K \\times 1`` Black-Litterman posterior factor mean.
+  - ``\\hat{\\mathbf{\\Sigma}}_{f,BL}``: ``K \\times K`` Black-Litterman posterior factor covariance.
+  - ``\\mathbf{B}``: ``N \\times K`` factor loadings matrix.
+  - ``\\boldsymbol{\\alpha}``: ``N \\times 1`` regression intercept vector.
+  - ``\\mathbf{\\Sigma}_\\varepsilon``: ``N \\times N`` diagonal residual variance matrix (when `rsd = true`).
 
 # Arguments
 

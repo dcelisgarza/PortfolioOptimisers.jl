@@ -10,8 +10,16 @@ observation. Returns the existing expression if already present.
 # Mathematical definition
 
 ```math
-\\mathrm{MDD}(\\boldsymbol{w}) = \\max_{t=1,\\ldots,T} dd_t
+\\begin{align}
+\\mathrm{MDD}(\\boldsymbol{w}) &= \\max_{t=1,\\ldots,T} dd_t\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``\\mathrm{MDD}(\\boldsymbol{w})``: Maximum drawdown.
+  - $(math_dict[:T])
+  - ``dd_t``: Portfolio drawdown at time ``t``.
 
 where ``dd_t`` is the portfolio drawdown at time ``t``.
 

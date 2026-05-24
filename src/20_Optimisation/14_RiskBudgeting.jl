@@ -335,14 +335,26 @@ Keywords correspond to the struct's fields.
 Risk budgeting allocates weights so that each asset ``i`` contributes a target fraction ``b_i`` of total portfolio risk:
 
 ```math
-w_i \\frac{\\partial \\rho(\\boldsymbol{w})}{\\partial w_i} = b_i \\, \\rho(\\boldsymbol{w}), \\quad \\sum_{i=1}^{N} b_i = 1, \\quad b_i \\geq 0
+\\begin{align}
+w_i \\frac{\\partial \\rho(\\boldsymbol{w})}{\\partial w_i} &= b_i \\, \\rho(\\boldsymbol{w}), \\quad \\sum_{i=1}^{N} b_i = 1, \\quad b_i \\geq 0\\,.
+\\end{align}
 ```
 
 The logarithmic formulation (`LogRiskBudgeting`) solves the equivalent convex problem:
 
 ```math
-\\min_{\\boldsymbol{w}} \\; \\rho(\\boldsymbol{w}) - \\sum_{i=1}^{N} b_i \\ln w_i \\quad \\text{s.t.} \\quad \\boldsymbol{w} > \\boldsymbol{0}
+\\begin{align}
+\\underset{\\boldsymbol{w}}{\\min} \\; \\rho(\\boldsymbol{w}) - \\sum_{i=1}^{N} b_i \\ln w_i \\quad \\text{s.t.} \\quad \\boldsymbol{w} > \\boldsymbol{0}\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``w_i``: Portfolio weight of asset ``i``.
+  - ``\\rho(\\boldsymbol{w})``: Portfolio risk measure.
+  - ``b_i``: Risk budget (target risk fraction) for asset ``i``.
+  - ``N``: Number of assets.
+  - ``\\boldsymbol{w}``: Portfolio weight vector.
 
 # Related
 

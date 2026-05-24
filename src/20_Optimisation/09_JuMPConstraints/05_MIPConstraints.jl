@@ -51,10 +51,16 @@ The fall-through method does nothing when `wb` is `nothing`. The concrete method
 # Mathematical definition
 
 ```math
-\\boldsymbol{i}_s \\odot \\boldsymbol{\\ell} \\leq \\boldsymbol{w} \\leq \\boldsymbol{i}_l \\odot \\boldsymbol{u}
+\\begin{align}
+\\boldsymbol{i}_s \\odot \\boldsymbol{\\ell} \\leq \\boldsymbol{w} \\leq \\boldsymbol{i}_l \\odot \\boldsymbol{u}\\,.
+\\end{align}
 ```
 
-where ``\\boldsymbol{i}_l`` and ``\\boldsymbol{i}_s`` are long and short binary indicator vectors, and ``\\boldsymbol{\\ell}``, ``\\boldsymbol{u}`` are the lower and upper bound vectors from `wb`.
+Where:
+
+  - $(math_dict[:w_port])
+  - ``\\boldsymbol{i}_l``, ``\\boldsymbol{i}_s``: Long and short binary indicator vectors.
+  - ``\\boldsymbol{\\ell}``, ``\\boldsymbol{u}``: Lower and upper bound vectors from `wb`.
 
 # Arguments
 
@@ -102,16 +108,33 @@ Creates `ilb`/`isb` binary indicator variables (or their continuous relaxations 
 Mutual-exclusivity and big-M linearisation:
 
 ```math
-ilb_i + isb_i \\leq 1, \\quad ilf_i = ilb_i \\cdot k, \\quad isf_i = isb_i \\cdot k
+\\begin{align}
+ilb_i + isb_i \\leq 1, \\quad ilf_i &= ilb_i \\cdot k, \\quad isf_i = isb_i \\cdot k\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``ilb_i``, ``isb_i``: Long and short binary indicator variables for asset ``i``.
+  - ``ilf_i``, ``isf_i``: Continuous relaxations of ``ilb_i \\cdot k`` and ``isb_i \\cdot k``.
+  - $(math_dict[:k_budget])
 
 Minimum-holding thresholds:
 
 ```math
-w_i \\geq ilf_i\\, \\ell_i - M(1 - ilb_i), \\qquad w_i \\leq -isf_i\\, u_i + M(1 - isb_i)
+\\begin{align}
+w_i &\\geq ilf_i\\, \\ell_i - M(1 - ilb_i)\\,, \\\\
+w_i &\\leq -isf_i\\, u_i + M(1 - isb_i)\\,.
+\\end{align}
 ```
 
-where ``M`` is the big-M constant, ``\\ell_i`` and ``u_i`` are long and short minimum-holding thresholds.
+Where:
+
+  - ``w_i``: Portfolio weight for asset ``i``.
+  - ``ilf_i``, ``isf_i``: Long and short continuous indicator expressions.
+  - ``ilb_i``, ``isb_i``: Long and short binary indicator variables for asset ``i``.
+  - ``\\ell_i``, ``u_i``: Long and short minimum-holding thresholds for asset ``i``.
+  - ``M``: Big-M constant.
 
 # Arguments
 
@@ -217,16 +240,33 @@ Creates binary variable `ib[i]` per asset indicating whether the asset is held. 
 Big-M linearisation of ``ibf_i = ib_i \\cdot k``:
 
 ```math
-ibf_i \\leq k, \\quad ibf_i \\leq M\\, ib_i, \\quad ibf_i + M(1 - ib_i) \\geq k
+\\begin{align}
+ibf_i &\\leq k, \\quad ibf_i \\leq M\\, ib_i, \\quad ibf_i + M(1 - ib_i) \\geq k\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``ib_i``: Binary inclusion indicator for asset ``i``.
+  - ``ibf_i``: Continuous relaxation of ``ib_i \\cdot k``.
+  - $(math_dict[:k_budget])
+  - ``M``: Big-M constant.
 
 Minimum-holding threshold and cardinality:
 
 ```math
-w_i \\geq ibf_i\\, \\ell_i, \\qquad \\sum_i ib_i \\leq \\mathrm{card}
+\\begin{align}
+w_i &\\geq ibf_i\\, \\ell_i\\,, \\\\
+\\sum_i ib_i &\\leq \\mathrm{card}\\,.
+\\end{align}
 ```
 
-where ``M`` is the big-M constant, ``\\ell_i`` is the minimum holding threshold, and ``\\mathrm{card}`` is the maximum number of non-zero assets.
+Where:
+
+  - ``w_i``: Portfolio weight for asset ``i``.
+  - ``ibf_i``: Continuous relaxation of ``ib_i \\cdot k``.
+  - ``\\ell_i``: Minimum-holding threshold for asset ``i``.
+  - ``\\mathrm{card}``: Maximum number of non-zero assets (cardinality bound).
 
 # Arguments
 

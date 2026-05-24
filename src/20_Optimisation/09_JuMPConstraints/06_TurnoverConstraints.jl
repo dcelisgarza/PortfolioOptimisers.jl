@@ -33,11 +33,19 @@ Introduces auxiliary variable `t_tn_i`, expression `tn_i = w - wb * k`, and enfo
 # Mathematical definition
 
 ```math
-\\boldsymbol{t}_{tn} \\geq |\\boldsymbol{w} - \\boldsymbol{w}_b k|, \\qquad
-\\boldsymbol{t}_{tn} \\leq \\boldsymbol{v} k
+\\begin{align}
+\\boldsymbol{t}_{tn} &\\geq |\\boldsymbol{w} - \\boldsymbol{w}_b k|\\,, \\\\
+\\boldsymbol{t}_{tn} &\\leq \\boldsymbol{v} k\\,.
+\\end{align}
 ```
 
-where ``\\boldsymbol{w}`` is the portfolio weight vector, ``\\boldsymbol{w}_b`` is the benchmark weight vector, ``k`` is a budget scaling variable, and ``\\boldsymbol{v}`` is the per-asset turnover limit vector.
+Where:
+
+  - $(math_dict[:w_port])
+  - ``\\boldsymbol{w}_b``: Benchmark weight vector.
+  - $(math_dict[:k_budget])
+  - ``\\boldsymbol{v}``: Per-asset turnover limit vector.
+  - ``\\boldsymbol{t}_{tn}``: Auxiliary absolute-deviation variable.
 
 # Arguments
 

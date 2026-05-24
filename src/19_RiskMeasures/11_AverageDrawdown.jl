@@ -10,14 +10,31 @@ Represents the Average Drawdown risk measure.
 Define the absolute drawdown series:
 
 ```math
-c_t = \\sum_{s=1}^{t} x_s\\,, \\qquad d_t = c_t - \\max_{0 \\leq s \\leq t} c_s \\leq 0\\,.
+\\begin{align}
+c_t &= \\sum_{s=1}^{t} x_s\\,, \\\\
+d_t &= c_t - \\max_{0 \\leq s \\leq t} c_s \\leq 0\\,.
+\\end{align}
 ```
+
+Where:
+
+  - $(math_dict[:xret])
+  - $(math_dict[:ct])
+  - $(math_dict[:dtdd])
 
 The Average Drawdown is:
 
 ```math
-\\mathrm{ADD}(\\boldsymbol{x}) = -\\frac{1}{T} \\sum_{t=1}^{T} d_t\\,.
+\\begin{align}
+\\mathrm{ADD}(\\boldsymbol{x}) &= -\\frac{1}{T} \\sum_{t=1}^{T} d_t\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``\\mathrm{ADD}(\\boldsymbol{x})``: Average drawdown.
+  - $(math_dict[:T])
+  - $(math_dict[:dtdd])
 
 For observation-weighted samples, the weighted mean is used instead.
 
@@ -99,14 +116,31 @@ Represents the Relative Average Drawdown risk measure for hierarchical optimisat
 Define the compounded wealth process and relative drawdown series:
 
 ```math
-C_t = \\prod_{s=1}^{t} (1 + x_s)\\,, \\qquad rd_t = \\frac{C_t}{\\max_{0 \\leq s \\leq t} C_s} - 1 \\leq 0\\,.
+\\begin{align}
+C_t &= \\prod_{s=1}^{t} (1 + x_s)\\,, \\\\
+rd_t &= \\frac{C_t}{\\max_{0 \\leq s \\leq t} C_s} - 1 \\leq 0\\,.
+\\end{align}
 ```
+
+Where:
+
+  - $(math_dict[:xret])
+  - $(math_dict[:Ct])
+  - $(math_dict[:rdt])
 
 The Relative Average Drawdown is:
 
 ```math
-\\mathrm{RADD}(\\boldsymbol{x}) = -\\frac{1}{T} \\sum_{t=1}^{T} rd_t\\,.
+\\begin{align}
+\\mathrm{RADD}(\\boldsymbol{x}) &= -\\frac{1}{T} \\sum_{t=1}^{T} rd_t\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``\\mathrm{RADD}(\\boldsymbol{x})``: Relative average drawdown.
+  - $(math_dict[:T])
+  - $(math_dict[:rdt])
 
 # Fields
 

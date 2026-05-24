@@ -126,10 +126,20 @@ Keywords correspond to the struct's fields.
 Let ``\\boldsymbol{w}_{\\min}``, ``\\boldsymbol{w}_{\\mathrm{opt}}``, and ``\\boldsymbol{w}_{\\max}`` be the minimum-risk, user-optimal, and maximum-risk portfolios. The NOC solves:
 
 ```math
-\\max_{\\boldsymbol{w} \\in \\mathcal{W}} \\; \\min\\left\\{\\frac{\\boldsymbol{w} - \\boldsymbol{w}_{\\min}}{\\boldsymbol{w}_{\\mathrm{opt}} - \\boldsymbol{w}_{\\min}},\\; \\frac{\\boldsymbol{w}_{\\max} - \\boldsymbol{w}}{\\boldsymbol{w}_{\\max} - \\boldsymbol{w}_{\\mathrm{opt}}}\\right\\}
+\\begin{align}
+\\underset{\\boldsymbol{w}}{\\max} \\; \\min\\left\\{\\frac{\\boldsymbol{w} - \\boldsymbol{w}_{\\min}}{\\boldsymbol{w}_{\\mathrm{opt}} - \\boldsymbol{w}_{\\min}},\\; \\frac{\\boldsymbol{w}_{\\max} - \\boldsymbol{w}}{\\boldsymbol{w}_{\\max} - \\boldsymbol{w}_{\\mathrm{opt}}}\\right\\} \\quad \\text{s.t.} \\quad \\boldsymbol{w} \\in \\mathcal{W}\\,.
+\\end{align}
 ```
 
-yielding a portfolio centrally located within the near-optimal region, robust to small perturbations of the objective.
+Where:
+
+  - ``\\boldsymbol{w}``: Portfolio weight vector.
+  - ``\\mathcal{W}``: Feasible weight set defined by portfolio constraints.
+  - ``\\boldsymbol{w}_{\\min}``: Minimum-risk portfolio weights.
+  - ``\\boldsymbol{w}_{\\mathrm{opt}}``: User-optimal portfolio weights.
+  - ``\\boldsymbol{w}_{\\max}``: Maximum-risk portfolio weights.
+
+The solution yields a portfolio centrally located within the near-optimal region, robust to small perturbations of the objective.
 
 # Related
 

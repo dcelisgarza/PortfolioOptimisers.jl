@@ -54,14 +54,36 @@ multiple variance encodings via [`set_second_moment_risk!`](@ref).
 First lower moment / semi-deviation:
 
 ```math
-\\mathrm{FLM}(\\boldsymbol{w}) = \\frac{1}{T}\\sum_{t=1}^T z_t, \\qquad z_t \\geq \\boldsymbol{\\mu}^\\intercal \\boldsymbol{w} - \\hat{r}_t,\\quad z_t \\geq 0
+\\begin{align}
+\\mathrm{FLM}(\\boldsymbol{w}) &= \\frac{1}{T}\\sum_{t=1}^T z_t\\,, \\\\
+z_t &\\geq \\boldsymbol{\\mu}^\\intercal \\boldsymbol{w} - \\hat{r}_t,\\quad z_t \\geq 0\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``\\mathrm{FLM}(\\boldsymbol{w})``: First lower moment.
+  - $(math_dict[:T])
+  - ``z_t \\geq 0``: Auxiliary variables capturing deviations below the mean.
+  - ``\\boldsymbol{\\mu}``: Expected returns vector.
+  - ``\\hat{r}_t = \\boldsymbol{x}_t^\\intercal \\boldsymbol{w}``: Portfolio return at time ``t``.
 
 Mean absolute deviation:
 
 ```math
-\\mathrm{MAD}(\\boldsymbol{w}) = \\frac{1}{T}\\sum_{t=1}^T z_t, \\qquad z_t \\geq |\\hat{r}_t - \\boldsymbol{\\mu}^\\intercal \\boldsymbol{w}|,\\quad z_t \\geq 0
+\\begin{align}
+\\mathrm{MAD}(\\boldsymbol{w}) &= \\frac{1}{T}\\sum_{t=1}^T z_t\\,, \\\\
+z_t &\\geq |\\hat{r}_t - \\boldsymbol{\\mu}^\\intercal \\boldsymbol{w}|,\\quad z_t \\geq 0\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``\\mathrm{MAD}(\\boldsymbol{w})``: Mean absolute deviation.
+  - $(math_dict[:T])
+  - ``z_t \\geq 0``: Auxiliary variables capturing absolute deviations.
+  - ``\\boldsymbol{\\mu}``: Expected returns vector.
+  - ``\\hat{r}_t = \\boldsymbol{x}_t^\\intercal \\boldsymbol{w}``: Portfolio return at time ``t``.
 
 where ``\\hat{r}_t = \\boldsymbol{x}_t^\\intercal \\boldsymbol{w}`` is the net portfolio return at time ``t``.
 

@@ -10,20 +10,42 @@ Augmented Black-Litterman prior estimator for asset returns.
 Factor model linking assets and factors via regression:
 
 ```math
-\\mathbf{X} \\approx \\mathbf{F}\\mathbf{M}^{\\intercal} + \\mathbf{1}\\boldsymbol{b}^{\\intercal}
+\\begin{align}
+\\mathbf{X} &\\approx \\mathbf{F}\\mathbf{M}^{\\intercal} + \\mathbf{1}\\boldsymbol{b}^{\\intercal}\\,.
+\\end{align}
 ```
 
 Augmented prior moments (stacking asset and factor priors):
 
 ```math
-\\boldsymbol{\\mu}_{aug} = \\begin{pmatrix}\\boldsymbol{\\mu}_a \\\\ \\boldsymbol{\\mu}_f\\end{pmatrix}, \\qquad \\boldsymbol{\\Sigma}_{aug} = \\begin{pmatrix}\\boldsymbol{\\Sigma}_a & \\boldsymbol{\\Sigma}_a\\mathbf{M}^{\\intercal} \\\\ \\mathbf{M}\\boldsymbol{\\Sigma}_a & \\boldsymbol{\\Sigma}_f\\end{pmatrix}
+\\begin{align}
+\\boldsymbol{\\mu}_{aug} &= \\begin{pmatrix}\\boldsymbol{\\mu}_a \\\\ \\boldsymbol{\\mu}_f\\end{pmatrix}\\,, \\\\
+\\boldsymbol{\\Sigma}_{aug} &= \\begin{pmatrix}\\boldsymbol{\\Sigma}_a & \\boldsymbol{\\Sigma}_a\\mathbf{M}^{\\intercal} \\\\ \\mathbf{M}\\boldsymbol{\\Sigma}_a & \\boldsymbol{\\Sigma}_f\\end{pmatrix}\\,.
+\\end{align}
 ```
 
 Black-Litterman posterior on the augmented space with combined views ``(\\mathbf{P}_{aug}, \\boldsymbol{q}_{aug})``:
 
 ```math
-\\boldsymbol{\\mu}_{post} = \\boldsymbol{\\mu}_{aug} + \\tau\\boldsymbol{\\Sigma}_{aug}\\mathbf{P}_{aug}^{\\intercal}\\left(\\tau\\mathbf{P}_{aug}\\boldsymbol{\\Sigma}_{aug}\\mathbf{P}_{aug}^{\\intercal} + \\boldsymbol{\\Omega}_{aug}\\right)^{-1}\\!\\left(\\boldsymbol{q}_{aug} - \\mathbf{P}_{aug}\\boldsymbol{\\mu}_{aug}\\right)
+\\begin{align}
+\\boldsymbol{\\mu}_{post} &= \\boldsymbol{\\mu}_{aug} + \\tau\\boldsymbol{\\Sigma}_{aug}\\mathbf{P}_{aug}^{\\intercal}\\left(\\tau\\mathbf{P}_{aug}\\boldsymbol{\\Sigma}_{aug}\\mathbf{P}_{aug}^{\\intercal} + \\boldsymbol{\\Omega}_{aug}\\right)^{-1}\\!\\left(\\boldsymbol{q}_{aug} - \\mathbf{P}_{aug}\\boldsymbol{\\mu}_{aug}\\right)\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``\\mathbf{X}``: ``T \\times N`` asset returns matrix.
+  - ``\\mathbf{F}``: ``T \\times K`` factor returns matrix.
+  - ``\\mathbf{M}``: ``K \\times N`` factor loadings (regression coefficients).
+  - ``\\boldsymbol{b}``: ``N \\times 1`` regression intercept vector.
+  - ``\\boldsymbol{\\mu}_a``, ``\\boldsymbol{\\Sigma}_a``: Asset prior mean and covariance.
+  - ``\\boldsymbol{\\mu}_f``, ``\\boldsymbol{\\Sigma}_f``: Factor prior mean and covariance.
+  - ``\\boldsymbol{\\mu}_{aug}``, ``\\boldsymbol{\\Sigma}_{aug}``: Augmented (joint asset-factor) prior moments.
+  - ``\\boldsymbol{\\mu}_{post}``: Augmented posterior mean (asset component extracted as final result).
+  - ``\\tau``: Scaling parameter for the prior uncertainty.
+  - ``\\mathbf{P}_{aug}``: Combined asset and factor views matrix.
+  - ``\\boldsymbol{q}_{aug}``: Combined asset and factor views vector.
+  - ``\\boldsymbol{\\Omega}_{aug}``: Combined view uncertainty matrix.
 
 Asset posterior extracted from the augmented result and adjusted for intercept and risk-free rate.
 

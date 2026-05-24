@@ -53,13 +53,19 @@ $(DocStringExtensions.TYPEDEF)
 
 Similarity matrix algorithm using the maximum distance transformation.
 
+# Mathematical definition
+
 ```math
 \\begin{align}
 S_{i,\\,j} &= \\left\\lceil\\max(\\mathbf{D})^2\\right\\rceil - D_{i,\\,j}^2\\,,
 \\end{align}
 ```
 
-where `S` is the similarity, `\\mathbf{D}` the distance matrix, and each subscript denotes an asset.
+Where:
+
+  - ``S_{i,\\,j}``: Similarity between assets ``i`` and ``j``.
+  - ``\\mathbf{D}``: Distance matrix.
+  - ``D_{i,\\,j}``: Distance between assets ``i`` and ``j``.
 
 # Related
 
@@ -74,13 +80,19 @@ $(DocStringExtensions.TYPEDEF)
 
 Similarity matrix algorithm using the exponential transformation.
 
+# Mathematical definition
+
 ```math
 \\begin{align}
 S_{i,\\,j} &= e^{-D_{i,\\,j}}\\,,
 \\end{align}
 ```
 
-where `S` is the similarity, `\\mathbf{D}` the distance matrix, and each subscript denotes an asset.
+Where:
+
+  - ``S_{i,\\,j}``: Similarity between assets ``i`` and ``j``.
+  - ``\\mathbf{D}``: Distance matrix.
+  - ``D_{i,\\,j}``: Distance between assets ``i`` and ``j``.
 
 # Related
 
@@ -95,13 +107,21 @@ $(DocStringExtensions.TYPEDEF)
 
 Similarity matrix algorithm using a generalised exponential transformation.
 
+# Mathematical definition
+
 ```math
 \\begin{align}
 S_{i,\\,j} &= e^{-c \\cdot D_{i,\\,j}^p}\\,,
 \\end{align}
 ```
 
-where `S` is the similarity, `\\mathbf{D}` the distance matrix, ``c`` a scale factor, ``p`` an exponent, and each subscript denotes an asset.
+Where:
+
+  - ``S_{i,\\,j}``: Similarity between assets ``i`` and ``j``.
+  - ``\\mathbf{D}``: Distance matrix.
+  - ``D_{i,\\,j}``: Distance between assets ``i`` and ``j``.
+  - ``c``: Scale factor.
+  - ``p``: Exponent.
 
 # Fields
 

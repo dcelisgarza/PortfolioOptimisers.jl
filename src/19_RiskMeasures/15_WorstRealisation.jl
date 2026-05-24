@@ -8,8 +8,16 @@ Represents the Worst Realisation risk measure.
 # Mathematical definition
 
 ```math
-\\mathrm{WR}(\\boldsymbol{x}) = -\\min_{1 \\leq t \\leq T} x_t\\,.
+\\begin{align}
+\\mathrm{WR}(\\boldsymbol{x}) &= -\\min_{1 \\leq t \\leq T} x_t\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``\\mathrm{WR}(\\boldsymbol{x})``: Worst realisation of portfolio returns.
+  - $(math_dict[:xret])
+  - $(math_dict[:T])
 
 # Fields
 

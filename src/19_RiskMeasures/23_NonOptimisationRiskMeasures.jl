@@ -10,14 +10,30 @@ Represents a simple mean return measure for use in non-optimisation contexts.
 For `flag = false` (arithmetic mean):
 
 ```math
-\\bar{x} = \\frac{1}{T} \\sum_{t=1}^{T} x_t\\,.
+\\begin{align}
+\\bar{x} &= \\frac{1}{T} \\sum_{t=1}^{T} x_t\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``\\bar{x}``: Arithmetic mean portfolio return.
+  - $(math_dict[:xret])
+  - $(math_dict[:T])
 
 For `flag = true` (log-return mean):
 
 ```math
-\\bar{x}_{\\log} = \\frac{1}{T} \\sum_{t=1}^{T} \\log(1 + x_t)\\,.
+\\begin{align}
+\\bar{x}_{\\log} &= \\frac{1}{T} \\sum_{t=1}^{T} \\log(1 + x_t)\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``\\bar{x}_{\\log}``: Log-return mean portfolio return.
+  - $(math_dict[:xret])
+  - $(math_dict[:T])
 
 For observation-weighted samples, the weighted mean is used instead.
 
@@ -98,10 +114,18 @@ Represents a mean return to risk ratio measure.
 # Mathematical definition
 
 ```math
-\\mathrm{MRRR}(\\boldsymbol{x}) = \\frac{\\bar{x} - r_f}{\\rho(\\boldsymbol{x})}\\,,
+\\begin{align}
+\\mathrm{MRRR}(\\boldsymbol{x}) &= \\frac{\\bar{x} - r_f}{\\rho(\\boldsymbol{x})}\\,.
+\\end{align}
 ```
 
-where ``\\bar{x}`` is the mean return (computed by `rt`), ``r_f`` is the risk-free rate, and ``\\rho`` is any base risk measure (computed by `rk`).
+Where:
+
+  - ``\\mathrm{MRRR}(\\boldsymbol{x})``: Mean return to risk ratio.
+  - $(math_dict[:xret])
+  - ``\\bar{x}``: Mean portfolio return (computed by `rt`).
+  - ``r_f``: Risk-free rate.
+  - ``\\rho``: Base risk measure (computed by `rk`).
 
 # Fields
 
@@ -162,8 +186,18 @@ Represents the Third Central Moment risk measure.
 Let ``\\mu`` be the specified centre and ``\\delta_t = x_t - \\mu`` the centred deviations. The third central moment is:
 
 ```math
-m_3(\\boldsymbol{x}) = \\frac{1}{T} \\sum_{t=1}^{T} \\delta_t^3\\,.
+\\begin{align}
+m_3(\\boldsymbol{x}) &= \\frac{1}{T} \\sum_{t=1}^{T} \\delta_t^3\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``m_3(\\boldsymbol{x})``: Third central moment of portfolio returns.
+  - $(math_dict[:xret])
+  - $(math_dict[:T])
+  - ``\\mu``: Specified centre of the distribution.
+  - ``\\delta_t = x_t - \\mu``: Centred deviation at period ``t``.
 
 For observation-weighted samples, the weighted mean is used.
 
@@ -240,8 +274,19 @@ Represents the standardised Skewness risk measure.
 Let ``\\mu`` be the specified centre, ``\\delta_t = x_t - \\mu``, and ``\\sigma`` the standard deviation of returns. The skewness is:
 
 ```math
-\\mathrm{Skew}(\\boldsymbol{x}) = \\frac{1}{T \\sigma^3} \\sum_{t=1}^{T} \\delta_t^3\\,.
+\\begin{align}
+\\mathrm{Skew}(\\boldsymbol{x}) &= \\frac{1}{T \\sigma^3} \\sum_{t=1}^{T} \\delta_t^3\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``\\mathrm{Skew}(\\boldsymbol{x})``: Standardised skewness of portfolio returns.
+  - $(math_dict[:xret])
+  - $(math_dict[:T])
+  - ``\\mu``: Specified centre of the distribution.
+  - ``\\delta_t = x_t - \\mu``: Centred deviation at period ``t``.
+  - ``\\sigma``: Standard deviation of returns.
 
 # Fields
 

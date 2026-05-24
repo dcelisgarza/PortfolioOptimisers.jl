@@ -100,14 +100,17 @@ This method applies the mean estimator to the data and subtracts the risk-free r
 # Mathematical definition
 
 ```math
-\\hat{\\boldsymbol{\\mu}}_{\\text{excess}} = \\hat{\\boldsymbol{\\mu}} - r_f \\boldsymbol{1}
+\\begin{align}
+\\hat{\\boldsymbol{\\mu}}_{\\text{excess}} &= \\hat{\\boldsymbol{\\mu}} - r_f \\boldsymbol{1}\\,.
+\\end{align}
 ```
 
 Where:
 
-  - ``\\hat{\\boldsymbol{\\mu}}``: `N × 1` vector of estimated expected returns.
+  - ``\\hat{\\boldsymbol{\\mu}}_{\\text{excess}}``: ``N \\times 1`` vector of excess expected returns.
+  - ``\\hat{\\boldsymbol{\\mu}}``: ``N \\times 1`` vector of estimated expected returns.
   - ``r_f``: Risk-free rate.
-  - ``\\boldsymbol{1}``: `N × 1` vector of ones.
+  - ``\\boldsymbol{1}``: ``N \\times 1`` vector of ones.
 
 # Arguments
 

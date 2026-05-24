@@ -112,7 +112,9 @@ This method returns the standard deviation vector of `X` as estimated by the cov
 # Mathematical definition
 
 ```math
-\\hat{\\mu}_j = \\hat{\\sigma}_j = \\sqrt{\\frac{1}{T-c} \\sum_{t=1}^{T} w_t (r_{tj} - \\hat{\\mu}_j^{(0)})^2}
+\\begin{align}
+\\hat{\\mu}_j &= \\hat{\\sigma}_j = \\sqrt{\\frac{1}{T-c} \\sum_{t=1}^{T} w_t (r_{tj} - \\hat{\\mu}_j^{(0)})^2}\\,.
+\\end{align}
 ```
 
 Where:

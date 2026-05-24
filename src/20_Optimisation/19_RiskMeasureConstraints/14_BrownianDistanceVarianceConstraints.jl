@@ -12,8 +12,18 @@ and `Dt + Dx`.
 # Mathematical definition
 
 ```math
-D_t(i,j) \\geq |\\hat{r}_i - \\hat{r}_j|, \\qquad \\mathrm{BDV}(\\boldsymbol{w}) = \\frac{1}{T^2}\\sum_{i,j} D_t(i,j)^2 - \\left(\\frac{1}{T^2}\\sum_{i,j} D_t(i,j)\\right)^2
+\\begin{align}
+D_t(i,j) &\\geq |\\hat{r}_i - \\hat{r}_j|\\,, \\\\
+\\mathrm{BDV}(\\boldsymbol{w}) &= \\frac{1}{T^2}\\sum_{i,j} D_t(i,j)^2 - \\left(\\frac{1}{T^2}\\sum_{i,j} D_t(i,j)\\right)^2\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``D_t(i,j)``: Distance auxiliary variable between returns at times ``i`` and ``j``.
+  - ``\\hat{r}_i``, ``\\hat{r}_j``: Portfolio returns at times ``i`` and ``j``.
+  - ``\\mathrm{BDV}(\\boldsymbol{w})``: Brownian distance variance.
+  - $(math_dict[:T])
 
 # Arguments
 

@@ -40,19 +40,32 @@ Greedy Allocation portfolio optimiser.
 # Mathematical definition
 
 ```math
-x_i^{(0)} = \\mathrm{round}\\!\\left(\\frac{w_i C}{p_i \\cdot \\mathrm{unit}}\\right) \\cdot \\mathrm{unit}, \\qquad
-r^{(0)} = C - \\boldsymbol{x}^{(0)\\intercal} \\boldsymbol{p}
+\\begin{align}
+x_i^{(0)} &= \\mathrm{round}\\!\\left(\\frac{w_i C}{p_i \\cdot \\mathrm{unit}}\\right) \\cdot \\mathrm{unit}\\,, \\\\
+r^{(0)} &= C - \\boldsymbol{x}^{(0)\\intercal} \\boldsymbol{p}\\,.
+\\end{align}
 ```
 
 Then iteratively while ``r > 0``:
 
 ```math
-i^* = \\underset{i:\\, p_i \\leq r}{\\arg\\max}\\; w_i, \\qquad
-x_{i^*} \\leftarrow x_{i^*} + \\mathrm{unit}, \\qquad
-r \\leftarrow r - p_{i^*} \\cdot \\mathrm{unit}
+\\begin{align}
+i^* &= \\underset{i:\\, p_i \\leq r}{\\arg\\max}\\; w_i\\,, \\\\
+x_{i^*} &\\leftarrow x_{i^*} + \\mathrm{unit}\\,, \\\\
+r &\\leftarrow r - p_{i^*} \\cdot \\mathrm{unit}\\,.
+\\end{align}
 ```
 
-where ``\\boldsymbol{w}`` is the target weight vector, ``\\boldsymbol{p}`` is the asset price vector, ``C`` is available cash.
+Where:
+
+  - ``x_i^{(0)}``: Initial share allocation for asset ``i``.
+  - ``r^{(0)}``: Residual cash after initial allocation.
+  - ``\\boldsymbol{w}``: Target weight vector.
+  - ``C``: Available cash.
+  - ``\\boldsymbol{p}``: Asset price vector.
+  - ``\\mathrm{unit}``: Minimum share purchase unit.
+  - ``i^*``: Asset with largest weight among those affordable with remaining cash ``r``.
+  - ``\\boldsymbol{x}^{(0)}``: Initial share allocation vector.
 
 $(DocStringExtensions.FIELDS)
 

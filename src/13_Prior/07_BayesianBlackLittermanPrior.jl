@@ -210,14 +210,27 @@ Compute Bayesian Black-Litterman prior moments for asset returns.
 The Bayesian Black-Litterman model updates the prior ``(\\boldsymbol{\\Pi}, \\mathbf{\\Sigma}/T)`` with views:
 
 ```math
-\\hat{\\boldsymbol{\\mu}}_{BBL} = \\boldsymbol{\\Pi} + \\frac{\\mathbf{\\Sigma}}{T} \\mathbf{P}^\\intercal \\left(\\mathbf{P}\\frac{\\mathbf{\\Sigma}}{T}\\mathbf{P}^\\intercal + \\mathbf{\\Omega}\\right)^{-1} (\\boldsymbol{q} - \\mathbf{P}\\boldsymbol{\\Pi})
+\\begin{align}
+\\hat{\\boldsymbol{\\mu}}_{BBL} &= \\boldsymbol{\\Pi} + \\frac{\\mathbf{\\Sigma}}{T} \\mathbf{P}^\\intercal \\left(\\mathbf{P}\\frac{\\mathbf{\\Sigma}}{T}\\mathbf{P}^\\intercal + \\mathbf{\\Omega}\\right)^{-1} (\\boldsymbol{q} - \\mathbf{P}\\boldsymbol{\\Pi})\\,.
+\\end{align}
 ```
 
 ```math
-\\hat{\\mathbf{\\Sigma}}_{BBL} = \\mathbf{\\Sigma} + \\frac{\\mathbf{\\Sigma}}{T} - \\frac{\\mathbf{\\Sigma}}{T} \\mathbf{P}^\\intercal \\left(\\mathbf{P}\\frac{\\mathbf{\\Sigma}}{T}\\mathbf{P}^\\intercal + \\mathbf{\\Omega}\\right)^{-1} \\mathbf{P} \\frac{\\mathbf{\\Sigma}}{T}
+\\begin{align}
+\\hat{\\mathbf{\\Sigma}}_{BBL} &= \\mathbf{\\Sigma} + \\frac{\\mathbf{\\Sigma}}{T} - \\frac{\\mathbf{\\Sigma}}{T} \\mathbf{P}^\\intercal \\left(\\mathbf{P}\\frac{\\mathbf{\\Sigma}}{T}\\mathbf{P}^\\intercal + \\mathbf{\\Omega}\\right)^{-1} \\mathbf{P} \\frac{\\mathbf{\\Sigma}}{T}\\,.
+\\end{align}
 ```
 
-Where ``T`` is the number of observations.
+Where:
+
+  - ``\\hat{\\boldsymbol{\\mu}}_{BBL}``: Bayesian Black-Litterman posterior mean.
+  - ``\\hat{\\mathbf{\\Sigma}}_{BBL}``: Bayesian Black-Litterman posterior covariance.
+  - ``\\boldsymbol{\\Pi}``: ``N \\times 1`` prior expected returns.
+  - ``\\mathbf{\\Sigma}``: ``N \\times N`` prior covariance matrix.
+  - $(math_dict[:T])
+  - ``\\mathbf{P}``: ``K \\times N`` views matrix.
+  - ``\\boldsymbol{q}``: ``K \\times 1`` views vector.
+  - ``\\mathbf{\\Omega}``: ``K \\times K`` view uncertainty matrix.
 
 # Arguments
 

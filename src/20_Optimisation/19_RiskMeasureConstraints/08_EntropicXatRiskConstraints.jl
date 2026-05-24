@@ -13,14 +13,31 @@ lower and upper exponential cone.
 Entropic Value-at-Risk via exponential cone (Ahmadi-Javid 2012):
 
 ```math
-\\mathrm{EVaR}_\\alpha(\\boldsymbol{w}) = t - z \\ln(\\alpha T), \\qquad \\sum_{t=1}^T u_t \\leq z
+\\begin{align}
+\\mathrm{EVaR}_\\alpha(\\boldsymbol{w}) &= t - z \\ln(\\alpha T)\\,, \\\\
+\\sum_{t&=1}^T u_t \\leq z\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``\\mathrm{EVaR}_\\alpha(\\boldsymbol{w})``: Entropic Value-at-Risk.
+  - ``t``, ``z``: Dual variables for the exponential cone programme.
+  - ``u_t``: Auxiliary exponential cone variables.
+  - $(math_dict[:alpha_rm])
+  - $(math_dict[:T])
 
 ```math
-(-\\hat{r}_t - t,\\; z,\\; u_t) \\in \\mathcal{K}_{\\exp} \\quad \\forall\\, t
+\\begin{align}
+(-\\hat{r}_t - t,\\; z,\\; u_t) &\\in \\mathcal{K}_{\\exp} \\quad \\forall\\, t\\,.
+\\end{align}
 ```
 
-where ``\\mathcal{K}_{\\exp} = \\{(a,b,c) : b e^{a/b} \\leq c,\\, b > 0\\}`` is the exponential cone.
+Where:
+
+  - ``\\hat{r}_t``: Portfolio return at time ``t``.
+  - ``\\mathcal{K}_{\\exp} = \\{(a,b,c) : b e^{a/b} \\leq c,\\, b > 0\\}``: Exponential cone.
+  - ``u_t``: Auxiliary exponential cone variables.
 
 # Arguments
 

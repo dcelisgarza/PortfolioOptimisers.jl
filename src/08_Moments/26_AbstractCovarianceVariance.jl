@@ -8,10 +8,16 @@ This method extracts the diagonal of the covariance matrix returned by `Statisti
 # Mathematical definition
 
 ```math
-\\hat{\\sigma}_i^2 = \\hat{\\mathbf{\\Sigma}}_{ii}
+\\begin{align}
+\\hat{\\sigma}_i^2 &= \\hat{\\mathbf{\\Sigma}}_{ii}\\,.
+\\end{align}
 ```
 
-where ``\\hat{\\mathbf{\\Sigma}}`` is the estimated covariance matrix.
+Where:
+
+  - ``\\hat{\\sigma}_i^2``: Variance of asset ``i``.
+  - ``\\hat{\\mathbf{\\Sigma}}``: Estimated covariance matrix.
+  - ``\\hat{\\mathbf{\\Sigma}}_{ii}``: ``i``-th diagonal element of ``\\hat{\\mathbf{\\Sigma}}``.
 
 # Arguments
 
@@ -44,10 +50,16 @@ This method extracts the diagonal of the covariance matrix returned by `Statisti
 # Mathematical definition
 
 ```math
-\\hat{\\sigma}_i = \\sqrt{\\hat{\\mathbf{\\Sigma}}_{ii}}
+\\begin{align}
+\\hat{\\sigma}_i &= \\sqrt{\\hat{\\mathbf{\\Sigma}}_{ii}}\\,.
+\\end{align}
 ```
 
-where ``\\hat{\\mathbf{\\Sigma}}`` is the estimated covariance matrix.
+Where:
+
+  - ``\\hat{\\sigma}_i``: Standard deviation of asset ``i``.
+  - ``\\hat{\\mathbf{\\Sigma}}``: Estimated covariance matrix.
+  - ``\\hat{\\mathbf{\\Sigma}}_{ii}``: ``i``-th diagonal element of ``\\hat{\\mathbf{\\Sigma}}``.
 
 # Arguments
 

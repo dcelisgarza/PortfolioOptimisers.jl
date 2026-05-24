@@ -8,10 +8,20 @@ Container for Black-Litterman investor views in canonical matrix form.
 # Mathematical definition
 
 ```math
-\\mathbf{P}\\,\\boldsymbol{\\mu} = \\boldsymbol{q}, \\qquad \\boldsymbol{\\Omega} = \\mathrm{diag}(\\tau\\,\\mathbf{P}\\boldsymbol{\\Sigma}\\mathbf{P}^{\\intercal})
+\\begin{align}
+\\mathbf{P}\\,\\boldsymbol{\\mu} &= \\boldsymbol{q}\\,, \\\\
+\\boldsymbol{\\Omega} &= \\mathrm{diag}(\\tau\\,\\mathbf{P}\\boldsymbol{\\Sigma}\\mathbf{P}^{\\intercal})\\,.
+\\end{align}
 ```
 
-where ``\\mathbf{P}`` is the ``K \\times N`` views matrix, ``\\boldsymbol{q}`` the ``K``-vector of view expected returns, ``\\boldsymbol{\\mu}`` the prior mean, and ``\\boldsymbol{\\Omega}`` the view uncertainty matrix.
+Where:
+
+  - ``\\mathbf{P}``: ``K \\times N`` views matrix (each row encodes one view).
+  - ``\\boldsymbol{\\mu}``: ``N \\times 1`` prior mean vector.
+  - ``\\boldsymbol{q}``: ``K \\times 1`` vector of view expected returns.
+  - ``\\boldsymbol{\\Omega}``: ``K \\times K`` diagonal view uncertainty matrix.
+  - ``\\tau``: Scaling parameter for the prior covariance.
+  - ``\\mathbf{\\Sigma}``: ``N \\times N`` prior covariance matrix.
 
 # Fields
 

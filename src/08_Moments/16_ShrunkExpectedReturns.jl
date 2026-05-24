@@ -299,30 +299,46 @@ Compute the shrinkage target vector for expected returns estimation.
 **`GrandMean`**: each target element is the grand mean of sample expected returns:
 
 ```math
-b_j = \\bar{\\mu} = \\frac{1}{N} \\sum_{i=1}^{N} \\hat{\\mu}_i, \\quad j = 1, \\ldots, N
-```
-
-Where ``\\hat{\\boldsymbol{\\mu}}`` is the ``N \\times 1`` vector of sample expected returns.
-
-**`VolatilityWeighted`**: each target element is the inverse-covariance-weighted mean:
-
-```math
-b_j = \\bar{\\mu}_{\\text{vol}} = \\frac{\\boldsymbol{1}^\\intercal \\hat{\\mathbf{\\Sigma}}^{-1} \\hat{\\boldsymbol{\\mu}}}{\\boldsymbol{1}^\\intercal \\hat{\\mathbf{\\Sigma}}^{-1} \\boldsymbol{1}}, \\quad j = 1, \\ldots, N
+\\begin{align}
+b_j &= \\bar{\\mu} = \\frac{1}{N} \\sum_{i=1}^{N} \\hat{\\mu}_i, \\quad j = 1, \\ldots, N\\,.
+\\end{align}
 ```
 
 Where:
 
-  - ``\\hat{\\mathbf{\\Sigma}}``: `N × N` sample covariance matrix.
-  - ``\\hat{\\boldsymbol{\\mu}}``: `N × 1` sample expected returns vector.
-  - ``\\boldsymbol{1}``: `N × 1` vector of ones.
+  - ``b_j``: ``j``-th element of the shrinkage target vector.
+  - ``\\hat{\\boldsymbol{\\mu}}``: ``N \\times 1`` vector of sample expected returns.
+  - $(math_dict[:N])
+
+**`VolatilityWeighted`**: each target element is the inverse-covariance-weighted mean:
+
+```math
+\\begin{align}
+b_j &= \\bar{\\mu}_{\\text{vol}} = \\frac{\\boldsymbol{1}^\\intercal \\hat{\\mathbf{\\Sigma}}^{-1} \\hat{\\boldsymbol{\\mu}}}{\\boldsymbol{1}^\\intercal \\hat{\\mathbf{\\Sigma}}^{-1} \\boldsymbol{1}}, \\quad j = 1, \\ldots, N\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``b_j``: ``j``-th element of the shrinkage target vector.
+  - ``\\hat{\\mathbf{\\Sigma}}``: ``N \\times N`` sample covariance matrix.
+  - ``\\hat{\\boldsymbol{\\mu}}``: ``N \\times 1`` sample expected returns vector.
+  - ``\\boldsymbol{1}``: ``N \\times 1`` vector of ones.
 
 **`MeanSquaredError`**: each target element is the scaled matrix trace:
 
 ```math
-b_j = \\frac{\\mathrm{tr}(\\hat{\\mathbf{\\Sigma}})}{T}, \\quad j = 1, \\ldots, N
+\\begin{align}
+b_j &= \\frac{\\mathrm{tr}(\\hat{\\mathbf{\\Sigma}})}{T}, \\quad j = 1, \\ldots, N\\,.
+\\end{align}
 ```
 
-Where ``\\mathrm{tr}(\\cdot)`` is the matrix trace and ``T`` is the number of observations.
+Where:
+
+  - ``b_j``: ``j``-th element of the shrinkage target vector.
+  - ``\\mathrm{tr}(\\cdot)``: Matrix trace operator.
+  - ``\\hat{\\mathbf{\\Sigma}}``: ``N \\times N`` sample covariance matrix.
+  - $(math_dict[:T])
 
 # Arguments
 
@@ -381,23 +397,32 @@ This method applies a shrinkage algorithm to the sample expected returns, pullin
 James-Stein shrinkage of sample expected returns toward target ``\\boldsymbol{b}``:
 
 ```math
-\\hat{\\boldsymbol{\\mu}}_{JS} = (1 - \\alpha)\\, \\hat{\\boldsymbol{\\mu}} + \\alpha\\, \\boldsymbol{b}
-```
-
-where the shrinkage intensity is:
-
-```math
-\\alpha = \\frac{N \\bar{\\lambda} - 2 \\lambda_{\\max}}{T \\, \\lVert \\hat{\\boldsymbol{\\mu}} - \\boldsymbol{b} \\rVert_2^2}
+\\begin{align}
+\\hat{\\boldsymbol{\\mu}}_{JS} &= (1 - \\alpha)\\, \\hat{\\boldsymbol{\\mu}} + \\alpha\\, \\boldsymbol{b}\\,.
+\\end{align}
 ```
 
 Where:
 
-  - ``\\hat{\\boldsymbol{\\mu}}``: `N × 1` sample expected returns.
-  - ``\\boldsymbol{b}``: `N × 1` shrinkage target vector.
+  - ``\\hat{\\boldsymbol{\\mu}}_{JS}``: James-Stein shrunk expected returns.
+  - ``\\hat{\\boldsymbol{\\mu}}``: ``N \\times 1`` sample expected returns.
+  - ``\\boldsymbol{b}``: ``N \\times 1`` shrinkage target vector.
+  - ``\\alpha``: Shrinkage intensity.
+
+The shrinkage intensity is:
+
+```math
+\\begin{align}
+\\alpha &= \\frac{N \\bar{\\lambda} - 2 \\lambda_{\\max}}{T \\, \\lVert \\hat{\\boldsymbol{\\mu}} - \\boldsymbol{b} \\rVert_2^2}\\,.
+\\end{align}
+```
+
+Where:
+
   - ``\\bar{\\lambda}``: Mean eigenvalue of the covariance matrix.
   - ``\\lambda_{\\max}``: Maximum eigenvalue of the covariance matrix.
-  - ``T``: Number of observations.
-  - ``N``: Number of assets.
+  - $(math_dict[:T])
+  - $(math_dict[:N])
 
 # Arguments
 
@@ -468,10 +493,21 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 Bayes-Stein shrinkage intensity:
 
 ```math
-\\alpha = \\frac{N + 2}{(N + 2) + T \\, (\\hat{\\boldsymbol{\\mu}} - \\boldsymbol{b})^\\intercal \\hat{\\mathbf{\\Sigma}}^{-1} (\\hat{\\boldsymbol{\\mu}} - \\boldsymbol{b})}
+\\begin{align}
+\\alpha &= \\frac{N + 2}{(N + 2) + T \\, (\\hat{\\boldsymbol{\\mu}} - \\boldsymbol{b})^\\intercal \\hat{\\mathbf{\\Sigma}}^{-1} (\\hat{\\boldsymbol{\\mu}} - \\boldsymbol{b})}\\,, \\\\
+\\hat{\\boldsymbol{\\mu}}_{BS} &= (1 - \\alpha)\\hat{\\boldsymbol{\\mu}} + \\alpha \\boldsymbol{b}\\,.
+\\end{align}
 ```
 
-Shrunk returns: ``\\hat{\\boldsymbol{\\mu}}_{BS} = (1 - \\alpha)\\hat{\\boldsymbol{\\mu}} + \\alpha \\boldsymbol{b}``.
+Where:
+
+  - ``\\alpha``: Bayes-Stein shrinkage intensity.
+  - ``\\hat{\\boldsymbol{\\mu}}_{BS}``: Bayes-Stein shrunk expected returns.
+  - ``\\hat{\\boldsymbol{\\mu}}``: ``N \\times 1`` sample expected returns.
+  - ``\\boldsymbol{b}``: ``N \\times 1`` shrinkage target vector.
+  - ``\\hat{\\mathbf{\\Sigma}}``: ``N \\times N`` sample covariance matrix.
+  - $(math_dict[:T])
+  - $(math_dict[:N])
 """
 function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:BayesStein}, X::MatNum;
                          dims::Int = 1, kwargs...)
@@ -501,16 +537,42 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 Define scalars:
 
 ```math
-u = \\hat{\\boldsymbol{\\mu}}^\\intercal \\hat{\\mathbf{\\Sigma}}^{-1} \\hat{\\boldsymbol{\\mu}}, \\quad v = \\boldsymbol{b}^\\intercal \\hat{\\mathbf{\\Sigma}}^{-1} \\boldsymbol{b}, \\quad w = \\hat{\\boldsymbol{\\mu}}^\\intercal \\hat{\\mathbf{\\Sigma}}^{-1} \\boldsymbol{b}
+\\begin{align}
+u &= \\hat{\\boldsymbol{\\mu}}^\\intercal \\hat{\\mathbf{\\Sigma}}^{-1} \\hat{\\boldsymbol{\\mu}}\\,, \\\\
+v &= \\boldsymbol{b}^\\intercal \\hat{\\mathbf{\\Sigma}}^{-1} \\boldsymbol{b}\\,, \\\\
+w &= \\hat{\\boldsymbol{\\mu}}^\\intercal \\hat{\\mathbf{\\Sigma}}^{-1} \\boldsymbol{b}\\,.
+\\end{align}
 ```
 
-```math
-\\alpha = \\frac{(u - N/(T-N))v - w^2}{uv - w^2}, \\quad \\beta = \\frac{(1-\\alpha) w}{u}
-```
+Where:
+
+  - ``u``, ``v``, ``w``: Inverse-covariance-weighted quadratic forms.
+  - ``\\hat{\\boldsymbol{\\mu}}``: ``N \\times 1`` sample expected returns.
+  - ``\\boldsymbol{b}``: ``N \\times 1`` shrinkage target vector.
+  - ``\\hat{\\mathbf{\\Sigma}}``: ``N \\times N`` sample covariance matrix.
 
 ```math
-\\hat{\\boldsymbol{\\mu}}_{BOP} = \\alpha \\hat{\\boldsymbol{\\mu}} + \\beta \\boldsymbol{b}
+\\begin{align}
+\\alpha &= \\frac{(u - N/(T-N))v - w^2}{uv - w^2}\\,, \\\\
+\\beta &= \\frac{(1-\\alpha) w}{u}\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``\\alpha``, ``\\beta``: Shrinkage coefficients.
+  - $(math_dict[:T])
+  - $(math_dict[:N])
+
+```math
+\\begin{align}
+\\hat{\\boldsymbol{\\mu}}_{BOP} &= \\alpha \\hat{\\boldsymbol{\\mu}} + \\beta \\boldsymbol{b}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\hat{\\boldsymbol{\\mu}}_{BOP}``: Bodnar-Okhrin-Parolya shrunk expected returns.
 """
 function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:BodnarOkhrinParolya},
                          X::MatNum; dims::Int = 1, kwargs...)

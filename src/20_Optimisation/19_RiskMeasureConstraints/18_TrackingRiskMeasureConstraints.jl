@@ -13,8 +13,19 @@ risk difference via [`set_trdv_risk_constraints!`](@ref).
 # Mathematical definition
 
 ```math
-\\mathrm{TR}_p(\\boldsymbol{w}) = \\frac{\\|\\mathbf{X}\\boldsymbol{w} - \\boldsymbol{b}\\,k\\|_p}{c_p}
+\\begin{align}
+\\mathrm{TR}_p(\\boldsymbol{w}) &= \\frac{\\|\\mathbf{X}\\boldsymbol{w} - \\boldsymbol{b}\\,k\\|_p}{c_p}\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``\\mathrm{TR}_p(\\boldsymbol{w})``: Tracking risk measure.
+  - ``\\mathbf{X}``: Return matrix ``T \\times N``.
+  - $(math_dict[:w_port])
+  - ``\\boldsymbol{b}``: Benchmark return series.
+  - ``k``: Rebalancing factor (0 or 1).
+  - ``c_p``: Normalisation constant depending on the norm order ``p``.
 
 where ``\\boldsymbol{b}`` is the benchmark return series, ``k`` is the budget scaling variable, and ``c_p`` is the norm-order scaling factor (``T``, ``\\sqrt{T-d}``, etc.).
 

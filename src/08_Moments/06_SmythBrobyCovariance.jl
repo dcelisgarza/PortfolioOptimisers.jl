@@ -311,16 +311,27 @@ This function computes the kernel value for a pair of asset returns, applying th
 # Mathematical definition
 
 ```math
-\\kappa(r_i, r_j) = \\sqrt{(1 + |r_i|)(1 + |r_j|)}, \\quad \\gamma(r_i, r_j) = |r_i - r_j|
-```
-
-```math
-\\delta(r_i, r_j, n) = \\frac{\\kappa(r_i, r_j)}{1 + \\gamma(r_i, r_j)^n}
+\\begin{align}
+\\kappa(r_i, r_j) &= \\sqrt{(1 + |r_i|)(1 + |r_j|)}\\,, \\\\
+\\gamma(r_i, r_j) &= |r_i - r_j|\\,.
+\\end{align}
 ```
 
 Where:
 
+  - ``\\kappa(r_i, r_j)``: Amplitude kernel.
+  - ``\\gamma(r_i, r_j)``: Divergence measure between returns.
   - ``r_i, r_j``: Absolute standardised returns for assets ``i`` and ``j``.
+
+```math
+\\begin{align}
+\\delta(r_i, r_j, n) &= \\frac{\\kappa(r_i, r_j)}{1 + \\gamma(r_i, r_j)^n}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\delta(r_i, r_j, n)``: Smyth-Broby kernel value.
   - ``n``: Exponent parameter controlling kernel sharpness.
 
 # Arguments
@@ -361,14 +372,29 @@ This method computes the Smyth-Broby correlation or covariance matrix for the in
 For each pair ``(i, j)`` and observations ``t = 1, \\ldots, T``, classify using thresholds ``c_1 \\sigma_i`` and ``c_2 \\leq |\\tilde{r}_{ti}| \\leq c_3``:
 
 ```math
-\\text{pos} = \\sum_t \\delta(|\\tilde{r}_{ti}|, |\\tilde{r}_{tj}|, n) \\cdot \\mathbf{1}[\\tilde{r}_{ti} \\, \\tilde{r}_{tj} > 0], \\quad \\text{neg} = \\sum_t \\delta(|\\tilde{r}_{ti}|, |\\tilde{r}_{tj}|, n) \\cdot \\mathbf{1}[\\tilde{r}_{ti} \\, \\tilde{r}_{tj} < 0]
+\\begin{align}
+\\text{pos} &= \\sum_t \\delta(|\\tilde{r}_{ti}|, |\\tilde{r}_{tj}|, n) \\cdot \\mathbf{1}[\\tilde{r}_{ti} \\, \\tilde{r}_{tj} > 0], \\quad \\text{neg} = \\sum_t \\delta(|\\tilde{r}_{ti}|, |\\tilde{r}_{tj}|, n) \\cdot \\mathbf{1}[\\tilde{r}_{ti} \\, \\tilde{r}_{tj} < 0]\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``\\text{pos}``, ``\\text{neg}``: Weighted concordant and discordant pair counts.
+  - ``\\tilde{r}_{ti}``: Standardised centered return of asset ``i`` at time ``t``.
+  - ``\\delta(\\cdot)``: Indicator weighting function from the Smyth-Broby template.
+  - ``n``: Smyth-Broby template parameter.
 
 ```math
-\\hat{\\rho}_{ij} = \\frac{\\text{pos} - \\text{neg}}{\\text{pos} + \\text{neg}}
+\\begin{align}
+\\hat{\\rho}_{ij} &= \\frac{\\text{pos} - \\text{neg}}{\\text{pos} + \\text{neg}}\\,.
+\\end{align}
 ```
 
-Where ``\\tilde{r}_{ti} = (x_{ti} - \\mu_i) / \\sigma_i`` are the standardised centered returns.
+Where:
+
+  - ``\\hat{\\rho}_{ij}``: Smyth-Broby correlation between assets ``i`` and ``j``.
+  - ``\\text{pos}``, ``\\text{neg}``: Weighted concordant and discordant pair counts.
+  - ``\\tilde{r}_{ti} = (x_{ti} - \\mu_i) / \\sigma_i``: Standardised centered return of asset ``i`` at time ``t``.
 
 # Arguments
 

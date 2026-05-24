@@ -17,10 +17,22 @@ The collection method iterates over all tracking errors in `tres`.
 # Mathematical definition
 
 ```math
-t_{te} \\geq \\|\\mathbf{X}\\boldsymbol{w} - \\boldsymbol{b} k\\|_p \\cdot c_p^{-1}, \\qquad t_{te} \\leq \\mathrm{err} \\cdot k
+\\begin{align}
+t_{te} &\\geq \\|\\mathbf{X}\\boldsymbol{w} - \\boldsymbol{b} k\\|_p \\cdot c_p^{-1}\\,, \\\\
+t_{te} &\\leq \\mathrm{err} \\cdot k\\,.
+\\end{align}
 ```
 
-where ``\\boldsymbol{b}`` is the benchmark return vector, ``k`` is a budget scaling variable, ``p`` is the norm order, and ``c_p`` is the appropriate scaling factor (``T``, ``\\sqrt{T - d}``, etc.) defined by the tracking formulation.
+Where:
+
+  - ``t_{te}``: Auxiliary tracking error scalar variable.
+  - ``\\mathbf{X}``: Asset returns matrix (``T \\times N``).
+  - $(math_dict[:w_port])
+  - ``\\boldsymbol{b}``: Benchmark return vector.
+  - $(math_dict[:k_budget])
+  - ``p``: Norm order.
+  - ``c_p``: Norm-specific scaling factor (``T``, ``\\sqrt{T - d}``, etc.).
+  - ``\\mathrm{err}``: Tracking error tolerance.
 
 # Arguments
 

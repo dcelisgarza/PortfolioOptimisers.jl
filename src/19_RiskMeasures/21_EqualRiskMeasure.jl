@@ -10,8 +10,16 @@ Represents the Equal Risk Measure for hierarchical portfolio optimisation.
 For a portfolio of ``N`` assets with weights ``\\boldsymbol{w} \\in \\mathbb{R}^N``:
 
 ```math
-\\mathrm{ERC}(\\boldsymbol{w}) = \\frac{1}{N}\\,.
+\\begin{align}
+\\mathrm{ERC}(\\boldsymbol{w}) &= \\frac{1}{N}\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``\\mathrm{ERC}(\\boldsymbol{w})``: Equal risk contribution per asset.
+  - $(math_dict[:w_port])
+  - $(math_dict[:N])
 
 # Fields
 

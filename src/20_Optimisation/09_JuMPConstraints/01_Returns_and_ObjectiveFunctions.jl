@@ -344,13 +344,22 @@ struct MinimumRisk <: ObjectiveFunction end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Objective function that maximises risk-adjusted utility:
+Objective function that maximises risk-adjusted utility.
+
+# Mathematical definition
 
 ```math
-\\max\\; \\boldsymbol{\\mu}^\\intercal \\boldsymbol{w} - \\tfrac{l}{2}\\, R(\\boldsymbol{w})
+\\begin{align}
+\\max\\; \\boldsymbol{\\mu}^\\intercal \\boldsymbol{w} - \\tfrac{l}{2}\\, R(\\boldsymbol{w})\\,.
+\\end{align}
 ```
 
-where ``l`` is the risk-aversion coefficient and ``R`` is the portfolio risk.
+Where:
+
+  - $(math_dict[:mu_er])
+  - $(math_dict[:w_port])
+  - ``l``: Risk-aversion coefficient.
+  - $(math_dict[:R_w])
 
 # Fields
 
@@ -383,13 +392,22 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Objective function that maximises the risk-adjusted Sharpe-type ratio:
+Objective function that maximises the risk-adjusted Sharpe-type ratio.
+
+# Mathematical definition
 
 ```math
-\\max\\; \\frac{\\boldsymbol{\\mu}^\\intercal \\boldsymbol{w} - r_f}{R(\\boldsymbol{w})}
+\\begin{align}
+\\max\\; \\frac{\\boldsymbol{\\mu}^\\intercal \\boldsymbol{w} - r_f}{R(\\boldsymbol{w})}\\,.
+\\end{align}
 ```
 
-where ``r_f`` is the risk-free rate and ``R`` is the portfolio risk.
+Where:
+
+  - $(math_dict[:mu_er])
+  - $(math_dict[:w_port])
+  - ``r_f``: Risk-free rate.
+  - $(math_dict[:R_w])
 
 # Fields
 
@@ -668,16 +686,35 @@ Dispatches based on the uncertainty set type. For `BoxUncertaintySet`, uses a no
 Box uncertainty set (worst-case return):
 
 ```math
-\\hat{r}(\\boldsymbol{w}) = \\boldsymbol{\\mu}^\\intercal \\boldsymbol{w} - \\boldsymbol{\\Delta}^\\intercal |\\boldsymbol{w}|, \\qquad \\boldsymbol{\\Delta} = \\frac{\\boldsymbol{u} - \\boldsymbol{\\ell}}{2}
+\\begin{align}
+\\hat{r}(\\boldsymbol{w}) &= \\boldsymbol{\\mu}^\\intercal \\boldsymbol{w} - \\boldsymbol{\\Delta}^\\intercal |\\boldsymbol{w}|\\,, \\\\
+\\boldsymbol{\\Delta} &= \\frac{\\boldsymbol{u} - \\boldsymbol{\\ell}}{2}\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``\\hat{r}(\\boldsymbol{w})``: Worst-case expected return.
+  - $(math_dict[:mu_er])
+  - $(math_dict[:w_port])
+  - ``\\boldsymbol{\\Delta}``: Half-width of the box uncertainty set.
+  - ``\\boldsymbol{\\ell}``, ``\\boldsymbol{u}``: Lower and upper bounds of the box uncertainty set.
 
 Ellipsoidal uncertainty set (worst-case return):
 
 ```math
-\\hat{r}(\\boldsymbol{w}) = \\boldsymbol{\\mu}^\\intercal \\boldsymbol{w} - \\kappa \\|\\mathbf{G}\\boldsymbol{w}\\|_2
+\\begin{align}
+\\hat{r}(\\boldsymbol{w}) &= \\boldsymbol{\\mu}^\\intercal \\boldsymbol{w} - \\kappa \\|\\mathbf{G}\\boldsymbol{w}\\|_2\\,.
+\\end{align}
 ```
 
-where ``\\boldsymbol{\\ell}``, ``\\boldsymbol{u}`` are the box uncertainty bounds, ``\\kappa`` is the ellipsoidal radius, and ``\\mathbf{G}`` is the upper Cholesky factor of the uncertainty set covariance.
+Where:
+
+  - ``\\hat{r}(\\boldsymbol{w})``: Worst-case expected return.
+  - $(math_dict[:mu_er])
+  - $(math_dict[:w_port])
+  - ``\\kappa``: Ellipsoidal uncertainty set radius.
+  - ``\\mathbf{G}``: Upper Cholesky factor of the uncertainty set covariance.
 
 # Arguments
 

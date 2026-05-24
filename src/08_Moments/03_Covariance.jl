@@ -364,25 +364,43 @@ Compute the covariance matrix using a [`Covariance`](@ref) estimator.
 Full covariance:
 
 ```math
-\\hat{\\mathbf{\\Sigma}}_{ij} = \\frac{1}{T-1} \\sum_{t=1}^{T} (r_{ti} - \\hat{\\mu}_i)(r_{tj} - \\hat{\\mu}_j)
-```
-
-Semi (downside) covariance — clip de-meaned returns to zero before computing:
-
-```math
-\\tilde{r}_{tj} = \\min(r_{tj} - \\hat{\\mu}_j,\\, 0)
-```
-
-```math
-\\hat{\\mathbf{\\Sigma}}^{\\text{semi}}_{ij} = \\frac{1}{T-1} \\sum_{t=1}^{T} \\tilde{r}_{ti} \\, \\tilde{r}_{tj}
+\\begin{align}
+\\hat{\\mathbf{\\Sigma}}_{ij} &= \\frac{1}{T-1} \\sum_{t=1}^{T} (r_{ti} - \\hat{\\mu}_i)(r_{tj} - \\hat{\\mu}_j)\\,.
+\\end{align}
 ```
 
 Where:
 
-  - ``\\hat{\\mathbf{\\Sigma}}``: `N × N` estimated covariance matrix.
+  - ``\\hat{\\mathbf{\\Sigma}}_{ij}``: Estimated covariance between assets ``i`` and ``j``.
   - ``r_{ti}``: Return of asset ``i`` at time ``t``.
   - ``\\hat{\\mu}_i``: Estimated mean of asset ``i``.
-  - ``T``: Number of observations.
+  - $(math_dict[:T])
+
+Semi (downside) covariance — clip de-meaned returns to zero before computing:
+
+```math
+\\begin{align}
+\\tilde{r}_{tj} &= \\min(r_{tj} - \\hat{\\mu}_j,\\, 0)\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\tilde{r}_{tj}``: Clipped de-meaned return of asset ``j`` at time ``t``.
+  - ``r_{tj}``: Return of asset ``j`` at time ``t``.
+  - ``\\hat{\\mu}_j``: Estimated mean of asset ``j``.
+
+```math
+\\begin{align}
+\\hat{\\mathbf{\\Sigma}}^{\\text{semi}}_{ij} &= \\frac{1}{T-1} \\sum_{t=1}^{T} \\tilde{r}_{ti} \\, \\tilde{r}_{tj}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\hat{\\mathbf{\\Sigma}}^{\\text{semi}}_{ij}``: Estimated semi-covariance between assets ``i`` and ``j``.
+  - ``\\tilde{r}_{ti}``, ``\\tilde{r}_{tj}``: Clipped de-meaned returns of assets ``i`` and ``j``.
+  - $(math_dict[:T])
 
 # Arguments
 
@@ -437,13 +455,15 @@ Compute the correlation matrix using a [`Covariance`](@ref) estimator.
 # Mathematical definition
 
 ```math
-\\hat{\\mathbf{P}}_{ij} = \\frac{\\hat{\\mathbf{\\Sigma}}_{ij}}{\\hat{\\sigma}_i \\hat{\\sigma}_j}
+\\begin{align}
+\\hat{\\mathbf{P}}_{ij} &= \\frac{\\hat{\\mathbf{\\Sigma}}_{ij}}{\\hat{\\sigma}_i \\hat{\\sigma}_j}\\,.
+\\end{align}
 ```
 
 Where:
 
-  - ``\\hat{\\mathbf{P}}``: `N × N` estimated correlation matrix.
-  - ``\\hat{\\mathbf{\\Sigma}}``: `N × N` estimated covariance matrix.
+  - ``\\hat{\\mathbf{P}}_{ij}``: Estimated correlation between assets ``i`` and ``j``.
+  - ``\\hat{\\mathbf{\\Sigma}}_{ij}``: Estimated covariance between assets ``i`` and ``j``.
   - ``\\hat{\\sigma}_i``: Estimated standard deviation of asset ``i``.
 
 # Arguments

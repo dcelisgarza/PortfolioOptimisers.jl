@@ -64,16 +64,33 @@ Represents the Entropic Value-at-Risk (EVaR) risk measure.
 The EVaR is defined via the Chernoff bound as the tightest exponential upper bound on VaR and CVaR:
 
 ```math
-\\mathrm{EVaR}_{\\alpha}(\\boldsymbol{x}) = \\inf_{z > 0} \\left\\{ z \\ln\\!\\left( \\frac{M_{L}(1/z)}{\\alpha} \\right) \\right\\}\\,,
+\\begin{align}
+\\mathrm{EVaR}_{\\alpha}(\\boldsymbol{x}) &= \\inf_{z > 0} \\left\\{ z \\ln\\!\\left( \\frac{M_{L}(1/z)}{\\alpha} \\right) \\right\\}\\,.
+\\end{align}
 ```
 
-where ``L_t = -x_t`` is the loss and ``M_L(u) = \\mathbb{E}[e^{uL}]`` is the moment-generating function. Computationally, it is solved via the conic programme:
+Where:
+
+  - ``\\mathrm{EVaR}_{\\alpha}(\\boldsymbol{x})``: Entropic Value-at-Risk (tightest exponential upper bound on VaR and CVaR).
+  - $(math_dict[:xret])
+  - $(math_dict[:alpha_rm])
+  - ``L_t = -x_t``: Loss at period ``t``.
+  - ``M_L(u) = \\mathbb{E}[e^{uL}]``: Moment-generating function of the loss.
+  - ``z``: Exponential tilt parameter.
+
+Computationally, it is solved via the conic programme:
 
 ```math
-\\mathrm{EVaR}_{\\alpha}(\\boldsymbol{x}) = \\min_{t,\\, z \\geq 0,\\, \\boldsymbol{u}} \\left\\{ t - z \\ln(\\alpha T) \\;:\\; \\sum_{i=1}^{T} u_i \\leq z,\\; (-x_i - t,\\, z,\\, u_i) \\in K_{\\exp}\\; \\forall i \\right\\}\\,,
+\\begin{align}
+\\mathrm{EVaR}_{\\alpha}(\\boldsymbol{x}) &= \\underset{t,\\, z,\\, \\boldsymbol{u}}{\\min} \\left\\{ t - z \\ln(\\alpha T) \\;:\\; z \\geq 0,\\; \\sum_{i=1}^{T} u_i \\leq z,\\; (-x_i - t,\\, z,\\, u_i) \\in K_{\\exp}\\; \\forall i \\right\\}\\,.
+\\end{align}
 ```
 
-where ``K_{\\exp} = \\{(a, b, c) : b\\, e^{a/b} \\leq c,\\, b > 0\\}`` is the exponential cone.
+Where:
+
+  - $(math_dict[:T])
+  - ``t``, ``z``, ``\\boldsymbol{u}``: Conic optimisation variables.
+  - ``K_{\\exp} = \\{(a, b, c) : b\\, e^{a/b} \\leq c,\\, b > 0\\}``: Exponential cone.
 
 # Fields
 
@@ -166,10 +183,17 @@ Represents the Entropic Value-at-Risk Range (EVaR Range) risk measure.
 # Mathematical definition
 
 ```math
-\\mathrm{EVaRRange}_{\\alpha,\\beta}(\\boldsymbol{x}) = \\mathrm{EVaR}_{\\alpha}(\\boldsymbol{x}) + \\mathrm{EVaR}_{\\beta}(-\\boldsymbol{x})\\,,
+\\begin{align}
+\\mathrm{EVaRRange}_{\\alpha,\\beta}(\\boldsymbol{x}) &= \\mathrm{EVaR}_{\\alpha}(\\boldsymbol{x}) + \\mathrm{EVaR}_{\\beta}(-\\boldsymbol{x})\\,.
+\\end{align}
 ```
 
-where ``\\mathrm{EVaR}_{\\alpha}(\\boldsymbol{x})`` captures the lower-tail entropic risk and ``\\mathrm{EVaR}_{\\beta}(-\\boldsymbol{x})`` captures the upper-tail entropic risk (gain).
+Where:
+
+  - ``\\mathrm{EVaRRange}_{\\alpha,\\beta}(\\boldsymbol{x})``: EVaR range (entropic tail spread).
+  - $(math_dict[:xret])
+  - ``\\mathrm{EVaR}_{\\alpha}(\\boldsymbol{x})``: Lower-tail entropic risk at level ``\\alpha``.
+  - ``\\mathrm{EVaR}_{\\beta}(-\\boldsymbol{x})``: Upper-tail entropic risk at level ``\\beta``.
 
 # Fields
 
@@ -254,14 +278,31 @@ Represents the Entropic Drawdown-at-Risk (EDaR) risk measure.
 Define the absolute drawdown series:
 
 ```math
-c_t = \\sum_{s=1}^{t} x_s\\,, \\qquad d_t = c_t - \\max_{0 \\leq s \\leq t} c_s \\leq 0\\,.
+\\begin{align}
+c_t &= \\sum_{s=1}^{t} x_s\\,, \\\\
+d_t &= c_t - \\max_{0 \\leq s \\leq t} c_s \\leq 0\\,.
+\\end{align}
 ```
+
+Where:
+
+  - $(math_dict[:xret])
+  - $(math_dict[:ct])
+  - $(math_dict[:dtdd])
 
 The EDaR is the EVaR of the drawdown series:
 
 ```math
-\\mathrm{EDaR}_{\\alpha}(\\boldsymbol{x}) = \\mathrm{EVaR}_{\\alpha}(\\boldsymbol{d}(\\boldsymbol{x}))\\,.
+\\begin{align}
+\\mathrm{EDaR}_{\\alpha}(\\boldsymbol{x}) &= \\mathrm{EVaR}_{\\alpha}(\\boldsymbol{d}(\\boldsymbol{x}))\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``\\mathrm{EDaR}_{\\alpha}(\\boldsymbol{x})``: Entropic Drawdown-at-Risk.
+  - $(math_dict[:alpha_rm])
+  - ``\\boldsymbol{d}(\\boldsymbol{x})``: Absolute drawdown series vector ``T \\times 1``.
 
 # Fields
 
@@ -358,14 +399,31 @@ Represents the Relative Entropic Drawdown-at-Risk (Relative EDaR) risk measure f
 Define the compounded wealth process and relative drawdown series:
 
 ```math
-C_t = \\prod_{s=1}^{t} (1 + x_s)\\,, \\qquad rd_t = \\frac{C_t}{\\max_{0 \\leq s \\leq t} C_s} - 1 \\leq 0\\,.
+\\begin{align}
+C_t &= \\prod_{s=1}^{t} (1 + x_s)\\,, \\\\
+rd_t &= \\frac{C_t}{\\max_{0 \\leq s \\leq t} C_s} - 1 \\leq 0\\,.
+\\end{align}
 ```
+
+Where:
+
+  - $(math_dict[:xret])
+  - $(math_dict[:Ct])
+  - $(math_dict[:rdt])
 
 The Relative EDaR is the EVaR of the relative drawdown series:
 
 ```math
-\\mathrm{REDaR}_{\\alpha}(\\boldsymbol{x}) = \\mathrm{EVaR}_{\\alpha}(\\boldsymbol{rd}(\\boldsymbol{x}))\\,.
+\\begin{align}
+\\mathrm{REDaR}_{\\alpha}(\\boldsymbol{x}) &= \\mathrm{EVaR}_{\\alpha}(\\boldsymbol{rd}(\\boldsymbol{x}))\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``\\mathrm{REDaR}_{\\alpha}(\\boldsymbol{x})``: Relative Entropic Drawdown-at-Risk.
+  - $(math_dict[:alpha_rm])
+  - ``\\boldsymbol{rd}(\\boldsymbol{x})``: Relative drawdown series vector ``T \\times 1``.
 
 # Fields
 

@@ -8,8 +8,15 @@ Called when no L1 regularisation is configured. Returns `nothing`.
 # Mathematical definition
 
 ```math
-\\text{penalty} = \\lambda_1 \\|\\boldsymbol{w}\\|_1
+\\begin{align}
+\\text{penalty} &= \\lambda_1 \\|\\boldsymbol{w}\\|_1\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``\\lambda_1``: L1 regularisation coefficient.
+  - $(math_dict[:w_port])
 
 # Related
 
@@ -29,8 +36,15 @@ Called when no L2 regularisation is configured. Returns `nothing`.
 # Mathematical definition
 
 ```math
-\\text{penalty} = \\lambda_2 \\|\\boldsymbol{w}\\|_2
+\\begin{align}
+\\text{penalty} &= \\lambda_2 \\|\\boldsymbol{w}\\|_2\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``\\lambda_2``: L2 regularisation coefficient.
+  - $(math_dict[:w_port])
 
 # Related
 
@@ -64,8 +78,15 @@ Called when no L∞ regularisation is configured. Returns `nothing`.
 # Mathematical definition
 
 ```math
-\\text{penalty} = \\lambda_\\infty \\|\\boldsymbol{w}\\|_\\infty
+\\begin{align}
+\\text{penalty} &= \\lambda_\\infty \\|\\boldsymbol{w}\\|_\\infty\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``\\lambda_\\infty``: L∞ regularisation coefficient.
+  - $(math_dict[:w_port])
 
 # Related
 
@@ -106,11 +127,22 @@ abstract type AbstractRegularisationEstimator <: AbstractEstimator end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Lp-norm regularisation term added to the optimisation objective:
+Lp-norm regularisation term added to the optimisation objective.
+
+# Mathematical definition
 
 ```math
-\\text{penalty} = \\mathrm{val} \\cdot \\left( \\sum_{i=1}^N |w_i|^p \\right)^{1/p}
+\\begin{align}
+\\text{penalty} &= \\mathrm{val} \\cdot \\left( \\sum_{i=1}^N |w_i|^p \\right)^{1/p}\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``\\mathrm{val}``: Regularisation coefficient.
+  - ``w_i``: Portfolio weight for asset ``i``.
+  - ``p > 1``: Norm order.
+  - $(math_dict[:N])
 
 Penalises concentrated portfolios by encouraging weight smoothness for ``p > 1``.
 

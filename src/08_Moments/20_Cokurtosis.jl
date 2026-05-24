@@ -27,10 +27,15 @@ $(DocStringExtensions.FIELDS)
     Cokurtosis(;
         me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
         mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing(),
-        alg::AbstractMomentAlgorithm = Full()
+        alg::AbstractMomentAlgorithm = Full(),
+        w::Option{<:ObsWeights} = nothing
     ) -> Cokurtosis
 
 Keywords correspond to the struct's fields.
+
+# Validation
+
+  - $(val_dict[:oow])
 
 # Examples
 
@@ -47,7 +52,8 @@ Cokurtosis
       │      dt ┼ nothing
       │     alg ┼ nothing
       │   order ┴ DenoiseDetoneAlg()
-  alg ┴ Full()
+  alg ┼ Full()
+    w ┴ nothing
 ```
 
 # Related
@@ -64,15 +70,20 @@ Cokurtosis
     mp
     "$(field_dict[:malg])"
     alg
+    "$(field_dict[:oow])"
+    w
     function Cokurtosis(me::AbstractExpectedReturnsEstimator,
-                        mp::AbstractMatrixProcessingEstimator, alg::AbstractMomentAlgorithm)
-        return new{typeof(me), typeof(mp), typeof(alg)}(me, mp, alg)
+                        mp::AbstractMatrixProcessingEstimator, alg::AbstractMomentAlgorithm,
+                        w::Option{<:ObsWeights})
+        assert_nonempty_nonneg_finite_val(w, :w)
+        return new{typeof(me), typeof(mp), typeof(alg), typeof(w)}(me, mp, alg, w)
     end
 end
 function Cokurtosis(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
                     mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing(),
-                    alg::AbstractMomentAlgorithm = Full())::Cokurtosis
-    return Cokurtosis(me, mp, alg)
+                    alg::AbstractMomentAlgorithm = Full(),
+                    w::Option{<:ObsWeights} = nothing)::Cokurtosis
+    return Cokurtosis(me, mp, alg, w)
 end
 """
     factory(kte::Cokurtosis, w::ObsWeights) -> Cokurtosis
@@ -94,7 +105,7 @@ Return a new [`Cokurtosis`](@ref) estimator with observation weights `w` applied
   - [`factory`](@ref)
 """
 function factory(kte::Cokurtosis, w::ObsWeights)::Cokurtosis
-    return Cokurtosis(; me = factory(kte.me, w), mp = kte.mp, alg = kte.alg)
+    return Cokurtosis(; me = factory(kte.me, w), mp = kte.mp, alg = kte.alg, w = w)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -115,10 +126,10 @@ Gets the view of the cokurtosis estimator for the `i`-th element(s).
   - [`Cokurtosis`](@ref)
 """
 function moment_view(kte::Cokurtosis, i)::Cokurtosis
-    return Cokurtosis(; me = moment_view(kte.me, i), mp = kte.mp, alg = kte.alg)
+    return Cokurtosis(; me = moment_view(kte.me, i), mp = kte.mp, alg = kte.alg, w = kte.w)
 end
 """
-    _cokurtosis(X::MatNum, mp::AbstractMatrixProcessingEstimator)
+    _cokurtosis(X::MatNum, mp::AbstractMatrixProcessingEstimator, w::Option{<:ObsWeights}) -> MatNum
 
 Internal helper for cokurtosis computation.
 
@@ -129,21 +140,49 @@ Internal helper for cokurtosis computation.
 Let ``\\mathbf{X}`` be the ``T \\times N`` matrix of demeaned returns. Define the ``T \\times N^2`` matrix ``\\mathbf{Z}`` with rows:
 
 ```math
-\\mathbf{Z}_{t,\\cdot} = (\\boldsymbol{1}^\\intercal \\otimes \\boldsymbol{x}_t^\\intercal) \\odot (\\boldsymbol{x}_t^\\intercal \\otimes \\boldsymbol{1}^\\intercal)
+\\begin{align}
+\\mathbf{Z}_{t,\\cdot} &= (\\boldsymbol{1}^\\intercal \\otimes \\boldsymbol{x}_t^\\intercal) \\odot (\\boldsymbol{x}_t^\\intercal \\otimes \\boldsymbol{1}^\\intercal)\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``\\mathbf{Z}_{t,\\cdot}``: ``t``-th row of the auxiliary matrix ``\\mathbf{Z}``.
+  - ``\\boldsymbol{x}_t``: ``t``-th row of demeaned returns.
+  - ``\\otimes``: Kronecker product.
+  - ``\\odot``: Element-wise (Hadamard) product.
 
 The ``N^2 \\times N^2`` cokurtosis tensor is:
 
+Unweighted:
+
 ```math
-\\hat{\\mathbf{K}} = \\frac{1}{T} \\mathbf{Z}^\\intercal \\mathbf{Z}
+\\begin{align}
+\\hat{\\mathbf{K}} &= \\frac{1}{T} \\mathbf{Z}^\\intercal \\mathbf{Z}\\,.
+\\end{align}
 ```
 
-Where ``\\otimes`` is the Kronecker product and ``\\odot`` is element-wise multiplication.
+Weighted:
+
+```math
+\\begin{align}
+\\hat{\\mathbf{K}} &= \\frac{1}{\\sum_{t=1}^{T} w_t} (\\boldsymbol{w} \\odot \\mathbf{Z})^\\intercal \\mathbf{Z}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\hat{\\mathbf{K}}``: ``N^2 \\times N^2`` cokurtosis tensor.
+  - ``\\mathbf{Z}``: ``T \\times N^2`` auxiliary matrix of pairwise return products.
+  - $(math_dict[:T])
+  - ``\\boldsymbol{w}``: Observation weights vector ``T \\times 1``.
+  - ``w_t``: Observation weight at time ``t``.
 
 # Arguments
 
   - `X`: Data matrix (observations × assets).
   - `mp`: Matrix processing estimator.
+  - `w`: Optional observation weights.
 
 # Returns
 
@@ -155,11 +194,19 @@ Where ``\\otimes`` is the Kronecker product and ``\\odot`` is element-wise multi
   - [`matrix_processing!`](@ref)
   - [`cokurtosis`](@ref)
 """
-function _cokurtosis(X::MatNum, mp::AbstractMatrixProcessingEstimator)
+function _cokurtosis(X::MatNum, mp::AbstractMatrixProcessingEstimator, args...)
     T, N = size(X)
     o = transpose(range(one(eltype(X)), one(eltype(X)); length = N))
     z = kron(o, X) ⊙ kron(X, o)
     ckurt = transpose(z) * z / T
+    matrix_processing!(mp, ckurt, X)
+    return ckurt
+end
+function _cokurtosis(X::MatNum, mp::AbstractMatrixProcessingEstimator,
+                     w::StatsBase.AbstractWeights)
+    o = transpose(range(one(eltype(X)), one(eltype(X)); length = size(X, 2)))
+    z = kron(o, X) ⊙ kron(X, o)
+    ckurt = transpose(w .* z) * z / sum(w)
     matrix_processing!(mp, ckurt, X)
     return ckurt
 end
@@ -169,7 +216,7 @@ end
 
 Compute the cokurtosis tensor for a dataset.
 
-This method computes the cokurtosis tensor using the estimator's mean and matrix processing algorithm. For `Full`, it uses all centered data; for `Semi`, it uses only negative deviations. If the estimator is `nothing`, returns `nothing`.
+This method computes the cokurtosis tensor using the estimator's mean and matrix processing algorithm. Observation weights in `kte.w` are applied if set. For `Full`, it uses all centered data; for `Semi`, it uses only negative deviations. If the estimator is `nothing`, returns `nothing`.
 
 # Arguments
 
@@ -223,9 +270,10 @@ function cokurtosis(kte::Cokurtosis{<:Any, <:Any, <:Full}, X::MatNum; dims::Int 
     if dims == 2
         X = transpose(X)
     end
+    w = get_observation_weights(kte.w, X; dims = 1, kwargs...)
     mu = isnothing(mean) ? Statistics.mean(kte.me, X; kwargs...) : mean
     X = X .- mu
-    return _cokurtosis(X, kte.mp)
+    return _cokurtosis(X, kte.mp, w)
 end
 function cokurtosis(kte::Cokurtosis{<:Any, <:Any, <:Semi}, X::MatNum; dims::Int = 1,
                     mean = nothing, kwargs...)
@@ -233,9 +281,10 @@ function cokurtosis(kte::Cokurtosis{<:Any, <:Any, <:Semi}, X::MatNum; dims::Int 
     if dims == 2
         X = transpose(X)
     end
+    w = get_observation_weights(kte.w, X; dims = 1, kwargs...)
     mu = isnothing(mean) ? Statistics.mean(kte.me, X; kwargs...) : mean
     X = min.(X .- mu, zero(eltype(X)))
-    return _cokurtosis(X, kte.mp)
+    return _cokurtosis(X, kte.mp, w)
 end
 function cokurtosis(::Nothing, args...; kwargs...)
     return nothing

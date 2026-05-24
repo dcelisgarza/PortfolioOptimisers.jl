@@ -65,10 +65,16 @@ The fall-through method does nothing. The concrete method adds lower-bound and u
 # Mathematical definition
 
 ```math
-k \\boldsymbol{\\ell} \\leq \\boldsymbol{w} \\leq k \\boldsymbol{u}
+\\begin{align}
+k \\boldsymbol{\\ell} &\\leq \\boldsymbol{w} \\leq k \\boldsymbol{u}\\,.
+\\end{align}
 ```
 
-where ``\\boldsymbol{\\ell}`` and ``\\boldsymbol{u}`` are the lower and upper bound vectors from `wb`, and ``k`` is the budget scaling variable.
+Where:
+
+  - $(math_dict[:w_port])
+  - $(math_dict[:k_budget])
+  - ``\\boldsymbol{\\ell}``, ``\\boldsymbol{u}``: Lower and upper bound vectors from `wb`.
 
 # Arguments
 
@@ -169,10 +175,18 @@ The fall-through method does nothing. The concrete method iterates over the coll
 # Mathematical definition
 
 ```math
-\\mathbf{A}_{\\mathrm{ineq}} \\boldsymbol{w} \\leq k \\boldsymbol{B}_{\\mathrm{ineq}}, \\qquad \\mathbf{A}_{\\mathrm{eq}} \\boldsymbol{w} = k \\boldsymbol{B}_{\\mathrm{eq}}
+\\begin{align}
+\\mathbf{A}_{\\mathrm{ineq}} \\boldsymbol{w} \\leq k \\boldsymbol{B}_{\\mathrm{ineq}}\\,, \\\\
+\\mathbf{A}_{\\mathrm{eq}} \\boldsymbol{w} &= k \\boldsymbol{B}_{\\mathrm{eq}}\\,.
+\\end{align}
 ```
 
-where ``k`` is the budget scaling variable.
+Where:
+
+  - $(math_dict[:w_port])
+  - $(math_dict[:k_budget])
+  - ``\\mathbf{A}_{\\mathrm{ineq}}``, ``\\mathbf{A}_{\\mathrm{eq}}``: Constraint coefficient matrices for inequality and equality constraints.
+  - ``\\boldsymbol{B}_{\\mathrm{ineq}}``, ``\\boldsymbol{B}_{\\mathrm{eq}}``: Constraint response vectors for inequality and equality constraints.
 
 # Arguments
 

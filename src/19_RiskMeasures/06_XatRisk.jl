@@ -212,8 +212,18 @@ Represents the Value-at-Risk (VaR) risk measure.
 Let ``\\boldsymbol{x} = (x_1, \\ldots, x_T)^\\intercal`` be the portfolio returns vector and ``x_{(k)}`` the ``k``-th order statistic (``k``-th smallest value). The empirical VaR at significance level ``\\alpha`` is:
 
 ```math
-\\mathrm{VaR}_{\\alpha}(\\boldsymbol{x}) = -x_{(\\lceil \\alpha T \\rceil)}\\,.
+\\begin{align}
+\\mathrm{VaR}_{\\alpha}(\\boldsymbol{x}) &= -x_{(\\lceil \\alpha T \\rceil)}\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``\\mathrm{VaR}_{\\alpha}(\\boldsymbol{x})``: Value-at-Risk at significance level ``\\alpha``.
+  - ``\\boldsymbol{x} = (x_1, \\ldots, x_T)^\\intercal``: Portfolio returns vector.
+  - ``x_{(k)}``: ``k``-th order statistic (``k``-th smallest value) of ``\\boldsymbol{x}``.
+  - ``\\alpha``: Significance level (e.g., ``\\alpha = 0.05`` for 95% VaR).
+  - $(math_dict[:T])
 
 For observation-weighted samples with weight vector ``\\boldsymbol{w}`` summing to ``S_w``, VaR is the ``\\alpha S_w``-quantile of the weighted empirical distribution.
 
@@ -327,10 +337,19 @@ Represents the Value-at-Risk Range risk measure.
 # Mathematical definition
 
 ```math
-\\mathrm{VaRRange}_{\\alpha,\\beta}(\\boldsymbol{x}) = \\mathrm{VaR}_{\\alpha}(\\boldsymbol{x}) - \\mathrm{VaR}_{\\beta}(-\\boldsymbol{x})\\,,
+\\begin{align}
+\\mathrm{VaRRange}_{\\alpha,\\beta}(\\boldsymbol{x}) &= \\mathrm{VaR}_{\\alpha}(\\boldsymbol{x}) - \\mathrm{VaR}_{\\beta}(-\\boldsymbol{x})\\,,\\,.
+\\end{align}
 ```
 
-where ``\\mathrm{VaR}_{\\alpha}(\\boldsymbol{x})`` captures the lower-tail loss quantile and ``\\mathrm{VaR}_{\\beta}(-\\boldsymbol{x})`` captures the upper-tail gain quantile.
+Where:
+
+  - ``\\mathrm{VaRRange}_{\\alpha,\\beta}(\\boldsymbol{x})``: Value-at-Risk Range.
+  - ``\\mathrm{VaR}_{\\alpha}(\\boldsymbol{x})``: Lower-tail loss quantile.
+  - ``\\mathrm{VaR}_{\\beta}(-\\boldsymbol{x})``: Upper-tail gain quantile.
+  - ``\\boldsymbol{x}``: Portfolio returns vector.
+  - ``\\alpha``: Lower-tail significance level.
+  - ``\\beta``: Upper-tail significance level.
 
 # Fields
 
@@ -466,14 +485,33 @@ Represents the Drawdown-at-Risk (DaR) risk measure.
 Define the cumulative wealth process and absolute drawdown at time ``t``:
 
 ```math
-c_t = \\sum_{s=1}^{t} x_s\\,, \\qquad d_t = c_t - \\max_{0 \\leq s \\leq t} c_s \\leq 0\\,.
+\\begin{align}
+c_t &= \\sum_{s=1}^{t} x_s\\,, \\\\
+d_t &= c_t - \\max_{0 \\leq s \\leq t} c_s \\leq 0\\,.
+\\end{align}
 ```
+
+Where:
+
+  - $(math_dict[:xret])
+  - $(math_dict[:ct])
+  - $(math_dict[:dtdd])
 
 The Drawdown-at-Risk at level ``\\alpha`` is the ``\\lceil \\alpha T \\rceil``-th smallest (most extreme) drawdown:
 
 ```math
-\\mathrm{DaR}_{\\alpha}(\\boldsymbol{x}) = -d_{(\\lceil \\alpha T \\rceil)}\\,.
+\\begin{align}
+\\mathrm{DaR}_{\\alpha}(\\boldsymbol{x}) &= -d_{(\\lceil \\alpha T \\rceil)}\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``\\mathrm{DaR}_{\\alpha}(\\boldsymbol{x})``: Drawdown-at-Risk at level ``\\alpha``.
+  - $(math_dict[:alpha_rm])
+  - $(math_dict[:T])
+  - $(math_dict[:dtdd])
+  - ``d_{(k)}``: ``k``-th order statistic (sorted ascending) of the drawdown series.
 
 # Fields
 
@@ -635,16 +673,33 @@ Represents the Relative Drawdown-at-Risk risk measure for hierarchical optimisat
 Define the compounded wealth process and relative drawdown at time ``t``:
 
 ```math
-C_t = \\prod_{s=1}^{t} (1 + x_s)\\,, \\qquad rd_t = \\frac{C_t}{\\max_{0 \\leq s \\leq t} C_s} - 1 \\leq 0\\,.
+\\begin{align}
+C_t &= \\prod_{s=1}^{t} (1 + x_s)\\,, \\\\
+rd_t &= \\frac{C_t}{\\max_{0 \\leq s \\leq t} C_s} - 1 \\leq 0\\,.
+\\end{align}
 ```
+
+Where:
+
+  - $(math_dict[:xret])
+  - $(math_dict[:Ct])
+  - $(math_dict[:rdt])
 
 The Relative Drawdown-at-Risk at level ``\\alpha`` is:
 
 ```math
-\\mathrm{RDaR}_{\\alpha}(\\boldsymbol{x}) = -rd_{(\\lceil \\alpha T \\rceil)}\\,,
+\\begin{align}
+\\mathrm{RDaR}_{\\alpha}(\\boldsymbol{x}) &= -rd_{(\\lceil \\alpha T \\rceil)}\\,.
+\\end{align}
 ```
 
-where ``rd_{(k)}`` is the ``k``-th smallest relative drawdown.
+Where:
+
+  - ``\\mathrm{RDaR}_{\\alpha}(\\boldsymbol{x})``: Relative Drawdown-at-Risk at level ``\\alpha``.
+  - $(math_dict[:alpha_rm])
+  - $(math_dict[:T])
+  - $(math_dict[:rdt])
+  - ``rd_{(k)}``: ``k``-th order statistic (sorted ascending) of the relative drawdown series.
 
 # Fields
 

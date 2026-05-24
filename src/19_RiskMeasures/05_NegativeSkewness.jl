@@ -22,11 +22,19 @@ Represents the Negative Skewness risk measure.
 Let ``\\boldsymbol{w}`` be the portfolio weight vector and ``\\mathbf{V}`` the negative semi-definite coskewness matrix (spectral decomposition of the negative part of the sample coskewness tensor). The Negative Skewness risk measure is:
 
 ```math
-\\mathrm{NSke}(\\boldsymbol{w}) = \\begin{cases}
+\\begin{align}
+\\mathrm{NSke}(\\boldsymbol{w}) &= \\begin{cases}
   \\sqrt{\\boldsymbol{w}^\\intercal \\mathbf{V} \\boldsymbol{w}} & \\text{(SOC formulation)} \\\\
   \\boldsymbol{w}^\\intercal \\mathbf{V} \\boldsymbol{w} & \\text{(Quadratic formulation)}
-\\end{cases}
+\\end{cases}\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``\\mathrm{NSke}(\\boldsymbol{w})``: Negative Skewness risk measure.
+  - $(math_dict[:w_port])
+  - ``\\mathbf{V}``: Negative semi-definite coskewness matrix (spectral decomposition of the negative part of the sample coskewness tensor).
 
 # Fields
 

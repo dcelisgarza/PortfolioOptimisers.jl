@@ -165,20 +165,49 @@ The fall-through method does nothing. The concrete methods add the appropriate p
 Fixed / range:
 
 ```math
-k \\cdot \\mathrm{lb} \\leq \\sum_i w_i \\leq k \\cdot \\mathrm{ub}
+\\begin{align}
+k \\cdot \\mathrm{lb} &\\leq \\sum_i w_i \\leq k \\cdot \\mathrm{ub}\\,.
+\\end{align}
 ```
+
+Where:
+
+  - $(math_dict[:w_port])
+  - $(math_dict[:k_budget])
+  - ``\\mathrm{lb}``, ``\\mathrm{ub}``: Lower and upper budget bounds.
 
 Linear cost budget ([`BudgetCosts`](@ref)):
 
 ```math
-\\sum_i w_i + \\boldsymbol{v}_p^\\intercal \\boldsymbol{w}_p + \\boldsymbol{v}_n^\\intercal \\boldsymbol{w}_n \\in [k\\,\\mathrm{lb},\\; k\\,\\mathrm{ub}]
+\\begin{align}
+\\sum_i w_i + \\boldsymbol{v}_p^\\intercal \\boldsymbol{w}_p + \\boldsymbol{v}_n^\\intercal \\boldsymbol{w}_n \\in [k\\,\\mathrm{lb},\\; k\\,\\mathrm{ub}]\\,.
+\\end{align}
 ```
+
+Where:
+
+  - $(math_dict[:w_port])
+  - $(math_dict[:k_budget])
+  - ``\\boldsymbol{w}_p``, ``\\boldsymbol{w}_n``: Positive and negative weight increments.
+  - ``\\boldsymbol{v}_p``, ``\\boldsymbol{v}_n``: Cost coefficient vectors for positive and negative changes.
+  - ``\\mathrm{lb}``, ``\\mathrm{ub}``: Lower and upper budget bounds.
 
 Power-law market-impact budget ([`BudgetMarketImpact`](@ref)):
 
 ```math
-\\sum_i w_i + \\boldsymbol{v}_p^\\intercal \\boldsymbol{w}_p^\\beta + \\boldsymbol{v}_n^\\intercal \\boldsymbol{w}_n^\\beta \\in [k\\,\\mathrm{lb},\\; k\\,\\mathrm{ub}]
+\\begin{align}
+\\sum_i w_i + \\boldsymbol{v}_p^\\intercal \\boldsymbol{w}_p^\\beta + \\boldsymbol{v}_n^\\intercal \\boldsymbol{w}_n^\\beta \\in [k\\,\\mathrm{lb},\\; k\\,\\mathrm{ub}]\\,.
+\\end{align}
 ```
+
+Where:
+
+  - $(math_dict[:w_port])
+  - $(math_dict[:k_budget])
+  - ``\\boldsymbol{w}_p``, ``\\boldsymbol{w}_n``: Positive and negative weight increments.
+  - ``\\boldsymbol{v}_p``, ``\\boldsymbol{v}_n``: Market-impact cost coefficient vectors.
+  - ``\\beta \\in (0, 1]``: Market-impact power exponent.
+  - ``\\mathrm{lb}``, ``\\mathrm{ub}``: Lower and upper budget bounds.
 
 # Arguments
 
@@ -204,17 +233,24 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Budget constraint that accounts for linear transaction costs. Models the portfolio
-budget as:
+Budget constraint that accounts for linear transaction costs.
+
+# Mathematical definition
+
+Models the portfolio budget as:
 
 ```math
+\\begin{align}
 \\boldsymbol{v}_p^\\intercal \\boldsymbol{w}_p + \\boldsymbol{v}_n^\\intercal \\boldsymbol{w}_n
-\\in [\\mathrm{lb}, \\mathrm{ub}]
+\\in [\\mathrm{lb}, \\mathrm{ub}]\\,.
+\\end{align}
 ```
 
-where ``\\boldsymbol{w}_p``, ``\\boldsymbol{w}_n`` are the positive and negative weight
-increments, and ``\\boldsymbol{v}_p``, ``\\boldsymbol{v}_n`` are the corresponding
-cost coefficients.
+Where:
+
+  - ``\\boldsymbol{w}_p``, ``\\boldsymbol{w}_n``: Positive and negative weight increments.
+  - ``\\boldsymbol{v}_p``, ``\\boldsymbol{v}_n``: Cost coefficient vectors for positive and negative changes.
+  - ``\\mathrm{lb}``, ``\\mathrm{ub}``: Lower and upper budget bounds.
 
 # Fields
 

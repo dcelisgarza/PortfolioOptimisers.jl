@@ -140,11 +140,15 @@ Compute factor-based prior moments for asset returns using a factor model.
 The factor model maps factor moments to asset space via the loadings matrix ``\\mathbf{B}`` (with intercepts ``\\boldsymbol{\\alpha}``):
 
 ```math
-\\hat{\\boldsymbol{\\mu}} = \\mathbf{B} \\hat{\\boldsymbol{f}} + \\boldsymbol{\\alpha}
+\\begin{align}
+\\hat{\\boldsymbol{\\mu}} &= \\mathbf{B} \\hat{\\boldsymbol{f}} + \\boldsymbol{\\alpha}\\,.
+\\end{align}
 ```
 
 ```math
-\\hat{\\mathbf{\\Sigma}} = \\mathbf{B} \\mathbf{\\Sigma}_f \\mathbf{B}^\\intercal + \\mathbf{\\Sigma}_\\varepsilon
+\\begin{align}
+\\hat{\\mathbf{\\Sigma}} &= \\mathbf{B} \\mathbf{\\Sigma}_f \\mathbf{B}^\\intercal + \\mathbf{\\Sigma}_\\varepsilon\\,.
+\\end{align}
 ```
 
 Where:

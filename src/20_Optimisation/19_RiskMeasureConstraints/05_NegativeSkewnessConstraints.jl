@@ -110,8 +110,17 @@ overload unconditionally throws an `ArgumentError`.
 # Mathematical definition
 
 ```math
-\\mathrm{NSkew}(\\boldsymbol{w}) = \\|\\mathbf{G}_V \\boldsymbol{w}\\|_2, \\qquad \\mathbf{G}_V = \\mathrm{chol}(\\mathbf{V})
+\\begin{align}
+\\mathrm{NSkew}(\\boldsymbol{w}) &= \\|\\mathbf{G}_V \\boldsymbol{w}\\|_2\\,, \\\\
+\\mathbf{G}_V &= \\mathrm{chol}(\\mathbf{V})\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``\\mathrm{NSkew}(\\boldsymbol{w})``: Negative skewness risk measure.
+  - ``\\mathbf{G}_V``: Cholesky factor of the projected co-skewness matrix ``\\mathbf{V}``.
+  - $(math_dict[:w_port])
 
 where ``\\mathbf{V}`` is the co-skewness matrix projected onto the weight space.
 

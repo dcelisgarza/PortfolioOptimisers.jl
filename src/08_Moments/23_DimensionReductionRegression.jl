@@ -307,12 +307,24 @@ This function fits a regression model (as specified by `retgt`) to the response 
 # Mathematical definition
 
 ```math
-\\hat{y} = \\hat{\\beta}_0 + \\mathbf{x}_1 \\hat{\\boldsymbol{\\beta}}_{\\mathrm{pc}}, \\qquad
-\\hat{\\boldsymbol{\\beta}} = \\mathbf{V}_p \\hat{\\boldsymbol{\\beta}}_{\\mathrm{pc}} \\oslash \\boldsymbol{\\sigma}, \\qquad
-\\hat{\\beta}_0 = \\bar{y} - \\hat{\\boldsymbol{\\beta}}^{\\intercal} \\boldsymbol{\\mu}
+\\begin{align}
+\\hat{y} &= \\hat{\\beta}_0 + \\mathbf{X}_1 \\hat{\\boldsymbol{\\beta}}_{\\mathrm{pc}}\\,, \\\\
+\\hat{\\boldsymbol{\\beta}} &= \\mathbf{V}_p \\hat{\\boldsymbol{\\beta}}_{\\mathrm{pc}} \\oslash \\boldsymbol{\\sigma}\\,, \\\\
+\\hat{\\beta}_0 &= \\bar{y} - \\hat{\\boldsymbol{\\beta}}^{\\intercal} \\boldsymbol{\\mu}\\,.
+\\end{align}
 ```
 
-where ``\\mathbf{V}_p`` is the PCA/PPCA projection matrix, ``\\boldsymbol{\\sigma}`` are feature standard deviations, and ``\\oslash`` denotes element-wise division.
+Where:
+
+  - ``\\hat{y}``: Fitted response.
+  - ``\\hat{\\boldsymbol{\\beta}}_{\\mathrm{pc}}``: Regression coefficients in the reduced (PC) space.
+  - ``\\hat{\\boldsymbol{\\beta}}``: Regression coefficients in the original feature space.
+  - ``\\hat{\\beta}_0``: Intercept adjusted to the original space.
+  - ``\\mathbf{X}_1``: Projected feature matrix in the reduced space.
+  - ``\\mathbf{V}_p``: PCA/PPCA projection matrix.
+  - ``\\boldsymbol{\\sigma}``: Feature standard deviations.
+  - ``\\boldsymbol{\\mu}``: Feature means.
+  - ``\\oslash``: Element-wise division.
 
 # Arguments
 

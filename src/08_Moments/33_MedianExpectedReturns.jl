@@ -77,10 +77,16 @@ computes a weighted median for each asset using the observation weights `w`.
 # Mathematical definition
 
 ```math
-\\hat{\\mu}_j = \\mathrm{median}(r_{1j}, r_{2j}, \\ldots, r_{Tj})
+\\begin{align}
+\\hat{\\mu}_j &= \\mathrm{median}(r_{1j}, r_{2j}, \\ldots, r_{Tj})\\,.
+\\end{align}
 ```
 
-Where ``r_{tj}`` is the return of asset ``j`` at time ``t``.
+Where:
+
+  - ``\\hat{\\mu}_j``: Median expected return of asset ``j``.
+  - ``r_{tj}``: Return of asset ``j`` at time ``t``.
+  - $(math_dict[:T])
 
 # Arguments
 

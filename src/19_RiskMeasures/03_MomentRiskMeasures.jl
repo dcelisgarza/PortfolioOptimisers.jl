@@ -300,7 +300,7 @@ Keywords correspond to the struct's fields.
 
   - If `w` is not `nothing`, `!isempty(w)`.
 
-# Formulations
+# Mathematical definition
 
 Depending on the `alg` field, the risk measure is formulated using `JuMP` as follows:
 
@@ -343,7 +343,7 @@ The mean absolute deviation is computed as:
 
 ```math
 \\begin{align}
-\\mathrm{MeanAbsoluteDeviation}(\\boldsymbol{X}) &= \\mathbb{E}\\left[\\left\\lvert \\boldsymbol{X} - \\mathbb{E}\\left[\\boldsymbol{X}\\right] \\right\\rvert\\right]
+\\mathrm{MeanAbsoluteDeviation}(\\boldsymbol{X}) &= \\mathbb{E}\\left[\\left\\lvert \\boldsymbol{X} - \\mathbb{E}\\left[\\boldsymbol{X}\\right] \\right\\rvert\\right]\\,.
 \\end{align}
 ```
 
@@ -430,9 +430,21 @@ The variance is formulated as.
 \\underset{\\boldsymbol{w},\\,\\boldsymbol{d}}{\\mathrm{opt}} \\quad & f \\cdot \\sigma^2\\\\
 \\mathrm{s.t.} \\quad & \\boldsymbol{d} = \\mathrm{X} \\boldsymbol{w} - \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] \\\\
                \\quad & \\boldsymbol{d}_s = \\sqrt{\\boldsymbol{\\lambda}} \\odot \\boldsymbol{d} \\\\
-               \\quad & \\left(\\sigma,\\, \\boldsymbol{d}_s\\right) \\in K_{soc}
+               \\quad & \\left(\\sigma,\\, \\boldsymbol{d}_s\\right) \\in K_{soc}\\,.
 \\end{align}
 ```
+
+Where:
+
+  - ``\\boldsymbol{w}``: `N × 1` asset weights vector.
+  - ``\\boldsymbol{d}``: `T × 1` vector of auxiliary decision variables representing deviations from the target.
+  - ``\\sigma``: Standard deviation of the portfolio returns.
+  - ``\\boldsymbol{d}_s``: `T × 1` vector of scaled deviations according to observation weights.
+  - ``\\mathrm{X}``: `T × N` return matrix.
+  - ``\\boldsymbol{\\lambda}``: `T × 1` vector of observation weights.
+  - ``f``: Observation weights scaling factor, it is a function of the type of observation weights.
+  - ``K_{soc}``: Second order cone.
+  - ``\\odot``: Element-wise (Hadamard) product.
 
 The semi-variance is formulated as.
 
@@ -442,7 +454,7 @@ The semi-variance is formulated as.
 \\mathrm{s.t.} \\quad & \\mathrm{X} \\boldsymbol{w} - \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] \\geq -\\boldsymbol{d} \\\\
                \\quad & \\boldsymbol{d} \\geq 0 \\\\
                \\quad & \\boldsymbol{d}_s = \\sqrt{\\boldsymbol{\\lambda}} \\odot \\boldsymbol{d} \\\\
-               \\quad & \\left(\\sigma,\\, \\boldsymbol{d}_s\\right) \\in K_{soc}
+               \\quad & \\left(\\sigma,\\, \\boldsymbol{d}_s\\right) \\in K_{soc}\\,.
 \\end{align}
 ```
 
@@ -469,9 +481,21 @@ The variance is formulated as.
 \\underset{\\boldsymbol{w},\\,\\boldsymbol{d}}{\\mathrm{opt}} \\quad & f \\cdot t\\\\
 \\mathrm{s.t.} \\quad & \\boldsymbol{d} = \\mathrm{X} \\boldsymbol{w} - \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] \\\\
                \\quad & \\boldsymbol{d}_s = \\sqrt{\\boldsymbol{\\lambda}} \\odot \\boldsymbol{d} \\\\
-               \\quad & \\left(t,\\, 0.5,\\,\\boldsymbol{d}_s\\right) \\in K_{rsoc}
+               \\quad & \\left(t,\\, 0.5,\\,\\boldsymbol{d}_s\\right) \\in K_{rsoc}\\,.
 \\end{align}
 ```
+
+Where:
+
+  - ``\\boldsymbol{w}``: `N × 1` asset weights vector.
+  - ``\\boldsymbol{d}``: `T × 1` vector of auxiliary decision variables representing deviations from the target.
+  - ``t``: Variance of the portfolio returns.
+  - ``\\boldsymbol{d}_s``: `T × 1` vector of scaled deviations according to observation weights.
+  - ``\\mathrm{X}``: `T × N` return matrix.
+  - ``\\boldsymbol{\\lambda}``: `T × 1` vector of observation weights.
+  - ``f``: Observation weights scaling factor, it is a function of the type of observation weights.
+  - ``K_{rsoc}``: Rotated second order cone.
+  - ``\\odot``: Element-wise (Hadamard) product.
 
 The semi-variance is formulated as.
 
@@ -481,7 +505,7 @@ The semi-variance is formulated as.
 \\mathrm{s.t.} \\quad & \\mathrm{X} \\boldsymbol{w} - \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] \\geq -\\boldsymbol{d} \\\\
                \\quad & \\boldsymbol{d} \\geq 0 \\\\
                \\quad & \\boldsymbol{d}_s = \\sqrt{\\boldsymbol{\\lambda}} \\odot \\boldsymbol{d} \\\\
-               \\quad & \\left(t,\\, 0.5,\\,\\boldsymbol{d}_s\\right) \\in K_{rsoc}
+               \\quad & \\left(t,\\, 0.5,\\,\\boldsymbol{d}_s\\right) \\in K_{rsoc}\\,.
 \\end{align}
 ```
 
@@ -507,9 +531,19 @@ The variance is formulated as.
 \\begin{align}
 \\underset{\\boldsymbol{w},\\,\\boldsymbol{d}}{\\mathrm{opt}} \\quad & f \\cdot \\boldsymbol{d}_s \\cdot \\boldsymbol{d}_s\\\\
 \\mathrm{s.t.} \\quad & \\boldsymbol{d} = \\mathrm{X} \\boldsymbol{w} - \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] \\\\
-               \\quad & \\boldsymbol{d}_s = \\sqrt{\\boldsymbol{\\lambda}} \\odot \\boldsymbol{d}
+               \\quad & \\boldsymbol{d}_s = \\sqrt{\\boldsymbol{\\lambda}} \\odot \\boldsymbol{d}\\,.
 \\end{align}
 ```
+
+Where:
+
+  - ``\\boldsymbol{w}``: `N × 1` asset weights vector.
+  - ``\\boldsymbol{d}``: `T × 1` vector of auxiliary decision variables representing deviations from the target.
+  - ``\\boldsymbol{d}_s``: `T × 1` vector of scaled deviations according to observation weights.
+  - ``\\mathrm{X}``: `T × N` return matrix.
+  - ``\\boldsymbol{\\lambda}``: `T × 1` vector of observation weights.
+  - ``f``: Observation weights scaling factor, it is a function of the type of observation weights.
+  - ``\\odot``: Element-wise (Hadamard) product.
 
 The semi-variance is formulated as.
 
@@ -518,7 +552,7 @@ The semi-variance is formulated as.
 \\underset{\\boldsymbol{w},\\,\\boldsymbol{d}}{\\mathrm{opt}} \\quad & f \\cdot \\boldsymbol{d}_s \\cdot \\boldsymbol{d}_s\\\\
 \\mathrm{s.t.} \\quad & \\mathrm{X} \\boldsymbol{w} - \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] \\geq -\\boldsymbol{d} \\\\
                \\quad & \\boldsymbol{d} \\geq 0 \\\\
-               \\quad & \\boldsymbol{d}_s = \\sqrt{\\boldsymbol{\\lambda}} \\odot \\boldsymbol{d}
+               \\quad & \\boldsymbol{d}_s = \\sqrt{\\boldsymbol{\\lambda}} \\odot \\boldsymbol{d}\\,.
 \\end{align}
 ```
 
@@ -544,9 +578,21 @@ The standard deviation is formulated as.
 \\underset{\\boldsymbol{w},\\,\\boldsymbol{d}}{\\mathrm{opt}} \\quad & \\sqrt{f} \\cdot \\sigma\\\\
 \\mathrm{s.t.} \\quad & \\boldsymbol{d} = \\mathrm{X} \\boldsymbol{w} - \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] \\\\
                \\quad & \\boldsymbol{d}_s = \\sqrt{\\boldsymbol{\\lambda}} \\odot \\boldsymbol{d} \\\\
-               \\quad & \\left(\\sigma,\\, \\boldsymbol{d}_s\\right) \\in K_{soc}
+               \\quad & \\left(\\sigma,\\, \\boldsymbol{d}_s\\right) \\in K_{soc}\\,.
 \\end{align}
 ```
+
+Where:
+
+  - ``\\boldsymbol{w}``: `N × 1` asset weights vector.
+  - ``\\boldsymbol{d}``: `T × 1` vector of auxiliary decision variables representing deviations from the target.
+  - ``\\sigma``: Standard deviation of the portfolio returns.
+  - ``\\boldsymbol{d}_s``: `T × 1` vector of scaled deviations according to observation weights.
+  - ``\\mathrm{X}``: `T × N` return matrix.
+  - ``\\boldsymbol{\\lambda}``: `T × 1` vector of observation weights.
+  - ``f``: Observation weights scaling factor, it is a function of the type of observation weights.
+  - ``K_{soc}``: Second order cone.
+  - ``\\odot``: Element-wise (Hadamard) product.
 
 The semi-standard deviation is formulated as.
 
@@ -556,7 +602,7 @@ The semi-standard deviation is formulated as.
 \\mathrm{s.t.} \\quad & \\mathrm{X} \\boldsymbol{w} - \\mathbb{E}\\left[\\mathrm{X} \\boldsymbol{w}\\right] \\geq -\\boldsymbol{d} \\\\
                \\quad & \\boldsymbol{d} \\geq 0 \\\\
                \\quad & \\boldsymbol{d}_s = \\sqrt{\\boldsymbol{\\lambda}} \\odot \\boldsymbol{d} \\\\
-               \\quad & \\left(\\sigma,\\, \\boldsymbol{d}_s\\right) \\in K_{soc}
+               \\quad & \\left(\\sigma,\\, \\boldsymbol{d}_s\\right) \\in K_{soc}\\,.
 \\end{align}
 ```
 
@@ -673,7 +719,7 @@ Keywords correspond to the struct's fields.
 
   - If `w` is not `nothing`, `!isempty(w)`.
 
-# Formulations
+# Mathematical definition
 
 Depending on the `alg` field, the risk measure is can compute the third lower moment, fourth lower (semi) moment, or fourth central (full) moment. Each can be standardised or unstandardised.
 
@@ -692,17 +738,32 @@ All unstandardised central moments have the following formula.
 
 ```math
 \\begin{align}
-\\mu_n &= \\mathbb{E}\\left[\\left(\\boldsymbol{X} - \\mathbb{E}\\left[\\boldsymbol{X}\\right]\\right)^n\\right]
+\\mu_n &= \\mathbb{E}\\left[\\left(\\boldsymbol{X} - \\mathbb{E}\\left[\\boldsymbol{X}\\right]\\right)^n\\right]\\,.
 \\end{align}
 ```
+
+Where:
+
+  - ``\\mu_n``: ``n``-th central moment.
+  - ``\\boldsymbol{X}``: `T × 1` vector of portfolio returns.
+  - ``\\mathbb{E}[\\cdot]``: Expected value operator, supports weighted averages.
+  - ``n``: Moment order.
 
 All unstandardised lower moments have the following formula.
 
 ```math
 \\begin{align}
-\\mu_n &= \\mathbb{E}\\left[\\min \\circ \\left(\\boldsymbol{X} - \\mathbb{E}\\left[\\boldsymbol{X}\\right],\\, 0\\right)^n\\right]
+\\mu_n &= \\mathbb{E}\\left[\\min \\circ \\left(\\boldsymbol{X} - \\mathbb{E}\\left[\\boldsymbol{X}\\right],\\, 0\\right)^n\\right]\\,.
 \\end{align}
 ```
+
+Where:
+
+  - ``\\mu_n``: ``n``-th lower moment.
+  - ``\\boldsymbol{X}``: `T × 1` vector of portfolio returns.
+  - ``\\mathbb{E}[\\cdot]``: Expected value operator, supports weighted averages.
+  - ``\\circ``: Element-wise function application.
+  - ``n``: Moment order.
 
 ## Standardised Moments
 
@@ -710,23 +771,32 @@ All standardised central moments have the following formula.
 
 ```math
 \\begin{align}
-\\mu_n &= \\dfrac{\\mathbb{E}\\left[\\left(\\boldsymbol{X} - \\mathbb{E}\\left[\\boldsymbol{X}\\right]\\right)^n\\right]}{\\mathbb{E}\\left[\\left(\\boldsymbol{X} - \\mathbb{E}\\left[\\boldsymbol{X}\\right]\\right)^2\\right]^{n/2}}
-\\end{align}
-```
-
-All standardised lower moments have the following formula.
-
-```math
-\\begin{align}
-\\mu_n &= \\dfrac{\\mathbb{E}\\left[\\min \\circ \\left(\\boldsymbol{X} - \\mathbb{E}\\left[\\boldsymbol{X}\\right],\\, 0\\right)^n\\right]}{\\mathbb{E}\\left[\\min \\circ \\left(\\boldsymbol{X} - \\mathbb{E}\\left[\\boldsymbol{X}\\right],\\, 0\\right)^2\\right]^{n/2}}
+\\mu_n &= \\dfrac{\\mathbb{E}\\left[\\left(\\boldsymbol{X} - \\mathbb{E}\\left[\\boldsymbol{X}\\right]\\right)^n\\right]}{\\mathbb{E}\\left[\\left(\\boldsymbol{X} - \\mathbb{E}\\left[\\boldsymbol{X}\\right]\\right)^2\\right]^{n/2}}\\,.
 \\end{align}
 ```
 
 Where:
 
+  - ``\\mu_n``: ``n``-th standardised central moment.
+  - ``\\boldsymbol{X}``: `T × 1` vector of portfolio returns.
+  - ``\\mathbb{E}[\\cdot]``: Expected value operator, supports weighted averages.
+  - ``n``: Moment order.
+
+All standardised lower moments have the following formula.
+
+```math
+\\begin{align}
+\\mu_n &= \\dfrac{\\mathbb{E}\\left[\\min \\circ \\left(\\boldsymbol{X} - \\mathbb{E}\\left[\\boldsymbol{X}\\right],\\, 0\\right)^n\\right]}{\\mathbb{E}\\left[\\min \\circ \\left(\\boldsymbol{X} - \\mathbb{E}\\left[\\boldsymbol{X}\\right],\\, 0\\right)^2\\right]^{n/2}}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\mu_n``: ``n``-th standardised lower moment.
   - ``\\boldsymbol{X}``: `T × 1` vector of portfolio returns.
   - ``\\mathbb{E}[\\cdot]``: Expected value operator, supports weighted averages.
   - ``\\circ``: Element-wise function application.
+  - ``n``: Moment order.
 
 # Functor
 

@@ -88,8 +88,18 @@ Represents the Tracking Error risk measure.
 Let ``\\boldsymbol{x}`` be the portfolio returns series, ``\\boldsymbol{b}`` the benchmark returns, and ``N_T`` the number of observations. The ``L^2`` tracking error is:
 
 ```math
-\\mathrm{TE}(\\boldsymbol{w}) = \\sqrt{\\frac{1}{N_T}\\lVert \\boldsymbol{x} - \\boldsymbol{b} \\rVert_2^2}\\,.
+\\begin{align}
+\\mathrm{TE}(\\boldsymbol{w}) &= \\sqrt{\\frac{1}{N_T}\\lVert \\boldsymbol{x} - \\boldsymbol{b} \\rVert_2^2}\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``\\mathrm{TE}(\\boldsymbol{w})``: ``L^2`` tracking error of the portfolio.
+  - $(math_dict[:w_port])
+  - ``\\boldsymbol{x}``: Portfolio returns series ``N_T \\times 1``.
+  - ``\\boldsymbol{b}``: Benchmark returns series ``N_T \\times 1``.
+  - ``N_T``: Number of observations.
 
 Other norms can be selected via the `alg` field.
 
@@ -200,16 +210,32 @@ Represents the Risk Tracking risk measure.
 **Independent mode:**
 
 ```math
-\\mathrm{RkTrack}_{\\mathrm{indep}}(\\boldsymbol{w}) = \\rho(\\boldsymbol{w} - \\boldsymbol{w}_b)\\,,
+\\begin{align}
+\\mathrm{RkTrack}_{\\mathrm{indep}}(\\boldsymbol{w}) &= \\rho(\\boldsymbol{w} - \\boldsymbol{w}_b)\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``\\mathrm{RkTrack}_{\\mathrm{indep}}(\\boldsymbol{w})``: Risk of the weight difference between portfolio and benchmark.
+  - $(math_dict[:w_port])
+  - ``\\boldsymbol{w}_b``: Benchmark portfolio weights vector ``N \\times 1``.
+  - ``\\rho``: Chosen base risk measure.
 
 **Dependent mode:**
 
 ```math
-\\mathrm{RkTrack}_{\\mathrm{dep}}(\\boldsymbol{w}) = |\\rho(\\boldsymbol{w}) - \\rho(\\boldsymbol{w}_b)|\\,,
+\\begin{align}
+\\mathrm{RkTrack}_{\\mathrm{dep}}(\\boldsymbol{w}) &= |\\rho(\\boldsymbol{w}) - \\rho(\\boldsymbol{w}_b)|\\,.
+\\end{align}
 ```
 
-where ``\\boldsymbol{w}_b`` are the benchmark weights and ``\\rho`` is the chosen risk measure.
+Where:
+
+  - ``\\mathrm{RkTrack}_{\\mathrm{dep}}(\\boldsymbol{w})``: Absolute difference between portfolio risk and benchmark risk.
+  - $(math_dict[:w_port])
+  - ``\\boldsymbol{w}_b``: Benchmark portfolio weights vector ``N \\times 1``.
+  - ``\\rho``: Chosen base risk measure.
 
 # Fields
 

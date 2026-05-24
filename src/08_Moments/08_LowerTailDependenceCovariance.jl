@@ -122,15 +122,18 @@ The lower tail dependence (LTD) between two assets quantifies the probability th
 For a quantile level ``\\alpha \\in (0,1)`` and ``k = \\lceil T \\alpha \\rceil``, let ``\\hat{q}_i`` denote the empirical ``\\alpha``-quantile of asset ``i`` (the ``k``-th order statistic). The lower tail dependence between assets ``i`` and ``j`` is estimated as:
 
 ```math
-\\hat{\\lambda}_{ij} = \\frac{1}{k} \\sum_{t=1}^{T} \\mathbf{1}\\left[x_{ti} \\leq \\hat{q}_i \\text{ and } x_{tj} \\leq \\hat{q}_j\\right]
+\\begin{align}
+\\hat{\\lambda}_{ij} &= \\frac{1}{k} \\sum_{t=1}^{T} \\mathbf{1}\\left[x_{ti} \\leq \\hat{q}_i \\text{ and } x_{tj} \\leq \\hat{q}_j\\right]\\,.
+\\end{align}
 ```
 
 The resulting matrix is symmetric with entries clamped to ``[0,\\, 1]``.
 
 Where:
 
-  - ``T``: Number of observations.
-  - ``\\alpha``: Quantile level for the lower tail (e.g., ``0.05``).
+  - ``\\hat{\\lambda}_{ij}``: Lower tail dependence estimate between assets ``i`` and ``j``.
+  - $(math_dict[:T])
+  - $(math_dict[:alpha_rm])
   - ``k = \\lceil T \\alpha \\rceil``: Number of observations in the lower tail.
   - ``x_{ti}``: Return of asset ``i`` at time ``t``.
   - ``\\hat{q}_i``: Empirical ``\\alpha``-quantile of asset ``i``.

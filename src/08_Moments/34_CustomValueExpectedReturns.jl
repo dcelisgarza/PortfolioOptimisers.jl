@@ -53,10 +53,16 @@ Compute expected returns as custom values.
 Returns a user-supplied constant, vector, or function result as the expected returns:
 
 ```math
-\\hat{\\mu}_j = v_j, \\quad j = 1, \\ldots, N
+\\begin{align}
+\\hat{\\mu}_j &= v_j, \\quad j = 1, \\ldots, N\\,.
+\\end{align}
 ```
 
-Where ``v_j`` is the ``j``-th element of the custom value `me.val` (broadcast from a scalar, taken directly from a vector, or evaluated from a callable).
+Where:
+
+  - ``\\hat{\\mu}_j``: Expected return of asset ``j``.
+  - ``v_j``: ``j``-th element of the custom value `me.val` (broadcast from a scalar, taken directly from a vector, or evaluated from a callable).
+  - $(math_dict[:N])
 
 # Arguments
 

@@ -10,14 +10,33 @@ Represents the Conditional Value-at-Risk (CVaR) risk measure, also known as Expe
 Let ``\\boldsymbol{x} = (x_1, \\ldots, x_T)^\\intercal`` be the portfolio returns vector. The CVaR (also known as Expected Shortfall) at level ``\\alpha`` is the expected loss in the worst ``\\alpha`` fraction of scenarios:
 
 ```math
-\\mathrm{CVaR}_{\\alpha}(\\boldsymbol{x}) = \\min_{\\nu \\in \\mathbb{R}} \\left\\{ -\\nu + \\frac{1}{\\alpha T} \\sum_{t=1}^{T} \\max(-x_t - \\nu,\\, 0) \\right\\}\\,.
+\\begin{align}
+\\mathrm{CVaR}_{\\alpha}(\\boldsymbol{x}) &= \\underset{\\nu}{\\min} \\left\\{ -\\nu + \\frac{1}{\\alpha T} \\sum_{t=1}^{T} \\max(-x_t - \\nu,\\, 0) \\right\\}\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``\\mathrm{CVaR}_{\\alpha}(\\boldsymbol{x})``: Conditional Value-at-Risk (Expected Shortfall) at level ``\\alpha``.
+  - $(math_dict[:xret])
+  - $(math_dict[:alpha_rm])
+  - $(math_dict[:T])
+  - ``\\nu``: Auxiliary variable (Value-at-Risk threshold).
 
 Equivalently, it is the expected loss conditional on exceeding the VaR:
 
 ```math
-\\mathrm{CVaR}_{\\alpha}(\\boldsymbol{x}) = -\\mathbb{E}\\!\\left[x \\mid x \\leq -\\mathrm{VaR}_{\\alpha}(\\boldsymbol{x})\\right]\\,.
+\\begin{align}
+\\mathrm{CVaR}_{\\alpha}(\\boldsymbol{x}) &= -\\mathbb{E}\\!\\left[x \\mid x \\leq -\\mathrm{VaR}_{\\alpha}(\\boldsymbol{x})\\right]\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``\\mathrm{CVaR}_{\\alpha}(\\boldsymbol{x})``: CVaR as the expected loss conditional on exceeding the VaR threshold.
+  - $(math_dict[:xret])
+  - $(math_dict[:alpha_rm])
+  - ``\\mathrm{VaR}_{\\alpha}(\\boldsymbol{x})``: Value-at-Risk at level ``\\alpha``.
 
 # Fields
 
@@ -101,8 +120,18 @@ Represents the Distributionally Robust Conditional Value-at-Risk (DR-CVaR) risk 
 The DR-CVaR with Wasserstein ambiguity parameter ``l`` and radius ``r`` is a robust upper bound on CVaR under distributional uncertainty within a Wasserstein ball of radius ``r``:
 
 ```math
-\\mathrm{DR\\text{-}CVaR}_{\\alpha, l, r}(\\boldsymbol{x}) = \\mathrm{CVaR}_{\\alpha}(\\boldsymbol{x}) + l \\cdot r\\,.
+\\begin{align}
+\\mathrm{DR\\text{-}CVaR}_{\\alpha, l, r}(\\boldsymbol{x}) &= \\mathrm{CVaR}_{\\alpha}(\\boldsymbol{x}) + l \\cdot r\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``\\mathrm{DR\\text{-}CVaR}_{\\alpha, l, r}(\\boldsymbol{x})``: Distributionally Robust CVaR.
+  - $(math_dict[:xret])
+  - $(math_dict[:alpha_rm])
+  - ``l``: Wasserstein ambiguity scale factor.
+  - ``r``: Wasserstein ball radius.
 
 # Fields
 
@@ -247,10 +276,17 @@ Represents the Conditional Value-at-Risk Range (CVaR Range) risk measure.
 # Mathematical definition
 
 ```math
-\\mathrm{CVaRRange}_{\\alpha,\\beta}(\\boldsymbol{x}) = \\mathrm{CVaR}_{\\alpha}(\\boldsymbol{x}) - \\mathrm{CVaR}_{\\beta}(-\\boldsymbol{x})\\,,
+\\begin{align}
+\\mathrm{CVaRRange}_{\\alpha,\\beta}(\\boldsymbol{x}) &= \\mathrm{CVaR}_{\\alpha}(\\boldsymbol{x}) - \\mathrm{CVaR}_{\\beta}(-\\boldsymbol{x})\\,.
+\\end{align}
 ```
 
-where ``\\mathrm{CVaR}_{\\alpha}(\\boldsymbol{x})`` captures the lower-tail expected shortfall and ``\\mathrm{CVaR}_{\\beta}(-\\boldsymbol{x})`` captures the upper-tail expected surplus (gain).
+Where:
+
+  - ``\\mathrm{CVaRRange}_{\\alpha,\\beta}(\\boldsymbol{x})``: CVaR range (tail spread).
+  - $(math_dict[:xret])
+  - ``\\mathrm{CVaR}_{\\alpha}(\\boldsymbol{x})``: Lower-tail expected shortfall at level ``\\alpha``.
+  - ``\\mathrm{CVaR}_{\\beta}(-\\boldsymbol{x})``: Upper-tail expected surplus at level ``\\beta``.
 
 # Fields
 
@@ -345,10 +381,17 @@ Represents the Distributionally Robust Conditional Value-at-Risk Range (DR-CVaR 
 # Mathematical definition
 
 ```math
-\\mathrm{DR\\text{-}CVaRRange}(\\boldsymbol{x}) = \\mathrm{DR\\text{-}CVaR}_{\\alpha, l_a, r_a}(\\boldsymbol{x}) - \\mathrm{DR\\text{-}CVaR}_{\\beta, l_b, r_b}(-\\boldsymbol{x})\\,,
+\\begin{align}
+\\mathrm{DR\\text{-}CVaRRange}(\\boldsymbol{x}) &= \\mathrm{DR\\text{-}CVaR}_{\\alpha, l_a, r_a}(\\boldsymbol{x}) - \\mathrm{DR\\text{-}CVaR}_{\\beta, l_b, r_b}(-\\boldsymbol{x})\\,.
+\\end{align}
 ```
 
-where each DR-CVaR uses its own Wasserstein ambiguity parameters ``(l_a, r_a)`` and ``(l_b, r_b)`` respectively.
+Where:
+
+  - ``\\mathrm{DR\\text{-}CVaRRange}(\\boldsymbol{x})``: DR-CVaR range.
+  - $(math_dict[:xret])
+  - ``\\mathrm{DR\\text{-}CVaR}_{\\alpha, l_a, r_a}(\\boldsymbol{x})``: Lower-tail DR-CVaR with Wasserstein parameters ``(l_a, r_a)``.
+  - ``\\mathrm{DR\\text{-}CVaR}_{\\beta, l_b, r_b}(-\\boldsymbol{x})``: Upper-tail DR-CVaR with Wasserstein parameters ``(l_b, r_b)``.
 
 # Fields
 
@@ -550,14 +593,33 @@ Represents the Conditional Drawdown-at-Risk (CDaR) risk measure, also known as E
 Define the absolute drawdown series:
 
 ```math
-c_t = \\sum_{s=1}^{t} x_s\\,, \\qquad d_t = c_t - \\max_{0 \\leq s \\leq t} c_s \\leq 0\\,.
+\\begin{align}
+c_t &= \\sum_{s=1}^{t} x_s\\,, \\\\
+d_t &= c_t - \\max_{0 \\leq s \\leq t} c_s \\leq 0\\,.
+\\end{align}
 ```
+
+Where:
+
+  - $(math_dict[:xret])
+  - $(math_dict[:ct])
+  - $(math_dict[:dtdd])
 
 The CDaR is the CVaR of the drawdown series ``\\boldsymbol{d} = (d_1, \\ldots, d_T)^\\intercal``:
 
 ```math
-\\mathrm{CDaR}_{\\alpha}(\\boldsymbol{x}) = \\min_{\\nu \\in \\mathbb{R}} \\left\\{ -\\nu + \\frac{1}{\\alpha T} \\sum_{t=1}^{T} \\max(-d_t - \\nu,\\, 0) \\right\\}\\,.
+\\begin{align}
+\\mathrm{CDaR}_{\\alpha}(\\boldsymbol{x}) &= \\underset{\\nu}{\\min} \\left\\{ -\\nu + \\frac{1}{\\alpha T} \\sum_{t=1}^{T} \\max(-d_t - \\nu,\\, 0) \\right\\}\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``\\mathrm{CDaR}_{\\alpha}(\\boldsymbol{x})``: Conditional Drawdown-at-Risk (Expected Maximum Drawdown).
+  - $(math_dict[:alpha_rm])
+  - $(math_dict[:T])
+  - $(math_dict[:dtdd])
+  - ``\\nu``: Auxiliary variable (DaR threshold).
 
 # Fields
 
@@ -638,8 +700,18 @@ Represents the Distributionally Robust Conditional Drawdown-at-Risk (DR-CDaR) ri
 # Mathematical definition
 
 ```math
-\\mathrm{DR\\text{-}CDaR}_{\\alpha, l, r}(\\boldsymbol{x}) = \\mathrm{CDaR}_{\\alpha}(\\boldsymbol{x}) + l \\cdot r\\,.
+\\begin{align}
+\\mathrm{DR\\text{-}CDaR}_{\\alpha, l, r}(\\boldsymbol{x}) &= \\mathrm{CDaR}_{\\alpha}(\\boldsymbol{x}) + l \\cdot r\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``\\mathrm{DR\\text{-}CDaR}_{\\alpha, l, r}(\\boldsymbol{x})``: Distributionally Robust CDaR.
+  - $(math_dict[:xret])
+  - $(math_dict[:alpha_rm])
+  - ``l``: Wasserstein ambiguity scale factor.
+  - ``r``: Wasserstein ball radius.
 
 # Fields
 
@@ -785,14 +857,33 @@ Represents the Relative Conditional Drawdown-at-Risk risk measure for hierarchic
 Define the compounded wealth process and relative drawdown series:
 
 ```math
-C_t = \\prod_{s=1}^{t} (1 + x_s)\\,, \\qquad rd_t = \\frac{C_t}{\\max_{0 \\leq s \\leq t} C_s} - 1 \\leq 0\\,.
+\\begin{align}
+C_t &= \\prod_{s=1}^{t} (1 + x_s)\\,, \\\\
+rd_t &= \\frac{C_t}{\\max_{0 \\leq s \\leq t} C_s} - 1 \\leq 0\\,.
+\\end{align}
 ```
+
+Where:
+
+  - $(math_dict[:xret])
+  - $(math_dict[:Ct])
+  - $(math_dict[:rdt])
 
 The Relative CDaR is the CVaR of the relative drawdown series ``\\boldsymbol{rd}``:
 
 ```math
-\\mathrm{RCDaR}_{\\alpha}(\\boldsymbol{x}) = \\min_{\\nu \\in \\mathbb{R}} \\left\\{ -\\nu + \\frac{1}{\\alpha T} \\sum_{t=1}^{T} \\max(-rd_t - \\nu,\\, 0) \\right\\}\\,.
+\\begin{align}
+\\mathrm{RCDaR}_{\\alpha}(\\boldsymbol{x}) &= \\underset{\\nu}{\\min} \\left\\{ -\\nu + \\frac{1}{\\alpha T} \\sum_{t=1}^{T} \\max(-rd_t - \\nu,\\, 0) \\right\\}\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``\\mathrm{RCDaR}_{\\alpha}(\\boldsymbol{x})``: Relative Conditional Drawdown-at-Risk.
+  - $(math_dict[:alpha_rm])
+  - $(math_dict[:T])
+  - $(math_dict[:rdt])
+  - ``\\nu``: Auxiliary variable (RDaR threshold).
 
 # Fields
 

@@ -10,14 +10,32 @@ Represents the Ulcer Index risk measure.
 Define the absolute drawdown series:
 
 ```math
-c_t = \\sum_{s=1}^{t} x_s\\,, \\qquad d_t = c_t - \\max_{0 \\leq s \\leq t} c_s \\leq 0\\,.
+\\begin{align}
+c_t &= \\sum_{s=1}^{t} x_s\\,, \\\\
+d_t &= c_t - \\max_{0 \\leq s \\leq t} c_s \\leq 0\\,.
+\\end{align}
 ```
+
+Where:
+
+  - $(math_dict[:xret])
+  - $(math_dict[:ct])
+  - $(math_dict[:dtdd])
 
 The Ulcer Index is:
 
 ```math
-\\mathrm{UI}(\\boldsymbol{x}) = \\sqrt{\\frac{1}{T} \\sum_{t=1}^{T} d_t^2} = \\frac{\\lVert \\boldsymbol{d} \\rVert_2}{\\sqrt{T}}\\,.
+\\begin{align}
+\\mathrm{UI}(\\boldsymbol{x}) &= \\sqrt{\\frac{1}{T} \\sum_{t=1}^{T} d_t^2} = \\frac{\\lVert \\boldsymbol{d} \\rVert_2}{\\sqrt{T}}\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``\\mathrm{UI}(\\boldsymbol{x})``: Ulcer Index (root-mean-square drawdown).
+  - $(math_dict[:T])
+  - $(math_dict[:dtdd])
+  - ``\\boldsymbol{d}``: Absolute drawdown series vector ``T \\times 1``.
 
 # Fields
 
@@ -86,14 +104,32 @@ Represents the Relative Ulcer Index risk measure for hierarchical optimisation.
 Define the relative drawdown series:
 
 ```math
-C_t = \\prod_{s=1}^{t} (1 + x_s)\\,, \\qquad rd_t = \\frac{C_t}{\\max_{0 \\leq s \\leq t} C_s} - 1 \\leq 0\\,.
+\\begin{align}
+C_t &= \\prod_{s=1}^{t} (1 + x_s)\\,, \\\\
+rd_t &= \\frac{C_t}{\\max_{0 \\leq s \\leq t} C_s} - 1 \\leq 0\\,.
+\\end{align}
 ```
+
+Where:
+
+  - $(math_dict[:xret])
+  - $(math_dict[:Ct])
+  - $(math_dict[:rdt])
 
 The Relative Ulcer Index is:
 
 ```math
-\\mathrm{RUI}(\\boldsymbol{x}) = \\frac{\\lVert \\boldsymbol{rd} \\rVert_2}{\\sqrt{T}}\\,.
+\\begin{align}
+\\mathrm{RUI}(\\boldsymbol{x}) &= \\frac{\\lVert \\boldsymbol{rd} \\rVert_2}{\\sqrt{T}}\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``\\mathrm{RUI}(\\boldsymbol{x})``: Relative Ulcer Index (root-mean-square relative drawdown).
+  - $(math_dict[:T])
+  - $(math_dict[:rdt])
+  - ``\\boldsymbol{rd}``: Relative drawdown series vector ``T \\times 1``.
 
 # Fields
 

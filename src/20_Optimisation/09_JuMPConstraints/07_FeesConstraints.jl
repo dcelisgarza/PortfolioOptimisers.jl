@@ -41,10 +41,20 @@ The fall-through method does nothing. The concrete method computes `val' * |w - 
 # Mathematical definition
 
 ```math
-t_{ftn,i} \\geq |w_i - w_{t,i}\\, k|, \\qquad f_{tn} = \\boldsymbol{v}^\\intercal \\boldsymbol{t}_{ftn}
+\\begin{align}
+t_{ftn,i} &\\geq |w_i - w_{t,i}\\, k|\\,, \\\\
+f_{tn} &= \\boldsymbol{v}^\\intercal \\boldsymbol{t}_{ftn}\\,.
+\\end{align}
 ```
 
-where ``\\boldsymbol{w}_t`` is the benchmark weight vector, ``k`` is the budget scaling variable, ``\\boldsymbol{v}`` is the per-asset fee rate vector, and ``\\boldsymbol{t}_{ftn}`` is the absolute-deviation auxiliary variable.
+Where:
+
+  - ``w_i``: Portfolio weight for asset ``i``.
+  - ``w_{t,i}``: Benchmark weight for asset ``i``.
+  - $(math_dict[:k_budget])
+  - ``\\boldsymbol{v}``: Per-asset fee rate vector.
+  - ``\\boldsymbol{t}_{ftn}``: Auxiliary absolute-deviation variable vector.
+  - ``f_{tn}``: Total turnover fee.
 
 # Arguments
 
@@ -120,10 +130,16 @@ The fall-through method does nothing. The concrete method adds `fl' * lw` to the
 # Mathematical definition
 
 ```math
-f_l = \\boldsymbol{f}_l^\\intercal \\boldsymbol{lw}
+\\begin{align}
+f_l &= \\boldsymbol{f}_l^\\intercal \\boldsymbol{lw}\\,.
+\\end{align}
 ```
 
-where ``\\boldsymbol{f}_l`` is the per-asset long-side fee rate vector and ``\\boldsymbol{lw}`` is the long-weight vector.
+Where:
+
+  - ``f_l``: Total long-side fee.
+  - ``\\boldsymbol{f}_l``: Per-asset long-side fee rate vector.
+  - ``\\boldsymbol{lw}``: Long-weight vector.
 
 # Arguments
 
@@ -154,10 +170,16 @@ The fall-through method does nothing. The concrete method adds `fs' * sw` to the
 # Mathematical definition
 
 ```math
-f_s = \\boldsymbol{f}_s^\\intercal \\boldsymbol{sw}
+\\begin{align}
+f_s &= \\boldsymbol{f}_s^\\intercal \\boldsymbol{sw}\\,.
+\\end{align}
 ```
 
-where ``\\boldsymbol{f}_s`` is the per-asset short-side fee rate vector and ``\\boldsymbol{sw}`` is the short-weight vector.
+Where:
+
+  - ``f_s``: Total short-side fee.
+  - ``\\boldsymbol{f}_s``: Per-asset short-side fee rate vector.
+  - ``\\boldsymbol{sw}``: Short-weight vector.
 
 # Arguments
 

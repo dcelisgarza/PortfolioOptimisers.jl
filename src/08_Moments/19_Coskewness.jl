@@ -27,10 +27,15 @@ $(DocStringExtensions.FIELDS)
     Coskewness(;
         me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
         mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing(),
-        alg::AbstractMomentAlgorithm = Full()
+        alg::AbstractMomentAlgorithm = Full(),
+        w::Option{<:ObsWeights} = nothing
     ) -> Coskewness
 
 Keywords correspond to the struct's fields.
+
+# Validation
+
+  - $(val_dict[:oow])
 
 # Examples
 
@@ -47,7 +52,8 @@ Coskewness
       │      dt ┼ nothing
       │     alg ┼ nothing
       │   order ┴ DenoiseDetoneAlg()
-  alg ┴ Full()
+  alg ┼ Full()
+    w ┴ nothing
 ```
 
 # Related
@@ -64,15 +70,20 @@ Coskewness
     mp
     "$(field_dict[:malg])"
     alg
+    "$(field_dict[:oow])"
+    w
     function Coskewness(me::AbstractExpectedReturnsEstimator,
-                        mp::AbstractMatrixProcessingEstimator, alg::AbstractMomentAlgorithm)
-        return new{typeof(me), typeof(mp), typeof(alg)}(me, mp, alg)
+                        mp::AbstractMatrixProcessingEstimator, alg::AbstractMomentAlgorithm,
+                        w::Option{<:ObsWeights})
+        assert_nonempty_nonneg_finite_val(w, :w)
+        return new{typeof(me), typeof(mp), typeof(alg), typeof(w)}(me, mp, alg, w)
     end
 end
 function Coskewness(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
                     mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing(),
-                    alg::AbstractMomentAlgorithm = Full())::Coskewness
-    return Coskewness(me, mp, alg)
+                    alg::AbstractMomentAlgorithm = Full(),
+                    w::Option{<:ObsWeights} = nothing)::Coskewness
+    return Coskewness(me, mp, alg, w)
 end
 """
     factory(ske::Coskewness, w::ObsWeights) -> Coskewness
@@ -94,7 +105,7 @@ Return a new [`Coskewness`](@ref) estimator with observation weights `w` applied
   - [`factory`](@ref)
 """
 function factory(ske::Coskewness, w::ObsWeights)::Coskewness
-    return Coskewness(; me = factory(ske.me, w), mp = ske.mp, alg = ske.alg)
+    return Coskewness(; me = factory(ske.me, w), mp = ske.mp, alg = ske.alg, w = w)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -115,7 +126,7 @@ Gets the view of the coskewness estimator for the `i`-th element(s).
   - [`Coskewness`](@ref)
 """
 function moment_view(ske::Coskewness, i)::Coskewness
-    return Coskewness(; me = moment_view(ske.me, i), mp = ske.mp, alg = ske.alg)
+    return Coskewness(; me = moment_view(ske.me, i), mp = ske.mp, alg = ske.alg, w = ske.w)
 end
 """
     negative_spectral_coskewness(cskew::MatNum, X::MatNum,
@@ -164,7 +175,7 @@ function negative_spectral_coskewness(cskew::MatNum, X::MatNum,
     return V
 end
 """
-    _coskewness(Y::MatNum, X::MatNum, mp::AbstractMatrixProcessingEstimator)
+    _coskewness(Y::MatNum, X::MatNum, mp::AbstractMatrixProcessingEstimator, w::Option{<:StatsBase.AbstractWeights}) -> MatNum
 
 Internal helper for coskewness computation.
 
@@ -174,17 +185,40 @@ Internal helper for coskewness computation.
 
 Let ``\\mathbf{Y}`` be the ``T \\times N`` matrix of demeaned returns. Define ``\\boldsymbol{z}_t = \\boldsymbol{y}_t \\otimes \\boldsymbol{y}_t`` (Kronecker-style element-wise product). The ``N \\times N^2`` coskewness tensor is:
 
+Unweighted:
+
 ```math
-\\hat{\\mathbf{S}} = \\frac{1}{T} \\mathbf{Y}^\\intercal \\mathbf{Z}, \\quad \\mathbf{Z}_{t,\\cdot} = (\\boldsymbol{1}^\\intercal \\otimes \\boldsymbol{y}_t^\\intercal) \\odot (\\boldsymbol{y}_t^\\intercal \\otimes \\boldsymbol{1}^\\intercal)
+\\begin{align}
+\\hat{\\mathbf{S}} &= \\frac{1}{T} \\mathbf{Y}^\\intercal \\mathbf{Z}, \\quad \\mathbf{Z}_{t,\\cdot} = (\\boldsymbol{1}^\\intercal \\otimes \\boldsymbol{y}_t^\\intercal) \\odot (\\boldsymbol{y}_t^\\intercal \\otimes \\boldsymbol{1}^\\intercal)\\,.
+\\end{align}
 ```
 
-Where ``\\otimes`` denotes the Kronecker product and ``\\odot`` denotes element-wise multiplication.
+Weighted:
+
+```math
+\\begin{align}
+\\hat{\\mathbf{S}} &= \\frac{1}{\\sum_{t=1}^{T} w_t} (\\boldsymbol{w} \\odot \\mathbf{Y})^\\intercal \\mathbf{Z}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\hat{\\mathbf{S}}``: ``N \\times N^2`` coskewness tensor.
+  - $(math_dict[:T])
+  - ``\\mathbf{Y}``: ``T \\times N`` matrix of demeaned returns.
+  - ``\\mathbf{Z}``: Row-wise outer product expansion matrix.
+  - ``\\boldsymbol{y}_t``: Demeaned return vector at time ``t``.
+  - ``\\boldsymbol{w}``: Observation weights vector ``T \\times 1``.
+  - ``w_t``: Observation weight at time ``t``.
+  - ``\\otimes``: Kronecker product.
+  - ``\\odot``: Element-wise (row-wise broadcast) multiplication.
 
 # Arguments
 
   - `Y`: Centered data vector (e.g., `X .- mean`).
   - `X`: Data matrix (observations × assets).
   - `mp`: Matrix processing estimator.
+  - `w`: Optional observation weights.
 
 # Returns
 
@@ -197,10 +231,18 @@ Where ``\\otimes`` denotes the Kronecker product and ``\\odot`` denotes element-
   - [`negative_spectral_coskewness`](@ref)
   - [`coskewness`](@ref)
 """
-function _coskewness(Y::MatNum, X::MatNum, mp::AbstractMatrixProcessingEstimator)
+function _coskewness(Y::MatNum, X::MatNum, mp::AbstractMatrixProcessingEstimator, args...)
     o = transpose(range(one(eltype(Y)), one(eltype(Y)); length = size(Y, 2)))
     z = kron(o, Y) ⊙ kron(Y, o)
     cskew = transpose(Y) * z / size(Y, 1)
+    V = negative_spectral_coskewness(cskew, X, mp)
+    return cskew, V
+end
+function _coskewness(Y::MatNum, X::MatNum, mp::AbstractMatrixProcessingEstimator,
+                     w::StatsBase.AbstractWeights)
+    o = transpose(range(one(eltype(Y)), one(eltype(Y)); length = size(Y, 2)))
+    z = kron(o, Y) ⊙ kron(Y, o)
+    cskew = transpose(w .* Y) * z / sum(w)
     V = negative_spectral_coskewness(cskew, X, mp)
     return cskew, V
 end
@@ -208,7 +250,7 @@ end
     coskewness(ske::Option{<:Coskewness}, X::MatNum; dims::Int = 1,
                mean = nothing, kwargs...)
 
-Compute the full coskewness tensor and processed matrix for a dataset. For `Full`, it uses all centered data; for `Semi`, it uses only negative deviations. If the estimator is `nothing`, returns `(nothing, nothing)`.
+Compute the full coskewness tensor and processed matrix for a dataset. Observation weights in `ske.w` are applied if set. For `Full`, it uses all centered data; for `Semi`, it uses only negative deviations. If the estimator is `nothing`, returns `(nothing, nothing)`.
 
 # Arguments
 
@@ -271,9 +313,10 @@ function coskewness(ske::Coskewness{<:Any, <:Any, <:Full}, X::MatNum; dims::Int 
     if dims == 2
         X = transpose(X)
     end
+    w = get_observation_weights(ske.w, X; dims = 1, kwargs...)
     mu = isnothing(mean) ? Statistics.mean(ske.me, X; kwargs...) : mean
     Y = X .- mu
-    return _coskewness(Y, X, ske.mp)
+    return _coskewness(Y, X, ske.mp, w)
 end
 function coskewness(ske::Coskewness{<:Any, <:Any, <:Semi}, X::MatNum; dims::Int = 1,
                     mean = nothing, kwargs...)
@@ -281,9 +324,10 @@ function coskewness(ske::Coskewness{<:Any, <:Any, <:Semi}, X::MatNum; dims::Int 
     if dims == 2
         X = transpose(X)
     end
+    w = get_observation_weights(ske.w, X; dims = 1, kwargs...)
     mu = isnothing(mean) ? Statistics.mean(ske.me, X; kwargs...) : mean
     Y = min.(X .- mu, zero(eltype(X)))
-    return _coskewness(Y, X, ske.mp)
+    return _coskewness(Y, X, ske.mp, w)
 end
 function coskewness(::Nothing, args...; kwargs...)
     return nothing, nothing

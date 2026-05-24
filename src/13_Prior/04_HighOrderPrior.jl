@@ -511,14 +511,25 @@ Compute high order prior moments for asset returns using a composite estimator.
 In addition to the first and second moments, the high order estimator computes:
 
 ```math
-\\hat{M}_3 = \\frac{1}{T} \\sum_{t=1}^{T} (\\mathbf{x}_t - \\hat{\\boldsymbol{\\mu}}) \\otimes (\\mathbf{x}_t - \\hat{\\boldsymbol{\\mu}})^\\intercal \\otimes (\\mathbf{x}_t - \\hat{\\boldsymbol{\\mu}})^\\intercal
+\\begin{align}
+\\hat{M}_3 &= \\frac{1}{T} \\sum_{t=1}^{T} (\\boldsymbol{x}_t - \\hat{\\boldsymbol{\\mu}}) \\otimes (\\boldsymbol{x}_t - \\hat{\\boldsymbol{\\mu}})^\\intercal \\otimes (\\boldsymbol{x}_t - \\hat{\\boldsymbol{\\mu}})^\\intercal\\,.
+\\end{align}
 ```
 
 ```math
-\\hat{M}_4 = \\frac{1}{T} \\sum_{t=1}^{T} (\\mathbf{x}_t - \\hat{\\boldsymbol{\\mu}}) \\otimes (\\mathbf{x}_t - \\hat{\\boldsymbol{\\mu}})^\\intercal \\otimes (\\mathbf{x}_t - \\hat{\\boldsymbol{\\mu}})^\\intercal \\otimes (\\mathbf{x}_t - \\hat{\\boldsymbol{\\mu}})^\\intercal
+\\begin{align}
+\\hat{M}_4 &= \\frac{1}{T} \\sum_{t=1}^{T} (\\boldsymbol{x}_t - \\hat{\\boldsymbol{\\mu}}) \\otimes (\\boldsymbol{x}_t - \\hat{\\boldsymbol{\\mu}})^\\intercal \\otimes (\\boldsymbol{x}_t - \\hat{\\boldsymbol{\\mu}})^\\intercal \\otimes (\\boldsymbol{x}_t - \\hat{\\boldsymbol{\\mu}})^\\intercal\\,.
+\\end{align}
 ```
 
-Where ``\\hat{M}_3`` is the ``N \\times N^2`` coskewness matrix and ``\\hat{M}_4`` is the ``N^2 \\times N^2`` cokurtosis matrix.
+Where:
+
+  - ``\\hat{M}_3``: ``N \\times N^2`` coskewness matrix.
+  - ``\\hat{M}_4``: ``N^2 \\times N^2`` cokurtosis matrix.
+  - ``\\boldsymbol{x}_t``: ``N \\times 1`` vector of asset returns at time ``t``.
+  - ``\\hat{\\boldsymbol{\\mu}}``: ``N \\times 1`` sample mean vector.
+  - $(math_dict[:T])
+  - ``\\otimes``: Kronecker product.
 
 # Arguments
 

@@ -347,11 +347,19 @@ Akaike Information Criterion (AIC) for stepwise regression in `PortfolioOptimise
 
 `AIC` is a minimisation-based criterion used to evaluate model quality in stepwise regression algorithms. Lower values indicate better model fit, penalising model complexity to avoid overfitting.
 
+# Mathematical definition
+
 ```math
-\\mathrm{AIC} = 2k - 2\\ln\\hat{L}
+\\begin{align}
+\\mathrm{AIC} &= 2k - 2\\ln\\hat{L}\\,.
+\\end{align}
 ```
 
-where ``k`` is the number of parameters and ``\\hat{L}`` is the maximum likelihood.
+Where:
+
+  - ``\\mathrm{AIC}``: Akaike Information Criterion.
+  - ``k``: Number of model parameters.
+  - ``\\hat{L}``: Maximum likelihood of the model.
 
 # Related
 
@@ -368,11 +376,20 @@ Corrected Akaike Information Criterion (AICC) for stepwise regression in `Portfo
 
 `AICC` is a minimisation-based criterion similar to AIC, but includes a correction for small sample sizes. Lower values indicate better model fit, balancing fit and complexity.
 
+# Mathematical definition
+
 ```math
-\\mathrm{AICC} = \\mathrm{AIC} + \\frac{2k(k+1)}{T - k - 1}
+\\begin{align}
+\\mathrm{AICC} &= \\mathrm{AIC} + \\frac{2k(k+1)}{T - k - 1}\\,.
+\\end{align}
 ```
 
-where ``T`` is the sample size and ``k`` is the number of parameters.
+Where:
+
+  - ``\\mathrm{AICC}``: Corrected Akaike Information Criterion.
+  - ``\\mathrm{AIC}``: Standard Akaike Information Criterion.
+  - ``k``: Number of model parameters.
+  - $(math_dict[:T])
 
 # Related
 
@@ -389,9 +406,20 @@ Bayesian Information Criterion (BIC) for stepwise regression in `PortfolioOptimi
 
 `BIC` is a minimisation-based criterion used to evaluate model quality in stepwise regression algorithms. It penalises model complexity more strongly than AIC. Lower values indicate better model fit.
 
+# Mathematical definition
+
 ```math
-\\mathrm{BIC} = k\\ln T - 2\\ln\\hat{L}
+\\begin{align}
+\\mathrm{BIC} &= k\\ln T - 2\\ln\\hat{L}\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``\\mathrm{BIC}``: Bayesian Information Criterion.
+  - ``k``: Number of model parameters.
+  - $(math_dict[:T])
+  - ``\\hat{L}``: Maximum likelihood of the model.
 
 # Related
 
@@ -408,9 +436,22 @@ Coefficient of determination (R²) for stepwise regression in `PortfolioOptimise
 
 `RSquared` is a maximisation-based criterion used to evaluate model quality in stepwise regression algorithms. Higher values indicate better model fit, representing the proportion of variance explained by the model.
 
+# Mathematical definition
+
 ```math
-R^2 = 1 - \\frac{\\mathrm{SS}_{\\mathrm{res}}}{\\mathrm{SS}_{\\mathrm{tot}}} = 1 - \\frac{\\sum_t (y_t - \\hat{y}_t)^2}{\\sum_t (y_t - \\bar{y})^2}
+\\begin{align}
+R^2 &= 1 - \\frac{\\mathrm{SS}_{\\mathrm{res}}}{\\mathrm{SS}_{\\mathrm{tot}}} = 1 - \\frac{\\sum_t (y_t - \\hat{y}_t)^2}{\\sum_t (y_t - \\bar{y})^2}\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``R^2``: Coefficient of determination.
+  - ``\\mathrm{SS}_{\\mathrm{res}}``: Residual sum of squares.
+  - ``\\mathrm{SS}_{\\mathrm{tot}}``: Total sum of squares.
+  - ``y_t``: Observed response at time ``t``.
+  - ``\\hat{y}_t``: Fitted response at time ``t``.
+  - ``\\bar{y}``: Mean of observed responses.
 
 # Related
 
@@ -426,11 +467,20 @@ Adjusted coefficient of determination (Adjusted R²) for stepwise regression in 
 
 `AdjustedRSquared` is a maximisation-based criterion that adjusts R² for the number of predictors in the model, providing a more accurate measure of model quality when comparing models with different numbers of predictors.
 
+# Mathematical definition
+
 ```math
-\\bar{R}^2 = 1 - (1 - R^2) \\frac{T - 1}{T - k - 1}
+\\begin{align}
+\\bar{R}^2 &= 1 - (1 - R^2) \\frac{T - 1}{T - k - 1}\\,.
+\\end{align}
 ```
 
-where ``k`` is the number of predictors and ``T`` is the sample size.
+Where:
+
+  - ``\\bar{R}^2``: Adjusted coefficient of determination.
+  - ``R^2``: Standard coefficient of determination.
+  - ``k``: Number of predictors.
+  - $(math_dict[:T])
 
 # Related
 

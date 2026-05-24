@@ -124,8 +124,17 @@ For matrices without unit diagonal, the function converts them into correlation 
 Solves the nearest correlation matrix problem:
 
 ```math
-\\hat{\\mathbf{C}} = \\underset{\\mathbf{Y} \\succeq 0,\\; Y_{ii} = 1}{\\arg\\min} \\|\\mathbf{C} - \\mathbf{Y}\\|_F
+\\begin{align}
+\\hat{\\mathbf{C}} &= \\underset{\\mathbf{Y} \\succeq 0,\\; Y_{ii} = 1}{\\arg\\min} \\|\\mathbf{C} - \\mathbf{Y}\\|_F\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``\\hat{\\mathbf{C}}``: Nearest positive semidefinite correlation matrix.
+  - ``\\mathbf{C}``: Input correlation matrix.
+  - ``\\mathbf{Y}``: Feasible correlation matrix (positive semidefinite, unit diagonal).
+  - ``\\|\\cdot\\|_F``: Frobenius norm.
 
 For covariance matrices, first standardise ``\\mathbf{C} = \\mathrm{diag}(\\mathbf{\\Sigma})^{-1/2} \\mathbf{\\Sigma}\\, \\mathrm{diag}(\\mathbf{\\Sigma})^{-1/2}``, project, then rescale back.
 

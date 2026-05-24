@@ -289,10 +289,17 @@ This function computes the mutual information between two variables given their 
 Given the joint histogram ``\\mathbf{X}`` (unnormalised counts), with marginals ``p_i = \\sum_j X_{ij} / n`` and ``p_j = \\sum_i X_{ij} / n``:
 
 ```math
-\\hat{I}(X; Y) = \\sum_{i,j:\\, X_{ij} > 0} \\frac{X_{ij}}{n} \\log\\!\\left(\\frac{X_{ij} / n}{p_i \\, p_j}\\right)
+\\begin{align}
+\\hat{I}(X; Y) &= \\sum_{i,j:\\, X_{ij} > 0} \\frac{X_{ij}}{n} \\log\\!\\left(\\frac{X_{ij} / n}{p_i \\, p_j}\\right)\\,.
+\\end{align}
 ```
 
-Where ``n = \\sum_{i,j} X_{ij}`` is the total count.
+Where:
+
+  - ``\\hat{I}(X; Y)``: Estimated mutual information between ``X`` and ``Y``.
+  - ``X_{ij}``: Joint histogram count at bin ``(i, j)``.
+  - ``n = \\sum_{i,j} X_{ij}``: Total count.
+  - ``p_i = \\sum_j X_{ij} / n``, ``p_j = \\sum_i X_{ij} / n``: Marginal probabilities.
 
 # Arguments
 
@@ -351,14 +358,29 @@ This function computes the pairwise variation of information between all columns
 Let ``H(X)``, ``H(Y)`` denote the marginal Shannon entropies and ``I(X;Y)`` the mutual information. The variation of information is:
 
 ```math
-\\mathrm{VI}(X, Y) = H(X) + H(Y) - 2\\,I(X;Y)
+\\begin{align}
+\\mathrm{VI}(X, Y) &= H(X) + H(Y) - 2\\,I(X;Y)\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``\\mathrm{VI}(X, Y)``: Variation of information between ``X`` and ``Y``.
+  - ``H(X)``, ``H(Y)``: Marginal Shannon entropies.
+  - ``I(X;Y)``: Mutual information.
 
 When `normalise = true`, it is divided by the joint entropy ``H(X,Y) = H(X) + H(Y) - I(X;Y)``:
 
 ```math
-\\widetilde{\\mathrm{VI}}(X, Y) = \\frac{H(X) + H(Y) - 2\\,I(X;Y)}{H(X) + H(Y) - I(X;Y)}
+\\begin{align}
+\\widetilde{\\mathrm{VI}}(X, Y) &= \\frac{H(X) + H(Y) - 2\\,I(X;Y)}{H(X) + H(Y) - I(X;Y)}\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``\\widetilde{\\mathrm{VI}}(X, Y)``: Normalised variation of information.
+  - ``H(X,Y) = H(X) + H(Y) - I(X;Y)``: Joint entropy.
 
 # Arguments
 
@@ -482,14 +504,29 @@ This function computes the pairwise mutual information between all columns of th
 Mutual information between assets ``i`` and ``j``:
 
 ```math
-I(X_i; X_j) = H(X_i) + H(X_j) - H(X_i, X_j) = \\sum_{x,y} p(x,y) \\log\\frac{p(x,y)}{p(x)\\,p(y)}
+\\begin{align}
+I(X_i; X_j) &= H(X_i) + H(X_j) - H(X_i, X_j) = \\sum_{x,y} p(x,y) \\log\\frac{p(x,y)}{p(x)\\,p(y)}\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``I(X_i; X_j)``: Mutual information between assets ``i`` and ``j``.
+  - ``H(X_i)``, ``H(X_j)``: Marginal Shannon entropies.
+  - ``H(X_i, X_j)``: Joint entropy.
+  - ``p(x,y)``: Joint probability mass function.
 
 When `normalise = true`, the MI is normalised by the minimum marginal entropy:
 
 ```math
-\\tilde{I}(X_i; X_j) = \\frac{I(X_i; X_j)}{\\min\\bigl(H(X_i),\\, H(X_j)\\bigr)}
+\\begin{align}
+\\tilde{I}(X_i; X_j) &= \\frac{I(X_i; X_j)}{\\min\\bigl(H(X_i),\\, H(X_j)\\bigr)}\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``\\tilde{I}(X_i; X_j)``: Normalised mutual information.
 
 # Arguments
 

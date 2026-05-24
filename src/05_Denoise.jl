@@ -134,11 +134,22 @@ $(DocStringExtensions.TYPEDEF)
 
 A denoising algorithm that sets the smallest `num_factors` eigenvalues of a covariance or correlation matrix to zero, effectively removing the principal components relating to random noise according to random matrix theory-based approaches.
 
+# Mathematical definition
+
 Let ``\\mathbf{V}`` be the eigenvector matrix and ``\\boldsymbol{\\lambda}`` the eigenvalues sorted ascending. For ``k`` noise eigenvalues (``\\lambda_i \\leq \\lambda_+``):
 
 ```math
-\\tilde{\\mathbf{X}} = \\mathbf{V}_{\\mathrm{signal}} \\, \\mathrm{Diag}(\\boldsymbol{\\lambda}_{\\mathrm{signal}}) \\, \\mathbf{V}_{\\mathrm{signal}}^\\intercal
+\\begin{align}
+\\tilde{\\mathbf{X}} &= \\mathbf{V}_{\\mathrm{signal}} \\, \\mathrm{Diag}(\\boldsymbol{\\lambda}_{\\mathrm{signal}}) \\, \\mathbf{V}_{\\mathrm{signal}}^\\intercal\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``\\tilde{\\mathbf{X}}``: Denoised matrix (signal-only reconstruction).
+  - ``\\mathbf{V}_{\\mathrm{signal}}``: Eigenvector matrix of the signal components.
+  - ``\\boldsymbol{\\lambda}_{\\mathrm{signal}}``: Signal eigenvalues (``\\lambda_i > \\lambda_+``).
+  - ``\\lambda_+``: Marčenko-Pastur upper bound for noise eigenvalues.
 
 # Examples
 
@@ -164,11 +175,22 @@ $(DocStringExtensions.TYPEDEF)
 
 A denoising algorithm that replaces the smallest `num_factors` eigenvalues of a covariance or correlation matrix with their average, effectively averaging the principal components relating to random noise according to random matrix theory-based approaches.
 
+# Mathematical definition
+
 Noise eigenvalues ``\\{\\lambda_i : \\lambda_i \\leq \\lambda_+\\}`` are replaced by their mean ``\\bar{\\lambda}_\\text{noise}``:
 
 ```math
-\\tilde{\\lambda}_i = \\begin{cases} \\bar{\\lambda}_\\text{noise} & \\lambda_i \\leq \\lambda_+ \\\\ \\lambda_i & \\lambda_i > \\lambda_+ \\end{cases}
+\\begin{align}
+\\tilde{\\lambda}_i &= \\begin{cases} \\bar{\\lambda}_\\text{noise} & \\lambda_i \\leq \\lambda_+ \\\\ \\lambda_i & \\lambda_i > \\lambda_+ \\end{cases}\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``\\tilde{\\lambda}_i``: Denoised ``i``-th eigenvalue.
+  - ``\\lambda_i``: Original ``i``-th eigenvalue.
+  - ``\\bar{\\lambda}_\\text{noise}``: Mean of the noise eigenvalues.
+  - ``\\lambda_+``: Marčenko-Pastur upper bound for noise eigenvalues.
 
 # Examples
 
@@ -194,11 +216,23 @@ $(DocStringExtensions.TYPEDEF)
 
 A denoising algorithm that shrinks the smallest `num_factors` eigenvalues of a covariance or correlation matrix towards their diagonal, controlled by the shrinkage parameter `alpha`. This approach interpolates between no shrinkage (`alpha = 0`) and full shrinkage (`alpha = 1`), providing a flexible way to regularize noisy eigenvalues.
 
+# Mathematical definition
+
 Noise eigenvalues are shrunk towards the diagonal of the correlation matrix:
 
 ```math
-\\tilde{\\lambda}_i = (1 - \\alpha) \\lambda_i + \\alpha \\, X_{ii}, \\quad \\lambda_i \\leq \\lambda_+, \\quad \\alpha \\in [0, 1]
+\\begin{align}
+\\tilde{\\lambda}_i &= (1 - \\alpha) \\lambda_i + \\alpha \\, X_{ii}, \\quad \\lambda_i \\leq \\lambda_+\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``\\tilde{\\lambda}_i``: Shrunk ``i``-th eigenvalue.
+  - ``\\lambda_i``: Original ``i``-th noise eigenvalue (``\\lambda_i \\leq \\lambda_+``).
+  - ``\\alpha \\in [0, 1]``: Shrinkage intensity (``0`` = no shrinkage, ``1`` = full shrinkage).
+  - ``X_{ii}``: ``i``-th diagonal entry of the correlation matrix.
+  - ``\\lambda_+``: Marčenko-Pastur upper bound for noise eigenvalues.
 
 # Fields
 
@@ -500,6 +534,22 @@ In-place denoising of a covariance or correlation matrix using a [`Denoise`](@re
 
 For matrices without unit diagonal, the function converts them into correlation matrices i.e. matrices with unit diagonal, applies the algorithm, and rescales them back.
 
+# Mathematical definition
+
+The Marčenko-Pastur upper bound for noise eigenvalues (for effective sample ratio ``q = T/N``):
+
+```math
+\\begin{align}
+\\lambda_{+} &= \\sigma^2 \\left(1 + \\frac{1}{\\sqrt{q}}\\right)^2\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\lambda_+``: Marčenko-Pastur upper bound for noise eigenvalues.
+  - ``\\sigma^2``: Variance explained by noise (fitted from the Marčenko-Pastur distribution).
+  - ``q = T/N``: Effective sample ratio (observations to assets).
+
 # Arguments
 
   - $(arg_dict[:odn])
@@ -518,12 +568,6 @@ For matrices without unit diagonal, the function converts them into correlation 
   - If `X` is not a correlation matrix, it is converted to one before applying the algorithm.
   - Performs an eigenvector decomposition of `X`.
   - Uses the Marčenko-Pastur distribution to compute the maximum feasable noise eigenvalue.
-
-The Marčenko-Pastur upper bound for noise eigenvalues (for effective sample ratio ``q = T/N``):
-
-```math
-\\lambda_{+} = \\sigma^2 \\left(1 + \\frac{1}{\\sqrt{q}}\\right)^2
-```
 
 Eigenvalues ``\\lambda \\leq \\lambda_+`` are classified as noise and processed by `dn.alg`.
 

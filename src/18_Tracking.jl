@@ -114,10 +114,18 @@ Second-order cone (SOC) norm-based tracking formulation.
 # Mathematical definition
 
 ```math
-\\mathrm{TE}_{L_2}(\\boldsymbol{a},\\boldsymbol{b}) = \\frac{\\|\\boldsymbol{a} - \\boldsymbol{b}\\|_2}{\\sqrt{T - d}}
+\\begin{align}
+\\mathrm{TE}_{L_2}(\\boldsymbol{a},\\boldsymbol{b}) &= \\frac{\\|\\boldsymbol{a} - \\boldsymbol{b}\\|_2}{\\sqrt{T - d}}\\,.
+\\end{align}
 ```
 
-where ``\\boldsymbol{a}`` is the portfolio weight or return vector, ``\\boldsymbol{b}`` is the benchmark vector, ``T`` is the number of observations, and ``d`` is `ddof`. When ``T`` is not provided the denominator is 1.
+Where:
+
+  - ``\\mathrm{TE}_{L_2}(\\boldsymbol{a},\\boldsymbol{b})``: L2-norm tracking error.
+  - ``\\boldsymbol{a}``: Portfolio weight or return vector ``T \\times 1``.
+  - ``\\boldsymbol{b}``: Benchmark vector ``T \\times 1``.
+  - $(math_dict[:T])
+  - ``d``: Degrees of freedom, `ddof`. When ``T`` is not provided the denominator is 1.
 
 # Fields
 
@@ -169,10 +177,18 @@ Second-order cone (SOC) squared norm-based tracking formulation.
 # Mathematical definition
 
 ```math
-\\mathrm{TE}_{L_2^2}(\\boldsymbol{a},\\boldsymbol{b}) = \\frac{\\|\\boldsymbol{a} - \\boldsymbol{b}\\|_2^2}{T - d}
+\\begin{align}
+\\mathrm{TE}_{L_2^2}(\\boldsymbol{a},\\boldsymbol{b}) &= \\frac{\\|\\boldsymbol{a} - \\boldsymbol{b}\\|_2^2}{T - d}\\,.
+\\end{align}
 ```
 
-where ``\\boldsymbol{a}`` is the portfolio weight or return vector, ``\\boldsymbol{b}`` is the benchmark vector, ``T`` is the number of observations, and ``d`` is `ddof`. When ``T`` is not provided the denominator is 1.
+Where:
+
+  - ``\\mathrm{TE}_{L_2^2}(\\boldsymbol{a},\\boldsymbol{b})``: Squared L2-norm tracking error.
+  - ``\\boldsymbol{a}``: Portfolio weight or return vector ``T \\times 1``.
+  - ``\\boldsymbol{b}``: Benchmark vector ``T \\times 1``.
+  - $(math_dict[:T])
+  - ``d``: Degrees of freedom, `ddof`. When ``T`` is not provided the denominator is 1.
 
 # Fields
 
@@ -224,10 +240,17 @@ Norm-one (NOC) tracking formulation.
 # Mathematical definition
 
 ```math
-\\mathrm{TE}_{L_1}(\\boldsymbol{a},\\boldsymbol{b}) = \\frac{\\|\\boldsymbol{a} - \\boldsymbol{b}\\|_1}{T}
+\\begin{align}
+\\mathrm{TE}_{L_1}(\\boldsymbol{a},\\boldsymbol{b}) &= \\frac{\\|\\boldsymbol{a} - \\boldsymbol{b}\\|_1}{T}\\,.
+\\end{align}
 ```
 
-where ``\\boldsymbol{a}`` is the portfolio weight or return vector, ``\\boldsymbol{b}`` is the benchmark vector, and ``T`` is the number of observations. When ``T`` is not provided the denominator is 1.
+Where:
+
+  - ``\\mathrm{TE}_{L_1}(\\boldsymbol{a},\\boldsymbol{b})``: L1-norm tracking error.
+  - ``\\boldsymbol{a}``: Portfolio weight or return vector ``T \\times 1``.
+  - ``\\boldsymbol{b}``: Benchmark vector ``T \\times 1``.
+  - $(math_dict[:T]) When ``T`` is not provided the denominator is 1.
 
 # Examples
 
@@ -254,10 +277,19 @@ Computes the Lp-norm of the difference between portfolio and benchmark returns: 
 # Mathematical definition
 
 ```math
-\\mathrm{TE}_{L_p}(\\boldsymbol{a},\\boldsymbol{b}) = \\frac{\\|\\boldsymbol{a} - \\boldsymbol{b}\\|_p}{(T - d)^{1/p}}
+\\begin{align}
+\\mathrm{TE}_{L_p}(\\boldsymbol{a},\\boldsymbol{b}) &= \\frac{\\|\\boldsymbol{a} - \\boldsymbol{b}\\|_p}{(T - d)^{1/p}}\\,.
+\\end{align}
 ```
 
-where ``\\boldsymbol{a}`` is the portfolio weight or return vector, ``\\boldsymbol{b}`` is the benchmark vector, ``T`` is the number of observations, ``d`` is `ddof`, and ``p`` is the norm order. When ``T`` is not provided the denominator is 1.
+Where:
+
+  - ``\\mathrm{TE}_{L_p}(\\boldsymbol{a},\\boldsymbol{b})``: Lp-norm tracking error.
+  - ``\\boldsymbol{a}``: Portfolio weight or return vector ``T \\times 1``.
+  - ``\\boldsymbol{b}``: Benchmark vector ``T \\times 1``.
+  - $(math_dict[:T])
+  - ``d``: Degrees of freedom, `ddof`. When ``T`` is not provided the denominator is 1.
+  - ``p``: Norm order.
 
 # Fields
 
@@ -297,10 +329,18 @@ Computes the L∞-norm (maximum absolute deviation) of the difference between po
 # Mathematical definition
 
 ```math
-\\mathrm{TE}_{L_\\infty}(\\boldsymbol{a},\\boldsymbol{b}) = \\frac{\\|\\boldsymbol{a} - \\boldsymbol{b}\\|_\\infty}{T - d}
+\\begin{align}
+\\mathrm{TE}_{L_\\infty}(\\boldsymbol{a},\\boldsymbol{b}) &= \\frac{\\|\\boldsymbol{a} - \\boldsymbol{b}\\|_\\infty}{T - d}\\,.
+\\end{align}
 ```
 
-where ``\\boldsymbol{a}`` is the portfolio weight or return vector, ``\\boldsymbol{b}`` is the benchmark vector, ``T`` is the number of observations, and ``d`` is `ddof`. When ``T`` is not provided the denominator is 1. `pos = true` uses ``+\\infty``, `pos = false` uses ``-\\infty``.
+Where:
+
+  - ``\\mathrm{TE}_{L_\\infty}(\\boldsymbol{a},\\boldsymbol{b})``: L∞-norm tracking error. `pos = true` uses ``+\\infty``, `pos = false` uses ``-\\infty``.
+  - ``\\boldsymbol{a}``: Portfolio weight or return vector ``T \\times 1``.
+  - ``\\boldsymbol{b}``: Benchmark vector ``T \\times 1``.
+  - $(math_dict[:T])
+  - ``d``: Degrees of freedom, `ddof`. When ``T`` is not provided the denominator is 1.
 
 # Fields
 
@@ -344,12 +384,22 @@ Compute the norm-based tracking error between portfolio and benchmark weights.
 # Mathematical definition
 
 ```math
-\\mathrm{TE}_{L_2} = \\frac{\\|a - b\\|_2}{\\sqrt{T - d}}, \\qquad
-\\mathrm{TE}_{L_2^2} = \\frac{\\|a - b\\|_2^2}{T - d}, \\qquad
-\\mathrm{TE}_{L_1} = \\frac{\\|a - b\\|_1}{T}, \\qquad
-\\mathrm{TE}_{L_p} = \\frac{\\|a - b\\|_p}{(T-d)^{1/p}}, \\qquad
-\\mathrm{TE}_{L_\\infty} = \\frac{\\|a - b\\|_\\infty}{T - d}
+\\begin{align}
+\\mathrm{TE}_{L_2}(\\boldsymbol{a},\\boldsymbol{b}) &= \\frac{\\|\\boldsymbol{a} - \\boldsymbol{b}\\|_2}{\\sqrt{T - d}}\\,, \\\\
+\\mathrm{TE}_{L_2^2}(\\boldsymbol{a},\\boldsymbol{b}) &= \\frac{\\|\\boldsymbol{a} - \\boldsymbol{b}\\|_2^2}{T - d}\\,, \\\\
+\\mathrm{TE}_{L_1}(\\boldsymbol{a},\\boldsymbol{b}) &= \\frac{\\|\\boldsymbol{a} - \\boldsymbol{b}\\|_1}{T}\\,, \\\\
+\\mathrm{TE}_{L_p}(\\boldsymbol{a},\\boldsymbol{b}) &= \\frac{\\|\\boldsymbol{a} - \\boldsymbol{b}\\|_p}{(T-d)^{1/p}}\\,, \\\\
+\\mathrm{TE}_{L_\\infty}(\\boldsymbol{a},\\boldsymbol{b}) &= \\frac{\\|\\boldsymbol{a} - \\boldsymbol{b}\\|_\\infty}{T - d}\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``\\boldsymbol{a}``: Portfolio weight or return vector ``T \\times 1``.
+  - ``\\boldsymbol{b}``: Benchmark vector ``T \\times 1``.
+  - $(math_dict[:T])
+  - ``d``: Degrees of freedom, `ddof`.
+  - ``p``: Norm order.
 
 # Arguments
 

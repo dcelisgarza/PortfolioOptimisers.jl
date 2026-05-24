@@ -87,10 +87,16 @@ Inverse Volatility portfolio optimiser.
 # Mathematical definition
 
 ```math
-w_i = \\frac{1 / \\sigma_i}{\\sum_{j=1}^N 1 / \\sigma_j}\\,,
+\\begin{align}
+w_i &= \\frac{1 / \\sigma_i}{\\sum_{j=1}^N 1 / \\sigma_j}\\,,\\,.
+\\end{align}
 ```
 
-where ``\\sigma_i`` is the standard deviation (or variance when `sq = true`) of asset ``i``.
+Where:
+
+  - ``w_i``: Portfolio weight of asset ``i``.
+  - ``\\sigma_i``: Standard deviation of asset ``i`` (variance when `sq = true`).
+  - ``N``: Number of assets.
 
 # Fields
 
@@ -244,11 +250,20 @@ $(DocStringExtensions.TYPEDEF)
 
 Equal-weighted portfolio optimiser.
 
-`EqualWeighted` allocates equal weight to all ``N`` assets in the portfolio:
+`EqualWeighted` allocates equal weight to all ``N`` assets in the portfolio.
+
+# Mathematical definition
 
 ```math
-w_i = \\frac{1}{N} \\quad \\forall i\\,.
+\\begin{align}
+w_i &= \\frac{1}{N} \\quad \\forall i\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``w_i``: Portfolio weight of asset ``i``.
+  - ``N``: Number of assets.
 
 # Fields
 
@@ -364,10 +379,15 @@ Random-weighted portfolio optimiser.
 # Mathematical definition
 
 ```math
-\\boldsymbol{w} \\sim \\mathrm{Dirichlet}(\\boldsymbol{\\alpha})\\,,
+\\begin{align}
+\\boldsymbol{w} \\sim \\mathrm{Dirichlet}(\\boldsymbol{\\alpha})\\,,\\,.
+\\end{align}
 ```
 
-where ``\\boldsymbol{\\alpha}`` is a scalar or vector concentration parameter. Larger values of ``\\alpha`` concentrate the distribution near equal weights.
+Where:
+
+  - ``\\boldsymbol{w}``: Portfolio weight vector.
+  - ``\\boldsymbol{\\alpha}``: Scalar or vector concentration parameter. Larger values concentrate the distribution near equal weights.
 
 # Fields
 

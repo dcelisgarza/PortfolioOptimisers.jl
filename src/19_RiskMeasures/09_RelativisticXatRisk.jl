@@ -115,8 +115,20 @@ Represents the Relativistic Value-at-Risk (RVaR) risk measure.
 Define the ``\\kappa``-logarithm ``\\ell_\\kappa(u) = \\frac{u^\\kappa - u^{-\\kappa}}{2\\kappa}``. The RVaR is:
 
 ```math
-\\mathrm{RVaR}_{\\alpha,\\kappa}(\\boldsymbol{x}) = \\min_{t,\\, z \\geq 0} \\Bigl\\{ t + \\ell_\\kappa(\\alpha T)\\, z + \\sum_{i=1}^{T} (\\psi_i + \\theta_i) \\Bigr\\}
+\\begin{align}
+\\mathrm{RVaR}_{\\alpha,\\kappa}(\\boldsymbol{x}) &= \\underset{t,\\, z}{\\min} \\Bigl\\{ t + \\ell_\\kappa(\\alpha T)\\, z + \\sum_{i=1}^{T} (\\psi_i + \\theta_i) \\;:\\; z \\geq 0 \\Bigr\\}\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``\\mathrm{RVaR}_{\\alpha,\\kappa}(\\boldsymbol{x})``: Relativistic Value-at-Risk.
+  - $(math_dict[:xret])
+  - $(math_dict[:alpha_rm])
+  - $(math_dict[:T])
+  - ``\\kappa \\in (0,1)``: Tsallis deformation parameter.
+  - ``\\ell_\\kappa(u) = \\frac{u^\\kappa - u^{-\\kappa}}{2\\kappa}``: ``\\kappa``-logarithm.
+  - ``t``, ``z``, ``\\psi_i``, ``\\theta_i``, ``\\epsilon_i``, ``\\omega_i``: Conic optimisation variables.
 
 subject to the power-cone constraints:
 
@@ -124,11 +136,13 @@ subject to the power-cone constraints:
 \\begin{align}
 & \\left(\\tfrac{z(1+\\kappa)}{2\\kappa},\\, \\tfrac{\\psi_i(1+\\kappa)}{\\kappa},\\, \\epsilon_i\\right) \\in \\mathcal{K}_{\\mathrm{pow}}\\!\\left(\\tfrac{1}{1+\\kappa}\\right) \\quad \\forall i\\,,\\\\
 & \\left(\\tfrac{\\omega_i}{1-\\kappa},\\, \\tfrac{\\theta_i}{\\kappa},\\, -\\tfrac{z}{2\\kappa}\\right) \\in \\mathcal{K}_{\\mathrm{pow}}(1-\\kappa) \\quad \\forall i\\,,\\\\
-& \\epsilon_i + \\omega_i \\leq x_i + t \\quad \\forall i\\,,
+& \\epsilon_i + \\omega_i \\leq x_i + t \\quad \\forall i\\,.
 \\end{align}
 ```
 
-where ``\\mathcal{K}_{\\mathrm{pow}}(p) = \\{(a,b,c) : a^p b^{1-p} \\geq |c|,\\, a \\geq 0,\\, b \\geq 0\\}`` is the power cone.
+Where:
+
+  - ``\\mathcal{K}_{\\mathrm{pow}}(p) = \\{(a,b,c) : a^p b^{1-p} \\geq |c|,\\, a \\geq 0,\\, b \\geq 0\\}``: Power cone.
 
 # Fields
 
@@ -232,8 +246,17 @@ Represents the Relativistic Value-at-Risk Range (RVaR Range) risk measure.
 # Mathematical definition
 
 ```math
-\\mathrm{RVaRRange}_{\\alpha,\\kappa_a,\\beta,\\kappa_b}(\\boldsymbol{x}) = \\mathrm{RVaR}_{\\alpha,\\kappa_a}(\\boldsymbol{x}) + \\mathrm{RVaR}_{\\beta,\\kappa_b}(-\\boldsymbol{x})\\,.
+\\begin{align}
+\\mathrm{RVaRRange}_{\\alpha,\\kappa_a,\\beta,\\kappa_b}(\\boldsymbol{x}) &= \\mathrm{RVaR}_{\\alpha,\\kappa_a}(\\boldsymbol{x}) + \\mathrm{RVaR}_{\\beta,\\kappa_b}(-\\boldsymbol{x})\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``\\mathrm{RVaRRange}_{\\alpha,\\kappa_a,\\beta,\\kappa_b}(\\boldsymbol{x})``: Relativistic VaR range.
+  - $(math_dict[:xret])
+  - ``\\mathrm{RVaR}_{\\alpha,\\kappa_a}(\\boldsymbol{x})``: Lower-tail RVaR with parameters ``(\\alpha, \\kappa_a)``.
+  - ``\\mathrm{RVaR}_{\\beta,\\kappa_b}(-\\boldsymbol{x})``: Upper-tail RVaR with parameters ``(\\beta, \\kappa_b)``.
 
 # Fields
 
@@ -357,14 +380,32 @@ Represents the Relativistic Drawdown-at-Risk (RDDaR) risk measure.
 Define the absolute drawdown series:
 
 ```math
-c_t = \\sum_{s=1}^{t} x_s\\,, \\qquad d_t = c_t - \\max_{0 \\leq s \\leq t} c_s \\leq 0\\,.
+\\begin{align}
+c_t &= \\sum_{s=1}^{t} x_s\\,, \\\\
+d_t &= c_t - \\max_{0 \\leq s \\leq t} c_s \\leq 0\\,.
+\\end{align}
 ```
+
+Where:
+
+  - $(math_dict[:xret])
+  - $(math_dict[:ct])
+  - $(math_dict[:dtdd])
 
 The Relativistic Drawdown-at-Risk is the RVaR of the drawdown series:
 
 ```math
-\\mathrm{RDDaR}_{\\alpha,\\kappa}(\\boldsymbol{x}) = \\mathrm{RVaR}_{\\alpha,\\kappa}(\\boldsymbol{d}(\\boldsymbol{x}))\\,.
+\\begin{align}
+\\mathrm{RDDaR}_{\\alpha,\\kappa}(\\boldsymbol{x}) &= \\mathrm{RVaR}_{\\alpha,\\kappa}(\\boldsymbol{d}(\\boldsymbol{x}))\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``\\mathrm{RDDaR}_{\\alpha,\\kappa}(\\boldsymbol{x})``: Relativistic Drawdown-at-Risk.
+  - $(math_dict[:alpha_rm])
+  - ``\\kappa \\in (0,1)``: Tsallis deformation parameter.
+  - ``\\boldsymbol{d}(\\boldsymbol{x})``: Absolute drawdown series vector ``T \\times 1``.
 
 # Fields
 
@@ -470,14 +511,32 @@ Represents the Relative Relativistic Drawdown-at-Risk (Relative RDDaR) risk meas
 Define the compounded wealth process and relative drawdown series:
 
 ```math
-C_t = \\prod_{s=1}^{t} (1 + x_s)\\,, \\qquad rd_t = \\frac{C_t}{\\max_{0 \\leq s \\leq t} C_s} - 1 \\leq 0\\,.
+\\begin{align}
+C_t &= \\prod_{s=1}^{t} (1 + x_s)\\,, \\\\
+rd_t &= \\frac{C_t}{\\max_{0 \\leq s \\leq t} C_s} - 1 \\leq 0\\,.
+\\end{align}
 ```
+
+Where:
+
+  - $(math_dict[:xret])
+  - $(math_dict[:Ct])
+  - $(math_dict[:rdt])
 
 The Relative Relativistic Drawdown-at-Risk is the RVaR of the relative drawdown series:
 
 ```math
-\\mathrm{RRDDaR}_{\\alpha,\\kappa}(\\boldsymbol{x}) = \\mathrm{RVaR}_{\\alpha,\\kappa}(\\boldsymbol{rd}(\\boldsymbol{x}))\\,.
+\\begin{align}
+\\mathrm{RRDDaR}_{\\alpha,\\kappa}(\\boldsymbol{x}) &= \\mathrm{RVaR}_{\\alpha,\\kappa}(\\boldsymbol{rd}(\\boldsymbol{x}))\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``\\mathrm{RRDDaR}_{\\alpha,\\kappa}(\\boldsymbol{x})``: Relative Relativistic Drawdown-at-Risk.
+  - $(math_dict[:alpha_rm])
+  - ``\\kappa \\in (0,1)``: Tsallis deformation parameter.
+  - ``\\boldsymbol{rd}(\\boldsymbol{x})``: Relative drawdown series vector ``T \\times 1``.
 
 # Fields
 

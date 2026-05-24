@@ -360,8 +360,15 @@ SchurComplementHierarchicalRiskParity
 When splitting cluster ``C`` with sub-clusters ``C_1`` and ``C_2``, the Schur complement of the covariance partitioned as ``\\mathbf{\\Sigma}_{C} = \\begin{pmatrix} \\mathbf{\\Sigma}_{11} & \\mathbf{\\Sigma}_{12} \\\\ \\mathbf{\\Sigma}_{21} & \\mathbf{\\Sigma}_{22} \\end{pmatrix}`` is:
 
 ```math
-\\mathbf{S}(\\mathbf{\\Sigma}_{11}) = \\mathbf{\\Sigma}_{22} - \\mathbf{\\Sigma}_{21} \\mathbf{\\Sigma}_{11}^{-1} \\mathbf{\\Sigma}_{12}
+\\begin{align}
+\\mathbf{S}(\\mathbf{\\Sigma}_{11}) &= \\mathbf{\\Sigma}_{22} - \\mathbf{\\Sigma}_{21} \\mathbf{\\Sigma}_{11}^{-1} \\mathbf{\\Sigma}_{12}\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``\\mathbf{S}(\\mathbf{\\Sigma}_{11})``: Schur complement of the covariance block ``\\mathbf{\\Sigma}_{11}``.
+  - ``\\mathbf{\\Sigma}_{11}``, ``\\mathbf{\\Sigma}_{12}``, ``\\mathbf{\\Sigma}_{21}``, ``\\mathbf{\\Sigma}_{22}``: Covariance sub-blocks corresponding to the partition of cluster ``C`` into ``C_1`` and ``C_2``.
 
 The bisection weight ``\\alpha`` is then computed from the Schur-complement-corrected inter-cluster risks of ``C_1`` and ``C_2``, yielding a more accurate decomposition than vanilla HRP.
 

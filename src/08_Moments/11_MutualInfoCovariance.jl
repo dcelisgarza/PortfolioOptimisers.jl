@@ -8,11 +8,18 @@ Covariance estimator based on mutual information.
 # Mathematical definition
 
 ```math
-\\hat{\\boldsymbol{\\rho}}_{ij} = \\mathrm{MI}(X_i,\\, X_j), \\qquad
-\\hat{\\mathbf{\\Sigma}}_{ij} = \\hat{\\boldsymbol{\\rho}}_{ij}\\,\\hat{\\sigma}_i\\,\\hat{\\sigma}_j
+\\begin{align}
+\\hat{\\boldsymbol{\\rho}}_{ij} &= \\mathrm{MI}(X_i,\\, X_j)\\,, \\\\
+\\hat{\\mathbf{\\Sigma}}_{ij} &= \\hat{\\boldsymbol{\\rho}}_{ij}\\,\\hat{\\sigma}_i\\,\\hat{\\sigma}_j\\,.
+\\end{align}
 ```
 
-where ``\\mathrm{MI}(X_i, X_j)`` is the (optionally normalised) mutual information between assets ``i`` and ``j``, and ``\\hat{\\sigma}_i`` are marginal standard deviations from the variance estimator `ve`.
+Where:
+
+  - ``\\hat{\\boldsymbol{\\rho}}_{ij}``: Mutual information-based correlation between assets ``i`` and ``j``.
+  - ``\\hat{\\mathbf{\\Sigma}}_{ij}``: Covariance between assets ``i`` and ``j``.
+  - ``\\mathrm{MI}(X_i, X_j)``: (Optionally normalised) mutual information between assets ``i`` and ``j``.
+  - ``\\hat{\\sigma}_i``: Marginal standard deviation of asset ``i`` from the variance estimator `ve`.
 
 # Fields
 

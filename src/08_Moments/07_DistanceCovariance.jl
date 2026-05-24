@@ -133,20 +133,43 @@ This function computes the distance correlation between `v1` and `v2` using the 
 Let ``a_{kl} = d(v_{1k}, v_{1l})`` and ``b_{kl} = d(v_{2k}, v_{2l})`` be pairwise distance matrices. Define doubly-centered versions:
 
 ```math
-A_{kl} = a_{kl} - \\bar{a}_{k\\cdot} - \\bar{a}_{\\cdot l} + \\bar{a}_{\\cdot\\cdot}, \\quad B_{kl} = b_{kl} - \\bar{b}_{k\\cdot} - \\bar{b}_{\\cdot l} + \\bar{b}_{\\cdot\\cdot}
+\\begin{align}
+A_{kl} &= a_{kl} - \\bar{a}_{k\\cdot} - \\bar{a}_{\\cdot l} + \\bar{a}_{\\cdot\\cdot}\\,, \\\\
+B_{kl} &= b_{kl} - \\bar{b}_{k\\cdot} - \\bar{b}_{\\cdot l} + \\bar{b}_{\\cdot\\cdot}\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``a_{kl}``, ``b_{kl}``: Pairwise distances between observations ``k`` and ``l``.
+  - ``\\bar{a}_{k\\cdot}``: ``k``-th row mean of ``\\mathbf{a}``.
+  - ``\\bar{a}_{\\cdot l}``: ``l``-th column mean of ``\\mathbf{a}``.
+  - ``\\bar{a}_{\\cdot\\cdot}``: Grand mean of ``\\mathbf{a}``.
 
 The squared distance covariances and distance correlation are:
 
 ```math
-\\widehat{\\mathrm{dCov}}^2(X,X) = \\frac{\\mathbf{A}:\\mathbf{A}}{n^2}, \\quad \\widehat{\\mathrm{dCov}}^2(X,Y) = \\frac{\\mathbf{A}:\\mathbf{B}}{n^2}, \\quad \\widehat{\\mathrm{dCov}}^2(Y,Y) = \\frac{\\mathbf{B}:\\mathbf{B}}{n^2}
+\\begin{align}
+\\widehat{\\mathrm{dCov}}^2(X,X) &= \\frac{\\mathbf{A}:\\mathbf{A}}{n^2}\\,, \\\\
+\\widehat{\\mathrm{dCov}}^2(X,Y) &= \\frac{\\mathbf{A}:\\mathbf{B}}{n^2}\\,, \\\\
+\\widehat{\\mathrm{dCov}}^2(Y,Y) &= \\frac{\\mathbf{B}:\\mathbf{B}}{n^2}\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``n``: Number of observations.
+  - ``\\mathbf{A}:\\mathbf{B} = \\sum_{k,l} A_{kl} B_{kl}``: Frobenius inner product.
 
 ```math
-\\hat{R}_{\\mathrm{dist}}(X, Y) = \\frac{\\sqrt{\\widehat{\\mathrm{dCov}}^2(X,Y)}}{\\sqrt{\\sqrt{\\widehat{\\mathrm{dCov}}^2(X,X)} \\cdot \\sqrt{\\widehat{\\mathrm{dCov}}^2(Y,Y)}}}
+\\begin{align}
+\\hat{R}_{\\mathrm{dist}}(X, Y) &= \\frac{\\sqrt{\\widehat{\\mathrm{dCov}}^2(X,Y)}}{\\sqrt{\\sqrt{\\widehat{\\mathrm{dCov}}^2(X,X)} \\cdot \\sqrt{\\widehat{\\mathrm{dCov}}^2(Y,Y)}}}\\,.
+\\end{align}
 ```
 
-Where ``n`` is the number of observations, ``\\bar{a}_{k\\cdot}`` is the ``k``-th row mean, ``\\bar{a}_{\\cdot l}`` is the ``l``-th column mean, ``\\bar{a}_{\\cdot\\cdot}`` is the grand mean of ``\\mathbf{a}``, and ``\\mathbf{A}:\\mathbf{B} = \\sum_{k,l} A_{kl} B_{kl}``.
+Where:
+
+  - ``\\hat{R}_{\\mathrm{dist}}(X, Y)``: Distance correlation between ``X`` and ``Y``.
 
 # Arguments
 
@@ -294,10 +317,16 @@ This function computes the distance covariance between `v1` and `v2` using the s
 Using the same doubly-centered matrices ``\\mathbf{A}`` and ``\\mathbf{B}`` as in [`cor_distance`](@ref):
 
 ```math
-\\widehat{\\mathrm{dCov}}(X, Y) = \\sqrt{\\left|\\frac{\\mathbf{A}:\\mathbf{B}}{n^2}\\right|}
+\\begin{align}
+\\widehat{\\mathrm{dCov}}(X, Y) &= \\sqrt{\\left|\\frac{\\mathbf{A}:\\mathbf{B}}{n^2}\\right|}\\,.
+\\end{align}
 ```
 
-Where ``n`` is the number of observations and ``\\mathbf{A}:\\mathbf{B} = \\sum_{k,l} A_{kl} B_{kl}``.
+Where:
+
+  - ``\\widehat{\\mathrm{dCov}}(X, Y)``: Distance covariance between ``X`` and ``Y``.
+  - ``n``: Number of observations.
+  - ``\\mathbf{A}:\\mathbf{B} = \\sum_{k,l} A_{kl} B_{kl}``: Frobenius inner product of doubly-centered distance matrices.
 
 # Arguments
 

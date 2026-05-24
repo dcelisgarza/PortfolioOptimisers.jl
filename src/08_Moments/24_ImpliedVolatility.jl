@@ -277,8 +277,16 @@ Predict realised volatilities by scaling the latest implied volatility row by th
 # Mathematical definition
 
 ```math
-\\hat{\\sigma}_i = \\frac{\\mathrm{iv}_{T,i}}{\\mathrm{ivpa}_i}
+\\begin{align}
+\\hat{\\sigma}_i &= \\frac{\\mathrm{iv}_{T,i}}{\\mathrm{ivpa}_i}\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``\\hat{\\sigma}_i``: Predicted realised volatility for asset ``i``.
+  - ``\\mathrm{iv}_{T,i}``: Latest implied volatility for asset ``i`` (last row).
+  - ``\\mathrm{ivpa}_i``: Implied volatility premium adjustment factor for asset ``i``.
 
 # Arguments
 
@@ -311,14 +319,30 @@ For each asset, this function fits a regression model relating lagged implied vo
 For asset ``i``, fit the log-linear model over windows ``t = 1, \\ldots, T-1``:
 
 ```math
-\\ln \\hat{\\sigma}^{\\mathrm{rv}}_{t+1,i} = \\beta_0 + \\beta_1 \\ln \\sigma^{\\mathrm{iv}}_{t,i} + \\beta_2 \\ln \\hat{\\sigma}^{\\mathrm{rv}}_{t,i} + \\varepsilon_t
+\\begin{align}
+\\ln \\hat{\\sigma}^{\\mathrm{rv}}_{t+1,i} &= \\beta_0 + \\beta_1 \\ln \\sigma^{\\mathrm{iv}}_{t,i} + \\beta_2 \\ln \\hat{\\sigma}^{\\mathrm{rv}}_{t,i} + \\varepsilon_t\\,.
+\\end{align}
 ```
 
-then predict:
+Where:
+
+  - ``\\hat{\\sigma}^{\\mathrm{rv}}_{t+1,i}``: Predicted realised volatility for asset ``i`` at time ``t+1``.
+  - ``\\sigma^{\\mathrm{iv}}_{t,i}``: Implied volatility for asset ``i`` at time ``t``.
+  - ``\\beta_0, \\beta_1, \\beta_2``: Regression coefficients.
+  - ``\\varepsilon_t``: Regression residual.
+
+Then predict:
 
 ```math
-\\hat{\\sigma}^{\\mathrm{rv}}_{T+1,i} = \\exp\\!\\left(\\hat{\\beta}_0 + \\hat{\\beta}_1 \\ln \\sigma^{\\mathrm{iv}}_{T,i} + \\hat{\\beta}_2 \\ln \\hat{\\sigma}^{\\mathrm{rv}}_{T,i}\\right)
+\\begin{align}
+\\hat{\\sigma}^{\\mathrm{rv}}_{T+1,i} &= \\exp\\!\\left(\\hat{\\beta}_0 + \\hat{\\beta}_1 \\ln \\sigma^{\\mathrm{iv}}_{T,i} + \\hat{\\beta}_2 \\ln \\hat{\\sigma}^{\\mathrm{rv}}_{T,i}\\right)\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``\\hat{\\sigma}^{\\mathrm{rv}}_{T+1,i}``: Predicted next-period realised volatility for asset ``i``.
+  - ``\\hat{\\beta}_0, \\hat{\\beta}_1, \\hat{\\beta}_2``: Fitted regression coefficients.
 
 # Arguments
 
@@ -387,10 +411,16 @@ This method computes the correlation matrix of `X` using the base estimator in `
 # Mathematical definition
 
 ```math
-\\hat{\\mathbf{\\Sigma}} = \\mathrm{diag}(\\hat{\\boldsymbol{\\sigma}}) \\hat{\\boldsymbol{\\rho}} \\,\\mathrm{diag}(\\hat{\\boldsymbol{\\sigma}})
+\\begin{align}
+\\hat{\\mathbf{\\Sigma}} &= \\mathrm{diag}(\\hat{\\boldsymbol{\\sigma}}) \\hat{\\boldsymbol{\\rho}} \\,\\mathrm{diag}(\\hat{\\boldsymbol{\\sigma}})\\,.
+\\end{align}
 ```
 
-where ``\\hat{\\boldsymbol{\\rho}} = \\operatorname{cor}(\\mathbf{X})`` and ``\\hat{\\boldsymbol{\\sigma}}`` are the predicted realised volatilities from ``\\mathbf{iv} / \\sqrt{\\mathrm{af}}``.
+Where:
+
+  - ``\\hat{\\mathbf{\\Sigma}}``: Implied volatility-scaled covariance matrix.
+  - ``\\hat{\\boldsymbol{\\rho}} = \\operatorname{cor}(\\mathbf{X})``: Correlation matrix from asset returns.
+  - ``\\hat{\\boldsymbol{\\sigma}}``: Predicted realised volatilities from ``\\mathbf{iv} / \\sqrt{\\mathrm{af}}``.
 
 # Arguments
 

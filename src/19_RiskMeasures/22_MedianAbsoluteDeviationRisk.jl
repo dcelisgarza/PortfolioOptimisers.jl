@@ -60,8 +60,18 @@ Represents the Median Absolute Deviation (MAD) risk measure for hierarchical por
 Let ``\\mu`` be the chosen centre (median or mean of returns, or a user-supplied value). Define the deviations ``\\delta_t = x_t - \\mu``. The MAD is:
 
 ```math
-\\mathrm{MAD}(\\boldsymbol{x}) = \\mathrm{median}_{1 \\leq t \\leq T}(|\\delta_t|)\\,.
+\\begin{align}
+\\mathrm{MAD}(\\boldsymbol{x}) &= \\mathrm{median}_{1 \\leq t \\leq T}(|\\delta_t|)\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``\\mathrm{MAD}(\\boldsymbol{x})``: Median absolute deviation of portfolio returns.
+  - $(math_dict[:xret])
+  - $(math_dict[:T])
+  - ``\\mu``: Chosen centre (median, mean, or user-supplied value).
+  - ``\\delta_t = x_t - \\mu``: Deviation of return at period ``t`` from the centre.
 
 When `flag = true` (default), the result is scaled by a consistency factor ``(\\Phi^{-1}(3/4))^{-1} \\approx 1.4826`` so that the MAD is a consistent estimator of the standard deviation under normality.
 

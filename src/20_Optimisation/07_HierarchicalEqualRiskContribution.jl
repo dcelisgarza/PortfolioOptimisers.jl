@@ -124,16 +124,28 @@ HierarchicalEqualRiskContribution
 Let ``K`` be the number of clusters. The inter-cluster (outer) step assigns equal risk contribution across all clusters using risk measure ``\\rho_o``:
 
 ```math
-w_{C_k} = \\frac{\\tilde{\\rho}_o(C_k)^{-1}}{\\sum_{j=1}^{K} \\tilde{\\rho}_o(C_j)^{-1}}
+\\begin{align}
+w_{C_k} &= \\frac{\\tilde{\\rho}_o(C_k)^{-1}}{\\sum_{j=1}^{K} \\tilde{\\rho}_o(C_j)^{-1}}\\,.
+\\end{align}
 ```
 
 Within each cluster ``C_k``, the intra-cluster (inner) step assigns weights proportional to inverse intra-cluster risk ``\\rho_i``:
 
 ```math
-w_i \\propto \\tilde{\\rho}_i(\\{i\\})^{-1}, \\quad i \\in C_k, \\qquad \\sum_{i \\in C_k} w_i = w_{C_k}
+\\begin{align}
+w_i &\\propto \\tilde{\\rho}_i(\\{i\\})^{-1}, \\quad i \\in C_k\\,, \\\\
+\\sum_{i \\in C_k} w_i &= w_{C_k}\\,.
+\\end{align}
 ```
 
-where ``\\tilde{\\rho}`` denotes the quasi-diagonal cluster portfolio risk.
+Where:
+
+  - ``w_{C_k}``: Weight allocated to cluster ``C_k``.
+  - ``\\tilde{\\rho}_o(C_k)``: Outer (inter-cluster) risk of cluster ``C_k``.
+  - ``\\tilde{\\rho}_i(\\{i\\})``: Inner (intra-cluster) risk of asset ``i``.
+  - ``K``: Number of clusters.
+  - ``w_i``: Final weight of asset ``i``.
+  - ``\\tilde{\\rho}``: Quasi-diagonal cluster portfolio risk.
 
 # Related
 

@@ -10,25 +10,33 @@ Computes portfolio risk as the square root of the fourth central moment (kurtosi
 Let ``\\boldsymbol{x} = \\mathbf{X} \\boldsymbol{w}`` be the ``T \\times 1`` vector of portfolio returns, and let ``\\mu`` be the chosen centre (mean, weighted mean, or user-supplied value). Define the centred deviations:
 
 ```math
-\\delta_t = x_t - \\mu\\,.
+\\begin{align}
+\\delta_t &= x_t - \\mu\\,.
+\\end{align}
 ```
 
 The square-root kurtosis (full moment) is:
 
 ```math
-\\mathrm{Kurt}(\\boldsymbol{w}) = \\sqrt{\\frac{1}{T} \\sum_{t=1}^{T} \\delta_t^4}\\,.
+\\begin{align}
+\\mathrm{Kurt}(\\boldsymbol{w}) &= \\sqrt{\\frac{1}{T} \\sum_{t=1}^{T} \\delta_t^4}\\,.
+\\end{align}
 ```
 
 Equivalently, using the ``N^2 \\times N^2`` cokurtosis matrix ``\\hat{\\mathbf{K}}`` and the Kronecker product ``\\otimes``:
 
 ```math
-\\mathrm{Kurt}(\\boldsymbol{w}) = \\sqrt[4]{(\\boldsymbol{w}^\\intercal \\otimes \\boldsymbol{w}^\\intercal)\\, \\hat{\\mathbf{K}}\\, (\\boldsymbol{w} \\otimes \\boldsymbol{w})}\\,.
+\\begin{align}
+\\mathrm{Kurt}(\\boldsymbol{w}) &= \\sqrt[4]{(\\boldsymbol{w}^\\intercal \\otimes \\boldsymbol{w}^\\intercal)\\, \\hat{\\mathbf{K}}\\, (\\boldsymbol{w} \\otimes \\boldsymbol{w})}\\,.
+\\end{align}
 ```
 
 For the semi (downside) variant, only non-positive deviations contribute:
 
 ```math
-\\mathrm{SKurt}(\\boldsymbol{w}) = \\sqrt{\\frac{1}{T} \\sum_{t=1}^{T} \\min(\\delta_t, 0)^4}\\,.
+\\begin{align}
+\\mathrm{SKurt}(\\boldsymbol{w}) &= \\sqrt{\\frac{1}{T} \\sum_{t=1}^{T} \\min(\\delta_t, 0)^4}\\,.
+\\end{align}
 ```
 
 Where:
