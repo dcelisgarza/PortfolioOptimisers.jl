@@ -47,6 +47,17 @@ $(DocStringExtensions.TYPEDEF)
 
 Implements the original Gerber covariance algorithm.
 
+# Constructors
+
+    Gerber0() -> Gerber0
+
+# Examples
+
+```jldoctest
+julia> Gerber0()
+Gerber0()
+```
+
 # Related
 
   - [`GerberCovarianceAlgorithm`](@ref)
@@ -64,6 +75,17 @@ $(DocStringExtensions.TYPEDEF)
 
 Implements the first variant of the Gerber covariance algorithm.
 
+# Constructors
+
+    Gerber1() -> Gerber1
+
+# Examples
+
+```jldoctest
+julia> Gerber1()
+Gerber1()
+```
+
 # Related
 
   - [`GerberCovarianceAlgorithm`](@ref)
@@ -80,6 +102,17 @@ struct Gerber1 <: GerberCovarianceAlgorithm end
 $(DocStringExtensions.TYPEDEF)
 
 Implements the second variant of the Gerber covariance algorithm.
+
+# Constructors
+
+    Gerber2() -> Gerber2
+
+# Examples
+
+```jldoctest
+julia> Gerber2()
+Gerber2()
+```
 
 # Related
 
@@ -119,6 +152,25 @@ Keywords correspond to the struct's fields.
 ## Validation
 
   - $(val_dict[:gerbt])
+
+# Examples
+
+```jldoctest
+julia> GerberCovariance()
+GerberCovariance
+   ve ┼ SimpleVariance
+      │          me ┼ SimpleExpectedReturns
+      │             │   w ┴ nothing
+      │           w ┼ nothing
+      │   corrected ┴ Bool: true
+   me ┼ SimpleExpectedReturns
+      │   w ┴ nothing
+  pdm ┼ Posdef
+      │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+      │   kwargs ┴ @NamedTuple{}: NamedTuple()
+    t ┼ Float64: 0.5
+  alg ┴ Gerber1()
+```
 
 # Related
 

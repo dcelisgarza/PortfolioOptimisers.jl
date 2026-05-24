@@ -49,6 +49,17 @@ Histogram binning algorithm using Knuth's rule.
 
 `Knuth` implements Knuth's rule for selecting the optimal number of bins in a histogram, as provided by the [AstroPy](https://www.astropy.org/) library. This method aims to maximize the posterior probability of the histogram given the data, resulting in an adaptive binning strategy that balances bias and variance.
 
+# Constructors
+
+    Knuth() -> Knuth
+
+# Examples
+
+```jldoctest
+julia> Knuth()
+Knuth()
+```
+
 # Related
 
   - [`AstroPyBins`](@ref)
@@ -64,6 +75,17 @@ $(DocStringExtensions.TYPEDEF)
 Histogram binning algorithm using the Freedman-Diaconis rule.
 
 `FreedmanDiaconis` implements the Freedman-Diaconis rule for selecting the number of bins in a histogram, as provided by the [AstroPy](https://www.astropy.org/) library. This method determines bin width based on the interquartile range (IQR) and the number of data points, making it robust to outliers and suitable for skewed distributions.
+
+# Constructors
+
+    FreedmanDiaconis() -> FreedmanDiaconis
+
+# Examples
+
+```jldoctest
+julia> FreedmanDiaconis()
+FreedmanDiaconis()
+```
 
 # Related
 
@@ -81,6 +103,17 @@ Histogram binning algorithm using Scott's rule.
 
 `Scott` implements Scott's rule for selecting the number of bins in a histogram, as provided by the [AstroPy](https://www.astropy.org/) library. This method chooses bin width based on the standard deviation of the data and the number of observations, providing a good default for normally distributed data.
 
+# Constructors
+
+    Scott() -> Scott
+
+# Examples
+
+```jldoctest
+julia> Scott()
+Scott()
+```
+
 # Related
 
   - [`AstroPyBins`](@ref)
@@ -96,6 +129,17 @@ $(DocStringExtensions.TYPEDEF)
 Histogram binning algorithm using the Hacine-Gharbi–Ravier rule.
 
 `HacineGharbiRavier` implements the Hacine-Gharbi–Ravier rule for selecting the number of bins in a histogram. This method adapts the bin count based on the correlation structure and sample size, and is particularly useful for information-theoretic measures such as mutual information and variation of information.
+
+# Constructors
+
+    HacineGharbiRavier() -> HacineGharbiRavier
+
+# Examples
+
+```jldoctest
+julia> HacineGharbiRavier()
+HacineGharbiRavier()
+```
 
 # Related
 

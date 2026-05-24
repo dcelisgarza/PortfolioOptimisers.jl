@@ -77,6 +77,22 @@ Return a new [`LowerTailDependenceCovariance`](@ref) estimator with observation 
 
   - $(ret_dict[:ce])
 
+# Examples
+
+```jldoctest
+julia> ce = LowerTailDependenceCovariance();
+
+julia> factory(ce, StatsBase.Weights([0.2, 0.3, 0.5]))
+LowerTailDependenceCovariance
+     ve ┼ SimpleVariance
+        │          me ┼ SimpleExpectedReturns
+        │             │   w ┴ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.3, 0.5]
+        │           w ┼ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.3, 0.5]
+        │   corrected ┴ Bool: true
+  alpha ┼ Float64: 0.05
+     ex ┴ Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
+```
+
 # Related
 
   - [`LowerTailDependenceCovariance`](@ref)
@@ -205,6 +221,19 @@ This method computes the lower tail dependence (LTD) correlation matrix for the 
 
   - `dims` is either `1` or `2`.
 
+# Examples
+
+```jldoctest
+julia> ce = LowerTailDependenceCovariance();
+
+julia> X = [0.01 0.02; 0.03 0.04; 0.02 0.03];
+
+julia> cor(ce, X)
+2×2 Matrix{Float64}:
+ 1.0  1.0
+ 1.0  1.0
+```
+
 # Related
 
   - [`LowerTailDependenceCovariance`](@ref)
@@ -239,6 +268,19 @@ This method computes the lower tail dependence (LTD) covariance matrix for the i
 # Validation
 
   - `dims` is either `1` or `2`.
+
+# Examples
+
+```jldoctest
+julia> ce = LowerTailDependenceCovariance();
+
+julia> X = [0.01 0.02; 0.03 0.04; 0.02 0.03];
+
+julia> cov(ce, X)
+2×2 Matrix{Float64}:
+ 0.0001  0.0001
+ 0.0001  0.0001
+```
 
 # Related
 

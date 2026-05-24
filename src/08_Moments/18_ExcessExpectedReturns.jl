@@ -61,6 +61,18 @@ Return a new [`ExcessExpectedReturns`](@ref) estimator with observation weights 
 
   - `me::ExcessExpectedReturns`: Updated estimator with weights applied.
 
+# Examples
+
+```jldoctest
+julia> me = ExcessExpectedReturns();
+
+julia> factory(me, StatsBase.Weights([0.2, 0.3, 0.5]))
+ExcessExpectedReturns
+  me ┼ SimpleExpectedReturns
+     │   w ┴ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.3, 0.5]
+  rf ┴ Float64: 0.0
+```
+
 # Related
 
   - [`ExcessExpectedReturns`](@ref)
@@ -122,6 +134,18 @@ Where:
 # Returns
 
   - `mu::ArrNum`: Excess expected returns vector.
+
+# Examples
+
+```jldoctest
+julia> me = ExcessExpectedReturns(; rf = 0.01);
+
+julia> X = [0.01 0.02; 0.03 0.04; 0.02 0.03];
+
+julia> mean(me, X)
+1×2 Matrix{Float64}:
+ 0.01  0.02
+```
 
 # Related
 

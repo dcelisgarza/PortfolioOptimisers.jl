@@ -1439,7 +1439,7 @@ In order to implement a new estimator value algorithm which will work seamlessly
 
 We can create a dummy estimator value algorithm as follows:
 
-```jldoctests
+```jldoctest
 julia> struct MyIncreasingValue <: PortfolioOptimisers.AbstractEstimatorValueAlgorithm end
 
 julia> function PortfolioOptimisers.estimator_to_val(alg::MyIncreasingValue, sets::AssetSets,
@@ -1972,6 +1972,10 @@ Assert that the input matrix is square.
 # Details
 
   - Throws `DimensionMismatch` if the check fails.
+
+# Related
+
+  - [`MatNum`](@ref)
 """
 function assert_matrix_issquare(X::MatNum, X_sym::Symbol = :X)::Nothing
     @argcheck(size(X, 1) == size(X, 2),
@@ -2063,6 +2067,11 @@ Singleton vector type that represents a vector with a single element with value 
 # Constructors
 
     SingletonVector()
+
+# Related
+
+  - [`VecNum`](@ref)
+  - [`MatNum`](@ref)
 """
 struct SingletonVector{T} <: AbstractVector{T} end
 function SingletonVector()

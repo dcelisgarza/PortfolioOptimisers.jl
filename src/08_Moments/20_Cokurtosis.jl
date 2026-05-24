@@ -5,6 +5,99 @@ Abstract supertype for all cokurtosis estimators in `PortfolioOptimisers.jl`.
 
 All concrete and/or abstract types implementing cokurtosis estimation algorithms should be subtypes of `CokurtosisEstimator`.
 
+# Interfaces
+
+In order to implement a new cokurtosis estimator which will work seamlessly with the library, subtype `CokurtosisEstimator` with all necessary parameters---including observation weights---as part of the struct, and implement the following methods:
+
+## Cokurtosis
+
+  - `PortfolioOptimisers.cokurtosis(kte::CokurtosisEstimator, X::MatNum; dims::Int = 1, mean = nothing, kwargs...) -> MatNum`: Computes the cokurtosis tensor.
+
+### Arguments
+
+  - $(arg_dict[:kte])
+  - $(arg_dict[:X])
+  - $(arg_dict[:dims])
+  - $(arg_dict[:omean])
+  - `kwargs...`: Additional keyword arguments.
+
+### Returns
+
+  - `ckurt::MatNum`: Cokurtosis tensor `features^2 × features^2`.
+
+## Factory
+
+  - `PortfolioOptimisers.factory(kte::CokurtosisEstimator, w::PortfolioOptimisers.ObsWeights) -> CokurtosisEstimator`: Factory method for creating instances of the estimator with new observation weights.
+
+### Arguments
+
+  - $(arg_dict[:kte])
+  - $(arg_dict[:ow])
+
+### Returns
+
+  - `kte::CokurtosisEstimator`: New cokurtosis estimator of the same type, with the new weights applied.
+
+## View
+
+  - `PortfolioOptimisers.moment_view(kte::CokurtosisEstimator, i) -> CokurtosisEstimator`: Returns a view of the estimator for the `i`-th element(s).
+
+### Arguments
+
+  - $(arg_dict[:kte])
+  - `i`: Index or indices.
+
+### Returns
+
+  - $(ret_dict[:ktev])
+
+# Examples
+
+We can create a dummy cokurtosis estimator as follows:
+
+```jldoctest
+julia> struct MyCokurtosisEstimator{T1} <: PortfolioOptimisers.CokurtosisEstimator
+           w::T1
+           function MyCokurtosisEstimator(w::PortfolioOptimisers.Option{<:PortfolioOptimisers.ObsWeights})
+               PortfolioOptimisers.assert_nonempty_nonneg_finite_val(w, :w)
+               return new{typeof(w)}(w)
+           end
+       end
+
+julia> function MyCokurtosisEstimator(;
+                                      w::PortfolioOptimisers.Option{<:PortfolioOptimisers.ObsWeights} = nothing)
+           return MyCokurtosisEstimator(w)
+       end
+MyCokurtosisEstimator
+
+julia> function PortfolioOptimisers.factory(::MyCokurtosisEstimator,
+                                            w::PortfolioOptimisers.ObsWeights)
+           return MyCokurtosisEstimator(; w = w)
+       end
+
+julia> function PortfolioOptimisers.moment_view(kte::MyCokurtosisEstimator, i)
+           return kte
+       end
+
+julia> function PortfolioOptimisers.cokurtosis(kte::MyCokurtosisEstimator,
+                                               X::PortfolioOptimisers.MatNum;
+                                               dims::Int = 1, mean = nothing, kwargs...)
+           N = size(X, 2)
+           return zeros(N^2, N^2)
+       end
+
+julia> cokurtosis(MyCokurtosisEstimator(), [1.0 2.0; 0.3 0.7; 0.5 1.1])
+4×4 Matrix{Float64}:
+ 0.0  0.0  0.0  0.0
+ 0.0  0.0  0.0  0.0
+ 0.0  0.0  0.0  0.0
+ 0.0  0.0  0.0  0.0
+
+julia> PortfolioOptimisers.factory(MyCokurtosisEstimator(), StatsBase.Weights([1, 2, 3]))
+MyCokurtosisEstimator
+  w ┴ StatsBase.Weights{Int64, Int64, Vector{Int64}}: [1, 2, 3]
+```
+
 # Related
 
   - [`Cokurtosis`](@ref)
@@ -92,12 +185,33 @@ Return a new [`Cokurtosis`](@ref) estimator with observation weights `w` applied
 
 # Arguments
 
-  - `kte`: Cokurtosis estimator.
+  - $(arg_dict[:kte])
   - $(arg_dict[:ow])
 
 # Returns
 
   - `kte::Cokurtosis`: Updated estimator with weights applied.
+
+# Examples
+
+```jldoctest
+julia> kte = Cokurtosis();
+
+julia> factory(kte, StatsBase.Weights([0.2, 0.3, 0.5]))
+Cokurtosis
+   me ┼ SimpleExpectedReturns
+      │   w ┴ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.3, 0.5]
+   mp ┼ DenoiseDetoneAlgMatrixProcessing
+      │     pdm ┼ Posdef
+      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+      │      dn ┼ nothing
+      │      dt ┼ nothing
+      │     alg ┼ nothing
+      │   order ┴ DenoiseDetoneAlg()
+  alg ┼ Full()
+    w ┴ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.3, 0.5]
+```
 
 # Related
 

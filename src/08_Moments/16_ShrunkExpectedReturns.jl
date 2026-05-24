@@ -47,6 +47,17 @@ Shrinkage target representing the grand mean of expected returns.
 
 `GrandMean` computes the shrinkage target as the mean of all asset expected returns, resulting in a vector where each element is the same grand mean value. This is commonly used in shrinkage estimators to reduce estimation error by pulling individual expected returns toward the overall average.
 
+# Constructors
+
+    GrandMean() -> GrandMean
+
+# Examples
+
+```jldoctest
+julia> GrandMean()
+GrandMean()
+```
+
 # Related
 
   - [`AbstractShrunkExpectedReturnsTarget`](@ref)
@@ -60,6 +71,17 @@ Shrinkage target representing the volatility-weighted mean of expected returns.
 
 `VolatilityWeighted` computes the shrinkage target as a weighted mean of expected returns, where weights are inversely proportional to asset volatility (from the inverse covariance matrix). This approach accounts for differences in asset risk when estimating the shrinkage target.
 
+# Constructors
+
+    VolatilityWeighted() -> VolatilityWeighted
+
+# Examples
+
+```jldoctest
+julia> VolatilityWeighted()
+VolatilityWeighted()
+```
+
 # Related
 
   - [`AbstractShrunkExpectedReturnsTarget`](@ref)
@@ -72,6 +94,17 @@ $(DocStringExtensions.TYPEDEF)
 Shrinkage target representing the mean squared error of expected returns.
 
 `MeanSquaredError` computes the shrinkage target as the trace of the covariance matrix divided by the number of observations, resulting in a vector where each element is the same value. This target is useful for certain shrinkage estimators that minimize mean squared error.
+
+# Constructors
+
+    MeanSquaredError() -> MeanSquaredError
+
+# Examples
+
+```jldoctest
+julia> MeanSquaredError()
+MeanSquaredError()
+```
 
 # Related
 
@@ -614,6 +647,20 @@ Return a new [`ShrunkExpectedReturns`](@ref) estimator with observation weights 
 # Returns
 
   - `me::ShrunkExpectedReturns`: Updated estimator with weights applied.
+
+# Examples
+
+```jldoctest
+julia> me = ShrunkExpectedReturns();
+
+julia> me2 = factory(me, StatsBase.Weights([0.2, 0.3, 0.5]));
+
+julia> me2.me.w
+StatsBase.Weights{Float64, Float64, Vector{Float64}} with 3 entries
+  0.2
+  0.3
+  0.5
+```
 
 # Related
 

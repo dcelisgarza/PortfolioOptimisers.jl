@@ -14,7 +14,7 @@ In order to implement a new detoning estimator which will work seamlessly with t
 
 ## Arguments
 
-  - $(arg_dict[:odt])
+  - $(arg_dict[:dt])
   - $(arg_dict[:sigrhoX])
 
 ## Returns
@@ -238,9 +238,35 @@ function detone!(dt::Detone, X::MatNum)
     return X
 end
 """
-    detone(dt::Option{<:Detone}, X::MatNum)
+    detone(dt::Option{<:Detone}, X::MatNum) -> MatNum
 
 Out-of-place version of [`detone!`](@ref).
+
+# Arguments
+
+  - $(arg_dict[:odt])
+      + `::Detone`: The top `n` principal components are removed from a copy of `X`.
+      + `::Nothing`: No-op, returns `X` unchanged.
+  - $(arg_dict[:sigrhoX])
+
+# Returns
+
+  - `X::MatNum`: A new matrix equal to the detoned version of the input.
+
+# Examples
+
+```jldoctest
+julia> using StableRNGs
+
+julia> rng = StableRNG(123456789);
+
+julia> X = rand(rng, 10, 5); X = X' * X;
+
+julia> Xd = detone(Detone(), X);
+
+julia> size(Xd)
+(5, 5)
+```
 
 # Related
 

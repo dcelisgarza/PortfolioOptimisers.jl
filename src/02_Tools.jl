@@ -3,6 +3,11 @@
 
 Tensor product of two arrays. Returns a matrix of size `(length(A), length(B))` where each element is the product of elements from `A` and `B`.
 
+# Arguments
+
+  - `A::ArrNum`: First array.
+  - `B::ArrNum`: Second array.
+
 # Examples
 
 ```jldoctest
@@ -26,6 +31,11 @@ julia> PortfolioOptimisers.:⊗([1, 2], [3, 4])
 
 Elementwise (Hadamard) multiplication.
 
+# Arguments
+
+  - `A`: First operand (array or scalar).
+  - `B`: Second operand (array or scalar).
+
 # Examples
 
 ```jldoctest
@@ -47,6 +57,14 @@ julia> PortfolioOptimisers.:⊙(2, [3, 4])
 julia> PortfolioOptimisers.:⊙(2, 3)
 6
 ```
+
+# Related
+
+  - [`⊗`](@ref)
+  - [`⊘`](@ref)
+  - [`⊕`](@ref)
+  - [`⊖`](@ref)
+  - [`ArrNum`](@ref)
 """
 ⊙(A::ArrNum, B::ArrNum) = A .* B
 ⊙(A::ArrNum, B) = A * B
@@ -59,6 +77,11 @@ julia> PortfolioOptimisers.:⊙(2, 3)
     ⊘(A, B) -> promote_type(eltype(A), eltype(B))
 
 Elementwise (Hadamard) division.
+
+# Arguments
+
+  - `A`: Dividend (array or scalar).
+  - `B`: Divisor (array or scalar).
 
 # Examples
 
@@ -81,6 +104,14 @@ julia> PortfolioOptimisers.:⊘(8, [2, 4])
 julia> PortfolioOptimisers.:⊘(8, 2)
 4.0
 ```
+
+# Related
+
+  - [`⊗`](@ref)
+  - [`⊙`](@ref)
+  - [`⊕`](@ref)
+  - [`⊖`](@ref)
+  - [`ArrNum`](@ref)
 """
 ⊘(A::ArrNum, B::ArrNum) = A ./ B
 ⊘(A::ArrNum, B) = A / B
@@ -93,6 +124,11 @@ julia> PortfolioOptimisers.:⊘(8, 2)
     ⊕(A, B) -> promote_type(eltype(A), eltype(B))
 
 Elementwise (Hadamard) addition.
+
+# Arguments
+
+  - `A`: First summand (array or scalar).
+  - `B`: Second summand (array or scalar).
 
 # Examples
 
@@ -115,6 +151,14 @@ julia> PortfolioOptimisers.:⊕(2, [3, 4])
 julia> PortfolioOptimisers.:⊕(2, 3)
 5
 ```
+
+# Related
+
+  - [`⊗`](@ref)
+  - [`⊙`](@ref)
+  - [`⊘`](@ref)
+  - [`⊖`](@ref)
+  - [`ArrNum`](@ref)
 """
 ⊕(A::ArrNum, B::ArrNum) = A .+ B
 ⊕(A::ArrNum, B) = A .+ B
@@ -127,6 +171,11 @@ julia> PortfolioOptimisers.:⊕(2, 3)
     ⊖(A, B) -> promote_type(eltype(A), eltype(B))
 
 Elementwise (Hadamard) subtraction.
+
+# Arguments
+
+  - `A`: Minuend (array or scalar).
+  - `B`: Subtrahend (array or scalar).
 
 # Examples
 
@@ -149,6 +198,14 @@ julia> PortfolioOptimisers.:⊖(8, [2, 4])
 julia> PortfolioOptimisers.:⊖(8, 2)
 6
 ```
+
+# Related
+
+  - [`⊗`](@ref)
+  - [`⊙`](@ref)
+  - [`⊘`](@ref)
+  - [`⊕`](@ref)
+  - [`ArrNum`](@ref)
 """
 ⊖(A::ArrNum, B::ArrNum) = A .- B
 ⊖(A::ArrNum, B) = A .- B
@@ -221,7 +278,7 @@ Utility for safely viewing into possibly `nothing`, scalar, or array values.
 
   - `x`: Input value.
 
-      + `::Union{Nothing, <:Number, <:Pair, <:VecPair, <:Dict, <:AbstractEstimatorValueAlgorithm, <:DynamicAbstractWeights, , <:AbstractEstimator, <:AbstractAlgorithm}`: Returns `x` unchanged.
+      + `::Union{Nothing, <:Number, <:Pair, <:VecPair, <:Dict, <:AbstractEstimatorValueAlgorithm, <:DynamicAbstractWeights, <:AbstractEstimator, <:AbstractAlgorithm}`: Returns `x` unchanged.
       + `::AbstractVector`: Returns `view(x, i)`.
       + `::VecScalar`: Returns `VecScalar(; v = view(x.v, i), s = x.s)`.
       + `::AbstractMatrix`: Returns `view(x, i, i)`.
@@ -245,6 +302,11 @@ julia> PortfolioOptimisers.nothing_scalar_array_view([[1, 2], [3, 4]], 1)
  fill(1)
  fill(3)
 ```
+
+# Related
+
+  - [`nothing_scalar_array_getindex`](@ref)
+  - [`VecScalar`](@ref)
 """
 function nothing_scalar_array_view(x::Union{Nothing, <:Number, <:Pair, <:VecPair, <:Dict,
                                             <:AbstractEstimatorValueAlgorithm,
@@ -311,7 +373,7 @@ end
     nothing_scalar_array_view_odd_order(::Nothing, i, j)
     nothing_scalar_array_view_odd_order(x::AbstractMatrix, i, j) -> view(x, i, j)
 
-Utility for safely viewing or indexing into possibly `nothing` or array values with two indices.
+Utility for safely viewing into possibly `nothing` or array values with two indices.
 
   - If `x` is `nothing`, returns `nothing`.
   - Otherwise, returns `view(x, i, j)`.
@@ -334,6 +396,11 @@ julia> PortfolioOptimisers.nothing_scalar_array_view_odd_order([1 2; 3 4], 1, 2)
 0-dimensional view(::Matrix{Int64}, 1, 2) with eltype Int64:
 2
 ```
+
+# Related
+
+  - [`nothing_scalar_array_view`](@ref)
+  - [`nothing_scalar_array_getindex_odd_order`](@ref)
 """
 function nothing_scalar_array_view_odd_order(::Nothing, i, j)
     return nothing
@@ -391,6 +458,11 @@ julia> PortfolioOptimisers.nothing_scalar_array_getindex([[1, 2], [3, 4]], 1)
  1
  3
 ```
+
+# Related
+
+  - [`nothing_scalar_array_view`](@ref)
+  - [`VecScalar`](@ref)
 """
 function nothing_scalar_array_getindex(x::Union{Nothing, <:Number, <:Pair, <:VecPair,
                                                 <:Dict, <:AbstractEstimatorValueAlgorithm,
@@ -415,19 +487,19 @@ end
     nothing_scalar_array_getindex_odd_order(::Nothing, i, j)
     nothing_scalar_array_getindex_odd_order(x::AbstractMatrix, i, j) -> x[i, j]
 
-Utility for safely viewing or indexing into possibly `nothing` or array values with two indices.
+Utility for safely indexing into possibly `nothing` or array values with two indices.
 
   - If `x` is `nothing`, returns `nothing`.
-  - Otherwise, returns `view(x, i, j)`.
+  - Otherwise, returns `x[i, j]`.
 
 # Arguments
 
   - `x`: Input value.
-  - `i`, `j`: Indices to view.
+  - `i`, `j`: Indices to access.
 
 # Returns
 
-  - The corresponding matrix index or `nothing`.
+  - The corresponding matrix element or `nothing`.
 
 # Examples
 
@@ -437,6 +509,11 @@ julia> PortfolioOptimisers.nothing_scalar_array_getindex_odd_order(nothing, 1, 2
 julia> PortfolioOptimisers.nothing_scalar_array_getindex_odd_order([1 2; 3 4], 1, 2)
 2
 ```
+
+# Related
+
+  - [`nothing_scalar_array_getindex`](@ref)
+  - [`nothing_scalar_array_view_odd_order`](@ref)
 """
 function nothing_scalar_array_getindex_odd_order(::Nothing, i, j)
     return nothing
@@ -492,7 +569,7 @@ Recursively traverse all subtypes of the given abstract type `t` and collect all
 
 # Examples
 
-```julia
+```jldoctest
 julia> abstract type MyAbstract end
 
 julia> struct MyConcrete1 <: MyAbstract end
@@ -504,6 +581,11 @@ julia> traverse_concrete_subtypes(MyAbstract)
  MyConcrete1
  MyConcrete2
 ```
+
+# Related
+
+  - [`AbstractEstimator`](@ref)
+  - [`AbstractAlgorithm`](@ref)
 """
 function traverse_concrete_subtypes(t, ctarr::Option{<:AbstractVector} = nothing)
     if isnothing(ctarr)
@@ -545,6 +627,10 @@ julia> PortfolioOptimisers.concrete_typed_array(A)
  2.0
  3
 ```
+
+# Related
+
+  - [`ArrNum`](@ref)
 """
 function concrete_typed_array(A::AbstractArray)
     return reshape(Union{typeof.(A)...}[A...], size(A))
@@ -567,9 +653,18 @@ Defining methods which dispatch on the first argument allows for a consistent fa
 
   - `a`: The input unchanged.
 
+# Examples
+
+```jldoctest
+julia> factory(nothing, 1, 2; x = 3)
+
+julia> factory(MeanValue())
+MeanValue
+  w ┴ nothing
+```
+
 # Related
 
-  - [`factory`](@ref)
   - [`AbstractEstimator`](@ref)
   - [`AbstractAlgorithm`](@ref)
   - [`AbstractResult`](@ref)
@@ -588,6 +683,23 @@ $(DocStringExtensions.TYPEDEF)
 Abstract supertype for algorithms mapping a vector of real values to a single real value.
 
 `VectorToScalarMeasure` provides a unified interface for algorithms that reduce a vector of real numbers to a scalar, such as minimum, mean, median, or maximum. These are used in constraint generation and centrality-based portfolio constraints to aggregate asset-level metrics.
+
+# Interfaces
+
+In order to implement a new vector-to-scalar measure that works seamlessly with the library, subtype `VectorToScalarMeasure` and implement the following method:
+
+## Reduction method
+
+  - `vec_to_real_measure(measure::VectorToScalarMeasure, val::VecNum) -> Number`: Reduces `val` to a single scalar.
+
+### Arguments
+
+  - `measure`: Concrete subtype instance.
+  - `val`: Vector of real values to reduce.
+
+### Returns
+
+  - `score::Number`: Computed scalar.
 
 # Related
 
@@ -928,7 +1040,7 @@ julia> PortfolioOptimisers.vec_to_real_measure(VarValue(), [1.2, 3.4, 0.7])
 @concrete struct VarValue <: VectorToScalarMeasure
     "$(field_dict[:oow])"
     w
-    "Indicates whether to use Bessel's correction (`true` for sample standard deviation, `false` for population)."
+    "$(field_dict[:corrected])"
     corrected
     function VarValue(w::Option{<:ObsWeights}, corrected::Bool)
         assert_nonempty_nonneg_finite_val(w, :w)

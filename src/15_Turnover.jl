@@ -14,6 +14,12 @@ Used as a fallback method for missing turnover constraints or estimators, ensuri
 
   - `nothing`.
 
+# Examples
+
+```jldoctest
+julia> PortfolioOptimisers.turnover_view(nothing, 1)
+```
+
 # Related
 
   - [`TurnoverEstimator`](@ref)
@@ -262,7 +268,6 @@ Turnover
   - [`TurnoverEstimator`](@ref)
   - [`Turnover`](@ref)
   - [`AssetSets`](@ref)
-  - [`turnover_constraints`](@ref)
 """
 function turnover_constraints(tn::TurnoverEstimator, sets::AssetSets;
                               datatype::DataType = Float64, strict::Bool = false)::Turnover
@@ -276,6 +281,8 @@ $(DocStringExtensions.TYPEDEF)
 Container for turnover portfolio constraints.
 
 `Turnover` stores the portfolio weights and turnover constraint values for each asset. The turnover constraint can be specified as a scalar (applied to all assets) or as a vector of per-asset values.
+
+# Mathematical definition
 
 ```math
 \\begin{align}
@@ -513,7 +520,7 @@ Alias for a turnover constraint or estimator.
 
 Represents either a constructed turnover constraint or a turnover constraint estimator. Used for flexible dispatch in turnover constraint generation and processing.
 
-# Related Types
+# Related
 
   - [`Turnover`](@ref)
   - [`TurnoverEstimator`](@ref)
@@ -526,7 +533,7 @@ Alias for a vector of turnover constraints or estimators.
 
 Represents a collection of turnover constraints or estimators, enabling batch processing and broadcasting of turnover constraint generation.
 
-# Related Types
+# Related
 
   - [`TnE_Tn`](@ref)
   - [`Turnover`](@ref)
@@ -540,7 +547,7 @@ Alias for a vector of turnover constraints.
 
 Represents a collection of constructed turnover constraints for multiple portfolios or assets.
 
-# Related Types
+# Related
 
   - [`Turnover`](@ref)
 """
@@ -552,7 +559,7 @@ Alias for a single turnover constraint or a vector of turnover constraints.
 
 Enables flexible dispatch for functions that accept either a single turnover constraint or multiple constraints.
 
-# Related Types
+# Related
 
   - [`Turnover`](@ref)
   - [`VecTn`](@ref)
@@ -565,7 +572,7 @@ Alias for a single turnover constraint/estimator or a vector of them.
 
 Supports flexible dispatch for turnover constraint generation and processing, accepting either a single constraint/estimator or a collection.
 
-# Related Types
+# Related
 
   - [`TnE_Tn`](@ref)
   - [`VecTnE_Tn`](@ref)
@@ -592,6 +599,28 @@ Provides a uniform interface for processing multiple constraint estimators simul
 
   - `res::VecTn`: Vector of constructed turnover constraints.
 
+# Examples
+
+```jldoctest
+julia> sets = AssetSets(; dict = Dict("nx" => ["A", "B", "C"]));
+
+julia> tn1 = TurnoverEstimator(; w = [0.2, 0.3, 0.5], val = Dict("A" => 0.1, "B" => 0.2));
+
+julia> tn2 = TurnoverEstimator(; w = [0.1, 0.4, 0.5], val = Dict("B" => 0.15, "C" => 0.3));
+
+julia> turnover_constraints([tn1, tn2], sets)
+2-element Vector{Turnover{Vector{Float64}, Vector{Float64}, Bool}}:
+ Turnover
+      w ┼ Vector{Float64}: [0.2, 0.3, 0.5]
+    val ┼ Vector{Float64}: [0.1, 0.2, 0.0]
+  fixed ┴ Bool: false
+
+ Turnover
+      w ┼ Vector{Float64}: [0.1, 0.4, 0.5]
+    val ┼ Vector{Float64}: [0.0, 0.15, 0.3]
+  fixed ┴ Bool: false
+```
+
 # Related
 
   - [`VecTnE_Tn`](@ref)
@@ -602,6 +631,50 @@ function turnover_constraints(tn::VecTnE_Tn, sets::AssetSets; datatype::DataType
     return [turnover_constraints(tni, sets; datatype = datatype, strict = strict)
             for tni in tn]
 end
+"""
+    factory(tn::VecTnE_Tn, w::VecNum)
+
+Create new turnover constraints or estimators with updated portfolio weights.
+
+Applies [`factory`](@ref) to each element in `tn`, constructing a new collection of turnover constraints or estimators with the provided portfolio weights `w`.
+
+# Arguments
+
+  - `tn`: Vector of turnover constraints or estimators.
+  - `w`: New portfolio weights vector.
+
+# Returns
+
+  - `res::VecTnE_Tn`: Vector of updated turnover constraints or estimators.
+
+# Examples
+
+```jldoctest
+julia> tn1 = Turnover(; w = [0.2, 0.3, 0.5], val = [0.1, 0.2, 0.0]);
+
+julia> tn2 = Turnover(; w = [0.2, 0.3, 0.5], val = [0.05, 0.1, 0.0]);
+
+julia> factory([tn1, tn2], [0.1, 0.4, 0.5])
+2-element Vector{Turnover{Vector{Float64}, Vector{Float64}, Bool}}:
+ Turnover
+      w ┼ Vector{Float64}: [0.1, 0.4, 0.5]
+    val ┼ Vector{Float64}: [0.1, 0.2, 0.0]
+  fixed ┴ Bool: false
+
+ Turnover
+      w ┼ Vector{Float64}: [0.1, 0.4, 0.5]
+    val ┼ Vector{Float64}: [0.05, 0.1, 0.0]
+  fixed ┴ Bool: false
+```
+
+# Related
+
+  - [`VecTnE_Tn`](@ref)
+  - [`Turnover`](@ref)
+  - [`TurnoverEstimator`](@ref)
+  - [`factory(tn::Turnover, w::VecNum)`](@ref)
+  - [`factory(tn::TurnoverEstimator, w::VecNum)`](@ref)
+"""
 function factory(tn::VecTnE_Tn, w::VecNum)
     val = [factory(tni, w) for tni in tn]
     if isabstracttype(eltype(val))

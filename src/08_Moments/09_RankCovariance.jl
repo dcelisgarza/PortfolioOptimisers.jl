@@ -100,6 +100,17 @@ Where:
 
   - `dims` is either `1` or `2`.
 
+# Examples
+
+```jldoctest
+julia> X = [0.01 0.02; 0.03 0.04; 0.02 0.03];
+
+julia> cor(KendallCovariance(), X)
+2×2 Matrix{Float64}:
+ 1.0  1.0
+ 1.0  1.0
+```
+
 # Related
 
   - [`KendallCovariance`](@ref)
@@ -133,6 +144,17 @@ This method computes the covariance matrix for the input data matrix `X` by comb
 # Validation
 
   - `dims` is either `1` or `2`.
+
+# Examples
+
+```jldoctest
+julia> X = [0.01 0.02; 0.03 0.04; 0.02 0.03];
+
+julia> cov(KendallCovariance(), X)
+2×2 Matrix{Float64}:
+ 0.0001  0.0001
+ 0.0001  0.0001
+```
 
 # Related
 
@@ -237,6 +259,17 @@ Where:
 
   - `dims` is either `1` or `2`.
 
+# Examples
+
+```jldoctest
+julia> X = [0.01 0.02; 0.03 0.04; 0.02 0.03];
+
+julia> cor(SpearmanCovariance(), X)
+2×2 Matrix{Float64}:
+ 1.0  1.0
+ 1.0  1.0
+```
+
 # Related
 
   - [`SpearmanCovariance`](@ref)
@@ -270,6 +303,17 @@ This method computes the covariance matrix for the input data matrix `X` by comb
 # Validation
 
   - `dims` is either `1` or `2`.
+
+# Examples
+
+```jldoctest
+julia> X = [0.01 0.02; 0.03 0.04; 0.02 0.03];
+
+julia> cov(SpearmanCovariance(), X)
+2×2 Matrix{Float64}:
+ 0.0001  0.0001
+ 0.0001  0.0001
+```
 
 # Related
 

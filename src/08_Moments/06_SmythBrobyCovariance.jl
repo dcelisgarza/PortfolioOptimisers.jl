@@ -31,6 +31,17 @@ $(DocStringExtensions.TYPEDEF)
 
 Implements the original Smyth-Broby covariance algorithm.
 
+# Constructors
+
+    SmythBroby0() -> SmythBroby0
+
+# Examples
+
+```jldoctest
+julia> SmythBroby0()
+SmythBroby0()
+```
+
 # Related
 
   - [`SmythBrobyCovarianceAlgorithm`](@ref)
@@ -43,6 +54,17 @@ struct SmythBroby0 <: SmythBrobyCovarianceAlgorithm end
 $(DocStringExtensions.TYPEDEF)
 
 Implements the first variant of the Smyth-Broby covariance algorithm.
+
+# Constructors
+
+    SmythBroby1() -> SmythBroby1
+
+# Examples
+
+```jldoctest
+julia> SmythBroby1()
+SmythBroby1()
+```
 
 # Related
 
@@ -57,6 +79,17 @@ $(DocStringExtensions.TYPEDEF)
 
 Implements the second variant of the Smyth-Broby covariance algorithm.
 
+# Constructors
+
+    SmythBroby2() -> SmythBroby2
+
+# Examples
+
+```jldoctest
+julia> SmythBroby2()
+SmythBroby2()
+```
+
 # Related
 
   - [`SmythBrobyCovarianceAlgorithm`](@ref)
@@ -69,6 +102,17 @@ struct SmythBroby2 <: SmythBrobyCovarianceAlgorithm end
 $(DocStringExtensions.TYPEDEF)
 
 Implements the original Smyth-Broby covariance algorithm scaled by vote counts.
+
+# Constructors
+
+    SmythBrobyGerber0() -> SmythBrobyGerber0
+
+# Examples
+
+```jldoctest
+julia> SmythBrobyGerber0()
+SmythBrobyGerber0()
+```
 
 # Related
 
@@ -83,6 +127,17 @@ $(DocStringExtensions.TYPEDEF)
 
 Implements the first variant of the Smyth-Broby covariance algorithm scaled by vote counts.
 
+# Constructors
+
+    SmythBrobyGerber1() -> SmythBrobyGerber1
+
+# Examples
+
+```jldoctest
+julia> SmythBrobyGerber1()
+SmythBrobyGerber1()
+```
+
 # Related
 
   - [`SmythBrobyCovarianceAlgorithm`](@ref)
@@ -95,6 +150,17 @@ struct SmythBrobyGerber1 <: SmythBrobyCovarianceAlgorithm end
 $(DocStringExtensions.TYPEDEF)
 
 Implements the second variant of the Smyth-Broby covariance algorithm scaled by vote counts.
+
+# Constructors
+
+    SmythBrobyGerber2() -> SmythBrobyGerber2
+
+# Examples
+
+```jldoctest
+julia> SmythBrobyGerber2()
+SmythBrobyGerber2()
+```
 
 # Related
 
@@ -109,6 +175,17 @@ $(DocStringExtensions.TYPEDEF)
 
 Implements the original Smyth-Broby covariance algorithm using vote counts only.
 
+# Constructors
+
+    SmythBrobyCount0() -> SmythBrobyCount0
+
+# Examples
+
+```jldoctest
+julia> SmythBrobyCount0()
+SmythBrobyCount0()
+```
+
 # Related
 
   - [`SmythBrobyCovarianceAlgorithm`](@ref)
@@ -122,6 +199,17 @@ $(DocStringExtensions.TYPEDEF)
 
 Implements the first variant of the Smyth-Broby covariance algorithm using vote counts only.
 
+# Constructors
+
+    SmythBrobyCount1() -> SmythBrobyCount1
+
+# Examples
+
+```jldoctest
+julia> SmythBrobyCount1()
+SmythBrobyCount1()
+```
+
 # Related
 
   - [`SmythBrobyCovarianceAlgorithm`](@ref)
@@ -134,6 +222,17 @@ struct SmythBrobyCount1 <: SmythBrobyCovarianceAlgorithm end
 $(DocStringExtensions.TYPEDEF)
 
 Implements the second variant of the Smyth-Broby covariance algorithm using vote counts only.
+
+# Constructors
+
+    SmythBrobyCount2() -> SmythBrobyCount2
+
+# Examples
+
+```jldoctest
+julia> SmythBrobyCount2()
+SmythBrobyCount2()
+```
 
 # Related
 
@@ -267,6 +366,31 @@ Return a new [`SmythBrobyCovariance`](@ref) estimator with observation weights `
 # Returns
 
   - $(ret_dict[:ce])
+
+# Examples
+
+```jldoctest
+julia> ce = SmythBrobyCovariance();
+
+julia> factory(ce, StatsBase.Weights([0.2, 0.3, 0.5]))
+SmythBrobyCovariance
+   ve ┼ SimpleVariance
+      │          me ┼ SimpleExpectedReturns
+      │             │   w ┴ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.3, 0.5]
+      │           w ┼ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.3, 0.5]
+      │   corrected ┴ Bool: true
+   me ┼ SimpleExpectedReturns
+      │   w ┴ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.3, 0.5]
+  pdm ┼ Posdef
+      │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+      │   kwargs ┴ @NamedTuple{}: NamedTuple()
+   c1 ┼ Float64: 0.5
+   c2 ┼ Float64: 0.5
+   c3 ┼ Int64: 4
+    n ┼ Int64: 2
+  alg ┼ SmythBrobyGerber1()
+   ex ┴ Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
+```
 
 # Related
 

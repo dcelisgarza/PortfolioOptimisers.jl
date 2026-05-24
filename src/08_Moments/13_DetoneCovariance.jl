@@ -76,6 +76,20 @@ Return a new [`DetoneCovariance`](@ref) estimator with observation weights `w` a
 
   - $(ret_dict[:ce])
 
+# Examples
+
+```jldoctest
+julia> ce = DetoneCovariance();
+
+julia> ce2 = factory(ce, StatsBase.Weights([0.2, 0.3, 0.5]));
+
+julia> ce2.ce.me.w
+StatsBase.Weights{Float64, Float64, Vector{Float64}} with 3 entries
+  0.2
+  0.3
+  0.5
+```
+
 # Related
 
   - [`DetoneCovariance`](@ref)

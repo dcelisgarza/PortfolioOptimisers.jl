@@ -5,6 +5,45 @@ Abstract supertype for all regression estimator types in `PortfolioOptimisers.jl
 
 All concrete and/or abstract types implementing regression estimation algorithms should be subtypes of `AbstractRegressionEstimator`.
 
+# Interfaces
+
+In order to implement a new regression estimator which will work seamlessly with the library, subtype `AbstractRegressionEstimator` with all necessary parameters as part of the struct, and implement the following methods:
+
+## Regression
+
+  - `PortfolioOptimisers.regression(re::AbstractRegressionEstimator, X::MatNum, F::MatNum) -> Regression`: Computes the regression result from asset returns `X` and factor returns `F`.
+
+### Arguments
+
+  - `re`: Regression estimator.
+  - $(arg_dict[:X])
+  - $(arg_dict[:F])
+
+### Returns
+
+  - `reg::Regression`: Regression result containing the coefficient matrix and optional intercept.
+
+# Examples
+
+We can create a dummy regression estimator as follows:
+
+```jldoctest
+julia> struct MyRegressionEstimator <: PortfolioOptimisers.AbstractRegressionEstimator end
+
+julia> function PortfolioOptimisers.regression(::MyRegressionEstimator,
+                                               X::PortfolioOptimisers.MatNum,
+                                               F::PortfolioOptimisers.MatNum)
+           return PortfolioOptimisers.Regression(; M = F \\ X)
+       end
+
+julia> regression(MyRegressionEstimator(), [1.0 2.0; 3.0 4.0; 5.0 6.0],
+                  [1.0 0.0; 0.0 1.0; 0.5 0.5])
+Regression
+  M ┼ 2×2 Matrix{Float64}
+  L ┼ 2×2 Matrix{Float64}
+  b ┴ nothing
+```
+
 # Related
 
   - [`AbstractEstimator`](@ref)

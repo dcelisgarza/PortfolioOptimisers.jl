@@ -151,6 +151,10 @@ Where:
   - ``\\boldsymbol{\\lambda}_{\\mathrm{signal}}``: Signal eigenvalues (``\\lambda_i > \\lambda_+``).
   - ``\\lambda_+``: Marčenko-Pastur upper bound for noise eigenvalues.
 
+# Constructors
+
+    SpectralDenoise() -> SpectralDenoise
+
 # Examples
 
 ```jldoctest
@@ -191,6 +195,10 @@ Where:
   - ``\\lambda_i``: Original ``i``-th eigenvalue.
   - ``\\bar{\\lambda}_\\text{noise}``: Mean of the noise eigenvalues.
   - ``\\lambda_+``: Marčenko-Pastur upper bound for noise eigenvalues.
+
+# Constructors
+
+    FixedDenoise() -> FixedDenoise
 
 # Examples
 
@@ -305,6 +313,11 @@ $(DocStringExtensions.FIELDS)
     ) -> Denoise
 
 Keywords correspond to the struct's fields.
+
+## Validation
+
+  - `m > 1`.
+  - `n > 1`.
 
 # Examples
 
@@ -644,6 +657,33 @@ end
     denoise(dn::Option{<:Denoise}, X::MatNum, q::Number) -> MatNum
 
 Out-of-place version of [`denoise!`](@ref).
+
+# Arguments
+
+  - $(arg_dict[:odn])
+      + `::Denoise`: The specified denoising algorithm is applied to a copy of `X`.
+      + `::Nothing`: No-op, returns `X` unchanged.
+  - $(arg_dict[:sigrhoX])
+  - `q`: The effective sample ratio `observations / assets`, used for spectral thresholding.
+
+# Returns
+
+  - `X::MatNum`: A new matrix equal to the denoised version of the input.
+
+# Examples
+
+```jldoctest
+julia> using StableRNGs
+
+julia> rng = StableRNG(123456789);
+
+julia> X = rand(rng, 10, 5); X = X' * X;
+
+julia> Xd = denoise(Denoise(), X, 10 / 5);
+
+julia> size(Xd)
+(5, 5)
+```
 
 # Related
 

@@ -222,6 +222,8 @@ Fee values can be specified as scalars (applied to all assets) or as vectors of 
 
     The turnover and proportional fees must match the periodicity of the returns series, and the fixed fees must be divided by the portfolio's holding period. The units of the fees and returns must also be consistent.
 
+# Mathematical definition
+
 ## Portfolio fees
 
 For non-finite optimisations, the total portfolio transaction fees are computed as:
@@ -534,6 +536,12 @@ This method is used as a fallback for missing fee estimators or constraints, ens
 # Returns
 
   - `nothing`.
+
+# Examples
+
+```jldoctest
+julia> PortfolioOptimisers.fees_view(nothing, 1)
+```
 
 # Related
 

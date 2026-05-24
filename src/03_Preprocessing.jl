@@ -295,6 +295,35 @@ Return a view of the `ReturnsResult` object for assets at indices `j`, observati
   - [`Option`](@ref)
   - [`VecStr`](@ref)
   - [`MatNum`](@ref)
+
+# Examples
+
+```jldoctest
+julia> rd = ReturnsResult(; nx = ["A", "B"], X = [0.1 0.2; 0.3 0.4; 0.5 0.6],
+                          nf = ["F1"], F = [1.0; 2.0; 3.0;;])
+ReturnsResult
+    nx ┼ Vector{String}: ["A", "B"]
+     X ┼ 3×2 Matrix{Float64}
+    nf ┼ Vector{String}: ["F1"]
+     F ┼ 3×1 Matrix{Float64}
+    nb ┼ nothing
+     B ┼ nothing
+    ts ┼ nothing
+    iv ┼ nothing
+  ivpa ┴ nothing
+
+julia> returns_result_view(rd, 1:2, 2:2)
+ReturnsResult
+    nx ┼ SubArray{String, 1, Vector{String}, Tuple{UnitRange{Int64}}, true}: ["B"]
+     X ┼ 2×1 SubArray{Float64, 2, Matrix{Float64}, Tuple{UnitRange{Int64}, UnitRange{Int64}}, false}
+    nf ┼ Vector{String}: ["F1"]
+     F ┼ 2×1 SubArray{Float64, 2, Matrix{Float64}, Tuple{UnitRange{Int64}, Base.Slice{Base.OneTo{Int64}}}, false}
+    nb ┼ nothing
+     B ┼ nothing
+    ts ┼ nothing
+    iv ┼ nothing
+  ivpa ┴ nothing
+```
 """
 function returns_result_view(rd::ReturnsResult, i, j, k = :)
     nx = nothing_scalar_array_view(rd.nx, j)

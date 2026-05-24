@@ -5,6 +5,105 @@ Abstract supertype for all coskewness estimators in `PortfolioOptimisers.jl`.
 
 All concrete and/or abstract types implementing coskewness estimation algorithms should be subtypes of `CoskewnessEstimator`.
 
+# Interfaces
+
+In order to implement a new coskewness estimator which will work seamlessly with the library, subtype `CoskewnessEstimator` with all necessary parameters---including observation weights---as part of the struct, and implement the following methods:
+
+## Coskewness
+
+  - `PortfolioOptimisers.coskewness(ske::CoskewnessEstimator, X::MatNum; dims::Int = 1, mean = nothing, kwargs...) -> (MatNum, MatNum)`: Computes the coskewness tensor and processed matrix.
+
+### Arguments
+
+  - $(arg_dict[:ske])
+  - $(arg_dict[:X])
+  - $(arg_dict[:dims])
+  - $(arg_dict[:omean])
+  - `kwargs...`: Additional keyword arguments.
+
+### Returns
+
+  - `cskew::MatNum`: Coskewness tensor `features × features^2`.
+  - `V::MatNum`: Processed coskewness matrix `features × features`.
+
+## Factory
+
+  - `PortfolioOptimisers.factory(ske::CoskewnessEstimator, w::PortfolioOptimisers.ObsWeights) -> CoskewnessEstimator`: Factory method for creating instances of the estimator with new observation weights.
+
+### Arguments
+
+  - $(arg_dict[:ske])
+  - $(arg_dict[:ow])
+
+### Returns
+
+  - `ske::CoskewnessEstimator`: New coskewness estimator of the same type, with the new weights applied.
+
+## View
+
+  - `PortfolioOptimisers.moment_view(ske::CoskewnessEstimator, i) -> CoskewnessEstimator`: Returns a view of the estimator for the `i`-th element(s).
+
+### Arguments
+
+  - $(arg_dict[:ske])
+  - `i`: Index or indices.
+
+### Returns
+
+  - $(ret_dict[:skev])
+
+# Examples
+
+We can create a dummy coskewness estimator as follows:
+
+```jldoctest
+julia> struct MyCoskewnessEstimator{T1} <: PortfolioOptimisers.CoskewnessEstimator
+           w::T1
+           function MyCoskewnessEstimator(w::PortfolioOptimisers.Option{<:PortfolioOptimisers.ObsWeights})
+               PortfolioOptimisers.assert_nonempty_nonneg_finite_val(w, :w)
+               return new{typeof(w)}(w)
+           end
+       end
+
+julia> function MyCoskewnessEstimator(;
+                                      w::PortfolioOptimisers.Option{<:PortfolioOptimisers.ObsWeights} = nothing)
+           return MyCoskewnessEstimator(w)
+       end
+MyCoskewnessEstimator
+
+julia> function PortfolioOptimisers.factory(::MyCoskewnessEstimator,
+                                            w::PortfolioOptimisers.ObsWeights)
+           return MyCoskewnessEstimator(; w = w)
+       end
+
+julia> function PortfolioOptimisers.moment_view(ske::MyCoskewnessEstimator, i)
+           return ske
+       end
+
+julia> function PortfolioOptimisers.coskewness(ske::MyCoskewnessEstimator,
+                                               X::PortfolioOptimisers.MatNum;
+                                               dims::Int = 1, mean = nothing, kwargs...)
+           N = size(X, 2)
+           return zeros(N, N^2), zeros(N, N)
+       end
+
+julia> cskew, V = coskewness(MyCoskewnessEstimator(), [1.0 2.0; 0.3 0.7; 0.5 1.1]);
+
+julia> cskew
+2×4 Matrix{Float64}:
+ 0.0  0.0  0.0  0.0
+ 0.0  0.0  0.0  0.0
+
+julia> V
+2×2 Matrix{Float64}:
+ 0.0  0.0
+ 0.0  0.0
+
+julia> PortfolioOptimisers.factory(MyCoskewnessEstimator(), StatsBase.Weights([1, 2, 3]))
+MyCoskewnessEstimator
+  w ┴ StatsBase.Weights{Int64, Int64, Vector{Int64}}: [1, 2, 3]
+```
+
 # Related
 
   - [`Coskewness`](@ref)
@@ -92,12 +191,33 @@ Return a new [`Coskewness`](@ref) estimator with observation weights `w` applied
 
 # Arguments
 
-  - `ske`: Coskewness estimator.
+  - $(arg_dict[:ske])
   - $(arg_dict[:ow])
 
 # Returns
 
   - `ske::Coskewness`: Updated estimator with weights applied.
+
+# Examples
+
+```jldoctest
+julia> ske = Coskewness();
+
+julia> factory(ske, StatsBase.Weights([0.2, 0.3, 0.5]))
+Coskewness
+   me ┼ SimpleExpectedReturns
+      │   w ┴ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.3, 0.5]
+   mp ┼ DenoiseDetoneAlgMatrixProcessing
+      │     pdm ┼ Posdef
+      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+      │      dn ┼ nothing
+      │      dt ┼ nothing
+      │     alg ┼ nothing
+      │   order ┴ DenoiseDetoneAlg()
+  alg ┼ Full()
+    w ┴ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.3, 0.5]
+```
 
 # Related
 
@@ -189,7 +309,8 @@ Unweighted:
 
 ```math
 \\begin{align}
-\\hat{\\mathbf{S}} &= \\frac{1}{T} \\mathbf{Y}^\\intercal \\mathbf{Z}, \\quad \\mathbf{Z}_{t,\\cdot} = (\\boldsymbol{1}^\\intercal \\otimes \\boldsymbol{y}_t^\\intercal) \\odot (\\boldsymbol{y}_t^\\intercal \\otimes \\boldsymbol{1}^\\intercal)\\,.
+\\hat{\\mathbf{S}} &= \\frac{1}{T} \\mathbf{Y}^\\intercal \\mathbf{Z}\\,, \\\\
+\\mathbf{Z}_{t,\\cdot} &= (\\boldsymbol{1}^\\intercal \\otimes \\boldsymbol{y}_t^\\intercal) \\odot (\\boldsymbol{y}_t^\\intercal \\otimes \\boldsymbol{1}^\\intercal)\\,.
 \\end{align}
 ```
 

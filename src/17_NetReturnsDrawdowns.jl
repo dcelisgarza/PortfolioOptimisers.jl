@@ -6,6 +6,8 @@ Compute the net portfolio returns. If `fees` is not `nothing`, it deducts the co
 
 Returns the portfolio returns as the product of the asset return matrix `X` and portfolio weights `w`.
 
+# Mathematical definition
+
 ```math
 \\begin{align}
 \\boldsymbol{R}(\\mathbf{X},\\, \\boldsymbol{w}) &= \\mathbf{X} \\boldsymbol{w} \\ominus F_{\\text{t}}(\\boldsymbol{w})
@@ -63,6 +65,8 @@ end
 Compute the per asset net portfolio returns. If `fees` is not `nothing`, it deducts the computed fees from the gross returns.
 
 Returns the per asset portfolio returns as the product of the asset return matrix `X` and portfolio weights `w`.
+
+# Mathematical definition
 
 ```math
 \\begin{align}
@@ -166,6 +170,8 @@ end
 Compute simple or compounded cumulative returns along a specified dimension.
 
 `cumulative_returns` computes the cumulative returns for an array of asset or portfolio returns. By default, it computes simple cumulative returns using `cumsum`. If `compound` is `true`, it computes compounded cumulative returns using `cumprod(one(eltype(X)) .+ X)`.
+
+# Mathematical definition
 
 ## Portfolio cumulative returns
 
@@ -286,6 +292,8 @@ end
     drawdowns(X::ArrNum, compound::Bool = false; cX::Bool = false, dims::Int = 1)
 
 Compute simple or compounded drawdowns along a specified dimension.
+
+# Mathematical definition
 
 ## Portfolio drawdowns
 

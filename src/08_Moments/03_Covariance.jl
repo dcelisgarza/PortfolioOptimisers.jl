@@ -98,6 +98,17 @@ This method dispatches to the appropriate [`robust_cov`](@ref) depending on `ce.
   - [`GeneralCovariance`](@ref)
   - [`robust_cov`](@ref)
   - [`cor(ce::GeneralCovariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
+
+# Examples
+
+```jldoctest
+julia> X = [0.01 0.02; 0.03 0.04; 0.02 0.03];
+
+julia> cov(GeneralCovariance(), X)
+2×2 Matrix{Float64}:
+ 0.0001  0.0001
+ 0.0001  0.0001
+```
 """
 function Statistics.cov(ce::GeneralCovariance, X::MatNum; dims::Int = 1, mean = nothing,
                         kwargs...)
@@ -142,6 +153,17 @@ This method dispatches to the appropriate [`robust_cor`](@ref) depending on `ce.
   - [`GeneralCovariance`](@ref)
   - [`robust_cor`](@ref)
   - [`cov(ce::GeneralCovariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
+
+# Examples
+
+```jldoctest
+julia> X = [0.01 0.02; 0.03 0.04; 0.02 0.03];
+
+julia> cor(GeneralCovariance(), X)
+2×2 Matrix{Float64}:
+ 1.0  1.0
+ 1.0  1.0
+```
 """
 function Statistics.cor(ce::GeneralCovariance, X::MatNum; dims::Int = 1, mean = nothing,
                         kwargs...)
@@ -424,6 +446,17 @@ Where:
   - [`Full`](@ref)
   - [`Semi`](@ref)
   - [`cor(ce::Covariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
+
+# Examples
+
+```jldoctest
+julia> X = [0.01 0.02; 0.03 0.04; 0.02 0.03];
+
+julia> cov(Covariance(), X)
+2×2 Matrix{Float64}:
+ 0.0001  0.0001
+ 0.0001  0.0001
+```
 """
 function Statistics.cov(ce::Covariance{<:Any, <:Any, <:Full}, X::MatNum; dims::Int = 1,
                         mean = nothing, kwargs...)
@@ -493,6 +526,17 @@ Where:
   - [`Full`](@ref)
   - [`Semi`](@ref)
   - [`cov(ce::Covariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
+
+# Examples
+
+```jldoctest
+julia> X = [0.01 0.02; 0.03 0.04; 0.02 0.03];
+
+julia> cor(Covariance(), X)
+2×2 Matrix{Float64}:
+ 1.0  1.0
+ 1.0  1.0
+```
 """
 function Statistics.cor(ce::Covariance{<:Any, <:Any, <:Full}, X::MatNum; dims::Int = 1,
                         mean = nothing, kwargs...)

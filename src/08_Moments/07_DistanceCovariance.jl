@@ -81,6 +81,20 @@ Return a new [`DistanceCovariance`](@ref) estimator with observation weights `w`
 
   - $(ret_dict[:ce])
 
+# Examples
+
+```jldoctest
+julia> ce = DistanceCovariance();
+
+julia> factory(ce, StatsBase.Weights([0.2, 0.3, 0.5]))
+DistanceCovariance
+  metric ┼ Distances.Euclidean: Distances.Euclidean(0.0)
+    args ┼ Tuple{}: ()
+  kwargs ┼ @NamedTuple{}: NamedTuple()
+       w ┼ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.3, 0.5]
+      ex ┴ Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
+```
+
 # Related
 
   - [`DistanceCovariance`](@ref)

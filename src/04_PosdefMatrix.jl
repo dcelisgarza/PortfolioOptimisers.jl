@@ -219,6 +219,28 @@ end
 
 Out-of-place version of [`posdef!`](@ref).
 
+# Arguments
+
+  - $(arg_dict[:opdm])
+  - $(arg_dict[:sigrhoX])
+
+# Returns
+
+  - `X::MatNum`: A new matrix equal to the nearest positive definite projection of the input.
+
+# Examples
+
+```jldoctest
+julia> using LinearAlgebra
+
+julia> X = [1.0 2.0; 2.0 1.0];
+
+julia> Xpd = posdef(Posdef(), X);
+
+julia> LinearAlgebra.isposdef(Xpd)
+true
+```
+
 # Related
 
   - [`posdef!`](@ref)

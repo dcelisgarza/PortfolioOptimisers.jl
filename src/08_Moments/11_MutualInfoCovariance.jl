@@ -92,6 +92,22 @@ Return a new [`MutualInfoCovariance`](@ref) estimator with observation weights `
 
   - $(ret_dict[:ce])
 
+# Examples
+
+```jldoctest
+julia> ce = MutualInfoCovariance();
+
+julia> factory(ce, StatsBase.Weights([0.2, 0.3, 0.5]))
+MutualInfoCovariance
+         ve ┼ SimpleVariance
+            │          me ┼ SimpleExpectedReturns
+            │             │   w ┴ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.3, 0.5]
+            │           w ┼ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.3, 0.5]
+            │   corrected ┴ Bool: true
+       bins ┼ HacineGharbiRavier()
+  normalise ┴ Bool: true
+```
+
 # Related
 
   - [`MutualInfoCovariance`](@ref)
@@ -179,8 +195,6 @@ This method computes the pairwise mutual information covariance matrix for the i
 # Validation
 
   - `dims` is either `1` or `2`.
-
-# Examples
 
 # Related
 
