@@ -5,6 +5,28 @@ Augmented Black-Litterman prior estimator for asset returns.
 
 `AugmentedBlackLittermanPrior` is a low order prior estimator that computes the mean and covariance of asset returns using an augmented Black-Litterman model. It combines asset and factor prior estimators, matrix post-processing, regression and variance estimators, asset and factor views, asset and factor sets, view confidences, weights, risk-free rate, leverage, and a blending parameter `tau`. This estimator supports both direct and constraint-based views, flexible confidence specification, and matrix processing, and incorporates joint asset-factor Bayesian updating for posterior inference.
 
+# Summary Statistics
+
+Factor model linking assets and factors via regression:
+
+```math
+\\mathbf{X} \\approx \\mathbf{F}\\mathbf{M}^{\\intercal} + \\mathbf{1}\\boldsymbol{b}^{\\intercal}
+```
+
+Augmented prior moments (stacking asset and factor priors):
+
+```math
+\\boldsymbol{\\mu}_{aug} = \\begin{pmatrix}\\boldsymbol{\\mu}_a \\\\ \\boldsymbol{\\mu}_f\\end{pmatrix}, \\qquad \\boldsymbol{\\Sigma}_{aug} = \\begin{pmatrix}\\boldsymbol{\\Sigma}_a & \\boldsymbol{\\Sigma}_a\\mathbf{M}^{\\intercal} \\\\ \\mathbf{M}\\boldsymbol{\\Sigma}_a & \\boldsymbol{\\Sigma}_f\\end{pmatrix}
+```
+
+Black-Litterman posterior on the augmented space with combined views ``(\\mathbf{P}_{aug}, \\boldsymbol{q}_{aug})``:
+
+```math
+\\boldsymbol{\\mu}_{post} = \\boldsymbol{\\mu}_{aug} + \\tau\\boldsymbol{\\Sigma}_{aug}\\mathbf{P}_{aug}^{\\intercal}\\left(\\tau\\mathbf{P}_{aug}\\boldsymbol{\\Sigma}_{aug}\\mathbf{P}_{aug}^{\\intercal} + \\boldsymbol{\\Omega}_{aug}\\right)^{-1}\\!\\left(\\boldsymbol{q}_{aug} - \\mathbf{P}_{aug}\\boldsymbol{\\mu}_{aug}\\right)
+```
+
+Asset posterior extracted from the augmented result and adjusted for intercept and risk-free rate.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
