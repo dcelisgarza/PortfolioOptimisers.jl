@@ -207,13 +207,39 @@ function (r::RelativeAverageDrawdown)(x::VecNum)
     w = get_observation_weights(r.w, x)
     return -(isnothing(r.w) ? Statistics.mean(dd) : Statistics.mean(dd, w))
 end
-for r in (AverageDrawdown, RelativeAverageDrawdown)
-    eval(quote
-             function factory(r::$(r), pr::AbstractPriorResult, args...; kwargs...)
-                 w = nothing_scalar_array_selector(r.w, pr.w)
-                 return $(r)(; settings = r.settings, w = w)
-             end
-         end)
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create an instance of [`AverageDrawdown`](@ref) by selecting observation weights from the risk-measure instance or falling back to the prior result.
+
+# Related
+
+  - [`AverageDrawdown`](@ref)
+  - [`AbstractPriorResult`](@ref)
+  - [`factory`](@ref)
+  - [`nothing_scalar_array_selector`](@ref)
+"""
+function factory(r::AverageDrawdown, pr::AbstractPriorResult, args...;
+                 kwargs...)::AverageDrawdown
+    w = nothing_scalar_array_selector(r.w, pr.w)
+    return AverageDrawdown(; settings = r.settings, w = w)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create an instance of [`RelativeAverageDrawdown`](@ref) by selecting observation weights from the risk-measure instance or falling back to the prior result.
+
+# Related
+
+  - [`RelativeAverageDrawdown`](@ref)
+  - [`AbstractPriorResult`](@ref)
+  - [`factory`](@ref)
+  - [`nothing_scalar_array_selector`](@ref)
+"""
+function factory(r::RelativeAverageDrawdown, pr::AbstractPriorResult, args...;
+                 kwargs...)::RelativeAverageDrawdown
+    w = nothing_scalar_array_selector(r.w, pr.w)
+    return RelativeAverageDrawdown(; settings = r.settings, w = w)
 end
 
 export AverageDrawdown, RelativeAverageDrawdown

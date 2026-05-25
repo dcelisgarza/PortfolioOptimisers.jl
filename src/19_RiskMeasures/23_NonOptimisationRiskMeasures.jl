@@ -97,10 +97,34 @@ function (r::MeanReturn)(x::VecNum)
     end
     return isnothing(r.w) ? Statistics.mean(x) : Statistics.mean(x, r.w)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create an instance of [`MeanReturn`](@ref) by selecting observation weights from the risk-measure instance or falling back to the prior result.
+
+# Related
+
+  - [`MeanReturn`](@ref)
+  - [`AbstractPriorResult`](@ref)
+  - [`factory`](@ref)
+  - [`nothing_scalar_array_selector`](@ref)
+"""
 function factory(r::MeanReturn, pr::AbstractPriorResult, args...)::MeanReturn
     w = nothing_scalar_array_selector(r.w, pr.w)
     return MeanReturn(; w = w, flag = r.flag)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the [`MeanReturn`](@ref) risk measure `r` unchanged.
+
+[`MeanReturn`](@ref) does not have asset-level parameters to slice.
+
+# Related
+
+  - [`MeanReturn`](@ref)
+  - [`risk_measure_view`](@ref)
+"""
 function risk_measure_view(r::MeanReturn, ::Any, args...)::MeanReturn
     return r
 end
@@ -163,14 +187,48 @@ function MeanReturnRiskRatio(; rt::MeanReturn = MeanReturn(),
                              rf::Number = 0.0)::MeanReturnRiskRatio
     return MeanReturnRiskRatio(rt, rk, rf)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create an instance of [`MeanReturnRiskRatio`](@ref) by updating both the return measure and risk measure from the optimisation context.
+
+# Related
+
+  - [`MeanReturnRiskRatio`](@ref)
+  - [`factory`](@ref)
+"""
 function factory(r::MeanReturnRiskRatio, args...; kwargs...)::MeanReturnRiskRatio
     rt = factory(r.rt, args...)
     rk = factory(r.rk, args...; kwargs...)
     return MeanReturnRiskRatio(; rt = rt, rk = rk, rf = r.rf)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create an instance of [`MeanReturnRiskRatio`](@ref) updating the risk measure from new portfolio weights `w`.
+
+The return measure `rt` is preserved unchanged.
+
+# Related
+
+  - [`MeanReturnRiskRatio`](@ref)
+  - [`factory`](@ref)
+"""
 function factory(r::MeanReturnRiskRatio, w::VecNum)::MeanReturnRiskRatio
     return MeanReturnRiskRatio(; rt = r.rt, rk = factory(r.rk, w), rf = r.rf)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return whether [`MeanReturnRiskRatio`](@ref) `r` requires previous portfolio weights.
+
+Delegates to the inner risk measure `r.rk`.
+
+# Related
+
+  - [`MeanReturnRiskRatio`](@ref)
+  - [`needs_previous_weights`](@ref)
+"""
 function needs_previous_weights(r::MeanReturnRiskRatio)
     return needs_previous_weights(r.rk)
 end
@@ -374,6 +432,31 @@ Used for unified dispatch on moment-target calculation methods.
   - [`calc_moment_target`](@ref)
 """
 const TCM_Sk{T1, T2} = Union{<:ThirdCentralMoment{T1, T2}, <:Skewness{<:Any, T1, T2}}
+"""
+    calc_moment_target(::TCM_Sk{Nothing, Nothing}, ::Any, x::VecNum)
+    calc_moment_target(r::TCM_Sk{<:StatsBase.AbstractWeights, Nothing}, ::Any, x::VecNum)
+    calc_moment_target(r::TCM_Sk{<:Any, <:VecNum}, w::VecNum, ::Any)
+    calc_moment_target(r::TCM_Sk{<:Any, <:VecScalar}, w::VecNum, ::Any)
+    calc_moment_target(r::TCM_Sk{<:Any, <:Number}, ::Any, ::Any)
+
+Compute the centering target for [`ThirdCentralMoment`](@ref) and [`Skewness`](@ref) risk measures.
+
+Dispatches on the observation-weight type `T1` and mean type `T2` of [`TCM_Sk`](@ref):
+
+  - No weights, no mu: arithmetic mean of `x`.
+  - `AbstractWeights`, no mu: weighted mean of `x`.
+  - `VecNum` mu: dot product ``\\boldsymbol{w}^\\intercal \\boldsymbol{\\mu}``.
+  - `VecScalar` mu: ``\\boldsymbol{w}^\\intercal \\boldsymbol{\\mu}_v + \\mu_s``.
+  - `Number` mu: the scalar `r.mu` directly.
+
+# Related
+
+  - [`TCM_Sk`](@ref)
+  - [`ThirdCentralMoment`](@ref)
+  - [`Skewness`](@ref)
+  - [`calc_moment_target`](@ref)
+  - [`calc_deviations_vec`](@ref)
+"""
 function calc_moment_target(::TCM_Sk{Nothing, Nothing}, ::Any, x::VecNum)
     return Statistics.mean(x)
 end
@@ -390,17 +473,53 @@ end
 function calc_moment_target(r::TCM_Sk{<:Any, <:Number}, ::Any, ::Any)
     return r.mu
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Compute the vector of deviations from the centering target for [`ThirdCentralMoment`](@ref) and [`Skewness`](@ref) risk measures.
+
+# Related
+
+  - [`TCM_Sk`](@ref)
+  - [`calc_deviations_vec`](@ref)
+  - [`calc_moment_target`](@ref)
+"""
 function calc_deviations_vec(r::TCM_Sk, w::VecNum, X::MatNum,
                              fees::Option{<:Fees} = nothing)
     x = calc_net_returns(w, X, fees)
     tgt = calc_moment_target(r, w, x)
     return x .- tgt
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create an instance of [`ThirdCentralMoment`](@ref) by selecting observation weights and expected returns from the risk-measure instance or falling back to the prior result.
+
+# Related
+
+  - [`ThirdCentralMoment`](@ref)
+  - [`AbstractPriorResult`](@ref)
+  - [`factory`](@ref)
+  - [`nothing_scalar_array_selector`](@ref)
+"""
 function factory(r::ThirdCentralMoment, pr::AbstractPriorResult, args...; kwargs...)
     w = nothing_scalar_array_selector(r.w, pr.w)
     mu = nothing_scalar_array_selector(r.mu, pr.mu)
     return ThirdCentralMoment(; w = w, mu = mu)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a view of [`ThirdCentralMoment`](@ref) `r` sliced to asset indices `i`.
+
+Slices the expected returns `mu` for cluster-based optimisation.
+
+# Related
+
+  - [`ThirdCentralMoment`](@ref)
+  - [`risk_measure_view`](@ref)
+  - [`nothing_scalar_array_view`](@ref)
+"""
 function risk_measure_view(r::ThirdCentralMoment, i, args...)
     mu = nothing_scalar_array_view(r.mu, i)
     return ThirdCentralMoment(; w = r.w, mu = mu)
@@ -416,11 +535,36 @@ function (r::ThirdCentralMoment{<:DynamicAbstractWeights})(w::VecNum, X::MatNum,
                                                            fees::Option{<:Fees} = nothing)
     return ThirdCentralMoment(; w = get_observation_weights(r.w, X), mu = r.mu)(w, X, fees)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create an instance of [`Skewness`](@ref) by selecting observation weights and expected returns from the risk-measure instance or falling back to the prior result.
+
+# Related
+
+  - [`Skewness`](@ref)
+  - [`AbstractPriorResult`](@ref)
+  - [`factory`](@ref)
+  - [`nothing_scalar_array_selector`](@ref)
+"""
 function factory(r::Skewness, pr::AbstractPriorResult, args...; kwargs...)
     w = nothing_scalar_array_selector(r.w, pr.w)
     mu = nothing_scalar_array_selector(r.mu, pr.mu)
     return Skewness(; ve = factory(r.ve, w), w = w, mu = mu)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a view of [`Skewness`](@ref) `r` sliced to asset indices `i`.
+
+Slices the expected returns `mu` for cluster-based optimisation.
+
+# Related
+
+  - [`Skewness`](@ref)
+  - [`risk_measure_view`](@ref)
+  - [`nothing_scalar_array_view`](@ref)
+"""
 function risk_measure_view(r::Skewness, i, args...)
     mu = nothing_scalar_array_view(r.mu, i)
     return Skewness(; ve = r.ve, w = r.w, mu = mu)

@@ -67,6 +67,18 @@ Stores the train and test index vectors for each fold.
 
 $(DocStringExtensions.FIELDS)
 
+# Constructors
+
+    KFoldResult(; train_idx::VecVecInt, test_idx::VecVecInt) -> KFoldResult
+
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - `!isempty(train_idx)`.
+  - `!isempty(test_idx)`.
+  - `length(train_idx) == length(test_idx)`.
+
 # Related
 
   - [`KFold`](@ref)

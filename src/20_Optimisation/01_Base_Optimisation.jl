@@ -173,6 +173,18 @@ The default implementation does nothing. Overridden for estimators (e.g. [`Stack
 function assert_special_nco_requirements(::OptE_Opt)::Nothing
     return nothing
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return `opt` unchanged.
+
+Default pass-through factory for optimisation estimators and results. Overridden for estimators that carry parameters requiring update at each optimisation step.
+
+# Related
+
+  - [`OptE_Opt`](@ref)
+  - [`factory`](@ref)
+"""
 function factory(opt::OptE_Opt, ::Any)
     return opt
 end
@@ -260,18 +272,68 @@ Represents a collection of [`OptE_Opt`](@ref) objects for batch processing.
   - [`OptE_Opt`](@ref)
 """
 const VecOptE_Opt = AbstractVector{<:OptE_Opt}
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Apply [`factory`](@ref) element-wise to a vector of optimisation estimators or results.
+
+# Related
+
+  - [`VecOptE_Opt`](@ref)
+  - [`factory`](@ref)
+"""
 function factory(opt::VecOptE_Opt, args...)
     return [factory(opti, args...) for opti in opt]
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Assert special NCO requirements for each element of a vector of optimisation estimators or results.
+
+# Related
+
+  - [`assert_special_nco_requirements`](@ref)
+  - [`NestedClustered`](@ref)
+"""
 function assert_special_nco_requirements(opt::VecOptE_Opt)::Nothing
     return assert_special_nco_requirements.(opt)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return `true` if any element of the vector of optimisation estimators or results requires previous portfolio weights.
+
+# Related
+
+  - [`needs_previous_weights`](@ref)
+  - [`VecOptE_Opt`](@ref)
+"""
 function needs_previous_weights(opt::VecOptE_Opt)
     return any(needs_previous_weights.(opt))
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return `true` if any element of the vector of optimisation estimators or results is time-dependent.
+
+# Related
+
+  - [`is_time_dependent`](@ref)
+  - [`VecOptE_Opt`](@ref)
+"""
 function is_time_dependent(opt::VecOptE_Opt)
     return any(is_time_dependent.(opt))
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Apply [`update_time_dependent_estimator`](@ref) element-wise to a vector of optimisation estimators or results.
+
+# Related
+
+  - [`update_time_dependent_estimator`](@ref)
+  - [`VecOptE_Opt`](@ref)
+"""
 function update_time_dependent_estimator(opt::VecOptE_Opt, args...)
     return [update_time_dependent_estimator(opti, args...) for opti in opt]
 end
@@ -799,6 +861,16 @@ Default fallback returns the estimator unchanged. Overridden for composite estim
 function opt_view(opt::AbstractOptimisationEstimator, args...)
     return opt
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Apply [`opt_view`](@ref) element-wise to a vector of optimisation estimators.
+
+# Related
+
+  - [`opt_view`](@ref)
+  - [`VecOptE`](@ref)
+"""
 function opt_view(opt::VecOptE, args...)
     return [opt_view(opti, args...) for opti in opt]
 end
@@ -887,20 +959,49 @@ function optimise(opt::OptimisationEstimator, args...; kwargs...)
     end
     return isempty(fb) ? res : factory(res, fb)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Assert that `res` is a valid internal optimisation result.
+
+Default no-op. Overridden for result types that must satisfy internal constraints before use.
+
+# Related
+
+  - [`NonFiniteAllocationOptimisationResult`](@ref)
+"""
 function assert_internal_optimiser(::NonFiniteAllocationOptimisationResult)::Nothing
     return nothing
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Assert that `res` is a valid external optimisation result.
+
+Default no-op. Overridden for result types that must satisfy external interface constraints.
+
+# Related
+
+  - [`NonFiniteAllocationOptimisationResult`](@ref)
+"""
 function assert_external_optimiser(::NonFiniteAllocationOptimisationResult)::Nothing
     return nothing
 end
 """
-    calc_net_returns(
-        res::NonFiniteAllocationOptimisationResult,
-        X::MatNum,
-        fees::Option{<:Fees} = nothing
-    )
+    calc_net_returns(res::NonFiniteAllocationOptimisationResult, X::MatNum, fees = nothing)
+    calc_net_returns(res::NonFiniteAllocationOptimisationResult, pr::Pr_RR, fees = nothing)
 
-Compute net returns for a [`NonFiniteAllocationOptimisationResult`](@ref). `fees` takes precedence over `res.fees` if both are provided. Delegates to [`calc_net_returns(w, X, fees)`](@ref).
+Compute net returns for a [`NonFiniteAllocationOptimisationResult`](@ref).
+
+`fees` takes precedence over `res.fees` if both are provided. Delegates to [`calc_net_returns(w, X, fees)`](@ref).
+
+When `pr::Pr_RR` is passed, extracts `X` from `pr.X` and delegates.
+
+# Related
+
+  - [`calc_net_returns`](@ref)
+  - [`NonFiniteAllocationOptimisationResult`](@ref)
+  - [`Pr_RR`](@ref)
 """
 function calc_net_returns(res::NonFiniteAllocationOptimisationResult, X::MatNum,
                           fees::Option{<:Fees} = nothing)
@@ -913,6 +1014,22 @@ function calc_net_returns(res::NonFiniteAllocationOptimisationResult, pr::Pr_RR,
                           fees::Option{<:Fees} = nothing)
     return calc_net_returns(res, pr.X, fees)
 end
+"""
+    expected_risk(r::AbstractBaseRiskMeasure, res::OptimisationResult, X::MatNum, fees = nothing; kwargs...)
+    expected_risk(r::AbstractBaseRiskMeasure, res::OptimisationResult, pr = nothing, fees = nothing; kwargs...)
+
+Compute the expected risk for an [`OptimisationResult`](@ref).
+
+Extracts `w` from `res` and delegates to the weight-based [`expected_risk`](@ref). `fees` takes precedence over `res.fees` if both are provided.
+
+When `pr::Pr_RR` is `nothing`, tries to extract a prior result from `res.pr` or `res.pa.pr` before delegating.
+
+# Related
+
+  - [`expected_risk`](@ref)
+  - [`OptimisationResult`](@ref)
+  - [`AbstractBaseRiskMeasure`](@ref)
+"""
 function expected_risk(r::AbstractBaseRiskMeasure, res::OptimisationResult, X::MatNum,
                        fees::Option{<:Fees} = nothing; kwargs...)
     if isnothing(fees) && hasproperty(res, :fees)
@@ -934,6 +1051,17 @@ function expected_risk(r::AbstractBaseRiskMeasure, res::OptimisationResult,
     end
     return expected_risk(r, res, pr.X, fees; kwargs...)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return `false`.
+
+`nothing` never requires previous portfolio weights.
+
+# Related
+
+  - [`needs_previous_weights`](@ref)
+"""
 function needs_previous_weights(::Nothing)
     return false
 end

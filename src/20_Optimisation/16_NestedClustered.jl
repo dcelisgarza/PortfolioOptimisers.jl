@@ -3,6 +3,8 @@ $(DocStringExtensions.TYPEDEF)
 
 Result type for Nested Clustered Optimisation.
 
+# Fields
+
 $(DocStringExtensions.FIELDS)
 
 # Related
@@ -34,6 +36,11 @@ $(DocStringExtensions.FIELDS)
     "$(field_dict[:fb])"
     fb
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Rebuild a [`NestedClusteredResult`](@ref) with an updated fallback optimiser `fb`.
+"""
 function factory(res::NestedClusteredResult, fb::Option{<:OptE_Opt})
     return NestedClusteredResult(res.oe, res.pr, res.clr, res.wb, res.fees, res.resi,
                                  res.reso, res.cv, res.retcode, res.w, fb)
@@ -213,6 +220,8 @@ Nested Clustered Optimisation (NCO) portfolio optimiser.
 
 `NestedClustered` implements the Nested Clustered Optimisation algorithm. It first clusters assets, then solves a within-cluster (inner) optimisation for each cluster independently, and finally solves an across-cluster (outer) optimisation to combine the cluster portfolios into a final portfolio.
 
+# Fields
+
 $(DocStringExtensions.FIELDS)
 
 # Constructors
@@ -235,6 +244,12 @@ $(DocStringExtensions.FIELDS)
     ) -> NestedClustered
 
 Keywords correspond to the struct's fields.
+
+## Validation
+
+  - `opto` must pass `assert_external_optimiser` and `assert_special_nco_requirements`.
+  - If `opti !== opto`: `opti` must pass `assert_internal_optimiser` and `assert_special_nco_requirements`.
+  - If `cv` is provided: `opti` must also pass `assert_external_optimiser` and `assert_special_nco_requirements`.
 
 # Mathematical definition
 
@@ -346,12 +361,22 @@ function assert_external_optimiser(opt::NestedClustered)::Nothing
     end
     return nothing
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return `true` if any sub-estimator of `opt` requires previous portfolio weights (fees, inner optimiser, outer optimiser, or fallback).
+"""
 function needs_previous_weights(opt::NestedClustered)
     return (needs_previous_weights(opt.fees) ||
             needs_previous_weights(opt.opti) ||
             needs_previous_weights(opt.opto) ||
             needs_previous_weights(opt.fb))
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Build an updated [`NestedClustered`](@ref) with all estimators that track previous weights updated via `factory` using `w`.
+"""
 function factory(nco::NestedClustered, w::AbstractVector)
     fees = factory(nco.fees, w)
     opti = factory(nco.opti, w)
@@ -362,6 +387,11 @@ function factory(nco::NestedClustered, w::AbstractVector)
                            wf = nco.wf, ex = nco.ex, fb = fb, brt = nco.brt,
                            cle_pr = nco.cle_pr, strict = nco.strict)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a cluster-sliced copy of [`NestedClustered`](@ref) for asset index set `i` and returns matrix `X`.
+"""
 function opt_view(nco::NestedClustered, i, X::MatNum)
     X = isa(nco.pe, AbstractPriorResult) ? nco.pe.X : X
     pe = prior_view(nco.pe, i)
@@ -608,6 +638,8 @@ end
              dims::Int = 1, branchorder::Symbol = :optimal, str_names::Bool = false,
              save::Bool = true, kwargs...) -> NestedClusteredResult
 
+Run the Nested Clustered Optimisation portfolio optimisation.
+
 # Arguments
 
   - `nco`: The nested clustered optimiser to use.
@@ -617,6 +649,11 @@ end
   - `str_names`: Passed to the inner and outer optimisers. Whether to use string names for the assets in the optimisation.
   - `save`: Passed to the inner and outer optimisers. Whether to save the JuMP model in the optimisation result.
   - `kwargs`: Additional keyword arguments passed to the optimisation function.
+
+# Related
+
+  - [`NestedClustered`](@ref)
+  - [`NestedClusteredResult`](@ref)
 """
 function optimise(nco::NestedClustered{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                        <:Any, <:Any, <:Any, Nothing}, rd::ReturnsResult;

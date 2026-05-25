@@ -15,6 +15,23 @@ All concrete risk measures can be used as functors (callable structs) to compute
   - [`HierarchicalRiskMeasure`](@ref)
 """
 abstract type AbstractBaseRiskMeasure <: AbstractEstimator end
+"""
+    needs_previous_weights(r::AbstractBaseRiskMeasure) -> Bool
+    needs_previous_weights(r::VecBaseRM) -> Bool
+
+Return whether risk measure `r` requires previous portfolio weights as input.
+
+The default returns `false`. Override to `true` for risk measures such as turnover or tracking constraints that depend on prior weights. The `VecBaseRM` overload returns `true` if any element returns `true`.
+
+# Returns
+
+  - `Bool`: `true` if prior weights are required; `false` otherwise.
+
+# Related
+
+  - [`AbstractBaseRiskMeasure`](@ref)
+  - [`VecBaseRM`](@ref)
+"""
 function needs_previous_weights(::AbstractBaseRiskMeasure)::Bool
     return false
 end
@@ -389,9 +406,31 @@ function HierarchicalRiskMeasureSettings(;
                                          scale::Number = 1.0)::HierarchicalRiskMeasureSettings
     return HierarchicalRiskMeasureSettings(scale)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the risk measure `rs` unchanged.
+
+Identity pass-through used when a risk measure is provided in a context that calls [`factory`](@ref).
+
+# Related
+
+  - [`AbstractBaseRiskMeasure`](@ref)
+  - [`factory`](@ref)
+"""
 function factory(rs::AbstractBaseRiskMeasure, args...; kwargs...)
     return rs
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a new vector of risk measures with [`factory`](@ref) applied element-wise.
+
+# Related
+
+  - [`VecBaseRM`](@ref)
+  - [`factory`](@ref)
+"""
 function factory(rs::VecBaseRM, args...; kwargs...)
     return [factory(r, args...; kwargs...) for r in rs]
 end
@@ -713,9 +752,74 @@ end
 function solver_selector(::Nothing, ::Nothing)
     throw(ArgumentError("Both risk_solver and prior_solver are nothing, cannot solve JuMP model."))
 end
+"""
+    expected_risk(r, args...; kwargs...)
+
+Compute the expected value of a risk measure.
+
+Generic function extended by concrete risk measure types. Each method computes the risk value associated with its risk measure type, given a portfolio (or its return distribution).
+
+# Related
+
+  - [`AbstractBaseRiskMeasure`](@ref)
+"""
 function expected_risk end
+"""
+    no_bounds_risk_measure(r, args...; kwargs...)
+
+Add a risk measure to a JuMP model without upper-bound constraints.
+
+Generic function extended by concrete risk measure types.
+
+# Related
+
+  - [`AbstractBaseRiskMeasure`](@ref)
+  - [`RiskMeasureSettings`](@ref)
+"""
 function no_bounds_risk_measure end
+"""
+    no_bounds_no_risk_expr_risk_measure(r, args...; kwargs...)
+
+Add a risk measure to a JuMP model without upper-bound constraints and without adding a risk expression variable.
+
+Generic function extended by concrete risk measure types.
+
+# Related
+
+  - [`AbstractBaseRiskMeasure`](@ref)
+  - [`RiskMeasureSettings`](@ref)
+"""
 function no_bounds_no_risk_expr_risk_measure end
+"""
+    no_risk_expr_risk_measure(r, args...; kwargs...)
+
+Return a copy of risk measure `r` with its risk-expression flag disabled while preserving its upper-bound constraint.
+
+Generic function extended by concrete risk measure types. For hierarchical risk measures, returns `r` unchanged.
+
+# Related
+
+  - [`AbstractBaseRiskMeasure`](@ref)
+  - [`RiskMeasureSettings`](@ref)
+  - [`no_bounds_risk_measure`](@ref)
+  - [`bounds_risk_measure`](@ref)
+"""
+function no_risk_expr_risk_measure end
+"""
+    bounds_risk_measure(r, ub, args...; kwargs...)
+
+Return a copy of risk measure `r` with its upper-bound constraint set to `ub`.
+
+Generic function extended by concrete risk measure types. For hierarchical risk measures, returns `r` unchanged.
+
+# Related
+
+  - [`AbstractBaseRiskMeasure`](@ref)
+  - [`RiskMeasureSettings`](@ref)
+  - [`no_bounds_risk_measure`](@ref)
+  - [`no_bounds_no_risk_expr_risk_measure`](@ref)
+"""
+function bounds_risk_measure end
 
 export Frontier, RiskMeasureSettings, HierarchicalRiskMeasureSettings, SumScalariser,
        MaxScalariser, MinScalariser, LogSumExpScalariser, expected_risk, RiskMeasure,

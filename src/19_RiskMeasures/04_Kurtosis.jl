@@ -172,6 +172,23 @@ function Kurtosis(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                   alg2::SecondMomentFormulation = SOCRiskExpr())::Kurtosis
     return Kurtosis(settings, w, mu, kt, N, alg1, alg2)
 end
+"""
+    calc_moment_target(::Kurtosis{<:Any, Nothing, Nothing, ...}, ::Any, x::VecNum)
+    calc_moment_target(r::Kurtosis{<:Any, <:ObsWeights, Nothing, ...}, ::Any, x::VecNum)
+    calc_moment_target(r::Kurtosis{<:Any, <:Any, <:VecNum, ...}, w::VecNum, ::Any)
+    calc_moment_target(r::Kurtosis{<:Any, <:Any, <:VecScalar, ...}, w::VecNum, ::Any)
+    calc_moment_target(r::Kurtosis{<:Any, <:Any, <:Number, ...}, ::Any, ::Any)
+
+Compute the target value for kurtosis moment calculations.
+
+Dispatches on the type of `r.w` and `r.mu` to select the appropriate centring target. Follows the same rules as [`calc_moment_target(::LoHiOrderMoment, ...)`](@ref).
+
+# Related
+
+  - [`Kurtosis`](@ref)
+  - [`calc_moment_target`](@ref)
+  - [`calc_deviations_vec`](@ref)
+"""
 function calc_moment_target(::Kurtosis{<:Any, Nothing, Nothing, <:Any, <:Any, <:Any, <:Any},
                             ::Any, x::VecNum)
     return Statistics.mean(x)
@@ -192,6 +209,19 @@ function calc_moment_target(r::Kurtosis{<:Any, <:Any, <:Number, <:Any, <:Any, <:
                             ::Any, ::Any)
     return r.mu
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Compute the vector of deviations from the target value for [`Kurtosis`](@ref) risk measures.
+
+See [`calc_deviations_vec(r::LoHiOrderMoment, ...)`](@ref) for details.
+
+# Related
+
+  - [`Kurtosis`](@ref)
+  - [`calc_deviations_vec`](@ref)
+  - [`calc_moment_target`](@ref)
+"""
 function calc_deviations_vec(r::Kurtosis, w::VecNum, X::MatNum,
                              fees::Option{<:Fees} = nothing)
     x = calc_net_returns(w, X, fees)
@@ -232,6 +262,18 @@ function (r::Kurtosis{<:Any, <:DynamicAbstractWeights, <:Any, <:Any, <:Any, <:Se
     return Kurtosis(; settings = r.settings, w = get_observation_weights(r.w, X), mu = r.mu,
                     kt = r.kt, N = r.N, alg1 = r.alg1, alg2 = r.alg2)(w, X, fees)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create an instance of [`Kurtosis`](@ref) by selecting the cokurtosis matrix, expected returns, and weights from the risk-measure instance or falling back to a [`HighOrderPrior`](@ref) result.
+
+# Related
+
+  - [`Kurtosis`](@ref)
+  - [`HighOrderPrior`](@ref)
+  - [`factory`](@ref)
+  - [`nothing_scalar_array_selector`](@ref)
+"""
 function factory(r::Kurtosis, pr::HighOrderPrior, args...; kwargs...)::Kurtosis
     w = nothing_scalar_array_selector(r.w, pr.w)
     mu = nothing_scalar_array_selector(r.mu, pr.mu)
@@ -239,6 +281,18 @@ function factory(r::Kurtosis, pr::HighOrderPrior, args...; kwargs...)::Kurtosis
     return Kurtosis(; settings = r.settings, w = w, mu = mu, kt = kt, N = r.N,
                     alg1 = r.alg1, alg2 = r.alg2)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create an instance of [`Kurtosis`](@ref) from a [`LowOrderPrior`](@ref) result (cokurtosis matrix is not used).
+
+# Related
+
+  - [`Kurtosis`](@ref)
+  - [`LowOrderPrior`](@ref)
+  - [`factory`](@ref)
+  - [`nothing_scalar_array_selector`](@ref)
+"""
 function factory(r::Kurtosis, pr::LowOrderPrior, args...; kwargs...)::Kurtosis
     w = nothing_scalar_array_selector(r.w, pr.w)
     mu = nothing_scalar_array_selector(r.mu, pr.mu)

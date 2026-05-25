@@ -301,6 +301,19 @@ end
 function (r::PowerNormValueatRiskRange)(x::VecNum)
     return PRM(x, r.slv, r.alpha, r.pa, r.w) + PRM(-x, r.slv, r.beta, r.pb, r.w)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create an instance of [`PowerNormValueatRiskRange`](@ref) by selecting observation weights and solver from the risk-measure instance or falling back to the prior result.
+
+# Related
+
+  - [`PowerNormValueatRiskRange`](@ref)
+  - [`AbstractPriorResult`](@ref)
+  - [`factory`](@ref)
+  - [`nothing_scalar_array_selector`](@ref)
+  - [`solver_selector`](@ref)
+"""
 function factory(r::PowerNormValueatRiskRange, pr::AbstractPriorResult,
                  slv::Option{<:Slv_VecSlv}, args...; kwargs...)::PowerNormValueatRiskRange
     w = nothing_scalar_array_selector(r.w, pr.w)
@@ -572,23 +585,131 @@ function (r::RelativePowerNormDrawdownatRisk)(x::VecNum)
     dd = relative_drawdown_vec(x)
     return PRM(dd, r.slv, r.alpha, r.p, r.w)
 end
-for r in (PowerNormValueatRisk, PowerNormDrawdownatRisk, RelativePowerNormDrawdownatRisk)
-    eval(quote
-             function factory(r::$(r), pr::AbstractPriorResult,
-                              slv::Option{<:Slv_VecSlv} = nothing, args...; kwargs...)
-                 w = nothing_scalar_array_selector(r.w, pr.w)
-                 slv = solver_selector(r.slv, slv)
-                 return $(r)(; settings = r.settings, slv = slv, alpha = r.alpha, p = r.p,
-                             w = w)
-             end
-             function factory(r::$(r), slv::Slv_VecSlv,
-                              pr::Option{<:AbstractPriorResult} = nothing; kwargs...)
-                 w = isnothing(pr) ? r.w : nothing_scalar_array_selector(r.w, pr.w)
-                 slv = solver_selector(r.slv, slv)
-                 return $(r)(; settings = r.settings, alpha = r.alpha, kappa = r.kappa,
-                             p = r.p, slv = slv, w = w)
-             end
-         end)
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create an instance of [`PowerNormValueatRisk`](@ref) by selecting observation weights and solver from the risk-measure instance or falling back to the prior result.
+
+# Related
+
+  - [`PowerNormValueatRisk`](@ref)
+  - [`AbstractPriorResult`](@ref)
+  - [`factory`](@ref)
+  - [`nothing_scalar_array_selector`](@ref)
+  - [`solver_selector`](@ref)
+"""
+function factory(r::PowerNormValueatRisk, pr::AbstractPriorResult,
+                 slv::Option{<:Slv_VecSlv} = nothing, args...;
+                 kwargs...)::PowerNormValueatRisk
+    w = nothing_scalar_array_selector(r.w, pr.w)
+    slv = solver_selector(r.slv, slv)
+    return PowerNormValueatRisk(; settings = r.settings, slv = slv, alpha = r.alpha,
+                                p = r.p, w = w)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create an instance of [`PowerNormValueatRisk`](@ref) by overriding the solver and optionally selecting observation weights from the prior result.
+
+# Related
+
+  - [`PowerNormValueatRisk`](@ref)
+  - [`AbstractPriorResult`](@ref)
+  - [`factory`](@ref)
+  - [`nothing_scalar_array_selector`](@ref)
+  - [`solver_selector`](@ref)
+"""
+function factory(r::PowerNormValueatRisk, slv::Slv_VecSlv,
+                 pr::Option{<:AbstractPriorResult} = nothing;
+                 kwargs...)::PowerNormValueatRisk
+    w = isnothing(pr) ? r.w : nothing_scalar_array_selector(r.w, pr.w)
+    slv = solver_selector(r.slv, slv)
+    return PowerNormValueatRisk(; settings = r.settings, alpha = r.alpha, p = r.p,
+                                slv = slv, w = w)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create an instance of [`PowerNormDrawdownatRisk`](@ref) by selecting observation weights and solver from the risk-measure instance or falling back to the prior result.
+
+# Related
+
+  - [`PowerNormDrawdownatRisk`](@ref)
+  - [`AbstractPriorResult`](@ref)
+  - [`factory`](@ref)
+  - [`nothing_scalar_array_selector`](@ref)
+  - [`solver_selector`](@ref)
+"""
+function factory(r::PowerNormDrawdownatRisk, pr::AbstractPriorResult,
+                 slv::Option{<:Slv_VecSlv} = nothing, args...;
+                 kwargs...)::PowerNormDrawdownatRisk
+    w = nothing_scalar_array_selector(r.w, pr.w)
+    slv = solver_selector(r.slv, slv)
+    return PowerNormDrawdownatRisk(; settings = r.settings, slv = slv, alpha = r.alpha,
+                                   p = r.p, w = w)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create an instance of [`PowerNormDrawdownatRisk`](@ref) by overriding the solver and optionally selecting observation weights from the prior result.
+
+# Related
+
+  - [`PowerNormDrawdownatRisk`](@ref)
+  - [`AbstractPriorResult`](@ref)
+  - [`factory`](@ref)
+  - [`nothing_scalar_array_selector`](@ref)
+  - [`solver_selector`](@ref)
+"""
+function factory(r::PowerNormDrawdownatRisk, slv::Slv_VecSlv,
+                 pr::Option{<:AbstractPriorResult} = nothing;
+                 kwargs...)::PowerNormDrawdownatRisk
+    w = isnothing(pr) ? r.w : nothing_scalar_array_selector(r.w, pr.w)
+    slv = solver_selector(r.slv, slv)
+    return PowerNormDrawdownatRisk(; settings = r.settings, alpha = r.alpha, p = r.p,
+                                   slv = slv, w = w)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create an instance of [`RelativePowerNormDrawdownatRisk`](@ref) by selecting observation weights and solver from the risk-measure instance or falling back to the prior result.
+
+# Related
+
+  - [`RelativePowerNormDrawdownatRisk`](@ref)
+  - [`AbstractPriorResult`](@ref)
+  - [`factory`](@ref)
+  - [`nothing_scalar_array_selector`](@ref)
+  - [`solver_selector`](@ref)
+"""
+function factory(r::RelativePowerNormDrawdownatRisk, pr::AbstractPriorResult,
+                 slv::Option{<:Slv_VecSlv} = nothing, args...;
+                 kwargs...)::RelativePowerNormDrawdownatRisk
+    w = nothing_scalar_array_selector(r.w, pr.w)
+    slv = solver_selector(r.slv, slv)
+    return RelativePowerNormDrawdownatRisk(; settings = r.settings, slv = slv,
+                                           alpha = r.alpha, p = r.p, w = w)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create an instance of [`RelativePowerNormDrawdownatRisk`](@ref) by overriding the solver and optionally selecting observation weights from the prior result.
+
+# Related
+
+  - [`RelativePowerNormDrawdownatRisk`](@ref)
+  - [`AbstractPriorResult`](@ref)
+  - [`factory`](@ref)
+  - [`nothing_scalar_array_selector`](@ref)
+  - [`solver_selector`](@ref)
+"""
+function factory(r::RelativePowerNormDrawdownatRisk, slv::Slv_VecSlv,
+                 pr::Option{<:AbstractPriorResult} = nothing;
+                 kwargs...)::RelativePowerNormDrawdownatRisk
+    w = isnothing(pr) ? r.w : nothing_scalar_array_selector(r.w, pr.w)
+    slv = solver_selector(r.slv, slv)
+    return RelativePowerNormDrawdownatRisk(; settings = r.settings, alpha = r.alpha,
+                                           p = r.p, slv = slv, w = w)
 end
 
 export PowerNormValueatRisk, PowerNormValueatRiskRange, PowerNormDrawdownatRisk,

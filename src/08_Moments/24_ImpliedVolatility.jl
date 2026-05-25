@@ -37,6 +37,21 @@ Keywords correspond to the struct's fields.
 
   - `ws > 2`.
 
+# Examples
+
+```jldoctest
+julia> ImpliedVolatilityRegression()
+ImpliedVolatilityRegression
+  ve ┼ SimpleVariance
+     │          me ┼ SimpleExpectedReturns
+     │             │   w ┴ nothing
+     │           w ┼ nothing
+     │   corrected ┴ Bool: true
+  ws ┼ Int64: 20
+  re ┼ LinearModel
+     │   kwargs ┴ @NamedTuple{}: NamedTuple()
+```
+
 # Related
 
   - [`ImpliedVolatilityAlgorithm`](@ref)

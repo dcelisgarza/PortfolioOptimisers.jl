@@ -270,6 +270,16 @@ function AugmentedBlackLittermanPrior(;
     return AugmentedBlackLittermanPrior(a_pe, f_pe, mp, re, a_views, f_views, a_sets,
                                         f_sets, a_views_conf, f_views_conf, w, rf, l, tau)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a new [`AugmentedBlackLittermanPrior`](@ref) estimator with observation weights `w` applied to the underlying asset prior, factor prior, and regression estimators.
+
+# Related
+
+  - [`AugmentedBlackLittermanPrior`](@ref)
+  - [`factory`](@ref)
+"""
 function factory(pe::AugmentedBlackLittermanPrior,
                  w::ObsWeights)::AugmentedBlackLittermanPrior
     return AugmentedBlackLittermanPrior(; a_pe = factory(pe.a_pe, w),
@@ -280,6 +290,16 @@ function factory(pe::AugmentedBlackLittermanPrior,
                                         f_views_conf = pe.f_views_conf, w = pe.w,
                                         rf = pe.rf, l = pe.l, tau = pe.tau)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a new [`AugmentedBlackLittermanPrior`](@ref) estimator restricted to the assets at index `i`.
+
+# Related
+
+  - [`AugmentedBlackLittermanPrior`](@ref)
+  - [`prior_view`](@ref)
+"""
 function prior_view(pe::AugmentedBlackLittermanPrior, i)::AugmentedBlackLittermanPrior
     return AugmentedBlackLittermanPrior(; a_pe = prior_view(pe.a_pe, i), f_pe = pe.f_pe,
                                         mp = pe.mp, re = regression_view(pe.re, i),

@@ -24,6 +24,28 @@ Keywords correspond to the struct's fields.
   - $(val_dict[:oow])
   - If `window` is provided, it must be nonempty, nonnegative, and finite.
 
+# Examples
+
+```jldoctest
+julia> WindowedCokurtosis()
+WindowedCokurtosis
+      ke ┼ Cokurtosis
+         │    me ┼ SimpleExpectedReturns
+         │       │   w ┴ nothing
+         │    mp ┼ DenoiseDetoneAlgMatrixProcessing
+         │       │     pdm ┼ Posdef
+         │       │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+         │       │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+         │       │      dn ┼ nothing
+         │       │      dt ┼ nothing
+         │       │     alg ┼ nothing
+         │       │   order ┴ DenoiseDetoneAlg()
+         │   alg ┼ Full()
+         │     w ┴ nothing
+       w ┼ nothing
+  window ┴ nothing
+```
+
 # Related
 
   - [`CokurtosisEstimator`](@ref)

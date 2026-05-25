@@ -194,12 +194,34 @@ function HierarchicalEqualRiskContribution(;
                                            fb::Option{<:OptE_Opt} = nothing)::HierarchicalEqualRiskContribution
     return HierarchicalEqualRiskContribution(opt, ri, ro, scai, scao, ex, fb)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return whether the [`HierarchicalEqualRiskContribution`](@ref) requires previous portfolio weights.
+
+Returns `true` if any of the base optimiser, inner/outer risk measures, or fallback require previous weights.
+
+# Related
+
+  - [`needs_previous_weights`](@ref)
+  - [`HierarchicalEqualRiskContribution`](@ref)
+"""
 function needs_previous_weights(opt::HierarchicalEqualRiskContribution)
     return (needs_previous_weights(opt.opt) ||
             needs_previous_weights(opt.ri) ||
             needs_previous_weights(opt.ro) ||
             needs_previous_weights(opt.fb))
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create a [`HierarchicalEqualRiskContribution`](@ref) updating the base optimiser, risk measures, and fallback with weights `w`.
+
+# Related
+
+  - [`HierarchicalEqualRiskContribution`](@ref)
+  - [`factory`](@ref)
+"""
 function factory(hec::HierarchicalEqualRiskContribution,
                  w::AbstractVector)::HierarchicalEqualRiskContribution
     opt = factory(hec.opt, w)
@@ -209,6 +231,16 @@ function factory(hec::HierarchicalEqualRiskContribution,
     return HierarchicalEqualRiskContribution(; opt = opt, ri = ri, ro = ro, scai = hec.scai,
                                              scao = hec.scao, ex = hec.ex, fb = fb)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a view of [`HierarchicalEqualRiskContribution`](@ref) `hec` sliced to asset indices `i`.
+
+# Related
+
+  - [`HierarchicalEqualRiskContribution`](@ref)
+  - [`opt_view`](@ref)
+"""
 function opt_view(hec::HierarchicalEqualRiskContribution, i,
                   X::MatNum)::HierarchicalEqualRiskContribution
     X = isa(hec.opt.pe, AbstractPriorResult) ? hec.opt.pe.X : X
@@ -729,6 +761,18 @@ function herc_risk(hec::HierarchicalEqualRiskContribution{<:Any, <:VecOptRM,
     end
     return w, rkcl, fees
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Internal implementation of Hierarchical Equal Risk Contribution optimisation.
+
+Clusters assets, computes intra- and inter-cluster risk contributions, and allocates weights via the bisection method along the dendrogram.
+
+# Related
+
+  - [`HierarchicalEqualRiskContribution`](@ref)
+  - [`optimise`](@ref)
+"""
 function _optimise(hec::HierarchicalEqualRiskContribution,
                    rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
                    branchorder::Symbol = :optimal, kwargs...)
@@ -784,6 +828,8 @@ end
             rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
             branchorder::Symbol = :optimal, kwargs...) -> HierarchicalResult
 
+Run the Hierarchical Equal Risk Contribution portfolio optimisation.
+
 # Arguments
 
   - `hec`: The hierarchical equal risk contribution optimiser to use.
@@ -791,6 +837,11 @@ end
   - `dims`: The dimension along which observations advance in time.
   - `branchorder`: The branch order to use for the clusterisation, this optimisation can use non-optimal branch orders, which make the clustering faster but the dendrogram won't be as nice.
   - `kwargs`: Additional keyword arguments passed to the optimisation function.
+
+# Related
+
+  - [`HierarchicalEqualRiskContribution`](@ref)
+  - [`HierarchicalResult`](@ref)
 """
 function optimise(hec::HierarchicalEqualRiskContribution{<:Any, <:Any, <:Any, <:Any, <:Any,
                                                          <:Any, Nothing},

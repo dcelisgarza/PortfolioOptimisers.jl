@@ -14,6 +14,18 @@ All concrete and/or abstract types representing the formulation for computing Va
   - [`ValueatRiskRange`](@ref)
 """
 abstract type ValueatRiskFormulation <: AbstractAlgorithm end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the Value-at-Risk formulation `alg` unchanged.
+
+Identity pass-through for formulation types that do not depend on prior results.
+
+# Related
+
+  - [`ValueatRiskFormulation`](@ref)
+  - [`factory`](@ref)
+"""
 function factory(alg::ValueatRiskFormulation, args...; kwargs...)::ValueatRiskFormulation
     return alg
 end
@@ -186,6 +198,17 @@ function DistributionValueatRisk(; mu::Option{<:VecNum} = nothing,
                                  dist::Distributions.Distribution = Distributions.Normal())::DistributionValueatRisk
     return DistributionValueatRisk(mu, sigma, chol, dist)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create an instance of [`DistributionValueatRisk`](@ref) by selecting distribution parameters from the formulation or falling back to the prior result.
+
+# Related
+
+  - [`DistributionValueatRisk`](@ref)
+  - [`factory`](@ref)
+  - [`nothing_scalar_array_selector`](@ref)
+"""
 function factory(alg::DistributionValueatRisk, pr::AbstractPriorResult, args...;
                  kwargs...)::DistributionValueatRisk
     mu = nothing_scalar_array_selector(alg.mu, pr.mu)
@@ -304,6 +327,17 @@ function ValueatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                      alg::ValueatRiskFormulation = MIPValueatRisk())::ValueatRisk
     return ValueatRisk(settings, alpha, w, alg)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create an instance of [`ValueatRisk`](@ref) by selecting observation weights and formulation from the risk-measure instance or falling back to the prior result.
+
+# Related
+
+  - [`ValueatRisk`](@ref)
+  - [`factory`](@ref)
+  - [`nothing_scalar_array_selector`](@ref)
+"""
 function factory(r::ValueatRisk, pr::AbstractPriorResult, args...; kwargs...)::ValueatRisk
     w = nothing_scalar_array_selector(r.w, pr.w)
     alg = factory(r.alg, pr, args...; kwargs...)
@@ -436,6 +470,17 @@ function ValueatRiskRange(; settings::RiskMeasureSettings = RiskMeasureSettings(
                           alg::ValueatRiskFormulation = MIPValueatRisk())::ValueatRiskRange
     return ValueatRiskRange(settings, alpha, beta, w, alg)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create an instance of [`ValueatRiskRange`](@ref) by selecting observation weights and formulation from the risk-measure instance or falling back to the prior result.
+
+# Related
+
+  - [`ValueatRiskRange`](@ref)
+  - [`factory`](@ref)
+  - [`nothing_scalar_array_selector`](@ref)
+"""
 function factory(r::ValueatRiskRange, pr::AbstractPriorResult, args...;
                  kwargs...)::ValueatRiskRange
     w = nothing_scalar_array_selector(r.w, pr.w)
@@ -608,6 +653,17 @@ function DrawdownatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                         s::Option{<:Number} = nothing)::DrawdownatRisk
     return DrawdownatRisk(settings, alpha, w, b, s)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create an instance of [`DrawdownatRisk`](@ref) by selecting observation weights from the risk-measure instance or falling back to the prior result.
+
+# Related
+
+  - [`DrawdownatRisk`](@ref)
+  - [`factory`](@ref)
+  - [`nothing_scalar_array_selector`](@ref)
+"""
 function factory(r::DrawdownatRisk, pr::AbstractPriorResult, args...;
                  kwargs...)::DrawdownatRisk
     w = nothing_scalar_array_selector(r.w, pr.w)
@@ -767,6 +823,17 @@ function RelativeDrawdownatRisk(;
                                 w::Option{<:ObsWeights} = nothing)::RelativeDrawdownatRisk
     return RelativeDrawdownatRisk(settings, alpha, w)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create an instance of [`RelativeDrawdownatRisk`](@ref) by selecting observation weights from the risk-measure instance or falling back to the prior result.
+
+# Related
+
+  - [`RelativeDrawdownatRisk`](@ref)
+  - [`factory`](@ref)
+  - [`nothing_scalar_array_selector`](@ref)
+"""
 function factory(r::RelativeDrawdownatRisk, pr::AbstractPriorResult, args...;
                  kwargs...)::RelativeDrawdownatRisk
     w = nothing_scalar_array_selector(r.w, pr.w)

@@ -188,10 +188,33 @@ information for use in prediction result types.
 
 $(DocStringExtensions.FIELDS)
 
+# Constructors
+
+    PredictionReturnsResult(;
+        nx::Option{<:VecStr} = nothing,
+        X::Option{<:VecNum_VecVecNum} = nothing,
+        nf::Option{<:VecStr} = nothing,
+        F::Option{<:MatNum} = nothing,
+        nb::Option{<:VecStr} = nothing,
+        B::Option{<:VecNum_VecVecNum} = nothing,
+        ts::Option{<:VecDate} = nothing,
+        iv::Option{<:VecNum_VecVecNum} = nothing,
+        ivpa::Option{<:Num_VecNum} = nothing
+    ) -> PredictionReturnsResult
+
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - `nf` and `F` must be consistent (both nothing, or `F` has `length(nf)` columns).
+  - If `X` and `F` provided: row count of `F` matches length of each `X` vector.
+  - If `B` and `X` provided: same type (`VecNum`/`VecVecNum`) and matching lengths.
+  - If `ts` provided: `!isempty(ts)`; at least one of `X`, `F` is not `nothing`; lengths of `ts` match `X`, `F`, and `B` where applicable.
+  - If `iv` is a `VecNum`: `ivpa` is scalar or nothing; `iv` is non-empty, non-negative, and finite; `length(iv) == length(X)`.
+  - If `iv` is a `VecVecNum`: `ivpa` is `VecNum` or nothing; `length(iv) == length(X) == length(ivpa)`; each sub-vector non-empty, non-negative, finite, and same length as corresponding `X`.
+
 # Related
 
-  - [`PredictionResult`](@ref)
-  - [`MultiPeriodPredictionResult`](@ref)
   - [`PredictionResult`](@ref)
   - [`MultiPeriodPredictionResult`](@ref)
 """
@@ -575,8 +598,6 @@ risk under `r`. Paths where any fold returned a non-success retcode are excluded
 
   - [`PopulationPredictionResult`](@ref)
   - [`expected_risk`](@ref)
-  - [`PopulationPredictionResult`](@ref)
-  - [`expected_risk`](@ref)
 """
 function sort_by_measure(ppred::PopulationPredictionResult, r::AbstractBaseRiskMeasure;
                          kwargs...)
@@ -725,11 +746,9 @@ optionally columns `cols`) of `rd` are used for the prediction.
 # Related
 
   - [`fit_predict`](@ref)
-  - [`PredictionResult`](@ref)
-  - [`MultiPeriodPredictionResult`](@ref)
-  - [`fit_predict`](@ref)
   - [`fit_and_predict`](@ref)
   - [`PredictionResult`](@ref)
+  - [`MultiPeriodPredictionResult`](@ref)
 """
 function StatsAPI.predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)
     X = calc_net_returns(res, rd.X)

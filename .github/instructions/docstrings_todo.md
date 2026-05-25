@@ -1,40 +1,40 @@
 These files are found in the `../src/` folder.
 
-- [x] 01_Base.jl
-- [x] 02_Tools.jl
-- [x] 03_Preprocessing.jl
-- [x] 04_PosdefMatrix.jl
-- [x] 05_Denoise.jl
-- [x] 06_Detone.jl
-- [x] 07_MatrixProcessing.jl
-- [x] 10_JuMPModelOptimisation.jl
-- [x] 15_Turnover.jl
-- [x] 16_Fees.jl
-- [x] 17_NetReturnsDrawdowns.jl
-- [x] 18_Tracking.jl
-- [x] 21_ExpectedReturns.jl
-- [x] 22_Plotting.jl
-- [x] 23_Precompilation.jl
-- [x] 08_Moments/01_Base_Moments.jl
-- [x] 08_Moments/02_SimpleExpectedReturns.jl
-- [x] 08_Moments/03_Covariance.jl
-- [x] 08_Moments/04_SimpleVariance.jl
-- [x] 08_Moments/05_GerberCovariance.jl
-- [x] 08_Moments/06_SmythBrobyCovariance.jl
-- [x] 08_Moments/07_DistanceCovariance.jl
-- [x] 08_Moments/08_LowerTailDependenceCovariance.jl
-- [x] 08_Moments/09_RankCovariance.jl
-- [x] 08_Moments/10_Histogram.jl
-- [x] 08_Moments/11_MutualInfoCovariance.jl
-- [x] 08_Moments/12_DenoiseCovariance.jl
-- [x] 08_Moments/13_DetoneCovariance.jl
-- [x] 08_Moments/14_ProcessedCovariance.jl
-- [x] 08_Moments/15_PortfolioOptimisersCovariance.jl
-- [x] 08_Moments/16_ShrunkExpectedReturns.jl
-- [x] 08_Moments/17_EquilibriumExpectedReturns.jl
-- [x] 08_Moments/18_ExcessExpectedReturns.jl
-- [x] 08_Moments/19_Coskewness.jl
-- [x] 08_Moments/20_Cokurtosis.jl
+- [ ] 01_Base.jl
+- [ ] 02_Tools.jl
+- [ ] 03_Preprocessing.jl
+- [ ] 04_PosdefMatrix.jl
+- [ ] 05_Denoise.jl
+- [ ] 06_Detone.jl
+- [ ] 07_MatrixProcessing.jl
+- [ ] 10_JuMPModelOptimisation.jl
+- [ ] 15_Turnover.jl
+- [ ] 16_Fees.jl
+- [ ] 17_NetReturnsDrawdowns.jl
+- [ ] 18_Tracking.jl
+- [ ] 21_ExpectedReturns.jl
+- [ ] 22_Plotting.jl
+- [ ] 23_Precompilation.jl
+- [ ] 08_Moments/01_Base_Moments.jl
+- [ ] 08_Moments/02_SimpleExpectedReturns.jl
+- [ ] 08_Moments/03_Covariance.jl
+- [ ] 08_Moments/04_SimpleVariance.jl
+- [ ] 08_Moments/05_GerberCovariance.jl
+- [ ] 08_Moments/06_SmythBrobyCovariance.jl
+- [ ] 08_Moments/07_DistanceCovariance.jl
+- [ ] 08_Moments/08_LowerTailDependenceCovariance.jl
+- [ ] 08_Moments/09_RankCovariance.jl
+- [ ] 08_Moments/10_Histogram.jl
+- [ ] 08_Moments/11_MutualInfoCovariance.jl
+- [ ] 08_Moments/12_DenoiseCovariance.jl
+- [ ] 08_Moments/13_DetoneCovariance.jl
+- [ ] 08_Moments/14_ProcessedCovariance.jl
+- [ ] 08_Moments/15_PortfolioOptimisersCovariance.jl
+- [ ] 08_Moments/16_ShrunkExpectedReturns.jl
+- [ ] 08_Moments/17_EquilibriumExpectedReturns.jl
+- [ ] 08_Moments/18_ExcessExpectedReturns.jl
+- [ ] 08_Moments/19_Coskewness.jl
+- [ ] 08_Moments/20_Cokurtosis.jl
 - [ ] 08_Moments/21_Base_Regression.jl
 - [ ] 08_Moments/22_StepwiseRegression.jl
 - [ ] 08_Moments/23_DimensionReductionRegression.jl

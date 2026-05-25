@@ -50,9 +50,34 @@ Matches either an [`AbstractPhylogenyEstimator`](@ref) or an [`AbstractPhylogeny
   - [`AbstractPhylogenyResult`](@ref)
 """
 const PlE_Pl = Union{<:AbstractPhylogenyEstimator, <:AbstractPhylogenyResult}
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the phylogeny estimator or result `pl` unchanged.
+
+Identity pass-through used when a phylogeny estimator or pre-computed result is provided in a context that calls [`factory`](@ref).
+
+# Related
+
+  - [`AbstractPhylogenyEstimator`](@ref)
+  - [`AbstractPhylogenyResult`](@ref)
+  - [`factory`](@ref)
+"""
 function factory(pl::PlE_Pl, args...; kwargs...)::PlE_Pl
     return pl
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the phylogeny algorithm `alg` unchanged.
+
+Identity pass-through used when a phylogeny algorithm is provided in a context that calls [`factory`](@ref).
+
+# Related
+
+  - [`AbstractPhylogenyAlgorithm`](@ref)
+  - [`factory`](@ref)
+"""
 function factory(alg::AbstractPhylogenyAlgorithm, args...;
                  kwargs...)::AbstractPhylogenyAlgorithm
     return alg

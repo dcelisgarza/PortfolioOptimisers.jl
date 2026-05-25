@@ -1786,6 +1786,16 @@ function clusterise(cle::ClustersEstimator{<:Any, <:Any, <:DBHT, <:Any}, X::MatN
     k = optimal_number_clusters(cle.onc, res, D)
     return Clusters(; res = res, S = S, D = D, k = k)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+No-op fallback: return `nothing` when no LoGo algorithm is configured.
+
+# Related
+
+  - [`LoGo`](@ref)
+  - [`logo!`](@ref)
+"""
 function logo!(::Nothing, args...; kwargs...)
     return nothing
 end

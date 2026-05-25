@@ -364,6 +364,19 @@ Internal helper used in high-order moment estimation. Returns the precomputed ma
 function dup_elim_sum_view(args...)
     return nothing, nothing, nothing
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Compute duplication, elimination, and summation matrices for a matrix argument.
+
+Overload of [`dup_elim_sum_view`](@ref) for a matrix argument. Returns the three matrices for dimension `n = size(M, 2)`.
+
+# Related
+
+  - [`duplication_matrix`](@ref)
+  - [`elimination_matrix`](@ref)
+  - [`summation_matrix`](@ref)
+"""
 function dup_elim_sum_view(::MatNum, n)
     return dup_elim_sum_matrices(n)
 end
@@ -476,10 +489,29 @@ function HighOrderPriorEstimator(;
                                                                                  alg = Full()))::HighOrderPriorEstimator
     return HighOrderPriorEstimator(pe, kte, ske)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a new [`HighOrderPriorEstimator`](@ref) with observation weights `w` applied to all sub-estimators.
+
+# Related
+
+  - [`HighOrderPriorEstimator`](@ref)
+  - [`factory`](@ref)
+"""
 function factory(pe::HighOrderPriorEstimator, w::ObsWeights)::HighOrderPriorEstimator
     return HighOrderPriorEstimator(; pe = factory(pe.pe, w), kte = factory(pe.kte, w),
                                    ske = factory(pe.ske, w))
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a new [`HighOrderPriorEstimator`](@ref) restricted to the assets at index `i`.
+
+# Related
+
+  - [`HighOrderPriorEstimator`](@ref)
+"""
 function prior_view(pr::HighOrderPriorEstimator, i)::HighOrderPriorEstimator
     return HighOrderPriorEstimator(; pe = prior_view(pr.pe, i),
                                    kte = moment_view(pr.kte, i),

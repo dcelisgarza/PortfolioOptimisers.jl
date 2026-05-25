@@ -365,6 +365,18 @@ function ConditionalValueatRiskRange(;
                                      w::Option{<:ObsWeights} = nothing)::ConditionalValueatRiskRange
     return ConditionalValueatRiskRange(settings, alpha, beta, w)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create an instance of [`ConditionalValueatRiskRange`](@ref) by selecting observation weights from the risk-measure instance or falling back to the prior result.
+
+# Related
+
+  - [`ConditionalValueatRiskRange`](@ref)
+  - [`AbstractPriorResult`](@ref)
+  - [`factory`](@ref)
+  - [`nothing_scalar_array_selector`](@ref)
+"""
 function factory(r::ConditionalValueatRiskRange, pr::AbstractPriorResult, args...;
                  kwargs...)::ConditionalValueatRiskRange
     w = nothing_scalar_array_selector(r.w, pr.w)
@@ -500,6 +512,18 @@ function DistributionallyRobustConditionalValueatRiskRange(;
     return DistributionallyRobustConditionalValueatRiskRange(settings, alpha, l_a, r_a,
                                                              beta, l_b, r_b, w)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create an instance of [`DistributionallyRobustConditionalValueatRiskRange`](@ref) by selecting observation weights from the risk-measure instance or falling back to the prior result.
+
+# Related
+
+  - [`DistributionallyRobustConditionalValueatRiskRange`](@ref)
+  - [`AbstractPriorResult`](@ref)
+  - [`factory`](@ref)
+  - [`nothing_scalar_array_selector`](@ref)
+"""
 function factory(r::DistributionallyRobustConditionalValueatRiskRange,
                  pr::AbstractPriorResult, args...;
                  kwargs...)::DistributionallyRobustConditionalValueatRiskRange
@@ -981,23 +1005,78 @@ function (r::RelativeConditionalDrawdownatRisk{<:Any, <:Any, <:ObsWeights})(x::V
           sorted_dd[idx] * (alpha - cum_w[idx - 1])) / alpha
     end
 end
-for r in (ConditionalValueatRisk, ConditionalDrawdownatRisk)
-    eval(quote
-             function factory(r::$(r), pr::AbstractPriorResult, args...; kwargs...)
-                 w = nothing_scalar_array_selector(r.w, pr.w)
-                 return $(r)(; settings = r.settings, alpha = r.alpha, w = w)
-             end
-         end)
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create an instance of [`ConditionalValueatRisk`](@ref) by selecting observation weights from the risk-measure instance or falling back to the prior result.
+
+# Related
+
+  - [`ConditionalValueatRisk`](@ref)
+  - [`AbstractPriorResult`](@ref)
+  - [`factory`](@ref)
+  - [`nothing_scalar_array_selector`](@ref)
+"""
+function factory(r::ConditionalValueatRisk, pr::AbstractPriorResult, args...;
+                 kwargs...)::ConditionalValueatRisk
+    w = nothing_scalar_array_selector(r.w, pr.w)
+    return ConditionalValueatRisk(; settings = r.settings, alpha = r.alpha, w = w)
 end
-for r in (DistributionallyRobustConditionalValueatRisk,
-          DistributionallyRobustConditionalDrawdownatRisk)
-    eval(quote
-             function factory(r::$(r), pr::AbstractPriorResult, args...; kwargs...)
-                 w = nothing_scalar_array_selector(r.w, pr.w)
-                 return $(r)(; settings = r.settings, alpha = r.alpha, l = r.l, r = r.r,
-                             w = w)
-             end
-         end)
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create an instance of [`ConditionalDrawdownatRisk`](@ref) by selecting observation weights from the risk-measure instance or falling back to the prior result.
+
+# Related
+
+  - [`ConditionalDrawdownatRisk`](@ref)
+  - [`AbstractPriorResult`](@ref)
+  - [`factory`](@ref)
+  - [`nothing_scalar_array_selector`](@ref)
+"""
+function factory(r::ConditionalDrawdownatRisk, pr::AbstractPriorResult, args...;
+                 kwargs...)::ConditionalDrawdownatRisk
+    w = nothing_scalar_array_selector(r.w, pr.w)
+    return ConditionalDrawdownatRisk(; settings = r.settings, alpha = r.alpha, w = w)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create an instance of [`DistributionallyRobustConditionalValueatRisk`](@ref) by selecting observation weights from the risk-measure instance or falling back to the prior result.
+
+# Related
+
+  - [`DistributionallyRobustConditionalValueatRisk`](@ref)
+  - [`AbstractPriorResult`](@ref)
+  - [`factory`](@ref)
+  - [`nothing_scalar_array_selector`](@ref)
+"""
+function factory(r::DistributionallyRobustConditionalValueatRisk, pr::AbstractPriorResult,
+                 args...; kwargs...)::DistributionallyRobustConditionalValueatRisk
+    w = nothing_scalar_array_selector(r.w, pr.w)
+    return DistributionallyRobustConditionalValueatRisk(; settings = r.settings,
+                                                        alpha = r.alpha, l = r.l, r = r.r,
+                                                        w = w)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create an instance of [`DistributionallyRobustConditionalDrawdownatRisk`](@ref) by selecting observation weights from the risk-measure instance or falling back to the prior result.
+
+# Related
+
+  - [`DistributionallyRobustConditionalDrawdownatRisk`](@ref)
+  - [`AbstractPriorResult`](@ref)
+  - [`factory`](@ref)
+  - [`nothing_scalar_array_selector`](@ref)
+"""
+function factory(r::DistributionallyRobustConditionalDrawdownatRisk,
+                 pr::AbstractPriorResult, args...;
+                 kwargs...)::DistributionallyRobustConditionalDrawdownatRisk
+    w = nothing_scalar_array_selector(r.w, pr.w)
+    return DistributionallyRobustConditionalDrawdownatRisk(; settings = r.settings,
+                                                           alpha = r.alpha, l = r.l,
+                                                           r = r.r, w = w)
 end
 
 export ConditionalValueatRisk, DistributionallyRobustConditionalValueatRisk,

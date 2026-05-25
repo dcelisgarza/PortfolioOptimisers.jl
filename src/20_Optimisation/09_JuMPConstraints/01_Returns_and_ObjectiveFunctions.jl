@@ -19,10 +19,19 @@ $(DocStringExtensions.FIELDS)
         mu::Option{<:Num_VecNum} = nothing
     ) -> ArithmeticReturn
 
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - If `ucs` is an `EllipsoidalUncertaintySet`: must be parameterised by `MuEllipsoidalUncertaintySet`.
+  - If `lb` is a number: `isfinite(lb)`.
+  - If `lb` is a vector: `!isempty(lb)` and `all(isfinite, lb)`.
+  - If `mu` is a number: `isfinite(mu)`.
+  - If `mu` is a vector: `!isempty(mu)` and `all(isfinite, mu)`.
+
 # Related
 
   - [`bounds_returns_estimator`](@ref)
-  - [`LogarithmicReturn`](@ref)
   - [`LogarithmicReturn`](@ref)
   - [`JuMPReturnsEstimator`](@ref)
 """
@@ -126,10 +135,17 @@ $(DocStringExtensions.FIELDS)
         lb::Option{<:RkRtBounds} = nothing
     ) -> LogarithmicReturn
 
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - If `w` is provided: `!isempty(w)`, all elements non-negative and finite.
+  - If `lb` is a number: `isfinite(lb)`.
+  - If `lb` is a vector: `!isempty(lb)` and `all(isfinite, lb)`.
+
 # Related
 
   - [`bounds_returns_estimator`](@ref)
-  - [`ArithmeticReturn`](@ref)
   - [`ArithmeticReturn`](@ref)
   - [`JuMPReturnsEstimator`](@ref)
 """
@@ -335,9 +351,6 @@ Objective function that minimises portfolio risk.
   - [`MaximumUtility`](@ref)
   - [`MaximumRatio`](@ref)
   - [`MaximumReturn`](@ref)
-  - [`MaximumUtility`](@ref)
-  - [`MaximumRatio`](@ref)
-  - [`MaximumReturn`](@ref)
   - [`ObjectiveFunction`](@ref)
 """
 struct MinimumRisk <: ObjectiveFunction end
@@ -369,13 +382,17 @@ $(DocStringExtensions.FIELDS)
 
     MaximumUtility(; l::Number = 2) -> MaximumUtility
 
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - `l >= 0`.
+
 # Related
 
   - [`MinimumRisk`](@ref)
   - [`MaximumRatio`](@ref)
   - [`MaximumReturn`](@ref)
-  - [`MinimumRisk`](@ref)
-  - [`MaximumRatio`](@ref)
   - [`ObjectiveFunction`](@ref)
 """
 @concrete struct MaximumUtility <: ObjectiveFunction
@@ -417,11 +434,14 @@ $(DocStringExtensions.FIELDS)
 
     MaximumRatio(; rf::Number = 0.0, ohf::Option{<:Number} = nothing) -> MaximumRatio
 
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - If `ohf` is provided: `ohf > 0`.
+
 # Related
 
-  - [`MinimumRisk`](@ref)
-  - [`MaximumUtility`](@ref)
-  - [`MaximumReturn`](@ref)
   - [`MinimumRisk`](@ref)
   - [`MaximumUtility`](@ref)
   - [`MaximumReturn`](@ref)

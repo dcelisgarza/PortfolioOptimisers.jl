@@ -345,6 +345,31 @@ function phylogeny_matrix(pl::NwE_ClE_Cl, pr::Pr_RR; rd::Option{<:ReturnsResult}
     X = isnothing(rd) || cle_pr ? pr.X : rd.X
     return phylogeny_matrix(pl, X; kwargs...)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Compute phylogeny constraints from asset returns in a prior result using a phylogeny constraint estimator.
+
+`phylogeny_constraints` delegates to the asset-returns variant by extracting `X` from `pr` (or `rd` if provided and `cle_pr` is false).
+
+# Arguments
+
+  - `plc`: Phylogeny constraint estimator.
+  - `pr`: Prior result or returns result object.
+  - `rd`: Optional returns result (used when `cle_pr = false`).
+  - `cle_pr`: If `true`, use asset returns from `pr`; otherwise, use `rd`. Default is `true`.
+  - `kwargs...`: Additional keyword arguments passed to the estimator.
+
+# Returns
+
+  - Phylogeny constraint result.
+
+# Related
+
+  - [`AbstractPhylogenyConstraintEstimator`](@ref)
+  - [`AbstractPriorResult`](@ref)
+  - [`phylogeny_constraints`](@ref)
+"""
 function phylogeny_constraints(plc::AbstractPhylogenyConstraintEstimator, pr::Pr_RR;
                                rd::Option{<:ReturnsResult} = nothing, cle_pr::Bool = true,
                                kwargs...)
@@ -518,6 +543,30 @@ function asset_phylogeny(pl::NwE_ClE_Cl, w::VecNum, pr::Pr_RR;
     X = isnothing(rd) || cle_pr ? pr.X : rd.X
     return asset_phylogeny(pl, w, X; kwargs...)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Compute centrality constraints from asset returns in a prior result using a centrality constraint estimator.
+
+`centrality_constraints` delegates to the asset-returns variant by extracting `X` from `pr` (or `rd` if provided and `cle_pr` is false).
+
+# Arguments
+
+  - `ccs`: Centrality constraint estimator or vector thereof.
+  - `pr`: Prior result or returns result object.
+  - `rd`: Optional returns result (used when `cle_pr = false`).
+  - `cle_pr`: If `true`, use asset returns from `pr`; otherwise, use `rd`. Default is `true`.
+  - `kwargs...`: Additional keyword arguments passed to the estimator.
+
+# Returns
+
+  - Centrality constraint result.
+
+# Related
+
+  - [`AbstractPriorResult`](@ref)
+  - [`centrality_constraints`](@ref)
+"""
 function centrality_constraints(ccs::CC_VecCC, pr::Pr_RR;
                                 rd::Option{<:ReturnsResult} = nothing, cle_pr::Bool = true,
                                 kwargs...)
@@ -674,6 +723,16 @@ function LowOrderPrior(; X::MatNum, mu::VecNum, sigma::MatNum,
                        f_w::Option{<:VecNum} = nothing)::LowOrderPrior
     return LowOrderPrior(X, mu, sigma, chol, w, ens, kld, ow, rr, f_mu, f_sigma, f_w)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a view of a [`LowOrderPrior`](@ref) restricted to assets at index `i`.
+
+# Related
+
+  - [`LowOrderPrior`](@ref)
+  - [`prior_view`](@ref)
+"""
 function prior_view(pr::LowOrderPrior, i)::LowOrderPrior
     chol = isnothing(pr.chol) ? nothing : view(pr.chol, :, i)
     return LowOrderPrior(; X = view(pr.X, :, i), mu = view(pr.mu, i),
@@ -844,6 +903,16 @@ function HighOrderPrior(; pr::AbstractPriorResult, kt::Option{<:MatNum} = nothin
     return HighOrderPrior(pr, kt, L2, S2, sk, V, skmp, f_kt, #chol_kt,
                           f_sk, f_V)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a view of a [`HighOrderPrior`](@ref) restricted to assets at index `i`, slicing all relevant moment tensors accordingly.
+
+# Related
+
+  - [`HighOrderPrior`](@ref)
+  - [`prior_view`](@ref)
+"""
 function prior_view(pr::HighOrderPrior, i)
     idx = fourth_moment_index_generator(length(pr.mu), i)
     kt = pr.kt

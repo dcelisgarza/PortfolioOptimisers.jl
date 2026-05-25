@@ -153,17 +153,49 @@ function HierarchicalRiskParity(; opt::HierarchicalOptimiser = HierarchicalOptim
                                 fb::Option{<:OptE_Opt} = nothing)::HierarchicalRiskParity
     return HierarchicalRiskParity(opt, r, sca, fb)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return whether the [`HierarchicalRiskParity`](@ref) requires previous portfolio weights.
+
+Returns `true` if any of the base optimiser, risk measure, or fallback estimator require previous weights.
+
+# Related
+
+  - [`needs_previous_weights`](@ref)
+  - [`HierarchicalRiskParity`](@ref)
+"""
 function needs_previous_weights(opt::HierarchicalRiskParity)
     return (needs_previous_weights(opt.opt) ||
             needs_previous_weights(opt.r) ||
             needs_previous_weights(opt.fb))
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create a [`HierarchicalRiskParity`](@ref) updating the base optimiser, risk measure, and fallback with weights `w`.
+
+# Related
+
+  - [`HierarchicalRiskParity`](@ref)
+  - [`factory`](@ref)
+"""
 function factory(hrp::HierarchicalRiskParity, w::AbstractVector)::HierarchicalRiskParity
     opt = factory(hrp.opt, w)
     r = factory(hrp.r, w)
     fb = factory(hrp.fb, w)
     return HierarchicalRiskParity(; opt = opt, r = r, sca = hrp.sca, fb = fb)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a view of [`HierarchicalRiskParity`](@ref) `hrp` sliced to asset indices `i`.
+
+# Related
+
+  - [`HierarchicalRiskParity`](@ref)
+  - [`opt_view`](@ref)
+"""
 function opt_view(hrp::HierarchicalRiskParity, i, X::MatNum)::HierarchicalRiskParity
     X = isa(hrp.opt.pe, AbstractPriorResult) ? hrp.opt.pe.X : X
     r = risk_measure_view(hrp.r, i, X)
@@ -209,6 +241,19 @@ function split_factor_weight_constraints(alpha::Number, wb::WeightBounds, w::Vec
     return one(alpha) -
            min(sum(view(ub, rc)) / wrc, max(sum(view(lb, rc)) / wrc, one(alpha) - alpha))
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Run the Hierarchical Risk Parity optimisation for a single risk measure.
+
+Internal dispatch called by [`optimise`](@ref). Computes the prior, clusters assets, applies inverse-risk bisection allocation, and finalises weight bounds.
+
+# Related
+
+  - [`HierarchicalRiskParity`](@ref)
+  - [`optimise`](@ref)
+  - [`_optimise`](@ref)
+"""
 function _optimise(hrp::HierarchicalRiskParity{<:Any, <:OptimisationRiskMeasure},
                    rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)
     rd = returns_result_picker(rd, hrp.opt.brt)
@@ -361,6 +406,20 @@ function hrp_scalarised_risk(sca::LogSumExpScalariser, wu::MatNum, wk::VecNum, r
     return LogExpFunctions.logsumexp(view(risk, :, 1)) / sca.gamma,
            LogExpFunctions.logsumexp(view(risk, :, 2)) / sca.gamma
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Run the Hierarchical Risk Parity optimisation for a vector of risk measures, scalarising each cluster's risk.
+
+Internal dispatch called by [`optimise`](@ref). Uses [`hrp_scalarised_risk`](@ref) to aggregate multiple risk measures.
+
+# Related
+
+  - [`HierarchicalRiskParity`](@ref)
+  - [`hrp_scalarised_risk`](@ref)
+  - [`optimise`](@ref)
+  - [`_optimise`](@ref)
+"""
 function _optimise(hrp::HierarchicalRiskParity{<:Any, <:VecOptRM},
                    rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)
     rd = returns_result_picker(rd, hrp.opt.brt)
@@ -401,12 +460,19 @@ end
     optimise(hrp::HierarchicalRiskParity{<:Any, <:Any, <:Any, <:Nothing},
              rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...) -> HierarchicalResult
 
+Run the Hierarchical Risk Parity portfolio optimisation.
+
 # Arguments
 
   - `hrp`: The hierarchical risk parity optimiser to use.
   - $(arg_dict[:rd]) If `isa(hrp.opt.pe, AbstractPriorResult)`, `rd` is not necessary if doing a standalone optimisation, but may be required/desired by fallbacks and/or clusterisation.
   - `dims`: The dimension along which observations advance in time.
   - `kwargs`: Additional keyword arguments passed to the optimisation function.
+
+# Related
+
+  - [`HierarchicalRiskParity`](@ref)
+  - [`HierarchicalResult`](@ref)
 """
 function optimise(hrp::HierarchicalRiskParity{<:Any, <:Any, <:Any, <:Nothing},
                   rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)

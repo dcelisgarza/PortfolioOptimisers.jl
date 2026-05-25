@@ -259,6 +259,19 @@ end
 function (r::EntropicValueatRiskRange)(x::VecNum)
     return ERM(x, r.slv, r.alpha, r.w) + ERM(-x, r.slv, r.beta, r.w)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create an instance of [`EntropicValueatRiskRange`](@ref) by selecting observation weights and solver from the risk-measure instance or falling back to the prior result.
+
+# Related
+
+  - [`EntropicValueatRiskRange`](@ref)
+  - [`AbstractPriorResult`](@ref)
+  - [`factory`](@ref)
+  - [`nothing_scalar_array_selector`](@ref)
+  - [`solver_selector`](@ref)
+"""
 function factory(r::EntropicValueatRiskRange, pr::AbstractPriorResult,
                  slv::Option{<:Slv_VecSlv}, args...; kwargs...)::EntropicValueatRiskRange
     w = nothing_scalar_array_selector(r.w, pr.w)
@@ -507,22 +520,129 @@ function (r::RelativeEntropicDrawdownatRisk)(x::VecNum)
     dd = relative_drawdown_vec(x)
     return ERM(dd, r.slv, r.alpha, r.w)
 end
-for r in (EntropicValueatRisk, EntropicDrawdownatRisk, RelativeEntropicDrawdownatRisk)
-    eval(quote
-             function factory(r::$(r), pr::AbstractPriorResult,
-                              slv::Option{<:Slv_VecSlv} = nothing, args...; kwargs...)
-                 w = nothing_scalar_array_selector(r.w, pr.w)
-                 slv = solver_selector(r.slv, slv)
-                 return $(r)(; settings = r.settings, slv = slv, alpha = r.alpha, w = w)
-             end
-             function factory(r::$(r), slv::Slv_VecSlv,
-                              pr::Option{<:AbstractPriorResult} = nothing, args...;
-                              kwargs...)
-                 w = isnothing(pr) ? r.w : nothing_scalar_array_selector(r.w, pr.w)
-                 slv = solver_selector(r.slv, slv)
-                 return $(r)(; settings = r.settings, slv = slv, alpha = r.alpha, w = w)
-             end
-         end)
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create an instance of [`EntropicValueatRisk`](@ref) by selecting observation weights and solver from the risk-measure instance or falling back to the prior result.
+
+# Related
+
+  - [`EntropicValueatRisk`](@ref)
+  - [`AbstractPriorResult`](@ref)
+  - [`factory`](@ref)
+  - [`nothing_scalar_array_selector`](@ref)
+  - [`solver_selector`](@ref)
+"""
+function factory(r::EntropicValueatRisk, pr::AbstractPriorResult,
+                 slv::Option{<:Slv_VecSlv} = nothing, args...;
+                 kwargs...)::EntropicValueatRisk
+    w = nothing_scalar_array_selector(r.w, pr.w)
+    slv = solver_selector(r.slv, slv)
+    return EntropicValueatRisk(; settings = r.settings, slv = slv, alpha = r.alpha, w = w)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create an instance of [`EntropicValueatRisk`](@ref) by overriding the solver and optionally selecting observation weights from the prior result.
+
+# Related
+
+  - [`EntropicValueatRisk`](@ref)
+  - [`AbstractPriorResult`](@ref)
+  - [`factory`](@ref)
+  - [`nothing_scalar_array_selector`](@ref)
+  - [`solver_selector`](@ref)
+"""
+function factory(r::EntropicValueatRisk, slv::Slv_VecSlv,
+                 pr::Option{<:AbstractPriorResult} = nothing, args...;
+                 kwargs...)::EntropicValueatRisk
+    w = isnothing(pr) ? r.w : nothing_scalar_array_selector(r.w, pr.w)
+    slv = solver_selector(r.slv, slv)
+    return EntropicValueatRisk(; settings = r.settings, slv = slv, alpha = r.alpha, w = w)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create an instance of [`EntropicDrawdownatRisk`](@ref) by selecting observation weights and solver from the risk-measure instance or falling back to the prior result.
+
+# Related
+
+  - [`EntropicDrawdownatRisk`](@ref)
+  - [`AbstractPriorResult`](@ref)
+  - [`factory`](@ref)
+  - [`nothing_scalar_array_selector`](@ref)
+  - [`solver_selector`](@ref)
+"""
+function factory(r::EntropicDrawdownatRisk, pr::AbstractPriorResult,
+                 slv::Option{<:Slv_VecSlv} = nothing, args...;
+                 kwargs...)::EntropicDrawdownatRisk
+    w = nothing_scalar_array_selector(r.w, pr.w)
+    slv = solver_selector(r.slv, slv)
+    return EntropicDrawdownatRisk(; settings = r.settings, slv = slv, alpha = r.alpha,
+                                  w = w)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create an instance of [`EntropicDrawdownatRisk`](@ref) by overriding the solver and optionally selecting observation weights from the prior result.
+
+# Related
+
+  - [`EntropicDrawdownatRisk`](@ref)
+  - [`AbstractPriorResult`](@ref)
+  - [`factory`](@ref)
+  - [`nothing_scalar_array_selector`](@ref)
+  - [`solver_selector`](@ref)
+"""
+function factory(r::EntropicDrawdownatRisk, slv::Slv_VecSlv,
+                 pr::Option{<:AbstractPriorResult} = nothing, args...;
+                 kwargs...)::EntropicDrawdownatRisk
+    w = isnothing(pr) ? r.w : nothing_scalar_array_selector(r.w, pr.w)
+    slv = solver_selector(r.slv, slv)
+    return EntropicDrawdownatRisk(; settings = r.settings, slv = slv, alpha = r.alpha,
+                                  w = w)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create an instance of [`RelativeEntropicDrawdownatRisk`](@ref) by selecting observation weights and solver from the risk-measure instance or falling back to the prior result.
+
+# Related
+
+  - [`RelativeEntropicDrawdownatRisk`](@ref)
+  - [`AbstractPriorResult`](@ref)
+  - [`factory`](@ref)
+  - [`nothing_scalar_array_selector`](@ref)
+  - [`solver_selector`](@ref)
+"""
+function factory(r::RelativeEntropicDrawdownatRisk, pr::AbstractPriorResult,
+                 slv::Option{<:Slv_VecSlv} = nothing, args...;
+                 kwargs...)::RelativeEntropicDrawdownatRisk
+    w = nothing_scalar_array_selector(r.w, pr.w)
+    slv = solver_selector(r.slv, slv)
+    return RelativeEntropicDrawdownatRisk(; settings = r.settings, slv = slv,
+                                          alpha = r.alpha, w = w)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create an instance of [`RelativeEntropicDrawdownatRisk`](@ref) by overriding the solver and optionally selecting observation weights from the prior result.
+
+# Related
+
+  - [`RelativeEntropicDrawdownatRisk`](@ref)
+  - [`AbstractPriorResult`](@ref)
+  - [`factory`](@ref)
+  - [`nothing_scalar_array_selector`](@ref)
+  - [`solver_selector`](@ref)
+"""
+function factory(r::RelativeEntropicDrawdownatRisk, slv::Slv_VecSlv,
+                 pr::Option{<:AbstractPriorResult} = nothing, args...;
+                 kwargs...)::RelativeEntropicDrawdownatRisk
+    w = isnothing(pr) ? r.w : nothing_scalar_array_selector(r.w, pr.w)
+    slv = solver_selector(r.slv, slv)
+    return RelativeEntropicDrawdownatRisk(; settings = r.settings, slv = slv,
+                                          alpha = r.alpha, w = w)
 end
 
 export EntropicValueatRisk, EntropicValueatRiskRange, EntropicDrawdownatRisk,

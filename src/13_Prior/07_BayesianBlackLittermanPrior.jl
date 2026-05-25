@@ -172,12 +172,31 @@ function BayesianBlackLittermanPrior(;
                                      tau::Option{<:Number} = nothing)::BayesianBlackLittermanPrior
     return BayesianBlackLittermanPrior(pe, mp, views, sets, views_conf, rf, tau)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a new [`BayesianBlackLittermanPrior`](@ref) estimator with observation weights `w` applied to the underlying prior estimator.
+
+# Related
+
+  - [`BayesianBlackLittermanPrior`](@ref)
+  - [`factory`](@ref)
+"""
 function factory(pe::BayesianBlackLittermanPrior,
                  w::ObsWeights)::BayesianBlackLittermanPrior
     return BayesianBlackLittermanPrior(; pe = factory(pe.pe, w), mp = pe.mp,
                                        views = pe.views, sets = pe.sets,
                                        views_conf = pe.views_conf, rf = pe.rf, tau = pe.tau)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a new [`BayesianBlackLittermanPrior`](@ref) estimator restricted to the assets at index `i`.
+
+# Related
+
+  - [`BayesianBlackLittermanPrior`](@ref)
+"""
 function prior_view(pr::BayesianBlackLittermanPrior, i)::BayesianBlackLittermanPrior
     return BayesianBlackLittermanPrior(; pe = prior_view(pr.pe, i), mp = pr.mp,
                                        views = pr.views, sets = pr.sets,

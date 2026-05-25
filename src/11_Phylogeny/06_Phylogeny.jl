@@ -145,6 +145,19 @@ All concrete and/or abstract types implementing specific centrality algorithms (
 """
 abstract type AbstractCentralityAlgorithm <: AbstractPhylogenyAlgorithm end
 
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Compute the centrality vector from a matrix [`PhylogenyResult`](@ref) using the specified centrality algorithm.
+
+Builds a graph from the phylogeny matrix and applies `ct` to compute node centrality scores.
+
+# Related
+
+  - [`PhylogenyResult`](@ref)
+  - [`AbstractCentralityAlgorithm`](@ref)
+  - [`calc_centrality`](@ref)
+"""
 function centrality_vector(plr::PhylogenyResult{<:MatNum}, ct::AbstractCentralityAlgorithm,
                            args...; kwargs...)
     G = Graphs.SimpleGraph(plr.X)

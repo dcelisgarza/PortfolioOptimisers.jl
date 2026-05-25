@@ -247,12 +247,50 @@ function DimensionReductionRegression(; ve::AbstractVarianceEstimator = SimpleVa
                                       retgt::AbstractRegressionTarget = LinearModel())::DimensionReductionRegression
     return DimensionReductionRegression(ve, drtgt, retgt)
 end
+"""
+    factory(re::DimensionReductionRegression, w::ObsWeights) -> DimensionReductionRegression
+
+Return a new [`DimensionReductionRegression`](@ref) estimator with observation weights `w` applied to the underlying variance and regression target estimators.
+
+# Arguments
+
+  - `re`: Dimension reduction regression estimator.
+  - $(arg_dict[:ow])
+
+# Returns
+
+  - `re::DimensionReductionRegression`: Updated estimator with weights applied to `ve`, `drtgt`, and `retgt`.
+
+# Related
+
+  - [`DimensionReductionRegression`](@ref)
+  - [`factory`](@ref)
+"""
 function factory(re::DimensionReductionRegression,
                  w::ObsWeights)::DimensionReductionRegression
     return DimensionReductionRegression(; ve = factory(re.ve, w),
                                         drtgt = factory(re.drtgt, w),
                                         retgt = factory(re.retgt, w))
 end
+"""
+    regression_view(re::DimensionReductionRegression, i) -> DimensionReductionRegression
+
+Return a new [`DimensionReductionRegression`](@ref) estimator restricted to assets at index `i`.
+
+# Arguments
+
+  - `re`: Dimension reduction regression estimator.
+  - `i`: Index or indices of assets to include.
+
+# Returns
+
+  - `re::DimensionReductionRegression`: Updated estimator with `ve` restricted to the selected assets.
+
+# Related
+
+  - [`DimensionReductionRegression`](@ref)
+  - [`regression_view`](@ref)
+"""
 function regression_view(re::DimensionReductionRegression, i)::DimensionReductionRegression
     return DimensionReductionRegression(; ve = moment_view(re.ve, i), drtgt = re.drtgt,
                                         retgt = re.retgt)

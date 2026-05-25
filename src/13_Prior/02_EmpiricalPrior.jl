@@ -79,10 +79,29 @@ function EmpiricalPrior(;
                         horizon::Option{<:Number} = nothing)::EmpiricalPrior
     return EmpiricalPrior(ce, me, horizon)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a new [`EmpiricalPrior`](@ref) estimator with observation weights `w` applied to the underlying covariance and expected returns estimators.
+
+# Related
+
+  - [`EmpiricalPrior`](@ref)
+  - [`factory`](@ref)
+"""
 function factory(pe::EmpiricalPrior, w::ObsWeights)::EmpiricalPrior
     return EmpiricalPrior(; me = factory(pe.me, w), ce = factory(pe.ce, w),
                           horizon = pe.horizon)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a new [`EmpiricalPrior`](@ref) estimator restricted to the assets at index `i`.
+
+# Related
+
+  - [`EmpiricalPrior`](@ref)
+"""
 function prior_view(pe::EmpiricalPrior, i)::EmpiricalPrior
     return EmpiricalPrior(; me = moment_view(pe.me, i), ce = moment_view(pe.ce, i),
                           horizon = pe.horizon)

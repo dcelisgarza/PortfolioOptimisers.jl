@@ -75,11 +75,33 @@ function RiskRatioRiskMeasure(; r1::OptimisationRiskMeasure = Variance(),
                               r2::OptimisationRiskMeasure = ConditionalValueatRisk())::RiskRatioRiskMeasure
     return RiskRatioRiskMeasure(r1, r2)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create an instance of [`RiskRatioRiskMeasure`](@ref) by updating both constituent risk measures from the optimisation context.
+
+Forwards all arguments to `factory` on `r1` and `r2`.
+
+# Related
+
+  - [`RiskRatioRiskMeasure`](@ref)
+  - [`factory`](@ref)
+"""
 function factory(r::RiskRatioRiskMeasure, args...; kwargs...)::RiskRatioRiskMeasure
     r1 = factory(r.r1, args...; kwargs...)
     r2 = factory(r.r2, args...; kwargs...)
     return RiskRatioRiskMeasure(; r1 = r1, r2 = r2)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create an instance of [`RiskRatioRiskMeasure`](@ref) updating both constituent risk measures from new portfolio weights `w`.
+
+# Related
+
+  - [`RiskRatioRiskMeasure`](@ref)
+  - [`factory`](@ref)
+"""
 function factory(r::RiskRatioRiskMeasure, w::VecNum)::RiskRatioRiskMeasure
     return RiskRatioRiskMeasure(; r1 = factory(r.r1, w), r2 = factory(r.r2, w))
 end
@@ -138,6 +160,18 @@ function NonOptimisationRiskRatioRiskMeasure(; r1::AbstractBaseRiskMeasure = Var
                                              r2::AbstractBaseRiskMeasure = ConditionalValueatRisk())::NonOptimisationRiskRatioRiskMeasure
     return NonOptimisationRiskRatioRiskMeasure(r1, r2)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create an instance of [`NonOptimisationRiskRatioRiskMeasure`](@ref) by updating both constituent risk measures from the optimisation context.
+
+Forwards all arguments to `factory` on `r1` and `r2`.
+
+# Related
+
+  - [`NonOptimisationRiskRatioRiskMeasure`](@ref)
+  - [`factory`](@ref)
+"""
 function factory(r::NonOptimisationRiskRatioRiskMeasure, args...;
                  kwargs...)::NonOptimisationRiskRatioRiskMeasure
     r1 = factory(r.r1, args...; kwargs...)

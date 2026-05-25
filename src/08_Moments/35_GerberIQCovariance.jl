@@ -435,6 +435,57 @@ function ExpGerberIQDecay(; e::Option{<:GerberIQEps} = nothing,
                           y::Option{<:GerberIQGamma} = nothing)::ExpGerberIQDecay
     return ExpGerberIQDecay(e, y)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Compute the exponential decay weight for a single observation at lag `T - k`.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+w_k &= \\exp\\!\\left(-y \\cdot \\max(0,\\, T - k - e)\\right)\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``w_k``: Decay weight for observation at index ``k``.
+  - ``y``: Decay rate parameter (`decay.y`).
+  - ``e``: Lookback delay (`decay.e`); observations within the last ``e`` periods are not discounted.
+  - $(math_dict[:T])
+  - ``k``: Observation index (``1 \\leq k \\leq T``).
+
+# Arguments
+
+  - `decay`: Fitted [`ExpGerberIQDecay`](@ref) with numeric `e` and `y` fields.
+  - `T`: Total number of observations.
+  - `k`: Index of the current observation.
+
+# Returns
+
+  - `w::Number`: Decay weight for observation `k`.
+
+# Examples
+
+```jldoctest
+julia> ExpGerberIQDecay(; e = 5.0, y = 0.1)(10, 5)
+1.0
+
+julia> ExpGerberIQDecay(; e = 0.0, y = 0.1)(10, 5)
+0.6065306597126334
+```
+
+# Related
+
+  - [`ExpGerberIQDecay`](@ref)
+  - [`regenerate_decay`](@ref)
+  - [`GerberIQCovariance`](@ref)
+
+# References
+
+  - [gerber2025squeezing](@cite) Gerber, Sander and Smyth, William and Markowitz, Harry and Miao, Yinsen and Ernst, Philip and Sargen, Paul, *Squeezing Financial Noise: A Novel Approach to Covariance Matrix Estimation* (December 01, 2025). Available at SSRN: https://ssrn.com/abstract=4986939 or http://dx.doi.org/10.2139/ssrn.4986939
+"""
 function (decay::ExpGerberIQDecay)(T::Number, k::Number)
     return exp(-decay.y * max(0, T - k - decay.e))
 end

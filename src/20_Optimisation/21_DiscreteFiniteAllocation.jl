@@ -3,6 +3,8 @@ $(DocStringExtensions.TYPEDEF)
 
 Result type for Discrete Allocation portfolio optimisation.
 
+# Fields
+
 $(DocStringExtensions.FIELDS)
 
 # Related
@@ -34,6 +36,11 @@ $(DocStringExtensions.FIELDS)
     "$(field_dict[:fb])"
     fb
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Rebuild a [`DiscreteAllocationResult`](@ref) with an updated fallback optimiser `fb`.
+"""
 function factory(res::DiscreteAllocationResult, fb::Option{<:FOptE_FOpt})
     return DiscreteAllocationResult(res.oe, res.retcode, res.s_retcode, res.l_retcode,
                                     res.shares, res.cost, res.w, res.cash, res.s_model,
@@ -336,6 +343,8 @@ end
              fees::Option{<:Fees} = nothing; str_names::Bool = false,
              save::Bool = true, kwargs...) -> DiscreteAllocationResult
 
+Run the Discrete Allocation portfolio optimisation.
+
 # Arguments
 
   - `da`: The discrete allocation optimiser to use.
@@ -347,6 +356,11 @@ end
   - `str_names`: Whether to use string names for the assets in the optimisation.
   - `save`: Whether to save the JuMP model in the optimisation result.
   - `kwargs`: Additional keyword arguments passed to the optimisation function.
+
+# Related
+
+  - [`DiscreteAllocation`](@ref)
+  - [`DiscreteAllocationResult`](@ref)
 """
 function optimise(da::DiscreteAllocation{<:Any, <:Any, <:Any, Nothing}, w::VecNum,
                   p::VecNum, cash::Number = 1e6, T::Option{<:Number} = nothing,

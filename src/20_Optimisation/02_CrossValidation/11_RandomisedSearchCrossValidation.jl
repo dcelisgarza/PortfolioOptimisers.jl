@@ -31,10 +31,11 @@ Keyword arguments correspond to the struct's fields.
 
 ## Validation
 
-  - Parameter grid `p` must not be empty.
-  - All parameter values must be vectors or distributions.
-  - For nested parameter grids, each must not be empty.
-  - `n_iter` must be non-empty, greater than zero, and finite.
+  - `!isempty(p)`.
+  - If `p` is a vector of parameter sets: each element must not be empty.
+  - All keys in `p` must be of type `GSCVKey` (i.e. `String`, `Symbol`, or `Integer`).
+  - All values in `p` must be of type `RSCVVal` (i.e. an `AbstractVector` or `Distributions.Distribution`).
+  - `n_iter > 0` and finite.
 
 # Examples
 
@@ -211,12 +212,6 @@ Performs randomised search cross-validation for portfolio optimisation estimator
 
   - `SearchCrossValidationResult`: Result type containing the optimal estimator, test and train scores, parameter grid, and selected index.
 
-# Validation
-
-  - Sets RNG seed if provided.
-  - Validates parameter grid and number of iterations.
-  - Ensures sampled parameter sets are valid.
-
 # Details
 
   - Samples parameter sets from vectors or distributions.
@@ -232,8 +227,6 @@ Performs randomised search cross-validation for portfolio optimisation estimator
   - [`RandomisedSearchCrossValidation`](@ref)
   - [`ReturnsResult`](@ref)
   - [`GridSearchCrossValidation`](@ref)
-
-# Examples
 """
 function search_cross_validation(opt::NonFiniteAllocationOptimisationEstimator,
                                  rscv::RandomisedSearchCrossValidation, rd::ReturnsResult)

@@ -3,6 +3,8 @@ $(DocStringExtensions.TYPEDEF)
 
 Result type for Greedy Allocation portfolio optimisation.
 
+# Fields
+
 $(DocStringExtensions.FIELDS)
 
 # Related
@@ -26,6 +28,11 @@ $(DocStringExtensions.FIELDS)
     "$(field_dict[:fb])"
     fb
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Rebuild a [`GreedyAllocationResult`](@ref) with an updated fallback optimiser `fb`.
+"""
 function factory(res::GreedyAllocationResult, fb::Option{<:FOptE_FOpt})
     return GreedyAllocationResult(res.oe, res.retcode, res.shares, res.cost, res.w,
                                   res.cash, fb)
@@ -66,6 +73,8 @@ Where:
   - ``\\mathrm{unit}``: Minimum share purchase unit.
   - ``i^*``: Asset with largest weight among those affordable with remaining cash ``r``.
   - ``\\boldsymbol{x}^{(0)}``: Initial share allocation vector.
+
+# Fields
 
 $(DocStringExtensions.FIELDS)
 
@@ -258,15 +267,22 @@ end
              cash::Number = 1e6, T::Option{<:Number} = nothing,
              fees::Option{<:Fees} = nothing; kwargs...) -> GreedyAllocationResult
 
+Run the Greedy Allocation portfolio optimisation.
+
 # Arguments
 
-  - `da`: The discrete allocation optimiser to use.
+  - `ga`: The greedy allocation optimiser to use.
   - $(arg_dict[:pw])
   - `p`: The prices of the assets in the same order as `w`.
   - `cash`: The initial cash balance.
   - `T`: The time horizon for the optimisation. Used to adjust the initial cash balance according to the fees charged on the portfolio for the time horizon.
   - `fees`: The fees to apply to the portfolio.
   - `kwargs`: Additional keyword arguments passed to the optimisation function.
+
+# Related
+
+  - [`GreedyAllocation`](@ref)
+  - [`GreedyAllocationResult`](@ref)
 """
 function optimise(ga::GreedyAllocation{<:Any, <:Any, <:Any, Nothing}, w::VecNum, p::VecNum,
                   cash::Number = 1e6, T::Option{<:Number} = nothing,

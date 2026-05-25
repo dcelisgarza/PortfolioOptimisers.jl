@@ -647,6 +647,16 @@ Alias for an abstract vector of [`EntropyPoolingPrior`](@ref) elements.
   - [`EntropyPoolingPrior`](@ref)
 """
 const VecEP = AbstractVector{<:EntropyPoolingPrior}
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a new [`EntropyPoolingPrior`](@ref) estimator with observation weights `w` applied to the underlying prior estimator and stored as the entropy pooling weights.
+
+# Related
+
+  - [`EntropyPoolingPrior`](@ref)
+  - [`factory`](@ref)
+"""
 function factory(pe::EntropyPoolingPrior, w::ObsWeights)::EntropyPoolingPrior
     return EntropyPoolingPrior(; pe = factory(pe.pe, w), mu_views = pe.mu_views,
                                var_views = pe.var_views, cvar_views = pe.cvar_views,
@@ -656,6 +666,16 @@ function factory(pe::EntropyPoolingPrior, w::ObsWeights)::EntropyPoolingPrior
                                sets = pe.sets, ds_opt = pe.ds_opt, dm_opt = pe.dm_opt,
                                opt = pe.opt, w = w, alg = pe.alg)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a new [`EntropyPoolingPrior`](@ref) estimator restricted to the assets at index `i`.
+
+# Related
+
+  - [`EntropyPoolingPrior`](@ref)
+  - [`prior_view`](@ref)
+"""
 function prior_view(pe::EntropyPoolingPrior, i)::EntropyPoolingPrior
     return EntropyPoolingPrior(; pe = prior_view(pe.pe, i), mu_views = pe.mu_views,
                                var_views = pe.var_views, cvar_views = pe.cvar_views,
@@ -1841,6 +1861,30 @@ Extract the prior correlation value between assets `i` and `j` from a prior resu
 function get_pr_value(pr::AbstractPriorResult, i::Integer, j::Integer, args...)
     return StatsBase.cov2cor(pr.sigma)[i, j]
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Extract the normalised average correlation between asset groups `i` and `j` from a prior result.
+
+`get_pr_value` returns the Frobenius norm of the correlation sub-matrix divided by the group length for vector index sets `i` and `j`. This variant handles grouped asset correlation views.
+
+# Arguments
+
+  - `pr`: Prior result containing asset return information.
+  - `i`: Vector of indices for the first asset group.
+  - `j`: Vector of indices for the second asset group.
+  - `args...`: Additional arguments (ignored).
+
+# Returns
+
+  - `rho::Number`: Normalised average correlation between asset groups `i` and `j`.
+
+# Related
+
+  - [`LowOrderPrior`](@ref)
+  - [`AbstractPriorResult`](@ref)
+  - [`get_pr_value`](@ref)
+"""
 function get_pr_value(pr::AbstractPriorResult, i::VecInt, j::VecInt, args...)
     return LinearAlgebra.norm(StatsBase.cov2cor(pr.sigma)[i, j]) / length(i)
 end

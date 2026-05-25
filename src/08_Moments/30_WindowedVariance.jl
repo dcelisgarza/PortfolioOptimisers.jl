@@ -24,6 +24,20 @@ Keywords correspond to the struct's fields.
   - $(val_dict[:oow])
   - If `window` is provided, it must be nonempty, nonnegative, and finite.
 
+# Examples
+
+```jldoctest
+julia> WindowedVariance()
+WindowedVariance
+      ce ┼ SimpleVariance
+         │          me ┼ SimpleExpectedReturns
+         │             │   w ┴ nothing
+         │           w ┼ nothing
+         │   corrected ┴ Bool: true
+       w ┼ nothing
+  window ┴ nothing
+```
+
 # Related
 
   - [`AbstractVarianceEstimator`](@ref)

@@ -5,29 +5,51 @@ Intermediate result type storing processed optimisation attributes for `JuMPOpti
 
 Used internally to pass processed constraints, bounds, and other data between optimisation stages.
 
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
 # Related
 
   - [`JuMPOptimiser`](@ref)
   - [`MeanRisk`](@ref)
 """
 @concrete struct ProcessedJuMPOptimiserAttributes <: AbstractResult
+    "Prior estimation result."
     pr
+    "Processed weight bounds constraints."
     wb
+    "Processed long threshold constraints."
     lt
+    "Processed short threshold constraints."
     st
+    "Processed linear constraints result."
     lcsr
+    "Processed centrality constraints result."
     ctr
+    "Processed group cardinality constraints result."
     gcardr
+    "Processed sub-group cardinality constraints result."
     sgcardr
+    "Asset sets matrix for group selection."
     smtx
+    "Asset sets matrix for sub-group selection."
     sgmtx
+    "Processed long threshold constraints for groups."
     slt
+    "Processed short threshold constraints for groups."
     sst
+    "Processed long threshold constraints for sub-groups."
     sglt
+    "Processed short threshold constraints for sub-groups."
     sgst
+    "Processed turnover constraints."
     tn
+    "Processed fees constraints."
     fees
+    "Processed phylogeny constraints result."
     plr
+    "Processed JuMP returns estimator."
     ret
 end
 """
@@ -116,6 +138,20 @@ $(DocStringExtensions.FIELDS)
     ) -> JuMPOptimiser
 
 Keywords correspond to the struct's fields.
+
+## Validation
+
+  - If `slv` is a vector: `!isempty(slv)`.
+  - If `bgt` is a number: `isfinite(bgt)`.
+  - If `bgt` is a `BudgetCostEstimator`: `isnothing(sbgt)`.
+  - If `sbgt` is a number: `isfinite(sbgt)` and `sbgt >= 0`.
+  - If `cte` is a vector: `!isempty(cte)`.
+  - If `card` is provided: `card > 0` and finite.
+  - If `tn` or `tr` is a vector: each must be non-empty.
+  - If `nea`, `l1`, `l2`, or `linf` is provided: each must be `> 0` and finite.
+  - If `scard` is provided: compatible `smtx`, `slt`, `sst` sizes required.
+  - If `sgcarde` is provided: compatible `sgmtx`, `sglt`, `sgst` sizes required.
+  - If any estimator-type field (`wb`, `lt`, `fees`, etc.) is provided: `!isnothing(sets)`.
 
 # Related
 
@@ -429,6 +465,11 @@ function JuMPOptimiser(; pe::PrE_Pr = EmpiricalPrior(), slv::Slv_VecSlv,
                          ccnt, cobj, sc, so, ss, card, scard, nea, l1, l2, linf, lp, brt,
                          cle_pr, strict)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return `true` if any sub-estimator of `opt` requires previous portfolio weights (turnover, fees, tracking, custom constraint, or custom objective).
+"""
 function needs_previous_weights(opt::JuMPOptimiser)
     return (needs_previous_weights(opt.tn) ||
             needs_previous_weights(opt.fees) ||
@@ -436,6 +477,11 @@ function needs_previous_weights(opt::JuMPOptimiser)
             needs_previous_weights(opt.ccnt) ||
             needs_previous_weights(opt.cobj))
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Build an updated [`JuMPOptimiser`](@ref) with all estimator fields that track previous weights updated via `factory` using `w`.
+"""
 function factory(opt::JuMPOptimiser, w::AbstractVector)::JuMPOptimiser
     tn = factory(opt.tn, w)
     fees = factory(opt.fees, w)
@@ -453,6 +499,13 @@ function factory(opt::JuMPOptimiser, w::AbstractVector)::JuMPOptimiser
                          l1 = opt.l1, l2 = opt.l2, linf = opt.linf, lp = opt.lp,
                          brt = opt.brt, cle_pr = opt.cle_pr, strict = opt.strict)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a cluster-sliced copy of [`JuMPOptimiser`](@ref) for asset index set `i` and returns matrix `X`.
+
+Slices all per-asset estimator fields (prior, bounds, thresholds, turnover, fees, tracking, custom constraint/objective) to the cluster `i`, leaving solver and scalar parameters unchanged.
+"""
 function opt_view(opt::JuMPOptimiser, i, X::MatNum)::JuMPOptimiser
     X = isa(opt.pe, AbstractPriorResult) ? opt.pe.X : X
     pe = prior_view(opt.pe, i)

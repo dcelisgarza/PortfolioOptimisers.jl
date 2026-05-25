@@ -181,6 +181,16 @@ function FactorBlackLittermanPrior(;
     return FactorBlackLittermanPrior(pe, f_mp, mp, re, ve, views, sets, views_conf, w, rf,
                                      l, tau, rsd)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a new [`FactorBlackLittermanPrior`](@ref) estimator with observation weights `w` applied to the underlying prior, regression, and variance estimators.
+
+# Related
+
+  - [`FactorBlackLittermanPrior`](@ref)
+  - [`factory`](@ref)
+"""
 function factory(pe::FactorBlackLittermanPrior, w::ObsWeights)::FactorBlackLittermanPrior
     return FactorBlackLittermanPrior(; pe = factory(pe.pe, w), f_mp = pe.f_mp, mp = pe.mp,
                                      re = factory(pe.re, w), ve = factory(pe.ve, w),
@@ -188,6 +198,16 @@ function factory(pe::FactorBlackLittermanPrior, w::ObsWeights)::FactorBlackLitte
                                      views_conf = pe.views_conf, w = pe.w, rf = pe.rf,
                                      l = pe.l, tau = pe.tau, rsd = pe.rsd)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a new [`FactorBlackLittermanPrior`](@ref) estimator restricted to the assets at index `i`.
+
+# Related
+
+  - [`FactorBlackLittermanPrior`](@ref)
+  - [`prior_view`](@ref)
+"""
 function prior_view(pe::FactorBlackLittermanPrior, i)
     return FactorPrior(; pe = pe.pe, f_mp = pe.f_mp, mp = pe.mp,
                        re = regression_view(pe.re, i), ve = moment_view(pe.ve, i),

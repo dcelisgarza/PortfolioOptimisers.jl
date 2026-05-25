@@ -36,6 +36,18 @@ Defines the interface for algorithms that compute portfolio risk using low-order
   - [`MeanAbsoluteDeviation`](@ref)
 """
 abstract type UnstandardisedLowOrderMomentMeasureAlgorithm <: LowOrderMomentMeasureAlgorithm end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the moment measure algorithm `alg` unchanged.
+
+Identity pass-through used when a moment measure algorithm is provided in a context that calls [`factory`](@ref).
+
+# Related
+
+  - [`MomentMeasureAlgorithm`](@ref)
+  - [`factory`](@ref)
+"""
 function factory(alg::MomentMeasureAlgorithm, args...; kwargs...)::MomentMeasureAlgorithm
     return alg
 end
@@ -125,6 +137,16 @@ function SecondMoment(; ve::AbstractVarianceEstimator = SimpleVariance(; me = no
                       alg2::SecondMomentFormulation = SquaredSOCRiskExpr())::SecondMoment
     return SecondMoment(ve, alg1, alg2)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a new [`SecondMoment`](@ref) with observation weights `w` applied to the underlying variance estimator.
+
+# Related
+
+  - [`SecondMoment`](@ref)
+  - [`factory`](@ref)
+"""
 function factory(alg::SecondMoment, w::ObsWeights)::SecondMoment
     return SecondMoment(; ve = factory(alg.ve, w), alg1 = alg.alg1, alg2 = alg.alg2)
 end
@@ -265,6 +287,16 @@ function StandardisedHighOrderMoment(;
                                      alg::UnstandardisedHighOrderMomentMeasureAlgorithm = ThirdLowerMoment())::StandardisedHighOrderMoment
     return StandardisedHighOrderMoment(ve, alg)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a new [`StandardisedHighOrderMoment`](@ref) with observation weights `w` applied to the underlying variance estimator.
+
+# Related
+
+  - [`StandardisedHighOrderMoment`](@ref)
+  - [`factory`](@ref)
+"""
 function factory(alg::StandardisedHighOrderMoment,
                  w::ObsWeights)::StandardisedHighOrderMoment
     return StandardisedHighOrderMoment(; ve = factory(alg.ve, w), alg = alg.alg)

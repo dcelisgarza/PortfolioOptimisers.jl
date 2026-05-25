@@ -158,11 +158,30 @@ function Base.getproperty(obj::BlackLittermanPrior, sym::Symbol)
         getfield(obj, sym)
     end
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a new [`BlackLittermanPrior`](@ref) estimator with observation weights `w` applied to the underlying prior estimator.
+
+# Related
+
+  - [`BlackLittermanPrior`](@ref)
+  - [`factory`](@ref)
+"""
 function factory(pe::BlackLittermanPrior, w::ObsWeights)::BlackLittermanPrior
     return BlackLittermanPrior(; pe = factory(pe.pe, w), mp = pe.mp, views = pe.views,
                                sets = pe.sets, views_conf = pe.views_conf, rf = pe.rf,
                                tau = pe.tau)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a new [`BlackLittermanPrior`](@ref) estimator restricted to the assets at index `i`.
+
+# Related
+
+  - [`BlackLittermanPrior`](@ref)
+"""
 function prior_view(pr::BlackLittermanPrior, i)::BlackLittermanPrior
     return BlackLittermanPrior(; pe = prior_view(pr.pe, i), mp = pr.mp, views = pr.views,
                                sets = asset_sets_view(pr.sets, i),

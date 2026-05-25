@@ -14,6 +14,8 @@ $(DocStringExtensions.TYPEDEF)
 
 Result type for Stacking portfolio optimisation.
 
+# Fields
+
 $(DocStringExtensions.FIELDS)
 
 # Related
@@ -43,6 +45,11 @@ $(DocStringExtensions.FIELDS)
     "$(field_dict[:fb])"
     fb
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Rebuild a [`StackingResult`](@ref) with an updated fallback optimiser `fb`.
+"""
 function factory(res::StackingResult, fb::Option{<:OptE_Opt})
     return StackingResult(res.oe, res.pr, res.wb, res.fees, res.resi, res.reso, res.cv,
                           res.retcode, res.w, fb)
@@ -53,6 +60,8 @@ $(DocStringExtensions.TYPEDEF)
 Stacking portfolio optimiser.
 
 `Stacking` implements a stacking (model combination) approach to portfolio optimisation. It applies multiple inner optimisers (`opti`) to the data, then combines their outputs with a single outer optimiser (`opto`) to produce a final portfolio. Optionally, cross-validation can be used to weight the inner optimisers' contributions.
+
+# Fields
 
 $(DocStringExtensions.FIELDS)
 
@@ -191,12 +200,22 @@ function assert_internal_optimiser(opt::Stacking)::Nothing
     end
     return nothing
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return `true` if any sub-estimator of `opt` requires previous portfolio weights (fees, inner optimiser, outer optimiser, or fallback).
+"""
 function needs_previous_weights(opt::Stacking)
     return (needs_previous_weights(opt.fees) ||
             needs_previous_weights(opt.opti) ||
             needs_previous_weights(opt.opto) ||
             needs_previous_weights(opt.fb))
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Build an updated [`Stacking`](@ref) with all estimators that track previous weights updated via `factory` using `w`.
+"""
 function factory(st::Stacking, w::AbstractVector)::Stacking
     fees = factory(st.fees, w)
     opti = factory(st.opti, w)
@@ -206,6 +225,11 @@ function factory(st::Stacking, w::AbstractVector)::Stacking
                     opti = opti, opto = opto, cv = st.cv, wf = st.wf, ex = st.ex, fb = fb,
                     brt = st.brt, strict = st.strict)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a cluster-sliced copy of [`Stacking`](@ref) for asset index set `i` and returns matrix `X`.
+"""
 function opt_view(st::Stacking, i, X::MatNum)::Stacking
     X = isa(st.pe, AbstractPriorResult) ? st.pe.X : X
     pe = prior_view(st.pe, i)
@@ -330,15 +354,22 @@ end
              dims::Int = 1, branchorder::Symbol = :optimal, str_names::Bool = false,
              save::Bool = true, kwargs...) -> StackingResult
 
+Run the Stacking portfolio optimisation.
+
 # Arguments
 
-  - `nco`: The nested clustered optimiser to use.
+  - `st`: The stacking optimiser to use.
   - $(arg_dict[:rd])
   - `dims`: The dimension along which observations advance in time.
   - `branchorder`: Passed to the inner and outer optimisers. The branch order to use for the clusterisation.
   - `str_names`: Passed to the inner and outer optimisers. Whether to use string names for the assets in the optimisation.
   - `save`: Passed to the inner and outer optimisers. Whether to save the JuMP model in the optimisation result.
   - `kwargs`: Additional keyword arguments passed to the optimisation function.
+
+# Related
+
+  - [`Stacking`](@ref)
+  - [`StackingResult`](@ref)
 """
 function optimise(st::Stacking{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                <:Any, <:Any, Nothing}, rd::ReturnsResult; dims::Int = 1,

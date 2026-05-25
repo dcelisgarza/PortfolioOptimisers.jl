@@ -74,6 +74,8 @@ $(DocStringExtensions.FIELDS)
 
     BudgetRange(; lb::Option{<:Number} = 1.0, ub::Option{<:Number} = 1.0) -> BudgetRange
 
+Keywords correspond to the struct's fields.
+
 ## Validation
 
   - At least one of `lb`, `ub` must not be `nothing`.
@@ -85,8 +87,6 @@ $(DocStringExtensions.FIELDS)
   - [`BudgetCosts`](@ref)
   - [`BudgetMarketImpact`](@ref)
   - [`set_weight_constraints!`](@ref)
-  - [`BudgetCosts`](@ref)
-  - [`BudgetMarketImpact`](@ref)
 """
 @concrete struct BudgetRange <: BudgetEstimator
     "$(field_dict[:lb])"
@@ -267,10 +267,18 @@ $(DocStringExtensions.FIELDS)
         un::Num_VecNum = 1.0
     ) -> BudgetCosts
 
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - `!isempty(w)`.
+  - If `vp` is a vector: `!isempty(vp)` and all elements `>= 0`. If scalar: `>= 0`.
+  - If `vn` is a vector: `!isempty(vn)` and all elements `>= 0`. If scalar: `>= 0`.
+  - If `up` is a vector: `!isempty(up)` and all elements `>= 0`. If scalar: `>= 0`.
+  - If `un` is a vector: `!isempty(un)` and all elements `>= 0`. If scalar: `>= 0`.
+
 # Related
 
-  - [`BudgetRange`](@ref)
-  - [`BudgetMarketImpact`](@ref)
   - [`BudgetRange`](@ref)
   - [`BudgetMarketImpact`](@ref)
 """
@@ -345,10 +353,31 @@ impact function.
 
 $(DocStringExtensions.FIELDS)
 
+# Constructors
+
+    BudgetMarketImpact(;
+        bgt::Num_BgtRg = 1.0,
+        w::VecNum,
+        vp::Num_VecNum = 1.0,
+        vn::Num_VecNum = 1.0,
+        up::Num_VecNum = 1.0,
+        un::Num_VecNum = 1.0,
+        beta::Number = 2/3
+    ) -> BudgetMarketImpact
+
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - `!isempty(w)`.
+  - If `vp` is a vector: `!isempty(vp)` and all elements `>= 0`. If scalar: `>= 0`.
+  - If `vn` is a vector: `!isempty(vn)` and all elements `>= 0`. If scalar: `>= 0`.
+  - If `up` is a vector: `!isempty(up)` and all elements `>= 0`. If scalar: `>= 0`.
+  - If `un` is a vector: `!isempty(un)` and all elements `>= 0`. If scalar: `>= 0`.
+  - `0 <= beta <= 1`.
+
 # Related
 
-  - [`BudgetRange`](@ref)
-  - [`BudgetCosts`](@ref)
   - [`BudgetRange`](@ref)
   - [`BudgetCosts`](@ref)
 """

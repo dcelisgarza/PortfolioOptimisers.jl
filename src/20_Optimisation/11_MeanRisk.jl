@@ -3,6 +3,8 @@ $(DocStringExtensions.TYPEDEF)
 
 Result type for Mean-Risk portfolio optimisation.
 
+# Fields
+
 $(DocStringExtensions.FIELDS)
 
 The `w` property is forwarded from `sol.w`.
@@ -26,6 +28,11 @@ The `w` property is forwarded from `sol.w`.
     "$(field_dict[:fb])"
     fb
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Rebuild a [`MeanRiskResult`](@ref) with an updated fallback optimiser `fb`.
+"""
 function factory(res::MeanRiskResult, fb::Option{<:OptE_Opt})
     return MeanRiskResult(res.oe, res.pa, res.retcode, res.sol, res.model, fb)
 end
@@ -51,6 +58,8 @@ $(DocStringExtensions.TYPEDEF)
 Mean-Risk portfolio optimiser.
 
 `MeanRisk` formulates and solves a mean-risk portfolio optimisation problem using JuMP. It can optimise a wide variety of objective functions (minimum risk, maximum return, maximum Sharpe ratio, maximum utility) subject to risk, weight, cardinality, and custom constraints.
+
+# Fields
 
 $(DocStringExtensions.FIELDS)
 
@@ -232,17 +241,32 @@ function MeanRisk(; opt::JuMPOptimiser = JuMPOptimiser(), r::RM_VecRM = Variance
                   fb::Option{<:OptE_Opt} = nothing)::MeanRisk
     return MeanRisk(opt, r, obj, wi, fb)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return `true` if any sub-estimator of `opt` requires previous portfolio weights (JuMP optimiser, risk measure, or fallback).
+"""
 function needs_previous_weights(opt::MeanRisk)
     return (needs_previous_weights(opt.opt) ||
             needs_previous_weights(opt.r) ||
             needs_previous_weights(opt.fb))
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Build an updated [`MeanRisk`](@ref) with all estimators that track previous weights updated via `factory` using `w`.
+"""
 function factory(mr::MeanRisk, w::AbstractVector)::MeanRisk
     opt = factory(mr.opt, w)
     r = factory(mr.r, w)
     fb = factory(mr.fb, w)
     return MeanRisk(; opt = opt, r = r, obj = mr.obj, wi = mr.wi, fb = fb)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a cluster-sliced copy of [`MeanRisk`](@ref) for asset index set `i` and returns matrix `X`.
+"""
 function opt_view(mr::MeanRisk, i, X::MatNum)::MeanRisk
     X = isa(mr.opt.pe, AbstractPriorResult) ? mr.opt.pe.X : X
     opt = opt_view(mr.opt, i, X)
@@ -612,14 +636,21 @@ end
              rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
              str_names::Bool = false, save::Bool = true, kwargs...) -> MeanRiskResult
 
+Run the Mean-Risk portfolio optimisation.
+
 # Arguments
 
   - `mr`: The mean risk optimiser to use.
-  - $(arg_dict[:rd]) If `isa(hec.opt.pe, AbstractPriorResult)`, `rd` is not necessary if doing a standalone optimisation, but may be required/desired by fallbacks and/or clusterisation.
+  - $(arg_dict[:rd]) If `isa(mr.opt.pe, AbstractPriorResult)`, `rd` is not necessary if doing a standalone optimisation, but may be required/desired by fallbacks and/or clusterisation.
   - `dims`: The dimension along which observations advance in time.
   - `str_names`: Whether to use string names for the assets in the optimisation.
   - `save`: Whether to save the JuMP model in the optimisation result.
   - `kwargs`: Additional keyword arguments passed to the optimisation function.
+
+# Related
+
+  - [`MeanRisk`](@ref)
+  - [`MeanRiskResult`](@ref)
 """
 function optimise(mr::MeanRisk{<:Any, <:Any, <:Any, <:Any, Nothing},
                   rd::ReturnsResult = ReturnsResult(); dims::Int = 1,

@@ -410,9 +410,29 @@ end
 function BoxUncertaintySet(; lb::ArrNum, ub::ArrNum)::BoxUncertaintySet
     return BoxUncertaintySet(lb, ub)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a view of a vector [`BoxUncertaintySet`](@ref) restricted to the asset indices `i`.
+
+# Related
+
+  - [`BoxUncertaintySet`](@ref)
+  - [`ucs_view`](@ref)
+"""
 function ucs_view(risk_ucs::BoxUncertaintySet{<:VecNum, <:VecNum}, i)::BoxUncertaintySet
     return BoxUncertaintySet(; lb = view(risk_ucs.lb, i), ub = view(risk_ucs.ub, i))
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a view of a matrix [`BoxUncertaintySet`](@ref) restricted to the asset indices `i`.
+
+# Related
+
+  - [`BoxUncertaintySet`](@ref)
+  - [`ucs_view`](@ref)
+"""
 function ucs_view(risk_ucs::BoxUncertaintySet{<:MatNum, <:MatNum}, i)::BoxUncertaintySet
     return BoxUncertaintySet(; lb = view(risk_ucs.lb, i, i), ub = view(risk_ucs.ub, i, i))
 end
@@ -713,6 +733,16 @@ function EllipsoidalUncertaintySet(; sigma::MatNum, k::Number,
                                    class::AbstractEllipsoidalUncertaintySetResultClass)::EllipsoidalUncertaintySet
     return EllipsoidalUncertaintySet(sigma, k, class)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a view of a covariance [`EllipsoidalUncertaintySet`](@ref) restricted to assets at index `i`, mapping the sigma index via cokurtosis index generation.
+
+# Related
+
+  - [`EllipsoidalUncertaintySet`](@ref)
+  - [`ucs_view`](@ref)
+"""
 function ucs_view(risk_ucs::EllipsoidalUncertaintySet{<:MatNum, <:Any,
                                                       <:SigmaEllipsoidalUncertaintySet},
                   i)::EllipsoidalUncertaintySet
@@ -720,6 +750,16 @@ function ucs_view(risk_ucs::EllipsoidalUncertaintySet{<:MatNum, <:Any,
     return EllipsoidalUncertaintySet(; sigma = view(risk_ucs.sigma, i, i), k = risk_ucs.k,
                                      class = risk_ucs.class)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a view of a mean [`EllipsoidalUncertaintySet`](@ref) restricted to assets at index `i`.
+
+# Related
+
+  - [`EllipsoidalUncertaintySet`](@ref)
+  - [`ucs_view`](@ref)
+"""
 function ucs_view(risk_ucs::EllipsoidalUncertaintySet{<:MatNum, <:Any,
                                                       <:MuEllipsoidalUncertaintySet},
                   i)::EllipsoidalUncertaintySet

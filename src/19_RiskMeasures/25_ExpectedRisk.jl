@@ -122,6 +122,37 @@ Union of all risk-ratio risk measures, where the expected risk is defined as the
   - [`expected_risk`](@ref)
 """
 const RkRatioRM = Union{<:RiskRatioRiskMeasure, <:NonOptimisationRiskRatioRiskMeasure}
+"""
+    expected_risk(r::ERkNetRet, w::VecNum, X::MatNum, fees = nothing; kwargs...)
+    expected_risk(r::ERkwXFees, w::VecNum, X::MatNum, fees = nothing; kwargs...)
+    expected_risk(r::ERkw, w::VecNum, args...; kwargs...)
+    expected_risk(r::RkRatioRM, w::VecNum, X::MatNum, fees = nothing; kwargs...)
+    expected_risk(r::MeanReturnRiskRatio, w::VecNum, X::MatNum, fees = nothing; kwargs...)
+    expected_risk(r::AbstractBaseRiskMeasure, w::VecNum, pr::Pr_RR, args...; kwargs...)
+    expected_risk(r::AbstractBaseRiskMeasure, w::VecVecNum, args...; kwargs...)
+
+Compute the expected value of a risk measure for a portfolio.
+
+Dispatches on the type of `r` to select the appropriate computation:
+
+  - [`ERkNetRet`](@ref): calls `r(calc_net_returns(w, X, fees))`.
+  - [`ERkwXFees`](@ref): calls `r(w, X, fees)`.
+  - [`ERkw`](@ref): calls `r(w)` (ignores `X` and `fees`).
+  - [`RkRatioRM`](@ref): computes `expected_risk(r.r1, ...) / expected_risk(r.r2, ...)`.
+  - [`MeanReturnRiskRatio`](@ref): `(expected_risk(r.rt, ...) - r.rf) / expected_risk(r.rk, ...)`.
+  - `AbstractBaseRiskMeasure` with [`Pr_RR`](@ref): extracts `X` from the prior result and recurses.
+  - `AbstractBaseRiskMeasure` with `VecVecNum`: maps over each weight vector in `w`.
+
+# Related
+
+  - [`expected_risk`](@ref)
+  - [`ERkNetRet`](@ref)
+  - [`ERkwXFees`](@ref)
+  - [`ERkw`](@ref)
+  - [`RkRatioRM`](@ref)
+  - [`MeanReturnRiskRatio`](@ref)
+  - [`calc_net_returns`](@ref)
+"""
 function expected_risk(r::ERkNetRet, w::VecNum, X::MatNum, fees::Option{<:Fees} = nothing;
                        kwargs...)
     return r(calc_net_returns(w, X, fees))

@@ -84,6 +84,23 @@ Stores the train index vectors, nested test index vectors (one per path), and a 
 
 $(DocStringExtensions.FIELDS)
 
+# Constructors
+
+    CombinatorialCrossValidationResult(;
+        train_idx::VecVecInt,
+        test_idx::VecVecVecInt,
+        path_ids::AbstractMatrix{<:Integer}
+    ) -> CombinatorialCrossValidationResult
+
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - `!isempty(train_idx)`.
+  - `!isempty(test_idx)`.
+  - `!isempty(path_ids)`.
+  - `length(train_idx) == length(test_idx) == size(path_ids, 2)`.
+
 # Related
 
   - [`CombinatorialCrossValidation`](@ref)

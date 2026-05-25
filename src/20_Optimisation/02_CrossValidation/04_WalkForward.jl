@@ -24,6 +24,18 @@ Stores the train and test index vectors for each fold of the walk-forward cross-
 
 $(DocStringExtensions.FIELDS)
 
+# Constructors
+
+    WalkForwardResult(; train_idx::VecVecInt, test_idx::VecVecInt) -> WalkForwardResult
+
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - `!isempty(train_idx)` (sufficient data to cover training + testing periods).
+  - `!isempty(test_idx)` (sufficient data to cover training + testing periods).
+  - `length(train_idx) == length(test_idx)`.
+
 # Related
 
   - [`WalkForwardEstimator`](@ref)

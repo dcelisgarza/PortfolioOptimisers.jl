@@ -32,6 +32,11 @@ The `w` property is forwarded from `sol.w`.
     "$(field_dict[:fb])"
     fb
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Rebuild a [`FactorRiskContributionResult`](@ref) with an updated fallback optimiser `fb`.
+"""
 function factory(res::FactorRiskContributionResult, fb::Option{<:OptE_Opt})
     return FactorRiskContributionResult(res.oe, res.pa, res.rr, res.frc_plr, res.retcode,
                                         res.sol, res.model, fb)
@@ -112,6 +117,11 @@ $(DocStringExtensions.FIELDS)
 
 Keywords correspond to the struct's fields.
 
+## Validation
+
+  - If `r` is a vector: `!isempty(r)`.
+  - If `wi` is provided: `!isempty(wi)`.
+
 # Related
 
   - [`RiskJuMPOptimisationEstimator`](@ref)
@@ -165,11 +175,21 @@ function FactorRiskContribution(; opt::JuMPOptimiser = JuMPOptimiser(),
                                 fb::Option{<:OptE_Opt} = nothing)::FactorRiskContribution
     return FactorRiskContribution(opt, re, r, obj, frc_ple, sets, wi, flag, fb)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return `true` if any sub-estimator of `opt` requires previous portfolio weights (JuMP optimiser, risk measure, or fallback).
+"""
 function needs_previous_weights(opt::FactorRiskContribution)
     return (needs_previous_weights(opt.opt) ||
             needs_previous_weights(opt.r) ||
             needs_previous_weights(opt.fb))
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Build an updated [`FactorRiskContribution`](@ref) with all estimators that track previous weights updated via `factory` using `w`.
+"""
 function factory(frc::FactorRiskContribution, w::AbstractVector)::FactorRiskContribution
     opt = factory(frc.opt, w)
     r = factory(frc.r, w)
@@ -178,6 +198,11 @@ function factory(frc::FactorRiskContribution, w::AbstractVector)::FactorRiskCont
                                   frc_ple = frc.frc_ple, sets = frc.sets, wi = frc.wi,
                                   flag = frc.flag, fb = fb)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a cluster-sliced copy of [`FactorRiskContribution`](@ref) for asset index set `i` and returns matrix `X`.
+"""
 function opt_view(frc::FactorRiskContribution, i, X::MatNum)::FactorRiskContribution
     X = isa(frc.opt.pe, AbstractPriorResult) ? frc.opt.pe.X : X
     opt = opt_view(frc.opt, i, X)
@@ -281,14 +306,21 @@ end
              rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
              str_names::Bool = false, save::Bool = true, kwargs...) -> FactorRiskContributionResult
 
+Run the Factor Risk Contribution portfolio optimisation.
+
 # Arguments
 
   - `frc`: The factor risk contribution optimiser to use.
-  - $(arg_dict[:rd]) If `isa(hec.opt.pe, AbstractPriorResult)`, `rd` is not necessary if doing a standalone optimisation, but may be required/desired by fallbacks and/or clusterisation.
+  - $(arg_dict[:rd]) If `isa(frc.opt.pe, AbstractPriorResult)`, `rd` is not necessary if doing a standalone optimisation, but may be required/desired by fallbacks and/or clusterisation.
   - `dims`: The dimension along which observations advance in time.
   - `str_names`: Whether to use string names for the assets in the optimisation.
   - `save`: Whether to save the JuMP model in the optimisation result.
   - `kwargs`: Additional keyword arguments passed to the optimisation function.
+
+# Related
+
+  - [`FactorRiskContribution`](@ref)
+  - [`FactorRiskContributionResult`](@ref)
 """
 function optimise(frc::FactorRiskContribution{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                               <:Any, <:Any, Nothing},

@@ -61,6 +61,16 @@ function KMeansAlgorithm(; rng::Random.AbstractRNG = Random.default_rng(),
                          kwargs::NamedTuple = (;))::KMeansAlgorithm
     return KMeansAlgorithm(rng, seed, kwargs)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a new [`KMeansAlgorithm`](@ref) with observation weights `w` added to the `kwargs` field.
+
+# Related
+
+  - [`KMeansAlgorithm`](@ref)
+  - [`factory`](@ref)
+"""
 function factory(alg::KMeansAlgorithm, w::StatsBase.AbstractWeights)::KMeansAlgorithm
     return KMeansAlgorithm(; rng = alg.rng, seed = alg.seed,
                            kwargs = (; alg.kwargs..., weights = w))
@@ -92,6 +102,39 @@ function _get_k_clusters_from_alg(alg::KMeansAlgorithm, D::MatNum, k::Integer)
     end
     return Clustering.kmeans(D, k; alg.kwargs...)
 end
+"""
+    optimal_number_clusters(onc::OptimalNumberClusters{<:Any, <:Integer},
+                             alg::AbstractNonHierarchicalClusteringAlgorithm, D::MatNum)
+    optimal_number_clusters(onc::OptimalNumberClusters{<:Any, <:SecondOrderDifference},
+                             alg::AbstractNonHierarchicalClusteringAlgorithm, D::MatNum)
+    optimal_number_clusters(onc::OptimalNumberClusters{<:Any, <:SilhouetteScore},
+                             alg::AbstractNonHierarchicalClusteringAlgorithm, D::MatNum)
+
+Select the optimal number of clusters for a non-hierarchical clustering algorithm.
+
+Dispatches on `onc.alg` to apply the configured selection strategy and returns both the best clustering result and the optimal `k`.
+
+# Arguments
+
+  - `onc`: Optimal number of clusters estimator.
+
+      + `onc::OptimalNumberClusters{<:Any, <:Integer}`: Uses a fixed `k` directly, clamped to `max_k`.
+      + `onc::OptimalNumberClusters{<:Any, <:SecondOrderDifference}`: Selects `k` by maximising the second-order difference of per-cluster costs.
+      + `onc::OptimalNumberClusters{<:Any, <:SilhouetteScore}`: Selects `k` by maximising the mean silhouette score.
+
+  - `alg`: Non-hierarchical clustering algorithm (e.g., [`KMeansAlgorithm`](@ref)).
+
+  - `D`: Pairwise distance matrix.
+
+# Returns
+
+  - `(res, k)`: The clustering result and optimal number of clusters.
+
+# Related
+
+  - [`OptimalNumberClusters`](@ref)
+  - [`KMeansAlgorithm`](@ref)
+"""
 function optimal_number_clusters(onc::OptimalNumberClusters{<:Any, <:Integer},
                                  alg::AbstractNonHierarchicalClusteringAlgorithm, D::MatNum)
     k = onc.alg
@@ -143,6 +186,32 @@ function optimal_number_clusters(onc::OptimalNumberClusters{<:Any, <:SilhouetteS
     k = all(!isfinite, W_list) ? length(W_list) : argmax(W_list)
     return cluster_lvls[k], k
 end
+"""
+    clusterise(cle::ClustersEstimator{<:Any, <:Any,
+                                      <:AbstractNonHierarchicalClusteringAlgorithm, <:Any},
+               X::MatNum; dims::Int = 1, kwargs...)
+
+Run non-hierarchical clustering and return the result as a [`Clusters`](@ref) object.
+
+Computes the similarity and distance matrices from `X`, selects the optimal number of clusters, and returns a [`Clusters`](@ref) result.
+
+# Arguments
+
+  - `cle`: Clustering estimator configured with a non-hierarchical algorithm.
+  - `X`: Data matrix (observations × assets).
+  - $(arg_dict[:dims])
+  - `kwargs...`: Additional keyword arguments passed to the underlying estimators.
+
+# Returns
+
+  - `res::Clusters`: Clustering result containing the result, similarity and distance matrices, and number of clusters.
+
+# Related
+
+  - [`Clusters`](@ref)
+  - [`ClustersEstimator`](@ref)
+  - [`AbstractNonHierarchicalClusteringAlgorithm`](@ref)
+"""
 function clusterise(cle::ClustersEstimator{<:Any, <:Any,
                                            <:AbstractNonHierarchicalClusteringAlgorithm,
                                            <:Any}, X::MatNum; dims::Int = 1, kwargs...)
@@ -150,6 +219,15 @@ function clusterise(cle::ClustersEstimator{<:Any, <:Any,
     res, k = optimal_number_clusters(cle.onc, cle.alg, D)
     return Clusters(; res = res, S = S, D = D, k = k)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the cluster assignments for a non-hierarchical [`Clusters`](@ref) result.
+
+# Related
+
+  - [`Clusters`](@ref)
+"""
 function Clustering.assignments(clr::Clusters{<:Clustering.ClusteringResult, <:Any, <:Any,
                                               <:Any})
     return clr.res.assignments

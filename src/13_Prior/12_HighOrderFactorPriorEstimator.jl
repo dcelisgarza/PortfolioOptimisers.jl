@@ -238,11 +238,31 @@ function HighOrderFactorPriorEstimator(;
                                        rsd::Bool = true)::HighOrderFactorPriorEstimator
     return HighOrderFactorPriorEstimator(pe, kte, ske, ex, rsd)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a new [`HighOrderFactorPriorEstimator`](@ref) estimator with observation weights `w` applied to the underlying prior, cokurtosis, and coskewness estimators.
+
+# Related
+
+  - [`HighOrderFactorPriorEstimator`](@ref)
+  - [`factory`](@ref)
+"""
 function factory(pe::HighOrderFactorPriorEstimator,
                  w::ObsWeights)::HighOrderFactorPriorEstimator
     return HighOrderFactorPriorEstimator(; pe = factory(pe.pe, w), kte = factory(pe.kte, w),
                                          ske = factory(pe.ske, w), ex = pe.ex, rsd = pe.rsd)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a new [`HighOrderFactorPriorEstimator`](@ref) estimator restricted to the assets at index `i`.
+
+# Related
+
+  - [`HighOrderFactorPriorEstimator`](@ref)
+  - [`prior_view`](@ref)
+"""
 function prior_view(pe::HighOrderFactorPriorEstimator, i)::HighOrderFactorPriorEstimator
     return HighOrderFactorPriorEstimator(; pe = prior_view(pe.pe, i), kte = pe.kte,
                                          ske = pe.ske, ex = pe.ex, rsd = pe.rsd)

@@ -106,10 +106,29 @@ function FactorPrior(; pe::AbstractLowOrderPriorEstimator_A_AF = EmpiricalPrior(
                      rsd::Bool = true)::FactorPrior
     return FactorPrior(pe, mp, re, ve, rsd)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a new [`FactorPrior`](@ref) estimator with observation weights `w` applied to the underlying prior, regression, and variance estimators.
+
+# Related
+
+  - [`FactorPrior`](@ref)
+  - [`factory`](@ref)
+"""
 function factory(pe::FactorPrior, w::ObsWeights)::FactorPrior
     return FactorPrior(; pe = factory(pe.pe, w), mp = pe.mp, re = factory(pe.re, w),
                        ve = factory(pe.ve, w), rsd = pe.rsd)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a new [`FactorPrior`](@ref) estimator restricted to the assets at index `i`.
+
+# Related
+
+  - [`FactorPrior`](@ref)
+"""
 function prior_view(pe::FactorPrior, i)::FactorPrior
     return FactorPrior(; pe = pe.pe, mp = pe.mp, re = regression_view(pe.re, i),
                        ve = moment_view(pe.ve, i), rsd = pe.rsd)

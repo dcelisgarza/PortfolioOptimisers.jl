@@ -71,6 +71,11 @@ $(DocStringExtensions.FIELDS)
     "$(field_dict[:fb])"
     fb
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Rebuild a [`NearOptimalCenteringResult`](@ref) with an updated fallback optimiser `fb`.
+"""
 function factory(res::NearOptimalCenteringResult, fb::Option{<:OptE_Opt})
     return NearOptimalCenteringResult(res.oe, res.pa, res.w_min_retcode, res.w_opt_retcode,
                                       res.w_max_retcode, res.noc_retcode, res.retcode,
@@ -120,6 +125,16 @@ $(DocStringExtensions.FIELDS)
     ) -> NearOptimalCentering
 
 Keywords correspond to the struct's fields.
+
+## Validation
+
+  - If `r` is a vector: `!isempty(r)`.
+  - If `w_min` is provided: `!isempty(w_min)`.
+  - If `w_min_ini` is provided: `!isempty(w_min_ini)`.
+  - If `w_opt` is provided: `!isempty(w_opt)` and `!isempty(w_opt_ini)`.
+  - If `w_max` is provided: `!isempty(w_max)`.
+  - If `w_max_ini` is provided: `!isempty(w_max_ini)`.
+  - If `bins` is a number: `isfinite(bins) && bins > 0`.
 
 # Mathematical definition
 
@@ -244,11 +259,21 @@ function NearOptimalCentering(; opt::JuMPOptimiser = JuMPOptimiser(),
     return NearOptimalCentering(opt, r, obj, bins, w_min, w_min_ini, w_opt, w_opt_ini,
                                 w_max, w_max_ini, ucs_flag, alg, fb)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return `true` if any sub-estimator of `opt` requires previous portfolio weights (JuMP optimiser, risk measure, or fallback).
+"""
 function needs_previous_weights(opt::NearOptimalCentering)
     return (needs_previous_weights(opt.opt) ||
             needs_previous_weights(opt.r) ||
             needs_previous_weights(opt.fb))
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Build an updated [`NearOptimalCentering`](@ref) with all estimators that track previous weights updated via `factory` using `w`.
+"""
 function factory(noc::NearOptimalCentering, w::AbstractVector)::NearOptimalCentering
     opt = factory(noc.opt, w)
     r = factory(noc.r, w)
@@ -259,6 +284,11 @@ function factory(noc::NearOptimalCentering, w::AbstractVector)::NearOptimalCente
                                 w_max = noc.w_max, w_max_ini = noc.w_max_ini,
                                 ucs_flag = noc.ucs_flag, alg = noc.alg, fb = fb)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a cluster-sliced copy of [`NearOptimalCentering`](@ref) for asset index set `i` and returns matrix `X`.
+"""
 function opt_view(noc::NearOptimalCentering, i, X::MatNum)::NearOptimalCentering
     X = isa(noc.opt.pe, AbstractPriorResult) ? noc.opt.pe.X : X
     opt = opt_view(noc.opt, i, X)
@@ -1008,14 +1038,21 @@ end
              rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
              str_names::Bool = false, save::Bool = true, kwargs...) -> NearOptimalCenteringResult
 
+Run the Near Optimal Centering portfolio optimisation.
+
 # Arguments
 
   - `noc`: The near optimal centering optimiser to use.
-  - $(arg_dict[:rd]) If `isa(hec.opt.pe, AbstractPriorResult)`, `rd` is not necessary if doing a standalone optimisation, but may be required/desired by fallbacks and/or clusterisation.
+  - $(arg_dict[:rd]) If `isa(noc.opt.pe, AbstractPriorResult)`, `rd` is not necessary if doing a standalone optimisation, but may be required/desired by fallbacks and/or clusterisation.
   - `dims`: The dimension along which observations advance in time.
   - `str_names`: Whether to use string names for the assets in the optimisation.
   - `save`: Whether to save the JuMP model in the optimisation result.
   - `kwargs`: Additional keyword arguments passed to the optimisation function.
+
+# Related
+
+  - [`NearOptimalCentering`](@ref)
+  - [`NearOptimalCenteringResult`](@ref)
 """
 function optimise(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                             <:Any, <:Any, <:Any, <:Any, <:Any, Nothing},

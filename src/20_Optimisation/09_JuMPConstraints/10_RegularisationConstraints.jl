@@ -154,9 +154,16 @@ $(DocStringExtensions.FIELDS)
 
     LpRegularisation(; p::Number = 3, val::Number = 1e-3) -> LpRegularisation
 
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - `isfinite(p)`.
+  - `p > 1`.
+  - `val > 0` and finite.
+
 # Related
 
-  - [`AbstractRegularisationEstimator`](@ref)
   - [`AbstractRegularisationEstimator`](@ref)
 """
 @concrete struct LpRegularisation <: AbstractRegularisationEstimator

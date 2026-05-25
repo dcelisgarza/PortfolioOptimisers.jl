@@ -146,6 +146,18 @@ end
 function (r::NegativeSkewness{<:Any, <:Any, <:Any, <:Any, <:NSkeQuadFormulations})(w::VecNum)
     return LinearAlgebra.dot(w, r.V, w)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create an instance of [`NegativeSkewness`](@ref) by selecting the coskewness matrix and spectral decomposition matrix from the risk-measure instance or falling back to a [`HighOrderPrior`](@ref) result.
+
+# Related
+
+  - [`NegativeSkewness`](@ref)
+  - [`HighOrderPrior`](@ref)
+  - [`factory`](@ref)
+  - [`nothing_scalar_array_selector`](@ref)
+"""
 function factory(r::NegativeSkewness, pr::HighOrderPrior, args...;
                  kwargs...)::NegativeSkewness
     sk = nothing_scalar_array_selector(r.sk, pr.sk)
@@ -153,6 +165,19 @@ function factory(r::NegativeSkewness, pr::HighOrderPrior, args...;
     return NegativeSkewness(; settings = r.settings, mp = r.mp, sk = sk, V = V, alg = r.alg,
                             window = r.window)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the [`NegativeSkewness`](@ref) risk measure `r` unchanged.
+
+Coskewness is not available in [`LowOrderPrior`](@ref) results; the existing risk measure is used as-is.
+
+# Related
+
+  - [`NegativeSkewness`](@ref)
+  - [`LowOrderPrior`](@ref)
+  - [`factory`](@ref)
+"""
 function factory(r::NegativeSkewness, ::LowOrderPrior, args...; kwargs...)::NegativeSkewness
     return r
 end
