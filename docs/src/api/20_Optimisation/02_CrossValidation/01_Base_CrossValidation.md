@@ -3,6 +3,7 @@
 ```@docs
 CrossValidationEstimator
 CrossValidationResult
+Base.split(res::CrossValidationResult, args...)
 CrossValidationAlgorithm
 CVER
 OptimisationCrossValidationEstimator
@@ -20,10 +21,17 @@ NonOptimisationNonSequentialCrossValidationEstimator
 NonOptimisationCrossValidationResult
 NonOptimisationSequentialCrossValidationResult
 NonOptimisationNonSequentialCrossValidationResult
+AbstractPredictionResult
 PredictionReturnsResult
 PredictionResult
+VecPredRes
+PredRes_MultiPredRes
+mapreduce_RetMtx(rd::AbstractVector{<:PredictionReturnsResult{<:Any, <:VecNum}}, sym = :X)
 MultiPeriodPredictionResult
+Base.getproperty(mpred::MultiPeriodPredictionResult, sym::Symbol)
+VecMPredRes
 PopulationPredictionResult
+_prediction_expected_risk
 predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)
 fit_predict
 sort_by_measure
@@ -31,4 +39,6 @@ quantile_by_measure
 fit_and_predict
 reconstruct_rd(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult, X::VecNum)
 sort_predictions!(test_idx::VecVecInt, predictions::VecPredRes)
+VecVecPredRes
+VecPredRes_MultiPredRes
 ```

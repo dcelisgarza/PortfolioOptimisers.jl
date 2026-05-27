@@ -26,9 +26,10 @@
                                      timestamp = :Date)[(end - 252):end],
                            TimeArray(CSV.File(joinpath(@__DIR__, "./assets/Factors.csv.gz"));
                                      timestamp = :Date)[(end - 252):end])
-    ew = eweights(1:252, inv(252); scale = true)
-    fw = fweights(rand(rng, 252))
-    rf = 4.34 / 100 / 252
+    ew = eweights(1:size(rd.X, 1), inv(size(rd.X, 1)); scale = true)
+    fw = fweights(rand(rng, size(rd.X, 1)))
+    pw = pweights(fill(inv(size(rd.X, 1)), size(rd.X, 1)))
+    rf = 4.34 / 100 / size(rd.X, 1)
     @testset "Expected ReturnsResult" begin
         mes = [ShrunkExpectedReturns(; alg = JamesStein()),
                ShrunkExpectedReturns(; alg = JamesStein(; tgt = VolatilityWeighted())),
@@ -112,10 +113,10 @@
                                               me = MedianExpectedReturns()), ew)
         me = factory(me0.me, ew[1:50])
         @test mean(me0, rd.X) ==
-              reshape(mean(me, rd.X[1:50, :]', dims = 2), 1, :) ==
+              reshape(mean(me, rd.X[1:50, :]'; dims = 2), 1, :) ==
               reduce(hcat, [median(Xi, ew[1:50]) for Xi in eachcol(rd.X[1:50, :])])
 
-        @test mean(MedianExpectedReturns(), rd.X) == median(rd.X, dims = 1)
+        @test mean(MedianExpectedReturns(), rd.X) == median(rd.X; dims = 1)
     end
     @testset "Covariance Estimators" begin
         ces = [Covariance(; alg = Full()),
@@ -535,6 +536,9 @@
         @test sk.me.w === ew
         @test sk.alg === sk0.alg
 
+        sk, v = coskewness(factory(Coskewness(), pw), rd.X)
+        @test isapprox([vec(sk); vec(v)], df[!, 1])
+
         ske0 = factory(WindowedCoskewness(; window = 50), ew)
         ske = factory(ske0.ske, ew[(end - 49):end])
         sk0, V0 = coskewness(ske0, rd.X[(end - 49):end, :])
@@ -559,6 +563,9 @@
         kt = PortfolioOptimisers.factory(kt0, ew)
         @test kt.me.w === ew
         @test kt.alg === kt0.alg
+
+        kt = cokurtosis(factory(Cokurtosis(), pw), rd.X)
+        @test isapprox(vec(kt), df[!, 1])
 
         kte0 = factory(WindowedCokurtosis(; window = 50), ew)
         kte = factory(kte0.ke, ew[(end - 49):end])

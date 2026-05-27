@@ -98,6 +98,17 @@ This method dispatches to the appropriate [`robust_cov`](@ref) depending on `ce.
   - [`GeneralCovariance`](@ref)
   - [`robust_cov`](@ref)
   - [`cor(ce::GeneralCovariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
+
+# Examples
+
+```jldoctest
+julia> X = [0.01 0.02; 0.03 0.04; 0.02 0.03];
+
+julia> cov(GeneralCovariance(), X)
+2×2 Matrix{Float64}:
+ 0.0001  0.0001
+ 0.0001  0.0001
+```
 """
 function Statistics.cov(ce::GeneralCovariance, X::MatNum; dims::Int = 1, mean = nothing,
                         kwargs...)
@@ -142,6 +153,17 @@ This method dispatches to the appropriate [`robust_cor`](@ref) depending on `ce.
   - [`GeneralCovariance`](@ref)
   - [`robust_cor`](@ref)
   - [`cov(ce::GeneralCovariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
+
+# Examples
+
+```jldoctest
+julia> X = [0.01 0.02; 0.03 0.04; 0.02 0.03];
+
+julia> cor(GeneralCovariance(), X)
+2×2 Matrix{Float64}:
+ 1.0  1.0
+ 1.0  1.0
+```
 """
 function Statistics.cor(ce::GeneralCovariance, X::MatNum; dims::Int = 1, mean = nothing,
                         kwargs...)
@@ -359,6 +381,49 @@ end
 
 Compute the covariance matrix using a [`Covariance`](@ref) estimator.
 
+# Mathematical definition
+
+Full covariance:
+
+```math
+\\begin{align}
+\\hat{\\mathbf{\\Sigma}}_{ij} &= \\frac{1}{T-1} \\sum_{t=1}^{T} (r_{ti} - \\hat{\\mu}_i)(r_{tj} - \\hat{\\mu}_j)\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\hat{\\mathbf{\\Sigma}}_{ij}``: Estimated covariance between assets ``i`` and ``j``.
+  - ``r_{ti}``: Return of asset ``i`` at time ``t``.
+  - ``\\hat{\\mu}_i``: Estimated mean of asset ``i``.
+  - $(math_dict[:T])
+
+Semi (downside) covariance — clip de-meaned returns to zero before computing:
+
+```math
+\\begin{align}
+\\tilde{r}_{tj} &= \\min(r_{tj} - \\hat{\\mu}_j,\\, 0)\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\tilde{r}_{tj}``: Clipped de-meaned return of asset ``j`` at time ``t``.
+  - ``r_{tj}``: Return of asset ``j`` at time ``t``.
+  - ``\\hat{\\mu}_j``: Estimated mean of asset ``j``.
+
+```math
+\\begin{align}
+\\hat{\\mathbf{\\Sigma}}^{\\text{semi}}_{ij} &= \\frac{1}{T-1} \\sum_{t=1}^{T} \\tilde{r}_{ti} \\, \\tilde{r}_{tj}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\hat{\\mathbf{\\Sigma}}^{\\text{semi}}_{ij}``: Estimated semi-covariance between assets ``i`` and ``j``.
+  - ``\\tilde{r}_{ti}``, ``\\tilde{r}_{tj}``: Clipped de-meaned returns of assets ``i`` and ``j``.
+  - $(math_dict[:T])
+
 # Arguments
 
   - $(arg_dict[:ce])
@@ -381,12 +446,28 @@ Compute the covariance matrix using a [`Covariance`](@ref) estimator.
   - [`Full`](@ref)
   - [`Semi`](@ref)
   - [`cor(ce::Covariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
+
+# Examples
+
+```jldoctest
+julia> X = [0.01 0.02; 0.03 0.04; 0.02 0.03];
+
+julia> cov(Covariance(), X)
+2×2 Matrix{Float64}:
+ 0.0001  0.0001
+ 0.0001  0.0001
+```
 """
 function Statistics.cov(ce::Covariance{<:Any, <:Any, <:Full}, X::MatNum; dims::Int = 1,
                         mean = nothing, kwargs...)
     mu = isnothing(mean) ? Statistics.mean(ce.me, X; dims = dims, kwargs...) : mean
     return Statistics.cov(ce.ce, X; dims = dims, mean = mu, kwargs...)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+[`Semi`](@ref) variant of [`cov(ce::Covariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref). Clips de-meaned returns to zero before computing the covariance matrix, capturing only downside co-movements.
+"""
 function Statistics.cov(ce::Covariance{<:Any, <:Any, <:Semi}, X::MatNum; dims::Int = 1,
                         mean = nothing, kwargs...)
     mu = isnothing(mean) ? Statistics.mean(ce.me, X; dims = dims, kwargs...) : mean
@@ -403,6 +484,20 @@ end
     ) -> MatNum
 
 Compute the correlation matrix using a [`Covariance`](@ref) estimator.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\hat{\\mathbf{P}}_{ij} &= \\frac{\\hat{\\mathbf{\\Sigma}}_{ij}}{\\hat{\\sigma}_i \\hat{\\sigma}_j}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\hat{\\mathbf{P}}_{ij}``: Estimated correlation between assets ``i`` and ``j``.
+  - ``\\hat{\\mathbf{\\Sigma}}_{ij}``: Estimated covariance between assets ``i`` and ``j``.
+  - ``\\hat{\\sigma}_i``: Estimated standard deviation of asset ``i``.
 
 # Arguments
 
@@ -431,12 +526,28 @@ Compute the correlation matrix using a [`Covariance`](@ref) estimator.
   - [`Full`](@ref)
   - [`Semi`](@ref)
   - [`cov(ce::Covariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
+
+# Examples
+
+```jldoctest
+julia> X = [0.01 0.02; 0.03 0.04; 0.02 0.03];
+
+julia> cor(Covariance(), X)
+2×2 Matrix{Float64}:
+ 1.0  1.0
+ 1.0  1.0
+```
 """
 function Statistics.cor(ce::Covariance{<:Any, <:Any, <:Full}, X::MatNum; dims::Int = 1,
                         mean = nothing, kwargs...)
     mu = isnothing(mean) ? Statistics.mean(ce.me, X; dims = dims, kwargs...) : mean
     return Statistics.cor(ce.ce, X; dims = dims, mean = mu, kwargs...)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+[`Semi`](@ref) variant of [`cor(ce::Covariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref). Clips de-meaned returns to zero before computing the correlation matrix, capturing only downside co-movements.
+"""
 function Statistics.cor(ce::Covariance{<:Any, <:Any, <:Semi}, X::MatNum; dims::Int = 1,
                         mean = nothing, kwargs...)
     mu = isnothing(mean) ? Statistics.mean(ce.me, X; dims = dims, kwargs...) : mean

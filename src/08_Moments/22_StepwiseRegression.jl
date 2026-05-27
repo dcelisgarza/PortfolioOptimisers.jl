@@ -82,9 +82,7 @@ Estimator for stepwise regression-based moment estimation.
 
 # Fields
 
-  - `crit`: Criterion for variable selection.
-  - `alg`: Stepwise algorithm.
-  - `tgt`: Regression target type.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -138,6 +136,25 @@ function StepwiseRegression(; crit::AbstractStepwiseRegressionCriterion = PValue
                             tgt::AbstractRegressionTarget = LinearModel())::StepwiseRegression
     return StepwiseRegression(crit, alg, tgt)
 end
+"""
+    factory(re::StepwiseRegression, w::ObsWeights) -> StepwiseRegression
+
+Return a new [`StepwiseRegression`](@ref) estimator with observation weights `w` applied to the underlying regression target.
+
+# Arguments
+
+  - `re`: Stepwise regression estimator.
+  - $(arg_dict[:ow])
+
+# Returns
+
+  - `re::StepwiseRegression`: Updated estimator with weights applied to `tgt`.
+
+# Related
+
+  - [`StepwiseRegression`](@ref)
+  - [`factory`](@ref)
+"""
 function factory(re::StepwiseRegression, w::ObsWeights)::StepwiseRegression
     return StepwiseRegression(; crit = re.crit, alg = re.alg, tgt = factory(re.tgt, w))
 end

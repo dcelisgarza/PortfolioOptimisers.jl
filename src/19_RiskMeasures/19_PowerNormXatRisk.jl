@@ -67,15 +67,25 @@ Represents the Power Norm Value-at-Risk (PNVaR) risk measure.
 
 `PowerNormValueatRisk` is a coherent risk measure that generalises EVaR by replacing the exponential moment-generating function with a power-norm. It is parametrised by a power ``p \\geq 1`` and a significance level ``\\alpha``, and is solved via a conic programme.
 
-# Mathematical Definition
+# Mathematical definition
 
 The PNVaR at level ``\\alpha`` with power ``p`` is:
 
 ```math
-\\mathrm{PNVaR}_{\\alpha,p}(\\boldsymbol{x}) = \\min_{\\eta,\\, t,\\, \\boldsymbol{w} \\geq 0,\\, \\boldsymbol{v}} \\left\\{ \\eta + \\frac{t}{\\alpha T^{1/p}} \\;:\\; \\sum_{i=1}^{T} v_i \\leq t,\\; (x_i + w_i) + \\eta \\geq 0,\\; (v_i, t, w_i) \\in \\mathcal{K}_{\\mathrm{pow}}(1/p)\\; \\forall i \\right\\}\\,,
+\\begin{align}
+\\mathrm{PNVaR}_{\\alpha,p}(\\boldsymbol{x}) &= \\underset{\\eta,\\, t,\\, \\boldsymbol{w},\\, \\boldsymbol{v}}{\\min} \\left\\{ \\eta + \\frac{t}{\\alpha T^{1/p}} \\;:\\; \\boldsymbol{w} \\geq \\boldsymbol{0},\\; \\sum_{i=1}^{T} v_i \\leq t,\\; (x_i + w_i) + \\eta \\geq 0,\\; (v_i, t, w_i) \\in \\mathcal{K}_{\\mathrm{pow}}(1/p)\\; \\forall i \\right\\}\\,.
+\\end{align}
 ```
 
-where ``\\mathcal{K}_{\\mathrm{pow}}(p') = \\{(a,b,c) : a^{p'} b^{1-p'} \\geq |c|,\\, a \\geq 0,\\, b \\geq 0\\}`` is the power cone.
+Where:
+
+  - ``\\mathrm{PNVaR}_{\\alpha,p}(\\boldsymbol{x})``: Power Norm Value-at-Risk.
+  - $(math_dict[:xret])
+  - $(math_dict[:alpha_rm])
+  - $(math_dict[:T])
+  - ``p \\geq 1``: Power parameter.
+  - ``\\eta``, ``t``, ``\\boldsymbol{w}``, ``\\boldsymbol{v}``: Conic optimisation variables.
+  - ``\\mathcal{K}_{\\mathrm{pow}}(p') = \\{(a,b,c) : a^{p'} b^{1-p'} \\geq |c|,\\, a \\geq 0,\\, b \\geq 0\\}``: Power cone.
 
 # Fields
 
@@ -176,11 +186,20 @@ Represents the Power Norm Value-at-Risk Range (PNVaRRange) risk measure.
 
 `PowerNormValueatRiskRange` computes the sum of the lower-tail PNVaR (at level `alpha` with power `pa`) and the upper-tail PNVaR (at level `beta` with power `pb`).
 
-# Mathematical Definition
+# Mathematical definition
 
 ```math
-\\mathrm{PNVaRRange}_{\\alpha,p_a,\\beta,p_b}(\\boldsymbol{x}) = \\mathrm{PNVaR}_{\\alpha,p_a}(\\boldsymbol{x}) + \\mathrm{PNVaR}_{\\beta,p_b}(-\\boldsymbol{x})\\,.
+\\begin{align}
+\\mathrm{PNVaRRange}_{\\alpha,p_a,\\beta,p_b}(\\boldsymbol{x}) &= \\mathrm{PNVaR}_{\\alpha,p_a}(\\boldsymbol{x}) + \\mathrm{PNVaR}_{\\beta,p_b}(-\\boldsymbol{x})\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``\\mathrm{PNVaRRange}_{\\alpha,p_a,\\beta,p_b}(\\boldsymbol{x})``: Power Norm VaR range.
+  - $(math_dict[:xret])
+  - ``\\mathrm{PNVaR}_{\\alpha,p_a}(\\boldsymbol{x})``: Lower-tail PNVaR with parameters ``(\\alpha, p_a)``.
+  - ``\\mathrm{PNVaR}_{\\beta,p_b}(-\\boldsymbol{x})``: Upper-tail PNVaR with parameters ``(\\beta, p_b)``.
 
 # Fields
 
@@ -282,6 +301,19 @@ end
 function (r::PowerNormValueatRiskRange)(x::VecNum)
     return PRM(x, r.slv, r.alpha, r.pa, r.w) + PRM(-x, r.slv, r.beta, r.pb, r.w)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create an instance of [`PowerNormValueatRiskRange`](@ref) by selecting observation weights and solver from the risk-measure instance or falling back to the prior result.
+
+# Related
+
+  - [`PowerNormValueatRiskRange`](@ref)
+  - [`AbstractPriorResult`](@ref)
+  - [`factory`](@ref)
+  - [`nothing_scalar_array_selector`](@ref)
+  - [`solver_selector`](@ref)
+"""
 function factory(r::PowerNormValueatRiskRange, pr::AbstractPriorResult,
                  slv::Option{<:Slv_VecSlv}, args...; kwargs...)::PowerNormValueatRiskRange
     w = nothing_scalar_array_selector(r.w, pr.w)
@@ -296,19 +328,38 @@ Represents the Power Norm Drawdown-at-Risk (PNDDaR) risk measure.
 
 `PowerNormDrawdownatRisk` applies the Power Norm Value-at-Risk framework to the absolute drawdown series of portfolio returns.
 
-# Mathematical Definition
+# Mathematical definition
 
 Define the absolute drawdown series:
 
 ```math
-c_t = \\sum_{s=1}^{t} x_s\\,, \\qquad d_t = c_t - \\max_{0 \\leq s \\leq t} c_s \\leq 0\\,.
+\\begin{align}
+c_t &= \\sum_{s=1}^{t} x_s\\,, \\\\
+d_t &= c_t - \\max_{0 \\leq s \\leq t} c_s \\leq 0\\,.
+\\end{align}
 ```
+
+Where:
+
+  - $(math_dict[:xret])
+  - $(math_dict[:ct])
+  - $(math_dict[:dtdd])
 
 The Power Norm Drawdown-at-Risk is the PNVaR of the drawdown series:
 
 ```math
-\\mathrm{PNDDaR}_{\\alpha,p}(\\boldsymbol{x}) = \\mathrm{PNVaR}_{\\alpha,p}(\\boldsymbol{d}(\\boldsymbol{x}))\\,.
+\\begin{align}
+\\mathrm{PNDDaR}_{\\alpha,p}(\\boldsymbol{x}) &= \\mathrm{PNVaR}_{\\alpha,p}(\\boldsymbol{d}(\\boldsymbol{x}))\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``\\mathrm{PNDDaR}_{\\alpha,p}(\\boldsymbol{x})``: Power Norm Drawdown-at-Risk.
+  - $(math_dict[:xret])
+  - $(math_dict[:alpha_rm])
+  - ``p \\geq 1``: Power parameter.
+  - ``\\boldsymbol{d}(\\boldsymbol{x})``: Absolute drawdown series.
 
 # Fields
 
@@ -410,19 +461,38 @@ Represents the Relative Power Norm Drawdown-at-Risk (Relative PNDDaR) risk measu
 
 `RelativePowerNormDrawdownatRisk` applies the Power Norm Value-at-Risk framework to the relative (compounded) drawdown series of portfolio returns.
 
-# Mathematical Definition
+# Mathematical definition
 
 Define the relative drawdown series:
 
 ```math
-C_t = \\prod_{s=1}^{t} (1 + x_s)\\,, \\qquad rd_t = \\frac{C_t}{\\max_{0 \\leq s \\leq t} C_s} - 1 \\leq 0\\,.
+\\begin{align}
+C_t &= \\prod_{s=1}^{t} (1 + x_s)\\,, \\\\
+rd_t &= \\frac{C_t}{\\max_{0 \\leq s \\leq t} C_s} - 1 \\leq 0\\,.
+\\end{align}
 ```
+
+Where:
+
+  - $(math_dict[:xret])
+  - $(math_dict[:Ct])
+  - $(math_dict[:rdt])
 
 The Relative Power Norm Drawdown-at-Risk is the PNVaR of the relative drawdown series:
 
 ```math
-\\mathrm{RPNDDaR}_{\\alpha,p}(\\boldsymbol{x}) = \\mathrm{PNVaR}_{\\alpha,p}(\\boldsymbol{rd}(\\boldsymbol{x}))\\,.
+\\begin{align}
+\\mathrm{RPNDDaR}_{\\alpha,p}(\\boldsymbol{x}) &= \\mathrm{PNVaR}_{\\alpha,p}(\\boldsymbol{rd}(\\boldsymbol{x}))\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``\\mathrm{RPNDDaR}_{\\alpha,p}(\\boldsymbol{x})``: Relative Power Norm Drawdown-at-Risk.
+  - $(math_dict[:xret])
+  - $(math_dict[:alpha_rm])
+  - ``p \\geq 1``: Power parameter.
+  - ``\\boldsymbol{rd}(\\boldsymbol{x})``: Relative drawdown series.
 
 # Fields
 
@@ -515,23 +585,131 @@ function (r::RelativePowerNormDrawdownatRisk)(x::VecNum)
     dd = relative_drawdown_vec(x)
     return PRM(dd, r.slv, r.alpha, r.p, r.w)
 end
-for r in (PowerNormValueatRisk, PowerNormDrawdownatRisk, RelativePowerNormDrawdownatRisk)
-    eval(quote
-             function factory(r::$(r), pr::AbstractPriorResult,
-                              slv::Option{<:Slv_VecSlv} = nothing, args...; kwargs...)
-                 w = nothing_scalar_array_selector(r.w, pr.w)
-                 slv = solver_selector(r.slv, slv)
-                 return $(r)(; settings = r.settings, slv = slv, alpha = r.alpha, p = r.p,
-                             w = w)
-             end
-             function factory(r::$(r), slv::Slv_VecSlv,
-                              pr::Option{<:AbstractPriorResult} = nothing; kwargs...)
-                 w = isnothing(pr) ? r.w : nothing_scalar_array_selector(r.w, pr.w)
-                 slv = solver_selector(r.slv, slv)
-                 return $(r)(; settings = r.settings, alpha = r.alpha, kappa = r.kappa,
-                             p = r.p, slv = slv, w = w)
-             end
-         end)
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create an instance of [`PowerNormValueatRisk`](@ref) by selecting observation weights and solver from the risk-measure instance or falling back to the prior result.
+
+# Related
+
+  - [`PowerNormValueatRisk`](@ref)
+  - [`AbstractPriorResult`](@ref)
+  - [`factory`](@ref)
+  - [`nothing_scalar_array_selector`](@ref)
+  - [`solver_selector`](@ref)
+"""
+function factory(r::PowerNormValueatRisk, pr::AbstractPriorResult,
+                 slv::Option{<:Slv_VecSlv} = nothing, args...;
+                 kwargs...)::PowerNormValueatRisk
+    w = nothing_scalar_array_selector(r.w, pr.w)
+    slv = solver_selector(r.slv, slv)
+    return PowerNormValueatRisk(; settings = r.settings, slv = slv, alpha = r.alpha,
+                                p = r.p, w = w)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create an instance of [`PowerNormValueatRisk`](@ref) by overriding the solver and optionally selecting observation weights from the prior result.
+
+# Related
+
+  - [`PowerNormValueatRisk`](@ref)
+  - [`AbstractPriorResult`](@ref)
+  - [`factory`](@ref)
+  - [`nothing_scalar_array_selector`](@ref)
+  - [`solver_selector`](@ref)
+"""
+function factory(r::PowerNormValueatRisk, slv::Slv_VecSlv,
+                 pr::Option{<:AbstractPriorResult} = nothing;
+                 kwargs...)::PowerNormValueatRisk
+    w = isnothing(pr) ? r.w : nothing_scalar_array_selector(r.w, pr.w)
+    slv = solver_selector(r.slv, slv)
+    return PowerNormValueatRisk(; settings = r.settings, alpha = r.alpha, p = r.p,
+                                slv = slv, w = w)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create an instance of [`PowerNormDrawdownatRisk`](@ref) by selecting observation weights and solver from the risk-measure instance or falling back to the prior result.
+
+# Related
+
+  - [`PowerNormDrawdownatRisk`](@ref)
+  - [`AbstractPriorResult`](@ref)
+  - [`factory`](@ref)
+  - [`nothing_scalar_array_selector`](@ref)
+  - [`solver_selector`](@ref)
+"""
+function factory(r::PowerNormDrawdownatRisk, pr::AbstractPriorResult,
+                 slv::Option{<:Slv_VecSlv} = nothing, args...;
+                 kwargs...)::PowerNormDrawdownatRisk
+    w = nothing_scalar_array_selector(r.w, pr.w)
+    slv = solver_selector(r.slv, slv)
+    return PowerNormDrawdownatRisk(; settings = r.settings, slv = slv, alpha = r.alpha,
+                                   p = r.p, w = w)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create an instance of [`PowerNormDrawdownatRisk`](@ref) by overriding the solver and optionally selecting observation weights from the prior result.
+
+# Related
+
+  - [`PowerNormDrawdownatRisk`](@ref)
+  - [`AbstractPriorResult`](@ref)
+  - [`factory`](@ref)
+  - [`nothing_scalar_array_selector`](@ref)
+  - [`solver_selector`](@ref)
+"""
+function factory(r::PowerNormDrawdownatRisk, slv::Slv_VecSlv,
+                 pr::Option{<:AbstractPriorResult} = nothing;
+                 kwargs...)::PowerNormDrawdownatRisk
+    w = isnothing(pr) ? r.w : nothing_scalar_array_selector(r.w, pr.w)
+    slv = solver_selector(r.slv, slv)
+    return PowerNormDrawdownatRisk(; settings = r.settings, alpha = r.alpha, p = r.p,
+                                   slv = slv, w = w)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create an instance of [`RelativePowerNormDrawdownatRisk`](@ref) by selecting observation weights and solver from the risk-measure instance or falling back to the prior result.
+
+# Related
+
+  - [`RelativePowerNormDrawdownatRisk`](@ref)
+  - [`AbstractPriorResult`](@ref)
+  - [`factory`](@ref)
+  - [`nothing_scalar_array_selector`](@ref)
+  - [`solver_selector`](@ref)
+"""
+function factory(r::RelativePowerNormDrawdownatRisk, pr::AbstractPriorResult,
+                 slv::Option{<:Slv_VecSlv} = nothing, args...;
+                 kwargs...)::RelativePowerNormDrawdownatRisk
+    w = nothing_scalar_array_selector(r.w, pr.w)
+    slv = solver_selector(r.slv, slv)
+    return RelativePowerNormDrawdownatRisk(; settings = r.settings, slv = slv,
+                                           alpha = r.alpha, p = r.p, w = w)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create an instance of [`RelativePowerNormDrawdownatRisk`](@ref) by overriding the solver and optionally selecting observation weights from the prior result.
+
+# Related
+
+  - [`RelativePowerNormDrawdownatRisk`](@ref)
+  - [`AbstractPriorResult`](@ref)
+  - [`factory`](@ref)
+  - [`nothing_scalar_array_selector`](@ref)
+  - [`solver_selector`](@ref)
+"""
+function factory(r::RelativePowerNormDrawdownatRisk, slv::Slv_VecSlv,
+                 pr::Option{<:AbstractPriorResult} = nothing;
+                 kwargs...)::RelativePowerNormDrawdownatRisk
+    w = isnothing(pr) ? r.w : nothing_scalar_array_selector(r.w, pr.w)
+    slv = solver_selector(r.slv, slv)
+    return RelativePowerNormDrawdownatRisk(; settings = r.settings, alpha = r.alpha,
+                                           p = r.p, slv = slv, w = w)
 end
 
 export PowerNormValueatRisk, PowerNormValueatRiskRange, PowerNormDrawdownatRisk,

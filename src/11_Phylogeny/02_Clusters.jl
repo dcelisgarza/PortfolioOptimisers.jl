@@ -24,6 +24,18 @@ All concrete and/or abstract types implementing specific clustering algorithms s
   - [`AbstractClusteringResult`](@ref)
 """
 abstract type AbstractClustersAlgorithm <: AbstractPhylogenyAlgorithm end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the clustering algorithm `alg` unchanged.
+
+Identity pass-through used when a clustering algorithm is provided in a context that calls [`factory`](@ref).
+
+# Related
+
+  - [`AbstractClustersAlgorithm`](@ref)
+  - [`factory`](@ref)
+"""
 function factory(alg::AbstractClustersAlgorithm, args...; kwargs...)
     return alg
 end
@@ -244,6 +256,16 @@ function SecondOrderDifference(;
                                alg::Num_VecToScaM = StandardisedValue())::SecondOrderDifference
     return SecondOrderDifference(alg)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a new [`SecondOrderDifference`](@ref) algorithm with observation weights `w` applied to the underlying vector-to-scalar measure.
+
+# Related
+
+  - [`SecondOrderDifference`](@ref)
+  - [`factory`](@ref)
+"""
 function factory(alg::SecondOrderDifference,
                  w::StatsBase.AbstractWeights)::SecondOrderDifference
     return SecondOrderDifference(; alg = factory(alg.alg, w))
@@ -297,6 +319,16 @@ end
 function SilhouetteScore(; alg::Num_VecToScaM = StandardisedValue())::SilhouetteScore
     return SilhouetteScore(alg)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a new [`SilhouetteScore`](@ref) algorithm with observation weights `w` applied to the underlying vector-to-scalar measure.
+
+# Related
+
+  - [`SilhouetteScore`](@ref)
+  - [`factory`](@ref)
+"""
 function factory(alg::SilhouetteScore, w::StatsBase.AbstractWeights)::SilhouetteScore
     return SilhouetteScore(; alg = factory(alg.alg, w))
 end
@@ -364,6 +396,16 @@ function OptimalNumberClusters(; max_k::Option{<:Integer} = nothing,
                                alg::Int_ONC = SecondOrderDifference())::OptimalNumberClusters
     return OptimalNumberClusters(max_k, alg)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a new [`OptimalNumberClusters`](@ref) estimator with observation weights `w` applied to the underlying optimal-number-of-clusters algorithm.
+
+# Related
+
+  - [`OptimalNumberClusters`](@ref)
+  - [`factory`](@ref)
+"""
 function factory(onc::OptimalNumberClusters,
                  w::StatsBase.AbstractWeights)::OptimalNumberClusters
     return OptimalNumberClusters(; max_k = onc.max_k, alg = factory(onc.alg, w))
@@ -499,6 +541,16 @@ function ClustersEstimator(;
                            onc::AbstractOptimalNumberClustersEstimator = OptimalNumberClusters())::ClustersEstimator
     return ClustersEstimator(ce, de, alg, onc)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a new [`ClustersEstimator`](@ref) with observation weights `w` applied to the underlying covariance estimator.
+
+# Related
+
+  - [`ClustersEstimator`](@ref)
+  - [`factory`](@ref)
+"""
 function factory(cle::ClustersEstimator, w::StatsBase.AbstractWeights)::ClustersEstimator
     return ClustersEstimator(; ce = factory(cle.ce, w), de = cle.de, alg = cle.alg,
                              onc = cle.onc)

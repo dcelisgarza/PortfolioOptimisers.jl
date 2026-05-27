@@ -15,6 +15,8 @@ $(DocStringExtensions.FIELDS)
         scorer::Option{<:PredictionCrossValScorer} = nothing
     ) -> OptimisationCrossValidation
 
+Keywords correspond to the struct's fields.
+
 # Related
 
   - [`KFold`](@ref)

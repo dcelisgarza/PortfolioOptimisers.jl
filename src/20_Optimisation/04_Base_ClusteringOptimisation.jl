@@ -59,6 +59,16 @@ $(DocStringExtensions.FIELDS)
     "$(field_dict[:fb])"
     fb
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create a [`HierarchicalResult`](@ref) with a new fallback result `fb`.
+
+# Related
+
+  - [`HierarchicalResult`](@ref)
+  - [`factory`](@ref)
+"""
 function factory(res::HierarchicalResult, fb::Option{<:OptE_Opt})
     return HierarchicalResult(res.oe, res.pr, res.clr, res.wb, res.fees, res.retcode, res.w,
                               fb)
@@ -219,14 +229,44 @@ function HierarchicalOptimiser(; pe::PrE_Pr = EmpiricalPrior(),
                                strict::Bool = false)::HierarchicalOptimiser
     return HierarchicalOptimiser(pe, cle, slv, wb, fees, sets, wf, brt, cle_pr, strict)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return whether the [`HierarchicalOptimiser`](@ref) requires previous portfolio weights (based on fee structure).
+
+# Related
+
+  - [`needs_previous_weights`](@ref)
+  - [`HierarchicalOptimiser`](@ref)
+"""
 function needs_previous_weights(opt::HierarchicalOptimiser)
     return needs_previous_weights(opt.fees)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create a [`HierarchicalOptimiser`](@ref) updating the fee structure with weights `w`.
+
+# Related
+
+  - [`HierarchicalOptimiser`](@ref)
+  - [`factory`](@ref)
+"""
 function factory(opt::HierarchicalOptimiser, w::AbstractVector)::HierarchicalOptimiser
     return HierarchicalOptimiser(; pe = opt.pe, cle = opt.cle, slv = opt.slv, wb = opt.wb,
                                  fees = factory(opt.fees, w), sets = opt.sets, wf = opt.wf,
                                  brt = opt.brt, cle_pr = opt.cle_pr, strict = opt.strict)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a view of [`HierarchicalOptimiser`](@ref) `hco` sliced to asset indices `i`.
+
+# Related
+
+  - [`HierarchicalOptimiser`](@ref)
+  - [`opt_view`](@ref)
+"""
 function opt_view(hco::HierarchicalOptimiser, i)::HierarchicalOptimiser
     pe = prior_view(hco.pe, i)
     wb = weight_bounds_view(hco.wb, i)

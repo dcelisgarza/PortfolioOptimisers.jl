@@ -5,13 +5,19 @@ Distance-of-distances estimator for portfolio optimization.
 
 `DistanceDistance` wraps a distance metric from [`Distances.jl`](https://github.com/JuliaStats/Distances.jl) and a distance algorithm, allowing you to compute a "distance of distances" matrix. If `power` is not `nothing`, it computes the generalised distance matrix, which is then used to compute the distances of distances matrix.
 
+# Mathematical definition
+
 ```math
 \\begin{align}
-    _{g}\\tilde{d}_{i,\\,j} &= \\lVert_{g}\\bm{D}_{i} - _{g}\\bm{D}_{j}\\rVert\\,,
+    _{g}\\tilde{d}_{i,\\,j} &= \\lVert_{g}\\boldsymbol{D}_{i} - _{g}\\boldsymbol{D}_{j}\\rVert\\,,
 \\end{align}
 ```
 
-where ``_{g}\\tilde{d}`` is the general distance of distances, ``_{g}\\bm{D}_{i}`` is the row corresponding to asset ``i`` of the general distance matrix computed using the specified distance algorithm [`AbstractDistanceAlgorithm`](@ref), ``\\lVert \\cdot \\rVert`` is the metric used to compute the distance of distances.
+Where:
+
+  - ``_{g}\\tilde{d}_{i,\\,j}``: General distance of distances between assets ``i`` and ``j``.
+  - ``_{g}\\boldsymbol{D}_{i}``: Row ``i`` of the generalised distance matrix (see [`AbstractDistanceAlgorithm`](@ref)).
+  - ``\\lVert \\cdot \\rVert``: Metric used to compute the distance of distances.
 
 # Fields
 
@@ -131,9 +137,6 @@ This method first computes a base distance matrix using [`Distance`](@ref) with 
   - [`DistanceDistance`](@ref)
   - [`Distance`](@ref)
   - [`distance`](@ref)
-
-```
-```
 """
 function distance(de::DistanceDistance, rho::MatNum, args...; kwargs...)
     D = distance(Distance(; power = de.power, alg = de.alg), rho, args...; kwargs...)

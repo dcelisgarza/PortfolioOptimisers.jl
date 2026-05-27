@@ -14,7 +14,7 @@ In order to implement a new detoning estimator which will work seamlessly with t
 
 ## Arguments
 
-  - $(arg_dict[:odt])
+  - $(arg_dict[:dt])
   - $(arg_dict[:sigrhoX])
 
 ## Returns
@@ -128,6 +128,25 @@ In-place removal of the top `n` principal components (market modes) from a covar
 
 For matrices without unit diagonal, the function converts them into correlation matrices i.e. matrices with unit diagonal, applies the algorithm, and rescales them back.
 
+# Mathematical definition
+
+The detoned matrix removes the ``n`` largest eigenmodes:
+
+```math
+\\begin{align}
+\\tilde{\\mathbf{X}} &= \\mathbf{X} - \\sum_{k=N-n+1}^{N} \\lambda_k \\boldsymbol{v}_k \\boldsymbol{v}_k^\\intercal\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\tilde{\\mathbf{X}}``: Detoned matrix.
+  - ``\\mathbf{X}``: Original correlation or covariance matrix.
+  - ``\\lambda_k``: ``k``-th largest eigenvalue of ``\\mathbf{X}``.
+  - ``\\boldsymbol{v}_k``: ``k``-th largest eigenvector of ``\\mathbf{X}``.
+  - ``n``: Number of eigenmodes (market modes) to remove.
+  - $(math_dict[:N])
+
 # Arguments
 
   - $(arg_dict[:odt])
@@ -219,9 +238,36 @@ function detone!(dt::Detone, X::MatNum)
     return X
 end
 """
-    detone(dt::Option{<:Detone}, X::MatNum)
+    detone(dt::Option{<:Detone}, X::MatNum) -> MatNum
 
 Out-of-place version of [`detone!`](@ref).
+
+# Arguments
+
+  - $(arg_dict[:odt])
+      + `::Detone`: The top `n` principal components are removed from a copy of `X`.
+      + `::Nothing`: No-op, returns `X` unchanged.
+  - $(arg_dict[:sigrhoX])
+
+# Returns
+
+  - `X::MatNum`: A new matrix equal to the detoned version of the input.
+
+# Examples
+
+```jldoctest
+julia> using StableRNGs
+
+julia> rng = StableRNG(123456789);
+
+julia> X = rand(rng, 10, 5);
+       X = X' * X;
+
+julia> Xd = detone(Detone(), X);
+
+julia> size(Xd)
+(5, 5)
+```
 
 # Related
 

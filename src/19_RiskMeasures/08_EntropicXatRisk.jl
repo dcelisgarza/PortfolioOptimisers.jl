@@ -59,21 +59,38 @@ Represents the Entropic Value-at-Risk (EVaR) risk measure.
 
 `EntropicValueatRisk` is a coherent risk measure based on the Chernoff bound. It is an upper bound for both CVaR and VaR and is computed by solving a conic optimisation problem via an external solver.
 
-# Mathematical Definition
+# Mathematical definition
 
 The EVaR is defined via the Chernoff bound as the tightest exponential upper bound on VaR and CVaR:
 
 ```math
-\\mathrm{EVaR}_{\\alpha}(\\boldsymbol{x}) = \\inf_{z > 0} \\left\\{ z \\ln\\!\\left( \\frac{M_{L}(1/z)}{\\alpha} \\right) \\right\\}\\,,
+\\begin{align}
+\\mathrm{EVaR}_{\\alpha}(\\boldsymbol{x}) &= \\inf_{z > 0} \\left\\{ z \\ln\\!\\left( \\frac{M_{L}(1/z)}{\\alpha} \\right) \\right\\}\\,.
+\\end{align}
 ```
 
-where ``L_t = -x_t`` is the loss and ``M_L(u) = \\mathbb{E}[e^{uL}]`` is the moment-generating function. Computationally, it is solved via the conic programme:
+Where:
+
+  - ``\\mathrm{EVaR}_{\\alpha}(\\boldsymbol{x})``: Entropic Value-at-Risk (tightest exponential upper bound on VaR and CVaR).
+  - $(math_dict[:xret])
+  - $(math_dict[:alpha_rm])
+  - ``L_t = -x_t``: Loss at period ``t``.
+  - ``M_L(u) = \\mathbb{E}[e^{uL}]``: Moment-generating function of the loss.
+  - ``z``: Exponential tilt parameter.
+
+Computationally, it is solved via the conic programme:
 
 ```math
-\\mathrm{EVaR}_{\\alpha}(\\boldsymbol{x}) = \\min_{t,\\, z \\geq 0,\\, \\boldsymbol{u}} \\left\\{ t - z \\ln(\\alpha T) \\;:\\; \\sum_{i=1}^{T} u_i \\leq z,\\; (-x_i - t,\\, z,\\, u_i) \\in K_{\\exp}\\; \\forall i \\right\\}\\,,
+\\begin{align}
+\\mathrm{EVaR}_{\\alpha}(\\boldsymbol{x}) &= \\underset{t,\\, z,\\, \\boldsymbol{u}}{\\min} \\left\\{ t - z \\ln(\\alpha T) \\;:\\; z \\geq 0,\\; \\sum_{i=1}^{T} u_i \\leq z,\\; (-x_i - t,\\, z,\\, u_i) \\in K_{\\exp}\\; \\forall i \\right\\}\\,.
+\\end{align}
 ```
 
-where ``K_{\\exp} = \\{(a, b, c) : b\\, e^{a/b} \\leq c,\\, b > 0\\}`` is the exponential cone.
+Where:
+
+  - $(math_dict[:T])
+  - ``t``, ``z``, ``\\boldsymbol{u}``: Conic optimisation variables.
+  - ``K_{\\exp} = \\{(a, b, c) : b\\, e^{a/b} \\leq c,\\, b > 0\\}``: Exponential cone.
 
 # Fields
 
@@ -163,13 +180,20 @@ Represents the Entropic Value-at-Risk Range (EVaR Range) risk measure.
 
 `EntropicValueatRiskRange` computes the difference between the lower-tail EVaR (at level `alpha`) and the upper-tail EVaR (at level `beta`).
 
-# Mathematical Definition
+# Mathematical definition
 
 ```math
-\\mathrm{EVaRRange}_{\\alpha,\\beta}(\\boldsymbol{x}) = \\mathrm{EVaR}_{\\alpha}(\\boldsymbol{x}) + \\mathrm{EVaR}_{\\beta}(-\\boldsymbol{x})\\,,
+\\begin{align}
+\\mathrm{EVaRRange}_{\\alpha,\\beta}(\\boldsymbol{x}) &= \\mathrm{EVaR}_{\\alpha}(\\boldsymbol{x}) + \\mathrm{EVaR}_{\\beta}(-\\boldsymbol{x})\\,.
+\\end{align}
 ```
 
-where ``\\mathrm{EVaR}_{\\alpha}(\\boldsymbol{x})`` captures the lower-tail entropic risk and ``\\mathrm{EVaR}_{\\beta}(-\\boldsymbol{x})`` captures the upper-tail entropic risk (gain).
+Where:
+
+  - ``\\mathrm{EVaRRange}_{\\alpha,\\beta}(\\boldsymbol{x})``: EVaR range (entropic tail spread).
+  - $(math_dict[:xret])
+  - ``\\mathrm{EVaR}_{\\alpha}(\\boldsymbol{x})``: Lower-tail entropic risk at level ``\\alpha``.
+  - ``\\mathrm{EVaR}_{\\beta}(-\\boldsymbol{x})``: Upper-tail entropic risk at level ``\\beta``.
 
 # Fields
 
@@ -235,6 +259,19 @@ end
 function (r::EntropicValueatRiskRange)(x::VecNum)
     return ERM(x, r.slv, r.alpha, r.w) + ERM(-x, r.slv, r.beta, r.w)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create an instance of [`EntropicValueatRiskRange`](@ref) by selecting observation weights and solver from the risk-measure instance or falling back to the prior result.
+
+# Related
+
+  - [`EntropicValueatRiskRange`](@ref)
+  - [`AbstractPriorResult`](@ref)
+  - [`factory`](@ref)
+  - [`nothing_scalar_array_selector`](@ref)
+  - [`solver_selector`](@ref)
+"""
 function factory(r::EntropicValueatRiskRange, pr::AbstractPriorResult,
                  slv::Option{<:Slv_VecSlv}, args...; kwargs...)::EntropicValueatRiskRange
     w = nothing_scalar_array_selector(r.w, pr.w)
@@ -249,19 +286,36 @@ Represents the Entropic Drawdown-at-Risk (EDaR) risk measure.
 
 `EntropicDrawdownatRisk` applies the Entropic Value-at-Risk framework to the absolute drawdown series of portfolio returns. It is a coherent risk measure providing an upper bound on both the Drawdown-at-Risk and Conditional Drawdown-at-Risk.
 
-# Mathematical Definition
+# Mathematical definition
 
 Define the absolute drawdown series:
 
 ```math
-c_t = \\sum_{s=1}^{t} x_s\\,, \\qquad d_t = c_t - \\max_{0 \\leq s \\leq t} c_s \\leq 0\\,.
+\\begin{align}
+c_t &= \\sum_{s=1}^{t} x_s\\,, \\\\
+d_t &= c_t - \\max_{0 \\leq s \\leq t} c_s \\leq 0\\,.
+\\end{align}
 ```
+
+Where:
+
+  - $(math_dict[:xret])
+  - $(math_dict[:ct])
+  - $(math_dict[:dtdd])
 
 The EDaR is the EVaR of the drawdown series:
 
 ```math
-\\mathrm{EDaR}_{\\alpha}(\\boldsymbol{x}) = \\mathrm{EVaR}_{\\alpha}(\\boldsymbol{d}(\\boldsymbol{x}))\\,.
+\\begin{align}
+\\mathrm{EDaR}_{\\alpha}(\\boldsymbol{x}) &= \\mathrm{EVaR}_{\\alpha}(\\boldsymbol{d}(\\boldsymbol{x}))\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``\\mathrm{EDaR}_{\\alpha}(\\boldsymbol{x})``: Entropic Drawdown-at-Risk.
+  - $(math_dict[:alpha_rm])
+  - ``\\boldsymbol{d}(\\boldsymbol{x})``: Absolute drawdown series vector ``T \\times 1``.
 
 # Fields
 
@@ -353,19 +407,36 @@ Represents the Relative Entropic Drawdown-at-Risk (Relative EDaR) risk measure f
 
 `RelativeEntropicDrawdownatRisk` applies the Entropic Value-at-Risk framework to the relative (compounded) drawdown series of portfolio returns.
 
-# Mathematical Definition
+# Mathematical definition
 
 Define the compounded wealth process and relative drawdown series:
 
 ```math
-C_t = \\prod_{s=1}^{t} (1 + x_s)\\,, \\qquad rd_t = \\frac{C_t}{\\max_{0 \\leq s \\leq t} C_s} - 1 \\leq 0\\,.
+\\begin{align}
+C_t &= \\prod_{s=1}^{t} (1 + x_s)\\,, \\\\
+rd_t &= \\frac{C_t}{\\max_{0 \\leq s \\leq t} C_s} - 1 \\leq 0\\,.
+\\end{align}
 ```
+
+Where:
+
+  - $(math_dict[:xret])
+  - $(math_dict[:Ct])
+  - $(math_dict[:rdt])
 
 The Relative EDaR is the EVaR of the relative drawdown series:
 
 ```math
-\\mathrm{REDaR}_{\\alpha}(\\boldsymbol{x}) = \\mathrm{EVaR}_{\\alpha}(\\boldsymbol{rd}(\\boldsymbol{x}))\\,.
+\\begin{align}
+\\mathrm{REDaR}_{\\alpha}(\\boldsymbol{x}) &= \\mathrm{EVaR}_{\\alpha}(\\boldsymbol{rd}(\\boldsymbol{x}))\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``\\mathrm{REDaR}_{\\alpha}(\\boldsymbol{x})``: Relative Entropic Drawdown-at-Risk.
+  - $(math_dict[:alpha_rm])
+  - ``\\boldsymbol{rd}(\\boldsymbol{x})``: Relative drawdown series vector ``T \\times 1``.
 
 # Fields
 
@@ -449,22 +520,129 @@ function (r::RelativeEntropicDrawdownatRisk)(x::VecNum)
     dd = relative_drawdown_vec(x)
     return ERM(dd, r.slv, r.alpha, r.w)
 end
-for r in (EntropicValueatRisk, EntropicDrawdownatRisk, RelativeEntropicDrawdownatRisk)
-    eval(quote
-             function factory(r::$(r), pr::AbstractPriorResult,
-                              slv::Option{<:Slv_VecSlv} = nothing, args...; kwargs...)
-                 w = nothing_scalar_array_selector(r.w, pr.w)
-                 slv = solver_selector(r.slv, slv)
-                 return $(r)(; settings = r.settings, slv = slv, alpha = r.alpha, w = w)
-             end
-             function factory(r::$(r), slv::Slv_VecSlv,
-                              pr::Option{<:AbstractPriorResult} = nothing, args...;
-                              kwargs...)
-                 w = isnothing(pr) ? r.w : nothing_scalar_array_selector(r.w, pr.w)
-                 slv = solver_selector(r.slv, slv)
-                 return $(r)(; settings = r.settings, slv = slv, alpha = r.alpha, w = w)
-             end
-         end)
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create an instance of [`EntropicValueatRisk`](@ref) by selecting observation weights and solver from the risk-measure instance or falling back to the prior result.
+
+# Related
+
+  - [`EntropicValueatRisk`](@ref)
+  - [`AbstractPriorResult`](@ref)
+  - [`factory`](@ref)
+  - [`nothing_scalar_array_selector`](@ref)
+  - [`solver_selector`](@ref)
+"""
+function factory(r::EntropicValueatRisk, pr::AbstractPriorResult,
+                 slv::Option{<:Slv_VecSlv} = nothing, args...;
+                 kwargs...)::EntropicValueatRisk
+    w = nothing_scalar_array_selector(r.w, pr.w)
+    slv = solver_selector(r.slv, slv)
+    return EntropicValueatRisk(; settings = r.settings, slv = slv, alpha = r.alpha, w = w)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create an instance of [`EntropicValueatRisk`](@ref) by overriding the solver and optionally selecting observation weights from the prior result.
+
+# Related
+
+  - [`EntropicValueatRisk`](@ref)
+  - [`AbstractPriorResult`](@ref)
+  - [`factory`](@ref)
+  - [`nothing_scalar_array_selector`](@ref)
+  - [`solver_selector`](@ref)
+"""
+function factory(r::EntropicValueatRisk, slv::Slv_VecSlv,
+                 pr::Option{<:AbstractPriorResult} = nothing, args...;
+                 kwargs...)::EntropicValueatRisk
+    w = isnothing(pr) ? r.w : nothing_scalar_array_selector(r.w, pr.w)
+    slv = solver_selector(r.slv, slv)
+    return EntropicValueatRisk(; settings = r.settings, slv = slv, alpha = r.alpha, w = w)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create an instance of [`EntropicDrawdownatRisk`](@ref) by selecting observation weights and solver from the risk-measure instance or falling back to the prior result.
+
+# Related
+
+  - [`EntropicDrawdownatRisk`](@ref)
+  - [`AbstractPriorResult`](@ref)
+  - [`factory`](@ref)
+  - [`nothing_scalar_array_selector`](@ref)
+  - [`solver_selector`](@ref)
+"""
+function factory(r::EntropicDrawdownatRisk, pr::AbstractPriorResult,
+                 slv::Option{<:Slv_VecSlv} = nothing, args...;
+                 kwargs...)::EntropicDrawdownatRisk
+    w = nothing_scalar_array_selector(r.w, pr.w)
+    slv = solver_selector(r.slv, slv)
+    return EntropicDrawdownatRisk(; settings = r.settings, slv = slv, alpha = r.alpha,
+                                  w = w)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create an instance of [`EntropicDrawdownatRisk`](@ref) by overriding the solver and optionally selecting observation weights from the prior result.
+
+# Related
+
+  - [`EntropicDrawdownatRisk`](@ref)
+  - [`AbstractPriorResult`](@ref)
+  - [`factory`](@ref)
+  - [`nothing_scalar_array_selector`](@ref)
+  - [`solver_selector`](@ref)
+"""
+function factory(r::EntropicDrawdownatRisk, slv::Slv_VecSlv,
+                 pr::Option{<:AbstractPriorResult} = nothing, args...;
+                 kwargs...)::EntropicDrawdownatRisk
+    w = isnothing(pr) ? r.w : nothing_scalar_array_selector(r.w, pr.w)
+    slv = solver_selector(r.slv, slv)
+    return EntropicDrawdownatRisk(; settings = r.settings, slv = slv, alpha = r.alpha,
+                                  w = w)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create an instance of [`RelativeEntropicDrawdownatRisk`](@ref) by selecting observation weights and solver from the risk-measure instance or falling back to the prior result.
+
+# Related
+
+  - [`RelativeEntropicDrawdownatRisk`](@ref)
+  - [`AbstractPriorResult`](@ref)
+  - [`factory`](@ref)
+  - [`nothing_scalar_array_selector`](@ref)
+  - [`solver_selector`](@ref)
+"""
+function factory(r::RelativeEntropicDrawdownatRisk, pr::AbstractPriorResult,
+                 slv::Option{<:Slv_VecSlv} = nothing, args...;
+                 kwargs...)::RelativeEntropicDrawdownatRisk
+    w = nothing_scalar_array_selector(r.w, pr.w)
+    slv = solver_selector(r.slv, slv)
+    return RelativeEntropicDrawdownatRisk(; settings = r.settings, slv = slv,
+                                          alpha = r.alpha, w = w)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create an instance of [`RelativeEntropicDrawdownatRisk`](@ref) by overriding the solver and optionally selecting observation weights from the prior result.
+
+# Related
+
+  - [`RelativeEntropicDrawdownatRisk`](@ref)
+  - [`AbstractPriorResult`](@ref)
+  - [`factory`](@ref)
+  - [`nothing_scalar_array_selector`](@ref)
+  - [`solver_selector`](@ref)
+"""
+function factory(r::RelativeEntropicDrawdownatRisk, slv::Slv_VecSlv,
+                 pr::Option{<:AbstractPriorResult} = nothing, args...;
+                 kwargs...)::RelativeEntropicDrawdownatRisk
+    w = isnothing(pr) ? r.w : nothing_scalar_array_selector(r.w, pr.w)
+    slv = solver_selector(r.slv, slv)
+    return RelativeEntropicDrawdownatRisk(; settings = r.settings, slv = slv,
+                                          alpha = r.alpha, w = w)
 end
 
 export EntropicValueatRisk, EntropicValueatRiskRange, EntropicDrawdownatRisk,

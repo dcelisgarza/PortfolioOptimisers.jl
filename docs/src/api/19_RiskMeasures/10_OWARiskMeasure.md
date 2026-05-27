@@ -25,6 +25,7 @@ OrderedWeightsArray
 OrderedWeightsArrayRange
 OWAJuMP
 owa_l_moment_crm
+owa_l_moment_crm_sumsq_obj
 owa_l_moment
 owa_gmd
 owa_cvar
@@ -38,4 +39,5 @@ owa_tgrg
 ncrra_weights
 owa_model_setup
 owa_model_solve
+owa_l_moment_crm_entropy
 ```

@@ -149,6 +149,18 @@ Matches either a [`RiskBudgetEstimator`](@ref) (specifying how to generate risk 
   - [`risk_budget_constraints`](@ref)
 """
 const RkbE_Rkb = Union{<:RiskBudgetEstimator, <:RiskBudget}
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the [`RiskBudgetEstimator`](@ref) `rb` unchanged.
+
+Identity pass-through: estimators are not sliced by cluster index.
+
+# Related
+
+  - [`RiskBudgetEstimator`](@ref)
+  - [`risk_budget_view`](@ref)
+"""
 function risk_budget_view(rb::RiskBudgetEstimator, ::Any)::RiskBudgetEstimator
     return rb
 end

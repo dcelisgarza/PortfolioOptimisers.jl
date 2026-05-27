@@ -53,4 +53,5 @@ sigma_ucs(ue::NormalUncertaintySet{<:Any,
                                             <:Any, <:Any, <:Any}, X::MatNum,
                    F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
 commutation_matrix
+choose_scaling_parameter(ue::NormalUncertaintySet, pr::LowOrderPrior)
 ```

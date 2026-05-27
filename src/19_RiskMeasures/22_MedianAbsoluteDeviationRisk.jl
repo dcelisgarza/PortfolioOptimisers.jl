@@ -55,13 +55,23 @@ Represents the Median Absolute Deviation (MAD) risk measure for hierarchical por
 
 `MedianAbsoluteDeviation` computes the median (or mean) absolute deviation of portfolio returns about a specified centre, providing a robust alternative to variance for measuring dispersion.
 
-# Mathematical Definition
+# Mathematical definition
 
 Let ``\\mu`` be the chosen centre (median or mean of returns, or a user-supplied value). Define the deviations ``\\delta_t = x_t - \\mu``. The MAD is:
 
 ```math
-\\mathrm{MAD}(\\boldsymbol{x}) = \\mathrm{median}_{1 \\leq t \\leq T}(|\\delta_t|)\\,.
+\\begin{align}
+\\mathrm{MAD}(\\boldsymbol{x}) &= \\mathrm{median}_{1 \\leq t \\leq T}(|\\delta_t|)\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``\\mathrm{MAD}(\\boldsymbol{x})``: Median absolute deviation of portfolio returns.
+  - $(math_dict[:xret])
+  - $(math_dict[:T])
+  - ``\\mu``: Chosen centre (median, mean, or user-supplied value).
+  - ``\\delta_t = x_t - \\mu``: Deviation of return at period ``t`` from the centre.
 
 When `flag = true` (default), the result is scaled by a consistency factor ``(\\Phi^{-1}(3/4))^{-1} \\approx 1.4826`` so that the MAD is a consistent estimator of the standard deviation under normality.
 
@@ -147,18 +157,82 @@ function MedianAbsoluteDeviation(;
                                  flag::Bool = true)::MedianAbsoluteDeviation
     return MedianAbsoluteDeviation(settings, w, mu, flag)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create an instance of [`MedianAbsoluteDeviation`](@ref) by selecting observation weights from the risk-measure instance or falling back to the prior result.
+
+# Related
+
+  - [`MedianAbsoluteDeviation`](@ref)
+  - [`AbstractPriorResult`](@ref)
+  - [`factory`](@ref)
+  - [`nothing_scalar_array_selector`](@ref)
+"""
 function factory(r::MedianAbsoluteDeviation, pr::AbstractPriorResult, args...;
                  kwargs...)::MedianAbsoluteDeviation
     w = nothing_scalar_array_selector(r.w, pr.w)
     return MedianAbsoluteDeviation(; settings = r.settings, w = w, mu = r.mu, flag = r.flag)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the [`MedianCenteringFunction`](@ref) `x` unchanged.
+
+Identity pass-through: centering functions are not sliced by asset index.
+
+# Related
+
+  - [`MedianCenteringFunction`](@ref)
+  - [`nothing_scalar_array_view`](@ref)
+"""
 function nothing_scalar_array_view(x::MedianCenteringFunction, ::Any)
     return x
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a view of [`MedianAbsoluteDeviation`](@ref) `r` sliced to asset indices `i`.
+
+Slices the centering target `mu` for cluster-based optimisation.
+
+# Related
+
+  - [`MedianAbsoluteDeviation`](@ref)
+  - [`risk_measure_view`](@ref)
+  - [`nothing_scalar_array_view`](@ref)
+"""
 function risk_measure_view(r::MedianAbsoluteDeviation, i, args...)::MedianAbsoluteDeviation
     mu = nothing_scalar_array_view(r.mu, i)
     return MedianAbsoluteDeviation(; settings = r.settings, w = r.w, mu = mu, flag = r.flag)
 end
+"""
+    calc_moment_target(::MedianAbsoluteDeviation{<:Any, Nothing, <:MeanCentering, ...}, ::Any, x::VecNum)
+    calc_moment_target(r::MedianAbsoluteDeviation{<:Any, <:ObsWeights, <:MeanCentering, ...}, ::Any, x::VecNum)
+    calc_moment_target(::MedianAbsoluteDeviation{<:Any, Nothing, <:MedianCentering, ...}, ::Any, x::VecNum)
+    calc_moment_target(r::MedianAbsoluteDeviation{<:Any, <:ObsWeights, <:MedianCentering, ...}, ::Any, x::VecNum)
+    calc_moment_target(r::MedianAbsoluteDeviation{<:Any, <:Any, <:VecNum, ...}, w::VecNum, ::Any)
+    calc_moment_target(r::MedianAbsoluteDeviation{<:Any, <:Any, <:Number, ...}, ::Any, ::Any)
+    calc_moment_target(r::MedianAbsoluteDeviation{<:Any, <:Any, <:VecScalar, ...}, w::VecNum, ::Any)
+
+Compute the centering target for [`MedianAbsoluteDeviation`](@ref) risk measure calculations.
+
+Dispatches on the type of `r.w` and `r.mu`:
+
+  - No weights + `MeanCentering`: arithmetic mean of `x`.
+  - `ObsWeights` + `MeanCentering`: weighted mean of `x`.
+  - No weights + `MedianCentering`: median of `x`.
+  - `ObsWeights` + `MedianCentering`: weighted median of `x`.
+  - `VecNum` mu: dot product ``\\boldsymbol{w}^\\intercal \\boldsymbol{\\mu}``.
+  - `Number` mu: the scalar `r.mu` directly.
+  - `VecScalar` mu: ``\\boldsymbol{w}^\\intercal \\boldsymbol{\\mu}_v + \\mu_s``.
+
+# Related
+
+  - [`MedianAbsoluteDeviation`](@ref)
+  - [`calc_moment_target`](@ref)
+  - [`calc_deviations_vec`](@ref)
+"""
 function calc_moment_target(::MedianAbsoluteDeviation{<:Any, Nothing, <:MeanCentering,
                                                       <:Any}, ::Any, x::VecNum)
     return Statistics.mean(x)
@@ -190,6 +264,17 @@ function calc_moment_target(r::MedianAbsoluteDeviation{<:Any, <:Any, <:VecScalar
                             w::VecNum, ::Any)
     return LinearAlgebra.dot(w, r.mu.v) + r.mu.s
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Compute the vector of deviations from the centering target for [`MedianAbsoluteDeviation`](@ref) risk measures.
+
+# Related
+
+  - [`MedianAbsoluteDeviation`](@ref)
+  - [`calc_deviations_vec`](@ref)
+  - [`calc_moment_target`](@ref)
+"""
 function calc_deviations_vec(r::MedianAbsoluteDeviation, w::VecNum, X::MatNum,
                              fees::Option{<:Fees} = nothing)
     x = calc_net_returns(w, X, fees)

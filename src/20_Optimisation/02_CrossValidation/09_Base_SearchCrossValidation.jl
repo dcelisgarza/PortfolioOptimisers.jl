@@ -43,7 +43,7 @@ Subtypes define the strategy used to select the best hyperparameter combination 
 """
 abstract type AbstractSearchCrossValidationAlgorithm <: AbstractAlgorithm end
 """
-    abstract type CrossValidationSearchScorer <: AbstractEstimator
+$(DocStringExtensions.TYPEDEF)
 
 Defines the interface for scoring strategies used in search cross-validation. Implementations select the optimal parameter set based on cross-validation scores.
 
@@ -123,8 +123,6 @@ Result type for search-based cross-validation routines. Stores the optimal estim
 
 $(DocStringExtensions.FIELDS)
 
-# Examples
-
 # Related
 
   - [`AbstractSearchCrossValidationResult`](@ref)
@@ -182,8 +180,6 @@ Fits a portfolio optimisation estimator on training data, scores it on test and 
   - [`expected_risk`](@ref)
   - [`predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)`](@ref)
   - [`NonFiniteAllocationOptimisationEstimator`](@ref)
-
-# Examples
 """
 function fit_and_score(opt::NonFiniteAllocationOptimisationEstimator,
                        scv::AbstractSearchCrossValidationEstimator, rd::ReturnsResult,

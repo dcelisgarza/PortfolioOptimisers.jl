@@ -5,6 +5,50 @@ Augmented Black-Litterman prior estimator for asset returns.
 
 `AugmentedBlackLittermanPrior` is a low order prior estimator that computes the mean and covariance of asset returns using an augmented Black-Litterman model. It combines asset and factor prior estimators, matrix post-processing, regression and variance estimators, asset and factor views, asset and factor sets, view confidences, weights, risk-free rate, leverage, and a blending parameter `tau`. This estimator supports both direct and constraint-based views, flexible confidence specification, and matrix processing, and incorporates joint asset-factor Bayesian updating for posterior inference.
 
+# Mathematical definition
+
+Factor model linking assets and factors via regression:
+
+```math
+\\begin{align}
+\\mathbf{X} &\\approx \\mathbf{F}\\mathbf{M}^{\\intercal} + \\mathbf{1}\\boldsymbol{b}^{\\intercal}\\,.
+\\end{align}
+```
+
+Augmented prior moments (stacking asset and factor priors):
+
+```math
+\\begin{align}
+\\boldsymbol{\\mu}_{aug} &= \\begin{pmatrix}\\boldsymbol{\\mu}_a \\\\ \\boldsymbol{\\mu}_f\\end{pmatrix}\\,, \\\\
+\\boldsymbol{\\Sigma}_{aug} &= \\begin{pmatrix}\\boldsymbol{\\Sigma}_a & \\boldsymbol{\\Sigma}_a\\mathbf{M}^{\\intercal} \\\\ \\mathbf{M}\\boldsymbol{\\Sigma}_a & \\boldsymbol{\\Sigma}_f\\end{pmatrix}\\,.
+\\end{align}
+```
+
+Black-Litterman posterior on the augmented space with combined views ``(\\mathbf{P}_{aug}, \\boldsymbol{q}_{aug})``:
+
+```math
+\\begin{align}
+\\boldsymbol{\\mu}_{post} &= \\boldsymbol{\\mu}_{aug} + \\tau\\boldsymbol{\\Sigma}_{aug}\\mathbf{P}_{aug}^{\\intercal}\\left(\\tau\\mathbf{P}_{aug}\\boldsymbol{\\Sigma}_{aug}\\mathbf{P}_{aug}^{\\intercal} + \\boldsymbol{\\Omega}_{aug}\\right)^{-1}\\!\\left(\\boldsymbol{q}_{aug} - \\mathbf{P}_{aug}\\boldsymbol{\\mu}_{aug}\\right)\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathbf{X}``: ``T \\times N`` asset returns matrix.
+  - ``\\mathbf{F}``: ``T \\times K`` factor returns matrix.
+  - ``\\mathbf{M}``: ``K \\times N`` factor loadings (regression coefficients).
+  - ``\\boldsymbol{b}``: ``N \\times 1`` regression intercept vector.
+  - ``\\boldsymbol{\\mu}_a``, ``\\boldsymbol{\\Sigma}_a``: Asset prior mean and covariance.
+  - ``\\boldsymbol{\\mu}_f``, ``\\boldsymbol{\\Sigma}_f``: Factor prior mean and covariance.
+  - ``\\boldsymbol{\\mu}_{aug}``, ``\\boldsymbol{\\Sigma}_{aug}``: Augmented (joint asset-factor) prior moments.
+  - ``\\boldsymbol{\\mu}_{post}``: Augmented posterior mean (asset component extracted as final result).
+  - ``\\tau``: Scaling parameter for the prior uncertainty.
+  - ``\\mathbf{P}_{aug}``: Combined asset and factor views matrix.
+  - ``\\boldsymbol{q}_{aug}``: Combined asset and factor views vector.
+  - ``\\boldsymbol{\\Omega}_{aug}``: Combined view uncertainty matrix.
+
+Asset posterior extracted from the augmented result and adjusted for intercept and risk-free rate.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -226,6 +270,16 @@ function AugmentedBlackLittermanPrior(;
     return AugmentedBlackLittermanPrior(a_pe, f_pe, mp, re, a_views, f_views, a_sets,
                                         f_sets, a_views_conf, f_views_conf, w, rf, l, tau)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a new [`AugmentedBlackLittermanPrior`](@ref) estimator with observation weights `w` applied to the underlying asset prior, factor prior, and regression estimators.
+
+# Related
+
+  - [`AugmentedBlackLittermanPrior`](@ref)
+  - [`factory`](@ref)
+"""
 function factory(pe::AugmentedBlackLittermanPrior,
                  w::ObsWeights)::AugmentedBlackLittermanPrior
     return AugmentedBlackLittermanPrior(; a_pe = factory(pe.a_pe, w),
@@ -236,6 +290,16 @@ function factory(pe::AugmentedBlackLittermanPrior,
                                         f_views_conf = pe.f_views_conf, w = pe.w,
                                         rf = pe.rf, l = pe.l, tau = pe.tau)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a new [`AugmentedBlackLittermanPrior`](@ref) estimator restricted to the assets at index `i`.
+
+# Related
+
+  - [`AugmentedBlackLittermanPrior`](@ref)
+  - [`prior_view`](@ref)
+"""
 function prior_view(pe::AugmentedBlackLittermanPrior, i)::AugmentedBlackLittermanPrior
     return AugmentedBlackLittermanPrior(; a_pe = prior_view(pe.a_pe, i), f_pe = pe.f_pe,
                                         mp = pe.mp, re = regression_view(pe.re, i),
@@ -246,6 +310,11 @@ function prior_view(pe::AugmentedBlackLittermanPrior, i)::AugmentedBlackLitterma
                                         w = nothing_scalar_array_view(pe.w, i), rf = pe.rf,
                                         l = pe.l, tau = pe.tau)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Access properties of [`AugmentedBlackLittermanPrior`](@ref). Exposes `:me`, `:ce` from the asset prior `obj.a_pe` and `:f_me`, `:f_ce` from the factor prior `obj.f_pe` for transparent access.
+"""
 function Base.getproperty(obj::AugmentedBlackLittermanPrior, sym::Symbol)
     return if sym == :me
         obj.a_pe.me

@@ -251,6 +251,8 @@ $(DocStringExtensions.FIELDS)
         rt::JuMPReturnsEstimator = ArithmeticReturn()
     ) -> ExpectedReturn
 
+Keywords correspond to the struct's fields.
+
 # Examples
 
 ```jldoctest
@@ -307,7 +309,6 @@ This function creates a new [`ExpectedReturn`](@ref) instance by updating the in
   - [`ExpectedReturn`](@ref)
   - [`AbstractPriorResult`](@ref)
   - [`factory`](@ref)
-  - [`factory`](@ref)
 """
 function factory(r::ExpectedReturn, args...; kwargs...)::ExpectedReturn
     rt = factory(r.rt, args...; kwargs...)
@@ -361,6 +362,8 @@ $(DocStringExtensions.FIELDS)
         rk::AbstractBaseRiskMeasure = Variance(),
         rf::Number = 0.0,
     ) -> ExpectedReturnRiskRatio
+
+Keywords correspond to the struct's fields.
 
 # Examples
 

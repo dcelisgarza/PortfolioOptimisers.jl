@@ -68,12 +68,13 @@ on the sum of weights. At least one of `lb` or `ub` must be provided.
 
 # Fields
 
-  - `lb::Option{<:Number}`: Lower bound on the sum of weights. Defaults to `1.0`.
-  - `ub::Option{<:Number}`: Upper bound on the sum of weights. Defaults to `1.0`.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
     BudgetRange(; lb::Option{<:Number} = 1.0, ub::Option{<:Number} = 1.0) -> BudgetRange
+
+Keywords correspond to the struct's fields.
 
 ## Validation
 
@@ -86,11 +87,11 @@ on the sum of weights. At least one of `lb` or `ub` must be provided.
   - [`BudgetCosts`](@ref)
   - [`BudgetMarketImpact`](@ref)
   - [`set_weight_constraints!`](@ref)
-  - [`BudgetCosts`](@ref)
-  - [`BudgetMarketImpact`](@ref)
 """
 @concrete struct BudgetRange <: BudgetEstimator
+    "$(field_dict[:lb])"
     lb
+    "$(field_dict[:ub])"
     ub
     function BudgetRange(lb::Option{<:Number}, ub::Option{<:Number})
         lb_flag = isnothing(lb)
@@ -159,6 +160,55 @@ Add budget constraints to the JuMP optimisation model.
 
 The fall-through method does nothing. The concrete methods add the appropriate portfolio budget constraint based on the type of budget specification provided.
 
+# Mathematical definition
+
+Fixed / range:
+
+```math
+\\begin{align}
+k \\cdot \\mathrm{lb} &\\leq \\sum_i w_i \\leq k \\cdot \\mathrm{ub}\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:w_port])
+  - $(math_dict[:k_budget])
+  - ``\\mathrm{lb}``, ``\\mathrm{ub}``: Lower and upper budget bounds.
+
+Linear cost budget ([`BudgetCosts`](@ref)):
+
+```math
+\\begin{align}
+\\sum_i w_i + \\boldsymbol{v}_p^\\intercal \\boldsymbol{w}_p + \\boldsymbol{v}_n^\\intercal \\boldsymbol{w}_n \\in [k\\,\\mathrm{lb},\\; k\\,\\mathrm{ub}]\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:w_port])
+  - $(math_dict[:k_budget])
+  - ``\\boldsymbol{w}_p``, ``\\boldsymbol{w}_n``: Positive and negative weight increments.
+  - ``\\boldsymbol{v}_p``, ``\\boldsymbol{v}_n``: Cost coefficient vectors for positive and negative changes.
+  - ``\\mathrm{lb}``, ``\\mathrm{ub}``: Lower and upper budget bounds.
+
+Power-law market-impact budget ([`BudgetMarketImpact`](@ref)):
+
+```math
+\\begin{align}
+\\sum_i w_i + \\boldsymbol{v}_p^\\intercal \\boldsymbol{w}_p^\\beta + \\boldsymbol{v}_n^\\intercal \\boldsymbol{w}_n^\\beta \\in [k\\,\\mathrm{lb},\\; k\\,\\mathrm{ub}]\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:w_port])
+  - $(math_dict[:k_budget])
+  - ``\\boldsymbol{w}_p``, ``\\boldsymbol{w}_n``: Positive and negative weight increments.
+  - ``\\boldsymbol{v}_p``, ``\\boldsymbol{v}_n``: Market-impact cost coefficient vectors.
+  - ``\\beta \\in (0, 1]``: Market-impact power exponent.
+  - ``\\mathrm{lb}``, ``\\mathrm{ub}``: Lower and upper budget bounds.
+
 # Arguments
 
   - $(arg_dict[:model])
@@ -183,26 +233,28 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Budget constraint that accounts for linear transaction costs. Models the portfolio
-budget as:
+Budget constraint that accounts for linear transaction costs.
+
+# Mathematical definition
+
+Models the portfolio budget as:
 
 ```math
+\\begin{align}
 \\boldsymbol{v}_p^\\intercal \\boldsymbol{w}_p + \\boldsymbol{v}_n^\\intercal \\boldsymbol{w}_n
-\\in [\\mathrm{lb}, \\mathrm{ub}]
+\\in [\\mathrm{lb}, \\mathrm{ub}]\\,.
+\\end{align}
 ```
 
-where ``\\boldsymbol{w}_p``, ``\\boldsymbol{w}_n`` are the positive and negative weight
-increments, and ``\\boldsymbol{v}_p``, ``\\boldsymbol{v}_n`` are the corresponding
-cost coefficients.
+Where:
+
+  - ``\\boldsymbol{w}_p``, ``\\boldsymbol{w}_n``: Positive and negative weight increments.
+  - ``\\boldsymbol{v}_p``, ``\\boldsymbol{v}_n``: Cost coefficient vectors for positive and negative changes.
+  - ``\\mathrm{lb}``, ``\\mathrm{ub}``: Lower and upper budget bounds.
 
 # Fields
 
-  - `bgt::Num_BgtRg`: Budget target or range.
-  - `w::VecNum`: Initial portfolio weights (current holdings).
-  - `vp::Num_VecNum`: Cost coefficients for positive weight changes. Non-negative.
-  - `vn::Num_VecNum`: Cost coefficients for negative weight changes. Non-negative.
-  - `up::Num_VecNum`: Upper limit on positive weight changes. Non-negative.
-  - `un::Num_VecNum`: Upper limit on negative weight changes. Non-negative.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -215,19 +267,33 @@ cost coefficients.
         un::Num_VecNum = 1.0
     ) -> BudgetCosts
 
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - `!isempty(w)`.
+  - If `vp` is a vector: `!isempty(vp)` and all elements `>= 0`. If scalar: `>= 0`.
+  - If `vn` is a vector: `!isempty(vn)` and all elements `>= 0`. If scalar: `>= 0`.
+  - If `up` is a vector: `!isempty(up)` and all elements `>= 0`. If scalar: `>= 0`.
+  - If `un` is a vector: `!isempty(un)` and all elements `>= 0`. If scalar: `>= 0`.
+
 # Related
 
   - [`BudgetRange`](@ref)
   - [`BudgetMarketImpact`](@ref)
-  - [`BudgetRange`](@ref)
-  - [`BudgetMarketImpact`](@ref)
 """
 @concrete struct BudgetCosts <: BudgetCostEstimator
+    "Budget target or range."
     bgt
+    "$(field_dict[:pw])"
     w
+    "Cost coefficients for positive weight changes. Non-negative."
     vp
+    "Cost coefficients for negative weight changes. Non-negative."
     vn
+    "Upper limit on positive weight changes. Non-negative."
     up
+    "Upper limit on negative weight changes. Non-negative."
     un
     function BudgetCosts(bgt::Num_BgtRg, w::VecNum, vp::Num_VecNum, vn::Num_VecNum,
                          up::Num_VecNum, un::Num_VecNum)
@@ -285,28 +351,50 @@ impact function.
 
 # Fields
 
-  - `bgt::Num_BgtRg`: Budget target or range.
-  - `w::VecNum`: Initial portfolio weights.
-  - `vp::Num_VecNum`: Cost coefficients for positive weight changes. Non-negative.
-  - `vn::Num_VecNum`: Cost coefficients for negative weight changes. Non-negative.
-  - `up::Num_VecNum`: Upper limit on positive weight changes. Non-negative.
-  - `un::Num_VecNum`: Upper limit on negative weight changes. Non-negative.
-  - `beta::Number`: Market impact exponent in `(0, 1]`.
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    BudgetMarketImpact(;
+        bgt::Num_BgtRg = 1.0,
+        w::VecNum,
+        vp::Num_VecNum = 1.0,
+        vn::Num_VecNum = 1.0,
+        up::Num_VecNum = 1.0,
+        un::Num_VecNum = 1.0,
+        beta::Number = 2/3
+    ) -> BudgetMarketImpact
+
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - `!isempty(w)`.
+  - If `vp` is a vector: `!isempty(vp)` and all elements `>= 0`. If scalar: `>= 0`.
+  - If `vn` is a vector: `!isempty(vn)` and all elements `>= 0`. If scalar: `>= 0`.
+  - If `up` is a vector: `!isempty(up)` and all elements `>= 0`. If scalar: `>= 0`.
+  - If `un` is a vector: `!isempty(un)` and all elements `>= 0`. If scalar: `>= 0`.
+  - `0 <= beta <= 1`.
 
 # Related
 
   - [`BudgetRange`](@ref)
   - [`BudgetCosts`](@ref)
-  - [`BudgetRange`](@ref)
-  - [`BudgetCosts`](@ref)
 """
 @concrete struct BudgetMarketImpact <: BudgetCostEstimator
+    "Budget target or range."
     bgt
+    "$(field_dict[:pw])"
     w
+    "Cost coefficients for positive weight changes. Non-negative."
     vp
+    "Cost coefficients for negative weight changes. Non-negative."
     vn
+    "Upper limit on positive weight changes. Non-negative."
     up
+    "Upper limit on negative weight changes. Non-negative."
     un
+    "Market impact exponent in `(0, 1]`."
     beta
     function BudgetMarketImpact(bgt::Num_BgtRg, w::VecNum, vp::Num_VecNum, vn::Num_VecNum,
                                 up::Num_VecNum, un::Num_VecNum, beta::Number)

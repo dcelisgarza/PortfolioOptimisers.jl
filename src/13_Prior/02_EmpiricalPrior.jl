@@ -79,10 +79,29 @@ function EmpiricalPrior(;
                         horizon::Option{<:Number} = nothing)::EmpiricalPrior
     return EmpiricalPrior(ce, me, horizon)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a new [`EmpiricalPrior`](@ref) estimator with observation weights `w` applied to the underlying covariance and expected returns estimators.
+
+# Related
+
+  - [`EmpiricalPrior`](@ref)
+  - [`factory`](@ref)
+"""
 function factory(pe::EmpiricalPrior, w::ObsWeights)::EmpiricalPrior
     return EmpiricalPrior(; me = factory(pe.me, w), ce = factory(pe.ce, w),
                           horizon = pe.horizon)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a new [`EmpiricalPrior`](@ref) estimator restricted to the assets at index `i`.
+
+# Related
+
+  - [`EmpiricalPrior`](@ref)
+"""
 function prior_view(pe::EmpiricalPrior, i)::EmpiricalPrior
     return EmpiricalPrior(; me = moment_view(pe.me, i), ce = moment_view(pe.ce, i),
                           horizon = pe.horizon)
@@ -94,6 +113,24 @@ end
 Compute empirical prior moments for asset returns (no horizon adjustment).
 
 `prior` estimates the mean and covariance of asset returns using the specified empirical prior estimator, without log-normalisation or scaling for investment horizon. The mean and covariance are computed using the estimators stored in `pe`, and returned in a [`LowOrderPrior`](@ref) result.
+
+# Mathematical definition
+
+The empirical prior directly estimates first and second moments from the sample:
+
+```math
+\\begin{align}
+\\hat{\\boldsymbol{\\mu}} &= \\frac{1}{T} \\sum_{t=1}^{T} \\boldsymbol{x}_t\\,, \\\\
+\\hat{\\mathbf{\\Sigma}} &= \\frac{1}{T-1} \\sum_{t=1}^{T} (\\boldsymbol{x}_t - \\hat{\\boldsymbol{\\mu}})(\\boldsymbol{x}_t - \\hat{\\boldsymbol{\\mu}})^\\intercal\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\hat{\\boldsymbol{\\mu}}``: ``N \\times 1`` sample mean vector.
+  - ``\\hat{\\mathbf{\\Sigma}}``: ``N \\times N`` sample covariance matrix.
+  - ``\\boldsymbol{x}_t``: ``N \\times 1`` vector of asset returns at time ``t``.
+  - $(math_dict[:T])
 
 # Arguments
 
@@ -134,6 +171,32 @@ end
 Compute empirical prior moments for asset returns with investment horizon adjustment.
 
 `prior` estimates the mean and covariance of asset returns using the specified empirical prior estimator, applying log-normalisation and scaling for the investment horizon. The asset returns are log-transformed, moments are computed using the estimators stored in `pe`, and then rescaled according to the investment horizon. The final mean and covariance are transformed back to arithmetic returns and returned in a [`LowOrderPrior`](@ref) result.
+
+# Mathematical definition
+
+Log-returns are computed and scaled by the investment horizon ``h``, then converted back to arithmetic returns:
+
+```math
+\\begin{align}
+\\tilde{\\boldsymbol{\\mu}} &= h \\cdot \\hat{\\boldsymbol{\\mu}}_{\\log}\\,, \\\\
+\\tilde{\\mathbf{\\Sigma}} &= h \\cdot \\hat{\\mathbf{\\Sigma}}_{\\log}\\,.
+\\end{align}
+```
+
+```math
+\\begin{align}
+\\hat{\\mu}_i &= \\exp\\!\\left(\\tilde{\\mu}_i + \\tfrac{1}{2}\\tilde{\\sigma}_{ii}\\right) - 1\\,, \\\\
+\\hat{\\sigma}_{ij} &= (\\hat{\\mu}_i + 1)(\\hat{\\mu}_j + 1)\\left(\\exp(\\tilde{\\sigma}_{ij}) - 1\\right)\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\tilde{\\boldsymbol{\\mu}}``, ``\\tilde{\\mathbf{\\Sigma}}``: Horizon-scaled log-return mean and covariance.
+  - ``h``: Investment horizon.
+  - ``\\hat{\\boldsymbol{\\mu}}_{\\log}``, ``\\hat{\\mathbf{\\Sigma}}_{\\log}``: Sample mean and covariance of log-returns ``\\log(1 + x_t)``.
+  - ``\\hat{\\mu}_i``: Arithmetic mean return for asset ``i``.
+  - ``\\hat{\\sigma}_{ij}``: Arithmetic covariance between assets ``i`` and ``j``.
 
 # Arguments
 

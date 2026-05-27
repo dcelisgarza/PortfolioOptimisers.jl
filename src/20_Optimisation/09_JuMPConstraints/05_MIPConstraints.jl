@@ -48,6 +48,20 @@ Add MIP-compatible weight bound constraints using binary selection variables.
 
 The fall-through method does nothing when `wb` is `nothing`. The concrete method adds `w ≥ is ⊙ lb` and `w ≤ il ⊙ ub` constraints when the respective finite bounds are present.
 
+# Mathematical definition
+
+```math
+\\begin{align}
+\\boldsymbol{i}_s \\odot \\boldsymbol{\\ell} \\leq \\boldsymbol{w} \\leq \\boldsymbol{i}_l \\odot \\boldsymbol{u}\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:w_port])
+  - ``\\boldsymbol{i}_l``, ``\\boldsymbol{i}_s``: Long and short binary indicator vectors.
+  - ``\\boldsymbol{\\ell}``, ``\\boldsymbol{u}``: Lower and upper bound vectors from `wb`.
+
 # Arguments
 
   - $(arg_dict[:model])
@@ -88,6 +102,39 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 Add MIP binary selection variables and threshold constraints for long-short portfolios.
 
 Creates `ilb`/`isb` binary indicator variables (or their continuous relaxations `ilf`/`isf` when `k` is a JuMP variable), enforces that each asset is either long or short but not both (`ilb + isb ≤ 1`), and applies long/short minimum-holding threshold and rebalancing constraints based on the flags provided.
+
+# Mathematical definition
+
+Mutual-exclusivity and big-M linearisation:
+
+```math
+\\begin{align}
+ilb_i + isb_i \\leq 1, \\quad ilf_i &= ilb_i \\cdot k, \\quad isf_i = isb_i \\cdot k\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``ilb_i``, ``isb_i``: Long and short binary indicator variables for asset ``i``.
+  - ``ilf_i``, ``isf_i``: Continuous relaxations of ``ilb_i \\cdot k`` and ``isb_i \\cdot k``.
+  - $(math_dict[:k_budget])
+
+Minimum-holding thresholds:
+
+```math
+\\begin{align}
+w_i &\\geq ilf_i\\, \\ell_i - M(1 - ilb_i)\\,, \\\\
+w_i &\\leq -isf_i\\, u_i + M(1 - isb_i)\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``w_i``: Portfolio weight for asset ``i``.
+  - ``ilf_i``, ``isf_i``: Long and short continuous indicator expressions.
+  - ``ilb_i``, ``isb_i``: Long and short binary indicator variables for asset ``i``.
+  - ``\\ell_i``, ``u_i``: Long and short minimum-holding thresholds for asset ``i``.
+  - ``M``: Big-M constant.
 
 # Arguments
 
@@ -187,6 +234,39 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 Add long-only MIP binary indicator variable and associated constraints to the JuMP optimisation model.
 
 Creates binary variable `ib[i]` per asset indicating whether the asset is held. When `k` is a JuMP variable, introduces continuous relaxation `ibf` with big-M linking constraints. Optionally applies minimum-holding threshold, fixed-fee, and rebalancing constraints.
+
+# Mathematical definition
+
+Big-M linearisation of ``ibf_i = ib_i \\cdot k``:
+
+```math
+\\begin{align}
+ibf_i &\\leq k, \\quad ibf_i \\leq M\\, ib_i, \\quad ibf_i + M(1 - ib_i) \\geq k\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``ib_i``: Binary inclusion indicator for asset ``i``.
+  - ``ibf_i``: Continuous relaxation of ``ib_i \\cdot k``.
+  - $(math_dict[:k_budget])
+  - ``M``: Big-M constant.
+
+Minimum-holding threshold and cardinality:
+
+```math
+\\begin{align}
+w_i &\\geq ibf_i\\, \\ell_i\\,, \\\\
+\\sum_i ib_i &\\leq \\mathrm{card}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``w_i``: Portfolio weight for asset ``i``.
+  - ``ibf_i``: Continuous relaxation of ``ib_i \\cdot k``.
+  - ``\\ell_i``: Minimum-holding threshold for asset ``i``.
+  - ``\\mathrm{card}``: Maximum number of non-zero assets (cardinality bound).
 
 # Arguments
 

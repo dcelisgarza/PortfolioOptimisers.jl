@@ -169,6 +169,50 @@ Maintains separate exponentially weighted running means for the covariance and t
 correlation, combining them at each step. After processing all observations, the result is
 scaled by the squared regime multiplier derived from the smoothed regime state.
 
+# Mathematical definition
+
+EWM covariance update (decay ``\\lambda``) and correlation (decay ``\\lambda_c``):
+
+```math
+\\begin{align}
+C_{ij,t} &= \\lambda C_{ij,t-1} + (1-\\lambda)(r_{i,t}-\\bar{r}_i)(r_{j,t}-\\bar{r}_j)\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``C_{ij,t}``: EWM covariance between assets ``i`` and ``j`` at time ``t``.
+  - ``\\lambda``: Covariance decay factor.
+  - ``r_{i,t}``: Return of asset ``i`` at time ``t``.
+  - ``\\bar{r}_i``: Mean return of asset ``i``.
+
+```math
+\\begin{align}
+\\rho_{ij,t} &= \\lambda_c \\rho_{ij,t-1} + (1-\\lambda_c)\\frac{(r_{i,t}-\\bar{r}_i)(r_{j,t}-\\bar{r}_j)}{\\sqrt{v_{i,t} v_{j,t}}}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\rho_{ij,t}``: EWM correlation between assets ``i`` and ``j`` at time ``t``.
+  - ``\\lambda_c``: Correlation decay factor.
+  - ``v_{i,t}``: EWM variance of asset ``i`` at time ``t``.
+
+The regime state ``s_t`` is smoothed from ``z_t^2`` using `regime_decay`. Final covariance:
+
+```math
+\\begin{align}
+\\hat{\\Sigma}_{ij} &= \\mathrm{mult}(s_T)^2 \\cdot \\rho_{ij,T}\\sqrt{v_{i,T} v_{j,T}}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\hat{\\Sigma}_{ij}``: Regime-adjusted covariance between assets ``i`` and ``j``.
+  - ``\\mathrm{mult}(s_T)``: Regime multiplier derived from the smoothed regime state ``s_T``.
+  - ``\\rho_{ij,T}``: Final EWM correlation.
+  - ``v_{i,T}``: Final EWM variance of asset ``i``.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -250,5 +294,5 @@ function RegimeAdjustedExpWeightedCovariance(; decay::Number = exp2(-inv(40.0)),
                                                regime_decay, regime_target)
 end
 
-# export RegimeAdjustedTarget, MahalanobisTarget, DiagonalTarget, PortfolioTarget,
-#       RegimeAdjustedExpWeightedCovariance
+export RegimeAdjustedTarget, MahalanobisTarget, DiagonalTarget, PortfolioTarget,
+       RegimeAdjustedExpWeightedCovariance

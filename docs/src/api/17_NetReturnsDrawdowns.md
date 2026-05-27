@@ -8,4 +8,7 @@ calc_net_asset_returns
 cumulative_returns
 drawdowns
 absolute_drawdown_arr
+relative_drawdown_arr
+_relative_cumulative_returns
+_absolute_cumulative_returns
 ```

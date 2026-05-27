@@ -24,6 +24,17 @@ Keywords correspond to the struct's fields.
   - $(val_dict[:oow])
   - If `window` is provided, it must be nonempty, nonnegative, and finite.
 
+# Examples
+
+```jldoctest
+julia> WindowedExpectedReturns()
+WindowedExpectedReturns
+      me ┼ SimpleExpectedReturns
+         │   w ┴ nothing
+       w ┼ nothing
+  window ┴ nothing
+```
+
 # Related
 
   - [`AbstractExpectedReturnsEstimator`](@ref)

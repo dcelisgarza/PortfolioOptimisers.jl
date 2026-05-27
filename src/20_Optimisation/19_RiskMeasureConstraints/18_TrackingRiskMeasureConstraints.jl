@@ -10,6 +10,25 @@ shifts the weight vector by a benchmark before delegating to [`set_triv_risk_con
 The dependent-variable overload computes a benchmark risk and adds an L1-norm cone on the
 risk difference via [`set_trdv_risk_constraints!`](@ref).
 
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathrm{TR}_p(\\boldsymbol{w}) &= \\frac{\\|\\mathbf{X}\\boldsymbol{w} - \\boldsymbol{b}\\,k\\|_p}{c_p}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathrm{TR}_p(\\boldsymbol{w})``: Tracking risk measure.
+  - ``\\mathbf{X}``: Return matrix ``T \\times N``.
+  - $(math_dict[:w_port])
+  - ``\\boldsymbol{b}``: Benchmark return series.
+  - ``k``: Rebalancing factor (0 or 1).
+  - ``c_p``: Normalisation constant depending on the norm order ``p``.
+
+where ``\\boldsymbol{b}`` is the benchmark return series, ``k`` is the budget scaling variable, and ``c_p`` is the norm-order scaling factor (``T``, ``\\sqrt{T-d}``, etc.).
+
 # Arguments
 
   - $(arg_dict[:model])

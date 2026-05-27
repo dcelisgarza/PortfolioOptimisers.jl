@@ -5,29 +5,51 @@ Intermediate result type storing processed optimisation attributes for `JuMPOpti
 
 Used internally to pass processed constraints, bounds, and other data between optimisation stages.
 
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
 # Related
 
   - [`JuMPOptimiser`](@ref)
   - [`MeanRisk`](@ref)
 """
 @concrete struct ProcessedJuMPOptimiserAttributes <: AbstractResult
+    "Prior estimation result."
     pr
+    "Processed weight bounds constraints."
     wb
+    "Processed long threshold constraints."
     lt
+    "Processed short threshold constraints."
     st
+    "Processed linear constraints result."
     lcsr
+    "Processed centrality constraints result."
     ctr
+    "Processed group cardinality constraints result."
     gcardr
+    "Processed sub-group cardinality constraints result."
     sgcardr
+    "Asset sets matrix for group selection."
     smtx
+    "Asset sets matrix for sub-group selection."
     sgmtx
+    "Processed long threshold constraints for groups."
     slt
+    "Processed short threshold constraints for groups."
     sst
+    "Processed long threshold constraints for sub-groups."
     sglt
+    "Processed short threshold constraints for sub-groups."
     sgst
+    "Processed turnover constraints."
     tn
+    "Processed fees constraints."
     fees
+    "Processed phylogeny constraints result."
     plr
+    "Processed JuMP returns estimator."
     ret
 end
 """
@@ -69,45 +91,7 @@ Main JuMP-based portfolio optimiser configuration.
 
 # Fields
 
-  - `pe`: Prior estimator or prior result.
-  - `slv`: Solver or vector of solvers.
-  - `wb`: Weight bounds estimator or bounds.
-  - `bgt`: Budget constraint (total weight sum). If a `Number`: the portfolio weights must sum to this value. If a `BudgetCostEstimator`: the budget is computed from asset-level data. Cannot be used together with `sbgt`.
-  - `sbgt`: Short-sale budget constraint range. If provided, `bgt` must not be a `BudgetCostEstimator`.
-  - `lt`: Long threshold estimator or threshold.
-  - `st`: Short threshold estimator or threshold.
-  - `lcse`: Linear constraint estimator or constraint(s).
-  - `cte`: Centring constraint estimator or constraint(s).
-  - `gcarde`: Grouped cardinality constraint estimator.
-  - `sgcarde`: Sub-grouped cardinality constraint estimator(s).
-  - `smtx`: Sub-group constraint matrix or estimator.
-  - `sgmtx`: Sub-grouped constraint matrix or estimator.
-  - `slt`: Sub-group long threshold.
-  - `sst`: Sub-group short threshold.
-  - `sglt`: Sub-grouped long threshold.
-  - `sgst`: Sub-grouped short threshold.
-  - `tn`: Turnover constraint estimator or constraints.
-  - `fees`: Fee estimator or fee structure.
-  - `sets`: Asset sets (required when any estimator-typed constraint is provided).
-  - `tr`: Tracking error constraint(s).
-  - `ple`: Placeholder constraints.
-  - `ret`: Returns estimator for JuMP models.
-  - `sca`: Scalariser for combining multiple risk measures.
-  - `ccnt`: Custom JuMP constraint.
-  - `cobj`: Custom JuMP objective.
-  - `sc`: Constraint scale factor.
-  - `so`: Objective scale factor.
-  - `ss`: Optional scalar shrinkage parameter.
-  - `card`: Global cardinality constraint (maximum number of non-zero weights).
-  - `scard`: Sub-group cardinality constraint(s).
-  - `nea`: Minimum number of effective assets.
-  - `l1`: L1 regularisation coefficient.
-  - `l2`: L2 regularisation coefficient.
-  - `linf`: L∞ regularisation coefficient.
-  - `lp`: Lp regularisation specification(s).
-  - `brt`: If `true`, uses bootstrap returns.
-  - `cle_pr`: If `true`, passes the prior result to the clustering estimator.
-  - `strict`: If `true`, strictly enforces weight bounds.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -155,6 +139,20 @@ Main JuMP-based portfolio optimiser configuration.
 
 Keywords correspond to the struct's fields.
 
+## Validation
+
+  - If `slv` is a vector: `!isempty(slv)`.
+  - If `bgt` is a number: `isfinite(bgt)`.
+  - If `bgt` is a `BudgetCostEstimator`: `isnothing(sbgt)`.
+  - If `sbgt` is a number: `isfinite(sbgt)` and `sbgt >= 0`.
+  - If `cte` is a vector: `!isempty(cte)`.
+  - If `card` is provided: `card > 0` and finite.
+  - If `tn` or `tr` is a vector: each must be non-empty.
+  - If `nea`, `l1`, `l2`, or `linf` is provided: each must be `> 0` and finite.
+  - If `scard` is provided: compatible `smtx`, `slt`, `sst` sizes required.
+  - If `sgcarde` is provided: compatible `sgmtx`, `sglt`, `sgst` sizes required.
+  - If any estimator-type field (`wb`, `lt`, `fees`, etc.) is provided: `!isnothing(sets)`.
+
 # Related
 
   - [`BaseJuMPOptimisationEstimator`](@ref)
@@ -163,44 +161,83 @@ Keywords correspond to the struct's fields.
   - [`RelaxedRiskBudgeting`](@ref)
 """
 @concrete struct JuMPOptimiser <: BaseJuMPOptimisationEstimator
+    "$(field_dict[:pe])"
     pe
+    "$(field_dict[:slv])"
     slv
+    "$(field_dict[:wb_jmp])"
     wb
+    "$(field_dict[:bgt])"
     bgt
+    "$(field_dict[:sbgt])"
     sbgt
+    "$(field_dict[:lt])"
     lt
+    "$(field_dict[:st])"
     st
+    "$(field_dict[:lcse])"
     lcse
+    "Centring constraint estimator or constraint(s)."
     cte
+    "$(field_dict[:gcarde])"
     gcarde
+    "$(field_dict[:sgcarde])"
     sgcarde
+    "$(field_dict[:smtx])"
     smtx
+    "$(field_dict[:sgmtx])"
     sgmtx
+    "$(field_dict[:slt])"
     slt
+    "$(field_dict[:sst])"
     sst
+    "$(field_dict[:sglt])"
     sglt
+    "$(field_dict[:sgst])"
     sgst
+    "$(field_dict[:tn_jmp])"
     tn
+    "$(field_dict[:fees_jmp])"
     fees
+    "$(field_dict[:sets])"
     sets
+    "$(field_dict[:tr_jmp])"
     tr
+    "$(field_dict[:ple])"
     ple
+    "$(field_dict[:ret_jmp])"
     ret
+    "$(field_dict[:sca])"
     sca
+    "$(field_dict[:ccnt])"
     ccnt
+    "$(field_dict[:cobj])"
     cobj
+    "$(field_dict[:sc])"
     sc
+    "$(field_dict[:so])"
     so
+    "$(field_dict[:ss])"
     ss
+    "$(field_dict[:card])"
     card
+    "$(field_dict[:scard])"
     scard
+    "$(field_dict[:nea])"
     nea
+    "$(field_dict[:l1])"
     l1
+    "$(field_dict[:l2])"
     l2
+    "$(field_dict[:linf])"
     linf
+    "$(field_dict[:lp])"
     lp
+    "$(field_dict[:brt])"
     brt
+    "$(field_dict[:cle_pr])"
     cle_pr
+    "$(field_dict[:strict_opt])"
     strict
     function JuMPOptimiser(pe::PrE_Pr, slv::Slv_VecSlv, wb::Option{<:WbE_Wb},
                            bgt::Option{<:Num_BgtCE}, sbgt::Option{<:Num_BgtRg},
@@ -428,6 +465,11 @@ function JuMPOptimiser(; pe::PrE_Pr = EmpiricalPrior(), slv::Slv_VecSlv,
                          ccnt, cobj, sc, so, ss, card, scard, nea, l1, l2, linf, lp, brt,
                          cle_pr, strict)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return `true` if any sub-estimator of `opt` requires previous portfolio weights (turnover, fees, tracking, custom constraint, or custom objective).
+"""
 function needs_previous_weights(opt::JuMPOptimiser)
     return (needs_previous_weights(opt.tn) ||
             needs_previous_weights(opt.fees) ||
@@ -435,6 +477,11 @@ function needs_previous_weights(opt::JuMPOptimiser)
             needs_previous_weights(opt.ccnt) ||
             needs_previous_weights(opt.cobj))
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Build an updated [`JuMPOptimiser`](@ref) with all estimator fields that track previous weights updated via `factory` using `w`.
+"""
 function factory(opt::JuMPOptimiser, w::AbstractVector)::JuMPOptimiser
     tn = factory(opt.tn, w)
     fees = factory(opt.fees, w)
@@ -452,6 +499,13 @@ function factory(opt::JuMPOptimiser, w::AbstractVector)::JuMPOptimiser
                          l1 = opt.l1, l2 = opt.l2, linf = opt.linf, lp = opt.lp,
                          brt = opt.brt, cle_pr = opt.cle_pr, strict = opt.strict)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a cluster-sliced copy of [`JuMPOptimiser`](@ref) for asset index set `i` and returns matrix `X`.
+
+Slices all per-asset estimator fields (prior, bounds, thresholds, turnover, fees, tracking, custom constraint/objective) to the cluster `i`, leaving solver and scalar parameters unchanged.
+"""
 function opt_view(opt::JuMPOptimiser, i, X::MatNum)::JuMPOptimiser
     X = isa(opt.pe, AbstractPriorResult) ? opt.pe.X : X
     pe = prior_view(opt.pe, i)

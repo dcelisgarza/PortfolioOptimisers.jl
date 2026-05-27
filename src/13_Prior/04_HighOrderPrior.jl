@@ -364,6 +364,19 @@ Internal helper used in high-order moment estimation. Returns the precomputed ma
 function dup_elim_sum_view(args...)
     return nothing, nothing, nothing
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Compute duplication, elimination, and summation matrices for a matrix argument.
+
+Overload of [`dup_elim_sum_view`](@ref) for a matrix argument. Returns the three matrices for dimension `n = size(M, 2)`.
+
+# Related
+
+  - [`duplication_matrix`](@ref)
+  - [`elimination_matrix`](@ref)
+  - [`summation_matrix`](@ref)
+"""
 function dup_elim_sum_view(::MatNum, n)
     return dup_elim_sum_matrices(n)
 end
@@ -428,7 +441,8 @@ HighOrderPriorEstimator
       │       │      dt ┼ nothing
       │       │     alg ┼ nothing
       │       │   order ┴ DenoiseDetoneAlg()
-      │   alg ┴ Full()
+      │   alg ┼ Full()
+      │     w ┴ nothing
   ske ┼ Coskewness
       │    me ┼ SimpleExpectedReturns
       │       │   w ┴ nothing
@@ -440,7 +454,8 @@ HighOrderPriorEstimator
       │       │      dt ┼ nothing
       │       │     alg ┼ nothing
       │       │   order ┴ DenoiseDetoneAlg()
-      │   alg ┴ Full()
+      │   alg ┼ Full()
+      │     w ┴ nothing
 ```
 
 # Related
@@ -476,15 +491,39 @@ function HighOrderPriorEstimator(;
                                                                                  alg = Full()))::HighOrderPriorEstimator
     return HighOrderPriorEstimator(pe, kte, ske)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a new [`HighOrderPriorEstimator`](@ref) with observation weights `w` applied to all sub-estimators.
+
+# Related
+
+  - [`HighOrderPriorEstimator`](@ref)
+  - [`factory`](@ref)
+"""
 function factory(pe::HighOrderPriorEstimator, w::ObsWeights)::HighOrderPriorEstimator
     return HighOrderPriorEstimator(; pe = factory(pe.pe, w), kte = factory(pe.kte, w),
                                    ske = factory(pe.ske, w))
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a new [`HighOrderPriorEstimator`](@ref) restricted to the assets at index `i`.
+
+# Related
+
+  - [`HighOrderPriorEstimator`](@ref)
+"""
 function prior_view(pr::HighOrderPriorEstimator, i)::HighOrderPriorEstimator
     return HighOrderPriorEstimator(; pe = prior_view(pr.pe, i),
                                    kte = moment_view(pr.kte, i),
                                    ske = moment_view(pr.ske, i))
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Access properties of [`HighOrderPriorEstimator`](@ref). Exposes `:me` and `:ce` from the embedded prior estimator `obj.pe` for transparent access.
+"""
 function Base.getproperty(obj::HighOrderPriorEstimator, sym::Symbol)
     return if sym == :me
         obj.pe.me
@@ -500,6 +539,31 @@ end
 Compute high order prior moments for asset returns using a composite estimator.
 
 `prior` estimates the mean, covariance, coskewness, and cokurtosis of asset returns using the specified high order prior estimator. It first computes low order moments (mean and covariance) using the embedded prior estimator, then computes coskewness and cokurtosis tensors using the provided coskewness and cokurtosis estimators. Optionally, factor returns `F` can be provided for factor-based estimation. The result is returned as a [`HighOrderPrior`](@ref) object.
+
+# Mathematical definition
+
+In addition to the first and second moments, the high order estimator computes:
+
+```math
+\\begin{align}
+\\hat{M}_3 &= \\frac{1}{T} \\sum_{t=1}^{T} (\\boldsymbol{x}_t - \\hat{\\boldsymbol{\\mu}}) \\otimes (\\boldsymbol{x}_t - \\hat{\\boldsymbol{\\mu}})^\\intercal \\otimes (\\boldsymbol{x}_t - \\hat{\\boldsymbol{\\mu}})^\\intercal\\,.
+\\end{align}
+```
+
+```math
+\\begin{align}
+\\hat{M}_4 &= \\frac{1}{T} \\sum_{t=1}^{T} (\\boldsymbol{x}_t - \\hat{\\boldsymbol{\\mu}}) \\otimes (\\boldsymbol{x}_t - \\hat{\\boldsymbol{\\mu}})^\\intercal \\otimes (\\boldsymbol{x}_t - \\hat{\\boldsymbol{\\mu}})^\\intercal \\otimes (\\boldsymbol{x}_t - \\hat{\\boldsymbol{\\mu}})^\\intercal\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\hat{M}_3``: ``N \\times N^2`` coskewness matrix.
+  - ``\\hat{M}_4``: ``N^2 \\times N^2`` cokurtosis matrix.
+  - ``\\boldsymbol{x}_t``: ``N \\times 1`` vector of asset returns at time ``t``.
+  - ``\\hat{\\boldsymbol{\\mu}}``: ``N \\times 1`` sample mean vector.
+  - $(math_dict[:T])
+  - ``\\otimes``: Kronecker product.
 
 # Arguments
 

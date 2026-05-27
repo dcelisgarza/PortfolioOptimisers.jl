@@ -5,12 +5,7 @@ Result type for Mean-Risk portfolio optimisation.
 
 # Fields
 
-  - `oe`: Type of the optimisation estimator that produced this result.
-  - `pa`: Processed optimisation attributes.
-  - `retcode`: Optimisation return code.
-  - `sol`: Optimisation solution (or vector of solutions for the efficient frontier).
-  - `model`: The JuMP model used for optimisation.
-  - `fb`: Fallback result (if a fallback optimiser was used).
+$(DocStringExtensions.FIELDS)
 
 The `w` property is forwarded from `sol.w`.
 
@@ -20,16 +15,32 @@ The `w` property is forwarded from `sol.w`.
   - [`MeanRisk`](@ref)
 """
 @concrete struct MeanRiskResult <: NonFiniteAllocationOptimisationResult
+    "$(field_dict[:oe])"
     oe
+    "$(field_dict[:pa])"
     pa
+    "$(field_dict[:retcode])"
     retcode
+    "$(field_dict[:sol])"
     sol
+    "$(field_dict[:model])"
     model
+    "$(field_dict[:fb])"
     fb
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Rebuild a [`MeanRiskResult`](@ref) with an updated fallback optimiser `fb`.
+"""
 function factory(res::MeanRiskResult, fb::Option{<:OptE_Opt})
     return MeanRiskResult(res.oe, res.pa, res.retcode, res.sol, res.model, fb)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Access properties of [`MeanRiskResult`](@ref). Virtual property `:w` extracts portfolio weights from `sol`; other unknown properties forward to `r.pa`.
+"""
 function Base.getproperty(r::MeanRiskResult, sym::Symbol)
     return if sym == :w
         !isa(r.sol, AbstractVector) ? getfield(r.sol, :w) : getfield.(r.sol, :w)
@@ -50,11 +61,7 @@ Mean-Risk portfolio optimiser.
 
 # Fields
 
-  - `opt`: JuMP optimiser configuration (prior, solver, constraints, bounds, fees, etc.).
-  - `r`: Risk measure or vector of risk measures.
-  - `obj`: Portfolio objective function.
-  - `wi`: Initial portfolio weights for warm-starting the solver (or `nothing`).
-  - `fb`: Fallback optimiser.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -161,6 +168,33 @@ MeanRisk
    fb ┴ nothing
 ```
 
+# Mathematical definition
+
+The general mean-risk optimisation problem is:
+
+```math
+\\begin{align}
+\\underset{\\boldsymbol{w}}{\\min} \\; f(\\boldsymbol{w}) \\quad \\text{s.t.} \\quad \\boldsymbol{w} \\in \\mathcal{W}\\,.
+\\end{align}
+```
+
+Objective ``f`` depends on [`ObjectiveFunction`](@ref):
+
+  - [`MinimumRisk`](@ref): ``f(\\boldsymbol{w}) = \\rho(\\boldsymbol{w})``
+  - [`MaximumReturn`](@ref): ``f(\\boldsymbol{w}) = -\\hat{\\boldsymbol{\\mu}}^\\intercal \\boldsymbol{w}``
+  - [`MaximumUtility`](@ref): ``f(\\boldsymbol{w}) = -\\hat{\\boldsymbol{\\mu}}^\\intercal \\boldsymbol{w} + \\lambda \\rho(\\boldsymbol{w})``
+  - [`MaximumRatio`](@ref) (Sharpe): ``f(\\boldsymbol{w}) = -(\\hat{\\boldsymbol{\\mu}}^\\intercal \\boldsymbol{w} - r_f) / \\rho(\\boldsymbol{w})``
+
+Where:
+
+  - ``\\boldsymbol{w}``: Portfolio weight vector.
+  - ``\\mathcal{W}``: Feasible weight set defined by portfolio constraints.
+  - ``f(\\boldsymbol{w})``: Objective function (depends on [`ObjectiveFunction`](@ref)).
+  - ``\\rho(\\boldsymbol{w})``: Portfolio risk measure.
+  - ``\\hat{\\boldsymbol{\\mu}}``: Estimated expected return vector.
+  - ``\\lambda``: Risk aversion parameter.
+  - ``r_f``: Risk-free rate.
+
 # Related
 
   - [`scalarise_risk_expression!`](@ref)
@@ -180,10 +214,15 @@ MeanRisk
   - [`RiskMeasure`](@ref)
 """
 @concrete struct MeanRisk <: RiskJuMPOptimisationEstimator
+    "$(field_dict[:opt_jmp])"
     opt
+    "$(field_dict[:r_opt])"
     r
+    "$(field_dict[:obj])"
     obj
+    "$(field_dict[:wi])"
     wi
+    "$(field_dict[:fb])"
     fb
     function MeanRisk(opt::JuMPOptimiser, r::RM_VecRM, obj::ObjectiveFunction,
                       wi::Option{<:VecNum}, fb::Option{<:OptE_Opt})
@@ -202,17 +241,32 @@ function MeanRisk(; opt::JuMPOptimiser = JuMPOptimiser(), r::RM_VecRM = Variance
                   fb::Option{<:OptE_Opt} = nothing)::MeanRisk
     return MeanRisk(opt, r, obj, wi, fb)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return `true` if any sub-estimator of `opt` requires previous portfolio weights (JuMP optimiser, risk measure, or fallback).
+"""
 function needs_previous_weights(opt::MeanRisk)
     return (needs_previous_weights(opt.opt) ||
             needs_previous_weights(opt.r) ||
             needs_previous_weights(opt.fb))
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Build an updated [`MeanRisk`](@ref) with all estimators that track previous weights updated via `factory` using `w`.
+"""
 function factory(mr::MeanRisk, w::AbstractVector)::MeanRisk
     opt = factory(mr.opt, w)
     r = factory(mr.r, w)
     fb = factory(mr.fb, w)
     return MeanRisk(; opt = opt, r = r, obj = mr.obj, wi = mr.wi, fb = fb)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a cluster-sliced copy of [`MeanRisk`](@ref) for asset index set `i` and returns matrix `X`.
+"""
 function opt_view(mr::MeanRisk, i, X::MatNum)::MeanRisk
     X = isa(mr.opt.pe, AbstractPriorResult) ? mr.opt.pe.X : X
     opt = opt_view(mr.opt, i, X)
@@ -582,14 +636,21 @@ end
              rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
              str_names::Bool = false, save::Bool = true, kwargs...) -> MeanRiskResult
 
+Run the Mean-Risk portfolio optimisation.
+
 # Arguments
 
   - `mr`: The mean risk optimiser to use.
-  - $(arg_dict[:rd]) If `isa(hec.opt.pe, AbstractPriorResult)`, `rd` is not necessary if doing a standalone optimisation, but may be required/desired by fallbacks and/or clusterisation.
+  - $(arg_dict[:rd]) If `isa(mr.opt.pe, AbstractPriorResult)`, `rd` is not necessary if doing a standalone optimisation, but may be required/desired by fallbacks and/or clusterisation.
   - `dims`: The dimension along which observations advance in time.
   - `str_names`: Whether to use string names for the assets in the optimisation.
   - `save`: Whether to save the JuMP model in the optimisation result.
   - `kwargs`: Additional keyword arguments passed to the optimisation function.
+
+# Related
+
+  - [`MeanRisk`](@ref)
+  - [`MeanRiskResult`](@ref)
 """
 function optimise(mr::MeanRisk{<:Any, <:Any, <:Any, <:Any, Nothing},
                   rd::ReturnsResult = ReturnsResult(); dims::Int = 1,

@@ -769,9 +769,26 @@ math_dict = Dict(:Xv => "``\\boldsymbol{X}``: Data vector `observations × 1`.",
                  :tgt => "``t``: Target value, usually the unweighted (or weighted) expected value ``E[\\boldsymbol{X}]``.",#
                  :A => "``\\mathbf{A}``: Constraint coefficient matrix.",#
                  :B => "``\\boldsymbol{B}``: Constraint response vector.",#
-                 :x => "``\\boldsymbol{x}``: Constrained variable.",
+                 :x => "``\\boldsymbol{x}``: Constrained variable.",#
                  :ineq => "``\\text{ineq}``: Subscript for inequality constraints.",#
-                 :eq => "``\\text{eq}``: Subscript for equality constraints.")
+                 :eq => "``\\text{eq}``: Subscript for equality constraints.",#
+                 # Portfolio returns and dimensions.
+                 :xret => "``\\boldsymbol{x}``: Portfolio returns vector ``T \\times 1``.",#
+                 :T => "``T``: Number of observations.",#
+                 :N => "``N``: Number of assets.",#
+                 # Risk measure parameters.
+                 :alpha_rm => "``\\alpha``: Significance level (left tail probability), ``\\alpha \\in (0, 1)``.",#
+                 :w_port => "``\\boldsymbol{w}``: Portfolio weights vector ``N \\times 1``.",#
+                 # Absolute drawdown series.
+                 :ct => "``c_t``: Cumulative simple portfolio return at period ``t``.",#
+                 :dtdd => "``d_t \\leq 0``: Absolute drawdown at period ``t``.",#
+                 # Relative drawdown series.
+                 :Ct => "``C_t``: Compound wealth process at period ``t``.",#
+                 :rdt => "``rd_t \\leq 0``: Relative drawdown at period ``t``.",#
+                 # JuMP optimisation variables.
+                 :k_budget => "``k``: Budget scaling / homogenisation variable.",#
+                 :mu_er => "``\\boldsymbol{\\mu}``: Expected returns vector ``N \\times 1``.",#
+                 :R_w => "``R(\\boldsymbol{w})``: Portfolio risk.")
 
 """
 $(DocStringExtensions.TYPEDEF)
@@ -1148,16 +1165,31 @@ Stacktrace:
     "$(field_dict[:msg])"
     msg
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Print human-readable representation of `PortfolioOptimisersError` subtypes to `io`, stripping parametric type suffixes.
+"""
 function Base.showerror(io::IO, err::PortfolioOptimisersError)
     name = string(typeof(err))
     name = name[1:(findfirst(x -> (x == '{' || x == '('), name) - 1)]
     return print(io, "$name: $(err.msg)")
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Make estimators, algorithms, and results behave as length-1 iterables, returning the object itself on the first iteration and `nothing` thereafter.
+"""
 function Base.iterate(obj::Union{<:AbstractEstimator, <:AbstractAlgorithm,
                                  <:AbstractResult}, state = 1)
     return state > 1 ? nothing : (obj, state + 1)
 end
 Base.length(::Union{<:AbstractEstimator, <:AbstractAlgorithm, <:AbstractResult}) = 1
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Index into estimators, algorithms, and results as length-1 containers. Only index `1` is valid; any other index throws `BoundsError`.
+"""
 function Base.getindex(obj::Union{<:AbstractEstimator, <:AbstractAlgorithm,
                                   <:AbstractResult}, i::Int)
     return i == 1 ? obj : throw(BoundsError(obj, i))
@@ -1407,7 +1439,7 @@ In order to implement a new estimator value algorithm which will work seamlessly
 
 We can create a dummy estimator value algorithm as follows:
 
-```jldoctests
+```jldoctest
 julia> struct MyIncreasingValue <: PortfolioOptimisers.AbstractEstimatorValueAlgorithm end
 
 julia> function PortfolioOptimisers.estimator_to_val(alg::MyIncreasingValue, sets::AssetSets,
@@ -1940,6 +1972,10 @@ Assert that the input matrix is square.
 # Details
 
   - Throws `DimensionMismatch` if the check fails.
+
+# Related
+
+  - [`MatNum`](@ref)
 """
 function assert_matrix_issquare(X::MatNum, X_sym::Symbol = :X)::Nothing
     @argcheck(size(X, 1) == size(X, 2),
@@ -2031,12 +2067,22 @@ Singleton vector type that represents a vector with a single element with value 
 # Constructors
 
     SingletonVector()
+
+# Related
+
+  - [`VecNum`](@ref)
+  - [`MatNum`](@ref)
 """
 struct SingletonVector{T} <: AbstractVector{T} end
 function SingletonVector()
     return SingletonVector{Int}()
 end
 Base.length(::SingletonVector) = 1
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Index into `SingletonVector`, returning `1` for index `1` and throwing `BoundsError` for any other index.
+"""
 function Base.getindex(A::SingletonVector, i::Int)
     return isone(i) ? 1 : throw(BoundsError(A, i))
 end

@@ -119,6 +119,25 @@ In-place projection of a matrix to the nearest positive definite matrix using th
 
 For matrices without unit diagonal, the function converts them into correlation matrices i.e. matrices with unit diagonal, applies the algorithm, and rescales them back.
 
+# Mathematical definition
+
+Solves the nearest correlation matrix problem:
+
+```math
+\\begin{align}
+\\hat{\\mathbf{C}} &= \\underset{\\mathbf{Y} \\succeq 0,\\; Y_{ii} = 1}{\\arg\\min} \\|\\mathbf{C} - \\mathbf{Y}\\|_F\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\hat{\\mathbf{C}}``: Nearest positive semidefinite correlation matrix.
+  - ``\\mathbf{C}``: Input correlation matrix.
+  - ``\\mathbf{Y}``: Feasible correlation matrix (positive semidefinite, unit diagonal).
+  - ``\\|\\cdot\\|_F``: Frobenius norm.
+
+For covariance matrices, first standardise ``\\mathbf{C} = \\mathrm{diag}(\\mathbf{\\Sigma})^{-1/2} \\mathbf{\\Sigma}\\, \\mathrm{diag}(\\mathbf{\\Sigma})^{-1/2}``, project, then rescale back.
+
 # Arguments
 
   - $(arg_dict[:opdm])
@@ -199,6 +218,28 @@ end
     posdef(pdm::Option{<:Posdef}, X::MatNum) -> MatNum
 
 Out-of-place version of [`posdef!`](@ref).
+
+# Arguments
+
+  - $(arg_dict[:opdm])
+  - $(arg_dict[:sigrhoX])
+
+# Returns
+
+  - `X::MatNum`: A new matrix equal to the nearest positive definite projection of the input.
+
+# Examples
+
+```jldoctest
+julia> using LinearAlgebra
+
+julia> X = [1.0 2.0; 2.0 1.0];
+
+julia> Xpd = posdef(Posdef(), X);
+
+julia> LinearAlgebra.isposdef(Xpd)
+true
+```
 
 # Related
 

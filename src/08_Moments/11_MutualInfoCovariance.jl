@@ -5,6 +5,22 @@ Covariance estimator based on mutual information.
 
 `MutualInfoCovariance` implements a robust covariance estimator that uses mutual information (MI) to capture both linear and nonlinear dependencies between asset returns. This estimator is particularly useful for identifying complex relationships that are not detected by traditional correlation-based methods. The MI matrix is optionally normalised and then rescaled by marginal standard deviations to produce a covariance matrix.
 
+# Mathematical definition
+
+```math
+\\begin{align}
+\\hat{\\boldsymbol{\\rho}}_{ij} &= \\mathrm{MI}(X_i,\\, X_j)\\,, \\\\
+\\hat{\\mathbf{\\Sigma}}_{ij} &= \\hat{\\boldsymbol{\\rho}}_{ij}\\,\\hat{\\sigma}_i\\,\\hat{\\sigma}_j\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\hat{\\boldsymbol{\\rho}}_{ij}``: Mutual information-based correlation between assets ``i`` and ``j``.
+  - ``\\hat{\\mathbf{\\Sigma}}_{ij}``: Covariance between assets ``i`` and ``j``.
+  - ``\\mathrm{MI}(X_i, X_j)``: (Optionally normalised) mutual information between assets ``i`` and ``j``.
+  - ``\\hat{\\sigma}_i``: Marginal standard deviation of asset ``i`` from the variance estimator `ve`.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -75,6 +91,22 @@ Return a new [`MutualInfoCovariance`](@ref) estimator with observation weights `
 # Returns
 
   - $(ret_dict[:ce])
+
+# Examples
+
+```jldoctest
+julia> ce = MutualInfoCovariance();
+
+julia> factory(ce, StatsBase.Weights([0.2, 0.3, 0.5]))
+MutualInfoCovariance
+         ve ┼ SimpleVariance
+            │          me ┼ SimpleExpectedReturns
+            │             │   w ┴ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.3, 0.5]
+            │           w ┼ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.3, 0.5]
+            │   corrected ┴ Bool: true
+       bins ┼ HacineGharbiRavier()
+  normalise ┴ Bool: true
+```
 
 # Related
 
@@ -163,8 +195,6 @@ This method computes the pairwise mutual information covariance matrix for the i
 # Validation
 
   - `dims` is either `1` or `2`.
-
-# Examples
 
 # Related
 

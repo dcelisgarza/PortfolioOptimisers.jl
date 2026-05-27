@@ -247,12 +247,50 @@ function DimensionReductionRegression(; ve::AbstractVarianceEstimator = SimpleVa
                                       retgt::AbstractRegressionTarget = LinearModel())::DimensionReductionRegression
     return DimensionReductionRegression(ve, drtgt, retgt)
 end
+"""
+    factory(re::DimensionReductionRegression, w::ObsWeights) -> DimensionReductionRegression
+
+Return a new [`DimensionReductionRegression`](@ref) estimator with observation weights `w` applied to the underlying variance and regression target estimators.
+
+# Arguments
+
+  - `re`: Dimension reduction regression estimator.
+  - $(arg_dict[:ow])
+
+# Returns
+
+  - `re::DimensionReductionRegression`: Updated estimator with weights applied to `ve`, `drtgt`, and `retgt`.
+
+# Related
+
+  - [`DimensionReductionRegression`](@ref)
+  - [`factory`](@ref)
+"""
 function factory(re::DimensionReductionRegression,
                  w::ObsWeights)::DimensionReductionRegression
     return DimensionReductionRegression(; ve = factory(re.ve, w),
                                         drtgt = factory(re.drtgt, w),
                                         retgt = factory(re.retgt, w))
 end
+"""
+    regression_view(re::DimensionReductionRegression, i) -> DimensionReductionRegression
+
+Return a new [`DimensionReductionRegression`](@ref) estimator restricted to assets at index `i`.
+
+# Arguments
+
+  - `re`: Dimension reduction regression estimator.
+  - `i`: Index or indices of assets to include.
+
+# Returns
+
+  - `re::DimensionReductionRegression`: Updated estimator with `ve` restricted to the selected assets.
+
+# Related
+
+  - [`DimensionReductionRegression`](@ref)
+  - [`regression_view`](@ref)
+"""
 function regression_view(re::DimensionReductionRegression, i)::DimensionReductionRegression
     return DimensionReductionRegression(; ve = moment_view(re.ve, i), drtgt = re.drtgt,
                                         retgt = re.retgt)
@@ -303,6 +341,28 @@ end
 Fit a regression model in reduced-dimensional space and recover coefficients in the original feature space.
 
 This function fits a regression model (as specified by `retgt`) to the response vector `y` using the projected feature matrix `x1` (typically obtained from a dimension reduction method such as PCA or PPCA). It then transforms the estimated coefficients from the reduced space back to the original feature space using the projection matrix `Vp` and rescales them by the standard deviations `sigma`. The intercept is adjusted to account for the mean of `y` and the means of the original features.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\hat{y} &= \\hat{\\beta}_0 + \\mathbf{X}_1 \\hat{\\boldsymbol{\\beta}}_{\\mathrm{pc}}\\,, \\\\
+\\hat{\\boldsymbol{\\beta}} &= \\mathbf{V}_p \\hat{\\boldsymbol{\\beta}}_{\\mathrm{pc}} \\oslash \\boldsymbol{\\sigma}\\,, \\\\
+\\hat{\\beta}_0 &= \\bar{y} - \\hat{\\boldsymbol{\\beta}}^{\\intercal} \\boldsymbol{\\mu}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\hat{y}``: Fitted response.
+  - ``\\hat{\\boldsymbol{\\beta}}_{\\mathrm{pc}}``: Regression coefficients in the reduced (PC) space.
+  - ``\\hat{\\boldsymbol{\\beta}}``: Regression coefficients in the original feature space.
+  - ``\\hat{\\beta}_0``: Intercept adjusted to the original space.
+  - ``\\mathbf{X}_1``: Projected feature matrix in the reduced space.
+  - ``\\mathbf{V}_p``: PCA/PPCA projection matrix.
+  - ``\\boldsymbol{\\sigma}``: Feature standard deviations.
+  - ``\\boldsymbol{\\mu}``: Feature means.
+  - ``\\oslash``: Element-wise division.
 
 # Arguments
 

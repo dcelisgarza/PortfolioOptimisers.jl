@@ -30,4 +30,5 @@ tracking_benchmark
 tracking_view
 factory(tr::WeightsTracking, w::VecNum)
 factory(tr::ReturnsTracking, ::Any)
+factory(tr::TrackingError, w::VecNum)
 ```

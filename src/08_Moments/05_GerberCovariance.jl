@@ -47,6 +47,17 @@ $(DocStringExtensions.TYPEDEF)
 
 Implements the original Gerber covariance algorithm.
 
+# Constructors
+
+    Gerber0() -> Gerber0
+
+# Examples
+
+```jldoctest
+julia> Gerber0()
+Gerber0()
+```
+
 # Related
 
   - [`GerberCovarianceAlgorithm`](@ref)
@@ -64,6 +75,17 @@ $(DocStringExtensions.TYPEDEF)
 
 Implements the first variant of the Gerber covariance algorithm.
 
+# Constructors
+
+    Gerber1() -> Gerber1
+
+# Examples
+
+```jldoctest
+julia> Gerber1()
+Gerber1()
+```
+
 # Related
 
   - [`GerberCovarianceAlgorithm`](@ref)
@@ -80,6 +102,17 @@ struct Gerber1 <: GerberCovarianceAlgorithm end
 $(DocStringExtensions.TYPEDEF)
 
 Implements the second variant of the Gerber covariance algorithm.
+
+# Constructors
+
+    Gerber2() -> Gerber2
+
+# Examples
+
+```jldoctest
+julia> Gerber2()
+Gerber2()
+```
 
 # Related
 
@@ -119,6 +152,25 @@ Keywords correspond to the struct's fields.
 ## Validation
 
   - $(val_dict[:gerbt])
+
+# Examples
+
+```jldoctest
+julia> GerberCovariance()
+GerberCovariance
+   ve ┼ SimpleVariance
+      │          me ┼ SimpleExpectedReturns
+      │             │   w ┴ nothing
+      │           w ┼ nothing
+      │   corrected ┴ Bool: true
+   me ┼ SimpleExpectedReturns
+      │   w ┴ nothing
+  pdm ┼ Posdef
+      │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+      │   kwargs ┴ @NamedTuple{}: NamedTuple()
+    t ┼ Float64: 0.5
+  alg ┴ Gerber1()
+```
 
 # Related
 
@@ -256,6 +308,33 @@ end
 
 Implements the original Gerber correlation algorithm.
 
+# Mathematical definition
+
+Let ``\\mathbf{U}, \\mathbf{D} \\in \\{0,1\\}^{T \\times N}`` be indicator matrices with:
+
+```math
+\\begin{align}
+U_{ti} &= \\mathbf{1}[x_{ti} \\geq t \\, \\sigma_i], \\quad D_{ti} = \\mathbf{1}[x_{ti} \\leq -t \\, \\sigma_i]\\,.
+\\end{align}
+```
+
+Define ``\\mathbf{H} = \\mathbf{U} - \\mathbf{D}`` and ``\\mathbf{V} = \\mathbf{U} + \\mathbf{D}``. The Gerber0 correlation is:
+
+```math
+\\begin{align}
+\\hat{\\boldsymbol{\\rho}} &= \\left(\\mathbf{H}^\\intercal \\mathbf{H}\\right) \\oslash \\left(\\mathbf{V}^\\intercal \\mathbf{V}\\right)\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``x_{ti}``: Return of asset ``i`` at time ``t``.
+  - ``t``: Threshold parameter.
+  - ``\\sigma_i``: Standard deviation of asset ``i``.
+  - ``T``: Number of observations.
+  - ``N``: Number of assets.
+  - ``\\oslash``: Element-wise division.
+
 # Arguments
 
   - $(arg_dict[:gerbce]). Configured with the `Gerber0` algorithm.
@@ -312,6 +391,34 @@ end
     ) -> MatNum
 
 Implements the first variant of the Gerber correlation algorithm.
+
+# Mathematical definition
+
+Let ``\\mathbf{U}, \\mathbf{D}, \\mathbf{N} \\in \\{0,1\\}^{T \\times N}`` be indicator matrices with:
+
+```math
+\\begin{align}
+U_{ti} &= \\mathbf{1}[x_{ti} \\geq t \\, \\sigma_i], \\quad D_{ti} = \\mathbf{1}[x_{ti} \\leq -t \\, \\sigma_i], \\quad N_{ti} = \\mathbf{1}[{-t\\sigma_i < x_{ti} < t\\sigma_i}]\\,.
+\\end{align}
+```
+
+Define ``\\mathbf{H} = \\mathbf{U} - \\mathbf{D}``. The Gerber1 correlation is:
+
+```math
+\\begin{align}
+\\hat{\\boldsymbol{\\rho}} &= \\left(\\mathbf{H}^\\intercal \\mathbf{H}\\right) \\oslash \\left(T \\boldsymbol{1}\\boldsymbol{1}^\\intercal - \\mathbf{N}^\\intercal \\mathbf{N}\\right)\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``x_{ti}``: Return of asset ``i`` at time ``t``.
+  - ``t``: Threshold parameter.
+  - ``\\sigma_i``: Standard deviation of asset ``i``.
+  - ``T``: Number of observations.
+  - ``N``: Number of assets.
+  - ``\\oslash``: Element-wise division.
+  - ``\\boldsymbol{1}``: Vector of ones.
 
 # Arguments
 
@@ -371,6 +478,32 @@ end
     ) -> MatNum
 
 Implements the second variant of the Gerber correlation algorithm.
+
+# Mathematical definition
+
+Let ``\\mathbf{U}, \\mathbf{D} \\in \\{0,1\\}^{T \\times N}`` be indicator matrices with:
+
+```math
+\\begin{align}
+U_{ti} &= \\mathbf{1}[x_{ti} \\geq t \\, \\sigma_i], \\quad D_{ti} = \\mathbf{1}[x_{ti} \\leq -t \\, \\sigma_i]\\,.
+\\end{align}
+```
+
+Define ``\\mathbf{H} = (\\mathbf{U} - \\mathbf{D})^\\intercal (\\mathbf{U} - \\mathbf{D})`` and ``\\boldsymbol{h} = \\sqrt{\\mathrm{diag}(\\mathbf{H})}``. The Gerber2 correlation is:
+
+```math
+\\begin{align}
+\\hat{\\boldsymbol{\\rho}} &= \\mathbf{H} \\oslash (\\boldsymbol{h} \\boldsymbol{h}^\\intercal)\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``x_{ti}``: Return of asset ``i`` at time ``t``.
+  - ``t``: Threshold parameter.
+  - ``\\sigma_i``: Standard deviation of asset ``i``.
+  - ``\\mathrm{diag}(\\cdot)``: Diagonal of a matrix.
+  - ``\\oslash``: Element-wise division.
 
 # Arguments
 

@@ -5,6 +5,45 @@ Abstract supertype for all regression estimator types in `PortfolioOptimisers.jl
 
 All concrete and/or abstract types implementing regression estimation algorithms should be subtypes of `AbstractRegressionEstimator`.
 
+# Interfaces
+
+In order to implement a new regression estimator which will work seamlessly with the library, subtype `AbstractRegressionEstimator` with all necessary parameters as part of the struct, and implement the following methods:
+
+## Regression
+
+  - `PortfolioOptimisers.regression(re::AbstractRegressionEstimator, X::MatNum, F::MatNum) -> Regression`: Computes the regression result from asset returns `X` and factor returns `F`.
+
+### Arguments
+
+  - `re`: Regression estimator.
+  - $(arg_dict[:X])
+  - $(arg_dict[:F])
+
+### Returns
+
+  - `reg::Regression`: Regression result containing the coefficient matrix and optional intercept.
+
+# Examples
+
+We can create a dummy regression estimator as follows:
+
+```jldoctest
+julia> struct MyRegressionEstimator <: PortfolioOptimisers.AbstractRegressionEstimator end
+
+julia> function PortfolioOptimisers.regression(::MyRegressionEstimator,
+                                               X::PortfolioOptimisers.MatNum,
+                                               F::PortfolioOptimisers.MatNum)
+           return PortfolioOptimisers.Regression(; M = F \\ X)
+       end
+
+julia> regression(MyRegressionEstimator(), [1.0 2.0; 3.0 4.0; 5.0 6.0],
+                  [1.0 0.0; 0.0 1.0; 0.5 0.5])
+Regression
+  M ┼ 2×2 Matrix{Float64}
+  L ┼ 2×2 Matrix{Float64}
+  b ┴ nothing
+```
+
 # Related
 
   - [`AbstractEstimator`](@ref)
@@ -347,6 +386,20 @@ Akaike Information Criterion (AIC) for stepwise regression in `PortfolioOptimise
 
 `AIC` is a minimisation-based criterion used to evaluate model quality in stepwise regression algorithms. Lower values indicate better model fit, penalising model complexity to avoid overfitting.
 
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathrm{AIC} &= 2k - 2\\ln\\hat{L}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathrm{AIC}``: Akaike Information Criterion.
+  - ``k``: Number of model parameters.
+  - ``\\hat{L}``: Maximum likelihood of the model.
+
 # Related
 
   - [`AbstractMinValStepwiseRegressionCriterion`](@ref)
@@ -361,6 +414,21 @@ $(DocStringExtensions.TYPEDEF)
 Corrected Akaike Information Criterion (AICC) for stepwise regression in `PortfolioOptimisers.jl`.
 
 `AICC` is a minimisation-based criterion similar to AIC, but includes a correction for small sample sizes. Lower values indicate better model fit, balancing fit and complexity.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathrm{AICC} &= \\mathrm{AIC} + \\frac{2k(k+1)}{T - k - 1}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathrm{AICC}``: Corrected Akaike Information Criterion.
+  - ``\\mathrm{AIC}``: Standard Akaike Information Criterion.
+  - ``k``: Number of model parameters.
+  - $(math_dict[:T])
 
 # Related
 
@@ -377,6 +445,21 @@ Bayesian Information Criterion (BIC) for stepwise regression in `PortfolioOptimi
 
 `BIC` is a minimisation-based criterion used to evaluate model quality in stepwise regression algorithms. It penalises model complexity more strongly than AIC. Lower values indicate better model fit.
 
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathrm{BIC} &= k\\ln T - 2\\ln\\hat{L}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathrm{BIC}``: Bayesian Information Criterion.
+  - ``k``: Number of model parameters.
+  - $(math_dict[:T])
+  - ``\\hat{L}``: Maximum likelihood of the model.
+
 # Related
 
   - [`AbstractMinValStepwiseRegressionCriterion`](@ref)
@@ -392,6 +475,23 @@ Coefficient of determination (R²) for stepwise regression in `PortfolioOptimise
 
 `RSquared` is a maximisation-based criterion used to evaluate model quality in stepwise regression algorithms. Higher values indicate better model fit, representing the proportion of variance explained by the model.
 
+# Mathematical definition
+
+```math
+\\begin{align}
+R^2 &= 1 - \\frac{\\mathrm{SS}_{\\mathrm{res}}}{\\mathrm{SS}_{\\mathrm{tot}}} = 1 - \\frac{\\sum_t (y_t - \\hat{y}_t)^2}{\\sum_t (y_t - \\bar{y})^2}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``R^2``: Coefficient of determination.
+  - ``\\mathrm{SS}_{\\mathrm{res}}``: Residual sum of squares.
+  - ``\\mathrm{SS}_{\\mathrm{tot}}``: Total sum of squares.
+  - ``y_t``: Observed response at time ``t``.
+  - ``\\hat{y}_t``: Fitted response at time ``t``.
+  - ``\\bar{y}``: Mean of observed responses.
+
 # Related
 
   - [`AbstractMaxValStepwiseRegressionCriteria`](@ref)
@@ -405,6 +505,21 @@ $(DocStringExtensions.TYPEDEF)
 Adjusted coefficient of determination (Adjusted R²) for stepwise regression in `PortfolioOptimisers.jl`.
 
 `AdjustedRSquared` is a maximisation-based criterion that adjusts R² for the number of predictors in the model, providing a more accurate measure of model quality when comparing models with different numbers of predictors.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\bar{R}^2 &= 1 - (1 - R^2) \\frac{T - 1}{T - k - 1}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\bar{R}^2``: Adjusted coefficient of determination.
+  - ``R^2``: Standard coefficient of determination.
+  - ``k``: Number of predictors.
+  - $(math_dict[:T])
 
 # Related
 
@@ -541,6 +656,11 @@ function Regression(; M::MatNum, L::Option{<:MatNum} = nothing,
                     b::Option{<:VecNum} = nothing)::Regression
     return Regression(M, L, b)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Access properties of `Regression` when `L` is `Nothing`. Returns `M` when `sym == :L`, falling back to `M` as the loadings matrix.
+"""
 function Base.getproperty(re::Regression{<:Any, Nothing, <:Any}, sym::Symbol)
     return if sym == :L
         getfield(re, :M)
@@ -548,6 +668,11 @@ function Base.getproperty(re::Regression{<:Any, Nothing, <:Any}, sym::Symbol)
         getfield(re, sym)
     end
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Access properties of `Regression` when `L` is a matrix. Returns the stored `L` field when `sym == :L`.
+"""
 function Base.getproperty(re::Regression{<:Any, <:MatNum, <:Any}, sym::Symbol)
     return if sym == :L
         getfield(re, :L)

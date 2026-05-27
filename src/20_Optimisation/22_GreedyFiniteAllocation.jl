@@ -5,13 +5,7 @@ Result type for Greedy Allocation portfolio optimisation.
 
 # Fields
 
-  - `oe`: Type of the optimisation estimator that produced this result.
-  - `retcode`: Optimisation return code.
-  - `shares`: Vector of shares allocated to each asset.
-  - `cost`: Total cost of the allocated shares.
-  - `w`: Realised portfolio weights.
-  - `cash`: Remaining uninvested cash.
-  - `fb`: Fallback result.
+$(DocStringExtensions.FIELDS)
 
 # Related
 
@@ -19,14 +13,26 @@ Result type for Greedy Allocation portfolio optimisation.
   - [`FiniteAllocationOptimisationResult`](@ref)
 """
 @concrete struct GreedyAllocationResult <: FiniteAllocationOptimisationResult
+    "$(field_dict[:oe])"
     oe
+    "$(field_dict[:retcode])"
     retcode
+    "$(field_dict[:shares])"
     shares
+    "$(field_dict[:cost_alloc])"
     cost
+    "Realised portfolio weights."
     w
+    "$(field_dict[:cash_alloc])"
     cash
+    "$(field_dict[:fb])"
     fb
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Rebuild a [`GreedyAllocationResult`](@ref) with an updated fallback optimiser `fb`.
+"""
 function factory(res::GreedyAllocationResult, fb::Option{<:FOptE_FOpt})
     return GreedyAllocationResult(res.oe, res.retcode, res.shares, res.cost, res.w,
                                   res.cash, fb)
@@ -38,12 +44,39 @@ Greedy Allocation portfolio optimiser.
 
 `GreedyAllocation` converts continuous portfolio weights to discrete share quantities using a greedy two-pass allocation: first round shares to the nearest `unit` multiple, then iteratively buy remaining shares with leftover cash in order of largest weight.
 
+# Mathematical definition
+
+```math
+\\begin{align}
+x_i^{(0)} &= \\mathrm{round}\\!\\left(\\frac{w_i C}{p_i \\cdot \\mathrm{unit}}\\right) \\cdot \\mathrm{unit}\\,, \\\\
+r^{(0)} &= C - \\boldsymbol{x}^{(0)\\intercal} \\boldsymbol{p}\\,.
+\\end{align}
+```
+
+Then iteratively while ``r > 0``:
+
+```math
+\\begin{align}
+i^* &= \\underset{i:\\, p_i \\leq r}{\\arg\\max}\\; w_i\\,, \\\\
+x_{i^*} &\\leftarrow x_{i^*} + \\mathrm{unit}\\,, \\\\
+r &\\leftarrow r - p_{i^*} \\cdot \\mathrm{unit}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``x_i^{(0)}``: Initial share allocation for asset ``i``.
+  - ``r^{(0)}``: Residual cash after initial allocation.
+  - ``\\boldsymbol{w}``: Target weight vector.
+  - ``C``: Available cash.
+  - ``\\boldsymbol{p}``: Asset price vector.
+  - ``\\mathrm{unit}``: Minimum share purchase unit.
+  - ``i^*``: Asset with largest weight among those affordable with remaining cash ``r``.
+  - ``\\boldsymbol{x}^{(0)}``: Initial share allocation vector.
+
 # Fields
 
-  - `unit`: Minimum share purchase unit (e.g., 1 for whole shares, 0.01 for fractional shares).
-  - `args`: Additional positional arguments forwarded to `round`.
-  - `kwargs`: Additional keyword arguments forwarded to `round`.
-  - `fb`: Fallback allocator.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -74,9 +107,13 @@ GreedyAllocation
   - [`GreedyAllocationResult`](@ref)
 """
 @concrete struct GreedyAllocation <: FiniteAllocationOptimisationEstimator
+    "$(field_dict[:unit])"
     unit
+    "Additional positional arguments forwarded to `round`."
     args
+    "$(field_dict[:kwargs])"
     kwargs
+    "$(field_dict[:fb])"
     fb
     function GreedyAllocation(unit::Number, args::Tuple, kwargs::NamedTuple,
                               fb::Option{<:FOptE_FOpt} = nothing)
@@ -230,15 +267,22 @@ end
              cash::Number = 1e6, T::Option{<:Number} = nothing,
              fees::Option{<:Fees} = nothing; kwargs...) -> GreedyAllocationResult
 
+Run the Greedy Allocation portfolio optimisation.
+
 # Arguments
 
-  - `da`: The discrete allocation optimiser to use.
+  - `ga`: The greedy allocation optimiser to use.
   - $(arg_dict[:pw])
   - `p`: The prices of the assets in the same order as `w`.
   - `cash`: The initial cash balance.
   - `T`: The time horizon for the optimisation. Used to adjust the initial cash balance according to the fees charged on the portfolio for the time horizon.
   - `fees`: The fees to apply to the portfolio.
   - `kwargs`: Additional keyword arguments passed to the optimisation function.
+
+# Related
+
+  - [`GreedyAllocation`](@ref)
+  - [`GreedyAllocationResult`](@ref)
 """
 function optimise(ga::GreedyAllocation{<:Any, <:Any, <:Any, Nothing}, w::VecNum, p::VecNum,
                   cash::Number = 1e6, T::Option{<:Number} = nothing,

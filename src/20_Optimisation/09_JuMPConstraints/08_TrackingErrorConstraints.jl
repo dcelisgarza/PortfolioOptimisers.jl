@@ -14,6 +14,26 @@ The fall-through method does nothing. Concrete methods dispatch on the tracking 
 
 The collection method iterates over all tracking errors in `tres`.
 
+# Mathematical definition
+
+```math
+\\begin{align}
+t_{te} &\\geq \\|\\mathbf{X}\\boldsymbol{w} - \\boldsymbol{b} k\\|_p \\cdot c_p^{-1}\\,, \\\\
+t_{te} &\\leq \\mathrm{err} \\cdot k\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``t_{te}``: Auxiliary tracking error scalar variable.
+  - ``\\mathbf{X}``: Asset returns matrix (``T \\times N``).
+  - $(math_dict[:w_port])
+  - ``\\boldsymbol{b}``: Benchmark return vector.
+  - $(math_dict[:k_budget])
+  - ``p``: Norm order.
+  - ``c_p``: Norm-specific scaling factor (``T``, ``\\sqrt{T - d}``, etc.).
+  - ``\\mathrm{err}``: Tracking error tolerance.
+
 # Arguments
 
   - $(arg_dict[:model])

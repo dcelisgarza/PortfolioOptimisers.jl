@@ -144,6 +144,11 @@ function BlackLittermanPrior(;
                              tau::Option{<:Number} = nothing)::BlackLittermanPrior
     return BlackLittermanPrior(pe, mp, views, sets, views_conf, rf, tau)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Access properties of [`BlackLittermanPrior`](@ref). Exposes `:me` and `:ce` from the embedded prior estimator `obj.pe` for transparent access.
+"""
 function Base.getproperty(obj::BlackLittermanPrior, sym::Symbol)
     return if sym == :me
         obj.pe.me
@@ -153,11 +158,30 @@ function Base.getproperty(obj::BlackLittermanPrior, sym::Symbol)
         getfield(obj, sym)
     end
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a new [`BlackLittermanPrior`](@ref) estimator with observation weights `w` applied to the underlying prior estimator.
+
+# Related
+
+  - [`BlackLittermanPrior`](@ref)
+  - [`factory`](@ref)
+"""
 function factory(pe::BlackLittermanPrior, w::ObsWeights)::BlackLittermanPrior
     return BlackLittermanPrior(; pe = factory(pe.pe, w), mp = pe.mp, views = pe.views,
                                sets = pe.sets, views_conf = pe.views_conf, rf = pe.rf,
                                tau = pe.tau)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a new [`BlackLittermanPrior`](@ref) estimator restricted to the assets at index `i`.
+
+# Related
+
+  - [`BlackLittermanPrior`](@ref)
+"""
 function prior_view(pr::BlackLittermanPrior, i)::BlackLittermanPrior
     return BlackLittermanPrior(; pe = prior_view(pr.pe, i), mp = pr.mp, views = pr.views,
                                sets = asset_sets_view(pr.sets, i),
@@ -170,6 +194,37 @@ end
 Compute the Black-Litterman view uncertainty matrix `Ω`.
 
 This method constructs the view uncertainty matrix `Ω` for the Black-Litterman model when no explicit view confidences are provided (`views_conf = nothing`). The uncertainty for each view is set to the variance of the projected prior covariance, i.e., `Ω = LinearAlgebra.diag(P * Σ * P')`, where `P` is the view matrix and `Σ` is the prior covariance matrix.
+
+# Mathematical definition
+
+Let ``\\mathbf{P}`` be the ``K \\times N`` view matrix and ``\\mathbf{\\Sigma}`` the ``N \\times N`` prior covariance. The view uncertainty matrix for each `views_conf` variant:
+
+```math
+\\begin{align}
+\\mathbf{\\Omega} &= \\mathrm{Diag}(\\mathbf{P} \\mathbf{\\Sigma} \\mathbf{P}^\\intercal) \\quad (\\text{no confidence})\\,.
+\\end{align}
+```
+
+```math
+\\begin{align}
+\\mathbf{\\Omega} &= \\left(\\frac{1}{v} - 1\\right) \\mathrm{Diag}(\\mathbf{P} \\mathbf{\\Sigma} \\mathbf{P}^\\intercal) \\quad (\\text{scalar confidence } v)\\,.
+\\end{align}
+```
+
+```math
+\\begin{align}
+\\mathbf{\\Omega} &= \\mathrm{Diag}\\!\\left(\\left(\\frac{1}{\\boldsymbol{v}} - \\boldsymbol{1}\\right) \\odot \\mathrm{diag}(\\mathbf{P} \\mathbf{\\Sigma} \\mathbf{P}^\\intercal)\\right) \\quad (\\text{vector confidence } \\boldsymbol{v})\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathbf{\\Omega}``: ``K \\times K`` diagonal view uncertainty matrix.
+  - ``\\mathbf{P}``: ``K \\times N`` views matrix.
+  - ``\\mathbf{\\Sigma}``: ``N \\times N`` prior covariance matrix.
+  - ``v``: Scalar view confidence level.
+  - ``\\boldsymbol{v}``: ``K \\times 1`` vector of view confidence levels.
+  - ``\\odot``: Element-wise multiplication.
 
 # Arguments
 
@@ -212,6 +267,34 @@ Compute the Black-Litterman posterior mean and covariance for asset returns.
 
 `vanilla_posteriors` implements the standard Black-Litterman update equations, combining the prior mean and covariance with user or algorithmic views. The function returns the posterior mean and covariance matrix, incorporating the blending parameter `tau`, risk-free rate `rf`, view uncertainty matrix `omega`, view matrix `P`, and view returns vector `Q`.
 
+# Mathematical definition
+
+Let ``\\boldsymbol{\\Pi}`` be the prior mean, ``\\mathbf{\\Sigma}`` the prior covariance, ``\\tau`` the scaling parameter, ``\\mathbf{P}`` the view matrix, ``\\boldsymbol{q}`` the view vector, and ``\\mathbf{\\Omega}`` the view uncertainty matrix:
+
+```math
+\\begin{align}
+\\hat{\\boldsymbol{\\mu}}_{BL} &= \\boldsymbol{\\Pi} + \\tau\\mathbf{\\Sigma}\\mathbf{P}^\\intercal \\left(\\mathbf{P}\\tau\\mathbf{\\Sigma}\\mathbf{P}^\\intercal + \\mathbf{\\Omega}\\right)^{-1} (\\boldsymbol{q} - \\mathbf{P}\\boldsymbol{\\Pi}) + r_f\\,.
+\\end{align}
+```
+
+```math
+\\begin{align}
+\\hat{\\mathbf{\\Sigma}}_{BL} &= \\mathbf{\\Sigma} + \\tau\\mathbf{\\Sigma} - \\tau\\mathbf{\\Sigma}\\mathbf{P}^\\intercal \\left(\\mathbf{P}\\tau\\mathbf{\\Sigma}\\mathbf{P}^\\intercal + \\mathbf{\\Omega}\\right)^{-1} \\mathbf{P}\\tau\\mathbf{\\Sigma}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\hat{\\boldsymbol{\\mu}}_{BL}``: Black-Litterman posterior mean vector.
+  - ``\\hat{\\mathbf{\\Sigma}}_{BL}``: Black-Litterman posterior covariance matrix.
+  - ``\\boldsymbol{\\Pi}``: ``N \\times 1`` prior (equilibrium) expected returns.
+  - ``\\mathbf{\\Sigma}``: ``N \\times N`` prior covariance matrix.
+  - ``\\tau``: Scaling parameter for the uncertainty in the prior.
+  - ``\\mathbf{P}``: ``K \\times N`` views matrix.
+  - ``\\boldsymbol{q}``: ``K \\times 1`` views vector.
+  - ``\\mathbf{\\Omega}``: ``K \\times K`` view uncertainty matrix.
+  - ``r_f``: Risk-free rate.
+
 # Arguments
 
   - `tau`: Scalar blending parameter for prior and views.
@@ -241,12 +324,45 @@ function vanilla_posteriors(tau::Number, rf::Number, prior_mu::VecNum, prior_sig
     posterior_sigma = prior_sigma + tau * prior_sigma - v1 * (v2 \ transpose(v1))
     return posterior_mu, posterior_sigma
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Remove excluded views from `views_conf`.
+
+Returns `views_conf` unchanged when `excl` is `nothing` or `views_conf` is scalar. Filters `views_conf` by removing indices in `excl` when both are vectors.
+
+# Related
+
+  - [`BlackLittermanPrior`](@ref)
+"""
 function remove_excl_views(views_conf::Option{<:Number}, args...)
     return views_conf
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Remove excluded views from `views_conf`.
+
+Returns `views_conf` unchanged (no exclusions).
+
+# Related
+
+  - [`BlackLittermanPrior`](@ref)
+"""
 function remove_excl_views(views_conf::VecNum, ::Nothing)
     return views_conf
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Remove excluded views from `views_conf`.
+
+Returns a view of `views_conf` with indices in `excl` removed.
+
+# Related
+
+  - [`BlackLittermanPrior`](@ref)
+"""
 function remove_excl_views(views_conf::VecNum, excl::VecInt)
     return nothing_scalar_array_view(views_conf, setdiff(1:length(views_conf), excl))
 end
@@ -258,6 +374,31 @@ end
 Compute the Black-Litterman prior moments for asset returns.
 
 `prior` estimates the mean and covariance of asset returns using the Black-Litterman model, combining a prior estimator, matrix post-processing, user or algorithmic views, asset sets, view confidences, risk-free rate, and blending parameter `tau`. The method supports both direct and constraint-based views, flexible confidence specification, and matrix processing.
+
+# Mathematical definition
+
+The Black-Litterman posterior distribution combines the prior ``(\\boldsymbol{\\Pi}, \\tau \\mathbf{\\Sigma})`` with investor views ``(\\mathbf{P}, \\boldsymbol{q}, \\mathbf{\\Omega})``:
+
+```math
+\\begin{align}
+\\hat{\\boldsymbol{\\mu}}_{BL} &= \\left[(\\tau\\mathbf{\\Sigma})^{-1} + \\mathbf{P}^\\intercal \\mathbf{\\Omega}^{-1} \\mathbf{P}\\right]^{-1} \\left[(\\tau\\mathbf{\\Sigma})^{-1} \\boldsymbol{\\Pi} + \\mathbf{P}^\\intercal \\mathbf{\\Omega}^{-1} \\boldsymbol{q}\\right]\\,.
+\\end{align}
+```
+
+```math
+\\begin{align}
+\\hat{\\mathbf{\\Sigma}}_{BL} &= \\mathbf{\\Sigma} + \\left[(\\tau\\mathbf{\\Sigma})^{-1} + \\mathbf{P}^\\intercal \\mathbf{\\Omega}^{-1} \\mathbf{P}\\right]^{-1}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{\\Pi}``: `N × 1` prior (equilibrium) expected returns.
+  - ``\\mathbf{\\Sigma}``: `N × N` prior covariance matrix.
+  - ``\\tau``: Scaling parameter for the uncertainty in the prior.
+  - ``\\mathbf{P}``: `K × N` views matrix (each row is one view).
+  - ``\\boldsymbol{q}``: `K × 1` views vector.
+  - ``\\mathbf{\\Omega}``: `K × K` views uncertainty matrix.
 
 # Arguments
 

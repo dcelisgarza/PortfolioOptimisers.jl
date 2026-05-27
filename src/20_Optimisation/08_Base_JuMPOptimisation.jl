@@ -67,6 +67,11 @@ Abstract supertype for JuMP-based returns estimators used in optimisation models
   - [`LogarithmicReturn`](@ref)
 """
 abstract type JuMPReturnsEstimator <: AbstractEstimator end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Identity factory for [`JuMPReturnsEstimator`](@ref). Returns `r` unchanged.
+"""
 function factory(r::JuMPReturnsEstimator, args...; kwargs...)
     return r
 end
@@ -133,9 +138,19 @@ Implement `add_custom_objective_term!` to add custom terms to the JuMP model obj
   - [`CustomJuMPConstraint`](@ref)
 """
 abstract type CustomJuMPObjective <: JuMPConstraintEstimator end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return `false`: custom JuMP constraints never require previous portfolio weights.
+"""
 function needs_previous_weights(::CustomJuMPConstraint)
     return false
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return `false`: custom JuMP objectives never require previous portfolio weights.
+"""
 function needs_previous_weights(::CustomJuMPObjective)
     return false
 end
@@ -249,6 +264,16 @@ Stores the solution (portfolio weights) from a JuMP optimisation model.
 # Fields
 
 $(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    JuMPOptimisationSolution(; w::ArrNum) -> JuMPOptimisationSolution
+
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - `!isempty(w)`.
 
 # Related
 
@@ -379,6 +404,20 @@ end
 function process_model(model::JuMP.Model, ::OptimisationFailure)
     return JuMPOptimisationSolution(; w = fill(NaN, length(model[:w])))
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Attempt to solve the JuMP model using each solver in `opt.opt.slv` in order.
+
+Tries each solver sequentially, checking feasibility and finite non-zero weights. Returns a `(retcode, solution)` tuple where `retcode` is [`OptimisationSuccess`](@ref) or [`OptimisationFailure`](@ref) and `solution` is a [`JuMPOptimisationSolution`](@ref).
+
+# Related
+
+  - [`JuMPOptimisationEstimator`](@ref)
+  - [`JuMPOptimisationSolution`](@ref)
+  - [`OptimisationSuccess`](@ref)
+  - [`OptimisationFailure`](@ref)
+"""
 function optimise_JuMP_model!(model::JuMP.Model, opt::JuMPOptimisationEstimator,
                               datatype::DataType = Float64)
     trials = Dict()
@@ -540,7 +579,31 @@ function set_portfolio_drawdowns_plus_one!(model::JuMP.Model, X::MatNum)
     JuMP.@expression(model, ddap1, _ddap1)
     return ddap1
 end
+"""
+    scalarise_risk_expression!(model, r, X, T, ...) -> nothing
+
+Scalarise a risk expression and add it to the JuMP model objective.
+
+Generic function stub; concrete methods are defined in constraint and risk measure files. Each method adds the appropriate risk objective term for a given risk measure type `r`.
+
+# Related
+
+  - [`set_risk_constraints!`](@ref)
+  - [`JuMPOptimisationEstimator`](@ref)
+"""
 function scalarise_risk_expression! end
+"""
+    set_risk_constraints!(model, r, X, T, ...) -> nothing
+
+Set risk constraints in the JuMP model for a given risk measure.
+
+Generic function stub; concrete methods are defined in constraint and risk measure files. Each method configures the appropriate risk constraint expressions for a given risk measure type `r`.
+
+# Related
+
+  - [`scalarise_risk_expression!`](@ref)
+  - [`JuMPOptimisationEstimator`](@ref)
+"""
 function set_risk_constraints! end
 
 export JuMPOptimisationSolution

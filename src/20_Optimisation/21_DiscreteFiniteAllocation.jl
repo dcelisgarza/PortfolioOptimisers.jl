@@ -5,17 +5,7 @@ Result type for Discrete Allocation portfolio optimisation.
 
 # Fields
 
-  - `oe`: Type of the optimisation estimator that produced this result.
-  - `retcode`: Overall optimisation return code.
-  - `s_retcode`: Return code for the short allocation sub-problem.
-  - `l_retcode`: Return code for the long allocation sub-problem.
-  - `shares`: Vector of shares (integer quantities) for each asset.
-  - `cost`: Total cost of the allocated shares.
-  - `w`: Realised portfolio weights.
-  - `cash`: Remaining uninvested cash.
-  - `s_model`: JuMP model for the short allocation.
-  - `l_model`: JuMP model for the long allocation.
-  - `fb`: Fallback result.
+$(DocStringExtensions.FIELDS)
 
 # Related
 
@@ -23,18 +13,34 @@ Result type for Discrete Allocation portfolio optimisation.
   - [`FiniteAllocationOptimisationResult`](@ref)
 """
 @concrete struct DiscreteAllocationResult <: FiniteAllocationOptimisationResult
+    "$(field_dict[:oe])"
     oe
+    "$(field_dict[:retcode])"
     retcode
+    "$(field_dict[:s_retcode])"
     s_retcode
+    "$(field_dict[:l_retcode])"
     l_retcode
+    "$(field_dict[:shares])"
     shares
+    "$(field_dict[:cost_alloc])"
     cost
+    "Realised portfolio weights."
     w
+    "$(field_dict[:cash_alloc])"
     cash
+    "$(field_dict[:s_model])"
     s_model
+    "$(field_dict[:l_model])"
     l_model
+    "$(field_dict[:fb])"
     fb
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Rebuild a [`DiscreteAllocationResult`](@ref) with an updated fallback optimiser `fb`.
+"""
 function factory(res::DiscreteAllocationResult, fb::Option{<:FOptE_FOpt})
     return DiscreteAllocationResult(res.oe, res.retcode, res.s_retcode, res.l_retcode,
                                     res.shares, res.cost, res.w, res.cash, res.s_model,
@@ -47,13 +53,32 @@ Discrete Allocation portfolio optimiser.
 
 `DiscreteAllocation` allocates a portfolio by solving a Mixed-Integer Programming (MIP) problem to find the optimal number of shares for each asset, minimising the deviation between the target continuous weights and the realised discrete allocation.
 
-# Fields
+# Mathematical definition
 
-  - `slv`: MIP solver or vector of solvers.
-  - `sc`: Constraint scale factor.
-  - `so`: Objective scale factor.
-  - `wf`: Weight error formulation (L1/L2 relative or absolute).
-  - `fb`: Fallback allocator (default: `GreedyAllocation()`).
+Default (absolute error) MIP formulation:
+
+```math
+\\begin{align}
+\\underset{\\boldsymbol{x} \\in \\mathbb{Z}_{\\geq 0}^N}{\\min} \\quad & u + r\\,, \\\\
+\\text{s.t.} \\quad & u \\geq \\|\\boldsymbol{w} C - \\boldsymbol{x} \\odot \\boldsymbol{p}\\|_1\\,, \\\\
+& r = C - \\boldsymbol{x}^\\intercal \\boldsymbol{p} \\geq 0\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{x}``: Integer share vector.
+  - ``u``: L1 tracking error auxiliary variable.
+  - ``r``: Residual cash.
+  - ``\\boldsymbol{w}``: Target weight vector.
+  - ``C``: Available cash.
+  - ``\\boldsymbol{p}``: Asset price vector.
+  - ``\\odot``: Element-wise (Hadamard) product.
+  - ``N``: Number of assets.
+
+The weight finaliser `wf` controls which norm/error is used.
+
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -100,10 +125,15 @@ DiscreteAllocation
   - [`DiscreteAllocationResult`](@ref)
 """
 @concrete struct DiscreteAllocation <: FiniteAllocationOptimisationEstimator
+    "$(field_dict[:slv])"
     slv
+    "$(field_dict[:sc])"
     sc
+    "$(field_dict[:so])"
     so
+    "$(field_dict[:wf])"
     wf
+    "$(field_dict[:fb])"
     fb
     function DiscreteAllocation(slv::Slv_VecSlv, sc::Number, so::Number,
                                 wf::JuMPWeightFinaliserFormulation,
@@ -313,6 +343,8 @@ end
              fees::Option{<:Fees} = nothing; str_names::Bool = false,
              save::Bool = true, kwargs...) -> DiscreteAllocationResult
 
+Run the Discrete Allocation portfolio optimisation.
+
 # Arguments
 
   - `da`: The discrete allocation optimiser to use.
@@ -324,6 +356,11 @@ end
   - `str_names`: Whether to use string names for the assets in the optimisation.
   - `save`: Whether to save the JuMP model in the optimisation result.
   - `kwargs`: Additional keyword arguments passed to the optimisation function.
+
+# Related
+
+  - [`DiscreteAllocation`](@ref)
+  - [`DiscreteAllocationResult`](@ref)
 """
 function optimise(da::DiscreteAllocation{<:Any, <:Any, <:Any, Nothing}, w::VecNum,
                   p::VecNum, cash::Number = 1e6, T::Option{<:Number} = nothing,

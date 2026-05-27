@@ -5,4 +5,5 @@ RandomisedSearchCrossValidation
 search_cross_validation(opt::NonFiniteAllocationOptimisationEstimator,
                         rscv::RandomisedSearchCrossValidation,
                         rd::ReturnsResult)
+make_p_grid
 ```

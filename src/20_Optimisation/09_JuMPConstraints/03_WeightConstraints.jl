@@ -62,6 +62,20 @@ Add weight bound constraints to the JuMP optimisation model.
 
 The fall-through method does nothing. The concrete method adds lower-bound and upper-bound constraints on the portfolio weight vector `w`, handles long-short decomposition when negative bounds are present via `lw`/`sw` variables, and delegates budget constraints to [`set_budget_constraints!`](@ref).
 
+# Mathematical definition
+
+```math
+\\begin{align}
+k \\boldsymbol{\\ell} &\\leq \\boldsymbol{w} \\leq k \\boldsymbol{u}\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:w_port])
+  - $(math_dict[:k_budget])
+  - ``\\boldsymbol{\\ell}``, ``\\boldsymbol{u}``: Lower and upper bound vectors from `wb`.
+
 # Arguments
 
   - $(arg_dict[:model])
@@ -157,6 +171,22 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 Add linear inequality and equality weight constraints to the JuMP optimisation model.
 
 The fall-through method does nothing. The concrete method iterates over the collection of [`LinearConstraint`](@ref) objects `lcms` and adds `A * w ≤ k * B` (inequality) and `A * w = k * B` (equality) constraints for each entry.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathbf{A}_{\\mathrm{ineq}} \\boldsymbol{w} \\leq k \\boldsymbol{B}_{\\mathrm{ineq}}\\,, \\\\
+\\mathbf{A}_{\\mathrm{eq}} \\boldsymbol{w} &= k \\boldsymbol{B}_{\\mathrm{eq}}\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:w_port])
+  - $(math_dict[:k_budget])
+  - ``\\mathbf{A}_{\\mathrm{ineq}}``, ``\\mathbf{A}_{\\mathrm{eq}}``: Constraint coefficient matrices for inequality and equality constraints.
+  - ``\\boldsymbol{B}_{\\mathrm{ineq}}``, ``\\boldsymbol{B}_{\\mathrm{eq}}``: Constraint response vectors for inequality and equality constraints.
 
 # Arguments
 

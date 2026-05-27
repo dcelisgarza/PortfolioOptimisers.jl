@@ -17,15 +17,7 @@ Result type for Subset Resampling portfolio optimisation.
 
 # Fields
 
-  - `oe`: Type of the optimisation estimator that produced this result.
-  - `pr`: Prior result used in optimisation.
-  - `wb`: Weight bounds applied.
-  - `fees`: Fee structure applied (or `nothing`).
-  - `ress`: Vector of sub-optimisation results for each subset.
-  - `idx`: Subset index vector.
-  - `retcode`: Overall return code.
-  - `w`: Aggregated optimal portfolio weights.
-  - `fb`: Fallback result.
+$(DocStringExtensions.FIELDS)
 
 # Related
 
@@ -33,16 +25,30 @@ Result type for Subset Resampling portfolio optimisation.
   - [`NonFiniteAllocationOptimisationResult`](@ref)
 """
 @concrete struct SubsetResamplingResult <: NonFiniteAllocationOptimisationResult
+    "$(field_dict[:oe])"
     oe
+    "$(field_dict[:pr])"
     pr
+    "$(field_dict[:wb])"
     wb
+    "$(field_dict[:fees])"
     fees
+    "Vector of sub-optimisation results for each subset."
     ress
+    "$(field_dict[:idx])"
     idx
+    "$(field_dict[:retcode])"
     retcode
+    "Aggregated optimal portfolio weights."
     w
+    "$(field_dict[:fb])"
     fb
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Rebuild a [`SubsetResamplingResult`](@ref) with an updated fallback optimiser `fb`.
+"""
 function factory(sr::SubsetResamplingResult, fb::Option{<:OptE_Opt})
     return SubsetResamplingResult(sr.oe, sr.pr, sr.wb, sr.fees, sr.ress, sr.idx, sr.retcode,
                                   sr.w, fb)
@@ -56,22 +62,7 @@ Subset Resampling portfolio optimiser.
 
 # Fields
 
-  - `pe`: Prior estimator or prior result.
-  - `wb`: Weight bounds estimator or bounds.
-  - `fees`: Fee estimator or fee structure.
-  - `sets`: Asset sets.
-  - `scale`: Optional scaling vector for inner optimiser weights (length must match `opti`).
-  - `opt`: Base portfolio optimiser applied to each subset.
-  - `wf`: Weight finaliser for enforcing bounds.
-  - `ex`: FLoops executor for parallelism.
-  - `subset_size`: Size of each subset (integer or fraction of total assets).
-  - `n_subsets`: Number of subsets to draw.
-  - `max_comb`: Maximum number of asset combinations to consider.
-  - `rng`: Random number generator.
-  - `seed`: Optional RNG seed for reproducibility.
-  - `fb`: Fallback optimiser.
-  - `brt`: If `true`, uses bootstrap returns.
-  - `strict`: If `true`, strictly enforces weight bounds.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -96,6 +87,36 @@ Subset Resampling portfolio optimiser.
 
 Keywords correspond to the struct's fields.
 
+## Validation
+
+  - If `scale` is provided: all elements must be non-empty, `> 0`, and finite.
+  - `opt` must pass `assert_internal_optimiser`.
+  - If `wb` is a `WeightBoundsEstimator`: `!isnothing(sets)`.
+  - If `fees` is a `FeesEstimator`: `!isnothing(sets)`.
+  - If `subset_size` is an `Integer`: `subset_size >= 1`.
+  - If `subset_size` is a `Float`: `0 < subset_size < 1`.
+  - If `n_subsets` is an `Integer`: `n_subsets >= 2`.
+  - `max_comb > 0` and finite.
+
+# Mathematical definition
+
+Draw ``M`` random subsets ``S_1, \\ldots, S_M`` of assets (size ``\\lfloor s \\cdot N \\rfloor``). Optimise on each:
+
+```math
+\\begin{align}
+\\boldsymbol{w}^* &= \\frac{1}{M} \\sum_{m=1}^{M} \\boldsymbol{e}_{S_m}(\\boldsymbol{w}_{S_m})\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{w}^*``: Final averaged portfolio weights.
+  - ``M``: Number of random subsets.
+  - ``S_m``: ``m``-th randomly drawn asset subset (size ``\\lfloor s \\cdot N \\rfloor``).
+  - ``\\boldsymbol{w}_{S_m}``: Optimal weights from the optimiser applied to subset ``S_m``.
+  - ``\\boldsymbol{e}_{S_m}(\\cdot)``: Embedding operator that places subset weights into full ``N``-asset space (zero-filling excluded assets).
+  - ``N``: Total number of assets.
+
 # Related
 
   - [`BaseSubsetResamplingOptimisationEstimator`](@ref)
@@ -103,21 +124,37 @@ Keywords correspond to the struct's fields.
   - [`MeanRisk`](@ref)
 """
 @concrete struct SubsetResampling <: BaseSubsetResamplingOptimisationEstimator
+    "$(field_dict[:pe])"
     pe
+    "$(field_dict[:wb_jmp])"
     wb
+    "$(field_dict[:feese])"
     fees
+    "$(field_dict[:sets])"
     sets
+    "Optional scaling vector for subset optimiser weights."
     scale
+    "Base portfolio optimiser applied to each asset subset."
     opt
+    "$(field_dict[:wf])"
     wf
+    "$(field_dict[:ex])"
     ex
+    "$(field_dict[:subset_size])"
     subset_size
+    "$(field_dict[:n_subsets])"
     n_subsets
+    "$(field_dict[:max_comb])"
     max_comb
+    "$(field_dict[:rng])"
     rng
+    "$(field_dict[:seed])"
     seed
+    "$(field_dict[:fb])"
     fb
+    "$(field_dict[:brt])"
     brt
+    "$(field_dict[:strict_opt])"
     strict
     function SubsetResampling(pe::PrE_Pr, wb::Option{<:WbE_Wb}, fees::Option{<:FeesE_Fees},
                               sets::Option{<:AssetSets}, scale::Option{<:VecNum},
@@ -176,11 +213,21 @@ end
 function assert_internal_optimiser(opt::SubsetResampling)::Nothing
     return assert_internal_optimiser(opt.opt)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return `true` if any sub-estimator of `opt` requires previous portfolio weights (fees, base optimiser, or fallback).
+"""
 function needs_previous_weights(opt::SubsetResampling)
     return (needs_previous_weights(opt.fees) ||
             needs_previous_weights(opt.opt) ||
             needs_previous_weights(opt.fb))
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Build an updated [`SubsetResampling`](@ref) with all estimators that track previous weights updated via `factory` using `w`.
+"""
 function factory(sr::SubsetResampling, w::AbstractVector)::SubsetResampling
     fees = factory(sr.fees, w)
     opt = factory(sr.opt, w)
@@ -191,6 +238,11 @@ function factory(sr::SubsetResampling, w::AbstractVector)::SubsetResampling
                             max_comb = sr.max_comb, rng = sr.rng, seed = sr.seed, fb = fb,
                             brt = sr.brt, strict = sr.strict)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a cluster-sliced copy of [`SubsetResampling`](@ref) for asset index set `i` and returns matrix `X`.
+"""
 function opt_view(sr::SubsetResampling, i, X::MatNum)::SubsetResampling
     X = isa(sr.pe, AbstractPriorResult) ? sr.pe.X : X
     pe = prior_view(sr.pe, i)
@@ -326,6 +378,8 @@ end
              dims::Int = 1, branchorder::Symbol = :optimal, str_names::Bool = false,
              save::Bool = true, kwargs...) -> SubsetResamplingResult
 
+Run the Subset Resampling portfolio optimisation.
+
 # Arguments
 
   - `sr`: The subset resampling optimiser to use.
@@ -335,6 +389,11 @@ end
   - `str_names`: Passed to the internal optimiser. Whether to use string names for the assets in the optimisation.
   - `save`: Passed to the internal optimiser. Whether to save the JuMP model in the optimisation result.
   - `kwargs`: Additional keyword arguments passed to the optimisation function.
+
+# Related
+
+  - [`SubsetResampling`](@ref)
+  - [`SubsetResamplingResult`](@ref)
 """
 function optimise(sr::SubsetResampling{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                        <:Any, <:Any, <:Any, <:Any, <:Any, Nothing},

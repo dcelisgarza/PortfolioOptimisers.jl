@@ -199,6 +199,37 @@ end
 
 Constructs box uncertainty sets for mean and covariance statistics under the assumption of normally distributed returns.
 
+# Mathematical definition
+
+Simulates ``M`` covariance matrices ``\\hat{\\mathbf{\\Sigma}}^{(m)} \\sim \\mathrm{Wishart}(T,\\, \\hat{\\mathbf{\\Sigma}}/T)`` and computes element-wise quantile bounds:
+
+```math
+\\begin{align}
+(\\mathbf{\\Sigma}_{lb})_{ij} &= Q_{q/2}\\!\\left(\\hat{\\Sigma}^{(m)}_{ij}\\right)\\,, \\\\
+(\\mathbf{\\Sigma}_{ub})_{ij} &= Q_{1-q/2}\\!\\left(\\hat{\\Sigma}^{(m)}_{ij}\\right)\\,.
+\\end{align}
+```
+
+Mean bounds use the normal complementary quantile ``z_{q/2} = \\Phi^{-1}(1-q/2)``:
+
+```math
+\\begin{align}
+\\boldsymbol{\\mu}_{lb} &= \\boldsymbol{0}\\,, \\\\
+\\mu_{ub,i} &= 2 z_{q/2} \\sqrt{(\\hat{\\mathbf{\\Sigma}}/T)_{ii}}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``(\\mathbf{\\Sigma}_{lb})_{ij}``, ``(\\mathbf{\\Sigma}_{ub})_{ij}``: Element-wise lower/upper covariance bounds.
+  - ``Q_{q/2}``, ``Q_{1-q/2}``: Lower and upper quantile functions at level ``q/2``.
+  - ``\\hat{\\Sigma}^{(m)}_{ij}``: ``(i,j)``-element of the ``m``-th simulated Wishart covariance draw.
+  - ``\\boldsymbol{\\mu}_{lb}``, ``\\mu_{ub,i}``: Lower and upper bounds for expected returns.
+  - ``z_{q/2} = \\Phi^{-1}(1 - q/2)``: Normal complementary quantile.
+  - ``\\hat{\\mathbf{\\Sigma}}``: Estimated covariance matrix.
+  - $(math_dict[:T])
+  - ``q``: Significance level.
+
 # Arguments
 
   - `ue`: Normal uncertainty set estimator.
@@ -268,6 +299,23 @@ end
 
 Constructs a box uncertainty set for expected returns under the assumption of normally distributed returns.
 
+# Mathematical definition
+
+```math
+\\begin{align}
+\\boldsymbol{\\mu}_{lb} &= \\boldsymbol{0}\\,, \\\\
+\\mu_{ub,i} &= 2 \\Phi^{-1}\\!\\left(1 - \\tfrac{q}{2}\\right) \\sqrt{(\\hat{\\mathbf{\\Sigma}}/T)_{ii}}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{\\mu}_{lb}``, ``\\mu_{ub,i}``: Lower and upper bounds for expected returns.
+  - ``\\Phi^{-1}(1 - q/2)``: Normal complementary quantile.
+  - ``\\hat{\\mathbf{\\Sigma}}``: Estimated covariance matrix.
+  - $(math_dict[:T])
+  - ``q``: Significance level.
+
 # Arguments
 
   - `ue`: Normal uncertainty set estimator.
@@ -314,6 +362,25 @@ end
               F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
 
 Constructs a box uncertainty set for covariance under the assumption of normally distributed returns.
+
+# Mathematical definition
+
+Simulates ``M`` matrices ``\\hat{\\mathbf{\\Sigma}}^{(m)} \\sim \\mathrm{Wishart}(T,\\,\\hat{\\mathbf{\\Sigma}}/T)`` and takes element-wise quantiles:
+
+```math
+\\begin{align}
+(\\mathbf{\\Sigma}_{lb})_{ij} &= Q_{q/2}\\!\\left(\\hat{\\Sigma}^{(m)}_{ij}\\right)\\,, \\\\
+(\\mathbf{\\Sigma}_{ub})_{ij} &= Q_{1-q/2}\\!\\left(\\hat{\\Sigma}^{(m)}_{ij}\\right)\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``(\\mathbf{\\Sigma}_{lb})_{ij}``, ``(\\mathbf{\\Sigma}_{ub})_{ij}``: Element-wise lower/upper covariance bounds.
+  - ``Q_{q/2}``, ``Q_{1-q/2}``: Lower and upper quantile functions at level ``q/2``.
+  - ``\\hat{\\Sigma}^{(m)}_{ij}``: ``(i,j)``-element of the ``m``-th Wishart draw.
+  - $(math_dict[:T])
+  - ``q``: Significance level.
 
 # Arguments
 
@@ -379,6 +446,44 @@ end
         F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
 
 Constructs ellipsoidal uncertainty sets for expected returns and covariance statistics under the assumption of normally distributed returns.
+
+# Mathematical definition
+
+Ellipsoidal sets centred at the prior estimates with asymptotic covariances:
+
+```math
+\\begin{align}
+\\mathbf{\\Sigma}_{\\mu} &= \\hat{\\mathbf{\\Sigma}} / T\\,, \\\\
+\\mathbf{\\Sigma}_{\\Sigma} &= T (\\mathbf{I} + \\mathbf{K})(\\mathbf{\\Sigma}_{\\mu} \\otimes \\mathbf{\\Sigma}_{\\mu})\\,.
+\\end{align}
+```
+
+The scaling ``k`` is fitted empirically from simulated samples ``\\hat{\\boldsymbol{\\mu}}^{(m)} \\sim \\mathcal{N}(\\hat{\\boldsymbol{\\mu}}, \\hat{\\mathbf{\\Sigma}})`` and ``\\hat{\\mathbf{\\Sigma}}^{(m)} \\sim \\mathrm{Wishart}(T, \\mathbf{\\Sigma}_{\\mu})``:
+
+```math
+\\begin{align}
+\\mathcal{E}_{\\mu} &= \\left\\{\\boldsymbol{\\mu} : (\\boldsymbol{\\mu} - \\hat{\\boldsymbol{\\mu}})^{\\intercal} \\mathbf{\\Sigma}_{\\mu}^{-1} (\\boldsymbol{\\mu} - \\hat{\\boldsymbol{\\mu}}) \\leq k_{\\mu}^2 \\right\\}\\,.
+\\end{align}
+```
+
+```math
+\\begin{align}
+\\mathcal{E}_{\\Sigma} &= \\left\\{\\mathbf{\\Sigma} : \\left\\| \\mathbf{\\Sigma}_{\\Sigma}^{-1/2} \\operatorname{vec}(\\mathbf{\\Sigma} - \\hat{\\mathbf{\\Sigma}}) \\right\\|_2 \\leq k_{\\Sigma} \\right\\}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathbf{\\Sigma}_{\\mu}``: Asymptotic covariance of the mean estimator.
+  - ``\\mathbf{\\Sigma}_{\\Sigma}``: Asymptotic covariance of the covariance estimator (vectorised).
+  - ``\\hat{\\mathbf{\\Sigma}}``: Estimated covariance matrix.
+  - $(math_dict[:T])
+  - ``\\mathbf{I}``: Identity matrix.
+  - ``\\mathbf{K}``: Commutation matrix.
+  - ``\\otimes``: Kronecker product.
+  - ``\\mathcal{E}_{\\mu}``: Ellipsoidal uncertainty set for expected returns.
+  - ``\\mathcal{E}_{\\Sigma}``: Ellipsoidal uncertainty set for covariance.
+  - ``k_{\\mu}``, ``k_{\\Sigma}``: Empirically fitted scaling parameters.
 
 # Arguments
 
@@ -453,6 +558,40 @@ end
         F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
 
 Constructs ellipsoidal uncertainty sets for expected returns and covariance statistics using the chi-squared scaling algorithm under the assumption of normally distributed returns.
+
+# Mathematical definition
+
+Asymptotic covariances are the same as the normal-``k`` variant:
+
+```math
+\\begin{align}
+\\mathbf{\\Sigma}_{\\mu} &= \\hat{\\mathbf{\\Sigma}} / T\\,, \\\\
+\\mathbf{\\Sigma}_{\\Sigma} &= T (\\mathbf{I} + \\mathbf{K})(\\mathbf{\\Sigma}_{\\mu} \\otimes \\mathbf{\\Sigma}_{\\mu})\\,.
+\\end{align}
+```
+
+The scaling ``k`` is the chi-squared quantile:
+
+```math
+\\begin{align}
+k_{\\mu} &= \\sqrt{\\chi^2_{N,\\,1-q}}\\,, \\\\
+k_{\\Sigma} &= \\sqrt{\\chi^2_{N^2,\\,1-q}}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathbf{\\Sigma}_{\\mu}``: Asymptotic covariance of the mean estimator.
+  - ``\\mathbf{\\Sigma}_{\\Sigma}``: Asymptotic covariance of the covariance estimator (vectorised).
+  - ``\\hat{\\mathbf{\\Sigma}}``: Estimated covariance matrix.
+  - $(math_dict[:T])
+  - ``\\mathbf{I}``: Identity matrix.
+  - ``\\mathbf{K}``: Commutation matrix.
+  - ``\\otimes``: Kronecker product.
+  - ``k_{\\mu}``, ``k_{\\Sigma}``: Chi-squared scaling parameters for mean and covariance ellipsoids.
+  - ``\\chi^2_{N,\\,1-q}``: ``(1-q)``-quantile of the chi-squared distribution with ``N`` degrees of freedom.
+  - ``N``: Number of assets.
+  - ``q``: Significance level.
 
 # Arguments
 

@@ -84,6 +84,23 @@ Stores the train index vectors, nested test index vectors (one per path), and a 
 
 $(DocStringExtensions.FIELDS)
 
+# Constructors
+
+    CombinatorialCrossValidationResult(;
+        train_idx::VecVecInt,
+        test_idx::VecVecVecInt,
+        path_ids::AbstractMatrix{<:Integer}
+    ) -> CombinatorialCrossValidationResult
+
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - `!isempty(train_idx)`.
+  - `!isempty(test_idx)`.
+  - `!isempty(path_ids)`.
+  - `length(train_idx) == length(test_idx) == size(path_ids, 2)`.
+
 # Related
 
   - [`CombinatorialCrossValidation`](@ref)
@@ -382,6 +399,26 @@ end
 
 Find the optimal `(n_folds, n_test_folds)` pair for combinatorial cross-validation by minimising a weighted cost that balances the average training size against the number of test paths.
 
+# Mathematical definition
+
+The cost function for a candidate `(n_folds, n_test_folds)` pair is:
+
+```math
+\\begin{align}
+\\text{cost} &= w_{\\text{ntp}} \\frac{|P(n,k) - P^*|}{P^*} + w_{\\text{tr}} \\frac{|\\bar{T}(n,k) - T^*|}{T^*}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\text{cost}``: Weighted cost for the candidate fold configuration.
+  - ``w_{\\text{ntp}}``: Weight on the test-paths component.
+  - ``w_{\\text{tr}}``: Weight on the training-size component.
+  - ``P(n,k)``: Number of test paths for ``n`` folds and ``k`` test folds.
+  - ``\\bar{T}(n,k)``: Average training size for ``n`` folds and ``k`` test folds.
+  - ``P^*``: Target number of test paths (`target_n_test_paths`).
+  - ``T^*``: Target training size (`target_train_size`).
+
 # Arguments
 
   - `T`: Total number of observations in the dataset.
@@ -394,16 +431,6 @@ Find the optimal `(n_folds, n_test_folds)` pair for combinatorial cross-validati
 # Returns
 
   - `Tuple{Int, Int}`: The optimal `(n_folds, n_test_folds)` pair minimising the weighted cost. Returns `(0, 0)` when no valid configuration is found.
-
-# Details
-
-The cost function for a candidate `(n_folds, n_test_folds)` pair is:
-
-```math
-\\text{cost} = w_{\\text{ntp}} \\frac{|P(n,k) - P^*|}{P^*} + w_{\\text{tr}} \\frac{|\\bar{T}(n,k) - T^*|}{T^*}
-```
-
-where ``P(n,k)`` is the number of test paths, ``\\bar{T}(n,k)`` is the average training size, ``P^*`` is `target_n_test_paths`, and ``T^*`` is `target_train_size`.
 
 # Related
 

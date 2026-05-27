@@ -74,6 +74,20 @@ This method returns the median of each asset across observations in `X`. If `me.
 the median is computed directly with `Statistics.median(X; dims = dims)`. Otherwise, the method
 computes a weighted median for each asset using the observation weights `w`.
 
+# Mathematical definition
+
+```math
+\\begin{align}
+\\hat{\\mu}_j &= \\mathrm{median}(r_{1j}, r_{2j}, \\ldots, r_{Tj})\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\hat{\\mu}_j``: Median expected return of asset ``j``.
+  - ``r_{tj}``: Return of asset ``j`` at time ``t``.
+  - $(math_dict[:T])
+
 # Arguments
 
   - `me`: Median expected returns estimator.
@@ -93,6 +107,11 @@ function Statistics.mean(me::MedianExpectedReturns{Nothing}, X::MatNum; dims::In
                          kwargs...)
     return Statistics.median(X; dims = dims)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Weighted-median overload of [`mean(me::MedianExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)`](@ref). Computes per-asset weighted median using the [`ObsWeights`](@ref) stored in `me.w`.
+"""
 function Statistics.mean(me::MedianExpectedReturns{<:ObsWeights}, X::MatNum; dims::Int = 1,
                          kwargs...)
     @argcheck(dims ∈ (1, 2))

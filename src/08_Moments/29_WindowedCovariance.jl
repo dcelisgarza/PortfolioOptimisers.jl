@@ -24,6 +24,31 @@ Keywords correspond to the struct's fields.
   - $(val_dict[:oow])
   - If `window` is provided, it must be nonempty, nonnegative, and finite.
 
+# Examples
+
+```jldoctest
+julia> WindowedCovariance()
+WindowedCovariance
+      ce ┼ PortfolioOptimisersCovariance
+         │   ce ┼ Covariance
+         │      │    me ┼ SimpleExpectedReturns
+         │      │       │   w ┴ nothing
+         │      │    ce ┼ GeneralCovariance
+         │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+         │      │       │    w ┴ nothing
+         │      │   alg ┴ Full()
+         │   mp ┼ DenoiseDetoneAlgMatrixProcessing
+         │      │     pdm ┼ Posdef
+         │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+         │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+         │      │      dn ┼ nothing
+         │      │      dt ┼ nothing
+         │      │     alg ┼ nothing
+         │      │   order ┴ DenoiseDetoneAlg()
+       w ┼ nothing
+  window ┴ nothing
+```
+
 # Related
 
   - [`AbstractCovarianceEstimator`](@ref)

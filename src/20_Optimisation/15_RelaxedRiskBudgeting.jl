@@ -46,7 +46,7 @@ Extends the regularised formulation with a penalty on deviations from target ris
 
 # Fields
 
-  - `p`: Penalty parameter (positive finite number).
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -66,6 +66,7 @@ Keywords correspond to the struct's fields.
   - [`RegularisedRelaxedRiskBudgeting`](@ref)
 """
 @concrete struct RegularisedPenalisedRelaxedRiskBudgeting <: RelaxedRiskBudgetingAlgorithm
+    "$(field_dict[:p_rm])"
     p
     function RegularisedPenalisedRelaxedRiskBudgeting(p::Number)
         @argcheck(isfinite(p) && p > zero(p))
@@ -85,11 +86,7 @@ Relaxed Risk Budgeting (RRB) portfolio optimiser.
 
 # Fields
 
-  - `opt`: JuMP optimiser configuration.
-  - `rba`: Risk budgeting algorithm.
-  - `wi`: Initial weights for warm-starting.
-  - `alg`: Relaxed risk budgeting algorithm variant.
-  - `fb`: Fallback optimiser.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -103,6 +100,34 @@ Relaxed Risk Budgeting (RRB) portfolio optimiser.
 
 Keywords correspond to the struct's fields.
 
+## Validation
+
+  - If `wi` is provided: `!isempty(wi)`.
+
+# Mathematical definition
+
+The Relaxed Risk Budgeting (RRB) formulation replaces the non-convex risk-parity constraint with a second-order cone (SOC) relaxation. Let ``\\mathbf{G}`` be the Cholesky factor of ``\\mathbf{\\Sigma}`` (so ``\\mathbf{G}^\\intercal\\mathbf{G} = \\mathbf{\\Sigma}``). Introduce auxiliary variables ``\\boldsymbol{\\zeta} = \\mathbf{\\Sigma}\\boldsymbol{w}``, ``\\psi \\geq 0``, ``\\gamma \\geq 0``:
+
+```math
+\\begin{align}
+\\underset{\\boldsymbol{w},\\psi,\\gamma,\\boldsymbol{\\zeta}}{\\min} \\quad & \\psi - \\gamma\\,, \\\\
+\\text{s.t.} \\quad & \\boldsymbol{\\zeta} = \\mathbf{\\Sigma}\\boldsymbol{w}\\,, \\\\
+& \\begin{pmatrix} w_i + \\zeta_i \\\\ 2\\gamma\\sqrt{b_i} \\\\ w_i - \\zeta_i \\end{pmatrix} \\in \\mathcal{K}_{\\mathrm{SOC}}\\,, \\quad \\forall i\\,.
+\\end{align}
+```
+
+The risk cone constraint (basic variant): ``(\\psi,\\, \\mathbf{G}\\boldsymbol{w}) \\in \\mathcal{K}_{\\mathrm{SOC}}``, i.e. ``\\psi \\geq \\|\\mathbf{G}\\boldsymbol{w}\\|_2 = \\sqrt{\\boldsymbol{w}^\\intercal\\mathbf{\\Sigma}\\boldsymbol{w}}``.
+
+Where:
+
+  - ``\\boldsymbol{w}``: Portfolio weight vector.
+  - ``\\psi``, ``\\gamma``: Scalar auxiliary variables.
+  - ``\\boldsymbol{\\zeta}``: Auxiliary vector equal to ``\\mathbf{\\Sigma}\\boldsymbol{w}``.
+  - ``b_i``: Risk budget for asset ``i``.
+  - ``\\mathbf{G}``: Cholesky factor of ``\\mathbf{\\Sigma}`` (so ``\\mathbf{G}^\\intercal\\mathbf{G} = \\mathbf{\\Sigma}``).
+  - ``\\mathbf{\\Sigma}``: Covariance matrix.
+  - ``\\mathcal{K}_{\\mathrm{SOC}}``: Second-order cone.
+
 # Related
 
   - [`JuMPOptimisationEstimator`](@ref)
@@ -110,10 +135,15 @@ Keywords correspond to the struct's fields.
   - [`RelaxedRiskBudgetingAlgorithm`](@ref)
 """
 @concrete struct RelaxedRiskBudgeting <: JuMPOptimisationEstimator
+    "$(field_dict[:opt_jmp])"
     opt
+    "$(field_dict[:rba])"
     rba
+    "$(field_dict[:wi])"
     wi
+    "Relaxed risk budgeting algorithm variant."
     alg
+    "$(field_dict[:fb])"
     fb
     function RelaxedRiskBudgeting(opt::JuMPOptimiser, rba::RiskBudgetingAlgorithm,
                                   wi::Option{<:VecNum}, alg::RelaxedRiskBudgetingAlgorithm,
@@ -133,15 +163,30 @@ function RelaxedRiskBudgeting(; opt::JuMPOptimiser = JuMPOptimiser(),
                               fb::Option{<:OptE_Opt} = nothing)::RelaxedRiskBudgeting
     return RelaxedRiskBudgeting(opt, rba, wi, alg, fb)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return `true` if the JuMP optimiser or fallback requires previous portfolio weights.
+"""
 function needs_previous_weights(opt::RelaxedRiskBudgeting)
     return (needs_previous_weights(opt.opt) || needs_previous_weights(opt.fb))
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Build an updated [`RelaxedRiskBudgeting`](@ref) with all estimators that track previous weights updated via `factory` using `w`.
+"""
 function factory(rrb::RelaxedRiskBudgeting, w::AbstractVector)::RelaxedRiskBudgeting
     opt = factory(rrb.opt, w)
     fb = factory(rrb.fb, w)
     return RelaxedRiskBudgeting(; opt = opt, rba = rrb.rba, wi = rrb.wi, alg = rrb.alg,
                                 fb = fb)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a cluster-sliced copy of [`RelaxedRiskBudgeting`](@ref) for asset index set `i` and returns matrix `X`.
+"""
 function opt_view(rrb::RelaxedRiskBudgeting, i, X::MatNum)::RelaxedRiskBudgeting
     X = isa(rrb.opt.pe, AbstractPriorResult) ? rrb.opt.pe.X : X
     opt = opt_view(rrb.opt, i, X)
@@ -363,14 +408,21 @@ end
              rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
              str_names::Bool = false, save::Bool = true, kwargs...) -> RiskBudgetingResult
 
+Run the Relaxed Risk Budgeting portfolio optimisation.
+
 # Arguments
 
   - `rrb`: The relaxed risk budgeting optimiser to use.
-  - $(arg_dict[:rd]) If `isa(hec.opt.pe, AbstractPriorResult)`, `rd` is not necessary if doing a standalone optimisation, but may be required/desired by fallbacks and/or clusterisation.
+  - $(arg_dict[:rd]) If `isa(rrb.opt.pe, AbstractPriorResult)`, `rd` is not necessary if doing a standalone optimisation, but may be required/desired by fallbacks and/or clusterisation.
   - `dims`: The dimension along which observations advance in time.
   - `str_names`: Whether to use string names for the assets in the optimisation.
   - `save`: Whether to save the JuMP model in the optimisation result.
   - `kwargs`: Additional keyword arguments passed to the optimisation function.
+
+# Related
+
+  - [`RelaxedRiskBudgeting`](@ref)
+  - [`RiskBudgetingResult`](@ref)
 """
 function optimise(rrb::RelaxedRiskBudgeting{<:Any, <:Any, <:Any, <:Any, Nothing},
                   rd::ReturnsResult = ReturnsResult(); dims::Int = 1,

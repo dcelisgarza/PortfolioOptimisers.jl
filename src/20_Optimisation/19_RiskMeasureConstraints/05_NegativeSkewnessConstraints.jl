@@ -107,6 +107,23 @@ creates a scalar variable, adds the SOC constraint `[sc * nskew_risk; sc * G * w
 and dispatches to [`set_negative_skewness_risk!`](@ref) for bounding. The `LowOrderPrior`
 overload unconditionally throws an `ArgumentError`.
 
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathrm{NSkew}(\\boldsymbol{w}) &= \\|\\mathbf{G}_V \\boldsymbol{w}\\|_2\\,, \\\\
+\\mathbf{G}_V &= \\mathrm{chol}(\\mathbf{V})\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathrm{NSkew}(\\boldsymbol{w})``: Negative skewness risk measure.
+  - ``\\mathbf{G}_V``: Cholesky factor of the projected co-skewness matrix ``\\mathbf{V}``.
+  - $(math_dict[:w_port])
+
+where ``\\mathbf{V}`` is the co-skewness matrix projected onto the weight space.
+
 # Arguments
 
   - $(arg_dict[:model])

@@ -77,6 +77,22 @@ Return a new [`LowerTailDependenceCovariance`](@ref) estimator with observation 
 
   - $(ret_dict[:ce])
 
+# Examples
+
+```jldoctest
+julia> ce = LowerTailDependenceCovariance();
+
+julia> factory(ce, StatsBase.Weights([0.2, 0.3, 0.5]))
+LowerTailDependenceCovariance
+     ve ┼ SimpleVariance
+        │          me ┼ SimpleExpectedReturns
+        │             │   w ┴ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.3, 0.5]
+        │           w ┼ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.3, 0.5]
+        │   corrected ┴ Bool: true
+  alpha ┼ Float64: 0.05
+     ex ┴ Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
+```
+
 # Related
 
   - [`LowerTailDependenceCovariance`](@ref)
@@ -116,6 +132,27 @@ end
 Compute the lower tail dependence matrix for a set of asset returns.
 
 The lower tail dependence (LTD) between two assets quantifies the probability that both assets experience returns in their respective lower tails (i.e., joint drawdowns or adverse events), given a specified quantile level `alpha`. This function estimates the LTD matrix for all pairs of assets in the input matrix `X`, which is particularly useful for risk management and stress testing.
+
+# Mathematical definition
+
+For a quantile level ``\\alpha \\in (0,1)`` and ``k = \\lceil T \\alpha \\rceil``, let ``\\hat{q}_i`` denote the empirical ``\\alpha``-quantile of asset ``i`` (the ``k``-th order statistic). The lower tail dependence between assets ``i`` and ``j`` is estimated as:
+
+```math
+\\begin{align}
+\\hat{\\lambda}_{ij} &= \\frac{1}{k} \\sum_{t=1}^{T} \\mathbf{1}\\left[x_{ti} \\leq \\hat{q}_i \\text{ and } x_{tj} \\leq \\hat{q}_j\\right]\\,.
+\\end{align}
+```
+
+The resulting matrix is symmetric with entries clamped to ``[0,\\, 1]``.
+
+Where:
+
+  - ``\\hat{\\lambda}_{ij}``: Lower tail dependence estimate between assets ``i`` and ``j``.
+  - $(math_dict[:T])
+  - $(math_dict[:alpha_rm])
+  - ``k = \\lceil T \\alpha \\rceil``: Number of observations in the lower tail.
+  - ``x_{ti}``: Return of asset ``i`` at time ``t``.
+  - ``\\hat{q}_i``: Empirical ``\\alpha``-quantile of asset ``i``.
 
 # Arguments
 
@@ -184,6 +221,19 @@ This method computes the lower tail dependence (LTD) correlation matrix for the 
 
   - `dims` is either `1` or `2`.
 
+# Examples
+
+```jldoctest
+julia> ce = LowerTailDependenceCovariance();
+
+julia> X = [0.01 0.02; 0.03 0.04; 0.02 0.03];
+
+julia> cor(ce, X)
+2×2 Matrix{Float64}:
+ 1.0  1.0
+ 1.0  1.0
+```
+
 # Related
 
   - [`LowerTailDependenceCovariance`](@ref)
@@ -218,6 +268,19 @@ This method computes the lower tail dependence (LTD) covariance matrix for the i
 # Validation
 
   - `dims` is either `1` or `2`.
+
+# Examples
+
+```jldoctest
+julia> ce = LowerTailDependenceCovariance();
+
+julia> X = [0.01 0.02; 0.03 0.04; 0.02 0.03];
+
+julia> cov(ce, X)
+2×2 Matrix{Float64}:
+ 0.0001  0.0001
+ 0.0001  0.0001
+```
 
 # Related
 

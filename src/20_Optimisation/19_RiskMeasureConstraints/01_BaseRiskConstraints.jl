@@ -23,6 +23,24 @@ The `SumScalariser` method sums all entries into a linear or quadratic expressio
 to encode a log-sum-exp scalarisation. The `MaxScalariser` method introduces a variable and
 linear constraints to encode the maximum over all entries.
 
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathcal{R}_{\\mathrm{sum}} &= \\sum_k \\mathcal{R}_k\\,, \\\\
+\\mathcal{R}_{\\mathrm{lse}} &= \\frac{1}{\\gamma}\\ln\\sum_k e^{\\gamma \\mathcal{R}_k}\\,, \\\\
+\\mathcal{R}_{\\mathrm{max}} &= \\max_k \\mathcal{R}_k\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathcal{R}_{\\mathrm{sum}}``: Sum scalarisation.
+  - ``\\mathcal{R}_{\\mathrm{lse}}``: Log-sum-exp scalarisation.
+  - ``\\mathcal{R}_{\\mathrm{max}}``: Maximum scalarisation.
+  - ``\\mathcal{R}_k``: ``k``-th risk expression.
+  - ``\\gamma``: Temperature parameter for log-sum-exp.
+
 # Arguments
 
   - $(arg_dict[:model])
@@ -264,6 +282,27 @@ Creates the `dd` variable array (length `T + 1`) together with three constraints
 `cdd_start` (initial drawdown is zero), `cdd_geq_0` (drawdowns are non-negative), and `cdd`
 (drawdown recurrence relation). Returns the `dd` array; returns the existing one if already
 present in `model`.
+
+# Mathematical definition
+
+Drawdown recurrence:
+
+```math
+\\begin{align}
+dd_0 &= 0\\,, \\\\
+dd_t &\\geq 0\\,, \\\\
+dd_t &\\geq dd_{t-1} - \\hat{r}_t
+\\quad \\Leftrightarrow \\quad dd_t &= \\max_{s \\leq t} V_s - V_t\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``dd_t``: Portfolio drawdown at time ``t``.
+  - ``\\hat{r}_t``: Portfolio return at time ``t``.
+  - ``V_t``: Cumulative portfolio wealth at time ``t``.
+
+where ``\\hat{r}_t = \\boldsymbol{x}_t^\\intercal \\boldsymbol{w}`` and ``V_t = k + \\sum_{s=1}^t \\hat{r}_s``.
 
 # Arguments
 

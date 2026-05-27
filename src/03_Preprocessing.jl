@@ -295,6 +295,35 @@ Return a view of the `ReturnsResult` object for assets at indices `j`, observati
   - [`Option`](@ref)
   - [`VecStr`](@ref)
   - [`MatNum`](@ref)
+
+# Examples
+
+```jldoctest
+julia> rd = ReturnsResult(; nx = ["A", "B"], X = [0.1 0.2; 0.3 0.4; 0.5 0.6], nf = ["F1"],
+                          F = [1.0; 2.0; 3.0;;])
+ReturnsResult
+    nx ┼ Vector{String}: ["A", "B"]
+     X ┼ 3×2 Matrix{Float64}
+    nf ┼ Vector{String}: ["F1"]
+     F ┼ 3×1 Matrix{Float64}
+    nb ┼ nothing
+     B ┼ nothing
+    ts ┼ nothing
+    iv ┼ nothing
+  ivpa ┴ nothing
+
+julia> PortfolioOptimisers.returns_result_view(rd, 1:2, 2:2)
+ReturnsResult
+    nx ┼ SubArray{String, 1, Vector{String}, Tuple{UnitRange{Int64}}, true}: ["B"]
+     X ┼ 2×1 SubArray{Float64, 2, Matrix{Float64}, Tuple{UnitRange{Int64}, UnitRange{Int64}}, false}
+    nf ┼ Vector{String}: ["F1"]
+     F ┼ 2×1 SubArray{Float64, 2, Matrix{Float64}, Tuple{UnitRange{Int64}, Base.Slice{Base.OneTo{Int64}}}, false}
+    nb ┼ nothing
+     B ┼ nothing
+    ts ┼ nothing
+    iv ┼ nothing
+  ivpa ┴ nothing
+```
 """
 function returns_result_view(rd::ReturnsResult, i, j, k = :)
     nx = nothing_scalar_array_view(rd.nx, j)
@@ -425,6 +454,26 @@ end
     ) -> ReturnsResult
 
 Convert price data (and optionally factor data) in `TimeSeries.TimeArray` format to returns, with flexible handling of missing data, imputation, and optional implied volatility information.
+
+# Mathematical definition
+
+Returns are computed from prices ``P_{t,i}`` as:
+
+```math
+\\begin{align}
+r_{t,i} &= \\begin{cases}
+(P_{t,i} - P_{t-1,i}) / P_{t-1,i} & \\text{simple} \\\\
+\\ln(P_{t,i} / P_{t-1,i}) & \\text{log}
+\\end{cases}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``r_{t,i}``: Return of asset ``i`` at time ``t``.
+  - ``P_{t,i}``: Price of asset ``i`` at time ``t``.
+
+If a benchmark ``B_{t,i}`` is provided, excess returns are used: ``\\tilde{r}_{t,i} = r_{t,i} - b_{t,i}``.
 
 # Arguments
 
@@ -673,6 +722,8 @@ function find_complete_indices(X::AbstractMatrix; dims::Int = 1)
     return setdiff(1:N, to_remove)
 end
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
 !!! note
 
     Not implemented yet, still unexported.

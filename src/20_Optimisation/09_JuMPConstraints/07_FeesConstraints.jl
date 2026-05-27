@@ -38,6 +38,24 @@ Add a turnover-based transaction fee expression to the JuMP optimisation model.
 
 The fall-through method does nothing. The concrete method computes `val' * |w - wt|` via NormOneCone constraints and accumulates the result into the model's `:fees` expression via [`add_to_fees!`](@ref).
 
+# Mathematical definition
+
+```math
+\\begin{align}
+t_{ftn,i} &\\geq |w_i - w_{t,i}\\, k|\\,, \\\\
+f_{tn} &= \\boldsymbol{v}^\\intercal \\boldsymbol{t}_{ftn}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``w_i``: Portfolio weight for asset ``i``.
+  - ``w_{t,i}``: Benchmark weight for asset ``i``.
+  - $(math_dict[:k_budget])
+  - ``\\boldsymbol{v}``: Per-asset fee rate vector.
+  - ``\\boldsymbol{t}_{ftn}``: Auxiliary absolute-deviation variable vector.
+  - ``f_{tn}``: Total turnover fee.
+
 # Arguments
 
   - $(arg_dict[:model])
@@ -109,6 +127,20 @@ Add proportional long-side fee expression to the JuMP optimisation model.
 
 The fall-through method does nothing. The concrete method adds `fl' * lw` to the model's `:fees` expression via [`add_to_fees!`](@ref).
 
+# Mathematical definition
+
+```math
+\\begin{align}
+f_l &= \\boldsymbol{f}_l^\\intercal \\boldsymbol{lw}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``f_l``: Total long-side fee.
+  - ``\\boldsymbol{f}_l``: Per-asset long-side fee rate vector.
+  - ``\\boldsymbol{lw}``: Long-weight vector.
+
 # Arguments
 
   - $(arg_dict[:model])
@@ -134,6 +166,20 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 Add proportional short-side fee expression to the JuMP optimisation model.
 
 The fall-through method does nothing. The concrete method adds `fs' * sw` to the model's `:fees` expression via [`add_to_fees!`](@ref). Does nothing when no short-weight variable `:sw` exists in the model.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+f_s &= \\boldsymbol{f}_s^\\intercal \\boldsymbol{sw}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``f_s``: Total short-side fee.
+  - ``\\boldsymbol{f}_s``: Per-asset short-side fee rate vector.
+  - ``\\boldsymbol{sw}``: Short-weight vector.
 
 # Arguments
 

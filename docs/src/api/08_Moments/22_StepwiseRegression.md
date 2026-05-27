@@ -5,9 +5,10 @@ PValue
 Forward
 Backward
 StepwiseRegression
+factory(re::StepwiseRegression, w::ObsWeights)
 regression(re::StepwiseRegression, X::MatNum, F::MatNum)
 _regression(re::StepwiseRegression{<:PValue, <:Forward}, x::VecNum, F::MatNum)
-_regression(re::StepwiseRegression{AbstractMinMaxValStepwiseRegressionCriterion, <:Forward}, x::VecNum, F::MatNum)
+_regression(re::StepwiseRegression{<:AbstractMinMaxValStepwiseRegressionCriterion, <:Forward}, x::VecNum, F::MatNum)
 _regression(re::StepwiseRegression{<:PValue, <:Backward}, x::VecNum, F::MatNum)
 _regression(re::StepwiseRegression{<:AbstractMinMaxValStepwiseRegressionCriterion, <:Backward}, x::VecNum, F::MatNum)
 add_best_feature_after_pval_failure!

@@ -2,7 +2,9 @@
 
 ```@docs
 LowerTailDependenceCovariance
+factory(ce::LowerTailDependenceCovariance, w::ObsWeights)
 cov(ce::LowerTailDependenceCovariance, X::MatNum; dims::Int = 1, kwargs...)
 cor(ce::LowerTailDependenceCovariance, X::MatNum; dims::Int = 1, kwargs...)
+moment_view(ce::LowerTailDependenceCovariance, i)
 lower_tail_dependence
 ```

@@ -14,6 +14,18 @@ All concrete and/or abstract types representing the formulation for computing Va
   - [`ValueatRiskRange`](@ref)
 """
 abstract type ValueatRiskFormulation <: AbstractAlgorithm end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the Value-at-Risk formulation `alg` unchanged.
+
+Identity pass-through for formulation types that do not depend on prior results.
+
+# Related
+
+  - [`ValueatRiskFormulation`](@ref)
+  - [`factory`](@ref)
+"""
 function factory(alg::ValueatRiskFormulation, args...; kwargs...)::ValueatRiskFormulation
     return alg
 end
@@ -186,6 +198,17 @@ function DistributionValueatRisk(; mu::Option{<:VecNum} = nothing,
                                  dist::Distributions.Distribution = Distributions.Normal())::DistributionValueatRisk
     return DistributionValueatRisk(mu, sigma, chol, dist)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create an instance of [`DistributionValueatRisk`](@ref) by selecting distribution parameters from the formulation or falling back to the prior result.
+
+# Related
+
+  - [`DistributionValueatRisk`](@ref)
+  - [`factory`](@ref)
+  - [`nothing_scalar_array_selector`](@ref)
+"""
 function factory(alg::DistributionValueatRisk, pr::AbstractPriorResult, args...;
                  kwargs...)::DistributionValueatRisk
     mu = nothing_scalar_array_selector(alg.mu, pr.mu)
@@ -207,13 +230,23 @@ Represents the Value-at-Risk (VaR) risk measure.
 
 `ValueatRisk` quantifies the maximum expected loss at a given confidence level `alpha` over a specified time horizon. It can be computed using empirical quantiles (weighted or unweighted) or via a parametric distribution.
 
-# Mathematical Definition
+# Mathematical definition
 
 Let ``\\boldsymbol{x} = (x_1, \\ldots, x_T)^\\intercal`` be the portfolio returns vector and ``x_{(k)}`` the ``k``-th order statistic (``k``-th smallest value). The empirical VaR at significance level ``\\alpha`` is:
 
 ```math
-\\mathrm{VaR}_{\\alpha}(\\boldsymbol{x}) = -x_{(\\lceil \\alpha T \\rceil)}\\,.
+\\begin{align}
+\\mathrm{VaR}_{\\alpha}(\\boldsymbol{x}) &= -x_{(\\lceil \\alpha T \\rceil)}\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``\\mathrm{VaR}_{\\alpha}(\\boldsymbol{x})``: Value-at-Risk at significance level ``\\alpha``.
+  - ``\\boldsymbol{x} = (x_1, \\ldots, x_T)^\\intercal``: Portfolio returns vector.
+  - ``x_{(k)}``: ``k``-th order statistic (``k``-th smallest value) of ``\\boldsymbol{x}``.
+  - ``\\alpha``: Significance level (e.g., ``\\alpha = 0.05`` for 95% VaR).
+  - $(math_dict[:T])
 
 For observation-weighted samples with weight vector ``\\boldsymbol{w}`` summing to ``S_w``, VaR is the ``\\alpha S_w``-quantile of the weighted empirical distribution.
 
@@ -294,6 +327,17 @@ function ValueatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                      alg::ValueatRiskFormulation = MIPValueatRisk())::ValueatRisk
     return ValueatRisk(settings, alpha, w, alg)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create an instance of [`ValueatRisk`](@ref) by selecting observation weights and formulation from the risk-measure instance or falling back to the prior result.
+
+# Related
+
+  - [`ValueatRisk`](@ref)
+  - [`factory`](@ref)
+  - [`nothing_scalar_array_selector`](@ref)
+"""
 function factory(r::ValueatRisk, pr::AbstractPriorResult, args...; kwargs...)::ValueatRisk
     w = nothing_scalar_array_selector(r.w, pr.w)
     alg = factory(r.alg, pr, args...; kwargs...)
@@ -324,13 +368,22 @@ Represents the Value-at-Risk Range risk measure.
 
 `ValueatRiskRange` computes the difference between the lower-tail Value-at-Risk (at level `alpha`) and the upper-tail Value-at-Risk (at level `beta`), measuring the spread between downside and upside tail risks.
 
-# Mathematical Definition
+# Mathematical definition
 
 ```math
-\\mathrm{VaRRange}_{\\alpha,\\beta}(\\boldsymbol{x}) = \\mathrm{VaR}_{\\alpha}(\\boldsymbol{x}) - \\mathrm{VaR}_{\\beta}(-\\boldsymbol{x})\\,,
+\\begin{align}
+\\mathrm{VaRRange}_{\\alpha,\\beta}(\\boldsymbol{x}) &= \\mathrm{VaR}_{\\alpha}(\\boldsymbol{x}) - \\mathrm{VaR}_{\\beta}(-\\boldsymbol{x})\\,,\\,.
+\\end{align}
 ```
 
-where ``\\mathrm{VaR}_{\\alpha}(\\boldsymbol{x})`` captures the lower-tail loss quantile and ``\\mathrm{VaR}_{\\beta}(-\\boldsymbol{x})`` captures the upper-tail gain quantile.
+Where:
+
+  - ``\\mathrm{VaRRange}_{\\alpha,\\beta}(\\boldsymbol{x})``: Value-at-Risk Range.
+  - ``\\mathrm{VaR}_{\\alpha}(\\boldsymbol{x})``: Lower-tail loss quantile.
+  - ``\\mathrm{VaR}_{\\beta}(-\\boldsymbol{x})``: Upper-tail gain quantile.
+  - ``\\boldsymbol{x}``: Portfolio returns vector.
+  - ``\\alpha``: Lower-tail significance level.
+  - ``\\beta``: Upper-tail significance level.
 
 # Fields
 
@@ -417,6 +470,17 @@ function ValueatRiskRange(; settings::RiskMeasureSettings = RiskMeasureSettings(
                           alg::ValueatRiskFormulation = MIPValueatRisk())::ValueatRiskRange
     return ValueatRiskRange(settings, alpha, beta, w, alg)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create an instance of [`ValueatRiskRange`](@ref) by selecting observation weights and formulation from the risk-measure instance or falling back to the prior result.
+
+# Related
+
+  - [`ValueatRiskRange`](@ref)
+  - [`factory`](@ref)
+  - [`nothing_scalar_array_selector`](@ref)
+"""
 function factory(r::ValueatRiskRange, pr::AbstractPriorResult, args...;
                  kwargs...)::ValueatRiskRange
     w = nothing_scalar_array_selector(r.w, pr.w)
@@ -461,19 +525,38 @@ Represents the Drawdown-at-Risk (DaR) risk measure.
 
 `DrawdownatRisk` quantifies the maximum drawdown not exceeded at a given confidence level `alpha`. It operates on absolute drawdowns computed from the portfolio returns series.
 
-# Mathematical Definition
+# Mathematical definition
 
 Define the cumulative wealth process and absolute drawdown at time ``t``:
 
 ```math
-c_t = \\sum_{s=1}^{t} x_s\\,, \\qquad d_t = c_t - \\max_{0 \\leq s \\leq t} c_s \\leq 0\\,.
+\\begin{align}
+c_t &= \\sum_{s=1}^{t} x_s\\,, \\\\
+d_t &= c_t - \\max_{0 \\leq s \\leq t} c_s \\leq 0\\,.
+\\end{align}
 ```
+
+Where:
+
+  - $(math_dict[:xret])
+  - $(math_dict[:ct])
+  - $(math_dict[:dtdd])
 
 The Drawdown-at-Risk at level ``\\alpha`` is the ``\\lceil \\alpha T \\rceil``-th smallest (most extreme) drawdown:
 
 ```math
-\\mathrm{DaR}_{\\alpha}(\\boldsymbol{x}) = -d_{(\\lceil \\alpha T \\rceil)}\\,.
+\\begin{align}
+\\mathrm{DaR}_{\\alpha}(\\boldsymbol{x}) &= -d_{(\\lceil \\alpha T \\rceil)}\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``\\mathrm{DaR}_{\\alpha}(\\boldsymbol{x})``: Drawdown-at-Risk at level ``\\alpha``.
+  - $(math_dict[:alpha_rm])
+  - $(math_dict[:T])
+  - $(math_dict[:dtdd])
+  - ``d_{(k)}``: ``k``-th order statistic (sorted ascending) of the drawdown series.
 
 # Fields
 
@@ -570,6 +653,17 @@ function DrawdownatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                         s::Option{<:Number} = nothing)::DrawdownatRisk
     return DrawdownatRisk(settings, alpha, w, b, s)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create an instance of [`DrawdownatRisk`](@ref) by selecting observation weights from the risk-measure instance or falling back to the prior result.
+
+# Related
+
+  - [`DrawdownatRisk`](@ref)
+  - [`factory`](@ref)
+  - [`nothing_scalar_array_selector`](@ref)
+"""
 function factory(r::DrawdownatRisk, pr::AbstractPriorResult, args...;
                  kwargs...)::DrawdownatRisk
     w = nothing_scalar_array_selector(r.w, pr.w)
@@ -630,21 +724,38 @@ Represents the Relative Drawdown-at-Risk risk measure for hierarchical optimisat
 
 `RelativeDrawdownatRisk` quantifies the maximum relative (compounded) drawdown not exceeded at a given confidence level `alpha`. It operates on relative drawdowns computed from the portfolio returns series.
 
-# Mathematical Definition
+# Mathematical definition
 
 Define the compounded wealth process and relative drawdown at time ``t``:
 
 ```math
-C_t = \\prod_{s=1}^{t} (1 + x_s)\\,, \\qquad rd_t = \\frac{C_t}{\\max_{0 \\leq s \\leq t} C_s} - 1 \\leq 0\\,.
+\\begin{align}
+C_t &= \\prod_{s=1}^{t} (1 + x_s)\\,, \\\\
+rd_t &= \\frac{C_t}{\\max_{0 \\leq s \\leq t} C_s} - 1 \\leq 0\\,.
+\\end{align}
 ```
+
+Where:
+
+  - $(math_dict[:xret])
+  - $(math_dict[:Ct])
+  - $(math_dict[:rdt])
 
 The Relative Drawdown-at-Risk at level ``\\alpha`` is:
 
 ```math
-\\mathrm{RDaR}_{\\alpha}(\\boldsymbol{x}) = -rd_{(\\lceil \\alpha T \\rceil)}\\,,
+\\begin{align}
+\\mathrm{RDaR}_{\\alpha}(\\boldsymbol{x}) &= -rd_{(\\lceil \\alpha T \\rceil)}\\,.
+\\end{align}
 ```
 
-where ``rd_{(k)}`` is the ``k``-th smallest relative drawdown.
+Where:
+
+  - ``\\mathrm{RDaR}_{\\alpha}(\\boldsymbol{x})``: Relative Drawdown-at-Risk at level ``\\alpha``.
+  - $(math_dict[:alpha_rm])
+  - $(math_dict[:T])
+  - $(math_dict[:rdt])
+  - ``rd_{(k)}``: ``k``-th order statistic (sorted ascending) of the relative drawdown series.
 
 # Fields
 
@@ -712,6 +823,17 @@ function RelativeDrawdownatRisk(;
                                 w::Option{<:ObsWeights} = nothing)::RelativeDrawdownatRisk
     return RelativeDrawdownatRisk(settings, alpha, w)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create an instance of [`RelativeDrawdownatRisk`](@ref) by selecting observation weights from the risk-measure instance or falling back to the prior result.
+
+# Related
+
+  - [`RelativeDrawdownatRisk`](@ref)
+  - [`factory`](@ref)
+  - [`nothing_scalar_array_selector`](@ref)
+"""
 function factory(r::RelativeDrawdownatRisk, pr::AbstractPriorResult, args...;
                  kwargs...)::RelativeDrawdownatRisk
     w = nothing_scalar_array_selector(r.w, pr.w)

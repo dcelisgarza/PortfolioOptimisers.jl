@@ -122,6 +122,37 @@ Union of all risk-ratio risk measures, where the expected risk is defined as the
   - [`expected_risk`](@ref)
 """
 const RkRatioRM = Union{<:RiskRatioRiskMeasure, <:NonOptimisationRiskRatioRiskMeasure}
+"""
+    expected_risk(r::ERkNetRet, w::VecNum, X::MatNum, fees = nothing; kwargs...)
+    expected_risk(r::ERkwXFees, w::VecNum, X::MatNum, fees = nothing; kwargs...)
+    expected_risk(r::ERkw, w::VecNum, args...; kwargs...)
+    expected_risk(r::RkRatioRM, w::VecNum, X::MatNum, fees = nothing; kwargs...)
+    expected_risk(r::MeanReturnRiskRatio, w::VecNum, X::MatNum, fees = nothing; kwargs...)
+    expected_risk(r::AbstractBaseRiskMeasure, w::VecNum, pr::Pr_RR, args...; kwargs...)
+    expected_risk(r::AbstractBaseRiskMeasure, w::VecVecNum, args...; kwargs...)
+
+Compute the expected value of a risk measure for a portfolio.
+
+Dispatches on the type of `r` to select the appropriate computation:
+
+  - [`ERkNetRet`](@ref): calls `r(calc_net_returns(w, X, fees))`.
+  - [`ERkwXFees`](@ref): calls `r(w, X, fees)`.
+  - [`ERkw`](@ref): calls `r(w)` (ignores `X` and `fees`).
+  - [`RkRatioRM`](@ref): computes `expected_risk(r.r1, ...) / expected_risk(r.r2, ...)`.
+  - [`MeanReturnRiskRatio`](@ref): `(expected_risk(r.rt, ...) - r.rf) / expected_risk(r.rk, ...)`.
+  - `AbstractBaseRiskMeasure` with [`Pr_RR`](@ref): extracts `X` from the prior result and recurses.
+  - `AbstractBaseRiskMeasure` with `VecVecNum`: maps over each weight vector in `w`.
+
+# Related
+
+  - [`expected_risk`](@ref)
+  - [`ERkNetRet`](@ref)
+  - [`ERkwXFees`](@ref)
+  - [`ERkw`](@ref)
+  - [`RkRatioRM`](@ref)
+  - [`MeanReturnRiskRatio`](@ref)
+  - [`calc_net_returns`](@ref)
+"""
 function expected_risk(r::ERkNetRet, w::VecNum, X::MatNum, fees::Option{<:Fees} = nothing;
                        kwargs...)
     return r(calc_net_returns(w, X, fees))
@@ -157,11 +188,20 @@ end
 """
     number_effective_assets(w::VecNum)
 
-Compute the effective number of assets (Herfindahl-Hirschman inverse index):
+Compute the effective number of assets (Herfindahl-Hirschman inverse index).
+
+# Mathematical definition
 
 ```math
-N_{\\mathrm{eff}} = \\frac{1}{\\sum_i w_i^2}
+\\begin{align}
+N_{\\mathrm{eff}} &= \\frac{1}{\\sum_i w_i^2}\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``N_{\\mathrm{eff}}``: Effective number of assets.
+  - $(math_dict[:w_port])
 
 Returns the number of equally-weighted assets that would produce the same level of
 concentration as the given weight vector `w`.
@@ -197,13 +237,24 @@ end
 
 Compute the risk contribution of each asset to the total portfolio risk using numerical differentiation.
 
+# Mathematical definition
+
 The risk contribution of asset ``i`` is defined as:
 
 ```math
-\\mathrm{RC}_i = w_i \\cdot \\frac{\\partial \\rho(\\boldsymbol{w})}{\\partial w_i}\\,,
+\\begin{align}
+\\mathrm{RC}_i &= w_i \\cdot \\frac{\\partial \\rho(\\boldsymbol{w})}{\\partial w_i}\\,.
+\\end{align}
 ```
 
-where the partial derivative is approximated using a two-sided finite difference with step size `delta`. When `marginal = true`, the function omits the weighting by ``w_i`` (i.e., only the marginal risk ``\\partial \\rho / \\partial w_i`` is returned).
+Where:
+
+  - ``\\mathrm{RC}_i``: Risk contribution of asset ``i``.
+  - $(math_dict[:w_port])
+  - ``\\rho``: Portfolio risk measure.
+  - ``w_i``: Weight of asset ``i``.
+
+The partial derivative is approximated using a two-sided finite difference with step size `delta`. When `marginal = true`, the function omits the weighting by ``w_i`` (i.e., only the marginal risk ``\\partial \\rho / \\partial w_i`` is returned).
 
 # Arguments
 
@@ -265,13 +316,22 @@ end
 
 Compute the risk contribution of each factor (and the idiosyncratic component) to the total portfolio risk using a factor regression.
 
+# Mathematical definition
+
 The factor risk contributions partition total portfolio risk into factor-specific components using the Brinson attribution framework:
 
 ```math
-\\mathrm{FRC}_k = (\\mathbf{B}^\\intercal \\boldsymbol{w})_k \\cdot (\\mathbf{B}^{-\\intercal} \\nabla \\rho)_k\\,,
+\\begin{align}
+\\mathrm{FRC}_k &= (\\mathbf{B}^\\intercal \\boldsymbol{w})_k \\cdot (\\mathbf{B}^{-\\intercal} \\nabla \\rho)_k\\,.
+\\end{align}
 ```
 
-where ``\\mathbf{B}`` is the factor loading matrix estimated by regression.
+Where:
+
+  - ``\\mathrm{FRC}_k``: Risk contribution of factor ``k``.
+  - $(math_dict[:w_port])
+  - ``\\mathbf{B}``: Factor loading matrix ``N \\times K``, estimated by regression.
+  - ``\\nabla \\rho``: Gradient of the risk measure with respect to the weights.
 
 # Arguments
 
