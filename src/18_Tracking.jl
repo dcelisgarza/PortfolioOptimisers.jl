@@ -74,7 +74,10 @@ julia> struct MyTracking <: PortfolioOptimisers.AbstractTrackingAlgorithm
            w::Vector{Float64}
        end
 
-julia> PortfolioOptimisers.tracking_benchmark(tr::MyTracking, X::PortfolioOptimisers.MatNum) = X * tr.w
+julia> function PortfolioOptimisers.tracking_benchmark(tr::MyTracking,
+                                                       X::PortfolioOptimisers.MatNum)
+           return X * tr.w
+       end
 
 julia> PortfolioOptimisers.factory(tr::MyTracking, w) = MyTracking(w)
 
@@ -613,6 +616,7 @@ Used as a fallback method for missing tracking constraints or estimators, ensuri
 
 ```jldoctest
 julia> PortfolioOptimisers.tracking_view(nothing, 1)
+
 ```
 
 # Related

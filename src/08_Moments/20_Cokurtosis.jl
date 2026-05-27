@@ -80,8 +80,8 @@ julia> function PortfolioOptimisers.moment_view(kte::MyCokurtosisEstimator, i)
        end
 
 julia> function PortfolioOptimisers.cokurtosis(kte::MyCokurtosisEstimator,
-                                               X::PortfolioOptimisers.MatNum;
-                                               dims::Int = 1, mean = nothing, kwargs...)
+                                               X::PortfolioOptimisers.MatNum; dims::Int = 1,
+                                               mean = nothing, kwargs...)
            N = size(X, 2)
            return zeros(N^2, N^2)
        end

@@ -81,8 +81,8 @@ julia> function PortfolioOptimisers.moment_view(ske::MyCoskewnessEstimator, i)
        end
 
 julia> function PortfolioOptimisers.coskewness(ske::MyCoskewnessEstimator,
-                                               X::PortfolioOptimisers.MatNum;
-                                               dims::Int = 1, mean = nothing, kwargs...)
+                                               X::PortfolioOptimisers.MatNum; dims::Int = 1,
+                                               mean = nothing, kwargs...)
            N = size(X, 2)
            return zeros(N, N^2), zeros(N, N)
        end

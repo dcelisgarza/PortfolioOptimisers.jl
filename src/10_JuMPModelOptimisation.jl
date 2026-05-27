@@ -224,6 +224,7 @@ This is a generic fallback that does nothing if no model or settings are provide
 
 ```jldoctest
 julia> PortfolioOptimisers.set_solver_attributes()
+
 ```
 
 # Related
