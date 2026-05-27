@@ -183,7 +183,8 @@ HighOrderFactorPriorEstimator
       │       │      dt ┼ nothing
       │       │     alg ┼ nothing
       │       │   order ┴ DenoiseDetoneAlg()
-      │   alg ┴ Full()
+      │   alg ┼ Full()
+      │     w ┴ nothing
   ske ┼ Coskewness
       │    me ┼ SimpleExpectedReturns
       │       │   w ┴ nothing
@@ -195,7 +196,8 @@ HighOrderFactorPriorEstimator
       │       │      dt ┼ nothing
       │       │     alg ┼ nothing
       │       │   order ┴ DenoiseDetoneAlg()
-      │   alg ┴ Full()
+      │   alg ┼ Full()
+      │     w ┴ nothing
    ex ┼ Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
   rsd ┴ Bool: true
 ```

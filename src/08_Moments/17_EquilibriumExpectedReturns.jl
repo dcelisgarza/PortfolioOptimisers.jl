@@ -95,7 +95,7 @@ julia> me = EquilibriumExpectedReturns();
 julia> me2 = factory(me, StatsBase.Weights([0.2, 0.3, 0.5]));
 
 julia> me2.ce.ce.me.w
-StatsBase.Weights{Float64, Float64, Vector{Float64}} with 3 entries
+Weights{Float64, Float64, Vector{Float64}} with 3 entries
   0.2
   0.3
   0.5

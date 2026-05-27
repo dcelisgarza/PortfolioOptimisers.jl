@@ -360,7 +360,7 @@ Keywords correspond to the struct's fields.
 ```jldoctest
 julia> LpTracking()
 LpTracking
-  p ┼ Int64: 3
+     p ┼ Int64: 3
   ddof ┴ Int64: 0
 ```
 
@@ -1188,13 +1188,13 @@ julia> tr = TrackingError(; tr = WeightsTracking(; w = [0.5, 0.5, 0.5]), err = 0
 julia> PortfolioOptimisers.tracking_view([tr], 1:2)
 1-element Vector{TrackingError{WeightsTracking{Nothing, SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}, Bool}, Float64, L2Tracking{Int64}}}:
  TrackingError
-    tr ┼ WeightsTracking
-       │    fees ┼ nothing
-       │       w ┼ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [0.5, 0.5]
-       │   fixed ┴ Bool: false
-   err ┼ Float64: 0.01
-   alg ┼ L2Tracking
-       │   ddof ┴ Int64: 1
+   tr ┼ WeightsTracking
+      │    fees ┼ nothing
+      │       w ┼ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [0.5, 0.5]
+      │   fixed ┴ Bool: false
+  err ┼ Float64: 0.01
+  alg ┼ L2Tracking
+      │   ddof ┴ Int64: 1
 ```
 
 # Related

@@ -90,7 +90,7 @@ julia> ce = DenoiseCovariance();
 julia> ce2 = factory(ce, StatsBase.Weights([0.2, 0.3, 0.5]));
 
 julia> ce2.ce.me.w
-StatsBase.Weights{Float64, Float64, Vector{Float64}} with 3 entries
+Weights{Float64, Float64, Vector{Float64}} with 3 entries
   0.2
   0.3
   0.5
