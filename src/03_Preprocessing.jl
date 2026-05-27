@@ -299,8 +299,8 @@ Return a view of the `ReturnsResult` object for assets at indices `j`, observati
 # Examples
 
 ```jldoctest
-julia> rd = ReturnsResult(; nx = ["A", "B"], X = [0.1 0.2; 0.3 0.4; 0.5 0.6],
-                          nf = ["F1"], F = [1.0; 2.0; 3.0;;])
+julia> rd = ReturnsResult(; nx = ["A", "B"], X = [0.1 0.2; 0.3 0.4; 0.5 0.6], nf = ["F1"],
+                          F = [1.0; 2.0; 3.0;;])
 ReturnsResult
     nx ┼ Vector{String}: ["A", "B"]
      X ┼ 3×2 Matrix{Float64}
@@ -312,7 +312,7 @@ ReturnsResult
     iv ┼ nothing
   ivpa ┴ nothing
 
-julia> returns_result_view(rd, 1:2, 2:2)
+julia> PortfolioOptimisers.returns_result_view(rd, 1:2, 2:2)
 ReturnsResult
     nx ┼ SubArray{String, 1, Vector{String}, Tuple{UnitRange{Int64}}, true}: ["B"]
      X ┼ 2×1 SubArray{Float64, 2, Matrix{Float64}, Tuple{UnitRange{Int64}, UnitRange{Int64}}, false}

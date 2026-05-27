@@ -16,4 +16,5 @@ AbstractLowOrderPriorEstimator_F_AF
 AbstractLowOrderPriorEstimator_A_F_AF
 AbstractHighOrderPriorEstimator
 AbstractPriorResult
+Pr_RR
 ```

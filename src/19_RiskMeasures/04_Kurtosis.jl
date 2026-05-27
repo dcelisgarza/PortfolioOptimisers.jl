@@ -181,7 +181,7 @@ end
 
 Compute the target value for kurtosis moment calculations.
 
-Dispatches on the type of `r.w` and `r.mu` to select the appropriate centring target. Follows the same rules as [`calc_moment_target(::LoHiOrderMoment, ...)`](@ref).
+Dispatches on the type of `r.w` and `r.mu` to select the appropriate centring target. Follows the same rules as [`calc_moment_target`](@ref).
 
 # Related
 
@@ -214,7 +214,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Compute the vector of deviations from the target value for [`Kurtosis`](@ref) risk measures.
 
-See [`calc_deviations_vec(r::LoHiOrderMoment, ...)`](@ref) for details.
+See [`calc_deviations_vec`](@ref) for details.
 
 # Related
 

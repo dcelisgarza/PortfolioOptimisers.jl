@@ -5,12 +5,17 @@ RhoParsingResult
 H0_EntropyPooling
 H1_EntropyPooling
 H2_EntropyPooling
+StagedEP
 LogEntropyPooling
 ExpEntropyPooling
 CVaREntropyPooling
 OptimEntropyPooling
 JuMPEntropyPooling
+NonCVaREP
 EntropyPoolingPrior
+factory(pe::EntropyPoolingPrior, w::ObsWeights)
+Base.getproperty(obj::EntropyPoolingPrior, sym::Symbol)
+VecEP
 prior(pe::EntropyPoolingPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                        <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                        <:Any,
@@ -19,9 +24,10 @@ prior(pe::EntropyPoolingPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                dims::Int = 1, strict::Bool = false, kwargs...)
 prior(pe::EntropyPoolingPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                               <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                              <:H0_EntropyPooling}, X::MatNum;
-      F::Option{<:MatNum} = nothing, dims::Int = 1, strict::Bool = false,
+                              <:H0_EntropyPooling}, X::MatNum,
+      F::Option{<:MatNum} = nothing; dims::Int = 1, strict::Bool = false,
       kwargs...)
+prior_view(pr::EntropyPoolingPrior, rd)
 AbstractEntropyPoolingOptimiser
 AbstractEntropyPoolingAlgorithm
 AbstractEntropyPoolingOptAlgorithm

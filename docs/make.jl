@@ -1,6 +1,9 @@
 using PortfolioOptimisers
 using Documenter, DocumenterTools, DocumenterCitations, Literate, StatsPlots, GraphRecipes,
       Handcalcs, StatsBase, DocumenterVitepress, Dates, JuMP, StatsAPI
+using FLoops: FLoops
+using Random: Random
+using Clustering: Clustering
 
 exported_symbols = names(PortfolioOptimisers)
 all_symbols = names(PortfolioOptimisers; all = true)
@@ -82,8 +85,8 @@ end
 
 diff_flag = isempty(String(read(Cmd(`git diff $(@__DIR__) $(joinpath(@__DIR__, "../src/")) $(joinpath(@__DIR__, "../ext/")) $(joinpath(@__DIR__, "../test/"))`))))
 
-examples = generate_files("../examples/", "examples/", diff_flag)
-user_guide = generate_files("../user_guide/", "user_guide/", diff_flag)
+examples = generate_files("../examples/", "examples/", true)
+user_guide = generate_files("../user_guide/", "user_guide/", true)
 
 root_pages = [file
               for file in readdir(joinpath(@__DIR__, "src")) if splitext(file)[2] == ".md"]
@@ -93,7 +96,7 @@ contribute = [joinpath("contribute", file)
               if splitext(file)[2] == ".md"]
 idx1 = findfirst("api", api_pages[1][1])[1]
 
-makedocs(; #modules = [PortfolioOptimisers],
+makedocs(; modules = [PortfolioOptimisers], doctest = false,
          authors = "Daniel Celis Garza <daniel.celis.garza@gmail.com>",
          repo = "https://github.com/dcelisgarza/PortfolioOptimisers.jl/blob/{commit}{path}#{line}",
          sitename = "PortfolioOptimisers.jl",

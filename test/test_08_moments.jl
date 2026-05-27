@@ -536,7 +536,7 @@
         @test sk.me.w === ew
         @test sk.alg === sk0.alg
 
-        ske, v = coskewness(factory(Coskewness(), pw), rd.X)
+        sk, v = coskewness(factory(Coskewness(), pw), rd.X)
         @test isapprox([vec(sk); vec(v)], df[!, 1])
 
         ske0 = factory(WindowedCoskewness(; window = 50), ew)

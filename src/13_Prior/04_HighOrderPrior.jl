@@ -441,7 +441,8 @@ HighOrderPriorEstimator
       │       │      dt ┼ nothing
       │       │     alg ┼ nothing
       │       │   order ┴ DenoiseDetoneAlg()
-      │   alg ┴ Full()
+      │   alg ┼ Full()
+      │     w ┴ nothing
   ske ┼ Coskewness
       │    me ┼ SimpleExpectedReturns
       │       │   w ┴ nothing
@@ -453,7 +454,8 @@ HighOrderPriorEstimator
       │       │      dt ┼ nothing
       │       │     alg ┼ nothing
       │       │   order ┴ DenoiseDetoneAlg()
-      │   alg ┴ Full()
+      │   alg ┼ Full()
+      │     w ┴ nothing
 ```
 
 # Related
