@@ -105,7 +105,7 @@ function factory(ce::DistanceCovariance, w::ObsWeights)::DistanceCovariance
                               w = w, ex = ce.ex)
 end
 """
-    calc_pairwise_dists(ce::DistanceCovariance, v1, v2, w)
+    calc_pairwise_dists(ce::DistanceCovariance, v1::VecNum, v2::VecNum, w::Option{<:StatsBase.AbstractWeights}) -> (MatNum, MatNum)
 
 Compute pairwise distance matrices between two vectors using the configured metric.
 

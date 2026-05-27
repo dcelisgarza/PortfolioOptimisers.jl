@@ -18,6 +18,7 @@ Used as a fallback method for missing turnover constraints or estimators, ensuri
 
 ```jldoctest
 julia> PortfolioOptimisers.turnover_view(nothing, 1)
+
 ```
 
 # Related
@@ -742,10 +743,29 @@ function turnover_view(tn::VecTnE_Tn, i)
     end
     return val
 end
-function needs_previous_weights(tn::TnE_Tn)
+"""
+    needs_previous_weights(tn::TnE_Tn) -> Bool
+    needs_previous_weights(tn::VecTnE_Tn) -> Bool
+
+Check if a turnover constraint or estimator requires previous portfolio weights.
+
+# Arguments
+
+  - `tn`: Turnover constraint or estimator.
+
+# Returns
+
+  - `Bool`: `true` if previous weights are needed, `false` otherwise.
+
+# Related
+
+  - [`TurnoverEstimator`](@ref)
+  - [`Turnover`](@ref)
+"""
+function needs_previous_weights(tn::TnE_Tn)::Bool
     return !tn.fixed
 end
-function needs_previous_weights(tn::VecTnE_Tn)
+function needs_previous_weights(tn::VecTnE_Tn)::Bool
     return any(needs_previous_weights.(tn))
 end
 

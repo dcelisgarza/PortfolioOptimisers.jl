@@ -243,7 +243,7 @@ Matches either a [`MultipleRandomised`](@ref) estimator or a [`MultipleRandomise
 """
 const MRCVR = Union{<:MultipleRandomised, <:MultipleRandomisedResult}
 """
-    combination_by_index(idx, N, k)
+    combination_by_index(idx::Integer, N::Integer, k::Integer) -> VecInt
 
 Return the `idx`-th combination of `k` items from `N` total items.
 

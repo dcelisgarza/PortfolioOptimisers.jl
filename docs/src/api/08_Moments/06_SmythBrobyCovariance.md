@@ -11,10 +11,12 @@ SmythBrobyCount0
 SmythBrobyCount1
 SmythBrobyCount2
 SmythBrobyCovariance
+factory(ce::SmythBrobyCovariance, w::ObsWeights)
 cov(ce::SmythBrobyCovariance, X::MatNum; dims::Int = 1,
                        kwargs...)
 cor(ce::SmythBrobyCovariance, X::MatNum; dims::Int = 1,
                        kwargs...)
+moment_view(ce::SmythBrobyCovariance, i)
 BaseSmythBrobyCovariance
 SmythBrobyCovarianceAlgorithm
 sb_delta

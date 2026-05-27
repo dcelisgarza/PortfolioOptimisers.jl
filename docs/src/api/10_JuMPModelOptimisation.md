@@ -6,6 +6,7 @@ These types and functions let us define solver and solution interfaces.
 
 ```@docs
 Dict_VecPair
+SlvKeys
 SlvSettings
 Solver
 VecSlv
@@ -13,5 +14,4 @@ Slv_VecSlv
 AbstractJuMPResult
 JuMPResult
 set_solver_attributes
-optimise_JuMP_model!
 ```

@@ -2,6 +2,10 @@
 
 [`01_Base.jl`](https://github.com/dcelisgarza/PortfolioOptimisers.jl/blob/main/src/01_Base.jl) implements the most basal symbols used in `PortfolioOptimisers.jl`.
 
+```@docs
+PortfolioOptimisers
+```
+
 ## Base abstract types
 
 `PortfolioOptimisers.jl` is designed in a deliberately structured and hierarchical way. Enabling us to create self-contained, independent, composable processes. These abstract types form the basis of this hierarchy.
@@ -41,6 +45,7 @@ Many of the types defined in `PortfolioOptimisers.jl` make use of extensive data
 
 ```@docs
 PortfolioOptimisersError
+Base.showerror(io::IO, err::PortfolioOptimisersError)
 IsNothingError
 IsEmptyError
 IsNonFiniteError
@@ -87,6 +92,8 @@ VecStr_Expr
 EqnType
 VecVecNum
 VecVecInt
+VecInt_VecVecInt
+VecVecVecInt
 VecMatNum
 VecStr
 VecPair
@@ -111,4 +118,16 @@ In order to standardise the documentation we use a arg_dict of terms.
 arg_dict
 val_dict
 ret_dict
+field_dict
+math_dict
+```
+
+## Iteration and indexing
+
+Estimators, algorithms, and results behave as length-1 iterables and containers to simplify dispatch and slicing in hierarchical workflows.
+
+```@docs
+Base.iterate(obj::Union{<:AbstractEstimator, <:AbstractAlgorithm, <:AbstractResult}, state)
+Base.getindex(obj::Union{<:AbstractEstimator, <:AbstractAlgorithm, <:AbstractResult}, i::Int)
+Base.getindex(A::SingletonVector, i::Int)
 ```

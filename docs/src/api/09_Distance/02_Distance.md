@@ -16,4 +16,7 @@ cor_and_dist(::Distance{Nothing, <:SimpleDistance},
                       kwargs...)
 distance(de::Distance{<:Any, <:CanonicalDistance}, ce::MutualInfoCovariance,
                   X::MatNum; dims::Int = 1, kwargs...)
+LTDCov_AllInternalLTDCov
+AllInternalMutualInfoCov
+DistCov_AllInternalDistCov
 ```

@@ -381,7 +381,25 @@ Union type for fee constraint objects and estimators.
   - [`FeesEstimator`](@ref)
 """
 const FeesE_Fees = Union{<:Fees, <:FeesEstimator}
-function needs_previous_weights(fe::FeesE_Fees)
+"""
+    needs_previous_weights(fe::FeesE_Fees) -> Bool
+
+Check if a fee constraint or estimator requires previous portfolio weights by calling [`needs_previous_weights`](@ref) on `fe.tn`.
+
+# Arguments
+
+  - `fe`: Fee constraint or estimator.
+
+# Returns
+
+  - `Bool`: `true` if previous weights are needed, `false` otherwise.
+
+# Related
+
+  - [`FeesEstimator`](@ref)
+  - [`Fees`](@ref)
+"""
+function needs_previous_weights(fe::FeesE_Fees)::Bool
     return needs_previous_weights(fe.tn)
 end
 """
@@ -541,6 +559,7 @@ This method is used as a fallback for missing fee estimators or constraints, ens
 
 ```jldoctest
 julia> PortfolioOptimisers.fees_view(nothing, 1)
+
 ```
 
 # Related

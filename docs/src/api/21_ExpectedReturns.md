@@ -23,10 +23,12 @@ expected_sric
 expected_risk_ret_sric
 factory(r::ExpectedReturn, pr::AbstractPriorResult, args...; kwargs...)
 factory(r::ExpectedReturn, args...; kwargs...)
+factory(r::ExpectedReturnRiskRatio, args...; kwargs...)
 factory(r::ExpectedReturnRiskRatio, pr::AbstractPriorResult, args...; kwargs...)
 factory(r::ExpectedReturnRiskRatio{<:Any, <:UncertaintySetVariance}, ucs::UcSE_UcS;
                  kwargs...)
 factory(r::ExpectedReturnRiskRatio{<:Any, <:SlvRM}, slv::Slv_VecSlv; kwargs...)
 factory(r::ExpectedReturnRiskRatio{<:Any, <:TnTrRM}, w::VecNum)
+needs_previous_weights(r::ExpectedReturnRiskRatio)
 brinson_attribution
 ```

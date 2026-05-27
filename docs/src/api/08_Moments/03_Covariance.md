@@ -6,16 +6,20 @@ The covariance is an important measure of risk used in portfolio selection and p
 
 ```@docs
 GeneralCovariance
-factory(ce::GeneralCovariance, w::StatsBase.AbstractWeights)
+factory(ce::GeneralCovariance, w::ObsWeights)
 cov(ce::GeneralCovariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)
 cor(ce::GeneralCovariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)
+moment_view(ce::GeneralCovariance, i)
 ```
 
 ## [Covariance](@id api-covariance)
 
 ```@docs
 Covariance
-factory(ce::Covariance, w::StatsBase.AbstractWeights)
+factory(ce::Covariance, w::ObsWeights)
 cov(ce::Covariance{<:Any, <:Any, <:Full}, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)
+cov(ce::Covariance{<:Any, <:Any, <:Semi}, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)
 cor(ce::Covariance{<:Any, <:Any, <:Full}, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)
+cor(ce::Covariance{<:Any, <:Any, <:Semi}, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)
+moment_view(ce::Covariance, i)
 ```
