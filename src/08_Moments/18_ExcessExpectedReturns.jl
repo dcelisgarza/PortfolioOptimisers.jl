@@ -61,6 +61,18 @@ Return a new [`ExcessExpectedReturns`](@ref) estimator with observation weights 
 
   - `me::ExcessExpectedReturns`: Updated estimator with weights applied.
 
+# Examples
+
+```jldoctest
+julia> me = ExcessExpectedReturns();
+
+julia> factory(me, StatsBase.Weights([0.2, 0.3, 0.5]))
+ExcessExpectedReturns
+  me ┼ SimpleExpectedReturns
+     │   w ┴ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.3, 0.5]
+  rf ┴ Float64: 0.0
+```
+
 # Related
 
   - [`ExcessExpectedReturns`](@ref)
@@ -97,6 +109,21 @@ Compute excess expected returns by subtracting the risk-free rate.
 
 This method applies the mean estimator to the data and subtracts the risk-free rate from the resulting expected returns.
 
+# Mathematical definition
+
+```math
+\\begin{align}
+\\hat{\\boldsymbol{\\mu}}_{\\text{excess}} &= \\hat{\\boldsymbol{\\mu}} - r_f \\boldsymbol{1}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\hat{\\boldsymbol{\\mu}}_{\\text{excess}}``: ``N \\times 1`` vector of excess expected returns.
+  - ``\\hat{\\boldsymbol{\\mu}}``: ``N \\times 1`` vector of estimated expected returns.
+  - ``r_f``: Risk-free rate.
+  - ``\\boldsymbol{1}``: ``N \\times 1`` vector of ones.
+
 # Arguments
 
   - `me`: Excess expected returns estimator.
@@ -107,6 +134,18 @@ This method applies the mean estimator to the data and subtracts the risk-free r
 # Returns
 
   - `mu::ArrNum`: Excess expected returns vector.
+
+# Examples
+
+```jldoctest
+julia> me = ExcessExpectedReturns(; rf = 0.01);
+
+julia> X = [0.01 0.02; 0.03 0.04; 0.02 0.03];
+
+julia> mean(me, X)
+1×2 Matrix{Float64}:
+ 0.01  0.02
+```
 
 # Related
 

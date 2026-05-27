@@ -82,6 +82,20 @@ Return a new [`DenoiseCovariance`](@ref) estimator with observation weights `w` 
 
   - $(ret_dict[:ce])
 
+# Examples
+
+```jldoctest
+julia> ce = DenoiseCovariance();
+
+julia> ce2 = factory(ce, StatsBase.Weights([0.2, 0.3, 0.5]));
+
+julia> ce2.ce.me.w
+3-element Weights{Float64, Float64, Vector{Float64}}:
+ 0.2
+ 0.3
+ 0.5
+```
+
 # Related
 
   - [`DenoiseCovariance`](@ref)

@@ -37,6 +37,21 @@ Keywords correspond to the struct's fields.
 
   - `ws > 2`.
 
+# Examples
+
+```jldoctest
+julia> ImpliedVolatilityRegression()
+ImpliedVolatilityRegression
+  ve ┼ SimpleVariance
+     │          me ┼ SimpleExpectedReturns
+     │             │   w ┴ nothing
+     │           w ┼ nothing
+     │   corrected ┴ Bool: true
+  ws ┼ Int64: 20
+  re ┼ LinearModel
+     │   kwargs ┴ @NamedTuple{}: NamedTuple()
+```
+
 # Related
 
   - [`ImpliedVolatilityAlgorithm`](@ref)
@@ -274,6 +289,20 @@ end
 
 Predict realised volatilities by scaling the latest implied volatility row by the premium adjustment factor.
 
+# Mathematical definition
+
+```math
+\\begin{align}
+\\hat{\\sigma}_i &= \\frac{\\mathrm{iv}_{T,i}}{\\mathrm{ivpa}_i}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\hat{\\sigma}_i``: Predicted realised volatility for asset ``i``.
+  - ``\\mathrm{iv}_{T,i}``: Latest implied volatility for asset ``i`` (last row).
+  - ``\\mathrm{ivpa}_i``: Implied volatility premium adjustment factor for asset ``i``.
+
 # Arguments
 
   - `::ImpliedVolatilityPremium`: Implied volatility premium algorithm.
@@ -299,6 +328,36 @@ end
 Predict realised volatilities using a regression model fitted on implied and realised volatility.
 
 For each asset, this function fits a regression model relating lagged implied volatility and lagged realised volatility (computed from rolling windows of `X`) to the next-period realised volatility. The fitted model is then used to predict the next-period realised volatility from the most recent data.
+
+# Mathematical definition
+
+For asset ``i``, fit the log-linear model over windows ``t = 1, \\ldots, T-1``:
+
+```math
+\\begin{align}
+\\ln \\hat{\\sigma}^{\\mathrm{rv}}_{t+1,i} &= \\beta_0 + \\beta_1 \\ln \\sigma^{\\mathrm{iv}}_{t,i} + \\beta_2 \\ln \\hat{\\sigma}^{\\mathrm{rv}}_{t,i} + \\varepsilon_t\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\hat{\\sigma}^{\\mathrm{rv}}_{t+1,i}``: Predicted realised volatility for asset ``i`` at time ``t+1``.
+  - ``\\sigma^{\\mathrm{iv}}_{t,i}``: Implied volatility for asset ``i`` at time ``t``.
+  - ``\\beta_0, \\beta_1, \\beta_2``: Regression coefficients.
+  - ``\\varepsilon_t``: Regression residual.
+
+Then predict:
+
+```math
+\\begin{align}
+\\hat{\\sigma}^{\\mathrm{rv}}_{T+1,i} &= \\exp\\!\\left(\\hat{\\beta}_0 + \\hat{\\beta}_1 \\ln \\sigma^{\\mathrm{iv}}_{T,i} + \\hat{\\beta}_2 \\ln \\hat{\\sigma}^{\\mathrm{rv}}_{T,i}\\right)\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\hat{\\sigma}^{\\mathrm{rv}}_{T+1,i}``: Predicted next-period realised volatility for asset ``i``.
+  - ``\\hat{\\beta}_0, \\hat{\\beta}_1, \\hat{\\beta}_2``: Fitted regression coefficients.
 
 # Arguments
 
@@ -363,6 +422,20 @@ end
 Compute the covariance matrix using implied volatility scaling.
 
 This method computes the correlation matrix of `X` using the base estimator in `ce`, then predicts realised volatilities from `iv` using the implied volatility algorithm in `ce.alg`. The predicted realised volatilities are used to convert the correlation matrix to a covariance matrix, which is then post-processed by the matrix processing estimator `ce.mp`.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\hat{\\mathbf{\\Sigma}} &= \\mathrm{diag}(\\hat{\\boldsymbol{\\sigma}}) \\hat{\\boldsymbol{\\rho}} \\,\\mathrm{diag}(\\hat{\\boldsymbol{\\sigma}})\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\hat{\\mathbf{\\Sigma}}``: Implied volatility-scaled covariance matrix.
+  - ``\\hat{\\boldsymbol{\\rho}} = \\operatorname{cor}(\\mathbf{X})``: Correlation matrix from asset returns.
+  - ``\\hat{\\boldsymbol{\\sigma}}``: Predicted realised volatilities from ``\\mathbf{iv} / \\sqrt{\\mathrm{af}}``.
 
 # Arguments
 

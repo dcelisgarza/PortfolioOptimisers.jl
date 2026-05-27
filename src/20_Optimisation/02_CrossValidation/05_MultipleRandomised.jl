@@ -90,9 +90,19 @@ $(DocStringExtensions.FIELDS)
         seed::Option{<:Integer} = nothing
     ) -> MultipleRandomised
 
+`cv` is positional; remaining arguments are keyword and correspond to the struct's fields.
+
+## Validation
+
+  - If `subset_size` is an `Integer`: `subset_size >= 1`.
+  - If `subset_size` is a float: `0 < subset_size < 1`.
+  - If `n_subsets` is an `Integer`: `n_subsets >= 2`.
+  - `max_comb > 0` and finite.
+  - If `window_size` is an `Integer`: `window_size >= 2`.
+  - If `window_size` is a float: `0 < window_size < 1`.
+
 # Related
 
-  - [`MultipleRandomisedResult`](@ref)
   - [`MultipleRandomisedResult`](@ref)
   - [`WalkForwardEstimator`](@ref)
   - [`IndexWalkForward`](@ref)
@@ -156,9 +166,27 @@ identifier for each fold.
 
 $(DocStringExtensions.FIELDS)
 
+# Constructors
+
+    MultipleRandomisedResult(;
+        train_idx::VecVecInt,
+        test_idx::VecVecInt,
+        asset_idx::VecVecInt,
+        path_ids::VecInt
+    ) -> MultipleRandomisedResult
+
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - `!isempty(train_idx)`.
+  - `!isempty(test_idx)`.
+  - `!isempty(asset_idx)`.
+  - `!isempty(path_ids)`.
+  - `length(train_idx) == length(test_idx) == length(asset_idx) == length(path_ids)`.
+
 # Related
 
-  - [`MultipleRandomised`](@ref)
   - [`MultipleRandomised`](@ref)
 """
 @concrete struct MultipleRandomisedResult <: NonOptimisationSequentialCrossValidationResult
@@ -215,7 +243,7 @@ Matches either a [`MultipleRandomised`](@ref) estimator or a [`MultipleRandomise
 """
 const MRCVR = Union{<:MultipleRandomised, <:MultipleRandomisedResult}
 """
-    combination_by_index(idx, N, k)
+    combination_by_index(idx::Integer, N::Integer, k::Integer) -> VecInt
 
 Return the `idx`-th combination of `k` items from `N` total items.
 

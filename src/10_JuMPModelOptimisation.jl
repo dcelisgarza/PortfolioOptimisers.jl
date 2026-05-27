@@ -219,6 +219,18 @@ This is a generic fallback that does nothing if no model or settings are provide
 # Returns
 
   - `nothing`.
+
+# Examples
+
+```jldoctest
+julia> PortfolioOptimisers.set_solver_attributes()
+
+```
+
+# Related
+
+  - [`set_solver_attributes`](@ref)
+  - [`Solver`](@ref)
 """
 function set_solver_attributes(args...)::Nothing
     return nothing

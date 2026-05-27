@@ -79,7 +79,21 @@ julia> struct MyConcreteType <: PortfolioOptimisers.MyAbstractType end
 abstract type MyAbstractType <: AbstractEstimator end
 ````
 
-## Step 4 — Write concrete struct docstrings
+## Step 4 — Add mathematical notation (if applicable)
+
+If the type or function has a mathematical formulation, add a `# Mathematical definition` section:
+
+- Place it immediately before `# Fields` for structs, or before `# Arguments` for functions.
+- Use `\begin{align}...\end{align}` with `&` alignment markers and `\\` line breaks.
+- Put each equation on its own line. Never use `\qquad` to separate distinct equations on one line.
+- Use `\boldsymbol` for vectors, `\mathbf` for matrices, `\mathbb` for number domains, `\mathcal` for sets, `\intercal` for transpose.
+- Use `\underset{\boldsymbol{x}}{\min}` for optimisation objectives.
+- Immediately after the last math block, add a `Where:` bullet list defining every symbol.
+- Interpolate `$(math_dict[:key])` for standardised variables. Add missing keys to `src/01_Base.jl` first.
+
+See the `## Mathematical Notation` section in `.github/instructions/julia-docstrings.instructions.md` for the full worked example.
+
+## Step 5 — Write concrete struct docstrings
 
 Use `$(DocStringExtensions.TYPEDEF)` as the header. Document fields inline using `field_dict`. Include a `# Constructors` section with the keyword-arg signature, a `## Validation` subsection listing all preconditions, and a `jldoctest` showing default construction.
 
@@ -135,7 +149,7 @@ function MyType(; field1::Type1 = default1, field2::Type2 = default2)
 end
 ````
 
-## Step 5 — Write public function docstrings
+## Step 6 — Write public function docstrings
 
 Use a **manually written** signature as the header (not `TYPEDSIGNATURES`) so that default values and overloads are shown clearly. Include `# Arguments`, `# Validation` (if applicable), `# Returns`, `# Details` (if applicable), and `# Examples`.
 
@@ -184,7 +198,7 @@ function function_name(arg1::Type1, arg2::Type2; kwarg1::Type3 = default)
 end
 ````
 
-## Step 6 — Write internal/private function docstrings
+## Step 7 — Write internal/private function docstrings
 
 Use `$(DocStringExtensions.TYPEDSIGNATURES)` as the header. Include `# Arguments`, `# Returns`, and `# Examples` sections. The `# Validation` section is only needed if the function enforces preconditions.
 
@@ -219,7 +233,7 @@ end
 
 ````
 
-## Step 7 — Add to API docs
+## Step 8 — Add to API docs
 
 For every new or updated public symbol, ensure it is listed in the corresponding `docs/src/api/*.md` file under an appropriate heading:
 
@@ -233,7 +247,7 @@ MyAbstractType
 
 The correspondence is: `src/SomeFeature.jl` → `docs/src/api/SomeFeature.md`.
 
-## Step 8 — Final checks
+## Step 9 — Final checks
 
 Run the full pre-commit, test, and doctest suite following `.github/prompts/pre-commit-and-test.prompt.md`.
 

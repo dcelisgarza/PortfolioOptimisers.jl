@@ -54,11 +54,12 @@ $(DocStringExtensions.TYPEDEF)
 
 `LinearConstraint` holds both the inequality and equality constraints for a portfolio optimisation problem, each represented by a [`PartialLinearConstraint`](@ref).
 
+# Mathematical definition
+
 ```math
 \\begin{align}
   \\mathbf{A}_\\text{ineq} \\boldsymbol{x} &\\leq \\boldsymbol{B}_\\text{ineq} \\\\
-  \\mathbf{A}_\\text{eq} \\boldsymbol{x} &= \\boldsymbol{B}_\\text{eq}
-
+  \\mathbf{A}_\\text{eq} \\boldsymbol{x} &= \\boldsymbol{B}_\\text{eq}\\,.
 \\end{align}
 ```
 
@@ -147,6 +148,11 @@ Alias for a union of a single [`LinearConstraint`](@ref) or a vector of them.
   - [`VecLc`](@ref)
 """
 const Lc_VecLc = Union{<:LinearConstraint, <:VecLc}
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Access flattened constraint matrices from a [`LinearConstraint`](@ref). Virtual properties `:A_ineq`, `:B_ineq`, `:A_eq`, `:B_eq` extract the corresponding sub-matrices from `obj.ineq` and `obj.eq`, returning `nothing` when the relevant constraint set is absent.
+"""
 function Base.getproperty(obj::LinearConstraint, sym::Symbol)
     return if sym == :A_ineq
         isnothing(obj.ineq) ? nothing : obj.ineq.A
@@ -314,6 +320,17 @@ function AssetSets(; key::AbstractString = "nx", ukey::AbstractString = "ux",
                    dict::AbstractDict{<:AbstractString, <:Any})::AssetSets
     return AssetSets(key, ukey, dict)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a view of an [`AssetSets`](@ref) restricted to the assets at index `i`.
+
+Slices all `key`-prefixed groups by `i`, and derives unique-entry `ukey`-prefixed groups from the corresponding sliced `key` group.
+
+# Related
+
+  - [`AssetSets`](@ref)
+"""
 function asset_sets_view(sets::AssetSets, i)::AssetSets
     key = sets.key
     ukey = sets.ukey
@@ -583,6 +600,19 @@ StepRangeLen(0.3333333333333333, 0.0, 3)
   - [`WeightBounds`](@ref)
 """
 struct UniformValues <: AbstractEstimatorValueAlgorithm end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a uniform value vector for all assets in the universe defined by `sets`.
+
+Each entry equals ``1/N`` where ``N`` is the number of assets.
+
+# Related
+
+  - [`UniformValues`](@ref)
+  - [`estimator_to_val`](@ref)
+  - [`AssetSets`](@ref)
+"""
 function estimator_to_val(::UniformValues, sets::AssetSets, ::Any = nothing,
                           key::Option{<:AbstractString} = nothing;
                           datatype::DataType = Float64, kwargs...)
@@ -976,12 +1006,11 @@ ParsingResult
     op ┼ String: "<="
    rhs ┼ Float64: 1.0
    eqn ┴ SubString{String}: "w_A + 2.0*w_B <= 1.0"
-```    # 1. Identify the comparison operator
+```
 
 # Related
 
   - [`ParsingResult`](@ref)
-```
 """
 function parse_equation(eqn::AbstractString; ops1::Tuple = ("==", "<=", ">="),
                         datatype::DataType = Float64, kwargs...)::ParsingResult

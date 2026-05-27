@@ -5,6 +5,7 @@ In active, and small quantity investing, fees can be a non-negligible factor tha
 ```@docs
 FeesEstimator
 Fees
+factory(fees::Fees, w::VecNum)
 FeesE_Fees
 fees_constraints
 fees_view
@@ -12,4 +13,5 @@ calc_fees
 calc_fixed_fees
 calc_asset_fees
 calc_asset_fixed_fees
+needs_previous_weights(fe::FeesE_Fees)
 ```

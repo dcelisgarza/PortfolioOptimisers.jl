@@ -5,19 +5,36 @@ Represents the Average Drawdown risk measure.
 
 `AverageDrawdown` computes the mean of the absolute drawdown series of the portfolio returns. It provides a measure of the average magnitude of drawdowns over the sample period.
 
-# Mathematical Definition
+# Mathematical definition
 
 Define the absolute drawdown series:
 
 ```math
-c_t = \\sum_{s=1}^{t} x_s\\,, \\qquad d_t = c_t - \\max_{0 \\leq s \\leq t} c_s \\leq 0\\,.
+\\begin{align}
+c_t &= \\sum_{s=1}^{t} x_s\\,, \\\\
+d_t &= c_t - \\max_{0 \\leq s \\leq t} c_s \\leq 0\\,.
+\\end{align}
 ```
+
+Where:
+
+  - $(math_dict[:xret])
+  - $(math_dict[:ct])
+  - $(math_dict[:dtdd])
 
 The Average Drawdown is:
 
 ```math
-\\mathrm{ADD}(\\boldsymbol{x}) = -\\frac{1}{T} \\sum_{t=1}^{T} d_t\\,.
+\\begin{align}
+\\mathrm{ADD}(\\boldsymbol{x}) &= -\\frac{1}{T} \\sum_{t=1}^{T} d_t\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``\\mathrm{ADD}(\\boldsymbol{x})``: Average drawdown.
+  - $(math_dict[:T])
+  - $(math_dict[:dtdd])
 
 For observation-weighted samples, the weighted mean is used instead.
 
@@ -94,19 +111,36 @@ Represents the Relative Average Drawdown risk measure for hierarchical optimisat
 
 `RelativeAverageDrawdown` computes the mean of the relative (compounded) drawdown series of the portfolio returns.
 
-# Mathematical Definition
+# Mathematical definition
 
 Define the compounded wealth process and relative drawdown series:
 
 ```math
-C_t = \\prod_{s=1}^{t} (1 + x_s)\\,, \\qquad rd_t = \\frac{C_t}{\\max_{0 \\leq s \\leq t} C_s} - 1 \\leq 0\\,.
+\\begin{align}
+C_t &= \\prod_{s=1}^{t} (1 + x_s)\\,, \\\\
+rd_t &= \\frac{C_t}{\\max_{0 \\leq s \\leq t} C_s} - 1 \\leq 0\\,.
+\\end{align}
 ```
+
+Where:
+
+  - $(math_dict[:xret])
+  - $(math_dict[:Ct])
+  - $(math_dict[:rdt])
 
 The Relative Average Drawdown is:
 
 ```math
-\\mathrm{RADD}(\\boldsymbol{x}) = -\\frac{1}{T} \\sum_{t=1}^{T} rd_t\\,.
+\\begin{align}
+\\mathrm{RADD}(\\boldsymbol{x}) &= -\\frac{1}{T} \\sum_{t=1}^{T} rd_t\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``\\mathrm{RADD}(\\boldsymbol{x})``: Relative average drawdown.
+  - $(math_dict[:T])
+  - $(math_dict[:rdt])
 
 # Fields
 
@@ -173,13 +207,39 @@ function (r::RelativeAverageDrawdown)(x::VecNum)
     w = get_observation_weights(r.w, x)
     return -(isnothing(r.w) ? Statistics.mean(dd) : Statistics.mean(dd, w))
 end
-for r in (AverageDrawdown, RelativeAverageDrawdown)
-    eval(quote
-             function factory(r::$(r), pr::AbstractPriorResult, args...; kwargs...)
-                 w = nothing_scalar_array_selector(r.w, pr.w)
-                 return $(r)(; settings = r.settings, w = w)
-             end
-         end)
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create an instance of [`AverageDrawdown`](@ref) by selecting observation weights from the risk-measure instance or falling back to the prior result.
+
+# Related
+
+  - [`AverageDrawdown`](@ref)
+  - [`AbstractPriorResult`](@ref)
+  - [`factory`](@ref)
+  - [`nothing_scalar_array_selector`](@ref)
+"""
+function factory(r::AverageDrawdown, pr::AbstractPriorResult, args...;
+                 kwargs...)::AverageDrawdown
+    w = nothing_scalar_array_selector(r.w, pr.w)
+    return AverageDrawdown(; settings = r.settings, w = w)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create an instance of [`RelativeAverageDrawdown`](@ref) by selecting observation weights from the risk-measure instance or falling back to the prior result.
+
+# Related
+
+  - [`RelativeAverageDrawdown`](@ref)
+  - [`AbstractPriorResult`](@ref)
+  - [`factory`](@ref)
+  - [`nothing_scalar_array_selector`](@ref)
+"""
+function factory(r::RelativeAverageDrawdown, pr::AbstractPriorResult, args...;
+                 kwargs...)::RelativeAverageDrawdown
+    w = nothing_scalar_array_selector(r.w, pr.w)
+    return RelativeAverageDrawdown(; settings = r.settings, w = w)
 end
 
 export AverageDrawdown, RelativeAverageDrawdown

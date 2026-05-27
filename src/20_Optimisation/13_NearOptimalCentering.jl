@@ -42,16 +42,7 @@ Result type for Near Optimal Centering portfolio optimisation.
 
 # Fields
 
-  - `oe`: Type of the optimisation estimator that produced this result.
-  - `pa`: Processed optimisation attributes.
-  - `w_min_retcode`: Return code for the minimum-risk sub-problem.
-  - `w_opt_retcode`: Return code for the optimal-objective sub-problem.
-  - `w_max_retcode`: Return code for the maximum-risk sub-problem.
-  - `noc_retcode`: Return code for the Near Optimal Centering problem.
-  - `retcode`: Overall return code.
-  - `sol`: Optimisation solution.
-  - `model`: The JuMP model.
-  - `fb`: Fallback result.
+$(DocStringExtensions.FIELDS)
 
 # Related
 
@@ -59,22 +50,42 @@ Result type for Near Optimal Centering portfolio optimisation.
   - [`NonFiniteAllocationOptimisationResult`](@ref)
 """
 @concrete struct NearOptimalCenteringResult <: NonFiniteAllocationOptimisationResult
+    "$(field_dict[:oe])"
     oe
+    "$(field_dict[:pa])"
     pa
+    "$(field_dict[:w_min_retcode])"
     w_min_retcode
+    "$(field_dict[:w_opt_retcode])"
     w_opt_retcode
+    "$(field_dict[:w_max_retcode])"
     w_max_retcode
+    "$(field_dict[:noc_retcode])"
     noc_retcode
+    "$(field_dict[:retcode])"
     retcode
+    "$(field_dict[:sol])"
     sol
+    "$(field_dict[:model])"
     model
+    "$(field_dict[:fb])"
     fb
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Rebuild a [`NearOptimalCenteringResult`](@ref) with an updated fallback optimiser `fb`.
+"""
 function factory(res::NearOptimalCenteringResult, fb::Option{<:OptE_Opt})
     return NearOptimalCenteringResult(res.oe, res.pa, res.w_min_retcode, res.w_opt_retcode,
                                       res.w_max_retcode, res.noc_retcode, res.retcode,
                                       res.sol, res.model, fb)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Access properties of [`NearOptimalCenteringResult`](@ref). Virtual property `:w` extracts portfolio weights from `sol`; other unknown properties forward to `r.pa`.
+"""
 function Base.getproperty(r::NearOptimalCenteringResult, sym::Symbol)
     return if sym == :w
         !isa(r.sol, AbstractVector) ? r.sol.w : getproperty.(r.sol, :w)
@@ -93,19 +104,7 @@ Near Optimal Centering (NOC) portfolio optimiser.
 
 # Fields
 
-  - `opt`: JuMP optimiser configuration.
-  - `r`: Risk measure or vector of risk measures.
-  - `obj`: Portfolio objective function for the central (optimal) point.
-  - `bins`: Number of equally-spaced risk bins for the frontier approximation.
-  - `w_min`: Pre-computed minimum-risk portfolio weights (or `nothing`).
-  - `w_min_ini`: Initial weights for the minimum-risk sub-problem.
-  - `w_opt`: Pre-computed optimal portfolio weights (or `nothing`).
-  - `w_opt_ini`: Initial weights for the optimal sub-problem.
-  - `w_max`: Pre-computed maximum-risk portfolio weights (or `nothing`).
-  - `w_max_ini`: Initial weights for the maximum-risk sub-problem.
-  - `ucs_flag`: If `true`, uncertainty set constraints are used.
-  - `alg`: Near Optimal Centering algorithm variant.
-  - `fb`: Fallback optimiser.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -127,6 +126,36 @@ Near Optimal Centering (NOC) portfolio optimiser.
 
 Keywords correspond to the struct's fields.
 
+## Validation
+
+  - If `r` is a vector: `!isempty(r)`.
+  - If `w_min` is provided: `!isempty(w_min)`.
+  - If `w_min_ini` is provided: `!isempty(w_min_ini)`.
+  - If `w_opt` is provided: `!isempty(w_opt)` and `!isempty(w_opt_ini)`.
+  - If `w_max` is provided: `!isempty(w_max)`.
+  - If `w_max_ini` is provided: `!isempty(w_max_ini)`.
+  - If `bins` is a number: `isfinite(bins) && bins > 0`.
+
+# Mathematical definition
+
+Let ``\\boldsymbol{w}_{\\min}``, ``\\boldsymbol{w}_{\\mathrm{opt}}``, and ``\\boldsymbol{w}_{\\max}`` be the minimum-risk, user-optimal, and maximum-risk portfolios. The NOC solves:
+
+```math
+\\begin{align}
+\\underset{\\boldsymbol{w}}{\\max} \\; \\min\\left\\{\\frac{\\boldsymbol{w} - \\boldsymbol{w}_{\\min}}{\\boldsymbol{w}_{\\mathrm{opt}} - \\boldsymbol{w}_{\\min}},\\; \\frac{\\boldsymbol{w}_{\\max} - \\boldsymbol{w}}{\\boldsymbol{w}_{\\max} - \\boldsymbol{w}_{\\mathrm{opt}}}\\right\\} \\quad \\text{s.t.} \\quad \\boldsymbol{w} \\in \\mathcal{W}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{w}``: Portfolio weight vector.
+  - ``\\mathcal{W}``: Feasible weight set defined by portfolio constraints.
+  - ``\\boldsymbol{w}_{\\min}``: Minimum-risk portfolio weights.
+  - ``\\boldsymbol{w}_{\\mathrm{opt}}``: User-optimal portfolio weights.
+  - ``\\boldsymbol{w}_{\\max}``: Maximum-risk portfolio weights.
+
+The solution yields a portfolio centrally located within the near-optimal region, robust to small perturbations of the objective.
+
 # Related
 
   - [`scalarise_risk_expression!`](@ref)
@@ -136,18 +165,31 @@ Keywords correspond to the struct's fields.
   - [`NearOptimalCenteringAlgorithm`](@ref)
 """
 @concrete struct NearOptimalCentering <: RiskJuMPOptimisationEstimator
+    "$(field_dict[:opt_jmp])"
     opt
+    "$(field_dict[:r_opt])"
     r
+    "$(field_dict[:obj])"
     obj
+    "Number of equally-spaced risk bins for the frontier approximation."
     bins
+    "$(field_dict[:w_min_noc])"
     w_min
+    "$(field_dict[:w_min_ini])"
     w_min_ini
+    "$(field_dict[:w_opt_noc])"
     w_opt
+    "$(field_dict[:w_opt_ini])"
     w_opt_ini
+    "$(field_dict[:w_max_noc])"
     w_max
+    "$(field_dict[:w_max_ini])"
     w_max_ini
+    "$(field_dict[:ucs_flag])"
     ucs_flag
+    "Near Optimal Centering algorithm variant."
     alg
+    "$(field_dict[:fb])"
     fb
     function NearOptimalCentering(opt::JuMPOptimiser, r::RM_VecRM,
                                   obj::Option{<:ObjectiveFunction}, bins::Option{<:Number},
@@ -217,11 +259,21 @@ function NearOptimalCentering(; opt::JuMPOptimiser = JuMPOptimiser(),
     return NearOptimalCentering(opt, r, obj, bins, w_min, w_min_ini, w_opt, w_opt_ini,
                                 w_max, w_max_ini, ucs_flag, alg, fb)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return `true` if any sub-estimator of `opt` requires previous portfolio weights (JuMP optimiser, risk measure, or fallback).
+"""
 function needs_previous_weights(opt::NearOptimalCentering)
     return (needs_previous_weights(opt.opt) ||
             needs_previous_weights(opt.r) ||
             needs_previous_weights(opt.fb))
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Build an updated [`NearOptimalCentering`](@ref) with all estimators that track previous weights updated via `factory` using `w`.
+"""
 function factory(noc::NearOptimalCentering, w::AbstractVector)::NearOptimalCentering
     opt = factory(noc.opt, w)
     r = factory(noc.r, w)
@@ -232,6 +284,11 @@ function factory(noc::NearOptimalCentering, w::AbstractVector)::NearOptimalCente
                                 w_max = noc.w_max, w_max_ini = noc.w_max_ini,
                                 ucs_flag = noc.ucs_flag, alg = noc.alg, fb = fb)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a cluster-sliced copy of [`NearOptimalCentering`](@ref) for asset index set `i` and returns matrix `X`.
+"""
 function opt_view(noc::NearOptimalCentering, i, X::MatNum)::NearOptimalCentering
     X = isa(noc.opt.pe, AbstractPriorResult) ? noc.opt.pe.X : X
     opt = opt_view(noc.opt, i, X)
@@ -382,18 +439,7 @@ Holds pre-computed portfolio weights, risk and return targets, and sub-problem r
 
 # Fields
 
-  - `w_opt`: Optimal (central) portfolio weights.
-  - `rk_opt`: Optimal risk target for the NOC problem.
-  - `rt_opt`: Optimal return target for the NOC problem.
-  - `rt_min`: Minimum return from the minimum-risk portfolio.
-  - `rt_max`: Maximum return from the maximum-return portfolio.
-  - `w_min`: Minimum-risk portfolio weights.
-  - `w_max`: Maximum-risk (maximum-return) portfolio weights.
-  - `r`: Risk measure or vector of risk measures.
-  - `opt`: Processed JuMP optimiser configuration.
-  - `w_min_retcode`: Return code for the minimum-risk sub-problem.
-  - `w_opt_retcode`: Return code for the optimal-objective sub-problem.
-  - `w_max_retcode`: Return code for the maximum-risk sub-problem.
+$(DocStringExtensions.FIELDS)
 
 # Related
 
@@ -401,17 +447,29 @@ Holds pre-computed portfolio weights, risk and return targets, and sub-problem r
   - [`near_optimal_centering_setup`](@ref)
 """
 @concrete struct NearOptimalSetup <: AbstractResult
+    "$(field_dict[:w_opt_noc])"
     w_opt
+    "$(field_dict[:rk_opt])"
     rk_opt
+    "$(field_dict[:rt_opt])"
     rt_opt
+    "$(field_dict[:rt_min])"
     rt_min
+    "$(field_dict[:rt_max])"
     rt_max
+    "$(field_dict[:w_min_noc])"
     w_min
+    "$(field_dict[:w_max_noc])"
     w_max
+    "$(field_dict[:r_opt])"
     r
+    "$(field_dict[:opt_jmp])"
     opt
+    "$(field_dict[:w_min_retcode])"
     w_min_retcode
+    "$(field_dict[:w_opt_retcode])"
     w_opt_retcode
+    "$(field_dict[:w_max_retcode])"
     w_max_retcode
 end
 """
@@ -980,14 +1038,21 @@ end
              rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
              str_names::Bool = false, save::Bool = true, kwargs...) -> NearOptimalCenteringResult
 
+Run the Near Optimal Centering portfolio optimisation.
+
 # Arguments
 
   - `noc`: The near optimal centering optimiser to use.
-  - $(arg_dict[:rd]) If `isa(hec.opt.pe, AbstractPriorResult)`, `rd` is not necessary if doing a standalone optimisation, but may be required/desired by fallbacks and/or clusterisation.
+  - $(arg_dict[:rd]) If `isa(noc.opt.pe, AbstractPriorResult)`, `rd` is not necessary if doing a standalone optimisation, but may be required/desired by fallbacks and/or clusterisation.
   - `dims`: The dimension along which observations advance in time.
   - `str_names`: Whether to use string names for the assets in the optimisation.
   - `save`: Whether to save the JuMP model in the optimisation result.
   - `kwargs`: Additional keyword arguments passed to the optimisation function.
+
+# Related
+
+  - [`NearOptimalCentering`](@ref)
+  - [`NearOptimalCenteringResult`](@ref)
 """
 function optimise(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                             <:Any, <:Any, <:Any, <:Any, <:Any, Nothing},

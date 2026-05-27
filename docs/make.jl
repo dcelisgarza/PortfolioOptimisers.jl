@@ -1,6 +1,6 @@
 using PortfolioOptimisers
 using Documenter, DocumenterTools, DocumenterCitations, Literate, StatsPlots, GraphRecipes,
-      Handcalcs, StatsBase, DocumenterVitepress, Dates, JuMP, StatsAPI
+      Handcalcs, StatsBase, DocumenterVitepress, Dates, JuMP, StatsAPI, Random
 
 exported_symbols = names(PortfolioOptimisers)
 all_symbols = names(PortfolioOptimisers; all = true)
@@ -93,7 +93,7 @@ contribute = [joinpath("contribute", file)
               if splitext(file)[2] == ".md"]
 idx1 = findfirst("api", api_pages[1][1])[1]
 
-makedocs(; #modules = [PortfolioOptimisers],
+makedocs(; modules = [PortfolioOptimisers], doctest = false,
          authors = "Daniel Celis Garza <daniel.celis.garza@gmail.com>",
          repo = "https://github.com/dcelisgarza/PortfolioOptimisers.jl/blob/{commit}{path}#{line}",
          sitename = "PortfolioOptimisers.jl",

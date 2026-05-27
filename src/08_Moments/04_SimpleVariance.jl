@@ -82,6 +82,54 @@ Compute the standard deviation using a [`SimpleVariance`](@ref) estimator for a 
 
 This method computes the standard deviation of the input matrix `X` using the configuration specified in `ve`.
 
+# Mathematical definition
+
+Unweighted:
+
+```math
+\\begin{align}
+\\hat{\\sigma}_j &= \\sqrt{\\hat{\\sigma}^2_j}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\hat{\\sigma}_j``: Standard deviation of asset ``j``.
+  - ``\\hat{\\sigma}^2_j``: Variance of asset ``j``.
+
+For `corrected = true`:
+
+```math
+\\begin{align}
+\\hat{\\sigma}^2_j &= \\frac{1}{T-1} \\sum_{t=1}^{T} (r_{tj} - \\hat{\\mu}_j)^2\\,.
+\\end{align}
+```
+
+For `corrected = false`:
+
+```math
+\\begin{align}
+\\hat{\\sigma}^2_j &= \\frac{1}{T} \\sum_{t=1}^{T} (r_{tj} - \\hat{\\mu}_j)^2\\,.
+\\end{align}
+```
+
+Weighted:
+
+```math
+\\begin{align}
+\\hat{\\sigma}^2_j &= \\frac{\\sum_{t=1}^{T} w_t (r_{tj} - \\hat{\\mu}_j)^2}{\\sum_{t=1}^{T} w_t - c}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\hat{\\sigma}^2_j``: Estimated variance of asset ``j``.
+  - ``r_{tj}``: Return of asset ``j`` at time ``t``.
+  - ``\\hat{\\mu}_j``: Estimated mean of asset ``j``.
+  - ``T``: Number of observations.
+  - ``w_t``: Observation weight at time ``t``.
+  - ``c``: Bias correction factor.
+
 # Arguments
 
   - $(arg_dict[:ve])
@@ -129,6 +177,11 @@ function Statistics.std(ve::SimpleVariance, X::MatNum; dims::Int = 1, mean = not
         Statistics.std(X, w, dims; corrected = ve.corrected, mean = mu)
     end
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+`SimpleVariance{Nothing}` overload of [`std(ve::SimpleVariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref). Uses [`SimpleExpectedReturns`](@ref) to compute the mean when none is provided, ignoring the `me` field.
+"""
 function Statistics.std(ve::SimpleVariance{Nothing}, X::MatNum; dims::Int = 1,
                         mean = nothing, kwargs...)
     mu = if isnothing(mean)
@@ -219,6 +272,41 @@ Compute the variance using a [`SimpleVariance`](@ref) estimator for a matrix.
 
 This method computes the variance of the input matrix `X` using the configuration specified in `ve`.
 
+# Mathematical definition
+
+Unweighted, `corrected = true`:
+
+```math
+\\begin{align}
+\\hat{\\sigma}^2_j &= \\frac{1}{T-1} \\sum_{t=1}^{T} (r_{tj} - \\hat{\\mu}_j)^2\\,.
+\\end{align}
+```
+
+Unweighted, `corrected = false`:
+
+```math
+\\begin{align}
+\\hat{\\sigma}^2_j &= \\frac{1}{T} \\sum_{t=1}^{T} (r_{tj} - \\hat{\\mu}_j)^2\\,.
+\\end{align}
+```
+
+Weighted:
+
+```math
+\\begin{align}
+\\hat{\\sigma}^2_j &= \\frac{\\sum_{t=1}^{T} w_t (r_{tj} - \\hat{\\mu}_j)^2}{\\sum_{t=1}^{T} w_t - c}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\hat{\\sigma}^2_j``: Estimated variance of asset ``j``.
+  - ``r_{tj}``: Return of asset ``j`` at time ``t``.
+  - ``\\hat{\\mu}_j``: Estimated mean of asset ``j``.
+  - ``T``: Number of observations.
+  - ``w_t``: Observation weight at time ``t``.
+  - ``c``: Bias correction factor.
+
 # Arguments
 
   - $(arg_dict[:ve])
@@ -266,6 +354,11 @@ function Statistics.var(ve::SimpleVariance, X::MatNum; dims::Int = 1, mean = not
         Statistics.var(X, w, dims; corrected = ve.corrected, mean = mu)
     end
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+`SimpleVariance{Nothing}` overload of [`var(ve::SimpleVariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref). Uses [`SimpleExpectedReturns`](@ref) to compute the mean when none is provided, ignoring the `me` field.
+"""
 function Statistics.var(ve::SimpleVariance{Nothing}, X::MatNum; dims::Int = 1,
                         mean = nothing, kwargs...)
     me = SimpleExpectedReturns()

@@ -81,6 +81,20 @@ Return a new [`DistanceCovariance`](@ref) estimator with observation weights `w`
 
   - $(ret_dict[:ce])
 
+# Examples
+
+```jldoctest
+julia> ce = DistanceCovariance();
+
+julia> factory(ce, StatsBase.Weights([0.2, 0.3, 0.5]))
+DistanceCovariance
+  metric ┼ Distances.Euclidean: Distances.Euclidean(0.0)
+    args ┼ Tuple{}: ()
+  kwargs ┼ @NamedTuple{}: NamedTuple()
+       w ┼ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.3, 0.5]
+      ex ┴ Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
+```
+
 # Related
 
   - [`DistanceCovariance`](@ref)
@@ -91,7 +105,7 @@ function factory(ce::DistanceCovariance, w::ObsWeights)::DistanceCovariance
                               w = w, ex = ce.ex)
 end
 """
-    calc_pairwise_dists(ce::DistanceCovariance, v1, v2, w)
+    calc_pairwise_dists(ce::DistanceCovariance, v1::VecNum, v2::VecNum, w::Option{<:StatsBase.AbstractWeights}) -> (MatNum, MatNum)
 
 Compute pairwise distance matrices between two vectors using the configured metric.
 
@@ -127,6 +141,49 @@ end
 Compute the distance correlation between two vectors using a configured [`DistanceCovariance`](@ref) estimator.
 
 This function computes the distance correlation between `v1` and `v2` using the specified distance metric, optional weights, and any additional arguments or keyword arguments provided in the estimator. The computation follows the standard distance correlation procedure, centering the pairwise distance matrices and normalizing the result.
+
+# Mathematical definition
+
+Let ``a_{kl} = d(v_{1k}, v_{1l})`` and ``b_{kl} = d(v_{2k}, v_{2l})`` be pairwise distance matrices. Define doubly-centered versions:
+
+```math
+\\begin{align}
+A_{kl} &= a_{kl} - \\bar{a}_{k\\cdot} - \\bar{a}_{\\cdot l} + \\bar{a}_{\\cdot\\cdot}\\,, \\\\
+B_{kl} &= b_{kl} - \\bar{b}_{k\\cdot} - \\bar{b}_{\\cdot l} + \\bar{b}_{\\cdot\\cdot}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``a_{kl}``, ``b_{kl}``: Pairwise distances between observations ``k`` and ``l``.
+  - ``\\bar{a}_{k\\cdot}``: ``k``-th row mean of ``\\mathbf{a}``.
+  - ``\\bar{a}_{\\cdot l}``: ``l``-th column mean of ``\\mathbf{a}``.
+  - ``\\bar{a}_{\\cdot\\cdot}``: Grand mean of ``\\mathbf{a}``.
+
+The squared distance covariances and distance correlation are:
+
+```math
+\\begin{align}
+\\widehat{\\mathrm{dCov}}^2(X,X) &= \\frac{\\mathbf{A}:\\mathbf{A}}{n^2}\\,, \\\\
+\\widehat{\\mathrm{dCov}}^2(X,Y) &= \\frac{\\mathbf{A}:\\mathbf{B}}{n^2}\\,, \\\\
+\\widehat{\\mathrm{dCov}}^2(Y,Y) &= \\frac{\\mathbf{B}:\\mathbf{B}}{n^2}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``n``: Number of observations.
+  - ``\\mathbf{A}:\\mathbf{B} = \\sum_{k,l} A_{kl} B_{kl}``: Frobenius inner product.
+
+```math
+\\begin{align}
+\\hat{R}_{\\mathrm{dist}}(X, Y) &= \\frac{\\sqrt{\\widehat{\\mathrm{dCov}}^2(X,Y)}}{\\sqrt{\\sqrt{\\widehat{\\mathrm{dCov}}^2(X,X)} \\cdot \\sqrt{\\widehat{\\mathrm{dCov}}^2(Y,Y)}}}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\hat{R}_{\\mathrm{dist}}(X, Y)``: Distance correlation between ``X`` and ``Y``.
 
 # Arguments
 
@@ -268,6 +325,22 @@ end
 Compute the distance covariance between two vectors using a configured [`DistanceCovariance`](@ref) estimator.
 
 This function computes the distance covariance between `v1` and `v2` using the specified distance metric, optional weights, and any additional arguments or keyword arguments provided in the estimator. The computation follows the standard distance covariance procedure, centering the pairwise distance matrices and aggregating the result.
+
+# Mathematical definition
+
+Using the same doubly-centered matrices ``\\mathbf{A}`` and ``\\mathbf{B}`` as in [`cor_distance`](@ref):
+
+```math
+\\begin{align}
+\\widehat{\\mathrm{dCov}}(X, Y) &= \\sqrt{\\left|\\frac{\\mathbf{A}:\\mathbf{B}}{n^2}\\right|}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\widehat{\\mathrm{dCov}}(X, Y)``: Distance covariance between ``X`` and ``Y``.
+  - ``n``: Number of observations.
+  - ``\\mathbf{A}:\\mathbf{B} = \\sum_{k,l} A_{kl} B_{kl}``: Frobenius inner product of doubly-centered distance matrices.
 
 # Arguments
 

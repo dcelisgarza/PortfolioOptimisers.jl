@@ -623,6 +623,11 @@ function EntropyPoolingPrior(; pe::AbstractLowOrderPriorEstimator_A_F_AF = Empir
                                kt_views, rho_views, var_alpha, cvar_alpha, sets, ds_opt,
                                dm_opt, opt, w, alg)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Access properties of [`EntropyPoolingPrior`](@ref). Exposes `:me` and `:ce` from the embedded prior estimator `obj.pe` for transparent access.
+"""
 function Base.getproperty(obj::EntropyPoolingPrior, sym::Symbol)
     return if sym == :me
         obj.pe.me
@@ -642,6 +647,16 @@ Alias for an abstract vector of [`EntropyPoolingPrior`](@ref) elements.
   - [`EntropyPoolingPrior`](@ref)
 """
 const VecEP = AbstractVector{<:EntropyPoolingPrior}
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a new [`EntropyPoolingPrior`](@ref) estimator with observation weights `w` applied to the underlying prior estimator and stored as the entropy pooling weights.
+
+# Related
+
+  - [`EntropyPoolingPrior`](@ref)
+  - [`factory`](@ref)
+"""
 function factory(pe::EntropyPoolingPrior, w::ObsWeights)::EntropyPoolingPrior
     return EntropyPoolingPrior(; pe = factory(pe.pe, w), mu_views = pe.mu_views,
                                var_views = pe.var_views, cvar_views = pe.cvar_views,
@@ -651,6 +666,16 @@ function factory(pe::EntropyPoolingPrior, w::ObsWeights)::EntropyPoolingPrior
                                sets = pe.sets, ds_opt = pe.ds_opt, dm_opt = pe.dm_opt,
                                opt = pe.opt, w = w, alg = pe.alg)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a new [`EntropyPoolingPrior`](@ref) estimator restricted to the assets at index `i`.
+
+# Related
+
+  - [`EntropyPoolingPrior`](@ref)
+  - [`prior_view`](@ref)
+"""
 function prior_view(pe::EntropyPoolingPrior, i)::EntropyPoolingPrior
     return EntropyPoolingPrior(; pe = prior_view(pe.pe, i), mu_views = pe.mu_views,
                                var_views = pe.var_views, cvar_views = pe.cvar_views,
@@ -1073,6 +1098,33 @@ end
 Solve the dual of the exponential entropy pooling formulation using Optim.jl.
 
 `entropy_pooling` computes posterior probabilities by minimising the exponential divergence between prior and posterior weights, subject to moment and view constraints. The optimisation is performed using [`Optim.jl`](https://github.com/JuliaNLSolvers/Optim.jl), supporting box constraints and slack variables for relaxed equality constraints. This method is used internally by [`EntropyPoolingPrior`](@ref) when the optimiser is an [`OptimEntropyPooling`](@ref).
+
+# Mathematical definition
+
+The dual of the entropy pooling KL divergence problem is solved for Lagrange multipliers ``\\boldsymbol{x}``. The dual objective (for `ExpEntropyPooling`) is:
+
+```math
+\\begin{align}
+\\underset{\\boldsymbol{x}}{\\min} &\\; \\boldsymbol{x}^\\intercal \\boldsymbol{b} + \\sum_{t=1}^{T} q_t \\exp\\!\\left(-\\boldsymbol{x}^\\intercal \\mathbf{A}_{\\cdot t} - 1\\right)\\,.
+\\end{align}
+```
+
+The optimal posterior weights recover as:
+
+```math
+\\begin{align}
+p_t^* &= q_t \\exp\\!\\left(-\\boldsymbol{x}^{*\\intercal} \\mathbf{A}_{\\cdot t} - 1\\right)\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{x}``: Lagrange multipliers (dual variables).
+  - ``\\boldsymbol{b}``: Right-hand side constraint vector.
+  - ``\\mathbf{A}_{\\cdot t}``: ``t``-th column of the constraint matrix ``\\mathbf{A}``.
+  - ``q_t``: Prior weight for scenario ``t``.
+  - ``p_t^*``: Optimal posterior weight for scenario ``t``.
+  - $(math_dict[:T])
 
 # Arguments
 
@@ -1809,6 +1861,30 @@ Extract the prior correlation value between assets `i` and `j` from a prior resu
 function get_pr_value(pr::AbstractPriorResult, i::Integer, j::Integer, args...)
     return StatsBase.cov2cor(pr.sigma)[i, j]
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Extract the normalised average correlation between asset groups `i` and `j` from a prior result.
+
+`get_pr_value` returns the Frobenius norm of the correlation sub-matrix divided by the group length for vector index sets `i` and `j`. This variant handles grouped asset correlation views.
+
+# Arguments
+
+  - `pr`: Prior result containing asset return information.
+  - `i`: Vector of indices for the first asset group.
+  - `j`: Vector of indices for the second asset group.
+  - `args...`: Additional arguments (ignored).
+
+# Returns
+
+  - `rho::Number`: Normalised average correlation between asset groups `i` and `j`.
+
+# Related
+
+  - [`LowOrderPrior`](@ref)
+  - [`AbstractPriorResult`](@ref)
+  - [`get_pr_value`](@ref)
+"""
 function get_pr_value(pr::AbstractPriorResult, i::VecInt, j::VecInt, args...)
     return LinearAlgebra.norm(StatsBase.cov2cor(pr.sigma)[i, j]) / length(i)
 end
@@ -2061,6 +2137,26 @@ Compute entropy pooling prior moments for asset returns with iterative constrain
 
 `prior` estimates the mean and covariance of asset returns using the entropy pooling framework, supporting iterative constraint enforcement via the `H1_EntropyPooling` and `H2_EntropyPooling` algorithms. It integrates moment and view constraints (mean, variance, CVaR, skewness, kurtosis, correlation), flexible confidence specification, and composable optimisation algorithms. The method iteratively applies constraints, updating prior weights and moments at each step, and ensures that higher moment views do not inadvertently alter lower moments.
 
+# Mathematical definition
+
+Entropy pooling finds posterior weights ``\\boldsymbol{p}`` by minimising the Kullback-Leibler divergence from the prior ``\\boldsymbol{q}``:
+
+```math
+\\begin{align}
+\\underset{\\boldsymbol{p}}{\\min} &\\sum_{t=1}^{T} p_t \\ln\\!\\frac{p_t}{q_t} \\quad \\text{s.t.} \\quad \\mathbf{A}_{\\mathrm{eq}} \\boldsymbol{p} = \\boldsymbol{b}_{\\mathrm{eq}}, \\quad \\mathbf{A}_{\\mathrm{ineq}} \\boldsymbol{p} \\leq \\boldsymbol{b}_{\\mathrm{ineq}}, \\quad \\boldsymbol{p} \\geq \\boldsymbol{0}, \\quad \\boldsymbol{1}^\\intercal \\boldsymbol{p} = 1\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{p}``: ``T \\times 1`` posterior weight vector.
+  - ``\\boldsymbol{q}``: ``T \\times 1`` prior weight vector.
+  - ``\\mathbf{A}_{\\mathrm{eq}}``, ``\\boldsymbol{b}_{\\mathrm{eq}}``: Equality constraint matrix and vector.
+  - ``\\mathbf{A}_{\\mathrm{ineq}}``, ``\\boldsymbol{b}_{\\mathrm{ineq}}``: Inequality constraint matrix and vector.
+  - $(math_dict[:T])
+
+Posterior moments are then computed as probability-weighted sample statistics using ``\\boldsymbol{p}^*``.
+
 # Arguments
 
   - `pe`: Entropy pooling prior estimator with iterative algorithm .
@@ -2191,6 +2287,24 @@ end
 Compute entropy pooling prior moments for asset returns with single-shot constraint enforcement.
 
 `prior` estimates the mean and covariance of asset returns using the entropy pooling framework, enforcing all moment and view constraints in a single optimisation step via the `H0_EntropyPooling` algorithm. This approach is fast but may distort lower moments when higher moment views are present, as all constraints are applied simultaneously.
+
+# Mathematical definition
+
+Entropy pooling finds posterior weights ``\\boldsymbol{p}`` by minimising the Kullback-Leibler divergence from the prior ``\\boldsymbol{q}`` subject to all constraints simultaneously:
+
+```math
+\\begin{align}
+\\underset{\\boldsymbol{p}}{\\min} &\\sum_{t=1}^{T} p_t \\ln\\!\\frac{p_t}{q_t} \\quad \\text{s.t.} \\quad \\mathbf{A}_{\\mathrm{eq}} \\boldsymbol{p} = \\boldsymbol{b}_{\\mathrm{eq}}, \\quad \\mathbf{A}_{\\mathrm{ineq}} \\boldsymbol{p} \\leq \\boldsymbol{b}_{\\mathrm{ineq}}, \\quad \\boldsymbol{p} \\geq \\boldsymbol{0}, \\quad \\boldsymbol{1}^\\intercal \\boldsymbol{p} = 1\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{p}``: ``T \\times 1`` posterior weight vector.
+  - ``\\boldsymbol{q}``: ``T \\times 1`` prior weight vector.
+  - ``\\mathbf{A}_{\\mathrm{eq}}``, ``\\boldsymbol{b}_{\\mathrm{eq}}``: Equality constraint matrix and vector.
+  - ``\\mathbf{A}_{\\mathrm{ineq}}``, ``\\boldsymbol{b}_{\\mathrm{ineq}}``: Inequality constraint matrix and vector.
+  - $(math_dict[:T])
 
 # Arguments
 

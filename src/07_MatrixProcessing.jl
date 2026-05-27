@@ -150,7 +150,7 @@ All concrete and/or abstract types that specify the order of matrix processing s
 
 Given that these are meant to be used by matrix processing estimators, there are no specific methods that need to be implemented for this abstract type. However, it serves as a marker for dispatching and organising different matrix processing orders within the library. The interfaces should be defined at the level of the matrix processing estimator that utilises these orders.
 
-# Related Types
+# Related
 
   - [`DenoiseDetoneAlg`](@ref)
   - [`DenoiseAlgDetone`](@ref)
@@ -175,6 +175,10 @@ Matrix processing order: Denoising → Detoning → Custom Algorithm.
   - [`DetoneAlgDenoise`](@ref)
   - [`AlgDenoiseDetone`](@ref)
   - [`AlgDetoneDenoise`](@ref)
+
+# Constructors
+
+    DenoiseDetoneAlg() -> DenoiseDetoneAlg
 """
 struct DenoiseDetoneAlg <: AbstractMatrixProcessingOrder end
 """
@@ -192,6 +196,10 @@ Matrix processing order: Denoising → Custom Algorithm → Detoning.
   - [`DetoneAlgDenoise`](@ref)
   - [`AlgDenoiseDetone`](@ref)
   - [`AlgDetoneDenoise`](@ref)
+
+# Constructors
+
+    DenoiseAlgDetone() -> DenoiseAlgDetone
 """
 struct DenoiseAlgDetone <: AbstractMatrixProcessingOrder end
 """
@@ -209,6 +217,10 @@ Matrix processing order: Detoning → Denoising → Custom Algorithm.
   - [`DetoneAlgDenoise`](@ref)
   - [`AlgDenoiseDetone`](@ref)
   - [`AlgDetoneDenoise`](@ref)
+
+# Constructors
+
+    DetoneDenoiseAlg() -> DetoneDenoiseAlg
 """
 struct DetoneDenoiseAlg <: AbstractMatrixProcessingOrder end
 """
@@ -226,6 +238,10 @@ Matrix processing order: Detoning → Custom Algorithm → Denoising.
   - [`DetoneDenoiseAlg`](@ref)
   - [`AlgDenoiseDetone`](@ref)
   - [`AlgDetoneDenoise`](@ref)
+
+# Constructors
+
+    DetoneAlgDenoise() -> DetoneAlgDenoise
 """
 struct DetoneAlgDenoise <: AbstractMatrixProcessingOrder end
 """
@@ -243,6 +259,10 @@ Matrix processing order: Custom Algorithm → Denoising → Detoning.
   - [`DetoneDenoiseAlg`](@ref)
   - [`DetoneAlgDenoise`](@ref)
   - [`AlgDetoneDenoise`](@ref)
+
+# Constructors
+
+    AlgDenoiseDetone() -> AlgDenoiseDetone
 """
 struct AlgDenoiseDetone <: AbstractMatrixProcessingOrder end
 """
@@ -260,6 +280,10 @@ Matrix processing order: Custom Algorithm → Detoning → Denoising.
   - [`DetoneDenoiseAlg`](@ref)
   - [`DetoneAlgDenoise`](@ref)
   - [`AlgDenoiseDetone`](@ref)
+
+# Constructors
+
+    AlgDetoneDenoise() -> AlgDetoneDenoise
 """
 struct AlgDetoneDenoise <: AbstractMatrixProcessingOrder end
 """
@@ -572,6 +596,37 @@ end
     ) -> MatNum
 
 Out-of-place version of [`matrix_processing!`](@ref).
+
+# Arguments
+
+  - $(arg_dict[:omp])
+      + `::AbstractMatrixProcessingEstimator`: The specified processing pipeline is applied to a copy of `sigma`.
+      + `::Nothing`: No-op, returns `sigma` unchanged.
+  - $(arg_dict[:sigrho])
+  - $(arg_dict[:X])
+  - `args...`: Additional positional arguments passed to custom algorithms.
+  - `kwargs...`: Additional keyword arguments passed to custom algorithms.
+
+# Returns
+
+  - `sigma::MatNum`: A new matrix equal to the processed version of the input.
+
+# Examples
+
+```jldoctest
+julia> using StableRNGs, Statistics
+
+julia> rng = StableRNG(123456789);
+
+julia> X = rand(rng, 10, 5);
+
+julia> sigma = cov(X);
+
+julia> Xs = matrix_processing(DenoiseDetoneAlgMatrixProcessing(; dn = Denoise()), sigma, X);
+
+julia> size(Xs)
+(5, 5)
+```
 
 # Related
 

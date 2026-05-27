@@ -47,6 +47,17 @@ Shrinkage target representing the grand mean of expected returns.
 
 `GrandMean` computes the shrinkage target as the mean of all asset expected returns, resulting in a vector where each element is the same grand mean value. This is commonly used in shrinkage estimators to reduce estimation error by pulling individual expected returns toward the overall average.
 
+# Constructors
+
+    GrandMean() -> GrandMean
+
+# Examples
+
+```jldoctest
+julia> GrandMean()
+GrandMean()
+```
+
 # Related
 
   - [`AbstractShrunkExpectedReturnsTarget`](@ref)
@@ -60,6 +71,17 @@ Shrinkage target representing the volatility-weighted mean of expected returns.
 
 `VolatilityWeighted` computes the shrinkage target as a weighted mean of expected returns, where weights are inversely proportional to asset volatility (from the inverse covariance matrix). This approach accounts for differences in asset risk when estimating the shrinkage target.
 
+# Constructors
+
+    VolatilityWeighted() -> VolatilityWeighted
+
+# Examples
+
+```jldoctest
+julia> VolatilityWeighted()
+VolatilityWeighted()
+```
+
 # Related
 
   - [`AbstractShrunkExpectedReturnsTarget`](@ref)
@@ -72,6 +94,17 @@ $(DocStringExtensions.TYPEDEF)
 Shrinkage target representing the mean squared error of expected returns.
 
 `MeanSquaredError` computes the shrinkage target as the trace of the covariance matrix divided by the number of observations, resulting in a vector where each element is the same value. This target is useful for certain shrinkage estimators that minimize mean squared error.
+
+# Constructors
+
+    MeanSquaredError() -> MeanSquaredError
+
+# Examples
+
+```jldoctest
+julia> MeanSquaredError()
+MeanSquaredError()
+```
 
 # Related
 
@@ -294,6 +327,52 @@ Compute the shrinkage target vector for expected returns estimation.
 
 `target_mean` computes the target vector toward which expected returns are shrunk, based on the specified shrinkage target type. This function is used internally by shrinkage estimators such as James-Stein, Bayes-Stein, and Bodnar-Okhrin-Parolya.
 
+# Mathematical definition
+
+**`GrandMean`**: each target element is the grand mean of sample expected returns:
+
+```math
+\\begin{align}
+b_j &= \\bar{\\mu} = \\frac{1}{N} \\sum_{i=1}^{N} \\hat{\\mu}_i, \\quad j = 1, \\ldots, N\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``b_j``: ``j``-th element of the shrinkage target vector.
+  - ``\\hat{\\boldsymbol{\\mu}}``: ``N \\times 1`` vector of sample expected returns.
+  - $(math_dict[:N])
+
+**`VolatilityWeighted`**: each target element is the inverse-covariance-weighted mean:
+
+```math
+\\begin{align}
+b_j &= \\bar{\\mu}_{\\text{vol}} = \\frac{\\boldsymbol{1}^\\intercal \\hat{\\mathbf{\\Sigma}}^{-1} \\hat{\\boldsymbol{\\mu}}}{\\boldsymbol{1}^\\intercal \\hat{\\mathbf{\\Sigma}}^{-1} \\boldsymbol{1}}, \\quad j = 1, \\ldots, N\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``b_j``: ``j``-th element of the shrinkage target vector.
+  - ``\\hat{\\mathbf{\\Sigma}}``: ``N \\times N`` sample covariance matrix.
+  - ``\\hat{\\boldsymbol{\\mu}}``: ``N \\times 1`` sample expected returns vector.
+  - ``\\boldsymbol{1}``: ``N \\times 1`` vector of ones.
+
+**`MeanSquaredError`**: each target element is the scaled matrix trace:
+
+```math
+\\begin{align}
+b_j &= \\frac{\\mathrm{tr}(\\hat{\\mathbf{\\Sigma}})}{T}, \\quad j = 1, \\ldots, N\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``b_j``: ``j``-th element of the shrinkage target vector.
+  - ``\\mathrm{tr}(\\cdot)``: Matrix trace operator.
+  - ``\\hat{\\mathbf{\\Sigma}}``: ``N \\times N`` sample covariance matrix.
+  - $(math_dict[:T])
+
 # Arguments
 
   - `tgt`: The shrinkage target type.
@@ -345,6 +424,38 @@ end
 Compute shrunk expected returns using the specified estimator.
 
 This method applies a shrinkage algorithm to the sample expected returns, pulling them toward a specified target to reduce estimation error, especially in high-dimensional settings.
+
+# Mathematical definition
+
+James-Stein shrinkage of sample expected returns toward target ``\\boldsymbol{b}``:
+
+```math
+\\begin{align}
+\\hat{\\boldsymbol{\\mu}}_{JS} &= (1 - \\alpha)\\, \\hat{\\boldsymbol{\\mu}} + \\alpha\\, \\boldsymbol{b}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\hat{\\boldsymbol{\\mu}}_{JS}``: James-Stein shrunk expected returns.
+  - ``\\hat{\\boldsymbol{\\mu}}``: ``N \\times 1`` sample expected returns.
+  - ``\\boldsymbol{b}``: ``N \\times 1`` shrinkage target vector.
+  - ``\\alpha``: Shrinkage intensity.
+
+The shrinkage intensity is:
+
+```math
+\\begin{align}
+\\alpha &= \\frac{N \\bar{\\lambda} - 2 \\lambda_{\\max}}{T \\, \\lVert \\hat{\\boldsymbol{\\mu}} - \\boldsymbol{b} \\rVert_2^2}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\bar{\\lambda}``: Mean eigenvalue of the covariance matrix.
+  - ``\\lambda_{\\max}``: Maximum eigenvalue of the covariance matrix.
+  - $(math_dict[:T])
+  - $(math_dict[:N])
 
 # Arguments
 
@@ -405,6 +516,32 @@ function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:JamesStein}, 
             T
     return (one(alpha) - alpha) * mu + alpha * b
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+[`BayesStein`](@ref) overload of [`mean(me::ShrunkExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)`](@ref). Shrinks sample returns toward the target using a Bayesian formula with inverse covariance weighting.
+
+# Mathematical definition
+
+Bayes-Stein shrinkage intensity:
+
+```math
+\\begin{align}
+\\alpha &= \\frac{N + 2}{(N + 2) + T \\, (\\hat{\\boldsymbol{\\mu}} - \\boldsymbol{b})^\\intercal \\hat{\\mathbf{\\Sigma}}^{-1} (\\hat{\\boldsymbol{\\mu}} - \\boldsymbol{b})}\\,, \\\\
+\\hat{\\boldsymbol{\\mu}}_{BS} &= (1 - \\alpha)\\hat{\\boldsymbol{\\mu}} + \\alpha \\boldsymbol{b}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\alpha``: Bayes-Stein shrinkage intensity.
+  - ``\\hat{\\boldsymbol{\\mu}}_{BS}``: Bayes-Stein shrunk expected returns.
+  - ``\\hat{\\boldsymbol{\\mu}}``: ``N \\times 1`` sample expected returns.
+  - ``\\boldsymbol{b}``: ``N \\times 1`` shrinkage target vector.
+  - ``\\hat{\\mathbf{\\Sigma}}``: ``N \\times N`` sample covariance matrix.
+  - $(math_dict[:T])
+  - $(math_dict[:N])
+"""
 function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:BayesStein}, X::MatNum;
                          dims::Int = 1, kwargs...)
     mu = Statistics.mean(me.me, X; dims = dims, kwargs...)
@@ -423,6 +560,53 @@ function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:BayesStein}, 
     alpha = (N + 2) / ((N + 2) + T * LinearAlgebra.dot(mb, isigma, mb))
     return (one(alpha) - alpha) * mu + alpha * b
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+[`BodnarOkhrinParolya`](@ref) overload of [`mean(me::ShrunkExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)`](@ref). Shrinks sample returns toward the target using the Bodnar-Okhrin-Parolya formula, designed for robust high-dimensional estimation.
+
+# Mathematical definition
+
+Define scalars:
+
+```math
+\\begin{align}
+u &= \\hat{\\boldsymbol{\\mu}}^\\intercal \\hat{\\mathbf{\\Sigma}}^{-1} \\hat{\\boldsymbol{\\mu}}\\,, \\\\
+v &= \\boldsymbol{b}^\\intercal \\hat{\\mathbf{\\Sigma}}^{-1} \\boldsymbol{b}\\,, \\\\
+w &= \\hat{\\boldsymbol{\\mu}}^\\intercal \\hat{\\mathbf{\\Sigma}}^{-1} \\boldsymbol{b}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``u``, ``v``, ``w``: Inverse-covariance-weighted quadratic forms.
+  - ``\\hat{\\boldsymbol{\\mu}}``: ``N \\times 1`` sample expected returns.
+  - ``\\boldsymbol{b}``: ``N \\times 1`` shrinkage target vector.
+  - ``\\hat{\\mathbf{\\Sigma}}``: ``N \\times N`` sample covariance matrix.
+
+```math
+\\begin{align}
+\\alpha &= \\frac{(u - N/(T-N))v - w^2}{uv - w^2}\\,, \\\\
+\\beta &= \\frac{(1-\\alpha) w}{u}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\alpha``, ``\\beta``: Shrinkage coefficients.
+  - $(math_dict[:T])
+  - $(math_dict[:N])
+
+```math
+\\begin{align}
+\\hat{\\boldsymbol{\\mu}}_{BOP} &= \\alpha \\hat{\\boldsymbol{\\mu}} + \\beta \\boldsymbol{b}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\hat{\\boldsymbol{\\mu}}_{BOP}``: Bodnar-Okhrin-Parolya shrunk expected returns.
+"""
 function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:BodnarOkhrinParolya},
                          X::MatNum; dims::Int = 1, kwargs...)
     mu = Statistics.mean(me.me, X; dims = dims, kwargs...)
@@ -463,6 +647,20 @@ Return a new [`ShrunkExpectedReturns`](@ref) estimator with observation weights 
 # Returns
 
   - `me::ShrunkExpectedReturns`: Updated estimator with weights applied.
+
+# Examples
+
+```jldoctest
+julia> me = ShrunkExpectedReturns();
+
+julia> me2 = factory(me, StatsBase.Weights([0.2, 0.3, 0.5]));
+
+julia> me2.me.w
+3-element Weights{Float64, Float64, Vector{Float64}}:
+ 0.2
+ 0.3
+ 0.5
+```
 
 # Related
 

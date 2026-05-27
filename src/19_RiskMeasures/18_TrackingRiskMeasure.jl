@@ -56,22 +56,80 @@ function RiskTrackingError(; tr::WeightsTracking,
                            alg::VariableTracking = IndependentVariableTracking())::RiskTrackingError
     return RiskTrackingError(tr, r, err, alg)
 end
+"""
+    tracking_view(::Nothing, args...)
+
+Return `nothing` unchanged.
+
+Identity pass-through for optional tracking configuration fields.
+
+# Related
+
+  - [`tracking_view`](@ref)
+  - [`RiskTrackingError`](@ref)
+"""
 function tracking_view(::Nothing, args...)
     return nothing
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a view of [`RiskTrackingError`](@ref) `tr` sliced to asset indices `i`.
+
+Slices both the inner tracking benchmark and the risk measure for cluster-based optimisation.
+
+# Related
+
+  - [`RiskTrackingError`](@ref)
+  - [`tracking_view`](@ref)
+  - [`risk_measure_view`](@ref)
+"""
 function tracking_view(tr::RiskTrackingError, i, X::MatNum)
     return RiskTrackingError(; tr = tracking_view(tr.tr, i),
                              r = risk_measure_view(tr.r, i, X), err = tr.err, alg = tr.alg)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create an instance of [`RiskTrackingError`](@ref) updating the inner benchmark and risk measure from the prior result and solver context.
+
+# Related
+
+  - [`RiskTrackingError`](@ref)
+  - [`AbstractPriorResult`](@ref)
+  - [`factory`](@ref)
+"""
 function factory(tr::RiskTrackingError, pr::AbstractPriorResult, slv::Any, ucs::Any,
                  w::Option{<:VecNum} = nothing, args...; kwargs...)::RiskTrackingError
     return RiskTrackingError(; tr = factory(tr.tr, w),
                              r = factory(tr.r, pr, slv, ucs, w, args...; kwargs...),
                              err = tr.err, alg = tr.alg)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return whether [`RiskTrackingError`](@ref) `tr` requires previous portfolio weights.
+
+Returns `true` if either the inner tracking benchmark or the inner risk measure requires previous weights.
+
+# Related
+
+  - [`RiskTrackingError`](@ref)
+  - [`needs_previous_weights`](@ref)
+"""
 function needs_previous_weights(tr::RiskTrackingError)
     return (needs_previous_weights(tr.tr) || needs_previous_weights(tr.r))
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create an instance of [`RiskTrackingError`](@ref) updating the inner benchmark and risk measure from new portfolio weights `w`.
+
+# Related
+
+  - [`RiskTrackingError`](@ref)
+  - [`factory`](@ref)
+"""
 function factory(tr::RiskTrackingError, w::VecNum)::RiskTrackingError
     return RiskTrackingError(; tr = factory(tr.tr, w), r = factory(tr.r, w), err = tr.err,
                              alg = tr.alg)
@@ -83,13 +141,23 @@ Represents the Tracking Error risk measure.
 
 `TrackingRiskMeasure` penalises portfolio deviation from a benchmark by computing a norm of the difference between portfolio returns and a benchmark return series or benchmark weights. The tracking error is defined using returns-based or weights-based benchmarks, and the norm is configurable.
 
-# Mathematical Definition
+# Mathematical definition
 
 Let ``\\boldsymbol{x}`` be the portfolio returns series, ``\\boldsymbol{b}`` the benchmark returns, and ``N_T`` the number of observations. The ``L^2`` tracking error is:
 
 ```math
-\\mathrm{TE}(\\boldsymbol{w}) = \\sqrt{\\frac{1}{N_T}\\lVert \\boldsymbol{x} - \\boldsymbol{b} \\rVert_2^2}\\,.
+\\begin{align}
+\\mathrm{TE}(\\boldsymbol{w}) &= \\sqrt{\\frac{1}{N_T}\\lVert \\boldsymbol{x} - \\boldsymbol{b} \\rVert_2^2}\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``\\mathrm{TE}(\\boldsymbol{w})``: ``L^2`` tracking error of the portfolio.
+  - $(math_dict[:w_port])
+  - ``\\boldsymbol{x}``: Portfolio returns series ``N_T \\times 1``.
+  - ``\\boldsymbol{b}``: Benchmark returns series ``N_T \\times 1``.
+  - ``N_T``: Number of observations.
 
 Other norms can be selected via the `alg` field.
 
@@ -172,16 +240,63 @@ function (r::TrackingRiskMeasure{WeightsTracking})(::VecNum)
     throw(MethodError(r,
                       "Tracking risk measure using the `WeightsTracking` algorithm cannot be computed for a prediction of portfolio returns because there are no weights."))
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a view of [`TrackingRiskMeasure`](@ref) `r` sliced to asset indices `i`.
+
+Slices the inner tracking specification for cluster-based optimisation.
+
+# Related
+
+  - [`TrackingRiskMeasure`](@ref)
+  - [`risk_measure_view`](@ref)
+  - [`tracking_view`](@ref)
+"""
 function risk_measure_view(r::TrackingRiskMeasure, i, args...)
     tr = tracking_view(r.tr, i)
     return TrackingRiskMeasure(; settings = r.settings, tr = tr, alg = r.alg)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return whether [`TrackingRiskMeasure`](@ref) `r` requires previous portfolio weights.
+
+Delegates to the inner tracking specification.
+
+# Related
+
+  - [`TrackingRiskMeasure`](@ref)
+  - [`needs_previous_weights`](@ref)
+"""
 function needs_previous_weights(r::TrackingRiskMeasure)
     return needs_previous_weights(r.tr)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create an instance of [`TrackingRiskMeasure`](@ref) updating the inner tracking specification with new weights `w`.
+
+# Related
+
+  - [`TrackingRiskMeasure`](@ref)
+  - [`factory`](@ref)
+"""
 function factory(r::TrackingRiskMeasure, w::VecNum)
     return TrackingRiskMeasure(; settings = r.settings, tr = factory(r.tr, w), alg = r.alg)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create an instance of [`TrackingRiskMeasure`](@ref) from a full optimisation context, forwarding `w` to `factory(r, w)`.
+
+Ignores prior result, solver, and uncertainty set arguments.
+
+# Related
+
+  - [`TrackingRiskMeasure`](@ref)
+  - [`factory`](@ref)
+"""
 function factory(r::TrackingRiskMeasure, ::Any, ::Any, ::Any, w::VecNum, args...; kwargs...)
     return factory(r, w)
 end
@@ -195,21 +310,37 @@ Represents the Risk Tracking risk measure.
   - **Independent** (`IndependentVariableTracking`): computes the risk of the weight difference ``\\boldsymbol{w} - \\boldsymbol{w}_b``.
   - **Dependent** (`DependentVariableTracking`): computes the absolute difference between the portfolio risk and the benchmark risk.
 
-# Mathematical Definition
+# Mathematical definition
 
 **Independent mode:**
 
 ```math
-\\mathrm{RkTrack}_{\\mathrm{indep}}(\\boldsymbol{w}) = \\rho(\\boldsymbol{w} - \\boldsymbol{w}_b)\\,,
+\\begin{align}
+\\mathrm{RkTrack}_{\\mathrm{indep}}(\\boldsymbol{w}) &= \\rho(\\boldsymbol{w} - \\boldsymbol{w}_b)\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``\\mathrm{RkTrack}_{\\mathrm{indep}}(\\boldsymbol{w})``: Risk of the weight difference between portfolio and benchmark.
+  - $(math_dict[:w_port])
+  - ``\\boldsymbol{w}_b``: Benchmark portfolio weights vector ``N \\times 1``.
+  - ``\\rho``: Chosen base risk measure.
 
 **Dependent mode:**
 
 ```math
-\\mathrm{RkTrack}_{\\mathrm{dep}}(\\boldsymbol{w}) = |\\rho(\\boldsymbol{w}) - \\rho(\\boldsymbol{w}_b)|\\,,
+\\begin{align}
+\\mathrm{RkTrack}_{\\mathrm{dep}}(\\boldsymbol{w}) &= |\\rho(\\boldsymbol{w}) - \\rho(\\boldsymbol{w}_b)|\\,.
+\\end{align}
 ```
 
-where ``\\boldsymbol{w}_b`` are the benchmark weights and ``\\rho`` is the chosen risk measure.
+Where:
+
+  - ``\\mathrm{RkTrack}_{\\mathrm{dep}}(\\boldsymbol{w})``: Absolute difference between portfolio risk and benchmark risk.
+  - $(math_dict[:w_port])
+  - ``\\boldsymbol{w}_b``: Benchmark portfolio weights vector ``N \\times 1``.
+  - ``\\rho``: Chosen base risk measure.
 
 # Fields
 
@@ -313,18 +444,66 @@ function (r::RiskTrackingRiskMeasure{<:Any, <:Any, <:AbstractBaseRiskMeasure,
     r2 = expected_risk(r.r, wb, X, fees)
     return abs(r1 - r2)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a view of [`RiskTrackingRiskMeasure`](@ref) `r` sliced to asset indices `i`.
+
+Slices both the inner tracking benchmark and the risk measure for cluster-based optimisation.
+
+# Related
+
+  - [`RiskTrackingRiskMeasure`](@ref)
+  - [`risk_measure_view`](@ref)
+  - [`tracking_view`](@ref)
+"""
 function risk_measure_view(r::RiskTrackingRiskMeasure, i, X::MatNum)
     tr = tracking_view(r.tr, i)
     return RiskTrackingRiskMeasure(; settings = r.settings, tr = tr,
                                    r = risk_measure_view(r.r, i, X), alg = r.alg)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create an instance of [`RiskTrackingRiskMeasure`](@ref) updating the inner risk measure from the prior result.
+
+The inner tracking benchmark is preserved; the risk measure is updated via `factory`.
+
+# Related
+
+  - [`RiskTrackingRiskMeasure`](@ref)
+  - [`AbstractPriorResult`](@ref)
+  - [`factory`](@ref)
+"""
 function factory(r::RiskTrackingRiskMeasure, pr::AbstractPriorResult, args...; kwargs...)
     return RiskTrackingRiskMeasure(; settings = r.settings, tr = r.tr,
                                    r = factory(r.r, pr, args...; kwargs...), alg = r.alg)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return whether [`RiskTrackingRiskMeasure`](@ref) `r` requires previous portfolio weights.
+
+Returns `true` if either the inner tracking benchmark or the inner risk measure requires previous weights.
+
+# Related
+
+  - [`RiskTrackingRiskMeasure`](@ref)
+  - [`needs_previous_weights`](@ref)
+"""
 function needs_previous_weights(r::RiskTrackingRiskMeasure)
     return (needs_previous_weights(r.tr) || needs_previous_weights(r.r))
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create an instance of [`RiskTrackingRiskMeasure`](@ref) updating the inner benchmark and risk measure from new portfolio weights `w`.
+
+# Related
+
+  - [`RiskTrackingRiskMeasure`](@ref)
+  - [`factory`](@ref)
+"""
 function factory(r::RiskTrackingRiskMeasure, w::VecNum)
     return RiskTrackingRiskMeasure(; settings = r.settings, tr = factory(r.tr, w),
                                    r = factory(r.r, w), alg = r.alg)

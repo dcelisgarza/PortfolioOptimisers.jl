@@ -3,6 +3,8 @@ $(DocStringExtensions.TYPEDEF)
 
 If power is not `nothing`, computes the generalised distance estimator.
 
+# Mathematical definition
+
 ```math
 \\begin{align}
 _{g}d_{i,\\,j} &= s \\cdot \\left(d_{i,\\,j}\\right)^{p}\\\\
@@ -13,7 +15,12 @@ _{g}d_{i,\\,j} &= s \\cdot \\left(d_{i,\\,j}\\right)^{p}\\\\
 \\end{align}
 ```
 
-where ``_{g}d`` is the generalised distance, ``d`` is the base distance computed using the specified distance algorithm, ``p`` is the integer power, ``s`` is a scaling factor, and each subscript denotes an asset.
+Where:
+
+  - ``_{g}d_{i,\\,j}``: Generalised distance between assets ``i`` and ``j``.
+  - ``d_{i,\\,j}``: Base distance computed using the specified distance algorithm.
+  - ``p``: Integer power.
+  - ``s``: Scaling factor (``s = 1/2`` if ``p \\bmod 2 \\neq 0``, else ``s = 1``).
 
 # Fields
 

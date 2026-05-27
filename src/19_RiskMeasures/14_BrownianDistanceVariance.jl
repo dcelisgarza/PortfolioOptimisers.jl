@@ -59,21 +59,35 @@ Represents the Brownian Distance Variance (BDVar) risk measure.
 
 `BrownianDistanceVariance` measures dependence between portfolio returns and a reference using the Brownian (distance) covariance framework. It captures non-linear dependence and is zero if and only if the returns are independent of the reference.
 
-# Mathematical Definition
+# Mathematical definition
 
 Given a portfolio returns vector ``\\boldsymbol{x} = (x_1, \\ldots, x_T)^\\intercal``, define the pairwise absolute distance matrix:
 
 ```math
-D_{ij} = |x_i - x_j|\\,.
+\\begin{align}
+D_{ij} &= |x_i - x_j|\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``D_{ij}``: Pairwise absolute distance between returns at periods ``i`` and ``j``.
+  - $(math_dict[:xret])
 
 The Brownian Distance Variance is:
 
 ```math
-\\mathrm{BDVar}(\\boldsymbol{x}) = \\frac{1}{T^2} \\left( \\lVert \\mathbf{D} \\rVert_F^2 + \\frac{1}{T^2} \\left( \\sum_{i,j} D_{ij} \\right)^2 \\right)\\,,
+\\begin{align}
+\\mathrm{BDVar}(\\boldsymbol{x}) &= \\frac{1}{T^2} \\left( \\lVert \\mathbf{D} \\rVert_F^2 + \\frac{1}{T^2} \\left( \\sum_{i,j} D_{ij} \\right)^2 \\right)\\,.
+\\end{align}
 ```
 
-where ``\\lVert \\cdot \\rVert_F`` denotes the Frobenius norm.
+Where:
+
+  - ``\\mathrm{BDVar}(\\boldsymbol{x})``: Brownian distance variance.
+  - $(math_dict[:T])
+  - ``\\mathbf{D}``: ``T \\times T`` pairwise distance matrix.
+  - ``\\lVert \\cdot \\rVert_F``: Frobenius norm.
 
 # Fields
 

@@ -13,12 +13,42 @@ Naive optimisers compute portfolio weights directly from statistical properties 
   - [`RandomWeighted`](@ref)
 """
 abstract type NaiveOptimisationEstimator <: NonFiniteAllocationOptimisationEstimator end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return whether the naive optimiser's fallback estimator requires previous portfolio weights.
+
+# Related
+
+  - [`needs_previous_weights`](@ref)
+  - [`NaiveOptimisationEstimator`](@ref)
+"""
 function needs_previous_weights(opt::NaiveOptimisationEstimator)
     return needs_previous_weights(opt.fb)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Assert internal validity for a naive optimisation estimator. No-op default.
+
+# Related
+
+  - [`assert_internal_optimiser`](@ref)
+  - [`NaiveOptimisationEstimator`](@ref)
+"""
 function assert_internal_optimiser(::NaiveOptimisationEstimator)::Nothing
     return nothing
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Assert external validity for a naive optimisation estimator. No-op default.
+
+# Related
+
+  - [`assert_external_optimiser`](@ref)
+  - [`NaiveOptimisationEstimator`](@ref)
+"""
 function assert_external_optimiser(::NaiveOptimisationEstimator)::Nothing
     return nothing
 end
@@ -73,6 +103,16 @@ NaiveOptimisationResult
     "$(field_dict[:fb])"
     fb
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create a [`NaiveOptimisationResult`](@ref) with a new fallback result `fb`.
+
+# Related
+
+  - [`NaiveOptimisationResult`](@ref)
+  - [`factory`](@ref)
+"""
 function factory(res::NaiveOptimisationResult,
                  fb::Option{<:OptE_Opt})::NaiveOptimisationResult
     return NaiveOptimisationResult(res.oe, res.pr, res.wb, res.retcode, res.w, fb)
@@ -84,13 +124,19 @@ Inverse Volatility portfolio optimiser.
 
 `InverseVolatility` allocates portfolio weights inversely proportional to each asset's volatility (standard deviation). Optionally, `sq = true` uses variance instead.
 
-# Mathematical Definition
+# Mathematical definition
 
 ```math
-w_i = \\frac{1 / \\sigma_i}{\\sum_{j=1}^N 1 / \\sigma_j}\\,,
+\\begin{align}
+w_i &= \\frac{1 / \\sigma_i}{\\sum_{j=1}^N 1 / \\sigma_j}\\,,\\,.
+\\end{align}
 ```
 
-where ``\\sigma_i`` is the standard deviation (or variance when `sq = true`) of asset ``i``.
+Where:
+
+  - ``w_i``: Portfolio weight of asset ``i``.
+  - ``\\sigma_i``: Standard deviation of asset ``i`` (variance when `sq = true`).
+  - ``N``: Number of assets.
 
 # Fields
 
@@ -189,11 +235,31 @@ function InverseVolatility(; pe::PrE_Pr = EmpiricalPrior(),
                            brt::Bool = false, strict::Bool = false)::InverseVolatility
     return InverseVolatility(pe, wb, sets, wf, fb, sq, brt, strict)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create an [`InverseVolatility`](@ref) updating the fallback estimator with weights `w`.
+
+# Related
+
+  - [`InverseVolatility`](@ref)
+  - [`factory`](@ref)
+"""
 function factory(opt::InverseVolatility, w::AbstractVector)::InverseVolatility
     return InverseVolatility(; pe = opt.pe, wb = opt.wb, sets = opt.sets, wf = opt.wf,
                              fb = factory(opt.fb, w), sq = opt.sq, brt = opt.brt,
                              strict = opt.strict)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a view of [`InverseVolatility`](@ref) `opt` sliced to asset indices `i`.
+
+# Related
+
+  - [`InverseVolatility`](@ref)
+  - [`opt_view`](@ref)
+"""
 function opt_view(opt::InverseVolatility, i, args...)::InverseVolatility
     pe = prior_view(opt.pe, i)
     wb = weight_bounds_view(opt.wb, i)
@@ -201,12 +267,37 @@ function opt_view(opt::InverseVolatility, i, args...)::InverseVolatility
     return InverseVolatility(; pe = pe, wb = wb, sets = sets, wf = opt.wf, fb = opt.fb,
                              sq = opt.sq, brt = opt.brt, strict = opt.strict)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Assert that [`InverseVolatility`](@ref) is valid for external use.
+
+Requires that `opt.pe` is not an `AbstractPriorResult`.
+
+# Related
+
+  - [`InverseVolatility`](@ref)
+  - [`assert_external_optimiser`](@ref)
+"""
 function assert_external_optimiser(opt::InverseVolatility)::Nothing
     #! Maybe results can be allowed with a warning. This goes for other stuff like bounds and threshold vectors. And then the optimisation can throw a domain error when it comes to using them.
     @argcheck(!isa(opt.pe, AbstractPriorResult))
     assert_internal_optimiser(opt)
     return nothing
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Run the inverse volatility portfolio optimisation.
+
+Internal dispatch called by [`optimise`](@ref). Computes covariance via the prior estimator, assigns weights inversely proportional to volatility (or variance when `iv.sq = true`), then applies weight bounds.
+
+# Related
+
+  - [`InverseVolatility`](@ref)
+  - [`optimise`](@ref)
+  - [`_optimise`](@ref)
+"""
 function _optimise(iv::InverseVolatility, rd::ReturnsResult = ReturnsResult();
                    dims::Int = 1, kwargs...)
     @argcheck(dims in (1, 2))
@@ -244,11 +335,20 @@ $(DocStringExtensions.TYPEDEF)
 
 Equal-weighted portfolio optimiser.
 
-`EqualWeighted` allocates equal weight to all ``N`` assets in the portfolio:
+`EqualWeighted` allocates equal weight to all ``N`` assets in the portfolio.
+
+# Mathematical definition
 
 ```math
-w_i = \\frac{1}{N} \\quad \\forall i\\,.
+\\begin{align}
+w_i &= \\frac{1}{N} \\quad \\forall i\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``w_i``: Portfolio weight of asset ``i``.
+  - ``N``: Number of assets.
 
 # Fields
 
@@ -316,16 +416,49 @@ function EqualWeighted(; wb::Option{<:WbE_Wb} = WeightBounds(),
                        strict::Bool = false)::EqualWeighted
     return EqualWeighted(wb, sets, wf, fb, strict)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create an [`EqualWeighted`](@ref) updating the fallback estimator with weights `w`.
+
+# Related
+
+  - [`EqualWeighted`](@ref)
+  - [`factory`](@ref)
+"""
 function factory(opt::EqualWeighted, w::AbstractVector)::EqualWeighted
     return EqualWeighted(; wb = opt.wb, sets = opt.sets, wf = opt.wf,
                          fb = factory(opt.fb, w), strict = opt.strict)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a view of [`EqualWeighted`](@ref) `opt` sliced to asset indices `i`.
+
+# Related
+
+  - [`EqualWeighted`](@ref)
+  - [`opt_view`](@ref)
+"""
 function opt_view(opt::EqualWeighted, i, args...)::EqualWeighted
     wb = weight_bounds_view(opt.wb, i)
     sets = asset_sets_view(opt.sets, i)
     return EqualWeighted(; wb = wb, sets = sets, wf = opt.wf, fb = opt.fb,
                          strict = opt.strict)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Run the equal-weighted portfolio optimisation.
+
+Internal dispatch called by [`optimise`](@ref). Assigns equal weights to all assets, then applies weight bounds.
+
+# Related
+
+  - [`EqualWeighted`](@ref)
+  - [`optimise`](@ref)
+  - [`_optimise`](@ref)
+"""
 function _optimise(ew::EqualWeighted, rd::ReturnsResult; dims::Int = 1, kwargs...)
     @argcheck(!isnothing(rd.X))
     @argcheck(dims in (1, 2))
@@ -361,13 +494,18 @@ Random-weighted portfolio optimiser.
 
 `RandomWeighted` draws portfolio weights at random from a Dirichlet distribution with concentration parameter `alpha`. This can be used for simulation, benchmarking, or stress-testing.
 
-# Mathematical Definition
+# Mathematical definition
 
 ```math
-\\boldsymbol{w} \\sim \\mathrm{Dirichlet}(\\boldsymbol{\\alpha})\\,,
+\\begin{align}
+\\boldsymbol{w} \\sim \\mathrm{Dirichlet}(\\boldsymbol{\\alpha})\\,,\\,.
+\\end{align}
 ```
 
-where ``\\boldsymbol{\\alpha}`` is a scalar or vector concentration parameter. Larger values of ``\\alpha`` concentrate the distribution near equal weights.
+Where:
+
+  - ``\\boldsymbol{w}``: Portfolio weight vector.
+  - ``\\boldsymbol{\\alpha}``: Scalar or vector concentration parameter. Larger values concentrate the distribution near equal weights.
 
 # Fields
 
@@ -455,11 +593,31 @@ function RandomWeighted(; alpha::Num_VecNum = 1,
                         strict::Bool = false)::RandomWeighted
     return RandomWeighted(alpha, rng, seed, wb, sets, wf, fb, strict)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create a [`RandomWeighted`](@ref) updating the fallback estimator with weights `w`.
+
+# Related
+
+  - [`RandomWeighted`](@ref)
+  - [`factory`](@ref)
+"""
 function factory(opt::RandomWeighted, w::AbstractVector)::RandomWeighted
     return RandomWeighted(; alpha = opt.alpha, rng = opt.rng, seed = opt.seed, wb = opt.wb,
                           sets = opt.sets, wf = opt.wf, fb = factory(opt.fb, w),
                           strict = opt.strict)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a view of [`RandomWeighted`](@ref) `opt` sliced to asset indices `i`.
+
+# Related
+
+  - [`RandomWeighted`](@ref)
+  - [`opt_view`](@ref)
+"""
 function opt_view(opt::RandomWeighted, i, args...)::RandomWeighted
     wb = weight_bounds_view(opt.wb, i)
     sets = asset_sets_view(opt.sets, i)
@@ -467,6 +625,19 @@ function opt_view(opt::RandomWeighted, i, args...)::RandomWeighted
     return RandomWeighted(; alpha = alpha, rng = opt.rng, seed = opt.seed, wb = wb,
                           sets = sets, wf = opt.wf, fb = opt.fb, strict = opt.strict)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Run the random-weighted portfolio optimisation.
+
+Internal dispatch called by [`optimise`](@ref). Draws weights from a Dirichlet distribution parameterised by `rw.alpha`, then applies weight bounds.
+
+# Related
+
+  - [`RandomWeighted`](@ref)
+  - [`optimise`](@ref)
+  - [`_optimise`](@ref)
+"""
 function _optimise(rw::RandomWeighted, rd::ReturnsResult; dims::Int = 1, kwargs...)
     @argcheck(!isnothing(rd.X))
     @argcheck(dims in (1, 2))

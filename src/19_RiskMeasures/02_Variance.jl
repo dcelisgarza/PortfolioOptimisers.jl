@@ -803,12 +803,36 @@ function factory(r::UncertaintySetVariance, pr::AbstractPriorResult, ::Any,
     sigma = nothing_scalar_array_selector(r.sigma, pr.sigma)
     return UncertaintySetVariance(; settings = r.settings, ucs = ucs, sigma = sigma)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create an instance of [`UncertaintySetVariance`](@ref) without a placeholder positional argument (see [`factory(r::UncertaintySetVariance, pr::AbstractPriorResult, ::Any, ucs, args...; kwargs...)`](@ref)).
+
+# Related
+
+  - [`UncertaintySetVariance`](@ref)
+  - [`factory`](@ref)
+  - [`ucs_selector`](@ref)
+  - [`nothing_scalar_array_selector`](@ref)
+"""
 function factory(r::UncertaintySetVariance, pr::AbstractPriorResult,
                  ucs::Option{<:UcSE_UcS} = nothing; kwargs...)
     ucs = ucs_selector(r.ucs, ucs)
     sigma = nothing_scalar_array_selector(r.sigma, pr.sigma)
     return UncertaintySetVariance(; settings = r.settings, ucs = ucs, sigma = sigma)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create an instance of [`UncertaintySetVariance`](@ref) with the uncertainty set as the first override argument.
+
+# Related
+
+  - [`UncertaintySetVariance`](@ref)
+  - [`factory`](@ref)
+  - [`ucs_selector`](@ref)
+  - [`nothing_scalar_array_selector`](@ref)
+"""
 function factory(r::UncertaintySetVariance, ucs::UcSE_UcS,
                  pr::Option{<:AbstractPriorResult} = nothing; kwargs...)
     ucs = ucs_selector(r.ucs, ucs)

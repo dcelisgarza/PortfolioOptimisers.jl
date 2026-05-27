@@ -275,11 +275,31 @@ function OpinionPoolingPrior(; pes::VecEP,
                              ex::FLoops.Transducers.Executor = FLoops.Transducers.ThreadedEx())::OpinionPoolingPrior
     return OpinionPoolingPrior(pes, pe1, pe2, p, w, alg, ex)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a new [`OpinionPoolingPrior`](@ref) estimator with observation weights `w` applied to all component prior estimators.
+
+# Related
+
+  - [`OpinionPoolingPrior`](@ref)
+  - [`factory`](@ref)
+"""
 function factory(pe::OpinionPoolingPrior, w::ObsWeights)::OpinionPoolingPrior
     return OpinionPoolingPrior(; pes = factory(pe.pes, w), pe1 = factory(pe.pe1, w),
                                pe2 = factory(pe.pe2, w), p = pe.p, w = pe.w, alg = pe.alg,
                                ex = pe.ex)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a new [`OpinionPoolingPrior`](@ref) estimator restricted to the assets at index `i`.
+
+# Related
+
+  - [`OpinionPoolingPrior`](@ref)
+  - [`prior_view`](@ref)
+"""
 function prior_view(pe::OpinionPoolingPrior, i)::OpinionPoolingPrior
     return OpinionPoolingPrior(; pes = prior_view(pe.pes, i), pe1 = prior_view(pe.pe1, i),
                                pe2 = prior_view(pe.pe2, i), p = pe.p, w = pe.w,
@@ -346,6 +366,35 @@ Compute the consensus posterior return distribution from individual prior distri
   - For `LinearOpinionPooling`, computes the weighted arithmetic mean of the individual prior weights: `w = pw * ow`.
   - For `LogarithmicOpinionPooling`, computes the weighted geometric mean of the individual prior weights: `w = exp.(log.(pw) * ow - LogExpFunctions.logsumexp(log.(pw) * ow))`.
   - Used internally by [`OpinionPoolingPrior`](@ref) to form the consensus prior distribution.
+
+# Mathematical definition
+
+Let ``\\boldsymbol{\\alpha}`` be the opinion probabilities and ``\\mathbf{P}`` the ``T \\times K`` matrix of scenario weights for ``K`` experts:
+
+Linear (weighted arithmetic mean):
+
+```math
+\\begin{align}
+\\boldsymbol{p}^* &= \\mathbf{P} \\boldsymbol{\\alpha}\\,.
+\\end{align}
+```
+
+Logarithmic (weighted geometric mean, normalised):
+
+```math
+\\begin{align}
+\\log p_t^* \\propto \\sum_{k&=1}^{K} \\alpha_k \\log p_{tk}\\,, \\\\
+p_t^* &= \\frac{\\exp\\!\\left(\\sum_k \\alpha_k \\log p_{tk}\\right)}{\\sum_{s} \\exp\\!\\left(\\sum_k \\alpha_k \\log p_{sk}\\right)}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{p}^*``: ``T \\times 1`` pooled posterior weight vector.
+  - ``\\mathbf{P}``: ``T \\times K`` matrix of scenario weights for ``K`` experts.
+  - ``\\boldsymbol{\\alpha}``: ``K \\times 1`` opinion probability vector (weights summing to 1).
+  - ``p_{tk}``: Scenario weight for scenario ``t`` from expert ``k``.
+  - $(math_dict[:T])
 
 # Related
 

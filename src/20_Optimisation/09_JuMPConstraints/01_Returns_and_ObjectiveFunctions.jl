@@ -9,9 +9,7 @@ on the portfolio return.
 
 # Fields
 
-  - `ucs`: Optional ellipsoidal uncertainty set on the mean return.
-  - `lb`: Optional lower bound on the portfolio return (scalar or vector).
-  - `mu`: Optional mean return override (scalar or vector).
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -21,16 +19,28 @@ on the portfolio return.
         mu::Option{<:Num_VecNum} = nothing
     ) -> ArithmeticReturn
 
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - If `ucs` is an `EllipsoidalUncertaintySet`: must be parameterised by `MuEllipsoidalUncertaintySet`.
+  - If `lb` is a number: `isfinite(lb)`.
+  - If `lb` is a vector: `!isempty(lb)` and `all(isfinite, lb)`.
+  - If `mu` is a number: `isfinite(mu)`.
+  - If `mu` is a vector: `!isempty(mu)` and `all(isfinite, mu)`.
+
 # Related
 
   - [`bounds_returns_estimator`](@ref)
   - [`LogarithmicReturn`](@ref)
-  - [`LogarithmicReturn`](@ref)
   - [`JuMPReturnsEstimator`](@ref)
 """
 @concrete struct ArithmeticReturn <: JuMPReturnsEstimator
+    "$(field_dict[:ucs])"
     ucs
+    "$(field_dict[:lb])"
     lb
+    "$(field_dict[:mu])"
     mu
     function ArithmeticReturn(ucs::Option{<:UcSE_UcS}, lb::Option{<:RkRtBounds},
                               mu::Option{<:Num_VecNum})
@@ -116,8 +126,7 @@ Optionally supports observation weights and a lower bound on the portfolio retur
 
 # Fields
 
-  - `w`: Optional observation weights.
-  - `lb`: Optional lower bound on the portfolio return (scalar or vector).
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -126,15 +135,24 @@ Optionally supports observation weights and a lower bound on the portfolio retur
         lb::Option{<:RkRtBounds} = nothing
     ) -> LogarithmicReturn
 
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - If `w` is provided: `!isempty(w)`, all elements non-negative and finite.
+  - If `lb` is a number: `isfinite(lb)`.
+  - If `lb` is a vector: `!isempty(lb)` and `all(isfinite, lb)`.
+
 # Related
 
   - [`bounds_returns_estimator`](@ref)
   - [`ArithmeticReturn`](@ref)
-  - [`ArithmeticReturn`](@ref)
   - [`JuMPReturnsEstimator`](@ref)
 """
 @concrete struct LogarithmicReturn <: JuMPReturnsEstimator
+    "$(field_dict[:oow])"
     w
+    "$(field_dict[:lb])"
     lb
     function LogarithmicReturn(w::Option{<:ObsWeights}, lb::Option{<:RkRtBounds})
         assert_nonempty_nonneg_finite_val(w, :w)
@@ -171,6 +189,11 @@ function AKelly(; formulation::VarianceFormulation = SOC(),
     end
     return AKelly(formulation, a_rc, b_rc)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Set properties of [`AKelly`](@ref) with validation. When setting `:a_rc` or `:b_rc`, checks that the new value is consistent with the existing constraint matrix dimensions.
+"""
 function Base.setproperty!(obj::AKelly, sym::Symbol, val)
     if sym == :a_rc
         if !isnothing(val) && !isnothing(obj.b_rc) && !isempty(val) && !isempty(obj.b_rc)
@@ -328,41 +351,52 @@ Objective function that minimises portfolio risk.
   - [`MaximumUtility`](@ref)
   - [`MaximumRatio`](@ref)
   - [`MaximumReturn`](@ref)
-  - [`MaximumUtility`](@ref)
-  - [`MaximumRatio`](@ref)
-  - [`MaximumReturn`](@ref)
   - [`ObjectiveFunction`](@ref)
 """
 struct MinimumRisk <: ObjectiveFunction end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Objective function that maximises risk-adjusted utility:
+Objective function that maximises risk-adjusted utility.
+
+# Mathematical definition
 
 ```math
-\\max\\; \\boldsymbol{\\mu}^\\intercal \\boldsymbol{w} - \\tfrac{l}{2}\\, R(\\boldsymbol{w})
+\\begin{align}
+\\max\\; \\boldsymbol{\\mu}^\\intercal \\boldsymbol{w} - \\tfrac{l}{2}\\, R(\\boldsymbol{w})\\,.
+\\end{align}
 ```
 
-where ``l`` is the risk-aversion coefficient and ``R`` is the portfolio risk.
+Where:
+
+  - $(math_dict[:mu_er])
+  - $(math_dict[:w_port])
+  - ``l``: Risk-aversion coefficient.
+  - $(math_dict[:R_w])
 
 # Fields
 
-  - `l::Number`: Risk-aversion coefficient. Must be non-negative. Defaults to `2`.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
     MaximumUtility(; l::Number = 2) -> MaximumUtility
+
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - `l >= 0`.
 
 # Related
 
   - [`MinimumRisk`](@ref)
   - [`MaximumRatio`](@ref)
   - [`MaximumReturn`](@ref)
-  - [`MinimumRisk`](@ref)
-  - [`MaximumRatio`](@ref)
   - [`ObjectiveFunction`](@ref)
 """
 @concrete struct MaximumUtility <: ObjectiveFunction
+    "$(field_dict[:l])"
     l
     function MaximumUtility(l::Number)
         @argcheck(l >= zero(l))
@@ -375,36 +409,48 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Objective function that maximises the risk-adjusted Sharpe-type ratio:
+Objective function that maximises the risk-adjusted Sharpe-type ratio.
+
+# Mathematical definition
 
 ```math
-\\max\\; \\frac{\\boldsymbol{\\mu}^\\intercal \\boldsymbol{w} - r_f}{R(\\boldsymbol{w})}
+\\begin{align}
+\\max\\; \\frac{\\boldsymbol{\\mu}^\\intercal \\boldsymbol{w} - r_f}{R(\\boldsymbol{w})}\\,.
+\\end{align}
 ```
 
-where ``r_f`` is the risk-free rate and ``R`` is the portfolio risk.
+Where:
+
+  - $(math_dict[:mu_er])
+  - $(math_dict[:w_port])
+  - ``r_f``: Risk-free rate.
+  - $(math_dict[:R_w])
 
 # Fields
 
-  - `rf::Number`: Risk-free rate. Defaults to `0.0`.
-  - `ohf::Option{<:Number}`: Optional objective homogenisation factor used internally
-    for numerical stability. Defaults to `nothing` (auto-determined).
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
     MaximumRatio(; rf::Number = 0.0, ohf::Option{<:Number} = nothing) -> MaximumRatio
+
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - If `ohf` is provided: `ohf > 0`.
 
 # Related
 
   - [`MinimumRisk`](@ref)
   - [`MaximumUtility`](@ref)
   - [`MaximumReturn`](@ref)
-  - [`MinimumRisk`](@ref)
-  - [`MaximumUtility`](@ref)
-  - [`MaximumReturn`](@ref)
   - [`ObjectiveFunction`](@ref)
 """
 @concrete struct MaximumRatio <: ObjectiveFunction
+    "$(field_dict[:rf])"
     rf
+    "Optional objective homogenisation factor for numerical stability of the ratio problem. Defaults to `nothing` (auto-determined)."
     ohf
     function MaximumRatio(rf::Number, ohf::Option{<:Number})
         if !isnothing(ohf)
@@ -654,6 +700,41 @@ end
 Add uncertainty-set-robust return constraints to the JuMP model.
 
 Dispatches based on the uncertainty set type. For `BoxUncertaintySet`, uses a norm-1 cone constraint. For `EllipsoidalUncertaintySet`, uses a second-order cone constraint.
+
+# Mathematical definition
+
+Box uncertainty set (worst-case return):
+
+```math
+\\begin{align}
+\\hat{r}(\\boldsymbol{w}) &= \\boldsymbol{\\mu}^\\intercal \\boldsymbol{w} - \\boldsymbol{\\Delta}^\\intercal |\\boldsymbol{w}|\\,, \\\\
+\\boldsymbol{\\Delta} &= \\frac{\\boldsymbol{u} - \\boldsymbol{\\ell}}{2}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\hat{r}(\\boldsymbol{w})``: Worst-case expected return.
+  - $(math_dict[:mu_er])
+  - $(math_dict[:w_port])
+  - ``\\boldsymbol{\\Delta}``: Half-width of the box uncertainty set.
+  - ``\\boldsymbol{\\ell}``, ``\\boldsymbol{u}``: Lower and upper bounds of the box uncertainty set.
+
+Ellipsoidal uncertainty set (worst-case return):
+
+```math
+\\begin{align}
+\\hat{r}(\\boldsymbol{w}) &= \\boldsymbol{\\mu}^\\intercal \\boldsymbol{w} - \\kappa \\|\\mathbf{G}\\boldsymbol{w}\\|_2\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\hat{r}(\\boldsymbol{w})``: Worst-case expected return.
+  - $(math_dict[:mu_er])
+  - $(math_dict[:w_port])
+  - ``\\kappa``: Ellipsoidal uncertainty set radius.
+  - ``\\mathbf{G}``: Upper Cholesky factor of the uncertainty set covariance.
 
 # Arguments
 

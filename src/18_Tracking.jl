@@ -18,7 +18,7 @@ abstract type AbstractTracking <: AbstractResult end
 
 Alias for a vector of tracking result types.
 
-# Related Types
+# Related
 
   - [`AbstractTracking`](@ref)
   - [`TrackingError`](@ref)
@@ -31,7 +31,7 @@ const VecTr = AbstractVector{<:AbstractTracking}
 
 Union type for a single tracking result or a vector of tracking results.
 
-# Related Types
+# Related
 
   - [`AbstractTracking`](@ref)
   - [`VecTr`](@ref)
@@ -46,6 +46,52 @@ $(DocStringExtensions.TYPEDEF)
 Abstract supertype for all tracking algorithm types in `PortfolioOptimisers.jl`.
 
 All concrete and/or abstract types representing tracking algorithms (such as weights or returns tracking) should be subtypes of `AbstractTrackingAlgorithm`.
+
+# Interfaces
+
+In order to implement a new tracking algorithm that works seamlessly with the library, subtype `AbstractTrackingAlgorithm` and implement the following methods:
+
+  - `tracking_benchmark(tr::AbstractTrackingAlgorithm, X::MatNum) -> VecNum`: Compute benchmark returns from the asset return matrix `X`.
+  - `factory(tr::AbstractTrackingAlgorithm, w::VecNum) -> AbstractTrackingAlgorithm`: Construct a new instance with updated portfolio weights `w`.
+  - `tracking_view(tr::AbstractTrackingAlgorithm, i) -> AbstractTrackingAlgorithm`: Create a view of the tracking algorithm for the subset of assets at indices `i`.
+
+## Arguments
+
+  - `tr`: The concrete tracking algorithm instance.
+  - $(arg_dict[:sigrhoX])
+  - `w`: New portfolio weights.
+  - `i`: Index or indices for asset subset.
+
+## Returns
+
+  - `b::VecNum`: Benchmark returns (for `tracking_benchmark`).
+  - `tr::AbstractTrackingAlgorithm`: Updated or viewed tracking algorithm (for `factory`, `tracking_view`).
+
+## Examples
+
+```jldoctest
+julia> struct MyTracking <: PortfolioOptimisers.AbstractTrackingAlgorithm
+           w::Vector{Float64}
+       end
+
+julia> function PortfolioOptimisers.tracking_benchmark(tr::MyTracking,
+                                                       X::PortfolioOptimisers.MatNum)
+           return X * tr.w
+       end
+
+julia> PortfolioOptimisers.factory(tr::MyTracking, w) = MyTracking(w)
+
+julia> PortfolioOptimisers.tracking_view(tr::MyTracking, i) = MyTracking(tr.w[i])
+
+julia> tr = MyTracking([0.5, 0.5]);
+
+julia> X = [0.01 0.02; 0.03 0.04];
+
+julia> PortfolioOptimisers.tracking_benchmark(tr, X)
+2-element Vector{Float64}:
+ 0.015
+ 0.035
+```
 
 # Related
 
@@ -111,6 +157,22 @@ Second-order cone (SOC) norm-based tracking formulation.
 
 `L2Tracking` implements a norm-based tracking error formulation using the Euclidean (L2) norm, scaled by the square root of the number of assets minus the degrees of freedom (`ddof`). This is commonly used for tracking error constraints and objectives in portfolio optimisation.
 
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathrm{TE}_{L_2}(\\boldsymbol{a},\\boldsymbol{b}) &= \\frac{\\|\\boldsymbol{a} - \\boldsymbol{b}\\|_2}{\\sqrt{T - d}}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathrm{TE}_{L_2}(\\boldsymbol{a},\\boldsymbol{b})``: L2-norm tracking error.
+  - ``\\boldsymbol{a}``: Portfolio weight or return vector ``T \\times 1``.
+  - ``\\boldsymbol{b}``: Benchmark vector ``T \\times 1``.
+  - $(math_dict[:T])
+  - ``d``: Degrees of freedom, `ddof`. When ``T`` is not provided the denominator is 1.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -157,6 +219,22 @@ $(DocStringExtensions.TYPEDEF)
 Second-order cone (SOC) squared norm-based tracking formulation.
 
 `SquaredL2Tracking` implements a norm-based tracking error formulation using the squared Euclidean (L2) norm, scaled by the number of assets minus the degrees of freedom (`ddof`). This is commonly used for tracking error constraints and objectives in portfolio optimisation where squared error is preferred.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathrm{TE}_{L_2^2}(\\boldsymbol{a},\\boldsymbol{b}) &= \\frac{\\|\\boldsymbol{a} - \\boldsymbol{b}\\|_2^2}{T - d}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathrm{TE}_{L_2^2}(\\boldsymbol{a},\\boldsymbol{b})``: Squared L2-norm tracking error.
+  - ``\\boldsymbol{a}``: Portfolio weight or return vector ``T \\times 1``.
+  - ``\\boldsymbol{b}``: Benchmark vector ``T \\times 1``.
+  - $(math_dict[:T])
+  - ``d``: Degrees of freedom, `ddof`. When ``T`` is not provided the denominator is 1.
 
 # Fields
 
@@ -205,6 +283,25 @@ Norm-one (NOC) tracking formulation.
 
 `L1Tracking` implements a norm-based tracking error formulation using the L1 (norm-one) distance between portfolio and benchmark weights. This is commonly used for tracking error constraints and objectives in portfolio optimisation where sparsity or absolute deviations are preferred.
 
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathrm{TE}_{L_1}(\\boldsymbol{a},\\boldsymbol{b}) &= \\frac{\\|\\boldsymbol{a} - \\boldsymbol{b}\\|_1}{T}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathrm{TE}_{L_1}(\\boldsymbol{a},\\boldsymbol{b})``: L1-norm tracking error.
+  - ``\\boldsymbol{a}``: Portfolio weight or return vector ``T \\times 1``.
+  - ``\\boldsymbol{b}``: Benchmark vector ``T \\times 1``.
+  - $(math_dict[:T]) When ``T`` is not provided the denominator is 1.
+
+# Constructors
+
+    L1Tracking() -> L1Tracking
+
 # Examples
 
 ```jldoctest
@@ -227,6 +324,23 @@ L-p norm tracking error estimator.
 
 Computes the Lp-norm of the difference between portfolio and benchmark returns: ``\\lvert\\mathbf{X} \\boldsymbol{w} - \\boldsymbol{b}\\rvert_p``.
 
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathrm{TE}_{L_p}(\\boldsymbol{a},\\boldsymbol{b}) &= \\frac{\\|\\boldsymbol{a} - \\boldsymbol{b}\\|_p}{(T - d)^{1/p}}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathrm{TE}_{L_p}(\\boldsymbol{a},\\boldsymbol{b})``: Lp-norm tracking error.
+  - ``\\boldsymbol{a}``: Portfolio weight or return vector ``T \\times 1``.
+  - ``\\boldsymbol{b}``: Benchmark vector ``T \\times 1``.
+  - $(math_dict[:T])
+  - ``d``: Degrees of freedom, `ddof`. When ``T`` is not provided the denominator is 1.
+  - ``p``: Norm order.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -234,6 +348,21 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     LpTracking(; p::Number = 3, ddof::Integer = 0) -> LpTracking
+
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - `0 <= ddof`.
+
+# Examples
+
+```jldoctest
+julia> LpTracking()
+LpTracking
+     p ┼ Int64: 3
+  ddof ┴ Int64: 0
+```
 
 # Related
 
@@ -262,6 +391,22 @@ L-infinity norm (maximum absolute deviation) tracking error estimator.
 
 Computes the L∞-norm (maximum absolute deviation) of the difference between portfolio and benchmark returns.
 
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathrm{TE}_{L_\\infty}(\\boldsymbol{a},\\boldsymbol{b}) &= \\frac{\\|\\boldsymbol{a} - \\boldsymbol{b}\\|_\\infty}{T - d}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathrm{TE}_{L_\\infty}(\\boldsymbol{a},\\boldsymbol{b})``: L∞-norm tracking error. `pos = true` uses ``+\\infty``, `pos = false` uses ``-\\infty``.
+  - ``\\boldsymbol{a}``: Portfolio weight or return vector ``T \\times 1``.
+  - ``\\boldsymbol{b}``: Benchmark vector ``T \\times 1``.
+  - $(math_dict[:T])
+  - ``d``: Degrees of freedom, `ddof`. When ``T`` is not provided the denominator is 1.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -269,6 +414,21 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     LInfTracking(; ddof::Integer = 0, pos::Bool = true) -> LInfTracking
+
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - `0 <= ddof`.
+
+# Examples
+
+```jldoctest
+julia> LInfTracking()
+LInfTracking
+  ddof ┼ Int64: 0
+   pos ┴ Bool: true
+```
 
 # Related
 
@@ -300,6 +460,26 @@ end
 Compute the norm-based tracking error between portfolio and benchmark weights.
 
 `norm_tracking` computes the tracking error using either the Euclidean (L2) norm for [`L2Tracking`](@ref), squared Euclidean (L2) norm for [`SquaredL2Tracking`](@ref), or the L1 (norm-one) distance for [`L1Tracking`](@ref). The error is optionally scaled by the number of assets and degrees of freedom for SOC, or by the number of assets for NOC.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathrm{TE}_{L_2}(\\boldsymbol{a},\\boldsymbol{b}) &= \\frac{\\|\\boldsymbol{a} - \\boldsymbol{b}\\|_2}{\\sqrt{T - d}}\\,, \\\\
+\\mathrm{TE}_{L_2^2}(\\boldsymbol{a},\\boldsymbol{b}) &= \\frac{\\|\\boldsymbol{a} - \\boldsymbol{b}\\|_2^2}{T - d}\\,, \\\\
+\\mathrm{TE}_{L_1}(\\boldsymbol{a},\\boldsymbol{b}) &= \\frac{\\|\\boldsymbol{a} - \\boldsymbol{b}\\|_1}{T}\\,, \\\\
+\\mathrm{TE}_{L_p}(\\boldsymbol{a},\\boldsymbol{b}) &= \\frac{\\|\\boldsymbol{a} - \\boldsymbol{b}\\|_p}{(T-d)^{1/p}}\\,, \\\\
+\\mathrm{TE}_{L_\\infty}(\\boldsymbol{a},\\boldsymbol{b}) &= \\frac{\\|\\boldsymbol{a} - \\boldsymbol{b}\\|_\\infty}{T - d}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{a}``: Portfolio weight or return vector ``T \\times 1``.
+  - ``\\boldsymbol{b}``: Benchmark vector ``T \\times 1``.
+  - $(math_dict[:T])
+  - ``d``: Degrees of freedom, `ddof`.
+  - ``p``: Norm order.
 
 # Arguments
 
@@ -370,6 +550,17 @@ Independent variable-based tracking formulation.
 
 `IndependentVariableTracking` tracks the independent variables of a measurement.
 
+# Constructors
+
+    IndependentVariableTracking() -> IndependentVariableTracking
+
+# Examples
+
+```jldoctest
+julia> IndependentVariableTracking()
+IndependentVariableTracking()
+```
+
 # Related
 
   - [`VariableTracking`](@ref)
@@ -382,6 +573,17 @@ $(DocStringExtensions.TYPEDEF)
 Dependent variable-based tracking formulation.
 
 `DependentVariableTracking` tracks the measurement.
+
+# Constructors
+
+    DependentVariableTracking() -> DependentVariableTracking
+
+# Examples
+
+```jldoctest
+julia> DependentVariableTracking()
+DependentVariableTracking()
+```
 
 # Related
 
@@ -409,6 +611,13 @@ Used as a fallback method for missing tracking constraints or estimators, ensuri
 
   - Used to propagate `nothing` in tracking view operations.
   - Ensures interface consistency for missing tracking objects.
+
+# Examples
+
+```jldoctest
+julia> PortfolioOptimisers.tracking_view(nothing, 1)
+
+```
 
 # Related
 
@@ -732,6 +941,16 @@ This function returns the input [`ReturnsTracking`](@ref) object unchanged. It i
   - Returns the input object unchanged.
   - Ensures interface consistency for tracking view operations.
 
+# Examples
+
+```jldoctest
+julia> tr = ReturnsTracking(; w = [0.01, 0.02, 0.03]);
+
+julia> PortfolioOptimisers.tracking_view(tr, 1:2)
+ReturnsTracking
+  w ┴ Vector{Float64}: [0.01, 0.02, 0.03]
+```
+
 # Related
 
   - [`ReturnsTracking`](@ref)
@@ -797,6 +1016,16 @@ This function provides a consistent interface for updating or copying returns-ba
 
   - Returns the input object unchanged.
   - Ensures interface consistency for factory operations.
+
+# Examples
+
+```jldoctest
+julia> tr = ReturnsTracking(; w = [0.01, 0.02, 0.03]);
+
+julia> PortfolioOptimisers.factory(tr, [0.1, 0.4, 0.5])
+ReturnsTracking
+  w ┴ Vector{Float64}: [0.01, 0.02, 0.03]
+```
 
 # Related
 
@@ -950,6 +1179,23 @@ This function applies `tracking_view` to each element of the input vector of tra
   - Applies `tracking_view` to each element in the input vector.
   - Passes all additional arguments to each call.
   - Returns a vector of the results.
+
+# Examples
+
+```jldoctest
+julia> tr = TrackingError(; tr = WeightsTracking(; w = [0.5, 0.5, 0.5]), err = 0.01);
+
+julia> PortfolioOptimisers.tracking_view([tr], 1:2)
+1-element Vector{TrackingError{WeightsTracking{Nothing, SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}, Bool}, Float64, L2Tracking{Int64}}}:
+ TrackingError
+   tr ┼ WeightsTracking
+      │    fees ┼ nothing
+      │       w ┼ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [0.5, 0.5]
+      │   fixed ┴ Bool: false
+  err ┼ Float64: 0.01
+  alg ┼ L2Tracking
+      │   ddof ┴ Int64: 1
+```
 
 # Related
 

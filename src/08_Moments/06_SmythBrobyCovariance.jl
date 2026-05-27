@@ -31,6 +31,17 @@ $(DocStringExtensions.TYPEDEF)
 
 Implements the original Smyth-Broby covariance algorithm.
 
+# Constructors
+
+    SmythBroby0() -> SmythBroby0
+
+# Examples
+
+```jldoctest
+julia> SmythBroby0()
+SmythBroby0()
+```
+
 # Related
 
   - [`SmythBrobyCovarianceAlgorithm`](@ref)
@@ -43,6 +54,17 @@ struct SmythBroby0 <: SmythBrobyCovarianceAlgorithm end
 $(DocStringExtensions.TYPEDEF)
 
 Implements the first variant of the Smyth-Broby covariance algorithm.
+
+# Constructors
+
+    SmythBroby1() -> SmythBroby1
+
+# Examples
+
+```jldoctest
+julia> SmythBroby1()
+SmythBroby1()
+```
 
 # Related
 
@@ -57,6 +79,17 @@ $(DocStringExtensions.TYPEDEF)
 
 Implements the second variant of the Smyth-Broby covariance algorithm.
 
+# Constructors
+
+    SmythBroby2() -> SmythBroby2
+
+# Examples
+
+```jldoctest
+julia> SmythBroby2()
+SmythBroby2()
+```
+
 # Related
 
   - [`SmythBrobyCovarianceAlgorithm`](@ref)
@@ -69,6 +102,17 @@ struct SmythBroby2 <: SmythBrobyCovarianceAlgorithm end
 $(DocStringExtensions.TYPEDEF)
 
 Implements the original Smyth-Broby covariance algorithm scaled by vote counts.
+
+# Constructors
+
+    SmythBrobyGerber0() -> SmythBrobyGerber0
+
+# Examples
+
+```jldoctest
+julia> SmythBrobyGerber0()
+SmythBrobyGerber0()
+```
 
 # Related
 
@@ -83,6 +127,17 @@ $(DocStringExtensions.TYPEDEF)
 
 Implements the first variant of the Smyth-Broby covariance algorithm scaled by vote counts.
 
+# Constructors
+
+    SmythBrobyGerber1() -> SmythBrobyGerber1
+
+# Examples
+
+```jldoctest
+julia> SmythBrobyGerber1()
+SmythBrobyGerber1()
+```
+
 # Related
 
   - [`SmythBrobyCovarianceAlgorithm`](@ref)
@@ -95,6 +150,17 @@ struct SmythBrobyGerber1 <: SmythBrobyCovarianceAlgorithm end
 $(DocStringExtensions.TYPEDEF)
 
 Implements the second variant of the Smyth-Broby covariance algorithm scaled by vote counts.
+
+# Constructors
+
+    SmythBrobyGerber2() -> SmythBrobyGerber2
+
+# Examples
+
+```jldoctest
+julia> SmythBrobyGerber2()
+SmythBrobyGerber2()
+```
 
 # Related
 
@@ -109,6 +175,17 @@ $(DocStringExtensions.TYPEDEF)
 
 Implements the original Smyth-Broby covariance algorithm using vote counts only.
 
+# Constructors
+
+    SmythBrobyCount0() -> SmythBrobyCount0
+
+# Examples
+
+```jldoctest
+julia> SmythBrobyCount0()
+SmythBrobyCount0()
+```
+
 # Related
 
   - [`SmythBrobyCovarianceAlgorithm`](@ref)
@@ -122,6 +199,17 @@ $(DocStringExtensions.TYPEDEF)
 
 Implements the first variant of the Smyth-Broby covariance algorithm using vote counts only.
 
+# Constructors
+
+    SmythBrobyCount1() -> SmythBrobyCount1
+
+# Examples
+
+```jldoctest
+julia> SmythBrobyCount1()
+SmythBrobyCount1()
+```
+
 # Related
 
   - [`SmythBrobyCovarianceAlgorithm`](@ref)
@@ -134,6 +222,17 @@ struct SmythBrobyCount1 <: SmythBrobyCovarianceAlgorithm end
 $(DocStringExtensions.TYPEDEF)
 
 Implements the second variant of the Smyth-Broby covariance algorithm using vote counts only.
+
+# Constructors
+
+    SmythBrobyCount2() -> SmythBrobyCount2
+
+# Examples
+
+```jldoctest
+julia> SmythBrobyCount2()
+SmythBrobyCount2()
+```
 
 # Related
 
@@ -268,6 +367,31 @@ Return a new [`SmythBrobyCovariance`](@ref) estimator with observation weights `
 
   - $(ret_dict[:ce])
 
+# Examples
+
+```jldoctest
+julia> ce = SmythBrobyCovariance();
+
+julia> factory(ce, StatsBase.Weights([0.2, 0.3, 0.5]))
+SmythBrobyCovariance
+   ve ┼ SimpleVariance
+      │          me ┼ SimpleExpectedReturns
+      │             │   w ┴ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.3, 0.5]
+      │           w ┼ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.3, 0.5]
+      │   corrected ┴ Bool: true
+   me ┼ SimpleExpectedReturns
+      │   w ┴ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.3, 0.5]
+  pdm ┼ Posdef
+      │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+      │   kwargs ┴ @NamedTuple{}: NamedTuple()
+   c1 ┼ Float64: 0.5
+   c2 ┼ Float64: 0.5
+   c3 ┼ Int64: 4
+    n ┼ Int64: 2
+  alg ┼ SmythBrobyGerber1()
+   ex ┴ Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
+```
+
 # Related
 
   - [`SmythBrobyCovariance`](@ref)
@@ -308,6 +432,32 @@ Smyth-Broby kernel function for covariance and correlation computation.
 
 This function computes the kernel value for a pair of asset returns, applying the Smyth-Broby logic for zones of confusion and indecision. It is used to aggregate positive and negative co-movements in Smyth-Broby covariance algorithms. It assumes the returns are centered around zero.
 
+# Mathematical definition
+
+```math
+\\begin{align}
+\\kappa(r_i, r_j) &= \\sqrt{(1 + |r_i|)(1 + |r_j|)}\\,, \\\\
+\\gamma(r_i, r_j) &= |r_i - r_j|\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\kappa(r_i, r_j)``: Amplitude kernel.
+  - ``\\gamma(r_i, r_j)``: Divergence measure between returns.
+  - ``r_i, r_j``: Absolute standardised returns for assets ``i`` and ``j``.
+
+```math
+\\begin{align}
+\\delta(r_i, r_j, n) &= \\frac{\\kappa(r_i, r_j)}{1 + \\gamma(r_i, r_j)^n}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\delta(r_i, r_j, n)``: Smyth-Broby kernel value.
+  - ``n``: Exponent parameter controlling kernel sharpness.
+
 # Arguments
 
   - `ri`: Absolute standardised return for asset `i`.
@@ -340,6 +490,35 @@ end
 Implements the original Smyth-Broby covariance/correlation algorithm.
 
 This method computes the Smyth-Broby correlation or covariance matrix for the input data matrix `X` using the original `SmythBroby0` algorithm. The computation is based on thresholding the data, applying the Smyth-Broby kernel, and aggregating positive and negative co-movements.
+
+# Mathematical definition
+
+For each pair ``(i, j)`` and observations ``t = 1, \\ldots, T``, classify using thresholds ``c_1 \\sigma_i`` and ``c_2 \\leq |\\tilde{r}_{ti}| \\leq c_3``:
+
+```math
+\\begin{align}
+\\text{pos} &= \\sum_t \\delta(|\\tilde{r}_{ti}|, |\\tilde{r}_{tj}|, n) \\cdot \\mathbf{1}[\\tilde{r}_{ti} \\, \\tilde{r}_{tj} > 0], \\quad \\text{neg} = \\sum_t \\delta(|\\tilde{r}_{ti}|, |\\tilde{r}_{tj}|, n) \\cdot \\mathbf{1}[\\tilde{r}_{ti} \\, \\tilde{r}_{tj} < 0]\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\text{pos}``, ``\\text{neg}``: Weighted concordant and discordant pair counts.
+  - ``\\tilde{r}_{ti}``: Standardised centered return of asset ``i`` at time ``t``.
+  - ``\\delta(\\cdot)``: Indicator weighting function from the Smyth-Broby template.
+  - ``n``: Smyth-Broby template parameter.
+
+```math
+\\begin{align}
+\\hat{\\rho}_{ij} &= \\frac{\\text{pos} - \\text{neg}}{\\text{pos} + \\text{neg}}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\hat{\\rho}_{ij}``: Smyth-Broby correlation between assets ``i`` and ``j``.
+  - ``\\text{pos}``, ``\\text{neg}``: Weighted concordant and discordant pair counts.
+  - ``\\tilde{r}_{ti} = (x_{ti} - \\mu_i) / \\sigma_i``: Standardised centered return of asset ``i`` at time ``t``.
 
 # Arguments
 

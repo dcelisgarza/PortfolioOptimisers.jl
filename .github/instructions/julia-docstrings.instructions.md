@@ -266,6 +266,80 @@ When adding a new symbol, also add it to the corresponding API markdown file.
 
 ---
 
+## Mathematical Notation
+
+When a type or function has a mathematical formulation, include a `# Mathematical definition` section immediately before `# Fields` (for structs) or before `# Arguments` (for functions).
+
+### LaTeX conventions
+
+| Notation | Use for |
+| --- | --- |
+| `\boldsymbol{x}` | Vectors (e.g., ``\boldsymbol{w}``, ``\boldsymbol{\mu}``) |
+| `\mathbf{A}` | Matrices (e.g., ``\mathbf{\Sigma}``, ``\mathbf{F}``) |
+| `\mathbb{R}` | Number domains (e.g., ``\mathbb{R}^N``, ``\mathbb{Z}_{\geq 0}``) |
+| `\mathcal{W}` | Sets (e.g., ``\mathcal{W}``, ``\mathcal{K}_{\mathrm{SOC}}``) |
+| `\underset{\boldsymbol{w}}{\min}` | Optimisation formulations (not `\min_{\boldsymbol{w}}`) |
+| `\intercal` | Transpose (e.g., ``\boldsymbol{w}^\intercal``) |
+
+### `\begin{align}` environment
+
+All math blocks use `\begin{align}...\end{align}` with `&` alignment markers and `\\` line breaks. Each separate equation goes on its own line. Use `\quad` for in-equation spacing only; split distinct equations onto separate lines (never `\qquad` between two equations in the same block).
+
+````julia
+# Good — each equation on its own line
+```math
+\begin{align}
+\hat{\boldsymbol{\mu}} &= \frac{1}{T} \sum_{t=1}^{T} \boldsymbol{x}_t\,, \\
+\hat{\mathbf{\Sigma}} &= \frac{1}{T-1} \sum_{t=1}^{T}
+    (\boldsymbol{x}_t - \hat{\boldsymbol{\mu}})
+    (\boldsymbol{x}_t - \hat{\boldsymbol{\mu}})^\intercal\,.
+\end{align}
+```
+
+# Bad — \qquad to cram two equations on one line
+```math
+\begin{align}
+\hat{\boldsymbol{\mu}} &= \frac{1}{T} \sum_{t=1}^T \boldsymbol{x}_t \qquad
+\hat{\mathbf{\Sigma}} = \frac{1}{T-1} \sum_{t=1}^T \ldots
+\end{align}
+```
+````
+
+### `Where:` section
+
+Immediately after each math block (or after the **last** math block when multiple consecutive blocks belong to the same docstring), add a `Where:` bullet list defining every symbol. Use `$(math_dict[:key])` for common variables.
+
+````julia
+"""
+# Mathematical definition
+
+```math
+\\begin{align}
+\\hat{\\boldsymbol{\\mu}} &= \\frac{1}{T} \\sum_{t=1}^{T} \\boldsymbol{x}_t\\,, \\\\
+\\hat{\\mathbf{\\Sigma}} &= \\frac{1}{T-1} \\sum_{t=1}^{T}
+    (\\boldsymbol{x}_t - \\hat{\\boldsymbol{\\mu}})
+    (\\boldsymbol{x}_t - \\hat{\\boldsymbol{\\mu}})^\\intercal\\,.
+\\end{align}
+```
+
+Where:
+
+- ``\\hat{\\boldsymbol{\\mu}}``: Estimated mean vector.
+- ``\\hat{\\mathbf{\\Sigma}}``: Estimated covariance matrix.
+- $(math_dict[:x_t])
+- $(math_dict[:T])
+"""
+````
+
+Key rules:
+
+- One comprehensive `Where:` after the last block is acceptable when multiple blocks appear in the same docstring.
+- Every symbol that appears in any block must be defined.
+- Interpolate `$(math_dict[:key])` for standardised variables (``T``, ``\boldsymbol{x}_t``, ``\alpha``, etc.).
+- If a key is missing from `math_dict`, add it to `src/01_Base.jl` first.
+
+---
+
 ## Complete Example
 
 The following is a fully worked example covering abstract types, concrete types, and functions. Use it as a reference when writing docstrings.

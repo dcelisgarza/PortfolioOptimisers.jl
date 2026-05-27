@@ -333,6 +333,33 @@ end
 
 Constructs box uncertainty sets for expected returns and covariance statistics using bootstrap resampling for time series data.
 
+# Mathematical definition
+
+Generate ``M`` bootstrap samples, compute ``\\hat{\\boldsymbol{\\mu}}^{(m)}`` and ``\\hat{\\mathbf{\\Sigma}}^{(m)}``, then take element-wise quantile bounds:
+
+```math
+\\begin{align}
+\\mu_{lb,i} &= Q_{q/2}\\!\\left(\\hat{\\mu}^{(m)}_i\\right)\\,, \\\\
+\\mu_{ub,i} &= Q_{1-q/2}\\!\\left(\\hat{\\mu}^{(m)}_i\\right)\\,.
+\\end{align}
+```
+
+```math
+\\begin{align}
+(\\mathbf{\\Sigma}_{lb})_{ij} &= Q_{q/2}\\!\\left(\\hat{\\Sigma}^{(m)}_{ij}\\right)\\,, \\\\
+(\\mathbf{\\Sigma}_{ub})_{ij} &= Q_{1-q/2}\\!\\left(\\hat{\\Sigma}^{(m)}_{ij}\\right)\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\mu_{lb,i}``, ``\\mu_{ub,i}``: Lower/upper bounds for expected return of asset ``i``.
+  - ``(\\mathbf{\\Sigma}_{lb})_{ij}``, ``(\\mathbf{\\Sigma}_{ub})_{ij}``: Lower/upper covariance bounds.
+  - ``Q_{q/2}``, ``Q_{1-q/2}``: Quantile functions at level ``q/2``.
+  - ``\\hat{\\mu}^{(m)}_i``: Bootstrap mean for asset ``i`` in sample ``m``.
+  - ``\\hat{\\Sigma}^{(m)}_{ij}``: Bootstrap covariance element ``(i,j)`` in sample ``m``.
+  - ``q``: Significance level.
+
 # Arguments
 
   - `ue`: ARCH uncertainty set estimator.
@@ -394,6 +421,22 @@ end
 
 Constructs a box uncertainty set for expected returns using bootstrap resampling for time series data.
 
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mu_{lb,i} &= Q_{q/2}\\!\\left(\\hat{\\mu}^{(m)}_i\\right)\\,, \\\\
+\\mu_{ub,i} &= Q_{1-q/2}\\!\\left(\\hat{\\mu}^{(m)}_i\\right)\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\mu_{lb,i}``, ``\\mu_{ub,i}``: Lower/upper bounds for expected return of asset ``i``.
+  - ``Q_{q/2}``, ``Q_{1-q/2}``: Quantile functions at level ``q/2``.
+  - ``\\hat{\\mu}^{(m)}_i``: Bootstrap mean for asset ``i`` in sample ``m``.
+  - ``q``: Significance level.
+
 # Arguments
 
   - `ue`: ARCH uncertainty set estimator.
@@ -444,6 +487,22 @@ end
               F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
 
 Constructs a box uncertainty set for covariance using bootstrap resampling for time series data.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+(\\mathbf{\\Sigma}_{lb})_{ij} &= Q_{q/2}\\!\\left(\\hat{\\Sigma}^{(m)}_{ij}\\right)\\,, \\\\
+(\\mathbf{\\Sigma}_{ub})_{ij} &= Q_{1-q/2}\\!\\left(\\hat{\\Sigma}^{(m)}_{ij}\\right)\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``(\\mathbf{\\Sigma}_{lb})_{ij}``, ``(\\mathbf{\\Sigma}_{ub})_{ij}``: Lower/upper covariance bounds.
+  - ``Q_{q/2}``, ``Q_{1-q/2}``: Quantile functions at level ``q/2``.
+  - ``\\hat{\\Sigma}^{(m)}_{ij}``: Bootstrap covariance element ``(i,j)`` in sample ``m``.
+  - ``q``: Significance level.
 
 # Arguments
 
@@ -498,6 +557,41 @@ end
         F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
 
 Constructs ellipsoidal uncertainty sets for expected returns and covariance statistics using bootstrap resampling for time series data.
+
+# Mathematical definition
+
+Compute bootstrap deviations ``\\boldsymbol{\\delta}_{\\mu}^{(m)} = \\hat{\\boldsymbol{\\mu}}^{(m)} - \\hat{\\boldsymbol{\\mu}}`` and ``\\boldsymbol{\\delta}_{\\Sigma}^{(m)} = \\operatorname{vec}(\\hat{\\mathbf{\\Sigma}}^{(m)} - \\hat{\\mathbf{\\Sigma}})``. Fit empirical covariances:
+
+```math
+\\begin{align}
+\\mathbf{\\Sigma}_{\\mu} &= \\operatorname{Cov}\\!\\left(\\boldsymbol{\\delta}_{\\mu}^{(m)}\\right)\\,, \\\\
+\\mathbf{\\Sigma}_{\\Sigma} &= \\operatorname{Cov}\\!\\left(\\boldsymbol{\\delta}_{\\Sigma}^{(m)}\\right)\\,.
+\\end{align}
+```
+
+Then form ellipsoidal sets:
+
+```math
+\\begin{align}
+\\mathcal{E}_{\\mu} &= \\left\\{\\boldsymbol{\\mu} : (\\boldsymbol{\\mu} - \\hat{\\boldsymbol{\\mu}})^{\\intercal} \\mathbf{\\Sigma}_{\\mu}^{-1} (\\boldsymbol{\\mu} - \\hat{\\boldsymbol{\\mu}}) \\leq k_{\\mu}^2\\right\\}\\,.
+\\end{align}
+```
+
+```math
+\\begin{align}
+\\mathcal{E}_{\\Sigma} &= \\left\\{\\mathbf{\\Sigma} : \\left\\|\\mathbf{\\Sigma}_{\\Sigma}^{-1/2} \\operatorname{vec}(\\mathbf{\\Sigma} - \\hat{\\mathbf{\\Sigma}})\\right\\|_2 \\leq k_{\\Sigma}\\right\\}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathbf{\\Sigma}_{\\mu}``: Empirical covariance of bootstrap mean deviations.
+  - ``\\mathbf{\\Sigma}_{\\Sigma}``: Empirical covariance of bootstrap covariance deviations (vectorised).
+  - ``\\hat{\\boldsymbol{\\mu}}``, ``\\hat{\\mathbf{\\Sigma}}``: Estimated mean and covariance.
+  - ``\\boldsymbol{\\delta}_{\\mu}^{(m)}``, ``\\boldsymbol{\\delta}_{\\Sigma}^{(m)}``: Bootstrap deviations for mean and covariance.
+  - ``\\mathcal{E}_{\\mu}``: Ellipsoidal uncertainty set for expected returns.
+  - ``\\mathcal{E}_{\\Sigma}``: Ellipsoidal uncertainty set for covariance.
+  - ``k_{\\mu}``, ``k_{\\Sigma}``: Empirically fitted scaling parameters.
 
 # Arguments
 
@@ -563,6 +657,22 @@ end
 
 Constructs an ellipsoidal uncertainty set for expected returns using bootstrap resampling for time series data.
 
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathbf{\\Sigma}_{\\mu} &= \\operatorname{Cov}\\!\\left(\\hat{\\boldsymbol{\\mu}}^{(m)} - \\hat{\\boldsymbol{\\mu}}\\right)\\,, \\\\
+\\mathcal{E}_{\\mu} &= \\left\\{\\boldsymbol{\\mu} : (\\boldsymbol{\\mu} - \\hat{\\boldsymbol{\\mu}})^{\\intercal} \\mathbf{\\Sigma}_{\\mu}^{-1} (\\boldsymbol{\\mu} - \\hat{\\boldsymbol{\\mu}}) \\leq k_{\\mu}^2\\right\\}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathbf{\\Sigma}_{\\mu}``: Empirical covariance of bootstrap mean deviations.
+  - ``\\hat{\\boldsymbol{\\mu}}``: Estimated mean vector.
+  - ``\\mathcal{E}_{\\mu}``: Ellipsoidal uncertainty set for expected returns.
+  - ``k_{\\mu}``: Empirically fitted scaling parameter.
+
 # Arguments
 
   - `ue`: ARCH uncertainty set estimator. Contains prior estimator, ellipsoidal algorithm, simulation parameters, block size, quantile, seed, and bootstrap type.
@@ -617,6 +727,22 @@ end
               F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
 
 Constructs an ellipsoidal uncertainty set for covariance using bootstrap resampling for time series data.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathbf{\\Sigma}_{\\Sigma} &= \\operatorname{Cov}\\!\\left(\\operatorname{vec}(\\hat{\\mathbf{\\Sigma}}^{(m)} - \\hat{\\mathbf{\\Sigma}})\\right)\\,, \\\\
+\\mathcal{E}_{\\Sigma} &= \\left\\{\\mathbf{\\Sigma} : \\left\\|\\mathbf{\\Sigma}_{\\Sigma}^{-1/2} \\operatorname{vec}(\\mathbf{\\Sigma} - \\hat{\\mathbf{\\Sigma}})\\right\\|_2 \\leq k_{\\Sigma}\\right\\}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathbf{\\Sigma}_{\\Sigma}``: Empirical covariance of bootstrap covariance deviations (vectorised).
+  - ``\\hat{\\mathbf{\\Sigma}}``: Estimated covariance matrix.
+  - ``\\mathcal{E}_{\\Sigma}``: Ellipsoidal uncertainty set for covariance.
+  - ``k_{\\Sigma}``: Empirically fitted scaling parameter.
 
 # Arguments
 

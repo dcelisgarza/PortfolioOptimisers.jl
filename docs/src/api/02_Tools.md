@@ -9,7 +9,7 @@ We strive to be as type-stable, inferrable, and immutable as possible in order t
 ```@docs
 traverse_concrete_subtypes
 concrete_typed_array
-factory(::Nothing, args...; kwargs...)
+factory(a::Union{Nothing, <:AbstractEstimator, <:AbstractAlgorithm, <:AbstractResult}, args...; kwargs...)
 get_window
 ```
 
@@ -47,18 +47,18 @@ VectorToScalarMeasure
 Num_VecToScaM
 MinValue
 MeanValue
-factory(mv::MeanValue, w::StatsBase.AbstractWeights)
+factory(mv::MeanValue, w::ObsWeights)
 MedianValue
-factory(mdv::MedianValue, w::StatsBase.AbstractWeights)
+factory(mdv::MedianValue, w::ObsWeights)
 MaxValue
 StdValue
-factory(sv::StdValue, w::StatsBase.AbstractWeights)
+factory(sv::StdValue, w::ObsWeights)
 VarValue
-factory(vv::VarValue, w::StatsBase.AbstractWeights)
+factory(vv::VarValue, w::ObsWeights)
 SumValue
 ProdValue
 ModeValue
 StandardisedValue
-factory(msv::StandardisedValue, w::StatsBase.AbstractWeights)
+factory(msv::StandardisedValue, w::ObsWeights)
 vec_to_real_measure
 ```

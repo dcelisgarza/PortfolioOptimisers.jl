@@ -110,13 +110,25 @@ Represents the Relativistic Value-at-Risk (RVaR) risk measure.
 
 `RelativisticValueatRisk` is a coherent risk measure generalising EVaR via the Tsallis (``\\kappa``-deformed) entropy. It is parametrised by a deformation parameter ``\\kappa \\in (0, 1)`` and reduces to EVaR in the limit ``\\kappa \\to 0``. It is solved via a conic programme.
 
-# Mathematical Definition
+# Mathematical definition
 
 Define the ``\\kappa``-logarithm ``\\ell_\\kappa(u) = \\frac{u^\\kappa - u^{-\\kappa}}{2\\kappa}``. The RVaR is:
 
 ```math
-\\mathrm{RVaR}_{\\alpha,\\kappa}(\\boldsymbol{x}) = \\min_{t,\\, z \\geq 0} \\Bigl\\{ t + \\ell_\\kappa(\\alpha T)\\, z + \\sum_{i=1}^{T} (\\psi_i + \\theta_i) \\Bigr\\}
+\\begin{align}
+\\mathrm{RVaR}_{\\alpha,\\kappa}(\\boldsymbol{x}) &= \\underset{t,\\, z}{\\min} \\Bigl\\{ t + \\ell_\\kappa(\\alpha T)\\, z + \\sum_{i=1}^{T} (\\psi_i + \\theta_i) \\;:\\; z \\geq 0 \\Bigr\\}\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``\\mathrm{RVaR}_{\\alpha,\\kappa}(\\boldsymbol{x})``: Relativistic Value-at-Risk.
+  - $(math_dict[:xret])
+  - $(math_dict[:alpha_rm])
+  - $(math_dict[:T])
+  - ``\\kappa \\in (0,1)``: Tsallis deformation parameter.
+  - ``\\ell_\\kappa(u) = \\frac{u^\\kappa - u^{-\\kappa}}{2\\kappa}``: ``\\kappa``-logarithm.
+  - ``t``, ``z``, ``\\psi_i``, ``\\theta_i``, ``\\epsilon_i``, ``\\omega_i``: Conic optimisation variables.
 
 subject to the power-cone constraints:
 
@@ -124,11 +136,13 @@ subject to the power-cone constraints:
 \\begin{align}
 & \\left(\\tfrac{z(1+\\kappa)}{2\\kappa},\\, \\tfrac{\\psi_i(1+\\kappa)}{\\kappa},\\, \\epsilon_i\\right) \\in \\mathcal{K}_{\\mathrm{pow}}\\!\\left(\\tfrac{1}{1+\\kappa}\\right) \\quad \\forall i\\,,\\\\
 & \\left(\\tfrac{\\omega_i}{1-\\kappa},\\, \\tfrac{\\theta_i}{\\kappa},\\, -\\tfrac{z}{2\\kappa}\\right) \\in \\mathcal{K}_{\\mathrm{pow}}(1-\\kappa) \\quad \\forall i\\,,\\\\
-& \\epsilon_i + \\omega_i \\leq x_i + t \\quad \\forall i\\,,
+& \\epsilon_i + \\omega_i \\leq x_i + t \\quad \\forall i\\,.
 \\end{align}
 ```
 
-where ``\\mathcal{K}_{\\mathrm{pow}}(p) = \\{(a,b,c) : a^p b^{1-p} \\geq |c|,\\, a \\geq 0,\\, b \\geq 0\\}`` is the power cone.
+Where:
+
+  - ``\\mathcal{K}_{\\mathrm{pow}}(p) = \\{(a,b,c) : a^p b^{1-p} \\geq |c|,\\, a \\geq 0,\\, b \\geq 0\\}``: Power cone.
 
 # Fields
 
@@ -229,11 +243,20 @@ Represents the Relativistic Value-at-Risk Range (RVaR Range) risk measure.
 
 `RelativisticValueatRiskRange` computes the sum of the lower-tail RVaR (at level `alpha` with deformation `kappa_a`) and the upper-tail RVaR (at level `beta` with deformation `kappa_b`).
 
-# Mathematical Definition
+# Mathematical definition
 
 ```math
-\\mathrm{RVaRRange}_{\\alpha,\\kappa_a,\\beta,\\kappa_b}(\\boldsymbol{x}) = \\mathrm{RVaR}_{\\alpha,\\kappa_a}(\\boldsymbol{x}) + \\mathrm{RVaR}_{\\beta,\\kappa_b}(-\\boldsymbol{x})\\,.
+\\begin{align}
+\\mathrm{RVaRRange}_{\\alpha,\\kappa_a,\\beta,\\kappa_b}(\\boldsymbol{x}) &= \\mathrm{RVaR}_{\\alpha,\\kappa_a}(\\boldsymbol{x}) + \\mathrm{RVaR}_{\\beta,\\kappa_b}(-\\boldsymbol{x})\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``\\mathrm{RVaRRange}_{\\alpha,\\kappa_a,\\beta,\\kappa_b}(\\boldsymbol{x})``: Relativistic VaR range.
+  - $(math_dict[:xret])
+  - ``\\mathrm{RVaR}_{\\alpha,\\kappa_a}(\\boldsymbol{x})``: Lower-tail RVaR with parameters ``(\\alpha, \\kappa_a)``.
+  - ``\\mathrm{RVaR}_{\\beta,\\kappa_b}(-\\boldsymbol{x})``: Upper-tail RVaR with parameters ``(\\beta, \\kappa_b)``.
 
 # Fields
 
@@ -337,13 +360,27 @@ end
 function (r::RelativisticValueatRiskRange)(x::VecNum)
     return RRM(x, r.slv, r.alpha, r.kappa_a, r.w) + RRM(-x, r.slv, r.beta, r.kappa_b, r.w)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create an instance of [`RelativisticValueatRiskRange`](@ref) by selecting observation weights and solver from the risk-measure instance or falling back to the prior result.
+
+# Related
+
+  - [`RelativisticValueatRiskRange`](@ref)
+  - [`AbstractPriorResult`](@ref)
+  - [`factory`](@ref)
+  - [`nothing_scalar_array_selector`](@ref)
+  - [`solver_selector`](@ref)
+"""
 function factory(r::RelativisticValueatRiskRange, pr::AbstractPriorResult,
                  slv::Option{<:Slv_VecSlv}, args...;
                  kwargs...)::RelativisticValueatRiskRange
+    w = nothing_scalar_array_selector(r.w, pr.w)
     slv = solver_selector(r.slv, slv)
     return RelativisticValueatRiskRange(; settings = r.settings, alpha = r.alpha,
                                         kappa_a = r.kappa_a, beta = r.beta,
-                                        kappa_b = r.kappa_b, slv = slv)
+                                        kappa_b = r.kappa_b, slv = slv, w = w)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -352,19 +389,37 @@ Represents the Relativistic Drawdown-at-Risk (RDDaR) risk measure.
 
 `RelativisticDrawdownatRisk` applies the Relativistic Value-at-Risk framework to the absolute drawdown series of portfolio returns.
 
-# Mathematical Definition
+# Mathematical definition
 
 Define the absolute drawdown series:
 
 ```math
-c_t = \\sum_{s=1}^{t} x_s\\,, \\qquad d_t = c_t - \\max_{0 \\leq s \\leq t} c_s \\leq 0\\,.
+\\begin{align}
+c_t &= \\sum_{s=1}^{t} x_s\\,, \\\\
+d_t &= c_t - \\max_{0 \\leq s \\leq t} c_s \\leq 0\\,.
+\\end{align}
 ```
+
+Where:
+
+  - $(math_dict[:xret])
+  - $(math_dict[:ct])
+  - $(math_dict[:dtdd])
 
 The Relativistic Drawdown-at-Risk is the RVaR of the drawdown series:
 
 ```math
-\\mathrm{RDDaR}_{\\alpha,\\kappa}(\\boldsymbol{x}) = \\mathrm{RVaR}_{\\alpha,\\kappa}(\\boldsymbol{d}(\\boldsymbol{x}))\\,.
+\\begin{align}
+\\mathrm{RDDaR}_{\\alpha,\\kappa}(\\boldsymbol{x}) &= \\mathrm{RVaR}_{\\alpha,\\kappa}(\\boldsymbol{d}(\\boldsymbol{x}))\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``\\mathrm{RDDaR}_{\\alpha,\\kappa}(\\boldsymbol{x})``: Relativistic Drawdown-at-Risk.
+  - $(math_dict[:alpha_rm])
+  - ``\\kappa \\in (0,1)``: Tsallis deformation parameter.
+  - ``\\boldsymbol{d}(\\boldsymbol{x})``: Absolute drawdown series vector ``T \\times 1``.
 
 # Fields
 
@@ -465,19 +520,37 @@ Represents the Relative Relativistic Drawdown-at-Risk (Relative RDDaR) risk meas
 
 `RelativeRelativisticDrawdownatRisk` applies the Relativistic Value-at-Risk framework to the relative (compounded) drawdown series of portfolio returns.
 
-# Mathematical Definition
+# Mathematical definition
 
 Define the compounded wealth process and relative drawdown series:
 
 ```math
-C_t = \\prod_{s=1}^{t} (1 + x_s)\\,, \\qquad rd_t = \\frac{C_t}{\\max_{0 \\leq s \\leq t} C_s} - 1 \\leq 0\\,.
+\\begin{align}
+C_t &= \\prod_{s=1}^{t} (1 + x_s)\\,, \\\\
+rd_t &= \\frac{C_t}{\\max_{0 \\leq s \\leq t} C_s} - 1 \\leq 0\\,.
+\\end{align}
 ```
+
+Where:
+
+  - $(math_dict[:xret])
+  - $(math_dict[:Ct])
+  - $(math_dict[:rdt])
 
 The Relative Relativistic Drawdown-at-Risk is the RVaR of the relative drawdown series:
 
 ```math
-\\mathrm{RRDDaR}_{\\alpha,\\kappa}(\\boldsymbol{x}) = \\mathrm{RVaR}_{\\alpha,\\kappa}(\\boldsymbol{rd}(\\boldsymbol{x}))\\,.
+\\begin{align}
+\\mathrm{RRDDaR}_{\\alpha,\\kappa}(\\boldsymbol{x}) &= \\mathrm{RVaR}_{\\alpha,\\kappa}(\\boldsymbol{rd}(\\boldsymbol{x}))\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``\\mathrm{RRDDaR}_{\\alpha,\\kappa}(\\boldsymbol{x})``: Relative Relativistic Drawdown-at-Risk.
+  - $(math_dict[:alpha_rm])
+  - ``\\kappa \\in (0,1)``: Tsallis deformation parameter.
+  - ``\\boldsymbol{rd}(\\boldsymbol{x})``: Relative drawdown series vector ``T \\times 1``.
 
 # Fields
 
@@ -570,25 +643,131 @@ function (r::RelativeRelativisticDrawdownatRisk)(x::VecNum)
     dd = relative_drawdown_vec(x)
     return RRM(dd, r.slv, r.alpha, r.kappa, r.w)
 end
-for r in (RelativisticValueatRisk, RelativisticDrawdownatRisk,
-          RelativeRelativisticDrawdownatRisk)
-    eval(quote
-             function factory(r::$(r), pr::AbstractPriorResult, slv::Option{<:Slv_VecSlv},
-                              args...; kwargs...)
-                 w = nothing_scalar_array_selector(r.w, pr.w)
-                 slv = solver_selector(r.slv, slv)
-                 return $(r)(; settings = r.settings, slv = slv, alpha = r.alpha,
-                             kappa = r.kappa, w = w)
-             end
-             function factory(r::$(r), slv::Slv_VecSlv,
-                              pr::Option{<:AbstractPriorResult} = nothing, args...;
-                              kwargs...)
-                 w = isnothing(pr) ? r.w : nothing_scalar_array_selector(r.w, pr.w)
-                 slv = solver_selector(r.slv, slv)
-                 return $(r)(; settings = r.settings, alpha = r.alpha, kappa = r.kappa,
-                             slv = slv, w = w)
-             end
-         end)
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create an instance of [`RelativisticValueatRisk`](@ref) by selecting observation weights and solver from the risk-measure instance or falling back to the prior result.
+
+# Related
+
+  - [`RelativisticValueatRisk`](@ref)
+  - [`AbstractPriorResult`](@ref)
+  - [`factory`](@ref)
+  - [`nothing_scalar_array_selector`](@ref)
+  - [`solver_selector`](@ref)
+"""
+function factory(r::RelativisticValueatRisk, pr::AbstractPriorResult,
+                 slv::Option{<:Slv_VecSlv} = nothing, args...;
+                 kwargs...)::RelativisticValueatRisk
+    w = nothing_scalar_array_selector(r.w, pr.w)
+    slv = solver_selector(r.slv, slv)
+    return RelativisticValueatRisk(; settings = r.settings, slv = slv, alpha = r.alpha,
+                                   kappa = r.kappa, w = w)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create an instance of [`RelativisticValueatRisk`](@ref) by overriding the solver and optionally selecting observation weights from the prior result.
+
+# Related
+
+  - [`RelativisticValueatRisk`](@ref)
+  - [`AbstractPriorResult`](@ref)
+  - [`factory`](@ref)
+  - [`nothing_scalar_array_selector`](@ref)
+  - [`solver_selector`](@ref)
+"""
+function factory(r::RelativisticValueatRisk, slv::Slv_VecSlv,
+                 pr::Option{<:AbstractPriorResult} = nothing, args...;
+                 kwargs...)::RelativisticValueatRisk
+    w = isnothing(pr) ? r.w : nothing_scalar_array_selector(r.w, pr.w)
+    slv = solver_selector(r.slv, slv)
+    return RelativisticValueatRisk(; settings = r.settings, alpha = r.alpha,
+                                   kappa = r.kappa, slv = slv, w = w)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create an instance of [`RelativisticDrawdownatRisk`](@ref) by selecting observation weights and solver from the risk-measure instance or falling back to the prior result.
+
+# Related
+
+  - [`RelativisticDrawdownatRisk`](@ref)
+  - [`AbstractPriorResult`](@ref)
+  - [`factory`](@ref)
+  - [`nothing_scalar_array_selector`](@ref)
+  - [`solver_selector`](@ref)
+"""
+function factory(r::RelativisticDrawdownatRisk, pr::AbstractPriorResult,
+                 slv::Option{<:Slv_VecSlv} = nothing, args...;
+                 kwargs...)::RelativisticDrawdownatRisk
+    w = nothing_scalar_array_selector(r.w, pr.w)
+    slv = solver_selector(r.slv, slv)
+    return RelativisticDrawdownatRisk(; settings = r.settings, slv = slv, alpha = r.alpha,
+                                      kappa = r.kappa, w = w)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create an instance of [`RelativisticDrawdownatRisk`](@ref) by overriding the solver and optionally selecting observation weights from the prior result.
+
+# Related
+
+  - [`RelativisticDrawdownatRisk`](@ref)
+  - [`AbstractPriorResult`](@ref)
+  - [`factory`](@ref)
+  - [`nothing_scalar_array_selector`](@ref)
+  - [`solver_selector`](@ref)
+"""
+function factory(r::RelativisticDrawdownatRisk, slv::Slv_VecSlv,
+                 pr::Option{<:AbstractPriorResult} = nothing, args...;
+                 kwargs...)::RelativisticDrawdownatRisk
+    w = isnothing(pr) ? r.w : nothing_scalar_array_selector(r.w, pr.w)
+    slv = solver_selector(r.slv, slv)
+    return RelativisticDrawdownatRisk(; settings = r.settings, alpha = r.alpha,
+                                      kappa = r.kappa, slv = slv, w = w)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create an instance of [`RelativeRelativisticDrawdownatRisk`](@ref) by selecting observation weights and solver from the risk-measure instance or falling back to the prior result.
+
+# Related
+
+  - [`RelativeRelativisticDrawdownatRisk`](@ref)
+  - [`AbstractPriorResult`](@ref)
+  - [`factory`](@ref)
+  - [`nothing_scalar_array_selector`](@ref)
+  - [`solver_selector`](@ref)
+"""
+function factory(r::RelativeRelativisticDrawdownatRisk, pr::AbstractPriorResult,
+                 slv::Option{<:Slv_VecSlv} = nothing, args...;
+                 kwargs...)::RelativeRelativisticDrawdownatRisk
+    w = nothing_scalar_array_selector(r.w, pr.w)
+    slv = solver_selector(r.slv, slv)
+    return RelativeRelativisticDrawdownatRisk(; settings = r.settings, slv = slv,
+                                              alpha = r.alpha, kappa = r.kappa, w = w)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create an instance of [`RelativeRelativisticDrawdownatRisk`](@ref) by overriding the solver and optionally selecting observation weights from the prior result.
+
+# Related
+
+  - [`RelativeRelativisticDrawdownatRisk`](@ref)
+  - [`AbstractPriorResult`](@ref)
+  - [`factory`](@ref)
+  - [`nothing_scalar_array_selector`](@ref)
+  - [`solver_selector`](@ref)
+"""
+function factory(r::RelativeRelativisticDrawdownatRisk, slv::Slv_VecSlv,
+                 pr::Option{<:AbstractPriorResult} = nothing, args...;
+                 kwargs...)::RelativeRelativisticDrawdownatRisk
+    w = isnothing(pr) ? r.w : nothing_scalar_array_selector(r.w, pr.w)
+    slv = solver_selector(r.slv, slv)
+    return RelativeRelativisticDrawdownatRisk(; settings = r.settings, alpha = r.alpha,
+                                              kappa = r.kappa, slv = slv, w = w)
 end
 
 export RelativisticValueatRisk, RelativisticValueatRiskRange, RelativisticDrawdownatRisk,

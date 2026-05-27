@@ -81,6 +81,34 @@ end
 
 Constructs box uncertainty sets for mean and covariance statistics using delta bounds from a prior estimator.
 
+# Mathematical definition
+
+Given prior mean ``\\hat{\\boldsymbol{\\mu}}`` and covariance ``\\hat{\\mathbf{\\Sigma}}``, the box bounds are:
+
+```math
+\\begin{align}
+\\boldsymbol{\\mu}_{lb} &= \\boldsymbol{0}\\,, \\\\
+\\boldsymbol{\\mu}_{ub} &= 2 \\delta_{\\mu} |\\hat{\\boldsymbol{\\mu}}|\\,.
+\\end{align}
+```
+
+```math
+\\begin{align}
+\\mathbf{\\Sigma}_{lb} &= \\hat{\\mathbf{\\Sigma}} - \\delta_{\\sigma} |\\hat{\\mathbf{\\Sigma}}|\\,, \\\\
+\\mathbf{\\Sigma}_{ub} &= \\hat{\\mathbf{\\Sigma}} + \\delta_{\\sigma} |\\hat{\\mathbf{\\Sigma}}|\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{\\mu}_{lb}``, ``\\boldsymbol{\\mu}_{ub}``: Lower and upper bounds for expected returns.
+  - ``\\mathbf{\\Sigma}_{lb}``, ``\\mathbf{\\Sigma}_{ub}``: Lower and upper bounds for covariance matrix.
+  - ``\\hat{\\boldsymbol{\\mu}}``: Estimated mean vector.
+  - ``\\hat{\\mathbf{\\Sigma}}``: Estimated covariance matrix.
+  - ``\\delta_{\\mu}``: Delta bound for expected returns.
+  - ``\\delta_{\\sigma}``: Delta bound for covariance.
+  - ``|\\cdot|``: Element-wise absolute value.
+
 # Arguments
 
   - `ue`: Delta uncertainty set estimator. Provides delta bounds and prior estimator.
@@ -124,6 +152,22 @@ end
 
 Constructs a box uncertainty set for expected returns (mean) using delta bounds from a prior estimator.
 
+# Mathematical definition
+
+```math
+\\begin{align}
+\\boldsymbol{\\mu}_{lb} &= \\boldsymbol{0}\\,, \\\\
+\\boldsymbol{\\mu}_{ub} &= 2 \\delta_{\\mu} |\\hat{\\boldsymbol{\\mu}}|\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{\\mu}_{lb}``, ``\\boldsymbol{\\mu}_{ub}``: Lower and upper bounds for expected returns.
+  - ``\\hat{\\boldsymbol{\\mu}}``: Estimated mean vector.
+  - ``\\delta_{\\mu}``: Delta bound for expected returns.
+  - ``|\\cdot|``: Element-wise absolute value.
+
 # Arguments
 
   - `ue`: Delta uncertainty set estimator. Provides delta bounds and prior estimator.
@@ -162,6 +206,22 @@ end
               F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
 
 Constructs a box uncertainty set for covariance using delta bounds from a prior estimator.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathbf{\\Sigma}_{lb} &= \\hat{\\mathbf{\\Sigma}} - \\delta_{\\sigma} |\\hat{\\mathbf{\\Sigma}}|\\,, \\\\
+\\mathbf{\\Sigma}_{ub} &= \\hat{\\mathbf{\\Sigma}} + \\delta_{\\sigma} |\\hat{\\mathbf{\\Sigma}}|\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathbf{\\Sigma}_{lb}``, ``\\mathbf{\\Sigma}_{ub}``: Lower and upper bounds for covariance matrix.
+  - ``\\hat{\\mathbf{\\Sigma}}``: Estimated covariance matrix.
+  - ``\\delta_{\\sigma}``: Delta bound for covariance.
+  - ``|\\cdot|``: Element-wise absolute value.
 
 # Arguments
 

@@ -5,6 +5,20 @@ Compute the variance vector from the diagonal of the covariance matrix.
 
 This method extracts the diagonal of the covariance matrix returned by `Statistics.cov(ce, X; dims = dims, kwargs...)` and reshapes it into a row or column vector depending on `dims`.
 
+# Mathematical definition
+
+```math
+\\begin{align}
+\\hat{\\sigma}_i^2 &= \\hat{\\mathbf{\\Sigma}}_{ii}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\hat{\\sigma}_i^2``: Variance of asset ``i``.
+  - ``\\hat{\\mathbf{\\Sigma}}``: Estimated covariance matrix.
+  - ``\\hat{\\mathbf{\\Sigma}}_{ii}``: ``i``-th diagonal element of ``\\hat{\\mathbf{\\Sigma}}``.
+
 # Arguments
 
   - `ce`: Covariance estimator.
@@ -32,6 +46,20 @@ end
 Compute the standard deviation vector from the diagonal of the covariance matrix.
 
 This method extracts the diagonal of the covariance matrix returned by `Statistics.cov(ce, X; dims = dims, kwargs...)`, takes the element-wise square root, and reshapes it into a row or column vector depending on `dims`.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\hat{\\sigma}_i &= \\sqrt{\\hat{\\mathbf{\\Sigma}}_{ii}}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\hat{\\sigma}_i``: Standard deviation of asset ``i``.
+  - ``\\hat{\\mathbf{\\Sigma}}``: Estimated covariance matrix.
+  - ``\\hat{\\mathbf{\\Sigma}}_{ii}``: ``i``-th diagonal element of ``\\hat{\\mathbf{\\Sigma}}``.
 
 # Arguments
 

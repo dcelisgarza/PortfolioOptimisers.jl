@@ -172,17 +172,41 @@ function BayesianBlackLittermanPrior(;
                                      tau::Option{<:Number} = nothing)::BayesianBlackLittermanPrior
     return BayesianBlackLittermanPrior(pe, mp, views, sets, views_conf, rf, tau)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a new [`BayesianBlackLittermanPrior`](@ref) estimator with observation weights `w` applied to the underlying prior estimator.
+
+# Related
+
+  - [`BayesianBlackLittermanPrior`](@ref)
+  - [`factory`](@ref)
+"""
 function factory(pe::BayesianBlackLittermanPrior,
                  w::ObsWeights)::BayesianBlackLittermanPrior
     return BayesianBlackLittermanPrior(; pe = factory(pe.pe, w), mp = pe.mp,
                                        views = pe.views, sets = pe.sets,
                                        views_conf = pe.views_conf, rf = pe.rf, tau = pe.tau)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a new [`BayesianBlackLittermanPrior`](@ref) estimator restricted to the assets at index `i`.
+
+# Related
+
+  - [`BayesianBlackLittermanPrior`](@ref)
+"""
 function prior_view(pr::BayesianBlackLittermanPrior, i)::BayesianBlackLittermanPrior
     return BayesianBlackLittermanPrior(; pe = prior_view(pr.pe, i), mp = pr.mp,
                                        views = pr.views, sets = pr.sets,
                                        views_conf = pr.views_conf, rf = pr.rf, tau = pr.tau)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Access properties of [`BayesianBlackLittermanPrior`](@ref). Exposes `:me` and `:ce` from the embedded prior estimator `obj.pe` for transparent access.
+"""
 function Base.getproperty(obj::BayesianBlackLittermanPrior, sym::Symbol)
     return if sym == :me
         obj.pe.me
@@ -199,6 +223,33 @@ end
 Compute Bayesian Black-Litterman prior moments for asset returns.
 
 `prior` estimates the mean and covariance of asset returns using the Bayesian Black-Litterman model, combining a factor prior estimator, matrix post-processing, user or algorithmic views, asset sets, view confidences, risk-free rate, and blending parameter `tau`. This method supports both direct and constraint-based views, flexible confidence specification, and matrix processing, and incorporates Bayesian updating for posterior inference.
+
+# Mathematical definition
+
+The Bayesian Black-Litterman model updates the prior ``(\\boldsymbol{\\Pi}, \\mathbf{\\Sigma}/T)`` with views:
+
+```math
+\\begin{align}
+\\hat{\\boldsymbol{\\mu}}_{BBL} &= \\boldsymbol{\\Pi} + \\frac{\\mathbf{\\Sigma}}{T} \\mathbf{P}^\\intercal \\left(\\mathbf{P}\\frac{\\mathbf{\\Sigma}}{T}\\mathbf{P}^\\intercal + \\mathbf{\\Omega}\\right)^{-1} (\\boldsymbol{q} - \\mathbf{P}\\boldsymbol{\\Pi})\\,.
+\\end{align}
+```
+
+```math
+\\begin{align}
+\\hat{\\mathbf{\\Sigma}}_{BBL} &= \\mathbf{\\Sigma} + \\frac{\\mathbf{\\Sigma}}{T} - \\frac{\\mathbf{\\Sigma}}{T} \\mathbf{P}^\\intercal \\left(\\mathbf{P}\\frac{\\mathbf{\\Sigma}}{T}\\mathbf{P}^\\intercal + \\mathbf{\\Omega}\\right)^{-1} \\mathbf{P} \\frac{\\mathbf{\\Sigma}}{T}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\hat{\\boldsymbol{\\mu}}_{BBL}``: Bayesian Black-Litterman posterior mean.
+  - ``\\hat{\\mathbf{\\Sigma}}_{BBL}``: Bayesian Black-Litterman posterior covariance.
+  - ``\\boldsymbol{\\Pi}``: ``N \\times 1`` prior expected returns.
+  - ``\\mathbf{\\Sigma}``: ``N \\times N`` prior covariance matrix.
+  - $(math_dict[:T])
+  - ``\\mathbf{P}``: ``K \\times N`` views matrix.
+  - ``\\boldsymbol{q}``: ``K \\times 1`` views vector.
+  - ``\\mathbf{\\Omega}``: ``K \\times K`` view uncertainty matrix.
 
 # Arguments
 

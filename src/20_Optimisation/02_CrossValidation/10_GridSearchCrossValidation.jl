@@ -23,9 +23,9 @@ Positional and keyword arguments correspond to fields above.
 
 ## Validation
 
-  - `@argcheck(!isempty(p), IsEmptyError)`: Parameter grid must not be empty.
-  - If `p` is a vector of parameter sets, each must not be empty.
-  - All validations use custom error types.
+  - `!isempty(p)`.
+  - If `p` is a vector of parameter sets: each element must not be empty.
+  - All keys in `p` must be of type `GSCVKey` (i.e. `String`, `Symbol`, or `Integer`).
 
 # Examples
 
@@ -181,11 +181,6 @@ Performs grid search cross-validation for portfolio optimisation estimators. Ite
 
   - `SearchCrossValidationResult`: Result type containing the optimal estimator, test and train scores, parameter grid, and selected index.
 
-# Validation
-
-  - Ensures parameter grid is not empty.
-  - Validates cross-validation splits and indices.
-
 # Details
 
   - Iterates over all parameter combinations in the grid.
@@ -201,8 +196,6 @@ Performs grid search cross-validation for portfolio optimisation estimators. Ite
   - [`RandomisedSearchCrossValidation`](@ref)
   - [`ReturnsResult`](@ref)
   - [`GridSearchCrossValidation`](@ref)
-
-# Examples
 """
 function search_cross_validation(opt::NonFiniteAllocationOptimisationEstimator,
                                  gscv::GridSearchCrossValidation, rd::ReturnsResult)

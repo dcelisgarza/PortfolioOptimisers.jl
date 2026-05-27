@@ -2,4 +2,5 @@
 
 ```@docs
 OptimisationCrossValidation
+NonCombOptCV
 ```

@@ -5,11 +5,19 @@ Represents the Range risk measure.
 
 `Range` computes the difference between the maximum and minimum portfolio returns, measuring the full spread of the return distribution. It is a simple measure of the total variability across all scenarios.
 
-# Mathematical Definition
+# Mathematical definition
 
 ```math
-\\mathrm{Range}(\\boldsymbol{x}) = \\max_{1 \\leq t \\leq T} x_t - \\min_{1 \\leq t \\leq T} x_t\\,.
+\\begin{align}
+\\mathrm{Range}(\\boldsymbol{x}) &= \\max_{1 \\leq t \\leq T} x_t - \\min_{1 \\leq t \\leq T} x_t\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``\\mathrm{Range}(\\boldsymbol{x})``: Full return spread of the portfolio.
+  - $(math_dict[:xret])
+  - $(math_dict[:T])
 
 # Fields
 

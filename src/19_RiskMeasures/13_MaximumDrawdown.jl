@@ -5,19 +5,36 @@ Represents the Maximum Drawdown risk measure.
 
 `MaximumDrawdown` computes the largest peak-to-trough decline in the cumulative portfolio returns. It captures the worst-case loss from a previous high.
 
-# Mathematical Definition
+# Mathematical definition
 
 Define the absolute drawdown series:
 
 ```math
-c_t = \\sum_{s=1}^{t} x_s\\,, \\qquad d_t = c_t - \\max_{0 \\leq s \\leq t} c_s \\leq 0\\,.
+\\begin{align}
+c_t &= \\sum_{s=1}^{t} x_s\\,, \\\\
+d_t &= c_t - \\max_{0 \\leq s \\leq t} c_s \\leq 0\\,.
+\\end{align}
 ```
+
+Where:
+
+  - $(math_dict[:xret])
+  - $(math_dict[:ct])
+  - $(math_dict[:dtdd])
 
 The Maximum Drawdown is the most negative value in the drawdown series:
 
 ```math
-\\mathrm{MDD}(\\boldsymbol{x}) = -\\min_{1 \\leq t \\leq T} d_t\\,.
+\\begin{align}
+\\mathrm{MDD}(\\boldsymbol{x}) &= -\\min_{1 \\leq t \\leq T} d_t\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``\\mathrm{MDD}(\\boldsymbol{x})``: Maximum drawdown.
+  - $(math_dict[:T])
+  - $(math_dict[:dtdd])
 
 # Fields
 
@@ -82,19 +99,36 @@ Represents the Relative Maximum Drawdown risk measure for hierarchical optimisat
 
 `RelativeMaximumDrawdown` computes the maximum of the relative (compounded) drawdown series.
 
-# Mathematical Definition
+# Mathematical definition
 
 Define the relative drawdown series:
 
 ```math
-C_t = \\prod_{s=1}^{t} (1 + x_s)\\,, \\qquad rd_t = \\frac{C_t}{\\max_{0 \\leq s \\leq t} C_s} - 1 \\leq 0\\,.
+\\begin{align}
+C_t &= \\prod_{s=1}^{t} (1 + x_s)\\,, \\\\
+rd_t &= \\frac{C_t}{\\max_{0 \\leq s \\leq t} C_s} - 1 \\leq 0\\,.
+\\end{align}
 ```
+
+Where:
+
+  - $(math_dict[:xret])
+  - $(math_dict[:Ct])
+  - $(math_dict[:rdt])
 
 The Relative Maximum Drawdown is:
 
 ```math
-\\mathrm{RMDD}(\\boldsymbol{x}) = -\\min_{1 \\leq t \\leq T} rd_t\\,.
+\\begin{align}
+\\mathrm{RMDD}(\\boldsymbol{x}) &= -\\min_{1 \\leq t \\leq T} rd_t\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``\\mathrm{RMDD}(\\boldsymbol{x})``: Relative maximum drawdown.
+  - $(math_dict[:T])
+  - $(math_dict[:rdt])
 
 # Fields
 

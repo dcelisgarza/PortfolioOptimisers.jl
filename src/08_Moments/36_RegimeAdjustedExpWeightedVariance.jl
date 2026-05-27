@@ -52,10 +52,30 @@ $(DocStringExtensions.TYPEDEF)
 Regime adjustment method that scales variance exponentially with the smoothed log-deviation
 of standardised squared returns from its expected value under stationarity.
 
-The regime state `s` is defined as `mean(log(max(z², ε))) - κ`, where
-`κ = digamma(x) + log(y)` is the stationary expectation of `log(z²)` under a
-``\\chi^2(1)`` distribution scaled by `y`, and `ε` is a small positive threshold.
-The variance multiplier is `exp(x * s)`.
+# Mathematical definition
+
+The regime state ``s`` is defined as ``\\bar{s} = \\frac{1}{T}\\sum_t \\ln\\max(z_t^2, \\varepsilon) - \\kappa``, where
+``\\kappa = \\psi(x) + \\ln y`` (``\\psi`` = digamma) is the stationary expectation of ``\\ln z^2`` under a
+``\\chi^2(1)`` distribution scaled by ``y``, and ``\\varepsilon`` is a small positive threshold.
+
+```math
+\\begin{align}
+\\kappa &= \\psi(x) + \\ln y\\,, \\\\
+s &= \\frac{1}{T}\\sum_{t} \\ln\\!\\max(z_t^2, \\varepsilon) - \\kappa\\,, \\\\
+\\mathrm{mult} &= \\exp(x \\cdot s)\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\kappa``: Stationary expectation of ``\\ln z^2`` under the specified distribution.
+  - ``\\psi``: Digamma function.
+  - ``x``, ``y``: Parameters of [`LogRegimeAdjusted`](@ref).
+  - ``s``: Smoothed log-deviation regime state.
+  - $(math_dict[:T])
+  - ``z_t^2``: Standardised squared return at time ``t``.
+  - ``\\varepsilon``: Small positive threshold for numerical stability.
+  - ``\\mathrm{mult}``: Variance scaling multiplier.
 
 # Fields
 
@@ -116,8 +136,24 @@ $(DocStringExtensions.TYPEDEF)
 Regime adjustment method that scales variance by the ratio of the mean absolute deviation
 of standardised returns to the first-moment normalisation constant `x`.
 
-The regime state `s` is defined as `mean(sqrt(max(z², 0))) / x`, where `z²` are the
-standardised squared returns. The variance multiplier is `s` directly.
+# Mathematical definition
+
+The regime state ``s`` and multiplier are:
+
+```math
+\\begin{align}
+s &= \\frac{1}{x} \\cdot \\frac{1}{T}\\sum_t \\sqrt{\\max(z_t^2, 0)}\\,, \\\\
+\\mathrm{mult} &= s\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``s``: Regime state (ratio of mean absolute deviation to normalisation constant ``x``).
+  - ``x = \\sqrt{2/\\pi}``: Expected value of ``|z|`` for a standard normal ``z``.
+  - $(math_dict[:T])
+  - ``z_t``: Standardised return at time ``t``.
+  - ``\\mathrm{mult}``: Variance scaling multiplier.
 
 # Fields
 
@@ -168,8 +204,21 @@ $(DocStringExtensions.TYPEDEF)
 Regime adjustment method that scales variance by the square root of the mean of the
 standardised squared returns.
 
-The regime state `s` is defined as `mean(z²)` and the variance multiplier is
-`sqrt(max(s, 0))`.
+# Mathematical definition
+
+```math
+\\begin{align}
+s &= \\frac{1}{T}\\sum_t z_t^2\\,, \\\\
+\\mathrm{mult} &= \\sqrt{\\max(s, 0)}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``s``: Mean of standardised squared returns.
+  - $(math_dict[:T])
+  - ``z_t``: Standardised return at time ``t``.
+  - ``\\mathrm{mult}``: Variance scaling multiplier.
 
 ## Related
 
@@ -254,6 +303,54 @@ At each observation, it updates a running exponentially weighted variance and co
 a standardised squared innovation `z²`. After accumulating enough observations, it
 smooths a regime state using `regime_decay`, then scales the final variance by
 `regime_multiplier(regime_method, regime_state)²`.
+
+# Mathematical definition
+
+EWM variance update (decay ``\\lambda``):
+
+```math
+\\begin{align}
+v_t &= \\lambda v_{t-1} + (1 - \\lambda)(r_t - \\bar{r})^2\\,.
+\\end{align}
+```
+
+Standardised innovation:
+
+```math
+\\begin{align}
+z_t^2 &= (r_t - \\bar{r})^2 / v_t\\,.
+\\end{align}
+```
+
+Regime state smoothed with `regime_decay` ``\\lambda_r`` (``g`` defined by [`RegimeAdjustedMethod`](@ref)):
+
+```math
+\\begin{align}
+s_t &= \\lambda_r s_{t-1} + (1 - \\lambda_r) \\cdot g(z_t^2)\\,.
+\\end{align}
+```
+
+Final variance:
+
+```math
+\\begin{align}
+\\hat{\\sigma}^2 &= \\mathrm{mult}(s_T)^2 \\cdot v_T\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``v_t``: Exponentially weighted variance at time ``t``.
+  - ``\\lambda``: EWM decay parameter (`decay` field).
+  - ``r_t``: Return at time ``t``.
+  - ``\\bar{r}``: Mean return.
+  - ``z_t^2``: Standardised squared innovation ``(r_t - \\bar{r})^2 / v_t``.
+  - ``s_t``: Smoothed regime state at time ``t``.
+  - ``\\lambda_r``: Regime decay parameter (`regime_decay` field).
+  - ``g(\\cdot)``: Regime state transformation (see [`RegimeAdjustedMethod`](@ref)).
+  - ``\\hat{\\sigma}^2``: Final regime-adjusted variance.
+  - ``\\mathrm{mult}(s_T)``: Variance scaling multiplier (see [`RegimeAdjustedMethod`](@ref)).
+  - $(math_dict[:T])
 
 # Fields
 

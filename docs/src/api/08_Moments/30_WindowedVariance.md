@@ -9,4 +9,5 @@ var(ce::WindowedVariance, X::VecNum; mean = nothing)
 std(ce::WindowedVariance, X::MatNum; dims::Int = 1, mean = nothing,
                         kwargs...)
 std(ce::WindowedVariance, X::VecNum; mean = nothing)
+moment_view(ce::WindowedVariance, i)
 ```

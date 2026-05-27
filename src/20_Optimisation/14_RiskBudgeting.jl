@@ -5,13 +5,7 @@ Result type for Risk Budgeting portfolio optimisation.
 
 # Fields
 
-  - `oe`: Type of the optimisation estimator that produced this result.
-  - `pa`: Processed optimisation attributes.
-  - `prb`: Processed risk budgeting attributes.
-  - `retcode`: Optimisation return code.
-  - `sol`: JuMP model solution.
-  - `model`: The JuMP model.
-  - `fb`: Fallback result.
+$(DocStringExtensions.FIELDS)
 
 The `w` property is forwarded from `sol.w`.
 
@@ -21,17 +15,34 @@ The `w` property is forwarded from `sol.w`.
   - [`NonFiniteAllocationOptimisationResult`](@ref)
 """
 @concrete struct RiskBudgetingResult <: NonFiniteAllocationOptimisationResult
+    "$(field_dict[:oe])"
     oe
+    "$(field_dict[:pa])"
     pa
+    "$(field_dict[:prb])"
     prb
+    "$(field_dict[:retcode])"
     retcode
+    "$(field_dict[:sol])"
     sol
+    "$(field_dict[:model])"
     model
+    "$(field_dict[:fb])"
     fb
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Rebuild a [`RiskBudgetingResult`](@ref) with an updated fallback optimiser `fb`.
+"""
 function factory(res::RiskBudgetingResult, fb::Option{<:OptE_Opt})
     return RiskBudgetingResult(res.oe, res.pa, res.prb, res.retcode, res.sol, res.model, fb)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Access properties of [`RiskBudgetingResult`](@ref). Virtual property `:w` extracts portfolio weights from `sol`; other unknown properties forward to `r.prb` then `r.pa`.
+"""
 function Base.getproperty(r::RiskBudgetingResult, sym::Symbol)
     return if sym == :w
         r.sol.w
@@ -50,14 +61,21 @@ $(DocStringExtensions.TYPEDEF)
 
 Processed factor risk budgeting attributes for intermediate computations.
 
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
 # Related
 
   - [`RiskBudgeting`](@ref)
   - [`FactorRiskBudgeting`](@ref)
 """
 @concrete struct ProcessedFactorRiskBudgetingAttributes <: AbstractResult
+    "Processed risk budget constraints vector."
     rkb
+    "Factor-level risk budget vector."
     b1
+    "Regression result used for factor loading estimation."
     rr
 end
 """
@@ -65,12 +83,17 @@ $(DocStringExtensions.TYPEDEF)
 
 Processed asset risk budgeting attributes for intermediate computations.
 
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
 # Related
 
   - [`RiskBudgeting`](@ref)
   - [`AssetRiskBudgeting`](@ref)
 """
 @concrete struct ProcessedAssetRiskBudgetingAttributes <: AbstractResult
+    "Processed asset risk budget constraints vector."
     rkb
 end
 """
@@ -85,7 +108,9 @@ Abstract supertype for risk budgeting optimisation formulations.
 """
 abstract type RiskBudgetingFormulation <: OptimisationAlgorithm end
 """
-risk_budgeting_formulation_view(::RiskBudgetingFormulation, args...) -> nothing
+    risk_budgeting_formulation_view(::RiskBudgetingFormulation, args...) -> nothing
+
+Default fallback for risk budgeting formulation view. Returns `nothing` for formulations that do not require view slicing.
 """
 function risk_budgeting_formulation_view(::RiskBudgetingFormulation, args...)
     return nothing
@@ -97,21 +122,34 @@ Log-barrier formulation for Risk Budgeting.
 
 Uses a logarithmic objective to enforce the risk budget constraints. Can provide an optional orthant vector to allow for negative weights in specific assets.
 
-# Arguments
+# Fields
 
-  - `z::Option{<:VecInt}`: Optional orthant vector defining which asset can have negative weights. If nothing all assets will have positive weights.
+$(DocStringExtensions.FIELDS)
 
-# Related Types
+# Constructors
+
+    LogRiskBudgeting(;
+        z::Option{<:VecInt} = nothing
+    ) -> LogRiskBudgeting
+
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - If `z` is provided: `!isempty(z)` and `all(x -> abs(x) == 1, z)`.
+
+# Related
 
   - [`RiskBudgetingFormulation`](@ref)
   - [`MixedIntegerRiskBudgeting`](@ref)
 """
 @concrete struct LogRiskBudgeting{T} <: RiskBudgetingFormulation
+    "Optional orthant vector of ±1 defining which assets can have negative weights (`-1`) or must be positive (`+1`). If `nothing`, all assets have positive weights."
     z::T
     function LogRiskBudgeting(z::Option{<:VecInt})
         if !isnothing(z)
             @argcheck(!isempty(z))
-            @argcheck(all(x->abs(x) == 1, z))
+            @argcheck(all(x -> abs(x) == 1, z))
         end
         return new{typeof(z)}(z)
     end
@@ -158,9 +196,7 @@ Asset-level Risk Budgeting algorithm.
 
 # Fields
 
-  - `rkb`: Risk budget estimator or risk budget constraints.
-  - `sets`: Asset sets (required when `rkb` is a `RiskBudgetEstimator`).
-  - `alg`: Risk budgeting formulation.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -172,6 +208,10 @@ Asset-level Risk Budgeting algorithm.
 
 Keywords correspond to the struct's fields.
 
+## Validation
+
+  - If `rkb` is a `RiskBudgetEstimator`: `!isnothing(sets)`.
+
 # Related
 
   - [`RiskBudgetingAlgorithm`](@ref)
@@ -179,8 +219,11 @@ Keywords correspond to the struct's fields.
   - [`RiskBudgeting`](@ref)
 """
 @concrete struct AssetRiskBudgeting <: RiskBudgetingAlgorithm
+    "$(field_dict[:rkb])"
     rkb
+    "$(field_dict[:sets])"
     sets
+    "$(field_dict[:rba])"
     alg
     function AssetRiskBudgeting(rkb::Option{<:RkbE_Rkb}, sets::Option{<:AssetSets},
                                 alg::RiskBudgetingFormulation)
@@ -232,10 +275,7 @@ Factor-level Risk Budgeting algorithm.
 
 # Fields
 
-  - `re`: Regression estimator for factor loadings.
-  - `rkb`: Risk budget estimator or risk budget constraints.
-  - `sets`: Asset sets (required when `rkb` is a `RiskBudgetEstimator`).
-  - `flag`: If `true`, includes the idiosyncratic component in the budget.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -248,6 +288,10 @@ Factor-level Risk Budgeting algorithm.
 
 Keywords correspond to the struct's fields.
 
+## Validation
+
+  - If `rkb` is a `RiskBudgetEstimator`: `!isnothing(sets)`.
+
 # Related
 
   - [`RiskBudgetingAlgorithm`](@ref)
@@ -255,9 +299,13 @@ Keywords correspond to the struct's fields.
   - [`RiskBudgeting`](@ref)
 """
 @concrete struct FactorRiskBudgeting <: RiskBudgetingAlgorithm
+    "$(field_dict[:re])"
     re
+    "$(field_dict[:rkb])"
     rkb
+    "$(field_dict[:sets])"
     sets
+    "$(field_dict[:flag])"
     flag
     function FactorRiskBudgeting(re::RegE_Reg, rkb::Option{<:RkbE_Rkb},
                                  sets::Option{<:AssetSets}, flag::Bool)
@@ -308,11 +356,7 @@ Risk Budgeting (RB) portfolio optimiser.
 
 # Fields
 
-  - `opt`: JuMP optimiser configuration.
-  - `r`: Risk measure or vector of risk measures.
-  - `rba`: Risk budgeting algorithm (`AssetRiskBudgeting` or `FactorRiskBudgeting`).
-  - `wi`: Initial weights for warm-starting.
-  - `fb`: Fallback optimiser.
+$(DocStringExtensions.FIELDS)
 
 # Constructors
 
@@ -326,6 +370,37 @@ Risk Budgeting (RB) portfolio optimiser.
 
 Keywords correspond to the struct's fields.
 
+## Validation
+
+  - If `r` is a vector: `!isempty(r)`.
+  - If `wi` is provided: `!isempty(wi)`.
+
+# Mathematical definition
+
+Risk budgeting allocates weights so that each asset ``i`` contributes a target fraction ``b_i`` of total portfolio risk:
+
+```math
+\\begin{align}
+w_i \\frac{\\partial \\rho(\\boldsymbol{w})}{\\partial w_i} &= b_i \\, \\rho(\\boldsymbol{w}), \\quad \\sum_{i=1}^{N} b_i = 1, \\quad b_i \\geq 0\\,.
+\\end{align}
+```
+
+The logarithmic formulation (`LogRiskBudgeting`) solves the equivalent convex problem:
+
+```math
+\\begin{align}
+\\underset{\\boldsymbol{w}}{\\min} \\; \\rho(\\boldsymbol{w}) - \\sum_{i=1}^{N} b_i \\ln w_i \\quad \\text{s.t.} \\quad \\boldsymbol{w} > \\boldsymbol{0}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``w_i``: Portfolio weight of asset ``i``.
+  - ``\\rho(\\boldsymbol{w})``: Portfolio risk measure.
+  - ``b_i``: Risk budget (target risk fraction) for asset ``i``.
+  - ``N``: Number of assets.
+  - ``\\boldsymbol{w}``: Portfolio weight vector.
+
 # Related
 
   - [`scalarise_risk_expression!`](@ref)
@@ -337,10 +412,15 @@ Keywords correspond to the struct's fields.
   - [`FactorRiskBudgeting`](@ref)
 """
 @concrete struct RiskBudgeting <: RiskJuMPOptimisationEstimator
+    "$(field_dict[:opt_jmp])"
     opt
+    "$(field_dict[:r_opt])"
     r
+    "$(field_dict[:rba])"
     rba
+    "$(field_dict[:wi])"
     wi
+    "$(field_dict[:fb])"
     fb
     function RiskBudgeting(opt::JuMPOptimiser, r::RM_VecRM, rba::RiskBudgetingAlgorithm,
                            wi::Option{<:VecNum}, fb::Option{<:OptE_Opt})
@@ -360,17 +440,32 @@ function RiskBudgeting(; opt::JuMPOptimiser = JuMPOptimiser(), r::RM_VecRM = Var
                        fb::Option{<:OptE_Opt} = nothing)::RiskBudgeting
     return RiskBudgeting(opt, r, rba, wi, fb)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return `true` if any sub-estimator of `opt` requires previous portfolio weights (JuMP optimiser, risk measure, or fallback).
+"""
 function needs_previous_weights(opt::RiskBudgeting)
     return (needs_previous_weights(opt.opt) ||
             needs_previous_weights(opt.r) ||
             needs_previous_weights(opt.fb))
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Build an updated [`RiskBudgeting`](@ref) with all estimators that track previous weights updated via `factory` using `w`.
+"""
 function factory(rb::RiskBudgeting, w::AbstractVector)::RiskBudgeting
     opt = factory(rb.opt, w)
     r = factory(rb.r, w)
     fb = factory(rb.fb, w)
     return RiskBudgeting(; opt = opt, r = r, rba = rb.rba, wi = rb.wi, fb = fb)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a cluster-sliced copy of [`RiskBudgeting`](@ref) for asset index set `i` and returns matrix `X`.
+"""
 function opt_view(rb::RiskBudgeting, i, X::MatNum)::RiskBudgeting
     X = isa(rb.opt.pe, AbstractPriorResult) ? rb.opt.pe.X : X
     opt = opt_view(rb.opt, i, X)
@@ -580,14 +675,21 @@ end
              rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
              str_names::Bool = false, save::Bool = true, kwargs...) -> RiskBudgetingResult
 
+Run the Risk Budgeting portfolio optimisation.
+
 # Arguments
 
   - `rb`: The risk budgeting optimiser to use.
-  - $(arg_dict[:rd]) If `isa(hec.opt.pe, AbstractPriorResult)`, `rd` is not necessary if doing a standalone optimisation, but may be required/desired by fallbacks and/or clusterisation.
+  - $(arg_dict[:rd]) If `isa(rb.opt.pe, AbstractPriorResult)`, `rd` is not necessary if doing a standalone optimisation, but may be required/desired by fallbacks and/or clusterisation.
   - `dims`: The dimension along which observations advance in time.
   - `str_names`: Whether to use string names for the assets in the optimisation.
   - `save`: Whether to save the JuMP model in the optimisation result.
   - `kwargs`: Additional keyword arguments passed to the optimisation function.
+
+# Related
+
+  - [`RiskBudgeting`](@ref)
+  - [`RiskBudgetingResult`](@ref)
 """
 function optimise(rb::RiskBudgeting{<:Any, <:Any, <:Any, <:Any, Nothing},
                   rd::ReturnsResult = ReturnsResult(); dims::Int = 1,

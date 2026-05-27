@@ -26,4 +26,8 @@ AbstractNetworkEstimator
 AbstractCentralityEstimator
 calc_adjacency
 calc_centrality
+Tree_SimMat
+NwE_PlM_ClE_Cl
+NwE_ClE_Cl
+NwE_Pl_ClE_Cl
 ```

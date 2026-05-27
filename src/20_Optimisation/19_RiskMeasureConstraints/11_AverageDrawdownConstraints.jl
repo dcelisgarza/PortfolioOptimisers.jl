@@ -6,6 +6,22 @@ Add average drawdown risk constraints to `model`.
 Calls [`set_drawdown_constraints!`](@ref) to ensure drawdown variables exist, then creates
 an observation-weighted mean of the drawdown path as the risk expression.
 
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathrm{ADD}(\\boldsymbol{w}) &= \\frac{1}{T}\\sum_{t=1}^T dd_t\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathrm{ADD}(\\boldsymbol{w})``: Average drawdown.
+  - $(math_dict[:T])
+  - ``dd_t``: Portfolio drawdown at time ``t`` (see [`set_drawdown_constraints!`](@ref)).
+
+where ``dd_t`` is the portfolio drawdown at time ``t`` (see [`set_drawdown_constraints!`](@ref)).
+
 # Arguments
 
   - $(arg_dict[:model])

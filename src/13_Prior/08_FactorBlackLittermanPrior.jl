@@ -181,6 +181,16 @@ function FactorBlackLittermanPrior(;
     return FactorBlackLittermanPrior(pe, f_mp, mp, re, ve, views, sets, views_conf, w, rf,
                                      l, tau, rsd)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a new [`FactorBlackLittermanPrior`](@ref) estimator with observation weights `w` applied to the underlying prior, regression, and variance estimators.
+
+# Related
+
+  - [`FactorBlackLittermanPrior`](@ref)
+  - [`factory`](@ref)
+"""
 function factory(pe::FactorBlackLittermanPrior, w::ObsWeights)::FactorBlackLittermanPrior
     return FactorBlackLittermanPrior(; pe = factory(pe.pe, w), f_mp = pe.f_mp, mp = pe.mp,
                                      re = factory(pe.re, w), ve = factory(pe.ve, w),
@@ -188,12 +198,27 @@ function factory(pe::FactorBlackLittermanPrior, w::ObsWeights)::FactorBlackLitte
                                      views_conf = pe.views_conf, w = pe.w, rf = pe.rf,
                                      l = pe.l, tau = pe.tau, rsd = pe.rsd)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a new [`FactorBlackLittermanPrior`](@ref) estimator restricted to the assets at index `i`.
+
+# Related
+
+  - [`FactorBlackLittermanPrior`](@ref)
+  - [`prior_view`](@ref)
+"""
 function prior_view(pe::FactorBlackLittermanPrior, i)
     return FactorPrior(; pe = pe.pe, f_mp = pe.f_mp, mp = pe.mp,
                        re = regression_view(pe.re, i), ve = moment_view(pe.ve, i),
                        views = pe.views, sets = pe.sets, views_conf = pe.views_conf,
                        w = pe.w, rf = pe.rf, l = pe.l, tau = pe.tau, rsd = pe.rsd)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Access properties of [`FactorBlackLittermanPrior`](@ref). Exposes `:me` and `:ce` from the embedded prior estimator `obj.pe` for transparent access.
+"""
 function Base.getproperty(obj::FactorBlackLittermanPrior, sym::Symbol)
     return if sym == :me
         obj.pe.me
@@ -210,6 +235,32 @@ end
 Compute factor Black-Litterman prior moments for asset returns.
 
 `prior` estimates the mean and covariance of asset returns using the factor-based Black-Litterman model, combining an asset prior estimator, matrix post-processing for factors and assets, regression and variance estimators, user or algorithmic views, asset sets, view confidences, weights, risk-free rate, leverage, blending parameter `tau`, and a residual variance flag. This method supports both direct and constraint-based views, flexible confidence specification, and matrix processing, and incorporates factor regression and residual adjustment for posterior inference.
+
+# Mathematical definition
+
+Black-Litterman views are applied directly to the factor space, updating factor moments ``(\\boldsymbol{\\Pi}_f, \\mathbf{\\Sigma}_f)`` via the standard BL equations, then asset posteriors are reconstructed through the loadings matrix:
+
+```math
+\\begin{align}
+\\hat{\\boldsymbol{\\mu}} &= \\mathbf{B} \\hat{\\boldsymbol{\\mu}}_{f,BL} + \\boldsymbol{\\alpha}\\,.
+\\end{align}
+```
+
+```math
+\\begin{align}
+\\hat{\\mathbf{\\Sigma}} &= \\mathbf{B} \\hat{\\mathbf{\\Sigma}}_{f,BL} \\mathbf{B}^\\intercal + \\mathbf{\\Sigma}_\\varepsilon\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\hat{\\boldsymbol{\\mu}}``: ``N \\times 1`` posterior asset mean vector.
+  - ``\\hat{\\mathbf{\\Sigma}}``: ``N \\times N`` posterior asset covariance matrix.
+  - ``\\hat{\\boldsymbol{\\mu}}_{f,BL}``: ``K \\times 1`` Black-Litterman posterior factor mean.
+  - ``\\hat{\\mathbf{\\Sigma}}_{f,BL}``: ``K \\times K`` Black-Litterman posterior factor covariance.
+  - ``\\mathbf{B}``: ``N \\times K`` factor loadings matrix.
+  - ``\\boldsymbol{\\alpha}``: ``N \\times 1`` regression intercept vector.
+  - ``\\mathbf{\\Sigma}_\\varepsilon``: ``N \\times N`` diagonal residual variance matrix (when `rsd = true`).
 
 # Arguments
 

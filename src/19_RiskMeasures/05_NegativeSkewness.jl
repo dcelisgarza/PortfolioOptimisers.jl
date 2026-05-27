@@ -17,16 +17,24 @@ Represents the Negative Skewness risk measure.
 
 `NegativeSkewness` quantifies the portfolio's exposure to negative asymmetry in returns by computing a quadratic or SOC (second-order cone) form of the coskewness matrix. It penalises portfolio constructions that exhibit heavy left-tail behaviour.
 
-# Mathematical Definition
+# Mathematical definition
 
 Let ``\\boldsymbol{w}`` be the portfolio weight vector and ``\\mathbf{V}`` the negative semi-definite coskewness matrix (spectral decomposition of the negative part of the sample coskewness tensor). The Negative Skewness risk measure is:
 
 ```math
-\\mathrm{NSke}(\\boldsymbol{w}) = \\begin{cases}
+\\begin{align}
+\\mathrm{NSke}(\\boldsymbol{w}) &= \\begin{cases}
   \\sqrt{\\boldsymbol{w}^\\intercal \\mathbf{V} \\boldsymbol{w}} & \\text{(SOC formulation)} \\\\
   \\boldsymbol{w}^\\intercal \\mathbf{V} \\boldsymbol{w} & \\text{(Quadratic formulation)}
-\\end{cases}
+\\end{cases}\\,.
+\\end{align}
 ```
+
+Where:
+
+  - ``\\mathrm{NSke}(\\boldsymbol{w})``: Negative Skewness risk measure.
+  - $(math_dict[:w_port])
+  - ``\\mathbf{V}``: Negative semi-definite coskewness matrix (spectral decomposition of the negative part of the sample coskewness tensor).
 
 # Fields
 
@@ -138,6 +146,18 @@ end
 function (r::NegativeSkewness{<:Any, <:Any, <:Any, <:Any, <:NSkeQuadFormulations})(w::VecNum)
     return LinearAlgebra.dot(w, r.V, w)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create an instance of [`NegativeSkewness`](@ref) by selecting the coskewness matrix and spectral decomposition matrix from the risk-measure instance or falling back to a [`HighOrderPrior`](@ref) result.
+
+# Related
+
+  - [`NegativeSkewness`](@ref)
+  - [`HighOrderPrior`](@ref)
+  - [`factory`](@ref)
+  - [`nothing_scalar_array_selector`](@ref)
+"""
 function factory(r::NegativeSkewness, pr::HighOrderPrior, args...;
                  kwargs...)::NegativeSkewness
     sk = nothing_scalar_array_selector(r.sk, pr.sk)
@@ -145,6 +165,19 @@ function factory(r::NegativeSkewness, pr::HighOrderPrior, args...;
     return NegativeSkewness(; settings = r.settings, mp = r.mp, sk = sk, V = V, alg = r.alg,
                             window = r.window)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the [`NegativeSkewness`](@ref) risk measure `r` unchanged.
+
+Coskewness is not available in [`LowOrderPrior`](@ref) results; the existing risk measure is used as-is.
+
+# Related
+
+  - [`NegativeSkewness`](@ref)
+  - [`LowOrderPrior`](@ref)
+  - [`factory`](@ref)
+"""
 function factory(r::NegativeSkewness, ::LowOrderPrior, args...; kwargs...)::NegativeSkewness
     return r
 end

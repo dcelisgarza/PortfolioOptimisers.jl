@@ -2,6 +2,7 @@
 
 ```@docs
 ClusterNode
+VecClN
 is_leaf
 PreorderTreeByID
 pre_order
@@ -12,4 +13,5 @@ get_node_property
 AbstractPreorderBy
 validate_k_value
 valid_k_clusters
+assignments
 ```

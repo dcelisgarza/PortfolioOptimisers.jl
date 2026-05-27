@@ -47,6 +47,16 @@ $(DocStringExtensions.FIELDS)
     "$(field_dict[:fb])"
     fb
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create a [`SchurComplementHierarchicalRiskParityResult`](@ref) with a new fallback result `fb`.
+
+# Related
+
+  - [`SchurComplementHierarchicalRiskParityResult`](@ref)
+  - [`factory`](@ref)
+"""
 function factory(res::SchurComplementHierarchicalRiskParityResult, fb::Option{<:OptE_Opt})
     return SchurComplementHierarchicalRiskParityResult(res.oe, res.pr, res.wb, res.clr,
                                                        res.gamma, res.retcode, res.w, fb)
@@ -355,6 +365,23 @@ SchurComplementHierarchicalRiskParity
       fb ┴ nothing
 ```
 
+# Mathematical definition
+
+When splitting cluster ``C`` with sub-clusters ``C_1`` and ``C_2``, the Schur complement of the covariance partitioned as ``\\mathbf{\\Sigma}_{C} = \\begin{pmatrix} \\mathbf{\\Sigma}_{11} & \\mathbf{\\Sigma}_{12} \\\\ \\mathbf{\\Sigma}_{21} & \\mathbf{\\Sigma}_{22} \\end{pmatrix}`` is:
+
+```math
+\\begin{align}
+\\mathbf{S}(\\mathbf{\\Sigma}_{11}) &= \\mathbf{\\Sigma}_{22} - \\mathbf{\\Sigma}_{21} \\mathbf{\\Sigma}_{11}^{-1} \\mathbf{\\Sigma}_{12}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathbf{S}(\\mathbf{\\Sigma}_{11})``: Schur complement of the covariance block ``\\mathbf{\\Sigma}_{11}``.
+  - ``\\mathbf{\\Sigma}_{11}``, ``\\mathbf{\\Sigma}_{12}``, ``\\mathbf{\\Sigma}_{21}``, ``\\mathbf{\\Sigma}_{22}``: Covariance sub-blocks corresponding to the partition of cluster ``C`` into ``C_1`` and ``C_2``.
+
+The bisection weight ``\\alpha`` is then computed from the Schur-complement-corrected inter-cluster risks of ``C_1`` and ``C_2``, yielding a more accurate decomposition than vanilla HRP.
+
 # Related
 
   - [`ClusteringOptimisationEstimator`](@ref)
@@ -384,15 +411,45 @@ function SchurComplementHierarchicalRiskParity(;
                                                fb::Option{<:OptE_Opt} = nothing)::SchurComplementHierarchicalRiskParity
     return SchurComplementHierarchicalRiskParity(opt, params, fb)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return whether the [`SchurComplementHierarchicalRiskParity`](@ref) requires previous portfolio weights.
+
+# Related
+
+  - [`needs_previous_weights`](@ref)
+  - [`SchurComplementHierarchicalRiskParity`](@ref)
+"""
 function needs_previous_weights(opt::SchurComplementHierarchicalRiskParity)
     return (needs_previous_weights(opt.opt) || needs_previous_weights(opt.fb))
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create a [`SchurComplementHierarchicalRiskParity`](@ref) updating the base optimiser and fallback with weights `w`.
+
+# Related
+
+  - [`SchurComplementHierarchicalRiskParity`](@ref)
+  - [`factory`](@ref)
+"""
 function factory(sh::SchurComplementHierarchicalRiskParity,
                  w::AbstractVector)::SchurComplementHierarchicalRiskParity
     opt = factory(sh.opt, w)
     fb = factory(sh.fb, w)
     return SchurComplementHierarchicalRiskParity(; opt = opt, params = sh.params, fb = fb)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a view of [`SchurComplementHierarchicalRiskParity`](@ref) `sh` sliced to asset indices `i`.
+
+# Related
+
+  - [`SchurComplementHierarchicalRiskParity`](@ref)
+  - [`opt_view`](@ref)
+"""
 function opt_view(sh::SchurComplementHierarchicalRiskParity, i,
                   X::MatNum)::SchurComplementHierarchicalRiskParity
     X = isa(sh.opt.pe, AbstractPriorResult) ? sh.opt.pe.X : X
@@ -634,6 +691,19 @@ function schur_complement_binary_search(objective::Function, lgamma::Number, hga
     strict ? throw(ArgumentError(msg)) : @warn(msg)
     return w, lgamma
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Compute SCHRP weights using the monotonic Schur complement method.
+
+Uses binary search to find the γ value that maximises risk reduction while maintaining monotonicity, then delegates to the non-monotonic overload.
+
+# Related
+
+  - [`schur_complement_weights`](@ref)
+  - [`MonotonicSchurComplement`](@ref)
+  - [`SchurComplementHierarchicalRiskParity`](@ref)
+"""
 function schur_complement_weights(pr::AbstractPriorResult, items::VecVecInt,
                                   wb::WeightBounds,
                                   params::SchurComplementParams{<:Any, <:Any, <:Any,
@@ -680,6 +750,19 @@ function schur_complement_weights(pr::AbstractPriorResult, items::VecVecInt,
                                           risks[end - 1], params.alg.tol, params.alg.iter,
                                           params.alg.strict)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Run the Schur Complement HRP optimisation for a single set of parameters.
+
+Internal dispatch called by [`optimise`](@ref). Computes the prior and clustering, then applies `schur_complement_weights` to allocate portfolio weights.
+
+# Related
+
+  - [`SchurComplementHierarchicalRiskParity`](@ref)
+  - [`optimise`](@ref)
+  - [`_optimise`](@ref)
+"""
 function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:Any},
                    rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)
     rd = returns_result_picker(rd, sh.opt.brt)
@@ -695,6 +778,19 @@ function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:Any},
     return SchurComplementHierarchicalRiskParityResult(typeof(sh), pr, wb, clr, gamma,
                                                        retcode, w, nothing)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Run the Schur Complement HRP optimisation for a vector of parameter sets.
+
+Internal dispatch called by [`optimise`](@ref). Combines risk-scaled weights from multiple `SchurComplementParams` configurations.
+
+# Related
+
+  - [`SchurComplementHierarchicalRiskParity`](@ref)
+  - [`optimise`](@ref)
+  - [`_optimise`](@ref)
+"""
 function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:AbstractVector},
                    rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)
     rd = returns_result_picker(rd, sh.opt.brt)
@@ -719,14 +815,21 @@ function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:AbstractVe
 end
 """
     optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:Any, Nothing},
-             rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...) -> HierarchicalResult
+             rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...) -> SchurComplementHierarchicalRiskParityResult
+
+Run the Schur Complement Hierarchical Risk Parity portfolio optimisation.
 
 # Arguments
 
   - `sh`: The Schur complement hierarchical risk parity optimiser to use.
-  - $(arg_dict[:rd]) If `isa(hrp.opt.pe, AbstractPriorResult)`, `rd` is not necessary if doing a standalone optimisation, but may be required/desired by fallbacks and/or clusterisation.
+  - $(arg_dict[:rd]) If `isa(sh.opt.pe, AbstractPriorResult)`, `rd` is not necessary if doing a standalone optimisation, but may be required/desired by fallbacks and/or clusterisation.
   - `dims`: The dimension along which observations advance in time.
   - `kwargs`: Additional keyword arguments passed to the optimisation function.
+
+# Related
+
+  - [`SchurComplementHierarchicalRiskParity`](@ref)
+  - [`SchurComplementHierarchicalRiskParityResult`](@ref)
 """
 function optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:Any, Nothing},
                   rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)

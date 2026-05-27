@@ -183,7 +183,8 @@ HighOrderFactorPriorEstimator
       │       │      dt ┼ nothing
       │       │     alg ┼ nothing
       │       │   order ┴ DenoiseDetoneAlg()
-      │   alg ┴ Full()
+      │   alg ┼ Full()
+      │     w ┴ nothing
   ske ┼ Coskewness
       │    me ┼ SimpleExpectedReturns
       │       │   w ┴ nothing
@@ -195,7 +196,8 @@ HighOrderFactorPriorEstimator
       │       │      dt ┼ nothing
       │       │     alg ┼ nothing
       │       │   order ┴ DenoiseDetoneAlg()
-      │   alg ┴ Full()
+      │   alg ┼ Full()
+      │     w ┴ nothing
    ex ┼ Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
   rsd ┴ Bool: true
 ```
@@ -238,15 +240,40 @@ function HighOrderFactorPriorEstimator(;
                                        rsd::Bool = true)::HighOrderFactorPriorEstimator
     return HighOrderFactorPriorEstimator(pe, kte, ske, ex, rsd)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a new [`HighOrderFactorPriorEstimator`](@ref) estimator with observation weights `w` applied to the underlying prior, cokurtosis, and coskewness estimators.
+
+# Related
+
+  - [`HighOrderFactorPriorEstimator`](@ref)
+  - [`factory`](@ref)
+"""
 function factory(pe::HighOrderFactorPriorEstimator,
                  w::ObsWeights)::HighOrderFactorPriorEstimator
     return HighOrderFactorPriorEstimator(; pe = factory(pe.pe, w), kte = factory(pe.kte, w),
                                          ske = factory(pe.ske, w), ex = pe.ex, rsd = pe.rsd)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a new [`HighOrderFactorPriorEstimator`](@ref) estimator restricted to the assets at index `i`.
+
+# Related
+
+  - [`HighOrderFactorPriorEstimator`](@ref)
+  - [`prior_view`](@ref)
+"""
 function prior_view(pe::HighOrderFactorPriorEstimator, i)::HighOrderFactorPriorEstimator
     return HighOrderFactorPriorEstimator(; pe = prior_view(pe.pe, i), kte = pe.kte,
                                          ske = pe.ske, ex = pe.ex, rsd = pe.rsd)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Access properties of [`HighOrderFactorPriorEstimator`](@ref). Exposes `:me` and `:ce` from the embedded prior estimator `obj.pe` for transparent access.
+"""
 function Base.getproperty(obj::HighOrderFactorPriorEstimator, sym::Symbol)
     return if sym == :me
         obj.pe.me
@@ -256,6 +283,64 @@ function Base.getproperty(obj::HighOrderFactorPriorEstimator, sym::Symbol)
         getfield(obj, sym)
     end
 end
+"""
+    prior(pe::HighOrderFactorPriorEstimator, X::MatNum, F::MatNum; dims::Int = 1,
+          kwargs...)
+
+Compute high order factor prior moments for asset returns using a factor model.
+
+`prior` estimates the mean, covariance, coskewness, and cokurtosis of asset returns using a factor model with residual error correction. It first computes low order moments via the embedded factor prior, then maps factor higher-order moments to asset space via the Kronecker product of the factor loadings, optionally adding residual corrections.
+
+# Mathematical definition
+
+Factor cokurtosis and coskewness are mapped to asset space via the loadings matrix ``\\mathbf{B}`` (with Kronecker product ``\\otimes``):
+
+```math
+\\begin{align}
+\\hat{\\mathbf{K}} &= (\\mathbf{B} \\otimes \\mathbf{B}) \\hat{\\mathbf{K}}_f (\\mathbf{B} \\otimes \\mathbf{B})^\\intercal + \\hat{\\mathbf{K}}_\\varepsilon\\,.
+\\end{align}
+```
+
+```math
+\\begin{align}
+\\hat{\\mathbf{S}} &= \\mathbf{B} \\hat{\\mathbf{S}}_f (\\mathbf{B} \\otimes \\mathbf{B})^\\intercal + \\hat{\\mathbf{S}}_\\varepsilon\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\hat{\\mathbf{K}}``: ``N^2 \\times N^2`` asset cokurtosis matrix.
+  - ``\\hat{\\mathbf{S}}``: ``N \\times N^2`` asset coskewness matrix.
+  - ``\\mathbf{B}``: ``N \\times K`` factor loadings matrix.
+  - ``\\hat{\\mathbf{K}}_f``: ``K^2 \\times K^2`` factor cokurtosis matrix.
+  - ``\\hat{\\mathbf{S}}_f``: ``K \\times K^2`` factor coskewness matrix.
+  - ``\\hat{\\mathbf{K}}_\\varepsilon``: Residual cokurtosis correction (when `rsd = true`).
+  - ``\\hat{\\mathbf{S}}_\\varepsilon``: Residual coskewness correction (when `rsd = true`).
+  - ``\\otimes``: Kronecker product.
+
+# Arguments
+
+  - `pe`: High order factor prior estimator.
+  - `X`: Asset returns matrix (observations × assets).
+  - `F`: Factor returns matrix (observations × factors).
+  - $(arg_dict[:dims])
+  - `kwargs...`: Additional keyword arguments passed to underlying estimators.
+
+# Returns
+
+  - `pr::HighOrderPrior`: Result object containing asset returns, mean, covariance, coskewness tensor, cokurtosis tensor, and factor moments.
+
+# Validation
+
+  - `dims in (1, 2)`.
+
+# Related
+
+  - [`HighOrderFactorPriorEstimator`](@ref)
+  - [`HighOrderPrior`](@ref)
+  - [`FactorPrior`](@ref)
+  - [`prior`](@ref)
+"""
 function prior(pe::HighOrderFactorPriorEstimator, X::MatNum, F::MatNum; dims::Int = 1,
                kwargs...)
     @argcheck(dims in (1, 2))

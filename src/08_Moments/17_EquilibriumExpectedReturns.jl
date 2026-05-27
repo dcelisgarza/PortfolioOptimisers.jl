@@ -87,6 +87,20 @@ Return a new [`EquilibriumExpectedReturns`](@ref) estimator with observation wei
 
   - `me::EquilibriumExpectedReturns`: Updated estimator with weights applied.
 
+# Examples
+
+```jldoctest
+julia> me = EquilibriumExpectedReturns();
+
+julia> me2 = factory(me, StatsBase.Weights([0.2, 0.3, 0.5]));
+
+julia> me2.ce.ce.me.w
+3-element Weights{Float64, Float64, Vector{Float64}}:
+ 0.2
+ 0.3
+ 0.5
+```
+
 # Related
 
   - [`EquilibriumExpectedReturns`](@ref)
@@ -123,6 +137,20 @@ end
 Compute equilibrium expected returns from a covariance estimator, weights, and risk aversion.
 
 This method computes equilibrium expected returns as `λ * Σ * w`, where `λ` is the risk aversion parameter, `Σ` is the covariance matrix, and `w` are the equilibrium weights. If `w` is not provided in the estimator, equal weights are used.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\hat{\\boldsymbol{\\mu}}_{\\text{eq}} &= \\lambda \\, \\hat{\\mathbf{\\Sigma}} \\, \\boldsymbol{w}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\lambda``: Risk aversion parameter (`me.l`).
+  - ``\\hat{\\mathbf{\\Sigma}}``: `N × N` covariance matrix estimated from the data.
+  - ``\\boldsymbol{w}``: `N × 1` equilibrium portfolio weights (equal weights if not provided).
 
 # Arguments
 
