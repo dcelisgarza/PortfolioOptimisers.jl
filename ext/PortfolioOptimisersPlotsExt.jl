@@ -60,6 +60,16 @@ function PortfolioOptimisers.plot_ptf_cumulative_returns(pred::Union{<:Predictio
     return PortfolioOptimisers.plot_ptf_cumulative_returns(w, Xm, nothing; ts = ts,
                                                            opts = opts, kwargs...)
 end
+function PortfolioOptimisers.plot_ptf_cumulative_returns(pred::PopulationPredictionResult;
+                                                         opts::PlottingOptions = PlottingOptions(),
+                                                         kwargs...)
+    plt = plot(; kwargs...)
+    for p in pred.pred
+        plot!(plt,
+              PortfolioOptimisers.plot_ptf_cumulative_returns(p; opts = opts, kwargs...))
+    end
+    return plt
+end
 # function PortfolioOptimisers.plot_ptf_cumulative_returns(pred::MultiPeriodPredictionResult;
 #                                                          opts::PlottingOptions = PlottingOptions(),
 #                                                          kwargs...)
