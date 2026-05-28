@@ -12,17 +12,26 @@ import PortfolioOptimisers: ArrNum, VecNum, MatNum, Option, VecNum_VecVecNum, Sl
                             _extract_pr, _relevant_assets, _rolling_window_measure,
                             _extract_fees, OptimisationResult
 ## plot_ptf_cumulative_returns
-function PortfolioOptimisers.plot_ptf_cumulative_returns(w::ArrNum, X::MatNum,
+function PortfolioOptimisers.plot_ptf_cumulative_returns(w::VecNum_VecVecNum, X::MatNum,
                                                          fees::Option{<:Fees} = nothing;
                                                          ts::AbstractVector = 1:size(X, 1),
                                                          opts::PlottingOptions = PlottingOptions(),
                                                          kwargs...)
     ret = cumulative_returns(calc_net_returns(w, X, fees), opts.compound)
     label = "$(opts.compound ? "Compound" : "Simple") Cumulative Returns"
-    return plot(ts, ret; title = "Portfolio", xlabel = "Date", ylabel = label,
-                legend = false, kwargs...)
+    return if isa(w, VecNum)
+        plot(ts, ret; title = "Portfolio", xlabel = "Date", ylabel = label, legend = false,
+             kwargs...)
+    else
+        plt = plot(ts, ret[1]; title = "Portfolio", xlabel = "Date", ylabel = label,
+                   label = "Portfolio 1", legend = true, kwargs...)
+        for i in 2:length(w)
+            plot!(plt, ts, ret[i]; label = "Portfolio $(i)", kwargs...)
+        end
+        plt
+    end
 end
-function PortfolioOptimisers.plot_ptf_cumulative_returns(w::ArrNum, pr::Pr_RR,
+function PortfolioOptimisers.plot_ptf_cumulative_returns(w::VecNum_VecVecNum, pr::Pr_RR,
                                                          fees::Option{<:Fees} = nothing;
                                                          ts::AbstractVector = size(pr.X, 1),
                                                          opts::PlottingOptions = PlottingOptions(),
