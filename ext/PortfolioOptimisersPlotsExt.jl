@@ -70,29 +70,6 @@ function PortfolioOptimisers.plot_ptf_cumulative_returns(pred::PopulationPredict
     end
     return plt
 end
-# function PortfolioOptimisers.plot_ptf_cumulative_returns(pred::MultiPeriodPredictionResult;
-#                                                          opts::PlottingOptions = PlottingOptions(),
-#                                                          kwargs...)
-#     mrd = pred.mrd
-#     # mrd.X already contains net portfolio returns (fees applied during predict())
-#     ret = isa(mrd.X, VecVecNum) ? first(mrd.X) : mrd.X
-#     ts = isnothing(mrd.ts) ? (1:length(ret)) : mrd.ts
-#     cret = cumulative_returns(ret, opts.compound)
-#     label_str = "$(opts.compound ? "Compound" : "Simple") Walk-Forward Cumulative Returns"
-#     f = plot(ts, cret; title = "Walk-Forward Portfolio", xlabel = "Date",
-#              ylabel = label_str, legend = :bottomleft, kwargs...)
-#     folds = pred.pred
-#     theme_cols = palette(:Dark2_8, length(folds))
-#     for (i, p) in enumerate(folds)
-#         if isnothing(p.rd.ts)
-#             continue
-#         end
-#         vspan!(f, [p.rd.ts[1], p.rd.ts[end]]; alpha = 0.08,
-#                color = theme_cols[mod1(i, length(theme_cols))], label = "")
-#     end
-#     return f
-# end
-
 ## plot_asset_cumulative_returns
 function PortfolioOptimisers.plot_asset_cumulative_returns(w::VecNum, rd::ReturnsResult,
                                                            fees::Option{<:Fees} = nothing;
@@ -104,7 +81,7 @@ function PortfolioOptimisers.plot_asset_cumulative_returns(w::VecNum, rd::Return
                                                              nx = nx, opts = opts,
                                                              kwargs...)
 end
-function PortfolioOptimisers.plot_asset_cumulative_returns(res::NonFiniteAllocationOptimisationResult,
+function PortfolioOptimisers.plot_asset_cumulative_returns(res::OptimisationResult,
                                                            rd::ReturnsResult;
                                                            opts::PlottingOptions = PlottingOptions(),
                                                            kwargs...)
@@ -117,25 +94,67 @@ function PortfolioOptimisers.plot_asset_cumulative_returns(::PredictionResult; k
 end
 
 ## plot_composition
-function PortfolioOptimisers.plot_composition(res::NonFiniteAllocationOptimisationResult,
-                                              rd::ReturnsResult;
+function PortfolioOptimisers.plot_composition(w::VecNum, nx::AbstractVector = 1:length(w);
+                                              opts::PlottingOptions = PlottingOptions(),
+                                              kwargs...)
+    M = length(w)
+    N, idx = _relevant_assets(w, M, opts.N)
+    if M > N
+        sort!(view(idx, 1:N))
+        fidx = view(idx, 1:N)
+        w_plot = [view(w, fidx); sum(view(w, view(idx, (N + 1):M)))]
+        nx_plot = [nx[fidx]; "Others"]
+    else
+        w_plot = w
+        nx_plot = nx
+    end
+    return bar(w_plot; xticks = (1:length(nx_plot), nx_plot),
+               title = "Portfolio Composition", xlabel = "Asset", ylabel = "Weight",
+               xrotation = 90, legend = false, kwargs...)
+end
+function PortfolioOptimisers.plot_composition(res::OptimisationResult, rd::ReturnsResult;
                                               opts::PlottingOptions = PlottingOptions(),
                                               kwargs...)
     nx = isnothing(rd.nx) ? (1:length(res.w)) : rd.nx
     return PortfolioOptimisers.plot_composition(res.w, nx; opts = opts, kwargs...)
-end
-function PortfolioOptimisers.plot_composition(res::NonFiniteAllocationOptimisationResult,
-                                              pr::PortfolioOptimisers.AbstractPriorResult;
-                                              opts::PlottingOptions = PlottingOptions(),
-                                              kwargs...)
-    return PortfolioOptimisers.plot_composition(res.w, 1:length(res.w); opts = opts,
-                                                kwargs...)
 end
 function PortfolioOptimisers.plot_composition(pred::PredictionResult;
                                               opts::PlottingOptions = PlottingOptions(),
                                               kwargs...)
     nx = isnothing(pred.rd.nx) ? (1:length(pred.res.w)) : pred.rd.nx
     return PortfolioOptimisers.plot_composition(pred.res.w, nx; opts = opts, kwargs...)
+end
+function PortfolioOptimisers.plot_composition(pred::MultiPeriodPredictionResult;
+                                              opts::PlottingOptions = PlottingOptions(),
+                                              kwargs...)
+    folds = pred.pred
+    w_mat = hcat(getproperty.(getproperty.(folds, :res), :w)...)
+    nx = let rd1 = folds[1].rd
+        isnothing(rd1.nx) ? (1:size(w_mat, 1)) : rd1.nx
+    end
+    return PortfolioOptimisers.plot_stacked_bar_composition(collect(eachcol(w_mat)), nx;
+                                                            opts = opts, xlabel = "Fold",
+                                                            title = "Walk-Forward Composition",
+                                                            kwargs...)
+end
+function PortfolioOptimisers.plot_composition(pred::PopulationPredictionResult;
+                                              opts::PlottingOptions = PlottingOptions(),
+                                              kwargs...)
+    members = pred.pred
+    w_mat = hcat(map(m -> if isa(m, PredictionResult)
+                         m.res.w
+                     else
+                         mean(hcat(getproperty.(getproperty.(m.pred, :res), :w)...);
+                              dims = 2)[:]
+                     end, members)...)
+    nx = let rd1 = isa(members[1], PredictionResult) ? members[1].rd : members[1].pred[1].rd
+        isnothing(rd1.nx) ? (1:size(w_mat, 1)) : rd1.nx
+    end
+    return PortfolioOptimisers.plot_stacked_bar_composition(collect(eachcol(w_mat)), nx;
+                                                            opts = opts,
+                                                            xlabel = "Population Member",
+                                                            title = "Population Composition",
+                                                            kwargs...)
 end
 
 ## plot_stacked_bar_composition / plot_stacked_area_composition
@@ -1118,30 +1137,6 @@ function PortfolioOptimisers.plot_asset_cumulative_returns(w::VecNum, X::MatNum,
     plot!(f; legend = :outerright, kwargs...)
     return f
 end
-
-## ────────────────────────────────────────────────────────────────────────────
-## Portfolio composition (bar)
-## ────────────────────────────────────────────────────────────────────────────
-
-function PortfolioOptimisers.plot_composition(w::VecNum, nx::AbstractVector = 1:length(w);
-                                              opts::PlottingOptions = PlottingOptions(),
-                                              kwargs...)
-    M = length(w)
-    N, idx = _relevant_assets(w, M, opts.N)
-    if M > N
-        sort!(view(idx, 1:N))
-        fidx = view(idx, 1:N)
-        w_plot = [view(w, fidx); sum(view(w, view(idx, (N + 1):M)))]
-        nx_plot = [nx[fidx]; "Others"]
-    else
-        w_plot = w
-        nx_plot = nx
-    end
-    return bar(w_plot; xticks = (1:length(nx_plot), nx_plot),
-               title = "Portfolio Composition", xlabel = "Asset", ylabel = "Weight",
-               xrotation = 90, legend = false, kwargs...)
-end
-
 ## ────────────────────────────────────────────────────────────────────────────
 ## Stacked bar / area compositions (multi-portfolio)
 ## ────────────────────────────────────────────────────────────────────────────
@@ -1410,49 +1405,6 @@ function PortfolioOptimisers.plot_correlation(X::MatNum, nx::AbstractVector = 1:
                    color = cgrad(:Spectral), yflip = true, title = "Correlation Matrix",
                    colorbar_title = "ρ", kwargs...)
 end
-
-## ────────────────────────────────────────────────────────────────────────────
-## MultiPeriodPredictionResult walk-forward composition
-## ────────────────────────────────────────────────────────────────────────────
-
-function PortfolioOptimisers.plot_composition(pred::MultiPeriodPredictionResult;
-                                              opts::PlottingOptions = PlottingOptions(),
-                                              kwargs...)
-    folds = pred.pred
-    w_mat = hcat(getproperty.(getproperty.(folds, :res), :w)...)
-    nx = let rd1 = folds[1].rd
-        isnothing(rd1.nx) ? (1:size(w_mat, 1)) : rd1.nx
-    end
-    return PortfolioOptimisers.plot_stacked_bar_composition(collect(eachcol(w_mat)), nx;
-                                                            opts = opts, xlabel = "Fold",
-                                                            title = "Walk-Forward Composition",
-                                                            kwargs...)
-end
-
-## ────────────────────────────────────────────────────────────────────────────
-## PopulationPredictionResult compositions
-## ────────────────────────────────────────────────────────────────────────────
-
-function PortfolioOptimisers.plot_composition(pred::PopulationPredictionResult;
-                                              opts::PlottingOptions = PlottingOptions(),
-                                              kwargs...)
-    members = pred.pred
-    w_mat = hcat(map(m -> if isa(m, PredictionResult)
-                         m.res.w
-                     else
-                         mean(hcat(getproperty.(getproperty.(m.pred, :res), :w)...);
-                              dims = 2)[:]
-                     end, members)...)
-    nx = let rd1 = isa(members[1], PredictionResult) ? members[1].rd : members[1].pred[1].rd
-        isnothing(rd1.nx) ? (1:size(w_mat, 1)) : rd1.nx
-    end
-    return PortfolioOptimisers.plot_stacked_bar_composition(collect(eachcol(w_mat)), nx;
-                                                            opts = opts,
-                                                            xlabel = "Population Member",
-                                                            title = "Population Composition",
-                                                            kwargs...)
-end
-
 ## ────────────────────────────────────────────────────────────────────────────
 ## Expected returns bar chart
 ## ────────────────────────────────────────────────────────────────────────────
