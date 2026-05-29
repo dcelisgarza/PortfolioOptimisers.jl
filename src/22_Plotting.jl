@@ -920,6 +920,87 @@ Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
 """
 function plot_cv_dashboard end
 
+## ──────────────────────────────────────────────────────────────────────────────
+## Efficient frontier
+## ──────────────────────────────────────────────────────────────────────────────
+"""
+    plot_efficient_frontier(res_vec, pr[, fees]; x, y, c, slv, flag,
+                            annotate_minrisk, annotate_maxsharpe, opts, kwargs...)
+    plot_efficient_frontier(res_vec, rd; ...)
+
+Sort a collection of portfolio results by risk (`x`), connect them with a line to
+trace the efficient frontier, and optionally annotate the **minimum-risk** and
+**maximum-Sharpe** portfolios.
+
+  - `x`: risk measure for the horizontal axis (default `Variance()`).
+  - `y`: return measure for the vertical axis (default `ExpectedReturn()`).
+  - `c`: colour-coding measure (default Sharpe ratio derived from `x`).
+  - `flag`: if `true` (default), call `factory` on the measures before evaluating.
+  - `annotate_minrisk`: overlay a star marker at the minimum-risk portfolio.
+  - `annotate_maxsharpe`: overlay a star marker at the maximum-Sharpe portfolio.
+
+Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
+
+# Related
+
+  - [`plot_measures`](@ref)
+  - [`PlottingOptions`](@ref)
+  - [`expected_risk`](@ref)
+"""
+function plot_efficient_frontier end
+
+## ──────────────────────────────────────────────────────────────────────────────
+## Performance summary
+## ──────────────────────────────────────────────────────────────────────────────
+"""
+    plot_performance_summary(w, X[, fees]; periods_per_year, opts, kwargs...)
+    plot_performance_summary(w, rd[, fees]; opts, kwargs...)
+    plot_performance_summary(res, rd; opts, kwargs...)
+    plot_performance_summary(pred; opts, kwargs...)
+    plot_performance_summary(mpred; opts, kwargs...)
+
+Bar chart of annualised portfolio performance metrics:
+annualised return, annualised volatility, Sharpe ratio, Sortino ratio, Calmar ratio,
+maximum drawdown %, and CVaR % (at `opts.alpha`).
+
+  - `periods_per_year`: trading periods per year used for annualisation (default `252`).
+  - `opts.alpha`: tail probability for CVaR (default `0.05`).
+
+Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
+
+# Related
+
+  - [`PlottingOptions`](@ref)
+  - [`calc_net_returns`](@ref)
+"""
+function plot_performance_summary end
+
+## ──────────────────────────────────────────────────────────────────────────────
+## Rolling drawdown evolution
+## ──────────────────────────────────────────────────────────────────────────────
+"""
+    plot_rolling_drawdowns(w, X[, fees]; ts, opts, kwargs...)
+    plot_rolling_drawdowns(w, rd[, fees]; opts, kwargs...)
+    plot_rolling_drawdowns(res, rd; opts, kwargs...)
+    plot_rolling_drawdowns(pred; opts, kwargs...)
+    plot_rolling_drawdowns(mpred; opts, kwargs...)
+
+Line plot of the rolling maximum drawdown over a sliding window.
+
+Window size is controlled by `opts.rolling` (0 = auto: ⌈√T⌉).
+`opts.compound` selects compound vs simple drawdowns.
+
+Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
+
+# Related
+
+  - [`PlottingOptions`](@ref)
+  - [`drawdowns`](@ref)
+  - [`plot_drawdowns`](@ref)
+  - [`plot_rolling_measure`](@ref)
+"""
+function plot_rolling_drawdowns end
+
 ## ────────────────────────────────────────────────────────────────────────────
 ## Internal helpers (no Plots.jl dependency)
 ## ────────────────────────────────────────────────────────────────────────────
@@ -960,4 +1041,5 @@ export PlottingOptions, plot_ptf_cumulative_returns, plot_asset_cumulative_retur
        plot_centrality, plot_correlation, plot_mu, plot_sigma, plot_factor_loadings,
        plot_factor_sigma, plot_eigenspectrum, plot_rolling_measure, plot_weight_stability,
        plot_cv_scores, plot_turnover, plot_prior, plot_factor_mu, plot_benchmark,
-       plot_coskewness, plot_cokurtosis, plot_portfolio_dashboard, plot_cv_dashboard
+       plot_coskewness, plot_cokurtosis, plot_portfolio_dashboard, plot_cv_dashboard,
+       plot_efficient_frontier, plot_performance_summary, plot_rolling_drawdowns

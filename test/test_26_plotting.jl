@@ -122,10 +122,9 @@
         @test is_plot(plot_histogram(w_rd, rd))
     end
 
-    # plot_network skipped: GraphRecipes v0.5.16 has internal annotation bug
     @testset "plot_network" begin
         ne = NetworkEstimator()
-        @test_skip is_plot(plot_network(ne, X, nx))
+        @test is_plot(plot_network(ne, X, nx))
     end
 
     @testset "plot_centrality" begin
@@ -233,6 +232,7 @@
         @test is_plot(plot_prior(res, rd))
         # default r=Variance() has no sigma; pass CVaR which computes from returns
         @test is_plot(plot_portfolio_dashboard(res, rd; r = r_cvr))
+        @test is_plot(plot_measures([res], rd))
     end
 
     @testset "Cross-validation dispatch" begin
@@ -247,6 +247,45 @@
         @test is_plot(plot_weight_stability(mpred))
         @test is_plot(plot_turnover(mpred))
         @test is_plot(plot_cv_dashboard(mpred))
+    end
+
+    @testset "plot_efficient_frontier" begin
+        # Frontier result (VecVecNum weights)
+        mr_f  = MeanRisk(; opt = JuMPOptimiser(; slv = slv, ret = ArithmeticReturn(; lb = Frontier(; N = 8))))
+        res_f = optimise(mr_f, rd)
+        @test is_plot(plot_efficient_frontier(res_f, rd))
+        @test is_plot(plot_efficient_frontier(res_f, pr))
+        @test is_plot(plot_efficient_frontier(res_f, rd; annotate_minrisk = false,
+                                              annotate_maxsharpe = false))
+        # Vector-of-results form
+        mr1  = MeanRisk(; opt = JuMPOptimiser(; slv = slv))
+        res1 = optimise(mr1, rd)
+        mr2  = MeanRisk(; opt = JuMPOptimiser(; slv = slv), r = ConditionalValueatRisk())
+        res2 = optimise(mr2, rd)
+        @test is_plot(plot_efficient_frontier([res1, res2], rd))
+    end
+
+    @testset "plot_performance_summary" begin
+        @test is_plot(plot_performance_summary(w, X))
+        @test is_plot(plot_performance_summary(w_rd, rd))
+        mr_p  = MeanRisk(; opt = JuMPOptimiser(; slv = slv))
+        res_p = optimise(mr_p, rd)
+        @test is_plot(plot_performance_summary(res_p, rd))
+        mpred_p = cross_val_predict(mr_p, rd, IndexWalkForward(80, 40))
+        @test is_plot(plot_performance_summary(mpred_p))
+    end
+
+    @testset "plot_rolling_drawdowns" begin
+        @test is_plot(plot_rolling_drawdowns(w, X))
+        @test is_plot(plot_rolling_drawdowns(w_rd, rd))
+        @test is_plot(plot_rolling_drawdowns(w, X; opts = PlottingOptions(; rolling = 20)))
+        @test is_plot(plot_rolling_drawdowns(w, X;
+                                             opts = PlottingOptions(; compound = true)))
+        mr_d  = MeanRisk(; opt = JuMPOptimiser(; slv = slv))
+        res_d = optimise(mr_d, rd)
+        @test is_plot(plot_rolling_drawdowns(res_d, rd))
+        mpred_d = cross_val_predict(mr_d, rd, IndexWalkForward(80, 40))
+        @test is_plot(plot_rolling_drawdowns(mpred_d))
     end
 
     @testset "Error dispatch – unsupported PredictionResult" begin
