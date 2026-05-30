@@ -261,6 +261,16 @@ println("remaining cash: $(mip_res5.cash)")
 println("used cash ≈ available cash: $(isapprox(sum(abs.(mip_res5.cost)) + mip_res5.cash, 4506.9 * sum(abs.(res5.w))))")
 ````
 
+Comparing compositions across all strict budget constraint types side-by-side reveals how
+the budget and short-budget parameters shape the allocation.
+
+````@example 05_Budget_Constraints
+using StatsPlots, GraphRecipes
+
+#= Fully invested, market-neutral, short-only, leveraged, and underleveraged long-short. =#
+plot_stacked_bar_composition([res1, res2, res3, res4, res5], rd)
+````
+
 # 4. Budget range
 
 The other type of budget constraint we will explore in this example is the budget range constraint, `BudgetRange`. It allows the user to define upper and lower bounds on the budget and short budget. When using a `BudgetRange`, it is necessary to provide at least one of the upper or lower bounds. If only one is provided, the other is assumed to be unbounded. If no budget bounds are desired, simply set `bgt` or `sbgt` to `nothing`.
@@ -301,6 +311,13 @@ println("budget: $(sum(res7.w))")
 println("long budget: $(sum(res7.w[res7.w .>= zero(eltype(res7.w))]))")
 println("short budget: $(sum(res7.w[res7.w .< zero(eltype(res7.w))]))")
 println("weight bounds: $(all(x -> -one(x) <= x <= one(x), res7.w))")
+````
+
+Comparing the two budget-range portfolios shows how tightening the short-budget constraint
+changes the allocation.
+
+````@example 05_Budget_Constraints
+plot_stacked_bar_composition([res6, res7], rd)
 ````
 
 The previous example has an essentially unbounded short budget. If we constrain the absolute value of the short budget to be less than the unconstrained value, then the constraint has an effect on the portfolio weights.

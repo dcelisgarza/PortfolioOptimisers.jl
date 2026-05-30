@@ -95,6 +95,16 @@ pretty_table(DataFrame(; :assets => rd.nx, :benchmark => res0.w, :MinimumRisk =>
                        :MaximumReturn => res4.w); formatters = [resfmt])
 
 #=
+## 4. Visualising objective functions
+
+Comparing compositions and cumulative returns across objectives reveals how each allocation differs.
+=#
+
+using StatsPlots, GraphRecipes#= Stacked bar composition for the benchmark and all four objectives. =#
+
+plot_stacked_bar_composition([res0, res1, res2, res3, res4], rd)
+
+#=
 In order to confirm that the objective functions do what they say on the tin, we can compute the risk, return and risk return ration. There are individual functions for each `expected_risk`, `expected_return`, `expected_ratio`, but we also have `expected_risk_ret_ratio` that returns all three at once (`risk`, `return`, `risk-return ratio`) which is what we will use here.
 
 Due to the fact that we provide different expected portfolio return measures, any function that computes the expected portfolio return also needs to know which return type to compute. We will be consistent with the returns we used in the optimisation.
@@ -116,6 +126,25 @@ pretty_table(DataFrame(;
                             :Benchmark], :rk => [rk1, rk2, rk3, rk4, rk0],
                        :rt => [rt1, rt2, rt3, rt4, rt0], :rr => [rr1, rr2, rr3, rr4, rr0]);
              formatters = [resfmt])
+
+#=
+The return histogram for the minimum-risk portfolio shows the distribution of daily returns and the
+VaR / CVaR tail-risk markers.
+=#
+
+plot_histogram(res1, rd)
+
+#=
+Drawdown time series for the minimum-risk portfolio.
+=#
+
+plot_drawdowns(res1, rd)
+
+#=
+Per-asset semi-standard-deviation risk contribution for the minimum-risk portfolio.
+=#
+
+plot_risk_contribution(r, res1, rd)
 
 #=
 We can see that indeed, the minimum risk produces the portfolio with minimum risk, the maximum ratio produces the portfolio with the maximum risk-return ratio, and the maximum return portfolio produces the portfolio with the maximum return.

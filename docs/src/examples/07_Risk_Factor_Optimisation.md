@@ -91,6 +91,22 @@ Now let's compute the prior statistics for each estimator.
 prs = prior.(pes, rd)
 ````
 
+We can visualise the prior statistics to understand what each estimator produces.
+The empirical prior serves as the baseline.
+
+````@example 07_Risk_Factor_Optimisation
+using StatsPlots, GraphRecipes
+
+#= 3-panel composite (μ, σ, correlation) for the empirical prior. =#
+plot_prior(prs[1], rd)
+
+#= Factor prior with stepwise regression — factor loadings reveal which factors drive each asset. =#
+plot_prior(prs[2], rd)
+plot_factor_loadings(prs[2], rd)
+plot_factor_mu(prs[2], rd)
+plot_factor_sigma(prs[2], rd)
+````
+
 First let's compare the first three prior results.
 
 The expected returns, found in the `mu` field, do not change much between [`EmpiricalPrior`](@ref) and [`FactorPrior`](@ref). Which illustrates one of the reasons why it's unwise to put much stock on expected returns estimates, since they are highly uncertain and sensitive to noise. We will explore different expected returns estimators, which attempt to improve this drawback in future examples.
@@ -119,6 +135,15 @@ pretty_table(DataFrame([rd.nx prs[2].sigma], ["Assets"; rd.nx]); formatters = [m
 pretty_table(DataFrame([rd.nx prs[3].sigma], ["Assets"; rd.nx]); formatters = [mmtfmt],
              title = "FactorPrior(DimRed) Covariance",
              source_notes = "Condition number FactorPrior(DimRed): $(round(cond(prs[3].sigma); digits = 3))")
+````
+
+The eigenspectrum of the covariance matrix shows how many eigenvalues exceed the Marchenko-Pastur
+upper bound (noise floor). Factor models tend to suppress noise eigenvalues.
+
+````@example 07_Risk_Factor_Optimisation
+plot_eigenspectrum(prs[1], rd)
+plot_eigenspectrum(prs[2], rd)
+plot_eigenspectrum(prs[3], rd)
 ````
 
 The next three prior results have the same low order moments and adjusted returns series as the `i-3`'th prior result because they use the same regression model.
@@ -190,6 +215,14 @@ pretty_table(DataFrame([rd.nx prs[8].V], ["Assets"; rd.nx]); formatters = [hmmtf
              source_notes = "Condition number HighOrderFactorPriorEstimator(DimRed): $(round(cond(prs[8].V); digits = 3))")
 ````
 
+Coskewness heatmaps (N × N²) show the third-order dependence structure. Factor models can
+alter the off-diagonal structure.
+
+````@example 07_Risk_Factor_Optimisation
+plot_coskewness(prs[4], rd)
+plot_coskewness(prs[7], rd)
+````
+
 And the cokurtosis.
 
 ````@example 07_Risk_Factor_Optimisation
@@ -202,6 +235,13 @@ pretty_table(DataFrame([nx2 prs[7].kt], ["Assets^2"; nx2]); formatters = [hmmtfm
 pretty_table(DataFrame([nx2 prs[8].kt], ["Assets^2"; nx2]); formatters = [hmmtfmt],
              title = "HighOrderFactorPriorEstimator(DimRed) Cokurtosis",
              source_notes = "Condition number HighOrderFactorPriorEstimator(DimRed): $(round(cond(prs[8].kt); digits = 3))")
+````
+
+Cokurtosis eigenspectrum (N² × N²) with optional Marchenko-Pastur reference.
+
+````@example 07_Risk_Factor_Optimisation
+plot_cokurtosis(prs[4], rd)
+plot_cokurtosis(prs[7], rd)
 ````
 
 Ideally, the condition numbers of the higher order moments should be lower when using factor models, indicating more stable and robust estimates. However, this is not always the case due to the higher exponentiation involved in their computation.
@@ -324,6 +364,9 @@ ress = optimise.(mrs)
 pretty_table(DataFrame("Assets" => rd.nx, "EmpiricalPrior" => ress[1].w,
                        "FactorPrior(Step)" => ress[2].w,
                        "FactorPrior(DimRed)" => ress[3].w); formatters = [resfmt])
+
+#= Side-by-side composition: empirical vs two factor priors (MaximumRatio, StandardDeviation). =#
+plot_stacked_bar_composition(ress, rd)
 ````
 
 We can see that the factor model portfolios are more diversified than the empirical one. This is because the factor model reduces estimation error in the covariance matrix, leading to more stable and diversified portfolios.
@@ -423,6 +466,9 @@ ress = optimise.(mrs)
 pretty_table(DataFrame("Assets" => rd.nx, "EmpiricalPrior" => ress[1].w,
                        "FactorPrior(Step)" => ress[2].w,
                        "FactorPrior(DimRed)" => ress[3].w); formatters = [resfmt])
+
+#= Side-by-side composition: empirical vs two factor priors (MaximumRatio, NegativeSkewness). =#
+plot_stacked_bar_composition(ress, rd)
 ````
 
 Here we have the opposite effect to before, this follows from the fact that for this particular scenario the condition number of the matrix of negative spectral slices of the coskewness is actually lower for the empirical prior than for the factor priors. This goes to show that higher order moments are more susceptible to noise, and factor models may not be able to fully mitigate this.
@@ -520,6 +566,9 @@ ress = optimise.(mrs)
 pretty_table(DataFrame("Assets" => rd.nx, "EmpiricalPrior" => ress[1].w,
                        "FactorPrior(Step)" => ress[2].w,
                        "FactorPrior(DimRed)" => ress[3].w); formatters = [resfmt])
+
+#= Side-by-side composition: empirical vs two factor priors (MaximumRatio, Kurtosis). =#
+plot_stacked_bar_composition(ress, rd)
 ````
 
 These findings are again consistent with the previous result, and reflective of the higher condition numbers of the factor-based higher order statistics. The next example will explore ways of reducing the estimation error.

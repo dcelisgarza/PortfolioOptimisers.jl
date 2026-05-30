@@ -10,7 +10,7 @@ Cross validation is a powerful technique to evaluate the performance of a model 
 
 Cross validation can be used as a standalone method to evaluate the performance of a model, or it can be used in conjunction with other techniques like hyperparameter tuning or model selection. They can also be used in [`NestedClustered`](@ref) and [`Stacking`](@ref) optimisation estimators to optimise the outer estimator on the out-of-sample performance of the inner estimators.
 
-This example will only focus on showcasing the different cross validation methods, with examples on how to use them and what metrics can be computed. Further analysis like plots or grid searches have not been implemented yet, but are the top priority of future development.
+This example will only focus on showcasing the different cross validation methods, with examples on how to use them and what metrics can be computed. We also demonstrate the plotting functions available for cross-validation results.
 
 ````@example 10_CrossValidation
 using PortfolioOptimisers, PrettyTables
@@ -102,6 +102,24 @@ Let's perform the cross validation.
 
 ````@example 10_CrossValidation
 kfold_pred = cross_val_predict(mr, rd, kfold)
+````
+
+We can visualise the out-of-sample performance and weight behaviour across folds.
+
+````@example 10_CrossValidation
+using StatsPlots, GraphRecipes
+
+#= Portfolio cumulative returns across all KFold test periods. =#
+plot_ptf_cumulative_returns(kfold_pred)
+
+#= Per-asset weight distribution across folds. =#
+plot_weight_stability(kfold_pred)
+
+#= Portfolio turnover between consecutive folds. =#
+plot_turnover(kfold_pred)
+
+#= Cross-validation scores (second moment / variance) per fold. =#
+plot_cv_scores(LowOrderMoment(; alg = SecondMoment()), kfold_pred)
 ````
 
 The result is a [`MultiPeriodPredictionResult`](@ref) object, which is a wrapper for a vector of [`PredictionResult`](@ref) objects, one for each fold. Each [`PredictionResult`](@ref) contains the optimisation result based on the training set, and a [`PredictionReturnsResult`](@ref) containing the predicted returns result of the optimised portfolio evaluated on its corresponding test set.
@@ -199,6 +217,20 @@ sharpe_ratios = expected_risk(MeanReturnRiskRatio(;
 argmin(abs.(sharpe_ratios .- median(sharpe_ratios))) == median_pred_max_sharpe.id
 ````
 
+Weight stability across all combinatorial CV paths shows how robust the model is to different
+training subsets.
+
+````@example 10_CrossValidation
+plot_weight_stability(cfold_pred)
+````
+
+CV scores (Sharpe ratio) across all paths — the distribution shows the range of out-of-sample
+performance.
+
+````@example 10_CrossValidation
+plot_cv_scores(MeanReturnRiskRatio(; rk = LowOrderMoment(; alg = SecondMoment())), cfold_pred)
+````
+
 We can choose any compatible risk measure as outlined above, for demonstration purposes we will now rank them based on the variance.
 
 ````@example 10_CrossValidation
@@ -247,6 +279,24 @@ Let's check the timestamps.
 isequal(idx_walkforward_pred.mrd.ts, rd.ts[253:end])
 ````
 
+Cumulative returns across all walk-forward test windows, stacked together.
+
+````@example 10_CrossValidation
+plot_ptf_cumulative_returns(idx_walkforward_pred)
+````
+
+Portfolio composition evolution across walk-forward windows as a stacked bar.
+
+````@example 10_CrossValidation
+plot_composition(idx_walkforward_pred)
+````
+
+Turnover at each rebalancing point.
+
+````@example 10_CrossValidation
+plot_turnover(idx_walkforward_pred)
+````
+
 Now let's see the evolution of the weights across the different splits.
 
 ````@example 10_CrossValidation
@@ -275,6 +325,14 @@ Now let's see the evolution of the weights across the different splits. We can s
 pretty_table(hcat(DataFrame(:tickers => rd.nx),
                   DataFrame(reduce(hcat, getproperty.(idx_tn_walkforward_pred.res, :w)),
                             Symbol.(1:16))); formatters = [resfmt])
+````
+
+With the turnover constraint the turnover per rebalancing period is now capped at 2%.
+
+````@example 10_CrossValidation
+plot_ptf_cumulative_returns(idx_tn_walkforward_pred)
+plot_turnover(idx_tn_walkforward_pred)
+plot_weight_stability(idx_tn_walkforward_pred)
 ````
 
 #### 2.3.2 DateWalkForward
@@ -327,6 +385,13 @@ We can see the evolution of the weights across the different splits. We can see 
 pretty_table(hcat(DataFrame(:tickers => rd.nx),
                   DataFrame(reduce(hcat, getproperty.(date_tn_walkforward_pred.res, :w)),
                             Symbol.(1:15))); formatters = [resfmt])
+````
+
+Calendar-aligned walk-forward: cumulative returns and turnover across month-end rebalancing dates.
+
+````@example 10_CrossValidation
+plot_ptf_cumulative_returns(date_tn_walkforward_pred)
+plot_turnover(date_tn_walkforward_pred)
 ````
 
 The splits are different to the index walkforward method, so the weights are also different, but we can see there's not too much variation. That's because the training periods are roughly the same. However, the turnover constraint also helps in stabilising the weights.

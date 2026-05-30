@@ -123,6 +123,15 @@ for (lens, val) in zip(gs_res1.lens_grid[gs_res1.idx], gs_res1.val_grid[gs_res1.
 end
 ````
 
+We can now optimise the best estimator on the full dataset to inspect the resulting portfolio.
+
+````@example 11_HyperparameterTuning
+using StatsPlots, GraphRecipes
+
+res_gs1 = optimise(gs_res1.opt, rd)
+plot_composition(res_gs1, rd)
+````
+
 ### 2.2 Randomised cross validation search
 
 [`RandomisedSearchCrossValidation`](@ref) performs an randomised search over a sampled parameter grid via [`search_cross_validation`](@ref). It can take the same type of grid as [`GridSearchCrossValidation`](@ref), in which case the parameters are sampled without replacement. It can also take a subtype of [`Distributions.Distribution`](https://juliastats.org/Distributions.jl/latest/types/#Distributions) instead of a vector of values, in which case any parameters given as a vector will be sampled with replacement. The property `n_iter` defines the number of samples to draw from the vectors or distributions. When sampling without replacement, the sampling is performed up until the list of candidates is exhausted, so the maximum number of samples drawn from a list is `min(n_iter, length(list))`. After the parameters have been sampled, a grid search cross validation is performed. It's also possible to provide a vector of grids, which works exactly like [`GridSearchCrossValidation`](@ref).
@@ -152,6 +161,9 @@ pretty_table(DataFrame("Lens" => rs_res1.lens_grid[rs_res1.idx],
 for (lens, val) in zip(rs_res1.lens_grid[rs_res1.idx], rs_res1.val_grid[rs_res1.idx])
     println("$(lpad("lens:", 12)) $lens\n$(lpad("val:", 12)) $val\n$(lpad("Field value:", 12)) $(lens(rs_res1.opt))\n")
 end
+
+res_rs1 = optimise(rs_res1.opt, rd)
+plot_composition(res_rs1, rd)
 ````
 
 #### 2.2.2 Sampling from a distribution
@@ -184,6 +196,16 @@ pretty_table(DataFrame("Lens" => rs_res2.lens_grid[rs_res2.idx],
 for (lens, val) in zip(rs_res2.lens_grid[rs_res2.idx], rs_res2.val_grid[rs_res2.idx])
     println("$(lpad("lens:", 12)) $lens\n$(lpad("val:", 12)) $val\n$(lpad("Field value:", 12)) $(lens(rs_res2.opt))\n")
 end
+
+res_rs2 = optimise(rs_res2.opt, rd)
+plot_composition(res_rs2, rd)
+````
+
+Comparing the three best portfolios — grid search, randomised (predefined), randomised (distribution) —
+shows how different hyperparameter budgets and sampling strategies affect the final allocation.
+
+````@example 11_HyperparameterTuning
+plot_stacked_bar_composition([res_gs1, res_rs1, res_rs2], rd)
 ````
 
 The hyperparameter tuning can be used on any non finite optimisation estimator. In the future it will also be possible to provide a pipeline which will also allow users to tune pre-selection criteria.

@@ -102,7 +102,24 @@ Let's view the solution results as a pretty table. For convenience, we have ensu
 pretty_table(DataFrame(:assets => rd.nx, :weights => res.w); formatters = [resfmt])
 
 #=
-## 3. Finite allocation
+## 3. Visualising the portfolio
+
+We can visualise the composition, cumulative returns, return distribution, and drawdown profile of
+the optimal portfolio.
+=#
+
+using StatsPlots, GraphRecipes#= Portfolio weights as a bar chart. =#
+
+plot_composition(res, rd)#= Cumulative returns of the optimised portfolio over the sample period. =#
+
+plot_ptf_cumulative_returns(res, rd)#= Return histogram with tail-risk markers (VaR, CVaR). =#
+
+plot_histogram(res, rd)#= Drawdown time series showing peak-to-trough loss periods. =#
+
+plot_drawdowns(res, rd)
+
+#=
+## 4. Finite allocation
 
 We have the optimal solution, but most people don't have access to effectively unlimited funds. Given the optimised weights, current prices and a finite cash amount, it is possible to perform a finite allocation. We will use a discrete allocation method which uses mixed-integer programming to find the best allocation. We have another finite allocation method which uses a greedy algorithm that can deal with fractional shares, but we will reserve it for a later example.
 
@@ -145,3 +162,10 @@ We can also see that the cost of each asset is equal to the number of shares tim
 =#
 
 println("cost of shares ≈ cost of portfolio: $(all(isapprox.(mip_res.shares .* vec(values(X[end])), mip_res.cost)))")
+
+#=
+We can compare the optimal (continuous) and finite-allocation (MIP) compositions side by side.
+The MIP weights approximate the continuous ones, with small deviations due to rounding to whole shares.
+=#
+
+plot_stacked_bar_composition([res, mip_res], rd)

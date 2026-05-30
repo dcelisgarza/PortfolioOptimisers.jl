@@ -7,8 +7,7 @@ import PortfolioOptimisers: ArrNum, VecNum, MatNum, Option, VecNum_VecVecNum, Sl
                             MatNum_Pr, PrE_Pr, Pr_RR, HClE_HCl, VecVecNum, RegE_Reg,
                             NwE_ClE_Cl, AbstractCentralityEstimator,
                             AbstractClustersEstimator, AbstractClusteringResult,
-                            AbstractBaseRiskMeasure, PlottingOptions,
-                            NonFiniteAllocationOptimisationResult, _pred_rd_to_matrix,
+                            AbstractBaseRiskMeasure, PlottingOptions, _pred_rd_to_matrix,
                             _extract_pr, _relevant_assets, _rolling_window_measure,
                             _extract_fees, OptimisationResult
 ## plot_ptf_cumulative_returns
@@ -179,7 +178,7 @@ function PortfolioOptimisers.plot_stacked_bar_composition(res_vec::AbstractVecto
                                                           rd::ReturnsResult;
                                                           opts::PlottingOptions = PlottingOptions(),
                                                           kwargs...)
-    w = hcat(getproperty.(res_vec, :w)...)
+    w = getproperty.(res_vec, :w)
     nx = isnothing(rd.nx) ? (1:size(w, 1)) : rd.nx
     return PortfolioOptimisers.plot_stacked_bar_composition(w, nx; opts = opts, kwargs...)
 end
@@ -197,7 +196,7 @@ function PortfolioOptimisers.plot_stacked_area_composition(res_vec::AbstractVect
                                                            rd::ReturnsResult;
                                                            opts::PlottingOptions = PlottingOptions(),
                                                            kwargs...)
-    w = hcat(getproperty.(res_vec, :w)...)
+    w = getproperty.(res_vec, :w)
     nx = isnothing(rd.nx) ? (1:size(w, 1)) : rd.nx
     return PortfolioOptimisers.plot_stacked_area_composition(w, nx; opts = opts, kwargs...)
 end
@@ -212,7 +211,7 @@ function PortfolioOptimisers.plot_risk_contribution(r::PortfolioOptimisers.Abstr
                                                       opts = opts, kwargs...)
 end
 function PortfolioOptimisers.plot_risk_contribution(r::PortfolioOptimisers.AbstractBaseRiskMeasure,
-                                                    res::NonFiniteAllocationOptimisationResult,
+                                                    res::OptimisationResult,
                                                     rd::ReturnsResult;
                                                     opts::PlottingOptions = PlottingOptions(),
                                                     kwargs...)
@@ -221,14 +220,14 @@ function PortfolioOptimisers.plot_risk_contribution(r::PortfolioOptimisers.Abstr
                                                       kwargs...)
 end
 function PortfolioOptimisers.plot_risk_contribution(r::PortfolioOptimisers.AbstractBaseRiskMeasure,
-                                                    res::NonFiniteAllocationOptimisationResult,
+                                                    res::OptimisationResult,
                                                     pr::PortfolioOptimisers.AbstractPriorResult;
+                                                    nx::AbstractVector = 1:length(res.w),
                                                     opts::PlottingOptions = PlottingOptions(),
                                                     kwargs...)
     fees = hasproperty(res, :fees) ? res.fees : nothing
-    return PortfolioOptimisers.plot_risk_contribution(r, res.w, pr.X, fees;
-                                                      nx = 1:length(res.w), opts = opts,
-                                                      kwargs...)
+    return PortfolioOptimisers.plot_risk_contribution(r, res.w, pr.X, fees; nx = nx,
+                                                      opts = opts, kwargs...)
 end
 function PortfolioOptimisers.plot_risk_contribution(::PortfolioOptimisers.AbstractBaseRiskMeasure,
                                                     ::PredictionResult; kwargs...)
@@ -236,7 +235,7 @@ function PortfolioOptimisers.plot_risk_contribution(::PortfolioOptimisers.Abstra
 end
 ## plot_factor_risk_contribution
 function PortfolioOptimisers.plot_factor_risk_contribution(r::PortfolioOptimisers.AbstractBaseRiskMeasure,
-                                                           res::NonFiniteAllocationOptimisationResult,
+                                                           res::OptimisationResult,
                                                            rd::ReturnsResult;
                                                            re::RegE_Reg = StepwiseRegression(),
                                                            opts::PlottingOptions = PlottingOptions(),
@@ -401,8 +400,7 @@ function PortfolioOptimisers.plot_drawdowns(w::ArrNum, rd::ReturnsResult,
     return PortfolioOptimisers.plot_drawdowns(w, rd.X, fees; slv = slv, ts = ts,
                                               opts = opts, kwargs...)
 end
-function PortfolioOptimisers.plot_drawdowns(res::NonFiniteAllocationOptimisationResult,
-                                            rd::ReturnsResult;
+function PortfolioOptimisers.plot_drawdowns(res::OptimisationResult, rd::ReturnsResult;
                                             slv::Option{<:Slv_VecSlv} = nothing,
                                             opts::PlottingOptions = PlottingOptions(),
                                             kwargs...)
@@ -452,7 +450,7 @@ function PortfolioOptimisers.plot_measures(w::VecNum_VecVecNum, pr::Pr_RR,
                 legend = true, kwargs...)
     end
 end
-function PortfolioOptimisers.plot_measures(res_vec::AbstractVector{<:NonFiniteAllocationOptimisationResult},
+function PortfolioOptimisers.plot_measures(res_vec::AbstractVector{<:OptimisationResult},
                                            rd::ReturnsResult;
                                            x::PortfolioOptimisers.AbstractBaseRiskMeasure = Variance(),
                                            y::PortfolioOptimisers.AbstractBaseRiskMeasure = ExpectedReturn(),
@@ -532,8 +530,7 @@ function PortfolioOptimisers.plot_histogram(w::ArrNum, rd::ReturnsResult,
     return PortfolioOptimisers.plot_histogram(w, rd.X, fees; slv = slv, opts = opts,
                                               kwargs...)
 end
-function PortfolioOptimisers.plot_histogram(res::NonFiniteAllocationOptimisationResult,
-                                            rd::ReturnsResult;
+function PortfolioOptimisers.plot_histogram(res::OptimisationResult, rd::ReturnsResult;
                                             slv::Option{<:Slv_VecSlv} = nothing,
                                             opts::PlottingOptions = PlottingOptions(),
                                             kwargs...)
@@ -551,6 +548,23 @@ function PortfolioOptimisers.plot_histogram(pred::PredictionResult;
                                               kwargs...)
 end
 ## plot_network
+function PortfolioOptimisers.plot_network(pl::NwE_ClE_Cl, X::MatNum,
+                                          nx::AbstractVector = 1:size(X, 2),
+                                          w::Option{<:VecNum} = nothing;
+                                          threshold::Number = 0,
+                                          opts::PlottingOptions = PlottingOptions(),
+                                          kwargs...)
+    plr = phylogeny_matrix(pl, X)
+    A = copy(plr.X)
+    A[abs.(A) .<= threshold] .= 0
+    node_size = if isnothing(w)
+        fill(1, size(X, 2))
+    else
+        abs.(w) ./ maximum(abs.(w))
+    end
+    return graphplot(A; names = nx, node_weights = node_size, title = "Asset Network",
+                     kwargs...)
+end
 function PortfolioOptimisers.plot_network(pl::NwE_ClE_Cl,
                                           pr::PortfolioOptimisers.AbstractPriorResult,
                                           nx::AbstractVector = 1:size(pr.X, 2),
@@ -566,8 +580,7 @@ function PortfolioOptimisers.plot_network(pl::NwE_ClE_Cl, rd::ReturnsResult,
     nx = isnothing(rd.nx) ? (1:size(rd.X, 2)) : rd.nx
     return PortfolioOptimisers.plot_network(pl, rd.X, nx, w; opts = opts, kwargs...)
 end
-function PortfolioOptimisers.plot_network(pl::NwE_ClE_Cl,
-                                          res::NonFiniteAllocationOptimisationResult,
+function PortfolioOptimisers.plot_network(pl::NwE_ClE_Cl, res::OptimisationResult,
                                           rd::ReturnsResult;
                                           opts::PlottingOptions = PlottingOptions(),
                                           kwargs...)
@@ -607,8 +620,7 @@ function PortfolioOptimisers.plot_centrality(cte::AbstractCentralityEstimator,
     return PortfolioOptimisers.plot_centrality(cte, rd.X, nx; opts = opts, kwargs...)
 end
 function PortfolioOptimisers.plot_centrality(cte::AbstractCentralityEstimator,
-                                             res::NonFiniteAllocationOptimisationResult,
-                                             rd::ReturnsResult;
+                                             res::OptimisationResult, rd::ReturnsResult;
                                              opts::PlottingOptions = PlottingOptions(),
                                              kwargs...)
     nx = isnothing(rd.nx) ? (1:length(res.w)) : rd.nx
@@ -628,14 +640,13 @@ function PortfolioOptimisers.plot_correlation(pr::PortfolioOptimisers.AbstractPr
     nx = isnothing(rd.nx) ? (1:size(pr.sigma, 1)) : rd.nx
     return PortfolioOptimisers.plot_correlation(pr.sigma, nx; opts = opts, kwargs...)
 end
-function PortfolioOptimisers.plot_correlation(res::NonFiniteAllocationOptimisationResult,
-                                              rd::ReturnsResult;
+function PortfolioOptimisers.plot_correlation(res::OptimisationResult, rd::ReturnsResult;
                                               opts::PlottingOptions = PlottingOptions(),
                                               kwargs...)
     return PortfolioOptimisers.plot_correlation(_extract_pr(res), rd; opts = opts,
                                                 kwargs...)
 end
-function PortfolioOptimisers.plot_correlation(res::NonFiniteAllocationOptimisationResult;
+function PortfolioOptimisers.plot_correlation(res::OptimisationResult;
                                               opts::PlottingOptions = PlottingOptions(),
                                               kwargs...)
     return PortfolioOptimisers.plot_correlation(_extract_pr(res); opts = opts, kwargs...)
@@ -664,12 +675,11 @@ function PortfolioOptimisers.plot_mu(pr::PortfolioOptimisers.AbstractPriorResult
     nx = isnothing(rd.nx) ? (1:length(pr.mu)) : rd.nx
     return PortfolioOptimisers.plot_mu(pr.mu, nx; opts = opts, kwargs...)
 end
-function PortfolioOptimisers.plot_mu(res::NonFiniteAllocationOptimisationResult;
+function PortfolioOptimisers.plot_mu(res::OptimisationResult;
                                      opts::PlottingOptions = PlottingOptions(), kwargs...)
     return PortfolioOptimisers.plot_mu(_extract_pr(res); opts = opts, kwargs...)
 end
-function PortfolioOptimisers.plot_mu(res::NonFiniteAllocationOptimisationResult,
-                                     rd::ReturnsResult;
+function PortfolioOptimisers.plot_mu(res::OptimisationResult, rd::ReturnsResult;
                                      opts::PlottingOptions = PlottingOptions(), kwargs...)
     return PortfolioOptimisers.plot_mu(_extract_pr(res), rd; opts = opts, kwargs...)
 end
@@ -695,13 +705,12 @@ function PortfolioOptimisers.plot_sigma(pr::PortfolioOptimisers.AbstractPriorRes
     nx = isnothing(rd.nx) ? (1:size(pr.sigma, 1)) : rd.nx
     return PortfolioOptimisers.plot_sigma(pr.sigma, nx; opts = opts, kwargs...)
 end
-function PortfolioOptimisers.plot_sigma(res::NonFiniteAllocationOptimisationResult,
-                                        rd::ReturnsResult;
+function PortfolioOptimisers.plot_sigma(res::OptimisationResult, rd::ReturnsResult;
                                         opts::PlottingOptions = PlottingOptions(),
                                         kwargs...)
     return PortfolioOptimisers.plot_sigma(_extract_pr(res), rd; opts = opts, kwargs...)
 end
-function PortfolioOptimisers.plot_sigma(res::NonFiniteAllocationOptimisationResult;
+function PortfolioOptimisers.plot_sigma(res::OptimisationResult;
                                         opts::PlottingOptions = PlottingOptions(),
                                         kwargs...)
     return PortfolioOptimisers.plot_sigma(_extract_pr(res); opts = opts, kwargs...)
@@ -741,14 +750,14 @@ function PortfolioOptimisers.plot_factor_loadings(pr::PortfolioOptimisers.Abstra
     nf = isnothing(rd.nf) ? (1:size(pr.rr.M, 2)) : rd.nf
     return PortfolioOptimisers.plot_factor_loadings(pr.rr.M, nx, nf; opts = opts, kwargs...)
 end
-function PortfolioOptimisers.plot_factor_loadings(res::NonFiniteAllocationOptimisationResult,
+function PortfolioOptimisers.plot_factor_loadings(res::OptimisationResult,
                                                   rd::ReturnsResult;
                                                   opts::PlottingOptions = PlottingOptions(),
                                                   kwargs...)
     return PortfolioOptimisers.plot_factor_loadings(_extract_pr(res), rd; opts = opts,
                                                     kwargs...)
 end
-function PortfolioOptimisers.plot_factor_loadings(res::NonFiniteAllocationOptimisationResult;
+function PortfolioOptimisers.plot_factor_loadings(res::OptimisationResult;
                                                   opts::PlottingOptions = PlottingOptions(),
                                                   kwargs...)
     return PortfolioOptimisers.plot_factor_loadings(_extract_pr(res); opts = opts,
@@ -786,14 +795,13 @@ function PortfolioOptimisers.plot_factor_sigma(pr::PortfolioOptimisers.AbstractP
     nf = isnothing(rd.nf) ? (1:size(pr.f_sigma, 1)) : rd.nf
     return PortfolioOptimisers.plot_factor_sigma(pr.f_sigma, nf; opts = opts, kwargs...)
 end
-function PortfolioOptimisers.plot_factor_sigma(res::NonFiniteAllocationOptimisationResult,
-                                               rd::ReturnsResult;
+function PortfolioOptimisers.plot_factor_sigma(res::OptimisationResult, rd::ReturnsResult;
                                                opts::PlottingOptions = PlottingOptions(),
                                                kwargs...)
     return PortfolioOptimisers.plot_factor_sigma(_extract_pr(res), rd; opts = opts,
                                                  kwargs...)
 end
-function PortfolioOptimisers.plot_factor_sigma(res::NonFiniteAllocationOptimisationResult;
+function PortfolioOptimisers.plot_factor_sigma(res::OptimisationResult;
                                                opts::PlottingOptions = PlottingOptions(),
                                                kwargs...)
     return PortfolioOptimisers.plot_factor_sigma(_extract_pr(res); opts = opts, kwargs...)
@@ -824,13 +832,12 @@ function PortfolioOptimisers.plot_eigenspectrum(pr::PortfolioOptimisers.Abstract
     return PortfolioOptimisers.plot_eigenspectrum(pr.sigma; N_obs = T, opts = opts,
                                                   kwargs...)
 end
-function PortfolioOptimisers.plot_eigenspectrum(res::NonFiniteAllocationOptimisationResult;
+function PortfolioOptimisers.plot_eigenspectrum(res::OptimisationResult;
                                                 opts::PlottingOptions = PlottingOptions(),
                                                 kwargs...)
     return PortfolioOptimisers.plot_eigenspectrum(_extract_pr(res); opts = opts, kwargs...)
 end
-function PortfolioOptimisers.plot_eigenspectrum(res::NonFiniteAllocationOptimisationResult,
-                                                rd::ReturnsResult;
+function PortfolioOptimisers.plot_eigenspectrum(res::OptimisationResult, rd::ReturnsResult;
                                                 opts::PlottingOptions = PlottingOptions(),
                                                 kwargs...)
     return PortfolioOptimisers.plot_eigenspectrum(_extract_pr(res), rd; opts = opts,
@@ -929,13 +936,12 @@ function PortfolioOptimisers.plot_prior(pr::PortfolioOptimisers.AbstractPriorRes
     nx = isnothing(rd.nx) ? (1:length(pr.mu)) : rd.nx
     return PortfolioOptimisers.plot_prior(pr, nx; opts = opts, kwargs...)
 end
-function PortfolioOptimisers.plot_prior(res::NonFiniteAllocationOptimisationResult;
+function PortfolioOptimisers.plot_prior(res::OptimisationResult;
                                         opts::PlottingOptions = PlottingOptions(),
                                         kwargs...)
     return PortfolioOptimisers.plot_prior(_extract_pr(res); opts = opts, kwargs...)
 end
-function PortfolioOptimisers.plot_prior(res::NonFiniteAllocationOptimisationResult,
-                                        rd::ReturnsResult;
+function PortfolioOptimisers.plot_prior(res::OptimisationResult, rd::ReturnsResult;
                                         opts::PlottingOptions = PlottingOptions(),
                                         kwargs...)
     return PortfolioOptimisers.plot_prior(_extract_pr(res), rd; opts = opts, kwargs...)
@@ -970,13 +976,12 @@ function PortfolioOptimisers.plot_factor_mu(pr::PortfolioOptimisers.AbstractPrio
     nf = isnothing(rd.nf) ? (1:length(pr.f_mu)) : rd.nf
     return PortfolioOptimisers.plot_factor_mu(pr.f_mu, nf; opts = opts, kwargs...)
 end
-function PortfolioOptimisers.plot_factor_mu(res::NonFiniteAllocationOptimisationResult;
+function PortfolioOptimisers.plot_factor_mu(res::OptimisationResult;
                                             opts::PlottingOptions = PlottingOptions(),
                                             kwargs...)
     return PortfolioOptimisers.plot_factor_mu(_extract_pr(res); opts = opts, kwargs...)
 end
-function PortfolioOptimisers.plot_factor_mu(res::NonFiniteAllocationOptimisationResult,
-                                            rd::ReturnsResult;
+function PortfolioOptimisers.plot_factor_mu(res::OptimisationResult, rd::ReturnsResult;
                                             opts::PlottingOptions = PlottingOptions(),
                                             kwargs...)
     return PortfolioOptimisers.plot_factor_mu(_extract_pr(res), rd; opts = opts, kwargs...)
@@ -1005,8 +1010,7 @@ function PortfolioOptimisers.plot_benchmark(w::ArrNum, rd::ReturnsResult,
     return PortfolioOptimisers.plot_benchmark(w, rd.X, rd.B, fees; ts = ts, nb = nb,
                                               opts = opts, kwargs...)
 end
-function PortfolioOptimisers.plot_benchmark(res::NonFiniteAllocationOptimisationResult,
-                                            rd::ReturnsResult;
+function PortfolioOptimisers.plot_benchmark(res::OptimisationResult, rd::ReturnsResult;
                                             opts::PlottingOptions = PlottingOptions(),
                                             kwargs...)
     fees = hasproperty(res, :fees) ? res.fees : nothing
@@ -1045,7 +1049,7 @@ function PortfolioOptimisers.plot_coskewness(pr::HighOrderPrior, rd::ReturnsResu
     nx = isnothing(rd.nx) ? (1:size(pr.sk, 1)) : rd.nx
     return PortfolioOptimisers.plot_coskewness(pr.sk, nx; opts = opts, kwargs...)
 end
-function PortfolioOptimisers.plot_coskewness(res::NonFiniteAllocationOptimisationResult;
+function PortfolioOptimisers.plot_coskewness(res::OptimisationResult;
                                              opts::PlottingOptions = PlottingOptions(),
                                              kwargs...)
     pr = _extract_pr(res)
@@ -1054,8 +1058,7 @@ function PortfolioOptimisers.plot_coskewness(res::NonFiniteAllocationOptimisatio
     end
     return PortfolioOptimisers.plot_coskewness(pr; opts = opts, kwargs...)
 end
-function PortfolioOptimisers.plot_coskewness(res::NonFiniteAllocationOptimisationResult,
-                                             rd::ReturnsResult;
+function PortfolioOptimisers.plot_coskewness(res::OptimisationResult, rd::ReturnsResult;
                                              opts::PlottingOptions = PlottingOptions(),
                                              kwargs...)
     pr = _extract_pr(res)
@@ -1101,7 +1104,7 @@ function PortfolioOptimisers.plot_cokurtosis(pr::HighOrderPrior, rd::ReturnsResu
     nx = isnothing(rd.nx) ? (1:isqrt(size(pr.kt, 1))) : rd.nx
     return PortfolioOptimisers.plot_cokurtosis(pr.kt, nx; opts = opts, kwargs...)
 end
-function PortfolioOptimisers.plot_cokurtosis(res::NonFiniteAllocationOptimisationResult;
+function PortfolioOptimisers.plot_cokurtosis(res::OptimisationResult;
                                              opts::PlottingOptions = PlottingOptions(),
                                              kwargs...)
     pr = _extract_pr(res)
@@ -1110,8 +1113,7 @@ function PortfolioOptimisers.plot_cokurtosis(res::NonFiniteAllocationOptimisatio
     end
     return PortfolioOptimisers.plot_cokurtosis(pr; opts = opts, kwargs...)
 end
-function PortfolioOptimisers.plot_cokurtosis(res::NonFiniteAllocationOptimisationResult,
-                                             rd::ReturnsResult;
+function PortfolioOptimisers.plot_cokurtosis(res::OptimisationResult, rd::ReturnsResult;
                                              opts::PlottingOptions = PlottingOptions(),
                                              kwargs...)
     pr = _extract_pr(res)
@@ -1347,27 +1349,6 @@ function PortfolioOptimisers.plot_histogram(w::ArrNum, X::MatNum,
               color = colours[end], linewidth = 2)
     end
     return plt
-end
-## ────────────────────────────────────────────────────────────────────────────
-## Network / phylogeny graph
-## ────────────────────────────────────────────────────────────────────────────
-
-function PortfolioOptimisers.plot_network(pl::NwE_ClE_Cl, X::MatNum,
-                                          nx::AbstractVector = 1:size(X, 2),
-                                          w::Option{<:VecNum} = nothing;
-                                          threshold::Number = 0,
-                                          opts::PlottingOptions = PlottingOptions(),
-                                          kwargs...)
-    plr = phylogeny_matrix(pl, X)
-    A = copy(plr.X)
-    A[abs.(A) .<= threshold] .= 0
-    node_size = if isnothing(w)
-        fill(1, size(X, 2))
-    else
-        abs.(w) ./ maximum(abs.(w))
-    end
-    return graphplot(A; names = nx, node_weights = node_size, title = "Asset Network",
-                     kwargs...)
 end
 ## ────────────────────────────────────────────────────────────────────────────
 ## Correlation / covariance heatmap
@@ -1753,7 +1734,7 @@ end
 ## Portfolio dashboard (multi-panel composite)
 ## ────────────────────────────────────────────────────────────────────────────
 
-function PortfolioOptimisers.plot_portfolio_dashboard(res::NonFiniteAllocationOptimisationResult,
+function PortfolioOptimisers.plot_portfolio_dashboard(res::OptimisationResult,
                                                       rd::ReturnsResult;
                                                       r::PortfolioOptimisers.AbstractBaseRiskMeasure = Variance(),
                                                       slv::Option{<:Slv_VecSlv} = nothing,
@@ -1803,7 +1784,7 @@ end
 ## Efficient frontier
 ## ────────────────────────────────────────────────────────────────────────────
 
-function PortfolioOptimisers.plot_efficient_frontier(res_vec::AbstractVector{<:NonFiniteAllocationOptimisationResult},
+function PortfolioOptimisers.plot_efficient_frontier(res_vec::AbstractVector{<:OptimisationResult},
                                                      pr::Pr_RR;
                                                      x::PortfolioOptimisers.AbstractBaseRiskMeasure = Variance(),
                                                      y::PortfolioOptimisers.AbstractBaseRiskMeasure = ExpectedReturn(),
@@ -1846,7 +1827,7 @@ function PortfolioOptimisers.plot_efficient_frontier(res_vec::AbstractVector{<:N
     end
     return plt
 end
-function PortfolioOptimisers.plot_efficient_frontier(res_vec::AbstractVector{<:NonFiniteAllocationOptimisationResult},
+function PortfolioOptimisers.plot_efficient_frontier(res_vec::AbstractVector{<:OptimisationResult},
                                                      rd::ReturnsResult; kwargs...)
     pr = if hasproperty(first(res_vec), :pr)
         first(res_vec).pr
@@ -1898,8 +1879,7 @@ function PortfolioOptimisers.plot_efficient_frontier(w::VecVecNum, pr::Pr_RR;
     end
     return plt
 end
-function PortfolioOptimisers.plot_efficient_frontier(res::NonFiniteAllocationOptimisationResult,
-                                                     pr::Pr_RR;
+function PortfolioOptimisers.plot_efficient_frontier(res::OptimisationResult, pr::Pr_RR;
                                                      fees::Option{<:Fees} = nothing,
                                                      kwargs...)
     fees = _extract_fees(res, fees)
@@ -1911,7 +1891,7 @@ function PortfolioOptimisers.plot_efficient_frontier(res::NonFiniteAllocationOpt
                                                            kwargs...)
     end
 end
-function PortfolioOptimisers.plot_efficient_frontier(res::NonFiniteAllocationOptimisationResult,
+function PortfolioOptimisers.plot_efficient_frontier(res::OptimisationResult,
                                                      rd::ReturnsResult; kwargs...)
     return PortfolioOptimisers.plot_efficient_frontier(res, _extract_pr(res); kwargs...)
 end
@@ -1955,7 +1935,7 @@ function PortfolioOptimisers.plot_performance_summary(w::ArrNum, rd::ReturnsResu
     return PortfolioOptimisers.plot_performance_summary(w, rd.X, fees; opts = opts,
                                                         kwargs...)
 end
-function PortfolioOptimisers.plot_performance_summary(res::NonFiniteAllocationOptimisationResult,
+function PortfolioOptimisers.plot_performance_summary(res::OptimisationResult,
                                                       rd::ReturnsResult;
                                                       opts::PlottingOptions = PlottingOptions(),
                                                       kwargs...)
@@ -2010,7 +1990,7 @@ function PortfolioOptimisers.plot_rolling_drawdowns(w::ArrNum, rd::ReturnsResult
     return PortfolioOptimisers.plot_rolling_drawdowns(w, rd.X, fees; ts = ts, opts = opts,
                                                       kwargs...)
 end
-function PortfolioOptimisers.plot_rolling_drawdowns(res::NonFiniteAllocationOptimisationResult,
+function PortfolioOptimisers.plot_rolling_drawdowns(res::OptimisationResult,
                                                     rd::ReturnsResult;
                                                     opts::PlottingOptions = PlottingOptions(),
                                                     kwargs...)

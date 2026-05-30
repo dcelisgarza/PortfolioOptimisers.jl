@@ -135,6 +135,17 @@ Now let's compute the prior statistics for each estimator.
 prs = prior.(pes, rd)
 ````
 
+The eigenspectrum of each covariance matrix shows the effect of denoising and sparsification.
+Bars above the Marchenko-Pastur λ+ threshold contain signal; bars below are noise.
+
+````@example 08_Improving_Moment_Estimation
+using StatsPlots, GraphRecipes
+
+plot_eigenspectrum(prs[1], rd)   ## Vanilla
+plot_eigenspectrum(prs[2], rd)   ## Fixed denoise + BS(VW) mu
+plot_eigenspectrum(prs[3], rd)   ## LoGo(MaxDist) + BS(MSE) mu
+````
+
 ### 2.1 Expected returns
 
 First let's view the expected returns.
@@ -189,6 +200,10 @@ pretty_table(DataFrame([rd.nx prs[5].V], ["Assets"; rd.nx]); formatters = [hmmtf
 pretty_table(DataFrame([rd.nx prs[6].V], ["Assets"; rd.nx]); formatters = [hmmtfmt],
              title = "Coskewness Negative Spectral Slices: LoGo(MaxDist)",
              source_notes = "Condition number LoGo(MaxDist): $(round(cond(prs[6].V); digits = 3))")
+
+#= Coskewness heatmap (N × N²) for vanilla and denoised high-order priors. =#
+plot_coskewness(prs[4], rd)
+plot_coskewness(prs[5], rd)
 ````
 
 And finally the cokurtosis.
@@ -203,6 +218,10 @@ pretty_table(DataFrame([nx2 prs[5].kt], ["Assets^2"; nx2]); formatters = [hmmtfm
 pretty_table(DataFrame([nx2 prs[6].kt], ["Assets^2"; nx2]); formatters = [hmmtfmt],
              title = "Cokurtosis: Shrunk denoise (0) + LoGo(MaxDist)",
              source_notes = "Condition number Shrunk denoise (0) + LoGo(MaxDist): $(round(cond(prs[6].kt); digits = 3))")
+
+#= Cokurtosis eigenspectrum for vanilla and denoised high-order priors. =#
+plot_cokurtosis(prs[4], rd)
+plot_cokurtosis(prs[5], rd)
 ````
 
 ## 3. Comparing optimisations
@@ -389,6 +408,9 @@ pretty_table(DataFrame("Assets" => rd.nx, "Vanilla" => ress[1].w,
                        "Shrunk (0.5) + BOP(GM)" => ress[4].w,
                        "Fixed + LoGo(MaxDist) + BOP(VW)" => ress[5].w,
                        "LoGo(ExpDist) + BOP(MSE)" => ress[6].w); formatters = [resfmt])
+
+#= Compositions across all six moment-estimation variants (MaximumRatio, Variance). =#
+plot_stacked_bar_composition(ress, rd)
 ````
 
 Portfolios that emphasise expected returns are more sensitive to the expected returns estimation. It is important to exercise caution when relying on expected returns in particular. If one thinks about it, it summarises all returns information into a single number per asset, so any error in its estimation can have a large effect on the resulting portfolio. We will finish on showing these effects in higher order moment optimisation.
@@ -489,6 +511,9 @@ pretty_table(DataFrame("Assets" => rd.nx, "Vanilla V + BOP(GM) mu" => ress[1].w,
                        "Fixed Denoise V + BOP(VW) mu" => ress[2].w,
                        "Shrunk(0) Denoise + LoGo(MaxDist) V + BOP(MSE) mu" => ress[3].w);
              formatters = [resfmt])
+
+#= Compositions across denoising variants (MaximumRatio, NegativeSkewness). =#
+plot_stacked_bar_composition(ress, rd)
 ````
 
 Similarly to the mean-variance case, the more one emphasises the expected returns, the less stable the resulting portfolio. Generally, it's better to use a volatility weighted shrinkage target for the expected returns as that adjusts the expected returns by penalising high volatility and rewarding low volatility assets.
@@ -591,6 +616,9 @@ pretty_table(DataFrame("Assets" => rd.nx, "Vanilla kt + BOP(GM) mu" => ress[1].w
                        "Fixed Denoise kt + BOP(VW) mu" => ress[2].w,
                        "Shrunk(0) Denoise + LoGo(MaxDist) kt + BOP(MSE) mu" => ress[3].w);
              formatters = [resfmt])
+
+#= Compositions across denoising variants (MaximumRatio, Kurtosis). =#
+plot_stacked_bar_composition(ress, rd)
 ````
 
 Generally, the volatility weighted target for expected returns combined with fixed denoise, performs quite well. That's not to say other methods are not useful. It's worth using different techniques and comparing the results. For example with grid search cross-validation, which is as of yet unimplemented in `PortfolioOptimisers.jl`. Even so, it's never an exact science. It's always best to combine techniques, which is why we provide users with the ability to use multiple risk measures like in [`06_Multiple_Risk_Measures`](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/06_Multiple_Risk_Measures), or to impose constraints on the maximum risk without adding them to the objective function. There are also other ways of directly mitigating these instabilities, such as making use of:
