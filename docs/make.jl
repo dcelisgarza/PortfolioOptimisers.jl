@@ -103,27 +103,21 @@ makedocs(; modules = [PortfolioOptimisers], doctest = false,
                   "User Guide" => user_guide;
                   "Examples" => examples;
                   "API" => [joinpath.(api_pages[1][1][idx1:end], api_pages[1][3]);
-                            "Moments" => joinpath.(api_pages[2][1][idx1:end],
-                                                   api_pages[2][3])
-                            "Distance" => joinpath.(api_pages[3][1][idx1:end],
-                                                    api_pages[3][3])
-                            "Phylogeny" => joinpath.(api_pages[4][1][idx1:end],
-                                                     api_pages[4][3])
-                            "Constraint Generation" => joinpath.(api_pages[5][1][idx1:end],
-                                                                 api_pages[5][3])
+                            "Moments" => joinpath.(api_pages[2][1][idx1:end], api_pages[2][3])
+                            "Distance" => joinpath.(api_pages[3][1][idx1:end], api_pages[3][3])
+                            "Phylogeny" => joinpath.(api_pages[4][1][idx1:end], api_pages[4][3])
+                            "Constraint Generation" =>
+                                joinpath.(api_pages[5][1][idx1:end], api_pages[5][3])
                             "Prior" => joinpath.(api_pages[6][1][idx1:end], api_pages[6][3]);
-                            "Uncertainty Sets" => joinpath.(api_pages[7][1][idx1:end],
-                                                            api_pages[7][3])
-                            "Risk Measures" => joinpath.(api_pages[8][1][idx1:end],
-                                                         api_pages[8][3])
-                            "Optimisation" => [joinpath.(api_pages[9][1][idx1:end],
-                                                         api_pages[9][3])
-                                               joinpath.(api_pages[10][1][idx1:end],
-                                                         api_pages[10][3])
-                                               joinpath.(api_pages[11][1][idx1:end],
-                                                         api_pages[11][3])
-                                               joinpath.(api_pages[12][1][idx1:end],
-                                                         api_pages[12][3])]];
+                            "Uncertainty Sets" =>
+                                joinpath.(api_pages[7][1][idx1:end], api_pages[7][3])
+                            "Risk Measures" =>
+                                joinpath.(api_pages[8][1][idx1:end], api_pages[8][3])
+                            "Optimisation" =>
+                                [joinpath.(api_pages[9][1][idx1:end], api_pages[9][3])
+                                 joinpath.(api_pages[10][1][idx1:end], api_pages[10][3])
+                                 joinpath.(api_pages[11][1][idx1:end], api_pages[11][3])
+                                 joinpath.(api_pages[12][1][idx1:end], api_pages[12][3])]];
                   "Contribute" => contribute;
                   "References" => root_pages[2]],
          plugins = [CitationBibliography(joinpath(@__DIR__, "src", "References.bib");
