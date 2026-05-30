@@ -71,25 +71,45 @@ FeesEstimator
   - [`fees_constraints`](@ref)
 """
 @concrete struct FeesEstimator <: AbstractEstimator
-    "$(field_dict[:tn_fees])"
+    """
+    $(field_dict[:tn_fees])
+    """
     tn
-    "$(field_dict[:l_fees])"
+    """
+    $(field_dict[:l_fees])
+    """
     l
-    "$(field_dict[:s_fees])"
+    """
+    $(field_dict[:s_fees])
+    """
     s
-    "$(field_dict[:fl])"
+    """
+    $(field_dict[:fl])
+    """
     fl
-    "$(field_dict[:fs])"
+    """
+    $(field_dict[:fs])
+    """
     fs
-    "$(field_dict[:dl])"
+    """
+    $(field_dict[:dl])
+    """
     dl
-    "$(field_dict[:ds])"
+    """
+    $(field_dict[:ds])
+    """
     ds
-    "$(field_dict[:dfl])"
+    """
+    $(field_dict[:dfl])
+    """
     dfl
-    "$(field_dict[:dfs])"
+    """
+    $(field_dict[:dfs])
+    """
     dfs
-    "$(field_dict[:kwargs_fee])"
+    """
+    $(field_dict[:kwargs_fee])
+    """
     kwargs
     function FeesEstimator(tn::Option{<:TnE_Tn}, l::Option{<:EstValType},
                            s::Option{<:EstValType}, fl::Option{<:EstValType},
@@ -341,17 +361,29 @@ Fees
   - [`calc_net_returns`](@ref)
 """
 @concrete struct Fees <: AbstractResult
-    "$(field_dict[:tnr])"
+    """
+    $(field_dict[:tnr])
+    """
     tn
-    "$(field_dict[:l_fees])"
+    """
+    $(field_dict[:l_fees])
+    """
     l
-    "$(field_dict[:s_fees])"
+    """
+    $(field_dict[:s_fees])
+    """
     s
-    "$(field_dict[:fl])"
+    """
+    $(field_dict[:fl])
+    """
     fl
-    "$(field_dict[:fs])"
+    """
+    $(field_dict[:fs])
+    """
     fs
-    "$(field_dict[:kwargs_fee])"
+    """
+    $(field_dict[:kwargs_fee])
+    """
     kwargs
     function Fees(tn::Option{<:Turnover}, l::Option{<:Num_VecNum}, s::Option{<:Num_VecNum},
                   fl::Option{<:Num_VecNum}, fs::Option{<:Num_VecNum},

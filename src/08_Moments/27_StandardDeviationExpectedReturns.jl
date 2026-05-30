@@ -46,7 +46,9 @@ StandardDeviationExpectedReturns
   - [`PortfolioOptimisersCovariance`](@ref)
 """
 @concrete struct StandardDeviationExpectedReturns <: AbstractExpectedReturnsEstimator
-    "$(field_dict[:ce])"
+    """
+    $(field_dict[:ce])
+    """
     ce
     function StandardDeviationExpectedReturns(ce::StatsBase.CovarianceEstimator)
         return new{typeof(ce)}(ce)
@@ -192,7 +194,9 @@ VarianceExpectedReturns
   - [`PortfolioOptimisersCovariance`](@ref)
 """
 @concrete struct VarianceExpectedReturns <: AbstractExpectedReturnsEstimator
-    "$(field_dict[:ce])"
+    """
+    $(field_dict[:ce])
+    """
     ce
     function VarianceExpectedReturns(ce::StatsBase.CovarianceEstimator)
         return new{typeof(ce)}(ce)

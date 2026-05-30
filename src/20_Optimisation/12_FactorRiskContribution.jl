@@ -15,21 +15,37 @@ The `w` property is forwarded from `sol.w`.
   - [`NonFiniteAllocationOptimisationResult`](@ref)
 """
 @concrete struct FactorRiskContributionResult <: NonFiniteAllocationOptimisationResult
-    "$(field_dict[:oe])"
+    """
+    $(field_dict[:oe])
+    """
     oe
-    "$(field_dict[:pa])"
+    """
+    $(field_dict[:pa])
+    """
     pa
-    "$(field_dict[:reg_rr])"
+    """
+    $(field_dict[:reg_rr])
+    """
     rr
-    "Factor risk contribution placeholder result."
+    """
+    Factor risk contribution placeholder result.
+    """
     frc_plr
-    "$(field_dict[:retcode])"
+    """
+    $(field_dict[:retcode])
+    """
     retcode
-    "$(field_dict[:sol])"
+    """
+    $(field_dict[:sol])
+    """
     sol
-    "$(field_dict[:model])"
+    """
+    $(field_dict[:model])
+    """
     model
-    "$(field_dict[:fb])"
+    """
+    $(field_dict[:fb])
+    """
     fb
 end
 """
@@ -130,23 +146,41 @@ Keywords correspond to the struct's fields.
   - [`factor_risk_contribution`](@ref)
 """
 @concrete struct FactorRiskContribution <: RiskJuMPOptimisationEstimator
-    "$(field_dict[:opt_jmp])"
+    """
+    $(field_dict[:opt_jmp])
+    """
     opt
-    "$(field_dict[:re])"
+    """
+    $(field_dict[:re])
+    """
     re
-    "$(field_dict[:r_opt])"
+    """
+    $(field_dict[:r_opt])
+    """
     r
-    "$(field_dict[:obj])"
+    """
+    $(field_dict[:obj])
+    """
     obj
-    "Factor risk contribution placeholder constraints."
+    """
+    Factor risk contribution placeholder constraints.
+    """
     frc_ple
-    "$(field_dict[:sets])"
+    """
+    $(field_dict[:sets])
+    """
     sets
-    "$(field_dict[:wi])"
+    """
+    $(field_dict[:wi])
+    """
     wi
-    "$(field_dict[:flag])"
+    """
+    $(field_dict[:flag])
+    """
     flag
-    "$(field_dict[:fb])"
+    """
+    $(field_dict[:fb])
+    """
     fb
     function FactorRiskContribution(opt::JuMPOptimiser, re::RegE_Reg, r::RM_VecRM,
                                     obj::ObjectiveFunction,

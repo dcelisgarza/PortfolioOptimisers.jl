@@ -132,7 +132,9 @@ MaximumEntropy
   - [owa2](@cite) D. Cajas. *Higher order moment portfolio optimization with L-moments*. Available at SSRN 4393155 (2023).
 """
 @concrete struct MaximumEntropy <: AbstractOrderedWeightsArrayAlgorithm
-    "$(field_dict[:alg])"
+    """
+    $(field_dict[:alg])
+    """
     alg
     function MaximumEntropy(alg::EntropyFormulation)
         return new{typeof(alg)}(alg)
@@ -257,7 +259,9 @@ The `MinimumSquaredDistance` algorithm can be configured to use different second
   - [owa2](@cite) D. Cajas. *Higher order moment portfolio optimization with L-moments*. Available at SSRN 4393155 (2023).
 """
 struct MinimumSquaredDistance{__T_alg} <: SquaredOrderedWeightsArrayAlgorithm{__T_alg}
-    "$(field_dict[:alg])"
+    """
+    $(field_dict[:alg])
+    """
     alg::__T_alg
     function MinimumSquaredDistance(alg::UnionAllSOCRiskExpr)
         return new{typeof(alg)}(alg)
@@ -331,7 +335,9 @@ The `MinimumSumSquares` algorithm can be configured to use different second-orde
   - [owa2](@cite) D. Cajas. *Higher order moment portfolio optimization with L-moments*. Available at SSRN 4393155 (2023).
 """
 struct MinimumSumSquares{__T_alg} <: SquaredOrderedWeightsArrayAlgorithm{__T_alg}
-    "$(field_dict[:alg])"
+    """
+    $(field_dict[:alg])
+    """
     alg::__T_alg
     function MinimumSumSquares(alg::UnionAllSOCRiskExpr)
         return new{typeof(alg)}(alg)
@@ -404,7 +410,9 @@ NormalisedConstantRelativeRiskAversion
 """
 @concrete struct NormalisedConstantRelativeRiskAversion <:
                  AbstractOrderedWeightsArrayEstimator
-    "$(field_dict[:g_rm])"
+    """
+    $(field_dict[:g_rm])
+    """
     g
     function NormalisedConstantRelativeRiskAversion(g::Number)
         @argcheck(zero(g) < g < one(g), DomainError("0 < g < 1 must hold. Got\ng => $g"))
@@ -476,15 +484,25 @@ OWAJuMP
   - [owa2](@cite) D. Cajas. *Higher order moment portfolio optimization with L-moments*. Available at SSRN 4393155 (2023).
 """
 @concrete struct OWAJuMP <: AbstractOrderedWeightsArrayEstimator
-    "$(field_dict[:slv])"
+    """
+    $(field_dict[:slv])
+    """
     slv
-    "$(field_dict[:max_phi])"
+    """
+    $(field_dict[:max_phi])
+    """
     max_phi
-    "$(field_dict[:sc])"
+    """
+    $(field_dict[:sc])
+    """
     sc
-    "$(field_dict[:so])"
+    """
+    $(field_dict[:so])
+    """
     so
-    "$(field_dict[:alg])"
+    """
+    $(field_dict[:alg])
+    """
     alg
     function OWAJuMP(slv::Slv_VecSlv, max_phi::Number, sc::Number, so::Number,
                      alg::AbstractOrderedWeightsArrayAlgorithm)
@@ -1255,7 +1273,9 @@ $(DocStringExtensions.FIELDS)
   - [`OrderedWeightsArray`](@ref)
 """
 @concrete struct ApproxOrderedWeightsArray <: OrderedWeightsArrayFormulation
-    "$(field_dict[:p_rm])"
+    """
+    $(field_dict[:p_rm])
+    """
     p
     function ApproxOrderedWeightsArray(p::VecNum)
         @argcheck(!isempty(p))
@@ -1294,11 +1314,17 @@ $(DocStringExtensions.FIELDS)
   - [`RiskMeasureSettings`](@ref)
 """
 @concrete struct OrderedWeightsArray <: RiskMeasure
-    "$(field_dict[:settings_rm])"
+    """
+    $(field_dict[:settings_rm])
+    """
     settings
-    "$(field_dict[:owa_w])"
+    """
+    $(field_dict[:owa_w])
+    """
     w
-    "$(field_dict[:alg])"
+    """
+    $(field_dict[:alg])
+    """
     alg
     function OrderedWeightsArray(settings::RiskMeasureSettings, w::Option{<:VecNum},
                                  alg::OrderedWeightsArrayFormulation)
@@ -1347,13 +1373,21 @@ $(DocStringExtensions.FIELDS)
   - [`RiskMeasureSettings`](@ref)
 """
 @concrete struct OrderedWeightsArrayRange <: RiskMeasure
-    "$(field_dict[:settings_rm])"
+    """
+    $(field_dict[:settings_rm])
+    """
     settings
-    "$(field_dict[:w1_owa])"
+    """
+    $(field_dict[:w1_owa])
+    """
     w1
-    "$(field_dict[:w2_owa])"
+    """
+    $(field_dict[:w2_owa])
+    """
     w2
-    "$(field_dict[:alg])"
+    """
+    $(field_dict[:alg])
+    """
     alg
     function OrderedWeightsArrayRange(settings::RiskMeasureSettings, w1::Option{<:VecNum},
                                       w2::Option{<:VecNum},

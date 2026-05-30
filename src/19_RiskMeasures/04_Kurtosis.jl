@@ -121,19 +121,33 @@ Kurtosis
   - [`LowOrderPrior`](@ref)
 """
 @concrete struct Kurtosis <: RiskMeasure
-    "$(field_dict[:settings_rm])"
+    """
+    $(field_dict[:settings_rm])
+    """
     settings
-    "$(field_dict[:w_rm])"
+    """
+    $(field_dict[:w_rm])
+    """
     w
-    "$(field_dict[:mu_rm])"
+    """
+    $(field_dict[:mu_rm])
+    """
     mu
-    "$(field_dict[:kt])"
+    """
+    $(field_dict[:kt])
+    """
     kt
-    "$(field_dict[:N_kt])"
+    """
+    $(field_dict[:N_kt])
+    """
     N
-    "$(field_dict[:alg1])"
+    """
+    $(field_dict[:alg1])
+    """
     alg1
-    "$(field_dict[:alg2])"
+    """
+    $(field_dict[:alg2])
+    """
     alg2
     function Kurtosis(settings::RiskMeasureSettings, w::Option{<:ObsWeights},
                       mu::Option{<:Num_VecNum_VecScalar}, kt::Option{<:MatNum},

@@ -131,13 +131,21 @@ Where:
   - [`SchurComplementHierarchicalRiskParity`](@ref)
 """
 @concrete struct HierarchicalRiskParity <: ClusteringOptimisationEstimator
-    "$(field_dict[:opt_hier])"
+    """
+    $(field_dict[:opt_hier])
+    """
     opt
-    "$(field_dict[:r])"
+    """
+    $(field_dict[:r])
+    """
     r
-    "$(field_dict[:sca])"
+    """
+    $(field_dict[:sca])
+    """
     sca
-    "$(field_dict[:fb])"
+    """
+    $(field_dict[:fb])
+    """
     fb
     function HierarchicalRiskParity(opt::HierarchicalOptimiser, r::OptRM_VecOptRM,
                                     sca::Scalariser, fb::Option{<:OptE_Opt})

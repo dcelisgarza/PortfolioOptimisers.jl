@@ -46,11 +46,17 @@ DetoneCovariance
   - [`Posdef`](@ref)
 """
 @concrete struct DetoneCovariance <: AbstractCovarianceEstimator
-    "$(field_dict[:ce])"
+    """
+    $(field_dict[:ce])
+    """
     ce
-    "$(field_dict[:dt])"
+    """
+    $(field_dict[:dt])
+    """
     dt
-    "$(field_dict[:pdm])"
+    """
+    $(field_dict[:pdm])
+    """
     pdm
     function DetoneCovariance(ce::StatsBase.CovarianceEstimator, dt::Detone,
                               pdm::Option{<:Posdef})

@@ -131,17 +131,29 @@ $(DocStringExtensions.FIELDS)
   - [`fit_and_score`](@ref)
 """
 @concrete struct SearchCrossValidationResult <: AbstractSearchCrossValidationResult
-    "$(field_dict[:opt_cv])"
+    """
+    $(field_dict[:opt_cv])
+    """
     opt
-    "$(field_dict[:test_scores])"
+    """
+    $(field_dict[:test_scores])
+    """
     test_scores
-    "$(field_dict[:train_scores])"
+    """
+    $(field_dict[:train_scores])
+    """
     train_scores
-    "$(field_dict[:lens_grid])"
+    """
+    $(field_dict[:lens_grid])
+    """
     lens_grid
-    "$(field_dict[:val_grid])"
+    """
+    $(field_dict[:val_grid])
+    """
     val_grid
-    "$(field_dict[:idx_cv])"
+    """
+    $(field_dict[:idx_cv])
+    """
     idx
 end
 """

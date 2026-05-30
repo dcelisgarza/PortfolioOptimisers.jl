@@ -59,11 +59,17 @@ EmpiricalPrior
   - [`prior`](@ref)
 """
 @concrete struct EmpiricalPrior <: AbstractLowOrderPriorEstimator_A
-    "$(field_dict[:ce])"
+    """
+    $(field_dict[:ce])
+    """
     ce
-    "$(field_dict[:me])"
+    """
+    $(field_dict[:me])
+    """
     me
-    "$(field_dict[:horizon])"
+    """
+    $(field_dict[:horizon])
+    """
     horizon
     function EmpiricalPrior(ce::StatsBase.CovarianceEstimator,
                             me::AbstractExpectedReturnsEstimator, horizon::Option{<:Number})

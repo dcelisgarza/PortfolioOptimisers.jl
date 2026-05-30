@@ -643,29 +643,53 @@ LowOrderPrior
   - [`HighOrderPrior`](@ref)
 """
 @concrete struct LowOrderPrior <: AbstractPriorResult
-    "$(field_dict[:X])"
+    """
+    $(field_dict[:X])
+    """
     X
-    "$(field_dict[:mu])"
+    """
+    $(field_dict[:mu])
+    """
     mu
-    "$(field_dict[:sigma])"
+    """
+    $(field_dict[:sigma])
+    """
     sigma
-    "$(field_dict[:chol])"
+    """
+    $(field_dict[:chol])
+    """
     chol
-    "$(field_dict[:w_prior])"
+    """
+    $(field_dict[:w_prior])
+    """
     w
-    "$(field_dict[:ens])"
+    """
+    $(field_dict[:ens])
+    """
     ens
-    "$(field_dict[:kld])"
+    """
+    $(field_dict[:kld])
+    """
     kld
-    "$(field_dict[:op_w])"
+    """
+    $(field_dict[:op_w])
+    """
     ow
-    "$(field_dict[:reg_rr])"
+    """
+    $(field_dict[:reg_rr])
+    """
     rr
-    "$(field_dict[:f_mu])"
+    """
+    $(field_dict[:f_mu])
+    """
     f_mu
-    "$(field_dict[:f_sigma])"
+    """
+    $(field_dict[:f_sigma])
+    """
     f_sigma
-    "$(field_dict[:f_w])"
+    """
+    $(field_dict[:f_w])
+    """
     f_w
     function LowOrderPrior(X::MatNum, mu::VecNum, sigma::MatNum, chol::Option{<:MatNum},
                            w::Option{<:ObsWeights}, ens::Option{<:Number},
@@ -814,26 +838,46 @@ HighOrderPrior
   - [`prior`](@ref)
 """
 @concrete struct HighOrderPrior <: AbstractPriorResult
-    "$(field_dict[:pr])"
+    """
+    $(field_dict[:pr])
+    """
     pr
-    "$(field_dict[:kt])"
+    """
+    $(field_dict[:kt])
+    """
     kt
-    "$(field_dict[:L2])"
+    """
+    $(field_dict[:L2])
+    """
     L2
-    "$(field_dict[:S2])"
+    """
+    $(field_dict[:S2])
+    """
     S2
-    "$(field_dict[:sk])"
+    """
+    $(field_dict[:sk])
+    """
     sk
-    "$(field_dict[:V])"
+    """
+    $(field_dict[:V])
+    """
     V
-    "$(field_dict[:skmp])"
+    """
+    $(field_dict[:skmp])
+    """
     skmp
-    "$(field_dict[:f_kt])"
+    """
+    $(field_dict[:f_kt])
+    """
     f_kt
     # chol_kt
-    "$(field_dict[:f_sk])"
+    """
+    $(field_dict[:f_sk])
+    """
     f_sk
-    "$(field_dict[:f_V])"
+    """
+    $(field_dict[:f_V])
+    """
     f_V
     function HighOrderPrior(pr::AbstractPriorResult, kt::Option{<:MatNum},
                             L2::Option{<:MatNum}, S2::Option{<:MatNum},

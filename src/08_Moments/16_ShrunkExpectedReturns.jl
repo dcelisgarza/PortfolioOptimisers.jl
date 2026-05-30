@@ -147,7 +147,9 @@ JamesStein
   - [`BodnarOkhrinParolya`](@ref)
 """
 @concrete struct JamesStein <: AbstractShrunkExpectedReturnsAlgorithm
-    "$(field_dict[:mutgt])"
+    """
+    $(field_dict[:mutgt])
+    """
     tgt
     function JamesStein(tgt::AbstractShrunkExpectedReturnsTarget)
         return new{typeof(tgt)}(tgt)
@@ -191,7 +193,9 @@ BayesStein
   - [`BodnarOkhrinParolya`](@ref)
 """
 @concrete struct BayesStein <: AbstractShrunkExpectedReturnsAlgorithm
-    "$(field_dict[:mutgt])"
+    """
+    $(field_dict[:mutgt])
+    """
     tgt
     function BayesStein(tgt::AbstractShrunkExpectedReturnsTarget)
         return new{typeof(tgt)}(tgt)
@@ -235,7 +239,9 @@ BodnarOkhrinParolya
   - [`BayesStein`](@ref)
 """
 @concrete struct BodnarOkhrinParolya <: AbstractShrunkExpectedReturnsAlgorithm
-    "$(field_dict[:mutgt])"
+    """
+    $(field_dict[:mutgt])
+    """
     tgt
     function BodnarOkhrinParolya(tgt::AbstractShrunkExpectedReturnsTarget)
         return new{typeof(tgt)}(tgt)
@@ -301,11 +307,17 @@ ShrunkExpectedReturns
   - [`AbstractShrunkExpectedReturnsAlgorithm`](@ref)
 """
 @concrete struct ShrunkExpectedReturns <: AbstractShrunkExpectedReturnsEstimator
-    "$(field_dict[:me])"
+    """
+    $(field_dict[:me])
+    """
     me
-    "$(field_dict[:ce])"
+    """
+    $(field_dict[:ce])
+    """
     ce
-    "$(field_dict[:me_shrink_alg])"
+    """
+    $(field_dict[:me_shrink_alg])
+    """
     alg
     function ShrunkExpectedReturns(me::AbstractExpectedReturnsEstimator,
                                    ce::StatsBase.CovarianceEstimator,

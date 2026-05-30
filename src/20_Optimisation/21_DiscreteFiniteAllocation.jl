@@ -13,27 +13,49 @@ $(DocStringExtensions.FIELDS)
   - [`FiniteAllocationOptimisationResult`](@ref)
 """
 @concrete struct DiscreteAllocationResult <: FiniteAllocationOptimisationResult
-    "$(field_dict[:oe])"
+    """
+    $(field_dict[:oe])
+    """
     oe
-    "$(field_dict[:retcode])"
+    """
+    $(field_dict[:retcode])
+    """
     retcode
-    "$(field_dict[:s_retcode])"
+    """
+    $(field_dict[:s_retcode])
+    """
     s_retcode
-    "$(field_dict[:l_retcode])"
+    """
+    $(field_dict[:l_retcode])
+    """
     l_retcode
-    "$(field_dict[:shares])"
+    """
+    $(field_dict[:shares])
+    """
     shares
-    "$(field_dict[:cost_alloc])"
+    """
+    $(field_dict[:cost_alloc])
+    """
     cost
-    "Realised portfolio weights."
+    """
+    Realised portfolio weights.
+    """
     w
-    "$(field_dict[:cash_alloc])"
+    """
+    $(field_dict[:cash_alloc])
+    """
     cash
-    "$(field_dict[:s_model])"
+    """
+    $(field_dict[:s_model])
+    """
     s_model
-    "$(field_dict[:l_model])"
+    """
+    $(field_dict[:l_model])
+    """
     l_model
-    "$(field_dict[:fb])"
+    """
+    $(field_dict[:fb])
+    """
     fb
 end
 """
@@ -125,15 +147,25 @@ DiscreteAllocation
   - [`DiscreteAllocationResult`](@ref)
 """
 @concrete struct DiscreteAllocation <: FiniteAllocationOptimisationEstimator
-    "$(field_dict[:slv])"
+    """
+    $(field_dict[:slv])
+    """
     slv
-    "$(field_dict[:sc])"
+    """
+    $(field_dict[:sc])
+    """
     sc
-    "$(field_dict[:so])"
+    """
+    $(field_dict[:so])
+    """
     so
-    "$(field_dict[:wf])"
+    """
+    $(field_dict[:wf])
+    """
     wf
-    "$(field_dict[:fb])"
+    """
+    $(field_dict[:fb])
+    """
     fb
     function DiscreteAllocation(slv::Slv_VecSlv, sc::Number, so::Number,
                                 wf::JuMPWeightFinaliserFormulation,

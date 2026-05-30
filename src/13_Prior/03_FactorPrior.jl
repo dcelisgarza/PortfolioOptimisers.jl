@@ -81,15 +81,25 @@ FactorPrior
   - [`prior`](@ref)
 """
 @concrete struct FactorPrior <: AbstractLowOrderPriorEstimator_F
-    "$(field_dict[:pe])"
+    """
+    $(field_dict[:pe])
+    """
     pe
-    "$(field_dict[:mp])"
+    """
+    $(field_dict[:mp])
+    """
     mp
-    "$(field_dict[:re])"
+    """
+    $(field_dict[:re])
+    """
     re
-    "$(field_dict[:ve])"
+    """
+    $(field_dict[:ve])
+    """
     ve
-    "$(field_dict[:rsd])"
+    """
+    $(field_dict[:rsd])
+    """
     rsd
     function FactorPrior(pe::AbstractLowOrderPriorEstimator_A_AF,
                          mp::AbstractMatrixProcessingEstimator,

@@ -121,11 +121,17 @@ SecondMoment
   - [`SecondMomentFormulation`](@ref)
 """
 @concrete struct SecondMoment <: LowOrderMomentMeasureAlgorithm
-    "$(field_dict[:ve])"
+    """
+    $(field_dict[:ve])
+    """
     ve
-    "$(field_dict[:alg1])"
+    """
+    $(field_dict[:alg1])
+    """
     alg1
-    "$(field_dict[:alg2])"
+    """
+    $(field_dict[:alg2])
+    """
     alg2
     function SecondMoment(ve::AbstractVarianceEstimator, alg1::AbstractMomentAlgorithm,
                           alg2::SecondMomentFormulation)
@@ -224,7 +230,9 @@ FourthMoment
   - [`AbstractMomentAlgorithm`](@ref)
 """
 @concrete struct FourthMoment <: UnstandardisedHighOrderMomentMeasureAlgorithm
-    "$(field_dict[:malg])"
+    """
+    $(field_dict[:malg])
+    """
     alg
     function FourthMoment(alg::AbstractMomentAlgorithm)
         return new{typeof(alg)}(alg)
@@ -272,9 +280,13 @@ StandardisedHighOrderMoment
   - [`UnstandardisedHighOrderMomentMeasureAlgorithm`](@ref)
 """
 @concrete struct StandardisedHighOrderMoment <: HighOrderMomentMeasureAlgorithm
-    "$(field_dict[:ve])"
+    """
+    $(field_dict[:ve])
+    """
     ve
-    "$(field_dict[:malg])"
+    """
+    $(field_dict[:malg])
+    """
     alg
     function StandardisedHighOrderMoment(ve::AbstractVarianceEstimator,
                                          alg::UnstandardisedHighOrderMomentMeasureAlgorithm)
@@ -690,13 +702,21 @@ LowOrderMoment
   - [`SOCRiskExpr`](@ref)
 """
 @concrete struct LowOrderMoment <: RiskMeasure
-    "$(field_dict[:settings_rm])"
+    """
+    $(field_dict[:settings_rm])
+    """
     settings
-    "$(field_dict[:w_rm])"
+    """
+    $(field_dict[:w_rm])
+    """
     w
-    "$(field_dict[:mu_rm])"
+    """
+    $(field_dict[:mu_rm])
+    """
     mu
-    "$(field_dict[:malg])"
+    """
+    $(field_dict[:malg])
+    """
     alg
     function LowOrderMoment(settings::RiskMeasureSettings, w::Option{<:ObsWeights},
                             mu::Option{<:Num_VecNum_VecScalar},
@@ -865,13 +885,21 @@ HighOrderMoment
   - [`StandardisedHighOrderMoment`](@ref)
 """
 @concrete struct HighOrderMoment <: HierarchicalRiskMeasure
-    "$(field_dict[:settings_rm])"
+    """
+    $(field_dict[:settings_rm])
+    """
     settings
-    "$(field_dict[:w_rm])"
+    """
+    $(field_dict[:w_rm])
+    """
     w
-    "$(field_dict[:mu_rm])"
+    """
+    $(field_dict[:mu_rm])
+    """
     mu
-    "$(field_dict[:malg])"
+    """
+    $(field_dict[:malg])
+    """
     alg
     function HighOrderMoment(settings::RiskMeasureSettings, w::Option{<:ObsWeights},
                              mu::Option{<:Num_VecNum_VecScalar},

@@ -281,7 +281,9 @@ Keywords correspond to the struct's fields.
   - [`JuMPOptimisationEstimator`](@ref)
 """
 @concrete struct JuMPOptimisationSolution <: OptimisationModelResult
-    "$(field_dict[:pw])"
+    """
+    $(field_dict[:pw])
+    """
     w
     function JuMPOptimisationSolution(w::ArrNum)
         @argcheck(!isempty(w))

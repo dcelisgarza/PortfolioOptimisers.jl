@@ -164,13 +164,21 @@ Keywords correspond to the struct's fields.
   - [`ClustersEstimator`](@ref)
 """
 @concrete struct Clusters <: AbstractClusteringResult
-    "$(field_dict[:clres])"
+    """
+    $(field_dict[:clres])
+    """
     res
-    "$(field_dict[:S])"
+    """
+    $(field_dict[:S])
+    """
     S
-    "$(field_dict[:D])"
+    """
+    $(field_dict[:D])
+    """
     D
-    "$(field_dict[:ck])"
+    """
+    $(field_dict[:ck])
+    """
     k
     function Clusters(res::ClTypes, S::MatNum, D::MatNum, k::Integer)
         @argcheck(!isempty(S), IsEmptyError)
@@ -246,7 +254,9 @@ SecondOrderDifference
   - [`VectorToScalarMeasure`](@ref)
 """
 @concrete struct SecondOrderDifference <: AbstractOptimalNumberClustersAlgorithm
-    "$(field_dict[:vsalg])"
+    """
+    $(field_dict[:vsalg])
+    """
     alg
     function SecondOrderDifference(alg::Num_VecToScaM)
         return new{typeof(alg)}(alg)
@@ -310,7 +320,9 @@ SilhouetteScore
   - [`Distances.jl`](https://github.com/JuliaStats/Distances.jl)
 """
 @concrete struct SilhouetteScore <: AbstractOptimalNumberClustersAlgorithm
-    "$(field_dict[:vsalg])"
+    """
+    $(field_dict[:vsalg])
+    """
     alg
     function SilhouetteScore(alg::Num_VecToScaM)
         return new{typeof(alg)}(alg)
@@ -378,9 +390,13 @@ OptimalNumberClusters
   - [`AbstractOptimalNumberClustersAlgorithm`](@ref)
 """
 @concrete struct OptimalNumberClusters <: AbstractOptimalNumberClustersEstimator
-    "$(field_dict[:max_k])"
+    """
+    $(field_dict[:max_k])
+    """
     max_k
-    "$(field_dict[:kalg])"
+    """
+    $(field_dict[:kalg])
+    """
     alg
     function OptimalNumberClusters(max_k::Option{<:Integer}, alg::Int_ONC)
         if !isnothing(max_k)
@@ -443,7 +459,9 @@ HClustAlgorithm
   - [`ClustersEstimator`](@ref)
 """
 @concrete struct HClustAlgorithm <: AbstractHierarchicalClusteringAlgorithm
-    "Linkage method for hierarchical clustering from [`Clustering.jl`](https://juliastats.org/Clustering.jl/stable/hclust.html)."
+    """
+    Linkage method for hierarchical clustering from [`Clustering.jl`](https://juliastats.org/Clustering.jl/stable/hclust.html).
+    """
     linkage
     function HClustAlgorithm(linkage::Symbol)
         return new{typeof(linkage)}(linkage)
@@ -518,13 +536,21 @@ ClustersEstimator
   - [`AbstractOptimalNumberClustersEstimator`](@ref)
 """
 @concrete struct ClustersEstimator <: AbstractClustersEstimator
-    "$(field_dict[:ce])"
+    """
+    $(field_dict[:ce])
+    """
     ce
-    "$(field_dict[:de])"
+    """
+    $(field_dict[:de])
+    """
     de
-    "$(field_dict[:clalg])"
+    """
+    $(field_dict[:clalg])
+    """
     alg
-    "$(field_dict[:onc])"
+    """
+    $(field_dict[:onc])
+    """
     onc
     function ClustersEstimator(ce::StatsBase.CovarianceEstimator,
                                de::AbstractDistanceEstimator,

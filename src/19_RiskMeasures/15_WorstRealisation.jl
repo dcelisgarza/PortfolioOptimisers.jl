@@ -60,7 +60,9 @@ WorstRealisation
   - [`ValueatRisk`](@ref)
 """
 @concrete struct WorstRealisation <: RiskMeasure
-    "$(field_dict[:settings_rm])"
+    """
+    $(field_dict[:settings_rm])
+    """
     settings
     function WorstRealisation(settings::RiskMeasureSettings)
         return new{typeof(settings)}(settings)

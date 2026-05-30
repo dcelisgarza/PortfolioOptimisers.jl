@@ -30,21 +30,37 @@ $(DocStringExtensions.FIELDS)
 """
 @concrete struct SchurComplementHierarchicalRiskParityResult <:
                  NonFiniteAllocationOptimisationResult
-    "$(field_dict[:oe])"
+    """
+    $(field_dict[:oe])
+    """
     oe
-    "$(field_dict[:pr])"
+    """
+    $(field_dict[:pr])
+    """
     pr
-    "$(field_dict[:wb])"
+    """
+    $(field_dict[:wb])
+    """
     wb
-    "$(field_dict[:clr])"
+    """
+    $(field_dict[:clr])
+    """
     clr
-    "$(field_dict[:gamma_schur])"
+    """
+    $(field_dict[:gamma_schur])
+    """
     gamma
-    "$(field_dict[:retcode])"
+    """
+    $(field_dict[:retcode])
+    """
     retcode
-    "$(field_dict[:pw])"
+    """
+    $(field_dict[:pw])
+    """
     w
-    "$(field_dict[:fb])"
+    """
+    $(field_dict[:fb])
+    """
     fb
 end
 """
@@ -113,13 +129,21 @@ Keywords correspond to the struct's fields.
   - [`NonMonotonicSchurComplement`](@ref)
 """
 @concrete struct MonotonicSchurComplement <: SchurComplementAlgorithm
-    "$(field_dict[:N_msc])"
+    """
+    $(field_dict[:N_msc])
+    """
     N
-    "$(field_dict[:tol])"
+    """
+    $(field_dict[:tol])
+    """
     tol
-    "$(field_dict[:iter])"
+    """
+    $(field_dict[:iter])
+    """
     iter
-    "$(field_dict[:strict_conv])"
+    """
+    $(field_dict[:strict_conv])
+    """
     strict
     function MonotonicSchurComplement(N::Integer, tol::Number, iter::Option{<:Integer},
                                       strict::Bool)
@@ -170,15 +194,25 @@ Keywords correspond to the struct's fields.
   - [`SchurComplementAlgorithm`](@ref)
 """
 @concrete struct SchurComplementParams <: AbstractAlgorithm
-    "$(field_dict[:r])"
+    """
+    $(field_dict[:r])
+    """
     r
-    "$(field_dict[:gamma_schur])"
+    """
+    $(field_dict[:gamma_schur])
+    """
     gamma
-    "$(field_dict[:pdm])"
+    """
+    $(field_dict[:pdm])
+    """
     pdm
-    "$(field_dict[:schalg])"
+    """
+    $(field_dict[:schalg])
+    """
     alg
-    "$(field_dict[:flag])"
+    """
+    $(field_dict[:flag])
+    """
     flag
     function SchurComplementParams(r::Sd_Var, gamma::Number, pdm::Option{<:Posdef},
                                    alg::SchurComplementAlgorithm, flag::Bool)
@@ -390,11 +424,17 @@ The bisection weight ``\\alpha`` is then computed from the Schur-complement-corr
   - [`SchurComplementParams`](@ref)
 """
 @concrete struct SchurComplementHierarchicalRiskParity <: ClusteringOptimisationEstimator
-    "$(field_dict[:opt_hier])"
+    """
+    $(field_dict[:opt_hier])
+    """
     opt
-    "$(field_dict[:params])"
+    """
+    $(field_dict[:params])
+    """
     params
-    "$(field_dict[:fb])"
+    """
+    $(field_dict[:fb])
+    """
     fb
     function SchurComplementHierarchicalRiskParity(opt::HierarchicalOptimiser,
                                                    params::ScP_VecScP,

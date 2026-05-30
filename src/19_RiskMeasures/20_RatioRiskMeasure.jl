@@ -63,9 +63,13 @@ RiskRatioRiskMeasure
   - [`NonOptimisationRiskRatioRiskMeasure`](@ref)
 """
 @concrete struct RiskRatioRiskMeasure <: HierarchicalRiskMeasure
-    "$(field_dict[:r1])"
+    """
+    $(field_dict[:r1])
+    """
     r1
-    "$(field_dict[:r2])"
+    """
+    $(field_dict[:r2])
+    """
     r2
     function RiskRatioRiskMeasure(r1::OptimisationRiskMeasure, r2::OptimisationRiskMeasure)
         return new{typeof(r1), typeof(r2)}(r1, r2)
@@ -147,9 +151,13 @@ Keywords correspond to the struct's fields.
   - [`RiskRatioRiskMeasure`](@ref)
 """
 @concrete struct NonOptimisationRiskRatioRiskMeasure <: NonOptimisationRiskMeasure
-    "$(field_dict[:r1])"
+    """
+    $(field_dict[:r1])
+    """
     r1
-    "$(field_dict[:r2])"
+    """
+    $(field_dict[:r2])
+    """
     r2
     function NonOptimisationRiskRatioRiskMeasure(r1::AbstractBaseRiskMeasure,
                                                  r2::AbstractBaseRiskMeasure)

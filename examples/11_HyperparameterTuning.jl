@@ -85,14 +85,14 @@ Due to the typing system, if using a vector of vectors you have to call [`concre
 Here we will search three grids, the final score will reflect the best performing parameter combination among all grids.
 =#
 
-p = concrete_typed_array([["opti[2].opt.l1" => range(; start = 0.0005, stop = 0.0008,
-                                                     length = 3),
-                           "opti[1].opt.l2" => range(; start = 0.0004, stop = 0.0007,
-                                                     length = 3)],
-                          ["opti[1].opt.l2" => range(; start = 0.0004, stop = 0.0007,
-                                                     length = 3)],
-                          ["opti[2].opt.l1" => range(; start = 0.0009, stop = 0.0012,
-                                                     length = 3)],
+p = concrete_typed_array([["opti[2].opt.l1" =>
+                               range(; start = 0.0005, stop = 0.0008, length = 3),
+                           "opti[1].opt.l2" =>
+                               range(; start = 0.0004, stop = 0.0007, length = 3)],
+                          ["opti[1].opt.l2" =>
+                               range(; start = 0.0004, stop = 0.0007, length = 3)],
+                          ["opti[2].opt.l1" =>
+                               range(; start = 0.0009, stop = 0.0012, length = 3)],
                           ["opti[2]" => [MeanRisk(; opt = opt, obj = MaximumUtility()),
                                          MeanRisk(; opt = opt, obj = MaximumRatio())]]])
 gs_cv = GridSearchCrossValidation(p; r = r)

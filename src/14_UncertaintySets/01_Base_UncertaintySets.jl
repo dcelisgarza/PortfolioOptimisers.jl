@@ -396,9 +396,13 @@ BoxUncertaintySet
   - [`EllipsoidalUncertaintySet`](@ref)
 """
 @concrete struct BoxUncertaintySet <: AbstractUncertaintySetResult
-    "$(field_dict[:lb])"
+    """
+    $(field_dict[:lb])
+    """
     lb
-    "$(field_dict[:ub])"
+    """
+    $(field_dict[:ub])
+    """
     ub
     function BoxUncertaintySet(lb::ArrNum, ub::ArrNum)
         @argcheck(!isempty(lb))
@@ -473,7 +477,9 @@ NormalKUncertaintyAlgorithm
   - [`k_ucs`](@ref)
 """
 @concrete struct NormalKUncertaintyAlgorithm <: AbstractUncertaintyKAlgorithm
-    "$(field_dict[:kwargs])"
+    """
+    $(field_dict[:kwargs])
+    """
     kwargs
     function NormalKUncertaintyAlgorithm(kwargs::NamedTuple)
         return new{typeof(kwargs)}(kwargs)
@@ -598,9 +604,13 @@ EllipsoidalUncertaintySetAlgorithm
   - [`BoxUncertaintySetAlgorithm`](@ref)
 """
 @concrete struct EllipsoidalUncertaintySetAlgorithm <: AbstractUncertaintySetAlgorithm
-    "$(field_dict[:method_ucs])"
+    """
+    $(field_dict[:method_ucs])
+    """
     method
-    "$(field_dict[:diagonal])"
+    """
+    $(field_dict[:diagonal])
+    """
     diagonal
     function EllipsoidalUncertaintySetAlgorithm(method::Num_UcSK, diagonal::Bool)
         return new{typeof(method), typeof(diagonal)}(method, diagonal)
@@ -715,11 +725,17 @@ EllipsoidalUncertaintySet
   - [`k_ucs`](@ref)
 """
 @concrete struct EllipsoidalUncertaintySet <: AbstractUncertaintySetResult
-    "$(field_dict[:sigma])"
+    """
+    $(field_dict[:sigma])
+    """
     sigma
-    "$(field_dict[:k_ucs])"
+    """
+    $(field_dict[:k_ucs])
+    """
     k
-    "$(field_dict[:class_ucs])"
+    """
+    $(field_dict[:class_ucs])
+    """
     class
     function EllipsoidalUncertaintySet(sigma::MatNum, k::Number,
                                        class::AbstractEllipsoidalUncertaintySetResultClass)

@@ -48,9 +48,13 @@ GeneralCovariance
   - [`cov(ce::GeneralCovariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
 """
 @concrete struct GeneralCovariance <: AbstractCovarianceEstimator
-    "$(field_dict[:ce])"
+    """
+    $(field_dict[:ce])
+    """
     ce
-    "$(field_dict[:oow])"
+    """
+    $(field_dict[:oow])
+    """
     w
     function GeneralCovariance(ce::StatsBase.CovarianceEstimator, w::Option{<:ObsWeights})
         assert_nonempty_nonneg_finite_val(w, :w)
@@ -278,11 +282,17 @@ Covariance
   - [`Semi`](@ref)
 """
 @concrete struct Covariance <: AbstractCovarianceEstimator
-    "$(field_dict[:me])"
+    """
+    $(field_dict[:me])
+    """
     me
-    "$(field_dict[:ce])"
+    """
+    $(field_dict[:ce])
+    """
     ce
-    "$(field_dict[:malg])"
+    """
+    $(field_dict[:malg])
+    """
     alg
     function Covariance(me::AbstractExpectedReturnsEstimator,
                         ce::StatsBase.CovarianceEstimator, alg::AbstractMomentAlgorithm)

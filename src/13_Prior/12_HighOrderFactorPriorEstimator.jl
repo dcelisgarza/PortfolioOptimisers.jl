@@ -211,15 +211,25 @@ HighOrderFactorPriorEstimator
   - [`HighOrderPrior`](@ref)
 """
 @concrete struct HighOrderFactorPriorEstimator <: AbstractHighOrderPriorEstimator_F
-    "$(field_dict[:pe])"
+    """
+    $(field_dict[:pe])
+    """
     pe
-    "$(field_dict[:kte])"
+    """
+    $(field_dict[:kte])
+    """
     kte
-    "$(field_dict[:ske])"
+    """
+    $(field_dict[:ske])
+    """
     ske
-    "$(field_dict[:ex])"
+    """
+    $(field_dict[:ex])
+    """
     ex
-    "$(field_dict[:rsd])"
+    """
+    $(field_dict[:rsd])
+    """
     rsd
     function HighOrderFactorPriorEstimator(pe::AbstractLowOrderPriorEstimator_F_AF,
                                            kte::Option{<:CokurtosisEstimator},

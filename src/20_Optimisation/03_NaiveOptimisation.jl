@@ -90,17 +90,29 @@ NaiveOptimisationResult
   - [`RandomWeighted`](@ref)
 """
 @concrete struct NaiveOptimisationResult <: NonFiniteAllocationOptimisationResult
-    "$(field_dict[:oe])"
+    """
+    $(field_dict[:oe])
+    """
     oe
-    "$(field_dict[:pr])"
+    """
+    $(field_dict[:pr])
+    """
     pr
-    "$(field_dict[:wb])"
+    """
+    $(field_dict[:wb])
+    """
     wb
-    "$(field_dict[:retcode])"
+    """
+    $(field_dict[:retcode])
+    """
     retcode
-    "$(field_dict[:pw])"
+    """
+    $(field_dict[:pw])
+    """
     w
-    "$(field_dict[:fb])"
+    """
+    $(field_dict[:fb])
+    """
     fb
 end
 """
@@ -201,21 +213,37 @@ InverseVolatility
   - [`RandomWeighted`](@ref)
 """
 @concrete struct InverseVolatility <: NaiveOptimisationEstimator
-    "$(field_dict[:pe])"
+    """
+    $(field_dict[:pe])
+    """
     pe
-    "$(field_dict[:wb])"
+    """
+    $(field_dict[:wb])
+    """
     wb
-    "$(field_dict[:sets])"
+    """
+    $(field_dict[:sets])
+    """
     sets
-    "$(field_dict[:wf])"
+    """
+    $(field_dict[:wf])
+    """
     wf
-    "$(field_dict[:fb])"
+    """
+    $(field_dict[:fb])
+    """
     fb
-    "$(field_dict[:sq])"
+    """
+    $(field_dict[:sq])
+    """
     sq
-    "$(field_dict[:brt])"
+    """
+    $(field_dict[:brt])
+    """
     brt
-    "$(field_dict[:strict_opt])"
+    """
+    $(field_dict[:strict_opt])
+    """
     strict
     function InverseVolatility(pe::PrE_Pr, wb::Option{<:WbE_Wb}, sets::Option{<:AssetSets},
                                wf::WeightFinaliser, fb::Option{<:OptE_Opt}, sq::Bool,
@@ -388,15 +416,25 @@ EqualWeighted
   - [`RandomWeighted`](@ref)
 """
 @concrete struct EqualWeighted <: NaiveOptimisationEstimator
-    "$(field_dict[:wb])"
+    """
+    $(field_dict[:wb])
+    """
     wb
-    "$(field_dict[:sets])"
+    """
+    $(field_dict[:sets])
+    """
     sets
-    "$(field_dict[:wf])"
+    """
+    $(field_dict[:wf])
+    """
     wf
-    "$(field_dict[:fb])"
+    """
+    $(field_dict[:fb])
+    """
     fb
-    "$(field_dict[:strict_opt])"
+    """
+    $(field_dict[:strict_opt])
+    """
     strict
     function EqualWeighted(wb::Option{<:WbE_Wb}, sets::Option{<:AssetSets},
                            wf::WeightFinaliser, fb::Option{<:OptE_Opt}, strict::Bool)
@@ -553,21 +591,37 @@ RandomWeighted
   - [`EqualWeighted`](@ref)
 """
 @concrete struct RandomWeighted <: NaiveOptimisationEstimator
-    "$(field_dict[:alpha_dirichlet])"
+    """
+    $(field_dict[:alpha_dirichlet])
+    """
     alpha
-    "$(field_dict[:rng])"
+    """
+    $(field_dict[:rng])
+    """
     rng
-    "$(field_dict[:seed])"
+    """
+    $(field_dict[:seed])
+    """
     seed
-    "$(field_dict[:wb])"
+    """
+    $(field_dict[:wb])
+    """
     wb
-    "$(field_dict[:sets])"
+    """
+    $(field_dict[:sets])
+    """
     sets
-    "$(field_dict[:wf])"
+    """
+    $(field_dict[:wf])
+    """
     wf
-    "$(field_dict[:fb])"
+    """
+    $(field_dict[:fb])
+    """
     fb
-    "$(field_dict[:strict_opt])"
+    """
+    $(field_dict[:strict_opt])
+    """
     strict
     function RandomWeighted(alpha::Num_VecNum, rng::Random.AbstractRNG,
                             seed::Option{<:Integer}, wb::Option{<:WbE_Wb},

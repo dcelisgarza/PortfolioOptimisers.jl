@@ -128,13 +128,21 @@ MedianAbsoluteDeviation
   - [`MeanCentering`](@ref)
 """
 @concrete struct MedianAbsoluteDeviation <: HierarchicalRiskMeasure
-    "$(field_dict[:settings_rm])"
+    """
+    $(field_dict[:settings_rm])
+    """
     settings
-    "$(field_dict[:w_rm])"
+    """
+    $(field_dict[:w_rm])
+    """
     w
-    "$(field_dict[:mu_rm])"
+    """
+    $(field_dict[:mu_rm])
+    """
     mu
-    "$(field_dict[:flag])"
+    """
+    $(field_dict[:flag])
+    """
     flag
     function MedianAbsoluteDeviation(settings::HierarchicalRiskMeasureSettings,
                                      w::Option{<:ObsWeights}, mu::MedAbsDevMu,

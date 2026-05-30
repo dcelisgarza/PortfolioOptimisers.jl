@@ -97,9 +97,13 @@ MIPValueatRisk
   - [`Option`](@ref)
 """
 @concrete struct MIPValueatRisk <: ValueatRiskFormulation
-    "$(field_dict[:b_mip])"
+    """
+    $(field_dict[:b_mip])
+    """
     b
-    "$(field_dict[:s_mip])"
+    """
+    $(field_dict[:s_mip])
+    """
     s
     function MIPValueatRisk(b::Option{<:Number}, s::Option{<:Number})
         bflag = !isnothing(b)
@@ -167,13 +171,21 @@ DistributionValueatRisk
   - [`Option`](@ref)
 """
 @concrete struct DistributionValueatRisk <: ValueatRiskFormulation
-    "$(field_dict[:mu_rm])"
+    """
+    $(field_dict[:mu_rm])
+    """
     mu
-    "$(field_dict[:sigma])"
+    """
+    $(field_dict[:sigma])
+    """
     sigma
-    "$(field_dict[:chol])"
+    """
+    $(field_dict[:chol])
+    """
     chol
-    "$(field_dict[:dist])"
+    """
+    $(field_dict[:dist])
+    """
     dist
     function DistributionValueatRisk(mu::Option{<:VecNum}, sigma::Option{<:MatNum},
                                      chol::Option{<:MatNum},
@@ -306,13 +318,21 @@ ValueatRisk
   - [`ValueatRiskRange`](@ref)
 """
 @concrete struct ValueatRisk <: RiskMeasure
-    "$(field_dict[:settings_rm])"
+    """
+    $(field_dict[:settings_rm])
+    """
     settings
-    "$(field_dict[:alpha])"
+    """
+    $(field_dict[:alpha])
+    """
     alpha
-    "$(field_dict[:oow])"
+    """
+    $(field_dict[:oow])
+    """
     w
-    "$(field_dict[:alg])"
+    """
+    $(field_dict[:alg])
+    """
     alg
     function ValueatRisk(settings::RiskMeasureSettings, alpha::Number,
                          w::Option{<:ObsWeights}, alg::ValueatRiskFormulation)
@@ -442,15 +462,25 @@ ValueatRiskRange
   - [`ConditionalValueatRiskRange`](@ref)
 """
 @concrete struct ValueatRiskRange <: RiskMeasure
-    "$(field_dict[:settings_rm])"
+    """
+    $(field_dict[:settings_rm])
+    """
     settings
-    "$(field_dict[:alpha])"
+    """
+    $(field_dict[:alpha])
+    """
     alpha
-    "$(field_dict[:beta])"
+    """
+    $(field_dict[:beta])
+    """
     beta
-    "$(field_dict[:oow])"
+    """
+    $(field_dict[:oow])
+    """
     w
-    "$(field_dict[:alg])"
+    """
+    $(field_dict[:alg])
+    """
     alg
     function ValueatRiskRange(settings::RiskMeasureSettings, alpha::Number, beta::Number,
                               w::Option{<:ObsWeights}, alg::ValueatRiskFormulation)
@@ -615,15 +645,25 @@ DrawdownatRisk
   - [`RelativeDrawdownatRisk`](@ref)
 """
 @concrete struct DrawdownatRisk <: RiskMeasure
-    "$(field_dict[:settings_rm])"
+    """
+    $(field_dict[:settings_rm])
+    """
     settings
-    "$(field_dict[:alpha])"
+    """
+    $(field_dict[:alpha])
+    """
     alpha
-    "$(field_dict[:oow])"
+    """
+    $(field_dict[:oow])
+    """
     w
-    "$(field_dict[:b_mip])"
+    """
+    $(field_dict[:b_mip])
+    """
     b
-    "$(field_dict[:s_mip])"
+    """
+    $(field_dict[:s_mip])
+    """
     s
     function DrawdownatRisk(settings::RiskMeasureSettings, alpha::Number,
                             w::Option{<:ObsWeights}, b::Option{<:Number},
@@ -804,11 +844,17 @@ RelativeDrawdownatRisk
   - [`RelativeConditionalDrawdownatRisk`](@ref)
 """
 @concrete struct RelativeDrawdownatRisk <: HierarchicalRiskMeasure
-    "$(field_dict[:settings_rm])"
+    """
+    $(field_dict[:settings_rm])
+    """
     settings
-    "$(field_dict[:alpha])"
+    """
+    $(field_dict[:alpha])
+    """
     alpha
-    "$(field_dict[:oow])"
+    """
+    $(field_dict[:oow])
+    """
     w
     function RelativeDrawdownatRisk(settings::HierarchicalRiskMeasureSettings,
                                     alpha::Number, w::Option{<:ObsWeights})

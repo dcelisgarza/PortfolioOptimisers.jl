@@ -272,7 +272,9 @@ ExpectedReturn
   - [`expected_risk`](@ref)
 """
 @concrete struct ExpectedReturn <: NonOptimisationRiskMeasure
-    "$(field_dict[:rt])"
+    """
+    $(field_dict[:rt])
+    """
     rt
     function ExpectedReturn(rt::JuMPReturnsEstimator)
         return new{typeof(rt)}(rt)
@@ -394,11 +396,17 @@ ExpectedReturnRiskRatio
   - [`expected_risk`](@ref)
 """
 @concrete struct ExpectedReturnRiskRatio <: NonOptimisationRiskMeasure
-    "$(field_dict[:rt])"
+    """
+    $(field_dict[:rt])
+    """
     rt
-    "$(field_dict[:rk])"
+    """
+    $(field_dict[:rk])
+    """
     rk
-    "$(field_dict[:rf])"
+    """
+    $(field_dict[:rf])
+    """
     rf
     function ExpectedReturnRiskRatio(rt::JuMPReturnsEstimator, rk::AbstractBaseRiskMeasure,
                                      rf::Number)

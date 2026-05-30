@@ -34,9 +34,13 @@ ExcessExpectedReturns
   - [`AbstractExpectedReturnsEstimator`](@ref)
 """
 @concrete struct ExcessExpectedReturns <: AbstractShrunkExpectedReturnsEstimator
-    "$(field_dict[:me])"
+    """
+    $(field_dict[:me])
+    """
     me
-    "$(field_dict[:rf])"
+    """
+    $(field_dict[:rf])
+    """
     rf
     function ExcessExpectedReturns(me::AbstractExpectedReturnsEstimator, rf::Number)
         return new{typeof(me), typeof(rf)}(me, rf)

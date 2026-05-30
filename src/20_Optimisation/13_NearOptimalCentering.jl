@@ -50,25 +50,45 @@ $(DocStringExtensions.FIELDS)
   - [`NonFiniteAllocationOptimisationResult`](@ref)
 """
 @concrete struct NearOptimalCenteringResult <: NonFiniteAllocationOptimisationResult
-    "$(field_dict[:oe])"
+    """
+    $(field_dict[:oe])
+    """
     oe
-    "$(field_dict[:pa])"
+    """
+    $(field_dict[:pa])
+    """
     pa
-    "$(field_dict[:w_min_retcode])"
+    """
+    $(field_dict[:w_min_retcode])
+    """
     w_min_retcode
-    "$(field_dict[:w_opt_retcode])"
+    """
+    $(field_dict[:w_opt_retcode])
+    """
     w_opt_retcode
-    "$(field_dict[:w_max_retcode])"
+    """
+    $(field_dict[:w_max_retcode])
+    """
     w_max_retcode
-    "$(field_dict[:noc_retcode])"
+    """
+    $(field_dict[:noc_retcode])
+    """
     noc_retcode
-    "$(field_dict[:retcode])"
+    """
+    $(field_dict[:retcode])
+    """
     retcode
-    "$(field_dict[:sol])"
+    """
+    $(field_dict[:sol])
+    """
     sol
-    "$(field_dict[:model])"
+    """
+    $(field_dict[:model])
+    """
     model
-    "$(field_dict[:fb])"
+    """
+    $(field_dict[:fb])
+    """
     fb
 end
 """
@@ -165,31 +185,57 @@ The solution yields a portfolio centrally located within the near-optimal region
   - [`NearOptimalCenteringAlgorithm`](@ref)
 """
 @concrete struct NearOptimalCentering <: RiskJuMPOptimisationEstimator
-    "$(field_dict[:opt_jmp])"
+    """
+    $(field_dict[:opt_jmp])
+    """
     opt
-    "$(field_dict[:r_opt])"
+    """
+    $(field_dict[:r_opt])
+    """
     r
-    "$(field_dict[:obj])"
+    """
+    $(field_dict[:obj])
+    """
     obj
-    "Number of equally-spaced risk bins for the frontier approximation."
+    """
+    Number of equally-spaced risk bins for the frontier approximation.
+    """
     bins
-    "$(field_dict[:w_min_noc])"
+    """
+    $(field_dict[:w_min_noc])
+    """
     w_min
-    "$(field_dict[:w_min_ini])"
+    """
+    $(field_dict[:w_min_ini])
+    """
     w_min_ini
-    "$(field_dict[:w_opt_noc])"
+    """
+    $(field_dict[:w_opt_noc])
+    """
     w_opt
-    "$(field_dict[:w_opt_ini])"
+    """
+    $(field_dict[:w_opt_ini])
+    """
     w_opt_ini
-    "$(field_dict[:w_max_noc])"
+    """
+    $(field_dict[:w_max_noc])
+    """
     w_max
-    "$(field_dict[:w_max_ini])"
+    """
+    $(field_dict[:w_max_ini])
+    """
     w_max_ini
-    "$(field_dict[:ucs_flag])"
+    """
+    $(field_dict[:ucs_flag])
+    """
     ucs_flag
-    "Near Optimal Centering algorithm variant."
+    """
+    Near Optimal Centering algorithm variant.
+    """
     alg
-    "$(field_dict[:fb])"
+    """
+    $(field_dict[:fb])
+    """
     fb
     function NearOptimalCentering(opt::JuMPOptimiser, r::RM_VecRM,
                                   obj::Option{<:ObjectiveFunction}, bins::Option{<:Number},
@@ -447,29 +493,53 @@ $(DocStringExtensions.FIELDS)
   - [`near_optimal_centering_setup`](@ref)
 """
 @concrete struct NearOptimalSetup <: AbstractResult
-    "$(field_dict[:w_opt_noc])"
+    """
+    $(field_dict[:w_opt_noc])
+    """
     w_opt
-    "$(field_dict[:rk_opt])"
+    """
+    $(field_dict[:rk_opt])
+    """
     rk_opt
-    "$(field_dict[:rt_opt])"
+    """
+    $(field_dict[:rt_opt])
+    """
     rt_opt
-    "$(field_dict[:rt_min])"
+    """
+    $(field_dict[:rt_min])
+    """
     rt_min
-    "$(field_dict[:rt_max])"
+    """
+    $(field_dict[:rt_max])
+    """
     rt_max
-    "$(field_dict[:w_min_noc])"
+    """
+    $(field_dict[:w_min_noc])
+    """
     w_min
-    "$(field_dict[:w_max_noc])"
+    """
+    $(field_dict[:w_max_noc])
+    """
     w_max
-    "$(field_dict[:r_opt])"
+    """
+    $(field_dict[:r_opt])
+    """
     r
-    "$(field_dict[:opt_jmp])"
+    """
+    $(field_dict[:opt_jmp])
+    """
     opt
-    "$(field_dict[:w_min_retcode])"
+    """
+    $(field_dict[:w_min_retcode])
+    """
     w_min_retcode
-    "$(field_dict[:w_opt_retcode])"
+    """
+    $(field_dict[:w_opt_retcode])
+    """
     w_opt_retcode
-    "$(field_dict[:w_max_retcode])"
+    """
+    $(field_dict[:w_max_retcode])
+    """
     w_max_retcode
 end
 """

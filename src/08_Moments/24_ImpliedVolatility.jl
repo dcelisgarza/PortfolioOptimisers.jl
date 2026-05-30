@@ -59,12 +59,18 @@ ImpliedVolatilityRegression
   - [`ImpliedVolatility`](@ref)
 """
 @concrete struct ImpliedVolatilityRegression <: ImpliedVolatilityAlgorithm
-    "$(field_dict[:ve])"
+    """
+    $(field_dict[:ve])
+    """
     ve
-    "Window size for computing rolling realised volatility."
+    """
+    Window size for computing rolling realised volatility.
+    """
     ws
     # crit
-    "$(field_dict[:retgt])"
+    """
+    $(field_dict[:retgt])
+    """
     re
     function ImpliedVolatilityRegression(ve::AbstractVarianceEstimator, ws::Number,
                                          re::AbstractRegressionTarget)
@@ -127,13 +133,21 @@ Keywords correspond to the struct's fields.
   - [`AbstractMatrixProcessingEstimator`](@ref)
 """
 @concrete struct ImpliedVolatility <: AbstractCovarianceEstimator
-    "$(field_dict[:ce])"
+    """
+    $(field_dict[:ce])
+    """
     ce
-    "$(field_dict[:mp])"
+    """
+    $(field_dict[:mp])
+    """
     mp
-    "Implied volatility algorithm for predicting realised volatility."
+    """
+    Implied volatility algorithm for predicting realised volatility.
+    """
     alg
-    "Annualisation factor for converting annualised implied volatility to the data frequency."
+    """
+    Annualisation factor for converting annualised implied volatility to the data frequency.
+    """
     af
     function ImpliedVolatility(ce::StatsBase.CovarianceEstimator,
                                mp::AbstractMatrixProcessingEstimator,

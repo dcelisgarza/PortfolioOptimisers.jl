@@ -201,15 +201,25 @@ RelativisticValueatRisk
   - [`RelativisticDrawdownatRisk`](@ref)
 """
 @concrete struct RelativisticValueatRisk <: RiskMeasure
-    "$(field_dict[:settings_rm])"
+    """
+    $(field_dict[:settings_rm])
+    """
     settings
-    "$(field_dict[:slv])"
+    """
+    $(field_dict[:slv])
+    """
     slv
-    "$(field_dict[:alpha])"
+    """
+    $(field_dict[:alpha])
+    """
     alpha
-    "$(field_dict[:kappa])"
+    """
+    $(field_dict[:kappa])
+    """
     kappa
-    "$(field_dict[:oow])"
+    """
+    $(field_dict[:oow])
+    """
     w
     function RelativisticValueatRisk(settings::RiskMeasureSettings,
                                      slv::Option{<:Slv_VecSlv}, alpha::Number,
@@ -318,19 +328,33 @@ RelativisticValueatRiskRange
   - [`EntropicValueatRiskRange`](@ref)
 """
 @concrete struct RelativisticValueatRiskRange <: RiskMeasure
-    "$(field_dict[:settings_rm])"
+    """
+    $(field_dict[:settings_rm])
+    """
     settings
-    "$(field_dict[:slv])"
+    """
+    $(field_dict[:slv])
+    """
     slv
-    "$(field_dict[:alpha])"
+    """
+    $(field_dict[:alpha])
+    """
     alpha
-    "$(field_dict[:kappa_a])"
+    """
+    $(field_dict[:kappa_a])
+    """
     kappa_a
-    "$(field_dict[:beta])"
+    """
+    $(field_dict[:beta])
+    """
     beta
-    "$(field_dict[:kappa_b])"
+    """
+    $(field_dict[:kappa_b])
+    """
     kappa_b
-    "$(field_dict[:oow])"
+    """
+    $(field_dict[:oow])
+    """
     w
     function RelativisticValueatRiskRange(settings::RiskMeasureSettings,
                                           slv::Option{<:Slv_VecSlv}, alpha::Number,
@@ -478,15 +502,25 @@ RelativisticDrawdownatRisk
   - [`RelativeRelativisticDrawdownatRisk`](@ref)
 """
 @concrete struct RelativisticDrawdownatRisk <: RiskMeasure
-    "$(field_dict[:settings_rm])"
+    """
+    $(field_dict[:settings_rm])
+    """
     settings
-    "$(field_dict[:slv])"
+    """
+    $(field_dict[:slv])
+    """
     slv
-    "$(field_dict[:alpha])"
+    """
+    $(field_dict[:alpha])
+    """
     alpha
-    "$(field_dict[:kappa])"
+    """
+    $(field_dict[:kappa])
+    """
     kappa
-    "$(field_dict[:oow])"
+    """
+    $(field_dict[:oow])
+    """
     w
     function RelativisticDrawdownatRisk(settings, slv::Option{<:Slv_VecSlv}, alpha::Number,
                                         kappa::Number, w::Option{<:ObsWeights})
@@ -606,15 +640,25 @@ RelativeRelativisticDrawdownatRisk
   - [`RelativeEntropicDrawdownatRisk`](@ref)
 """
 @concrete struct RelativeRelativisticDrawdownatRisk <: HierarchicalRiskMeasure
-    "$(field_dict[:settings_rm])"
+    """
+    $(field_dict[:settings_rm])
+    """
     settings
-    "$(field_dict[:slv])"
+    """
+    $(field_dict[:slv])
+    """
     slv
-    "$(field_dict[:alpha])"
+    """
+    $(field_dict[:alpha])
+    """
     alpha
-    "$(field_dict[:kappa])"
+    """
+    $(field_dict[:kappa])
+    """
     kappa
-    "$(field_dict[:oow])"
+    """
+    $(field_dict[:oow])
+    """
     w
     function RelativeRelativisticDrawdownatRisk(settings::HierarchicalRiskMeasureSettings,
                                                 slv::Option{<:Slv_VecSlv}, alpha::Number,

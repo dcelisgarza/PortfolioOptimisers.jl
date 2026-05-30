@@ -35,7 +35,9 @@ PValue
   - [`StepwiseRegression`](@ref)
 """
 @concrete struct PValue <: AbstractStepwiseRegressionCriterion
-    "$(field_dict[:t])"
+    """
+    $(field_dict[:t])
+    """
     t
     function PValue(t::Number)
         @argcheck(zero(t) < t < one(t), DomainError("0 < t < 1 must hold. Got\nt => $t"))
@@ -113,11 +115,17 @@ StepwiseRegression
   - [`AbstractRegressionTarget`](@ref)
 """
 @concrete struct StepwiseRegression <: AbstractRegressionEstimator
-    "$(field_dict[:crit])"
+    """
+    $(field_dict[:crit])
+    """
     crit
-    "$(field_dict[:realg])"
+    """
+    $(field_dict[:realg])
+    """
     alg
-    "$(field_dict[:retgt])"
+    """
+    $(field_dict[:retgt])
+    """
     tgt
     function StepwiseRegression(crit::AbstractStepwiseRegressionCriterion,
                                 alg::AbstractStepwiseRegressionAlgorithm,

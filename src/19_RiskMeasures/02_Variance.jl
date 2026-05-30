@@ -250,15 +250,25 @@ julia> r(w)
   - [`expected_risk`](@ref)
 """
 @concrete struct Variance <: RiskMeasure
-    "$(field_dict[:settings_rm])"
+    """
+    $(field_dict[:settings_rm])
+    """
     settings
-    "$(field_dict[:sigma])"
+    """
+    $(field_dict[:sigma])
+    """
     sigma
-    "$(field_dict[:chol])"
+    """
+    $(field_dict[:chol])
+    """
     chol
-    "$(field_dict[:rc])"
+    """
+    $(field_dict[:rc])
+    """
     rc
-    "$(field_dict[:alg])"
+    """
+    $(field_dict[:alg])
+    """
     alg
     function Variance(settings::RiskMeasureSettings, sigma::Option{<:MatNum},
                       chol::Option{<:MatNum}, rc::Option{<:LcE_Lc},
@@ -413,11 +423,17 @@ julia> r(w)
   - [`expected_risk`](@ref)
 """
 @concrete struct StandardDeviation <: RiskMeasure
-    "$(field_dict[:settings_rm])"
+    """
+    $(field_dict[:settings_rm])
+    """
     settings
-    "$(field_dict[:sigma])"
+    """
+    $(field_dict[:sigma])
+    """
     sigma
-    "$(field_dict[:chol])"
+    """
+    $(field_dict[:chol])
+    """
     chol
     function StandardDeviation(settings::RiskMeasureSettings, sigma::Option{<:MatNum},
                                chol::Option{<:MatNum})::StandardDeviation
@@ -667,11 +683,17 @@ julia> r(w)
   - [`expected_risk`](@ref)
 """
 @concrete struct UncertaintySetVariance <: RiskMeasure
-    "$(field_dict[:settings_rm])"
+    """
+    $(field_dict[:settings_rm])
+    """
     settings
-    "$(field_dict[:ucs])"
+    """
+    $(field_dict[:ucs])
+    """
     ucs
-    "$(field_dict[:sigma])"
+    """
+    $(field_dict[:sigma])
+    """
     sigma
     function UncertaintySetVariance(settings::RiskMeasureSettings, ucs::Option{<:UcSE_UcS},
                                     sigma::Option{<:MatNum})

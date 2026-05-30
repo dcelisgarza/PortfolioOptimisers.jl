@@ -158,9 +158,13 @@ GeneralExponentialSimilarity
   - [`dbht_similarity`](@ref)
 """
 @concrete struct GeneralExponentialSimilarity <: AbstractSimilarityMatrixAlgorithm
-    "$(field_dict[:dbhtcoef])"
+    """
+    $(field_dict[:dbhtcoef])
+    """
     coef
-    "$(field_dict[:dbhtpower])"
+    """
+    $(field_dict[:dbhtpower])
+    """
     power
     function GeneralExponentialSimilarity(coef::Number, power::Number)
         @argcheck(zero(coef) < coef, DomainError)
@@ -254,9 +258,13 @@ DBHT
   - [`EqualRoot`](@ref)
 """
 @concrete struct DBHT <: AbstractHierarchicalClusteringAlgorithm
-    "$(field_dict[:sim])"
+    """
+    $(field_dict[:sim])
+    """
     sim
-    "$(field_dict[:root])"
+    """
+    $(field_dict[:root])
+    """
     root
     function DBHT(sim::AbstractSimilarityMatrixAlgorithm, root::DBHTRootMethod)
         return new{typeof(sim), typeof(root)}(sim, root)
@@ -1855,11 +1863,17 @@ LoGo
   - [`GeneralExponentialSimilarity`](@ref)
 """
 @concrete struct LoGo <: InverseMatrixSparsificationAlgorithm
-    "$(field_dict[:de])"
+    """
+    $(field_dict[:de])
+    """
     de
-    "$(field_dict[:sim])"
+    """
+    $(field_dict[:sim])
+    """
     sim
-    "$(field_dict[:pdm])"
+    """
+    $(field_dict[:pdm])
+    """
     pdm
     function LoGo(de::AbstractDistanceEstimator, sim::AbstractSimilarityMatrixAlgorithm,
                   pdm::Option{<:Posdef} = Posdef())

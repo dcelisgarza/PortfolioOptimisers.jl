@@ -58,11 +58,17 @@ BlackLittermanViews
   - [`black_litterman_views`](@ref)
 """
 @concrete struct BlackLittermanViews <: AbstractResult
-    "$(field_dict[:P])"
+    """
+    $(field_dict[:P])
+    """
     P
-    "$(field_dict[:Q])"
+    """
+    $(field_dict[:Q])
+    """
     Q
-    "$(field_dict[:excl])"
+    """
+    $(field_dict[:excl])
+    """
     excl
     function BlackLittermanViews(P::MatNum, Q::VecNum, excl::Option{<:VecInt})
         @argcheck(!isempty(P))

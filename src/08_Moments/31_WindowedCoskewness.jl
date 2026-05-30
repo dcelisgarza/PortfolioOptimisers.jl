@@ -52,11 +52,17 @@ WindowedCoskewness
   - [`Coskewness`](@ref)
 """
 @concrete struct WindowedCoskewness <: CoskewnessEstimator
-    "$(field_dict[:ske])"
+    """
+    $(field_dict[:ske])
+    """
     ske
-    "$(field_dict[:oow])"
+    """
+    $(field_dict[:oow])
+    """
     w
-    "Window specification: an integer (last `window` observations) or a vector of indices."
+    """
+    Window specification: an integer (last `window` observations) or a vector of indices.
+    """
     window
     function WindowedCoskewness(ske::CoskewnessEstimator, w::Option{<:ObsWeights},
                                 window::Option{<:Int_VecInt})

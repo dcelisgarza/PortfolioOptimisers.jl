@@ -51,11 +51,17 @@ SimpleVariance
   - [`var(ve::SimpleVariance, X::VecNum; mean = nothing)`](@ref)
 """
 @concrete struct SimpleVariance <: AbstractVarianceEstimator
-    "$(field_dict[:ome])"
+    """
+    $(field_dict[:ome])
+    """
     me
-    "$(field_dict[:ow])"
+    """
+    $(field_dict[:ow])
+    """
     w
-    "$(field_dict[:corrected])"
+    """
+    $(field_dict[:corrected])
+    """
     corrected
     function SimpleVariance(me::Option{<:AbstractExpectedReturnsEstimator},
                             w::Option{<:ObsWeights}, corrected::Bool)

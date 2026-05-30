@@ -41,7 +41,9 @@ PhylogenyResult
   - [`centrality_vector`](@ref)
 """
 @concrete struct PhylogenyResult <: AbstractPhylogenyResult
-    "$(field_dict[:phX_Xv])"
+    """
+    $(field_dict[:phX_Xv])
+    """
     X
     function PhylogenyResult(X::ArrNum)
         @argcheck(!isempty(X), IsEmptyError)
@@ -198,9 +200,13 @@ BetweennessCentrality
   - [`Graphs.betweenness_centrality`](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.betweenness_centrality)
 """
 @concrete struct BetweennessCentrality <: AbstractCentralityAlgorithm
-    "$(field_dict[:ctargs])"
+    """
+    $(field_dict[:ctargs])
+    """
     args
-    "$(field_dict[:ctkwargs])"
+    """
+    $(field_dict[:ctkwargs])
+    """
     kwargs
     function BetweennessCentrality(args::Tuple, kwargs::NamedTuple)
         return new{typeof(args), typeof(kwargs)}(args, kwargs)
@@ -245,9 +251,13 @@ ClosenessCentrality
   - [`Graphs.closeness_centrality`](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.closeness_centrality)
 """
 @concrete struct ClosenessCentrality <: AbstractCentralityAlgorithm
-    "$(field_dict[:ctargs])"
+    """
+    $(field_dict[:ctargs])
+    """
     args
-    "$(field_dict[:ctkwargs])"
+    """
+    $(field_dict[:ctkwargs])
+    """
     kwargs
     function ClosenessCentrality(args::Tuple, kwargs::NamedTuple)
         return new{typeof(args), typeof(kwargs)}(args, kwargs)
@@ -296,9 +306,13 @@ DegreeCentrality
   - [`Graphs._degree_centrality`](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.degree_centrality-Tuple%7BAbstractGraph%7D)
 """
 @concrete struct DegreeCentrality <: AbstractCentralityAlgorithm
-    "Degree type (0: total, 1: in-degree, 2: out-degree)."
+    """
+    Degree type (0: total, 1: in-degree, 2: out-degree).
+    """
     kind
-    "$(field_dict[:ctkwargs])"
+    """
+    $(field_dict[:ctkwargs])
+    """
     kwargs
     function DegreeCentrality(kind::Integer, kwargs::NamedTuple)
         @argcheck(kind in 0:2)
@@ -354,7 +368,9 @@ KatzCentrality
   - [`Graphs.katz_centrality`](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.katz_centrality)
 """
 @concrete struct KatzCentrality <: AbstractCentralityAlgorithm
-    "Attenuation factor for Katz centrality."
+    """
+    Attenuation factor for Katz centrality.
+    """
     alpha
     function KatzCentrality(alpha::Number)
         return new{typeof(alpha)}(alpha)
@@ -406,11 +422,17 @@ Pagerank
   - [`Graphs.pagerank`](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.pagerank-Union%7BTuple%7BAbstractGraph%7BU%7D%7D,%20Tuple%7BU%7D,%20Tuple%7BAbstractGraph%7BU%7D,%20Any%7D,%20Tuple%7BAbstractGraph%7BU%7D,%20Any,%20Integer%7D,%20Tuple%7BAbstractGraph%7BU%7D,%20Any,%20Integer,%20Any%7D%7D%20where%20U%3C:Integer)
 """
 @concrete struct Pagerank <: AbstractCentralityAlgorithm
-    "Number of iterations."
+    """
+    Number of iterations.
+    """
     n
-    "Damping factor."
+    """
+    Damping factor.
+    """
     alpha
-    "Convergence threshold."
+    """
+    Convergence threshold.
+    """
     epsilon
     function Pagerank(n::Integer, alpha::Number, epsilon::Number)
         @argcheck(0 < n, DomainError)
@@ -472,9 +494,13 @@ StressCentrality
   - [`Graphs.stress_centrality`](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.stress_centrality)
 """
 @concrete struct StressCentrality <: AbstractCentralityAlgorithm
-    "$(field_dict[:ctargs])"
+    """
+    $(field_dict[:ctargs])
+    """
     args
-    "$(field_dict[:ctkwargs])"
+    """
+    $(field_dict[:ctkwargs])
+    """
     kwargs
     function StressCentrality(args::Tuple, kwargs::NamedTuple)
         return new{typeof(args), typeof(kwargs)}(args, kwargs)
@@ -608,9 +634,13 @@ KruskalTree
   - [`Graphs.kruskal_mst`](https://juliagraphs.org/Graphs.jl/stable/algorithms/spanningtrees/#Graphs.kruskal_mst)
 """
 @concrete struct KruskalTree <: AbstractTreeType
-    "$(field_dict[:treeargs])"
+    """
+    $(field_dict[:treeargs])
+    """
     args
-    "$(field_dict[:treekwargs])"
+    """
+    $(field_dict[:treekwargs])
+    """
     kwargs
     function KruskalTree(args::Tuple, kwargs::NamedTuple)
         return new{typeof(args), typeof(kwargs)}(args, kwargs)
@@ -654,9 +684,13 @@ BoruvkaTree
   - [`Graphs.boruvka_mst`](https://juliagraphs.org/Graphs.jl/stable/algorithms/spanningtrees/#Graphs.boruvka_mst)
 """
 @concrete struct BoruvkaTree <: AbstractTreeType
-    "$(field_dict[:treeargs])"
+    """
+    $(field_dict[:treeargs])
+    """
     args
-    "$(field_dict[:treekwargs])"
+    """
+    $(field_dict[:treekwargs])
+    """
     kwargs
     function BoruvkaTree(args::Tuple, kwargs::NamedTuple)
         return new{typeof(args), typeof(kwargs)}(args, kwargs)
@@ -700,9 +734,13 @@ PrimTree
   - [`Graphs.prim_mst`](https://juliagraphs.org/Graphs.jl/stable/algorithms/spanningtrees/#Graphs.prim_mst)
 """
 @concrete struct PrimTree <: AbstractTreeType
-    "$(field_dict[:treeargs])"
+    """
+    $(field_dict[:treeargs])
+    """
     args
-    "$(field_dict[:treekwargs])"
+    """
+    $(field_dict[:treekwargs])
+    """
     kwargs
     function PrimTree(args::Tuple, kwargs::NamedTuple)
         return new{typeof(args), typeof(kwargs)}(args, kwargs)
@@ -866,13 +904,21 @@ NetworkEstimator
   - [`AbstractSimilarityMatrixAlgorithm`](@ref)
 """
 @concrete struct NetworkEstimator <: AbstractNetworkEstimator
-    "$(field_dict[:ce])"
+    """
+    $(field_dict[:ce])
+    """
     ce
-    "$(field_dict[:de])"
+    """
+    $(field_dict[:de])
+    """
     de
-    "$(field_dict[:ntalg])"
+    """
+    $(field_dict[:ntalg])
+    """
     alg
-    "$(field_dict[:ntn])"
+    """
+    $(field_dict[:ntn])
+    """
     n
     function NetworkEstimator(ce::StatsBase.CovarianceEstimator,
                               de::AbstractDistanceEstimator, alg::Tree_SimMat, n::Integer)
@@ -960,9 +1006,13 @@ CentralityEstimator
   - [`AbstractCentralityAlgorithm`](@ref)
 """
 @concrete struct CentralityEstimator <: AbstractCentralityEstimator
-    "$(field_dict[:pler])"
+    """
+    $(field_dict[:pler])
+    """
     pl
-    "$(field_dict[:cta])"
+    """
+    $(field_dict[:cta])
+    """
     ct
     function CentralityEstimator(pl::NwE_Pl_ClE_Cl, ct::AbstractCentralityAlgorithm)
         return new{typeof(pl), typeof(ct)}(pl, ct)

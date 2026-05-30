@@ -111,10 +111,11 @@ Let's make sure the results are what we expect.
 =#
 
 pretty_table(DataFrame(;
-                       :obj => [:MinimumRisk, :MaximumUtility, :MaximumRatio,
-                                :MaximumReturn, :Benchmark],
-                       :rk => [rk1, rk2, rk3, rk4, rk0], :rt => [rt1, rt2, rt3, rt4, rt0],
-                       :rr => [rr1, rr2, rr3, rr4, rr0]); formatters = [resfmt])
+                       :obj =>
+                           [:MinimumRisk, :MaximumUtility, :MaximumRatio, :MaximumReturn,
+                            :Benchmark], :rk => [rk1, rk2, rk3, rk4, rk0],
+                       :rt => [rt1, rt2, rt3, rt4, rt0], :rr => [rr1, rr2, rr3, rr4, rr0]);
+             formatters = [resfmt])
 
 #=
 We can see that indeed, the minimum risk produces the portfolio with minimum risk, the maximum ratio produces the portfolio with the maximum risk-return ratio, and the maximum return portfolio produces the portfolio with the maximum return.

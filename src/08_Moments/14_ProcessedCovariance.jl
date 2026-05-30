@@ -42,11 +42,17 @@ ProcessedCovariance
   - [`Posdef`](@ref)
 """
 @concrete struct ProcessedCovariance <: AbstractCovarianceEstimator
-    "$(field_dict[:ce])"
+    """
+    $(field_dict[:ce])
+    """
     ce
-    "$(field_dict[:mpa])"
+    """
+    $(field_dict[:mpa])
+    """
     alg
-    "$(field_dict[:pdm])"
+    """
+    $(field_dict[:pdm])
+    """
     pdm
     function ProcessedCovariance(ce::StatsBase.CovarianceEstimator,
                                  alg::Option{<:AbstractMatrixProcessingAlgorithm},

@@ -25,9 +25,13 @@ Keywords correspond to the struct's fields.
   - [`NearestQuantilePrediction`](@ref)
 """
 @concrete struct OptimisationCrossValidation <: AbstractEstimator
-    "$(field_dict[:cv])"
+    """
+    $(field_dict[:cv])
+    """
     cv
-    "$(field_dict[:scorer])"
+    """
+    $(field_dict[:scorer])
+    """
     scorer
     function OptimisationCrossValidation(cv::OptCVER,
                                          scorer::Option{<:PredictionCrossValScorer})

@@ -60,9 +60,13 @@ Distance
   - [`VariationInfoDistance`](@ref)
 """
 @concrete struct Distance <: AbstractDistanceEstimator
-    "$(field_dict[:dopower])"
+    """
+    $(field_dict[:dopower])
+    """
     power
-    "$(field_dict[:dalg])"
+    """
+    $(field_dict[:dalg])
+    """
     alg
     function Distance(power::Option{<:Integer}, alg::AbstractDistanceAlgorithm)
         if !isnothing(power)

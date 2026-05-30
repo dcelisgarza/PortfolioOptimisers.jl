@@ -44,11 +44,17 @@ WindowedVariance
   - [`SimpleVariance`](@ref)
 """
 @concrete struct WindowedVariance <: AbstractVarianceEstimator
-    "$(field_dict[:me])"
+    """
+    $(field_dict[:me])
+    """
     ce
-    "$(field_dict[:oow])"
+    """
+    $(field_dict[:oow])
+    """
     w
-    "Window specification: an integer (last `window` observations) or a vector of indices."
+    """
+    Window specification: an integer (last `window` observations) or a vector of indices.
+    """
     window
     function WindowedVariance(ce::AbstractVarianceEstimator, w::Option{<:ObsWeights},
                               window::Option{<:Int_VecInt})

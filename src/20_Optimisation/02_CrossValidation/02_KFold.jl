@@ -39,11 +39,17 @@ KFold
   - [`n_splits`](@ref)
 """
 @concrete struct KFold <: NonSequentialCrossValidationEstimator
-    "$(field_dict[:n_folds])"
+    """
+    $(field_dict[:n_folds])
+    """
     n
-    "$(field_dict[:purged_size])"
+    """
+    $(field_dict[:purged_size])
+    """
     purged_size
-    "$(field_dict[:embargo_size])"
+    """
+    $(field_dict[:embargo_size])
+    """
     embargo_size
     function KFold(n::Integer, purged_size::Integer, embargo_size::Integer)
         assert_nonempty_gt0_finite_val(n, :n)
@@ -86,9 +92,13 @@ Keywords correspond to the struct's fields.
   - [`n_splits`](@ref)
 """
 @concrete struct KFoldResult <: NonSequentialCrossValidationResult
-    "$(field_dict[:train_idx])"
+    """
+    $(field_dict[:train_idx])
+    """
     train_idx
-    "$(field_dict[:test_idx])"
+    """
+    $(field_dict[:test_idx])
+    """
     test_idx
     function KFoldResult(train_idx::VecVecInt, test_idx::VecVecInt)
         @argcheck(!isempty(train_idx))

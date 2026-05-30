@@ -45,13 +45,21 @@ CombinatorialCrossValidation
   - [`n_splits`](@ref)
 """
 @concrete struct CombinatorialCrossValidation <: NonSequentialCrossValidationEstimator
-    "$(field_dict[:n_folds])"
+    """
+    $(field_dict[:n_folds])
+    """
     n_folds
-    "$(field_dict[:n_test_folds])"
+    """
+    $(field_dict[:n_test_folds])
+    """
     n_test_folds
-    "$(field_dict[:purged_size])"
+    """
+    $(field_dict[:purged_size])
+    """
     purged_size
-    "$(field_dict[:embargo_size])"
+    """
+    $(field_dict[:embargo_size])
+    """
     embargo_size
     function CombinatorialCrossValidation(n_folds::Integer, n_test_folds::Integer,
                                           purged_size::Integer, embargo_size::Integer,
@@ -108,11 +116,17 @@ Keywords correspond to the struct's fields.
   - [`n_splits`](@ref)
 """
 @concrete struct CombinatorialCrossValidationResult <: NonSequentialCrossValidationResult
-    "$(field_dict[:train_idx])"
+    """
+    $(field_dict[:train_idx])
+    """
     train_idx
-    "$(field_dict[:test_idx])"
+    """
+    $(field_dict[:test_idx])
+    """
     test_idx
-    "$(field_dict[:path_ids])"
+    """
+    $(field_dict[:path_ids])
+    """
     path_ids
     function CombinatorialCrossValidationResult(train_idx::VecVecInt,
                                                 test_idx::VecVecVecInt,

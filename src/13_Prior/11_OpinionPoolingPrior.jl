@@ -233,19 +233,33 @@ OpinionPoolingPrior
   - [`prior`](@ref)
 """
 @concrete struct OpinionPoolingPrior <: AbstractLowOrderPriorEstimator_AF
-    "$(field_dict[:pes])"
+    """
+    $(field_dict[:pes])
+    """
     pes
-    "$(field_dict[:pe1])"
+    """
+    $(field_dict[:pe1])
+    """
     pe1
-    "$(field_dict[:pe2])"
+    """
+    $(field_dict[:pe2])
+    """
     pe2
-    "$(field_dict[:p_pool])"
+    """
+    $(field_dict[:p_pool])
+    """
     p
-    "$(field_dict[:op_w])"
+    """
+    $(field_dict[:op_w])
+    """
     w
-    "$(field_dict[:opalg])"
+    """
+    $(field_dict[:opalg])
+    """
     alg
-    "$(field_dict[:ex])"
+    """
+    $(field_dict[:ex])
+    """
     ex
     function OpinionPoolingPrior(pes::VecEP,
                                  pe1::Option{<:AbstractLowOrderPriorEstimator_A_F_AF},

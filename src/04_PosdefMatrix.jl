@@ -100,9 +100,13 @@ Posdef
   - [`NearestCorrelationMatrix.jl`](https://github.com/adknudson/NearestCorrelationMatrix.jl)
 """
 @concrete struct Posdef <: AbstractPosdefEstimator
-    "The algorithm used for the nearest correlation matrix projection."
+    """
+    The algorithm used for the nearest correlation matrix projection.
+    """
     alg
-    "A named tuple of keyword arguments to be passed to the algorithm."
+    """
+    A named tuple of keyword arguments to be passed to the algorithm.
+    """
     kwargs
     function Posdef(alg::Any, kwargs::NamedTuple)::Posdef
         return new{typeof(alg), typeof(kwargs)}(alg, kwargs)

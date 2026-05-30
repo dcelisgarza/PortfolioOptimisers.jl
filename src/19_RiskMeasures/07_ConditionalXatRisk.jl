@@ -90,11 +90,17 @@ ConditionalValueatRisk
   - [`ConditionalDrawdownatRisk`](@ref)
 """
 @concrete struct ConditionalValueatRisk <: RiskMeasure
-    "$(field_dict[:settings_rm])"
+    """
+    $(field_dict[:settings_rm])
+    """
     settings
-    "$(field_dict[:alpha])"
+    """
+    $(field_dict[:alpha])
+    """
     alpha
-    "$(field_dict[:oow])"
+    """
+    $(field_dict[:oow])
+    """
     w
     function ConditionalValueatRisk(settings::RiskMeasureSettings, alpha::Number,
                                     w::Option{<:ObsWeights})
@@ -190,15 +196,25 @@ DistributionallyRobustConditionalValueatRisk
   - [`DistributionallyRobustConditionalDrawdownatRisk`](@ref)
 """
 @concrete struct DistributionallyRobustConditionalValueatRisk <: RiskMeasure
-    "$(field_dict[:settings_rm])"
+    """
+    $(field_dict[:settings_rm])
+    """
     settings
-    "$(field_dict[:alpha])"
+    """
+    $(field_dict[:alpha])
+    """
     alpha
-    "$(field_dict[:l_wass])"
+    """
+    $(field_dict[:l_wass])
+    """
     l
-    "$(field_dict[:r_wass])"
+    """
+    $(field_dict[:r_wass])
+    """
     r
-    "$(field_dict[:oow])"
+    """
+    $(field_dict[:oow])
+    """
     w
     function DistributionallyRobustConditionalValueatRisk(settings::RiskMeasureSettings,
                                                           alpha::Number, l::Number,
@@ -342,13 +358,21 @@ ConditionalValueatRiskRange
   - [`DistributionallyRobustConditionalValueatRiskRange`](@ref)
 """
 @concrete struct ConditionalValueatRiskRange <: RiskMeasure
-    "$(field_dict[:settings_rm])"
+    """
+    $(field_dict[:settings_rm])
+    """
     settings
-    "$(field_dict[:alpha])"
+    """
+    $(field_dict[:alpha])
+    """
     alpha
-    "$(field_dict[:beta])"
+    """
+    $(field_dict[:beta])
+    """
     beta
-    "$(field_dict[:oow])"
+    """
+    $(field_dict[:oow])
+    """
     w
     function ConditionalValueatRiskRange(settings::RiskMeasureSettings, alpha::Number,
                                          beta::Number, w::Option{<:ObsWeights})
@@ -467,21 +491,37 @@ DistributionallyRobustConditionalValueatRiskRange
   - [`DistributionallyRobustConditionalValueatRisk`](@ref)
 """
 @concrete struct DistributionallyRobustConditionalValueatRiskRange <: RiskMeasure
-    "$(field_dict[:settings_rm])"
+    """
+    $(field_dict[:settings_rm])
+    """
     settings
-    "$(field_dict[:alpha])"
+    """
+    $(field_dict[:alpha])
+    """
     alpha
-    "$(field_dict[:l_a])"
+    """
+    $(field_dict[:l_a])
+    """
     l_a
-    "$(field_dict[:r_a])"
+    """
+    $(field_dict[:r_a])
+    """
     r_a
-    "$(field_dict[:beta])"
+    """
+    $(field_dict[:beta])
+    """
     beta
-    "$(field_dict[:l_b])"
+    """
+    $(field_dict[:l_b])
+    """
     l_b
-    "$(field_dict[:r_b])"
+    """
+    $(field_dict[:r_b])
+    """
     r_b
-    "$(field_dict[:oow])"
+    """
+    $(field_dict[:oow])
+    """
     w
     function DistributionallyRobustConditionalValueatRiskRange(settings::RiskMeasureSettings,
                                                                alpha::Number, l_a::Number,
@@ -696,11 +736,17 @@ ConditionalDrawdownatRisk
   - [`RelativeConditionalDrawdownatRisk`](@ref)
 """
 @concrete struct ConditionalDrawdownatRisk <: RiskMeasure
-    "$(field_dict[:settings_rm])"
+    """
+    $(field_dict[:settings_rm])
+    """
     settings
-    "$(field_dict[:alpha])"
+    """
+    $(field_dict[:alpha])
+    """
     alpha
-    "$(field_dict[:oow])"
+    """
+    $(field_dict[:oow])
+    """
     w
     function ConditionalDrawdownatRisk(settings::RiskMeasureSettings, alpha::Number,
                                        w::Option{<:ObsWeights})
@@ -793,15 +839,25 @@ DistributionallyRobustConditionalDrawdownatRisk
   - [`DistributionallyRobustConditionalValueatRisk`](@ref)
 """
 @concrete struct DistributionallyRobustConditionalDrawdownatRisk <: RiskMeasure
-    "$(field_dict[:settings_rm])"
+    """
+    $(field_dict[:settings_rm])
+    """
     settings
-    "$(field_dict[:alpha])"
+    """
+    $(field_dict[:alpha])
+    """
     alpha
-    "$(field_dict[:l_wass])"
+    """
+    $(field_dict[:l_wass])
+    """
     l
-    "$(field_dict[:r_wass])"
+    """
+    $(field_dict[:r_wass])
+    """
     r
-    "$(field_dict[:oow])"
+    """
+    $(field_dict[:oow])
+    """
     w
     function DistributionallyRobustConditionalDrawdownatRisk(settings::RiskMeasureSettings,
                                                              alpha::Number, l::Number,
@@ -957,11 +1013,17 @@ RelativeConditionalDrawdownatRisk
   - [`RelativeDrawdownatRisk`](@ref)
 """
 @concrete struct RelativeConditionalDrawdownatRisk <: HierarchicalRiskMeasure
-    "$(field_dict[:settings_rm])"
+    """
+    $(field_dict[:settings_rm])
+    """
     settings
-    "$(field_dict[:alpha])"
+    """
+    $(field_dict[:alpha])
+    """
     alpha
-    "$(field_dict[:oow])"
+    """
+    $(field_dict[:oow])
+    """
     w
     function RelativeConditionalDrawdownatRisk(settings::HierarchicalRiskMeasureSettings,
                                                alpha::Number, w::Option{<:ObsWeights})

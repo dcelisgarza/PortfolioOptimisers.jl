@@ -13,27 +13,49 @@ $(DocStringExtensions.FIELDS)
   - [`NonFiniteAllocationOptimisationResult`](@ref)
 """
 @concrete struct NestedClusteredResult <: NonFiniteAllocationOptimisationResult
-    "$(field_dict[:oe])"
+    """
+    $(field_dict[:oe])
+    """
     oe
-    "$(field_dict[:pr])"
+    """
+    $(field_dict[:pr])
+    """
     pr
-    "$(field_dict[:clr])"
+    """
+    $(field_dict[:clr])
+    """
     clr
-    "$(field_dict[:wb])"
+    """
+    $(field_dict[:wb])
+    """
     wb
-    "$(field_dict[:fees])"
+    """
+    $(field_dict[:fees])
+    """
     fees
-    "$(field_dict[:resi])"
+    """
+    $(field_dict[:resi])
+    """
     resi
-    "$(field_dict[:reso])"
+    """
+    $(field_dict[:reso])
+    """
     reso
-    "$(field_dict[:cv])"
+    """
+    $(field_dict[:cv])
+    """
     cv
-    "$(field_dict[:retcode])"
+    """
+    $(field_dict[:retcode])
+    """
     retcode
-    "Final aggregated portfolio weights."
+    """
+    Final aggregated portfolio weights.
+    """
     w
-    "$(field_dict[:fb])"
+    """
+    $(field_dict[:fb])
+    """
     fb
 end
 """
@@ -267,33 +289,61 @@ Let clusters ``C_1, \\ldots, C_K`` partition the ``N`` assets. The NCO algorithm
   - [`NestedClusteredResult`](@ref)
 """
 @concrete struct NestedClustered <: ClusteringOptimisationEstimator
-    "$(field_dict[:pe])"
+    """
+    $(field_dict[:pe])
+    """
     pe
-    "$(field_dict[:cle])"
+    """
+    $(field_dict[:cle])
+    """
     cle
-    "$(field_dict[:wb_jmp])"
+    """
+    $(field_dict[:wb_jmp])
+    """
     wb
-    "$(field_dict[:feese])"
+    """
+    $(field_dict[:feese])
+    """
     fees
-    "$(field_dict[:sets])"
+    """
+    $(field_dict[:sets])
+    """
     sets
-    "$(field_dict[:opti])"
+    """
+    $(field_dict[:opti])
+    """
     opti
-    "$(field_dict[:opto])"
+    """
+    $(field_dict[:opto])
+    """
     opto
-    "$(field_dict[:cv])"
+    """
+    $(field_dict[:cv])
+    """
     cv
-    "$(field_dict[:wf])"
+    """
+    $(field_dict[:wf])
+    """
     wf
-    "$(field_dict[:ex])"
+    """
+    $(field_dict[:ex])
+    """
     ex
-    "$(field_dict[:fb])"
+    """
+    $(field_dict[:fb])
+    """
     fb
-    "$(field_dict[:brt])"
+    """
+    $(field_dict[:brt])
+    """
     brt
-    "$(field_dict[:cle_pr])"
+    """
+    $(field_dict[:cle_pr])
+    """
     cle_pr
-    "$(field_dict[:strict_opt])"
+    """
+    $(field_dict[:strict_opt])
+    """
     strict
     function NestedClustered(pe::PrE_Pr, cle::ClE_Cl, wb::Option{<:WbE_Wb},
                              fees::Option{<:FeesE_Fees}, sets::Option{<:AssetSets},

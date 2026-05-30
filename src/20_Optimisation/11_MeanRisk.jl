@@ -15,17 +15,29 @@ The `w` property is forwarded from `sol.w`.
   - [`MeanRisk`](@ref)
 """
 @concrete struct MeanRiskResult <: NonFiniteAllocationOptimisationResult
-    "$(field_dict[:oe])"
+    """
+    $(field_dict[:oe])
+    """
     oe
-    "$(field_dict[:pa])"
+    """
+    $(field_dict[:pa])
+    """
     pa
-    "$(field_dict[:retcode])"
+    """
+    $(field_dict[:retcode])
+    """
     retcode
-    "$(field_dict[:sol])"
+    """
+    $(field_dict[:sol])
+    """
     sol
-    "$(field_dict[:model])"
+    """
+    $(field_dict[:model])
+    """
     model
-    "$(field_dict[:fb])"
+    """
+    $(field_dict[:fb])
+    """
     fb
 end
 """
@@ -214,15 +226,25 @@ Where:
   - [`RiskMeasure`](@ref)
 """
 @concrete struct MeanRisk <: RiskJuMPOptimisationEstimator
-    "$(field_dict[:opt_jmp])"
+    """
+    $(field_dict[:opt_jmp])
+    """
     opt
-    "$(field_dict[:r_opt])"
+    """
+    $(field_dict[:r_opt])
+    """
     r
-    "$(field_dict[:obj])"
+    """
+    $(field_dict[:obj])
+    """
     obj
-    "$(field_dict[:wi])"
+    """
+    $(field_dict[:wi])
+    """
     wi
-    "$(field_dict[:fb])"
+    """
+    $(field_dict[:fb])
+    """
     fb
     function MeanRisk(opt::JuMPOptimiser, r::RM_VecRM, obj::ObjectiveFunction,
                       wi::Option{<:VecNum}, fb::Option{<:OptE_Opt})

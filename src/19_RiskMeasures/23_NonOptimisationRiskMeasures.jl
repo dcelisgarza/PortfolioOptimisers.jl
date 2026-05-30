@@ -79,9 +79,13 @@ MeanReturn
   - [`MeanReturnRiskRatio`](@ref)
 """
 @concrete struct MeanReturn <: NonOptimisationRiskMeasure
-    "$(field_dict[:w_rm])"
+    """
+    $(field_dict[:w_rm])
+    """
     w
-    "$(field_dict[:flag])"
+    """
+    $(field_dict[:flag])
+    """
     flag
     function MeanReturn(w::Option{<:ObsWeights}, flag::Bool)
         assert_nonempty_nonneg_finite_val(w, :w)
@@ -172,11 +176,17 @@ Keywords correspond to the struct's fields.
   - [`AbstractBaseRiskMeasure`](@ref)
 """
 @concrete struct MeanReturnRiskRatio <: NonOptimisationRiskMeasure
-    "$(field_dict[:rt_mean])"
+    """
+    $(field_dict[:rt_mean])
+    """
     rt
-    "$(field_dict[:rk])"
+    """
+    $(field_dict[:rk])
+    """
     rk
-    "$(field_dict[:rf])"
+    """
+    $(field_dict[:rf])
+    """
     rf
     function MeanReturnRiskRatio(rt::MeanReturn, rk::AbstractBaseRiskMeasure, rf::Number)
         return new{typeof(rt), typeof(rk), typeof(rf)}(rt, rk, rf)
@@ -304,9 +314,13 @@ ThirdCentralMoment
   - [`Skewness`](@ref)
 """
 @concrete struct ThirdCentralMoment <: NonOptimisationRiskMeasure
-    "$(field_dict[:w_rm])"
+    """
+    $(field_dict[:w_rm])
+    """
     w
-    "$(field_dict[:mu_rm])"
+    """
+    $(field_dict[:mu_rm])
+    """
     mu
     function ThirdCentralMoment(w::Option{<:ObsWeights}, mu::Option{<:Num_VecNum_VecScalar})
         assert_nonempty_nonneg_finite_val(w, :w)
@@ -398,11 +412,17 @@ Skewness
   - [`AbstractVarianceEstimator`](@ref)
 """
 @concrete struct Skewness <: NonOptimisationRiskMeasure
-    "$(field_dict[:ve])"
+    """
+    $(field_dict[:ve])
+    """
     ve
-    "$(field_dict[:w_rm])"
+    """
+    $(field_dict[:w_rm])
+    """
     w
-    "$(field_dict[:mu_rm])"
+    """
+    $(field_dict[:mu_rm])
+    """
     mu
     function Skewness(ve::AbstractVarianceEstimator, w::Option{<:ObsWeights},
                       mu::Option{<:Num_VecNum_VecScalar})

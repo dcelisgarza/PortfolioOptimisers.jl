@@ -41,15 +41,25 @@ DistanceCovariance
   - [`FLoops.Transducers.Executor`](https://juliafolds2.github.io/FLoops.jl/dev/tutorials/parallel/#tutorials-ex)
 """
 @concrete struct DistanceCovariance <: AbstractCovarianceEstimator
-    "$(arg_dict[:metric])"
+    """
+    $(arg_dict[:metric])
+    """
     metric
-    "$(arg_dict[:metric_args])"
+    """
+    $(arg_dict[:metric_args])
+    """
     args
-    "$(arg_dict[:metric_kwargs])"
+    """
+    $(arg_dict[:metric_kwargs])
+    """
     kwargs
-    "$(arg_dict[:oow])"
+    """
+    $(arg_dict[:oow])
+    """
     w
-    "$(arg_dict[:ex])"
+    """
+    $(arg_dict[:ex])
+    """
     ex
     function DistanceCovariance(metric::Distances.Metric, args::Tuple, kwargs::NamedTuple,
                                 w::Option{<:ObsWeights}, ex::FLoops.Transducers.Executor)

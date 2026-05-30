@@ -55,11 +55,17 @@ EquilibriumExpectedReturns
   - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
 """
 @concrete struct EquilibriumExpectedReturns <: AbstractShrunkExpectedReturnsEstimator
-    "$(field_dict[:ce])"
+    """
+    $(field_dict[:ce])
+    """
     ce
-    "$(field_dict[:eqw])"
+    """
+    $(field_dict[:eqw])
+    """
     w
-    "$(field_dict[:l])"
+    """
+    $(field_dict[:l])
+    """
     l
     function EquilibriumExpectedReturns(ce::StatsBase.CovarianceEstimator,
                                         w::Option{<:VecNum}, l::Number)

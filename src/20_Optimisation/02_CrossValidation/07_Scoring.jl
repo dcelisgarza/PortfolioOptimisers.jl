@@ -82,13 +82,21 @@ prediction.
   - [`ConditionalValueatRisk`](@ref)
 """
 @concrete struct NearestQuantilePrediction <: PredictionScorer
-    "$(field_dict[:r])"
+    """
+    $(field_dict[:r])
+    """
     r
-    "$(field_dict[:q_scorer])"
+    """
+    $(field_dict[:q_scorer])
+    """
     q
-    "$(field_dict[:r_kwargs])"
+    """
+    $(field_dict[:r_kwargs])
+    """
     r_kwargs
-    "$(field_dict[:q_kwargs])"
+    """
+    $(field_dict[:q_kwargs])
+    """
     q_kwargs
     function NearestQuantilePrediction(r::AbstractBaseRiskMeasure, q::Real,
                                        r_kwargs::NamedTuple, q_kwargs::NamedTuple)

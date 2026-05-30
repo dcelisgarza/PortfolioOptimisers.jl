@@ -72,25 +72,45 @@ RandomisedSearchCrossValidation
   - [`CrossValSearchScorer`](@ref)
 """
 @concrete struct RandomisedSearchCrossValidation <: AbstractSearchCrossValidationEstimator
-    "$(field_dict[:p_cv])"
+    """
+    $(field_dict[:p_cv])
+    """
     p
-    "$(field_dict[:cv])"
+    """
+    $(field_dict[:cv])
+    """
     cv
-    "$(field_dict[:r])"
+    """
+    $(field_dict[:r])
+    """
     r
-    "$(field_dict[:scorer])"
+    """
+    $(field_dict[:scorer])
+    """
     scorer
-    "$(field_dict[:ex])"
+    """
+    $(field_dict[:ex])
+    """
     ex
-    "$(field_dict[:n_iter])"
+    """
+    $(field_dict[:n_iter])
+    """
     n_iter
-    "$(field_dict[:rng])"
+    """
+    $(field_dict[:rng])
+    """
     rng
-    "$(field_dict[:seed])"
+    """
+    $(field_dict[:seed])
+    """
     seed
-    "$(field_dict[:train_score])"
+    """
+    $(field_dict[:train_score])
+    """
     train_score
-    "$(field_dict[:kwargs])"
+    """
+    $(field_dict[:kwargs])
+    """
     kwargs
     function RandomisedSearchCrossValidation(p::Union{<:AbstractVector{<:Pair},
                                                       <:AbstractVector{<:AbstractVector{<:Pair}},

@@ -203,7 +203,9 @@ L2Tracking
   - [`norm_tracking`](@ref)
 """
 @concrete struct L2Tracking <: NormTracking
-    "$(field_dict[:ddof])"
+    """
+    $(field_dict[:ddof])
+    """
     ddof
     function L2Tracking(ddof::Integer)::L2Tracking
         assert_nonempty_nonneg_finite_val(ddof, :ddof)
@@ -266,7 +268,9 @@ SquaredL2Tracking
   - [`norm_tracking`](@ref)
 """
 @concrete struct SquaredL2Tracking <: NormTracking
-    "$(field_dict[:ddof])"
+    """
+    $(field_dict[:ddof])
+    """
     ddof
     function SquaredL2Tracking(ddof::Integer)::SquaredL2Tracking
         assert_nonempty_nonneg_finite_val(ddof, :ddof)
@@ -372,9 +376,13 @@ LpTracking
   - [`LInfTracking`](@ref)
 """
 @concrete struct LpTracking <: NormTracking
-    "$(field_dict[:p_rm])"
+    """
+    $(field_dict[:p_rm])
+    """
     p
-    "$(field_dict[:ddof])"
+    """
+    $(field_dict[:ddof])
+    """
     ddof
     function LpTracking(p::Number, ddof::Integer)::LpTracking
         assert_nonempty_nonneg_finite_val(ddof, :ddof)
@@ -438,9 +446,13 @@ LInfTracking
   - [`L2Tracking`](@ref)
 """
 @concrete struct LInfTracking <: NormTracking
-    "$(field_dict[:ddof])"
+    """
+    $(field_dict[:ddof])
+    """
     ddof
-    "$(field_dict[:pos])"
+    """
+    $(field_dict[:pos])
+    """
     pos
     function LInfTracking(ddof::Integer, pos::Bool)::LInfTracking
         assert_nonempty_nonneg_finite_val(ddof, :ddof)
@@ -672,11 +684,17 @@ WeightsTracking
   - [`tracking_benchmark`](@ref)
 """
 @concrete struct WeightsTracking <: AbstractTrackingAlgorithm
-    "$(field_dict[:fees])"
+    """
+    $(field_dict[:fees])
+    """
     fees
-    "$(field_dict[:w_tn])"
+    """
+    $(field_dict[:w_tn])
+    """
     w
-    "$(field_dict[:fixed])"
+    """
+    $(field_dict[:fixed])
+    """
     fixed
     function WeightsTracking(fees::Option{<:Fees}, w::VecNum, fixed::Bool)::WeightsTracking
         assert_nonempty_finite_val(w, :w)
@@ -910,7 +928,9 @@ ReturnsTracking
   - [`tracking_benchmark`](@ref)
 """
 @concrete struct ReturnsTracking <: AbstractTrackingAlgorithm
-    "$(field_dict[:w_bm_ret])"
+    """
+    $(field_dict[:w_bm_ret])
+    """
     w
     function ReturnsTracking(w::VecNum)
         assert_nonempty_finite_val(w, :w)
@@ -1085,11 +1105,17 @@ TrackingError
   - [`L1Tracking`](@ref)
 """
 @concrete struct TrackingError <: AbstractTracking
-    "$(field_dict[:tr])"
+    """
+    $(field_dict[:tr])
+    """
     tr
-    "$(field_dict[:err])"
+    """
+    $(field_dict[:err])
+    """
     err
-    "$(field_dict[:tralg])"
+    """
+    $(field_dict[:tralg])
+    """
     alg
     function TrackingError(tr::AbstractTrackingAlgorithm, err::Number, alg::NormTracking)
         assert_nonempty_nonneg_finite_val(err, :err)

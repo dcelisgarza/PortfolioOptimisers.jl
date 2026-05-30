@@ -27,10 +27,12 @@
     sets = AssetSets(;
                      dict = Dict("nx" => rd.nx, "group1" => rd.nx[1:2:end],
                                  "group2" => rd.nx[2:2:end],
-                                 "clusters1" => [1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2,
-                                                 3, 3, 3, 3, 3, 3],
-                                 "clusters2" => [1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2,
-                                                 3, 1, 2, 3, 1, 2]))
+                                 "clusters1" =>
+                                     [1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3,
+                                      3, 3],
+                                 "clusters2" =>
+                                     [1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3,
+                                      1, 2]))
     fsets = AssetSets(; dict = Dict("nx" => rd.nf))
     @testset "Empirical Prior" begin
         pes = [EmpiricalPrior(), EmpiricalPrior(; horizon = 252)]

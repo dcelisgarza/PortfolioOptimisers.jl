@@ -1092,7 +1092,9 @@ Stacktrace:
   - [`IsNonFiniteError`](@ref)
 """
 @concrete struct IsNothingError <: PortfolioOptimisersError
-    "$(field_dict[:msg])"
+    """
+    $(field_dict[:msg])
+    """
     msg
 end
 """
@@ -1127,7 +1129,9 @@ Stacktrace:
   - [`IsNonFiniteError`](@ref)
 """
 @concrete struct IsEmptyError <: PortfolioOptimisersError
-    "$(field_dict[:msg])"
+    """
+    $(field_dict[:msg])
+    """
     msg
 end
 """
@@ -1162,7 +1166,9 @@ Stacktrace:
   - [`IsEmptyError`](@ref)
 """
 @concrete struct IsNonFiniteError <: PortfolioOptimisersError
-    "$(field_dict[:msg])"
+    """
+    $(field_dict[:msg])
+    """
     msg
 end
 """
@@ -2022,9 +2028,13 @@ VecScalar
   - [`VecNum`](@ref)
 """
 @concrete struct VecScalar <: AbstractResult
-    "Vector component."
+    """
+    Vector component.
+    """
     v
-    "Scalar component."
+    """
+    Scalar component.
+    """
     s
     function VecScalar(v::VecNum, s::Number)
         assert_nonempty_finite_val(v, :v)

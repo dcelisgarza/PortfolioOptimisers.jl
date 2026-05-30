@@ -230,11 +230,17 @@ Frontier
   - [`RiskMeasureSettings`](@ref)
 """
 @concrete struct Frontier <: AbstractAlgorithm
-    "$(field_dict[:N_fr])"
+    """
+    $(field_dict[:N_fr])
+    """
     N
-    "$(field_dict[:factor_fr])"
+    """
+    $(field_dict[:factor_fr])
+    """
     factor
-    "$(field_dict[:flag_fr])"
+    """
+    $(field_dict[:flag_fr])
+    """
     flag
     function Frontier(N::Integer, factor::Number = 1, flag::Bool = true)::Frontier
         @argcheck(N > zero(N))
@@ -340,11 +346,17 @@ RiskMeasureSettings
   - [`HierarchicalRiskMeasureSettings`](@ref)
 """
 @concrete struct RiskMeasureSettings <: AbstractRiskMeasureSettings
-    "$(field_dict[:scale_rm])"
+    """
+    $(field_dict[:scale_rm])
+    """
     scale
-    "$(field_dict[:ub_rms])"
+    """
+    $(field_dict[:ub_rms])
+    """
     ub
-    "$(field_dict[:rke])"
+    """
+    $(field_dict[:rke])
+    """
     rke
     function RiskMeasureSettings(scale::Number, ub::Option{<:RkRtBounds},
                                  rke::Bool)::RiskMeasureSettings
@@ -395,7 +407,9 @@ HierarchicalRiskMeasureSettings
   - [`RiskMeasureSettings`](@ref)
 """
 @concrete struct HierarchicalRiskMeasureSettings <: AbstractRiskMeasureSettings
-    "$(field_dict[:scale_rm])"
+    """
+    $(field_dict[:scale_rm])
+    """
     scale
     function HierarchicalRiskMeasureSettings(scale::Number)::HierarchicalRiskMeasureSettings
         @argcheck(isfinite(scale))
@@ -652,7 +666,9 @@ LogSumExpScalariser
   - [`HierarchicalRiskMeasureSettings`](@ref)
 """
 @concrete struct LogSumExpScalariser <: NonHierarchicalScalariser
-    "$(field_dict[:gamma])"
+    """
+    $(field_dict[:gamma])
+    """
     gamma
     function LogSumExpScalariser(gamma::Number)
         @argcheck(gamma > zero(gamma))

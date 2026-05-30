@@ -87,9 +87,13 @@ AverageDrawdown
   - [`RelativeAverageDrawdown`](@ref)
 """
 @concrete struct AverageDrawdown <: RiskMeasure
-    "$(field_dict[:settings_rm])"
+    """
+    $(field_dict[:settings_rm])
+    """
     settings
-    "$(field_dict[:w_rm])"
+    """
+    $(field_dict[:w_rm])
+    """
     w
     function AverageDrawdown(settings::RiskMeasureSettings, w::Option{<:ObsWeights})
         assert_nonempty_nonneg_finite_val(w, :w)
@@ -187,9 +191,13 @@ RelativeAverageDrawdown
   - [`RelativeMaximumDrawdown`](@ref)
 """
 @concrete struct RelativeAverageDrawdown <: HierarchicalRiskMeasure
-    "$(field_dict[:settings_rm])"
+    """
+    $(field_dict[:settings_rm])
+    """
     settings
-    "$(field_dict[:w_rm])"
+    """
+    $(field_dict[:w_rm])
+    """
     w
     function RelativeAverageDrawdown(settings::HierarchicalRiskMeasureSettings,
                                      w::Option{<:ObsWeights})

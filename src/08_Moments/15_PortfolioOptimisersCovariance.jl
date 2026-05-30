@@ -46,9 +46,13 @@ PortfolioOptimisersCovariance
   - [`AbstractMatrixProcessingEstimator`](@ref)
 """
 @concrete struct PortfolioOptimisersCovariance <: AbstractCovarianceEstimator
-    "$(field_dict[:ce])"
+    """
+    $(field_dict[:ce])
+    """
     ce
-    "$(field_dict[:mp])"
+    """
+    $(field_dict[:mp])
+    """
     mp
     function PortfolioOptimisersCovariance(ce::StatsBase.CovarianceEstimator,
                                            mp::AbstractMatrixProcessingEstimator)

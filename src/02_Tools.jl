@@ -781,7 +781,9 @@ julia> PortfolioOptimisers.vec_to_real_measure(MeanValue(), [1.2, 3.4, 0.7])
   - [`vec_to_real_measure`](@ref)
 """
 @concrete struct MeanValue <: VectorToScalarMeasure
-    "$(field_dict[:oow])"
+    """
+    $(field_dict[:oow])
+    """
     w
     function MeanValue(w::Option{<:ObsWeights})
         assert_nonempty_nonneg_finite_val(w, :w)
@@ -858,7 +860,9 @@ julia> PortfolioOptimisers.vec_to_real_measure(MedianValue(), [1.2, 3.4, 0.7])
   - [`vec_to_real_measure`](@ref)
 """
 @concrete struct MedianValue <: VectorToScalarMeasure
-    "$(field_dict[:oow])"
+    """
+    $(field_dict[:oow])
+    """
     w
     function MedianValue(w::Option{<:ObsWeights})
         assert_nonempty_nonneg_finite_val(w, :w)
@@ -957,9 +961,13 @@ julia> PortfolioOptimisers.vec_to_real_measure(StdValue(), [1.2, 3.4, 0.7])
   - [`vec_to_real_measure`](@ref)
 """
 @concrete struct StdValue <: VectorToScalarMeasure
-    "$(field_dict[:oow])"
+    """
+    $(field_dict[:oow])
+    """
     w
-    "$(field_dict[:corrected])"
+    """
+    $(field_dict[:corrected])
+    """
     corrected
     function StdValue(w::Option{<:ObsWeights}, corrected::Bool)
         assert_nonempty_nonneg_finite_val(w, :w)
@@ -1038,9 +1046,13 @@ julia> PortfolioOptimisers.vec_to_real_measure(VarValue(), [1.2, 3.4, 0.7])
   - [`vec_to_real_measure`](@ref)
 """
 @concrete struct VarValue <: VectorToScalarMeasure
-    "$(field_dict[:oow])"
+    """
+    $(field_dict[:oow])
+    """
     w
-    "$(field_dict[:corrected])"
+    """
+    $(field_dict[:corrected])
+    """
     corrected
     function VarValue(w::Option{<:ObsWeights}, corrected::Bool)
         assert_nonempty_nonneg_finite_val(w, :w)
@@ -1175,9 +1187,13 @@ julia> PortfolioOptimisers.vec_to_real_measure(StandardisedValue(), [1.2, 3.4, 0
   - [`vec_to_real_measure`](@ref)
 """
 @concrete struct StandardisedValue <: VectorToScalarMeasure
-    "The mean value measure used for the numerator."
+    """
+    The mean value measure used for the numerator.
+    """
     mv
-    "The standard deviation measure used for the denominator."
+    """
+    The standard deviation measure used for the denominator.
+    """
     sv
     function StandardisedValue(mv::MeanValue, sv::StdValue)
         return new{typeof(mv), typeof(sv)}(mv, sv)

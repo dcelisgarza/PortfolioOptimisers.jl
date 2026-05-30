@@ -136,11 +136,17 @@ BrownianDistanceVariance
   - [`RSOCRiskExpr`](@ref)
 """
 @concrete struct BrownianDistanceVariance <: RiskMeasure
-    "$(field_dict[:settings_rm])"
+    """
+    $(field_dict[:settings_rm])
+    """
     settings
-    "$(field_dict[:alg1])"
+    """
+    $(field_dict[:alg1])
+    """
     alg1
-    "$(field_dict[:alg2])"
+    """
+    $(field_dict[:alg2])
+    """
     alg2
     function BrownianDistanceVariance(settings::RiskMeasureSettings,
                                       alg1::BDVarRkFormulations,

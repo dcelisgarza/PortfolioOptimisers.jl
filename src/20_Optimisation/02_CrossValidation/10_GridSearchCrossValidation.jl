@@ -59,19 +59,33 @@ GridSearchCrossValidation
   - [`search_cross_validation`](@ref)
 """
 @concrete struct GridSearchCrossValidation <: AbstractSearchCrossValidationEstimator
-    "$(field_dict[:p_cv])"
+    """
+    $(field_dict[:p_cv])
+    """
     p
-    "$(field_dict[:cv])"
+    """
+    $(field_dict[:cv])
+    """
     cv
-    "$(field_dict[:r])"
+    """
+    $(field_dict[:r])
+    """
     r
-    "$(field_dict[:scorer])"
+    """
+    $(field_dict[:scorer])
+    """
     scorer
-    "$(field_dict[:ex])"
+    """
+    $(field_dict[:ex])
+    """
     ex
-    "$(field_dict[:train_score])"
+    """
+    $(field_dict[:train_score])
+    """
     train_score
-    "$(field_dict[:kwargs])"
+    """
+    $(field_dict[:kwargs])
+    """
     kwargs
     function GridSearchCrossValidation(p::Union{<:AbstractVector{<:Pair{<:Any,
                                                                         <:AbstractVector}},
@@ -212,7 +226,8 @@ function search_cross_validation(opt::NonFiniteAllocationOptimisationEstimator,
         nothing
     end
     let opt = opt, test_scores = test_scores, train_scores = train_scores
-        FLoops.@floop gscv.ex for (i, (lenses, vals)) in enumerate(zip(lens_grid, val_grid))
+        FLoops.@floop gscv.ex for (i, (lenses, vals)) in
+                                  enumerate(zip(lens_grid, val_grid))
             local opti = opt
             for (lens, val) in zip(lenses, vals)
                 opti = Accessors.set(opti, lens, val)

@@ -25,23 +25,41 @@ $(DocStringExtensions.FIELDS)
   - [`NonFiniteAllocationOptimisationResult`](@ref)
 """
 @concrete struct SubsetResamplingResult <: NonFiniteAllocationOptimisationResult
-    "$(field_dict[:oe])"
+    """
+    $(field_dict[:oe])
+    """
     oe
-    "$(field_dict[:pr])"
+    """
+    $(field_dict[:pr])
+    """
     pr
-    "$(field_dict[:wb])"
+    """
+    $(field_dict[:wb])
+    """
     wb
-    "$(field_dict[:fees])"
+    """
+    $(field_dict[:fees])
+    """
     fees
-    "Vector of sub-optimisation results for each subset."
+    """
+    Vector of sub-optimisation results for each subset.
+    """
     ress
-    "$(field_dict[:idx])"
+    """
+    $(field_dict[:idx])
+    """
     idx
-    "$(field_dict[:retcode])"
+    """
+    $(field_dict[:retcode])
+    """
     retcode
-    "Aggregated optimal portfolio weights."
+    """
+    Aggregated optimal portfolio weights.
+    """
     w
-    "$(field_dict[:fb])"
+    """
+    $(field_dict[:fb])
+    """
     fb
 end
 """
@@ -124,37 +142,69 @@ Where:
   - [`MeanRisk`](@ref)
 """
 @concrete struct SubsetResampling <: BaseSubsetResamplingOptimisationEstimator
-    "$(field_dict[:pe])"
+    """
+    $(field_dict[:pe])
+    """
     pe
-    "$(field_dict[:wb_jmp])"
+    """
+    $(field_dict[:wb_jmp])
+    """
     wb
-    "$(field_dict[:feese])"
+    """
+    $(field_dict[:feese])
+    """
     fees
-    "$(field_dict[:sets])"
+    """
+    $(field_dict[:sets])
+    """
     sets
-    "Optional scaling vector for subset optimiser weights."
+    """
+    Optional scaling vector for subset optimiser weights.
+    """
     scale
-    "Base portfolio optimiser applied to each asset subset."
+    """
+    Base portfolio optimiser applied to each asset subset.
+    """
     opt
-    "$(field_dict[:wf])"
+    """
+    $(field_dict[:wf])
+    """
     wf
-    "$(field_dict[:ex])"
+    """
+    $(field_dict[:ex])
+    """
     ex
-    "$(field_dict[:subset_size])"
+    """
+    $(field_dict[:subset_size])
+    """
     subset_size
-    "$(field_dict[:n_subsets])"
+    """
+    $(field_dict[:n_subsets])
+    """
     n_subsets
-    "$(field_dict[:max_comb])"
+    """
+    $(field_dict[:max_comb])
+    """
     max_comb
-    "$(field_dict[:rng])"
+    """
+    $(field_dict[:rng])
+    """
     rng
-    "$(field_dict[:seed])"
+    """
+    $(field_dict[:seed])
+    """
     seed
-    "$(field_dict[:fb])"
+    """
+    $(field_dict[:fb])
+    """
     fb
-    "$(field_dict[:brt])"
+    """
+    $(field_dict[:brt])
+    """
     brt
-    "$(field_dict[:strict_opt])"
+    """
+    $(field_dict[:strict_opt])
+    """
     strict
     function SubsetResampling(pe::PrE_Pr, wb::Option{<:WbE_Wb}, fees::Option{<:FeesE_Fees},
                               sets::Option{<:AssetSets}, scale::Option{<:VecNum},

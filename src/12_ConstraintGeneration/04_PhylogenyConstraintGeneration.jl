@@ -156,9 +156,13 @@ SemiDefinitePhylogenyEstimator
   - [`phylogeny_constraints`](@ref)
 """
 @concrete struct SemiDefinitePhylogenyEstimator <: AbstractPhylogenyConstraintEstimator
-    "$(field_dict[:pler])"
+    """
+    $(field_dict[:pler])
+    """
     pl
-    "$(field_dict[:p_phylo])"
+    """
+    $(field_dict[:p_phylo])
+    """
     p
     function SemiDefinitePhylogenyEstimator(pl::NwE_PlM_ClE_Cl,
                                             p::Number)::SemiDefinitePhylogenyEstimator
@@ -225,9 +229,13 @@ SemiDefinitePhylogeny
   - [`phylogeny_constraints`](@ref)
 """
 @concrete struct SemiDefinitePhylogeny <: AbstractPhylogenyConstraintResult
-    "$(field_dict[:A_phylo])"
+    """
+    $(field_dict[:A_phylo])
+    """
     A
-    "$(field_dict[:p_phylo])"
+    """
+    $(field_dict[:p_phylo])
+    """
     p
     function SemiDefinitePhylogeny(A::MatNum, p::Number)::SemiDefinitePhylogeny
         @argcheck(all(iszero, LinearAlgebra.diag(A)))
@@ -396,11 +404,17 @@ IntegerPhylogenyEstimator
   - [`phylogeny_constraints`](@ref)
 """
 @concrete struct IntegerPhylogenyEstimator <: AbstractPhylogenyConstraintEstimator
-    "$(field_dict[:pler])"
+    """
+    $(field_dict[:pler])
+    """
     pl
-    "$(field_dict[:B_phylo])"
+    """
+    $(field_dict[:B_phylo])
+    """
     B
-    "$(field_dict[:scale_phylo])"
+    """
+    $(field_dict[:scale_phylo])
+    """
     scale
     function IntegerPhylogenyEstimator(pl::NwE_PlM_ClE_Cl, B::Int_VecInt,
                                        scale::Number)::IntegerPhylogenyEstimator
@@ -462,11 +476,17 @@ IntegerPhylogeny
   - [`phylogeny_constraints`](@ref)
 """
 @concrete struct IntegerPhylogeny <: AbstractPhylogenyConstraintResult
-    "$(field_dict[:A_phylo])"
+    """
+    $(field_dict[:A_phylo])
+    """
     A
-    "$(field_dict[:B_phylo])"
+    """
+    $(field_dict[:B_phylo])
+    """
     B
-    "$(field_dict[:scale_phylo])"
+    """
+    $(field_dict[:scale_phylo])
+    """
     scale
     function IntegerPhylogeny(A::MatNum, B::Int_VecInt, scale::Number)::IntegerPhylogeny
         @argcheck(all(iszero, LinearAlgebra.diag(A)))
@@ -616,11 +636,17 @@ CentralityConstraint
   - [`centrality_constraints`](@ref)
 """
 @concrete struct CentralityConstraint <: AbstractCentralityConstraint
-    "$(field_dict[:cc_A])"
+    """
+    $(field_dict[:cc_A])
+    """
     A
-    "$(field_dict[:cc_B])"
+    """
+    $(field_dict[:cc_B])
+    """
     B
-    "$(field_dict[:cc_comp])"
+    """
+    $(field_dict[:cc_comp])
+    """
     comp
     function CentralityConstraint(A::CentralityEstimator, B::Num_VecToScaM,
                                   comp::ComparisonOperator)
