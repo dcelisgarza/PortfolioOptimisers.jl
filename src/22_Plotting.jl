@@ -15,18 +15,23 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     PlottingOptions(;
-        compound::Bool   = false,
         alpha::Number    = 0.05,
         kappa::Number    = 0.3,
         N                = nothing,
-        marginal::Bool   = false,
-        percentage::Bool = false,
         delta::Number    = 1e-6,
-        flag::Bool       = true,
         points::Integer  = 0,
         rw               = nothing,
         rolling::Integer = 0,
-        benchmark::Bool  = false
+        compound::Bool   = false,
+        marginal::Bool   = false,
+        percentage::Bool = false,
+        reference::Bool  = true,
+        variance::Bool   = false,
+        heatmap::Bool    = false,
+        benchmark::Bool  = false,
+        factory::Bool    = true,
+        min_risk::Bool   = true,
+        max_score::Bool  = true
     ) -> PlottingOptions
 
 Keywords correspond to the struct's fields.
@@ -43,20 +48,25 @@ Keywords correspond to the struct's fields.
 # Examples
 
 ```jldoctest
-julia> PlottingOptions()
+julia> opts = PlottingOptions()
 PlottingOptions
-  compound ┼ false
-     alpha ┼ 0.05
-     kappa ┼ 0.3
-         N ┼ nothing
-  marginal ┼ false
-percentage ┼ false
-     delta ┼ 1.0e-6
-      flag ┼ true
-    points ┼ 0
-        rw ┼ nothing
-   rolling ┼ 0
- benchmark ┴ false
+       alpha ┼ Float64: 0.05
+       kappa ┼ Float64: 0.3
+           N ┼ nothing
+       delta ┼ Float64: 1.0e-6
+      points ┼ Int64: 0
+          rw ┼ nothing
+     rolling ┼ Int64: 0
+    compound ┼ Bool: false
+    marginal ┼ Bool: false
+  percentage ┼ Bool: false
+   reference ┼ Bool: true
+    variance ┼ Bool: false
+     heatmap ┼ Bool: false
+   benchmark ┼ Bool: false
+     factory ┼ Bool: true
+    min_risk ┼ Bool: true
+   max_score ┴ Bool: true
 ```
 
 # Related
@@ -70,10 +80,6 @@ percentage ┼ false
 """
 @concrete struct PlottingOptions <: AbstractEstimator
     """
-    If `true`, compound cumulative returns; otherwise use simple cumulative sum.
-    """
-    compound
-    """
     Confidence level for tail risk measures (VaR, CVaR, DaR, …). Must satisfy `0 < alpha < 1`.
     """
     alpha
@@ -86,21 +92,9 @@ percentage ┼ false
     """
     N
     """
-    If `true`, compute marginal risk contribution; otherwise component risk contribution.
-    """
-    marginal
-    """
-    If `true`, normalise risk contributions to percentages.
-    """
-    percentage
-    """
     Finite-difference step size for [`risk_contribution`](@ref). Must be `> 0`.
     """
     delta
-    """
-    If `true`, overlay a fitted Normal distribution in [`plot_histogram`](@ref) or Marchenko-Pastur bound in [`plot_eigenspectrum`](@ref).
-    """
-    flag
     """
     Number of histogram bins / PDF evaluation points. `0` means auto-detect as `ceil(Int, 4*sqrt(T))`.
     """
@@ -114,13 +108,51 @@ percentage ┼ false
     """
     rolling
     """
-    If `true`, overlay a benchmark series where supported (e.g. [`plot_ptf_cumulative_returns`](@ref)).
+    If `true`, compound cumulative returns; otherwise use simple cumulative sums.
+    """
+    compound
+    """
+    If `true`, compute marginal risk contribution; otherwise component risk contribution.
+    """
+    marginal
+    """
+    If `true`, normalise asset risk contributions to percentages.
+    """
+    percentage
+    """
+    If `true`, overlay a fitted Normal distribution in [`plot_histogram`](@ref) or a reference bound/line in eigenvalue plots.
+    """
+    reference
+    """
+    If `true`, show variance instead of volatility in [`plot_sigma`](@ref).
+    """
+    variance
+    """
+    If `true`, show the raw cokurtosis heatmap instead of the cokurtosis eigenspectrum in [`plot_cokurtosis`](@ref).
+    """
+    heatmap
+    """
+    If `true`, overlay a benchmark series where supported (e.g. [`plot_benchmark`](@ref)).
     """
     benchmark
-    function PlottingOptions(compound::Bool, alpha::Number, kappa::Number,
-                             N::Option{<:Number}, marginal::Bool, percentage::Bool,
-                             delta::Number, flag::Bool, points::Integer,
-                             rw::Option{<:ObsWeights}, rolling::Integer, benchmark::Bool)
+    """
+    If `true`, call [`factory`](@ref) on plot measures before evaluation in [`plot_measures`](@ref) and [`plot_efficient_frontier`](@ref).
+    """
+    factory
+    """
+    If `true`, annotate the minimum-risk portfolio in [`plot_efficient_frontier`](@ref).
+    """
+    min_risk
+    """
+    If `true`, annotate the portfolio that maximises the colour-coding measure in [`plot_efficient_frontier`](@ref).
+    """
+    max_score
+    function PlottingOptions(alpha::Number, kappa::Number, N::Option{<:Number},
+                             delta::Number, points::Integer, rw::Option{<:ObsWeights},
+                             rolling::Integer, compound::Bool, marginal::Bool,
+                             percentage::Bool, reference::Bool, variance::Bool,
+                             heatmap::Bool, benchmark::Bool, factory::Bool, min_risk::Bool,
+                             max_score::Bool)
         @argcheck(zero(alpha) < alpha < one(alpha))
         @argcheck(zero(kappa) < kappa < one(kappa))
         @argcheck(delta > zero(delta))
@@ -129,27 +161,37 @@ percentage ┼ false
         if !isnothing(N)
             @argcheck(N > zero(N))
         end
-        return new{typeof(compound), typeof(alpha), typeof(kappa), typeof(N),
-                   typeof(marginal), typeof(percentage), typeof(delta), typeof(flag),
-                   typeof(points), typeof(rw), typeof(rolling), typeof(benchmark)}(compound,
-                                                                                   alpha,
-                                                                                   kappa, N,
-                                                                                   marginal,
-                                                                                   percentage,
-                                                                                   delta,
-                                                                                   flag,
-                                                                                   points,
-                                                                                   rw,
-                                                                                   rolling,
-                                                                                   benchmark)
+        return new{typeof(alpha), typeof(kappa), typeof(N), typeof(delta), typeof(points),
+                   typeof(rw), typeof(rolling), typeof(compound), typeof(marginal),
+                   typeof(percentage), typeof(reference), typeof(variance), typeof(heatmap),
+                   typeof(benchmark), typeof(factory), typeof(min_risk), typeof(max_score)}(alpha,
+                                                                                            kappa,
+                                                                                            N,
+                                                                                            delta,
+                                                                                            points,
+                                                                                            rw,
+                                                                                            rolling,
+                                                                                            compound,
+                                                                                            marginal,
+                                                                                            percentage,
+                                                                                            reference,
+                                                                                            variance,
+                                                                                            heatmap,
+                                                                                            benchmark,
+                                                                                            factory,
+                                                                                            min_risk,
+                                                                                            max_score)
     end
 end
-function PlottingOptions(; compound::Bool = false, alpha::Number = 0.05,
-                         kappa::Number = 0.3, N::Option{<:Number} = nothing,
+function PlottingOptions(; alpha::Number = 0.05, kappa::Number = 0.3,
+                         N::Option{<:Number} = nothing, delta::Number = 1e-6,
+                         points::Integer = 0, rw::Option{<:ObsWeights} = nothing,
+                         rolling::Integer = 0, compound::Bool = false,
                          marginal::Bool = false, percentage::Bool = false,
-                         delta::Number = 1e-6, flag::Bool = true, points::Integer = 0,
-                         rw::Option{<:ObsWeights} = nothing, rolling::Integer = 0,
-                         benchmark::Bool = false)::PlottingOptions
+                         reference::Bool = true, variance::Bool = false,
+                         heatmap::Bool = false, benchmark::Bool = false,
+                         factory::Bool = true, min_risk::Bool = true,
+                         max_score::Bool = true)::PlottingOptions
     @argcheck(zero(alpha) < alpha < one(alpha))
     @argcheck(zero(kappa) < kappa < one(kappa))
     @argcheck(delta > zero(delta))
@@ -158,8 +200,9 @@ function PlottingOptions(; compound::Bool = false, alpha::Number = 0.05,
     if !isnothing(N)
         @argcheck(N > zero(N))
     end
-    return PlottingOptions(compound, alpha, kappa, N, marginal, percentage, delta, flag,
-                           points, rw, rolling, benchmark)
+    return PlottingOptions(alpha, kappa, N, delta, points, rw, rolling, compound, marginal,
+                           percentage, reference, variance, heatmap, benchmark, factory,
+                           min_risk, max_score)
 end
 
 ## ──────────────────────────────────────────────────────────────────────────────
@@ -417,7 +460,7 @@ function plot_drawdowns end
 ## Risk/return scatter
 ## ──────────────────────────────────────────────────────────────────────────────
 """
-    plot_measures(w, pr[, fees]; x, y, z, c, slv, flag, opts, kwargs...)
+    plot_measures(w, pr[, fees]; x, y, z, c, slv, opts, kwargs...)
     plot_measures(res_vec, rd; x, y, z, c, slv, opts, kwargs...)
     plot_measures(mpred; x, y, z, c, slv, opts, kwargs...)
     plot_measures(ppred; x, y, z, c, slv, opts, kwargs...)
@@ -428,7 +471,7 @@ an efficient frontier or population).
   - `x`, `y`: risk/return measures for the axes (default `Variance()` and `ExpectedReturn()`).
   - `z`: optional third measure for 3-D scatter.
   - `c`: colour-coding measure (default `ExpectedReturnRiskRatio`).
-  - `flag`: if `true`, call `factory` on the measures before evaluating.
+  - `opts.factory`: if `true`, call `factory` on the measures before evaluating.
 
 Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
 
@@ -454,7 +497,7 @@ an optional fitted Normal distribution.
 
   - `opts.alpha`: confidence level.
   - `opts.kappa`: RLVaR shape parameter.
-  - `opts.flag`: overlay fitted Normal.
+  - `opts.reference`: overlay fitted Normal.
   - `opts.points`: number of PDF evaluation points (0 = auto).
   - `opts.rw`: observation weights.
   - `slv`: solver for EVaR / RLVaR (default `nothing` — those lines are omitted).
@@ -561,7 +604,7 @@ function plot_mu end
 
 Bar chart of per-asset volatility (√diag(Σ)).
 
-  - `opts.percentage`: if `true`, show variance (diag(Σ)) instead of standard deviation.
+  - `opts.variance`: if `true`, show variance (diag(Σ)) instead of standard deviation.
 
 Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
 
@@ -630,7 +673,7 @@ function plot_factor_sigma end
 
 Bar chart of eigenvalues of the covariance/correlation matrix, sorted in descending order.
 
-When `opts.flag = true` and a `ReturnsResult` is provided (so that the `T × N` ratio is
+When `opts.reference = true` and a `ReturnsResult` is provided (so that the `T × N` ratio is
 known), overlays the Marchenko-Pastur bulk upper bound `λ+ = σ̄²(1 + √(N/T))²` as a
 horizontal line, highlighting noise eigenvalues.
 
@@ -850,8 +893,8 @@ function plot_coskewness end
 
 Eigenvalue spectrum of the cokurtosis matrix (N² × N²) from a [`HighOrderPrior`](@ref).
 
-When `opts.flag = true`, overlays the Marchenko-Pastur noise bulk bound.
-When `opts.percentage = true`, shows the raw heatmap instead (only recommended for small N).
+When `opts.reference = true`, overlays the Marchenko-Pastur noise bulk bound.
+When `opts.heatmap = true`, shows the raw heatmap instead (only recommended for small N).
 
 Requires that `pr.kt` is not `nothing`.
 
@@ -924,8 +967,7 @@ function plot_cv_dashboard end
 ## Efficient frontier
 ## ──────────────────────────────────────────────────────────────────────────────
 """
-    plot_efficient_frontier(res_vec, pr[, fees]; x, y, c, slv, flag,
-                            annotate_minrisk, annotate_maxsharpe, opts, kwargs...)
+    plot_efficient_frontier(res_vec, pr[, fees]; x, y, c, slv, opts, kwargs...)
     plot_efficient_frontier(res_vec, rd; ...)
 
 Sort a collection of portfolio results by risk (`x`), connect them with a line to
@@ -935,9 +977,9 @@ trace the efficient frontier, and optionally annotate the **minimum-risk** and
   - `x`: risk measure for the horizontal axis (default `Variance()`).
   - `y`: return measure for the vertical axis (default `ExpectedReturn()`).
   - `c`: colour-coding measure (default Sharpe ratio derived from `x`).
-  - `flag`: if `true` (default), call `factory` on the measures before evaluating.
-  - `annotate_minrisk`: overlay a star marker at the minimum-risk portfolio.
-  - `annotate_maxsharpe`: overlay a star marker at the maximum-Sharpe portfolio.
+  - `opts.factory`: if `true` (default), call `factory` on the measures before evaluating.
+  - `opts.min_risk`: overlay a star marker at the minimum-risk portfolio.
+  - `opts.max_score`: overlay a star marker at the portfolio that maximises the colour-coding measure.
 
 Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
 

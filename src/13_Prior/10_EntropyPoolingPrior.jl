@@ -22,17 +22,29 @@ $(DocStringExtensions.FIELDS)
   - [`replace_prior_views`](@ref)
 """
 @concrete struct RhoParsingResult <: AbstractParsingResult
-    "$(field_dict[:vars])"
+    """
+    $(field_dict[:vars])
+    """
     vars
-    "$(field_dict[:coef_c])"
+    """
+    $(field_dict[:coef_c])
+    """
     coef
-    "$(field_dict[:op])"
+    """
+    $(field_dict[:op])
+    """
     op
-    "$(field_dict[:rhs])"
+    """
+    $(field_dict[:rhs])
+    """
     rhs
-    "$(field_dict[:eqn])"
+    """
+    $(field_dict[:eqn])
+    """
     eqn
-    "$(field_dict[:ij])"
+    """
+    $(field_dict[:ij])
+    """
     ij
     function RhoParsingResult(vars::VecStr, coef::VecNum, op::AbstractString, rhs::Number,
                               eqn::AbstractString,
@@ -204,9 +216,13 @@ CVaREntropyPooling
   - [`Roots.jl`](https://github.com/JuliaMath/Roots.jl)
 """
 @concrete struct CVaREntropyPooling <: AbstractEntropyPoolingOptimiser
-    "$(field_dict[:optargs])"
+    """
+    $(field_dict[:optargs])
+    """
     args
-    "$(field_dict[:optkwargs])"
+    """
+    $(field_dict[:optkwargs])
+    """
     kwargs
     function CVaREntropyPooling(args::Tuple, kwargs::NamedTuple)
         return new{typeof(args), typeof(kwargs)}(args, kwargs)
@@ -267,15 +283,25 @@ OptimEntropyPooling
   - [`Optim.jl`](https://github.com/JuliaNLSolvers/Optim.jl)
 """
 @concrete struct OptimEntropyPooling <: AbstractEntropyPoolingOptimiser
-    "$(field_dict[:optargs])"
+    """
+    $(field_dict[:optargs])
+    """
     args
-    "$(field_dict[:optkwargs])"
+    """
+    $(field_dict[:optkwargs])
+    """
     kwargs
-    "$(field_dict[:sc1])"
+    """
+    $(field_dict[:sc1])
+    """
     sc1
-    "$(field_dict[:sc2])"
+    """
+    $(field_dict[:sc2])
+    """
     sc2
-    "$(field_dict[:epoptalg])"
+    """
+    $(field_dict[:epoptalg])
+    """
     alg
     function OptimEntropyPooling(args::Tuple, kwargs::NamedTuple, sc1::Number, sc2::Number,
                                  alg::AbstractEntropyPoolingOptAlgorithm)
@@ -350,15 +376,25 @@ JuMPEntropyPooling
   - [`JuMP.jl`](https://github.com/jump-dev/JuMP.jl)
 """
 @concrete struct JuMPEntropyPooling <: AbstractEntropyPoolingOptimiser
-    "$(field_dict[:slv])"
+    """
+    $(field_dict[:slv])
+    """
     slv
-    "$(field_dict[:sc1])"
+    """
+    $(field_dict[:sc1])
+    """
     sc1
-    "$(field_dict[:sc2])"
+    """
+    $(field_dict[:sc2])
+    """
     sc2
-    "$(field_dict[:so])"
+    """
+    $(field_dict[:so])
+    """
     so
-    "$(field_dict[:epoptalg])"
+    """
+    $(field_dict[:epoptalg])
+    """
     alg
     function JuMPEntropyPooling(slv::Slv_VecSlv, sc1::Number, sc2::Number, so::Number,
                                 alg::AbstractEntropyPoolingOptAlgorithm)
@@ -505,37 +541,69 @@ EntropyPoolingPrior
   - [`AbstractEntropyPoolingAlgorithm`](@ref)
 """
 @concrete struct EntropyPoolingPrior <: AbstractLowOrderPriorEstimator_AF
-    "$(field_dict[:pe])"
+    """
+    $(field_dict[:pe])
+    """
     pe
-    "$(field_dict[:mu_views])"
+    """
+    $(field_dict[:mu_views])
+    """
     mu_views
-    "$(field_dict[:var_views])"
+    """
+    $(field_dict[:var_views])
+    """
     var_views
-    "$(field_dict[:cvar_views])"
+    """
+    $(field_dict[:cvar_views])
+    """
     cvar_views
-    "$(field_dict[:sigma_views])"
+    """
+    $(field_dict[:sigma_views])
+    """
     sigma_views
-    "$(field_dict[:sk_views])"
+    """
+    $(field_dict[:sk_views])
+    """
     sk_views
-    "$(field_dict[:kt_views])"
+    """
+    $(field_dict[:kt_views])
+    """
     kt_views
-    "$(field_dict[:rho_views])"
+    """
+    $(field_dict[:rho_views])
+    """
     rho_views
-    "$(field_dict[:var_alpha])"
+    """
+    $(field_dict[:var_alpha])
+    """
     var_alpha
-    "$(field_dict[:cvar_alpha])"
+    """
+    $(field_dict[:cvar_alpha])
+    """
     cvar_alpha
-    "$(field_dict[:sets])"
+    """
+    $(field_dict[:sets])
+    """
     sets
-    "$(field_dict[:ds_opt])"
+    """
+    $(field_dict[:ds_opt])
+    """
     ds_opt
-    "$(field_dict[:dm_opt])"
+    """
+    $(field_dict[:dm_opt])
+    """
     dm_opt
-    "$(field_dict[:opt_ep])"
+    """
+    $(field_dict[:opt_ep])
+    """
     opt
-    "$(field_dict[:ep_w])"
+    """
+    $(field_dict[:ep_w])
+    """
     w
-    "$(field_dict[:epalg])"
+    """
+    $(field_dict[:epalg])
+    """
     alg
     function EntropyPoolingPrior(pe::AbstractLowOrderPriorEstimator_A_F_AF,
                                  mu_views::Option{<:LinearConstraintEstimator},
@@ -1198,7 +1266,7 @@ function entropy_pooling(w::VecNum, epc::AbstractDict,
         return opt.sc1 * G
     end
     #! Start: Optim.jl's Fminbox() initial_mu! with default mu0 is broken. Use this until it's fixed.
-    @static if pkgversion(Optim) == v"2.0.1"
+    @static if pkgversion(Optim) in (v"2.0.1", v"2.1.0")
         args = ifelse(isempty(opt.args), (Optim.Fminbox(; mu0 = 1e-5),), opt.args)
         result = Optim.optimize(f, g!, view(wb, :, 1), view(wb, :, 2), x0, args...;
                                 opt.kwargs...)
@@ -1259,7 +1327,7 @@ function entropy_pooling(w::VecNum, epc::AbstractDict,
         return opt.sc1 * G
     end
     #! Start: Optim.jl's Fminbox() initial_mu! with default mu0 is broken. Use this until it's fixed.
-    @static if pkgversion(Optim) == v"2.0.1"
+    @static if pkgversion(Optim) in (v"2.0.1", v"2.1.0")
         args = ifelse(isempty(opt.args), (Optim.Fminbox(; mu0 = 1e-5),), opt.args)
         result = Optim.optimize(f, g!, view(wb, :, 1), view(wb, :, 2), x0, args...;
                                 opt.kwargs...)

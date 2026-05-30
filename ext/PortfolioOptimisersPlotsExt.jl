@@ -93,7 +93,6 @@ end
 function PortfolioOptimisers.plot_asset_cumulative_returns(::PredictionResult; kwargs...)
     throw(ArgumentError("`plot_asset_cumulative_returns(pred::PredictionResult)` is not supported: `PredictionReturnsResult` stores portfolio returns, not per-asset returns. Call `plot_asset_cumulative_returns(pred.res.w, rd::ReturnsResult, ...)` with the original returns data."))
 end
-
 ## plot_composition
 function PortfolioOptimisers.plot_composition(w::VecNum, nx::AbstractVector = 1:length(w);
                                               opts::PlottingOptions = PlottingOptions(),
@@ -164,9 +163,19 @@ function PortfolioOptimisers.plot_composition(pred::PopulationPredictionResult;
                                                             title = "Population Composition",
                                                             kwargs...)
 end
-
 ## plot_stacked_bar_composition / plot_stacked_area_composition
-function PortfolioOptimisers.plot_stacked_bar_composition(res_vec::AbstractVector{<:NonFiniteAllocationOptimisationResult},
+function PortfolioOptimisers.plot_stacked_bar_composition(w::VecNum_VecVecNum,
+                                                          nx::AbstractVector = 1:size(w, 1);
+                                                          opts::PlottingOptions = PlottingOptions(),
+                                                          kwargs...)
+    wmat = isa(w, VecVecNum) ? hcat(w...) : w
+    M = size(wmat, 2)
+    ctg = repeat(nx; inner = M)
+    return groupedbar(transpose(wmat); xticks = (1:M, 1:M), bar_position = :stack,
+                      group = ctg, xlabel = "Portfolios", ylabel = "Weight",
+                      title = "Portfolio Composition", legend = :outerright, kwargs...)
+end
+function PortfolioOptimisers.plot_stacked_bar_composition(res_vec::AbstractVector{<:OptimisationResult},
                                                           rd::ReturnsResult;
                                                           opts::PlottingOptions = PlottingOptions(),
                                                           kwargs...)
@@ -174,7 +183,17 @@ function PortfolioOptimisers.plot_stacked_bar_composition(res_vec::AbstractVecto
     nx = isnothing(rd.nx) ? (1:size(w, 1)) : rd.nx
     return PortfolioOptimisers.plot_stacked_bar_composition(w, nx; opts = opts, kwargs...)
 end
-function PortfolioOptimisers.plot_stacked_area_composition(res_vec::AbstractVector{<:NonFiniteAllocationOptimisationResult},
+function PortfolioOptimisers.plot_stacked_area_composition(w::VecNum_VecVecNum,
+                                                           nx::AbstractVector = 1:size(w, 1);
+                                                           opts::PlottingOptions = PlottingOptions(),
+                                                           kwargs...)
+    wmat = isa(w, VecVecNum) ? hcat(w...) : w
+    M = size(wmat, 2)
+    return areaplot(transpose(wmat); xticks = (1:M, 1:M), label = permutedims(nx),
+                    xlabel = "Portfolios", ylabel = "Weight",
+                    title = "Portfolio Composition", legend = :outerright, kwargs...)
+end
+function PortfolioOptimisers.plot_stacked_area_composition(res_vec::AbstractVector{<:OptimisationResult},
                                                            rd::ReturnsResult;
                                                            opts::PlottingOptions = PlottingOptions(),
                                                            kwargs...)
@@ -182,7 +201,6 @@ function PortfolioOptimisers.plot_stacked_area_composition(res_vec::AbstractVect
     nx = isnothing(rd.nx) ? (1:size(w, 1)) : rd.nx
     return PortfolioOptimisers.plot_stacked_area_composition(w, nx; opts = opts, kwargs...)
 end
-
 ## plot_risk_contribution
 function PortfolioOptimisers.plot_risk_contribution(r::PortfolioOptimisers.AbstractBaseRiskMeasure,
                                                     w::VecNum, rd::ReturnsResult,
@@ -216,7 +234,6 @@ function PortfolioOptimisers.plot_risk_contribution(::PortfolioOptimisers.Abstra
                                                     ::PredictionResult; kwargs...)
     throw(ArgumentError("`plot_risk_contribution(r, pred::PredictionResult)` is not supported: `PredictionReturnsResult` stores portfolio returns, not raw asset returns. Call `plot_risk_contribution(r, pred.res.w, rd::ReturnsResult, ...)` with the original returns data."))
 end
-
 ## plot_factor_risk_contribution
 function PortfolioOptimisers.plot_factor_risk_contribution(r::PortfolioOptimisers.AbstractBaseRiskMeasure,
                                                            res::NonFiniteAllocationOptimisationResult,
@@ -233,7 +250,6 @@ function PortfolioOptimisers.plot_factor_risk_contribution(::PortfolioOptimisers
                                                            ::PredictionResult; kwargs...)
     throw(ArgumentError("`plot_factor_risk_contribution(r, pred::PredictionResult)` is not supported: `PredictionReturnsResult` stores portfolio returns, not raw asset returns. Call `plot_factor_risk_contribution(r, pred.res.w, rd::ReturnsResult, ...)` with the original returns data."))
 end
-
 ## plot_dendrogram
 function PortfolioOptimisers.plot_dendrogram(clr::AbstractClusteringResult,
                                              nx::AbstractVector = 1:length(clr.res.order);
@@ -320,8 +336,8 @@ function PortfolioOptimisers.plot_clusters(clr::AbstractClusteringResult,
                 xrotation = 90, colorbar = false, clim = clim, xlim = (0.5, N + 0.5),
                 ylim = (0.5, N + 0.5), color = colgrad, yflip = true)
     dend1 = plot(clr.res; xticks = false, ylim = extrema(clr.res.heights))
-    dend2 = plot(clr.res; yticks = false, xrotation = 90, permute = (:y, :x), yflip = true,
-                 xlim = extrema(clr.res.heights))
+    dend2 = plot(clr.res; yticks = false, orientation = :horizontal, xrotation = 90,
+                 yflip = true, xlim = extrema(clr.res.heights))
     for (i, cl) in pairs(cls)
         a = filter(!isnothing, [findfirst(x -> x == c, clr.res.order) for c in cl])
         if isempty(a)
@@ -375,7 +391,6 @@ function PortfolioOptimisers.plot_clusters(cle::HClE_HCl, pr::PortfolioOptimiser
     end
     return PortfolioOptimisers.plot_clusters(cle, pr.X, nx; opts = opts, kwargs...)
 end
-
 ## plot_drawdowns
 function PortfolioOptimisers.plot_drawdowns(w::ArrNum, rd::ReturnsResult,
                                             fees::Option{<:Fees} = nothing;
@@ -405,7 +420,6 @@ function PortfolioOptimisers.plot_drawdowns(pred::PredictionResult;
     return PortfolioOptimisers.plot_drawdowns(w, Xm, nothing; slv = slv, ts = ts,
                                               opts = opts, kwargs...)
 end
-
 ## plot_measures
 function PortfolioOptimisers.plot_measures(w::VecNum_VecVecNum, pr::Pr_RR,
                                            fees::Option{<:Fees} = nothing;
@@ -417,14 +431,13 @@ function PortfolioOptimisers.plot_measures(w::VecNum_VecVecNum, pr::Pr_RR,
                                                                                                                     rt = ArithmeticReturn(),
                                                                                                                     rf = 0),
                                            slv::Option{<:Slv_VecSlv} = nothing,
-                                           flag::Bool = true,
                                            opts::PlottingOptions = PlottingOptions(),
                                            kwargs...)
-    if flag
-        x = factory(x, pr, slv)
-        y = factory(y, pr, slv)
-        z = isnothing(z) ? nothing : factory(z, pr, slv)
-        c = factory(c, pr, slv)
+    if opts.factory
+        x = PortfolioOptimisers.factory(x, pr, slv)
+        y = PortfolioOptimisers.factory(y, pr, slv)
+        z = isnothing(z) ? nothing : PortfolioOptimisers.factory(z, pr, slv)
+        c = PortfolioOptimisers.factory(c, pr, slv)
     end
     xr = expected_risk(x, w, pr, fees)
     yr = expected_risk(y, w, pr, fees)
@@ -450,7 +463,6 @@ function PortfolioOptimisers.plot_measures(res_vec::AbstractVector{<:NonFiniteAl
                                                                                                                     rf = 0),
                                            slv::Option{<:Slv_VecSlv} = nothing,
                                            fees::Option{<:Fees} = nothing,
-                                           flag::Bool = true,
                                            opts::PlottingOptions = PlottingOptions(),
                                            kwargs...)
     pr = if hasproperty(first(res_vec), :pr)
@@ -462,7 +474,7 @@ function PortfolioOptimisers.plot_measures(res_vec::AbstractVector{<:NonFiniteAl
     end
     w = getproperty.(res_vec, :w)
     return PortfolioOptimisers.plot_measures(w, pr, fees; x = x, y = y, z = z, c = c,
-                                             slv = slv, flag = flag, opts = opts, kwargs...)
+                                             slv = slv, opts = opts, kwargs...)
 end
 function PortfolioOptimisers.plot_measures(mpred::MultiPeriodPredictionResult;
                                            x::PortfolioOptimisers.AbstractBaseRiskMeasure = Variance(),
@@ -474,12 +486,11 @@ function PortfolioOptimisers.plot_measures(mpred::MultiPeriodPredictionResult;
                                                                                                                     rf = 0),
                                            slv::Option{<:Slv_VecSlv} = nothing,
                                            fees::Option{<:Fees} = nothing,
-                                           flag::Bool = true,
                                            opts::PlottingOptions = PlottingOptions(),
                                            kwargs...)
     return PortfolioOptimisers.plot_measures(mpred.res, mpred.mrd; x = x, y = y, z = z,
-                                             c = c, slv = slv, fees = fees, flag = flag,
-                                             opts = opts, kwargs...)
+                                             c = c, slv = slv, fees = fees, opts = opts,
+                                             kwargs...)
 end
 function PortfolioOptimisers.plot_measures(ppred::PopulationPredictionResult;
                                            x::PortfolioOptimisers.AbstractBaseRiskMeasure = Variance(),
@@ -491,7 +502,6 @@ function PortfolioOptimisers.plot_measures(ppred::PopulationPredictionResult;
                                                                                                                     rf = 0),
                                            slv::Option{<:Slv_VecSlv} = nothing,
                                            fees::Option{<:Fees} = nothing,
-                                           flag::Bool = true,
                                            opts::PlottingOptions = PlottingOptions(),
                                            kwargs...)
     members = ppred.pred
@@ -511,9 +521,8 @@ function PortfolioOptimisers.plot_measures(ppred::PopulationPredictionResult;
         throw(ArgumentError("population member has no `.pr` or `.pa.pr`; pass `pr` explicitly"))
     end
     return PortfolioOptimisers.plot_measures(w, pr, fees; x = x, y = y, z = z, c = c,
-                                             slv = slv, flag = flag, opts = opts, kwargs...)
+                                             slv = slv, opts = opts, kwargs...)
 end
-
 ## plot_histogram
 function PortfolioOptimisers.plot_histogram(w::ArrNum, rd::ReturnsResult,
                                             fees::Option{<:Fees} = nothing;
@@ -541,7 +550,6 @@ function PortfolioOptimisers.plot_histogram(pred::PredictionResult;
     return PortfolioOptimisers.plot_histogram(w, Xm, nothing; slv = slv, opts = opts,
                                               kwargs...)
 end
-
 ## plot_network
 function PortfolioOptimisers.plot_network(pl::NwE_ClE_Cl,
                                           pr::PortfolioOptimisers.AbstractPriorResult,
@@ -566,8 +574,24 @@ function PortfolioOptimisers.plot_network(pl::NwE_ClE_Cl,
     nx = isnothing(rd.nx) ? (1:length(res.w)) : rd.nx
     return PortfolioOptimisers.plot_network(pl, rd.X, nx, res.w; opts = opts, kwargs...)
 end
-
 ## plot_centrality
+function PortfolioOptimisers.plot_centrality(cte::AbstractCentralityEstimator, X::MatNum,
+                                             nx::AbstractVector = 1:size(X, 2);
+                                             opts::PlottingOptions = PlottingOptions(),
+                                             kwargs...)
+    plr = centrality_vector(cte, X)
+    scores = plr.X
+    M = length(scores)
+    N, idx = _relevant_assets(scores, M, opts.N)
+    top_idx = view(idx, 1:N)
+    sort!(top_idx; by = i -> scores[i], rev = true)
+    if opts.percentage
+        scores ./= sum(scores)
+    end
+    return bar(scores[top_idx]; xticks = (1:N, nx[top_idx]), title = "Asset Centrality",
+               xlabel = "Asset", ylabel = "Centrality Score", xrotation = 90,
+               legend = false, kwargs...)
+end
 function PortfolioOptimisers.plot_centrality(cte::AbstractCentralityEstimator,
                                              pr::PortfolioOptimisers.AbstractPriorResult,
                                              nx::AbstractVector = 1:size(pr.X, 2);
@@ -590,7 +614,6 @@ function PortfolioOptimisers.plot_centrality(cte::AbstractCentralityEstimator,
     nx = isnothing(rd.nx) ? (1:length(res.w)) : rd.nx
     return PortfolioOptimisers.plot_centrality(cte, rd.X, nx; opts = opts, kwargs...)
 end
-
 ## plot_correlation
 function PortfolioOptimisers.plot_correlation(pr::PortfolioOptimisers.AbstractPriorResult,
                                               nx::AbstractVector = 1:size(pr.sigma, 1);
@@ -629,7 +652,6 @@ function PortfolioOptimisers.plot_correlation(pred::PredictionResult;
     return PortfolioOptimisers.plot_correlation(_extract_pr(pred.res); opts = opts,
                                                 kwargs...)
 end
-
 ## plot_mu
 function PortfolioOptimisers.plot_mu(pr::PortfolioOptimisers.AbstractPriorResult,
                                      nx::AbstractVector = 1:length(pr.mu);
@@ -659,7 +681,6 @@ function PortfolioOptimisers.plot_mu(pred::PredictionResult, rd::ReturnsResult;
                                      opts::PlottingOptions = PlottingOptions(), kwargs...)
     return PortfolioOptimisers.plot_mu(_extract_pr(pred.res), rd; opts = opts, kwargs...)
 end
-
 ## plot_sigma
 function PortfolioOptimisers.plot_sigma(pr::PortfolioOptimisers.AbstractPriorResult,
                                         nx::AbstractVector = 1:size(pr.sigma, 1);
@@ -695,7 +716,6 @@ function PortfolioOptimisers.plot_sigma(pred::PredictionResult, rd::ReturnsResul
                                         kwargs...)
     return PortfolioOptimisers.plot_sigma(_extract_pr(pred.res), rd; opts = opts, kwargs...)
 end
-
 ## plot_factor_loadings
 function PortfolioOptimisers.plot_factor_loadings(pr::PortfolioOptimisers.AbstractPriorResult,
                                                   nx::Option{<:AbstractVector} = nothing,
@@ -746,7 +766,6 @@ function PortfolioOptimisers.plot_factor_loadings(pred::PredictionResult;
     return PortfolioOptimisers.plot_factor_loadings(_extract_pr(pred.res); opts = opts,
                                                     kwargs...)
 end
-
 ## plot_factor_sigma
 function PortfolioOptimisers.plot_factor_sigma(pr::PortfolioOptimisers.AbstractPriorResult,
                                                nf::AbstractVector = 1:size(pr.f_sigma, 1);
@@ -791,7 +810,6 @@ function PortfolioOptimisers.plot_factor_sigma(pred::PredictionResult;
     return PortfolioOptimisers.plot_factor_sigma(_extract_pr(pred.res); opts = opts,
                                                  kwargs...)
 end
-
 ## plot_eigenspectrum
 function PortfolioOptimisers.plot_eigenspectrum(pr::PortfolioOptimisers.AbstractPriorResult;
                                                 opts::PlottingOptions = PlottingOptions(),
@@ -830,8 +848,21 @@ function PortfolioOptimisers.plot_eigenspectrum(pred::PredictionResult, rd::Retu
     return PortfolioOptimisers.plot_eigenspectrum(_extract_pr(pred.res), rd; opts = opts,
                                                   kwargs...)
 end
-
 ## plot_rolling_measure
+function PortfolioOptimisers.plot_rolling_measure(r::PortfolioOptimisers.AbstractBaseRiskMeasure,
+                                                  w::VecNum, X::MatNum,
+                                                  fees::Option{<:Fees} = nothing;
+                                                  ts::AbstractVector = 1:size(X, 1),
+                                                  opts::PlottingOptions = PlottingOptions(),
+                                                  kwargs...)
+    T = size(X, 1)
+    window = opts.rolling == 0 ? ceil(Int, sqrt(T)) : opts.rolling
+    rolling = _rolling_window_measure(r, w, X, fees, window)
+    ts_rolling = ts[window:end]
+    rname = string(nameof(typeof(r)))
+    return plot(ts_rolling, rolling; title = "Rolling $rname (window=$window)",
+                ylabel = rname, xlabel = "Date", legend = false, linewidth = 2, kwargs...)
+end
 function PortfolioOptimisers.plot_rolling_measure(r::PortfolioOptimisers.AbstractBaseRiskMeasure,
                                                   w::VecNum, rd::ReturnsResult,
                                                   fees::Option{<:Fees} = nothing;
@@ -842,7 +873,7 @@ function PortfolioOptimisers.plot_rolling_measure(r::PortfolioOptimisers.Abstrac
                                                     kwargs...)
 end
 function PortfolioOptimisers.plot_rolling_measure(r::PortfolioOptimisers.AbstractBaseRiskMeasure,
-                                                  res::NonFiniteAllocationOptimisationResult,
+                                                  res::OptimisationResult,
                                                   rd::ReturnsResult;
                                                   opts::PlottingOptions = PlottingOptions(),
                                                   kwargs...)
@@ -860,7 +891,6 @@ function PortfolioOptimisers.plot_rolling_measure(r::PortfolioOptimisers.Abstrac
     return PortfolioOptimisers.plot_rolling_measure(r, w, Xm, nothing; ts = ts, opts = opts,
                                                     kwargs...)
 end
-
 ## plot_cv_scores
 function PortfolioOptimisers.plot_cv_scores(r::PortfolioOptimisers.AbstractBaseRiskMeasure,
                                             mpred::MultiPeriodPredictionResult;
@@ -878,7 +908,6 @@ function PortfolioOptimisers.plot_cv_scores(r::PortfolioOptimisers.AbstractBaseR
     return PortfolioOptimisers.plot_cv_scores(scores, 1:length(scores); opts = opts,
                                               kwargs...)
 end
-
 ## plot_turnover
 function PortfolioOptimisers.plot_turnover(mpred::MultiPeriodPredictionResult;
                                            opts::PlottingOptions = PlottingOptions(),
@@ -892,7 +921,6 @@ function PortfolioOptimisers.plot_turnover(mpred::MultiPeriodPredictionResult;
     end
     return PortfolioOptimisers.plot_turnover(w_series; ts = ts, opts = opts, kwargs...)
 end
-
 ## plot_prior
 function PortfolioOptimisers.plot_prior(pr::PortfolioOptimisers.AbstractPriorResult,
                                         rd::ReturnsResult;
@@ -922,7 +950,6 @@ function PortfolioOptimisers.plot_prior(pred::PredictionResult, rd::ReturnsResul
                                         kwargs...)
     return PortfolioOptimisers.plot_prior(_extract_pr(pred.res), rd; opts = opts, kwargs...)
 end
-
 ## plot_factor_mu
 function PortfolioOptimisers.plot_factor_mu(pr::PortfolioOptimisers.AbstractPriorResult,
                                             nf::AbstractVector = 1:length(pr.f_mu);
@@ -965,7 +992,6 @@ function PortfolioOptimisers.plot_factor_mu(pred::PredictionResult, rd::ReturnsR
     return PortfolioOptimisers.plot_factor_mu(_extract_pr(pred.res), rd; opts = opts,
                                               kwargs...)
 end
-
 ## plot_benchmark
 function PortfolioOptimisers.plot_benchmark(w::ArrNum, rd::ReturnsResult,
                                             fees::Option{<:Fees} = nothing;
@@ -1000,7 +1026,6 @@ function PortfolioOptimisers.plot_benchmark(pred::PredictionResult;
     return PortfolioOptimisers.plot_benchmark(w, Xm, B, nothing; ts = ts, nb = nb,
                                               opts = opts, kwargs...)
 end
-
 ## plot_coskewness
 function PortfolioOptimisers.plot_coskewness(pr::HighOrderPrior,
                                              nx::AbstractVector = 1:size(pr.sk, 1);
@@ -1057,7 +1082,6 @@ function PortfolioOptimisers.plot_coskewness(pred::PredictionResult, rd::Returns
     end
     return PortfolioOptimisers.plot_coskewness(pr, rd; opts = opts, kwargs...)
 end
-
 ## plot_cokurtosis
 function PortfolioOptimisers.plot_cokurtosis(pr::HighOrderPrior,
                                              nx::AbstractVector = 1:isqrt(size(pr.kt, 1));
@@ -1149,33 +1173,6 @@ function PortfolioOptimisers.plot_asset_cumulative_returns(w::VecNum, X::MatNum,
     return f
 end
 ## ────────────────────────────────────────────────────────────────────────────
-## Stacked bar / area compositions (multi-portfolio)
-## ────────────────────────────────────────────────────────────────────────────
-
-function PortfolioOptimisers.plot_stacked_bar_composition(w::VecNum_VecVecNum,
-                                                          nx::AbstractVector = 1:size(w, 1);
-                                                          opts::PlottingOptions = PlottingOptions(),
-                                                          kwargs...)
-    wmat = isa(w, VecVecNum) ? hcat(w...) : w
-    M = size(wmat, 2)
-    ctg = repeat(nx; inner = M)
-    return groupedbar(transpose(wmat); xticks = (1:M, 1:M), bar_position = :stack,
-                      group = ctg, xlabel = "Portfolios", ylabel = "Weight",
-                      title = "Portfolio Composition", legend = :outerright, kwargs...)
-end
-
-function PortfolioOptimisers.plot_stacked_area_composition(w::VecNum_VecVecNum,
-                                                           nx::AbstractVector = 1:size(w, 1);
-                                                           opts::PlottingOptions = PlottingOptions(),
-                                                           kwargs...)
-    wmat = isa(w, VecVecNum) ? hcat(w...) : w
-    M = size(wmat, 2)
-    return areaplot(transpose(wmat); xticks = (1:M, 1:M), label = permutedims(nx),
-                    xlabel = "Portfolios", ylabel = "Weight",
-                    title = "Portfolio Composition", legend = :outerright, kwargs...)
-end
-
-## ────────────────────────────────────────────────────────────────────────────
 ## Risk contribution
 ## ────────────────────────────────────────────────────────────────────────────
 
@@ -1191,7 +1188,6 @@ function PortfolioOptimisers.plot_risk_contribution(r::PortfolioOptimisers.Abstr
     end
     return PortfolioOptimisers.plot_composition(rc, nx; opts = opts, kwargs...)
 end
-
 ## ────────────────────────────────────────────────────────────────────────────
 ## Factor risk contribution
 ## ────────────────────────────────────────────────────────────────────────────
@@ -1286,7 +1282,6 @@ function PortfolioOptimisers.plot_drawdowns(w::ArrNum, X::MatNum,
     return plot(f_ret, f_dd; layout = (2, 1), size = (750, ceil(Integer, 750 / 1.618)),
                 kwargs...)
 end
-
 ## ────────────────────────────────────────────────────────────────────────────
 ## Return distribution histogram
 ## ────────────────────────────────────────────────────────────────────────────
@@ -1342,7 +1337,7 @@ function PortfolioOptimisers.plot_histogram(w::ArrNum, X::MatNum,
         vline!([risk]; label = lbl, color = colours[i + 1], linewidth = 2)
     end
     D = StatsAPI.fit(Normal, ret)
-    if opts.flag
+    if opts.reference
         density!(ret;
                  label = "Normal: μ=$(round(100*mean(D); digits=2))%, σ=$(round(100*std(D); digits=2))%",
                  color = colours[end], linewidth = 2)
@@ -1353,7 +1348,6 @@ function PortfolioOptimisers.plot_histogram(w::ArrNum, X::MatNum,
     end
     return plt
 end
-
 ## ────────────────────────────────────────────────────────────────────────────
 ## Network / phylogeny graph
 ## ────────────────────────────────────────────────────────────────────────────
@@ -1375,26 +1369,6 @@ function PortfolioOptimisers.plot_network(pl::NwE_ClE_Cl, X::MatNum,
     return graphplot(A; names = nx, node_weights = node_size, title = "Asset Network",
                      kwargs...)
 end
-
-## ────────────────────────────────────────────────────────────────────────────
-## Centrality bar chart
-## ────────────────────────────────────────────────────────────────────────────
-
-function PortfolioOptimisers.plot_centrality(cte::AbstractCentralityEstimator, X::MatNum,
-                                             nx::AbstractVector = 1:size(X, 2);
-                                             opts::PlottingOptions = PlottingOptions(),
-                                             kwargs...)
-    plr = centrality_vector(cte, X)
-    scores = plr.X
-    M = length(scores)
-    N, idx = _relevant_assets(scores, M, opts.N)
-    top_idx = view(idx, 1:N)
-    sort!(top_idx; by = i -> scores[i], rev = true)
-    return bar(scores[top_idx]; xticks = (1:N, nx[top_idx]), title = "Asset Centrality",
-               xlabel = "Asset", ylabel = "Centrality Score", xrotation = 90,
-               legend = false, kwargs...)
-end
-
 ## ────────────────────────────────────────────────────────────────────────────
 ## Correlation / covariance heatmap
 ## ────────────────────────────────────────────────────────────────────────────
@@ -1430,7 +1404,6 @@ function PortfolioOptimisers.plot_mu(mu::VecNum, nx::AbstractVector = 1:length(m
                title = "Expected Returns", xlabel = "Asset", ylabel = "μ", xrotation = 90,
                legend = false, kwargs...)
 end
-
 ## ────────────────────────────────────────────────────────────────────────────
 ## Asset volatility bar chart
 ## ────────────────────────────────────────────────────────────────────────────
@@ -1439,9 +1412,8 @@ function PortfolioOptimisers.plot_sigma(sigma::MatNum,
                                         nx::AbstractVector = 1:size(sigma, 1);
                                         opts::PlottingOptions = PlottingOptions(),
                                         kwargs...)
-    # opts.percentage = true → show variance; false (default) → std dev
-    vals = opts.percentage ? LinearAlgebra.diag(sigma) : sqrt.(LinearAlgebra.diag(sigma))
-    ylabel_str = opts.percentage ? "Variance (σ²)" : "Volatility (σ)"
+    vals = opts.variance ? LinearAlgebra.diag(sigma) : sqrt.(LinearAlgebra.diag(sigma))
+    ylabel_str = opts.variance ? "Variance (σ²)" : "Volatility (σ)"
     M = length(vals)
     # sort descending by value
     idx = sortperm(vals; rev = true)
@@ -1452,7 +1424,6 @@ function PortfolioOptimisers.plot_sigma(sigma::MatNum,
                title = "Asset Volatility", xlabel = "Asset", ylabel = ylabel_str,
                xrotation = 90, legend = false, kwargs...)
 end
-
 ## ────────────────────────────────────────────────────────────────────────────
 ## Factor loadings heatmap
 ## ────────────────────────────────────────────────────────────────────────────
@@ -1469,7 +1440,6 @@ function PortfolioOptimisers.plot_factor_loadings(M::MatNum,
                    clim = (-clim_val, clim_val), title = "Factor Loadings",
                    colorbar_title = "β", yflip = true, kwargs...)
 end
-
 ## ────────────────────────────────────────────────────────────────────────────
 ## Factor covariance heatmap
 ## ────────────────────────────────────────────────────────────────────────────
@@ -1482,7 +1452,6 @@ function PortfolioOptimisers.plot_factor_sigma(f_sigma::MatNum,
                                                 colorbar_title = "ρ_f", opts = opts,
                                                 kwargs...)
 end
-
 ## ────────────────────────────────────────────────────────────────────────────
 ## Eigenvalue spectrum
 ## ────────────────────────────────────────────────────────────────────────────
@@ -1496,9 +1465,9 @@ function PortfolioOptimisers.plot_eigenspectrum(sigma::MatNum;
     N = length(sorted_ev)
 
     f = bar(1:N, sorted_ev; title = "Eigenspectrum", xlabel = "Component",
-            ylabel = "Eigenvalue", legend = opts.flag && !isnothing(N_obs), kwargs...)
+            ylabel = "Eigenvalue", legend = opts.reference && !isnothing(N_obs), kwargs...)
 
-    if opts.flag && !isnothing(N_obs)
+    if opts.reference && !isnothing(N_obs)
         q = N / N_obs          # N/T ratio
         s2 = tr(sigma) / N     # mean variance (≈1 for correlation)
         λ_plus = s2 * (1 + sqrt(q))^2
@@ -1512,26 +1481,6 @@ function PortfolioOptimisers.plot_eigenspectrum(sigma::MatNum;
     end
     return f
 end
-
-## ────────────────────────────────────────────────────────────────────────────
-## Rolling risk/return measure
-## ────────────────────────────────────────────────────────────────────────────
-
-function PortfolioOptimisers.plot_rolling_measure(r::PortfolioOptimisers.AbstractBaseRiskMeasure,
-                                                  w::VecNum, X::MatNum,
-                                                  fees::Option{<:Fees} = nothing;
-                                                  ts::AbstractVector = 1:size(X, 1),
-                                                  opts::PlottingOptions = PlottingOptions(),
-                                                  kwargs...)
-    T = size(X, 1)
-    window = opts.rolling == 0 ? ceil(Int, sqrt(T)) : opts.rolling
-    rolling = _rolling_window_measure(r, w, X, fees, window)
-    ts_rolling = ts[window:end]
-    rname = string(nameof(typeof(r)))
-    return plot(ts_rolling, rolling; title = "Rolling $rname (window=$window)",
-                ylabel = rname, xlabel = "Date", legend = false, linewidth = 2, kwargs...)
-end
-
 ## ────────────────────────────────────────────────────────────────────────────
 ## Weight stability across folds
 ## ────────────────────────────────────────────────────────────────────────────
@@ -1554,7 +1503,6 @@ function PortfolioOptimisers.plot_weight_stability(mpred::MultiPeriodPredictionR
     return boxplot(data'; xticks = (1:N, labels), title = "Weight Stability",
                    ylabel = "Weight", legend = false, xrotation = 60, kwargs...)
 end
-
 function PortfolioOptimisers.plot_weight_stability(ppred::PopulationPredictionResult;
                                                    opts::PlottingOptions = PlottingOptions(),
                                                    kwargs...)
@@ -1580,7 +1528,6 @@ function PortfolioOptimisers.plot_weight_stability(ppred::PopulationPredictionRe
     return boxplot(data'; xticks = (1:N, labels), title = "Population Weight Stability",
                    ylabel = "Weight", legend = false, xrotation = 60, kwargs...)
 end
-
 ## ────────────────────────────────────────────────────────────────────────────
 ## Cross-validation scores
 ## ────────────────────────────────────────────────────────────────────────────
@@ -1594,7 +1541,6 @@ function PortfolioOptimisers.plot_cv_scores(scores::AbstractVector{<:Number},
                ylabel = "Score", xlabel = "Fold / Member", legend = false, xrotation = 45,
                kwargs...)
 end
-
 ## ────────────────────────────────────────────────────────────────────────────
 ## Portfolio turnover
 ## ────────────────────────────────────────────────────────────────────────────
@@ -1609,7 +1555,6 @@ function PortfolioOptimisers.plot_turnover(w_series::AbstractVector{<:VecNum};
                 ylabel = "Turnover (∑|Δw|)", xlabel = "Date", legend = false, linewidth = 2,
                 kwargs...)
 end
-
 ## ────────────────────────────────────────────────────────────────────────────
 ## MultiPeriodPredictionResult: drawdowns, histogram, rolling measure
 ## ────────────────────────────────────────────────────────────────────────────
@@ -1626,7 +1571,6 @@ function PortfolioOptimisers.plot_drawdowns(pred::MultiPeriodPredictionResult;
     return PortfolioOptimisers.plot_drawdowns(w, Xm, nothing; slv = slv, ts = ts,
                                               opts = opts, kwargs...)
 end
-
 function PortfolioOptimisers.plot_histogram(pred::MultiPeriodPredictionResult;
                                             slv::Option{<:Slv_VecSlv} = nothing,
                                             opts::PlottingOptions = PlottingOptions(),
@@ -1638,7 +1582,6 @@ function PortfolioOptimisers.plot_histogram(pred::MultiPeriodPredictionResult;
     return PortfolioOptimisers.plot_histogram(w, Xm, nothing; slv = slv, opts = opts,
                                               kwargs...)
 end
-
 function PortfolioOptimisers.plot_rolling_measure(r::PortfolioOptimisers.AbstractBaseRiskMeasure,
                                                   pred::MultiPeriodPredictionResult;
                                                   opts::PlottingOptions = PlottingOptions(),
@@ -1651,7 +1594,23 @@ function PortfolioOptimisers.plot_rolling_measure(r::PortfolioOptimisers.Abstrac
     return PortfolioOptimisers.plot_rolling_measure(r, w, Xm, nothing; ts = ts, opts = opts,
                                                     kwargs...)
 end
-
+function PortfolioOptimisers.plot_rolling_measure(r::PortfolioOptimisers.AbstractBaseRiskMeasure,
+                                                  ppred::PopulationPredictionResult;
+                                                  opts::PlottingOptions = PlottingOptions(),
+                                                  kwargs...)
+    members = ppred.pred
+    rets = map(members) do m
+        mrd = isa(m, PredictionResult) ? m.rd : m.mrd
+        return isa(mrd.X, VecVecNum) ? first(mrd.X) : mrd.X
+    end
+    avg_ret = vec(mean(hcat(rets...); dims = 2))
+    first_mrd = isa(members[1], PredictionResult) ? members[1].rd : members[1].mrd
+    ts = isnothing(first_mrd.ts) ? (1:length(avg_ret)) : first_mrd.ts
+    w = [one(eltype(avg_ret))]
+    Xm = reshape(avg_ret, :, 1)
+    return PortfolioOptimisers.plot_rolling_measure(r, w, Xm, nothing; ts = ts, opts = opts,
+                                                    kwargs...)
+end
 ## ────────────────────────────────────────────────────────────────────────────
 ## PopulationPredictionResult: drawdowns, histogram, rolling measure
 ## ────────────────────────────────────────────────────────────────────────────
@@ -1673,7 +1632,6 @@ function PortfolioOptimisers.plot_drawdowns(ppred::PopulationPredictionResult;
     return PortfolioOptimisers.plot_drawdowns(w, Xm, nothing; slv = slv, ts = ts,
                                               opts = opts, kwargs...)
 end
-
 function PortfolioOptimisers.plot_histogram(ppred::PopulationPredictionResult;
                                             slv::Option{<:Slv_VecSlv} = nothing,
                                             opts::PlottingOptions = PlottingOptions(),
@@ -1689,25 +1647,6 @@ function PortfolioOptimisers.plot_histogram(ppred::PopulationPredictionResult;
     return PortfolioOptimisers.plot_histogram(w, Xm, nothing; slv = slv, opts = opts,
                                               kwargs...)
 end
-
-function PortfolioOptimisers.plot_rolling_measure(r::PortfolioOptimisers.AbstractBaseRiskMeasure,
-                                                  ppred::PopulationPredictionResult;
-                                                  opts::PlottingOptions = PlottingOptions(),
-                                                  kwargs...)
-    members = ppred.pred
-    rets = map(members) do m
-        mrd = isa(m, PredictionResult) ? m.rd : m.mrd
-        return isa(mrd.X, VecVecNum) ? first(mrd.X) : mrd.X
-    end
-    avg_ret = vec(mean(hcat(rets...); dims = 2))
-    first_mrd = isa(members[1], PredictionResult) ? members[1].rd : members[1].mrd
-    ts = isnothing(first_mrd.ts) ? (1:length(avg_ret)) : first_mrd.ts
-    w = [one(eltype(avg_ret))]
-    Xm = reshape(avg_ret, :, 1)
-    return PortfolioOptimisers.plot_rolling_measure(r, w, Xm, nothing; ts = ts, opts = opts,
-                                                    kwargs...)
-end
-
 ## ────────────────────────────────────────────────────────────────────────────
 ## Factor expected returns bar chart
 ## ────────────────────────────────────────────────────────────────────────────
@@ -1724,7 +1663,6 @@ function PortfolioOptimisers.plot_factor_mu(f_mu::VecNum,
                title = "Factor Expected Returns", xlabel = "Factor", ylabel = "f_μ",
                xrotation = 90, legend = false, kwargs...)
 end
-
 ## ────────────────────────────────────────────────────────────────────────────
 ## Benchmark overlay
 ## ────────────────────────────────────────────────────────────────────────────
@@ -1749,7 +1687,6 @@ function PortfolioOptimisers.plot_benchmark(w::ArrNum, X::MatNum, B::VecNum_VecV
     end
     return f
 end
-
 function PortfolioOptimisers.plot_benchmark(pred::MultiPeriodPredictionResult;
                                             opts::PlottingOptions = PlottingOptions(),
                                             kwargs...)
@@ -1764,7 +1701,6 @@ function PortfolioOptimisers.plot_benchmark(pred::MultiPeriodPredictionResult;
     return PortfolioOptimisers.plot_benchmark(w, Xm, mrd.B, nothing; ts = ts, nb = mrd.nb,
                                               opts = opts, kwargs...)
 end
-
 ## ────────────────────────────────────────────────────────────────────────────
 ## Coskewness heatmap
 ## ────────────────────────────────────────────────────────────────────────────
@@ -1787,7 +1723,6 @@ function PortfolioOptimisers.plot_coskewness(sk::MatNum, nx::AbstractVector = 1:
                    clim = (-clim_val, clim_val), title = "Coskewness Matrix",
                    colorbar_title = "S̃", yflip = true, kwargs...)
 end
-
 ## ────────────────────────────────────────────────────────────────────────────
 ## Cokurtosis eigenspectrum / heatmap
 ## ────────────────────────────────────────────────────────────────────────────
@@ -1796,7 +1731,7 @@ function PortfolioOptimisers.plot_cokurtosis(kt::MatNum,
                                              nx::AbstractVector = 1:isqrt(size(kt, 1));
                                              opts::PlottingOptions = PlottingOptions(),
                                              kwargs...)
-    if opts.percentage
+    if opts.heatmap
         clim_val = maximum(abs, kt)
         return heatmap(kt; color = cgrad(:RdBu; rev = true), clim = (-clim_val, clim_val),
                        title = "Cokurtosis Matrix", colorbar_title = "K̃", yflip = true,
@@ -1805,8 +1740,8 @@ function PortfolioOptimisers.plot_cokurtosis(kt::MatNum,
         ev = sort(real.(eigvals(Symmetric(kt))); rev = true)
         N2 = length(ev)
         f = bar(1:N2, ev; title = "Cokurtosis Eigenspectrum", xlabel = "Component",
-                ylabel = "Eigenvalue", legend = opts.flag, kwargs...)
-        if opts.flag
+                ylabel = "Eigenvalue", legend = opts.reference, kwargs...)
+        if opts.reference
             λ_mean = mean(ev)
             hline!(f, [λ_mean]; label = "Mean eigenvalue ($(round(λ_mean; digits=4)))",
                    linewidth = 2, color = :red, linestyle = :dash)
@@ -1814,7 +1749,6 @@ function PortfolioOptimisers.plot_cokurtosis(kt::MatNum,
         return f
     end
 end
-
 ## ────────────────────────────────────────────────────────────────────────────
 ## Portfolio dashboard (multi-panel composite)
 ## ────────────────────────────────────────────────────────────────────────────
@@ -1836,7 +1770,6 @@ function PortfolioOptimisers.plot_portfolio_dashboard(res::NonFiniteAllocationOp
     p4 = PortfolioOptimisers.plot_drawdowns(w, rd.X, fees; slv = slv, ts = ts, opts = opts)
     return plot(p1, p2, p3, p4; layout = (2, 2), size = (1200, 800), kwargs...)
 end
-
 ## ────────────────────────────────────────────────────────────────────────────
 ## Cross-validation dashboard (multi-panel composite)
 ## ────────────────────────────────────────────────────────────────────────────
@@ -1850,7 +1783,6 @@ function PortfolioOptimisers.plot_cv_dashboard(mpred::MultiPeriodPredictionResul
     p4 = PortfolioOptimisers.plot_weight_stability(mpred; opts = opts)
     return plot(p1, p2, p3, p4; layout = (2, 2), size = (1200, 800), kwargs...)
 end
-
 ## ────────────────────────────────────────────────────────────────────────────
 ## Composite prior dashboard
 ## ────────────────────────────────────────────────────────────────────────────
@@ -1867,7 +1799,6 @@ function PortfolioOptimisers.plot_prior(pr::PortfolioOptimisers.AbstractPriorRes
                                                   title = "Correlation Matrix")
     return plot(p_mu, p_sigma, p_corr; layout = (1, 3), size = (1800, 500), kwargs...)
 end
-
 ## ────────────────────────────────────────────────────────────────────────────
 ## Efficient frontier
 ## ────────────────────────────────────────────────────────────────────────────
@@ -1882,36 +1813,33 @@ function PortfolioOptimisers.plot_efficient_frontier(res_vec::AbstractVector{<:N
                                                                                                                               rf = 0),
                                                      slv::Option{<:Slv_VecSlv} = nothing,
                                                      fees::Option{<:Fees} = nothing,
-                                                     flag::Bool = true,
-                                                     annotate_minrisk::Bool = true,
-                                                     annotate_maxsharpe::Bool = true,
                                                      opts::PlottingOptions = PlottingOptions(),
                                                      kwargs...)
-    if flag
-        x = factory(x, pr, slv)
-        y = factory(y, pr, slv)
-        c = factory(c, pr, slv)
+    if opts.factory
+        x = PortfolioOptimisers.factory(x, pr, slv)
+        y = PortfolioOptimisers.factory(y, pr, slv)
+        c = PortfolioOptimisers.factory(c, pr, slv)
     end
     w = getproperty.(res_vec, :w)
     xr = expected_risk(x, w, pr, fees)
     yr = expected_risk(y, w, pr, fees)
     cr = expected_risk(c, w, pr, fees)
     order = sortperm(xr)
-    xr_s = xr[order];
-    yr_s = yr[order];
+    xr_s = xr[order]
+    yr_s = yr[order]
     cr_s = cr[order]
-    xname = string(nameof(typeof(x)));
+    xname = string(nameof(typeof(x)))
     yname = string(nameof(typeof(y)))
     cname = string(nameof(typeof(c)))
     plt = plot(xr_s, yr_s; zcolor = cr_s, line_z = cr_s, title = "Efficient Frontier",
                xlabel = xname, ylabel = yname, colorbar_title = cname, label = nothing,
                linewidth = 2, markershape = :circle, markersize = 4, kwargs...)
-    if annotate_minrisk
+    if opts.min_risk
         i = argmin(xr_s)
         scatter!(plt, [xr_s[i]], [yr_s[i]]; label = "Min Risk", markershape = :star5,
                  markersize = 12, color = :blue, legend = true)
     end
-    if annotate_maxsharpe
+    if opts.max_score
         i = argmax(cr_s)
         scatter!(plt, [xr_s[i]], [yr_s[i]]; label = "Max $(cname)", markershape = :star5,
                  markersize = 12, color = :red, legend = true)
@@ -1938,35 +1866,32 @@ function PortfolioOptimisers.plot_efficient_frontier(w::VecVecNum, pr::Pr_RR;
                                                                                                                               rf = 0),
                                                      slv::Option{<:Slv_VecSlv} = nothing,
                                                      fees::Option{<:Fees} = nothing,
-                                                     flag::Bool = true,
-                                                     annotate_minrisk::Bool = true,
-                                                     annotate_maxsharpe::Bool = true,
                                                      opts::PlottingOptions = PlottingOptions(),
                                                      kwargs...)
-    if flag
-        x = factory(x, pr, slv)
-        y = factory(y, pr, slv)
-        c = factory(c, pr, slv)
+    if opts.factory
+        x = PortfolioOptimisers.factory(x, pr, slv)
+        y = PortfolioOptimisers.factory(y, pr, slv)
+        c = PortfolioOptimisers.factory(c, pr, slv)
     end
     xr = expected_risk(x, w, pr, fees)
     yr = expected_risk(y, w, pr, fees)
     cr = expected_risk(c, w, pr, fees)
     order = sortperm(xr)
-    xr_s = xr[order];
-    yr_s = yr[order];
+    xr_s = xr[order]
+    yr_s = yr[order]
     cr_s = cr[order]
-    xname = string(nameof(typeof(x)));
+    xname = string(nameof(typeof(x)))
     yname = string(nameof(typeof(y)))
     cname = string(nameof(typeof(c)))
     plt = plot(xr_s, yr_s; zcolor = cr_s, line_z = cr_s, title = "Efficient Frontier",
                xlabel = xname, ylabel = yname, colorbar_title = cname, label = nothing,
                linewidth = 2, markershape = :circle, markersize = 4, kwargs...)
-    if annotate_minrisk
+    if opts.min_risk
         i = argmin(xr_s)
         scatter!(plt, [xr_s[i]], [yr_s[i]]; label = "Min Risk", markershape = :star5,
                  markersize = 12, color = :blue, legend = true)
     end
-    if annotate_maxsharpe
+    if opts.max_score
         i = argmax(cr_s)
         scatter!(plt, [xr_s[i]], [yr_s[i]]; label = "Max $(cname)", markershape = :star5,
                  markersize = 12, color = :red, legend = true)
@@ -1990,7 +1915,6 @@ function PortfolioOptimisers.plot_efficient_frontier(res::NonFiniteAllocationOpt
                                                      rd::ReturnsResult; kwargs...)
     return PortfolioOptimisers.plot_efficient_frontier(res, _extract_pr(res); kwargs...)
 end
-
 ## ────────────────────────────────────────────────────────────────────────────
 ## Performance summary
 ## ────────────────────────────────────────────────────────────────────────────
@@ -2057,7 +1981,6 @@ function PortfolioOptimisers.plot_performance_summary(pred::MultiPeriodPredictio
     return PortfolioOptimisers.plot_performance_summary(w, Xm, nothing; opts = opts,
                                                         kwargs...)
 end
-
 ## ────────────────────────────────────────────────────────────────────────────
 ## Rolling maximum drawdown
 ## ────────────────────────────────────────────────────────────────────────────
