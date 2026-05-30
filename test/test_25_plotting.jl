@@ -148,7 +148,7 @@
     @testset "plot_sigma" begin
         @test is_plot(plot_sigma(sigma))
         @test is_plot(plot_sigma(pr.sigma, rd.nx))
-        @test is_plot(plot_sigma(sigma; opts = PlottingOptions(; variance = true)))
+        @test is_plot(plot_sigma(sigma; variance = true))
     end
 
     @testset "plot_factor_loadings" begin
@@ -208,7 +208,7 @@
         kt_raw = randn(rng, N^2, N^2)
         kt = kt_raw * kt_raw'
         @test is_plot(plot_cokurtosis(kt))
-        @test is_plot(plot_cokurtosis(kt; opts = PlottingOptions(; heatmap = true)))
+        @test is_plot(plot_cokurtosis(kt; heatmap = true))
     end
 
     @testset "plot_prior" begin
@@ -257,9 +257,8 @@
         res_f = optimise(mr_f, rd)
         @test is_plot(plot_efficient_frontier(res_f, rd))
         @test is_plot(plot_efficient_frontier(res_f, pr))
-        @test is_plot(plot_efficient_frontier(res_f, rd;
-                                              opts = PlottingOptions(; min_risk = false,
-                                                                     max_score = false)))
+        @test is_plot(plot_efficient_frontier(res_f, rd; min_risk = false,
+                                              max_score = false))
         # Vector-of-results form
         mr1  = MeanRisk(; opt = JuMPOptimiser(; slv = slv))
         res1 = optimise(mr1, rd)

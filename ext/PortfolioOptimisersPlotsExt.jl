@@ -85,7 +85,7 @@ function PortfolioOptimisers.plot_asset_cumulative_returns(res::OptimisationResu
                                                            rd::ReturnsResult;
                                                            opts::PlottingOptions = PlottingOptions(),
                                                            kwargs...)
-    fees = hasproperty(res, :fees) ? res.fees : nothing
+    fees = _extract_fees(res, nothing)
     return PortfolioOptimisers.plot_asset_cumulative_returns(res.w, rd, fees; opts = opts,
                                                              kwargs...)
 end
@@ -215,7 +215,7 @@ function PortfolioOptimisers.plot_risk_contribution(r::PortfolioOptimisers.Abstr
                                                     rd::ReturnsResult;
                                                     opts::PlottingOptions = PlottingOptions(),
                                                     kwargs...)
-    fees = hasproperty(res, :fees) ? res.fees : nothing
+    fees = _extract_fees(res, nothing)
     return PortfolioOptimisers.plot_risk_contribution(r, res.w, rd, fees; opts = opts,
                                                       kwargs...)
 end
@@ -225,7 +225,7 @@ function PortfolioOptimisers.plot_risk_contribution(r::PortfolioOptimisers.Abstr
                                                     nx::AbstractVector = 1:length(res.w),
                                                     opts::PlottingOptions = PlottingOptions(),
                                                     kwargs...)
-    fees = hasproperty(res, :fees) ? res.fees : nothing
+    fees = _extract_fees(res, nothing)
     return PortfolioOptimisers.plot_risk_contribution(r, res.w, pr.X, fees; nx = nx,
                                                       opts = opts, kwargs...)
 end
@@ -240,7 +240,7 @@ function PortfolioOptimisers.plot_factor_risk_contribution(r::PortfolioOptimiser
                                                            re::RegE_Reg = StepwiseRegression(),
                                                            opts::PlottingOptions = PlottingOptions(),
                                                            kwargs...)
-    fees = hasproperty(res, :fees) ? res.fees : nothing
+    fees = _extract_fees(res, nothing)
     return PortfolioOptimisers.plot_factor_risk_contribution(r, res.w, rd.X, fees; re = re,
                                                              rd = rd, opts = opts,
                                                              kwargs...)
@@ -404,7 +404,7 @@ function PortfolioOptimisers.plot_drawdowns(res::OptimisationResult, rd::Returns
                                             slv::Option{<:Slv_VecSlv} = nothing,
                                             opts::PlottingOptions = PlottingOptions(),
                                             kwargs...)
-    fees = hasproperty(res, :fees) ? res.fees : nothing
+    fees = _extract_fees(res, nothing)
     return PortfolioOptimisers.plot_drawdowns(res.w, rd, fees; slv = slv, opts = opts,
                                               kwargs...)
 end
@@ -463,13 +463,7 @@ function PortfolioOptimisers.plot_measures(res_vec::AbstractVector{<:Optimisatio
                                            fees::Option{<:Fees} = nothing,
                                            opts::PlottingOptions = PlottingOptions(),
                                            kwargs...)
-    pr = if hasproperty(first(res_vec), :pr)
-        first(res_vec).pr
-    elseif hasproperty(first(res_vec), :pa) && hasproperty(first(res_vec).pa, :pr)
-        first(res_vec).pa.pr
-    else
-        throw(ArgumentError("result type $(nameof(typeof(first(res_vec)))) has no `.pr` or `.pa.pr`; pass `pr` explicitly"))
-    end
+    pr = _extract_pr(first(res_vec))
     w = getproperty.(res_vec, :w)
     return PortfolioOptimisers.plot_measures(w, pr, fees; x = x, y = y, z = z, c = c,
                                              slv = slv, opts = opts, kwargs...)
@@ -511,13 +505,7 @@ function PortfolioOptimisers.plot_measures(ppred::PopulationPredictionResult;
         end
     end
     first_res = isa(members[1], PredictionResult) ? members[1].res : members[1].pred[1].res
-    pr = if hasproperty(first_res, :pr)
-        first_res.pr
-    elseif hasproperty(first_res, :pa) && hasproperty(first_res.pa, :pr)
-        first_res.pa.pr
-    else
-        throw(ArgumentError("population member has no `.pr` or `.pa.pr`; pass `pr` explicitly"))
-    end
+    pr = _extract_pr(first_res)
     return PortfolioOptimisers.plot_measures(w, pr, fees; x = x, y = y, z = z, c = c,
                                              slv = slv, opts = opts, kwargs...)
 end
@@ -534,7 +522,7 @@ function PortfolioOptimisers.plot_histogram(res::OptimisationResult, rd::Returns
                                             slv::Option{<:Slv_VecSlv} = nothing,
                                             opts::PlottingOptions = PlottingOptions(),
                                             kwargs...)
-    fees = hasproperty(res, :fees) ? res.fees : nothing
+    fees = _extract_fees(res, nothing)
     return PortfolioOptimisers.plot_histogram(res.w, rd.X, fees; slv = slv, opts = opts,
                                               kwargs...)
 end
@@ -884,7 +872,7 @@ function PortfolioOptimisers.plot_rolling_measure(r::PortfolioOptimisers.Abstrac
                                                   rd::ReturnsResult;
                                                   opts::PlottingOptions = PlottingOptions(),
                                                   kwargs...)
-    fees = hasproperty(res, :fees) ? res.fees : nothing
+    fees = _extract_fees(res, nothing)
     return PortfolioOptimisers.plot_rolling_measure(r, res.w, rd, fees; opts = opts,
                                                     kwargs...)
 end
@@ -1013,7 +1001,7 @@ end
 function PortfolioOptimisers.plot_benchmark(res::OptimisationResult, rd::ReturnsResult;
                                             opts::PlottingOptions = PlottingOptions(),
                                             kwargs...)
-    fees = hasproperty(res, :fees) ? res.fees : nothing
+    fees = _extract_fees(res, nothing)
     return PortfolioOptimisers.plot_benchmark(res.w, rd, fees; opts = opts, kwargs...)
 end
 function PortfolioOptimisers.plot_benchmark(pred::PredictionResult;
@@ -1391,10 +1379,11 @@ end
 
 function PortfolioOptimisers.plot_sigma(sigma::MatNum,
                                         nx::AbstractVector = 1:size(sigma, 1);
+                                        variance::Bool = false,
                                         opts::PlottingOptions = PlottingOptions(),
                                         kwargs...)
-    vals = opts.variance ? LinearAlgebra.diag(sigma) : sqrt.(LinearAlgebra.diag(sigma))
-    ylabel_str = opts.variance ? "Variance (σ²)" : "Volatility (σ)"
+    vals = variance ? LinearAlgebra.diag(sigma) : sqrt.(LinearAlgebra.diag(sigma))
+    ylabel_str = variance ? "Variance (σ²)" : "Volatility (σ)"
     M = length(vals)
     # sort descending by value
     idx = sortperm(vals; rev = true)
@@ -1710,13 +1699,14 @@ end
 
 function PortfolioOptimisers.plot_cokurtosis(kt::MatNum,
                                              nx::AbstractVector = 1:isqrt(size(kt, 1));
+                                             heatmap::Bool = false,
                                              opts::PlottingOptions = PlottingOptions(),
                                              kwargs...)
-    if opts.heatmap
+    if heatmap
         clim_val = maximum(abs, kt)
-        return heatmap(kt; color = cgrad(:RdBu; rev = true), clim = (-clim_val, clim_val),
-                       title = "Cokurtosis Matrix", colorbar_title = "K̃", yflip = true,
-                       kwargs...)
+        return StatsPlots.heatmap(kt; color = cgrad(:RdBu; rev = true),
+                                  clim = (-clim_val, clim_val), title = "Cokurtosis Matrix",
+                                  colorbar_title = "K̃", yflip = true, kwargs...)
     else
         ev = sort(real.(eigvals(Symmetric(kt))); rev = true)
         N2 = length(ev)
@@ -1740,7 +1730,7 @@ function PortfolioOptimisers.plot_portfolio_dashboard(res::OptimisationResult,
                                                       slv::Option{<:Slv_VecSlv} = nothing,
                                                       opts::PlottingOptions = PlottingOptions(),
                                                       kwargs...)
-    fees = hasproperty(res, :fees) ? res.fees : nothing
+    fees = _extract_fees(res, nothing)
     w = res.w
     nx = isnothing(rd.nx) ? (1:length(w)) : rd.nx
     ts = isnothing(rd.ts) ? (1:size(rd.X, 1)) : rd.ts
@@ -1794,6 +1784,8 @@ function PortfolioOptimisers.plot_efficient_frontier(res_vec::AbstractVector{<:O
                                                                                                                               rf = 0),
                                                      slv::Option{<:Slv_VecSlv} = nothing,
                                                      fees::Option{<:Fees} = nothing,
+                                                     min_risk::Bool = true,
+                                                     max_score::Bool = true,
                                                      opts::PlottingOptions = PlottingOptions(),
                                                      kwargs...)
     if opts.factory
@@ -1815,12 +1807,12 @@ function PortfolioOptimisers.plot_efficient_frontier(res_vec::AbstractVector{<:O
     plt = plot(xr_s, yr_s; zcolor = cr_s, line_z = cr_s, title = "Efficient Frontier",
                xlabel = xname, ylabel = yname, colorbar_title = cname, label = nothing,
                linewidth = 2, markershape = :circle, markersize = 4, kwargs...)
-    if opts.min_risk
+    if min_risk
         i = argmin(xr_s)
         scatter!(plt, [xr_s[i]], [yr_s[i]]; label = "Min Risk", markershape = :star5,
                  markersize = 12, color = :blue, legend = true)
     end
-    if opts.max_score
+    if max_score
         i = argmax(cr_s)
         scatter!(plt, [xr_s[i]], [yr_s[i]]; label = "Max $(cname)", markershape = :star5,
                  markersize = 12, color = :red, legend = true)
@@ -1829,14 +1821,8 @@ function PortfolioOptimisers.plot_efficient_frontier(res_vec::AbstractVector{<:O
 end
 function PortfolioOptimisers.plot_efficient_frontier(res_vec::AbstractVector{<:OptimisationResult},
                                                      rd::ReturnsResult; kwargs...)
-    pr = if hasproperty(first(res_vec), :pr)
-        first(res_vec).pr
-    elseif hasproperty(first(res_vec), :pa) && hasproperty(first(res_vec).pa, :pr)
-        first(res_vec).pa.pr
-    else
-        throw(ArgumentError("result type $(nameof(typeof(first(res_vec)))) has no `.pr` or `.pa.pr`"))
-    end
-    return PortfolioOptimisers.plot_efficient_frontier(res_vec, pr; kwargs...)
+    return PortfolioOptimisers.plot_efficient_frontier(res_vec, _extract_pr(first(res_vec));
+                                                       kwargs...)
 end
 function PortfolioOptimisers.plot_efficient_frontier(w::VecVecNum, pr::Pr_RR;
                                                      x::PortfolioOptimisers.AbstractBaseRiskMeasure = Variance(),
@@ -1847,6 +1833,8 @@ function PortfolioOptimisers.plot_efficient_frontier(w::VecVecNum, pr::Pr_RR;
                                                                                                                               rf = 0),
                                                      slv::Option{<:Slv_VecSlv} = nothing,
                                                      fees::Option{<:Fees} = nothing,
+                                                     min_risk::Bool = true,
+                                                     max_score::Bool = true,
                                                      opts::PlottingOptions = PlottingOptions(),
                                                      kwargs...)
     if opts.factory
@@ -1867,12 +1855,12 @@ function PortfolioOptimisers.plot_efficient_frontier(w::VecVecNum, pr::Pr_RR;
     plt = plot(xr_s, yr_s; zcolor = cr_s, line_z = cr_s, title = "Efficient Frontier",
                xlabel = xname, ylabel = yname, colorbar_title = cname, label = nothing,
                linewidth = 2, markershape = :circle, markersize = 4, kwargs...)
-    if opts.min_risk
+    if min_risk
         i = argmin(xr_s)
         scatter!(plt, [xr_s[i]], [yr_s[i]]; label = "Min Risk", markershape = :star5,
                  markersize = 12, color = :blue, legend = true)
     end
-    if opts.max_score
+    if max_score
         i = argmax(cr_s)
         scatter!(plt, [xr_s[i]], [yr_s[i]]; label = "Max $(cname)", markershape = :star5,
                  markersize = 12, color = :red, legend = true)
@@ -1939,7 +1927,7 @@ function PortfolioOptimisers.plot_performance_summary(res::OptimisationResult,
                                                       rd::ReturnsResult;
                                                       opts::PlottingOptions = PlottingOptions(),
                                                       kwargs...)
-    fees = hasproperty(res, :fees) ? res.fees : nothing
+    fees = _extract_fees(res, nothing)
     return PortfolioOptimisers.plot_performance_summary(res.w, rd.X, fees; opts = opts,
                                                         kwargs...)
 end
@@ -1994,7 +1982,7 @@ function PortfolioOptimisers.plot_rolling_drawdowns(res::OptimisationResult,
                                                     rd::ReturnsResult;
                                                     opts::PlottingOptions = PlottingOptions(),
                                                     kwargs...)
-    fees = hasproperty(res, :fees) ? res.fees : nothing
+    fees = _extract_fees(res, nothing)
     return PortfolioOptimisers.plot_rolling_drawdowns(res.w, rd, fees; opts = opts,
                                                       kwargs...)
 end
