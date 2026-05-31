@@ -33,6 +33,8 @@
                   settings = ["verbose" => false, "max_step_fraction" => 0.95])]
 
     r_cvr = ConditionalValueatRisk()   # return-based: works with raw X windows
+    mr = MeanRisk(; r = r_cvr, opt = JuMPOptimiser(; slv = slv))
+    res = optimise(mr, rd)
 
     @testset "PlottingOptions" begin
         opts = PlottingOptions()
@@ -57,9 +59,11 @@
     @testset "plot_ptf_cumulative_returns" begin
         @test is_plot(plot_ptf_cumulative_returns(w, X))
         @test is_plot(plot_ptf_cumulative_returns(w, X; ts = 1:T))
-        @test is_plot(plot_ptf_cumulative_returns(w, X;
-                                                  opts = PlottingOptions(; compound = true)))
+        @test is_plot(plot_ptf_cumulative_returns(w, X; compound = true))
         @test is_plot(plot_ptf_cumulative_returns(w_rd, rd))
+        @test is_plot(plot_ptf_cumulative_returns(w_rd, pr))
+        @test is_plot(plot_ptf_cumulative_returns(res; pr = rd))
+        @test is_plot(plot_ptf_cumulative_returns(res))
     end
 
     @testset "plot_asset_cumulative_returns" begin
@@ -217,11 +221,8 @@
     end
 
     @testset "Optimisation-based dispatch" begin
-        mr  = MeanRisk(; opt = JuMPOptimiser(; slv = slv))
-        res = optimise(mr, rd)
         @test !isnothing(res)
 
-        @test is_plot(plot_ptf_cumulative_returns(res, rd))
         @test is_plot(plot_asset_cumulative_returns(res, rd))
         @test is_plot(plot_composition(res, rd))
         @test is_plot(plot_composition(res, pr))

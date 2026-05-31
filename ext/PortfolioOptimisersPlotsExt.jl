@@ -40,9 +40,12 @@ function PortfolioOptimisers.plot_ptf_cumulative_returns(w::VecNum_VecVecNum, pr
     return PortfolioOptimisers.plot_ptf_cumulative_returns(w, pr.X, fees; ts = ts,
                                                            compound = compound, kwargs...)
 end
-function PortfolioOptimisers.plot_ptf_cumulative_returns(res::OptimisationResult, pr::Pr_RR,
-                                                         fees::Option{<:Fees} = nothing;
+#! add ts keyword arg?
+function PortfolioOptimisers.plot_ptf_cumulative_returns(res::OptimisationResult;
+                                                         pr::Option{<:Pr_RR} = nothing,
+                                                         fees::Option{<:Fees} = nothing,
                                                          compound::Bool = false, kwargs...)
+    pr = _extract_pr(res, pr)
     fees = _extract_fees(res, fees)
     return PortfolioOptimisers.plot_ptf_cumulative_returns(res.w, pr, fees;
                                                            compound = compound, kwargs...)
@@ -54,7 +57,7 @@ function PortfolioOptimisers.plot_ptf_cumulative_returns(pred::Union{<:Predictio
     ts = isnothing(rd.ts) ? (1:length(isa(rd.X, VecVecNum) ? first(rd.X) : rd.X)) : rd.ts
     w, Xm = _pred_rd_to_matrix(rd)
     return PortfolioOptimisers.plot_ptf_cumulative_returns(w, Xm, nothing; ts = ts,
-                                                           opts = opts, kwargs...)
+                                                           compound = compound, kwargs...)
 end
 function PortfolioOptimisers.plot_ptf_cumulative_returns(pred::PopulationPredictionResult;
                                                          compound::Bool = false, kwargs...)

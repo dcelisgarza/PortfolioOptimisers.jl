@@ -160,29 +160,51 @@ end
 ## Cumulative returns
 ## ──────────────────────────────────────────────────────────────────────────────
 """
-    plot_ptf_cumulative_returns(w, X[, fees]; ts, opts, kwargs...)
-    plot_ptf_cumulative_returns(w, rd[, fees]; opts, kwargs...)
-    plot_ptf_cumulative_returns(res, rd; opts, kwargs...)
-    plot_ptf_cumulative_returns(pred; opts, kwargs...)
-    plot_ptf_cumulative_returns(mpred; opts, kwargs...)
+    plot_ptf_cumulative_returns(
+        w::VecNum_VecVecNum,
+        X::MatNum,
+        fees::Option{<:Fees} = nothing;
+        ts::AbstractVector = 1:size(X, 1),
+        compound::Bool = false,
+        kwargs...
+    ) -> Plot
+    plot_ptf_cumulative_returns(
+        w::VecNum_VecVecNum,
+        pr::Pr_RR,
+        fees::Option{<:Fees} = nothing;
+        ts::AbstractVector = 1:size(pr.X,1),
+        compound::Bool = false,
+        kwargs...
+    ) -> Plot
+    plot_ptf_cumulative_returns(
+        res::OptimisationResult;
+        pr::Option{<:Pr_RR} = nothing,
+        fees::Option{<:Fees} = nothing,
+        compound::Bool = false,
+        kwargs...
+    ) -> Plot
+    plot_ptf_cumulative_returns(
+        pred::Union{
+                        <:PredictionResult,
+                        <:MultiPeriodPredictionResult,
+                        <:PopulationPredictionResult
+                    };
+        compound::Bool = false,
+        kwargs...
+    ) -> Plot
 
-Plot the cumulative returns of a portfolio.
+Plot the cumulative returns of a portfolio. If a keyword is provided, it takes precedence over the data in the input objects.
 
-# Arguments (low-level)
+# Arguments
 
   - `w`: Portfolio weights vector.
   - `X`: Asset returns matrix (observations × assets).
   - `fees`: Optional transaction fees.
-  - `ts`: Time axis (default `1:T`).
-  - `opts`: [`PlottingOptions`](@ref) for semantic parameters.
-  - `kwargs...`: Forwarded to the plotting backend (title, xlabel, etc.).
-
-# Arguments (high-level)
-
-  - `rd`: [`ReturnsResult`](@ref) — extracts `X`, `ts`, `nx` automatically.
-  - `res`: [`NonFiniteAllocationOptimisationResult`](@ref) — extracts `w`, `fees`.
-  - `pred`: [`PredictionResult`](@ref) — single fold.
-  - `mpred`: [`MultiPeriodPredictionResult`](@ref) — shaded walk-forward folds.
+  - `ts`: Time axis.
+  - `compound`: Whether to compound returns.
+  - `pr`: Prior or returns result, extracts `X`, `ts`, `nx` automatically if available.
+  - `res`: Extracts `w`, and `fees` if available.
+  - `pred`: Predicted portfolio results.
 
 Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
 
