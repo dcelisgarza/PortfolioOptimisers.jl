@@ -14,10 +14,9 @@ import PortfolioOptimisers: ArrNum, VecNum, MatNum, Option, VecNum_VecVecNum, Sl
 function PortfolioOptimisers.plot_ptf_cumulative_returns(w::VecNum_VecVecNum, X::MatNum,
                                                          fees::Option{<:Fees} = nothing;
                                                          ts::AbstractVector = 1:size(X, 1),
-                                                         opts::PlottingOptions = PlottingOptions(),
-                                                         kwargs...)
-    ret = cumulative_returns(calc_net_returns(w, X, fees), opts.compound)
-    label = "$(opts.compound ? "Compound" : "Simple") Cumulative Returns"
+                                                         compound::Bool = false, kwargs...)
+    ret = cumulative_returns(calc_net_returns(w, X, fees), compound)
+    label = "$(compound ? "Compound" : "Simple") Cumulative Returns"
     return if isa(w, VecNum)
         plot(ts, ret; title = "Portfolio", xlabel = "Date", ylabel = label, legend = false,
              kwargs...)
@@ -34,26 +33,23 @@ function PortfolioOptimisers.plot_ptf_cumulative_returns(w::VecNum_VecVecNum, pr
                                                          fees::Option{<:Fees} = nothing;
                                                          ts::AbstractVector = 1:size(pr.X,
                                                                                      1),
-                                                         opts::PlottingOptions = PlottingOptions(),
-                                                         kwargs...)
+                                                         compound::Bool = false, kwargs...)
     if isa(pr, ReturnsResult)
         ts = isnothing(pr.ts) ? (1:size(pr.X, 1)) : pr.ts
     end
     return PortfolioOptimisers.plot_ptf_cumulative_returns(w, pr.X, fees; ts = ts,
-                                                           opts = opts, kwargs...)
+                                                           compound = compound, kwargs...)
 end
-function PortfolioOptimisers.plot_ptf_cumulative_returns(res::OptimisationResult, pr::Pr_RR;
-                                                         fees::Option{<:Fees} = nothing,
-                                                         opts::PlottingOptions = PlottingOptions(),
-                                                         kwargs...)
+function PortfolioOptimisers.plot_ptf_cumulative_returns(res::OptimisationResult, pr::Pr_RR,
+                                                         fees::Option{<:Fees} = nothing;
+                                                         compound::Bool = false, kwargs...)
     fees = _extract_fees(res, fees)
-    return PortfolioOptimisers.plot_ptf_cumulative_returns(res.w, pr, fees; opts = opts,
-                                                           kwargs...)
+    return PortfolioOptimisers.plot_ptf_cumulative_returns(res.w, pr, fees;
+                                                           compound = compound, kwargs...)
 end
 function PortfolioOptimisers.plot_ptf_cumulative_returns(pred::Union{<:PredictionResult,
                                                                      <:MultiPeriodPredictionResult};
-                                                         opts::PlottingOptions = PlottingOptions(),
-                                                         kwargs...)
+                                                         compound::Bool = false, kwargs...)
     rd = isa(pred, PredictionResult) ? pred.rd : pred.mrd
     ts = isnothing(rd.ts) ? (1:length(isa(rd.X, VecVecNum) ? first(rd.X) : rd.X)) : rd.ts
     w, Xm = _pred_rd_to_matrix(rd)
@@ -61,12 +57,12 @@ function PortfolioOptimisers.plot_ptf_cumulative_returns(pred::Union{<:Predictio
                                                            opts = opts, kwargs...)
 end
 function PortfolioOptimisers.plot_ptf_cumulative_returns(pred::PopulationPredictionResult;
-                                                         opts::PlottingOptions = PlottingOptions(),
-                                                         kwargs...)
+                                                         compound::Bool = false, kwargs...)
     plt = plot(; kwargs...)
     for p in pred.pred
         plot!(plt,
-              PortfolioOptimisers.plot_ptf_cumulative_returns(p; opts = opts, kwargs...))
+              PortfolioOptimisers.plot_ptf_cumulative_returns(p; compound = compound,
+                                                              kwargs...))
     end
     return plt
 end
@@ -249,6 +245,49 @@ function PortfolioOptimisers.plot_factor_risk_contribution(::PortfolioOptimisers
                                                            ::PredictionResult; kwargs...)
     throw(ArgumentError("`plot_factor_risk_contribution(r, pred::PredictionResult)` is not supported: `PredictionReturnsResult` stores portfolio returns, not raw asset returns. Call `plot_factor_risk_contribution(r, pred.res.w, rd::ReturnsResult, ...)` with the original returns data."))
 end
+## plot_network
+function PortfolioOptimisers.plot_network(pl::NwE_ClE_Cl, X::MatNum,
+                                          nx::AbstractVector = 1:size(X, 2),
+                                          w::Option{<:VecNum} = nothing;
+                                          threshold::Number = 0,
+                                          opts::PlottingOptions = PlottingOptions(),
+                                          kwargs...)
+    plr = phylogeny_matrix(pl, X)
+    A = copy(plr.X)
+    A[abs.(A) .<= threshold] .= 0
+    node_size = if isnothing(w)
+        fill(1, size(X, 2))
+    else
+        abs.(w) ./ maximum(abs.(w))
+    end
+    return graphplot(A; names = nx, node_weights = node_size, title = "Asset Network",
+                     kwargs...)
+end
+function PortfolioOptimisers.plot_network(pl::NwE_ClE_Cl, pr::Pr_RR,
+                                          w::Option{<:VecNum} = nothing;
+                                          nx::AbstractVector = 1:size(pr.X, 2),
+                                          opts::PlottingOptions = PlottingOptions(),
+                                          kwargs...)
+    if isa(pr, ReturnsResult) && !isnothing(pr.nx)
+        nx = pr.nx
+    end
+    return PortfolioOptimisers.plot_network(pl, pr.X, nx, w; opts = opts, kwargs...)
+end
+function PortfolioOptimisers.plot_network(pl::NwE_ClE_Cl, res::OptimisationResult;
+                                          rd::Option{<:Pr_RR} = nothing,
+                                          nx::AbstractVector = 1:length(res.w),
+                                          opts::PlottingOptions = PlottingOptions(),
+                                          kwargs...)
+    pr = if isa(rd, ReturnsResult)
+        if !isnothing(rd.nx)
+            nx = rd.nx
+        end
+        rd
+    elseif isnothing(rd)
+        _extract_pr(res, pr)
+    end
+    return PortfolioOptimisers.plot_network(pl, rd.X, nx, res.w; opts = opts, kwargs...)
+end
 ## plot_dendrogram
 function PortfolioOptimisers.plot_dendrogram(clr::AbstractClusteringResult,
                                              nx::AbstractVector = 1:length(clr.res.order);
@@ -392,8 +431,8 @@ function PortfolioOptimisers.plot_clusters(cle::HClE_HCl, pr::PortfolioOptimiser
 end
 ## plot_drawdowns
 function PortfolioOptimisers.plot_drawdowns(w::ArrNum, rd::ReturnsResult,
-                                            fees::Option{<:Fees} = nothing;
                                             slv::Option{<:Slv_VecSlv} = nothing,
+                                            fees::Option{<:Fees} = nothing;
                                             opts::PlottingOptions = PlottingOptions(),
                                             kwargs...)
     ts = isnothing(rd.ts) ? (1:size(rd.X, 1)) : rd.ts
@@ -451,7 +490,7 @@ function PortfolioOptimisers.plot_measures(w::VecNum_VecVecNum, pr::Pr_RR,
     end
 end
 function PortfolioOptimisers.plot_measures(res_vec::AbstractVector{<:OptimisationResult},
-                                           rd::ReturnsResult;
+                                           pr::Option{<:Pr_RR} = nothing;
                                            x::PortfolioOptimisers.AbstractBaseRiskMeasure = Variance(),
                                            y::PortfolioOptimisers.AbstractBaseRiskMeasure = ExpectedReturn(),
                                            z::Option{<:PortfolioOptimisers.AbstractBaseRiskMeasure} = nothing,
@@ -463,29 +502,32 @@ function PortfolioOptimisers.plot_measures(res_vec::AbstractVector{<:Optimisatio
                                            fees::Option{<:Fees} = nothing,
                                            opts::PlottingOptions = PlottingOptions(),
                                            kwargs...)
-    pr = _extract_pr(first(res_vec))
+    pr = ifelse(isnothing(pr), nothing, pr)
+    slv = ifelse(isnothing(slv), nothing, slv)
+    pr = _extract_pr.(res_vec, pr)
+    fees = _extract_fees.(res_vec, fees)
     w = getproperty.(res_vec, :w)
-    return PortfolioOptimisers.plot_measures(w, pr, fees; x = x, y = y, z = z, c = c,
-                                             slv = slv, opts = opts, kwargs...)
-end
-function PortfolioOptimisers.plot_measures(mpred::MultiPeriodPredictionResult;
-                                           x::PortfolioOptimisers.AbstractBaseRiskMeasure = Variance(),
-                                           y::PortfolioOptimisers.AbstractBaseRiskMeasure = ExpectedReturn(),
-                                           z::Option{<:PortfolioOptimisers.AbstractBaseRiskMeasure} = nothing,
-                                           c::PortfolioOptimisers.AbstractBaseRiskMeasure = ExpectedReturnRiskRatio(;
-                                                                                                                    rk = x,
-                                                                                                                    rt = ArithmeticReturn(),
-                                                                                                                    rf = 0),
-                                           slv::Option{<:Slv_VecSlv} = nothing,
-                                           fees::Option{<:Fees} = nothing,
-                                           opts::PlottingOptions = PlottingOptions(),
-                                           kwargs...)
-    return PortfolioOptimisers.plot_measures(mpred.res, mpred.mrd; x = x, y = y, z = z,
-                                             c = c, slv = slv, fees = fees, opts = opts,
-                                             kwargs...)
+    if opts.factory
+        x = PortfolioOptimisers.factory.(x, pr, slv)
+        y = PortfolioOptimisers.factory.(y, pr, slv)
+        z = isnothing(z) ? nothing : PortfolioOptimisers.factory.(z, pr, slv)
+        c = PortfolioOptimisers.factory.(c, pr, slv)
+    end
+    xr = expected_risk.(x, w, pr, fees)
+    yr = expected_risk.(y, w, pr, fees)
+    zr = isnothing(z) ? nothing : expected_risk.(z, w, pr, fees)
+    cr = expected_risk.(c, w, pr, fees)
+    return if isnothing(zr)
+        scatter(xr, yr; zcolor = cr, title = "Pareto Frontier", xlabel = "X", ylabel = "Y",
+                colorbar_title = "C", label = nothing, legend = true, kwargs...)
+    else
+        scatter(xr, yr, zr; zcolor = cr, title = "Pareto Frontier", xlabel = "X",
+                ylabel = "Y", zlabel = "Z", colorbar_title = "C", label = nothing,
+                legend = true, kwargs...)
+    end
 end
 function PortfolioOptimisers.plot_measures(ppred::PopulationPredictionResult;
-                                           x::PortfolioOptimisers.AbstractBaseRiskMeasure = Variance(),
+                                           x::PortfolioOptimisers.AbstractBaseRiskMeasure = ConditionalValueatRisk(),
                                            y::PortfolioOptimisers.AbstractBaseRiskMeasure = ExpectedReturn(),
                                            z::Option{<:PortfolioOptimisers.AbstractBaseRiskMeasure} = nothing,
                                            c::PortfolioOptimisers.AbstractBaseRiskMeasure = ExpectedReturnRiskRatio(;
@@ -493,21 +535,26 @@ function PortfolioOptimisers.plot_measures(ppred::PopulationPredictionResult;
                                                                                                                     rt = ArithmeticReturn(),
                                                                                                                     rf = 0),
                                            slv::Option{<:Slv_VecSlv} = nothing,
-                                           fees::Option{<:Fees} = nothing,
                                            opts::PlottingOptions = PlottingOptions(),
                                            kwargs...)
-    members = ppred.pred
-    w = map(members) do m
-        if isa(m, PredictionResult)
-            m.res.w
-        else
-            vec(mean(hcat(getproperty.(getproperty.(m.pred, :res), :w)...); dims = 2))
-        end
+    if opts.factory
+        x = PortfolioOptimisers.factory.(x, nothing, slv)
+        y = PortfolioOptimisers.factory.(y, nothing, slv)
+        z = isnothing(z) ? nothing : PortfolioOptimisers.factory.(z, nothing, slv)
+        c = PortfolioOptimisers.factory.(c, nothing, slv)
     end
-    first_res = isa(members[1], PredictionResult) ? members[1].res : members[1].pred[1].res
-    pr = _extract_pr(first_res)
-    return PortfolioOptimisers.plot_measures(w, pr, fees; x = x, y = y, z = z, c = c,
-                                             slv = slv, opts = opts, kwargs...)
+    xr = expected_risk.(x, ppred)
+    yr = expected_risk.(y, ppred)
+    zr = isnothing(z) ? nothing : expected_risk.(z, ppred)
+    cr = expected_risk.(c, ppred)
+    return if isnothing(zr)
+        scatter(xr, yr; zcolor = cr, title = "Pareto Frontier", xlabel = "X", ylabel = "Y",
+                colorbar_title = "C", label = nothing, legend = true, kwargs...)
+    else
+        scatter(xr, yr, zr; zcolor = cr, title = "Pareto Frontier", xlabel = "X",
+                ylabel = "Y", zlabel = "Z", colorbar_title = "C", label = nothing,
+                legend = true, kwargs...)
+    end
 end
 ## plot_histogram
 function PortfolioOptimisers.plot_histogram(w::ArrNum, rd::ReturnsResult,
@@ -534,46 +581,6 @@ function PortfolioOptimisers.plot_histogram(pred::PredictionResult;
     w, Xm = _pred_rd_to_matrix(rd)
     return PortfolioOptimisers.plot_histogram(w, Xm, nothing; slv = slv, opts = opts,
                                               kwargs...)
-end
-## plot_network
-function PortfolioOptimisers.plot_network(pl::NwE_ClE_Cl, X::MatNum,
-                                          nx::AbstractVector = 1:size(X, 2),
-                                          w::Option{<:VecNum} = nothing;
-                                          threshold::Number = 0,
-                                          opts::PlottingOptions = PlottingOptions(),
-                                          kwargs...)
-    plr = phylogeny_matrix(pl, X)
-    A = copy(plr.X)
-    A[abs.(A) .<= threshold] .= 0
-    node_size = if isnothing(w)
-        fill(1, size(X, 2))
-    else
-        abs.(w) ./ maximum(abs.(w))
-    end
-    return graphplot(A; names = nx, node_weights = node_size, title = "Asset Network",
-                     kwargs...)
-end
-function PortfolioOptimisers.plot_network(pl::NwE_ClE_Cl,
-                                          pr::PortfolioOptimisers.AbstractPriorResult,
-                                          nx::AbstractVector = 1:size(pr.X, 2),
-                                          w::Option{<:VecNum} = nothing;
-                                          opts::PlottingOptions = PlottingOptions(),
-                                          kwargs...)
-    return PortfolioOptimisers.plot_network(pl, pr.X, nx, w; opts = opts, kwargs...)
-end
-function PortfolioOptimisers.plot_network(pl::NwE_ClE_Cl, rd::ReturnsResult,
-                                          w::Option{<:VecNum} = nothing;
-                                          opts::PlottingOptions = PlottingOptions(),
-                                          kwargs...)
-    nx = isnothing(rd.nx) ? (1:size(rd.X, 2)) : rd.nx
-    return PortfolioOptimisers.plot_network(pl, rd.X, nx, w; opts = opts, kwargs...)
-end
-function PortfolioOptimisers.plot_network(pl::NwE_ClE_Cl, res::OptimisationResult,
-                                          rd::ReturnsResult;
-                                          opts::PlottingOptions = PlottingOptions(),
-                                          kwargs...)
-    nx = isnothing(rd.nx) ? (1:length(res.w)) : rd.nx
-    return PortfolioOptimisers.plot_network(pl, rd.X, nx, res.w; opts = opts, kwargs...)
 end
 ## plot_centrality
 function PortfolioOptimisers.plot_centrality(cte::AbstractCentralityEstimator, X::MatNum,
@@ -1724,19 +1731,23 @@ end
 ## Portfolio dashboard (multi-panel composite)
 ## ────────────────────────────────────────────────────────────────────────────
 
-function PortfolioOptimisers.plot_portfolio_dashboard(res::OptimisationResult,
-                                                      rd::ReturnsResult;
+function PortfolioOptimisers.plot_portfolio_dashboard(res::OptimisationResult, rd::Pr_RR;
+                                                      ts = 1:size(rd.X, 1),
+                                                      nx = 1:size(rd.X, 2),
                                                       r::PortfolioOptimisers.AbstractBaseRiskMeasure = Variance(),
                                                       slv::Option{<:Slv_VecSlv} = nothing,
+                                                      compound::Bool = false,
                                                       opts::PlottingOptions = PlottingOptions(),
                                                       kwargs...)
     fees = _extract_fees(res, nothing)
     w = res.w
-    nx = isnothing(rd.nx) ? (1:length(w)) : rd.nx
-    ts = isnothing(rd.ts) ? (1:size(rd.X, 1)) : rd.ts
+    if isa(rd, ReturnsResult)
+        nx = rd.nx
+        ts = rd.ts
+    end
     p1 = PortfolioOptimisers.plot_composition(w, nx; opts = opts)
     p2 = PortfolioOptimisers.plot_ptf_cumulative_returns(w, rd.X, fees; ts = ts,
-                                                         opts = opts)
+                                                         compound = compound)
     p3 = PortfolioOptimisers.plot_risk_contribution(r, w, rd.X, fees; nx = nx, opts = opts)
     p4 = PortfolioOptimisers.plot_drawdowns(w, rd.X, fees; slv = slv, ts = ts, opts = opts)
     return plot(p1, p2, p3, p4; layout = (2, 2), size = (1200, 800), kwargs...)
@@ -1747,9 +1758,9 @@ end
 
 function PortfolioOptimisers.plot_cv_dashboard(mpred::MultiPeriodPredictionResult;
                                                opts::PlottingOptions = PlottingOptions(),
-                                               kwargs...)
+                                               compound::Bool = false, kwargs...)
     p1 = PortfolioOptimisers.plot_composition(mpred; opts = opts)
-    p2 = PortfolioOptimisers.plot_ptf_cumulative_returns(mpred; opts = opts)
+    p2 = PortfolioOptimisers.plot_ptf_cumulative_returns(mpred; compound = compound)
     p3 = PortfolioOptimisers.plot_turnover(mpred; opts = opts)
     p4 = PortfolioOptimisers.plot_weight_stability(mpred; opts = opts)
     return plot(p1, p2, p3, p4; layout = (2, 2), size = (1200, 800), kwargs...)
