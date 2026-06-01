@@ -202,6 +202,7 @@ const arg_dict = Dict(
                       :clalg => "`alg`: Clustering algorithm.",#
                       :onc => "`onc`: Optimal number of clusters estimator.",#
                       :phX_Xv => "`X`: Phylogeny matrix or vector.",#
+                      :phX => "`X`: Phylogeny matrix.",#
                       :pler => "`pl`: Network estimator, phylogeny result, clustering estimator, or clustering result.",#
                       ## DBHT
                       :dbhtpower => "`power`: Exponent for the the distance matrix when computing the similarity matrix.",#

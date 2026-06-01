@@ -40,7 +40,6 @@ function PortfolioOptimisers.plot_ptf_cumulative_returns(w::VecNum_VecVecNum, pr
     return PortfolioOptimisers.plot_ptf_cumulative_returns(w, pr.X, fees; ts = ts,
                                                            compound = compound, kwargs...)
 end
-#! add ts keyword arg?
 function PortfolioOptimisers.plot_ptf_cumulative_returns(res::OptimisationResult;
                                                          pr::Option{<:Pr_RR} = nothing,
                                                          fees::Option{<:Fees} = nothing,
@@ -394,7 +393,7 @@ function PortfolioOptimisers.plot_clusters(clr::AbstractClusteringResult,
         if isempty(i3)
             continue
         end
-        h = min(maximum(clr.res.heights[i3]) * 1.1, 1)
+        h = maximum(clr.res.heights[i3])
         col_i = colours[mod1(i, clr.k)]
         box_x = [xmin - 0.5, xmax - 0.5, xmax - 0.5, xmax - 0.5, xmax - 0.5, xmin - 0.5,
                  xmin - 0.5, xmin - 0.5]

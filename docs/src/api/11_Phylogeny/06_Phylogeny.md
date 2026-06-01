@@ -14,6 +14,19 @@ KruskalTree
 BoruvkaTree
 PrimTree
 NetworkEstimator
+factory(nt::NetworkEstimator, w::ObsWeights)
+NetworkClustersEstimator
+factory(nt::NetworkClustersEstimator, w::ObsWeights)
+_clusterise(alg::HClustAlgorithm, onc::AbstractOptimalNumberClustersEstimator,
+                    S::MatNum, D::MatNum, P::MatNum; branchorder::Symbol = :optimal)
+clusterise(nte::NetworkClustersEstimator{<:NetworkEstimator{<:Any, <:Any,
+                                                                     <:AbstractTreeType,
+                                                                     <:Any}}, X::MatNum;
+                    dims::Int = 1, branchorder::Symbol = :optimal, kwargs...)
+clusterise(nte::NetworkClustersEstimator{<:NetworkEstimator{<:Any, <:Any,
+                                                                     <:AbstractSimilarityMatrixAlgorithm,
+                                                                     <:Any}}, X::MatNum;
+                    dims::Int = 1, branchorder::Symbol = :optimal, kwargs...)
 CentralityEstimator
 phylogeny_matrix
 centrality_vector
@@ -30,4 +43,5 @@ Tree_SimMat
 NwE_PlM_ClE_Cl
 NwE_ClE_Cl
 NwE_Pl_ClE_Cl
+HClE_HCl
 ```

@@ -22,6 +22,5 @@ AbstractOptimalNumberClustersAlgorithm
 AbstractClusteringResult
 Int_ONC
 ClTypes
-HClE_HCl
 ClE_Cl
 ```

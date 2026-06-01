@@ -146,6 +146,7 @@ $(DocStringExtensions.FIELDS)
         res::ClTypes,
         S::MatNum,
         D::MatNum,
+        P::Option{<:MatNum} = nothing,
         k::Integer
     ) -> Clusters
 
@@ -177,19 +178,28 @@ Keywords correspond to the struct's fields.
     """
     D
     """
+    $(field_dict[:phX])
+    """
+    P
+    """
     $(field_dict[:ck])
     """
     k
-    function Clusters(res::ClTypes, S::MatNum, D::MatNum, k::Integer)
+    function Clusters(res::ClTypes, S::MatNum, D::MatNum, P::Option{<:MatNum}, k::Integer)
         @argcheck(!isempty(S), IsEmptyError)
         @argcheck(!isempty(D), IsEmptyError)
         @argcheck(size(S) == size(D), DimensionMismatch)
+        if !isnothing(P)
+            @argcheck(!isempty(P), IsEmptyError)
+            @argcheck(size(S) == size(P), DimensionMismatch)
+        end
         @argcheck(one(k) <= k, DomainError)
-        return new{typeof(res), typeof(S), typeof(D), typeof(k)}(res, S, D, k)
+        return new{typeof(res), typeof(S), typeof(D), typeof(P), typeof(k)}(res, S, D, P, k)
     end
 end
-function Clusters(; res::ClTypes, S::MatNum, D::MatNum, k::Integer)::Clusters
-    return Clusters(res, S, D, k)
+function Clusters(; res::ClTypes, S::MatNum, D::MatNum, P::Option{<:MatNum} = nothing,
+                  k::Integer)::Clusters
+    return Clusters(res, S, D, P, k)
 end
 """
     clusterise(cle::AbstractClusteringResult, args...; kwargs...)
@@ -577,30 +587,10 @@ Return a new [`ClustersEstimator`](@ref) with observation weights `w` applied to
   - [`ClustersEstimator`](@ref)
   - [`factory`](@ref)
 """
-function factory(cle::ClustersEstimator, w::StatsBase.AbstractWeights)::ClustersEstimator
+function factory(cle::ClustersEstimator, w::ObsWeights)::ClustersEstimator
     return ClustersEstimator(; ce = factory(cle.ce, w), de = cle.de, alg = cle.alg,
                              onc = cle.onc)
 end
-"""
-    const HClE_HCl = Union{<:ClustersEstimator{<:Any, <:Any,
-                                               <:AbstractHierarchicalClusteringAlgorithm,
-                                               <:Any},
-                           <:Clusters{<:Clustering.Hclust, <:Any, <:Any, <:Any}}
-
-Alias for a hierarchical clustering estimator or result.
-
-Matches either a [`ClustersEstimator`](@ref) parameterised with a hierarchical clustering algorithm, or a [`Clusters`](@ref) result wrapping a `Clustering.Hclust`. Used internally for dispatch in hierarchical clustering workflows.
-
-# Related
-
-  - [`ClustersEstimator`](@ref)
-  - [`AbstractHierarchicalClusteringAlgorithm`](@ref)
-  - [`Clusters`](@ref)
-"""
-const HClE_HCl = Union{<:ClustersEstimator{<:Any, <:Any,
-                                           <:AbstractHierarchicalClusteringAlgorithm,
-                                           <:Any},
-                       <:Clusters{<:Clustering.Hclust, <:Any, <:Any, <:Any}}
 """
     const ClE_Cl = Union{<:AbstractClustersEstimator, <:AbstractClusteringResult}
 
