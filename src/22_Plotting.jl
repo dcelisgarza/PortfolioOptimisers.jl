@@ -1026,7 +1026,7 @@ function _pred_rd_to_matrix(rd::PredictionReturnsResult{<:Any, <:VecVecNum})
 end
 # Select top-N assets by absolute weight magnitude.
 # Returns (N_selected, sorted_idx) where idx is sorted descending by |w|.
-function _relevant_assets(w::VecNum, M::Integer, N_opt::Option{<:Number})
+function _relevant_assets(w::VecNum, M::Integer, N_opt::Option{<:Number} = nothing)
     N_eff = isnothing(N_opt) ? number_effective_assets(w) : N_opt
     abs_w = abs.(w)
     idx = sortperm(abs_w; rev = true)

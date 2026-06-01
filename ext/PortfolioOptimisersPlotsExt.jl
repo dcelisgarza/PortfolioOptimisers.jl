@@ -69,26 +69,122 @@ function PortfolioOptimisers.plot_ptf_cumulative_returns(pred::PopulationPredict
     return plt
 end
 ## plot_asset_cumulative_returns
-function PortfolioOptimisers.plot_asset_cumulative_returns(w::VecNum, rd::ReturnsResult,
+function PortfolioOptimisers.plot_asset_cumulative_returns(w::VecNum, X::MatNum,
                                                            fees::Option{<:Fees} = nothing;
-                                                           opts::PlottingOptions = PlottingOptions(),
+                                                           ts::AbstractVector = 1:size(X, 1),
+                                                           nx::AbstractVector = 1:size(X, 2),
+                                                           compound::Bool = false,
+                                                           N::Option{<:Integer} = nothing,
                                                            kwargs...)
-    ts = isnothing(rd.ts) ? (1:size(rd.X, 1)) : rd.ts
-    nx = isnothing(rd.nx) ? (1:size(rd.X, 2)) : rd.nx
-    return PortfolioOptimisers.plot_asset_cumulative_returns(w, rd.X, fees; ts = ts,
-                                                             nx = nx, opts = opts,
+    net_asset_ret = calc_net_asset_returns(w, X, fees)
+    ret = cumulative_returns(net_asset_ret, compound)
+    M = size(X, 2)
+    N, idx = _relevant_assets(w, M, N)
+    ret_sorted = view(ret, :, idx)
+    nx_sorted = view(nx, idx)
+
+    label_str = "$(compound ? "Compound" : "Simple") Asset Cumulative Returns"
+    f = plot(; xlabel = "Date", ylabel = label_str)
+    for i in 1:N
+        plot!(f, ts, view(ret_sorted, :, i); label = string(nx_sorted[i]))
+    end
+    if M > N
+        rest_idx = view(idx, (N + 1):M)
+        rest_ret = cumulative_returns(calc_net_returns(view(w, rest_idx),
+                                                       view(X, :, rest_idx),
+                                                       PortfolioOptimisers.fees_view(fees,
+                                                                                     rest_idx)),
+                                      compound)
+        plot!(f, ts, rest_ret; label = "Others")
+    end
+    plot!(f; legend = :outerright, kwargs...)
+    return f
+end
+function PortfolioOptimisers.plot_asset_cumulative_returns(w::VecNum, pr::Pr_RR,
+                                                           fees::Option{<:Fees} = nothing;
+                                                           ts::AbstractVector = 1:size(pr.X,
+                                                                                       1),
+                                                           nx::AbstractVector = 1:size(pr.X,
+                                                                                       2),
+                                                           compound::Bool = false,
+                                                           N::Option{<:Integer} = nothing,
+                                                           kwargs...)
+    if isa(pr, ReturnsResult)
+        ts = isnothing(pr.ts) ? (1:size(pr.X, 1)) : pr.ts
+        nx = isnothing(pr.nx) ? (1:size(pr.X, 2)) : pr.nx
+    end
+    return PortfolioOptimisers.plot_asset_cumulative_returns(w, pr.X, fees; ts = ts,
+                                                             nx = nx, compound = compound,
+                                                             N = N, kwargs...)
+end
+function PortfolioOptimisers.plot_asset_cumulative_returns(res::OptimisationResult;
+                                                           pr::Option{<:Pr_RR} = nothing,
+                                                           fees::Option{<:Fees} = nothing,
+                                                           compound::Bool = false,
+                                                           N::Option{<:Integer} = nothing,
+                                                           kwargs...)
+    pr = _extract_pr(res, pr)
+    fees = _extract_fees(res, fees)
+    return PortfolioOptimisers.plot_asset_cumulative_returns(res.w, pr, fees;
+                                                             compound = compound, N = N,
                                                              kwargs...)
 end
-function PortfolioOptimisers.plot_asset_cumulative_returns(res::OptimisationResult,
-                                                           rd::ReturnsResult;
-                                                           opts::PlottingOptions = PlottingOptions(),
+function PortfolioOptimisers.plot_asset_cumulative_returns(pred::PredictionResult;
+                                                           compound::Bool = false,
+                                                           N::Option{<:Integer} = nothing,
                                                            kwargs...)
-    fees = _extract_fees(res, nothing)
-    return PortfolioOptimisers.plot_asset_cumulative_returns(res.w, rd, fees; opts = opts,
-                                                             kwargs...)
+    return PortfolioOptimisers.plot_asset_cumulative_returns(pred.res; compound = compound,
+                                                             N = N, kwargs...)
 end
-function PortfolioOptimisers.plot_asset_cumulative_returns(::PredictionResult; kwargs...)
-    throw(ArgumentError("`plot_asset_cumulative_returns(pred::PredictionResult)` is not supported: `PredictionReturnsResult` stores portfolio returns, not per-asset returns. Call `plot_asset_cumulative_returns(pred.res.w, rd::ReturnsResult, ...)` with the original returns data."))
+function PortfolioOptimisers.plot_asset_cumulative_returns(pred::MultiperiodPredictionResult;
+                                                           compound::Bool = false,
+                                                           N::Option{<:Integer} = nothing,
+                                                           kwargs...)
+    res_vec = pred.res
+    X = Vector{eltype(first(res_vec).rd.X)}[]
+    ts = Vector{eltype(first(res_vec).rd.ts)}[]
+    nx = first(res_vec).rd.nx
+    M = length(nx)
+    mean_w = zeros(length(first(res_vec).w), M)
+    for res in res_vec
+        w = res.w
+        pr = _extract_pr(res)
+        fees = _extract_fees(res)
+        mean_w .+= w
+        net_asset_ret = calc_net_asset_returns(w, pr.X, fees)
+        ret = cumulative_returns(net_asset_ret, compound)
+        append!(X; vec(ret))
+        append!(ts; res.rd.ts)
+    end
+    mean_w ./= length(res_vec)
+    X = reshape(X, length(ts), M)
+    N, idx = _relevant_assets(mean_w, M, N)
+    ret_sorted = view(X, :, idx)
+    nx_sorted = view(nx, idx)
+    label_str = "$(compound ? "Compound" : "Simple") Asset Cumulative Returns"
+    f = plot(; xlabel = "Date", ylabel = label_str)
+    for i in 1:N
+        plot!(f, ts, view(ret_sorted, :, i); label = string(nx_sorted[i]))
+    end
+    if M > N
+        rest_idx = view(idx, (N + 1):M)
+        rest_ret = vec(sum(X; dims = 2) - sum(view(X, :, 1:N); dims = 2))
+        plot!(f, ts, rest_ret; label = "Others")
+    end
+    plot!(f; legend = :outerright, kwargs...)
+    return f
+end
+function PortfolioOptimisers.plot_asset_cumulative_returns(pred::PopulationPredictionResult;
+                                                           compound::Bool = false,
+                                                           N::Option{<:Integer} = nothing,
+                                                           kwargs...)
+    plt = plot(; kwargs...)
+    for p in pred.pred
+        plot!(plt,
+              PortfolioOptimisers.plot_asset_cumulative_returns(p; compound = compound,
+                                                                N = N, kwargs...))
+    end
+    return plt
 end
 ## plot_composition
 function PortfolioOptimisers.plot_composition(w::VecNum, nx::AbstractVector = 1:length(w);
@@ -1136,40 +1232,6 @@ function PortfolioOptimisers.plot_cokurtosis(pred::PredictionResult, rd::Returns
         throw(ArgumentError("`$(nameof(typeof(pred.res)))` prior is not a `HighOrderPrior`; no cokurtosis available"))
     end
     return PortfolioOptimisers.plot_cokurtosis(pr, rd; opts = opts, kwargs...)
-end
-## ────────────────────────────────────────────────────────────────────────────
-## Asset cumulative returns
-## ────────────────────────────────────────────────────────────────────────────
-
-function PortfolioOptimisers.plot_asset_cumulative_returns(w::VecNum, X::MatNum,
-                                                           fees::Option{<:Fees} = nothing;
-                                                           ts::AbstractVector = 1:size(X, 1),
-                                                           nx::AbstractVector = 1:size(X, 2),
-                                                           opts::PlottingOptions = PlottingOptions(),
-                                                           kwargs...)
-    net_asset_ret = calc_net_asset_returns(w, X, fees)
-    ret = cumulative_returns(net_asset_ret, opts.compound)
-    M = size(X, 2)
-    N, idx = _relevant_assets(w, M, opts.N)
-    ret_sorted = view(ret, :, idx)
-    nx_sorted = view(nx, idx)
-
-    label_str = "$(opts.compound ? "Compound" : "Simple") Asset Cumulative Returns"
-    f = plot(; xlabel = "Date", ylabel = label_str)
-    for i in 1:N
-        plot!(f, ts, view(ret_sorted, :, i); label = string(nx_sorted[i]))
-    end
-    if M > N
-        rest_idx = view(idx, (N + 1):M)
-        rest_ret = cumulative_returns(calc_net_returns(view(w, rest_idx),
-                                                       view(X, :, rest_idx),
-                                                       PortfolioOptimisers.fees_view(fees,
-                                                                                     rest_idx)),
-                                      opts.compound)
-        plot!(f, ts, rest_ret; label = "Others")
-    end
-    plot!(f; legend = :outerright, kwargs...)
-    return f
 end
 ## ────────────────────────────────────────────────────────────────────────────
 ## Risk contribution
