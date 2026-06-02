@@ -1,7 +1,6 @@
 # Plotting
 
 ```@docs
-PlottingOptions
 plot_ptf_cumulative_returns
 plot_asset_cumulative_returns
 plot_composition

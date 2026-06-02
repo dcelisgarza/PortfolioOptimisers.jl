@@ -1,161 +1,3 @@
-"""
-$(DocStringExtensions.TYPEDEF)
-
-Configuration struct for plotting functions in `PortfolioOptimisers.jl`.
-
-`PlottingOptions` encapsulates semantic plotting parameters (confidence levels, display modes,
-numeric tolerances) that are shared across multiple `plot_*` functions and is passed via an
-`opts` keyword argument. Plot-specific boolean flags (e.g. `variance` for
-[`plot_sigma`](@ref), `heatmap` for [`plot_cokurtosis`](@ref), `min_risk`/`max_score` for
-[`plot_efficient_frontier`](@ref)) are passed directly as `kwargs...` on those functions.
-Plots.jl formatting options (titles, axis labels, colours, etc.) are also passed through
-`kwargs...`.
-
-# Fields
-
-$(DocStringExtensions.FIELDS)
-
-# Constructors
-
-    PlottingOptions(;
-        alpha::Number    = 0.05,
-        kappa::Number    = 0.3,
-        N                = nothing,
-        delta::Number    = 1e-6,
-        points::Integer  = 0,
-        rw               = nothing,
-        rolling::Integer = 0,
-        compound::Bool   = false,
-        marginal::Bool   = false,
-        percentage::Bool = false,
-        reference::Bool  = true,
-        factory::Bool    = true,
-    ) -> PlottingOptions
-
-Keywords correspond to the struct's fields.
-
-## Validation
-
-  - `0 < alpha < 1`.
-  - `0 < kappa < 1`.
-  - `delta > 0`.
-  - `points >= 0`.
-  - `rolling >= 0`.
-  - If `N` is not `nothing`, `N > 0`.
-
-# Examples
-
-```jldoctest
-julia> opts = PlottingOptions()
-PlottingOptions
-       alpha ┼ Float64: 0.05
-       kappa ┼ Float64: 0.3
-           N ┼ nothing
-       delta ┼ Float64: 1.0e-6
-      points ┼ Int64: 0
-          rw ┼ nothing
-     rolling ┼ Int64: 0
-    compound ┼ Bool: false
-    marginal ┼ Bool: false
-  percentage ┼ Bool: false
-   reference ┼ Bool: true
-     factory ┴ Bool: true
-```
-
-# Related
-
-  - [`AbstractEstimator`](@ref)
-  - [`plot_ptf_cumulative_returns`](@ref)
-  - [`plot_drawdowns`](@ref)
-  - [`plot_histogram`](@ref)
-  - [`plot_risk_contribution`](@ref)
-  - [`plot_rolling_measure`](@ref)
-"""
-@concrete struct PlottingOptions <: AbstractEstimator
-    """
-    Confidence level for tail risk measures (VaR, CVaR, DaR, …). Must satisfy `0 < alpha < 1`.
-    """
-    alpha
-    """
-    Relativistic deformation parameter for RLVaR / RLDaR. Must satisfy `0 < kappa < 1`.
-    """
-    kappa
-    """
-    Maximum number of assets/factors to display. `nothing` auto-selects via [`number_effective_assets`](@ref). A value in `(0, 1]` is treated as a cumulative weight threshold; a value `> 1` is treated as an asset count.
-    """
-    N
-    """
-    Finite-difference step size for [`risk_contribution`](@ref). Must be `> 0`.
-    """
-    delta
-    """
-    Number of histogram bins / PDF evaluation points. `0` means auto-detect as `ceil(Int, 4*sqrt(T))`.
-    """
-    points
-    """
-    Optional observation weights for risk measures that accept [`ObsWeights`](@ref).
-    """
-    rw
-    """
-    Rolling window size (≥ 0). Used by [`plot_rolling_measure`](@ref); `0` = auto (⌈√T⌉).
-    """
-    rolling
-    """
-    If `true`, compound cumulative returns; otherwise use simple cumulative sums.
-    """
-    compound
-    """
-    If `true`, compute marginal risk contribution; otherwise component risk contribution.
-    """
-    marginal
-    """
-    If `true`, normalise asset risk contributions to percentages.
-    """
-    percentage
-    """
-    If `true`, overlay a fitted Normal distribution in [`plot_histogram`](@ref), a reference
-    bound/line in eigenvalue plots, or a mean-eigenvalue line in [`plot_cokurtosis`](@ref).
-    """
-    reference
-    """
-    If `true`, call [`factory`](@ref) on plot measures before evaluation in
-    [`plot_measures`](@ref) and [`plot_efficient_frontier`](@ref).
-    """
-    factory
-    function PlottingOptions(alpha::Number, kappa::Number, N::Option{<:Number},
-                             delta::Number, points::Integer, rw::Option{<:ObsWeights},
-                             rolling::Integer, compound::Bool, marginal::Bool,
-                             percentage::Bool, reference::Bool, factory::Bool)
-        @argcheck(zero(alpha) < alpha < one(alpha))
-        @argcheck(zero(kappa) < kappa < one(kappa))
-        @argcheck(delta > zero(delta))
-        @argcheck(points >= 0)
-        @argcheck(rolling >= 0)
-        if !isnothing(N)
-            @argcheck(N > zero(N))
-        end
-        return new{typeof(alpha), typeof(kappa), typeof(N), typeof(delta), typeof(points),
-                   typeof(rw), typeof(rolling), typeof(compound), typeof(marginal),
-                   typeof(percentage), typeof(reference), typeof(factory)}(alpha, kappa, N,
-                                                                           delta, points,
-                                                                           rw, rolling,
-                                                                           compound,
-                                                                           marginal,
-                                                                           percentage,
-                                                                           reference,
-                                                                           factory)
-    end
-end
-function PlottingOptions(; alpha::Number = 0.05, kappa::Number = 0.3,
-                         N::Option{<:Number} = nothing, delta::Number = 1e-6,
-                         points::Integer = 0, rw::Option{<:ObsWeights} = nothing,
-                         rolling::Integer = 0, compound::Bool = false,
-                         marginal::Bool = false, percentage::Bool = false,
-                         reference::Bool = true, factory::Bool = true)::PlottingOptions
-    return PlottingOptions(alpha, kappa, N, delta, points, rw, rolling, compound, marginal,
-                           percentage, reference, factory)
-end
-
 ## ──────────────────────────────────────────────────────────────────────────────
 ## Cumulative returns
 ## ──────────────────────────────────────────────────────────────────────────────
@@ -172,7 +14,7 @@ end
         w::VecNum_VecVecNum,
         pr::Pr_RR,
         fees::Option{<:Fees} = nothing;
-        ts::AbstractVector = 1:size(pr.X,1),
+        ts::AbstractVector = 1:size(pr.X, 1),
         compound::Bool = false,
         kwargs...
     ) -> Plot
@@ -193,24 +35,23 @@ end
         kwargs...
     ) -> Plot
 
-Plot the cumulative returns of a portfolio. If a keyword is provided, it takes precedence over the data in the input objects.
+Plot the cumulative returns of a portfolio.
 
 # Arguments
 
-  - `w`: Portfolio weights vector.
+  - `w`: Portfolio weights vector or vector of weight vectors.
   - `X`: Asset returns matrix (observations × assets).
-  - `fees`: Optional transaction fees.
-  - `ts`: Time axis.
-  - `compound`: Whether to compound returns.
-  - `pr`: Prior or returns result, extracts `X`, `ts`, `nx` automatically if available.
-  - `res`: Extracts `w`, and `fees` if available.
+  - `fees::Option{<:Fees} = nothing`: Optional transaction fees.
+  - `ts::AbstractVector = 1:size(X, 1)`: Time axis labels.
+  - `compound::Bool = false`: If `true`, compound cumulative returns; otherwise use simple cumulative sums.
+  - `pr`: Prior or returns result; extracts `X`, `ts`, and `nx` automatically when available.
+  - `res::OptimisationResult`: Extracts `w` and `fees` when available.
   - `pred`: Predicted portfolio results.
 
 Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
 
 # Related
 
-  - [`PlottingOptions`](@ref)
   - [`calc_net_returns`](@ref)
   - [`cumulative_returns`](@ref)
 """
@@ -220,20 +61,44 @@ function plot_ptf_cumulative_returns end
 ## Asset cumulative returns
 ## ──────────────────────────────────────────────────────────────────────────────
 """
-    plot_asset_cumulative_returns(w, X[, fees]; ts, nx, opts, kwargs...)
-    plot_asset_cumulative_returns(w, rd[, fees]; opts, kwargs...)
-    plot_asset_cumulative_returns(res, rd; opts, kwargs...)
-    plot_asset_cumulative_returns(pred; opts, kwargs...)
+    plot_asset_cumulative_returns(
+        w::VecNum,
+        X::MatNum,
+        fees::Option{<:Fees} = nothing;
+        ts::AbstractVector = 1:size(X, 1),
+        nx::AbstractVector = 1:size(X, 2),
+        compound::Bool = false,
+        N::Option{<:Number} = nothing,
+        kwargs...
+    ) -> Plot
+    plot_asset_cumulative_returns(w::VecNum, pr::Pr_RR, fees = nothing; compound, N, kwargs...) -> Plot
+    plot_asset_cumulative_returns(res::OptimisationResult, rd; compound, N, kwargs...) -> Plot
+    plot_asset_cumulative_returns(pred; compound, N, kwargs...) -> Plot
 
-Plot the cumulative returns of individual assets, selecting the most relevant via
-[`PlottingOptions`](@ref) `N`. Assets beyond the top `N` are aggregated into "Others".
+Plot the cumulative returns of individual assets, selecting the most relevant via `N`.
+Assets beyond the top `N` are aggregated into an "Others" series.
+
+# Arguments
+
+  - `w`: Portfolio weights vector.
+  - `X`: Asset returns matrix (observations × assets).
+  - `fees::Option{<:Fees} = nothing`: Optional transaction fees.
+  - `ts::AbstractVector = 1:size(X, 1)`: Time axis labels.
+  - `nx::AbstractVector = 1:size(X, 2)`: Asset names.
+  - `compound::Bool = false`: If `true`, compound cumulative returns.
+  - `N::Option{<:Number} = nothing`: Maximum number of assets to display individually.
+    `nothing` auto-selects via [`number_effective_assets`](@ref).
+    A value in `(0, 1]` is treated as a cumulative weight threshold; a value `> 1` as an asset count.
+  - `pr`: Prior or returns result; extracts `X`, `ts`, and `nx` automatically.
+  - `res::OptimisationResult`: Extracts `w` and `fees` when available.
 
 Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
 
 # Related
 
-  - [`PlottingOptions`](@ref)
   - [`number_effective_assets`](@ref)
+  - [`calc_net_returns`](@ref)
+  - [`cumulative_returns`](@ref)
 """
 function plot_asset_cumulative_returns end
 
@@ -241,24 +106,38 @@ function plot_asset_cumulative_returns end
 ## Composition
 ## ──────────────────────────────────────────────────────────────────────────────
 """
-    plot_composition(w[, nx]; opts, kwargs...)
-    plot_composition(res, rd; opts, kwargs...)
-    plot_composition(res, pr; opts, kwargs...)
-    plot_composition(pred; opts, kwargs...)
-    plot_composition(mpred; opts, kwargs...)
-    plot_composition(ppred; opts, kwargs...)
+    plot_composition(
+        w::VecNum,
+        nx::AbstractVector = 1:length(w);
+        N::Option{<:Number} = nothing,
+        kwargs...
+    ) -> Plot
+    plot_composition(res::OptimisationResult, rd; N, kwargs...) -> Plot
+    plot_composition(res::OptimisationResult, pr; N, kwargs...) -> Plot
+    plot_composition(pred::PredictionResult; N, kwargs...) -> Plot
+    plot_composition(mpred::MultiPeriodPredictionResult; N, kwargs...) -> Plot
+    plot_composition(ppred::PopulationPredictionResult; N, kwargs...) -> Plot
 
 Plot portfolio composition as a bar chart of asset weights. Assets beyond the top `N`
-(from [`PlottingOptions`](@ref)) are collapsed into an "Others" bar.
+are collapsed into an "Others" bar.
 
-`mpred` / `ppred` produce stacked-bar fold compositions (delegates to
-[`plot_stacked_bar_composition`](@ref)).
+`mpred` / `ppred` overloads produce stacked-bar fold compositions via
+[`plot_stacked_bar_composition`](@ref); `N` is accepted but not applied in those overloads.
+
+# Arguments
+
+  - `w`: Portfolio weights vector.
+  - `nx::AbstractVector = 1:length(w)`: Asset names.
+  - `N::Option{<:Number} = nothing`: Maximum number of assets to display.
+    `nothing` auto-selects via [`number_effective_assets`](@ref).
+    A value in `(0, 1]` is treated as a cumulative weight threshold; a value `> 1` as an asset count.
+  - `res::OptimisationResult`: Extracts `w` when available.
+  - `rd::ReturnsResult`: Extracts `nx` when available.
 
 Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
 
 # Related
 
-  - [`PlottingOptions`](@ref)
   - [`number_effective_assets`](@ref)
   - [`plot_stacked_bar_composition`](@ref)
 """
@@ -268,33 +147,39 @@ function plot_composition end
 ## Stacked compositions
 ## ──────────────────────────────────────────────────────────────────────────────
 """
-    plot_stacked_bar_composition(w[, nx]; opts, kwargs...)
-    plot_stacked_bar_composition(res_vec, rd; opts, kwargs...)
+    plot_stacked_bar_composition(
+        w::VecNum_VecVecNum,
+        nx::AbstractVector = 1:size(w, 1);
+        kwargs...
+    ) -> Plot
+    plot_stacked_bar_composition(res_vec::AbstractVector{<:OptimisationResult}, rd; kwargs...) -> Plot
 
 Plot portfolio composition as a stacked bar chart. Accepts a matrix, a `VecVecNum`, or a
-vector of [`NonFiniteAllocationOptimisationResult`](@ref).
+vector of [`OptimisationResult`](@ref).
 
 Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
 
 # Related
 
-  - [`PlottingOptions`](@ref)
   - [`plot_stacked_area_composition`](@ref)
 """
 function plot_stacked_bar_composition end
 
 """
-    plot_stacked_area_composition(w[, nx]; opts, kwargs...)
-    plot_stacked_area_composition(res_vec, rd; opts, kwargs...)
+    plot_stacked_area_composition(
+        w::VecNum_VecVecNum,
+        nx::AbstractVector = 1:size(w, 1);
+        kwargs...
+    ) -> Plot
+    plot_stacked_area_composition(res_vec::AbstractVector{<:OptimisationResult}, rd; kwargs...) -> Plot
 
 Plot portfolio composition as a stacked area chart. Accepts a matrix, `VecVecNum`, or a
-vector of [`NonFiniteAllocationOptimisationResult`](@ref).
+vector of [`OptimisationResult`](@ref).
 
 Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
 
 # Related
 
-  - [`PlottingOptions`](@ref)
   - [`plot_stacked_bar_composition`](@ref)
 """
 function plot_stacked_area_composition end
@@ -303,25 +188,47 @@ function plot_stacked_area_composition end
 ## Risk contribution
 ## ──────────────────────────────────────────────────────────────────────────────
 """
-    plot_risk_contribution(r, w, X[, fees]; nx, opts, kwargs...)
-    plot_risk_contribution(r, w, rd[, fees]; opts, kwargs...)
-    plot_risk_contribution(r, res, rd; opts, kwargs...)
-    plot_risk_contribution(r, res, pr; opts, kwargs...)
-    plot_risk_contribution(r, pred; opts, kwargs...)
+    plot_risk_contribution(
+        r::AbstractBaseRiskMeasure,
+        w::VecNum,
+        X::MatNum_Pr,
+        fees::Option{<:Fees} = nothing;
+        nx::AbstractVector = 1:length(w),
+        delta::Number = 1e-6,
+        marginal::Bool = false,
+        percentage::Bool = false,
+        N::Option{<:Number} = nothing,
+        kwargs...
+    ) -> Plot
+    plot_risk_contribution(r, w, rd::ReturnsResult, fees = nothing; delta, marginal, percentage, N, kwargs...) -> Plot
+    plot_risk_contribution(r, res::OptimisationResult, rd; delta, marginal, percentage, N, kwargs...) -> Plot
+    plot_risk_contribution(r, res::OptimisationResult, pr; nx, delta, marginal, percentage, N, kwargs...) -> Plot
 
 Plot per-asset risk contribution as a bar chart.
 
-  - `opts.delta`: finite-difference step.
-  - `opts.marginal`: marginal vs component contribution.
-  - `opts.percentage`: normalise to percentages.
-  - `opts.N`: top-N assets.
+# Arguments
+
+  - `r`: Risk measure.
+  - `w`: Portfolio weights vector.
+  - `X` / `rd` / `pr`: Asset returns or prior result.
+  - `fees::Option{<:Fees} = nothing`: Optional transaction fees.
+  - `nx::AbstractVector = 1:length(w)`: Asset names.
+  - `delta::Number = 1e-6`: Finite-difference step size for [`risk_contribution`](@ref). Must be `> 0`.
+  - `marginal::Bool = false`: If `true`, compute marginal risk contribution; otherwise component.
+  - `percentage::Bool = false`: If `true`, normalise contributions to percentages.
+  - `N::Option{<:Number} = nothing`: Maximum number of assets to display.
+
+# Validation
+
+  - `delta > 0`.
+  - If `N` is not `nothing`, `N > 0`.
 
 Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
 
 # Related
 
   - [`risk_contribution`](@ref)
-  - [`PlottingOptions`](@ref)
+  - [`plot_composition`](@ref)
 """
 function plot_risk_contribution end
 
@@ -329,21 +236,45 @@ function plot_risk_contribution end
 ## Factor risk contribution
 ## ──────────────────────────────────────────────────────────────────────────────
 """
-    plot_factor_risk_contribution(r, w, X[, fees]; re, rd, nf, opts, kwargs...)
-    plot_factor_risk_contribution(r, res, rd; re, opts, kwargs...)
-    plot_factor_risk_contribution(r, pred; re, opts, kwargs...)
+    plot_factor_risk_contribution(
+        r::AbstractBaseRiskMeasure,
+        w::VecNum,
+        X::MatNum_Pr,
+        fees::Option{<:Fees} = nothing;
+        re::RegE_Reg = StepwiseRegression(),
+        rd::ReturnsResult = ReturnsResult(),
+        nf::Option{<:AbstractVector} = nothing,
+        delta::Number = 1e-6,
+        N::Option{<:Number} = nothing,
+        kwargs...
+    ) -> Plot
+    plot_factor_risk_contribution(r, res::OptimisationResult, rd; re, delta, N, kwargs...) -> Plot
 
 Plot per-factor risk contribution as a bar chart, including the constant (idiosyncratic) term.
 
-  - `opts.delta`: finite-difference step.
-  - `opts.N`: top-N factors.
+# Arguments
+
+  - `r`: Risk measure.
+  - `w`: Portfolio weights vector.
+  - `X` / `rd`: Asset returns or returns result.
+  - `fees::Option{<:Fees} = nothing`: Optional transaction fees.
+  - `re::RegE_Reg = StepwiseRegression()`: Factor regression estimator.
+  - `rd::ReturnsResult = ReturnsResult()`: Returns result providing factor names via `rd.nf`.
+  - `nf::Option{<:AbstractVector} = nothing`: Factor names; overrides `rd.nf` when provided.
+  - `delta::Number = 1e-6`: Finite-difference step size. Must be `> 0`.
+  - `N::Option{<:Number} = nothing`: Maximum number of factors to display.
+
+# Validation
+
+  - `delta > 0`.
+  - If `N` is not `nothing`, `N > 0`.
 
 Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
 
 # Related
 
   - [`factor_risk_contribution`](@ref)
-  - [`PlottingOptions`](@ref)
+  - [`plot_composition`](@ref)
 """
 function plot_factor_risk_contribution end
 
@@ -351,24 +282,31 @@ function plot_factor_risk_contribution end
 ## Dendrogram
 ## ──────────────────────────────────────────────────────────────────────────────
 """
-    plot_dendrogram(clr[, nx]; opts, kwargs...)
-    plot_dendrogram(clr, rd; opts, kwargs...)
-    plot_dendrogram(cle, X[, nx]; dims, opts, kwargs...)
-    plot_dendrogram(cle, pr[, nx]; dims, opts, kwargs...)
+    plot_dendrogram(
+        clr::AbstractClusteringResult,
+        nx::AbstractVector = 1:length(clr.res.order);
+        dend_theme::Symbol = :Spectral,
+        kwargs...
+    ) -> Plot
+    plot_dendrogram(cle::HClE_HCl, X::MatNum, nx = 1:size(X,2); dims, kwargs...) -> Plot
+    plot_dendrogram(cle::HClE_HCl, pr::Pr_RR, nx = 1:size(pr.X,2); dims, kwargs...) -> Plot
 
 Plot a hierarchical clustering dendrogram with coloured cluster regions.
 
-  - `clr`: [`AbstractClusteringResult`](@ref) (already computed).
-  - `cle`: Clustering estimator — computes clustering from `X` or `pr.X`.
-  - `pr`: [`AbstractPriorResult`](@ref) — extracts `X`.
-  - `rd`: [`ReturnsResult`](@ref) — extracts `nx` automatically.
+# Arguments
+
+  - `clr::AbstractClusteringResult`: Precomputed clustering result.
+  - `cle::HClE_HCl`: Clustering estimator; computes clustering from `X` or `pr.X`.
+  - `pr`: [`AbstractPriorResult`](@ref); extracts `X` and optionally `nx`.
+  - `nx`: Asset names.
+  - `dend_theme::Symbol = :Spectral`: Colour palette for cluster regions.
+  - `dims::Integer = 1`: Dimension passed to [`clusterise`](@ref).
 
 Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
 
 # Related
 
   - [`clusterise`](@ref)
-  - [`PlottingOptions`](@ref)
 """
 function plot_dendrogram end
 
@@ -376,19 +314,34 @@ function plot_dendrogram end
 ## Cluster heatmap
 ## ──────────────────────────────────────────────────────────────────────────────
 """
-    plot_clusters(pe, cle[, rd]; dims, opts, kwargs...)
-    plot_clusters(clr, X[, nx]; opts, kwargs...)
-    plot_clusters(cle, pr[, nx]; dims, opts, kwargs...)
+    plot_clusters(
+        clr::AbstractClusteringResult,
+        nx::AbstractVector = 1:size(clr.S, 1);
+        dend_theme::Symbol = :Spectral,
+        hmap_theme::Symbol = :Spectral,
+        color_func = x -> any(x .< 0) ? (-1, 1) : (0, 1),
+        line_color = :black,
+        line_width = 3,
+        kwargs...
+    ) -> Plot
+    plot_clusters(cle::HClE_HCl, X::MatNum, nx = 1:size(X,2); dims, kwargs...) -> Plot
+    plot_clusters(cle::HClE_HCl, pr::Pr_RR, nx = 1:size(pr.X,2); dims, kwargs...) -> Plot
 
 Plot a reordered correlation/covariance heatmap with flanking dendrograms and coloured
 cluster boxes.
 
-  - `pe` + `cle` + `rd`: compute prior and clustering from returns data.
-  - `clr` + `X`: use precomputed clustering result and raw returns.
-  - `cle` + `pr`: cluster from a prior result.
+# Arguments
 
-The `dend_theme`, `hmap_theme`, `color_func`, `line_color`, and `line_width` parameters
-are passed as `kwargs...`.
+  - `clr::AbstractClusteringResult`: Precomputed clustering result.
+  - `cle::HClE_HCl`: Clustering estimator.
+  - `pr`: [`AbstractPriorResult`](@ref); extracts `X` and optionally `nx`.
+  - `nx`: Asset names.
+  - `dend_theme::Symbol = :Spectral`: Colour palette for dendrogram cluster fills.
+  - `hmap_theme::Symbol = :Spectral`: Colour gradient for the heatmap.
+  - `color_func`: Function mapping the matrix to a colour range `(lo, hi)`.
+  - `line_color = :black`: Colour of the cluster-border lines on the heatmap.
+  - `line_width = 3`: Width of the cluster-border lines.
+  - `dims::Integer = 1`: Dimension passed to [`clusterise`](@ref).
 
 Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
 
@@ -396,7 +349,6 @@ Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
 
   - [`clusterise`](@ref)
   - [`prior`](@ref)
-  - [`PlottingOptions`](@ref)
 """
 function plot_clusters end
 
@@ -404,28 +356,49 @@ function plot_clusters end
 ## Drawdowns
 ## ──────────────────────────────────────────────────────────────────────────────
 """
-    plot_drawdowns(w, X[, fees]; slv, ts, opts, kwargs...)
-    plot_drawdowns(w, rd[, fees]; slv, opts, kwargs...)
-    plot_drawdowns(res, rd; slv, opts, kwargs...)
-    plot_drawdowns(pred; slv, opts, kwargs...)
-    plot_drawdowns(mpred; slv, opts, kwargs...)
+    plot_drawdowns(
+        w::ArrNum,
+        X::MatNum,
+        fees::Option{<:Fees} = nothing;
+        slv::Option{<:Slv_VecSlv} = nothing,
+        ts::AbstractVector = 1:size(X, 1),
+        compound::Bool = false,
+        alpha::Number = 0.05,
+        kappa::Number = 0.3,
+        rw = nothing,
+        kwargs...
+    ) -> Plot
+    plot_drawdowns(w, rd::ReturnsResult, fees = nothing; slv, compound, alpha, kappa, rw, kwargs...) -> Plot
+    plot_drawdowns(res::OptimisationResult, rd; slv, compound, alpha, kappa, rw, kwargs...) -> Plot
+    plot_drawdowns(pred; slv, compound, alpha, kappa, rw, kwargs...) -> Plot
+    plot_drawdowns(mpred::MultiPeriodPredictionResult; slv, compound, alpha, kappa, rw, kwargs...) -> Plot
+    plot_drawdowns(ppred::PopulationPredictionResult; slv, compound, alpha, kappa, rw, kwargs...) -> Plot
 
 Plot portfolio drawdown over time with horizontal lines for AverageDrawdown, UlcerIndex,
-DaR, CDaR, MaximumDrawdown, and — when `slv` is provided — EDaR and RLDaR at confidence
-level `opts.alpha`.
+DaR, CDaR, MaximumDrawdown, and — when `slv` is provided — EDaR and RLDaR.
 
-  - `opts.compound`: compound vs simple drawdowns.
-  - `opts.alpha`: confidence level for risk lines.
-  - `opts.kappa`: RLDaR shape parameter.
-  - `opts.rw`: observation weights.
-  - `slv`: solver for EDaR / RLDaR (default `nothing` — those lines are omitted).
+# Arguments
+
+  - `w`: Portfolio weights.
+  - `X`: Asset returns matrix (observations × assets).
+  - `fees::Option{<:Fees} = nothing`: Optional transaction fees.
+  - `slv::Option{<:Slv_VecSlv} = nothing`: Solver for EDaR / RLDaR lines (omitted when `nothing`).
+  - `ts::AbstractVector = 1:size(X, 1)`: Time axis labels.
+  - `compound::Bool = false`: If `true`, use compound drawdowns.
+  - `alpha::Number = 0.05`: Confidence level for DaR / CDaR / EDaR / RLDaR lines. Must satisfy `0 < alpha < 1`.
+  - `kappa::Number = 0.3`: Relativistic deformation parameter for RLDaR. Must satisfy `0 < kappa < 1`.
+  - `rw`: Optional observation weights for AverageDrawdown and UlcerIndex.
+
+# Validation
+
+  - `0 < alpha < 1`.
+  - `0 < kappa < 1`.
 
 Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
 
 # Related
 
   - [`drawdowns`](@ref)
-  - [`PlottingOptions`](@ref)
 """
 function plot_drawdowns end
 
@@ -433,25 +406,39 @@ function plot_drawdowns end
 ## Risk/return scatter
 ## ──────────────────────────────────────────────────────────────────────────────
 """
-    plot_measures(w, pr[, fees]; x, y, z, c, slv, opts, kwargs...)
-    plot_measures(res_vec, rd; x, y, z, c, slv, opts, kwargs...)
-    plot_measures(mpred; x, y, z, c, slv, opts, kwargs...)
-    plot_measures(ppred; x, y, z, c, slv, opts, kwargs...)
+    plot_measures(
+        w::VecNum_VecVecNum,
+        pr::Pr_RR,
+        fees::Option{<:Fees} = nothing;
+        x::AbstractBaseRiskMeasure = Variance(),
+        y::AbstractBaseRiskMeasure = ExpectedReturn(),
+        z::Option{<:AbstractBaseRiskMeasure} = nothing,
+        c::AbstractBaseRiskMeasure = ExpectedReturnRiskRatio(; rk=x, rt=ArithmeticReturn(), rf=0),
+        slv::Option{<:Slv_VecSlv} = nothing,
+        factory::Bool = true,
+        kwargs...
+    ) -> Plot
+    plot_measures(res_vec::AbstractVector{<:OptimisationResult}, pr = nothing; x, y, z, c, slv, fees, factory, kwargs...) -> Plot
+    plot_measures(ppred::PopulationPredictionResult; x, y, z, c, slv, factory, kwargs...) -> Plot
 
-Scatter plot of risk/return measures across a collection of portfolio weight vectors (e.g.,
-an efficient frontier or population).
+Scatter plot of risk/return measures across a collection of portfolio weight vectors.
 
-  - `x`, `y`: risk/return measures for the axes (default `Variance()` and `ExpectedReturn()`).
-  - `z`: optional third measure for 3-D scatter.
-  - `c`: colour-coding measure (default `ExpectedReturnRiskRatio`).
-  - `opts.factory`: if `true`, call `factory` on the measures before evaluating.
+# Arguments
+
+  - `w`: Portfolio weights or vector of weight vectors.
+  - `pr`: Prior or returns result.
+  - `x`: Risk/return measure for the horizontal axis (default `Variance()`).
+  - `y`: Risk/return measure for the vertical axis (default `ExpectedReturn()`).
+  - `z`: Optional third measure for 3-D scatter.
+  - `c`: Colour-coding measure (default Sharpe ratio derived from `x`).
+  - `slv::Option{<:Slv_VecSlv} = nothing`: Solver passed to `factory`.
+  - `factory::Bool = true`: If `true`, call [`factory`](@ref) on measures before evaluating.
 
 Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
 
 # Related
 
   - [`expected_risk`](@ref)
-  - [`PlottingOptions`](@ref)
 """
 function plot_measures end
 
@@ -459,27 +446,46 @@ function plot_measures end
 ## Return histogram
 ## ──────────────────────────────────────────────────────────────────────────────
 """
-    plot_histogram(w, X[, fees]; slv, opts, kwargs...)
-    plot_histogram(w, rd[, fees]; slv, opts, kwargs...)
-    plot_histogram(res, rd; slv, opts, kwargs...)
-    plot_histogram(pred; slv, opts, kwargs...)
-    plot_histogram(mpred; slv, opts, kwargs...)
+    plot_histogram(
+        w::ArrNum,
+        X::MatNum,
+        fees::Option{<:Fees} = nothing;
+        slv::Option{<:Slv_VecSlv} = nothing,
+        alpha::Number = 0.05,
+        kappa::Number = 0.3,
+        rw = nothing,
+        points::Integer = 0,
+        reference::Bool = true,
+        kwargs...
+    ) -> Plot
+    plot_histogram(w, rd::ReturnsResult, fees = nothing; slv, alpha, kappa, rw, points, reference, kwargs...) -> Plot
+    plot_histogram(res::OptimisationResult, rd; slv, alpha, kappa, rw, points, reference, kwargs...) -> Plot
+    plot_histogram(pred; slv, alpha, kappa, rw, points, reference, kwargs...) -> Plot
+    plot_histogram(mpred::MultiPeriodPredictionResult; slv, alpha, kappa, rw, points, reference, kwargs...) -> Plot
+    plot_histogram(ppred::PopulationPredictionResult; slv, alpha, kappa, rw, points, reference, kwargs...) -> Plot
 
-Plot a histogram of portfolio returns with vertical lines for common tail risk measures and
-an optional fitted Normal distribution.
+Plot a histogram of portfolio returns with vertical risk-measure lines and an optional
+fitted Normal distribution.
 
-  - `opts.alpha`: confidence level.
-  - `opts.kappa`: RLVaR shape parameter.
-  - `opts.reference`: overlay fitted Normal.
-  - `opts.points`: number of PDF evaluation points (0 = auto).
-  - `opts.rw`: observation weights.
-  - `slv`: solver for EVaR / RLVaR (default `nothing` — those lines are omitted).
+# Arguments
+
+  - `w`: Portfolio weights.
+  - `X`: Asset returns matrix (observations × assets).
+  - `fees::Option{<:Fees} = nothing`: Optional transaction fees.
+  - `slv::Option{<:Slv_VecSlv} = nothing`: Solver for EVaR / RLVaR lines (omitted when `nothing`).
+  - `alpha::Number = 0.05`: Tail confidence level. Must satisfy `0 < alpha < 1`.
+  - `kappa::Number = 0.3`: Relativistic deformation parameter for RLVaR. Must satisfy `0 < kappa < 1`.
+  - `rw`: Optional observation weights for MAD, GMD, VaR, and CVaR.
+  - `points::Integer = 0`: Number of PDF evaluation points. `0` auto-detects as `ceil(Int, 4√T)`.
+  - `reference::Bool = true`: If `true`, overlay a fitted Normal distribution curve.
+
+# Validation
+
+  - `0 < alpha < 1`.
+  - `0 < kappa < 1`.
+  - `points >= 0`.
 
 Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
-
-# Related
-
-  - [`PlottingOptions`](@ref)
 """
 function plot_histogram end
 
@@ -487,21 +493,35 @@ function plot_histogram end
 ## Network / phylogeny
 ## ──────────────────────────────────────────────────────────────────────────────
 """
-    plot_network(pl, X[, nx, w]; threshold, opts, kwargs...)
-    plot_network(pl, pr[, nx, w]; opts, kwargs...)
-    plot_network(pl, rd[, w]; opts, kwargs...)
-    plot_network(pl, res, rd; opts, kwargs...)
+    plot_network(
+        pl::NwE_ClE_Cl,
+        X::MatNum,
+        nx::AbstractVector = 1:size(X, 2),
+        w::Option{<:VecNum} = nothing;
+        threshold::Number = 0,
+        kwargs...
+    ) -> Plot
+    plot_network(pl, pr::Pr_RR, w = nothing; nx, kwargs...) -> Plot
+    plot_network(pl, res::OptimisationResult; rd, nx, kwargs...) -> Plot
 
-Plot the asset network (MST, PMFG, TMFG, or adjacency from a clustering result) as a graph
-using `GraphRecipes.graphplot`. Node size is uniform by default; pass `w` to scale node
+Plot the asset network (MST, PMFG, TMFG, or adjacency) as a graph using
+`GraphRecipes.graphplot`. Node size is uniform by default; pass `w` to scale node
 area proportionally to portfolio weight.
+
+# Arguments
+
+  - `pl`: Network or clustering estimator.
+  - `X`: Asset returns matrix (observations × assets).
+  - `nx`: Asset names.
+  - `w::Option{<:VecNum} = nothing`: Optional portfolio weights for node sizing.
+  - `threshold::Number = 0`: Adjacency entries with absolute value ≤ this are zeroed.
+  - `pr`: Prior or returns result; extracts `X` and optionally `nx`.
 
 Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots` and `GraphRecipes`).
 
 # Related
 
   - [`phylogeny_matrix`](@ref)
-  - [`PlottingOptions`](@ref)
 """
 function plot_network end
 
@@ -509,21 +529,35 @@ function plot_network end
 ## Centrality
 ## ──────────────────────────────────────────────────────────────────────────────
 """
-    plot_centrality(cte, X[, nx]; opts, kwargs...)
-    plot_centrality(cte, pr[, nx]; opts, kwargs...)
-    plot_centrality(cte, rd; opts, kwargs...)
-    plot_centrality(cte, res, rd; opts, kwargs...)
+    plot_centrality(
+        cte::AbstractCentralityEstimator,
+        X::MatNum,
+        nx::AbstractVector = 1:size(X, 2);
+        N::Option{<:Number} = nothing,
+        percentage::Bool = false,
+        kwargs...
+    ) -> Plot
+    plot_centrality(cte, pr::AbstractPriorResult, nx = 1:size(pr.X,2); N, percentage, kwargs...) -> Plot
+    plot_centrality(cte, rd::ReturnsResult; N, percentage, kwargs...) -> Plot
+    plot_centrality(cte, res::OptimisationResult, rd; N, percentage, kwargs...) -> Plot
 
 Bar chart of asset centrality scores, sorted in descending order.
 
-  - `opts.N`: show top-N assets.
+# Arguments
+
+  - `cte`: Centrality estimator.
+  - `X`: Asset returns matrix (observations × assets).
+  - `nx`: Asset names.
+  - `N::Option{<:Number} = nothing`: Maximum number of assets to display.
+    `nothing` auto-selects via [`number_effective_assets`](@ref).
+    A value in `(0, 1]` is treated as a cumulative score threshold; a value `> 1` as an asset count.
+  - `percentage::Bool = false`: If `true`, normalise scores to sum to one.
 
 Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
 
 # Related
 
   - [`centrality_vector`](@ref)
-  - [`PlottingOptions`](@ref)
 """
 function plot_centrality end
 
@@ -531,19 +565,20 @@ function plot_centrality end
 ## Correlation / covariance heatmap
 ## ──────────────────────────────────────────────────────────────────────────────
 """
-    plot_correlation(X[, nx]; opts, kwargs...)
-    plot_correlation(pr[, nx]; opts, kwargs...)
-    plot_correlation(pr, rd; opts, kwargs...)
+    plot_correlation(X::MatNum, nx::AbstractVector = 1:size(X, 1); kwargs...) -> Plot
+    plot_correlation(pr::AbstractPriorResult, nx = 1:size(pr.sigma,1); kwargs...) -> Plot
+    plot_correlation(pr::AbstractPriorResult, rd::ReturnsResult; kwargs...) -> Plot
+    plot_correlation(res::OptimisationResult[, rd]; kwargs...) -> Plot
+    plot_correlation(pred::PredictionResult[, rd]; kwargs...) -> Plot
 
-Standalone correlation (or covariance) heatmap without clustering or dendrograms. If the
-input contains a covariance matrix, it is normalised to a correlation matrix before plotting.
+Standalone correlation (or covariance) heatmap without clustering or dendrograms.
+If the input contains a covariance matrix, it is normalised to a correlation matrix before plotting.
 
 Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
 
 # Related
 
   - [`plot_clusters`](@ref)
-  - [`PlottingOptions`](@ref)
 """
 function plot_correlation end
 
@@ -551,18 +586,31 @@ function plot_correlation end
 ## Expected returns bar chart
 ## ──────────────────────────────────────────────────────────────────────────────
 """
-    plot_mu(mu[, nx]; opts, kwargs...)
-    plot_mu(pr[, nx]; opts, kwargs...)
-    plot_mu(pr, rd; opts, kwargs...)
-    plot_mu(res; opts, kwargs...)
+    plot_mu(
+        mu::VecNum,
+        nx::AbstractVector = 1:length(mu);
+        N::Option{<:Number} = nothing,
+        kwargs...
+    ) -> Plot
+    plot_mu(pr::AbstractPriorResult[, nx]; N, kwargs...) -> Plot
+    plot_mu(pr::AbstractPriorResult, rd::ReturnsResult; N, kwargs...) -> Plot
+    plot_mu(res::OptimisationResult[, rd]; N, kwargs...) -> Plot
+    plot_mu(pred::PredictionResult[, rd]; N, kwargs...) -> Plot
 
 Bar chart of per-asset expected returns (μ vector).
+
+# Arguments
+
+  - `mu`: Expected returns vector.
+  - `nx`: Asset names.
+  - `N::Option{<:Number} = nothing`: Maximum number of assets to display.
+    `nothing` auto-selects via [`number_effective_assets`](@ref).
+    A value in `(0, 1]` is treated as a cumulative return threshold; a value `> 1` as an asset count.
 
 Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
 
 # Related
 
-  - [`PlottingOptions`](@ref)
   - [`plot_sigma`](@ref)
 """
 function plot_mu end
@@ -571,19 +619,33 @@ function plot_mu end
 ## Asset volatility bar chart
 ## ──────────────────────────────────────────────────────────────────────────────
 """
-    plot_sigma(sigma[, nx]; opts, kwargs...)
-    plot_sigma(pr[, nx]; opts, kwargs...)
-    plot_sigma(pr, rd; opts, kwargs...)
+    plot_sigma(
+        sigma::MatNum,
+        nx::AbstractVector = 1:size(sigma, 1);
+        variance::Bool = false,
+        N::Option{<:Number} = nothing,
+        kwargs...
+    ) -> Plot
+    plot_sigma(pr::AbstractPriorResult[, nx]; variance, N, kwargs...) -> Plot
+    plot_sigma(pr::AbstractPriorResult, rd::ReturnsResult; variance, N, kwargs...) -> Plot
+    plot_sigma(res::OptimisationResult[, rd]; variance, N, kwargs...) -> Plot
+    plot_sigma(pred::PredictionResult[, rd]; variance, N, kwargs...) -> Plot
 
 Bar chart of per-asset volatility (√diag(Σ)).
 
-  - `variance::Bool = false` (kwarg): if `true`, show variance (diag(Σ)) instead of standard deviation.
+# Arguments
+
+  - `sigma`: Covariance (or correlation) matrix.
+  - `nx`: Asset names.
+  - `variance::Bool = false`: If `true`, show variance (diag(Σ)) instead of standard deviation.
+  - `N::Option{<:Number} = nothing`: Maximum number of assets to display.
+    `nothing` auto-selects the top assets by volatility magnitude.
+    A value `> 1` is treated as an asset count.
 
 Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
 
 # Related
 
-  - [`PlottingOptions`](@ref)
   - [`plot_mu`](@ref)
   - [`plot_correlation`](@ref)
 """
@@ -593,9 +655,16 @@ function plot_sigma end
 ## Factor loadings heatmap
 ## ──────────────────────────────────────────────────────────────────────────────
 """
-    plot_factor_loadings(M[, nx, nf]; opts, kwargs...)
-    plot_factor_loadings(pr[, nx, nf]; opts, kwargs...)
-    plot_factor_loadings(pr, rd; opts, kwargs...)
+    plot_factor_loadings(
+        M::MatNum,
+        nx::AbstractVector = 1:size(M, 1),
+        nf::AbstractVector = 1:size(M, 2);
+        kwargs...
+    ) -> Plot
+    plot_factor_loadings(pr::AbstractPriorResult[, nx, nf]; kwargs...) -> Plot
+    plot_factor_loadings(pr::AbstractPriorResult, rd::ReturnsResult; kwargs...) -> Plot
+    plot_factor_loadings(res::OptimisationResult[, rd]; kwargs...) -> Plot
+    plot_factor_loadings(pred::PredictionResult[, rd]; kwargs...) -> Plot
 
 Heatmap of the factor loadings matrix B (assets × factors) from a prior with a regression
 model. Uses a diverging colour scale centred at zero.
@@ -606,7 +675,6 @@ Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
 
 # Related
 
-  - [`PlottingOptions`](@ref)
   - [`plot_factor_sigma`](@ref)
   - [`LowOrderPrior`](@ref)
 """
@@ -616,9 +684,15 @@ function plot_factor_loadings end
 ## Factor covariance heatmap
 ## ──────────────────────────────────────────────────────────────────────────────
 """
-    plot_factor_sigma(f_sigma[, nf]; opts, kwargs...)
-    plot_factor_sigma(pr[, nf]; opts, kwargs...)
-    plot_factor_sigma(pr, rd; opts, kwargs...)
+    plot_factor_sigma(
+        f_sigma::MatNum,
+        nf::AbstractVector = 1:size(f_sigma, 1);
+        kwargs...
+    ) -> Plot
+    plot_factor_sigma(pr::AbstractPriorResult[, nf]; kwargs...) -> Plot
+    plot_factor_sigma(pr::AbstractPriorResult, rd::ReturnsResult; kwargs...) -> Plot
+    plot_factor_sigma(res::OptimisationResult[, rd]; kwargs...) -> Plot
+    plot_factor_sigma(pred::PredictionResult[, rd]; kwargs...) -> Plot
 
 Correlation/covariance heatmap of the factor covariance matrix (`pr.f_sigma`). Behaves
 identically to [`plot_correlation`](@ref) but operates on the factor space.
@@ -629,7 +703,6 @@ Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
 
 # Related
 
-  - [`PlottingOptions`](@ref)
   - [`plot_factor_loadings`](@ref)
   - [`plot_correlation`](@ref)
   - [`LowOrderPrior`](@ref)
@@ -640,20 +713,30 @@ function plot_factor_sigma end
 ## Eigenvalue spectrum
 ## ──────────────────────────────────────────────────────────────────────────────
 """
-    plot_eigenspectrum(sigma; opts, kwargs...)
-    plot_eigenspectrum(pr; opts, kwargs...)
-    plot_eigenspectrum(pr, rd; opts, kwargs...)
+    plot_eigenspectrum(
+        sigma::MatNum;
+        N_obs::Option{<:Integer} = nothing,
+        reference::Bool = true,
+        kwargs...
+    ) -> Plot
+    plot_eigenspectrum(pr::AbstractPriorResult; reference, kwargs...) -> Plot
+    plot_eigenspectrum(pr::AbstractPriorResult, rd::ReturnsResult; reference, kwargs...) -> Plot
+    plot_eigenspectrum(res::OptimisationResult[, rd]; reference, kwargs...) -> Plot
+    plot_eigenspectrum(pred::PredictionResult[, rd]; reference, kwargs...) -> Plot
 
 Bar chart of eigenvalues of the covariance/correlation matrix, sorted in descending order.
 
-When `opts.reference = true` and `N_obs` is provided, overlays the Marchenko-Pastur bulk
-upper bound `λ+ = σ̄²(1 + √(N/T))²` as a horizontal line, highlighting noise eigenvalues.
+# Arguments
+
+  - `sigma`: Covariance or correlation matrix.
+  - `N_obs::Option{<:Integer} = nothing`: Number of observations; enables Marchenko-Pastur overlay.
+  - `reference::Bool = true`: If `true` and `N_obs` is provided, overlays the Marchenko-Pastur
+    bulk upper bound `λ₊ = σ̄²(1 + √(N/T))²` as a reference line.
 
 Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
 
 # Related
 
-  - [`PlottingOptions`](@ref)
   - [`plot_correlation`](@ref)
 """
 function plot_eigenspectrum end
@@ -662,24 +745,40 @@ function plot_eigenspectrum end
 ## Rolling risk/return measure
 ## ──────────────────────────────────────────────────────────────────────────────
 """
-    plot_rolling_measure(r, w, X[, fees]; ts, opts, kwargs...)
-    plot_rolling_measure(r, w, rd[, fees]; opts, kwargs...)
-    plot_rolling_measure(r, res, rd; opts, kwargs...)
-    plot_rolling_measure(r, pred; opts, kwargs...)
-    plot_rolling_measure(r, mpred; opts, kwargs...)
+    plot_rolling_measure(
+        r::AbstractBaseRiskMeasure,
+        w::VecNum,
+        X::MatNum,
+        fees::Option{<:Fees} = nothing;
+        ts::AbstractVector = 1:size(X, 1),
+        rolling::Integer = 0,
+        kwargs...
+    ) -> Plot
+    plot_rolling_measure(r, w, rd::ReturnsResult, fees = nothing; rolling, kwargs...) -> Plot
+    plot_rolling_measure(r, res::OptimisationResult, rd; rolling, kwargs...) -> Plot
+    plot_rolling_measure(r, pred; rolling, kwargs...) -> Plot
+    plot_rolling_measure(r, mpred::MultiPeriodPredictionResult; rolling, kwargs...) -> Plot
+    plot_rolling_measure(r, ppred::PopulationPredictionResult; rolling, kwargs...) -> Plot
 
 Line plot of a risk or return measure evaluated over a rolling window of portfolio returns.
 
-Window size is controlled by `opts.rolling` (0 = auto: ⌈√T⌉).
+# Arguments
 
-The risk measure `r` may embed its own solver (e.g. `EntropicValueatRisk(; slv=...)`), so
-no separate solver argument is needed here.
+  - `r`: Risk or return measure. May embed its own solver (e.g. `EntropicValueatRisk(; slv=...)`).
+  - `w`: Portfolio weights.
+  - `X`: Asset returns matrix (observations × assets).
+  - `fees::Option{<:Fees} = nothing`: Optional transaction fees.
+  - `ts::AbstractVector = 1:size(X, 1)`: Time axis labels.
+  - `rolling::Integer = 0`: Rolling window size. `0` auto-detects as `⌈√T⌉`. Must be `>= 0`.
+
+# Validation
+
+  - `rolling >= 0`.
 
 Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
 
 # Related
 
-  - [`PlottingOptions`](@ref)
   - [`expected_risk`](@ref)
 """
 function plot_rolling_measure end
@@ -688,19 +787,27 @@ function plot_rolling_measure end
 ## Weight stability across folds
 ## ──────────────────────────────────────────────────────────────────────────────
 """
-    plot_weight_stability(mpred; opts, kwargs...)
-    plot_weight_stability(ppred; opts, kwargs...)
+    plot_weight_stability(
+        mpred::MultiPeriodPredictionResult;
+        N::Option{<:Number} = nothing,
+        kwargs...
+    ) -> Plot
+    plot_weight_stability(ppred::PopulationPredictionResult; N, kwargs...) -> Plot
 
-Box plot of per-asset weight distributions across cross-validation folds.
+Box plot of per-asset weight distributions across cross-validation folds or population members.
 
-  - `opts.N`: top-N assets by mean absolute weight (default: all).
-  - For `PopulationPredictionResult`, pools weights from all population members.
+# Arguments
+
+  - `mpred::MultiPeriodPredictionResult`: Walk-forward prediction result.
+  - `ppred::PopulationPredictionResult`: Population prediction result; pools weights from all members.
+  - `N::Option{<:Number} = nothing`: Maximum number of assets to display by mean absolute weight.
+    `nothing` shows all assets.
+    A value `> 1` is treated as an asset count.
 
 Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
 
 # Related
 
-  - [`PlottingOptions`](@ref)
   - [`MultiPeriodPredictionResult`](@ref)
   - [`PopulationPredictionResult`](@ref)
 """
@@ -710,20 +817,20 @@ function plot_weight_stability end
 ## Cross-validation scores
 ## ──────────────────────────────────────────────────────────────────────────────
 """
-    plot_cv_scores(scores[, labels]; opts, kwargs...)
-    plot_cv_scores(r, mpred; opts, kwargs...)
-    plot_cv_scores(r, ppred; opts, kwargs...)
+    plot_cv_scores(
+        scores::AbstractVector{<:Number},
+        labels::AbstractVector = 1:length(scores);
+        kwargs...
+    ) -> Plot
+    plot_cv_scores(r::AbstractBaseRiskMeasure, mpred::MultiPeriodPredictionResult; kwargs...) -> Plot
+    plot_cv_scores(r::AbstractBaseRiskMeasure, ppred::PopulationPredictionResult; kwargs...) -> Plot
 
 Bar chart of cross-validation scores (one bar per fold or population member).
-
-  - For `MultiPeriodPredictionResult`: one score per fold.
-  - For `PopulationPredictionResult`: one score per population member.
 
 Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
 
 # Related
 
-  - [`PlottingOptions`](@ref)
   - [`expected_risk`](@ref)
   - [`MultiPeriodPredictionResult`](@ref)
   - [`PopulationPredictionResult`](@ref)
@@ -734,8 +841,12 @@ function plot_cv_scores end
 ## Portfolio turnover
 ## ──────────────────────────────────────────────────────────────────────────────
 """
-    plot_turnover(w_series[; ts, opts, kwargs...])
-    plot_turnover(mpred; opts, kwargs...)
+    plot_turnover(
+        w_series::AbstractVector{<:VecNum};
+        ts::AbstractVector = 1:length(w_series),
+        kwargs...
+    ) -> Plot
+    plot_turnover(mpred::MultiPeriodPredictionResult; kwargs...) -> Plot
 
 Line plot of portfolio turnover (L1 weight change) over time.
 
@@ -745,7 +856,6 @@ Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
 
 # Related
 
-  - [`PlottingOptions`](@ref)
   - [`MultiPeriodPredictionResult`](@ref)
 """
 function plot_turnover end
@@ -754,8 +864,15 @@ function plot_turnover end
 ## Composite prior dashboard
 ## ──────────────────────────────────────────────────────────────────────────────
 """
-    plot_prior(pr; opts, kwargs...)
-    plot_prior(pr, rd; opts, kwargs...)
+    plot_prior(
+        pr::AbstractPriorResult,
+        nx::AbstractVector = 1:length(pr.mu);
+        N::Option{<:Number} = nothing,
+        kwargs...
+    ) -> Plot
+    plot_prior(pr::AbstractPriorResult, rd::ReturnsResult; N, kwargs...) -> Plot
+    plot_prior(res::OptimisationResult[, rd]; N, kwargs...) -> Plot
+    plot_prior(pred::PredictionResult[, rd]; N, kwargs...) -> Plot
 
 Three-panel composite plot summarising a prior result:
 
@@ -763,13 +880,17 @@ Three-panel composite plot summarising a prior result:
  2. Asset volatility bar chart ([`plot_sigma`](@ref)).
  3. Correlation heatmap ([`plot_correlation`](@ref)).
 
-When `rd` is provided, asset names (`rd.nx`) are used throughout.
+# Arguments
+
+  - `pr::AbstractPriorResult`: Prior result containing `mu` and `sigma`.
+  - `nx`: Asset names.
+  - `N::Option{<:Number} = nothing`: Forwarded to [`plot_mu`](@ref) and [`plot_sigma`](@ref) to limit displayed assets.
+  - `rd::ReturnsResult`: Provides asset names via `rd.nx` when given.
 
 Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
 
 # Related
 
-  - [`PlottingOptions`](@ref)
   - [`plot_mu`](@ref)
   - [`plot_sigma`](@ref)
   - [`plot_correlation`](@ref)
@@ -781,21 +902,32 @@ function plot_prior end
 ## Factor expected returns bar chart
 ## ──────────────────────────────────────────────────────────────────────────────
 """
-    plot_factor_mu(f_mu[, nf]; opts, kwargs...)
-    plot_factor_mu(pr[, nf]; opts, kwargs...)
-    plot_factor_mu(pr, rd; opts, kwargs...)
-    plot_factor_mu(res[, rd]; opts, kwargs...)
-    plot_factor_mu(pred[, rd]; opts, kwargs...)
+    plot_factor_mu(
+        f_mu::VecNum,
+        nf::AbstractVector = 1:length(f_mu);
+        N::Option{<:Number} = nothing,
+        kwargs...
+    ) -> Plot
+    plot_factor_mu(pr::AbstractPriorResult[, nf]; N, kwargs...) -> Plot
+    plot_factor_mu(pr::AbstractPriorResult, rd::ReturnsResult; N, kwargs...) -> Plot
+    plot_factor_mu(res::OptimisationResult[, rd]; N, kwargs...) -> Plot
+    plot_factor_mu(pred::PredictionResult[, rd]; N, kwargs...) -> Plot
 
 Bar chart of per-factor expected returns (f_μ vector from a factor model prior).
 
 Requires that the prior was estimated with a factor model (`pr.f_mu` is not `nothing`).
 
+# Arguments
+
+  - `f_mu`: Factor expected returns vector.
+  - `nf`: Factor names.
+  - `N::Option{<:Number} = nothing`: Maximum number of factors to display.
+    `nothing` auto-selects via [`number_effective_assets`](@ref).
+
 Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
 
 # Related
 
-  - [`PlottingOptions`](@ref)
   - [`plot_mu`](@ref)
   - [`LowOrderPrior`](@ref)
 """
@@ -805,22 +937,38 @@ function plot_factor_mu end
 ## Benchmark overlay
 ## ──────────────────────────────────────────────────────────────────────────────
 """
-    plot_benchmark(w, X, B[, fees]; ts, nb, opts, kwargs...)
-    plot_benchmark(w, rd[, fees]; opts, kwargs...)
-    plot_benchmark(res, rd; opts, kwargs...)
-    plot_benchmark(pred; opts, kwargs...)
-    plot_benchmark(mpred; opts, kwargs...)
+    plot_benchmark(
+        w::ArrNum,
+        X::MatNum,
+        B::VecNum_VecVecNum,
+        fees::Option{<:Fees} = nothing;
+        ts::AbstractVector = 1:size(X, 1),
+        nb::Option{<:AbstractVector} = nothing,
+        compound::Bool = false,
+        kwargs...
+    ) -> Plot
+    plot_benchmark(w, rd::ReturnsResult, fees = nothing; compound, kwargs...) -> Plot
+    plot_benchmark(res::OptimisationResult, rd; compound, kwargs...) -> Plot
+    plot_benchmark(pred::PredictionResult; compound, kwargs...) -> Plot
+    plot_benchmark(mpred::MultiPeriodPredictionResult; compound, kwargs...) -> Plot
 
 Overlay portfolio cumulative returns against one or more benchmark return series from `rd.B`.
 
-`opts.compound` controls compounding for both the portfolio and benchmark series.
-Throws `ArgumentError` if `rd.B` is `nothing`.
+# Arguments
+
+  - `w`: Portfolio weights.
+  - `X`: Asset returns matrix (observations × assets).
+  - `B`: Benchmark return series or vector of series.
+  - `fees::Option{<:Fees} = nothing`: Optional transaction fees.
+  - `ts::AbstractVector = 1:size(X, 1)`: Time axis labels.
+  - `nb::Option{<:AbstractVector} = nothing`: Benchmark names.
+  - `compound::Bool = false`: If `true`, compound cumulative returns for both portfolio and benchmarks.
+  - `rd::ReturnsResult`: Provides `B`, `ts`, and `nb`; throws `ArgumentError` if `rd.B` is `nothing`.
 
 Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
 
 # Related
 
-  - [`PlottingOptions`](@ref)
   - [`plot_ptf_cumulative_returns`](@ref)
   - [`ReturnsResult`](@ref)
 """
@@ -830,24 +978,25 @@ function plot_benchmark end
 ## Coskewness heatmap
 ## ──────────────────────────────────────────────────────────────────────────────
 """
-    plot_coskewness(sk[, nx]; opts, kwargs...)
-    plot_coskewness(pr[, nx]; opts, kwargs...)
-    plot_coskewness(pr, rd; opts, kwargs...)
-    plot_coskewness(res[, rd]; opts, kwargs...)
-    plot_coskewness(pred[, rd]; opts, kwargs...)
+    plot_coskewness(
+        sk::MatNum,
+        nx::AbstractVector = 1:size(sk, 1);
+        kwargs...
+    ) -> Plot
+    plot_coskewness(pr::HighOrderPrior[, nx]; kwargs...) -> Plot
+    plot_coskewness(pr::HighOrderPrior, rd::ReturnsResult; kwargs...) -> Plot
+    plot_coskewness(res::OptimisationResult[, rd]; kwargs...) -> Plot
+    plot_coskewness(pred::PredictionResult[, rd]; kwargs...) -> Plot
 
 Heatmap of the coskewness matrix (N × N²) from a [`HighOrderPrior`](@ref).
-
 Uses a diverging colour scale centred at zero.
-Requires that `pr.sk` is not `nothing` (i.e. the prior was estimated with higher moments).
 
-The factor variant uses `pr.f_sk` when available.
+Requires that `pr.sk` is not `nothing` (i.e. the prior was estimated with higher moments).
 
 Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
 
 # Related
 
-  - [`PlottingOptions`](@ref)
   - [`plot_cokurtosis`](@ref)
   - [`HighOrderPrior`](@ref)
 """
@@ -857,16 +1006,26 @@ function plot_coskewness end
 ## Cokurtosis eigenspectrum / heatmap
 ## ──────────────────────────────────────────────────────────────────────────────
 """
-    plot_cokurtosis(kt[, nx]; opts, kwargs...)
-    plot_cokurtosis(pr[, nx]; opts, kwargs...)
-    plot_cokurtosis(pr, rd; opts, kwargs...)
-    plot_cokurtosis(res[, rd]; opts, kwargs...)
-    plot_cokurtosis(pred[, rd]; opts, kwargs...)
+    plot_cokurtosis(
+        kt::MatNum,
+        nx::AbstractVector = 1:isqrt(size(kt, 1));
+        heatmap::Bool = false,
+        reference::Bool = true,
+        kwargs...
+    ) -> Plot
+    plot_cokurtosis(pr::HighOrderPrior[, nx]; heatmap, reference, kwargs...) -> Plot
+    plot_cokurtosis(pr::HighOrderPrior, rd::ReturnsResult; heatmap, reference, kwargs...) -> Plot
+    plot_cokurtosis(res::OptimisationResult[, rd]; heatmap, reference, kwargs...) -> Plot
+    plot_cokurtosis(pred::PredictionResult[, rd]; heatmap, reference, kwargs...) -> Plot
 
 Eigenvalue spectrum of the cokurtosis matrix (N² × N²) from a [`HighOrderPrior`](@ref).
 
-When `opts.reference = true`, overlays the Marchenko-Pastur noise bulk bound.
-Pass `heatmap = true` as a kwarg to show the raw heatmap instead (only recommended for small N).
+# Arguments
+
+  - `kt`: Cokurtosis matrix (N² × N²).
+  - `nx`: Asset names.
+  - `heatmap::Bool = false`: If `true`, show the raw heatmap instead (only recommended for small N).
+  - `reference::Bool = true`: If `true`, overlays the mean eigenvalue as a reference line.
 
 Requires that `pr.kt` is not `nothing`.
 
@@ -874,7 +1033,6 @@ Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
 
 # Related
 
-  - [`PlottingOptions`](@ref)
   - [`plot_coskewness`](@ref)
   - [`HighOrderPrior`](@ref)
 """
@@ -884,8 +1042,23 @@ function plot_cokurtosis end
 ## Portfolio dashboard (multi-panel composite)
 ## ──────────────────────────────────────────────────────────────────────────────
 """
-    plot_portfolio_dashboard(res, rd; r, slv, opts, kwargs...)
-    plot_portfolio_dashboard(pred; r, slv, opts, kwargs...)
+    plot_portfolio_dashboard(
+        res::OptimisationResult,
+        rd::Pr_RR;
+        ts = 1:size(rd.X, 1),
+        nx = 1:size(rd.X, 2),
+        r::AbstractBaseRiskMeasure = Variance(),
+        slv::Option{<:Slv_VecSlv} = nothing,
+        compound::Bool = false,
+        N::Option{<:Number} = nothing,
+        delta::Number = 1e-6,
+        marginal::Bool = false,
+        percentage::Bool = false,
+        alpha::Number = 0.05,
+        kappa::Number = 0.3,
+        rw = nothing,
+        kwargs...
+    ) -> Plot
 
 Four-panel composite plot for a single optimisation result:
 
@@ -899,11 +1072,25 @@ Four-panel composite plot for a single optimisation result:
 Note: panel 3 requires raw asset returns. Pass `rd::ReturnsResult` (original returns),
 not a `PredictionResult`, for the risk contribution panel.
 
+# Arguments
+
+  - `res::OptimisationResult`: Optimisation result.
+  - `rd::Pr_RR`: Returns result or prior; extracts `nx` and `ts` from `rd` when `ReturnsResult`.
+  - `r`: Risk measure for panels 3 and 4.
+  - `slv`: Solver for EDaR / RLDaR drawdown lines.
+  - `compound::Bool = false`: If `true`, compound cumulative returns and drawdowns.
+  - `N::Option{<:Number} = nothing`: Forwarded to composition and risk contribution panels.
+  - `delta::Number = 1e-6`: Finite-difference step for risk contribution. Must be `> 0`.
+  - `marginal::Bool = false`: Marginal vs component risk contribution.
+  - `percentage::Bool = false`: Normalise risk contributions to percentages.
+  - `alpha::Number = 0.05`: Confidence level for drawdown risk lines.
+  - `kappa::Number = 0.3`: Relativistic parameter for RLDaR.
+  - `rw`: Observation weights for drawdown risk measures.
+
 Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
 
 # Related
 
-  - [`PlottingOptions`](@ref)
   - [`plot_composition`](@ref)
   - [`plot_ptf_cumulative_returns`](@ref)
   - [`plot_risk_contribution`](@ref)
@@ -915,7 +1102,12 @@ function plot_portfolio_dashboard end
 ## Cross-validation dashboard (multi-panel composite)
 ## ──────────────────────────────────────────────────────────────────────────────
 """
-    plot_cv_dashboard(mpred; r, opts, kwargs...)
+    plot_cv_dashboard(
+        mpred::MultiPeriodPredictionResult;
+        N::Option{<:Number} = nothing,
+        compound::Bool = false,
+        kwargs...
+    ) -> Plot
 
 Four-panel composite plot for a walk-forward cross-validation result:
 
@@ -924,11 +1116,16 @@ Four-panel composite plot for a walk-forward cross-validation result:
  3. Turnover per fold ([`plot_turnover`](@ref)).
  4. Weight stability box plot ([`plot_weight_stability`](@ref)).
 
+# Arguments
+
+  - `mpred::MultiPeriodPredictionResult`: Walk-forward prediction result.
+  - `N::Option{<:Number} = nothing`: Forwarded to [`plot_weight_stability`](@ref).
+  - `compound::Bool = false`: Forwarded to [`plot_ptf_cumulative_returns`](@ref).
+
 Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
 
 # Related
 
-  - [`PlottingOptions`](@ref)
   - [`MultiPeriodPredictionResult`](@ref)
   - [`plot_turnover`](@ref)
   - [`plot_weight_stability`](@ref)
@@ -939,26 +1136,45 @@ function plot_cv_dashboard end
 ## Efficient frontier
 ## ──────────────────────────────────────────────────────────────────────────────
 """
-    plot_efficient_frontier(res_vec, pr[, fees]; x, y, c, slv, opts, kwargs...)
-    plot_efficient_frontier(res_vec, rd; ...)
+    plot_efficient_frontier(
+        res_vec::AbstractVector{<:OptimisationResult},
+        pr::Pr_RR;
+        x::AbstractBaseRiskMeasure = Variance(),
+        y::AbstractBaseRiskMeasure = ExpectedReturn(),
+        c::AbstractBaseRiskMeasure = ExpectedReturnRiskRatio(; rk=x, rt=ArithmeticReturn(), rf=0),
+        slv::Option{<:Slv_VecSlv} = nothing,
+        fees::Option{<:Fees} = nothing,
+        min_risk::Bool = true,
+        max_score::Bool = true,
+        factory::Bool = true,
+        kwargs...
+    ) -> Plot
+    plot_efficient_frontier(res_vec, rd::ReturnsResult; kwargs...) -> Plot
+    plot_efficient_frontier(w::VecVecNum, pr::Pr_RR; x, y, c, slv, fees, min_risk, max_score, factory, kwargs...) -> Plot
+    plot_efficient_frontier(res::OptimisationResult, pr::Pr_RR; fees, kwargs...) -> Plot
+    plot_efficient_frontier(res::OptimisationResult, rd::ReturnsResult; kwargs...) -> Plot
 
 Sort a collection of portfolio results by risk (`x`), connect them with a line to
-trace the efficient frontier, and optionally annotate the **minimum-risk** and
-**maximum-Sharpe** portfolios.
+trace the efficient frontier, and optionally annotate the minimum-risk and maximum-score portfolios.
 
-  - `x`: risk measure for the horizontal axis (default `Variance()`).
-  - `y`: return measure for the vertical axis (default `ExpectedReturn()`).
-  - `c`: colour-coding measure (default Sharpe ratio derived from `x`).
-  - `opts.factory`: if `true` (default), call `factory` on the measures before evaluating.
-  - `min_risk::Bool = true` (kwarg): overlay a star marker at the minimum-risk portfolio.
-  - `max_score::Bool = true` (kwarg): overlay a star marker at the portfolio that maximises the colour-coding measure.
+# Arguments
+
+  - `res_vec` / `w`: Portfolio results or weight vectors.
+  - `pr` / `rd`: Prior or returns result for risk evaluation.
+  - `x`: Risk measure for the horizontal axis (default `Variance()`).
+  - `y`: Return measure for the vertical axis (default `ExpectedReturn()`).
+  - `c`: Colour-coding measure (default Sharpe ratio derived from `x`).
+  - `slv::Option{<:Slv_VecSlv} = nothing`: Solver passed to `factory`.
+  - `fees::Option{<:Fees} = nothing`: Optional transaction fees.
+  - `min_risk::Bool = true`: Overlay a star marker at the minimum-risk portfolio.
+  - `max_score::Bool = true`: Overlay a star marker at the portfolio that maximises `c`.
+  - `factory::Bool = true`: If `true`, call [`factory`](@ref) on measures before evaluating.
 
 Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
 
 # Related
 
   - [`plot_measures`](@ref)
-  - [`PlottingOptions`](@ref)
   - [`expected_risk`](@ref)
 """
 function plot_efficient_frontier end
@@ -967,24 +1183,41 @@ function plot_efficient_frontier end
 ## Performance summary
 ## ──────────────────────────────────────────────────────────────────────────────
 """
-    plot_performance_summary(w, X[, fees]; periods_per_year, opts, kwargs...)
-    plot_performance_summary(w, rd[, fees]; opts, kwargs...)
-    plot_performance_summary(res, rd; opts, kwargs...)
-    plot_performance_summary(pred; opts, kwargs...)
-    plot_performance_summary(mpred; opts, kwargs...)
+    plot_performance_summary(
+        w::ArrNum,
+        X::MatNum,
+        fees::Option{<:Fees} = nothing;
+        periods_per_year::Number = 252,
+        alpha::Number = 0.05,
+        compound::Bool = false,
+        kwargs...
+    ) -> Plot
+    plot_performance_summary(w, rd::ReturnsResult, fees = nothing; alpha, compound, kwargs...) -> Plot
+    plot_performance_summary(res::OptimisationResult, rd; alpha, compound, kwargs...) -> Plot
+    plot_performance_summary(pred; alpha, compound, kwargs...) -> Plot
+    plot_performance_summary(mpred::MultiPeriodPredictionResult; alpha, compound, kwargs...) -> Plot
 
 Bar chart of annualised portfolio performance metrics:
 annualised return, annualised volatility, Sharpe ratio, Sortino ratio, Calmar ratio,
-maximum drawdown %, and CVaR % (at `opts.alpha`).
+maximum drawdown %, and CVaR %.
 
-  - `periods_per_year`: trading periods per year used for annualisation (default `252`).
-  - `opts.alpha`: tail probability for CVaR (default `0.05`).
+# Arguments
+
+  - `w`: Portfolio weights.
+  - `X`: Asset returns matrix (observations × assets).
+  - `fees::Option{<:Fees} = nothing`: Optional transaction fees.
+  - `periods_per_year::Number = 252`: Trading periods per year used for annualisation.
+  - `alpha::Number = 0.05`: Tail probability for CVaR. Must satisfy `0 < alpha < 1`.
+  - `compound::Bool = false`: If `true`, use compound cumulative returns for max drawdown.
+
+# Validation
+
+  - `0 < alpha < 1`.
 
 Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
 
 # Related
 
-  - [`PlottingOptions`](@ref)
   - [`calc_net_returns`](@ref)
 """
 function plot_performance_summary end
@@ -993,22 +1226,39 @@ function plot_performance_summary end
 ## Rolling drawdown evolution
 ## ──────────────────────────────────────────────────────────────────────────────
 """
-    plot_rolling_drawdowns(w, X[, fees]; ts, opts, kwargs...)
-    plot_rolling_drawdowns(w, rd[, fees]; opts, kwargs...)
-    plot_rolling_drawdowns(res, rd; opts, kwargs...)
-    plot_rolling_drawdowns(pred; opts, kwargs...)
-    plot_rolling_drawdowns(mpred; opts, kwargs...)
+    plot_rolling_drawdowns(
+        w::ArrNum,
+        X::MatNum,
+        fees::Option{<:Fees} = nothing;
+        ts::AbstractVector = 1:size(X, 1),
+        rolling::Integer = 0,
+        compound::Bool = false,
+        kwargs...
+    ) -> Plot
+    plot_rolling_drawdowns(w, rd::ReturnsResult, fees = nothing; rolling, compound, kwargs...) -> Plot
+    plot_rolling_drawdowns(res::OptimisationResult, rd; rolling, compound, kwargs...) -> Plot
+    plot_rolling_drawdowns(pred; rolling, compound, kwargs...) -> Plot
+    plot_rolling_drawdowns(mpred::MultiPeriodPredictionResult; rolling, compound, kwargs...) -> Plot
 
 Line plot of the rolling maximum drawdown over a sliding window.
 
-Window size is controlled by `opts.rolling` (0 = auto: ⌈√T⌉).
-`opts.compound` selects compound vs simple drawdowns.
+# Arguments
+
+  - `w`: Portfolio weights.
+  - `X`: Asset returns matrix (observations × assets).
+  - `fees::Option{<:Fees} = nothing`: Optional transaction fees.
+  - `ts::AbstractVector = 1:size(X, 1)`: Time axis labels.
+  - `rolling::Integer = 0`: Window size. `0` auto-detects as `⌈√T⌉`. Must be `>= 0`.
+  - `compound::Bool = false`: If `true`, use compound drawdowns.
+
+# Validation
+
+  - `rolling >= 0`.
 
 Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
 
 # Related
 
-  - [`PlottingOptions`](@ref)
   - [`drawdowns`](@ref)
   - [`plot_drawdowns`](@ref)
   - [`plot_rolling_measure`](@ref)
@@ -1048,12 +1298,12 @@ function _rolling_window_measure(r::AbstractBaseRiskMeasure, w::VecNum, X::MatNu
     return [expected_risk(r, w, view(X, (t - window + 1):t, :), fees) for t in window:T]
 end
 
-export PlottingOptions, plot_ptf_cumulative_returns, plot_asset_cumulative_returns,
-       plot_composition, plot_stacked_bar_composition, plot_stacked_area_composition,
-       plot_dendrogram, plot_clusters, plot_drawdowns, plot_risk_contribution,
-       plot_factor_risk_contribution, plot_measures, plot_histogram, plot_network,
-       plot_centrality, plot_correlation, plot_mu, plot_sigma, plot_factor_loadings,
-       plot_factor_sigma, plot_eigenspectrum, plot_rolling_measure, plot_weight_stability,
-       plot_cv_scores, plot_turnover, plot_prior, plot_factor_mu, plot_benchmark,
-       plot_coskewness, plot_cokurtosis, plot_portfolio_dashboard, plot_cv_dashboard,
-       plot_efficient_frontier, plot_performance_summary, plot_rolling_drawdowns
+export plot_ptf_cumulative_returns, plot_asset_cumulative_returns, plot_composition,
+       plot_stacked_bar_composition, plot_stacked_area_composition, plot_dendrogram,
+       plot_clusters, plot_drawdowns, plot_risk_contribution, plot_factor_risk_contribution,
+       plot_measures, plot_histogram, plot_network, plot_centrality, plot_correlation,
+       plot_mu, plot_sigma, plot_factor_loadings, plot_factor_sigma, plot_eigenspectrum,
+       plot_rolling_measure, plot_weight_stability, plot_cv_scores, plot_turnover,
+       plot_prior, plot_factor_mu, plot_benchmark, plot_coskewness, plot_cokurtosis,
+       plot_portfolio_dashboard, plot_cv_dashboard, plot_efficient_frontier,
+       plot_performance_summary, plot_rolling_drawdowns

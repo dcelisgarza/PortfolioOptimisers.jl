@@ -223,7 +223,7 @@ We can also visualise the portfolio using various plotting functions. For exampl
 
 ```@example 0_index
 # Plot the portfolio cumulative returns of the finite allocation portfolio.
-plot_ptf_cumulative_returns(mip_res.w, rd.X; ts = rd.ts, opts = PlottingOptions(; compound = true))
+plot_ptf_cumulative_returns(mip_res.w, rd.X; ts = rd.ts, compound = true)
 ```
 
 We can plot the histogram of portfolio returns.

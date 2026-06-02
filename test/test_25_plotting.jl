@@ -36,24 +36,22 @@
     mr = MeanRisk(; r = r_cvr, opt = JuMPOptimiser(; slv = slv))
     res = optimise(mr, rd)
 
-    @testset "PlottingOptions" begin
-        opts = PlottingOptions()
-        @test opts.alpha == 0.05
-        @test opts.kappa == 0.3
-        @test opts.points == 0
-        @test opts.rolling == 0
-        @test opts.compound == false
-        @test opts.reference == true
-        @test opts.factory == true
-
-        @test PlottingOptions(; alpha = 0.1).alpha == 0.1
-        @test_throws Exception PlottingOptions(; alpha = 0.0)
-        @test_throws Exception PlottingOptions(; alpha = 1.0)
-        @test_throws Exception PlottingOptions(; kappa = 0.0)
-        @test_throws Exception PlottingOptions(; delta = 0.0)
-        @test_throws Exception PlottingOptions(; points = -1)
-        @test_throws Exception PlottingOptions(; rolling = -1)
-        @test_throws Exception PlottingOptions(; N = -1.0)
+    @testset "Keyword validation" begin
+        # alpha validated in plot_drawdowns, plot_histogram, plot_performance_summary
+        @test_throws ArgumentError plot_drawdowns(w, X; alpha = 0.0)
+        @test_throws ArgumentError plot_drawdowns(w, X; alpha = 1.0)
+        @test_throws ArgumentError plot_histogram(w, X; alpha = 0.0)
+        @test_throws ArgumentError plot_performance_summary(w, X; alpha = 1.0)
+        # kappa validated in plot_drawdowns, plot_histogram
+        @test_throws ArgumentError plot_drawdowns(w, X; kappa = 0.0)
+        @test_throws ArgumentError plot_histogram(w, X; kappa = 1.0)
+        # delta validated in plot_risk_contribution, plot_factor_risk_contribution
+        @test_throws ArgumentError plot_risk_contribution(r_cvr, w, X; delta = 0.0)
+        # points validated in plot_histogram
+        @test_throws ArgumentError plot_histogram(w, X; points = -1)
+        # rolling validated in plot_rolling_measure, plot_rolling_drawdowns
+        @test_throws ArgumentError plot_rolling_measure(r_cvr, w, X; rolling = -1)
+        @test_throws ArgumentError plot_rolling_drawdowns(w, X; rolling = -1)
     end
 
     @testset "plot_ptf_cumulative_returns" begin
@@ -118,12 +116,12 @@
     @testset "plot_drawdowns" begin
         @test is_plot(plot_drawdowns(w, X))
         @test is_plot(plot_drawdowns(w_rd, rd))
-        @test is_plot(plot_drawdowns(w, X; opts = PlottingOptions(; compound = true)))
+        @test is_plot(plot_drawdowns(w, X; compound = true))
     end
 
     @testset "plot_histogram" begin
         @test is_plot(plot_histogram(w, X))
-        @test is_plot(plot_histogram(w, X; opts = PlottingOptions(; reference = false)))
+        @test is_plot(plot_histogram(w, X; reference = false))
         @test is_plot(plot_histogram(w_rd, rd))
     end
 
@@ -134,8 +132,7 @@
 
     @testset "plot_centrality" begin
         cte = CentralityEstimator()
-        @test is_plot(plot_centrality(cte, X, nx;
-                                      opts = PlottingOptions(; N = 20, percentage = true)))
+        @test is_plot(plot_centrality(cte, X, nx; N = 20, percentage = true))
     end
 
     @testset "plot_correlation" begin
@@ -166,15 +163,13 @@
 
     @testset "plot_eigenspectrum" begin
         @test is_plot(plot_eigenspectrum(sigma))
-        @test is_plot(plot_eigenspectrum(sigma; N_obs = T,
-                                         opts = PlottingOptions(; reference = true)))
+        @test is_plot(plot_eigenspectrum(sigma; N_obs = T, reference = true))
     end
 
     @testset "plot_rolling_measure" begin
         # use return-based risk measure (CVaR), not covariance-based (Variance)
         @test is_plot(plot_rolling_measure(r_cvr, w, X))
-        @test is_plot(plot_rolling_measure(r_cvr, w, X;
-                                           opts = PlottingOptions(; rolling = 20)))
+        @test is_plot(plot_rolling_measure(r_cvr, w, X; rolling = 20))
     end
 
     @testset "plot_cv_scores" begin
@@ -223,7 +218,7 @@
     @testset "Optimisation-based dispatch" begin
         @test !isnothing(res)
 
-        @test is_plot(plot_asset_cumulative_returns(res, rd))
+        @test is_plot(plot_asset_cumulative_returns(res; pr = rd))
         @test is_plot(plot_composition(res, rd))
         @test is_plot(plot_composition(res, pr))
         @test is_plot(plot_risk_contribution(r_cvr, res, rd))
@@ -235,7 +230,7 @@
         @test is_plot(plot_prior(res, rd))
         # default r=Variance() has no sigma; pass CVaR which computes from returns
         @test is_plot(plot_portfolio_dashboard(res, rd; r = r_cvr))
-        @test is_plot(plot_measures([res], rd))
+        @test is_plot(plot_measures([res], pr))
     end
 
     @testset "Cross-validation dispatch" begin
@@ -281,9 +276,8 @@
     @testset "plot_rolling_drawdowns" begin
         @test is_plot(plot_rolling_drawdowns(w, X))
         @test is_plot(plot_rolling_drawdowns(w_rd, rd))
-        @test is_plot(plot_rolling_drawdowns(w, X; opts = PlottingOptions(; rolling = 20)))
-        @test is_plot(plot_rolling_drawdowns(w, X;
-                                             opts = PlottingOptions(; compound = true)))
+        @test is_plot(plot_rolling_drawdowns(w, X; rolling = 20))
+        @test is_plot(plot_rolling_drawdowns(w, X; compound = true))
         mr_d  = MeanRisk(; opt = JuMPOptimiser(; slv = slv))
         res_d = optimise(mr_d, rd)
         @test is_plot(plot_rolling_drawdowns(res_d, rd))
@@ -296,7 +290,7 @@
         raw  = cross_val_predict(mr, rd, KFold(; n = 2)).pred
         pred = isa(raw[1], PredictionResult) ? raw[1] : raw[1].pred[1]
 
-        @test_throws ArgumentError plot_asset_cumulative_returns(pred)
+        @test is_plot(plot_asset_cumulative_returns(pred))
         @test_throws ArgumentError plot_risk_contribution(r_cvr, pred)
         @test_throws ArgumentError plot_factor_risk_contribution(r_cvr, pred)
     end
