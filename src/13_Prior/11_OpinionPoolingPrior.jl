@@ -105,7 +105,7 @@ julia> OpinionPoolingPrior(;
                                                                                            val = ["A == 0.05",
                                                                                                   "B + C >= 0.06"]))])
 OpinionPoolingPrior
-  pes ┼ EntropyPoolingPrior{EmpiricalPrior{PortfolioOptimisersCovariance{Covariance{SimpleExpectedReturns{Nothing}, GeneralCovariance{StatsBase.SimpleCovariance, Nothing}, Full}, DenoiseDetoneAlgMatrixProcessing{Posdef{UnionAll, @NamedTuple{}}, Nothing, Nothing, Nothing, DenoiseDetoneAlg}}, SimpleExpectedReturns{Nothing}, Nothing}, LinearConstraintEstimator{Vector{String}, Nothing}, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, AssetSets{String, String, Dict{String, Vector{String}}}, Nothing, Nothing, OptimEntropyPooling{Tuple{}, @NamedTuple{}, Int64, Float64, ExpEntropyPooling}, Nothing, H1_EntropyPooling}[EntropyPoolingPrior
+  pes ┼ EntropyPoolingPrior{EmpiricalPrior{PortfolioOptimisersCovariance{Covariance{SimpleExpectedReturns{Nothing}, GeneralCovariance{StatsBase.SimpleCovariance, Nothing}, Full}, DenoiseDetoneAlgMatrixProcessing{Posdef{UnionAll, @NamedTuple{}}, Nothing, Nothing, Nothing, DenoiseDetoneAlg}}, SimpleExpectedReturns{Nothing}, Nothing}, LinearConstraintEstimator{Vector{String}, Nothing}, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, AssetSets{String, String, Dict{String, Vector{String}}}, Nothing, Nothing, OptimEntropyPooling{Tuple{}, @NamedTuple{}, Int64, Float64, ExpEntropyPooling}, Nothing, H1_EntropyPooling}[EntropyPoolingPrior
       │            pe ┼ EmpiricalPrior
       │               │        ce ┼ PortfolioOptimisersCovariance
       │               │           │   ce ┼ Covariance
@@ -134,6 +134,7 @@ OpinionPoolingPrior
       │   sigma_views ┼ nothing
       │      sk_views ┼ nothing
       │      kt_views ┼ nothing
+      │     cov_views ┼ nothing
       │     rho_views ┼ nothing
       │     var_alpha ┼ nothing
       │    cvar_alpha ┼ nothing
@@ -180,6 +181,7 @@ OpinionPoolingPrior
       │   sigma_views ┼ nothing
       │      sk_views ┼ nothing
       │      kt_views ┼ nothing
+      │     cov_views ┼ nothing
       │     rho_views ┼ nothing
       │     var_alpha ┼ nothing
       │    cvar_alpha ┼ nothing

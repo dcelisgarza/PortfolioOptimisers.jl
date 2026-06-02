@@ -153,8 +153,8 @@ function PortfolioOptimisers.plot_asset_cumulative_returns(pred::MultiperiodPred
         mean_w .+= w
         net_asset_ret = calc_net_asset_returns(w, pr.X, fees)
         ret = cumulative_returns(net_asset_ret, compound)
-        append!(X; vec(ret))
-        append!(ts; res.rd.ts)
+        append!(X, vec(ret))
+        append!(ts, res.rd.ts)
     end
     mean_w ./= length(res_vec)
     X = reshape(X, length(ts), M)

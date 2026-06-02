@@ -339,6 +339,7 @@ const arg_dict = Dict(
                       :sigma_views => "`sigma_views`: Covariance views estimator or result.",#
                       :sk_views => "`sk_views`: Coskewness views estimator or result.",#
                       :kt_views => "`kt_views`: Cokurtosis views estimator or result.",#
+                      :cov_views => "`cov_views`: Covariance views estimator or result.",#
                       :rho_views => "`rho_views`: Correlation views estimator or result.",#
                       :var_alpha => "`var_alpha`: Quantile level for variance views.",#
                       :cvar_alpha => "`cvar_alpha`: Quantile level for conditional value-at-risk views.",#

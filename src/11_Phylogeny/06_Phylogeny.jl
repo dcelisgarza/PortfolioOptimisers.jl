@@ -872,30 +872,29 @@ Keywords correspond to the struct's fields.
 ```jldoctest
 julia> NetworkEstimator()
 NetworkEstimator
-    ce ┼ PortfolioOptimisersCovariance
-       │   ce ┼ Covariance
-       │      │    me ┼ SimpleExpectedReturns
-       │      │       │   w ┴ nothing
-       │      │    ce ┼ GeneralCovariance
-       │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-       │      │       │    w ┴ nothing
-       │      │   alg ┴ Full()
-       │   mp ┼ DenoiseDetoneAlgMatrixProcessing
-       │      │     pdm ┼ Posdef
-       │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-       │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
-       │      │      dn ┼ nothing
-       │      │      dt ┼ nothing
-       │      │     alg ┼ nothing
-       │      │   order ┴ DenoiseDetoneAlg()
-    de ┼ Distance
-       │   power ┼ nothing
-       │     alg ┴ CanonicalDistance()
-   alg ┼ KruskalTree
-       │     args ┼ Tuple{}: ()
-       │   kwargs ┴ @NamedTuple{}: NamedTuple()
-     n ┼ Int64: 1
-  flag ┴ Bool: false
+   ce ┼ PortfolioOptimisersCovariance
+      │   ce ┼ Covariance
+      │      │    me ┼ SimpleExpectedReturns
+      │      │       │   w ┴ nothing
+      │      │    ce ┼ GeneralCovariance
+      │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+      │      │       │    w ┴ nothing
+      │      │   alg ┴ Full()
+      │   mp ┼ DenoiseDetoneAlgMatrixProcessing
+      │      │     pdm ┼ Posdef
+      │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+      │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+      │      │      dn ┼ nothing
+      │      │      dt ┼ nothing
+      │      │     alg ┼ nothing
+      │      │   order ┴ DenoiseDetoneAlg()
+   de ┼ Distance
+      │   power ┼ nothing
+      │     alg ┴ CanonicalDistance()
+  alg ┼ KruskalTree
+      │     args ┼ Tuple{}: ()
+      │   kwargs ┴ @NamedTuple{}: NamedTuple()
+    n ┴ Int64: 1
 ```
 
 # Related
@@ -979,29 +978,41 @@ Keywords correspond to the struct's fields.
 ```jldoctest
 julia> NetworkClustersEstimator()
 NetworkClustersEstimator
-   ce ┼ PortfolioOptimisersCovariance
-      │   ce ┼ Covariance
-      │      │    me ┼ SimpleExpectedReturns
-      │      │       │   w ┴ nothing
-      │      │    ce ┼ GeneralCovariance
-      │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-      │      │       │    w ┴ nothing
-      │      │   alg ┴ Full()
-      │   mp ┼ DenoiseDetoneAlgMatrixProcessing
-      │      │     pdm ┼ Posdef
-      │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-      │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
-      │      │      dn ┼ nothing
-      │      │      dt ┼ nothing
-      │      │     alg ┼ nothing
-      │      │   order ┴ DenoiseDetoneAlg()
-   de ┼ Distance
-      │   power ┼ nothing
-      │     alg ┴ CanonicalDistance()
-  alg ┼ KruskalTree
-      │     args ┼ Tuple{}: ()
-      │   kwargs ┴ @NamedTuple{}: NamedTuple()
-    n ┴ Int64: 1
+  nte ┼ NetworkEstimator
+      │    ce ┼ PortfolioOptimisersCovariance
+      │       │   ce ┼ Covariance
+      │       │      │    me ┼ SimpleExpectedReturns
+      │       │      │       │   w ┴ nothing
+      │       │      │    ce ┼ GeneralCovariance
+      │       │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+      │       │      │       │    w ┴ nothing
+      │       │      │   alg ┴ Full()
+      │       │   mp ┼ DenoiseDetoneAlgMatrixProcessing
+      │       │      │     pdm ┼ Posdef
+      │       │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+      │       │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+      │       │      │      dn ┼ nothing
+      │       │      │      dt ┼ nothing
+      │       │      │     alg ┼ nothing
+      │       │      │   order ┴ DenoiseDetoneAlg()
+      │    de ┼ Distance
+      │       │   power ┼ nothing
+      │       │     alg ┴ CanonicalDistance()
+      │   alg ┼ KruskalTree
+      │       │     args ┼ Tuple{}: ()
+      │       │   kwargs ┴ @NamedTuple{}: NamedTuple()
+      │     n ┴ Int64: 1
+  alg ┼ HClustAlgorithm
+      │   linkage ┴ Symbol: :ward
+  onc ┼ OptimalNumberClusters
+      │   max_k ┼ nothing
+      │     alg ┼ SecondOrderDifference
+      │         │   alg ┼ StandardisedValue
+      │         │       │   mv ┼ MeanValue
+      │         │       │      │   w ┴ nothing
+      │         │       │   sv ┼ StdValue
+      │         │       │      │           w ┼ nothing
+      │         │       │      │   corrected ┴ Bool: true
 ```
 
 # Related
