@@ -143,6 +143,29 @@ function SecondMoment(; ve::AbstractVarianceEstimator = SimpleVariance(; me = no
                       alg2::SecondMomentFormulation = SquaredSOCRiskExpr())::SecondMoment
     return SecondMoment(ve, alg1, alg2)
 end
+@concrete struct EvenMoment <: UnstandardisedLowOrderMomentMeasureAlgorithm
+    """
+    Order of the even moment.
+    """
+    p
+    """
+    $(field_dict[:ddof])
+    """
+    ddof
+    """
+    $(field_dict[:malg])
+    """
+    alg
+    function EvenMoment(p::Integer, ddof::Integer, alg::AbstractMomentAlgorithm)
+        @argcheck(p >= 2, DomainError)
+        assert_nonempty_nonneg_finite_val(ddof, :ddof)
+        return new{typeof(p), typeof(ddof), typeof(alg)}(p, ddof, alg)
+    end
+end
+function EvenMoment(; p::Integer = 2, ddof::Integer = 0,
+                    alg::AbstractMomentAlgorithm = Full())::EvenMoment
+    return EvenMoment(p, ddof, alg)
+end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
@@ -1159,6 +1182,32 @@ function (r::LowOrderMoment{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any,
     val = calc_deviations_vec(r, w, X, fees)
     return Statistics.var(r.alg.ve, val; mean = zero(eltype(val)))
 end
+function (r::LowOrderMoment{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any,
+                            <:EvenMoment{<:Any, <:Any, <:Semi}})(w::VecNum, X::MatNum,
+                                                                 fees::Option{<:Fees} = nothing)
+    T = size(X, 1) - r.alg.ddof
+    val = min.(calc_deviations_vec(r, w, X, fees), zero(eltype(X)))
+    val = if isnothing(r.w)
+        LinearAlgebra.norm(val, 2 * r.alg.p)
+    else
+        T = T / size(X, 1) * sum(r.w)
+        LinearAlgebra.norm(val .* r.w, 2 * r.alg.p)
+    end
+    return val^2 / T^inv(r.alg.p)
+end
+function (r::LowOrderMoment{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any,
+                            <:EvenMoment{<:Any, <:Any, <:Full}})(w::VecNum, X::MatNum,
+                                                                 fees::Option{<:Fees} = nothing)
+    T = size(X, 1) - r.alg.ddof
+    val = calc_deviations_vec(r, w, X, fees)
+    val = if isnothing(r.w)
+        LinearAlgebra.norm(val, 2 * r.alg.p)
+    else
+        T = T / size(X, 1) * sum(r.w)
+        LinearAlgebra.norm(val .* r.w, 2 * r.alg.p)
+    end
+    return val^2 / T^inv(r.alg.p)
+end
 function (r::HighOrderMoment{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any,
                              <:FourthMoment{<:Semi}})(w::VecNum, X::MatNum,
                                                       fees::Option{<:Fees} = nothing)
@@ -1221,4 +1270,5 @@ for rt in (LowOrderMoment, HighOrderMoment)
 end
 
 export FirstLowerMoment, SecondMoment, MeanAbsoluteDeviation, ThirdLowerMoment,
-       FourthMoment, StandardisedHighOrderMoment, LowOrderMoment, HighOrderMoment
+       FourthMoment, StandardisedHighOrderMoment, LowOrderMoment, HighOrderMoment,
+       EvenMoment

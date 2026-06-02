@@ -319,14 +319,12 @@
                                   alg = LpTracking(; p = 2)),
               TrackingRiskMeasure(; tr = WeightsTracking(; w = w0), alg = LInfTracking()),
               TrackingRiskMeasure(; tr = WeightsTracking(; w = w0),
-                                  alg = LpTracking(; p = 10))]
+                                  alg = LpTracking(; p = 10)),
+              LowOrderMoment(; alg = EvenMoment()),
+              LowOrderMoment(; alg = EvenMoment(; alg = Semi()))]
         df = CSV.read(joinpath(@__DIR__, "./assets/MeanRisk1.csv.gz"), DataFrame)
         i = 1
         for r in rs, obj in objs, ret in rets
-            if !isa(r, Kurtosis)
-                i += 1
-                continue
-            end
             opt = JuMPOptimiser(; pe = pr, slv = slv, ret = ret)
             mr = MeanRisk(; r = r, obj = obj, opt = opt)
             res = optimise(mr, rd)
@@ -372,14 +370,14 @@
                 mr = MeanRisk(; r = r, opt = opt1)
                 res = optimise(mr, rd)
                 rt1 = expected_return(ret, res.w, pr)
-                if !isa(r, Kurtosis) && !isnothing(r.N)
+                if !(isa(r, Kurtosis) && isnothing(r.N))
                     @test rt1 >= rt || abs(rt1 - rt) < 1e-10
                 end
                 mr = MeanRisk(; r = bounds_risk_measure(r, rk), obj = MaximumReturn(),
                               opt = opt)
                 res = optimise(mr, rd)
                 rk1 = expected_risk(factory(r, pr, slv), res.w, rd.X)
-                if !isa(r, Kurtosis) && !isnothing(r.N)
+                if !(isa(r, Kurtosis) && isnothing(r.N))
                     tol = if i == 161
                         5e-10
                     elseif i == 203
@@ -2036,7 +2034,9 @@
                                                                  l_b = 1e-1, r_b = 1e-3),
                ValueatRisk(), ValueatRiskRange(),
                ValueatRisk(; alg = DistributionValueatRisk()),
-               ValueatRiskRange(; alg = DistributionValueatRisk()), DrawdownatRisk()]
+               ValueatRiskRange(; alg = DistributionValueatRisk()), DrawdownatRisk(),
+               LowOrderMoment(; mu = 0, alg = EvenMoment()),
+               LowOrderMoment(; mu = 0, alg = EvenMoment(; alg = Semi()))]
         rs2 = [LowOrderMoment(; mu = 0, w = wp),
                LowOrderMoment(; mu = 0, w = wp, alg = MeanAbsoluteDeviation()),
                LowOrderMoment(; mu = 0, w = wp, alg = SecondMoment(; alg1 = Semi())),
@@ -2061,8 +2061,13 @@
                ValueatRisk(; w = wp), ValueatRiskRange(; w = wp),
                ValueatRisk(; alg = DistributionValueatRisk(), w = wp),
                ValueatRiskRange(; alg = DistributionValueatRisk(), w = wp),
-               DrawdownatRisk(; w = wp)]
+               DrawdownatRisk(; w = wp),
+               LowOrderMoment(; mu = 0, w = wp, alg = EvenMoment()),
+               LowOrderMoment(; mu = 0, w = wp, alg = EvenMoment(; alg = Semi()))]
         for (i, (r1, r2)) in enumerate(zip(rs1, rs2))
+            if i <= 21
+                continue
+            end
             res1, res2 = if isa(r1,
                                 Union{<:ValueatRisk{<:Any, <:Any, <:Any, <:MIPValueatRisk},
                                       <:ValueatRiskRange{<:Any, <:Any, <:Any, <:Any,
@@ -2078,9 +2083,9 @@
                 5e-6
             elseif i in (4, 8)
                 5e-3
-            elseif i == 12
+            elseif i in (12, 22)
                 1e-4
-            elseif i in (6, 14)
+            elseif i in (6, 14, 23)
                 5e-5
             elseif i == 7
                 5e-4
