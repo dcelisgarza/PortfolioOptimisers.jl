@@ -355,6 +355,61 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                              second_moment_risk, r.settings)
     return second_moment_risk
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Add even-moment risk constraints to `model` for [`LowOrderMoment`](@ref) with [`EvenMoment`](@ref).
+
+Introduces auxiliary variables `even_moment_u`, `even_moment_t`, and `even_moment_risk`, and adds a chain of power cone constraints encoding the ``2p``-th central (full) or lower (semi) even moment of portfolio returns relative to the target. Registers the risk expression and upper-bound constraint.
+
+# Mathematical definition
+
+The ``2p``-th even moment is encoded via the following power cone formulation (full variant):
+
+```math
+\\begin{align}
+\\underset{\\boldsymbol{w},\\,\\boldsymbol{u},\\,\\boldsymbol{s},\\,r}{\\mathrm{opt}} \\quad & r \\\\
+\\mathrm{s.t.} \\quad & \\sum_{t=1}^{T} u_t \\leq r \\\\
+               \\quad & \\left(u_t \\cdot T_d,\\, r,\\, s_t\\right) \\in \\mathcal{K}_{\\mathrm{pow}}\\!\\left(\\tfrac{1}{p}\\right),\\quad t = 1,\\ldots,T \\\\
+               \\quad & \\left(s_t,\\, k,\\, \\hat{r}_t - \\mu\\right) \\in \\mathcal{K}_{\\mathrm{pow}}\\!\\left(\\tfrac{1}{2}\\right),\\quad t = 1,\\ldots,T\\,.
+\\end{align}
+```
+
+For the semi variant, lower-deviation variables ``d_t \\geq 0`` with ``\\hat{r}_t - \\mu + d_t \\geq 0`` replace the centred returns in the innermost power cone.
+
+Where:
+
+  - ``r``: Even-moment risk variable.
+  - ``\\boldsymbol{u}``: `T × 1` auxiliary variable vector.
+  - ``\\boldsymbol{s}``: `T × 1` auxiliary variable vector.
+  - ``T_d = T - \\mathrm{ddof}``: Effective sample size.
+  - $(math_dict[:T])
+  - ``k``: Budget-scaling / homogenisation variable.
+  - ``p``: Order parameter; the moment order is ``2p``.
+  - ``\\hat{r}_t = \\boldsymbol{x}_t^\\intercal\\boldsymbol{w}``: Portfolio return at time ``t``.
+  - ``\\mu``: Target return.
+  - ``\\mathcal{K}_{\\mathrm{pow}}(\\alpha)``: Power cone ``\\{(a, b, c) : a^{\\alpha}\\,b^{1-\\alpha} \\geq |c|,\\; a, b \\geq 0\\}``.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - $(arg_dict[:ci])
+  - `r::LowOrderMoment{<:Any, <:Any, <:Any, <:EvenMoment}`: The even-moment risk measure.
+  - $(arg_dict[:opt_rjumpe])
+  - $(arg_dict[:pr])
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`LowOrderMoment`](@ref)
+  - [`EvenMoment`](@ref)
+  - [`set_risk_constraints!`](@ref)
+  - [`calc_risk_constraint_target`](@ref)
+  - [`set_risk_bounds_and_expression!`](@ref)
+"""
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::LowOrderMoment{<:Any, <:Any, <:Any, <:EvenMoment},
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,

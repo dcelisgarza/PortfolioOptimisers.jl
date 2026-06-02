@@ -5,6 +5,7 @@ FirstLowerMoment
 MeanAbsoluteDeviation
 SecondMoment
 factory(alg::SecondMoment, w::ObsWeights)
+EvenMoment
 LowOrderMoment
 ThirdLowerMoment
 FourthMoment

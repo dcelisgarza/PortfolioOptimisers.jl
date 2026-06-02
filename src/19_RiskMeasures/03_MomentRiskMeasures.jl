@@ -34,6 +34,7 @@ Defines the interface for algorithms that compute portfolio risk using low-order
 
   - [`FirstLowerMoment`](@ref)
   - [`MeanAbsoluteDeviation`](@ref)
+  - [`EvenMoment`](@ref)
 """
 abstract type UnstandardisedLowOrderMomentMeasureAlgorithm <: LowOrderMomentMeasureAlgorithm end
 """
@@ -143,9 +144,52 @@ function SecondMoment(; ve::AbstractVarianceEstimator = SimpleVariance(; me = no
                       alg2::SecondMomentFormulation = SquaredSOCRiskExpr())::SecondMoment
     return SecondMoment(ve, alg1, alg2)
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Represents an even-order moment risk measure algorithm in `PortfolioOptimisers.jl`.
+
+Computes portfolio risk using the ``2p``-th central (full) or lower (semi) even moment of the return distribution. Despite the potentially high moment order, even moments admit an exact power cone reformulation, keeping the optimisation formulation affine.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    EvenMoment(;
+        p::Integer = 2,
+        ddof::Integer = 0,
+        alg::AbstractMomentAlgorithm = Full(),
+    ) -> EvenMoment
+
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - `p >= 2`.
+  - `ddof >= 0` and `isfinite(ddof)`.
+
+# Examples
+
+```jldoctest
+julia> EvenMoment()
+EvenMoment
+  p ┼ Int64: 2
+  ddof ┼ Int64: 0
+  alg ┴ Full()
+```
+
+# Related
+
+  - [`UnstandardisedLowOrderMomentMeasureAlgorithm`](@ref)
+  - [`LowOrderMoment`](@ref)
+  - [`Full`](@ref)
+  - [`Semi`](@ref)
+"""
 @concrete struct EvenMoment <: UnstandardisedLowOrderMomentMeasureAlgorithm
     """
-    Order of the even moment.
+    $(field_dict[:p_rm])
     """
     p
     """
@@ -686,6 +730,73 @@ Where:
   - ``\\odot``: Element-wise (Hadamard) product.
   - ``K_{soc}``: Second order cone.
 
+## `EvenMoment`
+
+[`EvenMoment`](@ref) computes the ``2p``-th central (full) or lower (semi) moment of the return distribution. Although the moment order ``2p \\geq 4`` can be arbitrarily high, `EvenMoment` is not a low-order moment in the classical sense. However, because the exponent is always even, the moment can be expressed as an iterated power of squared deviations, admitting an exact reformulation using power cone constraints. This makes the optimisation problem affine and solvable by standard conic solvers.
+
+The full (central) even moment is computed as:
+
+```math
+\\begin{align}
+\\mathrm{EvenMoment}_{p}(\\boldsymbol{X}) &= \\left(\\frac{1}{T_d}\\sum_{t=1}^{T}\\left(\\boldsymbol{X}_t - \\mathbb{E}\\left[\\boldsymbol{X}\\right]\\right)^{2p}\\right)^{1/p}\\,.
+\\end{align}
+```
+
+The semi (lower) even moment is computed as:
+
+```math
+\\begin{align}
+\\mathrm{Semi\\text{-}EvenMoment}_{p}(\\boldsymbol{X}) &= \\left(\\frac{1}{T_d}\\sum_{t=1}^{T}\\min \\circ \\left(\\boldsymbol{X}_t - \\mathbb{E}\\left[\\boldsymbol{X}\\right],\\, 0\\right)^{2p}\\right)^{1/p}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{X}``: `T × 1` vector of portfolio returns.
+  - ``\\mathbb{E}[\\cdot]``: Expected value operator, supports weighted averages.
+  - ``T_d = T - \\mathrm{ddof}``: Effective sample size after degrees-of-freedom correction.
+  - ``p \\geq 2``: Order parameter; the moment order is ``2p``.
+  - ``\\circ``: Element-wise function application.
+
+As an optimisation problem, the full even moment is formulated using a chain of power cone constraints:
+
+```math
+\\begin{align}
+\\underset{\\boldsymbol{w},\\,\\boldsymbol{u},\\,\\boldsymbol{s},\\,r}{\\mathrm{opt}} \\quad & r \\\\
+\\mathrm{s.t.} \\quad & \\sum_{t=1}^{T} u_t \\leq r \\\\
+               \\quad & \\left(u_t \\cdot T_d,\\, r,\\, s_t\\right) \\in \\mathcal{K}_{\\mathrm{pow}}\\!\\left(\\tfrac{1}{p}\\right),\\quad t = 1,\\ldots,T \\\\
+               \\quad & \\left(s_t,\\, k,\\, \\hat{r}_t - \\mu\\right) \\in \\mathcal{K}_{\\mathrm{pow}}\\!\\left(\\tfrac{1}{2}\\right),\\quad t = 1,\\ldots,T\\,.
+\\end{align}
+```
+
+The semi even moment is formulated as:
+
+```math
+\\begin{align}
+\\underset{\\boldsymbol{w},\\,\\boldsymbol{u},\\,\\boldsymbol{s},\\,\\boldsymbol{d},\\,r}{\\mathrm{opt}} \\quad & r \\\\
+\\mathrm{s.t.} \\quad & \\sum_{t=1}^{T} u_t \\leq r \\\\
+               \\quad & \\left(u_t \\cdot T_d,\\, r,\\, s_t\\right) \\in \\mathcal{K}_{\\mathrm{pow}}\\!\\left(\\tfrac{1}{p}\\right),\\quad t = 1,\\ldots,T \\\\
+               \\quad & \\left(s_t,\\, k,\\, d_t\\right) \\in \\mathcal{K}_{\\mathrm{pow}}\\!\\left(\\tfrac{1}{2}\\right),\\quad t = 1,\\ldots,T \\\\
+               \\quad & \\hat{r}_t - \\mu + d_t \\geq 0,\\quad t = 1,\\ldots,T \\\\
+               \\quad & d_t \\geq 0,\\quad t = 1,\\ldots,T\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{w}``: `N × 1` asset weights vector.
+  - ``r``: Even-moment risk variable.
+  - ``\\boldsymbol{u}``: `T × 1` auxiliary variable vector.
+  - ``\\boldsymbol{s}``: `T × 1` auxiliary variable vector.
+  - ``\\boldsymbol{d}``: `T × 1` lower-deviation auxiliary variables, capturing returns below the target.
+  - ``T_d``: Effective sample size.
+  - ``k``: Budget-scaling / homogenisation variable.
+  - ``p``: Order parameter; the moment order is ``2p``.
+  - ``\\mathrm{X}``: `T × N` return matrix.
+  - ``\\hat{r}_t = \\boldsymbol{x}_t^\\intercal\\boldsymbol{w}``: Portfolio return at time ``t``.
+  - ``\\mu``: Target return.
+  - ``\\mathcal{K}_{\\mathrm{pow}}(\\alpha)``: Power cone ``\\{(a, b, c) : a^{\\alpha}\\,b^{1-\\alpha} \\geq |c|,\\; a, b \\geq 0\\}``.
+
 # Functor
 
     (r::LowOrderMoment)(w::VecNum, X::MatNum;
@@ -723,6 +834,7 @@ LowOrderMoment
   - [`RSOCRiskExpr`](@ref)
   - [`QuadRiskExpr`](@ref)
   - [`SOCRiskExpr`](@ref)
+  - [`EvenMoment`](@ref)
 """
 @concrete struct LowOrderMoment <: RiskMeasure
     """
