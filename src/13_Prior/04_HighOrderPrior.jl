@@ -604,9 +604,16 @@ function prior(pe::HighOrderPriorEstimator, X::MatNum, F::Option{<:MatNum} = not
     end
     pr = prior(pe.pe, X, F; kwargs...)
     kt = cokurtosis(pe.kte, X; kwargs...)
-    L2, S2 = !isnothing(kt) ? dup_elim_sum_matrices(size(pr.X, 2))[2:3] : (nothing, nothing)
+    D2 = nothing
+    L2 = nothing
+    S2 = nothing
     sk, V = coskewness(pe.ske, X; kwargs...)
-    return HighOrderPrior(; pr = pr, kt = kt, L2 = L2, S2 = S2, sk = sk, V = V,
+    if !isnothing(kt) && !isnothing(sk)
+        D2, L2, S2 = dup_elim_sum_matrices(size(pr.X, 2))
+    elseif !isnothing(kt) && isnothing(sk)
+        L2, S2 = dup_elim_sum_matrices(size(pr.X, 2))[2:3]
+    end
+    return HighOrderPrior(; pr = pr, kt = kt, D2 = D2, L2 = L2, S2 = S2, sk = sk, V = V,
                           skmp = isnothing(sk) ? nothing : pe.ske.mp)
 end
 

@@ -355,8 +355,9 @@ const arg_dict = Dict(
                       :f_sk => "`f_sk`: Factor coskewness matrix.",#
                       :f_V => "`f_V`: Factor sum of negative spectral slices of the cokurtosis matrix.",#
                       :skmp => "`skmp`: Coskewness matrix processing estimator.",#
-                      :L2 => "`L2`: Second-order factor loading matrix.",#
-                      :S2 => "`S2`: Second-order factor covariance matrix.",#
+                      :D2 => "`D2`: Duplication matrix.",#
+                      :L2 => "`L2`: Elimination matrix.",#
+                      :S2 => "`S2`: Summation matrix.",#
                       # Uncertainty sets.
                       :lb => "`lb`: Lower bound.",#
                       :ub => "`ub`: Upper bound.",#
