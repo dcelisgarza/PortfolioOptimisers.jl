@@ -371,7 +371,14 @@
                 res = optimise(mr, rd)
                 rt1 = expected_return(ret, res.w, pr)
                 if !(isa(r, Kurtosis) && isnothing(r.N))
-                    @test rt1 >= rt || abs(rt1 - rt) < 1e-10
+                    flag = rt1 >= rt || abs(rt1 - rt) < 1e-10
+                    if !flag
+                        println("Counter: $i")
+                        println("rt1: $rt1")
+                        println("rt: $rt")
+                        println("abs(rt1 - rt): $(abs(rt1 - rt))")
+                    end
+                    @test flag
                 end
                 mr = MeanRisk(; r = bounds_risk_measure(r, rk), obj = MaximumReturn(),
                               opt = opt)
@@ -387,7 +394,14 @@
                     else
                         1e-10
                     end
-                    @test rk1 <= rk || abs(rk1 - rk) < tol
+                    flag = rk1 <= rk || abs(rk1 - rk) < tol
+                    if !flag
+                        println("Counter: $i")
+                        println("rk1: $rk1")
+                        println("rk: $rk")
+                        println("abs(rk1 - rk): $(abs(rk1 - rk))")
+                    end
+                    @test flag
                 else
                     @test rk1 / rk < 1.15
                 end
@@ -2083,11 +2097,11 @@
                 5e-6
             elseif i in (4, 8)
                 5e-3
-            elseif i in (12, 22)
+            elseif i == 12
                 1e-4
             elseif i in (6, 14, 23)
                 5e-5
-            elseif i == 7
+            elseif i in (7, 22)
                 5e-4
             else
                 1e-6

@@ -175,9 +175,9 @@ Keywords correspond to the struct's fields.
 ```jldoctest
 julia> EvenMoment()
 EvenMoment
-  p ┼ Int64: 2
+     p ┼ Int64: 2
   ddof ┼ Int64: 0
-  alg ┴ Full()
+   alg ┴ Full()
 ```
 
 # Related

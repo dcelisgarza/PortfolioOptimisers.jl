@@ -588,8 +588,8 @@ Return a new [`ClustersEstimator`](@ref) with observation weights `w` applied to
   - [`factory`](@ref)
 """
 function factory(cle::ClustersEstimator, w::ObsWeights)::ClustersEstimator
-    return ClustersEstimator(; ce = factory(cle.ce, w), de = cle.de, alg = cle.alg,
-                             onc = cle.onc)
+    return ClustersEstimator(; ce = factory(cle.ce, w), de = factory(cle.de, w),
+                             alg = cle.alg, onc = cle.onc)
 end
 """
     const ClE_Cl = Union{<:AbstractClustersEstimator, <:AbstractClusteringResult}

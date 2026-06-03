@@ -11,7 +11,7 @@ OptimalNumberClusters
 factory(onc::OptimalNumberClusters, w::StatsBase.AbstractWeights)
 HClustAlgorithm
 ClustersEstimator
-factory(cle::ClustersEstimator, w::StatsBase.AbstractWeights)
+factory(cle::ClustersEstimator, w::ObsWeights)
 AbstractClustersEstimator
 AbstractClustersAlgorithm
 factory(alg::AbstractClustersAlgorithm, args...; kwargs...)

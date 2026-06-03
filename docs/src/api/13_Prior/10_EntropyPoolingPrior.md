@@ -17,13 +17,12 @@ factory(pe::EntropyPoolingPrior, w::ObsWeights)
 Base.getproperty(obj::EntropyPoolingPrior, sym::Symbol)
 VecEP
 prior(pe::EntropyPoolingPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                       <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                       <:Any,
-                                       <:StagedEP},
+                              <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
+                              <:Any, <:Any, <:StagedEP},
                X::MatNum, F::Option{<:MatNum} = nothing;
                dims::Int = 1, strict::Bool = false, kwargs...)
 prior(pe::EntropyPoolingPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                              <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
+                              <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                               <:H0_EntropyPooling}, X::MatNum,
       F::Option{<:MatNum} = nothing; dims::Int = 1, strict::Bool = false,
       kwargs...)
@@ -42,7 +41,7 @@ entropy_pooling
 ep_cvar_views_solve!
 ep_sigma_views!
 fix_sigma!
-ep_sigma_views!
+ep_cov_views!
 ep_rho_views!
 ep_sk_views!
 ep_kt_views!
