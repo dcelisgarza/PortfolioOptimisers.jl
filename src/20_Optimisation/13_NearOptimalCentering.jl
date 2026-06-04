@@ -904,7 +904,8 @@ function solve_noc!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any,
     for (keys, vals) in risk_frontier
         ub = model[keys[1]] = JuMP.@variable(model,
                                              set = JuMP.Parameter(zero(eltype(vals[2]))))
-        model[keys[2]] = JuMP.@constraint(model, sc * (vals[1] - ub) <= 0)
+        d = ifelse(vals[3], 1, -1)
+        model[keys[2]] = JuMP.@constraint(model, d * sc * (vals[1] - ub) <= 0)
     end
     itrs = [(Iterators.repeated(rkf[1][1], length(rkf[2][2])), rkf[2][2])
             for rkf in risk_frontier]
@@ -938,7 +939,8 @@ function solve_noc!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any,
     for (keys, vals) in risk_frontier
         ub = model[keys[1]] = JuMP.@variable(model,
                                              set = JuMP.Parameter(zero(eltype(vals[2]))))
-        model[keys[2]] = JuMP.@constraint(model, sc * (vals[1] - ub) <= 0)
+        d = ifelse(vals[3], 1, -1)
+        model[keys[2]] = JuMP.@constraint(model, d * sc * (vals[1] - ub) <= 0)
     end
     itrs = [(Iterators.repeated(rkf[1][1], length(rkf[2][2])), rkf[2][2])
             for rkf in risk_frontier]

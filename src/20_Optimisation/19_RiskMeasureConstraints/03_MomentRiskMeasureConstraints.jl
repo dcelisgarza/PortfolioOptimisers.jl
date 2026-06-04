@@ -263,14 +263,20 @@ square-root transformation to convert from variance to standard-deviation units.
 
   - [`set_second_moment_risk!`](@ref)
 """
-function second_moment_bound_val(alg::SecondMomentFormulation, ub::Frontier, factor::Number)
-    return _Frontier(; N = ub.N, factor = inv(factor), flag = isa(alg, SOCRiskExpr))
+function second_moment_bound_val(::SecondMomentFormulation, ub::Frontier, factor::Number)
+    return _Frontier(; N = ub.N, factor = inv(factor), bound = SquareRootBound())
 end
-function second_moment_bound_val(alg::SecondMomentFormulation, ub::VecNum, factor::Number)
-    return inv(factor) * (isa(alg, SOCRiskExpr) ? ub : sqrt.(ub))
+function second_moment_bound_val(::SOCRiskExpr, ub::Frontier, factor::Number)
+    return _Frontier(; N = ub.N, factor = inv(factor), bound = LinearBound())
 end
-function second_moment_bound_val(alg::SecondMomentFormulation, ub::Number, factor::Number)
-    return inv(factor) * (isa(alg, SOCRiskExpr) ? ub : sqrt(ub))
+function second_moment_bound_val(::SecondMomentFormulation, ub::VecNum, factor::Number)
+    return inv(factor) * sqrt.(ub)
+end
+function second_moment_bound_val(::SecondMomentFormulation, ub::Number, factor::Number)
+    return inv(factor) * sqrt(ub)
+end
+function second_moment_bound_val(::SOCRiskExpr, ub::Num_VecNum, factor::Number)
+    return inv(factor) * ub
 end
 function second_moment_bound_val(::Any, ::Nothing, ::Any)
     return nothing

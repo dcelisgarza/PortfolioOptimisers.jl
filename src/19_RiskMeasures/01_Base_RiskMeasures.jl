@@ -179,10 +179,86 @@ Defines the interface for settings types that configure the behavior of risk mea
 
 # Related
 
+  - [`JuMPRiskMeasureSettings`](@ref)
   - [`RiskMeasureSettings`](@ref)
   - [`HierarchicalRiskMeasureSettings`](@ref)
 """
 abstract type AbstractRiskMeasureSettings <: AbstractEstimator end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for risk measure settings used in JuMP-based optimisation routines.
+
+All concrete settings types compatible with JuMP optimisation (e.g. [`RiskMeasureSettings`](@ref), [`MaxRiskMeasureSettings`](@ref)) should subtype `JuMPRiskMeasureSettings`.
+
+# Related
+
+  - [`AbstractRiskMeasureSettings`](@ref)
+  - [`RiskMeasureSettings`](@ref)
+  - [`MaxRiskMeasureSettings`](@ref)
+"""
+abstract type JuMPRiskMeasureSettings <: AbstractRiskMeasureSettings end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for bound-transformation strategies applied to efficient frontier bounds.
+
+Concrete subtypes control how numeric bound values are transformed before being applied to JuMP risk expressions. All subtypes should subtype `FrontierBoundEstimator`.
+
+# Related
+
+  - [`LinearBound`](@ref)
+  - [`SquareRootBound`](@ref)
+  - [`SquaredBound`](@ref)
+  - [`variance_risk_bounds_val`](@ref)
+  - [`Frontier`](@ref)
+"""
+abstract type FrontierBoundEstimator <: AbstractEstimator end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Applies a square-root transformation to bound values before enforcing them.
+
+Used when the risk expression is in standard-deviation units but the user-supplied bound is in variance units (e.g. kurtosis and negative-skewness SOC formulations).
+
+# Related
+
+  - [`FrontierBoundEstimator`](@ref)
+  - [`LinearBound`](@ref)
+  - [`SquaredBound`](@ref)
+  - [`variance_risk_bounds_val`](@ref)
+"""
+struct SquareRootBound <: FrontierBoundEstimator end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Passes bound values through unchanged (identity transformation).
+
+Used when the risk expression and the user-supplied bound are already in the same units (e.g. SDP variance formulation where both sides are in variance units).
+
+# Related
+
+  - [`FrontierBoundEstimator`](@ref)
+  - [`SquareRootBound`](@ref)
+  - [`SquaredBound`](@ref)
+  - [`variance_risk_bounds_val`](@ref)
+"""
+struct LinearBound <: FrontierBoundEstimator end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Applies a squaring transformation to bound values before enforcing them.
+
+Used when the risk expression is in squared units but the user-supplied bound is in linear units (e.g. kurtosis SDP formulation).
+
+# Related
+
+  - [`FrontierBoundEstimator`](@ref)
+  - [`LinearBound`](@ref)
+  - [`SquareRootBound`](@ref)
+  - [`variance_risk_bounds_val`](@ref)
+"""
+struct SquaredBound <: FrontierBoundEstimator end
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -194,21 +270,20 @@ $(DocStringExtensions.FIELDS)
 
 # Constructors
 
-Creates a `Frontier` with the specified number of points, scaling factor, and flag.
-
     Frontier(;
         N::Integer = 20,
+        bound::FrontierBoundEstimator = LinearBound()
     ) -> Frontier
 
-Creates a `Frontier` with `N` points, a scaling factor of `1`, and `flag = true`. This is used to set the appropriate frontier bounds in [`variance_risk_bounds_val`](@ref) and [`second_moment_bound_val`](@ref).
+Creates a `Frontier` with `N` points, a scaling factor of `1`, and the specified `bound` strategy. Used to set appropriate frontier bounds in [`variance_risk_bounds_val`](@ref) and [`second_moment_bound_val`](@ref).
 
     PortfolioOptimisers._Frontier(;
         N::Integer = 20,
-        factor::Number = 1.0,
-        flag::Bool = true
+        factor::Number,
+        bound::FrontierBoundEstimator
     ) -> Frontier
 
-Keywords correspond to the struct's fields.
+Internal constructor. Keywords correspond to the struct's fields.
 
 ## Validation
 
@@ -222,11 +297,15 @@ julia> Frontier(; N = 15)
 Frontier
        N ┼ Int64: 15
   factor ┼ Int64: 1
-    flag ┴ Bool: true
+   bound ┴ LinearBound()
 ```
 
 # Related
 
+  - [`FrontierBoundEstimator`](@ref)
+  - [`LinearBound`](@ref)
+  - [`SquareRootBound`](@ref)
+  - [`SquaredBound`](@ref)
   - [`RiskMeasureSettings`](@ref)
 """
 @concrete struct Frontier <: AbstractAlgorithm
@@ -239,21 +318,22 @@ Frontier
     """
     factor
     """
-    $(field_dict[:flag_fr])
+    $(field_dict[:bound_fr])
     """
-    flag
-    function Frontier(N::Integer, factor::Number = 1, flag::Bool = true)::Frontier
+    bound
+    function Frontier(N::Integer, factor::Number, bound::FrontierBoundEstimator)::Frontier
         @argcheck(N > zero(N))
         @argcheck(isfinite(factor))
         @argcheck(factor > zero(factor))
-        return new{typeof(N), typeof(factor), typeof(flag)}(N, factor, flag)
+        return new{typeof(N), typeof(factor), typeof(bound)}(N, factor, bound)
     end
 end
-function Frontier(; N::Integer = 20)::Frontier
-    return Frontier(N, 1, true)
+function Frontier(; N::Integer = 20,
+                  bound::FrontierBoundEstimator = LinearBound())::Frontier
+    return Frontier(N, 1, bound)
 end
 """
-    _Frontier(; N = 20, factor, flag)
+    _Frontier(; N = 20, factor, bound)
 
 Construct a range of N evenly-spaced frontier parameter values.
 
@@ -263,7 +343,7 @@ Internal helper that generates a parameter grid (e.g., for risk bounds) used whe
 
   - `N`: Number of frontier points (default 20).
   - `factor`: Scaling factor for the range.
-  - `flag`: Controls whether to sweep from min-to-max or max-to-min.
+  - `bound`: Controls whether to sweep from min-to-max or max-to-min.
 
 # Returns
 
@@ -274,8 +354,8 @@ Internal helper that generates a parameter grid (e.g., for risk bounds) used whe
   - [`MeanRisk`](@ref)
   - [`NearOptimalCentering`](@ref)
 """
-function _Frontier(; N::Integer = 20, factor::Number, flag::Bool)
-    return Frontier(N, factor, flag)
+function _Frontier(; N::Integer = 20, factor::Number, bound::FrontierBoundEstimator)
+    return Frontier(N, factor, bound)
 end
 """
     const RkRtBounds = Union{<:Num_VecNum, <:Frontier}
@@ -340,12 +420,12 @@ RiskMeasureSettings
 
 # Related
 
-  - [`AbstractRiskMeasureSettings`](@ref)
+  - [`JuMPRiskMeasureSettings`](@ref)
   - [`RiskMeasure`](@ref)
   - [`Frontier`](@ref)
   - [`HierarchicalRiskMeasureSettings`](@ref)
 """
-@concrete struct RiskMeasureSettings <: AbstractRiskMeasureSettings
+@concrete struct RiskMeasureSettings <: JuMPRiskMeasureSettings
     """
     $(field_dict[:scale_rm])
     """
@@ -839,4 +919,4 @@ function bounds_risk_measure end
 
 export Frontier, RiskMeasureSettings, HierarchicalRiskMeasureSettings, SumScalariser,
        MaxScalariser, MinScalariser, LogSumExpScalariser, expected_risk, RiskMeasure,
-       HierarchicalRiskMeasure
+       HierarchicalRiskMeasure, SquareRootBound, LinearBound, SquaredBound

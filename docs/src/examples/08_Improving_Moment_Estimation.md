@@ -199,9 +199,8 @@ pretty_table(DataFrame([rd.nx prs[5].V], ["Assets"; rd.nx]); formatters = [hmmtf
              source_notes = "Condition number FixedDenoise: $(round(cond(prs[5].V); digits = 3))")
 pretty_table(DataFrame([rd.nx prs[6].V], ["Assets"; rd.nx]); formatters = [hmmtfmt],
              title = "Coskewness Negative Spectral Slices: LoGo(MaxDist)",
-             source_notes = "Condition number LoGo(MaxDist): $(round(cond(prs[6].V); digits = 3))")
+             source_notes = "Condition number LoGo(MaxDist): $(round(cond(prs[6].V); digits = 3))")#= Coskewness heatmap (N × N²) for vanilla and denoised high-order priors. =#
 
-#= Coskewness heatmap (N × N²) for vanilla and denoised high-order priors. =#
 plot_coskewness(prs[4], rd)
 plot_coskewness(prs[5], rd)
 ````
@@ -217,9 +216,8 @@ pretty_table(DataFrame([nx2 prs[5].kt], ["Assets^2"; nx2]); formatters = [hmmtfm
              source_notes = "Condition number FixedDenoise: $(round(cond(prs[5].kt); digits = 3))")
 pretty_table(DataFrame([nx2 prs[6].kt], ["Assets^2"; nx2]); formatters = [hmmtfmt],
              title = "Cokurtosis: Shrunk denoise (0) + LoGo(MaxDist)",
-             source_notes = "Condition number Shrunk denoise (0) + LoGo(MaxDist): $(round(cond(prs[6].kt); digits = 3))")
+             source_notes = "Condition number Shrunk denoise (0) + LoGo(MaxDist): $(round(cond(prs[6].kt); digits = 3))")#= Cokurtosis eigenspectrum for vanilla and denoised high-order priors. =#
 
-#= Cokurtosis eigenspectrum for vanilla and denoised high-order priors. =#
 plot_cokurtosis(prs[4], rd)
 plot_cokurtosis(prs[5], rd)
 ````
@@ -407,9 +405,8 @@ pretty_table(DataFrame("Assets" => rd.nx, "Vanilla" => ress[1].w,
                        "LoGo(MaxDist) + BS(MSE)" => ress[3].w,
                        "Shrunk (0.5) + BOP(GM)" => ress[4].w,
                        "Fixed + LoGo(MaxDist) + BOP(VW)" => ress[5].w,
-                       "LoGo(ExpDist) + BOP(MSE)" => ress[6].w); formatters = [resfmt])
+                       "LoGo(ExpDist) + BOP(MSE)" => ress[6].w); formatters = [resfmt])#= Compositions across all six moment-estimation variants (MaximumRatio, Variance). =#
 
-#= Compositions across all six moment-estimation variants (MaximumRatio, Variance). =#
 plot_stacked_bar_composition(ress, rd)
 ````
 
@@ -510,9 +507,8 @@ ress = optimise.(mrs)
 pretty_table(DataFrame("Assets" => rd.nx, "Vanilla V + BOP(GM) mu" => ress[1].w,
                        "Fixed Denoise V + BOP(VW) mu" => ress[2].w,
                        "Shrunk(0) Denoise + LoGo(MaxDist) V + BOP(MSE) mu" => ress[3].w);
-             formatters = [resfmt])
+             formatters = [resfmt])#= Compositions across denoising variants (MaximumRatio, NegativeSkewness). =#
 
-#= Compositions across denoising variants (MaximumRatio, NegativeSkewness). =#
 plot_stacked_bar_composition(ress, rd)
 ````
 
@@ -615,9 +611,8 @@ ress = optimise.(mrs)
 pretty_table(DataFrame("Assets" => rd.nx, "Vanilla kt + BOP(GM) mu" => ress[1].w,
                        "Fixed Denoise kt + BOP(VW) mu" => ress[2].w,
                        "Shrunk(0) Denoise + LoGo(MaxDist) kt + BOP(MSE) mu" => ress[3].w);
-             formatters = [resfmt])
+             formatters = [resfmt])#= Compositions across denoising variants (MaximumRatio, Kurtosis). =#
 
-#= Compositions across denoising variants (MaximumRatio, Kurtosis). =#
 plot_stacked_bar_composition(ress, rd)
 ````
 

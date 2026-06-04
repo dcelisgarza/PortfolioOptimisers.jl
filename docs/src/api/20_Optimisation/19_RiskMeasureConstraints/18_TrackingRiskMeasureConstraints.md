@@ -10,5 +10,5 @@ set_risk_constraints!(model::JuMP.Model, i::Any, r::RiskTrackingRiskMeasure{<:An
 set_tracking_risk!
 set_risk_tr_constraints!
 set_triv_risk_constraints!
-set_trdv_risk_constraints!
 ```
+<!-- set_trdv_risk_constraints! -->

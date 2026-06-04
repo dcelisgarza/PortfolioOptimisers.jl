@@ -107,18 +107,14 @@ kfold_pred = cross_val_predict(mr, rd, kfold)
 We can visualise the out-of-sample performance and weight behaviour across folds.
 
 ````@example 10_CrossValidation
-using StatsPlots, GraphRecipes
+using StatsPlots, GraphRecipes#= Portfolio cumulative returns across all KFold test periods. =#
 
-#= Portfolio cumulative returns across all KFold test periods. =#
-plot_ptf_cumulative_returns(kfold_pred)
+plot_ptf_cumulative_returns(kfold_pred)#= Per-asset weight distribution across folds. =#
 
-#= Per-asset weight distribution across folds. =#
-plot_weight_stability(kfold_pred)
+plot_weight_stability(kfold_pred)#= Portfolio turnover between consecutive folds. =#
 
-#= Portfolio turnover between consecutive folds. =#
-plot_turnover(kfold_pred)
+plot_turnover(kfold_pred)#= Cross-validation scores (second moment / variance) per fold. =#
 
-#= Cross-validation scores (second moment / variance) per fold. =#
 plot_cv_scores(LowOrderMoment(; alg = SecondMoment()), kfold_pred)
 ````
 
@@ -228,7 +224,8 @@ CV scores (Sharpe ratio) across all paths — the distribution shows the range o
 performance.
 
 ````@example 10_CrossValidation
-plot_cv_scores(MeanReturnRiskRatio(; rk = LowOrderMoment(; alg = SecondMoment())), cfold_pred)
+plot_cv_scores(MeanReturnRiskRatio(; rk = LowOrderMoment(; alg = SecondMoment())),
+               cfold_pred)
 ````
 
 We can choose any compatible risk measure as outlined above, for demonstration purposes we will now rank them based on the variance.

@@ -74,6 +74,7 @@ via [`set_risk_expression!`](@ref) according to `settings`.
   - $(arg_dict[:key_sym])
   - `r_expr::JuMP.AbstractJuMPScalar`: Risk expression added to the objective.
   - `settings::RiskMeasureSettings`: Settings carrying scale and `rke` flag.
+  - `flag::Bool`: If true, sets upper bound; if false sets lower bound.
 
 # Returns
 
@@ -89,8 +90,9 @@ function set_variance_risk_bounds_and_expression!(model::JuMP.Model,
                                                   r_expr_ub::JuMP.AbstractJuMPScalar,
                                                   ub::Option{<:RkRtBounds}, key::Symbol,
                                                   r_expr::JuMP.AbstractJuMPScalar,
-                                                  settings::RiskMeasureSettings)
-    set_risk_upper_bound!(model, opt, r_expr_ub, ub, key)
+                                                  settings::JuMPRiskMeasureSettings,
+                                                  flag::Bool = true)
+    set_risk_upper_bound!(model, opt, r_expr_ub, ub, key, flag)
     set_risk_expression!(model, r_expr, settings.scale, settings.rke)
     return nothing
 end
@@ -237,34 +239,36 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return whether the SDP (semidefinite) variance formulation should be used.
+Return the [`FrontierBoundEstimator`](@ref) that selects the appropriate variance formulation.
 
-Returns `true` when any of the following hold: `rc_flag` is `true`, `model` already contains
-a `rc_variance` expression, or `pl` contains a `SemiDefinitePhylogeny` constraint.
+Returns [`LinearBound`](@ref) (SDP formulation) when any of the following hold: `rc_flag` is `true`, `model` already contains a `rc_variance` expression, or `pl` contains a [`SemiDefinitePhylogeny`](@ref) constraint. Returns [`SquareRootBound`](@ref) (SOC formulation) otherwise.
 
 # Arguments
 
   - $(arg_dict[:model])
-  - `rc_flag::Bool`: Whether risk-contribution constraints require SDP.
+  - `rc_flag::Bool`: Whether risk-contribution constraints require the SDP formulation.
   - `pl`: Optional phylogeny constraint(s).
 
 # Returns
 
-  - `flag::Bool`: Whether the SDP variance formulation should be used.
+  - `bound::FrontierBoundEstimator`: [`LinearBound`](@ref) for SDP; [`SquareRootBound`](@ref) for SOC.
 
 # Related
 
   - [`sdp_rc_variance_flag!`](@ref)
   - [`set_variance_risk!`](@ref)
+  - [`FrontierBoundEstimator`](@ref)
+  - [`LinearBound`](@ref)
+  - [`SquareRootBound`](@ref)
 """
 function sdp_variance_flag!(model::JuMP.Model, rc_flag::Bool, pl::Option{<:PlC_VecPlC})
     return if rc_flag ||
               haskey(model, :rc_variance) ||
               isa(pl, SemiDefinitePhylogeny) ||
               isa(pl, AbstractVector) && any(x -> isa(x, SemiDefinitePhylogeny), pl)
-        true
+        LinearBound()
     else
-        false
+        SquareRootBound()
     end
 end
 """
@@ -283,7 +287,9 @@ directly as ``\\boldsymbol{w}^\\intercal \\Sigma \\boldsymbol{w}``.
   - $(arg_dict[:ci])
   - `r::Variance`: Variance risk measure.
   - $(arg_dict[:pr_sigma])
-  - `flag::Bool`: Whether to use the SDP formulation.
+  - `flag`:
+      + `::LinearBound`: Use the SDP formulation.
+      + `::SquareRootBound`: Use the SOC formulation.
   - $(arg_dict[:key_sym])
 
 # Returns
@@ -296,12 +302,12 @@ directly as ``\\boldsymbol{w}^\\intercal \\Sigma \\boldsymbol{w}``.
   - [`set_risk_constraints!`](@ref)
 """
 function set_variance_risk!(model::JuMP.Model, i::Any, r::Variance, pr::AbstractPriorResult,
-                            flag::Bool, key::Symbol)
-    return if flag
-        set_sdp_variance_risk!(model, i, r, pr, key)
-    else
-        set_variance_risk!(model, i, r, pr, key)
-    end
+                            ::LinearBound, key::Symbol)
+    return set_sdp_variance_risk!(model, i, r, pr, key)
+end
+function set_variance_risk!(model::JuMP.Model, i::Any, r::Variance, pr::AbstractPriorResult,
+                            ::SquareRootBound, key::Symbol)
+    return set_variance_risk!(model, i, r, pr, key)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -372,7 +378,9 @@ are returned; otherwise the standard-deviation variable and `:dev_i` key are ret
 
   - $(arg_dict[:model])
   - `i`: Constraint index.
-  - `flag::Bool`: Whether the SDP formulation is used.
+  - `flag`:
+      + `::LinearBound`: Use the SDP formulation.
+      + `::SquareRootBound`: Use the SOC formulation.
 
 # Returns
 
@@ -382,45 +390,61 @@ are returned; otherwise the standard-deviation variable and `:dev_i` key are ret
 
   - [`variance_risk_bounds_val`](@ref)
 """
-function variance_risk_bounds_expr(model::JuMP.Model, i::Any, flag::Bool)
-    return if flag
-        key = Symbol(:variance_risk_, i)
-        model[key], key
-    else
-        key = Symbol(:dev_, i)
-        model[key], key
-    end
+function variance_risk_bounds_expr(model::JuMP.Model, i::Any, ::LinearBound)
+    key = Symbol(:variance_risk_, i)
+    return model[key], key
+end
+function variance_risk_bounds_expr(model::JuMP.Model, i::Any, ::SquareRootBound)
+    key = Symbol(:dev_, i)
+    return model[key], key
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Convert an upper-bound value to the appropriate scale for the variance or std formulation.
+Convert a bound value to the appropriate scale for the selected variance formulation.
 
-When `flag` is `true` the bound is already in variance units and is passed through unchanged
-(or wrapped in a `_Frontier`). When `flag` is `false` the bound is converted from variance to
-standard-deviation units via `sqrt`. Returns `nothing` when `ub` is `nothing`.
+Dispatches on the [`FrontierBoundEstimator`](@ref) strategy:
+
+  - [`LinearBound`](@ref): passes the bound through unchanged (variance units → variance units).
+  - [`SquareRootBound`](@ref): applies `sqrt` to convert from variance to standard-deviation units.
+  - [`SquaredBound`](@ref): applies squaring to convert from linear to squared units.
+
+Returns `nothing` when `ub` is `nothing`.
 
 # Arguments
 
-  - `flag::Bool`: Whether the SDP/variance formulation is used.
-  - `ub`: Upper bound in variance units (scalar, vector, `Frontier`, or `nothing`).
+  - `bound::FrontierBoundEstimator`: Bound-transformation strategy.
+  - `ub`: Bound value (scalar, vector, [`Frontier`](@ref), or `nothing`).
 
 # Returns
 
-  - The rescaled upper bound, or `nothing` when `ub` is `nothing`.
+  - The rescaled bound, or `nothing` when `ub` is `nothing`.
 
 # Related
 
+  - [`FrontierBoundEstimator`](@ref)
+  - [`LinearBound`](@ref)
+  - [`SquareRootBound`](@ref)
+  - [`SquaredBound`](@ref)
   - [`variance_risk_bounds_expr`](@ref)
 """
-function variance_risk_bounds_val(flag::Bool, ub::Frontier)
-    return _Frontier(; N = ub.N, factor = 1, flag = flag)
+function variance_risk_bounds_val(bound::FrontierBoundEstimator, ub::Frontier)
+    return _Frontier(; N = ub.N, factor = 1, bound = bound)
 end
-function variance_risk_bounds_val(flag::Bool, ub::VecNum)
-    return flag ? ub : sqrt.(ub)
+function variance_risk_bounds_val(::LinearBound, ub::Num_VecNum)
+    return ub
 end
-function variance_risk_bounds_val(flag::Bool, ub::Number)
-    return flag ? ub : sqrt(ub)
+function variance_risk_bounds_val(::SquareRootBound, ub::VecNum)
+    return sqrt.(ub)
+end
+function variance_risk_bounds_val(::SquareRootBound, ub::Number)
+    return sqrt(ub)
+end
+function variance_risk_bounds_val(::SquaredBound, ub::VecNum)
+    return ub .^ 2
+end
+function variance_risk_bounds_val(::SquaredBound, ub::Number)
+    return ub^2
 end
 function variance_risk_bounds_val(::Any, ::Nothing)
     return nothing
@@ -572,8 +596,8 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::Variance,
                                                              transpose(b1) * sigma * b1 * W)
     variance_risk = model[key] = JuMP.@expression(model, LinearAlgebra.tr(sigma_W))
     rc_variance_constraints!(model, i, rc, variance_risk)
-    var_bound_expr, var_bound_key = variance_risk_bounds_expr(model, i, true)
-    ub = variance_risk_bounds_val(true, r.settings.ub)
+    var_bound_expr, var_bound_key = variance_risk_bounds_expr(model, i, LinearBound())
+    ub = variance_risk_bounds_val(LinearBound(), r.settings.ub)
     set_variance_risk_bounds_and_expression!(model, opt, var_bound_expr, ub, var_bound_key,
                                              variance_risk, r.settings)
     return variance_risk

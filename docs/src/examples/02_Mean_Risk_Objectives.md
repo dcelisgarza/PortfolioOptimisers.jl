@@ -108,9 +108,8 @@ pretty_table(DataFrame(; :assets => rd.nx, :benchmark => res0.w, :MinimumRisk =>
 Comparing compositions and cumulative returns across objectives reveals how each allocation differs.
 
 ````@example 02_Mean_Risk_Objectives
-using StatsPlots, GraphRecipes
+using StatsPlots, GraphRecipes#= Stacked bar composition for the benchmark and all four objectives. =#
 
-#= Stacked bar composition for the benchmark and all four objectives. =#
 plot_stacked_bar_composition([res0, res1, res2, res3, res4], rd)
 ````
 
@@ -131,10 +130,11 @@ Let's make sure the results are what we expect.
 
 ````@example 02_Mean_Risk_Objectives
 pretty_table(DataFrame(;
-                       :obj => [:MinimumRisk, :MaximumUtility, :MaximumRatio,
-                                :MaximumReturn, :Benchmark],
-                       :rk => [rk1, rk2, rk3, rk4, rk0], :rt => [rt1, rt2, rt3, rt4, rt0],
-                       :rr => [rr1, rr2, rr3, rr4, rr0]); formatters = [resfmt])
+                       :obj =>
+                           [:MinimumRisk, :MaximumUtility, :MaximumRatio, :MaximumReturn,
+                            :Benchmark], :rk => [rk1, rk2, rk3, rk4, rk0],
+                       :rt => [rt1, rt2, rt3, rt4, rt0], :rr => [rr1, rr2, rr3, rr4, rr0]);
+             formatters = [resfmt])
 ````
 
 The return histogram for the minimum-risk portfolio shows the distribution of daily returns and the

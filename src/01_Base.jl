@@ -390,14 +390,18 @@ const arg_dict = Dict(
                       :settings_rm => "`settings`: Risk measure settings.",#
                       :scale_rm => "`scale`: Scaling factor applied to the risk measure.",#
                       :ub_rms => "`ub`: Upper bound(s) for the risk measure. Can be a scalar, vector, or [`Frontier`](@ref).",#
+                      :lb_rms => "`lb`: Lower bound(s) for the risk measure. Can be a scalar, vector, or [`Frontier`](@ref).",#
                       :rke => "`rke`: Whether to include the risk measure value in the `JuMP` risk expression.",#
                       # Frontier.
                       :N_fr => "`N`: Number of points on the efficient frontier.",#
                       :factor_fr => "`factor`: Scaling factor for the efficient frontier range.",#
-                      :flag_fr => "`flag`: Whether to sweep the frontier from minimum to maximum.",#
+                      :bound_fr => "`bound`: What operation needs to be performed on the risk lower bound.",#
                       # Risk measure fields.
                       :rc => "`rc`: Risk contribution constraint.",#
                       :alg => "`alg`: Risk measure optimisation formulation algorithm.",#
+                      :vr_rm => "`vr`: Variance risk measure component.",#
+                      :sk_rm => "`sk`: Skewness risk measure component.",#
+                      :kt_rm => "`kt`: Kurtosis risk measure component.",#
                       :alg1 => "`alg1`: First algorithm variant.",#
                       :alg2 => "`alg2`: Second algorithm variant.",#
                       :N_kt => "`N`: Optional number of eigenvalues per asset for the approximate cokurtosis formulation.",#

@@ -113,18 +113,14 @@ We can visualise the composition, cumulative returns, return distribution, and d
 the optimal portfolio.
 
 ````@example 01_Getting_Started
-using StatsPlots, GraphRecipes
+using StatsPlots, GraphRecipes#= Portfolio weights as a bar chart. =#
 
-#= Portfolio weights as a bar chart. =#
-plot_composition(res, rd)
+plot_composition(res, rd)#= Cumulative returns of the optimised portfolio over the sample period. =#
 
-#= Cumulative returns of the optimised portfolio over the sample period. =#
-plot_ptf_cumulative_returns(res, rd)
+plot_ptf_cumulative_returns(res; pr = rd)#= Return histogram with tail-risk markers (VaR, CVaR). =#
 
-#= Return histogram with tail-risk markers (VaR, CVaR). =#
-plot_histogram(res, rd)
+plot_histogram(res, rd)#= Drawdown time series showing peak-to-trough loss periods. =#
 
-#= Drawdown time series showing peak-to-trough loss periods. =#
 plot_drawdowns(res, rd)
 ````
 
