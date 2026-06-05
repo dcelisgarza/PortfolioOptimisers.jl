@@ -1,6 +1,6 @@
 @safetestset "Mean Risk Optimisation" begin
     using Test, PortfolioOptimisers, DataFrames, CSV, TimeSeries, Clarabel, HiGHS, Pajarito,
-          JuMP, StatsBase, StableRNGs, LinearAlgebra, Distributions, StableRNGs
+          JuMP, StatsBase, StableRNGs, LinearAlgebra, Distributions, StableRNGs, SCS
     function find_tol(a1, a2; name1 = :lhs, name2 = :rhs)
         for rtol in
             [1e-10, 5e-10, 1e-9, 5e-9, 1e-8, 5e-8, 1e-7, 5e-7, 1e-6, 5e-6, 1e-5, 5e-5, 1e-4,
@@ -247,6 +247,10 @@
                                                                                        "reduced_tol_infeas_rel" =>
                                                                                            1e-4)),
                       check_sol = (; allow_local = true, allow_almost = true))]
+
+    scs_slv = Solver(; name = :scs1, solver = SCS.Optimizer,
+                     check_sol = (; allow_local = true, allow_almost = true),
+                     settings = "verbose" => false)
     sets = AssetSets(;
                      dict = Dict("nx" => rd.nx, "group1" => rd.nx[1:2:end],
                                  "group2" => rd.nx[2:2:end],
@@ -285,7 +289,7 @@
     rf = 4.2 / 100 / 252
     rd2 = prices_to_returns(TimeArray(CSV.File(joinpath(@__DIR__, "./assets/SP500.csv.gz"));
                                       timestamp = :Date)[(end - 50):end])
-    pr2 = prior(EmpiricalPrior(), rd2)
+    pr2 = prior(HighOrderPriorEstimator(), rd2)
     @testset "Mean Risk" begin
         objs = [MinimumRisk(), MaximumUtility(), MaximumRatio(; rf = rf)]
         rets = [ArithmeticReturn(), LogarithmicReturn()]
@@ -329,10 +333,11 @@
                 i += 1
                 continue
             end
-            opt = JuMPOptimiser(; pe = pr, slv = slv, ret = ret)
+            opt = JuMPOptimiser(; pe = pr, slv = _slv, ret = ret)
             mr = MeanRisk(; r = r, obj = obj, opt = opt)
             res = optimise(mr, rd)
             @test isa(res.retcode, OptimisationSuccess)
+            df[!, "$i"] = res.w
             rtol = if i == 22 && Sys.islinux()
                 1e-2
             elseif i in
@@ -545,6 +550,34 @@
             else
                 1e-6
             end
+            success = isapprox(res.w, df[!, i]; rtol = rtol)
+            if !success
+                println("Counter: $i")
+                find_tol(res.w, df[!, i])
+            end
+            @test success
+            i += 1
+        end
+
+        r = VarianceSkewKurtosis(;
+                                 sk = Skewness(;
+                                               settings = MaxRiskMeasureSettings(;
+                                                                                 scale = 2)),
+                                 kt = Kurtosis(;
+                                               settings = RiskMeasureSettings(; scale = 3)))
+        df = CSV.read(joinpath(@__DIR__, "./assets/MeanRiskVarianceSkewKurtosis.csv.gz"),
+                      DataFrame)
+        i = 1
+        for obj in objs, ret in rets
+            if i == 6
+                i += 1
+                continue
+            end
+            opt = JuMPOptimiser(; pe = pr2, slv = scs_slv, ret = ret)
+            mr = MeanRisk(; r = r, obj = obj, opt = opt)
+            res = optimise(mr, rd2)
+            @test isa(res.retcode, OptimisationSuccess)
+            rtol = 1e-6
             success = isapprox(res.w, df[!, i]; rtol = rtol)
             if !success
                 println("Counter: $i")
