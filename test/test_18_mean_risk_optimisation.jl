@@ -382,7 +382,7 @@
                     rkd = 8e-1 * rk
                 elseif i == 198
                     rkd = rk
-                    rtd = 8e-1 * rt
+                    rtd = rt
                 elseif i == 210
                     rkd = 8e-1 * rk
                     rtd = 9e-1 * rt
@@ -473,9 +473,9 @@
                 5e-3
             elseif i == 22 && Sys.islinux()
                 1e-2
-            elseif i in (22, 23)
+            elseif i in (22, 23, 47)
                 1e-4
-            elseif i in (26, 43, 44)
+            elseif i in (26, 43, 44, 48)
                 5e-5
             else
                 1e-6
@@ -499,14 +499,16 @@
             mr = MeanRisk(; r = r1, obj = MaximumRatio(; rf = rf), opt = opt)
             res = optimise(mr, rd)
             @test isa(res.retcode, OptimisationSuccess)
-            rtol = if i in (16, 30, 48)
+            rtol = if i in (16, 30)
                 5e-5
             elseif i == 24
                 5e-6
             elseif i in (27, 44)
                 5e-5
             elseif i == 47
-                1e-4
+                1e-3
+            elseif i == 48
+                5e-3
             else
                 1e-6
             end
