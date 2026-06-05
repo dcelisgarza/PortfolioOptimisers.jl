@@ -347,7 +347,8 @@ Used for unified dispatch on moment-target calculation methods.
   - [`Skewness`](@ref)
   - [`calc_moment_target`](@ref)
 """
-const TCM_Sk{T1, T2} = Union{<:ThirdCentralMoment{T1, T2}, <:Skewness{<:Any, <:Any, T1, T2}}
+const TCM_Sk{T1, T2} = Union{<:ThirdCentralMoment{T1, T2},
+                             <:Skewness{<:Any, <:Any, <:Any, T1, T2}}
 """
     calc_moment_target(::TCM_Sk{Nothing, Nothing}, ::Any, x::VecNum)
     calc_moment_target(r::TCM_Sk{<:StatsBase.AbstractWeights, Nothing}, ::Any, x::VecNum)

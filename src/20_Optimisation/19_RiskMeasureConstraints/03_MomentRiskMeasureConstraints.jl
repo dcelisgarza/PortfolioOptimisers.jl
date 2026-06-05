@@ -275,7 +275,10 @@ end
 function second_moment_bound_val(::SecondMomentFormulation, ub::Number, factor::Number)
     return inv(factor) * sqrt(ub)
 end
-function second_moment_bound_val(::SOCRiskExpr, ub::Num_VecNum, factor::Number)
+function second_moment_bound_val(::SOCRiskExpr, ub::VecNum, factor::Number)
+    return inv(factor) * ub
+end
+function second_moment_bound_val(::SOCRiskExpr, ub::Number, factor::Number)
     return inv(factor) * ub
 end
 function second_moment_bound_val(::Any, ::Nothing, ::Any)
