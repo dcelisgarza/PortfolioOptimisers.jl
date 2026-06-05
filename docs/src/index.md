@@ -242,7 +242,7 @@ We can plot the histogram of portfolio returns.
 plot_histogram(mip_res.w, rd.X; slv = slv)
 ```
 
-We can also plot the compounded or uncompounded drawdowns. We use the former here.
+We can also plot the compounded or uncompounded drawdowns.
 
 ```@example 0_index
 plot_drawdowns(mip_res.w, rd.X, slv; ts = rd.ts, compound = true)
