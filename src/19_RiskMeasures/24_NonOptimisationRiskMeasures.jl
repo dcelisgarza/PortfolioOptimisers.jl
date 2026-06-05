@@ -84,7 +84,7 @@ MeanReturn
     """
     w
     """
-    $(field_dict[:flag])
+    If true use log returns; else use arithmetic returns.
     """
     flag
     function MeanReturn(w::Option{<:ObsWeights}, flag::Bool)

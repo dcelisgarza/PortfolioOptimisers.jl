@@ -365,7 +365,11 @@
 
         mu_views = LinearConstraintEstimator(; val = "AAPL == 0.002")
         sets = AssetSets(; dict = Dict("nx" => rd.nx))
-        pr2 = prior(EntropyPoolingPrior(; sets = sets, mu_views = mu_views), rd)
+        pr2 = prior(EntropyPoolingPrior(; sets = sets, mu_views = mu_views,
+                                        opt = OptimEntropyPooling(;
+                                                                  args = (Optim.Fminbox(;
+                                                                                        mu0 = 1e-5),))),
+                    rd)
         rf = 4.2 / 252 / 100
         Xret = rd.X * w
 
