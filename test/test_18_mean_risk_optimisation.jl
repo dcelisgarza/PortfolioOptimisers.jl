@@ -333,7 +333,7 @@
                 i += 1
                 continue
             end
-            opt = JuMPOptimiser(; pe = pr, slv = _slv, ret = ret)
+            opt = JuMPOptimiser(; pe = pr, slv = slv, ret = ret)
             mr = MeanRisk(; r = r, obj = obj, opt = opt)
             res = optimise(mr, rd)
             @test isa(res.retcode, OptimisationSuccess)

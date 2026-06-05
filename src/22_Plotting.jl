@@ -1268,14 +1268,85 @@ function plot_rolling_drawdowns end
 ## ────────────────────────────────────────────────────────────────────────────
 ## Internal helpers (no Plots.jl dependency)
 ## ────────────────────────────────────────────────────────────────────────────
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Convert a [`PredictionReturnsResult`](@ref) with a flat return vector to the standard
+`(group_index, matrix)` plotting form.
+
+# Arguments
+
+  - `rd::PredictionReturnsResult{<:Any, <:VecNum}`: Prediction result whose `X` field is a
+    flat numeric vector of returns.
+
+# Returns
+
+  - `Tuple{SingletonVector{Int}, Matrix}`: A singleton group-index vector and `rd.X`
+    reshaped into a column matrix of size `(T, 1)`.
+
+# Related
+
+  - [`_pred_rd_to_matrix(::PredictionReturnsResult{<:Any, <:VecVecNum})`](@ref)
+  - [`PredictionReturnsResult`](@ref)
+  - [`SingletonVector`](@ref)
+"""
 function _pred_rd_to_matrix(rd::PredictionReturnsResult{<:Any, <:VecNum})
     return SingletonVector{Int}(), reshape(rd.X, :, 1)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Convert a [`PredictionReturnsResult`](@ref) with a vector of return vectors to the standard
+`(group_index, matrices)` plotting form.
+
+# Arguments
+
+  - `rd::PredictionReturnsResult{<:Any, <:VecVecNum}`: Prediction result whose `X` field is
+    a vector of numeric sub-vectors, one per scenario or period.
+
+# Returns
+
+  - `Tuple{SingletonVector{Int}, Vector{Matrix}}`: A singleton group-index vector and each
+    sub-vector of `rd.X` reshaped into a column matrix of size `(T_i, 1)`.
+
+# Related
+
+  - [`_pred_rd_to_matrix(::PredictionReturnsResult{<:Any, <:VecNum})`](@ref)
+  - [`PredictionReturnsResult`](@ref)
+  - [`SingletonVector`](@ref)
+"""
 function _pred_rd_to_matrix(rd::PredictionReturnsResult{<:Any, <:VecVecNum})
     return SingletonVector{Int}(), [reshape(ret, :, 1) for ret in rd.X]
 end
-# Select top-N assets by absolute weight magnitude.
-# Returns (N_selected, sorted_idx) where idx is sorted descending by |w|.
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Select the top-N assets from a weight vector by absolute weight magnitude.
+
+# Arguments
+
+  - `w::VecNum`: Portfolio weight vector.
+  - `M::Integer`: Total number of assets (upper bound for `N`).
+  - `N_opt::Option{<:Number} = nothing`: Asset-count specification.
+    `nothing` auto-selects via [`number_effective_assets`](@ref).
+
+# Returns
+
+  - `Tuple{Int, Vector{Int}}`: `(N, idx)` where `N` is the number of selected assets and
+    `idx` is a permutation vector sorted descending by `|w|`.
+
+# Details
+
+  - When `N_opt` is `nothing`, `N_eff = number_effective_assets(w)`.
+  - When `0 < N_eff ≤ 1`, `N_eff` is treated as a concentration threshold: `N` is the
+    smallest index such that the cumulative normalised absolute weight covers at least
+    `1 - N_eff` of the total; falls back to `M` if no such index exists.
+  - Otherwise `N_eff` is treated as a count: `N = clamp(ceil(Int, N_eff), 1, M)`.
+
+# Related
+
+  - [`number_effective_assets`](@ref)
+"""
 function _relevant_assets(w::VecNum, M::Integer, N_opt::Option{<:Number} = nothing)
     N_eff = isnothing(N_opt) ? number_effective_assets(w) : N_opt
     abs_w = abs.(w)
@@ -1289,13 +1360,6 @@ function _relevant_assets(w::VecNum, M::Integer, N_opt::Option{<:Number} = nothi
         clamp(ceil(Int, N_eff), 1, M)
     end
     return N, idx
-end
-# Rolling window evaluation of a risk measure.
-# Returns a vector of length T - window + 1 for t = window:T.
-function _rolling_window_measure(r::AbstractBaseRiskMeasure, w::VecNum, X::MatNum,
-                                 fees::Option{<:Fees}, window::Integer)
-    T = size(X, 1)
-    return [expected_risk(r, w, view(X, (t - window + 1):t, :), fees) for t in window:T]
 end
 
 export plot_ptf_cumulative_returns, plot_asset_cumulative_returns, plot_composition,

@@ -8,8 +8,7 @@ import PortfolioOptimisers: ArrNum, VecNum, MatNum, Option, VecNum_VecVecNum, Sl
                             NwE_ClE_Cl, AbstractCentralityEstimator,
                             AbstractClustersEstimator, AbstractClusteringResult,
                             AbstractBaseRiskMeasure, _pred_rd_to_matrix, _extract_pr,
-                            _relevant_assets, _rolling_window_measure, _extract_fees,
-                            OptimisationResult
+                            _relevant_assets, _extract_fees, OptimisationResult
 
 ## plot_ptf_cumulative_returns
 function PortfolioOptimisers.plot_ptf_cumulative_returns(w::VecNum_VecVecNum, X::MatNum,
@@ -2014,7 +2013,7 @@ function PortfolioOptimisers.plot_rolling_measure(r::PortfolioOptimisers.Abstrac
     end
     T = size(X, 1)
     window = rolling == 0 ? ceil(Int, sqrt(T)) : rolling
-    rolling_vals = _rolling_window_measure(r, w, X, fees, window)
+    rolling_vals = rolling_window_measure(r, w, X, fees, window)
     ts_rolling = ts[window:end]
     rname = string(nameof(typeof(r)))
     return plot(ts_rolling, rolling_vals; title = "Rolling $rname (window=$window)",
