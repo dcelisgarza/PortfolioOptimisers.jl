@@ -71,10 +71,8 @@ end
 ## plot_asset_cumulative_returns
 function PortfolioOptimisers.plot_asset_cumulative_returns(w::VecNum, X::MatNum,
                                                            fees::Option{<:Fees} = nothing;
-                                                           ts::AbstractVector = 1:size(X,
-                                                                                       1),
-                                                           nx::AbstractVector = 1:size(X,
-                                                                                       2),
+                                                           ts::AbstractVector = 1:size(X, 1),
+                                                           nx::AbstractVector = 1:size(X, 2),
                                                            compound::Bool = false,
                                                            N::Option{<:Integer} = nothing,
                                                            kwargs...)
@@ -268,8 +266,7 @@ function PortfolioOptimisers.plot_stacked_bar_composition(res_vec::AbstractVecto
     return PortfolioOptimisers.plot_stacked_bar_composition(w, nx; kwargs...)
 end
 function PortfolioOptimisers.plot_stacked_area_composition(w::VecNum_VecVecNum,
-                                                           nx::AbstractVector = 1:size(w,
-                                                                                       1);
+                                                           nx::AbstractVector = 1:size(w, 1);
                                                            kwargs...)
     wmat = isa(w, VecVecNum) ? hcat(w...) : w
     M = size(wmat, 2)
