@@ -71,8 +71,10 @@ end
 ## plot_asset_cumulative_returns
 function PortfolioOptimisers.plot_asset_cumulative_returns(w::VecNum, X::MatNum,
                                                            fees::Option{<:Fees} = nothing;
-                                                           ts::AbstractVector = 1:size(X, 1),
-                                                           nx::AbstractVector = 1:size(X, 2),
+                                                           ts::AbstractVector = 1:size(X,
+                                                                                       1),
+                                                           nx::AbstractVector = 1:size(X,
+                                                                                       2),
                                                            compound::Bool = false,
                                                            N::Option{<:Integer} = nothing,
                                                            kwargs...)
@@ -266,7 +268,8 @@ function PortfolioOptimisers.plot_stacked_bar_composition(res_vec::AbstractVecto
     return PortfolioOptimisers.plot_stacked_bar_composition(w, nx; kwargs...)
 end
 function PortfolioOptimisers.plot_stacked_area_composition(w::VecNum_VecVecNum,
-                                                           nx::AbstractVector = 1:size(w, 1);
+                                                           nx::AbstractVector = 1:size(w,
+                                                                                       1);
                                                            kwargs...)
     wmat = isa(w, VecVecNum) ? hcat(w...) : w
     M = size(wmat, 2)
@@ -512,8 +515,8 @@ function PortfolioOptimisers.plot_clusters(cle::HClE_HCl, pr::PortfolioOptimiser
 end
 ## plot_drawdowns
 function PortfolioOptimisers.plot_drawdowns(w::ArrNum, rd::ReturnsResult,
-                                            slv::Option{<:Slv_VecSlv} = nothing,
                                             fees::Option{<:Fees} = nothing;
+                                            slv::Option{<:Slv_VecSlv} = nothing,
                                             compound::Bool = false, alpha::Number = 0.05,
                                             kappa::Number = 0.3, rw = nothing, kwargs...)
     ts = isnothing(rd.ts) ? (1:size(rd.X, 1)) : rd.ts
@@ -1701,10 +1704,10 @@ end
 ## ────────────────────────────────────────────────────────────────────────────
 
 function PortfolioOptimisers.plot_portfolio_dashboard(res::OptimisationResult, rd::Pr_RR;
+                                                      slv::Option{<:Slv_VecSlv} = nothing,
                                                       ts = 1:size(rd.X, 1),
                                                       nx = 1:size(rd.X, 2),
                                                       r::PortfolioOptimisers.AbstractBaseRiskMeasure = Variance(),
-                                                      slv::Option{<:Slv_VecSlv} = nothing,
                                                       compound::Bool = false,
                                                       N::Option{<:Number} = nothing,
                                                       delta::Number = 1e-6,

@@ -167,7 +167,7 @@ plot_histogram(mip_res.w, rd.X; slv = slv)
 
 ```julia
 # Plot compounded or uncompounded drawdowns.
-plot_drawdowns(mip_res.w, rd.X, slv; ts = rd.ts, compound = true)
+plot_drawdowns(mip_res.w, rd.X; slv = slv, ts = rd.ts, compound = true)
 ```
 
 ![Fig. 4](https://github.com/dcelisgarza/PortfolioOptimisers.jl/blob/main/docs/src/assets/readme_4.svg)
