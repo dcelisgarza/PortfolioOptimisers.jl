@@ -51,11 +51,25 @@ function _curryable_bare_name(n)
     return error("@curryable: cannot extract struct name from: $(repr(n))")
 end
 
+# Return the field name for a plain field expression (Symbol or field::Type),
+# or nothing for LineNumberNodes, inner constructors, and other non-field nodes.
+function _try_field_name(expr)
+    if expr isa Symbol
+        return expr
+    end
+    if expr isa Expr && expr.head == :(::) && expr.args[1] isa Symbol
+        return expr.args[1]
+    end
+    return nothing
+end
+
 # Walk the struct body, collecting @c-tagged field names and stripping the tags.
+# Also collects non-@c field names so factory can carry them through unchanged.
 # Handles both bare (@c field) and docstring-prefixed ("doc" \n @c field) forms.
 function _curryable_parse_body(body)
-    curryable = Symbol[]
-    new_args = Any[]
+    curryable     = Symbol[]
+    non_curryable = Symbol[]
+    new_args      = Any[]
     for arg in body.args
         if arg isa Expr && arg.head == :macrocall
             head = arg.args[1]
@@ -75,16 +89,26 @@ function _curryable_parse_body(body)
                     push!(new_args,
                           Expr(:macrocall, arg.args[1:(end - 1)]..., inner.args[end]))
                 else
-                    push!(new_args, arg)                # plain docstring'd field
+                    # plain docstring'd field — carry through unchanged
+                    fname = _try_field_name(inner)
+                    if fname !== nothing
+                        push!(non_curryable, fname)
+                    end
+                    push!(new_args, arg)
                 end
             else
                 push!(new_args, arg)
             end
         else
-            push!(new_args, arg)                        # LineNumberNode, Symbol, ::, function, …
+            # LineNumberNode, bare Symbol field, field::Type, inner constructor, …
+            fname = _try_field_name(arg)
+            if fname !== nothing
+                push!(non_curryable, fname)
+            end
+            push!(new_args, arg)
         end
     end
-    return curryable, Expr(:block, new_args...)
+    return curryable, non_curryable, Expr(:block, new_args...)
 end
 
 # ---------------------------------------------------------------------------
@@ -141,7 +165,7 @@ macro curryable(expr)
     body        = struct_node.args[3]
     struct_name = _curryable_bare_name(type_head)
 
-    curryable_fields, new_body = _curryable_parse_body(body)
+    curryable_fields, non_curryable_fields, new_body = _curryable_parse_body(body)
 
     new_struct = Expr(:struct, struct_node.args[1], type_head, new_body)
     chain      = rebuild(new_struct)
@@ -149,10 +173,13 @@ macro curryable(expr)
     if isempty(curryable_fields)
         factory_body = :x
     else
-        kw_pairs = [Expr(:kw, f,
-                         :(_factory_child($(Expr(:., :x, QuoteNode(f))), args...;
-                                          kwargs...))) for f in curryable_fields]
-        factory_body = Expr(:call, struct_name, Expr(:parameters, kw_pairs...))
+        curry_pairs = [Expr(:kw, f,
+                            :(_factory_child($(Expr(:., :x, QuoteNode(f))), args...;
+                                             kwargs...))) for f in curryable_fields]
+        pass_pairs = [Expr(:kw, f, Expr(:., :x, QuoteNode(f)))
+                      for f in non_curryable_fields]
+        factory_body = Expr(:call, struct_name,
+                            Expr(:parameters, curry_pairs..., pass_pairs...))
     end
 
     factory_def = quote
