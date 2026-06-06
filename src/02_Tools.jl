@@ -708,10 +708,57 @@ _factory_child(::StatsBase.AbstractWeights, w::ObsWeights, args...; kwargs...) =
 
 # --- private AST helpers ----------------------------------------------------
 
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return `true` if `x` is a reference to the [`@c`](@ref) macro (bare `Symbol` or `GlobalRef`).
+
+Used by [`_curryable_parse_body`](@ref) to detect `@c`-tagged fields in a struct body.
+
+# Related
+
+  - [`@c`](@ref)
+  - [`_curryable_parse_body`](@ref)
+  - [`@curryable`](@ref)
+"""
 _is_c_macro(x) = x == Symbol("@c") || (x isa GlobalRef && x.name == Symbol("@c"))
 
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return `true` if `x` is a reference to Julia's `@doc` macro (bare `Symbol` or `GlobalRef`).
+
+Used by [`_curryable_parse_body`](@ref) to recognise docstring-prefixed fields in a struct body.
+
+# Related
+
+  - [`_curryable_parse_body`](@ref)
+  - [`@curryable`](@ref)
+"""
 _is_doc_macro(x) = (x isa GlobalRef && x.name == Symbol("@doc")) || x == Symbol("@doc")
 
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Extract the field name `Symbol` from a bare field or `field::Type` expression.
+
+Errors with a descriptive message when `expr` is neither a bare `Symbol` nor a
+`field::Type` annotation, since only those forms are valid after [`@c`](@ref).
+
+# Arguments
+
+  - `expr`: A `Symbol`, an `Expr` with head `:(::)`, or any other expression (triggers an error).
+
+# Returns
+
+  - `name::Symbol`: The field name.
+
+# Related
+
+  - [`@c`](@ref)
+  - [`_curryable_parse_body`](@ref)
+  - [`@curryable`](@ref)
+"""
 function _extract_field_name(expr)
     if expr isa Symbol
         return expr
@@ -722,9 +769,32 @@ function _extract_field_name(expr)
     return error("@curryable: @c must precede a bare field name or field::Type, got: $(repr(expr))")
 end
 
-# Recursively unwrap macrocall chains until the :struct node is found.
-# Returns (struct_node, rebuild_fn) where rebuild_fn(new_struct) reassembles
-# the original macro chain with new_struct in place of the original struct.
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Recursively unwrap macro call chains to locate the innermost `:struct` node.
+
+Returns `(struct_node, rebuild_fn)` where `rebuild_fn(new_struct)` reconstructs the
+original macro chain with `new_struct` in place of the original struct. This allows
+[`@curryable`](@ref) to inject modified struct definitions back into arbitrary macro
+wrappers such as `@concrete`.
+
+# Arguments
+
+  - `expr`: A `:struct` expression or a `:macrocall` expression wrapping one.
+
+# Returns
+
+  - `struct_node::Expr`: The innermost `:struct` expression.
+  - `rebuild_fn::Function`: A function that, given a replacement `:struct`, returns the
+    full macro chain with the replacement in place of the original.
+
+# Related
+
+  - [`_curryable_parse_body`](@ref)
+  - [`_curryable_bare_name`](@ref)
+  - [`@curryable`](@ref)
+"""
 function _curryable_find_struct(expr)
     if !(expr isa Expr)
         error("@curryable: expected a struct or macro-wrapped struct, got $(typeof(expr))")
@@ -742,6 +812,28 @@ function _curryable_find_struct(expr)
     end
 end
 
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Extract the plain struct name `Symbol` from a potentially parameterised or
+supertype-constrained name expression.
+
+Handles the forms `Name`, `Name{T, ...}`, and `Name{T, ...} <: SuperType` by
+recursively peeling `:curly` and `:<:` wrappers until a bare `Symbol` is reached.
+
+# Arguments
+
+  - `n`: A `Symbol`, or an `Expr` with head `:curly` or `:<:`.
+
+# Returns
+
+  - `name::Symbol`: The plain struct name.
+
+# Related
+
+  - [`_curryable_find_struct`](@ref)
+  - [`@curryable`](@ref)
+"""
 function _curryable_bare_name(n)
     if n isa Symbol
         return n
@@ -755,8 +847,30 @@ function _curryable_bare_name(n)
     return error("@curryable: cannot extract struct name from: $(repr(n))")
 end
 
-# Return the field name for a plain field expression (Symbol or field::Type),
-# or nothing for LineNumberNodes, inner constructors, and other non-field nodes.
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the field name `Symbol` for a plain field declaration, or `nothing` for
+non-field nodes.
+
+Recognises bare `Symbol` fields and `field::Type` annotations. Returns `nothing` for
+`LineNumberNode`s, inner constructors, and any other expression that does not declare
+a single named field.
+
+# Arguments
+
+  - `expr`: Any expression appearing in a struct body.
+
+# Returns
+
+  - `name::Symbol`: The field name, if `expr` is a plain field declaration.
+  - `nothing`: If `expr` is not a plain field declaration.
+
+# Related
+
+  - [`_curryable_parse_body`](@ref)
+  - [`@curryable`](@ref)
+"""
 function _try_field_name(expr)
     if expr isa Symbol
         return expr
@@ -767,9 +881,35 @@ function _try_field_name(expr)
     return nothing
 end
 
-# Walk the struct body, collecting @c-tagged field names and stripping the tags.
-# Also collects non-@c field names so factory can carry them through unchanged.
-# Handles both bare (@c field) and docstring-prefixed ("doc" \n @c field) forms.
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Walk a struct body, collecting [`@c`](@ref)-tagged and non-tagged field names and
+stripping the [`@c`](@ref) tags from the body.
+
+Handles two forms of tagged fields: bare `@c field` and docstring-prefixed
+`"doc" \\n @c field`. Non-field nodes (line numbers, inner constructors) are carried
+through unchanged.
+
+# Arguments
+
+  - `body::Expr`: The `:block` expression forming the struct body.
+
+# Returns
+
+  - `curryable::Vector{Symbol}`: Names of [`@c`](@ref)-tagged fields.
+  - `non_curryable::Vector{Symbol}`: Names of untagged fields.
+  - `new_body::Expr`: The struct body with all [`@c`](@ref) tags stripped.
+
+# Related
+
+  - [`_is_c_macro`](@ref)
+  - [`_is_doc_macro`](@ref)
+  - [`_extract_field_name`](@ref)
+  - [`_try_field_name`](@ref)
+  - [`@c`](@ref)
+  - [`@curryable`](@ref)
+"""
 function _curryable_parse_body(body)
     curryable     = Symbol[]
     non_curryable = Symbol[]
