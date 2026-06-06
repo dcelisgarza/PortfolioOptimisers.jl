@@ -306,15 +306,15 @@ ShrunkExpectedReturns
   - [`StatsBase.CovarianceEstimator`](https://juliastats.org/StatsBase.jl/stable/cov/#StatsBase.CovarianceEstimator)
   - [`AbstractShrunkExpectedReturnsAlgorithm`](@ref)
 """
-@concrete struct ShrunkExpectedReturns <: AbstractShrunkExpectedReturnsEstimator
+@curryable @concrete struct ShrunkExpectedReturns <: AbstractShrunkExpectedReturnsEstimator
     """
     $(field_dict[:me])
     """
-    me
+    @c me
     """
     $(field_dict[:ce])
     """
-    ce
+    @c ce
     """
     $(field_dict[:me_shrink_alg])
     """
@@ -645,43 +645,6 @@ function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:BodnarOkhrinP
     alpha /= u * v - w^2
     beta = (one(alpha) - alpha) * w / u
     return alpha * mu + beta * b
-end
-"""
-    factory(ce::ShrunkExpectedReturns, w::ObsWeights) -> ShrunkExpectedReturns
-
-Return a new [`ShrunkExpectedReturns`](@ref) estimator with observation weights `w` applied to the underlying mean and covariance estimators.
-
-# Arguments
-
-  - `me`: Shrunk expected returns estimator.
-  - $(arg_dict[:ow])
-
-# Returns
-
-  - `me::ShrunkExpectedReturns`: Updated estimator with weights applied.
-
-# Examples
-
-```jldoctest
-julia> me = ShrunkExpectedReturns();
-
-julia> me2 = factory(me, StatsBase.Weights([0.2, 0.3, 0.5]));
-
-julia> me2.me.w
-3-element Weights{Float64, Float64, Vector{Float64}}:
- 0.2
- 0.3
- 0.5
-```
-
-# Related
-
-  - [`ShrunkExpectedReturns`](@ref)
-  - [`factory`](@ref)
-"""
-function factory(me::ShrunkExpectedReturns, w::ObsWeights)::ShrunkExpectedReturns
-    return ShrunkExpectedReturns(; me = factory(me.me, w), ce = factory(me.ce, w),
-                                 alg = me.alg)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

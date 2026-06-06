@@ -677,6 +677,18 @@ function factory(a::AbstractVector{<:Union{<:AbstractEstimator, <:AbstractAlgori
                                            <:AbstractResult}}, args...; kwargs...)
     return [factory(ai, args...; kwargs...) for ai in a]
 end
+
+# Per-field recursion helper called by @curryable-generated factory methods.
+# Eligible values recurse via factory; everything else passes through unchanged.
+_factory_child(v, args...; kwargs...) = v
+function _factory_child(v::Union{<:AbstractEstimator, <:AbstractAlgorithm,
+                                 <:AbstractResult}, args...; kwargs...)
+    return factory(v, args...; kwargs...)
+end
+function _factory_child(v::AbstractArray{<:Union{<:AbstractEstimator, <:AbstractAlgorithm,
+                                                 <:AbstractResult}}, args...; kwargs...)
+    return [_factory_child(vi, args...; kwargs...) for vi in v]
+end
 """
 $(DocStringExtensions.TYPEDEF)
 

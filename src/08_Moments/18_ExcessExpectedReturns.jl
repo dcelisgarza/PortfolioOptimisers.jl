@@ -33,11 +33,11 @@ ExcessExpectedReturns
   - [`AbstractShrunkExpectedReturnsEstimator`](@ref)
   - [`AbstractExpectedReturnsEstimator`](@ref)
 """
-@concrete struct ExcessExpectedReturns <: AbstractShrunkExpectedReturnsEstimator
+@curryable @concrete struct ExcessExpectedReturns <: AbstractShrunkExpectedReturnsEstimator
     """
     $(field_dict[:me])
     """
-    me
+    @c me
     """
     $(field_dict[:rf])
     """
@@ -50,40 +50,6 @@ function ExcessExpectedReturns(;
                                me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
                                rf::Number = 0.0)::ExcessExpectedReturns
     return ExcessExpectedReturns(me, rf)
-end
-"""
-    factory(me::ExcessExpectedReturns, w::ObsWeights) -> ExcessExpectedReturns
-
-Return a new [`ExcessExpectedReturns`](@ref) estimator with observation weights `w` applied to the underlying mean estimator.
-
-# Arguments
-
-  - `me`: Excess expected returns estimator.
-  - $(arg_dict[:ow])
-
-# Returns
-
-  - `me::ExcessExpectedReturns`: Updated estimator with weights applied.
-
-# Examples
-
-```jldoctest
-julia> me = ExcessExpectedReturns();
-
-julia> factory(me, StatsBase.Weights([0.2, 0.3, 0.5]))
-ExcessExpectedReturns
-  me ┼ SimpleExpectedReturns
-     │   w ┴ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.3, 0.5]
-  rf ┴ Float64: 0.0
-```
-
-# Related
-
-  - [`ExcessExpectedReturns`](@ref)
-  - [`factory`](@ref)
-"""
-function factory(me::ExcessExpectedReturns, w::ObsWeights)::ExcessExpectedReturns
-    return ExcessExpectedReturns(; me = factory(me.me, w), rf = me.rf)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

@@ -65,6 +65,7 @@ include.(src_files)
 
 include("01_Base.jl")
 include("02_Tools.jl")
+include("02b_Curryable.jl")
 include("03_Preprocessing.jl")
 include("04_PosdefMatrix.jl")
 include("05_Denoise.jl")

@@ -45,11 +45,12 @@ StandardDeviationExpectedReturns
   - [`AbstractExpectedReturnsEstimator`](@ref)
   - [`PortfolioOptimisersCovariance`](@ref)
 """
-@concrete struct StandardDeviationExpectedReturns <: AbstractExpectedReturnsEstimator
+@curryable @concrete struct StandardDeviationExpectedReturns <:
+                            AbstractExpectedReturnsEstimator
     """
     $(field_dict[:ce])
     """
-    ce
+    @c ce
     function StandardDeviationExpectedReturns(ce::StatsBase.CovarianceEstimator)
         return new{typeof(ce)}(ce)
     end
@@ -57,29 +58,6 @@ end
 function StandardDeviationExpectedReturns(;
                                           ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance())::StandardDeviationExpectedReturns
     return StandardDeviationExpectedReturns(ce)
-end
-"""
-    factory(ce::StandardDeviationExpectedReturns, w::ObsWeights) -> StandardDeviationExpectedReturns
-
-Return a new [`StandardDeviationExpectedReturns`](@ref) estimator with observation weights `w` applied to the underlying covariance estimator.
-
-# Arguments
-
-  - `ce`: Standard deviation expected returns estimator.
-  - $(arg_dict[:ow])
-
-# Returns
-
-  - `me::StandardDeviationExpectedReturns`: Updated estimator with weights applied.
-
-# Related
-
-  - [`StandardDeviationExpectedReturns`](@ref)
-  - [`factory`](@ref)
-"""
-function factory(ce::StandardDeviationExpectedReturns,
-                 w::ObsWeights)::StandardDeviationExpectedReturns
-    return StandardDeviationExpectedReturns(; ce = factory(ce.ce, w))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -193,11 +171,11 @@ VarianceExpectedReturns
   - [`AbstractExpectedReturnsEstimator`](@ref)
   - [`PortfolioOptimisersCovariance`](@ref)
 """
-@concrete struct VarianceExpectedReturns <: AbstractExpectedReturnsEstimator
+@curryable @concrete struct VarianceExpectedReturns <: AbstractExpectedReturnsEstimator
     """
     $(field_dict[:ce])
     """
-    ce
+    @c ce
     function VarianceExpectedReturns(ce::StatsBase.CovarianceEstimator)
         return new{typeof(ce)}(ce)
     end
@@ -205,28 +183,6 @@ end
 function VarianceExpectedReturns(;
                                  ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance())::VarianceExpectedReturns
     return VarianceExpectedReturns(ce)
-end
-"""
-    factory(ce::VarianceExpectedReturns, w::ObsWeights) -> VarianceExpectedReturns
-
-Return a new [`VarianceExpectedReturns`](@ref) estimator with observation weights `w` applied to the underlying covariance estimator.
-
-# Arguments
-
-  - `ce`: variance expected returns estimator.
-  - $(arg_dict[:ow])
-
-# Returns
-
-  - `me::VarianceExpectedReturns`: Updated estimator with weights applied.
-
-# Related
-
-  - [`VarianceExpectedReturns`](@ref)
-  - [`factory`](@ref)
-"""
-function factory(ce::VarianceExpectedReturns, w::ObsWeights)::VarianceExpectedReturns
-    return VarianceExpectedReturns(; ce = factory(ce.ce, w))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
