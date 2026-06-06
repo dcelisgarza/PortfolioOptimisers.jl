@@ -114,7 +114,7 @@ StepwiseRegression
   - [`AbstractStepwiseRegressionAlgorithm`](@ref)
   - [`AbstractRegressionTarget`](@ref)
 """
-@concrete struct StepwiseRegression <: AbstractRegressionEstimator
+@curryable @concrete struct StepwiseRegression <: AbstractRegressionEstimator
     """
     $(field_dict[:crit])
     """
@@ -126,7 +126,7 @@ StepwiseRegression
     """
     $(field_dict[:retgt])
     """
-    tgt
+    @c tgt
     function StepwiseRegression(crit::AbstractStepwiseRegressionCriterion,
                                 alg::AbstractStepwiseRegressionAlgorithm,
                                 tgt::AbstractRegressionTarget)
@@ -143,28 +143,6 @@ function StepwiseRegression(; crit::AbstractStepwiseRegressionCriterion = PValue
                             alg::AbstractStepwiseRegressionAlgorithm = Forward(),
                             tgt::AbstractRegressionTarget = LinearModel())::StepwiseRegression
     return StepwiseRegression(crit, alg, tgt)
-end
-"""
-    factory(re::StepwiseRegression, w::ObsWeights) -> StepwiseRegression
-
-Return a new [`StepwiseRegression`](@ref) estimator with observation weights `w` applied to the underlying regression target.
-
-# Arguments
-
-  - `re`: Stepwise regression estimator.
-  - $(arg_dict[:ow])
-
-# Returns
-
-  - `re::StepwiseRegression`: Updated estimator with weights applied to `tgt`.
-
-# Related
-
-  - [`StepwiseRegression`](@ref)
-  - [`factory`](@ref)
-"""
-function factory(re::StepwiseRegression, w::ObsWeights)::StepwiseRegression
-    return StepwiseRegression(; crit = re.crit, alg = re.alg, tgt = factory(re.tgt, w))
 end
 """
     add_best_feature_after_pval_failure!(tgt::AbstractRegressionTarget,

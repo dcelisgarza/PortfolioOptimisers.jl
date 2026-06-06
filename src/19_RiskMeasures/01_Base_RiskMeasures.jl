@@ -321,7 +321,8 @@ Frontier
     $(field_dict[:bound_fr])
     """
     bound
-    function Frontier(N::Integer, factor::Number, bound::FrontierBoundEstimator)::Frontier
+    function Frontier(N::Integer, factor::Number = 1,
+                      bound::FrontierBoundEstimator = LinearBound())::Frontier
         @argcheck(N > zero(N))
         @argcheck(isfinite(factor))
         @argcheck(factor > zero(factor))

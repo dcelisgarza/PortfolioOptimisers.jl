@@ -1017,45 +1017,6 @@ function tracking_benchmark(tr::ReturnsTracking, args...)
     return tr.w
 end
 """
-    factory(tr::ReturnsTracking, ::Any)
-
-Return the input `ReturnsTracking` object unchanged.
-
-This function provides a consistent interface for updating or copying returns-based tracking algorithms. It is used for composability in portfolio analytics workflows where the tracking object does not require modification.
-
-# Arguments
-
-  - `tr`: A [`ReturnsTracking`](@ref) object containing benchmark portfolio returns.
-  - `::Any`: Index or argument (ignored).
-
-# Returns
-
-  - `tr::ReturnsTracking`: The input tracking algorithm object.
-
-# Details
-
-  - Returns the input object unchanged.
-  - Ensures interface consistency for factory operations.
-
-# Examples
-
-```jldoctest
-julia> tr = ReturnsTracking(; w = [0.01, 0.02, 0.03]);
-
-julia> PortfolioOptimisers.factory(tr, [0.1, 0.4, 0.5])
-ReturnsTracking
-  w ┴ Vector{Float64}: [0.01, 0.02, 0.03]
-```
-
-# Related
-
-  - [`ReturnsTracking`](@ref)
-  - [`factory`](@ref)
-"""
-function factory(tr::ReturnsTracking, ::Any)
-    return tr
-end
-"""
 $(DocStringExtensions.TYPEDEF)
 
 Tracking error result type.
@@ -1104,11 +1065,11 @@ TrackingError
   - [`L2Tracking`](@ref)
   - [`L1Tracking`](@ref)
 """
-@concrete struct TrackingError <: AbstractTracking
+@curryable @concrete struct TrackingError <: AbstractTracking
     """
     $(field_dict[:tr])
     """
-    tr
+    @c tr
     """
     $(field_dict[:err])
     """
@@ -1233,64 +1194,6 @@ julia> PortfolioOptimisers.tracking_view([tr], 1:2)
 """
 function tracking_view(tr::VecTr, args...)
     return [tracking_view(t, args...) for t in tr]
-end
-"""
-    factory(tr::TrackingError, w::VecNum)
-
-Construct a new `TrackingError` object with updated tracking algorithm weights.
-
-This function creates a new [`TrackingError`](@ref) instance by updating the underlying tracking algorithm using the provided weights `w`. The error value and formulation algorithm are preserved.
-
-# Arguments
-
-  - `tr`: A [`TrackingError`](@ref) object containing a tracking algorithm, error value, and formulation algorithm.
-  - `w`: Portfolio weights (vector of real numbers) to update the underlying tracking algorithm.
-
-# Returns
-
-  - `tre::TrackingError`: New tracking error result object with the underlying tracking algorithm updated using `w`.
-
-# Details
-
-  - Uses `factory(tr.tr, w)` to update the underlying tracking algorithm.
-  - Preserves the `err` and `alg` fields.
-  - Returns a new `TrackingError` object with the updated tracking algorithm.
-
-# Examples
-
-```jldoctest
-julia> tr = WeightsTracking(; w = [0.5, 0.5]);
-
-julia> err = TrackingError(; tr = tr, err = 0.01)
-TrackingError
-   tr ┼ WeightsTracking
-      │    fees ┼ nothing
-      │       w ┼ Vector{Float64}: [0.5, 0.5]
-      │   fixed ┴ Bool: false
-  err ┼ Float64: 0.01
-  alg ┼ L2Tracking
-      │   ddof ┴ Int64: 1
-
-julia> factory(err, [0.6, 0.4])
-TrackingError
-   tr ┼ WeightsTracking
-      │    fees ┼ nothing
-      │       w ┼ Vector{Float64}: [0.6, 0.4]
-      │   fixed ┴ Bool: false
-  err ┼ Float64: 0.01
-  alg ┼ L2Tracking
-      │   ddof ┴ Int64: 1
-```
-
-# Related
-
-  - [`TrackingError`](@ref)
-  - [`factory`](@ref)
-  - [`WeightsTracking`](@ref)
-  - [`ReturnsTracking`](@ref)
-"""
-function factory(tr::TrackingError, w::VecNum)
-    return TrackingError(; tr = factory(tr.tr, w), err = tr.err, alg = tr.alg)
 end
 function needs_previous_weights(tr::TrackingError)
     return needs_previous_weights(tr.tr)

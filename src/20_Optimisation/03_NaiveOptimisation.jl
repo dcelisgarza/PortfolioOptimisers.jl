@@ -212,7 +212,7 @@ InverseVolatility
   - [`EqualWeighted`](@ref)
   - [`RandomWeighted`](@ref)
 """
-@concrete struct InverseVolatility <: NaiveOptimisationEstimator
+@curryable @concrete struct InverseVolatility <: NaiveOptimisationEstimator
     """
     $(field_dict[:pe])
     """
@@ -232,7 +232,7 @@ InverseVolatility
     """
     $(field_dict[:fb])
     """
-    fb
+    @c fb
     """
     $(field_dict[:sq])
     """
@@ -262,21 +262,6 @@ function InverseVolatility(; pe::PrE_Pr = EmpiricalPrior(),
                            fb::Option{<:OptE_Opt} = nothing, sq::Bool = false,
                            brt::Bool = false, strict::Bool = false)::InverseVolatility
     return InverseVolatility(pe, wb, sets, wf, fb, sq, brt, strict)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Create an [`InverseVolatility`](@ref) updating the fallback estimator with weights `w`.
-
-# Related
-
-  - [`InverseVolatility`](@ref)
-  - [`factory`](@ref)
-"""
-function factory(opt::InverseVolatility, w::AbstractVector)::InverseVolatility
-    return InverseVolatility(; pe = opt.pe, wb = opt.wb, sets = opt.sets, wf = opt.wf,
-                             fb = factory(opt.fb, w), sq = opt.sq, brt = opt.brt,
-                             strict = opt.strict)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -415,7 +400,7 @@ EqualWeighted
   - [`InverseVolatility`](@ref)
   - [`RandomWeighted`](@ref)
 """
-@concrete struct EqualWeighted <: NaiveOptimisationEstimator
+@curryable @concrete struct EqualWeighted <: NaiveOptimisationEstimator
     """
     $(field_dict[:wb])
     """
@@ -431,7 +416,7 @@ EqualWeighted
     """
     $(field_dict[:fb])
     """
-    fb
+    @c fb
     """
     $(field_dict[:strict_opt])
     """
@@ -453,20 +438,6 @@ function EqualWeighted(; wb::Option{<:WbE_Wb} = WeightBounds(),
                        fb::Option{<:OptE_Opt} = nothing,
                        strict::Bool = false)::EqualWeighted
     return EqualWeighted(wb, sets, wf, fb, strict)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Create an [`EqualWeighted`](@ref) updating the fallback estimator with weights `w`.
-
-# Related
-
-  - [`EqualWeighted`](@ref)
-  - [`factory`](@ref)
-"""
-function factory(opt::EqualWeighted, w::AbstractVector)::EqualWeighted
-    return EqualWeighted(; wb = opt.wb, sets = opt.sets, wf = opt.wf,
-                         fb = factory(opt.fb, w), strict = opt.strict)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -590,7 +561,7 @@ RandomWeighted
   - [`InverseVolatility`](@ref)
   - [`EqualWeighted`](@ref)
 """
-@concrete struct RandomWeighted <: NaiveOptimisationEstimator
+@curryable @concrete struct RandomWeighted <: NaiveOptimisationEstimator
     """
     $(field_dict[:alpha_dirichlet])
     """
@@ -618,7 +589,7 @@ RandomWeighted
     """
     $(field_dict[:fb])
     """
-    fb
+    @c fb
     """
     $(field_dict[:strict_opt])
     """
@@ -646,21 +617,6 @@ function RandomWeighted(; alpha::Num_VecNum = 1,
                         fb::Option{<:OptE_Opt} = nothing,
                         strict::Bool = false)::RandomWeighted
     return RandomWeighted(alpha, rng, seed, wb, sets, wf, fb, strict)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Create a [`RandomWeighted`](@ref) updating the fallback estimator with weights `w`.
-
-# Related
-
-  - [`RandomWeighted`](@ref)
-  - [`factory`](@ref)
-"""
-function factory(opt::RandomWeighted, w::AbstractVector)::RandomWeighted
-    return RandomWeighted(; alpha = opt.alpha, rng = opt.rng, seed = opt.seed, wb = opt.wb,
-                          sets = opt.sets, wf = opt.wf, fb = factory(opt.fb, w),
-                          strict = opt.strict)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

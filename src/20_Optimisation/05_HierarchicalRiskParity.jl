@@ -130,15 +130,15 @@ Where:
   - [`HierarchicalEqualRiskContribution`](@ref)
   - [`SchurComplementHierarchicalRiskParity`](@ref)
 """
-@concrete struct HierarchicalRiskParity <: ClusteringOptimisationEstimator
+@curryable @concrete struct HierarchicalRiskParity <: ClusteringOptimisationEstimator
     """
     $(field_dict[:opt_hier])
     """
-    opt
+    @c opt
     """
     $(field_dict[:r])
     """
-    r
+    @c r
     """
     $(field_dict[:sca])
     """
@@ -146,7 +146,7 @@ Where:
     """
     $(field_dict[:fb])
     """
-    fb
+    @c fb
     function HierarchicalRiskParity(opt::HierarchicalOptimiser, r::OptRM_VecOptRM,
                                     sca::Scalariser, fb::Option{<:OptE_Opt})
         if isa(r, AbstractVector)
@@ -177,22 +177,6 @@ function needs_previous_weights(opt::HierarchicalRiskParity)
     return (needs_previous_weights(opt.opt) ||
             needs_previous_weights(opt.r) ||
             needs_previous_weights(opt.fb))
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Create a [`HierarchicalRiskParity`](@ref) updating the base optimiser, risk measure, and fallback with weights `w`.
-
-# Related
-
-  - [`HierarchicalRiskParity`](@ref)
-  - [`factory`](@ref)
-"""
-function factory(hrp::HierarchicalRiskParity, w::AbstractVector)::HierarchicalRiskParity
-    opt = factory(hrp.opt, w)
-    r = factory(hrp.r, w)
-    fb = factory(hrp.fb, w)
-    return HierarchicalRiskParity(; opt = opt, r = r, sca = hrp.sca, fb = fb)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

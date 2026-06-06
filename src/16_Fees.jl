@@ -360,11 +360,11 @@ Fees
   - [`calc_asset_fees`](@ref)
   - [`calc_net_returns`](@ref)
 """
-@concrete struct Fees <: AbstractResult
+@curryable @concrete struct Fees <: AbstractResult
     """
     $(field_dict[:tnr])
     """
-    tn
+    @c tn
     """
     $(field_dict[:l_fees])
     """
@@ -677,75 +677,6 @@ function fees_view(fees::Fees, i)::Fees
     fl = nothing_scalar_array_view(fees.fl, i)
     fs = nothing_scalar_array_view(fees.fs, i)
     return Fees(; tn = tn, l = l, s = s, fl = fl, fs = fs, kwargs = fees.kwargs)
-end
-"""
-    factory(fees::Fees, w::VecNum)
-
-Create a new `Fees` constraint with updated portfolio weights.
-
-`factory` constructs a new [`Fees`](@ref) object using the provided portfolio weights `w` and the fee values from an existing `Fees` constraint `fees`. The turnover constraint is updated using `factory(fees.tn, w)`, while all other fee fields and keyword arguments are preserved.
-
-# Arguments
-
-  - `fees`: Existing `Fees` constraint object.
-  - `w`: New weights to assign to the constraint.
-
-# Returns
-
-  - `fe::Fees`: New constraint object with updated weights in the turnover field and original fee values.
-
-# Details
-
-  - Updates only the weights field in the turnover constraint via `factory(fees.tn, w)`.
-  - Propagates all other fields unchanged
-
-# Examples
-
-```jldoctest
-julia> fees = Fees(; tn = Turnover(; w = [0.2, 0.3, 0.5], val = [0.1, 0.0, 0.0]),
-                   l = [0.001, 0.002, 0.0], s = [0.001, 0.002, 0.0], fl = [5.0, 0.0, 0.0],
-                   fs = [0.0, 10.0, 0.0]);
-
-julia> factory(fees, [0.4, 0.4, 0.2])
-Fees
-      tn ┼ Turnover
-         │       w ┼ Vector{Float64}: [0.4, 0.4, 0.2]
-         │     val ┼ Vector{Float64}: [0.1, 0.0, 0.0]
-         │   fixed ┴ Bool: false
-       l ┼ Vector{Float64}: [0.001, 0.002, 0.0]
-       s ┼ Vector{Float64}: [0.001, 0.002, 0.0]
-      fl ┼ Vector{Float64}: [5.0, 0.0, 0.0]
-      fs ┼ Vector{Float64}: [0.0, 10.0, 0.0]
-  kwargs ┴ @NamedTuple{atol::Float64}: (atol = 1.0e-8,)
-
-julia> fees = Fees(; tn = Turnover(; w = [0.2, 0.3, 0.5], val = [0.1, 0.0, 0.0], fixed = true),
-                   l = [0.001, 0.002, 0.0], s = [0.001, 0.002, 0.0], fl = [5.0, 0.0, 0.0],
-                   fs = [0.0, 10.0, 0.0]);
-
-julia> factory(fees, [0.4, 0.4, 0.4])
-Fees
-      tn ┼ Turnover
-         │       w ┼ Vector{Float64}: [0.2, 0.3, 0.5]
-         │     val ┼ Vector{Float64}: [0.1, 0.0, 0.0]
-         │   fixed ┴ Bool: true
-       l ┼ Vector{Float64}: [0.001, 0.002, 0.0]
-       s ┼ Vector{Float64}: [0.001, 0.002, 0.0]
-      fl ┼ Vector{Float64}: [5.0, 0.0, 0.0]
-      fs ┼ Vector{Float64}: [0.0, 10.0, 0.0]
-  kwargs ┴ @NamedTuple{atol::Float64}: (atol = 1.0e-8,)
-```
-
-# Related
-
-  - [`Fees`](@ref)
-  - [`Turnover`](@ref)
-  - [`VecNum`](@ref)
-  - [`factory(tn::Turnover, w::VecNum)`](@ref)
-  - [`fees_constraints`](@ref)
-"""
-function factory(fees::Fees, w::VecNum)::Fees
-    return Fees(; tn = factory(fees.tn, w), l = fees.l, s = fees.s, fl = fees.fl,
-                fs = fees.fs, kwargs = fees.kwargs)
 end
 """
     calc_fees(w::VecNum, p::VecNum, ::Nothing, ::Function)

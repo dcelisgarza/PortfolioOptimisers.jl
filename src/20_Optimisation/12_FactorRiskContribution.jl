@@ -145,11 +145,11 @@ Keywords correspond to the struct's fields.
   - [`RiskBudgeting`](@ref)
   - [`factor_risk_contribution`](@ref)
 """
-@concrete struct FactorRiskContribution <: RiskJuMPOptimisationEstimator
+@curryable @concrete struct FactorRiskContribution <: RiskJuMPOptimisationEstimator
     """
     $(field_dict[:opt_jmp])
     """
-    opt
+    @c opt
     """
     $(field_dict[:re])
     """
@@ -157,7 +157,7 @@ Keywords correspond to the struct's fields.
     """
     $(field_dict[:r_opt])
     """
-    r
+    @c r
     """
     $(field_dict[:obj])
     """
@@ -181,7 +181,7 @@ Keywords correspond to the struct's fields.
     """
     $(field_dict[:fb])
     """
-    fb
+    @c fb
     function FactorRiskContribution(opt::JuMPOptimiser, re::RegE_Reg, r::RM_VecRM,
                                     obj::ObjectiveFunction,
                                     frc_ple::Option{<:PlCE_PhC_VecPlCE_PlC},
@@ -218,19 +218,6 @@ function needs_previous_weights(opt::FactorRiskContribution)
     return (needs_previous_weights(opt.opt) ||
             needs_previous_weights(opt.r) ||
             needs_previous_weights(opt.fb))
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Build an updated [`FactorRiskContribution`](@ref) with all estimators that track previous weights updated via `factory` using `w`.
-"""
-function factory(frc::FactorRiskContribution, w::AbstractVector)::FactorRiskContribution
-    opt = factory(frc.opt, w)
-    r = factory(frc.r, w)
-    fb = factory(frc.fb, w)
-    return FactorRiskContribution(; opt = opt, re = frc.re, r = r, obj = frc.obj,
-                                  frc_ple = frc.frc_ple, sets = frc.sets, wi = frc.wi,
-                                  flag = frc.flag, fb = fb)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

@@ -132,11 +132,11 @@ Keywords correspond to the struct's fields.
   - [`ImpliedVolatilityPremium`](@ref)
   - [`AbstractMatrixProcessingEstimator`](@ref)
 """
-@concrete struct ImpliedVolatility <: AbstractCovarianceEstimator
+@curryable @concrete struct ImpliedVolatility <: AbstractCovarianceEstimator
     """
     $(field_dict[:ce])
     """
-    ce
+    @c ce
     """
     $(field_dict[:mp])
     """
@@ -161,28 +161,6 @@ function ImpliedVolatility(; ce::StatsBase.CovarianceEstimator = Covariance(),
                            alg::ImpliedVolatilityAlgorithm = ImpliedVolatilityRegression(),
                            af::Number = 252)::ImpliedVolatility
     return ImpliedVolatility(ce, mp, alg, af)
-end
-"""
-    factory(ce::ImpliedVolatility, w::ObsWeights) -> ImpliedVolatility
-
-Return a new [`ImpliedVolatility`](@ref) estimator with observation weights `w` applied to the underlying covariance estimator.
-
-# Arguments
-
-  - $(arg_dict[:ce])
-  - $(arg_dict[:ow])
-
-# Returns
-
-  - $(ret_dict[:ce])
-
-# Related
-
-  - [`ImpliedVolatility`](@ref)
-  - [`factory`](@ref)
-"""
-function factory(ce::ImpliedVolatility, w::ObsWeights)::ImpliedVolatility
-    return ImpliedVolatility(; ce = factory(ce.ce, w), mp = ce.mp)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

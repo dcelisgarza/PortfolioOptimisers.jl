@@ -423,11 +423,12 @@ The bisection weight ``\\alpha`` is then computed from the Schur-complement-corr
   - [`HierarchicalEqualRiskContribution`](@ref)
   - [`SchurComplementParams`](@ref)
 """
-@concrete struct SchurComplementHierarchicalRiskParity <: ClusteringOptimisationEstimator
+@curryable @concrete struct SchurComplementHierarchicalRiskParity <:
+                            ClusteringOptimisationEstimator
     """
     $(field_dict[:opt_hier])
     """
-    opt
+    @c opt
     """
     $(field_dict[:params])
     """
@@ -435,7 +436,7 @@ The bisection weight ``\\alpha`` is then computed from the Schur-complement-corr
     """
     $(field_dict[:fb])
     """
-    fb
+    @c fb
     function SchurComplementHierarchicalRiskParity(opt::HierarchicalOptimiser,
                                                    params::ScP_VecScP,
                                                    fb::Option{<:OptE_Opt})
@@ -463,22 +464,6 @@ Return whether the [`SchurComplementHierarchicalRiskParity`](@ref) requires prev
 """
 function needs_previous_weights(opt::SchurComplementHierarchicalRiskParity)
     return (needs_previous_weights(opt.opt) || needs_previous_weights(opt.fb))
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Create a [`SchurComplementHierarchicalRiskParity`](@ref) updating the base optimiser and fallback with weights `w`.
-
-# Related
-
-  - [`SchurComplementHierarchicalRiskParity`](@ref)
-  - [`factory`](@ref)
-"""
-function factory(sh::SchurComplementHierarchicalRiskParity,
-                 w::AbstractVector)::SchurComplementHierarchicalRiskParity
-    opt = factory(sh.opt, w)
-    fb = factory(sh.fb, w)
-    return SchurComplementHierarchicalRiskParity(; opt = opt, params = sh.params, fb = fb)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

@@ -271,50 +271,17 @@ ExpectedReturn
   - [`expected_return`](@ref)
   - [`expected_risk`](@ref)
 """
-@concrete struct ExpectedReturn <: NonOptimisationRiskMeasure
+@curryable @concrete struct ExpectedReturn <: NonOptimisationRiskMeasure
     """
     $(field_dict[:rt])
     """
-    rt
+    @c rt
     function ExpectedReturn(rt::JuMPReturnsEstimator)
         return new{typeof(rt)}(rt)
     end
 end
 function ExpectedReturn(; rt::JuMPReturnsEstimator = ArithmeticReturn())::ExpectedReturn
     return ExpectedReturn(rt)
-end
-"""
-    factory(r::ExpectedReturn, args...; kwargs...)
-
-Construct a new `ExpectedReturn` object with an updated return estimator based on the provided prior result.
-
-This function creates a new [`ExpectedReturn`](@ref) instance by updating the internal return estimator using the prior result and any additional arguments or keyword arguments.
-
-# Arguments
-
-  - `r`: A [`ExpectedReturn`](@ref) object containing a return estimator.
-  - `prior`: Prior result used to update the return estimator.
-  - `args...`: Additional positional arguments for updating the return estimator.
-  - `kwargs...`: Additional keyword arguments for updating the return estimator.
-
-# Returns
-
-  - `r::ExpectedReturn`: New risk measure object with updated return estimator.
-
-# Details
-
-  - Calls [`factory`](@ref) to update the return estimator using the prior result and arguments.
-  - Returns a new `ExpectedReturn` object with the updated estimator.
-
-# Related
-
-  - [`ExpectedReturn`](@ref)
-  - [`AbstractPriorResult`](@ref)
-  - [`factory`](@ref)
-"""
-function factory(r::ExpectedReturn, args...; kwargs...)::ExpectedReturn
-    rt = factory(r.rt, args...; kwargs...)
-    return ExpectedReturn(; rt = rt)
 end
 """
     expected_risk(r::ExpectedReturn, w::VecNum, pr::AbstractPriorResult;
@@ -395,15 +362,15 @@ ExpectedReturnRiskRatio
   - [`expected_ratio`](@ref)
   - [`expected_risk`](@ref)
 """
-@concrete struct ExpectedReturnRiskRatio <: NonOptimisationRiskMeasure
+@curryable @concrete struct ExpectedReturnRiskRatio <: NonOptimisationRiskMeasure
     """
     $(field_dict[:rt])
     """
-    rt
+    @c rt
     """
     $(field_dict[:rk])
     """
-    rk
+    @c rk
     """
     $(field_dict[:rf])
     """
@@ -417,40 +384,6 @@ function ExpectedReturnRiskRatio(; rt::JuMPReturnsEstimator = ArithmeticReturn()
                                  rk::AbstractBaseRiskMeasure = Variance(),
                                  rf::Number = 0.0)::ExpectedReturnRiskRatio
     return ExpectedReturnRiskRatio(rt, rk, rf)
-end
-"""
-    factory(r::ExpectedReturnRiskRatio, pr::AbstractPriorResult, args...; kwargs...)
-
-Construct a new `ExpectedReturnRiskRatio` object with updated return and risk estimators based on the provided prior result.
-
-This function creates a new [`ExpectedReturnRiskRatio`](@ref) instance by updating the internal return estimator and risk measure using the prior result and any additional arguments or keyword arguments.
-
-# Arguments
-
-  - `r`: Ratio-based risk measure object.
-  - `prior`: Prior result used to update the return estimator and risk measure.
-  - `args...`: Additional positional arguments for updating the estimators.
-  - `kwargs...`: Additional keyword arguments for updating the estimators.
-
-# Returns
-
-  - `r::ExpectedReturnRiskRatio`: New risk measure object with updated return estimator and risk measure.
-
-# Details
-
-  - Calls `factory(r.rt, pr, args...; kwargs...)` to update the return estimator using the prior result and arguments.
-  - Calls `factory(r.rk, pr, args...; kwargs...)` to update the risk measure using the prior result and arguments.
-  - Returns a new `ExpectedReturnRiskRatio` object with the updated fields and original risk-free rate.
-
-# Related
-
-  - [`ExpectedReturnRiskRatio`](@ref)
-  - [`AbstractPriorResult`](@ref)
-"""
-function factory(r::ExpectedReturnRiskRatio, args...; kwargs...)::ExpectedReturnRiskRatio
-    rt = factory(r.rt, args...; kwargs...)
-    rk = factory(r.rk, args...; kwargs...)
-    return ExpectedReturnRiskRatio(; rt = rt, rk = rk, rf = r.rf)
 end
 """
     expected_risk(r::ExpectedReturnRiskRatio, w::VecNum, pr::AbstractPriorResult;

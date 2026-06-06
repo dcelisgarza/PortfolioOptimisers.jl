@@ -162,11 +162,11 @@ Coskewness
   - [`AbstractMatrixProcessingEstimator`](@ref)
   - [`AbstractMomentAlgorithm`](@ref)
 """
-@concrete struct Coskewness <: CoskewnessEstimator
+@curryable @concrete struct Coskewness <: CoskewnessEstimator
     """
     $(field_dict[:me])
     """
-    me
+    @c me
     """
     $(field_dict[:mp])
     """
@@ -178,7 +178,7 @@ Coskewness
     """
     $(field_dict[:oow])
     """
-    w
+    @c w
     function Coskewness(me::AbstractExpectedReturnsEstimator,
                         mp::AbstractMatrixProcessingEstimator, alg::AbstractMomentAlgorithm,
                         w::Option{<:ObsWeights})
@@ -191,49 +191,6 @@ function Coskewness(; me::AbstractExpectedReturnsEstimator = SimpleExpectedRetur
                     alg::AbstractMomentAlgorithm = Full(),
                     w::Option{<:ObsWeights} = nothing)::Coskewness
     return Coskewness(me, mp, alg, w)
-end
-"""
-    factory(ske::Coskewness, w::ObsWeights) -> Coskewness
-
-Return a new [`Coskewness`](@ref) estimator with observation weights `w` applied to the underlying mean estimator.
-
-# Arguments
-
-  - $(arg_dict[:ske])
-  - $(arg_dict[:ow])
-
-# Returns
-
-  - `ske::Coskewness`: Updated estimator with weights applied.
-
-# Examples
-
-```jldoctest
-julia> ske = Coskewness();
-
-julia> factory(ske, StatsBase.Weights([0.2, 0.3, 0.5]))
-Coskewness
-   me ┼ SimpleExpectedReturns
-      │   w ┴ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.3, 0.5]
-   mp ┼ DenoiseDetoneAlgMatrixProcessing
-      │     pdm ┼ Posdef
-      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
-      │      dn ┼ nothing
-      │      dt ┼ nothing
-      │     alg ┼ nothing
-      │   order ┴ DenoiseDetoneAlg()
-  alg ┼ Full()
-    w ┴ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.3, 0.5]
-```
-
-# Related
-
-  - [`Coskewness`](@ref)
-  - [`factory`](@ref)
-"""
-function factory(ske::Coskewness, w::ObsWeights)::Coskewness
-    return Coskewness(; me = factory(ske.me, w), mp = ske.mp, alg = ske.alg, w = w)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

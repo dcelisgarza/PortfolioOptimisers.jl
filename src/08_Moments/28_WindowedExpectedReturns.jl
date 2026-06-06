@@ -40,15 +40,15 @@ WindowedExpectedReturns
   - [`AbstractExpectedReturnsEstimator`](@ref)
   - [`SimpleExpectedReturns`](@ref)
 """
-@concrete struct WindowedExpectedReturns <: AbstractExpectedReturnsEstimator
+@curryable @concrete struct WindowedExpectedReturns <: AbstractExpectedReturnsEstimator
     """
     $(field_dict[:me])
     """
-    me
+    @c me
     """
     $(field_dict[:oow])
     """
-    w
+    @c w
     """
     Window specification: an integer (last `window` observations) or a vector of indices.
     """
@@ -65,28 +65,6 @@ function WindowedExpectedReturns(;
                                  w::Option{<:ObsWeights} = nothing,
                                  window::Option{<:Int_VecInt} = nothing)::WindowedExpectedReturns
     return WindowedExpectedReturns(me, w, window)
-end
-"""
-    factory(me::WindowedExpectedReturns, w::ObsWeights) -> WindowedExpectedReturns
-
-Return a new [`WindowedExpectedReturns`](@ref) estimator with observation weights `w` applied to the underlying mean estimator and stored as the windowed weights.
-
-# Arguments
-
-  - `me`: Windowed expected returns estimator.
-  - $(arg_dict[:ow])
-
-# Returns
-
-  - `me::WindowedExpectedReturns`: Updated estimator with weights applied.
-
-# Related
-
-  - [`WindowedExpectedReturns`](@ref)
-  - [`factory`](@ref)
-"""
-function factory(me::WindowedExpectedReturns, w::ObsWeights)::WindowedExpectedReturns
-    return WindowedExpectedReturns(; me = factory(me.me, w), w = w, window = me.window)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

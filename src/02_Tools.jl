@@ -689,6 +689,205 @@ function _factory_child(v::AbstractArray{<:Union{<:AbstractEstimator, <:Abstract
                                                  <:AbstractResult}}, args...; kwargs...)
     return [_factory_child(vi, args...; kwargs...) for vi in v]
 end
+# @c-tagged ObsWeights/nothing fields: replace with the incoming weights argument.
+_factory_child(::Nothing, w::ObsWeights, args...; kwargs...) = w
+_factory_child(::StatsBase.AbstractWeights, w::ObsWeights, args...; kwargs...) = w
+# ---------------------------------------------------------------------------
+# @curryable — struct-definition macro for factory propagation
+# ---------------------------------------------------------------------------
+
+# --- private AST helpers ----------------------------------------------------
+
+_is_c_macro(x) = x == Symbol("@c") || (x isa GlobalRef && x.name == Symbol("@c"))
+
+_is_doc_macro(x) = (x isa GlobalRef && x.name == Symbol("@doc")) || x == Symbol("@doc")
+
+function _extract_field_name(expr)
+    if expr isa Symbol
+        return expr
+    end
+    if expr isa Expr && expr.head == :(::)
+        return expr.args[1]
+    end
+    return error("@curryable: @c must precede a bare field name or field::Type, got: $(repr(expr))")
+end
+
+# Recursively unwrap macrocall chains until the :struct node is found.
+# Returns (struct_node, rebuild_fn) where rebuild_fn(new_struct) reassembles
+# the original macro chain with new_struct in place of the original struct.
+function _curryable_find_struct(expr)
+    if !(expr isa Expr)
+        error("@curryable: expected a struct or macro-wrapped struct, got $(typeof(expr))")
+    end
+    if expr.head == :struct
+        return expr, identity
+    elseif expr.head == :macrocall
+        inner = expr.args[end]
+        struct_node, rebuild = _curryable_find_struct(inner)
+        prefix = expr.args[1:(end - 1)]
+        return struct_node, s -> Expr(:macrocall, prefix..., rebuild(s))
+    else
+        error("@curryable: expected a struct definition (possibly wrapped in macros), " *
+              "got Expr with head :$(expr.head)")
+    end
+end
+
+function _curryable_bare_name(n)
+    if n isa Symbol
+        return n
+    end
+    if n isa Expr && n.head == :curly
+        return _curryable_bare_name(n.args[1])
+    end
+    if n isa Expr && n.head == :<:
+        return _curryable_bare_name(n.args[1])
+    end
+    return error("@curryable: cannot extract struct name from: $(repr(n))")
+end
+
+# Return the field name for a plain field expression (Symbol or field::Type),
+# or nothing for LineNumberNodes, inner constructors, and other non-field nodes.
+function _try_field_name(expr)
+    if expr isa Symbol
+        return expr
+    end
+    if expr isa Expr && expr.head == :(::) && expr.args[1] isa Symbol
+        return expr.args[1]
+    end
+    return nothing
+end
+
+# Walk the struct body, collecting @c-tagged field names and stripping the tags.
+# Also collects non-@c field names so factory can carry them through unchanged.
+# Handles both bare (@c field) and docstring-prefixed ("doc" \n @c field) forms.
+function _curryable_parse_body(body)
+    curryable     = Symbol[]
+    non_curryable = Symbol[]
+    new_args      = Any[]
+    for arg in body.args
+        if arg isa Expr && arg.head == :macrocall
+            head = arg.args[1]
+            if _is_c_macro(head)
+                # Bare @c field — no docstring
+                fname = _extract_field_name(arg.args[end])
+                push!(curryable, fname)
+                push!(new_args, arg.args[end])          # strip @c, keep field expr
+            elseif _is_doc_macro(head)
+                # Core.@doc "doc" (field or @c(field))
+                inner = arg.args[end]
+                if inner isa Expr && inner.head == :macrocall && _is_c_macro(inner.args[1])
+                    # "doc" \n @c field
+                    fname = _extract_field_name(inner.args[end])
+                    push!(curryable, fname)
+                    # Rebuild @doc node with @c stripped: replace last arg with bare field
+                    push!(new_args,
+                          Expr(:macrocall, arg.args[1:(end - 1)]..., inner.args[end]))
+                else
+                    # plain docstring'd field — carry through unchanged
+                    fname = _try_field_name(inner)
+                    if fname !== nothing
+                        push!(non_curryable, fname)
+                    end
+                    push!(new_args, arg)
+                end
+            else
+                push!(new_args, arg)
+            end
+        else
+            # LineNumberNode, bare Symbol field, field::Type, inner constructor, …
+            fname = _try_field_name(arg)
+            if fname !== nothing
+                push!(non_curryable, fname)
+            end
+            push!(new_args, arg)
+        end
+    end
+    return curryable, non_curryable, Expr(:block, new_args...)
+end
+
+# ---------------------------------------------------------------------------
+# Public API
+# ---------------------------------------------------------------------------
+
+"""
+    @c field
+
+Field tag for use inside a [`@curryable`](@ref) struct body.
+Marks the field as participating in [`factory`](@ref) propagation —
+`_factory_child` will be called on it when `factory` is invoked on the
+enclosing struct.
+
+Raises an error if used outside a `@curryable` struct body.
+"""
+macro c(expr)
+    return error("@c may only appear inside a @curryable struct body")
+end
+
+"""
+    @curryable expr
+
+Define a struct and automatically generate a [`factory`](@ref) propagation
+method for it.
+
+Fields tagged with [`@c`](@ref) receive `_factory_child` calls when
+`factory` is invoked, recursing runtime data (observation weights, prior
+results, solvers, …) down the composition tree. Untagged fields pass through
+unchanged regardless of their type — tagging is explicit and opt-in.
+
+Composes with `@concrete` (put `@curryable` outermost):
+
+```julia
+@curryable @concrete struct MyEstimator <: AbstractEstimator
+    @c inner   # factory recurses into this field
+    config     # passed through unchanged
+    function MyEstimator(inner::AbstractEstimator, config)
+        return new{typeof(inner), typeof(config)}(inner, config)
+    end
+end
+```
+
+The generated `factory` method is added to `PortfolioOptimisers.factory`,
+so `@curryable` works correctly for types defined in external packages.
+
+Docstrings on the enclosing definition are forwarded correctly via
+`Base.@__doc__`.
+"""
+macro curryable(expr)
+    struct_node, rebuild = _curryable_find_struct(expr)
+
+    type_head   = struct_node.args[2]
+    body        = struct_node.args[3]
+    struct_name = _curryable_bare_name(type_head)
+
+    curryable_fields, non_curryable_fields, new_body = _curryable_parse_body(body)
+
+    new_struct = Expr(:struct, struct_node.args[1], type_head, new_body)
+    chain      = rebuild(new_struct)
+
+    if isempty(curryable_fields)
+        factory_body = :x
+    else
+        curry_pairs = [Expr(:kw, f,
+                            :(_factory_child($(Expr(:., :x, QuoteNode(f))), args...;
+                                             kwargs...))) for f in curryable_fields]
+        pass_pairs = [Expr(:kw, f, Expr(:., :x, QuoteNode(f)))
+                      for f in non_curryable_fields]
+        factory_body = Expr(:call, struct_name,
+                            Expr(:parameters, curry_pairs..., pass_pairs...))
+    end
+
+    factory_def = quote
+        function factory(x::$struct_name, args...; kwargs...)
+            return $factory_body
+        end
+    end
+
+    return esc(quote
+                   Base.@__doc__ $chain
+                   $factory_def
+               end)
+end
+
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -792,11 +991,11 @@ julia> PortfolioOptimisers.vec_to_real_measure(MeanValue(), [1.2, 3.4, 0.7])
   - [`MaxValue`](@ref)
   - [`vec_to_real_measure`](@ref)
 """
-@concrete struct MeanValue <: VectorToScalarMeasure
+@curryable @concrete struct MeanValue <: VectorToScalarMeasure
     """
     $(field_dict[:oow])
     """
-    w
+    @c w
     function MeanValue(w::Option{<:ObsWeights})
         assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(w)}(w)
@@ -804,36 +1003,6 @@ julia> PortfolioOptimisers.vec_to_real_measure(MeanValue(), [1.2, 3.4, 0.7])
 end
 function MeanValue(; w::Option{<:ObsWeights} = nothing)
     return MeanValue(w)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Construct a `MeanValue` instance with observation weights `w`.
-
-# Arguments
-
-  - `mv`: Instance to update.
-  - $(arg_dict[:ow])
-
-# Returns
-
-  - `mv::MeanValue`: A new `MeanValue` with observation weights `w`.
-
-# Examples
-
-```jldoctest
-julia> factory(MeanValue(), StatsBase.Weights([1.2, 3.4, 0.7]))
-MeanValue
-  w ┴ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [1.2, 3.4, 0.7]
-```
-
-# Related
-
-  - [`MeanValue`](@ref)
-  - [`factory`](@ref)
-"""
-function factory(::MeanValue, w::ObsWeights)
-    return MeanValue(; w = w)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -871,11 +1040,11 @@ julia> PortfolioOptimisers.vec_to_real_measure(MedianValue(), [1.2, 3.4, 0.7])
   - [`MaxValue`](@ref)
   - [`vec_to_real_measure`](@ref)
 """
-@concrete struct MedianValue <: VectorToScalarMeasure
+@curryable @concrete struct MedianValue <: VectorToScalarMeasure
     """
     $(field_dict[:oow])
     """
-    w
+    @c w
     function MedianValue(w::Option{<:ObsWeights})
         assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(w)}(w)
@@ -883,36 +1052,6 @@ julia> PortfolioOptimisers.vec_to_real_measure(MedianValue(), [1.2, 3.4, 0.7])
 end
 function MedianValue(; w::Option{<:ObsWeights} = nothing)
     return MedianValue(w)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Constructs a `MedianValue` instance with observation weights `w`.
-
-# Arguments
-
-  - `mv`: Instance to update.
-  - $(arg_dict[:ow])
-
-# Returns
-
-  - `mdv::MedianValue`: A new `MedianValue` with observation weights `w`.
-
-# Examples
-
-```jldoctest
-julia> factory(MedianValue(), StatsBase.Weights([1.2, 3.4, 0.7]))
-MedianValue
-  w ┴ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [1.2, 3.4, 0.7]
-```
-
-# Related
-
-  - [`MedianValue`](@ref)
-  - [`factory`](@ref)
-"""
-function factory(::MedianValue, w::ObsWeights)
-    return MedianValue(; w = w)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -972,11 +1111,11 @@ julia> PortfolioOptimisers.vec_to_real_measure(StdValue(), [1.2, 3.4, 0.7])
   - [`StandardisedValue`](@ref)
   - [`vec_to_real_measure`](@ref)
 """
-@concrete struct StdValue <: VectorToScalarMeasure
+@curryable @concrete struct StdValue <: VectorToScalarMeasure
     """
     $(field_dict[:oow])
     """
-    w
+    @c w
     """
     $(field_dict[:corrected])
     """
@@ -988,37 +1127,6 @@ julia> PortfolioOptimisers.vec_to_real_measure(StdValue(), [1.2, 3.4, 0.7])
 end
 function StdValue(; w::Option{<:ObsWeights} = nothing, corrected::Bool = true)
     return StdValue(w, corrected)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Constructs a `StdValue` instance with observation weights `w`.
-
-# Arguments
-
-  - `sv`: Instance to update.
-  - $(arg_dict[:ow])
-
-# Returns
-
-  - `sv::StdValue`: A new `StdValue` with observation weights `w`.
-
-# Examples
-
-```jldoctest
-julia> factory(StdValue(), StatsBase.Weights([1.2, 3.4, 0.7]))
-StdValue
-          w ┼ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [1.2, 3.4, 0.7]
-  corrected ┴ Bool: true
-```
-
-# Related
-
-  - [`StdValue`](@ref)
-  - [`factory`](@ref)
-"""
-function factory(sv::StdValue, w::ObsWeights)
-    return StdValue(; w = w, corrected = sv.corrected)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -1057,11 +1165,11 @@ julia> PortfolioOptimisers.vec_to_real_measure(VarValue(), [1.2, 3.4, 0.7])
   - [`StandardisedValue`](@ref)
   - [`vec_to_real_measure`](@ref)
 """
-@concrete struct VarValue <: VectorToScalarMeasure
+@curryable @concrete struct VarValue <: VectorToScalarMeasure
     """
     $(field_dict[:oow])
     """
-    w
+    @c w
     """
     $(field_dict[:corrected])
     """
@@ -1073,37 +1181,6 @@ julia> PortfolioOptimisers.vec_to_real_measure(VarValue(), [1.2, 3.4, 0.7])
 end
 function VarValue(; w::Option{<:ObsWeights} = nothing, corrected::Bool = true)
     return VarValue(w, corrected)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Constructs a `VarValue` instance with observation weights `w`.
-
-# Arguments
-
-  - `vv`: Instance to update.
-  - $(arg_dict[:ow])
-
-# Returns
-
-  - `vv::VarValue`: A new `VarValue` with observation weights `w`.
-
-# Examples
-
-```jldoctest
-julia> factory(VarValue(), StatsBase.Weights([1.2, 3.4, 0.7]))
-VarValue
-          w ┼ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [1.2, 3.4, 0.7]
-  corrected ┴ Bool: true
-```
-
-# Related
-
-  - [`VarValue`](@ref)
-  - [`factory`](@ref)
-"""
-function factory(vv::VarValue, w::ObsWeights)
-    return VarValue(; w = w, corrected = vv.corrected)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -1198,57 +1275,21 @@ julia> PortfolioOptimisers.vec_to_real_measure(StandardisedValue(), [1.2, 3.4, 0
   - [`VarValue`](@ref)
   - [`vec_to_real_measure`](@ref)
 """
-@concrete struct StandardisedValue <: VectorToScalarMeasure
+@curryable @concrete struct StandardisedValue <: VectorToScalarMeasure
     """
     The mean value measure used for the numerator.
     """
-    mv
+    @c mv
     """
     The standard deviation measure used for the denominator.
     """
-    sv
+    @c sv
     function StandardisedValue(mv::MeanValue, sv::StdValue)
         return new{typeof(mv), typeof(sv)}(mv, sv)
     end
 end
 function StandardisedValue(; mv::MeanValue = MeanValue(), sv::StdValue = StdValue())
     return StandardisedValue(mv, sv)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Construct a `StandardisedValue` instance with observation weights `w` for both `mv` and `sv`.
-
-# Arguments
-
-  - `msv`: Instance to update.
-  - $(arg_dict[:ow])
-
-# Returns
-
-  - `msv::StandardisedValue`: A new `StandardisedValue` with observation weights `w` applied to both `mv` and `sv`.
-
-# Examples
-
-```jldoctest
-julia> factory(StandardisedValue(), StatsBase.Weights([1.2, 3.4, 0.7]))
-StandardisedValue
-  mv ┼ MeanValue
-     │   w ┴ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [1.2, 3.4, 0.7]
-  sv ┼ StdValue
-     │           w ┼ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [1.2, 3.4, 0.7]
-     │   corrected ┴ Bool: true
-```
-
-# Related
-
-  - [`StandardisedValue`](@ref)
-  - [`MeanValue`](@ref)
-  - [`StdValue`](@ref)
-  - [`factory`](@ref)
-"""
-function factory(msv::StandardisedValue, w::ObsWeights)
-    return StandardisedValue(; mv = factory(msv.mv, w), sv = factory(msv.sv, w))
 end
 """
     vec_to_real_measure(measure::Num_VecToScaM, val::VecNum) -> Number
@@ -1361,6 +1402,6 @@ function vec_to_real_measure(f::Function,
     return f(val)
 end
 
-export factory, traverse_concrete_subtypes, concrete_typed_array, MinValue, MeanValue,
-       MedianValue, MaxValue, StandardisedValue, StdValue, VarValue, SumValue, ProdValue,
-       ModeValue
+export @curryable, @c, factory, traverse_concrete_subtypes, concrete_typed_array, MinValue,
+       MeanValue, MedianValue, MaxValue, StandardisedValue, StdValue, VarValue, SumValue,
+       ProdValue, ModeValue

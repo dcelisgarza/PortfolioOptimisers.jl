@@ -40,7 +40,7 @@ DistanceCovariance
   - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
   - [`FLoops.Transducers.Executor`](https://juliafolds2.github.io/FLoops.jl/dev/tutorials/parallel/#tutorials-ex)
 """
-@concrete struct DistanceCovariance <: AbstractCovarianceEstimator
+@curryable @concrete struct DistanceCovariance <: AbstractCovarianceEstimator
     """
     $(arg_dict[:metric])
     """
@@ -56,7 +56,7 @@ DistanceCovariance
     """
     $(arg_dict[:oow])
     """
-    w
+    @c w
     """
     $(arg_dict[:ex])
     """
@@ -76,43 +76,6 @@ function DistanceCovariance(; metric::Distances.Metric = Distances.Euclidean(),
                             w::Option{<:ObsWeights} = nothing,
                             ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())::DistanceCovariance
     return DistanceCovariance(metric, args, kwargs, w, ex)
-end
-"""
-    factory(ce::DistanceCovariance, w::ObsWeights) -> DistanceCovariance
-
-Return a new [`DistanceCovariance`](@ref) estimator with observation weights `w`.
-
-# Arguments
-
-  - $(arg_dict[:ce])
-  - $(arg_dict[:ow])
-
-# Returns
-
-  - $(ret_dict[:ce])
-
-# Examples
-
-```jldoctest
-julia> ce = DistanceCovariance();
-
-julia> factory(ce, StatsBase.Weights([0.2, 0.3, 0.5]))
-DistanceCovariance
-  metric ┼ Distances.Euclidean: Distances.Euclidean(0.0)
-    args ┼ Tuple{}: ()
-  kwargs ┼ @NamedTuple{}: NamedTuple()
-       w ┼ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.3, 0.5]
-      ex ┴ Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
-```
-
-# Related
-
-  - [`DistanceCovariance`](@ref)
-  - [`factory`](@ref)
-"""
-function factory(ce::DistanceCovariance, w::ObsWeights)::DistanceCovariance
-    return DistanceCovariance(; metric = ce.metric, args = ce.args, kwargs = ce.kwargs,
-                              w = w, ex = ce.ex)
 end
 """
     calc_pairwise_dists(ce::DistanceCovariance, v1::VecNum, v2::VecNum, w::Option{<:StatsBase.AbstractWeights}) -> (MatNum, MatNum)
