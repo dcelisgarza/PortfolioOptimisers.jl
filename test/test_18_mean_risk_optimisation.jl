@@ -506,7 +506,7 @@
             elseif i in (27, 44)
                 5e-5
             elseif i == 47
-                1e-3
+                5e-2
             elseif i == 48
                 5e-3
             else

@@ -11,6 +11,9 @@ traverse_concrete_subtypes
 concrete_typed_array
 factory(a::Union{Nothing, <:AbstractEstimator, <:AbstractAlgorithm, <:AbstractResult}, args...; kwargs...)
 get_window
+curryable
+_factory_child
+c
 ```
 
 ## Mathematical functions
