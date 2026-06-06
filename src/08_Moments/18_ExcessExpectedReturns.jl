@@ -52,6 +52,17 @@ function ExcessExpectedReturns(;
     return ExcessExpectedReturns(me, rf)
 end
 """
+    factory(eer::ExcessExpectedReturns, args...; kwargs...) -> ExcessExpectedReturns
+
+Create a new [`ExcessExpectedReturns`](@ref) propagating factory arguments to its [`@c`](@ref)-tagged fields.
+
+# Related
+
+  - [`ExcessExpectedReturns`](@ref)
+  - [`factory`](@ref)
+"""
+factory(::ExcessExpectedReturns, args...; kwargs...)
+"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Gets the view of the expected returns estimator for the `i`-th element(s).

@@ -8,7 +8,7 @@ JamesStein
 BayesStein
 BodnarOkhrinParolya
 ShrunkExpectedReturns
-factory(me::ShrunkExpectedReturns, w::ObsWeights)
+factory(me::ShrunkExpectedReturns, args...; kwargs...)
 mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:JamesStein}, X::MatNum; dims::Int = 1, kwargs...)
 mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:BayesStein}, X::MatNum; dims::Int = 1, kwargs...)
 mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:BodnarOkhrinParolya}, X::MatNum; dims::Int = 1, kwargs...)

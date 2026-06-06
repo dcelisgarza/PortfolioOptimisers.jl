@@ -5,7 +5,7 @@ PValue
 Forward
 Backward
 StepwiseRegression
-factory(re::StepwiseRegression, w::ObsWeights)
+factory(re::StepwiseRegression, args...; kwargs...)
 regression(re::StepwiseRegression, X::MatNum, F::MatNum)
 _regression(re::StepwiseRegression{<:PValue, <:Forward}, x::VecNum, F::MatNum)
 _regression(re::StepwiseRegression{<:AbstractMinMaxValStepwiseRegressionCriterion, <:Forward}, x::VecNum, F::MatNum)

@@ -47,18 +47,18 @@ VectorToScalarMeasure
 Num_VecToScaM
 MinValue
 MeanValue
-factory(mv::MeanValue, w::ObsWeights)
+factory(mv::MeanValue, args...; kwargs...)
 MedianValue
-factory(mdv::MedianValue, w::ObsWeights)
+factory(mdv::MedianValue, args...; kwargs...)
 MaxValue
 StdValue
-factory(sv::StdValue, w::ObsWeights)
+factory(sv::StdValue, args...; kwargs...)
 VarValue
-factory(vv::VarValue, w::ObsWeights)
+factory(vv::VarValue, args...; kwargs...)
 SumValue
 ProdValue
 ModeValue
 StandardisedValue
-factory(msv::StandardisedValue, w::ObsWeights)
+factory(msv::StandardisedValue, args...; kwargs...)
 vec_to_real_measure
 ```

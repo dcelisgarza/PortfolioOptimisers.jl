@@ -193,6 +193,17 @@ function Coskewness(; me::AbstractExpectedReturnsEstimator = SimpleExpectedRetur
     return Coskewness(me, mp, alg, w)
 end
 """
+    factory(cs::Coskewness, args...; kwargs...) -> Coskewness
+
+Create a new [`Coskewness`](@ref) propagating factory arguments to its [`@c`](@ref)-tagged fields.
+
+# Related
+
+  - [`Coskewness`](@ref)
+  - [`factory`](@ref)
+"""
+factory(::Coskewness, args...; kwargs...)
+"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Gets the view of the coskewness estimator for the `i`-th element(s).

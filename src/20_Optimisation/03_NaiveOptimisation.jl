@@ -264,6 +264,17 @@ function InverseVolatility(; pe::PrE_Pr = EmpiricalPrior(),
     return InverseVolatility(pe, wb, sets, wf, fb, sq, brt, strict)
 end
 """
+    factory(opt::InverseVolatility, args...; kwargs...) -> InverseVolatility
+
+Create a new [`InverseVolatility`](@ref) propagating factory arguments to its [`@c`](@ref)-tagged fields.
+
+# Related
+
+  - [`InverseVolatility`](@ref)
+  - [`factory`](@ref)
+"""
+factory(::InverseVolatility, args...; kwargs...)
+"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return a view of [`InverseVolatility`](@ref) `opt` sliced to asset indices `i`.
@@ -439,6 +450,17 @@ function EqualWeighted(; wb::Option{<:WbE_Wb} = WeightBounds(),
                        strict::Bool = false)::EqualWeighted
     return EqualWeighted(wb, sets, wf, fb, strict)
 end
+"""
+    factory(opt::EqualWeighted, args...; kwargs...) -> EqualWeighted
+
+Create a new [`EqualWeighted`](@ref) propagating factory arguments to its [`@c`](@ref)-tagged fields.
+
+# Related
+
+  - [`EqualWeighted`](@ref)
+  - [`factory`](@ref)
+"""
+factory(::EqualWeighted, args...; kwargs...)
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
@@ -618,6 +640,17 @@ function RandomWeighted(; alpha::Num_VecNum = 1,
                         strict::Bool = false)::RandomWeighted
     return RandomWeighted(alpha, rng, seed, wb, sets, wf, fb, strict)
 end
+"""
+    factory(opt::RandomWeighted, args...; kwargs...) -> RandomWeighted
+
+Create a new [`RandomWeighted`](@ref) propagating factory arguments to its [`@c`](@ref)-tagged fields.
+
+# Related
+
+  - [`RandomWeighted`](@ref)
+  - [`factory`](@ref)
+"""
+factory(::RandomWeighted, args...; kwargs...)
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 

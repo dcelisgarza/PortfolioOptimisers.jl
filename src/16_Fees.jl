@@ -403,6 +403,17 @@ function Fees(; tn::Option{<:Turnover} = nothing, l::Option{<:Num_VecNum} = noth
     return Fees(tn, l, s, fl, fs, kwargs)
 end
 """
+    factory(fees::Fees, args...; kwargs...) -> Fees
+
+Create a new [`Fees`](@ref) propagating factory arguments to its [`@c`](@ref)-tagged fields.
+
+# Related
+
+  - [`Fees`](@ref)
+  - [`factory`](@ref)
+"""
+factory(::Fees, args...; kwargs...)
+"""
     const FeesE_Fees = Union{<:Fees, <:FeesEstimator}
 
 Union type for fee constraint objects and estimators.

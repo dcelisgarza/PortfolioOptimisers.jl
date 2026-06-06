@@ -1088,6 +1088,17 @@ function TrackingError(; tr::AbstractTrackingAlgorithm, err::Number = 0.0,
     return TrackingError(tr, err, alg)
 end
 """
+    factory(tr::TrackingError, args...; kwargs...) -> TrackingError
+
+Create a new [`TrackingError`](@ref) propagating factory arguments to its [`@c`](@ref)-tagged fields.
+
+# Related
+
+  - [`TrackingError`](@ref)
+  - [`factory`](@ref)
+"""
+factory(::TrackingError, args...; kwargs...)
+"""
     tracking_view(tr::TrackingError, i)
 
 Return a view of a `TrackingError` object for the given index or indices.

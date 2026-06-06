@@ -162,6 +162,17 @@ function HierarchicalRiskParity(; opt::HierarchicalOptimiser = HierarchicalOptim
     return HierarchicalRiskParity(opt, r, sca, fb)
 end
 """
+    factory(hrp::HierarchicalRiskParity, args...; kwargs...) -> HierarchicalRiskParity
+
+Create a new [`HierarchicalRiskParity`](@ref) propagating factory arguments to its [`@c`](@ref)-tagged fields.
+
+# Related
+
+  - [`HierarchicalRiskParity`](@ref)
+  - [`factory`](@ref)
+"""
+factory(::HierarchicalRiskParity, args...; kwargs...)
+"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return whether the [`HierarchicalRiskParity`](@ref) requires previous portfolio weights.

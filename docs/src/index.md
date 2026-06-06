@@ -245,7 +245,7 @@ plot_histogram(mip_res.w, rd.X; slv = slv)
 We can also plot the compounded or uncompounded drawdowns.
 
 ```@example 0_index
-plot_drawdowns(mip_res.w, rd.X, slv; ts = rd.ts, compound = true)
+plot_drawdowns(mip_res.w, rd.X; slv = slv, ts = rd.ts, compound = true)
 ```
 
 There are many other types of plotting functionality in `PortfolioOptimisers.jl`, check out the [Plotting](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/22_Plotting) page of the documentation.

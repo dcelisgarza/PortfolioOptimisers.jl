@@ -512,8 +512,8 @@ function PortfolioOptimisers.plot_clusters(cle::HClE_HCl, pr::PortfolioOptimiser
 end
 ## plot_drawdowns
 function PortfolioOptimisers.plot_drawdowns(w::ArrNum, rd::ReturnsResult,
-                                            slv::Option{<:Slv_VecSlv} = nothing,
                                             fees::Option{<:Fees} = nothing;
+                                            slv::Option{<:Slv_VecSlv} = nothing,
                                             compound::Bool = false, alpha::Number = 0.05,
                                             kappa::Number = 0.3, rw = nothing, kwargs...)
     ts = isnothing(rd.ts) ? (1:size(rd.X, 1)) : rd.ts
@@ -1701,10 +1701,10 @@ end
 ## ────────────────────────────────────────────────────────────────────────────
 
 function PortfolioOptimisers.plot_portfolio_dashboard(res::OptimisationResult, rd::Pr_RR;
+                                                      slv::Option{<:Slv_VecSlv} = nothing,
                                                       ts = 1:size(rd.X, 1),
                                                       nx = 1:size(rd.X, 2),
                                                       r::PortfolioOptimisers.AbstractBaseRiskMeasure = Variance(),
-                                                      slv::Option{<:Slv_VecSlv} = nothing,
                                                       compound::Bool = false,
                                                       N::Option{<:Number} = nothing,
                                                       delta::Number = 1e-6,
