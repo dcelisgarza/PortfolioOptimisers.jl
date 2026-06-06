@@ -1155,17 +1155,6 @@ function MeanValue(; w::Option{<:ObsWeights} = nothing)
     return MeanValue(w)
 end
 """
-    factory(mv::MeanValue, args...; kwargs...) -> MeanValue
-
-Create a new [`MeanValue`](@ref) propagating factory arguments to its [`@c`](@ref)-tagged fields.
-
-# Related
-
-  - [`MeanValue`](@ref)
-  - [`factory`](@ref)
-"""
-factory(::MeanValue, args...; kwargs...)
-"""
 $(DocStringExtensions.TYPEDEF)
 
 Algorithm for reducing a vector of real values to its optionally weighted median.
@@ -1214,17 +1203,6 @@ end
 function MedianValue(; w::Option{<:ObsWeights} = nothing)
     return MedianValue(w)
 end
-"""
-    factory(mdv::MedianValue, args...; kwargs...) -> MedianValue
-
-Create a new [`MedianValue`](@ref) propagating factory arguments to its [`@c`](@ref)-tagged fields.
-
-# Related
-
-  - [`MedianValue`](@ref)
-  - [`factory`](@ref)
-"""
-factory(::MedianValue, args...; kwargs...)
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -1301,17 +1279,6 @@ function StdValue(; w::Option{<:ObsWeights} = nothing, corrected::Bool = true)
     return StdValue(w, corrected)
 end
 """
-    factory(sv::StdValue, args...; kwargs...) -> StdValue
-
-Create a new [`StdValue`](@ref) propagating factory arguments to its [`@c`](@ref)-tagged fields.
-
-# Related
-
-  - [`StdValue`](@ref)
-  - [`factory`](@ref)
-"""
-factory(::StdValue, args...; kwargs...)
-"""
 $(DocStringExtensions.TYPEDEF)
 
 Algorithm for reducing a vector of real values to its optionally weighted variance.
@@ -1365,17 +1332,6 @@ end
 function VarValue(; w::Option{<:ObsWeights} = nothing, corrected::Bool = true)
     return VarValue(w, corrected)
 end
-"""
-    factory(vv::VarValue, args...; kwargs...) -> VarValue
-
-Create a new [`VarValue`](@ref) propagating factory arguments to its [`@c`](@ref)-tagged fields.
-
-# Related
-
-  - [`VarValue`](@ref)
-  - [`factory`](@ref)
-"""
-factory(::VarValue, args...; kwargs...)
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -1485,17 +1441,6 @@ end
 function StandardisedValue(; mv::MeanValue = MeanValue(), sv::StdValue = StdValue())
     return StandardisedValue(mv, sv)
 end
-"""
-    factory(msv::StandardisedValue, args...; kwargs...) -> StandardisedValue
-
-Create a new [`StandardisedValue`](@ref) propagating factory arguments to its [`@c`](@ref)-tagged fields.
-
-# Related
-
-  - [`StandardisedValue`](@ref)
-  - [`factory`](@ref)
-"""
-factory(::StandardisedValue, args...; kwargs...)
 """
     vec_to_real_measure(measure::Num_VecToScaM, val::VecNum) -> Number
 

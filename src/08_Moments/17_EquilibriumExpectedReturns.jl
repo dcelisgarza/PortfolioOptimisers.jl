@@ -81,17 +81,6 @@ function EquilibriumExpectedReturns(;
     return EquilibriumExpectedReturns(ce, w, l)
 end
 """
-    factory(eer::EquilibriumExpectedReturns, args...; kwargs...) -> EquilibriumExpectedReturns
-
-Create a new [`EquilibriumExpectedReturns`](@ref) propagating factory arguments to its [`@c`](@ref)-tagged fields.
-
-# Related
-
-  - [`EquilibriumExpectedReturns`](@ref)
-  - [`factory`](@ref)
-"""
-factory(::EquilibriumExpectedReturns, args...; kwargs...)
-"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Gets the view of the expected returns estimator for the `i`-th element(s).

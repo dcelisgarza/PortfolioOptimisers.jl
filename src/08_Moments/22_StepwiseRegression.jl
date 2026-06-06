@@ -145,17 +145,6 @@ function StepwiseRegression(; crit::AbstractStepwiseRegressionCriterion = PValue
     return StepwiseRegression(crit, alg, tgt)
 end
 """
-    factory(sr::StepwiseRegression, args...; kwargs...) -> StepwiseRegression
-
-Create a new [`StepwiseRegression`](@ref) propagating factory arguments to its [`@c`](@ref)-tagged fields.
-
-# Related
-
-  - [`StepwiseRegression`](@ref)
-  - [`factory`](@ref)
-"""
-factory(::StepwiseRegression, args...; kwargs...)
-"""
     add_best_feature_after_pval_failure!(tgt::AbstractRegressionTarget,
                                          included::VecInt, F::MatNum,
                                          x::VecNum)

@@ -210,17 +210,6 @@ function FactorRiskContribution(; opt::JuMPOptimiser = JuMPOptimiser(),
     return FactorRiskContribution(opt, re, r, obj, frc_ple, sets, wi, flag, fb)
 end
 """
-    factory(frc::FactorRiskContribution, args...; kwargs...) -> FactorRiskContribution
-
-Create a new [`FactorRiskContribution`](@ref) propagating factory arguments to its [`@c`](@ref)-tagged fields.
-
-# Related
-
-  - [`FactorRiskContribution`](@ref)
-  - [`factory`](@ref)
-"""
-factory(::FactorRiskContribution, args...; kwargs...)
-"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return `true` if any sub-estimator of `opt` requires previous portfolio weights (JuMP optimiser, risk measure, or fallback).

@@ -284,17 +284,6 @@ function ExpectedReturn(; rt::JuMPReturnsEstimator = ArithmeticReturn())::Expect
     return ExpectedReturn(rt)
 end
 """
-    factory(r::ExpectedReturn, args...; kwargs...) -> ExpectedReturn
-
-Create a new [`ExpectedReturn`](@ref) propagating factory arguments to its [`@c`](@ref)-tagged fields.
-
-# Related
-
-  - [`ExpectedReturn`](@ref)
-  - [`factory`](@ref)
-"""
-factory(::ExpectedReturn, args...; kwargs...)
-"""
     expected_risk(r::ExpectedReturn, w::VecNum, pr::AbstractPriorResult;
                   fees::Option{<:Fees} = nothing, kwargs...)
 
@@ -396,17 +385,6 @@ function ExpectedReturnRiskRatio(; rt::JuMPReturnsEstimator = ArithmeticReturn()
                                  rf::Number = 0.0)::ExpectedReturnRiskRatio
     return ExpectedReturnRiskRatio(rt, rk, rf)
 end
-"""
-    factory(r::ExpectedReturnRiskRatio, args...; kwargs...) -> ExpectedReturnRiskRatio
-
-Create a new [`ExpectedReturnRiskRatio`](@ref) propagating factory arguments to its [`@c`](@ref)-tagged fields.
-
-# Related
-
-  - [`ExpectedReturnRiskRatio`](@ref)
-  - [`factory`](@ref)
-"""
-factory(::ExpectedReturnRiskRatio, args...; kwargs...)
 """
     expected_risk(r::ExpectedReturnRiskRatio, w::VecNum, pr::AbstractPriorResult;
                   fees::Option{<:Fees} = nothing, kwargs...)

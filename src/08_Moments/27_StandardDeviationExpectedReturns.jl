@@ -60,17 +60,6 @@ function StandardDeviationExpectedReturns(;
     return StandardDeviationExpectedReturns(ce)
 end
 """
-    factory(ser::StandardDeviationExpectedReturns, args...; kwargs...) -> StandardDeviationExpectedReturns
-
-Create a new [`StandardDeviationExpectedReturns`](@ref) propagating factory arguments to its [`@c`](@ref)-tagged fields.
-
-# Related
-
-  - [`StandardDeviationExpectedReturns`](@ref)
-  - [`factory`](@ref)
-"""
-factory(::StandardDeviationExpectedReturns, args...; kwargs...)
-"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Gets the view of the expected returns estimator for the `i`-th element(s).
@@ -195,17 +184,6 @@ function VarianceExpectedReturns(;
                                  ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance())::VarianceExpectedReturns
     return VarianceExpectedReturns(ce)
 end
-"""
-    factory(ver::VarianceExpectedReturns, args...; kwargs...) -> VarianceExpectedReturns
-
-Create a new [`VarianceExpectedReturns`](@ref) propagating factory arguments to its [`@c`](@ref)-tagged fields.
-
-# Related
-
-  - [`VarianceExpectedReturns`](@ref)
-  - [`factory`](@ref)
-"""
-factory(::VarianceExpectedReturns, args...; kwargs...)
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 

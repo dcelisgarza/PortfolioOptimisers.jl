@@ -66,17 +66,6 @@ function ProcessedCovariance(; ce::StatsBase.CovarianceEstimator = Covariance(),
     return ProcessedCovariance(ce, alg, pdm)
 end
 """
-    factory(pc::ProcessedCovariance, args...; kwargs...) -> ProcessedCovariance
-
-Create a new [`ProcessedCovariance`](@ref) propagating factory arguments to its [`@c`](@ref)-tagged fields.
-
-# Related
-
-  - [`ProcessedCovariance`](@ref)
-  - [`factory`](@ref)
-"""
-factory(::ProcessedCovariance, args...; kwargs...)
-"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Gets the view of the covariance estimator for the `i`-th element(s).

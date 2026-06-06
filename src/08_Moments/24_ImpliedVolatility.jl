@@ -163,17 +163,6 @@ function ImpliedVolatility(; ce::StatsBase.CovarianceEstimator = Covariance(),
     return ImpliedVolatility(ce, mp, alg, af)
 end
 """
-    factory(iv::ImpliedVolatility, args...; kwargs...) -> ImpliedVolatility
-
-Create a new [`ImpliedVolatility`](@ref) propagating factory arguments to its [`@c`](@ref)-tagged fields.
-
-# Related
-
-  - [`ImpliedVolatility`](@ref)
-  - [`factory`](@ref)
-"""
-factory(::ImpliedVolatility, args...; kwargs...)
-"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Gets the view of the covariance estimator for the `i`-th element(s).

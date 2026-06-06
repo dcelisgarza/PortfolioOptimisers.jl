@@ -67,17 +67,6 @@ function WindowedExpectedReturns(;
     return WindowedExpectedReturns(me, w, window)
 end
 """
-    factory(wer::WindowedExpectedReturns, args...; kwargs...) -> WindowedExpectedReturns
-
-Create a new [`WindowedExpectedReturns`](@ref) propagating factory arguments to its [`@c`](@ref)-tagged fields.
-
-# Related
-
-  - [`WindowedExpectedReturns`](@ref)
-  - [`factory`](@ref)
-"""
-factory(::WindowedExpectedReturns, args...; kwargs...)
-"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Gets the view of the expected returns estimator for the `i`-th element(s).

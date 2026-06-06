@@ -332,17 +332,6 @@ function ShrunkExpectedReturns(;
     return ShrunkExpectedReturns(me, ce, alg)
 end
 """
-    factory(ser::ShrunkExpectedReturns, args...; kwargs...) -> ShrunkExpectedReturns
-
-Create a new [`ShrunkExpectedReturns`](@ref) propagating factory arguments to its [`@c`](@ref)-tagged fields.
-
-# Related
-
-  - [`ShrunkExpectedReturns`](@ref)
-  - [`factory`](@ref)
-"""
-factory(::ShrunkExpectedReturns, args...; kwargs...)
-"""
     target_mean(::AbstractShrunkExpectedReturnsTarget, mu::ArrNum, sigma::MatNum, args...;
                 kwargs...)
 

@@ -453,17 +453,6 @@ function SchurComplementHierarchicalRiskParity(;
     return SchurComplementHierarchicalRiskParity(opt, params, fb)
 end
 """
-    factory(sh::SchurComplementHierarchicalRiskParity, args...; kwargs...) -> SchurComplementHierarchicalRiskParity
-
-Create a new [`SchurComplementHierarchicalRiskParity`](@ref) propagating factory arguments to its [`@c`](@ref)-tagged fields.
-
-# Related
-
-  - [`SchurComplementHierarchicalRiskParity`](@ref)
-  - [`factory`](@ref)
-"""
-factory(::SchurComplementHierarchicalRiskParity, args...; kwargs...)
-"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return whether the [`SchurComplementHierarchicalRiskParity`](@ref) requires previous portfolio weights.

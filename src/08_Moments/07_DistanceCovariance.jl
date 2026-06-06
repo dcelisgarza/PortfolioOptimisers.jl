@@ -78,17 +78,6 @@ function DistanceCovariance(; metric::Distances.Metric = Distances.Euclidean(),
     return DistanceCovariance(metric, args, kwargs, w, ex)
 end
 """
-    factory(dc::DistanceCovariance, args...; kwargs...) -> DistanceCovariance
-
-Create a new [`DistanceCovariance`](@ref) propagating factory arguments to its [`@c`](@ref)-tagged fields.
-
-# Related
-
-  - [`DistanceCovariance`](@ref)
-  - [`factory`](@ref)
-"""
-factory(::DistanceCovariance, args...; kwargs...)
-"""
     calc_pairwise_dists(ce::DistanceCovariance, v1::VecNum, v2::VecNum, w::Option{<:StatsBase.AbstractWeights}) -> (MatNum, MatNum)
 
 Compute pairwise distance matrices between two vectors using the configured metric.
