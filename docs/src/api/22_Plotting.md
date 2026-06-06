@@ -36,6 +36,5 @@ plot_efficient_frontier
 plot_performance_summary
 plot_rolling_drawdowns
 _pred_rd_to_matrix
-_pred_rd_to_matrix
 _relevant_assets
 ```
