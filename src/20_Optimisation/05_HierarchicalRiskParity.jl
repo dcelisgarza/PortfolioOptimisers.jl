@@ -24,6 +24,14 @@ Keywords correspond to the struct's fields.
 
   - If `r` is a vector: `!isempty(r)`.
 
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@prop`-tagged fields are automatically propagated:
+
+  - `opt`: Recursively updated via [`factory`](@ref).
+  - `r`: Recursively updated via [`factory`](@ref).
+  - `fb`: Recursively updated via [`factory`](@ref).
+
 # Examples
 
 ```jldoctest
@@ -129,16 +137,17 @@ Where:
   - [`HierarchicalOptimiser`](@ref)
   - [`HierarchicalEqualRiskContribution`](@ref)
   - [`SchurComplementHierarchicalRiskParity`](@ref)
+  - [`factory`](@ref)
 """
-@curryable @concrete struct HierarchicalRiskParity <: ClusteringOptimisationEstimator
+@propagatable @concrete struct HierarchicalRiskParity <: ClusteringOptimisationEstimator
     """
     $(field_dict[:opt_hier])
     """
-    @c opt
+    @prop opt
     """
     $(field_dict[:r])
     """
-    @c r
+    @prop r
     """
     $(field_dict[:sca])
     """
@@ -146,7 +155,7 @@ Where:
     """
     $(field_dict[:fb])
     """
-    @c fb
+    @prop fb
     function HierarchicalRiskParity(opt::HierarchicalOptimiser, r::OptRM_VecOptRM,
                                     sca::Scalariser, fb::Option{<:OptE_Opt})
         if isa(r, AbstractVector)
@@ -155,6 +164,14 @@ Where:
         return new{typeof(opt), typeof(r), typeof(sca), typeof(fb)}(opt, r, sca, fb)
     end
 end
+#= Old factory function:
+function factory(hrp::HierarchicalRiskParity, w::AbstractVector)::HierarchicalRiskParity
+    opt = factory(hrp.opt, w)
+    r = factory(hrp.r, w)
+    fb = factory(hrp.fb, w)
+    return HierarchicalRiskParity(; opt = opt, r = r, sca = hrp.sca, fb = fb)
+end
+=#
 function HierarchicalRiskParity(; opt::HierarchicalOptimiser = HierarchicalOptimiser(),
                                 r::OptRM_VecOptRM = Variance(),
                                 sca::Scalariser = SumScalariser(),

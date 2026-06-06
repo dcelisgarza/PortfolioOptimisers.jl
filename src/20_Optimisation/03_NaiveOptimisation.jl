@@ -169,6 +169,12 @@ $(DocStringExtensions.FIELDS)
 
 Keywords correspond to the struct's fields.
 
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@prop`-tagged fields are automatically propagated:
+
+  - `fb`: Recursively updated via [`factory`](@ref).
+
 # Examples
 
 ```jldoctest
@@ -211,8 +217,9 @@ InverseVolatility
   - [`NaiveOptimisationEstimator`](@ref)
   - [`EqualWeighted`](@ref)
   - [`RandomWeighted`](@ref)
+  - [`factory`](@ref)
 """
-@curryable @concrete struct InverseVolatility <: NaiveOptimisationEstimator
+@propagatable @concrete struct InverseVolatility <: NaiveOptimisationEstimator
     """
     $(field_dict[:pe])
     """
@@ -232,7 +239,7 @@ InverseVolatility
     """
     $(field_dict[:fb])
     """
-    @c fb
+    @prop fb
     """
     $(field_dict[:sq])
     """
@@ -255,6 +262,13 @@ InverseVolatility
                    typeof(brt), typeof(strict)}(pe, wb, sets, wf, fb, sq, brt, strict)
     end
 end
+#= Old factory function:
+function factory(opt::InverseVolatility, w::AbstractVector)::InverseVolatility
+    return InverseVolatility(; pe = opt.pe, wb = opt.wb, sets = opt.sets, wf = opt.wf,
+                             fb = factory(opt.fb, w), sq = opt.sq, brt = opt.brt,
+                             strict = opt.strict)
+end
+=#
 function InverseVolatility(; pe::PrE_Pr = EmpiricalPrior(),
                            wb::Option{<:WbE_Wb} = WeightBounds(),
                            sets::Option{<:AssetSets} = nothing,
@@ -379,6 +393,12 @@ $(DocStringExtensions.FIELDS)
 
 Keywords correspond to the struct's fields.
 
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@prop`-tagged fields are automatically propagated:
+
+  - `fb`: Recursively updated via [`factory`](@ref).
+
 # Examples
 
 ```jldoctest
@@ -399,8 +419,9 @@ EqualWeighted
   - [`NaiveOptimisationEstimator`](@ref)
   - [`InverseVolatility`](@ref)
   - [`RandomWeighted`](@ref)
+  - [`factory`](@ref)
 """
-@curryable @concrete struct EqualWeighted <: NaiveOptimisationEstimator
+@propagatable @concrete struct EqualWeighted <: NaiveOptimisationEstimator
     """
     $(field_dict[:wb])
     """
@@ -416,7 +437,7 @@ EqualWeighted
     """
     $(field_dict[:fb])
     """
-    @c fb
+    @prop fb
     """
     $(field_dict[:strict_opt])
     """
@@ -432,6 +453,12 @@ EqualWeighted
                                                                                      strict)
     end
 end
+#= Old factory function:
+function factory(opt::EqualWeighted, w::AbstractVector)::EqualWeighted
+    return EqualWeighted(; wb = opt.wb, sets = opt.sets, wf = opt.wf,
+                         fb = factory(opt.fb, w), strict = opt.strict)
+end
+=#
 function EqualWeighted(; wb::Option{<:WbE_Wb} = WeightBounds(),
                        sets::Option{<:AssetSets} = nothing,
                        wf::WeightFinaliser = IterativeWeightFinaliser(),
@@ -539,6 +566,12 @@ Keywords correspond to the struct's fields.
 
   - If `alpha` is provided: all elements positive and finite.
 
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@prop`-tagged fields are automatically propagated:
+
+  - `fb`: Recursively updated via [`factory`](@ref).
+
 # Examples
 
 ```jldoctest
@@ -560,8 +593,9 @@ RandomWeighted
   - [`NaiveOptimisationEstimator`](@ref)
   - [`InverseVolatility`](@ref)
   - [`EqualWeighted`](@ref)
+  - [`factory`](@ref)
 """
-@curryable @concrete struct RandomWeighted <: NaiveOptimisationEstimator
+@propagatable @concrete struct RandomWeighted <: NaiveOptimisationEstimator
     """
     $(field_dict[:alpha_dirichlet])
     """
@@ -589,7 +623,7 @@ RandomWeighted
     """
     $(field_dict[:fb])
     """
-    @c fb
+    @prop fb
     """
     $(field_dict[:strict_opt])
     """
@@ -609,6 +643,13 @@ RandomWeighted
                                                            fb, strict)
     end
 end
+#= Old factory function:
+function factory(opt::RandomWeighted, w::AbstractVector)::RandomWeighted
+    return RandomWeighted(; alpha = opt.alpha, rng = opt.rng, seed = opt.seed, wb = opt.wb,
+                          sets = opt.sets, wf = opt.wf, fb = factory(opt.fb, w),
+                          strict = opt.strict)
+end
+=#
 function RandomWeighted(; alpha::Num_VecNum = 1,
                         rng::Random.AbstractRNG = Random.default_rng(),
                         seed::Option{<:Integer} = nothing, wb::Option{<:WbE_Wb} = nothing,

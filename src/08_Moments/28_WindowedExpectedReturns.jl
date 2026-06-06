@@ -24,6 +24,13 @@ Keywords correspond to the struct's fields.
   - $(val_dict[:oow])
   - If `window` is provided, it must be nonempty, nonnegative, and finite.
 
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@prop`-tagged fields are automatically propagated:
+
+  - `me`: Recursively updated via [`factory`](@ref).
+  - `w`: Replaced with the incoming [`ObsWeights`](@ref).
+
 # Examples
 
 ```jldoctest
@@ -39,16 +46,17 @@ WindowedExpectedReturns
 
   - [`AbstractExpectedReturnsEstimator`](@ref)
   - [`SimpleExpectedReturns`](@ref)
+  - [`factory`](@ref)
 """
-@curryable @concrete struct WindowedExpectedReturns <: AbstractExpectedReturnsEstimator
+@propagatable @concrete struct WindowedExpectedReturns <: AbstractExpectedReturnsEstimator
     """
     $(field_dict[:me])
     """
-    @c me
+    @prop me
     """
     $(field_dict[:oow])
     """
-    @c w
+    @prop w
     """
     Window specification: an integer (last `window` observations) or a vector of indices.
     """
@@ -60,6 +68,11 @@ WindowedExpectedReturns
         return new{typeof(me), typeof(w), typeof(window)}(me, w, window)
     end
 end
+#= Old factory function:
+function factory(me::WindowedExpectedReturns, w::ObsWeights)::WindowedExpectedReturns
+    return WindowedExpectedReturns(; me = factory(me.me, w), w = w, window = me.window)
+end
+=#
 function WindowedExpectedReturns(;
                                  me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
                                  w::Option{<:ObsWeights} = nothing,

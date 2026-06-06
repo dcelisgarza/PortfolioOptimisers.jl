@@ -21,6 +21,12 @@ $(DocStringExtensions.FIELDS)
 
 Keywords correspond to the struct's fields.
 
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@prop`-tagged fields are automatically propagated:
+
+  - `w`: Replaced with the incoming [`ObsWeights`](@ref).
+
 # Examples
 
 ```jldoctest
@@ -39,8 +45,9 @@ DistanceCovariance
   - [`Distances.Metric`](https://github.com/JuliaStats/Distances.jl)
   - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
   - [`FLoops.Transducers.Executor`](https://juliafolds2.github.io/FLoops.jl/dev/tutorials/parallel/#tutorials-ex)
+  - [`factory`](@ref)
 """
-@curryable @concrete struct DistanceCovariance <: AbstractCovarianceEstimator
+@propagatable @concrete struct DistanceCovariance <: AbstractCovarianceEstimator
     """
     $(arg_dict[:metric])
     """
@@ -56,7 +63,7 @@ DistanceCovariance
     """
     $(arg_dict[:oow])
     """
-    @c w
+    @prop w
     """
     $(arg_dict[:ex])
     """
@@ -71,6 +78,12 @@ DistanceCovariance
                                                                                         ex)
     end
 end
+#= Old factory function:
+function factory(ce::DistanceCovariance, w::ObsWeights)::DistanceCovariance
+    return DistanceCovariance(; metric = ce.metric, args = ce.args, kwargs = ce.kwargs,
+                              w = w, ex = ce.ex)
+end
+=#
 function DistanceCovariance(; metric::Distances.Metric = Distances.Euclidean(),
                             args::Tuple = (), kwargs::NamedTuple = (;),
                             w::Option{<:ObsWeights} = nothing,

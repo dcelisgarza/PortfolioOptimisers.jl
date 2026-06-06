@@ -325,6 +325,12 @@ $(DocStringExtensions.FIELDS)
 
   - `l`, `s`, `fl`, `fs` are validated with [`assert_nonempty_nonneg_finite_val`](@ref).
 
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@prop`-tagged fields are automatically propagated:
+
+  - `tn`: Recursively updated via [`factory`](@ref).
+
 # Examples
 
 ```jldoctest
@@ -359,12 +365,13 @@ Fees
   - [`calc_fees`](@ref)
   - [`calc_asset_fees`](@ref)
   - [`calc_net_returns`](@ref)
+  - [`factory`](@ref)
 """
-@curryable @concrete struct Fees <: AbstractResult
+@propagatable @concrete struct Fees <: AbstractResult
     """
     $(field_dict[:tnr])
     """
-    @c tn
+    @prop tn
     """
     $(field_dict[:l_fees])
     """
@@ -396,6 +403,12 @@ Fees
                    typeof(kwargs)}(tn, l, s, fl, fs, kwargs)
     end
 end
+#= Old factory function:
+function factory(fees::Fees, w::VecNum)::Fees
+    return Fees(; tn = factory(fees.tn, w), l = fees.l, s = fees.s, fl = fees.fl,
+                fs = fees.fs, kwargs = fees.kwargs)
+end
+=#
 function Fees(; tn::Option{<:Turnover} = nothing, l::Option{<:Num_VecNum} = nothing,
               s::Option{<:Num_VecNum} = nothing, fl::Option{<:Num_VecNum} = nothing,
               fs::Option{<:Num_VecNum} = nothing,

@@ -124,6 +124,12 @@ Keywords correspond to the struct's fields.
 
   - `af > 0`.
 
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@prop`-tagged fields are automatically propagated:
+
+  - `ce`: Recursively updated via [`factory`](@ref).
+
 # Related
 
   - [`AbstractCovarianceEstimator`](@ref)
@@ -131,12 +137,13 @@ Keywords correspond to the struct's fields.
   - [`ImpliedVolatilityRegression`](@ref)
   - [`ImpliedVolatilityPremium`](@ref)
   - [`AbstractMatrixProcessingEstimator`](@ref)
+  - [`factory`](@ref)
 """
-@curryable @concrete struct ImpliedVolatility <: AbstractCovarianceEstimator
+@propagatable @concrete struct ImpliedVolatility <: AbstractCovarianceEstimator
     """
     $(field_dict[:ce])
     """
-    @c ce
+    @prop ce
     """
     $(field_dict[:mp])
     """
@@ -156,6 +163,11 @@ Keywords correspond to the struct's fields.
         return new{typeof(ce), typeof(mp), typeof(alg), typeof(af)}(ce, mp, alg, af)
     end
 end
+#= Old factory function:
+function factory(ce::ImpliedVolatility, w::ObsWeights)::ImpliedVolatility
+    return ImpliedVolatility(; ce = factory(ce.ce, w), mp = ce.mp)
+end
+=#
 function ImpliedVolatility(; ce::StatsBase.CovarianceEstimator = Covariance(),
                            mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing(),
                            alg::ImpliedVolatilityAlgorithm = ImpliedVolatilityRegression(),

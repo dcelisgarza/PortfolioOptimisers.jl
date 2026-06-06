@@ -132,6 +132,13 @@ $(DocStringExtensions.FIELDS)
 
 Keywords correspond to the struct's fields.
 
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@prop`-tagged fields are automatically propagated:
+
+  - `me`: Recursively updated via [`factory`](@ref).
+  - `w`: Replaced with the incoming [`ObsWeights`](@ref).
+
 # Validation
 
   - $(val_dict[:oow])
@@ -161,12 +168,13 @@ Coskewness
   - [`AbstractExpectedReturnsEstimator`](@ref)
   - [`AbstractMatrixProcessingEstimator`](@ref)
   - [`AbstractMomentAlgorithm`](@ref)
+  - [`factory`](@ref)
 """
-@curryable @concrete struct Coskewness <: CoskewnessEstimator
+@propagatable @concrete struct Coskewness <: CoskewnessEstimator
     """
     $(field_dict[:me])
     """
-    @c me
+    @prop me
     """
     $(field_dict[:mp])
     """
@@ -178,7 +186,7 @@ Coskewness
     """
     $(field_dict[:oow])
     """
-    @c w
+    @prop w
     function Coskewness(me::AbstractExpectedReturnsEstimator,
                         mp::AbstractMatrixProcessingEstimator, alg::AbstractMomentAlgorithm,
                         w::Option{<:ObsWeights})
@@ -186,6 +194,11 @@ Coskewness
         return new{typeof(me), typeof(mp), typeof(alg), typeof(w)}(me, mp, alg, w)
     end
 end
+#= Old factory function:
+function factory(ske::Coskewness, w::ObsWeights)::Coskewness
+    return Coskewness(; me = factory(ske.me, w), mp = ske.mp, alg = ske.alg, w = w)
+end
+=#
 function Coskewness(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
                     mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing(),
                     alg::AbstractMomentAlgorithm = Full(),

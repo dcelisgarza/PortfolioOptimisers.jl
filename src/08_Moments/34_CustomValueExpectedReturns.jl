@@ -28,7 +28,7 @@ CustomValueExpectedReturns
   - [`AbstractExpectedReturnsEstimator`](@ref)
   - [`PortfolioOptimisersCovariance`](@ref)
 """
-@curryable @concrete struct CustomValueExpectedReturns <: AbstractExpectedReturnsEstimator
+@concrete struct CustomValueExpectedReturns <: AbstractExpectedReturnsEstimator
     """
     Custom value.\n  - If a scalar, all assets are assigned this value.\n    - If a vector, each element corresponds to an asset.\n    - If a function, it is called with the full `X` matrix and `dims`, with additional keyword arguments passed through.
     """

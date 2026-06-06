@@ -138,18 +138,27 @@ Keywords correspond to the struct's fields.
   - If `r` is a vector: `!isempty(r)`.
   - If `wi` is provided: `!isempty(wi)`.
 
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@prop`-tagged fields are automatically propagated:
+
+  - `opt`: Recursively updated via [`factory`](@ref).
+  - `r`: Recursively updated via [`factory`](@ref).
+  - `fb`: Recursively updated via [`factory`](@ref).
+
 # Related
 
   - [`RiskJuMPOptimisationEstimator`](@ref)
   - [`MeanRisk`](@ref)
   - [`RiskBudgeting`](@ref)
   - [`factor_risk_contribution`](@ref)
+  - [`factory`](@ref)
 """
-@curryable @concrete struct FactorRiskContribution <: RiskJuMPOptimisationEstimator
+@propagatable @concrete struct FactorRiskContribution <: RiskJuMPOptimisationEstimator
     """
     $(field_dict[:opt_jmp])
     """
-    @c opt
+    @prop opt
     """
     $(field_dict[:re])
     """
@@ -157,7 +166,7 @@ Keywords correspond to the struct's fields.
     """
     $(field_dict[:r_opt])
     """
-    @c r
+    @prop r
     """
     $(field_dict[:obj])
     """
@@ -181,7 +190,7 @@ Keywords correspond to the struct's fields.
     """
     $(field_dict[:fb])
     """
-    @c fb
+    @prop fb
     function FactorRiskContribution(opt::JuMPOptimiser, re::RegE_Reg, r::RM_VecRM,
                                     obj::ObjectiveFunction,
                                     frc_ple::Option{<:PlCE_PhC_VecPlCE_PlC},
@@ -199,6 +208,16 @@ Keywords correspond to the struct's fields.
                                                                        flag, fb)
     end
 end
+#= Old factory function:
+function factory(frc::FactorRiskContribution, w::AbstractVector)::FactorRiskContribution
+    opt = factory(frc.opt, w)
+    r = factory(frc.r, w)
+    fb = factory(frc.fb, w)
+    return FactorRiskContribution(; opt = opt, re = frc.re, r = r, obj = frc.obj,
+                                  frc_ple = frc.frc_ple, sets = frc.sets, wi = frc.wi,
+                                  flag = frc.flag, fb = fb)
+end
+=#
 function FactorRiskContribution(; opt::JuMPOptimiser = JuMPOptimiser(),
                                 re::RegE_Reg = StepwiseRegression(),
                                 r::RM_VecRM = Variance(),

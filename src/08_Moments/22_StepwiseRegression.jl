@@ -96,6 +96,12 @@ $(DocStringExtensions.FIELDS)
 
 Keywords correspond to the struct's fields.
 
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@prop`-tagged fields are automatically propagated:
+
+  - `tgt`: Recursively updated via [`factory`](@ref).
+
 # Examples
 
 ```jldoctest
@@ -113,8 +119,9 @@ StepwiseRegression
   - [`AbstractStepwiseRegressionCriterion`](@ref)
   - [`AbstractStepwiseRegressionAlgorithm`](@ref)
   - [`AbstractRegressionTarget`](@ref)
+  - [`factory`](@ref)
 """
-@curryable @concrete struct StepwiseRegression <: AbstractRegressionEstimator
+@propagatable @concrete struct StepwiseRegression <: AbstractRegressionEstimator
     """
     $(field_dict[:crit])
     """
@@ -126,7 +133,7 @@ StepwiseRegression
     """
     $(field_dict[:retgt])
     """
-    @c tgt
+    @prop tgt
     function StepwiseRegression(crit::AbstractStepwiseRegressionCriterion,
                                 alg::AbstractStepwiseRegressionAlgorithm,
                                 tgt::AbstractRegressionTarget)
@@ -139,6 +146,11 @@ StepwiseRegression
         return new{typeof(crit), typeof(alg), typeof(tgt)}(crit, alg, tgt)
     end
 end
+#= Old factory function:
+function factory(re::StepwiseRegression, w::ObsWeights)::StepwiseRegression
+    return StepwiseRegression(; crit = re.crit, alg = re.alg, tgt = factory(re.tgt, w))
+end
+=#
 function StepwiseRegression(; crit::AbstractStepwiseRegressionCriterion = PValue(),
                             alg::AbstractStepwiseRegressionAlgorithm = Forward(),
                             tgt::AbstractRegressionTarget = LinearModel())::StepwiseRegression

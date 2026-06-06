@@ -23,6 +23,12 @@ Keywords correspond to the struct's fields.
 
   - $(val_dict[:oow])
 
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@prop`-tagged fields are automatically propagated:
+
+  - `ce`: Recursively updated via [`factory`](@ref).
+
 # Examples
 
 ```jldoctest
@@ -53,13 +59,14 @@ EquilibriumExpectedReturns
   - [`AbstractShrunkExpectedReturnsEstimator`](@ref)
   - [`StatsBase.CovarianceEstimator`](https://juliastats.org/StatsBase.jl/stable/cov/#StatsBase.CovarianceEstimator)
   - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
+  - [`factory`](@ref)
 """
-@curryable @concrete struct EquilibriumExpectedReturns <:
-                            AbstractShrunkExpectedReturnsEstimator
+@propagatable @concrete struct EquilibriumExpectedReturns <:
+                               AbstractShrunkExpectedReturnsEstimator
     """
     $(field_dict[:ce])
     """
-    @c ce
+    @prop ce
     """
     $(field_dict[:eqw])
     """
@@ -74,6 +81,11 @@ EquilibriumExpectedReturns
         return new{typeof(ce), typeof(w), typeof(l)}(ce, w, l)
     end
 end
+#= Old factory function:
+function factory(me::EquilibriumExpectedReturns, w::ObsWeights)::EquilibriumExpectedReturns
+    return EquilibriumExpectedReturns(; ce = factory(me.ce, w), w = me.w, l = me.l)
+end
+=#
 function EquilibriumExpectedReturns(;
                                     ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
                                     w::Option{<:VecNum} = nothing,

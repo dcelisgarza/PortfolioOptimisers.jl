@@ -18,6 +18,12 @@ $(DocStringExtensions.FIELDS)
 
 Keywords correspond to the struct's fields.
 
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@prop`-tagged fields are automatically propagated:
+
+  - `me`: Recursively updated via [`factory`](@ref).
+
 # Examples
 
 ```jldoctest
@@ -32,12 +38,14 @@ ExcessExpectedReturns
 
   - [`AbstractShrunkExpectedReturnsEstimator`](@ref)
   - [`AbstractExpectedReturnsEstimator`](@ref)
+  - [`factory`](@ref)
 """
-@curryable @concrete struct ExcessExpectedReturns <: AbstractShrunkExpectedReturnsEstimator
+@propagatable @concrete struct ExcessExpectedReturns <:
+                               AbstractShrunkExpectedReturnsEstimator
     """
     $(field_dict[:me])
     """
-    @c me
+    @prop me
     """
     $(field_dict[:rf])
     """
@@ -46,6 +54,11 @@ ExcessExpectedReturns
         return new{typeof(me), typeof(rf)}(me, rf)
     end
 end
+#= Old factory function:
+function factory(me::ExcessExpectedReturns, w::ObsWeights)::ExcessExpectedReturns
+    return ExcessExpectedReturns(; me = factory(me.me, w), rf = me.rf)
+end
+=#
 function ExcessExpectedReturns(;
                                me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
                                rf::Number = 0.0)::ExcessExpectedReturns

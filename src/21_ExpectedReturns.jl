@@ -253,6 +253,12 @@ $(DocStringExtensions.FIELDS)
 
 Keywords correspond to the struct's fields.
 
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@prop`-tagged fields are automatically propagated:
+
+  - `rt`: Recursively updated via [`factory`](@ref).
+
 # Examples
 
 ```jldoctest
@@ -270,16 +276,23 @@ ExpectedReturn
   - [`ExpectedReturnRiskRatio`](@ref)
   - [`expected_return`](@ref)
   - [`expected_risk`](@ref)
+  - [`factory`](@ref)
 """
-@curryable @concrete struct ExpectedReturn <: NonOptimisationRiskMeasure
+@propagatable @concrete struct ExpectedReturn <: NonOptimisationRiskMeasure
     """
     $(field_dict[:rt])
     """
-    @c rt
+    @prop rt
     function ExpectedReturn(rt::JuMPReturnsEstimator)
         return new{typeof(rt)}(rt)
     end
 end
+#= Old factory function:
+function factory(r::ExpectedReturn, args...; kwargs...)::ExpectedReturn
+    rt = factory(r.rt, args...; kwargs...)
+    return ExpectedReturn(; rt = rt)
+end
+=#
 function ExpectedReturn(; rt::JuMPReturnsEstimator = ArithmeticReturn())::ExpectedReturn
     return ExpectedReturn(rt)
 end
@@ -334,6 +347,13 @@ $(DocStringExtensions.FIELDS)
 
 Keywords correspond to the struct's fields.
 
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@prop`-tagged fields are automatically propagated:
+
+  - `rt`: Recursively updated via [`factory`](@ref).
+  - `rk`: Recursively updated via [`factory`](@ref).
+
 # Examples
 
 ```jldoctest
@@ -361,16 +381,17 @@ ExpectedReturnRiskRatio
   - [`AbstractBaseRiskMeasure`](@ref)
   - [`expected_ratio`](@ref)
   - [`expected_risk`](@ref)
+  - [`factory`](@ref)
 """
-@curryable @concrete struct ExpectedReturnRiskRatio <: NonOptimisationRiskMeasure
+@propagatable @concrete struct ExpectedReturnRiskRatio <: NonOptimisationRiskMeasure
     """
     $(field_dict[:rt])
     """
-    @c rt
+    @prop rt
     """
     $(field_dict[:rk])
     """
-    @c rk
+    @prop rk
     """
     $(field_dict[:rf])
     """
@@ -380,6 +401,13 @@ ExpectedReturnRiskRatio
         return new{typeof(rt), typeof(rk), typeof(rf)}(rt, rk, rf)
     end
 end
+#= Old factory function:
+function factory(r::ExpectedReturnRiskRatio, args...; kwargs...)::ExpectedReturnRiskRatio
+    rt = factory(r.rt, args...; kwargs...)
+    rk = factory(r.rk, args...; kwargs...)
+    return ExpectedReturnRiskRatio(; rt = rt, rk = rk, rf = r.rf)
+end
+=#
 function ExpectedReturnRiskRatio(; rt::JuMPReturnsEstimator = ArithmeticReturn(),
                                  rk::AbstractBaseRiskMeasure = Variance(),
                                  rf::Number = 0.0)::ExpectedReturnRiskRatio

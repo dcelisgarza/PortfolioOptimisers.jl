@@ -1039,6 +1039,12 @@ $(DocStringExtensions.FIELDS)
 
   - `isfinite(err)` and `err >= 0`.
 
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@prop`-tagged fields are automatically propagated:
+
+  - `tr`: Recursively updated via [`factory`](@ref).
+
 # Examples
 
 ```jldoctest
@@ -1064,12 +1070,13 @@ TrackingError
   - [`NormTracking`](@ref)
   - [`L2Tracking`](@ref)
   - [`L1Tracking`](@ref)
+  - [`factory`](@ref)
 """
-@curryable @concrete struct TrackingError <: AbstractTracking
+@propagatable @concrete struct TrackingError <: AbstractTracking
     """
     $(field_dict[:tr])
     """
-    @c tr
+    @prop tr
     """
     $(field_dict[:err])
     """
@@ -1083,6 +1090,11 @@ TrackingError
         return new{typeof(tr), typeof(err), typeof(alg)}(tr, err, alg)
     end
 end
+#= Old factory function:
+function factory(tr::TrackingError, w::VecNum)
+    return TrackingError(; tr = factory(tr.tr, w), err = tr.err, alg = tr.alg)
+end
+=#
 function TrackingError(; tr::AbstractTrackingAlgorithm, err::Number = 0.0,
                        alg::NormTracking = L2Tracking())
     return TrackingError(tr, err, alg)

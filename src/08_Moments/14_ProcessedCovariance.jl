@@ -17,6 +17,12 @@ $(DocStringExtensions.FIELDS)
 
 Keywords correspond to the struct's fields.
 
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@prop`-tagged fields are automatically propagated:
+
+  - `ce`: Recursively updated via [`factory`](@ref).
+
 # Examples
 
 ```jldoctest
@@ -40,12 +46,13 @@ ProcessedCovariance
   - [`AbstractCovarianceEstimator`](@ref)
   - [`AbstractMatrixProcessingAlgorithm`](@ref)
   - [`Posdef`](@ref)
+  - [`factory`](@ref)
 """
-@curryable @concrete struct ProcessedCovariance <: AbstractCovarianceEstimator
+@propagatable @concrete struct ProcessedCovariance <: AbstractCovarianceEstimator
     """
     $(field_dict[:ce])
     """
-    @c ce
+    @prop ce
     """
     $(field_dict[:mpa])
     """
@@ -60,6 +67,11 @@ ProcessedCovariance
         return new{typeof(ce), typeof(alg), typeof(pdm)}(ce, alg, pdm)
     end
 end
+#= Old factory function:
+function factory(ce::ProcessedCovariance, w::ObsWeights)::ProcessedCovariance
+    return ProcessedCovariance(; ce = factory(ce.ce, w), alg = ce.alg, pdm = ce.pdm)
+end
+=#
 function ProcessedCovariance(; ce::StatsBase.CovarianceEstimator = Covariance(),
                              alg::Option{<:AbstractMatrixProcessingAlgorithm} = nothing,
                              pdm::Option{<:Posdef} = Posdef())::ProcessedCovariance

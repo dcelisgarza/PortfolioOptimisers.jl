@@ -11,16 +11,16 @@ traverse_concrete_subtypes
 concrete_typed_array
 factory(a::Union{Nothing, <:AbstractEstimator, <:AbstractAlgorithm, <:AbstractResult}, args...; kwargs...)
 get_window
-@curryable
+@propagatable
 _factory_child
-@c
-_is_c_macro
+@prop
+_is_prop_macro
 _is_doc_macro
 _extract_field_name
-_curryable_find_struct
-_curryable_bare_name
+_propagatable_find_struct
+_propagatable_bare_name
 _try_field_name
-_curryable_parse_body
+_propagatable_parse_body
 ```
 
 ## Mathematical functions
