@@ -148,7 +148,9 @@ PortfolioTarget
   - [`RegimeAdjustedExpWeightedCovariance`](@ref)
 """
 @concrete struct PortfolioTarget <: RegimeAdjustedTarget
-    "$(field_dict[:ra_w])"
+    """
+    $(field_dict[:ra_w])
+    """
     w
     function PortfolioTarget(w::Option{<:EstValType})
         if isa(w, AbstractVector)
@@ -252,17 +254,29 @@ true
   - [`RegimeAdjustedExpWeightedVariance`](@ref)
 """
 @concrete struct RegimeAdjustedExpWeightedCovariance <: AbstractCovarianceEstimator
-    "$(field_dict[:decay])"
+    """
+    $(field_dict[:decay])
+    """
     decay
-    "$(field_dict[:cor_decay])"
+    """
+    $(field_dict[:cor_decay])
+    """
     cor_decay
-    "$(field_dict[:hac_lags])"
+    """
+    $(field_dict[:hac_lags])
+    """
     hac_lags
-    "$(field_dict[:regime_method])"
+    """
+    $(field_dict[:regime_method])
+    """
     regime_method
-    "$(field_dict[:regime_decay])"
+    """
+    $(field_dict[:regime_decay])
+    """
     regime_decay
-    "$(field_dict[:regime_target])"
+    """
+    $(field_dict[:regime_target])
+    """
     regime_target
     function RegimeAdjustedExpWeightedCovariance(decay::Number, cor_decay::Number,
                                                  hac_lags::Option{<:Integer},

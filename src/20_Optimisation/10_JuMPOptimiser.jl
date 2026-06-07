@@ -15,41 +15,77 @@ $(DocStringExtensions.FIELDS)
   - [`MeanRisk`](@ref)
 """
 @concrete struct ProcessedJuMPOptimiserAttributes <: AbstractResult
-    "Prior estimation result."
+    """
+    Prior estimation result.
+    """
     pr
-    "Processed weight bounds constraints."
+    """
+    Processed weight bounds constraints.
+    """
     wb
-    "Processed long threshold constraints."
+    """
+    Processed long threshold constraints.
+    """
     lt
-    "Processed short threshold constraints."
+    """
+    Processed short threshold constraints.
+    """
     st
-    "Processed linear constraints result."
+    """
+    Processed linear constraints result.
+    """
     lcsr
-    "Processed centrality constraints result."
+    """
+    Processed centrality constraints result.
+    """
     ctr
-    "Processed group cardinality constraints result."
+    """
+    Processed group cardinality constraints result.
+    """
     gcardr
-    "Processed sub-group cardinality constraints result."
+    """
+    Processed sub-group cardinality constraints result.
+    """
     sgcardr
-    "Asset sets matrix for group selection."
+    """
+    Asset sets matrix for group selection.
+    """
     smtx
-    "Asset sets matrix for sub-group selection."
+    """
+    Asset sets matrix for sub-group selection.
+    """
     sgmtx
-    "Processed long threshold constraints for groups."
+    """
+    Processed long threshold constraints for groups.
+    """
     slt
-    "Processed short threshold constraints for groups."
+    """
+    Processed short threshold constraints for groups.
+    """
     sst
-    "Processed long threshold constraints for sub-groups."
+    """
+    Processed long threshold constraints for sub-groups.
+    """
     sglt
-    "Processed short threshold constraints for sub-groups."
+    """
+    Processed short threshold constraints for sub-groups.
+    """
     sgst
-    "Processed turnover constraints."
+    """
+    Processed turnover constraints.
+    """
     tn
-    "Processed fees constraints."
+    """
+    Processed fees constraints.
+    """
     fees
-    "Processed phylogeny constraints result."
+    """
+    Processed phylogeny constraints result.
+    """
     plr
-    "Processed JuMP returns estimator."
+    """
+    Processed JuMP returns estimator.
+    """
     ret
 end
 """
@@ -161,83 +197,161 @@ Keywords correspond to the struct's fields.
   - [`RelaxedRiskBudgeting`](@ref)
 """
 @concrete struct JuMPOptimiser <: BaseJuMPOptimisationEstimator
-    "$(field_dict[:pe])"
+    """
+    $(field_dict[:pe])
+    """
     pe
-    "$(field_dict[:slv])"
+    """
+    $(field_dict[:slv])
+    """
     slv
-    "$(field_dict[:wb_jmp])"
+    """
+    $(field_dict[:wb_jmp])
+    """
     wb
-    "$(field_dict[:bgt])"
+    """
+    $(field_dict[:bgt])
+    """
     bgt
-    "$(field_dict[:sbgt])"
+    """
+    $(field_dict[:sbgt])
+    """
     sbgt
-    "$(field_dict[:lt])"
+    """
+    $(field_dict[:lt])
+    """
     lt
-    "$(field_dict[:st])"
+    """
+    $(field_dict[:st])
+    """
     st
-    "$(field_dict[:lcse])"
+    """
+    $(field_dict[:lcse])
+    """
     lcse
-    "Centring constraint estimator or constraint(s)."
+    """
+    Centring constraint estimator or constraint(s).
+    """
     cte
-    "$(field_dict[:gcarde])"
+    """
+    $(field_dict[:gcarde])
+    """
     gcarde
-    "$(field_dict[:sgcarde])"
+    """
+    $(field_dict[:sgcarde])
+    """
     sgcarde
-    "$(field_dict[:smtx])"
+    """
+    $(field_dict[:smtx])
+    """
     smtx
-    "$(field_dict[:sgmtx])"
+    """
+    $(field_dict[:sgmtx])
+    """
     sgmtx
-    "$(field_dict[:slt])"
+    """
+    $(field_dict[:slt])
+    """
     slt
-    "$(field_dict[:sst])"
+    """
+    $(field_dict[:sst])
+    """
     sst
-    "$(field_dict[:sglt])"
+    """
+    $(field_dict[:sglt])
+    """
     sglt
-    "$(field_dict[:sgst])"
+    """
+    $(field_dict[:sgst])
+    """
     sgst
-    "$(field_dict[:tn_jmp])"
+    """
+    $(field_dict[:tn_jmp])
+    """
     tn
-    "$(field_dict[:fees_jmp])"
+    """
+    $(field_dict[:fees_jmp])
+    """
     fees
-    "$(field_dict[:sets])"
+    """
+    $(field_dict[:sets])
+    """
     sets
-    "$(field_dict[:tr_jmp])"
+    """
+    $(field_dict[:tr_jmp])
+    """
     tr
-    "$(field_dict[:ple])"
+    """
+    $(field_dict[:ple])
+    """
     ple
-    "$(field_dict[:ret_jmp])"
+    """
+    $(field_dict[:ret_jmp])
+    """
     ret
-    "$(field_dict[:sca])"
+    """
+    $(field_dict[:sca])
+    """
     sca
-    "$(field_dict[:ccnt])"
+    """
+    $(field_dict[:ccnt])
+    """
     ccnt
-    "$(field_dict[:cobj])"
+    """
+    $(field_dict[:cobj])
+    """
     cobj
-    "$(field_dict[:sc])"
+    """
+    $(field_dict[:sc])
+    """
     sc
-    "$(field_dict[:so])"
+    """
+    $(field_dict[:so])
+    """
     so
-    "$(field_dict[:ss])"
+    """
+    $(field_dict[:ss])
+    """
     ss
-    "$(field_dict[:card])"
+    """
+    $(field_dict[:card])
+    """
     card
-    "$(field_dict[:scard])"
+    """
+    $(field_dict[:scard])
+    """
     scard
-    "$(field_dict[:nea])"
+    """
+    $(field_dict[:nea])
+    """
     nea
-    "$(field_dict[:l1])"
+    """
+    $(field_dict[:l1])
+    """
     l1
-    "$(field_dict[:l2])"
+    """
+    $(field_dict[:l2])
+    """
     l2
-    "$(field_dict[:linf])"
+    """
+    $(field_dict[:linf])
+    """
     linf
-    "$(field_dict[:lp])"
+    """
+    $(field_dict[:lp])
+    """
     lp
-    "$(field_dict[:brt])"
+    """
+    $(field_dict[:brt])
+    """
     brt
-    "$(field_dict[:cle_pr])"
+    """
+    $(field_dict[:cle_pr])
+    """
     cle_pr
-    "$(field_dict[:strict_opt])"
+    """
+    $(field_dict[:strict_opt])
+    """
     strict
     function JuMPOptimiser(pe::PrE_Pr, slv::Slv_VecSlv, wb::Option{<:WbE_Wb},
                            bgt::Option{<:Num_BgtCE}, sbgt::Option{<:Num_BgtRg},

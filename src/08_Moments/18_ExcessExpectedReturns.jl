@@ -18,6 +18,12 @@ $(DocStringExtensions.FIELDS)
 
 Keywords correspond to the struct's fields.
 
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@prop`-tagged fields are automatically propagated:
+
+  - `me`: Recursively updated via [`factory`](@ref).
+
 # Examples
 
 ```jldoctest
@@ -32,54 +38,31 @@ ExcessExpectedReturns
 
   - [`AbstractShrunkExpectedReturnsEstimator`](@ref)
   - [`AbstractExpectedReturnsEstimator`](@ref)
+  - [`factory`](@ref)
 """
-@concrete struct ExcessExpectedReturns <: AbstractShrunkExpectedReturnsEstimator
-    "$(field_dict[:me])"
-    me
-    "$(field_dict[:rf])"
+@propagatable @concrete struct ExcessExpectedReturns <:
+                               AbstractShrunkExpectedReturnsEstimator
+    """
+    $(field_dict[:me])
+    """
+    @prop me
+    """
+    $(field_dict[:rf])
+    """
     rf
     function ExcessExpectedReturns(me::AbstractExpectedReturnsEstimator, rf::Number)
         return new{typeof(me), typeof(rf)}(me, rf)
     end
 end
+#= Old factory function:
+function factory(me::ExcessExpectedReturns, w::ObsWeights)::ExcessExpectedReturns
+    return ExcessExpectedReturns(; me = factory(me.me, w), rf = me.rf)
+end
+=#
 function ExcessExpectedReturns(;
                                me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
                                rf::Number = 0.0)::ExcessExpectedReturns
     return ExcessExpectedReturns(me, rf)
-end
-"""
-    factory(me::ExcessExpectedReturns, w::ObsWeights) -> ExcessExpectedReturns
-
-Return a new [`ExcessExpectedReturns`](@ref) estimator with observation weights `w` applied to the underlying mean estimator.
-
-# Arguments
-
-  - `me`: Excess expected returns estimator.
-  - $(arg_dict[:ow])
-
-# Returns
-
-  - `me::ExcessExpectedReturns`: Updated estimator with weights applied.
-
-# Examples
-
-```jldoctest
-julia> me = ExcessExpectedReturns();
-
-julia> factory(me, StatsBase.Weights([0.2, 0.3, 0.5]))
-ExcessExpectedReturns
-  me ┼ SimpleExpectedReturns
-     │   w ┴ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.3, 0.5]
-  rf ┴ Float64: 0.0
-```
-
-# Related
-
-  - [`ExcessExpectedReturns`](@ref)
-  - [`factory`](@ref)
-"""
-function factory(me::ExcessExpectedReturns, w::ObsWeights)::ExcessExpectedReturns
-    return ExcessExpectedReturns(; me = factory(me.me, w), rf = me.rf)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

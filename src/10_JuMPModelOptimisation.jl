@@ -101,15 +101,25 @@ Solver
   - [`SlvSettings`](@ref)
 """
 @concrete struct Solver <: AbstractEstimator
-    "$(field_dict[:name])"
+    """
+    $(field_dict[:name])
+    """
     name
-    "$(field_dict[:solver])"
+    """
+    $(field_dict[:solver])
+    """
     solver
-    "$(field_dict[:settings])"
+    """
+    $(field_dict[:settings])
+    """
     settings
-    "$(field_dict[:check_sol])"
+    """
+    $(field_dict[:check_sol])
+    """
     check_sol
-    "$(field_dict[:add_bridges])"
+    """
+    $(field_dict[:add_bridges])
+    """
     add_bridges
     function Solver(name::Sym_Str, solver::Any, settings::Option{<:SlvSettings},
                     check_sol::NamedTuple, add_bridges::Bool)::Solver
@@ -191,9 +201,13 @@ JuMPResult
   - [`optimise_JuMP_model!`](@ref)
 """
 @concrete struct JuMPResult <: AbstractJuMPResult
-    "Dictionary of solver trials and errors."
+    """
+    Dictionary of solver trials and errors.
+    """
     trials
-    "Boolean indicating whether optimisation succeeded."
+    """
+    Boolean indicating whether optimisation succeeded.
+    """
     success
     function JuMPResult(trials::AbstractDict, success::Bool)::JuMPResult
         if !success

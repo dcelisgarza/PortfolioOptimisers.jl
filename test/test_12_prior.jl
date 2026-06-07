@@ -27,10 +27,12 @@
     sets = AssetSets(;
                      dict = Dict("nx" => rd.nx, "group1" => rd.nx[1:2:end],
                                  "group2" => rd.nx[2:2:end],
-                                 "clusters1" => [1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2,
-                                                 3, 3, 3, 3, 3, 3],
-                                 "clusters2" => [1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2,
-                                                 3, 1, 2, 3, 1, 2]))
+                                 "clusters1" =>
+                                     [1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3,
+                                      3, 3],
+                                 "clusters2" =>
+                                     [1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3,
+                                      1, 2]))
     fsets = AssetSets(; dict = Dict("nx" => rd.nf))
     @testset "Empirical Prior" begin
         pes = [EmpiricalPrior(), EmpiricalPrior(; horizon = 252)]
@@ -580,6 +582,13 @@
                                                  sigma_views = sigma_views,
                                                  kt_views = kt_views), rd).w, rtol = 5e-3)
 
+        cov_views = LinearConstraintEstimator(; val = "(AAPL, XOM) == prior(AAPL, XOM)*1.1")
+        pr = prior(EntropyPoolingPrior(; sets = sets, cov_views = cov_views), rd)
+        @test isapprox(pr.sigma[1, end], pr0.sigma[1, end] * 1.1, rtol = 1e-3)
+        @test isapprox(pr.w,
+                       prior(EntropyPoolingPrior(; sets = sets, opt = jopt,
+                                                 cov_views = cov_views), rd).w, rtol = 5e-6)
+
         rho_views = LinearConstraintEstimator(; val = "(AAPL, XOM) == 0.35")
         pr = prior(EntropyPoolingPrior(; sets = sets, rho_views = rho_views), rd)
         @test isapprox(StatsBase.cov2cor(pr.sigma)[1, end], 0.35, rtol = 5e-6)
@@ -652,6 +661,7 @@
         sigma_views = LinearConstraintEstimator(;
                                                 val = ["AAPL==0.2prior(AAPL)",
                                                        "WMT==1.4prior(WMT)"])
+        cov_views = LinearConstraintEstimator(; val = "(MSFT, PEP) <= prior(MSFT, PEP)*0.8")
         rho_views = LinearConstraintEstimator(; val = "(AAPL, XOM) == 0.35")
         kt_views = LinearConstraintEstimator(; val = "AAPL >= prior(AAPL)*0.3")
         sk_views = LinearConstraintEstimator(; val = "WMT == prior(WMT)*1.4")
@@ -661,15 +671,17 @@
                                                                     sets = sets,
                                                                     mu_views = mu_views,
                                                                     sigma_views = sigma_views,
+                                                                    cov_views = cov_views,
                                                                     rho_views = rho_views,
                                                                     kt_views = kt_views,
                                                                     sk_views = sk_views)),
                    rd)
-        @test isapprox(pr.mu[1], 0.75 * pr0.mu[1], rtol = 5e-6)
+        @test isapprox(pr.mu[1], 0.75 * pr0.mu[1], rtol = 1e-5)
         @test pr.mu[end] >= 0.4 * pr0.mu[end]
         @test isapprox(pr.sigma[1, 1], 0.2 * pr0.sigma[1, 1], rtol = 1e-2)
         @test isapprox(pr.sigma[19, 19], 1.4 * pr0.sigma[19, 19], rtol = 5e-3)
         @test !isapprox(StatsBase.cov2cor(pr.sigma)[1, end], 0.35; rtol = 5e-4)
+        @test pr0.sigma[13, 14] * 0.8 >= pr.sigma[13, 14]
         @test HighOrderMoment(; w = pr.w,
                               alg = StandardisedHighOrderMoment(; alg = FourthMoment(),
                                                                 ve = SimpleVariance(;
@@ -907,6 +919,13 @@
                                                  sigma_views = sigma_views,
                                                  kt_views = kt_views), rd).w, rtol = 5e-3)
 
+        cov_views = LinearConstraintEstimator(; val = "(AAPL, XOM) == prior(AAPL, XOM)*1.1")
+        pr = prior(EntropyPoolingPrior(; sets = sets, cov_views = cov_views, opt = opt), rd)
+        @test isapprox(pr.sigma[1, end], pr0.sigma[1, end] * 1.1, rtol = 1e-3)
+        @test isapprox(pr.w,
+                       prior(EntropyPoolingPrior(; sets = sets, opt = jopt,
+                                                 cov_views = cov_views), rd).w, rtol = 5e-6)
+
         rho_views = LinearConstraintEstimator(; val = "(AAPL, XOM) == 0.35")
         pr = prior(EntropyPoolingPrior(; sets = sets, rho_views = rho_views, opt = opt), rd)
         @test isapprox(StatsBase.cov2cor(pr.sigma)[1, end], 0.35, rtol = 5e-6)
@@ -981,6 +1000,7 @@
         sigma_views = LinearConstraintEstimator(;
                                                 val = ["AAPL==0.2prior(AAPL)",
                                                        "WMT==1.4prior(WMT)"])
+        cov_views = LinearConstraintEstimator(; val = "(MSFT, PEP) <= prior(MSFT, PEP)*0.8")
         rho_views = LinearConstraintEstimator(; val = "(AAPL, XOM) == 0.35")
         kt_views = LinearConstraintEstimator(; val = "AAPL >= prior(AAPL)*0.3")
         sk_views = LinearConstraintEstimator(; val = "WMT == prior(WMT)*1.4")
@@ -990,15 +1010,17 @@
                                                                     sets = sets,
                                                                     mu_views = mu_views,
                                                                     sigma_views = sigma_views,
+                                                                    cov_views = cov_views,
                                                                     rho_views = rho_views,
                                                                     kt_views = kt_views,
                                                                     sk_views = sk_views,
                                                                     opt = opt)), rd)
-        @test isapprox(pr.mu[1], 0.75 * pr0.mu[1], rtol = 5e-6)
+        @test isapprox(pr.mu[1], 0.75 * pr0.mu[1], rtol = 1e-5)
         @test pr.mu[end] >= 0.4 * pr0.mu[end]
         @test isapprox(pr.sigma[1, 1], 0.2 * pr0.sigma[1, 1], rtol = 1e-2)
         @test isapprox(pr.sigma[19, 19], 1.4 * pr0.sigma[19, 19], rtol = 5e-3)
         @test !isapprox(StatsBase.cov2cor(pr.sigma)[1, end], 0.35; rtol = 5e-4)
+        @test pr0.sigma[13, 14] * 0.8 >= pr.sigma[13, 14]
         @test HighOrderMoment(; w = pr.w,
                               alg = StandardisedHighOrderMoment(; alg = FourthMoment(),
                                                                 ve = SimpleVariance(;

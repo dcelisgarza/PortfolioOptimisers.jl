@@ -146,13 +146,21 @@ EntropicValueatRisk
   - [`EntropicDrawdownatRisk`](@ref)
 """
 @concrete struct EntropicValueatRisk <: RiskMeasure
-    "$(field_dict[:settings_rm])"
+    """
+    $(field_dict[:settings_rm])
+    """
     settings
-    "$(field_dict[:slv])"
+    """
+    $(field_dict[:slv])
+    """
     slv
-    "$(field_dict[:alpha])"
+    """
+    $(field_dict[:alpha])
+    """
     alpha
-    "$(field_dict[:oow])"
+    """
+    $(field_dict[:oow])
+    """
     w
     function EntropicValueatRisk(settings::RiskMeasureSettings, slv::Option{<:Slv_VecSlv},
                                  alpha::Number, w::Option{<:ObsWeights})
@@ -224,15 +232,25 @@ Keywords correspond to the struct's fields.
   - [`EntropicValueatRisk`](@ref)
 """
 @concrete struct EntropicValueatRiskRange <: RiskMeasure
-    "$(field_dict[:settings_rm])"
+    """
+    $(field_dict[:settings_rm])
+    """
     settings
-    "$(field_dict[:slv])"
+    """
+    $(field_dict[:slv])
+    """
     slv
-    "$(field_dict[:alpha])"
+    """
+    $(field_dict[:alpha])
+    """
     alpha
-    "$(field_dict[:beta])"
+    """
+    $(field_dict[:beta])
+    """
     beta
-    "$(field_dict[:oow])"
+    """
+    $(field_dict[:oow])
+    """
     w
     function EntropicValueatRiskRange(settings::RiskMeasureSettings,
                                       slv::Option{<:Slv_VecSlv}, alpha::Number,
@@ -371,13 +389,21 @@ EntropicDrawdownatRisk
   - [`RelativeEntropicDrawdownatRisk`](@ref)
 """
 @concrete struct EntropicDrawdownatRisk <: RiskMeasure
-    "$(field_dict[:settings_rm])"
+    """
+    $(field_dict[:settings_rm])
+    """
     settings
-    "$(field_dict[:slv])"
+    """
+    $(field_dict[:slv])
+    """
     slv
-    "$(field_dict[:alpha])"
+    """
+    $(field_dict[:alpha])
+    """
     alpha
-    "$(field_dict[:oow])"
+    """
+    $(field_dict[:oow])
+    """
     w
     function EntropicDrawdownatRisk(settings::RiskMeasureSettings,
                                     slv::Option{<:Slv_VecSlv}, alpha::Number,
@@ -489,13 +515,21 @@ RelativeEntropicDrawdownatRisk
   - [`RelativeRelativisticDrawdownatRisk`](@ref)
 """
 @concrete struct RelativeEntropicDrawdownatRisk <: HierarchicalRiskMeasure
-    "$(field_dict[:settings_rm])"
+    """
+    $(field_dict[:settings_rm])
+    """
     settings
-    "$(field_dict[:slv])"
+    """
+    $(field_dict[:slv])
+    """
     slv
-    "$(field_dict[:alpha])"
+    """
+    $(field_dict[:alpha])
+    """
     alpha
-    "$(field_dict[:oow])"
+    """
+    $(field_dict[:oow])
+    """
     w
     function RelativeEntropicDrawdownatRisk(settings::HierarchicalRiskMeasureSettings,
                                             slv::Option{<:Slv_VecSlv}, alpha::Number,

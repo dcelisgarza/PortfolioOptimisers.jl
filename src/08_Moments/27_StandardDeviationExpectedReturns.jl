@@ -17,6 +17,12 @@ $(DocStringExtensions.FIELDS)
 
 Keywords correspond to the struct's fields.
 
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@prop`-tagged fields are automatically propagated:
+
+  - `ce`: Recursively updated via [`factory`](@ref).
+
 # Examples
 
 ```jldoctest
@@ -44,40 +50,27 @@ StandardDeviationExpectedReturns
 
   - [`AbstractExpectedReturnsEstimator`](@ref)
   - [`PortfolioOptimisersCovariance`](@ref)
+  - [`factory`](@ref)
 """
-@concrete struct StandardDeviationExpectedReturns <: AbstractExpectedReturnsEstimator
-    "$(field_dict[:ce])"
-    ce
+@propagatable @concrete struct StandardDeviationExpectedReturns <:
+                               AbstractExpectedReturnsEstimator
+    """
+    $(field_dict[:ce])
+    """
+    @prop ce
     function StandardDeviationExpectedReturns(ce::StatsBase.CovarianceEstimator)
         return new{typeof(ce)}(ce)
     end
 end
-function StandardDeviationExpectedReturns(;
-                                          ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance())::StandardDeviationExpectedReturns
-    return StandardDeviationExpectedReturns(ce)
-end
-"""
-    factory(ce::StandardDeviationExpectedReturns, w::ObsWeights) -> StandardDeviationExpectedReturns
-
-Return a new [`StandardDeviationExpectedReturns`](@ref) estimator with observation weights `w` applied to the underlying covariance estimator.
-
-# Arguments
-
-  - `ce`: Standard deviation expected returns estimator.
-  - $(arg_dict[:ow])
-
-# Returns
-
-  - `me::StandardDeviationExpectedReturns`: Updated estimator with weights applied.
-
-# Related
-
-  - [`StandardDeviationExpectedReturns`](@ref)
-  - [`factory`](@ref)
-"""
+#= Old factory function:
 function factory(ce::StandardDeviationExpectedReturns,
                  w::ObsWeights)::StandardDeviationExpectedReturns
     return StandardDeviationExpectedReturns(; ce = factory(ce.ce, w))
+end
+=#
+function StandardDeviationExpectedReturns(;
+                                          ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance())::StandardDeviationExpectedReturns
+    return StandardDeviationExpectedReturns(ce)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -163,6 +156,12 @@ $(DocStringExtensions.FIELDS)
 
 Keywords correspond to the struct's fields.
 
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@prop`-tagged fields are automatically propagated:
+
+  - `ce`: Recursively updated via [`factory`](@ref).
+
 # Examples
 
 ```jldoctest
@@ -190,39 +189,25 @@ VarianceExpectedReturns
 
   - [`AbstractExpectedReturnsEstimator`](@ref)
   - [`PortfolioOptimisersCovariance`](@ref)
+  - [`factory`](@ref)
 """
-@concrete struct VarianceExpectedReturns <: AbstractExpectedReturnsEstimator
-    "$(field_dict[:ce])"
-    ce
+@propagatable @concrete struct VarianceExpectedReturns <: AbstractExpectedReturnsEstimator
+    """
+    $(field_dict[:ce])
+    """
+    @prop ce
     function VarianceExpectedReturns(ce::StatsBase.CovarianceEstimator)
         return new{typeof(ce)}(ce)
     end
 end
+#= Old factory function:
+function factory(ce::VarianceExpectedReturns, w::ObsWeights)::VarianceExpectedReturns
+    return VarianceExpectedReturns(; ce = factory(ce.ce, w))
+end
+=#
 function VarianceExpectedReturns(;
                                  ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance())::VarianceExpectedReturns
     return VarianceExpectedReturns(ce)
-end
-"""
-    factory(ce::VarianceExpectedReturns, w::ObsWeights) -> VarianceExpectedReturns
-
-Return a new [`VarianceExpectedReturns`](@ref) estimator with observation weights `w` applied to the underlying covariance estimator.
-
-# Arguments
-
-  - `ce`: variance expected returns estimator.
-  - $(arg_dict[:ow])
-
-# Returns
-
-  - `me::VarianceExpectedReturns`: Updated estimator with weights applied.
-
-# Related
-
-  - [`VarianceExpectedReturns`](@ref)
-  - [`factory`](@ref)
-"""
-function factory(ce::VarianceExpectedReturns, w::ObsWeights)::VarianceExpectedReturns
-    return VarianceExpectedReturns(; ce = factory(ce.ce, w))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

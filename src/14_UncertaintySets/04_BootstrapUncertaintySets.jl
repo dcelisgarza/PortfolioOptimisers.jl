@@ -176,21 +176,37 @@ ARCHUncertaintySet
   - [`EllipsoidalUncertaintySet`](@ref)
 """
 @concrete struct ARCHUncertaintySet <: BootstrapUncertaintySetEstimator
-    "$(field_dict[:pe])"
+    """
+    $(field_dict[:pe])
+    """
     pe
-    "$(field_dict[:ucsa])"
+    """
+    $(field_dict[:ucsa])
+    """
     alg
-    "$(field_dict[:n_sim])"
+    """
+    $(field_dict[:n_sim])
+    """
     n_sim
-    "$(field_dict[:block_size])"
+    """
+    $(field_dict[:block_size])
+    """
     block_size
-    "$(field_dict[:q_bs])"
+    """
+    $(field_dict[:q_bs])
+    """
     q
-    "$(field_dict[:seed])"
+    """
+    $(field_dict[:seed])
+    """
     seed
-    "$(field_dict[:bootstrap])"
+    """
+    $(field_dict[:bootstrap])
+    """
     bootstrap
-    "$(field_dict[:kwargs])"
+    """
+    $(field_dict[:kwargs])
+    """
     kwargs
     function ARCHUncertaintySet(pe::AbstractLowOrderPriorEstimator,
                                 alg::AbstractUncertaintySetAlgorithm, n_sim::Integer,

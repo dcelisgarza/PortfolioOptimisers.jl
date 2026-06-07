@@ -93,14 +93,14 @@ Due to the typing system, if using a vector of vectors you have to call [`concre
 Here we will search three grids, the final score will reflect the best performing parameter combination among all grids.
 
 ````@example 11_HyperparameterTuning
-p = concrete_typed_array([["opti[2].opt.l1" => range(; start = 0.0005, stop = 0.0008,
-                                                     length = 3),
-                           "opti[1].opt.l2" => range(; start = 0.0004, stop = 0.0007,
-                                                     length = 3)],
-                          ["opti[1].opt.l2" => range(; start = 0.0004, stop = 0.0007,
-                                                     length = 3)],
-                          ["opti[2].opt.l1" => range(; start = 0.0009, stop = 0.0012,
-                                                     length = 3)],
+p = concrete_typed_array([["opti[2].opt.l1" =>
+                               range(; start = 0.0005, stop = 0.0008, length = 3),
+                           "opti[1].opt.l2" =>
+                               range(; start = 0.0004, stop = 0.0007, length = 3)],
+                          ["opti[1].opt.l2" =>
+                               range(; start = 0.0004, stop = 0.0007, length = 3)],
+                          ["opti[2].opt.l1" =>
+                               range(; start = 0.0009, stop = 0.0012, length = 3)],
                           ["opti[2]" => [MeanRisk(; opt = opt, obj = MaximumUtility()),
                                          MeanRisk(; opt = opt, obj = MaximumRatio())]]])
 gs_cv = GridSearchCrossValidation(p; r = r)
@@ -121,6 +121,15 @@ pretty_table(DataFrame("Lens" => gs_res1.lens_grid[gs_res1.idx],
 for (lens, val) in zip(gs_res1.lens_grid[gs_res1.idx], gs_res1.val_grid[gs_res1.idx])
     println("$(lpad("lens:", 12)) $lens\n$(lpad("val:", 12)) $val\n$(lpad("Field value:", 12)) $(lens(gs_res1.opt))\n")
 end
+````
+
+We can now optimise the best estimator on the full dataset to inspect the resulting portfolio.
+
+````@example 11_HyperparameterTuning
+using StatsPlots, GraphRecipes
+
+res_gs1 = optimise(gs_res1.opt, rd)
+plot_composition(res_gs1, rd)
 ````
 
 ### 2.2 Randomised cross validation search
@@ -152,6 +161,9 @@ pretty_table(DataFrame("Lens" => rs_res1.lens_grid[rs_res1.idx],
 for (lens, val) in zip(rs_res1.lens_grid[rs_res1.idx], rs_res1.val_grid[rs_res1.idx])
     println("$(lpad("lens:", 12)) $lens\n$(lpad("val:", 12)) $val\n$(lpad("Field value:", 12)) $(lens(rs_res1.opt))\n")
 end
+
+res_rs1 = optimise(rs_res1.opt, rd)
+plot_composition(res_rs1, rd)
 ````
 
 #### 2.2.2 Sampling from a distribution
@@ -184,6 +196,16 @@ pretty_table(DataFrame("Lens" => rs_res2.lens_grid[rs_res2.idx],
 for (lens, val) in zip(rs_res2.lens_grid[rs_res2.idx], rs_res2.val_grid[rs_res2.idx])
     println("$(lpad("lens:", 12)) $lens\n$(lpad("val:", 12)) $val\n$(lpad("Field value:", 12)) $(lens(rs_res2.opt))\n")
 end
+
+res_rs2 = optimise(rs_res2.opt, rd)
+plot_composition(res_rs2, rd)
+````
+
+Comparing the three best portfolios — grid search, randomised (predefined), randomised (distribution) —
+shows how different hyperparameter budgets and sampling strategies affect the final allocation.
+
+````@example 11_HyperparameterTuning
+plot_stacked_bar_composition([res_gs1, res_rs1, res_rs2], rd)
 ````
 
 The hyperparameter tuning can be used on any non finite optimisation estimator. In the future it will also be possible to provide a pipeline which will also allow users to tune pre-selection criteria.

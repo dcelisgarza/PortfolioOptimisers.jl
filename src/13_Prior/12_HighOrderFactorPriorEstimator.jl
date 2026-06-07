@@ -211,15 +211,25 @@ HighOrderFactorPriorEstimator
   - [`HighOrderPrior`](@ref)
 """
 @concrete struct HighOrderFactorPriorEstimator <: AbstractHighOrderPriorEstimator_F
-    "$(field_dict[:pe])"
+    """
+    $(field_dict[:pe])
+    """
     pe
-    "$(field_dict[:kte])"
+    """
+    $(field_dict[:kte])
+    """
     kte
-    "$(field_dict[:ske])"
+    """
+    $(field_dict[:ske])
+    """
     ske
-    "$(field_dict[:ex])"
+    """
+    $(field_dict[:ex])
+    """
     ex
-    "$(field_dict[:rsd])"
+    """
+    $(field_dict[:rsd])
+    """
     rsd
     function HighOrderFactorPriorEstimator(pe::AbstractLowOrderPriorEstimator_F_AF,
                                            kte::Option{<:CokurtosisEstimator},
@@ -349,6 +359,7 @@ function prior(pe::HighOrderFactorPriorEstimator, X::MatNum, F::MatNum; dims::In
         F = transpose(F)
     end
     kM = nothing
+    D2 = nothing
     L2 = nothing
     S2 = nothing
     posterior_kt = nothing
@@ -360,7 +371,6 @@ function prior(pe::HighOrderFactorPriorEstimator, X::MatNum, F::MatNum; dims::In
     f_kt = cokurtosis(pe.kte, F; kwargs...)
     if !isnothing(f_kt)
         kM = kron(M, M)
-        L2, S2 = dup_elim_sum_matrices(size(posterior_X, 2))[2:3]
         posterior_kt = kM * f_kt * transpose(kM)
         matrix_processing!(pe.kte.mp, posterior_kt, posterior_X; kwargs...)
     end
@@ -370,6 +380,11 @@ function prior(pe::HighOrderFactorPriorEstimator, X::MatNum, F::MatNum; dims::In
             kM = kron(M, M)
         end
         posterior_sk = M * f_sk * transpose(kM)
+    end
+    if !isnothing(f_kt) && !isnothing(f_sk)
+        D2, L2, S2 = dup_elim_sum_matrices(size(posterior_X, 2))
+    elseif !isnothing(f_kt) && isnothing(f_sk)
+        L2, S2 = dup_elim_sum_matrices(size(posterior_X, 2))[2:3]
     end
     if pe.rsd
         err = X - posterior_X
@@ -398,9 +413,10 @@ function prior(pe::HighOrderFactorPriorEstimator, X::MatNum, F::MatNum; dims::In
     if !isnothing(f_sk)
         posterior_V = negative_spectral_coskewness(posterior_sk, posterior_X, pe.ske.mp)
     end
-    return HighOrderPrior(; pr = pr, kt = posterior_kt, L2 = L2, S2 = S2, sk = posterior_sk,
-                          V = posterior_V, skmp = isnothing(f_sk) ? nothing : pe.ske.mp,
-                          f_kt = f_kt, f_sk = f_sk, f_V = f_V)
+    return HighOrderPrior(; pr = pr, kt = posterior_kt, D2 = D2, L2 = L2, S2 = S2,
+                          sk = posterior_sk, V = posterior_V,
+                          skmp = isnothing(f_sk) ? nothing : pe.ske.mp, f_kt = f_kt,
+                          f_sk = f_sk, f_V = f_V)
 end
 
 export HighOrderFactorPriorEstimator

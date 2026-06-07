@@ -78,7 +78,9 @@ MaximumDrawdown
   - [`RelativeMaximumDrawdown`](@ref)
 """
 @concrete struct MaximumDrawdown <: RiskMeasure
-    "$(field_dict[:settings_rm])"
+    """
+    $(field_dict[:settings_rm])
+    """
     settings
     function MaximumDrawdown(settings::RiskMeasureSettings)
         return new{typeof(settings)}(settings)
@@ -169,7 +171,9 @@ RelativeMaximumDrawdown
   - [`RelativeAverageDrawdown`](@ref)
 """
 @concrete struct RelativeMaximumDrawdown <: HierarchicalRiskMeasure
-    "$(field_dict[:settings_rm])"
+    """
+    $(field_dict[:settings_rm])
+    """
     settings
     function RelativeMaximumDrawdown(settings::HierarchicalRiskMeasureSettings)
         return new{typeof(settings)}(settings)

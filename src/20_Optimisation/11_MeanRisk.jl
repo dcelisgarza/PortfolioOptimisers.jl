@@ -15,17 +15,29 @@ The `w` property is forwarded from `sol.w`.
   - [`MeanRisk`](@ref)
 """
 @concrete struct MeanRiskResult <: NonFiniteAllocationOptimisationResult
-    "$(field_dict[:oe])"
+    """
+    $(field_dict[:oe])
+    """
     oe
-    "$(field_dict[:pa])"
+    """
+    $(field_dict[:pa])
+    """
     pa
-    "$(field_dict[:retcode])"
+    """
+    $(field_dict[:retcode])
+    """
     retcode
-    "$(field_dict[:sol])"
+    """
+    $(field_dict[:sol])
+    """
     sol
-    "$(field_dict[:model])"
+    """
+    $(field_dict[:model])
+    """
     model
-    "$(field_dict[:fb])"
+    """
+    $(field_dict[:fb])
+    """
     fb
 end
 """
@@ -214,15 +226,25 @@ Where:
   - [`RiskMeasure`](@ref)
 """
 @concrete struct MeanRisk <: RiskJuMPOptimisationEstimator
-    "$(field_dict[:opt_jmp])"
+    """
+    $(field_dict[:opt_jmp])
+    """
     opt
-    "$(field_dict[:r_opt])"
+    """
+    $(field_dict[:r_opt])
+    """
     r
-    "$(field_dict[:obj])"
+    """
+    $(field_dict[:obj])
+    """
     obj
-    "$(field_dict[:wi])"
+    """
+    $(field_dict[:wi])
+    """
     wi
-    "$(field_dict[:fb])"
+    """
+    $(field_dict[:fb])
+    """
     fb
     function MeanRisk(opt::JuMPOptimiser, r::RM_VecRM, obj::ObjectiveFunction,
                       wi::Option{<:VecNum}, fb::Option{<:OptE_Opt})
@@ -422,17 +444,23 @@ Recomputes the risk range used for the efficient frontier given updated prior in
 function _rebuild_risk_frontier(pr::AbstractPriorResult, fees::Option{<:Fees},
                                 r::RiskMeasure, risk_frontier::VecPair, w_min::VecNum,
                                 w_max::VecNum, i::Integer = 1)
-    (; N, factor, flag) = risk_frontier[i].second[2]
+    (; N, factor, bound) = risk_frontier[i].second[2]
     X = pr.X
     rk_min = expected_risk(r, w_min, X, fees)
     rk_max = expected_risk(r, w_max, X, fees)
-    rk_min, rk_max = if flag
+    if bigger_is_better(r)
+        rk_min, rk_max = rk_max, rk_min
+    end
+    rk_min, rk_max = if isa(bound, LinearBound)
         factor * rk_min, factor * rk_max
-    else
+    elseif isa(bound, SquareRootBound)
         factor * sqrt(rk_min), factor * sqrt(rk_max)
+    elseif isa(bound, SquaredBound)
+        factor * rk_min^2, factor * rk_max^2
     end
     ub = range(rk_min, rk_max; length = N)
-    return risk_frontier[i].first => (risk_frontier[1].second[1], ub)
+    return risk_frontier[i].first =>
+        (risk_frontier[1].second[1], ub, risk_frontier[1].second[3])
 end
 """
     rebuild_risk_frontier(model, mr, ...)
@@ -539,7 +567,8 @@ function solve_mean_risk!(model::JuMP.Model, mr::MeanRisk, ret::JuMPReturnsEstim
     for (keys, vals) in risk_frontier
         ub = model[keys[1]] = JuMP.@variable(model,
                                              set = JuMP.Parameter(zero(eltype(vals[2]))))
-        model[keys[2]] = JuMP.@constraint(model, sc * (vals[1] - ub * k) <= 0)
+        d = ifelse(vals[3], 1, -1)
+        model[keys[2]] = JuMP.@constraint(model, d * sc * (vals[1] - ub * k) <= 0)
     end
     itrs = [(Iterators.repeated(rkf[1][1], length(rkf[2][2])), rkf[2][2])
             for rkf in risk_frontier]
@@ -568,7 +597,8 @@ function solve_mean_risk!(model::JuMP.Model, mr::MeanRisk, ret::JuMPReturnsEstim
     for (keys, vals) in risk_frontier
         ub = model[keys[1]] = JuMP.@variable(model,
                                              set = JuMP.Parameter(zero(eltype(vals[2]))))
-        model[keys[2]] = JuMP.@constraint(model, sc * (vals[1] - ub * k) <= 0)
+        d = ifelse(vals[3], 1, -1)
+        model[keys[2]] = JuMP.@constraint(model, d * sc * (vals[1] - ub * k) <= 0)
     end
     itrs = [(Iterators.repeated(rkf[1][1], length(rkf[2][2])), rkf[2][2])
             for rkf in risk_frontier]

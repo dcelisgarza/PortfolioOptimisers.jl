@@ -35,13 +35,21 @@ Keywords correspond to the struct's fields.
   - [`DependentVariableTracking`](@ref)
 """
 @concrete struct RiskTrackingError <: AbstractTracking
-    "$(field_dict[:tr_spec])"
+    """
+    $(field_dict[:tr_spec])
+    """
     tr
-    "$(field_dict[:r_risk])"
+    """
+    $(field_dict[:r_risk])
+    """
     r
-    "$(field_dict[:err])"
+    """
+    $(field_dict[:err])
+    """
     err
-    "$(field_dict[:tralg])"
+    """
+    $(field_dict[:tralg])
+    """
     alg
     function RiskTrackingError(tr::WeightsTracking, r::AbstractBaseRiskMeasure, err::Number,
                                alg::VariableTracking)
@@ -212,11 +220,17 @@ TrackingRiskMeasure
   - [`NormTracking`](@ref)
 """
 @concrete struct TrackingRiskMeasure <: RiskMeasure
-    "$(field_dict[:settings_rm])"
+    """
+    $(field_dict[:settings_rm])
+    """
     settings
-    "$(field_dict[:tr_spec])"
+    """
+    $(field_dict[:tr_spec])
+    """
     tr
-    "$(field_dict[:tralg])"
+    """
+    $(field_dict[:tralg])
+    """
     alg
     function TrackingRiskMeasure(settings::RiskMeasureSettings,
                                  tr::AbstractTrackingAlgorithm, alg::NormTracking)
@@ -405,13 +419,21 @@ RiskTrackingRiskMeasure
   - [`DependentVariableTracking`](@ref)
 """
 @concrete struct RiskTrackingRiskMeasure <: RiskMeasure
-    "$(field_dict[:settings_rm])"
+    """
+    $(field_dict[:settings_rm])
+    """
     settings
-    "$(field_dict[:tr_spec])"
+    """
+    $(field_dict[:tr_spec])
+    """
     tr
-    "$(field_dict[:r_risk])"
+    """
+    $(field_dict[:r_risk])
+    """
     r
-    "$(field_dict[:tralg])"
+    """
+    $(field_dict[:tralg])
+    """
     alg
     function RiskTrackingRiskMeasure(settings::RiskMeasureSettings, tr::WeightsTracking,
                                      r::AbstractBaseRiskMeasure, alg::VariableTracking)

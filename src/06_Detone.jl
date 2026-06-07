@@ -109,9 +109,13 @@ Detone
   - [mlp1](@cite) M. M. De Prado. *Machine learning for asset managers* (Cambridge University Press, 2020). Chapter 2.
 """
 @concrete struct Detone <: AbstractDetoneEstimator
-    "$(field_dict[:opdm])"
+    """
+    $(field_dict[:opdm])
+    """
     pdm
-    "Number of leading principal components to remove."
+    """
+    Number of leading principal components to remove.
+    """
     n
     function Detone(pdm::Option{<:Posdef}, n::Integer)
         @argcheck(zero(n) < n, DomainError)

@@ -79,9 +79,13 @@ MeanReturn
   - [`MeanReturnRiskRatio`](@ref)
 """
 @concrete struct MeanReturn <: NonOptimisationRiskMeasure
-    "$(field_dict[:w_rm])"
+    """
+    $(field_dict[:w_rm])
+    """
     w
-    "$(field_dict[:flag])"
+    """
+    If true use log returns; else use arithmetic returns.
+    """
     flag
     function MeanReturn(w::Option{<:ObsWeights}, flag::Bool)
         assert_nonempty_nonneg_finite_val(w, :w)
@@ -172,11 +176,17 @@ Keywords correspond to the struct's fields.
   - [`AbstractBaseRiskMeasure`](@ref)
 """
 @concrete struct MeanReturnRiskRatio <: NonOptimisationRiskMeasure
-    "$(field_dict[:rt_mean])"
+    """
+    $(field_dict[:rt_mean])
+    """
     rt
-    "$(field_dict[:rk])"
+    """
+    $(field_dict[:rk])
+    """
     rk
-    "$(field_dict[:rf])"
+    """
+    $(field_dict[:rf])
+    """
     rf
     function MeanReturnRiskRatio(rt::MeanReturn, rk::AbstractBaseRiskMeasure, rf::Number)
         return new{typeof(rt), typeof(rk), typeof(rf)}(rt, rk, rf)
@@ -304,9 +314,13 @@ ThirdCentralMoment
   - [`Skewness`](@ref)
 """
 @concrete struct ThirdCentralMoment <: NonOptimisationRiskMeasure
-    "$(field_dict[:w_rm])"
+    """
+    $(field_dict[:w_rm])
+    """
     w
-    "$(field_dict[:mu_rm])"
+    """
+    $(field_dict[:mu_rm])
+    """
     mu
     function ThirdCentralMoment(w::Option{<:ObsWeights}, mu::Option{<:Num_VecNum_VecScalar})
         assert_nonempty_nonneg_finite_val(w, :w)
@@ -321,105 +335,7 @@ function ThirdCentralMoment(; w::Option{<:ObsWeights} = nothing,
     return ThirdCentralMoment(w, mu)
 end
 """
-$(DocStringExtensions.TYPEDEF)
-
-Represents the standardised Skewness risk measure.
-
-`Skewness` computes the third standardised central moment (skewness) of portfolio returns. Negative skewness indicates a return distribution with a heavier left tail.
-
-# Mathematical definition
-
-Let ``\\mu`` be the specified centre, ``\\delta_t = x_t - \\mu``, and ``\\sigma`` the standard deviation of returns. The skewness is:
-
-```math
-\\begin{align}
-\\mathrm{Skew}(\\boldsymbol{x}) &= \\frac{1}{T \\sigma^3} \\sum_{t=1}^{T} \\delta_t^3\\,.
-\\end{align}
-```
-
-Where:
-
-  - ``\\mathrm{Skew}(\\boldsymbol{x})``: Standardised skewness of portfolio returns.
-  - $(math_dict[:xret])
-  - $(math_dict[:T])
-  - ``\\mu``: Specified centre of the distribution.
-  - ``\\delta_t = x_t - \\mu``: Centred deviation at period ``t``.
-  - ``\\sigma``: Standard deviation of returns.
-
-# Fields
-
-$(DocStringExtensions.FIELDS)
-
-# Constructors
-
-    Skewness(;
-        ve::AbstractVarianceEstimator = SimpleVariance(),
-        w::Option{<:ObsWeights} = nothing,
-        mu::Option{<:Num_VecNum_VecScalar} = nothing
-    ) -> Skewness
-
-Keywords correspond to the struct's fields.
-
-## Validation
-
-  - If `mu` is a `VecNum`: `!isempty(mu)`.
-  - If `w` is not `nothing`: `!isempty(w)`.
-
-# Functor
-
-    (r::Skewness)(w::VecNum, X::MatNum, fees = nothing)
-
-Computes the skewness of the portfolio returns.
-
-## Arguments
-
-  - `w::VecNum`: Portfolio weights vector.
-  - `X::MatNum`: Asset returns matrix (``T \\times N``).
-  - `fees`: Optional fee structure.
-
-# Examples
-
-```jldoctest
-julia> Skewness()
-Skewness
-  ve ┼ SimpleVariance
-     │          me ┼ SimpleExpectedReturns
-     │             │   w ┴ nothing
-     │           w ┼ nothing
-     │   corrected ┴ Bool: true
-   w ┼ nothing
-  mu ┴ nothing
-```
-
-# Related
-
-  - [`NonOptimisationRiskMeasure`](@ref)
-  - [`ThirdCentralMoment`](@ref)
-  - [`AbstractVarianceEstimator`](@ref)
-"""
-@concrete struct Skewness <: NonOptimisationRiskMeasure
-    "$(field_dict[:ve])"
-    ve
-    "$(field_dict[:w_rm])"
-    w
-    "$(field_dict[:mu_rm])"
-    mu
-    function Skewness(ve::AbstractVarianceEstimator, w::Option{<:ObsWeights},
-                      mu::Option{<:Num_VecNum_VecScalar})
-        assert_nonempty_nonneg_finite_val(w, :w)
-        if isa(mu, VecNum)
-            @argcheck(!isempty(mu))
-        end
-        return new{typeof(ve), typeof(w), typeof(mu)}(ve, w, mu)
-    end
-end
-function Skewness(; ve::AbstractVarianceEstimator = SimpleVariance(),
-                  w::Option{<:ObsWeights} = nothing,
-                  mu::Option{<:Num_VecNum_VecScalar} = nothing)::Skewness
-    return Skewness(ve, w, mu)
-end
-"""
-    const TCM_Sk{T1, T2} = Union{...}
+    const TCM_Sk{T1, T2} = Union{<:ThirdCentralMoment{T1, T2}, <:Skewness{<:Any, <:Any, T1, T2}}
 
 Parameterised union of [`ThirdCentralMoment`](@ref) and [`Skewness`](@ref) sharing the same observation-weight (`T1`) and target-mean (`T2`) type parameters.
 
@@ -431,7 +347,8 @@ Used for unified dispatch on moment-target calculation methods.
   - [`Skewness`](@ref)
   - [`calc_moment_target`](@ref)
 """
-const TCM_Sk{T1, T2} = Union{<:ThirdCentralMoment{T1, T2}, <:Skewness{<:Any, T1, T2}}
+const TCM_Sk{T1, T2} = Union{<:ThirdCentralMoment{T1, T2},
+                             <:Skewness{<:Any, <:Any, <:Any, T1, T2}}
 """
     calc_moment_target(::TCM_Sk{Nothing, Nothing}, ::Any, x::VecNum)
     calc_moment_target(r::TCM_Sk{<:StatsBase.AbstractWeights, Nothing}, ::Any, x::VecNum)
@@ -535,51 +452,5 @@ function (r::ThirdCentralMoment{<:DynamicAbstractWeights})(w::VecNum, X::MatNum,
                                                            fees::Option{<:Fees} = nothing)
     return ThirdCentralMoment(; w = get_observation_weights(r.w, X), mu = r.mu)(w, X, fees)
 end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
 
-Create an instance of [`Skewness`](@ref) by selecting observation weights and expected returns from the risk-measure instance or falling back to the prior result.
-
-# Related
-
-  - [`Skewness`](@ref)
-  - [`AbstractPriorResult`](@ref)
-  - [`factory`](@ref)
-  - [`nothing_scalar_array_selector`](@ref)
-"""
-function factory(r::Skewness, pr::AbstractPriorResult, args...; kwargs...)
-    w = nothing_scalar_array_selector(r.w, pr.w)
-    mu = nothing_scalar_array_selector(r.mu, pr.mu)
-    return Skewness(; ve = factory(r.ve, w), w = w, mu = mu)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Return a view of [`Skewness`](@ref) `r` sliced to asset indices `i`.
-
-Slices the expected returns `mu` for cluster-based optimisation.
-
-# Related
-
-  - [`Skewness`](@ref)
-  - [`risk_measure_view`](@ref)
-  - [`nothing_scalar_array_view`](@ref)
-"""
-function risk_measure_view(r::Skewness, i, args...)
-    mu = nothing_scalar_array_view(r.mu, i)
-    return Skewness(; ve = r.ve, w = r.w, mu = mu)
-end
-function (r::Skewness{<:Any, <:Option{<:StatsBase.AbstractWeights}})(w::VecNum, X::MatNum,
-                                                                     fees::Option{<:Fees} = nothing)
-    val = calc_deviations_vec(r, w, X, fees)
-    sigma = Statistics.std(r.ve, val; mean = zero(eltype(val)))
-    val .= val .^ 3
-    res = isnothing(r.w) ? Statistics.mean(val) : Statistics.mean(val, r.w)
-    return res / sigma^3
-end
-function (r::Skewness{<:Any, <:DynamicAbstractWeights})(w::VecNum, X::MatNum,
-                                                        fees::Option{<:Fees} = nothing)
-    return Skewness(; ve = r.ve, w = get_observation_weights(r.w, X), mu = r.mu)(w, X, fees)
-end
-
-export MeanReturn, ThirdCentralMoment, Skewness, MeanReturnRiskRatio
+export MeanReturn, ThirdCentralMoment, MeanReturnRiskRatio

@@ -19,7 +19,6 @@ SchurComplementHierarchicalRiskParityResult
 factory(res::SchurComplementHierarchicalRiskParityResult, fb::Option{<:OptE_Opt})
 SchurComplementHierarchicalRiskParity
 needs_previous_weights(opt::SchurComplementHierarchicalRiskParity)
-factory(sh::SchurComplementHierarchicalRiskParity, w::AbstractVector)
 opt_view(sh::SchurComplementHierarchicalRiskParity, i, X::MatNum)
 optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:Any, Nothing},
                   rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)

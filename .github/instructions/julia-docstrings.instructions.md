@@ -174,6 +174,83 @@ function MyType(; field1::Type1 = default1, field2::Type2 = default2)
 end
 ````
 
+### `@propagatable` concrete struct types
+
+When a struct is decorated with `@propagatable`, some fields carry an `@prop` tag inside the struct body. These fields are automatically propagated when [`factory`](@ref) is called on the enclosing struct (see `_factory_child` for dispatch rules). Add a `## Propagated parameters` subsection inside `# Constructors`, placed **after** `## Validation` (or directly after "Keywords correspond to the struct's fields." when there is no `## Validation`), listing each `@prop`-tagged field and how it is propagated:
+
+- **Observation-weight fields** (type `ObsWeights`, `Nothing`, or `Option{<:ObsWeights}`): write `` `fieldname`: Replaced with the incoming [`ObsWeights`](@ref). ``
+- **Estimator, algorithm, or result fields** (subtypes of `AbstractEstimator`, `AbstractAlgorithm`, or `AbstractResult`): write `` `fieldname`: Recursively updated via [`factory`](@ref). ``
+
+List fields in the same order they appear in the struct body.
+
+````julia
+"""
+$(DocStringExtensions.TYPEDEF)
+
+One-sentence description of what this type does.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    MyType(;
+        weight_field::Option{<:ObsWeights} = nothing,
+        nested_est::AbstractEstimator = MyEstimator(),
+        config::Bool = true
+    ) -> MyType
+
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - $(val_dict[:oow])
+
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@prop`-tagged fields are automatically propagated:
+
+  - `nested_est`: Recursively updated via [`factory`](@ref).
+  - `weight_field`: Replaced with the incoming [`ObsWeights`](@ref).
+
+# Examples
+
+```jldoctest
+julia> MyType()
+MyType
+  nested_est ┼ MyEstimator
+  weight_field ┴ nothing
+```
+
+# Related
+
+  - [`AbstractMyType`](@ref)
+  - [`factory`](@ref)
+"""
+@propagatable @concrete struct MyType <: AbstractMyType
+    "$(field_dict[:oow])"
+    @prop weight_field
+    "$(field_dict[:nested])"
+    @prop nested_est
+    "$(field_dict[:cfg])"
+    config
+    function MyType(weight_field::Option{<:ObsWeights}, nested_est::AbstractEstimator,
+                    config::Bool)
+        assert_nonempty_nonneg_finite_val(weight_field, :weight_field)
+        return new{typeof(weight_field), typeof(nested_est), typeof(config)}(weight_field,
+                                                                             nested_est,
+                                                                             config)
+    end
+end
+function MyType(;
+                weight_field::Option{<:ObsWeights} = nothing,
+                nested_est::AbstractEstimator = MyEstimator(),
+                config::Bool = true)::MyType
+    return MyType(weight_field, nested_est, config)
+end
+````
+
 ---
 
 ## Section Structure for Functions

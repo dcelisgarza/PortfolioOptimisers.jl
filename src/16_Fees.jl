@@ -71,25 +71,45 @@ FeesEstimator
   - [`fees_constraints`](@ref)
 """
 @concrete struct FeesEstimator <: AbstractEstimator
-    "$(field_dict[:tn_fees])"
+    """
+    $(field_dict[:tn_fees])
+    """
     tn
-    "$(field_dict[:l_fees])"
+    """
+    $(field_dict[:l_fees])
+    """
     l
-    "$(field_dict[:s_fees])"
+    """
+    $(field_dict[:s_fees])
+    """
     s
-    "$(field_dict[:fl])"
+    """
+    $(field_dict[:fl])
+    """
     fl
-    "$(field_dict[:fs])"
+    """
+    $(field_dict[:fs])
+    """
     fs
-    "$(field_dict[:dl])"
+    """
+    $(field_dict[:dl])
+    """
     dl
-    "$(field_dict[:ds])"
+    """
+    $(field_dict[:ds])
+    """
     ds
-    "$(field_dict[:dfl])"
+    """
+    $(field_dict[:dfl])
+    """
     dfl
-    "$(field_dict[:dfs])"
+    """
+    $(field_dict[:dfs])
+    """
     dfs
-    "$(field_dict[:kwargs_fee])"
+    """
+    $(field_dict[:kwargs_fee])
+    """
     kwargs
     function FeesEstimator(tn::Option{<:TnE_Tn}, l::Option{<:EstValType},
                            s::Option{<:EstValType}, fl::Option{<:EstValType},
@@ -305,6 +325,12 @@ $(DocStringExtensions.FIELDS)
 
   - `l`, `s`, `fl`, `fs` are validated with [`assert_nonempty_nonneg_finite_val`](@ref).
 
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@prop`-tagged fields are automatically propagated:
+
+  - `tn`: Recursively updated via [`factory`](@ref).
+
 # Examples
 
 ```jldoctest
@@ -339,19 +365,32 @@ Fees
   - [`calc_fees`](@ref)
   - [`calc_asset_fees`](@ref)
   - [`calc_net_returns`](@ref)
+  - [`factory`](@ref)
 """
-@concrete struct Fees <: AbstractResult
-    "$(field_dict[:tnr])"
-    tn
-    "$(field_dict[:l_fees])"
+@propagatable @concrete struct Fees <: AbstractResult
+    """
+    $(field_dict[:tnr])
+    """
+    @prop tn
+    """
+    $(field_dict[:l_fees])
+    """
     l
-    "$(field_dict[:s_fees])"
+    """
+    $(field_dict[:s_fees])
+    """
     s
-    "$(field_dict[:fl])"
+    """
+    $(field_dict[:fl])
+    """
     fl
-    "$(field_dict[:fs])"
+    """
+    $(field_dict[:fs])
+    """
     fs
-    "$(field_dict[:kwargs_fee])"
+    """
+    $(field_dict[:kwargs_fee])
+    """
     kwargs
     function Fees(tn::Option{<:Turnover}, l::Option{<:Num_VecNum}, s::Option{<:Num_VecNum},
                   fl::Option{<:Num_VecNum}, fs::Option{<:Num_VecNum},
@@ -364,6 +403,12 @@ Fees
                    typeof(kwargs)}(tn, l, s, fl, fs, kwargs)
     end
 end
+#= Old factory function:
+function factory(fees::Fees, w::VecNum)::Fees
+    return Fees(; tn = factory(fees.tn, w), l = fees.l, s = fees.s, fl = fees.fl,
+                fs = fees.fs, kwargs = fees.kwargs)
+end
+=#
 function Fees(; tn::Option{<:Turnover} = nothing, l::Option{<:Num_VecNum} = nothing,
               s::Option{<:Num_VecNum} = nothing, fl::Option{<:Num_VecNum} = nothing,
               fs::Option{<:Num_VecNum} = nothing,
@@ -645,75 +690,6 @@ function fees_view(fees::Fees, i)::Fees
     fl = nothing_scalar_array_view(fees.fl, i)
     fs = nothing_scalar_array_view(fees.fs, i)
     return Fees(; tn = tn, l = l, s = s, fl = fl, fs = fs, kwargs = fees.kwargs)
-end
-"""
-    factory(fees::Fees, w::VecNum)
-
-Create a new `Fees` constraint with updated portfolio weights.
-
-`factory` constructs a new [`Fees`](@ref) object using the provided portfolio weights `w` and the fee values from an existing `Fees` constraint `fees`. The turnover constraint is updated using `factory(fees.tn, w)`, while all other fee fields and keyword arguments are preserved.
-
-# Arguments
-
-  - `fees`: Existing `Fees` constraint object.
-  - `w`: New weights to assign to the constraint.
-
-# Returns
-
-  - `fe::Fees`: New constraint object with updated weights in the turnover field and original fee values.
-
-# Details
-
-  - Updates only the weights field in the turnover constraint via `factory(fees.tn, w)`.
-  - Propagates all other fields unchanged
-
-# Examples
-
-```jldoctest
-julia> fees = Fees(; tn = Turnover(; w = [0.2, 0.3, 0.5], val = [0.1, 0.0, 0.0]),
-                   l = [0.001, 0.002, 0.0], s = [0.001, 0.002, 0.0], fl = [5.0, 0.0, 0.0],
-                   fs = [0.0, 10.0, 0.0]);
-
-julia> factory(fees, [0.4, 0.4, 0.2])
-Fees
-      tn ┼ Turnover
-         │       w ┼ Vector{Float64}: [0.4, 0.4, 0.2]
-         │     val ┼ Vector{Float64}: [0.1, 0.0, 0.0]
-         │   fixed ┴ Bool: false
-       l ┼ Vector{Float64}: [0.001, 0.002, 0.0]
-       s ┼ Vector{Float64}: [0.001, 0.002, 0.0]
-      fl ┼ Vector{Float64}: [5.0, 0.0, 0.0]
-      fs ┼ Vector{Float64}: [0.0, 10.0, 0.0]
-  kwargs ┴ @NamedTuple{atol::Float64}: (atol = 1.0e-8,)
-
-julia> fees = Fees(; tn = Turnover(; w = [0.2, 0.3, 0.5], val = [0.1, 0.0, 0.0], fixed = true),
-                   l = [0.001, 0.002, 0.0], s = [0.001, 0.002, 0.0], fl = [5.0, 0.0, 0.0],
-                   fs = [0.0, 10.0, 0.0]);
-
-julia> factory(fees, [0.4, 0.4, 0.4])
-Fees
-      tn ┼ Turnover
-         │       w ┼ Vector{Float64}: [0.2, 0.3, 0.5]
-         │     val ┼ Vector{Float64}: [0.1, 0.0, 0.0]
-         │   fixed ┴ Bool: true
-       l ┼ Vector{Float64}: [0.001, 0.002, 0.0]
-       s ┼ Vector{Float64}: [0.001, 0.002, 0.0]
-      fl ┼ Vector{Float64}: [5.0, 0.0, 0.0]
-      fs ┼ Vector{Float64}: [0.0, 10.0, 0.0]
-  kwargs ┴ @NamedTuple{atol::Float64}: (atol = 1.0e-8,)
-```
-
-# Related
-
-  - [`Fees`](@ref)
-  - [`Turnover`](@ref)
-  - [`VecNum`](@ref)
-  - [`factory(tn::Turnover, w::VecNum)`](@ref)
-  - [`fees_constraints`](@ref)
-"""
-function factory(fees::Fees, w::VecNum)::Fees
-    return Fees(; tn = factory(fees.tn, w), l = fees.l, s = fees.s, fl = fees.fl,
-                fs = fees.fs, kwargs = fees.kwargs)
 end
 """
     calc_fees(w::VecNum, p::VecNum, ::Nothing, ::Function)

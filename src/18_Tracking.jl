@@ -203,7 +203,9 @@ L2Tracking
   - [`norm_tracking`](@ref)
 """
 @concrete struct L2Tracking <: NormTracking
-    "$(field_dict[:ddof])"
+    """
+    $(field_dict[:ddof])
+    """
     ddof
     function L2Tracking(ddof::Integer)::L2Tracking
         assert_nonempty_nonneg_finite_val(ddof, :ddof)
@@ -266,7 +268,9 @@ SquaredL2Tracking
   - [`norm_tracking`](@ref)
 """
 @concrete struct SquaredL2Tracking <: NormTracking
-    "$(field_dict[:ddof])"
+    """
+    $(field_dict[:ddof])
+    """
     ddof
     function SquaredL2Tracking(ddof::Integer)::SquaredL2Tracking
         assert_nonempty_nonneg_finite_val(ddof, :ddof)
@@ -372,9 +376,13 @@ LpTracking
   - [`LInfTracking`](@ref)
 """
 @concrete struct LpTracking <: NormTracking
-    "$(field_dict[:p_rm])"
+    """
+    $(field_dict[:p_rm])
+    """
     p
-    "$(field_dict[:ddof])"
+    """
+    $(field_dict[:ddof])
+    """
     ddof
     function LpTracking(p::Number, ddof::Integer)::LpTracking
         assert_nonempty_nonneg_finite_val(ddof, :ddof)
@@ -438,9 +446,13 @@ LInfTracking
   - [`L2Tracking`](@ref)
 """
 @concrete struct LInfTracking <: NormTracking
-    "$(field_dict[:ddof])"
+    """
+    $(field_dict[:ddof])
+    """
     ddof
-    "$(field_dict[:pos])"
+    """
+    $(field_dict[:pos])
+    """
     pos
     function LInfTracking(ddof::Integer, pos::Bool)::LInfTracking
         assert_nonempty_nonneg_finite_val(ddof, :ddof)
@@ -672,11 +684,17 @@ WeightsTracking
   - [`tracking_benchmark`](@ref)
 """
 @concrete struct WeightsTracking <: AbstractTrackingAlgorithm
-    "$(field_dict[:fees])"
+    """
+    $(field_dict[:fees])
+    """
     fees
-    "$(field_dict[:w_tn])"
+    """
+    $(field_dict[:w_tn])
+    """
     w
-    "$(field_dict[:fixed])"
+    """
+    $(field_dict[:fixed])
+    """
     fixed
     function WeightsTracking(fees::Option{<:Fees}, w::VecNum, fixed::Bool)::WeightsTracking
         assert_nonempty_finite_val(w, :w)
@@ -910,7 +928,9 @@ ReturnsTracking
   - [`tracking_benchmark`](@ref)
 """
 @concrete struct ReturnsTracking <: AbstractTrackingAlgorithm
-    "$(field_dict[:w_bm_ret])"
+    """
+    $(field_dict[:w_bm_ret])
+    """
     w
     function ReturnsTracking(w::VecNum)
         assert_nonempty_finite_val(w, :w)
@@ -997,45 +1017,6 @@ function tracking_benchmark(tr::ReturnsTracking, args...)
     return tr.w
 end
 """
-    factory(tr::ReturnsTracking, ::Any)
-
-Return the input `ReturnsTracking` object unchanged.
-
-This function provides a consistent interface for updating or copying returns-based tracking algorithms. It is used for composability in portfolio analytics workflows where the tracking object does not require modification.
-
-# Arguments
-
-  - `tr`: A [`ReturnsTracking`](@ref) object containing benchmark portfolio returns.
-  - `::Any`: Index or argument (ignored).
-
-# Returns
-
-  - `tr::ReturnsTracking`: The input tracking algorithm object.
-
-# Details
-
-  - Returns the input object unchanged.
-  - Ensures interface consistency for factory operations.
-
-# Examples
-
-```jldoctest
-julia> tr = ReturnsTracking(; w = [0.01, 0.02, 0.03]);
-
-julia> PortfolioOptimisers.factory(tr, [0.1, 0.4, 0.5])
-ReturnsTracking
-  w ┴ Vector{Float64}: [0.01, 0.02, 0.03]
-```
-
-# Related
-
-  - [`ReturnsTracking`](@ref)
-  - [`factory`](@ref)
-"""
-function factory(tr::ReturnsTracking, ::Any)
-    return tr
-end
-"""
 $(DocStringExtensions.TYPEDEF)
 
 Tracking error result type.
@@ -1057,6 +1038,12 @@ $(DocStringExtensions.FIELDS)
 ## Validation
 
   - `isfinite(err)` and `err >= 0`.
+
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@prop`-tagged fields are automatically propagated:
+
+  - `tr`: Recursively updated via [`factory`](@ref).
 
 # Examples
 
@@ -1083,19 +1070,31 @@ TrackingError
   - [`NormTracking`](@ref)
   - [`L2Tracking`](@ref)
   - [`L1Tracking`](@ref)
+  - [`factory`](@ref)
 """
-@concrete struct TrackingError <: AbstractTracking
-    "$(field_dict[:tr])"
-    tr
-    "$(field_dict[:err])"
+@propagatable @concrete struct TrackingError <: AbstractTracking
+    """
+    $(field_dict[:tr])
+    """
+    @prop tr
+    """
+    $(field_dict[:err])
+    """
     err
-    "$(field_dict[:tralg])"
+    """
+    $(field_dict[:tralg])
+    """
     alg
     function TrackingError(tr::AbstractTrackingAlgorithm, err::Number, alg::NormTracking)
         assert_nonempty_nonneg_finite_val(err, :err)
         return new{typeof(tr), typeof(err), typeof(alg)}(tr, err, alg)
     end
 end
+#= Old factory function:
+function factory(tr::TrackingError, w::VecNum)
+    return TrackingError(; tr = factory(tr.tr, w), err = tr.err, alg = tr.alg)
+end
+=#
 function TrackingError(; tr::AbstractTrackingAlgorithm, err::Number = 0.0,
                        alg::NormTracking = L2Tracking())
     return TrackingError(tr, err, alg)
@@ -1207,64 +1206,6 @@ julia> PortfolioOptimisers.tracking_view([tr], 1:2)
 """
 function tracking_view(tr::VecTr, args...)
     return [tracking_view(t, args...) for t in tr]
-end
-"""
-    factory(tr::TrackingError, w::VecNum)
-
-Construct a new `TrackingError` object with updated tracking algorithm weights.
-
-This function creates a new [`TrackingError`](@ref) instance by updating the underlying tracking algorithm using the provided weights `w`. The error value and formulation algorithm are preserved.
-
-# Arguments
-
-  - `tr`: A [`TrackingError`](@ref) object containing a tracking algorithm, error value, and formulation algorithm.
-  - `w`: Portfolio weights (vector of real numbers) to update the underlying tracking algorithm.
-
-# Returns
-
-  - `tre::TrackingError`: New tracking error result object with the underlying tracking algorithm updated using `w`.
-
-# Details
-
-  - Uses `factory(tr.tr, w)` to update the underlying tracking algorithm.
-  - Preserves the `err` and `alg` fields.
-  - Returns a new `TrackingError` object with the updated tracking algorithm.
-
-# Examples
-
-```jldoctest
-julia> tr = WeightsTracking(; w = [0.5, 0.5]);
-
-julia> err = TrackingError(; tr = tr, err = 0.01)
-TrackingError
-   tr ┼ WeightsTracking
-      │    fees ┼ nothing
-      │       w ┼ Vector{Float64}: [0.5, 0.5]
-      │   fixed ┴ Bool: false
-  err ┼ Float64: 0.01
-  alg ┼ L2Tracking
-      │   ddof ┴ Int64: 1
-
-julia> factory(err, [0.6, 0.4])
-TrackingError
-   tr ┼ WeightsTracking
-      │    fees ┼ nothing
-      │       w ┼ Vector{Float64}: [0.6, 0.4]
-      │   fixed ┴ Bool: false
-  err ┼ Float64: 0.01
-  alg ┼ L2Tracking
-      │   ddof ┴ Int64: 1
-```
-
-# Related
-
-  - [`TrackingError`](@ref)
-  - [`factory`](@ref)
-  - [`WeightsTracking`](@ref)
-  - [`ReturnsTracking`](@ref)
-"""
-function factory(tr::TrackingError, w::VecNum)
-    return TrackingError(; tr = factory(tr.tr, w), err = tr.err, alg = tr.alg)
 end
 function needs_previous_weights(tr::TrackingError)
     return needs_previous_weights(tr.tr)

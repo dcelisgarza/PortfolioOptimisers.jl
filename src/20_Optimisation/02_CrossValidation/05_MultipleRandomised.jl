@@ -109,19 +109,33 @@ $(DocStringExtensions.FIELDS)
   - [`DateWalkForward`](@ref)
 """
 @concrete struct MultipleRandomised <: NonOptimisationSequentialCrossValidationEstimator
-    "$(field_dict[:cv])"
+    """
+    $(field_dict[:cv])
+    """
     cv
-    "$(field_dict[:subset_size])"
+    """
+    $(field_dict[:subset_size])
+    """
     subset_size
-    "$(field_dict[:n_subsets])"
+    """
+    $(field_dict[:n_subsets])
+    """
     n_subsets
-    "$(field_dict[:max_comb])"
+    """
+    $(field_dict[:max_comb])
+    """
     max_comb
-    "$(field_dict[:window_size])"
+    """
+    $(field_dict[:window_size])
+    """
     window_size
-    "$(field_dict[:rng])"
+    """
+    $(field_dict[:rng])
+    """
     rng
-    "$(field_dict[:seed])"
+    """
+    $(field_dict[:seed])
+    """
     seed
     function MultipleRandomised(cv::WalkForwardEstimator, subset_size::SubsetSizeE,
                                 n_subsets::NumberSubsetsE, max_comb::Integer,
@@ -190,13 +204,21 @@ Keywords correspond to the struct's fields.
   - [`MultipleRandomised`](@ref)
 """
 @concrete struct MultipleRandomisedResult <: NonOptimisationSequentialCrossValidationResult
-    "$(field_dict[:train_idx])"
+    """
+    $(field_dict[:train_idx])
+    """
     train_idx
-    "$(field_dict[:test_idx])"
+    """
+    $(field_dict[:test_idx])
+    """
     test_idx
-    "$(field_dict[:asset_idx])"
+    """
+    $(field_dict[:asset_idx])
+    """
     asset_idx
-    "$(field_dict[:path_ids])"
+    """
+    $(field_dict[:path_ids])
+    """
     path_ids
     function MultipleRandomisedResult(train_idx::VecVecInt, test_idx::VecVecInt,
                                       asset_idx::VecVecInt, path_ids::VecInt)

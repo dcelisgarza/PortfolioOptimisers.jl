@@ -402,15 +402,25 @@ DenoiseDetoneAlgMatrixProcessing
   - [mpdist](@cite) V. A. Marčenko and L. A. Pastur. *Distribution of eigenvalues for some sets of random matrices*. Mathematics of the USSR-Sbornik 1, 457 (1967).
 """
 @concrete struct DenoiseDetoneAlgMatrixProcessing <: AbstractMatrixProcessingEstimator
-    "$(field_dict[:opdm])"
+    """
+    $(field_dict[:opdm])
+    """
     pdm
-    "$(field_dict[:odn])"
+    """
+    $(field_dict[:odn])
+    """
     dn
-    "$(field_dict[:odt])"
+    """
+    $(field_dict[:odt])
+    """
     dt
-    "Optional custom matrix processing algorithm."
+    """
+    Optional custom matrix processing algorithm.
+    """
     alg
-    "Specifies the order in which denoising, detoning, and custom algorithm steps are applied."
+    """
+    Specifies the order in which denoising, detoning, and custom algorithm steps are applied.
+    """
     order
     function DenoiseDetoneAlgMatrixProcessing(pdm::Option{<:Posdef}, dn::Option{<:Denoise},
                                               dt::Option{<:Detone},

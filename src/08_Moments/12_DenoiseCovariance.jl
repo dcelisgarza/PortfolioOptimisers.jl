@@ -52,11 +52,17 @@ DenoiseCovariance
   - [`Posdef`](@ref)
 """
 @concrete struct DenoiseCovariance <: AbstractCovarianceEstimator
-    "$(field_dict[:ce])"
+    """
+    $(field_dict[:ce])
+    """
     ce
-    "$(field_dict[:dn])"
+    """
+    $(field_dict[:dn])
+    """
     dn
-    "$(field_dict[:pdm])"
+    """
+    $(field_dict[:pdm])
+    """
     pdm
     function DenoiseCovariance(ce::StatsBase.CovarianceEstimator, dn::Denoise,
                                pdm::Option{<:Posdef})

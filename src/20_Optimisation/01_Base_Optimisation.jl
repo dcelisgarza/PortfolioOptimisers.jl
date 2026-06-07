@@ -503,7 +503,9 @@ IterativeWeightFinaliser
   - [`JuMPWeightFinaliser`](@ref)
 """
 @concrete struct IterativeWeightFinaliser <: WeightFinaliser
-    "$(field_dict[:iter])"
+    """
+    $(field_dict[:iter])
+    """
     iter
     function IterativeWeightFinaliser(iter::Integer)
         @argcheck(iter > 0)
@@ -563,13 +565,21 @@ JuMPWeightFinaliser
   - [`JuMPWeightFinaliserFormulation`](@ref)
 """
 @concrete struct JuMPWeightFinaliser <: WeightFinaliser
-    "$(field_dict[:slv])"
+    """
+    $(field_dict[:slv])
+    """
     slv
-    "$(field_dict[:sc])"
+    """
+    $(field_dict[:sc])
+    """
     sc
-    "$(field_dict[:so])"
+    """
+    $(field_dict[:so])
+    """
     so
-    "$(field_dict[:wfalg])"
+    """
+    $(field_dict[:wfalg])
+    """
     alg
     function JuMPWeightFinaliser(slv::Slv_VecSlv, sc::Number, so::Number,
                                  alg::JuMPWeightFinaliserFormulation)
@@ -795,7 +805,9 @@ OptimisationSuccess
   - [`OptimisationFailure`](@ref)
 """
 @concrete struct OptimisationSuccess <: OptimisationReturnCode
-    "$(field_dict[:res_retcode])"
+    """
+    $(field_dict[:res_retcode])
+    """
     res
 end
 function OptimisationSuccess(; res = nothing)
@@ -830,7 +842,9 @@ OptimisationFailure
   - [`OptimisationSuccess`](@ref)
 """
 @concrete struct OptimisationFailure <: OptimisationReturnCode
-    "$(field_dict[:res_retcode])"
+    """
+    $(field_dict[:res_retcode])
+    """
     res
 end
 function OptimisationFailure(; res = nothing)
@@ -988,10 +1002,36 @@ function assert_external_optimiser(::NonFiniteAllocationOptimisationResult)::Not
     return nothing
 end
 """
-    calc_net_returns(res::NonFiniteAllocationOptimisationResult, X::MatNum, fees = nothing)
-    calc_net_returns(res::NonFiniteAllocationOptimisationResult, pr::Pr_RR, fees = nothing)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
-Compute net returns for a [`NonFiniteAllocationOptimisationResult`](@ref).
+Obtains the fees to use for net return calculations from an optimisation result. If `fees` is provided; if not, it looks for a `fees` property in the result. Returns the fees or `nothing` if not found.
+
+# Arguments
+
+  - `res`: Optimisation result, potentially containing a `fees` property.
+  - `fees`: Optional fees to use, which take precedence over `res.fees` if provided.
+
+# Returns
+
+  - `Option{<:Fees}`: The fees to use for net return calculations, or `nothing` if not found.
+
+# Related
+
+  - [`calc_net_returns`](@ref)
+  - [`OptimisationResult`](@ref)
+  - [`Fees`](@ref)
+"""
+function _extract_fees(res::OptimisationResult, fees::Option{<:Fees} = nothing)
+    if isnothing(fees) && hasproperty(res, :fees)
+        fees = res.fees
+    end
+    return fees
+end
+"""
+    calc_net_returns(res::OptimisationResult, X::MatNum, fees = nothing)
+    calc_net_returns(res::OptimisationResult, pr::Pr_RR, fees = nothing)
+
+Compute net returns for a [`OptimisationResult`](@ref).
 
 `fees` takes precedence over `res.fees` if both are provided. Delegates to [`calc_net_returns(w, X, fees)`](@ref).
 
@@ -1000,19 +1040,42 @@ When `pr::Pr_RR` is passed, extracts `X` from `pr.X` and delegates.
 # Related
 
   - [`calc_net_returns`](@ref)
-  - [`NonFiniteAllocationOptimisationResult`](@ref)
+  - [`OptimisationResult`](@ref)
   - [`Pr_RR`](@ref)
 """
-function calc_net_returns(res::NonFiniteAllocationOptimisationResult, X::MatNum,
+function calc_net_returns(res::OptimisationResult, X::MatNum,
                           fees::Option{<:Fees} = nothing)
-    if isnothing(fees) && hasproperty(res, :fees)
-        fees = res.fees
-    end
+    fees = _extract_fees(res, fees)
     return calc_net_returns(res.w, X, fees)
 end
-function calc_net_returns(res::NonFiniteAllocationOptimisationResult, pr::Pr_RR,
+function calc_net_returns(res::OptimisationResult, pr::Pr_RR,
                           fees::Option{<:Fees} = nothing)
     return calc_net_returns(res, pr.X, fees)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Extracts the prior result for risk calculation from an optimisation result. Checks for an explicitly provided `pr`, then looks for `res.pr` and `res.pa.pr` before throwing an error if none are found.
+
+# Arguments
+
+  - `res`: Optimisation result, potentially containing a prior result in `res.pr` or `res.pa.pr`.
+  - `pr`: Optional prior result to use for risk calculation, which takes precedence over any found in `res`.
+
+# Returns
+
+  - `Option{<:Pr_RR}`: The prior result to use for risk calculation, or throws an error if none is found.
+"""
+function _extract_pr(res::OptimisationResult, pr::Option{<:Pr_RR} = nothing)
+    return if !isnothing(pr)
+        pr
+    elseif hasproperty(res, :pr)
+        res.pr
+    elseif hasproperty(res, :pa) && hasproperty(res.pa, :pr)
+        res.pa.pr
+    else
+        throw(ArgumentError("`$(nameof(typeof(res)))` has no `.pr` or `.pa.pr`; provide `pr` explicitly"))
+    end
 end
 """
     expected_risk(r::AbstractBaseRiskMeasure, res::OptimisationResult, X::MatNum, fees = nothing; kwargs...)
@@ -1032,23 +1095,13 @@ When `pr::Pr_RR` is `nothing`, tries to extract a prior result from `res.pr` or 
 """
 function expected_risk(r::AbstractBaseRiskMeasure, res::OptimisationResult, X::MatNum,
                        fees::Option{<:Fees} = nothing; kwargs...)
-    if isnothing(fees) && hasproperty(res, :fees)
-        fees = res.fees
-    end
+    fees = _extract_fees(res, fees)
     return expected_risk(r, res.w, X, fees; kwargs...)
 end
 function expected_risk(r::AbstractBaseRiskMeasure, res::OptimisationResult,
                        pr::Option{<:Pr_RR} = nothing, fees::Option{<:Fees} = nothing;
                        kwargs...)
-    pr = if !isnothing(pr)
-        pr
-    elseif isnothing(pr) && hasproperty(res, :pr)
-        res.pr
-    elseif isnothing(pr) && hasproperty(res, :pa) && hasproperty(res.pa, :pr)
-        res.pa.pr
-    else
-        throw(ArgumentError("`res` is a $(Base.typename(typeof(res)).wrapper), which does not have a valid `res.pr` or `res.opt.pr` field, please provide `pr` or a data matrix as an argument"))
-    end
+    pr = _extract_pr(res, pr)
     return expected_risk(r, res, pr.X, fees; kwargs...)
 end
 """

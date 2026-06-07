@@ -101,17 +101,29 @@ NegativeSkewness
   - [`SOCRiskExpr`](@ref)
 """
 @concrete struct NegativeSkewness <: RiskMeasure
-    "$(field_dict[:settings_rm])"
+    """
+    $(field_dict[:settings_rm])
+    """
     settings
-    "$(field_dict[:mp])"
+    """
+    $(field_dict[:mp])
+    """
     mp
-    "$(field_dict[:sk])"
+    """
+    $(field_dict[:sk])
+    """
     sk
-    "$(field_dict[:V])"
+    """
+    $(field_dict[:V])
+    """
     V
-    "$(field_dict[:alg])"
+    """
+    $(field_dict[:alg])
+    """
     alg
-    "$(field_dict[:window])"
+    """
+    $(field_dict[:window])
+    """
     window
     function NegativeSkewness(settings::RiskMeasureSettings,
                               mp::AbstractMatrixProcessingEstimator, sk::Option{<:MatNum},
@@ -189,7 +201,7 @@ function risk_measure_view(r::NegativeSkewness{<:Any, <:Any, <:MatNum, <:MatNum}
                            X::MatNum)::NegativeSkewness
     sk = r.sk
     idx = fourth_moment_index_generator(size(sk, 1), i)
-    sk = view(r.sk, i, idx)
+    sk = nothing_scalar_array_view_odd_order(r.sk, i, idx)
     window = get_window(r.window, X)
     V = negative_spectral_coskewness(sk, view(X, window, i), r.mp)
     return NegativeSkewness(; settings = r.settings, alg = r.alg, mp = r.mp, sk = sk, V = V,

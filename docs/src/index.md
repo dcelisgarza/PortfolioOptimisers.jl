@@ -226,38 +226,26 @@ We can also visualise the portfolio using various plotting functions. For exampl
 plot_ptf_cumulative_returns(mip_res.w, rd.X; ts = rd.ts, compound = true)
 ```
 
-We can plot the histogram of portfolio returns.
-
-```@example 0_index
-# Plot histogram of returns.
-plot_histogram(mip_res.w, rd.X, slv)
-```
-
-We can plot the portfolio drawdowns, in this case compound drawdowns.
-
-```@example 0_index
-# Plot compounded drawdowns.
-plot_drawdowns(mip_res.w, rd.X, slv; ts = rd.ts, compound = true)
-```
-
-Furthermore, we can also plot the risk contribution per asset. For this, we must provide an instance of the risk measure we want to use with the appropriate statistics/parameters. We can do this by using the [`factory`](@ref) function (recommended when doing so programmatically), or manually set the quantities ourselves.
+We can also plot the risk contribution per asset. For this, we must provide an instance of the risk measure we want to use with the appropriate statistics/parameters. We can do this by using the [`factory`](@ref) function (recommended when doing so programmatically), or manually set the quantities ourselves.
 
 ```@example 0_index
 # Plot the risk contribution per asset.
-plot_risk_contribution(factory(Variance(), res.pr), mip_res.w, rd.X; nx = rd.nx,
-                       percentage = true)
+plot_risk_contribution(factory(Variance(), res.pr), mip_res.w, rd.X; nx = rd.nx)
 ```
 
 This awkwardness is due to the fact that `PortfolioOptimisers.jl` tries to decouple the risk measures from optimisation estimators and results. However, the advantage of this approach is that it lets us use multiple different risk measures as part of the risk expression, or as risk limits in optimisations. We explore this further in the [examples](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/00_Examples).
 
-We can also plot the returns' histogram and probability density.
+We can plot the histogram of portfolio returns.
 
 ```@example 0_index
-plot_histogram(mip_res.w, rd.X, slv)
+# Plot histogram of returns.
+plot_histogram(mip_res.w, rd.X; slv = slv)
 ```
 
-We can also plot the compounded or uncompounded drawdowns, here we plot the former.
+We can also plot the compounded or uncompounded drawdowns.
 
 ```@example 0_index
-plot_drawdowns(mip_res.w, rd.X, slv; ts = rd.ts, compound = true)
+plot_drawdowns(mip_res.w, rd.X; slv = slv, ts = rd.ts, compound = true)
 ```
+
+There are many other types of plotting functionality in `PortfolioOptimisers.jl`, check out the [Plotting](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/22_Plotting) page of the documentation.

@@ -177,9 +177,13 @@ VariationInfoDistance
   - [`cor_and_dist`](@ref)
 """
 @concrete struct VariationInfoDistance <: AbstractDistanceAlgorithm
-    "$(field_dict[:bins])"
+    """
+    $(field_dict[:bins])
+    """
     bins
-    "$(field_dict[:normalise])"
+    """
+    $(field_dict[:normalise])
+    """
     normalise
     function VariationInfoDistance(bins::Int_Bin, normalise::Bool)
         if isa(bins, Integer)

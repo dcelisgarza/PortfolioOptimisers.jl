@@ -167,9 +167,13 @@ Keywords correspond to the struct's fields.
   - [`AbstractRegularisationEstimator`](@ref)
 """
 @concrete struct LpRegularisation <: AbstractRegularisationEstimator
-    "$(field_dict[:p_rm])"
+    """
+    $(field_dict[:p_rm])
+    """
     p
-    "$(field_dict[:val])"
+    """
+    $(field_dict[:val])
+    """
     val
     function LpRegularisation(p::Number, val::Number)
         @argcheck(isfinite(p), IsNonFiniteError)

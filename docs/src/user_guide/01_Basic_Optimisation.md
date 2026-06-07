@@ -16,7 +16,7 @@ Here we show a quick example of a heterogeneous dataset that only returns data w
 
 ````@example 01_Basic_Optimisation
 using PortfolioOptimisers, CSV, TimeSeries, DataFrames, PrettyTables, LinearAlgebra,
-      StableRNGs
+      StableRNGs, StatsPlots, GraphRecipes
 resfmt = (v, i, j) -> begin
     return if j == 1
         v
@@ -32,6 +32,13 @@ rd = prices_to_returns(TimeArray(CSV.File(joinpath(@__DIR__, "../examples/SP500.
                        B = TimeArray(CSV.File(joinpath(@__DIR__,
                                                        "../examples/SP500_idx.csv.gz"));
                                      timestamp = :Date)[(end - 5 * 252):end])
+````
+
+The prior statistics (expected returns, per-asset volatility, and correlation matrix) give a first
+impression of the data.
+
+````@example 01_Basic_Optimisation
+plot_prior(prior(EmpiricalPrior(), rd), rd)
 ````
 
 ## 2. Basic optimisations
@@ -67,6 +74,12 @@ inv_var /= sum(inv_var)
 pretty_table(DataFrame([rd.nx ress[1].w inv_vol ress[2].w inv_var],
                        ["assets", "Opt Vol", "Inv Vol", "Opt Var", "Inv Var"]);
              formatters = [resfmt], title = "Composition")
+````
+
+Side-by-side composition of the two inverse-volatility variants.
+
+````@example 01_Basic_Optimisation
+plot_stacked_bar_composition(ress, rd)
 ````
 
 #### 2.1.2 Equal weighted
@@ -186,6 +199,18 @@ pretty_table(hcat(DataFrame(:Stat => ["Std", "Return", "Return/Std"]),
              formatters = [resfmt], title = "Statistics")
 ````
 
+Portfolio compositions across all four objectives side-by-side.
+
+````@example 01_Basic_Optimisation
+plot_stacked_bar_composition(ress, rd)
+````
+
+Per-asset standard-deviation risk contribution for the minimum-risk portfolio.
+
+````@example 01_Basic_Optimisation
+plot_risk_contribution(r, ress[1], rd)
+````
+
 #### 2.2.2 Factor risk contribution
 
 The [`FactorRiskContribution`](@ref) is a more complex estimator that requires more setup. It accepts objective functions, but can also define risk contributions per factor for the variance risk measure. The minimum risk optimisation will follow the risk contribution constraints the closest. With enough data and assets, it can be quite exact up to the user-provided convergence settings for the solvers used.
@@ -261,6 +286,18 @@ pretty_table(hcat(DataFrame(:factors => [rd.nf; "Intercept"]),
              formatters = [resfmt], title = "Factor Risk Contributions")
 ````
 
+Portfolio compositions for each FactorRiskContribution objective.
+
+````@example 01_Basic_Optimisation
+plot_stacked_bar_composition(ress, rd)
+````
+
+Factor risk contribution bar chart for the minimum-risk portfolio. The last bar is the intercept term.
+
+````@example 01_Basic_Optimisation
+plot_factor_risk_contribution(r, ress[1], rd)
+````
+
 #### 2.2.3 Near optimal centering
 
 [`NearOptimalCentering`](@ref) is a way to smear an optimal portfolio within a region around the point of optimality. The size of this region can be tuned by the user via the `bins` keyword, or automatically decided based on the number of observations and assets (default). This makes the portfolio more robust to estimation error and more diversified. It is not compatible with risk measures which produce quadratic risk expressions, so the risk measure keyword `r` defaults to [`StandardDeviation`](@ref).
@@ -325,6 +362,12 @@ pretty_table(hcat(DataFrame(:Stat => ["Std", "Return", "Return/Std"]),
              formatters = [resfmt], title = "Statistics")
 ````
 
+Portfolio compositions for each NearOptimalCentering objective.
+
+````@example 01_Basic_Optimisation
+plot_stacked_bar_composition(ress, rd)
+````
+
 #### 2.2.4 Risk budgeting
 
 [`RiskBudgeting`](@ref) provides a way to allocate risk across assets or factors via the `rba` keyword according to a user-defined risk budgeting vector provided via the `rkb` keyword of [`AssetRiskBudgeting`](@ref) and [`FactorRiskBudgeting`](@ref) risk budgeting algorithms. The risk budget vectors do not have to be normalised. The risk being budgeted depends on the risk measures used. This does not support objective functions, the optimisation is solely focused on achieving the risk budgeting as closely as possible. It is compatible with the same risk measures as [`MeanRisk`](@ref).
@@ -376,6 +419,14 @@ pretty_table(hcat(DataFrame(:assets => rd.nx),
                   DataFrame(reduce(hcat, [[res.w rkc] for (res, rkc) in zip(ress, rkcs)]),
                             ["Eq Risk Weights", "Eq Risk Budget", "Incr Risk Weights",
                              "Incr Risk Budget"])); formatters = [resfmt])
+````
+
+Asset risk contributions confirm that the equal-budget portfolio distributes variance evenly,
+while the increasing-budget portfolio skews towards higher-weighted assets.
+
+````@example 01_Basic_Optimisation
+plot_risk_contribution(r, ress[1], rd)
+plot_risk_contribution(r, ress[2], rd)
 ````
 
 ##### 2.2.4.1 Factor risk budgeting
@@ -440,6 +491,13 @@ pretty_table(hcat(DataFrame(:factors => [rd.nf; "Intercept"]),
                             ["Eq Risk Weights", "Eq Risk Budget", "Incr Risk Weights",
                              "Incr Risk Budget"])); formatters = [resfmt],
              title = "Factor risk contribution")
+````
+
+Factor risk contributions for the equal-budget and increasing-budget factor risk portfolios.
+
+````@example 01_Basic_Optimisation
+plot_factor_risk_contribution(r, ress[1], rd)
+plot_factor_risk_contribution(r, ress[2], rd)
 ````
 
 #### 2.2.5 Relaxed risk budgeting
@@ -508,6 +566,12 @@ pretty_table(hcat(DataFrame(:assets => rd.nx),
                              "RegPen Weights", "RegPen Budget"])); formatters = [resfmt])
 ````
 
+Compositions across the three relaxed risk budgeting variants.
+
+````@example 01_Basic_Optimisation
+plot_stacked_bar_composition(ress, rd)
+````
+
 ### 2.3 Clustering optimisers
 
 Clustering based optimisers use the relationship structure between assets. The weights are a function of the risks associated with those structures. Aside from the [`NestedClustered`](@ref) estimator, they all use an instance of [`HierarchicalOptimiser`](@ref) which defines common parameters for all clustering optimisers. [`HierarchicalOptimiser`](@ref) does not require a solver to be specified via the `slv` keyword unless the clustering optimisation estimator uses a risk measure that requires one.
@@ -545,6 +609,19 @@ pretty_table(DataFrame(:assets => rd.nx, :Weights => res.w); formatters = [resfm
 pretty_table(DataFrame(:Stat => ["Std", "Return", "Return/Std"],
                        :Measure => [rk, rt, ratio]); formatters = [resfmt],
              title = "Statistics")
+````
+
+The hierarchical clustering dendrogram shows which assets were grouped together.
+
+````@example 01_Basic_Optimisation
+plot_dendrogram(res.clr, rd.nx)
+````
+
+Portfolio composition and per-asset risk contribution for HRP.
+
+````@example 01_Basic_Optimisation
+plot_composition(res, rd)
+plot_risk_contribution(r, res, rd)
 ````
 
 #### 2.3.2 Schur complement hierarchical risk parity
@@ -617,6 +694,13 @@ pretty_table(hcat(DataFrame(:Stat => ["Std", "Return", "Return/Std"]),
              formatters = [resfmt], title = "Statistics")
 ````
 
+Compositions across HRP, Schur complement variants, and MVO — showing how `gamma` interpolates
+between HRP (γ=0) and mean-variance optimisation (γ=1).
+
+````@example 01_Basic_Optimisation
+plot_stacked_bar_composition(ress, rd)
+````
+
 #### 2.3.3 Hierarchical equal risk contribution
 
 The [`HierarchicalEqualRiskContribution`](@ref) estimator uses the hierarchical structure of the assets as well as a score of clustering quality to iteratively break up the asset universe into left and right clusters up until the optimal number of clusters according to the score. Each cluster is treated as a synthetic asset for which the risk is computed. The weight of each cluster is computed based on the risk it represents with respect to the cluster on the other side. The risks of each asset in the cluster are also computed, and the weights computed off of these. The per-asset weights are multiplied by the weight associated with the cluster as a whole. This is repeated for every clustering level until the optimal number of clusters is reached.
@@ -663,6 +747,19 @@ pretty_table(DataFrame(:assets => rd.nx, :cluster => assignments(res.clr),
 pretty_table(hcat(DataFrame(:Stat => ["Std", "Return", "Return/Std"]),
                   DataFrame(vcat(rk', rt', ratio'), [:Original, :Flipped]));
              formatters = [resfmt], title = "Statistics")
+````
+
+The dendrogram and reordered correlation heatmap show the cluster structure used by HERC.
+
+````@example 01_Basic_Optimisation
+plot_dendrogram(ress[1].clr, rd.nx)
+plot_clusters(ress[1].clr, rd.nx)
+````
+
+Side-by-side compositions for original and flipped HERC.
+
+````@example 01_Basic_Optimisation
+plot_stacked_bar_composition(ress, rd)
 ````
 
 #### 2.3.4 Nested clustered
@@ -725,6 +822,18 @@ pretty_table(hcat(DataFrame(:Stat => ["Std", "Return", "Return/Std"]),
              formatters = [resfmt])
 ````
 
+Compositions across the three nested-clustered configurations.
+
+````@example 01_Basic_Optimisation
+plot_stacked_bar_composition(ress, rd)
+````
+
+Dendrogram from the first nested-clustered result.
+
+````@example 01_Basic_Optimisation
+plot_dendrogram(ress[1].clr, rd.nx)
+````
+
 ### 2.4 Stacking
 
 The [`Stacking`](@ref) optimiser uses a similar approach to [`NestedClustered`](@ref), but instead of using a single inner estimator, it uses a vector of estimators, inheriting the requirements of each estimator being used.
@@ -770,6 +879,15 @@ pretty_table(DataFrame(:assets => rd.nx, :Weights => res.w); formatters = [resfm
 pretty_table(DataFrame(:Stat => ["Std", "Return", "Return/Std"],
                        :Measure => [rk, rt, ratio]); formatters = [resfmt],
              title = "Statistics")
+````
+
+Portfolio composition, cumulative returns vs the S&P 500 benchmark, and drawdown profile for the
+stacking portfolio.
+
+````@example 01_Basic_Optimisation
+plot_composition(res, rd)
+plot_benchmark(res, rd)
+plot_drawdowns(res, rd)
 ````
 
 ### 2.5 Subset resampling
@@ -825,6 +943,13 @@ pretty_table(hcat(DataFrame(:Stat => ["Std", "Return", "Return/Std"]),
                   DataFrame(vcat(rk', rt', ratio'),
                             [:MeanRisk, :SubsetResampling, :EqualWeighted]));
              formatters = [resfmt])
+````
+
+Compositions for MeanRisk, SubsetResampling, and EqualWeighted — showing how subset resampling
+interpolates between concentrated and equal-weight allocations.
+
+````@example 01_Basic_Optimisation
+plot_stacked_bar_composition(ress, rd)
 ````
 
 ---

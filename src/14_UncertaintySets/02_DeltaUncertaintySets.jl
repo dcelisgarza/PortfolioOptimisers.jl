@@ -58,11 +58,17 @@ DeltaUncertaintySet
   - [`AbstractPriorEstimator`](@ref)
 """
 @concrete struct DeltaUncertaintySet <: AbstractUncertaintySetEstimator
-    "$(field_dict[:pe])"
+    """
+    $(field_dict[:pe])
+    """
     pe
-    "$(field_dict[:dmu])"
+    """
+    $(field_dict[:dmu])
+    """
     dmu
-    "$(field_dict[:dsigma])"
+    """
+    $(field_dict[:dsigma])
+    """
     dsigma
     function DeltaUncertaintySet(pe::AbstractLowOrderPriorEstimator, dmu::Number,
                                  dsigma::Number)

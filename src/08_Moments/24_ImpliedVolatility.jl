@@ -59,12 +59,18 @@ ImpliedVolatilityRegression
   - [`ImpliedVolatility`](@ref)
 """
 @concrete struct ImpliedVolatilityRegression <: ImpliedVolatilityAlgorithm
-    "$(field_dict[:ve])"
+    """
+    $(field_dict[:ve])
+    """
     ve
-    "Window size for computing rolling realised volatility."
+    """
+    Window size for computing rolling realised volatility.
+    """
     ws
     # crit
-    "$(field_dict[:retgt])"
+    """
+    $(field_dict[:retgt])
+    """
     re
     function ImpliedVolatilityRegression(ve::AbstractVarianceEstimator, ws::Number,
                                          re::AbstractRegressionTarget)
@@ -118,6 +124,12 @@ Keywords correspond to the struct's fields.
 
   - `af > 0`.
 
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@prop`-tagged fields are automatically propagated:
+
+  - `ce`: Recursively updated via [`factory`](@ref).
+
 # Related
 
   - [`AbstractCovarianceEstimator`](@ref)
@@ -125,15 +137,24 @@ Keywords correspond to the struct's fields.
   - [`ImpliedVolatilityRegression`](@ref)
   - [`ImpliedVolatilityPremium`](@ref)
   - [`AbstractMatrixProcessingEstimator`](@ref)
+  - [`factory`](@ref)
 """
-@concrete struct ImpliedVolatility <: AbstractCovarianceEstimator
-    "$(field_dict[:ce])"
-    ce
-    "$(field_dict[:mp])"
+@propagatable @concrete struct ImpliedVolatility <: AbstractCovarianceEstimator
+    """
+    $(field_dict[:ce])
+    """
+    @prop ce
+    """
+    $(field_dict[:mp])
+    """
     mp
-    "Implied volatility algorithm for predicting realised volatility."
+    """
+    Implied volatility algorithm for predicting realised volatility.
+    """
     alg
-    "Annualisation factor for converting annualised implied volatility to the data frequency."
+    """
+    Annualisation factor for converting annualised implied volatility to the data frequency.
+    """
     af
     function ImpliedVolatility(ce::StatsBase.CovarianceEstimator,
                                mp::AbstractMatrixProcessingEstimator,
@@ -142,33 +163,16 @@ Keywords correspond to the struct's fields.
         return new{typeof(ce), typeof(mp), typeof(alg), typeof(af)}(ce, mp, alg, af)
     end
 end
+#= Old factory function:
+function factory(ce::ImpliedVolatility, w::ObsWeights)::ImpliedVolatility
+    return ImpliedVolatility(; ce = factory(ce.ce, w), mp = ce.mp)
+end
+=#
 function ImpliedVolatility(; ce::StatsBase.CovarianceEstimator = Covariance(),
                            mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing(),
                            alg::ImpliedVolatilityAlgorithm = ImpliedVolatilityRegression(),
                            af::Number = 252)::ImpliedVolatility
     return ImpliedVolatility(ce, mp, alg, af)
-end
-"""
-    factory(ce::ImpliedVolatility, w::ObsWeights) -> ImpliedVolatility
-
-Return a new [`ImpliedVolatility`](@ref) estimator with observation weights `w` applied to the underlying covariance estimator.
-
-# Arguments
-
-  - $(arg_dict[:ce])
-  - $(arg_dict[:ow])
-
-# Returns
-
-  - $(ret_dict[:ce])
-
-# Related
-
-  - [`ImpliedVolatility`](@ref)
-  - [`factory`](@ref)
-"""
-function factory(ce::ImpliedVolatility, w::ObsWeights)::ImpliedVolatility
-    return ImpliedVolatility(; ce = factory(ce.ce, w), mp = ce.mp)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

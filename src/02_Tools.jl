@@ -677,6 +677,369 @@ function factory(a::AbstractVector{<:Union{<:AbstractEstimator, <:AbstractAlgori
                                            <:AbstractResult}}, args...; kwargs...)
     return [factory(ai, args...; kwargs...) for ai in a]
 end
+
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Per-field recursion helper called by [`@propagatable`](@ref)-generated [`factory`](@ref) methods.
+
+Dispatches on the field value type: estimators, algorithms, and results recurse via [`factory`](@ref); observation-weight fields (`::Nothing` or `::StatsBase.AbstractWeights`) are replaced by the incoming [`ObsWeights`](@ref) argument; everything else passes through unchanged.
+
+# Related
+
+  - [`@propagatable`](@ref)
+  - [`factory`](@ref)
+"""
+_factory_child(v, args...; kwargs...) = v
+function _factory_child(v::Union{<:AbstractEstimator, <:AbstractAlgorithm,
+                                 <:AbstractResult}, args...; kwargs...)
+    return factory(v, args...; kwargs...)
+end
+function _factory_child(v::AbstractArray{<:Union{<:AbstractEstimator, <:AbstractAlgorithm,
+                                                 <:AbstractResult}}, args...; kwargs...)
+    return [_factory_child(vi, args...; kwargs...) for vi in v]
+end
+# @prop-tagged ObsWeights/nothing fields: replace with the incoming weights argument.
+_factory_child(::Nothing, w::ObsWeights, args...; kwargs...) = w
+_factory_child(::StatsBase.AbstractWeights, w::ObsWeights, args...; kwargs...) = w
+# ---------------------------------------------------------------------------
+# @propagatable — struct-definition macro for factory propagation
+# ---------------------------------------------------------------------------
+
+# --- private AST helpers ----------------------------------------------------
+
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return `true` if `x` is a reference to the [`@prop`](@ref) macro (bare `Symbol` or `GlobalRef`).
+
+Used by [`_propagatable_parse_body`](@ref) to detect `@prop`-tagged fields in a struct body.
+
+# Related
+
+  - [`@prop`](@ref)
+  - [`_propagatable_parse_body`](@ref)
+  - [`@propagatable`](@ref)
+"""
+_is_prop_macro(x) = x == Symbol("@prop") || (x isa GlobalRef && x.name == Symbol("@prop"))
+
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return `true` if `x` is a reference to Julia's `@doc` macro (bare `Symbol` or `GlobalRef`).
+
+Used by [`_propagatable_parse_body`](@ref) to recognise docstring-prefixed fields in a struct body.
+
+# Related
+
+  - [`_propagatable_parse_body`](@ref)
+  - [`@propagatable`](@ref)
+"""
+_is_doc_macro(x) = (x isa GlobalRef && x.name == Symbol("@doc")) || x == Symbol("@doc")
+
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Extract the field name `Symbol` from a bare field or `field::Type` expression.
+
+Errors with a descriptive message when `expr` is neither a bare `Symbol` nor a
+`field::Type` annotation, since only those forms are valid after [`@prop`](@ref).
+
+# Arguments
+
+  - `expr`: A `Symbol`, an `Expr` with head `:(::)`, or any other expression (triggers an error).
+
+# Returns
+
+  - `name::Symbol`: The field name.
+
+# Related
+
+  - [`@prop`](@ref)
+  - [`_propagatable_parse_body`](@ref)
+  - [`@propagatable`](@ref)
+"""
+function _extract_field_name(expr)
+    if expr isa Symbol
+        return expr
+    end
+    if expr isa Expr && expr.head == :(::)
+        return expr.args[1]
+    end
+    return error("@propagatable: @prop must precede a bare field name or field::Type, got: $(repr(expr))")
+end
+
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Recursively unwrap macro call chains to locate the innermost `:struct` node.
+
+Returns `(struct_node, rebuild_fn)` where `rebuild_fn(new_struct)` reconstructs the
+original macro chain with `new_struct` in place of the original struct. This allows
+[`@propagatable`](@ref) to inject modified struct definitions back into arbitrary macro
+wrappers such as `@concrete`.
+
+# Arguments
+
+  - `expr`: A `:struct` expression or a `:macrocall` expression wrapping one.
+
+# Returns
+
+  - `struct_node::Expr`: The innermost `:struct` expression.
+  - `rebuild_fn::Function`: A function that, given a replacement `:struct`, returns the
+    full macro chain with the replacement in place of the original.
+
+# Related
+
+  - [`_propagatable_parse_body`](@ref)
+  - [`_propagatable_bare_name`](@ref)
+  - [`@propagatable`](@ref)
+"""
+function _propagatable_find_struct(expr)
+    if !(expr isa Expr)
+        error("@propagatable: expected a struct or macro-wrapped struct, got $(typeof(expr))")
+    end
+    if expr.head == :struct
+        return expr, identity
+    elseif expr.head == :macrocall
+        inner = expr.args[end]
+        struct_node, rebuild = _propagatable_find_struct(inner)
+        prefix = expr.args[1:(end - 1)]
+        return struct_node, s -> Expr(:macrocall, prefix..., rebuild(s))
+    else
+        error("@propagatable: expected a struct definition (possibly wrapped in macros), " *
+              "got Expr with head :$(expr.head)")
+    end
+end
+
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Extract the plain struct name `Symbol` from a potentially parameterised or
+supertype-constrained name expression.
+
+Handles the forms `Name`, `Name{T, ...}`, and `Name{T, ...} <: SuperType` by
+recursively peeling `:curly` and `:<:` wrappers until a bare `Symbol` is reached.
+
+# Arguments
+
+  - `n`: A `Symbol`, or an `Expr` with head `:curly` or `:<:`.
+
+# Returns
+
+  - `name::Symbol`: The plain struct name.
+
+# Related
+
+  - [`_propagatable_find_struct`](@ref)
+  - [`@propagatable`](@ref)
+"""
+function _propagatable_bare_name(n)
+    if n isa Symbol
+        return n
+    end
+    if n isa Expr && n.head == :curly
+        return _propagatable_bare_name(n.args[1])
+    end
+    if n isa Expr && n.head == :<:
+        return _propagatable_bare_name(n.args[1])
+    end
+    return error("@propagatable: cannot extract struct name from: $(repr(n))")
+end
+
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the field name `Symbol` for a plain field declaration, or `nothing` for
+non-field nodes.
+
+Recognises bare `Symbol` fields and `field::Type` annotations. Returns `nothing` for
+`LineNumberNode`s, inner constructors, and any other expression that does not declare
+a single named field.
+
+# Arguments
+
+  - `expr`: Any expression appearing in a struct body.
+
+# Returns
+
+  - `name::Symbol`: The field name, if `expr` is a plain field declaration.
+  - `nothing`: If `expr` is not a plain field declaration.
+
+# Related
+
+  - [`_propagatable_parse_body`](@ref)
+  - [`@propagatable`](@ref)
+"""
+function _try_field_name(expr)
+    if expr isa Symbol
+        return expr
+    end
+    if expr isa Expr && expr.head == :(::) && expr.args[1] isa Symbol
+        return expr.args[1]
+    end
+    return nothing
+end
+
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Walk a struct body, collecting [`@prop`](@ref)-tagged and non-tagged field names and
+stripping the [`@prop`](@ref) tags from the body.
+
+Handles two forms of tagged fields: bare `@prop field` and docstring-prefixed
+`"doc" \\n @prop field`. Non-field nodes (line numbers, inner constructors) are carried
+through unchanged.
+
+# Arguments
+
+  - `body::Expr`: The `:block` expression forming the struct body.
+
+# Returns
+
+  - `propagatable::Vector{Symbol}`: Names of [`@prop`](@ref)-tagged fields.
+  - `non_propagatable::Vector{Symbol}`: Names of untagged fields.
+  - `new_body::Expr`: The struct body with all [`@prop`](@ref) tags stripped.
+
+# Related
+
+  - [`_is_prop_macro`](@ref)
+  - [`_is_doc_macro`](@ref)
+  - [`_extract_field_name`](@ref)
+  - [`_try_field_name`](@ref)
+  - [`@prop`](@ref)
+  - [`@propagatable`](@ref)
+"""
+function _propagatable_parse_body(body)
+    propagatable     = Symbol[]
+    non_propagatable = Symbol[]
+    new_args         = Any[]
+    for arg in body.args
+        if arg isa Expr && arg.head == :macrocall
+            head = arg.args[1]
+            if _is_prop_macro(head)
+                # Bare @prop field — no docstring
+                fname = _extract_field_name(arg.args[end])
+                push!(propagatable, fname)
+                push!(new_args, arg.args[end])          # strip @prop, keep field expr
+            elseif _is_doc_macro(head)
+                # Core.@doc "doc" (field or @prop(field))
+                inner = arg.args[end]
+                if inner isa Expr &&
+                   inner.head == :macrocall &&
+                   _is_prop_macro(inner.args[1])
+                    # "doc" \n @prop field
+                    fname = _extract_field_name(inner.args[end])
+                    push!(propagatable, fname)
+                    # Rebuild @doc node with @prop stripped: replace last arg with bare field
+                    push!(new_args,
+                          Expr(:macrocall, arg.args[1:(end - 1)]..., inner.args[end]))
+                else
+                    # plain docstring'd field — carry through unchanged
+                    fname = _try_field_name(inner)
+                    if fname !== nothing
+                        push!(non_propagatable, fname)
+                    end
+                    push!(new_args, arg)
+                end
+            else
+                push!(new_args, arg)
+            end
+        else
+            # LineNumberNode, bare Symbol field, field::Type, inner constructor, …
+            fname = _try_field_name(arg)
+            if fname !== nothing
+                push!(non_propagatable, fname)
+            end
+            push!(new_args, arg)
+        end
+    end
+    return propagatable, non_propagatable, Expr(:block, new_args...)
+end
+
+# ---------------------------------------------------------------------------
+# Public API
+# ---------------------------------------------------------------------------
+
+"""
+    @prop field
+
+Field tag for use inside a [`@propagatable`](@ref) struct body.
+Marks the field as participating in [`factory`](@ref) propagation —
+`_factory_child` will be called on it when `factory` is invoked on the
+enclosing struct.
+
+Raises an error if used outside a `@propagatable` struct body.
+"""
+macro prop(expr)
+    return error("@prop may only appear inside a @propagatable struct body")
+end
+
+"""
+    @propagatable expr
+
+Define a struct and automatically generate a [`factory`](@ref) propagation
+method for it.
+
+Fields tagged with [`@prop`](@ref) receive `_factory_child` calls when
+`factory` is invoked, recursing runtime data (observation weights, prior
+results, solvers, …) down the composition tree. Untagged fields pass through
+unchanged regardless of their type — tagging is explicit and opt-in.
+
+Composes with `@concrete` (put `@propagatable` outermost):
+
+```julia
+@propagatable @concrete struct MyEstimator <: AbstractEstimator
+    @prop inner   # factory recurses into this field
+    config     # passed through unchanged
+    function MyEstimator(inner::AbstractEstimator, config)
+        return new{typeof(inner), typeof(config)}(inner, config)
+    end
+end
+```
+
+The generated `factory` method is added to `PortfolioOptimisers.factory`,
+so `@propagatable` works correctly for types defined in external packages.
+
+Docstrings on the enclosing definition are forwarded correctly via
+`Base.@__doc__`.
+"""
+macro propagatable(expr)
+    struct_node, rebuild = _propagatable_find_struct(expr)
+
+    type_head   = struct_node.args[2]
+    body        = struct_node.args[3]
+    struct_name = _propagatable_bare_name(type_head)
+
+    propagatable_fields, non_propagatable_fields, new_body = _propagatable_parse_body(body)
+
+    new_struct = Expr(:struct, struct_node.args[1], type_head, new_body)
+    chain      = rebuild(new_struct)
+
+    if isempty(propagatable_fields)
+        factory_body = :x
+    else
+        prop_pairs = [Expr(:kw, f,
+                           :(_factory_child($(Expr(:., :x, QuoteNode(f))), args...;
+                                            kwargs...))) for f in propagatable_fields]
+        pass_pairs = [Expr(:kw, f, Expr(:., :x, QuoteNode(f)))
+                      for f in non_propagatable_fields]
+        factory_body = Expr(:call, struct_name,
+                            Expr(:parameters, prop_pairs..., pass_pairs...))
+    end
+
+    factory_def = quote
+        function factory(x::$struct_name, args...; kwargs...)
+            return $factory_body
+        end
+    end
+
+    return esc(quote
+                   Base.@__doc__ $chain
+                   $factory_def
+               end)
+end
+
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -765,6 +1128,12 @@ Keywords correspond to the struct's fields.
 
   - $(val_dict[:oow])
 
+## Curried parameters
+
+When [`factory`](@ref) is called on this type, the following `@prop`-tagged fields are automatically propagated:
+
+  - `w`: Replaced with the incoming [`ObsWeights`](@ref).
+
 # Examples
 
 ```jldoctest
@@ -779,47 +1148,25 @@ julia> PortfolioOptimisers.vec_to_real_measure(MeanValue(), [1.2, 3.4, 0.7])
   - [`MedianValue`](@ref)
   - [`MaxValue`](@ref)
   - [`vec_to_real_measure`](@ref)
+  - [`factory`](@ref)
 """
-@concrete struct MeanValue <: VectorToScalarMeasure
-    "$(field_dict[:oow])"
-    w
+@propagatable @concrete struct MeanValue <: VectorToScalarMeasure
+    """
+    $(field_dict[:oow])
+    """
+    @prop w
     function MeanValue(w::Option{<:ObsWeights})
         assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(w)}(w)
     end
 end
-function MeanValue(; w::Option{<:ObsWeights} = nothing)
-    return MeanValue(w)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Construct a `MeanValue` instance with observation weights `w`.
-
-# Arguments
-
-  - `mv`: Instance to update.
-  - $(arg_dict[:ow])
-
-# Returns
-
-  - `mv::MeanValue`: A new `MeanValue` with observation weights `w`.
-
-# Examples
-
-```jldoctest
-julia> factory(MeanValue(), StatsBase.Weights([1.2, 3.4, 0.7]))
-MeanValue
-  w ┴ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [1.2, 3.4, 0.7]
-```
-
-# Related
-
-  - [`MeanValue`](@ref)
-  - [`factory`](@ref)
-"""
+#= Old factory function:
 function factory(::MeanValue, w::ObsWeights)
     return MeanValue(; w = w)
+end
+=#
+function MeanValue(; w::Option{<:ObsWeights} = nothing)
+    return MeanValue(w)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -842,6 +1189,12 @@ Keywords correspond to the struct's fields.
 
   - $(val_dict[:oow])
 
+## Curried parameters
+
+When [`factory`](@ref) is called on this type, the following `@prop`-tagged fields are automatically propagated:
+
+  - `w`: Replaced with the incoming [`ObsWeights`](@ref).
+
 # Examples
 
 ```jldoctest
@@ -856,47 +1209,25 @@ julia> PortfolioOptimisers.vec_to_real_measure(MedianValue(), [1.2, 3.4, 0.7])
   - [`MeanValue`](@ref)
   - [`MaxValue`](@ref)
   - [`vec_to_real_measure`](@ref)
+  - [`factory`](@ref)
 """
-@concrete struct MedianValue <: VectorToScalarMeasure
-    "$(field_dict[:oow])"
-    w
+@propagatable @concrete struct MedianValue <: VectorToScalarMeasure
+    """
+    $(field_dict[:oow])
+    """
+    @prop w
     function MedianValue(w::Option{<:ObsWeights})
         assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(w)}(w)
     end
 end
-function MedianValue(; w::Option{<:ObsWeights} = nothing)
-    return MedianValue(w)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Constructs a `MedianValue` instance with observation weights `w`.
-
-# Arguments
-
-  - `mv`: Instance to update.
-  - $(arg_dict[:ow])
-
-# Returns
-
-  - `mdv::MedianValue`: A new `MedianValue` with observation weights `w`.
-
-# Examples
-
-```jldoctest
-julia> factory(MedianValue(), StatsBase.Weights([1.2, 3.4, 0.7]))
-MedianValue
-  w ┴ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [1.2, 3.4, 0.7]
-```
-
-# Related
-
-  - [`MedianValue`](@ref)
-  - [`factory`](@ref)
-"""
+#= Old factory function:
 function factory(::MedianValue, w::ObsWeights)
     return MedianValue(; w = w)
+end
+=#
+function MedianValue(; w::Option{<:ObsWeights} = nothing)
+    return MedianValue(w)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -941,6 +1272,12 @@ Keywords correspond to the struct's fields.
 
   - $(val_dict[:oow])
 
+## Curried parameters
+
+When [`factory`](@ref) is called on this type, the following `@prop`-tagged fields are automatically propagated:
+
+  - `w`: Replaced with the incoming [`ObsWeights`](@ref).
+
 # Examples
 
 ```jldoctest
@@ -955,50 +1292,29 @@ julia> PortfolioOptimisers.vec_to_real_measure(StdValue(), [1.2, 3.4, 0.7])
   - [`VarValue`](@ref)
   - [`StandardisedValue`](@ref)
   - [`vec_to_real_measure`](@ref)
+  - [`factory`](@ref)
 """
-@concrete struct StdValue <: VectorToScalarMeasure
-    "$(field_dict[:oow])"
-    w
-    "$(field_dict[:corrected])"
+@propagatable @concrete struct StdValue <: VectorToScalarMeasure
+    """
+    $(field_dict[:oow])
+    """
+    @prop w
+    """
+    $(field_dict[:corrected])
+    """
     corrected
     function StdValue(w::Option{<:ObsWeights}, corrected::Bool)
         assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(w), typeof(corrected)}(w, corrected)
     end
 end
-function StdValue(; w::Option{<:ObsWeights} = nothing, corrected::Bool = true)
-    return StdValue(w, corrected)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Constructs a `StdValue` instance with observation weights `w`.
-
-# Arguments
-
-  - `sv`: Instance to update.
-  - $(arg_dict[:ow])
-
-# Returns
-
-  - `sv::StdValue`: A new `StdValue` with observation weights `w`.
-
-# Examples
-
-```jldoctest
-julia> factory(StdValue(), StatsBase.Weights([1.2, 3.4, 0.7]))
-StdValue
-          w ┼ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [1.2, 3.4, 0.7]
-  corrected ┴ Bool: true
-```
-
-# Related
-
-  - [`StdValue`](@ref)
-  - [`factory`](@ref)
-"""
+#= Old factory function:
 function factory(sv::StdValue, w::ObsWeights)
     return StdValue(; w = w, corrected = sv.corrected)
+end
+=#
+function StdValue(; w::Option{<:ObsWeights} = nothing, corrected::Bool = true)
+    return StdValue(w, corrected)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -1022,6 +1338,12 @@ Keywords correspond to the struct's fields.
 
   - $(val_dict[:oow])
 
+## Curried parameters
+
+When [`factory`](@ref) is called on this type, the following `@prop`-tagged fields are automatically propagated:
+
+  - `w`: Replaced with the incoming [`ObsWeights`](@ref).
+
 # Examples
 
 ```jldoctest
@@ -1036,50 +1358,29 @@ julia> PortfolioOptimisers.vec_to_real_measure(VarValue(), [1.2, 3.4, 0.7])
   - [`StdValue`](@ref)
   - [`StandardisedValue`](@ref)
   - [`vec_to_real_measure`](@ref)
+  - [`factory`](@ref)
 """
-@concrete struct VarValue <: VectorToScalarMeasure
-    "$(field_dict[:oow])"
-    w
-    "$(field_dict[:corrected])"
+@propagatable @concrete struct VarValue <: VectorToScalarMeasure
+    """
+    $(field_dict[:oow])
+    """
+    @prop w
+    """
+    $(field_dict[:corrected])
+    """
     corrected
     function VarValue(w::Option{<:ObsWeights}, corrected::Bool)
         assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(w), typeof(corrected)}(w, corrected)
     end
 end
-function VarValue(; w::Option{<:ObsWeights} = nothing, corrected::Bool = true)
-    return VarValue(w, corrected)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Constructs a `VarValue` instance with observation weights `w`.
-
-# Arguments
-
-  - `vv`: Instance to update.
-  - $(arg_dict[:ow])
-
-# Returns
-
-  - `vv::VarValue`: A new `VarValue` with observation weights `w`.
-
-# Examples
-
-```jldoctest
-julia> factory(VarValue(), StatsBase.Weights([1.2, 3.4, 0.7]))
-VarValue
-          w ┼ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [1.2, 3.4, 0.7]
-  corrected ┴ Bool: true
-```
-
-# Related
-
-  - [`VarValue`](@ref)
-  - [`factory`](@ref)
-"""
+#= Old factory function:
 function factory(vv::VarValue, w::ObsWeights)
     return VarValue(; w = w, corrected = vv.corrected)
+end
+=#
+function VarValue(; w::Option{<:ObsWeights} = nothing, corrected::Bool = true)
+    return VarValue(w, corrected)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -1159,6 +1460,13 @@ $(DocStringExtensions.FIELDS)
 
 Keywords correspond to the struct's fields.
 
+## Curried parameters
+
+When [`factory`](@ref) is called on this type, the following `@prop`-tagged fields are automatically propagated:
+
+  - `mv`: Recursively updated via [`factory`](@ref).
+  - `sv`: Recursively updated via [`factory`](@ref).
+
 # Examples
 
 ```jldoctest
@@ -1173,54 +1481,28 @@ julia> PortfolioOptimisers.vec_to_real_measure(StandardisedValue(), [1.2, 3.4, 0
   - [`StdValue`](@ref)
   - [`VarValue`](@ref)
   - [`vec_to_real_measure`](@ref)
+  - [`factory`](@ref)
 """
-@concrete struct StandardisedValue <: VectorToScalarMeasure
-    "The mean value measure used for the numerator."
-    mv
-    "The standard deviation measure used for the denominator."
-    sv
+@propagatable @concrete struct StandardisedValue <: VectorToScalarMeasure
+    """
+    The mean value measure used for the numerator.
+    """
+    @prop mv
+    """
+    The standard deviation measure used for the denominator.
+    """
+    @prop sv
     function StandardisedValue(mv::MeanValue, sv::StdValue)
         return new{typeof(mv), typeof(sv)}(mv, sv)
     end
 end
-function StandardisedValue(; mv::MeanValue = MeanValue(), sv::StdValue = StdValue())
-    return StandardisedValue(mv, sv)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Construct a `StandardisedValue` instance with observation weights `w` for both `mv` and `sv`.
-
-# Arguments
-
-  - `msv`: Instance to update.
-  - $(arg_dict[:ow])
-
-# Returns
-
-  - `msv::StandardisedValue`: A new `StandardisedValue` with observation weights `w` applied to both `mv` and `sv`.
-
-# Examples
-
-```jldoctest
-julia> factory(StandardisedValue(), StatsBase.Weights([1.2, 3.4, 0.7]))
-StandardisedValue
-  mv ┼ MeanValue
-     │   w ┴ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [1.2, 3.4, 0.7]
-  sv ┼ StdValue
-     │           w ┼ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [1.2, 3.4, 0.7]
-     │   corrected ┴ Bool: true
-```
-
-# Related
-
-  - [`StandardisedValue`](@ref)
-  - [`MeanValue`](@ref)
-  - [`StdValue`](@ref)
-  - [`factory`](@ref)
-"""
+#= Old factory function:
 function factory(msv::StandardisedValue, w::ObsWeights)
     return StandardisedValue(; mv = factory(msv.mv, w), sv = factory(msv.sv, w))
+end
+=#
+function StandardisedValue(; mv::MeanValue = MeanValue(), sv::StdValue = StdValue())
+    return StandardisedValue(mv, sv)
 end
 """
     vec_to_real_measure(measure::Num_VecToScaM, val::VecNum) -> Number
@@ -1333,6 +1615,6 @@ function vec_to_real_measure(f::Function,
     return f(val)
 end
 
-export factory, traverse_concrete_subtypes, concrete_typed_array, MinValue, MeanValue,
-       MedianValue, MaxValue, StandardisedValue, StdValue, VarValue, SumValue, ProdValue,
-       ModeValue
+export @propagatable, @prop, factory, traverse_concrete_subtypes, concrete_typed_array,
+       MinValue, MeanValue, MedianValue, MaxValue, StandardisedValue, StdValue, VarValue,
+       SumValue, ProdValue, ModeValue

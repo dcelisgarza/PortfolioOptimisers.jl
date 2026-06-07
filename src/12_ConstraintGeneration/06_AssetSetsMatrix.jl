@@ -45,7 +45,9 @@ julia> asset_sets_matrix(est, sets)
   - [`AbstractConstraintEstimator`](@ref)
 """
 @concrete struct AssetSetsMatrixEstimator <: AbstractConstraintEstimator
-    "$(field_dict[:asets_val])"
+    """
+    $(field_dict[:asets_val])
+    """
     val
     function AssetSetsMatrixEstimator(val::AbstractString)::AssetSetsMatrixEstimator
         @argcheck(!isempty(val))

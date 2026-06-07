@@ -24,6 +24,13 @@ Keywords correspond to the struct's fields.
   - $(val_dict[:oow])
   - If `window` is provided, it must be nonempty, nonnegative, and finite.
 
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@prop`-tagged fields are automatically propagated:
+
+  - `me`: Recursively updated via [`factory`](@ref).
+  - `w`: Replaced with the incoming [`ObsWeights`](@ref).
+
 # Examples
 
 ```jldoctest
@@ -39,13 +46,20 @@ WindowedExpectedReturns
 
   - [`AbstractExpectedReturnsEstimator`](@ref)
   - [`SimpleExpectedReturns`](@ref)
+  - [`factory`](@ref)
 """
-@concrete struct WindowedExpectedReturns <: AbstractExpectedReturnsEstimator
-    "$(field_dict[:me])"
-    me
-    "$(field_dict[:oow])"
-    w
-    "Window specification: an integer (last `window` observations) or a vector of indices."
+@propagatable @concrete struct WindowedExpectedReturns <: AbstractExpectedReturnsEstimator
+    """
+    $(field_dict[:me])
+    """
+    @prop me
+    """
+    $(field_dict[:oow])
+    """
+    @prop w
+    """
+    Window specification: an integer (last `window` observations) or a vector of indices.
+    """
     window
     function WindowedExpectedReturns(me::AbstractExpectedReturnsEstimator,
                                      w::Option{<:ObsWeights}, window::Option{<:Int_VecInt})
@@ -54,33 +68,16 @@ WindowedExpectedReturns
         return new{typeof(me), typeof(w), typeof(window)}(me, w, window)
     end
 end
+#= Old factory function:
+function factory(me::WindowedExpectedReturns, w::ObsWeights)::WindowedExpectedReturns
+    return WindowedExpectedReturns(; me = factory(me.me, w), w = w, window = me.window)
+end
+=#
 function WindowedExpectedReturns(;
                                  me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
                                  w::Option{<:ObsWeights} = nothing,
                                  window::Option{<:Int_VecInt} = nothing)::WindowedExpectedReturns
     return WindowedExpectedReturns(me, w, window)
-end
-"""
-    factory(me::WindowedExpectedReturns, w::ObsWeights) -> WindowedExpectedReturns
-
-Return a new [`WindowedExpectedReturns`](@ref) estimator with observation weights `w` applied to the underlying mean estimator and stored as the windowed weights.
-
-# Arguments
-
-  - `me`: Windowed expected returns estimator.
-  - $(arg_dict[:ow])
-
-# Returns
-
-  - `me::WindowedExpectedReturns`: Updated estimator with weights applied.
-
-# Related
-
-  - [`WindowedExpectedReturns`](@ref)
-  - [`factory`](@ref)
-"""
-function factory(me::WindowedExpectedReturns, w::ObsWeights)::WindowedExpectedReturns
-    return WindowedExpectedReturns(; me = factory(me.me, w), w = w, window = me.window)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

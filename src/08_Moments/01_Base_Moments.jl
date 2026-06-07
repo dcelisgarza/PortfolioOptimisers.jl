@@ -301,6 +301,12 @@ MyVarianceEstimator
 """
 abstract type AbstractVarianceEstimator <: AbstractCovarianceEstimator end
 @define_pretty_show(AbstractCovarianceEstimator)
+function _factory_child(v::AbstractCovarianceEstimator, args...; kwargs...)
+    return factory(v, args...; kwargs...)
+end
+function _factory_child(v::AbstractArray{<:AbstractCovarianceEstimator}, args...; kwargs...)
+    return [_factory_child(vi, args...; kwargs...) for vi in v]
+end
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -396,30 +402,6 @@ abstract type AbstractExpectedReturnsEstimator <: AbstractEstimator end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Fallback for abstract expected returns estimator factory methods.
-
-# Arguments
-
-  - $(arg_dict[:me])
-  - `args...`: Optional arguments (ignored).
-  - `kwargs...`: Optional keyword arguments (ignored).
-
-# Returns
-
-  - `me::AbstractExpectedReturnsEstimator`: The original expected returns estimator.
-
-# Related
-
-  - [`factory`](@ref)
-  - [`AbstractExpectedReturnsEstimator`](@ref)
-"""
-function factory(me::AbstractExpectedReturnsEstimator, args...;
-                 kwargs...)::AbstractExpectedReturnsEstimator
-    return me
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
 No-op fallback for getting the view of an expected returns estimator.
 
 # Arguments
@@ -456,30 +438,6 @@ Given that these are meant to be used by expected returns estimators, there are 
   - [`AbstractExpectedReturnsEstimator`](@ref)
 """
 abstract type AbstractExpectedReturnsAlgorithm <: AbstractAlgorithm end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Fallback for abstract expected returns algorithm factory methods.
-
-# Arguments
-
-  - `alg`: The expected returns algorithm.
-  - `args...`: Optional arguments (ignored).
-  - `kwargs...`: Optional keyword arguments (ignored).
-
-# Returns
-
-  - `alg::AbstractExpectedReturnsAlgorithm`: The original expected returns algorithm.
-
-# Related
-
-  - [`factory`](@ref)
-  - [`AbstractExpectedReturnsAlgorithm`](@ref)
-"""
-function factory(alg::AbstractExpectedReturnsAlgorithm, args...;
-                 kwargs...)::AbstractExpectedReturnsAlgorithm
-    return alg
-end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 

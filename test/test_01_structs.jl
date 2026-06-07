@@ -143,7 +143,8 @@
     @testset "JuMPResult" begin
         trials = Dict(:try => false)
         @test_logs (:warn, "Model could not be solved satisfactorily.\n$trials") JuMPResult(;
-                                                                                            trials = Dict(:try => false),
+                                                                                            trials = Dict(:try =>
+                                                                                                              false),
                                                                                             success = false)
         res = JuMPResult(; trials = trials, success = true)
         @test res.trials === trials

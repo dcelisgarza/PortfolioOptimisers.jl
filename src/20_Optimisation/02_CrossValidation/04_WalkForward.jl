@@ -44,9 +44,13 @@ Keywords correspond to the struct's fields.
   - [`SequentialCrossValidationResult`](@ref)
 """
 @concrete struct WalkForwardResult <: SequentialCrossValidationResult
-    "$(field_dict[:train_idx])"
+    """
+    $(field_dict[:train_idx])
+    """
     train_idx
-    "$(field_dict[:test_idx])"
+    """
+    $(field_dict[:test_idx])
+    """
     test_idx
     function WalkForwardResult(train_idx::VecVecInt, test_idx::VecVecInt)
         @argcheck(!isempty(train_idx),
@@ -118,15 +122,25 @@ IndexWalkForward
   - [`n_splits`](@ref)
 """
 @concrete struct IndexWalkForward <: WalkForwardEstimator
-    "$(field_dict[:train_size])"
+    """
+    $(field_dict[:train_size])
+    """
     train_size
-    "$(field_dict[:test_size])"
+    """
+    $(field_dict[:test_size])
+    """
     test_size
-    "$(field_dict[:purged_size])"
+    """
+    $(field_dict[:purged_size])
+    """
     purged_size
-    "$(field_dict[:expand_train])"
+    """
+    $(field_dict[:expand_train])
+    """
     expand_train
-    "$(field_dict[:reduce_test])"
+    """
+    $(field_dict[:reduce_test])
+    """
     reduce_test
     function IndexWalkForward(train_size::Integer, test_size::Integer, purged_size::Integer,
                               expand_train::Bool, reduce_test::Bool)
@@ -330,23 +344,41 @@ DateWalkForward
   - [`n_splits`](@ref)
 """
 @concrete struct DateWalkForward <: WalkForwardEstimator
-    "$(field_dict[:train_size])"
+    """
+    $(field_dict[:train_size])
+    """
     train_size
-    "$(field_dict[:test_size])"
+    """
+    $(field_dict[:test_size])
+    """
     test_size
-    "$(field_dict[:period])"
+    """
+    $(field_dict[:period])
+    """
     period
-    "$(field_dict[:period_offset])"
+    """
+    $(field_dict[:period_offset])
+    """
     period_offset
-    "$(field_dict[:purged_size])"
+    """
+    $(field_dict[:purged_size])
+    """
     purged_size
-    "$(field_dict[:adjuster])"
+    """
+    $(field_dict[:adjuster])
+    """
     adjuster
-    "$(field_dict[:previous])"
+    """
+    $(field_dict[:previous])
+    """
     previous
-    "$(field_dict[:expand_train])"
+    """
+    $(field_dict[:expand_train])
+    """
     expand_train
-    "$(field_dict[:reduce_test])"
+    """
+    $(field_dict[:reduce_test])
+    """
     reduce_test
     function DateWalkForward(train_size::IntPeriodDateRange, test_size::Integer,
                              period::DatesUnionPeriod,

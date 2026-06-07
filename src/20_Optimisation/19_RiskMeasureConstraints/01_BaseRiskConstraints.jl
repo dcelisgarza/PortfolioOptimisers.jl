@@ -160,6 +160,7 @@ directly to the model.
   - `r_expr::JuMP.AbstractJuMPScalar`: The risk JuMP expression to bound.
   - `ub`: Upper bound; a scalar number or a frontier specification.
   - `key::Symbol`: Symbol used to name the constraint in the model.
+  - `flag::Bool`: If true, sets upper bound; if false sets lower bound (default: `true`).
 
 # Returns
 
@@ -181,27 +182,31 @@ end
 #        settings = Dict("verbose" => false, "max_step_fraction" => 0.75))
 # https://discourse.julialang.org/t/solver-attributes-and-set-optimizer-with-parametricoptinterface-jl-and-jump-jl/129935/8?u=dcelisgarza
 function set_risk_upper_bound!(model::JuMP.Model, ::NonFRCJuMPOpt,
-                               r_expr::JuMP.AbstractJuMPScalar, ub::Front_NumVec, key)
+                               r_expr::JuMP.AbstractJuMPScalar, ub::Front_NumVec, key,
+                               flag::Bool = true)
     bound_key = Symbol(key, :_ub)
     bound_var_key = Symbol(key, :_ub_var)
     if !haskey(model, :risk_frontier)
         risk_frontier = JuMP.@expression(model, risk_frontier,
                                          Pair{Tuple{Symbol, Symbol},
                                               Tuple{<:JuMP.AbstractJuMPScalar,
-                                                    <:Front_NumVec}}[(bound_var_key, bound_key) => (r_expr,
-                                                                                                    ub)])
+                                                    <:Front_NumVec, Bool}}[(bound_var_key, bound_key) => (r_expr,
+                                                                                                          ub,
+                                                                                                          flag)])
     else
         risk_frontier = model[:risk_frontier]
-        push!(risk_frontier, (bound_var_key, bound_key) => (r_expr, ub))
+        push!(risk_frontier, (bound_var_key, bound_key) => (r_expr, ub, flag))
     end
     return nothing
 end
 function set_risk_upper_bound!(model::JuMP.Model, ::NonFRCJuMPOpt,
-                               r_expr::JuMP.AbstractJuMPScalar, ub::Number, key)
+                               r_expr::JuMP.AbstractJuMPScalar, ub::Number, key,
+                               flag::Bool = true)
     k = model[:k]
     sc = model[:sc]
     bound_key = Symbol(key, :_ub)
-    model[bound_key] = JuMP.@constraint(model, sc * (r_expr - ub * k) <= 0)
+    d = ifelse(flag, 1, -1)
+    model[bound_key] = JuMP.@constraint(model, d * sc * (r_expr - ub * k) <= 0)
     return nothing
 end
 """
@@ -255,6 +260,7 @@ with `settings.scale` and `settings.rke`.
   - `r_expr::JuMP.AbstractJuMPScalar`: Risk JuMP expression.
   - `settings::RiskMeasureSettings`: Settings carrying upper bound, scale, and `rke` flag.
   - $(arg_dict[:key_sym])
+  - `flag::Bool`: If true, sets upper bound; if false sets lower bound (default: `true`).
 
 # Returns
 
@@ -268,8 +274,9 @@ with `settings.scale` and `settings.rke`.
 function set_risk_bounds_and_expression!(model::JuMP.Model,
                                          opt::RiskJuMPOptimisationEstimator,
                                          r_expr::JuMP.AbstractJuMPScalar,
-                                         settings::RiskMeasureSettings, key)
-    set_risk_upper_bound!(model, opt, r_expr, settings.ub, key)
+                                         settings::RiskMeasureSettings, key,
+                                         flag::Bool = true)
+    set_risk_upper_bound!(model, opt, r_expr, settings.ub, key, flag)
     set_risk_expression!(model, r_expr, settings.scale, settings.rke)
     return nothing
 end

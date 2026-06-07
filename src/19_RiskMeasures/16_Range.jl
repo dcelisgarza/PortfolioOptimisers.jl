@@ -60,7 +60,9 @@ Range
   - [`ValueatRiskRange`](@ref)
 """
 @concrete struct Range <: RiskMeasure
-    "$(field_dict[:settings_rm])"
+    """
+    $(field_dict[:settings_rm])
+    """
     settings
     function Range(settings::RiskMeasureSettings)
         return new{typeof(settings)}(settings)

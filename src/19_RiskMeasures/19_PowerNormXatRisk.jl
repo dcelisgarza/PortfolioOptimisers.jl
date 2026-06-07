@@ -145,15 +145,25 @@ PowerNormValueatRisk
   - [`PowerNormDrawdownatRisk`](@ref)
 """
 @concrete struct PowerNormValueatRisk <: RiskMeasure
-    "$(field_dict[:settings_rm])"
+    """
+    $(field_dict[:settings_rm])
+    """
     settings
-    "$(field_dict[:slv])"
+    """
+    $(field_dict[:slv])
+    """
     slv
-    "$(field_dict[:alpha])"
+    """
+    $(field_dict[:alpha])
+    """
     alpha
-    "$(field_dict[:p_rm])"
+    """
+    $(field_dict[:p_rm])
+    """
     p
-    "$(field_dict[:w_rm])"
+    """
+    $(field_dict[:w_rm])
+    """
     w
     function PowerNormValueatRisk(settings::RiskMeasureSettings, slv::Option{<:Slv_VecSlv},
                                   alpha::Number, p::Number,
@@ -261,19 +271,33 @@ PowerNormValueatRiskRange
   - [`EntropicValueatRiskRange`](@ref)
 """
 @concrete struct PowerNormValueatRiskRange <: RiskMeasure
-    "$(field_dict[:settings_rm])"
+    """
+    $(field_dict[:settings_rm])
+    """
     settings
-    "$(field_dict[:slv])"
+    """
+    $(field_dict[:slv])
+    """
     slv
-    "$(field_dict[:alpha])"
+    """
+    $(field_dict[:alpha])
+    """
     alpha
-    "$(field_dict[:beta])"
+    """
+    $(field_dict[:beta])
+    """
     beta
-    "$(field_dict[:pa_rm])"
+    """
+    $(field_dict[:pa_rm])
+    """
     pa
-    "$(field_dict[:pb_rm])"
+    """
+    $(field_dict[:pb_rm])
+    """
     pb
-    "$(field_dict[:w_rm])"
+    """
+    $(field_dict[:w_rm])
+    """
     w
     function PowerNormValueatRiskRange(settings::RiskMeasureSettings,
                                        slv::Option{<:Slv_VecSlv}, alpha::Number,
@@ -419,15 +443,25 @@ PowerNormDrawdownatRisk
   - [`RelativePowerNormDrawdownatRisk`](@ref)
 """
 @concrete struct PowerNormDrawdownatRisk <: RiskMeasure
-    "$(field_dict[:settings_rm])"
+    """
+    $(field_dict[:settings_rm])
+    """
     settings
-    "$(field_dict[:slv])"
+    """
+    $(field_dict[:slv])
+    """
     slv
-    "$(field_dict[:alpha])"
+    """
+    $(field_dict[:alpha])
+    """
     alpha
-    "$(field_dict[:p_rm])"
+    """
+    $(field_dict[:p_rm])
+    """
     p
-    "$(field_dict[:w_rm])"
+    """
+    $(field_dict[:w_rm])
+    """
     w
     function PowerNormDrawdownatRisk(settings::RiskMeasureSettings,
                                      slv::Option{<:Slv_VecSlv}, alpha::Number, p::Number,
@@ -549,15 +583,25 @@ RelativePowerNormDrawdownatRisk
   - [`RelativeEntropicDrawdownatRisk`](@ref)
 """
 @concrete struct RelativePowerNormDrawdownatRisk <: HierarchicalRiskMeasure
-    "$(field_dict[:settings_rm])"
+    """
+    $(field_dict[:settings_rm])
+    """
     settings
-    "$(field_dict[:slv])"
+    """
+    $(field_dict[:slv])
+    """
     slv
-    "$(field_dict[:alpha])"
+    """
+    $(field_dict[:alpha])
+    """
     alpha
-    "$(field_dict[:p_rm])"
+    """
+    $(field_dict[:p_rm])
+    """
     p
-    "$(field_dict[:w_rm])"
+    """
+    $(field_dict[:w_rm])
+    """
     w
     function RelativePowerNormDrawdownatRisk(settings::HierarchicalRiskMeasureSettings,
                                              slv::Option{<:Slv_VecSlv}, alpha::Number,

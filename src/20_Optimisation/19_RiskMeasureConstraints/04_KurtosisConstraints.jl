@@ -118,7 +118,7 @@ function set_kurtosis_risk!(model::JuMP.Model,
                             args...)
     qsqrt_kurtosis_risk = model[Symbol(:sq_, key)] = JuMP.@expression(model,
                                                                       sqrt_kurtosis_risk^2)
-    ub = variance_risk_bounds_val(false, r.settings.ub)
+    ub = variance_risk_bounds_val(SquareRootBound(), r.settings.ub)
     set_risk_upper_bound!(model, opt, sqrt_kurtosis_risk, ub, key)
     set_risk_expression!(model, qsqrt_kurtosis_risk, r.settings.scale, r.settings.rke)
     return qsqrt_kurtosis_risk
@@ -131,7 +131,7 @@ function set_kurtosis_risk!(model::JuMP.Model,
     qsqrt_kurtosis_risk = model[Symbol(:qd_, key)] = JuMP.@expression(model,
                                                                       LinearAlgebra.dot(x_kurt,
                                                                                         x_kurt))
-    ub = variance_risk_bounds_val(false, r.settings.ub)
+    ub = variance_risk_bounds_val(SquareRootBound(), r.settings.ub)
     set_risk_upper_bound!(model, opt, sqrt_kurtosis_risk, ub, key)
     set_risk_expression!(model, qsqrt_kurtosis_risk, r.settings.scale, r.settings.rke)
     return qsqrt_kurtosis_risk
@@ -150,7 +150,7 @@ function set_kurtosis_risk!(model::JuMP.Model,
                                                                                  sc *
                                                                                  x_kurt] in
                                                                                 JuMP.RotatedSecondOrderCone())
-    ub = variance_risk_bounds_val(false, r.settings.ub)
+    ub = variance_risk_bounds_val(SquareRootBound(), r.settings.ub)
     set_risk_upper_bound!(model, opt, sqrt_kurtosis_risk, ub, key)
     set_risk_expression!(model, qsqrt_kurtosis_risk, r.settings.scale, r.settings.rke)
     return qsqrt_kurtosis_risk

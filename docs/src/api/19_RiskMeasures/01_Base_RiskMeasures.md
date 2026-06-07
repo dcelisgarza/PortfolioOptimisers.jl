@@ -14,6 +14,11 @@ AbstractBaseRiskMeasure
 NonOptimisationRiskMeasure
 OptimisationRiskMeasure
 AbstractRiskMeasureSettings
+JuMPRiskMeasureSettings
+FrontierBoundEstimator
+LinearBound
+SquareRootBound
+SquaredBound
 Scalariser
 NonHierarchicalScalariser
 HierarchicalScalariser

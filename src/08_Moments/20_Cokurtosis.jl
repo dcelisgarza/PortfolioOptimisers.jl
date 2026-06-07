@@ -157,13 +157,21 @@ Cokurtosis
   - [`AbstractMomentAlgorithm`](@ref)
 """
 @concrete struct Cokurtosis <: CokurtosisEstimator
-    "$(field_dict[:me])"
+    """
+    $(field_dict[:me])
+    """
     me
-    "$(field_dict[:mp])"
+    """
+    $(field_dict[:mp])
+    """
     mp
-    "$(field_dict[:malg])"
+    """
+    $(field_dict[:malg])
+    """
     alg
-    "$(field_dict[:oow])"
+    """
+    $(field_dict[:oow])
+    """
     w
     function Cokurtosis(me::AbstractExpectedReturnsEstimator,
                         mp::AbstractMatrixProcessingEstimator, alg::AbstractMomentAlgorithm,

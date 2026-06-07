@@ -77,8 +77,10 @@
                                           opt = JuMPOptimiser(; pe = pr,
                                                               slv = Solver(;
                                                                            solver = Clarabel.Optimizer,
-                                                                           settings = ["verbose" => false,
-                                                                                       "max_iter" => 1])),
+                                                                           settings = ["verbose" =>
+                                                                                           false,
+                                                                                       "max_iter" =>
+                                                                                           1])),
                                           fb = InverseVolatility(; pe = pr)), rd)
     @test isapprox(res.w, optimise(InverseVolatility(; pe = pr)).w)
 end

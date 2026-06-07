@@ -643,29 +643,53 @@ LowOrderPrior
   - [`HighOrderPrior`](@ref)
 """
 @concrete struct LowOrderPrior <: AbstractPriorResult
-    "$(field_dict[:X])"
+    """
+    $(field_dict[:X])
+    """
     X
-    "$(field_dict[:mu])"
+    """
+    $(field_dict[:mu])
+    """
     mu
-    "$(field_dict[:sigma])"
+    """
+    $(field_dict[:sigma])
+    """
     sigma
-    "$(field_dict[:chol])"
+    """
+    $(field_dict[:chol])
+    """
     chol
-    "$(field_dict[:w_prior])"
+    """
+    $(field_dict[:w_prior])
+    """
     w
-    "$(field_dict[:ens])"
+    """
+    $(field_dict[:ens])
+    """
     ens
-    "$(field_dict[:kld])"
+    """
+    $(field_dict[:kld])
+    """
     kld
-    "$(field_dict[:op_w])"
+    """
+    $(field_dict[:op_w])
+    """
     ow
-    "$(field_dict[:reg_rr])"
+    """
+    $(field_dict[:reg_rr])
+    """
     rr
-    "$(field_dict[:f_mu])"
+    """
+    $(field_dict[:f_mu])
+    """
     f_mu
-    "$(field_dict[:f_sigma])"
+    """
+    $(field_dict[:f_sigma])
+    """
     f_sigma
-    "$(field_dict[:f_w])"
+    """
+    $(field_dict[:f_w])
+    """
     f_w
     function LowOrderPrior(X::MatNum, mu::VecNum, sigma::MatNum, chol::Option{<:MatNum},
                            w::Option{<:ObsWeights}, ens::Option{<:Number},
@@ -756,6 +780,7 @@ $(DocStringExtensions.FIELDS)
     HighOrderPrior(;
         pr::AbstractPriorResult,
         kt::Option{<:MatNum} = nothing,
+        D2::Option{<:MatNum} = nothing,
         L2::Option{<:MatNum} = nothing,
         S2::Option{<:MatNum} = nothing,
         sk::Option{<:MatNum} = nothing,
@@ -778,6 +803,7 @@ Defining `N = length(pr.mu)`.
 julia> HighOrderPrior(;
                       pr = LowOrderPrior(; X = [0.01 0.02; 0.03 0.04], mu = [0.02, 0.03],
                                          sigma = [0.0001 0.0002; 0.0002 0.0003]), kt = rand(4, 4),
+                      D2 = PortfolioOptimisers.duplication_matrix(2),
                       L2 = PortfolioOptimisers.elimination_matrix(2),
                       S2 = PortfolioOptimisers.summation_matrix(2), sk = rand(2, 4),
                       V = rand(2, 2))
@@ -796,6 +822,7 @@ HighOrderPrior
        │   f_sigma ┼ nothing
        │       f_w ┴ nothing
     kt ┼ 4×4 Matrix{Float64}
+    D2 ┼ 4×3 SparseArrays.SparseMatrixCSC{Int64, Int64}
     L2 ┼ 3×4 SparseArrays.SparseMatrixCSC{Int64, Int64}
     S2 ┼ 3×4 SparseArrays.SparseMatrixCSC{Int64, Int64}
     sk ┼ 2×4 Matrix{Float64}
@@ -814,34 +841,59 @@ HighOrderPrior
   - [`prior`](@ref)
 """
 @concrete struct HighOrderPrior <: AbstractPriorResult
-    "$(field_dict[:pr])"
+    """
+    $(field_dict[:pr])
+    """
     pr
-    "$(field_dict[:kt])"
+    """
+    $(field_dict[:kt])
+    """
     kt
-    "$(field_dict[:L2])"
+    """
+    $(field_dict[:D2])
+    """
+    D2
+    """
+    $(field_dict[:L2])
+    """
     L2
-    "$(field_dict[:S2])"
+    """
+    $(field_dict[:S2])
+    """
     S2
-    "$(field_dict[:sk])"
+    """
+    $(field_dict[:sk])
+    """
     sk
-    "$(field_dict[:V])"
+    """
+    $(field_dict[:V])
+    """
     V
-    "$(field_dict[:skmp])"
+    """
+    $(field_dict[:skmp])
+    """
     skmp
-    "$(field_dict[:f_kt])"
+    """
+    $(field_dict[:f_kt])
+    """
     f_kt
     # chol_kt
-    "$(field_dict[:f_sk])"
+    """
+    $(field_dict[:f_sk])
+    """
     f_sk
-    "$(field_dict[:f_V])"
+    """
+    $(field_dict[:f_V])
+    """
     f_V
     function HighOrderPrior(pr::AbstractPriorResult, kt::Option{<:MatNum},
-                            L2::Option{<:MatNum}, S2::Option{<:MatNum},
-                            sk::Option{<:MatNum}, V::Option{<:MatNum},
+                            D2::Option{<:MatNum}, L2::Option{<:MatNum},
+                            S2::Option{<:MatNum}, sk::Option{<:MatNum}, V::Option{<:MatNum},
                             skmp::Option{<:AbstractMatrixProcessingEstimator},
                             f_kt::Option{<:MatNum}, #chol_kt::Option{<:MatNum},
                             f_sk::Option{<:MatNum}, f_V::Option{<:MatNum})
         N = length(pr.mu)
+        sk_flag = isa(sk, MatNum)
         kt_flag = isa(kt, MatNum)
         L2_flag = isa(L2, MatNum)
         S2_flag = isa(S2, MatNum)
@@ -854,8 +906,12 @@ HighOrderPrior
             @argcheck(!isempty(S2))
             @argcheck(size(kt) == (N^2, N^2))
             @argcheck(size(L2) == size(S2) == (div(N * (N + 1), 2), N^2))
+            if sk_flag
+                @argcheck(isa(D2, MatNum))
+                @argcheck(!isempty(D2))
+                @argcheck(size(D2) == size(transpose(L2)))
+            end
         end
-        sk_flag = isa(sk, MatNum)
         V_flag = isa(V, MatNum)
         if sk_flag || V_flag
             @argcheck(sk_flag)
@@ -885,22 +941,23 @@ HighOrderPrior
                 @argcheck(size(f_V) == (Nf, Nf))
             end
         end
-        return new{typeof(pr), typeof(kt), typeof(L2), typeof(S2), typeof(sk), typeof(V),
-                   typeof(skmp), typeof(f_kt), #typeof(chol_kt),
-                   typeof(f_sk), typeof(f_V)}(pr, kt, L2, S2, sk, V, skmp, f_kt,
+        return new{typeof(pr), typeof(kt), typeof(D2), typeof(L2), typeof(S2), typeof(sk),
+                   typeof(V), typeof(skmp), typeof(f_kt), #typeof(chol_kt),
+                   typeof(f_sk), typeof(f_V)}(pr, kt, D2, L2, S2, sk, V, skmp, f_kt,
                                               #  chol_kt,
                                               f_sk, f_V)
     end
 end
 function HighOrderPrior(; pr::AbstractPriorResult, kt::Option{<:MatNum} = nothing,
-                        L2::Option{<:MatNum} = nothing, S2::Option{<:MatNum} = nothing,
-                        sk::Option{<:MatNum} = nothing, V::Option{<:MatNum} = nothing,
+                        D2::Option{<:MatNum} = nothing, L2::Option{<:MatNum} = nothing,
+                        S2::Option{<:MatNum} = nothing, sk::Option{<:MatNum} = nothing,
+                        V::Option{<:MatNum} = nothing,
                         skmp::Option{<:AbstractMatrixProcessingEstimator} = nothing,
                         f_kt::Option{<:MatNum} = nothing,
                         # chol_kt::Option{<:MatNum} = nothing,
                         f_sk::Option{<:MatNum} = nothing,
                         f_V::Option{<:MatNum} = nothing)::HighOrderPrior
-    return HighOrderPrior(pr, kt, L2, S2, sk, V, skmp, f_kt, #chol_kt,
+    return HighOrderPrior(pr, kt, D2, L2, S2, sk, V, skmp, f_kt, #chol_kt,
                           f_sk, f_V)
 end
 """
@@ -916,7 +973,6 @@ Return a view of a [`HighOrderPrior`](@ref) restricted to assets at index `i`, s
 function prior_view(pr::HighOrderPrior, i)
     idx = fourth_moment_index_generator(length(pr.mu), i)
     kt = pr.kt
-    L2, S2 = dup_elim_sum_view(kt, length(i))[2:3]
     sk = pr.sk
     skmp = pr.skmp
     sk = nothing_scalar_array_view_odd_order(sk, i, idx)
@@ -925,10 +981,18 @@ function prior_view(pr::HighOrderPrior, i)
     else
         V = nothing
     end
+    if !isnothing(pr.D2)
+        D2, L2, S2 = dup_elim_sum_view(kt, length(i))
+    elseif !isnothing(pr.S2)
+        D2 = nothing
+        L2, S2 = dup_elim_sum_view(kt, length(i))[2:3]
+    else
+        D2, L2, S2 = (nothing, nothing, nothing)
+    end
     return HighOrderPrior(; pr = prior_view(pr.pr, i),
-                          kt = nothing_scalar_array_view(kt, idx), L2 = L2, S2 = S2,
-                          sk = sk, V = V, skmp = skmp, f_kt = pr.f_kt, f_sk = pr.f_sk,
-                          f_V = pr.f_V)
+                          kt = nothing_scalar_array_view(kt, idx), D2 = D2, L2 = L2,
+                          S2 = S2, sk = sk, V = V, skmp = skmp, f_kt = pr.f_kt,
+                          f_sk = pr.f_sk, f_V = pr.f_V)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

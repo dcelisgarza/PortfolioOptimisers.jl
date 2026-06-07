@@ -121,23 +121,41 @@ ReturnsResult
   - [`Num_VecNum`](@ref)
 """
 @concrete struct ReturnsResult <: AbstractReturnsResult
-    "Names or identifiers of asset columns (assets × 1)."
+    """
+    Names or identifiers of asset columns (assets × 1).
+    """
     nx
-    "Asset returns matrix (observations × assets)."
+    """
+    Asset returns matrix (observations × assets).
+    """
     X
-    "Names or identifiers of factor columns (factors × 1)."
+    """
+    Names or identifiers of factor columns (factors × 1).
+    """
     nf
-    "Factor returns matrix (observations × factors)."
+    """
+    Factor returns matrix (observations × factors).
+    """
     F
-    "Names or identifiers of benchmark columns (observations × 1) or (observations × assets)."
+    """
+    Names or identifiers of benchmark columns (observations × 1) or (observations × assets).
+    """
     nb
-    "Benchmark prices (observations × 1) or (observations × assets)."
+    """
+    Benchmark prices (observations × 1) or (observations × assets).
+    """
     B
-    "Optional timestamps for each observation (observations × 1)."
+    """
+    Optional timestamps for each observation (observations × 1).
+    """
     ts
-    "Implied volatilities matrix (observations × assets)."
+    """
+    Implied volatilities matrix (observations × assets).
+    """
     iv
-    "Implied volatility risk premium adjustment, if a vector (assets × 1)."
+    """
+    Implied volatility risk premium adjustment, if a vector (assets × 1).
+    """
     ivpa
     function ReturnsResult(nx::Option{<:VecStr}, X::Option{<:MatNum}, nf::Option{<:VecStr},
                            F::Option{<:MatNum}, nb::Option{<:VecStr},
@@ -599,7 +617,9 @@ function prices_to_returns(X::TimeSeries.TimeArray,
     end
     X = DataFrames.DataFrame(X)
 
-    f(x) = isa(x, Number) && isnan(x) ? missing : x
+    f(x) = if isa(x, Number)
+        isnan(x)
+    end ? missing : x
 
     DataFrames.transform!(X, 2:DataFrames.DataAPI.ncol(X) .=> DataFrames.ByRow((x) -> f(x));
                           renamecols = false)

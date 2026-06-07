@@ -45,86 +45,138 @@
     mip_slv = [Solver(; name = :mip1,
                       solver = optimizer_with_attributes(Pajarito.Optimizer,
                                                          "verbose" => false,
-                                                         "oa_solver" => optimizer_with_attributes(HiGHS.Optimizer,
-                                                                                                  JuMP.MOI.Silent() => true),
-                                                         "conic_solver" => optimizer_with_attributes(Clarabel.Optimizer,
-                                                                                                     "verbose" => false)),
+                                                         "oa_solver" =>
+                                                             optimizer_with_attributes(HiGHS.Optimizer,
+                                                                                       JuMP.MOI.Silent() =>
+                                                                                           true),
+                                                         "conic_solver" =>
+                                                             optimizer_with_attributes(Clarabel.Optimizer,
+                                                                                       "verbose" =>
+                                                                                           false)),
                       check_sol = (; allow_local = true, allow_almost = true)),
                Solver(; name = :mip2,
                       solver = optimizer_with_attributes(Pajarito.Optimizer,
                                                          "verbose" => false,
-                                                         "oa_solver" => optimizer_with_attributes(HiGHS.Optimizer,
-                                                                                                  JuMP.MOI.Silent() => true),
-                                                         "conic_solver" => optimizer_with_attributes(Clarabel.Optimizer,
-                                                                                                     "verbose" => false,
-                                                                                                     "max_step_fraction" => 0.95)),
+                                                         "oa_solver" =>
+                                                             optimizer_with_attributes(HiGHS.Optimizer,
+                                                                                       JuMP.MOI.Silent() =>
+                                                                                           true),
+                                                         "conic_solver" =>
+                                                             optimizer_with_attributes(Clarabel.Optimizer,
+                                                                                       "verbose" =>
+                                                                                           false,
+                                                                                       "max_step_fraction" =>
+                                                                                           0.95)),
                       check_sol = (; allow_local = true, allow_almost = true)),
                Solver(; name = :mip3,
                       solver = optimizer_with_attributes(Pajarito.Optimizer,
                                                          "verbose" => false,
-                                                         "oa_solver" => optimizer_with_attributes(HiGHS.Optimizer,
-                                                                                                  JuMP.MOI.Silent() => true),
-                                                         "conic_solver" => optimizer_with_attributes(Clarabel.Optimizer,
-                                                                                                     "verbose" => false,
-                                                                                                     "max_step_fraction" => 0.90)),
+                                                         "oa_solver" =>
+                                                             optimizer_with_attributes(HiGHS.Optimizer,
+                                                                                       JuMP.MOI.Silent() =>
+                                                                                           true),
+                                                         "conic_solver" =>
+                                                             optimizer_with_attributes(Clarabel.Optimizer,
+                                                                                       "verbose" =>
+                                                                                           false,
+                                                                                       "max_step_fraction" =>
+                                                                                           0.90)),
                       check_sol = (; allow_local = true, allow_almost = true)),
                Solver(; name = :mip4,
                       solver = optimizer_with_attributes(Pajarito.Optimizer,
                                                          "verbose" => false,
-                                                         "oa_solver" => optimizer_with_attributes(HiGHS.Optimizer,
-                                                                                                  JuMP.MOI.Silent() => true),
-                                                         "conic_solver" => optimizer_with_attributes(Clarabel.Optimizer,
-                                                                                                     "verbose" => false,
-                                                                                                     "max_step_fraction" => 0.85)),
+                                                         "oa_solver" =>
+                                                             optimizer_with_attributes(HiGHS.Optimizer,
+                                                                                       JuMP.MOI.Silent() =>
+                                                                                           true),
+                                                         "conic_solver" =>
+                                                             optimizer_with_attributes(Clarabel.Optimizer,
+                                                                                       "verbose" =>
+                                                                                           false,
+                                                                                       "max_step_fraction" =>
+                                                                                           0.85)),
                       check_sol = (; allow_local = true, allow_almost = true)),
                Solver(; name = :mip5,
                       solver = optimizer_with_attributes(Pajarito.Optimizer,
                                                          "verbose" => false,
-                                                         "oa_solver" => optimizer_with_attributes(HiGHS.Optimizer,
-                                                                                                  JuMP.MOI.Silent() => true),
-                                                         "conic_solver" => optimizer_with_attributes(Clarabel.Optimizer,
-                                                                                                     "verbose" => false,
-                                                                                                     "max_step_fraction" => 0.80)),
+                                                         "oa_solver" =>
+                                                             optimizer_with_attributes(HiGHS.Optimizer,
+                                                                                       JuMP.MOI.Silent() =>
+                                                                                           true),
+                                                         "conic_solver" =>
+                                                             optimizer_with_attributes(Clarabel.Optimizer,
+                                                                                       "verbose" =>
+                                                                                           false,
+                                                                                       "max_step_fraction" =>
+                                                                                           0.80)),
                       check_sol = (; allow_local = true, allow_almost = true)),
                Solver(; name = :mip6,
                       solver = optimizer_with_attributes(Pajarito.Optimizer,
                                                          "verbose" => false,
-                                                         "oa_solver" => optimizer_with_attributes(HiGHS.Optimizer,
-                                                                                                  JuMP.MOI.Silent() => true),
-                                                         "conic_solver" => optimizer_with_attributes(Clarabel.Optimizer,
-                                                                                                     "verbose" => false,
-                                                                                                     "max_step_fraction" => 0.75)),
+                                                         "oa_solver" =>
+                                                             optimizer_with_attributes(HiGHS.Optimizer,
+                                                                                       JuMP.MOI.Silent() =>
+                                                                                           true),
+                                                         "conic_solver" =>
+                                                             optimizer_with_attributes(Clarabel.Optimizer,
+                                                                                       "verbose" =>
+                                                                                           false,
+                                                                                       "max_step_fraction" =>
+                                                                                           0.75)),
                       check_sol = (; allow_local = true, allow_almost = true)),
                Solver(; name = :mip7,
                       solver = optimizer_with_attributes(Pajarito.Optimizer,
                                                          "verbose" => false,
-                                                         "oa_solver" => optimizer_with_attributes(HiGHS.Optimizer,
-                                                                                                  JuMP.MOI.Silent() => true),
-                                                         "conic_solver" => optimizer_with_attributes(Clarabel.Optimizer,
-                                                                                                     "verbose" => false,
-                                                                                                     "max_step_fraction" => 0.7)),
+                                                         "oa_solver" =>
+                                                             optimizer_with_attributes(HiGHS.Optimizer,
+                                                                                       JuMP.MOI.Silent() =>
+                                                                                           true),
+                                                         "conic_solver" =>
+                                                             optimizer_with_attributes(Clarabel.Optimizer,
+                                                                                       "verbose" =>
+                                                                                           false,
+                                                                                       "max_step_fraction" =>
+                                                                                           0.7)),
                       check_sol = (; allow_local = true, allow_almost = true)),
                Solver(; name = :mip8,
                       solver = optimizer_with_attributes(Pajarito.Optimizer,
                                                          "verbose" => false,
-                                                         "oa_solver" => optimizer_with_attributes(HiGHS.Optimizer,
-                                                                                                  JuMP.MOI.Silent() => true),
-                                                         "conic_solver" => optimizer_with_attributes(Clarabel.Optimizer,
-                                                                                                     "verbose" => false,
-                                                                                                     "max_step_fraction" => 0.6,
-                                                                                                     "max_iter" => 1500,
-                                                                                                     "tol_gap_abs" => 1e-4,
-                                                                                                     "tol_gap_rel" => 1e-4,
-                                                                                                     "tol_ktratio" => 1e-3,
-                                                                                                     "tol_feas" => 1e-4,
-                                                                                                     "tol_infeas_abs" => 1e-4,
-                                                                                                     "tol_infeas_rel" => 1e-4,
-                                                                                                     "reduced_tol_gap_abs" => 1e-4,
-                                                                                                     "reduced_tol_gap_rel" => 1e-4,
-                                                                                                     "reduced_tol_ktratio" => 1e-3,
-                                                                                                     "reduced_tol_feas" => 1e-4,
-                                                                                                     "reduced_tol_infeas_abs" => 1e-4,
-                                                                                                     "reduced_tol_infeas_rel" => 1e-4)),
+                                                         "oa_solver" =>
+                                                             optimizer_with_attributes(HiGHS.Optimizer,
+                                                                                       JuMP.MOI.Silent() =>
+                                                                                           true),
+                                                         "conic_solver" =>
+                                                             optimizer_with_attributes(Clarabel.Optimizer,
+                                                                                       "verbose" =>
+                                                                                           false,
+                                                                                       "max_step_fraction" =>
+                                                                                           0.6,
+                                                                                       "max_iter" =>
+                                                                                           1500,
+                                                                                       "tol_gap_abs" =>
+                                                                                           1e-4,
+                                                                                       "tol_gap_rel" =>
+                                                                                           1e-4,
+                                                                                       "tol_ktratio" =>
+                                                                                           1e-3,
+                                                                                       "tol_feas" =>
+                                                                                           1e-4,
+                                                                                       "tol_infeas_abs" =>
+                                                                                           1e-4,
+                                                                                       "tol_infeas_rel" =>
+                                                                                           1e-4,
+                                                                                       "reduced_tol_gap_abs" =>
+                                                                                           1e-4,
+                                                                                       "reduced_tol_gap_rel" =>
+                                                                                           1e-4,
+                                                                                       "reduced_tol_ktratio" =>
+                                                                                           1e-3,
+                                                                                       "reduced_tol_feas" =>
+                                                                                           1e-4,
+                                                                                       "reduced_tol_infeas_abs" =>
+                                                                                           1e-4,
+                                                                                       "reduced_tol_infeas_rel" =>
+                                                                                           1e-4)),
                       check_sol = (; allow_local = true, allow_almost = true))]
     pr = prior(HighOrderPriorEstimator(), rd)
     w0 = range(; start = inv(size(pr.X, 2)), stop = inv(size(pr.X, 2)),
@@ -149,11 +201,13 @@
     sets = AssetSets(;
                      dict = Dict("nx" => rd.nx, "group1" => rd.nx[1:2:end],
                                  "group2" => rd.nx[2:2:end],
-                                 "clusters1" => [1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2,
-                                                 3, 3, 3, 3, 3, 3],
-                                 "clusters2" => [1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2,
-                                                 3, 1, 2, 3, 1, 2], "c1" => rd.nx[1:3:end],
-                                 "c2" => rd.nx[2:3:end], "c3" => rd.nx[3:3:end]))
+                                 "clusters1" =>
+                                     [1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3,
+                                      3, 3],
+                                 "clusters2" =>
+                                     [1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3,
+                                      1, 2], "c1" => rd.nx[1:3:end], "c2" => rd.nx[2:3:end],
+                                 "c3" => rd.nx[3:3:end]))
     fsets = AssetSets(; dict = Dict("nx" => rd.nf))
     @testset "Asset Risk Budgeting" begin
         df = CSV.read(joinpath(@__DIR__, "./assets/AssetRiskBudgeting1.csv.gz"), DataFrame)
@@ -282,9 +336,12 @@
         rb = RiskBudgeting(;
                            rba = AssetRiskBudgeting(;
                                                     rkb = RiskBudgetEstimator(;
-                                                                              val = ["AAPL" => 0.5,
-                                                                                     "MSFT" => 0.25,
-                                                                                     "LLY" => 0.125]),
+                                                                              val = ["AAPL" =>
+                                                                                         0.5,
+                                                                                     "MSFT" =>
+                                                                                         0.25,
+                                                                                     "LLY" =>
+                                                                                         0.125]),
                                                     sets = sets),
                            opt = JuMPOptimiser(; pe = pr, slv = slv))
         res = optimise(rb, rd)
@@ -297,12 +354,15 @@
         res = optimise(RiskBudgeting(; wi = w0,
                                      rba = AssetRiskBudgeting(; sets = sets,
                                                               rkb = RiskBudgetEstimator(;
-                                                                                        val = ["AAPL" => 0.5])),
+                                                                                        val = ["AAPL" =>
+                                                                                                   0.5])),
                                      opt = JuMPOptimiser(; pe = pr,
                                                          slv = Solver(;
                                                                       solver = Clarabel.Optimizer,
-                                                                      settings = ["verbose" => false,
-                                                                                  "max_iter" => 1])),
+                                                                      settings = ["verbose" =>
+                                                                                      false,
+                                                                                  "max_iter" =>
+                                                                                      1])),
                                      fb = InverseVolatility(; pe = pr)))
         @test isapprox(res.w, optimise(InverseVolatility(; pe = pr)).w)
     end
@@ -439,7 +499,8 @@
         rb = RiskBudgeting(;
                            rba = FactorRiskBudgeting(; re = rr,
                                                      rkb = RiskBudgetEstimator(;
-                                                                               val = "MTUM" => 0.5),
+                                                                               val = "MTUM" =>
+                                                                                   0.5),
                                                      sets = fsets),
                            opt = JuMPOptimiser(; pe = pr, slv = slv,
                                                sbgt = BudgetRange(; lb = 0, ub = nothing),

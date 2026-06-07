@@ -70,11 +70,17 @@ TurnoverRiskMeasure
   - [`TrackingRiskMeasure`](@ref)
 """
 @concrete struct TurnoverRiskMeasure <: RiskMeasure
-    "$(field_dict[:settings_rm])"
+    """
+    $(field_dict[:settings_rm])
+    """
     settings
-    "$(field_dict[:w_ref])"
+    """
+    $(field_dict[:w_ref])
+    """
     w
-    "$(field_dict[:fixed])"
+    """
+    $(field_dict[:fixed])
+    """
     fixed
     function TurnoverRiskMeasure(settings::RiskMeasureSettings, w::VecNum, fixed::Bool)
         @argcheck(!isempty(w))

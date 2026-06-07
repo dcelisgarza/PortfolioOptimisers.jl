@@ -37,7 +37,9 @@ CorrelationCovariance
   - [`Covariance`](@ref)
 """
 @concrete struct CorrelationCovariance <: AbstractCovarianceEstimator
-    "$(field_dict[:ce])"
+    """
+    $(field_dict[:ce])
+    """
     ce
     function CorrelationCovariance(ce::StatsBase.CovarianceEstimator)
         return new{typeof(ce)}(ce)

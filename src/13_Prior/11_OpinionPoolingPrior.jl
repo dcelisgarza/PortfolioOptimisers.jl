@@ -105,7 +105,7 @@ julia> OpinionPoolingPrior(;
                                                                                            val = ["A == 0.05",
                                                                                                   "B + C >= 0.06"]))])
 OpinionPoolingPrior
-  pes ┼ EntropyPoolingPrior{EmpiricalPrior{PortfolioOptimisersCovariance{Covariance{SimpleExpectedReturns{Nothing}, GeneralCovariance{StatsBase.SimpleCovariance, Nothing}, Full}, DenoiseDetoneAlgMatrixProcessing{Posdef{UnionAll, @NamedTuple{}}, Nothing, Nothing, Nothing, DenoiseDetoneAlg}}, SimpleExpectedReturns{Nothing}, Nothing}, LinearConstraintEstimator{Vector{String}, Nothing}, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, AssetSets{String, String, Dict{String, Vector{String}}}, Nothing, Nothing, OptimEntropyPooling{Tuple{}, @NamedTuple{}, Int64, Float64, ExpEntropyPooling}, Nothing, H1_EntropyPooling}[EntropyPoolingPrior
+  pes ┼ EntropyPoolingPrior{EmpiricalPrior{PortfolioOptimisersCovariance{Covariance{SimpleExpectedReturns{Nothing}, GeneralCovariance{StatsBase.SimpleCovariance, Nothing}, Full}, DenoiseDetoneAlgMatrixProcessing{Posdef{UnionAll, @NamedTuple{}}, Nothing, Nothing, Nothing, DenoiseDetoneAlg}}, SimpleExpectedReturns{Nothing}, Nothing}, LinearConstraintEstimator{Vector{String}, Nothing}, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, AssetSets{String, String, Dict{String, Vector{String}}}, Nothing, Nothing, OptimEntropyPooling{Tuple{}, @NamedTuple{}, Int64, Float64, ExpEntropyPooling}, Nothing, H1_EntropyPooling}[EntropyPoolingPrior
       │            pe ┼ EmpiricalPrior
       │               │        ce ┼ PortfolioOptimisersCovariance
       │               │           │   ce ┼ Covariance
@@ -134,6 +134,7 @@ OpinionPoolingPrior
       │   sigma_views ┼ nothing
       │      sk_views ┼ nothing
       │      kt_views ┼ nothing
+      │     cov_views ┼ nothing
       │     rho_views ┼ nothing
       │     var_alpha ┼ nothing
       │    cvar_alpha ┼ nothing
@@ -180,6 +181,7 @@ OpinionPoolingPrior
       │   sigma_views ┼ nothing
       │      sk_views ┼ nothing
       │      kt_views ┼ nothing
+      │     cov_views ┼ nothing
       │     rho_views ┼ nothing
       │     var_alpha ┼ nothing
       │    cvar_alpha ┼ nothing
@@ -233,19 +235,33 @@ OpinionPoolingPrior
   - [`prior`](@ref)
 """
 @concrete struct OpinionPoolingPrior <: AbstractLowOrderPriorEstimator_AF
-    "$(field_dict[:pes])"
+    """
+    $(field_dict[:pes])
+    """
     pes
-    "$(field_dict[:pe1])"
+    """
+    $(field_dict[:pe1])
+    """
     pe1
-    "$(field_dict[:pe2])"
+    """
+    $(field_dict[:pe2])
+    """
     pe2
-    "$(field_dict[:p_pool])"
+    """
+    $(field_dict[:p_pool])
+    """
     p
-    "$(field_dict[:op_w])"
+    """
+    $(field_dict[:op_w])
+    """
     w
-    "$(field_dict[:opalg])"
+    """
+    $(field_dict[:opalg])
+    """
     alg
-    "$(field_dict[:ex])"
+    """
+    $(field_dict[:ex])
+    """
     ex
     function OpinionPoolingPrior(pes::VecEP,
                                  pe1::Option{<:AbstractLowOrderPriorEstimator_A_F_AF},

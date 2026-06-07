@@ -61,7 +61,9 @@ EqualRiskMeasure
   - [`RiskRatioRiskMeasure`](@ref)
 """
 @concrete struct EqualRiskMeasure <: HierarchicalRiskMeasure
-    "$(field_dict[:settings_rm])"
+    """
+    $(field_dict[:settings_rm])
+    """
     settings
     function EqualRiskMeasure(settings::HierarchicalRiskMeasureSettings)
         return new{typeof(settings)}(settings)

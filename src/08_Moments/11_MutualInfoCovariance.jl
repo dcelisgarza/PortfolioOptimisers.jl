@@ -59,11 +59,17 @@ MutualInfoCovariance
   - [`AbstractBins`](@ref)
 """
 @concrete struct MutualInfoCovariance <: AbstractCovarianceEstimator
-    "$(field_dict[:ve])"
+    """
+    $(field_dict[:ve])
+    """
     ve
-    "$(field_dict[:bins])"
+    """
+    $(field_dict[:bins])
+    """
     bins
-    "$(field_dict[:normalise])"
+    """
+    $(field_dict[:normalise])
+    """
     normalise
     function MutualInfoCovariance(ve::AbstractVarianceEstimator, bins::Int_Bin,
                                   normalise::Bool)

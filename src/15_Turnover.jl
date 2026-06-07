@@ -79,13 +79,21 @@ TurnoverEstimator
   - [`turnover_constraints`](@ref)
 """
 @concrete struct TurnoverEstimator <: AbstractEstimator
-    "$(field_dict[:w_tn])"
+    """
+    $(field_dict[:w_tn])
+    """
     w
-    "$(field_dict[:val])"
+    """
+    $(field_dict[:val])
+    """
     val
-    "$(field_dict[:dval])"
+    """
+    $(field_dict[:dval])
+    """
     dval
-    "$(field_dict[:fixed])"
+    """
+    $(field_dict[:fixed])
+    """
     fixed
     function TurnoverEstimator(w::VecNum, val::EstValType, dval::Option{<:Number},
                                fixed::Bool)::TurnoverEstimator
@@ -351,11 +359,17 @@ Turnover
   - [`turnover_view`](@ref)
 """
 @concrete struct Turnover <: AbstractResult
-    "$(field_dict[:w_tn])"
+    """
+    $(field_dict[:w_tn])
+    """
     w
-    "$(field_dict[:val])"
+    """
+    $(field_dict[:val])
+    """
     val
-    "$(field_dict[:fixed])"
+    """
+    $(field_dict[:fixed])
+    """
     fixed
     function Turnover(w::VecNum, val::Num_VecNum, fixed::Bool)::Turnover
         assert_nonempty_finite_val(w, :w)

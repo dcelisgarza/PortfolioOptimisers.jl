@@ -147,7 +147,9 @@ JamesStein
   - [`BodnarOkhrinParolya`](@ref)
 """
 @concrete struct JamesStein <: AbstractShrunkExpectedReturnsAlgorithm
-    "$(field_dict[:mutgt])"
+    """
+    $(field_dict[:mutgt])
+    """
     tgt
     function JamesStein(tgt::AbstractShrunkExpectedReturnsTarget)
         return new{typeof(tgt)}(tgt)
@@ -191,7 +193,9 @@ BayesStein
   - [`BodnarOkhrinParolya`](@ref)
 """
 @concrete struct BayesStein <: AbstractShrunkExpectedReturnsAlgorithm
-    "$(field_dict[:mutgt])"
+    """
+    $(field_dict[:mutgt])
+    """
     tgt
     function BayesStein(tgt::AbstractShrunkExpectedReturnsTarget)
         return new{typeof(tgt)}(tgt)
@@ -235,7 +239,9 @@ BodnarOkhrinParolya
   - [`BayesStein`](@ref)
 """
 @concrete struct BodnarOkhrinParolya <: AbstractShrunkExpectedReturnsAlgorithm
-    "$(field_dict[:mutgt])"
+    """
+    $(field_dict[:mutgt])
+    """
     tgt
     function BodnarOkhrinParolya(tgt::AbstractShrunkExpectedReturnsTarget)
         return new{typeof(tgt)}(tgt)
@@ -265,6 +271,13 @@ $(DocStringExtensions.FIELDS)
     ) -> ShrunkExpectedReturns
 
 Keywords correspond to the struct's fields.
+
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@prop`-tagged fields are automatically propagated:
+
+  - `me`: Recursively updated via [`factory`](@ref).
+  - `ce`: Recursively updated via [`factory`](@ref).
 
 # Examples
 
@@ -299,13 +312,21 @@ ShrunkExpectedReturns
   - [`AbstractExpectedReturnsEstimator`](@ref)
   - [`StatsBase.CovarianceEstimator`](https://juliastats.org/StatsBase.jl/stable/cov/#StatsBase.CovarianceEstimator)
   - [`AbstractShrunkExpectedReturnsAlgorithm`](@ref)
+  - [`factory`](@ref)
 """
-@concrete struct ShrunkExpectedReturns <: AbstractShrunkExpectedReturnsEstimator
-    "$(field_dict[:me])"
-    me
-    "$(field_dict[:ce])"
-    ce
-    "$(field_dict[:me_shrink_alg])"
+@propagatable @concrete struct ShrunkExpectedReturns <:
+                               AbstractShrunkExpectedReturnsEstimator
+    """
+    $(field_dict[:me])
+    """
+    @prop me
+    """
+    $(field_dict[:ce])
+    """
+    @prop ce
+    """
+    $(field_dict[:me_shrink_alg])
+    """
     alg
     function ShrunkExpectedReturns(me::AbstractExpectedReturnsEstimator,
                                    ce::StatsBase.CovarianceEstimator,
@@ -313,6 +334,12 @@ ShrunkExpectedReturns
         return new{typeof(me), typeof(ce), typeof(alg)}(me, ce, alg)
     end
 end
+#= Old factory function:
+function factory(me::ShrunkExpectedReturns, w::ObsWeights)::ShrunkExpectedReturns
+    return ShrunkExpectedReturns(; me = factory(me.me, w), ce = factory(me.ce, w),
+                                 alg = me.alg)
+end
+=#
 function ShrunkExpectedReturns(;
                                me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
                                ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
@@ -633,43 +660,6 @@ function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:BodnarOkhrinP
     alpha /= u * v - w^2
     beta = (one(alpha) - alpha) * w / u
     return alpha * mu + beta * b
-end
-"""
-    factory(ce::ShrunkExpectedReturns, w::ObsWeights) -> ShrunkExpectedReturns
-
-Return a new [`ShrunkExpectedReturns`](@ref) estimator with observation weights `w` applied to the underlying mean and covariance estimators.
-
-# Arguments
-
-  - `me`: Shrunk expected returns estimator.
-  - $(arg_dict[:ow])
-
-# Returns
-
-  - `me::ShrunkExpectedReturns`: Updated estimator with weights applied.
-
-# Examples
-
-```jldoctest
-julia> me = ShrunkExpectedReturns();
-
-julia> me2 = factory(me, StatsBase.Weights([0.2, 0.3, 0.5]));
-
-julia> me2.me.w
-3-element Weights{Float64, Float64, Vector{Float64}}:
- 0.2
- 0.3
- 0.5
-```
-
-# Related
-
-  - [`ShrunkExpectedReturns`](@ref)
-  - [`factory`](@ref)
-"""
-function factory(me::ShrunkExpectedReturns, w::ObsWeights)::ShrunkExpectedReturns
-    return ShrunkExpectedReturns(; me = factory(me.me, w), ce = factory(me.ce, w),
-                                 alg = me.alg)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

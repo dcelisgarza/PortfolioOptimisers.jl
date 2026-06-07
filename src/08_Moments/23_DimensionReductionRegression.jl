@@ -76,7 +76,9 @@ PCA
   - [`PPCA`](@ref)
 """
 @concrete struct PCA <: DimensionReductionTarget
-    "Keyword arguments passed to `fit(MultivariateStats.PCA, X; kwargs...)`"
+    """
+    Keyword arguments passed to `fit(MultivariateStats.PCA, X; kwargs...)`
+    """
     kwargs
     function PCA(kwargs::NamedTuple)
         return new{typeof(kwargs)}(kwargs)
@@ -144,7 +146,9 @@ PPCA
   - [`PCA`](@ref)
 """
 @concrete struct PPCA <: DimensionReductionTarget
-    "Keyword arguments passed to `fit(MultivariateStats.PPCA, X; kwargs...)`"
+    """
+    Keyword arguments passed to `fit(MultivariateStats.PPCA, X; kwargs...)`
+    """
     kwargs
     function PPCA(kwargs::NamedTuple)
         return new{typeof(kwargs)}(kwargs)
@@ -224,11 +228,17 @@ DimensionReductionRegression
   - [`AbstractRegressionTarget`](@ref)
 """
 @concrete struct DimensionReductionRegression <: AbstractRegressionEstimator
-    "$(field_dict[:ve])"
+    """
+    $(field_dict[:ve])
+    """
     ve
-    "$(field_dict[:drtgt])"
+    """
+    $(field_dict[:drtgt])
+    """
     drtgt
-    "$(field_dict[:dretgt])"
+    """
+    $(field_dict[:dretgt])
+    """
     retgt
     function DimensionReductionRegression(ve::AbstractVarianceEstimator,
                                           drtgt::DimensionReductionTarget,

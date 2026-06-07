@@ -29,7 +29,9 @@ CustomValueExpectedReturns
   - [`PortfolioOptimisersCovariance`](@ref)
 """
 @concrete struct CustomValueExpectedReturns <: AbstractExpectedReturnsEstimator
-    "Custom value.\n  - If a scalar, all assets are assigned this value.\n    - If a vector, each element corresponds to an asset.\n    - If a function, it is called with the full `X` matrix and `dims`, with additional keyword arguments passed through."
+    """
+    Custom value.\n  - If a scalar, all assets are assigned this value.\n    - If a vector, each element corresponds to an asset.\n    - If a function, it is called with the full `X` matrix and `dims`, with additional keyword arguments passed through.
+    """
     val
     function CustomValueExpectedReturns(val::Func_Num_VecNum)
         if isa(val, VecNum)
