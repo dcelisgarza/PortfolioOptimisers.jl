@@ -2,7 +2,6 @@
 
 ```@docs
 Coskewness
-factory(ske::Coskewness, args...; kwargs...)
 coskewness
 CoskewnessEstimator
 negative_spectral_coskewness

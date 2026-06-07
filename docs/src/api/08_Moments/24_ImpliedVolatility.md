@@ -5,7 +5,6 @@ ImpliedVolatilityAlgorithm
 ImpliedVolatilityRegression
 ImpliedVolatilityPremium
 ImpliedVolatility
-factory(ce::ImpliedVolatility, args...; kwargs...)
 moment_view(ce::ImpliedVolatility, i)
 realised_vol
 implied_vol
