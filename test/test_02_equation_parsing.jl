@@ -1,4 +1,4 @@
-@safetestset "Equation tests" begin
+@testset "Equation tests" begin
     using PortfolioOptimisers, Test, Logging
     Logging.disable_logging(Logging.Warn)
     res = parse_equation("2*sqrt(prior(a ,   1b1)) /2*  5 + cbrt(3)^3*f >= 5/5 + d-69/3*c")

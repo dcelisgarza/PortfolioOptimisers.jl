@@ -1,4 +1,4 @@
-@safetestset "Struct tests" begin
+@testset "Struct tests" begin
     using Test, PortfolioOptimisers, AverageShiftedHistograms, Dates, Clarabel, CSV,
           TimeSeries
     @testset "VecScalar" begin

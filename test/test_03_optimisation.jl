@@ -1,4 +1,4 @@
-@safetestset "Optimisation failure" begin
+@testset "Optimisation failure" begin
     using PortfolioOptimisers, JuMP, Test, Clarabel
     @testset "optimise_JuMP_model!" begin
         model = JuMP.Model()
