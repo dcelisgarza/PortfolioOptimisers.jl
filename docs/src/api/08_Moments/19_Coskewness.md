@@ -2,7 +2,6 @@
 
 ```@docs
 Coskewness
-factory(ske::Coskewness, w::ObsWeights)
 coskewness
 CoskewnessEstimator
 negative_spectral_coskewness

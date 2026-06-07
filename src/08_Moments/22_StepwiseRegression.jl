@@ -96,6 +96,12 @@ $(DocStringExtensions.FIELDS)
 
 Keywords correspond to the struct's fields.
 
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@prop`-tagged fields are automatically propagated:
+
+  - `tgt`: Recursively updated via [`factory`](@ref).
+
 # Examples
 
 ```jldoctest
@@ -113,8 +119,9 @@ StepwiseRegression
   - [`AbstractStepwiseRegressionCriterion`](@ref)
   - [`AbstractStepwiseRegressionAlgorithm`](@ref)
   - [`AbstractRegressionTarget`](@ref)
+  - [`factory`](@ref)
 """
-@concrete struct StepwiseRegression <: AbstractRegressionEstimator
+@propagatable @concrete struct StepwiseRegression <: AbstractRegressionEstimator
     """
     $(field_dict[:crit])
     """
@@ -126,7 +133,7 @@ StepwiseRegression
     """
     $(field_dict[:retgt])
     """
-    tgt
+    @prop tgt
     function StepwiseRegression(crit::AbstractStepwiseRegressionCriterion,
                                 alg::AbstractStepwiseRegressionAlgorithm,
                                 tgt::AbstractRegressionTarget)
@@ -139,32 +146,15 @@ StepwiseRegression
         return new{typeof(crit), typeof(alg), typeof(tgt)}(crit, alg, tgt)
     end
 end
+#= Old factory function:
+function factory(re::StepwiseRegression, w::ObsWeights)::StepwiseRegression
+    return StepwiseRegression(; crit = re.crit, alg = re.alg, tgt = factory(re.tgt, w))
+end
+=#
 function StepwiseRegression(; crit::AbstractStepwiseRegressionCriterion = PValue(),
                             alg::AbstractStepwiseRegressionAlgorithm = Forward(),
                             tgt::AbstractRegressionTarget = LinearModel())::StepwiseRegression
     return StepwiseRegression(crit, alg, tgt)
-end
-"""
-    factory(re::StepwiseRegression, w::ObsWeights) -> StepwiseRegression
-
-Return a new [`StepwiseRegression`](@ref) estimator with observation weights `w` applied to the underlying regression target.
-
-# Arguments
-
-  - `re`: Stepwise regression estimator.
-  - $(arg_dict[:ow])
-
-# Returns
-
-  - `re::StepwiseRegression`: Updated estimator with weights applied to `tgt`.
-
-# Related
-
-  - [`StepwiseRegression`](@ref)
-  - [`factory`](@ref)
-"""
-function factory(re::StepwiseRegression, w::ObsWeights)::StepwiseRegression
-    return StepwiseRegression(; crit = re.crit, alg = re.alg, tgt = factory(re.tgt, w))
 end
 """
     add_best_feature_after_pval_failure!(tgt::AbstractRegressionTarget,

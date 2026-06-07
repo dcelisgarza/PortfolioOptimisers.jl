@@ -308,6 +308,13 @@ Keywords correspond to the struct's fields.
 
   - If `params` is a vector: `!isempty(params)`.
 
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@prop`-tagged fields are automatically propagated:
+
+  - `opt`: Recursively updated via [`factory`](@ref).
+  - `fb`: Recursively updated via [`factory`](@ref).
+
 # Examples
 
 ```jldoctest
@@ -422,12 +429,14 @@ The bisection weight ``\\alpha`` is then computed from the Schur-complement-corr
   - [`HierarchicalRiskParity`](@ref)
   - [`HierarchicalEqualRiskContribution`](@ref)
   - [`SchurComplementParams`](@ref)
+  - [`factory`](@ref)
 """
-@concrete struct SchurComplementHierarchicalRiskParity <: ClusteringOptimisationEstimator
+@propagatable @concrete struct SchurComplementHierarchicalRiskParity <:
+                               ClusteringOptimisationEstimator
     """
     $(field_dict[:opt_hier])
     """
-    opt
+    @prop opt
     """
     $(field_dict[:params])
     """
@@ -435,7 +444,7 @@ The bisection weight ``\\alpha`` is then computed from the Schur-complement-corr
     """
     $(field_dict[:fb])
     """
-    fb
+    @prop fb
     function SchurComplementHierarchicalRiskParity(opt::HierarchicalOptimiser,
                                                    params::ScP_VecScP,
                                                    fb::Option{<:OptE_Opt})
@@ -445,6 +454,14 @@ The bisection weight ``\\alpha`` is then computed from the Schur-complement-corr
         return new{typeof(opt), typeof(params), typeof(fb)}(opt, params, fb)
     end
 end
+#= Old factory function:
+function factory(sh::SchurComplementHierarchicalRiskParity,
+                 w::AbstractVector)::SchurComplementHierarchicalRiskParity
+    opt = factory(sh.opt, w)
+    fb = factory(sh.fb, w)
+    return SchurComplementHierarchicalRiskParity(; opt = opt, params = sh.params, fb = fb)
+end
+=#
 function SchurComplementHierarchicalRiskParity(;
                                                opt::HierarchicalOptimiser = HierarchicalOptimiser(),
                                                params::ScP_VecScP = SchurComplementParams(),
@@ -463,22 +480,6 @@ Return whether the [`SchurComplementHierarchicalRiskParity`](@ref) requires prev
 """
 function needs_previous_weights(opt::SchurComplementHierarchicalRiskParity)
     return (needs_previous_weights(opt.opt) || needs_previous_weights(opt.fb))
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Create a [`SchurComplementHierarchicalRiskParity`](@ref) updating the base optimiser and fallback with weights `w`.
-
-# Related
-
-  - [`SchurComplementHierarchicalRiskParity`](@ref)
-  - [`factory`](@ref)
-"""
-function factory(sh::SchurComplementHierarchicalRiskParity,
-                 w::AbstractVector)::SchurComplementHierarchicalRiskParity
-    opt = factory(sh.opt, w)
-    fb = factory(sh.fb, w)
-    return SchurComplementHierarchicalRiskParity(; opt = opt, params = sh.params, fb = fb)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

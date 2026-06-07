@@ -17,6 +17,12 @@ $(DocStringExtensions.FIELDS)
 
 Keywords correspond to the struct's fields.
 
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@prop`-tagged fields are automatically propagated:
+
+  - `ce`: Recursively updated via [`factory`](@ref).
+
 # Examples
 
 ```jldoctest
@@ -40,12 +46,13 @@ ProcessedCovariance
   - [`AbstractCovarianceEstimator`](@ref)
   - [`AbstractMatrixProcessingAlgorithm`](@ref)
   - [`Posdef`](@ref)
+  - [`factory`](@ref)
 """
-@concrete struct ProcessedCovariance <: AbstractCovarianceEstimator
+@propagatable @concrete struct ProcessedCovariance <: AbstractCovarianceEstimator
     """
     $(field_dict[:ce])
     """
-    ce
+    @prop ce
     """
     $(field_dict[:mpa])
     """
@@ -60,46 +67,15 @@ ProcessedCovariance
         return new{typeof(ce), typeof(alg), typeof(pdm)}(ce, alg, pdm)
     end
 end
+#= Old factory function:
+function factory(ce::ProcessedCovariance, w::ObsWeights)::ProcessedCovariance
+    return ProcessedCovariance(; ce = factory(ce.ce, w), alg = ce.alg, pdm = ce.pdm)
+end
+=#
 function ProcessedCovariance(; ce::StatsBase.CovarianceEstimator = Covariance(),
                              alg::Option{<:AbstractMatrixProcessingAlgorithm} = nothing,
                              pdm::Option{<:Posdef} = Posdef())::ProcessedCovariance
     return ProcessedCovariance(ce, alg, pdm)
-end
-"""
-    factory(ce::ProcessedCovariance, w::ObsWeights) -> ProcessedCovariance
-
-Return a new [`ProcessedCovariance`](@ref) estimator with observation weights `w` applied to the underlying covariance estimator.
-
-# Arguments
-
-  - $(arg_dict[:ce])
-  - $(arg_dict[:ow])
-
-# Returns
-
-  - $(ret_dict[:ce])
-
-# Examples
-
-```jldoctest
-julia> ce = ProcessedCovariance();
-
-julia> ce2 = factory(ce, StatsBase.Weights([0.2, 0.3, 0.5]));
-
-julia> ce2.ce.me.w
-3-element Weights{Float64, Float64, Vector{Float64}}:
- 0.2
- 0.3
- 0.5
-```
-
-# Related
-
-  - [`ProcessedCovariance`](@ref)
-  - [`factory`](@ref)
-"""
-function factory(ce::ProcessedCovariance, w::ObsWeights)::ProcessedCovariance
-    return ProcessedCovariance(; ce = factory(ce.ce, w), alg = ce.alg, pdm = ce.pdm)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

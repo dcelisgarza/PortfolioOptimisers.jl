@@ -68,14 +68,6 @@ Abstract supertype for JuMP-based returns estimators used in optimisation models
 """
 abstract type JuMPReturnsEstimator <: AbstractEstimator end
 """
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Identity factory for [`JuMPReturnsEstimator`](@ref). Returns `r` unchanged.
-"""
-function factory(r::JuMPReturnsEstimator, args...; kwargs...)
-    return r
-end
-"""
     jump_returns_view(r, args...; kwargs...)
 
 Get a view or subset of JuMP returns estimator for slicing.
