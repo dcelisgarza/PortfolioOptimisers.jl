@@ -58,15 +58,25 @@ DistanceDistance
   - [`Distances.jl`](https://github.com/JuliaStats/Distances.jl)
 """
 @concrete struct DistanceDistance <: AbstractDistanceEstimator
-    "$(field_dict[:dmetric])"
+    """
+    $(field_dict[:dmetric])
+    """
     metric
-    "$(field_dict[:dmetric_args])"
+    """
+    $(field_dict[:dmetric_args])
+    """
     args
-    "$(field_dict[:dmetric_kwargs])"
+    """
+    $(field_dict[:dmetric_kwargs])
+    """
     kwargs
-    "$(field_dict[:dopower])"
+    """
+    $(field_dict[:dopower])
+    """
     power
-    "$(field_dict[:dalg])"
+    """
+    $(field_dict[:dalg])
+    """
     alg
     function DistanceDistance(metric::Distances.Metric, args::Tuple, kwargs::NamedTuple,
                               power::Option{<:Integer}, alg::AbstractDistanceAlgorithm)

@@ -146,6 +146,7 @@ $(DocStringExtensions.FIELDS)
         res::ClTypes,
         S::MatNum,
         D::MatNum,
+        P::Option{<:MatNum} = nothing,
         k::Integer
     ) -> Clusters
 
@@ -164,24 +165,41 @@ Keywords correspond to the struct's fields.
   - [`ClustersEstimator`](@ref)
 """
 @concrete struct Clusters <: AbstractClusteringResult
-    "$(field_dict[:clres])"
+    """
+    $(field_dict[:clres])
+    """
     res
-    "$(field_dict[:S])"
+    """
+    $(field_dict[:S])
+    """
     S
-    "$(field_dict[:D])"
+    """
+    $(field_dict[:D])
+    """
     D
-    "$(field_dict[:ck])"
+    """
+    $(field_dict[:phX])
+    """
+    P
+    """
+    $(field_dict[:ck])
+    """
     k
-    function Clusters(res::ClTypes, S::MatNum, D::MatNum, k::Integer)
+    function Clusters(res::ClTypes, S::MatNum, D::MatNum, P::Option{<:MatNum}, k::Integer)
         @argcheck(!isempty(S), IsEmptyError)
         @argcheck(!isempty(D), IsEmptyError)
         @argcheck(size(S) == size(D), DimensionMismatch)
+        if !isnothing(P)
+            @argcheck(!isempty(P), IsEmptyError)
+            @argcheck(size(S) == size(P), DimensionMismatch)
+        end
         @argcheck(one(k) <= k, DomainError)
-        return new{typeof(res), typeof(S), typeof(D), typeof(k)}(res, S, D, k)
+        return new{typeof(res), typeof(S), typeof(D), typeof(P), typeof(k)}(res, S, D, P, k)
     end
 end
-function Clusters(; res::ClTypes, S::MatNum, D::MatNum, k::Integer)::Clusters
-    return Clusters(res, S, D, k)
+function Clusters(; res::ClTypes, S::MatNum, D::MatNum, P::Option{<:MatNum} = nothing,
+                  k::Integer)::Clusters
+    return Clusters(res, S, D, P, k)
 end
 """
     clusterise(cle::AbstractClusteringResult, args...; kwargs...)
@@ -246,7 +264,9 @@ SecondOrderDifference
   - [`VectorToScalarMeasure`](@ref)
 """
 @concrete struct SecondOrderDifference <: AbstractOptimalNumberClustersAlgorithm
-    "$(field_dict[:vsalg])"
+    """
+    $(field_dict[:vsalg])
+    """
     alg
     function SecondOrderDifference(alg::Num_VecToScaM)
         return new{typeof(alg)}(alg)
@@ -310,7 +330,9 @@ SilhouetteScore
   - [`Distances.jl`](https://github.com/JuliaStats/Distances.jl)
 """
 @concrete struct SilhouetteScore <: AbstractOptimalNumberClustersAlgorithm
-    "$(field_dict[:vsalg])"
+    """
+    $(field_dict[:vsalg])
+    """
     alg
     function SilhouetteScore(alg::Num_VecToScaM)
         return new{typeof(alg)}(alg)
@@ -378,9 +400,13 @@ OptimalNumberClusters
   - [`AbstractOptimalNumberClustersAlgorithm`](@ref)
 """
 @concrete struct OptimalNumberClusters <: AbstractOptimalNumberClustersEstimator
-    "$(field_dict[:max_k])"
+    """
+    $(field_dict[:max_k])
+    """
     max_k
-    "$(field_dict[:kalg])"
+    """
+    $(field_dict[:kalg])
+    """
     alg
     function OptimalNumberClusters(max_k::Option{<:Integer}, alg::Int_ONC)
         if !isnothing(max_k)
@@ -443,7 +469,9 @@ HClustAlgorithm
   - [`ClustersEstimator`](@ref)
 """
 @concrete struct HClustAlgorithm <: AbstractHierarchicalClusteringAlgorithm
-    "Linkage method for hierarchical clustering from [`Clustering.jl`](https://juliastats.org/Clustering.jl/stable/hclust.html)."
+    """
+    Linkage method for hierarchical clustering from [`Clustering.jl`](https://juliastats.org/Clustering.jl/stable/hclust.html).
+    """
     linkage
     function HClustAlgorithm(linkage::Symbol)
         return new{typeof(linkage)}(linkage)
@@ -518,13 +546,21 @@ ClustersEstimator
   - [`AbstractOptimalNumberClustersEstimator`](@ref)
 """
 @concrete struct ClustersEstimator <: AbstractClustersEstimator
-    "$(field_dict[:ce])"
+    """
+    $(field_dict[:ce])
+    """
     ce
-    "$(field_dict[:de])"
+    """
+    $(field_dict[:de])
+    """
     de
-    "$(field_dict[:clalg])"
+    """
+    $(field_dict[:clalg])
+    """
     alg
-    "$(field_dict[:onc])"
+    """
+    $(field_dict[:onc])
+    """
     onc
     function ClustersEstimator(ce::StatsBase.CovarianceEstimator,
                                de::AbstractDistanceEstimator,
@@ -551,30 +587,10 @@ Return a new [`ClustersEstimator`](@ref) with observation weights `w` applied to
   - [`ClustersEstimator`](@ref)
   - [`factory`](@ref)
 """
-function factory(cle::ClustersEstimator, w::StatsBase.AbstractWeights)::ClustersEstimator
-    return ClustersEstimator(; ce = factory(cle.ce, w), de = cle.de, alg = cle.alg,
-                             onc = cle.onc)
+function factory(cle::ClustersEstimator, w::ObsWeights)::ClustersEstimator
+    return ClustersEstimator(; ce = factory(cle.ce, w), de = factory(cle.de, w),
+                             alg = cle.alg, onc = cle.onc)
 end
-"""
-    const HClE_HCl = Union{<:ClustersEstimator{<:Any, <:Any,
-                                               <:AbstractHierarchicalClusteringAlgorithm,
-                                               <:Any},
-                           <:Clusters{<:Clustering.Hclust, <:Any, <:Any, <:Any}}
-
-Alias for a hierarchical clustering estimator or result.
-
-Matches either a [`ClustersEstimator`](@ref) parameterised with a hierarchical clustering algorithm, or a [`Clusters`](@ref) result wrapping a `Clustering.Hclust`. Used internally for dispatch in hierarchical clustering workflows.
-
-# Related
-
-  - [`ClustersEstimator`](@ref)
-  - [`AbstractHierarchicalClusteringAlgorithm`](@ref)
-  - [`Clusters`](@ref)
-"""
-const HClE_HCl = Union{<:ClustersEstimator{<:Any, <:Any,
-                                           <:AbstractHierarchicalClusteringAlgorithm,
-                                           <:Any},
-                       <:Clusters{<:Clustering.Hclust, <:Any, <:Any, <:Any}}
 """
     const ClE_Cl = Union{<:AbstractClustersEstimator, <:AbstractClusteringResult}
 

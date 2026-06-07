@@ -114,11 +114,17 @@ LogRegimeAdjusted
   - [`RegimeAdjustedExpWeightedVariance`](@ref)
 """
 @concrete struct LogRegimeAdjusted <: RegimeAdjustedMethod
-    "$(field_dict[:ra_x])"
+    """
+    $(field_dict[:ra_x])
+    """
     x
-    "$(field_dict[:ra_y])"
+    """
+    $(field_dict[:ra_y])
+    """
     y
-    "$(field_dict[:ra_kappa])"
+    """
+    $(field_dict[:ra_kappa])
+    """
     kappa
     function LogRegimeAdjusted(x::Number, y::Number)
         assert_nonempty_nonneg_finite_val(x, :x)
@@ -187,7 +193,9 @@ FirstMomentRegimeAdjusted
   - [`RegimeAdjustedExpWeightedVariance`](@ref)
 """
 @concrete struct FirstMomentRegimeAdjusted <: RegimeAdjustedMethod
-    "$(field_dict[:ra_norm_x])"
+    """
+    $(field_dict[:ra_norm_x])
+    """
     x
     function FirstMomentRegimeAdjusted(x::Number)
         assert_nonempty_nonneg_finite_val(x, :x)
@@ -401,23 +409,41 @@ julia> ce.min_obs
   - [`AbstractCovarianceEstimator`](@ref)
 """
 @concrete struct RegimeAdjustedExpWeightedVariance <: AbstractCovarianceEstimator
-    "$(field_dict[:decay])"
+    """
+    $(field_dict[:decay])
+    """
     decay
-    "$(field_dict[:min_obs])"
+    """
+    $(field_dict[:min_obs])
+    """
     min_obs
-    "$(field_dict[:hac_lags])"
+    """
+    $(field_dict[:hac_lags])
+    """
     hac_lags
-    "$(field_dict[:regime_method])"
+    """
+    $(field_dict[:regime_method])
+    """
     regime_method
-    "$(field_dict[:regime_decay])"
+    """
+    $(field_dict[:regime_decay])
+    """
     regime_decay
-    "$(field_dict[:regime_min_obs])"
+    """
+    $(field_dict[:regime_min_obs])
+    """
     regime_min_obs
-    "$(field_dict[:regime_lohi_mult])"
+    """
+    $(field_dict[:regime_lohi_mult])
+    """
     regime_lohi_mult
-    "$(field_dict[:min_val])"
+    """
+    $(field_dict[:min_val])
+    """
     min_val
-    "$(field_dict[:centred])"
+    """
+    $(field_dict[:centred])
+    """
     centred
     function RegimeAdjustedExpWeightedVariance(decay::Number, min_obs::Integer,
                                                hac_lags::Option{<:Integer},
@@ -482,27 +508,49 @@ $(DocStringExtensions.FIELDS)
   - [`RegimeAdjustedExpWeightedVariance`](@ref)
 """
 @concrete struct RegimeAdjustedVarianceCache <: AbstractResult
-    "$(field_dict[:ret_buffer])"
+    """
+    $(field_dict[:ret_buffer])
+    """
     ret_buffer
-    "$(field_dict[:ra_variance])"
+    """
+    $(field_dict[:ra_variance])
+    """
     variance
-    "$(field_dict[:ra_X2])"
+    """
+    $(field_dict[:ra_X2])
+    """
     X2
-    "$(field_dict[:ra_X_old_i])"
+    """
+    $(field_dict[:ra_X_old_i])
+    """
     X_old_i
-    "$(field_dict[:ra_z2])"
+    """
+    $(field_dict[:ra_z2])
+    """
     z2
-    "$(field_dict[:ra_location])"
+    """
+    $(field_dict[:ra_location])
+    """
     location
-    "$(field_dict[:obs_count])"
+    """
+    $(field_dict[:obs_count])
+    """
     obs_count
-    "$(field_dict[:old_obs_count])"
+    """
+    $(field_dict[:old_obs_count])
+    """
     old_obs_count
-    "$(field_dict[:ra_active])"
+    """
+    $(field_dict[:ra_active])
+    """
     active
-    "$(field_dict[:regime_state])"
+    """
+    $(field_dict[:regime_state])
+    """
     regime_state
-    "$(field_dict[:n_regime_obs])"
+    """
+    $(field_dict[:n_regime_obs])
+    """
     n_regime_obs
 end
 """

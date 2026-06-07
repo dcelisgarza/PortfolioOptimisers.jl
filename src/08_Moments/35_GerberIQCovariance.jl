@@ -417,9 +417,13 @@ ExpGerberIQDecay
   - [gerber2025squeezing](@cite) Gerber, Sander and Smyth, William and Markowitz, Harry and Miao, Yinsen and Ernst, Philip and Sargen, Paul, *Squeezing Financial Noise: A Novel Approach to Covariance Matrix Estimation* (December 01, 2025). Available at SSRN: https://ssrn.com/abstract=4986939 or http://dx.doi.org/10.2139/ssrn.4986939
 """
 @concrete struct ExpGerberIQDecay <: GerberIQDecayEstimator
-    "Waiting period before the decay starts."
+    """
+    Waiting period before the decay starts.
+    """
     e
-    "Decay rate parameter."
+    """
+    Decay rate parameter.
+    """
     y
     function ExpGerberIQDecay(e::Option{<:GerberIQEps}, y::Option{<:GerberIQGamma})
         if isa(e, Number)
@@ -612,9 +616,13 @@ BasicGerberIQ
   - [gerber2025squeezing](@cite) Gerber, Sander and Smyth, William and Markowitz, Harry and Miao, Yinsen and Ernst, Philip and Sargen, Paul, *Squeezing Financial Noise: A Novel Approach to Covariance Matrix Estimation* (December 01, 2025). Available at SSRN: https://ssrn.com/abstract=4986939 or http://dx.doi.org/10.2139/ssrn.4986939
 """
 @concrete struct BasicGerberIQ <: GerberIQCovarianceAlgorithm
-    "Significance threshold parameter."
+    """
+    Significance threshold parameter.
+    """
     d
-    "Comovement compression parameter."
+    """
+    Comovement compression parameter.
+    """
     n
     function BasicGerberIQ(d::Number, n::Number)
         assert_nonempty_nonneg_finite_val(d, :d)
@@ -786,33 +794,61 @@ PartialGerberIQ
   - [gerber2025squeezing](@cite) Gerber, Sander and Smyth, William and Markowitz, Harry and Miao, Yinsen and Ernst, Philip and Sargen, Paul, *Squeezing Financial Noise: A Novel Approach to Covariance Matrix Estimation* (December 01, 2025). Available at SSRN: https://ssrn.com/abstract=4986939 or http://dx.doi.org/10.2139/ssrn.4986939
 """
 @concrete struct PartialGerberIQ <: GerberIQCovarianceAlgorithm
-    "Positive concordant movement threshold parameter."
+    """
+    Positive concordant movement threshold parameter.
+    """
     dcp
-    "Negative concordant movement threshold parameter."
+    """
+    Negative concordant movement threshold parameter.
+    """
     dcn
-    "Discordant movement threshold parameter, positive in `r_i`, negative in `r_j`."
+    """
+    Discordant movement threshold parameter, positive in `r_i`, negative in `r_j`.
+    """
     ddp
-    "Discordant movement threshold parameter, negative in `r_i`, positive in `r_j`."
+    """
+    Discordant movement threshold parameter, negative in `r_i`, positive in `r_j`.
+    """
     ddn
-    "Noise suppression parameter for small positive concordant movements."
+    """
+    Noise suppression parameter for small positive concordant movements.
+    """
     n1
-    "Noise suppression parameter for small negative concordant movements."
+    """
+    Noise suppression parameter for small negative concordant movements.
+    """
     n2
-    "Noise suppression parameter for small discordant movements."
+    """
+    Noise suppression parameter for small discordant movements.
+    """
     n3
-    "Noise suppression parameter for large positive concordant movements."
+    """
+    Noise suppression parameter for large positive concordant movements.
+    """
     n4
-    "Noise suppression parameter for large negative concordant movements."
+    """
+    Noise suppression parameter for large negative concordant movements.
+    """
     n5
-    "Noise suppression parameter for large discordant movements."
+    """
+    Noise suppression parameter for large discordant movements.
+    """
     n6
-    "Noise suppression parameter for positive concordant movements where one axis has a large movement and the other is small."
+    """
+    Noise suppression parameter for positive concordant movements where one axis has a large movement and the other is small.
+    """
     n7
-    "Noise suppression parameter for negative concordant movements where one axis has a large movement and the other is small."
+    """
+    Noise suppression parameter for negative concordant movements where one axis has a large movement and the other is small.
+    """
     n8
-    "Noise suppression parameter for discordant movements where one axis has a large movement and the other is small for the region between `ddn` and zero."
+    """
+    Noise suppression parameter for discordant movements where one axis has a large movement and the other is small for the region between `ddn` and zero.
+    """
     n9
-    "Noise suppression parameter for discordant movements where one axis has a large movement and the other is small for the region between `ddp` and zero."
+    """
+    Noise suppression parameter for discordant movements where one axis has a large movement and the other is small for the region between `ddp` and zero.
+    """
     n10
     function PartialGerberIQ(dcp::Number, dcn::Number, ddp::Number, ddn::Number, n1::Number,
                              n2::Number, n3::Number, n4::Number, n5::Number, n6::Number,
@@ -1053,55 +1089,105 @@ FullGerberIQ
   - [gerber2025squeezing](@cite) Gerber, Sander and Smyth, William and Markowitz, Harry and Miao, Yinsen and Ernst, Philip and Sargen, Paul, *Squeezing Financial Noise: A Novel Approach to Covariance Matrix Estimation* (December 01, 2025). Available at SSRN: https://ssrn.com/abstract=4986939 or http://dx.doi.org/10.2139/ssrn.4986939
 """
 @concrete struct FullGerberIQ <: GerberIQCovarianceAlgorithm
-    "Threshold for larger positive co-movements."
+    """
+    Threshold for larger positive co-movements.
+    """
     dp1
-    "Threshold for smaller positive co-movements."
+    """
+    Threshold for smaller positive co-movements.
+    """
     dp2
-    "Threshold for larger negative co-movements."
+    """
+    Threshold for larger negative co-movements.
+    """
     dn1
-    "Threshold for smaller negative co-movements."
+    """
+    Threshold for smaller negative co-movements.
+    """
     dn2
-    "Threshold for small positive concordant co-movements."
+    """
+    Threshold for small positive concordant co-movements.
+    """
     n1
-    "Threshold for small negative concordant co-movements."
+    """
+    Threshold for small negative concordant co-movements.
+    """
     n2
-    "Threshold for small discordant co-movements."
+    """
+    Threshold for small discordant co-movements.
+    """
     n3
-    "Threshold for moderate positive concordant co-movements."
+    """
+    Threshold for moderate positive concordant co-movements.
+    """
     n4
-    "Threshold for moderate negative concordant co-movements."
+    """
+    Threshold for moderate negative concordant co-movements.
+    """
     n5
-    "Threshold for moderate discordant co-movements."
+    """
+    Threshold for moderate discordant co-movements.
+    """
     n6
-    "Threshold for small and moderate positive concordant co-movements."
+    """
+    Threshold for small and moderate positive concordant co-movements.
+    """
     n7
-    "Threshold for small and moderate negative concordant co-movements."
+    """
+    Threshold for small and moderate negative concordant co-movements.
+    """
     n8
-    "Threshold for small and moderate discordant co-movements."
+    """
+    Threshold for small and moderate discordant co-movements.
+    """
     n9
-    "Threshold for moderate and small discordant co-movements."
+    """
+    Threshold for moderate and small discordant co-movements.
+    """
     n10
-    "Threshold for large positive concordant co-movements."
+    """
+    Threshold for large positive concordant co-movements.
+    """
     n11
-    "Threshold for large negative concordant co-movements."
+    """
+    Threshold for large negative concordant co-movements.
+    """
     n12
-    "Threshold for large discordant co-movements."
+    """
+    Threshold for large discordant co-movements.
+    """
     n13
-    "Threshold for moderate and large positive concordant co-movements."
+    """
+    Threshold for moderate and large positive concordant co-movements.
+    """
     n14
-    "Threshold for small and large positive concordant co-movements."
+    """
+    Threshold for small and large positive concordant co-movements.
+    """
     n15
-    "Threshold for small and large negative concordant co-movements."
+    """
+    Threshold for small and large negative concordant co-movements.
+    """
     n16
-    "Threshold for moderate and large positive concordant co-movements."
+    """
+    Threshold for moderate and large positive concordant co-movements.
+    """
     n17
-    "Threshold for small and large discordant co-movements."
+    """
+    Threshold for small and large discordant co-movements.
+    """
     n18
-    "Threshold for moderate and large discordant co-movements."
+    """
+    Threshold for moderate and large discordant co-movements.
+    """
     n19
-    "Threshold for large and moderate discordant co-movements."
+    """
+    Threshold for large and moderate discordant co-movements.
+    """
     n20
-    "Threshold for large and small discordant co-movements."
+    """
+    Threshold for large and small discordant co-movements.
+    """
     n21
     function FullGerberIQ(dp1::Number, dp2::Number, dn1::Number, dn2::Number, n1::Number,
                           n2::Number, n3::Number, n4::Number, n5::Number, n6::Number,
@@ -1366,23 +1452,41 @@ Keywords correspond to the struct's fields.
   - [gerber2025squeezing](@cite) Gerber, Sander and Smyth, William and Markowitz, Harry and Miao, Yinsen and Ernst, Philip and Sargen, Paul, *Squeezing Financial Noise: A Novel Approach to Covariance Matrix Estimation* (December 01, 2025). Available at SSRN: https://ssrn.com/abstract=4986939 or http://dx.doi.org/10.2139/ssrn.4986939
 """
 @concrete struct GerberIQCovariance <: BaseGerberIQCovariance
-    "$(field_dict[:ve])"
+    """
+    $(field_dict[:ve])
+    """
     ve
-    "$(field_dict[:me])"
+    """
+    $(field_dict[:me])
+    """
     me
-    "$(field_dict[:pdm])"
+    """
+    $(field_dict[:pdm])
+    """
     pdm
-    "Small co-movement threshold."
+    """
+    Small co-movement threshold.
+    """
     c
-    "Temporal decay rate estimator for past observations [`GerberIQDecayEstimator`](@ref)."
+    """
+    Temporal decay rate estimator for past observations [`GerberIQDecayEstimator`](@ref).
+    """
     decay
-    "Threshold scaling factor estimator for co-movement thresholds [`GerberIQScaler`](@ref)."
+    """
+    Threshold scaling factor estimator for co-movement thresholds [`GerberIQScaler`](@ref).
+    """
     sc
-    "Gerber IQ covariance kind for squeezing co-movement noise [`GerberIQCovarianceAlgorithm`](@ref)."
+    """
+    Gerber IQ covariance kind for squeezing co-movement noise [`GerberIQCovarianceAlgorithm`](@ref).
+    """
     kind
-    "$(field_dict[:gerbalg])"
+    """
+    $(field_dict[:gerbalg])
+    """
     alg
-    "$(field_dict[:ex])."
+    """
+    $(field_dict[:ex]).
+    """
     ex
     function GerberIQCovariance(ve::StatsBase.CovarianceEstimator,
                                 me::AbstractExpectedReturnsEstimator, pdm::Option{<:Posdef},

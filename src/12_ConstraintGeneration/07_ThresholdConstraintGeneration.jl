@@ -65,11 +65,17 @@ ThresholdEstimator
   - [`AbstractConstraintEstimator`](@ref)
 """
 @concrete struct ThresholdEstimator <: AbstractConstraintEstimator
-    "$(field_dict[:thr_val])"
+    """
+    $(field_dict[:thr_val])
+    """
     val
-    "$(field_dict[:ekey])"
+    """
+    $(field_dict[:ekey])
+    """
     key
-    "$(field_dict[:dval])"
+    """
+    $(field_dict[:dval])
+    """
     dval
     function ThresholdEstimator(val::EstValType, key::Option{<:AbstractString} = nothing,
                                 dval::Option{<:Number} = nothing)::ThresholdEstimator
@@ -129,7 +135,9 @@ Threshold
   - [`AbstractConstraintResult`](@ref)
 """
 @concrete struct Threshold <: AbstractConstraintResult
-    "$(field_dict[:thr_res_val])"
+    """
+    $(field_dict[:thr_res_val])
+    """
     val
     function Threshold(val::Num_VecNum)::Threshold
         assert_nonempty_nonneg_finite_val(val)

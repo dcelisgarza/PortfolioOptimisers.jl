@@ -41,7 +41,9 @@ PhylogenyResult
   - [`centrality_vector`](@ref)
 """
 @concrete struct PhylogenyResult <: AbstractPhylogenyResult
-    "$(field_dict[:phX_Xv])"
+    """
+    $(field_dict[:phX_Xv])
+    """
     X
     function PhylogenyResult(X::ArrNum)
         @argcheck(!isempty(X), IsEmptyError)
@@ -198,9 +200,13 @@ BetweennessCentrality
   - [`Graphs.betweenness_centrality`](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.betweenness_centrality)
 """
 @concrete struct BetweennessCentrality <: AbstractCentralityAlgorithm
-    "$(field_dict[:ctargs])"
+    """
+    $(field_dict[:ctargs])
+    """
     args
-    "$(field_dict[:ctkwargs])"
+    """
+    $(field_dict[:ctkwargs])
+    """
     kwargs
     function BetweennessCentrality(args::Tuple, kwargs::NamedTuple)
         return new{typeof(args), typeof(kwargs)}(args, kwargs)
@@ -245,9 +251,13 @@ ClosenessCentrality
   - [`Graphs.closeness_centrality`](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.closeness_centrality)
 """
 @concrete struct ClosenessCentrality <: AbstractCentralityAlgorithm
-    "$(field_dict[:ctargs])"
+    """
+    $(field_dict[:ctargs])
+    """
     args
-    "$(field_dict[:ctkwargs])"
+    """
+    $(field_dict[:ctkwargs])
+    """
     kwargs
     function ClosenessCentrality(args::Tuple, kwargs::NamedTuple)
         return new{typeof(args), typeof(kwargs)}(args, kwargs)
@@ -296,9 +306,13 @@ DegreeCentrality
   - [`Graphs._degree_centrality`](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.degree_centrality-Tuple%7BAbstractGraph%7D)
 """
 @concrete struct DegreeCentrality <: AbstractCentralityAlgorithm
-    "Degree type (0: total, 1: in-degree, 2: out-degree)."
+    """
+    Degree type (0: total, 1: in-degree, 2: out-degree).
+    """
     kind
-    "$(field_dict[:ctkwargs])"
+    """
+    $(field_dict[:ctkwargs])
+    """
     kwargs
     function DegreeCentrality(kind::Integer, kwargs::NamedTuple)
         @argcheck(kind in 0:2)
@@ -354,7 +368,9 @@ KatzCentrality
   - [`Graphs.katz_centrality`](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.katz_centrality)
 """
 @concrete struct KatzCentrality <: AbstractCentralityAlgorithm
-    "Attenuation factor for Katz centrality."
+    """
+    Attenuation factor for Katz centrality.
+    """
     alpha
     function KatzCentrality(alpha::Number)
         return new{typeof(alpha)}(alpha)
@@ -406,11 +422,17 @@ Pagerank
   - [`Graphs.pagerank`](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.pagerank-Union%7BTuple%7BAbstractGraph%7BU%7D%7D,%20Tuple%7BU%7D,%20Tuple%7BAbstractGraph%7BU%7D,%20Any%7D,%20Tuple%7BAbstractGraph%7BU%7D,%20Any,%20Integer%7D,%20Tuple%7BAbstractGraph%7BU%7D,%20Any,%20Integer,%20Any%7D%7D%20where%20U%3C:Integer)
 """
 @concrete struct Pagerank <: AbstractCentralityAlgorithm
-    "Number of iterations."
+    """
+    Number of iterations.
+    """
     n
-    "Damping factor."
+    """
+    Damping factor.
+    """
     alpha
-    "Convergence threshold."
+    """
+    Convergence threshold.
+    """
     epsilon
     function Pagerank(n::Integer, alpha::Number, epsilon::Number)
         @argcheck(0 < n, DomainError)
@@ -472,9 +494,13 @@ StressCentrality
   - [`Graphs.stress_centrality`](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.stress_centrality)
 """
 @concrete struct StressCentrality <: AbstractCentralityAlgorithm
-    "$(field_dict[:ctargs])"
+    """
+    $(field_dict[:ctargs])
+    """
     args
-    "$(field_dict[:ctkwargs])"
+    """
+    $(field_dict[:ctkwargs])
+    """
     kwargs
     function StressCentrality(args::Tuple, kwargs::NamedTuple)
         return new{typeof(args), typeof(kwargs)}(args, kwargs)
@@ -608,9 +634,13 @@ KruskalTree
   - [`Graphs.kruskal_mst`](https://juliagraphs.org/Graphs.jl/stable/algorithms/spanningtrees/#Graphs.kruskal_mst)
 """
 @concrete struct KruskalTree <: AbstractTreeType
-    "$(field_dict[:treeargs])"
+    """
+    $(field_dict[:treeargs])
+    """
     args
-    "$(field_dict[:treekwargs])"
+    """
+    $(field_dict[:treekwargs])
+    """
     kwargs
     function KruskalTree(args::Tuple, kwargs::NamedTuple)
         return new{typeof(args), typeof(kwargs)}(args, kwargs)
@@ -654,9 +684,13 @@ BoruvkaTree
   - [`Graphs.boruvka_mst`](https://juliagraphs.org/Graphs.jl/stable/algorithms/spanningtrees/#Graphs.boruvka_mst)
 """
 @concrete struct BoruvkaTree <: AbstractTreeType
-    "$(field_dict[:treeargs])"
+    """
+    $(field_dict[:treeargs])
+    """
     args
-    "$(field_dict[:treekwargs])"
+    """
+    $(field_dict[:treekwargs])
+    """
     kwargs
     function BoruvkaTree(args::Tuple, kwargs::NamedTuple)
         return new{typeof(args), typeof(kwargs)}(args, kwargs)
@@ -700,9 +734,13 @@ PrimTree
   - [`Graphs.prim_mst`](https://juliagraphs.org/Graphs.jl/stable/algorithms/spanningtrees/#Graphs.prim_mst)
 """
 @concrete struct PrimTree <: AbstractTreeType
-    "$(field_dict[:treeargs])"
+    """
+    $(field_dict[:treeargs])
+    """
     args
-    "$(field_dict[:treekwargs])"
+    """
+    $(field_dict[:treekwargs])
+    """
     kwargs
     function PrimTree(args::Tuple, kwargs::NamedTuple)
         return new{typeof(args), typeof(kwargs)}(args, kwargs)
@@ -866,13 +904,21 @@ NetworkEstimator
   - [`AbstractSimilarityMatrixAlgorithm`](@ref)
 """
 @concrete struct NetworkEstimator <: AbstractNetworkEstimator
-    "$(field_dict[:ce])"
+    """
+    $(field_dict[:ce])
+    """
     ce
-    "$(field_dict[:de])"
+    """
+    $(field_dict[:de])
+    """
     de
-    "$(field_dict[:ntalg])"
+    """
+    $(field_dict[:ntalg])
+    """
     alg
-    "$(field_dict[:ntn])"
+    """
+    $(field_dict[:ntn])
+    """
     n
     function NetworkEstimator(ce::StatsBase.CovarianceEstimator,
                               de::AbstractDistanceEstimator, alg::Tree_SimMat, n::Integer)
@@ -886,6 +932,132 @@ function NetworkEstimator(;
                                                                    alg = CanonicalDistance()),
                           alg::Tree_SimMat = KruskalTree(), n::Integer = 1)
     return NetworkEstimator(ce, de, alg, n)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a new [`NetworkEstimator`](@ref) with observation weights `w`
+
+# Related
+
+  - [`NetworkEstimator`](@ref)
+  - [`factory`](@ref)
+"""
+function factory(nt::NetworkEstimator, w::ObsWeights)
+    return NetworkEstimator(; ce = factory(nt.ce, w), de = factory(nt.de, w), alg = nt.alg,
+                            n = nt.n)
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Estimator type for network-based phylogeny analysis in `PortfolioOptimisers.jl`.
+
+`NetworkEstimator` encapsulates the configuration for constructing a network from asset data, including the covariance estimator, distance estimator, tree or similarity algorithm, and the network depth parameter.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    NetworkEstimator(;
+        ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
+        de::AbstractDistanceEstimator = Distance(; alg = CanonicalDistance()),
+        alg::Tree_SimMat = KruskalTree(),
+        n::Integer = 1
+    ) -> NetworkEstimator
+
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - $(val_dict[:ntn])
+
+# Examples
+
+```jldoctest
+julia> NetworkClustersEstimator()
+NetworkClustersEstimator
+  nte ┼ NetworkEstimator
+      │    ce ┼ PortfolioOptimisersCovariance
+      │       │   ce ┼ Covariance
+      │       │      │    me ┼ SimpleExpectedReturns
+      │       │      │       │   w ┴ nothing
+      │       │      │    ce ┼ GeneralCovariance
+      │       │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+      │       │      │       │    w ┴ nothing
+      │       │      │   alg ┴ Full()
+      │       │   mp ┼ DenoiseDetoneAlgMatrixProcessing
+      │       │      │     pdm ┼ Posdef
+      │       │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+      │       │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+      │       │      │      dn ┼ nothing
+      │       │      │      dt ┼ nothing
+      │       │      │     alg ┼ nothing
+      │       │      │   order ┴ DenoiseDetoneAlg()
+      │    de ┼ Distance
+      │       │   power ┼ nothing
+      │       │     alg ┴ CanonicalDistance()
+      │   alg ┼ KruskalTree
+      │       │     args ┼ Tuple{}: ()
+      │       │   kwargs ┴ @NamedTuple{}: NamedTuple()
+      │     n ┴ Int64: 1
+  alg ┼ HClustAlgorithm
+      │   linkage ┴ Symbol: :ward
+  onc ┼ OptimalNumberClusters
+      │   max_k ┼ nothing
+      │     alg ┼ SecondOrderDifference
+      │         │   alg ┼ StandardisedValue
+      │         │       │   mv ┼ MeanValue
+      │         │       │      │   w ┴ nothing
+      │         │       │   sv ┼ StdValue
+      │         │       │      │           w ┼ nothing
+      │         │       │      │   corrected ┴ Bool: true
+```
+
+# Related
+
+  - [`AbstractNetworkEstimator`](@ref)
+  - [`AbstractTreeType`](@ref)
+  - [`AbstractSimilarityMatrixAlgorithm`](@ref)
+"""
+@concrete struct NetworkClustersEstimator <: AbstractClustersEstimator
+    """
+    Network estimator.
+    """
+    nte
+    """
+    $(field_dict[:clalg])
+    """
+    alg
+    """
+    $(field_dict[:onc])
+    """
+    onc
+    function NetworkClustersEstimator(nte::AbstractNetworkEstimator,
+                                      alg::AbstractClustersAlgorithm,
+                                      onc::AbstractOptimalNumberClustersEstimator)
+        return new{typeof(nte), typeof(alg), typeof(onc)}(nte, alg, onc)
+    end
+end
+function NetworkClustersEstimator(; nte::AbstractNetworkEstimator = NetworkEstimator(),
+                                  alg::AbstractClustersAlgorithm = HClustAlgorithm(),
+                                  onc::AbstractOptimalNumberClustersEstimator = OptimalNumberClusters())
+    return NetworkClustersEstimator(nte, alg, onc)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a new [`NetworkClustersEstimator`](@ref) with observation weights `w`
+
+# Related
+
+  - [`NetworkClustersEstimator`](@ref)
+  - [`NetworkEstimator`](@ref)
+  - [`factory`](@ref)
+"""
+function factory(nt::NetworkClustersEstimator, w::ObsWeights)
+    return NetworkClustersEstimator(; nte = factory(nt.nte, w), alg = nt.alg, onc = nt.onc)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -960,9 +1132,13 @@ CentralityEstimator
   - [`AbstractCentralityAlgorithm`](@ref)
 """
 @concrete struct CentralityEstimator <: AbstractCentralityEstimator
-    "$(field_dict[:pler])"
+    """
+    $(field_dict[:pler])
+    """
     pl
-    "$(field_dict[:cta])"
+    """
+    $(field_dict[:cta])
+    """
     ct
     function CentralityEstimator(pl::NwE_Pl_ClE_Cl, ct::AbstractCentralityAlgorithm)
         return new{typeof(pl), typeof(ct)}(pl, ct)
@@ -1000,21 +1176,193 @@ Compute the adjacency matrix for a network estimator.
   - [`calc_mst`](@ref)
   - [`PMFG_T2s`](@ref)
 """
-function calc_adjacency(nte::NetworkEstimator{<:Any, <:Any, <:AbstractTreeType, <:Any},
-                        X::MatNum; dims::Int = 1, kwargs...)
+function calc_adjacency(nte::NetworkEstimator{<:Any, <:Any, <:AbstractTreeType}, X::MatNum;
+                        dims::Int = 1, kwargs...)
     D = distance(nte.de, nte.ce, X; dims = dims, kwargs...)
     G = SimpleWeightedGraphs.SimpleWeightedGraph(D)
     tree = calc_mst(nte.alg, G)
     return Graphs.adjacency_matrix(Graphs.SimpleGraph(G[tree]))
 end
 function calc_adjacency(nte::NetworkEstimator{<:Any, <:Any,
-                                              <:AbstractSimilarityMatrixAlgorithm, <:Any},
+                                              <:AbstractSimilarityMatrixAlgorithm},
                         X::MatNum; dims::Int = 1, kwargs...)
     S, D = cor_and_dist(nte.de, nte.ce, X; dims = dims, kwargs...)
     S = dbht_similarity(nte.alg; S = S, D = D)
     Rpm = PMFG_T2s(S)[1]
     return Graphs.adjacency_matrix(Graphs.SimpleGraph(Rpm))
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Internal dispatch helper for constructing a [`Clusters`](@ref) result within a network-based clustering workflow.
+
+Selects the appropriate clustering routine based on `alg`, determines the optimal number of clusters, and returns a [`Clusters`](@ref) result encapsulating all relevant outputs.
+
+# Arguments
+
+  - `alg`: Clustering algorithm.
+
+      + `alg::HClustAlgorithm`: Applies hierarchical clustering via `Clustering.hclust` on the pseudo-distance matrix `P`.
+      + `alg::DBHT`: Applies Direct Bubble Hierarchical Tree clustering via [`DBHTs`](@ref) on `P` and `S`.
+      + `alg::AbstractNonHierarchicalClusteringAlgorithm`: Applies non-hierarchical clustering via [`optimal_number_clusters`](@ref) on `P`.
+
+  - $(arg_dict[:onc])
+
+  - $(arg_dict[:S])
+
+  - $(arg_dict[:D])
+
+  - `P::MatNum`: Symmetric pseudo-distance matrix derived from the network or similarity structure.
+
+  - `branchorder`: Branch ordering strategy for hierarchical clustering.
+
+# Returns
+
+  - `clr::Clusters`: Clustering result containing the clustering object, similarity matrix, distance matrix, pseudo-distance matrix, and optimal number of clusters.
+
+# Related
+
+  - [`Clusters`](@ref)
+  - [`HClustAlgorithm`](@ref)
+  - [`DBHT`](@ref)
+  - [`AbstractNonHierarchicalClusteringAlgorithm`](@ref)
+  - [`optimal_number_clusters`](@ref)
+  - [`clusterise`](@ref)
+"""
+function _clusterise(alg::HClustAlgorithm, onc::AbstractOptimalNumberClustersEstimator,
+                     S::MatNum, D::MatNum, P::MatNum; branchorder::Symbol = :optimal)
+    res = Clustering.hclust(P; linkage = alg.linkage, branchorder = branchorder)
+    k = optimal_number_clusters(onc, res, P)
+    return Clusters(; res = res, S = S, D = D, P = P, k = k)
+end
+function _clusterise(alg::DBHT, onc::AbstractOptimalNumberClustersEstimator, S::MatNum,
+                     D::MatNum, P::MatNum; branchorder::Symbol = :optimal)
+    res = DBHTs(P, S; branchorder = branchorder, root = alg.root)[end]
+    k = optimal_number_clusters(onc, res, P)
+    return Clusters(; res = res, S = S, D = D, P = P, k = k)
+end
+function _clusterise(alg::AbstractNonHierarchicalClusteringAlgorithm,
+                     onc::AbstractOptimalNumberClustersEstimator, S::MatNum, D::MatNum,
+                     P::MatNum; kwargs...)
+    res, k = optimal_number_clusters(onc, alg, P)
+    return Clusters(; res = res, S = S, D = D, P = P, k = k)
+end
+"""
+    clusterise(nte::NetworkClustersEstimator{<:NetworkEstimator{<:Any, <:Any,
+                                                                <:AbstractTreeType, <:Any}},
+               X::MatNum; dims::Int = 1, branchorder::Symbol = :optimal, kwargs...)
+
+Cluster assets using a minimum spanning tree (MST) network structure and return a [`Clusters`](@ref) result.
+
+Builds the MST from the distance matrix, accumulates a symmetric pseudo-distance matrix `P` over the configured network depth `n` as ``\\sum_{i=0}^{n}(\\mathbf{D}^i - \\mathbf{A}^i)``, and dispatches to `_clusterise` to perform the actual clustering and select the optimal number of clusters.
+
+# Arguments
+
+  - `nte`: Network clustering estimator configured with an MST-based [`NetworkEstimator`](@ref).
+  - $(arg_dict[:X])
+  - $(arg_dict[:dims])
+  - `branchorder`: Branch ordering strategy for hierarchical clustering.
+  - `kwargs...`: Additional keyword arguments passed to the underlying estimators.
+
+# Returns
+
+  - `clr::Clusters`: Clustering result containing the clustering object, similarity matrix, distance matrix, pseudo-distance matrix, and optimal number of clusters.
+
+# Related
+
+  - [`NetworkClustersEstimator`](@ref)
+  - [`AbstractTreeType`](@ref)
+  - [`Clusters`](@ref)
+  - [`_clusterise`](@ref)
+  - [`calc_mst`](@ref)
+"""
+function clusterise(nte::NetworkClustersEstimator{<:NetworkEstimator{<:Any, <:Any,
+                                                                     <:AbstractTreeType,
+                                                                     <:Any}}, X::MatNum;
+                    dims::Int = 1, branchorder::Symbol = :optimal, kwargs...)
+    S, D = cor_and_dist(nte.nte.de, nte.nte.ce, X; dims = dims, kwargs...)
+    P = zeros(eltype(D), size(D))
+    G = SimpleWeightedGraphs.SimpleWeightedGraph(D)
+    tree = calc_mst(nte.nte.alg, G)
+    A = Graphs.adjacency_matrix(G[tree])
+    for i in 0:(nte.nte.n)
+        P .+= D^i - A^i
+    end
+    P .-= LinearAlgebra.Diagonal(P)
+    return _clusterise(nte.alg, nte.onc, S, D, LinearAlgebra.Symmetric(P);
+                       branchorder = branchorder)
+end
+"""
+    clusterise(nte::NetworkClustersEstimator{<:NetworkEstimator{<:Any, <:Any,
+                                                                <:AbstractSimilarityMatrixAlgorithm,
+                                                                <:Any}},
+               X::MatNum; dims::Int = 1, branchorder::Symbol = :optimal, kwargs...)
+
+Cluster assets using a Planar Maximally Filtered Graph (PMFG) network structure and return a [`Clusters`](@ref) result.
+
+Builds the PMFG from the similarity matrix via [`PMFG_T2s`](@ref), accumulates a symmetric pseudo-distance matrix `P` over the configured network depth `n` as ``\\sum_{i=0}^{n}(\\mathbf{S}^i - \\mathbf{A}^i)``, and dispatches to `_clusterise` to perform the actual clustering and select the optimal number of clusters.
+
+# Arguments
+
+  - `nte`: Network clustering estimator configured with a similarity-matrix-based [`NetworkEstimator`](@ref).
+  - $(arg_dict[:X])
+  - $(arg_dict[:dims])
+  - `branchorder`: Branch ordering strategy for hierarchical clustering.
+  - `kwargs...`: Additional keyword arguments passed to the underlying estimators.
+
+# Returns
+
+  - `clr::Clusters`: Clustering result containing the clustering object, similarity matrix, distance matrix, pseudo-distance matrix, and optimal number of clusters.
+
+# Related
+
+  - [`NetworkClustersEstimator`](@ref)
+  - [`AbstractSimilarityMatrixAlgorithm`](@ref)
+  - [`Clusters`](@ref)
+  - [`_clusterise`](@ref)
+  - [`PMFG_T2s`](@ref)
+  - [`dbht_similarity`](@ref)
+"""
+function clusterise(nte::NetworkClustersEstimator{<:NetworkEstimator{<:Any, <:Any,
+                                                                     <:AbstractSimilarityMatrixAlgorithm,
+                                                                     <:Any}}, X::MatNum;
+                    dims::Int = 1, branchorder::Symbol = :optimal, kwargs...)
+    S, D = cor_and_dist(nte.nte.de, nte.nte.ce, X; dims = dims, kwargs...)
+    P = zeros(eltype(D), size(D))
+    S = dbht_similarity(nte.nte.alg; S = S, D = D)
+    Rpm = PMFG_T2s(S)[1]
+    for i in 0:(nte.nte.n)
+        P .+= S^i - Rpm^i
+    end
+    P .-= LinearAlgebra.Diagonal(P)
+    return _clusterise(nte.alg, nte.onc, S, D, LinearAlgebra.Symmetric(P);
+                       branchorder = branchorder)
+end
+"""
+    const HClE_HCl = Union{<:ClustersEstimator{<:Any, <:Any,
+                                               <:AbstractHierarchicalClusteringAlgorithm,
+                                               <:Any},
+                           <:Clusters{<:Clustering.Hclust, <:Any, <:Any, <:Any},
+                           <:NetworkClustersEstimator{<:Any,
+                                                  <:AbstractHierarchicalClusteringAlgorithm}}
+
+Alias for a hierarchical clustering estimator or result.
+
+Matches either a [`ClustersEstimator`](@ref) parameterised with a hierarchical clustering algorithm, or a [`Clusters`](@ref) result wrapping a `Clustering.Hclust`. Used internally for dispatch in hierarchical clustering workflows.
+
+# Related
+
+  - [`ClustersEstimator`](@ref)
+  - [`NetworkClustersEstimator`](@ref)
+  - [`AbstractHierarchicalClusteringAlgorithm`](@ref)
+  - [`Clusters`](@ref)
+"""
+const HClE_HCl = Union{<:ClustersEstimator{<:Any, <:Any,
+                                           <:AbstractHierarchicalClusteringAlgorithm,
+                                           <:Any},
+                       <:Clusters{<:Clustering.Hclust, <:Any, <:Any, <:Any},
+                       <:NetworkClustersEstimator{<:Any,
+                                                  <:AbstractHierarchicalClusteringAlgorithm}}
 """
     phylogeny_matrix(nte::AbstractNetworkEstimator, X::MatNum; dims::Int = 1, kwargs...)
 
@@ -1041,7 +1389,7 @@ This function constructs the adjacency matrix for the network, then computes the
 function phylogeny_matrix(nte::AbstractNetworkEstimator, X::MatNum; dims::Int = 1,
                           kwargs...)
     A = calc_adjacency(nte, X; dims = dims, kwargs...)
-    P = zeros(Int, size(Matrix(A)))
+    P = zeros(Int, size(A))
     for i in 0:(nte.n)
         P .+= A^i
     end
@@ -1291,4 +1639,4 @@ export PhylogenyResult, BetweennessCentrality, ClosenessCentrality, DegreeCentra
        EigenvectorCentrality, KatzCentrality, Pagerank, RadialityCentrality,
        StressCentrality, KruskalTree, BoruvkaTree, PrimTree, NetworkEstimator,
        phylogeny_matrix, average_centrality, asset_phylogeny, AbstractCentralityAlgorithm,
-       CentralityEstimator, centrality_vector
+       CentralityEstimator, centrality_vector, NetworkClustersEstimator

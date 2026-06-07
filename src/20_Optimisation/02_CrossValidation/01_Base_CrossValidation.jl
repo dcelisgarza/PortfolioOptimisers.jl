@@ -219,23 +219,41 @@ Keywords correspond to the struct's fields.
   - [`MultiPeriodPredictionResult`](@ref)
 """
 @concrete struct PredictionReturnsResult <: AbstractReturnsResult
-    "$(field_dict[:pred_nx])"
+    """
+    $(field_dict[:pred_nx])
+    """
     nx
-    "$(field_dict[:X])"
+    """
+    $(field_dict[:X])
+    """
     X
-    "$(field_dict[:pred_nf])"
+    """
+    $(field_dict[:pred_nf])
+    """
     nf
-    "$(field_dict[:F])"
+    """
+    $(field_dict[:F])
+    """
     F
-    "$(field_dict[:pred_nb])"
+    """
+    $(field_dict[:pred_nb])
+    """
     nb
-    "$(field_dict[:pred_B])"
+    """
+    $(field_dict[:pred_B])
+    """
     B
-    "$(field_dict[:ts])"
+    """
+    $(field_dict[:ts])
+    """
     ts
-    "$(field_dict[:iv_ret])"
+    """
+    $(field_dict[:iv_ret])
+    """
     iv
-    "$(field_dict[:ivpa])"
+    """
+    $(field_dict[:ivpa])
+    """
     ivpa
     function PredictionReturnsResult(nx::Option{<:VecStr}, X::Option{<:VecNum_VecVecNum},
                                      nf::Option{<:VecStr}, F::Option{<:MatNum},
@@ -342,9 +360,13 @@ $(DocStringExtensions.FIELDS)
   - [`PredictionReturnsResult`](@ref)
 """
 @concrete struct PredictionResult <: AbstractPredictionResult
-    "$(field_dict[:pred_res])"
+    """
+    $(field_dict[:pred_res])
+    """
     res
-    "$(field_dict[:rd])"
+    """
+    $(field_dict[:rd])
+    """
     rd
     function PredictionResult(res::NonFiniteAllocationOptimisationResult,
                               rd::PredictionReturnsResult)
@@ -457,11 +479,17 @@ $(DocStringExtensions.FIELDS)
   - [`PredictionReturnsResult`](@ref)
 """
 @concrete struct MultiPeriodPredictionResult <: AbstractPredictionResult
-    "$(field_dict[:pred])"
+    """
+    $(field_dict[:pred])
+    """
     pred
-    "$(field_dict[:mrd])"
+    """
+    $(field_dict[:mrd])
+    """
     mrd
-    "$(field_dict[:id_pred])"
+    """
+    $(field_dict[:id_pred])
+    """
     id
     function MultiPeriodPredictionResult(pred::VecPredRes, id::Any)
         rd = getfield.(pred, :rd)
@@ -561,7 +589,9 @@ $(DocStringExtensions.FIELDS)
   - [`MultipleRandomised`](@ref)
 """
 @concrete struct PopulationPredictionResult <: AbstractPredictionResult
-    "$(field_dict[:pred])"
+    """
+    $(field_dict[:pred])
+    """
     pred
     function PopulationPredictionResult(pred::VecPredRes_MultiPredRes)
         return new{typeof(pred)}(pred)

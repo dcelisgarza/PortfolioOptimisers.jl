@@ -336,6 +336,59 @@
         onc2 = factory(onc, wt)
         @test onc2.alg.alg.mv.w === wt
         @test onc2.alg.alg.sv.w === wt
+
+        clr = clusterise(NetworkClustersEstimator(; nte = NetworkEstimator(;)), pr.X)
+        clr_t = Hclust{Float64}([-2 -1; -7 -4; 1 -13; -20 -5; -9 -3; -6 5; -19 -14; -10 -16;
+                                 -15 -8; 9 -12; 10 -11; 7 -18; 3 2; -17 4; 6 13; 12 8;
+                                 16 11; 14 15; 18 17],
+                                [0.0, 0.0, 0.3045085076488489, 0.0, 0.0, 0.3581666988279946,
+                                 0.0, 0.0, 0.0, 0.3882307150253385, 0.42633640634280284,
+                                 0.47339491952572044, 0.6532873901085925,
+                                 0.3855084964240403, 0.775920065742249, 0.6145535259841394,
+                                 0.8716917373925989, 1.033182981547855, 1.1992052386632663],
+                                [17, 20, 5, 6, 9, 3, 2, 1, 13, 7, 4, 19, 14, 18, 10, 16, 15,
+                                 8, 12, 11], :ward)
+        @test clr.res.merges == clr_t.merges
+        @test isapprox(clr.res.heights, clr_t.heights)
+        @test clr.res.labels == clr_t.labels
+        @test clr.res.linkage == clr_t.linkage
+
+        clr = clusterise(NetworkClustersEstimator(;
+                                                  nte = NetworkEstimator(;
+                                                                         alg = MaximumDistanceSimilarity()),
+                                                  alg = DBHT()), pr.X)
+        clr_t = Hclust{Float64}([-1 -13; -7 -4; -9 -3; -5 -17; -20 4; -2 -6; -16 1; 3 2;
+                                 6 5; 8 7; 10 9; -14 -10; 12 -19; -11 -8; -15 -12; 13 -18;
+                                 15 14; 17 16; 11 18],
+                                [0.09090909090909091, 0.1, 0.1111111111111111, 0.125,
+                                 0.14285714285714285, 0.16666666666666666, 0.2, 0.25,
+                                 0.3333333333333333, 0.5, 1.0, 0.14285714285714285,
+                                 0.16666666666666666, 0.2, 0.25, 0.3333333333333333, 0.5,
+                                 1.0, 2.0],
+                                [9, 3, 7, 4, 16, 1, 13, 2, 6, 20, 5, 17, 15, 12, 11, 8, 14,
+                                 10, 19, 18], :DBHT)
+        @test clr.res.merges == clr_t.merges
+        @test isapprox(clr.res.heights, clr_t.heights)
+        @test clr.res.labels == clr_t.labels
+        @test clr.res.linkage == clr_t.linkage
+
+        clr = clusterise(NetworkClustersEstimator(;
+                                                  alg = KMeansAlgorithm(;
+                                                                        rng = StableRNG(42),
+                                                                        seed = 42,
+                                                                        kwargs = (;
+                                                                                  init = :kmcen))),
+                         pr.X)
+        @test clr.res.assignments ==
+              [2, 2, 2, 2, 2, 2, 2, 1, 2, 1, 1, 1, 2, 1, 1, 1, 2, 1, 1, 2]
+        @test isapprox(clr.res.costs,
+                       [0.8084243382409362, 0.4823137818592649, 0.4449980885512659,
+                        0.5756168699151285, 0.8319611307695158, 0.6650833126385258,
+                        0.7305444332229705, 0.6436524455289394, 0.5635425434334671,
+                        0.45097786305584187, 0.41692555461393965, 0.44452315606872084,
+                        0.5833758245529381, 0.859913739023499, 0.44658151098578713,
+                        0.4246925133166215, 0.8043043578502438, 0.3386253443760783,
+                        0.6407143305429042, 1.0446276900764264])
     end
     @testset "Centrality tests" begin
         ces = [BetweennessCentrality(), ClosenessCentrality(), DegreeCentrality(),

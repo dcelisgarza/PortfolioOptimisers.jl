@@ -200,13 +200,13 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
     w = model[:w]
     k = model[:k]
     sc = model[:sc]
-    te_dw = Symbol(:te_dw_, i)
+    te_ir = Symbol(:te_ir_, i)
     model[:oldw] = model[:w]
     JuMP.unregister(model, :w)
     model[:w] = JuMP.@expression(model, w - wb * k)
-    risk_expr = set_triv_risk_constraints!(model, te_dw, r, opt, pr, pl, fees, args...;
-                                           kwargs...)
-    model[Symbol(:triv_, i, :_w)] = model[:w]
+    risk_expr = set_risk_tracking_risk_constraints!(model, te_ir, r, opt, pr, pl, fees,
+                                                    te_ir, args...; kwargs...)
+    model[Symbol(te_ir, :_w)] = model[:w]
     model[:w] = model[:oldw]
     JuMP.unregister(model, :oldw)
     model[Symbol(:cter_, i)] = JuMP.@constraint(model, sc * (risk_expr - err * k) <= 0)
@@ -225,19 +225,21 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
     rb = expected_risk(factory(ri, pr, opt.opt.slv), wb, pr.X, fees)
     k = model[:k]
     sc = model[:sc]
-    key = Symbol(:t_dr_, i)
-    t_dr = model[key] = JuMP.@variable(model)
-    risk_expr = set_trdv_risk_constraints!(model, key, ri, opt, pr, pl, fees, args...;
-                                           kwargs...)
-    dr = model[Symbol(:dr_, i)] = JuMP.@expression(model, risk_expr - rb * k)
+    key = Symbol(:te_dr_, i)
+    te_dr = model[key] = JuMP.@variable(model)
+    # risk_expr = set_trdv_risk_constraints!(model, key, ri, opt, pr, pl, fees, args...;
+    #                                        kwargs...)
+    risk_expr = set_risk_tracking_risk_constraints!(model, key, ri, opt, pr, pl, fees, key,
+                                                    args...; kwargs...)
+    dr = model[Symbol(key, i)] = JuMP.@expression(model, risk_expr - rb * k)
     model[Symbol(:cter_noc_, i)], model[Symbol(:cter_, i)] = JuMP.@constraints(model,
                                                                                begin
                                                                                    [sc *
-                                                                                    t_dr
+                                                                                    te_dr
                                                                                     sc * dr] in
                                                                                    JuMP.MOI.NormOneCone(2)
                                                                                    sc *
-                                                                                   (t_dr -
+                                                                                   (te_dr -
                                                                                     err * k) <=
                                                                                    0
                                                                                end)

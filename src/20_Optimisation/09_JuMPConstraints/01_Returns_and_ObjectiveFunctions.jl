@@ -36,11 +36,17 @@ Keywords correspond to the struct's fields.
   - [`JuMPReturnsEstimator`](@ref)
 """
 @concrete struct ArithmeticReturn <: JuMPReturnsEstimator
-    "$(field_dict[:ucs])"
+    """
+    $(field_dict[:ucs])
+    """
     ucs
-    "$(field_dict[:lb])"
+    """
+    $(field_dict[:lb])
+    """
     lb
-    "$(field_dict[:mu])"
+    """
+    $(field_dict[:mu])
+    """
     mu
     function ArithmeticReturn(ucs::Option{<:UcSE_UcS}, lb::Option{<:RkRtBounds},
                               mu::Option{<:Num_VecNum})
@@ -150,9 +156,13 @@ Keywords correspond to the struct's fields.
   - [`JuMPReturnsEstimator`](@ref)
 """
 @concrete struct LogarithmicReturn <: JuMPReturnsEstimator
-    "$(field_dict[:oow])"
+    """
+    $(field_dict[:oow])
+    """
     w
-    "$(field_dict[:lb])"
+    """
+    $(field_dict[:lb])
+    """
     lb
     function LogarithmicReturn(w::Option{<:ObsWeights}, lb::Option{<:RkRtBounds})
         assert_nonempty_nonneg_finite_val(w, :w)
@@ -396,7 +406,9 @@ Keywords correspond to the struct's fields.
   - [`ObjectiveFunction`](@ref)
 """
 @concrete struct MaximumUtility <: ObjectiveFunction
-    "$(field_dict[:l])"
+    """
+    $(field_dict[:l])
+    """
     l
     function MaximumUtility(l::Number)
         @argcheck(l >= zero(l))
@@ -448,9 +460,13 @@ Keywords correspond to the struct's fields.
   - [`ObjectiveFunction`](@ref)
 """
 @concrete struct MaximumRatio <: ObjectiveFunction
-    "$(field_dict[:rf])"
+    """
+    $(field_dict[:rf])
+    """
     rf
-    "Optional objective homogenisation factor for numerical stability of the ratio problem. Defaults to `nothing` (auto-determined)."
+    """
+    Optional objective homogenisation factor for numerical stability of the ratio problem. Defaults to `nothing` (auto-determined).
+    """
     ohf
     function MaximumRatio(rf::Number, ohf::Option{<:Number})
         if !isnothing(ohf)

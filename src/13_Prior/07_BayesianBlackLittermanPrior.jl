@@ -131,19 +131,33 @@ BayesianBlackLittermanPrior
   - [`prior`](@ref)
 """
 @concrete struct BayesianBlackLittermanPrior <: AbstractLowOrderPriorEstimator_F
-    "$(field_dict[:pe])"
+    """
+    $(field_dict[:pe])
+    """
     pe
-    "$(field_dict[:mp])"
+    """
+    $(field_dict[:mp])
+    """
     mp
-    "$(field_dict[:views])"
+    """
+    $(field_dict[:views])
+    """
     views
-    "$(field_dict[:sets])"
+    """
+    $(field_dict[:sets])
+    """
     sets
-    "$(field_dict[:views_conf])"
+    """
+    $(field_dict[:views_conf])
+    """
     views_conf
-    "$(field_dict[:rf])"
+    """
+    $(field_dict[:rf])
+    """
     rf
-    "$(field_dict[:tau])"
+    """
+    $(field_dict[:tau])
+    """
     tau
     function BayesianBlackLittermanPrior(pe::AbstractLowOrderPriorEstimator_F_AF,
                                          mp::AbstractMatrixProcessingEstimator,

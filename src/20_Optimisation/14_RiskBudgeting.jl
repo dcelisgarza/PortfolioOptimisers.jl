@@ -15,19 +15,33 @@ The `w` property is forwarded from `sol.w`.
   - [`NonFiniteAllocationOptimisationResult`](@ref)
 """
 @concrete struct RiskBudgetingResult <: NonFiniteAllocationOptimisationResult
-    "$(field_dict[:oe])"
+    """
+    $(field_dict[:oe])
+    """
     oe
-    "$(field_dict[:pa])"
+    """
+    $(field_dict[:pa])
+    """
     pa
-    "$(field_dict[:prb])"
+    """
+    $(field_dict[:prb])
+    """
     prb
-    "$(field_dict[:retcode])"
+    """
+    $(field_dict[:retcode])
+    """
     retcode
-    "$(field_dict[:sol])"
+    """
+    $(field_dict[:sol])
+    """
     sol
-    "$(field_dict[:model])"
+    """
+    $(field_dict[:model])
+    """
     model
-    "$(field_dict[:fb])"
+    """
+    $(field_dict[:fb])
+    """
     fb
 end
 """
@@ -71,11 +85,17 @@ $(DocStringExtensions.FIELDS)
   - [`FactorRiskBudgeting`](@ref)
 """
 @concrete struct ProcessedFactorRiskBudgetingAttributes <: AbstractResult
-    "Processed risk budget constraints vector."
+    """
+    Processed risk budget constraints vector.
+    """
     rkb
-    "Factor-level risk budget vector."
+    """
+    Factor-level risk budget vector.
+    """
     b1
-    "Regression result used for factor loading estimation."
+    """
+    Regression result used for factor loading estimation.
+    """
     rr
 end
 """
@@ -93,7 +113,9 @@ $(DocStringExtensions.FIELDS)
   - [`AssetRiskBudgeting`](@ref)
 """
 @concrete struct ProcessedAssetRiskBudgetingAttributes <: AbstractResult
-    "Processed asset risk budget constraints vector."
+    """
+    Processed asset risk budget constraints vector.
+    """
     rkb
 end
 """
@@ -144,7 +166,9 @@ Keywords correspond to the struct's fields.
   - [`MixedIntegerRiskBudgeting`](@ref)
 """
 @concrete struct LogRiskBudgeting{T} <: RiskBudgetingFormulation
-    "Optional orthant vector of ±1 defining which assets can have negative weights (`-1`) or must be positive (`+1`). If `nothing`, all assets have positive weights."
+    """
+    Optional orthant vector of ±1 defining which assets can have negative weights (`-1`) or must be positive (`+1`). If `nothing`, all assets have positive weights.
+    """
     z::T
     function LogRiskBudgeting(z::Option{<:VecInt})
         if !isnothing(z)
@@ -219,11 +243,17 @@ Keywords correspond to the struct's fields.
   - [`RiskBudgeting`](@ref)
 """
 @concrete struct AssetRiskBudgeting <: RiskBudgetingAlgorithm
-    "$(field_dict[:rkb])"
+    """
+    $(field_dict[:rkb])
+    """
     rkb
-    "$(field_dict[:sets])"
+    """
+    $(field_dict[:sets])
+    """
     sets
-    "$(field_dict[:rba])"
+    """
+    $(field_dict[:rba])
+    """
     alg
     function AssetRiskBudgeting(rkb::Option{<:RkbE_Rkb}, sets::Option{<:AssetSets},
                                 alg::RiskBudgetingFormulation)
@@ -299,13 +329,21 @@ Keywords correspond to the struct's fields.
   - [`RiskBudgeting`](@ref)
 """
 @concrete struct FactorRiskBudgeting <: RiskBudgetingAlgorithm
-    "$(field_dict[:re])"
+    """
+    $(field_dict[:re])
+    """
     re
-    "$(field_dict[:rkb])"
+    """
+    $(field_dict[:rkb])
+    """
     rkb
-    "$(field_dict[:sets])"
+    """
+    $(field_dict[:sets])
+    """
     sets
-    "$(field_dict[:flag])"
+    """
+    $(field_dict[:flag])
+    """
     flag
     function FactorRiskBudgeting(re::RegE_Reg, rkb::Option{<:RkbE_Rkb},
                                  sets::Option{<:AssetSets}, flag::Bool)
@@ -412,15 +450,25 @@ Where:
   - [`FactorRiskBudgeting`](@ref)
 """
 @concrete struct RiskBudgeting <: RiskJuMPOptimisationEstimator
-    "$(field_dict[:opt_jmp])"
+    """
+    $(field_dict[:opt_jmp])
+    """
     opt
-    "$(field_dict[:r_opt])"
+    """
+    $(field_dict[:r_opt])
+    """
     r
-    "$(field_dict[:rba])"
+    """
+    $(field_dict[:rba])
+    """
     rba
-    "$(field_dict[:wi])"
+    """
+    $(field_dict[:wi])
+    """
     wi
-    "$(field_dict[:fb])"
+    """
+    $(field_dict[:fb])
+    """
     fb
     function RiskBudgeting(opt::JuMPOptimiser, r::RM_VecRM, rba::RiskBudgetingAlgorithm,
                            wi::Option{<:VecNum}, fb::Option{<:OptE_Opt})

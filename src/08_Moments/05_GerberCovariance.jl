@@ -188,15 +188,25 @@ GerberCovariance
   - [gerber](@cite) Gerber, Sander and Markowitz, Harry and Ernst, Philip and Miao, Yinsen and Name, No and Sargen, Paul, *The Gerber Statistic: A Robust Co-Movement Measure for Portfolio Optimization* (July 4, 2021). Available at SSRN: https://ssrn.com/abstract=3880054 or http://dx.doi.org/10.2139/ssrn.3880054
 """
 @concrete struct GerberCovariance <: BaseGerberCovariance
-    "$(field_dict[:ve])"
+    """
+    $(field_dict[:ve])
+    """
     ve
-    "$(field_dict[:me]) Used for centering the returns."
+    """
+    $(field_dict[:me]) Used for centering the returns.
+    """
     me
-    "$(field_dict[:pdm])"
+    """
+    $(field_dict[:pdm])
+    """
     pdm
-    "$(field_dict[:t])"
+    """
+    $(field_dict[:t])
+    """
     t
-    "$(field_dict[:gerbalg])"
+    """
+    $(field_dict[:gerbalg])
+    """
     alg
     function GerberCovariance(ve::StatsBase.CovarianceEstimator,
                               me::AbstractExpectedReturnsEstimator, pdm::Option{<:Posdef},

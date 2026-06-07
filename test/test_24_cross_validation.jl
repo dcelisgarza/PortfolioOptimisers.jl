@@ -743,20 +743,18 @@
         mr = Stacking(; opti = [MeanRisk(; opt = opt), RiskBudgeting(; opt = opt)],
                       opto = MeanRisk(; opt = opt))
         r = MeanReturnRiskRatio(; rk = LowOrderMoment(; alg = SecondMoment()))
-        p = concrete_typed_array([["opti[2].opt.l1" => range(; start = 0.0005,
-                                                             stop = 0.0008, length = 3),
-                                   "opti[1].opt.l2" => range(; start = 0.0004,
-                                                             stop = 0.0007, length = 3)],
-                                  ["opti[1].opt.l2" => range(; start = 0.0004,
-                                                             stop = 0.0007, length = 3)],
-                                  [PropertyLens(:l1) ∘ PropertyLens(:opt) ∘ IndexLens(2) ∘ PropertyLens(:opti) => range(;
-                                                                                                                        start = 0.0009,
-                                                                                                                        stop = 0.0012,
-                                                                                                                        length = 3)],
-                                  [:(opti[2]) => [MeanRisk(; opt = opt,
-                                                           obj = MaximumUtility()),
-                                                  MeanRisk(; opt = opt,
-                                                           obj = MaximumRatio())]]]);
+        p = concrete_typed_array([["opti[2].opt.l1" =>
+                                       range(; start = 0.0005, stop = 0.0008, length = 3),
+                                   "opti[1].opt.l2" =>
+                                       range(; start = 0.0004, stop = 0.0007, length = 3)],
+                                  ["opti[1].opt.l2" =>
+                                       range(; start = 0.0004, stop = 0.0007, length = 3)],
+                                  [PropertyLens(:l1) ∘ PropertyLens(:opt) ∘ IndexLens(2) ∘
+                                   PropertyLens(:opti) =>
+                                       range(; start = 0.0009, stop = 0.0012, length = 3)],
+                                  [:(opti[2]) =>
+                                       [MeanRisk(; opt = opt, obj = MaximumUtility()),
+                                        MeanRisk(; opt = opt, obj = MaximumRatio())]]]);
 
         gs_cv = GridSearchCrossValidation(p; r = r)
         gs_res1 = search_cross_validation(mr, gs_cv, rd)
@@ -764,20 +762,22 @@
         rs_res1 = search_cross_validation(mr, rs_cv1, rd)
         @test gs_res1.val_grid[gs_res1.idx] == rs_res1.val_grid[rs_res1.idx]
         @test gs_res1.lens_grid[gs_res1.idx] == rs_res1.lens_grid[rs_res1.idx]
-        p = concrete_typed_array([Dict("opti[2].opt.l1" => range(; start = 0.0005,
-                                                                 stop = 0.0008, length = 3),
-                                       "opti[1].opt.l2" => range(; start = 0.0004,
-                                                                 stop = 0.0007, length = 3)),
-                                  Dict("opti[1].opt.l2" => range(; start = 0.0004,
-                                                                 stop = 0.0007, length = 3)),
-                                  Dict(PropertyLens(:l1) ∘ PropertyLens(:opt) ∘ IndexLens(2) ∘ PropertyLens(:opti) => range(;
-                                                                                                                            start = 0.0009,
-                                                                                                                            stop = 0.0012,
-                                                                                                                            length = 3)),
-                                  Dict(:(opti[2]) => [MeanRisk(; opt = opt,
-                                                               obj = MaximumUtility()),
-                                                      MeanRisk(; opt = opt,
-                                                               obj = MaximumRatio())])])
+        p = concrete_typed_array([Dict("opti[2].opt.l1" =>
+                                           range(; start = 0.0005, stop = 0.0008,
+                                                 length = 3),
+                                       "opti[1].opt.l2" =>
+                                           range(; start = 0.0004, stop = 0.0007,
+                                                 length = 3)),
+                                  Dict("opti[1].opt.l2" =>
+                                           range(; start = 0.0004, stop = 0.0007,
+                                                 length = 3)),
+                                  Dict(PropertyLens(:l1) ∘ PropertyLens(:opt) ∘
+                                       IndexLens(2) ∘ PropertyLens(:opti) =>
+                                           range(; start = 0.0009, stop = 0.0012,
+                                                 length = 3)),
+                                  Dict(:(opti[2]) =>
+                                           [MeanRisk(; opt = opt, obj = MaximumUtility()),
+                                            MeanRisk(; opt = opt, obj = MaximumRatio())])])
         rs_cv2 = RandomisedSearchCrossValidation(p; rng = StableRNG(42), r = r)
         rs_res2 = search_cross_validation(mr, rs_cv2, rd)
         rev = rs_res2.val_grid[rs_res2.idx] != rs_res1.val_grid[rs_res1.idx]
@@ -789,11 +789,11 @@
             @test rs_res2.lens_grid[rs_res2.idx] == rs_res1.lens_grid[rs_res1.idx]
         end
 
-        p = concrete_typed_array(["opti[2]" => [MeanRisk(; opt = opt,
-                                                         obj = MaximumUtility()),
-                                                MeanRisk(; opt = opt, obj = MaximumRatio())],
-                                  "opti[2].opt.l1" => range(; start = 0.0005, stop = 0.002,
-                                                            length = 3)])
+        p = concrete_typed_array(["opti[2]" =>
+                                      [MeanRisk(; opt = opt, obj = MaximumUtility()),
+                                       MeanRisk(; opt = opt, obj = MaximumRatio())],
+                                  "opti[2].opt.l1" =>
+                                      range(; start = 0.0005, stop = 0.002, length = 3)])
         gs_cv = GridSearchCrossValidation(p; r = r)
         gs_res = search_cross_validation(mr, gs_cv, rd)
 
@@ -823,8 +823,8 @@
         rs_cv1 = RandomisedSearchCrossValidation(p; rng = StableRNG(42), r = r, n_iter = 2)
         rs_res1 = search_cross_validation(mr, rs_cv1, rd)
 
-        p = [OrderedDict("opti[2].opt.l1" => range(; start = 0.0005, stop = 0.0008,
-                                                   length = 3),
+        p = [OrderedDict("opti[2].opt.l1" =>
+                             range(; start = 0.0005, stop = 0.0008, length = 3),
                          "opti[1].opt.l2" => Uniform(0, 0.0015)),
              OrderedDict("opti[2]" => [MeanRisk(; opt = opt, obj = MaximumUtility()),
                                        MeanRisk(; opt = opt, obj = MaximumRatio())])]

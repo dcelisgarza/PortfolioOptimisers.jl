@@ -6,7 +6,6 @@ JuMPOptimisationEstimator
 RiskJuMPOptimisationEstimator
 ObjectiveFunction
 JuMPReturnsEstimator
-factory(r::JuMPReturnsEstimator, args...; kwargs...)
 jump_returns_view
 JuMPConstraintEstimator
 CustomJuMPConstraint

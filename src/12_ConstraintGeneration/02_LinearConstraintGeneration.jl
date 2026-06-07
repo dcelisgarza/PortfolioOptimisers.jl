@@ -36,9 +36,13 @@ PartialLinearConstraint
   - [`LinearConstraintEstimator`](@ref)
 """
 @concrete struct PartialLinearConstraint <: AbstractConstraintResult
-    "$(field_dict[:A])"
+    """
+    $(field_dict[:A])
+    """
     A
-    "$(field_dict[:B])"
+    """
+    $(field_dict[:B])
+    """
     B
     function PartialLinearConstraint(A::MatNum, B::VecNum)::PartialLinearConstraint
         @argcheck(!isempty(A), IsEmptyError)
@@ -111,9 +115,13 @@ LinearConstraint
   - [`LinearConstraintEstimator`](@ref)
 """
 @concrete struct LinearConstraint <: AbstractConstraintResult
-    "$(field_dict[:ineq])"
+    """
+    $(field_dict[:ineq])
+    """
     ineq
-    "$(field_dict[:eq])"
+    """
+    $(field_dict[:eq])
+    """
     eq
     function LinearConstraint(ineq::Option{<:PartialLinearConstraint},
                               eq::Option{<:PartialLinearConstraint})::LinearConstraint
@@ -197,15 +205,25 @@ $(DocStringExtensions.FIELDS)
   - [`RhoParsingResult`](@ref)
 """
 @concrete struct ParsingResult <: AbstractParsingResult
-    "$(field_dict[:vars])"
+    """
+    $(field_dict[:vars])
+    """
     vars
-    "$(field_dict[:coef_c])"
+    """
+    $(field_dict[:coef_c])
+    """
     coef
-    "$(field_dict[:op])"
+    """
+    $(field_dict[:op])
+    """
     op
-    "$(field_dict[:rhs])"
+    """
+    $(field_dict[:rhs])
+    """
     rhs
-    "$(field_dict[:eqn])"
+    """
+    $(field_dict[:eqn])
+    """
     eqn
     function ParsingResult(vars::VecStr, coef::VecNum, op::AbstractString, rhs::Number,
                            eqn::AbstractString)::ParsingResult
@@ -291,11 +309,17 @@ AssetSets
   - [`linear_constraints`](@ref)
 """
 @concrete struct AssetSets <: AbstractEstimator
-    "$(field_dict[:as_key])"
+    """
+    $(field_dict[:as_key])
+    """
     key
-    "$(field_dict[:as_ukey])"
+    """
+    $(field_dict[:as_ukey])
+    """
     ukey
-    "$(field_dict[:dict])"
+    """
+    $(field_dict[:dict])
+    """
     dict
     function AssetSets(key::AbstractString, ukey::AbstractString,
                        dict::AbstractDict{<:AbstractString, <:Any})::AssetSets
@@ -1385,9 +1409,13 @@ LinearConstraint
   - [`linear_constraints`](@ref)
 """
 @concrete struct LinearConstraintEstimator <: AbstractConstraintEstimator
-    "$(field_dict[:lce_val])"
+    """
+    $(field_dict[:lce_val])
+    """
     val
-    "$(field_dict[:ekey])"
+    """
+    $(field_dict[:ekey])
+    """
     key
     function LinearConstraintEstimator(val::EqnType,
                                        key::Option{<:AbstractString} = nothing)::LinearConstraintEstimator

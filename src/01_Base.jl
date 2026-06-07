@@ -202,6 +202,7 @@ const arg_dict = Dict(
                       :clalg => "`alg`: Clustering algorithm.",#
                       :onc => "`onc`: Optimal number of clusters estimator.",#
                       :phX_Xv => "`X`: Phylogeny matrix or vector.",#
+                      :phX => "`X`: Phylogeny matrix.",#
                       :pler => "`pl`: Network estimator, phylogeny result, clustering estimator, or clustering result.",#
                       ## DBHT
                       :dbhtpower => "`power`: Exponent for the the distance matrix when computing the similarity matrix.",#
@@ -338,6 +339,7 @@ const arg_dict = Dict(
                       :sigma_views => "`sigma_views`: Covariance views estimator or result.",#
                       :sk_views => "`sk_views`: Coskewness views estimator or result.",#
                       :kt_views => "`kt_views`: Cokurtosis views estimator or result.",#
+                      :cov_views => "`cov_views`: Covariance views estimator or result.",#
                       :rho_views => "`rho_views`: Correlation views estimator or result.",#
                       :var_alpha => "`var_alpha`: Quantile level for variance views.",#
                       :cvar_alpha => "`cvar_alpha`: Quantile level for conditional value-at-risk views.",#
@@ -353,8 +355,9 @@ const arg_dict = Dict(
                       :f_sk => "`f_sk`: Factor coskewness matrix.",#
                       :f_V => "`f_V`: Factor sum of negative spectral slices of the cokurtosis matrix.",#
                       :skmp => "`skmp`: Coskewness matrix processing estimator.",#
-                      :L2 => "`L2`: Second-order factor loading matrix.",#
-                      :S2 => "`S2`: Second-order factor covariance matrix.",#
+                      :D2 => "`D2`: Duplication matrix.",#
+                      :L2 => "`L2`: Elimination matrix.",#
+                      :S2 => "`S2`: Summation matrix.",#
                       # Uncertainty sets.
                       :lb => "`lb`: Lower bound.",#
                       :ub => "`ub`: Upper bound.",#
@@ -387,14 +390,18 @@ const arg_dict = Dict(
                       :settings_rm => "`settings`: Risk measure settings.",#
                       :scale_rm => "`scale`: Scaling factor applied to the risk measure.",#
                       :ub_rms => "`ub`: Upper bound(s) for the risk measure. Can be a scalar, vector, or [`Frontier`](@ref).",#
+                      :lb_rms => "`lb`: Lower bound(s) for the risk measure. Can be a scalar, vector, or [`Frontier`](@ref).",#
                       :rke => "`rke`: Whether to include the risk measure value in the `JuMP` risk expression.",#
                       # Frontier.
                       :N_fr => "`N`: Number of points on the efficient frontier.",#
                       :factor_fr => "`factor`: Scaling factor for the efficient frontier range.",#
-                      :flag_fr => "`flag`: Whether to sweep the frontier from minimum to maximum.",#
+                      :bound_fr => "`bound`: What operation needs to be performed on the risk lower bound.",#
                       # Risk measure fields.
                       :rc => "`rc`: Risk contribution constraint.",#
                       :alg => "`alg`: Risk measure optimisation formulation algorithm.",#
+                      :vr_rm => "`vr`: Variance risk measure component.",#
+                      :sk_rm => "`sk`: Skewness risk measure component.",#
+                      :kt_rm => "`kt`: Kurtosis risk measure component.",#
                       :alg1 => "`alg1`: First algorithm variant.",#
                       :alg2 => "`alg2`: Second algorithm variant.",#
                       :N_kt => "`N`: Optional number of eigenvalues per asset for the approximate cokurtosis formulation.",#
@@ -1092,7 +1099,9 @@ Stacktrace:
   - [`IsNonFiniteError`](@ref)
 """
 @concrete struct IsNothingError <: PortfolioOptimisersError
-    "$(field_dict[:msg])"
+    """
+    $(field_dict[:msg])
+    """
     msg
 end
 """
@@ -1127,7 +1136,9 @@ Stacktrace:
   - [`IsNonFiniteError`](@ref)
 """
 @concrete struct IsEmptyError <: PortfolioOptimisersError
-    "$(field_dict[:msg])"
+    """
+    $(field_dict[:msg])
+    """
     msg
 end
 """
@@ -1162,7 +1173,9 @@ Stacktrace:
   - [`IsEmptyError`](@ref)
 """
 @concrete struct IsNonFiniteError <: PortfolioOptimisersError
-    "$(field_dict[:msg])"
+    """
+    $(field_dict[:msg])
+    """
     msg
 end
 """
@@ -2022,9 +2035,13 @@ VecScalar
   - [`VecNum`](@ref)
 """
 @concrete struct VecScalar <: AbstractResult
-    "Vector component."
+    """
+    Vector component.
+    """
     v
-    "Scalar component."
+    """
+    Scalar component.
+    """
     s
     function VecScalar(v::VecNum, s::Number)
         assert_nonempty_finite_val(v, :v)

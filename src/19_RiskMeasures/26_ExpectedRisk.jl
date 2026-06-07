@@ -56,7 +56,7 @@ These risk measures are called as `r(w, X, fees)`.
 """
 const ERkwXFees = Union{<:LowOrderMoment, <:HighOrderMoment, <:TrackingRiskMeasure,
                         <:RiskTrackingRiskMeasure, <:Kurtosis, <:ThirdCentralMoment,
-                        <:Skewness, <:MedianAbsoluteDeviation}
+                        <:Skewness, <:MedianAbsoluteDeviation, <:VarianceSkewKurtosis}
 """
     const ERkX = Union{<:ERkNetRet, <:ERkwXFees}
 
@@ -370,6 +370,32 @@ function factor_risk_contribution(r::AbstractBaseRiskMeasure, w::VecNum, X::MatN
     rc_f = [rc_f; rc_of]
     return rc_f
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Compute the expected risk of a risk measure over rolling windows of the returns data.
+
+# Arguments
+
+  - `r::AbstractBaseRiskMeasure`: Risk measure to evaluate.
+  - `w::VecNum`: Portfolio weights vector.
+  - `X::MatNum`: Asset returns matrix.
+  - `fees::Option{<:Fees}`: Optional fee structure.
+  - `window::Integer`: Size of the rolling window (number of periods).
+
+# Returns
+
+  - `risks::VecNum`: Expected risk values for each rolling window.
+
+# Related
+
+  - [`expected_risk`](@ref)
+"""
+function rolling_window_measure(r::AbstractBaseRiskMeasure, w::VecNum, X::MatNum,
+                                fees::Option{<:Fees}, window::Integer)
+    T = size(X, 1)
+    return [expected_risk(r, w, view(X, (t - window + 1):t, :), fees) for t in window:T]
+end
 
 export RiskRatioRiskMeasure, number_effective_assets, risk_contribution,
-       factor_risk_contribution
+       factor_risk_contribution, rolling_window_measure

@@ -79,7 +79,9 @@ UlcerIndex
   - [`RelativeUlcerIndex`](@ref)
 """
 @concrete struct UlcerIndex <: RiskMeasure
-    "$(field_dict[:settings_rm])"
+    """
+    $(field_dict[:settings_rm])
+    """
     settings
     function UlcerIndex(settings::RiskMeasureSettings)
         return new{typeof(settings)}(settings)
@@ -170,7 +172,9 @@ RelativeUlcerIndex
   - [`RelativeAverageDrawdown`](@ref)
 """
 @concrete struct RelativeUlcerIndex <: HierarchicalRiskMeasure
-    "$(field_dict[:settings_rm])"
+    """
+    $(field_dict[:settings_rm])
+    """
     settings
     function RelativeUlcerIndex(settings::HierarchicalRiskMeasureSettings)
         return new{typeof(settings)}(settings)

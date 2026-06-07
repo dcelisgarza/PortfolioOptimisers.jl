@@ -149,6 +149,26 @@ function MyType(; field1::Type1 = default1, field2::Type2 = default2)
 end
 ````
 
+If the struct is decorated with `@propagatable`, identify every `@prop`-tagged field in the struct body and add a `## Propagated parameters` subsection inside `# Constructors` — placed after `## Validation` (or directly after "Keywords correspond to the struct's fields." when there is no `## Validation`):
+
+```markdown
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@prop`-tagged fields are automatically propagated:
+
+  - `nested_field`: Recursively updated via [`factory`](@ref).
+  - `w`: Replaced with the incoming [`ObsWeights`](@ref).
+```
+
+For each `@prop`-tagged field write:
+
+- `` `fieldname`: Replaced with the incoming [`ObsWeights`](@ref). `` — when the field type is `ObsWeights`, `Nothing`, or `Option{<:ObsWeights}`.
+- `` `fieldname`: Recursively updated via [`factory`](@ref). `` — when the field is a subtype of `AbstractEstimator`, `AbstractAlgorithm`, or `AbstractResult`.
+
+List fields in the same order they appear in the struct body. Also add [`factory`](@ref) to the `# Related` section.
+
+See `### @propagatable concrete struct types` in `.github/instructions/julia-docstrings.instructions.md` for a full worked example.
+
 ## Step 6 — Write public function docstrings
 
 Use a **manually written** signature as the header (not `TYPEDSIGNATURES`) so that default values and overloads are shown clearly. Include `# Arguments`, `# Validation` (if applicable), `# Returns`, `# Details` (if applicable), and `# Examples`.

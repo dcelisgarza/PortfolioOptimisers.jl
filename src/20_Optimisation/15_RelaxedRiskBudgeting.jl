@@ -66,7 +66,9 @@ Keywords correspond to the struct's fields.
   - [`RegularisedRelaxedRiskBudgeting`](@ref)
 """
 @concrete struct RegularisedPenalisedRelaxedRiskBudgeting <: RelaxedRiskBudgetingAlgorithm
-    "$(field_dict[:p_rm])"
+    """
+    $(field_dict[:p_rm])
+    """
     p
     function RegularisedPenalisedRelaxedRiskBudgeting(p::Number)
         @argcheck(isfinite(p) && p > zero(p))
@@ -135,15 +137,25 @@ Where:
   - [`RelaxedRiskBudgetingAlgorithm`](@ref)
 """
 @concrete struct RelaxedRiskBudgeting <: JuMPOptimisationEstimator
-    "$(field_dict[:opt_jmp])"
+    """
+    $(field_dict[:opt_jmp])
+    """
     opt
-    "$(field_dict[:rba])"
+    """
+    $(field_dict[:rba])
+    """
     rba
-    "$(field_dict[:wi])"
+    """
+    $(field_dict[:wi])
+    """
     wi
-    "Relaxed risk budgeting algorithm variant."
+    """
+    Relaxed risk budgeting algorithm variant.
+    """
     alg
-    "$(field_dict[:fb])"
+    """
+    $(field_dict[:fb])
+    """
     fb
     function RelaxedRiskBudgeting(opt::JuMPOptimiser, rba::RiskBudgetingAlgorithm,
                                   wi::Option{<:VecNum}, alg::RelaxedRiskBudgetingAlgorithm,

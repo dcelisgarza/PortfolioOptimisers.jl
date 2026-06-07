@@ -42,21 +42,37 @@ $(DocStringExtensions.FIELDS)
   - [`HierarchicalEqualRiskContribution`](@ref)
 """
 @concrete struct HierarchicalResult <: NonFiniteAllocationOptimisationResult
-    "$(field_dict[:oe])"
+    """
+    $(field_dict[:oe])
+    """
     oe
-    "$(field_dict[:pr])"
+    """
+    $(field_dict[:pr])
+    """
     pr
-    "$(field_dict[:clr])"
+    """
+    $(field_dict[:clr])
+    """
     clr
-    "$(field_dict[:wb])"
+    """
+    $(field_dict[:wb])
+    """
     wb
-    "$(field_dict[:fees])"
+    """
+    $(field_dict[:fees])
+    """
     fees
-    "$(field_dict[:retcode])"
+    """
+    $(field_dict[:retcode])
+    """
     retcode
-    "$(field_dict[:pw])"
+    """
+    $(field_dict[:pw])
+    """
     w
-    "$(field_dict[:fb])"
+    """
+    $(field_dict[:fb])
+    """
     fb
 end
 """
@@ -178,25 +194,45 @@ HierarchicalOptimiser
   - [`SchurComplementHierarchicalRiskParity`](@ref)
 """
 @concrete struct HierarchicalOptimiser <: BaseClusteringOptimisationEstimator
-    "$(field_dict[:pe])"
+    """
+    $(field_dict[:pe])
+    """
     pe
-    "$(field_dict[:cle])"
+    """
+    $(field_dict[:cle])
+    """
     cle
-    "$(field_dict[:slv])"
+    """
+    $(field_dict[:slv])
+    """
     slv
-    "$(field_dict[:wb])"
+    """
+    $(field_dict[:wb])
+    """
     wb
-    "$(field_dict[:fees])"
+    """
+    $(field_dict[:fees])
+    """
     fees
-    "$(field_dict[:sets])"
+    """
+    $(field_dict[:sets])
+    """
     sets
-    "$(field_dict[:wf])"
+    """
+    $(field_dict[:wf])
+    """
     wf
-    "$(field_dict[:brt])"
+    """
+    $(field_dict[:brt])
+    """
     brt
-    "$(field_dict[:cle_pr])"
+    """
+    $(field_dict[:cle_pr])
+    """
     cle_pr
-    "$(field_dict[:strict_opt])"
+    """
+    $(field_dict[:strict_opt])
+    """
     strict
     function HierarchicalOptimiser(pe::PrE_Pr, cle::HClE_HCl, slv::Option{<:Slv_VecSlv},
                                    wb::Option{<:WbE_Wb}, fees::Option{<:FeesE_Fees},

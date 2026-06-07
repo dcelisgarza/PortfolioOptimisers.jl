@@ -78,7 +78,7 @@ function set_negative_skewness_risk!(model::JuMP.Model,
                                      nskew_risk::JuMP.AbstractJuMPScalar, key::Symbol,
                                      args...)
     qnskew_risk = model[Symbol(:sq_, key)] = JuMP.@expression(model, nskew_risk^2)
-    ub = variance_risk_bounds_val(false, r.settings.ub)
+    ub = variance_risk_bounds_val(SquareRootBound(), r.settings.ub)
     set_risk_upper_bound!(model, opt, nskew_risk, ub, key)
     set_risk_expression!(model, qnskew_risk, r.settings.scale, r.settings.rke)
     return qnskew_risk
@@ -92,7 +92,7 @@ function set_negative_skewness_risk!(model::JuMP.Model,
     w = model[:w]
     qnskew_risk = model[Symbol(:qd_, key)] = JuMP.@expression(model,
                                                               LinearAlgebra.dot(w, V, w))
-    ub = variance_risk_bounds_val(false, r.settings.ub)
+    ub = variance_risk_bounds_val(SquareRootBound(), r.settings.ub)
     set_risk_upper_bound!(model, opt, nskew_risk, ub, key)
     set_risk_expression!(model, qnskew_risk, r.settings.scale, r.settings.rke)
     return qnskew_risk

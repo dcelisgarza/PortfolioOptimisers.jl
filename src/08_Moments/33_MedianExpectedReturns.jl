@@ -33,7 +33,9 @@ MedianExpectedReturns
   - [`PortfolioOptimisersCovariance`](@ref)
 """
 @concrete struct MedianExpectedReturns <: AbstractExpectedReturnsEstimator
-    "$(field_dict[:oow])"
+    """
+    $(field_dict[:oow])
+    """
     w
     function MedianExpectedReturns(w::Option{<:ObsWeights})
         return new{typeof(w)}(w)

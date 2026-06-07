@@ -37,7 +37,9 @@ RiskBudget
   - [`AbstractConstraintResult`](@ref)
 """
 @concrete struct RiskBudget <: AbstractConstraintResult
-    "$(field_dict[:rkb_val])"
+    """
+    $(field_dict[:rkb_val])
+    """
     val
     function RiskBudget(val::VecNum)::RiskBudget
         @argcheck(!isempty(val))
@@ -120,9 +122,13 @@ RiskBudgetEstimator
   - [`AssetSets`](@ref)
 """
 @concrete struct RiskBudgetEstimator <: AbstractConstraintEstimator
-    "$(field_dict[:rkbe_val])"
+    """
+    $(field_dict[:rkbe_val])
+    """
     val
-    "$(field_dict[:dval])"
+    """
+    $(field_dict[:dval])
+    """
     dval
     function RiskBudgetEstimator(val::EstValType,
                                  dval::Option{<:Number})::RiskBudgetEstimator

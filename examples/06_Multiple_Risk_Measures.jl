@@ -142,6 +142,19 @@ We will use the heirarchical equal risk contribution optimisation, precomputing 
 The [`HierarchicalEqualRiskContribution`](@ref) optimisation estimator accepts inner and outer risk measures and inner and outer scalarisers.
 =#
 clr = clusterise(ClustersEstimator(; alg = DBHT()), pr.X)
+
+#=
+## 4. Visualising cluster structure and results
+
+Before optimising, we can visualise the asset clustering structure derived from the correlation matrix.
+=#
+
+using StatsPlots, GraphRecipes#= Hierarchical clustering dendrogram. =#
+
+plot_dendrogram(clr, rd.nx)#= Reordered correlation heatmap with cluster boundary boxes. =#
+
+plot_clusters(clr, rd.nx)
+
 r = [Variance(), NegativeSkewness(; settings = RiskMeasureSettings(; scale = 0.1))]
 
 results = [optimise(HierarchicalEqualRiskContribution(; ri = r[1],# inner (intra-cluster) risk measure
@@ -176,6 +189,12 @@ pretty_table(DataFrame(:assets => rd.nx, :variance => results[1].w,
                        :neg_skew => results[2].w, :sum_sca => results[3].w,
                        :max_sca => results[4].w, :min_sca => results[5].w,
                        :log_sum_exp => results[6].w); formatters = [resfmt])
+
+#=
+Compositions across scalarisers with weighted NegativeSkewness (scale = 0.1).
+=#
+
+plot_stacked_bar_composition(results, rd)
 
 #=
 When the weights are different enough that one risk measure domintes over the other in all contexts, then the results of the max and min scalarisers will be as expected, i.e. they will be as if only one risk measure was used.
@@ -215,6 +234,13 @@ pretty_table(DataFrame(:assets => rd.nx, :variance => results[1].w,
                        :neg_skew => results[2].w, :sum_sca => results[3].w,
                        :max_sca => results[4].w, :min_sca => results[5].w,
                        :log_sum_exp => results[6].w); formatters = [resfmt])
+
+#=
+Compositions across scalarisers with equal-weight NegativeSkewness. Notice Max collapses to
+NegativeSkewness-only and Min collapses to Variance-only.
+=#
+
+plot_stacked_bar_composition(results, rd)
 
 #=
 Note how the max scalariser produced the same weights as the negative skewness and the min scalariser produced the same weights as the variance. This is because in all cases, the same the value of the negative skewness was greater than that of the variance. A similar behaviour can be observed with other clustering optimisers. [`NearOptimalCentering`](@ref) can also have unintuitive behaviour when computing the risk bounds with an effective frontier [`MaxScalariser`](@ref) and [`MinScalariser`](@ref) due to the fact that each point in the efficient frontier can have a different risk measure dominating the others.

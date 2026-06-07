@@ -278,7 +278,9 @@ ShrunkDenoise
   - [mpdist](@cite) V. A. Marčenko and L. A. Pastur. *Distribution of eigenvalues for some sets of random matrices*. Mathematics of the USSR-Sbornik 1, 457 (1967).
 """
 @concrete struct ShrunkDenoise <: AbstractDenoiseAlgorithm
-    "Shrinkage parameter controlling the degree of shrinkage applied to the smallest eigenvalues."
+    """
+    Shrinkage parameter controlling the degree of shrinkage applied to the smallest eigenvalues.
+    """
     alpha
     function ShrunkDenoise(alpha::Number)
         @argcheck(zero(alpha) <= alpha <= one(alpha),
@@ -364,19 +366,33 @@ Denoise
   - [mpdist](@cite) V. A. Marčenko and L. A. Pastur. *Distribution of eigenvalues for some sets of random matrices*. Mathematics of the USSR-Sbornik 1, 457 (1967).
 """
 @concrete struct Denoise <: AbstractDenoiseEstimator
-    "$(field_dict[:opdm])"
+    """
+    $(field_dict[:opdm])
+    """
     pdm
-    "Denoising algorithm."
+    """
+    Denoising algorithm.
+    """
     alg
-    "Positional arguments for the univariate [Optim.optimize](https://github.com/JuliaNLSolvers/Optim.jl)."
+    """
+    Positional arguments for the univariate [Optim.optimize](https://github.com/JuliaNLSolvers/Optim.jl).
+    """
     args
-    "Keyword arguments for the univariate [Optim.optimize](https://github.com/JuliaNLSolvers/Optim.jl)."
+    """
+    Keyword arguments for the univariate [Optim.optimize](https://github.com/JuliaNLSolvers/Optim.jl).
+    """
     kwargs
-    "Kernel function for [AverageShiftedHistograms.ash](https://github.com/joshday/AverageShiftedHistograms.jl)."
+    """
+    Kernel function for [AverageShiftedHistograms.ash](https://github.com/joshday/AverageShiftedHistograms.jl).
+    """
     kernel
-    "Number of adjacent histograms to smooth over in [AverageShiftedHistograms.ash](https://github.com/joshday/AverageShiftedHistograms.jl)."
+    """
+    Number of adjacent histograms to smooth over in [AverageShiftedHistograms.ash](https://github.com/joshday/AverageShiftedHistograms.jl).
+    """
     m
-    "Number of points in the range of eigenvalues used in the [AverageShiftedHistograms.ash](https://github.com/joshday/AverageShiftedHistograms.jl) density estimation."
+    """
+    Number of points in the range of eigenvalues used in the [AverageShiftedHistograms.ash](https://github.com/joshday/AverageShiftedHistograms.jl) density estimation.
+    """
     n
     function Denoise(pdm::Option{<:Posdef}, alg::AbstractDenoiseAlgorithm, args::Tuple,
                      kwargs::NamedTuple, kernel, m::Integer, n::Integer)::Denoise

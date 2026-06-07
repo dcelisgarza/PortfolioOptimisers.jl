@@ -30,21 +30,37 @@ $(DocStringExtensions.FIELDS)
 """
 @concrete struct SchurComplementHierarchicalRiskParityResult <:
                  NonFiniteAllocationOptimisationResult
-    "$(field_dict[:oe])"
+    """
+    $(field_dict[:oe])
+    """
     oe
-    "$(field_dict[:pr])"
+    """
+    $(field_dict[:pr])
+    """
     pr
-    "$(field_dict[:wb])"
+    """
+    $(field_dict[:wb])
+    """
     wb
-    "$(field_dict[:clr])"
+    """
+    $(field_dict[:clr])
+    """
     clr
-    "$(field_dict[:gamma_schur])"
+    """
+    $(field_dict[:gamma_schur])
+    """
     gamma
-    "$(field_dict[:retcode])"
+    """
+    $(field_dict[:retcode])
+    """
     retcode
-    "$(field_dict[:pw])"
+    """
+    $(field_dict[:pw])
+    """
     w
-    "$(field_dict[:fb])"
+    """
+    $(field_dict[:fb])
+    """
     fb
 end
 """
@@ -113,13 +129,21 @@ Keywords correspond to the struct's fields.
   - [`NonMonotonicSchurComplement`](@ref)
 """
 @concrete struct MonotonicSchurComplement <: SchurComplementAlgorithm
-    "$(field_dict[:N_msc])"
+    """
+    $(field_dict[:N_msc])
+    """
     N
-    "$(field_dict[:tol])"
+    """
+    $(field_dict[:tol])
+    """
     tol
-    "$(field_dict[:iter])"
+    """
+    $(field_dict[:iter])
+    """
     iter
-    "$(field_dict[:strict_conv])"
+    """
+    $(field_dict[:strict_conv])
+    """
     strict
     function MonotonicSchurComplement(N::Integer, tol::Number, iter::Option{<:Integer},
                                       strict::Bool)
@@ -170,15 +194,25 @@ Keywords correspond to the struct's fields.
   - [`SchurComplementAlgorithm`](@ref)
 """
 @concrete struct SchurComplementParams <: AbstractAlgorithm
-    "$(field_dict[:r])"
+    """
+    $(field_dict[:r])
+    """
     r
-    "$(field_dict[:gamma_schur])"
+    """
+    $(field_dict[:gamma_schur])
+    """
     gamma
-    "$(field_dict[:pdm])"
+    """
+    $(field_dict[:pdm])
+    """
     pdm
-    "$(field_dict[:schalg])"
+    """
+    $(field_dict[:schalg])
+    """
     alg
-    "$(field_dict[:flag])"
+    """
+    $(field_dict[:flag])
+    """
     flag
     function SchurComplementParams(r::Sd_Var, gamma::Number, pdm::Option{<:Posdef},
                                    alg::SchurComplementAlgorithm, flag::Bool)
@@ -273,6 +307,13 @@ Keywords correspond to the struct's fields.
 ## Validation
 
   - If `params` is a vector: `!isempty(params)`.
+
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@prop`-tagged fields are automatically propagated:
+
+  - `opt`: Recursively updated via [`factory`](@ref).
+  - `fb`: Recursively updated via [`factory`](@ref).
 
 # Examples
 
@@ -388,14 +429,22 @@ The bisection weight ``\\alpha`` is then computed from the Schur-complement-corr
   - [`HierarchicalRiskParity`](@ref)
   - [`HierarchicalEqualRiskContribution`](@ref)
   - [`SchurComplementParams`](@ref)
+  - [`factory`](@ref)
 """
-@concrete struct SchurComplementHierarchicalRiskParity <: ClusteringOptimisationEstimator
-    "$(field_dict[:opt_hier])"
-    opt
-    "$(field_dict[:params])"
+@propagatable @concrete struct SchurComplementHierarchicalRiskParity <:
+                               ClusteringOptimisationEstimator
+    """
+    $(field_dict[:opt_hier])
+    """
+    @prop opt
+    """
+    $(field_dict[:params])
+    """
     params
-    "$(field_dict[:fb])"
-    fb
+    """
+    $(field_dict[:fb])
+    """
+    @prop fb
     function SchurComplementHierarchicalRiskParity(opt::HierarchicalOptimiser,
                                                    params::ScP_VecScP,
                                                    fb::Option{<:OptE_Opt})
@@ -405,6 +454,14 @@ The bisection weight ``\\alpha`` is then computed from the Schur-complement-corr
         return new{typeof(opt), typeof(params), typeof(fb)}(opt, params, fb)
     end
 end
+#= Old factory function:
+function factory(sh::SchurComplementHierarchicalRiskParity,
+                 w::AbstractVector)::SchurComplementHierarchicalRiskParity
+    opt = factory(sh.opt, w)
+    fb = factory(sh.fb, w)
+    return SchurComplementHierarchicalRiskParity(; opt = opt, params = sh.params, fb = fb)
+end
+=#
 function SchurComplementHierarchicalRiskParity(;
                                                opt::HierarchicalOptimiser = HierarchicalOptimiser(),
                                                params::ScP_VecScP = SchurComplementParams(),
@@ -423,22 +480,6 @@ Return whether the [`SchurComplementHierarchicalRiskParity`](@ref) requires prev
 """
 function needs_previous_weights(opt::SchurComplementHierarchicalRiskParity)
     return (needs_previous_weights(opt.opt) || needs_previous_weights(opt.fb))
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Create a [`SchurComplementHierarchicalRiskParity`](@ref) updating the base optimiser and fallback with weights `w`.
-
-# Related
-
-  - [`SchurComplementHierarchicalRiskParity`](@ref)
-  - [`factory`](@ref)
-"""
-function factory(sh::SchurComplementHierarchicalRiskParity,
-                 w::AbstractVector)::SchurComplementHierarchicalRiskParity
-    opt = factory(sh.opt, w)
-    fb = factory(sh.fb, w)
-    return SchurComplementHierarchicalRiskParity(; opt = opt, params = sh.params, fb = fb)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

@@ -13,19 +13,33 @@ $(DocStringExtensions.FIELDS)
   - [`FiniteAllocationOptimisationResult`](@ref)
 """
 @concrete struct GreedyAllocationResult <: FiniteAllocationOptimisationResult
-    "$(field_dict[:oe])"
+    """
+    $(field_dict[:oe])
+    """
     oe
-    "$(field_dict[:retcode])"
+    """
+    $(field_dict[:retcode])
+    """
     retcode
-    "$(field_dict[:shares])"
+    """
+    $(field_dict[:shares])
+    """
     shares
-    "$(field_dict[:cost_alloc])"
+    """
+    $(field_dict[:cost_alloc])
+    """
     cost
-    "Realised portfolio weights."
+    """
+    Realised portfolio weights.
+    """
     w
-    "$(field_dict[:cash_alloc])"
+    """
+    $(field_dict[:cash_alloc])
+    """
     cash
-    "$(field_dict[:fb])"
+    """
+    $(field_dict[:fb])
+    """
     fb
 end
 """
@@ -107,13 +121,21 @@ GreedyAllocation
   - [`GreedyAllocationResult`](@ref)
 """
 @concrete struct GreedyAllocation <: FiniteAllocationOptimisationEstimator
-    "$(field_dict[:unit])"
+    """
+    $(field_dict[:unit])
+    """
     unit
-    "Additional positional arguments forwarded to `round`."
+    """
+    Additional positional arguments forwarded to `round`.
+    """
     args
-    "$(field_dict[:kwargs])"
+    """
+    $(field_dict[:kwargs])
+    """
     kwargs
-    "$(field_dict[:fb])"
+    """
+    $(field_dict[:fb])
+    """
     fb
     function GreedyAllocation(unit::Number, args::Tuple, kwargs::NamedTuple,
                               fb::Option{<:FOptE_FOpt} = nothing)

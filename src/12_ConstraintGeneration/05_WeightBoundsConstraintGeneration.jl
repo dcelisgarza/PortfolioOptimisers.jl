@@ -121,9 +121,13 @@ WeightBounds
   - [`weight_bounds_constraints`](@ref)
 """
 @concrete struct WeightBounds <: AbstractConstraintResult
-    "$(field_dict[:lb])"
+    """
+    $(field_dict[:lb])
+    """
     lb
-    "$(field_dict[:ub])"
+    """
+    $(field_dict[:ub])
+    """
     ub
     function WeightBounds(lb::Option{<:Num_VecNum}, ub::Option{<:Num_VecNum})::WeightBounds
         validate_bounds(lb, ub)
@@ -193,13 +197,21 @@ WeightBoundsEstimator
   - [`weight_bounds_constraints`](@ref)
 """
 @concrete struct WeightBoundsEstimator <: AbstractConstraintEstimator
-    "$(field_dict[:lb])"
+    """
+    $(field_dict[:lb])
+    """
     lb
-    "$(field_dict[:ub])"
+    """
+    $(field_dict[:ub])
+    """
     ub
-    "$(field_dict[:dlb])"
+    """
+    $(field_dict[:dlb])
+    """
     dlb
-    "$(field_dict[:dub])"
+    """
+    $(field_dict[:dub])
+    """
     dub
     function WeightBoundsEstimator(lb::Option{<:EstValType}, ub::Option{<:EstValType},
                                    dlb::Option{<:Number} = nothing,

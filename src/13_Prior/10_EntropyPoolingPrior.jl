@@ -22,17 +22,29 @@ $(DocStringExtensions.FIELDS)
   - [`replace_prior_views`](@ref)
 """
 @concrete struct RhoParsingResult <: AbstractParsingResult
-    "$(field_dict[:vars])"
+    """
+    $(field_dict[:vars])
+    """
     vars
-    "$(field_dict[:coef_c])"
+    """
+    $(field_dict[:coef_c])
+    """
     coef
-    "$(field_dict[:op])"
+    """
+    $(field_dict[:op])
+    """
     op
-    "$(field_dict[:rhs])"
+    """
+    $(field_dict[:rhs])
+    """
     rhs
-    "$(field_dict[:eqn])"
+    """
+    $(field_dict[:eqn])
+    """
     eqn
-    "$(field_dict[:ij])"
+    """
+    $(field_dict[:ij])
+    """
     ij
     function RhoParsingResult(vars::VecStr, coef::VecNum, op::AbstractString, rhs::Number,
                               eqn::AbstractString,
@@ -204,9 +216,13 @@ CVaREntropyPooling
   - [`Roots.jl`](https://github.com/JuliaMath/Roots.jl)
 """
 @concrete struct CVaREntropyPooling <: AbstractEntropyPoolingOptimiser
-    "$(field_dict[:optargs])"
+    """
+    $(field_dict[:optargs])
+    """
     args
-    "$(field_dict[:optkwargs])"
+    """
+    $(field_dict[:optkwargs])
+    """
     kwargs
     function CVaREntropyPooling(args::Tuple, kwargs::NamedTuple)
         return new{typeof(args), typeof(kwargs)}(args, kwargs)
@@ -267,15 +283,25 @@ OptimEntropyPooling
   - [`Optim.jl`](https://github.com/JuliaNLSolvers/Optim.jl)
 """
 @concrete struct OptimEntropyPooling <: AbstractEntropyPoolingOptimiser
-    "$(field_dict[:optargs])"
+    """
+    $(field_dict[:optargs])
+    """
     args
-    "$(field_dict[:optkwargs])"
+    """
+    $(field_dict[:optkwargs])
+    """
     kwargs
-    "$(field_dict[:sc1])"
+    """
+    $(field_dict[:sc1])
+    """
     sc1
-    "$(field_dict[:sc2])"
+    """
+    $(field_dict[:sc2])
+    """
     sc2
-    "$(field_dict[:epoptalg])"
+    """
+    $(field_dict[:epoptalg])
+    """
     alg
     function OptimEntropyPooling(args::Tuple, kwargs::NamedTuple, sc1::Number, sc2::Number,
                                  alg::AbstractEntropyPoolingOptAlgorithm)
@@ -350,15 +376,25 @@ JuMPEntropyPooling
   - [`JuMP.jl`](https://github.com/jump-dev/JuMP.jl)
 """
 @concrete struct JuMPEntropyPooling <: AbstractEntropyPoolingOptimiser
-    "$(field_dict[:slv])"
+    """
+    $(field_dict[:slv])
+    """
     slv
-    "$(field_dict[:sc1])"
+    """
+    $(field_dict[:sc1])
+    """
     sc1
-    "$(field_dict[:sc2])"
+    """
+    $(field_dict[:sc2])
+    """
     sc2
-    "$(field_dict[:so])"
+    """
+    $(field_dict[:so])
+    """
     so
-    "$(field_dict[:epoptalg])"
+    """
+    $(field_dict[:epoptalg])
+    """
     alg
     function JuMPEntropyPooling(slv::Slv_VecSlv, sc1::Number, sc2::Number, so::Number,
                                 alg::AbstractEntropyPoolingOptAlgorithm)
@@ -410,6 +446,7 @@ $(DocStringExtensions.FIELDS)
         sigma_views::Option{<:LinearConstraintEstimator} = nothing,
         sk_views::Option{<:LinearConstraintEstimator} = nothing,
         kt_views::Option{<:LinearConstraintEstimator} = nothing,
+        cov_views::Option{<:LinearConstraintEstimator} = nothing,
         rho_views::Option{<:LinearConstraintEstimator} = nothing,
         var_alpha::Number = 0.05,
         cvar_alpha::Number = 0.05,
@@ -472,6 +509,7 @@ EntropyPoolingPrior
   sigma_views ┼ nothing
      sk_views ┼ nothing
      kt_views ┼ nothing
+    cov_views ┼ nothing
     rho_views ┼ nothing
     var_alpha ┼ nothing
    cvar_alpha ┼ nothing
@@ -505,37 +543,73 @@ EntropyPoolingPrior
   - [`AbstractEntropyPoolingAlgorithm`](@ref)
 """
 @concrete struct EntropyPoolingPrior <: AbstractLowOrderPriorEstimator_AF
-    "$(field_dict[:pe])"
+    """
+    $(field_dict[:pe])
+    """
     pe
-    "$(field_dict[:mu_views])"
+    """
+    $(field_dict[:mu_views])
+    """
     mu_views
-    "$(field_dict[:var_views])"
+    """
+    $(field_dict[:var_views])
+    """
     var_views
-    "$(field_dict[:cvar_views])"
+    """
+    $(field_dict[:cvar_views])
+    """
     cvar_views
-    "$(field_dict[:sigma_views])"
+    """
+    $(field_dict[:sigma_views])
+    """
     sigma_views
-    "$(field_dict[:sk_views])"
+    """
+    $(field_dict[:sk_views])
+    """
     sk_views
-    "$(field_dict[:kt_views])"
+    """
+    $(field_dict[:kt_views])
+    """
     kt_views
-    "$(field_dict[:rho_views])"
+    """
+    $(field_dict[:cov_views])
+    """
+    cov_views
+    """
+    $(field_dict[:rho_views])
+    """
     rho_views
-    "$(field_dict[:var_alpha])"
+    """
+    $(field_dict[:var_alpha])
+    """
     var_alpha
-    "$(field_dict[:cvar_alpha])"
+    """
+    $(field_dict[:cvar_alpha])
+    """
     cvar_alpha
-    "$(field_dict[:sets])"
+    """
+    $(field_dict[:sets])
+    """
     sets
-    "$(field_dict[:ds_opt])"
+    """
+    $(field_dict[:ds_opt])
+    """
     ds_opt
-    "$(field_dict[:dm_opt])"
+    """
+    $(field_dict[:dm_opt])
+    """
     dm_opt
-    "$(field_dict[:opt_ep])"
+    """
+    $(field_dict[:opt_ep])
+    """
     opt
-    "$(field_dict[:ep_w])"
+    """
+    $(field_dict[:ep_w])
+    """
     w
-    "$(field_dict[:epalg])"
+    """
+    $(field_dict[:epalg])
+    """
     alg
     function EntropyPoolingPrior(pe::AbstractLowOrderPriorEstimator_A_F_AF,
                                  mu_views::Option{<:LinearConstraintEstimator},
@@ -544,6 +618,7 @@ EntropyPoolingPrior
                                  sigma_views::Option{<:LinearConstraintEstimator},
                                  sk_views::Option{<:LinearConstraintEstimator},
                                  kt_views::Option{<:LinearConstraintEstimator},
+                                 cov_views::Option{<:LinearConstraintEstimator},
                                  rho_views::Option{<:LinearConstraintEstimator},
                                  var_alpha::Option{<:Number}, cvar_alpha::Option{<:Number},
                                  sets::Option{<:AssetSets},
@@ -565,6 +640,7 @@ EntropyPoolingPrior
            !isnothing(sigma_views) ||
            !isnothing(sk_views) ||
            !isnothing(kt_views) ||
+           !isnothing(cov_views) ||
            !isnothing(rho_views)
             @argcheck(!isnothing(sets))
         end
@@ -584,23 +660,13 @@ EntropyPoolingPrior
         end
         return new{typeof(pe), typeof(mu_views), typeof(var_views), typeof(cvar_views),
                    typeof(sigma_views), typeof(sk_views), typeof(kt_views),
-                   typeof(rho_views), typeof(var_alpha), typeof(cvar_alpha), typeof(sets),
-                   typeof(ds_opt), typeof(dm_opt), typeof(opt), typeof(w), typeof(alg)}(pe,
-                                                                                        mu_views,
-                                                                                        var_views,
-                                                                                        cvar_views,
-                                                                                        sigma_views,
-                                                                                        sk_views,
-                                                                                        kt_views,
-                                                                                        rho_views,
-                                                                                        var_alpha,
-                                                                                        cvar_alpha,
-                                                                                        sets,
-                                                                                        ds_opt,
-                                                                                        dm_opt,
-                                                                                        opt,
-                                                                                        w,
-                                                                                        alg)
+                   typeof(cov_views), typeof(rho_views), typeof(var_alpha),
+                   typeof(cvar_alpha), typeof(sets), typeof(ds_opt), typeof(dm_opt),
+                   typeof(opt), typeof(w), typeof(alg)}(pe, mu_views, var_views, cvar_views,
+                                                        sigma_views, sk_views, kt_views,
+                                                        cov_views, rho_views, var_alpha,
+                                                        cvar_alpha, sets, ds_opt, dm_opt,
+                                                        opt, w, alg)
     end
 end
 function EntropyPoolingPrior(; pe::AbstractLowOrderPriorEstimator_A_F_AF = EmpiricalPrior(),
@@ -610,6 +676,7 @@ function EntropyPoolingPrior(; pe::AbstractLowOrderPriorEstimator_A_F_AF = Empir
                              sigma_views::Option{<:LinearConstraintEstimator} = nothing,
                              sk_views::Option{<:LinearConstraintEstimator} = nothing,
                              kt_views::Option{<:LinearConstraintEstimator} = nothing,
+                             cov_views::Option{<:LinearConstraintEstimator} = nothing,
                              rho_views::Option{<:LinearConstraintEstimator} = nothing,
                              var_alpha::Option{<:Number} = nothing,
                              cvar_alpha::Option{<:Number} = nothing,
@@ -620,8 +687,8 @@ function EntropyPoolingPrior(; pe::AbstractLowOrderPriorEstimator_A_F_AF = Empir
                              w::Option{<:StatsBase.ProbabilityWeights} = nothing,
                              alg::AbstractEntropyPoolingAlgorithm = H1_EntropyPooling())::EntropyPoolingPrior
     return EntropyPoolingPrior(pe, mu_views, var_views, cvar_views, sigma_views, sk_views,
-                               kt_views, rho_views, var_alpha, cvar_alpha, sets, ds_opt,
-                               dm_opt, opt, w, alg)
+                               kt_views, cov_views, rho_views, var_alpha, cvar_alpha, sets,
+                               ds_opt, dm_opt, opt, w, alg)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -661,10 +728,11 @@ function factory(pe::EntropyPoolingPrior, w::ObsWeights)::EntropyPoolingPrior
     return EntropyPoolingPrior(; pe = factory(pe.pe, w), mu_views = pe.mu_views,
                                var_views = pe.var_views, cvar_views = pe.cvar_views,
                                sigma_views = pe.sigma_views, sk_views = pe.sk_views,
-                               kt_views = pe.kt_views, rho_views = pe.rho_views,
-                               var_alpha = pe.var_alpha, cvar_alpha = pe.cvar_alpha,
-                               sets = pe.sets, ds_opt = pe.ds_opt, dm_opt = pe.dm_opt,
-                               opt = pe.opt, w = w, alg = pe.alg)
+                               kt_views = pe.kt_views, cov_views = pe.cov_views,
+                               rho_views = pe.rho_views, var_alpha = pe.var_alpha,
+                               cvar_alpha = pe.cvar_alpha, sets = pe.sets,
+                               ds_opt = pe.ds_opt, dm_opt = pe.dm_opt, opt = pe.opt, w = w,
+                               alg = pe.alg)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -680,8 +748,9 @@ function prior_view(pe::EntropyPoolingPrior, i)::EntropyPoolingPrior
     return EntropyPoolingPrior(; pe = prior_view(pe.pe, i), mu_views = pe.mu_views,
                                var_views = pe.var_views, cvar_views = pe.cvar_views,
                                sigma_views = pe.sigma_views, sk_views = pe.sk_views,
-                               kt_views = pe.kt_views, rho_views = pe.rho_views,
-                               var_alpha = pe.var_alpha, cvar_alpha = pe.cvar_alpha,
+                               kt_views = pe.kt_views, cov_views = pe.cov_views,
+                               rho_views = pe.rho_views, var_alpha = pe.var_alpha,
+                               cvar_alpha = pe.cvar_alpha,
                                sets = asset_sets_view(pe.sets, i), ds_opt = pe.ds_opt,
                                dm_opt = pe.dm_opt, opt = pe.opt, w = pe.w, alg = pe.alg)
 end
@@ -1198,7 +1267,7 @@ function entropy_pooling(w::VecNum, epc::AbstractDict,
         return opt.sc1 * G
     end
     #! Start: Optim.jl's Fminbox() initial_mu! with default mu0 is broken. Use this until it's fixed.
-    @static if pkgversion(Optim) == v"2.0.1"
+    @static if pkgversion(Optim) in (v"2.0.1", v"2.1.0")
         args = ifelse(isempty(opt.args), (Optim.Fminbox(; mu0 = 1e-5),), opt.args)
         result = Optim.optimize(f, g!, view(wb, :, 1), view(wb, :, 2), x0, args...;
                                 opt.kwargs...)
@@ -1259,7 +1328,7 @@ function entropy_pooling(w::VecNum, epc::AbstractDict,
         return opt.sc1 * G
     end
     #! Start: Optim.jl's Fminbox() initial_mu! with default mu0 is broken. Use this until it's fixed.
-    @static if pkgversion(Optim) == v"2.0.1"
+    @static if pkgversion(Optim) in (v"2.0.1", v"2.1.0")
         args = ifelse(isempty(opt.args), (Optim.Fminbox(; mu0 = 1e-5),), opt.args)
         result = Optim.optimize(f, g!, view(wb, :, 1), view(wb, :, 2), x0, args...;
                                 opt.kwargs...)
@@ -1714,18 +1783,19 @@ function fix_sigma!(epc::AbstractDict, fixed::AbstractVector, to_fix::BitVector,
     return nothing
 end
 """
-    replace_prior_views(res::ParsingResult, pr::AbstractPriorResult, sets::AssetSets;
-                        strict::Bool = false)
+    replace_coprior_views(res::ParsingResult, pr::AbstractPriorResult, sets::AssetSets, key::Symbol;
+                          strict::Bool = false)
 
 Replace correlation prior references in view parsing results with their corresponding prior values.
 
-`replace_prior_views` scans a parsed correlation view constraint (`ParsingResult`) for references to prior values (e.g., `prior(A, B)`), and replaces them with the actual prior correlation value from the provided prior result object. This ensures that prior-based terms in correlation view constraints are treated as constants and not as variables in the optimisation. If an asset referenced in a prior is not found in the asset set, a warning is issued (or an error if `strict=true`). If all variables in the view are prior references, an error is thrown.
+`replace_coprior_views` scans a parsed correlation view constraint (`ParsingResult`) for references to prior values (e.g., `prior(A, B)`), and replaces them with the actual prior correlation value from the provided prior result object. This ensures that prior-based terms in correlation view constraints are treated as constants and not as variables in the optimisation. If an asset referenced in a prior is not found in the asset set, a warning is issued (or an error if `strict=true`). If all variables in the view are prior references, an error is thrown.
 
 # Arguments
 
   - `res`: Parsed correlation view constraint containing variables and coefficients.
   - `pr`: Prior result object containing prior correlation values.
   - `sets`: Asset set mapping asset names to indices.
+  - `key`: Symbol representing whether it's a correlation or covariance view.
   - `strict`: If `true`, throws error for missing assets; otherwise, issue warnings.
 
 # Returns
@@ -1748,8 +1818,8 @@ Replace correlation prior references in view parsing results with their correspo
   - [`AssetSets`](@ref)
   - [`prior`](@ref)
 """
-function replace_prior_views(res::ParsingResult, pr::AbstractPriorResult, sets::AssetSets;
-                             strict::Bool = false)
+function replace_coprior_views(res::ParsingResult, pr::AbstractPriorResult, sets::AssetSets,
+                               key::Symbol; strict::Bool = false)
     prior_pattern = r"prior\(([^()]*)\)"
     prior_corr_pattern = r"prior\(\s*([A-Za-z0-9_]+|\[[A-Za-z0-9_,\s]*\])\s*,\s*([A-Za-z0-9_]+|\[[A-Za-z0-9_,\s]*\])\s*\)"
     corr_pattern = r"\(\s*([A-Za-z0-9_]+|\[[A-Za-z0-9_,\s]*\])\s*,\s*([A-Za-z0-9_]+|\[[A-Za-z0-9_,\s]*\])\s*\)"
@@ -1818,7 +1888,7 @@ function replace_prior_views(res::ParsingResult, pr::AbstractPriorResult, sets::
                 continue
             end
         end
-        rhs -= get_pr_value(pr, j, k) * c
+        rhs -= get_pr_value(pr, j, k, Val(key)) * c
         push!(idx_rm, i)
     end
     if isempty(idx_rm)
@@ -1832,6 +1902,32 @@ function replace_prior_views(res::ParsingResult, pr::AbstractPriorResult, sets::
     eqn = replace(join(string.(coeffs_new) .* "*" .* variables_new, " + "))
     return RhoParsingResult(variables_new, coeffs_new, res.op, rhs,
                             "$(eqn) $(res.op) $(rhs)", jk_idx)
+end
+"""
+    replace_coprior_views(res::VecPR, args...; kwargs...)
+
+Broadcast prior reference replacement across multiple view constraints.
+
+`replace_coprior_views` applies [`replace_coprior_views`](@ref) to each element of a vector of parsed view constraints, replacing prior references with their corresponding prior values.
+
+# Arguments
+
+  - `res:`: Vector of parsed view constraints.
+  - `args...`: Additional positional arguments forwarded to [`replace_coprior_views`](@ref).
+  - `kwargs...`: Additional keyword arguments forwarded to [`replace_coprior_views`](@ref).
+
+# Returns
+
+  - `res::Vector{<:ParsingResult}`: Vector of updated parsing results with prior references replaced by their values.
+
+# Related
+
+  - [`ParsingResult`](@ref)
+  - [`LowOrderPrior`](@ref)
+  - [`AssetSets`](@ref)
+"""
+function replace_coprior_views(res::VecPR, args...; kwargs...)
+    return replace_coprior_views.(res, args...; kwargs...)
 end
 """
     get_pr_value(pr::AbstractPriorResult, i::Integer, j::Integer, args...)
@@ -1858,8 +1954,11 @@ Extract the prior correlation value between assets `i` and `j` from a prior resu
   - [`AbstractPriorResult`](@ref)
   - [`get_pr_value`](@ref)
 """
-function get_pr_value(pr::AbstractPriorResult, i::Integer, j::Integer, args...)
+function get_pr_value(pr::AbstractPriorResult, i::Integer, j::Integer, ::Val{:rho}, args...)
     return StatsBase.cov2cor(pr.sigma)[i, j]
+end
+function get_pr_value(pr::AbstractPriorResult, i::Integer, j::Integer, ::Val{:cov}, args...)
+    return pr.sigma[i, j]
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1887,6 +1986,61 @@ Extract the normalised average correlation between asset groups `i` and `j` from
 """
 function get_pr_value(pr::AbstractPriorResult, i::VecInt, j::VecInt, args...)
     return LinearAlgebra.norm(StatsBase.cov2cor(pr.sigma)[i, j]) / length(i)
+end
+"""
+    ep_cov_views!(cov_views::LinearConstraintEstimator, epc::AbstractDict,
+                  pr::AbstractPriorResult, sets::AssetSets; strict::Bool = false)
+
+Parse and add correlation view constraints to the entropy pooling constraint dictionary.
+
+`ep_cov_views!` parses correlation view equations from a [`LinearConstraintEstimator`](@ref), replaces any prior references with their actual values, and constructs the corresponding linear constraints for entropy pooling. The constraints are then added to the entropy pooling constraint dictionary `epc`. This method returns a boolean vector indicating which assets require their mean and variance to be fixed to the prior value, ensuring that correlation views do not inadvertently alter lower moments.
+
+# Arguments
+
+  - `cov_views`: Correlation view constraints.
+  - `epc`: Dictionary of entropy pooling constraints, mapping keys to `(lhs, rhs)` pairs.
+  - `pr`: Prior result containing asset return information.
+  - `sets`: Asset set mapping asset names to indices.
+  - `strict`: If `true`, throws error for missing assets; otherwise, issue warnings.
+
+# Returns
+
+  - `to_fix::BitVector`: Boolean vector indicating which assets require their mean and variance to be fixed.
+
+# Details
+
+  - Parses view equations and replaces groupings by assets.
+  - Replaces prior references in views with their actual prior correlation values.
+  - Converts parsed views to linear constraints and adds them to `epc`.
+  - Returns a boolean vector for assets that need their mean and variance fixed due to correlation constraints.
+
+# Related
+
+  - [`add_ep_constraint!`](@ref)
+  - [`replace_prior_views`](@ref)
+  - [`EntropyPoolingPrior`](@ref)
+"""
+function ep_cov_views!(cov_views::LinearConstraintEstimator, epc::AbstractDict,
+                       pr::AbstractPriorResult, sets::AssetSets; strict::Bool = false)
+    X = pr.X
+    cov_views = parse_equation(cov_views.val; datatype = eltype(X))
+    cov_views = replace_group_by_assets(cov_views, sets, false, true, true)
+    cov_views = replace_coprior_views(cov_views, pr, sets, :cov; strict = strict)
+    to_fix = falses(size(X, 2))
+    for cov_view in cov_views
+        @argcheck(length(cov_view.vars) == 1,
+                  "Cannot mix multiple covariance pairs in a single view `$(cov_view.eqn)`.")
+        d = ifelse(cov_view.op == ">=", -1, 1)
+        i, j = cov_view.ij[1]
+        Ai = d * cov_view.coef[1] * view(X, :, i) .* view(X, :, j)
+        Bi = d * pr.mu[i] ⊙ pr.mu[j] ⊕ cov_view.rhs
+        if !isa(i, AbstractVector)
+            Bi = [Bi]
+        end
+        add_ep_constraint!(epc, transpose(Ai), Bi, ifelse(cov_view.op == "==", :eq, :ineq))
+        to_fix[union(i, j)] .= true
+    end
+    return to_fix
 end
 """
     ep_rho_views!(rho_views::LinearConstraintEstimator, epc::AbstractDict,
@@ -1926,7 +2080,7 @@ function ep_rho_views!(rho_views::LinearConstraintEstimator, epc::AbstractDict,
     X = pr.X
     rho_views = parse_equation(rho_views.val; datatype = eltype(X))
     rho_views = replace_group_by_assets(rho_views, sets, false, true, true)
-    rho_views = replace_prior_views(rho_views, pr, sets; strict = strict)
+    rho_views = replace_coprior_views(rho_views, pr, sets, :rho; strict = strict)
     to_fix = falses(size(X, 2))
     sigma = LinearAlgebra.diag(pr.sigma)
     for rho_view in rho_views
@@ -2198,13 +2352,14 @@ Posterior moments are then computed as probability-weighted sample statistics us
   - [`ep_sigma_views!`](@ref)
   - [`ep_sk_views!`](@ref)
   - [`ep_kt_views!`](@ref)
+  - [`ep_cov_views!`](@ref)
   - [`ep_rho_views!`](@ref)
   - [`fix_mu!`](@ref)
   - [`fix_sigma!`](@ref)
 """
 function prior(pe::EntropyPoolingPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                        <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                       <:Any, <:StagedEP}, X::MatNum,
+                                       <:Any, <:Any, <:StagedEP}, X::MatNum,
                F::Option{<:MatNum} = nothing; dims::Int = 1, strict::Bool = false,
                kwargs...)
     @argcheck(dims in (1, 2))
@@ -2235,10 +2390,17 @@ function prior(pe::EntropyPoolingPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
         pe = factory(pe, w1)
         pr = prior(pe.pe, X, F; strict = strict, kwargs...)
     end
-    # sigma
-    if !isnothing(pe.sigma_views)
-        to_fix = ep_sigma_views!(pe.sigma_views, epc, pr, pe.sets; strict = strict)
-        fix_mu!(epc, view(fixed, :, 1), to_fix, pr)
+    if !isnothing(pe.sigma_views) || !isnothing(pe.cov_views)
+        # sigma
+        if !isnothing(pe.sigma_views)
+            to_fix = ep_sigma_views!(pe.sigma_views, epc, pr, pe.sets; strict = strict)
+            fix_mu!(epc, view(fixed, :, 1), to_fix, pr)
+        end
+        # cov
+        if !isnothing(pe.cov_views)
+            to_fix = ep_cov_views!(pe.cov_views, epc, pr, pe.sets; strict = strict)
+            fix_mu!(epc, view(fixed, :, 1), to_fix, pr)
+        end
         w1 = ep_cvar_views_solve!(pe.cvar_views, epc, pr, pe.sets, pe.cvar_alpha,
                                   ifelse(isa(pe.alg, H1_EntropyPooling), w0, w1), pe.opt,
                                   pe.ds_opt, pe.dm_opt; strict = strict)
@@ -2343,11 +2505,12 @@ Where:
   - [`ep_sigma_views!`](@ref)
   - [`ep_sk_views!`](@ref)
   - [`ep_kt_views!`](@ref)
+  - [`ep_cov_views!`](@ref)
   - [`ep_rho_views!`](@ref)
 """
 function prior(pe::EntropyPoolingPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                        <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                       <:Any, <:H0_EntropyPooling}, X::MatNum,
+                                       <:Any, <:Any, <:H0_EntropyPooling}, X::MatNum,
                F::Option{<:MatNum} = nothing; dims::Int = 1, strict::Bool = false,
                kwargs...)
     @argcheck(dims in (1, 2))
@@ -2371,9 +2534,15 @@ function prior(pe::EntropyPoolingPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
     pr = prior(pe.pe, X, F; strict = strict, kwargs...)
     ep_mu_views!(pe.mu_views, epc, pr, pe.sets; strict = strict)
     ep_var_views!(pe.var_views, epc, pr, pe.sets, pe.var_alpha; strict = strict)
-    # sigma
-    if !isnothing(pe.sigma_views)
-        ep_sigma_views!(pe.sigma_views, epc, pr, pe.sets; strict = strict)
+    if !isnothing(pe.sigma_views) || !isnothing(pe.cov_views)
+        # sigma
+        if !isnothing(pe.sigma_views)
+            ep_sigma_views!(pe.sigma_views, epc, pr, pe.sets; strict = strict)
+        end
+        # cov
+        if !isnothing(pe.cov_views)
+            ep_cov_views!(pe.cov_views, epc, pr, pe.sets; strict = strict)
+        end
     end
     if !isnothing(pe.rho_views) || !isnothing(pe.sk_views) || !isnothing(pe.kt_views)
         # skew

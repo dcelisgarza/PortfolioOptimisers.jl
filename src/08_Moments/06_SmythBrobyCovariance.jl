@@ -314,23 +314,41 @@ SmythBrobyCovariance
   - [`FLoops.Transducers.Executor`](https://juliafolds2.github.io/FLoops.jl/dev/tutorials/parallel/#tutorials-ex)
 """
 @concrete struct SmythBrobyCovariance <: BaseSmythBrobyCovariance
-    "$(field_dict[:ve])"
+    """
+    $(field_dict[:ve])
+    """
     ve
-    "$(field_dict[:me]) Used for optionally centering the returns."
+    """
+    $(field_dict[:me]) Used for optionally centering the returns.
+    """
     me
-    "$(field_dict[:pdm])"
+    """
+    $(field_dict[:pdm])
+    """
     pdm
-    "$(field_dict[:c1])"
+    """
+    $(field_dict[:c1])
+    """
     c1
-    "$(field_dict[:c2])"
+    """
+    $(field_dict[:c2])
+    """
     c2
-    "$(field_dict[:c3])"
+    """
+    $(field_dict[:c3])
+    """
     c3
-    "$(field_dict[:sbn])"
+    """
+    $(field_dict[:sbn])
+    """
     n
-    "$(field_dict[:sbalg])"
+    """
+    $(field_dict[:sbalg])
+    """
     alg
-    "$(field_dict[:ex])"
+    """
+    $(field_dict[:ex])
+    """
     ex
     function SmythBrobyCovariance(ve::StatsBase.CovarianceEstimator,
                                   me::AbstractExpectedReturnsEstimator,

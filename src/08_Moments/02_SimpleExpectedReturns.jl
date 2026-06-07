@@ -41,7 +41,9 @@ SimpleExpectedReturns
   - [`mean(me::SimpleExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
 """
 @concrete struct SimpleExpectedReturns <: AbstractExpectedReturnsEstimator
-    "$(field_dict[:oow])"
+    """
+    $(field_dict[:oow])
+    """
     w
     function SimpleExpectedReturns(w::Option{<:ObsWeights})::SimpleExpectedReturns
         assert_nonempty_nonneg_finite_val(w, :w)

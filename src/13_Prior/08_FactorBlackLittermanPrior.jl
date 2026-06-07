@@ -118,31 +118,57 @@ FactorBlackLittermanPrior
   - [`prior`](@ref)
 """
 @concrete struct FactorBlackLittermanPrior <: AbstractLowOrderPriorEstimator_F
-    "$(field_dict[:pe])"
+    """
+    $(field_dict[:pe])
+    """
     pe
-    "$(field_dict[:f_mp])"
+    """
+    $(field_dict[:f_mp])
+    """
     f_mp
-    "$(field_dict[:mp])"
+    """
+    $(field_dict[:mp])
+    """
     mp
-    "$(field_dict[:re])"
+    """
+    $(field_dict[:re])
+    """
     re
-    "$(field_dict[:ve])"
+    """
+    $(field_dict[:ve])
+    """
     ve
-    "$(field_dict[:views])"
+    """
+    $(field_dict[:views])
+    """
     views
-    "$(field_dict[:sets])"
+    """
+    $(field_dict[:sets])
+    """
     sets
-    "$(field_dict[:views_conf])"
+    """
+    $(field_dict[:views_conf])
+    """
     views_conf
-    "$(field_dict[:w_rm])"
+    """
+    $(field_dict[:w_rm])
+    """
     w
-    "$(field_dict[:rf])"
+    """
+    $(field_dict[:rf])
+    """
     rf
-    "$(field_dict[:l])"
+    """
+    $(field_dict[:l])
+    """
     l
-    "$(field_dict[:tau])"
+    """
+    $(field_dict[:tau])
+    """
     tau
-    "$(field_dict[:rsd])"
+    """
+    $(field_dict[:rsd])
+    """
     rsd
     function FactorBlackLittermanPrior(pe::AbstractLowOrderPriorEstimator_A_AF,
                                        f_mp::AbstractMatrixProcessingEstimator,

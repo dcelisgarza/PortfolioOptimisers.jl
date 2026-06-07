@@ -39,15 +39,25 @@ ClusterNode
   - [`pre_order`](@ref)
 """
 struct ClusterNode{tid, tl, tr, td, tcnt} <: AbstractResult
-    "$(field_dict[:id_node])"
+    """
+    $(field_dict[:id_node])
+    """
     id::tid
-    "$(field_dict[:left_node])"
+    """
+    $(field_dict[:left_node])
+    """
     left::tl
-    "$(field_dict[:right_node])"
+    """
+    $(field_dict[:right_node])
+    """
     right::tr
-    "$(field_dict[:height_node])"
+    """
+    $(field_dict[:height_node])
+    """
     height::td
-    "$(field_dict[:level_node])"
+    """
+    $(field_dict[:level_node])
+    """
     level::tcnt
     function ClusterNode(id, left::Option{<:ClusterNode} = nothing,
                          right::Option{<:ClusterNode} = nothing, height::Number = 0.0,

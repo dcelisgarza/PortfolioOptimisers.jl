@@ -155,19 +155,33 @@ Where:
   - [`HierarchicalOptimiser`](@ref)
 """
 @concrete struct HierarchicalEqualRiskContribution <: ClusteringOptimisationEstimator
-    "$(field_dict[:opt_hier])"
+    """
+    $(field_dict[:opt_hier])
+    """
     opt
-    "$(field_dict[:ri])"
+    """
+    $(field_dict[:ri])
+    """
     ri
-    "$(field_dict[:ro])"
+    """
+    $(field_dict[:ro])
+    """
     ro
-    "$(field_dict[:scai])"
+    """
+    $(field_dict[:scai])
+    """
     scai
-    "$(field_dict[:scao])"
+    """
+    $(field_dict[:scao])
+    """
     scao
-    "$(field_dict[:ex])"
+    """
+    $(field_dict[:ex])
+    """
     ex
-    "$(field_dict[:fb])"
+    """
+    $(field_dict[:fb])
+    """
     fb
     function HierarchicalEqualRiskContribution(opt::HierarchicalOptimiser,
                                                ri::OptRM_VecOptRM, ro::OptRM_VecOptRM,

@@ -11,6 +11,16 @@ traverse_concrete_subtypes
 concrete_typed_array
 factory(a::Union{Nothing, <:AbstractEstimator, <:AbstractAlgorithm, <:AbstractResult}, args...; kwargs...)
 get_window
+@propagatable
+_factory_child
+@prop
+_is_prop_macro
+_is_doc_macro
+_extract_field_name
+_propagatable_find_struct
+_propagatable_bare_name
+_try_field_name
+_propagatable_parse_body
 ```
 
 ## Mathematical functions
@@ -47,18 +57,18 @@ VectorToScalarMeasure
 Num_VecToScaM
 MinValue
 MeanValue
-factory(mv::MeanValue, w::ObsWeights)
+factory(mv::MeanValue, args...; kwargs...)
 MedianValue
-factory(mdv::MedianValue, w::ObsWeights)
+factory(mdv::MedianValue, args...; kwargs...)
 MaxValue
 StdValue
-factory(sv::StdValue, w::ObsWeights)
+factory(sv::StdValue, args...; kwargs...)
 VarValue
-factory(vv::VarValue, w::ObsWeights)
+factory(vv::VarValue, args...; kwargs...)
 SumValue
 ProdValue
 ModeValue
 StandardisedValue
-factory(msv::StandardisedValue, w::ObsWeights)
+factory(msv::StandardisedValue, args...; kwargs...)
 vec_to_real_measure
 ```

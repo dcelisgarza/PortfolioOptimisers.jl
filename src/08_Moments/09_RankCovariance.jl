@@ -51,7 +51,9 @@ KendallCovariance
   - [`SimpleVariance`](@ref)
 """
 @concrete struct KendallCovariance <: RankCovarianceEstimator
-    "$(field_dict[:ve])"
+    """
+    $(field_dict[:ve])
+    """
     ve
     function KendallCovariance(ve::AbstractVarianceEstimator)
         return new{typeof(ve)}(ve)
@@ -209,7 +211,9 @@ SpearmanCovariance
   - [`SimpleVariance`](@ref)
 """
 @concrete struct SpearmanCovariance <: RankCovarianceEstimator
-    "$(field_dict[:ve])"
+    """
+    $(field_dict[:ve])
+    """
     ve
     function SpearmanCovariance(ve::AbstractVarianceEstimator)
         return new{typeof(ve)}(ve)

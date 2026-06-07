@@ -184,33 +184,61 @@ AugmentedBlackLittermanPrior
   - [`prior`](@ref)
 """
 @concrete struct AugmentedBlackLittermanPrior <: AbstractLowOrderPriorEstimator_F
-    "$(field_dict[:a_pe])"
+    """
+    $(field_dict[:a_pe])
+    """
     a_pe
-    "$(field_dict[:f_pe])"
+    """
+    $(field_dict[:f_pe])
+    """
     f_pe
-    "$(field_dict[:mp])"
+    """
+    $(field_dict[:mp])
+    """
     mp
-    "$(field_dict[:re])"
+    """
+    $(field_dict[:re])
+    """
     re
-    "$(field_dict[:a_views])"
+    """
+    $(field_dict[:a_views])
+    """
     a_views
-    "$(field_dict[:f_views])"
+    """
+    $(field_dict[:f_views])
+    """
     f_views
-    "$(field_dict[:a_sets])"
+    """
+    $(field_dict[:a_sets])
+    """
     a_sets
-    "$(field_dict[:f_sets])"
+    """
+    $(field_dict[:f_sets])
+    """
     f_sets
-    "$(field_dict[:a_views_conf])"
+    """
+    $(field_dict[:a_views_conf])
+    """
     a_views_conf
-    "$(field_dict[:f_views_conf])"
+    """
+    $(field_dict[:f_views_conf])
+    """
     f_views_conf
-    "$(field_dict[:eqw])"
+    """
+    $(field_dict[:eqw])
+    """
     w
-    "$(field_dict[:rf])"
+    """
+    $(field_dict[:rf])
+    """
     rf
-    "$(field_dict[:l])"
+    """
+    $(field_dict[:l])
+    """
     l
-    "$(field_dict[:tau])"
+    """
+    $(field_dict[:tau])
+    """
     tau
     function AugmentedBlackLittermanPrior(a_pe::AbstractLowOrderPriorEstimator_A_AF,
                                           f_pe::AbstractLowOrderPriorEstimator_A_AF,
