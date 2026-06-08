@@ -4,6 +4,11 @@ status: accepted
 
 # Give the JuMP model a typed state interface
 
+> **Note (superseded in part):** §5 below decided the nested-risk-state mechanism
+> would be a registered key-set with a scoped snapshot/restore swap. That mechanism
+> was tried and reverted; it is **superseded by [ADR 0005](0005-prefix-namespaced-risk-state.md)**,
+> which namespaces nested state by key prefix instead. §1–4 and §6 still hold.
+
 ## Context
 
 JuMP-based optimisers build one `JuMP.Model` incrementally: dozens of constraint

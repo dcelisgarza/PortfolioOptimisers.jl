@@ -24,9 +24,21 @@ from the start, per ADR 0004. Decided over the registry/build-then-swap approach
 Add `prefix::Symbol = Symbol("")` to `set_risk_constraints!` and every per-measure
 builder it reaches, and USE it for:
 
-1. **Reads of infra keys** — replace bare reads/`haskey` with prefixed:
-   `model[:W]`→`model[Symbol(prefix,:W)]` (or `set_sdp_constraints!(model; prefix)`),
-   same for `:dd`, `:X`, `:net_X`, `:Xap1`, `:ddap1`. Use `get_w(model, prefix)`.
+0. **Full Category-A accessor coverage (decided 2026-06-08).** The Step-5 seam-lock
+   is **literal `model[:` only** (see Step 5), so prefix-threaded keys become
+   computed `model[Symbol(prefix,name)]` and are naturally exempt. Within that:
+   - **Cross-file shared infra** (`:X`, `:net_X`, `:Xap1`, `:ddap1`, `:dd`, SDP
+     `:W`/`:M`) get **named prefixed accessors** `get_X(model,prefix)` /
+     `has_X(model,prefix)` etc. in `08_Base_JuMPOptimisation.jl`, alongside the
+     existing `get_w`. Consumers route through these, not raw indexing.
+   - **Per-measure singletons** (`:wr_risk`, `:variance_flag`, `:mdd_risk`, `:owa`,
+     `:uci`, `:bdvariance_risk`, skew/kurtosis `W*`, …) are read only inside their
+     own builder; they stay on the prefix-computed `model[Symbol(prefix,name)]`
+     form (lock-exempt, self-documenting in-file). No ceremonial one-caller accessor.
+1. **Reads of infra keys** — replace bare reads/`haskey` with the named prefixed
+   accessors from (0): `get_X(model,prefix)`/`has_X(model,prefix)`, same for `:dd`,
+   `:net_X`, `:Xap1`, `:ddap1`; SDP via `set_sdp_constraints!(model; prefix)`. Use
+   `get_w(model, prefix)`.
 2. **Risk-specific singleton creations** — register via `preg!(model, prefix, …)`
    and guard via `haskey(model, Symbol(prefix, …))`:
    - `:variance_flag`, `:rc_variance`            → 02_VarianceConstraints
@@ -52,8 +64,13 @@ In `18_TrackingRiskMeasureConstraints.jl`: the Independent/Dependent
 `set_risk_constraints!` methods currently swap `:w`↔`:oldw` and call
 `set_risk_tracking_risk_constraints!`, which hand-rolls the 390-line save→build→
 restore (lines ~358–745). Replace with: store the tracking-difference weights at
-`Symbol(prefix, :w)` (prefix e.g. `Symbol(:tr_iv_, i, :_)`), call the inner risk
-build with that `prefix`, and **delete** `set_risk_tracking_risk_constraints!`'s
+`Symbol(prefix, :w)` and **compose** the new tracking prefix onto the incoming one —
+`Symbol(prefix, :tr_iv_, i, :_)`, NOT a fresh `Symbol(:tr_iv_, i, :_)` — so
+tracking-nested-in-tracking is collision-free (decided 2026-06-08; the inner
+risk-vector `enumerate` restarts `i` at 1, and `RiskTrackingRiskMeasure`'s inner
+`r::AbstractBaseRiskMeasure` permits nesting, so a replace-prefix would alias). This
+is what makes ADR 0005's re-entrancy claim true. Call the inner risk build with that
+composed `prefix`, and **delete** `set_risk_tracking_risk_constraints!`'s
 save/restore body + the `:w`/`:oldw` swap. Same prefix flows to
 `set_risk_tr_constraints!` → inner `set_risk_constraints!(; prefix)`.
 Also drop the dead commented `set_trdv_risk_constraints!` block (~800–947).
@@ -81,4 +98,20 @@ commit attempt; just `git add` + re-commit.
 
 ## Step 5 (after Step 4)
 
-Seam-lock test: fail CI on raw `model[:` outside `08_Base_JuMPOptimisation.jl`.
+Seam-lock test: fail CI on raw **literal** `model[:` outside
+`08_Base_JuMPOptimisation.jl` (i.e. the regex `model\[:`, NOT all `model[`). Scope
+decided 2026-06-08: a literal-key lock catches every Category-A leak once Cat-A has
+full accessor coverage (Phase 2 §0), while Category-B's computed
+`model[Symbol(:variance_risk_, i)]` is naturally exempt — so we honour ADR 0004 §1
+(Cat-B stays raw) without an allowlist. Residual hole (accepted, per ADR 0004 §2):
+a sloppy raw `model[Symbol(prefix, :newCatA)]` looks like Cat-B and slips through.
+
+## Note on verification (prefixed path)
+
+The full suite golden-tests every measure in `rs` under BOTH tracking modes
+(`mr_block2`=Dependent / `mr_block3`=Independent in `test/test18_setup.jl`, vs
+`MeanRiskDT.csv.gz`/`MeanRiskIT.csv.gz`; QuadExpr-under-Dependent expected
+`OptimisationFailure`). So the prefixed path is well covered — but only at **Phase 3**
+(when tracking flips to prefixes). During Phase 2 the prefix plumbing is dormant
+(always default-empty), so `check_all()` should be byte-identical to baseline; a
+Phase-2 threading bug only surfaces once Phase 3 activates the path.
