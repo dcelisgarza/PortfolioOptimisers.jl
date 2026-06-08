@@ -67,13 +67,13 @@ where ``z_\\alpha`` is the distribution quantile at level ``\\alpha`` and ``\\ma
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::ValueatRisk{<:Any, <:Any, <:Any, <:MIPValueatRisk},
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               args...; kwargs...)
+                               args...; prefix::Symbol = Symbol(""), kwargs...)
     b = ifelse(!isnothing(r.alg.b), r.alg.b, 1e3)
     s = ifelse(!isnothing(r.alg.s), r.alg.s, 1e-5)
     @argcheck(b > s)
     key = Symbol(:var_risk_, i)
     sc = get_constraint_scale(model)
-    net_X = set_net_portfolio_returns!(model, pr.X)
+    net_X = set_net_portfolio_returns!(model, pr.X; prefix = prefix)
     T = length(net_X)
     var_risk, z_var = model[key], model[Symbol(:z_var_, i)] = JuMP.@variables(model,
                                                                               begin
@@ -132,13 +132,13 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::ValueatRiskRange{<:Any, <:Any, <:Any, <:Any,
                                                    <:MIPValueatRisk},
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               args...; kwargs...)
+                               args...; prefix::Symbol = Symbol(""), kwargs...)
     b = ifelse(!isnothing(r.alg.b), r.alg.b, 1e3)
     s = ifelse(!isnothing(r.alg.s), r.alg.s, 1e-5)
     @argcheck(b > s)
     key = Symbol(:var_range_risk_, i)
     sc = get_constraint_scale(model)
-    net_X = set_net_portfolio_returns!(model, pr.X)
+    net_X = set_net_portfolio_returns!(model, pr.X; prefix = prefix)
     T = length(net_X)
     var_risk_l, z_var_l, var_risk_h, z_var_h = model[Symbol(:var_risk_l_, i)], model[Symbol(:z_var_l_, i)], model[Symbol(:var_risk_h_, i)], model[Symbol(:z_var_h_, i)] = JuMP.@variables(model,
                                                                                                                                                                                           begin
@@ -306,11 +306,11 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::ValueatRisk{<:Any, <:Any, <:Any,
                                               <:DistributionValueatRisk},
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               args...; kwargs...)
+                               args...; prefix::Symbol = Symbol(""), kwargs...)
     alg = r.alg
     mu = nothing_scalar_array_selector(alg.mu, pr.mu)
     G = chol_sigma_selector(model, pr, r.alg)
-    w = get_w(model)
+    w = get_w(model, prefix)
     sc = get_constraint_scale(model)
     z = compute_value_at_risk_z(r.alg.dist, r.alpha)
     key = Symbol(:var_risk_, i)
@@ -357,11 +357,11 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::ValueatRiskRange{<:Any, <:Any, <:Any, <:Any,
                                                    <:DistributionValueatRisk},
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               args...; kwargs...)
+                               args...; prefix::Symbol = Symbol(""), kwargs...)
     alg = r.alg
     mu = nothing_scalar_array_selector(alg.mu, pr.mu)
     G = chol_sigma_selector(model, pr, r.alg)
-    w = get_w(model)
+    w = get_w(model, prefix)
     sc = get_constraint_scale(model)
     dist = r.alg.dist
     z_l = compute_value_at_risk_z(dist, r.alpha)
@@ -417,13 +417,13 @@ the empirical drawdown quantile at confidence level `r.alpha`.
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::DrawdownatRisk,
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               args...; kwargs...)
+                               args...; prefix::Symbol = Symbol(""), kwargs...)
     b = ifelse(!isnothing(r.b), r.b, 1e3)
     s = ifelse(!isnothing(r.s), r.s, 1e-5)
     @argcheck(b > s)
     key = Symbol(:dar_risk_, i)
     sc = get_constraint_scale(model)
-    dd = set_drawdown_constraints!(model, pr.X)
+    dd = set_drawdown_constraints!(model, pr.X; prefix = prefix)
     T = length(dd) - 1
     dar_risk, z_dar = model[key], model[Symbol(:z_dar_, i)] = JuMP.@variables(model,
                                                                               begin

@@ -50,10 +50,10 @@ where ``\\hat{r}_t = \\boldsymbol{x}_t^\\intercal \\boldsymbol{w}`` is the net p
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::ConditionalValueatRisk,
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               args...; kwargs...)
+                               args...; prefix::Symbol = Symbol(""), kwargs...)
     key = Symbol(:cvar_risk_, i)
     sc = get_constraint_scale(model)
-    net_X = set_net_portfolio_returns!(model, pr.X)
+    net_X = set_net_portfolio_returns!(model, pr.X; prefix = prefix)
     T = length(net_X)
     var, z_cvar = model[Symbol(:var_, i)], model[Symbol(:z_cvar_, i)] = JuMP.@variables(model,
                                                                                         begin
@@ -101,10 +101,10 @@ then computes the CVaR range as their difference.
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::ConditionalValueatRiskRange,
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               args...; kwargs...)
+                               args...; prefix::Symbol = Symbol(""), kwargs...)
     key = Symbol(:cvar_range_risk_, i)
     sc = get_constraint_scale(model)
-    net_X = set_net_portfolio_returns!(model, pr.X)
+    net_X = set_net_portfolio_returns!(model, pr.X; prefix = prefix)
     T = length(net_X)
     var_l, z_cvar_l, var_h, z_cvar_h = model[Symbol(:var_l_, i)], model[Symbol(:z_cvar_l_, i)], model[Symbol(:var_h_, i)], model[Symbol(:z_cvar_h_, i)] = JuMP.@variables(model,
                                                                                                                                                                           begin
@@ -191,13 +191,13 @@ auxiliary exceedance variables to encode the distributionally robust CVaR.
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::DistributionallyRobustConditionalValueatRisk,
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               args...; kwargs...)
+                               args...; prefix::Symbol = Symbol(""), kwargs...)
     key = Symbol(:drcvar_risk_, i)
     sc = get_constraint_scale(model)
-    w = get_w(model)
+    w = get_w(model, prefix)
     X = pr.X
-    net_X = set_net_portfolio_returns!(model, X)
-    Xap1 = set_portfolio_returns_plus_one!(model, X)
+    net_X = set_net_portfolio_returns!(model, X; prefix = prefix)
+    Xap1 = set_portfolio_returns_plus_one!(model, X; prefix = prefix)
     T, N = size(X)
 
     alpha = r.alpha
@@ -313,13 +313,13 @@ Wasserstein ambiguity ball constraints, then computes their difference as the ra
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::DistributionallyRobustConditionalValueatRiskRange,
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               args...; kwargs...)
+                               args...; prefix::Symbol = Symbol(""), kwargs...)
     key = Symbol(:drcvar_risk_range_, i)
     sc = get_constraint_scale(model)
-    w = get_w(model)
+    w = get_w(model, prefix)
     X = pr.X
-    net_X = set_net_portfolio_returns!(model, X)
-    Xap1 = set_portfolio_returns_plus_one!(model, X)
+    net_X = set_net_portfolio_returns!(model, X; prefix = prefix)
+    Xap1 = set_portfolio_returns_plus_one!(model, X; prefix = prefix)
     T, N = size(X)
 
     alpha = r.alpha
@@ -510,10 +510,10 @@ drawdown series. The CDaR risk expression is the expected shortfall over drawdow
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::ConditionalDrawdownatRisk,
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               args...; kwargs...)
+                               args...; prefix::Symbol = Symbol(""), kwargs...)
     key = Symbol(:cdar_risk_, i)
     sc = get_constraint_scale(model)
-    dd = set_drawdown_constraints!(model, pr.X)
+    dd = set_drawdown_constraints!(model, pr.X; prefix = prefix)
     T = length(dd) - 1
     iat = inv(r.alpha * T)
     dar, z_cdar = model[Symbol(:dar_, i)], model[Symbol(:z_cdar_, i)] = JuMP.@variables(model,
@@ -568,12 +568,12 @@ applied to the drawdown series.
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::DistributionallyRobustConditionalDrawdownatRisk,
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               args...; kwargs...)
+                               args...; prefix::Symbol = Symbol(""), kwargs...)
     key = Symbol(:drcvar_risk_, i)
     sc = get_constraint_scale(model)
-    w = get_w(model)
+    w = get_w(model, prefix)
     X = pr.X
-    dd = set_drawdown_constraints!(model, X)
+    dd = set_drawdown_constraints!(model, X; prefix = prefix)
     ddap1 = set_portfolio_drawdowns_plus_one!(model, X)
     T, N = size(X)
 
