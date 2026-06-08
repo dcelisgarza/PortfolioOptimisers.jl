@@ -17,7 +17,32 @@ from the start, per ADR 0004. Decided over the registry/build-then-swap approach
   `set_portfolio_returns_plus_one!` :Xap1, `set_portfolio_drawdowns_plus_one!`
   :ddap1, `set_drawdown_constraints!` :dd/:cdd*, `set_sdp_constraints!`
   :W/:M/:M_PSD) and prefixed `get_w`. Default empty = bare keys; behaviour
-  identical to baseline. **NEXT: Phase 2.**
+  identical to baseline.
+- **Phase 2 slice 1 (committed `fa6c0f458`):** prefix threaded through the
+  drawdown/realisation/range builders — files 10 (OWA), 11 (AverageDrawdown),
+  12 (UlcerIndex), 13 (MaximumDrawdown), 14 (BrownianDistanceVariance),
+  15 (WorstRealisation), 16 (Range). `check_all()` byte-identical to baseline
+  (11/12 + sum 1.0, `trk_var_d`=(false,NaN)). **NEXT: Phase 2 slice 2.**
+
+## Phase 2 slice plan (decided 2026-06-08)
+
+The remaining per-measure files split by difficulty, NOT file order:
+
+- **Easy (per-`i` Category-B keys + infra reads only):** 03 (Moment), 06 (VaR/DaR),
+  07 (CVaR/CDaR/DRCVaR), 08 (EVaR/EDaR), 09 (RLVaR/RLDaR), and 05
+  (NegativeSkewness, modulo its `:GV` cache). Mechanical: thread `prefix` to the
+  infra reads (`set_net_portfolio_returns!`, `set_portfolio_returns_plus_one!`,
+  `get_k`). Do as **slice 2**, commit, `check_all()`.
+- **Hard (shared/weight-dependent singletons + SDP):** **02 (Variance)**,
+  **04 (Kurtosis)**, **20 (VarianceSkewKurtosis)**. Do as **slice 3** (final),
+  carefully reviewed in isolation.
+
+**The bare-vs-prefix invariant (decided 2026-06-08):** *prefix a key iff it is
+weight-dependent; prior-derived caches stay bare.* Tracking shifts the WEIGHTS
+(via the benchmark difference), not the prior moments, so any key that is a pure
+function of `pr` is identical in the inner build and is correctly shared bare.
+This explains the old swap list post-hoc — and exposes `:L2W` as the one
+weight-dependent key it WRONGLY omitted (see slice-3 note below).
 
 ## Phase 2 — thread `prefix` through the risk-build spine (NEXT)
 
@@ -50,9 +75,17 @@ builder it reaches, and USE it for:
    - `:owa/:owac`                                 → 10_OWA
    - `:bdvariance_risk/:Dt/:Dx`                  → 14_BrownianDistanceVariance
    - `:W1_vr_sk_kt/:W2_vr_sk_kt/:W3_vr_sk_kt/:L2W1_vr_sk_kt/:M_vr_sk_kt/:M_vr_sk_kt_PSD` → 20_VarianceSkewKurtosis
+   - `:W/:M/:M_PSD` (via `set_sdp_constraints!(model; prefix)`, shared with 02) AND
+     **`:L2W`** → 04_Kurtosis. `:L2W = L2·vec(W)` is weight-dependent (a function of
+     the prefixed SDP `W`), so it MUST be prefixed and added to group 3 — the old
+     swap list OMITTED it (correctness gap; see ADR 0005). Prefixing is byte-identical
+     on the single-measure golden tests AND closes the latent stale-`:L2W`
+     kurtosis-in-kurtosis re-entrancy bug.
 3. `:fees` stays BARE everywhere (shared, never recreated by a nested build).
-   `:G` (chol cache), `:frc_W`/`:frc_M`/`:frc_M_PSD` (FRC) stay BARE — not in the
-   swap groups.
+   `:frc_W`/`:frc_M`/`:frc_M_PSD` (FRC) stay BARE — not in the swap groups.
+   **Prior-derived caches stay BARE** (weight-independent → identical in inner
+   builds, correctly shared): `:G` (chol), `:Gkt` (04), `:GV` (05),
+   `:vals_Akt`/`:vecs_Akt` (04). Invariant: prefix iff weight-dependent.
 
 Spine files (per-measure `set_risk_constraints!`/`set_risk!`): 01 (dispatch),
 02–20 under `19_RiskMeasureConstraints/`, plus readers in `09_JuMPConstraints/`.
@@ -74,9 +107,10 @@ composed `prefix`, and **delete** `set_risk_tracking_risk_constraints!`'s
 save/restore body + the `:w`/`:oldw` swap. Same prefix flows to
 `set_risk_tr_constraints!` → inner `set_risk_constraints!(; prefix)`.
 Also drop the dead commented `set_trdv_risk_constraints!` block (~800–947).
-The 17 snapshot groups (the keys to prefix) are exactly:
+The old swap had 17 snapshot groups; the keys to prefix are those PLUS `:L2W`
+(group 3 below — the swap list omitted it, see Phase 2 slice plan):
 
-    (:variance_flag,), (:rc_variance,), (:W,:M,:M_PSD),
+    (:variance_flag,), (:rc_variance,), (:W,:M,:M_PSD,:L2W),
     (:Au,:Al,:cbucs_variance), (:E,:WpE,:ceucs_variance),
     (:X,), (:net_X,), (:Xap1,), (:ddap1,), (:wr_risk,:cwr),
     (:range_risk,:br_risk,:cbr), (:dd,:cdd_start,:cdd_geq_0,:cdd),

@@ -47,9 +47,23 @@ risk-build spine; the inner build reads and writes only prefixed keys.
   *is* the new obligation: the discipline moved from "remember to extend the swap
   block" to "remember to pass `prefix`," enforced by the seam-lock test (0004 §6.5),
   not the type system.
-- A small set of keys stay deliberately **bare** because they are shared and never
-  recreated by a nested build: `:fees`, `:G` (Cholesky cache), and the FRC keys
-  (`:frc_W`/`:frc_M`/`:frc_M_PSD`). Prefixing them would break sharing, not protect it.
+- The rule for what to prefix is an **invariant: prefix a key iff it is
+  weight-dependent.** A nested build (risk tracking) shifts the *weights* via the
+  benchmark difference, not the prior moments, so a key that is a pure function of
+  the prior `pr` is identical in the inner and outer builds and is correctly shared
+  **bare**. The deliberately-bare keys are therefore `:fees`, the FRC keys
+  (`:frc_W`/`:frc_M`/`:frc_M_PSD`), and the prior-derived caches `:G`, `:Gkt`, `:GV`,
+  `:vals_Akt`/`:vecs_Akt` (Cholesky/eigendecompositions of `pr`). Prefixing these
+  would break sharing, not protect it.
+- That invariant also exposes a latent gap in the old swap, which is direct evidence
+  for the fragility argument above: the swap rebuilt the SDP `:W`/`:M`/`:M_PSD` under
+  tracking weights but **never `:L2W`** (`= L2·vec(W)`, a function of that `W`). The
+  single-measure golden tests never hit it (with no outer Kurtosis, `:L2W` is built
+  fresh against the tracking `W`), but a Kurtosis-nested-in-Kurtosis tracking would
+  reuse a stale `:L2W`. The prefix approach fixes this for free — `:L2W` is prefixed
+  alongside `:W`, byte-identical on the golden tests and correct under re-entrancy —
+  precisely because "thread `prefix`" forces the question "is this weight-dependent?"
+  that the swap list silently got wrong.
 - The Step 5 seam-lock (0004 §6.5) is therefore scoped to **literal** `model[:`
   only, not all `model[`. Prefix-threaded Category-A keys become computed
   `model[Symbol(prefix, name)]`, and Category-B scratch (0004 §1) is computed too, so
