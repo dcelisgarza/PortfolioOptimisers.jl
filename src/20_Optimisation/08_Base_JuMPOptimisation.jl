@@ -388,6 +388,38 @@ function get_k(model::JuMP.Model)
     return model[:k]
 end
 """
+    get_ret(model::JuMP.Model)
+
+Return the portfolio expected-return expression `model[:ret]`.
+
+Asserts the return expression has been registered; errors otherwise.
+
+# Related
+
+  - [`get_risk`](@ref)
+"""
+function get_ret(model::JuMP.Model)
+    @argcheck(haskey(model, :ret))
+    return model[:ret]
+end
+"""
+    get_risk(model::JuMP.Model)
+
+Return the scalarised portfolio risk expression `model[:risk]`.
+
+Asserts the risk expression has been registered (via [`scalarise_risk_expression!`](@ref));
+errors otherwise.
+
+# Related
+
+  - [`scalarise_risk_expression!`](@ref)
+  - [`get_ret`](@ref)
+"""
+function get_risk(model::JuMP.Model)
+    @argcheck(haskey(model, :risk))
+    return model[:risk]
+end
+"""
     set_initial_w!(args...)
     set_initial_w!(w::VecNum, wi::VecNum)
 

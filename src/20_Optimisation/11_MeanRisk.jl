@@ -407,7 +407,7 @@ function solve_mean_risk!(model::JuMP.Model, mr::MeanRisk, ret::JuMPReturnsEstim
     sols = sizehint!(JuMPOptimisationSolution[], length(lbs))
     k = get_k(model)
     sc = get_constraint_scale(model)
-    ret_expr = model[:ret]
+    ret_expr = get_ret(model)
     JuMP.@variable(model, ret_lb_var in JuMP.Parameter(zero(eltype(lbs))))
     JuMP.@constraint(model, ret_lb, sc * (ret_expr - ret_lb_var * k) >= 0)
     set_portfolio_objective_function!(model, mr.obj, ret, mr.opt.cobj, mr, pr)
@@ -605,7 +605,7 @@ function solve_mean_risk!(model::JuMP.Model, mr::MeanRisk, ret::JuMPReturnsEstim
     pitrs = Iterators.product.(itrs...)
     retcodes = sizehint!(OptimisationReturnCode[], length(lbs) * length(pitrs))
     sols = sizehint!(JuMPOptimisationSolution[], length(lbs) * length(pitrs))
-    ret_expr = model[:ret]
+    ret_expr = get_ret(model)
     JuMP.@variable(model, ret_lb_var in JuMP.Parameter(zero(eltype(lbs))))
     JuMP.@constraint(model, ret_lb, sc * (ret_expr - ret_lb_var * k) >= 0)
     set_portfolio_objective_function!(model, mr.obj, ret, mr.opt.cobj, mr, pr)
