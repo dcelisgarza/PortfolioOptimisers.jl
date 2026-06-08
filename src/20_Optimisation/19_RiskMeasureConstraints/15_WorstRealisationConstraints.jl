@@ -35,14 +35,14 @@ where ``\\hat{r}_t = \\boldsymbol{x}_t^\\intercal \\boldsymbol{w}`` is the net p
 
   - [`set_risk_constraints!`](@ref)
 """
-function set_wr_risk_expression!(model::JuMP.Model, X::MatNum)
-    if haskey(model, :wr_risk)
-        return model[:wr_risk]
+function set_wr_risk_expression!(model::JuMP.Model, X::MatNum; prefix::Symbol = Symbol(""))
+    if haskey(model, Symbol(prefix, :wr_risk))
+        return model[Symbol(prefix, :wr_risk)]
     end
     sc = get_constraint_scale(model)
-    net_X = set_net_portfolio_returns!(model, X)
-    JuMP.@variable(model, wr_risk)
-    JuMP.@constraint(model, cwr, sc * (wr_risk .+ net_X) >= 0)
+    net_X = set_net_portfolio_returns!(model, X; prefix = prefix)
+    wr_risk = preg!(model, prefix, :wr_risk, JuMP.@variable(model))
+    preg!(model, prefix, :cwr, JuMP.@constraint(model, sc * (wr_risk .+ net_X) >= 0))
     return wr_risk
 end
 """
@@ -71,11 +71,12 @@ Delegates to [`set_wr_risk_expression!`](@ref) to create `wr_risk`, then calls
 """
 function set_risk_constraints!(model::JuMP.Model, ::Any, r::WorstRealisation,
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               args...; kwargs...)
-    if haskey(model, :wr_risk)
-        return model[:wr_risk]
+                               args...; prefix::Symbol = Symbol(""), kwargs...)
+    if haskey(model, Symbol(prefix, :wr_risk))
+        return model[Symbol(prefix, :wr_risk)]
     end
-    wr_risk = set_wr_risk_expression!(model, pr.X)
-    set_risk_bounds_and_expression!(model, opt, wr_risk, r.settings, :wr_risk)
+    wr_risk = set_wr_risk_expression!(model, pr.X; prefix = prefix)
+    set_risk_bounds_and_expression!(model, opt, wr_risk, r.settings,
+                                    Symbol(prefix, :wr_risk))
     return wr_risk
 end

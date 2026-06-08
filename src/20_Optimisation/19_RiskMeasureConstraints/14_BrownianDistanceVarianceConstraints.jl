@@ -42,21 +42,24 @@ Where:
 """
 function set_brownian_distance_variance_constraints!(model::JuMP.Model,
                                                      ::NormOneConeBrownianDistanceVariance,
-                                                     Dt::MatNum, Dx::MatNum)
+                                                     Dt::MatNum, Dx::MatNum;
+                                                     prefix::Symbol = Symbol(""))
     T = size(Dt, 1)
     sc = get_constraint_scale(model)
-    JuMP.@constraint(model, cbdvariance_noc[j = 1:T, i = j:T],
-                     [sc * Dt[i, j]; sc * Dx[i, j]] in JuMP.MOI.NormOneCone(2))
+    preg!(model, prefix, :cbdvariance_noc,
+          JuMP.@constraint(model, [j = 1:T, i = j:T],
+                           [sc * Dt[i, j]; sc * Dx[i, j]] in JuMP.MOI.NormOneCone(2)))
     return nothing
 end
 function set_brownian_distance_variance_constraints!(model::JuMP.Model,
                                                      ::IneqBrownianDistanceVariance,
-                                                     Dt::MatNum, Dx::MatNum)
+                                                     Dt::MatNum, Dx::MatNum;
+                                                     prefix::Symbol = Symbol(""))
     sc = get_constraint_scale(model)
-    JuMP.@constraints(model, begin
-                          cp_bdvariance, sc * (Dt - Dx) in JuMP.Nonnegatives()
-                          cn_bdvariance, sc * (Dt + Dx) in JuMP.Nonnegatives()
-                      end)
+    preg!(model, prefix, :cp_bdvariance,
+          JuMP.@constraint(model, sc * (Dt - Dx) in JuMP.Nonnegatives()))
+    preg!(model, prefix, :cn_bdvariance,
+          JuMP.@constraint(model, sc * (Dt + Dx) in JuMP.Nonnegatives()))
     return nothing
 end
 """
@@ -85,21 +88,24 @@ of the quadratic dot product.
   - [`set_risk_constraints!`](@ref)
 """
 function set_brownian_distance_risk_constraint!(model::JuMP.Model, ::QuadRiskExpr,
-                                                Dt::MatNum, iT2::Number)
-    JuMP.@expression(model, bdvariance_risk,
-                     iT2 * (LinearAlgebra.dot(Dt, Dt) + iT2 * sum(Dt)^2))
-    return bdvariance_risk
+                                                Dt::MatNum, iT2::Number;
+                                                prefix::Symbol = Symbol(""))
+    return preg!(model, prefix, :bdvariance_risk,
+                 JuMP.@expression(model,
+                                  iT2 * (LinearAlgebra.dot(Dt, Dt) + iT2 * sum(Dt)^2)))
 end
 function set_brownian_distance_risk_constraint!(model::JuMP.Model, ::RSOCRiskExpr,
-                                                Dt::MatNum, iT2::Number)
+                                                Dt::MatNum, iT2::Number;
+                                                prefix::Symbol = Symbol(""))
     sc = get_constraint_scale(model)
-    JuMP.@variable(model, tDt)
-    JuMP.@constraint(model, rsoc_Dt,
-                     [sc * tDt;
-                      0.5;
-                      sc * vec(Dt)] in JuMP.RotatedSecondOrderCone())
-    JuMP.@expression(model, bdvariance_risk, iT2 * (tDt + iT2 * sum(Dt)^2))
-    return bdvariance_risk
+    tDt = preg!(model, prefix, :tDt, JuMP.@variable(model))
+    preg!(model, prefix, :rsoc_Dt,
+          JuMP.@constraint(model,
+                           [sc * tDt;
+                            0.5;
+                            sc * vec(Dt)] in JuMP.RotatedSecondOrderCone()))
+    return preg!(model, prefix, :bdvariance_risk,
+                 JuMP.@expression(model, iT2 * (tDt + iT2 * sum(Dt)^2)))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -130,20 +136,22 @@ the existing expression if already present.
 """
 function set_risk_constraints!(model::JuMP.Model, ::Any, r::BrownianDistanceVariance,
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               args...; kwargs...)
-    if haskey(model, :bdvariance_risk)
-        return model[:bdvariance_risk]
+                               args...; prefix::Symbol = Symbol(""), kwargs...)
+    if haskey(model, Symbol(prefix, :bdvariance_risk))
+        return model[Symbol(prefix, :bdvariance_risk)]
     end
     X = pr.X
-    net_X = set_net_portfolio_returns!(model, X)
+    net_X = set_net_portfolio_returns!(model, X; prefix = prefix)
     T = length(net_X)
     iT2 = inv(T^2)
     ovec = range(one(eltype(X)), one(eltype(X)); length = T)
-    JuMP.@variable(model, Dt[1:T, 1:T], Symmetric)
-    JuMP.@expression(model, Dx, net_X * transpose(ovec) - ovec * transpose(net_X))
-    bdvariance_risk = set_brownian_distance_risk_constraint!(model, r.alg1, Dt, iT2)
-    set_brownian_distance_variance_constraints!(model, r.alg2, Dt, Dx)
+    Dt = preg!(model, prefix, :Dt, JuMP.@variable(model, [1:T, 1:T], Symmetric))
+    Dx = preg!(model, prefix, :Dx,
+               JuMP.@expression(model, net_X * transpose(ovec) - ovec * transpose(net_X)))
+    bdvariance_risk = set_brownian_distance_risk_constraint!(model, r.alg1, Dt, iT2;
+                                                             prefix = prefix)
+    set_brownian_distance_variance_constraints!(model, r.alg2, Dt, Dx; prefix = prefix)
     set_risk_bounds_and_expression!(model, opt, bdvariance_risk, r.settings,
-                                    :bdvariance_risk)
+                                    Symbol(prefix, :bdvariance_risk))
     return bdvariance_risk
 end
