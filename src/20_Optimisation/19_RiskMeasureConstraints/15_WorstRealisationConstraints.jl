@@ -39,7 +39,7 @@ function set_wr_risk_expression!(model::JuMP.Model, X::MatNum)
     if haskey(model, :wr_risk)
         return model[:wr_risk]
     end
-    sc = model[:sc]
+    sc = get_constraint_scale(model)
     net_X = set_net_portfolio_returns!(model, X)
     JuMP.@variable(model, wr_risk)
     JuMP.@constraint(model, cwr, sc * (wr_risk .+ net_X) >= 0)

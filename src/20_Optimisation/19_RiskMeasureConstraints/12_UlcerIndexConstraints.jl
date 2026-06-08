@@ -46,7 +46,7 @@ function set_risk_constraints!(model::JuMP.Model, ::Any, r::UlcerIndex,
     if haskey(model, :uci)
         return model[:uci_risk]
     end
-    sc = model[:sc]
+    sc = get_constraint_scale(model)
     dd = set_drawdown_constraints!(model, pr.X)
     T = length(dd) - 1
     JuMP.@variable(model, uci)

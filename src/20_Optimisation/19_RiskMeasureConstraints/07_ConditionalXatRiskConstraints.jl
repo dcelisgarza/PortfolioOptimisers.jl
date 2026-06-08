@@ -52,7 +52,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::ConditionalValueatR
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; kwargs...)
     key = Symbol(:cvar_risk_, i)
-    sc = model[:sc]
+    sc = get_constraint_scale(model)
     net_X = set_net_portfolio_returns!(model, pr.X)
     T = length(net_X)
     var, z_cvar = model[Symbol(:var_, i)], model[Symbol(:z_cvar_, i)] = JuMP.@variables(model,
@@ -103,7 +103,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::ConditionalValueatR
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; kwargs...)
     key = Symbol(:cvar_range_risk_, i)
-    sc = model[:sc]
+    sc = get_constraint_scale(model)
     net_X = set_net_portfolio_returns!(model, pr.X)
     T = length(net_X)
     var_l, z_cvar_l, var_h, z_cvar_h = model[Symbol(:var_l_, i)], model[Symbol(:z_cvar_l_, i)], model[Symbol(:var_h_, i)], model[Symbol(:z_cvar_h_, i)] = JuMP.@variables(model,
@@ -193,8 +193,8 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; kwargs...)
     key = Symbol(:drcvar_risk_, i)
-    sc = model[:sc]
-    w = model[:w]
+    sc = get_constraint_scale(model)
+    w = get_w(model)
     X = pr.X
     net_X = set_net_portfolio_returns!(model, X)
     Xap1 = set_portfolio_returns_plus_one!(model, X)
@@ -315,8 +315,8 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; kwargs...)
     key = Symbol(:drcvar_risk_range_, i)
-    sc = model[:sc]
-    w = model[:w]
+    sc = get_constraint_scale(model)
+    w = get_w(model)
     X = pr.X
     net_X = set_net_portfolio_returns!(model, X)
     Xap1 = set_portfolio_returns_plus_one!(model, X)
@@ -512,7 +512,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::ConditionalDrawdown
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; kwargs...)
     key = Symbol(:cdar_risk_, i)
-    sc = model[:sc]
+    sc = get_constraint_scale(model)
     dd = set_drawdown_constraints!(model, pr.X)
     T = length(dd) - 1
     iat = inv(r.alpha * T)
@@ -570,8 +570,8 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; kwargs...)
     key = Symbol(:drcvar_risk_, i)
-    sc = model[:sc]
-    w = model[:w]
+    sc = get_constraint_scale(model)
+    w = get_w(model)
     X = pr.X
     dd = set_drawdown_constraints!(model, X)
     ddap1 = set_portfolio_drawdowns_plus_one!(model, X)

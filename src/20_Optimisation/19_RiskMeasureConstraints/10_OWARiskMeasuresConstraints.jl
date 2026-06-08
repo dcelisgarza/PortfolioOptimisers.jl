@@ -23,7 +23,7 @@ function set_owa_constraints!(model::JuMP.Model, X::MatNum)
     if haskey(model, :owa)
         return model[:owa]
     end
-    sc = model[:sc]
+    sc = get_constraint_scale(model)
     net_X = set_net_portfolio_returns!(model, X)
     T = size(X, 1)
     JuMP.@variable(model, owa[1:T])
@@ -81,7 +81,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; kwargs...)
     key = Symbol(:owa_risk_, i)
-    sc = model[:sc]
+    sc = get_constraint_scale(model)
     X = pr.X
     T = size(X, 1)
     owa = set_owa_constraints!(model, X)
@@ -136,7 +136,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; kwargs...)
     key = Symbol(:owa_range_risk_, i)
-    sc = model[:sc]
+    sc = get_constraint_scale(model)
     X = pr.X
     T = size(X, 1)
     owa = set_owa_constraints!(model, X)
@@ -192,7 +192,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; kwargs...)
     key = Symbol(:aowa_risk_, i)
-    sc = model[:sc]
+    sc = get_constraint_scale(model)
     X = pr.X
     T = size(X, 1)
     net_X = set_net_portfolio_returns!(model, X)
@@ -300,7 +300,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; kwargs...)
     key = Symbol(:aowa_range_risk_, i)
-    sc = model[:sc]
+    sc = get_constraint_scale(model)
     X = pr.X
     T = size(X, 1)
     net_X = set_net_portfolio_returns!(model, X)

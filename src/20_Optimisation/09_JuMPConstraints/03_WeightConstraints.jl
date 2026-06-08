@@ -109,10 +109,10 @@ function set_weight_constraints!(model::JuMP.Model, wb::WeightBounds,
     ub = wb.ub
     flag = w_neg_flag(lb) || w_neg_flag(ub)
     @argcheck(!(long && flag), "Long-only strategy cannot have negative weight limits")
-    w = model[:w]
+    w = get_w(model)
     N = length(w)
-    k = model[:k]
-    sc = model[:sc]
+    k = get_k(model)
+    sc = get_constraint_scale(model)
     if w_finite_flag(lb)
         JuMP.@constraint(model, w_lb, sc * (w - k * lb) >= 0)
     end
@@ -210,9 +210,9 @@ function set_linear_weight_constraints!(args...)
 end
 function set_linear_weight_constraints!(model::JuMP.Model, lcms::Lc_VecLc, key_ineq::Symbol,
                                         key_eq::Symbol)
-    w = model[:w]
-    k = model[:k]
-    sc = model[:sc]
+    w = get_w(model)
+    k = get_k(model)
+    sc = get_constraint_scale(model)
     for (i, lcm) in enumerate(lcms)
         if !isnothing(lcm.ineq)
             A = lcm.ineq.A

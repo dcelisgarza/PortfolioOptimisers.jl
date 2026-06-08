@@ -65,8 +65,8 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
                                          tr::TrackingError{<:Any, <:Any, <:L1Tracking},
                                          args...; kwargs...)
     X = pr.X
-    k = model[:k]
-    sc = model[:sc]
+    k = get_k(model)
+    sc = get_constraint_scale(model)
     net_X = set_net_portfolio_returns!(model, X)
     wb = tracking_benchmark(tr.tr, X)
     err = tr.err
@@ -94,8 +94,8 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
                                                                    <:SquaredL2Tracking}},
                                          args...; kwargs...)
     X = pr.X
-    k = model[:k]
-    sc = model[:sc]
+    k = get_k(model)
+    sc = get_constraint_scale(model)
     net_X = set_net_portfolio_returns!(model, X)
     wb = tracking_benchmark(tr.tr, X)
     err = tr.err
@@ -120,8 +120,8 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
                                          args...; kwargs...)
     @argcheck(tr.alg.p > 1, DomainError)
     X = pr.X
-    k = model[:k]
-    sc = model[:sc]
+    k = get_k(model)
+    sc = get_constraint_scale(model)
     net_X = set_net_portfolio_returns!(model, X)
     wb = tracking_benchmark(tr.tr, X)
     T = size(X, 1)
@@ -162,8 +162,8 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
                                          tr::TrackingError{<:Any, <:Any, <:LInfTracking},
                                          args...; kwargs...)
     X = pr.X
-    k = model[:k]
-    sc = model[:sc]
+    k = get_k(model)
+    sc = get_constraint_scale(model)
     net_X = set_net_portfolio_returns!(model, X)
     wb = tracking_benchmark(tr.tr, X)
     T = size(X, 1)
@@ -198,8 +198,8 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
     wb = tr.tr.w
     err = tr.err
     w = model[:w]
-    k = model[:k]
-    sc = model[:sc]
+    k = get_k(model)
+    sc = get_constraint_scale(model)
     te_ir = Symbol(:te_ir_, i)
     model[:oldw] = model[:w]
     JuMP.unregister(model, :w)
@@ -223,8 +223,8 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
     wb = tr.tr.w
     err = tr.err
     rb = expected_risk(factory(ri, pr, opt.opt.slv), wb, pr.X, fees)
-    k = model[:k]
-    sc = model[:sc]
+    k = get_k(model)
+    sc = get_constraint_scale(model)
     key = Symbol(:te_dr_, i)
     te_dr = model[key] = JuMP.@variable(model)
     # risk_expr = set_trdv_risk_constraints!(model, key, ri, opt, pr, pl, fees, args...;

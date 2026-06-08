@@ -311,6 +311,82 @@ function set_model_scales!(model::JuMP.Model, so::Number, sc::Number)
                       end)
     return nothing
 end
+# ---------------------------------------------------------------------------
+# Model-state read interface
+#
+# The JuMP model is the shared blackboard between every constraint and risk
+# builder. These accessors give its always-present singleton entries a named,
+# checked interface: each asserts the entry has been populated and returns it,
+# turning an absent-key bug into a clear error at the read site instead of an
+# opaque `KeyError` (or, worse, silent misbehaviour) deep in a builder.
+#
+# Prefer these over raw `model[:sym]` for the entries they cover. See ADR 0004.
+# ---------------------------------------------------------------------------
+"""
+    get_constraint_scale(model::JuMP.Model)
+
+Return the constraint scale expression `model[:sc]`.
+
+Asserts the scale has been registered (via [`set_model_scales!`](@ref)); errors otherwise.
+
+# Related
+
+  - [`set_model_scales!`](@ref)
+  - [`get_objective_scale`](@ref)
+"""
+function get_constraint_scale(model::JuMP.Model)
+    @argcheck(haskey(model, :sc))
+    return model[:sc]
+end
+"""
+    get_objective_scale(model::JuMP.Model)
+
+Return the objective scale expression `model[:so]`.
+
+Asserts the scale has been registered (via [`set_model_scales!`](@ref)); errors otherwise.
+
+# Related
+
+  - [`set_model_scales!`](@ref)
+  - [`get_constraint_scale`](@ref)
+"""
+function get_objective_scale(model::JuMP.Model)
+    @argcheck(haskey(model, :so))
+    return model[:so]
+end
+"""
+    get_w(model::JuMP.Model)
+
+Return the portfolio weight variables `model[:w]`.
+
+Asserts the weights have been registered (via [`set_w!`](@ref)); errors otherwise.
+
+# Related
+
+  - [`set_w!`](@ref)
+"""
+function get_w(model::JuMP.Model)
+    @argcheck(haskey(model, :w))
+    return model[:w]
+end
+"""
+    get_k(model::JuMP.Model)
+
+Return the homogenisation variable `model[:k]`.
+
+`k >= 0` is the auxiliary scaling variable used to homogenise fractional/ratio
+objectives (e.g. maximum ratio); recovered weights are `w / k`. Asserts `:k` has
+been registered; errors otherwise.
+
+# Related
+
+  - [`process_model`](@ref)
+  - [`get_w`](@ref)
+"""
+function get_k(model::JuMP.Model)
+    @argcheck(haskey(model, :k))
+    return model[:k]
+end
 """
     set_initial_w!(args...)
     set_initial_w!(w::VecNum, wi::VecNum)

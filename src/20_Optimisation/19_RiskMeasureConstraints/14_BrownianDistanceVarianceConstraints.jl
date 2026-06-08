@@ -44,7 +44,7 @@ function set_brownian_distance_variance_constraints!(model::JuMP.Model,
                                                      ::NormOneConeBrownianDistanceVariance,
                                                      Dt::MatNum, Dx::MatNum)
     T = size(Dt, 1)
-    sc = model[:sc]
+    sc = get_constraint_scale(model)
     JuMP.@constraint(model, cbdvariance_noc[j = 1:T, i = j:T],
                      [sc * Dt[i, j]; sc * Dx[i, j]] in JuMP.MOI.NormOneCone(2))
     return nothing
@@ -52,7 +52,7 @@ end
 function set_brownian_distance_variance_constraints!(model::JuMP.Model,
                                                      ::IneqBrownianDistanceVariance,
                                                      Dt::MatNum, Dx::MatNum)
-    sc = model[:sc]
+    sc = get_constraint_scale(model)
     JuMP.@constraints(model, begin
                           cp_bdvariance, sc * (Dt - Dx) in JuMP.Nonnegatives()
                           cn_bdvariance, sc * (Dt + Dx) in JuMP.Nonnegatives()
@@ -92,7 +92,7 @@ function set_brownian_distance_risk_constraint!(model::JuMP.Model, ::QuadRiskExp
 end
 function set_brownian_distance_risk_constraint!(model::JuMP.Model, ::RSOCRiskExpr,
                                                 Dt::MatNum, iT2::Number)
-    sc = model[:sc]
+    sc = get_constraint_scale(model)
     JuMP.@variable(model, tDt)
     JuMP.@constraint(model, rsoc_Dt,
                      [sc * tDt;

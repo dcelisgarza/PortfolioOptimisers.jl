@@ -216,7 +216,7 @@ function set_discrete_error!(model::JuMP.Model, w::VecNum, p::VecNum, cash::Numb
     end
     x = model[:x]
     u = model[:u]
-    sc = model[:sc]
+    sc = get_constraint_scale(model)
     JuMP.@constraint(model, crel_err,
                      [sc * u
                       sc *
@@ -233,7 +233,7 @@ function set_discrete_error!(model::JuMP.Model, w::VecNum, p::VecNum, cash::Numb
     end
     x = model[:x]
     u = model[:u]
-    sc = model[:sc]
+    sc = get_constraint_scale(model)
     JuMP.@constraint(model, csqrel_err,
                      [sc * u;
                       sc *
@@ -245,7 +245,7 @@ function set_discrete_error!(model::JuMP.Model, w::VecNum, p::VecNum, cash::Numb
                              ::AbsoluteErrorWeightFinaliser)
     x = model[:x]
     u = model[:u]
-    sc = model[:sc]
+    sc = get_constraint_scale(model)
     JuMP.@constraint(model, cabs_err,
                      [sc * u; sc * (w * cash - x .* p)] in
                      JuMP.MOI.NormOneCone(length(x) + 1))
@@ -255,7 +255,7 @@ function set_discrete_error!(model::JuMP.Model, w::VecNum, p::VecNum, cash::Numb
                              ::SquaredAbsoluteErrorWeightFinaliser)
     x = model[:x]
     u = model[:u]
-    sc = model[:sc]
+    sc = get_constraint_scale(model)
     JuMP.@constraint(model, csqabs_err,
                      [sc * u;
                       sc * (w * cash - x .* p)] in JuMP.SecondOrderCone())

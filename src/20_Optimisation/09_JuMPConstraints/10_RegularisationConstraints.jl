@@ -96,8 +96,8 @@ function set_linf_regularisation!(args...)
     return nothing
 end
 function set_l1_regularisation!(model::JuMP.Model, l1_val::Number)
-    w = model[:w]
-    sc = model[:sc]
+    w = get_w(model)
+    sc = get_constraint_scale(model)
     JuMP.@variable(model, t_l1)
     JuMP.@constraint(model, cl1_noc,
                      [sc * t_l1; sc * w] in JuMP.MOI.NormOneCone(1 + length(w)))
@@ -106,8 +106,8 @@ function set_l1_regularisation!(model::JuMP.Model, l1_val::Number)
     return nothing
 end
 function set_l2_regularisation!(model::JuMP.Model, l2_val::Number)
-    w = model[:w]
-    sc = model[:sc]
+    w = get_w(model)
+    sc = get_constraint_scale(model)
     JuMP.@variable(model, t_l2)
     JuMP.@constraint(model, cl2_soc, [sc * t_l2; sc * w] in JuMP.SecondOrderCone())
     JuMP.@expression(model, l2, l2_val * t_l2)
@@ -213,8 +213,8 @@ Matches either a single [`LpRegularisation`](@ref) or a vector of them ([`VecLpR
 """
 const LpReg_VecLpReg = Union{<:LpRegularisation, <:VecLpReg}
 function set_lp_regularisation!(model::JuMP.Model, lps::LpReg_VecLpReg)
-    w = model[:w]
-    sc = model[:sc]
+    w = get_w(model)
+    sc = get_constraint_scale(model)
     N = length(w)
     for (i, lp) in enumerate(lps)
         val = lp.val
@@ -244,8 +244,8 @@ function set_lp_regularisation!(model::JuMP.Model, lps::LpReg_VecLpReg)
     end
 end
 function set_linf_regularisation!(model::JuMP.Model, linf::Number)
-    w = model[:w]
-    sc = model[:sc]
+    w = get_w(model)
+    sc = get_constraint_scale(model)
     t_linf = model[:t_linf] = JuMP.@variable(model)
     model[:clinf_nic] = JuMP.@constraint(model,
                                          [sc * t_linf;

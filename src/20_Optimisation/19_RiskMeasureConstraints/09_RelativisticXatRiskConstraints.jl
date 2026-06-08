@@ -51,7 +51,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::RelativisticValueat
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; kwargs...)
     key = Symbol(:rlvar_risk_, i)
-    sc = model[:sc]
+    sc = get_constraint_scale(model)
     net_X = set_net_portfolio_returns!(model, pr.X)
     T = length(net_X)
     alpha = r.alpha
@@ -150,7 +150,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::RelativisticValueat
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; kwargs...)
     key = Symbol(:rlvar_range_risk_, i)
-    sc = model[:sc]
+    sc = get_constraint_scale(model)
     net_X = set_net_portfolio_returns!(model, pr.X)
     T = length(net_X)
     alpha = r.alpha
@@ -315,7 +315,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::RelativisticDrawdow
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; kwargs...)
     key = Symbol(:rldar_risk_, i)
-    sc = model[:sc]
+    sc = get_constraint_scale(model)
     dd = set_drawdown_constraints!(model, pr.X)
     T = length(dd) - 1
     alpha = r.alpha

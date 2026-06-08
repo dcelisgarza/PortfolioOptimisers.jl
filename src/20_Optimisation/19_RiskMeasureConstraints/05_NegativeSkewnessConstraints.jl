@@ -89,7 +89,7 @@ function set_negative_skewness_risk!(model::JuMP.Model,
                                      opt::RiskJuMPOptimisationEstimator,
                                      nskew_risk::JuMP.AbstractJuMPScalar, key::Symbol,
                                      V::MatNum)
-    w = model[:w]
+    w = get_w(model)
     qnskew_risk = model[Symbol(:qd_, key)] = JuMP.@expression(model,
                                                               LinearAlgebra.dot(w, V, w))
     ub = variance_risk_bounds_val(SquareRootBound(), r.settings.ub)
@@ -145,8 +145,8 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::NegativeSkewness,
                                opt::RiskJuMPOptimisationEstimator, pr::HighOrderPrior,
                                args...; kwargs...)
     key = Symbol(:nskew_risk_, i)
-    sc = model[:sc]
-    w = model[:w]
+    sc = get_constraint_scale(model)
+    w = get_w(model)
     V, G = if isnothing(r.V)
         (pr.V, get_chol_or_V_pm(model, pr))
     else

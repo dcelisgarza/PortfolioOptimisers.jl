@@ -72,7 +72,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     s = ifelse(!isnothing(r.alg.s), r.alg.s, 1e-5)
     @argcheck(b > s)
     key = Symbol(:var_risk_, i)
-    sc = model[:sc]
+    sc = get_constraint_scale(model)
     net_X = set_net_portfolio_returns!(model, pr.X)
     T = length(net_X)
     var_risk, z_var = model[key], model[Symbol(:z_var_, i)] = JuMP.@variables(model,
@@ -137,7 +137,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     s = ifelse(!isnothing(r.alg.s), r.alg.s, 1e-5)
     @argcheck(b > s)
     key = Symbol(:var_range_risk_, i)
-    sc = model[:sc]
+    sc = get_constraint_scale(model)
     net_X = set_net_portfolio_returns!(model, pr.X)
     T = length(net_X)
     var_risk_l, z_var_l, var_risk_h, z_var_h = model[Symbol(:var_risk_l_, i)], model[Symbol(:z_var_l_, i)], model[Symbol(:var_risk_h_, i)], model[Symbol(:z_var_h_, i)] = JuMP.@variables(model,
@@ -310,8 +310,8 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     alg = r.alg
     mu = nothing_scalar_array_selector(alg.mu, pr.mu)
     G = chol_sigma_selector(model, pr, r.alg)
-    w = model[:w]
-    sc = model[:sc]
+    w = get_w(model)
+    sc = get_constraint_scale(model)
     z = compute_value_at_risk_z(r.alg.dist, r.alpha)
     key = Symbol(:var_risk_, i)
     g_var = model[Symbol(:g_var_, i)] = JuMP.@variable(model)
@@ -361,8 +361,8 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     alg = r.alg
     mu = nothing_scalar_array_selector(alg.mu, pr.mu)
     G = chol_sigma_selector(model, pr, r.alg)
-    w = model[:w]
-    sc = model[:sc]
+    w = get_w(model)
+    sc = get_constraint_scale(model)
     dist = r.alg.dist
     z_l = compute_value_at_risk_z(dist, r.alpha)
     z_h = compute_value_at_risk_cz(dist, r.beta)
@@ -422,7 +422,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::DrawdownatRisk,
     s = ifelse(!isnothing(r.s), r.s, 1e-5)
     @argcheck(b > s)
     key = Symbol(:dar_risk_, i)
-    sc = model[:sc]
+    sc = get_constraint_scale(model)
     dd = set_drawdown_constraints!(model, pr.X)
     T = length(dd) - 1
     dar_risk, z_dar = model[key], model[Symbol(:z_dar_, i)] = JuMP.@variables(model,

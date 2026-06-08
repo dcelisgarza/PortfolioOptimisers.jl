@@ -141,7 +141,7 @@ function set_kurtosis_risk!(model::JuMP.Model,
                                         <:RSOCRiskExpr}, opt::RiskJuMPOptimisationEstimator,
                             sqrt_kurtosis_risk::JuMP.AbstractJuMPScalar, x_kurt,
                             key::Symbol, i::Any)
-    sc = model[:sc]
+    sc = get_constraint_scale(model)
     tkurtosis = model[Symbol(:tkurtosis_risk, i)] = JuMP.@variable(model)
     qsqrt_kurtosis_risk = model[Symbol(:ckurtosis_rsoc_, i)] = JuMP.@constraint(model,
                                                                                 [sc *
@@ -209,7 +209,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                            <:Any}, opt::RiskJuMPOptimisationEstimator,
                                pr::HighOrderPrior, args...; kwargs...)
     key = Symbol(:kurtosis_risk_, i)
-    sc = model[:sc]
+    sc = get_constraint_scale(model)
     W = set_sdp_constraints!(model)
     N = size(W, 1)
     f = clamp(r.N, 1, N)
@@ -284,7 +284,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                            <:Any}, opt::RiskJuMPOptimisationEstimator,
                                pr::HighOrderPrior, args...; kwargs...)
     key = Symbol(:kurtosis_risk_, i)
-    sc = model[:sc]
+    sc = get_constraint_scale(model)
     W = set_sdp_constraints!(model)
     G = if isnothing(r.kt)
         get_chol_or_Gkt_pm(model, pr)

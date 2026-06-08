@@ -77,7 +77,7 @@ function scalarise_risk_expression!(model::JuMP.Model, sca::LogSumExpScalariser)
         return nothing
     end
     risk_vec = model[:risk_vec]
-    sc = model[:sc]
+    sc = get_constraint_scale(model)
     N = length(risk_vec)
     gamma = sca.gamma
     JuMP.@variables(model, begin
@@ -202,8 +202,8 @@ end
 function set_risk_upper_bound!(model::JuMP.Model, ::NonFRCJuMPOpt,
                                r_expr::JuMP.AbstractJuMPScalar, ub::Number, key,
                                flag::Bool = true)
-    k = model[:k]
-    sc = model[:sc]
+    k = get_k(model)
+    sc = get_constraint_scale(model)
     bound_key = Symbol(key, :_ub)
     d = ifelse(flag, 1, -1)
     model[bound_key] = JuMP.@constraint(model, d * sc * (r_expr - ub * k) <= 0)
@@ -328,7 +328,7 @@ function set_drawdown_constraints!(model::JuMP.Model, X::MatNum)
     if haskey(model, :dd)
         return model[:dd]
     end
-    sc = model[:sc]
+    sc = get_constraint_scale(model)
     net_X = set_net_portfolio_returns!(model, X)
     T = length(net_X)
     JuMP.@variable(model, dd[1:(T + 1)])

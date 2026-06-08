@@ -110,9 +110,9 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; kwargs...)
     key = Symbol(:flm_risk_, i)
-    sc = model[:sc]
-    w = model[:w]
-    k = model[:k]
+    sc = get_constraint_scale(model)
+    w = get_w(model)
+    k = get_k(model)
     tgt = calc_risk_constraint_target(r, w, pr.mu, k)
     net_X = set_net_portfolio_returns!(model, pr.X)
     T = length(net_X)
@@ -162,9 +162,9 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; kwargs...)
     key = Symbol(:mad_risk_, i)
-    sc = model[:sc]
-    w = model[:w]
-    k = model[:k]
+    sc = get_constraint_scale(model)
+    w = get_w(model)
+    k = get_k(model)
     tgt = calc_risk_constraint_target(r, w, pr.mu, k)
     net_X = set_net_portfolio_returns!(model, pr.X)
     T = length(net_X)
@@ -220,7 +220,7 @@ end
 function set_second_moment_risk!(model::JuMP.Model, ::RSOCRiskExpr, i::Any, factor::Number,
                                  second_moment, key::Symbol, keyt::Symbol, keyc::Symbol,
                                  args...)
-    sc = model[:sc]
+    sc = get_constraint_scale(model)
     tsecond_moment = model[Symbol(keyt, i)] = JuMP.@variable(model)
     model[Symbol(keyc, i)] = JuMP.@constraint(model,
                                               [sc * tsecond_moment;
@@ -317,9 +317,9 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; kwargs...)
     key = Symbol(:second_moment_risk_, i)
-    w = model[:w]
-    k = model[:k]
-    sc = model[:sc]
+    w = get_w(model)
+    k = get_k(model)
+    sc = get_constraint_scale(model)
     tgt = calc_risk_constraint_target(r, w, pr.mu, k)
     net_X = set_net_portfolio_returns!(model, pr.X)
     T = length(net_X)
@@ -424,9 +424,9 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; kwargs...)
     key = Symbol(:even_moment_risk_, i)
-    w = model[:w]
-    k = ifelse(haskey(model, :crkb), 1, model[:k])
-    sc = model[:sc]
+    w = get_w(model)
+    k = ifelse(haskey(model, :crkb), 1, get_k(model))
+    sc = get_constraint_scale(model)
     tgt = calc_risk_constraint_target(r, w, pr.mu, k)
     net_X = set_net_portfolio_returns!(model, pr.X)
     T = length(net_X)

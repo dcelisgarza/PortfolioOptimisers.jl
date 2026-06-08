@@ -44,9 +44,9 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::TurnoverRiskMeasure
                                opt::RiskJuMPOptimisationEstimator, ::AbstractPriorResult,
                                args...; kwargs...)
     key = Symbol(:turnover_risk_, i)
-    sc = model[:sc]
-    w = model[:w]
-    k = model[:k]
+    sc = get_constraint_scale(model)
+    w = get_w(model)
+    k = get_k(model)
     N = length(w)
     turnover_risk = model[key] = JuMP.@variable(model)
     benchmark = r.w

@@ -54,8 +54,8 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; kwargs...)
     key = Symbol(:tracking_risk_, i)
-    sc = model[:sc]
-    k = model[:k]
+    sc = get_constraint_scale(model)
+    k = get_k(model)
     X = pr.X
     net_X = set_net_portfolio_returns!(model, X)
     T = length(net_X)
@@ -150,8 +150,8 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; kwargs...)
     key = Symbol(:tracking_risk_, i)
-    sc = model[:sc]
-    k = model[:k]
+    sc = get_constraint_scale(model)
+    k = get_k(model)
     X = pr.X
     net_X = set_net_portfolio_returns!(model, X)
     T = length(net_X)
@@ -200,8 +200,8 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                args...; kwargs...)
     @argcheck(r.alg.p > 1, DomainError)
     key = Symbol(:tracking_risk_, i)
-    sc = model[:sc]
-    k = model[:k]
+    sc = get_constraint_scale(model)
+    k = get_k(model)
     X = pr.X
     net_X = set_net_portfolio_returns!(model, X)
     T = length(net_X)
@@ -266,8 +266,8 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; kwargs...)
     key = Symbol(:tracking_risk_, i)
-    sc = model[:sc]
-    k = model[:k]
+    sc = get_constraint_scale(model)
+    k = get_k(model)
     X = pr.X
     net_X = set_net_portfolio_returns!(model, X)
     T = length(net_X)
@@ -785,7 +785,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     ri = r.r
     wb = r.tr.w
     w = model[:w]
-    k = model[:k]
+    k = get_k(model)
     model[:oldw] = model[:w]
     JuMP.unregister(model, :w)
     model[:w] = JuMP.@expression(model, w - wb * k)
@@ -986,8 +986,8 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     ri = r.r
     wb = r.tr.w
     rb = expected_risk(factory(ri, pr, opt.opt.slv), wb, pr.X, fees)
-    k = model[:k]
-    sc = model[:sc]
+    k = get_k(model)
+    sc = get_constraint_scale(model)
     tracking_risk = model[key] = JuMP.@variable(model)
     # risk_expr = set_trdv_risk_constraints!(model, i, ri, opt, pr, pl, fees, args...;
     #                                        kwargs...)

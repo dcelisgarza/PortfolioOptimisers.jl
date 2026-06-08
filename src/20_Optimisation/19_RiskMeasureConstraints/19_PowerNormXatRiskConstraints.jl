@@ -62,7 +62,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::PowerNormValueatRis
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; kwargs...)
     key = Symbol(:pvar_risk_, i)
-    sc = model[:sc]
+    sc = get_constraint_scale(model)
     net_X = set_net_portfolio_returns!(model, pr.X)
     T = length(net_X)
     ip = inv(r.p)
@@ -137,7 +137,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::PowerNormValueatRis
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; kwargs...)
     key = Symbol(:pvar_range_risk_, i)
-    sc = model[:sc]
+    sc = get_constraint_scale(model)
     net_X = set_net_portfolio_returns!(model, pr.X)
     T = length(net_X)
     ipa = inv(r.pa)
@@ -258,7 +258,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::PowerNormDrawdownat
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; kwargs...)
     key = Symbol(:pdar_risk_, i)
-    sc = model[:sc]
+    sc = get_constraint_scale(model)
     dd = set_drawdown_constraints!(model, pr.X)
     T = length(dd) - 1
     ip = inv(r.p)

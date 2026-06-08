@@ -162,8 +162,8 @@ function set_risk!(model::JuMP.Model, i::Any, r::StandardDeviation,
                    opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult, args...;
                    kwargs...)
     key = Symbol(:sd_risk_, i)
-    sc = model[:sc]
-    w = model[:w]
+    sc = get_constraint_scale(model)
+    w = get_w(model)
     G = chol_sigma_selector(model, pr, r)
     sd_risk = model[key] = JuMP.@variable(model)
     model[Symbol(:csd_risk_soc_, i)] = JuMP.@constraint(model,
@@ -343,8 +343,8 @@ end
 function set_variance_risk!(model::JuMP.Model, i::Any,
                             r::Variance{<:Any, <:Any, <:Any, <:Any, <:SquaredSOCRiskExpr},
                             pr::AbstractPriorResult, key::Symbol)
-    sc = model[:sc]
-    w = model[:w]
+    sc = get_constraint_scale(model)
+    w = get_w(model)
     G = chol_sigma_selector(model, pr, r)
     key_dev = Symbol(:dev_, i)
     dev = model[key_dev] = JuMP.@variable(model)
@@ -356,8 +356,8 @@ end
 function set_variance_risk!(model::JuMP.Model, i::Any,
                             r::Variance{<:Any, <:Any, <:Any, <:Any, <:QuadRiskExpr},
                             pr::AbstractPriorResult, key::Symbol)
-    sc = model[:sc]
-    w = model[:w]
+    sc = get_constraint_scale(model)
+    w = get_w(model)
     sigma = isnothing(r.sigma) ? pr.sigma : r.sigma
     G = chol_sigma_selector(model, pr, r)
     dev = model[Symbol(:dev_, i)] = JuMP.@variable(model)
@@ -481,7 +481,7 @@ end
 function rc_variance_constraints!(model::JuMP.Model, i::Any, rc::LinearConstraint,
                                   variance_risk::JuMP.AbstractJuMPScalar)
     sigma_W = model[Symbol(:sigma_W_, i)]
-    sc = model[:sc]
+    sc = get_constraint_scale(model)
     if !haskey(model, :rc_variance)
         JuMP.@expression(model, rc_variance, true)
     end
@@ -629,7 +629,7 @@ and adds an SOC constraint to bound the ellipsoidal perturbation term.
 """
 function set_ucs_variance_risk!(model::JuMP.Model, i::Any, ucs::BoxUncertaintySet, args...)
     if !haskey(model, :Au)
-        sc = model[:sc]
+        sc = get_constraint_scale(model)
         W = model[:W]
         N = size(W, 1)
         JuMP.@variables(model, begin
@@ -650,7 +650,7 @@ function set_ucs_variance_risk!(model::JuMP.Model, i::Any, ucs::BoxUncertaintySe
 end
 function set_ucs_variance_risk!(model::JuMP.Model, i::Any, ucs::EllipsoidalUncertaintySet,
                                 sigma::MatNum)
-    sc = model[:sc]
+    sc = get_constraint_scale(model)
     if !haskey(model, :E)
         W = model[:W]
         N = size(W, 1)
