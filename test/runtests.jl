@@ -14,7 +14,11 @@ See docs/adr/0001-parallelise-test-suite.md.
 =#
 const init_code = quote
     using Test, PortfolioOptimisers
+    using Logging
     using CSV, TimeSeries, DataFrames, StableRNGs, StatsBase, LinearAlgebra
+
+    # Silence all logging by default.
+    global_logger(NullLogger())
 
     # Headless GR for plotting tests; respect an externally set value.
     ENV["GKSwstype"] = get(ENV, "GKSwstype", "100")
