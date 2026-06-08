@@ -35,17 +35,18 @@ Where:
   - [`set_sdp_phylogeny_constraints!`](@ref)
   - [`SemiDefinitePhylogeny`](@ref)
 """
-function set_sdp_constraints!(model::JuMP.Model)
-    if haskey(model, :W)
-        return model[:W]
+function set_sdp_constraints!(model::JuMP.Model; prefix::Symbol = Symbol(""))
+    if haskey(model, Symbol(prefix, :W))
+        return model[Symbol(prefix, :W)]
     end
-    w = get_w(model)
+    w = get_w(model, prefix)
     k = ifelse(haskey(model, :crkb), 1, get_k(model))
     sc = get_constraint_scale(model)
     N = length(w)
-    JuMP.@variable(model, W[1:N, 1:N], Symmetric)
-    JuMP.@expression(model, M, hcat(vcat(W, transpose(w)), vcat(w, k)))
-    JuMP.@constraint(model, M_PSD, sc * M in JuMP.PSDCone())
+    W = preg!(model, prefix, :W, JuMP.@variable(model, [1:N, 1:N], Symmetric))
+    M = preg!(model, prefix, :M,
+              JuMP.@expression(model, hcat(vcat(W, transpose(w)), vcat(w, k))))
+    preg!(model, prefix, :M_PSD, JuMP.@constraint(model, sc * M in JuMP.PSDCone()))
     return W
 end
 """

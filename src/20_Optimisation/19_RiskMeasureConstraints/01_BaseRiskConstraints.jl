@@ -324,19 +324,18 @@ where ``\\hat{r}_t = \\boldsymbol{x}_t^\\intercal \\boldsymbol{w}`` and ``V_t = 
 
   - [`set_risk_constraints!`](@ref)
 """
-function set_drawdown_constraints!(model::JuMP.Model, X::MatNum)
-    if haskey(model, :dd)
-        return model[:dd]
+function set_drawdown_constraints!(model::JuMP.Model, X::MatNum;
+                                   prefix::Symbol = Symbol(""))
+    if haskey(model, Symbol(prefix, :dd))
+        return model[Symbol(prefix, :dd)]
     end
     sc = get_constraint_scale(model)
-    net_X = set_net_portfolio_returns!(model, X)
+    net_X = set_net_portfolio_returns!(model, X; prefix = prefix)
     T = length(net_X)
-    JuMP.@variable(model, dd[1:(T + 1)])
-    JuMP.@constraints(model,
-                      begin
-                          cdd_start, sc * dd[1] == 0
-                          cdd_geq_0, sc * view(dd, 2:(T + 1)) >= 0
-                          cdd, sc * (net_X + view(dd, 2:(T + 1)) - view(dd, 1:T)) >= 0
-                      end)
+    dd = preg!(model, prefix, :dd, JuMP.@variable(model, [1:(T + 1)]))
+    preg!(model, prefix, :cdd_start, JuMP.@constraint(model, sc * dd[1] == 0))
+    preg!(model, prefix, :cdd_geq_0, JuMP.@constraint(model, sc * view(dd, 2:(T + 1)) >= 0))
+    preg!(model, prefix, :cdd,
+          JuMP.@constraint(model, sc * (net_X + view(dd, 2:(T + 1)) - view(dd, 1:T)) >= 0))
     return dd
 end
