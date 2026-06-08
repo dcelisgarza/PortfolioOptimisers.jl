@@ -420,6 +420,151 @@ function get_risk(model::JuMP.Model)
     return model[:risk]
 end
 """
+    has_X(model::JuMP.Model, prefix::Symbol = Symbol(""))
+
+Return `true` if the portfolio returns `model[Symbol(prefix, :X)]` have been
+registered (via [`set_portfolio_returns!`](@ref)).
+
+# Related
+
+  - [`get_X`](@ref)
+"""
+function has_X(model::JuMP.Model, prefix::Symbol = Symbol(""))
+    return haskey(model, Symbol(prefix, :X))
+end
+"""
+    get_X(model::JuMP.Model, prefix::Symbol = Symbol(""))
+
+Return the portfolio returns expression `model[Symbol(prefix, :X)]`.
+
+Asserts it has been registered (via [`set_portfolio_returns!`](@ref)); errors otherwise.
+
+# Related
+
+  - [`set_portfolio_returns!`](@ref)
+  - [`has_X`](@ref)
+"""
+function get_X(model::JuMP.Model, prefix::Symbol = Symbol(""))
+    @argcheck(has_X(model, prefix))
+    return model[Symbol(prefix, :X)]
+end
+"""
+    has_net_X(model::JuMP.Model, prefix::Symbol = Symbol(""))
+
+Return `true` if the net portfolio returns `model[Symbol(prefix, :net_X)]` have been
+registered (via [`set_net_portfolio_returns!`](@ref)).
+
+# Related
+
+  - [`get_net_X`](@ref)
+"""
+function has_net_X(model::JuMP.Model, prefix::Symbol = Symbol(""))
+    return haskey(model, Symbol(prefix, :net_X))
+end
+"""
+    get_net_X(model::JuMP.Model, prefix::Symbol = Symbol(""))
+
+Return the net portfolio returns expression `model[Symbol(prefix, :net_X)]`.
+
+Asserts it has been registered (via [`set_net_portfolio_returns!`](@ref)); errors otherwise.
+
+# Related
+
+  - [`set_net_portfolio_returns!`](@ref)
+  - [`has_net_X`](@ref)
+"""
+function get_net_X(model::JuMP.Model, prefix::Symbol = Symbol(""))
+    @argcheck(has_net_X(model, prefix))
+    return model[Symbol(prefix, :net_X)]
+end
+"""
+    has_Xap1(model::JuMP.Model, prefix::Symbol = Symbol(""))
+
+Return `true` if the gross portfolio returns `model[Symbol(prefix, :Xap1)]` have been
+registered (via [`set_portfolio_returns_plus_one!`](@ref)).
+
+# Related
+
+  - [`get_Xap1`](@ref)
+"""
+function has_Xap1(model::JuMP.Model, prefix::Symbol = Symbol(""))
+    return haskey(model, Symbol(prefix, :Xap1))
+end
+"""
+    get_Xap1(model::JuMP.Model, prefix::Symbol = Symbol(""))
+
+Return the gross portfolio returns expression `model[Symbol(prefix, :Xap1)]` (`X .+ 1`).
+
+Asserts it has been registered (via [`set_portfolio_returns_plus_one!`](@ref)); errors otherwise.
+
+# Related
+
+  - [`set_portfolio_returns_plus_one!`](@ref)
+  - [`has_Xap1`](@ref)
+"""
+function get_Xap1(model::JuMP.Model, prefix::Symbol = Symbol(""))
+    @argcheck(has_Xap1(model, prefix))
+    return model[Symbol(prefix, :Xap1)]
+end
+"""
+    has_ddap1(model::JuMP.Model, prefix::Symbol = Symbol(""))
+
+Return `true` if the drawdowns-plus-one `model[Symbol(prefix, :ddap1)]` have been
+registered (via [`set_portfolio_drawdowns_plus_one!`](@ref)).
+
+# Related
+
+  - [`get_ddap1`](@ref)
+"""
+function has_ddap1(model::JuMP.Model, prefix::Symbol = Symbol(""))
+    return haskey(model, Symbol(prefix, :ddap1))
+end
+"""
+    get_ddap1(model::JuMP.Model, prefix::Symbol = Symbol(""))
+
+Return the drawdowns-plus-one expression `model[Symbol(prefix, :ddap1)]`.
+
+Asserts it has been registered (via [`set_portfolio_drawdowns_plus_one!`](@ref)); errors otherwise.
+
+# Related
+
+  - [`set_portfolio_drawdowns_plus_one!`](@ref)
+  - [`has_ddap1`](@ref)
+"""
+function get_ddap1(model::JuMP.Model, prefix::Symbol = Symbol(""))
+    @argcheck(has_ddap1(model, prefix))
+    return model[Symbol(prefix, :ddap1)]
+end
+"""
+    has_dd(model::JuMP.Model, prefix::Symbol = Symbol(""))
+
+Return `true` if the cumulative-drawdown variables `model[Symbol(prefix, :dd)]` have
+been registered (via [`set_drawdown_constraints!`](@ref)).
+
+# Related
+
+  - [`get_dd`](@ref)
+"""
+function has_dd(model::JuMP.Model, prefix::Symbol = Symbol(""))
+    return haskey(model, Symbol(prefix, :dd))
+end
+"""
+    get_dd(model::JuMP.Model, prefix::Symbol = Symbol(""))
+
+Return the cumulative-drawdown variables `model[Symbol(prefix, :dd)]`.
+
+Asserts they have been registered (via [`set_drawdown_constraints!`](@ref)); errors otherwise.
+
+# Related
+
+  - [`set_drawdown_constraints!`](@ref)
+  - [`has_dd`](@ref)
+"""
+function get_dd(model::JuMP.Model, prefix::Symbol = Symbol(""))
+    @argcheck(has_dd(model, prefix))
+    return model[Symbol(prefix, :dd)]
+end
+"""
     preg!(model::JuMP.Model, prefix::Symbol, name::Symbol, val)
 
 Register `val` in the model under the prefixed key `Symbol(prefix, name)` and return it.

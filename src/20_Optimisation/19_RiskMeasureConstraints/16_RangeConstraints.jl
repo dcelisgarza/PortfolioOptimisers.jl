@@ -49,7 +49,7 @@ function set_risk_constraints!(model::JuMP.Model, ::Any, r::Range,
     end
     sc = get_constraint_scale(model)
     wr_risk = set_wr_risk_expression!(model, pr.X)
-    net_X = model[:net_X]
+    net_X = get_net_X(model)
     JuMP.@variable(model, br_risk)
     JuMP.@expression(model, range_risk, wr_risk - br_risk)
     JuMP.@constraint(model, cbr, sc * (br_risk .+ net_X) <= 0)
