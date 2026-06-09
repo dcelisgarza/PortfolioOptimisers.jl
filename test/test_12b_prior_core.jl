@@ -313,9 +313,13 @@ end
     pr = prior(EntropyPoolingPrior(; w = StatsBase.pweights(range(iT, iT; length = T)),
                                    sets = sets, mu_views = mu_views, opt = opt), rd)
     @test isapprox(pr.mu[1], 0.002, rtol = 1e-7)
-    @test isapprox(pr.w,
-                   prior(EntropyPoolingPrior(; sets = sets, opt = jopt,
-                                             mu_views = mu_views), rd).w, rtol = 1e-5)
+    prmuw = prior(EntropyPoolingPrior(; sets = sets, opt = jopt, mu_views = mu_views), rd).w
+    res = isapprox(pr.w, prmuw; rtol = 1e-5)
+    if !res
+        println("Weights fail")
+        find_tol(pr.w, prmuw)
+    end
+    @test res
 
     pr = prior(EntropyPoolingPrior(;
                                    pe = FactorPrior(;

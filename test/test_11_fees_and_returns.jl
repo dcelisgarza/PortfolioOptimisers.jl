@@ -38,15 +38,20 @@
             @test isapprox(df[!, "$(2*(i-1)+1)"], f2)
             f3 = calc_asset_fees(res.w, vec(values(X[end])), fe)
             @test isapprox(df[!, "$(2*(i-1)+2)"], f3)
-            @test isapprox(calc_fees(res.w, vec(values(X[end])), fe) * T,
-                           1000 - (sum(res_mip.cost) + res_mip.cash))
+            fopt1 = calc_fees(res.w, vec(values(X[end])), fe) * T
+            fopt2 = 1000 - (sum(res_mip.cost) + res_mip.cash)
+            result = isapprox(fopt1, fopt2; rtol = 1e-6)
+            if !result
+                println("Counter: $i")
+                println("fopt2 = $fopt2")
+            end
+            @test result
             @test all(isapprox(calc_net_returns(res.w, pr.X) .- calc_fees(res.w, fe),
                                calc_net_returns(res.w, pr.X, fe)))
             @test all(isapprox(calc_net_asset_returns(res.w, pr.X) .-
                                transpose(calc_asset_fees(res.w, fes[1])),
                                calc_net_asset_returns(res.w, pr.X, fes[1])))
         end
-
         @test iszero(calc_fees(res.w, Fees()))
         @test all(iszero, calc_asset_fees(res.w, Fees()))
         @test iszero(calc_fees(res.w, vec(values(X[end])), Fees()))

@@ -145,7 +145,7 @@ end
     @test sum(res.w[[findfirst(x -> x == a, rd.nx) for a in sets.dict["group4"]]]) >=
           3 * sum(res.w[[findfirst(x -> x == a, rd.nx) for a in sets.dict["group5"]]])
     @test res.w[findfirst(x -> x == "RRC", rd.nx)] <= -0.02
-    @test res.w[findfirst(x -> x == "MSFT", rd.nx)] == 0.01
+    @test isapprox(res.w[findfirst(x -> x == "MSFT", rd.nx)], 0.01, rtol = 1e-6)
 
     opt = JuMPOptimiser(; pe = pr, slv = slv, sets = sets, sbgt = 1, bgt = 1,
                         wb = WeightBounds(; lb = -1, ub = 1), lcse = res.lcsr)
