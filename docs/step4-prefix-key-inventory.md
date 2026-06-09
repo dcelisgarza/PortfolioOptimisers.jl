@@ -51,10 +51,16 @@ from the start, per ADR 0004. Decided over the registry/build-then-swap approach
   partial — all read Cat-A infra BARE, so Independent tracking (shifted weights) failed
   at IT-golden i=28 while Dependent (original weights) passed; fixed in `b2f8dccd9`.
   Full single-core suite GREEN (4075/4075, test_13 flake did not recur).
-  **NEXT: Step 5 seam-lock.**
 - **Post-migration registration tests — DONE (committed `4c146e2a0`):**
   `test/test_27_prefix_registration.jl` (233 pass, 1 skip standalone). See the
   "Post-migration deliverable" section below for the design.
+- **Step 5 seam-lock — DONE (committed `3aabcea51`):**
+  `test/test_28_seam_lock.jl`, a DENYLIST of prefix-managed keys (see Step 5 below).
+
+**STEP 4 COMPLETE.** All phases + the registration tests + the seam-lock are committed;
+full suite green (4075/4075) at Phase 3. This working note can be deleted (per its own
+header) once the branch is reviewed/merged; the durable records are ADR 0004, ADR 0005,
+and tests 27/28.
 
 ## Phase 2 slice plan (decided 2026-06-08)
 
@@ -175,15 +181,26 @@ Gate before each commit milestone: full single-core suite
 4075/4075). Pre-commit Julia formatter reformats new code and aborts the FIRST
 commit attempt; just `git add` + re-commit.
 
-## Step 5 (after Step 4)
+## Step 5 — DONE (`test/test_28_seam_lock.jl`, committed `3aabcea51`)
 
-Seam-lock test: fail CI on raw **literal** `model[:` outside
-`08_Base_JuMPOptimisation.jl` (i.e. the regex `model\[:`, NOT all `model[`). Scope
-decided 2026-06-08: a literal-key lock catches every Category-A leak once Cat-A has
-full accessor coverage (Phase 2 §0), while Category-B's computed
-`model[Symbol(:variance_risk_, i)]` is naturally exempt — so we honour ADR 0004 §1
-(Cat-B stays raw) without an allowlist. Residual hole (accepted, per ADR 0004 §2):
-a sloppy raw `model[Symbol(prefix, :newCatA)]` looks like Cat-B and slips through.
+Seam-lock test guarding against the bare-read-under-tracking regression class.
+
+**Scope CORRECTION (2026-06-09).** The 2026-06-08 plan — fail CI on ANY raw literal
+`model[:` outside `08_Base_JuMPOptimisation.jl`, "without an allowlist" — was based on a
+FALSE premise. It assumed full Category-A accessor coverage would leave zero literal
+`model[:foo]` reads. In reality **~91 legitimate bare literals remain**: prior-derived
+caches (`:G`, `:GV`, `:Gkt`, `:vals_Akt`, `:vecs_Akt`, `:frc_*`) that stay bare by the
+bare-vs-prefix invariant, plus top-level construction keys (`:lw`, `:sw`, `:theta`, `:x`,
+`:w1`, `:risk_vec`, `:risk_frontier`) and docstring mentions. An "all literals" lock would
+flag all of them.
+
+So the lock is a **DENYLIST** (user-confirmed 2026-06-09): fail on a literal
+`model[:key]` where `key` is one of the ~42 prefix-managed Category-A keys (the ADR 0005
+swap groups + `:w`/`:X`/`:net_X`/`:Xap1`/`:ddap1`/`:dd`) outside `08_Base`. Verified ZERO
+violations on the post-migration tree. Computed Cat-B `model[Symbol(:variance_risk_, i)]`
+and the bare-by-design caches are naturally exempt; docstring/comment lines are skipped.
+Residual hole (accepted, ADR 0004 §2): a sloppy `model[Symbol(prefix, :newCatA)]` looks
+like Cat-B and slips through; and a NEW prefix-managed key must be added to the denylist.
 
 ## Note on verification (prefixed path)
 
