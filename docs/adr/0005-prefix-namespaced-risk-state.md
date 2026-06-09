@@ -47,14 +47,27 @@ risk-build spine; the inner build reads and writes only prefixed keys.
   *is* the new obligation: the discipline moved from "remember to extend the swap
   block" to "remember to pass `prefix`," enforced by the seam-lock test (0004 §6.5),
   not the type system.
-- The rule for what to prefix is an **invariant: prefix a key iff it is
-  weight-dependent.** A nested build (risk tracking) shifts the *weights* via the
-  benchmark difference, not the prior moments, so a key that is a pure function of
-  the prior `pr` is identical in the inner and outer builds and is correctly shared
-  **bare**. The deliberately-bare keys are therefore `:fees`, the FRC keys
+- The rule for what to prefix is an **invariant: prefix a key iff it is per-build
+  risk state.** That is two kinds of key: (a) **weight-dependent** expressions — a
+  nested build (risk tracking) shifts the *weights* via the benchmark difference, so
+  any key that is a function of `:w` differs between the inner and outer builds; and
+  (b) **build-scoped presence flags** — boolean markers (`:variance_flag`,
+  `:rc_variance`) that are not weight-dependent but gate per-build formulation
+  decisions, so the inner build must not see the outer build's flags (and vice
+  versa). A key that is a pure function of the prior `pr` is identical in the inner
+  and outer builds and is correctly shared **bare**: `:fees`, the FRC keys
   (`:frc_W`/`:frc_M`/`:frc_M_PSD`), and the prior-derived caches `:G`, `:Gkt`, `:GV`,
-  `:vals_Akt`/`:vecs_Akt` (Cholesky/eigendecompositions of `pr`). Prefixing these
+  `:vals_Akt`/`:vecs_Akt` (Cholesky/eigendecompositions of `pr`). Prefixing those
   would break sharing, not protect it.
+- The presence flags need care at the **read** site, not just the write. `:rc_variance`
+  is read *in-spine* by the `sdp_variance_flag!` predicate to choose the SDP-vs-SOC
+  variance formulation, so `prefix` threads through that predicate (and the
+  `set_risk!`/`set_variance_risk!`/`rc_variance_constraints!` chain) — its `haskey`
+  becomes `haskey(model, Symbol(prefix, :rc_variance))`. `:variance_flag`'s only
+  readers are the *outer-level* phylogeny builders (they add a `p·tr(W)` penalty only
+  when no variance is present); those stay bare, and prefixing the inner *write* is
+  what stops a nested variance from leaking presence to the outer model — the job the
+  old save/restore did, now structural.
 - That invariant also exposes a latent gap in the old swap, which is direct evidence
   for the fragility argument above: the swap rebuilt the SDP `:W`/`:M`/`:M_PSD` under
   tracking weights but **never `:L2W`** (`= L2·vec(W)`, a function of that `W`). The
