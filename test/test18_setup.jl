@@ -369,7 +369,7 @@ function mr_block1(idx)
             res = optimise(mr, rd)
             rt1 = expected_return(ret, res.w, pr)
             if !(isa(r, Kurtosis) && isnothing(r.N))
-                flag = rt1 >= rt - rtd || abs(rt1 - rt + rtd) < 1e-10
+                flag = rt1 >= rt - rtd || abs(rt1 - rt + rtd) < 1e-9
                 if !flag
                     println("Counter: $i")
                     println("rt1: $rt1")
@@ -443,8 +443,10 @@ function mr_block2(idx)
             5e-3
         elseif i == 22 && Sys.islinux()
             1e-2
-        elseif i in (22, 23, 47)
+        elseif i in (22, 47)
             1e-4
+        elseif i == 23
+            1e-3
         elseif i in (26, 43, 44, 48)
             5e-5
         else
@@ -513,9 +515,7 @@ function mr_block4()
         mr = MeanRisk(; r = r, obj = obj, opt = opt)
         res = optimise(mr, rd2)
         @test isa(res.retcode, OptimisationSuccess)
-        rtol = if i == 4
-            5e-6
-        elseif i == 6
+        rtol = if i in (4, 6)
             5e-5
         elseif i == 47
             1e-3

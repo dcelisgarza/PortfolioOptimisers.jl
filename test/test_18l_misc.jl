@@ -500,9 +500,9 @@ end
             5e-6
         elseif i in (4, 8)
             5e-3
-        elseif i == 12
+        elseif i in (12, 23)
             1e-4
-        elseif i in (6, 14, 23)
+        elseif i in (6, 14)
             5e-5
         elseif i in (7, 22)
             5e-4

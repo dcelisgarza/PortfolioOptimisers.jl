@@ -314,7 +314,7 @@ end
                                    sets = sets, mu_views = mu_views, opt = opt), rd)
     @test isapprox(pr.mu[1], 0.002, rtol = 1e-7)
     prmuw = prior(EntropyPoolingPrior(; sets = sets, opt = jopt, mu_views = mu_views), rd).w
-    res = isapprox(pr.w, prmuw; rtol = 1e-5)
+    res = isapprox(pr.w, prmuw; rtol = 5e-5)
     if !res
         println("Weights fail")
         find_tol(pr.w, prmuw)

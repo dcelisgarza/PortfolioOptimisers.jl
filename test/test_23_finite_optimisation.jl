@@ -58,11 +58,11 @@
     else
         5e-3
     end
-    res = isapprox(sum(res_da.cost), 4206.9 * 0.8; rtol = rtol)
-    if !res
+    result = isapprox(sum(res_da.cost), 4206.9 * 0.8; rtol = rtol)
+    if !result
         @test isapprox(3337.326, 3337.326; rtol = 0.005)
     else
-        @test res
+        @test result
     end
     @test isapprox(res_da.shares .* vec(values(X[end])), res_da.cost)
     @test isapprox(rmsd(res.w, res_da.w), 0.029094976416644103, rtol = 5e-2)
