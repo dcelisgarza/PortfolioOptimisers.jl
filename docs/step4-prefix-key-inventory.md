@@ -29,8 +29,18 @@ from the start, per ADR 0004. Decided over the registry/build-then-swap approach
 - **Phase 2 slice 3a (committed `8c632d51a`):** prefix threaded through
   04 (Kurtosis, both overloads) + 20 (VarianceSkewKurtosis), incl. the
   previously-omitted `:L2W`. Full single-core suite green (4075/4075).
-  **NEXT: Phase 2 slice 3b (02 Variance, the presence-flag predicate-threading one),
-  then Phase 3.**
+- **Phase 2 slice 3b (02 Variance — the presence-flag predicate-threading one):**
+  prefix threaded through StandardDeviation/Variance/UncertaintySetVariance/FRC,
+  the `sdp_variance_flag!` predicate (`haskey(prefix,:rc_variance)`), `:variance_flag`/
+  `:rc_variance` writes (bare phylogeny readers untouched), and the box/ellipsoidal
+  UCS keys (`:Au`/`:Al`/`:cbucs_variance`/`:E`/`:WpE`/`:ceucs_variance`). `:G`/`:frc_W`
+  stay bare. Anonymous `@variable` bound fix: `lower_bound=0`, not `>=`. Validated via
+  6-path smoke (SOC/SD/UCS×2/rc/SDP-phylogeny) + standalone variance suites
+  (test_09/18g/18h/18j/18k/18l/16a/19, all green incl. DT/IT tracking golden). The
+  full single-core gate's ONLY failure was an UNRELATED flaky k-means test
+  (`test_13_phylogeny.jl:281`, SilhouetteScore cluster count) — reproduced as the
+  correct `3` deterministically in a clean process; between-process k-means
+  non-determinism, NOT a slice-3b regression. **NEXT: Phase 3.**
 
 ## Phase 2 slice plan (decided 2026-06-08)
 
