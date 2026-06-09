@@ -40,7 +40,18 @@ from the start, per ADR 0004. Decided over the registry/build-then-swap approach
   full single-core gate's ONLY failure was an UNRELATED flaky k-means test
   (`test_13_phylogeny.jl:281`, SilhouetteScore cluster count) — reproduced as the
   correct `3` deterministically in a clean process; between-process k-means
-  non-determinism, NOT a slice-3b regression. **NEXT: Phase 3.**
+  non-determinism, NOT a slice-3b regression. (Committed `627867f7f`.)
+- **Phase 3 — DONE (`b2f8dccd9` gap-fixes + `91b452435` swap deletion):** replaced the
+  390-line save/restore swap with composed prefixes
+  (`Symbol(prefix, :tr_iv_/:tr_dv_, i, :_)`); store tracking weights at
+  `Symbol(tprefix, :w)`, build inner risk under `prefix = tprefix`; deleted the dead
+  `set_trdv` block (file 18: 1002→479 lines) + the same in the RiskTrackingError
+  CONSTRAINT path (file 08). Activation EXPOSED incomplete Phase-2 threading — files
+  17 (Turnover) and 19 (PowerNorm) never threaded; 10 (OWA-approx) and 07 (DR-CDaR)
+  partial — all read Cat-A infra BARE, so Independent tracking (shifted weights) failed
+  at IT-golden i=28 while Dependent (original weights) passed; fixed in `b2f8dccd9`.
+  Full single-core suite GREEN (4075/4075, test_13 flake did not recur).
+  **NEXT: post-migration registration tests (below) + Step 5 seam-lock.**
 
 ## Phase 2 slice plan (decided 2026-06-08)
 
@@ -202,44 +213,47 @@ measure: Variance, Kurtosis full+approx, VSK, NegativeSkewness, the drawdown fam
 VaR/CVaR/EVaR/RLVaR & drawdown forms, OWA, WorstRealisation, Range,
 BrownianDistanceVariance, …).
 
-**Both tracking algs (user, 2026-06-09).** Run each measure under BOTH
-`IndependentVariableTracking` AND `DependentVariableTracking`. Key registration happens
-during model BUILD, which completes before the solve — so the registration assertions
-below MUST hold regardless of solve outcome. In particular, `QuadExpr` measures under
-`DependentVariableTracking` are EXPECTED to return `OptimisationFailure` (by design; see
-the `check_all` note — e.g. Variance, and any measure whose formulation lowers to a
-QuadExpr), yet their keys (outer bare + inner tracking-prefixed) must STILL be fully
-registered. Assert keys first, solve outcome second.
+**Both tracking algs.** Run each measure under BOTH `IndependentVariableTracking`
+(`:tr_iv_`) AND `DependentVariableTracking` (`:tr_dv_`).
+
+**Nested case too (user, 2026-06-09).** In addition to the single-level
+`[A, Tracking(A)]`, add a **tracking-nested-in-tracking** case —
+`Tracking(Tracking(A))` (a `RiskTrackingRiskMeasure` whose inner `r` is itself a
+`RiskTrackingRiskMeasure` wrapping `A`) — to pin the prefix COMPOSITION. Cover all
+relevant cases (measures × algs).
+
+**ASSERT KEY CONSTRUCTION ONLY (user, 2026-06-09).** Just check that keys are
+constructed where expected in `model.obj_dict` — do NOT check weights and do NOT check
+whether the optimisation succeeded. Key registration happens during model BUILD (before
+the solve), so this is independent of solve outcome; the `QuadExpr`-under-Dependent
+`OptimisationFailure` cases are irrelevant here. This drops the earlier need to reach the
+model on failure and the need for a solver to converge — only the built `obj_dict`
+matters.
 
 **Sizing (small-scale rule).** 3 assets when `A` is full `Kurtosis`/`VarianceSkewKurtosis`;
 10–20 observations when `A` is `BrownianDistanceVariance` (observation-bound `:Dt`/`:Dx`
-~T²).
+~T²). (Solve cost is irrelevant — keys only — but small sizes keep the build cheap.)
 
-**Open implementation detail (now load-bearing):** obtain the built `JuMP.Model` from
-the optimisation to inspect `model.obj_dict` — AND it must be reachable even when the
-result is `OptimisationFailure` (the Dependent/QuadExpr case). Confirm whether the
-result/opt exposes the model on failure or whether a build-only seam is needed; resolve
-when writing the file.
+**Open implementation detail:** obtain the built `JuMP.Model` to read `model.obj_dict`.
+Since solve success is irrelevant, a build-only seam (or `res.model`) suffices regardless
+of `OptimisationSuccess`/`Failure`. Resolve when writing the file.
 
-Assert, on the single built model carrying both outer-`A` and inner-tracked-`A`:
+Assert, on the single built model:
 
-1. **Outer `A` keys present BARE.** Every prefix-threaded key of `A` (group-3 / the
-   per-measure singletons) exists bare from the outer build — e.g. `:W`/`:M`/`:M_PSD`/
-   `:L2W` (Kurtosis), the six `:*_vr_sk_kt` keys (VSK), `:Dt`/`:Dx`/`:bdvariance_risk`
-   (BDVar).
+1. **Outer `A` keys present BARE.** Every prefix-threaded key of `A` exists bare from the
+   outer build — e.g. `:W`/`:M`/`:M_PSD`/`:L2W` (Kurtosis), the six `:*_vr_sk_kt` (VSK),
+   `:Dt`/`:Dx`/`:bdvariance_risk` (BDVar), `:net_X`/`:owa` (OWA), `:dd` (drawdowns).
 2. **Inner (tracked) `A` keys present UNDER the composed prefix, distinct from bare.**
-   The same key names exist as `Symbol(:tr_iv_, 1, :_, name)` and are NOT the same
-   objects as the bare ones — both sets coexist, no `obj_dict` collision/overwrite.
-3. **`:L2W` appears under the tracking prefix (the correctness fix).** Explicitly
-   assert the inner kurtosis registers its OWN `Symbol(:tr_iv_, 1, :_, :L2W)` — the key
-   the old swap list OMITTED (ADR 0005); a regression reintroduces the
-   kurtosis-in-kurtosis stale-`:L2W` bug, observable here as a missing/aliased inner key.
-4. **Prior-derived caches stay bare and SHARED.** `:Gkt`, `:vals_Akt`, `:vecs_Akt`
-   (04), `:G`, `:GV` (05) appear exactly once, BARE, even though both outer and inner
-   `A` need them (weight-independent → shared, not re-registered under the prefix) — the
-   bare-vs-prefix invariant.
-5. **Solve outcome (asserted AFTER keys).** `IndependentVariableTracking` →
-   `OptimisationSuccess`, `sum(w) ≈ 1` (dual build is solvable, not just key-clean).
-   `DependentVariableTracking` → `OptimisationSuccess` for non-QuadExpr measures;
-   `OptimisationFailure` is the EXPECTED result for QuadExpr measures — and assertions
-   1–4 must already have passed on that failed-solve model.
+   The same names exist as `Symbol(:tr_iv_, 1, :_, name)` (and `:tr_dv_` for Dependent)
+   and are NOT the bare keys — both coexist, no `obj_dict` collision.
+3. **`:L2W` appears under the tracking prefix (the correctness fix).** Assert the inner
+   kurtosis registers its OWN `Symbol(:tr_iv_, 1, :_, :L2W)` — the key the old swap list
+   OMITTED (ADR 0005); a regression shows as a missing/aliased inner key.
+4. **Prior-derived caches stay bare and SHARED.** `:Gkt`, `:vals_Akt`, `:vecs_Akt` (04),
+   `:G`, `:GV` (05) appear bare (and only bare), even though outer and inner `A` both
+   need them — the bare-vs-prefix invariant.
+5. **Nested composition (no aliasing).** For `Tracking(Tracking(A))`, the innermost `A`'s
+   keys exist under the COMPOSED prefix `Symbol(:tr_iv_, 1, :_, :tr_iv_, 1, :_, name)`
+   (the inner enumerate restarts `i` at 1, so prefixes compose rather than replace) and
+   do NOT collide with the single-level `Symbol(:tr_iv_, 1, :_, name)` keys. This is the
+   re-entrancy guarantee the old swap could not provide.
