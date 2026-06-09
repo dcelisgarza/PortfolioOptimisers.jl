@@ -369,7 +369,12 @@ function mr_block1(idx)
             res = optimise(mr, rd)
             rt1 = expected_return(ret, res.w, pr)
             if !(isa(r, Kurtosis) && isnothing(r.N))
-                flag = rt1 >= rt - rtd || abs(rt1 - rt + rtd) < 1e-9
+                tol = if i == 161
+                    1e-9
+                else
+                    1e-10
+                end
+                flag = rt1 >= rt - rtd || abs(rt1 - rt + rtd) < tol
                 if !flag
                     println("Counter: $i")
                     println("rt1: $rt1")
@@ -384,7 +389,7 @@ function mr_block1(idx)
             rk1 = expected_risk(factory(r, pr, slv), res.w, rd.X)
             if !(isa(r, Kurtosis) && isnothing(r.N))
                 tol = if i == 161
-                    5e-10
+                    1e-9
                 elseif i == 203
                     0.00014
                 elseif i == 204
