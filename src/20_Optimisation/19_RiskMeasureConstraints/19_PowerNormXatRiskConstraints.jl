@@ -60,10 +60,10 @@ Where:
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::PowerNormValueatRisk,
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               args...; kwargs...)
+                               args...; prefix::Symbol = Symbol(""), kwargs...)
     key = Symbol(:pvar_risk_, i)
     sc = get_constraint_scale(model)
-    net_X = set_net_portfolio_returns!(model, pr.X)
+    net_X = set_net_portfolio_returns!(model, pr.X; prefix = prefix)
     T = length(net_X)
     ip = inv(r.p)
     pvar_eta, pvar_t, pvar_w, pvar_v = model[Symbol(:pvar_eta_, i)], model[Symbol(:pvar_t_, i)], model[Symbol(:pvar_w_, i)], model[Symbol(:pvar_v_, i)] = JuMP.@variables(model,
@@ -135,10 +135,10 @@ upper power-norm value-at-risk, parameterised by `r.pa` and `r.pb`.
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::PowerNormValueatRiskRange,
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               args...; kwargs...)
+                               args...; prefix::Symbol = Symbol(""), kwargs...)
     key = Symbol(:pvar_range_risk_, i)
     sc = get_constraint_scale(model)
-    net_X = set_net_portfolio_returns!(model, pr.X)
+    net_X = set_net_portfolio_returns!(model, pr.X; prefix = prefix)
     T = length(net_X)
     ipa = inv(r.pa)
     ipb = inv(r.pb)
@@ -256,10 +256,10 @@ computed over the drawdown path of portfolio returns.
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::PowerNormDrawdownatRisk,
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               args...; kwargs...)
+                               args...; prefix::Symbol = Symbol(""), kwargs...)
     key = Symbol(:pdar_risk_, i)
     sc = get_constraint_scale(model)
-    dd = set_drawdown_constraints!(model, pr.X)
+    dd = set_drawdown_constraints!(model, pr.X; prefix = prefix)
     T = length(dd) - 1
     ip = inv(r.p)
     pdar_eta, pdar_t, pdar_w, pdar_v = model[Symbol(:pdar_eta_, i)], model[Symbol(:pdar_t_, i)], model[Symbol(:pdar_w_, i)], model[Symbol(:pdar_v_, i)] = JuMP.@variables(model,

@@ -42,10 +42,10 @@ where ``\\boldsymbol{w}_b`` is the benchmark weight vector and ``k`` is the budg
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::TurnoverRiskMeasure,
                                opt::RiskJuMPOptimisationEstimator, ::AbstractPriorResult,
-                               args...; kwargs...)
+                               args...; prefix::Symbol = Symbol(""), kwargs...)
     key = Symbol(:turnover_risk_, i)
     sc = get_constraint_scale(model)
-    w = get_w(model)
+    w = get_w(model, prefix)
     k = get_k(model)
     N = length(w)
     turnover_risk = model[key] = JuMP.@variable(model)

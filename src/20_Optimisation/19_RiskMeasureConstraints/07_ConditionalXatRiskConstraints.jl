@@ -574,7 +574,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     w = get_w(model, prefix)
     X = pr.X
     dd = set_drawdown_constraints!(model, X; prefix = prefix)
-    ddap1 = set_portfolio_drawdowns_plus_one!(model, X)
+    ddap1 = set_portfolio_drawdowns_plus_one!(model, X; prefix = prefix)
     T, N = size(X)
 
     alpha = r.alpha
