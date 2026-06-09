@@ -52,12 +52,12 @@ where ``\\boldsymbol{b}`` is the benchmark return series, ``k`` is the budget sc
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::TrackingRiskMeasure{<:Any, <:Any, <:L1Tracking},
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               args...; kwargs...)
+                               args...; prefix::Symbol = Symbol(""), kwargs...)
     key = Symbol(:tracking_risk_, i)
     sc = get_constraint_scale(model)
     k = get_k(model)
     X = pr.X
-    net_X = set_net_portfolio_returns!(model, X)
+    net_X = set_net_portfolio_returns!(model, X; prefix = prefix)
     T = length(net_X)
     t_tracking_risk = model[Symbol(:t_tracking_risk_, i)] = JuMP.@variable(model)
     tracking_risk = model[key] = JuMP.@expression(model, t_tracking_risk / T)
@@ -148,12 +148,12 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                                       <:Union{<:L2Tracking,
                                                               <:SquaredL2Tracking}},
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               args...; kwargs...)
+                               args...; prefix::Symbol = Symbol(""), kwargs...)
     key = Symbol(:tracking_risk_, i)
     sc = get_constraint_scale(model)
     k = get_k(model)
     X = pr.X
-    net_X = set_net_portfolio_returns!(model, X)
+    net_X = set_net_portfolio_returns!(model, X; prefix = prefix)
     T = length(net_X)
     t_tracking_risk = model[Symbol(:t_tracking_risk_, i)] = JuMP.@variable(model)
     tracking_risk = model[key] = JuMP.@expression(model,
@@ -197,13 +197,13 @@ error between portfolio and benchmark returns, scaled by `(T - ddof)^(1/p)`.
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::TrackingRiskMeasure{<:Any, <:Any, <:LpTracking},
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               args...; kwargs...)
+                               args...; prefix::Symbol = Symbol(""), kwargs...)
     @argcheck(r.alg.p > 1, DomainError)
     key = Symbol(:tracking_risk_, i)
     sc = get_constraint_scale(model)
     k = get_k(model)
     X = pr.X
-    net_X = set_net_portfolio_returns!(model, X)
+    net_X = set_net_portfolio_returns!(model, X; prefix = prefix)
     T = length(net_X)
     t_tracking_risk, r_tr = model[Symbol(:t_tracking_risk_, i)], model[Symbol(:r_tracking_risk_, i)] = JuMP.@variables(model,
                                                                                                                        begin
@@ -264,12 +264,12 @@ Introduces a scalar variable and an infinity-norm cone constraint to encode the 
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::TrackingRiskMeasure{<:Any, <:Any, <:LInfTracking},
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               args...; kwargs...)
+                               args...; prefix::Symbol = Symbol(""), kwargs...)
     key = Symbol(:tracking_risk_, i)
     sc = get_constraint_scale(model)
     k = get_k(model)
     X = pr.X
-    net_X = set_net_portfolio_returns!(model, X)
+    net_X = set_net_portfolio_returns!(model, X; prefix = prefix)
     T = length(net_X)
     t_tracking_risk = model[Symbol(:t_tracking_risk_, i)] = JuMP.@variable(model)
     scale = T - r.alg.ddof
@@ -330,418 +330,40 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Set risk constraints for independent-variable tracking, saving and restoring any global
-singleton model state that would conflict with the nested solve.
+Build the inner risk expression for risk tracking under a namespaced `tprefix`.
 
-Stashes existing model-level expressions and constraints (e.g., `net_X`, `dd`, `wr_risk`,
-SDP matrices) with `old` prefixes, calls [`set_risk_tr_constraints!`](@ref) with the
-`triv_i_` naming prefix, then restores the original state.
+The caller stores the tracking-difference weights at `Symbol(tprefix, :w)`, so the inner
+[`set_risk_tr_constraints!`](@ref) build reads and writes ALL of its shared model-state
+keys (`:w`, `:net_X`, `:W`, `:variance_flag`, …) under `tprefix` and cannot collide with
+the outer model's keys. This replaces the former save/unregister/restore swap (ADR 0005):
+the prefix isolates the nested build structurally. Because tracking prefixes COMPOSE
+(`tprefix = Symbol(prefix, :tr_iv_, i, :_)`), tracking-nested-in-tracking is collision-free.
 
 # Arguments
 
   - $(arg_dict[:model])
-  - $(arg_dict[:ci])
-  - `r::RiskMeasure`: Inner risk measure.
+  - `r`: Inner risk measure (or vector of measures).
   - $(arg_dict[:opt_rjumpe])
   - $(arg_dict[:pr])
   - $(arg_dict[:pl_opt])
   - $(arg_dict[:fees_opt])
+  - `tprefix::Symbol`: Composed tracking prefix namespacing the nested build's keys.
 
 # Returns
 
-  - `nothing`.
+  - The inner risk JuMP expression.
 
 # Related
 
   - [`set_risk_tr_constraints!`](@ref)
 """
-function set_risk_tracking_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMeasure,
+function set_risk_tracking_risk_constraints!(model::JuMP.Model, r,
                                              opt::RiskJuMPOptimisationEstimator,
                                              pr::AbstractPriorResult,
                                              pl::Option{<:PlC_VecPlC}, fees::Option{<:Fees},
-                                             key::Symbol, args...; kwargs...)
-    variance_flag = haskey(model, :variance_flag)
-    rc_variance = haskey(model, :rc_variance)
-    W = haskey(model, :W)
-    Au = haskey(model, :Au)
-    E = haskey(model, :E)
-    X = haskey(model, :X)
-    net_X = haskey(model, :net_X)
-    Xap1 = haskey(model, :Xap1)
-    ddap1 = haskey(model, :ddap1)
-    wr_risk = haskey(model, :wr_risk)
-    range_risk = haskey(model, :range_risk)
-    dd = haskey(model, :dd)
-    mdd_risk = haskey(model, :mdd_risk)
-    uci = haskey(model, :uci)
-    owa = haskey(model, :owa)
-    bdvariance_risk = haskey(model, :bdvariance_risk)
-    W1_vr_sk_kt = haskey(model, :W1_vr_sk_kt)
-    if variance_flag
-        model[:oldvariance_flag] = model[:variance_flag]
-        JuMP.unregister(model, :variance_flag)
-    end
-    if rc_variance
-        model[:oldrc_variance] = model[:rc_variance]
-        JuMP.unregister(model, :rc_variance)
-    end
-    if W
-        model[:oldW] = model[:W]
-        model[:oldM] = model[:M]
-        model[:oldM_PSD] = model[:M_PSD]
-        JuMP.unregister(model, :W)
-        JuMP.unregister(model, :M)
-        JuMP.unregister(model, :M_PSD)
-    end
-    if Au
-        model[:oldAu] = model[:Au]
-        model[:oldAl] = model[:Al]
-        model[:oldcbucs_variance] = model[:cbucs_variance]
-        JuMP.unregister(model, :Au)
-        JuMP.unregister(model, :Al)
-        JuMP.unregister(model, :cbucs_variance)
-    end
-    if E
-        model[:oldE] = model[:E]
-        model[:oldWpE] = model[:WpE]
-        model[:oldceucs_variance] = model[:ceucs_variance]
-        JuMP.unregister(model, :E)
-        JuMP.unregister(model, :WpE)
-        JuMP.unregister(model, :ceucs_variance)
-    end
-    if X
-        model[:oldX] = model[:X]
-        JuMP.unregister(model, :X)
-    end
-    if net_X
-        model[:oldnet_X] = model[:net_X]
-        JuMP.unregister(model, :net_X)
-    end
-    if Xap1
-        model[:oldXap1] = model[:Xap1]
-        JuMP.unregister(model, :Xap1)
-    end
-    if ddap1
-        model[:oldddap1] = model[:ddap1]
-        JuMP.unregister(model, :ddap1)
-    end
-    if wr_risk
-        model[:oldwr_risk] = model[:wr_risk]
-        model[:oldcwr] = model[:cwr]
-        JuMP.unregister(model, :wr_risk)
-        JuMP.unregister(model, :cwr)
-    end
-    if range_risk
-        model[:oldrange_risk] = model[:range_risk]
-        model[:oldbr_risk] = model[:br_risk]
-        model[:oldcbr] = model[:cbr]
-        JuMP.unregister(model, :range_risk)
-        JuMP.unregister(model, :br_risk)
-        JuMP.unregister(model, :cbr)
-    end
-    if dd
-        model[:olddd] = model[:dd]
-        model[:oldcdd_start] = model[:cdd_start]
-        model[:oldcdd_geq_0] = model[:cdd_geq_0]
-        model[:oldcdd] = model[:cdd]
-        JuMP.unregister(model, :dd)
-        JuMP.unregister(model, :cdd_start)
-        JuMP.unregister(model, :cdd_geq_0)
-        JuMP.unregister(model, :cdd)
-    end
-    if mdd_risk
-        model[:oldmdd_risk] = model[:mdd_risk]
-        model[:oldcmdd_risk] = model[:cmdd_risk]
-        JuMP.unregister(model, :mdd_risk)
-        JuMP.unregister(model, :cmdd_risk)
-    end
-    if uci
-        model[:olduci] = model[:uci]
-        model[:olduci_risk] = model[:uci_risk]
-        model[:oldcuci_soc] = model[:cuci_soc]
-        JuMP.unregister(model, :uci)
-        JuMP.unregister(model, :uci_risk)
-        JuMP.unregister(model, :cuci_soc)
-    end
-    if owa
-        model[:oldowa] = model[:owa]
-        model[:oldowac] = model[:owac]
-        JuMP.unregister(model, :owa)
-        JuMP.unregister(model, :owac)
-    end
-    if bdvariance_risk
-        model[:oldbdvariance_risk] = model[:bdvariance_risk]
-        model[:oldDt] = model[:Dt]
-        model[:oldDx] = model[:Dx]
-        JuMP.unregister(model, :Dt)
-        JuMP.unregister(model, :Dx)
-        JuMP.unregister(model, :bdvariance_risk)
-    end
-    if W1_vr_sk_kt
-        model[:oldW1_vr_sk_kt] = model[:W1_vr_sk_kt]
-        model[:oldW2_vr_sk_kt] = model[:W2_vr_sk_kt]
-        model[:oldW3_vr_sk_kt] = model[:W3_vr_sk_kt]
-        model[:oldL2W1_vr_sk_kt] = model[:L2W1_vr_sk_kt]
-        model[:oldM_vr_sk_kt] = model[:M_vr_sk_kt]
-        model[:oldM_vr_sk_kt_PSD] = model[:M_vr_sk_kt_PSD]
-        JuMP.unregister(model, :W1_vr_sk_kt)
-        JuMP.unregister(model, :W2_vr_sk_kt)
-        JuMP.unregister(model, :W3_vr_sk_kt)
-        JuMP.unregister(model, :L2W1_vr_sk_kt)
-        JuMP.unregister(model, :M_vr_sk_kt)
-        JuMP.unregister(model, :M_vr_sk_kt_PSD)
-    end
-    risk_expr = set_risk_tr_constraints!(Symbol(key, i, :_), model, r, opt, pr, pl, fees,
-                                         args...; kwargs...)
-
-    if (!variance_flag && haskey(model, :variance_flag)) || haskey(model, :oldvariance_flag)
-        model[Symbol(key, i, :_variance_flag)] = model[:variance_flag]
-        JuMP.unregister(model, :variance_flag)
-
-        if haskey(model, :oldvariance_flag)
-            model[:variance_flag] = model[:oldvariance_flag]
-            JuMP.unregister(model, :oldvariance_flag)
-        end
-    end
-    if (!rc_variance && haskey(model, :rc_variance)) || haskey(model, :oldrc_variance)
-        model[Symbol(key, i, :_rc_variance)] = model[:rc_variance]
-        JuMP.unregister(model, :rc_variance)
-
-        if haskey(model, :oldrc_variance)
-            model[:rc_variance] = model[:oldrc_variance]
-            JuMP.unregister(model, :oldrc_variance)
-        end
-    end
-    if (!W && haskey(model, :W)) || haskey(model, :oldW)
-        model[Symbol(key, i, :_W)] = model[:W]
-        model[Symbol(key, i, :_M)] = model[:M]
-        model[Symbol(key, i, :_M_PSD)] = model[:M_PSD]
-        JuMP.unregister(model, :W)
-        JuMP.unregister(model, :M)
-        JuMP.unregister(model, :M_PSD)
-
-        if haskey(model, :oldW)
-            model[:W] = model[:oldW]
-            model[:M] = model[:oldM]
-            model[:M_PSD] = model[:oldM_PSD]
-            JuMP.unregister(model, :oldW)
-            JuMP.unregister(model, :oldM)
-            JuMP.unregister(model, :oldM_PSD)
-        end
-    end
-    if (!Au && haskey(model, :Au)) || haskey(model, :oldAu)
-        model[Symbol(key, i, :_Au)] = model[:Au]
-        model[Symbol(key, i, :_Al)] = model[:Al]
-        model[Symbol(key, i, :_cbucs_variance)] = model[:cbucs_variance]
-        JuMP.unregister(model, :Au)
-        JuMP.unregister(model, :Al)
-        JuMP.unregister(model, :cbucs_variance)
-
-        if haskey(model, :oldAu)
-            model[:Au] = model[:oldAu]
-            model[:Al] = model[:oldAl]
-            model[:cbucs_variance] = model[:oldcbucs_variance]
-            JuMP.unregister(model, :oldAu)
-            JuMP.unregister(model, :oldAl)
-            JuMP.unregister(model, :oldcbucs_variance)
-        end
-    end
-    if (!E && haskey(model, :E)) || haskey(model, :oldE)
-        model[Symbol(key, i, :_E)] = model[:E]
-        model[Symbol(key, i, :_WpE)] = model[:WpE]
-        model[Symbol(key, i, :_ceucs_variance)] = model[:ceucs_variance]
-        JuMP.unregister(model, :E)
-        JuMP.unregister(model, :WpE)
-        JuMP.unregister(model, :ceucs_variance)
-
-        if haskey(model, :oldE)
-            model[:E] = model[:oldE]
-            model[:WpE] = model[:oldWpE]
-            model[:ceucs_variance] = model[:oldceucs_variance]
-            JuMP.unregister(model, :oldE)
-            JuMP.unregister(model, :oldWpE)
-            JuMP.unregister(model, :oldceucs_variance)
-        end
-    end
-    if (!X && haskey(model, :X)) || haskey(model, :oldX)
-        model[Symbol(key, i, :_X)] = model[:X]
-        JuMP.unregister(model, :X)
-
-        if haskey(model, :oldX)
-            model[:X] = model[:oldX]
-            JuMP.unregister(model, :oldX)
-        end
-    end
-    if (!net_X && haskey(model, :net_X)) || haskey(model, :oldnet_X)
-        model[Symbol(key, i, :_net_X)] = model[:net_X]
-        JuMP.unregister(model, :net_X)
-
-        if haskey(model, :oldnet_X)
-            model[:net_X] = model[:oldnet_X]
-            JuMP.unregister(model, :oldnet_X)
-        end
-    end
-    if (!Xap1 && haskey(model, :Xap1)) || haskey(model, :oldXap1)
-        model[Symbol(key, i, :_Xap1)] = model[:Xap1]
-        JuMP.unregister(model, :Xap1)
-
-        if haskey(model, :oldXap1)
-            model[:Xap1] = model[:oldXap1]
-            JuMP.unregister(model, :oldXap1)
-        end
-    end
-    if (!ddap1 && haskey(model, :ddap1)) || haskey(model, :oldddap1)
-        model[Symbol(key, i, :_ddap1)] = model[:ddap1]
-        JuMP.unregister(model, :ddap1)
-
-        if haskey(model, :oldddap1)
-            model[:ddap1] = model[:oldddap1]
-            JuMP.unregister(model, :oldddap1)
-        end
-    end
-    if (!wr_risk && haskey(model, :wr_risk)) || haskey(model, :oldwr_risk)
-        model[Symbol(key, i, :_wr_risk)] = model[:wr_risk]
-        model[Symbol(key, i, :_cwr)] = model[:cwr]
-        JuMP.unregister(model, :wr_risk)
-        JuMP.unregister(model, :cwr)
-
-        if haskey(model, :oldwr_risk)
-            model[:wr_risk] = model[:oldwr_risk]
-            model[:cwr] = model[:oldcwr]
-            JuMP.unregister(model, :oldwr_risk)
-            JuMP.unregister(model, :oldcwr)
-        end
-    end
-    if (!range_risk && haskey(model, :range_risk)) || haskey(model, :oldrange_risk)
-        model[Symbol(key, i, :_range_risk)] = model[:range_risk]
-        model[Symbol(key, i, :_br_risk)] = model[:br_risk]
-        model[Symbol(key, i, :_cbr)] = model[:cbr]
-        JuMP.unregister(model, :range_risk)
-        JuMP.unregister(model, :br_risk)
-        JuMP.unregister(model, :cbr)
-
-        if haskey(model, :oldrange_risk)
-            model[:range_risk] = model[:oldrange_risk]
-            model[:br_risk] = model[:oldbr_risk]
-            model[:cbr] = model[:oldcbr]
-            JuMP.unregister(model, :oldrange_risk)
-            JuMP.unregister(model, :oldbr_risk)
-            JuMP.unregister(model, :oldcbr)
-        end
-    end
-    if (!dd && haskey(model, :dd)) || haskey(model, :olddd)
-        model[Symbol(key, i, :_dd)] = model[:dd]
-        model[Symbol(key, i, :_cdd_start)] = model[:cdd_start]
-        model[Symbol(key, i, :_cdd_geq_0)] = model[:cdd_geq_0]
-        model[Symbol(key, i, :_cdd)] = model[:cdd]
-        JuMP.unregister(model, :dd)
-        JuMP.unregister(model, :cdd_start)
-        JuMP.unregister(model, :cdd_geq_0)
-        JuMP.unregister(model, :cdd)
-
-        if haskey(model, :olddd)
-            model[:dd] = model[:olddd]
-            model[:cdd_start] = model[:oldcdd_start]
-            model[:cdd_geq_0] = model[:oldcdd_geq_0]
-            model[:cdd] = model[:oldcdd]
-            JuMP.unregister(model, :olddd)
-            JuMP.unregister(model, :oldcdd_start)
-            JuMP.unregister(model, :oldcdd_geq_0)
-            JuMP.unregister(model, :oldcdd)
-        end
-    end
-    if (!mdd_risk && haskey(model, :mdd_risk)) || haskey(model, :oldmdd_risk)
-        model[Symbol(key, i, :_mdd_risk)] = model[:mdd_risk]
-        model[Symbol(key, i, :_cmdd_risk)] = model[:cmdd_risk]
-        JuMP.unregister(model, :mdd_risk)
-        JuMP.unregister(model, :cmdd_risk)
-
-        if haskey(model, :oldmdd_risk)
-            model[:mdd_risk] = model[:oldmdd_risk]
-            model[:cmdd_risk] = model[:oldcmdd_risk]
-            JuMP.unregister(model, :oldmdd_risk)
-            JuMP.unregister(model, :oldcmdd_risk)
-        end
-    end
-    if (!uci && haskey(model, :uci)) || haskey(model, :olduci)
-        model[Symbol(key, i, :_uci)] = model[:uci]
-        model[Symbol(key, i, :_uci_risk)] = model[:uci_risk]
-        model[Symbol(key, i, :_cuci_soc)] = model[:cuci_soc]
-        JuMP.unregister(model, :uci)
-        JuMP.unregister(model, :uci_risk)
-        JuMP.unregister(model, :cuci_soc)
-
-        if haskey(model, :olduci)
-            model[:uci] = model[:olduci]
-            model[:uci_risk] = model[:olduci_risk]
-            model[:cuci_soc] = model[:oldcuci_soc]
-            JuMP.unregister(model, :olduci)
-            JuMP.unregister(model, :olduci_risk)
-            JuMP.unregister(model, :oldcuci_soc)
-        end
-    end
-    if (!owa && haskey(model, :owa)) || haskey(model, :oldowa)
-        model[Symbol(key, i, :_owa)] = model[:owa]
-        model[Symbol(key, i, :_owac)] = model[:owac]
-        JuMP.unregister(model, :owa)
-        JuMP.unregister(model, :owac)
-
-        if haskey(model, :oldowa)
-            model[:owa] = model[:oldowa]
-            model[:owac] = model[:oldowac]
-            JuMP.unregister(model, :oldowa)
-            JuMP.unregister(model, :oldowac)
-        end
-    end
-    if (!bdvariance_risk && haskey(model, :bdvariance_risk)) ||
-       haskey(model, :oldbdvariance_risk)
-        model[Symbol(key, i, :_bdvariance_risk)] = model[:bdvariance_risk]
-        model[Symbol(key, i, :_Dt)] = model[:Dt]
-        model[Symbol(key, i, :_Dx)] = model[:Dx]
-        JuMP.unregister(model, :bdvariance_risk)
-        JuMP.unregister(model, :Dt)
-        JuMP.unregister(model, :Dx)
-
-        if haskey(model, :oldbdvariance_risk)
-            model[:bdvariance_risk] = model[:oldbdvariance_risk]
-            model[:Dt] = model[:oldDt]
-            model[:Dx] = model[:oldDx]
-            JuMP.unregister(model, :oldbdvariance_risk)
-            JuMP.unregister(model, :oldDt)
-            JuMP.unregister(model, :oldDx)
-        end
-    end
-
-    if (!W1_vr_sk_kt && haskey(model, :W1_vr_sk_kt)) || haskey(model, :oldW1_vr_sk_kt)
-        model[Symbol(key, i, :_W1_vr_sk_kt)] = model[:W1_vr_sk_kt]
-        model[Symbol(key, i, :_W2_vr_sk_kt)] = model[:W2_vr_sk_kt]
-        model[Symbol(key, i, :_W3_vr_sk_kt)] = model[:W3_vr_sk_kt]
-        model[Symbol(key, i, :_L2W1_vr_sk_kt)] = model[:L2W1_vr_sk_kt]
-        model[Symbol(key, i, :_M_vr_sk_kt)] = model[:M_vr_sk_kt]
-        model[Symbol(key, i, :_M_vr_sk_kt_PSD)] = model[:M_vr_sk_kt_PSD]
-        JuMP.unregister(model, :W1_vr_sk_kt)
-        JuMP.unregister(model, :W2_vr_sk_kt)
-        JuMP.unregister(model, :W3_vr_sk_kt)
-        JuMP.unregister(model, :L2W1_vr_sk_kt)
-        JuMP.unregister(model, :M_vr_sk_kt)
-        JuMP.unregister(model, :M_vr_sk_kt_PSD)
-
-        if haskey(model, :oldW1_vr_sk_kt)
-            model[:W1_vr_sk_kt] = model[:oldW1_vr_sk_kt]
-            model[:W2_vr_sk_kt] = model[:oldW2_vr_sk_kt]
-            model[:W3_vr_sk_kt] = model[:oldW3_vr_sk_kt]
-            model[:L2W1_vr_sk_kt] = model[:oldL2W1_vr_sk_kt]
-            model[:M_vr_sk_kt] = model[:oldM_vr_sk_kt]
-            model[:M_vr_sk_kt_PSD] = model[:oldM_vr_sk_kt_PSD]
-            JuMP.unregister(model, :oldW1_vr_sk_kt)
-            JuMP.unregister(model, :oldW2_vr_sk_kt)
-            JuMP.unregister(model, :oldW3_vr_sk_kt)
-            JuMP.unregister(model, :oldL2W1_vr_sk_kt)
-            JuMP.unregister(model, :oldM_vr_sk_kt)
-            JuMP.unregister(model, :oldM_vr_sk_kt_PSD)
-        end
-    end
-    return risk_expr
+                                             tprefix::Symbol, args...; kwargs...)
+    return set_risk_tr_constraints!(tprefix, model, r, opt, pr, pl, fees, args...;
+                                    prefix = tprefix, kwargs...)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -749,9 +371,11 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 Add JuMP risk constraints for `RiskTrackingRiskMeasure` with `IndependentVariableTracking`
 to `model`.
 
-Shifts the portfolio weight vector by the benchmark weights, delegates to
-[`set_risk_tracking_risk_constraints!`](@ref) to compute the inner risk expression on the adjusted
-weights, then applies risk bounds and expression registration.
+Stores the benchmark-shifted weights `w - wb*k` at `Symbol(tprefix, :w)` under the composed
+tracking prefix `tprefix = Symbol(prefix, :tr_iv_, i, :_)`, delegates to
+[`set_risk_tracking_risk_constraints!`](@ref) to build the inner risk on those weights under
+`tprefix`, then applies risk bounds and expression registration. The prefix namespacing
+replaces the former save/restore swap (ADR 0005) and is re-entrant.
 
 # Arguments
 
@@ -766,7 +390,7 @@ weights, then applies risk bounds and expression registration.
 
 # Returns
 
-  - `nothing`.
+  - The tracking risk JuMP expression.
 
 # Related
 
@@ -780,179 +404,32 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                                           <:IndependentVariableTracking},
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                pl::Option{<:PlC_VecPlC}, fees::Option{<:Fees}, args...;
-                               kwargs...)
+                               prefix::Symbol = Symbol(""), kwargs...)
     key = Symbol(:tracking_risk_, i)
     ri = r.r
     wb = r.tr.w
-    w = model[:w]
+    w = get_w(model, prefix)
     k = get_k(model)
-    model[:oldw] = model[:w]
-    JuMP.unregister(model, :w)
-    model[:w] = JuMP.@expression(model, w - wb * k)
-    tracking_risk = set_risk_tracking_risk_constraints!(model, i, ri, opt, pr, pl, fees,
-                                                        :tr_iv_, args...; kwargs...)
-    model[Symbol(:tr_iv_, i, :_w)] = model[:w]
-    model[:w] = model[:oldw]
-    JuMP.unregister(model, :oldw)
+    tprefix = Symbol(prefix, :tr_iv_, i, :_)
+    preg!(model, tprefix, :w, JuMP.@expression(model, w - wb * k))
+    tracking_risk = set_risk_tracking_risk_constraints!(model, ri, opt, pr, pl, fees,
+                                                        tprefix, args...; kwargs...)
     set_risk_bounds_and_expression!(model, opt, tracking_risk, r.settings, key)
     return tracking_risk
 end
-# """
-# $(DocStringExtensions.TYPEDSIGNATURES)
-
-# Set risk constraints for dependent-variable tracking, saving and restoring variance-related
-# model state.
-
-# Stashes existing SDP matrices (`W`, `Au`, `E`) and variance flags, calls
-# [`set_risk_tr_constraints!`](@ref) with the `trdv_i_` naming prefix, then restores the
-# original state. This ensures the inner risk measure's variance constraints do not interfere
-# with the outer model.
-
-# # Arguments
-
-#   - $(arg_dict[:model])
-#   - $(arg_dict[:ci])
-#   - `r::RiskMeasure`: Inner risk measure.
-#   - $(arg_dict[:opt_rjumpe])
-#   - $(arg_dict[:pr])
-#   - $(arg_dict[:pl_opt])
-#   - $(arg_dict[:fees_opt])
-
-# # Returns
-
-#   - `nothing`.
-
-# # Related
-
-#   - [`set_risk_tr_constraints!`](@ref)
-#   - [`set_risk_tracking_risk_constraints!`](@ref)
-# """
-# function set_trdv_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMeasure,
-#                                     opt::RiskJuMPOptimisationEstimator,
-#                                     pr::AbstractPriorResult, pl::Option{<:PlC_VecPlC},
-#                                     fees::Option{<:Fees}, args...; kwargs...)
-#     variance_flag = haskey(model, :variance_flag)
-#     rc_variance = haskey(model, :rc_variance)
-#     W = haskey(model, :W)
-#     Au = haskey(model, :Au)
-#     E = haskey(model, :E)
-#     if variance_flag
-#         model[:oldvariance_flag] = model[:variance_flag]
-#         JuMP.unregister(model, :variance_flag)
-#     end
-#     if rc_variance
-#         model[:oldrc_variance] = model[:rc_variance]
-#         JuMP.unregister(model, :rc_variance)
-#     end
-#     if W
-#         model[:oldW] = model[:W]
-#         model[:oldM] = model[:M]
-#         model[:oldM_PSD] = model[:M_PSD]
-#         JuMP.unregister(model, :W)
-#         JuMP.unregister(model, :M)
-#         JuMP.unregister(model, :M_PSD)
-#     end
-#     if Au
-#         model[:oldAu] = model[:Au]
-#         model[:oldAl] = model[:Al]
-#         model[:oldcbucs_variance] = model[:cbucs_variance]
-#         JuMP.unregister(model, :Au)
-#         JuMP.unregister(model, :Al)
-#         JuMP.unregister(model, :cbucs_variance)
-#     end
-#     if E
-#         model[:oldE] = model[:E]
-#         model[:oldWpE] = model[:WpE]
-#         model[:oldceucs_variance] = model[:ceucs_variance]
-#         JuMP.unregister(model, :E)
-#         JuMP.unregister(model, :WpE)
-#         JuMP.unregister(model, :ceucs_variance)
-#     end
-
-#     risk_expr = set_risk_tr_constraints!(Symbol(:trdv_, i, :_), model, r, opt, pr, pl, fees,
-#                                          args...; kwargs...)
-
-#     if (!variance_flag && haskey(model, :variance_flag)) || haskey(model, :oldvariance_flag)
-#         model[Symbol(:trdv_, i, :_variance_flag)] = model[:variance_flag]
-#         JuMP.unregister(model, :variance_flag)
-
-#         if haskey(model, :oldvariance_flag)
-#             model[:variance_flag] = model[:oldvariance_flag]
-#             JuMP.unregister(model, :oldvariance_flag)
-#         end
-#     end
-#     if (!rc_variance && haskey(model, :rc_variance)) || haskey(model, :oldrc_variance)
-#         model[Symbol(:trdv_, i, :_rc_variance)] = model[:rc_variance]
-#         JuMP.unregister(model, :rc_variance)
-
-#         if haskey(model, :oldrc_variance)
-#             model[:rc_variance] = model[:oldrc_variance]
-#             JuMP.unregister(model, :oldrc_variance)
-#         end
-#     end
-#     if (!W && haskey(model, :W)) || haskey(model, :oldW)
-#         model[Symbol(:trdv_, i, :_W)] = model[:W]
-#         model[Symbol(:trdv_, i, :_M)] = model[:M]
-#         model[Symbol(:trdv_, i, :_M_PSD)] = model[:M_PSD]
-#         JuMP.unregister(model, :W)
-#         JuMP.unregister(model, :M)
-#         JuMP.unregister(model, :M_PSD)
-
-#         if haskey(model, :oldW)
-#             model[:W] = model[:oldW]
-#             model[:M] = model[:oldM]
-#             model[:M_PSD] = model[:oldM_PSD]
-#             JuMP.unregister(model, :oldW)
-#             JuMP.unregister(model, :oldM)
-#             JuMP.unregister(model, :oldM_PSD)
-#         end
-#     end
-#     if (!Au && haskey(model, :Au)) || haskey(model, :oldAu)
-#         model[Symbol(:trdv_, i, :_Au)] = model[:Au]
-#         model[Symbol(:trdv_, i, :_Al)] = model[:Al]
-#         model[Symbol(:trdv_, i, :_cbucs_variance)] = model[:cbucs_variance]
-#         JuMP.unregister(model, :Au)
-#         JuMP.unregister(model, :Al)
-#         JuMP.unregister(model, :cbucs_variance)
-
-#         if haskey(model, :oldAu)
-#             model[:Au] = model[:oldAu]
-#             model[:Al] = model[:oldAl]
-#             model[:cbucs_variance] = model[:oldcbucs_variance]
-#             JuMP.unregister(model, :oldAu)
-#             JuMP.unregister(model, :oldAl)
-#             JuMP.unregister(model, :oldcbucs_variance)
-#         end
-#     end
-#     if (!E && haskey(model, :E)) || haskey(model, :oldE)
-#         model[Symbol(:trdv_, i, :_E)] = model[:E]
-#         model[Symbol(:trdv_, i, :_WpE)] = model[:WpE]
-#         model[Symbol(:trdv_, i, :_ceucs_variance)] = model[:ceucs_variance]
-#         JuMP.unregister(model, :E)
-#         JuMP.unregister(model, :WpE)
-#         JuMP.unregister(model, :ceucs_variance)
-
-#         if haskey(model, :oldE)
-#             model[:E] = model[:oldE]
-#             model[:WpE] = model[:oldWpE]
-#             model[:ceucs_variance] = model[:oldceucs_variance]
-#             JuMP.unregister(model, :oldE)
-#             JuMP.unregister(model, :oldWpE)
-#             JuMP.unregister(model, :oldceucs_variance)
-#         end
-#     end
-#     return risk_expr
-# end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Add JuMP risk constraints for `RiskTrackingRiskMeasure` with `DependentVariableTracking`
 to `model`.
 
-Computes the benchmark's expected risk value, delegates to
-[`set_risk_tracking_risk_constraints!`](@ref) to compute the inner risk expression, then adds an
-L1-norm cone constraint on the difference between the portfolio's risk expression and the
-benchmark's expected risk, scaled by the allocation variable `k`.
+Computes the benchmark's expected risk value, stores the (unshifted) portfolio weights at
+`Symbol(tprefix, :w)` under the composed tracking prefix
+`tprefix = Symbol(prefix, :tr_dv_, i, :_)`, delegates to
+[`set_risk_tracking_risk_constraints!`](@ref) to build the inner portfolio risk under
+`tprefix`, then adds an L1-norm cone constraint on the difference between the portfolio's
+risk expression and the benchmark's expected risk scaled by the allocation variable `k`.
+The prefix namespacing replaces the former save/restore swap (ADR 0005) and is re-entrant.
 
 # Arguments
 
@@ -967,7 +444,7 @@ benchmark's expected risk, scaled by the allocation variable `k`.
 
 # Returns
 
-  - `nothing`.
+  - The tracking risk JuMP expression.
 
 # Related
 
@@ -981,7 +458,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                                           <:DependentVariableTracking},
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                pl::Option{<:PlC_VecPlC}, fees::Option{<:Fees}, args...;
-                               kwargs...)
+                               prefix::Symbol = Symbol(""), kwargs...)
     key = Symbol(:tracking_risk_, i)
     ri = r.r
     wb = r.tr.w
@@ -989,10 +466,10 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     k = get_k(model)
     sc = get_constraint_scale(model)
     tracking_risk = model[key] = JuMP.@variable(model)
-    # risk_expr = set_trdv_risk_constraints!(model, i, ri, opt, pr, pl, fees, args...;
-    #                                        kwargs...)
-    risk_expr = set_risk_tracking_risk_constraints!(model, i, ri, opt, pr, pl, fees,
-                                                    :tr_dv_, args...; kwargs...)
+    tprefix = Symbol(prefix, :tr_dv_, i, :_)
+    preg!(model, tprefix, :w, get_w(model, prefix))
+    risk_expr = set_risk_tracking_risk_constraints!(model, ri, opt, pr, pl, fees, tprefix,
+                                                    args...; kwargs...)
     dr = model[Symbol(:r_dv_, i)] = JuMP.@expression(model, risk_expr - rb * k)
     model[Symbol(:crtr_noc_, i)] = JuMP.@constraint(model,
                                                     [sc * tracking_risk;

@@ -193,22 +193,17 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
                                                                <:IndependentVariableTracking},
                                          opt::JuMPOptimisationEstimator,
                                          pl::Option{<:PlC_VecPlC}, fees::Option{<:Fees},
-                                         args...; kwargs...)
+                                         args...; prefix::Symbol = Symbol(""), kwargs...)
     r = tr.r
     wb = tr.tr.w
     err = tr.err
-    w = model[:w]
+    w = get_w(model, prefix)
     k = get_k(model)
     sc = get_constraint_scale(model)
-    te_ir = Symbol(:te_ir_, i)
-    model[:oldw] = model[:w]
-    JuMP.unregister(model, :w)
-    model[:w] = JuMP.@expression(model, w - wb * k)
-    risk_expr = set_risk_tracking_risk_constraints!(model, te_ir, r, opt, pr, pl, fees,
-                                                    te_ir, args...; kwargs...)
-    model[Symbol(te_ir, :_w)] = model[:w]
-    model[:w] = model[:oldw]
-    JuMP.unregister(model, :oldw)
+    tprefix = Symbol(prefix, :te_ir_, i, :_)
+    preg!(model, tprefix, :w, JuMP.@expression(model, w - wb * k))
+    risk_expr = set_risk_tracking_risk_constraints!(model, r, opt, pr, pl, fees, tprefix,
+                                                    args...; kwargs...)
     model[Symbol(:cter_, i)] = JuMP.@constraint(model, sc * (risk_expr - err * k) <= 0)
     return nothing
 end
@@ -218,7 +213,7 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
                                                                <:DependentVariableTracking},
                                          opt::JuMPOptimisationEstimator,
                                          pl::Option{<:PlC_VecPlC}, fees::Option{<:Fees},
-                                         args...; kwargs...)
+                                         args...; prefix::Symbol = Symbol(""), kwargs...)
     ri = tr.r
     wb = tr.tr.w
     err = tr.err
@@ -227,9 +222,9 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
     sc = get_constraint_scale(model)
     key = Symbol(:te_dr_, i)
     te_dr = model[key] = JuMP.@variable(model)
-    # risk_expr = set_trdv_risk_constraints!(model, key, ri, opt, pr, pl, fees, args...;
-    #                                        kwargs...)
-    risk_expr = set_risk_tracking_risk_constraints!(model, key, ri, opt, pr, pl, fees, key,
+    tprefix = Symbol(prefix, :te_dr_, i, :_)
+    preg!(model, tprefix, :w, get_w(model, prefix))
+    risk_expr = set_risk_tracking_risk_constraints!(model, ri, opt, pr, pl, fees, tprefix,
                                                     args...; kwargs...)
     dr = model[Symbol(key, i)] = JuMP.@expression(model, risk_expr - rb * k)
     model[Symbol(:cter_noc_, i)], model[Symbol(:cter_, i)] = JuMP.@constraints(model,
