@@ -207,10 +207,11 @@ where ``\\mathbf{K}`` is the co-kurtosis matrix and ``\\mathbf{S}_2`` is the dup
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::Kurtosis{<:Any, <:Any, <:Any, <:Any, <:Integer, <:Any,
                                            <:Any}, opt::RiskJuMPOptimisationEstimator,
-                               pr::HighOrderPrior, args...; kwargs...)
+                               pr::HighOrderPrior, args...; prefix::Symbol = Symbol(""),
+                               kwargs...)
     key = Symbol(:kurtosis_risk_, i)
     sc = get_constraint_scale(model)
-    W = set_sdp_constraints!(model)
+    W = set_sdp_constraints!(model; prefix = prefix)
     N = size(W, 1)
     f = clamp(r.N, 1, N)
     Nf = f * N
@@ -282,21 +283,22 @@ when the kurtosis truncation rank is `Nothing` (no truncation).
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::Kurtosis{<:Any, <:Any, <:Any, <:Any, Nothing, <:Any,
                                            <:Any}, opt::RiskJuMPOptimisationEstimator,
-                               pr::HighOrderPrior, args...; kwargs...)
+                               pr::HighOrderPrior, args...; prefix::Symbol = Symbol(""),
+                               kwargs...)
     key = Symbol(:kurtosis_risk_, i)
     sc = get_constraint_scale(model)
-    W = set_sdp_constraints!(model)
+    W = set_sdp_constraints!(model; prefix = prefix)
     G = if isnothing(r.kt)
         get_chol_or_Gkt_pm(model, pr)
     else
         LinearAlgebra.cholesky(pr.S2 * r.kt * transpose(pr.S2)).U
     end
     sqrt_kurtosis_risk = model[key] = JuMP.@variable(model)
-    L2W = if !haskey(model, :L2W)
+    L2W = if !haskey(model, Symbol(prefix, :L2W))
         L2 = pr.L2
-        model[:L2W] = JuMP.@expression(model, L2 * vec(W))
+        preg!(model, prefix, :L2W, JuMP.@expression(model, L2 * vec(W)))
     else
-        model[:L2W]
+        model[Symbol(prefix, :L2W)]
     end
     x_kurt = model[Symbol(:x_kurt_, i)] = JuMP.@expression(model, G * L2W)
     model[Symbol(:ckurt_soc_, i)] = JuMP.@constraint(model,

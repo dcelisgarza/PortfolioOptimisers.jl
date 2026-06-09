@@ -26,12 +26,12 @@ Constructs the semidefinite lifting variables `W1`, `W2`, `W3` and the PSD cone 
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::VarianceSkewKurtosis,
                                opt::RiskJuMPOptimisationEstimator, pr::HighOrderPrior,
-                               args...; kwargs...)
+                               args...; prefix::Symbol = Symbol(""), kwargs...)
     key = Symbol(:vr_sk_kt_risk_, i)
     vr_key = Symbol(:vr_risk_, i)
     sk_key = Symbol(:sk_risk_, i)
     kt_key = Symbol(:kt_risk_, i)
-    w = get_w(model)
+    w = get_w(model, prefix)
     sc = get_constraint_scale(model)
     k = ifelse(haskey(model, :crkb), 1, get_k(model))
     sigma = ifelse(isnothing(r.vr.sigma), pr.sigma, r.vr.sigma)
@@ -42,22 +42,28 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::VarianceSkewKurtosi
     S2 = pr.S2
     N = size(pr.X, 2)
     M = div(N * (N + 1), 2)
-    if !haskey(model, :W1_vr_sk_kt)
-        JuMP.@variables(model, begin
-                            W1_vr_sk_kt[1:N, 1:N], Symmetric
-                            W2_vr_sk_kt[1:M, 1:N]
-                            W3_vr_sk_kt[1:M, 1:M], Symmetric
-                        end)
-        JuMP.@expression(model, L2W1_vr_sk_kt, L2 * vec(W1_vr_sk_kt))
-        JuMP.@expression(model, M_vr_sk_kt,
-                         vcat(hcat(k, transpose(w), transpose(L2W1_vr_sk_kt)),
-                              hcat(w, W1_vr_sk_kt, transpose(W2_vr_sk_kt)),
-                              hcat(L2W1_vr_sk_kt, W2_vr_sk_kt, W3_vr_sk_kt)))
-        JuMP.@constraint(model, M_vr_sk_kt_PSD, sc * M_vr_sk_kt in JuMP.PSDCone())
+    if !haskey(model, Symbol(prefix, :W1_vr_sk_kt))
+        W1_vr_sk_kt = preg!(model, prefix, :W1_vr_sk_kt,
+                            JuMP.@variable(model, [1:N, 1:N], Symmetric))
+        W2_vr_sk_kt = preg!(model, prefix, :W2_vr_sk_kt, JuMP.@variable(model, [1:M, 1:N]))
+        W3_vr_sk_kt = preg!(model, prefix, :W3_vr_sk_kt,
+                            JuMP.@variable(model, [1:M, 1:M], Symmetric))
+        L2W1_vr_sk_kt = preg!(model, prefix, :L2W1_vr_sk_kt,
+                              JuMP.@expression(model, L2 * vec(W1_vr_sk_kt)))
+        M_vr_sk_kt = preg!(model, prefix, :M_vr_sk_kt,
+                           JuMP.@expression(model,
+                                            vcat(hcat(k, transpose(w),
+                                                      transpose(L2W1_vr_sk_kt)),
+                                                 hcat(w, W1_vr_sk_kt,
+                                                      transpose(W2_vr_sk_kt)),
+                                                 hcat(L2W1_vr_sk_kt, W2_vr_sk_kt,
+                                                      W3_vr_sk_kt))))
+        preg!(model, prefix, :M_vr_sk_kt_PSD,
+              JuMP.@constraint(model, sc * M_vr_sk_kt in JuMP.PSDCone()))
     end
-    W1 = model[:W1_vr_sk_kt]
-    W2 = model[:W2_vr_sk_kt]
-    W3 = model[:W3_vr_sk_kt]
+    W1 = model[Symbol(prefix, :W1_vr_sk_kt)]
+    W2 = model[Symbol(prefix, :W2_vr_sk_kt)]
+    W3 = model[Symbol(prefix, :W3_vr_sk_kt)]
     vr_risk, sk_risk, kt_risk = model[Symbol(:vr_risk_, i)], model[Symbol(:sk_risk_, i)], model[Symbol(:kt_risk_, i)] = JuMP.@expressions(model,
                                                                                                                                           begin
                                                                                                                                               LinearAlgebra.tr(sigma *
