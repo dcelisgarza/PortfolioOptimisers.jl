@@ -51,7 +51,10 @@ from the start, per ADR 0004. Decided over the registry/build-then-swap approach
   partial — all read Cat-A infra BARE, so Independent tracking (shifted weights) failed
   at IT-golden i=28 while Dependent (original weights) passed; fixed in `b2f8dccd9`.
   Full single-core suite GREEN (4075/4075, test_13 flake did not recur).
-  **NEXT: post-migration registration tests (below) + Step 5 seam-lock.**
+  **NEXT: Step 5 seam-lock.**
+- **Post-migration registration tests — DONE (committed `4c146e2a0`):**
+  `test/test_27_prefix_registration.jl` (233 pass, 1 skip standalone). See the
+  "Post-migration deliverable" section below for the design.
 
 ## Phase 2 slice plan (decided 2026-06-08)
 
@@ -192,12 +195,19 @@ The full suite golden-tests every measure in `rs` under BOTH tracking modes
 (always default-empty), so `check_all()` should be byte-identical to baseline; a
 Phase-2 threading bug only surfaces once Phase 3 activates the path.
 
-## Post-migration deliverable — direct prefix-registration tests (REQUIRED)
+## Post-migration deliverable — direct prefix-registration tests (DONE `4c146e2a0`)
 
-Decided 2026-06-09 (user): the golden suite only covers the prefixed path
-*indirectly* (output byte-identity) and only at Phase 3. Once the migration is
-complete, add a **dedicated test file** (e.g. `test/test_2X_prefix_registration.jl`,
-wired into `runtests.jl`).
+Implemented as `test/test_27_prefix_registration.jl` (auto-discovered by `runtests.jl`).
+233 pass / 1 skip standalone. The build-truth that shaped it: in `[A, Tracking(A)]` the
+tracking measure sits at vector index 2, so its prefix is `:tr_iv_2_`/`:tr_dv_2_` (NOT
+`:_1_`); the model is reachable as `res.model` regardless of solve outcome; and nested
+`Tracking(Tracking(A))` composes to `Symbol(:tr_iv_1_, :tr_iv_, :tr_iv_1_1, :_)` (the
+inner tracking's index is itself the composed symbol) — deeper than a naive `:tr_iv_1_
+tr_iv_1_`, but provably collision-free. Spec below kept for rationale.
+
+Decided 2026-06-09 (user): the golden suite only covered the prefixed path
+*indirectly* (output byte-identity) and only at Phase 3, so a dedicated build-level test
+file asserts the key construction directly.
 
 **Test structure — within the optimisation framework (user, 2026-06-09).** Do NOT
 hand-build a bare `JuMP.Model` with `set_risk_constraints!`. Instead drive each test
