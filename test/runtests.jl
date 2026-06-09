@@ -17,8 +17,8 @@ const init_code = quote
     using Logging
     using CSV, TimeSeries, DataFrames, StableRNGs, StatsBase, LinearAlgebra
 
-    # Silence all logging by default.
-    global_logger(NullLogger())
+    # # Silence all logging by default.
+    # global_logger(NullLogger())
 
     # Headless GR for plotting tests; respect an externally set value.
     ENV["GKSwstype"] = get(ENV, "GKSwstype", "100")
