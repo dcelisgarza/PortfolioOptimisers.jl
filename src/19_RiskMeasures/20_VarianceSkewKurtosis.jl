@@ -306,7 +306,7 @@ function bounds_risk_measure(r::Skewness, ub::Number)
                                                       scale = r.settings.scale), ve = r.ve,
                     sk = r.sk, w = r.w, mu = r.mu)
 end
-function (r::Skewness{<:Any, <:Any, <:Any, <:Any, <:Option{<:StatsBase.AbstractWeights}})(w::VecNum,
+function (r::Skewness{<:Any, <:Any, <:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any})(w::VecNum,
                                                                                           X::MatNum,
                                                                                           fees::Option{<:Fees} = nothing)
     val = calc_deviations_vec(r, w, X, fees)
@@ -315,7 +315,7 @@ function (r::Skewness{<:Any, <:Any, <:Any, <:Any, <:Option{<:StatsBase.AbstractW
     res = isnothing(r.w) ? Statistics.mean(val) : Statistics.mean(val, r.w)
     return res / sigma^3
 end
-function (r::Skewness{<:Any, <:Any, <:Any, <:Any, <:DynamicAbstractWeights})(w::VecNum,
+function (r::Skewness{<:Any, <:Any, <:Any, <:DynamicAbstractWeights, <:Any})(w::VecNum,
                                                                              X::MatNum,
                                                                              fees::Option{<:Fees} = nothing)
     return Skewness(; ve = r.ve, sk = r.sk, w = get_observation_weights(r.w, X), mu = r.mu)(w,
