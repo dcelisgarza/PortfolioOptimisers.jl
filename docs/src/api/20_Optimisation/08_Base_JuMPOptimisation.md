@@ -28,7 +28,6 @@ set_portfolio_returns_plus_one!
 set_portfolio_drawdowns_plus_one!
 set_risk_constraints!
 get_constraint_scale
-preg
 has_Xap1
 get_ret
 get_net_X
