@@ -1,6 +1,6 @@
 # Shared fixtures for the test_22 nested-clustered/stacking split files.
 # Not a test file (no `test_` prefix) so it is excluded from discovery;
-# included by each split file. See ADR 0001.
+# included by each split file. See ADR 0003.
 using PortfolioOptimisers, CSV, Test, TimeSeries, Clarabel, DataFrames, StableRNGs,
       Pajarito, HiGHS, JuMP, Clustering, NearestCorrelationMatrix
 rd = prices_to_returns(TimeArray(CSV.File(joinpath(@__DIR__, "./assets/SP500.csv.gz"));

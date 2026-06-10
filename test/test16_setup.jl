@@ -1,6 +1,6 @@
 # Shared fixtures for the test_16 risk-budgeting split files.
 # Not a test file (no `test_` prefix) so it is excluded from discovery;
-# included by each split file. See ADR 0001.
+# included by each split file. See ADR 0003.
 using Test, PortfolioOptimisers, DataFrames, CSV, TimeSeries, Clarabel, StatsBase, JuMP,
       Pajarito, HiGHS
 rd = prices_to_returns(TimeArray(CSV.File(joinpath(@__DIR__, "./assets/SP500.csv.gz"));

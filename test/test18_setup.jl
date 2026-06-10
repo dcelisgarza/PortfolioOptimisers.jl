@@ -2,7 +2,7 @@
 # Not a test file (no `test_` prefix); excluded from discovery, included by
 # each split file. Mean Risk blocks are sliced by `rs[idx]`; the absolute `i`
 # counter is preserved so the hardcoded per-`i` tolerance tables stay valid.
-# See ADR 0001.
+# See ADR 0003.
 
 using Test, PortfolioOptimisers, DataFrames, CSV, TimeSeries, Clarabel, HiGHS, Pajarito,
       JuMP, StatsBase, StableRNGs, LinearAlgebra, Distributions, StableRNGs, SCS

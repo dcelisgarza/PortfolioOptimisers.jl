@@ -1,6 +1,6 @@
 # Shared fixtures for the test_12 prior split files.
 # Not a test file (no `test_` prefix); excluded from discovery,
-# included by each split file. See ADR 0001.
+# included by each split file. See ADR 0003.
 using Test, PortfolioOptimisers, DataFrames, TimeSeries, CSV, StatsBase, Clarabel
 rd = prices_to_returns(TimeArray(CSV.File(joinpath(@__DIR__, "./assets/SP500.csv.gz"));
                                  timestamp = :Date)[(end - 252 * 4):end],
