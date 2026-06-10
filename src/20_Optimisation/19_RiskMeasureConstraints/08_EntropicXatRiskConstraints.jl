@@ -58,10 +58,10 @@ Where:
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::EntropicValueatRisk,
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               args...; kwargs...)
+                               args...; prefix::Symbol = Symbol(""), kwargs...)
     key = Symbol(:evar_risk_, i)
-    sc = model[:sc]
-    net_X = set_net_portfolio_returns!(model, pr.X)
+    sc = get_constraint_scale(model)
+    net_X = set_net_portfolio_returns!(model, pr.X; prefix = prefix)
     T = length(net_X)
     t_evar, z_evar, u_evar = model[Symbol(:t_evar_, i)], model[Symbol(:z_evar_, i)], model[Symbol(:u_evar_, i)] = JuMP.@variables(model,
                                                                                                                                   begin
@@ -119,10 +119,10 @@ expressions and computes their difference as the range risk.
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::EntropicValueatRiskRange,
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               args...; kwargs...)
+                               args...; prefix::Symbol = Symbol(""), kwargs...)
     key = Symbol(:evar_risk_range_, i)
-    sc = model[:sc]
-    net_X = set_net_portfolio_returns!(model, pr.X)
+    sc = get_constraint_scale(model)
+    net_X = set_net_portfolio_returns!(model, pr.X; prefix = prefix)
     T = length(net_X)
     t_evar_l, z_evar_l, u_evar_l, t_evar_h, z_evar_h, u_evar_h = model[Symbol(:t_evar_l_, i)], model[Symbol(:z_evar_l_, i)], model[Symbol(:u_evar_l_, i)], model[Symbol(:t_evar_h_, i)], model[Symbol(:z_evar_h_, i)], model[Symbol(:u_evar_h_, i)] = JuMP.@variables(model,
                                                                                                                                                                                                                                                                       begin
@@ -229,10 +229,10 @@ drawdown-at-risk at confidence level `r.alpha`.
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::EntropicDrawdownatRisk,
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               args...; kwargs...)
+                               args...; prefix::Symbol = Symbol(""), kwargs...)
     key = Symbol(:edar_risk_, i)
-    sc = model[:sc]
-    dd = set_drawdown_constraints!(model, pr.X)
+    sc = get_constraint_scale(model)
+    dd = set_drawdown_constraints!(model, pr.X; prefix = prefix)
     T = length(dd) - 1
     at = r.alpha * T
     t_edar, z_edar, u_edar = model[Symbol(:t_edar_, i)], model[Symbol(:z_edar_, i)], model[Symbol(:u_edar_, i)] = JuMP.@variables(model,

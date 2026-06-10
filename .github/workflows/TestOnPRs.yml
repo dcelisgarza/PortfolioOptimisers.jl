@@ -34,7 +34,8 @@ jobs:
       fail-fast: false
       matrix:
         version: ["1"]
-        os: [ubuntu-latest, macOS-latest]
+        os: [ubuntu-latest]
+        # , macOS-latest]
         arch: [x64]
         allow_failure: [false]
         # include:

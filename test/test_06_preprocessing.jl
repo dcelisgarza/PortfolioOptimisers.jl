@@ -1,4 +1,4 @@
-@safetestset "Tools tests" begin
+@testset "Tools tests" begin
     using Test, PortfolioOptimisers, DataFrames, TimeSeries, Dates, Random, StableRNGs, CSV,
           Statistics, LinearAlgebra
 

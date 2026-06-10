@@ -311,6 +311,278 @@ function set_model_scales!(model::JuMP.Model, so::Number, sc::Number)
                       end)
     return nothing
 end
+# ---------------------------------------------------------------------------
+# Model-state read interface
+#
+# The JuMP model is the shared blackboard between every constraint and risk
+# builder. These accessors give its always-present singleton entries a named,
+# checked interface: each asserts the entry has been populated and returns it,
+# turning an absent-key bug into a clear error at the read site instead of an
+# opaque `KeyError` (or, worse, silent misbehaviour) deep in a builder.
+#
+# Prefer these over raw `model[:sym]` for the entries they cover. See ADR 0004.
+# ---------------------------------------------------------------------------
+"""
+    get_constraint_scale(model::JuMP.Model)
+
+Return the constraint scale expression `model[:sc]`.
+
+Asserts the scale has been registered (via [`set_model_scales!`](@ref)); errors otherwise.
+
+# Related
+
+  - [`set_model_scales!`](@ref)
+  - [`get_objective_scale`](@ref)
+"""
+function get_constraint_scale(model::JuMP.Model)
+    @argcheck(haskey(model, :sc))
+    return model[:sc]
+end
+"""
+    get_objective_scale(model::JuMP.Model)
+
+Return the objective scale expression `model[:so]`.
+
+Asserts the scale has been registered (via [`set_model_scales!`](@ref)); errors otherwise.
+
+# Related
+
+  - [`set_model_scales!`](@ref)
+  - [`get_constraint_scale`](@ref)
+"""
+function get_objective_scale(model::JuMP.Model)
+    @argcheck(haskey(model, :so))
+    return model[:so]
+end
+"""
+    get_w(model::JuMP.Model)
+
+Return the portfolio weight variables `model[:w]`.
+
+Asserts the weights have been registered (via [`set_w!`](@ref)); errors otherwise.
+
+# Related
+
+  - [`set_w!`](@ref)
+"""
+function get_w(model::JuMP.Model, prefix::Symbol = Symbol(""))
+    @argcheck(haskey(model, Symbol(prefix, :w)))
+    return model[Symbol(prefix, :w)]
+end
+"""
+    get_k(model::JuMP.Model)
+
+Return the homogenisation variable `model[:k]`.
+
+`k >= 0` is the auxiliary scaling variable used to homogenise fractional/ratio
+objectives (e.g. maximum ratio); recovered weights are `w / k`. Asserts `:k` has
+been registered; errors otherwise.
+
+# Related
+
+  - [`process_model`](@ref)
+  - [`get_w`](@ref)
+"""
+function get_k(model::JuMP.Model)
+    @argcheck(haskey(model, :k))
+    return model[:k]
+end
+"""
+    get_ret(model::JuMP.Model)
+
+Return the portfolio expected-return expression `model[:ret]`.
+
+Asserts the return expression has been registered; errors otherwise.
+
+# Related
+
+  - [`get_risk`](@ref)
+"""
+function get_ret(model::JuMP.Model)
+    @argcheck(haskey(model, :ret))
+    return model[:ret]
+end
+"""
+    get_risk(model::JuMP.Model)
+
+Return the scalarised portfolio risk expression `model[:risk]`.
+
+Asserts the risk expression has been registered (via [`scalarise_risk_expression!`](@ref));
+errors otherwise.
+
+# Related
+
+  - [`scalarise_risk_expression!`](@ref)
+  - [`get_ret`](@ref)
+"""
+function get_risk(model::JuMP.Model)
+    @argcheck(haskey(model, :risk))
+    return model[:risk]
+end
+"""
+    has_X(model::JuMP.Model, prefix::Symbol = Symbol(""))
+
+Return `true` if the portfolio returns `model[Symbol(prefix, :X)]` have been
+registered (via [`set_portfolio_returns!`](@ref)).
+
+# Related
+
+  - [`get_X`](@ref)
+"""
+function has_X(model::JuMP.Model, prefix::Symbol = Symbol(""))
+    return haskey(model, Symbol(prefix, :X))
+end
+"""
+    get_X(model::JuMP.Model, prefix::Symbol = Symbol(""))
+
+Return the portfolio returns expression `model[Symbol(prefix, :X)]`.
+
+Asserts it has been registered (via [`set_portfolio_returns!`](@ref)); errors otherwise.
+
+# Related
+
+  - [`set_portfolio_returns!`](@ref)
+  - [`has_X`](@ref)
+"""
+function get_X(model::JuMP.Model, prefix::Symbol = Symbol(""))
+    @argcheck(has_X(model, prefix))
+    return model[Symbol(prefix, :X)]
+end
+"""
+    has_net_X(model::JuMP.Model, prefix::Symbol = Symbol(""))
+
+Return `true` if the net portfolio returns `model[Symbol(prefix, :net_X)]` have been
+registered (via [`set_net_portfolio_returns!`](@ref)).
+
+# Related
+
+  - [`get_net_X`](@ref)
+"""
+function has_net_X(model::JuMP.Model, prefix::Symbol = Symbol(""))
+    return haskey(model, Symbol(prefix, :net_X))
+end
+"""
+    get_net_X(model::JuMP.Model, prefix::Symbol = Symbol(""))
+
+Return the net portfolio returns expression `model[Symbol(prefix, :net_X)]`.
+
+Asserts it has been registered (via [`set_net_portfolio_returns!`](@ref)); errors otherwise.
+
+# Related
+
+  - [`set_net_portfolio_returns!`](@ref)
+  - [`has_net_X`](@ref)
+"""
+function get_net_X(model::JuMP.Model, prefix::Symbol = Symbol(""))
+    @argcheck(has_net_X(model, prefix))
+    return model[Symbol(prefix, :net_X)]
+end
+"""
+    has_Xap1(model::JuMP.Model, prefix::Symbol = Symbol(""))
+
+Return `true` if the gross portfolio returns `model[Symbol(prefix, :Xap1)]` have been
+registered (via [`set_portfolio_returns_plus_one!`](@ref)).
+
+# Related
+
+  - [`get_Xap1`](@ref)
+"""
+function has_Xap1(model::JuMP.Model, prefix::Symbol = Symbol(""))
+    return haskey(model, Symbol(prefix, :Xap1))
+end
+"""
+    get_Xap1(model::JuMP.Model, prefix::Symbol = Symbol(""))
+
+Return the gross portfolio returns expression `model[Symbol(prefix, :Xap1)]` (`X .+ 1`).
+
+Asserts it has been registered (via [`set_portfolio_returns_plus_one!`](@ref)); errors otherwise.
+
+# Related
+
+  - [`set_portfolio_returns_plus_one!`](@ref)
+  - [`has_Xap1`](@ref)
+"""
+function get_Xap1(model::JuMP.Model, prefix::Symbol = Symbol(""))
+    @argcheck(has_Xap1(model, prefix))
+    return model[Symbol(prefix, :Xap1)]
+end
+"""
+    has_ddap1(model::JuMP.Model, prefix::Symbol = Symbol(""))
+
+Return `true` if the drawdowns-plus-one `model[Symbol(prefix, :ddap1)]` have been
+registered (via [`set_portfolio_drawdowns_plus_one!`](@ref)).
+
+# Related
+
+  - [`get_ddap1`](@ref)
+"""
+function has_ddap1(model::JuMP.Model, prefix::Symbol = Symbol(""))
+    return haskey(model, Symbol(prefix, :ddap1))
+end
+"""
+    get_ddap1(model::JuMP.Model, prefix::Symbol = Symbol(""))
+
+Return the drawdowns-plus-one expression `model[Symbol(prefix, :ddap1)]`.
+
+Asserts it has been registered (via [`set_portfolio_drawdowns_plus_one!`](@ref)); errors otherwise.
+
+# Related
+
+  - [`set_portfolio_drawdowns_plus_one!`](@ref)
+  - [`has_ddap1`](@ref)
+"""
+function get_ddap1(model::JuMP.Model, prefix::Symbol = Symbol(""))
+    @argcheck(has_ddap1(model, prefix))
+    return model[Symbol(prefix, :ddap1)]
+end
+"""
+    has_dd(model::JuMP.Model, prefix::Symbol = Symbol(""))
+
+Return `true` if the cumulative-drawdown variables `model[Symbol(prefix, :dd)]` have
+been registered (via [`set_drawdown_constraints!`](@ref)).
+
+# Related
+
+  - [`get_dd`](@ref)
+"""
+function has_dd(model::JuMP.Model, prefix::Symbol = Symbol(""))
+    return haskey(model, Symbol(prefix, :dd))
+end
+"""
+    get_dd(model::JuMP.Model, prefix::Symbol = Symbol(""))
+
+Return the cumulative-drawdown variables `model[Symbol(prefix, :dd)]`.
+
+Asserts they have been registered (via [`set_drawdown_constraints!`](@ref)); errors otherwise.
+
+# Related
+
+  - [`set_drawdown_constraints!`](@ref)
+  - [`has_dd`](@ref)
+"""
+function get_dd(model::JuMP.Model, prefix::Symbol = Symbol(""))
+    @argcheck(has_dd(model, prefix))
+    return model[Symbol(prefix, :dd)]
+end
+"""
+    preg!(model::JuMP.Model, prefix::Symbol, name::Symbol, val)
+
+Register `val` in the model under the prefixed key `Symbol(prefix, name)` and return it.
+
+The single place the model-state namespacing convention lives: a nested risk build
+(e.g. risk tracking) passes a non-empty `prefix` so the shared infrastructure keys it
+creates (`:X`, `:net_X`, `:W`, `:dd`, …) do not collide with the outer model's; the
+default empty prefix reproduces the bare key. Pairs with the prefixed read accessors.
+See ADR 0004.
+
+# Related
+
+  - [`get_w`](@ref)
+"""
+function preg!(model::JuMP.Model, prefix::Symbol, name::Symbol, val)
+    model[Symbol(prefix, name)] = val
+    return val
+end
 """
     set_initial_w!(args...)
     set_initial_w!(w::VecNum, wi::VecNum)
@@ -475,13 +747,12 @@ If the expression already exists in the model, returns it directly (idempotent).
   - [`set_net_portfolio_returns!`](@ref)
   - [`JuMPOptimiser`](@ref)
 """
-function set_portfolio_returns!(model::JuMP.Model, X::MatNum)
-    if haskey(model, :X)
-        return model[:X]
+function set_portfolio_returns!(model::JuMP.Model, X::MatNum; prefix::Symbol = Symbol(""))
+    if haskey(model, Symbol(prefix, :X))
+        return model[Symbol(prefix, :X)]
     end
-    w = model[:w]
-    JuMP.@expression(model, X, X * w)
-    return X
+    w = get_w(model, prefix)
+    return preg!(model, prefix, :X, JuMP.@expression(model, X * w))
 end
 """
     set_net_portfolio_returns!(model::JuMP.Model, X::MatNum)
@@ -504,18 +775,19 @@ Calls [`set_portfolio_returns!`](@ref) and subtracts fees if present.
   - [`set_portfolio_returns!`](@ref)
   - [`JuMPOptimiser`](@ref)
 """
-function set_net_portfolio_returns!(model::JuMP.Model, X::MatNum)
-    if haskey(model, :net_X)
-        return model[:net_X]
+function set_net_portfolio_returns!(model::JuMP.Model, X::MatNum;
+                                    prefix::Symbol = Symbol(""))
+    if haskey(model, Symbol(prefix, :net_X))
+        return model[Symbol(prefix, :net_X)]
     end
-    X = set_portfolio_returns!(model, X)
+    X = set_portfolio_returns!(model, X; prefix = prefix)
+    # `:fees` is shared and not recreated by a nested build, so it is read bare.
     if haskey(model, :fees)
         fees = model[:fees]
-        JuMP.@expression(model, net_X, X .- fees)
+        return preg!(model, prefix, :net_X, JuMP.@expression(model, X .- fees))
     else
-        JuMP.@expression(model, net_X, X)
+        return preg!(model, prefix, :net_X, JuMP.@expression(model, X))
     end
-    return net_X
 end
 """
     set_portfolio_returns_plus_one!(model::JuMP.Model, X::MatNum)
@@ -538,12 +810,12 @@ Used in drawdown and logarithmic return computations.
   - [`set_portfolio_drawdowns_plus_one!`](@ref)
   - [`set_portfolio_returns!`](@ref)
 """
-function set_portfolio_returns_plus_one!(model::JuMP.Model, X::MatNum)
-    if haskey(model, :Xap1)
-        return model[:Xap1]
+function set_portfolio_returns_plus_one!(model::JuMP.Model, X::MatNum;
+                                         prefix::Symbol = Symbol(""))
+    if haskey(model, Symbol(prefix, :Xap1))
+        return model[Symbol(prefix, :Xap1)]
     end
-    JuMP.@expression(model, Xap1, X .+ one(eltype(X)))
-    return Xap1
+    return preg!(model, prefix, :Xap1, JuMP.@expression(model, X .+ one(eltype(X))))
 end
 """
     set_portfolio_drawdowns_plus_one!(model::JuMP.Model, X::MatNum)
@@ -565,13 +837,13 @@ Computes `absolute_drawdown_arr(X) .+ 1` and registers it in the model.
 
   - [`set_portfolio_returns_plus_one!`](@ref)
 """
-function set_portfolio_drawdowns_plus_one!(model::JuMP.Model, X::MatNum)
-    if haskey(model, :ddap1)
-        return model[:ddap1]
+function set_portfolio_drawdowns_plus_one!(model::JuMP.Model, X::MatNum;
+                                           prefix::Symbol = Symbol(""))
+    if haskey(model, Symbol(prefix, :ddap1))
+        return model[Symbol(prefix, :ddap1)]
     end
     _ddap1 = absolute_drawdown_arr(X) .+ one(eltype(X))
-    JuMP.@expression(model, ddap1, _ddap1)
-    return ddap1
+    return preg!(model, prefix, :ddap1, JuMP.@expression(model, _ddap1))
 end
 """
     scalarise_risk_expression!(model, r, X, T, ...) -> nothing

@@ -180,6 +180,9 @@ Wraps a single external backend (Clarabel, HiGHS, …): solver module, settings,
 **JuMPOptimiser**
 The shared JuMP model configuration: one or more `Solver`s (fallback chains) plus JuMP-level settings. The execution environment consumed by all JuMP-based optimisers.
 
+**Model State**
+The in-flight state of the JuMP model as it is being built — the shared variables, expressions, and scales that successive constraint/risk builders read and write. Accessed through a named interface rather than raw model keys.
+
 ### 4.4 Constraints
 
 **Asset Sets**

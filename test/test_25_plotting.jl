@@ -1,4 +1,4 @@
-@safetestset "Plotting" begin
+@testset "Plotting" begin
     using Test, PortfolioOptimisers, StatsPlots, GraphRecipes, Clarabel, CSV, TimeSeries,
           LinearAlgebra, Random, Statistics
 

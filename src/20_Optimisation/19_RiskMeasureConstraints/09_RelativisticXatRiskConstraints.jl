@@ -49,10 +49,10 @@ encoded via power cones ``\\mathcal{K}_{1/(1+\\kappa)}`` and ``\\mathcal{K}_{1/(
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::RelativisticValueatRisk,
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               args...; kwargs...)
+                               args...; prefix::Symbol = Symbol(""), kwargs...)
     key = Symbol(:rlvar_risk_, i)
-    sc = model[:sc]
-    net_X = set_net_portfolio_returns!(model, pr.X)
+    sc = get_constraint_scale(model)
+    net_X = set_net_portfolio_returns!(model, pr.X; prefix = prefix)
     T = length(net_X)
     alpha = r.alpha
     kappa = r.kappa
@@ -148,10 +148,10 @@ risk measures parameterised by `kappa`, then computes their difference as the ra
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::RelativisticValueatRiskRange,
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               args...; kwargs...)
+                               args...; prefix::Symbol = Symbol(""), kwargs...)
     key = Symbol(:rlvar_range_risk_, i)
-    sc = model[:sc]
-    net_X = set_net_portfolio_returns!(model, pr.X)
+    sc = get_constraint_scale(model)
+    net_X = set_net_portfolio_returns!(model, pr.X; prefix = prefix)
     T = length(net_X)
     alpha = r.alpha
     kappa_a = r.kappa_a
@@ -313,10 +313,10 @@ drawdown-at-risk parameterised by `kappa` at confidence level `r.alpha`.
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::RelativisticDrawdownatRisk,
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               args...; kwargs...)
+                               args...; prefix::Symbol = Symbol(""), kwargs...)
     key = Symbol(:rldar_risk_, i)
-    sc = model[:sc]
-    dd = set_drawdown_constraints!(model, pr.X)
+    sc = get_constraint_scale(model)
+    dd = set_drawdown_constraints!(model, pr.X; prefix = prefix)
     T = length(dd) - 1
     alpha = r.alpha
     kappa = r.kappa

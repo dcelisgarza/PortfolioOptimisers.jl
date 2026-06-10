@@ -35,17 +35,18 @@ Where:
   - [`set_sdp_phylogeny_constraints!`](@ref)
   - [`SemiDefinitePhylogeny`](@ref)
 """
-function set_sdp_constraints!(model::JuMP.Model)
-    if haskey(model, :W)
-        return model[:W]
+function set_sdp_constraints!(model::JuMP.Model; prefix::Symbol = Symbol(""))
+    if haskey(model, Symbol(prefix, :W))
+        return model[Symbol(prefix, :W)]
     end
-    w = model[:w]
-    k = ifelse(haskey(model, :crkb), 1, model[:k])
-    sc = model[:sc]
+    w = get_w(model, prefix)
+    k = ifelse(haskey(model, :crkb), 1, get_k(model))
+    sc = get_constraint_scale(model)
     N = length(w)
-    JuMP.@variable(model, W[1:N, 1:N], Symmetric)
-    JuMP.@expression(model, M, hcat(vcat(W, transpose(w)), vcat(w, k)))
-    JuMP.@constraint(model, M_PSD, sc * M in JuMP.PSDCone())
+    W = preg!(model, prefix, :W, JuMP.@variable(model, [1:N, 1:N], Symmetric))
+    M = preg!(model, prefix, :M,
+              JuMP.@expression(model, hcat(vcat(W, transpose(w)), vcat(w, k))))
+    preg!(model, prefix, :M_PSD, JuMP.@constraint(model, sc * M in JuMP.PSDCone()))
     return W
 end
 """
@@ -74,8 +75,8 @@ function set_sdp_frc_constraints!(model::JuMP.Model)
         return model[:frc_W]
     end
     w1 = model[:w1]
-    sc = model[:sc]
-    k = model[:k]
+    sc = get_constraint_scale(model)
+    k = get_k(model)
     Nf = length(w1)
     JuMP.@variable(model, frc_W[1:Nf, 1:Nf], Symmetric)
     JuMP.@expression(model, frc_M, hcat(vcat(frc_W, transpose(w1)), vcat(w1, k)))
@@ -109,7 +110,7 @@ function set_sdp_phylogeny_constraints!(model::JuMP.Model, plgs::Option{<:PlC_Ve
          isa(plgs, AbstractVector) && any(x -> isa(x, SemiDefinitePhylogeny), plgs))
         return nothing
     end
-    sc = model[:sc]
+    sc = get_constraint_scale(model)
     W = set_sdp_constraints!(model)
     for (i, pl) in enumerate(plgs)
         if !isa(pl, SemiDefinitePhylogeny)
@@ -155,7 +156,7 @@ function set_sdp_frc_phylogeny_constraints!(model::JuMP.Model,
          isa(plgs, AbstractVector) && any(x -> isa(x, SemiDefinitePhylogeny), plgs))
         return nothing
     end
-    sc = model[:sc]
+    sc = get_constraint_scale(model)
     W = set_sdp_frc_constraints!(model)
     for (i, pl) in enumerate(plgs)
         if !isa(pl, SemiDefinitePhylogeny)

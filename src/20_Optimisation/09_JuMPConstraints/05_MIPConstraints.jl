@@ -84,8 +84,8 @@ function mip_wb(::Any, ::Nothing, args...)
     return nothing
 end
 function mip_wb(model::JuMP.Model, wb::WeightBounds, il::VecNum, is::VecNum)
-    sc = model[:sc]
-    w = model[:w]
+    sc = get_constraint_scale(model)
+    w = get_w(model)
     lb = wb.lb
     if !isnothing(lb) && w_finite_flag(lb)
         JuMP.@constraint(model, w_mip_lb, sc * (w - is ⊙ lb) >= 0)
@@ -169,9 +169,9 @@ function short_mip_threshold_constraints(model::JuMP.Model, wb::WeightBounds,
                                          ffs::Option{<:Num_VecNum}, ss::Option{<:Number},
                                          lt_flag::Bool, st_flag::Bool, ffl_flag::Bool,
                                          ffs_flag::Bool, miprb_flag::Bool)
-    w = model[:w]
-    k = model[:k]
-    sc = model[:sc]
+    w = get_w(model)
+    k = get_k(model)
+    sc = get_constraint_scale(model)
     JuMP.@expression(model, ss, get_mip_ss(ss, wb))
     N = length(w)
     JuMP.@variables(model, begin
@@ -296,9 +296,9 @@ Where:
 function mip_constraints(model::JuMP.Model, wb::WeightBounds, ffl::Option{<:Num_VecNum},
                          lt::Option{<:Threshold}, ss::Option{<:Number}, lt_flag::Bool,
                          ffl_flag::Bool, miprb_flag::Bool)
-    w = model[:w]
-    k = model[:k]
-    sc = model[:sc]
+    w = get_w(model)
+    k = get_k(model)
+    sc = get_constraint_scale(model)
     N = length(w)
     JuMP.@variable(model, ib[1:N], binary = true)
     if isa(k, Number)
@@ -355,7 +355,7 @@ Iterates over `plgs` and, for each [`IntegerPhylogeny`](@ref) entry, enforces `A
 """
 function set_iplg_constraints!(model::JuMP.Model, plgs::PlC_VecPlC)
     ib = model[:ib]
-    sc = model[:sc]
+    sc = get_constraint_scale(model)
     for (i, pl) in enumerate(plgs)
         if !isa(pl, IntegerPhylogeny)
             continue
@@ -432,7 +432,7 @@ function set_mip_constraints!(model::JuMP.Model, wb::WeightBounds, card::Option{
     else
         mip_constraints(model, wb, ffl, lt, ss, lt_flag, ffl_flag, miprb_flag)
     end
-    sc = model[:sc]
+    sc = get_constraint_scale(model)
     if card_flag
         JuMP.@constraint(model, card, sc * (sum(ib) - card) <= 0)
     end
@@ -487,7 +487,7 @@ end
 function smip_wb(model::JuMP.Model, wb::WeightBounds, smtx::MatNum,
                  smtx_expr::VecJuMPScalar, il::VecNum, is::VecNum,
                  key::Symbol = :set_w_mip_, i::Integer = 1)
-    sc = model[:sc]
+    sc = get_constraint_scale(model)
     lb = wb.lb
     if !isnothing(lb) && w_finite_flag(lb)
         lb = smtx * lb
@@ -543,9 +543,9 @@ function short_smip_threshold_constraints(model::JuMP.Model, wb::WeightBounds,
                                           lt_flag::Bool, st_flag::Bool, key1::Symbol = :si,
                                           key7::Symbol = :smtx_expr_,
                                           key8::Symbol = :set_w_mip_, i::Integer = 1)
-    w = model[:w]
-    k = model[:k]
-    sc = model[:sc]
+    w = get_w(model)
+    k = get_k(model)
+    sc = get_constraint_scale(model)
     JuMP.@expression(model, ss, get_mip_ss(ss, wb))
     N = size(smtx, 1)
     ilb, isb = model[Symbol(key1, :lb_, i)], model[Symbol(key1, :ub_, i)] = JuMP.@variables(model,
@@ -672,9 +672,9 @@ function smip_constraints(model::JuMP.Model, wb::WeightBounds, smtx::Option{<:Ma
                           key3::Symbol = :isbf_, key4::Symbol = :smtx_expr_,
                           key5::Symbol = :set_w_mip_, key6::Symbol = :w_smip_lt_,
                           i::Integer = 1)
-    w = model[:w]
-    k = model[:k]
-    sc = model[:sc]
+    w = get_w(model)
+    k = get_k(model)
+    sc = get_constraint_scale(model)
     N = size(smtx, 1)
     sib = model[Symbol(key1, i)] = JuMP.@variable(model, [1:N], binary = true)
     i_smip = if isa(k, Number)
@@ -756,7 +756,7 @@ function set_all_smip_constraints!(model::JuMP.Model, wb::WeightBounds,
     if !(card_flag || gcard_flag || lt_flag || st_flag)
         return nothing
     end
-    sc = model[:sc]
+    sc = get_constraint_scale(model)
     sib = if st_flag && haskey(model, :sw)
         short_smip_threshold_constraints(model, wb, smtx, lt, st, ss, lt_flag, st_flag, :si,
                                          :smtx_expr_, :set_w_mip_, i)
@@ -832,7 +832,7 @@ function set_scardmip_constraints!(model::JuMP.Model, wb::WeightBounds,
     if !(card_flag || lt_flag || st_flag)
         return nothing
     end
-    sc = model[:sc]
+    sc = get_constraint_scale(model)
     sib = if st_flag && haskey(model, :sw)
         short_smip_threshold_constraints(model, wb, smtx, lt, st, ss, lt_flag, st_flag, :si,
                                          :smtx_expr_, :set_w_mip_, i)
@@ -894,7 +894,7 @@ function set_sgcardmip_constraints!(model::JuMP.Model, wb::WeightBounds,
     if !(gcard_flag || lt_flag || st_flag)
         return nothing
     end
-    sc = model[:sc]
+    sc = get_constraint_scale(model)
     sib = if st_flag && haskey(model, :sw)
         short_smip_threshold_constraints(model, wb, smtx, lt, st, ss, lt_flag, st_flag,
                                          :sgi, :sgmtx_expr_, :setg_w_mip_, i)

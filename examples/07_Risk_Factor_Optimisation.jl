@@ -87,9 +87,9 @@ We can visualise the prior statistics to understand what each estimator produces
 The empirical prior serves as the baseline.
 =#
 
-using StatsPlots, GraphRecipes#= 3-panel composite (μ, σ, correlation) for the empirical prior. =#
+using StatsPlots, GraphRecipes #= 3-panel composite (μ, σ, correlation) for the empirical prior. =#
 
-plot_prior(prs[1], rd)#= Factor prior with stepwise regression — factor loadings reveal which factors drive each asset. =#
+plot_prior(prs[1], rd) #= Factor prior with stepwise regression — factor loadings reveal which factors drive each asset. =#
 
 plot_prior(prs[2], rd)
 plot_factor_loadings(prs[2], rd)
@@ -319,7 +319,7 @@ mrs = [MeanRisk(; r = StandardDeviation(), obj = MaximumRatio(; rf = 4.2 / 100 /
 ress = optimise.(mrs)
 pretty_table(DataFrame("Assets" => rd.nx, "EmpiricalPrior" => ress[1].w,
                        "FactorPrior(Step)" => ress[2].w,
-                       "FactorPrior(DimRed)" => ress[3].w); formatters = [resfmt])#= Side-by-side composition: empirical vs two factor priors (MaximumRatio, StandardDeviation). =#
+                       "FactorPrior(DimRed)" => ress[3].w); formatters = [resfmt]) #= Side-by-side composition: empirical vs two factor priors (MaximumRatio, StandardDeviation). =#
 
 plot_stacked_bar_composition(ress, rd)
 
@@ -398,7 +398,7 @@ mrs = [MeanRisk(; r = NegativeSkewness(), obj = MaximumRatio(; rf = 4.2 / 100 / 
 ress = optimise.(mrs)
 pretty_table(DataFrame("Assets" => rd.nx, "EmpiricalPrior" => ress[1].w,
                        "FactorPrior(Step)" => ress[2].w,
-                       "FactorPrior(DimRed)" => ress[3].w); formatters = [resfmt])#= Side-by-side composition: empirical vs two factor priors (MaximumRatio, NegativeSkewness). =#
+                       "FactorPrior(DimRed)" => ress[3].w); formatters = [resfmt]) #= Side-by-side composition: empirical vs two factor priors (MaximumRatio, NegativeSkewness). =#
 
 plot_stacked_bar_composition(ress, rd)
 
@@ -475,7 +475,7 @@ mrs = [MeanRisk(; r = NegativeSkewness(), obj = MaximumRatio(; rf = 4.2 / 100 / 
 ress = optimise.(mrs)
 pretty_table(DataFrame("Assets" => rd.nx, "EmpiricalPrior" => ress[1].w,
                        "FactorPrior(Step)" => ress[2].w,
-                       "FactorPrior(DimRed)" => ress[3].w); formatters = [resfmt])#= Side-by-side composition: empirical vs two factor priors (MaximumRatio, Kurtosis). =#
+                       "FactorPrior(DimRed)" => ress[3].w); formatters = [resfmt]) #= Side-by-side composition: empirical vs two factor priors (MaximumRatio, Kurtosis). =#
 
 plot_stacked_bar_composition(ress, rd)
 

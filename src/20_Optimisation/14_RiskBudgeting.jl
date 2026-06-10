@@ -549,7 +549,7 @@ function _set_risk_budgeting_constraints!(model::JuMP.Model, rb::RiskBudgeting,
     rkb = risk_budget_constraints(rb.rba.rkb, rb.rba.sets; N = N, strict = strict)
     rb = rkb.val
     @argcheck(length(rb) == N)
-    sc = model[:sc]
+    sc = get_constraint_scale(model)
     JuMP.@variables(model, begin
                         k
                         log_w[1:N]
@@ -595,7 +595,7 @@ function set_risk_budgeting_constraints!(model::JuMP.Model,
                                                            <:Any}, pr::AbstractPriorResult,
                                          wb::WeightBounds, args...)
     set_w!(model, pr.X, rb.wi)
-    rkb = _set_risk_budgeting_constraints!(model, rb, model[:w]; strict = rb.opt.strict)
+    rkb = _set_risk_budgeting_constraints!(model, rb, get_w(model); strict = rb.opt.strict)
     set_weight_constraints!(model, wb, rb.opt.bgt, nothing, true)
     return ProcessedAssetRiskBudgetingAttributes(rkb)
 end
@@ -608,11 +608,11 @@ function set_risk_budgeting_constraints!(model::JuMP.Model,
                                          wb::WeightBounds, args...)
     set_w!(model, pr.X, rb.wi)
     z = rb.rba.alg.z
-    @argcheck(length(z) == length(model[:w]))
-    w = z .* model[:w]
+    @argcheck(length(z) == length(get_w(model)))
+    w = z .* get_w(model)
     rkb = _set_risk_budgeting_constraints!(model, rb, w; strict = rb.opt.strict)
-    sc = model[:sc]
-    k = model[:k]
+    sc = get_constraint_scale(model)
+    k = get_k(model)
     JuMP.@constraints(model, begin
                           mipcrkb, sc * (sum(w) - k) >= 0
                           orthcrkb, sc * w >= 0
@@ -672,9 +672,9 @@ function set_risk_budgeting_constraints!(model::JuMP.Model,
                                          wb::WeightBounds, args...)
     set_rb_mip_w!(model, pr.X)
     rkb = _set_risk_budgeting_constraints!(model, rb, model[:w_obj]; strict = rb.opt.strict)
-    w = model[:w]
-    sc = model[:sc]
-    k = model[:k]
+    w = get_w(model)
+    sc = get_constraint_scale(model)
+    k = get_k(model)
     JuMP.@constraint(model, mipcrkb, sc * (sum(w) - k) >= 0)
     set_weight_constraints!(model, wb, rb.opt.bgt, rb.opt.sbgt)
     return ProcessedAssetRiskBudgetingAttributes(rkb)

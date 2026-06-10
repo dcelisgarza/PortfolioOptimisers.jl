@@ -234,7 +234,7 @@ function set_relaxed_risk_budgeting_alg_constraints!(::BasicRelaxedRiskBudgeting
                                                      model::JuMP.Model, w::VecJuMPScalar,
                                                      sigma::MatNum,
                                                      chol::Option{<:MatNum} = nothing)
-    sc = model[:sc]
+    sc = get_constraint_scale(model)
     psi = model[:psi]
     G = isnothing(chol) ? LinearAlgebra.cholesky(sigma).U : chol
     JuMP.@constraint(model, cbasic_rrp, [sc * psi; sc * G * w] in JuMP.SecondOrderCone())
@@ -244,7 +244,7 @@ function set_relaxed_risk_budgeting_alg_constraints!(::RegularisedRelaxedRiskBud
                                                      model::JuMP.Model, w::VecJuMPScalar,
                                                      sigma::MatNum,
                                                      chol::Option{<:MatNum} = nothing)
-    sc = model[:sc]
+    sc = get_constraint_scale(model)
     psi = model[:psi]
     G = isnothing(chol) ? LinearAlgebra.cholesky(sigma).U : chol
     JuMP.@variable(model, rho >= 0)
@@ -262,7 +262,7 @@ function set_relaxed_risk_budgeting_alg_constraints!(alg::RegularisedPenalisedRe
                                                      model::JuMP.Model, w::VecJuMPScalar,
                                                      sigma::MatNum,
                                                      chol::Option{<:MatNum} = nothing)
-    sc = model[:sc]
+    sc = get_constraint_scale(model)
     psi = model[:psi]
     G = isnothing(chol) ? LinearAlgebra.cholesky(sigma).U : chol
     theta = LinearAlgebra.Diagonal(sqrt.(LinearAlgebra.diag(sigma)))
@@ -309,7 +309,7 @@ function _set_relaxed_risk_budgeting_constraints!(model::JuMP.Model,
     rkb = risk_budget_constraints(rrb.rba.rkb, rrb.rba.sets; N = N, strict = rrb.opt.strict)
     rb = rkb.val
     @argcheck(length(rb) == N)
-    sc = model[:sc]
+    sc = get_constraint_scale(model)
     JuMP.@variables(model, begin
                         psi >= 0
                         gamma >= 0
@@ -375,7 +375,8 @@ function set_relaxed_risk_budgeting_constraints!(model::JuMP.Model,
                                                  args...)
     set_w!(model, pr.X, rrb.wi)
     set_weight_constraints!(model, wb, rrb.opt.bgt, nothing, true)
-    rkb = _set_relaxed_risk_budgeting_constraints!(model, rrb, model[:w], pr.sigma, pr.chol)
+    rkb = _set_relaxed_risk_budgeting_constraints!(model, rrb, get_w(model), pr.sigma,
+                                                   pr.chol)
     return ProcessedAssetRiskBudgetingAttributes(rkb)
 end
 function _optimise(rrb::RelaxedRiskBudgeting, rd::ReturnsResult = ReturnsResult();

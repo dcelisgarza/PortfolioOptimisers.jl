@@ -19,15 +19,15 @@ Introduces a vector variable `owa` of length `T` and adds the equality constrain
 
   - [`set_risk_constraints!`](@ref)
 """
-function set_owa_constraints!(model::JuMP.Model, X::MatNum)
-    if haskey(model, :owa)
-        return model[:owa]
+function set_owa_constraints!(model::JuMP.Model, X::MatNum; prefix::Symbol = Symbol(""))
+    if haskey(model, Symbol(prefix, :owa))
+        return model[Symbol(prefix, :owa)]
     end
-    sc = model[:sc]
-    net_X = set_net_portfolio_returns!(model, X)
+    sc = get_constraint_scale(model)
+    net_X = set_net_portfolio_returns!(model, X; prefix = prefix)
     T = size(X, 1)
-    JuMP.@variable(model, owa[1:T])
-    JuMP.@constraint(model, owac, sc * (net_X - owa) == 0)
+    owa = preg!(model, prefix, :owa, JuMP.@variable(model, [1:T]))
+    preg!(model, prefix, :owac, JuMP.@constraint(model, sc * (net_X - owa) == 0))
     return owa
 end
 """
@@ -79,12 +79,12 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::OrderedWeightsArray{<:Any, <:Any,
                                                       <:ExactOrderedWeightsArray},
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               args...; kwargs...)
+                               args...; prefix::Symbol = Symbol(""), kwargs...)
     key = Symbol(:owa_risk_, i)
-    sc = model[:sc]
+    sc = get_constraint_scale(model)
     X = pr.X
     T = size(X, 1)
-    owa = set_owa_constraints!(model, X)
+    owa = set_owa_constraints!(model, X; prefix = prefix)
     ovec = range(one(eltype(X)), one(eltype(X)); length = T)
     owa_a, owa_b = model[Symbol(:owa_a_, i)], model[Symbol(:owa_b_, i)] = JuMP.@variables(model,
                                                                                           begin
@@ -134,12 +134,12 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::OrderedWeightsArrayRange{<:Any, <:Any, <:Any,
                                                            <:ExactOrderedWeightsArray},
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               args...; kwargs...)
+                               args...; prefix::Symbol = Symbol(""), kwargs...)
     key = Symbol(:owa_range_risk_, i)
-    sc = model[:sc]
+    sc = get_constraint_scale(model)
     X = pr.X
     T = size(X, 1)
-    owa = set_owa_constraints!(model, X)
+    owa = set_owa_constraints!(model, X; prefix = prefix)
     ovec = range(one(eltype(X)), one(eltype(X)); length = T)
     owa_a, owa_b = model[Symbol(:owa_range_a_, i)], model[Symbol(:owa_range_b_, i)] = JuMP.@variables(model,
                                                                                                       begin
@@ -190,12 +190,12 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::OrderedWeightsArray{<:Any, <:Any,
                                                       <:ApproxOrderedWeightsArray},
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               args...; kwargs...)
+                               args...; prefix::Symbol = Symbol(""), kwargs...)
     key = Symbol(:aowa_risk_, i)
-    sc = model[:sc]
+    sc = get_constraint_scale(model)
     X = pr.X
     T = size(X, 1)
-    net_X = set_net_portfolio_returns!(model, X)
+    net_X = set_net_portfolio_returns!(model, X; prefix = prefix)
     owa_p = r.alg.p
     M = length(owa_p)
     owa_t, owa_nu, owa_eta, owa_epsilon, owa_psi, owa_z, owa_y = model[Symbol(:owa_t_, i)], model[Symbol(:owa_nu_, i)], model[Symbol(:owa_eta_, i)], model[Symbol(:owa_epsilon_, i)], model[Symbol(:owa_psi_, i)], model[Symbol(:owa_z_, i)], model[Symbol(:owa_y_, i)] = JuMP.@variables(model,
@@ -298,12 +298,12 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::OrderedWeightsArrayRange{<:Any, <:Any, <:Any,
                                                            <:ApproxOrderedWeightsArray},
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               args...; kwargs...)
+                               args...; prefix::Symbol = Symbol(""), kwargs...)
     key = Symbol(:aowa_range_risk_, i)
-    sc = model[:sc]
+    sc = get_constraint_scale(model)
     X = pr.X
     T = size(X, 1)
-    net_X = set_net_portfolio_returns!(model, X)
+    net_X = set_net_portfolio_returns!(model, X; prefix = prefix)
     owa_p = r.alg.p
     M = length(owa_p)
     owa_l_t, owa_l_nu, owa_l_eta, owa_l_epsilon, owa_l_psi, owa_l_z, owa_l_y, owa_h_t, owa_h_nu, owa_h_eta, owa_h_epsilon, owa_h_psi, owa_h_z, owa_h_y = model[Symbol(:owa_l_t_, i)], model[Symbol(:owa_l_nu_, i)], model[Symbol(:owa_l_eta_, i)], model[Symbol(:owa_l_epsilon_, i)], model[Symbol(:owa_l_psi_, i)], model[Symbol(:owa_l_z_, i)], model[Symbol(:owa_l_y_, i)], model[Symbol(:owa_h_t_, i)], model[Symbol(:owa_h_nu_, i)], model[Symbol(:owa_h_eta_, i)], model[Symbol(:owa_h_epsilon_, i)], model[Symbol(:owa_h_psi_, i)], model[Symbol(:owa_h_z_, i)], model[Symbol(:owa_h_y_, i)] = JuMP.@variables(model,

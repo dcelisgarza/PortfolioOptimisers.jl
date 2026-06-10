@@ -1,4 +1,4 @@
-@safetestset "Tools" begin
+@testset "Tools" begin
     using PortfolioOptimisers, Statistics, StatsBase, Test, LinearAlgebra
     A = [0, 1, 1, 2, 3, 4, 5, 8]
     B = [2, 3, 3, 5, 8, 10, 15, 21]

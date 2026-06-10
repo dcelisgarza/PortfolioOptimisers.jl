@@ -1,4 +1,4 @@
-@safetestset "Struct tests" begin
+@testset "Struct tests" begin
     using Test, PortfolioOptimisers, AverageShiftedHistograms, Dates, Clarabel, CSV,
           TimeSeries
     @testset "VecScalar" begin
@@ -142,10 +142,13 @@
     end
     @testset "JuMPResult" begin
         trials = Dict(:try => false)
-        @test_logs (:warn, "Model could not be solved satisfactorily.\n$trials") JuMPResult(;
-                                                                                            trials = Dict(:try =>
-                                                                                                              false),
-                                                                                            success = false)
+        logger = SimpleLogger()
+        with_logger(logger) do
+            @test_logs (:warn, "Model could not be solved satisfactorily.\n$trials") JuMPResult(;
+                                                                                                trials = Dict(:try =>
+                                                                                                                  false),
+                                                                                                success = false)
+        end
         res = JuMPResult(; trials = trials, success = true)
         @test res.trials === trials
         @test res.success == true
@@ -513,7 +516,7 @@
 
         @test PortfolioOptimisers.needs_previous_weights(chain_opt)
         chain_opt = factory(chain_opt, w0)
-        @test chain_opt.fb.fb.fb.fb.fb.fb.fb.fb.fb.fb.fb.fb.fb.opt.r.w===w0
+        @test chain_opt.fb.fb.fb.fb.fb.fb.fb.fb.fb.fb.fb.fb.fb.opt.r.w === w0
 
         chain_opt = InverseVolatility(;
                                       fb = EqualWeighted(;
@@ -619,7 +622,7 @@
 
         @test PortfolioOptimisers.needs_previous_weights(chain_opt)
         chain_opt = factory(chain_opt, w0)
-        @test chain_opt.fb.fb.fb.fb.fb.fb.fb.fb.fb.fb.fb.fb.fb.fb.r.w===w0
+        @test chain_opt.fb.fb.fb.fb.fb.fb.fb.fb.fb.fb.fb.fb.fb.fb.r.w === w0
 
         chain_opt = InverseVolatility(;
                                       fb = EqualWeighted(;

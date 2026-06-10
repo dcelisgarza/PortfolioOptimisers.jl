@@ -63,9 +63,9 @@ Where:
   - [`Turnover`](@ref)
 """
 function _set_turnover_constraints!(model::JuMP.Model, tn::Turnover, i::Integer = 1)
-    w = model[:w]
-    k = model[:k]
-    sc = model[:sc]
+    w = get_w(model)
+    k = get_k(model)
+    sc = get_constraint_scale(model)
     N = length(w)
     wb = tn.w
     val = tn.val

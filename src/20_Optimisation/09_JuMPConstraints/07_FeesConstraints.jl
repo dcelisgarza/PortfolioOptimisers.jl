@@ -77,9 +77,9 @@ function set_turnover_fees!(args...)
     return nothing
 end
 function set_turnover_fees!(model::JuMP.Model, tn::Turnover)
-    w = model[:w]
-    k = model[:k]
-    sc = model[:sc]
+    w = get_w(model)
+    k = get_k(model)
+    sc = get_constraint_scale(model)
     N = length(w)
     wt = tn.w
     val = tn.val

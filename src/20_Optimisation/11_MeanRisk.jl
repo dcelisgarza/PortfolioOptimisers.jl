@@ -405,9 +405,9 @@ function solve_mean_risk!(model::JuMP.Model, mr::MeanRisk, ret::JuMPReturnsEstim
     lbs = compute_ret_lbs(model[:ret_frontier], model, mr, ret, pr, fees)
     retcodes = sizehint!(OptimisationReturnCode[], length(lbs))
     sols = sizehint!(JuMPOptimisationSolution[], length(lbs))
-    k = model[:k]
-    sc = model[:sc]
-    ret_expr = model[:ret]
+    k = get_k(model)
+    sc = get_constraint_scale(model)
+    ret_expr = get_ret(model)
     JuMP.@variable(model, ret_lb_var in JuMP.Parameter(zero(eltype(lbs))))
     JuMP.@constraint(model, ret_lb, sc * (ret_expr - ret_lb_var * k) >= 0)
     set_portfolio_objective_function!(model, mr.obj, ret, mr.opt.cobj, mr, pr)
@@ -562,8 +562,8 @@ function solve_mean_risk!(model::JuMP.Model, mr::MeanRisk, ret::JuMPReturnsEstim
                           fees::Option{<:Fees})
     X = pr.X
     risk_frontier = compute_risk_ubs(model, mr, ret, pr, fees)
-    k = model[:k]
-    sc = model[:sc]
+    k = get_k(model)
+    sc = get_constraint_scale(model)
     for (keys, vals) in risk_frontier
         ub = model[keys[1]] = JuMP.@variable(model,
                                              set = JuMP.Parameter(zero(eltype(vals[2]))))
@@ -592,8 +592,8 @@ function solve_mean_risk!(model::JuMP.Model, mr::MeanRisk, ret::JuMPReturnsEstim
     X = pr.X
     lbs = compute_ret_lbs(model[:ret_frontier], model, mr, ret, pr, fees)
     risk_frontier = compute_risk_ubs(model, mr, ret, pr, fees)
-    sc = model[:sc]
-    k = model[:k]
+    sc = get_constraint_scale(model)
+    k = get_k(model)
     for (keys, vals) in risk_frontier
         ub = model[keys[1]] = JuMP.@variable(model,
                                              set = JuMP.Parameter(zero(eltype(vals[2]))))
@@ -605,7 +605,7 @@ function solve_mean_risk!(model::JuMP.Model, mr::MeanRisk, ret::JuMPReturnsEstim
     pitrs = Iterators.product.(itrs...)
     retcodes = sizehint!(OptimisationReturnCode[], length(lbs) * length(pitrs))
     sols = sizehint!(JuMPOptimisationSolution[], length(lbs) * length(pitrs))
-    ret_expr = model[:ret]
+    ret_expr = get_ret(model)
     JuMP.@variable(model, ret_lb_var in JuMP.Parameter(zero(eltype(lbs))))
     JuMP.@constraint(model, ret_lb, sc * (ret_expr - ret_lb_var * k) >= 0)
     set_portfolio_objective_function!(model, mr.obj, ret, mr.opt.cobj, mr, pr)

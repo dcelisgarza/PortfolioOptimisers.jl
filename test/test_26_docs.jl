@@ -1,4 +1,4 @@
-@safetestset "Docs completeness" begin
+@testset "Docs completeness" begin
     using PortfolioOptimisers, Test
     all_names = Base.undocumented_names(PortfolioOptimisers; private = true)
     public_names = Base.undocumented_names(PortfolioOptimisers; private = false)
