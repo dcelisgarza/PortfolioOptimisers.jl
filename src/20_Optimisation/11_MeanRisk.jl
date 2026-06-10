@@ -634,32 +634,14 @@ function _optimise(mr::MeanRisk, rd::ReturnsResult = ReturnsResult(); dims::Int 
     set_maximum_ratio_factor_variables!(model, pr.mu, mr.obj)
     set_w!(model, pr.X, mr.wi)
     set_weight_constraints!(model, wb, mr.opt.bgt, mr.opt.sbgt)
-    set_linear_weight_constraints!(model, lcsr, :lcs_ineq_, :lcs_eq_)
-    set_linear_weight_constraints!(model, ctr, :cent_ineq_, :cent_eq_)
-    set_mip_constraints!(model, wb, mr.opt.card, gcardr, plr, lt, st, fees, mr.opt.ss)
-    set_smip_constraints!(model, wb, mr.opt.scard, sgcardr, smtx, sgmtx, slt, sst, sglt,
-                          sgst, mr.opt.ss)
-    set_turnover_constraints!(model, tn)
-    set_tracking_error_constraints!(model, pr, mr.opt.tr, mr, plr, fees; rd = rd)
-    set_number_effective_assets!(model, mr.opt.nea)
-    set_l1_regularisation!(model, mr.opt.l1)
-    set_l2_regularisation!(model, mr.opt.l2)
-    set_linf_regularisation!(model, mr.opt.linf)
-    set_lp_regularisation!(model, mr.opt.lp)
-    set_non_fixed_fees!(model, fees)
-    set_risk_constraints!(model, mr.r, mr, pr, plr, fees; rd = rd)
-    scalarise_risk_expression!(model, mr.opt.sca)
-    set_return_constraints!(model, ret, mr.obj, pr; rd = rd)
-    set_sdp_phylogeny_constraints!(model, plr)
-    add_custom_constraint!(model, mr.opt.ccnt, mr, pr)
+    attrs = ProcessedJuMPOptimiserAttributes(pr, wb, lt, st, lcsr, ctr, gcardr, sgcardr,
+                                             smtx, sgmtx, slt, sst, sglt, sgst, tn, fees,
+                                             plr, ret)
+    _assemble_jump_model!(model, mr, mr.opt, attrs, rd; r = mr.r, obj = mr.obj)
     retcode, sol = solve_mean_risk!(model, mr, ret, pr, Val(haskey(model, :ret_frontier)),
                                     Val(haskey(model, :risk_frontier)), fees)
-    return MeanRiskResult(typeof(mr),
-                          ProcessedJuMPOptimiserAttributes(pr, wb, lt, st, lcsr, ctr,
-                                                           gcardr, sgcardr, smtx, sgmtx,
-                                                           slt, sst, sglt, sgst, tn, fees,
-                                                           plr, ret), retcode, sol,
-                          ifelse(save, model, nothing), nothing)
+    return MeanRiskResult(typeof(mr), attrs, retcode, sol, ifelse(save, model, nothing),
+                          nothing)
 end
 """
     optimise(mr::MeanRisk{<:Any, <:Any, <:Any, <:Any, Nothing},

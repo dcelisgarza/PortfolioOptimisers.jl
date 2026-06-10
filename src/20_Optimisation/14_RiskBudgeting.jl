@@ -689,34 +689,17 @@ function _optimise(rb::RiskBudgeting, rd::ReturnsResult = ReturnsResult(); dims:
     JuMP.set_string_names_on_creation(model, str_names)
     set_model_scales!(model, rb.opt.sc, rb.opt.so)
     prb = set_risk_budgeting_constraints!(model, rb, pr, wb, rd)
-    set_linear_weight_constraints!(model, lcsr, :lcs_ineq_, :lcs_eq_)
-    set_linear_weight_constraints!(model, ctr, :cent_ineq_, :cent_eq_)
-    set_mip_constraints!(model, wb, rb.opt.card, gcardr, plr, lt, st, fees, rb.opt.ss,
-                         isa(rb.rba,
-                             AssetRiskBudgeting{<:Any, <:Any, <:MixedIntegerRiskBudgeting}))
-    set_smip_constraints!(model, wb, rb.opt.scard, sgcardr, smtx, sgmtx, slt, sst, sglt,
-                          sgst, rb.opt.ss)
-    set_turnover_constraints!(model, tn)
-    set_tracking_error_constraints!(model, pr, rb.opt.tr, rb, plr, fees; rd = rd)
-    set_number_effective_assets!(model, rb.opt.nea)
-    set_l1_regularisation!(model, rb.opt.l1)
-    set_l2_regularisation!(model, rb.opt.l2)
-    set_linf_regularisation!(model, rb.opt.linf)
-    set_lp_regularisation!(model, rb.opt.lp)
-    set_non_fixed_fees!(model, fees)
-    set_risk_constraints!(model, rb.r, rb, pr, plr, fees; rd = rd)
-    scalarise_risk_expression!(model, rb.opt.sca)
-    set_return_constraints!(model, ret, MinimumRisk(), pr; rd = rd)
-    set_sdp_phylogeny_constraints!(model, plr)
-    add_custom_constraint!(model, rb.opt.ccnt, rb, pr)
+    attrs = ProcessedJuMPOptimiserAttributes(pr, wb, lt, st, lcsr, ctr, gcardr, sgcardr,
+                                             smtx, sgmtx, slt, sst, sglt, sgst, tn, fees,
+                                             plr, ret)
+    _assemble_jump_model!(model, rb, rb.opt, attrs, rd; r = rb.r,
+                          miprb_flag = isa(rb.rba,
+                                           AssetRiskBudgeting{<:Any, <:Any,
+                                                              <:MixedIntegerRiskBudgeting}))
     set_portfolio_objective_function!(model, MinimumRisk(), ret, rb.opt.cobj, rb, pr)
     retcode, sol = optimise_JuMP_model!(model, rb, eltype(pr.X))
-    return RiskBudgetingResult(typeof(rb),
-                               ProcessedJuMPOptimiserAttributes(pr, wb, lt, st, lcsr, ctr,
-                                                                gcardr, sgcardr, smtx,
-                                                                sgmtx, slt, sst, sglt, sgst,
-                                                                tn, fees, plr, ret), prb,
-                               retcode, sol, ifelse(save, model, nothing), nothing)
+    return RiskBudgetingResult(typeof(rb), attrs, prb, retcode, sol,
+                               ifelse(save, model, nothing), nothing)
 end
 """
     optimise(rb::RiskBudgeting{<:Any, <:Any, <:Any, <:Any, Nothing},

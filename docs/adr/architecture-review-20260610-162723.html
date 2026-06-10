@@ -1,0 +1,486 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Architecture review — PortfolioOptimisers.jl</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="module">
+      import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+      mermaid.initialize({ startOnLoad: true, theme: "neutral", securityLevel: "loose" });
+    </script>
+    <style>
+      .seam { stroke-dasharray: 5 4; }
+      .deep { background: linear-gradient(135deg, #0f172a, #1e293b); }
+      .faded { opacity: .38; }
+      .chip { font-size: .65rem; letter-spacing: .08em; }
+      .schem { font-size: .6rem; letter-spacing: .12em; text-transform: uppercase; }
+      .copybox { background: repeating-linear-gradient(135deg,#fff,#fff 9px,#f1f5f9 9px,#f1f5f9 18px); }
+    </style>
+  </head>
+  <body class="bg-stone-50 text-slate-900 font-sans antialiased">
+    <main class="max-w-5xl mx-auto px-6 py-12 space-y-14">
+      <!-- HEADER -->
+      <header class="space-y-5">
+        <p class="text-xs uppercase tracking-[0.2em] text-slate-500">Architecture review</p>
+        <h1 class="text-4xl font-serif tracking-tight">PortfolioOptimisers.jl — deepening opportunities</h1>
+        <p class="text-sm text-slate-500">2026-06-10 · branch <code class="text-indigo-700">dev-improve-arch</code> · ~89k LOC / 172 files · informed by <code>CONTEXT.md</code> and ADRs 0001–0005</p>
+        <div class="flex flex-wrap gap-4 text-xs text-slate-600 border-t border-b border-slate-200 py-3">
+          <span class="flex items-center gap-2"><span class="inline-block w-5 h-4 border-2 border-slate-700 bg-white"></span> module</span>
+          <span class="flex items-center gap-2"><svg width="34" height="10"><line x1="0" y1="5" x2="34" y2="5" class="seam" stroke="#475569" stroke-width="2"/></svg> seam</span>
+          <span class="flex items-center gap-2"><svg width="34" height="10"><line x1="0" y1="5" x2="34" y2="5" stroke="#dc2626" stroke-width="2"/></svg> leakage / duplication</span>
+          <span class="flex items-center gap-2"><span class="inline-block w-5 h-4 deep"></span> deep module</span>
+        </div>
+        <p class="text-sm text-slate-700 leading-relaxed max-w-3xl">
+          Five candidates, ranked. Each turns a cluster of <strong>shallow</strong> modules — interface nearly as
+          wide as the implementation — into one <strong>deep</strong> module: more behaviour behind a smaller
+          interface, so changes, bugs, and tests concentrate in one place. The verified centrepiece is the
+          duplicated JuMP model-assembly pipeline. None of these contradict ADRs 0001–0005; two of them
+          <em>extend</em> the philosophy of ADR&nbsp;0001.
+        </p>
+      </header>
+
+      <section id="candidates" class="space-y-12">
+
+        <!-- ============ CANDIDATE 1 ============ -->
+        <article id="c1" class="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+          <div class="px-7 pt-7 pb-5 space-y-4">
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="chip uppercase font-semibold px-2 py-1 rounded bg-emerald-600 text-white">Strong</span>
+              <span class="chip uppercase font-semibold px-2 py-1 rounded bg-slate-200 text-slate-700">in-process</span>
+              <span class="chip uppercase px-2 py-1 rounded bg-indigo-50 text-indigo-700">verified</span>
+            </div>
+            <h2 class="text-2xl font-serif">1 · Collapse the JuMP model-assembly pipeline</h2>
+            <p class="font-mono text-sm text-slate-500">20_Optimisation/11_MeanRisk.jl · 14_RiskBudgeting.jl · 12_FactorRiskContribution.jl · 13_NearOptimalCentering.jl · 15_RelaxedRiskBudgeting.jl</p>
+          </div>
+
+          <!-- before / after -->
+          <div class="grid md:grid-cols-2 gap-px bg-slate-200 border-y border-slate-200">
+            <!-- BEFORE -->
+            <div class="bg-white p-6">
+              <p class="schem text-slate-400 mb-4">Before — pipeline copy-pasted per optimiser</p>
+              <div class="flex gap-3 justify-center">
+                <!-- three near-identical columns -->
+                <div class="copybox border-2 border-red-300 rounded-md p-2 w-28">
+                  <p class="schem text-center text-red-600 mb-1">MeanRisk</p>
+                  <div class="space-y-[3px] text-[9px] leading-tight text-slate-600">
+                    <p class="text-emerald-700 font-semibold">set_w + bounds</p>
+                    <p>linear ×2</p><p>mip / smip</p><p>turnover</p><p>tracking</p><p>nea</p><p>l1/l2/linf/lp</p><p>fees</p><p>risk</p><p>scalarise</p><p>returns</p><p>phylogeny</p><p>custom</p>
+                    <p class="text-emerald-700 font-semibold">obj + solve</p>
+                  </div>
+                </div>
+                <div class="copybox border-2 border-red-300 rounded-md p-2 w-28">
+                  <p class="schem text-center text-red-600 mb-1">RiskBudget</p>
+                  <div class="space-y-[3px] text-[9px] leading-tight text-slate-600">
+                    <p class="text-emerald-700 font-semibold">rb constraints</p>
+                    <p>linear ×2</p><p>mip / smip</p><p>turnover</p><p>tracking</p><p>nea</p><p>l1/l2/linf/lp</p><p>fees</p><p>risk</p><p>scalarise</p><p>returns</p><p>phylogeny</p><p>custom</p>
+                    <p class="text-emerald-700 font-semibold">obj + solve</p>
+                  </div>
+                </div>
+                <div class="copybox border-2 border-red-300 rounded-md p-2 w-28">
+                  <p class="schem text-center text-red-600 mb-1">FRC / NOC</p>
+                  <div class="space-y-[3px] text-[9px] leading-tight text-slate-600">
+                    <p class="text-emerald-700 font-semibold">frc constraints</p>
+                    <p>linear ×2</p><p>mip / smip</p><p>turnover</p><p>tracking</p><p>nea</p><p>l1/l2/linf/lp</p><p>fees</p><p>risk</p><p>scalarise</p><p>returns</p><p>phylogeny</p><p>custom</p>
+                    <p class="text-emerald-700 font-semibold">obj + solve</p>
+                  </div>
+                </div>
+              </div>
+              <p class="text-[11px] text-slate-500 mt-4 text-center">~18 of ~22 build steps are <span class="text-red-600 font-semibold">byte-identical</span> across columns. Only the green caps differ.</p>
+            </div>
+            <!-- AFTER -->
+            <div class="bg-white p-6">
+              <p class="schem text-slate-400 mb-4">After — one deep assembler, three thin hooks</p>
+              <div class="flex flex-col items-center gap-3">
+                <div class="flex gap-2">
+                  <div class="border border-emerald-400 bg-emerald-50 rounded px-2 py-1 text-[9px] text-emerald-800">head: w-shaping</div>
+                  <div class="border border-emerald-400 bg-emerald-50 rounded px-2 py-1 text-[9px] text-emerald-800">objective</div>
+                  <div class="border border-emerald-400 bg-emerald-50 rounded px-2 py-1 text-[9px] text-emerald-800">solve tail</div>
+                </div>
+                <svg width="160" height="22"><line x1="80" y1="0" x2="80" y2="22" stroke="#64748b" stroke-width="1.5"/><polygon points="76,14 84,14 80,22" fill="#64748b"/></svg>
+                <div class="deep rounded-lg p-5 w-72 text-center shadow-lg">
+                  <p class="schem text-slate-300 mb-1">deep module</p>
+                  <p class="text-white font-semibold text-sm">assemble_jump_model!</p>
+                  <div class="mt-3 grid grid-cols-2 gap-[3px] text-[8px] text-slate-400 faded">
+                    <p>linear</p><p>mip/smip</p><p>turnover</p><p>tracking</p><p>nea</p><p>regularisation</p><p>fees</p><p>risk+scalarise</p><p>returns</p><p>phylogeny</p><p>custom</p><p>...</p>
+                  </div>
+                </div>
+                <p class="text-[11px] text-slate-500 text-center">Optimisers inject 3 hooks. The 14-step middle lives once.</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="px-7 py-6 grid md:grid-cols-2 gap-6">
+            <div class="space-y-4">
+              <div>
+                <p class="schem text-slate-400 mb-1">Problem</p>
+                <p class="text-sm text-slate-700">Every JuMP optimiser re-writes the same constraint-ordering sequence inline; the assembly is not a module, so it has no interface to test or change in one place.</p>
+              </div>
+              <div>
+                <p class="schem text-slate-400 mb-1">Solution</p>
+                <p class="text-sm text-slate-700">Lift the shared middle into one <code>assemble_jump_model!</code> module. Each optimiser supplies three thin hooks: how weights are shaped (<code>set_w!</code> vs <code>set_risk_budgeting_constraints!</code> vs <code>set_factor_risk_contribution_constraints!</code>), the objective, and the solve/finalise tail.</p>
+              </div>
+            </div>
+            <div class="space-y-3">
+              <div>
+                <p class="schem text-slate-400 mb-1">Evidence</p>
+                <p class="text-xs text-slate-600 font-mono leading-relaxed">11_MeanRisk.jl:631–656 and 14_RiskBudgeting.jl:688–713 — same 18 calls, same order. FRC (12:299–341) &amp; NOC (13:1018–1104) repeat it again with their own head/tail.</p>
+              </div>
+              <div>
+                <p class="schem text-slate-400 mb-1">Wins</p>
+                <ul class="text-sm text-slate-700 space-y-1 list-disc list-inside">
+                  <li>locality: constraint order lives once</li>
+                  <li>leverage: one interface, N optimisers</li>
+                  <li>new constraint type → edit one module</li>
+                  <li>interface testable without a solver: assert the built model, don't solve it</li>
+                  <li>meta-optimisers reuse the same assembler</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+          <div class="px-7 pb-6">
+            <div class="bg-indigo-50 border border-indigo-200 rounded-md px-4 py-3 text-xs text-indigo-900">
+              <strong>Complements ADR 0004/0005.</strong> The typed model-state interface (<code>get_w</code>, <code>get_k</code>, prefix-namespaced risk state) is the <em>accessor</em> behind each step; this candidate is the <em>orchestration</em> on top. The seam this opens is exactly where ADR 0004 said builders "just know" the population order — assembly makes that order a single named interface.
+            </div>
+          </div>
+        </article>
+
+        <!-- ============ CANDIDATE 2 ============ -->
+        <article id="c2" class="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+          <div class="px-7 pt-7 pb-5 space-y-4">
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="chip uppercase font-semibold px-2 py-1 rounded bg-amber-500 text-white">Worth exploring</span>
+              <span class="chip uppercase font-semibold px-2 py-1 rounded bg-slate-200 text-slate-700">in-process</span>
+              <span class="chip uppercase px-2 py-1 rounded bg-indigo-50 text-indigo-700">verified</span>
+            </div>
+            <h2 class="text-2xl font-serif">2 · Let each risk measure classify itself — retire the <code>expected_risk</code> union registry</h2>
+            <p class="font-mono text-sm text-slate-500">19_RiskMeasures/26_ExpectedRisk.jl</p>
+          </div>
+
+          <div class="grid md:grid-cols-2 gap-px bg-slate-200 border-y border-slate-200">
+            <!-- BEFORE -->
+            <div class="bg-white p-6">
+              <p class="schem text-slate-400 mb-4">Before — central hand-curated type lists</p>
+              <div class="space-y-2">
+                <div class="border-2 border-red-300 rounded p-3">
+                  <p class="schem text-red-600 mb-1">26_ExpectedRisk.jl</p>
+                  <div class="text-[10px] font-mono text-slate-600 space-y-1">
+                    <p>ERkNetRet = Union{ 36 types… }</p>
+                    <p>ERkwXFees = Union{ 9 types… }</p>
+                    <p>ERkw&nbsp;&nbsp;&nbsp;&nbsp; = Union{ 6 types… }</p>
+                    <p>SlvRM&nbsp;&nbsp;&nbsp; = Union{ 8 types… }</p>
+                  </div>
+                </div>
+                <div class="flex justify-center"><svg width="20" height="26"><line x1="10" y1="0" x2="10" y2="26" stroke="#dc2626" class="seam" stroke-width="1.5"/></svg></div>
+                <div class="grid grid-cols-4 gap-1">
+                  <div class="border border-slate-300 rounded text-[8px] text-center py-1 text-slate-500">CVaR</div>
+                  <div class="border border-slate-300 rounded text-[8px] text-center py-1 text-slate-500">EVaR</div>
+                  <div class="border border-slate-300 rounded text-[8px] text-center py-1 text-slate-500">MDD</div>
+                  <div class="border border-red-400 rounded text-[8px] text-center py-1 text-red-600 font-semibold">new ?</div>
+                </div>
+                <p class="text-[11px] text-red-600 mt-2">A new measure must be hand-added to the right Union far away. Miss it → silent fallback to <code>r(w, X)</code>, wrong answer, no error.</p>
+              </div>
+            </div>
+            <!-- AFTER -->
+            <div class="bg-white p-6">
+              <p class="schem text-slate-400 mb-4">After — classification stated at the definition site</p>
+              <div class="grid grid-cols-3 gap-2">
+                <div class="deep rounded p-2 text-center">
+                  <p class="schem text-slate-400">CVaR</p>
+                  <p class="text-[9px] text-emerald-300 mt-1">net_returns</p>
+                </div>
+                <div class="deep rounded p-2 text-center">
+                  <p class="schem text-slate-400">EVaR</p>
+                  <p class="text-[9px] text-emerald-300 mt-1">solver</p>
+                </div>
+                <div class="deep rounded p-2 text-center">
+                  <p class="schem text-slate-400">Variance</p>
+                  <p class="text-[9px] text-emerald-300 mt-1">weights</p>
+                </div>
+              </div>
+              <div class="mt-4 border border-emerald-400 bg-emerald-50 rounded p-3 text-center">
+                <p class="text-[11px] text-emerald-800"><code>expected_risk</code> dispatches on one trait:<br><code class="text-[10px]">risk_input_kind(::RiskMeasure)</code></p>
+              </div>
+              <p class="text-[11px] text-slate-500 mt-3">Each measure declares its own input shape. Adding a measure touches only its own file. A missing declaration is a method error, not a wrong number.</p>
+            </div>
+          </div>
+
+          <div class="px-7 py-6 grid md:grid-cols-2 gap-6">
+            <div class="space-y-4">
+              <div>
+                <p class="schem text-slate-400 mb-1">Problem</p>
+                <p class="text-sm text-slate-700">Whether a measure needs net returns, raw weights, or a solver is a fact <em>about that measure</em>, but it's recorded in four ever-growing <code>Union</code> aliases in a distant file. The interface to "compute risk" leaks the full census of measures.</p>
+              </div>
+              <div>
+                <p class="schem text-slate-400 mb-1">Solution</p>
+                <p class="text-sm text-slate-700">Replace the unions with a single trait method each measure answers (<code>risk_input_kind</code>). <code>expected_risk</code> dispatches on the trait. The catch-all fallback becomes an explicit, loud error.</p>
+              </div>
+            </div>
+            <div class="space-y-3">
+              <div>
+                <p class="schem text-slate-400 mb-1">Evidence</p>
+                <p class="text-xs text-slate-600 font-mono leading-relaxed">26_ExpectedRisk.jl:25–124 — ERkNetRet lists 36 types by hand; ERkwXFees/ERkw/SlvRM add ~23 more. Line ~231 silently routes unregistered measures to <code>expected_risk(r, w, pr.X)</code>.</p>
+              </div>
+              <div>
+                <p class="schem text-slate-400 mb-1">Wins</p>
+                <ul class="text-sm text-slate-700 space-y-1 list-disc list-inside">
+                  <li>locality: a measure's I/O shape lives with the measure</li>
+                  <li>silent-fallback bug becomes a method error</li>
+                  <li>no distant edit when adding a measure</li>
+                  <li>interface stops enumerating every measure</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+          <div class="px-7 pb-6">
+            <div class="bg-emerald-50 border border-emerald-200 rounded-md px-4 py-3 text-xs text-emerald-900">
+              <strong>Extends ADR 0001/0002.</strong> ADR 0001 chose explicit <code>@prop</code> field tagging over central type-dispatch because "the domain decision cannot be recovered from types alone — it must be stated at the definition site." The union registry is the same decision made in the wrong place. This candidate moves it <em>to</em> the definition site, exactly as <code>@prop</code> did for factory fields.
+            </div>
+          </div>
+        </article>
+
+        <!-- ============ CANDIDATE 3 ============ -->
+        <article id="c3" class="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+          <div class="px-7 pt-7 pb-5 space-y-4">
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="chip uppercase font-semibold px-2 py-1 rounded bg-amber-500 text-white">Worth exploring</span>
+              <span class="chip uppercase font-semibold px-2 py-1 rounded bg-slate-200 text-slate-700">in-process</span>
+              <span class="chip uppercase px-2 py-1 rounded bg-indigo-50 text-indigo-700">verified</span>
+            </div>
+            <h2 class="text-2xl font-serif">3 · One windowing adapter, not five</h2>
+            <p class="font-mono text-sm text-slate-500">08_Moments/28_WindowedExpectedReturns · 29_WindowedCovariance · 30_WindowedVariance · 31_WindowedCoskewness · 32_WindowedCokurtosis</p>
+          </div>
+
+          <div class="grid md:grid-cols-2 gap-px bg-slate-200 border-y border-slate-200">
+            <div class="bg-white p-6">
+              <p class="schem text-slate-400 mb-4">Before — same dance, redefined per moment</p>
+              <div class="space-y-2">
+                <div class="grid grid-cols-5 gap-1 text-center">
+                  <div class="border-2 border-red-300 rounded text-[8px] py-1">W·Cov</div>
+                  <div class="border-2 border-red-300 rounded text-[8px] py-1">W·Var</div>
+                  <div class="border-2 border-red-300 rounded text-[8px] py-1">W·μ</div>
+                  <div class="border-2 border-red-300 rounded text-[8px] py-1">W·Cosk</div>
+                  <div class="border-2 border-red-300 rounded text-[8px] py-1">W·Cokurt</div>
+                </div>
+                <div class="copybox border border-slate-300 rounded p-3 text-[10px] font-mono text-slate-600 leading-relaxed">
+                  window = get_window(...)<br>
+                  X, w = moment_window_and_weights(...)<br>
+                  ce = factory(ce.ce, w)<br>
+                  delegate(ce, X; iv-slice…)
+                </div>
+                <p class="text-[11px] text-red-600">Four identical lines, written five times (and twice each, for <code>cov</code> &amp; <code>cor</code>). Adding a sixth moment means a sixth copy.</p>
+              </div>
+            </div>
+            <div class="bg-white p-6">
+              <p class="schem text-slate-400 mb-4">After — windowing wraps any estimator once</p>
+              <div class="flex flex-col items-center gap-3">
+                <div class="deep rounded-lg p-4 w-60 text-center shadow">
+                  <p class="schem text-slate-400 mb-1">deep adapter</p>
+                  <p class="text-white text-sm font-semibold">Windowed(inner)</p>
+                  <p class="text-[9px] text-slate-400 mt-2 faded">get_window · slice · factory · delegate</p>
+                </div>
+                <svg width="200" height="20"><line x1="100" y1="0" x2="100" y2="10" stroke="#64748b"/><line x1="30" y1="10" x2="170" y2="10" stroke="#64748b"/><line x1="30" y1="10" x2="30" y2="20" stroke="#64748b"/><line x1="100" y1="10" x2="100" y2="20" stroke="#64748b"/><line x1="170" y1="10" x2="170" y2="20" stroke="#64748b"/></svg>
+                <div class="flex gap-2 text-[8px] text-center text-slate-500">
+                  <div class="border border-slate-300 rounded px-2 py-1">any cov</div>
+                  <div class="border border-slate-300 rounded px-2 py-1">any μ</div>
+                  <div class="border border-slate-300 rounded px-2 py-1">any tensor</div>
+                </div>
+                <p class="text-[11px] text-slate-500 text-center">Slice-and-delegate is the deep part; it sits once. The moment kind is a parameter, not a new type.</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="px-7 py-6 grid md:grid-cols-2 gap-6">
+            <div class="space-y-4">
+              <div>
+                <p class="schem text-slate-400 mb-1">Problem</p>
+                <p class="text-sm text-slate-700">Windowing — pick observations, re-weight, delegate — is one behaviour, but it's re-implemented as five near-identical decorator types, each with duplicated <code>cov</code>/<code>cor</code> bodies.</p>
+              </div>
+              <div>
+                <p class="schem text-slate-400 mb-1">Solution</p>
+                <p class="text-sm text-slate-700">One <code>Windowed</code> adapter parameterised by its inner estimator. The slice-and-delegate logic lives once; <code>moment_view</code>/<code>factory</code> forward through generically.</p>
+              </div>
+            </div>
+            <div class="space-y-3">
+              <div>
+                <p class="schem text-slate-400 mb-1">Evidence</p>
+                <p class="text-xs text-slate-600 font-mono leading-relaxed">29_WindowedCovariance.jl:152–197 — <code>cov</code> and <code>cor</code> are the same body twice. 30/31/32 repeat it for Variance, Coskewness, Cokurtosis; 28 for ExpectedReturns.</p>
+              </div>
+              <div>
+                <p class="schem text-slate-400 mb-1">Wins</p>
+                <ul class="text-sm text-slate-700 space-y-1 list-disc list-inside">
+                  <li>interface shrinks five types to one</li>
+                  <li>locality: windowing edited in one body</li>
+                  <li>leverage: works for any future moment</li>
+                  <li>one test exercises the seam for all</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+          <div class="px-7 pb-6">
+            <div class="bg-amber-50 border border-amber-200 rounded-md px-4 py-3 text-xs text-amber-900">
+              <strong>Deletion test, honestly.</strong> Deleting a Windowed type pushes the slice-and-delegate dance onto callers — so each one <em>is</em> earning its keep; it is a decorator, not a pass-through. The friction is not shallowness but five-fold duplication of one deep behaviour. The collapse is a leverage/locality win, not a deletion.
+            </div>
+          </div>
+        </article>
+
+        <!-- ============ CANDIDATE 4 ============ -->
+        <article id="c4" class="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+          <div class="px-7 pt-7 pb-5 space-y-4">
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="chip uppercase font-semibold px-2 py-1 rounded bg-amber-500 text-white">Worth exploring</span>
+              <span class="chip uppercase font-semibold px-2 py-1 rounded bg-slate-200 text-slate-700">in-process</span>
+            </div>
+            <h2 class="text-2xl font-serif">4 · One matrix-post-processing decorator for covariance</h2>
+            <p class="font-mono text-sm text-slate-500">08_Moments/12_DenoiseCovariance · 13_DetoneCovariance · 14_ProcessedCovariance · vs · 05_Denoise · 06_Detone · 07_MatrixProcessing</p>
+          </div>
+
+          <div class="rounded-lg border border-slate-200 bg-white m-6 p-4">
+            <pre class="mermaid">
+flowchart LR
+  subgraph wrappers["08_Moments wrappers — duplicate orchestration"]
+    DN[DenoiseCovariance]
+    DT[DetoneCovariance]
+    PC[ProcessedCovariance]
+  end
+  subgraph algs["standalone matrix processing"]
+    D5[05_Denoise]
+    D6[06_Detone]
+    D7[07_MatrixProcessing]
+  end
+  DN -. "dims-check + transpose + posdef! + denoise!" .-> D5
+  DT -. "dims-check + transpose + posdef! + detone!" .-> D6
+  PC -. "dims-check + transpose + posdef! + process" .-> D7
+  classDef leak stroke:#dc2626,stroke-width:2px,fill:#fff;
+  class DN,DT,PC leak
+            </pre>
+            <p class="text-[11px] text-slate-500 mt-2 text-center">Each wrapper re-implements the same <span class="text-red-600">cov → ensure-mutable → posdef! → process</span> seam. <code>07_MatrixProcessing</code> already composes denoise+detone+posdef in a configurable order — the wrappers duplicate a slice of it.</p>
+          </div>
+
+          <div class="px-7 pb-2 grid md:grid-cols-2 gap-6">
+            <div class="space-y-4">
+              <div>
+                <p class="schem text-slate-400 mb-1">Problem</p>
+                <p class="text-sm text-slate-700">Three covariance wrappers each hand-roll the same "estimate, then post-process the matrix" orchestration that <code>07_MatrixProcessing</code> already owns — the post-processing seam leaks into 08_Moments three times.</p>
+              </div>
+              <div>
+                <p class="schem text-slate-400 mb-1">Solution</p>
+                <p class="text-sm text-slate-700">One <code>ProcessedCovariance(inner, matrix_processing)</code> adapter that estimates then defers to the existing <code>07_MatrixProcessing</code> order. Denoise-only / detone-only become configurations, not separate types.</p>
+              </div>
+            </div>
+            <div class="space-y-3">
+              <div>
+                <p class="schem text-slate-400 mb-1">Evidence</p>
+                <p class="text-xs text-slate-600 font-mono leading-relaxed">12_DenoiseCovariance.jl:170–182 — <code>cov</code> does dims-check, transpose, <code>Matrix()</code>, <code>posdef!</code>, <code>denoise!</code> by hand; 13/14 repeat with detone/process. 07_MatrixProcessing.jl already sequences all three.</p>
+              </div>
+              <div>
+                <p class="schem text-slate-400 mb-1">Wins</p>
+                <ul class="text-sm text-slate-700 space-y-1 list-disc list-inside">
+                  <li>post-processing seam crossed once</li>
+                  <li>locality: order logic lives in 07 only</li>
+                  <li>denoise/detone/custom freely composable</li>
+                  <li>two adapters justify the seam (cov + raw matrix)</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+          <div class="px-7 py-6"></div>
+        </article>
+
+        <!-- ============ CANDIDATE 5 ============ -->
+        <article id="c5" class="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+          <div class="px-7 pt-7 pb-5 space-y-4">
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="chip uppercase font-semibold px-2 py-1 rounded bg-slate-500 text-white">Speculative</span>
+              <span class="chip uppercase font-semibold px-2 py-1 rounded bg-slate-200 text-slate-700">in-process</span>
+            </div>
+            <h2 class="text-2xl font-serif">5 · Lift the per-measure settings &amp; bounds plumbing behind one interface</h2>
+            <p class="font-mono text-sm text-slate-500">20_Optimisation/19_RiskMeasureConstraints/01_BaseRiskConstraints.jl · 02_VarianceConstraints.jl (+ ~20 measure files)</p>
+          </div>
+
+          <!-- mass diagram -->
+          <div class="grid md:grid-cols-2 gap-px bg-slate-200 border-y border-slate-200">
+            <div class="bg-white p-6">
+              <p class="schem text-slate-400 mb-4">Before — interface as tall as implementation</p>
+              <div class="flex items-end gap-4 justify-center h-44">
+                <div class="text-center">
+                  <div class="flex items-end gap-1">
+                    <div class="w-10 bg-red-300 rounded-t" style="height:140px"></div>
+                    <div class="w-10 bg-slate-700 rounded-t" style="height:150px"></div>
+                  </div>
+                  <p class="schem mt-2 text-slate-500">one measure</p>
+                </div>
+              </div>
+              <div class="flex justify-center gap-6 text-[10px] text-slate-500 mt-1">
+                <span><span class="inline-block w-3 h-3 bg-red-300"></span> interface (settings, bounds, weight-select)</span>
+                <span><span class="inline-block w-3 h-3 bg-slate-700"></span> impl</span>
+              </div>
+              <p class="text-[11px] text-slate-500 mt-3">Each measure repeats <code>nothing_scalar_array_selector</code> + <code>get_observation_weights</code> and ends with <code>set_risk_bounds_and_expression!</code>. The variance-named <code>variance_risk_bounds_val</code> is called generically by Kurtosis, Skewness, Tracking.</p>
+            </div>
+            <div class="bg-white p-6">
+              <p class="schem text-slate-400 mb-4">After — thin interface, behaviour absorbed</p>
+              <div class="flex items-end gap-4 justify-center h-44">
+                <div class="text-center">
+                  <div class="flex items-end gap-1">
+                    <div class="w-10 bg-emerald-300 rounded-t" style="height:38px"></div>
+                    <div class="w-10 bg-slate-700 rounded-t" style="height:150px"></div>
+                  </div>
+                  <p class="schem mt-2 text-slate-500">one measure</p>
+                </div>
+              </div>
+              <p class="text-[11px] text-slate-500 mt-3">Each measure declares only its risk expression. Weight-selection and bound-transform (renamed off "variance") move into the shared <code>set_risk_bounds_and_expression!</code> entry, called once per measure with no setup.</p>
+            </div>
+          </div>
+
+          <div class="px-7 py-6 grid md:grid-cols-2 gap-6">
+            <div class="space-y-4">
+              <div>
+                <p class="schem text-slate-400 mb-1">Problem</p>
+                <p class="text-sm text-slate-700">The settings/scale/bounds/weight-selection plumbing is copied into the head and tail of ~20 measure constraint builders; a variance-named bounds transform is reused generically, a leaky name.</p>
+              </div>
+              <div>
+                <p class="schem text-slate-400 mb-1">Why speculative</p>
+                <p class="text-sm text-slate-700">Some of this overlaps candidate 1's spirit and may be better tackled after it. The bound transform genuinely varies per measure (sqrt for SOC, identity for quantile), so the seam must stay configurable — risk of over-abstracting.</p>
+              </div>
+            </div>
+            <div class="space-y-3">
+              <div>
+                <p class="schem text-slate-400 mb-1">Evidence</p>
+                <p class="text-xs text-slate-600 font-mono leading-relaxed">71 calls to <code>set_risk_bounds_and_expression!</code> across 20 files; <code>variance_risk_bounds_val</code> (02_VarianceConstraints.jl:435–454) called from Kurtosis/Skewness/Tracking; <code>nothing_scalar_array_selector</code>+<code>get_observation_weights</code> repeated ~15×.</p>
+              </div>
+              <div>
+                <p class="schem text-slate-400 mb-1">Wins</p>
+                <ul class="text-sm text-slate-700 space-y-1 list-disc list-inside">
+                  <li>interface shrinks; impl absorbs plumbing</li>
+                  <li>bound transform gets a measure-neutral name</li>
+                  <li>weight-selection defined once</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </article>
+
+      </section>
+
+      <!-- TOP RECOMMENDATION -->
+      <section id="top-recommendation">
+        <div class="deep rounded-xl p-8 text-white shadow-lg">
+          <p class="schem text-emerald-300 mb-2">Top recommendation</p>
+          <h2 class="text-2xl font-serif mb-3">Start with <a href="#c1" class="underline decoration-emerald-400">candidate 1 — collapse the JuMP model-assembly pipeline</a>.</h2>
+          <p class="text-sm text-slate-300 leading-relaxed max-w-3xl">
+            It is the only candidate verified line-for-line as duplicated rather than merely repetitive: MeanRisk and
+            RiskBudgeting build the identical 18-step model, and FRC/NOC repeat it. It is pure in-process work, so the
+            new module is tested directly by inspecting the assembled model — no solver in the loop. It sits cleanly on
+            top of the ADR 0004/0005 typed model-state interface, and it unlocks candidate 5 and the meta-optimiser
+            cleanup. Highest locality and leverage per unit of risk.
+          </p>
+          <p class="text-xs text-slate-400 mt-4">Next-best independent win: candidate 2 — it is small, self-contained, removes a silent-fallback bug class, and continues the ADR 0001 "decide at the definition site" philosophy.</p>
+        </div>
+      </section>
+
+      <footer class="text-xs text-slate-400 text-center pt-4">
+        Vocabulary per the architecture glossary: module · interface · implementation · depth · seam · adapter · leverage · locality. Domain terms per CONTEXT.md.
+      </footer>
+    </main>
+  </body>
+</html>
