@@ -189,4 +189,8 @@ function (::RelativeUlcerIndex)(x::VecNum)
     return LinearAlgebra.norm(dd, 2) / sqrt(length(x))
 end
 
+# Expected-risk input kind — see `risk_input_kind`.
+risk_input_kind(::UlcerIndex) = NetReturnsInput()
+risk_input_kind(::RelativeUlcerIndex) = NetReturnsInput()
+
 export UlcerIndex, RelativeUlcerIndex

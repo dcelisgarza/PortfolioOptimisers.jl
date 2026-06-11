@@ -495,4 +495,8 @@ function (r::VarianceSkewKurtosis)(w::VecNum, X::MatNum, fees::Option{<:VecNum} 
            r.kt(w, X, fees) * r.kt.settings.scale
 end
 
+# Expected-risk input kind — see `risk_input_kind`.
+risk_input_kind(::Skewness) = WeightsReturnsFeesInput()
+risk_input_kind(::VarianceSkewKurtosis) = WeightsReturnsFeesInput()
+
 export MaxRiskMeasureSettings, Skewness, VarianceSkewKurtosis

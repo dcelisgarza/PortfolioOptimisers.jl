@@ -71,6 +71,76 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
+Abstract supertype for the input-shape classification of a risk measure, used by [`expected_risk`](@ref) to decide what to feed a measure's functor.
+
+Each concrete [`AbstractBaseRiskMeasure`](@ref) declares its kind via [`risk_input_kind`](@ref). The three kinds correspond to the three functor call shapes:
+
+  - [`NetReturnsInput`](@ref): `r(calc_net_returns(w, X, fees))`.
+  - [`WeightsReturnsFeesInput`](@ref): `r(w, X, fees)`.
+  - [`WeightsInput`](@ref): `r(w)`.
+
+# Related
+
+  - [`risk_input_kind`](@ref)
+  - [`expected_risk`](@ref)
+"""
+abstract type RiskInputKind end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Input kind for risk measures whose expected risk is computed on net returns (returns after fees). The measure's functor is called as `r(calc_net_returns(w, X, fees))`.
+
+# Related
+
+  - [`RiskInputKind`](@ref)
+  - [`risk_input_kind`](@ref)
+  - [`calc_net_returns`](@ref)
+"""
+struct NetReturnsInput <: RiskInputKind end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Input kind for risk measures whose expected risk depends on weights, the returns matrix, and fees. The measure's functor is called as `r(w, X, fees)`.
+
+# Related
+
+  - [`RiskInputKind`](@ref)
+  - [`risk_input_kind`](@ref)
+"""
+struct WeightsReturnsFeesInput <: RiskInputKind end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Input kind for risk measures whose expected risk depends only on portfolio weights. The measure's functor is called as `r(w)`.
+
+# Related
+
+  - [`RiskInputKind`](@ref)
+  - [`risk_input_kind`](@ref)
+"""
+struct WeightsInput <: RiskInputKind end
+"""
+    risk_input_kind(r::AbstractBaseRiskMeasure) -> RiskInputKind
+
+Return the [`RiskInputKind`](@ref) of risk measure `r`, declaring what its functor consumes when [`expected_risk`](@ref) evaluates it.
+
+There is no default: every concrete [`AbstractBaseRiskMeasure`](@ref) (other than composite measures handled by explicit `expected_risk` methods) must declare its kind beside its type definition. Returning one of [`NetReturnsInput`](@ref), [`WeightsReturnsFeesInput`](@ref), or [`WeightsInput`](@ref). An undeclared measure throws, rather than silently routing to the wrong input shape.
+
+# Returns
+
+  - `RiskInputKind`: the declared input kind.
+
+# Related
+
+  - [`RiskInputKind`](@ref)
+  - [`expected_risk`](@ref)
+"""
+function risk_input_kind(r::AbstractBaseRiskMeasure)
+    throw(ArgumentError("`risk_input_kind` is not defined for `$(typeof(r))`. Every concrete `AbstractBaseRiskMeasure` must declare its input kind beside its definition by adding a method returning one of `NetReturnsInput()`, `WeightsReturnsFeesInput()`, or `WeightsInput()`."))
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
 Abstract supertype for risk measures that are not intended for use in portfolio optimisation routines.
 
 These risk measures are typically used for analysis, reporting, or diagnostics, and are not designed to be included as objectives or constraints in optimisation problems. Subtype this when implementing a risk measure that should not be selectable by optimisation algorithms.

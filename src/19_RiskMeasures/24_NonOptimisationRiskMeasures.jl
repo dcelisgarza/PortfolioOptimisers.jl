@@ -453,4 +453,8 @@ function (r::ThirdCentralMoment{<:DynamicAbstractWeights})(w::VecNum, X::MatNum,
     return ThirdCentralMoment(; w = get_observation_weights(r.w, X), mu = r.mu)(w, X, fees)
 end
 
+# Expected-risk input kind — see `risk_input_kind`.
+risk_input_kind(::MeanReturn) = NetReturnsInput()
+risk_input_kind(::ThirdCentralMoment) = WeightsReturnsFeesInput()
+
 export MeanReturn, ThirdCentralMoment, MeanReturnRiskRatio

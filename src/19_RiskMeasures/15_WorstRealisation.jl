@@ -76,4 +76,7 @@ function (::WorstRealisation)(x::VecNum)
     return -minimum(x)
 end
 
+# Expected-risk input kind — see `risk_input_kind`.
+risk_input_kind(::WorstRealisation) = NetReturnsInput()
+
 export WorstRealisation

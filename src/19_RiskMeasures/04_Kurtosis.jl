@@ -332,4 +332,7 @@ function risk_measure_view(r::Kurtosis, i, args...)::Kurtosis
                     alg1 = r.alg1, alg2 = r.alg2)
 end
 
+# Expected-risk input kind — see `risk_input_kind`.
+risk_input_kind(::Kurtosis) = WeightsReturnsFeesInput()
+
 export Kurtosis

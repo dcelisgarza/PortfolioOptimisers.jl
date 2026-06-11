@@ -1381,6 +1381,10 @@ for rt in (LowOrderMoment, HighOrderMoment)
          end)
 end
 
+# Expected-risk input kind — see `risk_input_kind`.
+risk_input_kind(::LowOrderMoment) = WeightsReturnsFeesInput()
+risk_input_kind(::HighOrderMoment) = WeightsReturnsFeesInput()
+
 export FirstLowerMoment, SecondMoment, MeanAbsoluteDeviation, ThirdLowerMoment,
        FourthMoment, StandardisedHighOrderMoment, LowOrderMoment, HighOrderMoment,
        EvenMoment

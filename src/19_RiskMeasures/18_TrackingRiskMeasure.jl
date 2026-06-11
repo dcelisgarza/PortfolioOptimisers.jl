@@ -542,4 +542,8 @@ Union of tracking risk measures used for dispatch on factory methods and expecte
 """
 const TrRM = Union{<:TrackingRiskMeasure, <:RiskTrackingRiskMeasure}
 
+# Expected-risk input kind — see `risk_input_kind`.
+risk_input_kind(::TrackingRiskMeasure) = WeightsReturnsFeesInput()
+risk_input_kind(::RiskTrackingRiskMeasure) = WeightsReturnsFeesInput()
+
 export TrackingRiskMeasure, RiskTrackingRiskMeasure, RiskTrackingError

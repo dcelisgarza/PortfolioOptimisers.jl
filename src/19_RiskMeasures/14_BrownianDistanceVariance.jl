@@ -170,5 +170,8 @@ function (::BrownianDistanceVariance)(x::VecNum)
     return val
 end
 
+# Expected-risk input kind — see `risk_input_kind`.
+risk_input_kind(::BrownianDistanceVariance) = NetReturnsInput()
+
 export NormOneConeBrownianDistanceVariance, IneqBrownianDistanceVariance,
        BrownianDistanceVariance

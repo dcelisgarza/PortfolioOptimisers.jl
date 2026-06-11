@@ -208,4 +208,7 @@ function risk_measure_view(r::NegativeSkewness{<:Any, <:Any, <:MatNum, <:MatNum}
                             window = r.window)
 end
 
+# Expected-risk input kind — see `risk_input_kind`.
+risk_input_kind(::NegativeSkewness) = WeightsInput()
+
 export NegativeSkewness

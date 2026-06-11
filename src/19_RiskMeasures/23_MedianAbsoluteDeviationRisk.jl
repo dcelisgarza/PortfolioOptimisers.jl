@@ -294,4 +294,7 @@ function (r::MedianAbsoluteDeviation)(w::VecNum, X::MatNum, fees::Option{<:Fees}
     return StatsBase.mad(val; center = zero(eltype(X)), normalize = r.flag)
 end
 
+# Expected-risk input kind — see `risk_input_kind`.
+risk_input_kind(::MedianAbsoluteDeviation) = WeightsReturnsFeesInput()
+
 export MedianAbsoluteDeviation, MedianCentering, MeanCentering
