@@ -306,14 +306,21 @@ function bounds_risk_measure(r::Skewness, ub::Number)
                                                       scale = r.settings.scale), ve = r.ve,
                     sk = r.sk, w = r.w, mu = r.mu)
 end
-function (r::Skewness{<:Any, <:Any, <:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any})(w::VecNum,
-                                                                                          X::MatNum,
-                                                                                          fees::Option{<:Fees} = nothing)
-    val = calc_deviations_vec(r, w, X, fees)
+function _moment_risk(r::Skewness{<:Any, <:Any, <:Any,
+                                  <:Option{<:StatsBase.AbstractWeights}, <:Any},
+                      val::VecNum)
     sigma = Statistics.std(r.ve, val; mean = zero(eltype(val)))
     val .= val .^ 3
     res = isnothing(r.w) ? Statistics.mean(val) : Statistics.mean(val, r.w)
     return res / sigma^3
+end
+function (r::Skewness{<:Any, <:Any, <:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any})(w::VecNum,
+                                                                                          X::MatNum,
+                                                                                          fees::Option{<:Fees} = nothing)
+    return _moment_risk(r, calc_deviations_vec(r, w, X, fees))
+end
+function (r::Skewness{<:Any, <:Any, <:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any})(x::VecNum)
+    return _moment_risk(r, calc_deviations_vec(r, x))
 end
 function (r::Skewness{<:Any, <:Any, <:Any, <:DynamicAbstractWeights, <:Any})(w::VecNum,
                                                                              X::MatNum,
@@ -321,6 +328,9 @@ function (r::Skewness{<:Any, <:Any, <:Any, <:DynamicAbstractWeights, <:Any})(w::
     return Skewness(; ve = r.ve, sk = r.sk, w = get_observation_weights(r.w, X), mu = r.mu)(w,
                                                                                             X,
                                                                                             fees)
+end
+function (r::Skewness{<:Any, <:Any, <:Any, <:DynamicAbstractWeights, <:Any})(x::VecNum)
+    return Skewness(; ve = r.ve, sk = r.sk, w = get_observation_weights(r.w, x), mu = r.mu)(x)
 end
 """
 $(DocStringExtensions.TYPEDEF)

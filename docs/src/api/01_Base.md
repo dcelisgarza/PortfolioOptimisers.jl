@@ -33,7 +33,6 @@ Custom types are the bread and butter of `PorfolioOptimisers.jl`, the following 
 ```@docs
 VecScalar
 AbstractEstimatorValueAlgorithm
-SingletonVector
 get_observation_weights
 ```
 
@@ -129,5 +128,4 @@ Estimators, algorithms, and results behave as length-1 iterables and containers 
 ```@docs
 Base.iterate(obj::Union{<:AbstractEstimator, <:AbstractAlgorithm, <:AbstractResult}, state)
 Base.getindex(obj::Union{<:AbstractEstimator, <:AbstractAlgorithm, <:AbstractResult}, i::Int)
-Base.getindex(A::SingletonVector, i::Int)
 ```

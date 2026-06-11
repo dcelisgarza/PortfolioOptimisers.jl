@@ -242,39 +242,50 @@ function calc_deviations_vec(r::Kurtosis, w::VecNum, X::MatNum,
     tgt = calc_moment_target(r, w, x)
     return x .- tgt
 end
-function (r::Kurtosis{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any, <:Any, <:Any,
-                      <:Full, <:SOCRiskExpr})(w::VecNum, X::MatNum,
-                                              fees::Option{<:Fees} = nothing)
-    val = calc_deviations_vec(r, w, X, fees)
+function calc_deviations_vec(r::Kurtosis, x::VecNum)
+    return x .- calc_moment_target(r, nothing, x)
+end
+function _moment_risk(r::Kurtosis{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any,
+                                  <:Any, <:Any, <:Full, <:SOCRiskExpr}, val::VecNum)
     val .= val .^ 4
     return sqrt(isnothing(r.w) ? Statistics.mean(val) : Statistics.mean(val, r.w))
 end
-function (r::Kurtosis{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any, <:Any, <:Any,
-                      <:Semi, <:SOCRiskExpr})(w::VecNum, X::MatNum,
-                                              fees::Option{<:Fees} = nothing)
-    val = min.(calc_deviations_vec(r, w, X, fees), zero(eltype(X)))
+function _moment_risk(r::Kurtosis{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any,
+                                  <:Any, <:Any, <:Semi, <:SOCRiskExpr}, val::VecNum)
+    val = min.(val, zero(eltype(val)))
     val .= val .^ 4
     return sqrt(isnothing(r.w) ? Statistics.mean(val) : Statistics.mean(val, r.w))
 end
-function (r::Kurtosis{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any, <:Any, <:Any,
-                      <:Full, <:QuadSecondMomentFormulations})(w::VecNum, X::MatNum,
-                                                               fees::Option{<:Fees} = nothing)
-    val = calc_deviations_vec(r, w, X, fees)
+function _moment_risk(r::Kurtosis{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any,
+                                  <:Any, <:Any, <:Full, <:QuadSecondMomentFormulations},
+                      val::VecNum)
+    val .= val .^ 4
+    return isnothing(r.w) ? Statistics.mean(val) : Statistics.mean(val, r.w)
+end
+function _moment_risk(r::Kurtosis{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any,
+                                  <:Any, <:Any, <:Semi, <:QuadSecondMomentFormulations},
+                      val::VecNum)
+    val = min.(val, zero(eltype(val)))
     val .= val .^ 4
     return isnothing(r.w) ? Statistics.mean(val) : Statistics.mean(val, r.w)
 end
 function (r::Kurtosis{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any, <:Any, <:Any,
-                      <:Semi, <:QuadSecondMomentFormulations})(w::VecNum, X::MatNum,
-                                                               fees::Option{<:Fees} = nothing)
-    val = min.(calc_deviations_vec(r, w, X, fees), zero(eltype(X)))
-    val .= val .^ 4
-    return isnothing(r.w) ? Statistics.mean(val) : Statistics.mean(val, r.w)
+                      <:Any, <:Any})(w::VecNum, X::MatNum, fees::Option{<:Fees} = nothing)
+    return _moment_risk(r, calc_deviations_vec(r, w, X, fees))
+end
+function (r::Kurtosis{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any, <:Any, <:Any,
+                      <:Any, <:Any})(x::VecNum)
+    return _moment_risk(r, calc_deviations_vec(r, x))
 end
 function (r::Kurtosis{<:Any, <:DynamicAbstractWeights, <:Any, <:Any, <:Any, <:Semi, <:Any})(w::VecNum,
                                                                                             X::MatNum,
                                                                                             fees::Option{<:Fees} = nothing)
     return Kurtosis(; settings = r.settings, w = get_observation_weights(r.w, X), mu = r.mu,
                     kt = r.kt, N = r.N, alg1 = r.alg1, alg2 = r.alg2)(w, X, fees)
+end
+function (r::Kurtosis{<:Any, <:DynamicAbstractWeights, <:Any, <:Any, <:Any, <:Semi, <:Any})(x::VecNum)
+    return Kurtosis(; settings = r.settings, w = get_observation_weights(r.w, x), mu = r.mu,
+                    kt = r.kt, N = r.N, alg1 = r.alg1, alg2 = r.alg2)(x)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

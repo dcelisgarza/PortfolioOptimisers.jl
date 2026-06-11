@@ -407,6 +407,9 @@ function calc_deviations_vec(r::TCM_Sk, w::VecNum, X::MatNum,
     tgt = calc_moment_target(r, w, x)
     return x .- tgt
 end
+function calc_deviations_vec(r::TCM_Sk, x::VecNum)
+    return x .- calc_moment_target(r, nothing, x)
+end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
@@ -441,16 +444,25 @@ function risk_measure_view(r::ThirdCentralMoment, i, args...)
     mu = nothing_scalar_array_view(r.mu, i)
     return ThirdCentralMoment(; w = r.w, mu = mu)
 end
+function _moment_risk(r::ThirdCentralMoment{<:Option{<:StatsBase.AbstractWeights}},
+                      val::VecNum)
+    val .= val .^ 3
+    return isnothing(r.w) ? Statistics.mean(val) : Statistics.mean(val, r.w)
+end
 function (r::ThirdCentralMoment{<:Option{<:StatsBase.AbstractWeights}})(w::VecNum,
                                                                         X::MatNum,
                                                                         fees::Option{<:Fees} = nothing)
-    val = calc_deviations_vec(r, w, X, fees)
-    val .= val .^ 3
-    return isnothing(r.w) ? Statistics.mean(val) : Statistics.mean(val, r.w)
+    return _moment_risk(r, calc_deviations_vec(r, w, X, fees))
+end
+function (r::ThirdCentralMoment{<:Option{<:StatsBase.AbstractWeights}})(x::VecNum)
+    return _moment_risk(r, calc_deviations_vec(r, x))
 end
 function (r::ThirdCentralMoment{<:DynamicAbstractWeights})(w::VecNum, X::MatNum,
                                                            fees::Option{<:Fees} = nothing)
     return ThirdCentralMoment(; w = get_observation_weights(r.w, X), mu = r.mu)(w, X, fees)
+end
+function (r::ThirdCentralMoment{<:DynamicAbstractWeights})(x::VecNum)
+    return ThirdCentralMoment(; w = get_observation_weights(r.w, x), mu = r.mu)(x)
 end
 
 # Expected-risk input kind — see `risk_input_kind`.

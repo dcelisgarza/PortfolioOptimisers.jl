@@ -288,12 +288,6 @@
         @test !PortfolioOptimisers.needs_previous_weights(f)
         @test PortfolioOptimisers.needs_previous_weights(Fees(; tn = Turnover(; w = [1])))
     end
-    @testset "Misc" begin
-        sv = PortfolioOptimisers.SingletonVector()
-        @test sv[1] == 1
-        @test size(sv) == (1,)
-        @test length(sv) == 1
-    end
     rd = prices_to_returns(TimeArray(CSV.File(joinpath(@__DIR__, "./assets/SP500.csv.gz"));
                                      timestamp = :Date)[(end - 252):end],
                            TimeArray(CSV.File(joinpath(@__DIR__, "./assets/Factors.csv.gz"));

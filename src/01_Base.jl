@@ -2076,34 +2076,4 @@ Alias for a union of a numeric type, an array of numeric types, or a `VecScalar`
 const Num_ArrNum_VecScalar_DynWeights = Union{<:Num_ArrNum, <:VecScalar,
                                               <:DynamicAbstractWeights}
 
-"""
-$(DocStringExtensions.TYPEDEF)
-
-Singleton vector type that represents a vector with a single element with value equal to 1. Used for reducing matrix vector products to dropping the matrix's second dimension.
-
-# Constructors
-
-    SingletonVector()
-
-# Related
-
-  - [`VecNum`](@ref)
-  - [`MatNum`](@ref)
-"""
-struct SingletonVector{T} <: AbstractVector{T} end
-function SingletonVector()
-    return SingletonVector{Int}()
-end
-Base.length(::SingletonVector) = 1
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Index into `SingletonVector`, returning `1` for index `1` and throwing `BoundsError` for any other index.
-"""
-function Base.getindex(A::SingletonVector, i::Int)
-    return isone(i) ? 1 : throw(BoundsError(A, i))
-end
-Base.:*(M::Matrix, ::SingletonVector) = dropdims(M; dims = 2)
-Base.size(::SingletonVector) = (1,)
-
 export IsEmptyError, IsNothingError, IsNonFiniteError, VecScalar

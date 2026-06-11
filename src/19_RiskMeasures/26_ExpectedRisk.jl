@@ -77,11 +77,37 @@ function expected_risk(r::MeanReturnRiskRatio, w::VecNum, X::MatNum,
     return (expected_risk(r.rt, w, X, fees; kwargs...) - r.rf) /
            expected_risk(r.rk, w, X, fees; kwargs...)
 end
+# Precomputed-returns contract for the ratio composites: decompose onto the series, mirroring
+# the `(w, X, fees)` decomposition above. Each component is evaluated via its own single-vector
+# functor, so a ratio whose parts all support the contract works; one with a part that does not
+# (e.g. a weights-only risk) surfaces the fallback error from that part.
+function (r::RkRatioRM)(x::VecNum)
+    return r.r1(x) / r.r2(x)
+end
+function (r::MeanReturnRiskRatio)(x::VecNum)
+    return (r.rt(x) - r.rf) / r.rk(x)
+end
 function expected_risk(r::AbstractBaseRiskMeasure, w::VecNum, pr::Pr_RR, args...; kwargs...)
     return expected_risk(r, w, pr.X, args...; kwargs...)
 end
 function expected_risk(r::AbstractBaseRiskMeasure, w::VecVecNum, args...; kwargs...)
     return [expected_risk(r, wi, args...; kwargs...) for wi in w]
+end
+"""
+    (r::AbstractBaseRiskMeasure)(::VecNum)
+
+Fallback for the single-argument *precomputed-returns* functor contract: `r(x::VecNum)`
+means "the expected risk of the net-return series `x`". A measure that does not define a
+single-vector method cannot be evaluated on an already-reduced return series — it needs
+portfolio weights and/or per-asset data — so this fallback throws an explanatory error
+instead of a bare `MethodError`.
+
+Measures that *do* support the contract (the net-returns families and the moment family
+with a weight-independent target) define a more specific `(r::ConcreteMeasure)(::VecNum)`
+that wins over this fallback.
+"""
+function (r::AbstractBaseRiskMeasure)(::VecNum)
+    throw(ArgumentError("`$(typeof(r))` cannot be evaluated on a precomputed return series: it requires portfolio weights and/or per-asset data (e.g. a weights-only measure such as `Turnover`/`EqualRiskMeasure`, a composite carrying a variance term such as `VarianceSkewKurtosis`, or a moment measure with a per-asset `mu`). Evaluate it through `expected_risk(r, w, X, fees)` with explicit weights instead."))
 end
 """
     number_effective_assets(w::VecNum)

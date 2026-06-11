@@ -289,9 +289,17 @@ function calc_deviations_vec(r::MedianAbsoluteDeviation, w::VecNum, X::MatNum,
     tgt = calc_moment_target(r, w, x)
     return x .- tgt
 end
+function calc_deviations_vec(r::MedianAbsoluteDeviation, x::VecNum)
+    return x .- calc_moment_target(r, nothing, x)
+end
+function _moment_risk(r::MedianAbsoluteDeviation, val::VecNum)
+    return StatsBase.mad(val; center = zero(eltype(val)), normalize = r.flag)
+end
 function (r::MedianAbsoluteDeviation)(w::VecNum, X::MatNum, fees::Option{<:Fees} = nothing)
-    val = calc_deviations_vec(r, w, X, fees)
-    return StatsBase.mad(val; center = zero(eltype(X)), normalize = r.flag)
+    return _moment_risk(r, calc_deviations_vec(r, w, X, fees))
+end
+function (r::MedianAbsoluteDeviation)(x::VecNum)
+    return _moment_risk(r, calc_deviations_vec(r, x))
 end
 
 # Expected-risk input kind — see `risk_input_kind`.

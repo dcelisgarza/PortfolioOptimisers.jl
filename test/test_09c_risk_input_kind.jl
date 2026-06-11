@@ -75,3 +75,47 @@ end
         @test isconcretetype(k) && k <: PO.RiskInputKind
     end
 end
+
+#=
+I think the failure is due to running the tests/script when the test environment was out of sync with the worktree. When i started a session with
+
+```bash
+julia --project
+```
+
+and ran the init code in `test/runtests.jl` in the REPL followed by `test_09c` also in the REPL, i got this
+
+```julia
+julia> @testset "risk_input_kind — equivalence with old routing unions" begin
+           # The three kinds partition the measures; no type may be classified two ways.
+           @test allunique(vcat(_OLD_NETRETURNS, _OLD_WEIGHTSRETURNSFEES, _OLD_WEIGHTS))
+           for T in _OLD_NETRETURNS
+               @test declared_kind(T) === PO.NetReturnsInput
+           end
+           for T in _OLD_WEIGHTSRETURNSFEES
+               @test declared_kind(T) === PO.WeightsReturnsFeesInput
+           end
+           for T in _OLD_WEIGHTS
+               @test declared_kind(T) === PO.WeightsInput
+           end
+       end
+Test Summary:                                         | Pass  Total  Time
+risk_input_kind — equivalence with old routing unions |   51     51  1.1s
+Test.DefaultTestSet("risk_input_kind — equivalence with old routing unions", Any[], 51, false, false, true, 1.781186434598269e9, 1.781186435665745e9, false, "REPL[19]", Random.Xoshiro(0x8738dd43ca12461a, 0x15592c6ca14d5bb6, 0xe256aaf2f4cfe209, 0x0ea8a7bd9ede2ed8, 0x99924f77ce1d0b51))
+
+julia> @testset "risk_input_kind — every concrete measure is classified" begin
+           for T in all_concrete(PO.AbstractBaseRiskMeasure)
+               if T in _EXPLICIT
+                   continue
+               end
+               k = declared_kind(T)
+               @test isconcretetype(k) && k <: PO.RiskInputKind
+           end
+       end
+Test Summary:                                          | Pass  Total  Time
+risk_input_kind — every concrete measure is classified |   50     50  0.2s
+Test.DefaultTestSet("risk_input_kind — every concrete measure is classified", Any[], 50, false, false, true, 1.78118643752396e9, 1.781186437731832e9, false, "REPL[20]", Random.Xoshiro(0x8738dd43ca12461a, 0x15592c6ca14d5bb6, 0xe256aaf2f4cfe209, 0x0ea8a7bd9ede2ed8, 0x99924f77ce1d0b51))
+```
+
+I don't know how to fix this, but the reason is clear: the test environment is not synced to the worktree environment. The fix is to properly syncronise it, but i don't know how.
+=#

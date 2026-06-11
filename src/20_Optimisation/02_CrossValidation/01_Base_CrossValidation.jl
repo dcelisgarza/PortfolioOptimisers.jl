@@ -421,11 +421,10 @@ Internal helper that dispatches on whether `X` is a plain vector or a vector of 
   - Expected risk value(s).
 """
 function _prediction_expected_risk(r::AbstractBaseRiskMeasure, X::VecNum; kwargs...)
-    return expected_risk(r, SingletonVector{Int}(), reshape(X, :, 1); kwargs...)
+    return r(X)
 end
 function _prediction_expected_risk(r::AbstractBaseRiskMeasure, X::VecVecNum; kwargs...)
-    return [expected_risk(r, SingletonVector{Int}(), reshape(Xi, :, 1); kwargs...)
-            for Xi in X]
+    return [r(Xi) for Xi in X]
 end
 function expected_risk(r::AbstractBaseRiskMeasure, pred::PredictionResult; kwargs...)
     return _prediction_expected_risk(r, pred.rd.X, kwargs...)
