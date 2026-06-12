@@ -68,11 +68,35 @@ function expected_risk(::WeightsInput, r::AbstractBaseRiskMeasure, w::VecNum, ar
                        kwargs...)
     return r(w)
 end
-# Ratio composites evaluate on a series through their own `r(x)` functors (defined above),
-# not the kind trait. They are series-eligible exactly when both constituents are.
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return whether [`RkRatioRM`](@ref) `r` supports evaluation on a precomputed return series.
+
+Returns `true` only when both constituent risk measures support precomputed returns.
+
+# Related
+
+  - [`RkRatioRM`](@ref)
+  - [`supports_precomputed_returns`](@ref)
+  - [`expected_risk_from_returns`](@ref)
+"""
 function supports_precomputed_returns(r::RkRatioRM)
     return supports_precomputed_returns(r.r1) && supports_precomputed_returns(r.r2)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return whether [`MeanReturnRiskRatio`](@ref) `r` supports evaluation on a precomputed return series.
+
+Returns `true` only when both the return measure `rt` and the risk measure `rk` support precomputed returns.
+
+# Related
+
+  - [`MeanReturnRiskRatio`](@ref)
+  - [`supports_precomputed_returns`](@ref)
+  - [`expected_risk_from_returns`](@ref)
+"""
 function supports_precomputed_returns(r::MeanReturnRiskRatio)
     return supports_precomputed_returns(r.rt) && supports_precomputed_returns(r.rk)
 end
@@ -125,6 +149,18 @@ function expected_risk_from_returns(r::AbstractBaseRiskMeasure, X::VecNum; kwarg
     end
     return r(X)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Evaluate a risk measure on each element of a vector of precomputed return series.
+
+Maps [`expected_risk_from_returns`](@ref) over each `Xi` in `X`.
+
+# Related
+
+  - [`expected_risk_from_returns`](@ref)
+  - [`supports_precomputed_returns`](@ref)
+"""
 function expected_risk_from_returns(r::AbstractBaseRiskMeasure, X::VecVecNum; kwargs...)
     return [expected_risk_from_returns(r, Xi; kwargs...) for Xi in X]
 end

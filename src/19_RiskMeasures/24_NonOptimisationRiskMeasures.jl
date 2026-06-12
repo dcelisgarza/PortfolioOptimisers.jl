@@ -84,7 +84,7 @@ MeanReturn
     """
     w
     """
-    If true use log returns; else use arithmetic returns.
+    $(field_dict[:flag])
     """
     flag
     function MeanReturn(w::Option{<:ObsWeights}, flag::Bool)
@@ -407,6 +407,21 @@ function calc_deviations_vec(r::TCM_Sk, w::VecNum, X::MatNum,
     tgt = calc_moment_target(r, w, x)
     return x .- tgt
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Compute the vector of deviations from the centering target for a precomputed returns series for [`ThirdCentralMoment`](@ref) and [`Skewness`](@ref) risk measures.
+
+Single-argument form used by the precomputed-returns functor `r(x::VecNum)` (ADR 0007).
+
+# Related
+
+  - [`TCM_Sk`](@ref)
+  - [`ThirdCentralMoment`](@ref)
+  - [`Skewness`](@ref)
+  - [`calc_deviations_vec`](@ref)
+  - [`calc_moment_target`](@ref)
+"""
 function calc_deviations_vec(r::TCM_Sk, x::VecNum)
     return x .- calc_moment_target(r, nothing, x)
 end
@@ -468,8 +483,20 @@ end
 # Expected-risk input kind — see `risk_input_kind`.
 risk_input_kind(::MeanReturn) = NetReturnsInput()
 risk_input_kind(::ThirdCentralMoment) = WeightsReturnsFeesInput()
-# Precomputed-returns eligibility — see `supports_precomputed_returns`. Instance-dependent:
-# eligible iff the moment target is weight-independent.
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return whether [`ThirdCentralMoment`](@ref) `r` supports precomputed-return evaluation.
+
+Delegates to [`weight_independent_target`](@ref) on `r.mu`: `true` iff the target is
+`Nothing`, a `Number`, or a [`MedianCenteringFunction`](@ref); `false` for per-asset targets.
+
+# Related
+
+  - [`supports_precomputed_returns`](@ref)
+  - [`weight_independent_target`](@ref)
+  - [`ThirdCentralMoment`](@ref)
+"""
 supports_precomputed_returns(r::ThirdCentralMoment) = weight_independent_target(r.mu)
 
 export MeanReturn, ThirdCentralMoment, MeanReturnRiskRatio

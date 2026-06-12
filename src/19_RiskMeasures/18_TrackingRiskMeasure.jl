@@ -545,9 +545,31 @@ const TrRM = Union{<:TrackingRiskMeasure, <:RiskTrackingRiskMeasure}
 # Expected-risk input kind — see `risk_input_kind`.
 risk_input_kind(::TrackingRiskMeasure) = WeightsReturnsFeesInput()
 risk_input_kind(::RiskTrackingRiskMeasure) = WeightsReturnsFeesInput()
-# Precomputed-returns eligibility — see `supports_precomputed_returns`. Tracking measures
-# need a benchmark and explicit weights, so a bare return series is undefined for them.
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return `false`: a [`WeightsTracking`](@ref) measure compares against a benchmark weight
+vector and always requires explicit portfolio weights.
+
+# Related
+
+  - [`supports_precomputed_returns`](@ref)
+  - [`TrackingRiskMeasure`](@ref)
+  - [`WeightsTracking`](@ref)
+"""
 supports_precomputed_returns(::TrackingRiskMeasure{<:WeightsTracking}) = false
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return `true`: a [`ReturnsTracking`](@ref) measure compares against a benchmark return
+series and its risk is a function of the net-return series alone.
+
+# Related
+
+  - [`supports_precomputed_returns`](@ref)
+  - [`TrackingRiskMeasure`](@ref)
+  - [`ReturnsTracking`](@ref)
+"""
 supports_precomputed_returns(::TrackingRiskMeasure{<:ReturnsTracking}) = true
 
 export TrackingRiskMeasure, RiskTrackingRiskMeasure, RiskTrackingError

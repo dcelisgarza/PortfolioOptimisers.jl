@@ -193,19 +193,85 @@ silently consuming the series as weights.
 function supports_precomputed_returns(r::AbstractBaseRiskMeasure)
     return supports_precomputed_returns(risk_input_kind(r), r)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return `true`: [`NetReturnsInput`](@ref) measures always support precomputed returns —
+their functor *is* the net-returns functor.
+
+# Related
+
+  - [`supports_precomputed_returns`](@ref)
+  - [`NetReturnsInput`](@ref)
+"""
 supports_precomputed_returns(::NetReturnsInput, ::Any) = true
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return `false`: [`WeightsInput`](@ref) measures never support precomputed returns —
+their functor consumes portfolio weights, not a return series.
+
+# Related
+
+  - [`supports_precomputed_returns`](@ref)
+  - [`WeightsInput`](@ref)
+"""
 supports_precomputed_returns(::WeightsInput, ::Any) = false
-# Erroring tripwire — mirrors `risk_input_kind`'s erroring default. Every
-# `WeightsReturnsFeesInput` measure declares `supports_precomputed_returns` at its own
-# definition site: the moment family in terms of `weight_independent_target(r.mu)`,
-# tracking / variance-carrying composites as `false`. Reaching this leaf means a WRF
-# measure forgot to declare it — fail loudly rather than silently mis-route (and the
-# completeness test in `test_09c_risk_input_kind.jl` turns that into a CI failure).
-function supports_precomputed_returns(::WeightsReturnsFeesInput, r)
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Erroring tripwire for [`WeightsReturnsFeesInput`](@ref) measures that have not declared
+[`supports_precomputed_returns`](@ref) at their own definition site. Every such measure
+must declare it there: moment measures as `supports_precomputed_returns(r::T) = weight_independent_target(r.mu)`; weights-dependent measures (tracking, variance-carrying
+composites) as `supports_precomputed_returns(::T) = false`. Reaching this leaf means a
+measure forgot to declare it — throws an `ArgumentError` with instructions rather than
+silently mis-routing (and the completeness test in `test_09c_risk_input_kind.jl` turns that
+into a CI failure).
+
+# Related
+
+  - [`supports_precomputed_returns`](@ref)
+  - [`WeightsReturnsFeesInput`](@ref)
+  - [`weight_independent_target`](@ref)
+"""
+function supports_precomputed_returns(::WeightsReturnsFeesInput, r::AbstractBaseRiskMeasure)
     throw(ArgumentError("`$(typeof(r))` is a `WeightsReturnsFeesInput` risk measure that does not declare `supports_precomputed_returns`. Declare it at the measure's definition site: a moment measure as `supports_precomputed_returns(r::$(typeof(r))) = weight_independent_target(r.mu)`; a weights-dependent measure (tracking, variance-carrying composite) as `supports_precomputed_returns(::$(typeof(r))) = false`."))
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return `true`: a `Nothing` target is trivially weight-independent and can be evaluated
+on a bare return series.
+
+# Related
+
+  - [`supports_precomputed_returns`](@ref)
+  - [`weight_independent_target`](@ref)
+"""
 weight_independent_target(::Nothing) = true
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return `true`: a scalar target does not require portfolio weights and can be evaluated
+on a bare return series.
+
+# Related
+
+  - [`supports_precomputed_returns`](@ref)
+  - [`weight_independent_target`](@ref)
+"""
 weight_independent_target(::Number) = true
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return `false`: the target type requires portfolio weights (e.g. a per-asset `mu` involves
+`dot(w, mu)`) and cannot be evaluated on a bare return series.
+
+# Related
+
+  - [`supports_precomputed_returns`](@ref)
+  - [`weight_independent_target`](@ref)
+"""
 weight_independent_target(::Any) = false
 """
 $(DocStringExtensions.TYPEDEF)

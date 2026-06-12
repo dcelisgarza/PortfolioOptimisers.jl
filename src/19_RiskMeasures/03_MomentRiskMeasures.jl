@@ -1237,6 +1237,19 @@ function calc_deviations_vec(r::LoHiOrderMoment, w::VecNum, X::MatNum,
     tgt = calc_moment_target(r, w, x)
     return x .- tgt
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Compute the vector of deviations from the target value for a precomputed returns series.
+
+Single-argument form of [`calc_deviations_vec`](@ref) used by the precomputed-returns functor `r(x::VecNum)` (ADR 0007).
+
+# Related
+
+  - [`calc_deviations_vec`](@ref)
+  - [`calc_moment_target`](@ref)
+  - [`LoHiOrderMoment`](@ref)
+"""
 function calc_deviations_vec(r::LoHiOrderMoment, x::VecNum)
     return x .- calc_moment_target(r, nothing, x)
 end
@@ -1405,25 +1418,93 @@ function (r::HighOrderMoment{<:Any, <:DynamicAbstractWeights, <:Any, <:Any})(x::
     return HighOrderMoment(; settings = r.settings, alg = r.alg,
                            w = get_observation_weights(r.w, x), mu = r.mu)(x)
 end
-for rt in (LowOrderMoment, HighOrderMoment)
-    eval(quote
-             function factory(r::$(rt), pr::AbstractPriorResult, args...; kwargs...)
-                 w = nothing_scalar_array_selector(r.w, pr.w)
-                 mu = nothing_scalar_array_selector(r.mu, pr.mu)
-                 alg = factory(r.alg, w)
-                 return $(rt)(; settings = r.settings, alg = alg, w = w, mu = mu)
-             end
-             function risk_measure_view(r::$(rt), i, args...)
-                 mu = nothing_scalar_array_view(r.mu, i)
-                 return $(rt)(; settings = r.settings, alg = r.alg, w = r.w, mu = mu)
-             end
-         end)
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create an instance of [`LowOrderMoment`](@ref) by selecting observation weights, expected returns, and algorithm from the risk-measure instance or falling back to the prior result.
+
+# Related
+
+  - [`LowOrderMoment`](@ref)
+  - [`AbstractPriorResult`](@ref)
+  - [`factory`](@ref)
+  - [`nothing_scalar_array_selector`](@ref)
+"""
+function factory(r::LowOrderMoment, pr::AbstractPriorResult, args...; kwargs...)
+    w = nothing_scalar_array_selector(r.w, pr.w)
+    mu = nothing_scalar_array_selector(r.mu, pr.mu)
+    alg = factory(r.alg, w)
+    return LowOrderMoment(; settings = r.settings, alg = alg, w = w, mu = mu)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a view of [`LowOrderMoment`](@ref) `r` sliced to asset indices `i`.
+
+Slices the expected returns `mu` for cluster-based optimisation.
+
+# Related
+
+  - [`LowOrderMoment`](@ref)
+  - [`risk_measure_view`](@ref)
+  - [`nothing_scalar_array_view`](@ref)
+"""
+function risk_measure_view(r::LowOrderMoment, i, args...)
+    mu = nothing_scalar_array_view(r.mu, i)
+    return LowOrderMoment(; settings = r.settings, alg = r.alg, w = r.w, mu = mu)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Create an instance of [`HighOrderMoment`](@ref) by selecting observation weights, expected returns, and algorithm from the risk-measure instance or falling back to the prior result.
+
+# Related
+
+  - [`HighOrderMoment`](@ref)
+  - [`AbstractPriorResult`](@ref)
+  - [`factory`](@ref)
+  - [`nothing_scalar_array_selector`](@ref)
+"""
+function factory(r::HighOrderMoment, pr::AbstractPriorResult, args...; kwargs...)
+    w = nothing_scalar_array_selector(r.w, pr.w)
+    mu = nothing_scalar_array_selector(r.mu, pr.mu)
+    alg = factory(r.alg, w)
+    return HighOrderMoment(; settings = r.settings, alg = alg, w = w, mu = mu)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a view of [`HighOrderMoment`](@ref) `r` sliced to asset indices `i`.
+
+Slices the expected returns `mu` for cluster-based optimisation.
+
+# Related
+
+  - [`HighOrderMoment`](@ref)
+  - [`risk_measure_view`](@ref)
+  - [`nothing_scalar_array_view`](@ref)
+"""
+function risk_measure_view(r::HighOrderMoment, i, args...)
+    mu = nothing_scalar_array_view(r.mu, i)
+    return HighOrderMoment(; settings = r.settings, alg = r.alg, w = r.w, mu = mu)
 end
 
 # Expected-risk input kind — see `risk_input_kind`.
 risk_input_kind(::LoHiOrderMoment) = WeightsReturnsFeesInput()
-# Precomputed-returns eligibility — see `supports_precomputed_returns`. Instance-dependent:
-# eligible iff the moment target is weight-independent.
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return whether [`LoHiOrderMoment`](@ref) `r` supports precomputed-return evaluation.
+
+Delegates to [`weight_independent_target`](@ref) on `r.mu`: `true` iff the target is
+`Nothing`, a `Number`, or a [`MedianCenteringFunction`](@ref); `false` for per-asset targets.
+
+# Related
+
+  - [`supports_precomputed_returns`](@ref)
+  - [`weight_independent_target`](@ref)
+  - [`LoHiOrderMoment`](@ref)
+"""
 supports_precomputed_returns(r::LoHiOrderMoment) = weight_independent_target(r.mu)
 
 export FirstLowerMoment, SecondMoment, MeanAbsoluteDeviation, ThirdLowerMoment,

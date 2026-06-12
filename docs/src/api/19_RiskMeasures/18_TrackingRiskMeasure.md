@@ -2,6 +2,8 @@
 
 ```@docs
 RiskTrackingError
+tracking_view(::Nothing, args...)
+tracking_view(tr::RiskTrackingError, i, X::MatNum)
 factory(tr::RiskTrackingError, pr::AbstractPriorResult, slv::Any, ucs::Any,
                  w::Option{<:VecNum} = nothing, args...; kwargs...)
 needs_previous_weights(tr::RiskTrackingError)
@@ -17,4 +19,6 @@ needs_previous_weights(r::RiskTrackingRiskMeasure)
 factory(r::RiskTrackingRiskMeasure, w::VecNum)
 factory(r::RiskTrackingRiskMeasure, pr::AbstractPriorResult, args...; kwargs...)
 TrRM
+supports_precomputed_returns(::TrackingRiskMeasure{<:WeightsTracking})
+supports_precomputed_returns(::TrackingRiskMeasure{<:ReturnsTracking})
 ```

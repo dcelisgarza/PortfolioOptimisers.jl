@@ -242,6 +242,19 @@ function calc_deviations_vec(r::Kurtosis, w::VecNum, X::MatNum,
     tgt = calc_moment_target(r, w, x)
     return x .- tgt
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Compute the vector of deviations from the target value for a precomputed returns series for [`Kurtosis`](@ref).
+
+Single-argument form used by the precomputed-returns functor `r(x::VecNum)` (ADR 0007).
+
+# Related
+
+  - [`Kurtosis`](@ref)
+  - [`calc_deviations_vec`](@ref)
+  - [`calc_moment_target`](@ref)
+"""
 function calc_deviations_vec(r::Kurtosis, x::VecNum)
     return x .- calc_moment_target(r, nothing, x)
 end
@@ -325,6 +338,20 @@ function factory(r::Kurtosis, pr::LowOrderPrior, args...; kwargs...)::Kurtosis
     return Kurtosis(; settings = r.settings, w = w, mu = mu, kt = kt, N = r.N,
                     alg1 = r.alg1, alg2 = r.alg2)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a view of [`Kurtosis`](@ref) `r` sliced to asset indices `i`.
+
+Slices both the cokurtosis matrix `kt` and the expected returns `mu` for cluster-based optimisation.
+
+# Related
+
+  - [`Kurtosis`](@ref)
+  - [`risk_measure_view`](@ref)
+  - [`nothing_scalar_array_view`](@ref)
+  - [`fourth_moment_index_generator`](@ref)
+"""
 function risk_measure_view(r::Kurtosis, i, args...)::Kurtosis
     mu = r.mu
     kt = r.kt
@@ -345,8 +372,20 @@ end
 
 # Expected-risk input kind — see `risk_input_kind`.
 risk_input_kind(::Kurtosis) = WeightsReturnsFeesInput()
-# Precomputed-returns eligibility — see `supports_precomputed_returns`. Instance-dependent:
-# eligible iff the moment target is weight-independent.
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return whether [`Kurtosis`](@ref) `r` supports precomputed-return evaluation.
+
+Delegates to [`weight_independent_target`](@ref) on `r.mu`: `true` iff the target is
+`Nothing`, a `Number`, or a [`MedianCenteringFunction`](@ref); `false` for per-asset targets.
+
+# Related
+
+  - [`supports_precomputed_returns`](@ref)
+  - [`weight_independent_target`](@ref)
+  - [`Kurtosis`](@ref)
+"""
 supports_precomputed_returns(r::Kurtosis) = weight_independent_target(r.mu)
 
 export Kurtosis

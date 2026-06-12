@@ -294,12 +294,34 @@ function no_risk_expr_risk_measure(r::Skewness)
                                                       scale = r.settings.scale), ve = r.ve,
                     sk = r.sk, w = r.w, mu = r.mu)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a copy of [`Skewness`](@ref) `r` with `rke = false` and `lb = nothing`, removing bounds and disabling its contribution to the JuMP objective expression.
+
+# Related
+
+  - [`Skewness`](@ref)
+  - [`MaxRiskMeasureSettings`](@ref)
+  - [`no_bounds_no_risk_expr_risk_measure`](@ref)
+"""
 function no_bounds_no_risk_expr_risk_measure(r::Skewness, ::Any = nothing)
     return Skewness(;
                     settings = MaxRiskMeasureSettings(; rke = false, lb = nothing,
                                                       scale = 1), ve = r.ve, sk = r.sk,
                     w = r.w, mu = r.mu)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a copy of [`Skewness`](@ref) `r` with the lower bound set to `ub`.
+
+# Related
+
+  - [`Skewness`](@ref)
+  - [`MaxRiskMeasureSettings`](@ref)
+  - [`bounds_risk_measure`](@ref)
+"""
 function bounds_risk_measure(r::Skewness, ub::Number)
     return Skewness(;
                     settings = MaxRiskMeasureSettings(; rke = r.settings.rke, lb = ub,
@@ -508,10 +530,32 @@ end
 # Expected-risk input kind — see `risk_input_kind`.
 risk_input_kind(::Skewness) = WeightsReturnsFeesInput()
 risk_input_kind(::VarianceSkewKurtosis) = WeightsReturnsFeesInput()
-# Precomputed-returns eligibility — see `supports_precomputed_returns`. `Skewness` is a
-# moment measure (eligible iff its target is weight-independent); `VarianceSkewKurtosis`
-# carries a weights-only variance term `r.vr(w)` with no bare-series form, so `false`.
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return whether [`Skewness`](@ref) `r` supports precomputed-return evaluation.
+
+Delegates to [`weight_independent_target`](@ref) on `r.mu`: `true` iff the target is
+`Nothing`, a `Number`, or a [`MedianCenteringFunction`](@ref); `false` for per-asset targets.
+
+# Related
+
+  - [`supports_precomputed_returns`](@ref)
+  - [`weight_independent_target`](@ref)
+  - [`Skewness`](@ref)
+"""
 supports_precomputed_returns(r::Skewness) = weight_independent_target(r.mu)
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return `false`: [`VarianceSkewKurtosis`](@ref) carries a weights-only variance term
+`r.vr(w)` with no bare-series form.
+
+# Related
+
+  - [`supports_precomputed_returns`](@ref)
+  - [`VarianceSkewKurtosis`](@ref)
+"""
 supports_precomputed_returns(::VarianceSkewKurtosis) = false
 
 export MaxRiskMeasureSettings, Skewness, VarianceSkewKurtosis
