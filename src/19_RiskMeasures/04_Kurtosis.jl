@@ -345,5 +345,8 @@ end
 
 # Expected-risk input kind — see `risk_input_kind`.
 risk_input_kind(::Kurtosis) = WeightsReturnsFeesInput()
+# Precomputed-returns eligibility — see `supports_precomputed_returns`. Instance-dependent:
+# eligible iff the moment target is weight-independent.
+supports_precomputed_returns(r::Kurtosis) = weight_independent_target(r.mu)
 
 export Kurtosis

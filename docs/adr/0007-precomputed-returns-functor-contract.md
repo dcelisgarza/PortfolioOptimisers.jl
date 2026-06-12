@@ -1,5 +1,5 @@
 ---
-status: accepted — single-argument functor `r(x::VecNum)` as the precomputed-returns contract, gated by `supports_precomputed_returns` (amended, see Correction)
+status: accepted — single-argument functor `r(x::VecNum)` as the precomputed-returns contract, gated by `supports_precomputed_returns` (amended, see Corrections)
 ---
 
 # Feed already-reduced return series through the functor `r(x::VecNum)`, not a `SingletonVector` sentinel
@@ -11,8 +11,6 @@ Three internal call sites need the expected risk (or a moment) of a return serie
 
 - **`get_pr_value`** (entropy pooling) — the skewness / kurtosis of one asset's column,
   `view(pr.X, :, i)`;
-- **`_prediction_expected_risk`** (cross-validation) — the risk of a prediction's
-  out-of-sample portfolio return series `rd.X`;
 - **the seven portfolio-level plot functions** (`plot_ptf_cumulative_returns`,
   `plot_drawdowns`, `plot_histogram`, `plot_rolling_measure`, `plot_benchmark`,
   `plot_performance_summary`, `plot_rolling_drawdowns`) applied to a `PredictionResult`,
@@ -81,7 +79,7 @@ missing.
   is shadowed by it (and, for the moment family, by the generic `r(x)`). Instead a predicate
   `supports_precomputed_returns(r)` — `true` for `NetReturnsInput` measures and the
   weight-independent-target moment family, `false` for `WeightsInput`/tracking/variance-carrying
-  composites — is consulted by a single internal contract entry `_expected_risk_from_returns(r, x)`,
+  composites — is consulted by a single internal contract entry `expected_risk_from_returns(r, x)`,
   which throws an explanatory `ArgumentError` for an ineligible measure *before* ever calling the
   functor. The call sites that hold a precomputed series (cross-validation prediction scoring)
   route through this entry. The bare `(::AbstractBaseRiskMeasure)(::VecNum)` survives only as a
@@ -94,10 +92,6 @@ The call sites then state their intent directly:
 # get_pr_value
 Skewness()(view(pr.X, :, i))
 HighOrderMoment(; alg = StandardisedHighOrderMoment(; alg = FourthMoment()))(view(pr.X, :, i))
-
-# cross-validation
-_prediction_expected_risk(r, X::VecNum)    = r(X)
-_prediction_expected_risk(r, X::VecVecNum) = [r(Xi) for Xi in X]
 ```
 
 **Plotting is unified onto the same idea rather than left on a literal `[1]`.** Each
@@ -138,7 +132,7 @@ test are removed.
   function has a series-first core reused by both the `(w, X, fees)` method and the prediction
   wrapper. Net plotting code shrinks.
 - **A silent wrong answer becomes a loud error — at the contract entry.** Scoring a prediction
-  through `_expected_risk_from_returns` with a `WeightsInput` measure, a moment measure with a
+  through `expected_risk_from_returns` with a `WeightsInput` measure, a moment measure with a
   per-asset `mu`, or a variance-carrying composite now throws an actionable `ArgumentError` via
   the `supports_precomputed_returns` gate, instead of returning nonsense (turnover of the series
   read as weights) or an opaque `MethodError`. The guarantee lives at the gate, not the bare
@@ -178,7 +172,62 @@ silently does the wrong thing for measures that genuinely need weights."*
 **Fix.** Keep the single-argument functor as the contract for *eligible* measures, but move the
 safety guarantee off the functor onto a gated contract entry: a predicate
 `supports_precomputed_returns(r)` (kind-derived, with the moment family's eligibility turning on
-whether its `mu` target is weight-independent) consulted by `_expected_risk_from_returns(r, x)`,
+whether its `mu` target is weight-independent) consulted by `expected_risk_from_returns(r, x)`,
 through which the precomputed-series call sites route. Ratio composites recurse into their
 constituents. The amended Decision bullet above describes the result. Guarded by a behavioural +
 completeness test in `test/test_09c_risk_input_kind.jl`.
+
+## Correction 2 — eligibility moves to the definition site (ADR 0006 consistency)
+
+The gated-eligibility fix above first shipped `supports_precomputed_returns` with the moment
+family's eligibility recorded **centrally**, as a `Union` alias:
+
+```julia
+const PrecomputedMomentRM = Union{<:LowOrderMoment, <:HighOrderMoment, <:Skewness,
+                                  <:Kurtosis, <:MedianAbsoluteDeviation, <:ThirdCentralMoment}
+supports_precomputed_returns(::WeightsReturnsFeesInput, ::Any)                 = false
+supports_precomputed_returns(::WeightsReturnsFeesInput, r::PrecomputedMomentRM) =
+    weight_independent_target(r.mu)
+```
+
+This reintroduced exactly the pattern **ADR 0006** retired. "Whether `Kurtosis` supports a
+precomputed series" is a fact *about Kurtosis*, but it lived in a distant union — the same
+**locality** complaint 0006 made against the routing unions, in the very file whose own ADR text
+argues that is the wrong place. The failure mode was milder than 0006's silent wrong number (a
+forgotten measure falls to `false` → a *loud refusal* at `expected_risk_from_returns`, not a
+wrong result), but it was **silent at classification time and untested**: the completeness test
+only asserted the predicate *resolves* to a `Bool`, which a forgotten measure still does
+(`false`), so a future moment measure dropped from the union would be silently mis-refused with a
+green CI.
+
+**Fix.** Delete `PrecomputedMomentRM` and push the eligibility decision to each measure's
+definition site, mirroring how `risk_input_kind` is already declared there (ADR 0006 / 0001
+lineage):
+
+```julia
+# at the Kurtosis definition site, beside `risk_input_kind(::Kurtosis)`:
+supports_precomputed_returns(r::Kurtosis) = weight_independent_target(r.mu)
+# at the TrackingRiskMeasure site:
+supports_precomputed_returns(::TrackingRiskMeasure) = false
+```
+
+The two **uniform** kinds stay kind-derived — re-stating them per measure would be noise
+(`supports_precomputed_returns(::NetReturnsInput, ::Any) = true`,
+`(::WeightsInput, ::Any) = false`). Only the **`WeightsReturnsFeesInput`** branch — the one kind
+where eligibility is *not* uniform (the 6 moment measures are instance-dependent on `r.mu`; the
+3 weights-dependent ones — `TrackingRiskMeasure`, `RiskTrackingRiskMeasure`,
+`VarianceSkewKurtosis` — are `false`) — drops its `false` default for an **erroring leaf**, the
+same "erroring default, not a fallback value" discipline ADR 0006 chose for `risk_input_kind`:
+
+```julia
+supports_precomputed_returns(::WeightsReturnsFeesInput, r) =
+    throw(ArgumentError("`$(typeof(r))` … does not declare `supports_precomputed_returns` …"))
+```
+
+So all 9 `WeightsReturnsFeesInput` measures now declare at their site; the ratio composites keep
+their existing public-method overrides. A future WRF measure that forgets **throws** at the leaf,
+and the completeness test — `Bool <: return_types(supports_precomputed_returns, (T,))` — now
+**fails** on it (the throwing leaf infers `Union{}`), closing the untested-misclassification gap
+the first correction left. Net effect: the ADR-0006 locality property is restored for the
+precomputed-returns axis, at the cost of 3 explicit `= false` lines for the weights-dependent WRF
+measures.

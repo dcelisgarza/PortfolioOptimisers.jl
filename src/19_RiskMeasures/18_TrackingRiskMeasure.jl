@@ -246,11 +246,11 @@ function (r::TrackingRiskMeasure)(w::VecNum, X::MatNum, fees::Option{<:Fees} = n
     benchmark = tracking_benchmark(r.tr, X)
     return norm_tracking(r.alg, calc_net_returns(w, X, fees), benchmark, size(X, 1))
 end
-function (r::TrackingRiskMeasure{ReturnsTracking})(X::VecNum)
+function (r::TrackingRiskMeasure{<:ReturnsTracking})(X::VecNum)
     benchmark = tracking_benchmark(r.tr, X)
     return norm_tracking(r.alg, X, benchmark, length(X))
 end
-function (r::TrackingRiskMeasure{WeightsTracking})(::VecNum)
+function (r::TrackingRiskMeasure{<:WeightsTracking})(::VecNum)
     throw(MethodError(r,
                       "Tracking risk measure using the `WeightsTracking` algorithm cannot be computed for a prediction of portfolio returns because there are no weights."))
 end
@@ -545,5 +545,9 @@ const TrRM = Union{<:TrackingRiskMeasure, <:RiskTrackingRiskMeasure}
 # Expected-risk input kind — see `risk_input_kind`.
 risk_input_kind(::TrackingRiskMeasure) = WeightsReturnsFeesInput()
 risk_input_kind(::RiskTrackingRiskMeasure) = WeightsReturnsFeesInput()
+# Precomputed-returns eligibility — see `supports_precomputed_returns`. Tracking measures
+# need a benchmark and explicit weights, so a bare return series is undefined for them.
+supports_precomputed_returns(::TrackingRiskMeasure{<:WeightsTracking}) = false
+supports_precomputed_returns(::TrackingRiskMeasure{<:ReturnsTracking}) = true
 
 export TrackingRiskMeasure, RiskTrackingRiskMeasure, RiskTrackingError

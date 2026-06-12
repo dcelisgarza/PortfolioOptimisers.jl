@@ -508,5 +508,10 @@ end
 # Expected-risk input kind — see `risk_input_kind`.
 risk_input_kind(::Skewness) = WeightsReturnsFeesInput()
 risk_input_kind(::VarianceSkewKurtosis) = WeightsReturnsFeesInput()
+# Precomputed-returns eligibility — see `supports_precomputed_returns`. `Skewness` is a
+# moment measure (eligible iff its target is weight-independent); `VarianceSkewKurtosis`
+# carries a weights-only variance term `r.vr(w)` with no bare-series form, so `false`.
+supports_precomputed_returns(r::Skewness) = weight_independent_target(r.mu)
+supports_precomputed_returns(::VarianceSkewKurtosis) = false
 
 export MaxRiskMeasureSettings, Skewness, VarianceSkewKurtosis

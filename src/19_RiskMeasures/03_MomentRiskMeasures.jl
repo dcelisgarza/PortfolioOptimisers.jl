@@ -1421,8 +1421,10 @@ for rt in (LowOrderMoment, HighOrderMoment)
 end
 
 # Expected-risk input kind — see `risk_input_kind`.
-risk_input_kind(::LowOrderMoment) = WeightsReturnsFeesInput()
-risk_input_kind(::HighOrderMoment) = WeightsReturnsFeesInput()
+risk_input_kind(::LoHiOrderMoment) = WeightsReturnsFeesInput()
+# Precomputed-returns eligibility — see `supports_precomputed_returns`. Instance-dependent:
+# eligible iff the moment target is weight-independent.
+supports_precomputed_returns(r::LoHiOrderMoment) = weight_independent_target(r.mu)
 
 export FirstLowerMoment, SecondMoment, MeanAbsoluteDeviation, ThirdLowerMoment,
        FourthMoment, StandardisedHighOrderMoment, LowOrderMoment, HighOrderMoment,

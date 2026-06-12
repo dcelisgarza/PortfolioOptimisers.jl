@@ -77,7 +77,7 @@ end
 end
 
 # ── ADR 0007: the precomputed-returns contract ────────────────────────────────────────────
-# `_expected_risk_from_returns(r, x)` evaluates a measure on an already-reduced net-return
+# `expected_risk_from_returns(r, x)` evaluates a measure on an already-reduced net-return
 # series. It is gated by `supports_precomputed_returns` so that an ineligible measure — a
 # `WeightsInput` measure (whose `r(w)` shares the `r(::VecNum)` signature and would otherwise
 # silently score the series as weights), a moment measure with a per-asset `mu` (whose target
@@ -86,7 +86,7 @@ end
 const _x_series = [sinpi(2i / 64) * 0.1 + cospi(i / 32) * 0.03 for i in 1:64]
 
 @testset "precomputed-returns contract — eligibility & differential" begin
-    g = PO._expected_risk_from_returns
+    g = PO.expected_risk_from_returns
     # Eligible: NetReturnsInput measures, the weight-independent-target moment family, and
     # ratio composites whose constituents are themselves eligible.
     eligible = Any[ConditionalValueatRisk(), MaximumDrawdown(), ValueatRisk(),

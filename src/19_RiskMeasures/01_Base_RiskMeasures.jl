@@ -139,6 +139,75 @@ function risk_input_kind(r::AbstractBaseRiskMeasure)
     throw(ArgumentError("`risk_input_kind` is not defined for `$(typeof(r))`. Every concrete `AbstractBaseRiskMeasure` must declare its input kind beside its definition by adding a method returning one of `NetReturnsInput()`, `WeightsReturnsFeesInput()`, or `WeightsInput()`."))
 end
 """
+    (r::AbstractBaseRiskMeasure)(::VecNum)
+
+Backstop for the single-argument *precomputed-returns* functor contract `r(x::VecNum)`
+(ADR 0007).
+
+This method is only ever reached by a measure that defines **no** `VecNum` functor of its
+own — e.g. a composite carrying a weights-only variance term such as `VarianceSkewKurtosis`.
+For such a measure the precomputed-returns form is undefined, so this throws.
+
+It is *not* the primary safety mechanism. A [`WeightsInput`](@ref) measure's own functor
+`r(w)` shares this `r(::VecNum)` signature and would otherwise silently consume a return
+series *as weights*; dispatch alone cannot tell the two apart. Eligibility is therefore
+decided up front by [`supports_precomputed_returns`](@ref), which the contract entry
+[`expected_risk_from_returns`](@ref) consults before ever calling the functor.
+"""
+function (r::AbstractBaseRiskMeasure)(::VecNum)
+    throw(ArgumentError("`$(typeof(r))` has no precomputed-return-series form `r(x::VecNum)`: its risk depends on portfolio weights and/or per-asset data (e.g. a variance-carrying composite such as `VarianceSkewKurtosis`). Evaluate it through `expected_risk(r, w, X, fees)` with explicit weights instead."))
+end
+"""
+    supports_precomputed_returns(r::AbstractBaseRiskMeasure) -> Bool
+    supports_precomputed_returns(rk::RiskInputKind, r::AbstractBaseRiskMeasure) -> Bool
+
+Whether risk measure `r` has a well-defined *precomputed-returns* form — i.e. whether its
+expected risk can be evaluated on an already-reduced net-return series `x` alone, via the
+functor `r(x::VecNum)` (ADR 0007).
+
+The contract is well-defined exactly when the measure's result is a function of the series
+alone:
+
+  - [`NetReturnsInput`](@ref) measures (quantile / drawdown families): always `true` — their
+    functor *is* the net-returns functor.
+  - The moment family ([`LowOrderMoment`](@ref), [`HighOrderMoment`](@ref), [`Skewness`](@ref),
+    [`Kurtosis`](@ref), [`MedianAbsoluteDeviation`](@ref), [`ThirdCentralMoment`](@ref)):
+    `true` iff its target is weight-independent (`mu` is `nothing`, a scalar, or a centering
+    function); a per-asset `mu` (`VecNum`/`VecScalar`) reduces as `dot(w, mu)` and needs the
+    weights the series no longer carries, so `false`.
+  - [`WeightsInput`](@ref) measures, tracking measures, and variance-carrying composites
+    (`VarianceSkewKurtosis`): `false` — "risk of a bare return series" is undefined for them.
+
+This predicate is what makes the precomputed-returns contract *safe*. Because a
+`WeightsInput` measure's functor `r(w)` shares the `r(::VecNum)` signature with the contract,
+dispatch alone cannot distinguish weights from returns; [`expected_risk_from_returns`](@ref)
+consults this predicate and throws an explanatory error for ineligible measures rather than
+silently consuming the series as weights.
+
+# Related
+
+  - [`expected_risk_from_returns`](@ref)
+  - [`risk_input_kind`](@ref)
+  - [`RiskInputKind`](@ref)
+"""
+function supports_precomputed_returns(r::AbstractBaseRiskMeasure)
+    return supports_precomputed_returns(risk_input_kind(r), r)
+end
+supports_precomputed_returns(::NetReturnsInput, ::Any) = true
+supports_precomputed_returns(::WeightsInput, ::Any) = false
+# Erroring tripwire — mirrors `risk_input_kind`'s erroring default. Every
+# `WeightsReturnsFeesInput` measure declares `supports_precomputed_returns` at its own
+# definition site: the moment family in terms of `weight_independent_target(r.mu)`,
+# tracking / variance-carrying composites as `false`. Reaching this leaf means a WRF
+# measure forgot to declare it — fail loudly rather than silently mis-route (and the
+# completeness test in `test_09c_risk_input_kind.jl` turns that into a CI failure).
+function supports_precomputed_returns(::WeightsReturnsFeesInput, r)
+    throw(ArgumentError("`$(typeof(r))` is a `WeightsReturnsFeesInput` risk measure that does not declare `supports_precomputed_returns`. Declare it at the measure's definition site: a moment measure as `supports_precomputed_returns(r::$(typeof(r))) = weight_independent_target(r.mu)`; a weights-dependent measure (tracking, variance-carrying composite) as `supports_precomputed_returns(::$(typeof(r))) = false`."))
+end
+weight_independent_target(::Nothing) = true
+weight_independent_target(::Number) = true
+weight_independent_target(::Any) = false
+"""
 $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for risk measures that are not intended for use in portfolio optimisation routines.
@@ -932,6 +1001,19 @@ Generic function extended by concrete risk measure types. Each method computes t
 """
 function expected_risk end
 """
+    expected_risk_from_returns(r, X; kwargs...)
+
+Compute the expected risk of a measure from a precomputed net-return series.
+
+Generic function extended by concrete risk measure types that support the precomputed-returns contract. Only measures with `supports_precomputed_returns(r) == true` should implement this method.
+
+# Related
+
+  - [`AbstractBaseRiskMeasure`](@ref)
+  - [`supports_precomputed_returns`](@ref)
+"""
+function expected_risk_from_returns end
+"""
     no_bounds_risk_measure(r, args...; kwargs...)
 
 Add a risk measure to a JuMP model without upper-bound constraints.
@@ -989,5 +1071,6 @@ Generic function extended by concrete risk measure types. For hierarchical risk 
 function bounds_risk_measure end
 
 export Frontier, RiskMeasureSettings, HierarchicalRiskMeasureSettings, SumScalariser,
-       MaxScalariser, MinScalariser, LogSumExpScalariser, expected_risk, RiskMeasure,
-       HierarchicalRiskMeasure, SquareRootBound, LinearBound, SquaredBound
+       MaxScalariser, MinScalariser, LogSumExpScalariser, expected_risk,
+       expected_risk_from_returns, RiskMeasure, HierarchicalRiskMeasure, SquareRootBound,
+       LinearBound, SquaredBound

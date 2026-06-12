@@ -301,8 +301,11 @@ end
 function (r::MedianAbsoluteDeviation)(x::VecNum)
     return _moment_risk(r, calc_deviations_vec(r, x))
 end
-
 # Expected-risk input kind — see `risk_input_kind`.
 risk_input_kind(::MedianAbsoluteDeviation) = WeightsReturnsFeesInput()
+weight_independent_target(::MedianCenteringFunction) = true
+# Precomputed-returns eligibility — see `supports_precomputed_returns`. Instance-dependent:
+# eligible iff the moment target is weight-independent.
+supports_precomputed_returns(r::MedianAbsoluteDeviation) = weight_independent_target(r.mu)
 
 export MedianAbsoluteDeviation, MedianCentering, MeanCentering

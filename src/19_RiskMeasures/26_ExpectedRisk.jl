@@ -56,16 +56,25 @@ Composite and container forms keep explicit methods:
 function expected_risk(r::AbstractBaseRiskMeasure, w::VecNum, args...; kwargs...)
     return expected_risk(risk_input_kind(r), r, w, args...; kwargs...)
 end
-function expected_risk(::NetReturnsInput, r, w::VecNum, X::MatNum,
+function expected_risk(::NetReturnsInput, r::AbstractBaseRiskMeasure, w::VecNum, X::MatNum,
                        fees::Option{<:Fees} = nothing; kwargs...)
     return r(calc_net_returns(w, X, fees))
 end
-function expected_risk(::WeightsReturnsFeesInput, r, w::VecNum, X::MatNum,
-                       fees::Option{<:Fees} = nothing; kwargs...)
+function expected_risk(::WeightsReturnsFeesInput, r::AbstractBaseRiskMeasure, w::VecNum,
+                       X::MatNum, fees::Option{<:Fees} = nothing; kwargs...)
     return r(w, X, fees)
 end
-function expected_risk(::WeightsInput, r, w::VecNum, args...; kwargs...)
+function expected_risk(::WeightsInput, r::AbstractBaseRiskMeasure, w::VecNum, args...;
+                       kwargs...)
     return r(w)
+end
+# Ratio composites evaluate on a series through their own `r(x)` functors (defined above),
+# not the kind trait. They are series-eligible exactly when both constituents are.
+function supports_precomputed_returns(r::RkRatioRM)
+    return supports_precomputed_returns(r.r1) && supports_precomputed_returns(r.r2)
+end
+function supports_precomputed_returns(r::MeanReturnRiskRatio)
+    return supports_precomputed_returns(r.rt) && supports_precomputed_returns(r.rk)
 end
 function expected_risk(r::RkRatioRM, w::VecNum, X::MatNum, fees::Option{<:Fees} = nothing;
                        kwargs...)
@@ -94,98 +103,12 @@ function expected_risk(r::AbstractBaseRiskMeasure, w::VecVecNum, args...; kwargs
     return [expected_risk(r, wi, args...; kwargs...) for wi in w]
 end
 """
-    (r::AbstractBaseRiskMeasure)(::VecNum)
+    expected_risk_from_returns(r::AbstractBaseRiskMeasure, X::VecNum; kwargs...) -> Number
 
-Backstop for the single-argument *precomputed-returns* functor contract `r(x::VecNum)`
-(ADR 0007).
-
-This method is only ever reached by a measure that defines **no** `VecNum` functor of its
-own — e.g. a composite carrying a weights-only variance term such as `VarianceSkewKurtosis`.
-For such a measure the precomputed-returns form is undefined, so this throws.
-
-It is *not* the primary safety mechanism. A [`WeightsInput`](@ref) measure's own functor
-`r(w)` shares this `r(::VecNum)` signature and would otherwise silently consume a return
-series *as weights*; dispatch alone cannot tell the two apart. Eligibility is therefore
-decided up front by [`supports_precomputed_returns`](@ref), which the contract entry
-[`_expected_risk_from_returns`](@ref) consults before ever calling the functor.
-"""
-function (r::AbstractBaseRiskMeasure)(::VecNum)
-    throw(ArgumentError("`$(typeof(r))` has no precomputed-return-series form `r(x::VecNum)`: its risk depends on portfolio weights and/or per-asset data (e.g. a variance-carrying composite such as `VarianceSkewKurtosis`). Evaluate it through `expected_risk(r, w, X, fees)` with explicit weights instead."))
-end
-"""
-    supports_precomputed_returns(r::AbstractBaseRiskMeasure) -> Bool
-
-Whether risk measure `r` has a well-defined *precomputed-returns* form — i.e. whether its
-expected risk can be evaluated on an already-reduced net-return series `x` alone, via the
-functor `r(x::VecNum)` (ADR 0007).
-
-The contract is well-defined exactly when the measure's result is a function of the series
-alone:
-
-  - [`NetReturnsInput`](@ref) measures (quantile / drawdown families): always `true` — their
-    functor *is* the net-returns functor.
-  - The moment family ([`LowOrderMoment`](@ref), [`HighOrderMoment`](@ref), [`Skewness`](@ref),
-    [`Kurtosis`](@ref), [`MedianAbsoluteDeviation`](@ref), [`ThirdCentralMoment`](@ref)):
-    `true` iff its target is weight-independent (`mu` is `nothing`, a scalar, or a centering
-    function); a per-asset `mu` (`VecNum`/`VecScalar`) reduces as `dot(w, mu)` and needs the
-    weights the series no longer carries, so `false`.
-  - [`WeightsInput`](@ref) measures, tracking measures, and variance-carrying composites
-    (`VarianceSkewKurtosis`): `false` — "risk of a bare return series" is undefined for them.
-
-This predicate is what makes the precomputed-returns contract *safe*. Because a
-`WeightsInput` measure's functor `r(w)` shares the `r(::VecNum)` signature with the contract,
-dispatch alone cannot distinguish weights from returns; [`_expected_risk_from_returns`](@ref)
-consults this predicate and throws an explanatory error for ineligible measures rather than
-silently consuming the series as weights.
-
-# Related
-
-  - [`_expected_risk_from_returns`](@ref)
-  - [`risk_input_kind`](@ref)
-  - [`RiskInputKind`](@ref)
-"""
-function supports_precomputed_returns(r::AbstractBaseRiskMeasure)
-    return _supports_precomputed_returns(risk_input_kind(r), r)
-end
-"""
-    const PrecomputedMomentRM = Union{...}
-
-The moment-family risk measures that gain a single-argument precomputed-returns functor
-`r(x::VecNum)` under ADR 0007. Their eligibility is instance-dependent (it turns on the
-`mu` target), so [`supports_precomputed_returns`](@ref) inspects `r.mu` for these.
-
-# Related
-
-  - [`supports_precomputed_returns`](@ref)
-"""
-const PrecomputedMomentRM = Union{<:LowOrderMoment, <:HighOrderMoment, <:Skewness,
-                                  <:Kurtosis, <:MedianAbsoluteDeviation,
-                                  <:ThirdCentralMoment}
-_supports_precomputed_returns(::NetReturnsInput, ::Any) = true
-_supports_precomputed_returns(::WeightsInput, ::Any) = false
-_supports_precomputed_returns(::WeightsReturnsFeesInput, ::Any) = false
-function _supports_precomputed_returns(::WeightsReturnsFeesInput, r::PrecomputedMomentRM)
-    return _weight_independent_target(r.mu)
-end
-_weight_independent_target(::Nothing) = true
-_weight_independent_target(::Number) = true
-_weight_independent_target(::MedianCenteringFunction) = true
-_weight_independent_target(::Any) = false
-# Ratio composites evaluate on a series through their own `r(x)` functors (defined above),
-# not the kind trait. They are series-eligible exactly when both constituents are.
-function supports_precomputed_returns(r::RkRatioRM)
-    return supports_precomputed_returns(r.r1) && supports_precomputed_returns(r.r2)
-end
-function supports_precomputed_returns(r::MeanReturnRiskRatio)
-    return supports_precomputed_returns(r.rt) && supports_precomputed_returns(r.rk)
-end
-"""
-    _expected_risk_from_returns(r::AbstractBaseRiskMeasure, x::VecNum)
-
-Contract entry for evaluating a risk measure on an already-reduced net-return series `x`
+Contract entry for evaluating a risk measure on an already-reduced net-return series `X`
 (ADR 0007). Consults [`supports_precomputed_returns`](@ref): for an eligible measure it
-returns `r(x)`; for an ineligible one it throws an explanatory `ArgumentError` instead of
-silently consuming `x` as weights (a [`WeightsInput`](@ref) measure) or hitting an opaque
+returns `r(X)`; for an ineligible one it throws an explanatory `ArgumentError` instead of
+silently consuming `X` as weights (a [`WeightsInput`](@ref) measure) or hitting an opaque
 `MethodError` (a moment measure with a per-asset `mu`).
 
 Internal call sites that hold a precomputed series — cross-validation prediction scoring —
@@ -196,11 +119,14 @@ route through here rather than calling the functor directly.
   - [`supports_precomputed_returns`](@ref)
   - [`expected_risk`](@ref)
 """
-function _expected_risk_from_returns(r::AbstractBaseRiskMeasure, x::VecNum)
+function expected_risk_from_returns(r::AbstractBaseRiskMeasure, X::VecNum; kwargs...)
     if !supports_precomputed_returns(r)
         throw(ArgumentError("`$(typeof(r))` cannot be evaluated on a precomputed return series: it requires portfolio weights and/or per-asset data (e.g. a weights-only measure such as `TurnoverRiskMeasure`/`EqualRiskMeasure`, a tracking measure, a variance-carrying composite such as `VarianceSkewKurtosis`, or a moment measure with a per-asset `mu`). Evaluate it through `expected_risk(r, w, X, fees)` with explicit weights instead."))
     end
-    return r(x)
+    return r(X)
+end
+function expected_risk_from_returns(r::AbstractBaseRiskMeasure, X::VecVecNum; kwargs...)
+    return [expected_risk_from_returns(r, Xi; kwargs...) for Xi in X]
 end
 """
     number_effective_assets(w::VecNum)
