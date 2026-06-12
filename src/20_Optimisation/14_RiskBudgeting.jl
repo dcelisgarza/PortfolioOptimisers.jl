@@ -681,23 +681,18 @@ function set_risk_budgeting_constraints!(model::JuMP.Model,
 end
 function _optimise(rb::RiskBudgeting, rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
                    str_names::Bool = false, save::Bool = true, kwargs...)
-    (; pr, wb, lt, st, lcsr, ctr, gcardr, sgcardr, smtx, slt, sst, sgmtx, sglt, sgst, plr, tn, fees, ret) = processed_jump_optimiser_attributes(rb.opt,
-                                                                                                                                                rd;
-                                                                                                                                                dims = dims,
-                                                                                                                                                kwargs...)
+    attrs = processed_jump_optimiser_attributes(rb.opt, rd; dims = dims, kwargs...)
     model = JuMP.Model()
     JuMP.set_string_names_on_creation(model, str_names)
     set_model_scales!(model, rb.opt.sc, rb.opt.so)
-    prb = set_risk_budgeting_constraints!(model, rb, pr, wb, rd)
-    attrs = ProcessedJuMPOptimiserAttributes(pr, wb, lt, st, lcsr, ctr, gcardr, sgcardr,
-                                             smtx, sgmtx, slt, sst, sglt, sgst, tn, fees,
-                                             plr, ret)
+    prb = set_risk_budgeting_constraints!(model, rb, attrs.pr, attrs.wb, rd)
     _assemble_jump_model!(model, rb, rb.opt, attrs, rd; r = rb.r,
                           miprb_flag = isa(rb.rba,
                                            AssetRiskBudgeting{<:Any, <:Any,
                                                               <:MixedIntegerRiskBudgeting}))
-    set_portfolio_objective_function!(model, MinimumRisk(), ret, rb.opt.cobj, rb, pr)
-    retcode, sol = optimise_JuMP_model!(model, rb, eltype(pr.X))
+    set_portfolio_objective_function!(model, MinimumRisk(), attrs.ret, rb.opt.cobj, rb,
+                                      attrs.pr)
+    retcode, sol = optimise_JuMP_model!(model, rb, eltype(attrs.pr.X))
     return RiskBudgetingResult(typeof(rb), attrs, prb, retcode, sol,
                                ifelse(save, model, nothing), nothing)
 end

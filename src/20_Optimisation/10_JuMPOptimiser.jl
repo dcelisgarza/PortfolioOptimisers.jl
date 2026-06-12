@@ -835,7 +835,7 @@ end
 Run the invariant model-assembly sequence shared by every single-JuMP-model Optimisation
 Estimator — the steps between shaping the weight variables (the per-optimiser *head*) and
 setting the objective/solving (the per-optimiser *tail*). See `Model Assembly` in
-`CONTEXT.md` and [ADR 0006](../../docs/adr/0006-jump-model-assembly.md).
+`CONTEXT.md` and [ADR 0008](../../docs/adr/0008-jump-model-assembly.md).
 
 Constraint *results* are read from `attrs` (a [`ProcessedJuMPOptimiserAttributes`](@ref));
 scalar *settings* from `opt` (the [`JuMPOptimiser`](@ref)); `optimiser` is the dispatch

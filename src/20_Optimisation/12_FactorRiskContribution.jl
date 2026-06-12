@@ -298,25 +298,20 @@ function set_factor_risk_contribution_constraints!(model::JuMP.Model, re::RegE_R
 end
 function _optimise(frc::FactorRiskContribution, rd::ReturnsResult = ReturnsResult();
                    dims::Int = 1, str_names::Bool = false, save::Bool = true, kwargs...)
-    (; pr, wb, lt, st, lcsr, ctr, gcardr, sgcardr, smtx, slt, sst, sgmtx, sglt, sgst, plr, tn, fees, ret) = processed_jump_optimiser_attributes(frc.opt,
-                                                                                                                                                rd;
-                                                                                                                                                dims = dims,
-                                                                                                                                                kwargs...)
+    attrs = processed_jump_optimiser_attributes(frc.opt, rd; dims = dims, kwargs...)
     model = JuMP.Model()
     JuMP.set_string_names_on_creation(model, str_names)
     set_model_scales!(model, frc.opt.sc, frc.opt.so)
-    set_maximum_ratio_factor_variables!(model, pr.mu, frc.obj)
+    set_maximum_ratio_factor_variables!(model, attrs.pr.mu, frc.obj)
     b1, rr = set_factor_risk_contribution_constraints!(model, frc.re, rd, frc.flag, frc.wi)
-    set_weight_constraints!(model, wb, frc.opt.bgt, frc.opt.sbgt)
-    attrs = ProcessedJuMPOptimiserAttributes(pr, wb, lt, st, lcsr, ctr, gcardr, sgcardr,
-                                             smtx, sgmtx, slt, sst, sglt, sgst, tn, fees,
-                                             plr, ret)
+    set_weight_constraints!(model, attrs.wb, frc.opt.bgt, frc.opt.sbgt)
     _assemble_jump_model!(model, frc, frc.opt, attrs, rd; r = frc.r, b1 = b1, obj = frc.obj,
                           sdp_phylogeny = false)
     frc_plr = phylogeny_constraints(frc.frc_ple, rd.F, kwargs...)
     set_sdp_frc_phylogeny_constraints!(model, frc_plr)
-    set_portfolio_objective_function!(model, frc.obj, ret, frc.opt.cobj, frc, pr)
-    retcode, sol = optimise_JuMP_model!(model, frc, eltype(pr.X))
+    set_portfolio_objective_function!(model, frc.obj, attrs.ret, frc.opt.cobj, frc,
+                                      attrs.pr)
+    retcode, sol = optimise_JuMP_model!(model, frc, eltype(attrs.pr.X))
     return FactorRiskContributionResult(typeof(frc), attrs, rr, frc_plr, retcode, sol,
                                         ifelse(save, model, nothing), nothing)
 end

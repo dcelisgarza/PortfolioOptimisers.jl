@@ -381,21 +381,16 @@ function set_relaxed_risk_budgeting_constraints!(model::JuMP.Model,
 end
 function _optimise(rrb::RelaxedRiskBudgeting, rd::ReturnsResult = ReturnsResult();
                    dims::Int = 1, str_names::Bool = false, save::Bool = true, kwargs...)
-    (; pr, wb, lt, st, lcsr, ctr, gcardr, sgcardr, smtx, slt, sst, sgmtx, sglt, sgst, plr, tn, fees, ret) = processed_jump_optimiser_attributes(rrb.opt,
-                                                                                                                                                rd;
-                                                                                                                                                dims = dims,
-                                                                                                                                                kwargs...)
+    attrs = processed_jump_optimiser_attributes(rrb.opt, rd; dims = dims, kwargs...)
     model = JuMP.Model()
     JuMP.set_string_names_on_creation(model, str_names)
     set_model_scales!(model, rrb.opt.sc, rrb.opt.so)
     JuMP.@expression(model, k, 1)
-    prb = set_relaxed_risk_budgeting_constraints!(model, rrb, pr, wb, rd)
-    attrs = ProcessedJuMPOptimiserAttributes(pr, wb, lt, st, lcsr, ctr, gcardr, sgcardr,
-                                             smtx, sgmtx, slt, sst, sglt, sgst, tn, fees,
-                                             plr, ret)
+    prb = set_relaxed_risk_budgeting_constraints!(model, rrb, attrs.pr, attrs.wb, rd)
     _assemble_jump_model!(model, rrb, rrb.opt, attrs, rd)
-    set_portfolio_objective_function!(model, MinimumRisk(), ret, rrb.opt.cobj, rrb, pr)
-    retcode, sol = optimise_JuMP_model!(model, rrb, eltype(pr.X))
+    set_portfolio_objective_function!(model, MinimumRisk(), attrs.ret, rrb.opt.cobj, rrb,
+                                      attrs.pr)
+    retcode, sol = optimise_JuMP_model!(model, rrb, eltype(attrs.pr.X))
     return RiskBudgetingResult(typeof(rrb), attrs, prb, retcode, sol,
                                ifelse(save, model, nothing), nothing)
 end
