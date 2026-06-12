@@ -1,5 +1,5 @@
 ---
-status: accepted — single-argument functor `r(x::VecNum)` as the precomputed-returns contract
+status: accepted — single-argument functor `r(x::VecNum)` as the precomputed-returns contract, gated by `supports_precomputed_returns` (amended, see Correction)
 ---
 
 # Feed already-reduced return series through the functor `r(x::VecNum)`, not a `SingletonVector` sentinel
@@ -74,10 +74,19 @@ missing.
   already errored.
 - **`WeightsInput` measures get no single-vector form**, by design — "risk of a bare return
   series" is undefined for a weights-only measure.
-- **An explanatory fallback replaces the bare `MethodError`.** A catch-all
-  `(::AbstractBaseRiskMeasure)(::VecNum)` throws an `ArgumentError` naming the measure and
-  stating it cannot be evaluated on a precomputed return series (it needs weights / per-asset
-  data), turning the contract boundary into a discoverable rule.
+- **Eligibility is gated, not left to the bare functor.** *(amended — see Correction; the
+  original wording of this bullet is preserved there.)* The contract cannot be enforced on the
+  functor alone: a `WeightsInput` measure's own `r(w)` *is* `r(::VecNum)`, so dispatch cannot
+  tell a weight vector from a return series, and a catch-all `(::AbstractBaseRiskMeasure)(::VecNum)`
+  is shadowed by it (and, for the moment family, by the generic `r(x)`). Instead a predicate
+  `supports_precomputed_returns(r)` — `true` for `NetReturnsInput` measures and the
+  weight-independent-target moment family, `false` for `WeightsInput`/tracking/variance-carrying
+  composites — is consulted by a single internal contract entry `_expected_risk_from_returns(r, x)`,
+  which throws an explanatory `ArgumentError` for an ineligible measure *before* ever calling the
+  functor. The call sites that hold a precomputed series (cross-validation prediction scoring)
+  route through this entry. The bare `(::AbstractBaseRiskMeasure)(::VecNum)` survives only as a
+  backstop for measures with no `VecNum` functor at all (a variance-carrying composite such as
+  `VarianceSkewKurtosis`).
 
 The call sites then state their intent directly:
 
@@ -128,12 +137,48 @@ test are removed.
 - **Plotting loses a helper and gains symmetry.** `_pred_rd_to_matrix` is deleted; each plot
   function has a series-first core reused by both the `(w, X, fees)` method and the prediction
   wrapper. Net plotting code shrinks.
-- **A silent wrong answer becomes a loud error.** Scoring a prediction with a `WeightsInput`
-  measure, or a moment measure with a per-asset `mu`, now throws an actionable `ArgumentError`
-  instead of returning nonsense (or an opaque `dot` length-mismatch).
+- **A silent wrong answer becomes a loud error — at the contract entry.** Scoring a prediction
+  through `_expected_risk_from_returns` with a `WeightsInput` measure, a moment measure with a
+  per-asset `mu`, or a variance-carrying composite now throws an actionable `ArgumentError` via
+  the `supports_precomputed_returns` gate, instead of returning nonsense (turnover of the series
+  read as weights) or an opaque `MethodError`. The guarantee lives at the gate, not the bare
+  functor: `EqualRiskMeasure()(v)` remains a legitimate `r(weights)` call and cannot be told
+  apart from a misuse by dispatch.
 - **The boundary is documented by construction.** Which measures support a bare return series
   is now a property visible at each measure's functor definition, not an emergent consequence
   of a sentinel's arithmetic.
 - **Extends ADR 0006.** Same dispatch surface; this closes the "I already hold the reduced
   series" case that the input-kind trait left implicit, using the trait's own
   `NetReturnsInput` shape (`r(::VecNum)`) as the model for the whole moment family.
+
+## Correction — gated eligibility (amended in place)
+
+The original Decision delivered the explanatory error through the bare-functor catch-all:
+
+> **An explanatory fallback replaces the bare `MethodError`.** A catch-all
+> `(::AbstractBaseRiskMeasure)(::VecNum)` throws an `ArgumentError` naming the measure and
+> stating it cannot be evaluated on a precomputed return series (it needs weights / per-asset
+> data), turning the contract boundary into a discoverable rule.
+
+That holds only for measures with **no** `VecNum` functor at all (e.g. `VarianceSkewKurtosis`).
+It is **not** true for the two cases the ADR explicitly named as now-loud:
+
+- a `WeightsInput` measure's functor `r(w)` shares the `r(::VecNum)` signature, so it shadows
+  the catch-all and **silently scores the series as weights** (`EqualRiskMeasure()(x)` → `1/N`,
+  `TurnoverRiskMeasure()(x)` → turnover-of-series), or throws an opaque `DimensionMismatch`
+  (`Variance`/`StandardDeviation`);
+- a moment measure with a per-asset `mu` is shadowed by the moment family's generic `r(x)` and
+  dies on a raw `MethodError` inside `calc_moment_target`, not the explanatory error.
+
+So the version first shipped reproduced — in a new shape — the very silent-wrong-answer this ADR
+set out to remove (cf. option D's rejection, *"a lone vector cannot mean both"*, which recurs at
+the functor level). This is the same failure the `SingletonVector` Context described: *"it
+silently does the wrong thing for measures that genuinely need weights."*
+
+**Fix.** Keep the single-argument functor as the contract for *eligible* measures, but move the
+safety guarantee off the functor onto a gated contract entry: a predicate
+`supports_precomputed_returns(r)` (kind-derived, with the moment family's eligibility turning on
+whether its `mu` target is weight-independent) consulted by `_expected_risk_from_returns(r, x)`,
+through which the precomputed-series call sites route. Ratio composites recurse into their
+constituents. The amended Decision bullet above describes the result. Guarded by a behavioural +
+completeness test in `test/test_09c_risk_input_kind.jl`.

@@ -96,18 +96,111 @@ end
 """
     (r::AbstractBaseRiskMeasure)(::VecNum)
 
-Fallback for the single-argument *precomputed-returns* functor contract: `r(x::VecNum)`
-means "the expected risk of the net-return series `x`". A measure that does not define a
-single-vector method cannot be evaluated on an already-reduced return series — it needs
-portfolio weights and/or per-asset data — so this fallback throws an explanatory error
-instead of a bare `MethodError`.
+Backstop for the single-argument *precomputed-returns* functor contract `r(x::VecNum)`
+(ADR 0007).
 
-Measures that *do* support the contract (the net-returns families and the moment family
-with a weight-independent target) define a more specific `(r::ConcreteMeasure)(::VecNum)`
-that wins over this fallback.
+This method is only ever reached by a measure that defines **no** `VecNum` functor of its
+own — e.g. a composite carrying a weights-only variance term such as `VarianceSkewKurtosis`.
+For such a measure the precomputed-returns form is undefined, so this throws.
+
+It is *not* the primary safety mechanism. A [`WeightsInput`](@ref) measure's own functor
+`r(w)` shares this `r(::VecNum)` signature and would otherwise silently consume a return
+series *as weights*; dispatch alone cannot tell the two apart. Eligibility is therefore
+decided up front by [`supports_precomputed_returns`](@ref), which the contract entry
+[`_expected_risk_from_returns`](@ref) consults before ever calling the functor.
 """
 function (r::AbstractBaseRiskMeasure)(::VecNum)
-    throw(ArgumentError("`$(typeof(r))` cannot be evaluated on a precomputed return series: it requires portfolio weights and/or per-asset data (e.g. a weights-only measure such as `Turnover`/`EqualRiskMeasure`, a composite carrying a variance term such as `VarianceSkewKurtosis`, or a moment measure with a per-asset `mu`). Evaluate it through `expected_risk(r, w, X, fees)` with explicit weights instead."))
+    throw(ArgumentError("`$(typeof(r))` has no precomputed-return-series form `r(x::VecNum)`: its risk depends on portfolio weights and/or per-asset data (e.g. a variance-carrying composite such as `VarianceSkewKurtosis`). Evaluate it through `expected_risk(r, w, X, fees)` with explicit weights instead."))
+end
+"""
+    supports_precomputed_returns(r::AbstractBaseRiskMeasure) -> Bool
+
+Whether risk measure `r` has a well-defined *precomputed-returns* form — i.e. whether its
+expected risk can be evaluated on an already-reduced net-return series `x` alone, via the
+functor `r(x::VecNum)` (ADR 0007).
+
+The contract is well-defined exactly when the measure's result is a function of the series
+alone:
+
+  - [`NetReturnsInput`](@ref) measures (quantile / drawdown families): always `true` — their
+    functor *is* the net-returns functor.
+  - The moment family ([`LowOrderMoment`](@ref), [`HighOrderMoment`](@ref), [`Skewness`](@ref),
+    [`Kurtosis`](@ref), [`MedianAbsoluteDeviation`](@ref), [`ThirdCentralMoment`](@ref)):
+    `true` iff its target is weight-independent (`mu` is `nothing`, a scalar, or a centering
+    function); a per-asset `mu` (`VecNum`/`VecScalar`) reduces as `dot(w, mu)` and needs the
+    weights the series no longer carries, so `false`.
+  - [`WeightsInput`](@ref) measures, tracking measures, and variance-carrying composites
+    (`VarianceSkewKurtosis`): `false` — "risk of a bare return series" is undefined for them.
+
+This predicate is what makes the precomputed-returns contract *safe*. Because a
+`WeightsInput` measure's functor `r(w)` shares the `r(::VecNum)` signature with the contract,
+dispatch alone cannot distinguish weights from returns; [`_expected_risk_from_returns`](@ref)
+consults this predicate and throws an explanatory error for ineligible measures rather than
+silently consuming the series as weights.
+
+# Related
+
+  - [`_expected_risk_from_returns`](@ref)
+  - [`risk_input_kind`](@ref)
+  - [`RiskInputKind`](@ref)
+"""
+function supports_precomputed_returns(r::AbstractBaseRiskMeasure)
+    return _supports_precomputed_returns(risk_input_kind(r), r)
+end
+"""
+    const PrecomputedMomentRM = Union{...}
+
+The moment-family risk measures that gain a single-argument precomputed-returns functor
+`r(x::VecNum)` under ADR 0007. Their eligibility is instance-dependent (it turns on the
+`mu` target), so [`supports_precomputed_returns`](@ref) inspects `r.mu` for these.
+
+# Related
+
+  - [`supports_precomputed_returns`](@ref)
+"""
+const PrecomputedMomentRM = Union{<:LowOrderMoment, <:HighOrderMoment, <:Skewness,
+                                  <:Kurtosis, <:MedianAbsoluteDeviation,
+                                  <:ThirdCentralMoment}
+_supports_precomputed_returns(::NetReturnsInput, ::Any) = true
+_supports_precomputed_returns(::WeightsInput, ::Any) = false
+_supports_precomputed_returns(::WeightsReturnsFeesInput, ::Any) = false
+function _supports_precomputed_returns(::WeightsReturnsFeesInput, r::PrecomputedMomentRM)
+    return _weight_independent_target(r.mu)
+end
+_weight_independent_target(::Nothing) = true
+_weight_independent_target(::Number) = true
+_weight_independent_target(::MedianCenteringFunction) = true
+_weight_independent_target(::Any) = false
+# Ratio composites evaluate on a series through their own `r(x)` functors (defined above),
+# not the kind trait. They are series-eligible exactly when both constituents are.
+function supports_precomputed_returns(r::RkRatioRM)
+    return supports_precomputed_returns(r.r1) && supports_precomputed_returns(r.r2)
+end
+function supports_precomputed_returns(r::MeanReturnRiskRatio)
+    return supports_precomputed_returns(r.rt) && supports_precomputed_returns(r.rk)
+end
+"""
+    _expected_risk_from_returns(r::AbstractBaseRiskMeasure, x::VecNum)
+
+Contract entry for evaluating a risk measure on an already-reduced net-return series `x`
+(ADR 0007). Consults [`supports_precomputed_returns`](@ref): for an eligible measure it
+returns `r(x)`; for an ineligible one it throws an explanatory `ArgumentError` instead of
+silently consuming `x` as weights (a [`WeightsInput`](@ref) measure) or hitting an opaque
+`MethodError` (a moment measure with a per-asset `mu`).
+
+Internal call sites that hold a precomputed series — cross-validation prediction scoring —
+route through here rather than calling the functor directly.
+
+# Related
+
+  - [`supports_precomputed_returns`](@ref)
+  - [`expected_risk`](@ref)
+"""
+function _expected_risk_from_returns(r::AbstractBaseRiskMeasure, x::VecNum)
+    if !supports_precomputed_returns(r)
+        throw(ArgumentError("`$(typeof(r))` cannot be evaluated on a precomputed return series: it requires portfolio weights and/or per-asset data (e.g. a weights-only measure such as `TurnoverRiskMeasure`/`EqualRiskMeasure`, a tracking measure, a variance-carrying composite such as `VarianceSkewKurtosis`, or a moment measure with a per-asset `mu`). Evaluate it through `expected_risk(r, w, X, fees)` with explicit weights instead."))
+    end
+    return r(x)
 end
 """
     number_effective_assets(w::VecNum)

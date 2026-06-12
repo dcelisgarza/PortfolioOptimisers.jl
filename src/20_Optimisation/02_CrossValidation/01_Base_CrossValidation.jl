@@ -409,22 +409,31 @@ const VecVecPredRes = AbstractVector{<:VecPredRes}
 Compute the expected risk for a prediction result's returns.
 
 Internal helper that dispatches on whether `X` is a plain vector or a vector of vectors.
+The portfolio return series is already reduced, so each value is evaluated through the
+precomputed-returns contract entry [`_expected_risk_from_returns`](@ref) (ADR 0007), which
+throws an explanatory error if `r` is not series-evaluable (e.g. a [`WeightsInput`](@ref)
+measure) rather than silently scoring nonsense.
 
 # Arguments
 
   - `r`: Risk measure.
   - `X`: Returns vector or vector of vectors.
-  - `kwargs...`: Additional keyword arguments passed to [`expected_risk`](@ref).
+  - `kwargs...`: Additional keyword arguments.
 
 # Returns
 
   - Expected risk value(s).
+
+# Related
+
+  - [`_expected_risk_from_returns`](@ref)
+  - [`supports_precomputed_returns`](@ref)
 """
 function _prediction_expected_risk(r::AbstractBaseRiskMeasure, X::VecNum; kwargs...)
-    return r(X)
+    return _expected_risk_from_returns(r, X)
 end
 function _prediction_expected_risk(r::AbstractBaseRiskMeasure, X::VecVecNum; kwargs...)
-    return [r(Xi) for Xi in X]
+    return [_expected_risk_from_returns(r, Xi) for Xi in X]
 end
 function expected_risk(r::AbstractBaseRiskMeasure, pred::PredictionResult; kwargs...)
     return _prediction_expected_risk(r, pred.rd.X, kwargs...)

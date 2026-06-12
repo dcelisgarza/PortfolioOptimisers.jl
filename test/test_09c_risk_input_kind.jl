@@ -76,6 +76,75 @@ end
     end
 end
 
+# ── ADR 0007: the precomputed-returns contract ────────────────────────────────────────────
+# `_expected_risk_from_returns(r, x)` evaluates a measure on an already-reduced net-return
+# series. It is gated by `supports_precomputed_returns` so that an ineligible measure — a
+# `WeightsInput` measure (whose `r(w)` shares the `r(::VecNum)` signature and would otherwise
+# silently score the series as weights), a moment measure with a per-asset `mu` (whose target
+# `dot(w, mu)` needs the absent weights), or a variance-carrying composite — throws an
+# explanatory error rather than returning nonsense or hitting a raw `MethodError`.
+const _x_series = [sinpi(2i / 64) * 0.1 + cospi(i / 32) * 0.03 for i in 1:64]
+
+@testset "precomputed-returns contract — eligibility & differential" begin
+    g = PO._expected_risk_from_returns
+    # Eligible: NetReturnsInput measures, the weight-independent-target moment family, and
+    # ratio composites whose constituents are themselves eligible.
+    eligible = Any[ConditionalValueatRisk(), MaximumDrawdown(), ValueatRisk(),
+                   WorstRealisation(), Range(), MeanReturn(), LowOrderMoment(),
+                   HighOrderMoment(), Skewness(), Kurtosis(), MedianAbsoluteDeviation(),
+                   ThirdCentralMoment(), LowOrderMoment(; mu = 0.01),
+                   MedianAbsoluteDeviation(; mu = PO.MeanCentering()),
+                   RiskRatioRiskMeasure(; r1 = ConditionalValueatRisk(),
+                                        r2 = MaximumDrawdown()),
+                   MeanReturnRiskRatio(; rk = ConditionalValueatRisk())]
+    for r in eligible
+        @test PO.supports_precomputed_returns(r)
+        v = g(r, _x_series)
+        @test v isa Number && isfinite(v)
+    end
+
+    # Differential oracle: for the moment family the single-vector form equals the one-asset
+    # `(w, X, fees)` form — the same oracle the entropy-pooling tests use (ADR 0007).
+    for r in (LowOrderMoment(), HighOrderMoment(), Skewness(), Kurtosis(),
+              MedianAbsoluteDeviation(), ThirdCentralMoment(), LowOrderMoment(; mu = 0.01))
+        @test g(r, _x_series) ≈ r([1], reshape(_x_series, :, 1))
+    end
+
+    # Ineligible: the gate throws the explanatory `ArgumentError` — no silent wrong answer,
+    # no raw `MethodError`. The default `RiskRatioRiskMeasure` is ineligible via its
+    # weights-only `Variance` constituent.
+    mu2 = [0.1, 0.2]
+    ineligible = Any[EqualRiskMeasure(), TurnoverRiskMeasure(; w = fill(inv(64), 64)),
+                     StandardDeviation(; sigma = [1.0 0.0; 0.0 1.0]),
+                     Variance(; sigma = [1.0 0.0; 0.0 1.0]), NegativeSkewness(),
+                     VarianceSkewKurtosis(), RiskRatioRiskMeasure(),
+                     LowOrderMoment(; mu = mu2), HighOrderMoment(; mu = mu2),
+                     Skewness(; mu = mu2), Kurtosis(; mu = mu2),
+                     MedianAbsoluteDeviation(; mu = mu2), ThirdCentralMoment(; mu = mu2)]
+    for r in ineligible
+        @test !PO.supports_precomputed_returns(r)
+        @test_throws ArgumentError g(r, _x_series)
+    end
+end
+
+@testset "precomputed-returns contract — completeness" begin
+    # Every kind-classified concrete measure resolves `supports_precomputed_returns` to a
+    # `Bool` — a future measure that fails to inherit an eligibility (e.g. via a missing
+    # `risk_input_kind`) trips here rather than at runtime. The `_EXPLICIT` composites are
+    # covered behaviourally above.
+    for T in all_concrete(PO.AbstractBaseRiskMeasure)
+        if T in _EXPLICIT
+            continue
+        end
+        rt = reduce(typejoin, Base.return_types(PO.supports_precomputed_returns, (T,));
+                    init = Union{})
+        # `Bool <: rt` holds when the predicate resolves — `Bool`, or `Any` for a moment
+        # UnionAll whose `mu` field is abstractly typed. It fails only on `Union{}`: an
+        # undeclared measure whose `risk_input_kind` throws.
+        @test Bool <: rt
+    end
+end
+
 #=
 I think the failure is due to running the tests/script when the test environment was out of sync with the worktree. When i started a session with
 
