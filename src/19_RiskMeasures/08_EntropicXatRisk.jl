@@ -679,5 +679,11 @@ function factory(r::RelativeEntropicDrawdownatRisk, slv::Slv_VecSlv,
                                           alpha = r.alpha, w = w)
 end
 
+# Expected-risk input kind — see `risk_input_kind`.
+risk_input_kind(::EntropicValueatRisk) = NetReturnsInput()
+risk_input_kind(::EntropicValueatRiskRange) = NetReturnsInput()
+risk_input_kind(::EntropicDrawdownatRisk) = NetReturnsInput()
+risk_input_kind(::RelativeEntropicDrawdownatRisk) = NetReturnsInput()
+
 export EntropicValueatRisk, EntropicValueatRiskRange, EntropicDrawdownatRisk,
        RelativeEntropicDrawdownatRisk

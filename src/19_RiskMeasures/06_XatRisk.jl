@@ -947,5 +947,11 @@ Union of risk measures that support Cholesky-factor-based computation.
 """
 const CholRM = Union{<:Variance, <:StandardDeviation, <:DistributionValueatRisk}
 
+# Expected-risk input kind — see `risk_input_kind`.
+risk_input_kind(::ValueatRisk) = NetReturnsInput()
+risk_input_kind(::ValueatRiskRange) = NetReturnsInput()
+risk_input_kind(::DrawdownatRisk) = NetReturnsInput()
+risk_input_kind(::RelativeDrawdownatRisk) = NetReturnsInput()
+
 export MIPValueatRisk, DistributionValueatRisk, ValueatRisk, ValueatRiskRange,
        DrawdownatRisk, RelativeDrawdownatRisk

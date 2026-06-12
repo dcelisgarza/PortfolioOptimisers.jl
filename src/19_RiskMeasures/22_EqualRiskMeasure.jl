@@ -77,4 +77,7 @@ function (::EqualRiskMeasure)(w::VecNum)
     return inv(length(w))
 end
 
+# Expected-risk input kind — see `risk_input_kind`.
+risk_input_kind(::EqualRiskMeasure) = WeightsInput()
+
 export EqualRiskMeasure

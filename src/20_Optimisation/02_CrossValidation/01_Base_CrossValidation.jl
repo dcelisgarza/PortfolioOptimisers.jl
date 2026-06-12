@@ -403,32 +403,8 @@ Represents the outer collection of cross-validation paths, where each inner vect
   - [`CombinatorialCrossValidation`](@ref)
 """
 const VecVecPredRes = AbstractVector{<:VecPredRes}
-"""
-    _prediction_expected_risk(r, X; kwargs...)
-
-Compute the expected risk for a prediction result's returns.
-
-Internal helper that dispatches on whether `X` is a plain vector or a vector of vectors.
-
-# Arguments
-
-  - `r`: Risk measure.
-  - `X`: Returns vector or vector of vectors.
-  - `kwargs...`: Additional keyword arguments passed to [`expected_risk`](@ref).
-
-# Returns
-
-  - Expected risk value(s).
-"""
-function _prediction_expected_risk(r::AbstractBaseRiskMeasure, X::VecNum; kwargs...)
-    return expected_risk(r, SingletonVector{Int}(), reshape(X, :, 1); kwargs...)
-end
-function _prediction_expected_risk(r::AbstractBaseRiskMeasure, X::VecVecNum; kwargs...)
-    return [expected_risk(r, SingletonVector{Int}(), reshape(Xi, :, 1); kwargs...)
-            for Xi in X]
-end
 function expected_risk(r::AbstractBaseRiskMeasure, pred::PredictionResult; kwargs...)
-    return _prediction_expected_risk(r, pred.rd.X, kwargs...)
+    return expected_risk_from_returns(r, pred.rd.X; kwargs...)
 end
 """
     mapreduce_RetMtx(rd, sym = :X)
@@ -542,7 +518,7 @@ end
 function expected_risk(r::AbstractBaseRiskMeasure, mpred::MultiPeriodPredictionResult;
                        kwargs...)
     X = mpred.mrd.X
-    return _prediction_expected_risk(r, X; kwargs...)
+    return expected_risk_from_returns(r, X; kwargs...)
 end
 """
     const PredRes_MultiPredRes = Union{<:PredictionResult, <:MultiPeriodPredictionResult}

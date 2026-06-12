@@ -76,4 +76,7 @@ function (::Range)(x::VecNum)
     return ub - lb
 end
 
+# Expected-risk input kind — see `risk_input_kind`.
+risk_input_kind(::Range) = NetReturnsInput()
+
 export Range

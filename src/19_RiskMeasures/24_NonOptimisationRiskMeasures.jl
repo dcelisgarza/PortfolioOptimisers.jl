@@ -84,7 +84,7 @@ MeanReturn
     """
     w
     """
-    If true use log returns; else use arithmetic returns.
+    $(field_dict[:flag])
     """
     flag
     function MeanReturn(w::Option{<:ObsWeights}, flag::Bool)
@@ -410,6 +410,24 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
+Compute the vector of deviations from the centering target for a precomputed returns series for [`ThirdCentralMoment`](@ref) and [`Skewness`](@ref) risk measures.
+
+Single-argument form used by the precomputed-returns functor `r(x::VecNum)` (ADR 0007).
+
+# Related
+
+  - [`TCM_Sk`](@ref)
+  - [`ThirdCentralMoment`](@ref)
+  - [`Skewness`](@ref)
+  - [`calc_deviations_vec`](@ref)
+  - [`calc_moment_target`](@ref)
+"""
+function calc_deviations_vec(r::TCM_Sk, x::VecNum)
+    return x .- calc_moment_target(r, nothing, x)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
 Create an instance of [`ThirdCentralMoment`](@ref) by selecting observation weights and expected returns from the risk-measure instance or falling back to the prior result.
 
 # Related
@@ -441,16 +459,44 @@ function risk_measure_view(r::ThirdCentralMoment, i, args...)
     mu = nothing_scalar_array_view(r.mu, i)
     return ThirdCentralMoment(; w = r.w, mu = mu)
 end
+function _moment_risk(r::ThirdCentralMoment{<:Option{<:StatsBase.AbstractWeights}},
+                      val::VecNum)
+    val .= val .^ 3
+    return isnothing(r.w) ? Statistics.mean(val) : Statistics.mean(val, r.w)
+end
 function (r::ThirdCentralMoment{<:Option{<:StatsBase.AbstractWeights}})(w::VecNum,
                                                                         X::MatNum,
                                                                         fees::Option{<:Fees} = nothing)
-    val = calc_deviations_vec(r, w, X, fees)
-    val .= val .^ 3
-    return isnothing(r.w) ? Statistics.mean(val) : Statistics.mean(val, r.w)
+    return _moment_risk(r, calc_deviations_vec(r, w, X, fees))
+end
+function (r::ThirdCentralMoment{<:Option{<:StatsBase.AbstractWeights}})(x::VecNum)
+    return _moment_risk(r, calc_deviations_vec(r, x))
 end
 function (r::ThirdCentralMoment{<:DynamicAbstractWeights})(w::VecNum, X::MatNum,
                                                            fees::Option{<:Fees} = nothing)
     return ThirdCentralMoment(; w = get_observation_weights(r.w, X), mu = r.mu)(w, X, fees)
 end
+function (r::ThirdCentralMoment{<:DynamicAbstractWeights})(x::VecNum)
+    return ThirdCentralMoment(; w = get_observation_weights(r.w, x), mu = r.mu)(x)
+end
+
+# Expected-risk input kind — see `risk_input_kind`.
+risk_input_kind(::MeanReturn) = NetReturnsInput()
+risk_input_kind(::ThirdCentralMoment) = WeightsReturnsFeesInput()
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return whether [`ThirdCentralMoment`](@ref) `r` supports precomputed-return evaluation.
+
+Delegates to [`weight_independent_target`](@ref) on `r.mu`: `true` iff the target is
+`Nothing`, a `Number`, or a [`MedianCenteringFunction`](@ref); `false` for per-asset targets.
+
+# Related
+
+  - [`supports_precomputed_returns`](@ref)
+  - [`weight_independent_target`](@ref)
+  - [`ThirdCentralMoment`](@ref)
+"""
+supports_precomputed_returns(r::ThirdCentralMoment) = weight_independent_target(r.mu)
 
 export MeanReturn, ThirdCentralMoment, MeanReturnRiskRatio

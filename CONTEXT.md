@@ -242,6 +242,12 @@ Discretises continuous weights into whole shares for a fixed cash budget (real-w
 **Risk Measure**
 Quantifies portfolio risk. Three-way split by legal usage: **Optimisation** (has a JuMP formulation; usable as objective/constraint), **Non-Optimisation** (analysis only; may be negative or non-formulable), **Hierarchical** (no JuMP formulation but valid as a clustering risk proxy).
 
+**Risk Input Kind**
+A classification of a risk measure *orthogonal* to the legal-usage split above: what the measure consumes when its expected risk is evaluated. Three kinds — **net-returns** (a function of the portfolio's net-return series), **weights-returns-fees** (needs the weights, the asset-return matrix, and fees together — the moment families and tracking), and **weights-only** (a function of the weights alone — the variance/standard-deviation family). A measure sits on this axis independently of whether it is Optimisation, Non-Optimisation, or Hierarchical, so the two axes are stated separately.
+
+**Precomputed-returns contract**
+The rule for evaluating a risk measure on an *already-reduced* net-return series the caller holds directly, with no weights to apply (e.g. an out-of-sample portfolio return series, or a single asset's return column). Well-defined exactly when the measure's result is a function of the series alone: the net-returns measures, and the moment families whose target is weight-independent. It is undefined for weights-only measures and for moment measures carrying a per-asset target — these need the weights the bare series no longer carries — and asking for it there is a defined error, never a silent wrong number.
+
 The `XatRisk` naming uses "X" as shorthand for "Value" or "Drawdown" — the same family applied to returns or to drawdowns. "Relative" variants are the hierarchical drawdown forms; "Range" variants penalise the gap between upper and lower tails; "Distributionally Robust (DR)" variants optimise against worst-case scenario distributions.
 
 ### Settings & combination

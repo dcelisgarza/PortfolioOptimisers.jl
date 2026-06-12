@@ -246,11 +246,11 @@ function (r::TrackingRiskMeasure)(w::VecNum, X::MatNum, fees::Option{<:Fees} = n
     benchmark = tracking_benchmark(r.tr, X)
     return norm_tracking(r.alg, calc_net_returns(w, X, fees), benchmark, size(X, 1))
 end
-function (r::TrackingRiskMeasure{ReturnsTracking})(X::VecNum)
+function (r::TrackingRiskMeasure{<:ReturnsTracking})(X::VecNum)
     benchmark = tracking_benchmark(r.tr, X)
     return norm_tracking(r.alg, X, benchmark, length(X))
 end
-function (r::TrackingRiskMeasure{WeightsTracking})(::VecNum)
+function (r::TrackingRiskMeasure{<:WeightsTracking})(::VecNum)
     throw(MethodError(r,
                       "Tracking risk measure using the `WeightsTracking` algorithm cannot be computed for a prediction of portfolio returns because there are no weights."))
 end
@@ -541,5 +541,35 @@ Union of tracking risk measures used for dispatch on factory methods and expecte
   - [`RiskTrackingRiskMeasure`](@ref)
 """
 const TrRM = Union{<:TrackingRiskMeasure, <:RiskTrackingRiskMeasure}
+
+# Expected-risk input kind — see `risk_input_kind`.
+risk_input_kind(::TrackingRiskMeasure) = WeightsReturnsFeesInput()
+risk_input_kind(::RiskTrackingRiskMeasure) = WeightsReturnsFeesInput()
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return `false`: a [`WeightsTracking`](@ref) measure compares against a benchmark weight
+vector and always requires explicit portfolio weights.
+
+# Related
+
+  - [`supports_precomputed_returns`](@ref)
+  - [`TrackingRiskMeasure`](@ref)
+  - [`WeightsTracking`](@ref)
+"""
+supports_precomputed_returns(::TrackingRiskMeasure{<:WeightsTracking}) = false
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return `true`: a [`ReturnsTracking`](@ref) measure compares against a benchmark return
+series and its risk is a function of the net-return series alone.
+
+# Related
+
+  - [`supports_precomputed_returns`](@ref)
+  - [`TrackingRiskMeasure`](@ref)
+  - [`ReturnsTracking`](@ref)
+"""
+supports_precomputed_returns(::TrackingRiskMeasure{<:ReturnsTracking}) = true
 
 export TrackingRiskMeasure, RiskTrackingRiskMeasure, RiskTrackingError

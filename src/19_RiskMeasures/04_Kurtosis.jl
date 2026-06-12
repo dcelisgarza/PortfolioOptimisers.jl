@@ -242,39 +242,63 @@ function calc_deviations_vec(r::Kurtosis, w::VecNum, X::MatNum,
     tgt = calc_moment_target(r, w, x)
     return x .- tgt
 end
-function (r::Kurtosis{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any, <:Any, <:Any,
-                      <:Full, <:SOCRiskExpr})(w::VecNum, X::MatNum,
-                                              fees::Option{<:Fees} = nothing)
-    val = calc_deviations_vec(r, w, X, fees)
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Compute the vector of deviations from the target value for a precomputed returns series for [`Kurtosis`](@ref).
+
+Single-argument form used by the precomputed-returns functor `r(x::VecNum)` (ADR 0007).
+
+# Related
+
+  - [`Kurtosis`](@ref)
+  - [`calc_deviations_vec`](@ref)
+  - [`calc_moment_target`](@ref)
+"""
+function calc_deviations_vec(r::Kurtosis, x::VecNum)
+    return x .- calc_moment_target(r, nothing, x)
+end
+function _moment_risk(r::Kurtosis{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any,
+                                  <:Any, <:Any, <:Full, <:SOCRiskExpr}, val::VecNum)
     val .= val .^ 4
     return sqrt(isnothing(r.w) ? Statistics.mean(val) : Statistics.mean(val, r.w))
 end
-function (r::Kurtosis{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any, <:Any, <:Any,
-                      <:Semi, <:SOCRiskExpr})(w::VecNum, X::MatNum,
-                                              fees::Option{<:Fees} = nothing)
-    val = min.(calc_deviations_vec(r, w, X, fees), zero(eltype(X)))
+function _moment_risk(r::Kurtosis{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any,
+                                  <:Any, <:Any, <:Semi, <:SOCRiskExpr}, val::VecNum)
+    val = min.(val, zero(eltype(val)))
     val .= val .^ 4
     return sqrt(isnothing(r.w) ? Statistics.mean(val) : Statistics.mean(val, r.w))
 end
-function (r::Kurtosis{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any, <:Any, <:Any,
-                      <:Full, <:QuadSecondMomentFormulations})(w::VecNum, X::MatNum,
-                                                               fees::Option{<:Fees} = nothing)
-    val = calc_deviations_vec(r, w, X, fees)
+function _moment_risk(r::Kurtosis{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any,
+                                  <:Any, <:Any, <:Full, <:QuadSecondMomentFormulations},
+                      val::VecNum)
+    val .= val .^ 4
+    return isnothing(r.w) ? Statistics.mean(val) : Statistics.mean(val, r.w)
+end
+function _moment_risk(r::Kurtosis{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any,
+                                  <:Any, <:Any, <:Semi, <:QuadSecondMomentFormulations},
+                      val::VecNum)
+    val = min.(val, zero(eltype(val)))
     val .= val .^ 4
     return isnothing(r.w) ? Statistics.mean(val) : Statistics.mean(val, r.w)
 end
 function (r::Kurtosis{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any, <:Any, <:Any,
-                      <:Semi, <:QuadSecondMomentFormulations})(w::VecNum, X::MatNum,
-                                                               fees::Option{<:Fees} = nothing)
-    val = min.(calc_deviations_vec(r, w, X, fees), zero(eltype(X)))
-    val .= val .^ 4
-    return isnothing(r.w) ? Statistics.mean(val) : Statistics.mean(val, r.w)
+                      <:Any, <:Any})(w::VecNum, X::MatNum, fees::Option{<:Fees} = nothing)
+    return _moment_risk(r, calc_deviations_vec(r, w, X, fees))
+end
+function (r::Kurtosis{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any, <:Any, <:Any,
+                      <:Any, <:Any})(x::VecNum)
+    return _moment_risk(r, calc_deviations_vec(r, x))
 end
 function (r::Kurtosis{<:Any, <:DynamicAbstractWeights, <:Any, <:Any, <:Any, <:Semi, <:Any})(w::VecNum,
                                                                                             X::MatNum,
                                                                                             fees::Option{<:Fees} = nothing)
     return Kurtosis(; settings = r.settings, w = get_observation_weights(r.w, X), mu = r.mu,
                     kt = r.kt, N = r.N, alg1 = r.alg1, alg2 = r.alg2)(w, X, fees)
+end
+function (r::Kurtosis{<:Any, <:DynamicAbstractWeights, <:Any, <:Any, <:Any, <:Semi, <:Any})(x::VecNum)
+    return Kurtosis(; settings = r.settings, w = get_observation_weights(r.w, x), mu = r.mu,
+                    kt = r.kt, N = r.N, alg1 = r.alg1, alg2 = r.alg2)(x)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -314,6 +338,20 @@ function factory(r::Kurtosis, pr::LowOrderPrior, args...; kwargs...)::Kurtosis
     return Kurtosis(; settings = r.settings, w = w, mu = mu, kt = kt, N = r.N,
                     alg1 = r.alg1, alg2 = r.alg2)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a view of [`Kurtosis`](@ref) `r` sliced to asset indices `i`.
+
+Slices both the cokurtosis matrix `kt` and the expected returns `mu` for cluster-based optimisation.
+
+# Related
+
+  - [`Kurtosis`](@ref)
+  - [`risk_measure_view`](@ref)
+  - [`nothing_scalar_array_view`](@ref)
+  - [`fourth_moment_index_generator`](@ref)
+"""
 function risk_measure_view(r::Kurtosis, i, args...)::Kurtosis
     mu = r.mu
     kt = r.kt
@@ -331,5 +369,23 @@ function risk_measure_view(r::Kurtosis, i, args...)::Kurtosis
     return Kurtosis(; settings = r.settings, w = r.w, mu = mu, kt = kt, N = r.N,
                     alg1 = r.alg1, alg2 = r.alg2)
 end
+
+# Expected-risk input kind — see `risk_input_kind`.
+risk_input_kind(::Kurtosis) = WeightsReturnsFeesInput()
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return whether [`Kurtosis`](@ref) `r` supports precomputed-return evaluation.
+
+Delegates to [`weight_independent_target`](@ref) on `r.mu`: `true` iff the target is
+`Nothing`, a `Number`, or a [`MedianCenteringFunction`](@ref); `false` for per-asset targets.
+
+# Related
+
+  - [`supports_precomputed_returns`](@ref)
+  - [`weight_independent_target`](@ref)
+  - [`Kurtosis`](@ref)
+"""
+supports_precomputed_returns(r::Kurtosis) = weight_independent_target(r.mu)
 
 export Kurtosis

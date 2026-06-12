@@ -289,9 +289,60 @@ function calc_deviations_vec(r::MedianAbsoluteDeviation, w::VecNum, X::MatNum,
     tgt = calc_moment_target(r, w, x)
     return x .- tgt
 end
-function (r::MedianAbsoluteDeviation)(w::VecNum, X::MatNum, fees::Option{<:Fees} = nothing)
-    val = calc_deviations_vec(r, w, X, fees)
-    return StatsBase.mad(val; center = zero(eltype(X)), normalize = r.flag)
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Compute the vector of deviations from the centering target for a precomputed returns series for [`MedianAbsoluteDeviation`](@ref).
+
+Single-argument form used by the precomputed-returns functor `r(x::VecNum)` (ADR 0007).
+
+# Related
+
+  - [`MedianAbsoluteDeviation`](@ref)
+  - [`calc_deviations_vec`](@ref)
+  - [`calc_moment_target`](@ref)
+"""
+function calc_deviations_vec(r::MedianAbsoluteDeviation, x::VecNum)
+    return x .- calc_moment_target(r, nothing, x)
 end
+function _moment_risk(r::MedianAbsoluteDeviation, val::VecNum)
+    return StatsBase.mad(val; center = zero(eltype(val)), normalize = r.flag)
+end
+function (r::MedianAbsoluteDeviation)(w::VecNum, X::MatNum, fees::Option{<:Fees} = nothing)
+    return _moment_risk(r, calc_deviations_vec(r, w, X, fees))
+end
+function (r::MedianAbsoluteDeviation)(x::VecNum)
+    return _moment_risk(r, calc_deviations_vec(r, x))
+end
+# Expected-risk input kind — see `risk_input_kind`.
+risk_input_kind(::MedianAbsoluteDeviation) = WeightsReturnsFeesInput()
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return `true`: [`MedianCenteringFunction`](@ref) targets are weight-independent centering
+functions and can be evaluated on a bare return series.
+
+# Related
+
+  - [`weight_independent_target`](@ref)
+  - [`supports_precomputed_returns`](@ref)
+  - [`MedianCenteringFunction`](@ref)
+"""
+weight_independent_target(::MedianCenteringFunction) = true
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return whether [`MedianAbsoluteDeviation`](@ref) `r` supports precomputed-return evaluation.
+
+Delegates to [`weight_independent_target`](@ref) on `r.mu`: `true` iff the target is
+`Nothing`, a `Number`, or a [`MedianCenteringFunction`](@ref); `false` for per-asset targets.
+
+# Related
+
+  - [`supports_precomputed_returns`](@ref)
+  - [`weight_independent_target`](@ref)
+  - [`MedianAbsoluteDeviation`](@ref)
+"""
+supports_precomputed_returns(r::MedianAbsoluteDeviation) = weight_independent_target(r.mu)
 
 export MedianAbsoluteDeviation, MedianCentering, MeanCentering

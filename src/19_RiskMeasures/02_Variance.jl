@@ -871,5 +871,10 @@ function risk_measure_view(r::UncertaintySetVariance, i, args...)
     return UncertaintySetVariance(; settings = r.settings, ucs = ucs, sigma = sigma)
 end
 
+# Expected-risk input kind — see `risk_input_kind`.
+risk_input_kind(::Variance) = WeightsInput()
+risk_input_kind(::StandardDeviation) = WeightsInput()
+risk_input_kind(::UncertaintySetVariance) = WeightsInput()
+
 export SOCRiskExpr, QuadRiskExpr, SquaredSOCRiskExpr, RSOCRiskExpr, Variance,
        StandardDeviation, UncertaintySetVariance

@@ -250,4 +250,8 @@ function factory(r::RelativeAverageDrawdown, pr::AbstractPriorResult, args...;
     return RelativeAverageDrawdown(; settings = r.settings, w = w)
 end
 
+# Expected-risk input kind — see `risk_input_kind`.
+risk_input_kind(::AverageDrawdown) = NetReturnsInput()
+risk_input_kind(::RelativeAverageDrawdown) = NetReturnsInput()
+
 export AverageDrawdown, RelativeAverageDrawdown

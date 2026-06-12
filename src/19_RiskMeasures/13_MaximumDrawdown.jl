@@ -188,4 +188,8 @@ function (::RelativeMaximumDrawdown)(x::VecNum)
     return -minimum(dd)
 end
 
+# Expected-risk input kind — see `risk_input_kind`.
+risk_input_kind(::MaximumDrawdown) = NetReturnsInput()
+risk_input_kind(::RelativeMaximumDrawdown) = NetReturnsInput()
+
 export MaximumDrawdown, RelativeMaximumDrawdown

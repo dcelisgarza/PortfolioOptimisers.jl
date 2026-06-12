@@ -1428,6 +1428,10 @@ function (r::OrderedWeightsArrayRange)(x::VecNum)
     return LinearAlgebra.dot(w, sort(x))
 end
 
+# Expected-risk input kind — see `risk_input_kind`.
+risk_input_kind(::OrderedWeightsArray) = NetReturnsInput()
+risk_input_kind(::OrderedWeightsArrayRange) = NetReturnsInput()
+
 export MaximumEntropy, ExponentialConeEntropy, RelativeEntropy, MinimumSquaredDistance,
        MinimumSumSquares, NormalisedConstantRelativeRiskAversion, OWAJuMP, owa_gmd,
        owa_cvar, owa_wcvar, owa_tg, owa_wr, owa_rg, owa_cvarrg, owa_wcvarrg, owa_tgrg,
