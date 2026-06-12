@@ -161,4 +161,7 @@ function factory(r::TurnoverRiskMeasure, ::Any, ::Any, ::Any, w::Option{<:VecNum
     return factory(r, w)
 end
 
+# Expected-risk input kind — see `risk_input_kind`.
+risk_input_kind(::TurnoverRiskMeasure) = WeightsInput()
+
 export TurnoverRiskMeasure

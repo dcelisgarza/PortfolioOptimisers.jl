@@ -756,5 +756,11 @@ function factory(r::RelativePowerNormDrawdownatRisk, slv::Slv_VecSlv,
                                            p = r.p, slv = slv, w = w)
 end
 
+# Expected-risk input kind — see `risk_input_kind`.
+risk_input_kind(::PowerNormValueatRisk) = NetReturnsInput()
+risk_input_kind(::PowerNormValueatRiskRange) = NetReturnsInput()
+risk_input_kind(::PowerNormDrawdownatRisk) = NetReturnsInput()
+risk_input_kind(::RelativePowerNormDrawdownatRisk) = NetReturnsInput()
+
 export PowerNormValueatRisk, PowerNormValueatRiskRange, PowerNormDrawdownatRisk,
        RelativePowerNormDrawdownatRisk

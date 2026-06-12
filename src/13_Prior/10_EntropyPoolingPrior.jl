@@ -2132,7 +2132,7 @@ Extract the skewness for asset `i` from a prior result.
 """
 function get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:skew}, args...)
     #! Think about how to include pr.w
-    return Skewness()(SingletonVector(), reshape(view(pr.X, :, i), :, 1))
+    return Skewness()(view(pr.X, :, i))
 end
 """
     ep_sk_views!(skew_views::LinearConstraintEstimator, epc::AbstractDict,
@@ -2215,12 +2215,9 @@ Extract the kurtosis for asset `i` from a prior result.
 """
 function get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:kurtosis}, args...)
     #! Think about how to include pr.w
-    return HighOrderMoment(; alg = StandardisedHighOrderMoment(; alg = FourthMoment()))(SingletonVector(),
-                                                                                        reshape(view(pr.X,
-                                                                                                     :,
-                                                                                                     i),
-                                                                                                :,
-                                                                                                1))
+    return HighOrderMoment(; alg = StandardisedHighOrderMoment(; alg = FourthMoment()))(view(pr.X,
+                                                                                             :,
+                                                                                             i))
 end
 """
     ep_kt_views!(kurtosis_views::LinearConstraintEstimator, epc::AbstractDict,

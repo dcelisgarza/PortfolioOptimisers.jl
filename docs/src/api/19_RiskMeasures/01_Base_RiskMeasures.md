@@ -34,6 +34,18 @@ RkRtBounds
 Front_NumVec
 bigger_is_better
 needs_previous_weights(::AbstractBaseRiskMeasure)
+RiskInputKind
+NetReturnsInput
+WeightsReturnsFeesInput
+WeightsInput
+risk_input_kind
+supports_precomputed_returns(r::AbstractBaseRiskMeasure)
+supports_precomputed_returns(::NetReturnsInput, ::Any)
+supports_precomputed_returns(::WeightsInput, ::Any)
+supports_precomputed_returns(::WeightsReturnsFeesInput, r::AbstractBaseRiskMeasure)
+weight_independent_target(::Nothing)
+weight_independent_target(::Number)
+weight_independent_target(::Any)
 factory(rs::AbstractBaseRiskMeasure, args...; kwargs...)
 factory(rs::VecBaseRM, args...; kwargs...)
 risk_measure_view(rs::AbstractBaseRiskMeasure, ::Any, ::Any)

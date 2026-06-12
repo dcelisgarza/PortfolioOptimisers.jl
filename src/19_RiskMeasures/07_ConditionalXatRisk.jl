@@ -1141,6 +1141,15 @@ function factory(r::DistributionallyRobustConditionalDrawdownatRisk,
                                                            r = r.r, w = w)
 end
 
+# Expected-risk input kind — see `risk_input_kind`.
+risk_input_kind(::ConditionalValueatRisk) = NetReturnsInput()
+risk_input_kind(::DistributionallyRobustConditionalValueatRisk) = NetReturnsInput()
+risk_input_kind(::ConditionalValueatRiskRange) = NetReturnsInput()
+risk_input_kind(::DistributionallyRobustConditionalValueatRiskRange) = NetReturnsInput()
+risk_input_kind(::ConditionalDrawdownatRisk) = NetReturnsInput()
+risk_input_kind(::DistributionallyRobustConditionalDrawdownatRisk) = NetReturnsInput()
+risk_input_kind(::RelativeConditionalDrawdownatRisk) = NetReturnsInput()
+
 export ConditionalValueatRisk, DistributionallyRobustConditionalValueatRisk,
        ConditionalValueatRiskRange, DistributionallyRobustConditionalValueatRiskRange,
        ConditionalDrawdownatRisk, DistributionallyRobustConditionalDrawdownatRisk,

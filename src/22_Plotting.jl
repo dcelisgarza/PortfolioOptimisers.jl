@@ -1271,56 +1271,6 @@ function plot_rolling_drawdowns end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Convert a [`PredictionReturnsResult`](@ref) with a flat return vector to the standard
-`(group_index, matrix)` plotting form.
-
-# Arguments
-
-  - `rd::PredictionReturnsResult{<:Any, <:VecNum}`: Prediction result whose `X` field is a
-    flat numeric vector of returns.
-
-# Returns
-
-  - `Tuple{SingletonVector{Int}, Matrix}`: A singleton group-index vector and `rd.X`
-    reshaped into a column matrix of size `(T, 1)`.
-
-# Related
-
-  - [`_pred_rd_to_matrix(::PredictionReturnsResult{<:Any, <:VecVecNum})`](@ref)
-  - [`PredictionReturnsResult`](@ref)
-  - [`SingletonVector`](@ref)
-"""
-function _pred_rd_to_matrix(rd::PredictionReturnsResult{<:Any, <:VecNum})
-    return SingletonVector{Int}(), reshape(rd.X, :, 1)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Convert a [`PredictionReturnsResult`](@ref) with a vector of return vectors to the standard
-`(group_index, matrices)` plotting form.
-
-# Arguments
-
-  - `rd::PredictionReturnsResult{<:Any, <:VecVecNum}`: Prediction result whose `X` field is
-    a vector of numeric sub-vectors, one per scenario or period.
-
-# Returns
-
-  - `Tuple{SingletonVector{Int}, Vector{Matrix}}`: A singleton group-index vector and each
-    sub-vector of `rd.X` reshaped into a column matrix of size `(T_i, 1)`.
-
-# Related
-
-  - [`_pred_rd_to_matrix(::PredictionReturnsResult{<:Any, <:VecNum})`](@ref)
-  - [`PredictionReturnsResult`](@ref)
-  - [`SingletonVector`](@ref)
-"""
-function _pred_rd_to_matrix(rd::PredictionReturnsResult{<:Any, <:VecVecNum})
-    return SingletonVector{Int}(), [reshape(ret, :, 1) for ret in rd.X]
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
 Select the top-N assets from a weight vector by absolute weight magnitude.
 
 # Arguments

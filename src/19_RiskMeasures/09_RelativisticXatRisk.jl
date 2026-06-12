@@ -814,5 +814,11 @@ function factory(r::RelativeRelativisticDrawdownatRisk, slv::Slv_VecSlv,
                                               kappa = r.kappa, slv = slv, w = w)
 end
 
+# Expected-risk input kind — see `risk_input_kind`.
+risk_input_kind(::RelativisticValueatRisk) = NetReturnsInput()
+risk_input_kind(::RelativisticValueatRiskRange) = NetReturnsInput()
+risk_input_kind(::RelativisticDrawdownatRisk) = NetReturnsInput()
+risk_input_kind(::RelativeRelativisticDrawdownatRisk) = NetReturnsInput()
+
 export RelativisticValueatRisk, RelativisticValueatRiskRange, RelativisticDrawdownatRisk,
        RelativeRelativisticDrawdownatRisk

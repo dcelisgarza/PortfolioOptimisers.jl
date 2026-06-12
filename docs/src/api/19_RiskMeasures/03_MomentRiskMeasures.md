@@ -29,4 +29,11 @@ calc_moment_target(r::LoHiOrderMoment{<:Any, <:Any, <:VecScalar, <:Any},
                             w::VecNum, ::Any)
 calc_moment_target(r::LoHiOrderMoment{<:Any, <:Any, <:Number, <:Any}, ::Any, ::Any)
 calc_deviations_vec(r::LoHiOrderMoment, w::VecNum, X::MatNum, fees::Option{<:Fees} = nothing)
+calc_deviations_vec(r::LoHiOrderMoment, x::VecNum)
+factory(r::LowOrderMoment, pr::AbstractPriorResult, args...; kwargs...)
+risk_measure_view(r::LowOrderMoment, i, args...)
+factory(r::HighOrderMoment, pr::AbstractPriorResult, args...; kwargs...)
+risk_measure_view(r::HighOrderMoment, i, args...)
+supports_precomputed_returns(r::LoHiOrderMoment)
+_moment_risk
 ```

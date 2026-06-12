@@ -31,7 +31,6 @@ MultiPeriodPredictionResult
 Base.getproperty(mpred::MultiPeriodPredictionResult, sym::Symbol)
 VecMPredRes
 PopulationPredictionResult
-_prediction_expected_risk
 predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)
 fit_predict
 sort_by_measure
