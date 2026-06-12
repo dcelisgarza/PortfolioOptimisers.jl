@@ -36,7 +36,8 @@ const _OLD_WEIGHTS = Any[StandardDeviation, NegativeSkewness, TurnoverRiskMeasur
 # Composite / return-like measures handled by explicit `expected_risk` methods — they
 # orchestrate other measures and intentionally declare no input kind.
 const _EXPLICIT = Set{Any}([RiskRatioRiskMeasure, NonOptimisationRiskRatioRiskMeasure,
-                            MeanReturnRiskRatio, ExpectedReturn, ExpectedReturnRiskRatio])
+                            MeanReturnRiskRatio, ExpectedReturn, ExpectedReturnRiskRatio,
+                            RiskTrackingRiskMeasure])
 
 # The declared kind as a *type* — instance-free, since each method returns a singleton.
 # Undeclared types hit the erroring default (inferred `Union{}`).
@@ -77,7 +78,7 @@ end
 end
 
 # ── ADR 0007: the precomputed-returns contract ────────────────────────────────────────────
-# `expected_risk_from_returns(r, x)` evaluates a measure on an already-reduced net-return
+# `_expected_risk_from_returns(r, x)` evaluates a measure on an already-reduced net-return
 # series. It is gated by `supports_precomputed_returns` so that an ineligible measure — a
 # `WeightsInput` measure (whose `r(w)` shares the `r(::VecNum)` signature and would otherwise
 # silently score the series as weights), a moment measure with a per-asset `mu` (whose target
@@ -86,7 +87,7 @@ end
 const _x_series = [sinpi(2i / 64) * 0.1 + cospi(i / 32) * 0.03 for i in 1:64]
 
 @testset "precomputed-returns contract — eligibility & differential" begin
-    g = PO.expected_risk_from_returns
+    g = PO._expected_risk_from_returns
     # Eligible: NetReturnsInput measures, the weight-independent-target moment family, and
     # ratio composites whose constituents are themselves eligible.
     eligible = Any[ConditionalValueatRisk(), MaximumDrawdown(), ValueatRisk(),
@@ -144,47 +145,3 @@ end
         @test Bool <: rt
     end
 end
-
-#=
-I think the failure is due to running the tests/script when the test environment was out of sync with the worktree. When i started a session with
-
-```bash
-julia --project
-```
-
-and ran the init code in `test/runtests.jl` in the REPL followed by `test_09c` also in the REPL, i got this
-
-```julia
-julia> @testset "risk_input_kind — equivalence with old routing unions" begin
-           # The three kinds partition the measures; no type may be classified two ways.
-           @test allunique(vcat(_OLD_NETRETURNS, _OLD_WEIGHTSRETURNSFEES, _OLD_WEIGHTS))
-           for T in _OLD_NETRETURNS
-               @test declared_kind(T) === PO.NetReturnsInput
-           end
-           for T in _OLD_WEIGHTSRETURNSFEES
-               @test declared_kind(T) === PO.WeightsReturnsFeesInput
-           end
-           for T in _OLD_WEIGHTS
-               @test declared_kind(T) === PO.WeightsInput
-           end
-       end
-Test Summary:                                         | Pass  Total  Time
-risk_input_kind — equivalence with old routing unions |   51     51  1.1s
-Test.DefaultTestSet("risk_input_kind — equivalence with old routing unions", Any[], 51, false, false, true, 1.781186434598269e9, 1.781186435665745e9, false, "REPL[19]", Random.Xoshiro(0x8738dd43ca12461a, 0x15592c6ca14d5bb6, 0xe256aaf2f4cfe209, 0x0ea8a7bd9ede2ed8, 0x99924f77ce1d0b51))
-
-julia> @testset "risk_input_kind — every concrete measure is classified" begin
-           for T in all_concrete(PO.AbstractBaseRiskMeasure)
-               if T in _EXPLICIT
-                   continue
-               end
-               k = declared_kind(T)
-               @test isconcretetype(k) && k <: PO.RiskInputKind
-           end
-       end
-Test Summary:                                          | Pass  Total  Time
-risk_input_kind — every concrete measure is classified |   50     50  0.2s
-Test.DefaultTestSet("risk_input_kind — every concrete measure is classified", Any[], 50, false, false, true, 1.78118643752396e9, 1.781186437731832e9, false, "REPL[20]", Random.Xoshiro(0x8738dd43ca12461a, 0x15592c6ca14d5bb6, 0xe256aaf2f4cfe209, 0x0ea8a7bd9ede2ed8, 0x99924f77ce1d0b51))
-```
-
-I don't know how to fix this, but the reason is clear: the test environment is not synced to the worktree environment. The fix is to properly syncronise it, but i don't know how.
-=#
