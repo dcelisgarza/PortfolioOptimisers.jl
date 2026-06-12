@@ -59,7 +59,7 @@ in place.
 1. **Inner core.** A mutating builder
 
    ```julia
-   _assemble_jump_model!(model, optimiser, opt, attrs, rd;
+   assemble_jump_model!(model, optimiser, opt, attrs, rd;
                          r = nothing, b1 = nothing, obj = MinimumRisk(),
                          miprb_flag = false, sdp_phylogeny = true)
    ```
@@ -98,7 +98,7 @@ in place.
    `assemble_jump_model!(noc, model, setup::NearOptimalSetup)` unwraps the
    `NearOptimalSetup` (extracting `setup.opt` for settings and building the
    `ProcessedJuMPOptimiserAttributes` NOC already constructs for its Result), then delegates
-   to the shared `_assemble_jump_model!`. The `lcse`↔`lcsr` field-name divergence is confined
+   to the shared `assemble_jump_model!`. The `lcse`↔`lcsr` field-name divergence is confined
    to this one wrapper. The inner core sees a single concrete shape.
 
 5. **FRC factor phylogeny stays caller-side.** FRC's `set_sdp_frc_phylogeny_constraints!`
@@ -128,7 +128,7 @@ in place.
 
 ## Consequences
 
-- A solver-free test surface appears: `_assemble_jump_model!` can be tested by building a
+- A solver-free test surface appears: `assemble_jump_model!` can be tested by building a
   model, running a minimal head, calling it with a hand-built `attrs`, and asserting on the
   constructed model through the Model State accessors and JuMP's constraint listings — no
   solve required. Existing per-optimiser CSV + solver tests are retained as numeric
@@ -142,7 +142,7 @@ in place.
   remap, the processing happens once. Fully eliminating `processed_jump_optimiser` would
   require NOC's inner sub-problem solves to stop needing a `JuMPOptimiser`; left as-is.
 - Rather than a separate public `assemble_jump_model!` wrapper, each `_optimise` builds its
-  `attrs` once (reused for both assembly and the Result) and calls `_assemble_jump_model!`
+  `attrs` once (reused for both assembly and the Result) and calls `assemble_jump_model!`
   directly. Constrained-NOC builds `attrs` from its processed in-place `opt` (the `NearOptimalSetup`
   fields); unconstrained-NOC has no middle and is untouched.
 
@@ -172,7 +172,7 @@ exercises the `r = nothing` no-op), Factor Risk Contribution (4/4 — exercises 
 and `sdp_phylogeny = false`), and Near Optimal Centering (24/24, cold load).
 
 The promised solver-free surface is realised in `test/test_03b_jump_model_assembly.jl`: it
-runs the head + `_assemble_jump_model!` and asserts on the registered Model-State keys
+runs the head + `assemble_jump_model!` and asserts on the registered Model-State keys
 without solving — `r` routing (one indexed risk key per measure), the `r = nothing` no-op
 (risk keys absent, head and return constraints still present), and `nea`/`l1` toggling their
 keys. 15 assertions, ~1 s — versus the multi-minute solver suites.

@@ -686,10 +686,10 @@ function _optimise(rb::RiskBudgeting, rd::ReturnsResult = ReturnsResult(); dims:
     JuMP.set_string_names_on_creation(model, str_names)
     set_model_scales!(model, rb.opt.sc, rb.opt.so)
     prb = set_risk_budgeting_constraints!(model, rb, attrs.pr, attrs.wb, rd)
-    _assemble_jump_model!(model, rb, rb.opt, attrs, rd; r = rb.r,
-                          miprb_flag = isa(rb.rba,
-                                           AssetRiskBudgeting{<:Any, <:Any,
-                                                              <:MixedIntegerRiskBudgeting}))
+    assemble_jump_model!(model, rb, rb.opt, attrs, rd; r = rb.r,
+                         miprb_flag = isa(rb.rba,
+                                          AssetRiskBudgeting{<:Any, <:Any,
+                                                             <:MixedIntegerRiskBudgeting}))
     set_portfolio_objective_function!(model, MinimumRisk(), attrs.ret, rb.opt.cobj, rb,
                                       attrs.pr)
     retcode, sol = optimise_JuMP_model!(model, rb, eltype(attrs.pr.X))

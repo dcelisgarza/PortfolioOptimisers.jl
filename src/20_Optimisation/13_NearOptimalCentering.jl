@@ -531,7 +531,7 @@ $(DocStringExtensions.FIELDS)
     opt
     """
     Processed JuMP optimiser attributes, computed once and shared with the model-assembly
-    pipeline (`_assemble_jump_model!`) so the constrained build needs no `lcse`→`lcsr` remap.
+    pipeline (`assemble_jump_model!`) so the constrained build needs no `lcse`→`lcsr` remap.
     """
     attrs
     """
@@ -1071,7 +1071,7 @@ function _optimise(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, 
     JuMP.@expression(model, k, 1)
     set_w!(model, opt.pe.X, w_opt)
     set_weight_constraints!(model, opt.wb, opt.bgt, opt.sbgt)
-    _assemble_jump_model!(model, noc, opt, attrs, rd; r = r)
+    assemble_jump_model!(model, noc, opt, attrs, rd; r = r)
     noc_retcode, sol = solve_noc!(noc, model, rk_opt, rt_opt, opt, rt_min, rt_max, w_min,
                                   w_max, Val(haskey(model, :ret_frontier)),
                                   Val(haskey(model, :risk_frontier)))

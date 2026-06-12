@@ -1,6 +1,6 @@
-# Solver-free tests for the shared JuMP model-assembly pipeline (ADR 0006).
+# Solver-free tests for the shared JuMP model-assembly pipeline (ADR 0008).
 #
-# These build a model through the per-optimiser head and `_assemble_jump_model!`, then
+# These build a model through the per-optimiser head and `assemble_jump_model!`, then
 # assert on the *constructed* model — without ever solving it. The interface under test is
 # the assembler's keyword arguments (`r`, `nea`/`l1`/… settings); the assertions check which
 # Model-State keys the middle registers, so they exercise the routing rather than numerics.
@@ -28,8 +28,8 @@
                                                     nt.ctr, nt.gcardr, nt.sgcardr, nt.smtx,
                                                     nt.sgmtx, nt.slt, nt.sst, nt.sglt,
                                                     nt.sgst, nt.tn, nt.fees, nt.plr, nt.ret)
-        PO._assemble_jump_model!(model, mr, mr.opt, attrs, rd; r = r, b1 = b1, obj = obj,
-                                 miprb_flag = miprb_flag, sdp_phylogeny = sdp_phylogeny)
+        PO.assemble_jump_model!(model, mr, mr.opt, attrs, rd; r = r, b1 = b1, obj = obj,
+                                miprb_flag = miprb_flag, sdp_phylogeny = sdp_phylogeny)
         return Set(string.(keys(JuMP.object_dictionary(model))))
     end
 

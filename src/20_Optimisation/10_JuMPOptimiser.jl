@@ -768,7 +768,7 @@ mapping the result-named fields onto the optimiser's estimator-named slots (`lcs
 
 Used where a fully-processed optimiser object is needed (e.g. the inner sub-problems of
 [`near_optimal_centering_setup`](@ref)) while the same `attrs` is reused directly by
-[`_assemble_jump_model!`](@ref) — so the processing is done once and never round-tripped.
+[`assemble_jump_model!`](@ref) — so the processing is done once and never round-tripped.
 
 # Related
 
@@ -812,7 +812,7 @@ end
     _set_risk_and_scalarise!(model, r, optimiser, opt, pr, pl, fees, extra; rd)
 
 Add the risk-measure constraints and scalarise the combined risk expression, as one step of
-[`_assemble_jump_model!`](@ref). Dispatched on the risk measure: when `r === nothing` (e.g.
+[`assemble_jump_model!`](@ref). Dispatched on the risk measure: when `r === nothing` (e.g.
 [`RelaxedRiskBudgeting`](@ref), whose risk lives in its head) this is a no-op. `extra` is the
 optional trailing-argument tuple (empty, or `(b1,)` for [`FactorRiskContribution`](@ref)),
 splatted into the risk builder so the non-factor call is reproduced exactly.
@@ -828,14 +828,14 @@ function _set_risk_and_scalarise!(model::JuMP.Model, r, optimiser, opt, pr, pl, 
 end
 
 """
-    _assemble_jump_model!(model, optimiser, opt, attrs, rd;
+    assemble_jump_model!(model, optimiser, opt, attrs, rd;
                           r = nothing, b1 = nothing, obj = MinimumRisk(),
                           miprb_flag = false, sdp_phylogeny = true)
 
 Run the invariant model-assembly sequence shared by every single-JuMP-model Optimisation
 Estimator — the steps between shaping the weight variables (the per-optimiser *head*) and
 setting the objective/solving (the per-optimiser *tail*). See `Model Assembly` in
-`CONTEXT.md` and [ADR 0008](../../docs/adr/0008-jump-model-assembly.md).
+`CONTEXT.md` and `0008-jump-model-assembly.md`.
 
 Constraint *results* are read from `attrs` (a [`ProcessedJuMPOptimiserAttributes`](@ref));
 scalar *settings* from `opt` (the [`JuMPOptimiser`](@ref)); `optimiser` is the dispatch
@@ -856,11 +856,11 @@ varies inside the middle rides in as optional keyword arguments:
 The head must have populated the Model State (the `w`/`k` variables) before this is called.
 Returns `nothing`; mutates `model`.
 """
-function _assemble_jump_model!(model::JuMP.Model, optimiser::JuMPOptimisationEstimator,
-                               opt::JuMPOptimiser, attrs::ProcessedJuMPOptimiserAttributes,
-                               rd::ReturnsResult; r = nothing, b1 = nothing,
-                               obj::ObjectiveFunction = MinimumRisk(),
-                               miprb_flag::Bool = false, sdp_phylogeny::Bool = true)
+function assemble_jump_model!(model::JuMP.Model, optimiser::JuMPOptimisationEstimator,
+                              opt::JuMPOptimiser, attrs::ProcessedJuMPOptimiserAttributes,
+                              rd::ReturnsResult; r = nothing, b1 = nothing,
+                              obj::ObjectiveFunction = MinimumRisk(),
+                              miprb_flag::Bool = false, sdp_phylogeny::Bool = true)
     (; pr, wb, lt, st, lcsr, ctr, gcardr, sgcardr, smtx, sgmtx, slt, sst, sglt, sgst, tn, fees, plr, ret) = attrs
     extra = isnothing(b1) ? () : (b1,)
     set_linear_weight_constraints!(model, lcsr, :lcs_ineq_, :lcs_eq_)
