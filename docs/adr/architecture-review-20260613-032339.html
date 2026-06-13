@@ -1,146 +1,202 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Architecture review — PortfolioOptimisers.jl</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script type="module">
-      import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
-      mermaid.initialize({ startOnLoad: true, theme: "neutral", securityLevel: "loose" });
-    </script>
-    <style>
-      .seam { stroke-dasharray: 5 4; }
-      .deepbox { background: linear-gradient(135deg, #0f172a, #1e293b); }
-      .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
-      .schem { letter-spacing: .08em; }
-      mark { background: #fde68a; padding: 0 .15em; border-radius: 2px; }
-    </style>
-  </head>
-  <body class="bg-stone-50 text-slate-900 font-sans antialiased">
-    <main class="max-w-5xl mx-auto px-6 py-12 space-y-12">
-      <!-- ───────────────────────── header ───────────────────────── -->
-      <header class="space-y-5">
-        <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Architecture review</p>
-        <h1 class="text-4xl font-serif font-semibold tracking-tight">PortfolioOptimisers.jl</h1>
-        <p class="text-sm text-slate-500">2026-06-13 · branch <span class="mono">dev</span> · ~85k LOC · deepening opportunities outside the eight accepted ADRs</p>
 
-        <div class="flex flex-wrap gap-x-6 gap-y-2 text-xs text-slate-600 border-t border-b border-slate-200 py-3">
-          <span class="flex items-center gap-2"><span class="inline-block w-5 h-3 border border-slate-700"></span> module</span>
-          <span class="flex items-center gap-2"><svg width="26" height="8"><line x1="0" y1="4" x2="26" y2="4" stroke="#64748b" stroke-width="2" class="seam"/></svg> seam</span>
-          <span class="flex items-center gap-2"><svg width="26" height="8"><line x1="0" y1="4" x2="26" y2="4" stroke="#dc2626" stroke-width="2"/></svg> leakage across a seam</span>
-          <span class="flex items-center gap-2"><span class="inline-block w-5 h-3 deepbox"></span> deep module</span>
-        </div>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Architecture review — PortfolioOptimisers.jl</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script type="module">
+    import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+    mermaid.initialize({ startOnLoad: true, theme: "neutral", securityLevel: "loose" });
+  </script>
+  <style>
+    .seam {
+      stroke-dasharray: 5 4;
+    }
 
-        <div class="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
-          <a href="#c1" class="rounded-lg border border-slate-200 bg-white px-4 py-3 hover:border-emerald-400 transition"><span class="text-emerald-600 font-semibold">01</span> · Moment resolution</a>
-          <a href="#c2" class="rounded-lg border border-slate-200 bg-white px-4 py-3 hover:border-emerald-400 transition"><span class="text-emerald-600 font-semibold">02</span> · Matrix-processing leakage</a>
-          <a href="#c3" class="rounded-lg border border-slate-200 bg-white px-4 py-3 hover:border-emerald-400 transition"><span class="text-amber-600 font-semibold">03</span> · Processing-order markers</a>
-          <a href="#c4" class="rounded-lg border border-slate-200 bg-white px-4 py-3 hover:border-emerald-400 transition"><span class="text-emerald-600 font-semibold">04</span> · Meta-optimiser harness</a>
-          <a href="#c5" class="rounded-lg border border-slate-200 bg-white px-4 py-3 hover:border-amber-400 transition"><span class="text-amber-600 font-semibold">05</span> · Distance interface</a>
-          <a href="#c6" class="rounded-lg border border-slate-200 bg-white px-4 py-3 hover:border-slate-400 transition"><span class="text-slate-500 font-semibold">06</span> · Measure / constraint split</a>
-        </div>
-      </header>
+    .deepbox {
+      background: linear-gradient(135deg, #0f172a, #1e293b);
+    }
 
-      <section id="candidates" class="space-y-12">
+    .mono {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
 
-        <!-- ══════════════════════ CANDIDATE 1 ══════════════════════ -->
-        <article id="c1" class="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-          <div class="p-7 space-y-6">
-            <div class="flex items-start justify-between gap-4">
-              <h2 class="text-2xl font-serif font-semibold">01 · Deepen moment resolution behind one interface</h2>
-              <div class="flex flex-col items-end gap-2 shrink-0">
-                <span class="text-xs font-semibold uppercase tracking-wider px-3 py-1 rounded-full bg-emerald-100 text-emerald-800">Strong</span>
-                <span class="text-[11px] uppercase tracking-wider px-2 py-1 rounded bg-slate-100 text-slate-500">in-process</span>
-              </div>
+    .schem {
+      letter-spacing: .08em;
+    }
+
+    mark {
+      background: #fde68a;
+      padding: 0 .15em;
+      border-radius: 2px;
+    }
+  </style>
+</head>
+
+<body class="bg-stone-50 text-slate-900 font-sans antialiased">
+  <main class="max-w-5xl mx-auto px-6 py-12 space-y-12">
+    <!-- ───────────────────────── header ───────────────────────── -->
+    <header class="space-y-5">
+      <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Architecture review</p>
+      <h1 class="text-4xl font-serif font-semibold tracking-tight">PortfolioOptimisers.jl</h1>
+      <p class="text-sm text-slate-500">2026-06-13 · branch <span class="mono">dev</span> · ~85k LOC · deepening
+        opportunities outside the eight accepted ADRs</p>
+
+      <div class="flex flex-wrap gap-x-6 gap-y-2 text-xs text-slate-600 border-t border-b border-slate-200 py-3">
+        <span class="flex items-center gap-2"><span class="inline-block w-5 h-3 border border-slate-700"></span>
+          module</span>
+        <span class="flex items-center gap-2"><svg width="26" height="8">
+            <line x1="0" y1="4" x2="26" y2="4" stroke="#64748b" stroke-width="2" class="seam" />
+          </svg> seam</span>
+        <span class="flex items-center gap-2"><svg width="26" height="8">
+            <line x1="0" y1="4" x2="26" y2="4" stroke="#dc2626" stroke-width="2" />
+          </svg> leakage across a seam</span>
+        <span class="flex items-center gap-2"><span class="inline-block w-5 h-3 deepbox"></span> deep module</span>
+      </div>
+
+      <div class="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
+        <a href="#c1"
+          class="rounded-lg border border-slate-200 bg-white px-4 py-3 hover:border-emerald-400 transition"><span
+            class="text-emerald-600 font-semibold">01</span> · Moment resolution</a>
+        <a href="#c2"
+          class="rounded-lg border border-slate-200 bg-white px-4 py-3 hover:border-emerald-400 transition"><span
+            class="text-emerald-600 font-semibold">02</span> · Matrix-processing leakage</a>
+        <a href="#c3"
+          class="rounded-lg border border-slate-200 bg-white px-4 py-3 hover:border-emerald-400 transition"><span
+            class="text-amber-600 font-semibold">03</span> · Processing-order markers</a>
+        <a href="#c4"
+          class="rounded-lg border border-slate-200 bg-white px-4 py-3 hover:border-emerald-400 transition"><span
+            class="text-emerald-600 font-semibold">04</span> · Meta-optimiser harness</a>
+        <a href="#c5"
+          class="rounded-lg border border-slate-200 bg-white px-4 py-3 hover:border-amber-400 transition"><span
+            class="text-amber-600 font-semibold">05</span> · Distance interface</a>
+        <a href="#c6"
+          class="rounded-lg border border-slate-200 bg-white px-4 py-3 hover:border-slate-400 transition"><span
+            class="text-slate-500 font-semibold">06</span> · Measure / constraint split</a>
+      </div>
+    </header>
+
+    <section id="candidates" class="space-y-12">
+
+      <!-- ══════════════════════ CANDIDATE 1 ══════════════════════ -->
+      <article id="c1" class="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+        <div class="p-7 space-y-6">
+          <div class="flex items-start justify-between gap-4">
+            <h2 class="text-2xl font-serif font-semibold">01 · Deepen moment resolution behind one interface</h2>
+            <div class="flex flex-col items-end gap-2 shrink-0">
+              <span
+                class="text-xs font-semibold uppercase tracking-wider px-3 py-1 rounded-full bg-emerald-100 text-emerald-800">Strong</span>
+              <span
+                class="text-[11px] uppercase tracking-wider px-2 py-1 rounded bg-slate-100 text-slate-500">in-process</span>
             </div>
-
-            <div class="text-sm mono text-slate-500 space-y-0.5">
-              <div>src/19_RiskMeasures/{02_Variance, 04_Kurtosis, 06_XatRisk, 08–10, 11, 19, 20, 24}.jl</div>
-              <div>src/20_Optimisation/19_RiskMeasureConstraints/02_VarianceConstraints.jl:341,365,602,727</div>
-              <div>src/20_Optimisation/19_RiskMeasureConstraints/20_VarianceSkewKurtosisConstraints.jl:37–39</div>
-            </div>
-
-            <!-- before / after -->
-            <div class="grid md:grid-cols-2 gap-5">
-              <!-- before -->
-              <div class="rounded-xl border border-slate-200 p-4">
-                <p class="text-xs uppercase tracking-wider text-slate-400 mb-3">Before — fallback inlined at every call site</p>
-                <div class="space-y-2">
-                  <div class="mono text-[11px] bg-slate-900 text-slate-100 rounded p-3 leading-relaxed">
-                    <span class="text-slate-500"># 02_VarianceConstraints.jl:341</span><br/>
-                    sigma = isnothing(<mark class="!bg-rose-300">r.sigma</mark>) ? <mark class="!bg-rose-300">pr.sigma</mark> : r.sigma<br/>
-                    <span class="text-slate-500"># …:365, :602, :727 — same line, 4×</span><br/><br/>
-                    <span class="text-slate-500"># 20_VarianceSkewKurtosisConstraints.jl:37</span><br/>
-                    sigma = ifelse(isnothing(<mark class="!bg-rose-300">r.vr.sigma</mark>), <mark class="!bg-rose-300">pr.sigma</mark>, r.vr.sigma)<br/>
-                    sk&nbsp;&nbsp;&nbsp;= ifelse(isnothing(<mark class="!bg-rose-300">r.sk.sk</mark>), <mark class="!bg-rose-300">pr.sk</mark>, r.sk.sk)<br/>
-                    kt&nbsp;&nbsp;&nbsp;= ifelse(isnothing(<mark class="!bg-rose-300">r.kt.kt</mark>), <mark class="!bg-rose-300">pr.kt</mark>, r.kt.kt)
-                  </div>
-                  <p class="text-xs text-slate-500 leading-relaxed">~12 measure files + constraint files each re-implement <em>"use the measure's override field, else fall back to the Prior."</em> The constraint builder reaches across the seam into sub-measure fields (<span class="mono">r.vr.sigma</span>) <em>and</em> the Prior.</p>
-                </div>
-              </div>
-              <!-- after -->
-              <div class="rounded-xl border-2 border-emerald-500 p-4">
-                <p class="text-xs uppercase tracking-wider text-emerald-600 mb-3">After — one deep resolver</p>
-                <div class="space-y-2">
-                  <div class="mono text-[11px] deepbox text-slate-100 rounded p-3 leading-relaxed">
-                    <span class="text-emerald-300"># one interface, dispatched per measure</span><br/>
-                    sigma = <span class="text-emerald-300">resolve_sigma(r, pr)</span><br/>
-                    sk&nbsp;&nbsp;&nbsp;= <span class="text-emerald-300">resolve_sk(r, pr)</span><br/>
-                    kt&nbsp;&nbsp;&nbsp;= <span class="text-emerald-300">resolve_kt(r, pr)</span><br/><br/>
-                    <span class="text-slate-500"># composite delegates to its parts:</span><br/>
-                    resolve_sigma(r::VarSkewKurt, pr) =<br/>
-                    &nbsp;&nbsp;resolve_sigma(r.vr, pr)
-                  </div>
-                  <p class="text-xs text-slate-500 leading-relaxed">The override-or-Prior rule lives once. Composites compose resolvers instead of knowing their parts' field names. A renamed field breaks one method, not twelve.</p>
-                </div>
-              </div>
-            </div>
-
-            <div class="grid md:grid-cols-2 gap-5 text-sm">
-              <div>
-                <p class="text-xs uppercase tracking-wider text-slate-400 mb-1">Problem</p>
-                <p>The override-or-Prior moment rule is inlined at ~20 sites, and composite constraint builders read sub-measure fields directly — leakage across the measure seam.</p>
-              </div>
-              <div>
-                <p class="text-xs uppercase tracking-wider text-slate-400 mb-1">Solution</p>
-                <p>One <span class="mono">resolve_*(measure, prior)</span> per moment; composites compose the resolvers of their parts.</p>
-              </div>
-            </div>
-
-            <ul class="grid md:grid-cols-2 gap-x-8 gap-y-1 text-sm text-slate-700 list-disc pl-5">
-              <li>locality: fallback rule lives in one module</li>
-              <li>leverage: one interface, ~20 call sites</li>
-              <li>field rename breaks one method, not twelve</li>
-              <li>interface shrinks; the resolver absorbs the ifelse</li>
-              <li>tests hit the resolver, not each builder</li>
-              <li>deletion test: <span class="font-semibold text-emerald-700">concentrates</span></li>
-            </ul>
           </div>
-        </article>
 
-        <!-- ══════════════════════ CANDIDATE 2 ══════════════════════ -->
-        <article id="c2" class="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-          <div class="p-7 space-y-6">
-            <div class="flex items-start justify-between gap-4">
-              <h2 class="text-2xl font-serif font-semibold">02 · Route post-processing covariances through <span class="mono text-xl">matrix_processing!</span></h2>
-              <div class="flex flex-col items-end gap-2 shrink-0">
-                <span class="text-xs font-semibold uppercase tracking-wider px-3 py-1 rounded-full bg-emerald-100 text-emerald-800">Strong</span>
-                <span class="text-[11px] uppercase tracking-wider px-2 py-1 rounded bg-slate-100 text-slate-500">local-substitutable</span>
+          <div class="text-sm mono text-slate-500 space-y-0.5">
+            <div>src/19_RiskMeasures/{02_Variance, 04_Kurtosis, 06_XatRisk, 08–10, 11, 19, 20, 24}.jl</div>
+            <div>src/20_Optimisation/20_RiskMeasureConstraints/02_VarianceConstraints.jl:341,365,602,727</div>
+            <div>src/20_Optimisation/20_RiskMeasureConstraints/20_VarianceSkewKurtosisConstraints.jl:37–39</div>
+          </div>
+
+          <!-- before / after -->
+          <div class="grid md:grid-cols-2 gap-5">
+            <!-- before -->
+            <div class="rounded-xl border border-slate-200 p-4">
+              <p class="text-xs uppercase tracking-wider text-slate-400 mb-3">Before — fallback inlined at every call
+                site</p>
+              <div class="space-y-2">
+                <div class="mono text-[11px] bg-slate-900 text-slate-100 rounded p-3 leading-relaxed">
+                  <span class="text-slate-500"># 02_VarianceConstraints.jl:341</span><br />
+                  sigma = isnothing(<mark class="!bg-rose-300">r.sigma</mark>) ? <mark
+                    class="!bg-rose-300">pr.sigma</mark> : r.sigma<br />
+                  <span class="text-slate-500"># …:365, :602, :727 — same line, 4×</span><br /><br />
+                  <span class="text-slate-500"># 20_VarianceSkewKurtosisConstraints.jl:37</span><br />
+                  sigma = ifelse(isnothing(<mark class="!bg-rose-300">r.vr.sigma</mark>), <mark
+                    class="!bg-rose-300">pr.sigma</mark>, r.vr.sigma)<br />
+                  sk&nbsp;&nbsp;&nbsp;= ifelse(isnothing(<mark class="!bg-rose-300">r.sk.sk</mark>), <mark
+                    class="!bg-rose-300">pr.sk</mark>, r.sk.sk)<br />
+                  kt&nbsp;&nbsp;&nbsp;= ifelse(isnothing(<mark class="!bg-rose-300">r.kt.kt</mark>), <mark
+                    class="!bg-rose-300">pr.kt</mark>, r.kt.kt)
+                </div>
+                <p class="text-xs text-slate-500 leading-relaxed">~12 measure files + constraint files each re-implement
+                  <em>"use the measure's override field, else fall back to the Prior."</em> The constraint builder
+                  reaches across the seam into sub-measure fields (<span class="mono">r.vr.sigma</span>) <em>and</em>
+                  the Prior.</p>
               </div>
             </div>
-
-            <div class="text-sm mono text-slate-500 space-y-0.5">
-              <div>src/07_MatrixProcessing.jl:539–597 &nbsp;<span class="text-slate-400">(the canonical pipeline)</span></div>
-              <div>src/08_Moments/12_DenoiseCovariance.jl:170–183</div>
-              <div>src/08_Moments/13_DetoneCovariance.jl · 14_ProcessedCovariance.jl · 15_PortfolioOptimisersCovariance.jl</div>
+            <!-- after -->
+            <div class="rounded-xl border-2 border-emerald-500 p-4">
+              <p class="text-xs uppercase tracking-wider text-emerald-600 mb-3">After — one deep resolver</p>
+              <div class="space-y-2">
+                <div class="mono text-[11px] deepbox text-slate-100 rounded p-3 leading-relaxed">
+                  <span class="text-emerald-300"># one interface, dispatched per measure</span><br />
+                  sigma = <span class="text-emerald-300">resolve_sigma(r, pr)</span><br />
+                  sk&nbsp;&nbsp;&nbsp;= <span class="text-emerald-300">resolve_sk(r, pr)</span><br />
+                  kt&nbsp;&nbsp;&nbsp;= <span class="text-emerald-300">resolve_kt(r, pr)</span><br /><br />
+                  <span class="text-slate-500"># composite delegates to its parts:</span><br />
+                  resolve_sigma(r::VarSkewKurt, pr) =<br />
+                  &nbsp;&nbsp;resolve_sigma(r.vr, pr)
+                </div>
+                <p class="text-xs text-slate-500 leading-relaxed">The override-or-Prior rule lives once. Composites
+                  compose resolvers instead of knowing their parts' field names. A renamed field breaks one method, not
+                  twelve.</p>
+              </div>
             </div>
+          </div>
 
-            <!-- mermaid before/after -->
-            <div class="grid md:grid-cols-2 gap-5">
-              <div class="rounded-xl border border-slate-200 bg-white p-4">
-                <p class="text-xs uppercase tracking-wider text-slate-400 mb-2">Before — each estimator re-orchestrates the primitives</p>
-                <pre class="mermaid">
+          <div class="grid md:grid-cols-2 gap-5 text-sm">
+            <div>
+              <p class="text-xs uppercase tracking-wider text-slate-400 mb-1">Problem</p>
+              <p>The override-or-Prior moment rule is inlined at ~20 sites, and composite constraint builders read
+                sub-measure fields directly — leakage across the measure seam.</p>
+            </div>
+            <div>
+              <p class="text-xs uppercase tracking-wider text-slate-400 mb-1">Solution</p>
+              <p>One <span class="mono">resolve_*(measure, prior)</span> per moment; composites compose the resolvers of
+                their parts.</p>
+            </div>
+          </div>
+
+          <ul class="grid md:grid-cols-2 gap-x-8 gap-y-1 text-sm text-slate-700 list-disc pl-5">
+            <li>locality: fallback rule lives in one module</li>
+            <li>leverage: one interface, ~20 call sites</li>
+            <li>field rename breaks one method, not twelve</li>
+            <li>interface shrinks; the resolver absorbs the ifelse</li>
+            <li>tests hit the resolver, not each builder</li>
+            <li>deletion test: <span class="font-semibold text-emerald-700">concentrates</span></li>
+          </ul>
+        </div>
+      </article>
+
+      <!-- ══════════════════════ CANDIDATE 2 ══════════════════════ -->
+      <article id="c2" class="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+        <div class="p-7 space-y-6">
+          <div class="flex items-start justify-between gap-4">
+            <h2 class="text-2xl font-serif font-semibold">02 · Route post-processing covariances through <span
+                class="mono text-xl">matrix_processing!</span></h2>
+            <div class="flex flex-col items-end gap-2 shrink-0">
+              <span
+                class="text-xs font-semibold uppercase tracking-wider px-3 py-1 rounded-full bg-emerald-100 text-emerald-800">Strong</span>
+              <span
+                class="text-[11px] uppercase tracking-wider px-2 py-1 rounded bg-slate-100 text-slate-500">local-substitutable</span>
+            </div>
+          </div>
+
+          <div class="text-sm mono text-slate-500 space-y-0.5">
+            <div>src/07_MatrixProcessing.jl:539–597 &nbsp;<span class="text-slate-400">(the canonical pipeline)</span>
+            </div>
+            <div>src/08_Moments/12_DenoiseCovariance.jl:170–183</div>
+            <div>src/08_Moments/13_DetoneCovariance.jl · 14_ProcessedCovariance.jl · 15_PortfolioOptimisersCovariance.jl
+            </div>
+          </div>
+
+          <!-- mermaid before/after -->
+          <div class="grid md:grid-cols-2 gap-5">
+            <div class="rounded-xl border border-slate-200 bg-white p-4">
+              <p class="text-xs uppercase tracking-wider text-slate-400 mb-2">Before — each estimator re-orchestrates
+                the primitives</p>
+              <pre class="mermaid">
 flowchart TD
   A[DenoiseCovariance.cov] --> P1[posdef!]
   A --> D1[denoise!]
@@ -152,11 +208,14 @@ flowchart TD
   classDef leak stroke:#dc2626,stroke-width:2px,fill:#fff;
   class A,B,C,P1,P2,P3,D1,T1 leak
                 </pre>
-                <p class="text-xs text-slate-500 mt-2">Three estimators hand-compose <span class="mono">posdef! → denoise!/detone!</span> — duplicating the ordering logic that <span class="mono">matrix_processing!</span> already owns.</p>
-              </div>
-              <div class="rounded-xl border-2 border-emerald-500 bg-white p-4">
-                <p class="text-xs uppercase tracking-wider text-emerald-600 mb-2">After — one deep pipeline, estimators delegate</p>
-                <pre class="mermaid">
+              <p class="text-xs text-slate-500 mt-2">Three estimators hand-compose <span class="mono">posdef! →
+                  denoise!/detone!</span> — duplicating the ordering logic that <span
+                  class="mono">matrix_processing!</span> already owns.</p>
+            </div>
+            <div class="rounded-xl border-2 border-emerald-500 bg-white p-4">
+              <p class="text-xs uppercase tracking-wider text-emerald-600 mb-2">After — one deep pipeline, estimators
+                delegate</p>
+              <pre class="mermaid">
 flowchart TD
   A[DenoiseCovariance.cov] --> MP
   B[DetoneCovariance.cov] --> MP
@@ -167,123 +226,150 @@ flowchart TD
   MP --> AL[algorithm!]
   classDef deep fill:#0f172a,color:#fff,stroke:#0f172a;
                 </pre>
-                <p class="text-xs text-slate-500 mt-2">Ordering and posdef projection live once. Estimators become thin configs over the deep pipeline.</p>
-              </div>
+              <p class="text-xs text-slate-500 mt-2">Ordering and posdef projection live once. Estimators become thin
+                configs over the deep pipeline.</p>
             </div>
-
-            <div class="grid md:grid-cols-2 gap-5 text-sm">
-              <div>
-                <p class="text-xs uppercase tracking-wider text-slate-400 mb-1">Problem</p>
-                <p>Denoise/Detone/Processed covariances each replay <span class="mono">posdef!</span> + a primitive instead of crossing the <span class="mono">matrix_processing!</span> seam — ordering logic exists in four places.</p>
-              </div>
-              <div>
-                <p class="text-xs uppercase tracking-wider text-slate-400 mb-1">Solution</p>
-                <p>Make the three estimators construct and delegate to a <span class="mono">matrix_processing!</span> pipeline; delete their bespoke bodies.</p>
-              </div>
-            </div>
-
-            <ul class="grid md:grid-cols-2 gap-x-8 gap-y-1 text-sm text-slate-700 list-disc pl-5">
-              <li>locality: ordering lives in one pipeline</li>
-              <li>posdef stops leaking into estimators</li>
-              <li>new processing step touches one place</li>
-              <li>deletion test: <span class="font-semibold text-emerald-700">concentrates</span></li>
-            </ul>
           </div>
-        </article>
 
-        <!-- ══════════════════════ CANDIDATE 3 ══════════════════════ -->
-        <article id="c3" class="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-          <div class="p-7 space-y-6">
-            <div class="flex items-start justify-between gap-4">
-              <h2 class="text-2xl font-serif font-semibold">03 · Collapse six empty order-marker structs into one configured order</h2>
-              <div class="flex flex-col items-end gap-2 shrink-0">
-                <span class="text-xs font-semibold uppercase tracking-wider px-3 py-1 rounded-full bg-amber-100 text-amber-800">Worth exploring</span>
-                <span class="text-[11px] uppercase tracking-wider px-2 py-1 rounded bg-slate-100 text-slate-500">in-process</span>
-              </div>
+          <div class="grid md:grid-cols-2 gap-5 text-sm">
+            <div>
+              <p class="text-xs uppercase tracking-wider text-slate-400 mb-1">Problem</p>
+              <p>Denoise/Detone/Processed covariances each replay <span class="mono">posdef!</span> + a primitive
+                instead of crossing the <span class="mono">matrix_processing!</span> seam — ordering logic exists in
+                four places.</p>
             </div>
-
-            <div class="text-sm mono text-slate-500 space-y-0.5">
-              <div>src/07_MatrixProcessing.jl:162–288 &nbsp;<span class="text-slate-400">(6 empty structs)</span></div>
-              <div>src/07_MatrixProcessing.jl:539–597 &nbsp;<span class="text-slate-400">(6 near-identical bodies)</span></div>
+            <div>
+              <p class="text-xs uppercase tracking-wider text-slate-400 mb-1">Solution</p>
+              <p>Make the three estimators construct and delegate to a <span class="mono">matrix_processing!</span>
+                pipeline; delete their bespoke bodies.</p>
             </div>
-
-            <!-- mass diagram: shallow -->
-            <div class="grid md:grid-cols-2 gap-5">
-              <div class="rounded-xl border border-slate-200 p-4">
-                <p class="text-xs uppercase tracking-wider text-slate-400 mb-3">Before — interface as wide as the implementation</p>
-                <div class="flex items-end gap-2 h-[200px]">
-                  <!-- 6 markers each tall interface, tiny implementation -->
-                  <div class="flex flex-col items-center gap-1">
-                    <div class="w-9 bg-rose-300 schem text-[9px] text-center" style="height:150px">6 types</div>
-                    <div class="w-9 bg-slate-800 text-white text-[9px] text-center" style="height:18px">0 logic</div>
-                    <span class="text-[9px] text-slate-400 schem">markers</span>
-                  </div>
-                  <div class="flex flex-col items-center gap-1">
-                    <div class="w-24 bg-rose-300 schem text-[9px] text-center flex items-center justify-center" style="height:120px">6 methods<br/>dispatch</div>
-                    <div class="w-24 bg-slate-800 text-white text-[9px] text-center flex items-center justify-center" style="height:55px">posdef!+3 ops<br/>×6 reorderings</div>
-                    <span class="text-[9px] text-slate-400 schem">matrix_processing!</span>
-                  </div>
-                </div>
-                <p class="text-xs text-slate-500 mt-3">Six fieldless structs whose only content is a docstring; six method bodies that differ only in the order of three calls.</p>
-              </div>
-              <div class="rounded-xl border-2 border-emerald-500 p-4">
-                <p class="text-xs uppercase tracking-wider text-emerald-600 mb-3">After — short interface, the order is data</p>
-                <div class="flex items-end gap-2 h-[200px]">
-                  <div class="flex flex-col items-center gap-1">
-                    <div class="w-12 bg-emerald-300 schem text-[9px] text-center flex items-center justify-center" style="height:30px">1 order</div>
-                    <div class="w-12 deepbox text-white text-[9px] text-center flex items-center justify-center" style="height:140px">run ops in<br/>order</div>
-                    <span class="text-[9px] text-slate-400 schem">one method</span>
-                  </div>
-                </div>
-                <p class="text-xs text-slate-500 mt-3">One method walks a configured sequence (e.g. a tuple of step symbols). Adding a step is data, not a 7th struct + 7th body.</p>
-              </div>
-            </div>
-
-            <div class="grid md:grid-cols-2 gap-5 text-sm">
-              <div>
-                <p class="text-xs uppercase tracking-wider text-slate-400 mb-1">Problem</p>
-                <p>Shallow: six empty types and six bodies encode a permutation of three operations — interface surface nearly equals the implementation.</p>
-              </div>
-              <div>
-                <p class="text-xs uppercase tracking-wider text-slate-400 mb-1">Solution</p>
-                <p>Represent the order as data and run one pipeline. Keep the named-type ergonomics only if profiling shows dispatch matters.</p>
-              </div>
-            </div>
-
-            <div class="rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-xs px-4 py-3">
-              ⚠ Per-type dispatch is idiomatic Julia and zero-cost; the win here is locality, not speed. Worth confirming no downstream code dispatches on the individual order types before collapsing.
-            </div>
-
-            <ul class="grid md:grid-cols-2 gap-x-8 gap-y-1 text-sm text-slate-700 list-disc pl-5">
-              <li>interface shrinks 6 → 1</li>
-              <li>locality: the ordering is one readable list</li>
-              <li>new step = data, not a new method</li>
-              <li>deletion test: <span class="font-semibold text-emerald-700">concentrates</span></li>
-            </ul>
           </div>
-        </article>
 
-        <!-- ══════════════════════ CANDIDATE 4 ══════════════════════ -->
-        <article id="c4" class="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-          <div class="p-7 space-y-6">
-            <div class="flex items-start justify-between gap-4">
-              <h2 class="text-2xl font-serif font-semibold">04 · Lift the meta-optimiser harness out of NestedClustered</h2>
-              <div class="flex flex-col items-end gap-2 shrink-0">
-                <span class="text-xs font-semibold uppercase tracking-wider px-3 py-1 rounded-full bg-emerald-100 text-emerald-800">Strong</span>
-                <span class="text-[11px] uppercase tracking-wider px-2 py-1 rounded bg-slate-100 text-slate-500">in-process</span>
+          <ul class="grid md:grid-cols-2 gap-x-8 gap-y-1 text-sm text-slate-700 list-disc pl-5">
+            <li>locality: ordering lives in one pipeline</li>
+            <li>posdef stops leaking into estimators</li>
+            <li>new processing step touches one place</li>
+            <li>deletion test: <span class="font-semibold text-emerald-700">concentrates</span></li>
+          </ul>
+        </div>
+      </article>
+
+      <!-- ══════════════════════ CANDIDATE 3 ══════════════════════ -->
+      <article id="c3" class="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+        <div class="p-7 space-y-6">
+          <div class="flex items-start justify-between gap-4">
+            <h2 class="text-2xl font-serif font-semibold">03 · Collapse six empty order-marker structs into one
+              configured order</h2>
+            <div class="flex flex-col items-end gap-2 shrink-0">
+              <span
+                class="text-xs font-semibold uppercase tracking-wider px-3 py-1 rounded-full bg-amber-100 text-amber-800">Worth
+                exploring</span>
+              <span
+                class="text-[11px] uppercase tracking-wider px-2 py-1 rounded bg-slate-100 text-slate-500">in-process</span>
+            </div>
+          </div>
+
+          <div class="text-sm mono text-slate-500 space-y-0.5">
+            <div>src/07_MatrixProcessing.jl:162–288 &nbsp;<span class="text-slate-400">(6 empty structs)</span></div>
+            <div>src/07_MatrixProcessing.jl:539–597 &nbsp;<span class="text-slate-400">(6 near-identical bodies)</span>
+            </div>
+          </div>
+
+          <!-- mass diagram: shallow -->
+          <div class="grid md:grid-cols-2 gap-5">
+            <div class="rounded-xl border border-slate-200 p-4">
+              <p class="text-xs uppercase tracking-wider text-slate-400 mb-3">Before — interface as wide as the
+                implementation</p>
+              <div class="flex items-end gap-2 h-[200px]">
+                <!-- 6 markers each tall interface, tiny implementation -->
+                <div class="flex flex-col items-center gap-1">
+                  <div class="w-9 bg-rose-300 schem text-[9px] text-center" style="height:150px">6 types</div>
+                  <div class="w-9 bg-slate-800 text-white text-[9px] text-center" style="height:18px">0 logic</div>
+                  <span class="text-[9px] text-slate-400 schem">markers</span>
+                </div>
+                <div class="flex flex-col items-center gap-1">
+                  <div class="w-24 bg-rose-300 schem text-[9px] text-center flex items-center justify-center"
+                    style="height:120px">6 methods<br />dispatch</div>
+                  <div class="w-24 bg-slate-800 text-white text-[9px] text-center flex items-center justify-center"
+                    style="height:55px">posdef!+3 ops<br />×6 reorderings</div>
+                  <span class="text-[9px] text-slate-400 schem">matrix_processing!</span>
+                </div>
               </div>
+              <p class="text-xs text-slate-500 mt-3">Six fieldless structs whose only content is a docstring; six method
+                bodies that differ only in the order of three calls.</p>
             </div>
-
-            <div class="text-sm mono text-slate-500 space-y-0.5">
-              <div>src/20_Optimisation/16_NestedClustered.jl:481–511 <span class="text-slate-400">outer_optimisation_finaliser</span>, :577 <span class="text-slate-400">rebuild_returns_result</span></div>
-              <div>src/20_Optimisation/17_Stacking.jl:303–366 <span class="text-slate-400">predict_outer_st_… (calls helpers from NCO)</span></div>
-              <div>src/20_Optimisation/18_SubsetResampling.jl:410–416 <span class="text-slate-400">inner loop</span></div>
+            <div class="rounded-xl border-2 border-emerald-500 p-4">
+              <p class="text-xs uppercase tracking-wider text-emerald-600 mb-3">After — short interface, the order is
+                data</p>
+              <div class="flex items-end gap-2 h-[200px]">
+                <div class="flex flex-col items-center gap-1">
+                  <div class="w-12 bg-emerald-300 schem text-[9px] text-center flex items-center justify-center"
+                    style="height:30px">1 order</div>
+                  <div class="w-12 deepbox text-white text-[9px] text-center flex items-center justify-center"
+                    style="height:140px">run ops in<br />order</div>
+                  <span class="text-[9px] text-slate-400 schem">one method</span>
+                </div>
+              </div>
+              <p class="text-xs text-slate-500 mt-3">One method walks a configured sequence (e.g. a tuple of step
+                symbols). Adding a step is data, not a 7th struct + 7th body.</p>
             </div>
+          </div>
 
-            <div class="grid md:grid-cols-2 gap-5">
-              <div class="rounded-xl border border-slate-200 bg-white p-4">
-                <p class="text-xs uppercase tracking-wider text-slate-400 mb-2">Before — Stacking & SubsetResampling reach into NCO's file</p>
-                <pre class="mermaid">
+          <div class="grid md:grid-cols-2 gap-5 text-sm">
+            <div>
+              <p class="text-xs uppercase tracking-wider text-slate-400 mb-1">Problem</p>
+              <p>Shallow: six empty types and six bodies encode a permutation of three operations — interface surface
+                nearly equals the implementation.</p>
+            </div>
+            <div>
+              <p class="text-xs uppercase tracking-wider text-slate-400 mb-1">Solution</p>
+              <p>Represent the order as data and run one pipeline. Keep the named-type ergonomics only if profiling
+                shows dispatch matters.</p>
+            </div>
+          </div>
+
+          <div class="rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-xs px-4 py-3">
+            ⚠ Per-type dispatch is idiomatic Julia and zero-cost; the win here is locality, not speed. Worth confirming
+            no downstream code dispatches on the individual order types before collapsing.
+          </div>
+
+          <ul class="grid md:grid-cols-2 gap-x-8 gap-y-1 text-sm text-slate-700 list-disc pl-5">
+            <li>interface shrinks 6 → 1</li>
+            <li>locality: the ordering is one readable list</li>
+            <li>new step = data, not a new method</li>
+            <li>deletion test: <span class="font-semibold text-emerald-700">concentrates</span></li>
+          </ul>
+        </div>
+      </article>
+
+      <!-- ══════════════════════ CANDIDATE 4 ══════════════════════ -->
+      <article id="c4" class="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+        <div class="p-7 space-y-6">
+          <div class="flex items-start justify-between gap-4">
+            <h2 class="text-2xl font-serif font-semibold">04 · Lift the meta-optimiser harness out of NestedClustered
+            </h2>
+            <div class="flex flex-col items-end gap-2 shrink-0">
+              <span
+                class="text-xs font-semibold uppercase tracking-wider px-3 py-1 rounded-full bg-emerald-100 text-emerald-800">Strong</span>
+              <span
+                class="text-[11px] uppercase tracking-wider px-2 py-1 rounded bg-slate-100 text-slate-500">in-process</span>
+            </div>
+          </div>
+
+          <div class="text-sm mono text-slate-500 space-y-0.5">
+            <div>src/20_Optimisation/16_NestedClustered.jl:481–511 <span
+                class="text-slate-400">outer_optimisation_finaliser</span>, :577 <span
+                class="text-slate-400">rebuild_returns_result</span></div>
+            <div>src/20_Optimisation/17_Stacking.jl:303–366 <span class="text-slate-400">predict_outer_st_… (calls
+                helpers from NCO)</span></div>
+            <div>src/20_Optimisation/18_SubsetResampling.jl:410–416 <span class="text-slate-400">inner loop</span></div>
+          </div>
+
+          <div class="grid md:grid-cols-2 gap-5">
+            <div class="rounded-xl border border-slate-200 bg-white p-4">
+              <p class="text-xs uppercase tracking-wider text-slate-400 mb-2">Before — Stacking & SubsetResampling reach
+                into NCO's file</p>
+              <pre class="mermaid">
 flowchart LR
   NCO[NestedClustered.jl]
   ST[Stacking.jl]
@@ -296,11 +382,14 @@ flowchart LR
   classDef leak stroke:#dc2626,stroke-width:2px,fill:#fff;
   class ST,SR,RB,OF leak
                 </pre>
-                <p class="text-xs text-slate-500 mt-2">Shared harness (CV-predict → rebuild returns → aggregate weights → finalise) lives <em>inside</em> NestedClustered; Stacking and SubsetResampling import across the seam. Three near-identical inner loops + <span class="mono">predict_outer_*</span> variants.</p>
-              </div>
-              <div class="rounded-xl border-2 border-emerald-500 bg-white p-4">
-                <p class="text-xs uppercase tracking-wider text-emerald-600 mb-2">After — one meta-optimiser harness module</p>
-                <pre class="mermaid">
+              <p class="text-xs text-slate-500 mt-2">Shared harness (CV-predict → rebuild returns → aggregate weights →
+                finalise) lives <em>inside</em> NestedClustered; Stacking and SubsetResampling import across the seam.
+                Three near-identical inner loops + <span class="mono">predict_outer_*</span> variants.</p>
+            </div>
+            <div class="rounded-xl border-2 border-emerald-500 bg-white p-4">
+              <p class="text-xs uppercase tracking-wider text-emerald-600 mb-2">After — one meta-optimiser harness
+                module</p>
+              <pre class="mermaid">
 flowchart LR
   H[MetaOptimiser harness]:::deep
   NCO[NestedClustered]
@@ -311,180 +400,229 @@ flowchart LR
   SR --> H
   classDef deep fill:#0f172a,color:#fff,stroke:#0f172a;
                 </pre>
-                <p class="text-xs text-slate-500 mt-2">The shared run-inner / rebuild / finalise plumbing becomes a deep module each meta-optimiser configures with its own indexing.</p>
-              </div>
+              <p class="text-xs text-slate-500 mt-2">The shared run-inner / rebuild / finalise plumbing becomes a deep
+                module each meta-optimiser configures with its own indexing.</p>
             </div>
-
-            <div class="grid md:grid-cols-2 gap-5 text-sm">
-              <div>
-                <p class="text-xs uppercase tracking-wider text-slate-400 mb-1">Problem</p>
-                <p>The cross-validation aggregation harness is owned by one meta-optimiser's file but consumed by the other two — poor locality and a hidden dependency on NestedClustered's internals.</p>
-              </div>
-              <div>
-                <p class="text-xs uppercase tracking-wider text-slate-400 mb-1">Solution</p>
-                <p>Extract <span class="mono">rebuild_returns_result</span>, <span class="mono">outer_optimisation_finaliser</span>, and the inner-optimisation loop into a shared harness; meta-optimisers pass an indexing strategy.</p>
-              </div>
-            </div>
-
-            <div class="rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-xs px-4 py-3">
-              ⚠ Echoes ADR-0008 (model-assembly pipeline) — same move, different layer. The three inner loops differ only in indexing (clusters / stacks / subsets); confirm that variance fits one strategy parameter before committing.
-            </div>
-
-            <ul class="grid md:grid-cols-2 gap-x-8 gap-y-1 text-sm text-slate-700 list-disc pl-5">
-              <li>locality: CV aggregation in one module</li>
-              <li>Stacking stops depending on NCO's file</li>
-              <li>new meta-optimiser configures, doesn't copy</li>
-              <li>deletion test: <span class="font-semibold text-emerald-700">concentrates</span></li>
-            </ul>
           </div>
-        </article>
 
-        <!-- ══════════════════════ CANDIDATE 5 ══════════════════════ -->
-        <article id="c5" class="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-          <div class="p-7 space-y-6">
-            <div class="flex items-start justify-between gap-4">
-              <h2 class="text-2xl font-serif font-semibold">05 · Make the correlation matrix the Distance interface</h2>
-              <div class="flex flex-col items-end gap-2 shrink-0">
-                <span class="text-xs font-semibold uppercase tracking-wider px-3 py-1 rounded-full bg-amber-100 text-amber-800">Worth exploring</span>
-                <span class="text-[11px] uppercase tracking-wider px-2 py-1 rounded bg-slate-100 text-slate-500">in-process</span>
-              </div>
+          <div class="grid md:grid-cols-2 gap-5 text-sm">
+            <div>
+              <p class="text-xs uppercase tracking-wider text-slate-400 mb-1">Problem</p>
+              <p>The cross-validation aggregation harness is owned by one meta-optimiser's file but consumed by the
+                other two — poor locality and a hidden dependency on NestedClustered's internals.</p>
             </div>
-
-            <div class="text-sm mono text-slate-500 space-y-0.5">
-              <div>src/09_Distance/02_Distance.jl:122–267 <span class="text-slate-400">(ce, X) paths</span></div>
-              <div>src/09_Distance/02_Distance.jl:319–405 <span class="text-slate-400">(rho) paths</span> · :439+ <span class="text-slate-400">cor_and_dist</span></div>
+            <div>
+              <p class="text-xs uppercase tracking-wider text-slate-400 mb-1">Solution</p>
+              <p>Extract <span class="mono">rebuild_returns_result</span>, <span
+                  class="mono">outer_optimisation_finaliser</span>, and the inner-optimisation loop into a shared
+                harness; meta-optimisers pass an indexing strategy.</p>
             </div>
-
-            <!-- cross-section -->
-            <div class="grid md:grid-cols-2 gap-5">
-              <div class="rounded-xl border border-slate-200 p-4">
-                <p class="text-xs uppercase tracking-wider text-slate-400 mb-3">Before — each algorithm coded twice</p>
-                <div class="space-y-1.5 text-[11px] schem">
-                  <div class="h-9 border-l-4 border-rose-400 bg-rose-50 flex items-center px-3">distance(de, ce, X) · computes rho, forwards</div>
-                  <div class="h-9 border-l-4 border-rose-400 bg-rose-50 flex items-center px-3">distance(de, rho) · the real formula</div>
-                  <div class="h-9 border-l-4 border-rose-400 bg-rose-50 flex items-center px-3">cor_and_dist(de, ce, X) · computes rho, forwards</div>
-                  <div class="h-9 border-l-4 border-slate-300 bg-slate-50 flex items-center px-3 text-slate-400">…× ~6 algorithms × {Nothing, Integer}</div>
-                </div>
-                <p class="text-xs text-slate-500 mt-3">The primary path forces a <span class="mono">CovarianceEstimator</span>; the pure correlation→distance formula is the secondary overload. Testing a distance formula drags in moment estimation.</p>
-              </div>
-              <div class="rounded-xl border-2 border-emerald-500 p-4">
-                <p class="text-xs uppercase tracking-wider text-emerald-600 mb-3">After — one formula, one thin adapter</p>
-                <div class="space-y-1.5 text-[11px] schem">
-                  <div class="h-14 deepbox text-white flex items-center px-3 rounded">distance(de, rho) · the formula, the test surface</div>
-                  <div class="h-9 border-l-4 border-emerald-400 bg-emerald-50 flex items-center px-3">distance(de, ce, X) = distance(de, cor(ce, X))</div>
-                </div>
-                <p class="text-xs text-slate-500 mt-3">Each algorithm's formula exists once. The estimator path is one adapter line. Distance is testable from a bare correlation matrix.</p>
-              </div>
-            </div>
-
-            <div class="grid md:grid-cols-2 gap-5 text-sm">
-              <div>
-                <p class="text-xs uppercase tracking-wider text-slate-400 mb-1">Problem</p>
-                <p>Distance algorithms are implemented per input shape; the <span class="mono">(ce, X)</span> methods are pass-throughs that compute a correlation then delegate, and they make the formula hard to test in isolation.</p>
-              </div>
-              <div>
-                <p class="text-xs uppercase tracking-wider text-slate-400 mb-1">Solution</p>
-                <p>Treat <span class="mono">distance(de, rho)</span> as the interface; reduce the estimator paths to a single shared adapter that computes <span class="mono">rho</span> once.</p>
-              </div>
-            </div>
-
-            <ul class="grid md:grid-cols-2 gap-x-8 gap-y-1 text-sm text-slate-700 list-disc pl-5">
-              <li>interface: the correlation matrix, one shape</li>
-              <li>test surface: formula without moments</li>
-              <li>collapses ~6 pass-through methods</li>
-              <li>deletion test: <span class="font-semibold text-emerald-700">concentrates</span></li>
-            </ul>
           </div>
-        </article>
 
-        <!-- ══════════════════════ CANDIDATE 6 ══════════════════════ -->
-        <article id="c6" class="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-          <div class="p-7 space-y-6">
-            <div class="flex items-start justify-between gap-4">
-              <h2 class="text-2xl font-serif font-semibold">06 · Co-locate each risk measure with its JuMP formulation</h2>
-              <div class="flex flex-col items-end gap-2 shrink-0">
-                <span class="text-xs font-semibold uppercase tracking-wider px-3 py-1 rounded-full bg-slate-200 text-slate-700">Speculative</span>
-                <span class="text-[11px] uppercase tracking-wider px-2 py-1 rounded bg-slate-100 text-slate-500">ports &amp; adapters</span>
+          <div class="rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-xs px-4 py-3">
+            ⚠ Echoes ADR-0008 (model-assembly pipeline) — same move, different layer. The three inner loops differ only
+            in indexing (clusters / stacks / subsets); confirm that variance fits one strategy parameter before
+            committing.
+          </div>
+
+          <ul class="grid md:grid-cols-2 gap-x-8 gap-y-1 text-sm text-slate-700 list-disc pl-5">
+            <li>locality: CV aggregation in one module</li>
+            <li>Stacking stops depending on NCO's file</li>
+            <li>new meta-optimiser configures, doesn't copy</li>
+            <li>deletion test: <span class="font-semibold text-emerald-700">concentrates</span></li>
+          </ul>
+        </div>
+      </article>
+
+      <!-- ══════════════════════ CANDIDATE 5 ══════════════════════ -->
+      <article id="c5" class="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+        <div class="p-7 space-y-6">
+          <div class="flex items-start justify-between gap-4">
+            <h2 class="text-2xl font-serif font-semibold">05 · Make the correlation matrix the Distance interface</h2>
+            <div class="flex flex-col items-end gap-2 shrink-0">
+              <span
+                class="text-xs font-semibold uppercase tracking-wider px-3 py-1 rounded-full bg-amber-100 text-amber-800">Worth
+                exploring</span>
+              <span
+                class="text-[11px] uppercase tracking-wider px-2 py-1 rounded bg-slate-100 text-slate-500">in-process</span>
+            </div>
+          </div>
+
+          <div class="text-sm mono text-slate-500 space-y-0.5">
+            <div>src/09_Distance/02_Distance.jl:122–267 <span class="text-slate-400">(ce, X) paths</span></div>
+            <div>src/09_Distance/02_Distance.jl:319–405 <span class="text-slate-400">(rho) paths</span> · :439+ <span
+                class="text-slate-400">cor_and_dist</span></div>
+          </div>
+
+          <!-- cross-section -->
+          <div class="grid md:grid-cols-2 gap-5">
+            <div class="rounded-xl border border-slate-200 p-4">
+              <p class="text-xs uppercase tracking-wider text-slate-400 mb-3">Before — each algorithm coded twice</p>
+              <div class="space-y-1.5 text-[11px] schem">
+                <div class="h-9 border-l-4 border-rose-400 bg-rose-50 flex items-center px-3">distance(de, ce, X) ·
+                  computes rho, forwards</div>
+                <div class="h-9 border-l-4 border-rose-400 bg-rose-50 flex items-center px-3">distance(de, rho) · the
+                  real formula</div>
+                <div class="h-9 border-l-4 border-rose-400 bg-rose-50 flex items-center px-3">cor_and_dist(de, ce, X) ·
+                  computes rho, forwards</div>
+                <div class="h-9 border-l-4 border-slate-300 bg-slate-50 flex items-center px-3 text-slate-400">…× ~6
+                  algorithms × {Nothing, Integer}</div>
               </div>
+              <p class="text-xs text-slate-500 mt-3">The primary path forces a <span
+                  class="mono">CovarianceEstimator</span>; the pure correlation→distance formula is the secondary
+                overload. Testing a distance formula drags in moment estimation.</p>
             </div>
-
-            <div class="text-sm mono text-slate-500 space-y-0.5">
-              <div>src/19_RiskMeasures/NN_Foo.jl &nbsp;↔&nbsp; src/20_Optimisation/19_RiskMeasureConstraints/NN_FooConstraints.jl</div>
-              <div>27 measure files &nbsp;↔&nbsp; 20 parallel constraint files</div>
+            <div class="rounded-xl border-2 border-emerald-500 p-4">
+              <p class="text-xs uppercase tracking-wider text-emerald-600 mb-3">After — one formula, one thin adapter
+              </p>
+              <div class="space-y-1.5 text-[11px] schem">
+                <div class="h-14 deepbox text-white flex items-center px-3 rounded">distance(de, rho) · the formula, the
+                  test surface</div>
+                <div class="h-9 border-l-4 border-emerald-400 bg-emerald-50 flex items-center px-3">distance(de, ce, X)
+                  = distance(de, cor(ce, X))</div>
+              </div>
+              <p class="text-xs text-slate-500 mt-3">Each algorithm's formula exists once. The estimator path is one
+                adapter line. Distance is testable from a bare correlation matrix.</p>
             </div>
+          </div>
 
-            <div class="grid md:grid-cols-2 gap-5">
-              <div class="rounded-xl border border-slate-200 p-4">
-                <p class="text-xs uppercase tracking-wider text-slate-400 mb-3">Before — one measure, two files</p>
-                <div class="relative">
-                  <div class="flex justify-between items-center gap-4">
-                    <div class="flex-1 border border-slate-300 rounded p-3 text-center">
-                      <div class="text-[10px] schem text-slate-400">19_RiskMeasures</div>
-                      <div class="text-xs mono mt-1">06_XatRisk.jl</div>
-                      <div class="text-[10px] text-slate-500 mt-1">struct + functor</div>
-                    </div>
-                    <svg width="40" height="20"><line x1="0" y1="10" x2="40" y2="10" stroke="#64748b" stroke-width="2" class="seam" marker-end="url(#a)"/><defs><marker id="a" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6" fill="none" stroke="#64748b"/></marker></defs></svg>
-                    <div class="flex-1 border border-slate-300 rounded p-3 text-center">
-                      <div class="text-[10px] schem text-slate-400">…/19_RiskMeasureConstraints</div>
-                      <div class="text-xs mono mt-1">06_XatRiskConstraints.jl</div>
-                      <div class="text-[10px] text-slate-500 mt-1">JuMP formulation</div>
-                    </div>
+          <div class="grid md:grid-cols-2 gap-5 text-sm">
+            <div>
+              <p class="text-xs uppercase tracking-wider text-slate-400 mb-1">Problem</p>
+              <p>Distance algorithms are implemented per input shape; the <span class="mono">(ce, X)</span> methods are
+                pass-throughs that compute a correlation then delegate, and they make the formula hard to test in
+                isolation.</p>
+            </div>
+            <div>
+              <p class="text-xs uppercase tracking-wider text-slate-400 mb-1">Solution</p>
+              <p>Treat <span class="mono">distance(de, rho)</span> as the interface; reduce the estimator paths to a
+                single shared adapter that computes <span class="mono">rho</span> once.</p>
+            </div>
+          </div>
+
+          <ul class="grid md:grid-cols-2 gap-x-8 gap-y-1 text-sm text-slate-700 list-disc pl-5">
+            <li>interface: the correlation matrix, one shape</li>
+            <li>test surface: formula without moments</li>
+            <li>collapses ~6 pass-through methods</li>
+            <li>deletion test: <span class="font-semibold text-emerald-700">concentrates</span></li>
+          </ul>
+        </div>
+      </article>
+
+      <!-- ══════════════════════ CANDIDATE 6 ══════════════════════ -->
+      <article id="c6" class="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+        <div class="p-7 space-y-6">
+          <div class="flex items-start justify-between gap-4">
+            <h2 class="text-2xl font-serif font-semibold">06 · Co-locate each risk measure with its JuMP formulation
+            </h2>
+            <div class="flex flex-col items-end gap-2 shrink-0">
+              <span
+                class="text-xs font-semibold uppercase tracking-wider px-3 py-1 rounded-full bg-slate-200 text-slate-700">Speculative</span>
+              <span class="text-[11px] uppercase tracking-wider px-2 py-1 rounded bg-slate-100 text-slate-500">ports
+                &amp; adapters</span>
+            </div>
+          </div>
+
+          <div class="text-sm mono text-slate-500 space-y-0.5">
+            <div>src/19_RiskMeasures/NN_Foo.jl &nbsp;↔&nbsp;
+              src/20_Optimisation/20_RiskMeasureConstraints/NN_FooConstraints.jl</div>
+            <div>27 measure files &nbsp;↔&nbsp; 20 parallel constraint files</div>
+          </div>
+
+          <div class="grid md:grid-cols-2 gap-5">
+            <div class="rounded-xl border border-slate-200 p-4">
+              <p class="text-xs uppercase tracking-wider text-slate-400 mb-3">Before — one measure, two files</p>
+              <div class="relative">
+                <div class="flex justify-between items-center gap-4">
+                  <div class="flex-1 border border-slate-300 rounded p-3 text-center">
+                    <div class="text-[10px] schem text-slate-400">19_RiskMeasures</div>
+                    <div class="text-xs mono mt-1">06_XatRisk.jl</div>
+                    <div class="text-[10px] text-slate-500 mt-1">struct + functor</div>
+                  </div>
+                  <svg width="40" height="20">
+                    <line x1="0" y1="10" x2="40" y2="10" stroke="#64748b" stroke-width="2" class="seam"
+                      marker-end="url(#a)" />
+                    <defs>
+                      <marker id="a" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+                        <path d="M0,0 L6,3 L0,6" fill="none" stroke="#64748b" />
+                      </marker>
+                    </defs>
+                  </svg>
+                  <div class="flex-1 border border-slate-300 rounded p-3 text-center">
+                    <div class="text-[10px] schem text-slate-400">…/20_RiskMeasureConstraints</div>
+                    <div class="text-xs mono mt-1">06_XatRiskConstraints.jl</div>
+                    <div class="text-[10px] text-slate-500 mt-1">JuMP formulation</div>
                   </div>
                 </div>
-                <p class="text-xs text-slate-500 mt-3">Understanding one measure means opening two files in two directories. Variable names (<span class="mono">wr_risk</span>) are shared by convention across the seam, not by interface.</p>
               </div>
-              <div class="rounded-xl border-2 border-slate-400 p-4">
-                <p class="text-xs uppercase tracking-wider text-slate-500 mb-3">After — measure + formulation as one module</p>
-                <div class="border-2 border-slate-700 rounded p-3 text-center deepbox text-white">
-                  <div class="text-xs mono">XatRisk</div>
-                  <div class="text-[10px] text-slate-300 mt-1">struct · functor · JuMP formulation</div>
-                  <div class="mt-2 text-[10px] text-slate-400">formulation builders stay faded-internal</div>
-                </div>
-                <p class="text-xs text-slate-500 mt-3">One module per measure; the JuMP builder is an internal seam, not a parallel file. Locality: the whole measure reads top to bottom.</p>
-              </div>
+              <p class="text-xs text-slate-500 mt-3">Understanding one measure means opening two files in two
+                directories. Variable names (<span class="mono">wr_risk</span>) are shared by convention across the
+                seam, not by interface.</p>
             </div>
-
-            <div class="grid md:grid-cols-2 gap-5 text-sm">
-              <div>
-                <p class="text-xs uppercase tracking-wider text-slate-400 mb-1">Problem</p>
-                <p>Each measure is split across two parallel files; the definition and its formulation evolve together but live apart, coupled by shared key names.</p>
+            <div class="rounded-xl border-2 border-slate-400 p-4">
+              <p class="text-xs uppercase tracking-wider text-slate-500 mb-3">After — measure + formulation as one
+                module</p>
+              <div class="border-2 border-slate-700 rounded p-3 text-center deepbox text-white">
+                <div class="text-xs mono">XatRisk</div>
+                <div class="text-[10px] text-slate-300 mt-1">struct · functor · JuMP formulation</div>
+                <div class="mt-2 text-[10px] text-slate-400">formulation builders stay faded-internal</div>
               </div>
-              <div>
-                <p class="text-xs uppercase tracking-wider text-slate-400 mb-1">Solution</p>
-                <p>Co-locate definition + functor + JuMP builder per measure, keeping the builder as an internal seam.</p>
-              </div>
+              <p class="text-xs text-slate-500 mt-3">One module per measure; the JuMP builder is an internal seam, not a
+                parallel file. Locality: the whole measure reads top to bottom.</p>
             </div>
-
-            <div class="rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-xs px-4 py-3">
-              ⚠ The split may be load-bearing: it keeps the JuMP dependency on one side and lets the functor side stay solver-free (relevant to ADR-0006 / ADR-0007). Treat as a question to answer, not a refactor to schedule — measure whether anything actually imports the functor side without JuMP before moving.
-            </div>
-
-            <ul class="grid md:grid-cols-2 gap-x-8 gap-y-1 text-sm text-slate-700 list-disc pl-5">
-              <li>locality: one measure, one module</li>
-              <li>shared key names become an interface</li>
-              <li>risk: may collapse a real solver-free seam</li>
-              <li>deletion test: <span class="font-semibold text-slate-600">unclear — verify first</span></li>
-            </ul>
           </div>
-        </article>
 
-      </section>
+          <div class="grid md:grid-cols-2 gap-5 text-sm">
+            <div>
+              <p class="text-xs uppercase tracking-wider text-slate-400 mb-1">Problem</p>
+              <p>Each measure is split across two parallel files; the definition and its formulation evolve together but
+                live apart, coupled by shared key names.</p>
+            </div>
+            <div>
+              <p class="text-xs uppercase tracking-wider text-slate-400 mb-1">Solution</p>
+              <p>Co-locate definition + functor + JuMP builder per measure, keeping the builder as an internal seam.</p>
+            </div>
+          </div>
 
-      <!-- ───────────────────── top recommendation ───────────────────── -->
-      <section id="top-recommendation">
-        <div class="rounded-2xl deepbox text-slate-100 p-8 space-y-3">
-          <p class="text-xs uppercase tracking-[0.3em] text-emerald-300">Top recommendation</p>
-          <h2 class="text-2xl font-serif font-semibold">Start with <a href="#c1" class="underline decoration-emerald-400 underline-offset-4">01 · Moment resolution</a></h2>
-          <p class="text-sm text-slate-300 leading-relaxed max-w-3xl">
-            It is the widest, lowest-risk deepening: the override-or-Prior rule is duplicated across ~20 sites in ~12 files, and composite constraint builders reach across the measure seam into sub-measure fields. One <span class="mono text-emerald-200">resolve_*(measure, prior)</span> interface concentrates that rule, lets composites compose their parts' resolvers, and turns a renamed field from twelve breakages into one. Pure leverage and locality, no JuMP or solver risk, and it sets up the cleaner seam that candidate 06 would later test.
-          </p>
+          <div class="rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-xs px-4 py-3">
+            ⚠ The split may be load-bearing: it keeps the JuMP dependency on one side and lets the functor side stay
+            solver-free (relevant to ADR-0006 / ADR-0007). Treat as a question to answer, not a refactor to schedule —
+            measure whether anything actually imports the functor side without JuMP before moving.
+          </div>
+
+          <ul class="grid md:grid-cols-2 gap-x-8 gap-y-1 text-sm text-slate-700 list-disc pl-5">
+            <li>locality: one measure, one module</li>
+            <li>shared key names become an interface</li>
+            <li>risk: may collapse a real solver-free seam</li>
+            <li>deletion test: <span class="font-semibold text-slate-600">unclear — verify first</span></li>
+          </ul>
         </div>
-      </section>
+      </article>
 
-      <footer class="text-center text-xs text-slate-400 pt-6">
-        Vocabulary: module · interface · implementation · depth · seam · adapter · leverage · locality.
-        Decided in ADRs 0001–0008 and deliberately excluded.
-      </footer>
-    </main>
-  </body>
+    </section>
+
+    <!-- ───────────────────── top recommendation ───────────────────── -->
+    <section id="top-recommendation">
+      <div class="rounded-2xl deepbox text-slate-100 p-8 space-y-3">
+        <p class="text-xs uppercase tracking-[0.3em] text-emerald-300">Top recommendation</p>
+        <h2 class="text-2xl font-serif font-semibold">Start with <a href="#c1"
+            class="underline decoration-emerald-400 underline-offset-4">01 · Moment resolution</a></h2>
+        <p class="text-sm text-slate-300 leading-relaxed max-w-3xl">
+          It is the widest, lowest-risk deepening: the override-or-Prior rule is duplicated across ~20 sites in ~12
+          files, and composite constraint builders reach across the measure seam into sub-measure fields. One <span
+            class="mono text-emerald-200">resolve_*(measure, prior)</span> interface concentrates that rule, lets
+          composites compose their parts' resolvers, and turns a renamed field from twelve breakages into one. Pure
+          leverage and locality, no JuMP or solver risk, and it sets up the cleaner seam that candidate 06 would later
+          test.
+        </p>
+      </div>
+    </section>
+
+    <footer class="text-center text-xs text-slate-400 pt-6">
+      Vocabulary: module · interface · implementation · depth · seam · adapter · leverage · locality.
+      Decided in ADRs 0001–0008 and deliberately excluded.
+    </footer>
+  </main>
+</body>
+
 </html>

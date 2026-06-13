@@ -13,7 +13,7 @@ status: accepted
 
 JuMP-based optimisers build one `JuMP.Model` incrementally: dozens of constraint
 and risk builders across [09_JuMPConstraints](../../src/20_Optimisation/09_JuMPConstraints/)
-and [19_RiskMeasureConstraints](../../src/20_Optimisation/19_RiskMeasureConstraints/)
+and [20_RiskMeasureConstraints](../../src/20_Optimisation/20_RiskMeasureConstraints/)
 read and write shared entries by raw symbol key — `model[:sc]`, `model[:w]`,
 `model[:k]`, … — with no accessor layer. There are ~650 `model[:sym]` references
 over ~120 distinct keys, plus 126 `haskey(model, :sym)` guards and 112 raw
@@ -35,7 +35,7 @@ Inspecting the keys shows they are **two different things**, not one:
   already locally scoped and self-documenting.
 
 The cost of the missing interface is concrete, not cosmetic. The clearest example is
-[18_TrackingRiskMeasureConstraints.jl](../../src/20_Optimisation/19_RiskMeasureConstraints/18_TrackingRiskMeasureConstraints.jl):
+[18_TrackingRiskMeasureConstraints.jl](../../src/20_Optimisation/20_RiskMeasureConstraints/18_TrackingRiskMeasureConstraints.jl):
 `RiskTrackingRiskMeasure` applies a risk measure to the portfolio-vs-benchmark
 difference, which requires rebuilding the risk expressions against a different
 returns vector. It does this with ~150 lines that manually rename every live
