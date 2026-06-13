@@ -8,8 +8,8 @@ include(joinpath(@__DIR__, "test22_setup.jl"))
     jopto = JuMPOptimiser(; slv = slv,
                           pe = HighOrderPriorEstimator(;
                                                        ske = Coskewness(;
-                                                                        mp = DenoiseDetoneAlgMatrixProcessing(;
-                                                                                                              pdm = nothing))))
+                                                                        mp = MatrixProcessing(;
+                                                                                              pdm = nothing))))
 
     resa = optimise(NestedClustered(; cle = clr,
                                     opti = MeanRisk(; r = Kurtosis(; mu = pr.mu),

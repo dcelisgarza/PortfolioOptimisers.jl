@@ -103,7 +103,7 @@ for res in results[1:5]
 end
 mean_w ./= 5
 res = optimise(MeanRisk(; r = rs, opt = JuMPOptimiser(; pe = pr, slv = slv)))
-pretty_table(DataFrame(:assets => rd.nx, :denoise => results[1].w, :gerber1 => results[2].w,
+pretty_table(DataFrame(:assets => rd.nx, :dn => results[1].w, :gerber1 => results[2].w,
                        :smyth_broby1 => results[3].w, :mutual_info => results[4].w,
                        :distance => results[5].w, :mean_w => mean_w,
                        :sum_covs => results[6].w, :multi_risk => res.w);
@@ -121,7 +121,7 @@ mean_w ./= 5
 res = optimise(MeanRisk(; r = rs, obj = MaximumRatio(),
                         opt = JuMPOptimiser(; pe = pr, slv = slv)))
 
-pretty_table(DataFrame(:assets => rd.nx, :denoise => results[1].w, :gerber1 => results[2].w,
+pretty_table(DataFrame(:assets => rd.nx, :dn => results[1].w, :gerber1 => results[2].w,
                        :smyth_broby1 => results[3].w, :mutual_info => results[4].w,
                        :distance => results[5].w, :mean_w => mean_w,
                        :sum_covs => results[6].w, :multi_risk => res.w);

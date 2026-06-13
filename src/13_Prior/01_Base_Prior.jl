@@ -785,7 +785,7 @@ $(DocStringExtensions.FIELDS)
         S2::Option{<:MatNum} = nothing,
         sk::Option{<:MatNum} = nothing,
         V::Option{<:MatNum} = nothing,
-        skmp::Option{<:AbstractMatrixProcessingEstimator} = DenoiseDetoneAlgMatrixProcessing()
+        skmp::Option{<:AbstractMatrixProcessingEstimator} = MatrixProcessing()
     ) -> HighOrderPrior
 
 Keywords correspond to the struct's fields.

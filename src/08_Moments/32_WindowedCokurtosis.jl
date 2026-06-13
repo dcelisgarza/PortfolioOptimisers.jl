@@ -32,14 +32,14 @@ WindowedCokurtosis
       ke ┼ Cokurtosis
          │    me ┼ SimpleExpectedReturns
          │       │   w ┴ nothing
-         │    mp ┼ DenoiseDetoneAlgMatrixProcessing
+         │    mp ┼ MatrixProcessing
          │       │     pdm ┼ Posdef
          │       │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
          │       │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
          │       │      dn ┼ nothing
          │       │      dt ┼ nothing
          │       │     alg ┼ nothing
-         │       │   order ┴ DenoiseDetoneAlg()
+         │       │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
          │   alg ┼ Full()
          │     w ┴ nothing
        w ┼ nothing

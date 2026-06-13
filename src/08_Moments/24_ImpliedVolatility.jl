@@ -113,7 +113,7 @@ $(DocStringExtensions.FIELDS)
 
     ImpliedVolatility(;
         ce::StatsBase.CovarianceEstimator = Covariance(),
-        mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing(),
+        mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
         alg::ImpliedVolatilityAlgorithm = ImpliedVolatilityRegression(),
         af::Number = 252
     ) -> ImpliedVolatility
@@ -169,7 +169,7 @@ function factory(ce::ImpliedVolatility, w::ObsWeights)::ImpliedVolatility
 end
 =#
 function ImpliedVolatility(; ce::StatsBase.CovarianceEstimator = Covariance(),
-                           mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing(),
+                           mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
                            alg::ImpliedVolatilityAlgorithm = ImpliedVolatilityRegression(),
                            af::Number = 252)::ImpliedVolatility
     return ImpliedVolatility(ce, mp, alg, af)

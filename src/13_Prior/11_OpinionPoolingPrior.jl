@@ -105,7 +105,7 @@ julia> OpinionPoolingPrior(;
                                                                                            val = ["A == 0.05",
                                                                                                   "B + C >= 0.06"]))])
 OpinionPoolingPrior
-  pes ┼ EntropyPoolingPrior{EmpiricalPrior{PortfolioOptimisersCovariance{Covariance{SimpleExpectedReturns{Nothing}, GeneralCovariance{StatsBase.SimpleCovariance, Nothing}, Full}, DenoiseDetoneAlgMatrixProcessing{Posdef{UnionAll, @NamedTuple{}}, Nothing, Nothing, Nothing, DenoiseDetoneAlg}}, SimpleExpectedReturns{Nothing}, Nothing}, LinearConstraintEstimator{Vector{String}, Nothing}, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, AssetSets{String, String, Dict{String, Vector{String}}}, Nothing, Nothing, OptimEntropyPooling{Tuple{}, @NamedTuple{}, Int64, Float64, ExpEntropyPooling}, Nothing, H1_EntropyPooling}[EntropyPoolingPrior
+  pes ┼ EntropyPoolingPrior{EmpiricalPrior{PortfolioOptimisersCovariance{Covariance{SimpleExpectedReturns{Nothing}, GeneralCovariance{StatsBase.SimpleCovariance, Nothing}, Full}, MatrixProcessing{Posdef{UnionAll, @NamedTuple{}}, Nothing, Nothing, Nothing, NTuple{4, Symbol}}}, SimpleExpectedReturns{Nothing}, Nothing}, LinearConstraintEstimator{Vector{String}, Nothing}, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, AssetSets{String, String, Dict{String, Vector{String}}}, Nothing, Nothing, OptimEntropyPooling{Tuple{}, @NamedTuple{}, Int64, Float64, ExpEntropyPooling}, Nothing, H1_EntropyPooling}[EntropyPoolingPrior
       │            pe ┼ EmpiricalPrior
       │               │        ce ┼ PortfolioOptimisersCovariance
       │               │           │   ce ┼ Covariance
@@ -115,14 +115,14 @@ OpinionPoolingPrior
       │               │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
       │               │           │      │       │    w ┴ nothing
       │               │           │      │   alg ┴ Full()
-      │               │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
+      │               │           │   mp ┼ MatrixProcessing
       │               │           │      │     pdm ┼ Posdef
       │               │           │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
       │               │           │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
       │               │           │      │      dn ┼ nothing
       │               │           │      │      dt ┼ nothing
       │               │           │      │     alg ┼ nothing
-      │               │           │      │   order ┴ DenoiseDetoneAlg()
+      │               │           │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
       │               │        me ┼ SimpleExpectedReturns
       │               │           │   w ┴ nothing
       │               │   horizon ┴ nothing
@@ -162,14 +162,14 @@ OpinionPoolingPrior
       │               │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
       │               │           │      │       │    w ┴ nothing
       │               │           │      │   alg ┴ Full()
-      │               │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
+      │               │           │   mp ┼ MatrixProcessing
       │               │           │      │     pdm ┼ Posdef
       │               │           │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
       │               │           │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
       │               │           │      │      dn ┼ nothing
       │               │           │      │      dt ┼ nothing
       │               │           │      │     alg ┼ nothing
-      │               │           │      │   order ┴ DenoiseDetoneAlg()
+      │               │           │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
       │               │        me ┼ SimpleExpectedReturns
       │               │           │   w ┴ nothing
       │               │   horizon ┴ nothing
@@ -210,14 +210,14 @@ OpinionPoolingPrior
       │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
       │           │      │       │    w ┴ nothing
       │           │      │   alg ┴ Full()
-      │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
+      │           │   mp ┼ MatrixProcessing
       │           │      │     pdm ┼ Posdef
       │           │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
       │           │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
       │           │      │      dn ┼ nothing
       │           │      │      dt ┼ nothing
       │           │      │     alg ┼ nothing
-      │           │      │   order ┴ DenoiseDetoneAlg()
+      │           │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
       │        me ┼ SimpleExpectedReturns
       │           │   w ┴ nothing
       │   horizon ┴ nothing

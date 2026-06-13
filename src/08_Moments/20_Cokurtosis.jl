@@ -119,7 +119,7 @@ $(DocStringExtensions.FIELDS)
 
     Cokurtosis(;
         me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
-        mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing(),
+        mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
         alg::AbstractMomentAlgorithm = Full(),
         w::Option{<:ObsWeights} = nothing
     ) -> Cokurtosis
@@ -137,14 +137,14 @@ julia> Cokurtosis()
 Cokurtosis
    me ┼ SimpleExpectedReturns
       │   w ┴ nothing
-   mp ┼ DenoiseDetoneAlgMatrixProcessing
+   mp ┼ MatrixProcessing
       │     pdm ┼ Posdef
       │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
       │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
       │      dn ┼ nothing
       │      dt ┼ nothing
       │     alg ┼ nothing
-      │   order ┴ DenoiseDetoneAlg()
+      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
   alg ┼ Full()
     w ┴ nothing
 ```
@@ -181,7 +181,7 @@ Cokurtosis
     end
 end
 function Cokurtosis(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
-                    mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing(),
+                    mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
                     alg::AbstractMomentAlgorithm = Full(),
                     w::Option{<:ObsWeights} = nothing)::Cokurtosis
     return Cokurtosis(me, mp, alg, w)
@@ -209,14 +209,14 @@ julia> factory(kte, StatsBase.Weights([0.2, 0.3, 0.5]))
 Cokurtosis
    me ┼ SimpleExpectedReturns
       │   w ┴ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.3, 0.5]
-   mp ┼ DenoiseDetoneAlgMatrixProcessing
+   mp ┼ MatrixProcessing
       │     pdm ┼ Posdef
       │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
       │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
       │      dn ┼ nothing
       │      dt ┼ nothing
       │     alg ┼ nothing
-      │   order ┴ DenoiseDetoneAlg()
+      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
   alg ┼ Full()
     w ┴ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.3, 0.5]
 ```

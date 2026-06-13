@@ -13,7 +13,7 @@ $(DocStringExtensions.FIELDS)
 
     PortfolioOptimisersCovariance(;
         ce::StatsBase.CovarianceEstimator = Covariance(),
-        mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing()
+        mp::AbstractMatrixProcessingEstimator = MatrixProcessing()
     ) -> PortfolioOptimisersCovariance
 
 Keywords correspond to the struct's fields.
@@ -30,14 +30,14 @@ PortfolioOptimisersCovariance
      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
      │       │    w ┴ nothing
      │   alg ┴ Full()
-  mp ┼ DenoiseDetoneAlgMatrixProcessing
+  mp ┼ MatrixProcessing
      │     pdm ┼ Posdef
      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
      │      dn ┼ nothing
      │      dt ┼ nothing
      │     alg ┼ nothing
-     │   order ┴ DenoiseDetoneAlg()
+     │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
 ```
 
 # Related
@@ -60,7 +60,7 @@ PortfolioOptimisersCovariance
     end
 end
 function PortfolioOptimisersCovariance(; ce::StatsBase.CovarianceEstimator = Covariance(),
-                                       mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing())::PortfolioOptimisersCovariance
+                                       mp::AbstractMatrixProcessingEstimator = MatrixProcessing())::PortfolioOptimisersCovariance
     return PortfolioOptimisersCovariance(ce, mp)
 end
 """

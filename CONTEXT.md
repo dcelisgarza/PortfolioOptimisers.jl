@@ -96,7 +96,7 @@ Removes the largest `n` principal components (market modes) from a correlation m
 Projects a matrix to the nearest positive definite matrix; used when a matrix is ill-conditioned or non-PD after denoising/detoning.
 
 **Matrix Processing**
-A composing estimator orchestrating Denoising, Detoning, and a custom algorithm in a configurable order (`AbstractMatrixProcessingOrder` — six permutations: `DenoiseDetoneAlg`, `DenoiseAlgDetone`, `DetoneDenoiseAlg`, `DetoneAlgDenoise`, `AlgDenoiseDetone`, `AlgDetoneDenoise`).
+A composing estimator (`MatrixProcessing`) that applies a sequence of post-processing steps — Posdef projection, Denoising, Detoning, and a custom algorithm — to a covariance/correlation matrix. Each step has its own estimator field (`pdm`/`dn`/`dt`/`alg`); the `order` field is a tuple (or vector) of step symbols (`:pdm`, `:dn`, `:dt`, `:alg`) naming which steps run and in what sequence, applied left to right.
 
 ### 3.6 Prior
 
