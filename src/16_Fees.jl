@@ -371,23 +371,23 @@ Fees
     """
     $(field_dict[:tnr])
     """
-    @fprop tn
+    @fprop @vprop tn
     """
     $(field_dict[:l_fees])
     """
-    l
+    @vprop l
     """
     $(field_dict[:s_fees])
     """
-    s
+    @vprop s
     """
     $(field_dict[:fl])
     """
-    fl
+    @vprop fl
     """
     $(field_dict[:fs])
     """
-    fs
+    @vprop fs
     """
     $(field_dict[:kwargs_fee])
     """
@@ -583,81 +583,6 @@ julia> fees_constraints(nothing)
 """
 function fees_constraints(fees::Option{<:Fees}, args...; kwargs...)::Option{<:Fees}
     return fees
-end
-"""
-    port_opt_view(fees::Fees, i)
-
-Create a view of a `Fees` constraint for a subset of assets.
-
-Returns a new `Fees` object with all fee fields restricted to the indices or assets specified by `i`. The keyword arguments are propagated unchanged.
-
-# Arguments
-
-  - `fees`: A `Fees` constraint object containing turnover, proportional, and fixed fee values.
-  - `i`: Index or indices specifying the subset of assets.
-
-# Returns
-
-  - `fe::Fees`: New constraint object with fields restricted to the specified subset.
-
-# Details
-
-  - Uses `port_opt_view` to subset the turnover constraint.
-  - Uses `nothing_scalar_array_view` to subset proportional and fixed fee fields.
-  - Propagates keyword arguments unchanged.
-  - Enables composable processing of asset subsets for fee constraints.
-
-# Examples
-
-```jldoctest
-julia> fees = Fees(; tn = Turnover(; w = [0.2, 0.3, 0.5], val = [0.1, 0.0, 0.0]),
-                   l = [0.001, 0.002, 0.0], s = [0.001, 0.002, 0.0], fl = [5.0, 0.0, 0.0],
-                   fs = [0.0, 10.0, 0.0]);
-
-julia> PortfolioOptimisers.port_opt_view(fees, 1:2)
-Fees
-      tn ┼ Turnover
-         │       w ┼ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [0.2, 0.3]
-         │     val ┼ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [0.1, 0.0]
-         │   fixed ┴ Bool: false
-       l ┼ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [0.001, 0.002]
-       s ┼ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [0.001, 0.002]
-      fl ┼ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [5.0, 0.0]
-      fs ┼ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [0.0, 10.0]
-  kwargs ┴ @NamedTuple{atol::Float64}: (atol = 1.0e-8,)
-
-julia> fees = Fees(; tn = Turnover(; w = [0.2, 0.3, 0.5], val = [0.1, 0.0, 0.0], fixed = true),
-                   l = [0.001, 0.002, 0.0], s = [0.001, 0.002, 0.0], fl = [5.0, 0.0, 0.0],
-                   fs = [0.0, 10.0, 0.0]);
-
-julia> PortfolioOptimisers.port_opt_view(fees, 1:2)
-Fees
-      tn ┼ Turnover
-         │       w ┼ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [0.2, 0.3]
-         │     val ┼ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [0.1, 0.0]
-         │   fixed ┴ Bool: true
-       l ┼ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [0.001, 0.002]
-       s ┼ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [0.001, 0.002]
-      fl ┼ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [5.0, 0.0]
-      fs ┼ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [0.0, 10.0]
-  kwargs ┴ @NamedTuple{atol::Float64}: (atol = 1.0e-8,)
-```
-
-# Related
-
-  - [`Fees`](@ref)
-  - [`FeesEstimator`](@ref)
-  - [`fees_constraints`](@ref)
-  - [`port_opt_view`](@ref)
-  - [`nothing_scalar_array_view`](@ref)
-"""
-function port_opt_view(fees::Fees, i, args...)::Fees
-    tn = port_opt_view(fees.tn, i)
-    l = nothing_scalar_array_view(fees.l, i)
-    s = nothing_scalar_array_view(fees.s, i)
-    fl = nothing_scalar_array_view(fees.fl, i)
-    fs = nothing_scalar_array_view(fees.fs, i)
-    return Fees(; tn = tn, l = l, s = s, fl = fl, fs = fs, kwargs = fees.kwargs)
 end
 """
     calc_fees(w::VecNum, p::VecNum, ::Nothing, ::Function)

@@ -1038,7 +1038,7 @@ TrackingError
     """
     $(field_dict[:tr])
     """
-    @fprop tr
+    @fprop @vprop tr
     """
     $(field_dict[:err])
     """
@@ -1060,64 +1060,6 @@ end
 function TrackingError(; tr::AbstractTrackingAlgorithm, err::Number = 0.0,
                        alg::NormTracking = L2Tracking())
     return TrackingError(tr, err, alg)
-end
-"""
-    port_opt_view(tr::TrackingError, i)
-
-Return a view of a `TrackingError` object for the given index or indices.
-
-This function creates a new [`TrackingError`](@ref) instance by extracting a view of the underlying tracking algorithm at the specified index or indices. The error value and formulation algorithm are preserved.
-
-# Arguments
-
-  - `tr`: A [`TrackingError`](@ref) object containing a tracking algorithm, error value, and formulation algorithm.
-  - `i`: Index or indices to subset the underlying tracking algorithm.
-
-# Returns
-
-  - `tre::TrackingError`: New tracking error result object with the underlying tracking algorithm viewed at `i`.
-
-# Details
-
-  - Uses `port_opt_view` to subset the `tr` field.
-  - Preserves the `err` and `alg` fields.
-  - Returns a new `TrackingError` object with the subsetted tracking algorithm.
-
-# Examples
-
-```jldoctest
-julia> tr = WeightsTracking(; w = [0.5, 0.5, 0.6]);
-
-julia> err = TrackingError(; tr = tr, err = 0.01)
-TrackingError
-   tr ┼ WeightsTracking
-      │    fees ┼ nothing
-      │       w ┼ Vector{Float64}: [0.5, 0.5, 0.6]
-      │   fixed ┴ Bool: false
-  err ┼ Float64: 0.01
-  alg ┼ L2Tracking
-      │   ddof ┴ Int64: 1
-
-julia> PortfolioOptimisers.port_opt_view(err, 2:3)
-TrackingError
-   tr ┼ WeightsTracking
-      │    fees ┼ nothing
-      │       w ┼ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [0.5, 0.6]
-      │   fixed ┴ Bool: false
-  err ┼ Float64: 0.01
-  alg ┼ L2Tracking
-      │   ddof ┴ Int64: 1
-```
-
-# Related
-
-  - [`TrackingError`](@ref)
-  - [`port_opt_view`](@ref)
-  - [`WeightsTracking`](@ref)
-  - [`ReturnsTracking`](@ref)
-"""
-function port_opt_view(tr::TrackingError, i, args...)
-    return TrackingError(; tr = port_opt_view(tr.tr, i), err = tr.err, alg = tr.alg)
 end
 """
     port_opt_view(tr::VecTr, args...)
