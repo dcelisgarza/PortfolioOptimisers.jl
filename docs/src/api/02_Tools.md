@@ -13,7 +13,7 @@ factory(a::Union{Nothing, <:AbstractEstimator, <:AbstractAlgorithm, <:AbstractRe
 get_window
 @propagatable
 _factory_child
-@prop
+@fprop
 _is_prop_macro
 _is_doc_macro
 _extract_field_name

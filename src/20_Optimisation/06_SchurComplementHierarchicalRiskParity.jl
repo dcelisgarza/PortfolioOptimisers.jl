@@ -257,7 +257,7 @@ Matches either a single [`SchurComplementParams`](@ref) or a vector of them ([`V
 """
 const ScP_VecScP = Union{<:SchurComplementParams, <:VecScP}
 """
-    schur_complement_params_view(sp, i, X)
+    port_opt_view(sp, i, X)
 
 Get a view or subset of Schur complement parameters for cluster index `i`.
 
@@ -278,8 +278,8 @@ Returns a [`SchurComplementParams`](@ref) with the risk measure sliced for the g
   - [`SchurComplementParams`](@ref)
   - [`SchurComplementHierarchicalRiskParity`](@ref)
 """
-function schur_complement_params_view(sp::SchurComplementParams, i, X::MatNum)
-    r = risk_measure_view(sp.r, i, X)
+function port_opt_view(sp::SchurComplementParams, i, X::MatNum)
+    r = port_opt_view(sp.r, i, X)
     return SchurComplementParams(; r = r, gamma = sp.gamma, pdm = sp.pdm, alg = sp.alg,
                                  flag = sp.flag)
 end
@@ -310,7 +310,7 @@ Keywords correspond to the struct's fields.
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@prop`-tagged fields are automatically propagated:
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
 
   - `opt`: Recursively updated via [`factory`](@ref).
   - `fb`: Recursively updated via [`factory`](@ref).
@@ -436,7 +436,7 @@ The bisection weight ``\\alpha`` is then computed from the Schur-complement-corr
     """
     $(field_dict[:opt_hier])
     """
-    @prop opt
+    @fprop opt
     """
     $(field_dict[:params])
     """
@@ -444,7 +444,7 @@ The bisection weight ``\\alpha`` is then computed from the Schur-complement-corr
     """
     $(field_dict[:fb])
     """
-    @prop fb
+    @fprop fb
     function SchurComplementHierarchicalRiskParity(opt::HierarchicalOptimiser,
                                                    params::ScP_VecScP,
                                                    fb::Option{<:OptE_Opt})
@@ -489,13 +489,13 @@ Return a view of [`SchurComplementHierarchicalRiskParity`](@ref) `sh` sliced to 
 # Related
 
   - [`SchurComplementHierarchicalRiskParity`](@ref)
-  - [`opt_view`](@ref)
+  - [`port_opt_view`](@ref)
 """
-function opt_view(sh::SchurComplementHierarchicalRiskParity, i,
-                  X::MatNum)::SchurComplementHierarchicalRiskParity
+function port_opt_view(sh::SchurComplementHierarchicalRiskParity, i,
+                       X::MatNum)::SchurComplementHierarchicalRiskParity
     X = isa(sh.opt.pe, AbstractPriorResult) ? sh.opt.pe.X : X
-    opt = opt_view(sh.opt, i)
-    params = schur_complement_params_view(sh.params, i, X)
+    opt = port_opt_view(sh.opt, i)
+    params = port_opt_view(sh.params, i, X)
     return SchurComplementHierarchicalRiskParity(; opt = opt, params = params, fb = sh.fb)
 end
 """

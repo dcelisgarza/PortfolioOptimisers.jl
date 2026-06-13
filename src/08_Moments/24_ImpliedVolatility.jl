@@ -126,7 +126,7 @@ Keywords correspond to the struct's fields.
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@prop`-tagged fields are automatically propagated:
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
 
   - `ce`: Recursively updated via [`factory`](@ref).
 
@@ -143,7 +143,7 @@ When [`factory`](@ref) is called on this type, the following `@prop`-tagged fiel
     """
     $(field_dict[:ce])
     """
-    @prop ce
+    @fprop ce
     """
     $(field_dict[:mp])
     """
@@ -192,8 +192,8 @@ Gets the view of the covariance estimator for the `i`-th element(s).
 
   - [`ImpliedVolatility`](@ref)
 """
-function moment_view(ce::ImpliedVolatility, i)::ImpliedVolatility
-    return ImpliedVolatility(; ce = moment_view(ce.ce, i), mp = ce.mp)
+function port_opt_view(ce::ImpliedVolatility, i)::ImpliedVolatility
+    return ImpliedVolatility(; ce = port_opt_view(ce.ce, i), mp = ce.mp)
 end
 """
     realised_vol(ce::AbstractVarianceEstimator, X::MatNum, ws::Integer,

@@ -301,13 +301,13 @@ Return a view of [`HierarchicalOptimiser`](@ref) `hco` sliced to asset indices `
 # Related
 
   - [`HierarchicalOptimiser`](@ref)
-  - [`opt_view`](@ref)
+  - [`port_opt_view`](@ref)
 """
-function opt_view(hco::HierarchicalOptimiser, i)::HierarchicalOptimiser
-    pe = prior_view(hco.pe, i)
-    wb = weight_bounds_view(hco.wb, i)
-    fees = fees_view(hco.fees, i)
-    sets = asset_sets_view(hco.sets, i)
+function port_opt_view(hco::HierarchicalOptimiser, i)::HierarchicalOptimiser
+    pe = port_opt_view(hco.pe, i)
+    wb = port_opt_view(hco.wb, i)
+    fees = port_opt_view(hco.fees, i)
+    sets = port_opt_view(hco.sets, i)
     return HierarchicalOptimiser(; pe = pe, cle = hco.cle, slv = hco.slv, wb = wb,
                                  fees = fees, wf = hco.wf, sets = sets, brt = hco.brt,
                                  cle_pr = hco.cle_pr, strict = hco.strict)

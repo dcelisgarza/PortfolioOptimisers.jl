@@ -26,7 +26,7 @@ Keywords correspond to the struct's fields.
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@prop`-tagged fields are automatically propagated:
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
 
   - `me`: Recursively updated via [`factory`](@ref).
   - `w`: Replaced with the incoming [`ObsWeights`](@ref).
@@ -52,11 +52,11 @@ WindowedExpectedReturns
     """
     $(field_dict[:me])
     """
-    @prop me
+    @fprop me
     """
     $(field_dict[:oow])
     """
-    @prop w
+    @fprop w
     """
     Window specification: an integer (last `window` observations) or a vector of indices.
     """
@@ -97,8 +97,8 @@ Gets the view of the expected returns estimator for the `i`-th element(s).
 
   - [`WindowedExpectedReturns`](@ref)
 """
-function moment_view(me::WindowedExpectedReturns, i)::WindowedExpectedReturns
-    return WindowedExpectedReturns(; me = moment_view(me.me, i), w = me.w,
+function port_opt_view(me::WindowedExpectedReturns, i)::WindowedExpectedReturns
+    return WindowedExpectedReturns(; me = port_opt_view(me.me, i), w = me.w,
                                    window = me.window)
 end
 """

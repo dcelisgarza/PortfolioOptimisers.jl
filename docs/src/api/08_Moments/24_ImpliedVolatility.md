@@ -5,7 +5,7 @@ ImpliedVolatilityAlgorithm
 ImpliedVolatilityRegression
 ImpliedVolatilityPremium
 ImpliedVolatility
-moment_view(ce::ImpliedVolatility, i)
+port_opt_view(ce::ImpliedVolatility, i)
 realised_vol
 implied_vol
 predict_realised_vols(::ImpliedVolatilityPremium, iv::MatNum, ::Any, ivpa::Nothing)

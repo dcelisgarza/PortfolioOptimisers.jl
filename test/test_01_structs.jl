@@ -232,7 +232,7 @@
                 @test tn.w == [-1, -2, -3]
             end
         end
-        tns2 = PortfolioOptimisers.turnover_view(tns, [2, 3])
+        tns2 = PortfolioOptimisers.port_opt_view(tns, [2, 3])
         for (tn2, tn) in zip(tns2, tns)
             @test tn2.w == view(tn.w, [2, 3])
         end

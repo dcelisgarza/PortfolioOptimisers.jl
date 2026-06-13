@@ -108,8 +108,8 @@ Return a new [`EmpiricalPrior`](@ref) estimator restricted to the assets at inde
 
   - [`EmpiricalPrior`](@ref)
 """
-function prior_view(pe::EmpiricalPrior, i)::EmpiricalPrior
-    return EmpiricalPrior(; me = moment_view(pe.me, i), ce = moment_view(pe.ce, i),
+function port_opt_view(pe::EmpiricalPrior, i)::EmpiricalPrior
+    return EmpiricalPrior(; me = port_opt_view(pe.me, i), ce = port_opt_view(pe.ce, i),
                           horizon = pe.horizon)
 end
 """

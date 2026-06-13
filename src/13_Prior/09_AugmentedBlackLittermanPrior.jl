@@ -326,13 +326,13 @@ Return a new [`AugmentedBlackLittermanPrior`](@ref) estimator restricted to the 
 # Related
 
   - [`AugmentedBlackLittermanPrior`](@ref)
-  - [`prior_view`](@ref)
+  - [`port_opt_view`](@ref)
 """
-function prior_view(pe::AugmentedBlackLittermanPrior, i)::AugmentedBlackLittermanPrior
-    return AugmentedBlackLittermanPrior(; a_pe = prior_view(pe.a_pe, i), f_pe = pe.f_pe,
-                                        mp = pe.mp, re = regression_view(pe.re, i),
+function port_opt_view(pe::AugmentedBlackLittermanPrior, i)::AugmentedBlackLittermanPrior
+    return AugmentedBlackLittermanPrior(; a_pe = port_opt_view(pe.a_pe, i), f_pe = pe.f_pe,
+                                        mp = pe.mp, re = port_opt_view(pe.re, i),
                                         a_views = pe.a_views, f_views = pe.f_views,
-                                        a_sets = asset_sets_view(pe.a_sets, i),
+                                        a_sets = port_opt_view(pe.a_sets, i),
                                         f_sets = pe.f_sets, a_views_conf = pe.a_views_conf,
                                         f_views_conf = pe.f_views_conf,
                                         w = nothing_scalar_array_view(pe.w, i), rf = pe.rf,

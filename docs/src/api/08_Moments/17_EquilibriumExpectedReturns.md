@@ -3,5 +3,5 @@
 ```@docs
 EquilibriumExpectedReturns
 mean(me::EquilibriumExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)
-moment_view(me::EquilibriumExpectedReturns, i)
+port_opt_view(me::EquilibriumExpectedReturns, i)
 ```

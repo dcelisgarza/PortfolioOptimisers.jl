@@ -442,14 +442,14 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return a cluster-sliced copy of [`NestedClustered`](@ref) for asset index set `i` and returns matrix `X`.
 """
-function opt_view(nco::NestedClustered, i, X::MatNum)
+function port_opt_view(nco::NestedClustered, i, X::MatNum)
     X = isa(nco.pe, AbstractPriorResult) ? nco.pe.X : X
-    pe = prior_view(nco.pe, i)
-    wb = weight_bounds_view(nco.wb, i)
-    fees = fees_view(nco.fees, i)
-    sets = asset_sets_view(nco.sets, i)
-    opti = opt_view(nco.opti, i, X)
-    opto = opt_view(nco.opto, i, X)
+    pe = port_opt_view(nco.pe, i)
+    wb = port_opt_view(nco.wb, i)
+    fees = port_opt_view(nco.fees, i)
+    sets = port_opt_view(nco.sets, i)
+    opti = port_opt_view(nco.opti, i, X)
+    opto = port_opt_view(nco.opto, i, X)
     return NestedClustered(; pe = pe, cle = nco.cle, wb = wb, fees = fees, sets = sets,
                            opti = opti, opto = opto, cv = nco.cv, wf = nco.wf, ex = nco.ex,
                            fb = nco.fb, brt = nco.brt, cle_pr = nco.cle_pr,
@@ -473,8 +473,8 @@ function predict_outer_nco_estimator_returns(nco::NestedClustered, rd::ReturnsRe
                                              wi::MatNum, resi::VecOpt, cls::VecVecInt)
     nb, B, iv, ivpa, X = prepare_outer_rd(rd, wi)
     for (i, (res, cl)) in enumerate(zip(resi, cls))
-        pri = prior_view(pr, cl)
-        feesi = fees_view(fees, cl)
+        pri = port_opt_view(pr, cl)
+        feesi = port_opt_view(fees, cl)
         X[:, i] = calc_net_returns(res, pri, feesi)
     end
     return ReturnsResult(; nx = ["_$i" for i in 1:size(wi, 2)], X = X, nf = rd.nf, F = rd.F,
@@ -536,7 +536,7 @@ function _optimise(nco::NestedClustered, rd::ReturnsResult; dims::Int = 1,
     resi = Vector{NonFiniteAllocationOptimisationResult}(undef, clr.k)
     # FLoops.@floop nco.ex
     for (i, cl) in pairs(cls)
-        optic = opt_view(opti, cl, X)
+        optic = port_opt_view(opti, cl, X)
         rdc = returns_result_view(rd, cl)
         res = optimise(optic, rdc; dims = dims, branchorder = branchorder,
                        str_names = str_names, save = save, kwargs...)

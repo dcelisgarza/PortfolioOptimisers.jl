@@ -8,7 +8,7 @@ BudgetCostEstimator
 set_budget_costs!
 BudgetRange
 Num_BgtRg
-budget_view
+port_opt_view
 BudgetCosts
 BudgetMarketImpact
 set_budget_constraints!

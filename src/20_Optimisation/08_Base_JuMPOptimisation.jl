@@ -68,7 +68,7 @@ Abstract supertype for JuMP-based returns estimators used in optimisation models
 """
 abstract type JuMPReturnsEstimator <: AbstractEstimator end
 """
-    jump_returns_view(r, args...; kwargs...)
+    port_opt_view(r, args...; kwargs...)
 
 Get a view or subset of JuMP returns estimator for slicing.
 
@@ -88,7 +88,7 @@ Returns the estimator sliced for a given asset cluster or returns it unchanged.
 
   - [`JuMPReturnsEstimator`](@ref)
 """
-function jump_returns_view(r::JuMPReturnsEstimator, args...; kwargs...)
+function port_opt_view(r::JuMPReturnsEstimator, ::Any, args...; kwargs...)
     return r
 end
 """
@@ -146,58 +146,10 @@ Return `false`: custom JuMP objectives never require previous portfolio weights.
 function needs_previous_weights(::CustomJuMPObjective)
     return false
 end
-"""
-    custom_constraint_view(cc, args...; kwargs...)
-
-Get a view or subset of a custom JuMP constraint for slicing.
-
-Returns `nothing` if no custom constraint is provided, or the constraint unchanged otherwise. Used in hierarchical optimisation to propagate custom constraints per cluster.
-
-# Arguments
-
-  - `cc`: Custom JuMP constraint or `nothing`.
-  - `args...`: Additional arguments.
-  - `kwargs...`: Additional keyword arguments.
-
-# Returns
-
-  - Constraint or `nothing`.
-
-# Related
-
-  - [`CustomJuMPConstraint`](@ref)
-"""
-function custom_constraint_view(::Nothing, args...; kwargs...)
+function port_opt_view(::CustomJuMPConstraint, ::Any, args...; kwargs...)
     return nothing
 end
-function custom_constraint_view(::CustomJuMPConstraint, args...; kwargs...)
-    return nothing
-end
-"""
-    custom_objective_view(co, args...; kwargs...)
-
-Get a view or subset of a custom JuMP objective term for slicing.
-
-Returns `nothing` if no custom objective is provided, or the objective unchanged otherwise.
-
-# Arguments
-
-  - `co`: Custom JuMP objective or `nothing`.
-  - `args...`: Additional arguments.
-  - `kwargs...`: Additional keyword arguments.
-
-# Returns
-
-  - Objective or `nothing`.
-
-# Related
-
-  - [`CustomJuMPObjective`](@ref)
-"""
-function custom_objective_view(::Nothing, args...; kwargs...)
-    return nothing
-end
-function custom_objective_view(::CustomJuMPObjective, args...; kwargs...)
+function port_opt_view(::CustomJuMPObjective, ::Any, args...; kwargs...)
     return nothing
 end
 """

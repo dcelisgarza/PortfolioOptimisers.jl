@@ -140,7 +140,7 @@ Keywords correspond to the struct's fields.
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@prop`-tagged fields are automatically propagated:
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
 
   - `opt`: Recursively updated via [`factory`](@ref).
   - `r`: Recursively updated via [`factory`](@ref).
@@ -158,7 +158,7 @@ When [`factory`](@ref) is called on this type, the following `@prop`-tagged fiel
     """
     $(field_dict[:opt_jmp])
     """
-    @prop opt
+    @fprop opt
     """
     $(field_dict[:re])
     """
@@ -166,7 +166,7 @@ When [`factory`](@ref) is called on this type, the following `@prop`-tagged fiel
     """
     $(field_dict[:r_opt])
     """
-    @prop r
+    @fprop r
     """
     $(field_dict[:obj])
     """
@@ -190,7 +190,7 @@ When [`factory`](@ref) is called on this type, the following `@prop`-tagged fiel
     """
     $(field_dict[:fb])
     """
-    @prop fb
+    @fprop fb
     function FactorRiskContribution(opt::JuMPOptimiser, re::RegE_Reg, r::RM_VecRM,
                                     obj::ObjectiveFunction,
                                     frc_ple::Option{<:PlCE_PhC_VecPlCE_PlC},
@@ -243,11 +243,11 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return a cluster-sliced copy of [`FactorRiskContribution`](@ref) for asset index set `i` and returns matrix `X`.
 """
-function opt_view(frc::FactorRiskContribution, i, X::MatNum)::FactorRiskContribution
+function port_opt_view(frc::FactorRiskContribution, i, X::MatNum)::FactorRiskContribution
     X = isa(frc.opt.pe, AbstractPriorResult) ? frc.opt.pe.X : X
-    opt = opt_view(frc.opt, i, X)
-    re = regression_view(frc.re, i)
-    r = risk_measure_view(frc.r, i, X)
+    opt = port_opt_view(frc.opt, i, X)
+    re = port_opt_view(frc.re, i)
+    r = port_opt_view(frc.r, i, X)
     return FactorRiskContribution(; opt = opt, re = re, r = r, obj = frc.obj,
                                   frc_ple = frc.frc_ple, sets = frc.sets, wi = frc.wi,
                                   flag = frc.flag, fb = frc.fb)

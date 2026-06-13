@@ -98,7 +98,7 @@ Keywords correspond to the struct's fields.
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@prop`-tagged fields are automatically propagated:
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
 
   - `tgt`: Recursively updated via [`factory`](@ref).
 
@@ -133,7 +133,7 @@ StepwiseRegression
     """
     $(field_dict[:retgt])
     """
-    @prop tgt
+    @fprop tgt
     function StepwiseRegression(crit::AbstractStepwiseRegressionCriterion,
                                 alg::AbstractStepwiseRegressionAlgorithm,
                                 tgt::AbstractRegressionTarget)

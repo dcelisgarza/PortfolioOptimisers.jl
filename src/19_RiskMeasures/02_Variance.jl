@@ -328,7 +328,7 @@ function factory(r::Variance, pr::AbstractPriorResult, args...; kwargs...)::Vari
     return Variance(; settings = r.settings, sigma = sigma, chol = chol, rc = r.rc,
                     alg = r.alg)
 end
-function risk_measure_view(r::Variance, i, args...)
+function port_opt_view(r::Variance, i, args...)
     sigma = nothing_scalar_array_view(r.sigma, i)
     chol = isnothing(r.chol) ? nothing : view(r.chol, :, i)
     @argcheck(!isa(r.rc, LinearConstraint),
@@ -487,7 +487,7 @@ function factory(r::StandardDeviation, pr::AbstractPriorResult, args...;
     chol = nothing_scalar_array_selector(r.chol, pr.chol)
     return StandardDeviation(; settings = r.settings, sigma = sigma, chol = chol)
 end
-function risk_measure_view(r::StandardDeviation, i, args...)
+function port_opt_view(r::StandardDeviation, i, args...)
     sigma = nothing_scalar_array_view(r.sigma, i)
     chol = isnothing(r.chol) ? nothing : view(r.chol, :, i)
     return StandardDeviation(; settings = r.settings, sigma = sigma, chol = chol)
@@ -865,8 +865,8 @@ function factory(r::UncertaintySetVariance, ucs::UcSE_UcS,
     end
     return UncertaintySetVariance(; settings = r.settings, ucs = ucs, sigma = sigma)
 end
-function risk_measure_view(r::UncertaintySetVariance, i, args...)
-    ucs = ucs_view(r.ucs, i)
+function port_opt_view(r::UncertaintySetVariance, i, args...)
+    ucs = port_opt_view(r.ucs, i)
     sigma = nothing_scalar_array_view(r.sigma, i)
     return UncertaintySetVariance(; settings = r.settings, ucs = ucs, sigma = sigma)
 end

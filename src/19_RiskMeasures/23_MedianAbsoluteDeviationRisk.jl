@@ -207,10 +207,10 @@ Slices the centering target `mu` for cluster-based optimisation.
 # Related
 
   - [`MedianAbsoluteDeviation`](@ref)
-  - [`risk_measure_view`](@ref)
+  - [`port_opt_view`](@ref)
   - [`nothing_scalar_array_view`](@ref)
 """
-function risk_measure_view(r::MedianAbsoluteDeviation, i, args...)::MedianAbsoluteDeviation
+function port_opt_view(r::MedianAbsoluteDeviation, i, args...)::MedianAbsoluteDeviation
     mu = nothing_scalar_array_view(r.mu, i)
     return MedianAbsoluteDeviation(; settings = r.settings, w = r.w, mu = mu, flag = r.flag)
 end

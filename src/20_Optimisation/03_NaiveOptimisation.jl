@@ -171,7 +171,7 @@ Keywords correspond to the struct's fields.
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@prop`-tagged fields are automatically propagated:
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
 
   - `fb`: Recursively updated via [`factory`](@ref).
 
@@ -239,7 +239,7 @@ InverseVolatility
     """
     $(field_dict[:fb])
     """
-    @prop fb
+    @fprop fb
     """
     $(field_dict[:sq])
     """
@@ -285,12 +285,12 @@ Return a view of [`InverseVolatility`](@ref) `opt` sliced to asset indices `i`.
 # Related
 
   - [`InverseVolatility`](@ref)
-  - [`opt_view`](@ref)
+  - [`port_opt_view`](@ref)
 """
-function opt_view(opt::InverseVolatility, i, args...)::InverseVolatility
-    pe = prior_view(opt.pe, i)
-    wb = weight_bounds_view(opt.wb, i)
-    sets = asset_sets_view(opt.sets, i)
+function port_opt_view(opt::InverseVolatility, i, args...)::InverseVolatility
+    pe = port_opt_view(opt.pe, i)
+    wb = port_opt_view(opt.wb, i)
+    sets = port_opt_view(opt.sets, i)
     return InverseVolatility(; pe = pe, wb = wb, sets = sets, wf = opt.wf, fb = opt.fb,
                              sq = opt.sq, brt = opt.brt, strict = opt.strict)
 end
@@ -395,7 +395,7 @@ Keywords correspond to the struct's fields.
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@prop`-tagged fields are automatically propagated:
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
 
   - `fb`: Recursively updated via [`factory`](@ref).
 
@@ -437,7 +437,7 @@ EqualWeighted
     """
     $(field_dict[:fb])
     """
-    @prop fb
+    @fprop fb
     """
     $(field_dict[:strict_opt])
     """
@@ -474,11 +474,11 @@ Return a view of [`EqualWeighted`](@ref) `opt` sliced to asset indices `i`.
 # Related
 
   - [`EqualWeighted`](@ref)
-  - [`opt_view`](@ref)
+  - [`port_opt_view`](@ref)
 """
-function opt_view(opt::EqualWeighted, i, args...)::EqualWeighted
-    wb = weight_bounds_view(opt.wb, i)
-    sets = asset_sets_view(opt.sets, i)
+function port_opt_view(opt::EqualWeighted, i, args...)::EqualWeighted
+    wb = port_opt_view(opt.wb, i)
+    sets = port_opt_view(opt.sets, i)
     return EqualWeighted(; wb = wb, sets = sets, wf = opt.wf, fb = opt.fb,
                          strict = opt.strict)
 end
@@ -568,7 +568,7 @@ Keywords correspond to the struct's fields.
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@prop`-tagged fields are automatically propagated:
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
 
   - `fb`: Recursively updated via [`factory`](@ref).
 
@@ -623,7 +623,7 @@ RandomWeighted
     """
     $(field_dict[:fb])
     """
-    @prop fb
+    @fprop fb
     """
     $(field_dict[:strict_opt])
     """
@@ -667,11 +667,11 @@ Return a view of [`RandomWeighted`](@ref) `opt` sliced to asset indices `i`.
 # Related
 
   - [`RandomWeighted`](@ref)
-  - [`opt_view`](@ref)
+  - [`port_opt_view`](@ref)
 """
-function opt_view(opt::RandomWeighted, i, args...)::RandomWeighted
-    wb = weight_bounds_view(opt.wb, i)
-    sets = asset_sets_view(opt.sets, i)
+function port_opt_view(opt::RandomWeighted, i, args...)::RandomWeighted
+    wb = port_opt_view(opt.wb, i)
+    sets = port_opt_view(opt.sets, i)
     alpha = nothing_scalar_array_view(opt.alpha, i)
     return RandomWeighted(; alpha = alpha, rng = opt.rng, seed = opt.seed, wb = wb,
                           sets = sets, wf = opt.wf, fb = opt.fb, strict = opt.strict)

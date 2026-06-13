@@ -19,7 +19,7 @@ Keywords correspond to the struct's fields.
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@prop`-tagged fields are automatically propagated:
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
 
   - `ce`: Recursively updated via [`factory`](@ref).
 
@@ -52,7 +52,7 @@ ProcessedCovariance
     """
     $(field_dict[:ce])
     """
-    @prop ce
+    @fprop ce
     """
     $(field_dict[:mpa])
     """
@@ -95,8 +95,8 @@ Gets the view of the covariance estimator for the `i`-th element(s).
 
   - [`ProcessedCovariance`](@ref)
 """
-function moment_view(ce::ProcessedCovariance, i)::ProcessedCovariance
-    return ProcessedCovariance(; ce = moment_view(ce.ce, i), alg = ce.alg, pdm = ce.pdm)
+function port_opt_view(ce::ProcessedCovariance, i)::ProcessedCovariance
+    return ProcessedCovariance(; ce = port_opt_view(ce.ce, i), alg = ce.alg, pdm = ce.pdm)
 end
 """
     Statistics.cov(ce::ProcessedCovariance, X::MatNum; dims = 1, kwargs...)

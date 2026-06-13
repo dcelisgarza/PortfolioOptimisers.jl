@@ -7,5 +7,5 @@ cov(ce::WindowedCovariance, X::MatNum; dims::Int = 1, mean = nothing,
                         kwargs...)
 cor(ce::WindowedCovariance, X::MatNum; dims::Int = 1, mean = nothing,
                         kwargs...)
-moment_view(ce::WindowedCovariance, i)
+port_opt_view(ce::WindowedCovariance, i)
 ```

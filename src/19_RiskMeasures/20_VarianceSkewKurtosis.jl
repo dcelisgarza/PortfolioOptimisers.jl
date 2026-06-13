@@ -251,10 +251,10 @@ Slices the expected returns `mu` for cluster-based optimisation.
 # Related
 
   - [`Skewness`](@ref)
-  - [`risk_measure_view`](@ref)
+  - [`port_opt_view`](@ref)
   - [`nothing_scalar_array_view`](@ref)
 """
-function risk_measure_view(r::Skewness{<:Any, <:Any, <:Nothing}, i, args...)
+function port_opt_view(r::Skewness{<:Any, <:Any, <:Nothing}, i, args...)
     mu = nothing_scalar_array_view(r.mu, i)
     return Skewness(; ve = r.ve, sk = r.sk, w = r.w, mu = mu)
 end
@@ -266,12 +266,12 @@ Return a view of [`Skewness`](@ref) `r` sliced to asset indices `i`, also slicin
 # Related
 
   - [`Skewness`](@ref)
-  - [`risk_measure_view`](@ref)
+  - [`port_opt_view`](@ref)
   - [`nothing_scalar_array_view`](@ref)
   - [`nothing_scalar_array_view_odd_order`](@ref)
   - [`fourth_moment_index_generator`](@ref)
 """
-function risk_measure_view(r::Skewness{<:Any, <:Any, <:MatNum}, i, args...)
+function port_opt_view(r::Skewness{<:Any, <:Any, <:MatNum}, i, args...)
     mu = nothing_scalar_array_view(r.mu, i)
     idx = fourth_moment_index_generator(size(r.sk, 1), i)
     sk = nothing_scalar_array_view_odd_order(r.sk, i, idx)
@@ -509,17 +509,17 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return a view of [`VarianceSkewKurtosis`](@ref) `r` sliced to asset indices `i` by delegating `risk_measure_view` to each sub-measure component.
+Return a view of [`VarianceSkewKurtosis`](@ref) `r` sliced to asset indices `i` by delegating `port_opt_view` to each sub-measure component.
 
 # Related
 
   - [`VarianceSkewKurtosis`](@ref)
-  - [`risk_measure_view`](@ref)
+  - [`port_opt_view`](@ref)
 """
-function risk_measure_view(r::VarianceSkewKurtosis, i, args...)
-    vr = risk_measure_view(r.vr, i, args...)
-    sk = risk_measure_view(r.sk, i, args...)
-    kt = risk_measure_view(r.kt, i, args...)
+function port_opt_view(r::VarianceSkewKurtosis, i, args...)
+    vr = port_opt_view(r.vr, i, args...)
+    sk = port_opt_view(r.sk, i, args...)
+    kt = port_opt_view(r.kt, i, args...)
     return VarianceSkewKurtosis(; settings = r.settings, vr = vr, sk = sk, kt = kt)
 end
 function (r::VarianceSkewKurtosis)(w::VecNum, X::MatNum, fees::Option{<:VecNum} = nothing)

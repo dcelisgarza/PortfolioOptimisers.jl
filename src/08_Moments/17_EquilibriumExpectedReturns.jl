@@ -25,7 +25,7 @@ Keywords correspond to the struct's fields.
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@prop`-tagged fields are automatically propagated:
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
 
   - `ce`: Recursively updated via [`factory`](@ref).
 
@@ -66,7 +66,7 @@ EquilibriumExpectedReturns
     """
     $(field_dict[:ce])
     """
-    @prop ce
+    @fprop ce
     """
     $(field_dict[:eqw])
     """
@@ -110,8 +110,8 @@ Gets the view of the expected returns estimator for the `i`-th element(s).
 
   - [`EquilibriumExpectedReturns`](@ref)
 """
-function moment_view(me::EquilibriumExpectedReturns, i)::EquilibriumExpectedReturns
-    return EquilibriumExpectedReturns(; ce = moment_view(me.ce, i),
+function port_opt_view(me::EquilibriumExpectedReturns, i)::EquilibriumExpectedReturns
+    return EquilibriumExpectedReturns(; ce = port_opt_view(me.ce, i),
                                       w = nothing_scalar_array_view(me.w, i), l = me.l)
 end
 """

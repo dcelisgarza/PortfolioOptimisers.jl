@@ -19,7 +19,7 @@ Keywords correspond to the struct's fields.
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@prop`-tagged fields are automatically propagated:
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
 
   - `ce`: Recursively updated via [`factory`](@ref).
 
@@ -57,7 +57,7 @@ StandardDeviationExpectedReturns
     """
     $(field_dict[:ce])
     """
-    @prop ce
+    @fprop ce
     function StandardDeviationExpectedReturns(ce::StatsBase.CovarianceEstimator)
         return new{typeof(ce)}(ce)
     end
@@ -90,9 +90,9 @@ Gets the view of the expected returns estimator for the `i`-th element(s).
 
   - [`StandardDeviationExpectedReturns`](@ref)
 """
-function moment_view(me::StandardDeviationExpectedReturns,
-                     i)::StandardDeviationExpectedReturns
-    return StandardDeviationExpectedReturns(; me = moment_view(me.ce, i))
+function port_opt_view(me::StandardDeviationExpectedReturns,
+                       i)::StandardDeviationExpectedReturns
+    return StandardDeviationExpectedReturns(; me = port_opt_view(me.ce, i))
 end
 """
     Statistics.mean(me::StandardDeviationExpectedReturns, X::MatNum;
@@ -158,7 +158,7 @@ Keywords correspond to the struct's fields.
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@prop`-tagged fields are automatically propagated:
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
 
   - `ce`: Recursively updated via [`factory`](@ref).
 
@@ -195,7 +195,7 @@ VarianceExpectedReturns
     """
     $(field_dict[:ce])
     """
-    @prop ce
+    @fprop ce
     function VarianceExpectedReturns(ce::StatsBase.CovarianceEstimator)
         return new{typeof(ce)}(ce)
     end
@@ -227,8 +227,8 @@ Gets the view of the expected returns estimator for the `i`-th element(s).
 
   - [`VarianceExpectedReturns`](@ref)
 """
-function moment_view(me::VarianceExpectedReturns, i)::VarianceExpectedReturns
-    return VarianceExpectedReturns(; me = moment_view(me.ce, i))
+function port_opt_view(me::VarianceExpectedReturns, i)::VarianceExpectedReturns
+    return VarianceExpectedReturns(; me = port_opt_view(me.ce, i))
 end
 """
     Statistics.mean(me::VarianceExpectedReturns, X::MatNum;

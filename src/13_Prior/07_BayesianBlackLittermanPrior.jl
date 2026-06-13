@@ -211,8 +211,8 @@ Return a new [`BayesianBlackLittermanPrior`](@ref) estimator restricted to the a
 
   - [`BayesianBlackLittermanPrior`](@ref)
 """
-function prior_view(pr::BayesianBlackLittermanPrior, i)::BayesianBlackLittermanPrior
-    return BayesianBlackLittermanPrior(; pe = prior_view(pr.pe, i), mp = pr.mp,
+function port_opt_view(pr::BayesianBlackLittermanPrior, i)::BayesianBlackLittermanPrior
+    return BayesianBlackLittermanPrior(; pe = port_opt_view(pr.pe, i), mp = pr.mp,
                                        views = pr.views, sets = pr.sets,
                                        views_conf = pr.views_conf, rf = pr.rf, tau = pr.tau)
 end

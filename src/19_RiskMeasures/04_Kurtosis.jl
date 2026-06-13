@@ -348,11 +348,11 @@ Slices both the cokurtosis matrix `kt` and the expected returns `mu` for cluster
 # Related
 
   - [`Kurtosis`](@ref)
-  - [`risk_measure_view`](@ref)
+  - [`port_opt_view`](@ref)
   - [`nothing_scalar_array_view`](@ref)
   - [`fourth_moment_index_generator`](@ref)
 """
-function risk_measure_view(r::Kurtosis, i, args...)::Kurtosis
+function port_opt_view(r::Kurtosis, i, args...)::Kurtosis
     mu = r.mu
     kt = r.kt
     j = nothing

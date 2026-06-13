@@ -40,7 +40,7 @@ In order to implement a new cokurtosis estimator which will work seamlessly with
 
 ## View
 
-  - `PortfolioOptimisers.moment_view(kte::CokurtosisEstimator, i) -> CokurtosisEstimator`: Returns a view of the estimator for the `i`-th element(s).
+  - `PortfolioOptimisers.port_opt_view(kte::CokurtosisEstimator, i) -> CokurtosisEstimator`: Returns a view of the estimator for the `i`-th element(s).
 
 ### Arguments
 
@@ -75,7 +75,7 @@ julia> function PortfolioOptimisers.factory(::MyCokurtosisEstimator,
            return MyCokurtosisEstimator(; w = w)
        end
 
-julia> function PortfolioOptimisers.moment_view(kte::MyCokurtosisEstimator, i)
+julia> function PortfolioOptimisers.port_opt_view(kte::MyCokurtosisEstimator, i)
            return kte
        end
 
@@ -247,8 +247,9 @@ Gets the view of the cokurtosis estimator for the `i`-th element(s).
 
   - [`Cokurtosis`](@ref)
 """
-function moment_view(kte::Cokurtosis, i)::Cokurtosis
-    return Cokurtosis(; me = moment_view(kte.me, i), mp = kte.mp, alg = kte.alg, w = kte.w)
+function port_opt_view(kte::Cokurtosis, i)::Cokurtosis
+    return Cokurtosis(; me = port_opt_view(kte.me, i), mp = kte.mp, alg = kte.alg,
+                      w = kte.w)
 end
 """
     _cokurtosis(X::MatNum, mp::AbstractMatrixProcessingEstimator, w::Option{<:ObsWeights}) -> MatNum

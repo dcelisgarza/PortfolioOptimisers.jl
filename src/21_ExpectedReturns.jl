@@ -255,7 +255,7 @@ Keywords correspond to the struct's fields.
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@prop`-tagged fields are automatically propagated:
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
 
   - `rt`: Recursively updated via [`factory`](@ref).
 
@@ -282,7 +282,7 @@ ExpectedReturn
     """
     $(field_dict[:rt])
     """
-    @prop rt
+    @fprop rt
     function ExpectedReturn(rt::JuMPReturnsEstimator)
         return new{typeof(rt)}(rt)
     end
@@ -349,7 +349,7 @@ Keywords correspond to the struct's fields.
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@prop`-tagged fields are automatically propagated:
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
 
   - `rt`: Recursively updated via [`factory`](@ref).
   - `rk`: Recursively updated via [`factory`](@ref).
@@ -387,11 +387,11 @@ ExpectedReturnRiskRatio
     """
     $(field_dict[:rt])
     """
-    @prop rt
+    @fprop rt
     """
     $(field_dict[:rk])
     """
-    @prop rk
+    @fprop rk
     """
     $(field_dict[:rf])
     """

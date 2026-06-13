@@ -276,14 +276,14 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return a cluster-sliced copy of [`Stacking`](@ref) for asset index set `i` and returns matrix `X`.
 """
-function opt_view(st::Stacking, i, X::MatNum)::Stacking
+function port_opt_view(st::Stacking, i, X::MatNum)::Stacking
     X = isa(st.pe, AbstractPriorResult) ? st.pe.X : X
-    pe = prior_view(st.pe, i)
-    wb = weight_bounds_view(st.wb, i)
-    fees = fees_view(st.fees, i)
-    sets = asset_sets_view(st.sets, i)
-    opti = opt_view(st.opti, i, X)
-    opto = opt_view(st.opto, i, X)
+    pe = port_opt_view(st.pe, i)
+    wb = port_opt_view(st.wb, i)
+    fees = port_opt_view(st.fees, i)
+    sets = port_opt_view(st.sets, i)
+    opti = port_opt_view(st.opti, i, X)
+    opto = port_opt_view(st.opto, i, X)
     return Stacking(; pe = pe, wb = wb, fees = fees, sets = sets, scale = st.scale,
                     opti = opti, opto = opto, cv = st.cv, wf = st.wf, ex = st.ex,
                     fb = st.fb, brt = st.brt, strict = st.strict)

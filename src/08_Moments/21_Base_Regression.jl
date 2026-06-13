@@ -681,7 +681,7 @@ function Base.getproperty(re::Regression{<:Any, <:MatNum, <:Any}, sym::Symbol)
     end
 end
 """
-    regression_view(re::Regression, i)
+    port_opt_view(re::Regression, i)
 
 Return a view of a [`Regression`](@ref) result object, selecting only the rows indexed by `i`.
 
@@ -705,7 +705,7 @@ Regression
   L ┼ 3×2 Matrix{Int64}
   b ┴ Vector{Int64}: [7, 8, 9]
 
-julia> PortfolioOptimisers.regression_view(re, [1, 3])
+julia> PortfolioOptimisers.port_opt_view(re, [1, 3])
 Regression
   M ┼ 2×2 SubArray{Int64, 2, Matrix{Int64}, Tuple{Vector{Int64}, Base.Slice{Base.OneTo{Int64}}}, false}
   L ┼ 2×2 SubArray{Int64, 2, Matrix{Int64}, Tuple{Vector{Int64}, Base.Slice{Base.OneTo{Int64}}}, false}
@@ -716,16 +716,16 @@ Regression
 
   - [`Regression`](@ref)
 """
-function regression_view(re::Regression, i)::Regression
+function port_opt_view(re::Regression, i)::Regression
     return Regression(; M = view(re.M, i, :),
                       L = isnothing(re.L) ? nothing : view(re.L, i, :), b = view(re.b, i))
 end
 """
-    regression_view(re::Option{<:AbstractRegressionEstimator}, args...)
+    port_opt_view(re::Option{<:AbstractRegressionEstimator}, args...)
 
-No-op fallback for `regression_view` when the input is `nothing` or an `AbstractRegressionEstimator`.
+No-op fallback for `port_opt_view` when the input is `nothing` or an `AbstractRegressionEstimator`.
 
-This method returns the input `re` unchanged. It is used internally to allow generic code to call `regression_view` without needing to check for `nothing` or estimator types, ensuring graceful handling of missing or non-result regression objects.
+This method returns the input `re` unchanged. It is used internally to allow generic code to call `port_opt_view` without needing to check for `nothing` or estimator types, ensuring graceful handling of missing or non-result regression objects.
 
 # Arguments
 
@@ -738,9 +738,9 @@ This method returns the input `re` unchanged. It is used internally to allow gen
 
 # Related
 
-  - [`regression_view(::Regression, ::VecNum)`](@ref)
+  - [`port_opt_view(::Regression, ::VecNum)`](@ref)
 """
-function regression_view(re::Option{<:AbstractRegressionEstimator}, args...)
+function port_opt_view(re::Option{<:AbstractRegressionEstimator}, ::Any, args...)
     return re
 end
 """

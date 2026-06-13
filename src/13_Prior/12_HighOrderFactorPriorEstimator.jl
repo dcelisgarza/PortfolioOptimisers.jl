@@ -273,10 +273,10 @@ Return a new [`HighOrderFactorPriorEstimator`](@ref) estimator restricted to the
 # Related
 
   - [`HighOrderFactorPriorEstimator`](@ref)
-  - [`prior_view`](@ref)
+  - [`port_opt_view`](@ref)
 """
-function prior_view(pe::HighOrderFactorPriorEstimator, i)::HighOrderFactorPriorEstimator
-    return HighOrderFactorPriorEstimator(; pe = prior_view(pe.pe, i), kte = pe.kte,
+function port_opt_view(pe::HighOrderFactorPriorEstimator, i)::HighOrderFactorPriorEstimator
+    return HighOrderFactorPriorEstimator(; pe = port_opt_view(pe.pe, i), kte = pe.kte,
                                          ske = pe.ske, ex = pe.ex, rsd = pe.rsd)
 end
 """

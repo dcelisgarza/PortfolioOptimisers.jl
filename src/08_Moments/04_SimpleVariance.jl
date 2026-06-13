@@ -507,8 +507,9 @@ Gets the view of the simple variance for the `i`-th element(s).
 
   - [`SimpleVariance`](@ref)
 """
-function moment_view(ve::SimpleVariance, i)::SimpleVariance
-    return SimpleVariance(; me = moment_view(ve.me, i), w = ve.w, corrected = ve.corrected)
+function port_opt_view(ve::SimpleVariance, i)::SimpleVariance
+    return SimpleVariance(; me = port_opt_view(ve.me, i), w = ve.w,
+                          corrected = ve.corrected)
 end
 
 export SimpleVariance, var, std

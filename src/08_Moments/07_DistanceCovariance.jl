@@ -23,7 +23,7 @@ Keywords correspond to the struct's fields.
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@prop`-tagged fields are automatically propagated:
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
 
   - `w`: Replaced with the incoming [`ObsWeights`](@ref).
 
@@ -63,7 +63,7 @@ DistanceCovariance
     """
     $(arg_dict[:oow])
     """
-    @prop w
+    @fprop w
     """
     $(arg_dict[:ex])
     """

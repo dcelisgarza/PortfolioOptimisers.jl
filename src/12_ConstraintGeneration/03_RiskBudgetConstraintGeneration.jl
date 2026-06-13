@@ -50,31 +50,7 @@ end
 function RiskBudget(; val::Num_VecNum)::RiskBudget
     return RiskBudget(val)
 end
-"""
-    risk_budget_view(rb, i)
-
-Get a view or subset of risk budget constraints for asset cluster index `i`.
-
-Returns `nothing` for `nothing` inputs, the budget unchanged for estimators, or a sliced budget for [`RiskBudget`](@ref) results.
-
-# Arguments
-
-  - `rb`: Risk budget, estimator, or `nothing`.
-  - `i`: Cluster or asset index.
-
-# Returns
-
-  - Sliced risk budget or unchanged value.
-
-# Related
-
-  - [`RiskBudget`](@ref)
-  - [`RiskBudgetEstimator`](@ref)
-"""
-function risk_budget_view(::Nothing, args...)::Nothing
-    return nothing
-end
-function risk_budget_view(rb::RiskBudget, i)::RiskBudget
+function port_opt_view(rb::RiskBudget, i)::RiskBudget
     val = nothing_scalar_array_view(rb.val, i)
     return RiskBudget(; val = val)
 end
@@ -165,9 +141,9 @@ Identity pass-through: estimators are not sliced by cluster index.
 # Related
 
   - [`RiskBudgetEstimator`](@ref)
-  - [`risk_budget_view`](@ref)
+  - [`port_opt_view`](@ref)
 """
-function risk_budget_view(rb::RiskBudgetEstimator, ::Any)::RiskBudgetEstimator
+function port_opt_view(rb::RiskBudgetEstimator, ::Any)::RiskBudgetEstimator
     return rb
 end
 """

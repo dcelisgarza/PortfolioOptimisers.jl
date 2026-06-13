@@ -130,11 +130,11 @@ Abstract supertype for risk budgeting optimisation formulations.
 """
 abstract type RiskBudgetingFormulation <: OptimisationAlgorithm end
 """
-    risk_budgeting_formulation_view(::RiskBudgetingFormulation, args...) -> nothing
+    port_opt_view(::RiskBudgetingFormulation, args...) -> nothing
 
 Default fallback for risk budgeting formulation view. Returns `nothing` for formulations that do not require view slicing.
 """
-function risk_budgeting_formulation_view(::RiskBudgetingFormulation, args...)
+function port_opt_view(::RiskBudgetingFormulation, ::Any, args...)
     return nothing
 end
 """
@@ -181,10 +181,10 @@ end
 function LogRiskBudgeting(; z::Option{<:VecInt} = nothing)::LogRiskBudgeting
     return LogRiskBudgeting(z)
 end
-function risk_budgeting_formulation_view(alg::LogRiskBudgeting{Nothing}, i)
+function port_opt_view(alg::LogRiskBudgeting{Nothing}, i)
     return alg
 end
-function risk_budgeting_formulation_view(alg::LogRiskBudgeting{<:VecInt}, i)
+function port_opt_view(alg::LogRiskBudgeting{<:VecInt}, i)
     return LogRiskBudgeting(; z = view(alg.z, i))
 end
 """
@@ -269,7 +269,7 @@ function AssetRiskBudgeting(; rkb::Option{<:RkbE_Rkb} = nothing,
     return AssetRiskBudgeting(rkb, sets, alg)
 end
 """
-    risk_budgeting_algorithm_view(r, i)
+    port_opt_view(r, i)
 
 Return a view or subset of a risk budgeting algorithm for cluster index `i`.
 
@@ -290,10 +290,10 @@ Used in hierarchical optimisation to slice risk budget and asset set configurati
   - [`FactorRiskBudgeting`](@ref)
   - [`RiskBudgeting`](@ref)
 """
-function risk_budgeting_algorithm_view(r::AssetRiskBudgeting, i)
-    rkb = risk_budget_view(r.rkb, i)
-    sets = asset_sets_view(r.sets, i)
-    alg = risk_budgeting_formulation_view(r.alg, i)
+function port_opt_view(r::AssetRiskBudgeting, i)
+    rkb = port_opt_view(r.rkb, i)
+    sets = port_opt_view(r.sets, i)
+    alg = port_opt_view(r.alg, i)
     return AssetRiskBudgeting(; rkb = rkb, sets = sets, alg = alg)
 end
 """
@@ -360,7 +360,7 @@ function FactorRiskBudgeting(; re::RegE_Reg = StepwiseRegression(),
     return FactorRiskBudgeting(re, rkb, sets, flag)
 end
 """
-    risk_budgeting_algorithm_view(r::FactorRiskBudgeting, i)
+    port_opt_view(r::FactorRiskBudgeting, i)
 
 Return a view of a `FactorRiskBudgeting` algorithm for cluster index `i`.
 
@@ -377,12 +377,12 @@ Slices the regression estimator for the given cluster while keeping the risk bud
 
 # Related
 
-  - [`risk_budgeting_algorithm_view`](@ref)
+  - [`port_opt_view`](@ref)
   - [`FactorRiskBudgeting`](@ref)
   - [`AssetRiskBudgeting`](@ref)
 """
-function risk_budgeting_algorithm_view(r::FactorRiskBudgeting, i)
-    re = regression_view(r.re, i)
+function port_opt_view(r::FactorRiskBudgeting, i)
+    re = port_opt_view(r.re, i)
     return FactorRiskBudgeting(; re = re, rkb = r.rkb, sets = r.sets, flag = r.flag)
 end
 """
@@ -514,11 +514,11 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return a cluster-sliced copy of [`RiskBudgeting`](@ref) for asset index set `i` and returns matrix `X`.
 """
-function opt_view(rb::RiskBudgeting, i, X::MatNum)::RiskBudgeting
+function port_opt_view(rb::RiskBudgeting, i, X::MatNum)::RiskBudgeting
     X = isa(rb.opt.pe, AbstractPriorResult) ? rb.opt.pe.X : X
-    opt = opt_view(rb.opt, i, X)
-    r = risk_measure_view(rb.r, i, X)
-    rba = risk_budgeting_algorithm_view(rb.rba, i)
+    opt = port_opt_view(rb.opt, i, X)
+    r = port_opt_view(rb.r, i, X)
+    rba = port_opt_view(rb.rba, i)
     wi = nothing_scalar_array_view(rb.wi, i)
     return RiskBudgeting(; opt = opt, r = r, rba = rba, wi = wi, fb = rb.fb)
 end

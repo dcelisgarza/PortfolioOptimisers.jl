@@ -257,7 +257,7 @@ function prior(pr::AbstractPriorResult, args...; kwargs...)::AbstractPriorResult
     return pr
 end
 """
-    prior_view(pr, args...; kwargs...)
+    port_opt_view(pr, args...; kwargs...)
 
 Get a view or subset of a prior estimator or result for slicing.
 
@@ -278,13 +278,13 @@ Returns the prior unchanged for estimators (they are not sliceable), or returns 
   - [`AbstractPriorEstimator`](@ref)
   - [`LowOrderPrior`](@ref)
 """
-function prior_view(pr::Option{<:AbstractPriorEstimator}, args...;
-                    kwargs...)::Option{<:AbstractPriorEstimator}
+function port_opt_view(pr::Option{<:AbstractPriorEstimator}, ::Any, args...;
+                       kwargs...)::Option{<:AbstractPriorEstimator}
     return pr
 end
-function prior_view(pr::AbstractVector{<:Union{<:AbstractPriorResult,
-                                               <:AbstractPriorEstimator}}, args...;
-                    kwargs...)
+function port_opt_view(pr::AbstractVector{<:Union{<:AbstractPriorResult,
+                                                  <:AbstractPriorEstimator}}, ::Any,
+                       args...; kwargs...)
     return pr
 end
 """
@@ -755,13 +755,13 @@ Return a view of a [`LowOrderPrior`](@ref) restricted to assets at index `i`.
 # Related
 
   - [`LowOrderPrior`](@ref)
-  - [`prior_view`](@ref)
+  - [`port_opt_view`](@ref)
 """
-function prior_view(pr::LowOrderPrior, i)::LowOrderPrior
+function port_opt_view(pr::LowOrderPrior, i)::LowOrderPrior
     chol = isnothing(pr.chol) ? nothing : view(pr.chol, :, i)
     return LowOrderPrior(; X = view(pr.X, :, i), mu = view(pr.mu, i),
                          sigma = view(pr.sigma, i, i), chol = chol, w = pr.w, ens = pr.ens,
-                         kld = pr.kld, ow = pr.ow, rr = regression_view(pr.rr, i),
+                         kld = pr.kld, ow = pr.ow, rr = port_opt_view(pr.rr, i),
                          f_mu = pr.f_mu, f_sigma = pr.f_sigma, f_w = pr.f_w)
 end
 """
@@ -968,9 +968,9 @@ Return a view of a [`HighOrderPrior`](@ref) restricted to assets at index `i`, s
 # Related
 
   - [`HighOrderPrior`](@ref)
-  - [`prior_view`](@ref)
+  - [`port_opt_view`](@ref)
 """
-function prior_view(pr::HighOrderPrior, i)
+function port_opt_view(pr::HighOrderPrior, i)
     idx = fourth_moment_index_generator(length(pr.mu), i)
     kt = pr.kt
     sk = pr.sk
@@ -989,7 +989,7 @@ function prior_view(pr::HighOrderPrior, i)
     else
         D2, L2, S2 = (nothing, nothing, nothing)
     end
-    return HighOrderPrior(; pr = prior_view(pr.pr, i),
+    return HighOrderPrior(; pr = port_opt_view(pr.pr, i),
                           kt = nothing_scalar_array_view(kt, idx), D2 = D2, L2 = L2,
                           S2 = S2, sk = sk, V = V, skmp = skmp, f_kt = pr.f_kt,
                           f_sk = pr.f_sk, f_V = pr.f_V)

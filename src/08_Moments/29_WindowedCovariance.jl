@@ -120,8 +120,8 @@ Gets the view of the covariance estimator for the `i`-th element(s).
 
   - [`WindowedCovariance`](@ref)
 """
-function moment_view(ce::WindowedCovariance, i)::WindowedCovariance
-    return WindowedCovariance(; ce = moment_view(ce.ce, i), w = ce.w, window = ce.window)
+function port_opt_view(ce::WindowedCovariance, i)::WindowedCovariance
+    return WindowedCovariance(; ce = port_opt_view(ce.ce, i), w = ce.w, window = ce.window)
 end
 """
     Statistics.cov(ce::WindowedCovariance, X::MatNum; dims::Int = 1, mean = nothing, iv::Option{<:MatNum} = nothing,

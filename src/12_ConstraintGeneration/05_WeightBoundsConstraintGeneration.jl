@@ -47,30 +47,6 @@ function validate_bounds(args...)::Nothing
     return nothing
 end
 """
-    weight_bounds_view(wb, i)
-
-Get a view or subset of portfolio weight bounds for asset index `i`.
-
-Returns a view of the weight bounds for the specified asset index `i`. If `wb` is `nothing`, returns `nothing`. For [`WeightBounds`](@ref) and [`WeightBoundsEstimator`](@ref), slices the bounds appropriately.
-
-# Arguments
-
-  - `wb`: Weight bounds object, estimator, or `nothing`.
-  - `i`: Asset index or range to slice.
-
-# Returns
-
-  - Sliced weight bounds or `nothing`.
-
-# Related
-
-  - [`WeightBounds`](@ref)
-  - [`WeightBoundsEstimator`](@ref)
-"""
-function weight_bounds_view(::Nothing, ::Any)::Nothing
-    return nothing
-end
-"""
 $(DocStringExtensions.TYPEDEF)
 
 Container for lower and upper portfolio weight bounds.
@@ -138,7 +114,7 @@ function WeightBounds(; lb::Option{<:Num_VecNum} = 0.0,
                       ub::Option{<:Num_VecNum} = 1.0)::WeightBounds
     return WeightBounds(lb, ub)
 end
-function weight_bounds_view(wb::WeightBounds, i)::WeightBounds
+function port_opt_view(wb::WeightBounds, i)::WeightBounds
     lb = nothing_scalar_array_view(wb.lb, i)
     ub = nothing_scalar_array_view(wb.ub, i)
     return WeightBounds(; lb = lb, ub = ub)
@@ -240,7 +216,7 @@ function WeightBoundsEstimator(; lb::Option{<:EstValType} = nothing,
                                dub::Option{<:Number} = nothing)::WeightBoundsEstimator
     return WeightBoundsEstimator(lb, ub, dlb, dub)
 end
-function weight_bounds_view(wb::WeightBoundsEstimator, i)::WeightBoundsEstimator
+function port_opt_view(wb::WeightBoundsEstimator, i)::WeightBoundsEstimator
     lb = nothing_scalar_array_view(wb.lb, i)
     ub = nothing_scalar_array_view(wb.ub, i)
     return wb = WeightBoundsEstimator(; lb = lb, ub = ub, dlb = wb.dlb, dub = wb.dub)

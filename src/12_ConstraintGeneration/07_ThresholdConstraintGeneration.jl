@@ -213,39 +213,15 @@ Matches either a single [`Threshold`](@ref) or a vector of optional [`Threshold`
   - [`VecOptBt`](@ref)
 """
 const Bt_VecOptBt = Union{<:Threshold, <:VecOptBt}
-"""
-    threshold_view(t, i)
-
-Get a view or subset of threshold constraints for asset index `i`.
-
-Returns a view of the threshold for the specified index. If `t` is `nothing`, returns `nothing`. Handles all threshold types.
-
-# Arguments
-
-  - `t`: Threshold object, estimator, vector thereof, or `nothing`.
-  - `i`: Asset index or range to slice.
-
-# Returns
-
-  - Sliced threshold or `nothing`.
-
-# Related
-
-  - [`Threshold`](@ref)
-  - [`ThresholdEstimator`](@ref)
-"""
-function threshold_view(::Nothing, ::Any)::Nothing
-    return nothing
-end
-function threshold_view(t::ThresholdEstimator, i)::ThresholdEstimator
+function port_opt_view(t::ThresholdEstimator, i)::ThresholdEstimator
     return ThresholdEstimator(; val = nothing_scalar_array_view(t.val, i), dval = t.dval,
                               key = t.key)
 end
-function threshold_view(t::Threshold, i)::Threshold
+function port_opt_view(t::Threshold, i)::Threshold
     return Threshold(; val = nothing_scalar_array_view(t.val, i))
 end
-function threshold_view(t::VecOptBtE_Bt, i)
-    return [threshold_view(ti, i) for ti in t]
+function port_opt_view(t::VecOptBtE_Bt, i)
+    return [port_opt_view(ti, i) for ti in t]
 end
 """
     threshold_constraints(t::Option{<:Threshold}, args...; kwargs...)

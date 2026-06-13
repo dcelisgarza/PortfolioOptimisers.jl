@@ -335,10 +335,10 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return a cluster-sliced copy of [`NearOptimalCentering`](@ref) for asset index set `i` and returns matrix `X`.
 """
-function opt_view(noc::NearOptimalCentering, i, X::MatNum)::NearOptimalCentering
+function port_opt_view(noc::NearOptimalCentering, i, X::MatNum)::NearOptimalCentering
     X = isa(noc.opt.pe, AbstractPriorResult) ? noc.opt.pe.X : X
-    opt = opt_view(noc.opt, i, X)
-    r = risk_measure_view(noc.r, i, X)
+    opt = port_opt_view(noc.opt, i, X)
+    r = port_opt_view(noc.r, i, X)
     w_min = nothing_scalar_array_view(noc.w_min, i)
     w_min_ini = nothing_scalar_array_view(noc.w_min_ini, i)
     w_opt = nothing_scalar_array_view(noc.w_opt, i)

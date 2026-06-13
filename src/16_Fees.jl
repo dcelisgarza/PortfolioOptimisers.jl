@@ -141,7 +141,7 @@ function FeesEstimator(; tn::Option{<:TnE_Tn} = nothing, l::Option{<:EstValType}
     return FeesEstimator(tn, l, s, fl, fs, dl, ds, dfl, dfs, kwargs)
 end
 """
-    fees_view(fees::FeesEstimator, i)
+    port_opt_view(fees::FeesEstimator, i)
 
 Create a view of a `FeesEstimator` for a subset of assets.
 
@@ -158,7 +158,7 @@ Returns a new `FeesEstimator` with all fee fields restricted to the indices or a
 
 # Details
 
-  - Uses `turnover_view` to subset the turnover estimator/result.
+  - Uses `port_opt_view` to subset the turnover estimator/result.
   - Uses `nothing_scalar_array_view` to subset proportional and fixed fee fields.
   - Propagates default fee values and keyword arguments unchanged.
   - Enables composable processing of asset subsets for fee constraints.
@@ -171,7 +171,7 @@ julia> fees = FeesEstimator(;
                             l = Dict("A" => 0.001, "B" => 0.002), s = ["A" => 0.001, "B" => 0.002],
                             fl = Dict("A" => 5.0), fs = ["B" => 10.0]);
 
-julia> PortfolioOptimisers.fees_view(fees, 1:2)
+julia> PortfolioOptimisers.port_opt_view(fees, 1:2)
 FeesEstimator
       tn ┼ TurnoverEstimator
          │       w ┼ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [0.2, 0.3]
@@ -194,7 +194,7 @@ julia> fees = FeesEstimator(;
                             l = Dict("A" => 0.001, "B" => 0.002), s = ["A" => 0.001, "B" => 0.002],
                             fl = Dict("A" => 5.0), fs = ["B" => 10.0]);
 
-julia> PortfolioOptimisers.fees_view(fees, 1:2)
+julia> PortfolioOptimisers.port_opt_view(fees, 1:2)
 FeesEstimator
       tn ┼ TurnoverEstimator
          │       w ┼ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [0.2, 0.3]
@@ -217,11 +217,11 @@ FeesEstimator
   - [`FeesEstimator`](@ref)
   - [`Fees`](@ref)
   - [`fees_constraints`](@ref)
-  - [`turnover_view`](@ref)
+  - [`port_opt_view`](@ref)
   - [`nothing_scalar_array_view`](@ref)
 """
-function fees_view(fees::FeesEstimator, i)::FeesEstimator
-    tn = turnover_view(fees.tn, i)
+function port_opt_view(fees::FeesEstimator, i)::FeesEstimator
+    tn = port_opt_view(fees.tn, i)
     l = nothing_scalar_array_view(fees.l, i)
     s = nothing_scalar_array_view(fees.s, i)
     fl = nothing_scalar_array_view(fees.fl, i)
@@ -327,7 +327,7 @@ $(DocStringExtensions.FIELDS)
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@prop`-tagged fields are automatically propagated:
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
 
   - `tn`: Recursively updated via [`factory`](@ref).
 
@@ -371,7 +371,7 @@ Fees
     """
     $(field_dict[:tnr])
     """
-    @prop tn
+    @fprop tn
     """
     $(field_dict[:l_fees])
     """
@@ -585,39 +585,7 @@ function fees_constraints(fees::Option{<:Fees}, args...; kwargs...)::Option{<:Fe
     return fees
 end
 """
-    fees_view(::Nothing, ::Any)
-
-Return `nothing` when no fee estimator or constraint is not `nothing`.
-
-This method is used as a fallback for missing fee estimators or constraints, ensuring composability and uniform interface handling in fee constraint processing workflows.
-
-# Arguments
-
-  - `::Nothing`: Indicates absence of a fee estimator or constraint.
-  - `::Any`: Index or argument (ignored).
-
-# Returns
-
-  - `nothing`.
-
-# Examples
-
-```jldoctest
-julia> PortfolioOptimisers.fees_view(nothing, 1)
-
-```
-
-# Related
-
-  - [`FeesEstimator`](@ref)
-  - [`Fees`](@ref)
-  - [`fees_view`](@ref)
-"""
-function fees_view(::Nothing, ::Any)::Nothing
-    return nothing
-end
-"""
-    fees_view(fees::Fees, i)
+    port_opt_view(fees::Fees, i)
 
 Create a view of a `Fees` constraint for a subset of assets.
 
@@ -634,7 +602,7 @@ Returns a new `Fees` object with all fee fields restricted to the indices or ass
 
 # Details
 
-  - Uses `turnover_view` to subset the turnover constraint.
+  - Uses `port_opt_view` to subset the turnover constraint.
   - Uses `nothing_scalar_array_view` to subset proportional and fixed fee fields.
   - Propagates keyword arguments unchanged.
   - Enables composable processing of asset subsets for fee constraints.
@@ -646,7 +614,7 @@ julia> fees = Fees(; tn = Turnover(; w = [0.2, 0.3, 0.5], val = [0.1, 0.0, 0.0])
                    l = [0.001, 0.002, 0.0], s = [0.001, 0.002, 0.0], fl = [5.0, 0.0, 0.0],
                    fs = [0.0, 10.0, 0.0]);
 
-julia> PortfolioOptimisers.fees_view(fees, 1:2)
+julia> PortfolioOptimisers.port_opt_view(fees, 1:2)
 Fees
       tn ┼ Turnover
          │       w ┼ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [0.2, 0.3]
@@ -662,7 +630,7 @@ julia> fees = Fees(; tn = Turnover(; w = [0.2, 0.3, 0.5], val = [0.1, 0.0, 0.0],
                    l = [0.001, 0.002, 0.0], s = [0.001, 0.002, 0.0], fl = [5.0, 0.0, 0.0],
                    fs = [0.0, 10.0, 0.0]);
 
-julia> PortfolioOptimisers.fees_view(fees, 1:2)
+julia> PortfolioOptimisers.port_opt_view(fees, 1:2)
 Fees
       tn ┼ Turnover
          │       w ┼ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [0.2, 0.3]
@@ -680,11 +648,11 @@ Fees
   - [`Fees`](@ref)
   - [`FeesEstimator`](@ref)
   - [`fees_constraints`](@ref)
-  - [`turnover_view`](@ref)
+  - [`port_opt_view`](@ref)
   - [`nothing_scalar_array_view`](@ref)
 """
-function fees_view(fees::Fees, i)::Fees
-    tn = turnover_view(fees.tn, i)
+function port_opt_view(fees::Fees, i)::Fees
+    tn = port_opt_view(fees.tn, i)
     l = nothing_scalar_array_view(fees.l, i)
     s = nothing_scalar_array_view(fees.s, i)
     fl = nothing_scalar_array_view(fees.fl, i)

@@ -851,7 +851,7 @@ function OptimisationFailure(; res = nothing)
     return OptimisationFailure(res)
 end
 """
-    opt_view(opt, i, args...)
+    port_opt_view(opt, i, args...)
 
 Return a view or subset of an optimisation estimator for a given cluster index `i`.
 
@@ -872,21 +872,21 @@ Default fallback returns the estimator unchanged. Overridden for composite estim
   - [`JuMPOptimiser`](@ref)
   - [`NestedClustered`](@ref)
 """
-function opt_view(opt::AbstractOptimisationEstimator, args...)
+function port_opt_view(opt::AbstractOptimisationEstimator, ::Any, args...)
     return opt
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Apply [`opt_view`](@ref) element-wise to a vector of optimisation estimators.
+Apply [`port_opt_view`](@ref) element-wise to a vector of optimisation estimators.
 
 # Related
 
-  - [`opt_view`](@ref)
+  - [`port_opt_view`](@ref)
   - [`VecOptE`](@ref)
 """
-function opt_view(opt::VecOptE, args...)
-    return [opt_view(opti, args...) for opti in opt]
+function port_opt_view(opt::VecOptE, i, args...)
+    return [port_opt_view(opti, i, args...) for opti in opt]
 end
 """
     optimise(opt::OptimisationEstimator, args...; kwargs...) -> OptimisationResult

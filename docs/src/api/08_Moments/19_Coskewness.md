@@ -6,5 +6,5 @@ coskewness
 CoskewnessEstimator
 negative_spectral_coskewness
 _coskewness
-moment_view(ske::Coskewness, i)
+port_opt_view(ske::Coskewness, i)
 ```

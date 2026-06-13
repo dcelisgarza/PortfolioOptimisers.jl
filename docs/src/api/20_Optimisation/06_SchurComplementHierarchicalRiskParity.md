@@ -5,7 +5,7 @@ SchurComplementAlgorithm
 NonMonotonicSchurComplement
 MonotonicSchurComplement
 SchurComplementParams
-schur_complement_params_view(sp::SchurComplementParams, i, X::MatNum)
+port_opt_view(sp::SchurComplementParams, i, X::MatNum)
 Sd_Var
 naive_portfolio_risk(::Variance, sigma::MatNum)
 symmetric_step_up_matrix(n1::Integer, n2::Integer)
@@ -19,7 +19,7 @@ SchurComplementHierarchicalRiskParityResult
 factory(res::SchurComplementHierarchicalRiskParityResult, fb::Option{<:OptE_Opt})
 SchurComplementHierarchicalRiskParity
 needs_previous_weights(opt::SchurComplementHierarchicalRiskParity)
-opt_view(sh::SchurComplementHierarchicalRiskParity, i, X::MatNum)
+port_opt_view(sh::SchurComplementHierarchicalRiskParity, i, X::MatNum)
 optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:Any, Nothing},
                   rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)
 ```

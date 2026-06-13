@@ -65,21 +65,6 @@ function RiskTrackingError(; tr::WeightsTracking,
     return RiskTrackingError(tr, r, err, alg)
 end
 """
-    tracking_view(::Nothing, args...)
-
-Return `nothing` unchanged.
-
-Identity pass-through for optional tracking configuration fields.
-
-# Related
-
-  - [`tracking_view`](@ref)
-  - [`RiskTrackingError`](@ref)
-"""
-function tracking_view(::Nothing, args...)
-    return nothing
-end
-"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return a view of [`RiskTrackingError`](@ref) `tr` sliced to asset indices `i`.
@@ -89,12 +74,12 @@ Slices both the inner tracking benchmark and the risk measure for cluster-based 
 # Related
 
   - [`RiskTrackingError`](@ref)
-  - [`tracking_view`](@ref)
-  - [`risk_measure_view`](@ref)
+  - [`port_opt_view`](@ref)
+  - [`port_opt_view`](@ref)
 """
-function tracking_view(tr::RiskTrackingError, i, X::MatNum)
-    return RiskTrackingError(; tr = tracking_view(tr.tr, i),
-                             r = risk_measure_view(tr.r, i, X), err = tr.err, alg = tr.alg)
+function port_opt_view(tr::RiskTrackingError, i, X::MatNum)
+    return RiskTrackingError(; tr = port_opt_view(tr.tr, i), r = port_opt_view(tr.r, i, X),
+                             err = tr.err, alg = tr.alg)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -264,11 +249,11 @@ Slices the inner tracking specification for cluster-based optimisation.
 # Related
 
   - [`TrackingRiskMeasure`](@ref)
-  - [`risk_measure_view`](@ref)
-  - [`tracking_view`](@ref)
+  - [`port_opt_view`](@ref)
+  - [`port_opt_view`](@ref)
 """
-function risk_measure_view(r::TrackingRiskMeasure, i, args...)
-    tr = tracking_view(r.tr, i)
+function port_opt_view(r::TrackingRiskMeasure, i, args...)
+    tr = port_opt_view(r.tr, i)
     return TrackingRiskMeasure(; settings = r.settings, tr = tr, alg = r.alg)
 end
 """
@@ -476,13 +461,13 @@ Slices both the inner tracking benchmark and the risk measure for cluster-based 
 # Related
 
   - [`RiskTrackingRiskMeasure`](@ref)
-  - [`risk_measure_view`](@ref)
-  - [`tracking_view`](@ref)
+  - [`port_opt_view`](@ref)
+  - [`port_opt_view`](@ref)
 """
-function risk_measure_view(r::RiskTrackingRiskMeasure, i, X::MatNum)
-    tr = tracking_view(r.tr, i)
+function port_opt_view(r::RiskTrackingRiskMeasure, i, X::MatNum)
+    tr = port_opt_view(r.tr, i)
     return RiskTrackingRiskMeasure(; settings = r.settings, tr = tr,
-                                   r = risk_measure_view(r.r, i, X), alg = r.alg)
+                                   r = port_opt_view(r.r, i, X), alg = r.alg)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

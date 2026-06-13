@@ -27,7 +27,7 @@ AbstractMinMaxValStepwiseRegressionCriterion
 AbstractRegressionTarget
 AbstractMinValStepwiseRegressionCriterion
 AbstractMaxValStepwiseRegressionCriteria
-regression_view
+port_opt_view
 regression_criterion_func
 regression_threshold
 ```

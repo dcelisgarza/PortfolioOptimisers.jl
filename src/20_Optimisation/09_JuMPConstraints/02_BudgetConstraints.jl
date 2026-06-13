@@ -130,7 +130,7 @@ Matches either a plain number (fixed budget, e.g. `1.0`) or a [`BudgetRange`](@r
 """
 const Num_BgtRg = Union{<:Number, <:BudgetRange}
 """
-    budget_view(bgt, i)
+    port_opt_view(bgt, i)
 
 Get a view or subset of the budget constraint for index `i`.
 
@@ -150,7 +150,7 @@ For scalar or [`BudgetRange`](@ref) inputs, returns the input unchanged (budget 
   - [`BudgetRange`](@ref)
   - [`set_long_short_budget_constraints!`](@ref)
 """
-function budget_view(bgt::Num_BgtRg, ::Any)
+function port_opt_view(bgt::Num_BgtRg, ::Any)
     return bgt
 end
 """
@@ -350,7 +350,7 @@ function BudgetCosts(; bgt::Num_BgtRg = 1.0, w::VecNum, vp::Num_VecNum = 1.0,
                      vn::Num_VecNum = 1.0, up::Num_VecNum = 1.0, un::Num_VecNum = 1.0)
     return BudgetCosts(bgt, w, vp, vn, up, un)
 end
-function budget_view(bgt::BudgetCosts, i)
+function port_opt_view(bgt::BudgetCosts, i)
     w = view(bgt.w, i)
     vp = nothing_scalar_array_view(bgt.vp, i)
     vn = nothing_scalar_array_view(bgt.vn, i)
@@ -463,7 +463,7 @@ function BudgetMarketImpact(; bgt::Num_BgtRg = 1.0, w::VecNum, vp::Num_VecNum = 
                             un::Num_VecNum = 1.0, beta::Number = 2 / 3)
     return BudgetMarketImpact(bgt, w, vp, vn, up, un, beta)
 end
-function budget_view(bgt::BudgetMarketImpact, i)
+function port_opt_view(bgt::BudgetMarketImpact, i)
     w = view(bgt.w, i)
     vp = nothing_scalar_array_view(bgt.vp, i)
     vn = nothing_scalar_array_view(bgt.vn, i)

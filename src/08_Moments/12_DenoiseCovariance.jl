@@ -128,8 +128,8 @@ Gets the view of the covariance estimator for the `i`-th element(s).
 
   - [`DenoiseCovariance`](@ref)
 """
-function moment_view(ce::DenoiseCovariance, i)::DenoiseCovariance
-    return DenoiseCovariance(; ce = moment_view(ce.ce, i), dn = ce.dn, pdm = ce.pdm)
+function port_opt_view(ce::DenoiseCovariance, i)::DenoiseCovariance
+    return DenoiseCovariance(; ce = port_opt_view(ce.ce, i), dn = ce.dn, pdm = ce.pdm)
 end
 """
     Statistics.cov(ce::DenoiseCovariance, X::MatNum; dims = 1, kwargs...)

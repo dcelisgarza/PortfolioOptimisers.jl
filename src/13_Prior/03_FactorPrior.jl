@@ -139,9 +139,9 @@ Return a new [`FactorPrior`](@ref) estimator restricted to the assets at index `
 
   - [`FactorPrior`](@ref)
 """
-function prior_view(pe::FactorPrior, i)::FactorPrior
-    return FactorPrior(; pe = pe.pe, mp = pe.mp, re = regression_view(pe.re, i),
-                       ve = moment_view(pe.ve, i), rsd = pe.rsd)
+function port_opt_view(pe::FactorPrior, i)::FactorPrior
+    return FactorPrior(; pe = pe.pe, mp = pe.mp, re = port_opt_view(pe.re, i),
+                       ve = port_opt_view(pe.ve, i), rsd = pe.rsd)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

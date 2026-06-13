@@ -722,47 +722,47 @@ julia> opt = JuMPOptimiser(; slv = Solver());
 
 julia> X = rand(50, 5);
 
-julia> PortfolioOptimisers.opt_view(opt, 1:3, X) isa JuMPOptimiser
+julia> PortfolioOptimisers.port_opt_view(opt, 1:3, X) isa JuMPOptimiser
 true
 ```
 
 # Related
 
   - [`JuMPOptimiser`](@ref)
-  - [`opt_view`](@ref)
+  - [`port_opt_view`](@ref)
 """
-function opt_view(opt::JuMPOptimiser, i, X::MatNum)::JuMPOptimiser
+function port_opt_view(opt::JuMPOptimiser, i, X::MatNum)::JuMPOptimiser
     X = isa(opt.pe, AbstractPriorResult) ? opt.pe.X : X
-    pe = prior_view(opt.pe, i)
-    wb = weight_bounds_view(opt.wb, i)
-    bgt = budget_view(opt.bgt, i)
-    lt = threshold_view(opt.lt, i)
-    st = threshold_view(opt.st, i)
+    pe = port_opt_view(opt.pe, i)
+    wb = port_opt_view(opt.wb, i)
+    bgt = port_opt_view(opt.bgt, i)
+    lt = port_opt_view(opt.lt, i)
+    st = port_opt_view(opt.st, i)
     if opt.smtx === opt.sgmtx
-        smtx = sgmtx = asset_sets_matrix_view(opt.smtx, i)
+        smtx = sgmtx = port_opt_view(opt.smtx, i)
     else
-        smtx = asset_sets_matrix_view(opt.smtx, i)
-        sgmtx = asset_sets_matrix_view(opt.sgmtx, i)
+        smtx = port_opt_view(opt.smtx, i)
+        sgmtx = port_opt_view(opt.sgmtx, i)
     end
     if opt.slt === opt.sglt
-        slt = sglt = threshold_view(opt.slt, i)
+        slt = sglt = port_opt_view(opt.slt, i)
     else
-        slt = threshold_view(opt.slt, i)
-        sglt = threshold_view(opt.sglt, i)
+        slt = port_opt_view(opt.slt, i)
+        sglt = port_opt_view(opt.sglt, i)
     end
     if opt.sst === opt.sgst
-        sst = sgst = threshold_view(opt.sst, i)
+        sst = sgst = port_opt_view(opt.sst, i)
     else
-        sst = threshold_view(opt.sst, i)
-        sgst = threshold_view(opt.sgst, i)
+        sst = port_opt_view(opt.sst, i)
+        sgst = port_opt_view(opt.sgst, i)
     end
-    tn = turnover_view(opt.tn, i)
-    sets = asset_sets_view(opt.sets, i)
-    fees = fees_view(opt.fees, i)
-    tr = tracking_view(opt.tr, i, X)
-    ret = jump_returns_view(opt.ret, i)
-    ccnt = custom_constraint_view(opt.ccnt, i)
-    cobj = custom_objective_view(opt.cobj, i)
+    tn = port_opt_view(opt.tn, i)
+    sets = port_opt_view(opt.sets, i)
+    fees = port_opt_view(opt.fees, i)
+    tr = port_opt_view(opt.tr, i, X)
+    ret = port_opt_view(opt.ret, i)
+    ccnt = port_opt_view(opt.ccnt, i)
+    cobj = port_opt_view(opt.cobj, i)
     return JuMPOptimiser(; pe = pe, slv = opt.slv, wb = wb, bgt = bgt, sbgt = opt.sbgt,
                          lt = lt, st = st, lcse = opt.lcse, cte = opt.cte,
                          gcarde = opt.gcarde, sgcarde = opt.sgcarde, smtx = smtx,

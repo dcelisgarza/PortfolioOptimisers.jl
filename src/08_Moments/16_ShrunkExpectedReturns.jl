@@ -274,7 +274,7 @@ Keywords correspond to the struct's fields.
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@prop`-tagged fields are automatically propagated:
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
 
   - `me`: Recursively updated via [`factory`](@ref).
   - `ce`: Recursively updated via [`factory`](@ref).
@@ -319,11 +319,11 @@ ShrunkExpectedReturns
     """
     $(field_dict[:me])
     """
-    @prop me
+    @fprop me
     """
     $(field_dict[:ce])
     """
-    @prop ce
+    @fprop ce
     """
     $(field_dict[:me_shrink_alg])
     """
@@ -679,9 +679,10 @@ Gets the view of the expected returns estimator for the `i`-th element(s).
 
   - [`ShrunkExpectedReturns`](@ref)
 """
-function moment_view(me::ShrunkExpectedReturns, i)::ShrunkExpectedReturns
-    return ShrunkExpectedReturns(; me = moment_view(me.me, i), ce = moment_view(me.ce, i),
-                                 alg = me_alg_view(me.alg, i))
+function port_opt_view(me::ShrunkExpectedReturns, i)::ShrunkExpectedReturns
+    return ShrunkExpectedReturns(; me = port_opt_view(me.me, i),
+                                 ce = port_opt_view(me.ce, i),
+                                 alg = port_opt_view(me.alg, i))
 end
 
 export GrandMean, VolatilityWeighted, MeanSquaredError, JamesStein, BayesStein,
