@@ -66,11 +66,11 @@ EquilibriumExpectedReturns
     """
     $(field_dict[:ce])
     """
-    @fprop ce
+    @fprop @vprop ce
     """
     $(field_dict[:eqw])
     """
-    w
+    @vprop w
     """
     $(field_dict[:l])
     """
@@ -91,29 +91,6 @@ function EquilibriumExpectedReturns(;
                                     w::Option{<:VecNum} = nothing,
                                     l::Number = 1)::EquilibriumExpectedReturns
     return EquilibriumExpectedReturns(ce, w, l)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Gets the view of the expected returns estimator for the `i`-th element(s).
-
-# Arguments
-
-  - $(arg_dict[:me])
-  - `i`: Index or indices to view.
-
-# Returns
-
-  - $(ret_dict[:mev])
-
-# Related
-
-  - [`EquilibriumExpectedReturns`](@ref)
-"""
-function port_opt_view(me::EquilibriumExpectedReturns, i,
-                       args...)::EquilibriumExpectedReturns
-    return EquilibriumExpectedReturns(; ce = port_opt_view(me.ce, i),
-                                      w = nothing_scalar_array_view(me.w, i), l = me.l)
 end
 """
     Statistics.mean(me::EquilibriumExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)

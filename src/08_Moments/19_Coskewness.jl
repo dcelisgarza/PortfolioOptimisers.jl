@@ -174,7 +174,7 @@ Coskewness
     """
     $(field_dict[:me])
     """
-    @fprop me
+    @fprop @vprop me
     """
     $(field_dict[:mp])
     """
@@ -204,28 +204,6 @@ function Coskewness(; me::AbstractExpectedReturnsEstimator = SimpleExpectedRetur
                     alg::AbstractMomentAlgorithm = Full(),
                     w::Option{<:ObsWeights} = nothing)::Coskewness
     return Coskewness(me, mp, alg, w)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Gets the view of the coskewness estimator for the `i`-th element(s).
-
-# Arguments
-
-  - $(arg_dict[:ske])
-  - `i`: Index or indices to view.
-
-# Returns
-
-  - $(ret_dict[:skev])
-
-# Related
-
-  - [`Coskewness`](@ref)
-"""
-function port_opt_view(ske::Coskewness, i, args...)::Coskewness
-    return Coskewness(; me = port_opt_view(ske.me, i), mp = ske.mp, alg = ske.alg,
-                      w = ske.w)
 end
 """
     negative_spectral_coskewness(cskew::MatNum, X::MatNum,

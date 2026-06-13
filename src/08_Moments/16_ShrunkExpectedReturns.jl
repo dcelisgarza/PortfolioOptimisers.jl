@@ -319,15 +319,15 @@ ShrunkExpectedReturns
     """
     $(field_dict[:me])
     """
-    @fprop me
+    @fprop @vprop me
     """
     $(field_dict[:ce])
     """
-    @fprop ce
+    @fprop @vprop ce
     """
     $(field_dict[:me_shrink_alg])
     """
-    alg
+    @vprop alg
     function ShrunkExpectedReturns(me::AbstractExpectedReturnsEstimator,
                                    ce::StatsBase.CovarianceEstimator,
                                    alg::AbstractShrunkExpectedReturnsAlgorithm)
@@ -660,29 +660,6 @@ function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:BodnarOkhrinP
     alpha /= u * v - w^2
     beta = (one(alpha) - alpha) * w / u
     return alpha * mu + beta * b
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Gets the view of the expected returns estimator for the `i`-th element(s).
-
-# Arguments
-
-  - $(arg_dict[:me])
-  - `i`: Index or indices to view.
-
-# Returns
-
-  - $(ret_dict[:mev])
-
-# Related
-
-  - [`ShrunkExpectedReturns`](@ref)
-"""
-function port_opt_view(me::ShrunkExpectedReturns, i, args...)::ShrunkExpectedReturns
-    return ShrunkExpectedReturns(; me = port_opt_view(me.me, i),
-                                 ce = port_opt_view(me.ce, i),
-                                 alg = port_opt_view(me.alg, i))
 end
 
 export GrandMean, VolatilityWeighted, MeanSquaredError, JamesStein, BayesStein,
