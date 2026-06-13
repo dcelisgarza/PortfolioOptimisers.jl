@@ -473,6 +473,9 @@ const arg_dict = Dict(
                       :fees_jmp => "`fees`: Fee estimator or fee structure.",#
                       :tr_jmp => "`tr`: Tracking error constraint(s).",#
                       :ple => "`ple`: Phylogeny constraint estimator(s).",#
+                      :lcsr => "`lcsr`: Processed linear constraint set result.",#
+                      :gcardr => "`gcardr`: Processed grouped cardinality constraint result.",#
+                      :sgcardr => "`sgcardr`: Processed sub-grouped cardinality constraint result.",#
                       :ret_jmp => "`ret`: Returns estimator for the `JuMP` model.",#
                       :ccnt => "`ccnt`: Custom `JuMP` constraint.",#
                       :cobj => "`cobj`: Custom `JuMP` objective.",#
@@ -600,6 +603,7 @@ const arg_dict = Dict(
                       # Fees.
                       :fees => "`fees`: Fees estimator or result.",#
                       # Near optimal centering result fields.
+                      :attrs_noc => "`attrs`: Processed JuMP optimiser attributes for the model-assembly pipeline.",#
                       :w_opt => "`w_opt`: Optimal portfolio weights.",#
                       :w_max => "`w_max`: Maximum-risk portfolio weights.",#
                       :w_min => "`w_min`: Minimum-risk portfolio weights.",#

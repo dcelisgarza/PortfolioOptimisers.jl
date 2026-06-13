@@ -9,4 +9,7 @@ factory(opt::JuMPOptimiser, w::AbstractVector)
 opt_view(opt::JuMPOptimiser, i, X::MatNum)
 processed_jump_optimiser_attributes
 processed_jump_optimiser
+assemble_jump_model!
+set_risk_and_scalarise!
+jump_optimiser_from_attributes
 ```

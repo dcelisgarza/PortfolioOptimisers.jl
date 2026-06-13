@@ -530,6 +530,10 @@ $(DocStringExtensions.FIELDS)
     """
     opt
     """
+    $(field_dict[:attrs_noc])
+    """
+    attrs
+    """
     $(field_dict[:w_min_retcode])
     """
     w_min_retcode
@@ -578,7 +582,8 @@ function near_optimal_centering_setup(noc::NearOptimalCentering, rd::ReturnsResu
     w_max_retcode = OptimisationSuccess(nothing)
     unconstrained = isa(noc.alg, UnconstrainedNearOptimalCentering)
     r = noc.r
-    opt = processed_jump_optimiser(noc.opt, rd; dims = dims, kwargs...)
+    attrs = processed_jump_optimiser_attributes(noc.opt, rd; dims = dims, kwargs...)
+    opt = jump_optimiser_from_attributes(noc.opt, attrs)
     if w_min_flag || w_max_flag || unconstrained
         nb_r = no_bounds_risk_measure(r, Val(noc.ucs_flag))
         nb_opt = no_bounds_optimiser(opt, noc.ucs_flag)
@@ -623,7 +628,7 @@ function near_optimal_centering_setup(noc::NearOptimalCentering, rd::ReturnsResu
         r, opt = nb_r, nb_opt
     end
     return NearOptimalSetup(w_opt, rk_opt, rt_opt, rt_min, rt_max, w_min, w_max, r, opt,
-                            w_min_retcode, w_opt_retcode, w_max_retcode)
+                            attrs, w_min_retcode, w_opt_retcode, w_max_retcode)
 end
 """
     set_near_optimal_centering_constraints!(model::JuMP.Model, wb::WeightBounds)
@@ -1055,52 +1060,23 @@ function _optimise(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, 
                                              <:ConstrainedNearOptimalCentering},
                    rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
                    str_names::Bool = false, save::Bool = true, kwargs...)
-    (; w_opt, rk_opt, rt_opt, r, opt, rt_min, rt_max, w_min, w_max, w_min_retcode, w_opt_retcode, w_max_retcode) = near_optimal_centering_setup(noc,
-                                                                                                                                                rd;
-                                                                                                                                                dims = dims,
-                                                                                                                                                kwargs...)
+    (; w_opt, rk_opt, rt_opt, r, opt, attrs, rt_min, rt_max, w_min, w_max, w_min_retcode, w_opt_retcode, w_max_retcode) = near_optimal_centering_setup(noc,
+                                                                                                                                                       rd;
+                                                                                                                                                       dims = dims,
+                                                                                                                                                       kwargs...)
     model = JuMP.Model()
     JuMP.set_string_names_on_creation(model, str_names)
     set_model_scales!(model, opt.sc, opt.so)
     JuMP.@expression(model, k, 1)
     set_w!(model, opt.pe.X, w_opt)
     set_weight_constraints!(model, opt.wb, opt.bgt, opt.sbgt)
-    set_linear_weight_constraints!(model, opt.lcse, :lcs_ineq_, :lcs_eq_)
-    set_linear_weight_constraints!(model, opt.cte, :cent_ineq_, :cent_eq_)
-    set_mip_constraints!(model, opt.wb, opt.card, opt.gcarde, opt.ple, opt.lt, opt.st,
-                         opt.fees, opt.ss)
-    set_smip_constraints!(model, opt.wb, opt.scard, opt.sgcarde, opt.smtx, opt.sgmtx,
-                          opt.slt, opt.sst, opt.sglt, nothing, opt.ss)
-    set_turnover_constraints!(model, opt.tn)
-    set_tracking_error_constraints!(model, opt.pe, opt.tr, noc, opt.ple, opt.fees; rd = rd)
-    set_number_effective_assets!(model, opt.nea)
-    set_l1_regularisation!(model, opt.l1)
-    set_l2_regularisation!(model, opt.l2)
-    set_linf_regularisation!(model, opt.linf)
-    set_lp_regularisation!(model, opt.lp)
-    set_non_fixed_fees!(model, opt.fees)
-    set_risk_constraints!(model, r, noc, opt.pe, opt.ple, opt.fees; rd = rd)
-    scalarise_risk_expression!(model, opt.sca)
-    set_return_constraints!(model, opt.ret, MinimumRisk(), opt.pe; rd = rd)
-    set_sdp_phylogeny_constraints!(model, opt.ple)
-    add_custom_constraint!(model, opt.ccnt, opt, opt.pe)
+    assemble_jump_model!(model, noc, opt, attrs, rd, r)
     noc_retcode, sol = solve_noc!(noc, model, rk_opt, rt_opt, opt, rt_min, rt_max, w_min,
                                   w_max, Val(haskey(model, :ret_frontier)),
                                   Val(haskey(model, :risk_frontier)))
     retcode = get_overall_retcode(w_min_retcode, w_opt_retcode, w_max_retcode, noc_retcode)
-    return NearOptimalCenteringResult(typeof(noc),
-                                      ProcessedJuMPOptimiserAttributes(opt.pe, opt.wb,
-                                                                       opt.lt, opt.st,
-                                                                       opt.lcse, opt.cte,
-                                                                       opt.gcarde,
-                                                                       opt.sgcarde,
-                                                                       opt.smtx, opt.sgmtx,
-                                                                       opt.slt, opt.sst,
-                                                                       opt.sglt, opt.sgst,
-                                                                       opt.tn, opt.fees,
-                                                                       opt.ple, opt.ret),
-                                      w_min_retcode, w_opt_retcode, w_max_retcode,
-                                      noc_retcode, retcode, sol,
+    return NearOptimalCenteringResult(typeof(noc), attrs, w_min_retcode, w_opt_retcode,
+                                      w_max_retcode, noc_retcode, retcode, sol,
                                       ifelse(save, model, nothing), nothing)
 end
 """
