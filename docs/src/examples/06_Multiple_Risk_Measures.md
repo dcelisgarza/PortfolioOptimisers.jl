@@ -84,9 +84,9 @@ For the multi risk measure optimisation, we will weigh each risk measure equally
 pr = prior(HighOrderPriorEstimator(), rd.X)
 
 ces = [PortfolioOptimisersCovariance(;
-                                     mp = DenoiseDetoneAlgMatrixProcessing(;
-                                                                           dn = Denoise(;
-                                                                                        alg = SpectralDenoise()))),
+                                     mp = MatrixProcessing(;
+                                                           dn = Denoise(;
+                                                                        alg = SpectralDenoise()))),
        PortfolioOptimisersCovariance(; ce = GerberCovariance()),
        PortfolioOptimisersCovariance(; ce = SmythBrobyCovariance(; alg = SmythBroby1())),
        PortfolioOptimisersCovariance(; ce = MutualInfoCovariance()),
@@ -115,7 +115,7 @@ for res in results[1:5]
 end
 mean_w ./= 5
 res = optimise(MeanRisk(; r = rs, opt = JuMPOptimiser(; pe = pr, slv = slv)))
-pretty_table(DataFrame(:assets => rd.nx, :denoise => results[1].w, :gerber1 => results[2].w,
+pretty_table(DataFrame(:assets => rd.nx, :dn => results[1].w, :gerber1 => results[2].w,
                        :smyth_broby1 => results[3].w, :mutual_info => results[4].w,
                        :distance => results[5].w, :mean_w => mean_w,
                        :sum_covs => results[6].w, :multi_risk => res.w);
@@ -135,7 +135,7 @@ mean_w ./= 5
 res = optimise(MeanRisk(; r = rs, obj = MaximumRatio(),
                         opt = JuMPOptimiser(; pe = pr, slv = slv)))
 
-pretty_table(DataFrame(:assets => rd.nx, :denoise => results[1].w, :gerber1 => results[2].w,
+pretty_table(DataFrame(:assets => rd.nx, :dn => results[1].w, :gerber1 => results[2].w,
                        :smyth_broby1 => results[3].w, :mutual_info => results[4].w,
                        :distance => results[5].w, :mean_w => mean_w,
                        :sum_covs => results[6].w, :multi_risk => res.w);
@@ -165,9 +165,9 @@ clr = clusterise(ClustersEstimator(; alg = DBHT()), pr.X)
 Before optimising, we can visualise the asset clustering structure derived from the correlation matrix.
 
 ````@example 06_Multiple_Risk_Measures
-using StatsPlots, GraphRecipes#= Hierarchical clustering dendrogram. =#
+using StatsPlots, GraphRecipes #= Hierarchical clustering dendrogram. =#
 
-plot_dendrogram(clr, rd.nx)#= Reordered correlation heatmap with cluster boundary boxes. =#
+plot_dendrogram(clr, rd.nx) #= Reordered correlation heatmap with cluster boundary boxes. =#
 
 plot_clusters(clr, rd.nx)
 

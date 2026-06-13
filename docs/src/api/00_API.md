@@ -63,7 +63,7 @@ This section is under active development so any [`<name>`]-(@ref) lacks docstrin
   - Fixed [`FixedDenoise`](@ref)
   - Shrunk [`ShrunkDenoise`](@ref)
 - Detoning [`Detone`](@ref), [`detone!`](@ref), [`detone`](@ref)
-- Matrix processing pipeline [`DenoiseDetoneAlgMatrixProcessing`](@ref), [`matrix_processing!`](@ref), [`matrix_processing`](@ref), [`DenoiseDetoneAlg`](@ref), [`DenoiseAlgDetone`](@ref), [`DetoneDenoiseAlg`](@ref), [`DetoneAlgDenoise`](@ref), [`AlgDenoiseDetone`](@ref), [`AlgDetoneDenoise`](@ref)
+- Matrix processing pipeline [`MatrixProcessing`](@ref), [`matrix_processing!`](@ref), [`matrix_processing_step!`](@ref), [`matrix_processing`](@ref)
 
 ### Regression models
 

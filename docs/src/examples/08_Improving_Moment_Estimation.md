@@ -73,23 +73,23 @@ pes = [EmpiricalPrior(;),#
                                                  alg = BayesStein(;
                                                                   tgt = VolatilityWeighted())),#
                       ce = PortfolioOptimisersCovariance(;
-                                                         mp = DenoiseDetoneAlgMatrixProcessing(;
-                                                                                               dn = Denoise(;
-                                                                                                            alg = FixedDenoise())))),#
+                                                         mp = MatrixProcessing(;
+                                                                               dn = Denoise(;
+                                                                                            alg = FixedDenoise())))),#
        EmpiricalPrior(;
                       me = ShrunkExpectedReturns(;
                                                  alg = BayesStein(;
                                                                   tgt = MeanSquaredError())),#
                       ce = PortfolioOptimisersCovariance(;
-                                                         mp = DenoiseDetoneAlgMatrixProcessing(;
-                                                                                               alg = LoGo()))),
+                                                         mp = MatrixProcessing(;
+                                                                               alg = LoGo()))),
        HighOrderPriorEstimator(;
                                pe = EmpiricalPrior(;
                                                    ce = PortfolioOptimisersCovariance(;
-                                                                                      mp = DenoiseDetoneAlgMatrixProcessing(;
-                                                                                                                            dn = Denoise(;
-                                                                                                                                         alg = ShrunkDenoise(;
-                                                                                                                                                             alpha = 0.5)))),
+                                                                                      mp = MatrixProcessing(;
+                                                                                                            dn = Denoise(;
+                                                                                                                         alg = ShrunkDenoise(;
+                                                                                                                                             alpha = 0.5)))),
                                                    me = ShrunkExpectedReturns(;
                                                                               alg = BodnarOkhrinParolya()))),
        HighOrderPriorEstimator(;
@@ -98,35 +98,33 @@ pes = [EmpiricalPrior(;),#
                                                                               alg = BodnarOkhrinParolya(;
                                                                                                         tgt = VolatilityWeighted())),
                                                    ce = PortfolioOptimisersCovariance(;
-                                                                                      mp = DenoiseDetoneAlgMatrixProcessing(;
-                                                                                                                            alg = LoGo(),
-                                                                                                                            dn = Denoise(;
-                                                                                                                                         alg = FixedDenoise())))),
+                                                                                      mp = MatrixProcessing(;
+                                                                                                            alg = LoGo(),
+                                                                                                            dn = Denoise(;
+                                                                                                                         alg = FixedDenoise())))),
                                ske = Coskewness(;
-                                                mp = DenoiseDetoneAlgMatrixProcessing(;
-                                                                                      dn = Denoise(;
-                                                                                                   alg = FixedDenoise()))),
+                                                mp = MatrixProcessing(;
+                                                                      dn = Denoise(;
+                                                                                   alg = FixedDenoise()))),
                                kte = Cokurtosis(;
-                                                mp = DenoiseDetoneAlgMatrixProcessing(;
-                                                                                      dn = Denoise(;
-                                                                                                   alg = FixedDenoise())))),
+                                                mp = MatrixProcessing(;
+                                                                      dn = Denoise(;
+                                                                                   alg = FixedDenoise())))),
        HighOrderPriorEstimator(;
                                pe = EmpiricalPrior(;
                                                    me = ShrunkExpectedReturns(;
                                                                               alg = BodnarOkhrinParolya(;
                                                                                                         tgt = MeanSquaredError())),
                                                    ce = PortfolioOptimisersCovariance(;
-                                                                                      mp = DenoiseDetoneAlgMatrixProcessing(;
-                                                                                                                            alg = LoGo(;
-                                                                                                                                       sim = ExponentialSimilarity())))),
+                                                                                      mp = MatrixProcessing(;
+                                                                                                            alg = LoGo(;
+                                                                                                                       sim = ExponentialSimilarity())))),
                                ske = Coskewness(;
-                                                mp = DenoiseDetoneAlgMatrixProcessing(;
-                                                                                      dn = Denoise(),
-                                                                                      alg = LoGo())),
+                                                mp = MatrixProcessing(; dn = Denoise(),
+                                                                      alg = LoGo())),
                                kte = Cokurtosis(;
-                                                mp = DenoiseDetoneAlgMatrixProcessing(;
-                                                                                      dn = Denoise(),
-                                                                                      alg = LoGo())))]
+                                                mp = MatrixProcessing(; dn = Denoise(),
+                                                                      alg = LoGo())))]
 ````
 
 Now let's compute the prior statistics for each estimator.
@@ -199,7 +197,7 @@ pretty_table(DataFrame([rd.nx prs[5].V], ["Assets"; rd.nx]); formatters = [hmmtf
              source_notes = "Condition number FixedDenoise: $(round(cond(prs[5].V); digits = 3))")
 pretty_table(DataFrame([rd.nx prs[6].V], ["Assets"; rd.nx]); formatters = [hmmtfmt],
              title = "Coskewness Negative Spectral Slices: LoGo(MaxDist)",
-             source_notes = "Condition number LoGo(MaxDist): $(round(cond(prs[6].V); digits = 3))")#= Coskewness heatmap (N × N²) for vanilla and denoised high-order priors. =#
+             source_notes = "Condition number LoGo(MaxDist): $(round(cond(prs[6].V); digits = 3))") #= Coskewness heatmap (N × N²) for vanilla and denoised high-order priors. =#
 
 plot_coskewness(prs[4], rd)
 plot_coskewness(prs[5], rd)
@@ -216,7 +214,7 @@ pretty_table(DataFrame([nx2 prs[5].kt], ["Assets^2"; nx2]); formatters = [hmmtfm
              source_notes = "Condition number FixedDenoise: $(round(cond(prs[5].kt); digits = 3))")
 pretty_table(DataFrame([nx2 prs[6].kt], ["Assets^2"; nx2]); formatters = [hmmtfmt],
              title = "Cokurtosis: Shrunk denoise (0) + LoGo(MaxDist)",
-             source_notes = "Condition number Shrunk denoise (0) + LoGo(MaxDist): $(round(cond(prs[6].kt); digits = 3))")#= Cokurtosis eigenspectrum for vanilla and denoised high-order priors. =#
+             source_notes = "Condition number Shrunk denoise (0) + LoGo(MaxDist): $(round(cond(prs[6].kt); digits = 3))") #= Cokurtosis eigenspectrum for vanilla and denoised high-order priors. =#
 
 plot_cokurtosis(prs[4], rd)
 plot_cokurtosis(prs[5], rd)
@@ -405,7 +403,7 @@ pretty_table(DataFrame("Assets" => rd.nx, "Vanilla" => ress[1].w,
                        "LoGo(MaxDist) + BS(MSE)" => ress[3].w,
                        "Shrunk (0.5) + BOP(GM)" => ress[4].w,
                        "Fixed + LoGo(MaxDist) + BOP(VW)" => ress[5].w,
-                       "LoGo(ExpDist) + BOP(MSE)" => ress[6].w); formatters = [resfmt])#= Compositions across all six moment-estimation variants (MaximumRatio, Variance). =#
+                       "LoGo(ExpDist) + BOP(MSE)" => ress[6].w); formatters = [resfmt]) #= Compositions across all six moment-estimation variants (MaximumRatio, Variance). =#
 
 plot_stacked_bar_composition(ress, rd)
 ````
@@ -507,7 +505,7 @@ ress = optimise.(mrs)
 pretty_table(DataFrame("Assets" => rd.nx, "Vanilla V + BOP(GM) mu" => ress[1].w,
                        "Fixed Denoise V + BOP(VW) mu" => ress[2].w,
                        "Shrunk(0) Denoise + LoGo(MaxDist) V + BOP(MSE) mu" => ress[3].w);
-             formatters = [resfmt])#= Compositions across denoising variants (MaximumRatio, NegativeSkewness). =#
+             formatters = [resfmt]) #= Compositions across denoising variants (MaximumRatio, NegativeSkewness). =#
 
 plot_stacked_bar_composition(ress, rd)
 ````
@@ -611,7 +609,7 @@ ress = optimise.(mrs)
 pretty_table(DataFrame("Assets" => rd.nx, "Vanilla kt + BOP(GM) mu" => ress[1].w,
                        "Fixed Denoise kt + BOP(VW) mu" => ress[2].w,
                        "Shrunk(0) Denoise + LoGo(MaxDist) kt + BOP(MSE) mu" => ress[3].w);
-             formatters = [resfmt])#= Compositions across denoising variants (MaximumRatio, Kurtosis). =#
+             formatters = [resfmt]) #= Compositions across denoising variants (MaximumRatio, Kurtosis). =#
 
 plot_stacked_bar_composition(ress, rd)
 ````

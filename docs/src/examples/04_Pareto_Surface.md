@@ -84,7 +84,7 @@ Note how many options this estimator contains.
 
 ````@example 04_Pareto_Surface
 dn = Denoise(; alg = SpectralDenoise(;))
-mp = DenoiseDetoneAlgMatrixProcessing(; dn = dn)
+mp = MatrixProcessing(; dn = dn)
 pe = HighOrderPriorEstimator(;
                              # Prior estimator for low order moments
                              pe = EmpiricalPrior(;

@@ -265,7 +265,7 @@ Comparing compositions across all strict budget constraint types side-by-side re
 the budget and short-budget parameters shape the allocation.
 
 ````@example 05_Budget_Constraints
-using StatsPlots, GraphRecipes#= Fully invested, market-neutral, short-only, leveraged, and underleveraged long-short. =#
+using StatsPlots, GraphRecipes #= Fully invested, market-neutral, short-only, leveraged, and underleveraged long-short. =#
 
 plot_stacked_bar_composition([res1, res2, res3, res4, res5], rd)
 ````

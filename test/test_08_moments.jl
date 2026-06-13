@@ -189,49 +189,64 @@
 
         @test isapprox(df[!, 36],
                        vec(cov(PortfolioOptimisersCovariance(;
-                                                             mp = DenoiseDetoneAlgMatrixProcessing(;
-                                                                                                   dn = Denoise(;
-                                                                                                                alg = SpectralDenoise()))),
+                                                             mp = MatrixProcessing(;
+                                                                                   dn = Denoise(;
+                                                                                                alg = SpectralDenoise()))),
                                rd.X)))
         @test isapprox(df[!, 37],
                        vec(cov(PortfolioOptimisersCovariance(;
-                                                             mp = DenoiseDetoneAlgMatrixProcessing(;
-                                                                                                   dt = Detone())),
+                                                             mp = MatrixProcessing(;
+                                                                                   dt = Detone())),
                                rd.X)))
         @test isapprox(df[!, 37],
                        vec(cov(PortfolioOptimisersCovariance(;
-                                                             mp = DenoiseDetoneAlgMatrixProcessing(;
-                                                                                                   order = DenoiseAlgDetone(),
-                                                                                                   dt = Detone())),
+                                                             mp = MatrixProcessing(;
+                                                                                   order = (:pdm,
+                                                                                            :dn,
+                                                                                            :alg,
+                                                                                            :dt),
+                                                                                   dt = Detone())),
                                rd.X)))
         @test isapprox(df[!, 37],
                        vec(cov(PortfolioOptimisersCovariance(;
-                                                             mp = DenoiseDetoneAlgMatrixProcessing(;
-                                                                                                   order = DetoneDenoiseAlg(),
-                                                                                                   dt = Detone())),
+                                                             mp = MatrixProcessing(;
+                                                                                   order = (:pdm,
+                                                                                            :dt,
+                                                                                            :dn,
+                                                                                            :alg),
+                                                                                   dt = Detone())),
                                rd.X)))
         @test isapprox(df[!, 37],
                        vec(cov(PortfolioOptimisersCovariance(;
-                                                             mp = DenoiseDetoneAlgMatrixProcessing(;
-                                                                                                   order = DetoneAlgDenoise(),
-                                                                                                   dt = Detone())),
+                                                             mp = MatrixProcessing(;
+                                                                                   order = (:pdm,
+                                                                                            :dt,
+                                                                                            :alg,
+                                                                                            :dn),
+                                                                                   dt = Detone())),
                                rd.X)))
         @test isapprox(df[!, 37],
                        vec(cov(PortfolioOptimisersCovariance(;
-                                                             mp = DenoiseDetoneAlgMatrixProcessing(;
-                                                                                                   order = AlgDenoiseDetone(),
-                                                                                                   dt = Detone())),
+                                                             mp = MatrixProcessing(;
+                                                                                   order = (:pdm,
+                                                                                            :alg,
+                                                                                            :dn,
+                                                                                            :dt),
+                                                                                   dt = Detone())),
                                rd.X)))
         @test isapprox(df[!, 37],
                        vec(cov(PortfolioOptimisersCovariance(;
-                                                             mp = DenoiseDetoneAlgMatrixProcessing(;
-                                                                                                   order = AlgDetoneDenoise(),
-                                                                                                   dt = Detone())),
+                                                             mp = MatrixProcessing(;
+                                                                                   order = (:pdm,
+                                                                                            :alg,
+                                                                                            :dt,
+                                                                                            :dn),
+                                                                                   dt = Detone())),
                                rd.X)))
         @test isapprox(df[!, 38],
                        vec(cov(PortfolioOptimisersCovariance(;
-                                                             mp = DenoiseDetoneAlgMatrixProcessing(;
-                                                                                                   alg = LoGo())),
+                                                             mp = MatrixProcessing(;
+                                                                                   alg = LoGo())),
                                rd.X)))
 
         @test isapprox(var(SimpleVariance(; w = ew, corrected = false), rd.X; dims = 1),

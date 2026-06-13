@@ -125,7 +125,7 @@ $(DocStringExtensions.FIELDS)
 
     Coskewness(;
         me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
-        mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing(),
+        mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
         alg::AbstractMomentAlgorithm = Full(),
         w::Option{<:ObsWeights} = nothing
     ) -> Coskewness
@@ -150,14 +150,14 @@ julia> Coskewness()
 Coskewness
    me ┼ SimpleExpectedReturns
       │   w ┴ nothing
-   mp ┼ DenoiseDetoneAlgMatrixProcessing
+   mp ┼ MatrixProcessing
       │     pdm ┼ Posdef
       │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
       │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
       │      dn ┼ nothing
       │      dt ┼ nothing
       │     alg ┼ nothing
-      │   order ┴ DenoiseDetoneAlg()
+      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
   alg ┼ Full()
     w ┴ nothing
 ```
@@ -200,7 +200,7 @@ function factory(ske::Coskewness, w::ObsWeights)::Coskewness
 end
 =#
 function Coskewness(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
-                    mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing(),
+                    mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
                     alg::AbstractMomentAlgorithm = Full(),
                     w::Option{<:ObsWeights} = nothing)::Coskewness
     return Coskewness(me, mp, alg, w)

@@ -141,25 +141,25 @@ HighOrderFactorPriorEstimator
       │       │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
       │       │           │      │       │    w ┴ nothing
       │       │           │      │   alg ┴ Full()
-      │       │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
+      │       │           │   mp ┼ MatrixProcessing
       │       │           │      │     pdm ┼ Posdef
       │       │           │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
       │       │           │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
       │       │           │      │      dn ┼ nothing
       │       │           │      │      dt ┼ nothing
       │       │           │      │     alg ┼ nothing
-      │       │           │      │   order ┴ DenoiseDetoneAlg()
+      │       │           │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
       │       │        me ┼ SimpleExpectedReturns
       │       │           │   w ┴ nothing
       │       │   horizon ┴ nothing
-      │    mp ┼ DenoiseDetoneAlgMatrixProcessing
+      │    mp ┼ MatrixProcessing
       │       │     pdm ┼ Posdef
       │       │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
       │       │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
       │       │      dn ┼ nothing
       │       │      dt ┼ nothing
       │       │     alg ┼ nothing
-      │       │   order ┴ DenoiseDetoneAlg()
+      │       │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
       │    re ┼ StepwiseRegression
       │       │   crit ┼ PValue
       │       │        │   t ┴ Float64: 0.05
@@ -175,27 +175,27 @@ HighOrderFactorPriorEstimator
   kte ┼ Cokurtosis
       │    me ┼ SimpleExpectedReturns
       │       │   w ┴ nothing
-      │    mp ┼ DenoiseDetoneAlgMatrixProcessing
+      │    mp ┼ MatrixProcessing
       │       │     pdm ┼ Posdef
       │       │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
       │       │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
       │       │      dn ┼ nothing
       │       │      dt ┼ nothing
       │       │     alg ┼ nothing
-      │       │   order ┴ DenoiseDetoneAlg()
+      │       │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
       │   alg ┼ Full()
       │     w ┴ nothing
   ske ┼ Coskewness
       │    me ┼ SimpleExpectedReturns
       │       │   w ┴ nothing
-      │    mp ┼ DenoiseDetoneAlgMatrixProcessing
+      │    mp ┼ MatrixProcessing
       │       │     pdm ┼ Posdef
       │       │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
       │       │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
       │       │      dn ┼ nothing
       │       │      dt ┼ nothing
       │       │     alg ┼ nothing
-      │       │   order ┴ DenoiseDetoneAlg()
+      │       │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
       │   alg ┼ Full()
       │     w ┴ nothing
    ex ┼ Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()

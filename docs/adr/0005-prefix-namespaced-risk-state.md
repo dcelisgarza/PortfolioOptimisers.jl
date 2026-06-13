@@ -38,7 +38,7 @@ risk-build spine; the inner build reads and writes only prefixed keys.
 ## Consequences
 
 - The ~390-line save→build→restore block and the `:w`↔`:oldw` swap in
-  [18_TrackingRiskMeasureConstraints.jl](../../src/20_Optimisation/19_RiskMeasureConstraints/18_TrackingRiskMeasureConstraints.jl)
+  [18_TrackingRiskMeasureConstraints.jl](../../src/20_Optimisation/20_RiskMeasureConstraints/18_TrackingRiskMeasureConstraints.jl)
   are **deleted**, not relocated. This is the payoff.
 - Nested builds are re-entrant: distinct prefixes never alias, so a tracking measure
   can itself contain a tracking measure without special handling.

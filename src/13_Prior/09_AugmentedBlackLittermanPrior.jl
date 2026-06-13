@@ -58,7 +58,7 @@ $(DocStringExtensions.FIELDS)
     AugmentedBlackLittermanPrior(;
         a_pe::AbstractLowOrderPriorEstimator_A_AF = EmpiricalPrior(),
         f_pe::AbstractLowOrderPriorEstimator_A_AF = EmpiricalPrior(),
-        mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing(),
+        mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
         re::AbstractRegressionEstimator = StepwiseRegression(),
         a_views::Lc_BLV,
         f_views::Lc_BLV,
@@ -107,14 +107,14 @@ AugmentedBlackLittermanPrior
                │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
                │           │      │       │    w ┴ nothing
                │           │      │   alg ┴ Full()
-               │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
+               │           │   mp ┼ MatrixProcessing
                │           │      │     pdm ┼ Posdef
                │           │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
                │           │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
                │           │      │      dn ┼ nothing
                │           │      │      dt ┼ nothing
                │           │      │     alg ┼ nothing
-               │           │      │   order ┴ DenoiseDetoneAlg()
+               │           │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
                │        me ┼ SimpleExpectedReturns
                │           │   w ┴ nothing
                │   horizon ┴ nothing
@@ -127,25 +127,25 @@ AugmentedBlackLittermanPrior
                │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
                │           │      │       │    w ┴ nothing
                │           │      │   alg ┴ Full()
-               │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
+               │           │   mp ┼ MatrixProcessing
                │           │      │     pdm ┼ Posdef
                │           │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
                │           │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
                │           │      │      dn ┼ nothing
                │           │      │      dt ┼ nothing
                │           │      │     alg ┼ nothing
-               │           │      │   order ┴ DenoiseDetoneAlg()
+               │           │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
                │        me ┼ SimpleExpectedReturns
                │           │   w ┴ nothing
                │   horizon ┴ nothing
-            mp ┼ DenoiseDetoneAlgMatrixProcessing
+            mp ┼ MatrixProcessing
                │     pdm ┼ Posdef
                │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
                │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
                │      dn ┼ nothing
                │      dt ┼ nothing
                │     alg ┼ nothing
-               │   order ┴ DenoiseDetoneAlg()
+               │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
             re ┼ StepwiseRegression
                │   crit ┼ PValue
                │        │   t ┴ Float64: 0.05
@@ -285,7 +285,7 @@ end
 function AugmentedBlackLittermanPrior(;
                                       a_pe::AbstractLowOrderPriorEstimator_A_AF = EmpiricalPrior(),
                                       f_pe::AbstractLowOrderPriorEstimator_A_AF = EmpiricalPrior(),
-                                      mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing(),
+                                      mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
                                       re::AbstractRegressionEstimator = StepwiseRegression(),
                                       a_views::Lc_BLV, f_views::Lc_BLV,
                                       a_sets::Option{<:AssetSets} = nothing,

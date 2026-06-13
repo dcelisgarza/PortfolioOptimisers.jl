@@ -44,7 +44,7 @@ $(DocStringExtensions.FIELDS)
 
     NegativeSkewness(;
         settings::RiskMeasureSettings = RiskMeasureSettings(),
-        mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing(),
+        mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
         sk::Option{<:MatNum} = nothing,
         V::Option{<:MatNum} = nothing,
         alg::NSkeFormulations = SOCRiskExpr(),
@@ -77,14 +77,14 @@ NegativeSkewness
            │   scale ┼ Float64: 1.0
            │      ub ┼ nothing
            │     rke ┴ Bool: true
-        mp ┼ DenoiseDetoneAlgMatrixProcessing
+        mp ┼ MatrixProcessing
            │     pdm ┼ Posdef
            │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
            │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
            │      dn ┼ nothing
            │      dt ┼ nothing
            │     alg ┼ nothing
-           │   order ┴ DenoiseDetoneAlg()
+           │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
         sk ┼ nothing
          V ┼ nothing
        alg ┼ SOCRiskExpr()
@@ -146,7 +146,7 @@ NegativeSkewness
     end
 end
 function NegativeSkewness(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                          mp::AbstractMatrixProcessingEstimator = DenoiseDetoneAlgMatrixProcessing(),
+                          mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
                           sk::Option{<:MatNum} = nothing, V::Option{<:MatNum} = nothing,
                           alg::NSkeFormulations = SOCRiskExpr(),
                           window::Option{<:Int_VecInt} = nothing)::NegativeSkewness

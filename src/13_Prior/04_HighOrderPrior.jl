@@ -419,41 +419,41 @@ HighOrderPriorEstimator
       │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
       │           │      │       │    w ┴ nothing
       │           │      │   alg ┴ Full()
-      │           │   mp ┼ DenoiseDetoneAlgMatrixProcessing
+      │           │   mp ┼ MatrixProcessing
       │           │      │     pdm ┼ Posdef
       │           │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
       │           │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
       │           │      │      dn ┼ nothing
       │           │      │      dt ┼ nothing
       │           │      │     alg ┼ nothing
-      │           │      │   order ┴ DenoiseDetoneAlg()
+      │           │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
       │        me ┼ SimpleExpectedReturns
       │           │   w ┴ nothing
       │   horizon ┴ nothing
   kte ┼ Cokurtosis
       │    me ┼ SimpleExpectedReturns
       │       │   w ┴ nothing
-      │    mp ┼ DenoiseDetoneAlgMatrixProcessing
+      │    mp ┼ MatrixProcessing
       │       │     pdm ┼ Posdef
       │       │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
       │       │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
       │       │      dn ┼ nothing
       │       │      dt ┼ nothing
       │       │     alg ┼ nothing
-      │       │   order ┴ DenoiseDetoneAlg()
+      │       │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
       │   alg ┼ Full()
       │     w ┴ nothing
   ske ┼ Coskewness
       │    me ┼ SimpleExpectedReturns
       │       │   w ┴ nothing
-      │    mp ┼ DenoiseDetoneAlgMatrixProcessing
+      │    mp ┼ MatrixProcessing
       │       │     pdm ┼ Posdef
       │       │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
       │       │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
       │       │      dn ┼ nothing
       │       │      dt ┼ nothing
       │       │     alg ┼ nothing
-      │       │   order ┴ DenoiseDetoneAlg()
+      │       │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
       │   alg ┼ Full()
       │     w ┴ nothing
 ```
