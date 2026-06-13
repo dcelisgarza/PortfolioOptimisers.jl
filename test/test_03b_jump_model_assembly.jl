@@ -17,7 +17,7 @@
     # Model-State key names. `r`/`b1`/`obj`/… default to the optimiser's own values but can
     # be overridden to probe a single branch in isolation.
     function assemble_keys(mr; r = mr.r, b1 = nothing, obj = mr.obj, miprb_flag = false,
-                           sdp_phylogeny = true)
+                           sdp_asset_phylogeny = true)
         nt = PO.processed_jump_optimiser_attributes(mr.opt, rd)
         model = JuMP.Model()
         PO.set_model_scales!(model, mr.opt.sc, mr.opt.so)
@@ -28,8 +28,8 @@
                                                     nt.ctr, nt.gcardr, nt.sgcardr, nt.smtx,
                                                     nt.sgmtx, nt.slt, nt.sst, nt.sglt,
                                                     nt.sgst, nt.tn, nt.fees, nt.plr, nt.ret)
-        PO.assemble_jump_model!(model, mr, mr.opt, attrs, rd; r = r, b1 = b1, obj = obj,
-                                miprb_flag = miprb_flag, sdp_phylogeny = sdp_phylogeny)
+        PO.assemble_jump_model!(model, mr, mr.opt, attrs, rd, r, obj, miprb_flag, b1,
+                                sdp_asset_phylogeny)
         return Set(string.(keys(JuMP.object_dictionary(model))))
     end
 

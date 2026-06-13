@@ -59,9 +59,12 @@ in place.
 1. **Inner core.** A mutating builder
 
    ```julia
-   assemble_jump_model!(model, optimiser, opt, attrs, rd;
-                         r = nothing, b1 = nothing, obj = MinimumRisk(),
-                         miprb_flag = false, sdp_phylogeny = true)
+   assemble_jump_model!(model::JuMP.Model, optimiser::JuMPOptimisationEstimator,
+                        opt::JuMPOptimiser, attrs::ProcessedJuMPOptimiserAttributes,
+                        rd::ReturnsResult, r::Option{<:RM_VecRM} = nothing,
+                        obj::ObjectiveFunction = MinimumRisk(),
+                        miprb_flag::Bool = false, b1::Option{<:MatNum} = nothing,
+                        sdp_asset_phylogeny::Bool = true)
    ```
 
    runs the middle from `set_linear_weight_constraints!` through `add_custom_constraint!`
@@ -74,7 +77,7 @@ in place.
 2. **Per-optimiser context as optional kwargs, not interface width.** The things that vary
    inside the middle ride in as kwargs defaulting to the common case: `r` (risk measures, or
    `nothing`), `b1` (factor loadings, `nothing`), `obj` (`MinimumRisk()`), `miprb_flag`
-   (`false`), and `sdp_phylogeny` (`true`). The `b1` value is splatted in via an optional
+   (`false`), and `sdp_asset_phylogeny` (`true`). The `b1` value is splatted in via an optional
    trailing-argument tuple — `extra = isnothing(b1) ? () : (b1,)` — so the non-factor
    tracking/risk calls are reproduced argument-for-argument, and FRC's calls (which dispatch
    on `opt::FactorRiskContribution` with a trailing `b1::MatNum`) get exactly `(b1,)`. The
@@ -86,7 +89,7 @@ in place.
    > surfaced two more divergences in the middle that the static read missed: RB alone passes
    > a mixed-integer flag to `set_mip_constraints!` (→ `miprb_flag`), and FRC applies a
    > factor-space SDP phylogeny in its tail *instead of* the standard asset-space one
-   > (→ `sdp_phylogeny = false`, with FRC's `set_sdp_frc_phylogeny_constraints!` left
+   > (→ `sdp_asset_phylogeny = false`, with FRC's `set_sdp_frc_phylogeny_constraints!` left
    > caller-side).
 
 3. **Head and tail stay per-optimiser.** Each `_optimise` keeps its own head (including
@@ -169,7 +172,7 @@ live Julia session (edit → Revise → re-run), with a final cold reload to rul
 or world-age artifacts. All green: MeanRisk (88/88 slice), Asset Risk Budgeting (235/235),
 MIP Risk Budgeting (26/26 — exercises `miprb_flag = true`), Relaxed Risk Budgeting (37/37 —
 exercises the `r = nothing` no-op), Factor Risk Contribution (4/4 — exercises the `b1` splat
-and `sdp_phylogeny = false`), and Near Optimal Centering (24/24, cold load).
+and `sdp_asset_phylogeny = false`), and Near Optimal Centering (24/24, cold load).
 
 The promised solver-free surface is realised in `test/test_03b_jump_model_assembly.jl`: it
 runs the head + `assemble_jump_model!` and asserts on the registered Model-State keys

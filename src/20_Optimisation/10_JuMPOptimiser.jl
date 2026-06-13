@@ -1,99 +1,125 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Intermediate result type storing processed optimisation attributes for `JuMPOptimiser`.
+Flat bundle of all processed constraint and prior results consumed by
+[`assemble_jump_model!`](@ref).
 
-Used internally to pass processed constraints, bounds, and other data between optimisation stages.
+Produced once per `optimise` call by [`processed_jump_optimiser_attributes`](@ref) and
+passed directly to the model-assembly pipeline, so every builder reads already-resolved
+results rather than re-processing estimators. See ADR 0008 (`0008-jump-model-assembly.md`).
 
 # Fields
 
 $(DocStringExtensions.FIELDS)
 
+# Constructors
+
+    ProcessedJuMPOptimiserAttributes(
+        pr, wb, lt, st, lcsr, ctr, gcardr, sgcardr,
+        smtx, sgmtx, slt, sst, sglt, sgst, tn, fees, plr, ret
+    ) -> ProcessedJuMPOptimiserAttributes
+
+Positional arguments correspond to the struct's fields in order. In practice, construct
+via [`processed_jump_optimiser_attributes`](@ref) rather than directly.
+
+# Examples
+
+```jldoctest
+julia> ProcessedJuMPOptimiserAttributes(nothing, nothing, nothing, nothing, nothing, nothing,
+                                        nothing, nothing, nothing, nothing, nothing, nothing,
+                                        nothing, nothing, nothing, nothing, nothing, nothing) isa
+       ProcessedJuMPOptimiserAttributes
+true
+```
+
 # Related
 
   - [`JuMPOptimiser`](@ref)
+  - [`processed_jump_optimiser_attributes`](@ref)
+  - [`assemble_jump_model!`](@ref)
   - [`MeanRisk`](@ref)
 """
 @concrete struct ProcessedJuMPOptimiserAttributes <: AbstractResult
     """
-    Prior estimation result.
+    $(field_dict[:pr])
     """
     pr
     """
-    Processed weight bounds constraints.
+    $(field_dict[:wb])
     """
     wb
     """
-    Processed long threshold constraints.
+    $(field_dict[:lt])
     """
     lt
     """
-    Processed short threshold constraints.
+    $(field_dict[:st])
     """
     st
     """
-    Processed linear constraints result.
+    $(field_dict[:lcsr])
     """
     lcsr
     """
-    Processed centrality constraints result.
+    $(field_dict[:ctr])
     """
     ctr
     """
-    Processed group cardinality constraints result.
+    $(field_dict[:gcardr])
     """
     gcardr
     """
-    Processed sub-group cardinality constraints result.
+    $(field_dict[:sgcardr])
     """
     sgcardr
     """
-    Asset sets matrix for group selection.
+    $(field_dict[:smtx])
     """
     smtx
     """
-    Asset sets matrix for sub-group selection.
+    $(field_dict[:sgmtx])
     """
     sgmtx
     """
-    Processed long threshold constraints for groups.
+    $(field_dict[:slt])
     """
     slt
     """
-    Processed short threshold constraints for groups.
+    $(field_dict[:sst])
     """
     sst
     """
-    Processed long threshold constraints for sub-groups.
+    $(field_dict[:sglt])
     """
     sglt
     """
-    Processed short threshold constraints for sub-groups.
+    $(field_dict[:sgst])
     """
     sgst
     """
-    Processed turnover constraints.
+    $(field_dict[:tnr])
     """
     tn
     """
-    Processed fees constraints.
+    $(field_dict[:feesr])
     """
     fees
     """
-    Processed phylogeny constraints result.
+    $(field_dict[:plr])
     """
     plr
     """
-    Processed JuMP returns estimator.
+    $(field_dict[:ret_jmp])
     """
     ret
 end
 """
-    assert_finite_nonnegative_real_or_vec(val)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
-Assert that a value is a finite, non-negative real number or vector of such.
+Assert that `val` is finite and non-negative; throw an `ArgCheck` error otherwise.
 
-Throws an `ArgCheck` error if `val` contains non-finite or negative elements.
+Accepts a scalar `Number` or a `VecNum`; the vector overload requires at least one finite
+and non-negative element and no negative elements.
 
 # Arguments
 
@@ -101,7 +127,16 @@ Throws an `ArgCheck` error if `val` contains non-finite or negative elements.
 
 # Returns
 
-  - `nothing` on success.
+  - `nothing`.
+
+# Examples
+
+```jldoctest
+julia> PortfolioOptimisers.assert_finite_nonnegative_real_or_vec(1.0)
+
+julia> PortfolioOptimisers.assert_finite_nonnegative_real_or_vec([0.5, 1.0])
+
+```
 
 # Related
 
@@ -582,7 +617,29 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return `true` if any sub-estimator of `opt` requires previous portfolio weights (turnover, fees, tracking, custom constraint, or custom objective).
+Return `true` if any sub-estimator of `opt` requires previous portfolio weights.
+
+Checks turnover, fees, tracking error, custom constraint, and custom objective fields.
+
+# Arguments
+
+  - `opt::JuMPOptimiser`: JuMP optimiser configuration.
+
+# Returns
+
+  - `Bool`: `true` if any sub-estimator needs previous weights; `false` otherwise.
+
+# Examples
+
+```jldoctest
+julia> PortfolioOptimisers.needs_previous_weights(JuMPOptimiser(; slv = Solver()))
+false
+```
+
+# Related
+
+  - [`JuMPOptimiser`](@ref)
+  - [`needs_previous_weights`](@ref)
 """
 function needs_previous_weights(opt::JuMPOptimiser)
     return (needs_previous_weights(opt.tn) ||
@@ -594,7 +651,33 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Build an updated [`JuMPOptimiser`](@ref) with all estimator fields that track previous weights updated via `factory` using `w`.
+Return a copy of `opt` with all weight-tracking estimator fields updated via `factory` for the new weights `w`.
+
+Updates turnover, fees, tracking error, custom constraint, and custom objective fields;
+all other fields are carried through unchanged.
+
+# Arguments
+
+  - `opt::JuMPOptimiser`: JuMP optimiser configuration.
+  - `w::AbstractVector`: New portfolio weights.
+
+# Returns
+
+  - `JuMPOptimiser`: Updated optimiser with weight-tracking fields refreshed.
+
+# Examples
+
+```jldoctest
+julia> opt = JuMPOptimiser(; slv = Solver());
+
+julia> PortfolioOptimisers.factory(opt, fill(0.1, 10)) isa JuMPOptimiser
+true
+```
+
+# Related
+
+  - [`JuMPOptimiser`](@ref)
+  - [`factory`](@ref)
 """
 function factory(opt::JuMPOptimiser, w::AbstractVector)::JuMPOptimiser
     tn = factory(opt.tn, w)
@@ -616,9 +699,37 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return a cluster-sliced copy of [`JuMPOptimiser`](@ref) for asset index set `i` and returns matrix `X`.
+Return a cluster-sliced copy of `opt` restricted to asset indices `i`.
 
-Slices all per-asset estimator fields (prior, bounds, thresholds, turnover, fees, tracking, custom constraint/objective) to the cluster `i`, leaving solver and scalar parameters unchanged.
+Slices all per-asset estimator fields (prior, weight bounds, thresholds, turnover, fees,
+tracking, custom constraint/objective) to the cluster; solver and scalar parameters are
+carried through unchanged.
+
+# Arguments
+
+  - `opt::JuMPOptimiser`: JuMP optimiser configuration.
+  - `i`: Asset index or index set for the cluster.
+  - `X::MatNum`: Full returns matrix used to slice tracking estimators.
+
+# Returns
+
+  - `JuMPOptimiser`: Cluster-restricted optimiser.
+
+# Examples
+
+```jldoctest
+julia> opt = JuMPOptimiser(; slv = Solver());
+
+julia> X = rand(50, 5);
+
+julia> PortfolioOptimisers.opt_view(opt, 1:3, X) isa JuMPOptimiser
+true
+```
+
+# Related
+
+  - [`JuMPOptimiser`](@ref)
+  - [`opt_view`](@ref)
 """
 function opt_view(opt::JuMPOptimiser, i, X::MatNum)::JuMPOptimiser
     X = isa(opt.pe, AbstractPriorResult) ? opt.pe.X : X
@@ -664,25 +775,36 @@ function opt_view(opt::JuMPOptimiser, i, X::MatNum)::JuMPOptimiser
                          strict = opt.strict)
 end
 """
-    processed_jump_optimiser_attributes(opt, rd; kwargs...)
+    processed_jump_optimiser_attributes(
+        opt::JuMPOptimiser,
+        rd::ReturnsResult;
+        dims::Int = 1
+    ) -> ProcessedJuMPOptimiserAttributes
 
-Compute and process all optimiser attributes from a JuMP optimiser and returns data.
+Compute all constraint and prior results needed for model assembly.
 
-Internal function that applies the `factory` transform and resolves view slices for all estimator fields of `opt` given the returns data `rd`.
+Resolves every estimator field of `opt` against `rd` — running priors, weight bounds,
+thresholds, linear constraints, centrality, cardinality, turnover, fees, and phylogeny
+— and returns the fully processed bundle as a
+[`ProcessedJuMPOptimiserAttributes`](@ref). The result is consumed directly by
+[`assemble_jump_model!`](@ref) and also stored in the per-optimiser Result struct, so
+processing happens exactly once per `optimise` call.
 
 # Arguments
 
-  - `opt`: [`JuMPOptimiser`](@ref) configuration.
-  - `rd`: [`ReturnsResult`](@ref) data.
-  - `kwargs...`: Additional keyword arguments.
+  - `opt::JuMPOptimiser`: JuMP optimiser configuration.
+  - $(arg_dict[:rd])
+  - `dims::Int = 1`: Observation dimension passed to the prior estimator.
 
 # Returns
 
-  - Named tuple of processed attributes.
+  - [`ProcessedJuMPOptimiserAttributes`](@ref): Fully resolved constraint and prior bundle.
 
 # Related
 
   - [`JuMPOptimiser`](@ref)
+  - [`ProcessedJuMPOptimiserAttributes`](@ref)
+  - [`assemble_jump_model!`](@ref)
   - [`processed_jump_optimiser`](@ref)
 """
 function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResult;
@@ -734,20 +856,30 @@ function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResu
                                             plr, ret)
 end
 """
-    no_bounds_optimiser(opt, args...)
+    no_bounds_optimiser(opt::JuMPOptimiser, args...) -> JuMPOptimiser
 
-Create a version of the JuMP optimiser with bounds removed for unbounded sub-problems.
+Return a copy of `opt` with the returns estimator replaced by its unbounded variant.
 
-Internal helper used in risk frontier construction sub-problems. Strips weight and risk bounds from `opt` so the sub-problem is unconstrained.
+Used internally in risk-frontier sub-problems where weight and risk bounds must be
+removed so the solver can range freely.
 
 # Arguments
 
-  - `opt`: [`JuMPOptimiser`](@ref) configuration.
-  - `args...`: Additional arguments.
+  - `opt::JuMPOptimiser`: JuMP optimiser configuration.
+  - `args...`: Forwarded to [`no_bounds_returns_estimator`](@ref).
 
 # Returns
 
-  - [`JuMPOptimiser`](@ref) without bounds.
+  - `JuMPOptimiser`: Optimiser with an unbounded returns estimator.
+
+# Examples
+
+```jldoctest
+julia> opt = JuMPOptimiser(; slv = Solver());
+
+julia> PortfolioOptimisers.no_bounds_optimiser(opt) isa JuMPOptimiser
+true
+```
 
 # Related
 
@@ -760,20 +892,35 @@ function no_bounds_optimiser(opt::JuMPOptimiser, args...)
                          NamedTuple{pnames}(getproperty.(opt, pnames))...)
 end
 """
-    jump_optimiser_from_attributes(opt, attrs)
+    jump_optimiser_from_attributes(
+        opt::JuMPOptimiser,
+        attrs::ProcessedJuMPOptimiserAttributes
+    ) -> JuMPOptimiser
 
-Repackage a [`ProcessedJuMPOptimiserAttributes`](@ref) back into a [`JuMPOptimiser`](@ref),
-mapping the result-named fields onto the optimiser's estimator-named slots (`lcsr` → `lcse`,
-`plr` → `ple`, `pr` → `pe`, …) and carrying the remaining settings through from `opt`.
+Repackage a [`ProcessedJuMPOptimiserAttributes`](@ref) into a [`JuMPOptimiser`](@ref).
 
-Used where a fully-processed optimiser object is needed (e.g. the inner sub-problems of
-[`near_optimal_centering_setup`](@ref)) while the same `attrs` is reused directly by
-[`assemble_jump_model!`](@ref) — so the processing is done once and never round-tripped.
+Maps result-named fields onto the optimiser's estimator-named slots (`lcsr` → `lcse`,
+`plr` → `ple`, `pr` → `pe`, …) and carries all remaining settings through from `opt`.
+Used where a processed optimiser object is needed for inner sub-problems (e.g.
+[`near_optimal_centering_setup`](@ref)) while the same `attrs` is also passed directly to
+[`assemble_jump_model!`](@ref) — so processing happens once and is never round-tripped.
+
+# Arguments
+
+  - `opt::JuMPOptimiser`: Source optimiser supplying solver, scalar settings, and any
+    fields not present in `attrs`.
+  - `attrs::ProcessedJuMPOptimiserAttributes`: Pre-computed constraint and prior bundle.
+
+# Returns
+
+  - `JuMPOptimiser`: Optimiser with all estimator slots populated from `attrs`.
 
 # Related
 
+  - [`ProcessedJuMPOptimiserAttributes`](@ref)
   - [`processed_jump_optimiser`](@ref)
   - [`processed_jump_optimiser_attributes`](@ref)
+  - [`assemble_jump_model!`](@ref)
 """
 function jump_optimiser_from_attributes(opt::JuMPOptimiser,
                                         attrs::ProcessedJuMPOptimiserAttributes)
@@ -790,15 +937,33 @@ function jump_optimiser_from_attributes(opt::JuMPOptimiser,
                          strict = opt.strict)
 end
 """
-    processed_jump_optimiser(opt, rd; dims = 1)
+    processed_jump_optimiser(
+        opt::JuMPOptimiser,
+        rd::ReturnsResult;
+        dims::Int = 1
+    ) -> JuMPOptimiser
 
-Build a fully processed `JuMPOptimiser` from raw configuration and returns data: computes the
-[`ProcessedJuMPOptimiserAttributes`](@ref) and repackages them via
-[`jump_optimiser_from_attributes`](@ref).
+Build a fully-processed [`JuMPOptimiser`](@ref) from raw configuration and returns data.
+
+Calls [`processed_jump_optimiser_attributes`](@ref) then repackages the result via
+[`jump_optimiser_from_attributes`](@ref). Used where a processed optimiser is needed for
+inner sub-problems (e.g. [`NearOptimalCentering`](@ref)) while the `attrs` bundle is
+reused directly by [`assemble_jump_model!`](@ref).
+
+# Arguments
+
+  - `opt::JuMPOptimiser`: Raw optimiser configuration.
+  - $(arg_dict[:rd])
+  - `dims::Int = 1`: Observation dimension passed to the prior estimator.
+
+# Returns
+
+  - `JuMPOptimiser`: Optimiser with all estimator slots populated from processed results.
 
 # Related
 
   - [`JuMPOptimiser`](@ref)
+  - [`ProcessedJuMPOptimiserAttributes`](@ref)
   - [`processed_jump_optimiser_attributes`](@ref)
   - [`jump_optimiser_from_attributes`](@ref)
 """
@@ -809,77 +974,144 @@ function processed_jump_optimiser(opt::JuMPOptimiser, rd::ReturnsResult; dims::I
 end
 
 """
-    _set_risk_and_scalarise!(model, r, optimiser, opt, pr, pl, fees, extra; rd)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
-Add the risk-measure constraints and scalarise the combined risk expression, as one step of
-[`assemble_jump_model!`](@ref). Dispatched on the risk measure: when `r === nothing` (e.g.
-[`RelaxedRiskBudgeting`](@ref), whose risk lives in its head) this is a no-op. `extra` is the
-optional trailing-argument tuple (empty, or `(b1,)` for [`FactorRiskContribution`](@ref)),
-splatted into the risk builder so the non-factor call is reproduced exactly.
+Add risk-measure constraints and scalarise the combined risk expression in `model`.
+
+One step of [`assemble_jump_model!`](@ref), dispatched on `r`: when `r` is `nothing`
+(e.g. [`RelaxedRiskBudgeting`](@ref), whose risk lives in its head) this is a no-op.
+`extra` is the optional trailing-argument tuple — empty for most optimisers, or `(b1,)`
+for [`FactorRiskContribution`](@ref) — splatted into `set_risk_constraints!` so the
+non-factor call signature is reproduced exactly.
+
+# Arguments
+
+  - `model::JuMP.Model`: JuMP optimisation model (mutated in place).
+  - `r`: Risk measure(s), or `nothing` to skip this step entirely.
+  - `optimiser`: Dispatch object for [`set_risk_constraints!`](@ref).
+  - `opt::JuMPOptimiser`: Supplies the scalariser `opt.sca`.
+  - `pr`: Prior result passed to risk builders.
+  - `pl`: Phylogeny result passed to risk builders.
+  - `fees`: Fees result passed to risk builders.
+  - `extra`: Trailing-argument tuple splatted into risk builders (`()` or `(b1,)`).
+  - `rd`: Returns result forwarded as a keyword argument to risk builders.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`assemble_jump_model!`](@ref)
+  - [`set_risk_constraints!`](@ref)
+  - [`scalarise_risk_expression!`](@ref)
+  - [`RelaxedRiskBudgeting`](@ref)
+  - [`FactorRiskContribution`](@ref)
 """
-function _set_risk_and_scalarise!(::JuMP.Model, ::Nothing, args...; kwargs...)
+function set_risk_and_scalarise!(::JuMP.Model, ::Nothing, args...; kwargs...)
     return nothing
 end
-function _set_risk_and_scalarise!(model::JuMP.Model, r, optimiser, opt, pr, pl, fees, extra;
-                                  rd)
-    set_risk_constraints!(model, r, optimiser, pr, pl, fees, extra...; rd = rd)
+function set_risk_and_scalarise!(model::JuMP.Model, r, optimiser, opt, pr, pl, fees,
+                                 args...; rd)
+    set_risk_constraints!(model, r, optimiser, pr, pl, fees, args...; rd = rd)
     scalarise_risk_expression!(model, opt.sca)
     return nothing
 end
 
 """
-    assemble_jump_model!(model, optimiser, opt, attrs, rd;
-                          r = nothing, b1 = nothing, obj = MinimumRisk(),
-                          miprb_flag = false, sdp_phylogeny = true)
+    assemble_jump_model!(
+        model::JuMP.Model,
+        optimiser::JuMPOptimisationEstimator,
+        opt::JuMPOptimiser,
+        attrs::ProcessedJuMPOptimiserAttributes,
+        rd::ReturnsResult,
+        r::Option{<:RM_VecRM} = nothing,
+        obj::ObjectiveFunction = MinimumRisk(),
+        miprb_flag::Bool = false,
+        b1::Option{<:MatNum} = nothing,
+        sdp_asset_phylogeny::Bool = true
+    ) -> Nothing
 
-Run the invariant model-assembly sequence shared by every single-JuMP-model Optimisation
-Estimator — the steps between shaping the weight variables (the per-optimiser *head*) and
-setting the objective/solving (the per-optimiser *tail*). See `Model Assembly` in
-`CONTEXT.md` and `0008-jump-model-assembly.md`.
+Run the invariant model-assembly sequence shared by all single-JuMP-model optimisers.
 
-Constraint *results* are read from `attrs` (a [`ProcessedJuMPOptimiserAttributes`](@ref));
-scalar *settings* from `opt` (the [`JuMPOptimiser`](@ref)); `optimiser` is the dispatch
-object for the risk, tracking, and custom-constraint builders. Per-optimiser context that
-varies inside the middle rides in as optional keyword arguments:
+Executes the constraint-builder pipeline — from `set_linear_weight_constraints!` through
+`add_custom_constraint!` — that sits between the per-optimiser *head* (weight variables)
+and *tail* (objective + solve). The head must have populated Model State (`w`/`k` variables)
+before calling this function. See `Model Assembly` in `CONTEXT.md` and
+`0008-jump-model-assembly.md`.
 
-  - `r`: the risk measure(s), or `nothing` when the optimiser carries none.
-  - `b1`: the factor loading matrix threaded into tracking and risk by
-    [`FactorRiskContribution`](@ref); `nothing` otherwise (then no trailing argument is
-    passed, reproducing the non-factor calls exactly).
-  - `obj`: the objective used by the return constraints.
-  - `miprb_flag`: the mixed-integer risk-budgeting flag consumed by
-    [`set_mip_constraints!`](@ref).
-  - `sdp_phylogeny`: whether to apply the standard (asset-space) SDP phylogeny constraints.
-    [`FactorRiskContribution`](@ref) passes `false` because it applies its own factor-space
-    phylogeny constraints in its tail instead.
+# Arguments
 
-The head must have populated the Model State (the `w`/`k` variables) before this is called.
-Returns `nothing`; mutates `model`.
+  - $(arg_dict[:model])
+  - `optimiser::JuMPOptimisationEstimator`: Dispatch object for risk, tracking, and custom
+    constraint builders.
+  - `opt::JuMPOptimiser`: Supplies scalar settings (`nea`, `l1`, `l2`, `linf`, `lp`,
+    `card`, `scard`, `tr`, `ccnt`, `sca`, `ss`).
+  - `attrs::ProcessedJuMPOptimiserAttributes`: Pre-computed constraint and prior bundle
+    produced by [`processed_jump_optimiser_attributes`](@ref).
+  - $(arg_dict[:rd])
+  - `r::Option{<:RiskMeasure} = nothing`: Risk measure(s), or `nothing` to skip risk
+    constraints and scalarisation (the [`RelaxedRiskBudgeting`](@ref) path).
+  - `obj::ObjectiveFunction = MinimumRisk()`: Objective used by the return constraints.
+  - `miprb_flag::Bool = false`: Mixed-integer risk-budgeting flag for
+    [`set_mip_constraints!`](@ref); only [`RiskBudgeting`](@ref) passes `true`.
+  - `b1::Option{<:MatNum} = nothing`: Factor loading matrix for
+    [`FactorRiskContribution`](@ref); `nothing` for all other optimisers.
+  - `sdp_asset_phylogeny::Bool = true`: Whether to apply the standard asset-space SDP phylogeny
+    constraints. [`FactorRiskContribution`](@ref) passes `false` and applies its own
+    factor-space variant in its tail instead.
+
+# Returns
+
+  - `nothing`. Mutates `model` in place.
+
+# Examples
+
+```jldoctest
+julia> using PortfolioOptimisers
+
+julia> ProcessedJuMPOptimiserAttributes(nothing, nothing, nothing, nothing, nothing, nothing,
+                                        nothing, nothing, nothing, nothing, nothing, nothing,
+                                        nothing, nothing, nothing, nothing, nothing, nothing) isa
+       ProcessedJuMPOptimiserAttributes
+true
+```
+
+# Related
+
+  - [`ProcessedJuMPOptimiserAttributes`](@ref)
+  - [`processed_jump_optimiser_attributes`](@ref)
+  - [`set_risk_and_scalarise!`](@ref)
+  - [`JuMPOptimiser`](@ref)
+  - [`MeanRisk`](@ref)
+  - [`RiskBudgeting`](@ref)
+  - [`RelaxedRiskBudgeting`](@ref)
+  - [`FactorRiskContribution`](@ref)
+  - [`NearOptimalCentering`](@ref)
 """
 function assemble_jump_model!(model::JuMP.Model, optimiser::JuMPOptimisationEstimator,
                               opt::JuMPOptimiser, attrs::ProcessedJuMPOptimiserAttributes,
-                              rd::ReturnsResult; r = nothing, b1 = nothing,
+                              rd::ReturnsResult, r::Option{<:RM_VecRM} = nothing,
                               obj::ObjectiveFunction = MinimumRisk(),
-                              miprb_flag::Bool = false, sdp_phylogeny::Bool = true)
+                              miprb_flag::Bool = false, b1::Option{<:MatNum} = nothing,
+                              sdp_asset_phylogeny::Bool = true)
     (; pr, wb, lt, st, lcsr, ctr, gcardr, sgcardr, smtx, sgmtx, slt, sst, sglt, sgst, tn, fees, plr, ret) = attrs
-    extra = isnothing(b1) ? () : (b1,)
     set_linear_weight_constraints!(model, lcsr, :lcs_ineq_, :lcs_eq_)
     set_linear_weight_constraints!(model, ctr, :cent_ineq_, :cent_eq_)
     set_mip_constraints!(model, wb, opt.card, gcardr, plr, lt, st, fees, opt.ss, miprb_flag)
     set_smip_constraints!(model, wb, opt.scard, sgcardr, smtx, sgmtx, slt, sst, sglt, sgst,
                           opt.ss)
     set_turnover_constraints!(model, tn)
-    set_tracking_error_constraints!(model, pr, opt.tr, optimiser, plr, fees, extra...;
-                                    rd = rd)
+    set_tracking_error_constraints!(model, pr, opt.tr, optimiser, plr, fees, b1; rd = rd)
     set_number_effective_assets!(model, opt.nea)
     set_l1_regularisation!(model, opt.l1)
     set_l2_regularisation!(model, opt.l2)
     set_linf_regularisation!(model, opt.linf)
     set_lp_regularisation!(model, opt.lp)
     set_non_fixed_fees!(model, fees)
-    _set_risk_and_scalarise!(model, r, optimiser, opt, pr, plr, fees, extra; rd = rd)
+    set_risk_and_scalarise!(model, r, optimiser, opt, pr, plr, fees, b1; rd = rd)
     set_return_constraints!(model, ret, obj, pr; rd = rd)
-    if sdp_phylogeny
+    if sdp_asset_phylogeny
         set_sdp_phylogeny_constraints!(model, plr)
     end
     add_custom_constraint!(model, opt.ccnt, optimiser, pr)
