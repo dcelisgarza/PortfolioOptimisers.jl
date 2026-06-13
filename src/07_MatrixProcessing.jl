@@ -272,7 +272,7 @@ MatrixProcessing
     """
     alg
     """
-    A tuple or vector of symbols naming the processing steps in the order they are applied. Recognised steps are `:pdm`, `:dn`, `:dt`, and `:alg`; an unrecognised symbol is skipped with a warning.
+    A tuple or vector of symbols naming the processing steps in the order they are applied. Recognised steps are `:pdm`, `:dn`, `:dt`, and `:alg`; an unrecognised symbol errors at construction.
     """
     order
     function MatrixProcessing(pdm::Option{<:Posdef}, dn::Option{<:Denoise},
@@ -327,7 +327,7 @@ This method applies a sequence of matrix processing steps to the input covarianc
 
   - If `mp` is `nothing`, the function returns `sigma` without modification.
   - Iterates over `mp.order` and applies each named step via [`matrix_processing_step!`](@ref): `:pdm` (using `mp.pdm`), `:dn` (using `mp.dn` and the ratio `T / N` from `X`), `:dt` (using `mp.dt`), and `:alg` (using `mp.alg`).
-  - An unrecognised step symbol is skipped with a warning.
+  - An unrecognised step symbol errors at construction.
 
 # Examples
 
@@ -413,7 +413,7 @@ This is the per-step worker that [`matrix_processing!`](@ref) calls while iterat
       + `:dn`: denoising using `mp.dn` and the ratio `T / N` derived from `X`.
       + `:dt`: detoning using `mp.dt`.
       + `:alg`: optional custom algorithm using `mp.alg`.
-      + Any other symbol: no-op, emitting a warning (`maxlog = 1`).
+      + Any other symbol: MethodError.
 
   - `mp`: Matrix processing estimator holding the per-step estimators.
 
@@ -449,11 +449,6 @@ function matrix_processing_step!(::Val{:alg}, mp::MatrixProcessing, sigma::MatNu
                                  X::MatNum; kwargs...)
     return matrix_processing_algorithm!(mp.alg, sigma, X; kwargs...)
 end
-# function matrix_processing_step!(::Val{step}, mp::MatrixProcessing, sigma::MatNum,
-#                                  X::MatNum; kwargs...) where {step}
-#     @warn "Unknown matrix processing step :$(step); skipping." maxlog = 1
-#     return sigma
-# end
 """
     matrix_processing(
         mp::Option{<:AbstractMatrixProcessingEstimator},
