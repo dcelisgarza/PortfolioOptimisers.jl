@@ -303,26 +303,7 @@ Predict outer portfolio returns for [`Stacking`](@ref) optimisation. Overload th
 function predict_outer_st_estimator_returns(st::Option{<:Stacking}, rd::ReturnsResult,
                                             pr::AbstractPriorResult, fees::Option{<:Fees},
                                             wi::MatNum, resi::VecOpt)
-    nb, B = if !isa(rd.B, MatNum)
-        rd.nb, rd.B
-    else
-        ["_b$(i)" for i in 1:size(wi, 2)], rd.B * wi
-    end
-    iv = rd.iv
-    ivpa = rd.ivpa
-    iv_flag = !isnothing(iv)
-    ivpa_flag = isa(ivpa, AbstractVector)
-    if iv_flag || ivpa_flag
-        wi = abs.(wi)
-        if iv_flag
-            iv = iv * wi
-        end
-        if ivpa_flag
-            ivpa = transpose(wi) * ivpa
-        end
-    end
-    X = pr.X
-    X = Matrix{eltype(X)}(undef, size(X, 1), size(wi, 2))
+    nb, B, iv, ivpa, X = prepare_outer_rd(rd, wi)
     for (i, res) in enumerate(resi)
         X[:, i] = calc_net_returns(res, pr, fees)
     end

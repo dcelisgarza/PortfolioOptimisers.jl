@@ -15,7 +15,5 @@ needs_previous_weights(opt::NestedClustered)
 assert_rc_pl(::Any)
 assert_external_optimiser(opt::ClusteringOptimisationEstimator)
 RiskBudgetingOptimiser
-outer_optimisation_finaliser(wb::Option{<:WeightBounds}, wf::WeightFinaliser, resi::VecOpt, rcos::AbstractVector{<:OptimisationReturnCode}, ws::VecVecNum, wi::MatNum)
-rebuild_returns_result(rd::ReturnsResult, predictions::VecMPredRes)
 assert_rc_variance
 ```
