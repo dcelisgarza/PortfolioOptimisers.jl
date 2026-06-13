@@ -108,7 +108,7 @@ pretty_table(DataFrame(; :assets => rd.nx, :benchmark => res0.w, :MinimumRisk =>
 Comparing compositions and cumulative returns across objectives reveals how each allocation differs.
 
 ````@example 02_Mean_Risk_Objectives
-using StatsPlots, GraphRecipes#= Stacked bar composition for the benchmark and all four objectives. =#
+using StatsPlots, GraphRecipes #= Stacked bar composition for the benchmark and all four objectives. =#
 
 plot_stacked_bar_composition([res0, res1, res2, res3, res4], rd)
 ````

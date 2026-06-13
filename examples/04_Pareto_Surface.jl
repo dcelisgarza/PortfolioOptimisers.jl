@@ -77,7 +77,7 @@ Note how many options this estimator contains.
 =#
 
 dn = Denoise(; alg = SpectralDenoise(;))
-mp = DenoiseDetoneAlgMatrixProcessing(; dn = dn)
+mp = MatrixProcessing(; dn = dn)
 pe = HighOrderPriorEstimator(;
                              ## Prior estimator for low order moments
                              pe = EmpiricalPrior(;

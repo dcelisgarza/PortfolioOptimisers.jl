@@ -75,9 +75,9 @@ For the multi risk measure optimisation, we will weigh each risk measure equally
 pr = prior(HighOrderPriorEstimator(), rd.X)
 
 ces = [PortfolioOptimisersCovariance(;
-                                     mp = DenoiseDetoneAlgMatrixProcessing(;
-                                                                           dn = Denoise(;
-                                                                                        alg = SpectralDenoise()))),
+                                     mp = MatrixProcessing(;
+                                                           dn = Denoise(;
+                                                                        alg = SpectralDenoise()))),
        PortfolioOptimisersCovariance(; ce = GerberCovariance()),
        PortfolioOptimisersCovariance(; ce = SmythBrobyCovariance(; alg = SmythBroby1())),
        PortfolioOptimisersCovariance(; ce = MutualInfoCovariance()),

@@ -6,7 +6,7 @@ status: accepted
 
 ## Context
 
-`DenoiseDetoneAlgMatrixProcessing` ([src/07_MatrixProcessing.jl](../../src/07_MatrixProcessing.jl))
+`MatrixProcessing` ([src/07_MatrixProcessing.jl](../../src/07_MatrixProcessing.jl))
 applied four steps to a covariance/correlation matrix — `posdef!` (always first), then
 denoising, detoning, and an optional custom algorithm — in a configurable order. The order
 was encoded in the type system: an empty marker struct per permutation of the three
@@ -37,7 +37,7 @@ sigmas). Collapsing the four fields would have broken every one of those sites, 
 **Keep the `pdm`/`dn`/`dt`/`alg` fields exactly as they were** — so the ~24 external `mp.pdm`
 reads keep working untouched — and change only the `order` field: from one of six marker structs
 to a **tuple (or vector) of step symbols**, dispatched via `Val`. Delete the six order structs
-and `AbstractMatrixProcessingOrder`. Rename `DenoiseDetoneAlgMatrixProcessing` → `MatrixProcessing`.
+and `AbstractMatrixProcessingOrder`. Rename `MatrixProcessing` → `MatrixProcessing`.
 
 ```julia
 @concrete struct MatrixProcessing <: AbstractMatrixProcessingEstimator

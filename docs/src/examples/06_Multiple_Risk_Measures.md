@@ -85,8 +85,8 @@ pr = prior(HighOrderPriorEstimator(), rd.X)
 
 ces = [PortfolioOptimisersCovariance(;
                                      mp = MatrixProcessing(;
-                                                                           dn = Denoise(;
-                                                                                        alg = SpectralDenoise()))),
+                                                           dn = Denoise(;
+                                                                        alg = SpectralDenoise()))),
        PortfolioOptimisersCovariance(; ce = GerberCovariance()),
        PortfolioOptimisersCovariance(; ce = SmythBrobyCovariance(; alg = SmythBroby1())),
        PortfolioOptimisersCovariance(; ce = MutualInfoCovariance()),
@@ -165,9 +165,9 @@ clr = clusterise(ClustersEstimator(; alg = DBHT()), pr.X)
 Before optimising, we can visualise the asset clustering structure derived from the correlation matrix.
 
 ````@example 06_Multiple_Risk_Measures
-using StatsPlots, GraphRecipes#= Hierarchical clustering dendrogram. =#
+using StatsPlots, GraphRecipes #= Hierarchical clustering dendrogram. =#
 
-plot_dendrogram(clr, rd.nx)#= Reordered correlation heatmap with cluster boundary boxes. =#
+plot_dendrogram(clr, rd.nx) #= Reordered correlation heatmap with cluster boundary boxes. =#
 
 plot_clusters(clr, rd.nx)
 
