@@ -243,7 +243,8 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return a cluster-sliced copy of [`FactorRiskContribution`](@ref) for asset index set `i` and returns matrix `X`.
 """
-function port_opt_view(frc::FactorRiskContribution, i, X::MatNum)::FactorRiskContribution
+function port_opt_view(frc::FactorRiskContribution, i, X::MatNum,
+                       args...)::FactorRiskContribution
     X = isa(frc.opt.pe, AbstractPriorResult) ? frc.opt.pe.X : X
     opt = port_opt_view(frc.opt, i, X)
     re = port_opt_view(frc.re, i)

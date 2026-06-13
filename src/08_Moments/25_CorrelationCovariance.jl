@@ -89,7 +89,7 @@ Gets the view of the covariance estimator for the `i`-th element(s).
 
   - [`CorrelationCovariance`](@ref)
 """
-function port_opt_view(ce::CorrelationCovariance, i)::CorrelationCovariance
+function port_opt_view(ce::CorrelationCovariance, i, args...)::CorrelationCovariance
     return CorrelationCovariance(; ce = port_opt_view(ce.ce, i))
 end
 """

@@ -293,7 +293,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return a cluster-sliced copy of [`SubsetResampling`](@ref) for asset index set `i` and returns matrix `X`.
 """
-function port_opt_view(sr::SubsetResampling, i, X::MatNum)::SubsetResampling
+function port_opt_view(sr::SubsetResampling, i, X::MatNum, args...)::SubsetResampling
     X = isa(sr.pe, AbstractPriorResult) ? sr.pe.X : X
     pe = port_opt_view(sr.pe, i)
     wb = port_opt_view(sr.wb, i)

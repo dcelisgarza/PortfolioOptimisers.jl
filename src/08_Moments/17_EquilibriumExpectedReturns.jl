@@ -110,7 +110,8 @@ Gets the view of the expected returns estimator for the `i`-th element(s).
 
   - [`EquilibriumExpectedReturns`](@ref)
 """
-function port_opt_view(me::EquilibriumExpectedReturns, i)::EquilibriumExpectedReturns
+function port_opt_view(me::EquilibriumExpectedReturns, i,
+                       args...)::EquilibriumExpectedReturns
     return EquilibriumExpectedReturns(; ce = port_opt_view(me.ce, i),
                                       w = nothing_scalar_array_view(me.w, i), l = me.l)
 end

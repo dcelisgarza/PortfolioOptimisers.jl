@@ -744,7 +744,7 @@ Return a new [`EntropyPoolingPrior`](@ref) estimator restricted to the assets at
   - [`EntropyPoolingPrior`](@ref)
   - [`port_opt_view`](@ref)
 """
-function port_opt_view(pe::EntropyPoolingPrior, i)::EntropyPoolingPrior
+function port_opt_view(pe::EntropyPoolingPrior, i, args...)::EntropyPoolingPrior
     return EntropyPoolingPrior(; pe = port_opt_view(pe.pe, i), mu_views = pe.mu_views,
                                var_views = pe.var_views, cvar_views = pe.cvar_views,
                                sigma_views = pe.sigma_views, sk_views = pe.sk_views,

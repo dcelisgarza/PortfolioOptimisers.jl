@@ -507,7 +507,7 @@ Gets the view of the simple variance for the `i`-th element(s).
 
   - [`SimpleVariance`](@ref)
 """
-function port_opt_view(ve::SimpleVariance, i)::SimpleVariance
+function port_opt_view(ve::SimpleVariance, i, args...)::SimpleVariance
     return SimpleVariance(; me = port_opt_view(ve.me, i), w = ve.w,
                           corrected = ve.corrected)
 end

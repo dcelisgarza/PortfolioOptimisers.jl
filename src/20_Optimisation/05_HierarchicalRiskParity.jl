@@ -205,7 +205,8 @@ Return a view of [`HierarchicalRiskParity`](@ref) `hrp` sliced to asset indices 
   - [`HierarchicalRiskParity`](@ref)
   - [`port_opt_view`](@ref)
 """
-function port_opt_view(hrp::HierarchicalRiskParity, i, X::MatNum)::HierarchicalRiskParity
+function port_opt_view(hrp::HierarchicalRiskParity, i, X::MatNum,
+                       args...)::HierarchicalRiskParity
     X = isa(hrp.opt.pe, AbstractPriorResult) ? hrp.opt.pe.X : X
     r = port_opt_view(hrp.r, i, X)
     opt = port_opt_view(hrp.opt, i)

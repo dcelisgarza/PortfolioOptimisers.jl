@@ -316,7 +316,7 @@ Return a new [`OpinionPoolingPrior`](@ref) estimator restricted to the assets at
   - [`OpinionPoolingPrior`](@ref)
   - [`port_opt_view`](@ref)
 """
-function port_opt_view(pe::OpinionPoolingPrior, i)::OpinionPoolingPrior
+function port_opt_view(pe::OpinionPoolingPrior, i, args...)::OpinionPoolingPrior
     return OpinionPoolingPrior(; pes = port_opt_view(pe.pes, i),
                                pe1 = port_opt_view(pe.pe1, i),
                                pe2 = port_opt_view(pe.pe2, i), p = pe.p, w = pe.w,

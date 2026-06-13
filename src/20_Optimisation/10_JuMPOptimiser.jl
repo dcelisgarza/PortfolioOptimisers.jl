@@ -731,7 +731,7 @@ true
   - [`JuMPOptimiser`](@ref)
   - [`port_opt_view`](@ref)
 """
-function port_opt_view(opt::JuMPOptimiser, i, X::MatNum)::JuMPOptimiser
+function port_opt_view(opt::JuMPOptimiser, i, X::MatNum, args...)::JuMPOptimiser
     X = isa(opt.pe, AbstractPriorResult) ? opt.pe.X : X
     pe = port_opt_view(opt.pe, i)
     wb = port_opt_view(opt.wb, i)

@@ -128,7 +128,7 @@ Gets the view of the covariance estimator for the `i`-th element(s).
 
   - [`DenoiseCovariance`](@ref)
 """
-function port_opt_view(ce::DenoiseCovariance, i)::DenoiseCovariance
+function port_opt_view(ce::DenoiseCovariance, i, args...)::DenoiseCovariance
     return DenoiseCovariance(; ce = port_opt_view(ce.ce, i), dn = ce.dn, pdm = ce.pdm)
 end
 """

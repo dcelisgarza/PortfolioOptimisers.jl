@@ -196,7 +196,7 @@ Return a new [`BlackLittermanPrior`](@ref) estimator restricted to the assets at
 
   - [`BlackLittermanPrior`](@ref)
 """
-function port_opt_view(pr::BlackLittermanPrior, i)::BlackLittermanPrior
+function port_opt_view(pr::BlackLittermanPrior, i, args...)::BlackLittermanPrior
     return BlackLittermanPrior(; pe = port_opt_view(pr.pe, i), mp = pr.mp, views = pr.views,
                                sets = port_opt_view(pr.sets, i), views_conf = pr.views_conf,
                                rf = pr.rf, tau = pr.tau)

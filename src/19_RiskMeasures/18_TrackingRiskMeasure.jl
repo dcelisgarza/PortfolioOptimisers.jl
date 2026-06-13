@@ -77,7 +77,7 @@ Slices both the inner tracking benchmark and the risk measure for cluster-based 
   - [`port_opt_view`](@ref)
   - [`port_opt_view`](@ref)
 """
-function port_opt_view(tr::RiskTrackingError, i, X::MatNum)
+function port_opt_view(tr::RiskTrackingError, i, X::MatNum, args...)
     return RiskTrackingError(; tr = port_opt_view(tr.tr, i), r = port_opt_view(tr.r, i, X),
                              err = tr.err, alg = tr.alg)
 end
@@ -464,7 +464,7 @@ Slices both the inner tracking benchmark and the risk measure for cluster-based 
   - [`port_opt_view`](@ref)
   - [`port_opt_view`](@ref)
 """
-function port_opt_view(r::RiskTrackingRiskMeasure, i, X::MatNum)
+function port_opt_view(r::RiskTrackingRiskMeasure, i, X::MatNum, args...)
     tr = port_opt_view(r.tr, i)
     return RiskTrackingRiskMeasure(; settings = r.settings, tr = tr,
                                    r = port_opt_view(r.r, i, X), alg = r.alg)

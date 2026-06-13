@@ -223,7 +223,7 @@ Gets the view of the coskewness estimator for the `i`-th element(s).
 
   - [`Coskewness`](@ref)
 """
-function port_opt_view(ske::Coskewness, i)::Coskewness
+function port_opt_view(ske::Coskewness, i, args...)::Coskewness
     return Coskewness(; me = port_opt_view(ske.me, i), mp = ske.mp, alg = ske.alg,
                       w = ske.w)
 end

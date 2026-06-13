@@ -520,7 +520,7 @@ Return a new [`HighOrderPriorEstimator`](@ref) restricted to the assets at index
 
   - [`HighOrderPriorEstimator`](@ref)
 """
-function port_opt_view(pr::HighOrderPriorEstimator, i)::HighOrderPriorEstimator
+function port_opt_view(pr::HighOrderPriorEstimator, i, args...)::HighOrderPriorEstimator
     return HighOrderPriorEstimator(; pe = port_opt_view(pr.pe, i),
                                    kte = port_opt_view(pr.kte, i),
                                    ske = port_opt_view(pr.ske, i))

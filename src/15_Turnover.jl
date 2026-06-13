@@ -130,7 +130,7 @@ TurnoverEstimator
   - [`turnover_constraints`](@ref)
   - [`nothing_scalar_array_view`](@ref)
 """
-function port_opt_view(tn::TurnoverEstimator, i)::TurnoverEstimator
+function port_opt_view(tn::TurnoverEstimator, i, args...)::TurnoverEstimator
     w = view(tn.w, i)
     val = nothing_scalar_array_view(tn.val, i)
     return TurnoverEstimator(; w = w, val = val, dval = tn.dval, fixed = tn.fixed)
@@ -399,7 +399,7 @@ Turnover
   - [`turnover_constraints`](@ref)
   - [`nothing_scalar_array_view`](@ref)
 """
-function port_opt_view(tn::Turnover, i)::Turnover
+function port_opt_view(tn::Turnover, i, args...)::Turnover
     w = view(tn.w, i)
     val = nothing_scalar_array_view(tn.val, i)
     return Turnover(; w = w, val = val, fixed = tn.fixed)
@@ -718,7 +718,7 @@ julia> PortfolioOptimisers.port_opt_view(concrete_typed_array([tn1, tn2]), 1:2)
   - [`port_opt_view`](@ref)
   - [`concrete_typed_array`](@ref)
 """
-function port_opt_view(tn::VecTnE_Tn, i)
+function port_opt_view(tn::VecTnE_Tn, i, args...)
     val = [port_opt_view(tni, i) for tni in tn]
     if isabstracttype(eltype(val))
         val = concrete_typed_array(val)

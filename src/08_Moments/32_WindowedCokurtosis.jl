@@ -116,7 +116,7 @@ Gets the view of the coskewness estimator for the `i`-th element(s).
 
   - [`WindowedCokurtosis`](@ref)
 """
-function port_opt_view(kte::WindowedCokurtosis, i)::WindowedCokurtosis
+function port_opt_view(kte::WindowedCokurtosis, i, args...)::WindowedCokurtosis
     return WindowedCokurtosis(; kte = port_opt_view(kte.kte, i), w = kte.w,
                               window = kte.window)
 end

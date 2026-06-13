@@ -181,10 +181,10 @@ end
 function LogRiskBudgeting(; z::Option{<:VecInt} = nothing)::LogRiskBudgeting
     return LogRiskBudgeting(z)
 end
-function port_opt_view(alg::LogRiskBudgeting{Nothing}, i)
+function port_opt_view(alg::LogRiskBudgeting{Nothing}, i, args...)
     return alg
 end
-function port_opt_view(alg::LogRiskBudgeting{<:VecInt}, i)
+function port_opt_view(alg::LogRiskBudgeting{<:VecInt}, i, args...)
     return LogRiskBudgeting(; z = view(alg.z, i))
 end
 """
@@ -290,7 +290,7 @@ Used in hierarchical optimisation to slice risk budget and asset set configurati
   - [`FactorRiskBudgeting`](@ref)
   - [`RiskBudgeting`](@ref)
 """
-function port_opt_view(r::AssetRiskBudgeting, i)
+function port_opt_view(r::AssetRiskBudgeting, i, args...)
     rkb = port_opt_view(r.rkb, i)
     sets = port_opt_view(r.sets, i)
     alg = port_opt_view(r.alg, i)
@@ -381,7 +381,7 @@ Slices the regression estimator for the given cluster while keeping the risk bud
   - [`FactorRiskBudgeting`](@ref)
   - [`AssetRiskBudgeting`](@ref)
 """
-function port_opt_view(r::FactorRiskBudgeting, i)
+function port_opt_view(r::FactorRiskBudgeting, i, args...)
     re = port_opt_view(r.re, i)
     return FactorRiskBudgeting(; re = re, rkb = r.rkb, sets = r.sets, flag = r.flag)
 end
@@ -514,7 +514,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return a cluster-sliced copy of [`RiskBudgeting`](@ref) for asset index set `i` and returns matrix `X`.
 """
-function port_opt_view(rb::RiskBudgeting, i, X::MatNum)::RiskBudgeting
+function port_opt_view(rb::RiskBudgeting, i, X::MatNum, args...)::RiskBudgeting
     X = isa(rb.opt.pe, AbstractPriorResult) ? rb.opt.pe.X : X
     opt = port_opt_view(rb.opt, i, X)
     r = port_opt_view(rb.r, i, X)

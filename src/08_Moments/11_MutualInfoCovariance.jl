@@ -141,7 +141,7 @@ Gets the view of the covariance estimator for the `i`-th element(s).
 
   - [`MutualInfoCovariance`](@ref)
 """
-function port_opt_view(ce::MutualInfoCovariance, i)::MutualInfoCovariance
+function port_opt_view(ce::MutualInfoCovariance, i, args...)::MutualInfoCovariance
     return MutualInfoCovariance(; ve = port_opt_view(ce.ve, i), bins = ce.bins,
                                 normalise = ce.normalise)
 end

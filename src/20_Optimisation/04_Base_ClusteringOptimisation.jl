@@ -303,7 +303,7 @@ Return a view of [`HierarchicalOptimiser`](@ref) `hco` sliced to asset indices `
   - [`HierarchicalOptimiser`](@ref)
   - [`port_opt_view`](@ref)
 """
-function port_opt_view(hco::HierarchicalOptimiser, i)::HierarchicalOptimiser
+function port_opt_view(hco::HierarchicalOptimiser, i, args...)::HierarchicalOptimiser
     pe = port_opt_view(hco.pe, i)
     wb = port_opt_view(hco.wb, i)
     fees = port_opt_view(hco.fees, i)

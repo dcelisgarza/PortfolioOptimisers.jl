@@ -197,8 +197,8 @@ function port_opt_view(r::NegativeSkewness{<:Any, <:Any, <:Any, <:Any}, ::Any,
                        args...)::NegativeSkewness
     return r
 end
-function port_opt_view(r::NegativeSkewness{<:Any, <:Any, <:MatNum, <:MatNum}, i,
-                       X::MatNum)::NegativeSkewness
+function port_opt_view(r::NegativeSkewness{<:Any, <:Any, <:MatNum, <:MatNum}, i, X::MatNum,
+                       args...)::NegativeSkewness
     sk = r.sk
     idx = fourth_moment_index_generator(size(sk, 1), i)
     sk = nothing_scalar_array_view_odd_order(r.sk, i, idx)

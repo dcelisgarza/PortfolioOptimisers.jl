@@ -335,7 +335,8 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return a cluster-sliced copy of [`NearOptimalCentering`](@ref) for asset index set `i` and returns matrix `X`.
 """
-function port_opt_view(noc::NearOptimalCentering, i, X::MatNum)::NearOptimalCentering
+function port_opt_view(noc::NearOptimalCentering, i, X::MatNum,
+                       args...)::NearOptimalCentering
     X = isa(noc.opt.pe, AbstractPriorResult) ? noc.opt.pe.X : X
     opt = port_opt_view(noc.opt, i, X)
     r = port_opt_view(noc.r, i, X)

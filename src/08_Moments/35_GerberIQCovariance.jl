@@ -1613,7 +1613,7 @@ Gets the view of the covariance estimator for the `i`-th element(s).
 
   - [`GerberIQCovariance`](@ref)
 """
-function port_opt_view(ce::GerberIQCovariance, i)
+function port_opt_view(ce::GerberIQCovariance, i, args...)
     return GerberIQCovariance(; ve = port_opt_view(ce.ve, i), me = port_opt_view(ce.me, i),
                               pdm = ce.pdm, c = ce.c, decay = ce.decay, sc = ce.sc,
                               kind = ce.kind, alg = ce.alg, ex = ce.ex)

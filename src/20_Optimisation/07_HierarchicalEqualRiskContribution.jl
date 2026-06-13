@@ -255,8 +255,8 @@ Return a view of [`HierarchicalEqualRiskContribution`](@ref) `hec` sliced to ass
   - [`HierarchicalEqualRiskContribution`](@ref)
   - [`port_opt_view`](@ref)
 """
-function port_opt_view(hec::HierarchicalEqualRiskContribution, i,
-                       X::MatNum)::HierarchicalEqualRiskContribution
+function port_opt_view(hec::HierarchicalEqualRiskContribution, i, X::MatNum,
+                       args...)::HierarchicalEqualRiskContribution
     X = isa(hec.opt.pe, AbstractPriorResult) ? hec.opt.pe.X : X
     ri = hec.ri
     ro = hec.ro

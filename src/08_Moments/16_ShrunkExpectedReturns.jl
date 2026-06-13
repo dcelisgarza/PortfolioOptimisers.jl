@@ -679,7 +679,7 @@ Gets the view of the expected returns estimator for the `i`-th element(s).
 
   - [`ShrunkExpectedReturns`](@ref)
 """
-function port_opt_view(me::ShrunkExpectedReturns, i)::ShrunkExpectedReturns
+function port_opt_view(me::ShrunkExpectedReturns, i, args...)::ShrunkExpectedReturns
     return ShrunkExpectedReturns(; me = port_opt_view(me.me, i),
                                  ce = port_opt_view(me.ce, i),
                                  alg = port_opt_view(me.alg, i))

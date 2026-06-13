@@ -338,7 +338,7 @@ for ce in traverse_concrete_subtypes(RankCovarianceEstimator)
              function factory(ce::$(ce), w::ObsWeights)
                  return $(ce)(; ve = factory(ce.ve, w))
              end
-             function port_opt_view(ce::$(ce), i)
+             function port_opt_view(ce::$(ce), i, args...)
                  return $(ce)(; ve = port_opt_view(ce.ve, i))
              end
          end)

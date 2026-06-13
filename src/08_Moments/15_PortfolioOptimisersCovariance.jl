@@ -118,7 +118,8 @@ Gets the view of the covariance estimator for the `i`-th element(s).
 
   - [`PortfolioOptimisersCovariance`](@ref)
 """
-function port_opt_view(ce::PortfolioOptimisersCovariance, i)::PortfolioOptimisersCovariance
+function port_opt_view(ce::PortfolioOptimisersCovariance, i,
+                       args...)::PortfolioOptimisersCovariance
     return PortfolioOptimisersCovariance(; ce = port_opt_view(ce.ce, i), mp = ce.mp)
 end
 """

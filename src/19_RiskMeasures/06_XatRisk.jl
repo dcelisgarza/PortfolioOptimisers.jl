@@ -227,7 +227,7 @@ function factory(alg::DistributionValueatRisk, pr::AbstractPriorResult, args...;
     chol = nothing_scalar_array_selector(alg.chol, pr.chol)
     return DistributionValueatRisk(; mu = mu, sigma = sigma, chol = chol, dist = alg.dist)
 end
-function port_opt_view(alg::DistributionValueatRisk, i)::DistributionValueatRisk
+function port_opt_view(alg::DistributionValueatRisk, i, args...)::DistributionValueatRisk
     mu = nothing_scalar_array_view(alg.mu, i)
     sigma = nothing_scalar_array_view(alg.sigma, i)
     chol = isnothing(alg.chol) ? nothing : view(alg.chol, :, i)

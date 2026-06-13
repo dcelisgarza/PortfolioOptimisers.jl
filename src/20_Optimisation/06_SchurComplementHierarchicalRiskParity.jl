@@ -278,7 +278,7 @@ Returns a [`SchurComplementParams`](@ref) with the risk measure sliced for the g
   - [`SchurComplementParams`](@ref)
   - [`SchurComplementHierarchicalRiskParity`](@ref)
 """
-function port_opt_view(sp::SchurComplementParams, i, X::MatNum)
+function port_opt_view(sp::SchurComplementParams, i, X::MatNum, args...)
     r = port_opt_view(sp.r, i, X)
     return SchurComplementParams(; r = r, gamma = sp.gamma, pdm = sp.pdm, alg = sp.alg,
                                  flag = sp.flag)
@@ -491,8 +491,8 @@ Return a view of [`SchurComplementHierarchicalRiskParity`](@ref) `sh` sliced to 
   - [`SchurComplementHierarchicalRiskParity`](@ref)
   - [`port_opt_view`](@ref)
 """
-function port_opt_view(sh::SchurComplementHierarchicalRiskParity, i,
-                       X::MatNum)::SchurComplementHierarchicalRiskParity
+function port_opt_view(sh::SchurComplementHierarchicalRiskParity, i, X::MatNum,
+                       args...)::SchurComplementHierarchicalRiskParity
     X = isa(sh.opt.pe, AbstractPriorResult) ? sh.opt.pe.X : X
     opt = port_opt_view(sh.opt, i)
     params = port_opt_view(sh.params, i, X)

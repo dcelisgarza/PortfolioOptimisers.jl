@@ -122,7 +122,7 @@ Gets the view of the covariance estimator for the `i`-th element(s).
 
   - [`DetoneCovariance`](@ref)
 """
-function port_opt_view(ce::DetoneCovariance, i)::DetoneCovariance
+function port_opt_view(ce::DetoneCovariance, i, args...)::DetoneCovariance
     return DetoneCovariance(; ce = port_opt_view(ce.ce, i), dt = ce.dt, pdm = ce.pdm)
 end
 """

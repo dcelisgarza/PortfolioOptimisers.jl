@@ -116,7 +116,7 @@ Gets the view of the coskewness estimator for the `i`-th element(s).
 
   - [`WindowedCoskewness`](@ref)
 """
-function port_opt_view(ske::WindowedCoskewness, i)::WindowedCoskewness
+function port_opt_view(ske::WindowedCoskewness, i, args...)::WindowedCoskewness
     return WindowedCoskewness(; ske = port_opt_view(ske.ske, i), w = ske.w,
                               window = ske.window)
 end

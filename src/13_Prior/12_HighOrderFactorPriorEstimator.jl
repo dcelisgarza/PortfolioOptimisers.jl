@@ -275,7 +275,8 @@ Return a new [`HighOrderFactorPriorEstimator`](@ref) estimator restricted to the
   - [`HighOrderFactorPriorEstimator`](@ref)
   - [`port_opt_view`](@ref)
 """
-function port_opt_view(pe::HighOrderFactorPriorEstimator, i)::HighOrderFactorPriorEstimator
+function port_opt_view(pe::HighOrderFactorPriorEstimator, i,
+                       args...)::HighOrderFactorPriorEstimator
     return HighOrderFactorPriorEstimator(; pe = port_opt_view(pe.pe, i), kte = pe.kte,
                                          ske = pe.ske, ex = pe.ex, rsd = pe.rsd)
 end

@@ -804,7 +804,7 @@ WeightsTracking
   - [`port_opt_view`](@ref)
   - [`port_opt_view`](@ref)
 """
-function port_opt_view(tr::WeightsTracking, i)
+function port_opt_view(tr::WeightsTracking, i, args...)
     fees = port_opt_view(tr.fees, i)
     w = view(tr.w, i)
     return WeightsTracking(; fees = fees, w = w, fixed = tr.fixed)
@@ -938,7 +938,7 @@ ReturnsTracking
   - [`ReturnsTracking`](@ref)
   - [`port_opt_view`](@ref)
 """
-function port_opt_view(tr::ReturnsTracking, ::Any)
+function port_opt_view(tr::ReturnsTracking, ::Any, args...)
     return tr
 end
 """
@@ -1116,7 +1116,7 @@ TrackingError
   - [`WeightsTracking`](@ref)
   - [`ReturnsTracking`](@ref)
 """
-function port_opt_view(tr::TrackingError, i)
+function port_opt_view(tr::TrackingError, i, args...)
     return TrackingError(; tr = port_opt_view(tr.tr, i), err = tr.err, alg = tr.alg)
 end
 """

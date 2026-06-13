@@ -305,7 +305,7 @@ Gets the view of the covariance estimator for the `i`-th element(s).
 
   - [`GerberCovariance`](@ref)
 """
-function port_opt_view(ce::GerberCovariance, i)::GerberCovariance
+function port_opt_view(ce::GerberCovariance, i, args...)::GerberCovariance
     return GerberCovariance(; ve = port_opt_view(ce.ve, i), me = port_opt_view(ce.me, i),
                             pdm = ce.pdm, t = ce.t, alg = ce.alg)
 end

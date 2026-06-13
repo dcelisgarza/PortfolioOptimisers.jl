@@ -90,8 +90,8 @@ Gets the view of the expected returns estimator for the `i`-th element(s).
 
   - [`StandardDeviationExpectedReturns`](@ref)
 """
-function port_opt_view(me::StandardDeviationExpectedReturns,
-                       i)::StandardDeviationExpectedReturns
+function port_opt_view(me::StandardDeviationExpectedReturns, i,
+                       args...)::StandardDeviationExpectedReturns
     return StandardDeviationExpectedReturns(; me = port_opt_view(me.ce, i))
 end
 """
@@ -227,7 +227,7 @@ Gets the view of the expected returns estimator for the `i`-th element(s).
 
   - [`VarianceExpectedReturns`](@ref)
 """
-function port_opt_view(me::VarianceExpectedReturns, i)::VarianceExpectedReturns
+function port_opt_view(me::VarianceExpectedReturns, i, args...)::VarianceExpectedReturns
     return VarianceExpectedReturns(; me = port_opt_view(me.ce, i))
 end
 """

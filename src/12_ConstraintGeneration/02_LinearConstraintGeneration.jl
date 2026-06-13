@@ -355,7 +355,7 @@ Slices all `key`-prefixed groups by `i`, and derives unique-entry `ukey`-prefixe
 
   - [`AssetSets`](@ref)
 """
-function port_opt_view(sets::AssetSets, i)::AssetSets
+function port_opt_view(sets::AssetSets, i, args...)::AssetSets
     key = sets.key
     ukey = sets.ukey
     dict = typeof(sets.dict)()

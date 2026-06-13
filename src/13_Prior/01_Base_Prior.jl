@@ -757,7 +757,7 @@ Return a view of a [`LowOrderPrior`](@ref) restricted to assets at index `i`.
   - [`LowOrderPrior`](@ref)
   - [`port_opt_view`](@ref)
 """
-function port_opt_view(pr::LowOrderPrior, i)::LowOrderPrior
+function port_opt_view(pr::LowOrderPrior, i, args...)::LowOrderPrior
     chol = isnothing(pr.chol) ? nothing : view(pr.chol, :, i)
     return LowOrderPrior(; X = view(pr.X, :, i), mu = view(pr.mu, i),
                          sigma = view(pr.sigma, i, i), chol = chol, w = pr.w, ens = pr.ens,
@@ -970,7 +970,7 @@ Return a view of a [`HighOrderPrior`](@ref) restricted to assets at index `i`, s
   - [`HighOrderPrior`](@ref)
   - [`port_opt_view`](@ref)
 """
-function port_opt_view(pr::HighOrderPrior, i)
+function port_opt_view(pr::HighOrderPrior, i, args...)
     idx = fourth_moment_index_generator(length(pr.mu), i)
     kt = pr.kt
     sk = pr.sk

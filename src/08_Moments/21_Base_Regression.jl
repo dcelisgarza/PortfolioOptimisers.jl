@@ -716,7 +716,7 @@ Regression
 
   - [`Regression`](@ref)
 """
-function port_opt_view(re::Regression, i)::Regression
+function port_opt_view(re::Regression, i, args...)::Regression
     return Regression(; M = view(re.M, i, :),
                       L = isnothing(re.L) ? nothing : view(re.L, i, :), b = view(re.b, i))
 end

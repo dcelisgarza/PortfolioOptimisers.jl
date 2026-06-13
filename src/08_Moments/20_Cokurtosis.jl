@@ -247,7 +247,7 @@ Gets the view of the cokurtosis estimator for the `i`-th element(s).
 
   - [`Cokurtosis`](@ref)
 """
-function port_opt_view(kte::Cokurtosis, i)::Cokurtosis
+function port_opt_view(kte::Cokurtosis, i, args...)::Cokurtosis
     return Cokurtosis(; me = port_opt_view(kte.me, i), mp = kte.mp, alg = kte.alg,
                       w = kte.w)
 end

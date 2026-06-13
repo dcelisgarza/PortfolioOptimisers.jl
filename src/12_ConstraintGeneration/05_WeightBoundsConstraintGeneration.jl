@@ -114,7 +114,7 @@ function WeightBounds(; lb::Option{<:Num_VecNum} = 0.0,
                       ub::Option{<:Num_VecNum} = 1.0)::WeightBounds
     return WeightBounds(lb, ub)
 end
-function port_opt_view(wb::WeightBounds, i)::WeightBounds
+function port_opt_view(wb::WeightBounds, i, args...)::WeightBounds
     lb = nothing_scalar_array_view(wb.lb, i)
     ub = nothing_scalar_array_view(wb.ub, i)
     return WeightBounds(; lb = lb, ub = ub)
@@ -216,7 +216,7 @@ function WeightBoundsEstimator(; lb::Option{<:EstValType} = nothing,
                                dub::Option{<:Number} = nothing)::WeightBoundsEstimator
     return WeightBoundsEstimator(lb, ub, dlb, dub)
 end
-function port_opt_view(wb::WeightBoundsEstimator, i)::WeightBoundsEstimator
+function port_opt_view(wb::WeightBoundsEstimator, i, args...)::WeightBoundsEstimator
     lb = nothing_scalar_array_view(wb.lb, i)
     ub = nothing_scalar_array_view(wb.ub, i)
     return wb = WeightBoundsEstimator(; lb = lb, ub = ub, dlb = wb.dlb, dub = wb.dub)

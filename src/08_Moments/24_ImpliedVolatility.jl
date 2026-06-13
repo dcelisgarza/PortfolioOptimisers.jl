@@ -192,7 +192,7 @@ Gets the view of the covariance estimator for the `i`-th element(s).
 
   - [`ImpliedVolatility`](@ref)
 """
-function port_opt_view(ce::ImpliedVolatility, i)::ImpliedVolatility
+function port_opt_view(ce::ImpliedVolatility, i, args...)::ImpliedVolatility
     return ImpliedVolatility(; ce = port_opt_view(ce.ce, i), mp = ce.mp)
 end
 """

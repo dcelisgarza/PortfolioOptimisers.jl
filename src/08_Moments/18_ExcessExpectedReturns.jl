@@ -82,7 +82,7 @@ Gets the view of the expected returns estimator for the `i`-th element(s).
 
   - [`ExcessExpectedReturns`](@ref)
 """
-function port_opt_view(me::ExcessExpectedReturns, i)::ExcessExpectedReturns
+function port_opt_view(me::ExcessExpectedReturns, i, args...)::ExcessExpectedReturns
     return ExcessExpectedReturns(; me = port_opt_view(me.me, i), rf = me.rf)
 end
 """

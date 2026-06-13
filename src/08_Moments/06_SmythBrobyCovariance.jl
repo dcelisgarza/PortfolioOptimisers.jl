@@ -438,7 +438,7 @@ Gets the view of the covariance estimator for the `i`-th element(s).
 
   - [`SmythBrobyCovariance`](@ref)
 """
-function port_opt_view(ce::SmythBrobyCovariance, i)::SmythBrobyCovariance
+function port_opt_view(ce::SmythBrobyCovariance, i, args...)::SmythBrobyCovariance
     return SmythBrobyCovariance(; ve = port_opt_view(ce.ve, i),
                                 me = port_opt_view(ce.me, i), pdm = ce.pdm, c1 = ce.c1,
                                 c2 = ce.c2, c3 = ce.c3, n = ce.n, alg = ce.alg, ex = ce.ex)

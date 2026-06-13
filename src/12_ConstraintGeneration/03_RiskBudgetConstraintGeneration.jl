@@ -50,7 +50,7 @@ end
 function RiskBudget(; val::Num_VecNum)::RiskBudget
     return RiskBudget(val)
 end
-function port_opt_view(rb::RiskBudget, i)::RiskBudget
+function port_opt_view(rb::RiskBudget, i, args...)::RiskBudget
     val = nothing_scalar_array_view(rb.val, i)
     return RiskBudget(; val = val)
 end
@@ -143,7 +143,7 @@ Identity pass-through: estimators are not sliced by cluster index.
   - [`RiskBudgetEstimator`](@ref)
   - [`port_opt_view`](@ref)
 """
-function port_opt_view(rb::RiskBudgetEstimator, ::Any)::RiskBudgetEstimator
+function port_opt_view(rb::RiskBudgetEstimator, ::Any, args...)::RiskBudgetEstimator
     return rb
 end
 """

@@ -199,7 +199,8 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return a cluster-sliced copy of [`RelaxedRiskBudgeting`](@ref) for asset index set `i` and returns matrix `X`.
 """
-function port_opt_view(rrb::RelaxedRiskBudgeting, i, X::MatNum)::RelaxedRiskBudgeting
+function port_opt_view(rrb::RelaxedRiskBudgeting, i, X::MatNum,
+                       args...)::RelaxedRiskBudgeting
     X = isa(rrb.opt.pe, AbstractPriorResult) ? rrb.opt.pe.X : X
     opt = port_opt_view(rrb.opt, i, X)
     rba = port_opt_view(rrb.rba, i)

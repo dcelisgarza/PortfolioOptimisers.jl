@@ -213,14 +213,14 @@ Matches either a single [`Threshold`](@ref) or a vector of optional [`Threshold`
   - [`VecOptBt`](@ref)
 """
 const Bt_VecOptBt = Union{<:Threshold, <:VecOptBt}
-function port_opt_view(t::ThresholdEstimator, i)::ThresholdEstimator
+function port_opt_view(t::ThresholdEstimator, i, args...)::ThresholdEstimator
     return ThresholdEstimator(; val = nothing_scalar_array_view(t.val, i), dval = t.dval,
                               key = t.key)
 end
-function port_opt_view(t::Threshold, i)::Threshold
+function port_opt_view(t::Threshold, i, args...)::Threshold
     return Threshold(; val = nothing_scalar_array_view(t.val, i))
 end
-function port_opt_view(t::VecOptBtE_Bt, i)
+function port_opt_view(t::VecOptBtE_Bt, i, args...)
     return [port_opt_view(ti, i) for ti in t]
 end
 """

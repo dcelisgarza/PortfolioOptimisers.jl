@@ -328,7 +328,8 @@ Return a new [`AugmentedBlackLittermanPrior`](@ref) estimator restricted to the 
   - [`AugmentedBlackLittermanPrior`](@ref)
   - [`port_opt_view`](@ref)
 """
-function port_opt_view(pe::AugmentedBlackLittermanPrior, i)::AugmentedBlackLittermanPrior
+function port_opt_view(pe::AugmentedBlackLittermanPrior, i,
+                       args...)::AugmentedBlackLittermanPrior
     return AugmentedBlackLittermanPrior(; a_pe = port_opt_view(pe.a_pe, i), f_pe = pe.f_pe,
                                         mp = pe.mp, re = port_opt_view(pe.re, i),
                                         a_views = pe.a_views, f_views = pe.f_views,

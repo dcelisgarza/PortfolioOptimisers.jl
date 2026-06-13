@@ -276,7 +276,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return a cluster-sliced copy of [`Stacking`](@ref) for asset index set `i` and returns matrix `X`.
 """
-function port_opt_view(st::Stacking, i, X::MatNum)::Stacking
+function port_opt_view(st::Stacking, i, X::MatNum, args...)::Stacking
     X = isa(st.pe, AbstractPriorResult) ? st.pe.X : X
     pe = port_opt_view(st.pe, i)
     wb = port_opt_view(st.wb, i)

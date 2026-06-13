@@ -289,7 +289,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return a cluster-sliced copy of [`MeanRisk`](@ref) for asset index set `i` and returns matrix `X`.
 """
-function port_opt_view(mr::MeanRisk, i, X::MatNum)::MeanRisk
+function port_opt_view(mr::MeanRisk, i, X::MatNum, args...)::MeanRisk
     X = isa(mr.opt.pe, AbstractPriorResult) ? mr.opt.pe.X : X
     opt = port_opt_view(mr.opt, i, X)
     r = port_opt_view(mr.r, i, X)

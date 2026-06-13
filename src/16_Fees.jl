@@ -220,7 +220,7 @@ FeesEstimator
   - [`port_opt_view`](@ref)
   - [`nothing_scalar_array_view`](@ref)
 """
-function port_opt_view(fees::FeesEstimator, i)::FeesEstimator
+function port_opt_view(fees::FeesEstimator, i, args...)::FeesEstimator
     tn = port_opt_view(fees.tn, i)
     l = nothing_scalar_array_view(fees.l, i)
     s = nothing_scalar_array_view(fees.s, i)
@@ -651,7 +651,7 @@ Fees
   - [`port_opt_view`](@ref)
   - [`nothing_scalar_array_view`](@ref)
 """
-function port_opt_view(fees::Fees, i)::Fees
+function port_opt_view(fees::Fees, i, args...)::Fees
     tn = port_opt_view(fees.tn, i)
     l = nothing_scalar_array_view(fees.l, i)
     s = nothing_scalar_array_view(fees.s, i)

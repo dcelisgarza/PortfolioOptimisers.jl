@@ -120,7 +120,7 @@ Gets the view of the covariance estimator for the `i`-th element(s).
 
   - [`WindowedCovariance`](@ref)
 """
-function port_opt_view(ce::WindowedCovariance, i)::WindowedCovariance
+function port_opt_view(ce::WindowedCovariance, i, args...)::WindowedCovariance
     return WindowedCovariance(; ce = port_opt_view(ce.ce, i), w = ce.w, window = ce.window)
 end
 """

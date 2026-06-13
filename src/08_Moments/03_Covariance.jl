@@ -236,7 +236,7 @@ Gets the view of the covariance estimator for the `i`-th element(s).
 
   - [`GeneralCovariance`](@ref)
 """
-function port_opt_view(ce::GeneralCovariance, i)::GeneralCovariance
+function port_opt_view(ce::GeneralCovariance, i, args...)::GeneralCovariance
     return GeneralCovariance(; ce = port_opt_view(ce.ce, i), w = ce.w)
 end
 """
@@ -376,7 +376,7 @@ Gets the view of the covariance estimator for the `i`-th element(s).
 
   - [`Covariance`](@ref)
 """
-function port_opt_view(ce::Covariance, i)::Covariance
+function port_opt_view(ce::Covariance, i, args...)::Covariance
     return Covariance(; me = port_opt_view(ce.me, i), ce = port_opt_view(ce.ce, i),
                       alg = ce.alg)
 end

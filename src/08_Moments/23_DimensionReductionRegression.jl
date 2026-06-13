@@ -301,7 +301,8 @@ Return a new [`DimensionReductionRegression`](@ref) estimator restricted to asse
   - [`DimensionReductionRegression`](@ref)
   - [`port_opt_view`](@ref)
 """
-function port_opt_view(re::DimensionReductionRegression, i)::DimensionReductionRegression
+function port_opt_view(re::DimensionReductionRegression, i,
+                       args...)::DimensionReductionRegression
     return DimensionReductionRegression(; ve = port_opt_view(re.ve, i), drtgt = re.drtgt,
                                         retgt = re.retgt)
 end

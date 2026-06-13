@@ -755,10 +755,11 @@ Returns the risk measure sliced for the given cluster or asset index. Used inter
 
   - [`AbstractBaseRiskMeasure`](@ref)
 """
-function port_opt_view(rs::AbstractBaseRiskMeasure, ::Any, ::Any)::AbstractBaseRiskMeasure
+function port_opt_view(rs::AbstractBaseRiskMeasure, ::Any, ::Any,
+                       args...)::AbstractBaseRiskMeasure
     return rs
 end
-function port_opt_view(rs::VecBaseRM, i, X::MatNum)
+function port_opt_view(rs::VecBaseRM, i, X::MatNum, args...)
     return [port_opt_view(r, i, X) for r in rs]
 end
 """

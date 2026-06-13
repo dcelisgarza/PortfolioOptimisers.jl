@@ -139,7 +139,7 @@ Return a new [`FactorPrior`](@ref) estimator restricted to the assets at index `
 
   - [`FactorPrior`](@ref)
 """
-function port_opt_view(pe::FactorPrior, i)::FactorPrior
+function port_opt_view(pe::FactorPrior, i, args...)::FactorPrior
     return FactorPrior(; pe = pe.pe, mp = pe.mp, re = port_opt_view(pe.re, i),
                        ve = port_opt_view(pe.ve, i), rsd = pe.rsd)
 end

@@ -95,7 +95,7 @@ Gets the view of the covariance estimator for the `i`-th element(s).
 
   - [`ProcessedCovariance`](@ref)
 """
-function port_opt_view(ce::ProcessedCovariance, i)::ProcessedCovariance
+function port_opt_view(ce::ProcessedCovariance, i, args...)::ProcessedCovariance
     return ProcessedCovariance(; ce = port_opt_view(ce.ce, i), alg = ce.alg, pdm = ce.pdm)
 end
 """

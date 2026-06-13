@@ -234,7 +234,7 @@ Return a new [`FactorBlackLittermanPrior`](@ref) estimator restricted to the ass
   - [`FactorBlackLittermanPrior`](@ref)
   - [`port_opt_view`](@ref)
 """
-function port_opt_view(pe::FactorBlackLittermanPrior, i)
+function port_opt_view(pe::FactorBlackLittermanPrior, i, args...)
     return FactorPrior(; pe = pe.pe, f_mp = pe.f_mp, mp = pe.mp,
                        re = port_opt_view(pe.re, i), ve = port_opt_view(pe.ve, i),
                        views = pe.views, sets = pe.sets, views_conf = pe.views_conf,

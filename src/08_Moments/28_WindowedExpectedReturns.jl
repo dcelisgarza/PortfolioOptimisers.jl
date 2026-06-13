@@ -97,7 +97,7 @@ Gets the view of the expected returns estimator for the `i`-th element(s).
 
   - [`WindowedExpectedReturns`](@ref)
 """
-function port_opt_view(me::WindowedExpectedReturns, i)::WindowedExpectedReturns
+function port_opt_view(me::WindowedExpectedReturns, i, args...)::WindowedExpectedReturns
     return WindowedExpectedReturns(; me = port_opt_view(me.me, i), w = me.w,
                                    window = me.window)
 end
