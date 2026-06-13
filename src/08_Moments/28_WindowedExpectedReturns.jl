@@ -52,7 +52,7 @@ WindowedExpectedReturns
     """
     $(field_dict[:me])
     """
-    @fprop me
+    @fprop @vprop me
     """
     $(field_dict[:oow])
     """
@@ -78,28 +78,6 @@ function WindowedExpectedReturns(;
                                  w::Option{<:ObsWeights} = nothing,
                                  window::Option{<:Int_VecInt} = nothing)::WindowedExpectedReturns
     return WindowedExpectedReturns(me, w, window)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Gets the view of the expected returns estimator for the `i`-th element(s).
-
-# Arguments
-
-  - $(arg_dict[:me])
-  - `i`: Index or indices to view.
-
-# Returns
-
-  - $(ret_dict[:mev])
-
-# Related
-
-  - [`WindowedExpectedReturns`](@ref)
-"""
-function port_opt_view(me::WindowedExpectedReturns, i, args...)::WindowedExpectedReturns
-    return WindowedExpectedReturns(; me = port_opt_view(me.me, i), w = me.w,
-                                   window = me.window)
 end
 """
     Statistics.mean(me::WindowedExpectedReturns, X::MatNum; dims::Int = 1, iv::Option{<:MatNum} = nothing, kwargs...)

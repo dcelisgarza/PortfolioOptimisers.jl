@@ -45,7 +45,7 @@ ExcessExpectedReturns
     """
     $(field_dict[:me])
     """
-    @fprop me
+    @fprop @vprop me
     """
     $(field_dict[:rf])
     """
@@ -63,27 +63,6 @@ function ExcessExpectedReturns(;
                                me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
                                rf::Number = 0.0)::ExcessExpectedReturns
     return ExcessExpectedReturns(me, rf)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Gets the view of the expected returns estimator for the `i`-th element(s).
-
-# Arguments
-
-  - $(arg_dict[:me])
-  - `i`: Index or indices to view.
-
-# Returns
-
-  - $(ret_dict[:mev])
-
-# Related
-
-  - [`ExcessExpectedReturns`](@ref)
-"""
-function port_opt_view(me::ExcessExpectedReturns, i, args...)::ExcessExpectedReturns
-    return ExcessExpectedReturns(; me = port_opt_view(me.me, i), rf = me.rf)
 end
 """
     Statistics.mean(me::ExcessExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)

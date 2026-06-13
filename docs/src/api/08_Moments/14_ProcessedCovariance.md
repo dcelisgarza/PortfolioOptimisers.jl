@@ -5,5 +5,4 @@ ProcessedCovariance
 factory(ce::ProcessedCovariance, args...; kwargs...)
 cov(ce::ProcessedCovariance, X::MatNum; dims = 1, kwargs...)
 cor(ce::ProcessedCovariance, X::MatNum; dims = 1, kwargs...)
-port_opt_view(ce::ProcessedCovariance, i)
 ```

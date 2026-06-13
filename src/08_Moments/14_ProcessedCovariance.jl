@@ -52,7 +52,7 @@ ProcessedCovariance
     """
     $(field_dict[:ce])
     """
-    @fprop ce
+    @fprop @vprop ce
     """
     $(field_dict[:mpa])
     """
@@ -76,27 +76,6 @@ function ProcessedCovariance(; ce::StatsBase.CovarianceEstimator = Covariance(),
                              alg::Option{<:AbstractMatrixProcessingAlgorithm} = nothing,
                              pdm::Option{<:Posdef} = Posdef())::ProcessedCovariance
     return ProcessedCovariance(ce, alg, pdm)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Gets the view of the covariance estimator for the `i`-th element(s).
-
-# Arguments
-
-  - $(arg_dict[:ce])
-  - `i`: Index or indices to view.
-
-# Returns
-
-  - $(ret_dict[:cev])
-
-# Related
-
-  - [`ProcessedCovariance`](@ref)
-"""
-function port_opt_view(ce::ProcessedCovariance, i, args...)::ProcessedCovariance
-    return ProcessedCovariance(; ce = port_opt_view(ce.ce, i), alg = ce.alg, pdm = ce.pdm)
 end
 """
     Statistics.cov(ce::ProcessedCovariance, X::MatNum; dims = 1, kwargs...)
