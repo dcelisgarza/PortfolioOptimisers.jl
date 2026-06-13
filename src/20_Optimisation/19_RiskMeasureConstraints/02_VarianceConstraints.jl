@@ -338,7 +338,7 @@ function set_sdp_variance_risk!(model::JuMP.Model, i::Any, r::Variance,
                                 pr::AbstractPriorResult, key::Symbol;
                                 prefix::Symbol = Symbol(""))
     W = set_sdp_constraints!(model; prefix = prefix)
-    sigma = isnothing(r.sigma) ? pr.sigma : r.sigma
+    sigma = nothing_scalar_array_selector(r.sigma, pr.sigma)
     sigma_W = model[Symbol(:sigma_W_, i)] = JuMP.@expression(model, sigma * W)
     return model[key] = JuMP.@expression(model, LinearAlgebra.tr(sigma_W))
 end
@@ -362,7 +362,7 @@ function set_variance_risk!(model::JuMP.Model, i::Any,
                             prefix::Symbol = Symbol(""))
     sc = get_constraint_scale(model)
     w = get_w(model, prefix)
-    sigma = isnothing(r.sigma) ? pr.sigma : r.sigma
+    sigma = nothing_scalar_array_selector(r.sigma, pr.sigma)
     G = chol_sigma_selector(model, pr, r)
     dev = model[Symbol(:dev_, i)] = JuMP.@variable(model)
     model[Symbol(:cdev_soc_, i)] = JuMP.@constraint(model,
@@ -599,7 +599,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::Variance,
     key = Symbol(:variance_risk_, i)
     set_sdp_frc_constraints!(model)
     W = model[:frc_W]
-    sigma = isnothing(r.sigma) ? pr.sigma : r.sigma
+    sigma = nothing_scalar_array_selector(r.sigma, pr.sigma)
     sigma_W = model[Symbol(:sigma_W_, i)] = JuMP.@expression(model,
                                                              transpose(b1) * sigma * b1 * W)
     variance_risk = model[key] = JuMP.@expression(model, LinearAlgebra.tr(sigma_W))
@@ -724,7 +724,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::UncertaintySetVaria
     end
     set_sdp_constraints!(model; prefix = prefix)
     ucs = r.ucs
-    sigma = isnothing(r.sigma) ? pr.sigma : r.sigma
+    sigma = nothing_scalar_array_selector(r.sigma, pr.sigma)
     ucs_variance_risk, key = set_ucs_variance_risk!(model, i, sigma_ucs(ucs, rd; kwargs...),
                                                     sigma; prefix = prefix)
     set_risk_bounds_and_expression!(model, opt, ucs_variance_risk, r.settings, key)

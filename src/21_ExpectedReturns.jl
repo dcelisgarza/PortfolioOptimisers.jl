@@ -44,7 +44,7 @@ Compute the expected portfolio return using the specified return estimator.
 """
 function expected_return(r::ArithmeticReturn, w::VecNum, pr::AbstractPriorResult,
                          fees::Option{<:Fees} = nothing; kwargs...)
-    mu = ifelse(isnothing(r.mu), pr.mu, r.mu)
+    mu = nothing_scalar_array_selector(r.mu, pr.mu)
     return LinearAlgebra.dot(w, mu) - calc_fees(w, fees)
 end
 function expected_return(ret::LogarithmicReturn, w::VecNum, pr::AbstractPriorResult,
