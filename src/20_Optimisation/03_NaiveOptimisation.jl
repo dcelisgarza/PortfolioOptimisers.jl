@@ -223,15 +223,15 @@ InverseVolatility
     """
     $(field_dict[:pe])
     """
-    pe
+    @vprop pe
     """
     $(field_dict[:wb])
     """
-    wb
+    @vprop wb
     """
     $(field_dict[:sets])
     """
-    sets
+    @vprop sets
     """
     $(field_dict[:wf])
     """
@@ -276,23 +276,6 @@ function InverseVolatility(; pe::PrE_Pr = EmpiricalPrior(),
                            fb::Option{<:OptE_Opt} = nothing, sq::Bool = false,
                            brt::Bool = false, strict::Bool = false)::InverseVolatility
     return InverseVolatility(pe, wb, sets, wf, fb, sq, brt, strict)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Return a view of [`InverseVolatility`](@ref) `opt` sliced to asset indices `i`.
-
-# Related
-
-  - [`InverseVolatility`](@ref)
-  - [`port_opt_view`](@ref)
-"""
-function port_opt_view(opt::InverseVolatility, i, args...)::InverseVolatility
-    pe = port_opt_view(opt.pe, i)
-    wb = port_opt_view(opt.wb, i)
-    sets = port_opt_view(opt.sets, i)
-    return InverseVolatility(; pe = pe, wb = wb, sets = sets, wf = opt.wf, fb = opt.fb,
-                             sq = opt.sq, brt = opt.brt, strict = opt.strict)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -425,11 +408,11 @@ EqualWeighted
     """
     $(field_dict[:wb])
     """
-    wb
+    @vprop wb
     """
     $(field_dict[:sets])
     """
-    sets
+    @vprop sets
     """
     $(field_dict[:wf])
     """
@@ -465,22 +448,6 @@ function EqualWeighted(; wb::Option{<:WbE_Wb} = WeightBounds(),
                        fb::Option{<:OptE_Opt} = nothing,
                        strict::Bool = false)::EqualWeighted
     return EqualWeighted(wb, sets, wf, fb, strict)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Return a view of [`EqualWeighted`](@ref) `opt` sliced to asset indices `i`.
-
-# Related
-
-  - [`EqualWeighted`](@ref)
-  - [`port_opt_view`](@ref)
-"""
-function port_opt_view(opt::EqualWeighted, i, args...)::EqualWeighted
-    wb = port_opt_view(opt.wb, i)
-    sets = port_opt_view(opt.sets, i)
-    return EqualWeighted(; wb = wb, sets = sets, wf = opt.wf, fb = opt.fb,
-                         strict = opt.strict)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -599,7 +566,7 @@ RandomWeighted
     """
     $(field_dict[:alpha_dirichlet])
     """
-    alpha
+    @vprop alpha
     """
     $(field_dict[:rng])
     """
@@ -611,11 +578,11 @@ RandomWeighted
     """
     $(field_dict[:wb])
     """
-    wb
+    @vprop wb
     """
     $(field_dict[:sets])
     """
-    sets
+    @vprop sets
     """
     $(field_dict[:wf])
     """
@@ -658,23 +625,6 @@ function RandomWeighted(; alpha::Num_VecNum = 1,
                         fb::Option{<:OptE_Opt} = nothing,
                         strict::Bool = false)::RandomWeighted
     return RandomWeighted(alpha, rng, seed, wb, sets, wf, fb, strict)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Return a view of [`RandomWeighted`](@ref) `opt` sliced to asset indices `i`.
-
-# Related
-
-  - [`RandomWeighted`](@ref)
-  - [`port_opt_view`](@ref)
-"""
-function port_opt_view(opt::RandomWeighted, i, args...)::RandomWeighted
-    wb = port_opt_view(opt.wb, i)
-    sets = port_opt_view(opt.sets, i)
-    alpha = nothing_scalar_array_view(opt.alpha, i)
-    return RandomWeighted(; alpha = alpha, rng = opt.rng, seed = opt.seed, wb = wb,
-                          sets = sets, wf = opt.wf, fb = opt.fb, strict = opt.strict)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
