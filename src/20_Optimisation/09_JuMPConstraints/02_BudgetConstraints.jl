@@ -130,30 +130,6 @@ Matches either a plain number (fixed budget, e.g. `1.0`) or a [`BudgetRange`](@r
 """
 const Num_BgtRg = Union{<:Number, <:BudgetRange}
 """
-    port_opt_view(bgt, i)
-
-Get a view or subset of the budget constraint for index `i`.
-
-For scalar or [`BudgetRange`](@ref) inputs, returns the input unchanged (budget applies to all assets).
-
-# Arguments
-
-  - `bgt`: Budget value, [`BudgetRange`](@ref), or `nothing`.
-  - `i`: Index (ignored for scalar/range budgets).
-
-# Returns
-
-  - The budget unchanged, or `nothing`.
-
-# Related
-
-  - [`BudgetRange`](@ref)
-  - [`set_long_short_budget_constraints!`](@ref)
-"""
-function port_opt_view(bgt::Num_BgtRg, ::Any, args...)
-    return bgt
-end
-"""
     set_budget_constraints!(args...)
     set_budget_constraints!(model::JuMP.Model, val::Number, w::VecNum)
     set_budget_constraints!(model::JuMP.Model, bgt::BudgetRange, w::VecNum)
@@ -281,12 +257,23 @@ Keywords correspond to the struct's fields.
   - If `up` is a vector: `!isempty(up)` and all elements `>= 0`. If scalar: `>= 0`.
   - If `un` is a vector: `!isempty(un)` and all elements `>= 0`. If scalar: `>= 0`.
 
+## View parameters
+
+When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+
+  - `w`: Sliced to the selected indices via [`port_opt_view`](@ref).
+  - `vp`: Sliced to the selected indices via [`port_opt_view`](@ref).
+  - `vn`: Sliced to the selected indices via [`port_opt_view`](@ref).
+  - `up`: Sliced to the selected indices via [`port_opt_view`](@ref).
+  - `un`: Sliced to the selected indices via [`port_opt_view`](@ref).
+
 # Related
 
   - [`BudgetRange`](@ref)
   - [`BudgetMarketImpact`](@ref)
+  - [`port_opt_view`](@ref)
 """
-@concrete struct BudgetCosts <: BudgetCostEstimator
+@propagatable @concrete struct BudgetCosts <: BudgetCostEstimator
     """
     Budget target or range.
     """
@@ -294,23 +281,23 @@ Keywords correspond to the struct's fields.
     """
     $(field_dict[:pw])
     """
-    w
+    @vprop w
     """
     Cost coefficients for positive weight changes. Non-negative.
     """
-    vp
+    @vprop vp
     """
     Cost coefficients for negative weight changes. Non-negative.
     """
-    vn
+    @vprop vn
     """
     Upper limit on positive weight changes. Non-negative.
     """
-    up
+    @vprop up
     """
     Upper limit on negative weight changes. Non-negative.
     """
-    un
+    @vprop un
     function BudgetCosts(bgt::Num_BgtRg, w::VecNum, vp::Num_VecNum, vn::Num_VecNum,
                          up::Num_VecNum, un::Num_VecNum)
         @argcheck(!isempty(w))
@@ -350,14 +337,6 @@ function BudgetCosts(; bgt::Num_BgtRg = 1.0, w::VecNum, vp::Num_VecNum = 1.0,
                      vn::Num_VecNum = 1.0, up::Num_VecNum = 1.0, un::Num_VecNum = 1.0)
     return BudgetCosts(bgt, w, vp, vn, up, un)
 end
-function port_opt_view(bgt::BudgetCosts, i, args...)
-    w = view(bgt.w, i)
-    vp = nothing_scalar_array_view(bgt.vp, i)
-    vn = nothing_scalar_array_view(bgt.vn, i)
-    up = nothing_scalar_array_view(bgt.up, i)
-    un = nothing_scalar_array_view(bgt.un, i)
-    return BudgetCosts(; bgt = bgt.bgt, w = w, vp = vp, vn = vn, up = up, un = un)
-end
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -392,12 +371,23 @@ Keywords correspond to the struct's fields.
   - If `un` is a vector: `!isempty(un)` and all elements `>= 0`. If scalar: `>= 0`.
   - `0 <= beta <= 1`.
 
+## View parameters
+
+When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+
+  - `w`: Sliced to the selected indices via [`port_opt_view`](@ref).
+  - `vp`: Sliced to the selected indices via [`port_opt_view`](@ref).
+  - `vn`: Sliced to the selected indices via [`port_opt_view`](@ref).
+  - `up`: Sliced to the selected indices via [`port_opt_view`](@ref).
+  - `un`: Sliced to the selected indices via [`port_opt_view`](@ref).
+
 # Related
 
   - [`BudgetRange`](@ref)
   - [`BudgetCosts`](@ref)
+  - [`port_opt_view`](@ref)
 """
-@concrete struct BudgetMarketImpact <: BudgetCostEstimator
+@propagatable @concrete struct BudgetMarketImpact <: BudgetCostEstimator
     """
     Budget target or range.
     """
@@ -405,23 +395,23 @@ Keywords correspond to the struct's fields.
     """
     $(field_dict[:pw])
     """
-    w
+    @vprop w
     """
     Cost coefficients for positive weight changes. Non-negative.
     """
-    vp
+    @vprop vp
     """
     Cost coefficients for negative weight changes. Non-negative.
     """
-    vn
+    @vprop vn
     """
     Upper limit on positive weight changes. Non-negative.
     """
-    up
+    @vprop up
     """
     Upper limit on negative weight changes. Non-negative.
     """
-    un
+    @vprop un
     """
     Market impact exponent in `(0, 1]`.
     """
@@ -462,15 +452,6 @@ function BudgetMarketImpact(; bgt::Num_BgtRg = 1.0, w::VecNum, vp::Num_VecNum = 
                             vn::Num_VecNum = 1.0, up::Num_VecNum = 1.0,
                             un::Num_VecNum = 1.0, beta::Number = 2 / 3)
     return BudgetMarketImpact(bgt, w, vp, vn, up, un, beta)
-end
-function port_opt_view(bgt::BudgetMarketImpact, i, args...)
-    w = view(bgt.w, i)
-    vp = nothing_scalar_array_view(bgt.vp, i)
-    vn = nothing_scalar_array_view(bgt.vn, i)
-    up = nothing_scalar_array_view(bgt.up, i)
-    un = nothing_scalar_array_view(bgt.un, i)
-    return BudgetMarketImpact(; bgt = bgt.bgt, w = w, vp = vp, vn = vn, up = up, un = un,
-                              beta = bgt.beta)
 end
 function set_budget_constraints!(model::JuMP.Model, val::Number, w::VecNum)
     k = get_k(model)
