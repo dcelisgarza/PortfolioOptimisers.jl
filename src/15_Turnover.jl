@@ -26,6 +26,13 @@ $(DocStringExtensions.FIELDS)
   - `val` is validated with [`assert_nonempty_nonneg_finite_val`](@ref).
   - `dval`, if not `nothing`, `dval >= 0`.
 
+## View parameters
+
+When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+
+  - `w`: Sliced to the selected indices via [`port_opt_view`](@ref).
+  - `val`: Sliced to the selected indices via [`port_opt_view`](@ref).
+
 # Examples
 
 ```jldoctest
@@ -45,16 +52,17 @@ TurnoverEstimator
   - [`EstValType`](@ref)
   - [`Option`](@ref)
   - [`turnover_constraints`](@ref)
+  - [`port_opt_view`](@ref)
 """
-@concrete struct TurnoverEstimator <: AbstractEstimator
+@propagatable @concrete struct TurnoverEstimator <: AbstractEstimator
     """
     $(field_dict[:w_tn])
     """
-    w
+    @vprop w
     """
     $(field_dict[:val])
     """
-    val
+    @vprop val
     """
     $(field_dict[:dval])
     """
@@ -76,64 +84,6 @@ end
 function TurnoverEstimator(; w::VecNum, val::EstValType, dval::Option{<:Number} = nothing,
                            fixed::Bool = false)::TurnoverEstimator
     return TurnoverEstimator(w, val, dval, fixed)
-end
-"""
-    port_opt_view(tn::TurnoverEstimator, i)
-
-Create a view of a `TurnoverEstimator` for a subset of assets.
-
-`port_opt_view` returns a new `TurnoverEstimator` with portfolio weights and turnover values restricted to the indices or assets specified by `i`. The default turnover value is propagated unchanged.
-
-# Arguments
-
-  - `tn`: An instance of `TurnoverEstimator`.
-  - `i`: Index or indices specifying the subset of assets.
-
-# Returns
-
-  - `tn::TurnoverEstimator`: A new estimator with fields restricted to the specified subset.
-
-# Details
-
-  - Uses `view` to create a subset of the weights.
-  - Uses [`nothing_scalar_array_view`](@ref) to subset turnover values.
-  - Propagates the default turnover value.
-
-# Examples
-
-```jldoctest
-julia> tn = TurnoverEstimator(; w = [0.2, 0.3, 0.5], val = Dict("A" => 0.1, "B" => 0.2),
-                              dval = 0.0);
-
-julia> PortfolioOptimisers.port_opt_view(tn, 1:2)
-TurnoverEstimator
-      w ┼ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [0.2, 0.3]
-    val ┼ Dict{String, Float64}: Dict("B" => 0.2, "A" => 0.1)
-   dval ┼ Float64: 0.0
-  fixed ┴ Bool: false
-
-julia> tn = TurnoverEstimator(; w = [0.2, 0.3, 0.5], val = Dict("A" => 0.1, "B" => 0.2),
-                              dval = 0.0, fixed = true);
-
-julia> PortfolioOptimisers.port_opt_view(tn, 1:2)
-TurnoverEstimator
-      w ┼ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [0.2, 0.3]
-    val ┼ Dict{String, Float64}: Dict("B" => 0.2, "A" => 0.1)
-   dval ┼ Float64: 0.0
-  fixed ┴ Bool: true
-```
-
-# Related
-
-  - [`TurnoverEstimator`](@ref)
-  - [`Turnover`](@ref)
-  - [`turnover_constraints`](@ref)
-  - [`nothing_scalar_array_view`](@ref)
-"""
-function port_opt_view(tn::TurnoverEstimator, i, args...)::TurnoverEstimator
-    w = view(tn.w, i)
-    val = nothing_scalar_array_view(tn.val, i)
-    return TurnoverEstimator(; w = w, val = val, dval = tn.dval, fixed = tn.fixed)
 end
 """
     factory(tn::TurnoverEstimator, w::VecNum)
@@ -297,6 +247,13 @@ Keywords correspond to the struct's fields.
       + `AbstractVector`: `!isempty(val)`, `length(w) == length(val)`, `any(isfinite, val)`, `all(x -> x >= 0, val)`.
       + `Number`: `isfinite(val)` and `val >= 0`.
 
+## View parameters
+
+When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+
+  - `w`: Sliced to the selected indices via [`port_opt_view`](@ref).
+  - `val`: Sliced to the selected indices via [`port_opt_view`](@ref).
+
 # Examples
 
 ```jldoctest
@@ -326,15 +283,15 @@ Turnover
   - [`factory(tn::Turnover, w::VecNum)`](@ref)
   - [`port_opt_view`](@ref)
 """
-@concrete struct Turnover <: AbstractResult
+@propagatable @concrete struct Turnover <: AbstractResult
     """
     $(field_dict[:w_tn])
     """
-    w
+    @vprop w
     """
     $(field_dict[:val])
     """
-    val
+    @vprop val
     """
     $(field_dict[:fixed])
     """
@@ -350,59 +307,6 @@ Turnover
 end
 function Turnover(; w::VecNum, val::Num_VecNum = 0.0, fixed::Bool = false)::Turnover
     return Turnover(w, val, fixed)
-end
-"""
-    port_opt_view(tn::Turnover, i)
-
-Create a view of a `Turnover` for a subset of assets.
-
-Returns a new `Turnover` object with portfolio weights and turnover values restricted to the indices or assets specified by `i`.
-
-# Arguments
-
-  - `tn`: A `Turnover` object containing portfolio weights and turnover values.
-  - `i`: Index or indices specifying the subset of assets.
-
-# Returns
-
-  - `tn::Turnover`: A new turnover constraint object with fields restricted to the specified subset.
-
-# Details
-
-  - Uses `view` to create a subset of the weights.
-  - Uses [`nothing_scalar_array_view`](@ref) to subset turnover values.
-
-# Examples
-
-```jldoctest
-julia> tn = Turnover(; w = [0.2, 0.3, 0.5], val = [0.1, 0.2, 0.0]);
-
-julia> PortfolioOptimisers.port_opt_view(tn, 1:2)
-Turnover
-      w ┼ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [0.2, 0.3]
-    val ┼ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [0.1, 0.2]
-  fixed ┴ Bool: false
-
-julia> tn = Turnover(; w = [0.2, 0.3, 0.5], val = [0.1, 0.2, 0.0], fixed = true);
-
-julia> PortfolioOptimisers.port_opt_view(tn, 1:2)
-Turnover
-      w ┼ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [0.2, 0.3]
-    val ┼ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [0.1, 0.2]
-  fixed ┴ Bool: true
-```
-
-# Related
-
-  - [`Turnover`](@ref)
-  - [`TurnoverEstimator`](@ref)
-  - [`turnover_constraints`](@ref)
-  - [`nothing_scalar_array_view`](@ref)
-"""
-function port_opt_view(tn::Turnover, i, args...)::Turnover
-    w = view(tn.w, i)
-    val = nothing_scalar_array_view(tn.val, i)
-    return Turnover(; w = w, val = val, fixed = tn.fixed)
 end
 """
     factory(tn::Turnover, w::VecNum)

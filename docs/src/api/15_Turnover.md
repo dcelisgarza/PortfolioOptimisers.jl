@@ -9,7 +9,7 @@ factory(tn::Turnover, w::VecNum)
 factory(tn::TurnoverEstimator, w::VecNum)
 factory(tn::VecTnE_Tn, w::VecNum)
 turnover_constraints
-port_opt_view
+port_opt_view(tn::VecTnE_Tn, i)
 TnE_Tn
 VecTnE_Tn
 VecTn
