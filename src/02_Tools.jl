@@ -771,7 +771,9 @@ Used by [`_propagatable_parse_body`](@ref) to detect `@fprop`-tagged fields in a
   - [`_propagatable_parse_body`](@ref)
   - [`@propagatable`](@ref)
 """
-_is_prop_macro(x) = x == Symbol("@fprop") || (x isa GlobalRef && x.name == Symbol("@fprop"))
+function _is_fprop_macro(x)
+    return x == Symbol("@fprop") || (x isa GlobalRef && x.name == Symbol("@fprop"))
+end
 
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -792,7 +794,7 @@ end
 function _is_prop_tag_call(x)
     return x isa Expr &&
            x.head == :macrocall &&
-           (_is_prop_macro(x.args[1]) || _is_vprop_macro(x.args[1]))
+           (_is_fprop_macro(x.args[1]) || _is_vprop_macro(x.args[1]))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -817,7 +819,7 @@ function _peel_prop_tags(expr)
     is_f = false
     is_v = false
     while _is_prop_tag_call(expr)
-        if _is_prop_macro(expr.args[1])
+        if _is_fprop_macro(expr.args[1])
             is_f = true
         else
             is_v = true
@@ -1009,7 +1011,7 @@ through unchanged.
 
 # Related
 
-  - [`_is_prop_macro`](@ref)
+  - [`_is_fprop_macro`](@ref)
   - [`_is_doc_macro`](@ref)
   - [`_extract_field_name`](@ref)
   - [`_try_field_name`](@ref)
@@ -1047,7 +1049,7 @@ function _propagatable_parse_body(body)
             end
         elseif arg isa Expr &&
                arg.head == :macrocall &&
-               (_is_prop_macro(arg.args[1]) || _is_vprop_macro(arg.args[1]))
+               (_is_fprop_macro(arg.args[1]) || _is_vprop_macro(arg.args[1]))
             # Bare @fprop/@vprop field (tags may be stacked) — no docstring
             is_f, is_v, stripped = _peel_prop_tags(arg)
             fname = _extract_field_name(stripped)
@@ -1109,28 +1111,41 @@ end
 """
     @propagatable expr
 
-Define a struct and automatically generate a [`factory`](@ref) propagation
-method for it.
+Define a struct and automatically generate its propagation methods from two
+orthogonal, stackable field tags:
 
-Fields tagged with [`@fprop`](@ref) receive `_factory_child` calls when
-`factory` is invoked, recursing runtime data (observation weights, prior
-results, solvers, …) down the composition tree. Untagged fields pass through
-unchanged regardless of their type — tagging is explicit and opt-in.
+  - [`@fprop`](@ref) (factory propagation): tagged fields receive `_factory_child`
+    calls when [`factory`](@ref) is invoked, recursing runtime *values*
+    (observation weights, prior results, solvers, …) down the composition tree.
+    A `factory` method is always generated (it is the identity when no field is
+    tagged).
+  - [`@vprop`](@ref) (view propagation): tagged fields receive
+    [`port_opt_view`](@ref) calls when a view (an index selection) is propagated,
+    recursing into composed children and slicing data arrays. A `port_opt_view`
+    method is generated **only when at least one field is tagged `@vprop`**.
+
+Untagged fields pass through unchanged in both methods, regardless of type —
+tagging is explicit and opt-in. The two tags are independent: a field may carry
+neither, either, or both (`@fprop @vprop field`, in either order), because the
+factory- and view-relevant field sets genuinely diverge (a field can be
+factory-propagated but view-passthrough, or vice versa). See ADR 0010.
 
 Composes with `@concrete` (put `@propagatable` outermost):
 
 ```julia
 @propagatable @concrete struct MyEstimator <: AbstractEstimator
-    @fprop inner   # factory recurses into this field
-    config     # passed through unchanged
-    function MyEstimator(inner::AbstractEstimator, config)
-        return new{typeof(inner), typeof(config)}(inner, config)
+    @fprop @vprop inner   # both factory- and view-propagated
+    @vprop data           # view-sliced only (passed through by factory)
+    config                # passed through unchanged by both
+    function MyEstimator(inner::AbstractEstimator, data, config)
+        return new{typeof(inner), typeof(data), typeof(config)}(inner, data, config)
     end
 end
 ```
 
-The generated `factory` method is added to `PortfolioOptimisers.factory`,
-so `@propagatable` works correctly for types defined in external packages.
+The generated `factory`/`port_opt_view` methods are added to the
+`PortfolioOptimisers` functions, so `@propagatable` works correctly for types
+defined in external packages.
 
 Docstrings on the enclosing definition are forwarded correctly via
 `Base.@__doc__`.
