@@ -175,6 +175,14 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
 
   - `fb`: Recursively updated via [`factory`](@ref).
 
+## View parameters
+
+When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+
+  - `pe`: Recursively viewed via [`port_opt_view`](@ref).
+  - `wb`: Recursively viewed via [`port_opt_view`](@ref).
+  - `sets`: Sliced to the selected indices via [`port_opt_view`](@ref).
+
 # Examples
 
 ```jldoctest
@@ -218,6 +226,7 @@ InverseVolatility
   - [`EqualWeighted`](@ref)
   - [`RandomWeighted`](@ref)
   - [`factory`](@ref)
+  - [`port_opt_view`](@ref)
 """
 @propagatable @concrete struct InverseVolatility <: NaiveOptimisationEstimator
     """
@@ -382,6 +391,13 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
 
   - `fb`: Recursively updated via [`factory`](@ref).
 
+## View parameters
+
+When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+
+  - `wb`: Recursively viewed via [`port_opt_view`](@ref).
+  - `sets`: Sliced to the selected indices via [`port_opt_view`](@ref).
+
 # Examples
 
 ```jldoctest
@@ -403,6 +419,7 @@ EqualWeighted
   - [`InverseVolatility`](@ref)
   - [`RandomWeighted`](@ref)
   - [`factory`](@ref)
+  - [`port_opt_view`](@ref)
 """
 @propagatable @concrete struct EqualWeighted <: NaiveOptimisationEstimator
     """
@@ -539,6 +556,14 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
 
   - `fb`: Recursively updated via [`factory`](@ref).
 
+## View parameters
+
+When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+
+  - `alpha`: Sliced to the selected indices via [`port_opt_view`](@ref).
+  - `wb`: Recursively viewed via [`port_opt_view`](@ref).
+  - `sets`: Sliced to the selected indices via [`port_opt_view`](@ref).
+
 # Examples
 
 ```jldoctest
@@ -561,6 +586,7 @@ RandomWeighted
   - [`InverseVolatility`](@ref)
   - [`EqualWeighted`](@ref)
   - [`factory`](@ref)
+  - [`port_opt_view`](@ref)
 """
 @propagatable @concrete struct RandomWeighted <: NaiveOptimisationEstimator
     """

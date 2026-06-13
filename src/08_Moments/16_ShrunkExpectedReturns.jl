@@ -279,6 +279,14 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
   - `me`: Recursively updated via [`factory`](@ref).
   - `ce`: Recursively updated via [`factory`](@ref).
 
+## View parameters
+
+When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+
+  - `me`: Recursively viewed via [`port_opt_view`](@ref).
+  - `ce`: Recursively viewed via [`port_opt_view`](@ref).
+  - `alg`: Recursively viewed via [`port_opt_view`](@ref).
+
 # Examples
 
 ```jldoctest
@@ -313,6 +321,7 @@ ShrunkExpectedReturns
   - [`StatsBase.CovarianceEstimator`](https://juliastats.org/StatsBase.jl/stable/cov/#StatsBase.CovarianceEstimator)
   - [`AbstractShrunkExpectedReturnsAlgorithm`](@ref)
   - [`factory`](@ref)
+  - [`port_opt_view`](@ref)
 """
 @propagatable @concrete struct ShrunkExpectedReturns <:
                                AbstractShrunkExpectedReturnsEstimator

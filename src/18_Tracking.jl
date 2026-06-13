@@ -1007,6 +1007,12 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
 
   - `tr`: Recursively updated via [`factory`](@ref).
 
+## View parameters
+
+When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+
+  - `tr`: Recursively viewed via [`port_opt_view`](@ref).
+
 # Examples
 
 ```jldoctest
@@ -1033,6 +1039,7 @@ TrackingError
   - [`L2Tracking`](@ref)
   - [`L1Tracking`](@ref)
   - [`factory`](@ref)
+  - [`port_opt_view`](@ref)
 """
 @propagatable @concrete struct TrackingError <: AbstractTracking
     """

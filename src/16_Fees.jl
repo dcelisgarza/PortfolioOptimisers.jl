@@ -331,6 +331,16 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
 
   - `tn`: Recursively updated via [`factory`](@ref).
 
+## View parameters
+
+When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+
+  - `tn`: Recursively viewed via [`port_opt_view`](@ref).
+  - `l`: Sliced to the selected indices via [`port_opt_view`](@ref).
+  - `s`: Sliced to the selected indices via [`port_opt_view`](@ref).
+  - `fl`: Sliced to the selected indices via [`port_opt_view`](@ref).
+  - `fs`: Sliced to the selected indices via [`port_opt_view`](@ref).
+
 # Examples
 
 ```jldoctest
@@ -366,6 +376,7 @@ Fees
   - [`calc_asset_fees`](@ref)
   - [`calc_net_returns`](@ref)
   - [`factory`](@ref)
+  - [`port_opt_view`](@ref)
 """
 @propagatable @concrete struct Fees <: AbstractResult
     """

@@ -23,6 +23,12 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
 
   - `ce`: Recursively updated via [`factory`](@ref).
 
+## View parameters
+
+When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+
+  - `ce`: Recursively viewed via [`port_opt_view`](@ref).
+
 # Examples
 
 ```jldoctest
@@ -51,6 +57,7 @@ StandardDeviationExpectedReturns
   - [`AbstractExpectedReturnsEstimator`](@ref)
   - [`PortfolioOptimisersCovariance`](@ref)
   - [`factory`](@ref)
+  - [`port_opt_view`](@ref)
 """
 @propagatable @concrete struct StandardDeviationExpectedReturns <:
                                AbstractExpectedReturnsEstimator
@@ -140,6 +147,12 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
 
   - `ce`: Recursively updated via [`factory`](@ref).
 
+## View parameters
+
+When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+
+  - `ce`: Recursively viewed via [`port_opt_view`](@ref).
+
 # Examples
 
 ```jldoctest
@@ -168,6 +181,7 @@ VarianceExpectedReturns
   - [`AbstractExpectedReturnsEstimator`](@ref)
   - [`PortfolioOptimisersCovariance`](@ref)
   - [`factory`](@ref)
+  - [`port_opt_view`](@ref)
 """
 @propagatable @concrete struct VarianceExpectedReturns <: AbstractExpectedReturnsEstimator
     """

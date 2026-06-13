@@ -130,6 +130,12 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
 
   - `ce`: Recursively updated via [`factory`](@ref).
 
+## View parameters
+
+When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+
+  - `ce`: Recursively viewed via [`port_opt_view`](@ref).
+
 # Related
 
   - [`AbstractCovarianceEstimator`](@ref)
@@ -138,6 +144,7 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
   - [`ImpliedVolatilityPremium`](@ref)
   - [`AbstractMatrixProcessingEstimator`](@ref)
   - [`factory`](@ref)
+  - [`port_opt_view`](@ref)
 """
 @propagatable @concrete struct ImpliedVolatility <: AbstractCovarianceEstimator
     """

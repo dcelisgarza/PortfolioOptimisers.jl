@@ -139,6 +139,12 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
   - `me`: Recursively updated via [`factory`](@ref).
   - `w`: Replaced with the incoming [`ObsWeights`](@ref).
 
+## View parameters
+
+When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+
+  - `me`: Recursively viewed via [`port_opt_view`](@ref).
+
 # Validation
 
   - $(val_dict[:oow])
@@ -169,6 +175,7 @@ Coskewness
   - [`AbstractMatrixProcessingEstimator`](@ref)
   - [`AbstractMomentAlgorithm`](@ref)
   - [`factory`](@ref)
+  - [`port_opt_view`](@ref)
 """
 @propagatable @concrete struct Coskewness <: CoskewnessEstimator
     """
