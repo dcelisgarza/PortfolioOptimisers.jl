@@ -23,6 +23,12 @@ $(DocStringExtensions.FIELDS)
   - If `dval` is not `nothing`, it is validated with [`assert_nonempty_nonneg_finite_val`](@ref).
   - If `key` is not `nothing`, it is a non-empty string.
 
+## View parameters
+
+When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+
+  - `val`: Sliced to the selected indices via [`port_opt_view`](@ref).
+
 # Examples
 
 ```jldoctest
@@ -63,12 +69,13 @@ ThresholdEstimator
   - [`EstValType`](@ref)
   - [`threshold_constraints`](@ref)
   - [`AbstractConstraintEstimator`](@ref)
+  - [`port_opt_view`](@ref)
 """
-@concrete struct ThresholdEstimator <: AbstractConstraintEstimator
+@propagatable @concrete struct ThresholdEstimator <: AbstractConstraintEstimator
     """
     $(field_dict[:thr_val])
     """
-    val
+    @vprop val
     """
     $(field_dict[:ekey])
     """
@@ -112,6 +119,12 @@ $(DocStringExtensions.FIELDS)
 
   - `val` is validated with [`assert_nonempty_nonneg_finite_val`](@ref).
 
+## View parameters
+
+When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+
+  - `val`: Sliced to the selected indices via [`port_opt_view`](@ref).
+
 # Examples
 
 ```jldoctest
@@ -133,12 +146,13 @@ Threshold
   - [`ThresholdEstimator`](@ref)
   - [`threshold_constraints`](@ref)
   - [`AbstractConstraintResult`](@ref)
+  - [`port_opt_view`](@ref)
 """
-@concrete struct Threshold <: AbstractConstraintResult
+@propagatable @concrete struct Threshold <: AbstractConstraintResult
     """
     $(field_dict[:thr_res_val])
     """
-    val
+    @vprop val
     function Threshold(val::Num_VecNum)::Threshold
         assert_nonempty_nonneg_finite_val(val)
         return new{typeof(val)}(val)
@@ -213,13 +227,6 @@ Matches either a single [`Threshold`](@ref) or a vector of optional [`Threshold`
   - [`VecOptBt`](@ref)
 """
 const Bt_VecOptBt = Union{<:Threshold, <:VecOptBt}
-function port_opt_view(t::ThresholdEstimator, i, args...)::ThresholdEstimator
-    return ThresholdEstimator(; val = nothing_scalar_array_view(t.val, i), dval = t.dval,
-                              key = t.key)
-end
-function port_opt_view(t::Threshold, i, args...)::Threshold
-    return Threshold(; val = nothing_scalar_array_view(t.val, i))
-end
 function port_opt_view(t::VecOptBtE_Bt, i, args...)
     return [port_opt_view(ti, i) for ti in t]
 end
