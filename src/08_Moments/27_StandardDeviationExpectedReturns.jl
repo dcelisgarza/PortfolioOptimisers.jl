@@ -57,7 +57,7 @@ StandardDeviationExpectedReturns
     """
     $(field_dict[:ce])
     """
-    @fprop ce
+    @fprop @vprop ce
     function StandardDeviationExpectedReturns(ce::StatsBase.CovarianceEstimator)
         return new{typeof(ce)}(ce)
     end
@@ -71,28 +71,6 @@ end
 function StandardDeviationExpectedReturns(;
                                           ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance())::StandardDeviationExpectedReturns
     return StandardDeviationExpectedReturns(ce)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Gets the view of the expected returns estimator for the `i`-th element(s).
-
-# Arguments
-
-  - $(arg_dict[:me])
-  - `i`: Index or indices to view.
-
-# Returns
-
-  - $(ret_dict[:mev])
-
-# Related
-
-  - [`StandardDeviationExpectedReturns`](@ref)
-"""
-function port_opt_view(me::StandardDeviationExpectedReturns, i,
-                       args...)::StandardDeviationExpectedReturns
-    return StandardDeviationExpectedReturns(; me = port_opt_view(me.ce, i))
 end
 """
     Statistics.mean(me::StandardDeviationExpectedReturns, X::MatNum;
@@ -195,7 +173,7 @@ VarianceExpectedReturns
     """
     $(field_dict[:ce])
     """
-    @fprop ce
+    @fprop @vprop ce
     function VarianceExpectedReturns(ce::StatsBase.CovarianceEstimator)
         return new{typeof(ce)}(ce)
     end
@@ -208,27 +186,6 @@ end
 function VarianceExpectedReturns(;
                                  ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance())::VarianceExpectedReturns
     return VarianceExpectedReturns(ce)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Gets the view of the expected returns estimator for the `i`-th element(s).
-
-# Arguments
-
-  - $(arg_dict[:me])
-  - `i`: Index or indices to view.
-
-# Returns
-
-  - $(ret_dict[:mev])
-
-# Related
-
-  - [`VarianceExpectedReturns`](@ref)
-"""
-function port_opt_view(me::VarianceExpectedReturns, i, args...)::VarianceExpectedReturns
-    return VarianceExpectedReturns(; me = port_opt_view(me.ce, i))
 end
 """
     Statistics.mean(me::VarianceExpectedReturns, X::MatNum;

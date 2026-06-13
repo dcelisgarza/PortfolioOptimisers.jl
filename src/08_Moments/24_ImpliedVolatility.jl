@@ -143,7 +143,7 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
     """
     $(field_dict[:ce])
     """
-    @fprop ce
+    @fprop @vprop ce
     """
     $(field_dict[:mp])
     """
@@ -173,27 +173,6 @@ function ImpliedVolatility(; ce::StatsBase.CovarianceEstimator = Covariance(),
                            alg::ImpliedVolatilityAlgorithm = ImpliedVolatilityRegression(),
                            af::Number = 252)::ImpliedVolatility
     return ImpliedVolatility(ce, mp, alg, af)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Gets the view of the covariance estimator for the `i`-th element(s).
-
-# Arguments
-
-  - $(arg_dict[:ce])
-  - `i`: Index or indices to view.
-
-# Returns
-
-  - $(ret_dict[:cev])
-
-# Related
-
-  - [`ImpliedVolatility`](@ref)
-"""
-function port_opt_view(ce::ImpliedVolatility, i, args...)::ImpliedVolatility
-    return ImpliedVolatility(; ce = port_opt_view(ce.ce, i), mp = ce.mp)
 end
 """
     realised_vol(ce::AbstractVarianceEstimator, X::MatNum, ws::Integer,

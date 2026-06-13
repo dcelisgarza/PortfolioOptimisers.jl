@@ -176,12 +176,24 @@ end
 
 ### `@propagatable` concrete struct types
 
-When a struct is decorated with `@propagatable`, some fields carry an `@prop` tag inside the struct body. These fields are automatically propagated when [`factory`](@ref) is called on the enclosing struct (see `_factory_child` for dispatch rules). Add a `## Propagated parameters` subsection inside `# Constructors`, placed **after** `## Validation` (or directly after "Keywords correspond to the struct's fields." when there is no `## Validation`), listing each `@prop`-tagged field and how it is propagated:
+When a struct is decorated with `@propagatable`, fields carry two orthogonal, stackable tags inside the struct body:
+
+- `@fprop` — **factory propagation**: the field is automatically propagated when [`factory`](@ref) is called on the enclosing struct (see `_factory_child` for dispatch rules).
+- `@vprop` — **view propagation**: the field is automatically subset when [`port_opt_view`](@ref) is called on the enclosing struct (recursing into composed children, slicing data arrays).
+
+A field may carry neither, either, or both (`@fprop @vprop field`, in either order) — the factory- and view-relevant field sets genuinely diverge (a field can be factory-propagated but view-passthrough, or vice versa). Document each in its own subsection inside `# Constructors`, placed **after** `## Validation` (or directly after "Keywords correspond to the struct's fields." when there is no `## Validation`).
+
+For `@fprop`-tagged fields, add a `## Propagated parameters` subsection listing each field and how it is propagated:
 
 - **Observation-weight fields** (type `ObsWeights`, `Nothing`, or `Option{<:ObsWeights}`): write `` `fieldname`: Replaced with the incoming [`ObsWeights`](@ref). ``
 - **Estimator, algorithm, or result fields** (subtypes of `AbstractEstimator`, `AbstractAlgorithm`, or `AbstractResult`): write `` `fieldname`: Recursively updated via [`factory`](@ref). ``
 
-List fields in the same order they appear in the struct body.
+For `@vprop`-tagged fields, add a `## View parameters` subsection listing each field and how it is viewed:
+
+- **Estimator, algorithm, or result fields** (subtypes of `AbstractEstimator`, `AbstractAlgorithm`, or `AbstractResult`): write `` `fieldname`: Recursively viewed via [`port_opt_view`](@ref). ``
+- **Data fields** (arrays, scalars, or `Option` thereof): write `` `fieldname`: Sliced to the selected indices via [`port_opt_view`](@ref). ``
+
+List fields in the same order they appear in the struct body, and add [`factory`](@ref) and/or [`port_opt_view`](@ref) to `# Related` to match the tags present.
 
 ````julia
 """
@@ -209,10 +221,16 @@ Keywords correspond to the struct's fields.
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@prop`-tagged fields are automatically propagated:
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
 
   - `nested_est`: Recursively updated via [`factory`](@ref).
   - `weight_field`: Replaced with the incoming [`ObsWeights`](@ref).
+
+## View parameters
+
+When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+
+  - `nested_est`: Recursively viewed via [`port_opt_view`](@ref).
 
 # Examples
 
@@ -227,12 +245,13 @@ MyType
 
   - [`AbstractMyType`](@ref)
   - [`factory`](@ref)
+  - [`port_opt_view`](@ref)
 """
 @propagatable @concrete struct MyType <: AbstractMyType
     "$(field_dict[:oow])"
-    @prop weight_field
+    @fprop weight_field
     "$(field_dict[:nested])"
-    @prop nested_est
+    @fprop @vprop nested_est
     "$(field_dict[:cfg])"
     config
     function MyType(weight_field::Option{<:ObsWeights}, nested_est::AbstractEstimator,
