@@ -15,6 +15,7 @@ get_window
 _factory_child
 @fprop
 @vprop
+_is_prop_tag_call
 _is_fprop_macro
 _is_vprop_macro
 _is_doc_macro

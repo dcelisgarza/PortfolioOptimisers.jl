@@ -791,6 +791,20 @@ Used by [`_propagatable_parse_body`](@ref) to detect `@vprop`-tagged fields in a
 function _is_vprop_macro(x)
     return x == Symbol("@vprop") || (x isa GlobalRef && x.name == Symbol("@vprop"))
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return `true` if `x` is a macro call to either [`@fprop`](@ref) or [`@vprop`](@ref).
+
+Used by [`_propagatable_parse_body`](@ref) to detect `@fprop` or `@vprop`-tagged fields in a struct body.
+
+# Related
+
+  - [`@fprop`](@ref)
+  - [`@vprop`](@ref)
+  - [`_propagatable_parse_body`](@ref)
+  - [`@propagatable`](@ref)
+"""
 function _is_prop_tag_call(x)
     return x isa Expr &&
            x.head == :macrocall &&
