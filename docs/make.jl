@@ -82,8 +82,11 @@ end
 
 diff_flag = isempty(String(read(Cmd(`git diff $(@__DIR__) $(joinpath(@__DIR__, "../src/")) $(joinpath(@__DIR__, "../ext/")) $(joinpath(@__DIR__, "../test/"))`))))
 
-examples = generate_files("../examples/", "examples/", false)
-user_guide = generate_files("../user_guide/", "user_guide/", false)
+examples = generate_files("../examples/", "examples/", true)
+user_guide = generate_files("../user_guide/", "user_guide/", true)
+
+include(joinpath(@__DIR__, "generate_type_hierarchy.jl"))
+generate_type_hierarchy()
 
 root_pages = [file
               for file in readdir(joinpath(@__DIR__, "src")) if splitext(file)[2] == ".md"]

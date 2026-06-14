@@ -29,7 +29,7 @@ Mirror the estimator structure on the result side.
 `OptimisationResult`, which remain supertypes; no method dispatches on the four concrete JuMP result
 types today):
 
-```md
+```text
 AbstractResult
 ├── BaseJuMPOptimisationResult                 (new abstract — off AbstractResult, not in the result hierarchy)
 │    └── JuMPOptimisationResult                (new struct: oe, pa, retcode, sol, model)
@@ -41,9 +41,12 @@ AbstractResult
      │    │    ├── NearOptimalCenteringResult     (jr, w_min/opt/max/noc_retcode, fb)
      │    │    └── FactorRiskContributionResult   (jr, rr, frc_plr, fb)
      │    └── NonJuMPOptimisationResult        (new abstract)
-     │         ├── NaiveOptimisationResult  ├── HierarchicalResult
+     │         ├── NaiveOptimisationResult
+     │         ├── HierarchicalResult
      │         ├── SchurComplementHierarchicalRiskParityResult
-     │         ├── NestedClusteredResult    ├── StackingResult    └── SubsetResamplingResult
+     │         ├── NestedClusteredResult
+     │         ├── StackingResult
+     │         └── SubsetResamplingResult
      └── FiniteAllocationOptimisationResult   (DiscreteAllocationResult, GreedyAllocationResult — unchanged)
 ```
 
