@@ -231,10 +231,6 @@ Returns a column view for matrix inputs, the estimator unchanged for estimator i
 function port_opt_view(smtx::MatNum, i, args...; kwargs...)
     return view(smtx, :, i)
 end
-function port_opt_view(smtx::Option{<:AssetSetsMatrixEstimator}, ::Any, args...;
-                       kwargs...)::Option{<:AssetSetsMatrixEstimator}
-    return smtx
-end
 function port_opt_view(smtx::VecMatNum_ASetMatE, i, args...; kwargs...)
     val = [port_opt_view(smtxi, i; kwargs...) for smtxi in smtx]
     if isabstracttype(eltype(val))

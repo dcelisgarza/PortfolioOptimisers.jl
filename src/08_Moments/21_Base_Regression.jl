@@ -721,29 +721,6 @@ function port_opt_view(re::Regression, i, args...)::Regression
                       L = isnothing(re.L) ? nothing : view(re.L, i, :), b = view(re.b, i))
 end
 """
-    port_opt_view(re::Option{<:AbstractRegressionEstimator}, args...)
-
-No-op fallback for `port_opt_view` when the input is `nothing` or an `AbstractRegressionEstimator`.
-
-This method returns the input `re` unchanged. It is used internally to allow generic code to call `port_opt_view` without needing to check for `nothing` or estimator types, ensuring graceful handling of missing or non-result regression objects.
-
-# Arguments
-
-  - `re`: Either `nothing` or a regression estimator type.
-  - `args...`: Additional arguments (ignored).
-
-# Returns
-
-  - The input `re`, unchanged.
-
-# Related
-
-  - [`port_opt_view(::Regression, ::VecNum)`](@ref)
-"""
-function port_opt_view(re::Option{<:AbstractRegressionEstimator}, ::Any, args...)
-    return re
-end
-"""
     regression(re::Regression, args...)
 
 Return the regression result object unchanged.

@@ -626,6 +626,13 @@ $(DocStringExtensions.FIELDS)
 
   - `!isempty(w)`.
 
+## View parameters
+
+When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+
+  - `fees`: Recursively viewed via [`port_opt_view`](@ref).
+  - `w`: Sliced to the selected indices via [`port_opt_view`](@ref).
+
 # Examples
 
 ```jldoctest
@@ -644,16 +651,17 @@ WeightsTracking
   - [`Fees`](@ref)
   - [`Option`](@ref)
   - [`tracking_benchmark`](@ref)
+  - [`port_opt_view`](@ref)
 """
-@concrete struct WeightsTracking <: AbstractTrackingAlgorithm
+@propagatable @concrete struct WeightsTracking <: AbstractTrackingAlgorithm
     """
     $(field_dict[:fees])
     """
-    fees
+    @vprop fees
     """
     $(field_dict[:w_tn])
     """
-    w
+    @vprop w
     """
     $(field_dict[:fixed])
     """
@@ -757,59 +765,6 @@ function factory(tr::WeightsTracking, w::VecNum)
     end
 end
 """
-    port_opt_view(tr::WeightsTracking, i)
-
-Return a view of a `WeightsTracking` object for the given index or indices.
-
-This function creates a new [`WeightsTracking`](@ref) instance by extracting a view of the fees and portfolio weights fields at the specified index or indices.
-
-# Arguments
-
-  - `tr`: A [`WeightsTracking`](@ref) object containing fees and portfolio weights.
-  - `i`: Index or indices to subset the fees and weights.
-
-# Returns
-
-  - `tr::WeightsTracking`: New tracking algorithm object with fees and weights viewed at `i`.
-
-# Details
-
-  - Uses `port_opt_view` to subset the `fees` field.
-  - Uses `view` to subset the `w` field.
-  - Returns a new `WeightsTracking` object with the subsetted fields.
-
-# Examples
-
-```jldoctest
-julia> tr = WeightsTracking(; w = [0.5, 0.5, 0.6]);
-
-julia> PortfolioOptimisers.port_opt_view(tr, 2:3)
-WeightsTracking
-   fees ┼ nothing
-      w ┼ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [0.5, 0.6]
-  fixed ┴ Bool: false
-
-julia> tr = WeightsTracking(; w = [0.5, 0.5, 0.6], fixed = true);
-
-julia> PortfolioOptimisers.port_opt_view(tr, 2:3)
-WeightsTracking
-   fees ┼ nothing
-      w ┼ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [0.5, 0.6]
-  fixed ┴ Bool: true
-```
-
-# Related
-
-  - [`WeightsTracking`](@ref)
-  - [`port_opt_view`](@ref)
-  - [`port_opt_view`](@ref)
-"""
-function port_opt_view(tr::WeightsTracking, i, args...)
-    fees = port_opt_view(tr.fees, i)
-    w = view(tr.w, i)
-    return WeightsTracking(; fees = fees, w = w, fixed = tr.fixed)
-end
-"""
     tracking_benchmark(tr::WeightsTracking, X::MatNum)
 
 Compute the benchmark portfolio returns for a weights-based tracking algorithm.
@@ -901,45 +856,6 @@ ReturnsTracking
 end
 function ReturnsTracking(; w::VecNum)
     return ReturnsTracking(w)
-end
-"""
-    port_opt_view(tr::ReturnsTracking, ::Any)
-
-Return a view of a `ReturnsTracking` object.
-
-This function returns the input [`ReturnsTracking`](@ref) object unchanged. It is used to provide a consistent interface for tracking view operations on returns-based tracking algorithms.
-
-# Arguments
-
-  - `tr`: A [`ReturnsTracking`](@ref) object containing benchmark portfolio returns.
-  - `::Any`: Index or argument (ignored).
-
-# Returns
-
-  - `tr::ReturnsTracking`: The input tracking algorithm object.
-
-# Details
-
-  - Returns the input object unchanged.
-  - Ensures interface consistency for tracking view operations.
-
-# Examples
-
-```jldoctest
-julia> tr = ReturnsTracking(; w = [0.01, 0.02, 0.03]);
-
-julia> PortfolioOptimisers.port_opt_view(tr, 1:2)
-ReturnsTracking
-  w ┴ Vector{Float64}: [0.01, 0.02, 0.03]
-```
-
-# Related
-
-  - [`ReturnsTracking`](@ref)
-  - [`port_opt_view`](@ref)
-"""
-function port_opt_view(tr::ReturnsTracking, ::Any, args...)
-    return tr
 end
 """
     tracking_benchmark(tr::ReturnsTracking, args...)

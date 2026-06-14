@@ -68,30 +68,6 @@ Abstract supertype for JuMP-based returns estimators used in optimisation models
 """
 abstract type JuMPReturnsEstimator <: AbstractEstimator end
 """
-    port_opt_view(r, args...; kwargs...)
-
-Get a view or subset of JuMP returns estimator for slicing.
-
-Returns the estimator sliced for a given asset cluster or returns it unchanged.
-
-# Arguments
-
-  - `r`: JuMP returns estimator.
-  - `args...`: Additional arguments (index, etc.).
-  - `kwargs...`: Additional keyword arguments.
-
-# Returns
-
-  - Sliced or unchanged returns estimator.
-
-# Related
-
-  - [`JuMPReturnsEstimator`](@ref)
-"""
-function port_opt_view(r::JuMPReturnsEstimator, ::Any, args...; kwargs...)
-    return r
-end
-"""
 $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for JuMP constraint estimators.

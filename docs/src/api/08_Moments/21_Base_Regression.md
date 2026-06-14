@@ -27,7 +27,7 @@ AbstractMinMaxValStepwiseRegressionCriterion
 AbstractRegressionTarget
 AbstractMinValStepwiseRegressionCriterion
 AbstractMaxValStepwiseRegressionCriteria
-port_opt_view
+port_opt_view(re::Regression, i)
 regression_criterion_func
 regression_threshold
 ```

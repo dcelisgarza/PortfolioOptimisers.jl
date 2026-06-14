@@ -27,6 +27,6 @@ NormTracking
 VariableTracking
 norm_tracking
 tracking_benchmark
-port_opt_view
+port_opt_view(tr::VecTr, args...)
 factory(tr::WeightsTracking, w::VecNum)
 ```

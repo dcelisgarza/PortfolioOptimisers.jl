@@ -6,14 +6,11 @@ JuMPOptimisationEstimator
 RiskJuMPOptimisationEstimator
 ObjectiveFunction
 JuMPReturnsEstimator
-port_opt_view
 JuMPConstraintEstimator
 CustomJuMPConstraint
 CustomJuMPObjective
 needs_previous_weights(::CustomJuMPConstraint)
 needs_previous_weights(::CustomJuMPObjective)
-port_opt_view
-port_opt_view
 JuMPOptimisationSolution
 add_custom_objective_term!
 add_custom_constraint!
