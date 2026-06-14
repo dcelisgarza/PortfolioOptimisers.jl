@@ -26,7 +26,7 @@ prior(pe::EntropyPoolingPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <
                               <:H0_EntropyPooling}, X::MatNum,
       F::Option{<:MatNum} = nothing; dims::Int = 1, strict::Bool = false,
       kwargs...)
-port_opt_view(pr::EntropyPoolingPrior, rd)
+port_opt_view(pr::EntropyPoolingPrior, rd, args...)
 AbstractEntropyPoolingOptimiser
 AbstractEntropyPoolingAlgorithm
 AbstractEntropyPoolingOptAlgorithm

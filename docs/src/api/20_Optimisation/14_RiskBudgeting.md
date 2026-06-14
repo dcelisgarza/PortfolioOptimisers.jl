@@ -7,9 +7,9 @@ Base.getproperty(r::RiskBudgetingResult, sym::Symbol)
 ProcessedFactorRiskBudgetingAttributes
 ProcessedAssetRiskBudgetingAttributes
 RiskBudgetingFormulation
-port_opt_view(::RiskBudgetingFormulation, args...)
-port_opt_view(alg::LogRiskBudgeting{Nothing}, i)
-port_opt_view(alg::LogRiskBudgeting{<:VecInt}, i)
+port_opt_view(::RiskBudgetingFormulation, ::Any, args...)
+port_opt_view(alg::LogRiskBudgeting{Nothing}, i, args...)
+port_opt_view(alg::LogRiskBudgeting{<:VecInt}, i, args...)
 LogRiskBudgeting
 MixedIntegerRiskBudgeting
 RiskBudgetingAlgorithm
@@ -18,9 +18,9 @@ FactorRiskBudgeting
 RiskBudgeting
 needs_previous_weights(opt::RiskBudgeting)
 factory(rb::RiskBudgeting, w::AbstractVector)
-port_opt_view(rb::RiskBudgeting, i, X::MatNum)
-port_opt_view(r::AssetRiskBudgeting, i)
-port_opt_view(r::FactorRiskBudgeting, i)
+port_opt_view(rb::RiskBudgeting, i, X::MatNum, args...)
+port_opt_view(r::AssetRiskBudgeting, i, args...)
+port_opt_view(r::FactorRiskBudgeting, i, args...)
 _set_risk_budgeting_constraints!(model::JuMP.Model, rb::RiskBudgeting, w::VecJuMPScalar; strict::Bool = false)
 set_risk_budgeting_constraints!
 set_rb_mip_w!

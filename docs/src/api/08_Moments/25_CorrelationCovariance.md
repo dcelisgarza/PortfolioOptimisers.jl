@@ -7,5 +7,5 @@ cov(ce::CorrelationCovariance, X::MatNum; dims::Int = 1,
                         kwargs...)
 cor(ce::CorrelationCovariance, X::MatNum; dims::Int = 1,
                         kwargs...)
-port_opt_view(ce::CorrelationCovariance, i)
+port_opt_view(ce::CorrelationCovariance, i, args...)
 ```

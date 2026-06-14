@@ -4,7 +4,7 @@
 HierarchicalEqualRiskContribution
 needs_previous_weights(opt::HierarchicalEqualRiskContribution)
 factory(hec::HierarchicalEqualRiskContribution, w::AbstractVector)
-port_opt_view(hec::HierarchicalEqualRiskContribution, i, X::MatNum)
+port_opt_view(hec::HierarchicalEqualRiskContribution, i, X::MatNum, args...)
 herc_scalarised_risk_o!
 herc_scalarised_risk_i!
 herc_risk

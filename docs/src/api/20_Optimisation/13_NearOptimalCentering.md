@@ -11,7 +11,7 @@ NearOptimalSetup
 NearOptimalCentering
 needs_previous_weights(opt::NearOptimalCentering)
 factory(noc::NearOptimalCentering, w::AbstractVector)
-port_opt_view(noc::NearOptimalCentering, i, X::MatNum)
+port_opt_view(noc::NearOptimalCentering, i, X::MatNum, args...)
 near_optimal_centering_risks
 near_optimal_centering_setup
 set_near_optimal_centering_constraints!

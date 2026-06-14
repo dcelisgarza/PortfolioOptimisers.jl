@@ -48,6 +48,6 @@ weight_independent_target(::Number)
 weight_independent_target(::Any)
 factory(rs::AbstractBaseRiskMeasure, args...; kwargs...)
 factory(rs::VecBaseRM, args...; kwargs...)
-port_opt_view(rs::AbstractBaseRiskMeasure, ::Any, ::Any)
+port_opt_view(rs::AbstractBaseRiskMeasure, ::Any, ::Any, args...)
 _Frontier
 ```
