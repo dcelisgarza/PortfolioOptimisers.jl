@@ -392,8 +392,9 @@ function _optimise(rrb::RelaxedRiskBudgeting, rd::ReturnsResult = ReturnsResult(
     set_portfolio_objective_function!(model, MinimumRisk(), attrs.ret, rrb.opt.cobj, rrb,
                                       attrs.pr)
     retcode, sol = optimise_JuMP_model!(model, rrb, eltype(attrs.pr.X))
-    return RiskBudgetingResult(typeof(rrb), attrs, prb, retcode, sol,
-                               ifelse(save, model, nothing), nothing)
+    return RiskBudgetingResult(JuMPOptimisationResult(typeof(rrb), attrs, retcode, sol,
+                                                      ifelse(save, model, nothing)), prb,
+                               nothing)
 end
 """
     optimise(rrb::RelaxedRiskBudgeting{<:Any, <:Any, <:Any, <:Any, Nothing},

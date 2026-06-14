@@ -12,7 +12,7 @@ $(DocStringExtensions.FIELDS)
   - [`NestedClustered`](@ref)
   - [`NonFiniteAllocationOptimisationResult`](@ref)
 """
-@concrete struct NestedClusteredResult <: NonFiniteAllocationOptimisationResult
+@concrete struct NestedClusteredResult <: NonJuMPOptimisationResult
     """
     $(field_dict[:oe])
     """
@@ -57,15 +57,6 @@ $(DocStringExtensions.FIELDS)
     $(field_dict[:fb])
     """
     fb
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Rebuild a [`NestedClusteredResult`](@ref) with an updated fallback optimiser `fb`.
-"""
-function factory(res::NestedClusteredResult, fb::Option{<:OptE_Opt})
-    return NestedClusteredResult(res.oe, res.pr, res.clr, res.wb, res.fees, res.resi,
-                                 res.reso, res.cv, res.retcode, res.w, fb)
 end
 """
     assert_internal_optimiser(opt)

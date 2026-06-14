@@ -7,38 +7,23 @@ Result type for Risk Budgeting portfolio optimisation.
 
 $(DocStringExtensions.FIELDS)
 
-The `w` property is forwarded from `sol.w`.
+Property access delegates to the embedded [`JuMPOptimisationResult`](@ref); unknown properties forward to `prb` first, then through `jr` (including the virtual `:w` and the `pa` fall-through).
 
 # Related
 
   - [`RiskBudgeting`](@ref)
-  - [`NonFiniteAllocationOptimisationResult`](@ref)
+  - [`RiskJuMPOptimisationResult`](@ref)
+  - [`JuMPOptimisationResult`](@ref)
 """
-@concrete struct RiskBudgetingResult <: NonFiniteAllocationOptimisationResult
+@concrete struct RiskBudgetingResult <: RiskJuMPOptimisationResult
     """
-    $(field_dict[:oe])
+    Shared JuMP result core, see [`JuMPOptimisationResult`](@ref).
     """
-    oe
-    """
-    $(field_dict[:pa])
-    """
-    pa
+    jr
     """
     $(field_dict[:prb])
     """
     prb
-    """
-    $(field_dict[:retcode])
-    """
-    retcode
-    """
-    $(field_dict[:sol])
-    """
-    sol
-    """
-    $(field_dict[:model])
-    """
-    model
     """
     $(field_dict[:fb])
     """
@@ -47,27 +32,15 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Rebuild a [`RiskBudgetingResult`](@ref) with an updated fallback optimiser `fb`.
-"""
-function factory(res::RiskBudgetingResult, fb::Option{<:OptE_Opt})
-    return RiskBudgetingResult(res.oe, res.pa, res.prb, res.retcode, res.sol, res.model, fb)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Access properties of [`RiskBudgetingResult`](@ref). Virtual property `:w` extracts portfolio weights from `sol`; other unknown properties forward to `r.prb` then `r.pa`.
+Access properties of [`RiskBudgetingResult`](@ref). Unique field `prb` resolves directly; unknown properties forward into `prb` first, then delegate to the embedded [`JuMPOptimisationResult`](@ref) `jr` (the virtual `:w` and `pa` fall-through).
 """
 function Base.getproperty(r::RiskBudgetingResult, sym::Symbol)
-    return if sym == :w
-        r.sol.w
-    elseif sym in propertynames(r)
+    return if sym in fieldnames(RiskBudgetingResult)
         getfield(r, sym)
-    elseif sym in propertynames(r.prb)
-        getproperty(r.prb, sym)
-    elseif sym in propertynames(r.pa)
-        getproperty(r.pa, sym)
+    elseif sym in propertynames(getfield(r, :prb))
+        getproperty(getfield(r, :prb), sym)
     else
-        getfield(r, sym)
+        getproperty(getfield(r, :jr), sym)
     end
 end
 """
@@ -692,8 +665,9 @@ function _optimise(rb::RiskBudgeting, rd::ReturnsResult = ReturnsResult(); dims:
     set_portfolio_objective_function!(model, MinimumRisk(), attrs.ret, rb.opt.cobj, rb,
                                       attrs.pr)
     retcode, sol = optimise_JuMP_model!(model, rb, eltype(attrs.pr.X))
-    return RiskBudgetingResult(typeof(rb), attrs, prb, retcode, sol,
-                               ifelse(save, model, nothing), nothing)
+    return RiskBudgetingResult(JuMPOptimisationResult(typeof(rb), attrs, retcode, sol,
+                                                      ifelse(save, model, nothing)), prb,
+                               nothing)
 end
 """
     optimise(rb::RiskBudgeting{<:Any, <:Any, <:Any, <:Any, Nothing},

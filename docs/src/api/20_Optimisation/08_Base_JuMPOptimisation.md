@@ -12,6 +12,12 @@ CustomJuMPObjective
 needs_previous_weights(::CustomJuMPConstraint)
 needs_previous_weights(::CustomJuMPObjective)
 JuMPOptimisationSolution
+BaseJuMPOptimisationResult
+JuMPOptimisationResult
+getproperty(jr::JuMPOptimisationResult, sym::Symbol)
+RiskJuMPOptimisationResult
+getproperty(r::RiskJuMPOptimisationResult, sym::Symbol)
+NonJuMPOptimisationResult
 add_custom_objective_term!
 add_custom_constraint!
 process_model

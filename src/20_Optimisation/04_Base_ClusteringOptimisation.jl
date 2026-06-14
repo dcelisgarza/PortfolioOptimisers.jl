@@ -41,7 +41,7 @@ $(DocStringExtensions.FIELDS)
   - [`HierarchicalRiskParity`](@ref)
   - [`HierarchicalEqualRiskContribution`](@ref)
 """
-@concrete struct HierarchicalResult <: NonFiniteAllocationOptimisationResult
+@concrete struct HierarchicalResult <: NonJuMPOptimisationResult
     """
     $(field_dict[:oe])
     """
@@ -74,20 +74,6 @@ $(DocStringExtensions.FIELDS)
     $(field_dict[:fb])
     """
     fb
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Create a [`HierarchicalResult`](@ref) with a new fallback result `fb`.
-
-# Related
-
-  - [`HierarchicalResult`](@ref)
-  - [`factory`](@ref)
-"""
-function factory(res::HierarchicalResult, fb::Option{<:OptE_Opt})
-    return HierarchicalResult(res.oe, res.pr, res.clr, res.wb, res.fees, res.retcode, res.w,
-                              fb)
 end
 """
 $(DocStringExtensions.TYPEDEF)

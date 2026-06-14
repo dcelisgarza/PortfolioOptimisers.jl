@@ -23,7 +23,7 @@ $(DocStringExtensions.FIELDS)
   - [`Stacking`](@ref)
   - [`NonFiniteAllocationOptimisationResult`](@ref)
 """
-@concrete struct StackingResult <: NonFiniteAllocationOptimisationResult
+@concrete struct StackingResult <: NonJuMPOptimisationResult
     """
     $(field_dict[:oe])
     """
@@ -64,15 +64,6 @@ $(DocStringExtensions.FIELDS)
     $(field_dict[:fb])
     """
     fb
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Rebuild a [`StackingResult`](@ref) with an updated fallback optimiser `fb`.
-"""
-function factory(res::StackingResult, fb::Option{<:OptE_Opt})
-    return StackingResult(res.oe, res.pr, res.wb, res.fees, res.resi, res.reso, res.cv,
-                          res.retcode, res.w, fb)
 end
 """
 $(DocStringExtensions.TYPEDEF)

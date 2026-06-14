@@ -24,7 +24,7 @@ $(DocStringExtensions.FIELDS)
   - [`SubsetResampling`](@ref)
   - [`NonFiniteAllocationOptimisationResult`](@ref)
 """
-@concrete struct SubsetResamplingResult <: NonFiniteAllocationOptimisationResult
+@concrete struct SubsetResamplingResult <: NonJuMPOptimisationResult
     """
     $(field_dict[:oe])
     """

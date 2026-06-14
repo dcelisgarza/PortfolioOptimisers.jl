@@ -7,22 +7,19 @@ Result type for Factor Risk Contribution portfolio optimisation.
 
 $(DocStringExtensions.FIELDS)
 
-The `w` property is forwarded from `sol.w`.
+Property access delegates to the embedded [`JuMPOptimisationResult`](@ref); unknown properties forward into `rr` first, then through `jr` (including the virtual `:w` and the `pa` fall-through).
 
 # Related
 
   - [`FactorRiskContribution`](@ref)
-  - [`NonFiniteAllocationOptimisationResult`](@ref)
+  - [`RiskJuMPOptimisationResult`](@ref)
+  - [`JuMPOptimisationResult`](@ref)
 """
-@concrete struct FactorRiskContributionResult <: NonFiniteAllocationOptimisationResult
+@concrete struct FactorRiskContributionResult <: RiskJuMPOptimisationResult
     """
-    $(field_dict[:oe])
+    Shared JuMP result core, see [`JuMPOptimisationResult`](@ref).
     """
-    oe
-    """
-    $(field_dict[:pa])
-    """
-    pa
+    jr
     """
     $(field_dict[:reg_rr])
     """
@@ -32,18 +29,6 @@ The `w` property is forwarded from `sol.w`.
     """
     frc_plr
     """
-    $(field_dict[:retcode])
-    """
-    retcode
-    """
-    $(field_dict[:sol])
-    """
-    sol
-    """
-    $(field_dict[:model])
-    """
-    model
-    """
     $(field_dict[:fb])
     """
     fb
@@ -51,28 +36,15 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Rebuild a [`FactorRiskContributionResult`](@ref) with an updated fallback optimiser `fb`.
-"""
-function factory(res::FactorRiskContributionResult, fb::Option{<:OptE_Opt})
-    return FactorRiskContributionResult(res.oe, res.pa, res.rr, res.frc_plr, res.retcode,
-                                        res.sol, res.model, fb)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Access properties of [`FactorRiskContributionResult`](@ref). Virtual property `:w` extracts portfolio weights from `sol`; other unknown properties forward to `r.rr` then `r.pa`.
+Access properties of [`FactorRiskContributionResult`](@ref). Unique fields `rr`/`frc_plr` resolve directly; unknown properties forward into `rr` first, then delegate to the embedded [`JuMPOptimisationResult`](@ref) `jr` (the virtual `:w` and `pa` fall-through).
 """
 function Base.getproperty(r::FactorRiskContributionResult, sym::Symbol)
-    return if sym == :w
-        !isa(r.sol, AbstractVector) ? getfield(r.sol, :w) : getfield.(r.sol, :w)
-    elseif sym in propertynames(r)
+    return if sym in fieldnames(FactorRiskContributionResult)
         getfield(r, sym)
-    elseif sym in propertynames(r.rr)
-        getproperty(r.rr, sym)
-    elseif sym in propertynames(r.pa)
-        getproperty(r.pa, sym)
+    elseif sym in propertynames(getfield(r, :rr))
+        getproperty(getfield(r, :rr), sym)
     else
-        getfield(r, sym)
+        getproperty(getfield(r, :jr), sym)
     end
 end
 """
@@ -312,8 +284,10 @@ function _optimise(frc::FactorRiskContribution, rd::ReturnsResult = ReturnsResul
     set_portfolio_objective_function!(model, frc.obj, attrs.ret, frc.opt.cobj, frc,
                                       attrs.pr)
     retcode, sol = optimise_JuMP_model!(model, frc, eltype(attrs.pr.X))
-    return FactorRiskContributionResult(typeof(frc), attrs, rr, frc_plr, retcode, sol,
-                                        ifelse(save, model, nothing), nothing)
+    return FactorRiskContributionResult(JuMPOptimisationResult(typeof(frc), attrs, retcode,
+                                                               sol,
+                                                               ifelse(save, model, nothing)),
+                                        rr, frc_plr, nothing)
 end
 """
     optimise(frc::FactorRiskContribution{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,

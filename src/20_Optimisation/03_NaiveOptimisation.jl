@@ -89,7 +89,7 @@ NaiveOptimisationResult
   - [`EqualWeighted`](@ref)
   - [`RandomWeighted`](@ref)
 """
-@concrete struct NaiveOptimisationResult <: NonFiniteAllocationOptimisationResult
+@concrete struct NaiveOptimisationResult <: NonJuMPOptimisationResult
     """
     $(field_dict[:oe])
     """
@@ -114,20 +114,6 @@ NaiveOptimisationResult
     $(field_dict[:fb])
     """
     fb
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Create a [`NaiveOptimisationResult`](@ref) with a new fallback result `fb`.
-
-# Related
-
-  - [`NaiveOptimisationResult`](@ref)
-  - [`factory`](@ref)
-"""
-function factory(res::NaiveOptimisationResult,
-                 fb::Option{<:OptE_Opt})::NaiveOptimisationResult
-    return NaiveOptimisationResult(res.oe, res.pr, res.wb, res.retcode, res.w, fb)
 end
 """
 $(DocStringExtensions.TYPEDEF)

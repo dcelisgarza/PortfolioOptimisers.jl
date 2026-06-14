@@ -28,8 +28,7 @@ $(DocStringExtensions.FIELDS)
   - [`SchurComplementHierarchicalRiskParity`](@ref)
   - [`NonFiniteAllocationOptimisationResult`](@ref)
 """
-@concrete struct SchurComplementHierarchicalRiskParityResult <:
-                 NonFiniteAllocationOptimisationResult
+@concrete struct SchurComplementHierarchicalRiskParityResult <: NonJuMPOptimisationResult
     """
     $(field_dict[:oe])
     """
@@ -62,20 +61,6 @@ $(DocStringExtensions.FIELDS)
     $(field_dict[:fb])
     """
     fb
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Create a [`SchurComplementHierarchicalRiskParityResult`](@ref) with a new fallback result `fb`.
-
-# Related
-
-  - [`SchurComplementHierarchicalRiskParityResult`](@ref)
-  - [`factory`](@ref)
-"""
-function factory(res::SchurComplementHierarchicalRiskParityResult, fb::Option{<:OptE_Opt})
-    return SchurComplementHierarchicalRiskParityResult(res.oe, res.pr, res.wb, res.clr,
-                                                       res.gamma, res.retcode, res.w, fb)
 end
 """
 $(DocStringExtensions.TYPEDEF)

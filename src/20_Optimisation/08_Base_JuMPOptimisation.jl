@@ -42,6 +42,101 @@ abstract type RiskJuMPOptimisationEstimator <: JuMPOptimisationEstimator end
 """
 $(DocStringExtensions.TYPEDEF)
 
+Abstract supertype for the embedded JuMP optimisation result core.
+
+Mirrors [`BaseJuMPOptimisationEstimator`](@ref): the factored-out struct holding the fields common to every JuMP-based optimisation result lives on this branch and is *not* part of the optimisation result hierarchy. The concrete core is [`JuMPOptimisationResult`](@ref).
+
+# Related
+
+  - [`JuMPOptimisationResult`](@ref)
+  - [`RiskJuMPOptimisationResult`](@ref)
+"""
+abstract type BaseJuMPOptimisationResult <: AbstractResult end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Shared field core for JuMP-based optimisation results.
+
+Holds the fields common to every JuMP optimisation result. Embedded as the first field (`jr`) of each concrete JuMP result, analogous to how [`JuMPOptimiser`](@ref) is embedded as `opt` in each JuMP optimiser. The concrete result keeps only its unique fields plus the trailing `fb`.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`BaseJuMPOptimisationResult`](@ref)
+  - [`RiskJuMPOptimisationResult`](@ref)
+  - [`JuMPOptimiser`](@ref)
+"""
+@concrete struct JuMPOptimisationResult <: BaseJuMPOptimisationResult
+    """
+    $(field_dict[:oe])
+    """
+    oe
+    """
+    $(field_dict[:pa])
+    """
+    pa
+    """
+    $(field_dict[:retcode])
+    """
+    retcode
+    """
+    $(field_dict[:sol])
+    """
+    sol
+    """
+    $(field_dict[:model])
+    """
+    model
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Access properties of [`JuMPOptimisationResult`](@ref). Virtual property `:w` extracts portfolio weights from `sol`; unknown properties forward to `pa`.
+"""
+function Base.getproperty(jr::JuMPOptimisationResult, sym::Symbol)
+    return if sym == :w
+        sol = getfield(jr, :sol)
+        !isa(sol, AbstractVector) ? getproperty(sol, :w) : getproperty.(sol, :w)
+    elseif sym in fieldnames(JuMPOptimisationResult)
+        getfield(jr, sym)
+    elseif sym in propertynames(getfield(jr, :pa))
+        getproperty(getfield(jr, :pa), sym)
+    else
+        getfield(jr, sym)
+    end
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for JuMP-based continuous optimisation results.
+
+The JuMP half of the result split; mirrors [`RiskJuMPOptimisationEstimator`](@ref). Concrete subtypes embed a [`JuMPOptimisationResult`](@ref) as their first field (`jr`) and add only their unique fields plus the trailing `fb`. The default `getproperty` resolves unique fields directly and delegates everything else (including `:w` and the `pa` fall-through) to `jr`; types with composed sub-result fields override it to forward into those first.
+
+# Related
+
+  - [`NonJuMPOptimisationResult`](@ref)
+  - [`JuMPOptimisationResult`](@ref)
+  - [`MeanRiskResult`](@ref)
+"""
+abstract type RiskJuMPOptimisationResult <: NonFiniteAllocationOptimisationResult end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Default property access for [`RiskJuMPOptimisationResult`](@ref): unique fields resolve directly; everything else delegates to the embedded [`JuMPOptimisationResult`](@ref) `jr`.
+"""
+function Base.getproperty(r::RiskJuMPOptimisationResult, sym::Symbol)
+    return if sym in fieldnames(typeof(r))
+        getfield(r, sym)
+    else
+        getproperty(getfield(r, :jr), sym)
+    end
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
 Abstract supertype for portfolio objective functions.
 
 Subtype `ObjectiveFunction` to implement portfolio optimisation objectives such as minimum risk, maximum return, or maximum Sharpe ratio.
@@ -800,4 +895,4 @@ Generic function stub; concrete methods are defined in constraint and risk measu
 """
 function set_risk_constraints! end
 
-export JuMPOptimisationSolution
+export JuMPOptimisationSolution, JuMPOptimisationResult

@@ -7,62 +7,23 @@ Result type for Mean-Risk portfolio optimisation.
 
 $(DocStringExtensions.FIELDS)
 
-The `w` property is forwarded from `sol.w`.
+Property access delegates to the embedded [`JuMPOptimisationResult`](@ref): the virtual `:w` property and unknown properties resolve through `jr`.
 
 # Related
 
-  - [`NonFiniteAllocationOptimisationResult`](@ref)
+  - [`RiskJuMPOptimisationResult`](@ref)
+  - [`JuMPOptimisationResult`](@ref)
   - [`MeanRisk`](@ref)
 """
-@concrete struct MeanRiskResult <: NonFiniteAllocationOptimisationResult
+@concrete struct MeanRiskResult <: RiskJuMPOptimisationResult
     """
-    $(field_dict[:oe])
+    Shared JuMP result core, see [`JuMPOptimisationResult`](@ref).
     """
-    oe
-    """
-    $(field_dict[:pa])
-    """
-    pa
-    """
-    $(field_dict[:retcode])
-    """
-    retcode
-    """
-    $(field_dict[:sol])
-    """
-    sol
-    """
-    $(field_dict[:model])
-    """
-    model
+    jr
     """
     $(field_dict[:fb])
     """
     fb
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Rebuild a [`MeanRiskResult`](@ref) with an updated fallback optimiser `fb`.
-"""
-function factory(res::MeanRiskResult, fb::Option{<:OptE_Opt})
-    return MeanRiskResult(res.oe, res.pa, res.retcode, res.sol, res.model, fb)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Access properties of [`MeanRiskResult`](@ref). Virtual property `:w` extracts portfolio weights from `sol`; other unknown properties forward to `r.pa`.
-"""
-function Base.getproperty(r::MeanRiskResult, sym::Symbol)
-    return if sym == :w
-        !isa(r.sol, AbstractVector) ? getfield(r.sol, :w) : getfield.(r.sol, :w)
-    elseif sym in propertynames(r)
-        getfield(r, sym)
-    elseif sym in propertynames(r.pa)
-        getproperty(r.pa, sym)
-    else
-        getfield(r, sym)
-    end
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -635,8 +596,8 @@ function _optimise(mr::MeanRisk, rd::ReturnsResult = ReturnsResult(); dims::Int 
     retcode, sol = solve_mean_risk!(model, mr, attrs.ret, attrs.pr,
                                     Val(haskey(model, :ret_frontier)),
                                     Val(haskey(model, :risk_frontier)), attrs.fees)
-    return MeanRiskResult(typeof(mr), attrs, retcode, sol, ifelse(save, model, nothing),
-                          nothing)
+    return MeanRiskResult(JuMPOptimisationResult(typeof(mr), attrs, retcode, sol,
+                                                 ifelse(save, model, nothing)), nothing)
 end
 """
     optimise(mr::MeanRisk{<:Any, <:Any, <:Any, <:Any, Nothing},
