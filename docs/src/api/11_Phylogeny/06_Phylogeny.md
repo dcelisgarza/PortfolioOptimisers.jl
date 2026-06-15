@@ -14,9 +14,7 @@ KruskalTree
 BoruvkaTree
 PrimTree
 NetworkEstimator
-factory(nt::NetworkEstimator, w::ObsWeights)
 NetworkClustersEstimator
-factory(nt::NetworkClustersEstimator, w::ObsWeights)
 _clusterise(alg::HClustAlgorithm, onc::AbstractOptimalNumberClustersEstimator,
                     S::MatNum, D::MatNum, P::MatNum; branchorder::Symbol = :optimal)
 clusterise(nte::NetworkClustersEstimator{<:NetworkEstimator{<:Any, <:Any,

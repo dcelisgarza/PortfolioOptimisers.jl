@@ -121,11 +121,11 @@ SecondMoment
   - [`AbstractMomentAlgorithm`](@ref)
   - [`SecondMomentFormulation`](@ref)
 """
-@concrete struct SecondMoment <: LowOrderMomentMeasureAlgorithm
+@propagatable @concrete struct SecondMoment <: LowOrderMomentMeasureAlgorithm
     """
     $(field_dict[:ve])
     """
-    ve
+    @fprop ve
     """
     $(field_dict[:alg1])
     """
@@ -209,19 +209,6 @@ end
 function EvenMoment(; p::Integer = 2, ddof::Integer = 0,
                     alg::AbstractMomentAlgorithm = Full())::EvenMoment
     return EvenMoment(p, ddof, alg)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Return a new [`SecondMoment`](@ref) with observation weights `w` applied to the underlying variance estimator.
-
-# Related
-
-  - [`SecondMoment`](@ref)
-  - [`factory`](@ref)
-"""
-function factory(alg::SecondMoment, w::ObsWeights)::SecondMoment
-    return SecondMoment(; ve = factory(alg.ve, w), alg1 = alg.alg1, alg2 = alg.alg2)
 end
 """
 $(DocStringExtensions.TYPEDEF)
