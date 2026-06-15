@@ -24,6 +24,12 @@ DynamicAbstractWeights
 ```@docs
 @define_pretty_show
 has_pretty_show_method
+set_compact_show!
+COMPACT_SHOW
+compact_show_budget
+pretty_show_vector_summary
+pretty_show_vector_element
+pretty_show_vector_body
 ```
 
 ## Utilities

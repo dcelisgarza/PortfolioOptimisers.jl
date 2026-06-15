@@ -12,9 +12,13 @@ for sym in private_symbols
          end)
 end
 
+# Keep rendered docs and @example output fully expanded (no large-struct collapsing).
+PortfolioOptimisers.set_compact_show!(false)
+
 DocMeta.setdocmeta!(PortfolioOptimisers, :DocTestSetup,
                     :(using PortfolioOptimisers, StatsBase, Statistics, LinearAlgebra,
-                            Dates, Distributions, StableRNGs, TimeSeries); recursive = true)
+                            Dates, Distributions, StableRNGs, TimeSeries;
+                    PortfolioOptimisers.set_compact_show!(false)); recursive = true)
 
 # utility function from https://github.com/JuliaOpt/Convex.jl/blob/master/docs/make.jl
 function pre_process_content_md(content)

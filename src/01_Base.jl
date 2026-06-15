@@ -959,7 +959,9 @@ This macro generates a `show` method that displays the type name and all fields 
   - Prints the type name and all fields with aligned labels.
   - Recursively pretty-prints nested custom types and collections.
   - Handles compact and multiline IO contexts.
-  - Displays matrix/vector fields with their size and type.
+  - Displays matrix fields with their size and type.
+  - Lists a vector of pretty-printable structs as a `"N-element Vector{Name}"` summary followed by one collapsed line per element (each a wrapper-type name, with a trailing `" ⋯"` when the element has fields). Long listings are truncated head-and-tail with a `"⋮"` line, bounded by [`compact_show_budget`](@ref).
+  - Collapses an oversized nested struct field to `Name ⋯` when its rendered height exceeds [`compact_show_budget`](@ref); see [`set_compact_show!`](@ref).
   - Skips fields that are not present or are `nothing`.
 
 # Related
@@ -1000,20 +1002,39 @@ macro define_pretty_show(T, flag::Bool = true)
                     print(io, lpad(string(field), padding), " ")
                     if isnothing(val)
                         print(io, "$(sym1) nothing", '\n')
-                    elseif flag || (isa(val, AbstractVector) &&
-                                    length(val) <= 6 &&
-                                    all(has_pretty_show_method, val))
-                        ioalg = IOBuffer()
+                    elseif flag
+                        ioalg = IOContext(IOBuffer(), :limit => get(io, :limit, false),
+                                          :displaysize => displaysize(io))
+                        pc = get(io, :po_compact, :__unset__)
+                        if pc !== :__unset__
+                            ioalg = IOContext(ioalg, :po_compact => pc)
+                        end
                         show(ioalg, val)
-                        algstr = String(take!(ioalg))
+                        algstr = String(take!(ioalg.io))
                         alglines = split(algstr, '\n')
-                        print(io, "$(sym1) ", alglines[1], '\n')
-                        for l in alglines[2:end]
-                            if isempty(l) || l == '\n'
-                                continue
+                        budget = compact_show_budget(io)
+                        if !isnothing(budget) &&
+                           count(l -> !(isempty(l) || l == "\n"), alglines) > budget
+                            conn = ifelse(i == length(fields), '┴', '┼')
+                            print(io, "$(conn) ", Base.typename(typeof(val)).wrapper, " ⋯",
+                                  '\n')
+                        else
+                            print(io, "$(sym1) ", alglines[1], '\n')
+                            for l in alglines[2:end]
+                                if isempty(l) || l == '\n'
+                                    continue
+                                end
+                                sym2 = '│'
+                                print(io, lpad("$sym2 ", padding + 3), l, '\n')
                             end
-                            sym2 = '│'
-                            print(io, lpad("$sym2 ", padding + 3), l, '\n')
+                        end
+                    elseif isa(val, AbstractVector) &&
+                           !isempty(val) &&
+                           all(has_pretty_show_method, val)
+                        print(io, "┼ ", pretty_show_vector_summary(val), '\n')
+                        ellines = [pretty_show_vector_element(v) for v in val]
+                        for l in pretty_show_vector_body(io, ellines)
+                            print(io, lpad("│ ", padding + 3), l, '\n')
                         end
                     elseif isa(val, AbstractMatrix)
                         print(io, "$(sym1) $(size(val,1))×$(size(val,2)) $(typeof(val))",
@@ -1032,6 +1053,152 @@ macro define_pretty_show(T, flag::Bool = true)
                 return nothing
             end
         end)
+end
+"""
+Global control for collapsing large nested structs in [`@define_pretty_show`](@ref) output.
+
+Holds one of:
+
+  - `false`: collapsing disabled; nested structs always expand fully.
+  - `true`: collapsing enabled with an automatic, terminal-size-derived line budget.
+  - `n::Int`: collapsing enabled with a fixed line budget of `n`.
+
+Set via [`set_compact_show!`](@ref). Read (together with the per-call `:po_compact` IO property) by [`compact_show_budget`](@ref).
+"""
+const COMPACT_SHOW = Ref{Union{Bool, Int}}(true)
+"""
+    set_compact_show!(x::Bool)
+    set_compact_show!(n::Integer)
+
+Configure whether [`@define_pretty_show`](@ref) collapses large nested structs.
+
+  - `set_compact_show!(false)`: disable collapsing (always expand fully).
+  - `set_compact_show!(true)`: enable collapsing with an automatic, terminal-size-derived budget.
+  - `set_compact_show!(n)`: enable collapsing with a fixed line budget `n`.
+
+Collapsing only ever applies to height-limited output (`get(io, :limit, false)`), i.e. the interactive REPL. Non-limited output (`string`, `repr`, file writes) always expands fully. The documentation build disables this so rendered docs keep full detail. Individual calls can override the global setting with the `:po_compact` IO property (`false`, `true`, or an `Int`).
+
+# Related
+
+  - [`@define_pretty_show`](@ref)
+  - [`compact_show_budget`](@ref)
+"""
+set_compact_show!(x::Bool) = (COMPACT_SHOW[] = x; return x)
+set_compact_show!(n::Integer) = (COMPACT_SHOW[] = Int(n); return n)
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Resolve the line budget that triggers collapsing a nested struct rendered by [`@define_pretty_show`](@ref).
+
+The per-call `:po_compact` IO property takes precedence over the global [`COMPACT_SHOW`](@ref) setting; both accept `false` (disabled), `true` (automatic budget), or an `Int` (fixed budget). The automatic budget is `max(8, displaysize(io)[1] - 4)`, so only subtrees that nearly fill or exceed the terminal collapse.
+
+# Returns
+
+  - `nothing` when collapsing is disabled.
+  - `budget::Int` (the maximum number of rendered lines a nested struct may occupy before collapsing) otherwise.
+
+# Related
+
+  - [`set_compact_show!`](@ref)
+  - [`@define_pretty_show`](@ref)
+"""
+function compact_show_budget(io::IO)
+    v = get(io, :po_compact, :__unset__)
+    if v === :__unset__
+        # No per-call override: only collapse height-limited output (the REPL),
+        # leaving `string`/`repr`/file writes fully expanded.
+        if !(get(io, :limit, false))
+            return nothing
+        end
+        v = COMPACT_SHOW[]
+    end
+    if v === false
+        return nothing
+    end
+    if v isa Integer && !(v isa Bool)
+        return Int(v)
+    end
+    return max(8, displaysize(io)[1] - 4)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Build the single-line summary for a vector field rendered by [`@define_pretty_show`](@ref).
+
+Returns a string of the form `"N-element Vector{Name}"`. A vector is treated as homogeneous when every element shares the same wrapper-type name (so elements that differ only in type parameters are still homogeneous): a homogeneous vector uses that common wrapper name, otherwise the wrapper of the element type, falling back to the raw `eltype` for `Union`s.
+
+# Arguments
+
+  - `val`: Non-empty vector whose elements all have a custom pretty-printing method.
+
+# Returns
+
+  - `summary::String`: Single-line `"N-element Vector{Name}"` summary.
+
+# Related
+
+  - [`@define_pretty_show`](@ref)
+  - [`pretty_show_vector_element`](@ref)
+  - [`pretty_show_vector_body`](@ref)
+"""
+function pretty_show_vector_summary(val::AbstractVector)
+    names = [string(Base.typename(typeof(v)).wrapper) for v in val]
+    et = eltype(val)
+    tname = if allequal(names)
+        first(names)
+    else
+        (et isa Union ? string(et) : string(Base.typename(et).wrapper))
+    end
+    return "$(length(val))-element Vector{$(tname)}"
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Render a single vector element as a collapsed line for [`@define_pretty_show`](@ref).
+
+Every element of a listed vector is shown as just its wrapper-type name. When the element is a struct with fields, a trailing `" ⋯"` marks it as a collapsed struct (consistent with how an over-budget struct field collapses to `Name ⋯`); fieldless elements are left bare.
+
+# Related
+
+  - [`@define_pretty_show`](@ref)
+  - [`pretty_show_vector_summary`](@ref)
+  - [`pretty_show_vector_body`](@ref)
+"""
+function pretty_show_vector_element(@nospecialize(v))
+    s = string(Base.typename(typeof(v)).wrapper)
+    return isempty(propertynames(v)) ? s : s * " ⋯"
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Apply the shared collapse budget to the per-element lines of a vector rendered by [`@define_pretty_show`](@ref).
+
+The budget comes from [`compact_show_budget`](@ref), so vector truncation honours the same `:limit` gate, global [`set_compact_show!`](@ref) setting, and per-call `:po_compact` override as struct collapsing. When the budget is `nothing` (disabled, unlimited output, or override-off) every line is returned. Otherwise, when the listing exceeds the budget it is split head-and-tail, mirroring how `Base` truncates long arrays, with a single `"⋮"` line marking the elision.
+
+# Arguments
+
+  - `io`: Output stream; drives the budget via [`compact_show_budget`](@ref).
+  - `lines`: Per-element display strings from [`pretty_show_vector_element`](@ref).
+
+# Returns
+
+  - `body::Vector{String}`: Lines to print, possibly truncated with a `"⋮"` separator.
+
+# Related
+
+  - [`@define_pretty_show`](@ref)
+  - [`compact_show_budget`](@ref)
+  - [`pretty_show_vector_element`](@ref)
+"""
+function pretty_show_vector_body(io::IO, lines::AbstractVector{<:AbstractString})
+    budget = compact_show_budget(io)
+    n = length(lines)
+    if isnothing(budget) || n <= budget
+        return lines
+    end
+    nhead = cld(budget, 2)
+    ntail = budget - nhead
+    return vcat(lines[1:nhead], "⋮", lines[(n - ntail + 1):n])
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
