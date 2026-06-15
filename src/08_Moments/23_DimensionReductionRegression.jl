@@ -227,19 +227,19 @@ DimensionReductionRegression
   - [`DimensionReductionTarget`](@ref)
   - [`AbstractRegressionTarget`](@ref)
 """
-@concrete struct DimensionReductionRegression <: AbstractRegressionEstimator
+@propagatable @concrete struct DimensionReductionRegression <: AbstractRegressionEstimator
     """
     $(field_dict[:ve])
     """
-    ve
+    @fprop @vprop ve
     """
     $(field_dict[:drtgt])
     """
-    drtgt
+    @fprop drtgt
     """
     $(field_dict[:dretgt])
     """
-    retgt
+    @fprop retgt
     function DimensionReductionRegression(ve::AbstractVarianceEstimator,
                                           drtgt::DimensionReductionTarget,
                                           retgt::AbstractRegressionTarget)
@@ -256,55 +256,6 @@ function DimensionReductionRegression(; ve::AbstractVarianceEstimator = SimpleVa
                                       drtgt::DimensionReductionTarget = PCA(),
                                       retgt::AbstractRegressionTarget = LinearModel())::DimensionReductionRegression
     return DimensionReductionRegression(ve, drtgt, retgt)
-end
-"""
-    factory(re::DimensionReductionRegression, w::ObsWeights) -> DimensionReductionRegression
-
-Return a new [`DimensionReductionRegression`](@ref) estimator with observation weights `w` applied to the underlying variance and regression target estimators.
-
-# Arguments
-
-  - `re`: Dimension reduction regression estimator.
-  - $(arg_dict[:ow])
-
-# Returns
-
-  - `re::DimensionReductionRegression`: Updated estimator with weights applied to `ve`, `drtgt`, and `retgt`.
-
-# Related
-
-  - [`DimensionReductionRegression`](@ref)
-  - [`factory`](@ref)
-"""
-function factory(re::DimensionReductionRegression,
-                 w::ObsWeights)::DimensionReductionRegression
-    return DimensionReductionRegression(; ve = factory(re.ve, w),
-                                        drtgt = factory(re.drtgt, w),
-                                        retgt = factory(re.retgt, w))
-end
-"""
-    port_opt_view(re::DimensionReductionRegression, i) -> DimensionReductionRegression
-
-Return a new [`DimensionReductionRegression`](@ref) estimator restricted to assets at index `i`.
-
-# Arguments
-
-  - `re`: Dimension reduction regression estimator.
-  - `i`: Index or indices of assets to include.
-
-# Returns
-
-  - `re::DimensionReductionRegression`: Updated estimator with `ve` restricted to the selected assets.
-
-# Related
-
-  - [`DimensionReductionRegression`](@ref)
-  - [`port_opt_view`](@ref)
-"""
-function port_opt_view(re::DimensionReductionRegression, i,
-                       args...)::DimensionReductionRegression
-    return DimensionReductionRegression(; ve = port_opt_view(re.ve, i), drtgt = re.drtgt,
-                                        retgt = re.retgt)
 end
 """
     prep_dim_red_reg(drtgt::DimensionReductionTarget, X::MatNum)

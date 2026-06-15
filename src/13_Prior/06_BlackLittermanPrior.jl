@@ -104,11 +104,11 @@ BlackLittermanPrior
   - [`LowOrderPrior`](@ref)
   - [`prior`](@ref)
 """
-@concrete struct BlackLittermanPrior <: AbstractLowOrderPriorEstimator_AF
+@propagatable @concrete struct BlackLittermanPrior <: AbstractLowOrderPriorEstimator_AF
     """
     $(field_dict[:pe])
     """
-    pe
+    @fprop @vprop pe
     """
     $(field_dict[:mp])
     """
@@ -120,7 +120,7 @@ BlackLittermanPrior
     """
     $(field_dict[:sets])
     """
-    sets
+    @vprop sets
     """
     $(field_dict[:views_conf])
     """
@@ -171,35 +171,6 @@ function Base.getproperty(obj::BlackLittermanPrior, sym::Symbol)
     else
         getfield(obj, sym)
     end
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Return a new [`BlackLittermanPrior`](@ref) estimator with observation weights `w` applied to the underlying prior estimator.
-
-# Related
-
-  - [`BlackLittermanPrior`](@ref)
-  - [`factory`](@ref)
-"""
-function factory(pe::BlackLittermanPrior, w::ObsWeights)::BlackLittermanPrior
-    return BlackLittermanPrior(; pe = factory(pe.pe, w), mp = pe.mp, views = pe.views,
-                               sets = pe.sets, views_conf = pe.views_conf, rf = pe.rf,
-                               tau = pe.tau)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Return a new [`BlackLittermanPrior`](@ref) estimator restricted to the assets at index `i`.
-
-# Related
-
-  - [`BlackLittermanPrior`](@ref)
-"""
-function port_opt_view(pr::BlackLittermanPrior, i, args...)::BlackLittermanPrior
-    return BlackLittermanPrior(; pe = port_opt_view(pr.pe, i), mp = pr.mp, views = pr.views,
-                               sets = port_opt_view(pr.sets, i), views_conf = pr.views_conf,
-                               rf = pr.rf, tau = pr.tau)
 end
 """
     calc_omega(views_conf::Option{<:Num_VecNum}, P::MatNum,

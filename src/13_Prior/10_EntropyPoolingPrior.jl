@@ -542,11 +542,11 @@ EntropyPoolingPrior
   - [`JuMPEntropyPooling`](@ref)
   - [`AbstractEntropyPoolingAlgorithm`](@ref)
 """
-@concrete struct EntropyPoolingPrior <: AbstractLowOrderPriorEstimator_AF
+@propagatable @concrete struct EntropyPoolingPrior <: AbstractLowOrderPriorEstimator_AF
     """
     $(field_dict[:pe])
     """
-    pe
+    @fprop @vprop pe
     """
     $(field_dict[:mu_views])
     """
@@ -590,7 +590,7 @@ EntropyPoolingPrior
     """
     $(field_dict[:sets])
     """
-    sets
+    @vprop sets
     """
     $(field_dict[:ds_opt])
     """
@@ -606,7 +606,7 @@ EntropyPoolingPrior
     """
     $(field_dict[:ep_w])
     """
-    w
+    @fprop w
     """
     $(field_dict[:epalg])
     """
@@ -714,46 +714,6 @@ Alias for an abstract vector of [`EntropyPoolingPrior`](@ref) elements.
   - [`EntropyPoolingPrior`](@ref)
 """
 const VecEP = AbstractVector{<:EntropyPoolingPrior}
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Return a new [`EntropyPoolingPrior`](@ref) estimator with observation weights `w` applied to the underlying prior estimator and stored as the entropy pooling weights.
-
-# Related
-
-  - [`EntropyPoolingPrior`](@ref)
-  - [`factory`](@ref)
-"""
-function factory(pe::EntropyPoolingPrior, w::ObsWeights)::EntropyPoolingPrior
-    return EntropyPoolingPrior(; pe = factory(pe.pe, w), mu_views = pe.mu_views,
-                               var_views = pe.var_views, cvar_views = pe.cvar_views,
-                               sigma_views = pe.sigma_views, sk_views = pe.sk_views,
-                               kt_views = pe.kt_views, cov_views = pe.cov_views,
-                               rho_views = pe.rho_views, var_alpha = pe.var_alpha,
-                               cvar_alpha = pe.cvar_alpha, sets = pe.sets,
-                               ds_opt = pe.ds_opt, dm_opt = pe.dm_opt, opt = pe.opt, w = w,
-                               alg = pe.alg)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Return a new [`EntropyPoolingPrior`](@ref) estimator restricted to the assets at index `i`.
-
-# Related
-
-  - [`EntropyPoolingPrior`](@ref)
-  - [`port_opt_view`](@ref)
-"""
-function port_opt_view(pe::EntropyPoolingPrior, i, args...)::EntropyPoolingPrior
-    return EntropyPoolingPrior(; pe = port_opt_view(pe.pe, i), mu_views = pe.mu_views,
-                               var_views = pe.var_views, cvar_views = pe.cvar_views,
-                               sigma_views = pe.sigma_views, sk_views = pe.sk_views,
-                               kt_views = pe.kt_views, cov_views = pe.cov_views,
-                               rho_views = pe.rho_views, var_alpha = pe.var_alpha,
-                               cvar_alpha = pe.cvar_alpha, sets = port_opt_view(pe.sets, i),
-                               ds_opt = pe.ds_opt, dm_opt = pe.dm_opt, opt = pe.opt,
-                               w = pe.w, alg = pe.alg)
-end
 """
     add_ep_constraint!(epc::AbstractDict, lhs::MatNum, rhs::VecNum, key::Symbol)
 

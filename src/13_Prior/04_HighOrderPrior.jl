@@ -470,19 +470,19 @@ HighOrderPriorEstimator
   - [`Coskewness`](@ref)
   - [`prior`](@ref)
 """
-@concrete struct HighOrderPriorEstimator <: AbstractHighOrderPriorEstimator
+@propagatable @concrete struct HighOrderPriorEstimator <: AbstractHighOrderPriorEstimator
     """
     $(field_dict[:pe])
     """
-    pe
+    @fprop @vprop pe
     """
     $(field_dict[:kte])
     """
-    kte
+    @fprop @vprop kte
     """
     $(field_dict[:ske])
     """
-    ske
+    @fprop @vprop ske
     function HighOrderPriorEstimator(pe::AbstractLowOrderPriorEstimator_A_F_AF,
                                      kte::Option{<:CokurtosisEstimator},
                                      ske::Option{<:CoskewnessEstimator})
@@ -496,34 +496,6 @@ function HighOrderPriorEstimator(;
                                  ske::Option{<:CoskewnessEstimator} = Coskewness(;
                                                                                  alg = Full()))::HighOrderPriorEstimator
     return HighOrderPriorEstimator(pe, kte, ske)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Return a new [`HighOrderPriorEstimator`](@ref) with observation weights `w` applied to all sub-estimators.
-
-# Related
-
-  - [`HighOrderPriorEstimator`](@ref)
-  - [`factory`](@ref)
-"""
-function factory(pe::HighOrderPriorEstimator, w::ObsWeights)::HighOrderPriorEstimator
-    return HighOrderPriorEstimator(; pe = factory(pe.pe, w), kte = factory(pe.kte, w),
-                                   ske = factory(pe.ske, w))
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Return a new [`HighOrderPriorEstimator`](@ref) restricted to the assets at index `i`.
-
-# Related
-
-  - [`HighOrderPriorEstimator`](@ref)
-"""
-function port_opt_view(pr::HighOrderPriorEstimator, i, args...)::HighOrderPriorEstimator
-    return HighOrderPriorEstimator(; pe = port_opt_view(pr.pe, i),
-                                   kte = port_opt_view(pr.kte, i),
-                                   ske = port_opt_view(pr.ske, i))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

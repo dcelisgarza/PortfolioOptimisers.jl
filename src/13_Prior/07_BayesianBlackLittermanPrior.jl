@@ -130,11 +130,12 @@ BayesianBlackLittermanPrior
   - [`LowOrderPrior`](@ref)
   - [`prior`](@ref)
 """
-@concrete struct BayesianBlackLittermanPrior <: AbstractLowOrderPriorEstimator_F
+@propagatable @concrete struct BayesianBlackLittermanPrior <:
+                               AbstractLowOrderPriorEstimator_F
     """
     $(field_dict[:pe])
     """
-    pe
+    @fprop @vprop pe
     """
     $(field_dict[:mp])
     """
@@ -185,37 +186,6 @@ function BayesianBlackLittermanPrior(;
                                      rf::Number = 0.0,
                                      tau::Option{<:Number} = nothing)::BayesianBlackLittermanPrior
     return BayesianBlackLittermanPrior(pe, mp, views, sets, views_conf, rf, tau)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Return a new [`BayesianBlackLittermanPrior`](@ref) estimator with observation weights `w` applied to the underlying prior estimator.
-
-# Related
-
-  - [`BayesianBlackLittermanPrior`](@ref)
-  - [`factory`](@ref)
-"""
-function factory(pe::BayesianBlackLittermanPrior,
-                 w::ObsWeights)::BayesianBlackLittermanPrior
-    return BayesianBlackLittermanPrior(; pe = factory(pe.pe, w), mp = pe.mp,
-                                       views = pe.views, sets = pe.sets,
-                                       views_conf = pe.views_conf, rf = pe.rf, tau = pe.tau)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Return a new [`BayesianBlackLittermanPrior`](@ref) estimator restricted to the assets at index `i`.
-
-# Related
-
-  - [`BayesianBlackLittermanPrior`](@ref)
-"""
-function port_opt_view(pr::BayesianBlackLittermanPrior, i,
-                       args...)::BayesianBlackLittermanPrior
-    return BayesianBlackLittermanPrior(; pe = port_opt_view(pr.pe, i), mp = pr.mp,
-                                       views = pr.views, sets = pr.sets,
-                                       views_conf = pr.views_conf, rf = pr.rf, tau = pr.tau)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
