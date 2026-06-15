@@ -974,7 +974,7 @@ RelativeConditionalDrawdownatRisk
   - [`ConditionalDrawdownatRisk`](@ref)
   - [`RelativeDrawdownatRisk`](@ref)
 """
-@concrete struct RelativeConditionalDrawdownatRisk <: HierarchicalRiskMeasure
+@propagatable @concrete struct RelativeConditionalDrawdownatRisk <: HierarchicalRiskMeasure
     """
     $(field_dict[:settings_rm])
     """
@@ -986,7 +986,7 @@ RelativeConditionalDrawdownatRisk
     """
     $(field_dict[:oow])
     """
-    w
+    @pprop w
     function RelativeConditionalDrawdownatRisk(settings::HierarchicalRiskMeasureSettings,
                                                alpha::Number, w::Option{<:ObsWeights})
         @argcheck(zero(alpha) < alpha < one(alpha))
