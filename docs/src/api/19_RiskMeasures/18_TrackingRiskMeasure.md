@@ -9,7 +9,6 @@ factory(tr::RiskTrackingError, pr::AbstractPriorResult, slv::Any, ucs::Any,
 needs_previous_weights(tr::RiskTrackingError)
 factory(tr::RiskTrackingError, w::VecNum)
 TrackingRiskMeasure
-port_opt_view(r::TrackingRiskMeasure, i, args...)
 needs_previous_weights(r::TrackingRiskMeasure)
 factory(r::TrackingRiskMeasure, w::VecNum)
 factory(r::TrackingRiskMeasure, ::Any, ::Any, ::Any, w::VecNum, args...; kwargs...)

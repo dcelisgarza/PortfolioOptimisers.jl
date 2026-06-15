@@ -465,15 +465,15 @@ Computes the variance skewness kurtosis composite risk measure of the portfolio 
     """
     $(field_dict[:vr_rm])
     """
-    @fprop vr
+    @fprop @vprop vr
     """
     $(field_dict[:sk_rm])
     """
-    @fprop sk
+    @fprop @vprop sk
     """
     $(field_dict[:kt_rm])
     """
-    @fprop kt
+    @fprop @vprop kt
     function VarianceSkewKurtosis(settings::RiskMeasureSettings, vr::Variance, sk::Skewness,
                                   kt::Kurtosis)
         vr = no_risk_expr_risk_measure(vr)
@@ -487,22 +487,6 @@ function VarianceSkewKurtosis(; settings::RiskMeasureSettings = RiskMeasureSetti
                               vr::Variance = Variance(), sk::Skewness = Skewness(),
                               kt::Kurtosis = Kurtosis())
     return VarianceSkewKurtosis(settings, vr, sk, kt)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Return a view of [`VarianceSkewKurtosis`](@ref) `r` sliced to asset indices `i` by delegating `port_opt_view` to each sub-measure component.
-
-# Related
-
-  - [`VarianceSkewKurtosis`](@ref)
-  - [`port_opt_view`](@ref)
-"""
-function port_opt_view(r::VarianceSkewKurtosis, i, args...)
-    vr = port_opt_view(r.vr, i, args...)
-    sk = port_opt_view(r.sk, i, args...)
-    kt = port_opt_view(r.kt, i, args...)
-    return VarianceSkewKurtosis(; settings = r.settings, vr = vr, sk = sk, kt = kt)
 end
 function (r::VarianceSkewKurtosis)(w::VecNum, X::MatNum, fees::Option{<:VecNum} = nothing)
     return r.vr(w) * r.vr.settings.scale - r.sk(w, X, fees) * r.sk.settings.scale +

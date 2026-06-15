@@ -313,7 +313,7 @@ ValueatRisk
     """
     $(field_dict[:alg])
     """
-    @fprop alg
+    @fprop @vprop alg
     function ValueatRisk(settings::RiskMeasureSettings, alpha::Number,
                          w::Option{<:ObsWeights}, alg::ValueatRiskFormulation)
         @argcheck(zero(alpha) < alpha < one(alpha))
@@ -326,10 +326,6 @@ function ValueatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                      alpha::Number = 0.05, w::Option{<:ObsWeights} = nothing,
                      alg::ValueatRiskFormulation = MIPValueatRisk())::ValueatRisk
     return ValueatRisk(settings, alpha, w, alg)
-end
-function port_opt_view(r::ValueatRisk, i, args...)::ValueatRisk
-    alg = port_opt_view(r.alg, i)
-    return ValueatRisk(; settings = r.settings, alpha = r.alpha, w = r.w, alg = alg)
 end
 function (r::ValueatRisk{<:Any, <:Any, Nothing})(x::VecNum)
     return -partialsort(x, ceil(Int, r.alpha * length(x)))
@@ -445,7 +441,7 @@ ValueatRiskRange
     """
     $(field_dict[:alg])
     """
-    @fprop alg
+    @fprop @vprop alg
     function ValueatRiskRange(settings::RiskMeasureSettings, alpha::Number, beta::Number,
                               w::Option{<:ObsWeights}, alg::ValueatRiskFormulation)
         @argcheck(zero(alpha) < alpha < one(alpha))
@@ -463,11 +459,6 @@ function ValueatRiskRange(; settings::RiskMeasureSettings = RiskMeasureSettings(
                           w::Option{<:ObsWeights} = nothing,
                           alg::ValueatRiskFormulation = MIPValueatRisk())::ValueatRiskRange
     return ValueatRiskRange(settings, alpha, beta, w, alg)
-end
-function port_opt_view(r::ValueatRiskRange, i, args...)::ValueatRiskRange
-    alg = port_opt_view(r.alg, i)
-    return ValueatRiskRange(; settings = r.settings, alpha = r.alpha, beta = r.beta,
-                            w = r.w, alg = alg)
 end
 function (r::ValueatRiskRange{<:Any, <:Any, <:Any, Nothing})(x::VecNum)
     x = copy(x)
