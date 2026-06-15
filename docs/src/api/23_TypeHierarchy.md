@@ -1,7 +1,7 @@
 # Type hierarchy
 
 The trees below are generated automatically from the live type hierarchy
-every time the documentation is built (see `docs/generate_type_hierarchy.jl`),
+every time the documentation is built (see `[docs/generate_type_hierarchy.jl](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/docs/generate_type_hierarchy.jl)`),
 so they always reflect the current state of the package. Each type links to
 its docstring.
 

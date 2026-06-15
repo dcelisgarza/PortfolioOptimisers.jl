@@ -18,7 +18,7 @@
 #   * Indentation uses `&nbsp;` (survives Documenter intact) rather than literal
 #     spaces, which would collapse / be parsed as an indented code block.
 
-using PortfolioOptimisers, StatsBase
+using PortfolioOptimisers, StatsBase, InteractiveUtils
 
 const _NBSP = "&nbsp;"
 
