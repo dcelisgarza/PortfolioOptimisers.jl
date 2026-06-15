@@ -74,11 +74,6 @@ ProcessedCovariance
         return new{typeof(ce), typeof(alg), typeof(pdm)}(ce, alg, pdm)
     end
 end
-#= Old factory function:
-function factory(ce::ProcessedCovariance, w::ObsWeights)::ProcessedCovariance
-    return ProcessedCovariance(; ce = factory(ce.ce, w), alg = ce.alg, pdm = ce.pdm)
-end
-=#
 function ProcessedCovariance(; ce::StatsBase.CovarianceEstimator = Covariance(),
                              alg::Option{<:AbstractMatrixProcessingAlgorithm} = nothing,
                              pdm::Option{<:Posdef} = Posdef())::ProcessedCovariance

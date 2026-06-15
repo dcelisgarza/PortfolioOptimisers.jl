@@ -439,14 +439,6 @@ The bisection weight ``\\alpha`` is then computed from the Schur-complement-corr
         return new{typeof(opt), typeof(params), typeof(fb)}(opt, params, fb)
     end
 end
-#= Old factory function:
-function factory(sh::SchurComplementHierarchicalRiskParity,
-                 w::AbstractVector)::SchurComplementHierarchicalRiskParity
-    opt = factory(sh.opt, w)
-    fb = factory(sh.fb, w)
-    return SchurComplementHierarchicalRiskParity(; opt = opt, params = sh.params, fb = fb)
-end
-=#
 function SchurComplementHierarchicalRiskParity(;
                                                opt::HierarchicalOptimiser = HierarchicalOptimiser(),
                                                params::ScP_VecScP = SchurComplementParams(),

@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: accepted
 ---
 
 # Deepen the prior→measure moment binding with `@pprop`/`@cprop` tags

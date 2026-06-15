@@ -75,11 +75,6 @@ WindowedExpectedReturns
         return new{typeof(me), typeof(w), typeof(window)}(me, w, window)
     end
 end
-#= Old factory function:
-function factory(me::WindowedExpectedReturns, w::ObsWeights)::WindowedExpectedReturns
-    return WindowedExpectedReturns(; me = factory(me.me, w), w = w, window = me.window)
-end
-=#
 function WindowedExpectedReturns(;
                                  me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
                                  w::Option{<:ObsWeights} = nothing,

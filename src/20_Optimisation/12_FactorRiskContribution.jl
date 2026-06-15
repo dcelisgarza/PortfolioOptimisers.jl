@@ -180,16 +180,6 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
                                                                        flag, fb)
     end
 end
-#= Old factory function:
-function factory(frc::FactorRiskContribution, w::AbstractVector)::FactorRiskContribution
-    opt = factory(frc.opt, w)
-    r = factory(frc.r, w)
-    fb = factory(frc.fb, w)
-    return FactorRiskContribution(; opt = opt, re = frc.re, r = r, obj = frc.obj,
-                                  frc_ple = frc.frc_ple, sets = frc.sets, wi = frc.wi,
-                                  flag = frc.flag, fb = fb)
-end
-=#
 function FactorRiskContribution(; opt::JuMPOptimiser = JuMPOptimiser(),
                                 re::RegE_Reg = StepwiseRegression(),
                                 r::RM_VecRM = Variance(),

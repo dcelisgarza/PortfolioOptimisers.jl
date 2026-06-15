@@ -78,12 +78,6 @@ DistanceCovariance
                                                                                         ex)
     end
 end
-#= Old factory function:
-function factory(ce::DistanceCovariance, w::ObsWeights)::DistanceCovariance
-    return DistanceCovariance(; metric = ce.metric, args = ce.args, kwargs = ce.kwargs,
-                              w = w, ex = ce.ex)
-end
-=#
 function DistanceCovariance(; metric::Distances.Metric = Distances.Euclidean(),
                             args::Tuple = (), kwargs::NamedTuple = (;),
                             w::Option{<:ObsWeights} = nothing,

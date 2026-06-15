@@ -1543,11 +1543,6 @@ julia> PortfolioOptimisers.vec_to_real_measure(MeanValue(), [1.2, 3.4, 0.7])
         return new{typeof(w)}(w)
     end
 end
-#= Old factory function:
-function factory(::MeanValue, w::ObsWeights)
-    return MeanValue(; w = w)
-end
-=#
 function MeanValue(; w::Option{<:ObsWeights} = nothing)
     return MeanValue(w)
 end
@@ -1604,11 +1599,6 @@ julia> PortfolioOptimisers.vec_to_real_measure(MedianValue(), [1.2, 3.4, 0.7])
         return new{typeof(w)}(w)
     end
 end
-#= Old factory function:
-function factory(::MedianValue, w::ObsWeights)
-    return MedianValue(; w = w)
-end
-=#
 function MedianValue(; w::Option{<:ObsWeights} = nothing)
     return MedianValue(w)
 end
@@ -1691,11 +1681,6 @@ julia> PortfolioOptimisers.vec_to_real_measure(StdValue(), [1.2, 3.4, 0.7])
         return new{typeof(w), typeof(corrected)}(w, corrected)
     end
 end
-#= Old factory function:
-function factory(sv::StdValue, w::ObsWeights)
-    return StdValue(; w = w, corrected = sv.corrected)
-end
-=#
 function StdValue(; w::Option{<:ObsWeights} = nothing, corrected::Bool = true)
     return StdValue(w, corrected)
 end
@@ -1757,11 +1742,6 @@ julia> PortfolioOptimisers.vec_to_real_measure(VarValue(), [1.2, 3.4, 0.7])
         return new{typeof(w), typeof(corrected)}(w, corrected)
     end
 end
-#= Old factory function:
-function factory(vv::VarValue, w::ObsWeights)
-    return VarValue(; w = w, corrected = vv.corrected)
-end
-=#
 function VarValue(; w::Option{<:ObsWeights} = nothing, corrected::Bool = true)
     return VarValue(w, corrected)
 end
@@ -1879,11 +1859,6 @@ julia> PortfolioOptimisers.vec_to_real_measure(StandardisedValue(), [1.2, 3.4, 0
         return new{typeof(mv), typeof(sv)}(mv, sv)
     end
 end
-#= Old factory function:
-function factory(msv::StandardisedValue, w::ObsWeights)
-    return StandardisedValue(; mv = factory(msv.mv, w), sv = factory(msv.sv, w))
-end
-=#
 function StandardisedValue(; mv::MeanValue = MeanValue(), sv::StdValue = StdValue())
     return StandardisedValue(mv, sv)
 end

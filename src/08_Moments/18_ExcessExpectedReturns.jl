@@ -61,11 +61,6 @@ ExcessExpectedReturns
         return new{typeof(me), typeof(rf)}(me, rf)
     end
 end
-#= Old factory function:
-function factory(me::ExcessExpectedReturns, w::ObsWeights)::ExcessExpectedReturns
-    return ExcessExpectedReturns(; me = factory(me.me, w), rf = me.rf)
-end
-=#
 function ExcessExpectedReturns(;
                                me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
                                rf::Number = 0.0)::ExcessExpectedReturns

@@ -164,14 +164,6 @@ Where:
         return new{typeof(opt), typeof(r), typeof(sca), typeof(fb)}(opt, r, sca, fb)
     end
 end
-#= Old factory function:
-function factory(hrp::HierarchicalRiskParity, w::AbstractVector)::HierarchicalRiskParity
-    opt = factory(hrp.opt, w)
-    r = factory(hrp.r, w)
-    fb = factory(hrp.fb, w)
-    return HierarchicalRiskParity(; opt = opt, r = r, sca = hrp.sca, fb = fb)
-end
-=#
 function HierarchicalRiskParity(; opt::HierarchicalOptimiser = HierarchicalOptimiser(),
                                 r::OptRM_VecOptRM = Variance(),
                                 sca::Scalariser = SumScalariser(),
