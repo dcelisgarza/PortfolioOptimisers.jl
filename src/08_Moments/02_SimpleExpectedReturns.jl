@@ -44,7 +44,7 @@ SimpleExpectedReturns
     """
     $(field_dict[:oow])
     """
-    @fprop w
+    @wprop w
     function SimpleExpectedReturns(w::Option{<:ObsWeights})::SimpleExpectedReturns
         assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(w)}(w)

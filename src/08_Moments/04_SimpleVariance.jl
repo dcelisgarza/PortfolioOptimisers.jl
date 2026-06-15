@@ -58,7 +58,7 @@ SimpleVariance
     """
     $(field_dict[:ow])
     """
-    @fprop w
+    @wprop w
     """
     $(field_dict[:corrected])
     """

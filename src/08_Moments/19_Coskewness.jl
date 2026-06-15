@@ -193,7 +193,7 @@ Coskewness
     """
     $(field_dict[:oow])
     """
-    @fprop w
+    @wprop w
     function Coskewness(me::AbstractExpectedReturnsEstimator,
                         mp::AbstractMatrixProcessingEstimator, alg::AbstractMomentAlgorithm,
                         w::Option{<:ObsWeights})

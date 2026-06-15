@@ -63,7 +63,7 @@ WindowedExpectedReturns
     """
     $(field_dict[:oow])
     """
-    @fprop w
+    @wprop w
     """
     Window specification: an integer (last `window` observations) or a vector of indices.
     """

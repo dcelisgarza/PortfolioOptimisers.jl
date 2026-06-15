@@ -36,7 +36,7 @@ MedianExpectedReturns
     """
     $(field_dict[:oow])
     """
-    @fprop w
+    @wprop w
     function MedianExpectedReturns(w::Option{<:ObsWeights})
         return new{typeof(w)}(w)
     end

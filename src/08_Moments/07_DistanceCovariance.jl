@@ -63,7 +63,7 @@ DistanceCovariance
     """
     $(arg_dict[:oow])
     """
-    @fprop w
+    @wprop w
     """
     $(arg_dict[:ex])
     """

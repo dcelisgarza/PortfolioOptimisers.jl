@@ -606,7 +606,7 @@ EntropyPoolingPrior
     """
     $(field_dict[:ep_w])
     """
-    @fprop w
+    @wprop w
     """
     $(field_dict[:epalg])
     """

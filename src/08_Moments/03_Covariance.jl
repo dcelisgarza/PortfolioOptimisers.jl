@@ -55,7 +55,7 @@ GeneralCovariance
     """
     $(field_dict[:oow])
     """
-    @fprop w
+    @wprop w
     function GeneralCovariance(ce::StatsBase.CovarianceEstimator, w::Option{<:ObsWeights})
         assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(ce), typeof(w)}(ce, w)
