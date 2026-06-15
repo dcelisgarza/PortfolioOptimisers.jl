@@ -1451,15 +1451,15 @@ Keywords correspond to the struct's fields.
 
   - [gerber2025squeezing](@cite) Gerber, Sander and Smyth, William and Markowitz, Harry and Miao, Yinsen and Ernst, Philip and Sargen, Paul, *Squeezing Financial Noise: A Novel Approach to Covariance Matrix Estimation* (December 01, 2025). Available at SSRN: https://ssrn.com/abstract=4986939 or http://dx.doi.org/10.2139/ssrn.4986939
 """
-@concrete struct GerberIQCovariance <: BaseGerberIQCovariance
+@propagatable @concrete struct GerberIQCovariance <: BaseGerberIQCovariance
     """
     $(field_dict[:ve])
     """
-    ve
+    @fprop @vprop ve
     """
     $(field_dict[:me])
     """
-    me
+    @fprop @vprop me
     """
     $(field_dict[:pdm])
     """
@@ -1471,7 +1471,7 @@ Keywords correspond to the struct's fields.
     """
     Temporal decay rate estimator for past observations [`GerberIQDecayEstimator`](@ref).
     """
-    decay
+    @fprop decay
     """
     Threshold scaling factor estimator for co-movement thresholds [`GerberIQScaler`](@ref).
     """
@@ -1483,7 +1483,7 @@ Keywords correspond to the struct's fields.
     """
     $(field_dict[:gerbalg])
     """
-    alg
+    @fprop alg
     """
     $(field_dict[:ex]).
     """
@@ -1512,111 +1512,6 @@ function GerberIQCovariance(; ve::StatsBase.CovarianceEstimator = SimpleVariance
                             alg::GerberCovarianceAlgorithm = Gerber1(),
                             ex::FLoops.Transducers.Executor = FLoops.Transducers.ThreadedEx())
     return GerberIQCovariance(ve, me, pdm, c, decay, sc, kind, alg, ex)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Return a new [`GerberIQCovariance`](@ref) estimator with the specified observation weights.
-
-# Arguments
-
-  - $(arg_dict[:ce])
-  - $(arg_dict[:oow])
-
-# Returns
-
-  - $(ret_dict[:ce])
-
-# Details
-
-  - Calls `factory(ce.alg, w)` to update the algorithm (current algorithms do not use weights, this for future proofing).
-  - Calls `factory(ce.ve, w)` to update the variance estimator.
-  - Calls `factory(ce.me, w)` to update the expected returns estimator.
-  - Calls `factory(ce.decay, w)` to update the decay estimator (current decay estimators do not use weights, this for future proofing).
-  - Preserves the other fields of the original estimator.
-
-# Examples
-
-```jldoctest
-julia> ce = GerberIQCovariance()
-GerberIQCovariance
-     ve ┼ SimpleVariance
-        │          me ┼ SimpleExpectedReturns
-        │             │   w ┴ nothing
-        │           w ┼ nothing
-        │   corrected ┴ Bool: true
-     me ┼ SimpleExpectedReturns
-        │   w ┴ nothing
-    pdm ┼ Posdef
-        │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-        │   kwargs ┴ @NamedTuple{}: NamedTuple()
-      c ┼ Float64: 0.5
-  decay ┼ ExpGerberIQDecay
-        │   e ┼ nothing
-        │   y ┴ nothing
-     sc ┼ nothing
-   kind ┼ BasicGerberIQ
-        │   d ┼ Float64: 2.0
-        │   n ┴ Float64: 0.5
-    alg ┼ Gerber1()
-     ex ┴ Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
-
-julia> factory(ce, StatsBase.Weights([1, 2, 3]))
-GerberIQCovariance
-     ve ┼ SimpleVariance
-        │          me ┼ SimpleExpectedReturns
-        │             │   w ┴ StatsBase.Weights{Int64, Int64, Vector{Int64}}: [1, 2, 3]
-        │           w ┼ StatsBase.Weights{Int64, Int64, Vector{Int64}}: [1, 2, 3]
-        │   corrected ┴ Bool: true
-     me ┼ SimpleExpectedReturns
-        │   w ┴ StatsBase.Weights{Int64, Int64, Vector{Int64}}: [1, 2, 3]
-    pdm ┼ Posdef
-        │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-        │   kwargs ┴ @NamedTuple{}: NamedTuple()
-      c ┼ Float64: 0.5
-  decay ┼ ExpGerberIQDecay
-        │   e ┼ nothing
-        │   y ┴ nothing
-     sc ┼ nothing
-   kind ┼ BasicGerberIQ
-        │   d ┼ Float64: 2.0
-        │   n ┴ Float64: 0.5
-    alg ┼ Gerber1()
-     ex ┴ Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
-```
-
-# References
-
-  - [gerber2025squeezing](@cite) Gerber, Sander and Smyth, William and Markowitz, Harry and Miao, Yinsen and Ernst, Philip and Sargen, Paul, *Squeezing Financial Noise: A Novel Approach to Covariance Matrix Estimation* (December 01, 2025). Available at SSRN: https://ssrn.com/abstract=4986939 or http://dx.doi.org/10.2139/ssrn.4986939
-"""
-function factory(ce::GerberIQCovariance, w::ObsWeights)
-    return GerberIQCovariance(; ve = factory(ce.ve, w), me = factory(ce.me, w),
-                              pdm = ce.pdm, c = ce.c, decay = factory(ce.decay, w),
-                              sc = ce.sc, kind = ce.kind, alg = factory(ce.alg, w),
-                              ex = ce.ex)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Gets the view of the covariance estimator for the `i`-th element(s).
-
-# Arguments
-
-  - $(arg_dict[:ce])
-  - `i`: Index or indices to view.
-
-# Returns
-
-  - $(ret_dict[:cev])
-
-# Related
-
-  - [`GerberIQCovariance`](@ref)
-"""
-function port_opt_view(ce::GerberIQCovariance, i, args...)
-    return GerberIQCovariance(; ve = port_opt_view(ce.ve, i), me = port_opt_view(ce.me, i),
-                              pdm = ce.pdm, c = ce.c, decay = ce.decay, sc = ce.sc,
-                              kind = ce.kind, alg = ce.alg, ex = ce.ex)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

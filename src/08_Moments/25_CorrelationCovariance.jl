@@ -36,11 +36,11 @@ CorrelationCovariance
   - [`AbstractCovarianceEstimator`](@ref)
   - [`Covariance`](@ref)
 """
-@concrete struct CorrelationCovariance <: AbstractCovarianceEstimator
+@propagatable @concrete struct CorrelationCovariance <: AbstractCovarianceEstimator
     """
     $(field_dict[:ce])
     """
-    ce
+    @fprop @vprop ce
     function CorrelationCovariance(ce::StatsBase.CovarianceEstimator)
         return new{typeof(ce)}(ce)
     end
@@ -48,49 +48,6 @@ end
 function CorrelationCovariance(;
                                ce::StatsBase.CovarianceEstimator = Covariance())::CorrelationCovariance
     return CorrelationCovariance(ce)
-end
-"""
-    factory(ce::CorrelationCovariance, w::ObsWeights) -> CorrelationCovariance
-
-Return a new [`CorrelationCovariance`](@ref) estimator with observation weights `w` applied to the underlying covariance estimator.
-
-# Arguments
-
-  - $(arg_dict[:ce])
-  - $(arg_dict[:ow])
-
-# Returns
-
-  - $(ret_dict[:ce])
-
-# Related
-
-  - [`CorrelationCovariance`](@ref)
-  - [`factory`](@ref)
-"""
-function factory(ce::CorrelationCovariance, w::ObsWeights)::CorrelationCovariance
-    return CorrelationCovariance(; ce = factory(ce.ce, w))
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Gets the view of the covariance estimator for the `i`-th element(s).
-
-# Arguments
-
-  - $(arg_dict[:ce])
-  - `i`: Index or indices to view.
-
-# Returns
-
-  - $(ret_dict[:cev])
-
-# Related
-
-  - [`CorrelationCovariance`](@ref)
-"""
-function port_opt_view(ce::CorrelationCovariance, i, args...)::CorrelationCovariance
-    return CorrelationCovariance(; ce = port_opt_view(ce.ce, i))
 end
 """
     Statistics.cov(ce::CorrelationCovariance, X::MatNum; dims::Int = 1,

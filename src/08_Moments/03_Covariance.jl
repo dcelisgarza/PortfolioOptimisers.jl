@@ -47,15 +47,15 @@ GeneralCovariance
   - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
   - [`cov(ce::GeneralCovariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
 """
-@concrete struct GeneralCovariance <: AbstractCovarianceEstimator
+@propagatable @concrete struct GeneralCovariance <: AbstractCovarianceEstimator
     """
     $(field_dict[:ce])
     """
-    ce
+    @fprop @vprop ce
     """
     $(field_dict[:oow])
     """
-    w
+    @fprop w
     function GeneralCovariance(ce::StatsBase.CovarianceEstimator, w::Option{<:ObsWeights})
         assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(ce), typeof(w)}(ce, w)
@@ -179,67 +179,6 @@ function Statistics.cor(ce::GeneralCovariance, X::MatNum; dims::Int = 1, mean = 
     end
 end
 """
-    factory(
-        ce::GeneralCovariance,
-        w::ObsWeights
-    ) -> GeneralCovariance
-
-Return a new `GeneralCovariance` estimator with observation weights `w`.
-
-# Arguments
-
-  - $(arg_dict[:ce])
-  - $(arg_dict[:ow])
-
-# Returns
-
-  - $(ret_dict[:ce])
-
-# Examples
-
-```jldoctest
-julia> ce = GeneralCovariance()
-GeneralCovariance
-  ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-   w ┴ nothing
-
-julia> factory(ce, StatsBase.Weights([0.1, 0.2, 0.7]))
-GeneralCovariance
-  ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-   w ┴ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.1, 0.2, 0.7]
-```
-
-# Related
-
-  - [`GeneralCovariance`](@ref)
-  - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
-  - [`factory`](@ref)
-"""
-function factory(ce::GeneralCovariance, w::ObsWeights)::GeneralCovariance
-    return GeneralCovariance(; ce = factory(ce.ce, w), w = w)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Gets the view of the covariance estimator for the `i`-th element(s).
-
-# Arguments
-
-  - $(arg_dict[:ce])
-  - `i`: Index or indices to view.
-
-# Returns
-
-  - $(ret_dict[:cev])
-
-# Related
-
-  - [`GeneralCovariance`](@ref)
-"""
-function port_opt_view(ce::GeneralCovariance, i, args...)::GeneralCovariance
-    return GeneralCovariance(; ce = port_opt_view(ce.ce, i), w = ce.w)
-end
-"""
 $(DocStringExtensions.TYPEDEF)
 
 A flexible container type for covariance estimation in `PortfolioOptimisers.jl`.
@@ -281,15 +220,15 @@ Covariance
   - [`Full`](@ref)
   - [`Semi`](@ref)
 """
-@concrete struct Covariance <: AbstractCovarianceEstimator
+@propagatable @concrete struct Covariance <: AbstractCovarianceEstimator
     """
     $(field_dict[:me])
     """
-    me
+    @fprop @vprop me
     """
     $(field_dict[:ce])
     """
-    ce
+    @fprop @vprop ce
     """
     $(field_dict[:malg])
     """
@@ -303,82 +242,6 @@ function Covariance(; me::AbstractExpectedReturnsEstimator = SimpleExpectedRetur
                     ce::StatsBase.CovarianceEstimator = GeneralCovariance(),
                     alg::AbstractMomentAlgorithm = Full())::Covariance
     return Covariance(me, ce, alg)
-end
-"""
-    factory(
-        ce::Covariance,
-        w::ObsWeights
-    ) -> Covariance
-
-Return a new `Covariance` estimator with observation weights `w` applied to both the expected returns and covariance estimators.
-
-# Arguments
-
-  - $(arg_dict[:ce])
-  - $(arg_dict[:ow])
-
-# Returns
-
-  - $(ret_dict[:ce])
-
-# Details
-
-  - Calls `factory(ce.me, w)` and `factory(ce.ce, w)` to propagate the weights to the mean and covariance estimators.
-  - Preserves the moment algorithm `ce.alg` from the original estimator.
-  - Enables weighted estimation for both mean and covariance in portfolio workflows.
-
-# Examples
-
-```jldoctest
-julia> ce = Covariance()
-Covariance
-   me ┼ SimpleExpectedReturns
-      │   w ┴ nothing
-   ce ┼ GeneralCovariance
-      │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-      │    w ┴ nothing
-  alg ┴ Full()
-
-julia> ce_w = factory(ce, StatsBase.Weights([0.2, 0.3, 0.5]))
-Covariance
-   me ┼ SimpleExpectedReturns
-      │   w ┴ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.3, 0.5]
-   ce ┼ GeneralCovariance
-      │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-      │    w ┴ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.3, 0.5]
-  alg ┴ Full()
-```
-
-# Related
-
-  - [`Covariance`](@ref)
-  - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
-  - [`factory`](@ref)
-"""
-function factory(ce::Covariance, w::ObsWeights)::Covariance
-    return Covariance(; me = factory(ce.me, w), ce = factory(ce.ce, w), alg = ce.alg)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Gets the view of the covariance estimator for the `i`-th element(s).
-
-# Arguments
-
-  - $(arg_dict[:ce])
-  - `i`: Index or indices to view.
-
-# Returns
-
-  - $(ret_dict[:cev])
-
-# Related
-
-  - [`Covariance`](@ref)
-"""
-function port_opt_view(ce::Covariance, i, args...)::Covariance
-    return Covariance(; me = port_opt_view(ce.me, i), ce = port_opt_view(ce.ce, i),
-                      alg = ce.alg)
 end
 """
     Statistics.cov(

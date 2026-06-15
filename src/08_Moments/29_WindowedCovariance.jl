@@ -54,15 +54,15 @@ WindowedCovariance
   - [`AbstractCovarianceEstimator`](@ref)
   - [`PortfolioOptimisersCovariance`](@ref)
 """
-@concrete struct WindowedCovariance <: AbstractCovarianceEstimator
+@propagatable @concrete struct WindowedCovariance <: AbstractCovarianceEstimator
     """
     $(field_dict[:ce])
     """
-    ce
+    @fprop @vprop ce
     """
     $(field_dict[:oow])
     """
-    w
+    @fprop w
     """
     Window specification: an integer (last `window` observations) or a vector of indices.
     """
@@ -79,49 +79,6 @@ function WindowedCovariance(;
                             w::Option{<:ObsWeights} = nothing,
                             window::Option{<:Int_VecInt} = nothing)::WindowedCovariance
     return WindowedCovariance(ce, w, window)
-end
-"""
-    factory(ce::WindowedCovariance, w::ObsWeights) -> WindowedCovariance
-
-Return a new [`WindowedCovariance`](@ref) estimator with observation weights `w` applied to the underlying covariance estimator and stored as the windowed weights.
-
-# Arguments
-
-  - $(arg_dict[:ce])
-  - $(arg_dict[:ow])
-
-# Returns
-
-  - $(ret_dict[:ce])
-
-# Related
-
-  - [`WindowedCovariance`](@ref)
-  - [`factory`](@ref)
-"""
-function factory(ce::WindowedCovariance, w::ObsWeights)::WindowedCovariance
-    return WindowedCovariance(; ce = factory(ce.ce, w), w = w, window = ce.window)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Gets the view of the covariance estimator for the `i`-th element(s).
-
-# Arguments
-
-  - $(arg_dict[:ce])
-  - `i`: Index or indices to view.
-
-# Returns
-
-  - $(ret_dict[:cev])
-
-# Related
-
-  - [`WindowedCovariance`](@ref)
-"""
-function port_opt_view(ce::WindowedCovariance, i, args...)::WindowedCovariance
-    return WindowedCovariance(; ce = port_opt_view(ce.ce, i), w = ce.w, window = ce.window)
 end
 """
     Statistics.cov(ce::WindowedCovariance, X::MatNum; dims::Int = 1, mean = nothing, iv::Option{<:MatNum} = nothing,

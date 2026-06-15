@@ -23,8 +23,6 @@ FullGerberIQ
 gerber_iq_assert_c_d
 gerber_iq_weight
 GerberIQCovariance
-factory(ce::GerberIQCovariance, w::ObsWeights)
-port_opt_view(ce::GerberIQCovariance, i, args...)
 gerber_IQ_delta
 gerber_IQ
 cor(ce::GerberIQCovariance, X::MatNum; dims::Int = 1,

@@ -45,11 +45,11 @@ DetoneCovariance
   - [`Detone`](@ref)
   - [`Posdef`](@ref)
 """
-@concrete struct DetoneCovariance <: AbstractCovarianceEstimator
+@propagatable @concrete struct DetoneCovariance <: AbstractCovarianceEstimator
     """
     $(field_dict[:ce])
     """
-    ce
+    @fprop @vprop ce
     """
     $(field_dict[:dt])
     """
@@ -67,63 +67,6 @@ function DetoneCovariance(; ce::StatsBase.CovarianceEstimator = Covariance(),
                           dt::Detone = Detone(),
                           pdm::Option{<:Posdef} = Posdef())::DetoneCovariance
     return DetoneCovariance(ce, dt, pdm)
-end
-"""
-    factory(ce::DetoneCovariance, w::ObsWeights) -> DetoneCovariance
-
-Return a new [`DetoneCovariance`](@ref) estimator with observation weights `w` applied to the underlying covariance estimator.
-
-# Arguments
-
-  - $(arg_dict[:ce])
-  - $(arg_dict[:ow])
-
-# Returns
-
-  - $(ret_dict[:ce])
-
-# Examples
-
-```jldoctest
-julia> ce = DetoneCovariance();
-
-julia> ce2 = factory(ce, StatsBase.Weights([0.2, 0.3, 0.5]));
-
-julia> ce2.ce.me.w
-3-element Weights{Float64, Float64, Vector{Float64}}:
- 0.2
- 0.3
- 0.5
-```
-
-# Related
-
-  - [`DetoneCovariance`](@ref)
-  - [`factory`](@ref)
-"""
-function factory(ce::DetoneCovariance, w::ObsWeights)::DetoneCovariance
-    return DetoneCovariance(; ce = factory(ce.ce, w), dt = ce.dt, pdm = ce.pdm)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Gets the view of the covariance estimator for the `i`-th element(s).
-
-# Arguments
-
-  - $(arg_dict[:ce])
-  - `i`: Index or indices to view.
-
-# Returns
-
-  - $(ret_dict[:cev])
-
-# Related
-
-  - [`DetoneCovariance`](@ref)
-"""
-function port_opt_view(ce::DetoneCovariance, i, args...)::DetoneCovariance
-    return DetoneCovariance(; ce = port_opt_view(ce.ce, i), dt = ce.dt, pdm = ce.pdm)
 end
 """
     Statistics.cov(ce::DetoneCovariance, X::MatNum; dims = 1, kwargs...)

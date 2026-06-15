@@ -44,11 +44,11 @@ LowerTailDependenceCovariance
   - [`AbstractCovarianceEstimator`](@ref)
   - [`FLoops.Transducers.Executor`](https://juliafolds2.github.io/FLoops.jl/dev/tutorials/parallel/#tutorials-ex)
 """
-@concrete struct LowerTailDependenceCovariance <: AbstractCovarianceEstimator
+@propagatable @concrete struct LowerTailDependenceCovariance <: AbstractCovarianceEstimator
     """
     $(field_dict[:ve])
     """
-    ve
+    @fprop @vprop ve
     """
     $(field_dict[:alpha])
     """
@@ -68,69 +68,6 @@ function LowerTailDependenceCovariance(; ve::AbstractVarianceEstimator = SimpleV
                                        alpha::Number = 0.05,
                                        ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())::LowerTailDependenceCovariance
     return LowerTailDependenceCovariance(ve, alpha, ex)
-end
-"""
-    factory(ce::LowerTailDependenceCovariance, w::ObsWeights) -> LowerTailDependenceCovariance
-
-Return a new [`LowerTailDependenceCovariance`](@ref) estimator with observation weights `w` applied to the underlying variance estimator.
-
-# Arguments
-
-  - $(arg_dict[:ce])
-  - $(arg_dict[:ow])
-
-# Returns
-
-  - $(ret_dict[:ce])
-
-# Examples
-
-```jldoctest
-julia> ce = LowerTailDependenceCovariance();
-
-julia> factory(ce, StatsBase.Weights([0.2, 0.3, 0.5]))
-LowerTailDependenceCovariance
-     ve ┼ SimpleVariance
-        │          me ┼ SimpleExpectedReturns
-        │             │   w ┴ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.3, 0.5]
-        │           w ┼ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.3, 0.5]
-        │   corrected ┴ Bool: true
-  alpha ┼ Float64: 0.05
-     ex ┴ Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
-```
-
-# Related
-
-  - [`LowerTailDependenceCovariance`](@ref)
-  - [`factory`](@ref)
-"""
-function factory(ce::LowerTailDependenceCovariance,
-                 w::ObsWeights)::LowerTailDependenceCovariance
-    return LowerTailDependenceCovariance(; ve = factory(ce.ve, w), alpha = ce.alpha,
-                                         ex = ce.ex)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Gets the view of the covariance estimator for the `i`-th element(s).
-
-# Arguments
-
-  - $(arg_dict[:ce])
-  - `i`: Index or indices to view.
-
-# Returns
-
-  - $(ret_dict[:cev])
-
-# Related
-
-  - [`LowerTailDependenceCovariance`](@ref)
-"""
-function port_opt_view(ce::LowerTailDependenceCovariance, i,
-                       args...)::LowerTailDependenceCovariance
-    return LowerTailDependenceCovariance(; ve = port_opt_view(ce.ve, i), alpha = ce.alpha,
-                                         ex = ce.ex)
 end
 """
     lower_tail_dependence(X::MatNum; alpha::Number = 0.05,

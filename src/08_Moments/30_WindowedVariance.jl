@@ -43,15 +43,15 @@ WindowedVariance
   - [`AbstractVarianceEstimator`](@ref)
   - [`SimpleVariance`](@ref)
 """
-@concrete struct WindowedVariance <: AbstractVarianceEstimator
+@propagatable @concrete struct WindowedVariance <: AbstractVarianceEstimator
     """
     $(field_dict[:me])
     """
-    ce
+    @fprop @vprop ce
     """
     $(field_dict[:oow])
     """
-    w
+    @fprop w
     """
     Window specification: an integer (last `window` observations) or a vector of indices.
     """
@@ -67,49 +67,6 @@ function WindowedVariance(; ce::AbstractVarianceEstimator = SimpleVariance(),
                           w::Option{<:ObsWeights} = nothing,
                           window::Option{<:Int_VecInt} = nothing)::WindowedVariance
     return WindowedVariance(ce, w, window)
-end
-"""
-    factory(ce::WindowedVariance, w::ObsWeights) -> WindowedVariance
-
-Return a new [`WindowedVariance`](@ref) estimator with observation weights `w` applied to the underlying variance estimator and stored as the windowed weights.
-
-# Arguments
-
-  - `ce`: Windowed variance estimator.
-  - $(arg_dict[:ow])
-
-# Returns
-
-  - `ce::WindowedVariance`: Updated estimator with weights applied.
-
-# Related
-
-  - [`WindowedVariance`](@ref)
-  - [`factory`](@ref)
-"""
-function factory(ce::WindowedVariance, w::ObsWeights)::WindowedVariance
-    return WindowedVariance(; ce = factory(ce.ce, w), w = w, window = ce.window)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Gets the view of the covariance estimator for the `i`-th element(s).
-
-# Arguments
-
-  - $(arg_dict[:ce])
-  - `i`: Index or indices to view.
-
-# Returns
-
-  - $(ret_dict[:cev])
-
-# Related
-
-  - [`WindowedVariance`](@ref)
-"""
-function port_opt_view(ce::WindowedVariance, i, args...)::WindowedVariance
-    return WindowedVariance(; ce = port_opt_view(ce.ce, i), w = ce.w, window = ce.window)
 end
 """
     Statistics.var(ce::WindowedVariance, X::MatNum; dims::Int = 1, mean = nothing, iv::Option{<:MatNum} = nothing,

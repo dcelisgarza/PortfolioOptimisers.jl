@@ -50,15 +50,15 @@ SimpleVariance
   - [`var(ve::SimpleVariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
   - [`var(ve::SimpleVariance, X::VecNum; mean = nothing)`](@ref)
 """
-@concrete struct SimpleVariance <: AbstractVarianceEstimator
+@propagatable @concrete struct SimpleVariance <: AbstractVarianceEstimator
     """
     $(field_dict[:ome])
     """
-    me
+    @fprop @vprop me
     """
     $(field_dict[:ow])
     """
-    w
+    @fprop w
     """
     $(field_dict[:corrected])
     """
@@ -439,77 +439,4 @@ function Statistics.var(ve::SimpleVariance, X::VecNum; mean = nothing)
         Statistics.var(X, w; corrected = ve.corrected, mean = mean)
     end
 end
-"""
-    factory(
-        ve::SimpleVariance,
-        w::ObsWeights
-    ) -> SimpleVariance
-
-Return a new `SimpleVariance` estimator with the specified observation weights.
-
-# Arguments
-
-  - $(arg_dict[:ve])
-  - $(arg_dict[:ow])
-
-# Returns
-
-  - $(ret_dict[:ve])
-
-# Details
-
-  - The mean estimator is updated using `factory(ve.me, w)` for consistency.
-  - Sets `w` to the new weights.
-  - The bias correction flag is preserved from the original estimator.
-
-# Examples
-
-```jldoctest
-julia> sv = SimpleVariance()
-SimpleVariance
-         me ┼ SimpleExpectedReturns
-            │   w ┴ nothing
-          w ┼ nothing
-  corrected ┴ Bool: true
-
-julia> factory(sv, StatsBase.Weights([0.2, 0.3, 0.5]))
-SimpleVariance
-         me ┼ SimpleExpectedReturns
-            │   w ┴ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.3, 0.5]
-          w ┼ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.3, 0.5]
-  corrected ┴ Bool: true
-```
-
-# Related
-
-  - [`SimpleVariance`](@ref)
-  - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
-  - [`factory`](@ref)
-"""
-function factory(ve::SimpleVariance, w::ObsWeights)::SimpleVariance
-    return SimpleVariance(; me = factory(ve.me, w), w = w, corrected = ve.corrected)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Gets the view of the simple variance for the `i`-th element(s).
-
-# Arguments
-
-  - $(arg_dict[:ve])
-  - `i`: Index or indices to view.
-
-# Returns
-
-  - $(ret_dict[:vev])
-
-# Related
-
-  - [`SimpleVariance`](@ref)
-"""
-function port_opt_view(ve::SimpleVariance, i, args...)::SimpleVariance
-    return SimpleVariance(; me = port_opt_view(ve.me, i), w = ve.w,
-                          corrected = ve.corrected)
-end
-
 export SimpleVariance, var, std

@@ -51,11 +51,11 @@ DenoiseCovariance
   - [`Denoise`](@ref)
   - [`Posdef`](@ref)
 """
-@concrete struct DenoiseCovariance <: AbstractCovarianceEstimator
+@propagatable @concrete struct DenoiseCovariance <: AbstractCovarianceEstimator
     """
     $(field_dict[:ce])
     """
-    ce
+    @fprop @vprop ce
     """
     $(field_dict[:dn])
     """
@@ -73,63 +73,6 @@ function DenoiseCovariance(; ce::StatsBase.CovarianceEstimator = Covariance(),
                            dn::Denoise = Denoise(),
                            pdm::Option{<:Posdef} = Posdef())::DenoiseCovariance
     return DenoiseCovariance(ce, dn, pdm)
-end
-"""
-    factory(ce::DenoiseCovariance, w::ObsWeights) -> DenoiseCovariance
-
-Return a new [`DenoiseCovariance`](@ref) estimator with observation weights `w` applied to the underlying covariance estimator.
-
-# Arguments
-
-  - $(arg_dict[:ce])
-  - $(arg_dict[:ow])
-
-# Returns
-
-  - $(ret_dict[:ce])
-
-# Examples
-
-```jldoctest
-julia> ce = DenoiseCovariance();
-
-julia> ce2 = factory(ce, StatsBase.Weights([0.2, 0.3, 0.5]));
-
-julia> ce2.ce.me.w
-3-element Weights{Float64, Float64, Vector{Float64}}:
- 0.2
- 0.3
- 0.5
-```
-
-# Related
-
-  - [`DenoiseCovariance`](@ref)
-  - [`factory`](@ref)
-"""
-function factory(ce::DenoiseCovariance, w::ObsWeights)::DenoiseCovariance
-    return DenoiseCovariance(; ce = factory(ce.ce, w), dn = ce.dn, pdm = ce.pdm)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Gets the view of the covariance estimator for the `i`-th element(s).
-
-# Arguments
-
-  - $(arg_dict[:ce])
-  - `i`: Index or indices to view.
-
-# Returns
-
-  - $(ret_dict[:cev])
-
-# Related
-
-  - [`DenoiseCovariance`](@ref)
-"""
-function port_opt_view(ce::DenoiseCovariance, i, args...)::DenoiseCovariance
-    return DenoiseCovariance(; ce = port_opt_view(ce.ce, i), dn = ce.dn, pdm = ce.pdm)
 end
 """
     Statistics.cov(ce::DenoiseCovariance, X::MatNum; dims = 1, kwargs...)
