@@ -106,7 +106,7 @@ function generate_type_hierarchy(dir::String = joinpath(@__DIR__, "src", "api"))
                 its docstring.
                 """)
         for (name, T) in roots
-            println(io, "## [`", name, "`](@id type-hierarchy-", name, ")\n")
+            println(io, "## [", name, "](@id type-hierarchy-", name, ")\n")
             println(io, "```@raw html")
             println(io, "<div class=\"type-tree\">")
             println(io, "```\n")
