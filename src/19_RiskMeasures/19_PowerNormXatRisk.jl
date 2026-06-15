@@ -144,7 +144,7 @@ PowerNormValueatRisk
   - [`PowerNormValueatRiskRange`](@ref)
   - [`PowerNormDrawdownatRisk`](@ref)
 """
-@concrete struct PowerNormValueatRisk <: RiskMeasure
+@propagatable @concrete struct PowerNormValueatRisk <: RiskMeasure
     """
     $(field_dict[:settings_rm])
     """
@@ -152,7 +152,7 @@ PowerNormValueatRisk
     """
     $(field_dict[:slv])
     """
-    slv
+    @cprop slv
     """
     $(field_dict[:alpha])
     """
@@ -164,7 +164,7 @@ PowerNormValueatRisk
     """
     $(field_dict[:w_rm])
     """
-    w
+    @pprop w
     function PowerNormValueatRisk(settings::RiskMeasureSettings, slv::Option{<:Slv_VecSlv},
                                   alpha::Number, p::Number,
                                   w::Option{<:StatsBase.AbstractWeights})
@@ -270,7 +270,7 @@ PowerNormValueatRiskRange
   - [`PowerNormValueatRisk`](@ref)
   - [`EntropicValueatRiskRange`](@ref)
 """
-@concrete struct PowerNormValueatRiskRange <: RiskMeasure
+@propagatable @concrete struct PowerNormValueatRiskRange <: RiskMeasure
     """
     $(field_dict[:settings_rm])
     """
@@ -278,7 +278,7 @@ PowerNormValueatRiskRange
     """
     $(field_dict[:slv])
     """
-    slv
+    @cprop slv
     """
     $(field_dict[:alpha])
     """
@@ -298,7 +298,7 @@ PowerNormValueatRiskRange
     """
     $(field_dict[:w_rm])
     """
-    w
+    @pprop w
     function PowerNormValueatRiskRange(settings::RiskMeasureSettings,
                                        slv::Option{<:Slv_VecSlv}, alpha::Number,
                                        beta::Number, pa::Number, pb::Number,
@@ -324,26 +324,6 @@ function PowerNormValueatRiskRange(; settings::RiskMeasureSettings = RiskMeasure
 end
 function (r::PowerNormValueatRiskRange)(x::VecNum)
     return PRM(x, r.slv, r.alpha, r.pa, r.w) + PRM(-x, r.slv, r.beta, r.pb, r.w)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Create an instance of [`PowerNormValueatRiskRange`](@ref) by selecting observation weights and solver from the risk-measure instance or falling back to the prior result.
-
-# Related
-
-  - [`PowerNormValueatRiskRange`](@ref)
-  - [`AbstractPriorResult`](@ref)
-  - [`factory`](@ref)
-  - [`nothing_scalar_array_selector`](@ref)
-  - [`solver_selector`](@ref)
-"""
-function factory(r::PowerNormValueatRiskRange, pr::AbstractPriorResult,
-                 slv::Option{<:Slv_VecSlv}, args...; kwargs...)::PowerNormValueatRiskRange
-    w = nothing_scalar_array_selector(r.w, pr.w)
-    slv = solver_selector(r.slv, slv)
-    return PowerNormValueatRiskRange(; settings = r.settings, slv = slv, alpha = r.alpha,
-                                     beta = r.beta, pa = r.pa, pb = r.pb, w = w)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -442,7 +422,7 @@ PowerNormDrawdownatRisk
   - [`EntropicDrawdownatRisk`](@ref)
   - [`RelativePowerNormDrawdownatRisk`](@ref)
 """
-@concrete struct PowerNormDrawdownatRisk <: RiskMeasure
+@propagatable @concrete struct PowerNormDrawdownatRisk <: RiskMeasure
     """
     $(field_dict[:settings_rm])
     """
@@ -450,7 +430,7 @@ PowerNormDrawdownatRisk
     """
     $(field_dict[:slv])
     """
-    slv
+    @cprop slv
     """
     $(field_dict[:alpha])
     """
@@ -462,7 +442,7 @@ PowerNormDrawdownatRisk
     """
     $(field_dict[:w_rm])
     """
-    w
+    @pprop w
     function PowerNormDrawdownatRisk(settings::RiskMeasureSettings,
                                      slv::Option{<:Slv_VecSlv}, alpha::Number, p::Number,
                                      w::Option{<:ObsWeights})
@@ -582,7 +562,7 @@ RelativePowerNormDrawdownatRisk
   - [`RelativeRelativisticDrawdownatRisk`](@ref)
   - [`RelativeEntropicDrawdownatRisk`](@ref)
 """
-@concrete struct RelativePowerNormDrawdownatRisk <: HierarchicalRiskMeasure
+@propagatable @concrete struct RelativePowerNormDrawdownatRisk <: HierarchicalRiskMeasure
     """
     $(field_dict[:settings_rm])
     """
@@ -590,7 +570,7 @@ RelativePowerNormDrawdownatRisk
     """
     $(field_dict[:slv])
     """
-    slv
+    @cprop slv
     """
     $(field_dict[:alpha])
     """
@@ -602,7 +582,7 @@ RelativePowerNormDrawdownatRisk
     """
     $(field_dict[:w_rm])
     """
-    w
+    @pprop w
     function RelativePowerNormDrawdownatRisk(settings::HierarchicalRiskMeasureSettings,
                                              slv::Option{<:Slv_VecSlv}, alpha::Number,
                                              p::Number, w::Option{<:ObsWeights})
@@ -628,132 +608,6 @@ end
 function (r::RelativePowerNormDrawdownatRisk)(x::VecNum)
     dd = relative_drawdown_vec(x)
     return PRM(dd, r.slv, r.alpha, r.p, r.w)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Create an instance of [`PowerNormValueatRisk`](@ref) by selecting observation weights and solver from the risk-measure instance or falling back to the prior result.
-
-# Related
-
-  - [`PowerNormValueatRisk`](@ref)
-  - [`AbstractPriorResult`](@ref)
-  - [`factory`](@ref)
-  - [`nothing_scalar_array_selector`](@ref)
-  - [`solver_selector`](@ref)
-"""
-function factory(r::PowerNormValueatRisk, pr::AbstractPriorResult,
-                 slv::Option{<:Slv_VecSlv} = nothing, args...;
-                 kwargs...)::PowerNormValueatRisk
-    w = nothing_scalar_array_selector(r.w, pr.w)
-    slv = solver_selector(r.slv, slv)
-    return PowerNormValueatRisk(; settings = r.settings, slv = slv, alpha = r.alpha,
-                                p = r.p, w = w)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Create an instance of [`PowerNormValueatRisk`](@ref) by overriding the solver and optionally selecting observation weights from the prior result.
-
-# Related
-
-  - [`PowerNormValueatRisk`](@ref)
-  - [`AbstractPriorResult`](@ref)
-  - [`factory`](@ref)
-  - [`nothing_scalar_array_selector`](@ref)
-  - [`solver_selector`](@ref)
-"""
-function factory(r::PowerNormValueatRisk, slv::Slv_VecSlv,
-                 pr::Option{<:AbstractPriorResult} = nothing;
-                 kwargs...)::PowerNormValueatRisk
-    w = isnothing(pr) ? r.w : nothing_scalar_array_selector(r.w, pr.w)
-    slv = solver_selector(r.slv, slv)
-    return PowerNormValueatRisk(; settings = r.settings, alpha = r.alpha, p = r.p,
-                                slv = slv, w = w)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Create an instance of [`PowerNormDrawdownatRisk`](@ref) by selecting observation weights and solver from the risk-measure instance or falling back to the prior result.
-
-# Related
-
-  - [`PowerNormDrawdownatRisk`](@ref)
-  - [`AbstractPriorResult`](@ref)
-  - [`factory`](@ref)
-  - [`nothing_scalar_array_selector`](@ref)
-  - [`solver_selector`](@ref)
-"""
-function factory(r::PowerNormDrawdownatRisk, pr::AbstractPriorResult,
-                 slv::Option{<:Slv_VecSlv} = nothing, args...;
-                 kwargs...)::PowerNormDrawdownatRisk
-    w = nothing_scalar_array_selector(r.w, pr.w)
-    slv = solver_selector(r.slv, slv)
-    return PowerNormDrawdownatRisk(; settings = r.settings, slv = slv, alpha = r.alpha,
-                                   p = r.p, w = w)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Create an instance of [`PowerNormDrawdownatRisk`](@ref) by overriding the solver and optionally selecting observation weights from the prior result.
-
-# Related
-
-  - [`PowerNormDrawdownatRisk`](@ref)
-  - [`AbstractPriorResult`](@ref)
-  - [`factory`](@ref)
-  - [`nothing_scalar_array_selector`](@ref)
-  - [`solver_selector`](@ref)
-"""
-function factory(r::PowerNormDrawdownatRisk, slv::Slv_VecSlv,
-                 pr::Option{<:AbstractPriorResult} = nothing;
-                 kwargs...)::PowerNormDrawdownatRisk
-    w = isnothing(pr) ? r.w : nothing_scalar_array_selector(r.w, pr.w)
-    slv = solver_selector(r.slv, slv)
-    return PowerNormDrawdownatRisk(; settings = r.settings, alpha = r.alpha, p = r.p,
-                                   slv = slv, w = w)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Create an instance of [`RelativePowerNormDrawdownatRisk`](@ref) by selecting observation weights and solver from the risk-measure instance or falling back to the prior result.
-
-# Related
-
-  - [`RelativePowerNormDrawdownatRisk`](@ref)
-  - [`AbstractPriorResult`](@ref)
-  - [`factory`](@ref)
-  - [`nothing_scalar_array_selector`](@ref)
-  - [`solver_selector`](@ref)
-"""
-function factory(r::RelativePowerNormDrawdownatRisk, pr::AbstractPriorResult,
-                 slv::Option{<:Slv_VecSlv} = nothing, args...;
-                 kwargs...)::RelativePowerNormDrawdownatRisk
-    w = nothing_scalar_array_selector(r.w, pr.w)
-    slv = solver_selector(r.slv, slv)
-    return RelativePowerNormDrawdownatRisk(; settings = r.settings, slv = slv,
-                                           alpha = r.alpha, p = r.p, w = w)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Create an instance of [`RelativePowerNormDrawdownatRisk`](@ref) by overriding the solver and optionally selecting observation weights from the prior result.
-
-# Related
-
-  - [`RelativePowerNormDrawdownatRisk`](@ref)
-  - [`AbstractPriorResult`](@ref)
-  - [`factory`](@ref)
-  - [`nothing_scalar_array_selector`](@ref)
-  - [`solver_selector`](@ref)
-"""
-function factory(r::RelativePowerNormDrawdownatRisk, slv::Slv_VecSlv,
-                 pr::Option{<:AbstractPriorResult} = nothing;
-                 kwargs...)::RelativePowerNormDrawdownatRisk
-    w = isnothing(pr) ? r.w : nothing_scalar_array_selector(r.w, pr.w)
-    slv = solver_selector(r.slv, slv)
-    return RelativePowerNormDrawdownatRisk(; settings = r.settings, alpha = r.alpha,
-                                           p = r.p, slv = slv, w = w)
 end
 
 # Expected-risk input kind — see `risk_input_kind`.
