@@ -8,7 +8,7 @@ factory(pe::OpinionPoolingPrior, w::ObsWeights)
 prior(pe::OpinionPoolingPrior, X::MatNum,
                F::Option{<:MatNum} = nothing; dims::Int = 1,
                strict::Bool = false, kwargs...)
-prior_view(pr::OpinionPoolingPrior, rd)
+port_opt_view(pr::OpinionPoolingPrior, rd, args...)
 OpinionPoolingAlgorithm
 robust_probabilities
 compute_pooling

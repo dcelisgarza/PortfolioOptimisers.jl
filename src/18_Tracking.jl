@@ -53,7 +53,7 @@ In order to implement a new tracking algorithm that works seamlessly with the li
 
   - `tracking_benchmark(tr::AbstractTrackingAlgorithm, X::MatNum) -> VecNum`: Compute benchmark returns from the asset return matrix `X`.
   - `factory(tr::AbstractTrackingAlgorithm, w::VecNum) -> AbstractTrackingAlgorithm`: Construct a new instance with updated portfolio weights `w`.
-  - `tracking_view(tr::AbstractTrackingAlgorithm, i) -> AbstractTrackingAlgorithm`: Create a view of the tracking algorithm for the subset of assets at indices `i`.
+  - `port_opt_view(tr::AbstractTrackingAlgorithm, i) -> AbstractTrackingAlgorithm`: Create a view of the tracking algorithm for the subset of assets at indices `i`.
 
 ## Arguments
 
@@ -65,7 +65,7 @@ In order to implement a new tracking algorithm that works seamlessly with the li
 ## Returns
 
   - `b::VecNum`: Benchmark returns (for `tracking_benchmark`).
-  - `tr::AbstractTrackingAlgorithm`: Updated or viewed tracking algorithm (for `factory`, `tracking_view`).
+  - `tr::AbstractTrackingAlgorithm`: Updated or viewed tracking algorithm (for `factory`, `port_opt_view`).
 
 ## Examples
 
@@ -81,7 +81,7 @@ julia> function PortfolioOptimisers.tracking_benchmark(tr::MyTracking,
 
 julia> PortfolioOptimisers.factory(tr::MyTracking, w) = MyTracking(w)
 
-julia> PortfolioOptimisers.tracking_view(tr::MyTracking, i) = MyTracking(tr.w[i])
+julia> PortfolioOptimisers.port_opt_view(tr::MyTracking, i) = MyTracking(tr.w[i])
 
 julia> tr = MyTracking([0.5, 0.5]);
 
@@ -604,44 +604,6 @@ DependentVariableTracking()
 """
 struct DependentVariableTracking <: VariableTracking end
 """
-    tracking_view(::Nothing, ::Any)
-
-Return a `nothing` value for tracking view when the input tracking object is `nothing`.
-
-Used as a fallback method for missing tracking constraints or estimators, ensuring composability and uniform interface handling in constraint processing workflows.
-
-# Arguments
-
-  - `::Nothing`: Indicates absence of a tracking object.
-  - `::Any`: Index or argument (ignored).
-
-# Returns
-
-  - `nothing`.
-
-# Details
-
-  - Used to propagate `nothing` in tracking view operations.
-  - Ensures interface consistency for missing tracking objects.
-
-# Examples
-
-```jldoctest
-julia> PortfolioOptimisers.tracking_view(nothing, 1)
-
-```
-
-# Related
-
-  - [`tracking_view`](@ref)
-  - [`AbstractTracking`](@ref)
-  - [`WeightsTracking`](@ref)
-  - [`ReturnsTracking`](@ref)
-"""
-function tracking_view(::Nothing, ::Any)::Nothing
-    return nothing
-end
-"""
 $(DocStringExtensions.TYPEDEF)
 
 Asset weights-based tracking algorithm.
@@ -664,6 +626,13 @@ $(DocStringExtensions.FIELDS)
 
   - `!isempty(w)`.
 
+## View parameters
+
+When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+
+  - `fees`: Recursively viewed via [`port_opt_view`](@ref).
+  - `w`: Sliced to the selected indices via [`port_opt_view`](@ref).
+
 # Examples
 
 ```jldoctest
@@ -682,16 +651,17 @@ WeightsTracking
   - [`Fees`](@ref)
   - [`Option`](@ref)
   - [`tracking_benchmark`](@ref)
+  - [`port_opt_view`](@ref)
 """
-@concrete struct WeightsTracking <: AbstractTrackingAlgorithm
+@propagatable @concrete struct WeightsTracking <: AbstractTrackingAlgorithm
     """
     $(field_dict[:fees])
     """
-    fees
+    @vprop fees
     """
     $(field_dict[:w_tn])
     """
-    w
+    @vprop w
     """
     $(field_dict[:fixed])
     """
@@ -795,59 +765,6 @@ function factory(tr::WeightsTracking, w::VecNum)
     end
 end
 """
-    tracking_view(tr::WeightsTracking, i)
-
-Return a view of a `WeightsTracking` object for the given index or indices.
-
-This function creates a new [`WeightsTracking`](@ref) instance by extracting a view of the fees and portfolio weights fields at the specified index or indices.
-
-# Arguments
-
-  - `tr`: A [`WeightsTracking`](@ref) object containing fees and portfolio weights.
-  - `i`: Index or indices to subset the fees and weights.
-
-# Returns
-
-  - `tr::WeightsTracking`: New tracking algorithm object with fees and weights viewed at `i`.
-
-# Details
-
-  - Uses `fees_view` to subset the `fees` field.
-  - Uses `view` to subset the `w` field.
-  - Returns a new `WeightsTracking` object with the subsetted fields.
-
-# Examples
-
-```jldoctest
-julia> tr = WeightsTracking(; w = [0.5, 0.5, 0.6]);
-
-julia> PortfolioOptimisers.tracking_view(tr, 2:3)
-WeightsTracking
-   fees ┼ nothing
-      w ┼ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [0.5, 0.6]
-  fixed ┴ Bool: false
-
-julia> tr = WeightsTracking(; w = [0.5, 0.5, 0.6], fixed = true);
-
-julia> PortfolioOptimisers.tracking_view(tr, 2:3)
-WeightsTracking
-   fees ┼ nothing
-      w ┼ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [0.5, 0.6]
-  fixed ┴ Bool: true
-```
-
-# Related
-
-  - [`WeightsTracking`](@ref)
-  - [`fees_view`](@ref)
-  - [`tracking_view`](@ref)
-"""
-function tracking_view(tr::WeightsTracking, i)
-    fees = fees_view(tr.fees, i)
-    w = view(tr.w, i)
-    return WeightsTracking(; fees = fees, w = w, fixed = tr.fixed)
-end
-"""
     tracking_benchmark(tr::WeightsTracking, X::MatNum)
 
 Compute the benchmark portfolio returns for a weights-based tracking algorithm.
@@ -941,45 +858,6 @@ function ReturnsTracking(; w::VecNum)
     return ReturnsTracking(w)
 end
 """
-    tracking_view(tr::ReturnsTracking, ::Any)
-
-Return a view of a `ReturnsTracking` object.
-
-This function returns the input [`ReturnsTracking`](@ref) object unchanged. It is used to provide a consistent interface for tracking view operations on returns-based tracking algorithms.
-
-# Arguments
-
-  - `tr`: A [`ReturnsTracking`](@ref) object containing benchmark portfolio returns.
-  - `::Any`: Index or argument (ignored).
-
-# Returns
-
-  - `tr::ReturnsTracking`: The input tracking algorithm object.
-
-# Details
-
-  - Returns the input object unchanged.
-  - Ensures interface consistency for tracking view operations.
-
-# Examples
-
-```jldoctest
-julia> tr = ReturnsTracking(; w = [0.01, 0.02, 0.03]);
-
-julia> PortfolioOptimisers.tracking_view(tr, 1:2)
-ReturnsTracking
-  w ┴ Vector{Float64}: [0.01, 0.02, 0.03]
-```
-
-# Related
-
-  - [`ReturnsTracking`](@ref)
-  - [`tracking_view`](@ref)
-"""
-function tracking_view(tr::ReturnsTracking, ::Any)
-    return tr
-end
-"""
     tracking_benchmark(tr::ReturnsTracking, args...)
 
 Return the benchmark portfolio returns for a returns-based tracking algorithm.
@@ -1041,9 +919,15 @@ $(DocStringExtensions.FIELDS)
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@prop`-tagged fields are automatically propagated:
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
 
   - `tr`: Recursively updated via [`factory`](@ref).
+
+## View parameters
+
+When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+
+  - `tr`: Recursively viewed via [`port_opt_view`](@ref).
 
 # Examples
 
@@ -1071,12 +955,13 @@ TrackingError
   - [`L2Tracking`](@ref)
   - [`L1Tracking`](@ref)
   - [`factory`](@ref)
+  - [`port_opt_view`](@ref)
 """
 @propagatable @concrete struct TrackingError <: AbstractTracking
     """
     $(field_dict[:tr])
     """
-    @prop tr
+    @fprop @vprop tr
     """
     $(field_dict[:err])
     """
@@ -1100,74 +985,16 @@ function TrackingError(; tr::AbstractTrackingAlgorithm, err::Number = 0.0,
     return TrackingError(tr, err, alg)
 end
 """
-    tracking_view(tr::TrackingError, i)
-
-Return a view of a `TrackingError` object for the given index or indices.
-
-This function creates a new [`TrackingError`](@ref) instance by extracting a view of the underlying tracking algorithm at the specified index or indices. The error value and formulation algorithm are preserved.
-
-# Arguments
-
-  - `tr`: A [`TrackingError`](@ref) object containing a tracking algorithm, error value, and formulation algorithm.
-  - `i`: Index or indices to subset the underlying tracking algorithm.
-
-# Returns
-
-  - `tre::TrackingError`: New tracking error result object with the underlying tracking algorithm viewed at `i`.
-
-# Details
-
-  - Uses `tracking_view` to subset the `tr` field.
-  - Preserves the `err` and `alg` fields.
-  - Returns a new `TrackingError` object with the subsetted tracking algorithm.
-
-# Examples
-
-```jldoctest
-julia> tr = WeightsTracking(; w = [0.5, 0.5, 0.6]);
-
-julia> err = TrackingError(; tr = tr, err = 0.01)
-TrackingError
-   tr ┼ WeightsTracking
-      │    fees ┼ nothing
-      │       w ┼ Vector{Float64}: [0.5, 0.5, 0.6]
-      │   fixed ┴ Bool: false
-  err ┼ Float64: 0.01
-  alg ┼ L2Tracking
-      │   ddof ┴ Int64: 1
-
-julia> PortfolioOptimisers.tracking_view(err, 2:3)
-TrackingError
-   tr ┼ WeightsTracking
-      │    fees ┼ nothing
-      │       w ┼ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [0.5, 0.6]
-      │   fixed ┴ Bool: false
-  err ┼ Float64: 0.01
-  alg ┼ L2Tracking
-      │   ddof ┴ Int64: 1
-```
-
-# Related
-
-  - [`TrackingError`](@ref)
-  - [`tracking_view`](@ref)
-  - [`WeightsTracking`](@ref)
-  - [`ReturnsTracking`](@ref)
-"""
-function tracking_view(tr::TrackingError, i)
-    return TrackingError(; tr = tracking_view(tr.tr, i), err = tr.err, alg = tr.alg)
-end
-"""
-    tracking_view(tr::VecTr, args...)
+    port_opt_view(tr::VecTr, args...)
 
 Return a vector of tracking views for each element in a vector of tracking results.
 
-This function applies `tracking_view` to each element of the input vector of tracking results, passing any additional arguments. It enables efficient subsetting and composability for collections of tracking error or tracking constraint results.
+This function applies `port_opt_view` to each element of the input vector of tracking results, passing any additional arguments. It enables efficient subsetting and composability for collections of tracking error or tracking constraint results.
 
 # Arguments
 
   - `tr`: A vector of tracking result objects (`VecTr`).
-  - `args...`: Additional arguments to pass to each `tracking_view` call.
+  - `args...`: Additional arguments to pass to each `port_opt_view` call.
 
 # Returns
 
@@ -1175,7 +1002,7 @@ This function applies `tracking_view` to each element of the input vector of tra
 
 # Details
 
-  - Applies `tracking_view` to each element in the input vector.
+  - Applies `port_opt_view` to each element in the input vector.
   - Passes all additional arguments to each call.
   - Returns a vector of the results.
 
@@ -1184,7 +1011,7 @@ This function applies `tracking_view` to each element of the input vector of tra
 ```jldoctest
 julia> tr = TrackingError(; tr = WeightsTracking(; w = [0.5, 0.5, 0.5]), err = 0.01);
 
-julia> PortfolioOptimisers.tracking_view([tr], 1:2)
+julia> PortfolioOptimisers.port_opt_view([tr], 1:2)
 1-element Vector{TrackingError{WeightsTracking{Nothing, SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}, Bool}, Float64, L2Tracking{Int64}}}:
  TrackingError
    tr ┼ WeightsTracking
@@ -1198,14 +1025,14 @@ julia> PortfolioOptimisers.tracking_view([tr], 1:2)
 
 # Related
 
-  - [`tracking_view`](@ref)
+  - [`port_opt_view`](@ref)
   - [`AbstractTracking`](@ref)
   - [`TrackingError`](@ref)
   - [`WeightsTracking`](@ref)
   - [`ReturnsTracking`](@ref)
 """
-function tracking_view(tr::VecTr, args...)
-    return [tracking_view(t, args...) for t in tr]
+function port_opt_view(tr::VecTr, i, args...)
+    return [port_opt_view(t, i, args...) for t in tr]
 end
 function needs_previous_weights(tr::TrackingError)
     return needs_previous_weights(tr.tr)

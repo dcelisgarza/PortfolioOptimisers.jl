@@ -36,10 +36,11 @@ update_time_dependent_estimator(opt::VecOptE_Opt, args...)
 set_clustering_weight_finaliser_alg!
 opt_weight_bounds
 finalise_weight_bounds
-opt_view(opt::AbstractOptimisationEstimator, args...)
-opt_view(opt::VecOptE, args...)
+port_opt_view(opt::AbstractOptimisationEstimator, ::Any, args...)
+port_opt_view(opt::VecOptE, ::Any, args...)
 assert_internal_optimiser(::NonFiniteAllocationOptimisationResult)
 assert_external_optimiser(::NonFiniteAllocationOptimisationResult)
+factory(res::NonFiniteAllocationOptimisationResult, fb::Option{<:OptE_Opt})
 factory(opt::OptE_Opt, ::Any)
 factory(opt::VecOptE_Opt, args...)
 OptE_Opt

@@ -42,6 +42,101 @@ abstract type RiskJuMPOptimisationEstimator <: JuMPOptimisationEstimator end
 """
 $(DocStringExtensions.TYPEDEF)
 
+Abstract supertype for the embedded JuMP optimisation result core.
+
+Mirrors [`BaseJuMPOptimisationEstimator`](@ref): the factored-out struct holding the fields common to every JuMP-based optimisation result lives on this branch and is *not* part of the optimisation result hierarchy. The concrete core is [`JuMPOptimisationResult`](@ref).
+
+# Related
+
+  - [`JuMPOptimisationResult`](@ref)
+  - [`RiskJuMPOptimisationResult`](@ref)
+"""
+abstract type BaseJuMPOptimisationResult <: AbstractResult end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Shared field core for JuMP-based optimisation results.
+
+Holds the fields common to every JuMP optimisation result. Embedded as the first field (`jr`) of each concrete JuMP result, analogous to how [`JuMPOptimiser`](@ref) is embedded as `opt` in each JuMP optimiser. The concrete result keeps only its unique fields plus the trailing `fb`.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`BaseJuMPOptimisationResult`](@ref)
+  - [`RiskJuMPOptimisationResult`](@ref)
+  - [`JuMPOptimiser`](@ref)
+"""
+@concrete struct JuMPOptimisationResult <: BaseJuMPOptimisationResult
+    """
+    $(field_dict[:oe])
+    """
+    oe
+    """
+    $(field_dict[:pa])
+    """
+    pa
+    """
+    $(field_dict[:retcode])
+    """
+    retcode
+    """
+    $(field_dict[:sol])
+    """
+    sol
+    """
+    $(field_dict[:model])
+    """
+    model
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Access properties of [`JuMPOptimisationResult`](@ref). Virtual property `:w` extracts portfolio weights from `sol`; unknown properties forward to `pa`.
+"""
+function Base.getproperty(jr::JuMPOptimisationResult, sym::Symbol)
+    return if sym == :w
+        sol = getfield(jr, :sol)
+        !isa(sol, AbstractVector) ? getproperty(sol, :w) : getproperty.(sol, :w)
+    elseif sym in fieldnames(JuMPOptimisationResult)
+        getfield(jr, sym)
+    elseif sym in propertynames(getfield(jr, :pa))
+        getproperty(getfield(jr, :pa), sym)
+    else
+        getfield(jr, sym)
+    end
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for JuMP-based continuous optimisation results.
+
+The JuMP half of the result split; mirrors [`RiskJuMPOptimisationEstimator`](@ref). Concrete subtypes embed a [`JuMPOptimisationResult`](@ref) as their first field (`jr`) and add only their unique fields plus the trailing `fb`. The default `getproperty` resolves unique fields directly and delegates everything else (including `:w` and the `pa` fall-through) to `jr`; types with composed sub-result fields override it to forward into those first.
+
+# Related
+
+  - [`NonJuMPOptimisationResult`](@ref)
+  - [`JuMPOptimisationResult`](@ref)
+  - [`MeanRiskResult`](@ref)
+"""
+abstract type RiskJuMPOptimisationResult <: NonFiniteAllocationOptimisationResult end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Default property access for [`RiskJuMPOptimisationResult`](@ref): unique fields resolve directly; everything else delegates to the embedded [`JuMPOptimisationResult`](@ref) `jr`.
+"""
+function Base.getproperty(r::RiskJuMPOptimisationResult, sym::Symbol)
+    return if sym in fieldnames(typeof(r))
+        getfield(r, sym)
+    else
+        getproperty(getfield(r, :jr), sym)
+    end
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
 Abstract supertype for portfolio objective functions.
 
 Subtype `ObjectiveFunction` to implement portfolio optimisation objectives such as minimum risk, maximum return, or maximum Sharpe ratio.
@@ -67,30 +162,6 @@ Abstract supertype for JuMP-based returns estimators used in optimisation models
   - [`LogarithmicReturn`](@ref)
 """
 abstract type JuMPReturnsEstimator <: AbstractEstimator end
-"""
-    jump_returns_view(r, args...; kwargs...)
-
-Get a view or subset of JuMP returns estimator for slicing.
-
-Returns the estimator sliced for a given asset cluster or returns it unchanged.
-
-# Arguments
-
-  - `r`: JuMP returns estimator.
-  - `args...`: Additional arguments (index, etc.).
-  - `kwargs...`: Additional keyword arguments.
-
-# Returns
-
-  - Sliced or unchanged returns estimator.
-
-# Related
-
-  - [`JuMPReturnsEstimator`](@ref)
-"""
-function jump_returns_view(r::JuMPReturnsEstimator, args...; kwargs...)
-    return r
-end
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -146,58 +217,10 @@ Return `false`: custom JuMP objectives never require previous portfolio weights.
 function needs_previous_weights(::CustomJuMPObjective)
     return false
 end
-"""
-    custom_constraint_view(cc, args...; kwargs...)
-
-Get a view or subset of a custom JuMP constraint for slicing.
-
-Returns `nothing` if no custom constraint is provided, or the constraint unchanged otherwise. Used in hierarchical optimisation to propagate custom constraints per cluster.
-
-# Arguments
-
-  - `cc`: Custom JuMP constraint or `nothing`.
-  - `args...`: Additional arguments.
-  - `kwargs...`: Additional keyword arguments.
-
-# Returns
-
-  - Constraint or `nothing`.
-
-# Related
-
-  - [`CustomJuMPConstraint`](@ref)
-"""
-function custom_constraint_view(::Nothing, args...; kwargs...)
+function port_opt_view(::CustomJuMPConstraint, ::Any, args...; kwargs...)
     return nothing
 end
-function custom_constraint_view(::CustomJuMPConstraint, args...; kwargs...)
-    return nothing
-end
-"""
-    custom_objective_view(co, args...; kwargs...)
-
-Get a view or subset of a custom JuMP objective term for slicing.
-
-Returns `nothing` if no custom objective is provided, or the objective unchanged otherwise.
-
-# Arguments
-
-  - `co`: Custom JuMP objective or `nothing`.
-  - `args...`: Additional arguments.
-  - `kwargs...`: Additional keyword arguments.
-
-# Returns
-
-  - Objective or `nothing`.
-
-# Related
-
-  - [`CustomJuMPObjective`](@ref)
-"""
-function custom_objective_view(::Nothing, args...; kwargs...)
-    return nothing
-end
-function custom_objective_view(::CustomJuMPObjective, args...; kwargs...)
+function port_opt_view(::CustomJuMPObjective, ::Any, args...; kwargs...)
     return nothing
 end
 """
@@ -872,4 +895,4 @@ Generic function stub; concrete methods are defined in constraint and risk measu
 """
 function set_risk_constraints! end
 
-export JuMPOptimisationSolution
+export JuMPOptimisationSolution, JuMPOptimisationResult

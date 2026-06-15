@@ -3,8 +3,8 @@
 ```@docs
 ValueatRiskFormulation
 factory(alg::ValueatRiskFormulation, args...; kwargs...)
-valueat_risk_formulation_view(r::ValueatRiskFormulation, args...)
-valueat_risk_formulation_view(alg::DistributionValueatRisk, i)
+port_opt_view(r::ValueatRiskFormulation, ::Any, args...)
+port_opt_view(alg::DistributionValueatRisk, i, args...)
 MIPValueatRisk
 DistributionValueatRisk
 factory(alg::DistributionValueatRisk, pr::AbstractPriorResult, args...; kwargs...)

@@ -9,5 +9,5 @@ coskewness_residuals
 cokurtosis_residuals
 Base.getproperty(obj::HighOrderFactorPriorEstimator, sym::Symbol)
 prior(pe::HighOrderFactorPriorEstimator, X::MatNum, F::MatNum; dims::Int = 1, kwargs...)
-prior_view(pr::HighOrderFactorPriorEstimator, rd)
+port_opt_view(pr::HighOrderFactorPriorEstimator, rd, args...)
 ```

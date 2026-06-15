@@ -36,6 +36,16 @@ Keywords correspond to the struct's fields.
 
   - `l`, `s`, `fl`, `fs`, `dl`, `ds`, `dfl`, `dfs` are validated with [`assert_nonempty_nonneg_finite_val`](@ref).
 
+## View parameters
+
+When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+
+  - `tn`: Recursively viewed via [`port_opt_view`](@ref).
+  - `l`: Sliced to the selected indices via [`port_opt_view`](@ref).
+  - `s`: Sliced to the selected indices via [`port_opt_view`](@ref).
+  - `fl`: Sliced to the selected indices via [`port_opt_view`](@ref).
+  - `fs`: Sliced to the selected indices via [`port_opt_view`](@ref).
+
 # Examples
 
 ```jldoctest
@@ -69,28 +79,29 @@ FeesEstimator
   - [`TnE_Tn`](@ref)
   - [`EstValType`](@ref)
   - [`fees_constraints`](@ref)
+  - [`port_opt_view`](@ref)
 """
-@concrete struct FeesEstimator <: AbstractEstimator
+@propagatable @concrete struct FeesEstimator <: AbstractEstimator
     """
     $(field_dict[:tn_fees])
     """
-    tn
+    @vprop tn
     """
     $(field_dict[:l_fees])
     """
-    l
+    @vprop l
     """
     $(field_dict[:s_fees])
     """
-    s
+    @vprop s
     """
     $(field_dict[:fl])
     """
-    fl
+    @vprop fl
     """
     $(field_dict[:fs])
     """
-    fs
+    @vprop fs
     """
     $(field_dict[:dl])
     """
@@ -139,95 +150,6 @@ function FeesEstimator(; tn::Option{<:TnE_Tn} = nothing, l::Option{<:EstValType}
                        dfs::Option{<:Number} = nothing,
                        kwargs::NamedTuple = (; atol = 1e-8))::FeesEstimator
     return FeesEstimator(tn, l, s, fl, fs, dl, ds, dfl, dfs, kwargs)
-end
-"""
-    fees_view(fees::FeesEstimator, i)
-
-Create a view of a `FeesEstimator` for a subset of assets.
-
-Returns a new `FeesEstimator` with all fee fields restricted to the indices or assets specified by `i`. The default fee values and keyword arguments are propagated unchanged.
-
-# Arguments
-
-  - `fees`: Instance of `FeesEstimator`.
-  - `i`: Index or indices specifying the subset of assets.
-
-# Returns
-
-  - `fe::FeesEstimator`: New estimator with fields restricted to the specified subset.
-
-# Details
-
-  - Uses `turnover_view` to subset the turnover estimator/result.
-  - Uses `nothing_scalar_array_view` to subset proportional and fixed fee fields.
-  - Propagates default fee values and keyword arguments unchanged.
-  - Enables composable processing of asset subsets for fee constraints.
-
-# Examples
-
-```jldoctest
-julia> fees = FeesEstimator(;
-                            tn = TurnoverEstimator(; w = [0.2, 0.3, 0.5], val = Dict("A" => 0.1)),
-                            l = Dict("A" => 0.001, "B" => 0.002), s = ["A" => 0.001, "B" => 0.002],
-                            fl = Dict("A" => 5.0), fs = ["B" => 10.0]);
-
-julia> PortfolioOptimisers.fees_view(fees, 1:2)
-FeesEstimator
-      tn ┼ TurnoverEstimator
-         │       w ┼ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [0.2, 0.3]
-         │     val ┼ Dict{String, Float64}: Dict("A" => 0.1)
-         │    dval ┼ nothing
-         │   fixed ┴ Bool: false
-       l ┼ Dict{String, Float64}: Dict("B" => 0.002, "A" => 0.001)
-       s ┼ Vector{Pair{String, Float64}}: ["A" => 0.001, "B" => 0.002]
-      fl ┼ Dict{String, Float64}: Dict("A" => 5.0)
-      fs ┼ Vector{Pair{String, Float64}}: ["B" => 10.0]
-      dl ┼ nothing
-      ds ┼ nothing
-     dfl ┼ nothing
-     dfs ┼ nothing
-  kwargs ┴ @NamedTuple{atol::Float64}: (atol = 1.0e-8,)
-
-julia> fees = FeesEstimator(;
-                            tn = TurnoverEstimator(; w = [0.2, 0.3, 0.5], val = Dict("A" => 0.1),
-                                                   fixed = true),
-                            l = Dict("A" => 0.001, "B" => 0.002), s = ["A" => 0.001, "B" => 0.002],
-                            fl = Dict("A" => 5.0), fs = ["B" => 10.0]);
-
-julia> PortfolioOptimisers.fees_view(fees, 1:2)
-FeesEstimator
-      tn ┼ TurnoverEstimator
-         │       w ┼ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [0.2, 0.3]
-         │     val ┼ Dict{String, Float64}: Dict("A" => 0.1)
-         │    dval ┼ nothing
-         │   fixed ┴ Bool: true
-       l ┼ Dict{String, Float64}: Dict("B" => 0.002, "A" => 0.001)
-       s ┼ Vector{Pair{String, Float64}}: ["A" => 0.001, "B" => 0.002]
-      fl ┼ Dict{String, Float64}: Dict("A" => 5.0)
-      fs ┼ Vector{Pair{String, Float64}}: ["B" => 10.0]
-      dl ┼ nothing
-      ds ┼ nothing
-     dfl ┼ nothing
-     dfs ┼ nothing
-  kwargs ┴ @NamedTuple{atol::Float64}: (atol = 1.0e-8,)
-```
-
-# Related
-
-  - [`FeesEstimator`](@ref)
-  - [`Fees`](@ref)
-  - [`fees_constraints`](@ref)
-  - [`turnover_view`](@ref)
-  - [`nothing_scalar_array_view`](@ref)
-"""
-function fees_view(fees::FeesEstimator, i)::FeesEstimator
-    tn = turnover_view(fees.tn, i)
-    l = nothing_scalar_array_view(fees.l, i)
-    s = nothing_scalar_array_view(fees.s, i)
-    fl = nothing_scalar_array_view(fees.fl, i)
-    fs = nothing_scalar_array_view(fees.fs, i)
-    return FeesEstimator(; tn = tn, l = l, s = s, fl = fl, fs = fs, dl = fees.dl,
-                         ds = fees.ds, dfl = fees.dfl, dfs = fees.dfs, kwargs = fees.kwargs)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -327,9 +249,19 @@ $(DocStringExtensions.FIELDS)
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@prop`-tagged fields are automatically propagated:
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
 
   - `tn`: Recursively updated via [`factory`](@ref).
+
+## View parameters
+
+When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+
+  - `tn`: Recursively viewed via [`port_opt_view`](@ref).
+  - `l`: Sliced to the selected indices via [`port_opt_view`](@ref).
+  - `s`: Sliced to the selected indices via [`port_opt_view`](@ref).
+  - `fl`: Sliced to the selected indices via [`port_opt_view`](@ref).
+  - `fs`: Sliced to the selected indices via [`port_opt_view`](@ref).
 
 # Examples
 
@@ -366,28 +298,29 @@ Fees
   - [`calc_asset_fees`](@ref)
   - [`calc_net_returns`](@ref)
   - [`factory`](@ref)
+  - [`port_opt_view`](@ref)
 """
 @propagatable @concrete struct Fees <: AbstractResult
     """
     $(field_dict[:tnr])
     """
-    @prop tn
+    @fprop @vprop tn
     """
     $(field_dict[:l_fees])
     """
-    l
+    @vprop l
     """
     $(field_dict[:s_fees])
     """
-    s
+    @vprop s
     """
     $(field_dict[:fl])
     """
-    fl
+    @vprop fl
     """
     $(field_dict[:fs])
     """
-    fs
+    @vprop fs
     """
     $(field_dict[:kwargs_fee])
     """
@@ -583,113 +516,6 @@ julia> fees_constraints(nothing)
 """
 function fees_constraints(fees::Option{<:Fees}, args...; kwargs...)::Option{<:Fees}
     return fees
-end
-"""
-    fees_view(::Nothing, ::Any)
-
-Return `nothing` when no fee estimator or constraint is not `nothing`.
-
-This method is used as a fallback for missing fee estimators or constraints, ensuring composability and uniform interface handling in fee constraint processing workflows.
-
-# Arguments
-
-  - `::Nothing`: Indicates absence of a fee estimator or constraint.
-  - `::Any`: Index or argument (ignored).
-
-# Returns
-
-  - `nothing`.
-
-# Examples
-
-```jldoctest
-julia> PortfolioOptimisers.fees_view(nothing, 1)
-
-```
-
-# Related
-
-  - [`FeesEstimator`](@ref)
-  - [`Fees`](@ref)
-  - [`fees_view`](@ref)
-"""
-function fees_view(::Nothing, ::Any)::Nothing
-    return nothing
-end
-"""
-    fees_view(fees::Fees, i)
-
-Create a view of a `Fees` constraint for a subset of assets.
-
-Returns a new `Fees` object with all fee fields restricted to the indices or assets specified by `i`. The keyword arguments are propagated unchanged.
-
-# Arguments
-
-  - `fees`: A `Fees` constraint object containing turnover, proportional, and fixed fee values.
-  - `i`: Index or indices specifying the subset of assets.
-
-# Returns
-
-  - `fe::Fees`: New constraint object with fields restricted to the specified subset.
-
-# Details
-
-  - Uses `turnover_view` to subset the turnover constraint.
-  - Uses `nothing_scalar_array_view` to subset proportional and fixed fee fields.
-  - Propagates keyword arguments unchanged.
-  - Enables composable processing of asset subsets for fee constraints.
-
-# Examples
-
-```jldoctest
-julia> fees = Fees(; tn = Turnover(; w = [0.2, 0.3, 0.5], val = [0.1, 0.0, 0.0]),
-                   l = [0.001, 0.002, 0.0], s = [0.001, 0.002, 0.0], fl = [5.0, 0.0, 0.0],
-                   fs = [0.0, 10.0, 0.0]);
-
-julia> PortfolioOptimisers.fees_view(fees, 1:2)
-Fees
-      tn ┼ Turnover
-         │       w ┼ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [0.2, 0.3]
-         │     val ┼ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [0.1, 0.0]
-         │   fixed ┴ Bool: false
-       l ┼ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [0.001, 0.002]
-       s ┼ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [0.001, 0.002]
-      fl ┼ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [5.0, 0.0]
-      fs ┼ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [0.0, 10.0]
-  kwargs ┴ @NamedTuple{atol::Float64}: (atol = 1.0e-8,)
-
-julia> fees = Fees(; tn = Turnover(; w = [0.2, 0.3, 0.5], val = [0.1, 0.0, 0.0], fixed = true),
-                   l = [0.001, 0.002, 0.0], s = [0.001, 0.002, 0.0], fl = [5.0, 0.0, 0.0],
-                   fs = [0.0, 10.0, 0.0]);
-
-julia> PortfolioOptimisers.fees_view(fees, 1:2)
-Fees
-      tn ┼ Turnover
-         │       w ┼ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [0.2, 0.3]
-         │     val ┼ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [0.1, 0.0]
-         │   fixed ┴ Bool: true
-       l ┼ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [0.001, 0.002]
-       s ┼ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [0.001, 0.002]
-      fl ┼ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [5.0, 0.0]
-      fs ┼ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [0.0, 10.0]
-  kwargs ┴ @NamedTuple{atol::Float64}: (atol = 1.0e-8,)
-```
-
-# Related
-
-  - [`Fees`](@ref)
-  - [`FeesEstimator`](@ref)
-  - [`fees_constraints`](@ref)
-  - [`turnover_view`](@ref)
-  - [`nothing_scalar_array_view`](@ref)
-"""
-function fees_view(fees::Fees, i)::Fees
-    tn = turnover_view(fees.tn, i)
-    l = nothing_scalar_array_view(fees.l, i)
-    s = nothing_scalar_array_view(fees.s, i)
-    fl = nothing_scalar_array_view(fees.fl, i)
-    fs = nothing_scalar_array_view(fees.fs, i)
-    return Fees(; tn = tn, l = l, s = s, fl = fl, fs = fs, kwargs = fees.kwargs)
 end
 """
     calc_fees(w::VecNum, p::VecNum, ::Nothing, ::Function)

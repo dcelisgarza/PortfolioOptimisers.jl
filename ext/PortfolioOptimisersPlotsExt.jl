@@ -95,8 +95,8 @@ function PortfolioOptimisers.plot_asset_cumulative_returns(w::VecNum, X::MatNum,
         rest_idx = view(idx, (N + 1):M)
         rest_ret = cumulative_returns(calc_net_returns(view(w, rest_idx),
                                                        view(X, :, rest_idx),
-                                                       PortfolioOptimisers.fees_view(fees,
-                                                                                     rest_idx)),
+                                                       PortfolioOptimisers.port_opt_view(fees,
+                                                                                         rest_idx)),
                                       compound)
         plot!(f, ts, rest_ret; label = "Others")
     end

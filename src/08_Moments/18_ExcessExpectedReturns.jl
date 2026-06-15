@@ -20,9 +20,15 @@ Keywords correspond to the struct's fields.
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@prop`-tagged fields are automatically propagated:
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
 
   - `me`: Recursively updated via [`factory`](@ref).
+
+## View parameters
+
+When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+
+  - `me`: Recursively viewed via [`port_opt_view`](@ref).
 
 # Examples
 
@@ -39,13 +45,14 @@ ExcessExpectedReturns
   - [`AbstractShrunkExpectedReturnsEstimator`](@ref)
   - [`AbstractExpectedReturnsEstimator`](@ref)
   - [`factory`](@ref)
+  - [`port_opt_view`](@ref)
 """
 @propagatable @concrete struct ExcessExpectedReturns <:
                                AbstractShrunkExpectedReturnsEstimator
     """
     $(field_dict[:me])
     """
-    @prop me
+    @fprop @vprop me
     """
     $(field_dict[:rf])
     """
@@ -63,27 +70,6 @@ function ExcessExpectedReturns(;
                                me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
                                rf::Number = 0.0)::ExcessExpectedReturns
     return ExcessExpectedReturns(me, rf)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Gets the view of the expected returns estimator for the `i`-th element(s).
-
-# Arguments
-
-  - $(arg_dict[:me])
-  - `i`: Index or indices to view.
-
-# Returns
-
-  - $(ret_dict[:mev])
-
-# Related
-
-  - [`ExcessExpectedReturns`](@ref)
-"""
-function moment_view(me::ExcessExpectedReturns, i)::ExcessExpectedReturns
-    return ExcessExpectedReturns(; me = moment_view(me.me, i), rf = me.rf)
 end
 """
     Statistics.mean(me::ExcessExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)

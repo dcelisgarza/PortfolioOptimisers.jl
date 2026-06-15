@@ -41,7 +41,7 @@ $(DocStringExtensions.FIELDS)
   - [`HierarchicalRiskParity`](@ref)
   - [`HierarchicalEqualRiskContribution`](@ref)
 """
-@concrete struct HierarchicalResult <: NonFiniteAllocationOptimisationResult
+@concrete struct HierarchicalResult <: NonJuMPOptimisationResult
     """
     $(field_dict[:oe])
     """
@@ -74,20 +74,6 @@ $(DocStringExtensions.FIELDS)
     $(field_dict[:fb])
     """
     fb
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Create a [`HierarchicalResult`](@ref) with a new fallback result `fb`.
-
-# Related
-
-  - [`HierarchicalResult`](@ref)
-  - [`factory`](@ref)
-"""
-function factory(res::HierarchicalResult, fb::Option{<:OptE_Opt})
-    return HierarchicalResult(res.oe, res.pr, res.clr, res.wb, res.fees, res.retcode, res.w,
-                              fb)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -301,13 +287,13 @@ Return a view of [`HierarchicalOptimiser`](@ref) `hco` sliced to asset indices `
 # Related
 
   - [`HierarchicalOptimiser`](@ref)
-  - [`opt_view`](@ref)
+  - [`port_opt_view`](@ref)
 """
-function opt_view(hco::HierarchicalOptimiser, i)::HierarchicalOptimiser
-    pe = prior_view(hco.pe, i)
-    wb = weight_bounds_view(hco.wb, i)
-    fees = fees_view(hco.fees, i)
-    sets = asset_sets_view(hco.sets, i)
+function port_opt_view(hco::HierarchicalOptimiser, i, args...)::HierarchicalOptimiser
+    pe = port_opt_view(hco.pe, i)
+    wb = port_opt_view(hco.wb, i)
+    fees = port_opt_view(hco.fees, i)
+    sets = port_opt_view(hco.sets, i)
     return HierarchicalOptimiser(; pe = pe, cle = hco.cle, slv = hco.slv, wb = wb,
                                  fees = fees, wf = hco.wf, sets = sets, brt = hco.brt,
                                  cle_pr = hco.cle_pr, strict = hco.strict)

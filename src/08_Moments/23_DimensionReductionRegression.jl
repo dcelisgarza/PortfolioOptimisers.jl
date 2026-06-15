@@ -283,7 +283,7 @@ function factory(re::DimensionReductionRegression,
                                         retgt = factory(re.retgt, w))
 end
 """
-    regression_view(re::DimensionReductionRegression, i) -> DimensionReductionRegression
+    port_opt_view(re::DimensionReductionRegression, i) -> DimensionReductionRegression
 
 Return a new [`DimensionReductionRegression`](@ref) estimator restricted to assets at index `i`.
 
@@ -299,10 +299,11 @@ Return a new [`DimensionReductionRegression`](@ref) estimator restricted to asse
 # Related
 
   - [`DimensionReductionRegression`](@ref)
-  - [`regression_view`](@ref)
+  - [`port_opt_view`](@ref)
 """
-function regression_view(re::DimensionReductionRegression, i)::DimensionReductionRegression
-    return DimensionReductionRegression(; ve = moment_view(re.ve, i), drtgt = re.drtgt,
+function port_opt_view(re::DimensionReductionRegression, i,
+                       args...)::DimensionReductionRegression
+    return DimensionReductionRegression(; ve = port_opt_view(re.ve, i), drtgt = re.drtgt,
                                         retgt = re.retgt)
 end
 """

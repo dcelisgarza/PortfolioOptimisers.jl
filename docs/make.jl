@@ -12,9 +12,13 @@ for sym in private_symbols
          end)
 end
 
+# Keep rendered docs and @example output fully expanded (no large-struct collapsing).
+PortfolioOptimisers.set_compact_show!(false)
+
 DocMeta.setdocmeta!(PortfolioOptimisers, :DocTestSetup,
                     :(using PortfolioOptimisers, StatsBase, Statistics, LinearAlgebra,
-                            Dates, Distributions, StableRNGs, TimeSeries); recursive = true)
+                            Dates, Distributions, StableRNGs, TimeSeries;
+                    PortfolioOptimisers.set_compact_show!(false)); recursive = true)
 
 # utility function from https://github.com/JuliaOpt/Convex.jl/blob/master/docs/make.jl
 function pre_process_content_md(content)
@@ -84,6 +88,9 @@ diff_flag = isempty(String(read(Cmd(`git diff $(@__DIR__) $(joinpath(@__DIR__, "
 
 examples = generate_files("../examples/", "examples/", false)
 user_guide = generate_files("../user_guide/", "user_guide/", false)
+
+include(joinpath(@__DIR__, "generate_type_hierarchy.jl"))
+generate_type_hierarchy()
 
 root_pages = [file
               for file in readdir(joinpath(@__DIR__, "src")) if splitext(file)[2] == ".md"]

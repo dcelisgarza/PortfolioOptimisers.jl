@@ -122,8 +122,8 @@ Gets the view of the covariance estimator for the `i`-th element(s).
 
   - [`DetoneCovariance`](@ref)
 """
-function moment_view(ce::DetoneCovariance, i)::DetoneCovariance
-    return DetoneCovariance(; ce = moment_view(ce.ce, i), dt = ce.dt, pdm = ce.pdm)
+function port_opt_view(ce::DetoneCovariance, i, args...)::DetoneCovariance
+    return DetoneCovariance(; ce = port_opt_view(ce.ce, i), dt = ce.dt, pdm = ce.pdm)
 end
 """
     Statistics.cov(ce::DetoneCovariance, X::MatNum; dims = 1, kwargs...)

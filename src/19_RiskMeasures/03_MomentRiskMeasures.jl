@@ -1446,10 +1446,10 @@ Slices the expected returns `mu` for cluster-based optimisation.
 # Related
 
   - [`LowOrderMoment`](@ref)
-  - [`risk_measure_view`](@ref)
+  - [`port_opt_view`](@ref)
   - [`nothing_scalar_array_view`](@ref)
 """
-function risk_measure_view(r::LowOrderMoment, i, args...)
+function port_opt_view(r::LowOrderMoment, i, args...)
     mu = nothing_scalar_array_view(r.mu, i)
     return LowOrderMoment(; settings = r.settings, alg = r.alg, w = r.w, mu = mu)
 end
@@ -1481,10 +1481,10 @@ Slices the expected returns `mu` for cluster-based optimisation.
 # Related
 
   - [`HighOrderMoment`](@ref)
-  - [`risk_measure_view`](@ref)
+  - [`port_opt_view`](@ref)
   - [`nothing_scalar_array_view`](@ref)
 """
-function risk_measure_view(r::HighOrderMoment, i, args...)
+function port_opt_view(r::HighOrderMoment, i, args...)
     mu = nothing_scalar_array_view(r.mu, i)
     return HighOrderMoment(; settings = r.settings, alg = r.alg, w = r.w, mu = mu)
 end

@@ -25,9 +25,16 @@ Keywords correspond to the struct's fields.
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@prop`-tagged fields are automatically propagated:
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
 
   - `ce`: Recursively updated via [`factory`](@ref).
+
+## View parameters
+
+When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+
+  - `ce`: Recursively viewed via [`port_opt_view`](@ref).
+  - `w`: Sliced to the selected indices via [`port_opt_view`](@ref).
 
 # Examples
 
@@ -60,17 +67,18 @@ EquilibriumExpectedReturns
   - [`StatsBase.CovarianceEstimator`](https://juliastats.org/StatsBase.jl/stable/cov/#StatsBase.CovarianceEstimator)
   - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
   - [`factory`](@ref)
+  - [`port_opt_view`](@ref)
 """
 @propagatable @concrete struct EquilibriumExpectedReturns <:
                                AbstractShrunkExpectedReturnsEstimator
     """
     $(field_dict[:ce])
     """
-    @prop ce
+    @fprop @vprop ce
     """
     $(field_dict[:eqw])
     """
-    w
+    @vprop w
     """
     $(field_dict[:l])
     """
@@ -91,28 +99,6 @@ function EquilibriumExpectedReturns(;
                                     w::Option{<:VecNum} = nothing,
                                     l::Number = 1)::EquilibriumExpectedReturns
     return EquilibriumExpectedReturns(ce, w, l)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Gets the view of the expected returns estimator for the `i`-th element(s).
-
-# Arguments
-
-  - $(arg_dict[:me])
-  - `i`: Index or indices to view.
-
-# Returns
-
-  - $(ret_dict[:mev])
-
-# Related
-
-  - [`EquilibriumExpectedReturns`](@ref)
-"""
-function moment_view(me::EquilibriumExpectedReturns, i)::EquilibriumExpectedReturns
-    return EquilibriumExpectedReturns(; ce = moment_view(me.ce, i),
-                                      w = nothing_scalar_array_view(me.w, i), l = me.l)
 end
 """
     Statistics.mean(me::EquilibriumExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)

@@ -108,8 +108,8 @@ Gets the view of the covariance estimator for the `i`-th element(s).
 
   - [`WindowedVariance`](@ref)
 """
-function moment_view(ce::WindowedVariance, i)::WindowedVariance
-    return WindowedVariance(; ce = moment_view(ce.ce, i), w = ce.w, window = ce.window)
+function port_opt_view(ce::WindowedVariance, i, args...)::WindowedVariance
+    return WindowedVariance(; ce = port_opt_view(ce.ce, i), w = ce.w, window = ce.window)
 end
 """
     Statistics.var(ce::WindowedVariance, X::MatNum; dims::Int = 1, mean = nothing, iv::Option{<:MatNum} = nothing,

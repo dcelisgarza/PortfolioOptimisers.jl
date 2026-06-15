@@ -573,7 +573,7 @@ function path_fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator,
         @info("Running walk forward sequentially because the optimiser must either use the previous optimisation's weights (needs_previous_weights(opt) == $prev_w_flag), and/or is time dependent (is_time_dependent(opt) == $time_dep_flag). This is because somewhere within the optimisation estimator is contained at least one of the following:\n\t- Turnover and/or TurnoverEstimator,\n\t- WeightsTracking,\n\t- TurnoverRiskMeasure,\n\t- custom constraints which use asset weights,\n\t- custom objective penalties which use asset weights.\n\t- Or there is a time dependent constraint or objective penalty.\nTo enable parallel processing please either mark the weights as fixed or remove the offending component(s).")
         for (i, (train, test, col)) in enumerate(zip(train_idx, test_idx, cols))
             rdi = returns_result_view(rd, col)
-            opti = opt_view(opt, col, rdi.X)
+            opti = port_opt_view(opt, col, rdi.X)
             if i > 1
                 if prev_w_flag
                     opti = factory(opti, predictions[i - 1].res.w)

@@ -13,13 +13,17 @@ factory(a::Union{Nothing, <:AbstractEstimator, <:AbstractAlgorithm, <:AbstractRe
 get_window
 @propagatable
 _factory_child
-@prop
-_is_prop_macro
+@fprop
+@vprop
+_is_prop_tag_call
+_is_fprop_macro
+_is_vprop_macro
 _is_doc_macro
 _extract_field_name
 _propagatable_find_struct
 _propagatable_bare_name
 _try_field_name
+_peel_prop_tags
 _propagatable_parse_body
 ```
 
@@ -41,6 +45,8 @@ dot_scalar
 [`NestedClustered`](@ref) optimisations need to index the asset universe in order to produce the inner optimisations. These indexing operations are implemented as views, indexing, and custom index generators.
 
 ```@docs
+port_opt_view(x, i, args...)
+port_opt_view(x::VecScalar, i, args...)
 nothing_scalar_array_view
 nothing_scalar_array_view_odd_order
 nothing_scalar_array_getindex

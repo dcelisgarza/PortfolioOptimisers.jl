@@ -11,5 +11,5 @@ std(ve::SimpleVariance, X::VecNum; mean = nothing)
 var(ve::SimpleVariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)
 var(ve::SimpleVariance{Nothing}, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)
 var(ve::SimpleVariance, X::VecNum; mean = nothing)
-moment_view(ve::SimpleVariance, i)
+port_opt_view(ve::SimpleVariance, i, args...)
 ```

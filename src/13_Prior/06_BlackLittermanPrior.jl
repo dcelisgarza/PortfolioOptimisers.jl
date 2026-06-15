@@ -196,10 +196,10 @@ Return a new [`BlackLittermanPrior`](@ref) estimator restricted to the assets at
 
   - [`BlackLittermanPrior`](@ref)
 """
-function prior_view(pr::BlackLittermanPrior, i)::BlackLittermanPrior
-    return BlackLittermanPrior(; pe = prior_view(pr.pe, i), mp = pr.mp, views = pr.views,
-                               sets = asset_sets_view(pr.sets, i),
-                               views_conf = pr.views_conf, rf = pr.rf, tau = pr.tau)
+function port_opt_view(pr::BlackLittermanPrior, i, args...)::BlackLittermanPrior
+    return BlackLittermanPrior(; pe = port_opt_view(pr.pe, i), mp = pr.mp, views = pr.views,
+                               sets = port_opt_view(pr.sets, i), views_conf = pr.views_conf,
+                               rf = pr.rf, tau = pr.tau)
 end
 """
     calc_omega(views_conf::Option{<:Num_VecNum}, P::MatNum,

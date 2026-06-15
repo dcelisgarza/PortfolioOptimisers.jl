@@ -24,7 +24,7 @@ $(DocStringExtensions.FIELDS)
   - [`SubsetResampling`](@ref)
   - [`NonFiniteAllocationOptimisationResult`](@ref)
 """
-@concrete struct SubsetResamplingResult <: NonFiniteAllocationOptimisationResult
+@concrete struct SubsetResamplingResult <: NonJuMPOptimisationResult
     """
     $(field_dict[:oe])
     """
@@ -293,13 +293,13 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return a cluster-sliced copy of [`SubsetResampling`](@ref) for asset index set `i` and returns matrix `X`.
 """
-function opt_view(sr::SubsetResampling, i, X::MatNum)::SubsetResampling
+function port_opt_view(sr::SubsetResampling, i, X::MatNum, args...)::SubsetResampling
     X = isa(sr.pe, AbstractPriorResult) ? sr.pe.X : X
-    pe = prior_view(sr.pe, i)
-    wb = weight_bounds_view(sr.wb, i)
-    fees = fees_view(sr.fees, i)
-    sets = asset_sets_view(sr.sets, i)
-    opt = opt_view(sr.opt, i, X)
+    pe = port_opt_view(sr.pe, i)
+    wb = port_opt_view(sr.wb, i)
+    fees = port_opt_view(sr.fees, i)
+    sets = port_opt_view(sr.sets, i)
+    opt = port_opt_view(sr.opt, i, X)
     return SubsetResampling(; pe = pe, wb = wb, fees = fees, sets = sets, scale = sr.scale,
                             opt = opt, wf = sr.wf, ex = sr.ex, subset_size = sr.subset_size,
                             n_subsets = sr.n_subsets, max_comb = sr.max_comb, rng = sr.rng,
@@ -409,7 +409,7 @@ function _optimise(sr::SubsetResampling, rd::ReturnsResult; dims::Int = 1,
     ress = Vector{NonFiniteAllocationOptimisationResult}(undef, n_subsets)
     FLoops.@floop sr.ex for i in 1:n_subsets
         idx = view(asset_idx, :, i)
-        opti = opt_view(opt, idx, X)
+        opti = port_opt_view(opt, idx, X)
         rdi = returns_result_view(rd, idx)
         ress[i] = optimise(opti, rdi; dims = dims, branchorder = branchorder,
                            str_names = str_names, save = save, kwargs...)

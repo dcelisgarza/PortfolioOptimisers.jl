@@ -7,38 +7,23 @@ Result type for Risk Budgeting portfolio optimisation.
 
 $(DocStringExtensions.FIELDS)
 
-The `w` property is forwarded from `sol.w`.
+Property access delegates to the embedded [`JuMPOptimisationResult`](@ref); unknown properties forward to `prb` first, then through `jr` (including the virtual `:w` and the `pa` fall-through).
 
 # Related
 
   - [`RiskBudgeting`](@ref)
-  - [`NonFiniteAllocationOptimisationResult`](@ref)
+  - [`RiskJuMPOptimisationResult`](@ref)
+  - [`JuMPOptimisationResult`](@ref)
 """
-@concrete struct RiskBudgetingResult <: NonFiniteAllocationOptimisationResult
+@concrete struct RiskBudgetingResult <: RiskJuMPOptimisationResult
     """
-    $(field_dict[:oe])
+    Shared JuMP result core, see [`JuMPOptimisationResult`](@ref).
     """
-    oe
-    """
-    $(field_dict[:pa])
-    """
-    pa
+    jr
     """
     $(field_dict[:prb])
     """
     prb
-    """
-    $(field_dict[:retcode])
-    """
-    retcode
-    """
-    $(field_dict[:sol])
-    """
-    sol
-    """
-    $(field_dict[:model])
-    """
-    model
     """
     $(field_dict[:fb])
     """
@@ -47,27 +32,15 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Rebuild a [`RiskBudgetingResult`](@ref) with an updated fallback optimiser `fb`.
-"""
-function factory(res::RiskBudgetingResult, fb::Option{<:OptE_Opt})
-    return RiskBudgetingResult(res.oe, res.pa, res.prb, res.retcode, res.sol, res.model, fb)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Access properties of [`RiskBudgetingResult`](@ref). Virtual property `:w` extracts portfolio weights from `sol`; other unknown properties forward to `r.prb` then `r.pa`.
+Access properties of [`RiskBudgetingResult`](@ref). Unique field `prb` resolves directly; unknown properties forward into `prb` first, then delegate to the embedded [`JuMPOptimisationResult`](@ref) `jr` (the virtual `:w` and `pa` fall-through).
 """
 function Base.getproperty(r::RiskBudgetingResult, sym::Symbol)
-    return if sym == :w
-        r.sol.w
-    elseif sym in propertynames(r)
+    return if sym in fieldnames(RiskBudgetingResult)
         getfield(r, sym)
-    elseif sym in propertynames(r.prb)
-        getproperty(r.prb, sym)
-    elseif sym in propertynames(r.pa)
-        getproperty(r.pa, sym)
+    elseif sym in propertynames(getfield(r, :prb))
+        getproperty(getfield(r, :prb), sym)
     else
-        getfield(r, sym)
+        getproperty(getfield(r, :jr), sym)
     end
 end
 """
@@ -130,11 +103,11 @@ Abstract supertype for risk budgeting optimisation formulations.
 """
 abstract type RiskBudgetingFormulation <: OptimisationAlgorithm end
 """
-    risk_budgeting_formulation_view(::RiskBudgetingFormulation, args...) -> nothing
+    port_opt_view(::RiskBudgetingFormulation, args...) -> nothing
 
 Default fallback for risk budgeting formulation view. Returns `nothing` for formulations that do not require view slicing.
 """
-function risk_budgeting_formulation_view(::RiskBudgetingFormulation, args...)
+function port_opt_view(::RiskBudgetingFormulation, ::Any, args...)
     return nothing
 end
 """
@@ -181,10 +154,10 @@ end
 function LogRiskBudgeting(; z::Option{<:VecInt} = nothing)::LogRiskBudgeting
     return LogRiskBudgeting(z)
 end
-function risk_budgeting_formulation_view(alg::LogRiskBudgeting{Nothing}, i)
+function port_opt_view(alg::LogRiskBudgeting{Nothing}, i, args...)
     return alg
 end
-function risk_budgeting_formulation_view(alg::LogRiskBudgeting{<:VecInt}, i)
+function port_opt_view(alg::LogRiskBudgeting{<:VecInt}, i, args...)
     return LogRiskBudgeting(; z = view(alg.z, i))
 end
 """
@@ -269,7 +242,7 @@ function AssetRiskBudgeting(; rkb::Option{<:RkbE_Rkb} = nothing,
     return AssetRiskBudgeting(rkb, sets, alg)
 end
 """
-    risk_budgeting_algorithm_view(r, i)
+    port_opt_view(r, i)
 
 Return a view or subset of a risk budgeting algorithm for cluster index `i`.
 
@@ -290,10 +263,10 @@ Used in hierarchical optimisation to slice risk budget and asset set configurati
   - [`FactorRiskBudgeting`](@ref)
   - [`RiskBudgeting`](@ref)
 """
-function risk_budgeting_algorithm_view(r::AssetRiskBudgeting, i)
-    rkb = risk_budget_view(r.rkb, i)
-    sets = asset_sets_view(r.sets, i)
-    alg = risk_budgeting_formulation_view(r.alg, i)
+function port_opt_view(r::AssetRiskBudgeting, i, args...)
+    rkb = port_opt_view(r.rkb, i)
+    sets = port_opt_view(r.sets, i)
+    alg = port_opt_view(r.alg, i)
     return AssetRiskBudgeting(; rkb = rkb, sets = sets, alg = alg)
 end
 """
@@ -360,7 +333,7 @@ function FactorRiskBudgeting(; re::RegE_Reg = StepwiseRegression(),
     return FactorRiskBudgeting(re, rkb, sets, flag)
 end
 """
-    risk_budgeting_algorithm_view(r::FactorRiskBudgeting, i)
+    port_opt_view(r::FactorRiskBudgeting, i)
 
 Return a view of a `FactorRiskBudgeting` algorithm for cluster index `i`.
 
@@ -377,12 +350,12 @@ Slices the regression estimator for the given cluster while keeping the risk bud
 
 # Related
 
-  - [`risk_budgeting_algorithm_view`](@ref)
+  - [`port_opt_view`](@ref)
   - [`FactorRiskBudgeting`](@ref)
   - [`AssetRiskBudgeting`](@ref)
 """
-function risk_budgeting_algorithm_view(r::FactorRiskBudgeting, i)
-    re = regression_view(r.re, i)
+function port_opt_view(r::FactorRiskBudgeting, i, args...)
+    re = port_opt_view(r.re, i)
     return FactorRiskBudgeting(; re = re, rkb = r.rkb, sets = r.sets, flag = r.flag)
 end
 """
@@ -514,11 +487,11 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return a cluster-sliced copy of [`RiskBudgeting`](@ref) for asset index set `i` and returns matrix `X`.
 """
-function opt_view(rb::RiskBudgeting, i, X::MatNum)::RiskBudgeting
+function port_opt_view(rb::RiskBudgeting, i, X::MatNum, args...)::RiskBudgeting
     X = isa(rb.opt.pe, AbstractPriorResult) ? rb.opt.pe.X : X
-    opt = opt_view(rb.opt, i, X)
-    r = risk_measure_view(rb.r, i, X)
-    rba = risk_budgeting_algorithm_view(rb.rba, i)
+    opt = port_opt_view(rb.opt, i, X)
+    r = port_opt_view(rb.r, i, X)
+    rba = port_opt_view(rb.rba, i)
     wi = nothing_scalar_array_view(rb.wi, i)
     return RiskBudgeting(; opt = opt, r = r, rba = rba, wi = wi, fb = rb.fb)
 end
@@ -692,8 +665,9 @@ function _optimise(rb::RiskBudgeting, rd::ReturnsResult = ReturnsResult(); dims:
     set_portfolio_objective_function!(model, MinimumRisk(), attrs.ret, rb.opt.cobj, rb,
                                       attrs.pr)
     retcode, sol = optimise_JuMP_model!(model, rb, eltype(attrs.pr.X))
-    return RiskBudgetingResult(typeof(rb), attrs, prb, retcode, sol,
-                               ifelse(save, model, nothing), nothing)
+    return RiskBudgetingResult(JuMPOptimisationResult(typeof(rb), attrs, retcode, sol,
+                                                      ifelse(save, model, nothing)), prb,
+                               nothing)
 end
 """
     optimise(rb::RiskBudgeting{<:Any, <:Any, <:Any, <:Any, Nothing},

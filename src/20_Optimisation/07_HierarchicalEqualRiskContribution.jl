@@ -253,20 +253,20 @@ Return a view of [`HierarchicalEqualRiskContribution`](@ref) `hec` sliced to ass
 # Related
 
   - [`HierarchicalEqualRiskContribution`](@ref)
-  - [`opt_view`](@ref)
+  - [`port_opt_view`](@ref)
 """
-function opt_view(hec::HierarchicalEqualRiskContribution, i,
-                  X::MatNum)::HierarchicalEqualRiskContribution
+function port_opt_view(hec::HierarchicalEqualRiskContribution, i, X::MatNum,
+                       args...)::HierarchicalEqualRiskContribution
     X = isa(hec.opt.pe, AbstractPriorResult) ? hec.opt.pe.X : X
     ri = hec.ri
     ro = hec.ro
     if ri === ro
-        ri = ro = risk_measure_view(ri, i, X)
+        ri = ro = port_opt_view(ri, i, X)
     else
-        ri = risk_measure_view(ri, i, X)
-        ro = risk_measure_view(ro, i, X)
+        ri = port_opt_view(ri, i, X)
+        ro = port_opt_view(ro, i, X)
     end
-    opt = opt_view(hec.opt, i)
+    opt = port_opt_view(hec.opt, i)
     return HierarchicalEqualRiskContribution(; ri = ri, ro = ro, opt = opt, scai = hec.scai,
                                              scao = hec.scao, ex = hec.ex, fb = hec.fb)
 end

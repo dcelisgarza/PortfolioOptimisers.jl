@@ -735,7 +735,7 @@ function factory(rs::VecBaseRM, args...; kwargs...)
     return [factory(r, args...; kwargs...) for r in rs]
 end
 """
-    risk_measure_view(rs, i, X)
+    port_opt_view(rs, i, X)
 
 Get a view or subset of a risk measure for asset cluster index `i`.
 
@@ -755,12 +755,12 @@ Returns the risk measure sliced for the given cluster or asset index. Used inter
 
   - [`AbstractBaseRiskMeasure`](@ref)
 """
-function risk_measure_view(rs::AbstractBaseRiskMeasure, ::Any,
-                           ::Any)::AbstractBaseRiskMeasure
+function port_opt_view(rs::AbstractBaseRiskMeasure, ::Any, ::Any,
+                       args...)::AbstractBaseRiskMeasure
     return rs
 end
-function risk_measure_view(rs::VecBaseRM, i, X::MatNum)
-    return [risk_measure_view(r, i, X) for r in rs]
+function port_opt_view(rs::VecBaseRM, i, X::MatNum, args...)
+    return [port_opt_view(r, i, X) for r in rs]
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -1012,7 +1012,7 @@ Internal helper for slicing scalar, array, or `nothing` risk/prior variables by 
 
 # Related
 
-  - [`risk_measure_view`](@ref)
+  - [`port_opt_view`](@ref)
 """
 function risk_measure_nothing_scalar_array_view(::Nothing, ::Nothing, i)
     throw(ArgumentError("Both risk_variable and prior_variable are nothing."))

@@ -92,8 +92,8 @@ end
 function factory(rt::ArithmeticReturn, ucs::UcSE_UcS, args...; kwargs...)
     return ArithmeticReturn(; ucs = ucs_selector(rt.ucs, ucs), lb = rt.lb, mu = rt.mu)
 end
-function jump_returns_view(r::ArithmeticReturn, i, args...)
-    uset = ucs_view(r.ucs, i)
+function port_opt_view(r::ArithmeticReturn, i, args...)
+    uset = port_opt_view(r.ucs, i)
     mu = nothing_scalar_array_view(r.mu, i)
     return ArithmeticReturn(; ucs = uset, lb = r.lb, mu = mu)
 end

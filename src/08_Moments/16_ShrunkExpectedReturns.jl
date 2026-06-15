@@ -274,10 +274,18 @@ Keywords correspond to the struct's fields.
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@prop`-tagged fields are automatically propagated:
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
 
   - `me`: Recursively updated via [`factory`](@ref).
   - `ce`: Recursively updated via [`factory`](@ref).
+
+## View parameters
+
+When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+
+  - `me`: Recursively viewed via [`port_opt_view`](@ref).
+  - `ce`: Recursively viewed via [`port_opt_view`](@ref).
+  - `alg`: Recursively viewed via [`port_opt_view`](@ref).
 
 # Examples
 
@@ -313,21 +321,22 @@ ShrunkExpectedReturns
   - [`StatsBase.CovarianceEstimator`](https://juliastats.org/StatsBase.jl/stable/cov/#StatsBase.CovarianceEstimator)
   - [`AbstractShrunkExpectedReturnsAlgorithm`](@ref)
   - [`factory`](@ref)
+  - [`port_opt_view`](@ref)
 """
 @propagatable @concrete struct ShrunkExpectedReturns <:
                                AbstractShrunkExpectedReturnsEstimator
     """
     $(field_dict[:me])
     """
-    @prop me
+    @fprop @vprop me
     """
     $(field_dict[:ce])
     """
-    @prop ce
+    @fprop @vprop ce
     """
     $(field_dict[:me_shrink_alg])
     """
-    alg
+    @vprop alg
     function ShrunkExpectedReturns(me::AbstractExpectedReturnsEstimator,
                                    ce::StatsBase.CovarianceEstimator,
                                    alg::AbstractShrunkExpectedReturnsAlgorithm)
@@ -660,28 +669,6 @@ function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:BodnarOkhrinP
     alpha /= u * v - w^2
     beta = (one(alpha) - alpha) * w / u
     return alpha * mu + beta * b
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Gets the view of the expected returns estimator for the `i`-th element(s).
-
-# Arguments
-
-  - $(arg_dict[:me])
-  - `i`: Index or indices to view.
-
-# Returns
-
-  - $(ret_dict[:mev])
-
-# Related
-
-  - [`ShrunkExpectedReturns`](@ref)
-"""
-function moment_view(me::ShrunkExpectedReturns, i)::ShrunkExpectedReturns
-    return ShrunkExpectedReturns(; me = moment_view(me.me, i), ce = moment_view(me.ce, i),
-                                 alg = me_alg_view(me.alg, i))
 end
 
 export GrandMean, VolatilityWeighted, MeanSquaredError, JamesStein, BayesStein,

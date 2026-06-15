@@ -190,7 +190,7 @@ function ucs_selector(::Nothing, prior_ucs::UcSE_UcS)::UcSE_UcS
     return prior_ucs
 end
 """
-    ucs_view(risk_ucs, i)
+    port_opt_view(risk_ucs, i)
 
 Get a view or subset of an uncertainty set for asset cluster index `i`.
 
@@ -211,8 +211,8 @@ Returns the uncertainty set sliced for the given index, or unchanged for estimat
   - [`BoxUncertaintySet`](@ref)
   - [`EllipsoidalUncertaintySet`](@ref)
 """
-function ucs_view(risk_ucs::Option{<:AbstractUncertaintySetEstimator},
-                  ::Any)::Option{<:AbstractUncertaintySetEstimator}
+function port_opt_view(risk_ucs::Option{<:AbstractUncertaintySetEstimator}, ::Any,
+                       args...)::Option{<:AbstractUncertaintySetEstimator}
     return risk_ucs
 end
 """
@@ -422,9 +422,10 @@ Return a view of a vector [`BoxUncertaintySet`](@ref) restricted to the asset in
 # Related
 
   - [`BoxUncertaintySet`](@ref)
-  - [`ucs_view`](@ref)
+  - [`port_opt_view`](@ref)
 """
-function ucs_view(risk_ucs::BoxUncertaintySet{<:VecNum, <:VecNum}, i)::BoxUncertaintySet
+function port_opt_view(risk_ucs::BoxUncertaintySet{<:VecNum, <:VecNum}, i,
+                       args...)::BoxUncertaintySet
     return BoxUncertaintySet(; lb = view(risk_ucs.lb, i), ub = view(risk_ucs.ub, i))
 end
 """
@@ -435,9 +436,10 @@ Return a view of a matrix [`BoxUncertaintySet`](@ref) restricted to the asset in
 # Related
 
   - [`BoxUncertaintySet`](@ref)
-  - [`ucs_view`](@ref)
+  - [`port_opt_view`](@ref)
 """
-function ucs_view(risk_ucs::BoxUncertaintySet{<:MatNum, <:MatNum}, i)::BoxUncertaintySet
+function port_opt_view(risk_ucs::BoxUncertaintySet{<:MatNum, <:MatNum}, i,
+                       args...)::BoxUncertaintySet
     return BoxUncertaintySet(; lb = view(risk_ucs.lb, i, i), ub = view(risk_ucs.ub, i, i))
 end
 """
@@ -757,11 +759,11 @@ Return a view of a covariance [`EllipsoidalUncertaintySet`](@ref) restricted to 
 # Related
 
   - [`EllipsoidalUncertaintySet`](@ref)
-  - [`ucs_view`](@ref)
+  - [`port_opt_view`](@ref)
 """
-function ucs_view(risk_ucs::EllipsoidalUncertaintySet{<:MatNum, <:Any,
-                                                      <:SigmaEllipsoidalUncertaintySet},
-                  i)::EllipsoidalUncertaintySet
+function port_opt_view(risk_ucs::EllipsoidalUncertaintySet{<:MatNum, <:Any,
+                                                           <:SigmaEllipsoidalUncertaintySet},
+                       i, args...)::EllipsoidalUncertaintySet
     i = fourth_moment_index_generator(floor(Int, sqrt(size(risk_ucs.sigma, 1))), i)
     return EllipsoidalUncertaintySet(; sigma = view(risk_ucs.sigma, i, i), k = risk_ucs.k,
                                      class = risk_ucs.class)
@@ -774,11 +776,11 @@ Return a view of a mean [`EllipsoidalUncertaintySet`](@ref) restricted to assets
 # Related
 
   - [`EllipsoidalUncertaintySet`](@ref)
-  - [`ucs_view`](@ref)
+  - [`port_opt_view`](@ref)
 """
-function ucs_view(risk_ucs::EllipsoidalUncertaintySet{<:MatNum, <:Any,
-                                                      <:MuEllipsoidalUncertaintySet},
-                  i)::EllipsoidalUncertaintySet
+function port_opt_view(risk_ucs::EllipsoidalUncertaintySet{<:MatNum, <:Any,
+                                                           <:MuEllipsoidalUncertaintySet},
+                       i, args...)::EllipsoidalUncertaintySet
     return EllipsoidalUncertaintySet(; sigma = view(risk_ucs.sigma, i, i), k = risk_ucs.k,
                                      class = risk_ucs.class)
 end

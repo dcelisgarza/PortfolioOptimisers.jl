@@ -127,8 +127,9 @@ Gets the view of the covariance estimator for the `i`-th element(s).
 
   - [`LowerTailDependenceCovariance`](@ref)
 """
-function moment_view(ce::LowerTailDependenceCovariance, i)::LowerTailDependenceCovariance
-    return LowerTailDependenceCovariance(; ve = moment_view(ce.ve, i), alpha = ce.alpha,
+function port_opt_view(ce::LowerTailDependenceCovariance, i,
+                       args...)::LowerTailDependenceCovariance
+    return LowerTailDependenceCovariance(; ve = port_opt_view(ce.ve, i), alpha = ce.alpha,
                                          ex = ce.ex)
 end
 """

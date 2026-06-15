@@ -7,7 +7,7 @@ factory(sr::SubsetResamplingResult, fb::Option{<:OptE_Opt})
 SubsetResampling
 needs_previous_weights(opt::SubsetResampling)
 factory(sr::SubsetResampling, w::AbstractVector)
-opt_view(sr::SubsetResampling, i, X::MatNum)
+port_opt_view(sr::SubsetResampling, i, X::MatNum, args...)
 optimise(sr::SubsetResampling{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                        <:Any, <:Any, <:Any, <:Any, <:Any, Nothing},
                   rd::ReturnsResult = ReturnsResult(); dims::Int = 1,

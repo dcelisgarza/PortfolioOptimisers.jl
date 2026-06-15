@@ -19,7 +19,7 @@ AbstractHighOrderPriorEstimator
 AbstractPriorResult
 Pr_RR
 PrE_Pr
-prior_view(pr::Union{Nothing, AbstractPriorEstimator}, args...)
-prior_view(pr::LowOrderPrior, rd)
-prior_view(pr::HighOrderPrior, rd)
+port_opt_view(pr::Union{Nothing, AbstractPriorEstimator}, ::Any, args...)
+port_opt_view(pr::LowOrderPrior, rd, args...)
+port_opt_view(pr::HighOrderPrior, rd, args...)
 ```

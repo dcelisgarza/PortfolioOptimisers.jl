@@ -39,6 +39,22 @@ Matches either a [`FiniteAllocationOptimisationEstimator`](@ref) or a [`FiniteAl
 """
 const FOptE_FOpt = Union{<:FiniteAllocationOptimisationEstimator,
                          <:FiniteAllocationOptimisationResult}
+"""
+    factory(res::FiniteAllocationOptimisationResult, fb::Option{<:FOptE_FOpt})
+
+Rebuild a finite allocation result with an updated fallback optimiser `fb`.
+
+Like the continuous-result generic, every finite allocation result carries `fb` as its last field, so the rebuild copies all fields unchanged except the trailing `fb`. Concrete result types may override this method when rebuilding requires more than swapping `fb`.
+
+# Related
+
+  - [`FOptE_FOpt`](@ref)
+  - [`FiniteAllocationOptimisationResult`](@ref)
+"""
+function factory(res::FiniteAllocationOptimisationResult, fb::Option{<:FOptE_FOpt})
+    flds = ntuple(i -> getfield(res, i), Val(fieldcount(typeof(res))))
+    return (typeof(res).name.wrapper)(Base.front(flds)..., fb)
+end
 
 """
     setup_alloc_optim(w, p, cash, ...)

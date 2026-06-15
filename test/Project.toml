@@ -31,6 +31,9 @@ StatsPlots = "f3b207a7-027a-5e70-b257-86293d7955fd"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 TimeSeries = "9e3dc215-6440-5c97-bce1-76c03772f85e"
 
+[sources]
+PortfolioOptimisers = {path = ".."}
+
 [compat]
 Accessors = "0.1"
 AverageShiftedHistograms = "0.8"
@@ -48,7 +51,7 @@ JuMP = "1.30"
 LinearAlgebra = "1.12, 1.11"
 Logging = "1.12, 1.11"
 NearestCorrelationMatrix = "1.1"
-Optim = "2.1, 2.0, 1.13"
+Optim = "2.2, 2.1, 2.0, 1.13"
 OrderedCollections = "1.8"
 Pajarito = "0.8"
 ParallelTestRunner = "2.6"

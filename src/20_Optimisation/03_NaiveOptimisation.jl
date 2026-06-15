@@ -89,7 +89,7 @@ NaiveOptimisationResult
   - [`EqualWeighted`](@ref)
   - [`RandomWeighted`](@ref)
 """
-@concrete struct NaiveOptimisationResult <: NonFiniteAllocationOptimisationResult
+@concrete struct NaiveOptimisationResult <: NonJuMPOptimisationResult
     """
     $(field_dict[:oe])
     """
@@ -114,20 +114,6 @@ NaiveOptimisationResult
     $(field_dict[:fb])
     """
     fb
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Create a [`NaiveOptimisationResult`](@ref) with a new fallback result `fb`.
-
-# Related
-
-  - [`NaiveOptimisationResult`](@ref)
-  - [`factory`](@ref)
-"""
-function factory(res::NaiveOptimisationResult,
-                 fb::Option{<:OptE_Opt})::NaiveOptimisationResult
-    return NaiveOptimisationResult(res.oe, res.pr, res.wb, res.retcode, res.w, fb)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -171,9 +157,17 @@ Keywords correspond to the struct's fields.
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@prop`-tagged fields are automatically propagated:
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
 
   - `fb`: Recursively updated via [`factory`](@ref).
+
+## View parameters
+
+When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+
+  - `pe`: Recursively viewed via [`port_opt_view`](@ref).
+  - `wb`: Recursively viewed via [`port_opt_view`](@ref).
+  - `sets`: Sliced to the selected indices via [`port_opt_view`](@ref).
 
 # Examples
 
@@ -218,20 +212,21 @@ InverseVolatility
   - [`EqualWeighted`](@ref)
   - [`RandomWeighted`](@ref)
   - [`factory`](@ref)
+  - [`port_opt_view`](@ref)
 """
 @propagatable @concrete struct InverseVolatility <: NaiveOptimisationEstimator
     """
     $(field_dict[:pe])
     """
-    pe
+    @vprop pe
     """
     $(field_dict[:wb])
     """
-    wb
+    @vprop wb
     """
     $(field_dict[:sets])
     """
-    sets
+    @vprop sets
     """
     $(field_dict[:wf])
     """
@@ -239,7 +234,7 @@ InverseVolatility
     """
     $(field_dict[:fb])
     """
-    @prop fb
+    @fprop fb
     """
     $(field_dict[:sq])
     """
@@ -276,23 +271,6 @@ function InverseVolatility(; pe::PrE_Pr = EmpiricalPrior(),
                            fb::Option{<:OptE_Opt} = nothing, sq::Bool = false,
                            brt::Bool = false, strict::Bool = false)::InverseVolatility
     return InverseVolatility(pe, wb, sets, wf, fb, sq, brt, strict)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Return a view of [`InverseVolatility`](@ref) `opt` sliced to asset indices `i`.
-
-# Related
-
-  - [`InverseVolatility`](@ref)
-  - [`opt_view`](@ref)
-"""
-function opt_view(opt::InverseVolatility, i, args...)::InverseVolatility
-    pe = prior_view(opt.pe, i)
-    wb = weight_bounds_view(opt.wb, i)
-    sets = asset_sets_view(opt.sets, i)
-    return InverseVolatility(; pe = pe, wb = wb, sets = sets, wf = opt.wf, fb = opt.fb,
-                             sq = opt.sq, brt = opt.brt, strict = opt.strict)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -395,9 +373,16 @@ Keywords correspond to the struct's fields.
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@prop`-tagged fields are automatically propagated:
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
 
   - `fb`: Recursively updated via [`factory`](@ref).
+
+## View parameters
+
+When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+
+  - `wb`: Recursively viewed via [`port_opt_view`](@ref).
+  - `sets`: Sliced to the selected indices via [`port_opt_view`](@ref).
 
 # Examples
 
@@ -420,16 +405,17 @@ EqualWeighted
   - [`InverseVolatility`](@ref)
   - [`RandomWeighted`](@ref)
   - [`factory`](@ref)
+  - [`port_opt_view`](@ref)
 """
 @propagatable @concrete struct EqualWeighted <: NaiveOptimisationEstimator
     """
     $(field_dict[:wb])
     """
-    wb
+    @vprop wb
     """
     $(field_dict[:sets])
     """
-    sets
+    @vprop sets
     """
     $(field_dict[:wf])
     """
@@ -437,7 +423,7 @@ EqualWeighted
     """
     $(field_dict[:fb])
     """
-    @prop fb
+    @fprop fb
     """
     $(field_dict[:strict_opt])
     """
@@ -465,22 +451,6 @@ function EqualWeighted(; wb::Option{<:WbE_Wb} = WeightBounds(),
                        fb::Option{<:OptE_Opt} = nothing,
                        strict::Bool = false)::EqualWeighted
     return EqualWeighted(wb, sets, wf, fb, strict)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Return a view of [`EqualWeighted`](@ref) `opt` sliced to asset indices `i`.
-
-# Related
-
-  - [`EqualWeighted`](@ref)
-  - [`opt_view`](@ref)
-"""
-function opt_view(opt::EqualWeighted, i, args...)::EqualWeighted
-    wb = weight_bounds_view(opt.wb, i)
-    sets = asset_sets_view(opt.sets, i)
-    return EqualWeighted(; wb = wb, sets = sets, wf = opt.wf, fb = opt.fb,
-                         strict = opt.strict)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -568,9 +538,17 @@ Keywords correspond to the struct's fields.
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@prop`-tagged fields are automatically propagated:
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
 
   - `fb`: Recursively updated via [`factory`](@ref).
+
+## View parameters
+
+When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+
+  - `alpha`: Sliced to the selected indices via [`port_opt_view`](@ref).
+  - `wb`: Recursively viewed via [`port_opt_view`](@ref).
+  - `sets`: Sliced to the selected indices via [`port_opt_view`](@ref).
 
 # Examples
 
@@ -594,12 +572,13 @@ RandomWeighted
   - [`InverseVolatility`](@ref)
   - [`EqualWeighted`](@ref)
   - [`factory`](@ref)
+  - [`port_opt_view`](@ref)
 """
 @propagatable @concrete struct RandomWeighted <: NaiveOptimisationEstimator
     """
     $(field_dict[:alpha_dirichlet])
     """
-    alpha
+    @vprop alpha
     """
     $(field_dict[:rng])
     """
@@ -611,11 +590,11 @@ RandomWeighted
     """
     $(field_dict[:wb])
     """
-    wb
+    @vprop wb
     """
     $(field_dict[:sets])
     """
-    sets
+    @vprop sets
     """
     $(field_dict[:wf])
     """
@@ -623,7 +602,7 @@ RandomWeighted
     """
     $(field_dict[:fb])
     """
-    @prop fb
+    @fprop fb
     """
     $(field_dict[:strict_opt])
     """
@@ -658,23 +637,6 @@ function RandomWeighted(; alpha::Num_VecNum = 1,
                         fb::Option{<:OptE_Opt} = nothing,
                         strict::Bool = false)::RandomWeighted
     return RandomWeighted(alpha, rng, seed, wb, sets, wf, fb, strict)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Return a view of [`RandomWeighted`](@ref) `opt` sliced to asset indices `i`.
-
-# Related
-
-  - [`RandomWeighted`](@ref)
-  - [`opt_view`](@ref)
-"""
-function opt_view(opt::RandomWeighted, i, args...)::RandomWeighted
-    wb = weight_bounds_view(opt.wb, i)
-    sets = asset_sets_view(opt.sets, i)
-    alpha = nothing_scalar_array_view(opt.alpha, i)
-    return RandomWeighted(; alpha = alpha, rng = opt.rng, seed = opt.seed, wb = wb,
-                          sets = sets, wf = opt.wf, fb = opt.fb, strict = opt.strict)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

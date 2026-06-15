@@ -99,6 +99,21 @@ Abstract supertype for continuous (non-integer allocation) optimisation results.
 """
 abstract type NonFiniteAllocationOptimisationResult <: OptimisationResult end
 """
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for non-JuMP continuous optimisation results.
+
+Groups the results that do not carry a JuMP model (naive, clustering, and meta-optimiser results). Mirrors the JuMP/non-JuMP split on the result side; the JuMP half is [`RiskJuMPOptimisationResult`](@ref).
+
+# Related
+
+  - [`NonFiniteAllocationOptimisationResult`](@ref)
+  - [`RiskJuMPOptimisationResult`](@ref)
+  - [`NaiveOptimisationResult`](@ref)
+  - [`HierarchicalResult`](@ref)
+"""
+abstract type NonJuMPOptimisationResult <: NonFiniteAllocationOptimisationResult end
+"""
     const VecOpt = AbstractVector{<:NonFiniteAllocationOptimisationResult}
 
 Alias for a vector of non-finite allocation optimisation results.
@@ -150,6 +165,22 @@ Matches either a [`NonFiniteAllocationOptimisationEstimator`](@ref) (specifying 
 """
 const OptE_Opt = Union{<:NonFiniteAllocationOptimisationEstimator,
                        <:NonFiniteAllocationOptimisationResult}
+"""
+    factory(res::NonFiniteAllocationOptimisationResult, fb::Option{<:OptE_Opt})
+
+Rebuild a continuous optimisation result with an updated fallback optimiser `fb`.
+
+Every optimisation result carries `fb` as its last field, so the generic rebuild copies all fields unchanged except the trailing `fb`. Concrete result types may override this method when rebuilding requires more than swapping `fb`.
+
+# Related
+
+  - [`OptE_Opt`](@ref)
+  - [`NonFiniteAllocationOptimisationResult`](@ref)
+"""
+function factory(res::NonFiniteAllocationOptimisationResult, fb::Option{<:OptE_Opt})
+    flds = ntuple(i -> getfield(res, i), Val(fieldcount(typeof(res))))
+    return (typeof(res).name.wrapper)(Base.front(flds)..., fb)
+end
 """
     assert_special_nco_requirements(opt)
 
@@ -851,7 +882,7 @@ function OptimisationFailure(; res = nothing)
     return OptimisationFailure(res)
 end
 """
-    opt_view(opt, i, args...)
+    port_opt_view(opt, i, args...)
 
 Return a view or subset of an optimisation estimator for a given cluster index `i`.
 
@@ -872,21 +903,21 @@ Default fallback returns the estimator unchanged. Overridden for composite estim
   - [`JuMPOptimiser`](@ref)
   - [`NestedClustered`](@ref)
 """
-function opt_view(opt::AbstractOptimisationEstimator, args...)
+function port_opt_view(opt::AbstractOptimisationEstimator, ::Any, args...)
     return opt
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Apply [`opt_view`](@ref) element-wise to a vector of optimisation estimators.
+Apply [`port_opt_view`](@ref) element-wise to a vector of optimisation estimators.
 
 # Related
 
-  - [`opt_view`](@ref)
+  - [`port_opt_view`](@ref)
   - [`VecOptE`](@ref)
 """
-function opt_view(opt::VecOptE, args...)
-    return [opt_view(opti, args...) for opti in opt]
+function port_opt_view(opt::VecOptE, i, args...)
+    return [port_opt_view(opti, i, args...) for opti in opt]
 end
 """
     optimise(opt::OptimisationEstimator, args...; kwargs...) -> OptimisationResult
@@ -1022,7 +1053,7 @@ Obtains the fees to use for net return calculations from an optimisation result.
   - [`Fees`](@ref)
 """
 function _extract_fees(res::OptimisationResult, fees::Option{<:Fees} = nothing)
-    if isnothing(fees) && hasproperty(res, :fees)
+    if isnothing(fees) && (hasproperty(res, :fees) || hasproperty(res, :jr))
         fees = res.fees
     end
     return fees
@@ -1069,12 +1100,10 @@ Extracts the prior result for risk calculation from an optimisation result. Chec
 function _extract_pr(res::OptimisationResult, pr::Option{<:Pr_RR} = nothing)
     return if !isnothing(pr)
         pr
-    elseif hasproperty(res, :pr)
+    elseif hasproperty(res, :pr) || hasproperty(res, :jr)
         res.pr
-    elseif hasproperty(res, :pa) && hasproperty(res.pa, :pr)
-        res.pa.pr
     else
-        throw(ArgumentError("`$(nameof(typeof(res)))` has no `.pr` or `.pa.pr`; provide `pr` explicitly"))
+        throw(ArgumentError("`$(nameof(typeof(res)))` has no `.pr` or `.jr.pr`; provide `pr` explicitly"))
     end
 end
 """

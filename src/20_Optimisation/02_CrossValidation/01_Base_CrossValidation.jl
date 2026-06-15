@@ -835,7 +835,7 @@ function fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator, rd::Retu
                          train_idx::VecInt, test_idx::VecInt_VecVecInt, cols = :)
     rd_train = returns_result_view(rd, train_idx, cols)
     if !isa(cols, Colon)
-        opt = opt_view(opt, cols, rd.X)
+        opt = port_opt_view(opt, cols, rd.X)
     end
     #! Add ability to do callbacks
     res = optimise(opt, rd_train)

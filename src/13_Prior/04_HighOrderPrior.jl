@@ -520,10 +520,10 @@ Return a new [`HighOrderPriorEstimator`](@ref) restricted to the assets at index
 
   - [`HighOrderPriorEstimator`](@ref)
 """
-function prior_view(pr::HighOrderPriorEstimator, i)::HighOrderPriorEstimator
-    return HighOrderPriorEstimator(; pe = prior_view(pr.pe, i),
-                                   kte = moment_view(pr.kte, i),
-                                   ske = moment_view(pr.ske, i))
+function port_opt_view(pr::HighOrderPriorEstimator, i, args...)::HighOrderPriorEstimator
+    return HighOrderPriorEstimator(; pe = port_opt_view(pr.pe, i),
+                                   kte = port_opt_view(pr.kte, i),
+                                   ske = port_opt_view(pr.ske, i))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

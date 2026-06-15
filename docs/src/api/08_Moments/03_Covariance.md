@@ -9,7 +9,7 @@ GeneralCovariance
 factory(ce::GeneralCovariance, w::ObsWeights)
 cov(ce::GeneralCovariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)
 cor(ce::GeneralCovariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)
-moment_view(ce::GeneralCovariance, i)
+port_opt_view(ce::GeneralCovariance, i, args...)
 ```
 
 ## [Covariance](@id api-covariance)
@@ -21,5 +21,5 @@ cov(ce::Covariance{<:Any, <:Any, <:Full}, X::MatNum; dims::Int = 1, mean = nothi
 cov(ce::Covariance{<:Any, <:Any, <:Semi}, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)
 cor(ce::Covariance{<:Any, <:Any, <:Full}, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)
 cor(ce::Covariance{<:Any, <:Any, <:Semi}, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)
-moment_view(ce::Covariance, i)
+port_opt_view(ce::Covariance, i, args...)
 ```

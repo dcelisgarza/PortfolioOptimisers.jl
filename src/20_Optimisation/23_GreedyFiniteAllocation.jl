@@ -43,15 +43,6 @@ $(DocStringExtensions.FIELDS)
     fb
 end
 """
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Rebuild a [`GreedyAllocationResult`](@ref) with an updated fallback optimiser `fb`.
-"""
-function factory(res::GreedyAllocationResult, fb::Option{<:FOptE_FOpt})
-    return GreedyAllocationResult(res.oe, res.retcode, res.shares, res.cost, res.w,
-                                  res.cash, fb)
-end
-"""
 $(DocStringExtensions.TYPEDEF)
 
 Greedy Allocation portfolio optimiser.

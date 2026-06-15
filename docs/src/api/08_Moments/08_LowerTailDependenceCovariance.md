@@ -5,6 +5,6 @@ LowerTailDependenceCovariance
 factory(ce::LowerTailDependenceCovariance, w::ObsWeights)
 cov(ce::LowerTailDependenceCovariance, X::MatNum; dims::Int = 1, kwargs...)
 cor(ce::LowerTailDependenceCovariance, X::MatNum; dims::Int = 1, kwargs...)
-moment_view(ce::LowerTailDependenceCovariance, i)
+port_opt_view(ce::LowerTailDependenceCovariance, i, args...)
 lower_tail_dependence
 ```

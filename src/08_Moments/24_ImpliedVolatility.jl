@@ -126,9 +126,15 @@ Keywords correspond to the struct's fields.
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@prop`-tagged fields are automatically propagated:
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
 
   - `ce`: Recursively updated via [`factory`](@ref).
+
+## View parameters
+
+When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+
+  - `ce`: Recursively viewed via [`port_opt_view`](@ref).
 
 # Related
 
@@ -138,12 +144,13 @@ When [`factory`](@ref) is called on this type, the following `@prop`-tagged fiel
   - [`ImpliedVolatilityPremium`](@ref)
   - [`AbstractMatrixProcessingEstimator`](@ref)
   - [`factory`](@ref)
+  - [`port_opt_view`](@ref)
 """
 @propagatable @concrete struct ImpliedVolatility <: AbstractCovarianceEstimator
     """
     $(field_dict[:ce])
     """
-    @prop ce
+    @fprop @vprop ce
     """
     $(field_dict[:mp])
     """
@@ -173,27 +180,6 @@ function ImpliedVolatility(; ce::StatsBase.CovarianceEstimator = Covariance(),
                            alg::ImpliedVolatilityAlgorithm = ImpliedVolatilityRegression(),
                            af::Number = 252)::ImpliedVolatility
     return ImpliedVolatility(ce, mp, alg, af)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Gets the view of the covariance estimator for the `i`-th element(s).
-
-# Arguments
-
-  - $(arg_dict[:ce])
-  - `i`: Index or indices to view.
-
-# Returns
-
-  - $(ret_dict[:cev])
-
-# Related
-
-  - [`ImpliedVolatility`](@ref)
-"""
-function moment_view(ce::ImpliedVolatility, i)::ImpliedVolatility
-    return ImpliedVolatility(; ce = moment_view(ce.ce, i), mp = ce.mp)
 end
 """
     realised_vol(ce::AbstractVarianceEstimator, X::MatNum, ws::Integer,

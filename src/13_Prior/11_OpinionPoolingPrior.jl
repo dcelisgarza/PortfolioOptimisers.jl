@@ -105,101 +105,9 @@ julia> OpinionPoolingPrior(;
                                                                                            val = ["A == 0.05",
                                                                                                   "B + C >= 0.06"]))])
 OpinionPoolingPrior
-  pes ┼ EntropyPoolingPrior{EmpiricalPrior{PortfolioOptimisersCovariance{Covariance{SimpleExpectedReturns{Nothing}, GeneralCovariance{StatsBase.SimpleCovariance, Nothing}, Full}, MatrixProcessing{Posdef{UnionAll, @NamedTuple{}}, Nothing, Nothing, Nothing, NTuple{4, Symbol}}}, SimpleExpectedReturns{Nothing}, Nothing}, LinearConstraintEstimator{Vector{String}, Nothing}, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, AssetSets{String, String, Dict{String, Vector{String}}}, Nothing, Nothing, OptimEntropyPooling{Tuple{}, @NamedTuple{}, Int64, Float64, ExpEntropyPooling}, Nothing, H1_EntropyPooling}[EntropyPoolingPrior
-      │            pe ┼ EmpiricalPrior
-      │               │        ce ┼ PortfolioOptimisersCovariance
-      │               │           │   ce ┼ Covariance
-      │               │           │      │    me ┼ SimpleExpectedReturns
-      │               │           │      │       │   w ┴ nothing
-      │               │           │      │    ce ┼ GeneralCovariance
-      │               │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-      │               │           │      │       │    w ┴ nothing
-      │               │           │      │   alg ┴ Full()
-      │               │           │   mp ┼ MatrixProcessing
-      │               │           │      │     pdm ┼ Posdef
-      │               │           │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-      │               │           │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
-      │               │           │      │      dn ┼ nothing
-      │               │           │      │      dt ┼ nothing
-      │               │           │      │     alg ┼ nothing
-      │               │           │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
-      │               │        me ┼ SimpleExpectedReturns
-      │               │           │   w ┴ nothing
-      │               │   horizon ┴ nothing
-      │      mu_views ┼ LinearConstraintEstimator
-      │               │   val ┼ Vector{String}: ["A == 0.03", "B + C == 0.04"]
-      │               │   key ┴ nothing
-      │     var_views ┼ nothing
-      │    cvar_views ┼ nothing
-      │   sigma_views ┼ nothing
-      │      sk_views ┼ nothing
-      │      kt_views ┼ nothing
-      │     cov_views ┼ nothing
-      │     rho_views ┼ nothing
-      │     var_alpha ┼ nothing
-      │    cvar_alpha ┼ nothing
-      │          sets ┼ AssetSets
-      │               │    key ┼ String: "nx"
-      │               │   ukey ┼ String: "ux"
-      │               │   dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"])
-      │        ds_opt ┼ nothing
-      │        dm_opt ┼ nothing
-      │           opt ┼ OptimEntropyPooling
-      │               │     args ┼ Tuple{}: ()
-      │               │   kwargs ┼ @NamedTuple{}: NamedTuple()
-      │               │      sc1 ┼ Int64: 1
-      │               │      sc2 ┼ Float64: 1000.0
-      │               │      alg ┴ ExpEntropyPooling()
-      │             w ┼ nothing
-      │           alg ┴ H1_EntropyPooling()
-      │ , EntropyPoolingPrior
-      │            pe ┼ EmpiricalPrior
-      │               │        ce ┼ PortfolioOptimisersCovariance
-      │               │           │   ce ┼ Covariance
-      │               │           │      │    me ┼ SimpleExpectedReturns
-      │               │           │      │       │   w ┴ nothing
-      │               │           │      │    ce ┼ GeneralCovariance
-      │               │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-      │               │           │      │       │    w ┴ nothing
-      │               │           │      │   alg ┴ Full()
-      │               │           │   mp ┼ MatrixProcessing
-      │               │           │      │     pdm ┼ Posdef
-      │               │           │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-      │               │           │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
-      │               │           │      │      dn ┼ nothing
-      │               │           │      │      dt ┼ nothing
-      │               │           │      │     alg ┼ nothing
-      │               │           │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
-      │               │        me ┼ SimpleExpectedReturns
-      │               │           │   w ┴ nothing
-      │               │   horizon ┴ nothing
-      │      mu_views ┼ LinearConstraintEstimator
-      │               │   val ┼ Vector{String}: ["A == 0.05", "B + C >= 0.06"]
-      │               │   key ┴ nothing
-      │     var_views ┼ nothing
-      │    cvar_views ┼ nothing
-      │   sigma_views ┼ nothing
-      │      sk_views ┼ nothing
-      │      kt_views ┼ nothing
-      │     cov_views ┼ nothing
-      │     rho_views ┼ nothing
-      │     var_alpha ┼ nothing
-      │    cvar_alpha ┼ nothing
-      │          sets ┼ AssetSets
-      │               │    key ┼ String: "nx"
-      │               │   ukey ┼ String: "ux"
-      │               │   dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"])
-      │        ds_opt ┼ nothing
-      │        dm_opt ┼ nothing
-      │           opt ┼ OptimEntropyPooling
-      │               │     args ┼ Tuple{}: ()
-      │               │   kwargs ┼ @NamedTuple{}: NamedTuple()
-      │               │      sc1 ┼ Int64: 1
-      │               │      sc2 ┼ Float64: 1000.0
-      │               │      alg ┴ ExpEntropyPooling()
-      │             w ┼ nothing
-      │           alg ┴ H1_EntropyPooling()
-      │ ]
+  pes ┼ 2-element Vector{EntropyPoolingPrior}
+      │ EntropyPoolingPrior ⋯
+      │ EntropyPoolingPrior ⋯
   pe1 ┼ nothing
   pe2 ┼ EmpiricalPrior
       │        ce ┼ PortfolioOptimisersCovariance
@@ -314,11 +222,12 @@ Return a new [`OpinionPoolingPrior`](@ref) estimator restricted to the assets at
 # Related
 
   - [`OpinionPoolingPrior`](@ref)
-  - [`prior_view`](@ref)
+  - [`port_opt_view`](@ref)
 """
-function prior_view(pe::OpinionPoolingPrior, i)::OpinionPoolingPrior
-    return OpinionPoolingPrior(; pes = prior_view(pe.pes, i), pe1 = prior_view(pe.pe1, i),
-                               pe2 = prior_view(pe.pe2, i), p = pe.p, w = pe.w,
+function port_opt_view(pe::OpinionPoolingPrior, i, args...)::OpinionPoolingPrior
+    return OpinionPoolingPrior(; pes = port_opt_view(pe.pes, i),
+                               pe1 = port_opt_view(pe.pe1, i),
+                               pe2 = port_opt_view(pe.pe2, i), p = pe.p, w = pe.w,
                                alg = pe.alg, ex = pe.ex)
 end
 """

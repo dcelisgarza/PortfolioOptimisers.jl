@@ -26,10 +26,16 @@ Keywords correspond to the struct's fields.
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@prop`-tagged fields are automatically propagated:
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
 
   - `me`: Recursively updated via [`factory`](@ref).
   - `w`: Replaced with the incoming [`ObsWeights`](@ref).
+
+## View parameters
+
+When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+
+  - `me`: Recursively viewed via [`port_opt_view`](@ref).
 
 # Examples
 
@@ -47,16 +53,17 @@ WindowedExpectedReturns
   - [`AbstractExpectedReturnsEstimator`](@ref)
   - [`SimpleExpectedReturns`](@ref)
   - [`factory`](@ref)
+  - [`port_opt_view`](@ref)
 """
 @propagatable @concrete struct WindowedExpectedReturns <: AbstractExpectedReturnsEstimator
     """
     $(field_dict[:me])
     """
-    @prop me
+    @fprop @vprop me
     """
     $(field_dict[:oow])
     """
-    @prop w
+    @fprop w
     """
     Window specification: an integer (last `window` observations) or a vector of indices.
     """
@@ -78,28 +85,6 @@ function WindowedExpectedReturns(;
                                  w::Option{<:ObsWeights} = nothing,
                                  window::Option{<:Int_VecInt} = nothing)::WindowedExpectedReturns
     return WindowedExpectedReturns(me, w, window)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Gets the view of the expected returns estimator for the `i`-th element(s).
-
-# Arguments
-
-  - $(arg_dict[:me])
-  - `i`: Index or indices to view.
-
-# Returns
-
-  - $(ret_dict[:mev])
-
-# Related
-
-  - [`WindowedExpectedReturns`](@ref)
-"""
-function moment_view(me::WindowedExpectedReturns, i)::WindowedExpectedReturns
-    return WindowedExpectedReturns(; me = moment_view(me.me, i), w = me.w,
-                                   window = me.window)
 end
 """
     Statistics.mean(me::WindowedExpectedReturns, X::MatNum; dims::Int = 1, iv::Option{<:MatNum} = nothing, kwargs...)

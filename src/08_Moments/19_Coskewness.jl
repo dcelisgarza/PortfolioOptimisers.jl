@@ -41,7 +41,7 @@ In order to implement a new coskewness estimator which will work seamlessly with
 
 ## View
 
-  - `PortfolioOptimisers.moment_view(ske::CoskewnessEstimator, i) -> CoskewnessEstimator`: Returns a view of the estimator for the `i`-th element(s).
+  - `PortfolioOptimisers.port_opt_view(ske::CoskewnessEstimator, i) -> CoskewnessEstimator`: Returns a view of the estimator for the `i`-th element(s).
 
 ### Arguments
 
@@ -76,7 +76,7 @@ julia> function PortfolioOptimisers.factory(::MyCoskewnessEstimator,
            return MyCoskewnessEstimator(; w = w)
        end
 
-julia> function PortfolioOptimisers.moment_view(ske::MyCoskewnessEstimator, i)
+julia> function PortfolioOptimisers.port_opt_view(ske::MyCoskewnessEstimator, i)
            return ske
        end
 
@@ -134,10 +134,16 @@ Keywords correspond to the struct's fields.
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@prop`-tagged fields are automatically propagated:
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
 
   - `me`: Recursively updated via [`factory`](@ref).
   - `w`: Replaced with the incoming [`ObsWeights`](@ref).
+
+## View parameters
+
+When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+
+  - `me`: Recursively viewed via [`port_opt_view`](@ref).
 
 # Validation
 
@@ -169,12 +175,13 @@ Coskewness
   - [`AbstractMatrixProcessingEstimator`](@ref)
   - [`AbstractMomentAlgorithm`](@ref)
   - [`factory`](@ref)
+  - [`port_opt_view`](@ref)
 """
 @propagatable @concrete struct Coskewness <: CoskewnessEstimator
     """
     $(field_dict[:me])
     """
-    @prop me
+    @fprop @vprop me
     """
     $(field_dict[:mp])
     """
@@ -186,7 +193,7 @@ Coskewness
     """
     $(field_dict[:oow])
     """
-    @prop w
+    @fprop w
     function Coskewness(me::AbstractExpectedReturnsEstimator,
                         mp::AbstractMatrixProcessingEstimator, alg::AbstractMomentAlgorithm,
                         w::Option{<:ObsWeights})
@@ -204,27 +211,6 @@ function Coskewness(; me::AbstractExpectedReturnsEstimator = SimpleExpectedRetur
                     alg::AbstractMomentAlgorithm = Full(),
                     w::Option{<:ObsWeights} = nothing)::Coskewness
     return Coskewness(me, mp, alg, w)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Gets the view of the coskewness estimator for the `i`-th element(s).
-
-# Arguments
-
-  - $(arg_dict[:ske])
-  - `i`: Index or indices to view.
-
-# Returns
-
-  - $(ret_dict[:skev])
-
-# Related
-
-  - [`Coskewness`](@ref)
-"""
-function moment_view(ske::Coskewness, i)::Coskewness
-    return Coskewness(; me = moment_view(ske.me, i), mp = ske.mp, alg = ske.alg, w = ske.w)
 end
 """
     negative_spectral_coskewness(cskew::MatNum, X::MatNum,

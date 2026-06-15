@@ -30,7 +30,7 @@ function factory(alg::ValueatRiskFormulation, args...; kwargs...)::ValueatRiskFo
     return alg
 end
 """
-    valueat_risk_formulation_view(r, args...)
+    port_opt_view(r, args...)
 
 Get a view or subset of a Value-at-Risk formulation for slicing.
 
@@ -50,8 +50,7 @@ Returns the formulation unchanged (for non-distribution types) or sliced (for di
   - [`ValueatRiskFormulation`](@ref)
   - [`DistributionValueatRisk`](@ref)
 """
-function valueat_risk_formulation_view(r::ValueatRiskFormulation,
-                                       args...)::ValueatRiskFormulation
+function port_opt_view(r::ValueatRiskFormulation, ::Any, args...)::ValueatRiskFormulation
     return r
 end
 """
@@ -228,8 +227,7 @@ function factory(alg::DistributionValueatRisk, pr::AbstractPriorResult, args...;
     chol = nothing_scalar_array_selector(alg.chol, pr.chol)
     return DistributionValueatRisk(; mu = mu, sigma = sigma, chol = chol, dist = alg.dist)
 end
-function valueat_risk_formulation_view(alg::DistributionValueatRisk,
-                                       i)::DistributionValueatRisk
+function port_opt_view(alg::DistributionValueatRisk, i, args...)::DistributionValueatRisk
     mu = nothing_scalar_array_view(alg.mu, i)
     sigma = nothing_scalar_array_view(alg.sigma, i)
     chol = isnothing(alg.chol) ? nothing : view(alg.chol, :, i)
@@ -363,8 +361,8 @@ function factory(r::ValueatRisk, pr::AbstractPriorResult, args...; kwargs...)::V
     alg = factory(r.alg, pr, args...; kwargs...)
     return ValueatRisk(; settings = r.settings, alpha = r.alpha, w = w, alg = alg)
 end
-function risk_measure_view(r::ValueatRisk, i, args...)::ValueatRisk
-    alg = valueat_risk_formulation_view(r.alg, i)
+function port_opt_view(r::ValueatRisk, i, args...)::ValueatRisk
+    alg = port_opt_view(r.alg, i)
     return ValueatRisk(; settings = r.settings, alpha = r.alpha, w = r.w, alg = alg)
 end
 function (r::ValueatRisk{<:Any, <:Any, Nothing})(x::VecNum)
@@ -518,8 +516,8 @@ function factory(r::ValueatRiskRange, pr::AbstractPriorResult, args...;
     return ValueatRiskRange(; settings = r.settings, alpha = r.alpha, beta = r.beta, w = w,
                             alg = alg)
 end
-function risk_measure_view(r::ValueatRiskRange, i, args...)::ValueatRiskRange
-    alg = valueat_risk_formulation_view(r.alg, i)
+function port_opt_view(r::ValueatRiskRange, i, args...)::ValueatRiskRange
+    alg = port_opt_view(r.alg, i)
     return ValueatRiskRange(; settings = r.settings, alpha = r.alpha, beta = r.beta,
                             w = r.w, alg = alg)
 end

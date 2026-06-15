@@ -26,7 +26,7 @@ Keywords correspond to the struct's fields.
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@prop`-tagged fields are automatically propagated:
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
 
   - `opt`: Recursively updated via [`factory`](@ref).
   - `r`: Recursively updated via [`factory`](@ref).
@@ -143,11 +143,11 @@ Where:
     """
     $(field_dict[:opt_hier])
     """
-    @prop opt
+    @fprop opt
     """
     $(field_dict[:r])
     """
-    @prop r
+    @fprop r
     """
     $(field_dict[:sca])
     """
@@ -155,7 +155,7 @@ Where:
     """
     $(field_dict[:fb])
     """
-    @prop fb
+    @fprop fb
     function HierarchicalRiskParity(opt::HierarchicalOptimiser, r::OptRM_VecOptRM,
                                     sca::Scalariser, fb::Option{<:OptE_Opt})
         if isa(r, AbstractVector)
@@ -203,12 +203,13 @@ Return a view of [`HierarchicalRiskParity`](@ref) `hrp` sliced to asset indices 
 # Related
 
   - [`HierarchicalRiskParity`](@ref)
-  - [`opt_view`](@ref)
+  - [`port_opt_view`](@ref)
 """
-function opt_view(hrp::HierarchicalRiskParity, i, X::MatNum)::HierarchicalRiskParity
+function port_opt_view(hrp::HierarchicalRiskParity, i, X::MatNum,
+                       args...)::HierarchicalRiskParity
     X = isa(hrp.opt.pe, AbstractPriorResult) ? hrp.opt.pe.X : X
-    r = risk_measure_view(hrp.r, i, X)
-    opt = opt_view(hrp.opt, i)
+    r = port_opt_view(hrp.r, i, X)
+    opt = port_opt_view(hrp.opt, i)
     return HierarchicalRiskParity(; r = r, opt = opt, sca = hrp.sca, fb = hrp.fb)
 end
 """

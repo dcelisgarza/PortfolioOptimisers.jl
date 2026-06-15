@@ -89,8 +89,8 @@ Gets the view of the covariance estimator for the `i`-th element(s).
 
   - [`CorrelationCovariance`](@ref)
 """
-function moment_view(ce::CorrelationCovariance, i)::CorrelationCovariance
-    return CorrelationCovariance(; ce = moment_view(ce.ce, i))
+function port_opt_view(ce::CorrelationCovariance, i, args...)::CorrelationCovariance
+    return CorrelationCovariance(; ce = port_opt_view(ce.ce, i))
 end
 """
     Statistics.cov(ce::CorrelationCovariance, X::MatNum; dims::Int = 1,

@@ -19,9 +19,15 @@ Keywords correspond to the struct's fields.
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@prop`-tagged fields are automatically propagated:
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
 
   - `ce`: Recursively updated via [`factory`](@ref).
+
+## View parameters
+
+When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+
+  - `ce`: Recursively viewed via [`port_opt_view`](@ref).
 
 # Examples
 
@@ -47,12 +53,13 @@ ProcessedCovariance
   - [`AbstractMatrixProcessingAlgorithm`](@ref)
   - [`Posdef`](@ref)
   - [`factory`](@ref)
+  - [`port_opt_view`](@ref)
 """
 @propagatable @concrete struct ProcessedCovariance <: AbstractCovarianceEstimator
     """
     $(field_dict[:ce])
     """
-    @prop ce
+    @fprop @vprop ce
     """
     $(field_dict[:mpa])
     """
@@ -76,27 +83,6 @@ function ProcessedCovariance(; ce::StatsBase.CovarianceEstimator = Covariance(),
                              alg::Option{<:AbstractMatrixProcessingAlgorithm} = nothing,
                              pdm::Option{<:Posdef} = Posdef())::ProcessedCovariance
     return ProcessedCovariance(ce, alg, pdm)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Gets the view of the covariance estimator for the `i`-th element(s).
-
-# Arguments
-
-  - $(arg_dict[:ce])
-  - `i`: Index or indices to view.
-
-# Returns
-
-  - $(ret_dict[:cev])
-
-# Related
-
-  - [`ProcessedCovariance`](@ref)
-"""
-function moment_view(ce::ProcessedCovariance, i)::ProcessedCovariance
-    return ProcessedCovariance(; ce = moment_view(ce.ce, i), alg = ce.alg, pdm = ce.pdm)
 end
 """
     Statistics.cov(ce::ProcessedCovariance, X::MatNum; dims = 1, kwargs...)

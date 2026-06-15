@@ -47,30 +47,6 @@ function validate_bounds(args...)::Nothing
     return nothing
 end
 """
-    weight_bounds_view(wb, i)
-
-Get a view or subset of portfolio weight bounds for asset index `i`.
-
-Returns a view of the weight bounds for the specified asset index `i`. If `wb` is `nothing`, returns `nothing`. For [`WeightBounds`](@ref) and [`WeightBoundsEstimator`](@ref), slices the bounds appropriately.
-
-# Arguments
-
-  - `wb`: Weight bounds object, estimator, or `nothing`.
-  - `i`: Asset index or range to slice.
-
-# Returns
-
-  - Sliced weight bounds or `nothing`.
-
-# Related
-
-  - [`WeightBounds`](@ref)
-  - [`WeightBoundsEstimator`](@ref)
-"""
-function weight_bounds_view(::Nothing, ::Any)::Nothing
-    return nothing
-end
-"""
 $(DocStringExtensions.TYPEDEF)
 
 Container for lower and upper portfolio weight bounds.
@@ -91,6 +67,13 @@ $(DocStringExtensions.FIELDS)
 ## Validation
 
   - `all(lb .<= ub)`.
+
+## View parameters
+
+When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+
+  - `lb`: Sliced to the selected indices via [`port_opt_view`](@ref).
+  - `ub`: Sliced to the selected indices via [`port_opt_view`](@ref).
 
 # Details
 
@@ -119,16 +102,17 @@ WeightBounds
   - [`set_linear_weight_constraints!`](@ref)
   - [`WeightBoundsEstimator`](@ref)
   - [`weight_bounds_constraints`](@ref)
+  - [`port_opt_view`](@ref)
 """
-@concrete struct WeightBounds <: AbstractConstraintResult
+@propagatable @concrete struct WeightBounds <: AbstractConstraintResult
     """
     $(field_dict[:lb])
     """
-    lb
+    @vprop lb
     """
     $(field_dict[:ub])
     """
-    ub
+    @vprop ub
     function WeightBounds(lb::Option{<:Num_VecNum}, ub::Option{<:Num_VecNum})::WeightBounds
         validate_bounds(lb, ub)
         return new{typeof(lb), typeof(ub)}(lb, ub)
@@ -137,11 +121,6 @@ end
 function WeightBounds(; lb::Option{<:Num_VecNum} = 0.0,
                       ub::Option{<:Num_VecNum} = 1.0)::WeightBounds
     return WeightBounds(lb, ub)
-end
-function weight_bounds_view(wb::WeightBounds, i)::WeightBounds
-    lb = nothing_scalar_array_view(wb.lb, i)
-    ub = nothing_scalar_array_view(wb.ub, i)
-    return WeightBounds(; lb = lb, ub = ub)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -166,6 +145,13 @@ $(DocStringExtensions.FIELDS)
 ## Validation
 
   - If `lb` or `ub` is a `AbstractDict` or `AbstractVector`, it must be non-empty.
+
+## View parameters
+
+When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+
+  - `lb`: Sliced to the selected indices via [`port_opt_view`](@ref).
+  - `ub`: Sliced to the selected indices via [`port_opt_view`](@ref).
 
 # Details
 
@@ -195,16 +181,17 @@ WeightBoundsEstimator
 
   - [`WeightBounds`](@ref)
   - [`weight_bounds_constraints`](@ref)
+  - [`port_opt_view`](@ref)
 """
-@concrete struct WeightBoundsEstimator <: AbstractConstraintEstimator
+@propagatable @concrete struct WeightBoundsEstimator <: AbstractConstraintEstimator
     """
     $(field_dict[:lb])
     """
-    lb
+    @vprop lb
     """
     $(field_dict[:ub])
     """
-    ub
+    @vprop ub
     """
     $(field_dict[:dlb])
     """
@@ -239,11 +226,6 @@ function WeightBoundsEstimator(; lb::Option{<:EstValType} = nothing,
                                dlb::Option{<:Number} = nothing,
                                dub::Option{<:Number} = nothing)::WeightBoundsEstimator
     return WeightBoundsEstimator(lb, ub, dlb, dub)
-end
-function weight_bounds_view(wb::WeightBoundsEstimator, i)::WeightBoundsEstimator
-    lb = nothing_scalar_array_view(wb.lb, i)
-    ub = nothing_scalar_array_view(wb.ub, i)
-    return wb = WeightBoundsEstimator(; lb = lb, ub = ub, dlb = wb.dlb, dub = wb.dub)
 end
 """
     const WbE_Wb = Union{<:WeightBoundsEstimator, <:WeightBounds}

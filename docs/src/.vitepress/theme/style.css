@@ -8,6 +8,23 @@ https://github.com/vuejs/vitepress/blob/main/src/client/theme-default/styles/var
   max-width: 600px;
 }
 
+/* Auto-generated type-hierarchy trees (see docs/generate_type_hierarchy.jl).
+   Renders the box-drawing tree as clean monospace with clickable @ref links. */
+.type-tree {
+  font-family: var(--vp-font-family-mono);
+  font-size: 0.85em;
+  line-height: 1.6;
+  white-space: nowrap;
+  overflow-x: auto;
+  margin: 16px 0;
+}
+.type-tree p {
+  margin: 0;
+}
+.type-tree a {
+  font-weight: 500;
+}
+
 /* Fonts */
 @font-face {
   font-family: JuliaMono-Regular;

@@ -59,16 +59,6 @@ $(DocStringExtensions.FIELDS)
     fb
 end
 """
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Rebuild a [`DiscreteAllocationResult`](@ref) with an updated fallback optimiser `fb`.
-"""
-function factory(res::DiscreteAllocationResult, fb::Option{<:FOptE_FOpt})
-    return DiscreteAllocationResult(res.oe, res.retcode, res.s_retcode, res.l_retcode,
-                                    res.shares, res.cost, res.w, res.cash, res.s_model,
-                                    res.l_model, fb)
-end
-"""
 $(DocStringExtensions.TYPEDEF)
 
 Discrete Allocation portfolio optimiser.

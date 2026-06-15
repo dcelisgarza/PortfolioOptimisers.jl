@@ -329,6 +329,56 @@ function nothing_scalar_array_view(x::AbstractVector{<:Union{<:AbstractVector,
     return [nothing_scalar_array_view(xi, i) for xi in x]
 end
 """
+    port_opt_view(x, i, args...; kwargs...) -> nothing_scalar_array_view(x, i)
+
+Universal fallback for [`port_opt_view`](@ref). Any value that has no more specific
+`port_opt_view` method is treated as leaf data: it is delegated to
+[`nothing_scalar_array_view`](@ref), which slices arrays/`VecScalar`s and passes
+scalars, `nothing`, estimators, and algorithms through unchanged. Composed structs that
+need to recurse into children define their own (more specific) method — emitted by the
+[`@vprop`](@ref) tag or hand-written.
+
+The threaded tail `args...` (typically the returns matrix `X` for the JuMP families) and
+any `kwargs` are accepted and dropped here, so a macro-threaded
+`port_opt_view(child, i, X)` never `MethodError`s on a leaf field.
+
+# Related
+
+  - [`nothing_scalar_array_view`](@ref)
+  - [`@vprop`](@ref)
+"""
+port_opt_view(x, i, args...; kwargs...) = nothing_scalar_array_view(x, i)
+"""
+    port_opt_view(x::VecScalar, i, args...) -> nothing_scalar_array_view(x, i)
+
+First-class [`port_opt_view`](@ref) method for [`VecScalar`](@ref): slices the vector
+component and preserves the scalar component, delegating to
+[`nothing_scalar_array_view`](@ref).
+"""
+port_opt_view(x::VecScalar, i, args...) = nothing_scalar_array_view(x, i)
+"""
+    port_opt_view(::Nothing, ::Any; kwargs...) -> nothing
+    port_opt_view(::Nothing, ::Any, args...; kwargs...) -> nothing
+
+Canonical absent-value fallback for [`port_opt_view`](@ref): an index view of a
+missing (`nothing`) estimator, algorithm, result, or constraint is itself `nothing`.
+
+These methods serve every propagation family. Because many optional fields are typed
+`Option{T} = Union{Nothing, T}`, the `::Nothing`-specific methods are also what
+disambiguate a `nothing` argument from the family-specific `Option{T}` passthroughs and
+from the universal leaf fallback. Both carry a fixed second positional so they dominate
+the universal `port_opt_view(x, i, args...)` method.
+
+# Examples
+
+```jldoctest
+julia> PortfolioOptimisers.port_opt_view(nothing, 1)
+
+```
+"""
+port_opt_view(::Nothing, ::Any; kwargs...) = nothing
+port_opt_view(::Nothing, ::Any, args...; kwargs...) = nothing
+"""
     get_window(window::Option{<:Colon}, args...) -> Option{<:Colon}
     get_window(window::Integer, X::MatNum, dims::Int = 1) -> VecInt
     get_window(window::Integer, X::VecNum, args...) -> VecInt
@@ -699,7 +749,7 @@ function _factory_child(v::AbstractArray{<:Union{<:AbstractEstimator, <:Abstract
                                                  <:AbstractResult}}, args...; kwargs...)
     return [_factory_child(vi, args...; kwargs...) for vi in v]
 end
-# @prop-tagged ObsWeights/nothing fields: replace with the incoming weights argument.
+# @fprop-tagged ObsWeights/nothing fields: replace with the incoming weights argument.
 _factory_child(::Nothing, w::ObsWeights, args...; kwargs...) = w
 _factory_child(::StatsBase.AbstractWeights, w::ObsWeights, args...; kwargs...) = w
 # ---------------------------------------------------------------------------
@@ -711,17 +761,87 @@ _factory_child(::StatsBase.AbstractWeights, w::ObsWeights, args...; kwargs...) =
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return `true` if `x` is a reference to the [`@prop`](@ref) macro (bare `Symbol` or `GlobalRef`).
+Return `true` if `x` is a reference to the [`@fprop`](@ref) macro (bare `Symbol` or `GlobalRef`).
 
-Used by [`_propagatable_parse_body`](@ref) to detect `@prop`-tagged fields in a struct body.
+Used by [`_propagatable_parse_body`](@ref) to detect `@fprop`-tagged fields in a struct body.
 
 # Related
 
-  - [`@prop`](@ref)
+  - [`@fprop`](@ref)
   - [`_propagatable_parse_body`](@ref)
   - [`@propagatable`](@ref)
 """
-_is_prop_macro(x) = x == Symbol("@prop") || (x isa GlobalRef && x.name == Symbol("@prop"))
+function _is_fprop_macro(x)
+    return x == Symbol("@fprop") || (x isa GlobalRef && x.name == Symbol("@fprop"))
+end
+
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return `true` if `x` is a reference to the [`@vprop`](@ref) macro (bare `Symbol` or `GlobalRef`).
+
+Used by [`_propagatable_parse_body`](@ref) to detect `@vprop`-tagged fields in a struct body.
+
+# Related
+
+  - [`@vprop`](@ref)
+  - [`_propagatable_parse_body`](@ref)
+  - [`@propagatable`](@ref)
+"""
+function _is_vprop_macro(x)
+    return x == Symbol("@vprop") || (x isa GlobalRef && x.name == Symbol("@vprop"))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return `true` if `x` is a macro call to either [`@fprop`](@ref) or [`@vprop`](@ref).
+
+Used by [`_propagatable_parse_body`](@ref) to detect `@fprop` or `@vprop`-tagged fields in a struct body.
+
+# Related
+
+  - [`@fprop`](@ref)
+  - [`@vprop`](@ref)
+  - [`_propagatable_parse_body`](@ref)
+  - [`@propagatable`](@ref)
+"""
+function _is_prop_tag_call(x)
+    return x isa Expr &&
+           x.head == :macrocall &&
+           (_is_fprop_macro(x.args[1]) || _is_vprop_macro(x.args[1]))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Peel any stack of [`@fprop`](@ref)/[`@vprop`](@ref) tag macrocalls off a field
+expression, recording which tags were present.
+
+Tags may be stacked in either order (`@fprop @vprop field`), which parses as nested
+`:macrocall` nodes; this unwraps them all and returns the bare field expression.
+
+# Returns
+
+  - `is_f::Bool`: whether an [`@fprop`](@ref) tag was present.
+  - `is_v::Bool`: whether a [`@vprop`](@ref) tag was present.
+  - `stripped`: the field expression with all tags removed.
+
+# Related
+
+  - [`_propagatable_parse_body`](@ref)
+"""
+function _peel_prop_tags(expr)
+    is_f = false
+    is_v = false
+    while _is_prop_tag_call(expr)
+        if _is_fprop_macro(expr.args[1])
+            is_f = true
+        else
+            is_v = true
+        end
+        expr = expr.args[end]
+    end
+    return is_f, is_v, expr
+end
 
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -743,7 +863,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 Extract the field name `Symbol` from a bare field or `field::Type` expression.
 
 Errors with a descriptive message when `expr` is neither a bare `Symbol` nor a
-`field::Type` annotation, since only those forms are valid after [`@prop`](@ref).
+`field::Type` annotation, since only those forms are valid after [`@fprop`](@ref).
 
 # Arguments
 
@@ -755,7 +875,7 @@ Errors with a descriptive message when `expr` is neither a bare `Symbol` nor a
 
 # Related
 
-  - [`@prop`](@ref)
+  - [`@fprop`](@ref)
   - [`_propagatable_parse_body`](@ref)
   - [`@propagatable`](@ref)
 """
@@ -766,7 +886,7 @@ function _extract_field_name(expr)
     if expr isa Expr && expr.head == :(::)
         return expr.args[1]
     end
-    return error("@propagatable: @prop must precede a bare field name or field::Type, got: $(repr(expr))")
+    return error("@propagatable: @fprop must precede a bare field name or field::Type, got: $(repr(expr))")
 end
 
 """
@@ -884,11 +1004,12 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Walk a struct body, collecting [`@prop`](@ref)-tagged and non-tagged field names and
-stripping the [`@prop`](@ref) tags from the body.
+Walk a struct body, collecting [`@fprop`](@ref)-tagged, [`@vprop`](@ref)-tagged and all
+field names and stripping the tags from the body.
 
-Handles two forms of tagged fields: bare `@prop field` and docstring-prefixed
-`"doc" \\n @prop field`. Non-field nodes (line numbers, inner constructors) are carried
+Handles bare tagged fields (`@fprop field`, `@vprop field`), stacked tags
+(`@fprop @vprop field`, in either order), and docstring-prefixed forms
+(`"doc" \\n @fprop field`). Non-field nodes (line numbers, inner constructors) are carried
 through unchanged.
 
 # Arguments
@@ -897,64 +1018,73 @@ through unchanged.
 
 # Returns
 
-  - `propagatable::Vector{Symbol}`: Names of [`@prop`](@ref)-tagged fields.
-  - `non_propagatable::Vector{Symbol}`: Names of untagged fields.
-  - `new_body::Expr`: The struct body with all [`@prop`](@ref) tags stripped.
+  - `fprop_fields::Vector{Symbol}`: Names of [`@fprop`](@ref)-tagged fields.
+  - `vprop_fields::Vector{Symbol}`: Names of [`@vprop`](@ref)-tagged fields.
+  - `all_fields::Vector{Symbol}`: Names of every declared field (tagged or not).
+  - `new_body::Expr`: The struct body with all tags stripped.
 
 # Related
 
-  - [`_is_prop_macro`](@ref)
+  - [`_is_fprop_macro`](@ref)
   - [`_is_doc_macro`](@ref)
   - [`_extract_field_name`](@ref)
   - [`_try_field_name`](@ref)
-  - [`@prop`](@ref)
+  - [`@fprop`](@ref)
   - [`@propagatable`](@ref)
 """
 function _propagatable_parse_body(body)
-    propagatable     = Symbol[]
-    non_propagatable = Symbol[]
-    new_args         = Any[]
+    fprop_fields = Symbol[]
+    vprop_fields = Symbol[]
+    all_fields   = Symbol[]
+    new_args     = Any[]
     for arg in body.args
-        if arg isa Expr && arg.head == :macrocall
-            head = arg.args[1]
-            if _is_prop_macro(head)
-                # Bare @prop field — no docstring
-                fname = _extract_field_name(arg.args[end])
-                push!(propagatable, fname)
-                push!(new_args, arg.args[end])          # strip @prop, keep field expr
-            elseif _is_doc_macro(head)
-                # Core.@doc "doc" (field or @prop(field))
-                inner = arg.args[end]
-                if inner isa Expr &&
-                   inner.head == :macrocall &&
-                   _is_prop_macro(inner.args[1])
-                    # "doc" \n @prop field
-                    fname = _extract_field_name(inner.args[end])
-                    push!(propagatable, fname)
-                    # Rebuild @doc node with @prop stripped: replace last arg with bare field
-                    push!(new_args,
-                          Expr(:macrocall, arg.args[1:(end - 1)]..., inner.args[end]))
-                else
-                    # plain docstring'd field — carry through unchanged
-                    fname = _try_field_name(inner)
-                    if fname !== nothing
-                        push!(non_propagatable, fname)
-                    end
-                    push!(new_args, arg)
+        if arg isa Expr && arg.head == :macrocall && _is_doc_macro(arg.args[1])
+            # Core.@doc "doc" (field or tagged field)
+            inner = arg.args[end]
+            is_f, is_v, stripped = _peel_prop_tags(inner)
+            if is_f || is_v
+                fname = _extract_field_name(stripped)
+                if is_f
+                    push!(fprop_fields, fname)
                 end
+                if is_v
+                    push!(vprop_fields, fname)
+                end
+                push!(all_fields, fname)
+                # Rebuild @doc node with tags stripped: replace last arg with bare field
+                push!(new_args, Expr(:macrocall, arg.args[1:(end - 1)]..., stripped))
             else
+                # plain docstring'd field — carry through unchanged
+                fname = _try_field_name(inner)
+                if fname !== nothing
+                    push!(all_fields, fname)
+                end
                 push!(new_args, arg)
             end
+        elseif arg isa Expr &&
+               arg.head == :macrocall &&
+               (_is_fprop_macro(arg.args[1]) || _is_vprop_macro(arg.args[1]))
+            # Bare @fprop/@vprop field (tags may be stacked) — no docstring
+            is_f, is_v, stripped = _peel_prop_tags(arg)
+            fname = _extract_field_name(stripped)
+            if is_f
+                push!(fprop_fields, fname)
+            end
+            if is_v
+                push!(vprop_fields, fname)
+            end
+            push!(all_fields, fname)
+            push!(new_args, stripped)               # strip tags, keep field expr
         else
             # LineNumberNode, bare Symbol field, field::Type, inner constructor, …
             fname = _try_field_name(arg)
             if fname !== nothing
-                push!(non_propagatable, fname)
+                push!(all_fields, fname)
             end
             push!(new_args, arg)
         end
     end
-    return propagatable, non_propagatable, Expr(:block, new_args...)
+    return fprop_fields, vprop_fields, all_fields, Expr(:block, new_args...)
 end
 
 # ---------------------------------------------------------------------------
@@ -962,7 +1092,7 @@ end
 # ---------------------------------------------------------------------------
 
 """
-    @prop field
+    @fprop field
 
 Field tag for use inside a [`@propagatable`](@ref) struct body.
 Marks the field as participating in [`factory`](@ref) propagation —
@@ -971,35 +1101,65 @@ enclosing struct.
 
 Raises an error if used outside a `@propagatable` struct body.
 """
-macro prop(expr)
-    return error("@prop may only appear inside a @propagatable struct body")
+macro fprop(expr)
+    return error("@fprop may only appear inside a @propagatable struct body")
+end
+
+"""
+    @vprop field
+
+Field tag for use inside a [`@propagatable`](@ref) struct body.
+Marks the field as participating in [`port_opt_view`](@ref) propagation —
+`port_opt_view` will be called on it when a view (index selection) is propagated
+through the enclosing struct.
+
+Orthogonal to [`@fprop`](@ref); the two may be stacked on one field
+(`@fprop @vprop field`) when it participates in both factory and view propagation.
+
+Raises an error if used outside a `@propagatable` struct body.
+"""
+macro vprop(expr)
+    return error("@vprop may only appear inside a @propagatable struct body")
 end
 
 """
     @propagatable expr
 
-Define a struct and automatically generate a [`factory`](@ref) propagation
-method for it.
+Define a struct and automatically generate its propagation methods from two
+orthogonal, stackable field tags:
 
-Fields tagged with [`@prop`](@ref) receive `_factory_child` calls when
-`factory` is invoked, recursing runtime data (observation weights, prior
-results, solvers, …) down the composition tree. Untagged fields pass through
-unchanged regardless of their type — tagging is explicit and opt-in.
+  - [`@fprop`](@ref) (factory propagation): tagged fields receive `_factory_child`
+    calls when [`factory`](@ref) is invoked, recursing runtime *values*
+    (observation weights, prior results, solvers, …) down the composition tree.
+    A `factory` method is always generated (it is the identity when no field is
+    tagged).
+  - [`@vprop`](@ref) (view propagation): tagged fields receive
+    [`port_opt_view`](@ref) calls when a view (an index selection) is propagated,
+    recursing into composed children and slicing data arrays. A `port_opt_view`
+    method is generated **only when at least one field is tagged `@vprop`**.
+
+Untagged fields pass through unchanged in both methods, regardless of type —
+tagging is explicit and opt-in. The two tags are independent: a field may carry
+neither, either, or both (`@fprop @vprop field`, in either order), because the
+factory- and view-relevant field sets genuinely diverge (a field can be
+factory-propagated but view-passthrough, or vice versa). See ADR 0010.
 
 Composes with `@concrete` (put `@propagatable` outermost):
 
 ```julia
 @propagatable @concrete struct MyEstimator <: AbstractEstimator
-    @prop inner   # factory recurses into this field
-    config     # passed through unchanged
-    function MyEstimator(inner::AbstractEstimator, config)
-        return new{typeof(inner), typeof(config)}(inner, config)
+    @fprop @vprop inner   # both factory- and view-propagated
+    @vprop data           # view-sliced only (passed through by factory)
+    config                # passed through unchanged by both
+    function MyEstimator(inner::AbstractEstimator, data, config)
+        return new{typeof(inner), typeof(data), typeof(config)}(inner, data, config)
     end
 end
 ```
 
-The generated `factory` method is added to `PortfolioOptimisers.factory`,
-so `@propagatable` works correctly for types defined in external packages.
+The generated `factory`/`port_opt_view` methods are added to the
+`PortfolioOptimisers` functions, so `@propagatable` works correctly for types
+defined in external packages.
 
 Docstrings on the enclosing definition are forwarded correctly via
 `Base.@__doc__`.
@@ -1011,19 +1171,20 @@ macro propagatable(expr)
     body        = struct_node.args[3]
     struct_name = _propagatable_bare_name(type_head)
 
-    propagatable_fields, non_propagatable_fields, new_body = _propagatable_parse_body(body)
+    fprop_fields, vprop_fields, all_fields, new_body = _propagatable_parse_body(body)
 
     new_struct = Expr(:struct, struct_node.args[1], type_head, new_body)
     chain      = rebuild(new_struct)
 
-    if isempty(propagatable_fields)
+    # --- factory propagation (@fprop) ---
+    if isempty(fprop_fields)
         factory_body = :x
     else
+        fpass = [f for f in all_fields if !(f in fprop_fields)]
         prop_pairs = [Expr(:kw, f,
                            :(_factory_child($(Expr(:., :x, QuoteNode(f))), args...;
-                                            kwargs...))) for f in propagatable_fields]
-        pass_pairs = [Expr(:kw, f, Expr(:., :x, QuoteNode(f)))
-                      for f in non_propagatable_fields]
+                                            kwargs...))) for f in fprop_fields]
+        pass_pairs = [Expr(:kw, f, Expr(:., :x, QuoteNode(f))) for f in fpass]
         factory_body = Expr(:call, struct_name,
                             Expr(:parameters, prop_pairs..., pass_pairs...))
     end
@@ -1034,9 +1195,28 @@ macro propagatable(expr)
         end
     end
 
+    defs = Any[factory_def]
+
+    # --- view propagation (@vprop) — emit only when a field opts in ---
+    if !isempty(vprop_fields)
+        vpass = [f for f in all_fields if !(f in vprop_fields)]
+        view_prop_pairs = [Expr(:kw, f,
+                                :(port_opt_view($(Expr(:., :x, QuoteNode(f))), i, args...)))
+                           for f in vprop_fields]
+        view_pass_pairs = [Expr(:kw, f, Expr(:., :x, QuoteNode(f))) for f in vpass]
+        view_body = Expr(:call, struct_name,
+                         Expr(:parameters, view_prop_pairs..., view_pass_pairs...))
+        view_def = quote
+            function port_opt_view(x::$struct_name, i, args...)
+                return $view_body
+            end
+        end
+        push!(defs, view_def)
+    end
+
     return esc(quote
                    Base.@__doc__ $chain
-                   $factory_def
+                   $(defs...)
                end)
 end
 
@@ -1130,7 +1310,7 @@ Keywords correspond to the struct's fields.
 
 ## Curried parameters
 
-When [`factory`](@ref) is called on this type, the following `@prop`-tagged fields are automatically propagated:
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
 
   - `w`: Replaced with the incoming [`ObsWeights`](@ref).
 
@@ -1154,7 +1334,7 @@ julia> PortfolioOptimisers.vec_to_real_measure(MeanValue(), [1.2, 3.4, 0.7])
     """
     $(field_dict[:oow])
     """
-    @prop w
+    @fprop w
     function MeanValue(w::Option{<:ObsWeights})
         assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(w)}(w)
@@ -1191,7 +1371,7 @@ Keywords correspond to the struct's fields.
 
 ## Curried parameters
 
-When [`factory`](@ref) is called on this type, the following `@prop`-tagged fields are automatically propagated:
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
 
   - `w`: Replaced with the incoming [`ObsWeights`](@ref).
 
@@ -1215,7 +1395,7 @@ julia> PortfolioOptimisers.vec_to_real_measure(MedianValue(), [1.2, 3.4, 0.7])
     """
     $(field_dict[:oow])
     """
-    @prop w
+    @fprop w
     function MedianValue(w::Option{<:ObsWeights})
         assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(w)}(w)
@@ -1274,7 +1454,7 @@ Keywords correspond to the struct's fields.
 
 ## Curried parameters
 
-When [`factory`](@ref) is called on this type, the following `@prop`-tagged fields are automatically propagated:
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
 
   - `w`: Replaced with the incoming [`ObsWeights`](@ref).
 
@@ -1298,7 +1478,7 @@ julia> PortfolioOptimisers.vec_to_real_measure(StdValue(), [1.2, 3.4, 0.7])
     """
     $(field_dict[:oow])
     """
-    @prop w
+    @fprop w
     """
     $(field_dict[:corrected])
     """
@@ -1340,7 +1520,7 @@ Keywords correspond to the struct's fields.
 
 ## Curried parameters
 
-When [`factory`](@ref) is called on this type, the following `@prop`-tagged fields are automatically propagated:
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
 
   - `w`: Replaced with the incoming [`ObsWeights`](@ref).
 
@@ -1364,7 +1544,7 @@ julia> PortfolioOptimisers.vec_to_real_measure(VarValue(), [1.2, 3.4, 0.7])
     """
     $(field_dict[:oow])
     """
-    @prop w
+    @fprop w
     """
     $(field_dict[:corrected])
     """
@@ -1462,7 +1642,7 @@ Keywords correspond to the struct's fields.
 
 ## Curried parameters
 
-When [`factory`](@ref) is called on this type, the following `@prop`-tagged fields are automatically propagated:
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
 
   - `mv`: Recursively updated via [`factory`](@ref).
   - `sv`: Recursively updated via [`factory`](@ref).
@@ -1487,11 +1667,11 @@ julia> PortfolioOptimisers.vec_to_real_measure(StandardisedValue(), [1.2, 3.4, 0
     """
     The mean value measure used for the numerator.
     """
-    @prop mv
+    @fprop mv
     """
     The standard deviation measure used for the denominator.
     """
-    @prop sv
+    @fprop sv
     function StandardisedValue(mv::MeanValue, sv::StdValue)
         return new{typeof(mv), typeof(sv)}(mv, sv)
     end
@@ -1615,6 +1795,6 @@ function vec_to_real_measure(f::Function,
     return f(val)
 end
 
-export @propagatable, @prop, factory, traverse_concrete_subtypes, concrete_typed_array,
-       MinValue, MeanValue, MedianValue, MaxValue, StandardisedValue, StdValue, VarValue,
-       SumValue, ProdValue, ModeValue
+export @propagatable, @fprop, @vprop, factory, traverse_concrete_subtypes,
+       concrete_typed_array, MinValue, MeanValue, MedianValue, MaxValue, StandardisedValue,
+       StdValue, VarValue, SumValue, ProdValue, ModeValue

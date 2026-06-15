@@ -127,9 +127,9 @@ Return the [`MeanReturn`](@ref) risk measure `r` unchanged.
 # Related
 
   - [`MeanReturn`](@ref)
-  - [`risk_measure_view`](@ref)
+  - [`port_opt_view`](@ref)
 """
-function risk_measure_view(r::MeanReturn, ::Any, args...)::MeanReturn
+function port_opt_view(r::MeanReturn, ::Any, args...)::MeanReturn
     return r
 end
 """
@@ -452,10 +452,10 @@ Slices the expected returns `mu` for cluster-based optimisation.
 # Related
 
   - [`ThirdCentralMoment`](@ref)
-  - [`risk_measure_view`](@ref)
+  - [`port_opt_view`](@ref)
   - [`nothing_scalar_array_view`](@ref)
 """
-function risk_measure_view(r::ThirdCentralMoment, i, args...)
+function port_opt_view(r::ThirdCentralMoment, i, args...)
     mu = nothing_scalar_array_view(r.mu, i)
     return ThirdCentralMoment(; w = r.w, mu = mu)
 end

@@ -4,5 +4,5 @@
 WindowedCoskewness
 factory(ske::WindowedCoskewness, w::ObsWeights)
 coskewness(ske::WindowedCoskewness, X::MatNum; dims::Int = 1, kwargs...)
-moment_view(ske::WindowedCoskewness, i)
+port_opt_view(ske::WindowedCoskewness, i, args...)
 ```

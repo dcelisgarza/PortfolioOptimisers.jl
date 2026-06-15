@@ -17,8 +17,8 @@ No-op fallback for getting the view of a covariance estimator.
   - [`AbstractCovarianceEstimator`](@ref)
   - [`StatsBase.CovarianceEstimator`](https://juliastats.org/StatsBase.jl/stable/cov/)
 """
-function moment_view(ce::StatsBase.CovarianceEstimator,
-                     args...)::StatsBase.CovarianceEstimator
+function port_opt_view(ce::StatsBase.CovarianceEstimator, ::Any,
+                       args...)::StatsBase.CovarianceEstimator
     return ce
 end
 """
@@ -417,8 +417,8 @@ No-op fallback for getting the view of an expected returns estimator.
 
   - [`AbstractExpectedReturnsEstimator`](@ref)
 """
-function moment_view(me::AbstractExpectedReturnsEstimator,
-                     args...)::AbstractExpectedReturnsEstimator
+function port_opt_view(me::AbstractExpectedReturnsEstimator, ::Any,
+                       args...)::AbstractExpectedReturnsEstimator
     return me
 end
 """
@@ -456,8 +456,8 @@ No-op fallback for getting the view of an expected returns algorithm.
 
   - [`AbstractExpectedReturnsAlgorithm`](@ref)
 """
-function me_alg_view(alg::AbstractExpectedReturnsAlgorithm,
-                     args...)::AbstractExpectedReturnsAlgorithm
+function port_opt_view(alg::AbstractExpectedReturnsAlgorithm, ::Any,
+                       args...)::AbstractExpectedReturnsAlgorithm
     return alg
 end
 """

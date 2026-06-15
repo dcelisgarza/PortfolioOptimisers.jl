@@ -104,9 +104,9 @@ Used for cluster-based optimisation where only a subset of assets is considered.
 # Related
 
   - [`TurnoverRiskMeasure`](@ref)
-  - [`risk_measure_view`](@ref)
+  - [`port_opt_view`](@ref)
 """
-function risk_measure_view(r::TurnoverRiskMeasure, i, args...)
+function port_opt_view(r::TurnoverRiskMeasure, i, args...)
     w = view(r.w, i)
     return TurnoverRiskMeasure(; settings = r.settings, w = w, fixed = r.fixed)
 end

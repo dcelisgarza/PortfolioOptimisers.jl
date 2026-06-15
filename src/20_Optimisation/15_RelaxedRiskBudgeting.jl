@@ -199,10 +199,11 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return a cluster-sliced copy of [`RelaxedRiskBudgeting`](@ref) for asset index set `i` and returns matrix `X`.
 """
-function opt_view(rrb::RelaxedRiskBudgeting, i, X::MatNum)::RelaxedRiskBudgeting
+function port_opt_view(rrb::RelaxedRiskBudgeting, i, X::MatNum,
+                       args...)::RelaxedRiskBudgeting
     X = isa(rrb.opt.pe, AbstractPriorResult) ? rrb.opt.pe.X : X
-    opt = opt_view(rrb.opt, i, X)
-    rba = risk_budgeting_algorithm_view(rrb.rba, i)
+    opt = port_opt_view(rrb.opt, i, X)
+    rba = port_opt_view(rrb.rba, i)
     wi = nothing_scalar_array_view(rrb.wi, i)
     return RelaxedRiskBudgeting(; opt = opt, rba = rba, wi = wi, alg = rrb.alg, fb = rrb.fb)
 end
@@ -391,8 +392,9 @@ function _optimise(rrb::RelaxedRiskBudgeting, rd::ReturnsResult = ReturnsResult(
     set_portfolio_objective_function!(model, MinimumRisk(), attrs.ret, rrb.opt.cobj, rrb,
                                       attrs.pr)
     retcode, sol = optimise_JuMP_model!(model, rrb, eltype(attrs.pr.X))
-    return RiskBudgetingResult(typeof(rrb), attrs, prb, retcode, sol,
-                               ifelse(save, model, nothing), nothing)
+    return RiskBudgetingResult(JuMPOptimisationResult(typeof(rrb), attrs, retcode, sol,
+                                                      ifelse(save, model, nothing)), prb,
+                               nothing)
 end
 """
     optimise(rrb::RelaxedRiskBudgeting{<:Any, <:Any, <:Any, <:Any, Nothing},

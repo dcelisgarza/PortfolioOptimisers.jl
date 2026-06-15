@@ -22,6 +22,12 @@ Keywords correspond to the struct's fields.
   - `!isempty(val)`.
   - `all(x -> zero(x) <= x, val)`.
 
+## View parameters
+
+When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+
+  - `val`: Sliced to the selected indices via [`port_opt_view`](@ref).
+
 # Examples
 
 ```jldoctest
@@ -35,12 +41,13 @@ RiskBudget
   - [`RiskBudgetEstimator`](@ref)
   - [`risk_budget_constraints`](@ref)
   - [`AbstractConstraintResult`](@ref)
+  - [`port_opt_view`](@ref)
 """
-@concrete struct RiskBudget <: AbstractConstraintResult
+@propagatable @concrete struct RiskBudget <: AbstractConstraintResult
     """
     $(field_dict[:rkb_val])
     """
-    val
+    @vprop val
     function RiskBudget(val::VecNum)::RiskBudget
         @argcheck(!isempty(val))
         @argcheck(all(x -> zero(x) <= x, val))
@@ -49,34 +56,6 @@ RiskBudget
 end
 function RiskBudget(; val::Num_VecNum)::RiskBudget
     return RiskBudget(val)
-end
-"""
-    risk_budget_view(rb, i)
-
-Get a view or subset of risk budget constraints for asset cluster index `i`.
-
-Returns `nothing` for `nothing` inputs, the budget unchanged for estimators, or a sliced budget for [`RiskBudget`](@ref) results.
-
-# Arguments
-
-  - `rb`: Risk budget, estimator, or `nothing`.
-  - `i`: Cluster or asset index.
-
-# Returns
-
-  - Sliced risk budget or unchanged value.
-
-# Related
-
-  - [`RiskBudget`](@ref)
-  - [`RiskBudgetEstimator`](@ref)
-"""
-function risk_budget_view(::Nothing, args...)::Nothing
-    return nothing
-end
-function risk_budget_view(rb::RiskBudget, i)::RiskBudget
-    val = nothing_scalar_array_view(rb.val, i)
-    return RiskBudget(; val = val)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -155,21 +134,6 @@ Matches either a [`RiskBudgetEstimator`](@ref) (specifying how to generate risk 
   - [`risk_budget_constraints`](@ref)
 """
 const RkbE_Rkb = Union{<:RiskBudgetEstimator, <:RiskBudget}
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Return the [`RiskBudgetEstimator`](@ref) `rb` unchanged.
-
-Identity pass-through: estimators are not sliced by cluster index.
-
-# Related
-
-  - [`RiskBudgetEstimator`](@ref)
-  - [`risk_budget_view`](@ref)
-"""
-function risk_budget_view(rb::RiskBudgetEstimator, ::Any)::RiskBudgetEstimator
-    return rb
-end
 """
     risk_budget_constraints(::Nothing, args...; N::Number, datatype::DataType = Float64,
                             kwargs...)

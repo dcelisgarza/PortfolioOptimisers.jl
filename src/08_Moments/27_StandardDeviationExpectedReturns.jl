@@ -19,9 +19,15 @@ Keywords correspond to the struct's fields.
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@prop`-tagged fields are automatically propagated:
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
 
   - `ce`: Recursively updated via [`factory`](@ref).
+
+## View parameters
+
+When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+
+  - `ce`: Recursively viewed via [`port_opt_view`](@ref).
 
 # Examples
 
@@ -51,13 +57,14 @@ StandardDeviationExpectedReturns
   - [`AbstractExpectedReturnsEstimator`](@ref)
   - [`PortfolioOptimisersCovariance`](@ref)
   - [`factory`](@ref)
+  - [`port_opt_view`](@ref)
 """
 @propagatable @concrete struct StandardDeviationExpectedReturns <:
                                AbstractExpectedReturnsEstimator
     """
     $(field_dict[:ce])
     """
-    @prop ce
+    @fprop @vprop ce
     function StandardDeviationExpectedReturns(ce::StatsBase.CovarianceEstimator)
         return new{typeof(ce)}(ce)
     end
@@ -71,28 +78,6 @@ end
 function StandardDeviationExpectedReturns(;
                                           ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance())::StandardDeviationExpectedReturns
     return StandardDeviationExpectedReturns(ce)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Gets the view of the expected returns estimator for the `i`-th element(s).
-
-# Arguments
-
-  - $(arg_dict[:me])
-  - `i`: Index or indices to view.
-
-# Returns
-
-  - $(ret_dict[:mev])
-
-# Related
-
-  - [`StandardDeviationExpectedReturns`](@ref)
-"""
-function moment_view(me::StandardDeviationExpectedReturns,
-                     i)::StandardDeviationExpectedReturns
-    return StandardDeviationExpectedReturns(; me = moment_view(me.ce, i))
 end
 """
     Statistics.mean(me::StandardDeviationExpectedReturns, X::MatNum;
@@ -158,9 +143,15 @@ Keywords correspond to the struct's fields.
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@prop`-tagged fields are automatically propagated:
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
 
   - `ce`: Recursively updated via [`factory`](@ref).
+
+## View parameters
+
+When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+
+  - `ce`: Recursively viewed via [`port_opt_view`](@ref).
 
 # Examples
 
@@ -190,12 +181,13 @@ VarianceExpectedReturns
   - [`AbstractExpectedReturnsEstimator`](@ref)
   - [`PortfolioOptimisersCovariance`](@ref)
   - [`factory`](@ref)
+  - [`port_opt_view`](@ref)
 """
 @propagatable @concrete struct VarianceExpectedReturns <: AbstractExpectedReturnsEstimator
     """
     $(field_dict[:ce])
     """
-    @prop ce
+    @fprop @vprop ce
     function VarianceExpectedReturns(ce::StatsBase.CovarianceEstimator)
         return new{typeof(ce)}(ce)
     end
@@ -208,27 +200,6 @@ end
 function VarianceExpectedReturns(;
                                  ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance())::VarianceExpectedReturns
     return VarianceExpectedReturns(ce)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Gets the view of the expected returns estimator for the `i`-th element(s).
-
-# Arguments
-
-  - $(arg_dict[:me])
-  - `i`: Index or indices to view.
-
-# Returns
-
-  - $(ret_dict[:mev])
-
-# Related
-
-  - [`VarianceExpectedReturns`](@ref)
-"""
-function moment_view(me::VarianceExpectedReturns, i)::VarianceExpectedReturns
-    return VarianceExpectedReturns(; me = moment_view(me.ce, i))
 end
 """
     Statistics.mean(me::VarianceExpectedReturns, X::MatNum;

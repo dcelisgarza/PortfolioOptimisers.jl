@@ -27,9 +27,9 @@ Num_UcSK
 AbstractEllipsoidalUncertaintySetResultClass
 ucs_selector
 k_ucs
-ucs_view(risk_ucs::Option{<:AbstractUncertaintySetEstimator}, ::Any)
-ucs_view(risk_ucs::BoxUncertaintySet{<:VecNum, <:VecNum}, i)
-ucs_view(risk_ucs::BoxUncertaintySet{<:MatNum, <:MatNum}, i)
-ucs_view(risk_ucs::EllipsoidalUncertaintySet{<:MatNum, <:Any, <:SigmaEllipsoidalUncertaintySet}, i)
-ucs_view(risk_ucs::EllipsoidalUncertaintySet{<:MatNum, <:Any, <:MuEllipsoidalUncertaintySet}, i)
+port_opt_view(risk_ucs::Option{<:AbstractUncertaintySetEstimator}, ::Any, args...)
+port_opt_view(risk_ucs::BoxUncertaintySet{<:VecNum, <:VecNum}, i, args...)
+port_opt_view(risk_ucs::BoxUncertaintySet{<:MatNum, <:MatNum}, i, args...)
+port_opt_view(risk_ucs::EllipsoidalUncertaintySet{<:MatNum, <:Any, <:SigmaEllipsoidalUncertaintySet}, i, args...)
+port_opt_view(risk_ucs::EllipsoidalUncertaintySet{<:MatNum, <:Any, <:MuEllipsoidalUncertaintySet}, i, args...)
 ```
