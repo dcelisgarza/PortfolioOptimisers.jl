@@ -169,19 +169,19 @@ DistributionValueatRisk
   - [`ValueatRisk`](@ref)
   - [`Option`](@ref)
 """
-@concrete struct DistributionValueatRisk <: ValueatRiskFormulation
+@propagatable @concrete struct DistributionValueatRisk <: ValueatRiskFormulation
     """
     $(field_dict[:mu_rm])
     """
-    mu
+    @pprop mu
     """
     $(field_dict[:sigma])
     """
-    sigma
+    @pprop sigma
     """
     $(field_dict[:chol])
     """
-    chol
+    @pprop chol
     """
     $(field_dict[:dist])
     """
@@ -208,24 +208,6 @@ function DistributionValueatRisk(; mu::Option{<:VecNum} = nothing,
                                  chol::Option{<:MatNum} = nothing,
                                  dist::Distributions.Distribution = Distributions.Normal())::DistributionValueatRisk
     return DistributionValueatRisk(mu, sigma, chol, dist)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Create an instance of [`DistributionValueatRisk`](@ref) by selecting distribution parameters from the formulation or falling back to the prior result.
-
-# Related
-
-  - [`DistributionValueatRisk`](@ref)
-  - [`factory`](@ref)
-  - [`nothing_scalar_array_selector`](@ref)
-"""
-function factory(alg::DistributionValueatRisk, pr::AbstractPriorResult, args...;
-                 kwargs...)::DistributionValueatRisk
-    mu = nothing_scalar_array_selector(alg.mu, pr.mu)
-    sigma = nothing_scalar_array_selector(alg.sigma, pr.sigma)
-    chol = nothing_scalar_array_selector(alg.chol, pr.chol)
-    return DistributionValueatRisk(; mu = mu, sigma = sigma, chol = chol, dist = alg.dist)
 end
 function port_opt_view(alg::DistributionValueatRisk, i, args...)::DistributionValueatRisk
     mu = nothing_scalar_array_view(alg.mu, i)
@@ -315,7 +297,7 @@ ValueatRisk
   - [`ConditionalValueatRisk`](@ref)
   - [`ValueatRiskRange`](@ref)
 """
-@concrete struct ValueatRisk <: RiskMeasure
+@propagatable @concrete struct ValueatRisk <: RiskMeasure
     """
     $(field_dict[:settings_rm])
     """
@@ -327,11 +309,11 @@ ValueatRisk
     """
     $(field_dict[:oow])
     """
-    w
+    @pprop w
     """
     $(field_dict[:alg])
     """
-    alg
+    @fprop alg
     function ValueatRisk(settings::RiskMeasureSettings, alpha::Number,
                          w::Option{<:ObsWeights}, alg::ValueatRiskFormulation)
         @argcheck(zero(alpha) < alpha < one(alpha))
@@ -344,22 +326,6 @@ function ValueatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                      alpha::Number = 0.05, w::Option{<:ObsWeights} = nothing,
                      alg::ValueatRiskFormulation = MIPValueatRisk())::ValueatRisk
     return ValueatRisk(settings, alpha, w, alg)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Create an instance of [`ValueatRisk`](@ref) by selecting observation weights and formulation from the risk-measure instance or falling back to the prior result.
-
-# Related
-
-  - [`ValueatRisk`](@ref)
-  - [`factory`](@ref)
-  - [`nothing_scalar_array_selector`](@ref)
-"""
-function factory(r::ValueatRisk, pr::AbstractPriorResult, args...; kwargs...)::ValueatRisk
-    w = nothing_scalar_array_selector(r.w, pr.w)
-    alg = factory(r.alg, pr, args...; kwargs...)
-    return ValueatRisk(; settings = r.settings, alpha = r.alpha, w = w, alg = alg)
 end
 function port_opt_view(r::ValueatRisk, i, args...)::ValueatRisk
     alg = port_opt_view(r.alg, i)
@@ -459,7 +425,7 @@ ValueatRiskRange
   - [`ValueatRisk`](@ref)
   - [`ConditionalValueatRiskRange`](@ref)
 """
-@concrete struct ValueatRiskRange <: RiskMeasure
+@propagatable @concrete struct ValueatRiskRange <: RiskMeasure
     """
     $(field_dict[:settings_rm])
     """
@@ -475,11 +441,11 @@ ValueatRiskRange
     """
     $(field_dict[:oow])
     """
-    w
+    @pprop w
     """
     $(field_dict[:alg])
     """
-    alg
+    @fprop alg
     function ValueatRiskRange(settings::RiskMeasureSettings, alpha::Number, beta::Number,
                               w::Option{<:ObsWeights}, alg::ValueatRiskFormulation)
         @argcheck(zero(alpha) < alpha < one(alpha))
@@ -497,24 +463,6 @@ function ValueatRiskRange(; settings::RiskMeasureSettings = RiskMeasureSettings(
                           w::Option{<:ObsWeights} = nothing,
                           alg::ValueatRiskFormulation = MIPValueatRisk())::ValueatRiskRange
     return ValueatRiskRange(settings, alpha, beta, w, alg)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Create an instance of [`ValueatRiskRange`](@ref) by selecting observation weights and formulation from the risk-measure instance or falling back to the prior result.
-
-# Related
-
-  - [`ValueatRiskRange`](@ref)
-  - [`factory`](@ref)
-  - [`nothing_scalar_array_selector`](@ref)
-"""
-function factory(r::ValueatRiskRange, pr::AbstractPriorResult, args...;
-                 kwargs...)::ValueatRiskRange
-    w = nothing_scalar_array_selector(r.w, pr.w)
-    alg = factory(r.alg, pr, args...; kwargs...)
-    return ValueatRiskRange(; settings = r.settings, alpha = r.alpha, beta = r.beta, w = w,
-                            alg = alg)
 end
 function port_opt_view(r::ValueatRiskRange, i, args...)::ValueatRiskRange
     alg = port_opt_view(r.alg, i)
@@ -642,7 +590,7 @@ DrawdownatRisk
   - [`ConditionalDrawdownatRisk`](@ref)
   - [`RelativeDrawdownatRisk`](@ref)
 """
-@concrete struct DrawdownatRisk <: RiskMeasure
+@propagatable @concrete struct DrawdownatRisk <: RiskMeasure
     """
     $(field_dict[:settings_rm])
     """
@@ -654,7 +602,7 @@ DrawdownatRisk
     """
     $(field_dict[:oow])
     """
-    w
+    @pprop w
     """
     $(field_dict[:b_mip])
     """
@@ -690,22 +638,6 @@ function DrawdownatRisk(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                         b::Option{<:Number} = nothing,
                         s::Option{<:Number} = nothing)::DrawdownatRisk
     return DrawdownatRisk(settings, alpha, w, b, s)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Create an instance of [`DrawdownatRisk`](@ref) by selecting observation weights from the risk-measure instance or falling back to the prior result.
-
-# Related
-
-  - [`DrawdownatRisk`](@ref)
-  - [`factory`](@ref)
-  - [`nothing_scalar_array_selector`](@ref)
-"""
-function factory(r::DrawdownatRisk, pr::AbstractPriorResult, args...;
-                 kwargs...)::DrawdownatRisk
-    w = nothing_scalar_array_selector(r.w, pr.w)
-    return DrawdownatRisk(; settings = r.settings, alpha = r.alpha, w = w, b = r.b, s = r.s)
 end
 """
     absolute_drawdown_vec(x::VecNum) -> Vector
@@ -841,7 +773,7 @@ RelativeDrawdownatRisk
   - [`DrawdownatRisk`](@ref)
   - [`RelativeConditionalDrawdownatRisk`](@ref)
 """
-@concrete struct RelativeDrawdownatRisk <: HierarchicalRiskMeasure
+@propagatable @concrete struct RelativeDrawdownatRisk <: HierarchicalRiskMeasure
     """
     $(field_dict[:settings_rm])
     """
@@ -853,7 +785,7 @@ RelativeDrawdownatRisk
     """
     $(field_dict[:oow])
     """
-    w
+    @pprop w
     function RelativeDrawdownatRisk(settings::HierarchicalRiskMeasureSettings,
                                     alpha::Number, w::Option{<:ObsWeights})
         @argcheck(zero(alpha) < alpha < one(alpha))
@@ -866,22 +798,6 @@ function RelativeDrawdownatRisk(;
                                 alpha::Number = 0.05,
                                 w::Option{<:ObsWeights} = nothing)::RelativeDrawdownatRisk
     return RelativeDrawdownatRisk(settings, alpha, w)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Create an instance of [`RelativeDrawdownatRisk`](@ref) by selecting observation weights from the risk-measure instance or falling back to the prior result.
-
-# Related
-
-  - [`RelativeDrawdownatRisk`](@ref)
-  - [`factory`](@ref)
-  - [`nothing_scalar_array_selector`](@ref)
-"""
-function factory(r::RelativeDrawdownatRisk, pr::AbstractPriorResult, args...;
-                 kwargs...)::RelativeDrawdownatRisk
-    w = nothing_scalar_array_selector(r.w, pr.w)
-    return RelativeDrawdownatRisk(; settings = r.settings, alpha = r.alpha, w = w)
 end
 """
     relative_drawdown_vec(x)

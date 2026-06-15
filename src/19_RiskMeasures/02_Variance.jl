@@ -246,10 +246,10 @@ julia> r(w)
   - [`SquaredSOCRiskExpr`](@ref)
   - [`SOCRiskExpr`](@ref)
   - [`RSOCRiskExpr`](@ref)
-  - [`factory(r::Variance, pr::AbstractPriorResult, args...; kwargs...)`](@ref)
+  - [`factory`](@ref)
   - [`expected_risk`](@ref)
 """
-@concrete struct Variance <: RiskMeasure
+@propagatable @concrete struct Variance <: RiskMeasure
     """
     $(field_dict[:settings_rm])
     """
@@ -257,11 +257,11 @@ julia> r(w)
     """
     $(field_dict[:sigma])
     """
-    sigma
+    @pprop sigma
     """
     $(field_dict[:chol])
     """
-    chol
+    @pprop chol
     """
     $(field_dict[:rc])
     """
@@ -295,38 +295,6 @@ function Variance(; settings::RiskMeasureSettings = RiskMeasureSettings(),
 end
 function (r::Variance)(w::VecNum)
     return LinearAlgebra.dot(w, r.sigma, w)
-end
-"""
-    factory(r::Variance, pr::AbstractPriorResult, args...; kwargs...)
-
-Create an instance of [`Variance`](@ref) by selecting the covariance matrix from the risk-measure instance or falling back to the prior result (see [`nothing_scalar_array_selector`](@ref)).
-
-# Arguments
-
-  - `r`: Prototype risk measure whose `settings`, `rc` and `alg` fields are reused for the new instance.
-  - `prior`: Prior result providing `pr.sigma` to use when `r.sigma === nothing`.
-  - `args...`: Extra positional arguments are accepted for API compatibility but are ignored by this constructor.
-  - `kwargs...` : Keyword arguments are accepted for API compatibility but are ignored by this constructor.
-
-# Returns
-
-  - `r_new::Variance`: A new `Variance` instance.
-
-# Details
-
-  - Selects `sigma` using [`nothing_scalar_array_selector`](@ref).
-  - Other fields are taken from `r`.
-
-# Related
-
-  - [`Variance`](@ref)
-  - [`nothing_scalar_array_selector`](@ref)
-"""
-function factory(r::Variance, pr::AbstractPriorResult, args...; kwargs...)::Variance
-    sigma = nothing_scalar_array_selector(r.sigma, pr.sigma)
-    chol = nothing_scalar_array_selector(r.chol, pr.chol)
-    return Variance(; settings = r.settings, sigma = sigma, chol = chol, rc = r.rc,
-                    alg = r.alg)
 end
 function port_opt_view(r::Variance, i, args...)
     sigma = nothing_scalar_array_view(r.sigma, i)
@@ -419,10 +387,10 @@ julia> r(w)
 # Related
 
   - [`RiskMeasureSettings`](@ref)
-  - [`factory(r::StandardDeviation, pr::AbstractPriorResult, args...; kwargs...)`](@ref)
+  - [`factory`](@ref)
   - [`expected_risk`](@ref)
 """
-@concrete struct StandardDeviation <: RiskMeasure
+@propagatable @concrete struct StandardDeviation <: RiskMeasure
     """
     $(field_dict[:settings_rm])
     """
@@ -430,11 +398,11 @@ julia> r(w)
     """
     $(field_dict[:sigma])
     """
-    sigma
+    @pprop sigma
     """
     $(field_dict[:chol])
     """
-    chol
+    @pprop chol
     function StandardDeviation(settings::RiskMeasureSettings, sigma::Option{<:MatNum},
                                chol::Option{<:MatNum})::StandardDeviation
         if isa(sigma, MatNum)
@@ -454,38 +422,6 @@ function StandardDeviation(; settings::RiskMeasureSettings = RiskMeasureSettings
 end
 function (r::StandardDeviation)(w::VecNum)
     return sqrt(LinearAlgebra.dot(w, r.sigma, w))
-end
-"""
-    factory(r::StandardDeviation, pr::AbstractPriorResult, args...; kwargs...)
-
-Create an instance of [`StandardDeviation`](@ref) by selecting the covariance matrix from the risk-measure instance or falling back to the prior result (see [`nothing_scalar_array_selector`](@ref)).
-
-# Arguments
-
-  - `r`: Prototype risk measure whose `settings`, `rc` and `alg` fields are reused for the new instance.
-  - `prior`: Prior result providing `pr.sigma` to use when `r.sigma === nothing`.
-  - `args...`: Extra positional arguments are accepted for API compatibility but are ignored by this constructor.
-  - `kwargs...` : Keyword arguments are accepted for API compatibility but are ignored by this constructor.
-
-# Returns
-
-  - `r_new::StandardDeviation`: A new `StandardDeviation` instance.
-
-# Details
-
-  - Selects `sigma` using [`nothing_scalar_array_selector`](@ref).
-  - Other fields are taken from `r`.
-
-# Related
-
-  - [`StandardDeviation`](@ref)
-  - [`nothing_scalar_array_selector`](@ref)
-"""
-function factory(r::StandardDeviation, pr::AbstractPriorResult, args...;
-                 kwargs...)::StandardDeviation
-    sigma = nothing_scalar_array_selector(r.sigma, pr.sigma)
-    chol = nothing_scalar_array_selector(r.chol, pr.chol)
-    return StandardDeviation(; settings = r.settings, sigma = sigma, chol = chol)
 end
 function port_opt_view(r::StandardDeviation, i, args...)
     sigma = nothing_scalar_array_view(r.sigma, i)

@@ -89,7 +89,7 @@ ConditionalValueatRisk
   - [`ConditionalValueatRiskRange`](@ref)
   - [`ConditionalDrawdownatRisk`](@ref)
 """
-@concrete struct ConditionalValueatRisk <: RiskMeasure
+@propagatable @concrete struct ConditionalValueatRisk <: RiskMeasure
     """
     $(field_dict[:settings_rm])
     """
@@ -101,7 +101,7 @@ ConditionalValueatRisk
     """
     $(field_dict[:oow])
     """
-    w
+    @pprop w
     function ConditionalValueatRisk(settings::RiskMeasureSettings, alpha::Number,
                                     w::Option{<:ObsWeights})
         @argcheck(zero(alpha) < alpha < one(alpha))
@@ -195,7 +195,7 @@ DistributionallyRobustConditionalValueatRisk
   - [`DistributionallyRobustConditionalValueatRiskRange`](@ref)
   - [`DistributionallyRobustConditionalDrawdownatRisk`](@ref)
 """
-@concrete struct DistributionallyRobustConditionalValueatRisk <: RiskMeasure
+@propagatable @concrete struct DistributionallyRobustConditionalValueatRisk <: RiskMeasure
     """
     $(field_dict[:settings_rm])
     """
@@ -215,7 +215,7 @@ DistributionallyRobustConditionalValueatRisk
     """
     $(field_dict[:oow])
     """
-    w
+    @pprop w
     function DistributionallyRobustConditionalValueatRisk(settings::RiskMeasureSettings,
                                                           alpha::Number, l::Number,
                                                           r::Number,
@@ -357,7 +357,7 @@ ConditionalValueatRiskRange
   - [`ValueatRiskRange`](@ref)
   - [`DistributionallyRobustConditionalValueatRiskRange`](@ref)
 """
-@concrete struct ConditionalValueatRiskRange <: RiskMeasure
+@propagatable @concrete struct ConditionalValueatRiskRange <: RiskMeasure
     """
     $(field_dict[:settings_rm])
     """
@@ -373,7 +373,7 @@ ConditionalValueatRiskRange
     """
     $(field_dict[:oow])
     """
-    w
+    @pprop w
     function ConditionalValueatRiskRange(settings::RiskMeasureSettings, alpha::Number,
                                          beta::Number, w::Option{<:ObsWeights})
         @argcheck(zero(alpha) < alpha < one(alpha))
@@ -388,24 +388,6 @@ function ConditionalValueatRiskRange(;
                                      alpha::Number = 0.05, beta::Number = 0.05,
                                      w::Option{<:ObsWeights} = nothing)::ConditionalValueatRiskRange
     return ConditionalValueatRiskRange(settings, alpha, beta, w)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Create an instance of [`ConditionalValueatRiskRange`](@ref) by selecting observation weights from the risk-measure instance or falling back to the prior result.
-
-# Related
-
-  - [`ConditionalValueatRiskRange`](@ref)
-  - [`AbstractPriorResult`](@ref)
-  - [`factory`](@ref)
-  - [`nothing_scalar_array_selector`](@ref)
-"""
-function factory(r::ConditionalValueatRiskRange, pr::AbstractPriorResult, args...;
-                 kwargs...)::ConditionalValueatRiskRange
-    w = nothing_scalar_array_selector(r.w, pr.w)
-    return ConditionalValueatRiskRange(; settings = r.settings, alpha = r.alpha,
-                                       beta = r.beta, w = w)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -490,7 +472,8 @@ DistributionallyRobustConditionalValueatRiskRange
   - [`ConditionalValueatRiskRange`](@ref)
   - [`DistributionallyRobustConditionalValueatRisk`](@ref)
 """
-@concrete struct DistributionallyRobustConditionalValueatRiskRange <: RiskMeasure
+@propagatable @concrete struct DistributionallyRobustConditionalValueatRiskRange <:
+                               RiskMeasure
     """
     $(field_dict[:settings_rm])
     """
@@ -522,7 +505,7 @@ DistributionallyRobustConditionalValueatRiskRange
     """
     $(field_dict[:oow])
     """
-    w
+    @pprop w
     function DistributionallyRobustConditionalValueatRiskRange(settings::RiskMeasureSettings,
                                                                alpha::Number, l_a::Number,
                                                                r_a::Number, beta::Number,
@@ -551,28 +534,6 @@ function DistributionallyRobustConditionalValueatRiskRange(;
                                                            w::Option{<:ObsWeights} = nothing)::DistributionallyRobustConditionalValueatRiskRange
     return DistributionallyRobustConditionalValueatRiskRange(settings, alpha, l_a, r_a,
                                                              beta, l_b, r_b, w)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Create an instance of [`DistributionallyRobustConditionalValueatRiskRange`](@ref) by selecting observation weights from the risk-measure instance or falling back to the prior result.
-
-# Related
-
-  - [`DistributionallyRobustConditionalValueatRiskRange`](@ref)
-  - [`AbstractPriorResult`](@ref)
-  - [`factory`](@ref)
-  - [`nothing_scalar_array_selector`](@ref)
-"""
-function factory(r::DistributionallyRobustConditionalValueatRiskRange,
-                 pr::AbstractPriorResult, args...;
-                 kwargs...)::DistributionallyRobustConditionalValueatRiskRange
-    w = nothing_scalar_array_selector(r.w, pr.w)
-    return DistributionallyRobustConditionalValueatRiskRange(; settings = r.settings,
-                                                             alpha = r.alpha, l_a = r.l_a,
-                                                             r_a = r.r_a, beta = r.beta,
-                                                             l_b = r.l_b, r_b = r.r_b,
-                                                             w = w)
 end
 """
     const RMCVaRRg{T} = Union{...}
@@ -735,7 +696,7 @@ ConditionalDrawdownatRisk
   - [`DistributionallyRobustConditionalDrawdownatRisk`](@ref)
   - [`RelativeConditionalDrawdownatRisk`](@ref)
 """
-@concrete struct ConditionalDrawdownatRisk <: RiskMeasure
+@propagatable @concrete struct ConditionalDrawdownatRisk <: RiskMeasure
     """
     $(field_dict[:settings_rm])
     """
@@ -747,7 +708,7 @@ ConditionalDrawdownatRisk
     """
     $(field_dict[:oow])
     """
-    w
+    @pprop w
     function ConditionalDrawdownatRisk(settings::RiskMeasureSettings, alpha::Number,
                                        w::Option{<:ObsWeights})
         @argcheck(zero(alpha) < alpha < one(alpha))
@@ -838,7 +799,8 @@ DistributionallyRobustConditionalDrawdownatRisk
   - [`ConditionalDrawdownatRisk`](@ref)
   - [`DistributionallyRobustConditionalValueatRisk`](@ref)
 """
-@concrete struct DistributionallyRobustConditionalDrawdownatRisk <: RiskMeasure
+@propagatable @concrete struct DistributionallyRobustConditionalDrawdownatRisk <:
+                               RiskMeasure
     """
     $(field_dict[:settings_rm])
     """
@@ -858,7 +820,7 @@ DistributionallyRobustConditionalDrawdownatRisk
     """
     $(field_dict[:oow])
     """
-    w
+    @pprop w
     function DistributionallyRobustConditionalDrawdownatRisk(settings::RiskMeasureSettings,
                                                              alpha::Number, l::Number,
                                                              r::Number,
@@ -1066,79 +1028,6 @@ function (r::RelativeConditionalDrawdownatRisk{<:Any, <:Any, <:ObsWeights})(x::V
         -(LinearAlgebra.dot(sorted_dd[1:(idx - 1)], sorted_w[1:(idx - 1)]) +
           sorted_dd[idx] * (alpha - cum_w[idx - 1])) / alpha
     end
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Create an instance of [`ConditionalValueatRisk`](@ref) by selecting observation weights from the risk-measure instance or falling back to the prior result.
-
-# Related
-
-  - [`ConditionalValueatRisk`](@ref)
-  - [`AbstractPriorResult`](@ref)
-  - [`factory`](@ref)
-  - [`nothing_scalar_array_selector`](@ref)
-"""
-function factory(r::ConditionalValueatRisk, pr::AbstractPriorResult, args...;
-                 kwargs...)::ConditionalValueatRisk
-    w = nothing_scalar_array_selector(r.w, pr.w)
-    return ConditionalValueatRisk(; settings = r.settings, alpha = r.alpha, w = w)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Create an instance of [`ConditionalDrawdownatRisk`](@ref) by selecting observation weights from the risk-measure instance or falling back to the prior result.
-
-# Related
-
-  - [`ConditionalDrawdownatRisk`](@ref)
-  - [`AbstractPriorResult`](@ref)
-  - [`factory`](@ref)
-  - [`nothing_scalar_array_selector`](@ref)
-"""
-function factory(r::ConditionalDrawdownatRisk, pr::AbstractPriorResult, args...;
-                 kwargs...)::ConditionalDrawdownatRisk
-    w = nothing_scalar_array_selector(r.w, pr.w)
-    return ConditionalDrawdownatRisk(; settings = r.settings, alpha = r.alpha, w = w)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Create an instance of [`DistributionallyRobustConditionalValueatRisk`](@ref) by selecting observation weights from the risk-measure instance or falling back to the prior result.
-
-# Related
-
-  - [`DistributionallyRobustConditionalValueatRisk`](@ref)
-  - [`AbstractPriorResult`](@ref)
-  - [`factory`](@ref)
-  - [`nothing_scalar_array_selector`](@ref)
-"""
-function factory(r::DistributionallyRobustConditionalValueatRisk, pr::AbstractPriorResult,
-                 args...; kwargs...)::DistributionallyRobustConditionalValueatRisk
-    w = nothing_scalar_array_selector(r.w, pr.w)
-    return DistributionallyRobustConditionalValueatRisk(; settings = r.settings,
-                                                        alpha = r.alpha, l = r.l, r = r.r,
-                                                        w = w)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Create an instance of [`DistributionallyRobustConditionalDrawdownatRisk`](@ref) by selecting observation weights from the risk-measure instance or falling back to the prior result.
-
-# Related
-
-  - [`DistributionallyRobustConditionalDrawdownatRisk`](@ref)
-  - [`AbstractPriorResult`](@ref)
-  - [`factory`](@ref)
-  - [`nothing_scalar_array_selector`](@ref)
-"""
-function factory(r::DistributionallyRobustConditionalDrawdownatRisk,
-                 pr::AbstractPriorResult, args...;
-                 kwargs...)::DistributionallyRobustConditionalDrawdownatRisk
-    w = nothing_scalar_array_selector(r.w, pr.w)
-    return DistributionallyRobustConditionalDrawdownatRisk(; settings = r.settings,
-                                                           alpha = r.alpha, l = r.l,
-                                                           r = r.r, w = w)
 end
 
 # Expected-risk input kind — see `risk_input_kind`.
