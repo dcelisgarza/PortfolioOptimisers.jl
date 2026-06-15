@@ -794,35 +794,75 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return `true` if `x` is a macro call to either [`@fprop`](@ref) or [`@vprop`](@ref).
+Return `true` if `x` is a reference to the [`@pprop`](@ref) macro (bare `Symbol` or `GlobalRef`).
 
-Used by [`_propagatable_parse_body`](@ref) to detect `@fprop` or `@vprop`-tagged fields in a struct body.
+Used by [`_propagatable_parse_body`](@ref) to detect `@pprop`-tagged fields in a struct body.
+
+# Related
+
+  - [`@pprop`](@ref)
+  - [`_propagatable_parse_body`](@ref)
+  - [`@propagatable`](@ref)
+"""
+function _is_pprop_macro(x)
+    return x == Symbol("@pprop") || (x isa GlobalRef && x.name == Symbol("@pprop"))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return `true` if `x` is a reference to the [`@cprop`](@ref) macro (bare `Symbol` or `GlobalRef`).
+
+Used by [`_propagatable_parse_body`](@ref) to detect `@cprop`-tagged fields in a struct body.
+
+# Related
+
+  - [`@cprop`](@ref)
+  - [`_propagatable_parse_body`](@ref)
+  - [`@propagatable`](@ref)
+"""
+function _is_cprop_macro(x)
+    return x == Symbol("@cprop") || (x isa GlobalRef && x.name == Symbol("@cprop"))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return `true` if `x` is a macro call to any of [`@fprop`](@ref), [`@vprop`](@ref),
+[`@pprop`](@ref) or [`@cprop`](@ref).
+
+Used by [`_propagatable_parse_body`](@ref) to detect tagged fields in a struct body.
 
 # Related
 
   - [`@fprop`](@ref)
   - [`@vprop`](@ref)
+  - [`@pprop`](@ref)
+  - [`@cprop`](@ref)
   - [`_propagatable_parse_body`](@ref)
   - [`@propagatable`](@ref)
 """
 function _is_prop_tag_call(x)
     return x isa Expr &&
            x.head == :macrocall &&
-           (_is_fprop_macro(x.args[1]) || _is_vprop_macro(x.args[1]))
+           (_is_fprop_macro(x.args[1]) ||
+            _is_vprop_macro(x.args[1]) ||
+            _is_pprop_macro(x.args[1]) ||
+            _is_cprop_macro(x.args[1]))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Peel any stack of [`@fprop`](@ref)/[`@vprop`](@ref) tag macrocalls off a field
-expression, recording which tags were present.
+Peel any stack of [`@fprop`](@ref)/[`@vprop`](@ref)/[`@pprop`](@ref)/[`@cprop`](@ref) tag
+macrocalls off a field expression, recording which tags were present.
 
-Tags may be stacked in either order (`@fprop @vprop field`), which parses as nested
+Tags may be stacked in either order (`@pprop @fprop field`), which parses as nested
 `:macrocall` nodes; this unwraps them all and returns the bare field expression.
 
 # Returns
 
   - `is_f::Bool`: whether an [`@fprop`](@ref) tag was present.
   - `is_v::Bool`: whether a [`@vprop`](@ref) tag was present.
+  - `is_p::Bool`: whether a [`@pprop`](@ref) tag was present.
+  - `is_c::Bool`: whether a [`@cprop`](@ref) tag was present.
   - `stripped`: the field expression with all tags removed.
 
 # Related
@@ -832,15 +872,21 @@ Tags may be stacked in either order (`@fprop @vprop field`), which parses as nes
 function _peel_prop_tags(expr)
     is_f = false
     is_v = false
+    is_p = false
+    is_c = false
     while _is_prop_tag_call(expr)
         if _is_fprop_macro(expr.args[1])
             is_f = true
-        else
+        elseif _is_vprop_macro(expr.args[1])
             is_v = true
+        elseif _is_pprop_macro(expr.args[1])
+            is_p = true
+        else
+            is_c = true
         end
         expr = expr.args[end]
     end
-    return is_f, is_v, expr
+    return is_f, is_v, is_p, is_c, expr
 end
 
 """
@@ -1004,11 +1050,12 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Walk a struct body, collecting [`@fprop`](@ref)-tagged, [`@vprop`](@ref)-tagged and all
-field names and stripping the tags from the body.
+Walk a struct body, collecting [`@fprop`](@ref)-, [`@vprop`](@ref)-, [`@pprop`](@ref)- and
+[`@cprop`](@ref)-tagged field names (and all field names) and stripping the tags from the
+body.
 
-Handles bare tagged fields (`@fprop field`, `@vprop field`), stacked tags
-(`@fprop @vprop field`, in either order), and docstring-prefixed forms
+Handles bare tagged fields (`@fprop field`, …), stacked tags
+(`@pprop @fprop field`, in any order), and docstring-prefixed forms
 (`"doc" \\n @fprop field`). Non-field nodes (line numbers, inner constructors) are carried
 through unchanged.
 
@@ -1020,6 +1067,8 @@ through unchanged.
 
   - `fprop_fields::Vector{Symbol}`: Names of [`@fprop`](@ref)-tagged fields.
   - `vprop_fields::Vector{Symbol}`: Names of [`@vprop`](@ref)-tagged fields.
+  - `pprop_fields::Vector{Symbol}`: Names of [`@pprop`](@ref)-tagged fields.
+  - `cprop_fields::Vector{Symbol}`: Names of [`@cprop`](@ref)-tagged fields.
   - `all_fields::Vector{Symbol}`: Names of every declared field (tagged or not).
   - `new_body::Expr`: The struct body with all tags stripped.
 
@@ -1035,22 +1084,34 @@ through unchanged.
 function _propagatable_parse_body(body)
     fprop_fields = Symbol[]
     vprop_fields = Symbol[]
+    pprop_fields = Symbol[]
+    cprop_fields = Symbol[]
     all_fields   = Symbol[]
     new_args     = Any[]
+    function _record!(fname, is_f, is_v, is_p, is_c)
+        if is_f
+            push!(fprop_fields, fname)
+        end
+        if is_v
+            push!(vprop_fields, fname)
+        end
+        if is_p
+            push!(pprop_fields, fname)
+        end
+        if is_c
+            push!(cprop_fields, fname)
+        end
+        push!(all_fields, fname)
+        return nothing
+    end
     for arg in body.args
         if arg isa Expr && arg.head == :macrocall && _is_doc_macro(arg.args[1])
             # Core.@doc "doc" (field or tagged field)
             inner = arg.args[end]
-            is_f, is_v, stripped = _peel_prop_tags(inner)
-            if is_f || is_v
+            is_f, is_v, is_p, is_c, stripped = _peel_prop_tags(inner)
+            if is_f || is_v || is_p || is_c
                 fname = _extract_field_name(stripped)
-                if is_f
-                    push!(fprop_fields, fname)
-                end
-                if is_v
-                    push!(vprop_fields, fname)
-                end
-                push!(all_fields, fname)
+                _record!(fname, is_f, is_v, is_p, is_c)
                 # Rebuild @doc node with tags stripped: replace last arg with bare field
                 push!(new_args, Expr(:macrocall, arg.args[1:(end - 1)]..., stripped))
             else
@@ -1061,19 +1122,11 @@ function _propagatable_parse_body(body)
                 end
                 push!(new_args, arg)
             end
-        elseif arg isa Expr &&
-               arg.head == :macrocall &&
-               (_is_fprop_macro(arg.args[1]) || _is_vprop_macro(arg.args[1]))
-            # Bare @fprop/@vprop field (tags may be stacked) — no docstring
-            is_f, is_v, stripped = _peel_prop_tags(arg)
+        elseif _is_prop_tag_call(arg)
+            # Bare @fprop/@vprop/@pprop/@cprop field (tags may be stacked) — no docstring
+            is_f, is_v, is_p, is_c, stripped = _peel_prop_tags(arg)
             fname = _extract_field_name(stripped)
-            if is_f
-                push!(fprop_fields, fname)
-            end
-            if is_v
-                push!(vprop_fields, fname)
-            end
-            push!(all_fields, fname)
+            _record!(fname, is_f, is_v, is_p, is_c)
             push!(new_args, stripped)               # strip tags, keep field expr
         else
             # LineNumberNode, bare Symbol field, field::Type, inner constructor, …
@@ -1084,7 +1137,8 @@ function _propagatable_parse_body(body)
             push!(new_args, arg)
         end
     end
-    return fprop_fields, vprop_fields, all_fields, Expr(:block, new_args...)
+    return fprop_fields, vprop_fields, pprop_fields, cprop_fields, all_fields,
+           Expr(:block, new_args...)
 end
 
 # ---------------------------------------------------------------------------
@@ -1123,36 +1177,82 @@ macro vprop(expr)
 end
 
 """
+    @pprop field
+
+Field tag for use inside a [`@propagatable`](@ref) struct body.
+Marks the field as **prior-selected**: when `factory(x, pr::AbstractPriorResult, …)` is
+invoked, the field is set to `sel(getfield(x, :field), getproperty(pr, :field))` — the
+risk-measure value if present, else the same-named moment from the prior result.
+
+Orthogonal to, and stackable with, [`@fprop`](@ref) (`@pprop @fprop w` gives a measure both
+a prior factory and an `ObsWeights` factory); `@pprop` wins in the prior method. Mutually
+exclusive with [`@cprop`](@ref) on a single field. See ADR 0012.
+
+Raises an error if used outside a `@propagatable` struct body.
+"""
+macro pprop(expr)
+    return error("@pprop may only appear inside a @propagatable struct body")
+end
+
+"""
+    @cprop field
+
+Field tag for use inside a [`@propagatable`](@ref) struct body.
+Marks the field as **context-selected**: when `factory(x, pr::AbstractPriorResult, …)` is
+invoked, the field is set to `sel(getfield(x, :field), _ctx(args...))` — the risk-measure
+value if present, else the threaded optimiser value (a solver) located by type in the
+variadic tail. Used for `slv` fields, whose source is a threaded argument rather than the
+prior. Mutually exclusive with [`@pprop`](@ref) on a single field. See ADR 0012.
+
+Raises an error if used outside a `@propagatable` struct body.
+"""
+macro cprop(expr)
+    return error("@cprop may only appear inside a @propagatable struct body")
+end
+
+"""
     @propagatable expr
 
-Define a struct and automatically generate its propagation methods from two
+Define a struct and automatically generate its propagation methods from four
 orthogonal, stackable field tags:
 
   - [`@fprop`](@ref) (factory propagation): tagged fields receive `_factory_child`
     calls when [`factory`](@ref) is invoked, recursing runtime *values*
     (observation weights, prior results, solvers, …) down the composition tree.
-    A `factory` method is always generated (it is the identity when no field is
-    tagged).
+    A `factory(x, args...)` method is always generated (it is the identity when no
+    field is tagged).
   - [`@vprop`](@ref) (view propagation): tagged fields receive
     [`port_opt_view`](@ref) calls when a view (an index selection) is propagated,
     recursing into composed children and slicing data arrays. A `port_opt_view`
     method is generated **only when at least one field is tagged `@vprop`**.
+  - [`@pprop`](@ref) (prior selection): tagged fields are selected from the
+    same-named field on a prior result via `sel(getfield(x, :f), getproperty(pr, :f))`.
+  - [`@cprop`](@ref) (context selection): tagged fields are selected against a
+    threaded optimiser value (a solver) found by type via `sel(getfield(x, :f), _ctx(args...))`.
 
-Untagged fields pass through unchanged in both methods, regardless of type —
-tagging is explicit and opt-in. The two tags are independent: a field may carry
-neither, either, or both (`@fprop @vprop field`, in either order), because the
-factory- and view-relevant field sets genuinely diverge (a field can be
-factory-propagated but view-passthrough, or vice versa). See ADR 0010.
+When at least one field is tagged `@pprop` or `@cprop`, a second method
+`factory(x, pr::AbstractPriorResult, args...)` is generated. It selects `@pprop`/`@cprop`
+fields as above and threads `@fprop`-only fields with `pr` (`_factory_child(getfield(x, :f), pr, args...)`);
+a field tagged both `@pprop` and `@fprop` is prior-selected in this method (`@pprop` wins).
+Because this method is more specific than the general `factory(x, args...)`, it is chosen
+whenever a prior is passed.
+
+Untagged fields pass through unchanged in every method, regardless of type —
+tagging is explicit and opt-in. The tags are independent and the relevant field sets
+genuinely diverge. `@pprop` and `@cprop` are mutually exclusive on one field (a value comes
+from exactly one source); the only legal stack is `@pprop @fprop`. See ADR 0010 and 0012.
 
 Composes with `@concrete` (put `@propagatable` outermost):
 
 ```julia
-@propagatable @concrete struct MyEstimator <: AbstractEstimator
-    @fprop @vprop inner   # both factory- and view-propagated
-    @vprop data           # view-sliced only (passed through by factory)
-    config                # passed through unchanged by both
-    function MyEstimator(inner::AbstractEstimator, data, config)
-        return new{typeof(inner), typeof(data), typeof(config)}(inner, data, config)
+@propagatable @concrete struct MyMeasure <: RiskMeasure
+    @pprop @fprop w       # prior factory selects pr.w; ObsWeights factory fills w
+    @pprop sigma          # prior-selected from pr.sigma
+    @fprop alg            # threaded (recursed) with pr / args
+    config                # passed through unchanged
+    function MyMeasure(w, sigma, alg, config)
+        return new{typeof(w), typeof(sigma), typeof(alg), typeof(config)}(w, sigma, alg,
+                                                                          config)
     end
 end
 ```
@@ -1171,7 +1271,7 @@ macro propagatable(expr)
     body        = struct_node.args[3]
     struct_name = _propagatable_bare_name(type_head)
 
-    fprop_fields, vprop_fields, all_fields, new_body = _propagatable_parse_body(body)
+    fprop_fields, vprop_fields, pprop_fields, cprop_fields, all_fields, new_body = _propagatable_parse_body(body)
 
     new_struct = Expr(:struct, struct_node.args[1], type_head, new_body)
     chain      = rebuild(new_struct)
@@ -1212,6 +1312,32 @@ macro propagatable(expr)
             end
         end
         push!(defs, view_def)
+    end
+
+    # --- prior/context selection (@pprop / @cprop) — emit only when a field opts in ---
+    if !isempty(pprop_fields) || !isempty(cprop_fields)
+        sel_pairs = Any[]
+        for f in all_fields
+            xf = Expr(:., :x, QuoteNode(f))
+            if f in pprop_fields            # @pprop wins over @fprop in the prior method
+                push!(sel_pairs,
+                      Expr(:kw, f, :(sel($xf, getproperty(pr, $(QuoteNode(f)))))))
+            elseif f in cprop_fields
+                push!(sel_pairs, Expr(:kw, f, :(sel($xf, _ctx(args...)))))
+            elseif f in fprop_fields
+                push!(sel_pairs,
+                      Expr(:kw, f, :(_factory_child($xf, pr, args...; kwargs...))))
+            else
+                push!(sel_pairs, Expr(:kw, f, xf))
+            end
+        end
+        prior_body = Expr(:call, struct_name, Expr(:parameters, sel_pairs...))
+        prior_def = quote
+            function factory(x::$struct_name, pr::AbstractPriorResult, args...; kwargs...)
+                return $prior_body
+            end
+        end
+        push!(defs, prior_def)
     end
 
     return esc(quote
@@ -1795,6 +1921,6 @@ function vec_to_real_measure(f::Function,
     return f(val)
 end
 
-export @propagatable, @fprop, @vprop, factory, traverse_concrete_subtypes,
+export @propagatable, @fprop, @vprop, @pprop, @cprop, factory, traverse_concrete_subtypes,
        concrete_typed_array, MinValue, MeanValue, MedianValue, MaxValue, StandardisedValue,
        StdValue, VarValue, SumValue, ProdValue, ModeValue

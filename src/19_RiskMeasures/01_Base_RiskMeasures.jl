@@ -1055,6 +1055,56 @@ function solver_selector(::Nothing, ::Nothing)
     throw(ArgumentError("Both risk_solver and prior_solver are nothing, cannot solve JuMP model."))
 end
 """
+    sel(risk_variable, source_variable)
+
+Unified risk-measure selector emitted by the [`@pprop`](@ref)/[`@cprop`](@ref) tags. Prefers
+the risk-measure value `risk_variable` when present, otherwise falls back to `source_variable`
+(a prior moment for `@pprop`, or a threaded optimiser value for `@cprop`). Dispatches on
+operand types to the appropriate leaf selector and inlines to zero cost:
+
+  - solvers (`Slv_VecSlv`) → [`solver_selector`](@ref)
+  - uncertainty sets (`UcSE_UcS`) → [`ucs_selector`](@ref)
+  - everything else (moments) → [`nothing_scalar_array_selector`](@ref)
+
+Note: the `solver_selector` both-`nothing` "cannot solve" error is not reachable through
+`sel` (both-`nothing` routes to the moment selector and returns `nothing`); the
+`JuMPOptimiser` solver-required invariant makes that case unreachable in the pipeline. See
+ADR 0012.
+
+# Related
+
+  - [`@pprop`](@ref)
+  - [`@cprop`](@ref)
+  - [`nothing_scalar_array_selector`](@ref)
+  - [`solver_selector`](@ref)
+  - [`ucs_selector`](@ref)
+"""
+function sel(risk_variable, source_variable)
+    return nothing_scalar_array_selector(risk_variable, source_variable)
+end
+function sel(risk_variable::Slv_VecSlv, source_variable)
+    return solver_selector(risk_variable, source_variable)
+end
+sel(::Nothing, source_variable::Slv_VecSlv) = solver_selector(nothing, source_variable)
+sel(risk_variable::UcSE_UcS, source_variable) = ucs_selector(risk_variable, source_variable)
+sel(::Nothing, source_variable::UcSE_UcS) = ucs_selector(nothing, source_variable)
+"""
+    _ctx(args...)
+
+Locate the lone threaded optimiser context value (a solver, `Slv_VecSlv`) in the variadic
+tail of a prior `factory` call, returning `nothing` if none is present. Emitted by the
+[`@cprop`](@ref) tag as the source argument to [`sel`](@ref). The tuple scan is unrolled by
+the compiler, so it is type-stable and allocation-free. See ADR 0012.
+
+# Related
+
+  - [`@cprop`](@ref)
+  - [`sel`](@ref)
+"""
+_ctx() = nothing
+_ctx(a::Slv_VecSlv, args...) = a
+_ctx(::Any, args...) = _ctx(args...)
+"""
     expected_risk(r, args...; kwargs...)
 
 Compute the expected value of a risk measure.
