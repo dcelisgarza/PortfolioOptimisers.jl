@@ -215,19 +215,19 @@ Keywords correspond to the struct's fields.
   - [`FactorRiskBudgeting`](@ref)
   - [`RiskBudgeting`](@ref)
 """
-@concrete struct AssetRiskBudgeting <: RiskBudgetingAlgorithm
+@propagatable @concrete struct AssetRiskBudgeting <: RiskBudgetingAlgorithm
     """
     $(field_dict[:rkb])
     """
-    rkb
+    @vprop rkb
     """
     $(field_dict[:sets])
     """
-    sets
+    @vprop sets
     """
     $(field_dict[:rba])
     """
-    alg
+    @vprop alg
     function AssetRiskBudgeting(rkb::Option{<:RkbE_Rkb}, sets::Option{<:AssetSets},
                                 alg::RiskBudgetingFormulation)
         if isa(rkb, RiskBudgetEstimator)
@@ -240,34 +240,6 @@ function AssetRiskBudgeting(; rkb::Option{<:RkbE_Rkb} = nothing,
                             sets::Option{<:AssetSets} = nothing,
                             alg::RiskBudgetingFormulation = LogRiskBudgeting())::AssetRiskBudgeting
     return AssetRiskBudgeting(rkb, sets, alg)
-end
-"""
-    port_opt_view(r, i)
-
-Return a view or subset of a risk budgeting algorithm for cluster index `i`.
-
-Used in hierarchical optimisation to slice risk budget and asset set configurations for each cluster.
-
-# Arguments
-
-  - `r`: Risk budgeting algorithm ([`AssetRiskBudgeting`](@ref) or [`FactorRiskBudgeting`](@ref)).
-  - `i`: Cluster or asset index.
-
-# Returns
-
-  - Sliced risk budgeting algorithm.
-
-# Related
-
-  - [`AssetRiskBudgeting`](@ref)
-  - [`FactorRiskBudgeting`](@ref)
-  - [`RiskBudgeting`](@ref)
-"""
-function port_opt_view(r::AssetRiskBudgeting, i, args...)
-    rkb = port_opt_view(r.rkb, i)
-    sets = port_opt_view(r.sets, i)
-    alg = port_opt_view(r.alg, i)
-    return AssetRiskBudgeting(; rkb = rkb, sets = sets, alg = alg)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -301,11 +273,11 @@ Keywords correspond to the struct's fields.
   - [`AssetRiskBudgeting`](@ref)
   - [`RiskBudgeting`](@ref)
 """
-@concrete struct FactorRiskBudgeting <: RiskBudgetingAlgorithm
+@propagatable @concrete struct FactorRiskBudgeting <: RiskBudgetingAlgorithm
     """
     $(field_dict[:re])
     """
-    re
+    @vprop re
     """
     $(field_dict[:rkb])
     """
@@ -331,32 +303,6 @@ function FactorRiskBudgeting(; re::RegE_Reg = StepwiseRegression(),
                              sets::Option{<:AssetSets} = nothing,
                              flag::Bool = true)::FactorRiskBudgeting
     return FactorRiskBudgeting(re, rkb, sets, flag)
-end
-"""
-    port_opt_view(r::FactorRiskBudgeting, i)
-
-Return a view of a `FactorRiskBudgeting` algorithm for cluster index `i`.
-
-Slices the regression estimator for the given cluster while keeping the risk budget, asset sets, and idiosyncratic flag unchanged.
-
-# Arguments
-
-  - `r::FactorRiskBudgeting`: Factor-level risk budgeting algorithm.
-  - `i`: Cluster or asset index.
-
-# Returns
-
-  - `FactorRiskBudgeting` with the regression estimator sliced to cluster `i`.
-
-# Related
-
-  - [`port_opt_view`](@ref)
-  - [`FactorRiskBudgeting`](@ref)
-  - [`AssetRiskBudgeting`](@ref)
-"""
-function port_opt_view(r::FactorRiskBudgeting, i, args...)
-    re = port_opt_view(r.re, i)
-    return FactorRiskBudgeting(; re = re, rkb = r.rkb, sets = r.sets, flag = r.flag)
 end
 """
 $(DocStringExtensions.TYPEDEF)
