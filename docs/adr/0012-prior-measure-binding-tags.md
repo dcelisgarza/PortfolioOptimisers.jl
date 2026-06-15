@@ -34,10 +34,14 @@ The investigation surfaced several structural facts that shape the design:
   `@fprop` method never runs. Therefore the prior method must *itself* thread the `@fprop`
   children — prior-binding cannot be decoupled from `@fprop` knowledge, ruling out a
   cleanly separate macro.
-- **`ObsWeights` factories come for free from `@fprop`.** A large existing
-  `factory(x, w::ObsWeights)` family fills `nothing`-slots via
-  `_factory_child(::Nothing, ::ObsWeights) = w`. Tagging a weights field `@fprop` gives a
-  measure an ObsWeights-direct factory at no extra cost.
+- **`ObsWeights` factories initially rode on `@fprop`, but the two semantics collide.** A
+  large existing `factory(x, w::ObsWeights)` family fills `nothing`-slots via
+  `_factory_child(::Nothing, ::ObsWeights) = w`. Tagging a weights field `@fprop` reused
+  this for free — but the same `_factory_child(::Nothing, ::ObsWeights)` method also fires
+  on an `@fprop`-tagged **sub-estimator** field that happens to be `nothing` (e.g.
+  `SimpleVariance(; me = nothing)`), wrongly setting it to the weights vector. Weights-
+  replace (`nothing → w`) and estimator-recurse (`nothing → nothing`) are indistinguishable
+  at runtime on that one dispatch, so they need separate tags (see `@wprop`, decision 0).
 - **Solvers/uncertainty sets are a *third* source axis.** `slv`/`ucs` are selected against
   a **threaded optimiser value** (`factory(r, pr, slv)`), not against `pr` — there is no
   `pr.slv`. They also carry different selectors (`solver_selector`/`ucs_selector`) and,
@@ -52,10 +56,23 @@ The investigation surfaced several structural facts that shape the design:
 
 ## Decision
 
-The `@propagatable` tag family grows from two axes to four, named by what distinguishes
-them. The existing tags name a *mechanism* (`@fprop` = factory threading, `@vprop` = view
-slicing); the two new tags name a *source* (`@pprop` = prior, `@cprop` = context), because
-that source is exactly what sets them apart.
+The `@propagatable` tag family grows from two axes to five. The existing tags name a
+*mechanism* (`@fprop` = factory threading, `@vprop` = view slicing); `@pprop`/`@cprop` name
+a *source* (`@pprop` = prior, `@cprop` = context); and `@wprop` splits the weights-replace
+mechanism out of `@fprop` (decision 0), because reusing `@fprop`'s `nothing`-handling for
+weights silently corrupts nothing-valued sub-estimator fields.
+
+### 0. `@wprop` — observation-weights replacement (split from `@fprop`)
+
+`@wprop f` declares that field `f` is an observation-weights slot: in the general (and
+prior) factory it is **replaced** by an incoming `ObsWeights` argument via
+`_wprop(getfield(x, :f), args...)` (`_wprop(::Any, w::ObsWeights, …) = w`, else the field
+unchanged). `@fprop` keeps only the estimator-recursion role, and the
+`_factory_child(::Nothing, w::ObsWeights) = w` shortcut is removed — so an `@fprop` sub-
+estimator that is `nothing` now correctly stays `nothing`. Every weights field previously
+tagged `@fprop w` is re-tagged `@wprop w`. `@wprop` may stack with `@pprop` (`@pprop @wprop w`
+gives a measure both a prior factory and an `ObsWeights` factory; `@pprop` wins in the prior
+method).
 
 ### 1. `@pprop` — prior selection (third tag)
 
@@ -65,11 +82,12 @@ result. Presence of any `@pprop` field emits a method
 
 - `@pprop f` → `f = sel(getfield(x, :f), getproperty(pr, :f))`
 - `@fprop`-only `g` → `g = _factory_child(getfield(x, :g), pr, args...)`
-- a field tagged both `@pprop @fprop` → `@pprop` wins **in this method**.
+- `@wprop`-only `w` → `w = _wprop(getfield(x, :w), args...)`
+- a field tagged both `@pprop @fprop`/`@pprop @wprop` → `@pprop` wins **in this method**.
 
-The general `factory(x, args...)` emitted by `@fprop` is unchanged and remains the
-`ObsWeights`-direct factory. So `@pprop @fprop w` on a measure yields *both* a prior
-factory and an `ObsWeights` factory from one declaration.
+The general `factory(x, args...)` is unchanged and remains the `ObsWeights`-direct factory
+(now via `@wprop`). So `@pprop @wprop w` on a measure yields *both* a prior factory and an
+`ObsWeights` factory from one declaration.
 
 `@pprop` keys strictly by name (`r.f` ↔ `pr.f`); there is no `@pprop f => g` remap. Every
 current measure is same-name; a future differing-name measure opts out.
@@ -119,8 +137,10 @@ not `@pprop`.
 - `@pprop` and `@cprop` are mutually exclusive on a field — a field's selected value comes
   from exactly one source (the prior, or the threaded context), never both.
 - `@cprop` fields are not also `@fprop` (a solver field is selected, not recursed).
-- `@pprop @fprop` on one field is the only legal stack (prior factory + ObsWeights factory),
-  resolved `@pprop`-wins in the prior method (decision 1).
+- `@fprop` (recurse sub-estimator) and `@wprop` (replace weights) are mutually exclusive on a
+  field — a field is either a sub-estimator or a weights slot.
+- The legal stacks are `@pprop @fprop` and `@pprop @wprop` (prior factory + recurse/weights
+  factory), resolved `@pprop`-wins in the prior method (decision 1).
 
 ## Considered options
 
@@ -156,9 +176,12 @@ not `@pprop`.
 - `@pprop` silently depends on the same-name `r.f`↔`pr.f` convention and on
   `mu`/`sigma`/`chol`/`w` remaining universal across all `AbstractPriorResult`s; a new prior
   result lacking one, or a measure needing a differing-name binding, must opt out.
-- Amends ADR 0002/0010: the `@propagatable` family grows from two tags to four
-  (`@fprop`/`@vprop`/`@pprop`/`@cprop`); exports and the use-outside-body error stubs extend
-  accordingly.
+- Amends ADR 0002/0010: the `@propagatable` family grows from two tags to five
+  (`@fprop`/`@wprop`/`@vprop`/`@pprop`/`@cprop`); exports and the use-outside-body error
+  stubs extend accordingly. Splitting `@wprop` out of `@fprop` also fixes a latent bug where
+  an `@fprop`-tagged sub-estimator field that was `nothing` (e.g. `SimpleVariance(; me =
+  nothing)`, reachable via `factory(SecondMoment(), w)`) was wrongly replaced by the
+  incoming weights and threw a constructor error.
 
 ## Verification
 
@@ -166,7 +189,9 @@ not `@pprop`.
   prior method and the `sel` wrapper must infer concretely (mirrors ADR 0002 §Verification).
 - A migrated measure's `factory(r, pr)` is observationally identical to its previous
   hand-written body (same fields selected, same fallbacks).
-- `@pprop @fprop w` measures expose both `factory(r, pr)` and `factory(r, ::ObsWeights)`.
+- `@pprop @wprop w` measures expose both `factory(r, pr)` and `factory(r, ::ObsWeights)`.
+- `@fprop`-tagged sub-estimator fields that are `nothing` survive `factory(x, ::ObsWeights)`
+  unchanged (regression test for the weights/estimator collision).
 - Full test suite green before merge (mirrors ADR 0011).
 
 ## Rollout
@@ -179,3 +204,7 @@ Staged, each independently reviewable (mirrors ADR 0010):
    hand-written prior `factory` bodies.
 3. **Context measures** — convert the `slv` families (Entropic/Relativistic/PowerNorm) to
    `@cprop`; drop the dead `slv`-first defensive factory methods.
+4. **`@wprop` split** — fold the remaining eligible estimators into `@fprop`/`@vprop`, then
+   add the `@wprop` tag and `_wprop` helper, remove the
+   `_factory_child(::Nothing, ::ObsWeights)` shortcut, and re-tag every weights field
+   `@fprop w` → `@wprop w`, fixing the nothing-sub-estimator collision.
