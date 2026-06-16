@@ -79,7 +79,7 @@ Property access delegates to the embedded [`JuMPOptimisationResult`](@ref): the 
     fb
     function NearOptimalCenteringResult(jr::JuMPOptimisationResult,
                                         w_min_retcode::OptimisationReturnCode,
-                                        w_opt_retcode::OptimisationReturnCode,
+                                        w_opt_retcode::OptRetCode_VecOptRetCode,
                                         w_max_retcode::OptimisationReturnCode,
                                         noc_retcode::OptimisationReturnCode,
                                         fb::Option{<:OptE_Opt})
@@ -93,7 +93,7 @@ Property access delegates to the embedded [`JuMPOptimisationResult`](@ref): the 
 end
 function NearOptimalCenteringResult(; jr::JuMPOptimisationResult,
                                     w_min_retcode::OptimisationReturnCode,
-                                    w_opt_retcode::OptimisationReturnCode,
+                                    w_opt_retcode::OptRetCode_VecOptRetCode,
                                     w_max_retcode::OptimisationReturnCode,
                                     noc_retcode::OptimisationReturnCode,
                                     fb::Option{<:OptE_Opt})::NearOptimalCenteringResult
@@ -541,7 +541,7 @@ $(DocStringExtensions.FIELDS)
                               w_max::VecNum_VecVecNum, r::RM_VecRM, opt::JuMPOptimiser,
                               attrs::ProcessedJuMPOptimiserAttributes,
                               w_min_retcode::OptimisationReturnCode,
-                              w_opt_retcode::OptimisationReturnCode,
+                              w_opt_retcode::OptRetCode_VecOptRetCode,
                               w_max_retcode::OptimisationReturnCode)
         return new{typeof(w_opt), typeof(rk_opt), typeof(rt_opt), typeof(rt_min),
                    typeof(rt_max), typeof(w_min), typeof(w_max), typeof(r), typeof(opt),
@@ -558,7 +558,7 @@ function NearOptimalSetup(; w_opt::VecNum_VecVecNum, rk_opt::Union{<:Number, <:V
                           w_max::VecNum_VecVecNum, r::RM_VecRM, opt::JuMPOptimiser,
                           attrs::ProcessedJuMPOptimiserAttributes,
                           w_min_retcode::OptimisationReturnCode,
-                          w_opt_retcode::OptimisationReturnCode,
+                          w_opt_retcode::OptRetCode_VecOptRetCode,
                           w_max_retcode::OptimisationReturnCode)::NearOptimalSetup
     return NearOptimalSetup(w_opt, rk_opt, rt_opt, rt_min, rt_max, w_min, w_max, r, opt,
                             attrs, w_min_retcode, w_opt_retcode, w_max_retcode)
