@@ -871,5 +871,92 @@ function demean_returns(X::MatNum, me::AbstractExpectedReturnsEstimator; dims::I
     mu = isnothing(mean) ? Statistics.mean(me, X; dims = dims, kwargs...) : mean
     return X .- mu
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Shared preamble for windowed moment estimators (matrix input).
+
+Resolves the window specification, subsets `X` (and `iv`) to the selected observations,
+rebinds observation weights to the window, and builds a weight-updated copy of `est` via
+[`factory`](@ref). When `window` is a vector of indices, `iv` is subset to the same rows
+(or columns when `dims = 2`); otherwise `iv` is returned unchanged.
+
+# Arguments
+
+  - `est`: Wrapped moment estimator to be cloned with updated weights.
+  - `w`: Optional observation weights applied after windowing.
+  - `window`: Window specification — `nothing` (full data), an `Int` (last `window`
+    observations), or a `VecInt` of explicit row/column indices.
+  - `X`: Data matrix of asset returns.
+  - `iv`: Optional instrument variable matrix; subsetted to the window when `window` is a
+    `VecInt`.
+  - `dims`: Observation dimension — 1 for rows (default), 2 for columns.
+  - `kwargs...`: Passed through to [`moment_window_and_weights`](@ref).
+
+# Returns
+
+  - `(inner, X, iv)`: Weight-updated estimator, windowed returns matrix, and (possibly
+    subsetted) instrument variable matrix.
+
+# Related
+
+  - [`get_window`](@ref)
+  - [`moment_window_and_weights`](@ref)
+  - [`factory`](@ref)
+  - [`mean(me::WindowedExpectedReturns, X::MatNum; dims::Int = 1, iv::Option{<:MatNum} = nothing, kwargs...)`](@ref)
+  - [`cov(ce::WindowedCovariance, X::MatNum; dims::Int = 1, mean = nothing, iv::Option{<:MatNum} = nothing, kwargs...)`](@ref)
+  - [`cor(ce::WindowedCovariance, X::MatNum; dims::Int = 1, mean = nothing, iv::Option{<:MatNum} = nothing, kwargs...)`](@ref)
+  - [`var(ce::WindowedVariance, X::MatNum; dims::Int = 1, mean = nothing, iv::Option{<:MatNum} = nothing, kwargs...)`](@ref)
+  - [`std(ce::WindowedVariance, X::MatNum; dims::Int = 1, mean = nothing, iv::Option{<:MatNum} = nothing, kwargs...)`](@ref)
+  - [`coskewness(ske::WindowedCoskewness, X::MatNum; dims::Int = 1, iv::Option{<:MatNum} = nothing, kwargs...)`](@ref)
+  - [`cokurtosis(ke::WindowedCokurtosis, X::MatNum; dims::Int = 1, iv::Option{<:MatNum} = nothing, kwargs...)`](@ref)
+"""
+function windowed_preamble(est, w::Option{<:ObsWeights}, window::Option{<:Int_VecInt},
+                           X::MatNum; iv::Option{<:MatNum} = nothing, dims::Int = 1,
+                           kwargs...)
+    win = get_window(window, X, dims)
+    X, w_new = moment_window_and_weights(X, w, win; dims = dims, kwargs...)
+    inner = factory(est, w_new)
+    if !isnothing(iv) && isa(win, VecInt)
+        iv = isone(dims) ? view(iv, win, :) : view(iv, :, win)
+    end
+    return inner, X, iv
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Shared preamble for windowed moment estimators (vector input).
+
+Resolves the window specification, subsets `X` to the selected observations, rebinds
+observation weights to the window, and builds a weight-updated copy of `est` via
+[`factory`](@ref).
+
+# Arguments
+
+  - `est`: Wrapped moment estimator to be cloned with updated weights.
+  - `w`: Optional observation weights applied after windowing.
+  - `window`: Window specification — `nothing` (full data), an `Int` (last `window`
+    observations), or a `VecInt` of explicit indices.
+  - `X`: Data vector of returns.
+
+# Returns
+
+  - `(inner, X)`: Weight-updated estimator and windowed returns vector.
+
+# Related
+
+  - [`get_window`](@ref)
+  - [`moment_window_and_weights`](@ref)
+  - [`factory`](@ref)
+  - [`var(ce::WindowedVariance, X::VecNum; mean = nothing)`](@ref)
+  - [`std(ce::WindowedVariance, X::VecNum; mean = nothing)`](@ref)
+"""
+function windowed_preamble(est, w::Option{<:ObsWeights}, window::Option{<:Int_VecInt},
+                           X::VecNum)
+    win = get_window(window, X)
+    X, w_new = moment_window_and_weights(X, w, win)
+    inner = factory(est, w_new)
+    return inner, X
+end
 
 export Full, Semi

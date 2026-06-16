@@ -86,7 +86,7 @@ AverageDrawdown
   - [`ConditionalDrawdownatRisk`](@ref)
   - [`RelativeAverageDrawdown`](@ref)
 """
-@concrete struct AverageDrawdown <: RiskMeasure
+@propagatable @concrete struct AverageDrawdown <: RiskMeasure
     """
     $(field_dict[:settings_rm])
     """
@@ -94,7 +94,7 @@ AverageDrawdown
     """
     $(field_dict[:w_rm])
     """
-    w
+    @pprop w
     function AverageDrawdown(settings::RiskMeasureSettings, w::Option{<:ObsWeights})
         assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(settings), typeof(w)}(settings, w)
@@ -190,7 +190,7 @@ RelativeAverageDrawdown
   - [`AverageDrawdown`](@ref)
   - [`RelativeMaximumDrawdown`](@ref)
 """
-@concrete struct RelativeAverageDrawdown <: HierarchicalRiskMeasure
+@propagatable @concrete struct RelativeAverageDrawdown <: HierarchicalRiskMeasure
     """
     $(field_dict[:settings_rm])
     """
@@ -198,7 +198,7 @@ RelativeAverageDrawdown
     """
     $(field_dict[:w_rm])
     """
-    w
+    @pprop w
     function RelativeAverageDrawdown(settings::HierarchicalRiskMeasureSettings,
                                      w::Option{<:ObsWeights})
         assert_nonempty_nonneg_finite_val(w, :w)
@@ -214,40 +214,6 @@ function (r::RelativeAverageDrawdown)(x::VecNum)
     dd = relative_drawdown_vec(x)
     w = get_observation_weights(r.w, x)
     return -(isnothing(r.w) ? Statistics.mean(dd) : Statistics.mean(dd, w))
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Create an instance of [`AverageDrawdown`](@ref) by selecting observation weights from the risk-measure instance or falling back to the prior result.
-
-# Related
-
-  - [`AverageDrawdown`](@ref)
-  - [`AbstractPriorResult`](@ref)
-  - [`factory`](@ref)
-  - [`nothing_scalar_array_selector`](@ref)
-"""
-function factory(r::AverageDrawdown, pr::AbstractPriorResult, args...;
-                 kwargs...)::AverageDrawdown
-    w = nothing_scalar_array_selector(r.w, pr.w)
-    return AverageDrawdown(; settings = r.settings, w = w)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Create an instance of [`RelativeAverageDrawdown`](@ref) by selecting observation weights from the risk-measure instance or falling back to the prior result.
-
-# Related
-
-  - [`RelativeAverageDrawdown`](@ref)
-  - [`AbstractPriorResult`](@ref)
-  - [`factory`](@ref)
-  - [`nothing_scalar_array_selector`](@ref)
-"""
-function factory(r::RelativeAverageDrawdown, pr::AbstractPriorResult, args...;
-                 kwargs...)::RelativeAverageDrawdown
-    w = nothing_scalar_array_selector(r.w, pr.w)
-    return RelativeAverageDrawdown(; settings = r.settings, w = w)
 end
 
 # Expected-risk input kind — see `risk_input_kind`.

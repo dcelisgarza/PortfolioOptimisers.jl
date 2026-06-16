@@ -69,12 +69,6 @@ StandardDeviationExpectedReturns
         return new{typeof(ce)}(ce)
     end
 end
-#= Old factory function:
-function factory(ce::StandardDeviationExpectedReturns,
-                 w::ObsWeights)::StandardDeviationExpectedReturns
-    return StandardDeviationExpectedReturns(; ce = factory(ce.ce, w))
-end
-=#
 function StandardDeviationExpectedReturns(;
                                           ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance())::StandardDeviationExpectedReturns
     return StandardDeviationExpectedReturns(ce)
@@ -192,11 +186,6 @@ VarianceExpectedReturns
         return new{typeof(ce)}(ce)
     end
 end
-#= Old factory function:
-function factory(ce::VarianceExpectedReturns, w::ObsWeights)::VarianceExpectedReturns
-    return VarianceExpectedReturns(; ce = factory(ce.ce, w))
-end
-=#
 function VarianceExpectedReturns(;
                                  ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance())::VarianceExpectedReturns
     return VarianceExpectedReturns(ce)

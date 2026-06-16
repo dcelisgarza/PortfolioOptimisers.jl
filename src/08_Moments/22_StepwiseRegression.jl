@@ -146,11 +146,6 @@ StepwiseRegression
         return new{typeof(crit), typeof(alg), typeof(tgt)}(crit, alg, tgt)
     end
 end
-#= Old factory function:
-function factory(re::StepwiseRegression, w::ObsWeights)::StepwiseRegression
-    return StepwiseRegression(; crit = re.crit, alg = re.alg, tgt = factory(re.tgt, w))
-end
-=#
 function StepwiseRegression(; crit::AbstractStepwiseRegressionCriterion = PValue(),
                             alg::AbstractStepwiseRegressionAlgorithm = Forward(),
                             tgt::AbstractRegressionTarget = LinearModel())::StepwiseRegression

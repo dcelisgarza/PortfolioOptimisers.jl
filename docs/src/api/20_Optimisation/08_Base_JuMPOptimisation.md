@@ -12,11 +12,12 @@ CustomJuMPObjective
 needs_previous_weights(::CustomJuMPConstraint)
 needs_previous_weights(::CustomJuMPObjective)
 JuMPOptimisationSolution
+VecJuMPOptSol
+JuMPOptSol_VecJuMPOptSol
 BaseJuMPOptimisationResult
-JuMPOptimisationResult
-getproperty(jr::JuMPOptimisationResult, sym::Symbol)
 RiskJuMPOptimisationResult
-getproperty(r::RiskJuMPOptimisationResult, sym::Symbol)
+Base.propertynames(r::RiskJuMPOptimisationResult)
+Base.getproperty(r::RiskJuMPOptimisationResult, sym::Symbol)
 NonJuMPOptimisationResult
 add_custom_objective_term!
 add_custom_constraint!

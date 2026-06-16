@@ -366,7 +366,7 @@ function set_relaxed_risk_budgeting_constraints!(model::JuMP.Model,
                                                                                   pr.sigma *
                                                                                   b1)))
     set_weight_constraints!(model, wb, rrb.opt.bgt, rrb.opt.sbgt)
-    return ProcessedFactorRiskBudgetingAttributes(rkb, b1, rr)
+    return ProcessedFactorRiskBudgetingAttributes(; rkb = rkb, b1 = b1, rr = rr)
 end
 function set_relaxed_risk_budgeting_constraints!(model::JuMP.Model,
                                                  rrb::RelaxedRiskBudgeting{<:Any,
@@ -378,7 +378,7 @@ function set_relaxed_risk_budgeting_constraints!(model::JuMP.Model,
     set_weight_constraints!(model, wb, rrb.opt.bgt, nothing, true)
     rkb = _set_relaxed_risk_budgeting_constraints!(model, rrb, get_w(model), pr.sigma,
                                                    pr.chol)
-    return ProcessedAssetRiskBudgetingAttributes(rkb)
+    return ProcessedAssetRiskBudgetingAttributes(; rkb = rkb)
 end
 function _optimise(rrb::RelaxedRiskBudgeting, rd::ReturnsResult = ReturnsResult();
                    dims::Int = 1, str_names::Bool = false, save::Bool = true, kwargs...)
@@ -392,9 +392,12 @@ function _optimise(rrb::RelaxedRiskBudgeting, rd::ReturnsResult = ReturnsResult(
     set_portfolio_objective_function!(model, MinimumRisk(), attrs.ret, rrb.opt.cobj, rrb,
                                       attrs.pr)
     retcode, sol = optimise_JuMP_model!(model, rrb, eltype(attrs.pr.X))
-    return RiskBudgetingResult(JuMPOptimisationResult(typeof(rrb), attrs, retcode, sol,
-                                                      ifelse(save, model, nothing)), prb,
-                               nothing)
+    return RiskBudgetingResult(;
+                               jr = JuMPOptimisationResult(; oe = typeof(rrb), pa = attrs,
+                                                           retcode = retcode, sol = sol,
+                                                           model = ifelse(save, model,
+                                                                          nothing)),
+                               prb = prb, fb = nothing)
 end
 """
     optimise(rrb::RelaxedRiskBudgeting{<:Any, <:Any, <:Any, <:Any, Nothing},

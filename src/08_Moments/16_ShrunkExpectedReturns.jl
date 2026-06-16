@@ -343,12 +343,6 @@ ShrunkExpectedReturns
         return new{typeof(me), typeof(ce), typeof(alg)}(me, ce, alg)
     end
 end
-#= Old factory function:
-function factory(me::ShrunkExpectedReturns, w::ObsWeights)::ShrunkExpectedReturns
-    return ShrunkExpectedReturns(; me = factory(me.me, w), ce = factory(me.ce, w),
-                                 alg = me.alg)
-end
-=#
 function ShrunkExpectedReturns(;
                                me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
                                ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),

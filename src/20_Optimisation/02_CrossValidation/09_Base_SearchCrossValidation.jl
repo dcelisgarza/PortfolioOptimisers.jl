@@ -155,6 +155,23 @@ $(DocStringExtensions.FIELDS)
     $(field_dict[:idx_cv])
     """
     idx
+    function SearchCrossValidationResult(opt::AbstractEstimator, test_scores::MatNum,
+                                         train_scores::Option{<:MatNum},
+                                         lens_grid::AbstractVector,
+                                         val_grid::AbstractVector, idx::Integer)
+        return new{typeof(opt), typeof(test_scores), typeof(train_scores),
+                   typeof(lens_grid), typeof(val_grid), typeof(idx)}(opt, test_scores,
+                                                                     train_scores,
+                                                                     lens_grid, val_grid,
+                                                                     idx)
+    end
+end
+function SearchCrossValidationResult(; opt::AbstractEstimator, test_scores::MatNum,
+                                     train_scores::Option{<:MatNum},
+                                     lens_grid::AbstractVector, val_grid::AbstractVector,
+                                     idx::Integer)::SearchCrossValidationResult
+    return SearchCrossValidationResult(opt, test_scores, train_scores, lens_grid, val_grid,
+                                       idx)
 end
 """
     fit_and_score(opt::NonFiniteAllocationOptimisationEstimator,

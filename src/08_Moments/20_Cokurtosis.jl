@@ -156,11 +156,11 @@ Cokurtosis
   - [`AbstractMatrixProcessingEstimator`](@ref)
   - [`AbstractMomentAlgorithm`](@ref)
 """
-@concrete struct Cokurtosis <: CokurtosisEstimator
+@propagatable @concrete struct Cokurtosis <: CokurtosisEstimator
     """
     $(field_dict[:me])
     """
-    me
+    @fprop @vprop me
     """
     $(field_dict[:mp])
     """
@@ -172,7 +172,7 @@ Cokurtosis
     """
     $(field_dict[:oow])
     """
-    w
+    @wprop w
     function Cokurtosis(me::AbstractExpectedReturnsEstimator,
                         mp::AbstractMatrixProcessingEstimator, alg::AbstractMomentAlgorithm,
                         w::Option{<:ObsWeights})
@@ -185,71 +185,6 @@ function Cokurtosis(; me::AbstractExpectedReturnsEstimator = SimpleExpectedRetur
                     alg::AbstractMomentAlgorithm = Full(),
                     w::Option{<:ObsWeights} = nothing)::Cokurtosis
     return Cokurtosis(me, mp, alg, w)
-end
-"""
-    factory(kte::Cokurtosis, w::ObsWeights) -> Cokurtosis
-
-Return a new [`Cokurtosis`](@ref) estimator with observation weights `w` applied to the underlying mean estimator.
-
-# Arguments
-
-  - $(arg_dict[:kte])
-  - $(arg_dict[:ow])
-
-# Returns
-
-  - `kte::Cokurtosis`: Updated estimator with weights applied.
-
-# Examples
-
-```jldoctest
-julia> kte = Cokurtosis();
-
-julia> factory(kte, StatsBase.Weights([0.2, 0.3, 0.5]))
-Cokurtosis
-   me ┼ SimpleExpectedReturns
-      │   w ┴ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.3, 0.5]
-   mp ┼ MatrixProcessing
-      │     pdm ┼ Posdef
-      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
-      │      dn ┼ nothing
-      │      dt ┼ nothing
-      │     alg ┼ nothing
-      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
-  alg ┼ Full()
-    w ┴ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.3, 0.5]
-```
-
-# Related
-
-  - [`Cokurtosis`](@ref)
-  - [`factory`](@ref)
-"""
-function factory(kte::Cokurtosis, w::ObsWeights)::Cokurtosis
-    return Cokurtosis(; me = factory(kte.me, w), mp = kte.mp, alg = kte.alg, w = w)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Gets the view of the cokurtosis estimator for the `i`-th element(s).
-
-# Arguments
-
-  - $(arg_dict[:kte])
-  - `i`: Index or indices to view.
-
-# Returns
-
-  - $(ret_dict[:ktev])
-
-# Related
-
-  - [`Cokurtosis`](@ref)
-"""
-function port_opt_view(kte::Cokurtosis, i, args...)::Cokurtosis
-    return Cokurtosis(; me = port_opt_view(kte.me, i), mp = kte.mp, alg = kte.alg,
-                      w = kte.w)
 end
 """
     _cokurtosis(X::MatNum, mp::AbstractMatrixProcessingEstimator, w::Option{<:ObsWeights}) -> MatNum

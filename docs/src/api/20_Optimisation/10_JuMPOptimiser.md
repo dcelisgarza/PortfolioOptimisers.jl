@@ -2,6 +2,7 @@
 
 ```@docs
 ProcessedJuMPOptimiserAttributes
+JuMPOptimisationResult
 assert_finite_nonnegative_real_or_vec
 JuMPOptimiser
 needs_previous_weights(opt::JuMPOptimiser)

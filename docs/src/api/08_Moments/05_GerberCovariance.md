@@ -22,11 +22,9 @@ Gerber0
 Gerber1
 Gerber2
 GerberCovariance
-factory(ce::GerberCovariance, w::ObsWeights)
 gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Any, <:Gerber0}, X::MatNum, sd::ArrNum)
 gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Any, <:Gerber1}, X::MatNum, sd::ArrNum)
 gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Any, <:Gerber2}, X::MatNum, sd::ArrNum)
 cov(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Any}, X::MatNum; dims::Int = 1, kwargs...)
 cor(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Any}, X::MatNum; dims::Int = 1, kwargs...)
-port_opt_view(ce::GerberCovariance, i, args...)
 ```

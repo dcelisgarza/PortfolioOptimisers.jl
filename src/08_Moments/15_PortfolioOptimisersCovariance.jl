@@ -45,11 +45,11 @@ PortfolioOptimisersCovariance
   - [`AbstractCovarianceEstimator`](@ref)
   - [`AbstractMatrixProcessingEstimator`](@ref)
 """
-@concrete struct PortfolioOptimisersCovariance <: AbstractCovarianceEstimator
+@propagatable @concrete struct PortfolioOptimisersCovariance <: AbstractCovarianceEstimator
     """
     $(field_dict[:ce])
     """
-    ce
+    @fprop @vprop ce
     """
     $(field_dict[:mp])
     """
@@ -62,65 +62,6 @@ end
 function PortfolioOptimisersCovariance(; ce::StatsBase.CovarianceEstimator = Covariance(),
                                        mp::AbstractMatrixProcessingEstimator = MatrixProcessing())::PortfolioOptimisersCovariance
     return PortfolioOptimisersCovariance(ce, mp)
-end
-"""
-    factory(ce::PortfolioOptimisersCovariance, w::ObsWeights) -> PortfolioOptimisersCovariance
-
-Return a new [`PortfolioOptimisersCovariance`](@ref) estimator with observation weights `w` applied to the underlying covariance estimator.
-
-# Arguments
-
-  - $(arg_dict[:ce])
-  - $(arg_dict[:ow])
-
-# Returns
-
-  - $(ret_dict[:ce])
-
-# Examples
-
-```jldoctest
-julia> ce = PortfolioOptimisersCovariance();
-
-julia> ce2 = factory(ce, StatsBase.Weights([0.2, 0.3, 0.5]));
-
-julia> ce2.ce.me.w
-3-element Weights{Float64, Float64, Vector{Float64}}:
- 0.2
- 0.3
- 0.5
-```
-
-# Related
-
-  - [`PortfolioOptimisersCovariance`](@ref)
-  - [`factory`](@ref)
-"""
-function factory(ce::PortfolioOptimisersCovariance,
-                 w::ObsWeights)::PortfolioOptimisersCovariance
-    return PortfolioOptimisersCovariance(; ce = factory(ce.ce, w), mp = ce.mp)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Gets the view of the covariance estimator for the `i`-th element(s).
-
-# Arguments
-
-  - $(arg_dict[:ce])
-  - `i`: Index or indices to view.
-
-# Returns
-
-  - $(ret_dict[:cev])
-
-# Related
-
-  - [`PortfolioOptimisersCovariance`](@ref)
-"""
-function port_opt_view(ce::PortfolioOptimisersCovariance, i,
-                       args...)::PortfolioOptimisersCovariance
-    return PortfolioOptimisersCovariance(; ce = port_opt_view(ce.ce, i), mp = ce.mp)
 end
 """
     Statistics.cov(ce::PortfolioOptimisersCovariance, X::MatNum; dims = 1, kwargs...)

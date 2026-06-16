@@ -263,11 +263,12 @@ SecondOrderDifference
   - [`OptimalNumberClusters`](@ref)
   - [`VectorToScalarMeasure`](@ref)
 """
-@concrete struct SecondOrderDifference <: AbstractOptimalNumberClustersAlgorithm
+@propagatable @concrete struct SecondOrderDifference <:
+                               AbstractOptimalNumberClustersAlgorithm
     """
     $(field_dict[:vsalg])
     """
-    alg
+    @fprop alg
     function SecondOrderDifference(alg::Num_VecToScaM)
         return new{typeof(alg)}(alg)
     end
@@ -275,20 +276,6 @@ end
 function SecondOrderDifference(;
                                alg::Num_VecToScaM = StandardisedValue())::SecondOrderDifference
     return SecondOrderDifference(alg)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Return a new [`SecondOrderDifference`](@ref) algorithm with observation weights `w` applied to the underlying vector-to-scalar measure.
-
-# Related
-
-  - [`SecondOrderDifference`](@ref)
-  - [`factory`](@ref)
-"""
-function factory(alg::SecondOrderDifference,
-                 w::StatsBase.AbstractWeights)::SecondOrderDifference
-    return SecondOrderDifference(; alg = factory(alg.alg, w))
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -329,30 +316,17 @@ SilhouetteScore
   - [`VectorToScalarMeasure`](@ref)
   - [`Distances.jl`](https://github.com/JuliaStats/Distances.jl)
 """
-@concrete struct SilhouetteScore <: AbstractOptimalNumberClustersAlgorithm
+@propagatable @concrete struct SilhouetteScore <: AbstractOptimalNumberClustersAlgorithm
     """
     $(field_dict[:vsalg])
     """
-    alg
+    @fprop alg
     function SilhouetteScore(alg::Num_VecToScaM)
         return new{typeof(alg)}(alg)
     end
 end
 function SilhouetteScore(; alg::Num_VecToScaM = StandardisedValue())::SilhouetteScore
     return SilhouetteScore(alg)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Return a new [`SilhouetteScore`](@ref) algorithm with observation weights `w` applied to the underlying vector-to-scalar measure.
-
-# Related
-
-  - [`SilhouetteScore`](@ref)
-  - [`factory`](@ref)
-"""
-function factory(alg::SilhouetteScore, w::StatsBase.AbstractWeights)::SilhouetteScore
-    return SilhouetteScore(; alg = factory(alg.alg, w))
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -399,7 +373,8 @@ OptimalNumberClusters
   - [`AbstractOptimalNumberClustersEstimator`](@ref)
   - [`AbstractOptimalNumberClustersAlgorithm`](@ref)
 """
-@concrete struct OptimalNumberClusters <: AbstractOptimalNumberClustersEstimator
+@propagatable @concrete struct OptimalNumberClusters <:
+                               AbstractOptimalNumberClustersEstimator
     """
     $(field_dict[:max_k])
     """
@@ -407,7 +382,7 @@ OptimalNumberClusters
     """
     $(field_dict[:kalg])
     """
-    alg
+    @fprop alg
     function OptimalNumberClusters(max_k::Option{<:Integer}, alg::Int_ONC)
         if !isnothing(max_k)
             @argcheck(one(max_k) <= max_k, DomainError)
@@ -421,20 +396,6 @@ end
 function OptimalNumberClusters(; max_k::Option{<:Integer} = nothing,
                                alg::Int_ONC = SecondOrderDifference())::OptimalNumberClusters
     return OptimalNumberClusters(max_k, alg)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Return a new [`OptimalNumberClusters`](@ref) estimator with observation weights `w` applied to the underlying optimal-number-of-clusters algorithm.
-
-# Related
-
-  - [`OptimalNumberClusters`](@ref)
-  - [`factory`](@ref)
-"""
-function factory(onc::OptimalNumberClusters,
-                 w::StatsBase.AbstractWeights)::OptimalNumberClusters
-    return OptimalNumberClusters(; max_k = onc.max_k, alg = factory(onc.alg, w))
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -545,15 +506,15 @@ ClustersEstimator
   - [`AbstractHierarchicalClusteringAlgorithm`](@ref)
   - [`AbstractOptimalNumberClustersEstimator`](@ref)
 """
-@concrete struct ClustersEstimator <: AbstractClustersEstimator
+@propagatable @concrete struct ClustersEstimator <: AbstractClustersEstimator
     """
     $(field_dict[:ce])
     """
-    ce
+    @fprop ce
     """
     $(field_dict[:de])
     """
-    de
+    @fprop de
     """
     $(field_dict[:clalg])
     """
@@ -576,20 +537,6 @@ function ClustersEstimator(;
                            alg::AbstractClustersAlgorithm = HClustAlgorithm(),
                            onc::AbstractOptimalNumberClustersEstimator = OptimalNumberClusters())::ClustersEstimator
     return ClustersEstimator(ce, de, alg, onc)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Return a new [`ClustersEstimator`](@ref) with observation weights `w` applied to the underlying covariance estimator.
-
-# Related
-
-  - [`ClustersEstimator`](@ref)
-  - [`factory`](@ref)
-"""
-function factory(cle::ClustersEstimator, w::ObsWeights)::ClustersEstimator
-    return ClustersEstimator(; ce = factory(cle.ce, w), de = factory(cle.de, w),
-                             alg = cle.alg, onc = cle.onc)
 end
 """
     const ClE_Cl = Union{<:AbstractClustersEstimator, <:AbstractClusteringResult}

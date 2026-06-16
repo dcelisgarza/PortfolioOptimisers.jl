@@ -77,6 +77,28 @@ Property access delegates to the embedded [`JuMPOptimisationResult`](@ref): the 
     $(field_dict[:fb])
     """
     fb
+    function NearOptimalCenteringResult(jr::JuMPOptimisationResult,
+                                        w_min_retcode::OptimisationReturnCode,
+                                        w_opt_retcode::OptRetCode_VecOptRetCode,
+                                        w_max_retcode::OptimisationReturnCode,
+                                        noc_retcode::OptRetCode_VecOptRetCode,
+                                        fb::Option{<:OptE_Opt})
+        return new{typeof(jr), typeof(w_min_retcode), typeof(w_opt_retcode),
+                   typeof(w_max_retcode), typeof(noc_retcode), typeof(fb)}(jr,
+                                                                           w_min_retcode,
+                                                                           w_opt_retcode,
+                                                                           w_max_retcode,
+                                                                           noc_retcode, fb)
+    end
+end
+function NearOptimalCenteringResult(; jr::JuMPOptimisationResult,
+                                    w_min_retcode::OptimisationReturnCode,
+                                    w_opt_retcode::OptRetCode_VecOptRetCode,
+                                    w_max_retcode::OptimisationReturnCode,
+                                    noc_retcode::OptRetCode_VecOptRetCode,
+                                    fb::Option{<:OptE_Opt})::NearOptimalCenteringResult
+    return NearOptimalCenteringResult(jr, w_min_retcode, w_opt_retcode, w_max_retcode,
+                                      noc_retcode, fb)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -509,6 +531,37 @@ $(DocStringExtensions.FIELDS)
     $(field_dict[:w_max_retcode])
     """
     w_max_retcode
+    # Weight and target fields take frontier-safe unions: the sub-problem weights may be a
+    # single vector or (in frontier mode) a vector of vectors, and the risk/return targets
+    # may likewise be a scalar or a vector.
+    function NearOptimalSetup(w_opt::VecNum_VecVecNum, rk_opt::Union{<:Number, <:VecNum},
+                              rt_opt::Union{<:Number, <:VecNum},
+                              rt_min::Union{<:Number, <:VecNum},
+                              rt_max::Union{<:Number, <:VecNum}, w_min::VecNum_VecVecNum,
+                              w_max::VecNum_VecVecNum, r::RM_VecRM, opt::JuMPOptimiser,
+                              attrs::ProcessedJuMPOptimiserAttributes,
+                              w_min_retcode::OptimisationReturnCode,
+                              w_opt_retcode::OptRetCode_VecOptRetCode,
+                              w_max_retcode::OptimisationReturnCode)
+        return new{typeof(w_opt), typeof(rk_opt), typeof(rt_opt), typeof(rt_min),
+                   typeof(rt_max), typeof(w_min), typeof(w_max), typeof(r), typeof(opt),
+                   typeof(attrs), typeof(w_min_retcode), typeof(w_opt_retcode),
+                   typeof(w_max_retcode)}(w_opt, rk_opt, rt_opt, rt_min, rt_max, w_min,
+                                          w_max, r, opt, attrs, w_min_retcode,
+                                          w_opt_retcode, w_max_retcode)
+    end
+end
+function NearOptimalSetup(; w_opt::VecNum_VecVecNum, rk_opt::Union{<:Number, <:VecNum},
+                          rt_opt::Union{<:Number, <:VecNum},
+                          rt_min::Union{<:Number, <:VecNum},
+                          rt_max::Union{<:Number, <:VecNum}, w_min::VecNum_VecVecNum,
+                          w_max::VecNum_VecVecNum, r::RM_VecRM, opt::JuMPOptimiser,
+                          attrs::ProcessedJuMPOptimiserAttributes,
+                          w_min_retcode::OptimisationReturnCode,
+                          w_opt_retcode::OptRetCode_VecOptRetCode,
+                          w_max_retcode::OptimisationReturnCode)::NearOptimalSetup
+    return NearOptimalSetup(w_opt, rk_opt, rt_opt, rt_min, rt_max, w_min, w_max, r, opt,
+                            attrs, w_min_retcode, w_opt_retcode, w_max_retcode)
 end
 """
     near_optimal_centering_setup(noc::NearOptimalCentering, rd::ReturnsResult; dims::Int = 1)
@@ -541,9 +594,9 @@ function near_optimal_centering_setup(noc::NearOptimalCentering, rd::ReturnsResu
     w_min_flag = isnothing(w_min)
     w_opt_flag = isnothing(w_opt)
     w_max_flag = isnothing(w_max)
-    w_min_retcode = OptimisationSuccess(nothing)
-    w_opt_retcode = OptimisationSuccess(nothing)
-    w_max_retcode = OptimisationSuccess(nothing)
+    w_min_retcode = OptimisationSuccess()
+    w_opt_retcode = OptimisationSuccess()
+    w_max_retcode = OptimisationSuccess()
     unconstrained = isa(noc.alg, UnconstrainedNearOptimalCentering)
     r = noc.r
     attrs = processed_jump_optimiser_attributes(noc.opt, rd; dims = dims, kwargs...)
@@ -591,8 +644,10 @@ function near_optimal_centering_setup(noc::NearOptimalCentering, rd::ReturnsResu
     if unconstrained
         r, opt = nb_r, nb_opt
     end
-    return NearOptimalSetup(w_opt, rk_opt, rt_opt, rt_min, rt_max, w_min, w_max, r, opt,
-                            attrs, w_min_retcode, w_opt_retcode, w_max_retcode)
+    return NearOptimalSetup(; w_opt = w_opt, rk_opt = rk_opt, rt_opt = rt_opt,
+                            rt_min = rt_min, rt_max = rt_max, w_min = w_min, w_max = w_max,
+                            r = r, opt = opt, attrs = attrs, w_min_retcode = w_min_retcode,
+                            w_opt_retcode = w_opt_retcode, w_max_retcode = w_max_retcode)
 end
 """
     set_near_optimal_centering_constraints!(model::JuMP.Model, wb::WeightBounds)
@@ -978,10 +1033,10 @@ function get_overall_retcode(w_min_retcode, w_opt_retcode, w_max_retcode, noc_re
         msg *= "noc_opt failed."
     end
     return if isempty(msg)
-        OptimisationSuccess(nothing)
+        OptimisationSuccess()
     else
         @warn("Failed to solve optimisation problem. Check `retcode.res` for details.")
-        OptimisationFailure(msg)
+        OptimisationFailure(; res = msg)
     end
 end
 function _optimise(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
@@ -1004,29 +1059,36 @@ function _optimise(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, 
     set_return_constraints!(model, opt.ret, MinimumRisk(), opt.pe; rd = rd)
     noc_retcode, sol = solve_noc!(noc, model, rk_opt, rt_opt, opt)
     retcode = get_overall_retcode(w_min_retcode, w_opt_retcode, w_max_retcode, noc_retcode)
-    return NearOptimalCenteringResult(JuMPOptimisationResult(typeof(noc),
-                                                             ProcessedJuMPOptimiserAttributes(opt.pe,
-                                                                                              opt.wb,
-                                                                                              opt.lt,
-                                                                                              opt.st,
-                                                                                              opt.lcse,
-                                                                                              opt.cte,
-                                                                                              opt.gcarde,
-                                                                                              opt.sgcarde,
-                                                                                              opt.smtx,
-                                                                                              opt.sgmtx,
-                                                                                              opt.slt,
-                                                                                              opt.sst,
-                                                                                              opt.sglt,
-                                                                                              opt.sgst,
-                                                                                              opt.tn,
-                                                                                              opt.fees,
-                                                                                              opt.ple,
-                                                                                              opt.ret),
-                                                             retcode, sol,
-                                                             ifelse(save, model, nothing)),
-                                      w_min_retcode, w_opt_retcode, w_max_retcode,
-                                      noc_retcode, nothing)
+    return NearOptimalCenteringResult(;
+                                      jr = JuMPOptimisationResult(; oe = typeof(noc),
+                                                                  pa = ProcessedJuMPOptimiserAttributes(;
+                                                                                                        pr = opt.pe,
+                                                                                                        wb = opt.wb,
+                                                                                                        lt = opt.lt,
+                                                                                                        st = opt.st,
+                                                                                                        lcsr = opt.lcse,
+                                                                                                        ctr = opt.cte,
+                                                                                                        gcardr = opt.gcarde,
+                                                                                                        sgcardr = opt.sgcarde,
+                                                                                                        smtx = opt.smtx,
+                                                                                                        sgmtx = opt.sgmtx,
+                                                                                                        slt = opt.slt,
+                                                                                                        sst = opt.sst,
+                                                                                                        sglt = opt.sglt,
+                                                                                                        sgst = opt.sgst,
+                                                                                                        tn = opt.tn,
+                                                                                                        fees = opt.fees,
+                                                                                                        plr = opt.ple,
+                                                                                                        ret = opt.ret),
+                                                                  retcode = retcode,
+                                                                  sol = sol,
+                                                                  model = ifelse(save,
+                                                                                 model,
+                                                                                 nothing)),
+                                      w_min_retcode = w_min_retcode,
+                                      w_opt_retcode = w_opt_retcode,
+                                      w_max_retcode = w_max_retcode,
+                                      noc_retcode = noc_retcode, fb = nothing)
 end
 function _optimise(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                              <:Any, <:Any, <:Any, <:Any, <:Any,
@@ -1048,11 +1110,18 @@ function _optimise(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, 
                                   w_max, Val(haskey(model, :ret_frontier)),
                                   Val(haskey(model, :risk_frontier)))
     retcode = get_overall_retcode(w_min_retcode, w_opt_retcode, w_max_retcode, noc_retcode)
-    return NearOptimalCenteringResult(JuMPOptimisationResult(typeof(noc), attrs, retcode,
-                                                             sol,
-                                                             ifelse(save, model, nothing)),
-                                      w_min_retcode, w_opt_retcode, w_max_retcode,
-                                      noc_retcode, nothing)
+    return NearOptimalCenteringResult(;
+                                      jr = JuMPOptimisationResult(; oe = typeof(noc),
+                                                                  pa = attrs,
+                                                                  retcode = retcode,
+                                                                  sol = sol,
+                                                                  model = ifelse(save,
+                                                                                 model,
+                                                                                 nothing)),
+                                      w_min_retcode = w_min_retcode,
+                                      w_opt_retcode = w_opt_retcode,
+                                      w_max_retcode = w_max_retcode,
+                                      noc_retcode = noc_retcode, fb = nothing)
 end
 """
     optimise(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,

@@ -978,7 +978,7 @@ macro define_pretty_show(T, flag::Bool = true)
                 has_pretty_show_method(::$T) = true
             end
             function Base.show(io::IO, obj::$T)
-                fields = propertynames(obj)
+                fields = fieldnames(typeof(obj))
                 tobj = typeof(obj)
                 if isempty(fields)
                     return print(io, string(tobj, "()"), '\n')
@@ -990,15 +990,15 @@ macro define_pretty_show(T, flag::Bool = true)
                 print(io, name, '\n')
                 padding = maximum(map(length, map(string, fields))) + 2
                 for (i, field) in enumerate(fields)
-                    if hasproperty(obj, field)
+                    if hasfield(typeof(obj), field)
                         val = getproperty(obj, field)
                     else
                         continue
                     end
                     flag = has_pretty_show_method(val)
                     sym1 = ifelse(i == length(fields) &&
-                                  (!flag || (flag && isempty(propertynames(val)))), '┴',
-                                  '┼')
+                                  (!flag || (flag && isempty(fieldnames(typeof(val))))),
+                                  '┴', '┼')
                     print(io, lpad(string(field), padding), " ")
                     if isnothing(val)
                         print(io, "$(sym1) nothing", '\n')
@@ -1166,7 +1166,7 @@ Every element of a listed vector is shown as just its wrapper-type name. When th
 """
 function pretty_show_vector_element(@nospecialize(v))
     s = string(Base.typename(typeof(v)).wrapper)
-    return isempty(propertynames(v)) ? s : s * " ⋯"
+    return isempty(fieldnames(typeof(v))) ? s : s * " ⋯"
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1344,6 +1344,42 @@ Stacktrace:
   - [`IsEmptyError`](@ref)
 """
 @concrete struct IsNonFiniteError <: PortfolioOptimisersError
+    """
+    $(field_dict[:msg])
+    """
+    msg
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Exception type thrown when a [`@forward_properties`](@ref) nested path cannot be descended because an intermediate node is `nothing`.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    PropertyPathError(msg)
+
+Arguments correspond to the fields above.
+
+# Examples
+
+```jldoctest
+julia> throw(PropertyPathError("cannot descend path `sol.w` on `JuMPOptimisationResult`: intermediate `sol` is `nothing`"))
+ERROR: PropertyPathError: cannot descend path `sol.w` on `JuMPOptimisationResult`: intermediate `sol` is `nothing`
+Stacktrace:
+ [1] top-level scope
+   @ none:1
+```
+
+# Related
+
+  - [`PortfolioOptimisersError`](@ref)
+  - [`@forward_properties`](@ref)
+"""
+@concrete struct PropertyPathError <: PortfolioOptimisersError
     """
     $(field_dict[:msg])
     """
@@ -1913,6 +1949,217 @@ function get_observation_weights(w::VecNum, args...; kwargs...)
     return w
 end
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Assert that `val` is non-empty.
+
+No-op for `Pair` and `Number` inputs; emptiness does not apply to scalars.
+
+# Arguments
+
+  - `val`: Container to check; one of `AbstractDict`, `VecPair`, or `ArrNum`.
+  - `sym`: Symbolic name used in the error message.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`assert_finite`](@ref)
+  - [`assert_nonneg`](@ref)
+  - [`assert_gt0`](@ref)
+  - [`assert_nonempty_nonneg_finite_val`](@ref)
+  - [`assert_nonempty_gt0_finite_val`](@ref)
+  - [`assert_nonempty_finite_val`](@ref)
+"""
+function assert_nonempty(val::Union{<:AbstractDict, <:VecPair, <:ArrNum},
+                         sym::Sym_Str = :val)::Nothing
+    @argcheck(!isempty(val),
+              IsEmptyError("!isempty($sym) must hold. Got\n!isempty($sym) => $(isempty(val))"))
+    return nothing
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+No-op overload of [`assert_nonempty`](@ref) for scalar inputs.
+
+Emptiness does not apply to `Pair` or `Number` values.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`assert_nonempty`](@ref)
+"""
+function assert_nonempty(::Union{<:Pair, <:Number}, ::Sym_Str = :val)::Nothing
+    return nothing
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Assert that `val` contains at least one finite element.
+
+Dispatches on the input type:
+
+  - `AbstractDict`: `any(isfinite, values(val))`.
+  - `VecPair`: `any(isfinite, getindex.(val, 2))`.
+  - `ArrNum`: `any(isfinite, val)`.
+  - `Pair`: `isfinite(val[2])`.
+  - `Number`: `isfinite(val)`.
+
+# Arguments
+
+  - `val`: Value to check.
+  - `sym`: Symbolic name used in the error message.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`assert_nonempty`](@ref)
+  - [`assert_nonneg`](@ref)
+  - [`assert_gt0`](@ref)
+  - [`assert_nonempty_nonneg_finite_val`](@ref)
+  - [`assert_nonempty_gt0_finite_val`](@ref)
+  - [`assert_nonempty_finite_val`](@ref)
+"""
+function assert_finite(val::AbstractDict, sym::Sym_Str = :val)::Nothing
+    @argcheck(any(isfinite, values(val)),
+              DomainError("any(isfinite, values($sym)) must hold. Got\nany(isfinite, values($sym)) => $(any(isfinite, values(val)))"))
+    return nothing
+end
+function assert_finite(val::VecPair, sym::Sym_Str = :val)::Nothing
+    @argcheck(any(isfinite, getindex.(val, 2)),
+              DomainError("any(isfinite, getindex.($sym, 2)) must hold. Got\nany(isfinite, getindex.($sym, 2)) => $(any(isfinite, getindex.(val, 2)))"))
+    return nothing
+end
+function assert_finite(val::ArrNum, sym::Sym_Str = :val)::Nothing
+    @argcheck(any(isfinite, val),
+              DomainError("any(isfinite, $sym) must hold. Got\nany(isfinite, $sym) => $(any(isfinite, val))"))
+    return nothing
+end
+function assert_finite(val::Pair, sym::Sym_Str = :val)::Nothing
+    @argcheck(isfinite(val[2]),
+              DomainError("isfinite($sym[2]) must hold. Got\nisfinite($sym[2]) => $(isfinite(val[2]))"))
+    return nothing
+end
+function assert_finite(val::Number, sym::Sym_Str = :val)::Nothing
+    @argcheck(isfinite(val),
+              DomainError("isfinite($sym) must hold. Got\nisfinite($sym) => $(isfinite(val))"))
+    return nothing
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Assert that all elements of `val` are non-negative (`>= 0`).
+
+Dispatches on the input type:
+
+  - `AbstractDict`: `all(x -> 0 <= x, values(val))`.
+  - `VecPair`: `all(x -> 0 <= x[2], val)`.
+  - `ArrNum`: `all(x -> 0 <= x, val)`.
+  - `Pair`: `0 <= val[2]`.
+  - `Number`: `0 <= val`.
+
+# Arguments
+
+  - `val`: Value to check.
+  - `sym`: Symbolic name used in the error message.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`assert_nonempty`](@ref)
+  - [`assert_finite`](@ref)
+  - [`assert_gt0`](@ref)
+  - [`assert_nonempty_nonneg_finite_val`](@ref)
+"""
+function assert_nonneg(val::AbstractDict, sym::Sym_Str = :val)::Nothing
+    @argcheck(all(x -> zero(x) <= x, values(val)),
+              DomainError("all(x -> 0 <= x, values($sym)) must hold. Got\nall(x -> 0 <= x, values($sym)) => $(all(x -> zero(x) <= x, values(val)))"))
+    return nothing
+end
+function assert_nonneg(val::VecPair, sym::Sym_Str = :val)::Nothing
+    @argcheck(all(x -> zero(x[2]) <= x[2], val),
+              DomainError("all(x -> 0 <= x[2], $sym) must hold. Got\nall(x -> 0 <= x[2], $sym) => $(all(x -> zero(x[2]) <= x[2], val))"))
+    return nothing
+end
+function assert_nonneg(val::ArrNum, sym::Sym_Str = :val)::Nothing
+    @argcheck(all(x -> zero(x) <= x, val),
+              DomainError("all(x -> 0 <= x, $sym) must hold. Got\nall(x -> 0 <= x, $sym) => $(all(x -> zero(x) <= x, val))"))
+    return nothing
+end
+function assert_nonneg(val::Pair, sym::Sym_Str = :val)::Nothing
+    @argcheck(zero(val[2]) <= val[2],
+              DomainError("0 <= $sym[2] must hold. Got\n$sym[2] => $(val[2])"))
+    return nothing
+end
+function assert_nonneg(val::Number, sym::Sym_Str = :val)::Nothing
+    @argcheck(zero(val) <= val, DomainError("0 <= $sym must hold. Got\n$sym => $(val)"))
+    return nothing
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Assert that all elements of `val` are strictly positive (`> 0`).
+
+Dispatches on the input type:
+
+  - `AbstractDict`: `all(x -> 0 < x, values(val))`.
+  - `VecPair`: `all(x -> 0 < x[2], val)`.
+  - `ArrNum`: `all(x -> 0 < x, val)`.
+  - `Pair`: `0 < val[2]`.
+  - `Number`: `0 < val`.
+
+# Arguments
+
+  - `val`: Value to check.
+  - `sym`: Symbolic name used in the error message.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`assert_nonempty`](@ref)
+  - [`assert_finite`](@ref)
+  - [`assert_nonneg`](@ref)
+  - [`assert_nonempty_gt0_finite_val`](@ref)
+"""
+function assert_gt0(val::AbstractDict, sym::Sym_Str = :val)::Nothing
+    @argcheck(all(x -> zero(x) < x, values(val)),
+              DomainError("all(x -> 0 < x, values($sym)) must hold. Got\nall(x -> 0 < x, values($sym)) => $(all(x -> zero(x) < x, values(val)))"))
+    return nothing
+end
+function assert_gt0(val::VecPair, sym::Sym_Str = :val)::Nothing
+    @argcheck(all(x -> zero(x[2]) < x[2], val),
+              DomainError("all(x -> 0 < x[2], $sym) must hold. Got\nall(x -> 0 < x[2], $sym) => $(all(x -> zero(x[2]) < x[2], val))"))
+    return nothing
+end
+function assert_gt0(val::ArrNum, sym::Sym_Str = :val)::Nothing
+    @argcheck(all(x -> zero(x) < x, val),
+              DomainError("all(x -> 0 < x, $sym) must hold. Got\nall(x -> 0 < x, $sym) => $(all(x -> zero(x) < x, val))"))
+    return nothing
+end
+function assert_gt0(val::Pair, sym::Sym_Str = :val)::Nothing
+    @argcheck(zero(val[2]) < val[2],
+              DomainError("0 < $sym[2] must hold. Got\n$sym[2] => $(val[2])"))
+    return nothing
+end
+function assert_gt0(val::Number, sym::Sym_Str = :val)::Nothing
+    @argcheck(zero(val) < val, DomainError("0 < $sym must hold. Got\n$sym => $(val)"))
+    return nothing
+end
+"""
     assert_nonempty_nonneg_finite_val(
         val::Union{<:AbstractDict, <:VecPair, <:ArrNum, Pair, Number},
         val_sym::Union{Symbol,<:AbstractString} = :val
@@ -1945,46 +2192,16 @@ Validate that the input value is non-empty, non-negative and finite.
 
   - [`assert_nonempty_finite_val`](@ref)
   - [`assert_nonempty_gt0_finite_val`](@ref)
+  - [`assert_nonempty`](@ref)
+  - [`assert_finite`](@ref)
+  - [`assert_nonneg`](@ref)
 """
-function assert_nonempty_nonneg_finite_val(val::AbstractDict,
+function assert_nonempty_nonneg_finite_val(val::Union{<:AbstractDict, <:VecPair, <:ArrNum,
+                                                      <:Pair, <:Number},
                                            val_sym::Sym_Str = :val)::Nothing
-    @argcheck(!isempty(val),
-              IsEmptyError("!isempty($val_sym) must hold. Got\n!isempty($val_sym) => $(isempty(val))"))
-    @argcheck(any(isfinite, values(val)),
-              DomainError("any(isfinite, values($val_sym)) must hold. Got\nany(isfinite, values($val_sym)) => $(any(isfinite, values(val)))"))
-    @argcheck(all(x -> zero(x) <= x, values(val)),
-              DomainError("all(x -> 0 <= x, values($val_sym)) must hold. Got\nall(x -> 0 <= x, values($val_sym)) => $(all(x -> zero(x) <= x, values(val)))"))
-    return nothing
-end
-function assert_nonempty_nonneg_finite_val(val::VecPair, val_sym::Sym_Str = :val)::Nothing
-    @argcheck(!isempty(val),
-              IsEmptyError("!isempty($val_sym) must hold. Got\n!isempty($val_sym) => $(isempty(val))"))
-    @argcheck(any(isfinite, getindex.(val, 2)),
-              DomainError("any(isfinite, getindex.($val_sym, 2)) must hold. Got\nany(isfinite, getindex.($val_sym, 2)) => $(any(isfinite, getindex.(val, 2)))"))
-    @argcheck(all(x -> zero(x[2]) <= x[2], val),
-              DomainError("all(x -> 0 <= x[2], $val_sym) must hold. Got\nall(x -> 0 <= x[2], $val_sym) => $(all(x -> zero(x[2]) <= x[2], val))"))
-    return nothing
-end
-function assert_nonempty_nonneg_finite_val(val::ArrNum, val_sym::Sym_Str = :val)::Nothing
-    @argcheck(!isempty(val),
-              IsEmptyError("!isempty($val_sym) must hold. Got\n!isempty($val_sym) => $(isempty(val))"))
-    @argcheck(any(isfinite, val),
-              DomainError("any(isfinite, $val_sym) must hold. Got\nany(isfinite, $val_sym) => $(any(isfinite, val))"))
-    @argcheck(all(x -> zero(x) <= x, val),
-              DomainError("all(x -> 0 <= x, $val_sym) must hold. Got\nall(x -> 0 <= x, $val_sym) => $(all(x -> zero(x) <= x, val))"))
-    return nothing
-end
-function assert_nonempty_nonneg_finite_val(val::Pair, val_sym::Sym_Str = :val)::Nothing
-    @argcheck(isfinite(val[2]),
-              DomainError("isfinite($val_sym[2]) must hold. Got\nisfinite($val_sym[2]) => $(isfinite(val[2]))"))
-    @argcheck(zero(val[2]) <= val[2],
-              DomainError("0 <= $(val[2]) must hold. Got\n$(val[2]) => $(val[2])"))
-    return nothing
-end
-function assert_nonempty_nonneg_finite_val(val::Number, val_sym::Sym_Str = :val)::Nothing
-    @argcheck(isfinite(val),
-              DomainError("isfinite($val_sym) must hold. Got\nisfinite($val_sym) => $(isfinite(val))"))
-    @argcheck(zero(val) <= val, DomainError("0 <= $(val) must hold. Got\n$(val) => $(val)"))
+    assert_nonempty(val, val_sym)
+    assert_finite(val, val_sym)
+    assert_nonneg(val, val_sym)
     return nothing
 end
 function assert_nonempty_nonneg_finite_val(args...)::Nothing
@@ -2023,45 +2240,16 @@ Validate that the input value is non-empty, greater than zero, and finite.
 
   - [`assert_nonempty_nonneg_finite_val`](@ref)
   - [`assert_nonempty_finite_val`](@ref)
+  - [`assert_nonempty`](@ref)
+  - [`assert_finite`](@ref)
+  - [`assert_gt0`](@ref)
 """
-function assert_nonempty_gt0_finite_val(val::AbstractDict, val_sym::Sym_Str = :val)::Nothing
-    @argcheck(!isempty(val),
-              IsEmptyError("!isempty($val_sym) must hold. Got\n!isempty($val_sym) => $(isempty(val))"))
-    @argcheck(any(isfinite, values(val)),
-              DomainError("any(isfinite, values($val_sym)) must hold. Got\nany(isfinite, values($val_sym)) => $(any(isfinite, values(val)))"))
-    @argcheck(all(x -> zero(x) < x, values(val)),
-              DomainError("all(x -> 0 < x, values($val_sym)) must hold. Got\nall(x -> 0 < x, values($val_sym)) => $(all(x -> zero(x) < x, values(val)))"))
-    return nothing
-end
-function assert_nonempty_gt0_finite_val(val::VecPair, val_sym::Sym_Str = :val)::Nothing
-    @argcheck(!isempty(val),
-              IsEmptyError("!isempty($val_sym) must hold. Got\n!isempty($val_sym) => $(isempty(val))"))
-    @argcheck(any(isfinite, getindex.(val, 2)),
-              DomainError("any(isfinite, getindex.($val_sym, 2)) must hold. Got\nany(isfinite, getindex.($val_sym, 2)) => $(any(isfinite, getindex.(val, 2)))"))
-    @argcheck(all(x -> zero(x[2]) < x[2], val),
-              DomainError("all(x -> 0 < x[2], $val_sym) must hold. Got\nall(x -> 0 < x[2], $val_sym) => $(all(x -> zero(x[2]) < x[2], val))"))
-    return nothing
-end
-function assert_nonempty_gt0_finite_val(val::ArrNum, val_sym::Sym_Str = :val)::Nothing
-    @argcheck(!isempty(val),
-              IsEmptyError("!isempty($val_sym) must hold. Got\n!isempty($val_sym) => $(isempty(val))"))
-    @argcheck(any(isfinite, val),
-              DomainError("any(isfinite, $val_sym) must hold. Got\nany(isfinite, $val_sym) => $(any(isfinite, val))"))
-    @argcheck(all(x -> zero(x) < x, val),
-              DomainError("all(x -> 0 < x, $val_sym) must hold. Got\nall(x -> 0 < x, $val_sym) => $(all(x -> zero(x) < x, val))"))
-    return nothing
-end
-function assert_nonempty_gt0_finite_val(val::Pair, val_sym::Sym_Str = :val)::Nothing
-    @argcheck(isfinite(val[2]),
-              DomainError("isfinite($val_sym[2]) must hold. Got\nisfinite($val_sym[2]) => $(isfinite(val[2]))"))
-    @argcheck(zero(val[2]) < val[2],
-              DomainError("0 < $(val[2]) must hold. Got\n$(val[2]) => $(val[2])"))
-    return nothing
-end
-function assert_nonempty_gt0_finite_val(val::Number, val_sym::Sym_Str = :val)::Nothing
-    @argcheck(isfinite(val),
-              DomainError("isfinite($val_sym) must hold. Got\nisfinite($val_sym) => $(isfinite(val))"))
-    @argcheck(zero(val) < val, DomainError("0 < $(val) must hold. Got\n$(val) => $(val)"))
+function assert_nonempty_gt0_finite_val(val::Union{<:AbstractDict, <:VecPair, <:ArrNum,
+                                                   <:Pair, <:Number},
+                                        val_sym::Sym_Str = :val)::Nothing
+    assert_nonempty(val, val_sym)
+    assert_finite(val, val_sym)
+    assert_gt0(val, val_sym)
     return nothing
 end
 function assert_nonempty_gt0_finite_val(args...)::Nothing
@@ -2100,36 +2288,13 @@ Validate that the input value is non-empty and finite.
 
   - [`assert_nonempty_nonneg_finite_val`](@ref)
   - [`assert_nonempty_gt0_finite_val`](@ref)
+  - [`assert_nonempty`](@ref)
+  - [`assert_finite`](@ref)
 """
-function assert_nonempty_finite_val(val::AbstractDict, val_sym::Sym_Str = :val)::Nothing
-    @argcheck(!isempty(val),
-              IsEmptyError("!isempty($val_sym) must hold. Got\n!isempty($val_sym) => $(isempty(val))"))
-    @argcheck(any(isfinite, values(val)),
-              DomainError("any(isfinite, values($val_sym)) must hold. Got\nany(isfinite, values($val_sym)) => $(any(isfinite, values(val)))"))
-    return nothing
-end
-function assert_nonempty_finite_val(val::VecPair, val_sym::Sym_Str = :val)::Nothing
-    @argcheck(!isempty(val),
-              IsEmptyError("!isempty($val_sym) must hold. Got\n!isempty($val_sym) => $(isempty(val))"))
-    @argcheck(any(isfinite, getindex.(val, 2)),
-              DomainError("any(isfinite, getindex.($val_sym, 2)) must hold. Got\nany(isfinite, getindex.($val_sym, 2)) => $(any(isfinite, getindex.(val, 2)))"))
-    return nothing
-end
-function assert_nonempty_finite_val(val::ArrNum, val_sym::Sym_Str = :val)::Nothing
-    @argcheck(!isempty(val),
-              IsEmptyError("!isempty($val_sym) must hold. Got\n!isempty($val_sym) => $(isempty(val))"))
-    @argcheck(any(isfinite, val),
-              DomainError("any(isfinite, $val_sym) must hold. Got\nany(isfinite, $val_sym) => $(any(isfinite, val))"))
-    return nothing
-end
-function assert_nonempty_finite_val(val::Pair, val_sym::Sym_Str = :val)::Nothing
-    @argcheck(isfinite(val[2]),
-              DomainError("isfinite($val_sym[2]) must hold. Got\nisfinite($val_sym[2]) => $(isfinite(val[2]))"))
-    return nothing
-end
-function assert_nonempty_finite_val(val::Number, val_sym::Sym_Str = :val)::Nothing
-    @argcheck(isfinite(val),
-              DomainError("isfinite($val_sym) must hold. Got\nisfinite($val_sym) => $(isfinite(val))"))
+function assert_nonempty_finite_val(val::Union{<:AbstractDict, <:VecPair, <:ArrNum, <:Pair,
+                                               <:Number}, val_sym::Sym_Str = :val)::Nothing
+    assert_nonempty(val, val_sym)
+    assert_finite(val, val_sym)
     return nothing
 end
 function assert_nonempty_finite_val(args...)::Nothing
@@ -2247,4 +2412,4 @@ Alias for a union of a numeric type, an array of numeric types, or a `VecScalar`
 const Num_ArrNum_VecScalar_DynWeights = Union{<:Num_ArrNum, <:VecScalar,
                                               <:DynamicAbstractWeights}
 
-export IsEmptyError, IsNothingError, IsNonFiniteError, VecScalar
+export IsEmptyError, IsNothingError, IsNonFiniteError, PropertyPathError, VecScalar

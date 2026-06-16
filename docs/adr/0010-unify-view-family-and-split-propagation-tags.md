@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: accepted
 ---
 
 # Unify the `*_view` family under `port_opt_view`; split propagation tags into `@fprop`/`@vprop`

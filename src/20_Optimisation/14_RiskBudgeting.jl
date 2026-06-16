@@ -1,51 +1,6 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Result type for Risk Budgeting portfolio optimisation.
-
-# Fields
-
-$(DocStringExtensions.FIELDS)
-
-Property access delegates to the embedded [`JuMPOptimisationResult`](@ref); unknown properties forward to `prb` first, then through `jr` (including the virtual `:w` and the `pa` fall-through).
-
-# Related
-
-  - [`RiskBudgeting`](@ref)
-  - [`RiskJuMPOptimisationResult`](@ref)
-  - [`JuMPOptimisationResult`](@ref)
-"""
-@concrete struct RiskBudgetingResult <: RiskJuMPOptimisationResult
-    """
-    Shared JuMP result core, see [`JuMPOptimisationResult`](@ref).
-    """
-    jr
-    """
-    $(field_dict[:prb])
-    """
-    prb
-    """
-    $(field_dict[:fb])
-    """
-    fb
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Access properties of [`RiskBudgetingResult`](@ref). Unique field `prb` resolves directly; unknown properties forward into `prb` first, then delegate to the embedded [`JuMPOptimisationResult`](@ref) `jr` (the virtual `:w` and `pa` fall-through).
-"""
-function Base.getproperty(r::RiskBudgetingResult, sym::Symbol)
-    return if sym in fieldnames(RiskBudgetingResult)
-        getfield(r, sym)
-    elseif sym in propertynames(getfield(r, :prb))
-        getproperty(getfield(r, :prb), sym)
-    else
-        getproperty(getfield(r, :jr), sym)
-    end
-end
-"""
-$(DocStringExtensions.TYPEDEF)
-
 Processed factor risk budgeting attributes for intermediate computations.
 
 # Fields
@@ -70,6 +25,14 @@ $(DocStringExtensions.FIELDS)
     Regression result used for factor loading estimation.
     """
     rr
+    function ProcessedFactorRiskBudgetingAttributes(rkb::RiskBudget, b1::MatNum,
+                                                    rr::AbstractRegressionResult)
+        return new{typeof(rkb), typeof(b1), typeof(rr)}(rkb, b1, rr)
+    end
+end
+function ProcessedFactorRiskBudgetingAttributes(; rkb::RiskBudget, b1::MatNum,
+                                                rr::AbstractRegressionResult)::ProcessedFactorRiskBudgetingAttributes
+    return ProcessedFactorRiskBudgetingAttributes(rkb, b1, rr)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -90,6 +53,73 @@ $(DocStringExtensions.FIELDS)
     Processed asset risk budget constraints vector.
     """
     rkb
+    function ProcessedAssetRiskBudgetingAttributes(rkb::RiskBudget)
+        return new{typeof(rkb)}(rkb)
+    end
+end
+function ProcessedAssetRiskBudgetingAttributes(;
+                                               rkb::RiskBudget)::ProcessedAssetRiskBudgetingAttributes
+    return ProcessedAssetRiskBudgetingAttributes(rkb)
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Result type for Risk Budgeting portfolio optimisation.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+Property access delegates to the embedded [`JuMPOptimisationResult`](@ref); unknown properties forward to `prb` first, then through `jr` (including the virtual `:w` and the `pa` fall-through).
+
+# Constructors
+
+    RiskBudgetingResult(;
+        jr::JuMPOptimisationResult,
+        prb::Union{ProcessedAssetRiskBudgetingAttributes,
+                   ProcessedFactorRiskBudgetingAttributes},
+        fb::Option{<:OptE_Opt}
+    ) -> RiskBudgetingResult
+
+Keywords correspond to the struct's fields.
+
+# Related
+
+  - [`RiskBudgeting`](@ref)
+  - [`RiskJuMPOptimisationResult`](@ref)
+  - [`JuMPOptimisationResult`](@ref)
+"""
+@concrete struct RiskBudgetingResult <: RiskJuMPOptimisationResult
+    """
+    Shared JuMP result core, see [`JuMPOptimisationResult`](@ref).
+    """
+    jr
+    """
+    $(field_dict[:prb])
+    """
+    prb
+    """
+    $(field_dict[:fb])
+    """
+    fb
+    function RiskBudgetingResult(jr::JuMPOptimisationResult,
+                                 prb::Union{ProcessedAssetRiskBudgetingAttributes,
+                                            ProcessedFactorRiskBudgetingAttributes},
+                                 fb::Option{<:OptE_Opt})
+        return new{typeof(jr), typeof(prb), typeof(fb)}(jr, prb, fb)
+    end
+end
+function RiskBudgetingResult(; jr::JuMPOptimisationResult,
+                             prb::Union{ProcessedAssetRiskBudgetingAttributes,
+                                        ProcessedFactorRiskBudgetingAttributes},
+                             fb::Option{<:OptE_Opt})::RiskBudgetingResult
+    return RiskBudgetingResult(jr, prb, fb)
+end
+# Unique field `prb` resolves directly; unknown properties forward into `prb` first, then
+# into the embedded [`JuMPOptimisationResult`](@ref) `jr` (the virtual `:w` and `pa` fall-through).
+@forward_properties RiskBudgetingResult begin
+    forward(prb)
+    forward(jr)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -215,19 +245,19 @@ Keywords correspond to the struct's fields.
   - [`FactorRiskBudgeting`](@ref)
   - [`RiskBudgeting`](@ref)
 """
-@concrete struct AssetRiskBudgeting <: RiskBudgetingAlgorithm
+@propagatable @concrete struct AssetRiskBudgeting <: RiskBudgetingAlgorithm
     """
     $(field_dict[:rkb])
     """
-    rkb
+    @vprop rkb
     """
     $(field_dict[:sets])
     """
-    sets
+    @vprop sets
     """
     $(field_dict[:rba])
     """
-    alg
+    @vprop alg
     function AssetRiskBudgeting(rkb::Option{<:RkbE_Rkb}, sets::Option{<:AssetSets},
                                 alg::RiskBudgetingFormulation)
         if isa(rkb, RiskBudgetEstimator)
@@ -240,34 +270,6 @@ function AssetRiskBudgeting(; rkb::Option{<:RkbE_Rkb} = nothing,
                             sets::Option{<:AssetSets} = nothing,
                             alg::RiskBudgetingFormulation = LogRiskBudgeting())::AssetRiskBudgeting
     return AssetRiskBudgeting(rkb, sets, alg)
-end
-"""
-    port_opt_view(r, i)
-
-Return a view or subset of a risk budgeting algorithm for cluster index `i`.
-
-Used in hierarchical optimisation to slice risk budget and asset set configurations for each cluster.
-
-# Arguments
-
-  - `r`: Risk budgeting algorithm ([`AssetRiskBudgeting`](@ref) or [`FactorRiskBudgeting`](@ref)).
-  - `i`: Cluster or asset index.
-
-# Returns
-
-  - Sliced risk budgeting algorithm.
-
-# Related
-
-  - [`AssetRiskBudgeting`](@ref)
-  - [`FactorRiskBudgeting`](@ref)
-  - [`RiskBudgeting`](@ref)
-"""
-function port_opt_view(r::AssetRiskBudgeting, i, args...)
-    rkb = port_opt_view(r.rkb, i)
-    sets = port_opt_view(r.sets, i)
-    alg = port_opt_view(r.alg, i)
-    return AssetRiskBudgeting(; rkb = rkb, sets = sets, alg = alg)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -301,11 +303,11 @@ Keywords correspond to the struct's fields.
   - [`AssetRiskBudgeting`](@ref)
   - [`RiskBudgeting`](@ref)
 """
-@concrete struct FactorRiskBudgeting <: RiskBudgetingAlgorithm
+@propagatable @concrete struct FactorRiskBudgeting <: RiskBudgetingAlgorithm
     """
     $(field_dict[:re])
     """
-    re
+    @vprop re
     """
     $(field_dict[:rkb])
     """
@@ -331,32 +333,6 @@ function FactorRiskBudgeting(; re::RegE_Reg = StepwiseRegression(),
                              sets::Option{<:AssetSets} = nothing,
                              flag::Bool = true)::FactorRiskBudgeting
     return FactorRiskBudgeting(re, rkb, sets, flag)
-end
-"""
-    port_opt_view(r::FactorRiskBudgeting, i)
-
-Return a view of a `FactorRiskBudgeting` algorithm for cluster index `i`.
-
-Slices the regression estimator for the given cluster while keeping the risk budget, asset sets, and idiosyncratic flag unchanged.
-
-# Arguments
-
-  - `r::FactorRiskBudgeting`: Factor-level risk budgeting algorithm.
-  - `i`: Cluster or asset index.
-
-# Returns
-
-  - `FactorRiskBudgeting` with the regression estimator sliced to cluster `i`.
-
-# Related
-
-  - [`port_opt_view`](@ref)
-  - [`FactorRiskBudgeting`](@ref)
-  - [`AssetRiskBudgeting`](@ref)
-"""
-function port_opt_view(r::FactorRiskBudgeting, i, args...)
-    re = port_opt_view(r.re, i)
-    return FactorRiskBudgeting(; re = re, rkb = r.rkb, sets = r.sets, flag = r.flag)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -570,7 +546,7 @@ function set_risk_budgeting_constraints!(model::JuMP.Model,
     set_w!(model, pr.X, rb.wi)
     rkb = _set_risk_budgeting_constraints!(model, rb, get_w(model); strict = rb.opt.strict)
     set_weight_constraints!(model, wb, rb.opt.bgt, nothing, true)
-    return ProcessedAssetRiskBudgetingAttributes(rkb)
+    return ProcessedAssetRiskBudgetingAttributes(; rkb = rkb)
 end
 function set_risk_budgeting_constraints!(model::JuMP.Model,
                                          rb::RiskBudgeting{<:Any, <:Any,
@@ -591,7 +567,7 @@ function set_risk_budgeting_constraints!(model::JuMP.Model,
                           orthcrkb, sc * w >= 0
                       end)
     set_weight_constraints!(model, wb, rb.opt.bgt, rb.opt.sbgt)
-    return ProcessedAssetRiskBudgetingAttributes(rkb)
+    return ProcessedAssetRiskBudgetingAttributes(; rkb = rkb)
 end
 function set_risk_budgeting_constraints!(model::JuMP.Model,
                                          rb::RiskBudgeting{<:Any, <:Any,
@@ -601,7 +577,7 @@ function set_risk_budgeting_constraints!(model::JuMP.Model,
                                                        rb.wi)
     rkb = _set_risk_budgeting_constraints!(model, rb, model[:w1]; strict = rb.opt.strict)
     set_weight_constraints!(model, wb, rb.opt.bgt, rb.opt.sbgt)
-    return ProcessedFactorRiskBudgetingAttributes(rkb, b1, rr)
+    return ProcessedFactorRiskBudgetingAttributes(; rkb = rkb, b1 = b1, rr = rr)
 end
 """
     set_rb_mip_w!(model::JuMP.Model, X::MatNum)
@@ -650,7 +626,7 @@ function set_risk_budgeting_constraints!(model::JuMP.Model,
     k = get_k(model)
     JuMP.@constraint(model, mipcrkb, sc * (sum(w) - k) >= 0)
     set_weight_constraints!(model, wb, rb.opt.bgt, rb.opt.sbgt)
-    return ProcessedAssetRiskBudgetingAttributes(rkb)
+    return ProcessedAssetRiskBudgetingAttributes(; rkb = rkb)
 end
 function _optimise(rb::RiskBudgeting, rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
                    str_names::Bool = false, save::Bool = true, kwargs...)
@@ -665,9 +641,12 @@ function _optimise(rb::RiskBudgeting, rd::ReturnsResult = ReturnsResult(); dims:
     set_portfolio_objective_function!(model, MinimumRisk(), attrs.ret, rb.opt.cobj, rb,
                                       attrs.pr)
     retcode, sol = optimise_JuMP_model!(model, rb, eltype(attrs.pr.X))
-    return RiskBudgetingResult(JuMPOptimisationResult(typeof(rb), attrs, retcode, sol,
-                                                      ifelse(save, model, nothing)), prb,
-                               nothing)
+    return RiskBudgetingResult(;
+                               jr = JuMPOptimisationResult(; oe = typeof(rb), pa = attrs,
+                                                           retcode = retcode, sol = sol,
+                                                           model = ifelse(save, model,
+                                                                          nothing)),
+                               prb = prb, fb = nothing)
 end
 """
     optimise(rb::RiskBudgeting{<:Any, <:Any, <:Any, <:Any, Nothing},

@@ -1,0 +1,392 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Architecture review — PortfolioOptimisers.jl</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="module">
+      import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+      mermaid.initialize({ startOnLoad: true, theme: "neutral", securityLevel: "loose" });
+    </script>
+    <style>
+      .seam { stroke-dasharray: 5 4; }
+      .deep { background: linear-gradient(135deg, #0f172a, #1e293b); }
+      .shallow { background: repeating-linear-gradient(45deg, #fef2f2, #fef2f2 8px, #fee2e2 8px, #fee2e2 16px); }
+      .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+      .card { scroll-margin-top: 1.5rem; }
+    </style>
+  </head>
+  <body class="bg-stone-50 text-slate-900 font-sans antialiased">
+    <main class="max-w-5xl mx-auto px-6 py-12 space-y-12">
+
+      <!-- ===================== HEADER ===================== -->
+      <header class="space-y-4 border-b border-slate-200 pb-8">
+        <p class="text-xs uppercase tracking-widest text-slate-500">Architecture review</p>
+        <h1 class="text-4xl font-serif font-semibold">PortfolioOptimisers.jl</h1>
+        <p class="text-slate-600 max-w-3xl">Deepening opportunities found by walking the
+          <span class="mono text-sm">data → moments → prior → optimisation → post-processing</span>
+          pipeline. ADRs 0001–0013 already deepened the propagation macros, the optimisation
+          <em>Result</em> hierarchy, the prior→measure binding, and property forwarding — those seams
+          are deliberately left alone. What follows is the friction <em>outside</em> the recorded decisions.</p>
+        <div class="flex flex-wrap gap-4 text-xs text-slate-600 pt-2">
+          <span class="inline-flex items-center gap-2"><span class="inline-block w-5 h-3 border-2 border-slate-700"></span> module</span>
+          <span class="inline-flex items-center gap-2"><svg width="34" height="8"><line x1="0" y1="4" x2="34" y2="4" class="seam" stroke="#475569" stroke-width="2"/></svg> seam</span>
+          <span class="inline-flex items-center gap-2"><svg width="34" height="8"><line x1="0" y1="4" x2="34" y2="4" stroke="#dc2626" stroke-width="2"/></svg> leakage / duplication</span>
+          <span class="inline-flex items-center gap-2"><span class="inline-block w-5 h-3 deep"></span> deep module</span>
+          <span class="inline-flex items-center gap-2"><span class="inline-block w-5 h-3 shallow border border-red-200"></span> shallow module</span>
+        </div>
+        <p class="text-xs text-slate-400 pt-1">2026-06-16 · branch <span class="mono">dev-prior-select</span> · src ≈ 87k LOC</p>
+      </header>
+
+      <!-- ===================== CONTENTS ===================== -->
+      <nav class="text-sm text-slate-600 grid sm:grid-cols-2 gap-x-8 gap-y-1">
+        <a class="hover:text-indigo-700" href="#c1">1 · Collapse the Windowed moment family <span class="text-emerald-600 font-medium">Strong</span></a>
+        <a class="hover:text-indigo-700" href="#c2">2 · One covariance pipeline, not four wrappers <span class="text-emerald-600 font-medium">Strong</span></a>
+        <a class="hover:text-indigo-700" href="#c3">3 · Concentrate the validation matrix <span class="text-emerald-600 font-medium">Strong</span></a>
+        <a class="hover:text-indigo-700" href="#c4">4 · Deepen the XatRisk constraint builders <span class="text-amber-600 font-medium">Worth exploring</span></a>
+        <a class="hover:text-indigo-700" href="#c5">5 · Unify the risk-measure declaration surface <span class="text-amber-600 font-medium">Worth exploring</span></a>
+        <a class="hover:text-indigo-700" href="#c6">6 · Gerber / Smyth-Broby marker types <span class="text-slate-500 font-medium">Speculative</span></a>
+      </nav>
+
+      <section id="candidates" class="space-y-12">
+
+        <!-- ===================== CARD 1 — WINDOWED ===================== -->
+        <article id="c1" class="card bg-white rounded-xl border border-slate-200 shadow-sm p-7 space-y-6">
+          <div class="flex items-start justify-between gap-4">
+            <h2 class="text-2xl font-serif font-semibold">1 · Collapse the Windowed moment family</h2>
+            <div class="flex gap-2 shrink-0">
+              <span class="text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800">Strong</span>
+              <span class="text-xs px-2.5 py-1 rounded-full bg-slate-100 text-slate-600">in-process</span>
+            </div>
+          </div>
+
+          <p class="mono text-sm text-slate-500">
+            src/08_Moments/28_WindowedExpectedReturns.jl · 29_WindowedCovariance.jl · 30_WindowedVariance.jl · 31_WindowedCoskewness.jl · 32_WindowedCokurtosis.jl
+          </p>
+
+          <!-- before / after -->
+          <div class="grid md:grid-cols-2 gap-5">
+            <div class="rounded-lg border border-slate-200 p-4">
+              <p class="text-xs uppercase tracking-wider text-slate-500 mb-3">Before — 5 modules, one windowing implementation copy-pasted</p>
+              <div class="space-y-2">
+                <!-- five identical shallow strips -->
+                <div class="shallow border border-red-200 rounded px-3 py-2 text-xs mono">WindowedExpectedReturns &nbsp;→&nbsp; get_window · window_and_weights · factory · iv-slice</div>
+                <div class="shallow border border-red-200 rounded px-3 py-2 text-xs mono">WindowedCovariance &nbsp;→&nbsp; get_window · window_and_weights · factory · iv-slice <span class="text-red-600">(×2: cov+cor)</span></div>
+                <div class="shallow border border-red-200 rounded px-3 py-2 text-xs mono">WindowedVariance &nbsp;→&nbsp; get_window · window_and_weights · factory · iv-slice</div>
+                <div class="shallow border border-red-200 rounded px-3 py-2 text-xs mono">WindowedCoskewness &nbsp;→&nbsp; get_window · window_and_weights · factory · iv-slice</div>
+                <div class="shallow border border-red-200 rounded px-3 py-2 text-xs mono">WindowedCokurtosis &nbsp;→&nbsp; get_window · window_and_weights · factory · iv-slice</div>
+              </div>
+              <p class="text-xs text-red-700 mt-3">Same 5-line preamble in every <span class="mono">mean/cov/cor/coskewness/cokurtosis</span> body. 704 LOC; the windowing logic lives in ~5 places.</p>
+            </div>
+
+            <div class="rounded-lg border border-slate-200 p-4">
+              <p class="text-xs uppercase tracking-wider text-slate-500 mb-3">After — one deep windowing module, 5 thin declarations</p>
+              <div class="deep rounded-lg p-4 text-stone-100 space-y-2">
+                <p class="text-xs uppercase tracking-wider text-stone-300">WindowedMoment&lt;E&gt; — one interface</p>
+                <p class="mono text-[11px] text-stone-300 leading-relaxed">window = get_window(…)<br/>X, w = window_and_weights(…)<br/>inner = factory(estimator, w)<br/>iv-slice · delegate(inner, X)</p>
+              </div>
+              <div class="mt-3 grid grid-cols-5 gap-1.5 text-[10px] mono text-center text-slate-600">
+                <div class="border border-slate-300 rounded py-1">mean</div>
+                <div class="border border-slate-300 rounded py-1">cov</div>
+                <div class="border border-slate-300 rounded py-1">cor</div>
+                <div class="border border-slate-300 rounded py-1">cosk</div>
+                <div class="border border-slate-300 rounded py-1">cokurt</div>
+              </div>
+              <p class="text-xs text-emerald-700 mt-3">Each variant declares only the wrapped estimator type and the delegate. Windowing concentrates in one body.</p>
+            </div>
+          </div>
+
+          <div class="grid sm:grid-cols-2 gap-x-8 gap-y-3 text-sm">
+            <p><span class="font-semibold">Problem.</span> Five wrappers share an identical struct shape <span class="mono text-xs">(estimator, w, window)</span> and an identical compute preamble; only the delegated moment call differs. A fix to the <span class="mono text-xs">iv</span>-slicing or weight handling must land in 5–7 bodies.</p>
+            <p><span class="font-semibold">Solution.</span> One deep <span class="mono text-xs">WindowedMoment{E}</span> parameterised by the wrapped estimator, or a <span class="mono text-xs">@windowed</span> generator — windowing implemented once, the moment delegate chosen by dispatch.</p>
+          </div>
+
+          <ul class="grid sm:grid-cols-2 gap-x-8 gap-y-1.5 text-sm text-slate-700 list-disc list-inside marker:text-emerald-500">
+            <li>locality: windowing bug fixed once</li>
+            <li>leverage: one impl, every moment estimator</li>
+            <li>interface stays tiny (window spec)</li>
+            <li>≈600 LOC of preamble absorbed</li>
+            <li>new moments get windowing free</li>
+            <li>test surface: one windowing body</li>
+          </ul>
+        </article>
+
+        <!-- ===================== CARD 2 — COVARIANCE PIPELINE ===================== -->
+        <article id="c2" class="card bg-white rounded-xl border border-slate-200 shadow-sm p-7 space-y-6">
+          <div class="flex items-start justify-between gap-4">
+            <h2 class="text-2xl font-serif font-semibold">2 · One covariance pipeline, not four wrappers</h2>
+            <div class="flex gap-2 shrink-0">
+              <span class="text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800">Strong</span>
+              <span class="text-xs px-2.5 py-1 rounded-full bg-slate-100 text-slate-600">in-process</span>
+            </div>
+          </div>
+
+          <p class="mono text-sm text-slate-500">
+            src/08_Moments/12_DenoiseCovariance.jl · 13_DetoneCovariance.jl · 14_ProcessedCovariance.jl · 15_PortfolioOptimisersCovariance.jl
+          </p>
+
+          <div class="rounded-lg border border-slate-200 bg-white p-4">
+            <pre class="mermaid">
+flowchart LR
+  subgraph BEFORE["Before — 3 special cases beside the general one"]
+    direction TB
+    A1["DenoiseCovariance<br/>cov base · mutable · posdef! · denoise!"]:::shallow
+    A2["DetoneCovariance<br/>cov base · mutable · posdef! · detone!"]:::shallow
+    A3["ProcessedCovariance<br/>cov base · mutable · posdef! · alg!"]:::shallow
+    A4["PortfolioOptimisersCovariance<br/>cov base · mutable · matrix_processing!"]:::deepb
+  end
+  classDef shallow fill:#fee2e2,stroke:#dc2626,color:#7f1d1d;
+  classDef deepb fill:#0f172a,stroke:#0f172a,color:#f1f5f9;
+            </pre>
+            <p class="text-xs text-slate-500 mt-2">Each of the three re-implements the <span class="mono">cov base → make mutable → apply one step</span> skeleton — exactly what <span class="mono">matrix_processing!</span> (ADR 0009) already sequences as <span class="mono">(:pdm, :dn, :dt, :alg)</span>.</p>
+          </div>
+
+          <div class="rounded-lg border border-slate-200 bg-white p-4">
+            <pre class="mermaid">
+flowchart LR
+  subgraph AFTER["After — one pipeline module, the rest are constructors"]
+    direction LR
+    D["PortfolioOptimisersCovariance<br/>+ MatrixProcessing order"]:::deepb
+    C1["DenoiseCovariance(…)"]:::ctor -.-> D
+    C2["DetoneCovariance(…)"]:::ctor -.-> D
+    C3["ProcessedCovariance(…)"]:::ctor -.-> D
+  end
+  classDef deepb fill:#0f172a,stroke:#0f172a,color:#f1f5f9;
+  classDef ctor fill:#ecfdf5,stroke:#10b981,color:#065f46;
+            </pre>
+            <p class="text-xs text-emerald-700 mt-2"><span class="mono">DenoiseCovariance(ce, dn, pdm) = PortfolioOptimisersCovariance(ce, MatrixProcessing(order=(:pdm,:dn), pdm=pdm, dn=dn))</span> — same call sites, one implementation behind the seam.</p>
+          </div>
+
+          <div class="grid sm:grid-cols-2 gap-x-8 gap-y-3 text-sm">
+            <p><span class="font-semibold">Problem.</span> Denoise / Detone / Processed are shallow — each module's interface is nearly its whole implementation, and all three are pre-configured instances of the <span class="mono text-xs">MatrixProcessing</span> pipeline the fourth already owns.</p>
+            <p><span class="font-semibold">Solution.</span> Make <span class="mono text-xs">PortfolioOptimisersCovariance + MatrixProcessing</span> the one seam for covariance post-processing; reduce the three to convenience constructors over it (or retire them).</p>
+          </div>
+
+          <div class="rounded-md bg-amber-50 border border-amber-200 px-4 py-2 text-sm text-amber-900">
+            <span class="font-semibold">Deletion test.</span> Delete <span class="mono text-xs">DenoiseCovariance</span> and the caller writes a one-line <span class="mono text-xs">MatrixProcessing</span> config — complexity <em>moves to the caller</em>, it does not reappear as new logic. Signature of a shallow module.
+          </div>
+
+          <ul class="grid sm:grid-cols-2 gap-x-8 gap-y-1.5 text-sm text-slate-700 list-disc list-inside marker:text-emerald-500">
+            <li>locality: posdef/denoise/detone ordering in one place</li>
+            <li>3 modules → 3 adapters over one</li>
+            <li>aligns with ADR 0009 step-symbol design</li>
+            <li>≈530 LOC of skeleton absorbed</li>
+          </ul>
+        </article>
+
+        <!-- ===================== CARD 3 — VALIDATION MATRIX ===================== -->
+        <article id="c3" class="card bg-white rounded-xl border border-slate-200 shadow-sm p-7 space-y-6">
+          <div class="flex items-start justify-between gap-4">
+            <h2 class="text-2xl font-serif font-semibold">3 · Concentrate the validation matrix</h2>
+            <div class="flex gap-2 shrink-0">
+              <span class="text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800">Strong</span>
+              <span class="text-xs px-2.5 py-1 rounded-full bg-slate-100 text-slate-600">in-process</span>
+            </div>
+          </div>
+
+          <p class="mono text-sm text-slate-500">src/01_Base.jl:1985–2200 — assert_nonempty_nonneg_finite_val · assert_nonempty_gt0_finite_val · assert_nonempty_finite_val</p>
+
+          <!-- matrix grid before / after -->
+          <div class="grid md:grid-cols-2 gap-5">
+            <div class="rounded-lg border border-slate-200 p-4">
+              <p class="text-xs uppercase tracking-wider text-slate-500 mb-3">Before — a 3 × 5 grid of near-identical bodies</p>
+              <div class="overflow-hidden rounded border border-red-200">
+                <table class="w-full text-[10px] mono">
+                  <thead class="bg-stone-100 text-slate-500">
+                    <tr><th class="p-1.5 text-left">predicate \ type</th><th class="p-1">Dict</th><th class="p-1">VecPair</th><th class="p-1">ArrNum</th><th class="p-1">Pair</th><th class="p-1">Number</th></tr>
+                  </thead>
+                  <tbody class="text-center text-red-700">
+                    <tr><td class="p-1.5 text-left text-slate-600">≥ 0</td><td class="shallow p-2">•</td><td class="shallow p-2">•</td><td class="shallow p-2">•</td><td class="shallow p-2">•</td><td class="shallow p-2">•</td></tr>
+                    <tr><td class="p-1.5 text-left text-slate-600">&gt; 0</td><td class="shallow p-2">•</td><td class="shallow p-2">•</td><td class="shallow p-2">•</td><td class="shallow p-2">•</td><td class="shallow p-2">•</td></tr>
+                    <tr><td class="p-1.5 text-left text-slate-600">finite</td><td class="shallow p-2">•</td><td class="shallow p-2">•</td><td class="shallow p-2">•</td><td class="shallow p-2">•</td><td class="shallow p-2">•</td></tr>
+                  </tbody>
+                </table>
+              </div>
+              <p class="text-xs text-red-700 mt-3">15 bodies. The only deltas: <span class="mono">&lt;=</span> vs <span class="mono">&lt;</span>, and whether the sign check is present. Every error-message string is hand-repeated.</p>
+            </div>
+
+            <div class="rounded-lg border border-slate-200 p-4">
+              <p class="text-xs uppercase tracking-wider text-slate-500 mb-3">After — orthogonal primitives behind the same names</p>
+              <div class="space-y-2 text-xs mono">
+                <div class="deep text-stone-100 rounded px-3 py-2">assert_nonempty(val, sym)</div>
+                <div class="deep text-stone-100 rounded px-3 py-2">assert_finite(val, sym)</div>
+                <div class="deep text-stone-100 rounded px-3 py-2">assert_sign(val, sym; strict)</div>
+              </div>
+              <p class="text-[11px] mono text-slate-500 mt-3">extract(::Dict)=values · (::VecPair)=2nd · (::Pair)=2nd · (::ArrNum)=elems</p>
+              <p class="text-xs text-emerald-700 mt-3">Each predicate × the value-extraction dispatch, composed. Three callers keep their names as thin compositions.</p>
+            </div>
+          </div>
+
+          <div class="grid sm:grid-cols-2 gap-x-8 gap-y-3 text-sm">
+            <p><span class="font-semibold">Problem.</span> The interface is three function names; the implementation is fifteen copy-pasted bodies. A change to the message format or a missed sign convention has fifteen places to be wrong — and the value-extraction-by-type logic is re-stated in each.</p>
+            <p><span class="font-semibold">Solution.</span> Factor the two independent axes — <em>predicate</em> (nonempty / finite / sign) and <em>value extraction</em> (Dict / Pair / array / scalar) — into composable primitives; rebuild the three public asserts as one-line compositions.</p>
+          </div>
+
+          <ul class="grid sm:grid-cols-2 gap-x-8 gap-y-1.5 text-sm text-slate-700 list-disc list-inside marker:text-emerald-500">
+            <li>locality: one message format, one sign rule</li>
+            <li>leverage: ~90 call sites, one impl each axis</li>
+            <li>interface unchanged for callers</li>
+            <li>new value-types: one extract method</li>
+          </ul>
+        </article>
+
+        <!-- ===================== CARD 4 — XatRisk constraints ===================== -->
+        <article id="c4" class="card bg-white rounded-xl border border-slate-200 shadow-sm p-7 space-y-6">
+          <div class="flex items-start justify-between gap-4">
+            <h2 class="text-2xl font-serif font-semibold">4 · Deepen the XatRisk constraint builders</h2>
+            <div class="flex gap-2 shrink-0">
+              <span class="text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-100 text-amber-800">Worth exploring</span>
+              <span class="text-xs px-2.5 py-1 rounded-full bg-slate-100 text-slate-600">in-process</span>
+            </div>
+          </div>
+
+          <p class="mono text-sm text-slate-500">src/20_Optimisation/20_RiskMeasureConstraints/06–09,19 — XatRisk · Conditional · Entropic · Relativistic · PowerNorm (+ each <span class="mono">…Range</span>)</p>
+
+          <!-- cross section -->
+          <div class="grid md:grid-cols-2 gap-5">
+            <div class="rounded-lg border border-slate-200 p-4">
+              <p class="text-xs uppercase tracking-wider text-slate-500 mb-3">Before — the point measure, then its Range twin re-derived</p>
+              <div class="space-y-1.5 text-xs mono">
+                <div class="border-l-4 border-emerald-400 bg-emerald-50 px-3 py-1.5">aux vars + bounds &nbsp;<span class="text-emerald-700">(shared helper ✓)</span></div>
+                <div class="shallow border border-red-200 px-3 py-1.5">VaR: z_var, var_risk, big-M, cone</div>
+                <div class="shallow border border-red-200 px-3 py-1.5">VaR<span class="font-bold">Range</span>: z_var_l/h, var_risk_l/h, big-M ×2, cone ×2</div>
+                <div class="shallow border border-red-200 px-3 py-1.5">CVaR / CVaRRange · EVaR / … · RVaR / … · PNVaR / …</div>
+              </div>
+              <p class="text-xs text-red-700 mt-3">Each <span class="mono">…Range</span> doubles its point twin's variable + cone setup; the base bounds/expression step is already shared. 5,694 LOC across the directory.</p>
+            </div>
+            <div class="rounded-lg border border-slate-200 p-4">
+              <p class="text-xs uppercase tracking-wider text-slate-500 mb-3">After — one tail-builder, range = two tails</p>
+              <div class="deep rounded-lg p-4 text-stone-100 space-y-2">
+                <p class="text-xs uppercase tracking-wider text-stone-300">build_tail!(model, side, cone, formula)</p>
+                <p class="mono text-[11px] text-stone-300">point = build_tail!(…)<br/>range = build_tail!(lo) + build_tail!(hi)</p>
+              </div>
+              <p class="text-xs text-emerald-700 mt-3">Each family supplies its cone + risk formula once; the Range form composes two tail calls instead of copying the setup.</p>
+            </div>
+          </div>
+
+          <div class="grid sm:grid-cols-2 gap-x-8 gap-y-3 text-sm">
+            <p><span class="font-semibold">Problem.</span> The base bounds/expression step is factored, but each <span class="mono text-xs">…Range</span> measure re-states its point twin's auxiliary-variable and cone scaffolding for an upper and a lower tail.</p>
+            <p><span class="font-semibold">Solution.</span> Extract a single tail-builder taking <span class="italic">side · cone · risk-formula</span>; express the point measure as one call and the Range as two.</p>
+          </div>
+
+          <div class="rounded-md bg-amber-50 border border-amber-200 px-4 py-2 text-sm text-amber-900">
+            <span class="font-semibold">Caveat.</span> The cone and risk-formula genuinely differ per family (NormOne / SOC / PowerCone; Rockafellar–Uryasev vs entropic vs relativistic). The deepening is in the point↔Range axis, not in flattening distinct cones — verify the tail-builder interface stays small before committing.
+          </div>
+
+          <ul class="grid sm:grid-cols-2 gap-x-8 gap-y-1.5 text-sm text-slate-700 list-disc list-inside marker:text-amber-500">
+            <li>locality: tail formulation in one place</li>
+            <li>Range follows point automatically</li>
+            <li>cone choice stays explicit per family</li>
+            <li>fewer silent big-M divergences</li>
+          </ul>
+        </article>
+
+        <!-- ===================== CARD 5 — risk measure declaration ===================== -->
+        <article id="c5" class="card bg-white rounded-xl border border-slate-200 shadow-sm p-7 space-y-6">
+          <div class="flex items-start justify-between gap-4">
+            <h2 class="text-2xl font-serif font-semibold">5 · Unify the risk-measure declaration surface</h2>
+            <div class="flex gap-2 shrink-0">
+              <span class="text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-100 text-amber-800">Worth exploring</span>
+              <span class="text-xs px-2.5 py-1 rounded-full bg-slate-100 text-slate-600">in-process</span>
+            </div>
+          </div>
+
+          <p class="mono text-sm text-slate-500">src/19_RiskMeasures/01_Base_RiskMeasures.jl + per-measure files — risk_input_kind · supports_precomputed_returns · functor arities</p>
+
+          <div class="rounded-lg border border-slate-200 p-4">
+            <p class="text-xs uppercase tracking-wider text-slate-500 mb-3">Before — one measure's contract scattered across ≥4 seams</p>
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] mono text-center">
+              <div class="border border-slate-300 rounded py-2">struct + @pprop fields<br/><span class="text-slate-400">file A</span></div>
+              <div class="border border-slate-300 rounded py-2">risk_input_kind(r)<br/><span class="text-slate-400">one line, elsewhere</span></div>
+              <div class="border border-slate-300 rounded py-2">supports_precomputed<br/><span class="text-slate-400">one line, elsewhere</span></div>
+              <div class="border border-slate-300 rounded py-2">functors r(x)/r(w,X)<br/><span class="text-slate-400">arity must match kind</span></div>
+            </div>
+            <p class="text-xs text-red-700 mt-3">The three trait declarations and the functor arity must agree, but nothing co-locates or cross-checks them — a mismatch surfaces late, as a wrong route in <span class="mono">expected_risk</span> or an optimiser crash.</p>
+          </div>
+
+          <div class="rounded-lg border border-slate-200 p-4">
+            <p class="text-xs uppercase tracking-wider text-slate-500 mb-3">After — one declaration, emitting the trio</p>
+            <div class="deep rounded-lg p-4 text-stone-100">
+              <p class="text-xs uppercase tracking-wider text-stone-300 mb-1">@risk_measure MyMeasure kind=net_returns precomputed=true</p>
+              <p class="mono text-[11px] text-stone-300">⇒ risk_input_kind · supports_precomputed_returns · functor stubs, in sync</p>
+            </div>
+            <p class="text-xs text-emerald-700 mt-3">Same machinery family as <span class="mono">@propagatable</span> / <span class="mono">@forward_properties</span>: one declared surface, the introspection generated and kept consistent.</p>
+          </div>
+
+          <div class="grid sm:grid-cols-2 gap-x-8 gap-y-3 text-sm">
+            <p><span class="font-semibold">Problem.</span> A risk measure's "what do I consume" contract (ADR 0006 Risk Input Kind + ADR 0007 precomputed contract + functor arity) is spread across three trait methods plus the functors, with no single place to read or verify it.</p>
+            <p><span class="font-semibold">Solution.</span> A <span class="mono text-xs">@risk_measure</span> declaration adjacent to the struct that emits the trait methods and functor stubs from one statement — the same "declared surface" discipline ADRs 0012/0013 applied to binding and forwarding.</p>
+          </div>
+
+          <ul class="grid sm:grid-cols-2 gap-x-8 gap-y-1.5 text-sm text-slate-700 list-disc list-inside marker:text-amber-500">
+            <li>locality: one contract per measure</li>
+            <li>kind ↔ arity checked at expansion</li>
+            <li>new measures can't omit a trait</li>
+            <li>fits the existing macro family</li>
+          </ul>
+        </article>
+
+        <!-- ===================== CARD 6 — Gerber markers ===================== -->
+        <article id="c6" class="card bg-white rounded-xl border border-slate-200 shadow-sm p-7 space-y-6">
+          <div class="flex items-start justify-between gap-4">
+            <h2 class="text-2xl font-serif font-semibold">6 · Gerber / Smyth-Broby marker types</h2>
+            <div class="flex gap-2 shrink-0">
+              <span class="text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-200 text-slate-700">Speculative</span>
+              <span class="text-xs px-2.5 py-1 rounded-full bg-slate-100 text-slate-600">in-process</span>
+            </div>
+          </div>
+
+          <p class="mono text-sm text-slate-500">src/08_Moments/05_GerberCovariance.jl · 06_SmythBrobyCovariance.jl</p>
+
+          <div class="grid md:grid-cols-2 gap-5 text-sm">
+            <div class="rounded-lg border border-slate-200 p-4">
+              <p class="text-xs uppercase tracking-wider text-slate-500 mb-3">Before — combinatorial marker structs</p>
+              <div class="flex flex-wrap gap-1.5 text-[10px] mono">
+                <span class="px-2 py-1 bg-red-50 border border-red-200 rounded">Gerber0/1/2</span>
+                <span class="px-2 py-1 bg-red-50 border border-red-200 rounded">SmythBroby0/1/2</span>
+                <span class="px-2 py-1 bg-red-50 border border-red-200 rounded">…Gerber0/1/2</span>
+                <span class="px-2 py-1 bg-red-50 border border-red-200 rounded">…Count0/1/2</span>
+              </div>
+              <p class="text-xs text-red-700 mt-3">~12 fieldless markers; the algorithmic delta is a few lines of which boolean matrices to combine. The types name a cross-product, not state.</p>
+            </div>
+            <div class="rounded-lg border border-slate-200 p-4">
+              <p class="text-xs uppercase tracking-wider text-slate-500 mb-3">After — axes as data (à la ADR 0009)</p>
+              <div class="deep rounded-lg p-4 text-stone-100">
+                <p class="mono text-[11px] text-stone-300">GerberAlgorithm(base=:sb0, cross=:gerber, count=true)</p>
+              </div>
+              <p class="text-xs text-slate-600 mt-3">ADR 0009 already turned ordering markers into step symbols. The same move could fold the cross-product into a small data-carrying algorithm.</p>
+            </div>
+          </div>
+
+          <p class="text-sm"><span class="font-semibold">Problem.</span> The variant explosion is a cross-product expressed as a type lattice; adding an axis multiplies the markers. <span class="font-semibold">Solution.</span> Carry the axes as fields on one algorithm, dispatching internally.</p>
+
+          <div class="rounded-md bg-amber-50 border border-amber-200 px-4 py-2 text-sm text-amber-900">
+            <span class="font-semibold">Why only speculative.</span> Unlike the matrix-processing <em>order</em> (a thin meta-choice), these variants are genuinely distinct co-movement algorithms, and the type lattice gives precise dispatch and docstring anchors. The win is real but the current design is defensible — confirm the variants share enough body to be worth merging before touching it.
+          </div>
+        </article>
+
+      </section>
+
+      <!-- ===================== TOP RECOMMENDATION ===================== -->
+      <section id="top-recommendation" class="rounded-xl deep text-stone-100 p-8 space-y-3">
+        <p class="text-xs uppercase tracking-widest text-stone-400">Top recommendation</p>
+        <h2 class="text-2xl font-serif font-semibold"><a href="#c1" class="hover:underline">1 · Collapse the Windowed moment family</a></h2>
+        <p class="text-stone-300 max-w-3xl text-sm leading-relaxed">
+          Highest leverage-to-risk. Five modules with a byte-identical struct shape and an identical
+          windowing preamble — pure copy-paste, no divergent edge cases to preserve, isolated under
+          <span class="mono">08_Moments</span> so the blast radius is contained. Deepening it concentrates
+          the windowing implementation in one place (locality) and makes every present and future moment
+          estimator windowable through one tiny interface (leverage). It is also the cleanest precedent for
+          the next two — covariance pipeline and validation matrix — which share the same "one implementation,
+          many shallow copies" shape.
+        </p>
+      </section>
+
+      <footer class="text-center text-xs text-slate-400 pt-4">
+        Vocabulary per the review glossary: module · interface · implementation · depth · seam · adapter · leverage · locality.
+        Domain terms per CONTEXT.md. ADRs 0001–0013 honoured, not re-litigated.
+      </footer>
+
+    </main>
+  </body>
+</html>

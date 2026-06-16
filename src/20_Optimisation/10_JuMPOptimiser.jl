@@ -14,20 +14,34 @@ $(DocStringExtensions.FIELDS)
 
 # Constructors
 
-    ProcessedJuMPOptimiserAttributes(
-        pr, wb, lt, st, lcsr, ctr, gcardr, sgcardr,
-        smtx, sgmtx, slt, sst, sglt, sgst, tn, fees, plr, ret
+    ProcessedJuMPOptimiserAttributes(;
+        pr::AbstractPriorResult, wb::Option{<:WeightBounds}, lt::Option{<:Threshold},
+        st::Option{<:Threshold}, lcsr::Option{<:Lc_VecLc}, ctr::Option{<:Lc_CC_VecCC},
+        gcardr::Option{<:LinearConstraint}, sgcardr::Option{<:Lc_VecLc},
+        smtx::Option{<:MatNum_VecMatNum}, sgmtx::Option{<:MatNum_VecMatNum},
+        slt::Option{<:Bt_VecOptBt}, sst::Option{<:Bt_VecOptBt}, sglt::Option{<:Bt_VecOptBt},
+        sgst::Option{<:Bt_VecOptBt}, tn::Option{<:Tn_VecTn}, fees::Option{<:Fees},
+        plr::Option{<:AbstractPhylogenyConstraintResult}, ret::JuMPReturnsEstimator
     ) -> ProcessedJuMPOptimiserAttributes
 
-Positional arguments correspond to the struct's fields in order. In practice, construct
-via [`processed_jump_optimiser_attributes`](@ref) rather than directly.
+Keywords correspond to the struct's fields. The field types are the *result* side of the
+matching [`JuMPOptimiser`](@ref) estimator slots: this bundle holds the constraint and
+prior results produced by [`processed_jump_optimiser_attributes`](@ref), not the raw
+estimators (`ret` aside — a returns estimator has no separate result form). In practice,
+construct via [`processed_jump_optimiser_attributes`](@ref) rather than directly.
 
 # Examples
 
 ```jldoctest
-julia> ProcessedJuMPOptimiserAttributes(nothing, nothing, nothing, nothing, nothing, nothing,
-                                        nothing, nothing, nothing, nothing, nothing, nothing,
-                                        nothing, nothing, nothing, nothing, nothing, nothing) isa
+julia> pr = prior(EmpiricalPrior(),
+                  ReturnsResult(; nx = ["a", "b"], X = [0.1 -0.2; -0.1 0.2; 0.05 0.1]));
+
+julia> ProcessedJuMPOptimiserAttributes(; pr = pr, wb = nothing, lt = nothing, st = nothing,
+                                        lcsr = nothing, ctr = nothing, gcardr = nothing,
+                                        sgcardr = nothing, smtx = nothing, sgmtx = nothing,
+                                        slt = nothing, sst = nothing, sglt = nothing,
+                                        sgst = nothing, tn = nothing, fees = nothing,
+                                        plr = nothing, ret = ArithmeticReturn()) isa
        ProcessedJuMPOptimiserAttributes
 true
 ```
@@ -112,6 +126,136 @@ true
     $(field_dict[:ret_jmp])
     """
     ret
+    # Field types are the *result* side of each matching `JuMPOptimiser` estimator slot:
+    # this bundle holds the constraint/prior results produced by
+    # `processed_jump_optimiser_attributes` — never the raw estimators. `ret` is the sole
+    # exception: a returns estimator has no separate result form. Processing has already
+    # validated the contents, so this bundle only type-gates.
+    function ProcessedJuMPOptimiserAttributes(pr::AbstractPriorResult,
+                                              wb::Option{<:WeightBounds},
+                                              lt::Option{<:Threshold},
+                                              st::Option{<:Threshold},
+                                              lcsr::Option{<:Lc_VecLc},
+                                              ctr::Option{<:Lc_CC_VecCC},
+                                              gcardr::Option{<:LinearConstraint},
+                                              sgcardr::Option{<:Lc_VecLc},
+                                              smtx::Option{<:MatNum_VecMatNum},
+                                              sgmtx::Option{<:MatNum_VecMatNum},
+                                              slt::Option{<:Bt_VecOptBt},
+                                              sst::Option{<:Bt_VecOptBt},
+                                              sglt::Option{<:Bt_VecOptBt},
+                                              sgst::Option{<:Bt_VecOptBt},
+                                              tn::Option{<:Tn_VecTn}, fees::Option{<:Fees},
+                                              plr::Option{<:Union{<:AbstractPhylogenyConstraintResult,
+                                                                  <:AbstractVector{<:AbstractPhylogenyConstraintResult}}},
+                                              ret::JuMPReturnsEstimator)
+        return new{typeof(pr), typeof(wb), typeof(lt), typeof(st), typeof(lcsr),
+                   typeof(ctr), typeof(gcardr), typeof(sgcardr), typeof(smtx),
+                   typeof(sgmtx), typeof(slt), typeof(sst), typeof(sglt), typeof(sgst),
+                   typeof(tn), typeof(fees), typeof(plr), typeof(ret)}(pr, wb, lt, st, lcsr,
+                                                                       ctr, gcardr, sgcardr,
+                                                                       smtx, sgmtx, slt,
+                                                                       sst, sglt, sgst, tn,
+                                                                       fees, plr, ret)
+    end
+end
+function ProcessedJuMPOptimiserAttributes(; pr::AbstractPriorResult,
+                                          wb::Option{<:WeightBounds},
+                                          lt::Option{<:Threshold}, st::Option{<:Threshold},
+                                          lcsr::Option{<:Lc_VecLc},
+                                          ctr::Option{<:Lc_CC_VecCC},
+                                          gcardr::Option{<:LinearConstraint},
+                                          sgcardr::Option{<:Lc_VecLc},
+                                          smtx::Option{<:MatNum_VecMatNum},
+                                          sgmtx::Option{<:MatNum_VecMatNum},
+                                          slt::Option{<:Bt_VecOptBt},
+                                          sst::Option{<:Bt_VecOptBt},
+                                          sglt::Option{<:Bt_VecOptBt},
+                                          sgst::Option{<:Bt_VecOptBt},
+                                          tn::Option{<:Tn_VecTn}, fees::Option{<:Fees},
+                                          plr::Option{<:Union{<:AbstractPhylogenyConstraintResult,
+                                                              <:AbstractVector{<:AbstractPhylogenyConstraintResult}}},
+                                          ret::JuMPReturnsEstimator)::ProcessedJuMPOptimiserAttributes
+    return ProcessedJuMPOptimiserAttributes(pr, wb, lt, st, lcsr, ctr, gcardr, sgcardr,
+                                            smtx, sgmtx, slt, sst, sglt, sgst, tn, fees,
+                                            plr, ret)
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Shared field core for JuMP-based optimisation results.
+
+Holds the fields common to every JuMP optimisation result. Embedded as the first field (`jr`) of each concrete JuMP result, analogous to how [`JuMPOptimiser`](@ref) is embedded as `opt` in each JuMP optimiser. The concrete result keeps only its unique fields plus the trailing `fb`.
+
+Defined here (rather than in `08_Base_JuMPOptimisation.jl`, where its [`BaseJuMPOptimisationResult`](@ref) supertype lives) so its typed constructor can bind `pa::ProcessedJuMPOptimiserAttributes` and `sol::JuMPOptimisationSolution`, both in scope at this point in load order.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    JuMPOptimisationResult(;
+        oe::Type{<:JuMPOptimisationEstimator},
+        pa::ProcessedJuMPOptimiserAttributes,
+        retcode::OptRetCode_VecOptRetCode,
+        sol::JuMPOptSol_VecJuMPOptSol,
+        model::Option{<:JuMP.Model}
+    ) -> JuMPOptimisationResult
+
+Keywords correspond to the struct's fields.
+
+# Related
+
+  - [`BaseJuMPOptimisationResult`](@ref)
+  - [`RiskJuMPOptimisationResult`](@ref)
+  - [`JuMPOptimiser`](@ref)
+"""
+@concrete struct JuMPOptimisationResult <: BaseJuMPOptimisationResult
+    """
+    $(field_dict[:oe])
+    """
+    oe
+    """
+    $(field_dict[:pa])
+    """
+    pa
+    """
+    $(field_dict[:retcode])
+    """
+    retcode
+    """
+    $(field_dict[:sol])
+    """
+    sol
+    """
+    $(field_dict[:model])
+    """
+    model
+    function JuMPOptimisationResult(oe::Type{<:JuMPOptimisationEstimator},
+                                    pa::ProcessedJuMPOptimiserAttributes,
+                                    retcode::OptRetCode_VecOptRetCode,
+                                    sol::JuMPOptSol_VecJuMPOptSol,
+                                    model::Option{<:JuMP.Model})
+        return new{typeof(oe), typeof(pa), typeof(retcode), typeof(sol), typeof(model)}(oe,
+                                                                                        pa,
+                                                                                        retcode,
+                                                                                        sol,
+                                                                                        model)
+    end
+end
+function JuMPOptimisationResult(; oe::Type{<:JuMPOptimisationEstimator},
+                                pa::ProcessedJuMPOptimiserAttributes,
+                                retcode::OptRetCode_VecOptRetCode,
+                                sol::JuMPOptSol_VecJuMPOptSol,
+                                model::Option{<:JuMP.Model})::JuMPOptimisationResult
+    return JuMPOptimisationResult(oe, pa, retcode, sol, model)
+end
+# Virtual property `:w` extracts portfolio weights from `sol` (a single solution or a vector
+# of them, hence the broadcast); unknown properties forward to `pa` (see [`@forward_properties`](@ref)).
+@forward_properties JuMPOptimisationResult begin
+    compute(w, sol.w; broadcast)
+    forward(pa)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -851,9 +995,11 @@ function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResu
     plr = phylogeny_constraints(opt.ple, pr; iv = rd.iv, ivpa = rd.ivpa, rd = rd,
                                 cle_pr = opt.cle_pr, kwargs...)
     ret = factory(opt.ret, pr)
-    return ProcessedJuMPOptimiserAttributes(pr, wb, lt, st, lcsr, ctr, gcardr, sgcardr,
-                                            smtx, sgmtx, slt, sst, sglt, sgst, tn, fees,
-                                            plr, ret)
+    return ProcessedJuMPOptimiserAttributes(; pr = pr, wb = wb, lt = lt, st = st,
+                                            lcsr = lcsr, ctr = ctr, gcardr = gcardr,
+                                            sgcardr = sgcardr, smtx = smtx, sgmtx = sgmtx,
+                                            slt = slt, sst = sst, sglt = sglt, sgst = sgst,
+                                            tn = tn, fees = fees, plr = plr, ret = ret)
 end
 """
     no_bounds_optimiser(opt::JuMPOptimiser, args...) -> JuMPOptimiser
@@ -887,9 +1033,9 @@ true
   - [`JuMPOptimiser`](@ref)
 """
 function no_bounds_optimiser(opt::JuMPOptimiser, args...)
-    pnames = Tuple(setdiff(propertynames(opt), (:ret,)))
+    pnames = Tuple(setdiff(fieldnames(typeof(opt)), (:ret,)))
     return JuMPOptimiser(; ret = no_bounds_returns_estimator(opt.ret, args...),
-                         NamedTuple{pnames}(getproperty.(opt, pnames))...)
+                         NamedTuple{pnames}(getfield.(opt, pnames))...)
 end
 """
     jump_optimiser_from_attributes(
@@ -1070,9 +1216,15 @@ before calling this function. See `Model Assembly` in `CONTEXT.md` and
 ```jldoctest
 julia> using PortfolioOptimisers
 
-julia> ProcessedJuMPOptimiserAttributes(nothing, nothing, nothing, nothing, nothing, nothing,
-                                        nothing, nothing, nothing, nothing, nothing, nothing,
-                                        nothing, nothing, nothing, nothing, nothing, nothing) isa
+julia> pr = prior(EmpiricalPrior(),
+                  ReturnsResult(; nx = ["a", "b"], X = [0.1 -0.2; -0.1 0.2; 0.05 0.1]));
+
+julia> ProcessedJuMPOptimiserAttributes(; pr = pr, wb = nothing, lt = nothing, st = nothing,
+                                        lcsr = nothing, ctr = nothing, gcardr = nothing,
+                                        sgcardr = nothing, smtx = nothing, sgmtx = nothing,
+                                        slt = nothing, sst = nothing, sglt = nothing,
+                                        sgst = nothing, tn = nothing, fees = nothing,
+                                        plr = nothing, ret = ArithmeticReturn()) isa
        ProcessedJuMPOptimiserAttributes
 true
 ```

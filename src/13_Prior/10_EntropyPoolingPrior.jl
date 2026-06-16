@@ -542,11 +542,11 @@ EntropyPoolingPrior
   - [`JuMPEntropyPooling`](@ref)
   - [`AbstractEntropyPoolingAlgorithm`](@ref)
 """
-@concrete struct EntropyPoolingPrior <: AbstractLowOrderPriorEstimator_AF
+@propagatable @concrete struct EntropyPoolingPrior <: AbstractLowOrderPriorEstimator_AF
     """
     $(field_dict[:pe])
     """
-    pe
+    @fprop @vprop pe
     """
     $(field_dict[:mu_views])
     """
@@ -590,7 +590,7 @@ EntropyPoolingPrior
     """
     $(field_dict[:sets])
     """
-    sets
+    @vprop sets
     """
     $(field_dict[:ds_opt])
     """
@@ -606,7 +606,7 @@ EntropyPoolingPrior
     """
     $(field_dict[:ep_w])
     """
-    w
+    @wprop w
     """
     $(field_dict[:epalg])
     """
@@ -690,19 +690,10 @@ function EntropyPoolingPrior(; pe::AbstractLowOrderPriorEstimator_A_F_AF = Empir
                                kt_views, cov_views, rho_views, var_alpha, cvar_alpha, sets,
                                ds_opt, dm_opt, opt, w, alg)
 end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Access properties of [`EntropyPoolingPrior`](@ref). Exposes `:me` and `:ce` from the embedded prior estimator `obj.pe` for transparent access.
-"""
-function Base.getproperty(obj::EntropyPoolingPrior, sym::Symbol)
-    return if sym == :me
-        obj.pe.me
-    elseif sym == :ce
-        obj.pe.ce
-    else
-        getfield(obj, sym)
-    end
+# Expose `:me` and `:ce` from the embedded prior estimator `pe` for transparent access
+# (see [`@forward_properties`](@ref)).
+@forward_properties EntropyPoolingPrior begin
+    forward(pe, me, ce)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -714,46 +705,6 @@ Alias for an abstract vector of [`EntropyPoolingPrior`](@ref) elements.
   - [`EntropyPoolingPrior`](@ref)
 """
 const VecEP = AbstractVector{<:EntropyPoolingPrior}
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Return a new [`EntropyPoolingPrior`](@ref) estimator with observation weights `w` applied to the underlying prior estimator and stored as the entropy pooling weights.
-
-# Related
-
-  - [`EntropyPoolingPrior`](@ref)
-  - [`factory`](@ref)
-"""
-function factory(pe::EntropyPoolingPrior, w::ObsWeights)::EntropyPoolingPrior
-    return EntropyPoolingPrior(; pe = factory(pe.pe, w), mu_views = pe.mu_views,
-                               var_views = pe.var_views, cvar_views = pe.cvar_views,
-                               sigma_views = pe.sigma_views, sk_views = pe.sk_views,
-                               kt_views = pe.kt_views, cov_views = pe.cov_views,
-                               rho_views = pe.rho_views, var_alpha = pe.var_alpha,
-                               cvar_alpha = pe.cvar_alpha, sets = pe.sets,
-                               ds_opt = pe.ds_opt, dm_opt = pe.dm_opt, opt = pe.opt, w = w,
-                               alg = pe.alg)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Return a new [`EntropyPoolingPrior`](@ref) estimator restricted to the assets at index `i`.
-
-# Related
-
-  - [`EntropyPoolingPrior`](@ref)
-  - [`port_opt_view`](@ref)
-"""
-function port_opt_view(pe::EntropyPoolingPrior, i, args...)::EntropyPoolingPrior
-    return EntropyPoolingPrior(; pe = port_opt_view(pe.pe, i), mu_views = pe.mu_views,
-                               var_views = pe.var_views, cvar_views = pe.cvar_views,
-                               sigma_views = pe.sigma_views, sk_views = pe.sk_views,
-                               kt_views = pe.kt_views, cov_views = pe.cov_views,
-                               rho_views = pe.rho_views, var_alpha = pe.var_alpha,
-                               cvar_alpha = pe.cvar_alpha, sets = port_opt_view(pe.sets, i),
-                               ds_opt = pe.ds_opt, dm_opt = pe.dm_opt, opt = pe.opt,
-                               w = pe.w, alg = pe.alg)
-end
 """
     add_ep_constraint!(epc::AbstractDict, lhs::MatNum, rhs::VecNum, key::Symbol)
 
@@ -984,7 +935,7 @@ function ep_mu_views!(mu_views::LinearConstraintEstimator, epc::AbstractDict,
     mu_views = replace_group_by_assets(mu_views, sets, false, true, false)
     mu_views = replace_prior_views(mu_views, pr, sets, :mu; strict = strict)
     lcs = get_linear_constraints(mu_views, sets; datatype = eltype(X), strict = strict)
-    for p in propertynames(lcs)
+    for p in (:ineq, :eq)
         if isnothing(getproperty(lcs, p))
             continue
         end
@@ -1140,7 +1091,7 @@ function ep_var_views!(var_views::LinearConstraintEstimator, epc::AbstractDict,
                 !isnothing(lcs.ineq) &&
                 any(x -> x < zero(eltype(x)), lcs.A_ineq .* lcs.B_ineq)),
               ArgumentError("`var_view` cannot be negative.\n$var_views"))
-    for p in propertynames(lcs)
+    for p in (:ineq, :eq)
         if isnothing(getproperty(lcs, p))
             continue
         end
@@ -1732,7 +1683,7 @@ function ep_sigma_views!(sigma_views::LinearConstraintEstimator, epc::AbstractDi
     lcs = get_linear_constraints(sigma_views, sets; datatype = eltype(X), strict = strict)
     tmp = transpose((X .- transpose(pr.mu)) .^ 2)
     to_fix = falses(size(X, 2))
-    for p in propertynames(lcs)
+    for p in (:ineq, :eq)
         if isnothing(getproperty(lcs, p))
             continue
         end
@@ -2178,7 +2129,7 @@ function ep_sk_views!(skew_views::LinearConstraintEstimator, epc::AbstractDict,
     tmp = transpose((X .^ 3 .- transpose(pr.mu) .^ 3 .- 3 * transpose(pr.mu .* sigma)) ./
                     transpose(sigma .* sqrt.(sigma)))
     to_fix = falses(size(X, 2))
-    for p in propertynames(lcs)
+    for p in (:ineq, :eq)
         if isnothing(getproperty(lcs, p))
             continue
         end
@@ -2267,7 +2218,7 @@ function ep_kt_views!(kurtosis_views::LinearConstraintEstimator, epc::AbstractDi
                      6 * transpose(mu_sq) .* X_sq .- 3 * transpose(mu_sq .* mu_sq)) ./
                     transpose(LinearAlgebra.diag(pr.sigma)) .^ 2)
     to_fix = falses(size(X, 2))
-    for p in propertynames(lcs)
+    for p in (:ineq, :eq)
         if isnothing(getproperty(lcs, p))
             continue
         end

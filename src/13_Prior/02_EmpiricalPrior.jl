@@ -58,15 +58,15 @@ EmpiricalPrior
   - [`PortfolioOptimisersCovariance`](@ref)
   - [`prior`](@ref)
 """
-@concrete struct EmpiricalPrior <: AbstractLowOrderPriorEstimator_A
+@propagatable @concrete struct EmpiricalPrior <: AbstractLowOrderPriorEstimator_A
     """
     $(field_dict[:ce])
     """
-    ce
+    @fprop @vprop ce
     """
     $(field_dict[:me])
     """
-    me
+    @fprop @vprop me
     """
     $(field_dict[:horizon])
     """
@@ -84,33 +84,6 @@ function EmpiricalPrior(;
                         me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
                         horizon::Option{<:Number} = nothing)::EmpiricalPrior
     return EmpiricalPrior(ce, me, horizon)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Return a new [`EmpiricalPrior`](@ref) estimator with observation weights `w` applied to the underlying covariance and expected returns estimators.
-
-# Related
-
-  - [`EmpiricalPrior`](@ref)
-  - [`factory`](@ref)
-"""
-function factory(pe::EmpiricalPrior, w::ObsWeights)::EmpiricalPrior
-    return EmpiricalPrior(; me = factory(pe.me, w), ce = factory(pe.ce, w),
-                          horizon = pe.horizon)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Return a new [`EmpiricalPrior`](@ref) estimator restricted to the assets at index `i`.
-
-# Related
-
-  - [`EmpiricalPrior`](@ref)
-"""
-function port_opt_view(pe::EmpiricalPrior, i, args...)::EmpiricalPrior
-    return EmpiricalPrior(; me = port_opt_view(pe.me, i), ce = port_opt_view(pe.ce, i),
-                          horizon = pe.horizon)
 end
 """
     prior(pe::EmpiricalPrior{<:Any, <:Any, Nothing}, X::MatNum, args...; dims::Int = 1,

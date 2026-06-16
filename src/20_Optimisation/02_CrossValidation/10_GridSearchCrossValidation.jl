@@ -247,7 +247,8 @@ function search_cross_validation(opt::NonFiniteAllocationOptimisationEstimator,
     for (lens, val) in zip(opt_lens, opt_vals)
         opt = Accessors.set(opt, lens, val)
     end
-    return SearchCrossValidationResult(opt, test_scores, train_scores, lens_grid, val_grid,
-                                       opt_idx)
+    return SearchCrossValidationResult(; opt = opt, test_scores = test_scores,
+                                       train_scores = train_scores, lens_grid = lens_grid,
+                                       val_grid = val_grid, idx = opt_idx)
 end
 export search_cross_validation, GridSearchCrossValidation

@@ -2,14 +2,12 @@
 
 ```@docs
 MeanReturn
-factory(r::MeanReturn, pr::AbstractPriorResult, args...)
 port_opt_view(r::MeanReturn, ::Any, args...)
 MeanReturnRiskRatio
 needs_previous_weights(r::MeanReturnRiskRatio)
 factory(r::MeanReturnRiskRatio, args...; kwargs...)
 factory(r::MeanReturnRiskRatio, w::VecNum)
 ThirdCentralMoment
-factory(r::ThirdCentralMoment, pr::AbstractPriorResult, args...; kwargs...)
 port_opt_view(r::ThirdCentralMoment, i, args...)
 TCM_Sk
 calc_moment_target(::TCM_Sk{Nothing, Nothing}, ::Any, x::VecNum)

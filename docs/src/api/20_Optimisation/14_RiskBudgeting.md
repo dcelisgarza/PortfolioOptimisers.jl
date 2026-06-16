@@ -19,8 +19,6 @@ RiskBudgeting
 needs_previous_weights(opt::RiskBudgeting)
 factory(rb::RiskBudgeting, w::AbstractVector)
 port_opt_view(rb::RiskBudgeting, i, X::MatNum, args...)
-port_opt_view(r::AssetRiskBudgeting, i, args...)
-port_opt_view(r::FactorRiskBudgeting, i, args...)
 _set_risk_budgeting_constraints!(model::JuMP.Model, rb::RiskBudgeting, w::VecJuMPScalar; strict::Bool = false)
 set_risk_budgeting_constraints!
 set_rb_mip_w!

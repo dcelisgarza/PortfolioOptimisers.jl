@@ -903,15 +903,15 @@ NetworkEstimator
   - [`AbstractTreeType`](@ref)
   - [`AbstractSimilarityMatrixAlgorithm`](@ref)
 """
-@concrete struct NetworkEstimator <: AbstractNetworkEstimator
+@propagatable @concrete struct NetworkEstimator <: AbstractNetworkEstimator
     """
     $(field_dict[:ce])
     """
-    ce
+    @fprop ce
     """
     $(field_dict[:de])
     """
-    de
+    @fprop de
     """
     $(field_dict[:ntalg])
     """
@@ -932,20 +932,6 @@ function NetworkEstimator(;
                                                                    alg = CanonicalDistance()),
                           alg::Tree_SimMat = KruskalTree(), n::Integer = 1)
     return NetworkEstimator(ce, de, alg, n)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Return a new [`NetworkEstimator`](@ref) with observation weights `w`
-
-# Related
-
-  - [`NetworkEstimator`](@ref)
-  - [`factory`](@ref)
-"""
-function factory(nt::NetworkEstimator, w::ObsWeights)
-    return NetworkEstimator(; ce = factory(nt.ce, w), de = factory(nt.de, w), alg = nt.alg,
-                            n = nt.n)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -1021,11 +1007,11 @@ NetworkClustersEstimator
   - [`AbstractTreeType`](@ref)
   - [`AbstractSimilarityMatrixAlgorithm`](@ref)
 """
-@concrete struct NetworkClustersEstimator <: AbstractClustersEstimator
+@propagatable @concrete struct NetworkClustersEstimator <: AbstractClustersEstimator
     """
     Network estimator.
     """
-    nte
+    @fprop nte
     """
     $(field_dict[:clalg])
     """
@@ -1044,20 +1030,6 @@ function NetworkClustersEstimator(; nte::AbstractNetworkEstimator = NetworkEstim
                                   alg::AbstractClustersAlgorithm = HClustAlgorithm(),
                                   onc::AbstractOptimalNumberClustersEstimator = OptimalNumberClusters())
     return NetworkClustersEstimator(nte, alg, onc)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Return a new [`NetworkClustersEstimator`](@ref) with observation weights `w`
-
-# Related
-
-  - [`NetworkClustersEstimator`](@ref)
-  - [`NetworkEstimator`](@ref)
-  - [`factory`](@ref)
-"""
-function factory(nt::NetworkClustersEstimator, w::ObsWeights)
-    return NetworkClustersEstimator(; nte = factory(nt.nte, w), alg = nt.alg, onc = nt.onc)
 end
 """
 $(DocStringExtensions.TYPEDEF)

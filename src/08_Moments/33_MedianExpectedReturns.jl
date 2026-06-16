@@ -32,39 +32,17 @@ MedianExpectedReturns
   - [`AbstractExpectedReturnsEstimator`](@ref)
   - [`PortfolioOptimisersCovariance`](@ref)
 """
-@concrete struct MedianExpectedReturns <: AbstractExpectedReturnsEstimator
+@propagatable @concrete struct MedianExpectedReturns <: AbstractExpectedReturnsEstimator
     """
     $(field_dict[:oow])
     """
-    w
+    @wprop w
     function MedianExpectedReturns(w::Option{<:ObsWeights})
         return new{typeof(w)}(w)
     end
 end
 function MedianExpectedReturns(; w::Option{<:ObsWeights} = nothing)::MedianExpectedReturns
     return MedianExpectedReturns(w)
-end
-"""
-    factory(ce::MedianExpectedReturns, w::ObsWeights) -> MedianExpectedReturns
-
-Return a new [`MedianExpectedReturns`](@ref) estimator with observation weights `w`.
-
-# Arguments
-
-  - `ce`: Median expected returns estimator.
-  - $(arg_dict[:ow])
-
-# Returns
-
-  - `me::MedianExpectedReturns`: Updated estimator with weights applied.
-
-# Related
-
-  - [`MedianExpectedReturns`](@ref)
-  - [`factory`](@ref)
-"""
-function factory(::MedianExpectedReturns, w::ObsWeights)::MedianExpectedReturns
-    return MedianExpectedReturns(; w = w)
 end
 """
     Statistics.mean(me::MedianExpectedReturns, X::MatNum;

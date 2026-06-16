@@ -342,11 +342,11 @@ for (i, r) in enumerate(traverse_concrete_subtypes(JuMPReturnsEstimator))
     end
     eval(quote
              @doc $(doc_str) function bounds_returns_estimator(r::$(r), lb::Number)
-                 pnames = Tuple(setdiff(propertynames(r), (:lb,)))
+                 pnames = Tuple(setdiff(fieldnames(typeof(r)), (:lb,)))
                  return if isempty(pnames)
                      $(r)(; lb = lb)
                  else
-                     $(r)(; lb = lb, NamedTuple{pnames}(getproperty.(r, pnames))...)
+                     $(r)(; lb = lb, NamedTuple{pnames}(getfield.(r, pnames))...)
                  end
              end
          end)

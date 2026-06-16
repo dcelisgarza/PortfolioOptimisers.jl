@@ -183,15 +183,16 @@ AugmentedBlackLittermanPrior
   - [`LowOrderPrior`](@ref)
   - [`prior`](@ref)
 """
-@concrete struct AugmentedBlackLittermanPrior <: AbstractLowOrderPriorEstimator_F
+@propagatable @concrete struct AugmentedBlackLittermanPrior <:
+                               AbstractLowOrderPriorEstimator_F
     """
     $(field_dict[:a_pe])
     """
-    a_pe
+    @fprop @vprop a_pe
     """
     $(field_dict[:f_pe])
     """
-    f_pe
+    @fprop f_pe
     """
     $(field_dict[:mp])
     """
@@ -199,7 +200,7 @@ AugmentedBlackLittermanPrior
     """
     $(field_dict[:re])
     """
-    re
+    @fprop @vprop re
     """
     $(field_dict[:a_views])
     """
@@ -211,7 +212,7 @@ AugmentedBlackLittermanPrior
     """
     $(field_dict[:a_sets])
     """
-    a_sets
+    @vprop a_sets
     """
     $(field_dict[:f_sets])
     """
@@ -227,7 +228,7 @@ AugmentedBlackLittermanPrior
     """
     $(field_dict[:eqw])
     """
-    w
+    @vprop w
     """
     $(field_dict[:rf])
     """
@@ -298,64 +299,12 @@ function AugmentedBlackLittermanPrior(;
     return AugmentedBlackLittermanPrior(a_pe, f_pe, mp, re, a_views, f_views, a_sets,
                                         f_sets, a_views_conf, f_views_conf, w, rf, l, tau)
 end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Return a new [`AugmentedBlackLittermanPrior`](@ref) estimator with observation weights `w` applied to the underlying asset prior, factor prior, and regression estimators.
-
-# Related
-
-  - [`AugmentedBlackLittermanPrior`](@ref)
-  - [`factory`](@ref)
-"""
-function factory(pe::AugmentedBlackLittermanPrior,
-                 w::ObsWeights)::AugmentedBlackLittermanPrior
-    return AugmentedBlackLittermanPrior(; a_pe = factory(pe.a_pe, w),
-                                        f_pe = factory(pe.f_pe, w), mp = pe.mp,
-                                        re = factory(pe.re, w), a_views = pe.a_views,
-                                        f_views = pe.f_views, a_sets = pe.a_sets,
-                                        f_sets = pe.f_sets, a_views_conf = pe.a_views_conf,
-                                        f_views_conf = pe.f_views_conf, w = pe.w,
-                                        rf = pe.rf, l = pe.l, tau = pe.tau)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Return a new [`AugmentedBlackLittermanPrior`](@ref) estimator restricted to the assets at index `i`.
-
-# Related
-
-  - [`AugmentedBlackLittermanPrior`](@ref)
-  - [`port_opt_view`](@ref)
-"""
-function port_opt_view(pe::AugmentedBlackLittermanPrior, i,
-                       args...)::AugmentedBlackLittermanPrior
-    return AugmentedBlackLittermanPrior(; a_pe = port_opt_view(pe.a_pe, i), f_pe = pe.f_pe,
-                                        mp = pe.mp, re = port_opt_view(pe.re, i),
-                                        a_views = pe.a_views, f_views = pe.f_views,
-                                        a_sets = port_opt_view(pe.a_sets, i),
-                                        f_sets = pe.f_sets, a_views_conf = pe.a_views_conf,
-                                        f_views_conf = pe.f_views_conf,
-                                        w = nothing_scalar_array_view(pe.w, i), rf = pe.rf,
-                                        l = pe.l, tau = pe.tau)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Access properties of [`AugmentedBlackLittermanPrior`](@ref). Exposes `:me`, `:ce` from the asset prior `obj.a_pe` and `:f_me`, `:f_ce` from the factor prior `obj.f_pe` for transparent access.
-"""
-function Base.getproperty(obj::AugmentedBlackLittermanPrior, sym::Symbol)
-    return if sym == :me
-        obj.a_pe.me
-    elseif sym == :ce
-        obj.a_pe.ce
-    elseif sym == :f_me
-        obj.f_pe.me
-    elseif sym == :f_ce
-        obj.f_pe.ce
-    else
-        getfield(obj, sym)
-    end
+# Expose `:me`, `:ce` from the asset prior `a_pe` and (renamed) `:f_me`, `:f_ce` from the
+# factor prior `f_pe` for transparent access (see [`@forward_properties`](@ref)).
+@forward_properties AugmentedBlackLittermanPrior begin
+    forward(a_pe, me, ce)
+    alias(f_me, f_pe.me)
+    alias(f_ce, f_pe.ce)
 end
 """
     prior(pe::AugmentedBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int = 1,

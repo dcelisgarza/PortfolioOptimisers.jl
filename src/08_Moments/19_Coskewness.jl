@@ -193,7 +193,7 @@ Coskewness
     """
     $(field_dict[:oow])
     """
-    @fprop w
+    @wprop w
     function Coskewness(me::AbstractExpectedReturnsEstimator,
                         mp::AbstractMatrixProcessingEstimator, alg::AbstractMomentAlgorithm,
                         w::Option{<:ObsWeights})
@@ -201,11 +201,6 @@ Coskewness
         return new{typeof(me), typeof(mp), typeof(alg), typeof(w)}(me, mp, alg, w)
     end
 end
-#= Old factory function:
-function factory(ske::Coskewness, w::ObsWeights)::Coskewness
-    return Coskewness(; me = factory(ske.me, w), mp = ske.mp, alg = ske.alg, w = w)
-end
-=#
 function Coskewness(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
                     mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
                     alg::AbstractMomentAlgorithm = Full(),

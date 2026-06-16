@@ -204,7 +204,7 @@ TrackingRiskMeasure
   - [`AbstractTrackingAlgorithm`](@ref)
   - [`NormTracking`](@ref)
 """
-@concrete struct TrackingRiskMeasure <: RiskMeasure
+@propagatable @concrete struct TrackingRiskMeasure <: RiskMeasure
     """
     $(field_dict[:settings_rm])
     """
@@ -212,7 +212,7 @@ TrackingRiskMeasure
     """
     $(field_dict[:tr_spec])
     """
-    tr
+    @vprop tr
     """
     $(field_dict[:tralg])
     """
@@ -238,23 +238,6 @@ end
 function (r::TrackingRiskMeasure{<:WeightsTracking})(::VecNum)
     throw(MethodError(r,
                       "Tracking risk measure using the `WeightsTracking` algorithm cannot be computed for a prediction of portfolio returns because there are no weights."))
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Return a view of [`TrackingRiskMeasure`](@ref) `r` sliced to asset indices `i`.
-
-Slices the inner tracking specification for cluster-based optimisation.
-
-# Related
-
-  - [`TrackingRiskMeasure`](@ref)
-  - [`port_opt_view`](@ref)
-  - [`port_opt_view`](@ref)
-"""
-function port_opt_view(r::TrackingRiskMeasure, i, args...)
-    tr = port_opt_view(r.tr, i)
-    return TrackingRiskMeasure(; settings = r.settings, tr = tr, alg = r.alg)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

@@ -164,14 +164,6 @@ Where:
         return new{typeof(opt), typeof(r), typeof(sca), typeof(fb)}(opt, r, sca, fb)
     end
 end
-#= Old factory function:
-function factory(hrp::HierarchicalRiskParity, w::AbstractVector)::HierarchicalRiskParity
-    opt = factory(hrp.opt, w)
-    r = factory(hrp.r, w)
-    fb = factory(hrp.fb, w)
-    return HierarchicalRiskParity(; opt = opt, r = r, sca = hrp.sca, fb = fb)
-end
-=#
 function HierarchicalRiskParity(; opt::HierarchicalOptimiser = HierarchicalOptimiser(),
                                 r::OptRM_VecOptRM = Variance(),
                                 sca::Scalariser = SumScalariser(),
@@ -303,7 +295,8 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:OptimisationRiskMeasure}
         end
     end
     retcode, w = finalise_weight_bounds(hrp.opt.wf, wb, w / sum(w))
-    return HierarchicalResult(typeof(hrp), pr, clr, wb, fees, retcode, w, nothing)
+    return HierarchicalResult(; oe = typeof(hrp), pr = pr, clr = clr, wb = wb, fees = fees,
+                              retcode = retcode, w = w, fb = nothing)
 end
 """
     hrp_scalarised_risk(scalariser, wu, wk, rku, lc, rc, rs, X, fees)
@@ -464,7 +457,8 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:VecOptRM},
         end
     end
     retcode, w = finalise_weight_bounds(hrp.opt.wf, wb, w / sum(w))
-    return HierarchicalResult(typeof(hrp), pr, clr, wb, fees, retcode, w, nothing)
+    return HierarchicalResult(; oe = typeof(hrp), pr = pr, clr = clr, wb = wb, fees = fees,
+                              retcode = retcode, w = w, fb = nothing)
 end
 """
     optimise(hrp::HierarchicalRiskParity{<:Any, <:Any, <:Any, <:Nothing},

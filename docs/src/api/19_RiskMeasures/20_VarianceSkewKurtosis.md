@@ -12,8 +12,6 @@ no_risk_expr_risk_measure(r::Skewness)
 no_bounds_no_risk_expr_risk_measure(r::Skewness)
 bounds_risk_measure(r::Skewness, ub::Number)
 VarianceSkewKurtosis
-factory(r::VarianceSkewKurtosis, pr::AbstractPriorResult, args...; kwargs...)
-port_opt_view(r::VarianceSkewKurtosis, i, args...)
 supports_precomputed_returns(r::Skewness)
 supports_precomputed_returns(::VarianceSkewKurtosis)
 ```

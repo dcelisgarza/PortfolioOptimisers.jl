@@ -200,7 +200,7 @@ RelativisticValueatRisk
   - [`RelativisticValueatRiskRange`](@ref)
   - [`RelativisticDrawdownatRisk`](@ref)
 """
-@concrete struct RelativisticValueatRisk <: RiskMeasure
+@propagatable @concrete struct RelativisticValueatRisk <: RiskMeasure
     """
     $(field_dict[:settings_rm])
     """
@@ -208,7 +208,7 @@ RelativisticValueatRisk
     """
     $(field_dict[:slv])
     """
-    slv
+    @cprop slv
     """
     $(field_dict[:alpha])
     """
@@ -220,7 +220,7 @@ RelativisticValueatRisk
     """
     $(field_dict[:oow])
     """
-    w
+    @pprop w
     function RelativisticValueatRisk(settings::RiskMeasureSettings,
                                      slv::Option{<:Slv_VecSlv}, alpha::Number,
                                      kappa::Number, w::Option{<:ObsWeights})
@@ -327,7 +327,7 @@ RelativisticValueatRiskRange
   - [`RelativisticValueatRisk`](@ref)
   - [`EntropicValueatRiskRange`](@ref)
 """
-@concrete struct RelativisticValueatRiskRange <: RiskMeasure
+@propagatable @concrete struct RelativisticValueatRiskRange <: RiskMeasure
     """
     $(field_dict[:settings_rm])
     """
@@ -335,7 +335,7 @@ RelativisticValueatRiskRange
     """
     $(field_dict[:slv])
     """
-    slv
+    @cprop slv
     """
     $(field_dict[:alpha])
     """
@@ -355,7 +355,7 @@ RelativisticValueatRiskRange
     """
     $(field_dict[:oow])
     """
-    w
+    @pprop w
     function RelativisticValueatRiskRange(settings::RiskMeasureSettings,
                                           slv::Option{<:Slv_VecSlv}, alpha::Number,
                                           kappa_a::Number, beta::Number, kappa_b::Number,
@@ -383,28 +383,6 @@ function RelativisticValueatRiskRange(;
 end
 function (r::RelativisticValueatRiskRange)(x::VecNum)
     return RRM(x, r.slv, r.alpha, r.kappa_a, r.w) + RRM(-x, r.slv, r.beta, r.kappa_b, r.w)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Create an instance of [`RelativisticValueatRiskRange`](@ref) by selecting observation weights and solver from the risk-measure instance or falling back to the prior result.
-
-# Related
-
-  - [`RelativisticValueatRiskRange`](@ref)
-  - [`AbstractPriorResult`](@ref)
-  - [`factory`](@ref)
-  - [`nothing_scalar_array_selector`](@ref)
-  - [`solver_selector`](@ref)
-"""
-function factory(r::RelativisticValueatRiskRange, pr::AbstractPriorResult,
-                 slv::Option{<:Slv_VecSlv}, args...;
-                 kwargs...)::RelativisticValueatRiskRange
-    w = nothing_scalar_array_selector(r.w, pr.w)
-    slv = solver_selector(r.slv, slv)
-    return RelativisticValueatRiskRange(; settings = r.settings, alpha = r.alpha,
-                                        kappa_a = r.kappa_a, beta = r.beta,
-                                        kappa_b = r.kappa_b, slv = slv, w = w)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -501,7 +479,7 @@ RelativisticDrawdownatRisk
   - [`EntropicDrawdownatRisk`](@ref)
   - [`RelativeRelativisticDrawdownatRisk`](@ref)
 """
-@concrete struct RelativisticDrawdownatRisk <: RiskMeasure
+@propagatable @concrete struct RelativisticDrawdownatRisk <: RiskMeasure
     """
     $(field_dict[:settings_rm])
     """
@@ -509,7 +487,7 @@ RelativisticDrawdownatRisk
     """
     $(field_dict[:slv])
     """
-    slv
+    @cprop slv
     """
     $(field_dict[:alpha])
     """
@@ -521,7 +499,7 @@ RelativisticDrawdownatRisk
     """
     $(field_dict[:oow])
     """
-    w
+    @pprop w
     function RelativisticDrawdownatRisk(settings, slv::Option{<:Slv_VecSlv}, alpha::Number,
                                         kappa::Number, w::Option{<:ObsWeights})
         if isa(slv, VecSlv)
@@ -639,7 +617,7 @@ RelativeRelativisticDrawdownatRisk
   - [`RelativisticDrawdownatRisk`](@ref)
   - [`RelativeEntropicDrawdownatRisk`](@ref)
 """
-@concrete struct RelativeRelativisticDrawdownatRisk <: HierarchicalRiskMeasure
+@propagatable @concrete struct RelativeRelativisticDrawdownatRisk <: HierarchicalRiskMeasure
     """
     $(field_dict[:settings_rm])
     """
@@ -647,7 +625,7 @@ RelativeRelativisticDrawdownatRisk
     """
     $(field_dict[:slv])
     """
-    slv
+    @cprop slv
     """
     $(field_dict[:alpha])
     """
@@ -659,7 +637,7 @@ RelativeRelativisticDrawdownatRisk
     """
     $(field_dict[:oow])
     """
-    w
+    @pprop w
     function RelativeRelativisticDrawdownatRisk(settings::HierarchicalRiskMeasureSettings,
                                                 slv::Option{<:Slv_VecSlv}, alpha::Number,
                                                 kappa::Number, w::Option{<:ObsWeights})
@@ -686,132 +664,6 @@ end
 function (r::RelativeRelativisticDrawdownatRisk)(x::VecNum)
     dd = relative_drawdown_vec(x)
     return RRM(dd, r.slv, r.alpha, r.kappa, r.w)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Create an instance of [`RelativisticValueatRisk`](@ref) by selecting observation weights and solver from the risk-measure instance or falling back to the prior result.
-
-# Related
-
-  - [`RelativisticValueatRisk`](@ref)
-  - [`AbstractPriorResult`](@ref)
-  - [`factory`](@ref)
-  - [`nothing_scalar_array_selector`](@ref)
-  - [`solver_selector`](@ref)
-"""
-function factory(r::RelativisticValueatRisk, pr::AbstractPriorResult,
-                 slv::Option{<:Slv_VecSlv} = nothing, args...;
-                 kwargs...)::RelativisticValueatRisk
-    w = nothing_scalar_array_selector(r.w, pr.w)
-    slv = solver_selector(r.slv, slv)
-    return RelativisticValueatRisk(; settings = r.settings, slv = slv, alpha = r.alpha,
-                                   kappa = r.kappa, w = w)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Create an instance of [`RelativisticValueatRisk`](@ref) by overriding the solver and optionally selecting observation weights from the prior result.
-
-# Related
-
-  - [`RelativisticValueatRisk`](@ref)
-  - [`AbstractPriorResult`](@ref)
-  - [`factory`](@ref)
-  - [`nothing_scalar_array_selector`](@ref)
-  - [`solver_selector`](@ref)
-"""
-function factory(r::RelativisticValueatRisk, slv::Slv_VecSlv,
-                 pr::Option{<:AbstractPriorResult} = nothing, args...;
-                 kwargs...)::RelativisticValueatRisk
-    w = isnothing(pr) ? r.w : nothing_scalar_array_selector(r.w, pr.w)
-    slv = solver_selector(r.slv, slv)
-    return RelativisticValueatRisk(; settings = r.settings, alpha = r.alpha,
-                                   kappa = r.kappa, slv = slv, w = w)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Create an instance of [`RelativisticDrawdownatRisk`](@ref) by selecting observation weights and solver from the risk-measure instance or falling back to the prior result.
-
-# Related
-
-  - [`RelativisticDrawdownatRisk`](@ref)
-  - [`AbstractPriorResult`](@ref)
-  - [`factory`](@ref)
-  - [`nothing_scalar_array_selector`](@ref)
-  - [`solver_selector`](@ref)
-"""
-function factory(r::RelativisticDrawdownatRisk, pr::AbstractPriorResult,
-                 slv::Option{<:Slv_VecSlv} = nothing, args...;
-                 kwargs...)::RelativisticDrawdownatRisk
-    w = nothing_scalar_array_selector(r.w, pr.w)
-    slv = solver_selector(r.slv, slv)
-    return RelativisticDrawdownatRisk(; settings = r.settings, slv = slv, alpha = r.alpha,
-                                      kappa = r.kappa, w = w)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Create an instance of [`RelativisticDrawdownatRisk`](@ref) by overriding the solver and optionally selecting observation weights from the prior result.
-
-# Related
-
-  - [`RelativisticDrawdownatRisk`](@ref)
-  - [`AbstractPriorResult`](@ref)
-  - [`factory`](@ref)
-  - [`nothing_scalar_array_selector`](@ref)
-  - [`solver_selector`](@ref)
-"""
-function factory(r::RelativisticDrawdownatRisk, slv::Slv_VecSlv,
-                 pr::Option{<:AbstractPriorResult} = nothing, args...;
-                 kwargs...)::RelativisticDrawdownatRisk
-    w = isnothing(pr) ? r.w : nothing_scalar_array_selector(r.w, pr.w)
-    slv = solver_selector(r.slv, slv)
-    return RelativisticDrawdownatRisk(; settings = r.settings, alpha = r.alpha,
-                                      kappa = r.kappa, slv = slv, w = w)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Create an instance of [`RelativeRelativisticDrawdownatRisk`](@ref) by selecting observation weights and solver from the risk-measure instance or falling back to the prior result.
-
-# Related
-
-  - [`RelativeRelativisticDrawdownatRisk`](@ref)
-  - [`AbstractPriorResult`](@ref)
-  - [`factory`](@ref)
-  - [`nothing_scalar_array_selector`](@ref)
-  - [`solver_selector`](@ref)
-"""
-function factory(r::RelativeRelativisticDrawdownatRisk, pr::AbstractPriorResult,
-                 slv::Option{<:Slv_VecSlv} = nothing, args...;
-                 kwargs...)::RelativeRelativisticDrawdownatRisk
-    w = nothing_scalar_array_selector(r.w, pr.w)
-    slv = solver_selector(r.slv, slv)
-    return RelativeRelativisticDrawdownatRisk(; settings = r.settings, slv = slv,
-                                              alpha = r.alpha, kappa = r.kappa, w = w)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Create an instance of [`RelativeRelativisticDrawdownatRisk`](@ref) by overriding the solver and optionally selecting observation weights from the prior result.
-
-# Related
-
-  - [`RelativeRelativisticDrawdownatRisk`](@ref)
-  - [`AbstractPriorResult`](@ref)
-  - [`factory`](@ref)
-  - [`nothing_scalar_array_selector`](@ref)
-  - [`solver_selector`](@ref)
-"""
-function factory(r::RelativeRelativisticDrawdownatRisk, slv::Slv_VecSlv,
-                 pr::Option{<:AbstractPriorResult} = nothing, args...;
-                 kwargs...)::RelativeRelativisticDrawdownatRisk
-    w = isnothing(pr) ? r.w : nothing_scalar_array_selector(r.w, pr.w)
-    slv = solver_selector(r.slv, slv)
-    return RelativeRelativisticDrawdownatRisk(; settings = r.settings, alpha = r.alpha,
-                                              kappa = r.kappa, slv = slv, w = w)
 end
 
 # Expected-risk input kind — see `risk_input_kind`.

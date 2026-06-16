@@ -50,11 +50,11 @@ KendallCovariance
   - [`AbstractVarianceEstimator`](@ref)
   - [`SimpleVariance`](@ref)
 """
-@concrete struct KendallCovariance <: RankCovarianceEstimator
+@propagatable @concrete struct KendallCovariance <: RankCovarianceEstimator
     """
     $(field_dict[:ve])
     """
-    ve
+    @fprop @vprop ve
     function KendallCovariance(ve::AbstractVarianceEstimator)
         return new{typeof(ve)}(ve)
     end
@@ -210,11 +210,11 @@ SpearmanCovariance
   - [`AbstractVarianceEstimator`](@ref)
   - [`SimpleVariance`](@ref)
 """
-@concrete struct SpearmanCovariance <: RankCovarianceEstimator
+@propagatable @concrete struct SpearmanCovariance <: RankCovarianceEstimator
     """
     $(field_dict[:ve])
     """
-    ve
+    @fprop @vprop ve
     function SpearmanCovariance(ve::AbstractVarianceEstimator)
         return new{typeof(ve)}(ve)
     end
@@ -333,15 +333,4 @@ function Statistics.cov(ce::SpearmanCovariance, X::MatNum; dims::Int = 1, kwargs
     sigma = StatsBase.corspearman(X)
     return StatsBase.cor2cov!(sigma, sd)
 end
-for ce in traverse_concrete_subtypes(RankCovarianceEstimator)
-    eval(quote
-             function factory(ce::$(ce), w::ObsWeights)
-                 return $(ce)(; ve = factory(ce.ve, w))
-             end
-             function port_opt_view(ce::$(ce), i, args...)
-                 return $(ce)(; ve = port_opt_view(ce.ve, i))
-             end
-         end)
-end
-
 export KendallCovariance, SpearmanCovariance

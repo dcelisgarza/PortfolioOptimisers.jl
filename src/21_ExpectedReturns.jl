@@ -287,12 +287,6 @@ ExpectedReturn
         return new{typeof(rt)}(rt)
     end
 end
-#= Old factory function:
-function factory(r::ExpectedReturn, args...; kwargs...)::ExpectedReturn
-    rt = factory(r.rt, args...; kwargs...)
-    return ExpectedReturn(; rt = rt)
-end
-=#
 function ExpectedReturn(; rt::JuMPReturnsEstimator = ArithmeticReturn())::ExpectedReturn
     return ExpectedReturn(rt)
 end
@@ -401,13 +395,6 @@ ExpectedReturnRiskRatio
         return new{typeof(rt), typeof(rk), typeof(rf)}(rt, rk, rf)
     end
 end
-#= Old factory function:
-function factory(r::ExpectedReturnRiskRatio, args...; kwargs...)::ExpectedReturnRiskRatio
-    rt = factory(r.rt, args...; kwargs...)
-    rk = factory(r.rk, args...; kwargs...)
-    return ExpectedReturnRiskRatio(; rt = rt, rk = rk, rf = r.rf)
-end
-=#
 function ExpectedReturnRiskRatio(; rt::JuMPReturnsEstimator = ArithmeticReturn(),
                                  rk::AbstractBaseRiskMeasure = Variance(),
                                  rf::Number = 0.0)::ExpectedReturnRiskRatio

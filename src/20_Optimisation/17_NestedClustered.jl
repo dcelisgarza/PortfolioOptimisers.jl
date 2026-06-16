@@ -57,6 +57,30 @@ $(DocStringExtensions.FIELDS)
     $(field_dict[:fb])
     """
     fb
+    function NestedClusteredResult(oe::Type{<:OptimisationEstimator},
+                                   pr::Option{<:AbstractPriorResult},
+                                   clr::Option{<:AbstractClusteringResult},
+                                   wb::Option{<:WeightBounds}, fees::Option{<:Fees},
+                                   resi::AbstractVector{<:NonFiniteAllocationOptimisationResult},
+                                   reso::OptimisationResult,
+                                   cv::Option{<:OptimisationCrossValidation},
+                                   retcode::OptRetCode_VecOptRetCode, w::VecNum_VecVecNum,
+                                   fb::Option{<:OptE_Opt})
+        return new{typeof(oe), typeof(pr), typeof(clr), typeof(wb), typeof(fees),
+                   typeof(resi), typeof(reso), typeof(cv), typeof(retcode), typeof(w),
+                   typeof(fb)}(oe, pr, clr, wb, fees, resi, reso, cv, retcode, w, fb)
+    end
+end
+function NestedClusteredResult(; oe::Type{<:OptimisationEstimator},
+                               pr::Option{<:AbstractPriorResult},
+                               clr::Option{<:AbstractClusteringResult},
+                               wb::Option{<:WeightBounds}, fees::Option{<:Fees},
+                               resi::AbstractVector{<:NonFiniteAllocationOptimisationResult},
+                               reso::OptimisationResult,
+                               cv::Option{<:OptimisationCrossValidation},
+                               retcode::OptRetCode_VecOptRetCode, w::VecNum_VecVecNum,
+                               fb::Option{<:OptE_Opt})::NestedClusteredResult
+    return NestedClusteredResult(oe, pr, clr, wb, fees, resi, reso, cv, retcode, w, fb)
 end
 """
     assert_internal_optimiser(opt)
@@ -483,7 +507,7 @@ function predict_outer_nco_estimator_returns(nco::NestedClustered{<:Any, <:Any, 
     predictions = Vector{MultiPeriodPredictionResult}(undef, length(cls))
     let cv = cv
         FLoops.@floop ex for (i, cl) in enumerate(cls)
-            cvi = !hasproperty(cv, :rng) ? cv : copy(cv)
+            cvi = !hasfield(typeof(cv), :rng) ? cv : copy(cv)
             predictions[i] = cross_val_predict(opti, rd, cvi; cols = cl, ex = ex)
         end
     end
@@ -501,7 +525,7 @@ function predict_outer_nco_estimator_returns(nco::NestedClustered{<:Any, <:Any, 
     predictions = Vector{PopulationPredictionResult}(undef, length(cls))
     let cv = cv
         FLoops.@floop ex for (i, cl) in enumerate(cls)
-            cvi = !hasproperty(cv, :rng) ? cv : copy(cv)
+            cvi = !hasfield(typeof(cv), :rng) ? cv : copy(cv)
             predictions[i] = cross_val_predict(opti, rd, cvi; cols = cl, ex = ex)
         end
     end
@@ -542,8 +566,9 @@ function _optimise(nco::NestedClustered, rd::ReturnsResult; dims::Int = 1,
     wb = weight_bounds_constraints(nco.wb, nco.sets; N = clr.k, strict = nco.strict,
                                    datatype = eltype(X))
     retcode, w = outer_optimisation_finaliser(wb, nco.wf, resi, reso.retcode, reso.w, wi)
-    return NestedClusteredResult(typeof(nco), pr, clr, wb, fees, resi, reso, nco.cv,
-                                 retcode, w, nothing)
+    return NestedClusteredResult(; oe = typeof(nco), pr = pr, clr = clr, wb = wb,
+                                 fees = fees, resi = resi, reso = reso, cv = nco.cv,
+                                 retcode = retcode, w = w, fb = nothing)
 end
 """
     optimise(nco::NestedClustered{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,

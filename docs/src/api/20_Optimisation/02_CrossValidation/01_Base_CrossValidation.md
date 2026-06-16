@@ -28,7 +28,6 @@ VecPredRes
 PredRes_MultiPredRes
 mapreduce_RetMtx(rd::AbstractVector{<:PredictionReturnsResult{<:Any, <:VecNum}}, sym = :X)
 MultiPeriodPredictionResult
-Base.getproperty(mpred::MultiPeriodPredictionResult, sym::Symbol)
 VecMPredRes
 PopulationPredictionResult
 predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)

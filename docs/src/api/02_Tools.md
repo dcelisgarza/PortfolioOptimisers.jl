@@ -15,16 +15,29 @@ get_window
 _factory_child
 @fprop
 @vprop
+@pprop
+@wprop
+@cprop
 _is_prop_tag_call
 _is_fprop_macro
 _is_vprop_macro
+_is_pprop_macro
+_is_wprop_macro
+_is_cprop_macro
 _is_doc_macro
+_ctx
+_wprop
+sel
 _extract_field_name
 _propagatable_find_struct
 _propagatable_bare_name
 _try_field_name
 _peel_prop_tags
 _propagatable_parse_body
+@forward_properties
+_forward_nonnothing
+_forward_flatten_path
+_forward_walk_expr
 ```
 
 ## Mathematical functions

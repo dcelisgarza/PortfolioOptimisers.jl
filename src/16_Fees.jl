@@ -336,12 +336,6 @@ Fees
                    typeof(kwargs)}(tn, l, s, fl, fs, kwargs)
     end
 end
-#= Old factory function:
-function factory(fees::Fees, w::VecNum)::Fees
-    return Fees(; tn = factory(fees.tn, w), l = fees.l, s = fees.s, fl = fees.fl,
-                fs = fees.fs, kwargs = fees.kwargs)
-end
-=#
 function Fees(; tn::Option{<:Turnover} = nothing, l::Option{<:Num_VecNum} = nothing,
               s::Option{<:Num_VecNum} = nothing, fl::Option{<:Num_VecNum} = nothing,
               fs::Option{<:Num_VecNum} = nothing,

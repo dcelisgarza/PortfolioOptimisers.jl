@@ -313,15 +313,15 @@ SmythBrobyCovariance
   - [`SmythBrobyGerber2`](@ref)
   - [`FLoops.Transducers.Executor`](https://juliafolds2.github.io/FLoops.jl/dev/tutorials/parallel/#tutorials-ex)
 """
-@concrete struct SmythBrobyCovariance <: BaseSmythBrobyCovariance
+@propagatable @concrete struct SmythBrobyCovariance <: BaseSmythBrobyCovariance
     """
     $(field_dict[:ve])
     """
-    ve
+    @fprop @vprop ve
     """
     $(field_dict[:me]) Used for optionally centering the returns.
     """
-    me
+    @fprop @vprop me
     """
     $(field_dict[:pdm])
     """
@@ -345,7 +345,7 @@ SmythBrobyCovariance
     """
     $(field_dict[:sbalg])
     """
-    alg
+    @fprop alg
     """
     $(field_dict[:ex])
     """
@@ -370,78 +370,6 @@ function SmythBrobyCovariance(; ve::StatsBase.CovarianceEstimator = SimpleVarian
                               alg::SmythBrobyCovarianceAlgorithm = SmythBrobyGerber1(),
                               ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())::SmythBrobyCovariance
     return SmythBrobyCovariance(ve, me, pdm, c1, c2, c3, n, alg, ex)
-end
-"""
-    factory(ce::SmythBrobyCovariance, w::ObsWeights) -> SmythBrobyCovariance
-
-Return a new [`SmythBrobyCovariance`](@ref) estimator with observation weights `w` applied to the underlying variance estimator.
-
-# Arguments
-
-  - $(arg_dict[:ce])
-  - $(arg_dict[:ow])
-
-# Returns
-
-  - $(ret_dict[:ce])
-
-# Examples
-
-```jldoctest
-julia> ce = SmythBrobyCovariance();
-
-julia> factory(ce, StatsBase.Weights([0.2, 0.3, 0.5]))
-SmythBrobyCovariance
-   ve ┼ SimpleVariance
-      │          me ┼ SimpleExpectedReturns
-      │             │   w ┴ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.3, 0.5]
-      │           w ┼ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.3, 0.5]
-      │   corrected ┴ Bool: true
-   me ┼ SimpleExpectedReturns
-      │   w ┴ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.3, 0.5]
-  pdm ┼ Posdef
-      │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-      │   kwargs ┴ @NamedTuple{}: NamedTuple()
-   c1 ┼ Float64: 0.5
-   c2 ┼ Float64: 0.5
-   c3 ┼ Int64: 4
-    n ┼ Int64: 2
-  alg ┼ SmythBrobyGerber1()
-   ex ┴ Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
-```
-
-# Related
-
-  - [`SmythBrobyCovariance`](@ref)
-  - [`factory`](@ref)
-"""
-function factory(ce::SmythBrobyCovariance, w::ObsWeights)::SmythBrobyCovariance
-    return SmythBrobyCovariance(; ve = factory(ce.ve, w), me = factory(ce.me, w),
-                                pdm = ce.pdm, c1 = ce.c1, c2 = ce.c2, c3 = ce.c3, n = ce.n,
-                                alg = factory(ce.alg, w), ex = ce.ex)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Gets the view of the covariance estimator for the `i`-th element(s).
-
-# Arguments
-
-  - $(arg_dict[:ce])
-  - `i`: Index or indices to view.
-
-# Returns
-
-  - $(ret_dict[:cev])
-
-# Related
-
-  - [`SmythBrobyCovariance`](@ref)
-"""
-function port_opt_view(ce::SmythBrobyCovariance, i, args...)::SmythBrobyCovariance
-    return SmythBrobyCovariance(; ve = port_opt_view(ce.ve, i),
-                                me = port_opt_view(ce.me, i), pdm = ce.pdm, c1 = ce.c1,
-                                c2 = ce.c2, c3 = ce.c3, n = ce.n, alg = ce.alg, ex = ce.ex)
 end
 """
     sb_delta(ri::Number, rj::Number, n::Number) -> Number

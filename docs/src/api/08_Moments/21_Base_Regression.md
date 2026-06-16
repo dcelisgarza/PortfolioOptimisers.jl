@@ -13,8 +13,6 @@ BIC
 RSquared
 AdjustedRSquared
 Regression
-Base.getproperty(re::Regression{<:Any, Nothing, <:Any}, sym::Symbol)
-Base.getproperty(re::Regression{<:Any, <:MatNum, <:Any}, sym::Symbol)
 regression(re::Regression, args...)
 regression(re::AbstractRegressionEstimator, rd::ReturnsResult)
 AbstractRegressionEstimator

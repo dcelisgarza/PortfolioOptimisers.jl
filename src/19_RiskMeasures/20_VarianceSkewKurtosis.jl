@@ -236,7 +236,7 @@ Create an instance of [`Skewness`](@ref) from a [`LowOrderPrior`](@ref) result, 
   - [`factory`](@ref)
   - [`nothing_scalar_array_selector`](@ref)
 """
-function factory(r::Skewness, pr::LowOrderPrior, args...; kwargs...)::NegativeSkewness
+function factory(r::Skewness, pr::LowOrderPrior, args...; kwargs...)::Skewness
     w = nothing_scalar_array_selector(r.w, pr.w)
     mu = nothing_scalar_array_selector(r.mu, pr.mu)
     return Skewness(; ve = factory(r.ve, w), sk = r.sk, w = w, mu = mu)
@@ -457,7 +457,7 @@ Computes the variance skewness kurtosis composite risk measure of the portfolio 
   - [`Skewness`](@ref)
   - [`Kurtosis`](@ref)
 """
-@concrete struct VarianceSkewKurtosis <: RiskMeasure
+@propagatable @concrete struct VarianceSkewKurtosis <: RiskMeasure
     """
     $(field_dict[:settings_rm])
     """
@@ -465,15 +465,15 @@ Computes the variance skewness kurtosis composite risk measure of the portfolio 
     """
     $(field_dict[:vr_rm])
     """
-    vr
+    @fprop @vprop vr
     """
     $(field_dict[:sk_rm])
     """
-    sk
+    @fprop @vprop sk
     """
     $(field_dict[:kt_rm])
     """
-    kt
+    @fprop @vprop kt
     function VarianceSkewKurtosis(settings::RiskMeasureSettings, vr::Variance, sk::Skewness,
                                   kt::Kurtosis)
         vr = no_risk_expr_risk_measure(vr)
@@ -487,40 +487,6 @@ function VarianceSkewKurtosis(; settings::RiskMeasureSettings = RiskMeasureSetti
                               vr::Variance = Variance(), sk::Skewness = Skewness(),
                               kt::Kurtosis = Kurtosis())
     return VarianceSkewKurtosis(settings, vr, sk, kt)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Create an instance of [`VarianceSkewKurtosis`](@ref) by delegating `factory` to each sub-measure component.
-
-# Related
-
-  - [`VarianceSkewKurtosis`](@ref)
-  - [`factory`](@ref)
-  - [`AbstractPriorResult`](@ref)
-"""
-function factory(r::VarianceSkewKurtosis, pr::AbstractPriorResult, args...;
-                 kwargs...)::VarianceSkewKurtosis
-    vr = factory(r.vr, pr, args...; kwargs...)
-    sk = factory(r.sk, pr, args...; kwargs...)
-    kt = factory(r.kt, pr, args...; kwargs...)
-    return VarianceSkewKurtosis(; settings = r.settings, vr = vr, sk = sk, kt = kt)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Return a view of [`VarianceSkewKurtosis`](@ref) `r` sliced to asset indices `i` by delegating `port_opt_view` to each sub-measure component.
-
-# Related
-
-  - [`VarianceSkewKurtosis`](@ref)
-  - [`port_opt_view`](@ref)
-"""
-function port_opt_view(r::VarianceSkewKurtosis, i, args...)
-    vr = port_opt_view(r.vr, i, args...)
-    sk = port_opt_view(r.sk, i, args...)
-    kt = port_opt_view(r.kt, i, args...)
-    return VarianceSkewKurtosis(; settings = r.settings, vr = vr, sk = sk, kt = kt)
 end
 function (r::VarianceSkewKurtosis)(w::VecNum, X::MatNum, fees::Option{<:VecNum} = nothing)
     return r.vr(w) * r.vr.settings.scale - r.sk(w, X, fees) * r.sk.settings.scale +

@@ -54,15 +54,15 @@ WindowedCovariance
   - [`AbstractCovarianceEstimator`](@ref)
   - [`PortfolioOptimisersCovariance`](@ref)
 """
-@concrete struct WindowedCovariance <: AbstractCovarianceEstimator
+@propagatable @concrete struct WindowedCovariance <: AbstractCovarianceEstimator
     """
     $(field_dict[:ce])
     """
-    ce
+    @fprop @vprop ce
     """
     $(field_dict[:oow])
     """
-    w
+    @wprop w
     """
     Window specification: an integer (last `window` observations) or a vector of indices.
     """
@@ -79,49 +79,6 @@ function WindowedCovariance(;
                             w::Option{<:ObsWeights} = nothing,
                             window::Option{<:Int_VecInt} = nothing)::WindowedCovariance
     return WindowedCovariance(ce, w, window)
-end
-"""
-    factory(ce::WindowedCovariance, w::ObsWeights) -> WindowedCovariance
-
-Return a new [`WindowedCovariance`](@ref) estimator with observation weights `w` applied to the underlying covariance estimator and stored as the windowed weights.
-
-# Arguments
-
-  - $(arg_dict[:ce])
-  - $(arg_dict[:ow])
-
-# Returns
-
-  - $(ret_dict[:ce])
-
-# Related
-
-  - [`WindowedCovariance`](@ref)
-  - [`factory`](@ref)
-"""
-function factory(ce::WindowedCovariance, w::ObsWeights)::WindowedCovariance
-    return WindowedCovariance(; ce = factory(ce.ce, w), w = w, window = ce.window)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Gets the view of the covariance estimator for the `i`-th element(s).
-
-# Arguments
-
-  - $(arg_dict[:ce])
-  - `i`: Index or indices to view.
-
-# Returns
-
-  - $(ret_dict[:cev])
-
-# Related
-
-  - [`WindowedCovariance`](@ref)
-"""
-function port_opt_view(ce::WindowedCovariance, i, args...)::WindowedCovariance
-    return WindowedCovariance(; ce = port_opt_view(ce.ce, i), w = ce.w, window = ce.window)
 end
 """
     Statistics.cov(ce::WindowedCovariance, X::MatNum; dims::Int = 1, mean = nothing, iv::Option{<:MatNum} = nothing,
@@ -148,16 +105,13 @@ This method selects a window of observations from `X` (and applies observation w
 
   - [`WindowedCovariance`](@ref)
   - [`cor(ce::WindowedCovariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
+  - [`windowed_preamble`](@ref)
 """
 function Statistics.cov(ce::WindowedCovariance, X::MatNum; dims::Int = 1, mean = nothing,
                         iv::Option{<:MatNum} = nothing, kwargs...)
-    window = get_window(ce.window, X, dims)
-    X, w = moment_window_and_weights(X, ce.w, window; dims = dims, kwargs...)
-    ce = factory(ce.ce, w)
-    if !isnothing(iv) && isa(window, VecInt)
-        iv = isone(dims) ? view(iv, window, :) : view(iv, :, window)
-    end
-    return Statistics.cov(ce, X; dims = dims, mean = mean, iv = iv, kwargs...)
+    inner, X, iv = windowed_preamble(ce.ce, ce.w, ce.window, X; iv = iv, dims = dims,
+                                     kwargs...)
+    return Statistics.cov(inner, X; dims = dims, mean = mean, iv = iv, kwargs...)
 end
 """
     Statistics.cor(ce::WindowedCovariance, X::MatNum; dims::Int = 1, mean = nothing, iv::Option{<:MatNum} = nothing,
@@ -184,16 +138,13 @@ This method selects a window of observations from `X` (and applies observation w
 
   - [`WindowedCovariance`](@ref)
   - [`cov(ce::WindowedCovariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
+  - [`windowed_preamble`](@ref)
 """
 function Statistics.cor(ce::WindowedCovariance, X::MatNum; dims::Int = 1,
                         iv::Option{<:MatNum} = nothing, kwargs...)
-    window = get_window(ce.window, X, dims)
-    X, w = moment_window_and_weights(X, ce.w, window; dims = dims, kwargs...)
-    ce = factory(ce.ce, w)
-    if !isnothing(iv) && isa(window, VecInt)
-        iv = isone(dims) ? view(iv, window, :) : view(iv, :, window)
-    end
-    return Statistics.cor(ce, X; dims = dims, iv = iv, kwargs...)
+    inner, X, iv = windowed_preamble(ce.ce, ce.w, ce.window, X; iv = iv, dims = dims,
+                                     kwargs...)
+    return Statistics.cor(inner, X; dims = dims, iv = iv, kwargs...)
 end
 
 export WindowedCovariance

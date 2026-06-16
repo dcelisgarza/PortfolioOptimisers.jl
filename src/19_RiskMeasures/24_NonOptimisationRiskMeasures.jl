@@ -78,11 +78,11 @@ MeanReturn
   - [`NonOptimisationRiskMeasure`](@ref)
   - [`MeanReturnRiskRatio`](@ref)
 """
-@concrete struct MeanReturn <: NonOptimisationRiskMeasure
+@propagatable @concrete struct MeanReturn <: NonOptimisationRiskMeasure
     """
     $(field_dict[:w_rm])
     """
-    w
+    @pprop w
     """
     $(field_dict[:flag])
     """
@@ -100,22 +100,6 @@ function (r::MeanReturn)(x::VecNum)
         x = log1p.(x)
     end
     return isnothing(r.w) ? Statistics.mean(x) : Statistics.mean(x, r.w)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Create an instance of [`MeanReturn`](@ref) by selecting observation weights from the risk-measure instance or falling back to the prior result.
-
-# Related
-
-  - [`MeanReturn`](@ref)
-  - [`AbstractPriorResult`](@ref)
-  - [`factory`](@ref)
-  - [`nothing_scalar_array_selector`](@ref)
-"""
-function factory(r::MeanReturn, pr::AbstractPriorResult, args...)::MeanReturn
-    w = nothing_scalar_array_selector(r.w, pr.w)
-    return MeanReturn(; w = w, flag = r.flag)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -313,15 +297,15 @@ ThirdCentralMoment
   - [`NonOptimisationRiskMeasure`](@ref)
   - [`Skewness`](@ref)
 """
-@concrete struct ThirdCentralMoment <: NonOptimisationRiskMeasure
+@propagatable @concrete struct ThirdCentralMoment <: NonOptimisationRiskMeasure
     """
     $(field_dict[:w_rm])
     """
-    w
+    @pprop w
     """
     $(field_dict[:mu_rm])
     """
-    mu
+    @pprop mu
     function ThirdCentralMoment(w::Option{<:ObsWeights}, mu::Option{<:Num_VecNum_VecScalar})
         assert_nonempty_nonneg_finite_val(w, :w)
         if isa(mu, VecNum)
@@ -424,23 +408,6 @@ Single-argument form used by the precomputed-returns functor `r(x::VecNum)` (ADR
 """
 function calc_deviations_vec(r::TCM_Sk, x::VecNum)
     return x .- calc_moment_target(r, nothing, x)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Create an instance of [`ThirdCentralMoment`](@ref) by selecting observation weights and expected returns from the risk-measure instance or falling back to the prior result.
-
-# Related
-
-  - [`ThirdCentralMoment`](@ref)
-  - [`AbstractPriorResult`](@ref)
-  - [`factory`](@ref)
-  - [`nothing_scalar_array_selector`](@ref)
-"""
-function factory(r::ThirdCentralMoment, pr::AbstractPriorResult, args...; kwargs...)
-    w = nothing_scalar_array_selector(r.w, pr.w)
-    mu = nothing_scalar_array_selector(r.mu, pr.mu)
-    return ThirdCentralMoment(; w = w, mu = mu)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

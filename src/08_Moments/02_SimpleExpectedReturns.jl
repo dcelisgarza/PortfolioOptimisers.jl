@@ -40,11 +40,11 @@ SimpleExpectedReturns
   - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
   - [`mean(me::SimpleExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
 """
-@concrete struct SimpleExpectedReturns <: AbstractExpectedReturnsEstimator
+@propagatable @concrete struct SimpleExpectedReturns <: AbstractExpectedReturnsEstimator
     """
     $(field_dict[:oow])
     """
-    w
+    @wprop w
     function SimpleExpectedReturns(w::Option{<:ObsWeights})::SimpleExpectedReturns
         assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(w)}(w)
@@ -144,44 +144,4 @@ function Statistics.mean(me::SimpleExpectedReturns, X::MatNum; dims::Int = 1, kw
         Statistics.mean(X, w; dims = dims)
     end
 end
-"""
-    factory(
-        me::SimpleExpectedReturns,
-        w::ObsWeights
-    ) -> SimpleExpectedReturns
-
-Create a new `SimpleExpectedReturns` estimator with observation weights `w`.
-
-This function constructs a new [`SimpleExpectedReturns`](@ref) object, replacing the weights stored in the input estimator with the provided weights.
-
-# Arguments
-
-  - $(arg_dict[:me])
-  - $(arg_dict[:ow])
-
-# Returns
-
-  - $(ret_dict[:me])
-
-# Examples
-
-```jldoctest
-julia> me = SimpleExpectedReturns()
-SimpleExpectedReturns
-  w ┴ nothing
-
-julia> factory(me, StatsBase.Weights([0.1, 0.2, 0.7]))
-SimpleExpectedReturns
-  w ┴ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.1, 0.2, 0.7]
-```
-
-# Related
-
-  - [`SimpleExpectedReturns`](@ref)
-  - [`StatsBase.AbstractWeights`](https://juliastats.org/StatsBase.jl/stable/weights/)
-"""
-function factory(::SimpleExpectedReturns, w::ObsWeights)::SimpleExpectedReturns
-    return SimpleExpectedReturns(; w = w)
-end
-
 export SimpleExpectedReturns, mean

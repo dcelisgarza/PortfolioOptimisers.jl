@@ -9,6 +9,12 @@ $(DocStringExtensions.FIELDS)
 
 Property access delegates to the embedded [`JuMPOptimisationResult`](@ref): the virtual `:w` property and unknown properties resolve through `jr`.
 
+# Constructors
+
+    MeanRiskResult(; jr::JuMPOptimisationResult, fb::Option{<:OptE_Opt}) -> MeanRiskResult
+
+Keywords correspond to the struct's fields.
+
 # Related
 
   - [`RiskJuMPOptimisationResult`](@ref)
@@ -24,6 +30,13 @@ Property access delegates to the embedded [`JuMPOptimisationResult`](@ref): the 
     $(field_dict[:fb])
     """
     fb
+    function MeanRiskResult(jr::JuMPOptimisationResult, fb::Option{<:OptE_Opt})
+        return new{typeof(jr), typeof(fb)}(jr, fb)
+    end
+end
+function MeanRiskResult(; jr::JuMPOptimisationResult,
+                        fb::Option{<:OptE_Opt})::MeanRiskResult
+    return MeanRiskResult(jr, fb)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -596,8 +609,11 @@ function _optimise(mr::MeanRisk, rd::ReturnsResult = ReturnsResult(); dims::Int 
     retcode, sol = solve_mean_risk!(model, mr, attrs.ret, attrs.pr,
                                     Val(haskey(model, :ret_frontier)),
                                     Val(haskey(model, :risk_frontier)), attrs.fees)
-    return MeanRiskResult(JuMPOptimisationResult(typeof(mr), attrs, retcode, sol,
-                                                 ifelse(save, model, nothing)), nothing)
+    return MeanRiskResult(;
+                          jr = JuMPOptimisationResult(; oe = typeof(mr), pa = attrs,
+                                                      retcode = retcode, sol = sol,
+                                                      model = ifelse(save, model, nothing)),
+                          fb = nothing)
 end
 """
     optimise(mr::MeanRisk{<:Any, <:Any, <:Any, <:Any, Nothing},

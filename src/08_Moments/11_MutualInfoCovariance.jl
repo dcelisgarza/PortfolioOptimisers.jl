@@ -58,11 +58,11 @@ MutualInfoCovariance
   - [`AbstractVarianceEstimator`](@ref)
   - [`AbstractBins`](@ref)
 """
-@concrete struct MutualInfoCovariance <: AbstractCovarianceEstimator
+@propagatable @concrete struct MutualInfoCovariance <: AbstractCovarianceEstimator
     """
     $(field_dict[:ve])
     """
-    ve
+    @fprop @vprop ve
     """
     $(field_dict[:bins])
     """
@@ -83,67 +83,6 @@ function MutualInfoCovariance(; ve::AbstractVarianceEstimator = SimpleVariance()
                               bins::Int_Bin = HacineGharbiRavier(),
                               normalise::Bool = true)::MutualInfoCovariance
     return MutualInfoCovariance(ve, bins, normalise)
-end
-"""
-    factory(ce::MutualInfoCovariance, w::ObsWeights) -> MutualInfoCovariance
-
-Return a new [`MutualInfoCovariance`](@ref) estimator with observation weights `w` applied to the underlying variance estimator.
-
-# Arguments
-
-  - $(arg_dict[:ce])
-  - $(arg_dict[:ow])
-
-# Returns
-
-  - $(ret_dict[:ce])
-
-# Examples
-
-```jldoctest
-julia> ce = MutualInfoCovariance();
-
-julia> factory(ce, StatsBase.Weights([0.2, 0.3, 0.5]))
-MutualInfoCovariance
-         ve ┼ SimpleVariance
-            │          me ┼ SimpleExpectedReturns
-            │             │   w ┴ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.3, 0.5]
-            │           w ┼ StatsBase.Weights{Float64, Float64, Vector{Float64}}: [0.2, 0.3, 0.5]
-            │   corrected ┴ Bool: true
-       bins ┼ HacineGharbiRavier()
-  normalise ┴ Bool: true
-```
-
-# Related
-
-  - [`MutualInfoCovariance`](@ref)
-  - [`factory`](@ref)
-"""
-function factory(ce::MutualInfoCovariance, w::ObsWeights)::MutualInfoCovariance
-    return MutualInfoCovariance(; ve = factory(ce.ve, w), bins = ce.bins,
-                                normalise = ce.normalise)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Gets the view of the covariance estimator for the `i`-th element(s).
-
-# Arguments
-
-  - $(arg_dict[:ce])
-  - `i`: Index or indices to view.
-
-# Returns
-
-  - $(ret_dict[:cev])
-
-# Related
-
-  - [`MutualInfoCovariance`](@ref)
-"""
-function port_opt_view(ce::MutualInfoCovariance, i, args...)::MutualInfoCovariance
-    return MutualInfoCovariance(; ve = port_opt_view(ce.ve, i), bins = ce.bins,
-                                normalise = ce.normalise)
 end
 """
     Statistics.cor(ce::MutualInfoCovariance, X::MatNum; dims::Int = 1, kwargs...)

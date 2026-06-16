@@ -170,11 +170,6 @@ When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagg
         return new{typeof(ce), typeof(mp), typeof(alg), typeof(af)}(ce, mp, alg, af)
     end
 end
-#= Old factory function:
-function factory(ce::ImpliedVolatility, w::ObsWeights)::ImpliedVolatility
-    return ImpliedVolatility(; ce = factory(ce.ce, w), mp = ce.mp)
-end
-=#
 function ImpliedVolatility(; ce::StatsBase.CovarianceEstimator = Covariance(),
                            mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
                            alg::ImpliedVolatilityAlgorithm = ImpliedVolatilityRegression(),

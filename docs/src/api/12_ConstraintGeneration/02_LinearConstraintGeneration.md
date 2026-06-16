@@ -3,7 +3,6 @@
 ```@docs
 PartialLinearConstraint
 LinearConstraint
-Base.getproperty(obj::LinearConstraint, sym::Symbol)
 VecLc
 Lc_VecLc
 LinearConstraintEstimator

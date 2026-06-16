@@ -51,15 +51,15 @@ WindowedCokurtosis
   - [`CokurtosisEstimator`](@ref)
   - [`Cokurtosis`](@ref)
 """
-@concrete struct WindowedCokurtosis <: CokurtosisEstimator
+@propagatable @concrete struct WindowedCokurtosis <: CokurtosisEstimator
     """
     Cokurtosis estimator.
     """
-    ke
+    @fprop @vprop ke
     """
     $(field_dict[:oow])
     """
-    w
+    @wprop w
     """
     Window specification: an integer (last `window` observations) or a vector of indices.
     """
@@ -75,50 +75,6 @@ function WindowedCokurtosis(; ke::Cokurtosis = Cokurtosis(),
                             w::Option{<:ObsWeights} = nothing,
                             window::Option{<:Int_VecInt} = nothing)::WindowedCokurtosis
     return WindowedCokurtosis(ke, w, window)
-end
-"""
-    factory(ke::WindowedCokurtosis, w::ObsWeights) -> WindowedCokurtosis
-
-Return a new [`WindowedCokurtosis`](@ref) estimator with observation weights `w` applied to the underlying cokurtosis estimator and stored as the windowed weights.
-
-# Arguments
-
-  - `ke`: Windowed cokurtosis estimator.
-  - $(arg_dict[:ow])
-
-# Returns
-
-  - `ke::WindowedCokurtosis`: Updated estimator with weights applied.
-
-# Related
-
-  - [`WindowedCokurtosis`](@ref)
-  - [`factory`](@ref)
-"""
-function factory(ke::WindowedCokurtosis, w::ObsWeights)::WindowedCokurtosis
-    return WindowedCokurtosis(; ke = factory(ke.ke, w), w = w, window = ke.window)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Gets the view of the coskewness estimator for the `i`-th element(s).
-
-# Arguments
-
-  - $(arg_dict[:kte])
-  - `i`: Index or indices to view.
-
-# Returns
-
-  - $(ret_dict[:ktev])
-
-# Related
-
-  - [`WindowedCokurtosis`](@ref)
-"""
-function port_opt_view(kte::WindowedCokurtosis, i, args...)::WindowedCokurtosis
-    return WindowedCokurtosis(; kte = port_opt_view(kte.kte, i), w = kte.w,
-                              window = kte.window)
 end
 """
     cokurtosis(ke::WindowedCokurtosis, X::MatNum; dims::Int = 1, iv::Option{<:MatNum} = nothing, kwargs...)
@@ -144,16 +100,13 @@ This method selects a window of observations from `X` (and applies observation w
   - [`WindowedCokurtosis`](@ref)
   - [`Cokurtosis`](@ref)
   - [`cokurtosis`](@ref)
+  - [`windowed_preamble`](@ref)
 """
 function cokurtosis(ke::WindowedCokurtosis, X::MatNum; dims::Int = 1,
                     iv::Option{<:MatNum} = nothing, kwargs...)
-    window = get_window(ke.window, X, dims)
-    X, w = moment_window_and_weights(X, ke.w, window; dims = dims, kwargs...)
-    ke = factory(ke.ke, w)
-    if !isnothing(iv) && isa(window, VecInt)
-        iv = isone(dims) ? view(iv, window, :) : view(iv, :, window)
-    end
-    return cokurtosis(ke, X; dims = dims, iv = iv, kwargs...)
+    inner, X, iv = windowed_preamble(ke.ke, ke.w, ke.window, X; iv = iv, dims = dims,
+                                     kwargs...)
+    return cokurtosis(inner, X; dims = dims, iv = iv, kwargs...)
 end
 
 export WindowedCokurtosis

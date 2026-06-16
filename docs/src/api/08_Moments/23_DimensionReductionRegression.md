@@ -6,8 +6,6 @@ fit(drtgt::PCA, X::MatNum)
 PPCA
 fit(drtgt::PPCA, X::MatNum)
 DimensionReductionRegression
-factory(re::DimensionReductionRegression, w::ObsWeights)
-port_opt_view(re::DimensionReductionRegression, i, args...)
 regression(re::DimensionReductionRegression, X::MatNum, F::MatNum)
 DimensionReductionTarget
 factory(drtgt::DimensionReductionTarget, args...; kwargs...)

@@ -52,62 +52,10 @@ Mirrors [`BaseJuMPOptimisationEstimator`](@ref): the factored-out struct holding
   - [`RiskJuMPOptimisationResult`](@ref)
 """
 abstract type BaseJuMPOptimisationResult <: AbstractResult end
-"""
-$(DocStringExtensions.TYPEDEF)
-
-Shared field core for JuMP-based optimisation results.
-
-Holds the fields common to every JuMP optimisation result. Embedded as the first field (`jr`) of each concrete JuMP result, analogous to how [`JuMPOptimiser`](@ref) is embedded as `opt` in each JuMP optimiser. The concrete result keeps only its unique fields plus the trailing `fb`.
-
-# Fields
-
-$(DocStringExtensions.FIELDS)
-
-# Related
-
-  - [`BaseJuMPOptimisationResult`](@ref)
-  - [`RiskJuMPOptimisationResult`](@ref)
-  - [`JuMPOptimiser`](@ref)
-"""
-@concrete struct JuMPOptimisationResult <: BaseJuMPOptimisationResult
-    """
-    $(field_dict[:oe])
-    """
-    oe
-    """
-    $(field_dict[:pa])
-    """
-    pa
-    """
-    $(field_dict[:retcode])
-    """
-    retcode
-    """
-    $(field_dict[:sol])
-    """
-    sol
-    """
-    $(field_dict[:model])
-    """
-    model
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Access properties of [`JuMPOptimisationResult`](@ref). Virtual property `:w` extracts portfolio weights from `sol`; unknown properties forward to `pa`.
-"""
-function Base.getproperty(jr::JuMPOptimisationResult, sym::Symbol)
-    return if sym == :w
-        sol = getfield(jr, :sol)
-        !isa(sol, AbstractVector) ? getproperty(sol, :w) : getproperty.(sol, :w)
-    elseif sym in fieldnames(JuMPOptimisationResult)
-        getfield(jr, sym)
-    elseif sym in propertynames(getfield(jr, :pa))
-        getproperty(getfield(jr, :pa), sym)
-    else
-        getfield(jr, sym)
-    end
-end
+# The concrete core `JuMPOptimisationResult` is defined in 10_JuMPOptimiser.jl, after
+# `ProcessedJuMPOptimiserAttributes` and `JuMPOptimiser` — it is the result-side analogue
+# of `JuMPOptimiser` and its typed constructor binds `pa::ProcessedJuMPOptimiserAttributes`,
+# which must be in scope.
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -133,6 +81,14 @@ function Base.getproperty(r::RiskJuMPOptimisationResult, sym::Symbol)
     else
         getproperty(getfield(r, :jr), sym)
     end
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Default property enumeration for [`RiskJuMPOptimisationResult`](@ref): mirrors the default `getproperty` by unioning the receiver's own field names with everything forwarded from the embedded [`JuMPOptimisationResult`](@ref) `jr` (which itself forwards `pa`). Concrete subtypes that override `getproperty` (e.g. via [`@forward_properties`](@ref)) emit their own, more-specific `propertynames`.
+"""
+function Base.propertynames(r::RiskJuMPOptimisationResult)
+    return Tuple(unique((fieldnames(typeof(r))..., propertynames(getfield(r, :jr))...)))
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -308,6 +264,27 @@ end
 function JuMPOptimisationSolution(; w::ArrNum)::JuMPOptimisationSolution
     return JuMPOptimisationSolution(w)
 end
+"""
+    const VecJuMPOptSol = AbstractVector{<:JuMPOptimisationSolution}
+
+Alias for a vector of JuMP optimisation solutions.
+
+# Related
+
+  - [`JuMPOptimisationSolution`](@ref)
+"""
+const VecJuMPOptSol = AbstractVector{<:JuMPOptimisationSolution}
+"""
+    const JuMPOptSol_VecJuMPOptSol = Union{<:JuMPOptimisationSolution, <:VecJuMPOptSol}
+
+Alias for a single JuMP optimisation solution or a vector of them.
+
+# Related
+
+  - [`JuMPOptimisationSolution`](@ref)
+  - [`VecJuMPOptSol`](@ref)
+"""
+const JuMPOptSol_VecJuMPOptSol = Union{<:JuMPOptimisationSolution, <:VecJuMPOptSol}
 """
     set_model_scales!(model::JuMP.Model, so::Number, sc::Number)
 

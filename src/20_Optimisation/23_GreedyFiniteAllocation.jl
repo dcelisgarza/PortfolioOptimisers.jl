@@ -41,6 +41,19 @@ $(DocStringExtensions.FIELDS)
     $(field_dict[:fb])
     """
     fb
+    function GreedyAllocationResult(oe::Type{<:FiniteAllocationOptimisationEstimator},
+                                    retcode::OptimisationReturnCode, shares::VecNum,
+                                    cost::VecNum, w::VecNum, cash::Number,
+                                    fb::Option{<:OptE_Opt})
+        return new{typeof(oe), typeof(retcode), typeof(shares), typeof(cost), typeof(w),
+                   typeof(cash), typeof(fb)}(oe, retcode, shares, cost, w, cash, fb)
+    end
+end
+function GreedyAllocationResult(; oe::Type{<:FiniteAllocationOptimisationEstimator},
+                                retcode::OptimisationReturnCode, shares::VecNum,
+                                cost::VecNum, w::VecNum, cash::Number,
+                                fb::Option{<:OptE_Opt})::GreedyAllocationResult
+    return GreedyAllocationResult(oe, retcode, shares, cost, w, cash, fb)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -272,8 +285,9 @@ function _optimise(ga::GreedyAllocation, w::VecNum, p::VecNum, cash::Number = 1e
     res[sidx, 2] = -scost
     res[lidx, 3] = lw
     res[sidx, 3] = -sw
-    return GreedyAllocationResult(typeof(ga), OptimisationSuccess(nothing), view(res, :, 1),
-                                  view(res, :, 2), view(res, :, 3), lcash, nothing)
+    return GreedyAllocationResult(; oe = typeof(ga), retcode = OptimisationSuccess(),
+                                  shares = view(res, :, 1), cost = view(res, :, 2),
+                                  w = view(res, :, 3), cash = lcash, fb = nothing)
 end
 """
     optimise(ga::GreedyAllocation{<:Any, <:Any, <:Any, Nothing}, w::VecNum, p::VecNum,

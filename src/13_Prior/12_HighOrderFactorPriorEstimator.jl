@@ -210,19 +210,20 @@ HighOrderFactorPriorEstimator
   - [`CoskewnessEstimator`](@ref)
   - [`HighOrderPrior`](@ref)
 """
-@concrete struct HighOrderFactorPriorEstimator <: AbstractHighOrderPriorEstimator_F
+@propagatable @concrete struct HighOrderFactorPriorEstimator <:
+                               AbstractHighOrderPriorEstimator_F
     """
     $(field_dict[:pe])
     """
-    pe
+    @fprop @vprop pe
     """
     $(field_dict[:kte])
     """
-    kte
+    @fprop kte
     """
     $(field_dict[:ske])
     """
-    ske
+    @fprop ske
     """
     $(field_dict[:ex])
     """
@@ -250,49 +251,10 @@ function HighOrderFactorPriorEstimator(;
                                        rsd::Bool = true)::HighOrderFactorPriorEstimator
     return HighOrderFactorPriorEstimator(pe, kte, ske, ex, rsd)
 end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Return a new [`HighOrderFactorPriorEstimator`](@ref) estimator with observation weights `w` applied to the underlying prior, cokurtosis, and coskewness estimators.
-
-# Related
-
-  - [`HighOrderFactorPriorEstimator`](@ref)
-  - [`factory`](@ref)
-"""
-function factory(pe::HighOrderFactorPriorEstimator,
-                 w::ObsWeights)::HighOrderFactorPriorEstimator
-    return HighOrderFactorPriorEstimator(; pe = factory(pe.pe, w), kte = factory(pe.kte, w),
-                                         ske = factory(pe.ske, w), ex = pe.ex, rsd = pe.rsd)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Return a new [`HighOrderFactorPriorEstimator`](@ref) estimator restricted to the assets at index `i`.
-
-# Related
-
-  - [`HighOrderFactorPriorEstimator`](@ref)
-  - [`port_opt_view`](@ref)
-"""
-function port_opt_view(pe::HighOrderFactorPriorEstimator, i,
-                       args...)::HighOrderFactorPriorEstimator
-    return HighOrderFactorPriorEstimator(; pe = port_opt_view(pe.pe, i), kte = pe.kte,
-                                         ske = pe.ske, ex = pe.ex, rsd = pe.rsd)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Access properties of [`HighOrderFactorPriorEstimator`](@ref). Exposes `:me` and `:ce` from the embedded prior estimator `obj.pe` for transparent access.
-"""
-function Base.getproperty(obj::HighOrderFactorPriorEstimator, sym::Symbol)
-    return if sym == :me
-        obj.pe.me
-    elseif sym == :ce
-        obj.pe.ce
-    else
-        getfield(obj, sym)
-    end
+# Expose `:me` and `:ce` from the embedded prior estimator `pe` for transparent access
+# (see [`@forward_properties`](@ref)).
+@forward_properties HighOrderFactorPriorEstimator begin
+    forward(pe, me, ce)
 end
 """
     prior(pe::HighOrderFactorPriorEstimator, X::MatNum, F::MatNum; dims::Int = 1,

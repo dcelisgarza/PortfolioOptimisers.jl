@@ -501,19 +501,11 @@ Represents a collection of [`MultiPeriodPredictionResult`](@ref) objects.
   - [`PredRes_MultiPredRes`](@ref)
 """
 const VecMPredRes = AbstractVector{<:MultiPeriodPredictionResult}
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Access properties of [`MultiPeriodPredictionResult`](@ref). Virtual properties `:res` and `:rd` broadcast over the inner `pred` vector, collecting per-fold results and relative drawdowns.
-"""
-function Base.getproperty(mpred::MultiPeriodPredictionResult, sym::Symbol)
-    return if sym == :res
-        getfield.(getfield(mpred, :pred), :res)
-    elseif sym === :rd
-        getfield.(getfield(mpred, :pred), :rd)
-    else
-        getfield(mpred, sym)
-    end
+# Virtual properties `:res` and `:rd` broadcast over the inner `pred` vector, collecting
+# per-fold results and relative drawdowns (see [`@forward_properties`](@ref)).
+@forward_properties MultiPeriodPredictionResult begin
+    compute(res, pred.res; broadcast)
+    compute(rd, pred.rd; broadcast)
 end
 function expected_risk(r::AbstractBaseRiskMeasure, mpred::MultiPeriodPredictionResult;
                        kwargs...)
@@ -877,7 +869,7 @@ end
 function fit_and_predict(opt::OptE_Opt, rd::ReturnsResult, cv::NonSeqCVER; cols = :,
                          ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
                          id = nothing)
-    @argcheck(!(hasproperty(cv, :shuffle) && cv.shuffle),
+    @argcheck(!(hasfield(typeof(cv), :shuffle) && cv.shuffle),
               "Cross validation estimator must not be shuffled.")
     cv_res = split(cv, rd)
     (; train_idx, test_idx) = cv_res

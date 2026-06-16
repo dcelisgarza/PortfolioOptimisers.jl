@@ -24,10 +24,15 @@
         PO.set_maximum_ratio_factor_variables!(model, nt.pr.mu, mr.obj)
         PO.set_w!(model, nt.pr.X, mr.wi)
         PO.set_weight_constraints!(model, nt.wb, mr.opt.bgt, mr.opt.sbgt)
-        attrs = PO.ProcessedJuMPOptimiserAttributes(nt.pr, nt.wb, nt.lt, nt.st, nt.lcsr,
-                                                    nt.ctr, nt.gcardr, nt.sgcardr, nt.smtx,
-                                                    nt.sgmtx, nt.slt, nt.sst, nt.sglt,
-                                                    nt.sgst, nt.tn, nt.fees, nt.plr, nt.ret)
+        attrs = PO.ProcessedJuMPOptimiserAttributes(; pr = nt.pr, wb = nt.wb, lt = nt.lt,
+                                                    st = nt.st, lcsr = nt.lcsr,
+                                                    ctr = nt.ctr, gcardr = nt.gcardr,
+                                                    sgcardr = nt.sgcardr, smtx = nt.smtx,
+                                                    sgmtx = nt.sgmtx, slt = nt.slt,
+                                                    sst = nt.sst, sglt = nt.sglt,
+                                                    sgst = nt.sgst, tn = nt.tn,
+                                                    fees = nt.fees, plr = nt.plr,
+                                                    ret = nt.ret)
         PO.assemble_jump_model!(model, mr, mr.opt, attrs, rd, r, obj, miprb_flag, b1,
                                 sdp_asset_phylogeny)
         return Set(string.(keys(JuMP.object_dictionary(model))))

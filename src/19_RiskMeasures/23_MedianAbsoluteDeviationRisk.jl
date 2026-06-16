@@ -127,7 +127,7 @@ MedianAbsoluteDeviation
   - [`MedianCentering`](@ref)
   - [`MeanCentering`](@ref)
 """
-@concrete struct MedianAbsoluteDeviation <: HierarchicalRiskMeasure
+@propagatable @concrete struct MedianAbsoluteDeviation <: HierarchicalRiskMeasure
     """
     $(field_dict[:settings_rm])
     """
@@ -135,7 +135,7 @@ MedianAbsoluteDeviation
     """
     $(field_dict[:w_rm])
     """
-    w
+    @pprop w
     """
     $(field_dict[:mu_rm])
     """
@@ -164,23 +164,6 @@ function MedianAbsoluteDeviation(;
                                  mu::MedAbsDevMu = MedianCentering(),
                                  flag::Bool = true)::MedianAbsoluteDeviation
     return MedianAbsoluteDeviation(settings, w, mu, flag)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Create an instance of [`MedianAbsoluteDeviation`](@ref) by selecting observation weights from the risk-measure instance or falling back to the prior result.
-
-# Related
-
-  - [`MedianAbsoluteDeviation`](@ref)
-  - [`AbstractPriorResult`](@ref)
-  - [`factory`](@ref)
-  - [`nothing_scalar_array_selector`](@ref)
-"""
-function factory(r::MedianAbsoluteDeviation, pr::AbstractPriorResult, args...;
-                 kwargs...)::MedianAbsoluteDeviation
-    w = nothing_scalar_array_selector(r.w, pr.w)
-    return MedianAbsoluteDeviation(; settings = r.settings, w = w, mu = r.mu, flag = r.flag)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

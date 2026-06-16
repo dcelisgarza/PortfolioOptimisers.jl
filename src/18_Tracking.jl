@@ -975,11 +975,6 @@ TrackingError
         return new{typeof(tr), typeof(err), typeof(alg)}(tr, err, alg)
     end
 end
-#= Old factory function:
-function factory(tr::TrackingError, w::VecNum)
-    return TrackingError(; tr = factory(tr.tr, w), err = tr.err, alg = tr.alg)
-end
-=#
 function TrackingError(; tr::AbstractTrackingAlgorithm, err::Number = 0.0,
                        alg::NormTracking = L2Tracking())
     return TrackingError(tr, err, alg)

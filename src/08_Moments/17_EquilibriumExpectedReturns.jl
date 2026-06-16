@@ -89,11 +89,6 @@ EquilibriumExpectedReturns
         return new{typeof(ce), typeof(w), typeof(l)}(ce, w, l)
     end
 end
-#= Old factory function:
-function factory(me::EquilibriumExpectedReturns, w::ObsWeights)::EquilibriumExpectedReturns
-    return EquilibriumExpectedReturns(; ce = factory(me.ce, w), w = me.w, l = me.l)
-end
-=#
 function EquilibriumExpectedReturns(;
                                     ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
                                     w::Option{<:VecNum} = nothing,
