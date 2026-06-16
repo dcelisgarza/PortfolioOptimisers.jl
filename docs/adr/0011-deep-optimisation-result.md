@@ -1,5 +1,5 @@
 ---
-status: accepted (design; implementation pending)
+status: accepted
 ---
 
 # One deep optimisation Result, mirroring the JuMP optimiser estimators

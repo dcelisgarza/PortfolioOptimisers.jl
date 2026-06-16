@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: accepted
 ---
 
 # Generate property forwarding with a standalone `@forward_properties` macro
