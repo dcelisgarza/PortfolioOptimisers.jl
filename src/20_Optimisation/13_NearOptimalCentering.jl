@@ -596,9 +596,9 @@ function near_optimal_centering_setup(noc::NearOptimalCentering, rd::ReturnsResu
     w_min_flag = isnothing(w_min)
     w_opt_flag = isnothing(w_opt)
     w_max_flag = isnothing(w_max)
-    w_min_retcode = OptimisationSuccess(nothing)
-    w_opt_retcode = OptimisationSuccess(nothing)
-    w_max_retcode = OptimisationSuccess(nothing)
+    w_min_retcode = OptimisationSuccess()
+    w_opt_retcode = OptimisationSuccess()
+    w_max_retcode = OptimisationSuccess()
     unconstrained = isa(noc.alg, UnconstrainedNearOptimalCentering)
     r = noc.r
     attrs = processed_jump_optimiser_attributes(noc.opt, rd; dims = dims, kwargs...)
@@ -1035,10 +1035,10 @@ function get_overall_retcode(w_min_retcode, w_opt_retcode, w_max_retcode, noc_re
         msg *= "noc_opt failed."
     end
     return if isempty(msg)
-        OptimisationSuccess(nothing)
+        OptimisationSuccess()
     else
         @warn("Failed to solve optimisation problem. Check `retcode.res` for details.")
-        OptimisationFailure(msg)
+        OptimisationFailure(; res = msg)
     end
 end
 function _optimise(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,

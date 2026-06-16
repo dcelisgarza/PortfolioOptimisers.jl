@@ -59,9 +59,9 @@ $(DocStringExtensions.FIELDS)
     fb
     function DiscreteAllocationResult(oe::Type{<:FiniteAllocationOptimisationEstimator},
                                       retcode::OptimisationReturnCode,
-                                      s_retcode::OptimisationReturnCode,
-                                      l_retcode::OptimisationReturnCode, shares::VecNum,
-                                      cost::VecNum, w::VecNum, cash::Number,
+                                      s_retcode::Option{<:OptimisationReturnCode},
+                                      l_retcode::Option{<:OptimisationReturnCode},
+                                      shares::VecNum, cost::VecNum, w::VecNum, cash::Number,
                                       s_model::Option{<:JuMP.Model},
                                       l_model::Option{<:JuMP.Model}, fb::Option{<:OptE_Opt})
         return new{typeof(oe), typeof(retcode), typeof(s_retcode), typeof(l_retcode),
@@ -72,9 +72,9 @@ $(DocStringExtensions.FIELDS)
 end
 function DiscreteAllocationResult(; oe::Type{<:FiniteAllocationOptimisationEstimator},
                                   retcode::OptimisationReturnCode,
-                                  s_retcode::OptimisationReturnCode,
-                                  l_retcode::OptimisationReturnCode, shares::VecNum,
-                                  cost::VecNum, w::VecNum, cash::Number,
+                                  s_retcode::Option{<:OptimisationReturnCode},
+                                  l_retcode::Option{<:OptimisationReturnCode},
+                                  shares::VecNum, cost::VecNum, w::VecNum, cash::Number,
                                   s_model::Option{<:JuMP.Model},
                                   l_model::Option{<:JuMP.Model},
                                   fb::Option{<:OptE_Opt})::DiscreteAllocationResult
@@ -373,9 +373,9 @@ function _optimise(da::DiscreteAllocation, w::VecNum, p::VecNum, cash::Number = 
         if isa(lretcode, OptimisationFailure)
             @warn("Failed to solve sub optimisation problem. Check `l_retcode.res` for details.")
         end
-        OptimisationFailure(nothing)
+        OptimisationFailure()
     else
-        OptimisationSuccess(nothing)
+        OptimisationSuccess()
     end
     return DiscreteAllocationResult(; oe = typeof(da), retcode = retcode,
                                     s_retcode = sretcode, l_retcode = lretcode,

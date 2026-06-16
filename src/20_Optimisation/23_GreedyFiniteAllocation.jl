@@ -285,7 +285,7 @@ function _optimise(ga::GreedyAllocation, w::VecNum, p::VecNum, cash::Number = 1e
     res[sidx, 2] = -scost
     res[lidx, 3] = lw
     res[sidx, 3] = -sw
-    return GreedyAllocationResult(; oe = typeof(ga), retcode = OptimisationSuccess(nothing),
+    return GreedyAllocationResult(; oe = typeof(ga), retcode = OptimisationSuccess(),
                                   shares = view(res, :, 1), cost = view(res, :, 2),
                                   w = view(res, :, 3), cash = lcash, fb = nothing)
 end
