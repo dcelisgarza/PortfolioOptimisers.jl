@@ -1,7 +1,7 @@
 for r in setdiff(traverse_concrete_subtypes(RiskMeasure), (UncertaintySetVariance,))
     eval(quote
              function no_bounds_risk_measure(r::$(r), ::Any = nothing)
-                 pnames = Tuple(setdiff(propertynames(r), (:settings,)))
+                 pnames = Tuple(setdiff(fieldnames(typeof(r)), (:settings,)))
                  settings = r.settings
                  settings = RiskMeasureSettings(; rke = settings.rke,
                                                 scale = settings.scale)
@@ -9,7 +9,7 @@ for r in setdiff(traverse_concrete_subtypes(RiskMeasure), (UncertaintySetVarianc
                      $(r)(; settings = settings)
                  else
                      $(r)(; settings = settings,
-                          NamedTuple{pnames}(getproperty.(r, pnames))...)
+                          NamedTuple{pnames}(getfield.(r, pnames))...)
                  end
              end
          end)
@@ -17,18 +17,18 @@ end
 for r in setdiff(traverse_concrete_subtypes(RiskMeasure), (UncertaintySetVariance,))
     eval(quote
              function no_bounds_no_risk_expr_risk_measure(r::$(r), ::Any = nothing)
-                 pnames = Tuple(setdiff(propertynames(r), (:settings,)))
+                 pnames = Tuple(setdiff(fieldnames(typeof(r)), (:settings,)))
                  settings = r.settings
                  settings = RiskMeasureSettings(; rke = false, scale = 1)
                  return if isempty(pnames)
                      $(r)(; settings = settings)
                  else
                      $(r)(; settings = settings,
-                          NamedTuple{pnames}(getproperty.(r, pnames))...)
+                          NamedTuple{pnames}(getfield.(r, pnames))...)
                  end
              end
              function no_risk_expr_risk_measure(r::$(r))
-                 pnames = Tuple(setdiff(propertynames(r), (:settings,)))
+                 pnames = Tuple(setdiff(fieldnames(typeof(r)), (:settings,)))
                  settings = r.settings
                  settings = RiskMeasureSettings(; rke = false, ub = settings.ub,
                                                 scale = settings.scale)
@@ -36,7 +36,7 @@ for r in setdiff(traverse_concrete_subtypes(RiskMeasure), (UncertaintySetVarianc
                      $(r)(; settings = settings)
                  else
                      $(r)(; settings = settings,
-                          NamedTuple{pnames}(getproperty.(r, pnames))...)
+                          NamedTuple{pnames}(getfield.(r, pnames))...)
                  end
              end
          end)
@@ -44,7 +44,7 @@ end
 for r in traverse_concrete_subtypes(RiskMeasure)
     eval(quote
              function bounds_risk_measure(r::$(r), ub::Number)
-                 pnames = Tuple(setdiff(propertynames(r), (:settings,)))
+                 pnames = Tuple(setdiff(fieldnames(typeof(r)), (:settings,)))
                  settings = r.settings
                  settings = RiskMeasureSettings(; ub = ub, rke = settings.rke,
                                                 scale = settings.scale)
@@ -52,7 +52,7 @@ for r in traverse_concrete_subtypes(RiskMeasure)
                      $(r)(; settings = settings)
                  else
                      $(r)(; settings = settings,
-                          NamedTuple{pnames}(getproperty.(r, pnames))...)
+                          NamedTuple{pnames}(getfield.(r, pnames))...)
                  end
              end
          end)

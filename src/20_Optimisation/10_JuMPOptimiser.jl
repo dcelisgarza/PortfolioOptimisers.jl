@@ -1033,9 +1033,9 @@ true
   - [`JuMPOptimiser`](@ref)
 """
 function no_bounds_optimiser(opt::JuMPOptimiser, args...)
-    pnames = Tuple(setdiff(propertynames(opt), (:ret,)))
+    pnames = Tuple(setdiff(fieldnames(typeof(opt)), (:ret,)))
     return JuMPOptimiser(; ret = no_bounds_returns_estimator(opt.ret, args...),
-                         NamedTuple{pnames}(getproperty.(opt, pnames))...)
+                         NamedTuple{pnames}(getfield.(opt, pnames))...)
 end
 """
     jump_optimiser_from_attributes(

@@ -935,7 +935,7 @@ function ep_mu_views!(mu_views::LinearConstraintEstimator, epc::AbstractDict,
     mu_views = replace_group_by_assets(mu_views, sets, false, true, false)
     mu_views = replace_prior_views(mu_views, pr, sets, :mu; strict = strict)
     lcs = get_linear_constraints(mu_views, sets; datatype = eltype(X), strict = strict)
-    for p in propertynames(lcs)
+    for p in (:ineq, :eq)
         if isnothing(getproperty(lcs, p))
             continue
         end
@@ -1091,7 +1091,7 @@ function ep_var_views!(var_views::LinearConstraintEstimator, epc::AbstractDict,
                 !isnothing(lcs.ineq) &&
                 any(x -> x < zero(eltype(x)), lcs.A_ineq .* lcs.B_ineq)),
               ArgumentError("`var_view` cannot be negative.\n$var_views"))
-    for p in propertynames(lcs)
+    for p in (:ineq, :eq)
         if isnothing(getproperty(lcs, p))
             continue
         end
@@ -1683,7 +1683,7 @@ function ep_sigma_views!(sigma_views::LinearConstraintEstimator, epc::AbstractDi
     lcs = get_linear_constraints(sigma_views, sets; datatype = eltype(X), strict = strict)
     tmp = transpose((X .- transpose(pr.mu)) .^ 2)
     to_fix = falses(size(X, 2))
-    for p in propertynames(lcs)
+    for p in (:ineq, :eq)
         if isnothing(getproperty(lcs, p))
             continue
         end
@@ -2129,7 +2129,7 @@ function ep_sk_views!(skew_views::LinearConstraintEstimator, epc::AbstractDict,
     tmp = transpose((X .^ 3 .- transpose(pr.mu) .^ 3 .- 3 * transpose(pr.mu .* sigma)) ./
                     transpose(sigma .* sqrt.(sigma)))
     to_fix = falses(size(X, 2))
-    for p in propertynames(lcs)
+    for p in (:ineq, :eq)
         if isnothing(getproperty(lcs, p))
             continue
         end
@@ -2218,7 +2218,7 @@ function ep_kt_views!(kurtosis_views::LinearConstraintEstimator, epc::AbstractDi
                      6 * transpose(mu_sq) .* X_sq .- 3 * transpose(mu_sq .* mu_sq)) ./
                     transpose(LinearAlgebra.diag(pr.sigma)) .^ 2)
     to_fix = falses(size(X, 2))
-    for p in propertynames(lcs)
+    for p in (:ineq, :eq)
         if isnothing(getproperty(lcs, p))
             continue
         end
