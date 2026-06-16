@@ -75,6 +75,16 @@ three markers. (This is the idiomatic Julia `@forward Foo.field` style, e.g. Laz
     hatch; it owns its body entirely, so any scalar/vector handling lives inside it and
     `broadcast` does not apply. (A lambda is required rather than a bare/module-qualified
     function name, since the latter would be ambiguous with a dotted path.)
+- `swap(field, …)` — *override the value of an existing field* (the one marker that may
+  name a real field). Same two forms as `compute` plus a bare-name locator: `swap(L, M)`
+  (locator), `swap(x, a.b.c)` (dotted path), `swap(L, obj -> …)` (function). Added when
+  `Regression` — whose hand-written `getproperty` returns the loadings `M` for `:L` when
+  `L` is unset — could not be expressed by `forward`/`alias`/`compute`: those resolve
+  *after* the own-field check, so a rule on a real field (`:L`) is dead code. `swap` is the
+  field-overriding counterpart and resolves *before* the field check. `T` may be a
+  parametric/`UnionAll` signature so a `swap` can be specialised per type parameter:
+  `@forward_properties Regression{<:Any, Nothing, <:Any} begin swap(L, M) end` (the
+  matrix-`L` case needs no rule — default field access already returns the stored `L`).
 
 **Nested-path traversal errors name the path.** Because a locator is known statically at
 macro-expansion time, the generated walk for a depth-≥2 path checks each *intermediate* hop
@@ -97,15 +107,27 @@ collapsed into a single `forward` taking rename-pairs: one marker = one intent k
 `forward` meaning "same-name pass-through", flags every rename with the word `alias`, and
 fixes the `alias(exposed, loc)` argument direction positionally — avoiding a scoped
 `=>` whose direction would have to be memorised (the same ambiguity that ruled out the
-top-level arrow grammar). `forward` and `alias` stay purely structural; `compute` is the
-*sole* place arbitrary logic lives, keeping the other two trivially analyzable and
+top-level arrow grammar). `forward` and `alias` stay purely structural; `compute` and `swap` are the
+places arbitrary logic lives, keeping the other two trivially analyzable and
 future-proofing the macro against computed properties that do not yet exist.
 
-Block order is fall-through order. The generated `getproperty` checks `fieldnames(T)`
-**first** (not `propertynames`, which becomes circular once overridden), then each rule in
-order with **first-match-wins**, then a `getfield(obj, sym)` terminal (standard "no field"
-error on the wrapper's own type). The generated `propertynames` unions own fieldnames with
-all forwarded/subset/alias/compute exposed names, deduped.
+Block order is fall-through order, split into **two precedence tiers** keyed on whether a
+rule adds a new name or overrides an existing field. The generated `getproperty` applies
+`swap` rules **first** (they intentionally shadow the field check, since their job is to
+override a field's value), then checks `fieldnames(T)` (not `propertynames`, which becomes
+circular once overridden), then each `forward`/`alias`/`compute` rule with
+**first-match-wins**, then a `getfield(obj, sym)` terminal (standard "no field" error on the
+wrapper's own type). Within each tier, declaration order is preserved. The generated
+`propertynames` unions own fieldnames with all forwarded/subset/alias/compute/swap exposed
+names, deduped (a swapped name is already a field, so it dedups away).
+
+The `swap` locator forms read through `getfield` and are recursion-safe. The `swap`
+**function form** is a footgun in one narrow way: because the swap branch precedes the field
+check, dot-access to the swapped field *inside the lambda* re-enters `getproperty` and
+recurses (`StackOverflowError`) — the lambda must read the swapped field via
+`getfield(obj, :field)` (the idiom the hand-written `Regression` body already used). Reading
+*other* fields with dot-access is safe (they resolve via the field check). This is loud
+(immediate overflow on first call), not silent, and is documented on the macro.
 
 Covers Shapes A, B, and C (~13 sites). The abstract `RiskJuMPOptimisationResult` default
 stays hand-written (no struct to attach to).

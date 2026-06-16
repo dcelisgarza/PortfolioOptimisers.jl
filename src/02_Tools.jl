@@ -1526,17 +1526,25 @@ end
         alias(exposed, loc)
         compute(exposed, loc; broadcast)
         compute(exposed, fn)
+        swap(field, loc)
+        swap(field, fn)
     end
 
 Generate the `Base.getproperty` / `Base.propertynames` pair for type `T` from a
 block of declarative forwarding rules, so the property-forwarding decision lives
 in one declared surface instead of a hand-written `getproperty` body (ADR 0013).
+`T` may be a bare type name or a parametric/`UnionAll` signature
+(`Foo{<:Any, Nothing, <:Any}`), so a `swap` can be specialised per type parameter.
 
 All names are written as **bare identifiers**. Every rule names its source via a
 **locator** — a bare name `a` (the field `a` of the receiver) or a dotted path
 `a.b.c` (the receiver-rooted path `obj.a.b.c`, any depth). Nesting is simply more
 dots; a depth-≥2 path guards each intermediate and throws a
 [`PropertyPathError`](@ref) naming the path when a node is `nothing`.
+
+`forward`/`alias`/`compute` only *add new virtual names* and so resolve **after**
+the receiver's own fields; `swap` *replaces the value of an existing field* and so
+resolves **before** the field check.
 
 # Rules
 
@@ -1549,14 +1557,25 @@ dots; a depth-≥2 path guards each intermediate and throws a
   - `compute(exposed, fn)`: expose `exposed` as `fn(obj)`; `fn` must be an
     anonymous function (a lambda), which would otherwise be ambiguous with a
     dotted path.
+  - `swap(field, loc)` / `swap(field, fn)`: override an *existing* field's value
+    with the value at `loc` (bare name, e.g. `swap(L, M)`, or dotted path) or with
+    `fn(obj)`. Unlike the others it takes precedence over the own-field check, and
+    is the only rule that may name a real field. Typically specialised on a
+    parametric `T` (`swap(L, M)` on `Regression{<:Any, Nothing, <:Any}`).
+    The locator form reads through `getfield` and is recursion-safe; in the
+    **function form the body must read the swapped field via `getfield(obj, :field)`,
+    never `obj.field`**, since dot-access on the swapped field re-enters
+    `getproperty` and recurses (`StackOverflowError`). Other fields may use
+    dot-access freely.
 
 # Details
 
-The generated `getproperty` checks the receiver's own `fieldnames` first (via
-`getfield`, so it never recurses), then each rule in declaration order with
-first-match-wins, then falls through to `getfield(x, sym)` (the standard "no
-field" error on `T`). The generated `propertynames` unions the own field names
-with every forwarded, subset, aliased and computed name, deduplicated.
+The generated `getproperty` applies any `swap` rules first (in declaration order),
+then checks the receiver's own `fieldnames` (via `getfield`, so it never recurses),
+then each remaining rule in declaration order with first-match-wins, then falls
+through to `getfield(x, sym)` (the standard "no field" error on `T`). The generated
+`propertynames` unions the own field names with every forwarded, subset, aliased,
+computed and swapped name, deduplicated.
 
 # Related
 
@@ -1568,13 +1587,14 @@ macro forward_properties(T, block)
         return error("@forward_properties: expected a `begin ... end` block of rules")
     end
     getprop_branches = Any[]
+    swap_branches = Any[]
     propname_contribs = Any[]
     for stmt in block.args
         if stmt isa LineNumberNode
             continue
         end
         if !(stmt isa Expr && stmt.head == :call)
-            return error("@forward_properties: each rule must be a `forward`/`alias`/`compute` call, got: $(repr(stmt))")
+            return error("@forward_properties: each rule must be a `forward`/`alias`/`compute`/`swap` call, got: $(repr(stmt))")
         end
         marker = stmt.args[1]
         args = stmt.args[2:end]
@@ -1656,12 +1676,35 @@ macro forward_properties(T, block)
                 return error("@forward_properties: `compute` source must be a dotted path (depth ≥ 2) or an anonymous function, got: $(repr(src))")
             end
             push!(propname_contribs, QuoteNode(exposed))
+        elseif marker == :swap
+            if !(length(args) == 2)
+                return error("@forward_properties: `swap` takes `(field, locator|fn)`, got: $(repr(stmt))")
+            end
+            exposed = args[1]
+            if !(exposed isa Symbol)
+                return error("@forward_properties: `swap` field name must be a bare identifier, got: $(repr(exposed))")
+            end
+            src = args[2]
+            if src isa Expr && src.head == :->
+                if broadcast
+                    return error("@forward_properties: `broadcast` does not apply to the function form of `swap`")
+                end
+                push!(swap_branches, :(sym === $(QuoteNode(exposed)) && return ($src)(x)))
+            elseif (src isa Expr && src.head == :.) || src isa Symbol
+                path = _forward_flatten_path(src)
+                walk = _forward_walk_expr(path, T, broadcast)
+                push!(swap_branches, :(sym === $(QuoteNode(exposed)) && return $walk))
+            else
+                return error("@forward_properties: `swap` source must be a bare name, a dotted path, or an anonymous function, got: $(repr(src))")
+            end
+            push!(propname_contribs, QuoteNode(exposed))
         else
-            return error("@forward_properties: unknown rule `$(marker)` (expected `forward`, `alias`, or `compute`)")
+            return error("@forward_properties: unknown rule `$(marker)` (expected `forward`, `alias`, `compute`, or `swap`)")
         end
     end
     getproperty_def = quote
         function Base.getproperty(x::$T, sym::Symbol)
+            $(swap_branches...)
             if sym in fieldnames($T)
                 return getfield(x, sym)
             end

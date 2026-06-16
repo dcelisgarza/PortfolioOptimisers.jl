@@ -13,7 +13,6 @@ OptimEntropyPooling
 JuMPEntropyPooling
 NonCVaREP
 EntropyPoolingPrior
-Base.getproperty(obj::EntropyPoolingPrior, sym::Symbol)
 VecEP
 prior(pe::EntropyPoolingPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                               <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,

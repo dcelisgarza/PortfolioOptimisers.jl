@@ -2,7 +2,6 @@
 
 ```@docs
 HighOrderPriorEstimator
-Base.getproperty(obj::HighOrderPriorEstimator, sym::Symbol)
 prior(pe::HighOrderPriorEstimator, X::MatNum,
                F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
 block_vec_pq

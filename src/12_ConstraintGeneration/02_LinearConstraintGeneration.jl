@@ -156,23 +156,15 @@ Alias for a union of a single [`LinearConstraint`](@ref) or a vector of them.
   - [`VecLc`](@ref)
 """
 const Lc_VecLc = Union{<:LinearConstraint, <:VecLc}
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Access flattened constraint matrices from a [`LinearConstraint`](@ref). Virtual properties `:A_ineq`, `:B_ineq`, `:A_eq`, `:B_eq` extract the corresponding sub-matrices from `obj.ineq` and `obj.eq`, returning `nothing` when the relevant constraint set is absent.
-"""
-function Base.getproperty(obj::LinearConstraint, sym::Symbol)
-    return if sym == :A_ineq
-        isnothing(obj.ineq) ? nothing : obj.ineq.A
-    elseif sym == :B_ineq
-        isnothing(obj.ineq) ? nothing : obj.ineq.B
-    elseif sym == :A_eq
-        isnothing(obj.eq) ? nothing : obj.eq.A
-    elseif sym == :B_eq
-        isnothing(obj.eq) ? nothing : obj.eq.B
-    else
-        getfield(obj, sym)
-    end
+# Flattened constraint matrices as virtual properties: `:A_ineq`, `:B_ineq`, `:A_eq`,
+# `:B_eq` extract the corresponding sub-matrices from `obj.ineq` / `obj.eq`, returning
+# `nothing` when the relevant constraint set is absent (the function form of `compute`
+# returns `nothing` rather than throwing `PropertyPathError`; see [`@forward_properties`](@ref)).
+@forward_properties LinearConstraint begin
+    compute(A_ineq, obj -> isnothing(obj.ineq) ? nothing : obj.ineq.A)
+    compute(B_ineq, obj -> isnothing(obj.ineq) ? nothing : obj.ineq.B)
+    compute(A_eq, obj -> isnothing(obj.eq) ? nothing : obj.eq.A)
+    compute(B_eq, obj -> isnothing(obj.eq) ? nothing : obj.eq.B)
 end
 """
 $(DocStringExtensions.TYPEDEF)

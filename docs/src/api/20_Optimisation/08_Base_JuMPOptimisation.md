@@ -16,6 +16,7 @@ VecJuMPOptSol
 JuMPOptSol_VecJuMPOptSol
 BaseJuMPOptimisationResult
 RiskJuMPOptimisationResult
+Base.propertynames(RiskJuMPOptimisationResult)
 getproperty(r::RiskJuMPOptimisationResult, sym::Symbol)
 NonJuMPOptimisationResult
 add_custom_objective_term!

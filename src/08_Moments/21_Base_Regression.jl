@@ -169,7 +169,9 @@ LinearModel
   - [`StatsAPI.fit(::LinearModel, ::MatNum, ::VecNum)`](@ref)
 """
 @concrete struct LinearModel <: AbstractRegressionTarget
-    "Keyword arguments passed to `fit(GLM.LinearModel, X, y; kwargs...)`."
+    """
+    Keyword arguments passed to `fit(GLM.LinearModel, X, y; kwargs...)`.
+    """
     kwargs
     function LinearModel(kwargs::NamedTuple)
         return new{typeof(kwargs)}(kwargs)
@@ -268,9 +270,13 @@ GeneralisedLinearModel
   - [`StatsAPI.fit(::GeneralisedLinearModel, ::MatNum, ::VecNum)`](@ref)
 """
 @concrete struct GeneralisedLinearModel <: AbstractRegressionTarget
-    "Positional arguments passed to `fit(GLM.GeneralizedLinearModel, X, y, args...; kwargs...)`."
+    """
+    Positional arguments passed to `fit(GLM.GeneralizedLinearModel, X, y, args...; kwargs...)`.
+    """
     args
-    "Keyword arguments passed to `fit(GLM.GeneralizedLinearModel, X, y, args...; kwargs...)`."
+    """
+    Keyword arguments passed to `fit(GLM.GeneralizedLinearModel, X, y, args...; kwargs...)`.
+    """
     kwargs
     function GeneralisedLinearModel(args::Tuple, kwargs::NamedTuple)
         return new{typeof(args), typeof(kwargs)}(args, kwargs)
@@ -634,11 +640,17 @@ Regression
   - [`AbstractRegressionResult`](@ref)
 """
 @concrete struct Regression <: AbstractRegressionResult
-    "$(arg_dict[:M])"
+    """
+    $(arg_dict[:M])
+    """
     M
-    "$(arg_dict[:L])"
+    """
+    $(arg_dict[:L])
+    """
     L
-    "$(arg_dict[:b])"
+    """
+    $(arg_dict[:b])
+    """
     b
     function Regression(M::MatNum, L::Option{<:MatNum}, b::Option{<:VecNum})
         @argcheck(!isempty(M), IsEmptyError)
@@ -656,29 +668,11 @@ function Regression(; M::MatNum, L::Option{<:MatNum} = nothing,
                     b::Option{<:VecNum} = nothing)::Regression
     return Regression(M, L, b)
 end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Access properties of `Regression` when `L` is `Nothing`. Returns `M` when `sym == :L`, falling back to `M` as the loadings matrix.
-"""
-function Base.getproperty(re::Regression{<:Any, Nothing, <:Any}, sym::Symbol)
-    return if sym == :L
-        getfield(re, :M)
-    else
-        getfield(re, sym)
-    end
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Access properties of `Regression` when `L` is a matrix. Returns the stored `L` field when `sym == :L`.
-"""
-function Base.getproperty(re::Regression{<:Any, <:MatNum, <:Any}, sym::Symbol)
-    return if sym == :L
-        getfield(re, :L)
-    else
-        getfield(re, sym)
-    end
+# When `L` is unset (`Nothing` type parameter), `:L` falls back to the loadings matrix `M`;
+# when `L` is a stored matrix the default field access already returns it, so only the
+# `Nothing` specialisation needs a rule (see [`@forward_properties`](@ref)'s `swap`).
+@forward_properties Regression{<:Any, Nothing, <:Any} begin
+    swap(L, M)
 end
 """
     port_opt_view(re::Regression, i)

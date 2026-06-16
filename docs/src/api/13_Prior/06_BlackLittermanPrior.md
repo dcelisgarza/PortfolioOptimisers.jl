@@ -2,7 +2,6 @@
 
 ```@docs
 BlackLittermanPrior
-Base.getproperty(obj::BlackLittermanPrior, sym::Symbol)
 prior(pe::BlackLittermanPrior, X::MatNum,
                F::Option{<:MatNum} = nothing; dims::Int = 1,
                strict::Bool = false, kwargs...)
