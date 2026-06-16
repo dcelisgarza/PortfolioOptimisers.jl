@@ -254,17 +254,8 @@ AugmentedBlackLittermanPrior
         if !isnothing(w)
             @argcheck(!isempty(w))
         end
-        if isa(a_views, LinearConstraintEstimator)
-            @argcheck(!isnothing(a_sets))
-        end
-        if isa(f_views, LinearConstraintEstimator)
-            @argcheck(!isnothing(f_sets))
-        end
-        assert_bl_views_conf(a_views_conf, a_views)
-        assert_bl_views_conf(f_views_conf, f_views)
-        if !isnothing(tau)
-            @argcheck(tau > zero(tau))
-        end
+        assert_bl(a_views, a_sets, a_views_conf, tau)
+        assert_bl(f_views, f_sets, f_views_conf, tau)
         return new{typeof(a_pe), typeof(f_pe), typeof(mp), typeof(re), typeof(a_views),
                    typeof(f_views), typeof(a_sets), typeof(f_sets), typeof(a_views_conf),
                    typeof(f_views_conf), typeof(w), typeof(rf), typeof(l), typeof(tau)}(a_pe,
@@ -375,16 +366,14 @@ function prior(pe::AugmentedBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int
     rr = regression(pe.re, X, F)
     (; b, M) = rr
     posterior_X = F * transpose(M) .+ transpose(b)
-    (; P, Q, excl) = black_litterman_views(pe.a_views, pe.a_sets;
-                                           datatype = eltype(posterior_X), strict = strict)
-    f_views = black_litterman_views(pe.f_views, pe.f_sets; datatype = eltype(posterior_X),
-                                    strict = strict)
-    f_P, f_Q, f_excl = f_views.P, f_views.Q, f_views.excl
-    tau = isnothing(pe.tau) ? inv(size(X, 1)) : pe.tau
-    a_views_conf = remove_excl_views(pe.a_views_conf, excl)
-    f_views_conf = remove_excl_views(pe.f_views_conf, f_excl)
-    a_omega = tau * calc_omega(a_views_conf, P, a_prior_sigma)
-    f_omega = tau * calc_omega(f_views_conf, f_P, f_prior_sigma)
+    dt = eltype(posterior_X)
+    T = size(X, 1)
+    (; P, Q, tau, omega) = _bl_preroll(pe.a_views, pe.a_sets, pe.a_views_conf,
+                                       a_prior_sigma, pe.tau, T, dt, strict)
+    a_omega = omega
+    f_result = _bl_preroll(pe.f_views, pe.f_sets, pe.f_views_conf, f_prior_sigma, pe.tau, T,
+                           dt, strict)
+    f_P, f_Q, f_omega = f_result.P, f_result.Q, f_result.omega
     aug_prior_sigma = hcat(vcat(a_prior_sigma, f_prior_sigma * transpose(M)),
                            vcat(M * f_prior_sigma, f_prior_sigma))
     aug_P = hcat(vcat(P, zeros(size(f_P, 1), size(P, 2))),

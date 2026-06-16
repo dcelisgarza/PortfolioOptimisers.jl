@@ -138,13 +138,7 @@ BlackLittermanPrior
                                  sets::Option{<:AssetSets},
                                  views_conf::Option{<:Num_VecNum}, rf::Number,
                                  tau::Option{<:Number})
-        if isa(views, LinearConstraintEstimator)
-            @argcheck(!isnothing(sets))
-        end
-        assert_bl_views_conf(views_conf, views)
-        if !isnothing(tau)
-            @argcheck(tau > zero(tau))
-        end
+        assert_bl(views, sets, views_conf, tau)
         return new{typeof(pe), typeof(mp), typeof(views), typeof(sets), typeof(views_conf),
                    typeof(rf), typeof(tau)}(pe, mp, views, sets, views_conf, rf, tau)
     end
@@ -223,6 +217,24 @@ Where:
   - [`BlackLittermanPrior`](@ref)
   - [`vanilla_posteriors`](@ref)
 """
+function assert_bl(views, sets, views_conf, tau)
+    if isa(views, LinearConstraintEstimator)
+        @argcheck(!isnothing(sets))
+    end
+    assert_bl_views_conf(views_conf, views)
+    if !isnothing(tau)
+        @argcheck(tau > zero(tau))
+    end
+    return nothing
+end
+function _bl_preroll(views, sets, views_conf, prior_sigma, pe_tau, T, datatype, strict)
+    (; P, Q, excl) = black_litterman_views(views, sets; datatype = datatype,
+                                           strict = strict)
+    tau = isnothing(pe_tau) ? inv(T) : pe_tau
+    views_conf = remove_excl_views(views_conf, excl)
+    omega = tau * calc_omega(views_conf, P, prior_sigma)
+    return (; P, Q, tau, omega)
+end
 function calc_omega(::Nothing, P::MatNum, sigma::MatNum)
     return LinearAlgebra.Diagonal(P * sigma * transpose(P))
 end
@@ -424,11 +436,8 @@ function prior(pe::BlackLittermanPrior, X::MatNum, F::Option{<:MatNum} = nothing
     @argcheck(length(pe.sets.dict[pe.sets.key]) == size(X, 2))
     prior_model = prior(pe.pe, X, F; strict = strict, kwargs...)
     posterior_X, prior_mu, prior_sigma = prior_model.X, prior_model.mu, prior_model.sigma
-    (; P, Q, excl) = black_litterman_views(pe.views, pe.sets;
-                                           datatype = eltype(posterior_X), strict = strict)
-    tau = isnothing(pe.tau) ? inv(size(X, 1)) : pe.tau
-    views_conf = remove_excl_views(pe.views_conf, excl)
-    omega = tau * calc_omega(views_conf, P, prior_sigma)
+    (; P, Q, tau, omega) = _bl_preroll(pe.views, pe.sets, pe.views_conf, prior_sigma,
+                                       pe.tau, size(X, 1), eltype(posterior_X), strict)
     posterior_mu, posterior_sigma = vanilla_posteriors(tau, pe.rf, prior_mu, prior_sigma,
                                                        omega, P, Q)
     matrix_processing!(pe.mp, posterior_sigma, posterior_X; kwargs...)

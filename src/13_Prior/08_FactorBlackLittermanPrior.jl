@@ -179,13 +179,7 @@ FactorBlackLittermanPrior
                                        views_conf::Option{<:Num_VecNum},
                                        w::Option{<:VecNum}, rf::Number, l::Option{<:Number},
                                        tau::Option{<:Number}, rsd::Bool)
-        if isa(views, LinearConstraintEstimator)
-            @argcheck(!isnothing(sets))
-        end
-        assert_bl_views_conf(views_conf, views)
-        if !isnothing(tau)
-            @argcheck(tau > zero(tau))
-        end
+        assert_bl(views, sets, views_conf, tau)
         return new{typeof(pe), typeof(f_mp), typeof(mp), typeof(re), typeof(ve),
                    typeof(views), typeof(sets), typeof(views_conf), typeof(w), typeof(rf),
                    typeof(l), typeof(tau), typeof(rsd)}(pe, f_mp, mp, re, ve, views, sets,
@@ -303,11 +297,8 @@ function prior(pe::FactorBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int = 
     rr = regression(pe.re, X, F)
     (; b, M) = rr
     posterior_X = F * transpose(M) .+ transpose(b)
-    (; P, Q, excl) = black_litterman_views(pe.views, pe.sets;
-                                           datatype = eltype(posterior_X), strict = strict)
-    tau = isnothing(pe.tau) ? inv(size(X, 1)) : pe.tau
-    views_conf = remove_excl_views(pe.views_conf, excl)
-    omega = tau * calc_omega(views_conf, P, prior_sigma)
+    (; P, Q, tau, omega) = _bl_preroll(pe.views, pe.sets, pe.views_conf, prior_sigma,
+                                       pe.tau, size(X, 1), eltype(posterior_X), strict)
     prior_mu = if !isnothing(pe.l)
         w = if !isnothing(pe.w)
             @argcheck(length(pe.w) == size(X, 2))

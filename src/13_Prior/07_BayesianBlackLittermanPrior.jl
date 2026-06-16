@@ -165,13 +165,7 @@ BayesianBlackLittermanPrior
                                          views::Lc_BLV, sets::Option{<:AssetSets},
                                          views_conf::Option{<:Num_VecNum}, rf::Number,
                                          tau::Option{<:Number})
-        if isa(views, LinearConstraintEstimator)
-            @argcheck(!isnothing(sets))
-        end
-        assert_bl_views_conf(views_conf, views)
-        if !isnothing(tau)
-            @argcheck(tau > zero(tau))
-        end
+        assert_bl(views, sets, views_conf, tau)
         return new{typeof(pe), typeof(mp), typeof(views), typeof(sets), typeof(views_conf),
                    typeof(rf), typeof(tau)}(pe, mp, views, sets, views_conf, rf, tau)
     end
@@ -275,14 +269,11 @@ function prior(pe::BayesianBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int 
     posterior_X, prior_sigma, f_mu, f_sigma, rr = prior_result.X, prior_result.sigma,
                                                   prior_result.f_mu, prior_result.f_sigma,
                                                   prior_result.rr
-    (; P, Q, excl) = black_litterman_views(pe.views, pe.sets;
-                                           datatype = eltype(posterior_X), strict = strict)
-    tau = isnothing(pe.tau) ? inv(size(F, 1)) : pe.tau
-    views_conf = remove_excl_views(pe.views_conf, excl)
-    f_omega = tau * calc_omega(views_conf, P, f_sigma)
+    (; P, Q, omega) = _bl_preroll(pe.views, pe.sets, pe.views_conf, f_sigma, pe.tau,
+                                  size(F, 1), eltype(posterior_X), strict)
     (; b, M) = rr
-    sigma_hat = f_sigma \ LinearAlgebra.I + transpose(P) * (f_omega \ P)
-    mu_hat = sigma_hat \ (f_sigma \ f_mu + transpose(P) * (f_omega \ Q))
+    sigma_hat = f_sigma \ LinearAlgebra.I + transpose(P) * (omega \ P)
+    mu_hat = sigma_hat \ (f_sigma \ f_mu + transpose(P) * (omega \ Q))
     v1 = prior_sigma \ M
     v2 = sigma_hat + transpose(M) * v1
     v3 = prior_sigma \ LinearAlgebra.I
