@@ -81,7 +81,7 @@ Property access delegates to the embedded [`JuMPOptimisationResult`](@ref): the 
                                         w_min_retcode::OptimisationReturnCode,
                                         w_opt_retcode::OptRetCode_VecOptRetCode,
                                         w_max_retcode::OptimisationReturnCode,
-                                        noc_retcode::OptimisationReturnCode,
+                                        noc_retcode::OptRetCode_VecOptRetCode,
                                         fb::Option{<:OptE_Opt})
         return new{typeof(jr), typeof(w_min_retcode), typeof(w_opt_retcode),
                    typeof(w_max_retcode), typeof(noc_retcode), typeof(fb)}(jr,
@@ -95,7 +95,7 @@ function NearOptimalCenteringResult(; jr::JuMPOptimisationResult,
                                     w_min_retcode::OptimisationReturnCode,
                                     w_opt_retcode::OptRetCode_VecOptRetCode,
                                     w_max_retcode::OptimisationReturnCode,
-                                    noc_retcode::OptimisationReturnCode,
+                                    noc_retcode::OptRetCode_VecOptRetCode,
                                     fb::Option{<:OptE_Opt})::NearOptimalCenteringResult
     return NearOptimalCenteringResult(jr, w_min_retcode, w_opt_retcode, w_max_retcode,
                                       noc_retcode, fb)

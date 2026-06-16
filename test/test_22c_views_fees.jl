@@ -95,7 +95,6 @@ end
                           opto = MeanRisk(; opt = JuMPOptimiser(; slv = slv)))
     @test isapprox(res.w, optimise(opt, rd).w)
 end
-
 @testset "Efficient frontier" begin
     mr1 = MeanRisk(; opt = JuMPOptimiser(; pe = pr, slv = slv))
     mr2 = MeanRisk(; obj = MaximumRatio(), opt = JuMPOptimiser(; pe = pr, slv = slv))
