@@ -70,7 +70,7 @@ $(DocStringExtensions.FIELDS)
                             resi::AbstractVector{<:NonFiniteAllocationOptimisationResult},
                             reso::OptimisationResult,
                             cv::Option{<:OptimisationCrossValidation},
-                            retcode::OptRetCode_VecOptRetCode, w::Option{<:VecNum},
+                            retcode::OptRetCode_VecOptRetCode, w::VecNum_VecVecNum,
                             fb::Option{<:OptE_Opt})
         return new{typeof(oe), typeof(pr), typeof(wb), typeof(fees), typeof(resi),
                    typeof(reso), typeof(cv), typeof(retcode), typeof(w), typeof(fb)}(oe, pr,
@@ -88,7 +88,7 @@ function StackingResult(; oe::Type{<:OptimisationEstimator},
                         fees::Option{<:Fees},
                         resi::AbstractVector{<:NonFiniteAllocationOptimisationResult},
                         reso::OptimisationResult, cv::Option{<:OptimisationCrossValidation},
-                        retcode::OptRetCode_VecOptRetCode, w::Option{<:VecNum},
+                        retcode::OptRetCode_VecOptRetCode, w::VecNum_VecVecNum,
                         fb::Option{<:OptE_Opt})::StackingResult
     return StackingResult(oe, pr, wb, fees, resi, reso, cv, retcode, w, fb)
 end
