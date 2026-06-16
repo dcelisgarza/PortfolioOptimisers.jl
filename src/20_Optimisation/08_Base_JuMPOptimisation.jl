@@ -257,6 +257,27 @@ function JuMPOptimisationSolution(; w::ArrNum)::JuMPOptimisationSolution
     return JuMPOptimisationSolution(w)
 end
 """
+    const VecJuMPOptSol = AbstractVector{<:JuMPOptimisationSolution}
+
+Alias for a vector of JuMP optimisation solutions.
+
+# Related
+
+  - [`JuMPOptimisationSolution`](@ref)
+"""
+const VecJuMPOptSol = AbstractVector{<:JuMPOptimisationSolution}
+"""
+    const JuMPOptSol_VecJuMPOptSol = Union{<:JuMPOptimisationSolution, <:VecJuMPOptSol}
+
+Alias for a single JuMP optimisation solution or a vector of them.
+
+# Related
+
+  - [`JuMPOptimisationSolution`](@ref)
+  - [`VecJuMPOptSol`](@ref)
+"""
+const JuMPOptSol_VecJuMPOptSol = Union{<:JuMPOptimisationSolution, <:VecJuMPOptSol}
+"""
     set_model_scales!(model::JuMP.Model, so::Number, sc::Number)
 
 Register objective scale `so` and constraint scale `sc` as named expressions in the JuMP model.

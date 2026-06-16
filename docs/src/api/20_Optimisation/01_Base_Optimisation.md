@@ -9,6 +9,8 @@ OptimisationAlgorithm
 OptimisationResult
 NonFiniteAllocationOptimisationResult
 OptimisationReturnCode
+VecOptRetCode
+OptRetCode_VecOptRetCode
 OptimisationModelResult
 OptimisationSuccess
 OptimisationFailure

@@ -560,10 +560,8 @@ function NearOptimalSetup(; w_opt::VecNum_VecVecNum, rk_opt::Union{<:Number, <:V
                           w_min_retcode::OptimisationReturnCode,
                           w_opt_retcode::OptimisationReturnCode,
                           w_max_retcode::OptimisationReturnCode)::NearOptimalSetup
-    return NearOptimalSetup(; w_opt = w_opt, rk_opt = rk_opt, rt_opt = rt_opt,
-                            rt_min = rt_min, rt_max = rt_max, w_min = w_min, w_max = w_max,
-                            r = r, opt = opt, attrs = attrs, w_min_retcode = w_min_retcode,
-                            w_opt_retcode = w_opt_retcode, w_max_retcode = w_max_retcode)
+    return NearOptimalSetup(w_opt, rk_opt, rt_opt, rt_min, rt_max, w_min, w_max, r, opt,
+                            attrs, w_min_retcode, w_opt_retcode, w_max_retcode)
 end
 """
     near_optimal_centering_setup(noc::NearOptimalCentering, rd::ReturnsResult; dims::Int = 1)

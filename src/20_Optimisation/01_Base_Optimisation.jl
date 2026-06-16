@@ -140,6 +140,27 @@ Concrete subtypes indicate whether an optimisation succeeded or failed.
 """
 abstract type OptimisationReturnCode <: AbstractResult end
 """
+    const VecOptRetCode = AbstractVector{<:OptimisationReturnCode}
+
+Alias for a vector of optimisation return codes.
+
+# Related
+
+  - [`OptimisationReturnCode`](@ref)
+"""
+const VecOptRetCode = AbstractVector{<:OptimisationReturnCode}
+"""
+    const OptRetCode_VecOptRetCode = Union{<:OptimisationReturnCode, <:VecOptRetCode}
+
+Alias for either a single optimisation return code or a vector of return codes.
+
+# Related
+
+  - [`OptimisationReturnCode`](@ref)
+  - [`VecOptRetCode`](@ref)
+"""
+const OptRetCode_VecOptRetCode = Union{<:OptimisationReturnCode, <:VecOptRetCode}
+"""
 $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for intermediate optimisation model results.

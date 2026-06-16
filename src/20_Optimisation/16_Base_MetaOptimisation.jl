@@ -45,9 +45,8 @@ function outer_optimisation_finaliser(wb::Option{<:WeightBounds}, wf::WeightFina
     return retcode, w
 end
 function outer_optimisation_finaliser(wb::Option{<:WeightBounds}, wf::WeightFinaliser,
-                                      resi::VecOpt,
-                                      rcos::AbstractVector{<:OptimisationReturnCode},
-                                      ws::VecVecNum, wi::MatNum)
+                                      resi::VecOpt, rcos::VecOptRetCode, ws::VecVecNum,
+                                      wi::MatNum)
     retcode_w = [outer_optimisation_finaliser(wb, wf, resi, rco, w, wi)
                  for (rco, w) in zip(rcos, ws)]
     return map(x -> x[1], retcode_w), map(x -> x[2], retcode_w)

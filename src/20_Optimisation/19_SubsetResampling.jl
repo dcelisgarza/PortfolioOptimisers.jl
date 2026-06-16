@@ -65,7 +65,7 @@ $(DocStringExtensions.FIELDS)
                                     pr::Option{<:AbstractPriorResult},
                                     wb::Option{<:WeightBounds}, fees::Option{<:Fees},
                                     ress::AbstractVector{<:NonFiniteAllocationOptimisationResult},
-                                    idx::AbstractVector, retcode::OptimisationReturnCode,
+                                    idx::MatNum, retcode::OptimisationReturnCode,
                                     w::Option{<:VecNum}, fb::Option{<:OptE_Opt})
         return new{typeof(oe), typeof(pr), typeof(wb), typeof(fees), typeof(ress),
                    typeof(idx), typeof(retcode), typeof(w), typeof(fb)}(oe, pr, wb, fees,
@@ -77,7 +77,7 @@ function SubsetResamplingResult(; oe::Type{<:OptimisationEstimator},
                                 pr::Option{<:AbstractPriorResult},
                                 wb::Option{<:WeightBounds}, fees::Option{<:Fees},
                                 ress::AbstractVector{<:NonFiniteAllocationOptimisationResult},
-                                idx::AbstractVector, retcode::OptimisationReturnCode,
+                                idx::MatNum, retcode::OptimisationReturnCode,
                                 w::Option{<:VecNum},
                                 fb::Option{<:OptE_Opt})::SubsetResamplingResult
     return SubsetResamplingResult(oe, pr, wb, fees, ress, idx, retcode, w, fb)

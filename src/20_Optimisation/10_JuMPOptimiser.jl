@@ -198,8 +198,8 @@ $(DocStringExtensions.FIELDS)
     JuMPOptimisationResult(;
         oe::Type{<:JuMPOptimisationEstimator},
         pa::ProcessedJuMPOptimiserAttributes,
-        retcode::OptimisationReturnCode,
-        sol::Union{<:JuMPOptimisationSolution, <:AbstractVector{<:JuMPOptimisationSolution}},
+        retcode::OptRetCode_VecOptRetCode,
+        sol::JuMPOptSol_VecJuMPOptSol,
         model::Option{<:JuMP.Model}
     ) -> JuMPOptimisationResult
 
@@ -234,9 +234,8 @@ Keywords correspond to the struct's fields.
     model
     function JuMPOptimisationResult(oe::Type{<:JuMPOptimisationEstimator},
                                     pa::ProcessedJuMPOptimiserAttributes,
-                                    retcode::OptimisationReturnCode,
-                                    sol::Union{<:JuMPOptimisationSolution,
-                                               <:AbstractVector{<:JuMPOptimisationSolution}},
+                                    retcode::OptRetCode_VecOptRetCode,
+                                    sol::JuMPOptSol_VecJuMPOptSol,
                                     model::Option{<:JuMP.Model})
         return new{typeof(oe), typeof(pa), typeof(retcode), typeof(sol), typeof(model)}(oe,
                                                                                         pa,
@@ -247,9 +246,8 @@ Keywords correspond to the struct's fields.
 end
 function JuMPOptimisationResult(; oe::Type{<:JuMPOptimisationEstimator},
                                 pa::ProcessedJuMPOptimiserAttributes,
-                                retcode::OptimisationReturnCode,
-                                sol::Union{<:JuMPOptimisationSolution,
-                                           <:AbstractVector{<:JuMPOptimisationSolution}},
+                                retcode::OptRetCode_VecOptRetCode,
+                                sol::JuMPOptSol_VecJuMPOptSol,
                                 model::Option{<:JuMP.Model})::JuMPOptimisationResult
     return JuMPOptimisationResult(oe, pa, retcode, sol, model)
 end
