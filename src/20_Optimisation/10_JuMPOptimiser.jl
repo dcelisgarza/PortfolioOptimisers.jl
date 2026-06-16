@@ -251,22 +251,11 @@ function JuMPOptimisationResult(; oe::Type{<:JuMPOptimisationEstimator},
                                 model::Option{<:JuMP.Model})::JuMPOptimisationResult
     return JuMPOptimisationResult(oe, pa, retcode, sol, model)
 end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Access properties of [`JuMPOptimisationResult`](@ref). Virtual property `:w` extracts portfolio weights from `sol`; unknown properties forward to `pa`.
-"""
-function Base.getproperty(jr::JuMPOptimisationResult, sym::Symbol)
-    return if sym == :w
-        sol = getfield(jr, :sol)
-        !isa(sol, AbstractVector) ? getproperty(sol, :w) : getproperty.(sol, :w)
-    elseif sym in fieldnames(JuMPOptimisationResult)
-        getfield(jr, sym)
-    elseif sym in propertynames(getfield(jr, :pa))
-        getproperty(getfield(jr, :pa), sym)
-    else
-        getfield(jr, sym)
-    end
+# Virtual property `:w` extracts portfolio weights from `sol` (a single solution or a vector
+# of them, hence the broadcast); unknown properties forward to `pa` (see [`@forward_properties`](@ref)).
+@forward_properties JuMPOptimisationResult begin
+    compute(w, sol.w; broadcast)
+    forward(pa)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

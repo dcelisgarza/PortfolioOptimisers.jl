@@ -507,7 +507,7 @@ function predict_outer_nco_estimator_returns(nco::NestedClustered{<:Any, <:Any, 
     predictions = Vector{MultiPeriodPredictionResult}(undef, length(cls))
     let cv = cv
         FLoops.@floop ex for (i, cl) in enumerate(cls)
-            cvi = !hasproperty(cv, :rng) ? cv : copy(cv)
+            cvi = !hasfield(typeof(cv), :rng) ? cv : copy(cv)
             predictions[i] = cross_val_predict(opti, rd, cvi; cols = cl, ex = ex)
         end
     end
@@ -525,7 +525,7 @@ function predict_outer_nco_estimator_returns(nco::NestedClustered{<:Any, <:Any, 
     predictions = Vector{PopulationPredictionResult}(undef, length(cls))
     let cv = cv
         FLoops.@floop ex for (i, cl) in enumerate(cls)
-            cvi = !hasproperty(cv, :rng) ? cv : copy(cv)
+            cvi = !hasfield(typeof(cv), :rng) ? cv : copy(cv)
             predictions[i] = cross_val_predict(opti, rd, cvi; cols = cl, ex = ex)
         end
     end

@@ -83,6 +83,14 @@ function Base.getproperty(r::RiskJuMPOptimisationResult, sym::Symbol)
     end
 end
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Default property enumeration for [`RiskJuMPOptimisationResult`](@ref): mirrors the default `getproperty` by unioning the receiver's own field names with everything forwarded from the embedded [`JuMPOptimisationResult`](@ref) `jr` (which itself forwards `pa`). Concrete subtypes that override `getproperty` (e.g. via [`@forward_properties`](@ref)) emit their own, more-specific `propertynames`.
+"""
+function Base.propertynames(r::RiskJuMPOptimisationResult)
+    return Tuple(unique((fieldnames(typeof(r))..., propertynames(getfield(r, :jr))...)))
+end
+"""
 $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for portfolio objective functions.

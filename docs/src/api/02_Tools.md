@@ -34,6 +34,10 @@ _propagatable_bare_name
 _try_field_name
 _peel_prop_tags
 _propagatable_parse_body
+@forward_properties
+_forward_nonnothing
+_forward_flatten_path
+_forward_walk_expr
 ```
 
 ## Mathematical functions

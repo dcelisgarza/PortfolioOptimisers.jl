@@ -54,6 +54,7 @@ Base.showerror(io::IO, err::PortfolioOptimisersError)
 IsNothingError
 IsEmptyError
 IsNonFiniteError
+PropertyPathError
 ```
 
 ## Assertions

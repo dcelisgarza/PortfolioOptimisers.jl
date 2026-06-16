@@ -978,7 +978,7 @@ macro define_pretty_show(T, flag::Bool = true)
                 has_pretty_show_method(::$T) = true
             end
             function Base.show(io::IO, obj::$T)
-                fields = propertynames(obj)
+                fields = fieldnames(typeof(obj))
                 tobj = typeof(obj)
                 if isempty(fields)
                     return print(io, string(tobj, "()"), '\n')
@@ -990,15 +990,15 @@ macro define_pretty_show(T, flag::Bool = true)
                 print(io, name, '\n')
                 padding = maximum(map(length, map(string, fields))) + 2
                 for (i, field) in enumerate(fields)
-                    if hasproperty(obj, field)
+                    if hasfield(typeof(obj), field)
                         val = getproperty(obj, field)
                     else
                         continue
                     end
                     flag = has_pretty_show_method(val)
                     sym1 = ifelse(i == length(fields) &&
-                                  (!flag || (flag && isempty(propertynames(val)))), '┴',
-                                  '┼')
+                                  (!flag || (flag && isempty(fieldnames(typeof(val))))),
+                                  '┴', '┼')
                     print(io, lpad(string(field), padding), " ")
                     if isnothing(val)
                         print(io, "$(sym1) nothing", '\n')
@@ -1166,7 +1166,7 @@ Every element of a listed vector is shown as just its wrapper-type name. When th
 """
 function pretty_show_vector_element(@nospecialize(v))
     s = string(Base.typename(typeof(v)).wrapper)
-    return isempty(propertynames(v)) ? s : s * " ⋯"
+    return isempty(fieldnames(typeof(v))) ? s : s * " ⋯"
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1344,6 +1344,42 @@ Stacktrace:
   - [`IsEmptyError`](@ref)
 """
 @concrete struct IsNonFiniteError <: PortfolioOptimisersError
+    """
+    $(field_dict[:msg])
+    """
+    msg
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Exception type thrown when a [`@forward_properties`](@ref) nested path cannot be descended because an intermediate node is `nothing`.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    PropertyPathError(msg)
+
+Arguments correspond to the fields above.
+
+# Examples
+
+```jldoctest
+julia> throw(PropertyPathError("cannot descend path `sol.w` on `JuMPOptimisationResult`: intermediate `sol` is `nothing`"))
+ERROR: PropertyPathError: cannot descend path `sol.w` on `JuMPOptimisationResult`: intermediate `sol` is `nothing`
+Stacktrace:
+ [1] top-level scope
+   @ none:1
+```
+
+# Related
+
+  - [`PortfolioOptimisersError`](@ref)
+  - [`@forward_properties`](@ref)
+"""
+@concrete struct PropertyPathError <: PortfolioOptimisersError
     """
     $(field_dict[:msg])
     """
@@ -2247,4 +2283,4 @@ Alias for a union of a numeric type, an array of numeric types, or a `VecScalar`
 const Num_ArrNum_VecScalar_DynWeights = Union{<:Num_ArrNum, <:VecScalar,
                                               <:DynamicAbstractWeights}
 
-export IsEmptyError, IsNothingError, IsNonFiniteError, VecScalar
+export IsEmptyError, IsNothingError, IsNonFiniteError, PropertyPathError, VecScalar

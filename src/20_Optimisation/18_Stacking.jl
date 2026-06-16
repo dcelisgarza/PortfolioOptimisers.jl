@@ -338,7 +338,7 @@ function predict_outer_st_estimator_returns(st::Stacking{<:Any, <:Any, <:Any, <:
     predictions = Vector{MultiPeriodPredictionResult}(undef, length(opti))
     let cv = cv
         FLoops.@floop ex for (i, opt) in enumerate(opti)
-            cvi = !hasproperty(cv, :rng) ? cv : copy(cv)
+            cvi = !hasfield(typeof(cv), :rng) ? cv : copy(cv)
             predictions[i] = cross_val_predict(opt, rd, cvi; ex = ex)
         end
     end
@@ -354,7 +354,7 @@ function predict_outer_st_estimator_returns(st::Stacking{<:Any, <:Any, <:Any, <:
     predictions = Vector{PopulationPredictionResult}(undef, length(opti))
     let cv = cv
         FLoops.@floop ex for (i, opt) in enumerate(opti)
-            cvi = !hasproperty(cv, :rng) ? cv : copy(cv)
+            cvi = !hasfield(typeof(cv), :rng) ? cv : copy(cv)
             predictions[i] = cross_val_predict(opt, rd, cvi; ex = ex)
         end
     end

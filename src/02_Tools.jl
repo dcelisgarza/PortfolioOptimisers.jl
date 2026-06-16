@@ -1423,6 +1423,264 @@ macro propagatable(expr)
                end)
 end
 
+# ---------------------------------------------------------------------------
+# @forward_properties — standalone property-forwarding macro (ADR 0013)
+# ---------------------------------------------------------------------------
+
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Guard one intermediate node of a [`@forward_properties`](@ref) nested path.
+
+Return `v` unchanged when it is not `nothing`; otherwise throw a
+[`PropertyPathError`](@ref) naming the receiver type `T`, the full declared path
+`pathstr`, and the `nodestr` node that resolved to `nothing`. Called once per
+intermediate hop in the descent generated for a depth-≥2 locator.
+
+# Related
+
+  - [`@forward_properties`](@ref)
+  - [`PropertyPathError`](@ref)
+"""
+function _forward_nonnothing(v, ::Type{T}, pathstr, nodestr) where {T}
+    if isnothing(v)
+        throw(PropertyPathError("cannot descend path `$(pathstr)` on `$(T)`: intermediate `$(nodestr)` is `nothing`"))
+    end
+    return v
+end
+
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Flatten a [`@forward_properties`](@ref) locator into its path of field symbols.
+
+A bare identifier `a` becomes `[:a]`; a dotted expression `a.b.c` becomes
+`[:a, :b, :c]`. Any other expression raises an error.
+
+# Related
+
+  - [`@forward_properties`](@ref)
+  - [`_forward_walk_expr`](@ref)
+"""
+function _forward_flatten_path(expr)
+    if expr isa Symbol
+        return Symbol[expr]
+    elseif expr isa Expr && expr.head == :. && length(expr.args) == 2
+        leaf = expr.args[2]
+        leaf = leaf isa QuoteNode ? leaf.value : leaf
+        if !(leaf isa Symbol)
+            return error("@forward_properties: invalid locator leaf $(repr(expr.args[2]))")
+        end
+        return Symbol[_forward_flatten_path(expr.args[1])..., leaf]
+    else
+        return error("@forward_properties: locator must be a bare name or a dotted path (`a.b.c`), got: $(repr(expr))")
+    end
+end
+
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Build the expression that descends a [`@forward_properties`](@ref) `path` (a
+vector of field symbols) on the receiver `x`, returning the value at the path.
+
+A depth-1 path is a single `getfield`. A depth-≥2 path descends hop by hop,
+guarding every intermediate with [`_forward_nonnothing`](@ref) (keyed on the
+receiver type `struct_name`) so a `nothing` node throws a path-naming
+[`PropertyPathError`](@ref). When `broadcast` is `true`, the final hop maps over
+the penultimate value if it is an `AbstractVector` (the scalar-or-vector
+solution case), otherwise it is a plain access.
+
+# Related
+
+  - [`@forward_properties`](@ref)
+  - [`_forward_nonnothing`](@ref)
+"""
+function _forward_walk_expr(path, struct_name, broadcast::Bool)
+    if length(path) == 1
+        return :(getfield(x, $(QuoteNode(path[1]))))
+    end
+    pathstr = join(string.(path), ".")
+    stmts = Any[:(__v = getfield(x, $(QuoteNode(path[1]))))]
+    for k in 2:length(path)
+        nodestr = join(string.(path[1:(k - 1)]), ".")
+        push!(stmts, :(__v = $(_forward_nonnothing)(__v, $struct_name, $pathstr, $nodestr)))
+        leaf = QuoteNode(path[k])
+        if k == length(path) && broadcast
+            push!(stmts, :(__v = if isa(__v, AbstractVector)
+                               getproperty.(__v, $leaf)
+                           else
+                               getproperty(__v, $leaf)
+                           end))
+        else
+            push!(stmts, :(__v = getproperty(__v, $leaf)))
+        end
+    end
+    push!(stmts, :__v)
+    return Expr(:let, Expr(:block), Expr(:block, stmts...))
+end
+
+"""
+    @forward_properties T begin
+        forward(loc)
+        forward(loc, names...)
+        alias(exposed, loc)
+        compute(exposed, loc; broadcast)
+        compute(exposed, fn)
+    end
+
+Generate the `Base.getproperty` / `Base.propertynames` pair for type `T` from a
+block of declarative forwarding rules, so the property-forwarding decision lives
+in one declared surface instead of a hand-written `getproperty` body (ADR 0013).
+
+All names are written as **bare identifiers**. Every rule names its source via a
+**locator** — a bare name `a` (the field `a` of the receiver) or a dotted path
+`a.b.c` (the receiver-rooted path `obj.a.b.c`, any depth). Nesting is simply more
+dots; a depth-≥2 path guards each intermediate and throws a
+[`PropertyPathError`](@ref) naming the path when a node is `nothing`.
+
+# Rules
+
+  - `forward(loc)`: forward *all* properties of the value at `loc`
+    (`sym in propertynames(value)` ? `getproperty(value, sym)`).
+  - `forward(loc, names...)`: forward only the named subset from the value at `loc`.
+  - `alias(exposed, loc)`: expose `exposed` as the value at `loc` (renaming).
+  - `compute(exposed, loc; broadcast)`: expose `exposed` via a dotted locator
+    (depth ≥ 2); `broadcast` maps the final hop over a vector penultimate value.
+  - `compute(exposed, fn)`: expose `exposed` as `fn(obj)`; `fn` must be an
+    anonymous function (a lambda), which would otherwise be ambiguous with a
+    dotted path.
+
+# Details
+
+The generated `getproperty` checks the receiver's own `fieldnames` first (via
+`getfield`, so it never recurses), then each rule in declaration order with
+first-match-wins, then falls through to `getfield(x, sym)` (the standard "no
+field" error on `T`). The generated `propertynames` unions the own field names
+with every forwarded, subset, aliased and computed name, deduplicated.
+
+# Related
+
+  - [`PropertyPathError`](@ref)
+  - [`@propagatable`](@ref)
+"""
+macro forward_properties(T, block)
+    if !(block isa Expr && block.head == :block)
+        return error("@forward_properties: expected a `begin ... end` block of rules")
+    end
+    getprop_branches = Any[]
+    propname_contribs = Any[]
+    for stmt in block.args
+        if stmt isa LineNumberNode
+            continue
+        end
+        if !(stmt isa Expr && stmt.head == :call)
+            return error("@forward_properties: each rule must be a `forward`/`alias`/`compute` call, got: $(repr(stmt))")
+        end
+        marker = stmt.args[1]
+        args = stmt.args[2:end]
+        broadcast = false
+        if !isempty(args) && args[1] isa Expr && args[1].head == :parameters
+            for p in args[1].args
+                if p === :broadcast
+                    broadcast = true
+                else
+                    return error("@forward_properties: unknown option $(repr(p)) (only `broadcast` is supported)")
+                end
+            end
+            args = args[2:end]
+        end
+        if marker == :forward
+            if isempty(args)
+                return error("@forward_properties: `forward` needs a locator")
+            end
+            path = _forward_flatten_path(args[1])
+            walk = _forward_walk_expr(path, T, false)
+            if length(args) == 1
+                # forward all properties of the located value
+                push!(getprop_branches, quote
+                          let __c = $walk
+                              if sym in propertynames(__c)
+                                  return getproperty(__c, sym)
+                              else
+                                  false
+                              end
+                          end
+                      end)
+                push!(propname_contribs, Expr(:..., :(propertynames($walk))))
+            else
+                names = args[2:end]
+                for n in names
+                    if !(n isa Symbol)
+                        return error("@forward_properties: `forward` names must be bare identifiers, got: $(repr(n))")
+                    else
+                        true
+                    end
+                end
+                nameset = Expr(:tuple, (QuoteNode(n) for n in names)...)
+                push!(getprop_branches,
+                      :(sym in $nameset && return getproperty($walk, sym)))
+                append!(propname_contribs, (QuoteNode(n) for n in names))
+            end
+        elseif marker == :alias
+            if !(length(args) == 2)
+                return error("@forward_properties: `alias` takes `(exposed, locator)`, got: $(repr(stmt))")
+            end
+            exposed = args[1]
+            if !(exposed isa Symbol)
+                return error("@forward_properties: `alias` exposed name must be a bare identifier, got: $(repr(exposed))")
+            end
+            path = _forward_flatten_path(args[2])
+            walk = _forward_walk_expr(path, T, false)
+            push!(getprop_branches, :(sym === $(QuoteNode(exposed)) && return $walk))
+            push!(propname_contribs, QuoteNode(exposed))
+        elseif marker == :compute
+            if !(length(args) == 2)
+                return error("@forward_properties: `compute` takes `(exposed, locator|fn)`, got: $(repr(stmt))")
+            end
+            exposed = args[1]
+            if !(exposed isa Symbol)
+                return error("@forward_properties: `compute` exposed name must be a bare identifier, got: $(repr(exposed))")
+            end
+            src = args[2]
+            if src isa Expr && src.head == :->
+                if broadcast
+                    return error("@forward_properties: `broadcast` does not apply to the function form of `compute`")
+                end
+                push!(getprop_branches,
+                      :(sym === $(QuoteNode(exposed)) && return ($src)(x)))
+            elseif src isa Expr && src.head == :.
+                path = _forward_flatten_path(src)
+                walk = _forward_walk_expr(path, T, broadcast)
+                push!(getprop_branches, :(sym === $(QuoteNode(exposed)) && return $walk))
+            else
+                return error("@forward_properties: `compute` source must be a dotted path (depth ≥ 2) or an anonymous function, got: $(repr(src))")
+            end
+            push!(propname_contribs, QuoteNode(exposed))
+        else
+            return error("@forward_properties: unknown rule `$(marker)` (expected `forward`, `alias`, or `compute`)")
+        end
+    end
+    getproperty_def = quote
+        function Base.getproperty(x::$T, sym::Symbol)
+            if sym in fieldnames($T)
+                return getfield(x, sym)
+            end
+            $(getprop_branches...)
+            return getfield(x, sym)
+        end
+    end
+    propertynames_tuple = Expr(:tuple, Expr(:..., :(fieldnames($T))), propname_contribs...)
+    propertynames_def = quote
+        function Base.propertynames(x::$T)
+            return Tuple(unique($propertynames_tuple))
+        end
+    end
+    return esc(quote
+                   $getproperty_def
+                   $propertynames_def
+               end)
+end
+
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -1973,6 +2231,6 @@ function vec_to_real_measure(f::Function,
     return f(val)
 end
 
-export @propagatable, @fprop, @vprop, @pprop, @cprop, @wprop, factory,
+export @propagatable, @fprop, @vprop, @pprop, @cprop, @wprop, @forward_properties, factory,
        traverse_concrete_subtypes, concrete_typed_array, MinValue, MeanValue, MedianValue,
        MaxValue, StandardisedValue, StdValue, VarValue, SumValue, ProdValue, ModeValue

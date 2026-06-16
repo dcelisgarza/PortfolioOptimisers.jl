@@ -115,19 +115,11 @@ function RiskBudgetingResult(; jr::JuMPOptimisationResult,
                              fb::Option{<:OptE_Opt})::RiskBudgetingResult
     return RiskBudgetingResult(jr, prb, fb)
 end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Access properties of [`RiskBudgetingResult`](@ref). Unique field `prb` resolves directly; unknown properties forward into `prb` first, then delegate to the embedded [`JuMPOptimisationResult`](@ref) `jr` (the virtual `:w` and `pa` fall-through).
-"""
-function Base.getproperty(r::RiskBudgetingResult, sym::Symbol)
-    return if sym in fieldnames(RiskBudgetingResult)
-        getfield(r, sym)
-    elseif sym in propertynames(getfield(r, :prb))
-        getproperty(getfield(r, :prb), sym)
-    else
-        getproperty(getfield(r, :jr), sym)
-    end
+# Unique field `prb` resolves directly; unknown properties forward into `prb` first, then
+# into the embedded [`JuMPOptimisationResult`](@ref) `jr` (the virtual `:w` and `pa` fall-through).
+@forward_properties RiskBudgetingResult begin
+    forward(prb)
+    forward(jr)
 end
 """
 $(DocStringExtensions.TYPEDEF)

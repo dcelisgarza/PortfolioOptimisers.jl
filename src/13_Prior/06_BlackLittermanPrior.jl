@@ -158,19 +158,10 @@ function BlackLittermanPrior(;
                              tau::Option{<:Number} = nothing)::BlackLittermanPrior
     return BlackLittermanPrior(pe, mp, views, sets, views_conf, rf, tau)
 end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Access properties of [`BlackLittermanPrior`](@ref). Exposes `:me` and `:ce` from the embedded prior estimator `obj.pe` for transparent access.
-"""
-function Base.getproperty(obj::BlackLittermanPrior, sym::Symbol)
-    return if sym == :me
-        obj.pe.me
-    elseif sym == :ce
-        obj.pe.ce
-    else
-        getfield(obj, sym)
-    end
+# Expose `:me` and `:ce` from the embedded prior estimator `pe` for transparent access
+# (see [`@forward_properties`](@ref)).
+@forward_properties BlackLittermanPrior begin
+    forward(pe, me, ce)
 end
 """
     calc_omega(views_conf::Option{<:Num_VecNum}, P::MatNum,

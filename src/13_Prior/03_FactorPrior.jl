@@ -116,19 +116,10 @@ function FactorPrior(; pe::AbstractLowOrderPriorEstimator_A_AF = EmpiricalPrior(
                      rsd::Bool = true)::FactorPrior
     return FactorPrior(pe, mp, re, ve, rsd)
 end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Access properties of [`FactorPrior`](@ref). Exposes `:me` and `:ce` from the embedded asset prior estimator `obj.pe` for transparent access.
-"""
-function Base.getproperty(obj::FactorPrior, sym::Symbol)
-    return if sym == :me
-        obj.pe.me
-    elseif sym == :ce
-        obj.pe.ce
-    else
-        getfield(obj, sym)
-    end
+# Expose `:me` and `:ce` from the embedded asset prior estimator `pe` for transparent access
+# (see [`@forward_properties`](@ref)).
+@forward_properties FactorPrior begin
+    forward(pe, me, ce)
 end
 """
     prior(pe::FactorPrior, X::MatNum, F::MatNum; dims::Int = 1, kwargs...)

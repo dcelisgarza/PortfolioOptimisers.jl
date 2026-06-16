@@ -187,19 +187,10 @@ function BayesianBlackLittermanPrior(;
                                      tau::Option{<:Number} = nothing)::BayesianBlackLittermanPrior
     return BayesianBlackLittermanPrior(pe, mp, views, sets, views_conf, rf, tau)
 end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Access properties of [`BayesianBlackLittermanPrior`](@ref). Exposes `:me` and `:ce` from the embedded prior estimator `obj.pe` for transparent access.
-"""
-function Base.getproperty(obj::BayesianBlackLittermanPrior, sym::Symbol)
-    return if sym == :me
-        obj.pe.me
-    elseif sym == :ce
-        obj.pe.ce
-    else
-        getfield(obj, sym)
-    end
+# Expose `:me` and `:ce` from the embedded prior estimator `pe` for transparent access
+# (see [`@forward_properties`](@ref)).
+@forward_properties BayesianBlackLittermanPrior begin
+    forward(pe, me, ce)
 end
 """
     prior(pe::BayesianBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int = 1,

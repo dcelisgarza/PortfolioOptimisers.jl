@@ -207,19 +207,10 @@ function FactorBlackLittermanPrior(;
     return FactorBlackLittermanPrior(pe, f_mp, mp, re, ve, views, sets, views_conf, w, rf,
                                      l, tau, rsd)
 end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Access properties of [`FactorBlackLittermanPrior`](@ref). Exposes `:me` and `:ce` from the embedded prior estimator `obj.pe` for transparent access.
-"""
-function Base.getproperty(obj::FactorBlackLittermanPrior, sym::Symbol)
-    return if sym == :me
-        obj.pe.me
-    elseif sym == :ce
-        obj.pe.ce
-    else
-        getfield(obj, sym)
-    end
+# Expose `:me` and `:ce` from the embedded prior estimator `pe` for transparent access
+# (see [`@forward_properties`](@ref)).
+@forward_properties FactorBlackLittermanPrior begin
+    forward(pe, me, ce)
 end
 """
     prior(pe::FactorBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int = 1,

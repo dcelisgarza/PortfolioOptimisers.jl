@@ -299,23 +299,12 @@ function AugmentedBlackLittermanPrior(;
     return AugmentedBlackLittermanPrior(a_pe, f_pe, mp, re, a_views, f_views, a_sets,
                                         f_sets, a_views_conf, f_views_conf, w, rf, l, tau)
 end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Access properties of [`AugmentedBlackLittermanPrior`](@ref). Exposes `:me`, `:ce` from the asset prior `obj.a_pe` and `:f_me`, `:f_ce` from the factor prior `obj.f_pe` for transparent access.
-"""
-function Base.getproperty(obj::AugmentedBlackLittermanPrior, sym::Symbol)
-    return if sym == :me
-        obj.a_pe.me
-    elseif sym == :ce
-        obj.a_pe.ce
-    elseif sym == :f_me
-        obj.f_pe.me
-    elseif sym == :f_ce
-        obj.f_pe.ce
-    else
-        getfield(obj, sym)
-    end
+# Expose `:me`, `:ce` from the asset prior `a_pe` and (renamed) `:f_me`, `:f_ce` from the
+# factor prior `f_pe` for transparent access (see [`@forward_properties`](@ref)).
+@forward_properties AugmentedBlackLittermanPrior begin
+    forward(a_pe, me, ce)
+    alias(f_me, f_pe.me)
+    alias(f_ce, f_pe.ce)
 end
 """
     prior(pe::AugmentedBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int = 1,

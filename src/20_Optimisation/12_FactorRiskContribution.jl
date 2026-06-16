@@ -54,19 +54,11 @@ function FactorRiskContributionResult(; jr::JuMPOptimisationResult,
                                       fb::Option{<:OptE_Opt})::FactorRiskContributionResult
     return FactorRiskContributionResult(jr, rr, frc_plr, fb)
 end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Access properties of [`FactorRiskContributionResult`](@ref). Unique fields `rr`/`frc_plr` resolve directly; unknown properties forward into `rr` first, then delegate to the embedded [`JuMPOptimisationResult`](@ref) `jr` (the virtual `:w` and `pa` fall-through).
-"""
-function Base.getproperty(r::FactorRiskContributionResult, sym::Symbol)
-    return if sym in fieldnames(FactorRiskContributionResult)
-        getfield(r, sym)
-    elseif sym in propertynames(getfield(r, :rr))
-        getproperty(getfield(r, :rr), sym)
-    else
-        getproperty(getfield(r, :jr), sym)
-    end
+# Unique fields resolve directly; unknown properties forward into `rr` first, then into the
+# embedded [`JuMPOptimisationResult`](@ref) `jr` (the virtual `:w` and `pa` fall-through).
+@forward_properties FactorRiskContributionResult begin
+    forward(rr)
+    forward(jr)
 end
 """
 $(DocStringExtensions.TYPEDEF)

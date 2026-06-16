@@ -690,19 +690,10 @@ function EntropyPoolingPrior(; pe::AbstractLowOrderPriorEstimator_A_F_AF = Empir
                                kt_views, cov_views, rho_views, var_alpha, cvar_alpha, sets,
                                ds_opt, dm_opt, opt, w, alg)
 end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Access properties of [`EntropyPoolingPrior`](@ref). Exposes `:me` and `:ce` from the embedded prior estimator `obj.pe` for transparent access.
-"""
-function Base.getproperty(obj::EntropyPoolingPrior, sym::Symbol)
-    return if sym == :me
-        obj.pe.me
-    elseif sym == :ce
-        obj.pe.ce
-    else
-        getfield(obj, sym)
-    end
+# Expose `:me` and `:ce` from the embedded prior estimator `pe` for transparent access
+# (see [`@forward_properties`](@ref)).
+@forward_properties EntropyPoolingPrior begin
+    forward(pe, me, ce)
 end
 """
 $(DocStringExtensions.TYPEDEF)

@@ -1074,7 +1074,7 @@ Obtains the fees to use for net return calculations from an optimisation result.
   - [`Fees`](@ref)
 """
 function _extract_fees(res::OptimisationResult, fees::Option{<:Fees} = nothing)
-    if isnothing(fees) && (hasproperty(res, :fees) || hasproperty(res, :jr))
+    if isnothing(fees) && hasproperty(res, :fees)
         fees = res.fees
     end
     return fees
@@ -1121,7 +1121,7 @@ Extracts the prior result for risk calculation from an optimisation result. Chec
 function _extract_pr(res::OptimisationResult, pr::Option{<:Pr_RR} = nothing)
     return if !isnothing(pr)
         pr
-    elseif hasproperty(res, :pr) || hasproperty(res, :jr)
+    elseif hasproperty(res, :pr)
         res.pr
     else
         throw(ArgumentError("`$(nameof(typeof(res)))` has no `.pr` or `.jr.pr`; provide `pr` explicitly"))
