@@ -105,16 +105,13 @@ This method selects a window of observations from `X` (and applies observation w
 
   - [`WindowedCovariance`](@ref)
   - [`cor(ce::WindowedCovariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
+  - [`windowed_preamble`](@ref)
 """
 function Statistics.cov(ce::WindowedCovariance, X::MatNum; dims::Int = 1, mean = nothing,
                         iv::Option{<:MatNum} = nothing, kwargs...)
-    window = get_window(ce.window, X, dims)
-    X, w = moment_window_and_weights(X, ce.w, window; dims = dims, kwargs...)
-    ce = factory(ce.ce, w)
-    if !isnothing(iv) && isa(window, VecInt)
-        iv = isone(dims) ? view(iv, window, :) : view(iv, :, window)
-    end
-    return Statistics.cov(ce, X; dims = dims, mean = mean, iv = iv, kwargs...)
+    inner, X, iv = windowed_preamble(ce.ce, ce.w, ce.window, X; iv = iv, dims = dims,
+                                     kwargs...)
+    return Statistics.cov(inner, X; dims = dims, mean = mean, iv = iv, kwargs...)
 end
 """
     Statistics.cor(ce::WindowedCovariance, X::MatNum; dims::Int = 1, mean = nothing, iv::Option{<:MatNum} = nothing,
@@ -141,16 +138,13 @@ This method selects a window of observations from `X` (and applies observation w
 
   - [`WindowedCovariance`](@ref)
   - [`cov(ce::WindowedCovariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
+  - [`windowed_preamble`](@ref)
 """
 function Statistics.cor(ce::WindowedCovariance, X::MatNum; dims::Int = 1,
                         iv::Option{<:MatNum} = nothing, kwargs...)
-    window = get_window(ce.window, X, dims)
-    X, w = moment_window_and_weights(X, ce.w, window; dims = dims, kwargs...)
-    ce = factory(ce.ce, w)
-    if !isnothing(iv) && isa(window, VecInt)
-        iv = isone(dims) ? view(iv, window, :) : view(iv, :, window)
-    end
-    return Statistics.cor(ce, X; dims = dims, iv = iv, kwargs...)
+    inner, X, iv = windowed_preamble(ce.ce, ce.w, ce.window, X; iv = iv, dims = dims,
+                                     kwargs...)
+    return Statistics.cor(inner, X; dims = dims, iv = iv, kwargs...)
 end
 
 export WindowedCovariance

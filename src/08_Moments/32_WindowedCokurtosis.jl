@@ -100,16 +100,13 @@ This method selects a window of observations from `X` (and applies observation w
   - [`WindowedCokurtosis`](@ref)
   - [`Cokurtosis`](@ref)
   - [`cokurtosis`](@ref)
+  - [`windowed_preamble`](@ref)
 """
 function cokurtosis(ke::WindowedCokurtosis, X::MatNum; dims::Int = 1,
                     iv::Option{<:MatNum} = nothing, kwargs...)
-    window = get_window(ke.window, X, dims)
-    X, w = moment_window_and_weights(X, ke.w, window; dims = dims, kwargs...)
-    ke = factory(ke.ke, w)
-    if !isnothing(iv) && isa(window, VecInt)
-        iv = isone(dims) ? view(iv, window, :) : view(iv, :, window)
-    end
-    return cokurtosis(ke, X; dims = dims, iv = iv, kwargs...)
+    inner, X, iv = windowed_preamble(ke.ke, ke.w, ke.window, X; iv = iv, dims = dims,
+                                     kwargs...)
+    return cokurtosis(inner, X; dims = dims, iv = iv, kwargs...)
 end
 
 export WindowedCokurtosis

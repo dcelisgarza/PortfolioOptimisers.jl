@@ -62,6 +62,10 @@ PropertyPathError
 In order to increase correctness, robustness, and safety, we make extensive use of [defensive programming](https://en.wikipedia.org/wiki/Defensive_programming). The following functions perform some of these validations and are usually called at variable instantiation.
 
 ```@docs
+assert_nonempty
+assert_finite
+assert_nonneg
+assert_gt0
 assert_nonempty_nonneg_finite_val
 assert_nonempty_gt0_finite_val
 assert_nonempty_finite_val

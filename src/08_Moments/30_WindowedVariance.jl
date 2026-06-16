@@ -93,16 +93,13 @@ This method selects a window of observations from `X`, applies observation weigh
 
   - [`WindowedVariance`](@ref)
   - [`std(ce::WindowedVariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
+  - [`windowed_preamble`](@ref)
 """
 function Statistics.var(ce::WindowedVariance, X::MatNum; dims::Int = 1, mean = nothing,
                         iv::Option{<:MatNum} = nothing, kwargs...)
-    window = get_window(ce.window, X, dims)
-    X, w = moment_window_and_weights(X, ce.w, window; dims = dims, kwargs...)
-    ce = factory(ce.ce, w)
-    if !isnothing(iv) && isa(window, VecInt)
-        iv = isone(dims) ? view(iv, window, :) : view(iv, :, window)
-    end
-    return Statistics.var(ce, X; dims = dims, mean = mean, iv = iv, kwargs...)
+    inner, X, iv = windowed_preamble(ce.ce, ce.w, ce.window, X; iv = iv, dims = dims,
+                                     kwargs...)
+    return Statistics.var(inner, X; dims = dims, mean = mean, iv = iv, kwargs...)
 end
 """
     Statistics.var(ce::WindowedVariance, X::VecNum; mean = nothing)
@@ -125,12 +122,11 @@ This method selects a window of observations from the vector `X`, applies observ
 
   - [`WindowedVariance`](@ref)
   - [`var(ce::WindowedVariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
+  - [`windowed_preamble`](@ref)
 """
 function Statistics.var(ce::WindowedVariance, X::VecNum; mean = nothing)
-    window = get_window(ce.window, X)
-    X, w = moment_window_and_weights(X, ce.w, window)
-    ce = factory(ce.ce, w)
-    return Statistics.var(ce, X; mean = mean)
+    inner, X = windowed_preamble(ce.ce, ce.w, ce.window, X)
+    return Statistics.var(inner, X; mean = mean)
 end
 """
     Statistics.std(ce::WindowedVariance, X::MatNum; dims::Int = 1, mean = nothing, iv::Option{<:MatNum} = nothing, kwargs...)
@@ -156,16 +152,13 @@ This method selects a window of observations from `X`, applies observation weigh
 
   - [`WindowedVariance`](@ref)
   - [`var(ce::WindowedVariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
+  - [`windowed_preamble`](@ref)
 """
 function Statistics.std(ce::WindowedVariance, X::MatNum; dims::Int = 1, mean = nothing,
                         iv::Option{<:MatNum} = nothing, kwargs...)
-    window = get_window(ce.window, X, dims)
-    X, w = moment_window_and_weights(X, ce.w, window; dims = dims, kwargs...)
-    ce = factory(ce.ce, w)
-    if !isnothing(iv) && isa(window, VecInt)
-        iv = isone(dims) ? view(iv, window, :) : view(iv, :, window)
-    end
-    return Statistics.std(ce, X; dims = dims, mean = mean, iv = iv, kwargs...)
+    inner, X, iv = windowed_preamble(ce.ce, ce.w, ce.window, X; iv = iv, dims = dims,
+                                     kwargs...)
+    return Statistics.std(inner, X; dims = dims, mean = mean, iv = iv, kwargs...)
 end
 """
     Statistics.std(ce::WindowedVariance, X::VecNum; mean = nothing)
@@ -188,12 +181,11 @@ This method selects a window of observations from the vector `X`, applies observ
 
   - [`WindowedVariance`](@ref)
   - [`Statistics.std(ce::WindowedVariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
+  - [`windowed_preamble`](@ref)
 """
 function Statistics.std(ce::WindowedVariance, X::VecNum; mean = nothing)
-    window = get_window(ce.window, X)
-    X, w = moment_window_and_weights(X, ce.w, window)
-    ce = factory(ce.ce, w)
-    return Statistics.std(ce, X; mean = mean)
+    inner, X = windowed_preamble(ce.ce, ce.w, ce.window, X)
+    return Statistics.std(inner, X; mean = mean)
 end
 
 export WindowedVariance

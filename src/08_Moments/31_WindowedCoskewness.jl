@@ -101,16 +101,13 @@ This method selects a window of observations from `X` (and applies observation w
   - [`WindowedCoskewness`](@ref)
   - [`Coskewness`](@ref)
   - [`coskewness`](@ref)
+  - [`windowed_preamble`](@ref)
 """
 function coskewness(ske::WindowedCoskewness, X::MatNum; dims::Int = 1,
                     iv::Option{<:MatNum} = nothing, kwargs...)
-    window = get_window(ske.window, X, dims)
-    X, w = moment_window_and_weights(X, ske.w, window; dims = dims, kwargs...)
-    ske = factory(ske.ske, w)
-    if !isnothing(iv) && isa(window, VecInt)
-        iv = isone(dims) ? view(iv, window, :) : view(iv, :, window)
-    end
-    return coskewness(ske, X; dims = dims, iv = iv, kwargs...)
+    inner, X, iv = windowed_preamble(ske.ske, ske.w, ske.window, X; iv = iv, dims = dims,
+                                     kwargs...)
+    return coskewness(inner, X; dims = dims, iv = iv, kwargs...)
 end
 
 export WindowedCoskewness

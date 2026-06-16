@@ -369,8 +369,8 @@
         ce = PortfolioOptimisers.factory(ce0, ew)
         @test ce.ce.ce.ce.w === ew
         @test ce.ce.ce.me.w === ew
-        @test ce.ce.dn == ce0.ce.dn
-        @test ce.ce.pdm == ce0.ce.pdm
+        @test ce.ce.mp.dn == ce0.ce.mp.dn
+        @test ce.ce.mp.pdm == ce0.ce.mp.pdm
         @test isapprox(cov(DenoiseCovariance(), rd.X),
                        cov(DenoiseCovariance(), rd.X'; dims = 2))
         @test isapprox(cor(DenoiseCovariance(), rd.X),
@@ -380,8 +380,8 @@
         ce = PortfolioOptimisers.factory(ce0, ew)
         @test ce.ce.ce.ce.w === ew
         @test ce.ce.ce.me.w === ew
-        @test ce.ce.dt == ce0.ce.dt
-        @test ce.ce.pdm == ce0.ce.pdm
+        @test ce.ce.mp.dt == ce0.ce.mp.dt
+        @test ce.ce.mp.pdm == ce0.ce.mp.pdm
         @test isapprox(cov(DetoneCovariance(), rd.X),
                        cov(DetoneCovariance(), rd.X'; dims = 2))
         @test isapprox(cor(DetoneCovariance(), rd.X),
@@ -391,8 +391,8 @@
         ce = PortfolioOptimisers.factory(ce0, ew)
         @test ce.ce.ce.ce.w === ew
         @test ce.ce.ce.me.w === ew
-        @test ce.ce.alg == ce0.ce.alg
-        @test ce.ce.pdm == ce0.ce.pdm
+        @test ce.ce.mp.alg == ce0.ce.mp.alg
+        @test ce.ce.mp.pdm == ce0.ce.mp.pdm
         @test isapprox(cov(ProcessedCovariance(; alg = LoGo()), rd.X),
                        cov(ProcessedCovariance(; alg = LoGo()), rd.X'; dims = 2))
         @test isapprox(cor(ProcessedCovariance(; alg = LoGo()), rd.X),

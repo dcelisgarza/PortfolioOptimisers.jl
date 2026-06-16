@@ -103,16 +103,13 @@ This method selects a window of observations from `X` (and applies observation w
 # Related
 
   - [`WindowedExpectedReturns`](@ref)
+  - [`windowed_preamble`](@ref)
 """
 function Statistics.mean(me::WindowedExpectedReturns, X::MatNum; dims::Int = 1,
                          iv::Option{<:MatNum} = nothing, kwargs...)
-    window = get_window(me.window, X, dims)
-    X, w = moment_window_and_weights(X, me.w, window; dims = dims, kwargs...)
-    me = factory(me.me, w)
-    if !isnothing(iv) && isa(window, VecInt)
-        iv = isone(dims) ? view(iv, window, :) : view(iv, :, window)
-    end
-    return Statistics.mean(me, X; dims = dims, iv = iv, kwargs...)
+    inner, X, iv = windowed_preamble(me.me, me.w, me.window, X; iv = iv, dims = dims,
+                                     kwargs...)
+    return Statistics.mean(inner, X; dims = dims, iv = iv, kwargs...)
 end
 
 export WindowedExpectedReturns
