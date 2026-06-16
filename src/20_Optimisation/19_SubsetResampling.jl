@@ -61,6 +61,26 @@ $(DocStringExtensions.FIELDS)
     $(field_dict[:fb])
     """
     fb
+    function SubsetResamplingResult(oe::Type{<:OptimisationEstimator},
+                                    pr::Option{<:AbstractPriorResult},
+                                    wb::Option{<:WeightBounds}, fees::Option{<:Fees},
+                                    ress::AbstractVector{<:NonFiniteAllocationOptimisationResult},
+                                    idx::AbstractVector, retcode::OptimisationReturnCode,
+                                    w::Option{<:VecNum}, fb::Option{<:OptE_Opt})
+        return new{typeof(oe), typeof(pr), typeof(wb), typeof(fees), typeof(ress),
+                   typeof(idx), typeof(retcode), typeof(w), typeof(fb)}(oe, pr, wb, fees,
+                                                                        ress, idx, retcode,
+                                                                        w, fb)
+    end
+end
+function SubsetResamplingResult(; oe::Type{<:OptimisationEstimator},
+                                pr::Option{<:AbstractPriorResult},
+                                wb::Option{<:WeightBounds}, fees::Option{<:Fees},
+                                ress::AbstractVector{<:NonFiniteAllocationOptimisationResult},
+                                idx::AbstractVector, retcode::OptimisationReturnCode,
+                                w::Option{<:VecNum},
+                                fb::Option{<:OptE_Opt})::SubsetResamplingResult
+    return SubsetResamplingResult(oe, pr, wb, fees, ress, idx, retcode, w, fb)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -68,8 +88,9 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 Rebuild a [`SubsetResamplingResult`](@ref) with an updated fallback optimiser `fb`.
 """
 function factory(sr::SubsetResamplingResult, fb::Option{<:OptE_Opt})
-    return SubsetResamplingResult(sr.oe, sr.pr, sr.wb, sr.fees, sr.ress, sr.idx, sr.retcode,
-                                  sr.w, fb)
+    return SubsetResamplingResult(; oe = sr.oe, pr = sr.pr, wb = sr.wb, fees = sr.fees,
+                                  ress = sr.ress, idx = sr.idx, retcode = sr.retcode,
+                                  w = sr.w, fb = fb)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -418,8 +439,9 @@ function _optimise(sr::SubsetResampling, rd::ReturnsResult; dims::Int = 1,
                                    datatype = eltype(X))
     retcode, w = subset_resampling_finaliser(N, n_subsets, asset_idx, wb, sr.wf, ress,
                                              ress[1].w, sr.scale)
-    return SubsetResamplingResult(typeof(sr), pr, wb, fees, ress, asset_idx, retcode, w,
-                                  nothing)
+    return SubsetResamplingResult(; oe = typeof(sr), pr = pr, wb = wb, fees = fees,
+                                  ress = ress, idx = asset_idx, retcode = retcode, w = w,
+                                  fb = nothing)
 end
 """
     optimise(sr::SubsetResampling{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,

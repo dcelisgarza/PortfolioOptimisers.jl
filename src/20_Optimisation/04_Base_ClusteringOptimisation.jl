@@ -74,6 +74,24 @@ $(DocStringExtensions.FIELDS)
     $(field_dict[:fb])
     """
     fb
+    function HierarchicalResult(oe::Type{<:OptimisationEstimator},
+                                pr::Option{<:AbstractPriorResult},
+                                clr::Option{<:AbstractClusteringResult},
+                                wb::Option{<:WeightBounds}, fees::Option{<:Fees},
+                                retcode::OptimisationReturnCode, w::Option{<:VecNum},
+                                fb::Option{<:OptE_Opt})
+        return new{typeof(oe), typeof(pr), typeof(clr), typeof(wb), typeof(fees),
+                   typeof(retcode), typeof(w), typeof(fb)}(oe, pr, clr, wb, fees, retcode,
+                                                           w, fb)
+    end
+end
+function HierarchicalResult(; oe::Type{<:OptimisationEstimator},
+                            pr::Option{<:AbstractPriorResult},
+                            clr::Option{<:AbstractClusteringResult},
+                            wb::Option{<:WeightBounds}, fees::Option{<:Fees},
+                            retcode::OptimisationReturnCode, w::Option{<:VecNum},
+                            fb::Option{<:OptE_Opt})::HierarchicalResult
+    return HierarchicalResult(oe, pr, clr, wb, fees, retcode, w, fb)
 end
 """
 $(DocStringExtensions.TYPEDEF)

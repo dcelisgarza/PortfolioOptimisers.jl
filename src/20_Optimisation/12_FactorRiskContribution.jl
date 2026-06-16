@@ -9,6 +9,15 @@ $(DocStringExtensions.FIELDS)
 
 Property access delegates to the embedded [`JuMPOptimisationResult`](@ref); unknown properties forward into `rr` first, then through `jr` (including the virtual `:w` and the `pa` fall-through).
 
+# Constructors
+
+    FactorRiskContributionResult(;
+        jr::JuMPOptimisationResult, rr::AbstractRegressionResult,
+        frc_plr::Option{<:AbstractPhylogenyConstraintResult}, fb::Option{<:OptE_Opt}
+    ) -> FactorRiskContributionResult
+
+Keywords correspond to the struct's fields.
+
 # Related
 
   - [`FactorRiskContribution`](@ref)
@@ -32,6 +41,18 @@ Property access delegates to the embedded [`JuMPOptimisationResult`](@ref); unkn
     $(field_dict[:fb])
     """
     fb
+    function FactorRiskContributionResult(jr::JuMPOptimisationResult,
+                                          rr::AbstractRegressionResult,
+                                          frc_plr::Option{<:AbstractPhylogenyConstraintResult},
+                                          fb::Option{<:OptE_Opt})
+        return new{typeof(jr), typeof(rr), typeof(frc_plr), typeof(fb)}(jr, rr, frc_plr, fb)
+    end
+end
+function FactorRiskContributionResult(; jr::JuMPOptimisationResult,
+                                      rr::AbstractRegressionResult,
+                                      frc_plr::Option{<:AbstractPhylogenyConstraintResult},
+                                      fb::Option{<:OptE_Opt})::FactorRiskContributionResult
+    return FactorRiskContributionResult(jr, rr, frc_plr, fb)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -274,10 +295,15 @@ function _optimise(frc::FactorRiskContribution, rd::ReturnsResult = ReturnsResul
     set_portfolio_objective_function!(model, frc.obj, attrs.ret, frc.opt.cobj, frc,
                                       attrs.pr)
     retcode, sol = optimise_JuMP_model!(model, frc, eltype(attrs.pr.X))
-    return FactorRiskContributionResult(JuMPOptimisationResult(typeof(frc), attrs, retcode,
-                                                               sol,
-                                                               ifelse(save, model, nothing)),
-                                        rr, frc_plr, nothing)
+    return FactorRiskContributionResult(;
+                                        jr = JuMPOptimisationResult(; oe = typeof(frc),
+                                                                    pa = attrs,
+                                                                    retcode = retcode,
+                                                                    sol = sol,
+                                                                    model = ifelse(save,
+                                                                                   model,
+                                                                                   nothing)),
+                                        rr = rr, frc_plr = frc_plr, fb = nothing)
 end
 """
     optimise(frc::FactorRiskContribution{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,

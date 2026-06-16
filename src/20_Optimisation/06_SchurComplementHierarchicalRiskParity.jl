@@ -61,6 +61,29 @@ $(DocStringExtensions.FIELDS)
     $(field_dict[:fb])
     """
     fb
+    function SchurComplementHierarchicalRiskParityResult(oe::Type{<:OptimisationEstimator},
+                                                         pr::Option{<:AbstractPriorResult},
+                                                         wb::Option{<:WeightBounds},
+                                                         clr::Option{<:AbstractClusteringResult},
+                                                         gamma::Union{<:Number, <:VecNum},
+                                                         retcode::OptimisationReturnCode,
+                                                         w::Option{<:VecNum},
+                                                         fb::Option{<:OptE_Opt})
+        return new{typeof(oe), typeof(pr), typeof(wb), typeof(clr), typeof(gamma),
+                   typeof(retcode), typeof(w), typeof(fb)}(oe, pr, wb, clr, gamma, retcode,
+                                                           w, fb)
+    end
+end
+function SchurComplementHierarchicalRiskParityResult(; oe::Type{<:OptimisationEstimator},
+                                                     pr::Option{<:AbstractPriorResult},
+                                                     wb::Option{<:WeightBounds},
+                                                     clr::Option{<:AbstractClusteringResult},
+                                                     gamma::Union{<:Number, <:VecNum},
+                                                     retcode::OptimisationReturnCode,
+                                                     w::Option{<:VecNum},
+                                                     fb::Option{<:OptE_Opt})::SchurComplementHierarchicalRiskParityResult
+    return SchurComplementHierarchicalRiskParityResult(oe, pr, wb, clr, gamma, retcode, w,
+                                                       fb)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -793,8 +816,10 @@ function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:Any},
                                    strict = sh.opt.strict, datatype = eltype(X))
     w, gamma = schur_complement_weights(pr, items, wb, sh.params)
     retcode, w = finalise_weight_bounds(sh.opt.wf, wb, w)
-    return SchurComplementHierarchicalRiskParityResult(typeof(sh), pr, wb, clr, gamma,
-                                                       retcode, w, nothing)
+    return SchurComplementHierarchicalRiskParityResult(; oe = typeof(sh), pr = pr, wb = wb,
+                                                       clr = clr, gamma = gamma,
+                                                       retcode = retcode, w = w,
+                                                       fb = nothing)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -828,8 +853,10 @@ function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:AbstractVe
         gammas[i] = gamma
     end
     retcode, w = finalise_weight_bounds(sh.opt.wf, wb, w / sum(w))
-    return SchurComplementHierarchicalRiskParityResult(typeof(sh), pr, wb, clr, gammas,
-                                                       retcode, w, nothing)
+    return SchurComplementHierarchicalRiskParityResult(; oe = typeof(sh), pr = pr, wb = wb,
+                                                       clr = clr, gamma = gammas,
+                                                       retcode = retcode, w = w,
+                                                       fb = nothing)
 end
 """
     optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:Any, Nothing},

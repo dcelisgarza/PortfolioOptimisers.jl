@@ -2,6 +2,8 @@
 
 ```@docs
 ProcessedJuMPOptimiserAttributes
+JuMPOptimisationResult
+getproperty(jr::JuMPOptimisationResult, sym::Symbol)
 assert_finite_nonnegative_real_or_vec
 JuMPOptimiser
 needs_previous_weights(opt::JuMPOptimiser)
