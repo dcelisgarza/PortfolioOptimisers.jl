@@ -35,5 +35,5 @@ plot_cv_dashboard
 plot_efficient_frontier
 plot_performance_summary
 plot_rolling_drawdowns
-relevant_assetss
+relevant_assets
 ```
