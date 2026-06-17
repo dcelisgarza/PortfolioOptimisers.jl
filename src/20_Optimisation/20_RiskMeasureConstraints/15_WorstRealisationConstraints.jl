@@ -43,6 +43,9 @@ function set_wr_risk_expression!(model::JuMP.Model, X::MatNum; loss::Bool = true
     end
     sc = get_constraint_scale(model)
     net_X = set_net_portfolio_returns!(model, X; prefix = prefix)
+    if !loss
+        net_X = -net_X
+    end
     wr_risk = preg!(model, prefix, key1, JuMP.@variable(model))
     preg!(model, prefix, key2, JuMP.@constraint(model, sc * (wr_risk .+ net_X) >= 0))
     return wr_risk
