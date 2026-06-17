@@ -625,11 +625,11 @@ function estimator_to_val(::UniformValues, sets::AssetSets, ::Any = nothing,
     return range(; start = iN, stop = iN, length = N)
 end
 """
-    _eval_numeric_functions(expr)
+    eval_numeric_functions(expr)
 
 Recursively evaluate numeric functions and constants in a Julia expression.
 
-`_eval_numeric_functions` traverses a Julia expression tree and evaluates any sub-expressions that are purely numeric, including standard mathematical functions and constants (such as `Inf`). This is used to simplify constraint equations before further parsing and canonicalisation.
+`eval_numeric_functions` traverses a Julia expression tree and evaluates any sub-expressions that are purely numeric, including standard mathematical functions and constants (such as `Inf`). This is used to simplify constraint equations before further parsing and canonicalisation.
 
 # Arguments
 
@@ -653,19 +653,19 @@ Recursively evaluate numeric functions and constants in a Julia expression.
   - [`_collect_terms`](@ref)
   - [`_parse_equation`](@ref)
 """
-function _eval_numeric_functions(expr)
+function eval_numeric_functions(expr)
     return if isa(expr, Expr)
         if expr.head == :call
             fname = expr.args[1]
             # Only evaluate if all arguments are numeric
-            args = [_eval_numeric_functions(arg) for arg in expr.args[2:end]]
+            args = [eval_numeric_functions(arg) for arg in expr.args[2:end]]
             if all(x -> isa(x, Number), args)
                 Base.invokelatest(getfield(Base, fname), args...)
             else
                 Expr(:call, fname, args...)
             end
         else
-            Expr(expr.head, map(_eval_numeric_functions, expr.args)...)
+            Expr(expr.head, map(eval_numeric_functions, expr.args)...)
         end
     elseif isa(expr, Symbol) && expr == :Inf
         Inf
@@ -686,7 +686,7 @@ Expand and collect all terms from a Julia expression representing a linear const
 
 # Details
 
-  - Calls [`_collect_terms!`](@ref) internally with an initial coefficient of `1.0` and an empty vector.
+  - Calls [`collect_terms!`](@ref) internally with an initial coefficient of `1.0` and an empty vector.
   - Numeric constants are collected as `(coefficient, nothing)`.
   - Variables are collected as `(coefficient, variable_name)`.
   - Arithmetic expressions are recursively expanded and collected.
@@ -697,20 +697,20 @@ Expand and collect all terms from a Julia expression representing a linear const
 
 # Related
 
-  - [`_collect_terms!`](@ref)
+  - [`collect_terms!`](@ref)
   - [`_parse_equation`](@ref)
 """
 function _collect_terms(expr)
     terms = []
-    _collect_terms!(expr, 1.0, terms)
+    collect_terms!(expr, 1.0, terms)
     return terms
 end
 """
-    _collect_terms!(expr, coeff, terms)
+    collect_terms!(expr, coeff, terms)
 
 Recursively collect and expand terms from a Julia expression for linear constraint parsing.
 
-`_collect_terms!` traverses a Julia expression tree representing a linear equation, expanding and collecting all terms into a vector of `(coefficient, variable)` pairs. It handles numeric constants, variables, and arithmetic operations (`+`, `-`, `*`, `/`), supporting canonicalisation of linear constraint equations for further processing.
+`collect_terms!` traverses a Julia expression tree representing a linear equation, expanding and collecting all terms into a vector of `(coefficient, variable)` pairs. It handles numeric constants, variables, and arithmetic operations (`+`, `-`, `*`, `/`), supporting canonicalisation of linear constraint equations for further processing.
 
 # Arguments
 
@@ -743,7 +743,7 @@ Recursively collect and expand terms from a Julia expression for linear constrai
   - [`_collect_terms`](@ref)
   - [`_parse_equation`](@ref)
 """
-function _collect_terms!(expr, coeff, terms)
+function collect_terms!(expr, coeff, terms)
     if isa(expr, Number)
         push!(terms, (coeff * oftype(coeff, expr), nothing))
     elseif isa(expr, Symbol)
@@ -753,9 +753,9 @@ function _collect_terms!(expr, coeff, terms)
             # Multiplication: find numeric and variable part
             a, b = expr.args[2], expr.args[3]
             if isa(a, Number)
-                _collect_terms!(b, coeff * oftype(coeff, a), terms)
+                collect_terms!(b, coeff * oftype(coeff, a), terms)
             elseif isa(b, Number)
-                _collect_terms!(a, coeff * oftype(coeff, b), terms)
+                collect_terms!(a, coeff * oftype(coeff, b), terms)
             else
                 # e.g. x*y, treat as variable
                 push!(terms, (coeff, string(expr)))
@@ -763,7 +763,7 @@ function _collect_terms!(expr, coeff, terms)
         elseif expr.head == :call && expr.args[1] == :/
             a, b = expr.args[2], expr.args[3]
             if isa(b, Number)
-                _collect_terms!(a, coeff / oftype(coeff, b), terms)
+                collect_terms!(a, coeff / oftype(coeff, b), terms)
             else
                 # e.g. x/y, treat as variable
                 push!(terms, (coeff, string(expr)))
@@ -771,14 +771,14 @@ function _collect_terms!(expr, coeff, terms)
         elseif expr.head == :call && expr.args[1] == :+
             for i in 2:length(expr.args)
                 # Collect terms from addition
-                _collect_terms!(expr.args[i], coeff, terms)
+                collect_terms!(expr.args[i], coeff, terms)
             end
         elseif expr.head == :call && expr.args[1] == :-
             for i in 2:(length(expr.args) - 1)
                 # Collect terms from addition
-                _collect_terms!(expr.args[i], coeff, terms)
+                collect_terms!(expr.args[i], coeff, terms)
             end
-            _collect_terms!(expr.args[length(expr.args)], -coeff, terms)
+            collect_terms!(expr.args[length(expr.args)], -coeff, terms)
         else
             # treat as variable (e.g. sin(x))
             push!(terms, (coeff, string(expr)))
@@ -786,11 +786,11 @@ function _collect_terms!(expr, coeff, terms)
     end
 end
 """
-    _format_term(coeff, var)
+    format_term(coeff, var)
 
 Format a single term in a linear constraint equation as a string.
 
-`_format_term` takes a coefficient and a variable name and returns a string representation suitable for display in a canonicalised linear constraint equation. Handles special cases for coefficients of `1` and `-1` to avoid redundant notation.
+`format_term` takes a coefficient and a variable name and returns a string representation suitable for display in a canonicalised linear constraint equation. Handles special cases for coefficients of `1` and `-1` to avoid redundant notation.
 
 # Arguments
 
@@ -812,7 +812,7 @@ Format a single term in a linear constraint equation as a string.
   - [`_parse_equation`](@ref)
   - [`ParsingResult`](@ref)
 """
-function _format_term(coeff, var)::String
+function format_term(coeff, var)::String
     return if isone(coeff)
         "$var"
     elseif isone(-coeff)
@@ -822,11 +822,11 @@ function _format_term(coeff, var)::String
     end
 end
 """
-    _rethrow_parse_error(expr; side = :lhs)
+    rethrow_parse_error(expr; side = :lhs)
 
 Internal utility for error handling during equation parsing.
 
-`_rethrow_parse_error` is used to detect and handle incomplete or invalid expressions encountered while parsing constraint equations. It is called on both sides of an equation during parsing to ensure that the expressions are valid and complete. If an incomplete expression is detected, a `Meta.ParseError` is thrown; otherwise, the function returns `nothing`.
+`rethrow_parse_error` is used to detect and handle incomplete or invalid expressions encountered while parsing constraint equations. It is called on both sides of an equation during parsing to ensure that the expressions are valid and complete. If an incomplete expression is detected, a `Meta.ParseError` is thrown; otherwise, the function returns `nothing`.
 
 # Arguments
 
@@ -852,14 +852,14 @@ Internal utility for error handling during equation parsing.
   - [`parse_equation`](@ref)
   - [`_parse_equation`](@ref)
 """
-function _rethrow_parse_error(::Any, side = :lhs)::Nothing
+function rethrow_parse_error(::Any, side = :lhs)::Nothing
     return nothing
 end
-function _rethrow_parse_error(::Nothing, side = :lhs)::Nothing
+function rethrow_parse_error(::Nothing, side = :lhs)::Nothing
     @warn("$(side) of equation is empy, assuming zero")
     return nothing
 end
-function _rethrow_parse_error(expr::Expr, side = :lhs)::Nothing
+function rethrow_parse_error(expr::Expr, side = :lhs)::Nothing
     @argcheck(expr.head != :incomplete,
               Meta.ParseError("$side is an incomplete expression.\n$expr"))
     return nothing
@@ -899,10 +899,10 @@ Parse and canonicalise a linear constraint equation from Julia expressions.
 function _parse_equation(lhs, opstr::AbstractString, rhs,
                          datatype::DataType = Float64)::ParsingResult
     # 3. Evaluate numeric functions on both sides
-    lexpr = _eval_numeric_functions(lhs)
-    _rethrow_parse_error(lexpr, :lhs)
-    rexpr = _eval_numeric_functions(rhs)
-    _rethrow_parse_error(rexpr, :rhs)
+    lexpr = eval_numeric_functions(lhs)
+    rethrow_parse_error(lexpr, :lhs)
+    rexpr = eval_numeric_functions(rhs)
+    rethrow_parse_error(rexpr, :rhs)
 
     # 4. Move all terms to LHS: lhs - rhs == 0
     diff_expr = :($lexpr - ($rexpr))
@@ -927,7 +927,7 @@ function _parse_equation(lhs, opstr::AbstractString, rhs,
     rhs_val = -constant
 
     # 8. Format the simplified expression
-    lhs_str = join([_format_term(coeff, var)
+    lhs_str = join([format_term(coeff, var)
                     for (coeff, var) in zip(coefficients, variables)], " + ")
     lhs_str = replace(lhs_str, "+ -" => "-", "  " => " ")
     rhs_str = string(rhs_val)
@@ -1031,13 +1031,13 @@ function parse_equation(eqn::AbstractString; ops1::Tuple = ("==", "<=", ">="),
     lhs, rhs = strip.(parts)
     # 2. Parse both sides into Julia expressions
     lexpr = Meta.parse(lhs)
-    _rethrow_parse_error(lexpr, :lhs)
+    rethrow_parse_error(lexpr, :lhs)
     rexpr = Meta.parse(rhs)
-    _rethrow_parse_error(rexpr, :rhs)
+    rethrow_parse_error(rexpr, :rhs)
     return _parse_equation(lexpr, opstr, rexpr, datatype)
 end
 """
-    _has_invalid_plus(expr)
+    has_invalid_plus(expr)
 
 Check whether a Julia expression contains an invalid `+` operator in a constraint context.
 
@@ -1051,7 +1051,7 @@ Internal helper used during linear constraint parsing to detect unsupported `+` 
 
   - `Bool`: `true` if the expression contains an invalid `+`, `false` otherwise.
 """
-function _has_invalid_plus(expr)::Bool
+function has_invalid_plus(expr)::Bool
     if !(isa(expr, Expr) && expr.head == :call)
         return false
     end
@@ -1061,12 +1061,12 @@ function _has_invalid_plus(expr)::Bool
         return true
     end
     # Recurse into sub-expressions
-    return any(_has_invalid_plus(arg) for arg in expr.args[2:end] if isa(arg, Expr))
+    return any(has_invalid_plus(arg) for arg in expr.args[2:end] if isa(arg, Expr))
 end
 function parse_equation(expr::Expr; ops2::Tuple = (:call, :(==), :(<=), :(>=)),
                         datatype::DataType = Float64, kwargs...)::ParsingResult
     # Recursively check for invalid "++" pattern in the expression tree
-    @argcheck(!_has_invalid_plus(expr),
+    @argcheck(!has_invalid_plus(expr),
               Meta.ParseError("Invalid operator pattern '++' detected in equation expression:\n$expr"))
     # Ensure the expression is a call to a valid comparison operator
     @argcheck(expr.head == :call,

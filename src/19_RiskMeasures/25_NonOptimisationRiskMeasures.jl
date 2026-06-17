@@ -426,18 +426,18 @@ function port_opt_view(r::ThirdCentralMoment, i, args...)
     mu = nothing_scalar_array_view(r.mu, i)
     return ThirdCentralMoment(; w = r.w, mu = mu)
 end
-function _moment_risk(r::ThirdCentralMoment{<:Option{<:StatsBase.AbstractWeights}},
-                      val::VecNum)
+function moment_risk(r::ThirdCentralMoment{<:Option{<:StatsBase.AbstractWeights}},
+                     val::VecNum)
     val .= val .^ 3
     return isnothing(r.w) ? Statistics.mean(val) : Statistics.mean(val, r.w)
 end
 function (r::ThirdCentralMoment{<:Option{<:StatsBase.AbstractWeights}})(w::VecNum,
                                                                         X::MatNum,
                                                                         fees::Option{<:Fees} = nothing)
-    return _moment_risk(r, calc_deviations_vec(r, w, X, fees))
+    return moment_risk(r, calc_deviations_vec(r, w, X, fees))
 end
 function (r::ThirdCentralMoment{<:Option{<:StatsBase.AbstractWeights}})(x::VecNum)
-    return _moment_risk(r, calc_deviations_vec(r, x))
+    return moment_risk(r, calc_deviations_vec(r, x))
 end
 function (r::ThirdCentralMoment{<:DynamicAbstractWeights})(w::VecNum, X::MatNum,
                                                            fees::Option{<:Fees} = nothing)

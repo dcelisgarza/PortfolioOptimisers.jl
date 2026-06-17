@@ -1073,7 +1073,7 @@ Obtains the fees to use for net return calculations from an optimisation result.
   - [`OptimisationResult`](@ref)
   - [`Fees`](@ref)
 """
-function _extract_fees(res::OptimisationResult, fees::Option{<:Fees} = nothing)
+function extract_fees(res::OptimisationResult, fees::Option{<:Fees} = nothing)
     if isnothing(fees) && hasproperty(res, :fees)
         fees = res.fees
     end
@@ -1097,7 +1097,7 @@ When `pr::Pr_RR` is passed, extracts `X` from `pr.X` and delegates.
 """
 function calc_net_returns(res::OptimisationResult, X::MatNum,
                           fees::Option{<:Fees} = nothing)
-    fees = _extract_fees(res, fees)
+    fees = extract_fees(res, fees)
     return calc_net_returns(res.w, X, fees)
 end
 function calc_net_returns(res::OptimisationResult, pr::Pr_RR,
@@ -1118,7 +1118,7 @@ Extracts the prior result for risk calculation from an optimisation result. Chec
 
   - `Option{<:Pr_RR}`: The prior result to use for risk calculation, or throws an error if none is found.
 """
-function _extract_pr(res::OptimisationResult, pr::Option{<:Pr_RR} = nothing)
+function extract_pr(res::OptimisationResult, pr::Option{<:Pr_RR} = nothing)
     return if !isnothing(pr)
         pr
     elseif hasproperty(res, :pr)
@@ -1145,13 +1145,13 @@ When `pr::Pr_RR` is `nothing`, tries to extract a prior result from `res.pr` or 
 """
 function expected_risk(r::AbstractBaseRiskMeasure, res::OptimisationResult, X::MatNum,
                        fees::Option{<:Fees} = nothing; kwargs...)
-    fees = _extract_fees(res, fees)
+    fees = extract_fees(res, fees)
     return expected_risk(r, res.w, X, fees; kwargs...)
 end
 function expected_risk(r::AbstractBaseRiskMeasure, res::OptimisationResult,
                        pr::Option{<:Pr_RR} = nothing, fees::Option{<:Fees} = nothing;
                        kwargs...)
-    pr = _extract_pr(res, pr)
+    pr = extract_pr(res, pr)
     return expected_risk(r, res, pr.X, fees; kwargs...)
 end
 """

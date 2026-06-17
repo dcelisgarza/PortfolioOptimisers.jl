@@ -238,7 +238,7 @@ end
 
 ## Step 7 — Write internal/private function docstrings
 
-Use `$(DocStringExtensions.TYPEDSIGNATURES)` as the header. Include `# Arguments`, `# Returns`, and `# Examples` sections. The `# Validation` section is only needed if the function enforces preconditions.
+Use `$(DocStringExtensions.TYPEDSIGNATURES)` as the header. Include `# Arguments`, `# Returns`, and `# Examples` sections. The `# Validation` section is only needed if the function enforces preconditions. Only prefix with an underscore (`_`) if it can be confused with a variable name, there is a higher level (private or public) function/macro with the same name that calls it, or it's declared inside a function.
 
 ````julia
 """
@@ -257,7 +257,7 @@ One-sentence description.
 # Examples
 
 ```jldoctest
-julia> _internal_fn(...)
+julia> internal_fn(...)
 ...
 ```
 
@@ -265,7 +265,7 @@ julia> _internal_fn(...)
 
 - [`PublicType`](@ref)
 """
-function _internal_fn(arg1::Type1)::ReturnType
+function internal_fn(arg1::Type1)::ReturnType
     ...
 end
 

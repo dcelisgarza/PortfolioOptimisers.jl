@@ -24,11 +24,11 @@ get_linear_constraints(lcs::PR_VecPR, sets::AssetSets,
 AbstractParsingResult
 group_to_val!
 _parse_equation
-_rethrow_parse_error
-_format_term
-_collect_terms!
+rethrow_parse_error
+format_term
+collect_terms!
 _collect_terms
-_eval_numeric_functions
-_has_invalid_plus
+eval_numeric_functions
+has_invalid_plus
 port_opt_view(sets::AssetSets, i, args...)
 ```

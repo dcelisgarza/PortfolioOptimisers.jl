@@ -21,14 +21,14 @@ axis and belongs in the same machinery.
 
 The investigation surfaced several structural facts that shape the design:
 
-- **`@fprop` does not cover prior-binding.** `@fprop` emits `f = _factory_child(x.f, args...)`
+- **`@fprop` does not cover prior-binding.** `@fprop` emits `f = factory_child(x.f, args...)`
   — it threads the whole runtime value down and dispatches on the *field's own value type*.
   Prior-binding must reach into a **second object `pr` by the field's name** (`sel(r.f, pr.f)`),
-  which `_factory_child` cannot express.
+  which `factory_child` cannot express.
 - **Leaves select; composites recurse.** Leaf measures (`Variance`, the XatRisk family, …)
   do `f = sel(r.f, pr.f)`. Composites (`VarianceSkewKurtosis`) instead recurse
   `factory(r.child, pr)` — which *is* the `@fprop` shape, since risk measures are
-  `AbstractEstimator`s and `_factory_child` already recurses them.
+  `AbstractEstimator`s and `factory_child` already recurses them.
 - **The prior method shadows the general method.** `factory(x, pr::AbstractPriorResult, args...)`
   is more specific than `factory(x, args...)`, so when called with a prior the general
   `@fprop` method never runs. Therefore the prior method must *itself* thread the `@fprop`
@@ -36,8 +36,8 @@ The investigation surfaced several structural facts that shape the design:
   cleanly separate macro.
 - **`ObsWeights` factories initially rode on `@fprop`, but the two semantics collide.** A
   large existing `factory(x, w::ObsWeights)` family fills `nothing`-slots via
-  `_factory_child(::Nothing, ::ObsWeights) = w`. Tagging a weights field `@fprop` reused
-  this for free — but the same `_factory_child(::Nothing, ::ObsWeights)` method also fires
+  `factory_child(::Nothing, ::ObsWeights) = w`. Tagging a weights field `@fprop` reused
+  this for free — but the same `factory_child(::Nothing, ::ObsWeights)` method also fires
   on an `@fprop`-tagged **sub-estimator** field that happens to be `nothing` (e.g.
   `SimpleVariance(; me = nothing)`), wrongly setting it to the weights vector. Weights-
   replace (`nothing → w`) and estimator-recurse (`nothing → nothing`) are indistinguishable
@@ -47,7 +47,7 @@ The investigation surfaced several structural facts that shape the design:
   `pr.slv`. They also carry different selectors (`solver_selector`/`ucs_selector`) and,
   for solvers, a different both-`nothing` policy (throw, not `nothing`). And because
   `Solver <: AbstractEstimator` and `UcSE_UcS` are estimators/results, they already sit in
-  `_factory_child`'s recursing union, so `@fprop` would *recurse* into them rather than
+  `factory_child`'s recursing union, so `@fprop` would *recurse* into them rather than
   select.
 - **Prior results forward but do not expose `propertynames`.** `HighOrderPrior` embeds a
   `LowOrderPrior` and forwards `mu`/`sigma`/`w` via a custom `getproperty`, but
@@ -68,7 +68,7 @@ weights silently corrupts nothing-valued sub-estimator fields.
 prior) factory it is **replaced** by an incoming `ObsWeights` argument via
 `_wprop(getfield(x, :f), args...)` (`_wprop(::Any, w::ObsWeights, …) = w`, else the field
 unchanged). `@fprop` keeps only the estimator-recursion role, and the
-`_factory_child(::Nothing, w::ObsWeights) = w` shortcut is removed — so an `@fprop` sub-
+`factory_child(::Nothing, w::ObsWeights) = w` shortcut is removed — so an `@fprop` sub-
 estimator that is `nothing` now correctly stays `nothing`. Every weights field previously
 tagged `@fprop w` is re-tagged `@wprop w`. `@wprop` may stack with `@pprop` (`@pprop @wprop w`
 gives a measure both a prior factory and an `ObsWeights` factory; `@pprop` wins in the prior
@@ -81,7 +81,7 @@ result. Presence of any `@pprop` field emits a method
 `factory(x, pr::AbstractPriorResult, args...)` that processes **both** tag families:
 
 - `@pprop f` → `f = sel(getfield(x, :f), getproperty(pr, :f))`
-- `@fprop`-only `g` → `g = _factory_child(getfield(x, :g), pr, args...)`
+- `@fprop`-only `g` → `g = factory_child(getfield(x, :g), pr, args...)`
 - `@wprop`-only `w` → `w = _wprop(getfield(x, :w), args...)`
 - a field tagged both `@pprop @fprop`/`@pprop @wprop` → `@pprop` wins **in this method**.
 
@@ -148,7 +148,7 @@ not `@pprop`.
   `@fprop` method, so it must thread `@fprop` children itself — a separate macro would just
   re-read `@propagatable`'s tags, gaining nothing and risking drift.
 - **`@fprop` for `slv`/`ucs`.** Rejected: `Solver`/`UcS` are estimators already recursed by
-  `_factory_child`; `@fprop` would rebuild them instead of selecting, and the prior method
+  `factory_child`; `@fprop` would rebuild them instead of selecting, and the prior method
   threads `pr` first, not the solver.
 - **Renaming `nothing_scalar_array_selector` → `rm_pr_selector`.** Rejected as unnecessary:
   the wrapper (decision 3) gives a single emitted name without touching 162 call sites or
@@ -206,5 +206,5 @@ Staged, each independently reviewable (mirrors ADR 0010):
    `@cprop`; drop the dead `slv`-first defensive factory methods.
 4. **`@wprop` split** — fold the remaining eligible estimators into `@fprop`/`@vprop`, then
    add the `@wprop` tag and `_wprop` helper, remove the
-   `_factory_child(::Nothing, ::ObsWeights)` shortcut, and re-tag every weights field
+   `factory_child(::Nothing, ::ObsWeights)` shortcut, and re-tag every weights field
    `@fprop w` → `@wprop w`, fixing the nothing-sub-estimator collision.

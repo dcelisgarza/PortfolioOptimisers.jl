@@ -203,10 +203,10 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                                      ((net_X + b * z_var_l) .+ var_risk_l) >=
                                                      0
                                                      sc *
-                                                     ((-net_X + b * z_var_h) .+ var_risk_h) >=
+                                                     ((net_X + b * z_var_h) .+ var_risk_h) <=
                                                      0
                                                  end)
-    var_range_risk = model[key] = JuMP.@expression(model, var_risk_l + var_risk_h)
+    var_range_risk = model[key] = JuMP.@expression(model, var_risk_l - var_risk_h)
     set_risk_bounds_and_expression!(model, opt, var_range_risk, r.settings, key)
     return var_range_risk
 end

@@ -301,11 +301,11 @@ MyVarianceEstimator
 """
 abstract type AbstractVarianceEstimator <: AbstractCovarianceEstimator end
 @define_pretty_show(AbstractCovarianceEstimator)
-function _factory_child(v::AbstractCovarianceEstimator, args...; kwargs...)
+function factory_child(v::AbstractCovarianceEstimator, args...; kwargs...)
     return factory(v, args...; kwargs...)
 end
-function _factory_child(v::AbstractArray{<:AbstractCovarianceEstimator}, args...; kwargs...)
-    return [_factory_child(vi, args...; kwargs...) for vi in v]
+function factory_child(v::AbstractArray{<:AbstractCovarianceEstimator}, args...; kwargs...)
+    return [factory_child(vi, args...; kwargs...) for vi in v]
 end
 """
 $(DocStringExtensions.TYPEDEF)

@@ -12,7 +12,7 @@ concrete_typed_array
 factory(a::Union{Nothing, <:AbstractEstimator, <:AbstractAlgorithm, <:AbstractResult}, args...; kwargs...)
 get_window
 @propagatable
-_factory_child
+factory_child
 @fprop
 @vprop
 @pprop

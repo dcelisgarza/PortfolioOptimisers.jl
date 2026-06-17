@@ -243,7 +243,7 @@ Base case for the lens-building recursion: a bare symbol maps directly to an `Ac
 
 # Related
 
-  - [`_expr_to_lens_chain`](@ref)
+  - [`expr_to_lens_chain`](@ref)
   - [`parse_lens`](@ref)
 """
 _expr_to_lens(ex::Symbol) = Accessors.PropertyLens(ex)
@@ -266,13 +266,13 @@ Converts integer, symbol, or vector expression AST nodes to concrete index value
 
 # Related
 
-  - [`_expr_to_lens_chain`](@ref)
+  - [`expr_to_lens_chain`](@ref)
 """
 _eval_index(x::Integer) = x
 _eval_index(x::Symbol) = x
 _eval_index(ex::Expr)  = ex.head === :vect ? [_eval_index(a) for a in ex.args] : error("Unsupported index expression: $ex")
 """
-    _expr_to_lens_chain(ex)
+    expr_to_lens_chain(ex)
 
 Convert a Julia expression to a chain of lens accessors.
 
@@ -291,7 +291,7 @@ Internal helper for parsing hyperparameter key strings into composable Accessors
   - [`parse_lens`](@ref)
   - [`_expr_to_lens`](@ref)
 """
-function _expr_to_lens_chain(ex)
+function expr_to_lens_chain(ex)
     optics = Union{Accessors.PropertyLens, Accessors.IndexLens}[]
     while ex isa Expr
         if ex.head === :.
@@ -325,15 +325,15 @@ Converts a dotted string path (e.g., `"opt.pe.ce"`) into a composable lens for g
 
 # Related
 
-  - [`_expr_to_lens_chain`](@ref)
+  - [`expr_to_lens_chain`](@ref)
   - [`GridSearchCrossValidation`](@ref)
   - [`RandomisedSearchCrossValidation`](@ref)
 """
 function parse_lens(key::AbstractString)
-    return _expr_to_lens_chain(Meta.parse(key))
+    return expr_to_lens_chain(Meta.parse(key))
 end
 function parse_lens(key::Union{Expr, Symbol})
-    return _expr_to_lens_chain(key)
+    return expr_to_lens_chain(key)
 end
 function parse_lens(key::Union{<:ComposedFunction, <:Accessors.PropertyLens,
                                <:Accessors.IndexLens})

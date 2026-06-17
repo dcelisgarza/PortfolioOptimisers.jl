@@ -17,7 +17,7 @@ the spike into production code.
 **Decision:** fields that participate in `factory` propagation must be tagged with `@prop`
 inside the struct body. Untagged fields pass through unchanged regardless of their type.
 
-**Why:** runtime type dispatch alone (`_factory_child` dispatching on
+**Why:** runtime type dispatch alone (`factory_child` dispatching on
 `Union{<:AbstractEstimator,<:AbstractAlgorithm}`) is insufficient. A field may hold
 an eligible-typed value that should not be recursed — for example, equilibrium portfolio
 weights stored as an estimator, or a configuration-only sub-estimator. The domain
@@ -54,16 +54,16 @@ dropped. `Base.@__doc__` is the standard Julia pattern for macros that need to b
 docstring-transparent; it forwards any preceding docstring through the `@concrete`
 expansion to `Foo`.
 
-### 4. Qualified `PortfolioOptimisers.factory` and `_factory_child` in the expansion
+### 4. Qualified `PortfolioOptimisers.factory` and `factory_child` in the expansion
 
 **Decision:** the generated factory method is `PortfolioOptimisers.factory(x::Foo, ...)`
-and the per-field helper call is `PortfolioOptimisers._factory_child(...)`, both fully
+and the per-field helper call is `PortfolioOptimisers.factory_child(...)`, both fully
 qualified.
 
 **Why:** `@propagatable` is exported for external use — a user in another package can write
 `@propagatable @concrete struct MyEstimator <: AbstractEstimator ...` and their type will
 slot into PO's factory propagation chain. Unqualified names would add `factory` and
-`_factory_child` to the *user's* module, not to `PortfolioOptimisers`.
+`factory_child` to the *user's* module, not to `PortfolioOptimisers`.
 
 ### 5. `@prop` error stub
 
@@ -76,10 +76,10 @@ intended usage.
 
 ### 6. Source layout
 
-- `_factory_child` helpers: `src/02_Tools.jl`, immediately after the existing `factory`
+- `factory_child` helpers: `src/02_Tools.jl`, immediately after the existing `factory`
   fallbacks. Lives near the `factory` definitions it supports.
 - `@propagatable`, `@prop`, helpers.
-- The `AbstractCovarianceEstimator` extension of `_factory_child` (needed for the full
+- The `AbstractCovarianceEstimator` extension of `factory_child` (needed for the full
   migration) lives in `src/08_Moments/01_Base_Moments.jl` after
   `AbstractCovarianceEstimator` is defined — `02_Tools.jl` cannot reference it because
   it is included before the `08_Moments` files.

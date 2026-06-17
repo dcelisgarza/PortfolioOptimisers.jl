@@ -178,7 +178,7 @@ end
 
 When a struct is decorated with `@propagatable`, fields carry two orthogonal, stackable tags inside the struct body:
 
-- `@fprop` — **factory propagation**: the field is automatically propagated when [`factory`](@ref) is called on the enclosing struct (see `_factory_child` for dispatch rules).
+- `@fprop` — **factory propagation**: the field is automatically propagated when [`factory`](@ref) is called on the enclosing struct (see `factory_child` for dispatch rules).
 - `@vprop` — **view propagation**: the field is automatically subset when [`port_opt_view`](@ref) is called on the enclosing struct (recursing into composed children, slicing data arrays).
 
 A field may carry neither, either, or both (`@fprop @vprop field`, in either order) — the factory- and view-relevant field sets genuinely diverge (a field can be factory-propagated but view-passthrough, or vice versa). Document each in its own subsection inside `# Constructors`, placed **after** `## Validation` (or directly after "Keywords correspond to the struct's fields." when there is no `## Validation`).

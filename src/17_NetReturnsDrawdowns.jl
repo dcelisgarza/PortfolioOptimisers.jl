@@ -117,7 +117,7 @@ function calc_net_asset_returns(w::VecNum, X::MatNum, fees::Fees)
     return X ⊙ transpose(w) .- transpose(calc_asset_fees(w, fees))
 end
 """
-    _relative_cumulative_returns(X; dims = 1)
+    relative_cumulative_returns(X; dims = 1)
 
 Compute the relative cumulative returns from a return matrix.
 
@@ -134,14 +134,14 @@ Internal helper that computes cumulative returns as `cumprod(1 .+ X; dims=dims)`
 
 # Related
 
-  - [`_absolute_cumulative_returns`](@ref)
+  - [`absolute_cumulative_returns`](@ref)
   - [`relative_drawdown_arr`](@ref)
 """
-function _relative_cumulative_returns(X::ArrNum; dims::Int = 1)
+function relative_cumulative_returns(X::ArrNum; dims::Int = 1)
     return cumprod(one(eltype(X)) .+ X; dims = dims)
 end
 """
-    _absolute_cumulative_returns(X; dims = 1)
+    absolute_cumulative_returns(X; dims = 1)
 
 Compute the absolute cumulative returns from a return matrix.
 
@@ -158,10 +158,10 @@ Internal helper that computes `cumsum(X; dims=dims)`, returning the cumulative s
 
 # Related
 
-  - [`_relative_cumulative_returns`](@ref)
+  - [`relative_cumulative_returns`](@ref)
   - [`absolute_drawdown_arr`](@ref)
 """
-function _absolute_cumulative_returns(X::ArrNum; dims::Int = 1)
+function absolute_cumulative_returns(X::ArrNum; dims::Int = 1)
     return cumsum(X; dims = dims)
 end
 """
@@ -229,9 +229,9 @@ julia> cumulative_returns([0.01, 0.02, -0.01], true)
 """
 function cumulative_returns(X::ArrNum, compound::Bool = false; dims::Int = 1)
     return if !compound
-        _absolute_cumulative_returns(X; dims = dims)
+        absolute_cumulative_returns(X; dims = dims)
     else
-        _relative_cumulative_returns(X; dims = dims)
+        relative_cumulative_returns(X; dims = dims)
     end
 end
 """
@@ -258,7 +258,7 @@ Each element represents the drawdown from the running peak along the specified d
   - [`cumulative_returns`](@ref)
 """
 function absolute_drawdown_arr(X::ArrNum; cX::Bool = false, dims::Int = 1)
-    cX = !cX ? _absolute_cumulative_returns(X; dims = dims) : X
+    cX = !cX ? absolute_cumulative_returns(X; dims = dims) : X
     return cX - accumulate(max, cX; dims = dims, init = zero(eltype(X)))
 end
 """
@@ -285,7 +285,7 @@ Each element represents the relative drawdown from the running peak along the sp
   - [`cumulative_returns`](@ref)
 """
 function relative_drawdown_arr(X::ArrNum; cX::Bool = false, dims::Int = 1)
-    cX = !cX ? _relative_cumulative_returns(X; dims = dims) : X
+    cX = !cX ? relative_cumulative_returns(X; dims = dims) : X
     return cX ./ accumulate(max, cX; dims = dims, init = one(eltype(X))) .- one(eltype(X))
 end
 """
