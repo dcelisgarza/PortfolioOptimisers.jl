@@ -67,13 +67,17 @@ where ``z_\\alpha`` is the distribution quantile at level ``\\alpha`` and ``\\ma
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::ValueatRisk{<:Any, <:Any, <:Any, <:MIPValueatRisk},
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               args...; prefix::Symbol = Symbol(""), kwargs...)
+                               args...; loss::Bool = true, prefix::Symbol = Symbol(""),
+                               kwargs...)
     b = ifelse(!isnothing(r.alg.b), r.alg.b, 1e3)
     s = ifelse(!isnothing(r.alg.s), r.alg.s, 1e-5)
     @argcheck(b > s)
     key = Symbol(:var_risk_, i)
     sc = get_constraint_scale(model)
     net_X = set_net_portfolio_returns!(model, pr.X; prefix = prefix)
+    if !loss
+        net_X = -net_X
+    end
     T = length(net_X)
     var_risk, z_var = model[key], model[Symbol(:z_var_, i)] = JuMP.@variables(model,
                                                                               begin
@@ -306,9 +310,13 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::ValueatRisk{<:Any, <:Any, <:Any,
                                               <:DistributionValueatRisk},
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               args...; prefix::Symbol = Symbol(""), kwargs...)
+                               args...; loss::Bool = true, prefix::Symbol = Symbol(""),
+                               kwargs...)
     alg = r.alg
     mu = nothing_scalar_array_selector(alg.mu, pr.mu)
+    if !loss
+        mu = -mu
+    end
     G = chol_sigma_selector(model, pr, r.alg)
     w = get_w(model, prefix)
     sc = get_constraint_scale(model)

@@ -58,10 +58,14 @@ Where:
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::EntropicValueatRisk,
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               args...; prefix::Symbol = Symbol(""), kwargs...)
+                               args...; loss::Bool = true, prefix::Symbol = Symbol(""),
+                               kwargs...)
     key = Symbol(:evar_risk_, i)
     sc = get_constraint_scale(model)
     net_X = set_net_portfolio_returns!(model, pr.X; prefix = prefix)
+    if !loss
+        net_X = -net_X
+    end
     T = length(net_X)
     t_evar, z_evar, u_evar = model[Symbol(:t_evar_, i)], model[Symbol(:z_evar_, i)], model[Symbol(:u_evar_, i)] = JuMP.@variables(model,
                                                                                                                                   begin

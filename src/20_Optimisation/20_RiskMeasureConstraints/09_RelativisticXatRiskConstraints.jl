@@ -49,10 +49,14 @@ encoded via power cones ``\\mathcal{K}_{1/(1+\\kappa)}`` and ``\\mathcal{K}_{1/(
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::RelativisticValueatRisk,
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               args...; prefix::Symbol = Symbol(""), kwargs...)
+                               args...; loss::Bool = true, prefix::Symbol = Symbol(""),
+                               kwargs...)
     key = Symbol(:rlvar_risk_, i)
     sc = get_constraint_scale(model)
     net_X = set_net_portfolio_returns!(model, pr.X; prefix = prefix)
+    if !loss
+        net_X = -net_X
+    end
     T = length(net_X)
     alpha = r.alpha
     kappa = r.kappa

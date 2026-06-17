@@ -432,6 +432,9 @@ const arg_dict = Dict(
                       # Power norm parameters.
                       :pa_rm => "`pa`: Power norm parameter for the lower tail.",#
                       :pb_rm => "`pb`: Power norm parameter for the upper tail.",#
+                      # Generic Value-at-Risk range components.
+                      :loss_rm => "`loss`: Loss-side XatRisk risk measure applied to the portfolio returns.",#
+                      :gain_rm => "`gain`: Gain-side XatRisk risk measure applied to the negated portfolio returns.",#
                       # Fees.
                       :tn_fees => "`tn`: Turnover estimator or result.",#
                       :l_fees => "`l`: Long proportional fees.",#

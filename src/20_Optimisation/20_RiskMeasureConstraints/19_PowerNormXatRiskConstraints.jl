@@ -60,10 +60,14 @@ Where:
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::PowerNormValueatRisk,
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               args...; prefix::Symbol = Symbol(""), kwargs...)
+                               args...; loss::Bool = true, prefix::Symbol = Symbol(""),
+                               kwargs...)
     key = Symbol(:pvar_risk_, i)
     sc = get_constraint_scale(model)
     net_X = set_net_portfolio_returns!(model, pr.X; prefix = prefix)
+    if !loss
+        net_X = -net_X
+    end
     T = length(net_X)
     ip = inv(r.p)
     pvar_eta, pvar_t, pvar_w, pvar_v = model[Symbol(:pvar_eta_, i)], model[Symbol(:pvar_t_, i)], model[Symbol(:pvar_w_, i)], model[Symbol(:pvar_v_, i)] = JuMP.@variables(model,

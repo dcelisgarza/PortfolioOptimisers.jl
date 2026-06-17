@@ -50,10 +50,14 @@ where ``\\hat{r}_t = \\boldsymbol{x}_t^\\intercal \\boldsymbol{w}`` is the net p
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::ConditionalValueatRisk,
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               args...; prefix::Symbol = Symbol(""), kwargs...)
+                               args...; loss::Bool = true, prefix::Symbol = Symbol(""),
+                               kwargs...)
     key = Symbol(:cvar_risk_, i)
     sc = get_constraint_scale(model)
     net_X = set_net_portfolio_returns!(model, pr.X; prefix = prefix)
+    if !loss
+        net_X = -net_X
+    end
     T = length(net_X)
     var, z_cvar = model[Symbol(:var_, i)], model[Symbol(:z_cvar_, i)] = JuMP.@variables(model,
                                                                                         begin
@@ -191,12 +195,16 @@ auxiliary exceedance variables to encode the distributionally robust CVaR.
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::DistributionallyRobustConditionalValueatRisk,
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               args...; prefix::Symbol = Symbol(""), kwargs...)
+                               args...; loss::Bool = true, prefix::Symbol = Symbol(""),
+                               kwargs...)
     key = Symbol(:drcvar_risk_, i)
     sc = get_constraint_scale(model)
     w = get_w(model, prefix)
     X = pr.X
     net_X = set_net_portfolio_returns!(model, X; prefix = prefix)
+    if !loss
+        net_X = -net_X
+    end
     Xap1 = set_portfolio_returns_plus_one!(model, X; prefix = prefix)
     T, N = size(X)
 
