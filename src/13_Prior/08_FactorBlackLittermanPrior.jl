@@ -297,8 +297,8 @@ function prior(pe::FactorBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int = 
     rr = regression(pe.re, X, F)
     (; b, M) = rr
     posterior_X = F * transpose(M) .+ transpose(b)
-    (; P, Q, tau, omega) = _bl_preroll(pe.views, pe.sets, pe.views_conf, prior_sigma,
-                                       pe.tau, size(X, 1), eltype(posterior_X), strict)
+    (; P, Q, tau, omega) = bl_preroll(pe.views, pe.sets, pe.views_conf, prior_sigma, pe.tau,
+                                      size(X, 1), eltype(posterior_X), strict)
     prior_mu = if !isnothing(pe.l)
         w = if !isnothing(pe.w)
             @argcheck(length(pe.w) == size(X, 2))

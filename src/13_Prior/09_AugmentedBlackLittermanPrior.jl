@@ -368,11 +368,11 @@ function prior(pe::AugmentedBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int
     posterior_X = F * transpose(M) .+ transpose(b)
     dt = eltype(posterior_X)
     T = size(X, 1)
-    (; P, Q, tau, omega) = _bl_preroll(pe.a_views, pe.a_sets, pe.a_views_conf,
-                                       a_prior_sigma, pe.tau, T, dt, strict)
+    (; P, Q, tau, omega) = bl_preroll(pe.a_views, pe.a_sets, pe.a_views_conf, a_prior_sigma,
+                                      pe.tau, T, dt, strict)
     a_omega = omega
-    f_result = _bl_preroll(pe.f_views, pe.f_sets, pe.f_views_conf, f_prior_sigma, pe.tau, T,
-                           dt, strict)
+    f_result = bl_preroll(pe.f_views, pe.f_sets, pe.f_views_conf, f_prior_sigma, pe.tau, T,
+                          dt, strict)
     f_P, f_Q, f_omega = f_result.P, f_result.Q, f_result.omega
     aug_prior_sigma = hcat(vcat(a_prior_sigma, f_prior_sigma * transpose(M)),
                            vcat(M * f_prior_sigma, f_prior_sigma))

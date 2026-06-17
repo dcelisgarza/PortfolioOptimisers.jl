@@ -269,8 +269,8 @@ function prior(pe::BayesianBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int 
     posterior_X, prior_sigma, f_mu, f_sigma, rr = prior_result.X, prior_result.sigma,
                                                   prior_result.f_mu, prior_result.f_sigma,
                                                   prior_result.rr
-    (; P, Q, omega) = _bl_preroll(pe.views, pe.sets, pe.views_conf, f_sigma, pe.tau,
-                                  size(F, 1), eltype(posterior_X), strict)
+    (; P, Q, omega) = bl_preroll(pe.views, pe.sets, pe.views_conf, f_sigma, pe.tau,
+                                 size(F, 1), eltype(posterior_X), strict)
     (; b, M) = rr
     sigma_hat = f_sigma \ LinearAlgebra.I + transpose(P) * (omega \ P)
     mu_hat = sigma_hat \ (f_sigma \ f_mu + transpose(P) * (omega \ Q))

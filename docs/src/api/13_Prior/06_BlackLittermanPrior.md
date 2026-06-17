@@ -6,6 +6,7 @@ prior(pe::BlackLittermanPrior, X::MatNum,
                F::Option{<:MatNum} = nothing; dims::Int = 1,
                strict::Bool = false, kwargs...)
 calc_omega
+bl_preroll
 vanilla_posteriors
 remove_excl_views
 ```
