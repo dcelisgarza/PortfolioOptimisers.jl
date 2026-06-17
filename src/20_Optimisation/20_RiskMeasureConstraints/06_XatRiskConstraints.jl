@@ -75,9 +75,6 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     key = Symbol(:var_risk_, i)
     sc = get_constraint_scale(model)
     net_X = set_net_portfolio_returns!(model, pr.X; prefix = prefix)
-    if !loss
-        net_X = -net_X
-    end
     T = length(net_X)
     var_risk, z_var = model[key], model[Symbol(:z_var_, i)] = JuMP.@variables(model,
                                                                               begin
@@ -85,6 +82,10 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                                                                   [1:T],
                                                                                   (binary = true)
                                                                               end)
+    if !loss
+        net_X = -net_X
+        z_var = -z_var
+    end
     alpha = r.alpha
     wi = nothing_scalar_array_selector(r.w, pr.w)
     wi = get_observation_weights(wi, net_X)

@@ -82,7 +82,7 @@ function factory(alg::KMeansAlgorithm, w::StatsBase.AbstractWeights)::KMeansAlgo
                            kwargs = (; alg.kwargs..., weights = w))
 end
 """
-    _get_k_clusters_from_alg(alg, D, k)
+    get_k_clusters_from_alg(alg, D, k)
 
 Assign observations to `k` clusters using the specified clustering algorithm and distance matrix.
 
@@ -102,7 +102,7 @@ Internal function used by non-hierarchical clustering estimators.
 
   - [`KMeansAlgorithm`](@ref)
 """
-function _get_k_clusters_from_alg(alg::KMeansAlgorithm, D::MatNum, k::Integer)
+function get_k_clusters_from_alg(alg::KMeansAlgorithm, D::MatNum, k::Integer)
     if !isnothing(alg.seed)
         Random.seed!(alg.rng, alg.seed)
     end
@@ -153,7 +153,7 @@ function optimal_number_clusters(onc::OptimalNumberClusters{<:Any, <:Integer},
     if k > max_k
         k = max_k
     end
-    res = _get_k_clusters_from_alg(alg, D, k)
+    res = get_k_clusters_from_alg(alg, D, k)
     return res, k
 end
 function optimal_number_clusters(onc::OptimalNumberClusters{<:Any, <:SecondOrderDifference},
@@ -161,7 +161,7 @@ function optimal_number_clusters(onc::OptimalNumberClusters{<:Any, <:SecondOrder
     N = size(D, 1)
     max_k = isnothing(onc.max_k) ? floor(Int, sqrt(N)) : onc.max_k
     c1 = min(min(floor(Int, sqrt(N)), max_k) + 2, N)
-    cluster_lvls = [_get_k_clusters_from_alg(alg, D, k) for k in 1:c1]
+    cluster_lvls = [get_k_clusters_from_alg(alg, D, k) for k in 1:c1]
     measure_alg = onc.alg.alg
     W_list = Vector{eltype(D)}(undef, c1)
     W_list[1] = typemin(eltype(D))
@@ -182,7 +182,7 @@ function optimal_number_clusters(onc::OptimalNumberClusters{<:Any, <:SilhouetteS
     N = size(D, 1)
     max_k = isnothing(onc.max_k) ? floor(Int, sqrt(N)) : onc.max_k
     c1 = min(floor(Int, sqrt(N)), max_k)
-    cluster_lvls = [_get_k_clusters_from_alg(alg, D, k) for k in 1:c1]
+    cluster_lvls = [get_k_clusters_from_alg(alg, D, k) for k in 1:c1]
     measure_alg = onc.alg.alg
     W_list = Vector{eltype(D)}(undef, c1)
     for i in 2:c1

@@ -130,11 +130,13 @@ GenericValueatRiskRange
                                                  <:DistributionallyRobustConditionalValueatRisk,
                                                  <:EntropicValueatRisk,
                                                  <:RelativisticValueatRisk,
+                                                 <:WorstRealisation,
                                                  <:PowerNormValueatRisk},
                                      gain::Union{<:ValueatRisk, <:ConditionalValueatRisk,
                                                  <:DistributionallyRobustConditionalValueatRisk,
                                                  <:EntropicValueatRisk,
                                                  <:RelativisticValueatRisk,
+                                                 <:WorstRealisation,
                                                  <:PowerNormValueatRisk})
         loss = no_risk_expr_risk_measure(loss)
         gain = no_risk_expr_risk_measure(gain)
@@ -145,12 +147,12 @@ function GenericValueatRiskRange(; settings::RiskMeasureSettings = RiskMeasureSe
                                  loss::Union{<:ValueatRisk, <:ConditionalValueatRisk,
                                              <:DistributionallyRobustConditionalValueatRisk,
                                              <:EntropicValueatRisk,
-                                             <:RelativisticValueatRisk,
+                                             <:RelativisticValueatRisk, <:WorstRealisation,
                                              <:PowerNormValueatRisk} = ConditionalValueatRisk(),
                                  gain::Union{<:ValueatRisk, <:ConditionalValueatRisk,
                                              <:DistributionallyRobustConditionalValueatRisk,
                                              <:EntropicValueatRisk,
-                                             <:RelativisticValueatRisk,
+                                             <:RelativisticValueatRisk, <:WorstRealisation,
                                              <:PowerNormValueatRisk} = ConditionalValueatRisk())::GenericValueatRiskRange
     return GenericValueatRiskRange(settings, loss, gain)
 end

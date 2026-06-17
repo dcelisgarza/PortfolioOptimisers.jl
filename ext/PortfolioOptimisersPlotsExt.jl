@@ -200,14 +200,13 @@ function PortfolioOptimisers.plot_composition(w::VecNum, nx::AbstractVector = 1:
     if M > N
         sort!(view(idx, 1:N))
         fidx = view(idx, 1:N)
-        wPortfolioOptimisers.plot = [view(w, fidx); sum(view(w, view(idx, (N + 1):M)))]
-        nxPortfolioOptimisers.plot = [nx[fidx]; "Others"]
+        w_plot = [view(w, fidx); sum(view(w, view(idx, (N + 1):M)))]
+        nx_plot = [nx[fidx]; "Others"]
     else
-        wPortfolioOptimisers.plot = w
-        nxPortfolioOptimisers.plot = nx
+        w_plot = w
+        nx_plot = nx
     end
-    return bar(wPortfolioOptimisers.plot;
-               xticks = (1:length(nxPortfolioOptimisers.plot), nxPortfolioOptimisers.plot),
+    return bar(w_plot; xticks = (1:length(nx_plot), nx_plot),
                title = "Portfolio Composition", xlabel = "Asset", ylabel = "Weight",
                xrotation = 90, legend = false, kwargs...)
 end

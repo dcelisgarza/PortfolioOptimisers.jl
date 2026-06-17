@@ -35,14 +35,19 @@ where ``\\hat{r}_t = \\boldsymbol{x}_t^\\intercal \\boldsymbol{w}`` is the net p
 
   - [`set_risk_constraints!`](@ref)
 """
-function set_wr_risk_expression!(model::JuMP.Model, X::MatNum; prefix::Symbol = Symbol(""))
-    if haskey(model, Symbol(prefix, :wr_risk))
-        return model[Symbol(prefix, :wr_risk)]
+function set_wr_risk_expression!(model::JuMP.Model, X::MatNum; key::Symbol = :wr_risk,
+                                 loss::Bool = true, prefix::Symbol = Symbol(""))
+    if haskey(model, Symbol(prefix, key))
+        return model[Symbol(prefix, key)]
     end
     sc = get_constraint_scale(model)
     net_X = set_net_portfolio_returns!(model, X; prefix = prefix)
-    wr_risk = preg!(model, prefix, :wr_risk, JuMP.@variable(model))
-    preg!(model, prefix, :cwr, JuMP.@constraint(model, sc * (wr_risk .+ net_X) >= 0))
+    if !loss
+        net_X = -net_X
+    end
+    wr_risk = preg!(model, prefix, key, JuMP.@variable(model))
+    preg!(model, prefix, Symbol(:cwr, key),
+          JuMP.@constraint(model, sc * (wr_risk .+ net_X) >= 0))
     return wr_risk
 end
 """
@@ -71,12 +76,13 @@ Delegates to [`set_wr_risk_expression!`](@ref) to create `wr_risk`, then calls
 """
 function set_risk_constraints!(model::JuMP.Model, ::Any, r::WorstRealisation,
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               args...; prefix::Symbol = Symbol(""), kwargs...)
-    if haskey(model, Symbol(prefix, :wr_risk))
-        return model[Symbol(prefix, :wr_risk)]
+                               args...; loss::Bool = true, prefix::Symbol = Symbol(""),
+                               kwargs...)
+    key = ifelse(loss, :wr_risk, :wr_risk_gain)
+    if haskey(model, Symbol(prefix, key))
+        return model[Symbol(prefix, key)]
     end
-    wr_risk = set_wr_risk_expression!(model, pr.X; prefix = prefix)
-    set_risk_bounds_and_expression!(model, opt, wr_risk, r.settings,
-                                    Symbol(prefix, :wr_risk))
+    wr_risk = set_wr_risk_expression!(model, pr.X; key = key, loss = loss, prefix = prefix)
+    set_risk_bounds_and_expression!(model, opt, wr_risk, r.settings, Symbol(prefix, key))
     return wr_risk
 end

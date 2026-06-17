@@ -395,3 +395,6 @@ include(joinpath(@__DIR__, "test18_setup.jl"))
     @test issorted(rts)
     @test all(rt_min - sqrt(eps()) .<= rts .<= rt_max + sqrt(eps()))
 end
+@testset "Generic X at Range" begin
+    mr_block6()
+end
