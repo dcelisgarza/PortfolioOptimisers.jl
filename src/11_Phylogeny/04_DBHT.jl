@@ -679,8 +679,8 @@ function FindDisjoint(Adj::MatNum, Cliq::VecNum)
     T = zeros(Int, N)
     IndxTotal = 1:N
     IndxNot = findall(IndxTotal .!= Cliq[1] .&&
-                      IndxTotal .!= Cliq[2] .&&
-                      IndxTotal .!= Cliq[3])
+                          IndxTotal .!= Cliq[2] .&&
+                          IndxTotal .!= Cliq[3])
     Temp[Cliq, :] .= 0
     Temp[:, Cliq] .= 0
     SparseArrays.dropzeros!(Temp)

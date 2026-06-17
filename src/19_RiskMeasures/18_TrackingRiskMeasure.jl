@@ -236,8 +236,8 @@ function (r::TrackingRiskMeasure{<:ReturnsTracking})(X::VecNum)
     return norm_tracking(r.alg, X, benchmark, length(X))
 end
 function (r::TrackingRiskMeasure{<:WeightsTracking})(::VecNum)
-    throw(MethodError(r,
-                      "Tracking risk measure using the `WeightsTracking` algorithm cannot be computed for a prediction of portfolio returns because there are no weights."))
+    return throw(MethodError(r,
+                             "Tracking risk measure using the `WeightsTracking` algorithm cannot be computed for a prediction of portfolio returns because there are no weights."))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

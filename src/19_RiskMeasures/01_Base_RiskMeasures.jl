@@ -136,7 +136,7 @@ There is no default: every concrete [`AbstractBaseRiskMeasure`](@ref) (other tha
   - [`expected_risk`](@ref)
 """
 function risk_input_kind(r::AbstractBaseRiskMeasure)
-    throw(ArgumentError("`risk_input_kind` is not defined for `$(typeof(r))`. Every concrete `AbstractBaseRiskMeasure` must declare its input kind beside its definition by adding a method returning one of `NetReturnsInput()`, `WeightsReturnsFeesInput()`, or `WeightsInput()`."))
+    return throw(ArgumentError("`risk_input_kind` is not defined for `$(typeof(r))`. Every concrete `AbstractBaseRiskMeasure` must declare its input kind beside its definition by adding a method returning one of `NetReturnsInput()`, `WeightsReturnsFeesInput()`, or `WeightsInput()`."))
 end
 """
     (r::AbstractBaseRiskMeasure)(::VecNum)
@@ -155,7 +155,7 @@ decided up front by [`supports_precomputed_returns`](@ref), which the contract e
 [`expected_risk_from_returns`](@ref) consults before ever calling the functor.
 """
 function (r::AbstractBaseRiskMeasure)(::VecNum)
-    throw(ArgumentError("`$(typeof(r))` has no precomputed-return-series form `r(x::VecNum)`: its risk depends on portfolio weights and/or per-asset data (e.g. a variance-carrying composite such as `VarianceSkewKurtosis`). Evaluate it through `expected_risk(r, w, X, fees)` with explicit weights instead."))
+    return throw(ArgumentError("`$(typeof(r))` has no precomputed-return-series form `r(x::VecNum)`: its risk depends on portfolio weights and/or per-asset data (e.g. a variance-carrying composite such as `VarianceSkewKurtosis`). Evaluate it through `expected_risk(r, w, X, fees)` with explicit weights instead."))
 end
 """
     supports_precomputed_returns(r::AbstractBaseRiskMeasure) -> Bool
@@ -235,7 +235,7 @@ into a CI failure).
   - [`weight_independent_target`](@ref)
 """
 function supports_precomputed_returns(::WeightsReturnsFeesInput, r::AbstractBaseRiskMeasure)
-    throw(ArgumentError("`$(typeof(r))` is a `WeightsReturnsFeesInput` risk measure that does not declare `supports_precomputed_returns`. Declare it at the measure's definition site: a moment measure as `supports_precomputed_returns(r::$(typeof(r))) = weight_independent_target(r.mu)`; a weights-dependent measure (tracking, variance-carrying composite) as `supports_precomputed_returns(::$(typeof(r))) = false`."))
+    return throw(ArgumentError("`$(typeof(r))` is a `WeightsReturnsFeesInput` risk measure that does not declare `supports_precomputed_returns`. Declare it at the measure's definition site: a moment measure as `supports_precomputed_returns(r::$(typeof(r))) = weight_independent_target(r.mu)`; a weights-dependent measure (tracking, variance-carrying composite) as `supports_precomputed_returns(::$(typeof(r))) = false`."))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1015,7 +1015,7 @@ Internal helper for slicing scalar, array, or `nothing` risk/prior variables by 
   - [`port_opt_view`](@ref)
 """
 function risk_measure_nothing_scalar_array_view(::Nothing, ::Nothing, i)
-    throw(ArgumentError("Both risk_variable and prior_variable are nothing."))
+    return throw(ArgumentError("Both risk_variable and prior_variable are nothing."))
 end
 function risk_measure_nothing_scalar_array_view(risk_variable::Num_ArrNum, ::Any, i)
     return nothing_scalar_array_view(risk_variable, i)
@@ -1052,7 +1052,7 @@ function solver_selector(::Nothing, slv::Slv_VecSlv)
     return slv
 end
 function solver_selector(::Nothing, ::Nothing)
-    throw(ArgumentError("Both risk_solver and prior_solver are nothing, cannot solve JuMP model."))
+    return throw(ArgumentError("Both risk_solver and prior_solver are nothing, cannot solve JuMP model."))
 end
 """
     sel(risk_variable, source_variable)

@@ -157,7 +157,13 @@ end
 @forward_properties BlackLittermanPrior begin
     forward(pe, me, ce)
 end
-function assert_bl(views, sets, views_conf, tau)
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Assert that the Black-Litterman prior's views, sets, view confidences, and blending parameter are valid.
+"""
+function assert_bl(views::Lc_BLV, sets::Option{<:AssetSets},
+                   views_conf::Option{<:Num_VecNum}, tau::Option{<:Number})
     if isa(views, LinearConstraintEstimator)
         @argcheck(!isnothing(sets))
     end

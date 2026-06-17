@@ -1000,7 +1000,7 @@ macro define_pretty_show(T, flag::Bool = true)
                     end
                     flag = has_pretty_show_method(val)
                     sym1 = ifelse(i == length(fields) &&
-                                  (!flag || (flag && isempty(fieldnames(typeof(val))))),
+                                      (!flag || (flag && isempty(fieldnames(typeof(val))))),
                                   '┴', '┼')
                     print(io, lpad(string(field), padding), " ")
                     if isnothing(val)
