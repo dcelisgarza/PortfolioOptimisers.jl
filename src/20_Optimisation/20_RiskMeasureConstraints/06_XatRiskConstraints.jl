@@ -203,10 +203,10 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                                      ((net_X + b * z_var_l) .+ var_risk_l) >=
                                                      0
                                                      sc *
-                                                     ((net_X + b * z_var_h) .+ var_risk_h) <=
+                                                     ((-net_X + b * z_var_h) .+ var_risk_h) >=
                                                      0
                                                  end)
-    var_range_risk = model[key] = JuMP.@expression(model, var_risk_l - var_risk_h)
+    var_range_risk = model[key] = JuMP.@expression(model, var_risk_l + var_risk_h)
     set_risk_bounds_and_expression!(model, opt, var_range_risk, r.settings, key)
     return var_range_risk
 end
@@ -314,13 +314,14 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                kwargs...)
     alg = r.alg
     mu = nothing_scalar_array_selector(alg.mu, pr.mu)
-    if !loss
-        mu = -mu
-    end
     G = chol_sigma_selector(model, pr, r.alg)
     w = get_w(model, prefix)
     sc = get_constraint_scale(model)
-    z = compute_value_at_risk_z(r.alg.dist, r.alpha)
+    z = if loss
+        compute_value_at_risk_z(r.alg.dist, r.alpha)
+    else
+        compute_value_at_risk_cz(r.alg.dist, r.alpha)
+    end
     key = Symbol(:var_risk_, i)
     g_var = model[Symbol(:g_var_, i)] = JuMP.@variable(model)
     var_risk = model[key] = JuMP.@expression(model, -LinearAlgebra.dot(mu, w) + z * g_var)
@@ -328,7 +329,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                                     [sc * g_var; sc * G * w] in
                                                     JuMP.SecondOrderCone())
     set_risk_bounds_and_expression!(model, opt, var_risk, r.settings, key)
-    return var_risk
+    return loss ? var_risk : -var_risk
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

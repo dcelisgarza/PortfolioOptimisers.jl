@@ -156,7 +156,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::PowerNormValueatRis
                                                                                                                                                                                                                                                                                                                                                                   ()
                                                                                                                                                                                                                                                                                                                                                                   ()
                                                                                                                                                                                                                                                                                                                                                                   [1:T],
-                                                                                                                                                                                                                                                                                                                                                                  (upper_bound = 0)
+                                                                                                                                                                                                                                                                                                                                                                  (lower_bound = 0)
                                                                                                                                                                                                                                                                                                                                                                   [1:T]
                                                                                                                                                                                                                                                                                                                                                               end)
     wi = nothing_scalar_array_selector(r.w, pr.w)
@@ -170,7 +170,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::PowerNormValueatRis
                                                                                                0
                                                                                                sc *
                                                                                                (sum(pvar_v_h) -
-                                                                                                pvar_t_h) >=
+                                                                                                pvar_t_h) <=
                                                                                                0
                                                                                            end)
         inv(r.alpha * T^ipa), inv(r.beta * T^ipb)
@@ -186,7 +186,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::PowerNormValueatRis
                                                                                                sc *
                                                                                                (LinearAlgebra.dot(wi,
                                                                                                                   pvar_v_h) -
-                                                                                                pvar_t_h) >=
+                                                                                                pvar_t_h) <=
                                                                                                0
                                                                                            end)
         inv(r.alpha * sw^ipa), inv(r.beta * sw^ipb)
@@ -206,19 +206,20 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::PowerNormValueatRis
                                                                                                                          sc *
                                                                                                                          pvar_w_l[i]] in
                                                                                                                         JuMP.MOI.PowerCone(ipa)
+
                                                                                                                         sc *
-                                                                                                                        ((net_X +
+                                                                                                                        ((-net_X +
                                                                                                                           pvar_w_h) .+
-                                                                                                                         pvar_eta_h) <=
+                                                                                                                         pvar_eta_h) >=
                                                                                                                         0
                                                                                                                         [i = 1:T],
                                                                                                                         [sc *
-                                                                                                                         -pvar_v_h[i],
+                                                                                                                         pvar_v_h[i],
                                                                                                                          sc *
-                                                                                                                         -pvar_t_h,
+                                                                                                                         pvar_t_h,
                                                                                                                          sc *
-                                                                                                                         -pvar_w_h[i]] in
-                                                                                                                        JuMP.MOI.PowerCone(ipb)
+                                                                                                                         pvar_w_h[i]] in
+                                                                                                                        JuMP.MOI.PowerCone(ipa)
                                                                                                                     end)
     pvar_risk_l, pvar_risk_h = model[Symbol(:pvar_risk_l_, i)], model[Symbol(:pvar_risk_h_, i)] = JuMP.@expressions(model,
                                                                                                                     begin
@@ -229,7 +230,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::PowerNormValueatRis
                                                                                                                         ibT *
                                                                                                                         pvar_t_h
                                                                                                                     end)
-    pvar_range_risk = model[key] = JuMP.@expression(model, pvar_risk_l - pvar_risk_h)
+    pvar_range_risk = model[key] = JuMP.@expression(model, pvar_risk_l + pvar_risk_h)
     set_risk_bounds_and_expression!(model, opt, pvar_range_risk, r.settings, key)
     return pvar_range_risk
 end
