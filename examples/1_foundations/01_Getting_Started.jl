@@ -1,5 +1,5 @@
 #=
-# Example 1: Simple `MeanRisk` optimisation
+# Getting started: a simple `MeanRisk` optimisation
 
 Here we show a simple example of how to use `PortfolioOptimisers`. We will perform the classic Markowitz optimisation.
 =#
@@ -43,7 +43,7 @@ Import the S&P500 data from a compressed `.csv` file. We will only use the last 
 
 using CSV, TimeSeries, DataFrames
 
-X = TimeArray(CSV.File(joinpath(@__DIR__, "SP500.csv.gz")); timestamp = :Date)[(end - 252):end]
+X = TimeArray(CSV.File(joinpath(@__DIR__, "..", "SP500.csv.gz")); timestamp = :Date)[(end - 252):end]
 pretty_table(X[(end - 5):end]; formatters = [tsfmt])
 
 #=

@@ -1,7 +1,16 @@
 #=
-# Example 6: Multiple risk measures
+# Multiple risk measures
 
 This example shows how to use multiple risk measures.
+
+!!! tip "When to reach for this"
+    Reach for multiple risk measures when no single measure captures everything you care
+    about and you want one optimisation to answer to *several at once* — for example bounding
+    variance while also controlling a tail measure like CVaR or drawdown. Any
+    [`MeanRisk`](@ref) optimisation accepts a vector of risk measures, each with its own
+    settings, so the objective and constraints can blend them rather than forcing you to pick
+    one. If you instead want to trade several criteria off against each other across many
+    portfolios, see the Pareto-surface example.
 =#
 using PortfolioOptimisers, PrettyTables
 ## Format for pretty tables.
@@ -28,7 +37,7 @@ We will use the same data as the previous example.
 
 using CSV, TimeSeries, DataFrames
 
-X = TimeArray(CSV.File(joinpath(@__DIR__, "SP500.csv.gz")); timestamp = :Date)[(end - 252):end]
+X = TimeArray(CSV.File(joinpath(@__DIR__, "..", "SP500.csv.gz")); timestamp = :Date)[(end - 252):end]
 pretty_table(X[(end - 5):end]; formatters = [tsfmt])
 
 ## Compute the returns
@@ -245,3 +254,14 @@ plot_stacked_bar_composition(results, rd)
 #=
 Note how the max scalariser produced the same weights as the negative skewness and the min scalariser produced the same weights as the variance. This is because in all cases, the same the value of the negative skewness was greater than that of the variance. A similar behaviour can be observed with other clustering optimisers. [`NearOptimalCentering`](@ref) can also have unintuitive behaviour when computing the risk bounds with an effective frontier [`MaxScalariser`](@ref) and [`MinScalariser`](@ref) due to the fact that each point in the efficient frontier can have a different risk measure dominating the others.
 =#
+
+#src ## Findings (authoring dogfooding — stripped from rendered docs)
+#src - Page runs end-to-end (6 covariance estimators incl. MutualInfo/Distance, equal-weight
+#src   + scalariser HERC sweeps, dendrogram/cluster/composition plots). Results match the
+#src   narrative (Max collapses to NegativeSkewness-only, Min to Variance-only).
+#src - PLOTTING DEPRECATION (record-only per hybrid policy → issue #125): `plot_clusters`
+#src   emits `Warning: Keyword argument `orientation` is deprecated. Please use `permute`
+#src   instead.` Origin: ext/PortfolioOptimisersPlotsExt.jl:468, the sideways `dend2`
+#src   (`orientation = :horizontal`). Likely fix `permute = (:x, :y)`, but it interacts with
+#src   the `xlim = extrema(heights)`/`yflip`/`xrotation` on the same call, so it needs a
+#src   rendered visual check before changing — not fixed blind here.

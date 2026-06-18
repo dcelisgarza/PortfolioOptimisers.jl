@@ -1,7 +1,16 @@
 #=
-# Example 7: Risk factor optimisation
+# Factor priors
 
 This example shows how to use factor models to perform optimisations. These reduce the estimation error by modelling asset returns as a function of common risk factors.
+
+!!! tip "When to reach for this"
+    Reach for a factor prior when you have a set of common risk factors (style, macro, or
+    statistical) and want the asset moments *implied by* a regression onto them rather than
+    estimated freely. By expressing the ``N`` assets through a handful of factors, the factor
+    model slashes the number of parameters and the estimation error — especially valuable when
+    the asset count is large relative to the history. If you have no meaningful factors, or a
+    long history relative to the universe, a denoised empirical prior (see the covariance and
+    higher-moment examples) is simpler.
 =#
 using PortfolioOptimisers, PrettyTables
 ## Format for pretty tables.
@@ -42,10 +51,10 @@ We will use the same data as the previous example. But we will also load factor 
 
 using CSV, TimeSeries, DataFrames
 
-X = TimeArray(CSV.File(joinpath(@__DIR__, "SP500.csv.gz")); timestamp = :Date)[(end - 252):end]
+X = TimeArray(CSV.File(joinpath(@__DIR__, "..", "SP500.csv.gz")); timestamp = :Date)[(end - 252):end]
 pretty_table(X[(end - 5):end]; formatters = [tsfmt])
 
-F = TimeArray(CSV.File(joinpath(@__DIR__, "Factors.csv.gz")); timestamp = :Date)[(end - 252):end]
+F = TimeArray(CSV.File(joinpath(@__DIR__, "..", "Factors.csv.gz")); timestamp = :Date)[(end - 252):end]
 pretty_table(F[(end - 5):end]; formatters = [tsfmt])
 
 ## Compute the returns
@@ -482,3 +491,12 @@ plot_stacked_bar_composition(ress, rd)
 #=
 These findings are again consistent with the previous result, and reflective of the higher condition numbers of the factor-based higher order statistics. The next example will explore ways of reducing the estimation error.
 =#
+
+#src ## Findings (authoring dogfooding — stripped from rendered docs)
+#src - Sweep clean (ADR 0014 retrofit): the renamed factor-priors page runs end-to-end with the
+#src   factor data, building empirical vs step-wise vs dimension-reduction factor priors and
+#src   comparing them across MeanRisk frontiers. Added the "When to reach for this" callout.
+#src - OBSERVATION (not a defect): the factor priors reproduce the empirical expected returns
+#src   on this data (`prs[1].mu ≈ prs[2].mu ≈ prs[3].mu`), so the factor-model benefit here is
+#src   concentrated in the covariance/high-order structure rather than the mean. Worth a sentence
+#src   in the prose if the page is revisited. Rolled up to #126.

@@ -1,5 +1,5 @@
 #=
-# Example 11: Hyper parameter tuning
+# Hyperparameter tuning
 
 Hyper parameter tuning is a powerful technique to choose parameters based on their performance on test folds. In this example, we will showcase the two implemented approaches implemented in PortfolioOptimisers.jl.
 =#
@@ -30,7 +30,7 @@ Cross validation cannot have precomputed values like we have done in previous ex
 
 using CSV, TimeSeries, DataFrames, Clarabel, Statistics, StableRNGs, Distributions
 
-X = TimeArray(CSV.File(joinpath(@__DIR__, "SP500.csv.gz")); timestamp = :Date)[(end - 252 * 5):end]
+X = TimeArray(CSV.File(joinpath(@__DIR__, "..", "SP500.csv.gz")); timestamp = :Date)[(end - 252 * 5):end]
 pretty_table(X[(end - 5):end]; formatters = [tsfmt])
 
 ## Compute the returns

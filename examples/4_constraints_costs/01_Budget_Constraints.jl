@@ -1,5 +1,5 @@
 #=
-# Example 5: Budget constraints
+# Budget constraints
 
 This example shows how to use basic budget constraints.
 
@@ -38,7 +38,7 @@ We will use the same data as the previous example.
 
 using CSV, TimeSeries, DataFrames
 
-X = TimeArray(CSV.File(joinpath(@__DIR__, "SP500.csv.gz")); timestamp = :Date)[(end - 252):end]
+X = TimeArray(CSV.File(joinpath(@__DIR__, "..", "SP500.csv.gz")); timestamp = :Date)[(end - 252):end]
 pretty_table(X[(end - 5):end]; formatters = [tsfmt])
 
 ## Compute the returns

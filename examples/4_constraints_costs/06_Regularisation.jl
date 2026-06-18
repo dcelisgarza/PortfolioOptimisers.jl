@@ -1,5 +1,5 @@
 #=
-# Example 9: Regularisation
+# Regularisation
 
 This example shows one of the simplest ways to improve the robustness of portfolios, regularisation penalties.
 =#
@@ -42,7 +42,7 @@ We will use the same data as the previous example.
 
 using CSV, TimeSeries, DataFrames, Clarabel
 
-X = TimeArray(CSV.File(joinpath(@__DIR__, "SP500.csv.gz")); timestamp = :Date)[(end - 252):end]
+X = TimeArray(CSV.File(joinpath(@__DIR__, "..", "SP500.csv.gz")); timestamp = :Date)[(end - 252):end]
 pretty_table(X[(end - 5):end]; formatters = [tsfmt])
 
 ## Compute the returns

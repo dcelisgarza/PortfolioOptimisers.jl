@@ -1,7 +1,15 @@
 #=
-# Example 2: `MeanRisk` objectives
+# `MeanRisk` objectives
 
 In this example we will show the different objective functions available in `MeanRisk`, and compare them to a benchmark.
+
+!!! tip "When to reach for this"
+    [`MeanRisk`](@ref) is the workhorse optimiser: reach for it whenever you want to express
+    a portfolio as an explicit *trade-off between expected return and risk* and let a single
+    objective pick the point — minimise risk, maximise return, maximise the risk-adjusted
+    ratio, or maximise a risk-averse utility. If you instead want to *allocate risk itself*
+    rather than trade it against return, see [`RiskBudgeting`](@ref); if you want the whole
+    trade-off curve rather than one point, see the efficient-frontier example.
 =#
 
 using PortfolioOptimisers, PrettyTables
@@ -29,7 +37,7 @@ We will use the same data as the previous example.
 
 using CSV, TimeSeries, DataFrames
 
-X = TimeArray(CSV.File(joinpath(@__DIR__, "SP500.csv.gz")); timestamp = :Date)[(end - 252):end]
+X = TimeArray(CSV.File(joinpath(@__DIR__, "..", "SP500.csv.gz")); timestamp = :Date)[(end - 252):end]
 pretty_table(X[(end - 5):end]; formatters = [tsfmt])
 
 ## Compute the returns
@@ -149,3 +157,9 @@ plot_risk_contribution(r, res1, rd)
 #=
 We can see that indeed, the minimum risk produces the portfolio with minimum risk, the maximum ratio produces the portfolio with the maximum risk-return ratio, and the maximum return portfolio produces the portfolio with the maximum return.
 =#
+
+#src ## Findings (authoring dogfooding — stripped from rendered docs)
+#src - Sweep clean (ADR 0014 retrofit): full page runs end-to-end on the docs env with no
+#src   errors or warnings. All four objectives + InverseVolatility benchmark solve, and the
+#src   expected_risk_ret_ratio table confirms each objective does what it claims. No doc,
+#src   ergonomics, plotting, or bug findings. Group rollup: issue #125.

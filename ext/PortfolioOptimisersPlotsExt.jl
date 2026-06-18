@@ -1140,6 +1140,7 @@ function PortfolioOptimisers.plot_risk_contribution(r::PortfolioOptimisers.Abstr
                                                     delta::Number = 1e-6,
                                                     marginal::Bool = false,
                                                     percentage::Bool = false,
+                                                    erc::Bool = true,
                                                     N::Option{<:Number} = nothing,
                                                     kwargs...)
     if !(delta > zero(delta))
@@ -1152,7 +1153,12 @@ function PortfolioOptimisers.plot_risk_contribution(r::PortfolioOptimisers.Abstr
     if percentage
         rc = rc ./ sum(rc)
     end
-    return PortfolioOptimisers.plot_composition(rc, nx; N = N, kwargs...)
+    plt = PortfolioOptimisers.plot_composition(rc, nx; N = N, ylabel = "Contribution",
+                                               title = "Risk Contribution", kwargs...)
+    if erc
+        plt = hline!(plt, [mean(rc)])
+    end
+    return plt
 end
 ## ────────────────────────────────────────────────────────────────────────────
 ## Factor risk contribution

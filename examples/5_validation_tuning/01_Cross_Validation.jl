@@ -1,5 +1,5 @@
 #=
-# Example 10: Cross validation
+# Cross validation
 
 Cross validation is a powerful technique to evaluate the performance of a model on unseen data. In this example, we will showcase the different cross validation methods available in PortfolioOptimisers.jl and how to use them to evaluate the performance of our portfolio optimization models.
 
@@ -33,7 +33,7 @@ Cross validation cannot have precomputed values like we have done in previous ex
 
 using CSV, TimeSeries, DataFrames, Clarabel, Statistics
 
-X = TimeArray(CSV.File(joinpath(@__DIR__, "SP500.csv.gz")); timestamp = :Date)[(end - 252 * 5):end]
+X = TimeArray(CSV.File(joinpath(@__DIR__, "..", "SP500.csv.gz")); timestamp = :Date)[(end - 252 * 5):end]
 pretty_table(X[(end - 5):end]; formatters = [tsfmt])
 
 ## Compute the returns

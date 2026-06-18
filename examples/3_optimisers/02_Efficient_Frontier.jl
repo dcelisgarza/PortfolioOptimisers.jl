@@ -1,7 +1,15 @@
 #=
-# Example 3: Efficient frontier
+# Efficient frontier
 
 In this example we will show how to compute efficient frontiers using the `MeanRisk` and `NearOptimalCentering` estimators.
+
+!!! tip "When to reach for this"
+    Reach for an efficient frontier when you do not want to commit to a single risk/return
+    point up front — you want to *see the whole trade-off curve* and choose a portfolio by
+    eye, hand it to a stakeholder, or feed the sweep to a downstream selection rule. It is
+    the natural next step once you understand the [`MeanRisk`](@ref) objectives: instead of
+    one objective value, you sweep the risk/return frontier. For more than two competing
+    criteria, see the Pareto-surface example.
 =#
 
 using PortfolioOptimisers, PrettyTables
@@ -29,7 +37,7 @@ We will use the same data as the previous example.
 
 using CSV, TimeSeries, DataFrames
 
-X = TimeArray(CSV.File(joinpath(@__DIR__, "SP500.csv.gz")); timestamp = :Date)[(end - 252):end]
+X = TimeArray(CSV.File(joinpath(@__DIR__, "..", "SP500.csv.gz")); timestamp = :Date)[(end - 252):end]
 pretty_table(X[(end - 5):end]; formatters = [tsfmt])
 
 ## Compute the returns
@@ -112,3 +120,9 @@ plot_measures(res1.w, res1.pr; x = r, y = ConditionalDrawdownatRisk(),
               c = RiskRatioRiskMeasure(; r1 = ConditionalDrawdownatRisk(), r2 = r),
               title = "Pareto Front", xlabel = "CVaR", ylabel = "CDaR",
               colorbar_title = "\nCDaR/CVaR Ratio", right_margin = 6Plots.mm)
+
+#src ## Findings (authoring dogfooding — stripped from rendered docs)
+#src - Sweep clean (ADR 0014 retrofit): the 30-point CVaR frontier solves with all points
+#src   OptimisationSuccess (the two-solver fallback vector handles the harder points), and
+#src   both plot_measures Pareto views render. No doc, ergonomics, plotting, or bug findings.
+#src   Group rollup: issue #125.

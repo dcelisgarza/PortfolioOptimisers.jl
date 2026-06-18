@@ -1,7 +1,14 @@
 #=
-# Example 4: Pareto surface
+# Pareto surface
 
 This example kicks up the complexity a couple of notches. We will introduce a new optimisation estimator, `NearOptimalCentering` optimiser.
+
+!!! tip "When to reach for this"
+    Reach for a Pareto surface when a single risk/return frontier is not enough because you
+    are trading off *more than two* competing criteria at once (e.g. two different risk
+    measures alongside return). Where the efficient frontier sweeps a curve, this sweeps a
+    surface/volume/hypervolume, exposing the full set of non-dominated portfolios. It builds directly on the
+    efficient-frontier example — reach for that first if two criteria suffice.
 =#
 
 using PortfolioOptimisers, PrettyTables
@@ -29,7 +36,7 @@ We will use the same data as the previous example.
 
 using CSV, TimeSeries, DataFrames
 
-X = TimeArray(CSV.File(joinpath(@__DIR__, "SP500.csv.gz")); timestamp = :Date)[(end - 252):end]
+X = TimeArray(CSV.File(joinpath(@__DIR__, "..", "SP500.csv.gz")); timestamp = :Date)[(end - 252):end]
 pretty_table(X[(end - 5):end]; formatters = [tsfmt])
 
 ## Compute the returns
@@ -221,3 +228,13 @@ plot_measures(res3.w, pr; x = r1, y = r2,
                                           rt = ArithmeticReturn(), rf = rf),
               title = "Pareto Front", xlabel = "Sqrt NSkew", ylabel = "Sqrt Kurt",
               colorbar_title = "\n\nCDaR/Return", right_margin = 8Plots.mm)
+
+#src ## Findings (authoring dogfooding — stripped from rendered docs)
+#src - Sweep clean (ADR 0014 retrofit): the high-order prior (denoised cov + cokurtosis +
+#src   coskewness), the two single-measure NOC bound optimisations, and the 5×5 = 25-point
+#src   NegativeSkewness×Kurtosis NOC surface all solve, with res3.retcode an
+#src   OptimisationSuccess. Both 3D surface and 2D front render. No findings.
+#src - NOTE (cross-ref, not a defect): this page already exercises NearOptimalCentering as a
+#src   frontier/surface engine; the dedicated 08_Near_Optimal_Centering page should focus on
+#src   NOC's *neighbourhood-centering* behaviour vs plain MeanRisk rather than re-deriving a
+#src   surface, to avoid overlap. Group rollup: issue #125.

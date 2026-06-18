@@ -48,6 +48,26 @@ end
 
 fix_suffix_md(filename) = replace(filename, ".jl" => ".md")
 
+# Display labels for the pipeline-stage example groups (see ADR 0014). Subdirectories not
+# listed here fall back to a derived title-case label.
+const GROUP_LABELS = Dict("1_foundations" => "Foundations",
+                          "2_moments_priors" => "Moments & Priors",
+                          "3_optimisers" => "Optimisers",
+                          "4_constraints_costs" => "Constraints & Costs",
+                          "5_validation_tuning" => "Validation & Tuning",
+                          "6_post_processing" => "Post-processing",
+                          "7_putting_it_together" => "Putting It Together")
+
+function group_label(dir)
+    return get(GROUP_LABELS, dir,
+               titlecase(replace(replace(dir, r"^\d+_" => ""), "_" => " ")))
+end
+
+# Build the Documenter page list for a narrative section (user guide or examples).
+# Top-level `.jl` files become flat pages (e.g. the section intro); each subdirectory
+# becomes a nested group of pages, in directory-name order. Shared data files live in the
+# section root and are copied into the build root so `@example` blocks in any subdirectory
+# resolve `../<data>` at build time (ADR 0014).
 function generate_files(source::String, build::String, diff_flag::Bool)
     function postprocess(cont)
         return """
@@ -57,28 +77,46 @@ function generate_files(source::String, build::String, diff_flag::Bool)
 
     src_path = joinpath(@__DIR__, source)
     build_path = joinpath(@__DIR__, "src", build)
-    files = readdir(src_path)
-    code_files = filter(x -> endswith(x, ".jl"), files)
-    data_files = filter(x -> (endswith(x, ".csv") || endswith(x, ".csv.gz")), files)
-    pages = fix_suffix_md.(build .* code_files)
+    mkpath(build_path)
 
-    for file in data_files
-        if isempty(String(read(Cmd(`git diff $(joinpath(@__DIR__, source, file))`))))
+    for file in readdir(src_path)
+        if !(endswith(file, ".csv") || endswith(file, ".csv.gz"))
             continue
         end
-        cp(joinpath(@__DIR__, source, file), joinpath(@__DIR__, "src", build, file);
-           force = true)
+        cp(joinpath(src_path, file), joinpath(build_path, file); force = true)
     end
 
-    for file in code_files
-        if diff_flag &&
-           isempty(String(read(Cmd(`git diff $(joinpath(@__DIR__, source, file))`))))
+    # Render one Literate source: markdown into the build dir, notebook next to the source.
+    # Returns the page path relative to docs/src.
+    function process(jl, src_dir_abs, out_build_abs, rel_build)
+        if !(diff_flag &&
+             isempty(String(read(Cmd(`git diff $(joinpath(src_dir_abs, jl))`)))))
+            Literate.markdown(joinpath(src_dir_abs, jl), out_build_abs;
+                              preprocess = pre_process_content_md,
+                              postprocess = postprocess, documenter = true, credit = true)
+            Literate.notebook(joinpath(src_dir_abs, jl), src_dir_abs;
+                              preprocess = pre_process_content_nb, documenter = true,
+                              credit = true)
+        end
+        return joinpath(rel_build, fix_suffix_md(jl))
+    end
+
+    code_files(dir) = sort(filter(x -> endswith(x, ".jl"), readdir(dir)))
+
+    pages = String[]
+    for jl in code_files(src_path)
+        push!(pages, process(jl, src_path, build_path, build))
+    end
+    for d in sort(filter(x -> isdir(joinpath(src_path, x)), readdir(src_path)))
+        group_src = joinpath(src_path, d)
+        group_build = joinpath(build_path, d)
+        mkpath(group_build)
+        group_pages = [process(jl, group_src, group_build, joinpath(build, d))
+                       for jl in code_files(group_src)]
+        if isempty(group_pages)
             continue
         end
-        Literate.markdown(src_path * file, build_path; preprocess = pre_process_content_md,
-                          postprocess = postprocess, documenter = true, credit = true)
-        Literate.notebook(src_path * file, src_path; preprocess = pre_process_content_nb,
-                          documenter = true, credit = true)
+        push!(pages, group_label(d) => group_pages)
     end
 
     return pages
