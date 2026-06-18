@@ -334,17 +334,17 @@ const arg_dict = Dict(
                       :p_pool => "`p`: Opinion pooling blending parameter.",#
                       # Entropy pooling.
                       :mu_views => "`mu_views`: Expected returns views estimator or result.",#
-                      :var_views => "`var_views`: Variance views estimator or result.",#
+                      :var_views => "`var_views`: Value-at-risk views estimator or result.",#
                       :cvar_views => "`cvar_views`: Conditional value-at-risk views estimator or result.",#
-                      :sigma_views => "`sigma_views`: Covariance views estimator or result.",#
-                      :sk_views => "`sk_views`: Coskewness views estimator or result.",#
-                      :kt_views => "`kt_views`: Cokurtosis views estimator or result.",#
+                      :sigma_views => "`sigma_views`: Variance views estimator or result.",#
+                      :sk_views => "`sk_views`: Skewness views estimator or result.",#
+                      :kt_views => "`kt_views`: Kurtosis views estimator or result.",#
                       :cov_views => "`cov_views`: Covariance views estimator or result.",#
                       :rho_views => "`rho_views`: Correlation views estimator or result.",#
                       :var_alpha => "`var_alpha`: Quantile level for variance views.",#
                       :cvar_alpha => "`cvar_alpha`: Quantile level for conditional value-at-risk views.",#
-                      :ds_opt => "`ds_opt`: Dual sigma optimisation estimator.",#
-                      :dm_opt => "`dm_opt`: Dual mean optimisation estimator.",#
+                      :ds_opt => "`ds_opt`: Thin wrapper for arguments and keyword arguments used in `Roots.findzero` for use with a single conditional value-at-risk view.",#
+                      :dm_opt => "`dm_opt`: Optimiser for multiple conditional value at risk views.",#
                       :opt_ep => "`opt`: Entropy pooling optimisation estimator.",#
                       # Black-Litterman views.
                       :P => "`P`: Views loading matrix `views × assets`.",#

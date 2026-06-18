@@ -1600,6 +1600,7 @@ function ep_cvar_views_solve!(cvar_views::LinearConstraintEstimator, epc::Abstra
         err = if N == 1
             sum(wi[.!iszero.(pos_part)]) - alpha
         else
+            #! Customise with different norms (see L2Tracking).
             LinearAlgebra.norm([ConditionalValueatRisk(; alpha = alpha, w = wi)(view(X, :,
                                                                                      i)) -
                                 B[i] for i in 1:N]) / sqrt(N)
