@@ -103,7 +103,7 @@ function generate_files(source::String, build::String, diff_flag::Bool)
 
     code_files(dir) = sort(filter(x -> endswith(x, ".jl"), readdir(dir)))
 
-    pages = String[]
+    pages = []
     for jl in code_files(src_path)
         push!(pages, process(jl, src_path, build_path, build))
     end

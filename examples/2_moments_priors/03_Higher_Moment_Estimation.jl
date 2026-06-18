@@ -136,11 +136,18 @@ pretty_table(DataFrame(["Assets" => rd.nx;
              title = "Minimum skew / kurtosis weights by prior")
 
 #=
-The composition plot contrasts the skew-minimising portfolios across the three priors.
+The composition plot contrasts the negative skew-minimising portfolios across the three priors.
 =#
 
 plot_stacked_bar_composition([r for (_, r) in ress_sk], rd;
                              xticks = (1:length(ress_sk), [k for (k, _) in ress_sk]))
+
+#=
+The composition plot contrasts the kurtosis-minimising portfolios across the three priors.
+=#
+
+plot_stacked_bar_composition([r for (_, r) in ress_kt], rd;
+                             xticks = (1:length(ress_kt), [k for (k, _) in ress_kt]))
 
 #src ## Findings (authoring dogfooding — stripped from rendered docs)
 #src - Page runs end-to-end (split from ex08, focused on the high-order tensors). Headline

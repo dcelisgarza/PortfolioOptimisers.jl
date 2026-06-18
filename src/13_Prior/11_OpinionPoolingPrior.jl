@@ -365,7 +365,10 @@ function prior(pe::OpinionPoolingPrior, X::MatNum, F::Option{<:MatNum} = nothing
     rw = one(eltype(ow)) - sum(ow)
     if rw > eps(typeof(rw))
         pw = Matrix{eltype(X)}(undef, T, M + 1)
-        push!(ow, rw)
+        # `ow` may alias the struct's `pe.w`; build a new vector instead of `push!`ing
+        # into it so repeated `prior` calls do not grow the stored weights (and so the
+        # uniform-weight `range` branch, which is immutable, also works).
+        ow = vcat(ow, rw)
         pw[:, end] .= inv(T)
     else
         pw = Matrix{eltype(X)}(undef, T, M)

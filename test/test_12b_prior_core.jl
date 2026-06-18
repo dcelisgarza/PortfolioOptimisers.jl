@@ -650,4 +650,33 @@ end
                                    w = [0.5, 0.5], alg = LogarithmicOpinionPooling(),
                                    p = 5), rd)
     @test isapprox(pr.mu[1], 0.002511023272287914, rtol = 1e-6)
+
+    # Regression: prior(OpinionPoolingPrior) must not mutate the stored weights `w`.
+    # `w` sums to < 1 so the uniform-prior remainder branch is exercised; calling `prior`
+    # twice on the same estimator used to grow `w` (via `push!` on an aliased vector),
+    # throwing `length(w) == length(pes)` on the second call.
+    opp = OpinionPoolingPrior(;
+                              pes = [EntropyPoolingPrior(; sets = sets,
+                                                         mu_views = LinearConstraintEstimator(;
+                                                                                              val = "AAPL == prior(AAPL)*1.5")),
+                                     EntropyPoolingPrior(; sets = sets,
+                                                         mu_views = LinearConstraintEstimator(;
+                                                                                              val = "AAPL == prior(AAPL)*2"))],
+                              w = [0.3, 0.3])
+    pr_a = prior(opp, rd)
+    @test length(opp.w) == 2
+    pr_b = prior(opp, rd)
+    @test length(opp.w) == 2
+    @test isapprox(pr_a.mu, pr_b.mu)
+
+    # Uniform-weight branch (`w === nothing`) also hits the remainder path and must not error.
+    pr_unif = prior(OpinionPoolingPrior(;
+                                        pes = [EntropyPoolingPrior(; sets = sets,
+                                                                   mu_views = LinearConstraintEstimator(;
+                                                                                                        val = "AAPL == prior(AAPL)*1.5")),
+                                               EntropyPoolingPrior(; sets = sets,
+                                                                   mu_views = LinearConstraintEstimator(;
+                                                                                                        val = "AAPL == prior(AAPL)*2"))]),
+                    rd)
+    @test all(isfinite, pr_unif.mu)
 end

@@ -5,7 +5,7 @@ every time the documentation is built (see `[docs/generate_type_hierarchy.jl](ht
 so they always reflect the current state of the package. Each type links to
 its docstring.
 
-## [`AbstractResult`](@id type-hierarchy-AbstractResult)
+## [AbstractResult](@id type-hierarchy-AbstractResult)
 
 ```@raw html
 <div class="type-tree">
@@ -189,7 +189,7 @@ its docstring.
 </div>
 ```
 
-## [`AbstractEstimator`](@id type-hierarchy-AbstractEstimator)
+## [AbstractEstimator](@id type-hierarchy-AbstractEstimator)
 
 ```@raw html
 <div class="type-tree">
@@ -268,6 +268,8 @@ its docstring.
 │&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;├──&nbsp;[EntropicValueatRisk](@ref)
 
 │&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;├──&nbsp;[EntropicValueatRiskRange](@ref)
+
+│&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;├──&nbsp;[GenericValueatRiskRange](@ref)
 
 │&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;├──&nbsp;[Kurtosis](@ref)
 
@@ -699,7 +701,7 @@ its docstring.
 </div>
 ```
 
-## [`AbstractAlgorithm`](@id type-hierarchy-AbstractAlgorithm)
+## [AbstractAlgorithm](@id type-hierarchy-AbstractAlgorithm)
 
 ```@raw html
 <div class="type-tree">
@@ -1157,7 +1159,7 @@ its docstring.
 </div>
 ```
 
-## [`AbstractCovarianceEstimator`](@id type-hierarchy-AbstractCovarianceEstimator)
+## [AbstractCovarianceEstimator](@id type-hierarchy-AbstractCovarianceEstimator)
 
 ```@raw html
 <div class="type-tree">
@@ -1187,10 +1189,6 @@ its docstring.
 
 ├──&nbsp;[Covariance](@ref)
 
-├──&nbsp;[DenoiseCovariance](@ref)
-
-├──&nbsp;[DetoneCovariance](@ref)
-
 ├──&nbsp;[DistanceCovariance](@ref)
 
 ├──&nbsp;[GeneralCovariance](@ref)
@@ -1202,8 +1200,6 @@ its docstring.
 ├──&nbsp;[MutualInfoCovariance](@ref)
 
 ├──&nbsp;[PortfolioOptimisersCovariance](@ref)
-
-├──&nbsp;[ProcessedCovariance](@ref)
 
 ├──&nbsp;[RankCovarianceEstimator](@ref)
 

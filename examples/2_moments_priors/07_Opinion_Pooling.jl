@@ -216,10 +216,11 @@ plot_stacked_bar_composition([res_emp, res_op], rd; xticks = (1:2, ["Empirical",
 #src   remainder to the uniform prior). Both verified to move mu on the real SP500 slice via
 #src   kaimon (session bc3429ca): linear≠log; lowering the weight total monotonically pulls
 #src   AAPL from +3.75 bps (total 1.0) back to −5.26 bps (total 0.4) toward empirical −11.26.
-#src - BUG/GOTCHA (→ #126): prior(OpinionPoolingPrior) MUTATES the `pes` vector in place (appends
-#src   the uniform/empirical prior), so reusing one `pes` array across two prior() calls throws
-#src   `length(w) == length(pes)` (len grows to 5 on a 4-opinion pool). Worked around in the
-#src   examples by passing fresh literals. Should copy `pes` internally before extending.
+#src - BUG FIXED this session (→ #126): prior(OpinionPoolingPrior) used to MUTATE the stored
+#src   weights `pe.w` in place — `ow = pe.w` aliased it and `push!(ow, rw)` grew it when
+#src   sum(w)<1, so a second prior() call threw `length(w) == length(pes)`. Fixed in
+#src   src/13_Prior/11_OpinionPoolingPrior.jl by `ow = vcat(ow, rw)` (also fixes the uniform
+#src   `range` branch, which was immutable). Regression test added in test_12b_prior_core.jl.
 #src - FINDING (→ #126): robust pooling `p` had NEGLIGIBLE effect here — even an extreme outlier
 #src   (AMD == 0.006) at p∈{1.0,0.5,0.1,0.01} moved pooled mu by ~1e-14 (machine eps) and sigma
 #src   likewise. The KL discount reshapes scenario probabilities but barely propagates into the
