@@ -39,8 +39,8 @@ Validate that asset or factor names and their corresponding returns matrix are p
 
   - [`ReturnsResult`](@ref)
 """
-function _check_names_and_returns_matrix(names::Option{<:VecStr}, mat::Option{<:MatNum},
-                                         names_sym::Symbol, mat_sym::Symbol)
+function check_names_and_returns_matrix(names::Option{<:VecStr}, mat::Option{<:MatNum},
+                                        names_sym::Symbol, mat_sym::Symbol)
     if !(isnothing(names) && isnothing(mat))
         @argcheck(!isnothing(names),
                   IsNothingError("$names_sym cannot be nothing if $mat_sym is not `nothing`. Got\n!isnothing($names_sym) => $(isnothing(names))\n!isnothing($mat_sym) => $(isnothing(mat))"))
@@ -161,12 +161,12 @@ ReturnsResult
                            F::Option{<:MatNum}, nb::Option{<:VecStr},
                            B::Option{<:VecNum_MatNum}, ts::Option{<:VecDate},
                            iv::Option{<:MatNum}, ivpa::Option{<:Num_VecNum})
-        _check_names_and_returns_matrix(nx, X, :nx, :X)
-        _check_names_and_returns_matrix(nf, F, :nf, :F)
+        check_names_and_returns_matrix(nx, X, :nx, :X)
+        check_names_and_returns_matrix(nf, F, :nf, :F)
         if isa(B, VecNum) && !isnothing(nb)
             @argcheck(length(nb) == 1, DimensionMismatch)
         elseif isa(B, MatNum)
-            _check_names_and_returns_matrix(nb, B, :nb, :B)
+            check_names_and_returns_matrix(nb, B, :nb, :B)
         end
         if !isnothing(X) && !isnothing(F)
             @argcheck(size(X, 1) == size(F, 1), DimensionMismatch)

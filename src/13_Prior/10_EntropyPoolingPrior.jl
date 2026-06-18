@@ -473,6 +473,14 @@ Keywords correspond to the struct's fields.
   - If `var_views` is not `nothing` without `var_alpha`, defaults to `0.05`.
   - If `cvar_views` is not `nothing` without `cvar_alpha`, defaults to `0.05`.
 
+# View comparison operators
+
+The comparison operators accepted in each view's constraint strings depend on the moment being constrained. An unsupported operator raises a `ParseError` listing the operators allowed for that view.
+
+  - `mu_views`, `sigma_views`, `sk_views`, `kt_views`, `cov_views`, `rho_views` accept `==`, `>=` and `<=`.
+  - `var_views` (Value at Risk) accepts only `==` and `>=`.
+  - `cvar_views` (Conditional Value at Risk) accepts only `==`.
+
 # Examples
 
 ```jldoctest

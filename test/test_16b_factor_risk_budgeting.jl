@@ -144,3 +144,18 @@ include(joinpath(@__DIR__, "test16_setup.jl"))
     rkb = risk_budget_constraints(rb.rba.rkb, fsets)
     @test isapprox(rkc[1:5], rkb.val, rtol = 5e-4)
 end
+
+@testset "Factor Risk Budgeting regression estimator/result data contract" begin
+    opt = JuMPOptimiser(; pe = pr, slv = slv)
+    ## A regression ESTIMATOR must fit the factor model, so it needs the returns data:
+    ## omitting `rd` raises a contextual IsNothingError rather than a deep cryptic one.
+    rb_est = RiskBudgeting(; r = Variance(), opt = opt,
+                           rba = FactorRiskBudgeting(; re = StepwiseRegression()))
+    @test_throws IsNothingError optimise(rb_est)
+    @test isa(optimise(rb_est, rd).retcode, OptimisationSuccess)
+    ## A precomputed regression RESULT carries the factor model, so it needs no data.
+    rr = regression(StepwiseRegression(), rd)
+    rb_res = RiskBudgeting(; r = Variance(), opt = opt,
+                           rba = FactorRiskBudgeting(; re = rr))
+    @test isa(optimise(rb_res).retcode, OptimisationSuccess)
+end

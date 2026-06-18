@@ -25,14 +25,14 @@ const _NBSP = "&nbsp;"
 # A type is linkable iff it has a docstring registered in PortfolioOptimisers
 # (every such docstring is rendered via an `@docs` block, so the `@ref`
 # resolves). Foreign / undocumented types fall back to plain text.
-function _is_linkable(T::Type)
+function is_linkable(T::Type)
     return haskey(Base.Docs.meta(PortfolioOptimisers),
                   Base.Docs.Binding(parentmodule(T), nameof(T)))
 end
 
 function _node(T::Type)#; qualified::Bool = false)
     name = string(nameof(T))
-    if !(_is_linkable(T))
+    if !(is_linkable(T))
         return name
     end
     # The root repeats the section heading, so a bare `@ref` would resolve to the
@@ -68,7 +68,7 @@ const _PAGE_SUFFIX = "_TypeHierarchy.md"
 
 # Highest `NN_` prefix among the entries in `dir` (files and directories alike,
 # since both are numbered in `src/api`), or -1 if none.
-function _max_api_index(dir::String)
+function max_api_index(dir::String)
     maxn = -1
     for entry in readdir(dir)
         m = match(r"^(\d+)_", entry)
@@ -88,7 +88,7 @@ function generate_type_hierarchy(dir::String = joinpath(@__DIR__, "src", "api"))
             rm(joinpath(dir, entry))
         end
     end
-    idx = _max_api_index(dir) + 1
+    idx = max_api_index(dir) + 1
     path = joinpath(dir, string(lpad(idx, 2, '0'), _PAGE_SUFFIX))
     roots = ["AbstractResult" => PortfolioOptimisers.AbstractResult,
              "AbstractEstimator" => PortfolioOptimisers.AbstractEstimator,

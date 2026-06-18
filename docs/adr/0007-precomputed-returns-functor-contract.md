@@ -57,10 +57,10 @@ missing.
   `MedianAbsoluteDeviation`, `ThirdCentralMoment` — `WeightsReturnsFeesInput`) gains a
   single-argument arity. Each functor's `(w, X, fees)` dependence lives *entirely* in its
   first line, `dev = calc_deviations_vec(r, w, X, fees)`; everything after operates on `dev`.
-  We extract that post-deviation math into a shared `_moment_risk(r, dev)` kernel, reuse the
+  We extract that post-deviation math into a shared `moment_risk(r, dev)` kernel, reuse the
   existing weight-independent `calc_moment_target(r, ::Any, x)` methods via a new
   `calc_deviations_vec(r, x::VecNum)`, and add one generic `r(x::VecNum)` arity per measure
-  that forwards `_moment_risk(r, calc_deviations_vec(r, x))`. `VarianceSkewKurtosis` is
+  that forwards `moment_risk(r, calc_deviations_vec(r, x))`. `VarianceSkewKurtosis` is
   *excluded*: although it is `WeightsReturnsFeesInput`, its variance component `r.vr(w)` is a
   weights-only `w'Σw` with no return-series form, so it cannot be evaluated on a bare series
   and falls to the fallback below.

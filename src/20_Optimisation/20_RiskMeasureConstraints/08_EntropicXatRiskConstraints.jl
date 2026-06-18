@@ -58,10 +58,14 @@ Where:
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::EntropicValueatRisk,
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               args...; prefix::Symbol = Symbol(""), kwargs...)
+                               args...; loss::Bool = true, prefix::Symbol = Symbol(""),
+                               kwargs...)
     key = Symbol(:evar_risk_, i)
     sc = get_constraint_scale(model)
     net_X = set_net_portfolio_returns!(model, pr.X; prefix = prefix)
+    if !loss
+        net_X = -net_X
+    end
     T = length(net_X)
     t_evar, z_evar, u_evar = model[Symbol(:t_evar_, i)], model[Symbol(:z_evar_, i)], model[Symbol(:u_evar_, i)] = JuMP.@variables(model,
                                                                                                                                   begin
@@ -132,7 +136,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::EntropicValueatRisk
                                                                                                                                                                                                                                                                           [1:T]
                                                                                                                                                                                                                                                                           ()
                                                                                                                                                                                                                                                                           (),
-                                                                                                                                                                                                                                                                          (upper_bound = 0)
+                                                                                                                                                                                                                                                                          (lower_bound = 0)
                                                                                                                                                                                                                                                                           [1:T]
                                                                                                                                                                                                                                                                       end)
     wi = nothing_scalar_array_selector(r.w, pr.w)
@@ -146,7 +150,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::EntropicValueatRisk
                                                                                          0
                                                                                          sc *
                                                                                          (sum(u_evar_h) -
-                                                                                          z_evar_h) >=
+                                                                                          z_evar_h) <=
                                                                                          0
                                                                                      end)
         r.alpha * T, r.beta * T
@@ -162,7 +166,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::EntropicValueatRisk
                                                                                          sc *
                                                                                          (LinearAlgebra.dot(wi,
                                                                                                             u_evar_h) -
-                                                                                          z_evar_h) >=
+                                                                                          z_evar_h) <=
                                                                                          0
                                                                                      end)
         r.alpha * sw, r.beta * sw
@@ -180,11 +184,11 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::EntropicValueatRisk
                                                                                                        JuMP.MOI.ExponentialCone()
                                                                                                        [i = 1:T],
                                                                                                        [sc *
-                                                                                                        (net_X[i] +
+                                                                                                        (net_X[i] -
                                                                                                          t_evar_h),
-                                                                                                        -sc *
+                                                                                                        sc *
                                                                                                         z_evar_h,
-                                                                                                        -sc *
+                                                                                                        sc *
                                                                                                         u_evar_h[i]] in
                                                                                                        JuMP.MOI.ExponentialCone()
                                                                                                    end)
@@ -197,7 +201,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::EntropicValueatRisk
                                                                                                                         z_evar_h *
                                                                                                                         log(bt)
                                                                                                                     end)
-    evar_risk_range = model[key] = JuMP.@expression(model, evar_risk_l - evar_risk_h)
+    evar_risk_range = model[key] = JuMP.@expression(model, evar_risk_l + evar_risk_h)
     set_risk_bounds_and_expression!(model, opt, evar_risk_range, r.settings, key)
     return evar_risk_range
 end

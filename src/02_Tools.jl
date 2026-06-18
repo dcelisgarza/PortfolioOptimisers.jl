@@ -740,14 +740,14 @@ Dispatches on the field value type: estimators, algorithms, and results recurse 
   - [`@propagatable`](@ref)
   - [`factory`](@ref)
 """
-_factory_child(v, args...; kwargs...) = v
-function _factory_child(v::Union{<:AbstractEstimator, <:AbstractAlgorithm,
-                                 <:AbstractResult}, args...; kwargs...)
+factory_child(v, args...; kwargs...) = v
+function factory_child(v::Union{<:AbstractEstimator, <:AbstractAlgorithm, <:AbstractResult},
+                       args...; kwargs...)
     return factory(v, args...; kwargs...)
 end
-function _factory_child(v::AbstractArray{<:Union{<:AbstractEstimator, <:AbstractAlgorithm,
-                                                 <:AbstractResult}}, args...; kwargs...)
-    return [_factory_child(vi, args...; kwargs...) for vi in v]
+function factory_child(v::AbstractArray{<:Union{<:AbstractEstimator, <:AbstractAlgorithm,
+                                                <:AbstractResult}}, args...; kwargs...)
+    return [factory_child(vi, args...; kwargs...) for vi in v]
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -757,7 +757,7 @@ Resolve the new value of a [`@wprop`](@ref)-tagged observation-weights field dur
 
 When an [`ObsWeights`](@ref) argument is threaded through `factory`, the field is
 **replaced** by those weights; otherwise the existing field value is kept. This is
-distinct from [`_factory_child`](@ref) (used by [`@fprop`](@ref)), which recurses into
+distinct from [`factory_child`](@ref) (used by [`@fprop`](@ref)), which recurses into
 sub-estimators and leaves `nothing`/non-estimator values unchanged — a weights slot
 must not be confused with an optional sub-estimator that happens to be `nothing`.
 
@@ -765,7 +765,7 @@ must not be confused with an optional sub-estimator that happens to be `nothing`
 
   - [`@wprop`](@ref)
   - [`@propagatable`](@ref)
-  - [`_factory_child`](@ref)
+  - [`factory_child`](@ref)
 """
 _wprop(field, args...; kwargs...) = field
 _wprop(::Any, w::ObsWeights, args...; kwargs...) = w
@@ -780,15 +780,15 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return `true` if `x` is a reference to the [`@fprop`](@ref) macro (bare `Symbol` or `GlobalRef`).
 
-Used by [`_propagatable_parse_body`](@ref) to detect `@fprop`-tagged fields in a struct body.
+Used by [`propagatable_parse_body`](@ref) to detect `@fprop`-tagged fields in a struct body.
 
 # Related
 
   - [`@fprop`](@ref)
-  - [`_propagatable_parse_body`](@ref)
+  - [`propagatable_parse_body`](@ref)
   - [`@propagatable`](@ref)
 """
-function _is_fprop_macro(x)
+function is_fprop_macro(x)
     return x == Symbol("@fprop") || (x isa GlobalRef && x.name == Symbol("@fprop"))
 end
 
@@ -797,15 +797,15 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return `true` if `x` is a reference to the [`@vprop`](@ref) macro (bare `Symbol` or `GlobalRef`).
 
-Used by [`_propagatable_parse_body`](@ref) to detect `@vprop`-tagged fields in a struct body.
+Used by [`propagatable_parse_body`](@ref) to detect `@vprop`-tagged fields in a struct body.
 
 # Related
 
   - [`@vprop`](@ref)
-  - [`_propagatable_parse_body`](@ref)
+  - [`propagatable_parse_body`](@ref)
   - [`@propagatable`](@ref)
 """
-function _is_vprop_macro(x)
+function is_vprop_macro(x)
     return x == Symbol("@vprop") || (x isa GlobalRef && x.name == Symbol("@vprop"))
 end
 """
@@ -813,15 +813,15 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return `true` if `x` is a reference to the [`@pprop`](@ref) macro (bare `Symbol` or `GlobalRef`).
 
-Used by [`_propagatable_parse_body`](@ref) to detect `@pprop`-tagged fields in a struct body.
+Used by [`propagatable_parse_body`](@ref) to detect `@pprop`-tagged fields in a struct body.
 
 # Related
 
   - [`@pprop`](@ref)
-  - [`_propagatable_parse_body`](@ref)
+  - [`propagatable_parse_body`](@ref)
   - [`@propagatable`](@ref)
 """
-function _is_pprop_macro(x)
+function is_pprop_macro(x)
     return x == Symbol("@pprop") || (x isa GlobalRef && x.name == Symbol("@pprop"))
 end
 """
@@ -829,15 +829,15 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return `true` if `x` is a reference to the [`@cprop`](@ref) macro (bare `Symbol` or `GlobalRef`).
 
-Used by [`_propagatable_parse_body`](@ref) to detect `@cprop`-tagged fields in a struct body.
+Used by [`propagatable_parse_body`](@ref) to detect `@cprop`-tagged fields in a struct body.
 
 # Related
 
   - [`@cprop`](@ref)
-  - [`_propagatable_parse_body`](@ref)
+  - [`propagatable_parse_body`](@ref)
   - [`@propagatable`](@ref)
 """
-function _is_cprop_macro(x)
+function is_cprop_macro(x)
     return x == Symbol("@cprop") || (x isa GlobalRef && x.name == Symbol("@cprop"))
 end
 """
@@ -845,15 +845,15 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return `true` if `x` is a reference to the [`@wprop`](@ref) macro (bare `Symbol` or `GlobalRef`).
 
-Used by [`_propagatable_parse_body`](@ref) to detect `@wprop`-tagged fields in a struct body.
+Used by [`propagatable_parse_body`](@ref) to detect `@wprop`-tagged fields in a struct body.
 
 # Related
 
   - [`@wprop`](@ref)
-  - [`_propagatable_parse_body`](@ref)
+  - [`propagatable_parse_body`](@ref)
   - [`@propagatable`](@ref)
 """
-function _is_wprop_macro(x)
+function is_wprop_macro(x)
     return x == Symbol("@wprop") || (x isa GlobalRef && x.name == Symbol("@wprop"))
 end
 """
@@ -862,7 +862,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 Return `true` if `x` is a macro call to any of [`@fprop`](@ref), [`@vprop`](@ref),
 [`@pprop`](@ref) or [`@cprop`](@ref).
 
-Used by [`_propagatable_parse_body`](@ref) to detect tagged fields in a struct body.
+Used by [`propagatable_parse_body`](@ref) to detect tagged fields in a struct body.
 
 # Related
 
@@ -870,17 +870,17 @@ Used by [`_propagatable_parse_body`](@ref) to detect tagged fields in a struct b
   - [`@vprop`](@ref)
   - [`@pprop`](@ref)
   - [`@cprop`](@ref)
-  - [`_propagatable_parse_body`](@ref)
+  - [`propagatable_parse_body`](@ref)
   - [`@propagatable`](@ref)
 """
-function _is_prop_tag_call(x)
+function is_prop_tag_call(x)
     return x isa Expr &&
            x.head == :macrocall &&
-           (_is_fprop_macro(x.args[1]) ||
-            _is_vprop_macro(x.args[1]) ||
-            _is_pprop_macro(x.args[1]) ||
-            _is_cprop_macro(x.args[1]) ||
-            _is_wprop_macro(x.args[1]))
+           (is_fprop_macro(x.args[1]) ||
+            is_vprop_macro(x.args[1]) ||
+            is_pprop_macro(x.args[1]) ||
+            is_cprop_macro(x.args[1]) ||
+            is_wprop_macro(x.args[1]))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -902,22 +902,22 @@ Tags may be stacked in either order (`@pprop @fprop field`), which parses as nes
 
 # Related
 
-  - [`_propagatable_parse_body`](@ref)
+  - [`propagatable_parse_body`](@ref)
 """
-function _peel_prop_tags(expr)
+function peel_prop_tags(expr)
     is_f = false
     is_v = false
     is_p = false
     is_c = false
     is_w = false
-    while _is_prop_tag_call(expr)
-        if _is_fprop_macro(expr.args[1])
+    while is_prop_tag_call(expr)
+        if is_fprop_macro(expr.args[1])
             is_f = true
-        elseif _is_vprop_macro(expr.args[1])
+        elseif is_vprop_macro(expr.args[1])
             is_v = true
-        elseif _is_pprop_macro(expr.args[1])
+        elseif is_pprop_macro(expr.args[1])
             is_p = true
-        elseif _is_cprop_macro(expr.args[1])
+        elseif is_cprop_macro(expr.args[1])
             is_c = true
         else
             is_w = true
@@ -932,14 +932,14 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return `true` if `x` is a reference to Julia's `@doc` macro (bare `Symbol` or `GlobalRef`).
 
-Used by [`_propagatable_parse_body`](@ref) to recognise docstring-prefixed fields in a struct body.
+Used by [`propagatable_parse_body`](@ref) to recognise docstring-prefixed fields in a struct body.
 
 # Related
 
-  - [`_propagatable_parse_body`](@ref)
+  - [`propagatable_parse_body`](@ref)
   - [`@propagatable`](@ref)
 """
-_is_doc_macro(x) = (x isa GlobalRef && x.name == Symbol("@doc")) || x == Symbol("@doc")
+is_doc_macro(x) = (x isa GlobalRef && x.name == Symbol("@doc")) || x == Symbol("@doc")
 
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -960,10 +960,10 @@ Errors with a descriptive message when `expr` is neither a bare `Symbol` nor a
 # Related
 
   - [`@fprop`](@ref)
-  - [`_propagatable_parse_body`](@ref)
+  - [`propagatable_parse_body`](@ref)
   - [`@propagatable`](@ref)
 """
-function _extract_field_name(expr)
+function extract_field_name(expr)
     if expr isa Symbol
         return expr
     end
@@ -995,11 +995,11 @@ wrappers such as `@concrete`.
 
 # Related
 
-  - [`_propagatable_parse_body`](@ref)
-  - [`_propagatable_bare_name`](@ref)
+  - [`propagatable_parse_body`](@ref)
+  - [`propagatable_bare_name`](@ref)
   - [`@propagatable`](@ref)
 """
-function _propagatable_find_struct(expr)
+function propagatable_find_struct(expr)
     if !(expr isa Expr)
         error("@propagatable: expected a struct or macro-wrapped struct, got $(typeof(expr))")
     end
@@ -1007,7 +1007,7 @@ function _propagatable_find_struct(expr)
         return expr, identity
     elseif expr.head == :macrocall
         inner = expr.args[end]
-        struct_node, rebuild = _propagatable_find_struct(inner)
+        struct_node, rebuild = propagatable_find_struct(inner)
         prefix = expr.args[1:(end - 1)]
         return struct_node, s -> Expr(:macrocall, prefix..., rebuild(s))
     else
@@ -1035,18 +1035,18 @@ recursively peeling `:curly` and `:<:` wrappers until a bare `Symbol` is reached
 
 # Related
 
-  - [`_propagatable_find_struct`](@ref)
+  - [`propagatable_find_struct`](@ref)
   - [`@propagatable`](@ref)
 """
-function _propagatable_bare_name(n)
+function propagatable_bare_name(n)
     if n isa Symbol
         return n
     end
     if n isa Expr && n.head == :curly
-        return _propagatable_bare_name(n.args[1])
+        return propagatable_bare_name(n.args[1])
     end
     if n isa Expr && n.head == :<:
-        return _propagatable_bare_name(n.args[1])
+        return propagatable_bare_name(n.args[1])
     end
     return error("@propagatable: cannot extract struct name from: $(repr(n))")
 end
@@ -1072,10 +1072,10 @@ a single named field.
 
 # Related
 
-  - [`_propagatable_parse_body`](@ref)
+  - [`propagatable_parse_body`](@ref)
   - [`@propagatable`](@ref)
 """
-function _try_field_name(expr)
+function try_field_name(expr)
     if expr isa Symbol
         return expr
     end
@@ -1113,14 +1113,14 @@ through unchanged.
 
 # Related
 
-  - [`_is_fprop_macro`](@ref)
-  - [`_is_doc_macro`](@ref)
-  - [`_extract_field_name`](@ref)
-  - [`_try_field_name`](@ref)
+  - [`is_fprop_macro`](@ref)
+  - [`is_doc_macro`](@ref)
+  - [`extract_field_name`](@ref)
+  - [`try_field_name`](@ref)
   - [`@fprop`](@ref)
   - [`@propagatable`](@ref)
 """
-function _propagatable_parse_body(body)
+function propagatable_parse_body(body)
     fprop_fields = Symbol[]
     vprop_fields = Symbol[]
     pprop_fields = Symbol[]
@@ -1148,32 +1148,32 @@ function _propagatable_parse_body(body)
         return nothing
     end
     for arg in body.args
-        if arg isa Expr && arg.head == :macrocall && _is_doc_macro(arg.args[1])
+        if arg isa Expr && arg.head == :macrocall && is_doc_macro(arg.args[1])
             # Core.@doc "doc" (field or tagged field)
             inner = arg.args[end]
-            is_f, is_v, is_p, is_c, is_w, stripped = _peel_prop_tags(inner)
+            is_f, is_v, is_p, is_c, is_w, stripped = peel_prop_tags(inner)
             if is_f || is_v || is_p || is_c || is_w
-                fname = _extract_field_name(stripped)
+                fname = extract_field_name(stripped)
                 _record!(fname, is_f, is_v, is_p, is_c, is_w)
                 # Rebuild @doc node with tags stripped: replace last arg with bare field
                 push!(new_args, Expr(:macrocall, arg.args[1:(end - 1)]..., stripped))
             else
                 # plain docstring'd field — carry through unchanged
-                fname = _try_field_name(inner)
+                fname = try_field_name(inner)
                 if fname !== nothing
                     push!(all_fields, fname)
                 end
                 push!(new_args, arg)
             end
-        elseif _is_prop_tag_call(arg)
+        elseif is_prop_tag_call(arg)
             # Bare @fprop/@vprop/@pprop/@cprop/@wprop field (tags may be stacked) — no docstring
-            is_f, is_v, is_p, is_c, is_w, stripped = _peel_prop_tags(arg)
-            fname = _extract_field_name(stripped)
+            is_f, is_v, is_p, is_c, is_w, stripped = peel_prop_tags(arg)
+            fname = extract_field_name(stripped)
             _record!(fname, is_f, is_v, is_p, is_c, is_w)
             push!(new_args, stripped)               # strip tags, keep field expr
         else
             # LineNumberNode, bare Symbol field, field::Type, inner constructor, …
-            fname = _try_field_name(arg)
+            fname = try_field_name(arg)
             if fname !== nothing
                 push!(all_fields, fname)
             end
@@ -1193,7 +1193,7 @@ end
 
 Field tag for use inside a [`@propagatable`](@ref) struct body.
 Marks the field as participating in [`factory`](@ref) propagation —
-`_factory_child` will be called on it when `factory` is invoked on the
+`factory_child` will be called on it when `factory` is invoked on the
 enclosing struct.
 
 Raises an error if used outside a `@propagatable` struct body.
@@ -1279,7 +1279,7 @@ end
 Define a struct and automatically generate its propagation methods from five
 orthogonal, stackable field tags:
 
-  - [`@fprop`](@ref) (factory propagation): tagged fields receive `_factory_child`
+  - [`@fprop`](@ref) (factory propagation): tagged fields receive `factory_child`
     calls when [`factory`](@ref) is invoked, recursing runtime *values*
     (observation weights, prior results, solvers, …) down the composition tree.
     A `factory(x, args...)` method is always generated (it is the identity when no
@@ -1300,7 +1300,7 @@ orthogonal, stackable field tags:
 
 When at least one field is tagged `@pprop` or `@cprop`, a second method
 `factory(x, pr::AbstractPriorResult, args...)` is generated. It selects `@pprop`/`@cprop`
-fields as above and threads `@fprop`-only fields with `pr` (`_factory_child(getfield(x, :f), pr, args...)`);
+fields as above and threads `@fprop`-only fields with `pr` (`factory_child(getfield(x, :f), pr, args...)`);
 a field tagged both `@pprop` and `@fprop` is prior-selected in this method (`@pprop` wins).
 Because this method is more specific than the general `factory(x, args...)`, it is chosen
 whenever a prior is passed.
@@ -1334,13 +1334,13 @@ Docstrings on the enclosing definition are forwarded correctly via
 `Base.@__doc__`.
 """
 macro propagatable(expr)
-    struct_node, rebuild = _propagatable_find_struct(expr)
+    struct_node, rebuild = propagatable_find_struct(expr)
 
     type_head   = struct_node.args[2]
     body        = struct_node.args[3]
-    struct_name = _propagatable_bare_name(type_head)
+    struct_name = propagatable_bare_name(type_head)
 
-    fprop_fields, vprop_fields, pprop_fields, cprop_fields, wprop_fields, all_fields, new_body = _propagatable_parse_body(body)
+    fprop_fields, vprop_fields, pprop_fields, cprop_fields, wprop_fields, all_fields, new_body = propagatable_parse_body(body)
 
     new_struct = Expr(:struct, struct_node.args[1], type_head, new_body)
     chain      = rebuild(new_struct)
@@ -1354,7 +1354,7 @@ macro propagatable(expr)
             xf = Expr(:., :x, QuoteNode(f))
             if f in fprop_fields
                 push!(factory_pairs,
-                      Expr(:kw, f, :(_factory_child($xf, args...; kwargs...))))
+                      Expr(:kw, f, :(factory_child($xf, args...; kwargs...))))
             elseif f in wprop_fields
                 push!(factory_pairs, Expr(:kw, f, :(_wprop($xf, args...; kwargs...))))
             else
@@ -1403,7 +1403,7 @@ macro propagatable(expr)
                 push!(sel_pairs, Expr(:kw, f, :(_wprop($xf, args...; kwargs...))))
             elseif f in fprop_fields
                 push!(sel_pairs,
-                      Expr(:kw, f, :(_factory_child($xf, pr, args...; kwargs...))))
+                      Expr(:kw, f, :(factory_child($xf, pr, args...; kwargs...))))
             else
                 push!(sel_pairs, Expr(:kw, f, xf))
             end
@@ -1442,7 +1442,7 @@ intermediate hop in the descent generated for a depth-≥2 locator.
   - [`@forward_properties`](@ref)
   - [`PropertyPathError`](@ref)
 """
-function _forward_nonnothing(v, ::Type{T}, pathstr, nodestr) where {T}
+function forward_nonnothing(v, ::Type{T}, pathstr, nodestr) where {T}
     if isnothing(v)
         throw(PropertyPathError("cannot descend path `$(pathstr)` on `$(T)`: intermediate `$(nodestr)` is `nothing`"))
     end
@@ -1460,9 +1460,9 @@ A bare identifier `a` becomes `[:a]`; a dotted expression `a.b.c` becomes
 # Related
 
   - [`@forward_properties`](@ref)
-  - [`_forward_walk_expr`](@ref)
+  - [`forward_walk_expr`](@ref)
 """
-function _forward_flatten_path(expr)
+function forward_flatten_path(expr)
     if expr isa Symbol
         return Symbol[expr]
     elseif expr isa Expr && expr.head == :. && length(expr.args) == 2
@@ -1471,7 +1471,7 @@ function _forward_flatten_path(expr)
         if !(leaf isa Symbol)
             return error("@forward_properties: invalid locator leaf $(repr(expr.args[2]))")
         end
-        return Symbol[_forward_flatten_path(expr.args[1])..., leaf]
+        return Symbol[forward_flatten_path(expr.args[1])..., leaf]
     else
         return error("@forward_properties: locator must be a bare name or a dotted path (`a.b.c`), got: $(repr(expr))")
     end
@@ -1484,7 +1484,7 @@ Build the expression that descends a [`@forward_properties`](@ref) `path` (a
 vector of field symbols) on the receiver `x`, returning the value at the path.
 
 A depth-1 path is a single `getfield`. A depth-≥2 path descends hop by hop,
-guarding every intermediate with [`_forward_nonnothing`](@ref) (keyed on the
+guarding every intermediate with [`forward_nonnothing`](@ref) (keyed on the
 receiver type `struct_name`) so a `nothing` node throws a path-naming
 [`PropertyPathError`](@ref). When `broadcast` is `true`, the final hop maps over
 the penultimate value if it is an `AbstractVector` (the scalar-or-vector
@@ -1493,9 +1493,9 @@ solution case), otherwise it is a plain access.
 # Related
 
   - [`@forward_properties`](@ref)
-  - [`_forward_nonnothing`](@ref)
+  - [`forward_nonnothing`](@ref)
 """
-function _forward_walk_expr(path, struct_name, broadcast::Bool)
+function forward_walk_expr(path, struct_name, broadcast::Bool)
     if length(path) == 1
         return :(getfield(x, $(QuoteNode(path[1]))))
     end
@@ -1503,7 +1503,7 @@ function _forward_walk_expr(path, struct_name, broadcast::Bool)
     stmts = Any[:(__v = getfield(x, $(QuoteNode(path[1]))))]
     for k in 2:length(path)
         nodestr = join(string.(path[1:(k - 1)]), ".")
-        push!(stmts, :(__v = $(_forward_nonnothing)(__v, $struct_name, $pathstr, $nodestr)))
+        push!(stmts, :(__v = $(forward_nonnothing)(__v, $struct_name, $pathstr, $nodestr)))
         leaf = QuoteNode(path[k])
         if k == length(path) && broadcast
             push!(stmts, :(__v = if isa(__v, AbstractVector)
@@ -1613,8 +1613,8 @@ macro forward_properties(T, block)
             if isempty(args)
                 return error("@forward_properties: `forward` needs a locator")
             end
-            path = _forward_flatten_path(args[1])
-            walk = _forward_walk_expr(path, T, false)
+            path = forward_flatten_path(args[1])
+            walk = forward_walk_expr(path, T, false)
             if length(args) == 1
                 # forward all properties of the located value
                 push!(getprop_branches, quote
@@ -1649,8 +1649,8 @@ macro forward_properties(T, block)
             if !(exposed isa Symbol)
                 return error("@forward_properties: `alias` exposed name must be a bare identifier, got: $(repr(exposed))")
             end
-            path = _forward_flatten_path(args[2])
-            walk = _forward_walk_expr(path, T, false)
+            path = forward_flatten_path(args[2])
+            walk = forward_walk_expr(path, T, false)
             push!(getprop_branches, :(sym === $(QuoteNode(exposed)) && return $walk))
             push!(propname_contribs, QuoteNode(exposed))
         elseif marker == :compute
@@ -1669,8 +1669,8 @@ macro forward_properties(T, block)
                 push!(getprop_branches,
                       :(sym === $(QuoteNode(exposed)) && return ($src)(x)))
             elseif src isa Expr && src.head == :.
-                path = _forward_flatten_path(src)
-                walk = _forward_walk_expr(path, T, broadcast)
+                path = forward_flatten_path(src)
+                walk = forward_walk_expr(path, T, broadcast)
                 push!(getprop_branches, :(sym === $(QuoteNode(exposed)) && return $walk))
             else
                 return error("@forward_properties: `compute` source must be a dotted path (depth ≥ 2) or an anonymous function, got: $(repr(src))")
@@ -1691,8 +1691,8 @@ macro forward_properties(T, block)
                 end
                 push!(swap_branches, :(sym === $(QuoteNode(exposed)) && return ($src)(x)))
             elseif (src isa Expr && src.head == :.) || src isa Symbol
-                path = _forward_flatten_path(src)
-                walk = _forward_walk_expr(path, T, broadcast)
+                path = forward_flatten_path(src)
+                walk = forward_walk_expr(path, T, broadcast)
                 push!(swap_branches, :(sym === $(QuoteNode(exposed)) && return $walk))
             else
                 return error("@forward_properties: `swap` source must be a bare name, a dotted path, or an anonymous function, got: $(repr(src))")

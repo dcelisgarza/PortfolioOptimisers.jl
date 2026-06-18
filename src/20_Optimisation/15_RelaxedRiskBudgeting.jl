@@ -130,6 +130,10 @@ Where:
   - ``\\mathbf{\\Sigma}``: Covariance matrix.
   - ``\\mathcal{K}_{\\mathrm{SOC}}``: Second-order cone.
 
+# Notes
+
+Because this is a *relaxation* of the risk budgeting problem, the realised risk contributions will not adhere to the target risk budget as tightly as the exact logarithmic-barrier or mixed-integer formulations in [`RiskBudgeting`](@ref). In well-behaved problems the deviation is negligible, but in pathological cases (e.g. ill-conditioned covariance matrices or extreme budget allocations) it can be noticeable. The trade-off is that the SOC formulation is convex and composes cleanly with additional constraints, making it the friendlier choice when the risk budget is one of several objectives rather than a hard requirement. Use [`RiskBudgeting`](@ref) when strict adherence to the risk budget is essential.
+
 # Related
 
   - [`JuMPOptimisationEstimator`](@ref)

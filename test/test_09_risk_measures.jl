@@ -384,4 +384,28 @@
               (mean(Xret) - rf) /
               expected_risk(RelativisticValueatRisk(; slv = slv), w, rd.X)
     end
+    @testset "Generic X at Risk Range" begin
+        rs1=[GenericValueatRiskRange(; loss = ValueatRisk(), gain = ValueatRisk()),
+             GenericValueatRiskRange(; loss = ConditionalValueatRisk(),
+                                     gain = ConditionalValueatRisk()),
+             GenericValueatRiskRange(; loss = EntropicValueatRisk(; slv = slv),
+                                     gain = EntropicValueatRisk(; slv = slv)),
+             GenericValueatRiskRange(; loss = RelativisticValueatRisk(; slv = slv),
+                                     gain = RelativisticValueatRisk(; slv = slv)),
+             GenericValueatRiskRange(; loss = WorstRealisation(),
+                                     gain = WorstRealisation()),
+             GenericValueatRiskRange(; loss = PowerNormValueatRisk(; slv = slv),
+                                     gain = PowerNormValueatRisk(; slv = slv))]
+        rs2=[ValueatRiskRange(), ConditionalValueatRiskRange(),
+             EntropicValueatRiskRange(; slv = slv),
+             RelativisticValueatRiskRange(; slv = slv), Range(),
+             PowerNormValueatRiskRange(; slv = slv)]
+        for (i, (r1, r2)) in enumerate(zip(rs1, rs2))
+            res = isapprox(expected_risk(r1, w, rd.X), expected_risk(r2, w, rd.X))
+            if !res
+                println("Iteration $i fails")
+                find_tol(expected_risk(r1, w, rd.X), expected_risk(r2, w, rd.X))
+            end
+        end
+    end
 end

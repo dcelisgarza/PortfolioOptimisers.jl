@@ -101,8 +101,8 @@ AbstractResult
   `(:jr, …, :fb)` — the forwarded names (`:pr`, `:pa`, `:fees`, `:retcode`, …) are reachable via
   `getproperty` but are no longer listed. Helpers that *introspect* a result (`hasproperty` /
   `:x in propertynames`) rather than just accessing it must check `:jr` for the JuMP case:
-  `_extract_pr` and `_extract_fees` were updated to `hasproperty(res, :pr/:fees) || hasproperty(res, :jr)`.
-  This surfaced (and fixed) a latent `_extract_fees` bug — it had silently returned `nothing` for
+  `extract_pr` and `extract_fees` were updated to `hasproperty(res, :pr/:fees) || hasproperty(res, :jr)`.
+  This surfaced (and fixed) a latent `extract_fees` bug — it had silently returned `nothing` for
   every JuMP result, because `:fees` was never in their flat `propertynames` even before the refactor.
 - Verified: full suite green (4544 passing); the only failures pre-fix were 7 plotting errors, all
-  routed through `_extract_pr`, cleared by the introspection fix.
+  routed through `extract_pr`, cleared by the introspection fix.

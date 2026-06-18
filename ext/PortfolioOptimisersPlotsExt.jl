@@ -7,12 +7,13 @@ import PortfolioOptimisers: ArrNum, VecNum, MatNum, Option, VecNum_VecVecNum, Sl
                             MatNum_Pr, PrE_Pr, Pr_RR, HClE_HCl, VecVecNum, RegE_Reg,
                             NwE_ClE_Cl, AbstractCentralityEstimator,
                             AbstractClustersEstimator, AbstractClusteringResult,
-                            AbstractBaseRiskMeasure, _extract_pr, _relevant_assets,
-                            _extract_fees, OptimisationResult
+                            AbstractBaseRiskMeasure, extract_pr, relevant_assets,
+                            extract_fees, OptimisationResult
 
 ## plot_ptf_cumulative_returns
-function _plot_ptf_cumulative_returns(net_ret::VecNum_VecVecNum; ts::AbstractVector,
-                                      compound::Bool = false, kwargs...)
+function PortfolioOptimisers.plot_ptf_cumulative_returns(net_ret::VecNum_VecVecNum;
+                                                         ts::AbstractVector,
+                                                         compound::Bool = false, kwargs...)
     ret = cumulative_returns(net_ret, compound)
     label = "$(compound ? "Compound" : "Simple") Cumulative Returns"
     return if isa(net_ret, VecNum)
@@ -31,8 +32,9 @@ function PortfolioOptimisers.plot_ptf_cumulative_returns(w::VecNum_VecVecNum, X:
                                                          fees::Option{<:Fees} = nothing;
                                                          ts::AbstractVector = 1:size(X, 1),
                                                          compound::Bool = false, kwargs...)
-    return _plot_ptf_cumulative_returns(calc_net_returns(w, X, fees); ts = ts,
-                                        compound = compound, kwargs...)
+    return PortfolioOptimisers.plot_ptf_cumulative_returns(calc_net_returns(w, X, fees);
+                                                           ts = ts, compound = compound,
+                                                           kwargs...)
 end
 function PortfolioOptimisers.plot_ptf_cumulative_returns(w::VecNum_VecVecNum, pr::Pr_RR,
                                                          fees::Option{<:Fees} = nothing;
@@ -49,8 +51,8 @@ function PortfolioOptimisers.plot_ptf_cumulative_returns(res::OptimisationResult
                                                          pr::Option{<:Pr_RR} = nothing,
                                                          fees::Option{<:Fees} = nothing,
                                                          compound::Bool = false, kwargs...)
-    pr = _extract_pr(res, pr)
-    fees = _extract_fees(res, fees)
+    pr = extract_pr(res, pr)
+    fees = extract_fees(res, fees)
     return PortfolioOptimisers.plot_ptf_cumulative_returns(res.w, pr, fees;
                                                            compound = compound, kwargs...)
 end
@@ -59,7 +61,8 @@ function PortfolioOptimisers.plot_ptf_cumulative_returns(pred::Union{<:Predictio
                                                          compound::Bool = false, kwargs...)
     rd = isa(pred, PredictionResult) ? pred.rd : pred.mrd
     ts = isnothing(rd.ts) ? (1:length(isa(rd.X, VecVecNum) ? first(rd.X) : rd.X)) : rd.ts
-    return _plot_ptf_cumulative_returns(rd.X; ts = ts, compound = compound, kwargs...)
+    return PortfolioOptimisers.plot_ptf_cumulative_returns(rd.X; ts = ts,
+                                                           compound = compound, kwargs...)
 end
 function PortfolioOptimisers.plot_ptf_cumulative_returns(pred::PopulationPredictionResult;
                                                          compound::Bool = false, kwargs...)
@@ -82,7 +85,7 @@ function PortfolioOptimisers.plot_asset_cumulative_returns(w::VecNum, X::MatNum,
     net_asset_ret = calc_net_asset_returns(w, X, fees)
     ret = cumulative_returns(net_asset_ret, compound)
     M = size(X, 2)
-    N, idx = _relevant_assets(w, M, N)
+    N, idx = relevant_assets(w, M, N)
     ret_sorted = view(ret, :, idx)
     nx_sorted = view(nx, idx)
 
@@ -126,8 +129,8 @@ function PortfolioOptimisers.plot_asset_cumulative_returns(res::OptimisationResu
                                                            compound::Bool = false,
                                                            N::Option{<:Integer} = nothing,
                                                            kwargs...)
-    pr = _extract_pr(res, pr)
-    fees = _extract_fees(res, fees)
+    pr = extract_pr(res, pr)
+    fees = extract_fees(res, fees)
     return PortfolioOptimisers.plot_asset_cumulative_returns(res.w, pr, fees;
                                                              compound = compound, N = N,
                                                              kwargs...)
@@ -151,8 +154,8 @@ function PortfolioOptimisers.plot_asset_cumulative_returns(pred::MultiPeriodPred
     mean_w = zeros(length(first(res_vec).w), M)
     for res in res_vec
         w = res.w
-        pr = _extract_pr(res)
-        fees = _extract_fees(res)
+        pr = extract_pr(res)
+        fees = extract_fees(res)
         mean_w .+= w
         net_asset_ret = calc_net_asset_returns(w, pr.X, fees)
         ret = cumulative_returns(net_asset_ret, compound)
@@ -161,7 +164,7 @@ function PortfolioOptimisers.plot_asset_cumulative_returns(pred::MultiPeriodPred
     end
     mean_w ./= length(res_vec)
     X = reshape(X, length(ts), M)
-    N, idx = _relevant_assets(mean_w, M, N)
+    N, idx = relevant_assets(mean_w, M, N)
     ret_sorted = view(X, :, idx)
     nx_sorted = view(nx, idx)
     label_str = "$(compound ? "Compound" : "Simple") Asset Cumulative Returns"
@@ -193,7 +196,7 @@ end
 function PortfolioOptimisers.plot_composition(w::VecNum, nx::AbstractVector = 1:length(w);
                                               N::Option{<:Number} = nothing, kwargs...)
     M = length(w)
-    N, idx = _relevant_assets(w, M, N)
+    N, idx = relevant_assets(w, M, N)
     if M > N
         sort!(view(idx, 1:N))
         fidx = view(idx, 1:N)
@@ -305,7 +308,7 @@ function PortfolioOptimisers.plot_risk_contribution(r::PortfolioOptimisers.Abstr
                                                     percentage::Bool = false,
                                                     N::Option{<:Number} = nothing,
                                                     kwargs...)
-    fees = _extract_fees(res, nothing)
+    fees = extract_fees(res, nothing)
     return PortfolioOptimisers.plot_risk_contribution(r, res.w, rd, fees; delta = delta,
                                                       marginal = marginal,
                                                       percentage = percentage, N = N,
@@ -320,7 +323,7 @@ function PortfolioOptimisers.plot_risk_contribution(r::PortfolioOptimisers.Abstr
                                                     percentage::Bool = false,
                                                     N::Option{<:Number} = nothing,
                                                     kwargs...)
-    fees = _extract_fees(res, nothing)
+    fees = extract_fees(res, nothing)
     return PortfolioOptimisers.plot_risk_contribution(r, res.w, pr.X, fees; nx = nx,
                                                       delta = delta, marginal = marginal,
                                                       percentage = percentage, N = N,
@@ -328,7 +331,7 @@ function PortfolioOptimisers.plot_risk_contribution(r::PortfolioOptimisers.Abstr
 end
 function PortfolioOptimisers.plot_risk_contribution(::PortfolioOptimisers.AbstractBaseRiskMeasure,
                                                     ::PredictionResult; kwargs...)
-    throw(ArgumentError("`plot_risk_contribution(r, pred::PredictionResult)` is not supported: `PredictionReturnsResult` stores portfolio returns, not raw asset returns. Call `plot_risk_contribution(r, pred.res.w, rd::ReturnsResult, ...)` with the original returns data."))
+    return throw(ArgumentError("`plot_risk_contribution(r, pred::PredictionResult)` is not supported: `PredictionReturnsResult` stores portfolio returns, not raw asset returns. Call `plot_risk_contribution(r, pred.res.w, rd::ReturnsResult, ...)` with the original returns data."))
 end
 ## plot_factor_risk_contribution
 function PortfolioOptimisers.plot_factor_risk_contribution(r::PortfolioOptimisers.AbstractBaseRiskMeasure,
@@ -338,14 +341,14 @@ function PortfolioOptimisers.plot_factor_risk_contribution(r::PortfolioOptimiser
                                                            delta::Number = 1e-6,
                                                            N::Option{<:Number} = nothing,
                                                            kwargs...)
-    fees = _extract_fees(res, nothing)
+    fees = extract_fees(res, nothing)
     return PortfolioOptimisers.plot_factor_risk_contribution(r, res.w, rd.X, fees; re = re,
                                                              rd = rd, delta = delta, N = N,
                                                              kwargs...)
 end
 function PortfolioOptimisers.plot_factor_risk_contribution(::PortfolioOptimisers.AbstractBaseRiskMeasure,
                                                            ::PredictionResult; kwargs...)
-    throw(ArgumentError("`plot_factor_risk_contribution(r, pred::PredictionResult)` is not supported: `PredictionReturnsResult` stores portfolio returns, not raw asset returns. Call `plot_factor_risk_contribution(r, pred.res.w, rd::ReturnsResult, ...)` with the original returns data."))
+    return throw(ArgumentError("`plot_factor_risk_contribution(r, pred::PredictionResult)` is not supported: `PredictionReturnsResult` stores portfolio returns, not raw asset returns. Call `plot_factor_risk_contribution(r, pred.res.w, rd::ReturnsResult, ...)` with the original returns data."))
 end
 ## plot_network
 function PortfolioOptimisers.plot_network(pl::NwE_ClE_Cl, X::MatNum,
@@ -380,7 +383,7 @@ function PortfolioOptimisers.plot_network(pl::NwE_ClE_Cl, res::OptimisationResul
         end
         rd
     elseif isnothing(rd)
-        _extract_pr(res, pr)
+        extract_pr(res, pr)
     end
     return PortfolioOptimisers.plot_network(pl, rd.X, nx, res.w; kwargs...)
 end
@@ -528,7 +531,7 @@ function PortfolioOptimisers.plot_drawdowns(res::OptimisationResult, rd::Returns
                                             slv::Option{<:Slv_VecSlv} = nothing,
                                             compound::Bool = false, alpha::Number = 0.05,
                                             kappa::Number = 0.3, rw = nothing, kwargs...)
-    fees = _extract_fees(res, nothing)
+    fees = extract_fees(res, nothing)
     return PortfolioOptimisers.plot_drawdowns(res.w, rd, fees; slv = slv,
                                               compound = compound, alpha = alpha,
                                               kappa = kappa, rw = rw, kwargs...)
@@ -540,8 +543,9 @@ function PortfolioOptimisers.plot_drawdowns(pred::PredictionResult;
     rd = pred.rd
     ret = isa(rd.X, VecVecNum) ? first(rd.X) : rd.X
     ts = isnothing(rd.ts) ? (1:length(ret)) : rd.ts
-    return _plot_drawdowns(ret; slv = slv, ts = ts, compound = compound, alpha = alpha,
-                           kappa = kappa, rw = rw, kwargs...)
+    return PortfolioOptimisers.plot_drawdowns(ret; slv = slv, ts = ts, compound = compound,
+                                              alpha = alpha, kappa = kappa, rw = rw,
+                                              kwargs...)
 end
 ## plot_measures
 function PortfolioOptimisers.plot_measures(w::VecNum_VecVecNum, pr::Pr_RR,
@@ -588,8 +592,8 @@ function PortfolioOptimisers.plot_measures(res_vec::AbstractVector{<:Optimisatio
                                            factory::Bool = true, kwargs...)
     pr = ifelse(isnothing(pr), nothing, pr)
     slv = ifelse(isnothing(slv), nothing, slv)
-    pr = _extract_pr.(res_vec, pr)
-    fees = _extract_fees.(res_vec, fees)
+    pr = extract_pr.(res_vec, pr)
+    fees = extract_fees.(res_vec, fees)
     w = getproperty.(res_vec, :w)
     if factory
         x = PortfolioOptimisers.factory.(x, pr, slv)
@@ -655,7 +659,7 @@ function PortfolioOptimisers.plot_histogram(res::OptimisationResult, rd::Returns
                                             alpha::Number = 0.05, kappa::Number = 0.3,
                                             rw = nothing, points::Integer = 0,
                                             reference::Bool = true, kwargs...)
-    fees = _extract_fees(res, nothing)
+    fees = extract_fees(res, nothing)
     return PortfolioOptimisers.plot_histogram(res.w, rd.X, fees; slv = slv, alpha = alpha,
                                               kappa = kappa, rw = rw, points = points,
                                               reference = reference, kwargs...)
@@ -667,8 +671,9 @@ function PortfolioOptimisers.plot_histogram(pred::PredictionResult;
                                             reference::Bool = true, kwargs...)
     rd = pred.rd
     ret = isa(rd.X, VecVecNum) ? first(rd.X) : rd.X
-    return _plot_histogram(ret; slv = slv, alpha = alpha, kappa = kappa, rw = rw,
-                           points = points, reference = reference, kwargs...)
+    return PortfolioOptimisers.plot_histogram(ret; slv = slv, alpha = alpha, kappa = kappa,
+                                              rw = rw, points = points,
+                                              reference = reference, kwargs...)
 end
 ## plot_centrality
 function PortfolioOptimisers.plot_centrality(cte::AbstractCentralityEstimator, X::MatNum,
@@ -678,7 +683,7 @@ function PortfolioOptimisers.plot_centrality(cte::AbstractCentralityEstimator, X
     plr = centrality_vector(cte, X)
     scores = plr.X
     M = length(scores)
-    N, idx = _relevant_assets(scores, M, N)
+    N, idx = relevant_assets(scores, M, N)
     top_idx = view(idx, 1:N)
     sort!(top_idx; by = i -> scores[i], rev = true)
     if percentage
@@ -725,17 +730,17 @@ function PortfolioOptimisers.plot_correlation(pr::PortfolioOptimisers.AbstractPr
 end
 function PortfolioOptimisers.plot_correlation(res::OptimisationResult, rd::ReturnsResult;
                                               kwargs...)
-    return PortfolioOptimisers.plot_correlation(_extract_pr(res), rd; kwargs...)
+    return PortfolioOptimisers.plot_correlation(extract_pr(res), rd; kwargs...)
 end
 function PortfolioOptimisers.plot_correlation(res::OptimisationResult; kwargs...)
-    return PortfolioOptimisers.plot_correlation(_extract_pr(res); kwargs...)
+    return PortfolioOptimisers.plot_correlation(extract_pr(res); kwargs...)
 end
 function PortfolioOptimisers.plot_correlation(pred::PredictionResult, rd::ReturnsResult;
                                               kwargs...)
-    return PortfolioOptimisers.plot_correlation(_extract_pr(pred.res), rd; kwargs...)
+    return PortfolioOptimisers.plot_correlation(extract_pr(pred.res), rd; kwargs...)
 end
 function PortfolioOptimisers.plot_correlation(pred::PredictionResult; kwargs...)
-    return PortfolioOptimisers.plot_correlation(_extract_pr(pred.res); kwargs...)
+    return PortfolioOptimisers.plot_correlation(extract_pr(pred.res); kwargs...)
 end
 ## plot_mu
 function PortfolioOptimisers.plot_mu(pr::PortfolioOptimisers.AbstractPriorResult,
@@ -751,19 +756,19 @@ function PortfolioOptimisers.plot_mu(pr::PortfolioOptimisers.AbstractPriorResult
 end
 function PortfolioOptimisers.plot_mu(res::OptimisationResult; N::Option{<:Number} = nothing,
                                      kwargs...)
-    return PortfolioOptimisers.plot_mu(_extract_pr(res); N = N, kwargs...)
+    return PortfolioOptimisers.plot_mu(extract_pr(res); N = N, kwargs...)
 end
 function PortfolioOptimisers.plot_mu(res::OptimisationResult, rd::ReturnsResult;
                                      N::Option{<:Number} = nothing, kwargs...)
-    return PortfolioOptimisers.plot_mu(_extract_pr(res), rd; N = N, kwargs...)
+    return PortfolioOptimisers.plot_mu(extract_pr(res), rd; N = N, kwargs...)
 end
 function PortfolioOptimisers.plot_mu(pred::PredictionResult; N::Option{<:Number} = nothing,
                                      kwargs...)
-    return PortfolioOptimisers.plot_mu(_extract_pr(pred.res); N = N, kwargs...)
+    return PortfolioOptimisers.plot_mu(extract_pr(pred.res); N = N, kwargs...)
 end
 function PortfolioOptimisers.plot_mu(pred::PredictionResult, rd::ReturnsResult;
                                      N::Option{<:Number} = nothing, kwargs...)
-    return PortfolioOptimisers.plot_mu(_extract_pr(pred.res), rd; N = N, kwargs...)
+    return PortfolioOptimisers.plot_mu(extract_pr(pred.res), rd; N = N, kwargs...)
 end
 ## plot_sigma
 function PortfolioOptimisers.plot_sigma(pr::PortfolioOptimisers.AbstractPriorResult,
@@ -779,19 +784,19 @@ function PortfolioOptimisers.plot_sigma(pr::PortfolioOptimisers.AbstractPriorRes
 end
 function PortfolioOptimisers.plot_sigma(res::OptimisationResult, rd::ReturnsResult;
                                         N::Option{<:Number} = nothing, kwargs...)
-    return PortfolioOptimisers.plot_sigma(_extract_pr(res), rd; N = N, kwargs...)
+    return PortfolioOptimisers.plot_sigma(extract_pr(res), rd; N = N, kwargs...)
 end
 function PortfolioOptimisers.plot_sigma(res::OptimisationResult;
                                         N::Option{<:Number} = nothing, kwargs...)
-    return PortfolioOptimisers.plot_sigma(_extract_pr(res); N = N, kwargs...)
+    return PortfolioOptimisers.plot_sigma(extract_pr(res); N = N, kwargs...)
 end
 function PortfolioOptimisers.plot_sigma(pred::PredictionResult;
                                         N::Option{<:Number} = nothing, kwargs...)
-    return PortfolioOptimisers.plot_sigma(_extract_pr(pred.res); N = N, kwargs...)
+    return PortfolioOptimisers.plot_sigma(extract_pr(pred.res); N = N, kwargs...)
 end
 function PortfolioOptimisers.plot_sigma(pred::PredictionResult, rd::ReturnsResult;
                                         N::Option{<:Number} = nothing, kwargs...)
-    return PortfolioOptimisers.plot_sigma(_extract_pr(pred.res), rd; N = N, kwargs...)
+    return PortfolioOptimisers.plot_sigma(extract_pr(pred.res), rd; N = N, kwargs...)
 end
 ## plot_factor_loadings
 function PortfolioOptimisers.plot_factor_loadings(pr::PortfolioOptimisers.AbstractPriorResult,
@@ -816,17 +821,17 @@ function PortfolioOptimisers.plot_factor_loadings(pr::PortfolioOptimisers.Abstra
 end
 function PortfolioOptimisers.plot_factor_loadings(res::OptimisationResult,
                                                   rd::ReturnsResult; kwargs...)
-    return PortfolioOptimisers.plot_factor_loadings(_extract_pr(res), rd; kwargs...)
+    return PortfolioOptimisers.plot_factor_loadings(extract_pr(res), rd; kwargs...)
 end
 function PortfolioOptimisers.plot_factor_loadings(res::OptimisationResult; kwargs...)
-    return PortfolioOptimisers.plot_factor_loadings(_extract_pr(res); kwargs...)
+    return PortfolioOptimisers.plot_factor_loadings(extract_pr(res); kwargs...)
 end
 function PortfolioOptimisers.plot_factor_loadings(pred::PredictionResult, rd::ReturnsResult;
                                                   kwargs...)
-    return PortfolioOptimisers.plot_factor_loadings(_extract_pr(pred.res), rd; kwargs...)
+    return PortfolioOptimisers.plot_factor_loadings(extract_pr(pred.res), rd; kwargs...)
 end
 function PortfolioOptimisers.plot_factor_loadings(pred::PredictionResult; kwargs...)
-    return PortfolioOptimisers.plot_factor_loadings(_extract_pr(pred.res); kwargs...)
+    return PortfolioOptimisers.plot_factor_loadings(extract_pr(pred.res); kwargs...)
 end
 ## plot_factor_sigma
 function PortfolioOptimisers.plot_factor_sigma(pr::PortfolioOptimisers.AbstractPriorResult,
@@ -847,17 +852,17 @@ function PortfolioOptimisers.plot_factor_sigma(pr::PortfolioOptimisers.AbstractP
 end
 function PortfolioOptimisers.plot_factor_sigma(res::OptimisationResult, rd::ReturnsResult;
                                                kwargs...)
-    return PortfolioOptimisers.plot_factor_sigma(_extract_pr(res), rd; kwargs...)
+    return PortfolioOptimisers.plot_factor_sigma(extract_pr(res), rd; kwargs...)
 end
 function PortfolioOptimisers.plot_factor_sigma(res::OptimisationResult; kwargs...)
-    return PortfolioOptimisers.plot_factor_sigma(_extract_pr(res); kwargs...)
+    return PortfolioOptimisers.plot_factor_sigma(extract_pr(res); kwargs...)
 end
 function PortfolioOptimisers.plot_factor_sigma(pred::PredictionResult, rd::ReturnsResult;
                                                kwargs...)
-    return PortfolioOptimisers.plot_factor_sigma(_extract_pr(pred.res), rd; kwargs...)
+    return PortfolioOptimisers.plot_factor_sigma(extract_pr(pred.res), rd; kwargs...)
 end
 function PortfolioOptimisers.plot_factor_sigma(pred::PredictionResult; kwargs...)
-    return PortfolioOptimisers.plot_factor_sigma(_extract_pr(pred.res); kwargs...)
+    return PortfolioOptimisers.plot_factor_sigma(extract_pr(pred.res); kwargs...)
 end
 ## plot_eigenspectrum
 function PortfolioOptimisers.plot_eigenspectrum(pr::PortfolioOptimisers.AbstractPriorResult;
@@ -874,22 +879,22 @@ function PortfolioOptimisers.plot_eigenspectrum(pr::PortfolioOptimisers.Abstract
 end
 function PortfolioOptimisers.plot_eigenspectrum(res::OptimisationResult;
                                                 reference::Bool = true, kwargs...)
-    return PortfolioOptimisers.plot_eigenspectrum(_extract_pr(res); reference = reference,
+    return PortfolioOptimisers.plot_eigenspectrum(extract_pr(res); reference = reference,
                                                   kwargs...)
 end
 function PortfolioOptimisers.plot_eigenspectrum(res::OptimisationResult, rd::ReturnsResult;
                                                 reference::Bool = true, kwargs...)
-    return PortfolioOptimisers.plot_eigenspectrum(_extract_pr(res), rd;
+    return PortfolioOptimisers.plot_eigenspectrum(extract_pr(res), rd;
                                                   reference = reference, kwargs...)
 end
 function PortfolioOptimisers.plot_eigenspectrum(pred::PredictionResult;
                                                 reference::Bool = true, kwargs...)
-    return PortfolioOptimisers.plot_eigenspectrum(_extract_pr(pred.res);
+    return PortfolioOptimisers.plot_eigenspectrum(extract_pr(pred.res);
                                                   reference = reference, kwargs...)
 end
 function PortfolioOptimisers.plot_eigenspectrum(pred::PredictionResult, rd::ReturnsResult;
                                                 reference::Bool = true, kwargs...)
-    return PortfolioOptimisers.plot_eigenspectrum(_extract_pr(pred.res), rd;
+    return PortfolioOptimisers.plot_eigenspectrum(extract_pr(pred.res), rd;
                                                   reference = reference, kwargs...)
 end
 ## plot_rolling_measure
@@ -905,7 +910,7 @@ function PortfolioOptimisers.plot_rolling_measure(r::PortfolioOptimisers.Abstrac
                                                   res::OptimisationResult,
                                                   rd::ReturnsResult; rolling::Integer = 0,
                                                   kwargs...)
-    fees = _extract_fees(res, nothing)
+    fees = extract_fees(res, nothing)
     return PortfolioOptimisers.plot_rolling_measure(r, res.w, rd, fees; rolling = rolling,
                                                     kwargs...)
 end
@@ -915,7 +920,8 @@ function PortfolioOptimisers.plot_rolling_measure(r::PortfolioOptimisers.Abstrac
     rd = pred.rd
     ret = isa(rd.X, VecVecNum) ? first(rd.X) : rd.X
     ts = isnothing(rd.ts) ? (1:length(ret)) : rd.ts
-    return _plot_rolling_measure(r, ret; ts = ts, rolling = rolling, kwargs...)
+    return PortfolioOptimisers.plot_rolling_measure(r, ret; ts = ts, rolling = rolling,
+                                                    kwargs...)
 end
 ## plot_cv_scores
 function PortfolioOptimisers.plot_cv_scores(r::PortfolioOptimisers.AbstractBaseRiskMeasure,
@@ -948,19 +954,19 @@ function PortfolioOptimisers.plot_prior(pr::PortfolioOptimisers.AbstractPriorRes
 end
 function PortfolioOptimisers.plot_prior(res::OptimisationResult;
                                         N::Option{<:Number} = nothing, kwargs...)
-    return PortfolioOptimisers.plot_prior(_extract_pr(res); N = N, kwargs...)
+    return PortfolioOptimisers.plot_prior(extract_pr(res); N = N, kwargs...)
 end
 function PortfolioOptimisers.plot_prior(res::OptimisationResult, rd::ReturnsResult;
                                         N::Option{<:Number} = nothing, kwargs...)
-    return PortfolioOptimisers.plot_prior(_extract_pr(res), rd; N = N, kwargs...)
+    return PortfolioOptimisers.plot_prior(extract_pr(res), rd; N = N, kwargs...)
 end
 function PortfolioOptimisers.plot_prior(pred::PredictionResult;
                                         N::Option{<:Number} = nothing, kwargs...)
-    return PortfolioOptimisers.plot_prior(_extract_pr(pred.res); N = N, kwargs...)
+    return PortfolioOptimisers.plot_prior(extract_pr(pred.res); N = N, kwargs...)
 end
 function PortfolioOptimisers.plot_prior(pred::PredictionResult, rd::ReturnsResult;
                                         N::Option{<:Number} = nothing, kwargs...)
-    return PortfolioOptimisers.plot_prior(_extract_pr(pred.res), rd; N = N, kwargs...)
+    return PortfolioOptimisers.plot_prior(extract_pr(pred.res), rd; N = N, kwargs...)
 end
 ## plot_factor_mu
 function PortfolioOptimisers.plot_factor_mu(pr::PortfolioOptimisers.AbstractPriorResult,
@@ -982,19 +988,19 @@ function PortfolioOptimisers.plot_factor_mu(pr::PortfolioOptimisers.AbstractPrio
 end
 function PortfolioOptimisers.plot_factor_mu(res::OptimisationResult;
                                             N::Option{<:Number} = nothing, kwargs...)
-    return PortfolioOptimisers.plot_factor_mu(_extract_pr(res); N = N, kwargs...)
+    return PortfolioOptimisers.plot_factor_mu(extract_pr(res); N = N, kwargs...)
 end
 function PortfolioOptimisers.plot_factor_mu(res::OptimisationResult, rd::ReturnsResult;
                                             N::Option{<:Number} = nothing, kwargs...)
-    return PortfolioOptimisers.plot_factor_mu(_extract_pr(res), rd; N = N, kwargs...)
+    return PortfolioOptimisers.plot_factor_mu(extract_pr(res), rd; N = N, kwargs...)
 end
 function PortfolioOptimisers.plot_factor_mu(pred::PredictionResult;
                                             N::Option{<:Number} = nothing, kwargs...)
-    return PortfolioOptimisers.plot_factor_mu(_extract_pr(pred.res); N = N, kwargs...)
+    return PortfolioOptimisers.plot_factor_mu(extract_pr(pred.res); N = N, kwargs...)
 end
 function PortfolioOptimisers.plot_factor_mu(pred::PredictionResult, rd::ReturnsResult;
                                             N::Option{<:Number} = nothing, kwargs...)
-    return PortfolioOptimisers.plot_factor_mu(_extract_pr(pred.res), rd; N = N, kwargs...)
+    return PortfolioOptimisers.plot_factor_mu(extract_pr(pred.res), rd; N = N, kwargs...)
 end
 ## plot_benchmark
 function PortfolioOptimisers.plot_benchmark(w::ArrNum, rd::ReturnsResult,
@@ -1010,7 +1016,7 @@ function PortfolioOptimisers.plot_benchmark(w::ArrNum, rd::ReturnsResult,
 end
 function PortfolioOptimisers.plot_benchmark(res::OptimisationResult, rd::ReturnsResult;
                                             compound::Bool = false, kwargs...)
-    fees = _extract_fees(res, nothing)
+    fees = extract_fees(res, nothing)
     return PortfolioOptimisers.plot_benchmark(res.w, rd, fees; compound = compound,
                                               kwargs...)
 end
@@ -1024,7 +1030,8 @@ function PortfolioOptimisers.plot_benchmark(pred::PredictionResult; compound::Bo
     ts = isnothing(rd.ts) ? (1:length(ret)) : rd.ts
     nb = rd.nb
     B = isa(rd.B, VecVecNum) ? first(rd.B) : rd.B
-    return _plot_benchmark(ret, B; ts = ts, nb = nb, compound = compound, kwargs...)
+    return PortfolioOptimisers.plot_benchmark(ret, B; ts = ts, nb = nb, compound = compound,
+                                              kwargs...)
 end
 ## plot_coskewness
 function PortfolioOptimisers.plot_coskewness(pr::HighOrderPrior,
@@ -1044,7 +1051,7 @@ function PortfolioOptimisers.plot_coskewness(pr::HighOrderPrior, rd::ReturnsResu
     return PortfolioOptimisers.plot_coskewness(pr.sk, nx; kwargs...)
 end
 function PortfolioOptimisers.plot_coskewness(res::OptimisationResult; kwargs...)
-    pr = _extract_pr(res)
+    pr = extract_pr(res)
     if !(isa(pr, HighOrderPrior))
         throw(ArgumentError("`$(nameof(typeof(res)))` prior is not a `HighOrderPrior`; no coskewness available"))
     end
@@ -1052,14 +1059,14 @@ function PortfolioOptimisers.plot_coskewness(res::OptimisationResult; kwargs...)
 end
 function PortfolioOptimisers.plot_coskewness(res::OptimisationResult, rd::ReturnsResult;
                                              kwargs...)
-    pr = _extract_pr(res)
+    pr = extract_pr(res)
     if !(isa(pr, HighOrderPrior))
         throw(ArgumentError("`$(nameof(typeof(res)))` prior is not a `HighOrderPrior`; no coskewness available"))
     end
     return PortfolioOptimisers.plot_coskewness(pr, rd; kwargs...)
 end
 function PortfolioOptimisers.plot_coskewness(pred::PredictionResult; kwargs...)
-    pr = _extract_pr(pred.res)
+    pr = extract_pr(pred.res)
     if !(isa(pr, HighOrderPrior))
         throw(ArgumentError("`$(nameof(typeof(pred.res)))` prior is not a `HighOrderPrior`; no coskewness available"))
     end
@@ -1067,7 +1074,7 @@ function PortfolioOptimisers.plot_coskewness(pred::PredictionResult; kwargs...)
 end
 function PortfolioOptimisers.plot_coskewness(pred::PredictionResult, rd::ReturnsResult;
                                              kwargs...)
-    pr = _extract_pr(pred.res)
+    pr = extract_pr(pred.res)
     if !(isa(pr, HighOrderPrior))
         throw(ArgumentError("`$(nameof(typeof(pred.res)))` prior is not a `HighOrderPrior`; no coskewness available"))
     end
@@ -1092,7 +1099,7 @@ function PortfolioOptimisers.plot_cokurtosis(pr::HighOrderPrior, rd::ReturnsResu
 end
 function PortfolioOptimisers.plot_cokurtosis(res::OptimisationResult;
                                              reference::Bool = true, kwargs...)
-    pr = _extract_pr(res)
+    pr = extract_pr(res)
     if !(isa(pr, HighOrderPrior))
         throw(ArgumentError("`$(nameof(typeof(res)))` prior is not a `HighOrderPrior`; no cokurtosis available"))
     end
@@ -1100,7 +1107,7 @@ function PortfolioOptimisers.plot_cokurtosis(res::OptimisationResult;
 end
 function PortfolioOptimisers.plot_cokurtosis(res::OptimisationResult, rd::ReturnsResult;
                                              reference::Bool = true, kwargs...)
-    pr = _extract_pr(res)
+    pr = extract_pr(res)
     if !(isa(pr, HighOrderPrior))
         throw(ArgumentError("`$(nameof(typeof(res)))` prior is not a `HighOrderPrior`; no cokurtosis available"))
     end
@@ -1108,7 +1115,7 @@ function PortfolioOptimisers.plot_cokurtosis(res::OptimisationResult, rd::Return
 end
 function PortfolioOptimisers.plot_cokurtosis(pred::PredictionResult; reference::Bool = true,
                                              kwargs...)
-    pr = _extract_pr(pred.res)
+    pr = extract_pr(pred.res)
     if !(isa(pr, HighOrderPrior))
         throw(ArgumentError("`$(nameof(typeof(pred.res)))` prior is not a `HighOrderPrior`; no cokurtosis available"))
     end
@@ -1116,7 +1123,7 @@ function PortfolioOptimisers.plot_cokurtosis(pred::PredictionResult; reference::
 end
 function PortfolioOptimisers.plot_cokurtosis(pred::PredictionResult, rd::ReturnsResult;
                                              reference::Bool = true, kwargs...)
-    pr = _extract_pr(pred.res)
+    pr = extract_pr(pred.res)
     if !(isa(pr, HighOrderPrior))
         throw(ArgumentError("`$(nameof(typeof(pred.res)))` prior is not a `HighOrderPrior`; no cokurtosis available"))
     end
@@ -1133,6 +1140,7 @@ function PortfolioOptimisers.plot_risk_contribution(r::PortfolioOptimisers.Abstr
                                                     delta::Number = 1e-6,
                                                     marginal::Bool = false,
                                                     percentage::Bool = false,
+                                                    erc::Bool = true,
                                                     N::Option{<:Number} = nothing,
                                                     kwargs...)
     if !(delta > zero(delta))
@@ -1145,7 +1153,12 @@ function PortfolioOptimisers.plot_risk_contribution(r::PortfolioOptimisers.Abstr
     if percentage
         rc = rc ./ sum(rc)
     end
-    return PortfolioOptimisers.plot_composition(rc, nx; N = N, kwargs...)
+    plt = PortfolioOptimisers.plot_composition(rc, nx; N = N, ylabel = "Contribution",
+                                               title = "Risk Contribution", kwargs...)
+    if erc
+        plt = hline!(plt, [mean(rc)])
+    end
+    return plt
 end
 ## ────────────────────────────────────────────────────────────────────────────
 ## Factor risk contribution
@@ -1189,13 +1202,15 @@ function PortfolioOptimisers.plot_drawdowns(w::ArrNum, X::MatNum,
                                             ts::AbstractVector = 1:size(X, 1),
                                             compound::Bool = false, alpha::Number = 0.05,
                                             kappa::Number = 0.3, rw = nothing, kwargs...)
-    return _plot_drawdowns(calc_net_returns(w, X, fees); slv = slv, ts = ts,
-                           compound = compound, alpha = alpha, kappa = kappa, rw = rw,
-                           kwargs...)
+    return PortfolioOptimisers.plot_drawdowns(calc_net_returns(w, X, fees); slv = slv,
+                                              ts = ts, compound = compound, alpha = alpha,
+                                              kappa = kappa, rw = rw, kwargs...)
 end
-function _plot_drawdowns(ret::VecNum; slv::Option{<:Slv_VecSlv} = nothing,
-                         ts::AbstractVector, compound::Bool = false, alpha::Number = 0.05,
-                         kappa::Number = 0.3, rw = nothing, kwargs...)
+function PortfolioOptimisers.plot_drawdowns(ret::VecNum;
+                                            slv::Option{<:Slv_VecSlv} = nothing,
+                                            ts::AbstractVector, compound::Bool = false,
+                                            alpha::Number = 0.05, kappa::Number = 0.3,
+                                            rw = nothing, kwargs...)
     if !(zero(alpha) < alpha < one(alpha))
         throw(ArgumentError("alpha must satisfy 0 < alpha < 1; got $alpha"))
     end
@@ -1270,13 +1285,16 @@ function PortfolioOptimisers.plot_histogram(w::ArrNum, X::MatNum,
                                             alpha::Number = 0.05, kappa::Number = 0.3,
                                             rw = nothing, points::Integer = 0,
                                             reference::Bool = true, kwargs...)
-    return _plot_histogram(calc_net_returns(w, X, fees); slv = slv, alpha = alpha,
-                           kappa = kappa, rw = rw, points = points, reference = reference,
-                           kwargs...)
+    return PortfolioOptimisers.plot_histogram(calc_net_returns(w, X, fees); slv = slv,
+                                              alpha = alpha, kappa = kappa, rw = rw,
+                                              points = points, reference = reference,
+                                              kwargs...)
 end
-function _plot_histogram(ret::VecNum; slv::Option{<:Slv_VecSlv} = nothing,
-                         alpha::Number = 0.05, kappa::Number = 0.3, rw = nothing,
-                         points::Integer = 0, reference::Bool = true, kwargs...)
+function PortfolioOptimisers.plot_histogram(ret::VecNum;
+                                            slv::Option{<:Slv_VecSlv} = nothing,
+                                            alpha::Number = 0.05, kappa::Number = 0.3,
+                                            rw = nothing, points::Integer = 0,
+                                            reference::Bool = true, kwargs...)
     if !(zero(alpha) < alpha < one(alpha))
         throw(ArgumentError("alpha must satisfy 0 < alpha < 1; got $alpha"))
     end
@@ -1366,7 +1384,7 @@ end
 function PortfolioOptimisers.plot_mu(mu::VecNum, nx::AbstractVector = 1:length(mu);
                                      N::Option{<:Number} = nothing, kwargs...)
     M = length(mu)
-    N, idx = _relevant_assets(mu, M, N)
+    N, idx = relevant_assets(mu, M, N)
     sort!(view(idx, 1:N))
     top_idx = view(idx, 1:N)
     return bar(mu[top_idx]; xticks = (1:N, string.(nx[top_idx])),
@@ -1458,7 +1476,7 @@ function PortfolioOptimisers.plot_weight_stability(mpred::MultiPeriodPredictionR
     end
     M, K = size(w_mat)
     mean_abs = vec(mean(abs.(w_mat); dims = 2))
-    N, idx = _relevant_assets(mean_abs, M, N)
+    N, idx = relevant_assets(mean_abs, M, N)
     top_idx = sort(view(idx, 1:N))
     labels = nx[top_idx]
     data = w_mat[top_idx, :]
@@ -1481,7 +1499,7 @@ function PortfolioOptimisers.plot_weight_stability(ppred::PopulationPredictionRe
     end
     M, K = size(w_mat)
     mean_abs = vec(mean(abs.(w_mat); dims = 2))
-    N, idx = _relevant_assets(mean_abs, M, N)
+    N, idx = relevant_assets(mean_abs, M, N)
     top_idx = sort(view(idx, 1:N))
     labels = nx[top_idx]
     data = w_mat[top_idx, :]
@@ -1524,8 +1542,9 @@ function PortfolioOptimisers.plot_drawdowns(pred::MultiPeriodPredictionResult;
     mrd = pred.mrd
     ret = isa(mrd.X, VecVecNum) ? first(mrd.X) : mrd.X
     ts = isnothing(mrd.ts) ? (1:length(ret)) : mrd.ts
-    return _plot_drawdowns(ret; slv = slv, ts = ts, compound = compound, alpha = alpha,
-                           kappa = kappa, rw = rw, kwargs...)
+    return PortfolioOptimisers.plot_drawdowns(ret; slv = slv, ts = ts, compound = compound,
+                                              alpha = alpha, kappa = kappa, rw = rw,
+                                              kwargs...)
 end
 function PortfolioOptimisers.plot_histogram(pred::MultiPeriodPredictionResult;
                                             slv::Option{<:Slv_VecSlv} = nothing,
@@ -1534,8 +1553,9 @@ function PortfolioOptimisers.plot_histogram(pred::MultiPeriodPredictionResult;
                                             reference::Bool = true, kwargs...)
     mrd = pred.mrd
     ret = isa(mrd.X, VecVecNum) ? first(mrd.X) : mrd.X
-    return _plot_histogram(ret; slv = slv, alpha = alpha, kappa = kappa, rw = rw,
-                           points = points, reference = reference, kwargs...)
+    return PortfolioOptimisers.plot_histogram(ret; slv = slv, alpha = alpha, kappa = kappa,
+                                              rw = rw, points = points,
+                                              reference = reference, kwargs...)
 end
 function PortfolioOptimisers.plot_rolling_measure(r::PortfolioOptimisers.AbstractBaseRiskMeasure,
                                                   pred::MultiPeriodPredictionResult;
@@ -1543,7 +1563,8 @@ function PortfolioOptimisers.plot_rolling_measure(r::PortfolioOptimisers.Abstrac
     mrd = pred.mrd
     ret = isa(mrd.X, VecVecNum) ? first(mrd.X) : mrd.X
     ts = isnothing(mrd.ts) ? (1:length(ret)) : mrd.ts
-    return _plot_rolling_measure(r, ret; ts = ts, rolling = rolling, kwargs...)
+    return PortfolioOptimisers.plot_rolling_measure(r, ret; ts = ts, rolling = rolling,
+                                                    kwargs...)
 end
 function PortfolioOptimisers.plot_rolling_measure(r::PortfolioOptimisers.AbstractBaseRiskMeasure,
                                                   ppred::PopulationPredictionResult;
@@ -1556,7 +1577,8 @@ function PortfolioOptimisers.plot_rolling_measure(r::PortfolioOptimisers.Abstrac
     avg_ret = vec(mean(hcat(rets...); dims = 2))
     first_mrd = isa(members[1], PredictionResult) ? members[1].rd : members[1].mrd
     ts = isnothing(first_mrd.ts) ? (1:length(avg_ret)) : first_mrd.ts
-    return _plot_rolling_measure(r, avg_ret; ts = ts, rolling = rolling, kwargs...)
+    return PortfolioOptimisers.plot_rolling_measure(r, avg_ret; ts = ts, rolling = rolling,
+                                                    kwargs...)
 end
 ## ────────────────────────────────────────────────────────────────────────────
 ## PopulationPredictionResult: drawdowns, histogram, rolling measure
@@ -1574,8 +1596,9 @@ function PortfolioOptimisers.plot_drawdowns(ppred::PopulationPredictionResult;
     avg_ret = vec(mean(hcat(rets...); dims = 2))
     first_mrd = isa(members[1], PredictionResult) ? members[1].rd : members[1].mrd
     ts = isnothing(first_mrd.ts) ? (1:length(avg_ret)) : first_mrd.ts
-    return _plot_drawdowns(avg_ret; slv = slv, ts = ts, compound = compound, alpha = alpha,
-                           kappa = kappa, rw = rw, kwargs...)
+    return PortfolioOptimisers.plot_drawdowns(avg_ret; slv = slv, ts = ts,
+                                              compound = compound, alpha = alpha,
+                                              kappa = kappa, rw = rw, kwargs...)
 end
 function PortfolioOptimisers.plot_histogram(ppred::PopulationPredictionResult;
                                             slv::Option{<:Slv_VecSlv} = nothing,
@@ -1588,8 +1611,9 @@ function PortfolioOptimisers.plot_histogram(ppred::PopulationPredictionResult;
         return isa(mrd.X, VecVecNum) ? first(mrd.X) : mrd.X
     end
     avg_ret = vec(mean(hcat(rets...); dims = 2))
-    return _plot_histogram(avg_ret; slv = slv, alpha = alpha, kappa = kappa, rw = rw,
-                           points = points, reference = reference, kwargs...)
+    return PortfolioOptimisers.plot_histogram(avg_ret; slv = slv, alpha = alpha,
+                                              kappa = kappa, rw = rw, points = points,
+                                              reference = reference, kwargs...)
 end
 ## ────────────────────────────────────────────────────────────────────────────
 ## Factor expected returns bar chart
@@ -1599,7 +1623,7 @@ function PortfolioOptimisers.plot_factor_mu(f_mu::VecNum,
                                             nf::AbstractVector = 1:length(f_mu);
                                             N::Option{<:Number} = nothing, kwargs...)
     M = length(f_mu)
-    N, idx = _relevant_assets(f_mu, M, N)
+    N, idx = relevant_assets(f_mu, M, N)
     sort!(view(idx, 1:N))
     top_idx = view(idx, 1:N)
     return bar(f_mu[top_idx]; xticks = (1:N, string.(nf[top_idx])),
@@ -1615,12 +1639,13 @@ function PortfolioOptimisers.plot_benchmark(w::ArrNum, X::MatNum, B::VecNum_VecV
                                             ts::AbstractVector = 1:size(X, 1),
                                             nb::Option{<:AbstractVector} = nothing,
                                             compound::Bool = false, kwargs...)
-    return _plot_benchmark(calc_net_returns(w, X, fees), B; ts = ts, nb = nb,
-                           compound = compound, kwargs...)
+    return PortfolioOptimisers.plot_benchmark(calc_net_returns(w, X, fees), B; ts = ts,
+                                              nb = nb, compound = compound, kwargs...)
 end
-function _plot_benchmark(net_ret::VecNum, B::VecNum_VecVecNum; ts::AbstractVector,
-                         nb::Option{<:AbstractVector} = nothing, compound::Bool = false,
-                         kwargs...)
+function PortfolioOptimisers.plot_benchmark(net_ret::VecNum, B::VecNum_VecVecNum;
+                                            ts::AbstractVector,
+                                            nb::Option{<:AbstractVector} = nothing,
+                                            compound::Bool = false, kwargs...)
     ret = cumulative_returns(net_ret, compound)
     Bmat = isa(B, VecVecNum) ? hcat(B...) : reshape(B, :, 1)
     Nb = size(Bmat, 2)
@@ -1643,7 +1668,8 @@ function PortfolioOptimisers.plot_benchmark(pred::MultiPeriodPredictionResult;
     end
     ret = isa(mrd.X, VecVecNum) ? first(mrd.X) : mrd.X
     ts = isnothing(mrd.ts) ? (1:length(ret)) : mrd.ts
-    return _plot_benchmark(ret, mrd.B; ts = ts, nb = mrd.nb, compound = compound, kwargs...)
+    return PortfolioOptimisers.plot_benchmark(ret, mrd.B; ts = ts, nb = mrd.nb,
+                                              compound = compound, kwargs...)
 end
 ## ────────────────────────────────────────────────────────────────────────────
 ## Coskewness heatmap
@@ -1709,7 +1735,7 @@ function PortfolioOptimisers.plot_portfolio_dashboard(res::OptimisationResult, r
                                                       alpha::Number = 0.05,
                                                       kappa::Number = 0.3, rw = nothing,
                                                       kwargs...)
-    fees = _extract_fees(res, nothing)
+    fees = extract_fees(res, nothing)
     w = res.w
     if isa(rd, ReturnsResult)
         nx = rd.nx
@@ -1804,7 +1830,7 @@ function PortfolioOptimisers.plot_efficient_frontier(res_vec::AbstractVector{<:O
 end
 function PortfolioOptimisers.plot_efficient_frontier(res_vec::AbstractVector{<:OptimisationResult},
                                                      rd::ReturnsResult; kwargs...)
-    return PortfolioOptimisers.plot_efficient_frontier(res_vec, _extract_pr(first(res_vec));
+    return PortfolioOptimisers.plot_efficient_frontier(res_vec, extract_pr(first(res_vec));
                                                        kwargs...)
 end
 function PortfolioOptimisers.plot_efficient_frontier(w::VecVecNum, pr::Pr_RR;
@@ -1852,7 +1878,7 @@ end
 function PortfolioOptimisers.plot_efficient_frontier(res::OptimisationResult, pr::Pr_RR;
                                                      fees::Option{<:Fees} = nothing,
                                                      kwargs...)
-    fees = _extract_fees(res, fees)
+    fees = extract_fees(res, fees)
     w = res.w
     if isa(w, VecVecNum)
         return PortfolioOptimisers.plot_efficient_frontier(w, pr; fees = fees, kwargs...)
@@ -1863,7 +1889,7 @@ function PortfolioOptimisers.plot_efficient_frontier(res::OptimisationResult, pr
 end
 function PortfolioOptimisers.plot_efficient_frontier(res::OptimisationResult,
                                                      rd::ReturnsResult; kwargs...)
-    return PortfolioOptimisers.plot_efficient_frontier(res, _extract_pr(res); kwargs...)
+    return PortfolioOptimisers.plot_efficient_frontier(res, extract_pr(res); kwargs...)
 end
 ## ────────────────────────────────────────────────────────────────────────────
 ## Performance summary
@@ -1874,12 +1900,15 @@ function PortfolioOptimisers.plot_performance_summary(w::ArrNum, X::MatNum,
                                                       periods_per_year::Number = 252,
                                                       alpha::Number = 0.05,
                                                       compound::Bool = false, kwargs...)
-    return _plot_performance_summary(calc_net_returns(w, X, fees);
-                                     periods_per_year = periods_per_year, alpha = alpha,
-                                     compound = compound, kwargs...)
+    return PortfolioOptimisers.plot_performance_summary(calc_net_returns(w, X, fees);
+                                                        periods_per_year = periods_per_year,
+                                                        alpha = alpha, compound = compound,
+                                                        kwargs...)
 end
-function _plot_performance_summary(ret::VecNum; periods_per_year::Number = 252,
-                                   alpha::Number = 0.05, compound::Bool = false, kwargs...)
+function PortfolioOptimisers.plot_performance_summary(ret::VecNum;
+                                                      periods_per_year::Number = 252,
+                                                      alpha::Number = 0.05,
+                                                      compound::Bool = false, kwargs...)
     if !(zero(alpha) < alpha < one(alpha))
         throw(ArgumentError("alpha must satisfy 0 < alpha < 1; got $alpha"))
     end
@@ -1916,7 +1945,7 @@ function PortfolioOptimisers.plot_performance_summary(res::OptimisationResult,
                                                       rd::ReturnsResult;
                                                       alpha::Number = 0.05,
                                                       compound::Bool = false, kwargs...)
-    fees = _extract_fees(res, nothing)
+    fees = extract_fees(res, nothing)
     return PortfolioOptimisers.plot_performance_summary(res.w, rd.X, fees; alpha = alpha,
                                                         compound = compound, kwargs...)
 end
@@ -1925,14 +1954,16 @@ function PortfolioOptimisers.plot_performance_summary(pred::PredictionResult;
                                                       compound::Bool = false, kwargs...)
     rd = pred.rd
     ret = isa(rd.X, VecVecNum) ? first(rd.X) : rd.X
-    return _plot_performance_summary(ret; alpha = alpha, compound = compound, kwargs...)
+    return PortfolioOptimisers.plot_performance_summary(ret; alpha = alpha,
+                                                        compound = compound, kwargs...)
 end
 function PortfolioOptimisers.plot_performance_summary(pred::MultiPeriodPredictionResult;
                                                       alpha::Number = 0.05,
                                                       compound::Bool = false, kwargs...)
     mrd = pred.mrd
     ret = isa(mrd.X, VecVecNum) ? first(mrd.X) : mrd.X
-    return _plot_performance_summary(ret; alpha = alpha, compound = compound, kwargs...)
+    return PortfolioOptimisers.plot_performance_summary(ret; alpha = alpha,
+                                                        compound = compound, kwargs...)
 end
 ## ────────────────────────────────────────────────────────────────────────────
 ## Rolling maximum drawdown
@@ -1943,11 +1974,13 @@ function PortfolioOptimisers.plot_rolling_drawdowns(w::ArrNum, X::MatNum,
                                                     ts::AbstractVector = 1:size(X, 1),
                                                     rolling::Integer = 0,
                                                     compound::Bool = false, kwargs...)
-    return _plot_rolling_drawdowns(calc_net_returns(w, X, fees); ts = ts, rolling = rolling,
-                                   compound = compound, kwargs...)
+    return PortfolioOptimisers.plot_rolling_drawdowns(calc_net_returns(w, X, fees); ts = ts,
+                                                      rolling = rolling,
+                                                      compound = compound, kwargs...)
 end
-function _plot_rolling_drawdowns(ret::VecNum; ts::AbstractVector, rolling::Integer = 0,
-                                 compound::Bool = false, kwargs...)
+function PortfolioOptimisers.plot_rolling_drawdowns(ret::VecNum; ts::AbstractVector,
+                                                    rolling::Integer = 0,
+                                                    compound::Bool = false, kwargs...)
     if !(rolling >= 0)
         throw(ArgumentError("rolling must be >= 0; got $rolling"))
     end
@@ -1974,7 +2007,7 @@ end
 function PortfolioOptimisers.plot_rolling_drawdowns(res::OptimisationResult,
                                                     rd::ReturnsResult; rolling::Integer = 0,
                                                     compound::Bool = false, kwargs...)
-    fees = _extract_fees(res, nothing)
+    fees = extract_fees(res, nothing)
     return PortfolioOptimisers.plot_rolling_drawdowns(res.w, rd, fees; rolling = rolling,
                                                       compound = compound, kwargs...)
 end
@@ -1984,8 +2017,8 @@ function PortfolioOptimisers.plot_rolling_drawdowns(pred::PredictionResult;
     rd = pred.rd
     ret = isa(rd.X, VecVecNum) ? first(rd.X) : rd.X
     ts = isnothing(rd.ts) ? (1:length(ret)) : rd.ts
-    return _plot_rolling_drawdowns(ret; ts = ts, rolling = rolling, compound = compound,
-                                   kwargs...)
+    return PortfolioOptimisers.plot_rolling_drawdowns(ret; ts = ts, rolling = rolling,
+                                                      compound = compound, kwargs...)
 end
 function PortfolioOptimisers.plot_rolling_drawdowns(pred::MultiPeriodPredictionResult;
                                                     rolling::Integer = 0,
@@ -1993,8 +2026,8 @@ function PortfolioOptimisers.plot_rolling_drawdowns(pred::MultiPeriodPredictionR
     mrd = pred.mrd
     ret = isa(mrd.X, VecVecNum) ? first(mrd.X) : mrd.X
     ts = isnothing(mrd.ts) ? (1:length(ret)) : mrd.ts
-    return _plot_rolling_drawdowns(ret; ts = ts, rolling = rolling, compound = compound,
-                                   kwargs...)
+    return PortfolioOptimisers.plot_rolling_drawdowns(ret; ts = ts, rolling = rolling,
+                                                      compound = compound, kwargs...)
 end
 ## ────────────────────────────────────────────────────────────────────────────
 ## Rolling measure base
@@ -2005,11 +2038,12 @@ function PortfolioOptimisers.plot_rolling_measure(r::PortfolioOptimisers.Abstrac
                                                   fees::Option{<:Fees} = nothing;
                                                   ts::AbstractVector = 1:size(X, 1),
                                                   rolling::Integer = 0, kwargs...)
-    return _plot_rolling_measure(r, calc_net_returns(w, X, fees); ts = ts,
-                                 rolling = rolling, kwargs...)
+    return PortfolioOptimisers.plot_rolling_measure(r, calc_net_returns(w, X, fees);
+                                                    ts = ts, rolling = rolling, kwargs...)
 end
-function _plot_rolling_measure(r::PortfolioOptimisers.AbstractBaseRiskMeasure, ret::VecNum;
-                               ts::AbstractVector, rolling::Integer = 0, kwargs...)
+function PortfolioOptimisers.plot_rolling_measure(r::PortfolioOptimisers.AbstractBaseRiskMeasure,
+                                                  ret::VecNum; ts::AbstractVector,
+                                                  rolling::Integer = 0, kwargs...)
     if !(rolling >= 0)
         throw(ArgumentError("rolling must be >= 0; got $rolling"))
     end

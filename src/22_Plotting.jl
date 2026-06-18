@@ -1297,7 +1297,7 @@ Select the top-N assets from a weight vector by absolute weight magnitude.
 
   - [`number_effective_assets`](@ref)
 """
-function _relevant_assets(w::VecNum, M::Integer, N_opt::Option{<:Number} = nothing)
+function relevant_assets(w::VecNum, M::Integer, N_opt::Option{<:Number} = nothing)
     N_eff = isnothing(N_opt) ? number_effective_assets(w) : N_opt
     abs_w = abs.(w)
     idx = sortperm(abs_w; rev = true)

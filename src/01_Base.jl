@@ -370,7 +370,7 @@ const arg_dict = Dict(
                       :diagonal => "`diagonal`: Whether to use only the diagonal of the covariance matrix.",#
                       :n_sim => "`n_sim`: Number of simulation samples.",#
                       :block_size => "`block_size`: Block size for bootstrap sampling.",#
-                      :q_bs => "`q`: Quantile parameter for uncertainty set computation.",#
+                      :q_bs => "`q`: Confidence level that sizes the uncertainty set (`0 < q < 1`). A *smaller* `q` is more demanding and yields a *larger, more conservative* set (wider box intervals / larger ellipsoid radius); a larger `q` gives a tighter set closer to the point estimate.",#
                       :bootstrap => "`bootstrap`: Bootstrap algorithm.",#
                       :ucs => "`ucs`: Uncertainty set.",#
                       :ucsa => "`alg`: Uncertainty set algorithm.",#
@@ -432,6 +432,9 @@ const arg_dict = Dict(
                       # Power norm parameters.
                       :pa_rm => "`pa`: Power norm parameter for the lower tail.",#
                       :pb_rm => "`pb`: Power norm parameter for the upper tail.",#
+                      # Generic Value-at-Risk range components.
+                      :loss_rm => "`loss`: Loss-side XatRisk risk measure applied to the portfolio returns.",#
+                      :gain_rm => "`gain`: Gain-side XatRisk risk measure applied to the negated portfolio returns.",#
                       # Fees.
                       :tn_fees => "`tn`: Turnover estimator or result.",#
                       :l_fees => "`l`: Long proportional fees.",#
@@ -997,7 +1000,7 @@ macro define_pretty_show(T, flag::Bool = true)
                     end
                     flag = has_pretty_show_method(val)
                     sym1 = ifelse(i == length(fields) &&
-                                  (!flag || (flag && isempty(fieldnames(typeof(val))))),
+                                      (!flag || (flag && isempty(fieldnames(typeof(val))))),
                                   '┴', '┼')
                     print(io, lpad(string(field), padding), " ")
                     if isnothing(val)

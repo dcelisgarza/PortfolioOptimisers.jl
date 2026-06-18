@@ -183,5 +183,5 @@ raises an error.
 function set_risk_constraints!(::JuMP.Model, ::Any, ::NegativeSkewness,
                                ::RiskJuMPOptimisationEstimator, pr::LowOrderPrior, args...;
                                kwargs...)
-    throw(ArgumentError("NegativeSkewness requires a HighOrderPrior, not a $(typeof(pr))."))
+    return throw(ArgumentError("NegativeSkewness requires a HighOrderPrior, not a $(typeof(pr))."))
 end

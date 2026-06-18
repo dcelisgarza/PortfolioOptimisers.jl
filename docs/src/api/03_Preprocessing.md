@@ -7,7 +7,7 @@ Other than [`FiniteAllocationOptimisationEstimator`](@ref), all optimisations wo
 ```@docs
 AbstractReturnsResult
 ReturnsResult
-_check_names_and_returns_matrix
+check_names_and_returns_matrix
 prices_to_returns
 returns_result_view
 returns_result_picker

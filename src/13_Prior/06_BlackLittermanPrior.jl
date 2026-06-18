@@ -138,13 +138,7 @@ BlackLittermanPrior
                                  sets::Option{<:AssetSets},
                                  views_conf::Option{<:Num_VecNum}, rf::Number,
                                  tau::Option{<:Number})
-        if isa(views, LinearConstraintEstimator)
-            @argcheck(!isnothing(sets))
-        end
-        assert_bl_views_conf(views_conf, views)
-        if !isnothing(tau)
-            @argcheck(tau > zero(tau))
-        end
+        assert_bl(views, sets, views_conf, tau)
         return new{typeof(pe), typeof(mp), typeof(views), typeof(sets), typeof(views_conf),
                    typeof(rf), typeof(tau)}(pe, mp, views, sets, views_conf, rf, tau)
     end
@@ -164,16 +158,73 @@ end
     forward(pe, me, ce)
 end
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Assert that the Black-Litterman prior's views, sets, view confidences, and blending parameter are valid.
+"""
+function assert_bl(views::Lc_BLV, sets::Option{<:AssetSets},
+                   views_conf::Option{<:Num_VecNum}, tau::Option{<:Number})
+    if isa(views, LinearConstraintEstimator)
+        @argcheck(!isnothing(sets))
+    end
+    assert_bl_views_conf(views_conf, views)
+    if !isnothing(tau)
+        @argcheck(tau > zero(tau))
+    end
+    return nothing
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Pre-compute shared Black-Litterman inputs from views, prior covariance, and blending parameters.
+
+Extracts the view matrix `P`, view returns vector `Q`, and excluded indices from `views` and `sets` via [`black_litterman_views`](@ref), resolves `tau`, filters excluded rows from `views_conf` via [`remove_excl_views`](@ref), and computes the scaled uncertainty matrix `omega = tau * Ω` via [`calc_omega`](@ref).
+
+# Arguments
+
+  - $(arg_dict[:views])
+  - $(arg_dict[:sets])
+  - $(arg_dict[:views_conf])
+  - `prior_sigma::MatNum`: Prior covariance matrix of asset returns `assets × assets`.
+  - `pe_tau::Option{<:Number}`: Optional user-specified blending parameter. If `nothing`, defaults to `1/T`.
+  - `T::Integer`: Number of observations used to compute the default `tau = 1/T`.
+  - $(arg_dict[:datatype])
+  - $(arg_dict[:strict])
+
+# Returns
+
+  - `(; P, Q, tau, omega)`: Named tuple where:
+
+      + `P::MatNum`: View matrix `views × assets`.
+      + `Q::VecNum`: View returns vector `views × 1`.
+      + `tau::Number`: Resolved blending parameter.
+      + `omega::LinearAlgebra.Diagonal`: Scaled view uncertainty matrix `tau * Ω`.
+
+# Related
+
+  - [`BlackLittermanPrior`](@ref)
+  - [`black_litterman_views`](@ref)
+  - [`calc_omega`](@ref)
+  - [`remove_excl_views`](@ref)
+  - [`vanilla_posteriors`](@ref)
+"""
+function bl_preroll(views, sets, views_conf, prior_sigma, pe_tau, T, datatype, strict)
+    (; P, Q, excl) = black_litterman_views(views, sets; datatype = datatype,
+                                           strict = strict)
+    tau = isnothing(pe_tau) ? inv(T) : pe_tau
+    views_conf = remove_excl_views(views_conf, excl)
+    omega = tau * calc_omega(views_conf, P, prior_sigma)
+    return (; P, Q, tau, omega)
+end
+"""
     calc_omega(views_conf::Option{<:Num_VecNum}, P::MatNum,
-               sigma::MatNum)
+               sigma::MatNum) -> LinearAlgebra.Diagonal
 
 Compute the Black-Litterman view uncertainty matrix `Ω`.
 
-This method constructs the view uncertainty matrix `Ω` for the Black-Litterman model when no explicit view confidences are provided (`views_conf = nothing`). The uncertainty for each view is set to the variance of the projected prior covariance, i.e., `Ω = LinearAlgebra.diag(P * Σ * P')`, where `P` is the view matrix and `Σ` is the prior covariance matrix.
-
 # Mathematical definition
 
-Let ``\\mathbf{P}`` be the ``K \\times N`` view matrix and ``\\mathbf{\\Sigma}`` the ``N \\times N`` prior covariance. The view uncertainty matrix for each `views_conf` variant:
+Let ``\\mathbf{P}`` be the ``K \\times N`` view matrix and ``\\mathbf{\\Sigma}`` the ``N \\times N`` prior covariance matrix. The view uncertainty matrix ``\\mathbf{\\Omega}`` for each `views_conf` variant is:
 
 ```math
 \\begin{align}
@@ -206,21 +257,22 @@ Where:
 
   - `views_conf`:
 
-      + `::Nothing`: Indicates no view confidence is specified, `LinearAlgebra.Diagonal(P * sigma * transpose(P))`.
-      + `::Number`: Scalar confidence level applied uniformly to all views, `(1/v - 1) * LinearAlgebra.Diagonal(P * sigma * transpose(P))`, where `v` is the view confidence level.
-      + `::VecNum`: Vector of confidence levels for each view, `(1 ./ v - 1) * Diag(P * Σ * P')`.
+      + `::Nothing`: No confidence specified; `Ω = Diag(P * sigma * P')`.
+      + `::Number`: Scalar confidence `v`; `Ω = (1/v - 1) * Diag(P * sigma * P')`.
+      + `::VecNum`: Per-view confidences `v`; `Ω = Diag((1 ./ v .- 1) .* diag(P * sigma * P'))`.
 
-  - `P`: The view matrix (views × assets).
+  - $(arg_dict[:P])
 
-  - `sigma`: The prior covariance matrix (assets × assets).
+  - $(arg_dict[:sigma])
 
 # Returns
 
-  - `omega::Diagonal`: Diagonal matrix of view uncertainties.
+  - `omega::LinearAlgebra.Diagonal`: Diagonal view uncertainty matrix `views × views`.
 
 # Related
 
   - [`BlackLittermanPrior`](@ref)
+  - [`bl_preroll`](@ref)
   - [`vanilla_posteriors`](@ref)
 """
 function calc_omega(::Nothing, P::MatNum, sigma::MatNum)
@@ -424,11 +476,8 @@ function prior(pe::BlackLittermanPrior, X::MatNum, F::Option{<:MatNum} = nothing
     @argcheck(length(pe.sets.dict[pe.sets.key]) == size(X, 2))
     prior_model = prior(pe.pe, X, F; strict = strict, kwargs...)
     posterior_X, prior_mu, prior_sigma = prior_model.X, prior_model.mu, prior_model.sigma
-    (; P, Q, excl) = black_litterman_views(pe.views, pe.sets;
-                                           datatype = eltype(posterior_X), strict = strict)
-    tau = isnothing(pe.tau) ? inv(size(X, 1)) : pe.tau
-    views_conf = remove_excl_views(pe.views_conf, excl)
-    omega = tau * calc_omega(views_conf, P, prior_sigma)
+    (; P, Q, tau, omega) = bl_preroll(pe.views, pe.sets, pe.views_conf, prior_sigma, pe.tau,
+                                      size(X, 1), eltype(posterior_X), strict)
     posterior_mu, posterior_sigma = vanilla_posteriors(tau, pe.rf, prior_mu, prior_sigma,
                                                        omega, P, Q)
     matrix_processing!(pe.mp, posterior_sigma, posterior_X; kwargs...)

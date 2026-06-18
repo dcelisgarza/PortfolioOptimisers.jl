@@ -566,3 +566,45 @@ function mr_block5()
         i += 1
     end
 end
+
+function mr_block6()
+    rs1 = [GenericValueatRiskRange(; loss = ValueatRisk(), gain = ValueatRisk()),
+           GenericValueatRiskRange(; loss = ValueatRisk(; alg = DistributionValueatRisk()),
+                                   gain = ValueatRisk(; alg = DistributionValueatRisk())),
+           GenericValueatRiskRange(; loss = ConditionalValueatRisk(),
+                                   gain = ConditionalValueatRisk()),
+           GenericValueatRiskRange(; loss = DistributionallyRobustConditionalValueatRisk(),
+                                   gain = DistributionallyRobustConditionalValueatRisk()),
+           GenericValueatRiskRange(; loss = EntropicValueatRisk(),
+                                   gain = EntropicValueatRisk()),
+           GenericValueatRiskRange(; loss = RelativisticValueatRisk(),
+                                   gain = RelativisticValueatRisk()),
+           GenericValueatRiskRange(; loss = WorstRealisation(), gain = WorstRealisation()),
+           GenericValueatRiskRange(; loss = PowerNormValueatRisk(),
+                                   gain = PowerNormValueatRisk())]
+    rs2 = [ValueatRiskRange(), ValueatRiskRange(; alg = DistributionValueatRisk()),
+           ConditionalValueatRiskRange(),
+           DistributionallyRobustConditionalValueatRiskRange(), EntropicValueatRiskRange(),
+           RelativisticValueatRiskRange(), Range(), PowerNormValueatRiskRange()]
+    for (i, (r1, r2)) in enumerate(zip(rs1, rs2))
+        opt = JuMPOptimiser(; pe = pr2, slv = mip_slv)
+        mr1 = MeanRisk(; r = r1, opt = opt)
+        mr2 = MeanRisk(; r = r2, opt = opt)
+        res1 = optimise(mr1, rd2)
+        res2 = optimise(mr2, rd2)
+        @test isa(res1.retcode, OptimisationSuccess)
+        rtol = if i == 2
+            5e-4
+        else
+            1e-6
+        end
+        success = isapprox(res1.w, res2.w; rtol = rtol)
+        if !success
+            println("Counter: $i")
+            find_tol(res1.w, res2.w)
+            display([res1.w res2.w])
+        end
+        @test success
+    end
+    return nothing
+end

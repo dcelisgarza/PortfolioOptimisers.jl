@@ -17,3 +17,4 @@ node_modules
 /docs/node_modules/*
 /docs/package-lock.json
 .venv/
+/graphify-out/

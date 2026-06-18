@@ -266,7 +266,7 @@ Throws an `ArgumentError` because `ImpliedVolatilityPremium` requires `ivpa` to 
   - [`predict_realised_vols`](@ref)
 """
 function predict_realised_vols(::ImpliedVolatilityPremium, iv::MatNum, ::Any, ivpa::Nothing)
-    throw(ArgumentError("ImpliedVolatilityPremium requires `ivpa` to be a `<:Number` or `<:VecNum`"))
+    return throw(ArgumentError("ImpliedVolatilityPremium requires `ivpa` to be a `<:Number` or `<:VecNum`"))
 end
 """
     predict_realised_vols(::ImpliedVolatilityPremium, iv::MatNum, ::Any,

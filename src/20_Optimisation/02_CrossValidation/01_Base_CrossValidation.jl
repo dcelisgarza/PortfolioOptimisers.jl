@@ -260,7 +260,7 @@ Keywords correspond to the struct's fields.
                                      nb::Option{<:VecStr}, B::Option{<:VecNum_VecVecNum},
                                      ts::Option{<:VecDate}, iv::Option{<:VecNum_VecVecNum},
                                      ivpa::Option{<:Num_VecNum})
-        _check_names_and_returns_matrix(nf, F, :nf, :F)
+        check_names_and_returns_matrix(nf, F, :nf, :F)
         if !isnothing(X) && !isnothing(F)
             if isa(X, VecNum)
                 @argcheck(length(X) == size(F, 1), DimensionMismatch)

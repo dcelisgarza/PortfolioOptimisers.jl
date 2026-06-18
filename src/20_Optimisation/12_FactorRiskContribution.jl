@@ -253,6 +253,10 @@ Sets up the factor-level risk budgeting constraints in the optimisation model, u
 function set_factor_risk_contribution_constraints!(model::JuMP.Model, re::RegE_Reg,
                                                    rd::ReturnsResult, flag::Bool,
                                                    wi::Option{<:VecNum})
+    if isa(re, AbstractRegressionEstimator)
+        @argcheck(!isnothing(rd.X) && !isnothing(rd.F),
+                  IsNothingError("Factor risk budgeting/contribution with a regression estimator (`re::$(typeof(re))`) must fit the factor model, which needs the returns data: `rd.X` and `rd.F` must not be `nothing`.\nEither pass the `ReturnsResult` to `optimise` (e.g. `optimise(est, rd)`), or supply a precomputed `Regression` result as `re`, which needs no data.\nGot\nisnothing(rd.X) => $(isnothing(rd.X))\nisnothing(rd.F) => $(isnothing(rd.F))"))
+    end
     rr = regression(re, rd)
     Bt = transpose(rr.L)
     b1 = LinearAlgebra.pinv(Bt)

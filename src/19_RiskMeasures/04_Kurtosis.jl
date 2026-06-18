@@ -258,37 +258,37 @@ Single-argument form used by the precomputed-returns functor `r(x::VecNum)` (ADR
 function calc_deviations_vec(r::Kurtosis, x::VecNum)
     return x .- calc_moment_target(r, nothing, x)
 end
-function _moment_risk(r::Kurtosis{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any,
-                                  <:Any, <:Any, <:Full, <:SOCRiskExpr}, val::VecNum)
+function moment_risk(r::Kurtosis{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any, <:Any,
+                                 <:Any, <:Full, <:SOCRiskExpr}, val::VecNum)
     val .= val .^ 4
     return sqrt(isnothing(r.w) ? Statistics.mean(val) : Statistics.mean(val, r.w))
 end
-function _moment_risk(r::Kurtosis{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any,
-                                  <:Any, <:Any, <:Semi, <:SOCRiskExpr}, val::VecNum)
+function moment_risk(r::Kurtosis{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any, <:Any,
+                                 <:Any, <:Semi, <:SOCRiskExpr}, val::VecNum)
     val = min.(val, zero(eltype(val)))
     val .= val .^ 4
     return sqrt(isnothing(r.w) ? Statistics.mean(val) : Statistics.mean(val, r.w))
 end
-function _moment_risk(r::Kurtosis{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any,
-                                  <:Any, <:Any, <:Full, <:QuadSecondMomentFormulations},
-                      val::VecNum)
+function moment_risk(r::Kurtosis{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any, <:Any,
+                                 <:Any, <:Full, <:QuadSecondMomentFormulations},
+                     val::VecNum)
     val .= val .^ 4
     return isnothing(r.w) ? Statistics.mean(val) : Statistics.mean(val, r.w)
 end
-function _moment_risk(r::Kurtosis{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any,
-                                  <:Any, <:Any, <:Semi, <:QuadSecondMomentFormulations},
-                      val::VecNum)
+function moment_risk(r::Kurtosis{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any, <:Any,
+                                 <:Any, <:Semi, <:QuadSecondMomentFormulations},
+                     val::VecNum)
     val = min.(val, zero(eltype(val)))
     val .= val .^ 4
     return isnothing(r.w) ? Statistics.mean(val) : Statistics.mean(val, r.w)
 end
 function (r::Kurtosis{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any, <:Any, <:Any,
                       <:Any, <:Any})(w::VecNum, X::MatNum, fees::Option{<:Fees} = nothing)
-    return _moment_risk(r, calc_deviations_vec(r, w, X, fees))
+    return moment_risk(r, calc_deviations_vec(r, w, X, fees))
 end
 function (r::Kurtosis{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any, <:Any, <:Any,
                       <:Any, <:Any})(x::VecNum)
-    return _moment_risk(r, calc_deviations_vec(r, x))
+    return moment_risk(r, calc_deviations_vec(r, x))
 end
 function (r::Kurtosis{<:Any, <:DynamicAbstractWeights, <:Any, <:Any, <:Any, <:Semi, <:Any})(w::VecNum,
                                                                                             X::MatNum,

@@ -34,5 +34,5 @@ port_opt_view(r::LowOrderMoment, i, args...)
 factory(r::HighOrderMoment, pr::AbstractPriorResult, args...; kwargs...)
 port_opt_view(r::HighOrderMoment, i, args...)
 supports_precomputed_returns(r::LoHiOrderMoment)
-_moment_risk
+moment_risk
 ```

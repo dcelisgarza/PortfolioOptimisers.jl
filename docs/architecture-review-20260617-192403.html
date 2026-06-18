@@ -1,0 +1,428 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Architecture review — PortfolioOptimisers.jl</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="module">
+      import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+      mermaid.initialize({ startOnLoad: true, theme: "neutral", securityLevel: "loose" });
+    </script>
+    <style>
+      .seam { stroke-dasharray: 5 4; }
+      .deep { background: linear-gradient(135deg, #0f172a, #1e293b); }
+      .shallow-band { border-left: 4px solid #cbd5e1; }
+      .faded { opacity: 0.4; }
+      pre.mermaid { background: transparent; }
+      .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+    </style>
+  </head>
+  <body class="bg-stone-50 text-slate-900 font-sans antialiased">
+    <main class="max-w-5xl mx-auto px-6 py-12 space-y-12">
+      <header class="space-y-4 border-b border-slate-200 pb-8">
+        <p class="text-xs uppercase tracking-widest text-slate-500">Architecture review</p>
+        <h1 class="text-4xl font-serif font-semibold">PortfolioOptimisers.jl</h1>
+        <p class="text-slate-600 max-w-3xl">
+          Five deepening opportunities, ranked. The codebase is already deep in most places
+          (13 ADRs, several from prior reviews). These are the shallow modules and copy-paste
+          families that survived — places where the <span class="font-medium">interface is nearly
+          as large as the implementation</span>, and a forgotten line is a silent wrong number.
+        </p>
+        <div class="flex flex-wrap gap-4 text-xs text-slate-600 pt-2">
+          <span class="flex items-center gap-2"><span class="inline-block w-5 h-3 border-2 border-slate-700"></span> module</span>
+          <span class="flex items-center gap-2"><svg width="34" height="8"><line class="seam" x1="0" y1="4" x2="34" y2="4" stroke="#64748b" stroke-width="2"/></svg> seam</span>
+          <span class="flex items-center gap-2"><svg width="34" height="8"><line x1="0" y1="4" x2="34" y2="4" stroke="#dc2626" stroke-width="2"/></svg> leakage</span>
+          <span class="flex items-center gap-2"><span class="inline-block w-5 h-3 deep"></span> deep module</span>
+        </div>
+        <p class="text-xs text-slate-400 pt-2">2026-06-17 · informed by CONTEXT.md domain glossary + graphify knowledge graph (1524 nodes, 2121 edges; no import cycles, all duplication within-file)</p>
+      </header>
+
+      <section id="candidates" class="space-y-12">
+
+        <!-- ============ CANDIDATE 1 ============ -->
+        <article class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+          <div class="p-7 space-y-6">
+            <div class="flex items-start justify-between gap-4 flex-wrap">
+              <div>
+                <p class="text-xs uppercase tracking-widest text-slate-400">Candidate 1 · Risk Measure Constraints</p>
+                <h2 class="text-2xl font-serif font-semibold mt-1">Collapse the drawdown constraint trio behind one builder</h2>
+              </div>
+              <div class="flex gap-2 flex-wrap">
+                <span class="text-xs font-medium px-3 py-1 rounded-full bg-emerald-100 text-emerald-800">Strong</span>
+                <span class="text-xs font-medium px-3 py-1 rounded-full bg-slate-100 text-slate-600">in-process</span>
+              </div>
+            </div>
+
+            <div class="mono text-sm text-slate-500 space-y-0.5">
+              <div>src/20_Optimisation/20_RiskMeasureConstraints/11_AverageDrawdownConstraints.jl</div>
+              <div>src/20_Optimisation/20_RiskMeasureConstraints/12_UlcerIndexConstraints.jl</div>
+              <div>src/20_Optimisation/20_RiskMeasureConstraints/13_MaximumDrawdownConstraints.jl</div>
+            </div>
+
+            <div class="grid md:grid-cols-2 gap-4">
+              <div class="rounded-lg border border-slate-200 p-4">
+                <p class="text-xs uppercase tracking-wider text-slate-400 mb-3">Before — three shallow files</p>
+                <div class="space-y-2 text-xs mono">
+                  <div class="shallow-band pl-3 py-2 bg-slate-50">11_AverageDrawdown<br><span class="text-slate-500">set_drawdown_constraints! · T=len−1 · <b>mean</b>(dd) · set_bounds</span></div>
+                  <div class="shallow-band pl-3 py-2 bg-slate-50">12_UlcerIndex<br><span class="text-slate-500">set_drawdown_constraints! · T=len−1 · <b>SOC ÷√T</b> · set_bounds</span></div>
+                  <div class="shallow-band pl-3 py-2 bg-slate-50">13_MaximumDrawdown<br><span class="text-slate-500">set_drawdown_constraints! · T=len−1 · <b>max≥dd</b> · set_bounds</span></div>
+                </div>
+                <p class="text-xs text-slate-500 mt-3">Same skeleton ×3. Only the aggregation of <span class="mono">dd[2:T+1]</span> varies — one line each.</p>
+              </div>
+              <div class="rounded-lg border border-slate-200 p-4">
+                <p class="text-xs uppercase tracking-wider text-slate-400 mb-3">After — one deep builder</p>
+                <div class="deep text-white rounded-lg p-4 space-y-2">
+                  <p class="text-xs uppercase tracking-wider text-slate-300">set_drawdown_risk!</p>
+                  <p class="text-sm">shared: set_drawdown_constraints! → T → set_risk_bounds_and_expression!</p>
+                  <div class="border-t border-slate-600 pt-2 mt-2">
+                    <p class="text-xs text-slate-400 mb-1">seam: drawdown-aggregation algorithm</p>
+                    <div class="flex gap-1 flex-wrap text-xs mono">
+                      <span class="px-2 py-0.5 bg-slate-700 rounded">Mean</span>
+                      <span class="px-2 py-0.5 bg-slate-700 rounded">RmsNorm</span>
+                      <span class="px-2 py-0.5 bg-slate-700 rounded">Max</span>
+                    </div>
+                  </div>
+                </div>
+                <p class="text-xs text-slate-500 mt-3">Aggregation becomes the only thing a new drawdown measure declares.</p>
+              </div>
+            </div>
+
+            <div class="grid md:grid-cols-2 gap-6 text-sm">
+              <div>
+                <p class="text-xs uppercase tracking-wider text-slate-400 mb-1">Problem</p>
+                <p class="text-slate-700">Three files repeat the same drawdown-constraint skeleton; the scaffolding (drawdown vars, <span class="mono">T</span>, bound wiring) is re-typed around each one-line aggregation.</p>
+              </div>
+              <div>
+                <p class="text-xs uppercase tracking-wider text-slate-400 mb-1">Solution</p>
+                <p class="text-slate-700">One builder owns the skeleton; the aggregation (<span class="mono">mean</span> / RMS-norm / max-bound) sits behind a small seam, dispatched per measure.</p>
+              </div>
+            </div>
+
+            <div>
+              <p class="text-xs uppercase tracking-wider text-slate-400 mb-2">Wins</p>
+              <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
+                <li>locality: drawdown wiring fixed once</li>
+                <li>interface shrinks to the aggregation</li>
+                <li>leverage: new drawdown measure = one expr</li>
+                <li>tests hit one builder, three aggregations</li>
+              </ul>
+            </div>
+          </div>
+        </article>
+
+        <!-- ============ CANDIDATE 2 ============ -->
+        <article class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+          <div class="p-7 space-y-6">
+            <div class="flex items-start justify-between gap-4 flex-wrap">
+              <div>
+                <p class="text-xs uppercase tracking-widest text-slate-400">Candidate 2 · Moments</p>
+                <h2 class="text-2xl font-serif font-semibold mt-1">One generic <span class="mono text-xl">Windowed</span> wrapper, not five</h2>
+              </div>
+              <div class="flex gap-2 flex-wrap">
+                <span class="text-xs font-medium px-3 py-1 rounded-full bg-emerald-100 text-emerald-800">Strong</span>
+                <span class="text-xs font-medium px-3 py-1 rounded-full bg-slate-100 text-slate-600">in-process</span>
+              </div>
+            </div>
+
+            <div class="mono text-sm text-slate-500 space-y-0.5">
+              <div>src/08_Moments/28_WindowedExpectedReturns.jl &nbsp;<span class="text-slate-400">(115)</span></div>
+              <div>src/08_Moments/29_WindowedCovariance.jl &nbsp;<span class="text-slate-400">(150)</span></div>
+              <div>src/08_Moments/30_WindowedVariance.jl &nbsp;<span class="text-slate-400">(191)</span></div>
+              <div>src/08_Moments/31_WindowedCoskewness.jl &nbsp;<span class="text-slate-400">(113)</span></div>
+              <div>src/08_Moments/32_WindowedCokurtosis.jl &nbsp;<span class="text-slate-400">(112)</span></div>
+            </div>
+
+            <div class="rounded-lg border border-slate-200 bg-white p-4">
+              <p class="text-xs uppercase tracking-wider text-slate-400 mb-2">Each file is one delegating call wrapped in a struct</p>
+              <pre class="mermaid">
+flowchart LR
+  subgraph B["Before — 5 near-identical wrappers"]
+    direction TB
+    W1["WindowedCoskewness\nstruct + ctor + docs"] --> P1["windowed_preamble"]
+    W2["WindowedCokurtosis\nstruct + ctor + docs"] --> P1
+    W3["WindowedCovariance\nstruct + ctor + docs"] --> P1
+    W4["WindowedVariance\nstruct + ctor + docs"] --> P1
+    W5["WindowedExpectedReturns\nstruct + ctor + docs"] --> P1
+    P1 --> D["inner estimator"]
+  end
+  classDef sh fill:#f1f5f9,stroke:#94a3b8;
+  class W1,W2,W3,W4,W5 sh
+              </pre>
+              <p class="text-xs text-slate-500 mt-1">31 vs 32: byte-identical but for the field name (<span class="mono">ske</span>/<span class="mono">ke</span>) and the delegated call (<span class="mono">coskewness</span>/<span class="mono">cokurtosis</span>).</p>
+            </div>
+
+            <div class="rounded-lg border border-slate-200 p-4">
+              <p class="text-xs uppercase tracking-wider text-slate-400 mb-3">After — one deep generic over the inner estimator</p>
+              <div class="flex items-center gap-4 flex-wrap">
+                <div class="deep text-white rounded-lg p-4 max-w-xs">
+                  <p class="text-xs uppercase tracking-wider text-slate-300 mb-1">Windowed{T}</p>
+                  <p class="text-sm">holds inner::T, w, window · runs windowed_preamble · delegates to the inner estimator's own method</p>
+                </div>
+                <div class="text-slate-400 text-2xl">←</div>
+                <div class="text-xs mono text-slate-500 space-y-1">
+                  <div class="line-through">WindowedExpectedReturns</div>
+                  <div class="line-through">WindowedCovariance</div>
+                  <div class="line-through">WindowedVariance</div>
+                  <div class="line-through">WindowedCoskewness</div>
+                  <div class="line-through">WindowedCokurtosis</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="grid md:grid-cols-2 gap-6 text-sm">
+              <div>
+                <p class="text-xs uppercase tracking-wider text-slate-400 mb-1">Problem</p>
+                <p class="text-slate-700">Five wrappers (681 loc, mostly docstrings) each add a struct, a validator, a keyword constructor and one delegating method. Deletion test: remove a wrapper and its complexity does not reappear in callers — it was a pass-through over the already-shared <span class="mono">windowed_preamble</span>.</p>
+              </div>
+              <div>
+                <p class="text-xs uppercase tracking-wider text-slate-400 mb-1">Solution</p>
+                <p class="text-slate-700">A single <span class="mono">Windowed{T&lt;:AbstractEstimator}</span>. The preamble runs once; the trailing call dispatches on the inner estimator's type — Julia resolves <span class="mono">mean</span>/<span class="mono">cov</span>/<span class="mono">coskewness</span> automatically.</p>
+              </div>
+            </div>
+
+            <div>
+              <p class="text-xs uppercase tracking-wider text-slate-400 mb-2">Wins</p>
+              <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
+                <li>locality: windowing logic in one place</li>
+                <li>leverage: free for any future estimator</li>
+                <li>delete 5 shallow wrappers</li>
+                <li>validation skew across files impossible</li>
+              </ul>
+            </div>
+
+            <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-900">
+              <span class="font-medium">Note:</span> verify the propagation macros (<span class="mono">@fprop/@vprop/@wprop</span>, ADR 0002/0010) tag a type-parameter field as cleanly as a concrete one. If they don't, the seam is the generic-vs-tagged-field interaction — worth a spike first.
+            </div>
+          </div>
+        </article>
+
+        <!-- ============ CANDIDATE 3 ============ -->
+        <article class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+          <div class="p-7 space-y-6">
+            <div class="flex items-start justify-between gap-4 flex-wrap">
+              <div>
+                <p class="text-xs uppercase tracking-widest text-slate-400">Candidate 3 · Higher-order moments</p>
+                <h2 class="text-2xl font-serif font-semibold mt-1">Unify the Coskewness / Cokurtosis containers</h2>
+              </div>
+              <div class="flex gap-2 flex-wrap">
+                <span class="text-xs font-medium px-3 py-1 rounded-full bg-amber-100 text-amber-800">Worth exploring</span>
+                <span class="text-xs font-medium px-3 py-1 rounded-full bg-slate-100 text-slate-600">in-process</span>
+              </div>
+            </div>
+
+            <div class="mono text-sm text-slate-500 space-y-0.5">
+              <div>src/08_Moments/19_Coskewness.jl &nbsp;<span class="text-slate-400">(416)</span></div>
+              <div>src/08_Moments/20_Cokurtosis.jl &nbsp;<span class="text-slate-400">(351)</span></div>
+            </div>
+
+            <div class="grid md:grid-cols-2 gap-4">
+              <div class="rounded-lg border border-slate-200 p-4">
+                <p class="text-xs uppercase tracking-wider text-slate-400 mb-3">Before — parallel struct families</p>
+                <div class="grid grid-cols-2 gap-2 text-xs mono">
+                  <div class="bg-slate-50 border border-slate-200 rounded p-2">
+                    <p class="font-bold text-slate-700">Coskewness</p>
+                    <p class="text-slate-500 mt-1">@fprop @vprop me<br>@fprop @vprop mp<br>alg · @wprop w<br><span class="text-slate-400">assert · new{…}</span></p>
+                  </div>
+                  <div class="bg-slate-50 border border-slate-200 rounded p-2">
+                    <p class="font-bold text-slate-700">Cokurtosis</p>
+                    <p class="text-slate-500 mt-1">@fprop @vprop me<br>@fprop @vprop mp<br>alg · @wprop w<br><span class="text-slate-400">assert · new{…}</span></p>
+                  </div>
+                </div>
+                <p class="text-xs text-slate-500 mt-3">Identical container, validation, propagation, keyword ctor, abstract supertype docstring. Differs only in the compute call and its output shape.</p>
+              </div>
+              <div class="rounded-lg border border-slate-200 p-4">
+                <p class="text-xs uppercase tracking-wider text-slate-400 mb-3">After</p>
+                <div class="deep text-white rounded-lg p-4">
+                  <p class="text-xs uppercase tracking-wider text-slate-300 mb-1">HighOrderCoMoment{Kind}</p>
+                  <p class="text-sm">shared container + validation + propagation</p>
+                  <div class="border-t border-slate-600 mt-2 pt-2 flex gap-1 text-xs mono">
+                    <span class="px-2 py-0.5 bg-slate-700 rounded">Coskew</span>
+                    <span class="px-2 py-0.5 bg-slate-700 rounded">Cokurt</span>
+                  </div>
+                </div>
+                <p class="text-xs text-slate-500 mt-3">Compute routine + output shape behind the <span class="mono">Kind</span> seam.</p>
+              </div>
+            </div>
+
+            <div class="grid md:grid-cols-2 gap-6 text-sm">
+              <div>
+                <p class="text-xs uppercase tracking-wider text-slate-400 mb-1">Problem</p>
+                <p class="text-slate-700">A validation rule or propagation tag added to one and forgotten on the other diverges silently — and the same split forces the two windowed wrappers in Candidate 2.</p>
+              </div>
+              <div>
+                <p class="text-xs uppercase tracking-wider text-slate-400 mb-1">Solution</p>
+                <p class="text-slate-700">One parametric container; the order-3 vs order-4 compute (and the tensor-vs-tensor+matrix return) sits behind a <span class="mono">Kind</span> seam.</p>
+              </div>
+            </div>
+
+            <div>
+              <p class="text-xs uppercase tracking-wider text-slate-400 mb-2">Wins</p>
+              <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
+                <li>locality: one container to validate</li>
+                <li>collapses two windowed wrappers too</li>
+                <li>interface shrinks to <span class="mono">Kind</span> + compute</li>
+                <li>silent validation skew impossible</li>
+              </ul>
+            </div>
+
+            <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-900">
+              <span class="font-medium">Tension to settle:</span> the differing return shapes (coskewness returns tensor + processed matrix; cokurtosis returns one tensor) are real interface differences — the seam must carry them, not hide them. Confirm this doesn't fight the <span class="mono">@pprop</span> prior-binding (ADR 0012); the open <em>Kurtosis fold-in</em> item depends on consistent prior propertynames here.
+            </div>
+          </div>
+        </article>
+
+        <!-- ============ CANDIDATE 4 ============ -->
+        <article class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+          <div class="p-7 space-y-6">
+            <div class="flex items-start justify-between gap-4 flex-wrap">
+              <div>
+                <p class="text-xs uppercase tracking-widest text-slate-400">Candidate 4 · Risk Measure Constraints</p>
+                <h2 class="text-2xl font-serif font-semibold mt-1">Factor the tracking-norm builders behind a cone seam</h2>
+              </div>
+              <div class="flex gap-2 flex-wrap">
+                <span class="text-xs font-medium px-3 py-1 rounded-full bg-amber-100 text-amber-800">Worth exploring</span>
+                <span class="text-xs font-medium px-3 py-1 rounded-full bg-slate-100 text-slate-600">in-process</span>
+              </div>
+            </div>
+
+            <div class="mono text-sm text-slate-500">src/20_Optimisation/20_RiskMeasureConstraints/18_TrackingRiskMeasureConstraints.jl &nbsp;<span class="text-slate-400">(479)</span></div>
+
+            <div class="rounded-lg border border-slate-200 p-4">
+              <p class="text-xs uppercase tracking-wider text-slate-400 mb-3">Before — six overloads, one varying line each</p>
+              <div class="space-y-2">
+                <div class="flex items-stretch gap-2 text-xs">
+                  <div class="bg-slate-100 text-slate-600 mono px-3 py-2 rounded flex-1">setup: tracking_risk var · benchmark · net_X − bench·k</div>
+                  <div class="bg-emerald-100 text-emerald-800 mono px-3 py-2 rounded w-40 text-center">NormOneCone (L1)</div>
+                </div>
+                <div class="flex items-stretch gap-2 text-xs">
+                  <div class="bg-slate-100 text-slate-600 mono px-3 py-2 rounded flex-1">setup: <span class="text-slate-400">…identical…</span></div>
+                  <div class="bg-emerald-100 text-emerald-800 mono px-3 py-2 rounded w-40 text-center">SecondOrderCone (L2)</div>
+                </div>
+                <div class="flex items-stretch gap-2 text-xs">
+                  <div class="bg-slate-100 text-slate-600 mono px-3 py-2 rounded flex-1">setup: <span class="text-slate-400">…identical…</span></div>
+                  <div class="bg-emerald-100 text-emerald-800 mono px-3 py-2 rounded w-40 text-center">PowerCone (Lp)</div>
+                </div>
+                <div class="flex items-stretch gap-2 text-xs">
+                  <div class="bg-slate-100 text-slate-600 mono px-3 py-2 rounded flex-1">setup: <span class="text-slate-400">…identical…</span></div>
+                  <div class="bg-emerald-100 text-emerald-800 mono px-3 py-2 rounded w-40 text-center">∞-norm (LInf)</div>
+                </div>
+              </div>
+              <p class="text-xs text-slate-500 mt-3">The setup (benchmark extraction, difference, scaling by <span class="mono">k</span>, bound wiring) repeats; the cone constraint is the one differing line. A wrong divisor in a rarely-tested norm stays silent.</p>
+            </div>
+
+            <div class="grid md:grid-cols-2 gap-6 text-sm">
+              <div>
+                <p class="text-xs uppercase tracking-wider text-slate-400 mb-1">Problem</p>
+                <p class="text-slate-700">Setup logic is copy-pasted across the norm overloads; a scaling fix lands in one and not the others.</p>
+              </div>
+              <div>
+                <p class="text-xs uppercase tracking-wider text-slate-400 mb-1">Solution</p>
+                <p class="text-slate-700">One builder owns the setup; the cone (<span class="mono">NormOneCone</span>/<span class="mono">SecondOrderCone</span>/<span class="mono">PowerCone</span>/∞) is the adapter behind a small seam.</p>
+              </div>
+            </div>
+
+            <div>
+              <p class="text-xs uppercase tracking-wider text-slate-400 mb-2">Wins</p>
+              <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
+                <li>locality: tracking setup fixed once</li>
+                <li>seam already justified: 4+ cone adapters</li>
+                <li>leverage: a new norm = one cone</li>
+                <li>same shape likely unifies Turnover risk too</li>
+              </ul>
+            </div>
+          </div>
+        </article>
+
+        <!-- ============ CANDIDATE 5 ============ -->
+        <article class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+          <div class="p-7 space-y-6">
+            <div class="flex items-start justify-between gap-4 flex-wrap">
+              <div>
+                <p class="text-xs uppercase tracking-widest text-slate-400">Candidate 5 · Risk Measures (XatRisk)</p>
+                <h2 class="text-2xl font-serif font-semibold mt-1">Pin the XatRisk variant-vs-formulation grid</h2>
+              </div>
+              <div class="flex gap-2 flex-wrap">
+                <span class="text-xs font-medium px-3 py-1 rounded-full bg-slate-200 text-slate-700">Speculative</span>
+                <span class="text-xs font-medium px-3 py-1 rounded-full bg-slate-100 text-slate-600">in-process</span>
+              </div>
+            </div>
+
+            <div class="mono text-sm text-slate-500 space-y-0.5">
+              <div>src/19_RiskMeasures/06_XatRisk.jl · 07_ConditionalXatRisk.jl · 08_EntropicXatRisk.jl</div>
+              <div>src/19_RiskMeasures/09_RelativisticXatRisk.jl · 19_PowerNormXatRisk.jl</div>
+              <div>src/20_Optimisation/20_RiskMeasureConstraints/06–09,19_*XatRiskConstraints.jl</div>
+            </div>
+
+            <div class="rounded-lg border border-slate-200 p-4">
+              <p class="text-xs uppercase tracking-wider text-slate-400 mb-3">The grid that drifts</p>
+              <table class="w-full text-xs mono border-collapse">
+                <thead>
+                  <tr class="text-slate-400">
+                    <th class="text-left p-1"></th><th class="p-1">Value</th><th class="p-1">Range</th><th class="p-1">Drawdown</th>
+                  </tr>
+                </thead>
+                <tbody class="text-slate-600">
+                  <tr><td class="p-1 text-slate-400">VaR</td><td class="p-1 text-center bg-slate-50 border">●</td><td class="p-1 text-center bg-slate-50 border">●</td><td class="p-1 text-center bg-slate-50 border">●</td></tr>
+                  <tr><td class="p-1 text-slate-400">CVaR</td><td class="p-1 text-center bg-slate-50 border">●</td><td class="p-1 text-center bg-slate-50 border">●</td><td class="p-1 text-center bg-slate-50 border">●</td></tr>
+                  <tr><td class="p-1 text-slate-400">EVaR</td><td class="p-1 text-center bg-slate-50 border">●</td><td class="p-1 text-center bg-slate-50 border">●</td><td class="p-1 text-center bg-slate-50 border">●</td></tr>
+                  <tr><td class="p-1 text-slate-400">RVaR</td><td class="p-1 text-center bg-slate-50 border">●</td><td class="p-1 text-center bg-slate-50 border">●</td><td class="p-1 text-center bg-slate-50 border">●</td></tr>
+                  <tr><td class="p-1 text-slate-400">PNVaR</td><td class="p-1 text-center bg-slate-50 border">●</td><td class="p-1 text-center bg-slate-50 border">●</td><td class="p-1 text-center bg-slate-50 border">●</td></tr>
+                </tbody>
+              </table>
+              <p class="text-xs text-slate-500 mt-3">~4000 loc across 10 files. The big-M, z-score and cone formulations are re-derived per cell. Update CVaR's z-score and miss RVaR's, and the two diverge with no test catching the co-evolution.</p>
+            </div>
+
+            <div class="grid md:grid-cols-2 gap-6 text-sm">
+              <div>
+                <p class="text-xs uppercase tracking-wider text-slate-400 mb-1">Problem</p>
+                <p class="text-slate-700">The Value/Range/Drawdown axis is copied per measure; shared formula fragments live in different files and drift independently.</p>
+              </div>
+              <div>
+                <p class="text-xs uppercase tracking-wider text-slate-400 mb-1">Solution</p>
+                <p class="text-slate-700">Make the two axes explicit: tail-formulation adapter × {Value, Range = two tails, Drawdown = tail-on-drawdowns}. One <span class="mono">build_tail!</span> shared across cells.</p>
+              </div>
+            </div>
+
+            <div>
+              <p class="text-xs uppercase tracking-wider text-slate-400 mb-2">Wins</p>
+              <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
+                <li>locality: one tail formula per family</li>
+                <li>Range stops re-deriving the tail twice</li>
+                <li>co-evolution becomes a shared edit</li>
+                <li>leverage: a new VaR family fills a column</li>
+              </ul>
+            </div>
+
+            <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-900">
+              <span class="font-medium">Overlaps existing future work — sequence carefully.</span> Two slices are already on the backlog: <em>XatRisk Range = two tail calls via <span class="mono">build_tail!</span></em> (caveat: cones differ per family) and a <em><span class="mono">@risk_measure</span> macro</em> emitting <span class="mono">risk_input_kind</span> + <span class="mono">supports_precomputed_returns</span> + functor stubs together (ADR 0006/0007). This card is the umbrella; do the macro and <span class="mono">build_tail!</span> first, then judge whether the full grid-collapse is still worth it. <b>Speculative</b> precisely because the per-family cone differences may be irreducible.
+            </div>
+          </div>
+        </article>
+
+      </section>
+
+      <!-- ============ TOP RECOMMENDATION ============ -->
+      <section id="top-recommendation">
+        <div class="deep text-white rounded-xl p-8 space-y-3 shadow">
+          <p class="text-xs uppercase tracking-widest text-slate-400">Top recommendation</p>
+          <h2 class="text-2xl font-serif font-semibold">Start with Candidate 1 — the drawdown constraint trio.</h2>
+          <p class="text-slate-300 max-w-3xl text-sm">
+            Smallest blast radius (174 loc, 3 files), highest confidence: the skeleton is provably
+            identical and only the <span class="mono">dd[2:T+1]</span> aggregation varies. It deepens a real
+            seam (the aggregation algorithm) with three live adapters, and the test surface drops to one
+            builder. It also rehearses the exact pattern behind Candidate 4 (tracking cones) and
+            Candidate 5 (XatRisk tails) — a low-risk warm-up for the larger constraint-family collapses.
+            Candidate 2 (the <span class="mono">Windowed</span> wrapper) is the close runner-up: equally
+            mechanical, larger payoff (681 loc, 5 files), pending only the macro-vs-generic spike.
+          </p>
+        </div>
+      </section>
+
+      <footer class="text-xs text-slate-400 pt-8 border-t border-slate-200">
+        Vocabulary: module · interface · implementation · depth · seam · adapter · leverage · locality.
+        Domain terms from CONTEXT.md. Settled decisions in docs/adr/ were not re-litigated.
+      </footer>
+    </main>
+  </body>
+</html>

@@ -4,8 +4,9 @@ $(DocStringExtensions.TYPEDEF)
 JuMP returns estimator that computes portfolio returns as the arithmetic (dot-product)
 mean return: ``r = \\boldsymbol{\\mu}^\\intercal \\boldsymbol{w}``.
 
-Optionally supports an ellipsoidal uncertainty set on the mean vector and a lower bound
-on the portfolio return.
+Optionally supports an uncertainty set on the mean vector (box or ellipsoidal) and a lower
+bound on the portfolio return. When `ucs` is set the optimiser maximises the **worst-case**
+expected return over the set instead of the point estimate `μ`, giving a robust return.
 
 # Fields
 
@@ -20,6 +21,10 @@ $(DocStringExtensions.FIELDS)
     ) -> ArithmeticReturn
 
 Keywords correspond to the struct's fields.
+
+## Details
+
+  - `ucs` accepts either a pre-built mean uncertainty set (the result of [`mu_ucs`](@ref), e.g. a `BoxUncertaintySet` or `EllipsoidalUncertaintySet`) or an uncertainty-set *estimator*. A pre-built set is the simplest path — symmetric with how [`UncertaintySetVariance`](@ref) takes a pre-built [`sigma_ucs`](@ref) result. Passing an estimator defers construction to solve time and requires the returns data (`rd`) to be threaded through the optimiser.
 
 ## Validation
 

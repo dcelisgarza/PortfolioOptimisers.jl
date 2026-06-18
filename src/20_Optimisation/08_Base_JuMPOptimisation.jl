@@ -481,7 +481,7 @@ end
     has_Xap1(model::JuMP.Model, prefix::Symbol = Symbol(""))
 
 Return `true` if the gross portfolio returns `model[Symbol(prefix, :Xap1)]` have been
-registered (via [`set_portfolio_returns_plus_one!`](@ref)).
+registered (via [`set_asset_returns_plus_one!`](@ref)).
 
 # Related
 
@@ -495,11 +495,11 @@ end
 
 Return the gross portfolio returns expression `model[Symbol(prefix, :Xap1)]` (`X .+ 1`).
 
-Asserts it has been registered (via [`set_portfolio_returns_plus_one!`](@ref)); errors otherwise.
+Asserts it has been registered (via [`set_asset_returns_plus_one!`](@ref)); errors otherwise.
 
 # Related
 
-  - [`set_portfolio_returns_plus_one!`](@ref)
+  - [`set_asset_returns_plus_one!`](@ref)
   - [`has_Xap1`](@ref)
 """
 function get_Xap1(model::JuMP.Model, prefix::Symbol = Symbol(""))
@@ -790,32 +790,60 @@ function set_net_portfolio_returns!(model::JuMP.Model, X::MatNum;
     end
 end
 """
-    set_portfolio_returns_plus_one!(model::JuMP.Model, X::MatNum)
+    set_asset_returns_plus_one!(model::JuMP.Model, X::MatNum)
 
-Compute and register portfolio gross returns `X .+ 1` in the JuMP model.
+Compute and register portfolio asset gross returns `X .+ 1` in the JuMP model.
 
 Used in drawdown and logarithmic return computations.
 
 # Arguments
 
   - `model::JuMP.Model`: JuMP optimisation model.
-  - `X::MatNum`: Portfolio returns expression.
+  - `X::MatNum`: Asset returns expression.
 
 # Returns
 
-  - The gross returns expression `X .+ 1`.
+  - The gross asset returns expression `X .+ 1`.
 
 # Related
 
   - [`set_portfolio_drawdowns_plus_one!`](@ref)
   - [`set_portfolio_returns!`](@ref)
 """
-function set_portfolio_returns_plus_one!(model::JuMP.Model, X::MatNum;
-                                         prefix::Symbol = Symbol(""))
+function set_asset_returns_plus_one!(model::JuMP.Model, X::MatNum;
+                                     prefix::Symbol = Symbol(""))
     if haskey(model, Symbol(prefix, :Xap1))
         return model[Symbol(prefix, :Xap1)]
     end
     return preg!(model, prefix, :Xap1, JuMP.@expression(model, X .+ one(eltype(X))))
+end
+"""
+    set_asset_neg_returns_plus_one!(model::JuMP.Model, X::MatNum)
+
+Compute and register negative asset gross returns `-X .+ 1` in the JuMP model.
+
+Used in drawdown and logarithmic return computations.
+
+# Arguments
+
+  - `model::JuMP.Model`: JuMP optimisation model.
+  - `X::MatNum`: Asset returns expression.
+
+# Returns
+
+  - The negative gross asset returns expression `-X .+ 1`.
+
+# Related
+
+  - [`set_portfolio_drawdowns_plus_one!`](@ref)
+  - [`set_portfolio_returns!`](@ref)
+"""
+function set_asset_neg_returns_plus_one!(model::JuMP.Model, X::MatNum;
+                                         prefix::Symbol = Symbol(""))
+    if haskey(model, Symbol(prefix, :nXap1))
+        return model[Symbol(prefix, :nXap1)]
+    end
+    return preg!(model, prefix, :nXap1, JuMP.@expression(model, -X .+ one(eltype(X))))
 end
 """
     set_portfolio_drawdowns_plus_one!(model::JuMP.Model, X::MatNum)
@@ -835,7 +863,7 @@ Computes `absolute_drawdown_arr(X) .+ 1` and registers it in the model.
 
 # Related
 
-  - [`set_portfolio_returns_plus_one!`](@ref)
+  - [`set_asset_returns_plus_one!`](@ref)
 """
 function set_portfolio_drawdowns_plus_one!(model::JuMP.Model, X::MatNum;
                                            prefix::Symbol = Symbol(""))

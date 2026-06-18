@@ -332,5 +332,5 @@ raises an error.
 function set_risk_constraints!(::JuMP.Model, ::Any, ::Kurtosis,
                                ::RiskJuMPOptimisationEstimator, pr::LowOrderPrior, args...;
                                kwargs...)
-    throw(ArgumentError("Kurtosis requires a HighOrderPrior, not a $(typeof(pr))."))
+    return throw(ArgumentError("Kurtosis requires a HighOrderPrior, not a $(typeof(pr))."))
 end
