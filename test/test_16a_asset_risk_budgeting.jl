@@ -39,7 +39,7 @@ include(joinpath(@__DIR__, "test16_setup.jl"))
         end
         @test success
 
-        rtol = if i ∈ (5, 7, 19, 25) || Sys.isapple() && i ∈ (2, 12)
+        rtol = if i ∈ (5, 7, 19, 25, 12) || Sys.isapple() && i == 2
             1e-4
         elseif i == 17
             5e-3

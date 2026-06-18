@@ -1,6 +1,18 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
+Abstract supertype for processed optimiser attributes. Every collection of processed optimiser attributes should subtype
+
+# Related
+
+  - [`ProcessedJuMPOptimiserAttributes`](@ref)
+  - [`ProcessedRiskBudgetingAttributes`](@ref)
+  - [`JuMPOptimiser`](@ref)
+"""
+abstract type ProcessedAttributes <: AbstractResult end
+"""
+$(DocStringExtensions.TYPEDEF)
+
 Flat bundle of all processed constraint and prior results consumed by
 [`assemble_jump_model!`](@ref).
 
@@ -53,7 +65,7 @@ true
   - [`assemble_jump_model!`](@ref)
   - [`MeanRisk`](@ref)
 """
-@concrete struct ProcessedJuMPOptimiserAttributes <: AbstractResult
+@concrete struct ProcessedJuMPOptimiserAttributes <: ProcessedAttributes
     """
     $(field_dict[:pr])
     """

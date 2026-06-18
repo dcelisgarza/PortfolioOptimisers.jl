@@ -1,6 +1,17 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
+Abstract supertype for processed risk budgeting attributes. Every collection of processed risk budgeting attributes should subtype this.
+
+# Related
+
+  - [`ProcessedAssetRiskBudgetingAttributes`](@ref)
+  - [`ProcessedFactorRiskBudgetingAttributes`](@ref)
+"""
+abstract type ProcessedRiskBudgetingAttributes <: ProcessedAttributes end
+"""
+$(DocStringExtensions.TYPEDEF)
+
 Processed factor risk budgeting attributes for intermediate computations.
 
 # Fields
@@ -12,7 +23,7 @@ $(DocStringExtensions.FIELDS)
   - [`RiskBudgeting`](@ref)
   - [`FactorRiskBudgeting`](@ref)
 """
-@concrete struct ProcessedFactorRiskBudgetingAttributes <: AbstractResult
+@concrete struct ProcessedFactorRiskBudgetingAttributes <: ProcessedRiskBudgetingAttributes
     """
     Processed risk budget constraints vector.
     """
@@ -48,7 +59,7 @@ $(DocStringExtensions.FIELDS)
   - [`RiskBudgeting`](@ref)
   - [`AssetRiskBudgeting`](@ref)
 """
-@concrete struct ProcessedAssetRiskBudgetingAttributes <: AbstractResult
+@concrete struct ProcessedAssetRiskBudgetingAttributes <: ProcessedRiskBudgetingAttributes
     """
     Processed asset risk budget constraints vector.
     """

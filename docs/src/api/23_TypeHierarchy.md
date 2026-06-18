@@ -173,11 +173,15 @@ its docstring.
 
 │&nbsp;&nbsp;&nbsp;└──&nbsp;[OptimisationSuccess](@ref)
 
-├──&nbsp;[ProcessedAssetRiskBudgetingAttributes](@ref)
+├──&nbsp;[ProcessedAttributes](@ref)
 
-├──&nbsp;[ProcessedFactorRiskBudgetingAttributes](@ref)
+│&nbsp;&nbsp;&nbsp;├──&nbsp;[ProcessedJuMPOptimiserAttributes](@ref)
 
-├──&nbsp;[ProcessedJuMPOptimiserAttributes](@ref)
+│&nbsp;&nbsp;&nbsp;└──&nbsp;[ProcessedRiskBudgetingAttributes](@ref)
+
+│&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;├──&nbsp;[ProcessedAssetRiskBudgetingAttributes](@ref)
+
+│&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└──&nbsp;[ProcessedFactorRiskBudgetingAttributes](@ref)
 
 ├──&nbsp;[RegimeAdjustedVarianceCache](@ref)
 

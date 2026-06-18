@@ -1,6 +1,7 @@
 # JuMP Optimiser
 
 ```@docs
+ProcessedAttributes
 ProcessedJuMPOptimiserAttributes
 JuMPOptimisationResult
 assert_finite_nonnegative_real_or_vec
