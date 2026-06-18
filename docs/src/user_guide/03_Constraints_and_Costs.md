@@ -36,7 +36,8 @@ slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
              settings = Dict("verbose" => false),
              check_sol = (; allow_local = true, allow_almost = true))
 
-res_base = optimise(MeanRisk(; obj = MinimumRisk(), opt = JuMPOptimiser(; pe = pr, slv = slv)))
+res_base = optimise(MeanRisk(; obj = MinimumRisk(),
+                             opt = JuMPOptimiser(; pe = pr, slv = slv)))
 ````
 
 ## 1. Weight bounds

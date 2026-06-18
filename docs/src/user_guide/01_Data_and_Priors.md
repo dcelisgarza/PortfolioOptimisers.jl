@@ -13,8 +13,8 @@ of moment estimators and view-based priors, see the
 [moments & priors examples](../examples/2_moments_priors/01_Expected_Returns_Estimation.md).
 
 ````@example 01_Data_and_Priors
-using PortfolioOptimisers, CSV, TimeSeries, DataFrames, PrettyTables, LinearAlgebra, StatsPlots,
-      GraphRecipes
+using PortfolioOptimisers, CSV, TimeSeries, DataFrames, PrettyTables, LinearAlgebra,
+      StatsPlots, GraphRecipes
 
 resfmt = (v, i, j) -> begin
     return if j == 1

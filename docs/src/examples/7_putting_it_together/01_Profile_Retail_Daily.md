@@ -67,7 +67,8 @@ budget against the current book, and explicit fees so trades must justify their 
 retail = optimise(MeanRisk(; obj = MinimumRisk(),
                            opt = JuMPOptimiser(; pe = pr, slv = slv,
                                                wb = WeightBounds(; lb = 0.0, ub = 0.15),
-                                               tn = Turnover(; w = current_book, val = 0.05),
+                                               tn = Turnover(; w = current_book,
+                                                             val = 0.05),
                                                fees = Fees(; l = 0.001))))
 
 pretty_table(DataFrame("Asset" => rd.nx, "Current" => current_book, "Target" => retail.w);
@@ -87,8 +88,9 @@ solver, instant, which suits a daily cadence.
 alloc = optimise(GreedyAllocation(), retail.w, prices, 10_000.0)
 
 invested = sum(alloc.shares .* prices)
-pretty_table(DataFrame("Asset" => rd.nx, "Target" => retail.w, "Shares" => round.(Int, alloc.shares),
-                       "Realised" => alloc.w); formatters = [resfmt],
+pretty_table(DataFrame("Asset" => rd.nx, "Target" => retail.w,
+                       "Shares" => round.(Int, alloc.shares), "Realised" => alloc.w);
+             formatters = [resfmt],
              title = "\$10,000 allocated — invested \```math(round(Int, invested)), cash left \```(round(alloc.cash, digits = 2))")
 ````
 

@@ -54,7 +54,8 @@ slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
              settings = Dict("verbose" => false),
              check_sol = (; allow_local = true, allow_almost = true))
 
-res_base = optimise(MeanRisk(; obj = MinimumRisk(), opt = JuMPOptimiser(; pe = pr, slv = slv)))
+res_base = optimise(MeanRisk(; obj = MinimumRisk(),
+                             opt = JuMPOptimiser(; pe = pr, slv = slv)))
 ````
 
 ## 2. The asset network
@@ -101,18 +102,22 @@ res_hub = optimise(MeanRisk(; obj = MinimumRisk(),
                             opt = JuMPOptimiser(; pe = pr, slv = slv,
                                                 cte = CentralityConstraint(;
                                                                            A = CentralityEstimator(),
-                                                                           B = 0.20, comp = >=))))
+                                                                           B = 0.20,
+                                                                           comp = >=))))
 res_periph = optimise(MeanRisk(; obj = MinimumRisk(),
                                opt = JuMPOptimiser(; pe = pr, slv = slv,
                                                    cte = CentralityConstraint(;
                                                                               A = CentralityEstimator(),
-                                                                              B = 0.08, comp = <=))))
+                                                                              B = 0.08,
+                                                                              comp = <=))))
 
 centrality = centrality_vector(CentralityEstimator(), pr).X
 avg_centrality(w) = sum(w .* centrality)
-pretty_table(DataFrame("Portfolio" => ["Baseline", "Hub-tilted (≥ 0.20)", "Periphery (≤ 0.08)"],
-                       "Avg centrality" => [avg_centrality(res_base.w), avg_centrality(res_hub.w),
-                                            avg_centrality(res_periph.w)]);
+pretty_table(DataFrame("Portfolio" =>
+                           ["Baseline", "Hub-tilted (≥ 0.20)", "Periphery (≤ 0.08)"],
+                       "Avg centrality" =>
+                           [avg_centrality(res_base.w), avg_centrality(res_hub.w),
+                            avg_centrality(res_periph.w)]);
              title = "Average network centrality of the portfolio")
 ````
 

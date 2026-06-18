@@ -68,7 +68,8 @@ net_daily = sum(calc_net_returns(res_base.w, rd.X, fee)) / size(rd.X, 1)
 fee_cost = calc_fees(res_base.w, fee)
 
 pretty_table(DataFrame("Quantity" => ["Gross daily return", "Fee cost", "Net daily return"],
-                       "Value" => [gross_daily, fee_cost, net_daily]); formatters = [resfmt],
+                       "Value" => [gross_daily, fee_cost, net_daily]);
+             formatters = [resfmt],
              title = "A 0.2% long fee against this book's daily edge")
 ````
 
@@ -80,7 +81,8 @@ the same rate everywhere (`l` for long, `s` for short positions).
 
 ````@example 05_Fees_and_Net_Returns
 res_fee = optimise(MeanRisk(; obj = MaximumRatio(; rf = rf),
-                            opt = JuMPOptimiser(; pe = pr, slv = slv, fees = Fees(; l = 0.002))))
+                            opt = JuMPOptimiser(; pe = pr, slv = slv,
+                                                fees = Fees(; l = 0.002))))
 ````
 
 ## 4. Differential fees steer the allocation
@@ -91,18 +93,23 @@ Costs are rarely uniform — some instruments are expensive to hold. A [`FeesEst
 the baseline loved makes the optimiser walk away from it.
 
 ````@example 05_Fees_and_Net_Returns
-sets = AssetSets(; dict = Dict("nx" => rd.nx,
-                               "healthcare" => ["JNJ", "LLY", "MRK", "PFE", "UNH"]))
+sets = AssetSets(;
+                 dict = Dict("nx" => rd.nx,
+                             "healthcare" => ["JNJ", "LLY", "MRK", "PFE", "UNH"]))
 res_diff = optimise(MeanRisk(; obj = MaximumRatio(; rf = rf),
                              opt = JuMPOptimiser(; pe = pr, slv = slv, sets = sets,
                                                  fees = FeesEstimator(;
-                                                                      l = ["healthcare" => 0.02]))))
+                                                                      l = ["healthcare" =>
+                                                                               0.02]))))
 
-healthcare_weight(w) = sum(w[i] for i in eachindex(w) if rd.nx[i] in sets.dict["healthcare"])
+function healthcare_weight(w)
+    return sum(w[i] for i in eachindex(w) if rd.nx[i] in sets.dict["healthcare"])
+end
 pretty_table(DataFrame("Portfolio" => ["Baseline", "Healthcare fee 2%"],
-                       "Healthcare weight" => [healthcare_weight(res_base.w),
-                                               healthcare_weight(res_diff.w)]);
-             formatters = [resfmt], title = "A targeted fee steers exposure away from a sector")
+                       "Healthcare weight" =>
+                           [healthcare_weight(res_base.w), healthcare_weight(res_diff.w)]);
+             formatters = [resfmt],
+             title = "A targeted fee steers exposure away from a sector")
 ````
 
 ## 5. Fixed fees need a MIP solver

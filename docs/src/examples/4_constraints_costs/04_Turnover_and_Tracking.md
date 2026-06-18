@@ -72,7 +72,8 @@ the result closer to where we started.
 turnover_vals = [0.005, 0.02, 0.1, 0.5]
 turnover_res = [optimise(MeanRisk(; obj = MaximumRatio(; rf = rf),
                                   opt = JuMPOptimiser(; pe = pr, slv = slv,
-                                                      tn = Turnover(; w = equal_weight, val = v))))
+                                                      tn = Turnover(; w = equal_weight,
+                                                                    val = v))))
                 for v in turnover_vals]
 
 drift(w) = sum(abs, w .- equal_weight)
@@ -92,7 +93,8 @@ a target.
 
 ````@example 04_Turnover_and_Tracking
 res_min_turnover = optimise(MeanRisk(; r = TurnoverRiskMeasure(; w = equal_weight),
-                                     obj = MinimumRisk(), opt = JuMPOptimiser(; pe = pr, slv = slv)))
+                                     obj = MinimumRisk(),
+                                     opt = JuMPOptimiser(; pe = pr, slv = slv)))
 ````
 
 ## 4. Tracking a benchmark
@@ -103,10 +105,18 @@ res_min_turnover = optimise(MeanRisk(; r = TurnoverRiskMeasure(; w = equal_weigh
 *replicating* portfolio from our 20 assets that best tracks the index.
 
 ````@example 04_Turnover_and_Tracking
-res_replicate_ew = optimise(MeanRisk(; r = TrackingRiskMeasure(; tr = WeightsTracking(; w = equal_weight)),
-                                     obj = MinimumRisk(), opt = JuMPOptimiser(; pe = pr, slv = slv)))
-res_replicate_idx = optimise(MeanRisk(; r = TrackingRiskMeasure(; tr = ReturnsTracking(; w = index_returns)),
-                                      obj = MinimumRisk(), opt = JuMPOptimiser(; pe = pr, slv = slv)))
+res_replicate_ew = optimise(MeanRisk(;
+                                     r = TrackingRiskMeasure(;
+                                                             tr = WeightsTracking(;
+                                                                                  w = equal_weight)),
+                                     obj = MinimumRisk(),
+                                     opt = JuMPOptimiser(; pe = pr, slv = slv)))
+res_replicate_idx = optimise(MeanRisk(;
+                                      r = TrackingRiskMeasure(;
+                                                              tr = ReturnsTracking(;
+                                                                                   w = index_returns)),
+                                      obj = MinimumRisk(),
+                                      opt = JuMPOptimiser(; pe = pr, slv = slv)))
 
 pretty_table(DataFrame("Asset" => rd.nx, "Replicate EW" => res_replicate_ew.w,
                        "Replicate index" => res_replicate_idx.w); formatters = [resfmt],
@@ -125,7 +135,8 @@ err_vals = [0.0005, 0.001, 0.005, 0.02]
 track_res = [optimise(MeanRisk(; obj = MaximumRatio(; rf = rf),
                                opt = JuMPOptimiser(; pe = pr, slv = slv,
                                                    tr = TrackingError(;
-                                                                      tr = WeightsTracking(; w = equal_weight),
+                                                                      tr = WeightsTracking(;
+                                                                                           w = equal_weight),
                                                                       err = e))))
              for e in err_vals]
 

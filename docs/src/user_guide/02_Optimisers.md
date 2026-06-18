@@ -56,7 +56,8 @@ non-MIP problems). The workhorse is [`MeanRisk`](@ref); its default objective is
 [`MinimumRisk`](@ref).
 
 ````@example 02_Optimisers
-res_mr = optimise(MeanRisk(; obj = MinimumRisk(), opt = JuMPOptimiser(; pe = pr, slv = slv)))
+res_mr = optimise(MeanRisk(; obj = MinimumRisk(),
+                           opt = JuMPOptimiser(; pe = pr, slv = slv)))
 ````
 
 `MeanRisk` also offers [`MaximumUtility`](@ref), [`MaximumRatio`](@ref) and
@@ -102,7 +103,8 @@ the prior; the outer one does not.
 ````@example 02_Optimisers
 res_nco = optimise(NestedClustered(; pe = pr, cle = clr,
                                    opti = MeanRisk(; obj = MinimumRisk(),
-                                                   opt = JuMPOptimiser(; pe = pr, slv = slv)),
+                                                   opt = JuMPOptimiser(; pe = pr,
+                                                                       slv = slv)),
                                    opto = MeanRisk(; obj = MinimumRisk(),
                                                    opt = JuMPOptimiser(; slv = slv))), rd)
 ````

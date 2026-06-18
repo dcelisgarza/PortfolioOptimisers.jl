@@ -38,7 +38,7 @@ the decision framework behind them.
 ## A rough map
 
 | Situation | Reach for |
-|:--|:--|
+| :-- | :-- |
 | Minimal compute, just want diversification | [`InverseVolatility`](@ref) / [`EqualWeighted`](@ref) |
 | Classic risk/return trade-off | [`MeanRisk`](@ref) with an objective + efficient frontier |
 | Want each holding to carry equal risk | [`RiskBudgeting`](@ref) |
@@ -71,7 +71,8 @@ slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
              check_sol = (; allow_local = true, allow_almost = true))
 
 res_ew = optimise(EqualWeighted(), rd)
-res_mr = optimise(MeanRisk(; obj = MinimumRisk(), opt = JuMPOptimiser(; pe = pr, slv = slv)))
+res_mr = optimise(MeanRisk(; obj = MinimumRisk(),
+                           opt = JuMPOptimiser(; pe = pr, slv = slv)))
 res_hrp = optimise(HierarchicalRiskParity(; r = Variance(),
                                           opt = HierarchicalOptimiser(; pe = pr,
                                                                       cle = clusterise(ClustersEstimator(),

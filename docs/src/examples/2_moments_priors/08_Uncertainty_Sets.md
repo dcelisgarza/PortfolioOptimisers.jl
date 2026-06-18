@@ -81,9 +81,11 @@ as `q` shrinks.
 ````@example 08_Uncertainty_Sets
 qs = [0.01, 0.05, 0.10, 0.20]
 box_widths = [let u = sigma_ucs(NormalUncertaintySet(; rng = StableRNG(1), q = q,
-                                                     alg = BoxUncertaintySetAlgorithm()), rd.X)
+                                                     alg = BoxUncertaintySetAlgorithm()),
+                                rd.X)
                   sum(abs, u.ub .- u.lb)
-              end for q in qs]
+              end
+              for q in qs]
 
 pretty_table(DataFrame(; q = qs, Symbol("box total width") => box_widths);
              title = "Smaller q → wider (more conservative) uncertainty set")
@@ -104,10 +106,10 @@ slv = Solver(; name = :clarabel1, solver = Clarabel.Optimizer,
 
 res_nom = optimise(MeanRisk(; r = Variance(), obj = MinimumRisk(),
                             opt = JuMPOptimiser(; pe = pr, slv = slv)))
-res_box = optimise(MeanRisk(; r = UncertaintySetVariance(; ucs = ucs_box), obj = MinimumRisk(),
-                            opt = JuMPOptimiser(; pe = pr, slv = slv)))
-res_ell = optimise(MeanRisk(; r = UncertaintySetVariance(; ucs = ucs_ell), obj = MinimumRisk(),
-                            opt = JuMPOptimiser(; pe = pr, slv = slv)))
+res_box = optimise(MeanRisk(; r = UncertaintySetVariance(; ucs = ucs_box),
+                            obj = MinimumRisk(), opt = JuMPOptimiser(; pe = pr, slv = slv)))
+res_ell = optimise(MeanRisk(; r = UncertaintySetVariance(; ucs = ucs_ell),
+                            obj = MinimumRisk(), opt = JuMPOptimiser(; pe = pr, slv = slv)))
 ````
 
 The robust portfolios hedge against covariance estimation error. For *covariance* robustness the
@@ -115,9 +117,9 @@ ellipsoidal set — which captures the joint geometry of the estimation error ra
 each entry on its own — typically produces the more diversified, less concentrated allocation.
 
 ````@example 08_Uncertainty_Sets
-pretty_table(DataFrame(["Assets" => rd.nx, "Nominal" => res_nom.w, "Box-robust" => res_box.w,
-                        "Ellipsoid-robust" => res_ell.w]); formatters = [resfmt],
-             title = "Minimum-variance weights: nominal vs robust")
+pretty_table(DataFrame(["Assets" => rd.nx, "Nominal" => res_nom.w,
+                        "Box-robust" => res_box.w, "Ellipsoid-robust" => res_ell.w]);
+             formatters = [resfmt], title = "Minimum-variance weights: nominal vs robust")
 
 using StatsPlots, GraphRecipes #= Nominal vs box- vs ellipsoid-robust minimum variance. =#
 

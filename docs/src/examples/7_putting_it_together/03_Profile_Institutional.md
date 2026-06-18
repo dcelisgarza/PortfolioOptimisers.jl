@@ -27,8 +27,8 @@ The reasoning, following the [strategy decision framework](../../user_guide/06_C
     The constraints, not the prior, are doing most of the work.
 
 ````@example 03_Profile_Institutional
-using PortfolioOptimisers, CSV, TimeSeries, DataFrames, PrettyTables, Clarabel, HiGHS, StatsPlots,
-      GraphRecipes
+using PortfolioOptimisers, CSV, TimeSeries, DataFrames, PrettyTables, Clarabel, HiGHS,
+      StatsPlots, GraphRecipes
 
 resfmt = (v, i, j) -> begin
     return if j == 1
@@ -54,10 +54,10 @@ N = length(rd.nx)
 prices = vec(values(X)[end, :])
 benchmark = fill(1 / N, N)
 
-sets = AssetSets(; dict = Dict("nx" => rd.nx,
-                               "tech" => ["AAPL", "AMD", "MSFT"],
-                               "energy" => ["CVX", "XOM", "RRC"],
-                               "healthcare" => ["JNJ", "LLY", "MRK", "PFE", "UNH"]))
+sets = AssetSets(;
+                 dict = Dict("nx" => rd.nx, "tech" => ["AAPL", "AMD", "MSFT"],
+                             "energy" => ["CVX", "XOM", "RRC"],
+                             "healthcare" => ["JNJ", "LLY", "MRK", "PFE", "UNH"]))
 
 slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
              settings = Dict("verbose" => false),
@@ -72,17 +72,21 @@ tracking-error budget against the benchmark. Every rule is a keyword on the [`Ju
 ````@example 03_Profile_Institutional
 institutional = optimise(MeanRisk(; obj = MinimumRisk(),
                                   opt = JuMPOptimiser(; pe = pr, slv = slv, sets = sets,
-                                                      wb = WeightBounds(; lb = 0.0, ub = 0.10),
+                                                      wb = WeightBounds(; lb = 0.0,
+                                                                        ub = 0.10),
                                                       lcse = LinearConstraintEstimator(;
                                                                                        val = ["energy <= 0.2"]),
                                                       tr = TrackingError(;
-                                                                         tr = WeightsTracking(; w = benchmark),
+                                                                         tr = WeightsTracking(;
+                                                                                              w = benchmark),
                                                                          err = 0.005))))
 
 sector_weight(w, g) = sum(w[i] for i in eachindex(w) if rd.nx[i] in sets.dict[g])
 pretty_table(DataFrame("Sector" => ["tech", "energy", "healthcare"],
-                       "Benchmark" => [sector_weight(benchmark, g) for g in ["tech", "energy", "healthcare"]],
-                       "Mandate book" => [sector_weight(institutional.w, g) for g in ["tech", "energy", "healthcare"]]);
+                       "Benchmark" => [sector_weight(benchmark, g)
+                                       for g in ["tech", "energy", "healthcare"]],
+                       "Mandate book" => [sector_weight(institutional.w, g)
+                                          for g in ["tech", "energy", "healthcare"]]);
              formatters = [resfmt],
              title = "Institutional book — capped, energy-limited, benchmark-tracking")
 ````

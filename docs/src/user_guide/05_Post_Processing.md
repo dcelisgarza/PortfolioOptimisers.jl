@@ -55,8 +55,8 @@ few dollars are left uninvested.
 ````@example 05_Post_Processing
 invested = sum(alloc.shares .* prices)
 pretty_table(DataFrame("Asset" => rd.nx, "Target weight" => res.w,
-                       "Shares" => round.(Int, alloc.shares),
-                       "Realised weight" => alloc.w); formatters = [resfmt],
+                       "Shares" => round.(Int, alloc.shares), "Realised weight" => alloc.w);
+             formatters = [resfmt],
              title = "Discrete allocation of \```math(round(Int, cash)) — invested \```(round(Int, invested)), cash left \$$(round(alloc.cash, digits = 2))")
 ````
 

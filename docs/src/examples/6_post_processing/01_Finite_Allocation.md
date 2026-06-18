@@ -26,8 +26,8 @@ interface.
     integer book. Watch the realised-vs-target drift — it is your discretisation error.
 
 ````@example 01_Finite_Allocation
-using PortfolioOptimisers, CSV, TimeSeries, DataFrames, PrettyTables, Clarabel, HiGHS, StatsPlots,
-      GraphRecipes
+using PortfolioOptimisers, CSV, TimeSeries, DataFrames, PrettyTables, Clarabel, HiGHS,
+      StatsPlots, GraphRecipes
 
 resfmt = (v, i, j) -> begin
     return if j == 1
@@ -68,8 +68,9 @@ cash = 100_000.0
 greedy = optimise(GreedyAllocation(), res.w, prices, cash)
 
 drift(alloc) = sum(abs, alloc.w .- res.w)
-pretty_table(DataFrame("Asset" => rd.nx, "Target" => res.w, "Shares" => round.(Int, greedy.shares),
-                       "Realised" => greedy.w); formatters = [resfmt],
+pretty_table(DataFrame("Asset" => rd.nx, "Target" => res.w,
+                       "Shares" => round.(Int, greedy.shares), "Realised" => greedy.w);
+             formatters = [resfmt],
              title = "Greedy allocation of \```math(round(Int, cash)) — leftover cash \```(round(greedy.cash, digits = 2)), drift $(round(drift(greedy), digits = 4))")
 ````
 
@@ -121,7 +122,8 @@ budget_allocs = [optimise(GreedyAllocation(), res.w, prices, c) for c in budgets
 pretty_table(DataFrame("Budget" => budgets,
                        "Leftover cash" => [a.cash for a in budget_allocs],
                        "Drift from target" => [drift(a) for a in budget_allocs]);
-             formatters = [resfmt], title = "Smaller budgets suffer larger discretisation error")
+             formatters = [resfmt],
+             title = "Smaller budgets suffer larger discretisation error")
 ````
 
 Both allocators also accept a [`Fees`](@ref) argument, so the share counts can be chosen net of

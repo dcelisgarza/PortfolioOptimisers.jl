@@ -6,7 +6,20 @@ EditURL = "../../../../examples/3_optimisers/01_MeanRisk_Objectives.jl"
 
 # `MeanRisk` objectives
 
-In this example we will show the different objective functions available in `MeanRisk`, and compare them to a benchmark.
+[`MeanRisk`](@ref) is the workhorse optimiser: it casts portfolio selection as an explicit
+trade-off between expected return and risk, and an **objective function** decides *which* point on
+that trade-off you get. The same estimator, prior and risk measure can produce four very different
+portfolios depending on the objective:
+
+- [`MinimumRisk`](@ref) — ignore return, take the least-risk portfolio.
+- [`MaximumReturn`](@ref) — ignore risk, take the highest-return portfolio (a corner solution).
+- [`MaximumRatio`](@ref) — maximise the risk-adjusted ratio (return over risk, net of the
+    risk-free rate) — the tangency portfolio.
+- [`MaximumUtility`](@ref) — maximise `return − l · risk`, where the risk-aversion `l` dials
+    continuously between the return-seeking and risk-averse ends.
+
+This page runs all four against a common benchmark, confirms each does what it claims, and shows how
+`MaximumUtility`'s risk-aversion parameter sweeps between the extremes.
 
 !!! tip "When to reach for this"
     [`MeanRisk`](@ref) is the workhorse optimiser: reach for it whenever you want to express
@@ -14,7 +27,8 @@ In this example we will show the different objective functions available in `Mea
     objective pick the point — minimise risk, maximise return, maximise the risk-adjusted
     ratio, or maximise a risk-averse utility. If you instead want to *allocate risk itself*
     rather than trade it against return, see [`RiskBudgeting`](@ref); if you want the whole
-    trade-off curve rather than one point, see the efficient-frontier example.
+    trade-off curve rather than one point, see the [efficient-frontier](02_Efficient_Frontier.md)
+    example.
 
 ````@example 01_MeanRisk_Objectives
 using PortfolioOptimisers, PrettyTables
@@ -38,7 +52,7 @@ nothing #hide
 
 ## 1. ReturnsResult data
 
-We will use the same data as the previous example.
+We use the same S&P 500 slice as the other optimiser examples.
 
 ````@example 01_MeanRisk_Objectives
 using CSV, TimeSeries, DataFrames
@@ -50,50 +64,51 @@ pretty_table(X[(end - 5):end]; formatters = [tsfmt])
 rd = prices_to_returns(X)
 ````
 
-## 2. MeanRisk objectives
+## 2. The four objectives
 
-Here we will show the different objective functions available in `MeanRisk`. We will also use the semi-standard deviation risk measure.
+We will hold the risk measure fixed and vary only the objective. For the risk measure we reach for
+the **semi–standard deviation** — and here we meet a consequence of the package's design
+philosophy: an entire class of risk measures is expressed as a single
+[`LowOrderMoment`](@ref) parametrised by an internal algorithm. Semi–standard deviation is the
+second lower partial moment (`Semi()`) rendered as a second-order cone expression
+([`SOCRiskExpr`](@ref)).
 
 ````@example 01_MeanRisk_Objectives
 using Clarabel
 slv = Solver(; name = :clarabel1, solver = Clarabel.Optimizer,
              settings = Dict("verbose" => false),
              check_sol = (; allow_local = true, allow_almost = true))
-````
 
-Here we encounter another consequence of the design philosophy of `PortfolioOptimisers`. An entire class of risk measures can be categorised and consistently implemented as `LowOrderMoment` risk measures with different internal algorithms. This corresponds to the semi-standard deviation.
-
-````@example 01_MeanRisk_Objectives
 r = LowOrderMoment(; alg = SecondMoment(; alg1 = Semi(), alg2 = SOCRiskExpr()))
 ````
 
-Since we will perform various optimisations on the same data, there's no need to redo work. Let's precompute the prior statistics using the `EmpiricalPrior` to avoid recomputing them every time we call the optimisation.
+Since every optimisation runs on the same data, we precompute the prior statistics once with
+[`EmpiricalPrior`](@ref) and pass the result to [`JuMPOptimiser`](@ref), so they are not recomputed
+on every call.
 
 ````@example 01_MeanRisk_Objectives
 pr = prior(EmpiricalPrior(), rd)
-````
-
-We can provide the prior result to `JuMPOptimiser`.
-
-````@example 01_MeanRisk_Objectives
 opt = JuMPOptimiser(; pe = pr, slv = slv)
 ````
 
-Here we define the estimators for different objective functions.
+Now the four objectives. Only the `obj` field changes — same prior, same risk measure, same
+optimiser.
 
 ````@example 01_MeanRisk_Objectives
 # Minimum risk
 mr1 = MeanRisk(; r = r, obj = MinimumRisk(), opt = opt)
-# Maximum utility with risk aversion parameter 2
+# Maximum utility (default risk aversion l = 2)
 mr2 = MeanRisk(; r = r, obj = MaximumUtility(), opt = opt)
-# Risk-free rate of 4.2/100/252
+# Maximum risk-adjusted ratio, risk-free rate of 4.2/100/252
 rf = 4.2 / 100 / 252
 mr3 = MeanRisk(; r = r, obj = MaximumRatio(; rf = rf), opt = opt)
 # Maximum return
 mr4 = MeanRisk(; r = r, obj = MaximumReturn(), opt = opt)
 ````
 
-Let's perform the optimisations, but since we've precomputed the prior statistics, we do not need to provide the returns data. We will also produce a benchmark using the `InverseVolatility` estimator.
+We optimise each. Because the prior is precomputed, we do not pass the returns data. For a
+reference point we also compute an [`InverseVolatility`](@ref) benchmark — a naive, solver-free
+allocation that ignores both objective and expected returns.
 
 ````@example 01_MeanRisk_Objectives
 res1 = optimise(mr1)
@@ -103,7 +118,8 @@ res4 = optimise(mr4)
 res0 = optimise(InverseVolatility(; pe = pr))
 ````
 
-Let's view the results as pretty tables.
+The weights side by side. Reading left to right, the benchmark spreads evenly, minimum-risk hugs
+the low-volatility names, and maximum-return collapses onto the single highest-return asset.
 
 ````@example 01_MeanRisk_Objectives
 pretty_table(DataFrame(; :assets => rd.nx, :benchmark => res0.w, :MinimumRisk => res1.w,
@@ -111,19 +127,52 @@ pretty_table(DataFrame(; :assets => rd.nx, :benchmark => res0.w, :MinimumRisk =>
                        :MaximumReturn => res4.w); formatters = [resfmt])
 ````
 
-## 4. Visualising objective functions
+## 3. Risk aversion: tuning `MaximumUtility`
 
-Comparing compositions and cumulative returns across objectives reveals how each allocation differs.
+[`MinimumRisk`](@ref) and [`MaximumReturn`](@ref) are the two extremes of the trade-off.
+[`MaximumUtility`](@ref) interpolates between them: it maximises `return − l · risk`, so the
+risk-aversion `l` is the dial. As `l → 0` utility chases return (toward the maximum-return corner);
+as `l` grows large the risk term dominates (toward the minimum-risk portfolio). The default is
+`l = 2`.
+
+We sweep a range of `l` and read off the realised risk and return of each portfolio.
 
 ````@example 01_MeanRisk_Objectives
-using StatsPlots, GraphRecipes #= Stacked bar composition for the benchmark and all four objectives. =#
+lambdas = [1, 2, 8, 32, 128]
+util = [optimise(MeanRisk(; r = r, obj = MaximumUtility(; l = l), opt = opt)) for l in lambdas]
 
-plot_stacked_bar_composition([res0, res1, res2, res3, res4], rd)
+sweep = map(zip(lambdas, util)) do (l, res)
+    rk, rt, rr = expected_risk_ret_ratio(r, res.ret, res.w, res.pr; rf = rf)
+    return (l, rk, rt, rr)
+end
+pretty_table(DataFrame(; Symbol("risk aversion l") => [s[1] for s in sweep],
+                       :risk => [s[2] for s in sweep], :return => [s[3] for s in sweep],
+                       :ratio => [s[4] for s in sweep]); formatters = [resfmt],
+             title = "MaximumUtility: higher l ⇒ lower risk and lower return")
 ````
 
-In order to confirm that the objective functions do what they say on the tin, we can compute the risk, return and risk return ration. There are individual functions for each `expected_risk`, `expected_return`, `expected_ratio`, but we also have `expected_risk_ret_ratio` that returns all three at once (`risk`, `return`, `risk-return ratio`) which is what we will use here.
+Both risk and return fall monotonically as `l` rises — the portfolio slides down the frontier from
+the return-seeking end toward the minimum-risk end. Plotting the realised (risk, return) of each
+step traces that path explicitly.
 
-Due to the fact that we provide different expected portfolio return measures, any function that computes the expected portfolio return also needs to know which return type to compute. We will be consistent with the returns we used in the optimisation.
+````@example 01_MeanRisk_Objectives
+using StatsPlots, GraphRecipes
+
+plot([s[2] for s in sweep], [s[3] for s in sweep]; seriestype = :path, marker = (:circle, 5),
+     xlabel = "Semi-deviation risk", ylabel = "Arithmetic return",
+     title = "MaximumUtility risk-aversion path",
+     label = "l = " * join(string.(lambdas), ", "))
+````
+
+## 4. Confirming the objectives
+
+To check each objective did what it says on the tin, we compute the risk, return and risk-return
+ratio of every portfolio. There are individual functions ([`expected_risk`](@ref),
+[`expected_return`](@ref), [`expected_ratio`](@ref)), but [`expected_risk_ret_ratio`](@ref) returns
+all three at once, which is what we use here.
+
+Any function that computes the expected portfolio return needs to know *which* return type to use;
+we stay consistent with the return measure used in each optimisation.
 
 ````@example 01_MeanRisk_Objectives
 rk1, rt1, rr1 = expected_risk_ret_ratio(r, res1.ret, res1.w, res1.pr; rf = rf);
@@ -134,7 +183,8 @@ rk0, rt0, rr0 = expected_risk_ret_ratio(r, ArithmeticReturn(), res0.w, res0.pr; 
 nothing #hide
 ````
 
-Let's make sure the results are what we expect.
+The table confirms it: `MinimumRisk` posts the lowest risk, `MaximumRatio` the highest ratio, and
+`MaximumReturn` the highest return — each column extremised on its own objective.
 
 ````@example 01_MeanRisk_Objectives
 pretty_table(DataFrame(;
@@ -143,6 +193,15 @@ pretty_table(DataFrame(;
                             :Benchmark], :rk => [rk1, rk2, rk3, rk4, rk0],
                        :rt => [rt1, rt2, rt3, rt4, rt0], :rr => [rr1, rr2, rr3, rr4, rr0]);
              formatters = [resfmt])
+````
+
+## 5. Visualising the objectives
+
+The stacked-bar composition contrasts the five allocations at a glance — note how the
+return-driven objectives concentrate while the benchmark and minimum-risk books spread out.
+
+````@example 01_MeanRisk_Objectives
+plot_stacked_bar_composition([res0, res1, res2, res3, res4], rd)
 ````
 
 The return histogram for the minimum-risk portfolio shows the distribution of daily returns and the
@@ -163,8 +222,6 @@ Per-asset semi-standard-deviation risk contribution for the minimum-risk portfol
 ````@example 01_MeanRisk_Objectives
 plot_risk_contribution(r, res1, rd)
 ````
-
-We can see that indeed, the minimum risk produces the portfolio with minimum risk, the maximum ratio produces the portfolio with the maximum risk-return ratio, and the maximum return portfolio produces the portfolio with the maximum return.
 
 ---
 

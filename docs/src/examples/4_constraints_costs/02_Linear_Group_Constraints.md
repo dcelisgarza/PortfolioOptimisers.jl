@@ -60,14 +60,12 @@ groups — here, sectors — that constraints will reference.
 
 ````@example 02_Linear_Group_Constraints
 sets = AssetSets(;
-                 dict = Dict("nx" => rd.nx,
-                             "tech" => ["AAPL", "AMD", "MSFT"],
+                 dict = Dict("nx" => rd.nx, "tech" => ["AAPL", "AMD", "MSFT"],
                              "financials" => ["BAC", "JPM"],
                              "energy" => ["CVX", "XOM", "RRC"],
                              "healthcare" => ["JNJ", "LLY", "MRK", "PFE", "UNH"],
                              "staples" => ["KO", "PEP", "PG", "WMT"],
-                             "consumer" => ["BBY", "HD"],
-                             "industrial" => ["GE"]))
+                             "consumer" => ["BBY", "HD"], "industrial" => ["GE"]))
 ````
 
 Our baseline is an unconstrained maximum-ratio portfolio. On this one-year slice it is starkly
@@ -79,7 +77,8 @@ res_base = optimise(MeanRisk(; obj = MaximumRatio(; rf = rf),
                              opt = JuMPOptimiser(; pe = pr, slv = slv)))
 
 sector_weight(w, g) = sum(w[i] for i in eachindex(w) if rd.nx[i] in sets.dict[g])
-sectors = ["tech", "financials", "energy", "healthcare", "staples", "consumer", "industrial"]
+sectors = ["tech", "financials", "energy", "healthcare", "staples", "consumer",
+           "industrial"]
 pretty_table(DataFrame("Sector" => sectors,
                        "Baseline" => [sector_weight(res_base.w, g) for g in sectors]);
              formatters = [resfmt], title = "Baseline max-ratio: sector exposure")
@@ -110,13 +109,15 @@ asks only that the four *together* reach 15%.
 res_member = optimise(MeanRisk(; obj = MaximumRatio(; rf = rf),
                                opt = JuMPOptimiser(; pe = pr, slv = slv, sets = sets,
                                                    wb = WeightBoundsEstimator(;
-                                                                              lb = ["staples" => 0.15]))))
+                                                                              lb = ["staples" =>
+                                                                                        0.15]))))
 res_groupsum = optimise(MeanRisk(; obj = MaximumRatio(; rf = rf),
                                  opt = JuMPOptimiser(; pe = pr, slv = slv, sets = sets,
                                                      lcse = LinearConstraintEstimator(;
                                                                                       val = ["staples >= 0.15"]))))
 
-pretty_table(DataFrame("Interpretation" => ["per-member (each ≥ 15%)", "group-sum (total ≥ 15%)"],
+pretty_table(DataFrame("Interpretation" =>
+                           ["per-member (each ≥ 15%)", "group-sum (total ≥ 15%)"],
                        "Staples total" => [sector_weight(res_member.w, "staples"),
                                            sector_weight(res_groupsum.w, "staples")]);
              formatters = [resfmt], title = "Same number, two very different constraints")

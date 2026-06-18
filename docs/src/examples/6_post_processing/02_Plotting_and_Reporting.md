@@ -37,12 +37,15 @@ slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
              check_sol = (; allow_local = true, allow_almost = true))
 rf = 4.2 / 100 / 252
 
-res_min = optimise(MeanRisk(; obj = MinimumRisk(), opt = JuMPOptimiser(; pe = pr, slv = slv)))
+res_min = optimise(MeanRisk(; obj = MinimumRisk(),
+                            opt = JuMPOptimiser(; pe = pr, slv = slv)))
 res_ratio = optimise(MeanRisk(; obj = MaximumRatio(; rf = rf),
                               opt = JuMPOptimiser(; pe = pr, slv = slv)))
 frontier = optimise(MeanRisk(; obj = MinimumRisk(),
                              opt = JuMPOptimiser(; pe = pr, slv = slv,
-                                                 ret = ArithmeticReturn(; lb = Frontier(; N = 15)))))
+                                                 ret = ArithmeticReturn(;
+                                                                        lb = Frontier(;
+                                                                                      N = 15)))))
 ````
 
 ## 2. Inspecting the inputs

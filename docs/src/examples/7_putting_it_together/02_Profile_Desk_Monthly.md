@@ -27,8 +27,8 @@ The reasoning, following the [strategy decision framework](../../user_guide/06_C
     and fee control matter less when you trade rarely.
 
 ````@example 02_Profile_Desk_Monthly
-using PortfolioOptimisers, CSV, TimeSeries, DataFrames, PrettyTables, Clarabel, HiGHS, StatsPlots,
-      GraphRecipes
+using PortfolioOptimisers, CSV, TimeSeries, DataFrames, PrettyTables, Clarabel, HiGHS,
+      StatsPlots, GraphRecipes
 
 resfmt = (v, i, j) -> begin
     return if j == 1
@@ -51,11 +51,12 @@ X = TimeArray(CSV.File(joinpath(@__DIR__, "..", "SP500.csv.gz")); timestamp = :D
 rd = prices_to_returns(X)
 prices = vec(values(X)[end, :])
 
-sets = AssetSets(; dict = Dict("nx" => rd.nx,
-                               "energy" => ["CVX", "XOM", "RRC"],
-                               "healthcare" => ["JNJ", "LLY", "MRK", "PFE", "UNH"]))
+sets = AssetSets(;
+                 dict = Dict("nx" => rd.nx, "energy" => ["CVX", "XOM", "RRC"],
+                             "healthcare" => ["JNJ", "LLY", "MRK", "PFE", "UNH"]))
 view_prior = EntropyPoolingPrior(; sets = sets,
-                                 mu_views = LinearConstraintEstimator(; val = ["healthcare >= energy"]))
+                                 mu_views = LinearConstraintEstimator(;
+                                                                      val = ["healthcare >= energy"]))
 pr = prior(view_prior, rd)
 
 slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
@@ -72,7 +73,9 @@ books across a sweep of return targets — rather than committing to a single ob
 ````@example 02_Profile_Desk_Monthly
 frontier = optimise(MeanRisk(; obj = MinimumRisk(),
                              opt = JuMPOptimiser(; pe = pr, slv = slv,
-                                                 ret = ArithmeticReturn(; lb = Frontier(; N = 15)))))
+                                                 ret = ArithmeticReturn(;
+                                                                        lb = Frontier(;
+                                                                                      N = 15)))))
 
 plot_efficient_frontier(frontier.w, pr; rt = frontier.ret)
 ````
@@ -83,9 +86,11 @@ From the frontier, the desk takes the risk-adjusted optimum — the [`MaximumRat
 (tangency) portfolio on the same view-tilted prior.
 
 ````@example 02_Profile_Desk_Monthly
-desk = optimise(MeanRisk(; obj = MaximumRatio(; rf = rf), opt = JuMPOptimiser(; pe = pr, slv = slv)))
+desk = optimise(MeanRisk(; obj = MaximumRatio(; rf = rf),
+                         opt = JuMPOptimiser(; pe = pr, slv = slv)))
 
-pretty_table(DataFrame("Asset" => rd.nx, "Tangency weight" => desk.w); formatters = [resfmt],
+pretty_table(DataFrame("Asset" => rd.nx, "Tangency weight" => desk.w);
+             formatters = [resfmt],
              title = "Desk monthly — risk-adjusted optimum on the view prior")
 ````
 
@@ -100,8 +105,9 @@ mip_slv = Solver(; name = :highs, solver = HiGHS.Optimizer,
 alloc = optimise(DiscreteAllocation(; slv = mip_slv), desk.w, prices, 500_000.0)
 
 invested = sum(alloc.shares .* prices)
-pretty_table(DataFrame("Asset" => rd.nx, "Target" => desk.w, "Shares" => round.(Int, alloc.shares),
-                       "Realised" => alloc.w); formatters = [resfmt],
+pretty_table(DataFrame("Asset" => rd.nx, "Target" => desk.w,
+                       "Shares" => round.(Int, alloc.shares), "Realised" => alloc.w);
+             formatters = [resfmt],
              title = "\$500,000 allocated — invested \```math(round(Int, invested)), cash left \```(round(alloc.cash, digits = 2))")
 ````
 
