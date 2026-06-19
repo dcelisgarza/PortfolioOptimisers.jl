@@ -617,9 +617,7 @@ function prices_to_returns(X::TimeSeries.TimeArray,
     end
     X = DataFrames.DataFrame(X)
 
-    f(x) = if isa(x, Number)
-        isnan(x)
-    end ? missing : x
+    f(x) = (isa(x, Number) && isnan(x)) ? missing : x
 
     DataFrames.transform!(X, 2:DataFrames.DataAPI.ncol(X) .=> DataFrames.ByRow((x) -> f(x));
                           renamecols = false)

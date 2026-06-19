@@ -36,11 +36,10 @@ Mark a topic covered (✅) only when all of the following hold:
 | ✅ | Higher-moment estimation (coskewness, cokurtosis, `HighOrderPriorEstimator`) | `examples/2_moments_priors/03_Higher_Moment_Estimation.jl` |
 | ✅ | Factor priors (`FactorPrior`, `HighOrderFactorPriorEstimator`, stepwise and dimension-reduction regression) | `examples/2_moments_priors/04_Factor_Priors.jl` |
 | ✅ | Black-Litterman prior (views, `views_conf`, equilibrium prior, posterior) | `examples/2_moments_priors/05_Black_Litterman.jl` |
-| ✅ | Entropy pooling | `examples/2_moments_priors/06_Entropy_Pooling.jl` |
-| ✅ | Opinion pooling | `examples/2_moments_priors/07_Opinion_Pooling.jl` |
-| ✅ | Uncertainty sets (`NormalUncertaintySet`, box and ellipsoidal, `q` sweep, mean and covariance forms) | `examples/2_moments_priors/08_Uncertainty_Sets.jl` |
-| ⬜ | Advanced Black-Litterman variants — `BayesianBlackLittermanPrior`, `FactorBlackLittermanPrior`, `AugmentedBlackLittermanPrior`; each has materially different view-construction logic that the base example does not cover | — |
-| ⬜ | Delta and Bootstrap uncertainty sets — `DeltaUncertaintySet` and `BootstrapUncertaintySet`; the current example uses only `NormalUncertaintySet` | — |
+| ✅ | Advanced Black-Litterman variants — `BayesianBlackLittermanPrior`, `FactorBlackLittermanPrior` (`rsd`/`l`), `AugmentedBlackLittermanPrior` (asset + factor views) | `examples/2_moments_priors/06_Advanced_Black_Litterman.jl` |
+| ✅ | Entropy pooling | `examples/2_moments_priors/07_Entropy_Pooling.jl` |
+| ✅ | Opinion pooling | `examples/2_moments_priors/08_Opinion_Pooling.jl` |
+| ✅ | Uncertainty sets (`NormalUncertaintySet` box/ellipsoidal, `q` sweep, mean and covariance forms, `DeltaUncertaintySet`; `ARCHUncertaintySet` block bootstrap described) | `examples/2_moments_priors/09_Uncertainty_Sets.jl` |
 | ⬜ | Windowed moment estimators — `WindowedCovariance`, `WindowedExpectedReturns`, `WindowedVariance`, `WindowedCoskewness`, `WindowedCokurtosis` (exponentially-weighted and rolling-window variants) | — |
 | ⬜ | Regime-adjusted estimators — `RegimeAdjustedExpWeightedCovariance` and `RegimeAdjustedExpWeightedVariance`; covariance conditioned on a regime model | — |
 | 🔶 | Implied volatility estimator — `ImpliedVolatility` (requires live Python/PythonCall environment; a stub showing how to plug into `EmpiricalPrior` would be useful) | — |
@@ -56,14 +55,14 @@ Mark a topic covered (✅) only when all of the following hold:
 | ✅ | OWA risk measures — `OrderedWeightsArray` with closed-form vectors (`owa_gmd`, `owa_cvar`, `owa_tg`, `owa_tgrg`, `owa_wr`, `owa_rg`, `owa_cvarrg`), approximate formulation, `OrderedWeightsArrayRange`, L-moment CRM with `NormalisedConstantRelativeRiskAversion` | `examples/3_optimisers/05_OWA_Risk_Measures.jl` |
 | ✅ | `BrownianDistanceVariance` and `VarianceSkewKurtosis` — NormOneCone and inequality formulations, both rank-expression variants; `VarianceSkewKurtosis` with `HighOrderPriorEstimator` + SCS, custom skewness/kurtosis scales | `examples/3_optimisers/06_Brownian_Distance_Variance_and_VarianceSkewKurtosis.jl` |
 | ✅ | Drawdown-family risk measures — `AverageDrawdown`, `UlcerIndex`, `MaximumDrawdown`, `DrawdownatRisk`, `ConditionalDrawdownatRisk`; alpha sweep, drawdown upper-bound constraint, post-optimisation `drawdowns()` / `cumulative_returns()` analytics | `examples/3_optimisers/07_Drawdown_Risk_Measures.jl` |
-| ✅ | Risk budgeting — `AssetRiskBudgeting`, `RelaxedRiskBudgeting`, `FactorRiskBudgeting` | `examples/3_optimisers/08_Risk_Budgeting.jl` |
-| ✅ | Risk contribution — asset and factor variance risk contributions using `rc` constraints, objective-function sweep (`MinimumRisk`, `MaximumUtility`, `MaximumRatio`) | `examples/3_optimisers/09_Risk_Contribution.jl` |
-| ✅ | Clustering optimisers — `HierarchicalRiskParity`, `HierarchicalEqualRiskContribution`, `SchurComplementHierarchicalRiskParity` | `examples/3_optimisers/10_Clustering_Optimisers.jl` |
-| ✅ | Clustering optimisers with mixed risks — mixed risk measures, scalariser sweep, constrained `HierarchicalEqualRiskContribution` | `examples/3_optimisers/11_Clustering_Mixed_Risks_And_Constraints.jl` |
-| ✅ | Meta-optimisers overview — `NestedClustered`, `Stacking`, `SubsetResampling` | `examples/3_optimisers/12_Meta_Optimisers.jl` |
-| ✅ | Subset resampling and cross-validation — `SubsetResampling`, `cross_val_predict`, frontier of a meta-optimiser | `examples/3_optimisers/13_Subset_Resampling_and_Cross_Validation.jl` |
-| ✅ | Near optimal centering | `examples/3_optimisers/14_Near_Optimal_Centering.jl` |
-| ⬜ | Remaining exotic / tail risk measures — `EntropicXatRisk`, `RelativisticXatRisk`, `PowerNormXatRisk`, `GenericValueatRiskRange`; comparative example showing when each is materially different from CVaR (slots in after `07_Drawdown_Risk_Measures`) | — |
+| ✅ | Exotic / tail risk measures — `EntropicValueatRisk`, `RelativisticValueatRisk`, `PowerNormValueatRisk`, `GenericValueatRiskRange`; cross-evaluation vs CVaR, κ-interpolation (EVaR↔worst realisation), `p`-sweep, asymmetric two-sided range | `examples/3_optimisers/08_Exotic_Tail_Risk_Measures.jl` |
+| ✅ | Risk budgeting — `AssetRiskBudgeting`, `RelaxedRiskBudgeting`, `FactorRiskBudgeting` | `examples/3_optimisers/09_Risk_Budgeting.jl` |
+| ✅ | Risk contribution — asset and factor variance risk contributions using `rc` constraints, objective-function sweep (`MinimumRisk`, `MaximumUtility`, `MaximumRatio`) | `examples/3_optimisers/10_Risk_Contribution.jl` |
+| ✅ | Clustering optimisers — `HierarchicalRiskParity`, `HierarchicalEqualRiskContribution`, `SchurComplementHierarchicalRiskParity` | `examples/3_optimisers/11_Clustering_Optimisers.jl` |
+| ✅ | Clustering optimisers with mixed risks — mixed risk measures, scalariser sweep, constrained `HierarchicalEqualRiskContribution` | `examples/3_optimisers/12_Clustering_Mixed_Risks_And_Constraints.jl` |
+| ✅ | Meta-optimisers overview — `NestedClustered`, `Stacking`, `SubsetResampling` | `examples/3_optimisers/13_Meta_Optimisers.jl` |
+| ✅ | Subset resampling and cross-validation — `SubsetResampling`, `cross_val_predict`, frontier of a meta-optimiser | `examples/3_optimisers/14_Subset_Resampling_and_Cross_Validation.jl` |
+| ✅ | Near optimal centering | `examples/3_optimisers/15_Near_Optimal_Centering.jl` |
 
 ## 4. Constraints and costs
 
@@ -92,7 +91,7 @@ Mark a topic covered (✅) only when all of the following hold:
 | ------ | ----- | ---- |
 | ✅ | Finite allocation — rounding fractional weights to integer lots | `examples/6_post_processing/01_Finite_Allocation.jl` |
 | ✅ | Plotting and reporting | `examples/6_post_processing/02_Plotting_and_Reporting.jl` |
-| ⬜ | Performance attribution — `drawdowns()`, `cumulative_returns()`, `relative_cumulative_returns()`, `absolute_cumulative_returns()`, `calc_net_returns` as diagnostic tools after optimisation (rather than as objectives) | — |
+| ✅ | Performance attribution — `cumulative_returns`, `drawdowns`, realised-performance scorecard, `calc_net_returns`/`calc_fees` cost drag, `risk_contribution` attribution (post-optimisation diagnostics) | `examples/6_post_processing/03_Performance_Attribution.jl` |
 
 ## 7. Putting it together (end-to-end profiles)
 

@@ -38,7 +38,7 @@ end;
 
 The desk's thesis: healthcare will outperform energy. It encodes that as an entropy-pooling view,
 reweighting the empirical scenarios so the prior reflects the conviction (see
-[Entropy Pooling](../2_moments_priors/06_Entropy_Pooling.md)).
+[Entropy Pooling](../2_moments_priors/07_Entropy_Pooling.md)).
 =#
 
 X = TimeArray(CSV.File(joinpath(@__DIR__, "..", "SP500.csv.gz")); timestamp = :Date)[(end - 252):end]

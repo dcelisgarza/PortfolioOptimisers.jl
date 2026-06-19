@@ -67,9 +67,9 @@ res_mr = optimise(MeanRisk(; obj = MinimumRisk(),
 follow the same `opt = JuMPOptimiser(...)` pattern:
 
 - [`RiskBudgeting`](@ref) / [`RelaxedRiskBudgeting`](@ref) — target a risk contribution per
-    asset or factor ([Risk Budgeting](../examples/3_optimisers/05_Risk_Budgeting.md)).
+    asset or factor ([Risk Budgeting](../examples/3_optimisers/09_Risk_Budgeting.md)).
 - [`NearOptimalCentering`](@ref) — a robust point near the efficient frontier
-    ([Near Optimal Centering](../examples/3_optimisers/08_Near_Optimal_Centering.md)).
+    ([Near Optimal Centering](../examples/3_optimisers/15_Near_Optimal_Centering.md)).
 
 Here is the minimal risk-budgeting call (equal risk contribution by default):
 
@@ -84,7 +84,7 @@ single program. They take a [`HierarchicalOptimiser`](@ref) carrying the prior a
 estimate. [`HierarchicalRiskParity`](@ref) (HRP) is the canonical one;
 [`HierarchicalEqualRiskContribution`](@ref) and
 [`SchurComplementHierarchicalRiskParity`](@ref) are its siblings — see
-[Clustering Optimisers](../examples/3_optimisers/06_Clustering_Optimisers.md).
+[Clustering Optimisers](../examples/3_optimisers/11_Clustering_Optimisers.md).
 
 ````@example 02_Optimisers
 clr = clusterise(ClustersEstimator(), pr.X)
@@ -97,7 +97,7 @@ res_hrp = optimise(HierarchicalRiskParity(; opt = hopt, r = Variance()))
 Meta-optimisers compose other optimisers. [`NestedClustered`](@ref) (NCO) runs an **inner**
 optimiser within each cluster and an **outer** optimiser across the cluster representatives;
 [`Stacking`](@ref) and [`SubsetResampling`](@ref) blend several fits — see
-[Meta Optimisers](../examples/3_optimisers/07_Meta_Optimisers.md). The inner optimiser carries
+[Meta Optimisers](../examples/3_optimisers/13_Meta_Optimisers.md). The inner optimiser carries
 the prior; the outer one does not.
 
 ````@example 02_Optimisers

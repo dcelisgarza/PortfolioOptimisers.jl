@@ -122,7 +122,7 @@ function generate_files(source::String, build::String, diff_flag::Bool)
     return pages
 end
 
-diff_flag = isempty(String(read(Cmd(`git diff $(@__DIR__) $(joinpath(@__DIR__, "../src/")) $(joinpath(@__DIR__, "../ext/")) $(joinpath(@__DIR__, "../test/"))`))))
+diff_flag = isempty(String(read(Cmd(`git diff $(@__DIR__) $(joinpath(@__DIR__, "../src/")) $(joinpath(@__DIR__, "../ext/")) $(joinpath(@__DIR__, "../test/")) $(joinpath(@__DIR__, "../examples/")) $(joinpath(@__DIR__, "../user_guide/"))`))))
 
 examples = generate_files("../examples/", "examples/", false)
 user_guide = generate_files("../user_guide/", "user_guide/", false)

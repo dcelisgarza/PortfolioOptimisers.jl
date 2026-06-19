@@ -22,11 +22,10 @@ variance and CVaR miss. Two such specialist measures are:
     skewed payoffs and standard mean-variance is blind to the shape of the distribution.
 
 !!! warning "Solver compatibility and dataset sizing"
-    `BrownianDistanceVariance` builds an O(T²) distance matrix inside the model — the
+    - `BrownianDistanceVariance` builds an O(T²) distance matrix inside the model — the
     number of auxiliary variables grows quadratically with observations. This example uses a
     50-observation slice to keep the model small.
-
-    `VarianceSkewKurtosis` requires **SCS** (or another solver that handles polynomial PSD
+    - `VarianceSkewKurtosis` requires **SCS** (or another solver that handles polynomial PSD
     cones). It will fail silently or produce wrong results with a continuous-only solver
     like Clarabel. The high-order prior (`HighOrderPriorEstimator`) must also be used, as
     it pre-computes the coskewness and cokurtosis tensors the risk measure needs. This

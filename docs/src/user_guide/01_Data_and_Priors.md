@@ -69,8 +69,8 @@ interface, so swapping one in is a one-line change. The common alternatives:
     [Black–Litterman](../examples/2_moments_priors/05_Black_Litterman.md)).
 - [`EntropyPoolingPrior`](@ref) / [`OpinionPoolingPrior`](@ref) — reweight the empirical
     scenarios to satisfy views on any moment (deep dives:
-    [Entropy Pooling](../examples/2_moments_priors/06_Entropy_Pooling.md),
-    [Opinion Pooling](../examples/2_moments_priors/07_Opinion_Pooling.md)).
+    [Entropy Pooling](../examples/2_moments_priors/07_Entropy_Pooling.md),
+    [Opinion Pooling](../examples/2_moments_priors/08_Opinion_Pooling.md)).
 
 The covariance estimator inside a prior is itself swappable (shrinkage, denoising, Gerber, …);
 see [Covariance Estimation](../examples/2_moments_priors/02_Covariance_Estimation.md).

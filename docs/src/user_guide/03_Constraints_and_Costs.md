@@ -73,7 +73,7 @@ res_grp = optimise(MeanRisk(; obj = MinimumRisk(),
 
 The same `lcse` handles absolute and relative bounds (`"AAPL <= 0.1"`, `"MSFT >= AMD"`). For
 constraints built from the asset *hierarchy* — phylogeny and centrality — see
-[Phylogeny & Centrality](../examples/4_constraints_costs/03_Phylogeny_Centrality.md).
+[Phylogeny & Centrality](../examples/4_constraints_costs/04_Phylogeny_Centrality.md).
 
 ## 3. Turnover
 
@@ -104,9 +104,9 @@ res_fee = optimise(MeanRisk(; obj = MaximumRatio(; rf = 4.2 / 100 / 252),
 
 Soft alternatives to hard turnover/position limits — L1/L2 weight regularisation and an
 effective-number-of-assets floor (`l1`, `l2`, `nea`) — are covered in
-[Regularisation](../examples/4_constraints_costs/06_Regularisation.md); benchmark
+[Regularisation](../examples/4_constraints_costs/07_Regularisation.md); benchmark
 [`Tracking`](@ref) (the `tr` keyword) in
-[Turnover & Tracking](../examples/4_constraints_costs/04_Turnover_and_Tracking.md).
+[Turnover & Tracking](../examples/4_constraints_costs/05_Turnover_and_Tracking.md).
 
 ## 5. Comparing the effect
 

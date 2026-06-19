@@ -235,6 +235,6 @@ plot_measures(res3.w, pr; x = r1, y = r2,
 #src   NegativeSkewness×Kurtosis NOC surface all solve, with res3.retcode an
 #src   OptimisationSuccess. Both 3D surface and 2D front render. No findings.
 #src - NOTE (cross-ref, not a defect): this page already exercises NearOptimalCentering as a
-#src   frontier/surface engine; the dedicated 14_Near_Optimal_Centering page should focus on
+#src   frontier/surface engine; the dedicated 15_Near_Optimal_Centering page should focus on
 #src   NOC's *neighbourhood-centering* behaviour vs plain MeanRisk rather than re-deriving a
 #src   surface, to avoid overlap. Group rollup: issue #125.

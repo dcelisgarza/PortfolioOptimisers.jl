@@ -159,7 +159,7 @@ a **centred** frontier instead: at each point it returns the portfolio at the an
 the near-optimal neighbourhood rather than the corner. The result sits just inside the extreme
 frontier — slightly less optimal, noticeably more diversified and more stable to changes in the
 prior. (NOC's neighbourhood-centring behaviour is dissected on its own
-[page](14_Near_Optimal_Centering.md); here we only use it as a frontier engine.)
+[page](15_Near_Optimal_Centering.md); here we only use it as a frontier engine.)
 
 NOC solves a harder problem than plain `MeanRisk`, so a single solver configuration can fail to
 converge. We give it a richer fallback vector with decreasing `max_step_fraction`.

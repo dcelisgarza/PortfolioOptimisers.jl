@@ -85,6 +85,25 @@ pr = prior(EmpiricalPrior(), rd)
 opt = JuMPOptimiser(; pe = pr, slv = slv)
 
 #=
+!!! note "Precomputed result vs estimator"
+    Passing `pe = pr` — the *result* of `prior(...)` — fixes the statistics once and reuses them
+    on every `optimise` call, which is why we need not pass the returns data again. But you can
+    instead hand the optimiser the **estimator itself**, `pe = EmpiricalPrior()`, and call
+    `optimise(model, rd)`; the prior is then recomputed from whatever data the optimiser is
+    given. Most examples here precompute for speed because they solve repeatedly on one fixed
+    slice, but the estimator form is the one to reach for whenever the data changes underneath
+    the optimiser:
+
+      - **Cross-validation** refits on each training fold, so it *requires* the estimator form —
+        a precomputed result (fit on the whole sample) would leak the test data into training,
+        and is therefore disallowed.
+      - **Meta-optimisers** ([`Stacking`](@ref), [`NestedClustered`](@ref)) feed their *outer*
+        optimiser synthetic returns assembled from the inner solves, where a precomputed
+        asset-level prior is meaningless; that slot takes an estimator (or just a solver).
+
+    Both are shown in the [meta-optimisers](13_Meta_Optimisers.md) and
+    [subset resampling / cross-validation](14_Subset_Resampling_and_Cross_Validation.md) examples.
+
 Now the four objectives. Only the `obj` field changes — same prior, same risk measure, same
 optimiser.
 =#

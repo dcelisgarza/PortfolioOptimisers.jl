@@ -77,9 +77,10 @@ examples/
     03_Higher_Moment_Estimation.jl     ⬩ (from ex08, split: coskew/cokurt)
     04_Factor_Priors.jl                [rename ex07]
     05_Black_Litterman.jl              ⬩  ─┐ sequenced arc:
-    06_Entropy_Pooling.jl              ⬩   │ each builds on the
-    07_Opinion_Pooling.jl              ⬩  ─┘ previous
-    08_Uncertainty_Sets.jl             ⬩ (robust optimisation)
+    06_Advanced_Black_Litterman.jl     ⬩   │ (Bayesian/Factor/Augmented BL)
+    07_Entropy_Pooling.jl              ⬩   │ each builds on the
+    08_Opinion_Pooling.jl              ⬩  ─┘ previous
+    09_Uncertainty_Sets.jl             ⬩ (robust optimisation)
   3_optimisers/                                # objectives → risk measures → optimiser families
     01_MeanRisk_Objectives.jl          [keep ex02]
     02_Efficient_Frontier.jl           [keep ex03]
@@ -87,14 +88,15 @@ examples/
     04_Multiple_Risk_Measures.jl       [keep ex06]
     05_OWA_Risk_Measures.jl            ⬩  ─┐ risk-measure deep dives,
     06_Brownian_Distance_..._SkewKurtosis.jl ⬩ │ extending §04
-    07_Drawdown_Risk_Measures.jl       ⬩  ─┘
-    08_Risk_Budgeting.jl               ⬩ (asset/factor/relaxed + FRC)
-    09_Risk_Contribution.jl            ⬩ (rc constraints; companion to RB)
-    10_Clustering_Optimisers.jl        ⬩ (HRP/HERC/SCHRP)
-    11_Clustering_Mixed_Risks_And_Constraints.jl ⬩ (mixed risks; companion to clustering)
-    12_Meta_Optimisers.jl              ⬩ (NCO/Stacking/SubsetResampling)
-    13_Subset_Resampling_and_Cross_Validation.jl ⬩ (companion to meta)
-    14_Near_Optimal_Centering.jl       ⬩
+    07_Drawdown_Risk_Measures.jl       ⬩  │
+    08_Exotic_Tail_Risk_Measures.jl    ⬩ ─┘ (EVaR/RLVaR/PNVaR/GenericVaRRange vs CVaR)
+    09_Risk_Budgeting.jl               ⬩ (asset/factor/relaxed + FRC)
+    10_Risk_Contribution.jl            ⬩ (rc constraints; companion to RB)
+    11_Clustering_Optimisers.jl        ⬩ (HRP/HERC/SCHRP)
+    12_Clustering_Mixed_Risks_And_Constraints.jl ⬩ (mixed risks; companion to clustering)
+    13_Meta_Optimisers.jl              ⬩ (NCO/Stacking/SubsetResampling)
+    14_Subset_Resampling_and_Cross_Validation.jl ⬩ (companion to meta)
+    15_Near_Optimal_Centering.jl       ⬩
   4_constraints_costs/
     01_Budget_Constraints.jl           [keep ex05]
     02_Linear_Group_Constraints.jl     ⬩ (asset sets, weight bounds, threshold)
@@ -110,6 +112,7 @@ examples/
   6_post_processing/
     01_Finite_Allocation.jl            ⬩ (Discrete/Greedy)
     02_Plotting_and_Reporting.jl       ⬩
+    03_Performance_Attribution.jl      ⬩ (cumulative returns, drawdowns, fee drag, risk attribution)
   7_putting_it_together/
     01_Profile_Retail_Daily.jl         ⬩ end-to-end (low compute/budget, high frequency)
     02_Profile_Desk_Monthly.jl         ⬩ end-to-end (high compute, monthly)
