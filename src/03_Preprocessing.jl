@@ -617,9 +617,10 @@ function prices_to_returns(X::TimeSeries.TimeArray,
     end
     X = DataFrames.DataFrame(X)
 
-    f(x) = (isa(x, Number) && isnan(x)) ? missing : x
-
-    DataFrames.transform!(X, 2:DataFrames.DataAPI.ncol(X) .=> DataFrames.ByRow((x) -> f(x));
+    DataFrames.transform!(X,
+                          2:DataFrames.DataAPI.ncol(X) .=>
+                              DataFrames.ByRow((x) -> ifelse((isa(x, Number) && isnan(x)),
+                                                             missing, x));
                           renamecols = false)
     if !isnothing(impute_method)
         X = Impute.impute(X, impute_method)
