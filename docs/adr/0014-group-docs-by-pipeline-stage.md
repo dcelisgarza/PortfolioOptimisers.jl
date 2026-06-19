@@ -122,7 +122,7 @@ examples/
 Every one of the original 11 examples is re-homed into a group, and each group grows depth-
 first as deep dives are written. The guide page for each group cross-links to the matching
 examples group, and vice versa. The live per-topic inventory (covered / partial / unwritten)
-is maintained in `docs/src/contribute/3-examples-coverage.md`, not here.
+is maintained in `docs/src/adr/examples-coverage.md`, not here.
 
 **Granularity is hybrid** — one example per family by default, split into its own page only
 where a mechanism is genuinely deep. Applications recorded above: the views family is three
@@ -207,7 +207,7 @@ Each shape closes with the mandatory plot, the "When to reach for this" callout,
   session), so coverage can be re-checked against the graph as pages are written.
 - **Coverage is tracked outside this record.** This ADR fixes the *structure*; the live
   inventory of which topics are covered, partially covered, or still unwritten lives in
-  `docs/src/contribute/3-examples-coverage.md` and is updated as pages land. A topic is
+  `docs/src/adr/examples-coverage.md` and is updated as pages land. A topic is
   marked covered only once its page runs end-to-end under Kaimon, `pre-commit run -a` passes,
   and the page opens with a `!!! tip "When to reach for this"` admonition. Authoring a page
   doubles as a dogfooding sweep: per-page `#src` findings roll up into one tracking issue per
