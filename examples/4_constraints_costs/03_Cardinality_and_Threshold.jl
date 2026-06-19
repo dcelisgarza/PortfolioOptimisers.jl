@@ -10,6 +10,12 @@ This example walks from the simplest mixed-integer constraints to the most struc
 
 The core idea is simple: constraints become more structured as you move from assets to sets to groups of sets.
 
+!!! tip "When to reach for this"
+    Reach for cardinality and threshold constraints when the *number* of positions matters as
+    much as their sizes — enforcing a maximum count of holdings, a minimum buy-in so you never
+    take dust positions, or limits on how many names, sets, or groups can be active. These are
+    the tools for turning a dense optimiser solution into an implementable, sparse portfolio.
+
 !!! tip "MIP required"
     These constraints introduce binary variables, so they need a mixed-integer-capable solver.
 =#
@@ -249,6 +255,19 @@ pretty_table(DataFrame("Case" => ["asset card", "asset card + l2", "gcarde", "se
                             count(res_sg_1.w .> 1e-10)]))
 
 #=
+## 7. Composition across constraint families
+
+A final visual comparison of how each constraint family reshapes the allocation: asset-level
+cardinality collapses to a few names, while the set- and group-level constraints spread the
+budget across the structure they are defined on.
+=#
+
+plot_stacked_bar_composition([res_card, res_card_l2, res_gcard, res_set_1, res_sg_1], rd;
+                             xticks = ([1, 2, 3, 4, 5],
+                                       ["asset card", "card+l2", "gcarde", "set-level",
+                                        "group-of-sets"]))
+
+#=
 Takeaways:
 
 - Use `card`, `lt`, `st` for direct asset-level sparsity and buy-in behavior.
@@ -257,3 +276,20 @@ Takeaways:
 - Use `sgmtx` + `sgcarde`/`sglt`/`sgst` when the constraint should apply to groups of sets.
 - If the solver returns an infeasible or failed retcode, the threshold or cardinality target is too tight for the available budget and bounds.
 =#
+
+#src ## Findings (authoring dogfooding — stripped from rendered docs)
+#src - Page runs end-to-end under Kaimon (docs env): all eight mixed-integer solves
+#src   (asset `card`/`card`+`l2`/`card`+bounds, `gcarde`, set-level `scard`/`slt`/`sst`,
+#src   group-of-sets `sgcarde`/`sglt`/`sgst`) succeed via Pajarito (HiGHS outer-approximation +
+#src   Clarabel conic). The targets bind: `card = 3` → 3 active, `card = 7` → 7, the XOM/MRK/WMT
+#src   `<= 2` and `group2 == 5` group-cardinality limits are met.
+#src - FIXED (this session): the page had no visualisation (tables + println only) and opened
+#src   only with a "MIP required" tip. Added a closing composition plot across the constraint
+#src   families and a `!!! tip "When to reach for this"` admonition to meet the ADR-0014
+#src   authoring standard.
+#src - NOISE (record-only): Pajarito prints `Warning: integral solution repeated`
+#src   (Pajarito/src/algorithms.jl:103) on some solves. It is benign progress information — the
+#src   solves return success — but it is worth a one-line note in the prose so a reader does not
+#src   mistake it for a failure.
+#src - COSMETIC: the `scard = 2` active-set count prints 3 because the third cluster carries a
+#src   ~0 residual exposure that `!iszero` still counts; tighten the tolerance if it matters.

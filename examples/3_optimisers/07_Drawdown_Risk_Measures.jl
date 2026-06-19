@@ -195,3 +195,15 @@ Drawdown measures target the *path* of cumulative wealth:
   - After optimisation, `drawdowns()` and `cumulative_returns()` give the full diagnostic
     picture for any weight vector without re-running the optimiser.
 =#
+
+#src ## Findings (authoring dogfooding — stripped from rendered docs)
+#src - Page runs end-to-end under Kaimon (docs env): the four drawdown measures, the CDaR
+#src   alpha-sweep (0.01–0.25), the CDaR upper-bound-constrained `MaximumRatio` solve
+#src   (`OptimisationSuccess`), and the post-optimisation analytics all run with Clarabel.
+#src - The narrative holds against the numbers: `MaximumDrawdown` concentrates hardest
+#src   (~67% JNJ), the CDaR alpha-sweep shifts weight JNJ→MRK monotonically as alpha rises,
+#src   and in the diagnostics table the MinCDaR portfolio beats MinVariance on all four
+#src   drawdown metrics — the intended "variance is path-blind" point lands.
+#src - The drawdown heatmap (vs. overlaid spaghetti lines) is the right call for comparing many
+#src   path-optimised portfolios; this is already captured in the summary as guidance.
+#src - No solver warnings or plotting deprecations observed.

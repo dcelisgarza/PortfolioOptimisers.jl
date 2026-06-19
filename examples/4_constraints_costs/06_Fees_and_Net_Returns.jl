@@ -7,7 +7,7 @@ fixed charges on long and short positions, plus a turnover-based component — a
 **optimise net of fees** (the optimiser trades expected return against cost) and **evaluate** a
 portfolio's net return after the fact with [`calc_net_returns`](@ref).
 
-This closes the constraints-and-costs group: where [Turnover and Tracking](04_Turnover_and_Tracking.md)
+This closes the constraints-and-costs group: where [Turnover and Tracking](05_Turnover_and_Tracking.md)
 charged for *moving*, this page charges for *holding*.
 
 !!! tip "When to reach for this"
@@ -115,7 +115,7 @@ same structure as thresholds and cardinality. They require a mixed-integer-capab
 handed to a continuous-only solver the problem fails to solve rather than returning a wrong
 answer. See [Budget Constraints](01_Budget_Constraints.md) for the MIP setup. Fees also carry a
 turnover component (the `tn` field), tying the holding cost here to the trading cost in
-[Turnover and Tracking](04_Turnover_and_Tracking.md).
+[Turnover and Tracking](05_Turnover_and_Tracking.md).
 
 ## 6. Comparing the books
 

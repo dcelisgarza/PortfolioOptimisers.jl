@@ -4,15 +4,15 @@
 This example shows how to apply constraints at three distinct layers of
 [`NestedClustered`](@ref):
 
-    - the inner optimisation within each cluster,
-    - the outer optimisation across synthetic cluster portfolios,
-    - and a final overall optimisation pass on the full universe.
+  - the inner optimisation within each cluster,
+  - the outer optimisation across synthetic cluster portfolios,
+  - and a final overall optimisation pass on the full universe.
 
 It also shows how fees can be attached to the nested stage and to the final overall stage.
 
 !!! tip "When to reach for this"
-        Reach for this when you want cluster structure for robustness, but still need practical
-        controls (fees and weight limits) at more than one stage of the nested workflow.
+    Reach for this when you want cluster structure for robustness, but still need practical
+    controls (fees and weight limits) at more than one stage of the nested workflow.
 =#
 
 using PortfolioOptimisers, PrettyTables, StableRNGs
@@ -30,9 +30,9 @@ end;
 
 We use one year of S&P 500 data and compute clusters once. Then we compare three nested setups:
 
-    - inner-only weight bounds,
-    - inner + outer bounds plus fees in the nested stage,
-    - direct overall asset bounds on [`NestedClustered`](@ref).
+  - inner-only weight bounds,
+  - inner + outer bounds plus fees in the nested stage,
+  - direct overall asset bounds on [`NestedClustered`](@ref).
 =#
 
 using CSV, TimeSeries, DataFrames, Clarabel
@@ -58,8 +58,8 @@ clr = clusterise(ClustersEstimator(; alg = DBHT()), pr.X)
 
 The nested workflow solves:
 
-    - an inner [`MeanRisk`](@ref) within each cluster, then
-    - an outer [`MeanRisk`](@ref) on synthetic cluster returns.
+  - an inner [`MeanRisk`](@ref) within each cluster, then
+  - an outer [`MeanRisk`](@ref) on synthetic cluster returns.
 
 The key wiring rule remains the same: the **outer optimiser must not** consume the
 asset-level prior directly; it works on synthetic cluster returns.
@@ -126,9 +126,9 @@ pretty_table(audit; formatters = [resfmt])
 #=
 These runs isolate layer placement:
 
-    - inner bounds shape per-cluster compositions,
-    - outer bounds shape allocation across clusters,
-    - direct `NestedClustered(wb = ...)` bounds constrain the final aggregated asset weights.
+  - inner bounds shape per-cluster compositions,
+  - outer bounds shape allocation across clusters,
+  - direct `NestedClustered(wb = ...)` bounds constrain the final aggregated asset weights.
 =#
 
 using StatsPlots, GraphRecipes
@@ -142,8 +142,21 @@ plot_stacked_bar_composition([res_inner, res_inner_outer, res_nested_overall], r
 Layered controls can be applied around [`NestedClustered`](@ref) without giving up the
 cluster-based decomposition.
 
-    - Inner `wb` controls weights inside each cluster.
-    - Outer `wb` controls allocation across synthetic cluster portfolios.
-    - Direct `NestedClustered(wb = ...)` can constrain final asset weights when provided with a weight
-      bounds result or estimator.
+  - Inner `wb` controls weights inside each cluster.
+  - Outer `wb` controls allocation across synthetic cluster portfolios.
+  - Direct `NestedClustered(wb = ...)` can constrain final asset weights when provided with a weight
+    bounds result or estimator.
 =#
+
+#src ## Findings (authoring dogfooding — stripped from rendered docs)
+#src - Page runs end-to-end under Kaimon (docs env): all three NCO configurations (inner-only
+#src   WB, inner+outer WB+fees, direct overall WB) solve with Clarabel. The audit table confirms
+#src   each bound binds where it is applied: the inner 0.35 cap holds on every inner solve; the
+#src   outer 0.62 cap binds only on the runs that set it on the outer optimiser (the inner-only
+#src   run leaves the outer unbounded, so its cluster max is 63.9% — correctly above 0.62); and
+#src   the direct overall 0.20 bound pins JNJ and MRK at exactly 20% in the final weights.
+#src - FIXED (this session): the opening admonition body and several bullet lists were indented
+#src   4/8 spaces inside the `#=` blocks, which Markdown renders as code blocks rather than
+#src   admonition text and lists. Dedented to the 4-space admonition / 2-space list convention
+#src   the other examples use.
+#src - No solver warnings or plotting deprecations observed.

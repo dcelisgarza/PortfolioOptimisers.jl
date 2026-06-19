@@ -220,7 +220,12 @@ pretty_table(DataFrame(hcat(rd.nx, [r.w for r in lcrm_results]...),
 #=
 Lower `g` concentrates into defensive names (the worst-day sensitivity dominates); higher
 `g` spreads across more assets as the estimator starts to care about moderate returns too.
+=#
 
+## The risk-aversion sweep, side by side: lower `g` (left) loads the defensive names harder.
+plot_stacked_bar_composition(lcrm_results, rd)
+
+#=
 ## Summary
 
 OWA risk measures offer a linear-programme-compatible family that spans the full
@@ -234,3 +239,16 @@ spectrum from worst-realisation to distributional dispersion:
     continuously tunable risk-aversion dial.
   - **Range variants** (`OrderedWeightsArrayRange`) track two-sided tail exposure.
 =#
+
+#src ## Findings (authoring dogfooding — stripped from rendered docs)
+#src - Page runs end-to-end under Kaimon (docs env): all eight closed-form OWA measures, the
+#src   default `ApproxOrderedWeightsArray`, both range variants, the `MaximumRatio` objective,
+#src   and the L-moment `g`-sweep solve with Clarabel on the 252-obs / 20-asset slice. No
+#src   warnings or deprecations from the solve or from `plot_stacked_bar_composition`.
+#src - FIXED (this session): the page previously ended on the L-moment table (sections 4–7 were
+#src   table-only). Added a closing `plot_stacked_bar_composition(lcrm_results, rd)` so the page
+#src   ends on a visualisation per the ADR-0014 authoring standard.
+#src - OBSERVED (not a bug): `MaximumRatio` with `owa_gmd` collapses to ~67% in a single name
+#src   (MRK). A dispersion measure in the ratio denominator on this small slice concentrates
+#src   hard; worth a sentence in future if it surprises readers, but it is the expected
+#src   risk-adjusted-return solution, not a solver artefact.

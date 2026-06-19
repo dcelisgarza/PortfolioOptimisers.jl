@@ -10,6 +10,13 @@ that are easy to miss in the overview:
 
 We use the same S&P 500 slice as the rest of the examples, then compare a plain HRP solve,
 several mixed-risk HERC variants, and a constrained HERC solve.
+
+!!! tip "When to reach for this"
+    Reach for mixed-risk clustering optimisers when no single risk measure captures what you
+    care about and you still want the hierarchy to do the diversification — for example
+    combining a tail measure with variance, or treating intra-cluster and inter-cluster risk
+    differently. The clustering structure keeps the allocation robust while the scalariser
+    controls how the mixed risk terms combine.
 =#
 
 using PortfolioOptimisers, PrettyTables
@@ -106,11 +113,13 @@ plot_stacked_bar_composition([hrp_sum, hrp_max, hrp_min, hrp_lse, herc_sum, herc
 
 The hierarchical optimiser itself can still carry weight bounds and fees. This version keeps
 the same mixed risk structure, but asks the optimiser to stay inside a bounded, fee-aware
-universe.
+universe. We set a 10% cap (`ub = 0.1`) deliberately tight enough to bind: the unconstrained
+HERC already concentrates around 13% in the largest names, so the cap pulls them down — watch
+the largest holdings in the comparison below.
 =#
 
 opt_constrained = HierarchicalOptimiser(; pe = pr, cle = clr, slv = slv,
-                                        wb = WeightBounds(; lb = 0.0, ub = 0.2),
+                                        wb = WeightBounds(; lb = 0.0, ub = 0.1),
                                         fees = Fees(; l = 0.001))
 herc_constrained = optimise(HierarchicalEqualRiskContribution(; opt = opt_constrained,
                                                               ri = r_mix, ro = r_mix,
@@ -139,3 +148,16 @@ Clustering optimisers give you a hierarchical lever on diversification.
   - [`HierarchicalOptimiser`](@ref) can still carry practical constraints like weight bounds
     and fees while the hierarchy does the allocation.
 =#
+
+#src ## Findings (authoring dogfooding — stripped from rendered docs)
+#src - Page runs end-to-end under Kaimon (docs env): HRP and HERC mixed-risk
+#src   (CVaR + scaled Variance) scalariser sweeps (Sum/Max/Min/LogSumExp) and the constrained
+#src   HERC all solve with Clarabel. The Max/Min collapse behaviour matches the narrative.
+#src - FIXED (this session): the "constrained HERC" section originally used `ub = 0.2`, but
+#src   unconstrained HERC already maxes around 13%, so the bound never bound and the
+#src   Constrained vs Unconstrained columns were identical to three decimals (only the fee
+#src   moved them). Tightened to `ub = 0.1`, which now binds (max weight pinned at 0.1, three
+#src   names at the cap) so the section actually demonstrates the constraint biting.
+#src - No solver warnings or plotting deprecations observed (this page uses
+#src   `plot_stacked_bar_composition` / `plot_risk_contribution`, not `plot_clusters`, so it
+#src   avoids the `orientation`-deprecation seen in the clustering-overview page).

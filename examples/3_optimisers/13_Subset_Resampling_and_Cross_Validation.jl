@@ -12,6 +12,13 @@ questions:
 We use [`MeanRisk`](@ref) as the benchmark and [`SubsetResampling`](@ref) as the meta-
 optimiser. The example also reuses the same clustering/prior setup as the standard meta-
 optimiser page so the allocations can be compared directly.
+
+!!! tip "When to reach for this"
+    Reach for subset resampling, and meta-optimisers generally, when a single full-universe
+    fit feels brittle — when small changes in the estimation window swing the allocation, or
+    when you want a portfolio averaged over many resampled universes rather than committed to
+    one point estimate. Cross-validation here is the tool for *checking* that stability, not
+    for producing the final portfolio.
 =#
 
 using PortfolioOptimisers, PrettyTables, StableRNGs
@@ -174,3 +181,19 @@ Meta-optimisers help when a single fit feels too brittle.
   - Frontier sweeps still work on the meta-optimiser, so you can compare its trade-off
     curve against the plain optimiser instead of choosing only one portfolio.
 =#
+
+#src ## Findings (authoring dogfooding — stripped from rendered docs)
+#src - Page runs end-to-end under Kaimon (docs env): MinVar benchmark plus NCO/Stacking/
+#src   SubsetResampling, KFold `cross_val_predict` for the benchmark and the bagged optimiser,
+#src   and a 15-point frontier of the meta-optimiser all solve with Clarabel.
+#src - Narrative holds: SubsetResampling spreads weight the most (JNJ 20.5% vs 37% for MinVar),
+#src   and at every frontier point the SSR max weight sits well below the plain MeanRisk max
+#src   (75% vs 100% at the most aggressive point) — the "bagging smooths the frontier" point lands.
+#src - FINDING (record-only → validation/meta rollup): section 3 prints
+#src   `Median benchmark fold id = nothing` and `Median SSR fold id = nothing`.
+#src   `NearestQuantilePrediction` runs without error, but the selected result's `.id` is
+#src   `nothing` when the `PopulationPredictionResult` wraps a single `cross_val_predict` stream,
+#src   so the "representative fold without hand-picking" narrative surfaces no usable id. Either
+#src   populate `.id` on this path or soften the prose — needs a look at how
+#src   `NearestQuantilePrediction` / `PopulationPredictionResult` carry fold identifiers.
+#src - No solver warnings or plotting deprecations observed.

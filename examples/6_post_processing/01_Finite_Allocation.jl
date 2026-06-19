@@ -121,7 +121,7 @@ pretty_table(DataFrame("Budget" => budgets,
 
 #=
 Both allocators also accept a [`Fees`](@ref) argument, so the share counts can be chosen net of
-transaction costs (see [Fees and Net Returns](../4_constraints_costs/05_Fees_and_Net_Returns.md)).
+transaction costs (see [Fees and Net Returns](../4_constraints_costs/06_Fees_and_Net_Returns.md)).
 
 ## 6. Target vs realised
 =#

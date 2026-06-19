@@ -11,8 +11,8 @@ variance and CVaR miss. Two such specialist measures are:
     so it scales quadratically in observations, not in assets.
   - [`VarianceSkewKurtosis`](@ref) — a composite that combines variance (penalises
     dispersion), negative skewness (penalises asymmetry), and kurtosis (penalises heavy
-    tails) into a single objective. It uses polynomial semidefinite constraints, which
-    require a solver that supports PSD cones. **Clarabel does not; SCS does.**
+    tails) into a single objective. It uses large PSD cones so it's best to use a solver that
+    supports first-order algorithms such as SCS.
 
 !!! tip "When to reach for this"
     `BrownianDistanceVariance` is useful when you suspect the return distribution has
@@ -205,3 +205,16 @@ plot_stacked_bar_composition([res_var_scs, res_vsk, res_vsk_heavy], rd)
     [`HighOrderPriorEstimator`](@ref) and a short observation window to keep the
     higher-moment tensor computation feasible.
 =#
+
+#src ## Findings (authoring dogfooding — stripped from rendered docs)
+#src - Page runs end-to-end under Kaimon (docs env) on the 50-obs slice. All three
+#src   `BrownianDistanceVariance` formulations (NormOneCone default, `IneqBrownianDistanceVariance`,
+#src   `RSOCRiskExpr`) return the same portfolio, confirming the section-2 prose. Both
+#src   `VarianceSkewKurtosis` solves (default scales and heavy skew/kurtosis) return
+#src   `OptimisationSuccess` with SCS.
+#src - The 50-obs slice and the SCS requirement are load-bearing, not stylistic: VSK needs large PSD
+#src   cones (Clarabel cannot solve them directly), and BDVar's O(T²) distance matrix makes T the binding size. Both
+#src   are flagged in the opening `!!! warning` so a reader who swaps in Clarabel or a 252-obs
+#src   slice knows why it breaks. No solver warnings or plotting deprecations observed.
+#src - COSMETIC: the `RSOCRiskExpr` column prints `-0.0 %` for zero weights (signed-zero from the
+#src   rotated-cone formulation). Harmless in the table; not worth a fix.

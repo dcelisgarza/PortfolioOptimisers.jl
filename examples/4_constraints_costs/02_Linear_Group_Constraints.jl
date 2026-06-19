@@ -185,4 +185,4 @@ plot_stacked_bar_composition(results, rd; xticks = (1:length(labels), labels))
 #src - FINDING (→ this group's issue): ThresholdEstimator(lt) and cardinality are MIP — Clarabel
 #src   returns a FAILED retcode (not an error, not a wrong answer). Documented in §6 with the
 #src   Pajarito/HiGHS pointer. A clearer "this constraint needs a MIP solver" message would help.
-#src - cte (centrality) / phylogeny constraints deferred to 03_Phylogeny_Centrality.
+#src - cte (centrality) / phylogeny constraints deferred to 04_Phylogeny_Centrality.

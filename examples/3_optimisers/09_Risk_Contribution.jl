@@ -153,3 +153,16 @@ Risk contribution workflows answer a different question from plain mean-risk opt
   - [`risk_contribution`](@ref) and [`factor_risk_contribution`](@ref) verify whether the
     solved portfolio's realised profile matches your intended contribution policy.
 =#
+
+#src ## Findings (authoring dogfooding — stripped from rendered docs)
+#src - Page runs end-to-end under Kaimon (docs env): asset RC (three objectives with per-asset
+#src   `rc <= 0.2` caps) and factor RC (three objectives with VLUE/QUAL/MTUM constraints) all
+#src   solve. The asset caps clearly bind — under `MinimumRisk`, JNJ and MRK both sit at exactly
+#src   20.0% risk contribution while their weights differ (21.9% vs 20.5%).
+#src - DOC/ERGO (record-only → risk-contribution rollup): the factor table displays *normalised*
+#src   contributions (`frc_risk ./= sum(frc_risk)`), but the `rc` targets are expressed on the
+#src   raw contributions, so the equality target is not visible in the output — `MTUM==0.09`
+#src   prints as 5.3% under `MinimumRisk`. A reader cannot confirm the constraint from the table.
+#src   Either show raw contributions alongside the normalised ones, or add a sentence noting that
+#src   the printed figures are renormalised and the constraint lives in raw space.
+#src - No solver warnings or plotting deprecations observed.
