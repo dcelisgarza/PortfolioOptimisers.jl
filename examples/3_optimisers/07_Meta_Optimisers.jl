@@ -137,8 +137,8 @@ The stacked-bar composition makes the diversifying effect of the meta-optimisers
 against the plain minimum-variance benchmark.
 =#
 
-using StatsPlots, GraphRecipes #= Composition of the benchmark and the three meta-optimisers. =#
-
+# Composition of the benchmark and the three meta-optimisers.
+using StatsPlots, GraphRecipes
 plot_stacked_bar_composition([res_bench, res_nco, res_stk, res_ssr], rd)
 
 #src ## Findings (authoring dogfooding — stripped from rendered docs)

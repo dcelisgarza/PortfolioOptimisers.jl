@@ -112,8 +112,8 @@ pretty_table(DataFrame(["Assets" => rd.nx, "Empirical" => pr_emp.mu,
                         "Entropy pooling" => pr_ep.mu]); formatters = [mmtfmt],
              title = "Expected returns: empirical vs entropy-pooling posterior")
 
-using StatsPlots, GraphRecipes #= Entropy-pooling posterior expected returns. =#
-
+# Entropy-pooling posterior expected returns.
+using StatsPlots, GraphRecipes
 plot_mu(pr_ep, rd.nx)
 
 #=

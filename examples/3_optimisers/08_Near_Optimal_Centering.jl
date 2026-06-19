@@ -133,8 +133,8 @@ The stacked-bar composition shows the corner solution collapsing onto a few asse
 fans the allocation out.
 =#
 
-using StatsPlots, GraphRecipes #= Composition: extreme MaxRatio vs the two NOC variants. =#
-
+# Composition: extreme MaxRatio vs the two NOC variants.
+using StatsPlots, GraphRecipes
 plot_stacked_bar_composition([res_mr, res_noc_u, res_noc_c], rd)
 
 #src ## Findings (authoring dogfooding — stripped from rendered docs)

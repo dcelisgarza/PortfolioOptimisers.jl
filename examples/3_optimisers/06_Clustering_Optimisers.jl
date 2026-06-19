@@ -79,10 +79,10 @@ We can inspect the structure the optimisers will act on: the dendrogram and the 
 correlation heatmap with the detected cluster boundaries.
 =#
 
-using StatsPlots, GraphRecipes #= Hierarchical clustering dendrogram. =#
-
-plot_dendrogram(clr, rd.nx) #= Reordered correlation heatmap with cluster boundary boxes. =#
-
+# Hierarchical clustering dendrogram.
+using StatsPlots, GraphRecipes
+# Reordered correlation heatmap with cluster boundary boxes.
+plot_dendrogram(clr, rd.nx)
 plot_clusters(clr, rd.nx)
 
 #=

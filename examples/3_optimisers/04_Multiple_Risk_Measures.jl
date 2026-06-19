@@ -158,10 +158,10 @@ clr = clusterise(ClustersEstimator(; alg = DBHT()), pr.X)
 Before optimising, we can visualise the asset clustering structure derived from the correlation matrix.
 =#
 
-using StatsPlots, GraphRecipes #= Hierarchical clustering dendrogram. =#
-
-plot_dendrogram(clr, rd.nx) #= Reordered correlation heatmap with cluster boundary boxes. =#
-
+# Hierarchical clustering dendrogram.
+using StatsPlots, GraphRecipes
+# Reordered correlation heatmap with cluster boundary boxes.
+plot_dendrogram(clr, rd.nx)
 plot_clusters(clr, rd.nx)
 
 r = [Variance(), NegativeSkewness(; settings = RiskMeasureSettings(; scale = 0.1))]

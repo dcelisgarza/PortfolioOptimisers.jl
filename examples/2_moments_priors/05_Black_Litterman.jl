@@ -75,10 +75,10 @@ pretty_table(DataFrame(["Assets" => rd.nx, "Sample mean" => pr_sample.mu,
                         "Equilibrium" => pr_eq.mu]); formatters = [mmtfmt],
              title = "Sample mean vs equilibrium prior")
 
-using StatsPlots, GraphRecipes #= Noisy sample-mean expected returns. =#
-
-plot_mu(pr_sample, rd.nx) #= Smoother market-equilibrium prior. =#
-
+# Noisy sample-mean expected returns.
+using StatsPlots, GraphRecipes
+# Smoother market-equilibrium prior.
+plot_mu(pr_sample, rd.nx)
 plot_mu(pr_eq, rd.nx)
 
 #=

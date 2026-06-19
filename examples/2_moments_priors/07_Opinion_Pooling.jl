@@ -106,8 +106,8 @@ pretty_table(DataFrame(["Assets" => rd.nx, "Empirical" => pr_emp.mu, "Opinion A"
                         "Pooled" => pr_op.mu]); formatters = [mmtfmt],
              title = "Expected returns: individual opinions vs pooled consensus")
 
-using StatsPlots, GraphRecipes #= Pooled consensus expected returns. =#
-
+# Pooled consensus expected returns.
+using StatsPlots, GraphRecipes
 plot_mu(pr_op, rd.nx)
 
 #=

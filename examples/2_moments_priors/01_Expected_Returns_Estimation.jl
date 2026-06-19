@@ -85,10 +85,10 @@ pretty_table(DataFrame(["Assets" => rd.nx; [k => p.mu for (k, p) in prs]]);
 shrunk estimator compresses the dispersion of the per-asset expected returns.
 =#
 
-using StatsPlots, GraphRecipes #= Vanilla sample-mean expected returns. =#
-
-plot_mu(prs[1].second, rd.nx) #= Bayes–Stein (volatility-weighted target) expected returns. =#
-
+# Vanilla sample-mean expected returns.
+using StatsPlots, GraphRecipes
+# Bayes–Stein (volatility-weighted target) expected returns.
+plot_mu(prs[1].second, rd.nx)
 plot_mu(prs[3].second, rd.nx)
 
 #=

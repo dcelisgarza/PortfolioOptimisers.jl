@@ -99,14 +99,14 @@ The coskewness and cokurtosis heatmaps show the denoising at work — the raw ma
 and noisy, the processed ones cleaner and better conditioned.
 =#
 
-using StatsPlots, GraphRecipes #= Coskewness heatmap: vanilla vs denoised. =#
-
-plot_coskewness(prs[1].second, rd) #= Coskewness heatmap: denoised. =#
-
-plot_coskewness(prs[2].second, rd) #= Cokurtosis eigenspectrum: vanilla vs denoised. =#
-
-plot_cokurtosis(prs[1].second, rd) #= Cokurtosis eigenspectrum: denoised. =#
-
+# Coskewness heatmap: vanilla vs denoised.
+using StatsPlots, GraphRecipes
+# Coskewness heatmap: denoised.
+plot_coskewness(prs[1].second, rd)
+# Cokurtosis eigenspectrum: vanilla vs denoised.
+plot_coskewness(prs[2].second, rd)
+# Cokurtosis eigenspectrum: denoised.
+plot_cokurtosis(prs[1].second, rd)
 plot_cokurtosis(prs[2].second, rd)
 
 #=

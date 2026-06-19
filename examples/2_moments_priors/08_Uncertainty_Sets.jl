@@ -115,8 +115,8 @@ pretty_table(DataFrame(["Assets" => rd.nx, "Nominal" => res_nom.w,
                         "Box-robust" => res_box.w, "Ellipsoid-robust" => res_ell.w]);
              formatters = [resfmt], title = "Minimum-variance weights: nominal vs robust")
 
-using StatsPlots, GraphRecipes #= Nominal vs box- vs ellipsoid-robust minimum variance. =#
-
+# Nominal vs box- vs ellipsoid-robust minimum variance.
+using StatsPlots, GraphRecipes
 plot_stacked_bar_composition([res_nom, res_box, res_ell], rd;
                              xticks = (1:3, ["Nominal", "Box", "Ellipsoid"]))
 

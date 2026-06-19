@@ -102,12 +102,12 @@ pretty_table(DataFrame(; :estimator => [k for (k, _) in prs],
 carry signal, bars below are noise. Denoising acts on the sub-threshold bulk.
 =#
 
-using StatsPlots, GraphRecipes #= Eigenspectrum: vanilla sample covariance. =#
-
-plot_eigenspectrum(prs[1].second, rd) #= Eigenspectrum: fixed-denoised covariance. =#
-
-plot_eigenspectrum(prs[2].second, rd) #= Eigenspectrum: LoGo(MaxDist) sparsified covariance. =#
-
+# Eigenspectrum: vanilla sample covariance.
+using StatsPlots, GraphRecipes
+# Eigenspectrum: fixed-denoised covariance.
+plot_eigenspectrum(prs[1].second, rd)
+# Eigenspectrum: LoGo(MaxDist) sparsified covariance.
+plot_eigenspectrum(prs[2].second, rd)
 plot_eigenspectrum(prs[5].second, rd)
 
 #=
