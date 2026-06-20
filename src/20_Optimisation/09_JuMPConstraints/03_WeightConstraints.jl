@@ -114,10 +114,10 @@ function set_weight_constraints!(model::JuMP.Model, wb::WeightBounds,
     k = get_k(model)
     sc = get_constraint_scale(model)
     if w_finite_flag(lb)
-        JuMP.@constraint(model, w_lb, sc * (w - k * lb) >= 0)
+        JuMP.@constraint(model, w_lb, sc * (w ⊖ k * lb) >= 0)
     end
     if w_finite_flag(ub)
-        JuMP.@constraint(model, w_ub, sc * (w - k * ub) <= 0)
+        JuMP.@constraint(model, w_ub, sc * (w ⊖ k * ub) <= 0)
     end
     set_budget_constraints!(model, bgt, w)
     if flag

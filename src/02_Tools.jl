@@ -160,7 +160,7 @@ julia> PortfolioOptimisers.:⊕(2, 3)
   - [`⊖`](@ref)
   - [`ArrNum`](@ref)
 """
-⊕(A::ArrNum, B::ArrNum) = A .+ B
+⊕(A::ArrNum, B::ArrNum) = A + B
 ⊕(A::ArrNum, B) = A .+ B
 ⊕(A, B::ArrNum) = A .+ B
 ⊕(A, B) = A + B
@@ -207,7 +207,7 @@ julia> PortfolioOptimisers.:⊖(8, 2)
   - [`⊕`](@ref)
   - [`ArrNum`](@ref)
 """
-⊖(A::ArrNum, B::ArrNum) = A .- B
+⊖(A::ArrNum, B::ArrNum) = A - B
 ⊖(A::ArrNum, B) = A .- B
 ⊖(A, B::ArrNum) = A .- B
 ⊖(A, B) = A - B

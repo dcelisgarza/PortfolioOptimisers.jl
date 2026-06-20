@@ -42,6 +42,7 @@ the decision framework behind them.
 | Minimal compute, just want diversification | [`InverseVolatility`](@ref) / [`EqualWeighted`](@ref) |
 | Classic risk/return trade-off | [`MeanRisk`](@ref) with an objective + efficient frontier |
 | Want each holding to carry equal risk | [`RiskBudgeting`](@ref) |
+| Care about tail losses or drawdowns, not just variance | swap `MeanRisk`'s `r` to a tail ([`ConditionalValueatRisk`](@ref)) or drawdown ([`MaximumDrawdown`](@ref)) measure |
 | Many assets, unstable covariance | [`HierarchicalRiskParity`](@ref) and clustering optimisers |
 | Distrust a single fit, want robustness | [`NestedClustered`](@ref) / [`Stacking`](@ref), or uncertainty sets |
 | Have real views | [`BlackLittermanPrior`](@ref) / [`EntropyPoolingPrior`](@ref) |

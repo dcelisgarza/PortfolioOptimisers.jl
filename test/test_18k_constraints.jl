@@ -641,3 +641,29 @@ end
     @test !haskey(res.model, :sbgt)
     @test !haskey(res.model, :lbgt)
 end
+
+@testset "Scalar weight bounds (broadcast ⊖ regression)" begin
+    # Scalar positive bounds with MaximumRatio previously errored ("Subtraction between an
+    # array and a JuMP scalar") because set_weight_constraints! built `w - k*lb` / `w - k*ub`
+    # without broadcasting. Vector bounds worked by accident; scalars did not. The constraint
+    # now uses `⊖`, so a scalar upper cap must assemble, solve, and bind.
+    opt = JuMPOptimiser(; pe = pr, slv = slv, wb = WeightBounds(; ub = 0.15))
+    res = optimise(MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt))
+    @test isapprox(sum(res.w), 1; rtol = 1e-6)
+    @test all(res.w .<= 0.15 + 1e-6)
+    @test isapprox(maximum(res.w), 0.15; atol = 1e-4)
+
+    # Estimator form (lb defaulting to nothing) must also assemble and solve. The
+    # WeightBoundsEstimator resolves per-name bounds, so it needs `sets`.
+    opt = JuMPOptimiser(; pe = pr, slv = slv, sets = sets,
+                        wb = WeightBoundsEstimator(; ub = 0.15))
+    res = optimise(MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt))
+    @test isapprox(sum(res.w), 1; rtol = 1e-6)
+    @test all(res.w .<= 0.15 + 1e-6)
+
+    # Scalar lower and upper bounds together both bind.
+    opt = JuMPOptimiser(; pe = pr, slv = slv, wb = WeightBounds(; lb = 0.01, ub = 0.2))
+    res = optimise(MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt))
+    @test all(res.w .>= 0.01 - 1e-6)
+    @test all(res.w .<= 0.2 + 1e-6)
+end

@@ -61,10 +61,31 @@ res_mr = optimise(MeanRisk(; obj = MinimumRisk(),
 ````
 
 `MeanRisk` also offers [`MaximumUtility`](@ref), [`MaximumRatio`](@ref) and
-[`MaximumReturn`](@ref) objectives, swappable risk measures, and efficient frontiers — see
+[`MaximumReturn`](@ref) objectives and efficient frontiers — see
 [MeanRisk Objectives](../examples/3_optimisers/01_MeanRisk_Objectives.md) and
-[Efficient Frontier](../examples/3_optimisers/02_Efficient_Frontier.md). The other JuMP families
-follow the same `opt = JuMPOptimiser(...)` pattern:
+[Efficient Frontier](../examples/3_optimisers/02_Efficient_Frontier.md).
+
+The **risk measure** is the `r` field (of `MeanRisk` and of the clustering optimisers below); the
+default is [`Variance`](@ref). Which family you pick encodes *what kind* of risk you penalise:
+
+- **Moment-based** — [`Variance`](@ref), [`StandardDeviation`](@ref), and higher-moment
+    measures. Cheap and classic; the right default when returns are roughly symmetric and you care
+    about overall dispersion.
+- **Quantile / tail** — [`ConditionalValueatRisk`](@ref), [`EntropicValueatRisk`](@ref),
+    [`RelativisticValueatRisk`](@ref), … Reach for these when the *left tail* matters more than
+    overall spread ([Exotic Tail Risk Measures](../examples/3_optimisers/08_Exotic_Tail_Risk_Measures.md)).
+- **OWA (ordered-weight)** — [`OrderedWeightsArray`](@ref) measures weight the whole ordered loss
+    distribution, the most general family
+    ([OWA Risk Measures](../examples/3_optimisers/05_OWA_Risk_Measures.md)).
+
+You can mix several in one objective ([Multiple Risk Measures](../examples/3_optimisers/04_Multiple_Risk_Measures.md)).
+**Drawdown** measures ([`MaximumDrawdown`](@ref), [`ConditionalDrawdownatRisk`](@ref), …) penalise
+peak-to-trough paths ([Drawdown Risk Measures](../examples/3_optimisers/07_Drawdown_Risk_Measures.md));
+the same drawdown notion is also useful purely as a *post-optimisation diagnostic* — via
+[`drawdowns`](@ref) on a realised book — when you want to measure rather than optimise it
+([Performance Attribution](../examples/6_post_processing/03_Performance_Attribution.md)).
+
+The other JuMP families follow the same `opt = JuMPOptimiser(...)` pattern:
 
 - [`RiskBudgeting`](@ref) / [`RelaxedRiskBudgeting`](@ref) — target a risk contribution per
     asset or factor ([Risk Budgeting](../examples/3_optimisers/09_Risk_Budgeting.md)).

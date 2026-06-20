@@ -25,7 +25,7 @@ Mark a topic covered (✅) only when all of the following hold:
 | Status | Topic | File |
 | ------ | ----- | ---- |
 | ✅ | Getting started — `prices_to_returns`, `ReturnsResult`, basic `MeanRisk` solve | `examples/1_foundations/01_Getting_Started.jl` |
-| ⬜ | Data preprocessing and imputation — `missing_col_percent`, `missing_row_percent`, `Impute.jl` imputors (`Locf`, `LinearInterpolation`, `GapFill`), handling stale prices and gaps before `prices_to_returns` | — |
+| ✅ | Data preprocessing and imputation — `missing_col_percent`, `missing_row_percent`, `Impute.jl` imputors (`LOCF`, `Interpolate`), handling stale prices and gaps before `prices_to_returns` | `examples/1_foundations/02_Data_Preprocessing.jl` |
 
 ## 2. Moments and priors
 
@@ -40,7 +40,7 @@ Mark a topic covered (✅) only when all of the following hold:
 | ✅ | Entropy pooling | `examples/2_moments_priors/07_Entropy_Pooling.jl` |
 | ✅ | Opinion pooling | `examples/2_moments_priors/08_Opinion_Pooling.jl` |
 | ✅ | Uncertainty sets (`NormalUncertaintySet` box/ellipsoidal, `q` sweep, mean and covariance forms, `DeltaUncertaintySet`; `ARCHUncertaintySet` block bootstrap described) | `examples/2_moments_priors/09_Uncertainty_Sets.jl` |
-| ⬜ | Windowed moment estimators — `WindowedCovariance`, `WindowedExpectedReturns`, `WindowedVariance`, `WindowedCoskewness`, `WindowedCokurtosis` (exponentially-weighted and rolling-window variants) | — |
+| ✅ | Windowed moment estimators — `WindowedCovariance`, `WindowedExpectedReturns` (trailing `window`, index-vector window for a named episode, `eweights` observation weights, prior wiring, caller-driven rolling demo) | `examples/2_moments_priors/10_Windowed_Estimators.jl` |
 | ⬜ | Regime-adjusted estimators — `RegimeAdjustedExpWeightedCovariance` and `RegimeAdjustedExpWeightedVariance`; covariance conditioned on a regime model | — |
 | 🔶 | Implied volatility estimator — `ImpliedVolatility` (requires live Python/PythonCall environment; a stub showing how to plug into `EmpiricalPrior` would be useful) | — |
 
@@ -83,7 +83,7 @@ Mark a topic covered (✅) only when all of the following hold:
 | ------ | ----- | ---- |
 | ✅ | Cross-validation — `KFold`, `CombinatorialCrossValidation`, `IndexWalkForward`, `NearestQuantilePrediction` | `examples/5_validation_tuning/01_Cross_Validation.jl` |
 | ✅ | Hyperparameter tuning | `examples/5_validation_tuning/02_Hyperparameter_Tuning.jl` |
-| ⬜ | `DateWalkForward` — calendar-aligned walk-forward using Julia's `Dates` module (e.g. retrain every quarter); the current cross-validation example uses `IndexWalkForward` only | — |
+| ✅ | `DateWalkForward` — calendar-aligned walk-forward using Julia's `Dates` module (month-end `adjuster`, `previous` alignment) | `examples/5_validation_tuning/01_Cross_Validation.jl` (§2.3.2) |
 
 ## 6. Post-processing
 
@@ -100,14 +100,14 @@ Mark a topic covered (✅) only when all of the following hold:
 | ✅ | Retail daily profile | `examples/7_putting_it_together/01_Profile_Retail_Daily.jl` |
 | ✅ | Desk monthly profile | `examples/7_putting_it_together/02_Profile_Desk_Monthly.jl` |
 | ✅ | Institutional profile | `examples/7_putting_it_together/03_Profile_Institutional.jl` |
-| ⬜ | Factor + Black-Litterman + JuMP pipeline — end-to-end example that combines factor-based prior, analyst BL views, and a JuMP optimiser with constraints; currently touched across several profiles but not isolated as a reusable pattern | — |
+| ✅ | Factor + Black-Litterman + JuMP pipeline — `FactorBlackLittermanPrior` (factor-premia views) → constrained `MaximumRatio` (per-asset + sector caps) → `DiscreteAllocation`, isolated as a reusable factor-views profile | `examples/7_putting_it_together/04_Profile_Factor_Views.jl` |
 
 ## User guide gaps
 
-| Status | Topic |
-| ------ | ----- |
-| ⬜ | Data preprocessing and imputation before `prices_to_returns` |
-| ⬜ | OWA vs moment-based vs quantile-based risk measure families — when to choose each |
-| ⬜ | Drawdown as a risk measure vs as a post-optimisation diagnostic |
-| ⬜ | The full Black-Litterman family and how the Bayesian, Factor, and Augmented variants differ from the base form |
-| ⬜ | Windowed and regime-adjusted moment estimators — motivation and trade-offs vs full-sample estimators |
+| Status | Topic | Where |
+| ------ | ----- | ----- |
+| ✅ | Data preprocessing and imputation before `prices_to_returns` | `user_guide/01_Data_and_Priors.jl` §1 |
+| ✅ | OWA vs moment-based vs quantile-based risk measure families — when to choose each | `user_guide/02_Optimisers.jl` §2 |
+| ✅ | Drawdown as a risk measure vs as a post-optimisation diagnostic | `user_guide/02_Optimisers.jl` §2 |
+| ✅ | The full Black-Litterman family and how the Bayesian, Factor, and Augmented variants differ from the base form | `user_guide/01_Data_and_Priors.jl` §3 |
+| ✅ | Windowed and regime-adjusted moment estimators — motivation and trade-offs vs full-sample estimators | `user_guide/01_Data_and_Priors.jl` §3 |
