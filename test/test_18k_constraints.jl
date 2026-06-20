@@ -474,7 +474,7 @@ end
 
     opt = JuMPOptimiser(; pe = pr, slv = slv,
                         tr = TrackingError(; tr = ReturnsTracking(; w = wr), err = 2.5e-3,
-                                           alg = L1Tracking()))
+                                           alg = L1Norm()))
     mre = MeanRisk(; obj = MinimumRisk(), opt = opt)
     res = optimise(mre)
     @test LinearAlgebra.norm(rd.X * res.w - wr, 1) / size(rd.X, 1) <= 2.5e-3
@@ -489,21 +489,21 @@ end
 
     opt = JuMPOptimiser(; pe = pr, slv = slv,
                         tr = TrackingError(; tr = ReturnsTracking(; w = wr), err = 4.5e-3,
-                                           alg = LpTracking()))
+                                           alg = LpNorm()))
     mre = MeanRisk(; obj = MinimumRisk(), opt = opt)
     res = optimise(mre)
     @test LinearAlgebra.norm(rd.X * res.w - wr, 3) / cbrt(size(rd.X, 1)) <= 4.5e-3
 
     opt = JuMPOptimiser(; pe = pr, slv = slv,
                         tr = TrackingError(; tr = ReturnsTracking(; w = wr), err = 8e-5,
-                                           alg = LInfTracking()))
+                                           alg = LInfNorm()))
     mre = MeanRisk(; obj = MinimumRisk(), opt = opt)
     res = optimise(mre)
     @test LinearAlgebra.norm(rd.X * res.w - wr, Inf) / size(rd.X, 1) <= 8e-5
 
     opt = JuMPOptimiser(; pe = pr, slv = slv,
                         tr = [TrackingError(; tr = WeightsTracking(; w = w0), err = 2e-3,
-                                            alg = L1Tracking())])
+                                            alg = L1Norm())])
     mre = MeanRisk(; obj = MinimumRisk(), opt = opt)
     res = optimise(mre)
     @test LinearAlgebra.norm(rd.X * (res.w - w0), 1) / size(rd.X, 1) <= 2e-3

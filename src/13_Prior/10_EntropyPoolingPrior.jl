@@ -251,6 +251,7 @@ $(DocStringExtensions.FIELDS)
         sc1::Number = 1,
         sc2::Number = 1e3,
         alg::AbstractEntropyPoolingOptAlgorithm = ExpEntropyPooling()
+        err::Option{<:NormError} = nothing
     ) -> OptimEntropyPooling
 
 Keywords correspond to the struct's fields.
@@ -269,7 +270,8 @@ OptimEntropyPooling
   kwargs ┼ @NamedTuple{}: NamedTuple()
      sc1 ┼ Int64: 1
      sc2 ┼ Float64: 1000.0
-     alg ┴ ExpEntropyPooling()
+     alg ┼ ExpEntropyPooling()
+     err ┴ nothing
 ```
 
 # Related
@@ -281,6 +283,7 @@ OptimEntropyPooling
   - [`CVaREntropyPooling`](@ref)
   - [`EntropyPoolingPrior`](@ref)
   - [`Optim.jl`](https://github.com/JuliaNLSolvers/Optim.jl)
+  - [`NormError`](@ref)
 """
 @concrete struct OptimEntropyPooling <: AbstractEntropyPoolingOptimiser
     """
@@ -303,20 +306,23 @@ OptimEntropyPooling
     $(field_dict[:epoptalg])
     """
     alg
+    """
+    $(field_dict[:err]) Only used when there are multiple cvar views. If `nothing`, the L2 norm is used.
+    """
+    err
     function OptimEntropyPooling(args::Tuple, kwargs::NamedTuple, sc1::Number, sc2::Number,
-                                 alg::AbstractEntropyPoolingOptAlgorithm)
+                                 alg::AbstractEntropyPoolingOptAlgorithm,
+                                 err::Option{<:NormError})
         @argcheck(sc1 >= zero(sc1))
-        return new{typeof(args), typeof(kwargs), typeof(sc1), typeof(sc2), typeof(alg)}(args,
-                                                                                        kwargs,
-                                                                                        sc1,
-                                                                                        sc2,
-                                                                                        alg)
+        return new{typeof(args), typeof(kwargs), typeof(sc1), typeof(sc2), typeof(alg),
+                   typeof(err)}(args, kwargs, sc1, sc2, alg, err)
     end
 end
 function OptimEntropyPooling(; args::Tuple = (), kwargs::NamedTuple = (;), sc1::Number = 1,
                              sc2::Number = 1e3,
-                             alg::AbstractEntropyPoolingOptAlgorithm = ExpEntropyPooling())::OptimEntropyPooling
-    return OptimEntropyPooling(args, kwargs, sc1, sc2, alg)
+                             alg::AbstractEntropyPoolingOptAlgorithm = ExpEntropyPooling(),
+                             err::Option{<:NormError} = nothing)::OptimEntropyPooling
+    return OptimEntropyPooling(args, kwargs, sc1, sc2, alg, err)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -532,7 +538,8 @@ EntropyPoolingPrior
               │   kwargs ┼ @NamedTuple{}: NamedTuple()
               │      sc1 ┼ Int64: 1
               │      sc2 ┼ Float64: 1000.0
-              │      alg ┴ ExpEntropyPooling()
+              │      alg ┼ ExpEntropyPooling()
+              │      err ┴ nothing
             w ┼ nothing
           alg ┴ H1_EntropyPooling()
 ```
@@ -1600,10 +1607,9 @@ function ep_cvar_views_solve!(cvar_views::LinearConstraintEstimator, epc::Abstra
         err = if N == 1
             sum(wi[.!iszero.(pos_part)]) - alpha
         else
-            #! Customise with different norms (see L2Tracking).
-            LinearAlgebra.norm([ConditionalValueatRisk(; alpha = alpha, w = wi)(view(X, :,
-                                                                                     i)) -
-                                B[i] for i in 1:N]) / sqrt(N)
+            norm_error(d_opt.err,
+                       [ConditionalValueatRisk(; alpha = alpha, w = wi)(view(X, :, i)) -
+                        B[i] for i in 1:N], N)
         end
         return wi, err
     end

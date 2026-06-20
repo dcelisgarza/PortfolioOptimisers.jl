@@ -3,11 +3,6 @@
 ## Public
 
 ```@docs
-L2Tracking
-SquaredL2Tracking
-L1Tracking
-LpTracking
-LInfTracking
 IndependentVariableTracking
 DependentVariableTracking
 WeightsTracking
@@ -23,9 +18,7 @@ AbstractTracking
 AbstractTrackingAlgorithm
 VecTr
 Tr_VecTr
-NormTracking
 VariableTracking
-norm_tracking
 tracking_benchmark
 port_opt_view(tr::VecTr, ::Any, args...)
 factory(tr::WeightsTracking, w::VecNum)

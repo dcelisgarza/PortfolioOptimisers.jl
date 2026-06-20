@@ -163,7 +163,7 @@ $(DocStringExtensions.FIELDS)
     TrackingRiskMeasure(;
         settings::RiskMeasureSettings = RiskMeasureSettings(),
         tr::AbstractTrackingAlgorithm,
-        alg::NormTracking = L2Tracking()
+        alg::NormError = L2Norm()
     ) -> TrackingRiskMeasure
 
 Keywords correspond to the struct's fields.
@@ -191,7 +191,7 @@ TrackingRiskMeasure
            │     rke ┴ Bool: true
         tr ┼ ReturnsTracking
            │   w ┴ Vector{Float64}: [0.1, -0.2, 0.3]
-       alg ┼ L2Tracking
+       alg ┼ L2Norm
            │   ddof ┴ Int64: 1
 ```
 
@@ -202,7 +202,7 @@ TrackingRiskMeasure
   - [`TurnoverRiskMeasure`](@ref)
   - [`RiskTrackingRiskMeasure`](@ref)
   - [`AbstractTrackingAlgorithm`](@ref)
-  - [`NormTracking`](@ref)
+  - [`NormError`](@ref)
 """
 @propagatable @concrete struct TrackingRiskMeasure <: RiskMeasure
     """
@@ -218,22 +218,22 @@ TrackingRiskMeasure
     """
     alg
     function TrackingRiskMeasure(settings::RiskMeasureSettings,
-                                 tr::AbstractTrackingAlgorithm, alg::NormTracking)
+                                 tr::AbstractTrackingAlgorithm, alg::NormError)
         return new{typeof(settings), typeof(tr), typeof(alg)}(settings, tr, alg)
     end
 end
 function TrackingRiskMeasure(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                              tr::AbstractTrackingAlgorithm,
-                             alg::NormTracking = L2Tracking())::TrackingRiskMeasure
+                             alg::NormError = L2Norm())::TrackingRiskMeasure
     return TrackingRiskMeasure(settings, tr, alg)
 end
 function (r::TrackingRiskMeasure)(w::VecNum, X::MatNum, fees::Option{<:Fees} = nothing)
     benchmark = tracking_benchmark(r.tr, X)
-    return norm_tracking(r.alg, calc_net_returns(w, X, fees), benchmark, size(X, 1))
+    return norm_error(r.alg, calc_net_returns(w, X, fees), benchmark, size(X, 1))
 end
 function (r::TrackingRiskMeasure{<:ReturnsTracking})(X::VecNum)
     benchmark = tracking_benchmark(r.tr, X)
-    return norm_tracking(r.alg, X, benchmark, length(X))
+    return norm_error(r.alg, X, benchmark, length(X))
 end
 function (r::TrackingRiskMeasure{<:WeightsTracking})(::VecNum)
     return throw(MethodError(r,

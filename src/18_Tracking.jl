@@ -114,28 +114,13 @@ All concrete and/or abstract types representing tracking formulation algorithms 
 # Related
 
   - [`AbstractAlgorithm`](@ref)
-  - [`NormTracking`](@ref)
+  - [`NormError`](@ref)
   - [`VariableTracking`](@ref)
-  - [`L2Tracking`](@ref)
-  - [`SquaredL2Tracking`](@ref)
-  - [`L1Tracking`](@ref)
+  - [`L2Norm`](@ref)
+  - [`SquaredL2Norm`](@ref)
+  - [`L1Norm`](@ref)
 """
 abstract type TrackingFormulation <: AbstractAlgorithm end
-"""
-$(DocStringExtensions.TYPEDEF)
-
-Abstract supertype for all norm-based tracking formulation algorithms in `PortfolioOptimisers.jl`.
-
-All concrete and/or abstract types representing norm-based tracking algorithms (such as second-order cone or norm-one tracking) should be subtypes of `NormTracking`.
-
-# Related
-
-  - [`TrackingFormulation`](@ref)
-  - [`L2Tracking`](@ref)
-  - [`SquaredL2Tracking`](@ref)
-  - [`L1Tracking`](@ref)
-"""
-abstract type NormTracking <: TrackingFormulation end
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -150,411 +135,6 @@ All concrete and/or abstract types representing variable-based tracking algorith
   - [`DependentVariableTracking`](@ref)
 """
 abstract type VariableTracking <: TrackingFormulation end
-"""
-$(DocStringExtensions.TYPEDEF)
-
-Second-order cone (SOC) norm-based tracking formulation.
-
-`L2Tracking` implements a norm-based tracking error formulation using the Euclidean (L2) norm, scaled by the square root of the number of assets minus the degrees of freedom (`ddof`). This is commonly used for tracking error constraints and objectives in portfolio optimisation.
-
-# Mathematical definition
-
-```math
-\\begin{align}
-\\mathrm{TE}_{L_2}(\\boldsymbol{a},\\boldsymbol{b}) &= \\frac{\\|\\boldsymbol{a} - \\boldsymbol{b}\\|_2}{\\sqrt{T - d}}\\,.
-\\end{align}
-```
-
-Where:
-
-  - ``\\mathrm{TE}_{L_2}(\\boldsymbol{a},\\boldsymbol{b})``: L2-norm tracking error.
-  - ``\\boldsymbol{a}``: Portfolio weight or return vector ``T \\times 1``.
-  - ``\\boldsymbol{b}``: Benchmark vector ``T \\times 1``.
-  - $(math_dict[:T])
-  - ``d``: Degrees of freedom, `ddof`. When ``T`` is not provided the denominator is 1.
-
-# Fields
-
-$(DocStringExtensions.FIELDS)
-
-# Constructors
-
-    L2Tracking(;
-        ddof::Integer = 1
-    ) -> L2Tracking
-
-## Validation
-
-  - `0 <= ddof`.
-
-# Examples
-
-```jldoctest
-julia> L2Tracking()
-L2Tracking
-  ddof ┴ Int64: 1
-```
-
-# Related
-
-  - [`NormTracking`](@ref)
-  - [`SquaredSOCRiskExpr`](@ref)
-  - [`L1Tracking`](@ref)
-  - [`norm_tracking`](@ref)
-"""
-@concrete struct L2Tracking <: NormTracking
-    """
-    $(field_dict[:ddof])
-    """
-    ddof
-    function L2Tracking(ddof::Integer)::L2Tracking
-        assert_nonempty_nonneg_finite_val(ddof, :ddof)
-        return new{typeof(ddof)}(ddof)
-    end
-end
-function L2Tracking(; ddof::Integer = 1)::L2Tracking
-    return L2Tracking(ddof)
-end
-"""
-$(DocStringExtensions.TYPEDEF)
-
-Second-order cone (SOC) squared norm-based tracking formulation.
-
-`SquaredL2Tracking` implements a norm-based tracking error formulation using the squared Euclidean (L2) norm, scaled by the number of assets minus the degrees of freedom (`ddof`). This is commonly used for tracking error constraints and objectives in portfolio optimisation where squared error is preferred.
-
-# Mathematical definition
-
-```math
-\\begin{align}
-\\mathrm{TE}_{L_2^2}(\\boldsymbol{a},\\boldsymbol{b}) &= \\frac{\\|\\boldsymbol{a} - \\boldsymbol{b}\\|_2^2}{T - d}\\,.
-\\end{align}
-```
-
-Where:
-
-  - ``\\mathrm{TE}_{L_2^2}(\\boldsymbol{a},\\boldsymbol{b})``: Squared L2-norm tracking error.
-  - ``\\boldsymbol{a}``: Portfolio weight or return vector ``T \\times 1``.
-  - ``\\boldsymbol{b}``: Benchmark vector ``T \\times 1``.
-  - $(math_dict[:T])
-  - ``d``: Degrees of freedom, `ddof`. When ``T`` is not provided the denominator is 1.
-
-# Fields
-
-$(DocStringExtensions.FIELDS)
-
-# Constructors
-
-    SquaredL2Tracking(;
-        ddof::Integer = 1,
-    ) -> SquaredL2Tracking
-
-## Validation
-
-  - `0 <= ddof`.
-
-# Examples
-
-```jldoctest
-julia> SquaredL2Tracking()
-SquaredL2Tracking
-  ddof ┴ Int64: 1
-```
-
-# Related
-
-  - [`NormTracking`](@ref)
-  - [`L2Tracking`](@ref)
-  - [`L1Tracking`](@ref)
-  - [`norm_tracking`](@ref)
-"""
-@concrete struct SquaredL2Tracking <: NormTracking
-    """
-    $(field_dict[:ddof])
-    """
-    ddof
-    function SquaredL2Tracking(ddof::Integer)::SquaredL2Tracking
-        assert_nonempty_nonneg_finite_val(ddof, :ddof)
-        return new{typeof(ddof)}(ddof)
-    end
-end
-function SquaredL2Tracking(; ddof::Integer = 1)::SquaredL2Tracking
-    return SquaredL2Tracking(ddof)
-end
-"""
-$(DocStringExtensions.TYPEDEF)
-
-Norm-one (NOC) tracking formulation.
-
-`L1Tracking` implements a norm-based tracking error formulation using the L1 (norm-one) distance between portfolio and benchmark weights. This is commonly used for tracking error constraints and objectives in portfolio optimisation where sparsity or absolute deviations are preferred.
-
-# Mathematical definition
-
-```math
-\\begin{align}
-\\mathrm{TE}_{L_1}(\\boldsymbol{a},\\boldsymbol{b}) &= \\frac{\\|\\boldsymbol{a} - \\boldsymbol{b}\\|_1}{T}\\,.
-\\end{align}
-```
-
-Where:
-
-  - ``\\mathrm{TE}_{L_1}(\\boldsymbol{a},\\boldsymbol{b})``: L1-norm tracking error.
-  - ``\\boldsymbol{a}``: Portfolio weight or return vector ``T \\times 1``.
-  - ``\\boldsymbol{b}``: Benchmark vector ``T \\times 1``.
-  - $(math_dict[:T]) When ``T`` is not provided the denominator is 1.
-
-# Constructors
-
-    L1Tracking() -> L1Tracking
-
-# Examples
-
-```jldoctest
-julia> L1Tracking()
-L1Tracking()
-```
-
-# Related
-
-  - [`NormTracking`](@ref)
-  - [`L2Tracking`](@ref)
-  - [`SquaredL2Tracking`](@ref)
-  - [`norm_tracking`](@ref)
-"""
-struct L1Tracking <: NormTracking end
-"""
-$(DocStringExtensions.TYPEDEF)
-
-L-p norm tracking error estimator.
-
-Computes the Lp-norm of the difference between portfolio and benchmark returns: ``\\lvert\\mathbf{X} \\boldsymbol{w} - \\boldsymbol{b}\\rvert_p``.
-
-# Mathematical definition
-
-```math
-\\begin{align}
-\\mathrm{TE}_{L_p}(\\boldsymbol{a},\\boldsymbol{b}) &= \\frac{\\|\\boldsymbol{a} - \\boldsymbol{b}\\|_p}{(T - d)^{1/p}}\\,.
-\\end{align}
-```
-
-Where:
-
-  - ``\\mathrm{TE}_{L_p}(\\boldsymbol{a},\\boldsymbol{b})``: Lp-norm tracking error.
-  - ``\\boldsymbol{a}``: Portfolio weight or return vector ``T \\times 1``.
-  - ``\\boldsymbol{b}``: Benchmark vector ``T \\times 1``.
-  - $(math_dict[:T])
-  - ``d``: Degrees of freedom, `ddof`. When ``T`` is not provided the denominator is 1.
-  - ``p``: Norm order.
-
-# Fields
-
-$(DocStringExtensions.FIELDS)
-
-# Constructors
-
-    LpTracking(; p::Number = 3, ddof::Integer = 0) -> LpTracking
-
-Keywords correspond to the struct's fields.
-
-## Validation
-
-  - `0 <= ddof`.
-
-# Examples
-
-```jldoctest
-julia> LpTracking()
-LpTracking
-     p ┼ Int64: 3
-  ddof ┴ Int64: 0
-```
-
-# Related
-
-  - [`NormTracking`](@ref)
-  - [`L1Tracking`](@ref)
-  - [`L2Tracking`](@ref)
-  - [`LInfTracking`](@ref)
-"""
-@concrete struct LpTracking <: NormTracking
-    """
-    $(field_dict[:p_rm])
-    """
-    p
-    """
-    $(field_dict[:ddof])
-    """
-    ddof
-    function LpTracking(p::Number, ddof::Integer)::LpTracking
-        assert_nonempty_nonneg_finite_val(ddof, :ddof)
-        return new{typeof(p), typeof(ddof)}(p, ddof)
-    end
-end
-function LpTracking(; p::Number = 3, ddof::Integer = 0)::LpTracking
-    return LpTracking(p, ddof)
-end
-"""
-$(DocStringExtensions.TYPEDEF)
-
-L-infinity norm (maximum absolute deviation) tracking error estimator.
-
-Computes the L∞-norm (maximum absolute deviation) of the difference between portfolio and benchmark returns.
-
-# Mathematical definition
-
-```math
-\\begin{align}
-\\mathrm{TE}_{L_\\infty}(\\boldsymbol{a},\\boldsymbol{b}) &= \\frac{\\|\\boldsymbol{a} - \\boldsymbol{b}\\|_\\infty}{T - d}\\,.
-\\end{align}
-```
-
-Where:
-
-  - ``\\mathrm{TE}_{L_\\infty}(\\boldsymbol{a},\\boldsymbol{b})``: L∞-norm tracking error. `pos = true` uses ``+\\infty``, `pos = false` uses ``-\\infty``.
-  - ``\\boldsymbol{a}``: Portfolio weight or return vector ``T \\times 1``.
-  - ``\\boldsymbol{b}``: Benchmark vector ``T \\times 1``.
-  - $(math_dict[:T])
-  - ``d``: Degrees of freedom, `ddof`. When ``T`` is not provided the denominator is 1.
-
-# Fields
-
-$(DocStringExtensions.FIELDS)
-
-# Constructors
-
-    LInfTracking(; ddof::Integer = 0, pos::Bool = true) -> LInfTracking
-
-Keywords correspond to the struct's fields.
-
-## Validation
-
-  - `0 <= ddof`.
-
-# Examples
-
-```jldoctest
-julia> LInfTracking()
-LInfTracking
-  ddof ┼ Int64: 0
-   pos ┴ Bool: true
-```
-
-# Related
-
-  - [`NormTracking`](@ref)
-  - [`LpTracking`](@ref)
-  - [`L1Tracking`](@ref)
-  - [`L2Tracking`](@ref)
-"""
-@concrete struct LInfTracking <: NormTracking
-    """
-    $(field_dict[:ddof])
-    """
-    ddof
-    """
-    $(field_dict[:pos])
-    """
-    pos
-    function LInfTracking(ddof::Integer, pos::Bool)::LInfTracking
-        assert_nonempty_nonneg_finite_val(ddof, :ddof)
-        return new{typeof(ddof), typeof(pos)}(ddof, pos)
-    end
-end
-function LInfTracking(; ddof::Integer = 0, pos::Bool = true)::LInfTracking
-    return LInfTracking(ddof, pos)
-end
-"""
-    norm_tracking(f::L2Tracking, a, b, T::Option{<:Number} = nothing)
-    norm_tracking(f::SquaredL2Tracking, a, b, T::Option{<:Number} = nothing)
-    norm_tracking(::L1Tracking, a, b, T::Option{<:Number} = nothing)
-    norm_tracking(f::LpTracking, a, b, T::Option{<:Number} = nothing)
-    norm_tracking(f::LInfTracking, a, b, T::Option{<:Number} = nothing)
-
-Compute the norm-based tracking error between portfolio and benchmark weights.
-
-`norm_tracking` computes the tracking error using either the Euclidean (L2) norm for [`L2Tracking`](@ref), squared Euclidean (L2) norm for [`SquaredL2Tracking`](@ref), or the L1 (norm-one) distance for [`L1Tracking`](@ref). The error is optionally scaled by the number of assets and degrees of freedom for SOC, or by the number of assets for NOC.
-
-# Mathematical definition
-
-```math
-\\begin{align}
-\\mathrm{TE}_{L_2}(\\boldsymbol{a},\\boldsymbol{b}) &= \\frac{\\|\\boldsymbol{a} - \\boldsymbol{b}\\|_2}{\\sqrt{T - d}}\\,, \\\\
-\\mathrm{TE}_{L_2^2}(\\boldsymbol{a},\\boldsymbol{b}) &= \\frac{\\|\\boldsymbol{a} - \\boldsymbol{b}\\|_2^2}{T - d}\\,, \\\\
-\\mathrm{TE}_{L_1}(\\boldsymbol{a},\\boldsymbol{b}) &= \\frac{\\|\\boldsymbol{a} - \\boldsymbol{b}\\|_1}{T}\\,, \\\\
-\\mathrm{TE}_{L_p}(\\boldsymbol{a},\\boldsymbol{b}) &= \\frac{\\|\\boldsymbol{a} - \\boldsymbol{b}\\|_p}{(T-d)^{1/p}}\\,, \\\\
-\\mathrm{TE}_{L_\\infty}(\\boldsymbol{a},\\boldsymbol{b}) &= \\frac{\\|\\boldsymbol{a} - \\boldsymbol{b}\\|_\\infty}{T - d}\\,.
-\\end{align}
-```
-
-Where:
-
-  - ``\\boldsymbol{a}``: Portfolio weight or return vector ``T \\times 1``.
-  - ``\\boldsymbol{b}``: Benchmark vector ``T \\times 1``.
-  - $(math_dict[:T])
-  - ``d``: Degrees of freedom, `ddof`.
-  - ``p``: Norm order.
-
-# Arguments
-
-  - `f`: Tracking formulation algorithm.
-  - `a`: Portfolio weights.
-  - `b`: Benchmark weights.
-  - `T`: Optional number of observations.
-
-# Returns
-
-  - `err::Number`: Norm-based tracking error.
-
-# Details
-
-  - For `L2Tracking`, computes `LinearAlgebra.norm(a - b, 2) / sqrt(T - f.ddof)` if `T` is not `nothing`, else unscaled.
-  - For `SquaredL2Tracking`, computes `LinearAlgebra.norm(a - b, 2)^2 / (T - f.ddof)` if `T` is not `nothing`, else unscaled.
-  - For `L1Tracking`, computes `LinearAlgebra.norm(a - b, 1) / T` if `T` is not `nothing`, else unscaled.
-
-# Examples
-
-```jldoctest
-julia> PortfolioOptimisers.norm_tracking(L2Tracking(), [0.5, 0.5], [0.6, 0.4], 2)
-0.14142135623730948
-
-julia> PortfolioOptimisers.norm_tracking(L1Tracking(), [0.5, 0.5], [0.6, 0.4], 2)
-0.09999999999999998
-```
-
-# Related
-
-  - [`L2Tracking`](@ref)
-  - [`L1Tracking`](@ref)
-  - [`NormTracking`](@ref)
-  - [`Option`](@ref)
-"""
-function norm_tracking(f::L2Tracking, a, b, T::Option{<:Number} = nothing)
-    factor = isnothing(T) ? 1 : sqrt(T - f.ddof)
-    return LinearAlgebra.norm(a - b, 2) / factor
-end
-function norm_tracking(f::SquaredL2Tracking, a, b, T::Option{<:Number} = nothing)
-    factor = isnothing(T) ? 1 : (T - f.ddof)
-    val = LinearAlgebra.norm(a - b, 2)
-    return val^2 / factor
-end
-function norm_tracking(::L1Tracking, a, b, T::Option{<:Number} = nothing)
-    factor = ifelse(isnothing(T), 1, T)
-    return LinearAlgebra.norm(a - b, 1) / factor
-end
-function norm_tracking(f::LpTracking, a, b, T::Option{<:Number} = nothing)
-    factor = ifelse(isnothing(T), 1, T - f.ddof)
-    factor = if f.p == 3
-        cbrt(factor)
-    else
-        factor^(inv(f.p))
-    end
-    return LinearAlgebra.norm(a - b, f.p) / factor
-end
-function norm_tracking(f::LInfTracking, a, b, T::Option{<:Number} = nothing)
-    factor = ifelse(isnothing(T), 1, T - f.ddof)
-    ty = promote_type(eltype(a), eltype(b))
-    p = ifelse(f.pos, typemax(ty), typemin(ty))
-    return LinearAlgebra.norm(a - b, p) / factor
-end
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -910,7 +490,7 @@ $(DocStringExtensions.FIELDS)
     TrackingError(;
         tr::AbstractTrackingAlgorithm,
         err::Number = 0.0,
-        alg::NormTracking = L2Tracking()
+        alg::NormError = L2Norm()
     ) -> TrackingError
 
 ## Validation
@@ -941,7 +521,7 @@ TrackingError
       │       w ┼ Vector{Float64}: [0.5, 0.5]
       │   fixed ┴ Bool: false
   err ┼ Float64: 0.01
-  alg ┼ L2Tracking
+  alg ┼ L2Norm
       │   ddof ┴ Int64: 1
 ```
 
@@ -951,9 +531,9 @@ TrackingError
   - [`AbstractTracking`](@ref)
   - [`WeightsTracking`](@ref)
   - [`ReturnsTracking`](@ref)
-  - [`NormTracking`](@ref)
-  - [`L2Tracking`](@ref)
-  - [`L1Tracking`](@ref)
+  - [`NormError`](@ref)
+  - [`L2Norm`](@ref)
+  - [`L1Norm`](@ref)
   - [`factory`](@ref)
   - [`port_opt_view`](@ref)
 """
@@ -970,13 +550,13 @@ TrackingError
     $(field_dict[:tralg])
     """
     alg
-    function TrackingError(tr::AbstractTrackingAlgorithm, err::Number, alg::NormTracking)
+    function TrackingError(tr::AbstractTrackingAlgorithm, err::Number, alg::NormError)
         assert_nonempty_nonneg_finite_val(err, :err)
         return new{typeof(tr), typeof(err), typeof(alg)}(tr, err, alg)
     end
 end
 function TrackingError(; tr::AbstractTrackingAlgorithm, err::Number = 0.0,
-                       alg::NormTracking = L2Tracking())
+                       alg::NormError = L2Norm())
     return TrackingError(tr, err, alg)
 end
 """
@@ -1007,14 +587,14 @@ This function applies `port_opt_view` to each element of the input vector of tra
 julia> tr = TrackingError(; tr = WeightsTracking(; w = [0.5, 0.5, 0.5]), err = 0.01);
 
 julia> PortfolioOptimisers.port_opt_view([tr], 1:2)
-1-element Vector{TrackingError{WeightsTracking{Nothing, SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}, Bool}, Float64, L2Tracking{Int64}}}:
+1-element Vector{TrackingError{WeightsTracking{Nothing, SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}, Bool}, Float64, L2Norm{Int64}}}:
  TrackingError
    tr ┼ WeightsTracking
       │    fees ┼ nothing
       │       w ┼ SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}: [0.5, 0.5]
       │   fixed ┴ Bool: false
   err ┼ Float64: 0.01
-  alg ┼ L2Tracking
+  alg ┼ L2Norm
       │   ddof ┴ Int64: 1
 ```
 
@@ -1039,6 +619,5 @@ function needs_previous_weights(tr::VecTr)
     return any(needs_previous_weights.(tr))
 end
 
-export L2Tracking, SquaredL2Tracking, L1Tracking, LpTracking, LInfTracking,
-       IndependentVariableTracking, DependentVariableTracking, WeightsTracking,
+export IndependentVariableTracking, DependentVariableTracking, WeightsTracking,
        ReturnsTracking, TrackingError

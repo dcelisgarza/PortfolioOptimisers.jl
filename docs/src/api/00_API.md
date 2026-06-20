@@ -339,14 +339,14 @@ It is often useful to create portfolios that track the performance of an index, 
   - Returns tracking [`ReturnsTracking`](@ref)
   - Weights tracking [`WeightsTracking`](@ref)
 
-The error can be computed using different algorithms using [`norm_tracking`](@ref).
+The error can be computed using different algorithms using [`norm_error`](@ref).
 
 - ::: details Norm tracking algorithms
-  - L1-norm [`L1Tracking`](@ref)
-  - L2-norm [`L2Tracking`](@ref)
-  - L2-norm squared [`SquaredL2Tracking`](@ref)
-  - Lp-norm [`LpTracking`](@ref)
-  - L-Inf-norm [`LInfTracking`](@ref)
+  - L1-norm [`L1Norm`](@ref)
+  - L2-norm [`L2Norm`](@ref)
+  - L2-norm squared [`SquaredL2Norm`](@ref)
+  - Lp-norm [`LpNorm`](@ref)
+  - L-Inf-norm [`LInfNorm`](@ref)
 
 It is also possible to track the error in with risk measures [`RiskTrackingError`](@ref) using [`WeightsTracking`](@ref), which allows for two approaches.
 
@@ -466,11 +466,11 @@ These are all subtypes of [`RiskMeasure`](@ref), and are supported by all optimi
 - Range [`Range`](@ref)
 - Turnover Risk Measure [`TurnoverRiskMeasure`](@ref)
 - ::: details Tracking Risk Measure [`TrackingRiskMeasure`](@ref)
-  - L1-norm [`L1Tracking`](@ref)
-  - L2-norm [`L2Tracking`](@ref)
-  - L2-norm squared [`SquaredL2Tracking`](@ref)
-  - Lp-norm [`LpTracking`](@ref)
-  - L-Inf-norm [`LInfTracking`](@ref)
+  - L1-norm [`L1Norm`](@ref)
+  - L2-norm [`L2Norm`](@ref)
+  - L2-norm squared [`SquaredL2Norm`](@ref)
+  - Lp-norm [`LpNorm`](@ref)
+  - L-Inf-norm [`LInfNorm`](@ref)
 - ::: details Risk Tracking Risk Measure
   - Dependent variable tracking [`DependentVariableTracking`](@ref)
   - Independent variable tracking [`IndependentVariableTracking`](@ref)

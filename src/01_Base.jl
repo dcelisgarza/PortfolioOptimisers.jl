@@ -2414,5 +2414,457 @@ Alias for a union of a numeric type, an array of numeric types, or a `VecScalar`
 """
 const Num_ArrNum_VecScalar_DynWeights = Union{<:Num_ArrNum, <:VecScalar,
                                               <:DynamicAbstractWeights}
+"""
+$(DocStringExtensions.TYPEDEF)
 
-export IsEmptyError, IsNothingError, IsNonFiniteError, PropertyPathError, VecScalar
+Abstract supertype for all norm-based error algorithms in `PortfolioOptimisers.jl`.
+
+All concrete and/or abstract types representing norm-based error algorithms (such as second-order cone or norm-one error) should be subtypes of `NormError`.
+
+# Related
+
+  - [`L2Norm`](@ref)
+  - [`SquaredL2Norm`](@ref)
+  - [`L1Norm`](@ref)
+"""
+abstract type NormError <: AbstractEstimator end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Second-order cone (SOC) norm-based error formulation.
+
+`L2Norm` implements a norm-based error formulation using the Euclidean (L2) norm, scaled by the square root of the number of assets minus the degrees of freedom (`ddof`). This is commonly used for error constraints and objectives in portfolio optimisation.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathrm{TE}_{L_2}(\\boldsymbol{a},\\boldsymbol{b}) &= \\frac{\\|\\boldsymbol{a} - \\boldsymbol{b}\\|_2}{\\sqrt{T - d}}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathrm{TE}_{L_2}(\\boldsymbol{a},\\boldsymbol{b})``: L2-norm error.
+  - ``\\boldsymbol{a}``: Portfolio weight or return vector ``T \\times 1``.
+  - ``\\boldsymbol{b}``: Benchmark vector ``T \\times 1``.
+  - $(math_dict[:T])
+  - ``d``: Degrees of freedom, `ddof`. When ``T`` is not provided the denominator is 1.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    L2Norm(;
+        ddof::Integer = 1
+    ) -> L2Norm
+
+## Validation
+
+  - `0 <= ddof`.
+
+# Examples
+
+```jldoctest
+julia> L2Norm()
+L2Norm
+  ddof ┴ Int64: 1
+```
+
+# Related
+
+  - [`NormError`](@ref)
+  - [`SquaredSOCRiskExpr`](@ref)
+  - [`L1Norm`](@ref)
+  - [`norm_error`](@ref)
+"""
+@concrete struct L2Norm <: NormError
+    """
+    $(field_dict[:ddof])
+    """
+    ddof
+    function L2Norm(ddof::Integer)::L2Norm
+        assert_nonempty_nonneg_finite_val(ddof, :ddof)
+        return new{typeof(ddof)}(ddof)
+    end
+end
+function L2Norm(; ddof::Integer = 1)::L2Norm
+    return L2Norm(ddof)
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Second-order cone (SOC) squared norm-based error formulation.
+
+`SquaredL2Norm` implements a norm-based error formulation using the squared Euclidean (L2) norm, scaled by the number of assets minus the degrees of freedom (`ddof`). This is commonly used for norm error constraints and objectives in portfolio optimisation where squared error is preferred.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathrm{TE}_{L_2^2}(\\boldsymbol{a},\\boldsymbol{b}) &= \\frac{\\|\\boldsymbol{a} - \\boldsymbol{b}\\|_2^2}{T - d}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathrm{TE}_{L_2^2}(\\boldsymbol{a},\\boldsymbol{b})``: Squared L2-norm error.
+  - ``\\boldsymbol{a}``: Portfolio weight or return vector ``T \\times 1``.
+  - ``\\boldsymbol{b}``: Benchmark vector ``T \\times 1``.
+  - $(math_dict[:T])
+  - ``d``: Degrees of freedom, `ddof`. When ``T`` is not provided the denominator is 1.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    SquaredL2Norm(;
+        ddof::Integer = 1,
+    ) -> SquaredL2Norm
+
+## Validation
+
+  - `0 <= ddof`.
+
+# Examples
+
+```jldoctest
+julia> SquaredL2Norm()
+SquaredL2Norm
+  ddof ┴ Int64: 1
+```
+
+# Related
+
+  - [`NormError`](@ref)
+  - [`L2Norm`](@ref)
+  - [`L1Norm`](@ref)
+  - [`norm_error`](@ref)
+"""
+@concrete struct SquaredL2Norm <: NormError
+    """
+    $(field_dict[:ddof])
+    """
+    ddof
+    function SquaredL2Norm(ddof::Integer)::SquaredL2Norm
+        assert_nonempty_nonneg_finite_val(ddof, :ddof)
+        return new{typeof(ddof)}(ddof)
+    end
+end
+function SquaredL2Norm(; ddof::Integer = 1)::SquaredL2Norm
+    return SquaredL2Norm(ddof)
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Norm-one (NOC) error formulation.
+
+`L1Norm` implements a norm-based error formulation using the L1 (norm-one) distance between portfolio and benchmark weights. This is commonly used for error constraints and objectives in portfolio optimisation where sparsity or absolute deviations are preferred.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathrm{TE}_{L_1}(\\boldsymbol{a},\\boldsymbol{b}) &= \\frac{\\|\\boldsymbol{a} - \\boldsymbol{b}\\|_1}{T}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathrm{TE}_{L_1}(\\boldsymbol{a},\\boldsymbol{b})``: L1-norm error.
+  - ``\\boldsymbol{a}``: Portfolio weight or return vector ``T \\times 1``.
+  - ``\\boldsymbol{b}``: Benchmark vector ``T \\times 1``.
+  - $(math_dict[:T]) When ``T`` is not provided the denominator is 1.
+
+# Constructors
+
+    L1Norm() -> L1Norm
+
+# Examples
+
+```jldoctest
+julia> L1Norm()
+L1Norm()
+```
+
+# Related
+
+  - [`NormError`](@ref)
+  - [`L2Norm`](@ref)
+  - [`SquaredL2Norm`](@ref)
+  - [`norm_error`](@ref)
+"""
+struct L1Norm <: NormError end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+L-p norm error estimator.
+
+Computes the Lp-norm of the difference between portfolio and benchmark returns: ``\\lvert\\mathbf{X} \\boldsymbol{w} - \\boldsymbol{b}\\rvert_p``.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathrm{TE}_{L_p}(\\boldsymbol{a},\\boldsymbol{b}) &= \\frac{\\|\\boldsymbol{a} - \\boldsymbol{b}\\|_p}{(T - d)^{1/p}}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathrm{TE}_{L_p}(\\boldsymbol{a},\\boldsymbol{b})``: Lp-norm error.
+  - ``\\boldsymbol{a}``: Portfolio weight or return vector ``T \\times 1``.
+  - ``\\boldsymbol{b}``: Benchmark vector ``T \\times 1``.
+  - $(math_dict[:T])
+  - ``d``: Degrees of freedom, `ddof`. When ``T`` is not provided the denominator is 1.
+  - ``p``: Norm order.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    LpNorm(; p::Number = 3, ddof::Integer = 0) -> LpNorm
+
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - `0 <= ddof`.
+
+# Examples
+
+```jldoctest
+julia> LpNorm()
+LpNorm
+     p ┼ Int64: 3
+  ddof ┴ Int64: 0
+```
+
+# Related
+
+  - [`NormError`](@ref)
+  - [`L1Norm`](@ref)
+  - [`L2Norm`](@ref)
+  - [`LInfNorm`](@ref)
+"""
+@concrete struct LpNorm <: NormError
+    """
+    $(field_dict[:p_rm])
+    """
+    p
+    """
+    $(field_dict[:ddof])
+    """
+    ddof
+    function LpNorm(p::Number, ddof::Integer)::LpNorm
+        assert_nonempty_nonneg_finite_val(ddof, :ddof)
+        return new{typeof(p), typeof(ddof)}(p, ddof)
+    end
+end
+function LpNorm(; p::Number = 3, ddof::Integer = 0)::LpNorm
+    return LpNorm(p, ddof)
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+L-infinity norm (maximum absolute deviation) error estimator.
+
+Computes the L∞-norm (maximum absolute deviation) of the difference between portfolio and benchmark returns.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathrm{TE}_{L_\\infty}(\\boldsymbol{a},\\boldsymbol{b}) &= \\frac{\\|\\boldsymbol{a} - \\boldsymbol{b}\\|_\\infty}{T - d}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathrm{TE}_{L_\\infty}(\\boldsymbol{a},\\boldsymbol{b})``: L∞-norm error. `pos = true` uses ``+\\infty``, `pos = false` uses ``-\\infty``.
+  - ``\\boldsymbol{a}``: Portfolio weight or return vector ``T \\times 1``.
+  - ``\\boldsymbol{b}``: Benchmark vector ``T \\times 1``.
+  - $(math_dict[:T])
+  - ``d``: Degrees of freedom, `ddof`. When ``T`` is not provided the denominator is 1.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    LInfNorm(; ddof::Integer = 0, pos::Bool = true) -> LInfNorm
+
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - `0 <= ddof`.
+
+# Examples
+
+```jldoctest
+julia> LInfNorm()
+LInfNorm
+  ddof ┼ Int64: 0
+   pos ┴ Bool: true
+```
+
+# Related
+
+  - [`NormError`](@ref)
+  - [`LpNorm`](@ref)
+  - [`L1Norm`](@ref)
+  - [`L2Norm`](@ref)
+"""
+@concrete struct LInfNorm <: NormError
+    """
+    $(field_dict[:ddof])
+    """
+    ddof
+    """
+    $(field_dict[:pos])
+    """
+    pos
+    function LInfNorm(ddof::Integer, pos::Bool)::LInfNorm
+        assert_nonempty_nonneg_finite_val(ddof, :ddof)
+        return new{typeof(ddof), typeof(pos)}(ddof, pos)
+    end
+end
+function LInfNorm(; ddof::Integer = 0, pos::Bool = true)::LInfNorm
+    return LInfNorm(ddof, pos)
+end
+"""
+    norm_error(f::L2Norm, a, b, T::Option{<:Number} = nothing)
+    norm_error(f::SquaredL2Norm, a, b, T::Option{<:Number} = nothing)
+    norm_error(::L1Norm, a, b, T::Option{<:Number} = nothing)
+    norm_error(f::LpNorm, a, b, T::Option{<:Number} = nothing)
+    norm_error(f::LInfNorm, a, b, T::Option{<:Number} = nothing)
+
+Compute the norm-based tracking error between portfolio and benchmark weights.
+
+`norm_error` computes the tracking error using either the Euclidean (L2) norm for [`L2Norm`](@ref), squared Euclidean (L2) norm for [`SquaredL2Norm`](@ref), or the L1 (norm-one) distance for [`L1Norm`](@ref). The error is optionally scaled by the number of assets and degrees of freedom for SOC, or by the number of assets for NOC.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathrm{TE}_{L_2}(\\boldsymbol{a},\\boldsymbol{b}) &= \\frac{\\|\\boldsymbol{a} - \\boldsymbol{b}\\|_2}{\\sqrt{T - d}}\\,, \\\\
+\\mathrm{TE}_{L_2^2}(\\boldsymbol{a},\\boldsymbol{b}) &= \\frac{\\|\\boldsymbol{a} - \\boldsymbol{b}\\|_2^2}{T - d}\\,, \\\\
+\\mathrm{TE}_{L_1}(\\boldsymbol{a},\\boldsymbol{b}) &= \\frac{\\|\\boldsymbol{a} - \\boldsymbol{b}\\|_1}{T}\\,, \\\\
+\\mathrm{TE}_{L_p}(\\boldsymbol{a},\\boldsymbol{b}) &= \\frac{\\|\\boldsymbol{a} - \\boldsymbol{b}\\|_p}{(T-d)^{1/p}}\\,, \\\\
+\\mathrm{TE}_{L_\\infty}(\\boldsymbol{a},\\boldsymbol{b}) &= \\frac{\\|\\boldsymbol{a} - \\boldsymbol{b}\\|_\\infty}{T - d}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{a}``: Portfolio weight or return vector ``T \\times 1``.
+  - ``\\boldsymbol{b}``: Benchmark vector ``T \\times 1``.
+  - $(math_dict[:T])
+  - ``d``: Degrees of freedom, `ddof`.
+  - ``p``: Norm order.
+
+# Arguments
+
+  - `f`: Tracking formulation algorithm.
+  - `a`: Portfolio weights.
+  - `b`: Benchmark weights.
+  - `T`: Optional number of observations.
+
+# Returns
+
+  - `err::Number`: Norm-based tracking error.
+
+# Details
+
+  - For `L2Norm`, computes `LinearAlgebra.norm(a - b, 2) / sqrt(T - f.ddof)` if `T` is not `nothing`, else unscaled.
+  - For `SquaredL2Norm`, computes `LinearAlgebra.norm(a - b, 2)^2 / (T - f.ddof)` if `T` is not `nothing`, else unscaled.
+  - For `L1Norm`, computes `LinearAlgebra.norm(a - b, 1) / T` if `T` is not `nothing`, else unscaled.
+
+# Examples
+
+```jldoctest
+julia> PortfolioOptimisers.norm_error(L2Norm(), [0.5, 0.5], [0.6, 0.4], 2)
+0.14142135623730948
+
+julia> PortfolioOptimisers.norm_error(L1Norm(), [0.5, 0.5], [0.6, 0.4], 2)
+0.09999999999999998
+```
+
+# Related
+
+  - [`L2Norm`](@ref)
+  - [`L1Norm`](@ref)
+  - [`NormError`](@ref)
+  - [`Option`](@ref)
+"""
+function norm_error(f::L2Norm, a, b, T::Option{<:Number} = nothing)
+    factor = isnothing(T) ? 1 : sqrt(T - f.ddof)
+    return LinearAlgebra.norm(a - b, 2) / factor
+end
+function norm_error(f::L2Norm, a, T::Option{<:Number} = nothing)
+    factor = isnothing(T) ? 1 : sqrt(T - f.ddof)
+    return LinearAlgebra.norm(a, 2) / factor
+end
+function norm_error(::Nothing, a, T::Option{<:Number} = nothing)
+    factor = isnothing(T) ? 1 : sqrt(T)
+    return LinearAlgebra.norm(a, 2) / factor
+end
+function norm_error(f::SquaredL2Norm, a, b, T::Option{<:Number} = nothing)
+    factor = isnothing(T) ? 1 : (T - f.ddof)
+    val = LinearAlgebra.norm(a - b, 2)
+    return val^2 / factor
+end
+function norm_error(f::SquaredL2Norm, a, T::Option{<:Number} = nothing)
+    factor = isnothing(T) ? 1 : (T - f.ddof)
+    val = LinearAlgebra.norm(a, 2)
+    return val^2 / factor
+end
+function norm_error(::L1Norm, a, b, T::Option{<:Number} = nothing)
+    factor = ifelse(isnothing(T), 1, T)
+    return LinearAlgebra.norm(a - b, 1) / factor
+end
+function norm_error(::L1Norm, a, T::Option{<:Number} = nothing)
+    factor = ifelse(isnothing(T), 1, T)
+    return LinearAlgebra.norm(a, 1) / factor
+end
+function norm_error(f::LpNorm, a, b, T::Option{<:Number} = nothing)
+    factor = ifelse(isnothing(T), 1, T - f.ddof)
+    factor = if f.p == 3
+        cbrt(factor)
+    else
+        factor^(inv(f.p))
+    end
+    return LinearAlgebra.norm(a - b, f.p) / factor
+end
+function norm_error(f::LpNorm, a, T::Option{<:Number} = nothing)
+    factor = ifelse(isnothing(T), 1, T - f.ddof)
+    factor = if f.p == 3
+        cbrt(factor)
+    else
+        factor^(inv(f.p))
+    end
+    return LinearAlgebra.norm(a, f.p) / factor
+end
+function norm_error(f::LInfNorm, a, b, T::Option{<:Number} = nothing)
+    factor = ifelse(isnothing(T), 1, T - f.ddof)
+    ty = promote_type(eltype(a), eltype(b))
+    p = ifelse(f.pos, typemax(ty), typemin(ty))
+    return LinearAlgebra.norm(a - b, p) / factor
+end
+function norm_error(f::LInfNorm, a, T::Option{<:Number} = nothing)
+    factor = ifelse(isnothing(T), 1, T - f.ddof)
+    ty = eltype(a)
+    p = ifelse(f.pos, typemax(ty), typemin(ty))
+    return LinearAlgebra.norm(a, p) / factor
+end
+
+export IsEmptyError, IsNothingError, IsNonFiniteError, PropertyPathError, VecScalar, L2Norm,
+       SquaredL2Norm, L1Norm, LpNorm, LInfNorm

@@ -1107,17 +1107,17 @@ its docstring.
 
 ├──&nbsp;[TrackingFormulation](@ref)
 
-│&nbsp;&nbsp;&nbsp;├──&nbsp;[NormTracking](@ref)
+│&nbsp;&nbsp;&nbsp;├──&nbsp;[NormError](@ref)
 
-│&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;├──&nbsp;[L1Tracking](@ref)
+│&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;├──&nbsp;[L1Norm](@ref)
 
-│&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;├──&nbsp;[L2Tracking](@ref)
+│&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;├──&nbsp;[L2Norm](@ref)
 
-│&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;├──&nbsp;[LInfTracking](@ref)
+│&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;├──&nbsp;[LInfNorm](@ref)
 
-│&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;├──&nbsp;[LpTracking](@ref)
+│&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;├──&nbsp;[LpNorm](@ref)
 
-│&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;└──&nbsp;[SquaredL2Tracking](@ref)
+│&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;└──&nbsp;[SquaredL2Norm](@ref)
 
 │&nbsp;&nbsp;&nbsp;└──&nbsp;[VariableTracking](@ref)
 

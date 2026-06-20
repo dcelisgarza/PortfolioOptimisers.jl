@@ -26,6 +26,10 @@ The sub-selection counterpart to Factory. Where Factory propagates runtime *valu
 **Vector-to-Scalar Reducers**
 Small reusable Algorithms that collapse a vector of reals to a scalar, reused throughout the library: `MinValue`, `MaxValue`, `MeanValue`, `MedianValue`, `ModeValue`, `StdValue`, `VarValue`, `SumValue`, `ProdValue`, `StandardisedValue` (weighted mean ÷ weighted std). Most accept optional observation weights.
 
+**LxNorm error family**
+LxNorm errors are used as constraints, targets for risk measures, and in entropy pooling of multiple
+conditional value at risk views: `L1Norm`, `L2Norm`, `SquaredL2Norm`, `LpNorm`, `LInfNorm`.
+
 **Full vs Semi**
 A pervasive Algorithm distinction in moment estimation: `Full` includes all deviations; `Semi` includes only observations below a target (downside-only). Drives the split between symmetric and downside risk/moment measures.
 
@@ -215,7 +219,7 @@ Post-solve adjustment forcing weights into the feasible region: `IterativeWeight
 Measures/constrains change relative to a reference. Dynamic (vs previous weights, needs them at runtime) or fixed (vs static target). Soft penalty or hard constraint.
 
 **Tracking Error**
-Measures/constrains closeness to a benchmark/target. `WeightsTracking` (vs a reference weight vector — needs a weight vector, not necessarily *previous*) or `ReturnsTracking` (vs a benchmark return series). Return formulations: `L1Tracking`, `L2Tracking`, `SquaredL2Tracking`, `LpTracking`, `LInfTracking` (norms) and `IndependentVariableTracking` / `DependentVariableTracking` (variable). Soft penalty or hard constraint.
+Measures/constrains closeness to a benchmark/target. `WeightsTracking` (vs a reference weight vector — needs a weight vector, not necessarily *previous*) or `ReturnsTracking` (vs a benchmark return series). Return tracking formulations: LxNorm error family (norm-based errors). Risk tracking formulations: `IndependentVariableTracking` / `DependentVariableTracking` (variable). Soft penalty or hard constraint.
 
 ### 4.5 Meta-optimisers
 

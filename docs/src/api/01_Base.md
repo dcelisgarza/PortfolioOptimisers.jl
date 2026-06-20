@@ -40,6 +40,13 @@ Custom types are the bread and butter of `PorfolioOptimisers.jl`, the following 
 VecScalar
 AbstractEstimatorValueAlgorithm
 get_observation_weights
+NormError
+L2Norm
+SquaredL2Norm
+L1Norm
+LpNorm
+LInfNorm
+norm_error
 ```
 
 ## Error types

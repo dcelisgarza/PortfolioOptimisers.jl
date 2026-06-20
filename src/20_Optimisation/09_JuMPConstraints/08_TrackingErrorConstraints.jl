@@ -5,10 +5,10 @@ Add tracking error constraints to the JuMP optimisation model.
 
 The fall-through method does nothing. Concrete methods dispatch on the tracking algorithm type:
 
-  - [`L1Tracking`](@ref): Enforces `‖net_X - wb * k‖₁ ≤ err * T` via NormOneCone.
-  - [`L2Tracking`](@ref) / [`SquaredL2Tracking`](@ref): Enforces a scaled L2 norm via SecondOrderCone.
-  - [`LpTracking`](@ref): Enforces a scaled Lp norm via power cone.
-  - [`LInfTracking`](@ref): Enforces `‖net_X - wb * k‖_∞ ≤ err * scale` via NormInfinityCone.
+  - [`L1Norm`](@ref): Enforces `‖net_X - wb * k‖₁ ≤ err * T` via NormOneCone.
+  - [`L2Norm`](@ref) / [`SquaredL2Norm`](@ref): Enforces a scaled L2 norm via SecondOrderCone.
+  - [`LpNorm`](@ref): Enforces a scaled Lp norm via power cone.
+  - [`LInfNorm`](@ref): Enforces `‖net_X - wb * k‖_∞ ≤ err * scale` via NormInfinityCone.
   - [`IndependentVariableTracking`](@ref): Substitutes `w - wb` for `w` and applies the chosen risk constraint.
   - [`DependentVariableTracking`](@ref): Constrains the absolute difference between portfolio risk and benchmark risk.
 
@@ -52,18 +52,18 @@ Where:
 
   - [`TrackingError`](@ref)
   - [`RiskTrackingError`](@ref)
-  - [`L1Tracking`](@ref)
-  - [`L2Tracking`](@ref)
-  - [`LpTracking`](@ref)
-  - [`LInfTracking`](@ref)
+  - [`L1Norm`](@ref)
+  - [`L2Norm`](@ref)
+  - [`LpNorm`](@ref)
+  - [`LInfNorm`](@ref)
 """
 function set_tracking_error_constraints!(args...; kwargs...)
     return nothing
 end
 function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
                                          pr::AbstractPriorResult,
-                                         tr::TrackingError{<:Any, <:Any, <:L1Tracking},
-                                         args...; kwargs...)
+                                         tr::TrackingError{<:Any, <:Any, <:L1Norm}, args...;
+                                         kwargs...)
     X = pr.X
     k = get_k(model)
     sc = get_constraint_scale(model)
@@ -90,8 +90,8 @@ end
 function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
                                          pr::AbstractPriorResult,
                                          tr::TrackingError{<:Any, <:Any,
-                                                           <:Union{<:L2Tracking,
-                                                                   <:SquaredL2Tracking}},
+                                                           <:Union{<:L2Norm,
+                                                                   <:SquaredL2Norm}},
                                          args...; kwargs...)
     X = pr.X
     k = get_k(model)
@@ -116,8 +116,8 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
 end
 function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
                                          pr::AbstractPriorResult,
-                                         tr::TrackingError{<:Any, <:Any, <:LpTracking},
-                                         args...; kwargs...)
+                                         tr::TrackingError{<:Any, <:Any, <:LpNorm}, args...;
+                                         kwargs...)
     @argcheck(tr.alg.p > 1, DomainError)
     X = pr.X
     k = get_k(model)
@@ -159,7 +159,7 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
 end
 function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
                                          pr::AbstractPriorResult,
-                                         tr::TrackingError{<:Any, <:Any, <:LInfTracking},
+                                         tr::TrackingError{<:Any, <:Any, <:LInfNorm},
                                          args...; kwargs...)
     X = pr.X
     k = get_k(model)

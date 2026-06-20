@@ -141,8 +141,8 @@ pretty_table(DataFrame("Tracking-error budget" => err_vals,
              title = "Tighter tracking-error budget hugs the benchmark")
 
 #=
-The tracking error itself can be measured with different norms — [`L1Tracking`](@ref) (absolute,
-sparse), [`LpTracking`](@ref) (general p-norm), [`LInfTracking`](@ref) (worst single deviation) —
+The tracking error itself can be measured with different norms — [`L1Norm`](@ref) (absolute,
+sparse), [`LpNorm`](@ref) (general p-norm), [`LInfNorm`](@ref) (worst single deviation) —
 passed as the `alg`, so you can choose whether to penalise the total drift or the largest single
 bet away from the benchmark.
 
