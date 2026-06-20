@@ -169,13 +169,13 @@ pretty_table(DataFrame(; :assets => rd.nx, Symbol("Log ERC risk") => rc_eq,
 ## 4. Factor risk budgeting
 
 [`FactorRiskBudgeting`](@ref) allocates risk across *factors* rather than assets, via a
-regression of asset returns onto factor returns. It needs the factor returns, so we rebuild
-the data with a factor matrix and use a [`FactorPrior`](@ref).
+regression of asset returns onto factor returns. It needs the factor returns, but not the
+factor prior so we should use use a [`EmpiricalPrior`](@ref).
 
 ````@example 09_Risk_Budgeting
 F = TimeArray(CSV.File(joinpath(@__DIR__, "..", "Factors.csv.gz")); timestamp = :Date)[(end - 252):end]
 rdf = prices_to_returns(X, F)
-prf = prior(FactorPrior(), rdf)
+prf = prior(EmpiricalPrior(), rdf)
 optf = JuMPOptimiser(; pe = prf, slv = slv)
 Nf = length(rdf.nf)
 

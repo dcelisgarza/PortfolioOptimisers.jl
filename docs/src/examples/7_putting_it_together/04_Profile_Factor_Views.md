@@ -78,8 +78,8 @@ residual variance (`rsd = true`) so the posterior covariance is the full asset r
 factor-explained part.
 
 ````@example 04_Profile_Factor_Views
-prior_est = FactorBlackLittermanPrior(; pe = EmpiricalPrior(), rsd = true, sets = factor_sets,
-                                      tau = tau, views = factor_views)
+prior_est = FactorBlackLittermanPrior(; pe = EmpiricalPrior(), rsd = true,
+                                      sets = factor_sets, tau = tau, views = factor_views)
 pr = prior(prior_est, rd)
 
 slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,

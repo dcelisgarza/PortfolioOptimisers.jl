@@ -151,8 +151,7 @@ plot_ptf_cumulative_returns(mip_res.w, rd.X; ts = rd.ts, compound = true)
 
 ```julia
 # Furthermore, we can also plot the risk contribution per asset. For this, we must provide an instance of the risk measure we want to use with the appropriate statistics/parameters. We can do this by using the `factory` function (recommended when doing so programmatically), or manually set the quantities ourselves.
-plot_risk_contribution(factory(Variance(), res.pr), mip_res.w, rd.X; nx = rd.nx,
-                       percentage = true)
+plot_risk_contribution(factory(Variance(), res.pr), mip_res.w, rd.X; nx = rd.nx, erc = false)
 
 # This awkwardness is due to the fact that `PortfolioOptimisers.jl` tries to decouple the risk measures from optimisation estimators and results. However, the advantage of this approach is that it lets us use multiple different risk measures as part of the risk expression, or as risk limits in optimisations. We explore this further in the [examples](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/00_Examples_Introduction).
 ```

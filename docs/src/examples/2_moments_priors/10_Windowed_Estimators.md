@@ -103,9 +103,9 @@ moment.
 T = size(rd.X, 1)
 ew = eweights(1:T, 2 / (T + 1); scale = true)
 uncorrected = PortfolioOptimisersCovariance(;
-                                             ce = GeneralCovariance(;
-                                                                    ce = SimpleCovariance(;
-                                                                                          corrected = false)))
+                                            ce = GeneralCovariance(;
+                                                                   ce = SimpleCovariance(;
+                                                                                         corrected = false)))
 
 vol_w = DataFrame("asset" => rd.nx,
                   "full (equal)" => annvol(PortfolioOptimisersCovariance()),
@@ -160,8 +160,8 @@ slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
 function windowed_minrisk(w)
     pe = EmpiricalPrior(; me = WindowedExpectedReturns(; window = w),
                         ce = WindowedCovariance(; window = w))
-    return optimise(MeanRisk(; obj = MinimumRisk(), opt = JuMPOptimiser(; pe = pe, slv = slv)),
-                    rd)
+    return optimise(MeanRisk(; obj = MinimumRisk(),
+                             opt = JuMPOptimiser(; pe = pe, slv = slv)), rd)
 end
 
 full_book = optimise(MeanRisk(; obj = MinimumRisk(),
@@ -195,12 +195,12 @@ the time-varying risk the full-sample estimate flattens into a single number.
 
 ````@example 10_Windowed_Estimators
 roll = 252
-rolling_vol = [sqrt(cov(WindowedCovariance(; window = roll), rd.X[1:t, :])[1, 1]) * sqrt(252)
-               for t in roll:T]
+rolling_vol = [sqrt(cov(WindowedCovariance(; window = roll), rd.X[1:t, :])[1, 1]) *
+               sqrt(252) for t in roll:T]
 rolling_dates = rd.ts[roll:T]
 
-plot(rolling_dates, rolling_vol; label = "AAPL trailing 252-day vol",
-     xlabel = "date", ylabel = "annualised volatility", legend = :topright, lw = 2,
+plot(rolling_dates, rolling_vol; label = "AAPL trailing 252-day vol", xlabel = "date",
+     ylabel = "annualised volatility", legend = :topright, lw = 2,
      title = "A windowed moment driven through time")
 ````
 

@@ -657,6 +657,18 @@ its docstring.
 
 │&nbsp;&nbsp;&nbsp;└──&nbsp;[LogarithmicReturn](@ref)
 
+├──&nbsp;[NormError](@ref)
+
+│&nbsp;&nbsp;&nbsp;├──&nbsp;[L1Norm](@ref)
+
+│&nbsp;&nbsp;&nbsp;├──&nbsp;[L2Norm](@ref)
+
+│&nbsp;&nbsp;&nbsp;├──&nbsp;[LInfNorm](@ref)
+
+│&nbsp;&nbsp;&nbsp;├──&nbsp;[LpNorm](@ref)
+
+│&nbsp;&nbsp;&nbsp;└──&nbsp;[SquaredL2Norm](@ref)
+
 ├──&nbsp;[NumberSubsetsEstimator](@ref)
 
 ├──&nbsp;[ObjectiveFunction](@ref)
@@ -1106,18 +1118,6 @@ its docstring.
 │&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└──&nbsp;[SquaredSOCRiskExpr](@ref)
 
 ├──&nbsp;[TrackingFormulation](@ref)
-
-│&nbsp;&nbsp;&nbsp;├──&nbsp;[NormError](@ref)
-
-│&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;├──&nbsp;[L1Norm](@ref)
-
-│&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;├──&nbsp;[L2Norm](@ref)
-
-│&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;├──&nbsp;[LInfNorm](@ref)
-
-│&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;├──&nbsp;[LpNorm](@ref)
-
-│&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;└──&nbsp;[SquaredL2Norm](@ref)
 
 │&nbsp;&nbsp;&nbsp;└──&nbsp;[VariableTracking](@ref)
 

@@ -292,7 +292,7 @@ function PortfolioOptimisers.plot_risk_contribution(r::PortfolioOptimisers.Abstr
                                                     fees::Option{<:Fees} = nothing;
                                                     delta::Number = 1e-6,
                                                     marginal::Bool = false,
-                                                    percentage::Bool = false,
+                                                    percentage::Bool = true,
                                                     N::Option{<:Number} = nothing,
                                                     kwargs...)
     nx = isnothing(rd.nx) ? (1:size(rd.X, 2)) : rd.nx
@@ -305,7 +305,7 @@ function PortfolioOptimisers.plot_risk_contribution(r::PortfolioOptimisers.Abstr
                                                     res::OptimisationResult,
                                                     rd::ReturnsResult; delta::Number = 1e-6,
                                                     marginal::Bool = false,
-                                                    percentage::Bool = false,
+                                                    percentage::Bool = true,
                                                     N::Option{<:Number} = nothing,
                                                     kwargs...)
     fees = extract_fees(res, nothing)
@@ -320,7 +320,7 @@ function PortfolioOptimisers.plot_risk_contribution(r::PortfolioOptimisers.Abstr
                                                     nx::AbstractVector = 1:length(res.w),
                                                     delta::Number = 1e-6,
                                                     marginal::Bool = false,
-                                                    percentage::Bool = false,
+                                                    percentage::Bool = true,
                                                     N::Option{<:Number} = nothing,
                                                     kwargs...)
     fees = extract_fees(res, nothing)
@@ -679,7 +679,7 @@ end
 function PortfolioOptimisers.plot_centrality(cte::AbstractCentralityEstimator, X::MatNum,
                                              nx::AbstractVector = 1:size(X, 2);
                                              N::Option{<:Number} = nothing,
-                                             percentage::Bool = false, kwargs...)
+                                             percentage::Bool = true, kwargs...)
     plr = centrality_vector(cte, X)
     scores = plr.X
     M = length(scores)
@@ -687,7 +687,7 @@ function PortfolioOptimisers.plot_centrality(cte::AbstractCentralityEstimator, X
     top_idx = view(idx, 1:N)
     sort!(top_idx; by = i -> scores[i], rev = true)
     if percentage
-        scores ./= sum(scores)
+        scores /= sum(scores)
     end
     return bar(scores[top_idx]; xticks = (1:N, nx[top_idx]), title = "Asset Centrality",
                xlabel = "Asset", ylabel = "Centrality Score", xrotation = 90,
@@ -697,14 +697,14 @@ function PortfolioOptimisers.plot_centrality(cte::AbstractCentralityEstimator,
                                              pr::PortfolioOptimisers.AbstractPriorResult,
                                              nx::AbstractVector = 1:size(pr.X, 2);
                                              N::Option{<:Number} = nothing,
-                                             percentage::Bool = false, kwargs...)
+                                             percentage::Bool = true, kwargs...)
     return PortfolioOptimisers.plot_centrality(cte, pr.X, nx; N = N,
                                                percentage = percentage, kwargs...)
 end
 function PortfolioOptimisers.plot_centrality(cte::AbstractCentralityEstimator,
                                              rd::ReturnsResult;
                                              N::Option{<:Number} = nothing,
-                                             percentage::Bool = false, kwargs...)
+                                             percentage::Bool = true, kwargs...)
     nx = isnothing(rd.nx) ? (1:size(rd.X, 2)) : rd.nx
     return PortfolioOptimisers.plot_centrality(cte, rd.X, nx; N = N,
                                                percentage = percentage, kwargs...)
@@ -712,7 +712,7 @@ end
 function PortfolioOptimisers.plot_centrality(cte::AbstractCentralityEstimator,
                                              res::OptimisationResult, rd::ReturnsResult;
                                              N::Option{<:Number} = nothing,
-                                             percentage::Bool = false, kwargs...)
+                                             percentage::Bool = true, kwargs...)
     nx = isnothing(rd.nx) ? (1:length(res.w)) : rd.nx
     return PortfolioOptimisers.plot_centrality(cte, rd.X, nx; N = N,
                                                percentage = percentage, kwargs...)
@@ -1139,7 +1139,7 @@ function PortfolioOptimisers.plot_risk_contribution(r::PortfolioOptimisers.Abstr
                                                     nx::AbstractVector = 1:length(w),
                                                     delta::Number = 1e-6,
                                                     marginal::Bool = false,
-                                                    percentage::Bool = false,
+                                                    percentage::Bool = true,
                                                     erc::Bool = true,
                                                     N::Option{<:Number} = nothing,
                                                     kwargs...)
@@ -1151,7 +1151,7 @@ function PortfolioOptimisers.plot_risk_contribution(r::PortfolioOptimisers.Abstr
     end
     rc = risk_contribution(r, w, X, fees; delta = delta, marginal = marginal)
     if percentage
-        rc = rc ./ sum(rc)
+        rc = rc / sum(rc)
     end
     plt = PortfolioOptimisers.plot_composition(rc, nx; N = N, ylabel = "Contribution",
                                                title = "Risk Contribution", kwargs...)
@@ -1172,7 +1172,8 @@ function PortfolioOptimisers.plot_factor_risk_contribution(r::PortfolioOptimiser
                                                            nf::Option{<:AbstractVector} = nothing,
                                                            delta::Number = 1e-6,
                                                            N::Option{<:Number} = nothing,
-                                                           kwargs...)
+                                                           percentage::Bool = true,
+                                                           erc::Bool = true, kwargs...)
     if !(delta > zero(delta))
         throw(ArgumentError("delta must be > 0; got $delta"))
     end
@@ -1187,10 +1188,17 @@ function PortfolioOptimisers.plot_factor_risk_contribution(r::PortfolioOptimiser
     else
         [string.(1:(length(rc) - 1)); "Constant"]
     end
-    return PortfolioOptimisers.plot_composition(rc, factor_names; N = N,
-                                                title = "Factor Risk Contribution",
-                                                xlabel = "Factor",
-                                                ylabel = "Risk Contribution", kwargs...)
+    if percentage
+        rc = rc / sum(rc)
+    end
+    plt = PortfolioOptimisers.plot_composition(rc, factor_names; N = N,
+                                               title = "Factor Risk Contribution",
+                                               xlabel = "Factor",
+                                               ylabel = "Risk Contribution", kwargs...)
+    if erc
+        hline!(plt, [mean(rc)])
+    end
+    return plt
 end
 ## ────────────────────────────────────────────────────────────────────────────
 ## Drawdowns
@@ -1731,7 +1739,7 @@ function PortfolioOptimisers.plot_portfolio_dashboard(res::OptimisationResult, r
                                                       N::Option{<:Number} = nothing,
                                                       delta::Number = 1e-6,
                                                       marginal::Bool = false,
-                                                      percentage::Bool = false,
+                                                      percentage::Bool = true,
                                                       alpha::Number = 0.05,
                                                       kappa::Number = 0.3, rw = nothing,
                                                       kwargs...)
