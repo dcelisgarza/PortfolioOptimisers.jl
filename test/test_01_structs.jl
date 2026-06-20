@@ -9,6 +9,22 @@
         @test vs.v == [1.0, -2.0, 3.0]
         @test vs.s == 2
     end
+    @testset "Norms" begin
+        @test isapprox(PortfolioOptimisers.norm_error(L1Norm(), [0.5, 0.5], [0.6, 0.4], 2),
+                       PortfolioOptimisers.norm_error(L1Norm(), [0.5, 0.5] - [0.6, 0.4], 2))
+        @test isapprox(PortfolioOptimisers.norm_error(L2Norm(), [0.5, 0.5], [0.6, 0.4], 2),
+                       PortfolioOptimisers.norm_error(L2Norm(), [0.5, 0.5] - [0.6, 0.4], 2))
+        @test isapprox(PortfolioOptimisers.norm_error(LpNorm(), [0.5, 0.5], [0.6, 0.4], 2),
+                       PortfolioOptimisers.norm_error(LpNorm(), [0.5, 0.5] - [0.6, 0.4], 2))
+        @test isapprox(PortfolioOptimisers.norm_error(LInfNorm(), [0.5, 0.5], [0.6, 0.4],
+                                                      2),
+                       PortfolioOptimisers.norm_error(LInfNorm(), [0.5, 0.5] - [0.6, 0.4],
+                                                      2))
+        @test isapprox(PortfolioOptimisers.norm_error(LInfNorm(pos = false), [0.5, 0.5],
+                                                      [0.6, 0.4], 2),
+                       PortfolioOptimisers.norm_error(LInfNorm(pos = false),
+                                                      [0.5, 0.5] - [0.6, 0.4], 2))
+    end
     @testset "ReturnsResult" begin
         X = rand(3, 4)
         F = rand(3, 2)
