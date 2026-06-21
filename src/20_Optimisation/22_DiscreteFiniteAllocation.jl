@@ -135,7 +135,7 @@ Keywords correspond to the struct's fields.
 # Examples
 
 ```jldoctest
-julia> DiscreteAllocation(; slv = Solver())
+julia> DiscreteAllocation(; slv = Solver(; solver = nothing))
 DiscreteAllocation
   slv ┼ Solver
       │          name ┼ String: ""

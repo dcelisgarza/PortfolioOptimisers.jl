@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Represents the Equal Risk Measure for hierarchical portfolio optimisation.
 
-`EqualRiskMeasure` assigns an equal risk contribution to each asset by returning the reciprocal of the number of assets. It is used in equal-risk-contribution (ERC) strategies.
+`EqualRisk` assigns an equal risk contribution to each asset by returning the reciprocal of the number of assets. It is used in equal-risk-contribution (ERC) strategies.
 
 # Mathematical definition
 
@@ -27,15 +27,15 @@ $(DocStringExtensions.FIELDS)
 
 # Constructors
 
-    EqualRiskMeasure(;
+    EqualRisk(;
         settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings()
-    ) -> EqualRiskMeasure
+    ) -> EqualRisk
 
 Keywords correspond to the struct's fields.
 
 # Functor
 
-    (r::EqualRiskMeasure)(w::VecNum)
+    (r::EqualRisk)(w::VecNum)
 
 Returns the equal risk contribution for a weight vector `w`.
 
@@ -46,8 +46,8 @@ Returns the equal risk contribution for a weight vector `w`.
 # Examples
 
 ```jldoctest
-julia> EqualRiskMeasure()
-EqualRiskMeasure
+julia> EqualRisk()
+EqualRisk
   settings ┼ HierarchicalRiskMeasureSettings
            │   scale ┴ Float64: 1.0
 ```
@@ -58,26 +58,26 @@ EqualRiskMeasure
   - [`set_number_effective_assets!`](@ref)
   - [`HierarchicalRiskMeasure`](@ref)
   - [`HierarchicalRiskMeasureSettings`](@ref)
-  - [`RiskRatioRiskMeasure`](@ref)
+  - [`RiskRatio`](@ref)
 """
-@concrete struct EqualRiskMeasure <: HierarchicalRiskMeasure
+@concrete struct EqualRisk <: HierarchicalRiskMeasure
     """
     $(field_dict[:settings_rm])
     """
     settings
-    function EqualRiskMeasure(settings::HierarchicalRiskMeasureSettings)
+    function EqualRisk(settings::HierarchicalRiskMeasureSettings)
         return new{typeof(settings)}(settings)
     end
 end
-function EqualRiskMeasure(;
-                          settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings())::EqualRiskMeasure
-    return EqualRiskMeasure(settings)
+function EqualRisk(;
+                   settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings())::EqualRisk
+    return EqualRisk(settings)
 end
-function (::EqualRiskMeasure)(w::VecNum)
+function (::EqualRisk)(w::VecNum)
     return inv(length(w))
 end
 
 # Expected-risk input kind — see `risk_input_kind`.
-risk_input_kind(::EqualRiskMeasure) = WeightsInput()
+risk_input_kind(::EqualRisk) = WeightsInput()
 
-export EqualRiskMeasure
+export EqualRisk

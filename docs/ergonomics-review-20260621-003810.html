@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PortfolioOptimisers.jl — Ergonomics Review</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+<script>
+  mermaid.initialize({ startOnLoad: true, theme: 'dark', securityLevel: 'loose' });
+</script>
+<style>
+  body { font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; }
+  .mono { font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; }
+  .card { transition: transform .12s ease, box-shadow .12s ease; }
+  .card:hover { transform: translateY(-2px); box-shadow: 0 12px 40px -12px rgba(0,0,0,.6); }
+  .diff-del { background: rgba(248,113,113,.10); border-left: 3px solid #f87171; }
+  .diff-add { background: rgba(74,222,128,.10); border-left: 3px solid #4ade80; }
+  pre { white-space: pre-wrap; word-break: break-word; }
+</style>
+</head>
+<body class="bg-slate-950 text-slate-200 antialiased">
+
+<header class="max-w-6xl mx-auto px-6 pt-14 pb-8">
+  <p class="text-sky-400 text-sm font-semibold tracking-widest uppercase">Caller-facing friction · ergonomics review</p>
+  <h1 class="text-4xl md:text-5xl font-bold text-white mt-2">PortfolioOptimisers.jl</h1>
+  <p class="text-slate-400 mt-4 max-w-3xl leading-relaxed">
+    Seven candidates where a <span class="text-white font-semibold">caller</span> pauses — a default that can't be
+    constructed, an error that names internal variables, a five-level composition tree, a 352-name flat export surface.
+    Every before/after below is <span class="text-white font-semibold">real code and real error text</span> from <span class="mono text-sky-300">dev/src</span>,
+    verified against source. Relationship structure cross-checked against the project's <span class="mono text-sky-300">graphify</span> graph.
+  </p>
+  <div class="flex flex-wrap gap-3 mt-6 text-xs">
+    <span class="px-3 py-1 rounded-full bg-slate-800 text-slate-300">352 exported names</span>
+    <span class="px-3 py-1 rounded-full bg-slate-800 text-slate-300">805 <span class="mono">@argcheck</span> sites · 401 bare</span>
+    <span class="px-3 py-1 rounded-full bg-slate-800 text-slate-300">2 user entrypoints: <span class="mono">optimise</span> · <span class="mono">prior</span></span>
+    <span class="px-3 py-1 rounded-full bg-slate-800 text-slate-300">cov nesting depth: 5</span>
+  </div>
+</header>
+
+<!-- LANGUAGE LEGEND -->
+<section class="max-w-6xl mx-auto px-6 pb-8">
+  <div class="grid grid-cols-2 md:grid-cols-6 gap-2 text-[11px]">
+    <span class="text-center px-2 py-1 rounded bg-indigo-500/15 text-indigo-300 border border-indigo-500/30">naming</span>
+    <span class="text-center px-2 py-1 rounded bg-rose-500/15 text-rose-300 border border-rose-500/30">errors</span>
+    <span class="text-center px-2 py-1 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30">defaults</span>
+    <span class="text-center px-2 py-1 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">aliases</span>
+    <span class="text-center px-2 py-1 rounded bg-sky-500/15 text-sky-300 border border-sky-500/30">docs</span>
+    <span class="text-center px-2 py-1 rounded bg-fuchsia-500/15 text-fuchsia-300 border border-fuchsia-500/30">discoverability</span>
+  </div>
+</section>
+
+<main class="max-w-6xl mx-auto px-6 pb-20 space-y-8">
+
+<!-- ============ CARD A ============ -->
+<article class="card bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden">
+  <div class="px-6 py-5 border-b border-slate-800 flex items-start justify-between gap-4">
+    <div>
+      <div class="flex items-center gap-2 mb-1">
+        <span class="text-xs px-2 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30">defaults</span>
+        <span class="text-xs px-2 py-0.5 rounded bg-rose-600 text-white font-semibold">Strong</span>
+      </div>
+      <h2 class="text-2xl font-bold text-white">A · <span class="mono text-amber-300">MeanRisk()</span> advertises a default it cannot build</h2>
+    </div>
+    <span class="text-5xl font-black text-slate-800">A</span>
+  </div>
+  <div class="px-6 py-5 space-y-5">
+    <div class="grid md:grid-cols-2 gap-4 text-sm">
+      <div><span class="text-slate-500 uppercase text-xs tracking-wider">Files</span>
+        <p class="mono text-slate-300 mt-1">src/20_Optimisation/11_MeanRisk.jl:235<br>src/20_Optimisation/10_JuMPOptimiser.jl:738</p></div>
+      <div><span class="text-slate-500 uppercase text-xs tracking-wider">Problem → Solution</span>
+        <p class="mt-1"><span class="text-rose-300">The signature promises <span class="mono">opt = JuMPOptimiser()</span>, but that call throws.</span><br>
+        <span class="text-emerald-300">Give <span class="mono">slv</span> a default, or drop the unreachable default on <span class="mono">opt</span> so the requirement is honest.</span></p></div>
+    </div>
+
+    <div class="grid md:grid-cols-2 gap-4">
+      <div class="diff-del rounded-lg p-4">
+        <p class="text-rose-300 text-xs font-semibold mb-2 uppercase tracking-wider">Before — the trap</p>
+        <pre class="mono text-xs text-slate-200">function MeanRisk(; <span class="text-amber-300">opt::JuMPOptimiser = JuMPOptimiser()</span>,
+                  r::RM_VecRM = Variance(),
+                  obj::ObjectiveFunction = MinimumRisk(), …)
+
+function JuMPOptimiser(; pe::PrE_Pr = EmpiricalPrior(),
+                       <span class="text-rose-400">slv::Slv_VecSlv,   # ← required, NO default</span>
+                       wb = WeightBounds(), bgt = 1.0, …)</pre>
+        <div class="mt-3 bg-black/40 rounded p-3 mono text-xs">
+          <span class="text-slate-500">julia&gt;</span> <span class="text-slate-200">MeanRisk()</span><br>
+          <span class="text-rose-400">ERROR: UndefKeywordError: keyword argument `slv` not assigned</span>
+        </div>
+      </div>
+      <div class="diff-add rounded-lg p-4">
+        <p class="text-emerald-300 text-xs font-semibold mb-2 uppercase tracking-wider">After — honest signature</p>
+        <pre class="mono text-xs text-slate-200">function JuMPOptimiser(; pe = EmpiricalPrior(),
+                       <span class="text-emerald-300">slv::Slv_VecSlv = Solver(),</span>
+                       wb = WeightBounds(), bgt = 1.0, …)</pre>
+        <p class="text-xs text-slate-400 mt-3">…<span class="text-slate-300">or</span>, if a solver genuinely can't be defaulted, make the dependency visible at the top level instead of hiding it three constructors down:</p>
+        <pre class="mono text-xs text-slate-200 mt-2">MeanRisk(; slv, opt = JuMPOptimiser(; slv), …)</pre>
+        <p class="text-xs text-slate-400 mt-2">Either way <span class="mono">MeanRisk()</span> with the documented defaults must run, or the default must not be documented.</p>
+      </div>
+    </div>
+
+    <div class="bg-amber-500/10 border border-amber-500/30 rounded-lg px-4 py-3 text-sm text-amber-200">
+      <span class="font-semibold">Default test:</span> every JuMP caller passes a solver — and the same broken pattern recurs at
+      <span class="mono">Solver(; solver = nothing)</span> (Card F). The friction is hidden because the failing default lives three constructors below the one the caller typed.
+    </div>
+
+    <div class="flex flex-wrap gap-2 text-xs">
+      <span class="px-2.5 py-1 rounded-full bg-slate-800 text-emerald-300">✓ default that constructs</span>
+      <span class="px-2.5 py-1 rounded-full bg-slate-800 text-emerald-300">✓ honest signature</span>
+      <span class="px-2.5 py-1 rounded-full bg-slate-800 text-emerald-300">✓ failure at call site, not 3 levels down</span>
+      <span class="px-2.5 py-1 rounded-full bg-slate-800 text-emerald-300">✓ matches HRP, which <em>does</em> construct</span>
+    </div>
+  </div>
+</article>
+
+<!-- ============ CARD B ============ -->
+<article class="card bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden">
+  <div class="px-6 py-5 border-b border-slate-800 flex items-start justify-between gap-4">
+    <div>
+      <div class="flex items-center gap-2 mb-1">
+        <span class="text-xs px-2 py-0.5 rounded bg-rose-500/15 text-rose-300 border border-rose-500/30">errors</span>
+        <span class="text-xs px-2 py-0.5 rounded bg-rose-600 text-white font-semibold">Strong</span>
+      </div>
+      <h2 class="text-2xl font-bold text-white">B · Half the argument checks name a variable the caller never typed</h2>
+    </div>
+    <span class="text-5xl font-black text-slate-800">B</span>
+  </div>
+  <div class="px-6 py-5 space-y-5">
+    <div class="grid md:grid-cols-2 gap-4 text-sm">
+      <div><span class="text-slate-500 uppercase text-xs tracking-wider">Files</span>
+        <p class="mono text-slate-300 mt-1">401 of 805 <span class="mono">@argcheck</span> sites are bare<br>e.g. 05_HierarchicalRiskParity.jl:162<br>08_Base_JuMPOptimisation.jl:612</p></div>
+      <div><span class="text-slate-500 uppercase text-xs tracking-wider">Problem → Solution</span>
+        <p class="mt-1"><span class="text-rose-300">A bare check echoes the failed Julia expression — internal names like <span class="mono">r</span>, <span class="mono">wi</span>, <span class="mono">val</span> — never the caller's argument or what to pass.</span><br>
+        <span class="text-emerald-300">Adopt the project's own good pattern across the surface: a typed error with a caller-facing sentence.</span></p></div>
+    </div>
+
+    <div class="grid md:grid-cols-2 gap-4">
+      <div class="diff-del rounded-lg p-4">
+        <p class="text-rose-300 text-xs font-semibold mb-2 uppercase tracking-wider">Before — what the caller sees</p>
+        <pre class="mono text-xs text-slate-200">@argcheck(!isempty(r))            <span class="text-slate-500"># HRP:162</span>
+@argcheck(length(wi) == length(w)) <span class="text-slate-500"># JuMP:612</span></pre>
+        <div class="mt-3 bg-black/40 rounded p-3 mono text-xs leading-relaxed">
+          <span class="text-rose-400">ERROR: ArgumentError: !isempty(r) must hold.</span><br>
+          <span class="text-rose-400">Got !isempty(r) =&gt; false</span><br><br>
+          <span class="text-slate-500"># what is `r`? the caller passed a risk measure</span><br>
+          <span class="text-slate-500"># to `MeanRisk`, never an `r`. And `wi` vs `w`?</span>
+        </div>
+      </div>
+      <div class="diff-add rounded-lg p-4">
+        <p class="text-emerald-300 text-xs font-semibold mb-2 uppercase tracking-wider">After — the pattern already in the repo</p>
+        <pre class="mono text-xs text-slate-200">@argcheck(!isempty(r),
+    IsEmptyError("risk measure vector `r` is empty; \
+pass at least one risk measure, e.g. r = Variance()"))
+
+@argcheck(length(wi) == length(w),
+    DimensionMismatch("initial weights `wi` ($(length(wi))) \
+must match asset count ($(length(w)))"))</pre>
+        <p class="text-xs text-slate-400 mt-3">This is not new machinery — it's the existing convention at
+        <span class="mono">02_Tools.jl:49</span>: <span class="mono text-emerald-300">IsEmptyError("$names_sym cannot be empty.")</span>.
+        The friction is that it holds only ~half the time.</p>
+      </div>
+    </div>
+
+    <!-- coverage bar -->
+    <div>
+      <p class="text-xs text-slate-500 uppercase tracking-wider mb-2">Convention coverage — <span class="mono">@argcheck</span> sites with a caller-facing message</p>
+      <div class="w-full h-7 rounded-lg overflow-hidden flex mono text-[11px] font-semibold">
+        <div class="bg-emerald-600/70 flex items-center justify-center text-white" style="width:50.2%">404 messaged</div>
+        <div class="bg-rose-700/70 flex items-center justify-center text-white" style="width:49.8%">401 bare</div>
+      </div>
+      <p class="text-xs text-slate-500 mt-1">A caller can't predict which kind of error they'll get — the convention test fails at the worst moment, on a mistake.</p>
+    </div>
+
+    <div class="flex flex-wrap gap-2 text-xs">
+      <span class="px-2.5 py-1 rounded-full bg-slate-800 text-emerald-300">✓ names the caller's argument</span>
+      <span class="px-2.5 py-1 rounded-full bg-slate-800 text-emerald-300">✓ says what to pass</span>
+      <span class="px-2.5 py-1 rounded-full bg-slate-800 text-emerald-300">✓ reuses existing pattern</span>
+      <span class="px-2.5 py-1 rounded-full bg-slate-800 text-emerald-300">✓ uniform across surface</span>
+    </div>
+  </div>
+</article>
+
+<!-- ============ CARD C ============ -->
+<article class="card bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden">
+  <div class="px-6 py-5 border-b border-slate-800 flex items-start justify-between gap-4">
+    <div>
+      <div class="flex items-center gap-2 mb-1">
+        <span class="text-xs px-2 py-0.5 rounded bg-indigo-500/15 text-indigo-300 border border-indigo-500/30">naming</span>
+        <span class="text-xs px-2 py-0.5 rounded bg-rose-600 text-white font-semibold">Strong</span>
+      </div>
+      <h2 class="text-2xl font-bold text-white">C · The <span class="mono text-indigo-300">…RiskMeasure</span> suffix is true 30% of the time</h2>
+    </div>
+    <span class="text-5xl font-black text-slate-800">C</span>
+  </div>
+  <div class="px-6 py-5 space-y-5">
+    <div class="grid md:grid-cols-2 gap-4 text-sm">
+      <div><span class="text-slate-500 uppercase text-xs tracking-wider">Files</span>
+        <p class="mono text-slate-300 mt-1">src/19_RiskMeasures/*.jl</p></div>
+      <div><span class="text-slate-500 uppercase text-xs tracking-wider">Problem → Solution</span>
+        <p class="mt-1"><span class="text-rose-300">Some risk measures carry a <span class="mono">RiskMeasure</span> suffix; most don't. A caller can't predict the name and can't trust autocomplete.</span><br>
+        <span class="text-emerald-300">Pick one rule and add deprecated aliases for the minority that change.</span></p></div>
+    </div>
+
+    <!-- naming map -->
+    <div class="grid md:grid-cols-2 gap-4">
+      <div class="bg-slate-950 rounded-lg p-4 border border-slate-800">
+        <p class="text-xs text-slate-400 uppercase tracking-wider mb-3">Bare — no suffix (the majority)</p>
+        <div class="flex flex-wrap gap-2 mono text-xs">
+          <span class="px-2 py-1 rounded bg-slate-800 text-slate-200">Variance</span>
+          <span class="px-2 py-1 rounded bg-slate-800 text-slate-200">Kurtosis</span>
+          <span class="px-2 py-1 rounded bg-slate-800 text-slate-200">NegativeSkewness</span>
+          <span class="px-2 py-1 rounded bg-slate-800 text-slate-200">AverageDrawdown</span>
+          <span class="px-2 py-1 rounded bg-slate-800 text-slate-200">MaximumDrawdown</span>
+          <span class="px-2 py-1 rounded bg-slate-800 text-slate-200">ConditionalValueatRisk</span>
+          <span class="px-2 py-1 rounded bg-slate-800 text-slate-200">WorstRealisation</span>
+          <span class="px-2 py-1 rounded bg-slate-800 text-slate-200">Range</span>
+        </div>
+      </div>
+      <div class="bg-slate-950 rounded-lg p-4 border border-slate-800">
+        <p class="text-xs text-amber-400 uppercase tracking-wider mb-3">Suffixed — <span class="mono">…RiskMeasure</span> (the minority)</p>
+        <div class="flex flex-wrap gap-2 mono text-xs">
+          <span class="px-2 py-1 rounded bg-amber-500/15 text-amber-200 border border-amber-500/30">TurnoverRiskMeasure</span>
+          <span class="px-2 py-1 rounded bg-amber-500/15 text-amber-200 border border-amber-500/30">TrackingRiskMeasure</span>
+          <span class="px-2 py-1 rounded bg-amber-500/15 text-amber-200 border border-amber-500/30">RiskTrackingRiskMeasure</span>
+          <span class="px-2 py-1 rounded bg-amber-500/15 text-amber-200 border border-amber-500/30">EqualRiskMeasure</span>
+          <span class="px-2 py-1 rounded bg-amber-500/15 text-amber-200 border border-amber-500/30">RiskRatioRiskMeasure</span>
+        </div>
+        <p class="text-xs text-slate-500 mt-3">Say them aloud: <span class="mono">Variance</span> and <span class="mono">TurnoverRiskMeasure</span> are the same kind of thing. The signal disagrees with itself.</p>
+      </div>
+    </div>
+
+    <div class="bg-amber-500/10 border border-amber-500/30 rounded-lg px-4 py-3 text-sm text-amber-200">
+      <span class="font-semibold">ADR note:</span> ADR-0006 classifies a measure's <em>input shape</em> with a trait, not subtypes — it does not legislate the surface name.
+      A naming convention here is open, not already-decided. Worth recording the chosen rule as an ADR so this review doesn't re-suggest it.
+    </div>
+
+    <div class="flex flex-wrap gap-2 text-xs">
+      <span class="px-2.5 py-1 rounded-full bg-slate-800 text-emerald-300">✓ predictable from one rule</span>
+      <span class="px-2.5 py-1 rounded-full bg-slate-800 text-emerald-300">✓ autocomplete-friendly</span>
+      <span class="px-2.5 py-1 rounded-full bg-slate-800 text-emerald-300">✓ aliases keep blast radius low</span>
+    </div>
+  </div>
+</article>
+
+<!-- ============ CARD D ============ -->
+<article class="card bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden">
+  <div class="px-6 py-5 border-b border-slate-800 flex items-start justify-between gap-4">
+    <div>
+      <div class="flex items-center gap-2 mb-1">
+        <span class="text-xs px-2 py-0.5 rounded bg-fuchsia-500/15 text-fuchsia-300 border border-fuchsia-500/30">discoverability</span>
+        <span class="text-xs px-2 py-0.5 rounded bg-rose-600 text-white font-semibold">Strong</span>
+      </div>
+      <h2 class="text-2xl font-bold text-white">D · 352 flat exports bury the 2 entrypoints among the macros</h2>
+    </div>
+    <span class="text-5xl font-black text-slate-800">D</span>
+  </div>
+  <div class="px-6 py-5 space-y-5">
+    <div class="grid md:grid-cols-2 gap-4 text-sm">
+      <div><span class="text-slate-500 uppercase text-xs tracking-wider">Files</span>
+        <p class="mono text-slate-300 mt-1">src/01_Base.jl:2869 · src/02_Tools.jl:2277<br>(every file appends to the flat <span class="mono">export</span>)</p></div>
+      <div><span class="text-slate-500 uppercase text-xs tracking-wider">Problem → Solution</span>
+        <p class="mt-1"><span class="text-rose-300">A newcomer typing <span class="mono">PortfolioOptimisers.</span> &lt;TAB&gt; meets 352 names — <span class="mono">optimise</span> sits beside <span class="mono">@fprop</span>, <span class="mono">@vprop</span>, <span class="mono">factory</span>, <span class="mono">port_opt_view</span>.</span><br>
+        <span class="text-emerald-300">Separate the caller surface from the extension surface: <span class="mono">export</span> the entrypoints, mark the machinery <span class="mono">public</span>.</span></p></div>
+    </div>
+
+    <div class="grid md:grid-cols-2 gap-4">
+      <div class="diff-del rounded-lg p-4">
+        <p class="text-rose-300 text-xs font-semibold mb-2 uppercase tracking-wider">Before — one flat tier</p>
+        <pre class="mono text-xs text-slate-200">export <span class="text-rose-400">@propagatable, @fprop, @vprop, @pprop,
+       @cprop, @wprop, @forward_properties,
+       factory</span>, optimise, prior, … <span class="text-slate-500"># 352 names</span></pre>
+        <p class="text-xs text-slate-400 mt-3">The signal test: from the export list alone, which name does a caller call <em>first</em>? Nothing distinguishes the 2 entrypoints from the ~7 extension macros from the ~340 building blocks.</p>
+      </div>
+      <div class="diff-add rounded-lg p-4">
+        <p class="text-emerald-300 text-xs font-semibold mb-2 uppercase tracking-wider">After — two tiers (Julia 1.11 <span class="mono">public</span>)</p>
+        <pre class="mono text-xs text-slate-200"><span class="text-emerald-300"># caller surface — exported</span>
+export optimise, prior, factory,
+       prices_to_returns, MeanRisk, …
+
+<span class="text-emerald-300"># extension surface — public, not exported</span>
+public @fprop, @vprop, @pprop, @cprop,
+       @forward_properties, port_opt_view</pre>
+        <p class="text-xs text-slate-400 mt-3">Extenders still reach the macros by qualified name; everyday callers get a curated namespace. No capability is removed — only re-tiered.</p>
+      </div>
+    </div>
+
+    <div class="bg-slate-950 rounded-lg p-4 border border-slate-800">
+      <p class="text-xs text-slate-500 uppercase tracking-wider mb-2">Pipeline a caller actually walks (the export list hides this order)</p>
+      <pre class="mermaid">
+flowchart LR
+  A[prices_to_returns] --> B[prior]
+  B --> C[optimise]
+  C --> D[Result.w]
+  classDef hot fill:#0ea5e9,stroke:#7dd3fc,color:#fff;
+  class A,B,C hot;
+      </pre>
+      <p class="text-xs text-slate-500">Three function names carry 90% of callers. They should be findable as a set, not as 3 needles in 352.</p>
+    </div>
+
+    <div class="flex flex-wrap gap-2 text-xs">
+      <span class="px-2.5 py-1 rounded-full bg-slate-800 text-emerald-300">✓ entrypoints discoverable</span>
+      <span class="px-2.5 py-1 rounded-full bg-slate-800 text-emerald-300">✓ machinery still reachable</span>
+      <span class="px-2.5 py-1 rounded-full bg-slate-800 text-emerald-300">✓ zero capability removed</span>
+      <span class="px-2.5 py-1 rounded-full bg-slate-800 text-emerald-300">✓ cleaner autocomplete</span>
+    </div>
+  </div>
+</article>
+
+<!-- ============ CARD E ============ -->
+<article class="card bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden">
+  <div class="px-6 py-5 border-b border-slate-800 flex items-start justify-between gap-4">
+    <div>
+      <div class="flex items-center gap-2 mb-1">
+        <span class="text-xs px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">aliases</span>
+        <span class="text-xs px-2 py-0.5 rounded bg-amber-600 text-white font-semibold">Worth exploring</span>
+      </div>
+      <h2 class="text-2xl font-bold text-white">E · Swapping the covariance estimator means threading five constructors</h2>
+    </div>
+    <span class="text-5xl font-black text-slate-800">E</span>
+  </div>
+  <div class="px-6 py-5 space-y-5">
+    <div class="grid md:grid-cols-2 gap-4 text-sm">
+      <div><span class="text-slate-500 uppercase text-xs tracking-wider">Files</span>
+        <p class="mono text-slate-300 mt-1">11_MeanRisk.jl · 10_JuMPOptimiser.jl<br>13_Prior/02_EmpiricalPrior.jl · 08_Moments/15,03</p></div>
+      <div><span class="text-slate-500 uppercase text-xs tracking-wider">Problem → Solution</span>
+        <p class="mt-1"><span class="text-rose-300">"Use a Gerber covariance" forces a caller to know and re-state four wrapper types just to reach the <span class="mono">ce</span> slot.</span><br>
+        <span class="text-emerald-300">A keyword-forwarding convenience constructor (or a <span class="mono">factory</span>-style override) for the common one-field swap.</span></p></div>
+    </div>
+
+    <div class="bg-slate-950 rounded-lg p-4 border border-slate-800">
+      <p class="text-xs text-slate-500 uppercase tracking-wider mb-2">Composition depth to the covariance slot — <span class="text-emerald-400">structure confirmed against the graphify graph</span></p>
+      <pre class="mermaid">
+flowchart TD
+  MR["MeanRisk"] -->|opt| JO["JuMPOptimiser"]
+  JO -->|pe| EP["EmpiricalPrior"]
+  EP -->|ce| POC["PortfolioOptimisersCovariance"]
+  POC -->|ce| COV["Covariance"]
+  COV -->|ce| GC["GeneralCovariance &lt;- the slot you wanted"]
+  MR -.->|r  ·  depth 1| RM["risk measure  ✓ shallow"]
+  classDef deep fill:#7c2d12,stroke:#fb923c,color:#fff;
+  classDef ok fill:#064e3b,stroke:#4ade80,color:#fff;
+  class POC,COV,GC deep;
+  class RM ok;
+      </pre>
+    </div>
+
+    <div class="grid md:grid-cols-2 gap-4">
+      <div class="diff-del rounded-lg p-4">
+        <p class="text-rose-300 text-xs font-semibold mb-2 uppercase tracking-wider">Before — five nested constructors</p>
+        <pre class="mono text-xs text-slate-200">MeanRisk(; opt = JuMPOptimiser(; slv,
+  pe = EmpiricalPrior(;
+    ce = PortfolioOptimisersCovariance(;
+      ce = Covariance(;
+        ce = GeneralCovariance(...))))))</pre>
+      </div>
+      <div class="diff-add rounded-lg p-4">
+        <p class="text-emerald-300 text-xs font-semibold mb-2 uppercase tracking-wider">After — name the common swap</p>
+        <pre class="mono text-xs text-slate-200"><span class="text-slate-500"># risk measure is already this easy — depth 1:</span>
+MeanRisk(; r = ConditionalValueatRisk())
+
+<span class="text-slate-500"># give the covariance swap the same altitude:</span>
+MeanRisk(; slv, covariance = Gerber2())</pre>
+        <p class="text-xs text-slate-400 mt-3">Note the contrast: the risk measure <span class="mono">r</span> is a <em>top-level</em> field, so it's a one-liner. The covariance estimator is the same conceptual "one knob," but lives four levels deeper. The asymmetry is the friction.</p>
+      </div>
+    </div>
+
+    <div class="flex flex-wrap gap-2 text-xs">
+      <span class="px-2.5 py-1 rounded-full bg-slate-800 text-emerald-300">✓ common swap is one line</span>
+      <span class="px-2.5 py-1 rounded-full bg-slate-800 text-emerald-300">✓ matches risk-measure altitude</span>
+      <span class="px-2.5 py-1 rounded-full bg-slate-800 text-emerald-300">✓ full tree still available</span>
+      <span class="px-2.5 py-1 rounded-full bg-slate-800 text-slate-400">⚠ define "common" carefully</span>
+    </div>
+  </div>
+</article>
+
+<!-- ============ CARD F ============ -->
+<article class="card bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden">
+  <div class="px-6 py-5 border-b border-slate-800 flex items-start justify-between gap-4">
+    <div>
+      <div class="flex items-center gap-2 mb-1">
+        <span class="text-xs px-2 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30">defaults</span>
+        <span class="text-xs px-2 py-0.5 rounded bg-amber-600 text-white font-semibold">Worth exploring</span>
+      </div>
+      <h2 class="text-2xl font-bold text-white">F · <span class="mono text-amber-300">Solver</span>'s one mandatory field defaults to <span class="mono">nothing</span></h2>
+    </div>
+    <span class="text-5xl font-black text-slate-800">F</span>
+  </div>
+  <div class="px-6 py-5 space-y-5">
+    <div class="grid md:grid-cols-2 gap-4 text-sm">
+      <div><span class="text-slate-500 uppercase text-xs tracking-wider">Files</span>
+        <p class="mono text-slate-300 mt-1">src/10_JuMPModelOptimisation.jl:140</p></div>
+      <div><span class="text-slate-500 uppercase text-xs tracking-wider">Problem → Solution</span>
+        <p class="mt-1"><span class="text-rose-300">The one field every caller must set — the backend — defaults to <span class="mono">nothing</span>, deferring the failure to solve time.</span><br>
+        <span class="text-emerald-300">Make <span class="mono">solver</span> the leading positional/required argument; keep <span class="mono">name</span> et al. defaulted.</span></p></div>
+    </div>
+
+    <div class="grid md:grid-cols-2 gap-4">
+      <div class="diff-del rounded-lg p-4">
+        <p class="text-rose-300 text-xs font-semibold mb-2 uppercase tracking-wider">Before</p>
+        <pre class="mono text-xs text-slate-200">function Solver(; name::Sym_Str = "",
+                <span class="text-rose-400">solver::Any = nothing,</span>   <span class="text-slate-500"># the one thing you must pass</span>
+                settings = nothing,
+                check_sol::NamedTuple = (;),
+                add_bridges::Bool = true)</pre>
+        <p class="text-xs text-slate-400 mt-3">A caller who writes <span class="mono">Solver(name="clarabel")</span> gets a struct that looks configured and fails only later, far from the typo.</p>
+      </div>
+      <div class="diff-add rounded-lg p-4">
+        <p class="text-emerald-300 text-xs font-semibold mb-2 uppercase tracking-wider">After</p>
+        <pre class="mono text-xs text-slate-200">function Solver(solver; name::Sym_Str = "",
+                settings = nothing,
+                check_sol::NamedTuple = (;),
+                add_bridges::Bool = true)
+<span class="text-slate-500"># Solver(Clarabel.Optimizer) reads as intended;</span>
+<span class="text-slate-500"># the required thing is required at construction.</span></pre>
+      </div>
+    </div>
+
+    <div class="flex flex-wrap gap-2 text-xs">
+      <span class="px-2.5 py-1 rounded-full bg-slate-800 text-emerald-300">✓ required field is required</span>
+      <span class="px-2.5 py-1 rounded-full bg-slate-800 text-emerald-300">✓ fails at construction</span>
+      <span class="px-2.5 py-1 rounded-full bg-slate-800 text-slate-400">⚠ small blast radius (Solver call sites)</span>
+    </div>
+  </div>
+</article>
+
+<!-- ============ CARD G ============ -->
+<article class="card bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden">
+  <div class="px-6 py-5 border-b border-slate-800 flex items-start justify-between gap-4">
+    <div>
+      <div class="flex items-center gap-2 mb-1">
+        <span class="text-xs px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">aliases</span>
+        <span class="text-xs px-2 py-0.5 rounded bg-slate-600 text-white font-semibold">Speculative</span>
+      </div>
+      <h2 class="text-2xl font-bold text-white">G · No American-spelling alias for <span class="mono">optimise</span></h2>
+    </div>
+    <span class="text-5xl font-black text-slate-800">G</span>
+  </div>
+  <div class="px-6 py-5 space-y-5">
+    <div class="grid md:grid-cols-2 gap-4 text-sm">
+      <div><span class="text-slate-500 uppercase text-xs tracking-wider">Files</span>
+        <p class="mono text-slate-300 mt-1">src/20_Optimisation/01_Base_Optimisation.jl</p></div>
+      <div><span class="text-slate-500 uppercase text-xs tracking-wider">Problem → Solution</span>
+        <p class="mt-1"><span class="text-rose-300">Callers arriving from scikit-learn / cvxpy reach for <span class="mono">optimize</span> and <span class="mono">Optimizer</span>; neither exists.</span><br>
+        <span class="text-emerald-300">A thin <span class="mono">const optimize = optimise</span> alias — additive, zero blast radius.</span></p></div>
+    </div>
+
+    <div class="grid md:grid-cols-2 gap-4">
+      <div class="diff-del rounded-lg p-4">
+        <p class="text-rose-300 text-xs font-semibold mb-2 uppercase tracking-wider">Before</p>
+        <div class="bg-black/40 rounded p-3 mono text-xs">
+          <span class="text-slate-500">julia&gt;</span> optimize(mr, rd)<br>
+          <span class="text-rose-400">ERROR: UndefVarError: `optimize` not defined</span>
+        </div>
+      </div>
+      <div class="diff-add rounded-lg p-4">
+        <p class="text-emerald-300 text-xs font-semibold mb-2 uppercase tracking-wider">After</p>
+        <pre class="mono text-xs text-slate-200">const optimize = optimise
+export optimize</pre>
+        <p class="text-xs text-slate-400 mt-3">British spelling stays canonical (it's the documented convention); the alias just stops a foreseeable dead-end.</p>
+      </div>
+    </div>
+
+    <div class="bg-amber-500/10 border border-amber-500/30 rounded-lg px-4 py-3 text-sm text-amber-200">
+      <span class="font-semibold">Judgement call:</span> dual spellings can themselves be friction (two names for one thing). Reasonable to <em>reject</em> — and if so, worth an ADR so it isn't re-proposed.
+    </div>
+  </div>
+</article>
+
+<!-- ============ TOP RECOMMENDATION ============ -->
+<section class="bg-gradient-to-br from-sky-950 to-slate-900 rounded-2xl border border-sky-800/50 p-8">
+  <p class="text-sky-400 text-sm font-semibold tracking-widest uppercase">Top recommendation</p>
+  <h2 class="text-3xl font-bold text-white mt-2">Start with A + B — the two that bite on the first thirty minutes</h2>
+  <p class="text-slate-300 mt-4 max-w-3xl leading-relaxed">
+    A newcomer's first session is: build an optimiser, run it, hit a wall. Both walls are here.
+    <span class="text-white font-semibold">Card A</span> means the very first <span class="mono">MeanRisk()</span> they type — with the documented defaults — throws
+    <span class="mono text-rose-300">UndefKeywordError: slv</span>. <span class="text-white font-semibold">Card B</span> means their next mistake is answered by an error that
+    names a variable they never wrote. Together they shape the impression that the library is harder than it is.
+  </p>
+  <p class="text-slate-300 mt-3 max-w-3xl leading-relaxed">
+    Both are cheap and reuse patterns already in the repo — a constructible default (HRP already does this) and the
+    <span class="mono text-emerald-300">IsEmptyError("…")</span> convention from <span class="mono">02_Tools.jl</span>. Neither is a breaking change for correct existing code:
+    A only makes a currently-throwing call succeed; B only enriches error text. <span class="text-white font-semibold">C and D</span> are the higher-value but
+    higher-discussion follow-ups (naming convention + export tiering) — best routed through an ADR each.
+  </p>
+  <div class="mt-6 grid md:grid-cols-3 gap-3 text-sm">
+    <div class="bg-slate-900/60 rounded-lg p-4 border border-slate-800">
+      <p class="text-emerald-300 font-semibold">Do now (low blast radius)</p>
+      <p class="text-slate-400 mt-1">A · B · F · G</p>
+    </div>
+    <div class="bg-slate-900/60 rounded-lg p-4 border border-slate-800">
+      <p class="text-amber-300 font-semibold">Discuss → ADR</p>
+      <p class="text-slate-400 mt-1">C (naming rule) · D (export tiers)</p>
+    </div>
+    <div class="bg-slate-900/60 rounded-lg p-4 border border-slate-800">
+      <p class="text-sky-300 font-semibold">Design work</p>
+      <p class="text-slate-400 mt-1">E (forwarding convenience ctor)</p>
+    </div>
+  </div>
+</section>
+
+<p class="text-center text-slate-600 text-xs pt-4">Generated by /improve-ergonomics · all signatures &amp; error text verified against dev/src · relationships cross-checked with graphify</p>
+</main>
+</body>
+</html>

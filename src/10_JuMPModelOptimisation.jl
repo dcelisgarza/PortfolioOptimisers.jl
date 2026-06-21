@@ -67,7 +67,7 @@ $(DocStringExtensions.FIELDS)
 
     Solver(;
         name::Sym_Str = "",
-        solver::Any = nothing,
+        solver::Any,
         settings::Option{<:SlvSettings} = nothing,
         check_sol::NamedTuple = (;),
         add_bridges::Bool = true
@@ -82,7 +82,7 @@ Keywords correspond to the struct's fields.
 # Examples
 
 ```jldoctest
-julia> Solver()
+julia> Solver(; solver = nothing)
 Solver
          name ┼ String: ""
        solver ┼ nothing
@@ -137,7 +137,7 @@ Solver
                    typeof(add_bridges)}(name, solver, settings, check_sol, add_bridges)
     end
 end
-function Solver(; name::Sym_Str = "", solver::Any = nothing,
+function Solver(; name::Sym_Str = "", solver::Any,
                 settings::Option{<:SlvSettings} = nothing, check_sol::NamedTuple = (;),
                 add_bridges::Bool = true)::Solver
     return Solver(name, solver, settings, check_sol, add_bridges)

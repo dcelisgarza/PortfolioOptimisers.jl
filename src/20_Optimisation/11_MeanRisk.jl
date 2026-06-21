@@ -52,7 +52,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     MeanRisk(;
-        opt::JuMPOptimiser = JuMPOptimiser(),
+        opt::JuMPOptimiser,
         r::RM_VecRM = Variance(),
         obj::ObjectiveFunction = MinimumRisk(),
         wi::Option{<:VecNum} = nothing,
@@ -69,7 +69,7 @@ Keywords correspond to the struct's fields.
 # Examples
 
 ```jldoctest
-julia> MeanRisk(; opt = JuMPOptimiser(; slv = Solver()))
+julia> MeanRisk(; opt = JuMPOptimiser(; slv = Solver(; solver = nothing)))
 MeanRisk
   opt ┼ JuMPOptimiser
       │        pe ┼ EmpiricalPrior
@@ -232,7 +232,7 @@ Where:
                                                                                 wi, fb)
     end
 end
-function MeanRisk(; opt::JuMPOptimiser = JuMPOptimiser(), r::RM_VecRM = Variance(),
+function MeanRisk(; opt::JuMPOptimiser, r::RM_VecRM = Variance(),
                   obj::ObjectiveFunction = MinimumRisk(), wi::Option{<:VecNum} = nothing,
                   fb::Option{<:OptE_Opt} = nothing)::MeanRisk
     return MeanRisk(opt, r, obj, wi, fb)

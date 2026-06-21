@@ -359,7 +359,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     RiskBudgeting(;
-        opt::JuMPOptimiser = JuMPOptimiser(),
+        opt::JuMPOptimiser,
         r::RM_VecRM = Variance(),
         rba::RiskBudgetingAlgorithm = AssetRiskBudgeting(),
         wi::Option{<:VecNum} = nothing,
@@ -442,7 +442,7 @@ Where:
                                                                                 wi, fb)
     end
 end
-function RiskBudgeting(; opt::JuMPOptimiser = JuMPOptimiser(), r::RM_VecRM = Variance(),
+function RiskBudgeting(; opt::JuMPOptimiser, r::RM_VecRM = Variance(),
                        rba::RiskBudgetingAlgorithm = AssetRiskBudgeting(),
                        wi::Option{<:VecNum} = nothing,
                        fb::Option{<:OptE_Opt} = nothing)::RiskBudgeting

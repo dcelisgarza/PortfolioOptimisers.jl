@@ -1,5 +1,5 @@
 # Equal Risk Measure
 
 ```@docs
-EqualRiskMeasure
+EqualRisk
 ```

@@ -247,7 +247,7 @@ fronts — we can even use the ratio of two risk measures as the colourbar.
 =#
 
 plot_measures(resA.w, resA.pr; x = r, y = ConditionalDrawdownatRisk(),
-              c = RiskRatioRiskMeasure(; r1 = ConditionalDrawdownatRisk(), r2 = r),
+              c = RiskRatio(; r1 = ConditionalDrawdownatRisk(), r2 = r),
               title = "Pareto Front", xlabel = "CVaR", ylabel = "CDaR",
               colorbar_title = "\nCDaR/CVaR Ratio", right_margin = 6Plots.mm)
 

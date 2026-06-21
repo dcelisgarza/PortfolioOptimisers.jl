@@ -597,7 +597,7 @@ Keywords correspond to the struct's fields.
 # Examples
 
 ```jldoctest
-julia> JuMPWeightFinaliser(; slv = Solver())
+julia> JuMPWeightFinaliser(; slv = Solver(; solver = nothing))
 JuMPWeightFinaliser
   slv ┼ Solver
       │          name ┼ String: ""

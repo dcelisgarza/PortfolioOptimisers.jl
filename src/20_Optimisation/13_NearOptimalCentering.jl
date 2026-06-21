@@ -114,7 +114,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     NearOptimalCentering(;
-        opt::JuMPOptimiser = JuMPOptimiser(),
+        opt::JuMPOptimiser,
         r::RM_VecRM = Variance(),
         obj::Option{<:ObjectiveFunction} = nothing,
         bins::Option{<:Number} = nothing,
@@ -275,8 +275,7 @@ The solution yields a portfolio centrally located within the near-optimal region
                                                                                  alg, fb)
     end
 end
-function NearOptimalCentering(; opt::JuMPOptimiser = JuMPOptimiser(),
-                              r::RM_VecRM = StandardDeviation(),
+function NearOptimalCentering(; opt::JuMPOptimiser, r::RM_VecRM = StandardDeviation(),
                               obj::Option{<:ObjectiveFunction} = MinimumRisk(),
                               bins::Option{<:Number} = nothing,
                               w_min::Option{<:VecNum} = nothing,

@@ -499,8 +499,8 @@ These are all subtypes of [`HierarchicalRiskMeasure`](@ref), and are only suppor
 - Relative Ulcer Index [`RelativeUlcerIndex`](@ref)
 - Relative Maximum Drawdown [`RelativeMaximumDrawdown`](@ref)
 - Relative Power Norm Drawdown at Risk [`RelativePowerNormDrawdownatRisk`](@ref)
-- Risk Ratio Risk Measure [`RiskRatioRiskMeasure`](@ref)
-- Equal Risk Measure [`EqualRiskMeasure`](@ref)
+- Risk Ratio Risk Measure [`RiskRatio`](@ref)
+- Equal Risk Measure [`EqualRisk`](@ref)
 - Median Absolute Deviation [`MedianAbsoluteDeviation`](@ref)
 
 #### Non-optimisation risk measures

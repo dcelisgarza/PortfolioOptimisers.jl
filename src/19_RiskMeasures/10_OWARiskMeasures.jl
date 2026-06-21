@@ -437,7 +437,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     OWAJuMP(;
-        slv::Slv_VecSlv = Solver(),
+        slv::Slv_VecSlv,
         max_phi::Number = 0.5,
         sc::Number = 1.0,
         so::Number = 1.0,
@@ -456,7 +456,7 @@ Keyword arguments correspond to the struct's fields.
 # Examples
 
 ```jldoctest
-julia> OWAJuMP()
+julia> OWAJuMP(; slv = Solver(; solver = nothing))
 OWAJuMP
       slv ┼ Solver
           │          name ┼ String: ""
@@ -520,7 +520,7 @@ OWAJuMP
                                                                                       alg)
     end
 end
-function OWAJuMP(; slv::Slv_VecSlv = Solver(), max_phi::Number = 0.5, sc::Number = 1.0,
+function OWAJuMP(; slv::Slv_VecSlv, max_phi::Number = 0.5, sc::Number = 1.0,
                  so::Number = 1.0,
                  alg::AbstractOrderedWeightsArrayAlgorithm = MaximumEntropy())::OWAJuMP
     return OWAJuMP(slv, max_phi, sc, so, alg)

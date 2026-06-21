@@ -105,7 +105,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     FactorRiskContribution(;
-        opt::JuMPOptimiser = JuMPOptimiser(),
+        opt::JuMPOptimiser,
         re::RegE_Reg = StepwiseRegression(),
         r::RM_VecRM = Variance(),
         obj::ObjectiveFunction = MinimumRisk(),
@@ -193,8 +193,7 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
                                                                        flag, fb)
     end
 end
-function FactorRiskContribution(; opt::JuMPOptimiser = JuMPOptimiser(),
-                                re::RegE_Reg = StepwiseRegression(),
+function FactorRiskContribution(; opt::JuMPOptimiser, re::RegE_Reg = StepwiseRegression(),
                                 r::RM_VecRM = Variance(),
                                 obj::ObjectiveFunction = MinimumRisk(),
                                 frc_ple::Option{<:PlCE_PhC_VecPlCE_PlC} = nothing,

@@ -141,7 +141,7 @@
         @test_throws IsEmptyError Solver(; settings = Dict{String, Any}())
         @test_throws IsEmptyError Solver(; settings = Pair{String, Any}[])
 
-        s = Solver()
+        s = Solver(; solver = nothing)
         @test s.name == ""
         @test isnothing(s.solver)
         @test isnothing(s.settings)
@@ -187,7 +187,7 @@
         @test_throws DomainError OWAJuMP(; so = Inf)
 
         owj = OWAJuMP()
-        @test owj.slv == Solver()
+        @test owj.slv == Solver(; solver = nothing)
         @test owj.max_phi == 0.5
         @test owj.sc == 1.0
         @test owj.so == 1.0

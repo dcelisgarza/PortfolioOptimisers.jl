@@ -93,7 +93,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     RelaxedRiskBudgeting(;
-        opt::JuMPOptimiser = JuMPOptimiser(),
+        opt::JuMPOptimiser,
         rba::RiskBudgetingAlgorithm = AssetRiskBudgeting(),
         wi::Option{<:VecNum} = nothing,
         alg::RelaxedRiskBudgetingAlgorithm = BasicRelaxedRiskBudgeting(),
@@ -172,7 +172,7 @@ Because this is a *relaxation* of the risk budgeting problem, the realised risk 
                                                                                   fb)
     end
 end
-function RelaxedRiskBudgeting(; opt::JuMPOptimiser = JuMPOptimiser(),
+function RelaxedRiskBudgeting(; opt::JuMPOptimiser,
                               rba::RiskBudgetingAlgorithm = AssetRiskBudgeting(),
                               wi::Option{<:VecNum} = nothing,
                               alg::RelaxedRiskBudgetingAlgorithm = BasicRelaxedRiskBudgeting(),

@@ -788,7 +788,8 @@ Checks turnover, fees, tracking error, custom constraint, and custom objective f
 # Examples
 
 ```jldoctest
-julia> PortfolioOptimisers.needs_previous_weights(JuMPOptimiser(; slv = Solver()))
+julia> PortfolioOptimisers.needs_previous_weights(JuMPOptimiser(;
+                                                                slv = Solver(; solver = nothing)))
 false
 ```
 
@@ -824,7 +825,7 @@ all other fields are carried through unchanged.
 # Examples
 
 ```jldoctest
-julia> opt = JuMPOptimiser(; slv = Solver());
+julia> opt = JuMPOptimiser(; slv = Solver(; solver = nothing));
 
 julia> PortfolioOptimisers.factory(opt, fill(0.1, 10)) isa JuMPOptimiser
 true
@@ -874,7 +875,7 @@ carried through unchanged.
 # Examples
 
 ```jldoctest
-julia> opt = JuMPOptimiser(; slv = Solver());
+julia> opt = JuMPOptimiser(; slv = Solver(; solver = nothing));
 
 julia> X = rand(50, 5);
 
@@ -1033,7 +1034,7 @@ removed so the solver can range freely.
 # Examples
 
 ```jldoctest
-julia> opt = JuMPOptimiser(; slv = Solver());
+julia> opt = JuMPOptimiser(; slv = Solver(; solver = nothing));
 
 julia> PortfolioOptimisers.no_bounds_optimiser(opt) isa JuMPOptimiser
 true

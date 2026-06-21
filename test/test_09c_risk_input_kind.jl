@@ -31,11 +31,11 @@ const _OLD_WEIGHTSRETURNSFEES = Any[LowOrderMoment, HighOrderMoment, TrackingRis
                                     RiskTrackingRiskMeasure, Kurtosis, ThirdCentralMoment,
                                     Skewness, MedianAbsoluteDeviation, VarianceSkewKurtosis]
 const _OLD_WEIGHTS = Any[StandardDeviation, NegativeSkewness, TurnoverRiskMeasure, Variance,
-                         UncertaintySetVariance, EqualRiskMeasure]
+                         UncertaintySetVariance, EqualRisk]
 
 # Composite / return-like measures handled by explicit `expected_risk` methods — they
 # orchestrate other measures and intentionally declare no input kind.
-const _EXPLICIT = Set{Any}([RiskRatioRiskMeasure, NonOptimisationRiskRatioRiskMeasure,
+const _EXPLICIT = Set{Any}([RiskRatio, NonOptimisationRiskRatioRiskMeasure,
                             MeanReturnRiskRatio, ExpectedReturn, ExpectedReturnRiskRatio,
                             RiskTrackingRiskMeasure])
 
@@ -95,8 +95,7 @@ const _x_series = [sinpi(2i / 64) * 0.1 + cospi(i / 32) * 0.03 for i in 1:64]
                    HighOrderMoment(), Skewness(), Kurtosis(), MedianAbsoluteDeviation(),
                    ThirdCentralMoment(), LowOrderMoment(; mu = 0.01),
                    MedianAbsoluteDeviation(; mu = PO.MeanCentering()),
-                   RiskRatioRiskMeasure(; r1 = ConditionalValueatRisk(),
-                                        r2 = MaximumDrawdown()),
+                   RiskRatio(; r1 = ConditionalValueatRisk(), r2 = MaximumDrawdown()),
                    MeanReturnRiskRatio(; rk = ConditionalValueatRisk())]
     for r in eligible
         @test PO.supports_precomputed_returns(r)
@@ -112,16 +111,16 @@ const _x_series = [sinpi(2i / 64) * 0.1 + cospi(i / 32) * 0.03 for i in 1:64]
     end
 
     # Ineligible: the gate throws the explanatory `ArgumentError` — no silent wrong answer,
-    # no raw `MethodError`. The default `RiskRatioRiskMeasure` is ineligible via its
+    # no raw `MethodError`. The default `RiskRatio` is ineligible via its
     # weights-only `Variance` constituent.
     mu2 = [0.1, 0.2]
-    ineligible = Any[EqualRiskMeasure(), TurnoverRiskMeasure(; w = fill(inv(64), 64)),
+    ineligible = Any[EqualRisk(), TurnoverRiskMeasure(; w = fill(inv(64), 64)),
                      StandardDeviation(; sigma = [1.0 0.0; 0.0 1.0]),
                      Variance(; sigma = [1.0 0.0; 0.0 1.0]), NegativeSkewness(),
-                     VarianceSkewKurtosis(), RiskRatioRiskMeasure(),
-                     LowOrderMoment(; mu = mu2), HighOrderMoment(; mu = mu2),
-                     Skewness(; mu = mu2), Kurtosis(; mu = mu2),
-                     MedianAbsoluteDeviation(; mu = mu2), ThirdCentralMoment(; mu = mu2)]
+                     VarianceSkewKurtosis(), RiskRatio(), LowOrderMoment(; mu = mu2),
+                     HighOrderMoment(; mu = mu2), Skewness(; mu = mu2),
+                     Kurtosis(; mu = mu2), MedianAbsoluteDeviation(; mu = mu2),
+                     ThirdCentralMoment(; mu = mu2)]
     for r in ineligible
         @test !PO.supports_precomputed_returns(r)
         @test_throws ArgumentError g(r, _x_series)
