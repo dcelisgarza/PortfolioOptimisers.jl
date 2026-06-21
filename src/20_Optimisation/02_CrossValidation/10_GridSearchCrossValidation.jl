@@ -104,19 +104,24 @@ GridSearchCrossValidation
         vp_flag = isa(p, AbstractVector{<:AbstractVector{<:Pair}})
         vd_flag = isa(p, AbstractVector{<:AbstractDict})
         if p_flag
-            @argcheck(all(x -> isa(x[1], GSCVKey), p))
+            @argcheck(all(x -> isa(x[1], GSCVKey), p),
+                      ArgumentError("all keys in p must be of type GSCVKey (String, Symbol, or Integer)"))
         elseif d_flag
-            @argcheck(all(x -> isa(x, GSCVKey), keys(p)))
+            @argcheck(all(x -> isa(x, GSCVKey), keys(p)),
+                      ArgumentError("all keys in p must be of type GSCVKey (String, Symbol, or Integer)"))
         elseif vp_flag || vd_flag
-            @argcheck(all(!isempty, p), IsEmptyError)
+            @argcheck(all(!isempty, p),
+                      IsEmptyError("each parameter set in p cannot be empty"))
             if vp_flag
                 for _p in p
-                    @argcheck(all(x -> isa(x[1], GSCVKey), _p))
+                    @argcheck(all(x -> isa(x[1], GSCVKey), _p),
+                              ArgumentError("all keys in p must be of type GSCVKey (String, Symbol, or Integer)"))
                 end
             end
             if vd_flag
                 for _p in p
-                    @argcheck(all(x -> isa(x, GSCVKey), keys(_p)))
+                    @argcheck(all(x -> isa(x, GSCVKey), keys(_p)),
+                              ArgumentError("all keys in p must be of type GSCVKey (String, Symbol, or Integer)"))
                 end
             end
         end
@@ -216,7 +221,8 @@ function search_cross_validation(opt::NonFiniteAllocationOptimisationEstimator,
     p = gscv.p
     lens_grid, val_grid = lens_val_grid(p)
     cv = split(gscv.cv, rd)
-    @argcheck(isa(cv.test_idx[1], VecInt))
+    @argcheck(isa(cv.test_idx[1], VecInt),
+              ArgumentError("grid search cross-validation requires non-combinatorial (VecInt) test indices, but got $(typeof(cv.test_idx[1]))"))
     N = length(val_grid)
     M = length(cv.train_idx)
     test_scores = Matrix{eltype(rd.X)}(undef, M, N)

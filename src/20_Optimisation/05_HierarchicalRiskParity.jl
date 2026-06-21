@@ -159,7 +159,7 @@ Where:
     function HierarchicalRiskParity(opt::HierarchicalOptimiser, r::OptRM_VecOptRM,
                                     sca::Scalariser, fb::Option{<:OptE_Opt})
         if isa(r, AbstractVector)
-            @argcheck(!isempty(r))
+            @argcheck(!isempty(r), IsEmptyError("r cannot be empty"))
         end
         return new{typeof(opt), typeof(r), typeof(sca), typeof(fb)}(opt, r, sca, fb)
     end

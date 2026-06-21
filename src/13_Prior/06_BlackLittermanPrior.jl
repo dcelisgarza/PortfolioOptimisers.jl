@@ -165,11 +165,12 @@ Assert that the Black-Litterman prior's views, sets, view confidences, and blend
 function assert_bl(views::Lc_BLV, sets::Option{<:AssetSets},
                    views_conf::Option{<:Num_VecNum}, tau::Option{<:Number})
     if isa(views, LinearConstraintEstimator)
-        @argcheck(!isnothing(sets))
+        @argcheck(!isnothing(sets),
+                  IsNothingError("sets cannot be nothing when views is a LinearConstraintEstimator"))
     end
     assert_bl_views_conf(views_conf, views)
     if !isnothing(tau)
-        @argcheck(tau > zero(tau))
+        @argcheck(tau > zero(tau), DomainError(tau, "tau must be > 0"))
     end
     return nothing
 end
@@ -466,14 +467,15 @@ Where:
 """
 function prior(pe::BlackLittermanPrior, X::MatNum, F::Option{<:MatNum} = nothing;
                dims::Int = 1, strict::Bool = false, kwargs...)
-    @argcheck(dims in (1, 2))
+    @argcheck(dims in (1, 2), DomainError(dims, "dims must be 1 or 2"))
     if dims == 2
         X = transpose(X)
         if !isnothing(F)
             F = transpose(F)
         end
     end
-    @argcheck(length(pe.sets.dict[pe.sets.key]) == size(X, 2))
+    @argcheck(length(pe.sets.dict[pe.sets.key]) == size(X, 2),
+              DimensionMismatch("length(pe.sets.dict[pe.sets.key]) ($(length(pe.sets.dict[pe.sets.key]))) must match size(X, 2) ($(size(X, 2)))"))
     prior_model = prior(pe.pe, X, F; strict = strict, kwargs...)
     posterior_X, prior_mu, prior_sigma = prior_model.X, prior_model.mu, prior_model.sigma
     (; P, Q, tau, omega) = bl_preroll(pe.views, pe.sets, pe.views_conf, prior_sigma, pe.tau,

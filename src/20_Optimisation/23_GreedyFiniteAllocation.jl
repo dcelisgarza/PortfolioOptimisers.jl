@@ -265,12 +265,14 @@ function finite_sub_allocation!(w::VecNum, p::VecNum, cash::Number, bgt::Number,
 end
 function _optimise(ga::GreedyAllocation, w::VecNum, p::VecNum, cash::Number = 1e6,
                    T::Option{<:Number} = nothing, fees::Option{<:Fees} = nothing; kwargs...)
-    @argcheck(!isempty(w))
-    @argcheck(!isempty(p))
-    @argcheck(length(w) == length(p))
-    @argcheck(cash > zero(cash))
+    @argcheck(!isempty(w), IsEmptyError("w cannot be empty"))
+    @argcheck(!isempty(p), IsEmptyError("p cannot be empty"))
+    @argcheck(length(w) == length(p),
+              DimensionMismatch("w ($(length(w))) must match p ($(length(p)))"))
+    @argcheck(cash > zero(cash), DomainError(cash, "cash must be > 0"))
     if !isnothing(fees)
-        @argcheck(!isnothing(T))
+        @argcheck(!isnothing(T),
+                  IsNothingError("T cannot be nothing when fees are provided"))
     end
     cash, bgt, lbgt, sbgt, lidx, sidx, lcash, scash = setup_alloc_optim(w, p, cash, T, fees)
     sshares, scost, sw, scash = finite_sub_allocation!(-view(w, sidx), view(p, sidx), scash,

@@ -316,7 +316,7 @@ Where:
 """
 function prior(pe::HighOrderFactorPriorEstimator, X::MatNum, F::MatNum; dims::Int = 1,
                kwargs...)
-    @argcheck(dims in (1, 2))
+    @argcheck(dims in (1, 2), DomainError(dims, "dims must be in (1, 2)"))
     if dims == 2
         X = transpose(X)
         F = transpose(F)

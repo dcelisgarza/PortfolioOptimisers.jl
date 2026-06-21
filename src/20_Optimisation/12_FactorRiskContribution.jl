@@ -182,10 +182,10 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
                                     sets::Option{<:AssetSets}, wi::Option{<:VecNum},
                                     flag::Bool, fb::Option{<:OptE_Opt})
         if isa(r, AbstractVector)
-            @argcheck(!isempty(r))
+            @argcheck(!isempty(r), IsEmptyError("r cannot be empty"))
         end
         if isa(wi, VecNum)
-            @argcheck(!isempty(wi))
+            @argcheck(!isempty(wi), IsEmptyError("wi cannot be empty"))
         end
         return new{typeof(opt), typeof(re), typeof(r), typeof(obj), typeof(frc_ple),
                    typeof(sets), typeof(wi), typeof(flag), typeof(fb)}(opt, re, r, obj,

@@ -528,9 +528,9 @@ Frontier
     bound
     function Frontier(N::Integer, factor::Number = 1,
                       bound::FrontierBoundEstimator = LinearBound())::Frontier
-        @argcheck(N > zero(N))
-        @argcheck(isfinite(factor))
-        @argcheck(factor > zero(factor))
+        @argcheck(N > zero(N), DomainError(N, "N must be > 0"))
+        @argcheck(isfinite(factor), IsNonFiniteError("factor must be finite, got $factor"))
+        @argcheck(factor > zero(factor), DomainError(factor, "factor must be positive"))
         return new{typeof(N), typeof(factor), typeof(bound)}(N, factor, bound)
     end
 end
@@ -647,7 +647,7 @@ RiskMeasureSettings
     function RiskMeasureSettings(scale::Number, ub::Option{<:RkRtBounds},
                                  rke::Bool)::RiskMeasureSettings
         assert_nonempty_nonneg_finite_val(ub, :ub)
-        @argcheck(isfinite(scale))
+        @argcheck(isfinite(scale), IsNonFiniteError("scale must be finite, got $scale"))
         return new{typeof(scale), typeof(ub), typeof(rke)}(scale, ub, rke)
     end
 end
@@ -698,7 +698,7 @@ HierarchicalRiskMeasureSettings
     """
     scale
     function HierarchicalRiskMeasureSettings(scale::Number)::HierarchicalRiskMeasureSettings
-        @argcheck(isfinite(scale))
+        @argcheck(isfinite(scale), IsNonFiniteError("scale must be finite, got $scale"))
         return new{typeof(scale)}(scale)
     end
 end
@@ -957,7 +957,7 @@ LogSumExpScalariser
     """
     gamma
     function LogSumExpScalariser(gamma::Number)
-        @argcheck(gamma > zero(gamma))
+        @argcheck(gamma > zero(gamma), DomainError(gamma, "gamma must be positive"))
         return new{typeof(gamma)}(gamma)
     end
 end
@@ -1015,7 +1015,7 @@ Internal helper for slicing scalar, array, or `nothing` risk/prior variables by 
   - [`port_opt_view`](@ref)
 """
 function risk_measure_nothing_scalar_array_view(::Nothing, ::Nothing, i)
-    return throw(ArgumentError("Both risk_variable and prior_variable are nothing."))
+    return throw(ArgumentError("Both risk_variable and prior_variable are `nothing`."))
 end
 function risk_measure_nothing_scalar_array_view(risk_variable::Num_ArrNum, ::Any, i)
     return nothing_scalar_array_view(risk_variable, i)
@@ -1052,7 +1052,7 @@ function solver_selector(::Nothing, slv::Slv_VecSlv)
     return slv
 end
 function solver_selector(::Nothing, ::Nothing)
-    return throw(ArgumentError("Both risk_solver and prior_solver are nothing, cannot solve JuMP model."))
+    return throw(ArgumentError("Both risk_solver and prior_solver are `nothing`, cannot solve JuMP model."))
 end
 """
     sel(risk_variable, source_variable)

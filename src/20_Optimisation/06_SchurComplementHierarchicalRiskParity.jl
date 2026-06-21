@@ -155,10 +155,10 @@ Keywords correspond to the struct's fields.
     strict
     function MonotonicSchurComplement(N::Integer, tol::Number, iter::Option{<:Integer},
                                       strict::Bool)
-        @argcheck(N > 0)
-        @argcheck(tol > 0)
+        @argcheck(N > 0, DomainError(N, "N must be > 0"))
+        @argcheck(tol > 0, DomainError(tol, "tol must be > 0"))
         if !isnothing(iter)
-            @argcheck(iter > 0)
+            @argcheck(iter > 0, DomainError(iter, "iter must be > 0"))
         end
         return new{typeof(N), typeof(tol), typeof(iter), typeof(strict)}(N, tol, iter,
                                                                          strict)
@@ -224,7 +224,8 @@ Keywords correspond to the struct's fields.
     flag
     function SchurComplementParams(r::Sd_Var, gamma::Number, pdm::Option{<:Posdef},
                                    alg::SchurComplementAlgorithm, flag::Bool)
-        @argcheck(one(gamma) >= gamma >= zero(gamma))
+        @argcheck(one(gamma) >= gamma >= zero(gamma),
+                  DomainError(gamma, "gamma must be in [0, 1]"))
         return new{typeof(r), typeof(gamma), typeof(pdm), typeof(alg), typeof(flag)}(r,
                                                                                      gamma,
                                                                                      pdm,
@@ -457,7 +458,7 @@ The bisection weight ``\\alpha`` is then computed from the Schur-complement-corr
                                                    params::ScP_VecScP,
                                                    fb::Option{<:OptE_Opt})
         if isa(params, AbstractVector)
-            @argcheck(!isempty(params))
+            @argcheck(!isempty(params), IsEmptyError("params cannot be empty"))
         end
         return new{typeof(opt), typeof(params), typeof(fb)}(opt, params, fb)
     end
@@ -519,7 +520,8 @@ Builds a matrix that maps between cluster levels of sizes `n1` and `n2`. Require
   - [`schur_augmentation`](@ref)
 """
 function symmetric_step_up_matrix(n1::Integer, n2::Integer)
-    @argcheck(abs(n1 - n2) <= 1)
+    @argcheck(abs(n1 - n2) <= 1,
+              DomainError("n1 ($n1) and n2 ($n2) must differ by at most 1"))
 
     if n1 == n2
         return LinearAlgebra.I(n1)

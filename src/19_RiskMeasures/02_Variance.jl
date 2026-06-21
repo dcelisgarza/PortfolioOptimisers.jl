@@ -274,11 +274,11 @@ julia> r(w)
                       chol::Option{<:MatNum}, rc::Option{<:LcE_Lc},
                       alg::VarianceFormulation)::Variance
         if isa(sigma, MatNum)
-            @argcheck(!isempty(sigma))
+            @argcheck(!isempty(sigma), IsEmptyError("sigma cannot be empty"))
             assert_matrix_issquare(sigma, :sigma)
         end
         if isa(chol, MatNum)
-            @argcheck(!isempty(chol))
+            @argcheck(!isempty(chol), IsEmptyError("chol cannot be empty"))
         end
         return new{typeof(settings), typeof(sigma), typeof(chol), typeof(rc), typeof(alg)}(settings,
                                                                                            sigma,
@@ -406,11 +406,11 @@ julia> r(w)
     function StandardDeviation(settings::RiskMeasureSettings, sigma::Option{<:MatNum},
                                chol::Option{<:MatNum})::StandardDeviation
         if isa(sigma, MatNum)
-            @argcheck(!isempty(sigma))
+            @argcheck(!isempty(sigma), IsEmptyError("sigma cannot be empty"))
             assert_matrix_issquare(sigma, :sigma)
         end
         if isa(chol, MatNum)
-            @argcheck(!isempty(chol))
+            @argcheck(!isempty(chol), IsEmptyError("chol cannot be empty"))
         end
         return new{typeof(settings), typeof(sigma), typeof(chol)}(settings, sigma, chol)
     end
@@ -634,7 +634,7 @@ julia> r(w)
     function UncertaintySetVariance(settings::RiskMeasureSettings, ucs::Option{<:UcSE_UcS},
                                     sigma::Option{<:MatNum})
         if isa(sigma, MatNum)
-            @argcheck(!isempty(sigma))
+            @argcheck(!isempty(sigma), IsEmptyError("sigma cannot be empty"))
         end
         return new{typeof(settings), typeof(ucs), typeof(sigma)}(settings, ucs, sigma)
     end

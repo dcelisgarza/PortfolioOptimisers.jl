@@ -35,8 +35,8 @@ const _OLD_WEIGHTS = Any[StandardDeviation, NegativeSkewness, TurnoverRiskMeasur
 
 # Composite / return-like measures handled by explicit `expected_risk` methods — they
 # orchestrate other measures and intentionally declare no input kind.
-const _EXPLICIT = Set{Any}([RiskRatio, NonOptimisationRiskRatioRiskMeasure,
-                            MeanReturnRiskRatio, ExpectedReturn, ExpectedReturnRiskRatio,
+const _EXPLICIT = Set{Any}([RiskRatio, NonOptimisationRiskRatio, MeanReturnRiskRatio,
+                            ExpectedReturn, ExpectedReturnRiskRatio,
                             RiskTrackingRiskMeasure])
 
 # The declared kind as a *type* — instance-free, since each method returns a singleton.

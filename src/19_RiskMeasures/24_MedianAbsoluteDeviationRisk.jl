@@ -148,10 +148,11 @@ MedianAbsoluteDeviation
                                      w::Option{<:ObsWeights}, mu::MedAbsDevMu,
                                      flag::Bool = true)
         if isa(mu, VecNum)
-            @argcheck(!isempty(mu))
-            @argcheck(all(isfinite, mu))
+            @argcheck(!isempty(mu), IsEmptyError("mu cannot be empty"))
+            @argcheck(all(isfinite, mu),
+                      IsNonFiniteError("all elements of mu must be finite"))
         elseif isa(mu, Number)
-            @argcheck(isfinite(mu))
+            @argcheck(isfinite(mu), IsNonFiniteError("mu must be finite, got $mu"))
         end
         assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(settings), typeof(w), typeof(mu), typeof(flag)}(settings, w, mu,

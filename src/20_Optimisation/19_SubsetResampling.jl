@@ -238,15 +238,16 @@ Where:
         assert_nonempty_gt0_finite_val(scale, :scale)
         assert_internal_optimiser(opt)
         if isa(wb, WeightBoundsEstimator)
-            @argcheck(!isnothing(sets))
+            @argcheck(!isnothing(sets), IsNothingError("sets cannot be nothing"))
         end
         if isa(fees, FeesEstimator)
-            @argcheck(!isnothing(sets))
+            @argcheck(!isnothing(sets), IsNothingError("sets cannot be nothing"))
         end
         if isa(subset_size, Integer)
             assert_nonempty_nonneg_finite_val(subset_size - 1, "subset_size - 1")
         elseif isa(subset_size, AbstractFloat)
-            @argcheck(0 < subset_size < 1)
+            @argcheck(0 < subset_size < 1,
+                      DomainError(subset_size, "subset_size must be in (0, 1)"))
         end
         if isa(n_subsets, Integer)
             assert_nonempty_nonneg_finite_val(n_subsets - 2, "n_subsets - 2")
@@ -278,7 +279,8 @@ function SubsetResampling(; pe::PrE_Pr = EmpiricalPrior(), wb::Option{<:WbE_Wb} 
                             max_comb, rng, seed, fb, brt, strict)
 end
 function assert_external_optimiser(opt::SubsetResampling)::Nothing
-    @argcheck(!isa(opt.pe, AbstractPriorResult))
+    @argcheck(!isa(opt.pe, AbstractPriorResult),
+              ArgumentError("opt.pe cannot be a precomputed AbstractPriorResult; use an estimator instead"))
     return assert_external_optimiser(opt.opt)
 end
 function assert_internal_optimiser(opt::SubsetResampling)::Nothing
@@ -418,7 +420,8 @@ function _optimise(sr::SubsetResampling, rd::ReturnsResult; dims::Int = 1,
     subset_size = get_subset_size(subset_size, pr)
     n_subsets = get_n_subsets(n_subsets, pr)
     if !isnothing(sr.scale)
-        @argcheck(length(sr.scale) == n_subsets)
+        @argcheck(length(sr.scale) == n_subsets,
+                  DimensionMismatch("sr.scale ($(length(sr.scale))) must match n_subsets ($n_subsets)"))
     end
     n_comb = binomial(N, subset_size)
     @argcheck(n_subsets <= n_comb,

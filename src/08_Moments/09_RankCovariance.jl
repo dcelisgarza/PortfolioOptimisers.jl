@@ -119,7 +119,7 @@ julia> cor(KendallCovariance(), X)
   - [`corkendall`](https://juliastats.org/StatsBase.jl/stable/ranking/#StatsBase.corkendall)
 """
 function Statistics.cor(::KendallCovariance, X::MatNum; dims::Int = 1, kwargs...)
-    @argcheck(dims in (1, 2))
+    @argcheck(dims in (1, 2), DomainError(dims, "dims must be 1 or 2"))
     if dims == 2
         X = transpose(X)
     end
@@ -164,7 +164,7 @@ julia> cov(KendallCovariance(), X)
   - [`corkendall`](https://juliastats.org/StatsBase.jl/stable/ranking/#StatsBase.corkendall)
 """
 function Statistics.cov(ce::KendallCovariance, X::MatNum; dims::Int = 1, kwargs...)
-    @argcheck(dims in (1, 2))
+    @argcheck(dims in (1, 2), DomainError(dims, "dims must be 1 or 2"))
     if dims == 2
         X = transpose(X)
     end
@@ -280,7 +280,7 @@ julia> cor(SpearmanCovariance(), X)
   - [`corspearman`](https://juliastats.org/StatsBase.jl/stable/ranking/#StatsBase.corspearman)
 """
 function Statistics.cor(::SpearmanCovariance, X::MatNum; dims::Int = 1, kwargs...)
-    @argcheck(dims in (1, 2))
+    @argcheck(dims in (1, 2), DomainError(dims, "dims must be 1 or 2"))
     if dims == 2
         X = transpose(X)
     end
@@ -325,7 +325,7 @@ julia> cov(SpearmanCovariance(), X)
   - [`corspearman`](https://juliastats.org/StatsBase.jl/stable/ranking/#StatsBase.corspearman)
 """
 function Statistics.cov(ce::SpearmanCovariance, X::MatNum; dims::Int = 1, kwargs...)
-    @argcheck(dims in (1, 2))
+    @argcheck(dims in (1, 2), DomainError(dims, "dims must be 1 or 2"))
     if dims == 2
         X = transpose(X)
     end

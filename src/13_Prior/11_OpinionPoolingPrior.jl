@@ -177,15 +177,17 @@ OpinionPoolingPrior
                                  p::Option{<:Number}, w::Option{<:VecNum},
                                  alg::OpinionPoolingAlgorithm,
                                  ex::FLoops.Transducers.Executor)
-        @argcheck(!isempty(pes))
+        @argcheck(!isempty(pes), IsEmptyError("pes cannot be empty"))
         if !isnothing(p)
-            @argcheck(p > zero(p))
+            @argcheck(p > zero(p), DomainError(p, "p must be > 0"))
         end
         if !isnothing(w)
-            @argcheck(!isempty(w))
-            @argcheck(length(w) == length(pes))
+            @argcheck(!isempty(w), IsEmptyError("w cannot be empty"))
+            @argcheck(length(w) == length(pes),
+                      DimensionMismatch("length(w) ($(length(w))) must match length(pes) ($(length(pes)))"))
             @argcheck(all(x -> zero(x) <= x <= one(x), w), DomainError)
-            @argcheck(sum(w) <= one(eltype(w)))
+            @argcheck(sum(w) <= one(eltype(w)),
+                      DomainError("sum(w) ($(sum(w))) must be <= 1"))
         end
         return new{typeof(pes), typeof(pe1), typeof(pe2), typeof(p), typeof(w), typeof(alg),
                    typeof(ex)}(pes, pe1, pe2, p, w, alg, ex)
@@ -351,7 +353,7 @@ Compute opinion pooling prior moments for asset returns.
 """
 function prior(pe::OpinionPoolingPrior, X::MatNum, F::Option{<:MatNum} = nothing;
                dims::Int = 1, strict::Bool = false, kwargs...)
-    @argcheck(dims in (1, 2))
+    @argcheck(dims in (1, 2), DomainError(dims, "dims must be in (1, 2)"))
     if dims == 2
         X = transpose(X)
         if !isnothing(F)

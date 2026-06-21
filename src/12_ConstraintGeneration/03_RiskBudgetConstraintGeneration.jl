@@ -49,8 +49,9 @@ RiskBudget
     """
     @vprop val
     function RiskBudget(val::VecNum)::RiskBudget
-        @argcheck(!isempty(val))
-        @argcheck(all(x -> zero(x) <= x, val))
+        @argcheck(!isempty(val), IsEmptyError("val cannot be empty"))
+        @argcheck(all(x -> zero(x) <= x, val),
+                  DomainError(val, "all entries of val must be >= 0"))
         return new{typeof(val)}(val)
     end
 end

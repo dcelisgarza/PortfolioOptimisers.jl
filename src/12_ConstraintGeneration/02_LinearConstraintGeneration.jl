@@ -318,8 +318,10 @@ AssetSets
         @argcheck(!isempty(dict), IsEmptyError)
         @argcheck(haskey(dict, key), KeyError)
         @argcheck(key !== ukey, ValueError)
-        @argcheck(!startswith(key, ukey))
-        @argcheck(!startswith(ukey, key))
+        @argcheck(!startswith(key, ukey),
+                  ArgumentError("key ($key) must not start with ukey ($ukey)"))
+        @argcheck(!startswith(ukey, key),
+                  ArgumentError("ukey ($ukey) must not start with key ($key)"))
         for k in setdiff(keys(dict), (key,))
             if startswith(k, key)
                 @argcheck(length(dict[k]) == length(dict[key]), DimensionMismatch)
@@ -1400,10 +1402,10 @@ LinearConstraint
     function LinearConstraintEstimator(val::EqnType,
                                        key::Option{<:AbstractString} = nothing)::LinearConstraintEstimator
         if isa(val, Str_Vec)
-            @argcheck(!isempty(val))
+            @argcheck(!isempty(val), IsEmptyError("val cannot be empty"))
         end
         if !isnothing(key)
-            @argcheck(!isempty(key))
+            @argcheck(!isempty(key), IsEmptyError("key cannot be empty"))
         end
         return new{typeof(val), typeof(key)}(val, key)
     end

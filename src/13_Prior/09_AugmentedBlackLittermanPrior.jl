@@ -252,7 +252,7 @@ AugmentedBlackLittermanPrior
                                           w::Option{<:VecNum}, rf::Number,
                                           l::Option{<:Number}, tau::Option{<:Number})
         if !isnothing(w)
-            @argcheck(!isempty(w))
+            @argcheck(!isempty(w), IsEmptyError("w cannot be empty"))
         end
         assert_bl(a_views, a_sets, a_views_conf, tau)
         assert_bl(f_views, f_sets, f_views_conf, tau)
@@ -349,13 +349,15 @@ Compute augmented Black-Litterman prior moments for asset returns.
 """
 function prior(pe::AugmentedBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int = 1,
                strict::Bool = false, kwargs...)
-    @argcheck(dims in (1, 2))
+    @argcheck(dims in (1, 2), DomainError(dims, "dims must be 1 or 2"))
     if dims == 2
         X = transpose(X)
         F = transpose(F)
     end
-    @argcheck(length(pe.a_sets.dict[pe.a_sets.key]) == size(X, 2))
-    @argcheck(length(pe.f_sets.dict[pe.f_sets.key]) == size(F, 2))
+    @argcheck(length(pe.a_sets.dict[pe.a_sets.key]) == size(X, 2),
+              DimensionMismatch("length(pe.a_sets.dict[pe.a_sets.key]) ($(length(pe.a_sets.dict[pe.a_sets.key]))) must match size(X, 2) ($(size(X, 2)))"))
+    @argcheck(length(pe.f_sets.dict[pe.f_sets.key]) == size(F, 2),
+              DimensionMismatch("length(pe.f_sets.dict[pe.f_sets.key]) ($(length(pe.f_sets.dict[pe.f_sets.key]))) must match size(F, 2) ($(size(F, 2)))"))
     # Asset prior.
     a_prior = prior(pe.a_pe, X; strict = strict, kwargs...)
     a_prior_mu, a_prior_sigma = a_prior.mu, a_prior.sigma
@@ -383,7 +385,8 @@ function prior(pe::AugmentedBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int
                      vcat(zeros(size(a_omega, 1), size(f_omega, 1)), f_omega))
     aug_prior_mu = if !isnothing(pe.l)
         w = if !isnothing(pe.w)
-            @argcheck(length(pe.w) == size(X, 2))
+            @argcheck(length(pe.w) == size(X, 2),
+                      DimensionMismatch("length(pe.w) ($(length(pe.w))) must match size(X, 2) ($(size(X, 2)))"))
             pe.w
         else
             iN = inv(size(X, 2))

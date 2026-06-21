@@ -114,7 +114,7 @@ MIPValueatRisk
             assert_nonempty_gt0_finite_val(s, :s)
         end
         if bflag && sflag
-            @argcheck(b > s)
+            @argcheck(b > s, DomainError("b must be greater than s, got b = $b, s = $s"))
         end
         return new{typeof(b), typeof(s)}(b, s)
     end
@@ -190,14 +190,14 @@ DistributionValueatRisk
                                      chol::Option{<:MatNum},
                                      dist::Distributions.Distribution)
         if !isnothing(mu)
-            @argcheck(!isempty(mu))
+            @argcheck(!isempty(mu), IsEmptyError("mu cannot be empty"))
         end
         if !isnothing(sigma)
-            @argcheck(!isempty(sigma))
+            @argcheck(!isempty(sigma), IsEmptyError("sigma cannot be empty"))
             assert_matrix_issquare(sigma, :sigma)
         end
         if !isnothing(chol)
-            @argcheck(!isempty(chol))
+            @argcheck(!isempty(chol), IsEmptyError("chol cannot be empty"))
         end
         return new{typeof(mu), typeof(sigma), typeof(chol), typeof(dist)}(mu, sigma, chol,
                                                                           dist)
@@ -316,7 +316,8 @@ ValueatRisk
     @fprop @vprop alg
     function ValueatRisk(settings::RiskMeasureSettings, alpha::Number,
                          w::Option{<:ObsWeights}, alg::ValueatRiskFormulation)
-        @argcheck(zero(alpha) < alpha < one(alpha))
+        @argcheck(zero(alpha) < alpha < one(alpha),
+                  DomainError(alpha, "alpha must be in (0, 1)"))
         assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(settings), typeof(alpha), typeof(w), typeof(alg)}(settings, alpha,
                                                                             w, alg)
@@ -444,8 +445,10 @@ ValueatRiskRange
     @fprop @vprop alg
     function ValueatRiskRange(settings::RiskMeasureSettings, alpha::Number, beta::Number,
                               w::Option{<:ObsWeights}, alg::ValueatRiskFormulation)
-        @argcheck(zero(alpha) < alpha < one(alpha))
-        @argcheck(zero(beta) < beta < one(beta))
+        @argcheck(zero(alpha) < alpha < one(alpha),
+                  DomainError(alpha, "alpha must be in (0, 1)"))
+        @argcheck(zero(beta) < beta < one(beta),
+                  DomainError(beta, "beta must be in (0, 1)"))
         assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(settings), typeof(alpha), typeof(beta), typeof(w), typeof(alg)}(settings,
                                                                                           alpha,
@@ -605,7 +608,8 @@ DrawdownatRisk
     function DrawdownatRisk(settings::RiskMeasureSettings, alpha::Number,
                             w::Option{<:ObsWeights}, b::Option{<:Number},
                             s::Option{<:Number})
-        @argcheck(zero(alpha) < alpha < one(alpha))
+        @argcheck(zero(alpha) < alpha < one(alpha),
+                  DomainError(alpha, "alpha must be in (0, 1)"))
         assert_nonempty_nonneg_finite_val(w, :w)
         bflag = !isnothing(b)
         sflag = !isnothing(s)
@@ -616,7 +620,7 @@ DrawdownatRisk
             assert_nonempty_gt0_finite_val(s, :s)
         end
         if bflag && sflag
-            @argcheck(b > s)
+            @argcheck(b > s, DomainError("b must be greater than s, got b = $b, s = $s"))
         end
         return new{typeof(settings), typeof(alpha), typeof(w), typeof(b), typeof(s)}(settings,
                                                                                      alpha,
@@ -779,7 +783,8 @@ RelativeDrawdownatRisk
     @pprop w
     function RelativeDrawdownatRisk(settings::HierarchicalRiskMeasureSettings,
                                     alpha::Number, w::Option{<:ObsWeights})
-        @argcheck(zero(alpha) < alpha < one(alpha))
+        @argcheck(zero(alpha) < alpha < one(alpha),
+                  DomainError(alpha, "alpha must be in (0, 1)"))
         assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(settings), typeof(alpha), typeof(w)}(settings, alpha, w)
     end

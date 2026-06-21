@@ -238,9 +238,11 @@ SemiDefinitePhylogeny
     """
     p
     function SemiDefinitePhylogeny(A::MatNum, p::Number)::SemiDefinitePhylogeny
-        @argcheck(all(iszero, LinearAlgebra.diag(A)))
-        @argcheck(LinearAlgebra.issymmetric(A))
-        @argcheck(p >= zero(p))
+        @argcheck(all(iszero, LinearAlgebra.diag(A)),
+                  ArgumentError("all diagonal entries of A must be zero"))
+        @argcheck(LinearAlgebra.issymmetric(A),
+                  ArgumentError("A must be a symmetric matrix"))
+        @argcheck(p >= zero(p), DomainError(p, "p must be >= 0"))
         return new{typeof(A), typeof(p)}(A, p)
     end
 end
@@ -489,12 +491,15 @@ IntegerPhylogeny
     """
     scale
     function IntegerPhylogeny(A::MatNum, B::Int_VecInt, scale::Number)::IntegerPhylogeny
-        @argcheck(all(iszero, LinearAlgebra.diag(A)))
-        @argcheck(LinearAlgebra.issymmetric(A))
+        @argcheck(all(iszero, LinearAlgebra.diag(A)),
+                  ArgumentError("all diagonal entries of A must be zero"))
+        @argcheck(LinearAlgebra.issymmetric(A),
+                  ArgumentError("A must be a symmetric matrix"))
         A = unique(A + LinearAlgebra.I; dims = 1)
         assert_nonempty_nonneg_finite_val(B, :B)
         if isa(B, VecInt)
-            @argcheck(size(A, 1) == length(B))
+            @argcheck(size(A, 1) == length(B),
+                      DimensionMismatch("size(A, 1) ($(size(A, 1))) must match length(B) ($(length(B)))"))
         end
         return new{typeof(A), typeof(B), typeof(scale)}(A, B, scale)
     end
@@ -731,7 +736,7 @@ Generate centrality-based linear constraints from one or more `CentralityConstra
 """
 function centrality_constraints(ccs::CC_VecCC, X::MatNum; dims::Int = 1, kwargs...)
     if isa(ccs, AbstractVector)
-        @argcheck(!isempty(ccs))
+        @argcheck(!isempty(ccs), IsEmptyError("ccs cannot be empty"))
     end
     A_ineq = Vector{eltype(X)}(undef, 0)
     B_ineq = Vector{eltype(X)}(undef, 0)

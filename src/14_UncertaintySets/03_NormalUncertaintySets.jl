@@ -107,8 +107,8 @@ NormalUncertaintySet
                                   q::Number, rng::Random.AbstractRNG,
                                   seed::Option{<:Integer}, ens::Option{<:Number},
                                   kwargs::NamedTuple)
-        @argcheck(zero(n_sim) < n_sim)
-        @argcheck(zero(q) < q < one(q))
+        @argcheck(zero(n_sim) < n_sim, DomainError(n_sim, "n_sim must be > 0"))
+        @argcheck(zero(q) < q < one(q), DomainError(q, "q must be in (0, 1)"))
         return new{typeof(pe), typeof(alg), typeof(n_sim), typeof(q), typeof(rng),
                    typeof(seed), typeof(ens), typeof(kwargs)}(pe, alg, n_sim, q, rng, seed,
                                                               ens, kwargs)

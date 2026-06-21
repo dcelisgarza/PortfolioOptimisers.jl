@@ -223,10 +223,10 @@ Where:
     function MeanRisk(opt::JuMPOptimiser, r::RM_VecRM, obj::ObjectiveFunction,
                       wi::Option{<:VecNum}, fb::Option{<:OptE_Opt})
         if isa(r, AbstractVector)
-            @argcheck(!isempty(r))
+            @argcheck(!isempty(r), IsEmptyError("r cannot be empty"))
         end
         if !isnothing(wi)
-            @argcheck(!isempty(wi))
+            @argcheck(!isempty(wi), IsEmptyError("wi cannot be empty"))
         end
         return new{typeof(opt), typeof(r), typeof(obj), typeof(wi), typeof(fb)}(opt, r, obj,
                                                                                 wi, fb)
@@ -362,11 +362,13 @@ function compute_ret_lbs(lbs::Frontier, model::JuMP.Model, mr::MeanRisk,
     X = pr.X
     set_portfolio_objective_function!(model, MinimumRisk(), ret, mr.opt.cobj, mr, pr)
     retcode, sol_min = optimise_JuMP_model!(model, mr, eltype(X))
-    @argcheck(isa(retcode, OptimisationSuccess))
+    @argcheck(isa(retcode, OptimisationSuccess),
+              ArgumentError("minimum-risk solve failed with retcode $retcode"))
     JuMP.unregister(model, :obj_expr)
     set_portfolio_objective_function!(model, MaximumReturn(), ret, mr.opt.cobj, mr, pr)
     retcode, sol_max = optimise_JuMP_model!(model, mr, eltype(X))
-    @argcheck(isa(retcode, OptimisationSuccess))
+    @argcheck(isa(retcode, OptimisationSuccess),
+              ArgumentError("maximum-return solve failed with retcode $retcode"))
     JuMP.unregister(model, :obj_expr)
     rt_min = expected_return(ret, sol_min.w, pr, fees)
     rt_max = expected_return(ret, sol_max.w, pr, fees)
@@ -466,11 +468,13 @@ function rebuild_risk_frontier(model::JuMP.Model,
     risk_frontier = copy(risk_frontier)
     set_portfolio_objective_function!(model, MinimumRisk(), ret, mr.opt.cobj, mr, pr)
     retcode, sol_min = optimise_JuMP_model!(model, mr, eltype(X))
-    @argcheck(isa(retcode, OptimisationSuccess))
+    @argcheck(isa(retcode, OptimisationSuccess),
+              ArgumentError("minimum-risk solve failed with retcode $retcode"))
     JuMP.unregister(model, :obj_expr)
     set_portfolio_objective_function!(model, MaximumReturn(), ret, mr.opt.cobj, mr, pr)
     retcode, sol_max = optimise_JuMP_model!(model, mr, eltype(X))
-    @argcheck(isa(retcode, OptimisationSuccess))
+    @argcheck(isa(retcode, OptimisationSuccess),
+              ArgumentError("maximum-return solve failed with retcode $retcode"))
     JuMP.unregister(model, :obj_expr)
     r = factory(view(mr.r, idx), pr, mr.opt.slv)
     for (i, ri) in zip(idx, r)
@@ -485,11 +489,13 @@ function rebuild_risk_frontier(model::JuMP.Model, mr::MeanRisk{<:Any, <:Any, <:A
     X = pr.X
     set_portfolio_objective_function!(model, MinimumRisk(), ret, mr.opt.cobj, mr, pr)
     retcode, sol_min = optimise_JuMP_model!(model, mr, eltype(X))
-    @argcheck(isa(retcode, OptimisationSuccess))
+    @argcheck(isa(retcode, OptimisationSuccess),
+              ArgumentError("minimum-risk solve failed with retcode $retcode"))
     JuMP.unregister(model, :obj_expr)
     set_portfolio_objective_function!(model, MaximumReturn(), ret, mr.opt.cobj, mr, pr)
     retcode, sol_max = optimise_JuMP_model!(model, mr, eltype(X))
-    @argcheck(isa(retcode, OptimisationSuccess))
+    @argcheck(isa(retcode, OptimisationSuccess),
+              ArgumentError("maximum-return solve failed with retcode $retcode"))
     JuMP.unregister(model, :obj_expr)
     r = factory(mr.r, pr, mr.opt.slv)
     return (_rebuild_risk_frontier(pr, fees, r, risk_frontier, sol_min.w, sol_max.w),)

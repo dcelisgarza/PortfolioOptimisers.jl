@@ -313,7 +313,7 @@ OptimEntropyPooling
     function OptimEntropyPooling(args::Tuple, kwargs::NamedTuple, sc1::Number, sc2::Number,
                                  alg::AbstractEntropyPoolingOptAlgorithm,
                                  err::Option{<:NormError})
-        @argcheck(sc1 >= zero(sc1))
+        @argcheck(sc1 >= zero(sc1), DomainError(sc1, "sc1 must be >= 0"))
         return new{typeof(args), typeof(kwargs), typeof(sc1), typeof(sc2), typeof(alg),
                    typeof(err)}(args, kwargs, sc1, sc2, alg, err)
     end
@@ -405,11 +405,11 @@ JuMPEntropyPooling
     function JuMPEntropyPooling(slv::Slv_VecSlv, sc1::Number, sc2::Number, so::Number,
                                 alg::AbstractEntropyPoolingOptAlgorithm)
         if isa(slv, VecSlv)
-            @argcheck(!isempty(slv))
+            @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
         end
-        @argcheck(sc1 >= zero(sc1))
-        @argcheck(sc2 >= zero(sc2))
-        @argcheck(so >= zero(so))
+        @argcheck(sc1 >= zero(sc1), DomainError(sc1, "sc1 must be >= 0"))
+        @argcheck(sc2 >= zero(sc2), DomainError(sc2, "sc2 must be >= 0"))
+        @argcheck(so >= zero(so), DomainError(so, "so must be >= 0"))
         return new{typeof(slv), typeof(sc1), typeof(sc2), typeof(so), typeof(alg)}(slv, sc1,
                                                                                    sc2, so,
                                                                                    alg)
@@ -642,7 +642,7 @@ EntropyPoolingPrior
                                  w::Option{<:StatsBase.ProbabilityWeights},
                                  alg::AbstractEntropyPoolingAlgorithm)
         if !isnothing(w)
-            @argcheck(!isempty(w))
+            @argcheck(!isempty(w), IsEmptyError("w cannot be empty"))
             if ismutable(w.values)
                 LinearAlgebra.normalize!(w, 1)
             else
@@ -657,18 +657,20 @@ EntropyPoolingPrior
            !isnothing(kt_views) ||
            !isnothing(cov_views) ||
            !isnothing(rho_views)
-            @argcheck(!isnothing(sets))
+            @argcheck(!isnothing(sets), IsNothingError("sets cannot be nothing"))
         end
         if !isnothing(var_views)
             if !isnothing(var_alpha)
-                @argcheck(zero(var_alpha) < var_alpha < one(var_alpha))
+                @argcheck(zero(var_alpha) < var_alpha < one(var_alpha),
+                          DomainError(var_alpha, "var_alpha must be in (0, 1)"))
             else
                 var_alpha = 0.05
             end
         end
         if !isnothing(cvar_views)
             if !isnothing(cvar_alpha)
-                @argcheck(zero(cvar_alpha) < cvar_alpha < one(cvar_alpha))
+                @argcheck(zero(cvar_alpha) < cvar_alpha < one(cvar_alpha),
+                          DomainError(cvar_alpha, "cvar_alpha must be in (0, 1)"))
             else
                 cvar_alpha = 0.05
             end
@@ -1097,15 +1099,15 @@ function ep_var_views!(var_views::LinearConstraintEstimator, epc::AbstractDict,
     lcs = get_linear_constraints(var_views, sets; datatype = eltype(X), strict = strict)
     @argcheck(!(!isnothing(lcs.ineq) && !any(x -> (iszero(x) || isone(x)), lcs.A_ineq) ||
                 !isnothing(lcs.eq) && !any(x -> (iszero(x) || isone(x)), lcs.A_eq)),
-              ArgumentError("`var_view` only supports coefficients of 1.\n$var_views"))
+              ArgumentError("var_view only supports coefficients of 1.\n$var_views"))
     @argcheck(!(!isnothing(lcs.ineq) &&
                 any(x -> x != 1, count(!iszero, lcs.A_ineq; dims = 2)) ||
                 !isnothing(lcs.eq) && any(x -> x != 1, count(!iszero, lcs.A_eq; dims = 2))),
-              ArgumentError("Cannot mix multiple assets in a single `var_view`.\n$var_views"))
+              ArgumentError("Cannot mix multiple assets in a single var_view.\n$var_views"))
     @argcheck(!(!isnothing(lcs.eq) && any(x -> x < zero(eltype(x)), lcs.A_eq .* lcs.B_eq) ||
                 !isnothing(lcs.ineq) &&
                 any(x -> x < zero(eltype(x)), lcs.A_ineq .* lcs.B_ineq)),
-              ArgumentError("`var_view` cannot be negative.\n$var_views"))
+              DomainError("var_views cannot be negative.\n$var_views"))
     for p in (:ineq, :eq)
         if isnothing(getproperty(lcs, p))
             continue
@@ -1117,7 +1119,7 @@ function ep_var_views!(var_views::LinearConstraintEstimator, epc::AbstractDict,
             #! Figure out a way to include pr.w, probably see how it's implemented in ValueatRisk.
             idx = findall(x -> x <= -abs(B[i]), view(X, :, j))
             @argcheck(!isempty(idx),
-                      ArgumentError("View `$(var_views[i].eqn)` is too extreme, the maximum viable for asset $(findfirst(x -> x == true, j)) is $(-minimum(X[:,j])). Please lower it or use a different prior with fatter tails."))
+                      DomainError("View $(i) = $(var_views[i].eqn) is too extreme, the maximum viable for asset $(findfirst(x -> x == true, j)) is $(-minimum(X[:,j])). Please lower it or use a different prior with fatter tails."))
             sign = ifelse(p == :eq || B[i] >= zero(eltype(B)), one(eltype(B)),
                           -one(eltype(B)))
             Ai = zeros(eltype(X), 1, size(X, 1))
@@ -1565,11 +1567,10 @@ function ep_cvar_views_solve!(cvar_views::LinearConstraintEstimator, epc::Abstra
     cvar_views = replace_group_by_assets(cvar_views, sets, false, true, false)
     cvar_views = replace_prior_views(cvar_views, pr, sets, :cvar, alpha; strict = strict)
     lcs = get_linear_constraints(cvar_views, sets; datatype = eltype(X), strict = strict)
-    @argcheck(isnothing(lcs.ineq), "`cvar_view` can only have equality constraints.")
     @argcheck(!any(x -> x != 1, count(!iszero, lcs.A_eq; dims = 2)),
-              ArgumentError("Cannot mix multiple assets in a single `cvar_view`."))
+              ArgumentError("Cannot mix multiple assets in a single cvar_view.\n$(cvar_views)"))
     @argcheck(!any(x -> x < zero(eltype(x)), lcs.A_eq .* lcs.B_eq),
-              ArgumentError("`cvar_view` cannot be negative."))
+              DomainError("cvar_views cannot be negative.\n$(cvar_views)"))
     idx = dropdims(.!iszero.(sum(lcs.A_eq; dims = 1)); dims = 1)
     idx2 = .!iszero.(lcs.A_eq)
     B = lcs.B_eq ./ view(lcs.A_eq, idx2)
@@ -1600,7 +1601,8 @@ function ep_cvar_views_solve!(cvar_views::LinearConstraintEstimator, epc::Abstra
     end
     function func(etas)
         delete!(epc, :cvar_eq)
-        @argcheck(all(zero(eltype(etas)) .<= etas .<= B))
+        @argcheck(all(zero(eltype(etas)) .<= etas .<= B),
+                  DomainError(etas, "all elements of etas must be in [0, B] where B = $B"))
         pos_part = max.(-X .- transpose(etas), zero(eltype(X)))
         add_ep_constraint!(epc, transpose(pos_part / alpha), B .- etas, :cvar_eq)
         wi = entropy_pooling(w, epc, opt)
@@ -1801,7 +1803,7 @@ function replace_coprior_views(res::ParsingResult, pr::AbstractPriorResult, sets
             non_prior = true
             n = match(corr_pattern, v)
             @argcheck(!isnothing(n),
-                      ArgumentError("Correlation prior view $(v) must be of the form `(a, b)`."))
+                      ArgumentError("Correlation view $(v) must be of the form `(a, b)`."))
             asset1 = n.captures[1]
             asset2 = n.captures[2]
             if startswith(asset1, "[") && endswith(asset1, "]")
@@ -2325,7 +2327,7 @@ function prior(pe::EntropyPoolingPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                        <:Any, <:Any, <:StagedEP}, X::MatNum,
                F::Option{<:MatNum} = nothing; dims::Int = 1, strict::Bool = false,
                kwargs...)
-    @argcheck(dims in (1, 2))
+    @argcheck(dims in (1, 2), DomainError(dims, "dims must be in (1, 2)"))
     if dims == 2
         X = transpose(X)
         if !isnothing(F)
@@ -2337,7 +2339,8 @@ function prior(pe::EntropyPoolingPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
         iT = inv(T)
         StatsBase.pweights(range(iT, iT; length = T))
     else
-        @argcheck(length(pe.w) == T)
+        @argcheck(length(pe.w) == T,
+                  DimensionMismatch("length(pe.w) ($(length(pe.w))) must match T ($T)"))
         pe.w
     end
     fixed = falses(N, 2)
@@ -2476,7 +2479,7 @@ function prior(pe::EntropyPoolingPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                        <:Any, <:Any, <:H0_EntropyPooling}, X::MatNum,
                F::Option{<:MatNum} = nothing; dims::Int = 1, strict::Bool = false,
                kwargs...)
-    @argcheck(dims in (1, 2))
+    @argcheck(dims in (1, 2), DomainError(dims, "dims must be in (1, 2)"))
     if dims == 2
         X = transpose(X)
         if !isnothing(F)
@@ -2488,7 +2491,8 @@ function prior(pe::EntropyPoolingPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
         iT = inv(T)
         StatsBase.pweights(range(iT, iT; length = T))
     else
-        @argcheck(length(pe.w) == T)
+        @argcheck(length(pe.w) == T,
+                  DimensionMismatch("length(pe.w) ($(length(pe.w))) must match T ($T)"))
         pe.w
     end
     epc = Dict{Symbol, Tuple{<:MatNum, <:VecNum}}()

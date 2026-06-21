@@ -71,7 +71,7 @@ Keywords correspond to the struct's fields.
     """
     p
     function RegularisedPenalisedRelaxedRiskBudgeting(p::Number)
-        @argcheck(isfinite(p) && p > zero(p))
+        @argcheck(isfinite(p) && p > zero(p), DomainError(p, "p must be finite and > 0"))
         return new{typeof(p)}(p)
     end
 end
@@ -165,7 +165,7 @@ Because this is a *relaxation* of the risk budgeting problem, the realised risk 
                                   wi::Option{<:VecNum}, alg::RelaxedRiskBudgetingAlgorithm,
                                   fb::Option{<:OptE_Opt})
         if isa(wi, VecNum)
-            @argcheck(!isempty(wi))
+            @argcheck(!isempty(wi), IsEmptyError("wi cannot be empty"))
         end
         return new{typeof(opt), typeof(rba), typeof(wi), typeof(alg), typeof(fb)}(opt, rba,
                                                                                   wi, alg,
@@ -313,7 +313,7 @@ function _set_relaxed_risk_budgeting_constraints!(model::JuMP.Model,
     N = length(w)
     rkb = risk_budget_constraints(rrb.rba.rkb, rrb.rba.sets; N = N, strict = rrb.opt.strict)
     rb = rkb.val
-    @argcheck(length(rb) == N)
+    @argcheck(length(rb) == N, DimensionMismatch("rb ($(length(rb))) must match N ($N)"))
     sc = get_constraint_scale(model)
     JuMP.@variables(model, begin
                         psi >= 0

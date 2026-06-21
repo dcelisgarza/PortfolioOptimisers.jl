@@ -83,7 +83,7 @@ Where:
 """
 function Statistics.mean(me::CustomValueExpectedReturns{<:Number}, X::MatNum; dims::Int = 1,
                          kwargs...)
-    @argcheck(dims in (1, 2))
+    @argcheck(dims in (1, 2), DomainError(dims, "dims must be 1 or 2"))
     return insertdims(fill(me.val, size(X, setdiff((1, 2), (dims,))[1])); dims = dims)
 end
 """
@@ -93,8 +93,10 @@ Vector overload of [`mean(me::CustomValueExpectedReturns, X::MatNum; dims::Int =
 """
 function Statistics.mean(me::CustomValueExpectedReturns{<:VecNum}, X::MatNum; dims::Int = 1,
                          kwargs...)
-    @argcheck(dims in (1, 2))
-    @argcheck(length(me.val) == size(X, setdiff((1, 2), (dims,))[1]))
+    @argcheck(dims in (1, 2), DomainError(dims, "dims must be 1 or 2"))
+    _ncols = size(X, setdiff((1, 2), (dims,))[1])
+    @argcheck(length(me.val) == _ncols,
+              DimensionMismatch("length(val) ($(length(me.val))) must match the number of assets ($_ncols)"))
     return insertdims(me.val; dims = dims)
 end
 """
@@ -104,7 +106,7 @@ Function overload of [`mean(me::CustomValueExpectedReturns, X::MatNum; dims::Int
 """
 function Statistics.mean(me::CustomValueExpectedReturns{<:Function}, X::MatNum;
                          dims::Int = 1, kwargs...)
-    @argcheck(dims in (1, 2))
+    @argcheck(dims in (1, 2), DomainError(dims, "dims must be 1 or 2"))
     return me.val(X; dims = dims, kwargs...)
 end
 

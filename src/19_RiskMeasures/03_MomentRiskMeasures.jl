@@ -844,13 +844,13 @@ LowOrderMoment
                             mu::Option{<:Num_VecNum_VecScalar},
                             alg::LowOrderMomentMeasureAlgorithm)
         if isa(mu, VecNum)
-            @argcheck(!isempty(mu))
-            @argcheck(all(isfinite, mu))
+            @argcheck(!isempty(mu), IsEmptyError("mu cannot be empty"))
+            @argcheck(all(isfinite, mu), IsNonFiniteError("mu must be finite, got $mu"))
         elseif isa(mu, Number)
-            @argcheck(isfinite(mu))
+            @argcheck(isfinite(mu), IsNonFiniteError("mu must be finite, got $mu"))
         end
         if !isnothing(w)
-            @argcheck(!isempty(w))
+            @argcheck(!isempty(w), IsEmptyError("w cannot be empty"))
         end
         return new{typeof(settings), typeof(w), typeof(mu), typeof(alg)}(settings, w, mu,
                                                                          alg)
@@ -1027,10 +1027,10 @@ HighOrderMoment
                              mu::Option{<:Num_VecNum_VecScalar},
                              alg::HighOrderMomentMeasureAlgorithm)
         if isa(mu, VecNum)
-            @argcheck(!isempty(mu))
-            @argcheck(all(isfinite, mu))
+            @argcheck(!isempty(mu), IsEmptyError("mu cannot be empty"))
+            @argcheck(all(isfinite, mu), IsNonFiniteError("mu must be finite, got $mu"))
         elseif isa(mu, Number)
-            @argcheck(isfinite(mu))
+            @argcheck(isfinite(mu), IsNonFiniteError("mu must be finite, got $mu"))
         end
         assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(settings), typeof(w), typeof(mu), typeof(alg)}(settings, w, mu,

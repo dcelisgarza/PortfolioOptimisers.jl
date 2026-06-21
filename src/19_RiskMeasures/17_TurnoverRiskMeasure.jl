@@ -83,7 +83,7 @@ TurnoverRiskMeasure
     """
     fixed
     function TurnoverRiskMeasure(settings::RiskMeasureSettings, w::VecNum, fixed::Bool)
-        @argcheck(!isempty(w))
+        @argcheck(!isempty(w), IsEmptyError("w cannot be empty"))
         return new{typeof(settings), typeof(w), typeof(fixed)}(settings, w, fixed)
     end
 end

@@ -58,19 +58,22 @@ Keywords correspond to the struct's fields.
         if isa(ucs, EllipsoidalUncertaintySet)
             @argcheck(isa(ucs,
                           EllipsoidalUncertaintySet{<:Any, <:Any,
-                                                    <:MuEllipsoidalUncertaintySet}))
+                                                    <:MuEllipsoidalUncertaintySet}),
+                      ArgumentError("ucs must be parameterised by MuEllipsoidalUncertaintySet, got $(typeof(ucs))"))
         end
         if isa(lb, Number)
-            @argcheck(isfinite(lb))
+            @argcheck(isfinite(lb), IsNonFiniteError("lb must be finite, got $lb"))
         elseif isa(lb, VecNum)
-            @argcheck(!isempty(lb))
-            @argcheck(all(isfinite, lb))
+            @argcheck(!isempty(lb), IsEmptyError("lb cannot be empty"))
+            @argcheck(all(isfinite, lb),
+                      IsNonFiniteError("all elements of lb must be finite"))
         end
         if isa(mu, VecNum)
-            @argcheck(!isempty(mu))
-            @argcheck(all(isfinite, mu))
+            @argcheck(!isempty(mu), IsEmptyError("mu cannot be empty"))
+            @argcheck(all(isfinite, mu),
+                      IsNonFiniteError("all elements of mu must be finite"))
         elseif isa(mu, Number)
-            @argcheck(isfinite(mu))
+            @argcheck(isfinite(mu), IsNonFiniteError("mu must be finite, got $mu"))
         end
         return new{typeof(ucs), typeof(lb), typeof(mu)}(ucs, lb, mu)
     end
@@ -172,10 +175,11 @@ Keywords correspond to the struct's fields.
     function LogarithmicReturn(w::Option{<:ObsWeights}, lb::Option{<:RkRtBounds})
         assert_nonempty_nonneg_finite_val(w, :w)
         if isa(lb, Number)
-            @argcheck(isfinite(lb))
+            @argcheck(isfinite(lb), IsNonFiniteError("lb must be finite, got $lb"))
         elseif isa(lb, VecNum)
-            @argcheck(!isempty(lb))
-            @argcheck(all(isfinite, lb))
+            @argcheck(!isempty(lb), IsEmptyError("lb cannot be empty"))
+            @argcheck(all(isfinite, lb),
+                      IsNonFiniteError("all elements of lb must be finite"))
         end
         return new{typeof(w), typeof(lb)}(w, lb)
     end
@@ -200,7 +204,8 @@ function AKelly(; formulation::VarianceFormulation = SOC(),
                 a_rc::Union{<:MatNum, Nothing} = nothing,
                 b_rc::Union{<:AbstractVector, Nothing} = nothing)
     if !isnothing(a_rc) && !isnothing(b_rc) && !isempty(a_rc) && !isempty(b_rc)
-        @argcheck(size(a_rc, 1) == length(b_rc))
+        @argcheck(size(a_rc, 1) == length(b_rc),
+                  DimensionMismatch("size(a_rc, 1) ($(size(a_rc, 1))) must match length(b_rc) ($(length(b_rc)))"))
     end
     return AKelly(formulation, a_rc, b_rc)
 end
@@ -212,11 +217,13 @@ Set properties of [`AKelly`](@ref) with validation. When setting `:a_rc` or `:b_
 function Base.setproperty!(obj::AKelly, sym::Symbol, val)
     if sym == :a_rc
         if !isnothing(val) && !isnothing(obj.b_rc) && !isempty(val) && !isempty(obj.b_rc)
-            @argcheck(size(val, 1) == length(obj.b_rc))
+            @argcheck(size(val, 1) == length(obj.b_rc),
+                      DimensionMismatch("size(val, 1) ($(size(val, 1))) must match length(obj.b_rc) ($(length(obj.b_rc)))"))
         end
     elseif sym == :b_rc
         if !isnothing(val) && !isnothing(obj.a_rc) && !isempty(val) && !isempty(obj.a_rc)
-            @argcheck(size(obj.a_rc, 1) == length(val))
+            @argcheck(size(obj.a_rc, 1) == length(val),
+                      DimensionMismatch("size(obj.a_rc, 1) ($(size(obj.a_rc, 1))) must match length(val) ($(length(val)))"))
         end
     end
     return setfield!(obj, sym, val)
@@ -416,7 +423,7 @@ Keywords correspond to the struct's fields.
     """
     l
     function MaximumUtility(l::Number)
-        @argcheck(l >= zero(l))
+        @argcheck(l >= zero(l), DomainError(l, "l must be >= 0"))
         return new{typeof(l)}(l)
     end
 end
@@ -475,7 +482,7 @@ Keywords correspond to the struct's fields.
     ohf
     function MaximumRatio(rf::Number, ohf::Option{<:Number})
         if !isnothing(ohf)
-            @argcheck(ohf > zero(ohf))
+            @argcheck(ohf > zero(ohf), DomainError(ohf, "ohf must be > 0"))
         end
         return new{typeof(rf), typeof(ohf)}(rf, ohf)
     end
@@ -528,7 +535,7 @@ function set_maximum_ratio_factor_variables!(model::JuMP.Model, mu::Num_VecNum,
     ohf = if isnothing(obj.ohf)
         min(1e3, max(1e-3, Statistics.mean(abs.(mu))))
     else
-        @argcheck(obj.ohf > zero(obj.ohf))
+        @argcheck(obj.ohf > zero(obj.ohf), DomainError(obj.ohf, "obj.ohf must be > 0"))
         obj.ohf
     end
     JuMP.@expression(model, ohf, ohf)

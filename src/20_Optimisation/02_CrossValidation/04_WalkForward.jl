@@ -57,7 +57,8 @@ Keywords correspond to the struct's fields.
                   IsEmptyError("not enough data to cover the training + testing periods, please check your inputs to ensure they are compatible."))
         @argcheck(!isempty(test_idx),
                   IsEmptyError("not enough data to cover the training + testing periods, please check your inputs to ensure they are compatible."))
-        @argcheck(length(train_idx) == length(test_idx))
+        @argcheck(length(train_idx) == length(test_idx),
+                  DimensionMismatch("train_idx ($(length(train_idx))) must match test_idx ($(length(test_idx)))"))
         return new{typeof(train_idx), typeof(test_idx)}(train_idx, test_idx)
     end
 end
@@ -181,7 +182,9 @@ indices. Each fold advances the test window by `test_size` observations.
 function Base.split(iwf::IndexWalkForward, rd::ReturnsResult)
     (; train_size, test_size, purged_size, expand_train, reduce_test) = iwf
     T = size(rd.X, 1)
-    @argcheck(train_size + purged_size < T)
+    @argcheck(train_size + purged_size < T,
+              DomainError(train_size + purged_size,
+                          "train_size + purged_size ($(train_size + purged_size)) must be less than T ($T)"))
     idx = 1:T
     test_start = train_size + purged_size
     train_indices = Vector{typeof(idx)}(undef, 0)

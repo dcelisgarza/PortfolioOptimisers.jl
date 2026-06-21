@@ -102,7 +102,8 @@ Checks that the inner optimiser does not use pre-computed prior results or regre
   - [`NestedClustered`](@ref)
 """
 function assert_internal_optimiser(opt::ClusteringOptimisationEstimator)::Nothing
-    @argcheck(!isa(opt.opt.cle, AbstractClusteringResult))
+    @argcheck(!isa(opt.opt.cle, AbstractClusteringResult),
+              ArgumentError("opt.opt.cle cannot be a precomputed AbstractClusteringResult; use an estimator instead"))
     return nothing
 end
 """
@@ -163,7 +164,8 @@ end
 function assert_rc_pl(opt::FactorRiskContribution)::Nothing
     @argcheck(!isa(opt.frc_ple, AbstractPhylogenyConstraintResult) ||
               isa(opt.frc_ple, AbstractVector) &&
-              !any(x -> isa(x, AbstractPhylogenyConstraintResult), opt.frc_ple))
+              !any(x -> isa(x, AbstractPhylogenyConstraintResult), opt.frc_ple),
+              ArgumentError("opt.frc_ple cannot be a precomputed AbstractPhylogenyConstraintResult in NCO outer optimiser; use an estimator instead"))
     return nothing
 end
 function assert_internal_optimiser(opt::JuMPOptimisationEstimator)::Nothing
@@ -171,17 +173,22 @@ function assert_internal_optimiser(opt::JuMPOptimisationEstimator)::Nothing
     assert_rc_pl(opt)
     @argcheck(!(isa(opt.opt.lcse, LinearConstraint) ||
                 isa(opt.opt.lcse, AbstractVector) &&
-                any(x -> isa(x, LinearConstraint), opt.opt.lcse)))
+                any(x -> isa(x, LinearConstraint), opt.opt.lcse)),
+              ArgumentError("opt.opt.lcse cannot be a LinearConstraint in NCO inner optimiser"))
     @argcheck(!(isa(opt.opt.cte, LinearConstraint) ||
                 isa(opt.opt.cte, AbstractVector) &&
-                any(x -> isa(x, LinearConstraint), opt.opt.cte)))
-    @argcheck(!isa(opt.opt.gcarde, LinearConstraint))
+                any(x -> isa(x, LinearConstraint), opt.opt.cte)),
+              ArgumentError("opt.opt.cte cannot be a LinearConstraint in NCO inner optimiser"))
+    @argcheck(!isa(opt.opt.gcarde, LinearConstraint),
+              ArgumentError("opt.opt.gcarde cannot be a LinearConstraint in NCO inner optimiser"))
     @argcheck(!(isa(opt.opt.sgcarde, LinearConstraint) ||
                 isa(opt.opt.sgcarde, AbstractVector) &&
-                any(x -> isa(x, LinearConstraint), opt.opt.sgcarde)))
+                any(x -> isa(x, LinearConstraint), opt.opt.sgcarde)),
+              ArgumentError("opt.opt.sgcarde cannot be a LinearConstraint in NCO inner optimiser"))
     @argcheck(!isa(opt.opt.ple, AbstractPhylogenyConstraintResult) ||
               isa(opt.opt.ple, AbstractVector) &&
-              !any(x -> isa(x, AbstractPhylogenyConstraintResult), opt.opt.ple))
+              !any(x -> isa(x, AbstractPhylogenyConstraintResult), opt.opt.ple),
+              ArgumentError("opt.opt.ple cannot be a precomputed AbstractPhylogenyConstraintResult in NCO inner optimiser; use an estimator instead"))
     return nothing
 end
 function assert_internal_optimiser(opt::VecOptE_Opt)::Nothing
@@ -213,7 +220,8 @@ function assert_external_optimiser(opt::ClusteringOptimisationEstimator)::Nothin
 end
 function assert_external_optimiser(opt::JuMPOptimisationEstimator)::Nothing
     #! Maybe results can be allowed with a warning. This goes for other stuff like bounds and threshold vectors. And then the optimisation can throw a domain error when it comes to using them.
-    @argcheck(!isa(opt.opt.pe, AbstractPriorResult))
+    @argcheck(!isa(opt.opt.pe, AbstractPriorResult),
+              ArgumentError("opt.opt.pe cannot be a precomputed AbstractPriorResult; use an estimator instead"))
     assert_internal_optimiser(opt)
     return nothing
 end
@@ -232,17 +240,21 @@ Matches either [`RiskBudgeting`](@ref) or [`RelaxedRiskBudgeting`](@ref). Used f
 const RiskBudgetingOptimiser = Union{<:RiskBudgeting, <:RelaxedRiskBudgeting}
 function assert_external_optimiser(opt::RiskBudgetingOptimiser)::Nothing
     #! Maybe results can be allowed with a warning. This goes for other stuff like bounds and threshold vectors. And then the optimisation can throw a domain error when it comes to using them.
-    @argcheck(!isa(opt.opt.pe, AbstractPriorResult))
+    @argcheck(!isa(opt.opt.pe, AbstractPriorResult),
+              ArgumentError("opt.opt.pe cannot be a precomputed AbstractPriorResult; use an estimator instead"))
     if isa(opt.rba, FactorRiskBudgeting)
-        @argcheck(!isa(opt.rba.re, AbstractRegressionResult))
+        @argcheck(!isa(opt.rba.re, AbstractRegressionResult),
+                  ArgumentError("opt.rba.re cannot be a precomputed AbstractRegressionResult; use an estimator instead"))
     end
     assert_internal_optimiser(opt)
     return nothing
 end
 function assert_external_optimiser(opt::FactorRiskContribution)::Nothing
     #! Maybe results can be allowed with a warning. This goes for other stuff like bounds and threshold vectors. And then the optimisation can throw a domain error when it comes to using them.
-    @argcheck(!isa(opt.opt.pe, AbstractPriorResult))
-    @argcheck(!isa(opt.re, AbstractRegressionResult))
+    @argcheck(!isa(opt.opt.pe, AbstractPriorResult),
+              ArgumentError("opt.opt.pe cannot be a precomputed AbstractPriorResult; use an estimator instead"))
+    @argcheck(!isa(opt.re, AbstractRegressionResult),
+              ArgumentError("opt.re cannot be a precomputed AbstractRegressionResult; use an estimator instead"))
     assert_internal_optimiser(opt)
     return nothing
 end
@@ -377,10 +389,10 @@ Let clusters ``C_1, \\ldots, C_K`` partition the ``N`` assets. The NCO algorithm
             assert_external_optimiser(opti)
         end
         if isa(wb, WeightBoundsEstimator)
-            @argcheck(!isnothing(sets))
+            @argcheck(!isnothing(sets), IsNothingError("sets cannot be nothing"))
         end
         if isa(fees, FeesEstimator)
-            @argcheck(!isnothing(sets))
+            @argcheck(!isnothing(sets), IsNothingError("sets cannot be nothing"))
         end
         return new{typeof(pe), typeof(cle), typeof(wb), typeof(fees), typeof(sets),
                    typeof(opti), typeof(opto), typeof(cv), typeof(wf), typeof(ex),
@@ -406,7 +418,8 @@ function NestedClustered(; pe::PrE_Pr = EmpiricalPrior(), cle::ClE_Cl = Clusters
                            strict)
 end
 function assert_internal_optimiser(opt::NestedClustered)::Nothing
-    @argcheck(!isa(opt.cle, AbstractClusteringResult))
+    @argcheck(!isa(opt.cle, AbstractClusteringResult),
+              ArgumentError("opt.cle cannot be a precomputed AbstractClusteringResult; use an estimator instead"))
     assert_external_optimiser(opt.opto)
     if !(opt.opti === opt.opto)
         assert_internal_optimiser(opt.opti)
@@ -415,8 +428,10 @@ function assert_internal_optimiser(opt::NestedClustered)::Nothing
 end
 function assert_external_optimiser(opt::NestedClustered)::Nothing
     #! Maybe results can be allowed with a warning. This goes for other stuff like bounds and threshold vectors. And then the optimisation can throw a domain error when it comes to using them.
-    @argcheck(!isa(opt.pe, AbstractPriorResult))
-    @argcheck(!isa(opt.cle, AbstractClusteringResult))
+    @argcheck(!isa(opt.pe, AbstractPriorResult),
+              ArgumentError("opt.pe cannot be a precomputed AbstractPriorResult; use an estimator instead"))
+    @argcheck(!isa(opt.cle, AbstractClusteringResult),
+              ArgumentError("opt.cle cannot be a precomputed AbstractClusteringResult; use an estimator instead"))
     assert_external_optimiser(opt.opto)
     if !(opt.opti === opt.opto)
         assert_internal_optimiser(opt.opti)
@@ -556,7 +571,8 @@ function _optimise(nco::NestedClustered, rd::ReturnsResult; dims::Int = 1,
         res = optimise(optic, rdc; dims = dims, branchorder = branchorder,
                        str_names = str_names, save = save, kwargs...)
         #! Support efficient frontier?
-        @argcheck(!isa(res.retcode, AbstractVector))
+        @argcheck(!isa(res.retcode, AbstractVector),
+                  ArgumentError("res.retcode cannot be an AbstractVector; efficient frontier results are not supported in NCO"))
         wi[cl, i] = res.w
         resi[i] = res
     end

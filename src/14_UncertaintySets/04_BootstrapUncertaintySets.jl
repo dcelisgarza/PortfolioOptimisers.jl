@@ -212,9 +212,10 @@ ARCHUncertaintySet
                                 alg::AbstractUncertaintySetAlgorithm, n_sim::Integer,
                                 block_size::Integer, q::Number, seed::Option{<:Integer},
                                 bootstrap::ARCHBootstrapSet, kwargs::NamedTuple)
-        @argcheck(n_sim > zero(n_sim))
-        @argcheck(block_size > zero(block_size))
-        @argcheck(zero(q) < q < one(q))
+        @argcheck(n_sim > zero(n_sim), DomainError(n_sim, "n_sim must be > 0"))
+        @argcheck(block_size > zero(block_size),
+                  DomainError(block_size, "block_size must be > 0"))
+        @argcheck(zero(q) < q < one(q), DomainError(q, "q must be in (0, 1)"))
         return new{typeof(pe), typeof(alg), typeof(n_sim), typeof(block_size), typeof(q),
                    typeof(seed), typeof(bootstrap), typeof(kwargs)}(pe, alg, n_sim,
                                                                     block_size, q, seed,

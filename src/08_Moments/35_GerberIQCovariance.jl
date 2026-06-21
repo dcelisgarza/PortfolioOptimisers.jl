@@ -626,7 +626,7 @@ BasicGerberIQ
     n
     function BasicGerberIQ(d::Number, n::Number)
         assert_nonempty_nonneg_finite_val(d, :d)
-        @argcheck(zero(n) <= n <= one(n))
+        @argcheck(zero(n) <= n <= one(n), DomainError(n, "n must be in [0, 1]"))
         return new{typeof(d), typeof(n)}(d, n)
     end
 end
@@ -654,7 +654,8 @@ Asserts that `c <= kind.d`, where `c` is the small movement threshold and `d` th
   - [gerber2025squeezing](@cite) Gerber, Sander and Smyth, William and Markowitz, Harry and Miao, Yinsen and Ernst, Philip and Sargen, Paul, *Squeezing Financial Noise: A Novel Approach to Covariance Matrix Estimation* (December 01, 2025). Available at SSRN: https://ssrn.com/abstract=4986939 or http://dx.doi.org/10.2139/ssrn.4986939
 """
 function gerber_iq_assert_c_d(c::Number, kind::BasicGerberIQ)
-    @argcheck(c <= kind.d)
+    @argcheck(c <= kind.d,
+              DomainError("c must be <= kind.d, got c = $c, kind.d = $(kind.d)"))
     return nothing
 end
 """
@@ -857,16 +858,16 @@ PartialGerberIQ
         assert_nonempty_nonneg_finite_val(dcn, :dcn)
         assert_nonempty_nonneg_finite_val(ddp, :ddp)
         assert_nonempty_nonneg_finite_val(ddn, :ddn)
-        @argcheck(zero(n1) <= n1 <= one(n1))
-        @argcheck(zero(n2) <= n2 <= one(n2))
-        @argcheck(zero(n3) <= n3 <= one(n3))
-        @argcheck(zero(n4) <= n4 <= one(n4))
-        @argcheck(zero(n5) <= n5 <= one(n5))
-        @argcheck(zero(n6) <= n6 <= one(n6))
-        @argcheck(zero(n7) <= n7 <= one(n7))
-        @argcheck(zero(n8) <= n8 <= one(n8))
-        @argcheck(zero(n9) <= n9 <= one(n9))
-        @argcheck(zero(n10) <= n10 <= one(n10))
+        @argcheck(zero(n1) <= n1 <= one(n1), DomainError(n1, "n1 must be in [0, 1]"))
+        @argcheck(zero(n2) <= n2 <= one(n2), DomainError(n2, "n2 must be in [0, 1]"))
+        @argcheck(zero(n3) <= n3 <= one(n3), DomainError(n3, "n3 must be in [0, 1]"))
+        @argcheck(zero(n4) <= n4 <= one(n4), DomainError(n4, "n4 must be in [0, 1]"))
+        @argcheck(zero(n5) <= n5 <= one(n5), DomainError(n5, "n5 must be in [0, 1]"))
+        @argcheck(zero(n6) <= n6 <= one(n6), DomainError(n6, "n6 must be in [0, 1]"))
+        @argcheck(zero(n7) <= n7 <= one(n7), DomainError(n7, "n7 must be in [0, 1]"))
+        @argcheck(zero(n8) <= n8 <= one(n8), DomainError(n8, "n8 must be in [0, 1]"))
+        @argcheck(zero(n9) <= n9 <= one(n9), DomainError(n9, "n9 must be in [0, 1]"))
+        @argcheck(zero(n10) <= n10 <= one(n10), DomainError(n10, "n10 must be in [0, 1]"))
         return new{typeof(dcp), typeof(dcn), typeof(ddp), typeof(ddn), typeof(n1),
                    typeof(n2), typeof(n3), typeof(n4), typeof(n5), typeof(n6), typeof(n7),
                    typeof(n8), typeof(n9), typeof(n10)}(dcp, dcn, ddp, ddn, n1, n2, n3, n4,
@@ -1200,27 +1201,27 @@ FullGerberIQ
         assert_nonempty_nonneg_finite_val(dn2, :dn2)
         dp2, dp1 = extrema((dp1, dp2))
         dn2, dn1 = extrema((dn1, dn2))
-        @argcheck(zero(n1) <= n1 <= one(n1))
-        @argcheck(zero(n2) <= n2 <= one(n2))
-        @argcheck(zero(n3) <= n3 <= one(n3))
-        @argcheck(zero(n4) <= n4 <= one(n4))
-        @argcheck(zero(n5) <= n5 <= one(n5))
-        @argcheck(zero(n6) <= n6 <= one(n6))
-        @argcheck(zero(n7) <= n7 <= one(n7))
-        @argcheck(zero(n8) <= n8 <= one(n8))
-        @argcheck(zero(n9) <= n9 <= one(n9))
-        @argcheck(zero(n10) <= n10 <= one(n10))
-        @argcheck(zero(n11) <= n11 <= one(n11))
-        @argcheck(zero(n12) <= n12 <= one(n12))
-        @argcheck(zero(n13) <= n13 <= one(n13))
-        @argcheck(zero(n14) <= n14 <= one(n14))
-        @argcheck(zero(n15) <= n15 <= one(n15))
-        @argcheck(zero(n16) <= n16 <= one(n16))
-        @argcheck(zero(n17) <= n17 <= one(n17))
-        @argcheck(zero(n18) <= n18 <= one(n18))
-        @argcheck(zero(n19) <= n19 <= one(n19))
-        @argcheck(zero(n20) <= n20 <= one(n20))
-        @argcheck(zero(n21) <= n21 <= one(n21))
+        @argcheck(zero(n1) <= n1 <= one(n1), DomainError(n1, "n1 must be in [0, 1]"))
+        @argcheck(zero(n2) <= n2 <= one(n2), DomainError(n2, "n2 must be in [0, 1]"))
+        @argcheck(zero(n3) <= n3 <= one(n3), DomainError(n3, "n3 must be in [0, 1]"))
+        @argcheck(zero(n4) <= n4 <= one(n4), DomainError(n4, "n4 must be in [0, 1]"))
+        @argcheck(zero(n5) <= n5 <= one(n5), DomainError(n5, "n5 must be in [0, 1]"))
+        @argcheck(zero(n6) <= n6 <= one(n6), DomainError(n6, "n6 must be in [0, 1]"))
+        @argcheck(zero(n7) <= n7 <= one(n7), DomainError(n7, "n7 must be in [0, 1]"))
+        @argcheck(zero(n8) <= n8 <= one(n8), DomainError(n8, "n8 must be in [0, 1]"))
+        @argcheck(zero(n9) <= n9 <= one(n9), DomainError(n9, "n9 must be in [0, 1]"))
+        @argcheck(zero(n10) <= n10 <= one(n10), DomainError(n10, "n10 must be in [0, 1]"))
+        @argcheck(zero(n11) <= n11 <= one(n11), DomainError(n11, "n11 must be in [0, 1]"))
+        @argcheck(zero(n12) <= n12 <= one(n12), DomainError(n12, "n12 must be in [0, 1]"))
+        @argcheck(zero(n13) <= n13 <= one(n13), DomainError(n13, "n13 must be in [0, 1]"))
+        @argcheck(zero(n14) <= n14 <= one(n14), DomainError(n14, "n14 must be in [0, 1]"))
+        @argcheck(zero(n15) <= n15 <= one(n15), DomainError(n15, "n15 must be in [0, 1]"))
+        @argcheck(zero(n16) <= n16 <= one(n16), DomainError(n16, "n16 must be in [0, 1]"))
+        @argcheck(zero(n17) <= n17 <= one(n17), DomainError(n17, "n17 must be in [0, 1]"))
+        @argcheck(zero(n18) <= n18 <= one(n18), DomainError(n18, "n18 must be in [0, 1]"))
+        @argcheck(zero(n19) <= n19 <= one(n19), DomainError(n19, "n19 must be in [0, 1]"))
+        @argcheck(zero(n20) <= n20 <= one(n20), DomainError(n20, "n20 must be in [0, 1]"))
+        @argcheck(zero(n21) <= n21 <= one(n21), DomainError(n21, "n21 must be in [0, 1]"))
         return new{typeof(dp1), typeof(dp2), typeof(dn1), typeof(dn2), typeof(n1),
                    typeof(n2), typeof(n3), typeof(n4), typeof(n5), typeof(n6), typeof(n7),
                    typeof(n8), typeof(n9), typeof(n10), typeof(n11), typeof(n12),
@@ -1268,17 +1269,17 @@ Asserts that all `c <= kind.d**`, where `c` is the small movement threshold and 
   - [gerber2025squeezing](@cite) Gerber, Sander and Smyth, William and Markowitz, Harry and Miao, Yinsen and Ernst, Philip and Sargen, Paul, *Squeezing Financial Noise: A Novel Approach to Covariance Matrix Estimation* (December 01, 2025). Available at SSRN: https://ssrn.com/abstract=4986939 or http://dx.doi.org/10.2139/ssrn.4986939
 """
 function gerber_iq_assert_c_d(c::Number, kind::PartialGerberIQ)
-    @argcheck(c <= kind.dcp)
-    @argcheck(c <= kind.dcn)
-    @argcheck(c <= kind.ddp)
-    @argcheck(c <= kind.ddn)
+    @argcheck(c <= kind.dcp, DomainError("c ($c) must be <= kind.dcp ($(kind.dcp))"))
+    @argcheck(c <= kind.dcn, DomainError("c ($c) must be <= kind.dcn ($(kind.dcn))"))
+    @argcheck(c <= kind.ddp, DomainError("c ($c) must be <= kind.ddp ($(kind.ddp))"))
+    @argcheck(c <= kind.ddn, DomainError("c ($c) must be <= kind.ddn ($(kind.ddn))"))
     return nothing
 end
 function gerber_iq_assert_c_d(c::Number, kind::FullGerberIQ)
-    @argcheck(c <= kind.dp1)
-    @argcheck(c <= kind.dp2)
-    @argcheck(c <= kind.dn1)
-    @argcheck(c <= kind.dn2)
+    @argcheck(c <= kind.dp1, DomainError("c ($c) must be <= kind.dp1 ($(kind.dp1))"))
+    @argcheck(c <= kind.dp2, DomainError("c ($c) must be <= kind.dp2 ($(kind.dp2))"))
+    @argcheck(c <= kind.dn1, DomainError("c ($c) must be <= kind.dn1 ($(kind.dn1))"))
+    @argcheck(c <= kind.dn2, DomainError("c ($c) must be <= kind.dn2 ($(kind.dn2))"))
     return nothing
 end
 """
@@ -1819,7 +1820,7 @@ This method computes the Gerber IQ correlation matrix for the input data matrix 
   - [gerber2025squeezing](@cite) Gerber, Sander and Smyth, William and Markowitz, Harry and Miao, Yinsen and Ernst, Philip and Sargen, Paul, *Squeezing Financial Noise: A Novel Approach to Covariance Matrix Estimation* (December 01, 2025). Available at SSRN: https://ssrn.com/abstract=4986939 or http://dx.doi.org/10.2139/ssrn.4986939
 """
 function Statistics.cor(ce::GerberIQCovariance, X::MatNum; dims::Int = 1, kwargs...)
-    @argcheck(dims in (1, 2))
+    @argcheck(dims in (1, 2), DomainError(dims, "dims must be 1 or 2"))
     if dims == 2
         X = transpose(X)
     end
@@ -1873,7 +1874,7 @@ This method computes the Gerber IQ covariance matrix for the input data matrix `
   - [gerber2025squeezing](@cite) Gerber, Sander and Smyth, William and Markowitz, Harry and Miao, Yinsen and Ernst, Philip and Sargen, Paul, *Squeezing Financial Noise: A Novel Approach to Covariance Matrix Estimation* (December 01, 2025). Available at SSRN: https://ssrn.com/abstract=4986939 or http://dx.doi.org/10.2139/ssrn.4986939
 """
 function Statistics.cov(ce::GerberIQCovariance, X::MatNum; dims::Int = 1, kwargs...)
-    @argcheck(dims in (1, 2))
+    @argcheck(dims in (1, 2), DomainError(dims, "dims must be 1 or 2"))
     if dims == 2
         X = transpose(X)
     end

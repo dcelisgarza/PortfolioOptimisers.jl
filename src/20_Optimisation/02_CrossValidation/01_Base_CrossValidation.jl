@@ -265,7 +265,8 @@ Keywords correspond to the struct's fields.
             if isa(X, VecNum)
                 @argcheck(length(X) == size(F, 1), DimensionMismatch)
             else
-                @argcheck(all(x -> length(x) == size(F, 1), X))
+                @argcheck(all(x -> length(x) == size(F, 1), X),
+                          DimensionMismatch("each element of X must have the same length as the number of rows in F"))
             end
         end
         if !isnothing(B) && !isnothing(X)
@@ -277,7 +278,7 @@ Keywords correspond to the struct's fields.
                     @argcheck(length(x) == length(b), DimensionMismatch)
                 end
             else
-                throw(ArgumentError("If B is VecNum, X must be `VecNum`, and if B is `VecVecNum`, X must be `VecVecNum`"))
+                throw(ArgumentError("If B is a vector of scalars, X must also be a vector of scalars, and if B is a vector of vectors, X must be a vector of vectors, got typeof(X) = $(typeof(X)), typeof(B) = $(typeof(B))"))
             end
         end
         if !isnothing(ts)
@@ -286,7 +287,8 @@ Keywords correspond to the struct's fields.
             if isa(X, VecNum)
                 @argcheck(length(ts) == length(X), DimensionMismatch)
             elseif isa(X, VecVecNum)
-                @argcheck(all(x -> length(x) == length(ts), X))
+                @argcheck(all(x -> length(x) == length(ts), X),
+                          DimensionMismatch("each element of X must have length $(length(ts))"))
             end
             if !isnothing(F)
                 @argcheck(length(ts) == size(F, 1), DimensionMismatch)
@@ -294,16 +296,19 @@ Keywords correspond to the struct's fields.
             if isa(B, VecNum)
                 @argcheck(length(ts) == length(B), DimensionMismatch)
             elseif isa(B, VecVecNum)
-                @argcheck(all(x -> length(x) == length(ts), B))
+                @argcheck(all(x -> length(x) == length(ts), B),
+                          DimensionMismatch("each element of B must have length $(length(ts))"))
             end
         end
         if isa(iv, VecNum)
-            @argcheck(isa(ivpa, Option{<:Number}))
+            @argcheck(isa(ivpa, Option{<:Number}),
+                      ArgumentError("ivpa must be a scalar (or nothing) when iv is a vector of numbers, got typeof(ivpa) = $(typeof(ivpa))"))
             assert_nonempty_nonneg_finite_val(iv, :iv)
             assert_nonempty_gt0_finite_val(ivpa, :ivpa)
             @argcheck(length(iv) == length(X), DimensionMismatch)
         elseif isa(iv, VecVecNum)
-            @argcheck(isa(ivpa, Option{<:VecNum}))
+            @argcheck(isa(ivpa, Option{<:VecNum}),
+                      ArgumentError("ivpa must be a vector of numbers (or nothing) when iv is a vector of vectors of numbers, got typeof(ivpa) = $(typeof(ivpa))"))
             @argcheck(length(iv) == length(X), DimensionMismatch)
             @argcheck(length(ivpa) == length(X), DimensionMismatch)
             for (ivi, ivpai, Xi) in zip(iv, ivpa, X)

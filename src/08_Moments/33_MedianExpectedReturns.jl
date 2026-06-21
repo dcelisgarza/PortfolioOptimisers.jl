@@ -94,7 +94,7 @@ Weighted-median overload of [`mean(me::MedianExpectedReturns, X::MatNum; dims::I
 """
 function Statistics.mean(me::MedianExpectedReturns{<:ObsWeights}, X::MatNum; dims::Int = 1,
                          kwargs...)
-    @argcheck(dims ∈ (1, 2))
+    @argcheck(dims ∈ (1, 2), DomainError(dims, "dims must be 1 or 2"))
     if dims == 2
         X = transpose(X)
     end

@@ -72,8 +72,8 @@ DeltaUncertaintySet
     dsigma
     function DeltaUncertaintySet(pe::AbstractLowOrderPriorEstimator, dmu::Number,
                                  dsigma::Number)
-        @argcheck(dmu >= 0.0)
-        @argcheck(dsigma >= 0.0)
+        @argcheck(dmu >= 0.0, DomainError(dmu, "dmu must be >= 0"))
+        @argcheck(dsigma >= 0.0, DomainError(dsigma, "dsigma must be >= 0"))
         return new{typeof(pe), typeof(dmu), typeof(dsigma)}(pe, dmu, dsigma)
     end
 end

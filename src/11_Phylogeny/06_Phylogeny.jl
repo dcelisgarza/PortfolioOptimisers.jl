@@ -48,8 +48,10 @@ PhylogenyResult
     function PhylogenyResult(X::ArrNum)
         @argcheck(!isempty(X), IsEmptyError)
         if isa(X, MatNum)
-            @argcheck(LinearAlgebra.issymmetric(X))
-            @argcheck(all(iszero, LinearAlgebra.diag(X)))
+            @argcheck(LinearAlgebra.issymmetric(X),
+                      ArgumentError("X must be a symmetric matrix"))
+            @argcheck(all(iszero, LinearAlgebra.diag(X)),
+                      ArgumentError("all diagonal elements of X must be zero"))
         end
         return new{typeof(X)}(X)
     end
@@ -315,7 +317,7 @@ DegreeCentrality
     """
     kwargs
     function DegreeCentrality(kind::Integer, kwargs::NamedTuple)
-        @argcheck(kind in 0:2)
+        @argcheck(kind in 0:2, DomainError(kind, "kind must be in 0:2"))
         return new{typeof(kind), typeof(kwargs)}(kind, kwargs)
     end
 end
@@ -922,7 +924,7 @@ NetworkEstimator
     n
     function NetworkEstimator(ce::StatsBase.CovarianceEstimator,
                               de::AbstractDistanceEstimator, alg::Tree_SimMat, n::Integer)
-        @argcheck(n >= one(n))
+        @argcheck(n >= one(n), DomainError(n, "n must be >= 1"))
         return new{typeof(ce), typeof(de), typeof(alg), typeof(n)}(ce, de, alg, n)
     end
 end

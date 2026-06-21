@@ -89,7 +89,7 @@ ThresholdEstimator
         assert_nonempty_nonneg_finite_val(val, :val)
         assert_nonempty_nonneg_finite_val(dval, :dval)
         if !isnothing(key)
-            @argcheck(!isempty(key))
+            @argcheck(!isempty(key), IsEmptyError("key cannot be empty"))
         end
         return new{typeof(val), typeof(key), typeof(dval)}(val, key, dval)
     end

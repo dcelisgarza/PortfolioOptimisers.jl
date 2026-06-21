@@ -507,7 +507,7 @@ OWAJuMP
     function OWAJuMP(slv::Slv_VecSlv, max_phi::Number, sc::Number, so::Number,
                      alg::AbstractOrderedWeightsArrayAlgorithm)
         if isa(slv, VecSlv)
-            @argcheck(!isempty(slv), IsEmptyError)
+            @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
         end
         @argcheck(zero(max_phi) < max_phi < one(max_phi),
                   DomainError("0 < max_phi < 1 must hold. Got\nmax_phi => $max_phi"))
@@ -1278,8 +1278,8 @@ $(DocStringExtensions.FIELDS)
     """
     p
     function ApproxOrderedWeightsArray(p::VecNum)
-        @argcheck(!isempty(p))
-        @argcheck(all(x -> x > one(x), p))
+        @argcheck(!isempty(p), IsEmptyError("p cannot be empty"))
+        @argcheck(all(x -> x > one(x), p), DomainError(p, "all elements of p must be > 1"))
         return new{typeof(p)}(p)
     end
 end
@@ -1329,7 +1329,7 @@ $(DocStringExtensions.FIELDS)
     function OrderedWeightsArray(settings::RiskMeasureSettings, w::Option{<:VecNum},
                                  alg::OrderedWeightsArrayFormulation)
         if !isnothing(w)
-            @argcheck(!isempty(w))
+            @argcheck(!isempty(w), IsEmptyError("w cannot be empty"))
         end
         return new{typeof(settings), typeof(w), typeof(alg)}(settings, w, alg)
     end
@@ -1395,10 +1395,10 @@ $(DocStringExtensions.FIELDS)
         w1_flag = !isnothing(w1)
         w2_flag = !isnothing(w2)
         if w1_flag
-            @argcheck(!isempty(w1))
+            @argcheck(!isempty(w1), IsEmptyError("w1 cannot be empty"))
         end
         if w2_flag
-            @argcheck(!isempty(w2))
+            @argcheck(!isempty(w2), IsEmptyError("w2 cannot be empty"))
             if !rev
                 if w1 === w2
                     w2 = reverse(w2)
@@ -1408,7 +1408,8 @@ $(DocStringExtensions.FIELDS)
             end
         end
         if w1_flag && w2_flag
-            @argcheck(length(w1) == length(w2))
+            @argcheck(length(w1) == length(w2),
+                      DimensionMismatch("w1 ($(length(w1))) must match w2 ($(length(w2)))"))
         end
         return new{typeof(settings), typeof(w1), typeof(w2), typeof(alg)}(settings, w1, w2,
                                                                           alg)

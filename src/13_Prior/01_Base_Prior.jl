@@ -696,41 +696,50 @@ LowOrderPrior
                            kld::Option{<:Num_VecNum}, ow::Option{<:VecNum},
                            rr::Option{<:Regression}, f_mu::Option{<:VecNum},
                            f_sigma::Option{<:MatNum}, f_w::Option{<:VecNum})
-        @argcheck(!isempty(X))
-        @argcheck(!isempty(mu))
-        @argcheck(!isempty(sigma))
+        @argcheck(!isempty(X), IsEmptyError("X cannot be empty"))
+        @argcheck(!isempty(mu), IsEmptyError("mu cannot be empty"))
+        @argcheck(!isempty(sigma), IsEmptyError("sigma cannot be empty"))
         assert_matrix_issquare(sigma, :sigma)
-        @argcheck(size(X, 2) == length(mu) == size(sigma, 1))
+        @argcheck(size(X, 2) == length(mu) == size(sigma, 1),
+                  DimensionMismatch("size(X, 2) ($(size(X, 2))), length(mu) ($(length(mu))), and size(sigma, 1) ($(size(sigma, 1))) must all match"))
         assert_nonempty_nonneg_finite_val(w, :w)
         if isa(w, StatsBase.AbstractWeights)
-            @argcheck(length(w) == size(X, 1))
+            @argcheck(length(w) == size(X, 1),
+                      DimensionMismatch("length(w) ($(length(w))) must match size(X, 1) ($(size(X, 1)))"))
         end
         if isa(kld, VecNum)
-            @argcheck(!isempty(kld))
+            @argcheck(!isempty(kld), IsEmptyError("kld cannot be empty"))
         end
         if !isnothing(ow)
-            @argcheck(!isempty(ow))
+            @argcheck(!isempty(ow), IsEmptyError("ow cannot be empty"))
         end
         loadings_flag = !isnothing(rr)
         f_mu_flag = !isnothing(f_mu)
         f_sigma_flag = !isnothing(f_sigma)
         if loadings_flag || f_mu_flag || f_sigma_flag
-            @argcheck(loadings_flag)
-            @argcheck(f_mu_flag)
-            @argcheck(f_sigma_flag)
-            @argcheck(!isempty(f_mu))
-            @argcheck(!isempty(f_sigma))
+            @argcheck(loadings_flag,
+                      ArgumentError("rr must be provided when f_mu or f_sigma is provided, isnothing(rr) = $(loadings_flag), isnothing(f_mu) = $(f_mu_flag), isnothing(f_sigma) = $(f_sigma_flag)"))
+            @argcheck(f_mu_flag,
+                      ArgumentError("f_mu must be provided when rr or f_sigma is provided, isnothing(rr) = $(loadings_flag), isnothing(f_mu) = $(f_mu_flag), isnothing(f_sigma) = $(f_sigma_flag)"))
+            @argcheck(f_sigma_flag,
+                      ArgumentError("f_sigma must be provided when rr or f_mu is provided, isnothing(rr) = $(loadings_flag), isnothing(f_mu) = $(f_mu_flag), isnothing(f_sigma) = $(f_sigma_flag)"))
+            @argcheck(!isempty(f_mu), IsEmptyError("f_mu cannot be empty"))
+            @argcheck(!isempty(f_sigma), IsEmptyError("f_sigma cannot be empty"))
             assert_matrix_issquare(f_sigma, :f_sigma)
-            @argcheck(size(rr.M, 2) == length(f_mu) == size(f_sigma, 1))
-            @argcheck(size(rr.M, 1) == length(mu))
+            @argcheck(size(rr.M, 2) == length(f_mu) == size(f_sigma, 1),
+                      DimensionMismatch("size(rr.M, 2) = $(size(rr.M, 2)), length(f_mu) = $(length(f_mu)), and size(f_sigma, 1) = $(size(f_sigma, 1)) must all match"))
+            @argcheck(size(rr.M, 1) == length(mu),
+                      DimensionMismatch("size(rr.M, 1) = $(size(rr.M, 1)) must match length(mu) = $(length(mu))"))
         end
         if !isnothing(chol)
-            @argcheck(!isempty(chol))
-            @argcheck(length(mu) == size(chol, 2))
+            @argcheck(!isempty(chol), IsEmptyError("chol cannot be empty"))
+            @argcheck(length(mu) == size(chol, 2),
+                      DimensionMismatch("length(mu) ($(length(mu))) must match size(chol, 2) ($(size(chol, 2)))"))
         end
         if !isnothing(f_w)
-            @argcheck(!isempty(f_w))
-            @argcheck(length(f_w) == size(X, 1))
+            @argcheck(!isempty(f_w), IsEmptyError("f_w cannot be empty"))
+            @argcheck(length(f_w) == size(X, 1),
+                      DimensionMismatch("length(f_w) ($(length(f_w))) must match size(X, 1) ($(size(X, 1)))"))
         end
         return new{typeof(X), typeof(mu), typeof(sigma), typeof(chol), typeof(w),
                    typeof(ens), typeof(kld), typeof(ow), typeof(rr), typeof(f_mu),
@@ -898,47 +907,62 @@ HighOrderPrior
         L2_flag = isa(L2, MatNum)
         S2_flag = isa(S2, MatNum)
         if kt_flag || L2_flag || S2_flag
-            @argcheck(kt_flag)
-            @argcheck(L2_flag)
-            @argcheck(S2_flag)
-            @argcheck(!isempty(kt))
-            @argcheck(!isempty(L2))
-            @argcheck(!isempty(S2))
-            @argcheck(size(kt) == (N^2, N^2))
-            @argcheck(size(L2) == size(S2) == (div(N * (N + 1), 2), N^2))
+            @argcheck(kt_flag,
+                      ArgumentError("kt must be provided when L2 or S2 is provided, isnothing(kt) = $(kt_flag), isnothing(L2) = $(L2_flag), isnothing(S2) = $(S2_flag)"))
+            @argcheck(L2_flag,
+                      ArgumentError("L2 must be provided when kt or S2 is provided, isnothing(kt) = $(kt_flag), isnothing(L2) = $(L2_flag), isnothing(S2) = $(S2_flag)"))
+            @argcheck(S2_flag,
+                      ArgumentError("S2 must be provided when kt or L2 is provided, isnothing(kt) = $(kt_flag), isnothing(L2) = $(L2_flag), isnothing(S2) = $(S2_flag)"))
+            @argcheck(!isempty(kt), IsEmptyError("kt cannot be empty"))
+            @argcheck(!isempty(L2), IsEmptyError("L2 cannot be empty"))
+            @argcheck(!isempty(S2), IsEmptyError("S2 cannot be empty"))
+            @argcheck(size(kt) == (N^2, N^2),
+                      DimensionMismatch("size(kt) ($(size(kt))) must be ($(N^2), $(N^2))"))
+            @argcheck(size(L2) == size(S2) == (div(N * (N + 1), 2), N^2),
+                      DimensionMismatch("size(L2) ($(size(L2))) and size(S2) ($(size(S2))) must be ($(div(N * (N + 1), 2)), $(N^2))"))
             if sk_flag
-                @argcheck(isa(D2, MatNum))
-                @argcheck(!isempty(D2))
-                @argcheck(size(D2) == size(transpose(L2)))
+                @argcheck(isa(D2, MatNum),
+                          ArgumentError("D2 must be provided when sk is provided, isnothing(D2) = $(isnothing(D2)), isnothing(sk) = $(sk_flag)"))
+                @argcheck(!isempty(D2), IsEmptyError("D2 cannot be empty"))
+                @argcheck(size(D2) == size(transpose(L2)),
+                          DimensionMismatch("size(D2) = $(size(D2)) must match size(L2') = $(size(transpose(L2)))"))
             end
         end
         V_flag = isa(V, MatNum)
         if sk_flag || V_flag
-            @argcheck(sk_flag)
-            @argcheck(V_flag)
-            @argcheck(!isempty(sk))
-            @argcheck(!isempty(V))
-            @argcheck(size(V) == (N, N))
-            @argcheck(size(sk) == (N, N^2))
+            @argcheck(sk_flag,
+                      ArgumentError("sk must be provided when V is provided, isnothing(sk) = $(sk_flag), isnothing(V) = $(V_flag)"))
+            @argcheck(V_flag,
+                      ArgumentError("V must be provided when sk is provided, isnothing(sk) = $(sk_flag), isnothing(V) = $(V_flag)"))
+            @argcheck(!isempty(sk), IsEmptyError("sk cannot be empty"))
+            @argcheck(!isempty(V), IsEmptyError("V cannot be empty"))
+            @argcheck(size(V) == (N, N),
+                      DimensionMismatch("size(V) = $(size(V)) must be ($N, $N)"))
+            @argcheck(size(sk) == (N, N^2),
+                      DimensionMismatch("size(sk) = $(size(sk)) must be ($N, $(N^2))"))
         end
         f_kt_flag = !isnothing(f_kt)
         f_sk_flag = !isnothing(f_sk)
         if f_kt_flag || f_sk_flag
             rr = pr.rr
-            @argcheck(!isnothing(rr))
+            @argcheck(!isnothing(rr),
+                      IsNothingError("pr.rr cannot be nothing when f_kt or f_sk is provided"))
             Nf = size(rr.M, 2)
             if f_kt_flag
-                @argcheck(!isempty(f_kt))
+                @argcheck(!isempty(f_kt), IsEmptyError("f_kt cannot be empty"))
                 # @argcheck(!isempty(chol_kt))
                 assert_matrix_issquare(f_kt, :f_kt)
-                @argcheck(Nf^2 == size(f_kt, 1))
+                @argcheck(Nf^2 == size(f_kt, 1),
+                          DimensionMismatch("Nf^2 ($( Nf^2)) must match size(f_kt, 1) ($(size(f_kt, 1)))"))
                 # @argcheck(N^2 == Nfa^2 == size(chol_kt, 2))
             end
             if f_sk_flag
-                @argcheck(!isempty(f_sk))
-                @argcheck(!isempty(f_V))
-                @argcheck(size(f_sk) == (Nf, Nf^2))
-                @argcheck(size(f_V) == (Nf, Nf))
+                @argcheck(!isempty(f_sk), IsEmptyError("f_sk cannot be empty"))
+                @argcheck(!isempty(f_V), IsEmptyError("f_V cannot be empty"))
+                @argcheck(size(f_sk) == (Nf, Nf^2),
+                          DimensionMismatch("size(f_sk) ($(size(f_sk))) must be ($Nf, $(Nf^2))"))
+                @argcheck(size(f_V) == (Nf, Nf),
+                          DimensionMismatch("size(f_V) ($(size(f_V))) must be ($Nf, $Nf)"))
             end
         end
         return new{typeof(pr), typeof(kt), typeof(D2), typeof(L2), typeof(S2), typeof(sk),

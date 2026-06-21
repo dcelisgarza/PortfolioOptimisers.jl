@@ -1144,10 +1144,10 @@ function PortfolioOptimisers.plot_risk_contribution(r::PortfolioOptimisers.Abstr
                                                     N::Option{<:Number} = nothing,
                                                     kwargs...)
     if !(delta > zero(delta))
-        throw(ArgumentError("delta must be > 0; got $delta"))
+        throw(DomainError(delta, "delta must be > 0"))
     end
     if !isnothing(N) && !(N > zero(N))
-        throw(ArgumentError("N must be > 0; got $N"))
+        throw(DomainError(N, "N must be > 0"))
     end
     rc = risk_contribution(r, w, X, fees; delta = delta, marginal = marginal)
     if percentage
@@ -1175,10 +1175,10 @@ function PortfolioOptimisers.plot_factor_risk_contribution(r::PortfolioOptimiser
                                                            percentage::Bool = true,
                                                            erc::Bool = true, kwargs...)
     if !(delta > zero(delta))
-        throw(ArgumentError("delta must be > 0; got $delta"))
+        throw(DomainError(delta, "delta must be > 0"))
     end
     if !isnothing(N) && !(N > zero(N))
-        throw(ArgumentError("N must be > 0; got $N"))
+        throw(DomainError(N, "N must be > 0"))
     end
     rc = factor_risk_contribution(r, w, X, fees; re = re, rd = rd, delta = delta)
     factor_names = if !isnothing(nf) && length(rc) <= length(nf) + 1
@@ -1220,10 +1220,10 @@ function PortfolioOptimisers.plot_drawdowns(ret::VecNum;
                                             alpha::Number = 0.05, kappa::Number = 0.3,
                                             rw = nothing, kwargs...)
     if !(zero(alpha) < alpha < one(alpha))
-        throw(ArgumentError("alpha must satisfy 0 < alpha < 1; got $alpha"))
+        throw(DomainError(alpha, "alpha must satisfy 0 < alpha < 1"))
     end
     if !(zero(kappa) < kappa < one(kappa))
-        throw(ArgumentError("kappa must satisfy 0 < kappa < 1; got $kappa"))
+        throw(DomainError(kappa, "kappa must satisfy 0 < kappa < 1"))
     end
     cret = cumulative_returns(ret, compound)
     dd = drawdowns(cret, compound; cX = true) .* 100
@@ -1304,13 +1304,13 @@ function PortfolioOptimisers.plot_histogram(ret::VecNum;
                                             rw = nothing, points::Integer = 0,
                                             reference::Bool = true, kwargs...)
     if !(zero(alpha) < alpha < one(alpha))
-        throw(ArgumentError("alpha must satisfy 0 < alpha < 1; got $alpha"))
+        throw(DomainError(alpha, "alpha must satisfy 0 < alpha < 1"))
     end
     if !(zero(kappa) < kappa < one(kappa))
-        throw(ArgumentError("kappa must satisfy 0 < kappa < 1; got $kappa"))
+        throw(DomainError(kappa, "kappa must satisfy 0 < kappa < 1"))
     end
     if !(points >= 0)
-        throw(ArgumentError("points must be >= 0; got $points"))
+        throw(DomainError(points, "points must be >= 0"))
     end
     T = length(ret)
     npts = points == 0 ? ceil(Int, 4 * sqrt(T)) : points
@@ -1918,7 +1918,7 @@ function PortfolioOptimisers.plot_performance_summary(ret::VecNum;
                                                       alpha::Number = 0.05,
                                                       compound::Bool = false, kwargs...)
     if !(zero(alpha) < alpha < one(alpha))
-        throw(ArgumentError("alpha must satisfy 0 < alpha < 1; got $alpha"))
+        throw(DomainError(alpha, "alpha must satisfy 0 < alpha < 1"))
     end
     ann = periods_per_year
     ann_ret = mean(ret) * ann
@@ -1990,7 +1990,7 @@ function PortfolioOptimisers.plot_rolling_drawdowns(ret::VecNum; ts::AbstractVec
                                                     rolling::Integer = 0,
                                                     compound::Bool = false, kwargs...)
     if !(rolling >= 0)
-        throw(ArgumentError("rolling must be >= 0; got $rolling"))
+        throw(DomainError(rolling, "rolling must be >= 0"))
     end
     T = length(ret)
     window = rolling == 0 ? ceil(Int, sqrt(T)) : rolling
@@ -2053,7 +2053,7 @@ function PortfolioOptimisers.plot_rolling_measure(r::PortfolioOptimisers.Abstrac
                                                   ret::VecNum; ts::AbstractVector,
                                                   rolling::Integer = 0, kwargs...)
     if !(rolling >= 0)
-        throw(ArgumentError("rolling must be >= 0; got $rolling"))
+        throw(DomainError(rolling, "rolling must be >= 0"))
     end
     T = length(ret)
     window = rolling == 0 ? ceil(Int, sqrt(T)) : rolling

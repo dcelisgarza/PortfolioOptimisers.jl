@@ -883,7 +883,7 @@ julia> struct MyWeights{T} <: PortfolioOptimisers.DynamicAbstractWeights
            half_life::T
            function MyWeights(half_life::Integer)
                if half_life < one(half_life)
-                   throw(ArgumentError("half_life must be a positive integer"))
+                   throw(DomainError(half_life, "half_life must be an integer greater than zero"))
                end
                return new{typeof(half_life)}(half_life)
            end

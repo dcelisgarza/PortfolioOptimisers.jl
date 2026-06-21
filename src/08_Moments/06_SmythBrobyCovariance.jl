@@ -358,7 +358,7 @@ SmythBrobyCovariance
         assert_nonempty_nonneg_finite_val(c1, :c1)
         assert_nonempty_nonneg_finite_val(c2, :c2)
         assert_nonempty_nonneg_finite_val(c3, :c3)
-        @argcheck(c2 < c3)
+        @argcheck(c2 < c3, DomainError("c2 must be less than c3, got c2 = $c2, c3 = $c3"))
         return new{typeof(ve), typeof(me), typeof(pdm), typeof(c1), typeof(c2), typeof(c3),
                    typeof(n), typeof(alg), typeof(ex)}(ve, me, pdm, c1, c2, c3, n, alg, ex)
     end
@@ -1286,7 +1286,7 @@ This method computes the Smyth-Broby correlation matrix for the input data matri
   - [`cov(ce::SmythBrobyCovariance, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
 """
 function Statistics.cor(ce::SmythBrobyCovariance, X::MatNum; dims::Int = 1, kwargs...)
-    @argcheck(dims in (1, 2))
+    @argcheck(dims in (1, 2), DomainError(dims, "dims must be 1 or 2"))
     if dims == 2
         X = transpose(X)
     end
@@ -1330,7 +1330,7 @@ This method computes the Smyth-Broby covariance matrix for the input data matrix
   - [`cov(ce::SmythBrobyCovariance, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
 """
 function Statistics.cov(ce::SmythBrobyCovariance, X::MatNum; dims::Int = 1, kwargs...)
-    @argcheck(dims in (1, 2))
+    @argcheck(dims in (1, 2), DomainError(dims, "dims must be 1 or 2"))
     if dims == 2
         X = transpose(X)
     end

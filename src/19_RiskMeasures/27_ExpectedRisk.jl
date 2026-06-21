@@ -11,17 +11,17 @@ Union of matrix-like types accepted as the data argument in [`risk_contribution`
 """
 const MatNum_Pr = Union{<:MatNum, <:AbstractPriorResult, <:ReturnsResult}
 """
-    const RkRatioRM = Union{<:RiskRatio, <:NonOptimisationRiskRatioRiskMeasure}
+    const RkRatioRM = Union{<:RiskRatio, <:NonOptimisationRiskRatio}
 
 Union of all risk-ratio risk measures, where the expected risk is defined as the ratio of two component risk values.
 
 # Related
 
   - [`RiskRatio`](@ref)
-  - [`NonOptimisationRiskRatioRiskMeasure`](@ref)
+  - [`NonOptimisationRiskRatio`](@ref)
   - [`expected_risk`](@ref)
 """
-const RkRatioRM = Union{<:RiskRatio, <:NonOptimisationRiskRatioRiskMeasure}
+const RkRatioRM = Union{<:RiskRatio, <:NonOptimisationRiskRatio}
 """
     expected_risk(r::AbstractBaseRiskMeasure, w::VecNum, args...; kwargs...)
     expected_risk(kind::RiskInputKind, r, w::VecNum, args...; kwargs...)

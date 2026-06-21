@@ -100,15 +100,16 @@ Keywords correspond to the struct's fields.
     function BudgetRange(lb::Option{<:Number}, ub::Option{<:Number})
         lb_flag = isnothing(lb)
         ub_flag = isnothing(ub)
-        @argcheck(!(lb_flag && ub_flag))
+        @argcheck(!(lb_flag && ub_flag),
+                  ArgumentError("at least one of lb or ub must not be nothing, got lb = $lb, ub = $ub"))
         if !lb_flag
-            @argcheck(isfinite(lb))
+            @argcheck(isfinite(lb), IsNonFiniteError("lb must be finite, got $lb"))
         end
         if !ub_flag
-            @argcheck(isfinite(ub))
+            @argcheck(isfinite(ub), IsNonFiniteError("ub must be finite, got $ub"))
         end
         if !lb_flag && !ub_flag
-            @argcheck(lb <= ub)
+            @argcheck(lb <= ub, DomainError("lb must be <= ub, got lb = $lb, ub = $ub"))
         end
         return new{typeof(lb), typeof(ub)}(lb, ub)
     end
@@ -300,30 +301,34 @@ When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagg
     @vprop un
     function BudgetCosts(bgt::Num_BgtRg, w::VecNum, vp::Num_VecNum, vn::Num_VecNum,
                          up::Num_VecNum, un::Num_VecNum)
-        @argcheck(!isempty(w))
+        @argcheck(!isempty(w), IsEmptyError("w cannot be empty"))
         if isa(vp, VecNum)
-            @argcheck(!isempty(vp))
-            @argcheck(all(x -> zero(x) <= x, vp))
+            @argcheck(!isempty(vp), IsEmptyError("vp cannot be empty"))
+            @argcheck(all(x -> zero(x) <= x, vp),
+                      DomainError(vp, "all elements of vp must be >= 0"))
         else
-            @argcheck(vp >= zero(vp))
+            @argcheck(vp >= zero(vp), DomainError(vp, "vp must be >= 0"))
         end
         if isa(vn, VecNum)
-            @argcheck(!isempty(vn))
-            @argcheck(all(x -> zero(x) <= x, vn))
+            @argcheck(!isempty(vn), IsEmptyError("vn cannot be empty"))
+            @argcheck(all(x -> zero(x) <= x, vn),
+                      DomainError(vn, "all elements of vn must be >= 0"))
         else
-            @argcheck(vn >= zero(vn))
+            @argcheck(vn >= zero(vn), DomainError(vn, "vn must be >= 0"))
         end
         if isa(up, VecNum)
-            @argcheck(!isempty(up))
-            @argcheck(all(x -> zero(x) <= x, up))
+            @argcheck(!isempty(up), IsEmptyError("up cannot be empty"))
+            @argcheck(all(x -> zero(x) <= x, up),
+                      DomainError(up, "all elements of up must be >= 0"))
         else
-            @argcheck(up >= zero(up))
+            @argcheck(up >= zero(up), DomainError(up, "up must be >= 0"))
         end
         if isa(un, VecNum)
-            @argcheck(!isempty(un))
-            @argcheck(all(x -> zero(x) <= x, un))
+            @argcheck(!isempty(un), IsEmptyError("un cannot be empty"))
+            @argcheck(all(x -> zero(x) <= x, un),
+                      DomainError(un, "all elements of un must be >= 0"))
         else
-            @argcheck(un >= zero(un))
+            @argcheck(un >= zero(un), DomainError(un, "un must be >= 0"))
         end
         return new{typeof(bgt), typeof(w), typeof(vp), typeof(vn), typeof(up), typeof(un)}(bgt,
                                                                                            w,
@@ -418,30 +423,34 @@ When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagg
     beta
     function BudgetMarketImpact(bgt::Num_BgtRg, w::VecNum, vp::Num_VecNum, vn::Num_VecNum,
                                 up::Num_VecNum, un::Num_VecNum, beta::Number)
-        @argcheck(!isempty(w))
+        @argcheck(!isempty(w), IsEmptyError("w cannot be empty"))
         if isa(vp, VecNum)
-            @argcheck(!isempty(vp))
-            @argcheck(all(x -> zero(x) <= x, vp))
+            @argcheck(!isempty(vp), IsEmptyError("vp cannot be empty"))
+            @argcheck(all(x -> zero(x) <= x, vp),
+                      DomainError(vp, "all elements of vp must be >= 0"))
         else
-            @argcheck(vp >= zero(vp))
+            @argcheck(vp >= zero(vp), DomainError(vp, "vp must be >= 0"))
         end
         if isa(vn, VecNum)
-            @argcheck(!isempty(vn))
-            @argcheck(all(x -> zero(x) <= x, vn))
+            @argcheck(!isempty(vn), IsEmptyError("vn cannot be empty"))
+            @argcheck(all(x -> zero(x) <= x, vn),
+                      DomainError(vn, "all elements of vn must be >= 0"))
         else
-            @argcheck(vn >= zero(vn))
+            @argcheck(vn >= zero(vn), DomainError(vn, "vn must be >= 0"))
         end
         if isa(up, VecNum)
-            @argcheck(!isempty(up))
-            @argcheck(all(x -> zero(x) <= x, up))
+            @argcheck(!isempty(up), IsEmptyError("up cannot be empty"))
+            @argcheck(all(x -> zero(x) <= x, up),
+                      DomainError(up, "all elements of up must be >= 0"))
         else
-            @argcheck(up >= zero(up))
+            @argcheck(up >= zero(up), DomainError(up, "up must be >= 0"))
         end
         if isa(un, VecNum)
-            @argcheck(!isempty(un))
-            @argcheck(all(x -> zero(x) <= x, un))
+            @argcheck(!isempty(un), IsEmptyError("un cannot be empty"))
+            @argcheck(all(x -> zero(x) <= x, un),
+                      DomainError(un, "all elements of un must be >= 0"))
         else
-            @argcheck(un >= zero(un))
+            @argcheck(un >= zero(un), DomainError(un, "un must be >= 0"))
         end
         @argcheck(zero(beta) <= beta <= one(beta), DomainError)
         return new{typeof(bgt), typeof(w), typeof(vp), typeof(vn), typeof(up), typeof(un),

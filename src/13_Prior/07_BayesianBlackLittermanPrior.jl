@@ -259,12 +259,13 @@ Where:
 """
 function prior(pe::BayesianBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int = 1,
                strict::Bool = false, kwargs...)
-    @argcheck(dims in (1, 2))
+    @argcheck(dims in (1, 2), DomainError(dims, "dims must be 1 or 2"))
     if dims == 2
         X = transpose(X)
         F = transpose(F)
     end
-    @argcheck(length(pe.sets.dict[pe.sets.key]) == size(F, 2))
+    @argcheck(length(pe.sets.dict[pe.sets.key]) == size(F, 2),
+              DimensionMismatch("length(pe.sets.dict[pe.sets.key]) ($(length(pe.sets.dict[pe.sets.key]))) must match size(F, 2) ($(size(F, 2)))"))
     prior_result = prior(pe.pe, X, F; strict = strict, kwargs...)
     posterior_X, prior_sigma, f_mu, f_sigma, rr = prior_result.X, prior_result.sigma,
                                                   prior_result.f_mu, prior_result.f_sigma,

@@ -39,8 +39,10 @@ julia> PortfolioOptimisers.block_vec_pq(A, 2, 2)
 """
 function block_vec_pq(A::MatNum, p::Integer, q::Integer)
     mp, nq = size(A)
-    @argcheck(mod(mp, p) == 0)
-    @argcheck(mod(nq, q) == 0)
+    @argcheck(mod(mp, p) == 0,
+              DomainError("size(A, 1) = $mp must be an integer multiple of p = $p"))
+    @argcheck(mod(nq, q) == 0,
+              DomainError("size(A, 2) = $nq must be an integer multiple of q = $q"))
     m = Int(mp / p)
     n = Int(nq / q)
     A_vec = Matrix{eltype(A)}(undef, m * n, p * q)
@@ -558,7 +560,7 @@ Where:
 """
 function prior(pe::HighOrderPriorEstimator, X::MatNum, F::Option{<:MatNum} = nothing;
                dims::Int = 1, kwargs...)
-    @argcheck(dims in (1, 2))
+    @argcheck(dims in (1, 2), DomainError(dims, "dims must be 1 or 2"))
     if dims == 2
         X = transpose(X)
         if !isnothing(F)

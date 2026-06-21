@@ -309,7 +309,7 @@ ThirdCentralMoment
     function ThirdCentralMoment(w::Option{<:ObsWeights}, mu::Option{<:Num_VecNum_VecScalar})
         assert_nonempty_nonneg_finite_val(w, :w)
         if isa(mu, VecNum)
-            @argcheck(!isempty(mu))
+            @argcheck(!isempty(mu), IsEmptyError("mu cannot be empty"))
         end
         return new{typeof(w), typeof(mu)}(w, mu)
     end

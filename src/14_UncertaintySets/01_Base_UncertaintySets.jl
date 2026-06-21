@@ -405,9 +405,10 @@ BoxUncertaintySet
     """
     ub
     function BoxUncertaintySet(lb::ArrNum, ub::ArrNum)
-        @argcheck(!isempty(lb))
-        @argcheck(!isempty(ub))
-        @argcheck(size(lb) == size(ub))
+        @argcheck(!isempty(lb), IsEmptyError("lb cannot be empty"))
+        @argcheck(!isempty(ub), IsEmptyError("ub cannot be empty"))
+        @argcheck(size(lb) == size(ub),
+                  DimensionMismatch("lb ($(size(lb))) must match ub ($(size(ub)))"))
         return new{typeof(lb), typeof(ub)}(lb, ub)
     end
 end
@@ -741,9 +742,9 @@ EllipsoidalUncertaintySet
     class
     function EllipsoidalUncertaintySet(sigma::MatNum, k::Number,
                                        class::AbstractEllipsoidalUncertaintySetResultClass)
-        @argcheck(!isempty(sigma))
+        @argcheck(!isempty(sigma), IsEmptyError("sigma cannot be empty"))
         assert_matrix_issquare(sigma, :sigma)
-        @argcheck(k > zero(k))
+        @argcheck(k > zero(k), DomainError(k, "k must be positive"))
         return new{typeof(sigma), typeof(k), typeof(class)}(sigma, k, class)
     end
 end

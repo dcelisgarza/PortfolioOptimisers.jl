@@ -186,8 +186,9 @@ Keywords correspond to the struct's fields.
     z::T
     function LogRiskBudgeting(z::Option{<:VecInt})
         if !isnothing(z)
-            @argcheck(!isempty(z))
-            @argcheck(all(x -> abs(x) == 1, z))
+            @argcheck(!isempty(z), IsEmptyError("z cannot be empty"))
+            @argcheck(all(x -> abs(x) == 1, z),
+                      ArgumentError("all elements of z must be ±1"))
         end
         return new{typeof(z)}(z)
     end
@@ -272,7 +273,7 @@ Keywords correspond to the struct's fields.
     function AssetRiskBudgeting(rkb::Option{<:RkbE_Rkb}, sets::Option{<:AssetSets},
                                 alg::RiskBudgetingFormulation)
         if isa(rkb, RiskBudgetEstimator)
-            @argcheck(!isnothing(sets))
+            @argcheck(!isnothing(sets), IsNothingError("sets cannot be nothing"))
         end
         return new{typeof(rkb), typeof(sets), typeof(alg)}(rkb, sets, alg)
     end
@@ -334,7 +335,7 @@ Keywords correspond to the struct's fields.
     function FactorRiskBudgeting(re::RegE_Reg, rkb::Option{<:RkbE_Rkb},
                                  sets::Option{<:AssetSets}, flag::Bool)
         if isa(rkb, RiskBudgetEstimator)
-            @argcheck(!isnothing(sets))
+            @argcheck(!isnothing(sets), IsNothingError("sets cannot be nothing"))
         end
         return new{typeof(re), typeof(rkb), typeof(sets), typeof(flag)}(re, rkb, sets, flag)
     end
@@ -433,10 +434,10 @@ Where:
     function RiskBudgeting(opt::JuMPOptimiser, r::RM_VecRM, rba::RiskBudgetingAlgorithm,
                            wi::Option{<:VecNum}, fb::Option{<:OptE_Opt})
         if isa(r, AbstractVector)
-            @argcheck(!isempty(r))
+            @argcheck(!isempty(r), IsEmptyError("r cannot be empty"))
         end
         if isa(wi, VecNum)
-            @argcheck(!isempty(wi))
+            @argcheck(!isempty(wi), IsEmptyError("wi cannot be empty"))
         end
         return new{typeof(opt), typeof(r), typeof(rba), typeof(wi), typeof(fb)}(opt, r, rba,
                                                                                 wi, fb)
@@ -508,7 +509,7 @@ function _set_risk_budgeting_constraints!(model::JuMP.Model, rb::RiskBudgeting,
     N = length(w)
     rkb = risk_budget_constraints(rb.rba.rkb, rb.rba.sets; N = N, strict = strict)
     rb = rkb.val
-    @argcheck(length(rb) == N)
+    @argcheck(length(rb) == N, DimensionMismatch("rb ($(length(rb))) must match N ($N)"))
     sc = get_constraint_scale(model)
     JuMP.@variables(model, begin
                         k
@@ -568,7 +569,8 @@ function set_risk_budgeting_constraints!(model::JuMP.Model,
                                          wb::WeightBounds, args...)
     set_w!(model, pr.X, rb.wi)
     z = rb.rba.alg.z
-    @argcheck(length(z) == length(get_w(model)))
+    @argcheck(length(z) == length(get_w(model)),
+              DimensionMismatch("z ($(length(z))) must match w ($(length(get_w(model)))))"))
     w = z .* get_w(model)
     rkb = _set_risk_budgeting_constraints!(model, rb, w; strict = rb.opt.strict)
     sc = get_constraint_scale(model)

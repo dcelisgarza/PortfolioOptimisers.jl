@@ -324,7 +324,7 @@ julia> cokurtosis(Cokurtosis(), X)
 """
 function cokurtosis(kte::Cokurtosis{<:Any, <:Any, <:Full}, X::MatNum; dims::Int = 1,
                     mean = nothing, kwargs...)
-    @argcheck(dims in (1, 2))
+    @argcheck(dims in (1, 2), DomainError(dims, "dims must be 1 or 2"))
     if dims == 2
         X = transpose(X)
     end
@@ -335,7 +335,7 @@ function cokurtosis(kte::Cokurtosis{<:Any, <:Any, <:Full}, X::MatNum; dims::Int 
 end
 function cokurtosis(kte::Cokurtosis{<:Any, <:Any, <:Semi}, X::MatNum; dims::Int = 1,
                     mean = nothing, kwargs...)
-    @argcheck(dims in (1, 2))
+    @argcheck(dims in (1, 2), DomainError(dims, "dims must be 1 or 2"))
     if dims == 2
         X = transpose(X)
     end

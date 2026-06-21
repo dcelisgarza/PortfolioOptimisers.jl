@@ -189,10 +189,10 @@ Where:
                                                ex::FLoops.Transducers.Executor,
                                                fb::Option{<:OptE_Opt})
         if isa(ri, AbstractVector)
-            @argcheck(!isempty(ri))
+            @argcheck(!isempty(ri), IsEmptyError("ri cannot be empty"))
         end
         if isa(ro, AbstractVector)
-            @argcheck(!isempty(ro))
+            @argcheck(!isempty(ro), IsEmptyError("ro cannot be empty"))
         end
         return new{typeof(opt), typeof(ri), typeof(ro), typeof(scai), typeof(scao),
                    typeof(ex), typeof(fb)}(opt, ri, ro, scai, scao, ex, fb)

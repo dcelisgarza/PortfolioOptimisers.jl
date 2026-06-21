@@ -131,10 +131,11 @@ Keywords correspond to the struct's fields.
     function CombinatorialCrossValidationResult(train_idx::VecVecInt,
                                                 test_idx::VecVecVecInt,
                                                 path_ids::AbstractMatrix{<:Integer})
-        @argcheck(!isempty(train_idx))
-        @argcheck(!isempty(test_idx))
-        @argcheck(!isempty(path_ids))
-        @argcheck(length(train_idx) == length(test_idx) == size(path_ids, 2))
+        @argcheck(!isempty(train_idx), IsEmptyError("train_idx cannot be empty"))
+        @argcheck(!isempty(test_idx), IsEmptyError("test_idx cannot be empty"))
+        @argcheck(!isempty(path_ids), IsEmptyError("path_ids cannot be empty"))
+        @argcheck(length(train_idx) == length(test_idx) == size(path_ids, 2),
+                  DimensionMismatch("train_idx ($(length(train_idx))), test_idx ($(length(test_idx))), and path_ids columns ($(size(path_ids, 2))) must all match"))
         return new{typeof(train_idx), typeof(test_idx), typeof(path_ids)}(train_idx,
                                                                           test_idx,
                                                                           path_ids)
@@ -358,7 +359,9 @@ function Base.split(ccv::CombinatorialCrossValidation, rd::ReturnsResult)
     T = size(rd.X, 1)
     (; n_folds, n_test_folds, purged_size, embargo_size) = ccv
     min_fold_size = div(T, n_folds)
-    @argcheck(purged_size + embargo_size < min_fold_size)
+    @argcheck(purged_size + embargo_size < min_fold_size,
+              DomainError(purged_size + embargo_size,
+                          "purged_size + embargo_size ($(purged_size + embargo_size)) must be less than the minimum fold size ($min_fold_size)"))
     fold_idx_num = div.(0:(T - 1), min_fold_size)
     fold_idx_num[fold_idx_num .== n_folds] .= n_folds - 1
     fold_idx_num .+= 1

@@ -184,10 +184,10 @@ DiscreteAllocation
                                 wf::JuMPWeightFinaliserFormulation,
                                 fb::Option{<:FOptE_FOpt})
         if isa(slv, VecSlv)
-            @argcheck(!isempty(slv))
+            @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
         end
-        @argcheck(sc > zero(sc))
-        @argcheck(so > zero(so))
+        @argcheck(sc > zero(sc), DomainError(sc, "sc must be > 0"))
+        @argcheck(so > zero(so), DomainError(so, "so must be > 0"))
         return new{typeof(slv), typeof(sc), typeof(so), typeof(wf), typeof(fb)}(slv, sc, so,
                                                                                 wf, fb)
     end
@@ -341,12 +341,14 @@ end
 function _optimise(da::DiscreteAllocation, w::VecNum, p::VecNum, cash::Number = 1e6,
                    T::Option{<:Number} = nothing, fees::Option{<:Fees} = nothing;
                    str_names::Bool = false, save::Bool = true, kwargs...)
-    @argcheck(!isempty(w))
-    @argcheck(!isempty(p))
-    @argcheck(length(w) == length(p))
-    @argcheck(cash > zero(cash))
+    @argcheck(!isempty(w), IsEmptyError("w cannot be empty"))
+    @argcheck(!isempty(p), IsEmptyError("p cannot be empty"))
+    @argcheck(length(w) == length(p),
+              DimensionMismatch("w ($(length(w))) must match p ($(length(p)))"))
+    @argcheck(cash > zero(cash), DomainError(cash, "cash must be > 0"))
     if !isnothing(fees)
-        @argcheck(!isnothing(T))
+        @argcheck(!isnothing(T),
+                  IsNothingError("T cannot be nothing when fees are provided"))
     end
     cash, bgt, lbgt, sbgt, lidx, sidx, lcash, scash = setup_alloc_optim(w, p, cash, T, fees)
     sshares, scost, sw, scash, sretcode, smodel = finite_sub_allocation(-view(w, sidx),

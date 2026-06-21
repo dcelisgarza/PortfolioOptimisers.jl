@@ -28,7 +28,7 @@ function PRM(x::VecNum, slv::Slv_VecSlv, alpha::Number = 0.05, p::Number = 2.0,
              w::Option{<:ObsWeights} = nothing)
     w = get_observation_weights(w, x)
     if isa(slv, VecSlv)
-        @argcheck(!isempty(slv))
+        @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
     end
     model = JuMP.Model()
     JuMP.set_string_names_on_creation(model, false)
@@ -169,10 +169,11 @@ PowerNormValueatRisk
                                   alpha::Number, p::Number,
                                   w::Option{<:StatsBase.AbstractWeights})
         if isa(slv, VecSlv)
-            @argcheck(!isempty(slv))
+            @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
         end
-        @argcheck(zero(alpha) < alpha < one(alpha))
-        @argcheck(p >= one(p))
+        @argcheck(zero(alpha) < alpha < one(alpha),
+                  DomainError(alpha, "alpha must be in (0, 1)"))
+        @argcheck(p >= one(p), DomainError(p, "p must be >= 1"))
         assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(settings), typeof(slv), typeof(alpha), typeof(p), typeof(w)}(settings,
                                                                                        slv,
@@ -304,12 +305,14 @@ PowerNormValueatRiskRange
                                        beta::Number, pa::Number, pb::Number,
                                        w::Option{<:ObsWeights})
         if isa(slv, VecSlv)
-            @argcheck(!isempty(slv))
+            @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
         end
-        @argcheck(zero(alpha) < alpha < one(alpha))
-        @argcheck(zero(beta) < beta < one(beta))
-        @argcheck(pa > one(pa))
-        @argcheck(pb > one(pb))
+        @argcheck(zero(alpha) < alpha < one(alpha),
+                  DomainError(alpha, "alpha must be in (0, 1)"))
+        @argcheck(zero(beta) < beta < one(beta),
+                  DomainError(beta, "beta must be in (0, 1)"))
+        @argcheck(pa > one(pa), DomainError(pa, "pa must be > 1"))
+        @argcheck(pb > one(pb), DomainError(pb, "pb must be > 1"))
         assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(settings), typeof(slv), typeof(alpha), typeof(beta), typeof(pa),
                    typeof(pb), typeof(w)}(settings, slv, alpha, beta, pa, pb, w)
@@ -447,10 +450,11 @@ PowerNormDrawdownatRisk
                                      slv::Option{<:Slv_VecSlv}, alpha::Number, p::Number,
                                      w::Option{<:ObsWeights})
         if isa(slv, VecSlv)
-            @argcheck(!isempty(slv))
+            @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
         end
-        @argcheck(zero(alpha) < alpha < one(alpha))
-        @argcheck(p >= one(p))
+        @argcheck(zero(alpha) < alpha < one(alpha),
+                  DomainError(alpha, "alpha must be in (0, 1)"))
+        @argcheck(p >= one(p), DomainError(p, "p must be >= 1"))
         assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(settings), typeof(slv), typeof(alpha), typeof(p), typeof(w)}(settings,
                                                                                        slv,
@@ -587,10 +591,11 @@ RelativePowerNormDrawdownatRisk
                                              slv::Option{<:Slv_VecSlv}, alpha::Number,
                                              p::Number, w::Option{<:ObsWeights})
         if isa(slv, VecSlv)
-            @argcheck(!isempty(slv))
+            @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
         end
-        @argcheck(zero(alpha) < alpha < one(alpha))
-        @argcheck(p >= one(p))
+        @argcheck(zero(alpha) < alpha < one(alpha),
+                  DomainError(alpha, "alpha must be in (0, 1)"))
+        @argcheck(p >= one(p), DomainError(p, "p must be >= 1"))
         assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(settings), typeof(slv), typeof(alpha), typeof(p), typeof(w)}(settings,
                                                                                        slv,

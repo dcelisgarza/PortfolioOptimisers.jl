@@ -144,7 +144,8 @@ $(DocStringExtensions.FIELDS)
         if isa(subset_size, Integer)
             assert_nonempty_nonneg_finite_val(subset_size - 1, "subset_size - 1")
         elseif isa(subset_size, AbstractFloat)
-            @argcheck(0 < subset_size < 1)
+            @argcheck(0 < subset_size < 1,
+                      DomainError(subset_size, "subset_size must be in (0, 1)"))
         end
         if isa(n_subsets, Integer)
             assert_nonempty_nonneg_finite_val(n_subsets - 2, "n_subsets - 2")
@@ -153,7 +154,8 @@ $(DocStringExtensions.FIELDS)
         if isa(window_size, Integer)
             assert_nonempty_nonneg_finite_val(window_size - 2, "window_size - 2")
         elseif isa(window_size, AbstractFloat)
-            @argcheck(0 < window_size < 1)
+            @argcheck(0 < window_size < 1,
+                      DomainError(window_size, "window_size must be in (0, 1)"))
         end
         return new{typeof(cv), typeof(subset_size), typeof(n_subsets), typeof(max_comb),
                    typeof(window_size), typeof(rng), typeof(seed)}(cv, subset_size,
@@ -222,14 +224,15 @@ Keywords correspond to the struct's fields.
     path_ids
     function MultipleRandomisedResult(train_idx::VecVecInt, test_idx::VecVecInt,
                                       asset_idx::VecVecInt, path_ids::VecInt)
-        @argcheck(!isempty(train_idx))
-        @argcheck(!isempty(test_idx))
-        @argcheck(!isempty(asset_idx))
-        @argcheck(!isempty(path_ids))
+        @argcheck(!isempty(train_idx), IsEmptyError("train_idx cannot be empty"))
+        @argcheck(!isempty(test_idx), IsEmptyError("test_idx cannot be empty"))
+        @argcheck(!isempty(asset_idx), IsEmptyError("asset_idx cannot be empty"))
+        @argcheck(!isempty(path_ids), IsEmptyError("path_ids cannot be empty"))
         @argcheck(length(train_idx) ==
                   length(test_idx) ==
                   length(asset_idx) ==
-                  length(path_ids))
+                  length(path_ids),
+                  DimensionMismatch("train_idx ($(length(train_idx))), test_idx ($(length(test_idx))), asset_idx ($(length(asset_idx))), and path_ids ($(length(path_ids))) must all match"))
         return new{typeof(train_idx), typeof(test_idx), typeof(asset_idx),
                    typeof(path_ids)}(train_idx, test_idx, asset_idx, path_ids)
     end
@@ -288,7 +291,7 @@ Internal helper for combinatorial path generation. Converts a lexicographic comb
 """
 function combination_by_index(idx::Integer, N::Integer, k::Integer)
     n_comb = binomial(N, k)
-    @argcheck(0 < idx <= n_comb)
+    @argcheck(0 < idx <= n_comb, DomainError(idx, "idx must be in (0, $n_comb]"))
     combination = Vector{typeof(N)}(undef, k)
     remaining_rank = idx
     next_element = 1
@@ -335,7 +338,7 @@ function sample_unique_assets(N::Integer, k::Integer, n_subsets::Integer;
                               seed::Option{<:Integer} = nothing)
     assert_nonempty_nonneg_finite_val(N, :N)
     assert_nonempty_nonneg_finite_val(k, :k)
-    @argcheck(k <= N)
+    @argcheck(k <= N, DomainError("k ($k) must be less than or equal to N ($N)"))
     assert_nonempty_finite_val(n_subsets, :n_subsets)
     n_comb = binomial(N, k)
     @argcheck(n_subsets <= n_comb,

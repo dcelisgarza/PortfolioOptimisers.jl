@@ -649,7 +649,8 @@ function prices_to_returns(X::TimeSeries.TimeArray,
     N = length(nx)
     ts = isempty(oc) ? nothing : vec(Matrix(X[!, oc]))
     if !isnothing(ts) && !isnothing(iv)
-        @argcheck(issubset(ts, TimeSeries.timestamp(iv)))
+        @argcheck(issubset(ts, TimeSeries.timestamp(iv)),
+                  ArgumentError("ts must be a subset of the timestamps in iv"))
         iv = iv[ts]
     end
     if !isnothing(iv)

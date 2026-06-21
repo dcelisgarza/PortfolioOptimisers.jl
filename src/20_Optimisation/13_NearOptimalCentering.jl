@@ -231,7 +231,7 @@ The solution yields a portfolio centrally located within the near-optimal region
                                   ucs_flag::Bool, alg::NearOptimalCenteringAlgorithm,
                                   fb::Option{<:OptE_Opt})
         if isa(r, AbstractVector)
-            @argcheck(!isempty(r))
+            @argcheck(!isempty(r), IsEmptyError("r cannot be empty"))
             if any(x -> isa(x, QuadExpressionRiskMeasures), r)
                 @warn("Risk measures that produce JuMP.QuadExpr risk expressions are not guaranteed to work. The variance with SDP constraints works because the risk measure is the trace of a matrix, an affine expression.")
             end
@@ -241,25 +241,26 @@ The solution yields a portfolio centrally located within the near-optimal region
             end
         end
         if !isnothing(w_min)
-            @argcheck(!isempty(w_min))
+            @argcheck(!isempty(w_min), IsEmptyError("w_min cannot be empty"))
         end
         if !isnothing(w_min_ini)
-            @argcheck(!isempty(w_min_ini))
+            @argcheck(!isempty(w_min_ini), IsEmptyError("w_min_ini cannot be empty"))
         end
         if !isnothing(w_opt)
-            @argcheck(!isempty(w_opt))
+            @argcheck(!isempty(w_opt), IsEmptyError("w_opt cannot be empty"))
         end
         if !isnothing(w_opt)
-            @argcheck(!isempty(w_opt_ini))
+            @argcheck(!isempty(w_opt_ini), IsEmptyError("w_opt_ini cannot be empty"))
         end
         if !isnothing(w_max)
-            @argcheck(!isempty(w_max))
+            @argcheck(!isempty(w_max), IsEmptyError("w_max cannot be empty"))
         end
         if !isnothing(w_max_ini)
-            @argcheck(!isempty(w_max_ini))
+            @argcheck(!isempty(w_max_ini), IsEmptyError("w_max_ini cannot be empty"))
         end
         if isa(bins, Number)
-            @argcheck(isfinite(bins) && bins > 0)
+            @argcheck(isfinite(bins) && bins > 0,
+                      DomainError(bins, "bins must be finite and > 0"))
         end
         return new{typeof(opt), typeof(r), typeof(obj), typeof(bins), typeof(w_min),
                    typeof(w_min_ini), typeof(w_opt), typeof(w_opt_ini), typeof(w_max),

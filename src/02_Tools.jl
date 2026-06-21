@@ -2274,6 +2274,7 @@ function vec_to_real_measure(f::Function,
     return f(val)
 end
 
-export @propagatable, @fprop, @vprop, @pprop, @cprop, @wprop, @forward_properties, factory,
-       traverse_concrete_subtypes, concrete_typed_array, MinValue, MeanValue, MedianValue,
-       MaxValue, StandardisedValue, StdValue, VarValue, SumValue, ProdValue, ModeValue
+export factory, concrete_typed_array, MinValue, MeanValue, MedianValue, MaxValue,
+       StandardisedValue, StdValue, VarValue, SumValue, ProdValue, ModeValue
+public @propagatable, @fprop, @vprop, @pprop, @cprop, @wprop, @forward_properties,
+       traverse_concrete_subtypes, factory_child, port_opt_view

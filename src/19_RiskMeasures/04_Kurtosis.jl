@@ -156,23 +156,25 @@ Kurtosis
         mu_flag = isa(mu, VecNum)
         kt_flag = isa(kt, MatNum)
         if mu_flag
-            @argcheck(!isempty(mu))
-            @argcheck(all(isfinite, mu))
+            @argcheck(!isempty(mu), IsEmptyError("mu cannot be empty"))
+            @argcheck(all(isfinite, mu), IsNonFiniteError("mu must be finite, got $mu"))
         elseif isa(mu, Number)
-            @argcheck(isfinite(mu))
+            @argcheck(isfinite(mu), IsNonFiniteError("mu must be finite, got $mu"))
         end
         assert_nonempty_nonneg_finite_val(w, :w)
         if kt_flag
-            @argcheck(!isempty(kt))
+            @argcheck(!isempty(kt), IsEmptyError("kt cannot be empty"))
             assert_matrix_issquare(kt, :kt)
         end
         if mu_flag && kt_flag
-            @argcheck(length(mu)^2 == size(kt, 1))
+            @argcheck(length(mu)^2 == size(kt, 1),
+                      DimensionMismatch("length(mu)^2 ($(length(mu)^2)) must match size(kt, 1) ($(size(kt, 1)))"))
         elseif isa(mu, VecScalar) && kt_flag
-            @argcheck(length(mu.v)^2 == size(kt, 1))
+            @argcheck(length(mu.v)^2 == size(kt, 1),
+                      DimensionMismatch("length(mu.v)^2 ($(length(mu.v)^2)) must match size(kt, 1) ($(size(kt, 1)))"))
         end
         if !isnothing(N)
-            @argcheck(N > zero(N))
+            @argcheck(N > zero(N), DomainError(N, "N must be positive"))
         end
         return new{typeof(settings), typeof(w), typeof(mu), typeof(kt), typeof(N),
                    typeof(alg1), typeof(alg2)}(settings, w, mu, kt, N, alg1, alg2)

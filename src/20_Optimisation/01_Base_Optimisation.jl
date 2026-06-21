@@ -560,7 +560,7 @@ IterativeWeightFinaliser
     """
     iter
     function IterativeWeightFinaliser(iter::Integer)
-        @argcheck(iter > 0)
+        @argcheck(iter > 0, DomainError(iter, "iter must be > 0"))
         return new{typeof(iter)}(iter)
     end
 end
@@ -636,10 +636,10 @@ JuMPWeightFinaliser
     function JuMPWeightFinaliser(slv::Slv_VecSlv, sc::Number, so::Number,
                                  alg::JuMPWeightFinaliserFormulation)
         if isa(slv, VecSlv)
-            @argcheck(!isempty(slv))
+            @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
         end
-        @argcheck(sc > zero(sc))
-        @argcheck(so > zero(so))
+        @argcheck(sc > zero(sc), DomainError(sc, "sc must be positive"))
+        @argcheck(so > zero(so), DomainError(so, "so must be positive"))
         return new{typeof(slv), typeof(sc), typeof(so), typeof(alg)}(slv, sc, so, alg)
     end
 end

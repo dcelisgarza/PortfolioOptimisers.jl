@@ -27,7 +27,7 @@ function RRM(x::VecNum, slv::Slv_VecSlv, alpha::Number = 0.05, kappa::Number = 0
              w::Option{<:ObsWeights} = nothing)
     w = get_observation_weights(w, x)
     if isa(slv, VecSlv)
-        @argcheck(!isempty(slv))
+        @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
     end
     opk = one(kappa) + kappa
     omk = one(kappa) - kappa
@@ -225,10 +225,12 @@ RelativisticValueatRisk
                                      slv::Option{<:Slv_VecSlv}, alpha::Number,
                                      kappa::Number, w::Option{<:ObsWeights})
         if isa(slv, VecSlv)
-            @argcheck(!isempty(slv))
+            @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
         end
-        @argcheck(zero(alpha) < alpha < one(alpha))
-        @argcheck(zero(kappa) < kappa < one(kappa))
+        @argcheck(zero(alpha) < alpha < one(alpha),
+                  DomainError(alpha, "alpha must be in (0, 1)"))
+        @argcheck(zero(kappa) < kappa < one(kappa),
+                  DomainError(kappa, "kappa must be in (0, 1)"))
         assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(settings), typeof(slv), typeof(alpha), typeof(kappa), typeof(w)}(settings,
                                                                                            slv,
@@ -361,12 +363,16 @@ RelativisticValueatRiskRange
                                           kappa_a::Number, beta::Number, kappa_b::Number,
                                           w::Option{<:ObsWeights})
         if isa(slv, VecSlv)
-            @argcheck(!isempty(slv))
+            @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
         end
-        @argcheck(zero(alpha) < alpha < one(alpha))
-        @argcheck(zero(kappa_a) < kappa_a < one(kappa_a))
-        @argcheck(zero(beta) < beta < one(beta))
-        @argcheck(zero(kappa_b) < kappa_b < one(kappa_b))
+        @argcheck(zero(alpha) < alpha < one(alpha),
+                  DomainError(alpha, "alpha must be in (0, 1)"))
+        @argcheck(zero(kappa_a) < kappa_a < one(kappa_a),
+                  DomainError(kappa_a, "kappa_a must be in (0, 1)"))
+        @argcheck(zero(beta) < beta < one(beta),
+                  DomainError(beta, "beta must be in (0, 1)"))
+        @argcheck(zero(kappa_b) < kappa_b < one(kappa_b),
+                  DomainError(kappa_b, "kappa_b must be in (0, 1)"))
         assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(settings), typeof(slv), typeof(alpha), typeof(kappa_a),
                    typeof(beta), typeof(kappa_b), typeof(w)}(settings, slv, alpha, kappa_a,
@@ -503,10 +509,12 @@ RelativisticDrawdownatRisk
     function RelativisticDrawdownatRisk(settings, slv::Option{<:Slv_VecSlv}, alpha::Number,
                                         kappa::Number, w::Option{<:ObsWeights})
         if isa(slv, VecSlv)
-            @argcheck(!isempty(slv))
+            @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
         end
-        @argcheck(zero(alpha) < alpha < one(alpha))
-        @argcheck(zero(kappa) < kappa < one(kappa))
+        @argcheck(zero(alpha) < alpha < one(alpha),
+                  DomainError(alpha, "alpha must be in (0, 1)"))
+        @argcheck(zero(kappa) < kappa < one(kappa),
+                  DomainError(kappa, "kappa must be in (0, 1)"))
         assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(settings), typeof(slv), typeof(alpha), typeof(kappa), typeof(w)}(settings,
                                                                                            slv,
@@ -642,10 +650,12 @@ RelativeRelativisticDrawdownatRisk
                                                 slv::Option{<:Slv_VecSlv}, alpha::Number,
                                                 kappa::Number, w::Option{<:ObsWeights})
         if isa(slv, VecSlv)
-            @argcheck(!isempty(slv))
+            @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
         end
-        @argcheck(zero(alpha) < alpha < one(alpha))
-        @argcheck(zero(kappa) < kappa < one(kappa))
+        @argcheck(zero(alpha) < alpha < one(alpha),
+                  DomainError(alpha, "alpha must be in (0, 1)"))
+        @argcheck(zero(kappa) < kappa < one(kappa),
+                  DomainError(kappa, "kappa must be in (0, 1)"))
         assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(settings), typeof(slv), typeof(alpha), typeof(kappa), typeof(w)}(settings,
                                                                                            slv,
