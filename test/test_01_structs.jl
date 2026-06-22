@@ -138,8 +138,8 @@
         @test dt.n == 5
     end
     @testset "Solver" begin
-        @test_throws IsEmptyError Solver(; settings = Dict{String, Any}())
-        @test_throws IsEmptyError Solver(; settings = Pair{String, Any}[])
+        @test_throws IsEmptyError Solver(; solver = nothing, settings = Dict{String, Any}())
+        @test_throws IsEmptyError Solver(; solver = nothing, settings = Pair{String, Any}[])
 
         s = Solver(; solver = nothing)
         @test s.name == ""
@@ -179,14 +179,14 @@
         @test ncrra.g == 0.25
 
         @test_throws IsEmptyError OWAJuMP(; slv = Solver[])
-        @test_throws DomainError OWAJuMP(; max_phi = 0)
-        @test_throws DomainError OWAJuMP(; max_phi = 1)
-        @test_throws DomainError OWAJuMP(; sc = 0)
-        @test_throws DomainError OWAJuMP(; sc = Inf)
-        @test_throws DomainError OWAJuMP(; so = 0)
-        @test_throws DomainError OWAJuMP(; so = Inf)
+        @test_throws DomainError OWAJuMP(; slv = Solver(; solver = nothing), max_phi = 0)
+        @test_throws DomainError OWAJuMP(; slv = Solver(; solver = nothing), max_phi = 1)
+        @test_throws DomainError OWAJuMP(; slv = Solver(; solver = nothing), sc = 0)
+        @test_throws DomainError OWAJuMP(; slv = Solver(; solver = nothing), sc = Inf)
+        @test_throws DomainError OWAJuMP(; slv = Solver(; solver = nothing), so = 0)
+        @test_throws DomainError OWAJuMP(; slv = Solver(; solver = nothing), so = Inf)
 
-        owj = OWAJuMP()
+        owj = OWAJuMP(; slv = Solver(; solver = nothing))
         @test owj.slv == Solver(; solver = nothing)
         @test owj.max_phi == 0.5
         @test owj.sc == 1.0

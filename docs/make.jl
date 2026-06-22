@@ -6,7 +6,9 @@ exported_symbols = names(PortfolioOptimisers)
 all_symbols = names(PortfolioOptimisers; all = true)
 filter!(x -> !contains(string(x), r"#|^eval$|^include$"), all_symbols)
 private_symbols = setdiff(all_symbols, exported_symbols)
-for sym in private_symbols
+public_symbols = exported_symbols[findall(x->!Base.isexported(PortfolioOptimisers, x),
+                                          exported_symbols)]
+for sym in [private_symbols; public_symbols]
     eval(quote
              import PortfolioOptimisers: $(sym)
          end)

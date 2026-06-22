@@ -626,7 +626,7 @@ julia> struct MyConcrete1 <: MyAbstract end
 
 julia> struct MyConcrete2 <: MyAbstract end
 
-julia> traverse_concrete_subtypes(MyAbstract)
+julia> PortfolioOptimisers.traverse_concrete_subtypes(MyAbstract)
 2-element Vector{Any}:
  MyConcrete1
  MyConcrete2
