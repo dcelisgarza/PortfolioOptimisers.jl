@@ -193,8 +193,8 @@
         @test owj.so == 1.0
         @test owj.alg == MaximumEntropy()
 
-        owj = OWAJuMP(; slv = Solver(; name = "Foo"), max_phi = 0.25, sc = 2.0, so = 3.0,
-                      alg = MinimumSumSquares())
+        owj = OWAJuMP(; slv = Solver(; solver = nothing, name = "Foo"), max_phi = 0.25,
+                      sc = 2.0, so = 3.0, alg = MinimumSumSquares())
         @test owj.slv == Solver(; solver = nothing, name = "Foo")
         @test owj.max_phi == 0.25
         @test owj.sc == 2.0
