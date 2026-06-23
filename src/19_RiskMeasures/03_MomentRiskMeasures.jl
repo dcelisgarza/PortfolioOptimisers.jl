@@ -95,7 +95,7 @@ $(DocStringExtensions.FIELDS)
 
     SecondMoment(;
         ve::AbstractVarianceEstimator = SimpleVariance(; me = nothing),
-        alg1::AbstractMomentAlgorithm = Full(),
+        alg1::AbstractMomentAlgorithm = FullMoment(),
         alg2::SecondMomentFormulation = SquaredSOCRiskExpr(),
     ) -> SecondMoment
 
@@ -110,7 +110,7 @@ SecondMoment
        │          me ┼ nothing
        │           w ┼ nothing
        │   corrected ┴ Bool: true
-  alg1 ┼ Full()
+  alg1 ┼ FullMoment()
   alg2 ┴ SquaredSOCRiskExpr()
 ```
 
@@ -140,7 +140,7 @@ SecondMoment
     end
 end
 function SecondMoment(; ve::AbstractVarianceEstimator = SimpleVariance(; me = nothing),
-                      alg1::AbstractMomentAlgorithm = Full(),
+                      alg1::AbstractMomentAlgorithm = FullMoment(),
                       alg2::SecondMomentFormulation = SquaredSOCRiskExpr())::SecondMoment
     return SecondMoment(ve, alg1, alg2)
 end
@@ -160,7 +160,7 @@ $(DocStringExtensions.FIELDS)
     EvenMoment(;
         p::Integer = 2,
         ddof::Integer = 0,
-        alg::AbstractMomentAlgorithm = Full(),
+        alg::AbstractMomentAlgorithm = FullMoment(),
     ) -> EvenMoment
 
 Keywords correspond to the struct's fields.
@@ -177,15 +177,15 @@ julia> EvenMoment()
 EvenMoment
      p ┼ Int64: 2
   ddof ┼ Int64: 0
-   alg ┴ Full()
+   alg ┴ FullMoment()
 ```
 
 # Related
 
   - [`UnstandardisedLowOrderMomentMeasureAlgorithm`](@ref)
   - [`LowOrderMoment`](@ref)
-  - [`Full`](@ref)
-  - [`Semi`](@ref)
+  - [`FullMoment`](@ref)
+  - [`SemiMoment`](@ref)
 """
 @concrete struct EvenMoment <: UnstandardisedLowOrderMomentMeasureAlgorithm
     """
@@ -207,7 +207,7 @@ EvenMoment
     end
 end
 function EvenMoment(; p::Integer = 2, ddof::Integer = 0,
-                    alg::AbstractMomentAlgorithm = Full())::EvenMoment
+                    alg::AbstractMomentAlgorithm = FullMoment())::EvenMoment
     return EvenMoment(p, ddof, alg)
 end
 """
@@ -265,7 +265,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     FourthMoment(;
-        alg::AbstractMomentAlgorithm = Full(),
+        alg::AbstractMomentAlgorithm = FullMoment(),
     ) -> FourthMoment
 
 Keywords correspond to the struct's fields.
@@ -275,7 +275,7 @@ Keywords correspond to the struct's fields.
 ```jldoctest
 julia> FourthMoment()
 FourthMoment
-  alg ┴ Full()
+  alg ┴ FullMoment()
 ```
 
 # Related
@@ -292,7 +292,7 @@ FourthMoment
         return new{typeof(alg)}(alg)
     end
 end
-function FourthMoment(; alg::AbstractMomentAlgorithm = Full())::FourthMoment
+function FourthMoment(; alg::AbstractMomentAlgorithm = FullMoment())::FourthMoment
     return FourthMoment(alg)
 end
 """
@@ -490,7 +490,7 @@ It is computed as:
 ```math
 \\begin{align}
 \\mathrm{Variance}(\\boldsymbol{X}) &= \\mathbb{E}\\left[\\left(\\boldsymbol{X} - \\mathbb{E}\\left[\\boldsymbol{X}\\right]\\right)^2\\right] \\,.
-\\mathrm{Semi-Variance}(\\boldsymbol{X}) &= \\mathbb{E}\\left[\\min \\circ \\left(\\boldsymbol{X} - \\mathbb{E}\\left[\\boldsymbol{X}\\right],\\,0\\right)^2\\right] \\,.
+\\mathrm{SemiMoment-Variance}(\\boldsymbol{X}) &= \\mathbb{E}\\left[\\min \\circ \\left(\\boldsymbol{X} - \\mathbb{E}\\left[\\boldsymbol{X}\\right],\\,0\\right)^2\\right] \\,.
 \\end{align}
 ```
 
@@ -508,7 +508,7 @@ It is computed as:
 ```math
 \\begin{align}
 \\mathrm{StandardDeviation}(\\boldsymbol{X}) &= \\sqrt{\\mathbb{E}\\left[\\left(\\boldsymbol{X} - \\mathbb{E}\\left[\\boldsymbol{X}\\right]\\right)^2\\right]} \\,.
-\\mathrm{Semi-StandardDeviation}(\\boldsymbol{X}) &= \\sqrt{\\mathbb{E}\\left[\\min \\circ \\left(\\boldsymbol{X} - \\mathbb{E}\\left[\\boldsymbol{X}\\right],\\,0\\right)^2\\right]} \\,.
+\\mathrm{SemiMoment-StandardDeviation}(\\boldsymbol{X}) &= \\sqrt{\\mathbb{E}\\left[\\min \\circ \\left(\\boldsymbol{X} - \\mathbb{E}\\left[\\boldsymbol{X}\\right],\\,0\\right)^2\\right]} \\,.
 \\end{align}
 ```
 
@@ -733,7 +733,7 @@ The semi (lower) even moment is computed as:
 
 ```math
 \\begin{align}
-\\mathrm{Semi\\text{-}EvenMoment}_{p}(\\boldsymbol{X}) &= \\left(\\frac{1}{T_d}\\sum_{t=1}^{T}\\min \\circ \\left(\\boldsymbol{X}_t - \\mathbb{E}\\left[\\boldsymbol{X}\\right],\\, 0\\right)^{2p}\\right)^{1/p}\\,.
+\\mathrm{SemiMoment\\text{-}EvenMoment}_{p}(\\boldsymbol{X}) &= \\left(\\frac{1}{T_d}\\sum_{t=1}^{T}\\min \\circ \\left(\\boldsymbol{X}_t - \\mathbb{E}\\left[\\boldsymbol{X}\\right],\\, 0\\right)^{2p}\\right)^{1/p}\\,.
 \\end{align}
 ```
 
@@ -1290,31 +1290,32 @@ function moment_risk(r::HighOrderMoment{<:Any, <:Option{<:StatsBase.AbstractWeig
     return res / (sigma * sqrt(sigma))
 end
 function moment_risk(r::LowOrderMoment{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any,
-                                       <:SecondMoment{<:Any, <:Semi, <:SOCRiskExpr}},
+                                       <:SecondMoment{<:Any, <:SemiMoment, <:SOCRiskExpr}},
                      val::VecNum)
     val = min.(val, zero(eltype(val)))
     return Statistics.std(r.alg.ve, val; mean = zero(eltype(val)))
 end
 function moment_risk(r::LowOrderMoment{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any,
-                                       <:SecondMoment{<:Any, <:Semi,
+                                       <:SecondMoment{<:Any, <:SemiMoment,
                                                       <:QuadSecondMomentFormulations}},
                      val::VecNum)
     val = min.(val, zero(eltype(val)))
     return Statistics.var(r.alg.ve, val; mean = zero(eltype(val)))
 end
 function moment_risk(r::LowOrderMoment{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any,
-                                       <:SecondMoment{<:Any, <:Full, <:SOCRiskExpr}},
+                                       <:SecondMoment{<:Any, <:FullMoment, <:SOCRiskExpr}},
                      val::VecNum)
     return Statistics.std(r.alg.ve, val; mean = zero(eltype(val)))
 end
 function moment_risk(r::LowOrderMoment{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any,
-                                       <:SecondMoment{<:Any, <:Full,
+                                       <:SecondMoment{<:Any, <:FullMoment,
                                                       <:QuadSecondMomentFormulations}},
                      val::VecNum)
     return Statistics.var(r.alg.ve, val; mean = zero(eltype(val)))
 end
 function moment_risk(r::LowOrderMoment{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any,
-                                       <:EvenMoment{<:Any, <:Any, <:Semi}}, val::VecNum)
+                                       <:EvenMoment{<:Any, <:Any, <:SemiMoment}},
+                     val::VecNum)
     T = length(val) - r.alg.ddof
     val = min.(val, zero(eltype(val)))
     val = if isnothing(r.w)
@@ -1326,7 +1327,8 @@ function moment_risk(r::LowOrderMoment{<:Any, <:Option{<:StatsBase.AbstractWeigh
     return val^2 / T^inv(r.alg.p)
 end
 function moment_risk(r::LowOrderMoment{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any,
-                                       <:EvenMoment{<:Any, <:Any, <:Full}}, val::VecNum)
+                                       <:EvenMoment{<:Any, <:Any, <:FullMoment}},
+                     val::VecNum)
     T = length(val) - r.alg.ddof
     val = if isnothing(r.w)
         LinearAlgebra.norm(val, 2 * r.alg.p)
@@ -1337,19 +1339,19 @@ function moment_risk(r::LowOrderMoment{<:Any, <:Option{<:StatsBase.AbstractWeigh
     return val^2 / T^inv(r.alg.p)
 end
 function moment_risk(r::HighOrderMoment{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any,
-                                        <:FourthMoment{<:Semi}}, val::VecNum)
+                                        <:FourthMoment{<:SemiMoment}}, val::VecNum)
     val = min.(val, zero(eltype(val)))
     val .= val .^ 4
     return isnothing(r.w) ? Statistics.mean(val) : Statistics.mean(val, r.w)
 end
 function moment_risk(r::HighOrderMoment{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any,
-                                        <:FourthMoment{<:Full}}, val::VecNum)
+                                        <:FourthMoment{<:FullMoment}}, val::VecNum)
     val .= val .^ 4
     return isnothing(r.w) ? Statistics.mean(val) : Statistics.mean(val, r.w)
 end
 function moment_risk(r::HighOrderMoment{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any,
                                         <:StandardisedHighOrderMoment{<:Any,
-                                                                      <:FourthMoment{<:Semi}}},
+                                                                      <:FourthMoment{<:SemiMoment}}},
                      val::VecNum)
     val = min.(val, zero(eltype(val)))
     sigma = Statistics.var(r.alg.ve, val; mean = zero(eltype(val)))
@@ -1359,7 +1361,7 @@ function moment_risk(r::HighOrderMoment{<:Any, <:Option{<:StatsBase.AbstractWeig
 end
 function moment_risk(r::HighOrderMoment{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any,
                                         <:StandardisedHighOrderMoment{<:Any,
-                                                                      <:FourthMoment{<:Full}}},
+                                                                      <:FourthMoment{<:FullMoment}}},
                      val::VecNum)
     sigma = Statistics.var(r.alg.ve, val; mean = zero(eltype(val)))
     val .= val .^ 4

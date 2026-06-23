@@ -194,7 +194,7 @@ $(DocStringExtensions.FIELDS)
     Covariance(;
         me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
         ce::StatsBase.CovarianceEstimator = GeneralCovariance(),
-        alg::AbstractMomentAlgorithm = Full()
+        alg::AbstractMomentAlgorithm = FullMoment()
     ) -> Covariance
 
 Keywords correspond to the struct's fields.
@@ -209,7 +209,7 @@ Covariance
    ce ┼ GeneralCovariance
       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
       │    w ┴ nothing
-  alg ┴ Full()
+  alg ┴ FullMoment()
 ```
 
 # Related
@@ -217,8 +217,8 @@ Covariance
   - [`AbstractCovarianceEstimator`](@ref)
   - [`GeneralCovariance`](@ref)
   - [`SimpleExpectedReturns`](@ref)
-  - [`Full`](@ref)
-  - [`Semi`](@ref)
+  - [`FullMoment`](@ref)
+  - [`SemiMoment`](@ref)
 """
 @propagatable @concrete struct Covariance <: AbstractCovarianceEstimator
     """
@@ -240,7 +240,7 @@ Covariance
 end
 function Covariance(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
                     ce::StatsBase.CovarianceEstimator = GeneralCovariance(),
-                    alg::AbstractMomentAlgorithm = Full())::Covariance
+                    alg::AbstractMomentAlgorithm = FullMoment())::Covariance
     return Covariance(me, ce, alg)
 end
 """
@@ -256,7 +256,7 @@ Compute the covariance matrix using a [`Covariance`](@ref) estimator.
 
 # Mathematical definition
 
-Full covariance:
+FullMoment covariance:
 
 ```math
 \\begin{align}
@@ -271,7 +271,7 @@ Where:
   - ``\\hat{\\mu}_i``: Estimated mean of asset ``i``.
   - $(math_dict[:T])
 
-Semi (downside) covariance — clip de-meaned returns to zero before computing:
+SemiMoment (downside) covariance — clip de-meaned returns to zero before computing:
 
 ```math
 \\begin{align}
@@ -300,8 +300,8 @@ Where:
 # Arguments
 
   - $(arg_dict[:ce])
-      + `ce::Covariance{<:Any, <:Any, <:Full}`: Covariance estimator with [`Full`](@ref) moment algorithm.
-      + `ce::Covariance{<:Any, <:Any, <:Semi}`: Covariance estimator with [`Semi`](@ref) moment algorithm.
+      + `ce::Covariance{<:Any, <:Any, <:FullMoment}`: Covariance estimator with [`FullMoment`](@ref) moment algorithm.
+      + `ce::Covariance{<:Any, <:Any, <:SemiMoment}`: Covariance estimator with [`SemiMoment`](@ref) moment algorithm.
   - $(arg_dict[:X])
   - $(arg_dict[:dims])
   - $(arg_dict[:omean]) If not provided, computed using `ce.me`.
@@ -316,8 +316,8 @@ Where:
   - [`Covariance`](@ref)
   - [`AbstractCovarianceEstimator`](@ref)
   - [`GeneralCovariance`](@ref)
-  - [`Full`](@ref)
-  - [`Semi`](@ref)
+  - [`FullMoment`](@ref)
+  - [`SemiMoment`](@ref)
   - [`cor(ce::Covariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
 
 # Examples
@@ -331,18 +331,18 @@ julia> cov(Covariance(), X)
  0.0001  0.0001
 ```
 """
-function Statistics.cov(ce::Covariance{<:Any, <:Any, <:Full}, X::MatNum; dims::Int = 1,
-                        mean = nothing, kwargs...)
+function Statistics.cov(ce::Covariance{<:Any, <:Any, <:FullMoment}, X::MatNum;
+                        dims::Int = 1, mean = nothing, kwargs...)
     mu = isnothing(mean) ? Statistics.mean(ce.me, X; dims = dims, kwargs...) : mean
     return Statistics.cov(ce.ce, X; dims = dims, mean = mu, kwargs...)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-[`Semi`](@ref) variant of [`cov(ce::Covariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref). Clips de-meaned returns to zero before computing the covariance matrix, capturing only downside co-movements.
+[`SemiMoment`](@ref) variant of [`cov(ce::Covariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref). Clips de-meaned returns to zero before computing the covariance matrix, capturing only downside co-movements.
 """
-function Statistics.cov(ce::Covariance{<:Any, <:Any, <:Semi}, X::MatNum; dims::Int = 1,
-                        mean = nothing, kwargs...)
+function Statistics.cov(ce::Covariance{<:Any, <:Any, <:SemiMoment}, X::MatNum;
+                        dims::Int = 1, mean = nothing, kwargs...)
     mu = isnothing(mean) ? Statistics.mean(ce.me, X; dims = dims, kwargs...) : mean
     X = min.(X .- mu, zero(eltype(X)))
     return Statistics.cov(ce.ce, X; dims = dims, mean = zero(eltype(X)), kwargs...)
@@ -376,8 +376,8 @@ Where:
 
   - $(arg_dict[:ce])
 
-      + `ce::Covariance{<:Any, <:Any, <:Full}`: Covariance estimator with [`Full`](@ref) moment algorithm.
-      + `ce::Covariance{<:Any, <:Any, <:Semi}`: Covariance estimator with [`Semi`](@ref) moment algorithm.
+      + `ce::Covariance{<:Any, <:Any, <:FullMoment}`: Covariance estimator with [`FullMoment`](@ref) moment algorithm.
+      + `ce::Covariance{<:Any, <:Any, <:SemiMoment}`: Covariance estimator with [`SemiMoment`](@ref) moment algorithm.
 
   - $(arg_dict[:X])
 
@@ -396,8 +396,8 @@ Where:
   - [`Covariance`](@ref)
   - [`AbstractCovarianceEstimator`](@ref)
   - [`GeneralCovariance`](@ref)
-  - [`Full`](@ref)
-  - [`Semi`](@ref)
+  - [`FullMoment`](@ref)
+  - [`SemiMoment`](@ref)
   - [`cov(ce::Covariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref)
 
 # Examples
@@ -411,18 +411,18 @@ julia> cor(Covariance(), X)
  1.0  1.0
 ```
 """
-function Statistics.cor(ce::Covariance{<:Any, <:Any, <:Full}, X::MatNum; dims::Int = 1,
-                        mean = nothing, kwargs...)
+function Statistics.cor(ce::Covariance{<:Any, <:Any, <:FullMoment}, X::MatNum;
+                        dims::Int = 1, mean = nothing, kwargs...)
     mu = isnothing(mean) ? Statistics.mean(ce.me, X; dims = dims, kwargs...) : mean
     return Statistics.cor(ce.ce, X; dims = dims, mean = mu, kwargs...)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-[`Semi`](@ref) variant of [`cor(ce::Covariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref). Clips de-meaned returns to zero before computing the correlation matrix, capturing only downside co-movements.
+[`SemiMoment`](@ref) variant of [`cor(ce::Covariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)`](@ref). Clips de-meaned returns to zero before computing the correlation matrix, capturing only downside co-movements.
 """
-function Statistics.cor(ce::Covariance{<:Any, <:Any, <:Semi}, X::MatNum; dims::Int = 1,
-                        mean = nothing, kwargs...)
+function Statistics.cor(ce::Covariance{<:Any, <:Any, <:SemiMoment}, X::MatNum;
+                        dims::Int = 1, mean = nothing, kwargs...)
     mu = isnothing(mean) ? Statistics.mean(ce.me, X; dims = dims, kwargs...) : mean
     X = min.(X .- mu, zero(eltype(X)))
     return Statistics.cor(ce.ce, X; dims = dims, mean = zero(eltype(X)), kwargs...)

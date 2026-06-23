@@ -267,9 +267,9 @@ objs = [MinimumRisk(), MaximumUtility(), MaximumRatio(; rf = rf)]
 rets = [ArithmeticReturn(), LogarithmicReturn()]
 rs = [StandardDeviation(), Variance(), UncertaintySetVariance(; ucs = ucs1),
       UncertaintySetVariance(; ucs = ucs2), LowOrderMoment(),
-      LowOrderMoment(; alg = SecondMoment(; alg1 = Semi(), alg2 = SOCRiskExpr())),
-      LowOrderMoment(; alg = SecondMoment(; alg1 = Semi())),
-      LowOrderMoment(; alg = SecondMoment(; alg1 = Full(), alg2 = SOCRiskExpr())),
+      LowOrderMoment(; alg = SecondMoment(; alg1 = SemiMoment(), alg2 = SOCRiskExpr())),
+      LowOrderMoment(; alg = SecondMoment(; alg1 = SemiMoment())),
+      LowOrderMoment(; alg = SecondMoment(; alg1 = FullMoment(), alg2 = SOCRiskExpr())),
       LowOrderMoment(; alg = SecondMoment()),
       LowOrderMoment(; alg = MeanAbsoluteDeviation()), WorstRealisation(), Range(),
       ConditionalValueatRisk(), ConditionalValueatRiskRange(), EntropicValueatRisk(),
@@ -292,7 +292,7 @@ rs = [StandardDeviation(), Variance(), UncertaintySetVariance(; ucs = ucs1),
       TrackingRiskMeasure(; tr = WeightsTracking(; w = w0), alg = LInfNorm()),
       TrackingRiskMeasure(; tr = WeightsTracking(; w = w0), alg = LpNorm(; p = 10)),
       LowOrderMoment(; alg = EvenMoment()),
-      LowOrderMoment(; alg = EvenMoment(; alg = Semi()))]
+      LowOrderMoment(; alg = EvenMoment(; alg = SemiMoment()))]
 tr = WeightsTracking(; w = w0)
 
 function mr_block1(idx)

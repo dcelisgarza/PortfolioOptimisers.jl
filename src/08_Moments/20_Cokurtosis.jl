@@ -120,7 +120,7 @@ $(DocStringExtensions.FIELDS)
     Cokurtosis(;
         me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
         mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
-        alg::AbstractMomentAlgorithm = Full(),
+        alg::AbstractMomentAlgorithm = FullMoment(),
         w::Option{<:ObsWeights} = nothing
     ) -> Cokurtosis
 
@@ -145,7 +145,7 @@ Cokurtosis
       │      dt ┼ nothing
       │     alg ┼ nothing
       │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
-  alg ┼ Full()
+  alg ┼ FullMoment()
     w ┴ nothing
 ```
 
@@ -182,7 +182,7 @@ Cokurtosis
 end
 function Cokurtosis(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
                     mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
-                    alg::AbstractMomentAlgorithm = Full(),
+                    alg::AbstractMomentAlgorithm = FullMoment(),
                     w::Option{<:ObsWeights} = nothing)::Cokurtosis
     return Cokurtosis(me, mp, alg, w)
 end
@@ -274,14 +274,14 @@ end
 
 Compute the cokurtosis tensor for a dataset.
 
-This method computes the cokurtosis tensor using the estimator's mean and matrix processing algorithm. Observation weights in `kte.w` are applied if set. For `Full`, it uses all centered data; for `Semi`, it uses only negative deviations. If the estimator is `nothing`, returns `nothing`.
+This method computes the cokurtosis tensor using the estimator's mean and matrix processing algorithm. Observation weights in `kte.w` are applied if set. For `FullMoment`, it uses all centered data; for `SemiMoment`, it uses only negative deviations. If the estimator is `nothing`, returns `nothing`.
 
 # Arguments
 
   - `kte`: Cokurtosis estimator.
 
-      + `kte::Cokurtosis{<:Any, <:Any, <:Full}`: Cokurtosis estimator with [`Full`](@ref) moment algorithm.
-      + `kte::Cokurtosis{<:Any, <:Any, <:Semi}`: Cokurtosis estimator with [`Semi`](@ref) moment algorithm.
+      + `kte::Cokurtosis{<:Any, <:Any, <:FullMoment}`: Cokurtosis estimator with [`FullMoment`](@ref) moment algorithm.
+      + `kte::Cokurtosis{<:Any, <:Any, <:SemiMoment}`: Cokurtosis estimator with [`SemiMoment`](@ref) moment algorithm.
       + `kte::Nothing`: No-op, returns `nothing`.
 
   - `X`: Data matrix (observations × assets).
@@ -322,7 +322,7 @@ julia> cokurtosis(Cokurtosis(), X)
   - [`Cokurtosis`](@ref)
   - [`_cokurtosis`](@ref)
 """
-function cokurtosis(kte::Cokurtosis{<:Any, <:Any, <:Full}, X::MatNum; dims::Int = 1,
+function cokurtosis(kte::Cokurtosis{<:Any, <:Any, <:FullMoment}, X::MatNum; dims::Int = 1,
                     mean = nothing, kwargs...)
     @argcheck(dims in (1, 2), DomainError(dims, "dims must be 1 or 2"))
     if dims == 2
@@ -333,7 +333,7 @@ function cokurtosis(kte::Cokurtosis{<:Any, <:Any, <:Full}, X::MatNum; dims::Int 
     X = X .- mu
     return _cokurtosis(X, kte.mp, w)
 end
-function cokurtosis(kte::Cokurtosis{<:Any, <:Any, <:Semi}, X::MatNum; dims::Int = 1,
+function cokurtosis(kte::Cokurtosis{<:Any, <:Any, <:SemiMoment}, X::MatNum; dims::Int = 1,
                     mean = nothing, kwargs...)
     @argcheck(dims in (1, 2), DomainError(dims, "dims must be 1 or 2"))
     if dims == 2

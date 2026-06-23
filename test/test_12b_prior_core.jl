@@ -99,17 +99,17 @@ end
     @test isapprox(pr.X, rd.X)
     @test isapprox(pr.mu, vec(mean(SimpleExpectedReturns(), rd.X)))
     @test isapprox(pr.sigma, cov(PortfolioOptimisersCovariance(), rd.X))
-    @test isapprox(pr.kt, cokurtosis(Cokurtosis(; alg = Full()), rd.X))
-    @test all(isapprox.((pr.sk, pr.V), coskewness(Coskewness(; alg = Full()), rd.X)))
+    @test isapprox(pr.kt, cokurtosis(Cokurtosis(; alg = FullMoment()), rd.X))
+    @test all(isapprox.((pr.sk, pr.V), coskewness(Coskewness(; alg = FullMoment()), rd.X)))
 
-    pe = HighOrderPriorEstimator(; kte = Cokurtosis(; alg = Semi()),
-                                 ske = Coskewness(; alg = Semi()))
+    pe = HighOrderPriorEstimator(; kte = Cokurtosis(; alg = SemiMoment()),
+                                 ske = Coskewness(; alg = SemiMoment()))
     pr = prior(pe, transpose(rd.X); dims = 2)
     @test isapprox(pr.X, rd.X)
     @test isapprox(pr.mu, vec(mean(SimpleExpectedReturns(), rd.X)))
     @test isapprox(pr.sigma, cov(PortfolioOptimisersCovariance(), rd.X))
-    @test isapprox(pr.kt, cokurtosis(Cokurtosis(; alg = Semi()), rd.X))
-    @test all(isapprox.((pr.sk, pr.V), coskewness(Coskewness(; alg = Semi()), rd.X)))
+    @test isapprox(pr.kt, cokurtosis(Cokurtosis(; alg = SemiMoment()), rd.X))
+    @test all(isapprox.((pr.sk, pr.V), coskewness(Coskewness(; alg = SemiMoment()), rd.X)))
 
     pe1 = FactorPrior(; re = DimensionReductionRegression(;), rsd = true)
     pr1 = prior(pe1, rd)
@@ -122,8 +122,9 @@ end
     @test pr1.X == pr2.X
     @test pr1.mu == pr2.mu
     @test pr1.sigma == pr2.sigma
-    @test isapprox(pr2.kt, cokurtosis(Cokurtosis(; alg = Full()), rd.X))
-    @test all(isapprox.((pr2.sk, pr2.V), coskewness(Coskewness(; alg = Full()), rd.X)))
+    @test isapprox(pr2.kt, cokurtosis(Cokurtosis(; alg = FullMoment()), rd.X))
+    @test all(isapprox.((pr2.sk, pr2.V),
+                        coskewness(Coskewness(; alg = FullMoment()), rd.X)))
 end
 
 @testset "High Order Factor Prior" begin

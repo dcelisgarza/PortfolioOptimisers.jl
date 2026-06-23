@@ -126,7 +126,7 @@ $(DocStringExtensions.FIELDS)
     Coskewness(;
         me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
         mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
-        alg::AbstractMomentAlgorithm = Full(),
+        alg::AbstractMomentAlgorithm = FullMoment(),
         w::Option{<:ObsWeights} = nothing
     ) -> Coskewness
 
@@ -164,7 +164,7 @@ Coskewness
       │      dt ┼ nothing
       │     alg ┼ nothing
       │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
-  alg ┼ Full()
+  alg ┼ FullMoment()
     w ┴ nothing
 ```
 
@@ -203,7 +203,7 @@ Coskewness
 end
 function Coskewness(; me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
                     mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
-                    alg::AbstractMomentAlgorithm = Full(),
+                    alg::AbstractMomentAlgorithm = FullMoment(),
                     w::Option{<:ObsWeights} = nothing)::Coskewness
     return Coskewness(me, mp, alg, w)
 end
@@ -330,14 +330,14 @@ end
     coskewness(ske::Option{<:Coskewness}, X::MatNum; dims::Int = 1,
                mean = nothing, kwargs...)
 
-Compute the full coskewness tensor and processed matrix for a dataset. Observation weights in `ske.w` are applied if set. For `Full`, it uses all centered data; for `Semi`, it uses only negative deviations. If the estimator is `nothing`, returns `(nothing, nothing)`.
+Compute the full coskewness tensor and processed matrix for a dataset. Observation weights in `ske.w` are applied if set. For `FullMoment`, it uses all centered data; for `SemiMoment`, it uses only negative deviations. If the estimator is `nothing`, returns `(nothing, nothing)`.
 
 # Arguments
 
   - `ske`: Coskewness estimator.
 
-      + `ske::Coskewness{<:Any, <:Any, <:Full}`: Coskewness estimator with [`Full`](@ref) moment algorithm.
-      + `ske::Coskewness{<:Any, <:Any, <:Semi}`: Coskewness estimator with [`Semi`](@ref) moment algorithm.
+      + `ske::Coskewness{<:Any, <:Any, <:FullMoment}`: Coskewness estimator with [`FullMoment`](@ref) moment algorithm.
+      + `ske::Coskewness{<:Any, <:Any, <:SemiMoment}`: Coskewness estimator with [`SemiMoment`](@ref) moment algorithm.
       + `ske::Nothing`: No-op, returns `(nothing, nothing)`.
 
   - `X`: Data matrix (observations × assets).
@@ -387,7 +387,7 @@ julia> V
   - [`_coskewness`](@ref)
   - [`negative_spectral_coskewness`](@ref)
 """
-function coskewness(ske::Coskewness{<:Any, <:Any, <:Full}, X::MatNum; dims::Int = 1,
+function coskewness(ske::Coskewness{<:Any, <:Any, <:FullMoment}, X::MatNum; dims::Int = 1,
                     mean = nothing, kwargs...)
     @argcheck(dims in (1, 2), DomainError(dims, "dims must be 1 or 2"))
     if dims == 2
@@ -398,7 +398,7 @@ function coskewness(ske::Coskewness{<:Any, <:Any, <:Full}, X::MatNum; dims::Int 
     Y = X .- mu
     return _coskewness(Y, X, ske.mp, w)
 end
-function coskewness(ske::Coskewness{<:Any, <:Any, <:Semi}, X::MatNum; dims::Int = 1,
+function coskewness(ske::Coskewness{<:Any, <:Any, <:SemiMoment}, X::MatNum; dims::Int = 1,
                     mean = nothing, kwargs...)
     @argcheck(dims in (1, 2), DomainError(dims, "dims must be 1 or 2"))
     if dims == 2

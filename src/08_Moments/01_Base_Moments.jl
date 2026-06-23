@@ -480,7 +480,7 @@ abstract type AbstractMomentAlgorithm <: AbstractAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-`Full` is used to indicate that all deviations are included in the moment estimation process.
+`FullMoment` is used to indicate that all deviations are included in the moment estimation process.
 
 # Mathematical definition
 
@@ -497,25 +497,25 @@ Where:
 
 # Constructors
 
-    Full() -> Full
+    FullMoment() -> FullMoment
 
 # Examples
 
 ```jldoctest
-julia> Full()
-Full()
+julia> FullMoment()
+FullMoment()
 ```
 
 # Related
 
   - [`AbstractMomentAlgorithm`](@ref)
-  - [`Semi`](@ref)
+  - [`SemiMoment`](@ref)
 """
-struct Full <: AbstractMomentAlgorithm end
+struct FullMoment <: AbstractMomentAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-`Semi` is used for semi-moment estimators, where only observations below a target are considered.
+`SemiMoment` is used for semi-moment estimators, where only observations below a target are considered.
 
 # Mathematical definition
 
@@ -532,21 +532,21 @@ Where:
 
 # Constructors
 
-    Semi() -> Semi
+    SemiMoment() -> SemiMoment
 
 # Examples
 
 ```jldoctest
-julia> Semi()
-Semi()
+julia> SemiMoment()
+SemiMoment()
 ```
 
 # Related
 
   - [`AbstractMomentAlgorithm`](@ref)
-  - [`Full`](@ref)
+  - [`FullMoment`](@ref)
 """
-struct Semi <: AbstractMomentAlgorithm end
+struct SemiMoment <: AbstractMomentAlgorithm end
 """
     robust_cov(
         ce::StatsBase.CovarianceEstimator,
@@ -959,4 +959,4 @@ function windowed_preamble(est, w::Option{<:ObsWeights}, window::Option{<:Int_Ve
     return inner, X
 end
 
-export Full, Semi
+export FullMoment, SemiMoment

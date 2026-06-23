@@ -327,7 +327,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     sqrt_second_moment = model[bound_key] = JuMP.@variable(model)
     second_moment = model[Symbol(:second_moment_, i)] = JuMP.@expression(model,
                                                                          net_X .- tgt)
-    if isa(r.alg.alg1, Semi)
+    if isa(r.alg.alg1, SemiMoment)
         second_lower_moment = model[Symbol(:second_lower_moment_, i)] = JuMP.@variable(model,
                                                                                        [1:T],
                                                                                        (lower_bound = 0))
@@ -455,7 +455,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                                               sc * even_moment_risk,
                                                               sc * even_moment_t[i]] in
                                                              JuMP.MOI.PowerCone(inv(p)))
-    if isa(r.alg.alg, Full)
+    if isa(r.alg.alg, FullMoment)
         model[Symbol(:cpoweven_moment_, i)] = JuMP.@constraint(model, [i = 1:T],
                                                                [sc * even_moment_t[i],
                                                                 sc * k,
