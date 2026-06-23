@@ -811,7 +811,7 @@ its docstring.
 
 ├──&nbsp;[AbstractMomentAlgorithm](@ref)
 
-│&nbsp;&nbsp;&nbsp;├──&nbsp;[Full](@ref)
+│&nbsp;&nbsp;&nbsp;├──&nbsp;[FullMoment](@ref)
 
 │&nbsp;&nbsp;&nbsp;├──&nbsp;[GerberCovarianceAlgorithm](@ref)
 
@@ -829,7 +829,7 @@ its docstring.
 
 │&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;└──&nbsp;[PartialGerberIQ](@ref)
 
-│&nbsp;&nbsp;&nbsp;├──&nbsp;[Semi](@ref)
+│&nbsp;&nbsp;&nbsp;├──&nbsp;[SemiMoment](@ref)
 
 │&nbsp;&nbsp;&nbsp;└──&nbsp;[SmythBrobyCovarianceAlgorithm](@ref)
 
@@ -921,9 +921,9 @@ its docstring.
 
 │&nbsp;&nbsp;&nbsp;├──&nbsp;[AbstractStepwiseRegressionAlgorithm](@ref)
 
-│&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;├──&nbsp;[Backward](@ref)
+│&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;├──&nbsp;[BackwardElimination](@ref)
 
-│&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;└──&nbsp;[Forward](@ref)
+│&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;└──&nbsp;[ForwardSelection](@ref)
 
 │&nbsp;&nbsp;&nbsp;├──&nbsp;[AbstractStepwiseRegressionCriterion](@ref)
 

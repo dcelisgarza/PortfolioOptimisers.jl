@@ -206,7 +206,7 @@
         r3 = factory(NegativeSkewness(; alg = QuadRiskExpr()), pr)
         @test isapprox(expected_risk(r1, w, rd.X), sqrt(expected_risk(r2, w, rd.X)))
         @test isapprox(expected_risk(r3, w, rd.X), expected_risk(r2, w, rd.X))
-        @test isapprox(expected_risk(Kurtosis(; alg1 = Semi()), w, rd.X),
+        @test isapprox(expected_risk(Kurtosis(; alg1 = SemiMoment()), w, rd.X),
                        0.0002291596657404573)
         @test isapprox(expected_risk(Kurtosis(;), w, rd.X),
                        expected_risk(Kurtosis(; mu = pr.mu), w, rd.X))
@@ -215,15 +215,18 @@
         @test isapprox(expected_risk(Kurtosis(; w = wt), w, rd.X),
                        expected_risk(Kurtosis(;), w, rd.X))
         @test isapprox(expected_risk(LowOrderMoment(;
-                                                    alg = SecondMoment(; alg1 = Semi(),
+                                                    alg = SecondMoment(;
+                                                                       alg1 = SemiMoment(),
                                                                        alg2 = SOCRiskExpr())),
                                      w, rd.X), 0.009123864007588172)
         @test isapprox(expected_risk(LowOrderMoment(; mu = LinearAlgebra.dot(w, pr.mu),
-                                                    alg = SecondMoment(; alg1 = Semi(),
+                                                    alg = SecondMoment(;
+                                                                       alg1 = SemiMoment(),
                                                                        alg2 = SOCRiskExpr())),
                                      w, rd.X),
                        sqrt(expected_risk(LowOrderMoment(;
-                                                         alg = SecondMoment(; alg1 = Semi(),
+                                                         alg = SecondMoment(;
+                                                                            alg1 = SemiMoment(),
                                                                             alg2 = QuadRiskExpr())),
                                           w, rd.X)))
         @test isapprox(expected_risk(LowOrderMoment(;
@@ -245,12 +248,17 @@
                        expected_risk(LowOrderMoment(; w = wt,
                                                     alg = MeanAbsoluteDeviation()), w,
                                      rd.X))
-        @test isapprox(expected_risk(HighOrderMoment(; alg = FourthMoment(; alg = Semi())),
+        @test isapprox(expected_risk(HighOrderMoment(;
+                                                     alg = FourthMoment(;
+                                                                        alg = SemiMoment())),
                                      w, rd.X), 5.251415240227812e-8)
         @test isapprox(expected_risk(HighOrderMoment(; mu = LinearAlgebra.dot(w, pr.mu),
-                                                     alg = FourthMoment(; alg = Semi())), w,
-                                     rd.X),
-                       expected_risk(HighOrderMoment(; alg = FourthMoment(; alg = Semi())),
+                                                     alg = FourthMoment(;
+                                                                        alg = SemiMoment())),
+                                     w, rd.X),
+                       expected_risk(HighOrderMoment(;
+                                                     alg = FourthMoment(;
+                                                                        alg = SemiMoment())),
                                      w, rd.X))
 
         @test isapprox(expected_risk(HighOrderMoment(; alg = FourthMoment()), w, rd.X),
@@ -273,17 +281,17 @@
         @test isapprox(expected_risk(HighOrderMoment(;
                                                      alg = StandardisedHighOrderMoment(;
                                                                                        alg = FourthMoment(;
-                                                                                                          alg = Semi()))),
+                                                                                                          alg = SemiMoment()))),
                                      w, rd.X), 7.5781142136319515)
         @test isapprox(expected_risk(HighOrderMoment(; mu = LinearAlgebra.dot(w, pr.mu),
                                                      alg = StandardisedHighOrderMoment(;
                                                                                        alg = FourthMoment(;
-                                                                                                          alg = Semi()))),
+                                                                                                          alg = SemiMoment()))),
                                      w, rd.X),
                        expected_risk(HighOrderMoment(;
                                                      alg = StandardisedHighOrderMoment(;
                                                                                        alg = FourthMoment(;
-                                                                                                          alg = Semi()))),
+                                                                                                          alg = SemiMoment()))),
                                      w, rd.X))
         @test isapprox(expected_risk(HighOrderMoment(;
                                                      alg = StandardisedHighOrderMoment(;

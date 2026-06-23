@@ -895,7 +895,7 @@ carried through unchanged.
 
   - `opt::JuMPOptimiser`: JuMP optimiser configuration.
   - `i`: Asset index or index set for the cluster.
-  - `X::MatNum`: Full returns matrix used to slice tracking estimators.
+  - `X::MatNum`: FullMoment returns matrix used to slice tracking estimators.
 
 # Returns
 

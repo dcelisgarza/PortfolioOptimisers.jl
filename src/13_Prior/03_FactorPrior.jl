@@ -34,7 +34,7 @@ FactorPrior
       │           │      │    ce ┼ GeneralCovariance
       │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
       │           │      │       │    w ┴ nothing
-      │           │      │   alg ┴ Full()
+      │           │      │   alg ┴ FullMoment()
       │           │   mp ┼ MatrixProcessing
       │           │      │     pdm ┼ Posdef
       │           │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
@@ -57,7 +57,7 @@ FactorPrior
    re ┼ StepwiseRegression
       │   crit ┼ PValue
       │        │   t ┴ Float64: 0.05
-      │    alg ┼ Forward()
+      │    alg ┼ ForwardSelection()
       │    tgt ┼ LinearModel
       │        │   kwargs ┴ @NamedTuple{}: NamedTuple()
    ve ┼ SimpleVariance

@@ -78,8 +78,8 @@ Factor prior models and implied volatility use [`regression`](@ref) in their est
 
 - ::: details Stepwise [`StepwiseRegression`](@ref)
   - ::: details Algorithms
-    - Forward [`Forward`](@ref)
-    - Backward [`Backward`](@ref)
+    - ForwardSelection [`ForwardSelection`](@ref)
+    - BackwardElimination [`BackwardElimination`](@ref)
   - ::: details Selection criteria
     - P-value [`PValue`](@ref)
     - Akaike information criteria [`AIC`](@ref)
@@ -123,8 +123,8 @@ Overloads `Statistics.cov` and `Statistics.cor`.
 
 - Optionally weighted covariance with custom covariance estimator [`GeneralCovariance`](@ref)
 - ::: details Covariance with custom covariance estimator [`Covariance`](@ref)
-  - Full [`Full`](@ref)
-  - Semi [`Semi`](@ref)
+  - FullMoment [`FullMoment`](@ref)
+  - SemiMoment [`SemiMoment`](@ref)
 - ::: details Gerber covariances with custom variance and demeaning estimator [`GerberCovariance`](@ref)
   - Gerber 0 [`Gerber0`](@ref)
   - Gerber 1 [`Gerber1`](@ref)
@@ -142,7 +142,7 @@ Overloads `Statistics.cov` and `Statistics.cor`.
 - ::: details Gerber Information Quality [`GerberIQCovariance`](@ref) with custom variance, demeaning, temporal decay and numerator + denominator estimators
   - Basic template [`BasicGerberIQ`](@ref)
   - Partial template [`PartialGerberIQ`](@ref)
-  - Full template [`FullGerberIQ`](@ref)
+  - FullMoment template [`FullGerberIQ`](@ref)
 - Distance covariance with custom distance estimator via [`Distances.jl`](https://github.com/JuliaStats/Distances.jl) [`DistanceCovariance`](@ref)
 - Lower Tail Dependence covariance [`LowerTailDependenceCovariance`](@ref)
 - ::: details Rank covariances
@@ -169,16 +169,16 @@ Overloads `Statistics.cov` and `Statistics.cor`.
 Implements [`coskewness`](@ref).
 
 - ::: details Coskewness and spectral decomposition of the negative coskewness with custom expected returns estimator and matrix processing pipeline [`Coskewness`](@ref)
-  - Full [`Full`](@ref)
-  - Semi [`Semi`](@ref)
+  - FullMoment [`FullMoment`](@ref)
+  - SemiMoment [`SemiMoment`](@ref)
 
 #### [Cokurtosis](@id readme-cokurtosis)
 
 Implements [`cokurtosis`](@ref).
 
 - ::: details Cokurtosis with custom expected returns estimator and matrix processing pipeline [`Cokurtosis`](@ref)
-  - Full [`Full`](@ref)
-  - Semi [`Semi`](@ref)
+  - FullMoment [`FullMoment`](@ref)
+  - SemiMoment [`SemiMoment`](@ref)
 
 ### Distance matrices
 
@@ -374,32 +374,32 @@ These are all subtypes of [`RiskMeasure`](@ref), and are supported by all optimi
   - Mean absolute deviation [`MeanAbsoluteDeviation`](@ref)
   - ::: details Second moment [`SecondMoment`](@ref)
     - ::: details Second squared moments
-      - Scenario variance [`Full`](@ref)
-      - Scenario semi-variance [`Semi`](@ref)
+      - Scenario variance [`FullMoment`](@ref)
+      - Scenario semi-variance [`SemiMoment`](@ref)
       - ::: details Traditional optimisation formulations
         - Quadratic risk expression [`QuadRiskExpr`](@ref)
         - Squared second order cone [`SquaredSOCRiskExpr`](@ref)
         - Rotated second order cone [`RSOCRiskExpr`](@ref)
     - ::: details Second moments [`SOCRiskExpr`](@ref)
-      - Scenario standard deviation [`Full`](@ref)
-      - Scenario semi-standard deviation [`Semi`](@ref)
+      - Scenario standard deviation [`FullMoment`](@ref)
+      - Scenario semi-standard deviation [`SemiMoment`](@ref)
 - ::: details Kurtosis [`Kurtosis`](@ref)
   - Actual kurtosis
-    - ::: details Full and semi-kurtosis are supported in traditional optimisers via the `kt` field. Risk calculation uses
-      - Full [`Full`](@ref)
-      - Semi [`Semi`](@ref)
+    - ::: details FullMoment and semi-kurtosis are supported in traditional optimisers via the `kt` field. Risk calculation uses
+      - FullMoment [`FullMoment`](@ref)
+      - SemiMoment [`SemiMoment`](@ref)
     - ::: details Traditional optimisation formulations
       - Quadratic risk expression [`QuadRiskExpr`](@ref)
       - Squared second order cone [`SquaredSOCRiskExpr`](@ref)
       - Rotated second order cone [`RSOCRiskExpr`](@ref)
   - ::: details Square root kurtosis [`SOCRiskExpr`](@ref)
-    - Full [`Full`](@ref)
-    - Semi [`Semi`](@ref)
+    - FullMoment [`FullMoment`](@ref)
+    - SemiMoment [`SemiMoment`](@ref)
 - ::: details Negative skewness [`NegativeSkewness`](@ref)
   - ::: details Squared negative skewness
-    - ::: details Full and semi-skewness are supported in traditional optimisers via the `sk` and `V` fields. Risk calculation uses
-      - Full [`Full`](@ref)
-      - Semi [`Semi`](@ref)
+    - ::: details FullMoment and semi-skewness are supported in traditional optimisers via the `sk` and `V` fields. Risk calculation uses
+      - FullMoment [`FullMoment`](@ref)
+      - SemiMoment [`SemiMoment`](@ref)
     - ::: details Traditional optimisation formulations
       - Quadratic risk expression [`QuadRiskExpr`](@ref)
       - Squared second order cone [`SquaredSOCRiskExpr`](@ref)
@@ -486,11 +486,11 @@ These are all subtypes of [`HierarchicalRiskMeasure`](@ref), and are only suppor
   - Unstandardised third lower moment [`ThirdLowerMoment`](@ref)
   - Standardised third lower moment [`StandardisedHighOrderMoment`](@ref) and [`ThirdLowerMoment`](@ref)
   - ::: details Unstandardised fourth moment [`FourthMoment`](@ref)
-    - Full [`Full`](@ref)
-    - Semi [`Semi`](@ref)
+    - FullMoment [`FullMoment`](@ref)
+    - SemiMoment [`SemiMoment`](@ref)
   - ::: details Standardised fourth moment [`StandardisedHighOrderMoment`](@ref) and [`FourthMoment`](@ref)
-    - Full [`Full`](@ref)
-    - Semi [`Semi`](@ref)
+    - FullMoment [`FullMoment`](@ref)
+    - SemiMoment [`SemiMoment`](@ref)
 - Relative Drawdown at Risk [`RelativeDrawdownatRisk`](@ref)
 - Relative Conditional Drawdown at Risk [`RelativeConditionalDrawdownatRisk`](@ref)
 - Relative Entropic Drawdown at Risk [`RelativeEntropicDrawdownatRisk`](@ref)

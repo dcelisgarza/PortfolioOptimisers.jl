@@ -117,7 +117,7 @@
                                                                    (IndependentVariableTracking(),
                                                                     DependentVariableTracking())
         p = trk_prefix(alg)
-        # Full Kurtosis (N = nothing) caches the projected-cokurtosis Cholesky as :Gkt.
+        # FullMoment Kurtosis (N = nothing) caches the projected-cokurtosis Cholesky as :Gkt.
         mf = track_model(Kurtosis(), alg, opt3, w03, rd3)
         if mf !== nothing
             @test haskey(mf, :Gkt)

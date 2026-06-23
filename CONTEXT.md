@@ -30,8 +30,8 @@ Small reusable Algorithms that collapse a vector of reals to a scalar, reused th
 LxNorm errors are used as constraints, targets for risk measures, and in entropy pooling of multiple
 conditional value at risk views: `L1Norm`, `L2Norm`, `SquaredL2Norm`, `LpNorm`, `LInfNorm`.
 
-**Full vs Semi**
-A pervasive Algorithm distinction in moment estimation: `Full` includes all deviations; `Semi` includes only observations below a target (downside-only). Drives the split between symmetric and downside risk/moment measures.
+**FullMoment vs SemiMoment**
+A pervasive Algorithm distinction in moment estimation: `FullMoment` includes all deviations; `SemiMoment` includes only observations below a target (downside-only). Drives the split between symmetric and downside risk/moment measures.
 
 ## 2. Data
 
@@ -81,14 +81,14 @@ Computes an asset covariance (and correlation) matrix. Core wrappers: `Covarianc
 ### 3.3 Higher-Order Moments
 
 **Coskewness** / **Cokurtosis**
-Third- and fourth-order co-moment tensors (with `Full`/`Semi` variants and windowed forms `WindowedCoskewness`, `WindowedCokurtosis`). Feed high-order priors and higher-moment risk measures.
+Third- and fourth-order co-moment tensors (with `FullMoment`/`SemiMoment` variants and windowed forms `WindowedCoskewness`, `WindowedCokurtosis`). Feed high-order priors and higher-moment risk measures.
 
 ### 3.4 Regression (factor modelling)
 
 **Regression Estimator**
 Builds a factor model mapping factor returns to asset returns; underpins factor priors. Families:
 
-- **StepwiseRegression**: greedy feature selection — `Forward` (selection) or `Backward` (elimination), driven by a criterion: `PValue`, `AIC`, `AICC`, `BIC`, `RSquared`, `AdjustedRSquared`.
+- **StepwiseRegression**: greedy feature selection — `ForwardSelection` (selection) or `BackwardElimination` (elimination), driven by a criterion: `PValue`, `AIC`, `AICC`, `BIC`, `RSquared`, `AdjustedRSquared`.
 - **DimensionReductionRegression**: regression on reduced factors — targets `PCA`, `PPCA`.
 - **Regression target** models: `LinearModel`, `GeneralisedLinearModel` (GLM).
 

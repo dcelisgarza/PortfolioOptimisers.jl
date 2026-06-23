@@ -438,16 +438,16 @@ end
     mip_opt = JuMPOptimiser(; pe = pr, slv = mip_slv)
     rs1 = [LowOrderMoment(; mu = 0),
            LowOrderMoment(; mu = 0, alg = MeanAbsoluteDeviation()),
-           LowOrderMoment(; mu = 0, alg = SecondMoment(; alg1 = Semi())),
+           LowOrderMoment(; mu = 0, alg = SecondMoment(; alg1 = SemiMoment())),
            LowOrderMoment(; mu = 0, alg = SecondMoment()),
            LowOrderMoment(; mu = 0,
-                          alg = SecondMoment(; alg1 = Semi(), alg2 = SOCRiskExpr())),
+                          alg = SecondMoment(; alg1 = SemiMoment(), alg2 = SOCRiskExpr())),
            LowOrderMoment(; mu = 0, alg = SecondMoment(; alg2 = SOCRiskExpr())),
            LowOrderMoment(; mu = 0,
-                          alg = SecondMoment(; alg1 = Semi(), alg2 = RSOCRiskExpr())),
+                          alg = SecondMoment(; alg1 = SemiMoment(), alg2 = RSOCRiskExpr())),
            LowOrderMoment(; mu = 0, alg = SecondMoment(; alg2 = RSOCRiskExpr())),
            LowOrderMoment(; mu = 0,
-                          alg = SecondMoment(; alg1 = Semi(), alg2 = QuadRiskExpr())),
+                          alg = SecondMoment(; alg1 = SemiMoment(), alg2 = QuadRiskExpr())),
            LowOrderMoment(; mu = 0, alg = SecondMoment(; alg2 = QuadRiskExpr())),
            ConditionalValueatRisk(), EntropicValueatRisk(), ConditionalValueatRiskRange(),
            EntropicValueatRiskRange(),
@@ -458,19 +458,19 @@ end
            ValueatRisk(; alg = DistributionValueatRisk()),
            ValueatRiskRange(; alg = DistributionValueatRisk()), DrawdownatRisk(),
            LowOrderMoment(; mu = 0, alg = EvenMoment()),
-           LowOrderMoment(; mu = 0, alg = EvenMoment(; alg = Semi()))]
+           LowOrderMoment(; mu = 0, alg = EvenMoment(; alg = SemiMoment()))]
     rs2 = [LowOrderMoment(; mu = 0, w = wp),
            LowOrderMoment(; mu = 0, w = wp, alg = MeanAbsoluteDeviation()),
-           LowOrderMoment(; mu = 0, w = wp, alg = SecondMoment(; alg1 = Semi())),
+           LowOrderMoment(; mu = 0, w = wp, alg = SecondMoment(; alg1 = SemiMoment())),
            LowOrderMoment(; mu = 0, w = wp, alg = SecondMoment()),
            LowOrderMoment(; mu = 0, w = wp,
-                          alg = SecondMoment(; alg1 = Semi(), alg2 = SOCRiskExpr())),
+                          alg = SecondMoment(; alg1 = SemiMoment(), alg2 = SOCRiskExpr())),
            LowOrderMoment(; mu = 0, w = wp, alg = SecondMoment(; alg2 = SOCRiskExpr())),
            LowOrderMoment(; mu = 0, w = wp,
-                          alg = SecondMoment(; alg1 = Semi(), alg2 = RSOCRiskExpr())),
+                          alg = SecondMoment(; alg1 = SemiMoment(), alg2 = RSOCRiskExpr())),
            LowOrderMoment(; mu = 0, w = wp, alg = SecondMoment(; alg2 = RSOCRiskExpr())),
            LowOrderMoment(; mu = 0, w = wp,
-                          alg = SecondMoment(; alg1 = Semi(), alg2 = QuadRiskExpr())),
+                          alg = SecondMoment(; alg1 = SemiMoment(), alg2 = QuadRiskExpr())),
            LowOrderMoment(; mu = 0, w = wp, alg = SecondMoment(; alg2 = QuadRiskExpr())),
            ConditionalValueatRisk(; w = wp), EntropicValueatRisk(; w = wp),
            ConditionalValueatRiskRange(; w = wp), EntropicValueatRiskRange(; w = wp),
@@ -482,7 +482,7 @@ end
            ValueatRisk(; alg = DistributionValueatRisk(), w = wp),
            ValueatRiskRange(; alg = DistributionValueatRisk(), w = wp),
            DrawdownatRisk(; w = wp), LowOrderMoment(; mu = 0, w = wp, alg = EvenMoment()),
-           LowOrderMoment(; mu = 0, w = wp, alg = EvenMoment(; alg = Semi()))]
+           LowOrderMoment(; mu = 0, w = wp, alg = EvenMoment(; alg = SemiMoment()))]
     for (i, (r1, r2)) in enumerate(zip(rs1, rs2))
         if i <= 21
             continue

@@ -1019,7 +1019,7 @@ function port_opt_view(pr::HighOrderPrior, i, args...)
                           S2 = S2, sk = sk, V = V, skmp = skmp, f_kt = pr.f_kt,
                           f_sk = pr.f_sk, f_V = pr.f_V)
 end
-# Forward unknown property names to the embedded `pr` prior, allowing transparent access to
+# ForwardSelection unknown property names to the embedded `pr` prior, allowing transparent access to
 # low-order moment fields (see [`@forward_properties`](@ref)).
 @forward_properties HighOrderPrior begin
     forward(pr)

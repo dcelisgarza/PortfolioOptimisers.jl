@@ -192,7 +192,7 @@ not `@pprop`.
 - `@pprop @wprop w` measures expose both `factory(r, pr)` and `factory(r, ::ObsWeights)`.
 - `@fprop`-tagged sub-estimator fields that are `nothing` survive `factory(x, ::ObsWeights)`
   unchanged (regression test for the weights/estimator collision).
-- Full test suite green before merge (mirrors ADR 0011).
+- FullMoment test suite green before merge (mirrors ADR 0011).
 
 ## Rollout
 

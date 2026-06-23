@@ -38,7 +38,7 @@ function outer_optimisation_finaliser(wb::Option{<:WeightBounds}, wf::WeightFina
             msg *= "opto failed.\n"
         end
         if wb_flag
-            msg *= "Full optimisation failed.\n"
+            msg *= "FullMoment optimisation failed.\n"
         end
         retcode = OptimisationFailure(; res = msg)
     end

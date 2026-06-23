@@ -807,7 +807,7 @@ The two-argument methods operate on a single pre-defined train/test split or on 
 # Arguments
 
   - `opt`: Optimisation estimator or an existing optimisation result.
-  - `rd::ReturnsResult`: Full returns data.
+  - `rd::ReturnsResult`: FullMoment returns data.
   - `cv::NonSeqCVER`: Non-sequential cross-validation estimator (e.g. [`KFold`](@ref) or [`CombinatorialCrossValidation`](@ref)).
   - `train_idx::VecInt`: Training indices.
   - `test_idx`: Test indices (vector or vector of vectors).

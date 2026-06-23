@@ -234,7 +234,7 @@ function PortfolioOptimisers.plot_composition(pred::MultiPeriodPredictionResult;
     end
     return PortfolioOptimisers.plot_stacked_bar_composition(collect(eachcol(w_mat)), nx;
                                                             xlabel = "Fold",
-                                                            title = "Walk-Forward Composition",
+                                                            title = "Walk-ForwardSelection Composition",
                                                             kwargs...)
 end
 function PortfolioOptimisers.plot_composition(pred::PopulationPredictionResult;

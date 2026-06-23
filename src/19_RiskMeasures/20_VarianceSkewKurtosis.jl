@@ -433,7 +433,7 @@ VarianceSkewKurtosis
            │         mu ┼ nothing
            │         kt ┼ nothing
            │          N ┼ nothing
-           │       alg1 ┼ Full()
+           │       alg1 ┼ FullMoment()
            │       alg2 ┴ SOCRiskExpr()
 ```
 

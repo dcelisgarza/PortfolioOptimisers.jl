@@ -547,7 +547,7 @@ Handles sequential and parallel execution. If the optimiser requires previous we
 # Arguments
 
   - `opt::NonFiniteAllocationOptimisationEstimator`: Portfolio optimisation estimator.
-  - `rd::ReturnsResult`: Full returns data.
+  - `rd::ReturnsResult`: FullMoment returns data.
   - `train_idx`: Sequence of training index vectors.
   - `test_idx`: Sequence of test index vectors.
   - `cols`: Sequence of asset column indices for each fold.

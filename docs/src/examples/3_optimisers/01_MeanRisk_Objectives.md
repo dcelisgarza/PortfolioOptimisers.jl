@@ -69,8 +69,8 @@ rd = prices_to_returns(X)
 We will hold the risk measure fixed and vary only the objective. For the risk measure we reach for
 the **semi–standard deviation** — and here we meet a consequence of the package's design
 philosophy: an entire class of risk measures is expressed as a single
-[`LowOrderMoment`](@ref) parametrised by an internal algorithm. Semi–standard deviation is the
-second lower partial moment (`Semi()`) rendered as a second-order cone expression
+[`LowOrderMoment`](@ref) parametrised by an internal algorithm. SemiMoment–standard deviation is the
+second lower partial moment (`SemiMoment()`) rendered as a second-order cone expression
 ([`SOCRiskExpr`](@ref)).
 
 ````@example 01_MeanRisk_Objectives
@@ -79,7 +79,7 @@ slv = Solver(; name = :clarabel1, solver = Clarabel.Optimizer,
              settings = Dict("verbose" => false),
              check_sol = (; allow_local = true, allow_almost = true))
 
-r = LowOrderMoment(; alg = SecondMoment(; alg1 = Semi(), alg2 = SOCRiskExpr()))
+r = LowOrderMoment(; alg = SecondMoment(; alg1 = SemiMoment(), alg2 = SOCRiskExpr()))
 ````
 
 Since every optimisation runs on the same data, we precompute the prior statistics once with
@@ -179,7 +179,7 @@ step traces that path explicitly.
 using StatsPlots, GraphRecipes
 
 plot([s[2] for s in sweep], [s[3] for s in sweep]; seriestype = :path,
-     marker = (:circle, 5), xlabel = "Semi-deviation risk", ylabel = "Arithmetic return",
+     marker = (:circle, 5), xlabel = "SemiMoment-deviation risk", ylabel = "Arithmetic return",
      title = "MaximumUtility risk-aversion path",
      label = "l = " * join(string.(lambdas), ", "))
 ````

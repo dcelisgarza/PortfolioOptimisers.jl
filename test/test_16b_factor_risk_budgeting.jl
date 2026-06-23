@@ -61,7 +61,7 @@ include(joinpath(@__DIR__, "test16_setup.jl"))
     end
 
     df = CSV.read(joinpath(@__DIR__, "./assets/FactorRiskBudgeting2.csv.gz"), DataFrame)
-    rr = regression(StepwiseRegression(; alg = Backward()), rd)
+    rr = regression(StepwiseRegression(; alg = BackwardElimination()), rd)
     for (i, r) in enumerate(rs)
         if i == 25
             continue

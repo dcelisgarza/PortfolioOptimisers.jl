@@ -41,7 +41,7 @@ HierarchicalEqualRiskContribution
        │          │           │      │    ce ┼ GeneralCovariance
        │          │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
        │          │           │      │       │    w ┴ nothing
-       │          │           │      │   alg ┴ Full()
+       │          │           │      │   alg ┴ FullMoment()
        │          │           │   mp ┼ MatrixProcessing
        │          │           │      │     pdm ┼ Posdef
        │          │           │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
@@ -61,7 +61,7 @@ HierarchicalEqualRiskContribution
        │          │       │      │    ce ┼ GeneralCovariance
        │          │       │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
        │          │       │      │       │    w ┴ nothing
-       │          │       │      │   alg ┴ Full()
+       │          │       │      │   alg ┴ FullMoment()
        │          │       │   mp ┼ MatrixProcessing
        │          │       │      │     pdm ┼ Posdef
        │          │       │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
