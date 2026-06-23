@@ -247,7 +247,8 @@ Constructs an uncertainty set from a given estimator and returns data.
 function ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult; kwargs...)
     @argcheck(!isnothing(rd.X), IsNothingError)
     if isa(uc.pe, AbstractHiLoOrderPriorEstimator_F)
-        @argcheck(!isnothing(rd.F), IsNothingError)
+        @argcheck(!isnothing(rd.F),
+                  IsNothingError("this is a factor prior; it needs factor returns. ReturnsResult.F is nothing — populate F (e.g. via prices_to_returns on factor prices)."))
     end
     return ucs(uc, rd.X, rd.F; iv = rd.iv, ivpa = rd.ivpa, kwargs...)
 end
@@ -283,7 +284,8 @@ Constructs an expected returns uncertainty set from a given estimator and return
 function mu_ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult; kwargs...)
     @argcheck(!isnothing(rd.X), IsNothingError)
     if isa(uc.pe, AbstractHiLoOrderPriorEstimator_F)
-        @argcheck(!isnothing(rd.F), IsNothingError)
+        @argcheck(!isnothing(rd.F),
+                  IsNothingError("this is a factor prior; it needs factor returns. ReturnsResult.F is nothing — populate F (e.g. via prices_to_returns on factor prices)."))
     end
     return mu_ucs(uc, rd.X, rd.F; iv = rd.iv, ivpa = rd.ivpa, kwargs...)
 end
@@ -319,7 +321,8 @@ Constructs a covariance uncertainty set from a given estimator and returns data.
 function sigma_ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult; kwargs...)
     @argcheck(!isnothing(rd.X), IsNothingError)
     if isa(uc.pe, AbstractHiLoOrderPriorEstimator_F)
-        @argcheck(!isnothing(rd.F), IsNothingError)
+        @argcheck(!isnothing(rd.F),
+                  IsNothingError("this is a factor prior; it needs factor returns. ReturnsResult.F is nothing — populate F (e.g. via prices_to_returns on factor prices)."))
     end
     return sigma_ucs(uc, rd.X, rd.F; iv = rd.iv, ivpa = rd.ivpa, kwargs...)
 end

@@ -227,7 +227,8 @@ Compute prior information from asset and/or factor returns using a prior estimat
 function prior(pr::AbstractPriorEstimator, rd::ReturnsResult; kwargs...)
     @argcheck(!isnothing(rd.X), IsNothingError)
     if isa(pr, AbstractHiLoOrderPriorEstimator_F)
-        @argcheck(!isnothing(rd.F), IsNothingError)
+        @argcheck(!isnothing(rd.F),
+                  IsNothingError("this is a factor prior; it needs factor returns. ReturnsResult.F is nothing — populate F (e.g. via prices_to_returns on factor prices)."))
     end
     return prior(pr, rd.X, rd.F; iv = rd.iv, ivpa = rd.ivpa, kwargs...)
 end

@@ -48,10 +48,8 @@ PhylogenyResult
     function PhylogenyResult(X::ArrNum)
         @argcheck(!isempty(X), IsEmptyError)
         if isa(X, MatNum)
-            @argcheck(LinearAlgebra.issymmetric(X),
-                      ArgumentError("X must be a symmetric matrix"))
-            @argcheck(all(iszero, LinearAlgebra.diag(X)),
-                      ArgumentError("all diagonal elements of X must be zero"))
+            @argcheck(LinearAlgebra.issymmetric(X) && all(iszero, LinearAlgebra.diag(X)),
+                      ArgumentError("phylogeny needs a distance matrix (symmetric, zero diagonal). Got a $(ifelse(LinearAlgebra.issymmetric(X), "symmetric", "non-symmetric")) $(ifelse(all(iszero, LinearAlgebra.diag(X)), "zero diagonal", "non-zero diagonal")) matrix."))
         end
         return new{typeof(X)}(X)
     end
