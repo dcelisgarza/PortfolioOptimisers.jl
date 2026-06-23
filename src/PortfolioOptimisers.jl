@@ -237,5 +237,6 @@ include("20_Optimisation/23_GreedyFiniteAllocation.jl")
 include("21_ExpectedReturns.jl")
 include("22_Plotting.jl")
 include("23_Precompilation.jl")
+include("24_Aliases.jl")
 
 end

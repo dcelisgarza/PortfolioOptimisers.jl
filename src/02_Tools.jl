@@ -331,12 +331,24 @@ end
 """
     port_opt_view(x, i, args...; kwargs...) -> nothing_scalar_array_view(x, i)
 
-Universal fallback for [`port_opt_view`](@ref). Any value that has no more specific
-`port_opt_view` method is treated as leaf data: it is delegated to
-[`nothing_scalar_array_view`](@ref), which slices arrays/`VecScalar`s and passes
-scalars, `nothing`, estimators, and algorithms through unchanged. Composed structs that
-need to recurse into children define their own (more specific) method — emitted by the
-[`@vprop`](@ref) tag or hand-written.
+Sub-select an estimator, result, or algorithm to the asset/observation index `i`.
+
+`port_opt_view` is the **index-selection counterpart of [`factory`](@ref)**: where `factory`
+threads *runtime values* down a composed struct tree, `port_opt_view` threads an *index
+selection* — restricting every data-bearing field and composed child to the subset `i`.
+It is the mechanism that makes meta-optimisers ([`NestedClustered`](@ref),
+[`SubsetResampling`](@ref)) and cross-validation variants operate on subproblems with
+identical struct shapes.
+
+Callers do not normally call `port_opt_view` directly; it is driven by meta-optimisers and
+cross-validation internals. It is `public` (not exported) because extension authors who
+implement a new composed estimator may need to define a method. Use [`@vprop`](@ref) on
+data-bearing fields to have the method generated automatically.
+
+This universal fallback handles *leaf* values: arrays are sliced via
+[`nothing_scalar_array_view`](@ref); scalars, `nothing`, estimators without data fields,
+and algorithms pass through unchanged. Composed structs that recurse into children define
+their own (more specific) method — emitted by [`@vprop`](@ref) or hand-written.
 
 The threaded tail `args...` (typically the returns matrix `X` for the JuMP families) and
 any `kwargs` are accepted and dropped here, so a macro-threaded
@@ -344,8 +356,9 @@ any `kwargs` are accepted and dropped here, so a macro-threaded
 
 # Related
 
-  - [`nothing_scalar_array_view`](@ref)
+  - [`factory`](@ref)
   - [`@vprop`](@ref)
+  - [`nothing_scalar_array_view`](@ref)
 """
 port_opt_view(x, i, args...; kwargs...) = nothing_scalar_array_view(x, i)
 """
@@ -693,6 +706,11 @@ No-op factory function for constructing objects with a uniform interface.
 
 Defining methods which dispatch on the first argument allows for a consistent factory interface across different types.
 
+`factory` and [`port_opt_view`](@ref) are the two propagation mechanisms in this library.
+They are duals: `factory` threads **runtime values** (prior moments, observation weights,
+previous portfolio weights) down through a composed struct tree; `port_opt_view` threads an
+**index selection** (a subset of assets or observations) down through the same tree.
+
 # Arguments
 
   - `a`: Indicates no object should be constructed.
@@ -715,6 +733,7 @@ MeanValue
 
 # Related
 
+  - [`port_opt_view`](@ref)
   - [`AbstractEstimator`](@ref)
   - [`AbstractAlgorithm`](@ref)
   - [`AbstractResult`](@ref)

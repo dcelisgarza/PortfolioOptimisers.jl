@@ -154,7 +154,7 @@ Threshold
     """
     @vprop val
     function Threshold(val::Num_VecNum)::Threshold
-        assert_nonempty_nonneg_finite_val(val)
+        assert_nonempty_nonneg_finite_val(val, :val)
         return new{typeof(val)}(val)
     end
 end

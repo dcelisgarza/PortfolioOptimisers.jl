@@ -112,8 +112,8 @@ RiskBudgetEstimator
     dval
     function RiskBudgetEstimator(val::EstValType,
                                  dval::Option{<:Number})::RiskBudgetEstimator
-        assert_nonempty_nonneg_finite_val(val)
-        assert_nonempty_nonneg_finite_val(dval)
+        assert_nonempty_nonneg_finite_val(val, :val)
+        assert_nonempty_nonneg_finite_val(dval, :dval)
         return new{typeof(val), typeof(dval)}(val, dval)
     end
 end
