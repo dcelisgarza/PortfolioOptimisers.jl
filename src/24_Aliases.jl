@@ -173,28 +173,28 @@ function SSK(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                                                              alg = ThirdLowerMoment()))
 end
 """
-    FCM(; settings::RiskMeasureSettings = RiskMeasureSettings(),
+    FTCM(; settings::RiskMeasureSettings = RiskMeasureSettings(),
           w::Option{<:ObsWeights} = nothing,
           mu::Option{<:Num_VecNum_VecScalar} = nothing) -> HighOrderMoment
 
-Alias for the Fourth Central Moment (FCM) risk measure.
+Alias for the Fourth Central Moment (FTCM) risk measure.
 """
-function FCM(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-             w::Option{<:ObsWeights} = nothing,
-             mu::Option{<:Num_VecNum_VecScalar} = nothing)::HighOrderMoment
+function FTCM(; settings::RiskMeasureSettings = RiskMeasureSettings(),
+              w::Option{<:ObsWeights} = nothing,
+              mu::Option{<:Num_VecNum_VecScalar} = nothing)::HighOrderMoment
     return HighOrderMoment(; settings = settings, w = w, mu = mu,
                            alg = FourthMoment(; alg = FullMoment()))
 end
 """
-    FLM(; settings::RiskMeasureSettings = RiskMeasureSettings(),
+    FTLM(; settings::RiskMeasureSettings = RiskMeasureSettings(),
           w::Option{<:ObsWeights} = nothing,
           mu::Option{<:Num_VecNum_VecScalar} = nothing) -> HighOrderMoment
 
-Alias for the Fourth Lower Moment (FLM) risk measure.
+Alias for the Fourth Lower Moment (FTLM) risk measure.
 """
-function FLM(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-             w::Option{<:ObsWeights} = nothing,
-             mu::Option{<:Num_VecNum_VecScalar} = nothing)::HighOrderMoment
+function FTLM(; settings::RiskMeasureSettings = RiskMeasureSettings(),
+              w::Option{<:ObsWeights} = nothing,
+              mu::Option{<:Num_VecNum_VecScalar} = nothing)::HighOrderMoment
     return HighOrderMoment(; settings = settings, w = w, mu = mu,
                            alg = FourthMoment(; alg = SemiMoment()))
 end
@@ -298,4 +298,4 @@ const PNDaR_R = RelativePowerNormDrawdownatRisk
 
 export HRP, HERC, SCHRP, NCO, STO, SSR, MR, RB, RRB, FRC, NOC, VaR, CVaR, EVaR, RVaR, PNVaR,
        DaR, CDaR, EDaR, RDaR, PNDaR, DaR_R, CDaR_R, EDaR_R, RDaR_R, PNDaR_R, FLM, MAD, SCM,
-       SLM, ECM, ELM, TLM, SSK, FCM, FLM, KT, SKT
+       SLM, ECM, ELM, TLM, SSK, FTCM, FTLM, KT, SKT
