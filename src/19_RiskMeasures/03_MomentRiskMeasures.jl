@@ -149,7 +149,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Represents an even-order moment risk measure algorithm in `PortfolioOptimisers.jl`.
 
-Computes portfolio risk using the ``2p``-th central (full) or lower (semi) even moment of the return distribution. Despite the potentially high moment order, even moments admit an exact power cone reformulation, keeping the optimisation formulation affine.
+Computes portfolio risk using the square root of the ``2p``-th central (full) or lower (semi) even moment of the return distribution. Despite the potentially high moment order, even moments admit an exact power cone reformulation, keeping the optimisation formulation affine.
 
 # Fields
 
@@ -1273,6 +1273,55 @@ function moment_risk(r::LowOrderMoment{<:Any, <:Option{<:StatsBase.AbstractWeigh
     val = abs.(val)
     return isnothing(r.w) ? Statistics.mean(val) : Statistics.mean(val, r.w)
 end
+function moment_risk(r::LowOrderMoment{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any,
+                                       <:SecondMoment{<:Any, <:FullMoment, <:SOCRiskExpr}},
+                     val::VecNum)
+    return Statistics.std(r.alg.ve, val; mean = zero(eltype(val)))
+end
+function moment_risk(r::LowOrderMoment{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any,
+                                       <:SecondMoment{<:Any, <:FullMoment,
+                                                      <:QuadSecondMomentFormulations}},
+                     val::VecNum)
+    return Statistics.var(r.alg.ve, val; mean = zero(eltype(val)))
+end
+function moment_risk(r::LowOrderMoment{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any,
+                                       <:SecondMoment{<:Any, <:SemiMoment, <:SOCRiskExpr}},
+                     val::VecNum)
+    val = min.(val, zero(eltype(val)))
+    return Statistics.std(r.alg.ve, val; mean = zero(eltype(val)))
+end
+function moment_risk(r::LowOrderMoment{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any,
+                                       <:SecondMoment{<:Any, <:SemiMoment,
+                                                      <:QuadSecondMomentFormulations}},
+                     val::VecNum)
+    val = min.(val, zero(eltype(val)))
+    return Statistics.var(r.alg.ve, val; mean = zero(eltype(val)))
+end
+function moment_risk(r::LowOrderMoment{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any,
+                                       <:EvenMoment{<:Any, <:Any, <:FullMoment}},
+                     val::VecNum)
+    T = length(val) - r.alg.ddof
+    val = if isnothing(r.w)
+        LinearAlgebra.norm(val, 2 * r.alg.p)
+    else
+        T = T / length(val) * sum(r.w)
+        LinearAlgebra.norm(val .* r.w, 2 * r.alg.p)
+    end
+    return val^2 / T^inv(r.alg.p)
+end
+function moment_risk(r::LowOrderMoment{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any,
+                                       <:EvenMoment{<:Any, <:Any, <:SemiMoment}},
+                     val::VecNum)
+    T = length(val) - r.alg.ddof
+    val = min.(val, zero(eltype(val)))
+    val = if isnothing(r.w)
+        LinearAlgebra.norm(val, 2 * r.alg.p)
+    else
+        T = T / length(val) * sum(r.w)
+        LinearAlgebra.norm(val .* r.w, 2 * r.alg.p)
+    end
+    return val^2 / T^inv(r.alg.p)
+end
 function moment_risk(r::HighOrderMoment{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any,
                                         <:ThirdLowerMoment}, val::VecNum)
     val = min.(val, zero(eltype(val)))
@@ -1289,54 +1338,10 @@ function moment_risk(r::HighOrderMoment{<:Any, <:Option{<:StatsBase.AbstractWeig
     res = isnothing(r.w) ? -Statistics.mean(val) : -Statistics.mean(val, r.w)
     return res / (sigma * sqrt(sigma))
 end
-function moment_risk(r::LowOrderMoment{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any,
-                                       <:SecondMoment{<:Any, <:SemiMoment, <:SOCRiskExpr}},
-                     val::VecNum)
-    val = min.(val, zero(eltype(val)))
-    return Statistics.std(r.alg.ve, val; mean = zero(eltype(val)))
-end
-function moment_risk(r::LowOrderMoment{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any,
-                                       <:SecondMoment{<:Any, <:SemiMoment,
-                                                      <:QuadSecondMomentFormulations}},
-                     val::VecNum)
-    val = min.(val, zero(eltype(val)))
-    return Statistics.var(r.alg.ve, val; mean = zero(eltype(val)))
-end
-function moment_risk(r::LowOrderMoment{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any,
-                                       <:SecondMoment{<:Any, <:FullMoment, <:SOCRiskExpr}},
-                     val::VecNum)
-    return Statistics.std(r.alg.ve, val; mean = zero(eltype(val)))
-end
-function moment_risk(r::LowOrderMoment{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any,
-                                       <:SecondMoment{<:Any, <:FullMoment,
-                                                      <:QuadSecondMomentFormulations}},
-                     val::VecNum)
-    return Statistics.var(r.alg.ve, val; mean = zero(eltype(val)))
-end
-function moment_risk(r::LowOrderMoment{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any,
-                                       <:EvenMoment{<:Any, <:Any, <:SemiMoment}},
-                     val::VecNum)
-    T = length(val) - r.alg.ddof
-    val = min.(val, zero(eltype(val)))
-    val = if isnothing(r.w)
-        LinearAlgebra.norm(val, 2 * r.alg.p)
-    else
-        T = T / length(val) * sum(r.w)
-        LinearAlgebra.norm(val .* r.w, 2 * r.alg.p)
-    end
-    return val^2 / T^inv(r.alg.p)
-end
-function moment_risk(r::LowOrderMoment{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any,
-                                       <:EvenMoment{<:Any, <:Any, <:FullMoment}},
-                     val::VecNum)
-    T = length(val) - r.alg.ddof
-    val = if isnothing(r.w)
-        LinearAlgebra.norm(val, 2 * r.alg.p)
-    else
-        T = T / length(val) * sum(r.w)
-        LinearAlgebra.norm(val .* r.w, 2 * r.alg.p)
-    end
-    return val^2 / T^inv(r.alg.p)
+function moment_risk(r::HighOrderMoment{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any,
+                                        <:FourthMoment{<:FullMoment}}, val::VecNum)
+    val .= val .^ 4
+    return isnothing(r.w) ? Statistics.mean(val) : Statistics.mean(val, r.w)
 end
 function moment_risk(r::HighOrderMoment{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any,
                                         <:FourthMoment{<:SemiMoment}}, val::VecNum)
@@ -1345,15 +1350,9 @@ function moment_risk(r::HighOrderMoment{<:Any, <:Option{<:StatsBase.AbstractWeig
     return isnothing(r.w) ? Statistics.mean(val) : Statistics.mean(val, r.w)
 end
 function moment_risk(r::HighOrderMoment{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any,
-                                        <:FourthMoment{<:FullMoment}}, val::VecNum)
-    val .= val .^ 4
-    return isnothing(r.w) ? Statistics.mean(val) : Statistics.mean(val, r.w)
-end
-function moment_risk(r::HighOrderMoment{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any,
                                         <:StandardisedHighOrderMoment{<:Any,
-                                                                      <:FourthMoment{<:SemiMoment}}},
+                                                                      <:FourthMoment{<:FullMoment}}},
                      val::VecNum)
-    val = min.(val, zero(eltype(val)))
     sigma = Statistics.var(r.alg.ve, val; mean = zero(eltype(val)))
     val .= val .^ 4
     res = isnothing(r.w) ? Statistics.mean(val) : Statistics.mean(val, r.w)
@@ -1361,8 +1360,9 @@ function moment_risk(r::HighOrderMoment{<:Any, <:Option{<:StatsBase.AbstractWeig
 end
 function moment_risk(r::HighOrderMoment{<:Any, <:Option{<:StatsBase.AbstractWeights}, <:Any,
                                         <:StandardisedHighOrderMoment{<:Any,
-                                                                      <:FourthMoment{<:FullMoment}}},
+                                                                      <:FourthMoment{<:SemiMoment}}},
                      val::VecNum)
+    val = min.(val, zero(eltype(val)))
     sigma = Statistics.var(r.alg.ve, val; mean = zero(eltype(val)))
     val .= val .^ 4
     res = isnothing(r.w) ? Statistics.mean(val) : Statistics.mean(val, r.w)

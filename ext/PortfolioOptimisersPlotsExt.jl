@@ -1229,15 +1229,14 @@ function PortfolioOptimisers.plot_drawdowns(ret::VecNum;
     dd = drawdowns(cret, compound; cX = true) .* 100
 
     base_risks = 100 * if !compound
-                       [-AverageDrawdown(; w = rw)(copy(ret)), -UlcerIndex()(copy(ret)),
-                        -DrawdownatRisk(; alpha = alpha)(copy(ret)),
-                        -ConditionalDrawdownatRisk(; alpha = alpha)(copy(ret)),
-                        -MaximumDrawdown()(copy(ret))]
+                       [-AverageDrawdown(; w = rw)(ret), -UlcerIndex()(ret),
+                        -DrawdownatRisk(; alpha = alpha)(ret),
+                        -ConditionalDrawdownatRisk(; alpha = alpha)(ret), -MaximumDrawdown()(ret)]
                        else
-                       [-RelativeAverageDrawdown(; w = rw)(copy(ret)), -RelativeUlcerIndex()(copy(ret)),
-                        -RelativeDrawdownatRisk(; alpha = alpha)(copy(ret)),
-                        -RelativeConditionalDrawdownatRisk(; alpha = alpha)(copy(ret)),
-                        -RelativeMaximumDrawdown()(copy(ret))]
+                       [-RelativeAverageDrawdown(; w = rw)(ret), -RelativeUlcerIndex()(ret),
+                        -RelativeDrawdownatRisk(; alpha = alpha)(ret),
+                        -RelativeConditionalDrawdownatRisk(; alpha = alpha)(ret),
+                        -RelativeMaximumDrawdown()(ret)]
                        end
 
     conf = round((1 - alpha) * 100; digits = 2)
@@ -1251,17 +1250,15 @@ function PortfolioOptimisers.plot_drawdowns(ret::VecNum;
     labels = copy(base_labels)
     if !isnothing(slv)
         if !compound
-            push!(risks,
-                  100 * -EntropicDrawdownatRisk(; slv = slv, alpha = alpha)(copy(ret)),
+            push!(risks, 100 * -EntropicDrawdownatRisk(; slv = slv, alpha = alpha)(ret),
                   100 *
-                  -RelativisticDrawdownatRisk(; slv = slv, alpha = alpha, kappa = kappa)(copy(ret)))
+                  -RelativisticDrawdownatRisk(; slv = slv, alpha = alpha, kappa = kappa)(ret))
         else
             push!(risks,
-                  100 *
-                  -RelativeEntropicDrawdownatRisk(; slv = slv, alpha = alpha)(copy(ret)),
+                  100 * -RelativeEntropicDrawdownatRisk(; slv = slv, alpha = alpha)(ret),
                   100 *
                   -RelativeRelativisticDrawdownatRisk(; slv = slv, alpha = alpha,
-                                                      kappa = kappa)(copy(ret)))
+                                                      kappa = kappa)(ret))
         end
         push!(labels, "$(conf)% EDaR: $(round(risks[6]; digits=2))%",
               "$(conf)% RLDaR ($(round(kappa; digits=2))): $(round(risks[7]; digits=2))%")
@@ -1319,12 +1316,12 @@ function PortfolioOptimisers.plot_histogram(ret::VecNum;
     mir, mar = extrema(ret)
     x_range = range(mir, mar; length = npts)
     mad = LowOrderMoment(; w = rw, alg = MeanAbsoluteDeviation())(ret)
-    gmd = OrderedWeightsArray()(copy(ret))
+    gmd = OrderedWeightsArray()(ret)
 
     base_risks = [mu_r, mu_r - sigma_r, mu_r - mad, mu_r - gmd,
-                  -ValueatRisk(; w = rw, alpha = alpha)(copy(ret)),
-                  -ConditionalValueatRisk(; w = rw, alpha = alpha)(copy(ret)),
-                  -OrderedWeightsArray(; w = owa_tg(T))(copy(ret))]
+                  -ValueatRisk(; w = rw, alpha = alpha)(ret),
+                  -ConditionalValueatRisk(; w = rw, alpha = alpha)(ret),
+                  -OrderedWeightsArray(; w = owa_tg(T))(ret)]
 
     conf = round((1 - alpha) * 100; digits = 2)
     base_labels = ["Mean: $(round(100*base_risks[1]; digits=2))%",
@@ -1338,8 +1335,8 @@ function PortfolioOptimisers.plot_histogram(ret::VecNum;
     risks = copy(base_risks)
     risk_labels = copy(base_labels)
     if !isnothing(slv)
-        push!(risks, -EntropicValueatRisk(; w = rw, slv = slv, alpha = alpha)(copy(ret)),
-              -RelativisticValueatRisk(; w = rw, slv = slv, alpha = alpha, kappa = kappa)(copy(ret)))
+        push!(risks, -EntropicValueatRisk(; w = rw, slv = slv, alpha = alpha)(ret),
+              -RelativisticValueatRisk(; w = rw, slv = slv, alpha = alpha, kappa = kappa)(ret))
         push!(risk_labels, "$(conf)% EVaR: $(round(100*risks[8]; digits=2))%",
               "$(conf)% RLVaR ($(round(kappa; digits=2))): $(round(100*risks[9]; digits=2))%")
     end
@@ -1931,7 +1928,7 @@ function PortfolioOptimisers.plot_performance_summary(ret::VecNum;
     dd_series = drawdowns(cret, compound; cX = true)
     max_dd = minimum(dd_series)
     calmar = max_dd < 0 ? ann_ret / abs(max_dd) : NaN
-    cvar_val = -ConditionalValueatRisk(; alpha = alpha)(copy(ret))
+    cvar_val = -ConditionalValueatRisk(; alpha = alpha)(ret)
     conf = round((1 - alpha) * 100; digits = 1)
     vals = [ann_ret * 100, ann_vol * 100, sharpe, sortino, calmar, max_dd * 100,
             cvar_val * 100]
