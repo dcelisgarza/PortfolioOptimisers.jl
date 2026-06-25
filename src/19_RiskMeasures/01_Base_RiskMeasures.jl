@@ -7,28 +7,6 @@ Defines the interface for risk measure types, which quantify portfolio risk usin
 
 All concrete risk measures can be used as functors (callable structs) to compute their associated risk quantity.
 
-# Quick-pick guide
-
-Three legal-usage classes: **Optimisation** (JuMP formulation; usable as objective/constraint), **Non-Optimisation** (analysis only), **Hierarchical** (clustering proxy, no JuMP formulation). See also [`risk_input_kind`](@ref) for the orthogonal consumption-axis classification.
-
-**Tail / quantile measures (XatRisk family)** — pick by what you are measuring:
-
-| Goal                                  | Returns-based                                      | Drawdown-based                                         |
-|:------------------------------------- |:-------------------------------------------------- |:------------------------------------------------------ |
-| Conditional tail loss (CVaR / CDaR)   | [`ConditionalValueatRisk`](@ref) ([`CVaR`](@ref))  | [`ConditionalDrawdownatRisk`](@ref) ([`CDaR`](@ref))   |
-| Entropic tail loss (EVaR / EDaR)      | [`EntropicValueatRisk`](@ref) ([`EVaR`](@ref))     | [`EntropicDrawdownatRisk`](@ref) ([`EDaR`](@ref))      |
-| Relativistic tail loss (RVaR / RDDaR) | [`RelativisticValueatRisk`](@ref) ([`RVaR`](@ref)) | [`RelativisticDrawdownatRisk`](@ref) ([`RDDaR`](@ref)) |
-| Power-norm tail loss (PNVaR / PNDaR)  | [`PowerNormValueatRisk`](@ref) ([`PNVaR`](@ref))   | [`PowerNormDrawdownatRisk`](@ref) ([`PNDaR`](@ref))    |
-| Pointwise tail loss (VaR / DaR)       | [`ValueatRisk`](@ref)                              | [`DrawdownatRisk`](@ref)                               |
-
-Append `Range` to any of the above for the gap between the upper and lower tail (e.g. [`ConditionalValueatRiskRange`](@ref)).
-
-**Dispersion / moment measures:** [`Variance`](@ref), [`StandardDeviation`](@ref), [`MeanAbsoluteDeviation`](@ref), [`MedianAbsoluteDeviation`](@ref), [`Kurtosis`](@ref), [`NegativeSkewness`](@ref), [`OWA`](@ref)-based ([`OrderedWeightsArray`](@ref)).
-
-**Drawdown statistics (non-quantile):** [`AverageDrawdown`](@ref), [`UlcerIndex`](@ref), [`MaximumDrawdown`](@ref).
-
-**Clustering proxies (Hierarchical only):** [`EqualRisk`](@ref), [`RiskRatio`](@ref), and all `Relative…` drawdown forms.
-
 # Related
 
   - [`NonOptimisationRiskMeasure`](@ref)

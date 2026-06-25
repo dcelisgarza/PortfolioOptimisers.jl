@@ -278,24 +278,24 @@ const PNDaR = PowerNormDrawdownatRisk
 """
 Alias for [`RelativeDrawdownatRisk`](@ref).
 """
-const DaR_R = RelativeDrawdownatRisk
+const R_DaR = RelativeDrawdownatRisk
 """
 Alias for [`RelativeConditionalDrawdownatRisk`](@ref).
 """
-const CDaR_R = RelativeConditionalDrawdownatRisk
+const R_CDaR = RelativeConditionalDrawdownatRisk
 """
 Alias for [`RelativeEntropicDrawdownatRisk`](@ref).
 """
-const EDaR_R = RelativeEntropicDrawdownatRisk
+const R_EDaR = RelativeEntropicDrawdownatRisk
 """
 Alias for [`RelativeRelativisticDrawdownatRisk`](@ref).
 """
-const RDaR_R = RelativeRelativisticDrawdownatRisk
+const R_RDaR = RelativeRelativisticDrawdownatRisk
 """
 Alias for [`RelativePowerNormDrawdownatRisk`](@ref).
 """
 const PNDaR_R = RelativePowerNormDrawdownatRisk
 
 export HRP, HERC, SCHRP, NCO, STO, SSR, MR, RB, RRB, FRC, NOC, VaR, CVaR, EVaR, RVaR, PNVaR,
-       DaR, CDaR, EDaR, RDaR, PNDaR, DaR_R, CDaR_R, EDaR_R, RDaR_R, PNDaR_R, FLM, MAD, SCM,
+       DaR, CDaR, EDaR, RDaR, PNDaR, R_DaR, R_CDaR, R_EDaR, R_RDaR, PNDaR_R, FLM, MAD, SCM,
        SLM, ECM, ELM, TLM, SSK, FTCM, FTLM, KT, SKT
