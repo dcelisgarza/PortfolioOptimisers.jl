@@ -6,46 +6,66 @@
 
 # ── Clustering / hierarchical optimisers ──────────────────────────────────────
 """
+    HRP
+
 Alias for [`HierarchicalRiskParity`](@ref).
 """
 const HRP = HierarchicalRiskParity
 """
+    HERC
+
 Alias for [`HierarchicalEqualRiskContribution`](@ref).
 """
 const HERC = HierarchicalEqualRiskContribution
 """
+    SCHRP
+
 Alias for [`SchurComplementHierarchicalRiskParity`](@ref).
 """
 const SCHRP = SchurComplementHierarchicalRiskParity
 
 # ── Meta-optimisers ───────────────────────────────────────────────────────────
 """
+    NCO
+
 Alias for [`NestedClustered`](@ref).
 """
 const NCO = NestedClustered
 """
+    STO
+
 Alias for [`Stacking`](@ref).
 """
 const STO = Stacking
 """
+    SSR
+
 Alias for [`SubsetResampling`](@ref).
 """
 const SSR = SubsetResampling
 
 # ── JuMP-based optimisers ─────────────────────────────────────────────────────
 """
+    MR
+
 Alias for [`MeanRisk`](@ref).
 """
 const MR = MeanRisk
 """
+    RB
+
 Alias for [`RiskBudgeting`](@ref).
 """
 const RB = RiskBudgeting
 """
+    RRB
+
 Alias for [`RelaxedRiskBudgeting`](@ref).
 """
 const RRB = RelaxedRiskBudgeting
 """
+    FRC
+
 Alias for [`FactorRiskContribution`](@ref).
 """
 const FRC = FactorRiskContribution
@@ -54,13 +74,28 @@ Alias for [`NearOptimalCentering`](@ref).
 """
 const NOC = NearOptimalCentering
 
+# ── Risk measures — Covariance-based ──────────────────────────────────────
+"""
+    SD
+
+Alias for [`StandardDeviation`](@ref).
+"""
+const SD = StandardDeviation
+
+"""
+    UcVariance
+
+Alias for [`UncertaintySetVariance`](@ref).
+"""
+const UcVariance = UncertaintySetVariance
+
 # ── Risk measures — Moment risk measure family ──────────────────────────────────────
 """
     FLM(; settings::RiskMeasureSettings = RiskMeasureSettings(),
           w::Option{<:ObsWeights} = nothing,
           mu::Option{<:Num_VecNum_VecScalar} = nothing) -> LowOrderMoment
 
-Alias for the first Lower Moment (FLM) risk measure.
+Alias for the first Lower Moment (FLM) risk measure [`LowOrderMoment`](@ref) + [`FirstLowerMoment`](@ref).
 """
 function FLM(; settings::RiskMeasureSettings = RiskMeasureSettings(),
              w::Option{<:ObsWeights} = nothing,
@@ -72,7 +107,7 @@ end
           w::Option{<:ObsWeights} = nothing,
           mu::Option{<:Num_VecNum_VecScalar} = nothing) -> LowOrderMoment
 
-Alias for the Mean Absolute Deviation (MAD) risk measure.
+Alias for the Mean Absolute Deviation (MAD) risk measure [`LowOrderMoment`](@ref) + [`MeanAbsoluteDeviation`](@ref).
 """
 function MAD(; settings::RiskMeasureSettings = RiskMeasureSettings(),
              w::Option{<:ObsWeights} = nothing,
@@ -87,7 +122,7 @@ end
           ve::AbstractVarianceEstimator = SimpleVariance(; me = nothing),
           alg::SecondMomentFormulation = SquaredSOCRiskExpr()) -> LowOrderMoment
 
-Alias for the Second Central Moment (SCM) risk measure. This can represent the scenario based variance or standard deviation.
+Alias for the Second Central Moment (SCM) risk measure [`LowOrderMoment`](@ref) + [`SecondMoment`](@ref) + [`FullMoment`](@ref).
 """
 function SCM(; settings::RiskMeasureSettings = RiskMeasureSettings(),
              w::Option{<:ObsWeights} = nothing,
@@ -104,7 +139,7 @@ end
           ve::AbstractVarianceEstimator = SimpleVariance(; me = nothing),
           alg::SecondMomentFormulation = SquaredSOCRiskExpr()) -> LowOrderMoment
 
-Alias for the Second Lower Moment (SLM) risk measure. This can represent the scenario based semi-variance or semi-standard deviation.
+Alias for the Second Lower Moment (SLM) risk measure [`LowOrderMoment`](@ref) + [`SecondMoment`](@ref) + [`SemiMoment`](@ref). This can represent the scenario based semi-variance or semi-standard deviation.
 """
 function SLM(; settings::RiskMeasureSettings = RiskMeasureSettings(),
              w::Option{<:ObsWeights} = nothing,
@@ -120,7 +155,7 @@ end
           mu::Option{<:Num_VecNum_VecScalar} = nothing, p::Integer = 2,
           ddof::Integer = 0) -> LowOrderMoment
 
-Alias for the square root of the central even moment of order `2p`.
+Alias for the square root of the central even moment of order `2p` [`LowOrderMoment`](@ref) + [`EvenMoment`](@ref) + [`FullMoment`](@ref).
 """
 function ECM(; settings::RiskMeasureSettings = RiskMeasureSettings(),
              w::Option{<:ObsWeights} = nothing,
@@ -135,7 +170,7 @@ end
           mu::Option{<:Num_VecNum_VecScalar} = nothing, p::Integer = 2,
           ddof::Integer = 0) -> LowOrderMoment
 
-Alias for the square root of the lower even moment of order `2p`.
+Alias for the square root of the lower even moment of order `2p` [`LowOrderMoment`](@ref) + [`EvenMoment`](@ref) + [`SemiMoment`](@ref).
 """
 function ELM(; settings::RiskMeasureSettings = RiskMeasureSettings(),
              w::Option{<:ObsWeights} = nothing,
@@ -149,7 +184,7 @@ end
           w::Option{<:ObsWeights} = nothing,
           mu::Option{<:Num_VecNum_VecScalar} = nothing) -> HighOrderMoment
 
-Alias for the Third Lower Moment (TLM) risk measure.
+Alias for the Third Lower Moment (TLM) risk measure [`HighOrderMoment`](@ref) + [`ThirdLowerMoment`](@ref).
 """
 function TLM(; settings::RiskMeasureSettings = RiskMeasureSettings(),
              w::Option{<:ObsWeights} = nothing,
@@ -162,7 +197,7 @@ end
           mu::Option{<:Num_VecNum_VecScalar} = nothing,
           ve::AbstractVarianceEstimator = SimpleVariance(; me = nothing)) -> HighOrderMoment
 
-Alias for the Standardised Third Lower Moment (SSK) risk measure. This represents the scenario based semi-skewness of the return distribution.
+Alias for the Standardised Third Lower Moment (SSK) risk measure [`HighOrderMoment`](@ref) + [`StandardisedHighOrderMoment`](@ref) + [`ThirdLowerMoment`](@ref). This represents the scenario based semi-skewness of the return distribution.
 """
 function SSK(; settings::RiskMeasureSettings = RiskMeasureSettings(),
              w::Option{<:ObsWeights} = nothing,
@@ -177,7 +212,7 @@ end
           w::Option{<:ObsWeights} = nothing,
           mu::Option{<:Num_VecNum_VecScalar} = nothing) -> HighOrderMoment
 
-Alias for the Fourth Central Moment (FTCM) risk measure.
+Alias for the Fourth Central Moment (FTCM) risk measure [`HighOrderMoment`](@ref) + [`FourthMoment`](@ref) + [`FullMoment`](@ref).
 """
 function FTCM(; settings::RiskMeasureSettings = RiskMeasureSettings(),
               w::Option{<:ObsWeights} = nothing,
@@ -190,7 +225,7 @@ end
           w::Option{<:ObsWeights} = nothing,
           mu::Option{<:Num_VecNum_VecScalar} = nothing) -> HighOrderMoment
 
-Alias for the Fourth Lower Moment (FTLM) risk measure.
+Alias for the Fourth Lower Moment (FTLM) risk measure [`HighOrderMoment`](@ref) + [`FourthMoment`](@ref) + [`SemiMoment`](@ref).
 """
 function FTLM(; settings::RiskMeasureSettings = RiskMeasureSettings(),
               w::Option{<:ObsWeights} = nothing,
@@ -204,7 +239,7 @@ end
          mu::Option{<:Num_VecNum_VecScalar} = nothing,
          ve::AbstractVarianceEstimator = SimpleVariance(; me = nothing)) -> HighOrderMoment
 
-Alias for the Standardised Fourth Central Moment (KT) risk measure. This represents the scenario based kurtosis of the return distribution.
+Alias for the Standardised Fourth Central Moment (KT) risk measure [`HighOrderMoment`](@ref) + [`StandardisedHighOrderMoment`](@ref) + [`FourthMoment`](@ref) + [`FullMoment`](@ref). This represents the scenario based kurtosis of the return distribution.
 """
 function KT(; settings::RiskMeasureSettings = RiskMeasureSettings(),
             w::Option{<:ObsWeights} = nothing, mu::Option{<:Num_VecNum_VecScalar} = nothing,
@@ -220,7 +255,7 @@ end
           mu::Option{<:Num_VecNum_VecScalar} = nothing,
           ve::AbstractVarianceEstimator = SimpleVariance(; me = nothing)) -> HighOrderMoment
 
-Alias for the Standardised Fourth Lower Moment (SKT) risk measure. This represents the scenario based semi-kurtosis of the return distribution.
+Alias for the Standardised Fourth Lower Moment (SKT) risk measure [`HighOrderMoment`](@ref) + [`StandardisedHighOrderMoment`](@ref) + [`FourthMoment`](@ref) + [`SemiMoment`](@ref). This represents the scenario based semi-kurtosis of the return distribution.
 """
 function SKT(; settings::RiskMeasureSettings = RiskMeasureSettings(),
              w::Option{<:ObsWeights} = nothing,
@@ -234,68 +269,159 @@ end
 
 # ── Risk measures — Value-at-Risk family ──────────────────────────────────────
 """
+    VaR
+
 Alias for [`ValueatRisk`](@ref).
 """
 const VaR = ValueatRisk
 """
-Alias for [`ConditionalValueatRisk`](@ref) (CVaR / Expected Shortfall).
+    CVaR
+
+Alias for [`ConditionalValueatRisk`](@ref).
 """
 const CVaR = ConditionalValueatRisk
 """
+    DRCVaR
+
+Alias for [`DistributionallyRobustConditionalValueatRisk`](@ref).
+"""
+const DRCVaR = DistributionallyRobustConditionalValueatRisk
+"""
+    EVaR
+
 Alias for [`EntropicValueatRisk`](@ref).
 """
 const EVaR = EntropicValueatRisk
 """
+    RVaR
+
 Alias for [`RelativisticValueatRisk`](@ref).
 """
 const RVaR = RelativisticValueatRisk
 """
+    PNVaR
+
 Alias for [`PowerNormValueatRisk`](@ref).
 """
 const PNVaR = PowerNormValueatRisk
 
-# ── Risk measures — Drawdown-at-Risk family ───────────────────────────────────
+# ── Risk measures — Value-at-Risk Range family ──────────────────────────────────────
 """
+    VaR_RG
+
+Alias for [`ValueatRiskRange`](@ref).
+"""
+const VaR_RG = ValueatRiskRange
+"""
+    CVaR_RG
+
+Alias for [`ConditionalValueatRiskRange`](@ref).
+"""
+const CVaR_RG = ConditionalValueatRiskRange
+"""
+    DRCVaR_RG
+
+Alias for [`DistributionallyRobustConditionalValueatRiskRange`](@ref).
+"""
+const DRCVaR_RG = DistributionallyRobustConditionalValueatRiskRange
+"""
+    EVaR_RG
+
+Alias for [`EntropicValueatRiskRange`](@ref).
+"""
+const EVaR_RG = EntropicValueatRiskRange
+"""
+    RVaR_RG
+
+Alias for [`RelativisticValueatRiskRange`](@ref).
+"""
+const RVaR_RG = RelativisticValueatRiskRange
+"""
+    PNVaR_RG
+
+Alias for [`PowerNormValueatRiskRange`](@ref).
+"""
+const PNVaR_RG = PowerNormValueatRiskRange
+
+# ── Risk measures — Drawdown-at-Risk family ──────────────────────────────────────
+"""
+    DaR
+
 Alias for [`DrawdownatRisk`](@ref).
 """
 const DaR = DrawdownatRisk
 """
+    CDaR
+
 Alias for [`ConditionalDrawdownatRisk`](@ref).
 """
 const CDaR = ConditionalDrawdownatRisk
 """
+    DRCDaR
+
+Alias for [`DistributionallyRobustConditionalDrawdownatRisk`](@ref).
+"""
+const DRCDaR = DistributionallyRobustConditionalDrawdownatRisk
+"""
+    EDaR
+
 Alias for [`EntropicDrawdownatRisk`](@ref).
 """
 const EDaR = EntropicDrawdownatRisk
 """
+    RDaR
+
 Alias for [`RelativisticDrawdownatRisk`](@ref).
 """
 const RDaR = RelativisticDrawdownatRisk
 """
+    PNDaR
+
 Alias for [`PowerNormDrawdownatRisk`](@ref).
 """
 const PNDaR = PowerNormDrawdownatRisk
+
 """
+    R_DaR
+
 Alias for [`RelativeDrawdownatRisk`](@ref).
 """
 const R_DaR = RelativeDrawdownatRisk
 """
+    R_CDaR
+
 Alias for [`RelativeConditionalDrawdownatRisk`](@ref).
 """
 const R_CDaR = RelativeConditionalDrawdownatRisk
 """
+    R_EDaR
+
 Alias for [`RelativeEntropicDrawdownatRisk`](@ref).
 """
 const R_EDaR = RelativeEntropicDrawdownatRisk
 """
+    R_RDaR
+
 Alias for [`RelativeRelativisticDrawdownatRisk`](@ref).
 """
 const R_RDaR = RelativeRelativisticDrawdownatRisk
 """
+    R_PNDaR
+
 Alias for [`RelativePowerNormDrawdownatRisk`](@ref).
 """
-const PNDaR_R = RelativePowerNormDrawdownatRisk
+const R_PNDaR = RelativePowerNormDrawdownatRisk
 
-export HRP, HERC, SCHRP, NCO, STO, SSR, MR, RB, RRB, FRC, NOC, VaR, CVaR, EVaR, RVaR, PNVaR,
-       DaR, CDaR, EDaR, RDaR, PNDaR, R_DaR, R_CDaR, R_EDaR, R_RDaR, PNDaR_R, FLM, MAD, SCM,
-       SLM, ECM, ELM, TLM, SSK, FTCM, FTLM, KT, SKT
+# ── Risk measures — Ordered Weights Array family ──────────────────────────────────────
+"""
+    OWA
+
+Alias for [`OrderedWeightsArray`](@ref).
+"""
+const OWA = OrderedWeightsArray
+"""
+    OWA_RG
+
+Alias for [`OrderedWeightsArrayRange`](@ref).
+"""
+const OWA_RG = OrderedWeightsArrayRange

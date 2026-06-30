@@ -12,19 +12,54 @@ Three legal-usage classes:
 - Hierarchical: clustering proxy, no JuMP formulation.
 - Non-Optimisation: analysis only.
 
-| Type       | Name (Alias)                                                                 | Compatibility       | JuMP Expr     | Solver        |
-|:---------- |:---------------------------------------------------------------------------- |:------------------- |:--------------|:------------- |
-| Dispersion | [`Variance`](@ref)                                                           | JuMP + Hierarchical | QuadExpr, SOC | Clarabel      |
-| Dispersion | [`StandardDeviation`](@ref) ([`SD`](@ref))                                   | JuMP + Hierarchical | SOC           | Clarabel      |
-| Dispersion | Box [`UncertaintySetVariance`](@ref) ([`UcVariance`](@ref))                  | JuMP + Hierarchical | Sym           | Clarabel      |
-| Dispersion | Ellipse [`UncertaintySetVariance`](@ref) ([`UcVariance`](@ref))              | JuMP + Hierarchical | Sym, PSD, SOC | Clarabel, SCS |
-| Dispersion | [`LowOrderMoment`](@ref) ([`FLM`](@ref))                                     | JuMP + Hierarchical | -             | Clarabel      |
-| Dispersion | [`LowOrderMoment`](@ref) ([`MAD`](@ref))                                     | JuMP + Hierarchical | -             | Clarabel      |
-| Dispersion | Direct / Squared SOC [`LowOrderMoment`](@ref) ([`SCM`](@ref), [`SLM`](@ref)) | JuMP + Hierarchical | QuadExpr, SOC | Clarabel      |
-| Dispersion | SOC [`LowOrderMoment`](@ref) ([`SCM`](@ref), [`SLM`](@ref))                  | JuMP + Hierarchical | SOC           | Clarabel      |
-| Dispersion | Sum of Squares [`LowOrderMoment`](@ref) ([`SCM`](@ref), [`SLM`](@ref))       | JuMP + Hierarchical | RSOC          | Clarabel      |
-| Dispersion | [`LowOrderMoment`](@ref) ([`ECM`](@ref), [`ELM`](@ref))                      | JuMP + Hierarchical | PowerCone     | Clarabel      |
-| Dispersion | [`HighOrderMoment`](@ref) ([`ECM`](@ref), [`ELM`](@ref))                     | Hierarchical        | -             | -             |
+| Type          | Name (Alias)                                                                                                          | Compatibility       | JuMP Expr & Cones  | Solver                      |
+|:------------- |:--------------------------------------------------------------------------------------------------------------------- |:------------------- |:------------------ |:--------------------------- |
+| Dispersion    | [`Variance`](@ref)                                                                                                    | JuMP + Hierarchical | QuadExpr, SOC      | Clarabel                    |
+| Dispersion    | [`StandardDeviation`](@ref) ([`SD`](@ref))                                                                            | JuMP + Hierarchical | SOC                | Clarabel                    |
+| Dispersion    | Box [`UncertaintySetVariance`](@ref) ([`UcVariance`](@ref))                                                           | JuMP + Hierarchical | Sym                | Clarabel                    |
+| Dispersion    | Ellipse [`UncertaintySetVariance`](@ref) ([`UcVariance`](@ref))                                                       | JuMP + Hierarchical | Sym, PSD, SOC      | Clarabel, SCS               |
+| Dispersion    | [`LowOrderMoment`](@ref) ([`FLM`](@ref))                                                                              | JuMP + Hierarchical | -                  | Clarabel                    |
+| Dispersion    | [`LowOrderMoment`](@ref) ([`MAD`](@ref))                                                                              | JuMP + Hierarchical | -                  | Clarabel                    |
+| Dispersion    | Direct / Squared SOC [`LowOrderMoment`](@ref) ([`SCM`](@ref), [`SLM`](@ref))                                          | JuMP + Hierarchical | QuadExpr, SOC      | Clarabel                    |
+| Dispersion    | Sum of Squares [`LowOrderMoment`](@ref) ([`SCM`](@ref), [`SLM`](@ref))                                                | JuMP + Hierarchical | SOC, RSOC          | Clarabel                    |
+| Dispersion    | SOC [`LowOrderMoment`](@ref) ([`SCM`](@ref), [`SLM`](@ref))                                                           | JuMP + Hierarchical | SOC                | Clarabel                    |
+| Dispersion    | [`LowOrderMoment`](@ref) ([`ECM`](@ref), [`ELM`](@ref))                                                               | JuMP + Hierarchical | PC                 | Clarabel                    |
+| Dispersion    | [`HighOrderMoment`](@ref) ([`TLM`](@ref), [`SSK`](@ref), [`FTCM`](@ref), [`FTLM`](@ref), [`KT`](@ref), [`SKT`](@ref)) | Hierarchical        | -                  | -                           |
+| Dispersion    | Direct / Squared SOC Exact [`Kurtosis`](@ref)                                                                         | JuMP + Hierarchical | QuadExpr, SOC, PSD | Clarabel, SCS               |
+| Dispersion    | Sum of Squares Exact [`Kurtosis`](@ref)                                                                               | JuMP + Hierarchical | SOC, RSOC, PSD     | Clarabel, SCS               |
+| Dispersion    | SOC Exact [`Kurtosis`](@ref)                                                                                          | JuMP + Hierarchical | SOC, PSD           | Clarabel, SCS               |
+| Dispersion    | Direct / Squared SOC Approx [`Kurtosis`](@ref)                                                                        | JuMP + Hierarchical | QuadExpr, SOC      | Clarabel                    |
+| Dispersion    | Sum of Squares Approx [`Kurtosis`](@ref)                                                                              | JuMP + Hierarchical | SOC, RSOC          | Clarabel                    |
+| Dispersion    | SOC Exact Approx [`Kurtosis`](@ref)                                                                                   | JuMP + Hierarchical | SOC                | Clarabel                    |
+| Dispersion    | [`NegativeSkewness`](@ref)                                                                                            | JuMP + Hierarchical | QuadExpr, SOC      | Clarabel                    |
+| Dispersion    | Square Root [`NegativeSkewness`](@ref)                                                                                | JuMP + Hierarchical | SOC                | Clarabel                    |
+| Tail loss     | Exact [`ValueatRisk`](@ref) ([`VaR`](@ref))                                                                           | JuMP + Hierarchical | MIP                | Pajarito (Clarabel + HiGHS) |
+| Tail loss     | Approx [`ValueatRisk`](@ref) ([`VaR`](@ref))                                                                          | JuMP + Hierarchical | SOC                | Clarabel                    |
+| Tail drawdown | [`DrawdownatRisk`](@ref) ([`DaR`](@ref))                                                                              | JuMP + Hierarchical | MIP                | Pajarito (Clarabel + HiGHS) |
+| Tail drawdown | [`RelativeDrawdownatRisk`](@ref) ([`R_DaR`](@ref))                                                                    | Hierarchical        | -                  | Clarabel                    |
+| Dispersion    | Exact [`ValueatRiskRange`](@ref) ([`VaR_RG`](@ref))                                                                   | JuMP + Hierarchical | MIP                | Pajarito (Clarabel + HiGHS) |
+| Dispersion    | Approx [`ValueatRiskRange`](@ref) ([`VaR_RG`](@ref))                                                                  | JuMP + Hierarchical | SOC                | Clarabel                    |
+| Tail loss     | [`ConditionalValueatRisk`](@ref) ([`CVaR`](@ref))                                                                     | JuMP + Hierarchical | -                  | Clarabel                    |
+| Tail loss     | [`DistributionallyRobustConditionalValueatRisk`](@ref) ([`DRCVaR`](@ref))                                             | JuMP + Hierarchical | NIC                | Clarabel                    |
+| Tail drawdown | [`ConditionalDrawdownatRisk`](@ref) ([`CDaR`](@ref))                                                                  | JuMP + Hierarchical | -                  | Clarabel                    |
+| Tail drawdown | [`DistributionallyRobustConditionalDrawdownatRisk`](@ref) ([`DRCDaR`](@ref))                                          | JuMP + Hierarchical | NIC                | Clarabel                    |
+| Tail drawdown | [`RelativeConditionalDrawdownatRisk`](@ref) ([`R_CDaR`](@ref))                                                        | Hierarchical        | -                  | Clarabel                    |
+| Dispersion    | [`ConditionalValueatRiskRange`](@ref) ([`CVaR_RG`](@ref))                                                             | JuMP + Hierarchical | -                  | Clarabel                    |
+| Dispersion    | [`DistributionallyRobustConditionalValueatRiskRange`](@ref) ([`DRCVaR_RG`](@ref))                                     | JuMP + Hierarchical | NIC                | Clarabel                    |
+| Tail loss     | [`EntropicValueatRisk`](@ref) ([`EVaR`](@ref))                                                                        | JuMP + Hierarchical | EC                 | Clarabel                    |
+| Tail drawdown | [`EntropicDrawdownatRisk`](@ref) ([`EDaR`](@ref))                                                                     | JuMP + Hierarchical | EC                 | Clarabel                    |
+| Tail drawdown | [`RelativeEntropicDrawdownatRisk`](@ref) ([`R_EDaR`](@ref))                                                           | Hierarchical        | -                  | Clarabel                    |
+| Dispersion    | [`EntropicValueatRiskRange`](@ref) ([`EVaR_RG`](@ref))                                                                | JuMP + Hierarchical | EC                 | Clarabel                    |
+| Tail loss     | [`RelativisticValueatRisk`](@ref) ([`RVaR`](@ref))                                                                    | JuMP + Hierarchical | PC                 | Clarabel                    |
+| Tail drawdown | [`RelativisticDrawdownatRisk`](@ref) ([`RDaR`](@ref))                                                                 | JuMP + Hierarchical | PC                 | Clarabel                    |
+| Tail drawdown | [`RelativeRelativisticDrawdownatRisk`](@ref) ([`R_RDaR`](@ref))                                                       | Hierarchical        | -                  | Clarabel                    |
+| Dispersion    | [`RelativisticValueatRiskRange`](@ref) ([`RVaR_RG`](@ref))                                                            | JuMP + Hierarchical | PC                 | Clarabel                    |
+| Tail loss     | [`PowerNormValueatRisk`](@ref) ([`PNVaR`](@ref))                                                                      | JuMP + Hierarchical | PC                 | Clarabel                    |
+| Tail drawdown | [`PowerNormDrawdownatRisk`](@ref) ([`PNDaR`](@ref))                                                                   | JuMP + Hierarchical | PC                 | Clarabel                    |
+| Tail drawdown | [`RelativePowerNormDrawdownatRisk`](@ref) ([`R_PNDaR`](@ref))                                                         | Hierarchical        | -                  | Clarabel                    |
+| Dispersion    | [`PowerNormValueatRiskRange`](@ref) ([`PNVaR_RG`](@ref))                                                              | JuMP + Hierarchical | PC                 | Clarabel                    |
+
+<!-- continue with owa,, make aliases for the different weights -->
 
 **Tail / quantile measures (XatRisk family)** — pick by what you are measuring:
 
