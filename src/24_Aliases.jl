@@ -70,6 +70,8 @@ Alias for [`FactorRiskContribution`](@ref).
 """
 const FRC = FactorRiskContribution
 """
+    NOC
+
 Alias for [`NearOptimalCentering`](@ref).
 """
 const NOC = NearOptimalCentering
@@ -269,6 +271,12 @@ end
 
 # ── Risk measures — Value-at-Risk family ──────────────────────────────────────
 """
+    WR
+
+Alias for [`WorstRealisation`](@ref).
+"""
+const WR = WorstRealisation
+"""
     VaR
 
 Alias for [`ValueatRisk`](@ref).
@@ -307,6 +315,12 @@ const PNVaR = PowerNormValueatRisk
 
 # ── Risk measures — Value-at-Risk Range family ──────────────────────────────────────
 """
+    RG
+
+Alias for [`Range`](@ref).
+"""
+const RG = Range
+"""
     VaR_RG
 
 Alias for [`ValueatRiskRange`](@ref).
@@ -342,6 +356,12 @@ const RVaR_RG = RelativisticValueatRiskRange
 Alias for [`PowerNormValueatRiskRange`](@ref).
 """
 const PNVaR_RG = PowerNormValueatRiskRange
+"""
+    GVaR_RG
+
+Alias for [`GenericValueatRiskRange`](@ref).
+"""
+const GVaR_RG = GenericValueatRiskRange
 
 # ── Risk measures — Drawdown-at-Risk family ──────────────────────────────────────
 """
@@ -419,9 +439,205 @@ const R_PNDaR = RelativePowerNormDrawdownatRisk
 Alias for [`OrderedWeightsArray`](@ref).
 """
 const OWA = OrderedWeightsArray
-"""
-    OWA_RG
 
-Alias for [`OrderedWeightsArrayRange`](@ref).
 """
-const OWA_RG = OrderedWeightsArrayRange
+    OWA_GMD(; settings::RiskMeasureSettings = RiskMeasureSettings(),
+              alg::OrderedWeightsArrayFormulation = ApproxOrderedWeightsArray()) -> OrderedWeightsArray
+
+Alias for the Gini Mean Difference (GMD) [`OrderedWeightsArray`](@ref) risk measure using [`owa_gmd`](@ref) weights.
+"""
+function OWA_GMD(; settings::RiskMeasureSettings = RiskMeasureSettings(),
+                 alg::OrderedWeightsArrayFormulation = ApproxOrderedWeightsArray())
+    return OrderedWeightsArray(; settings = settings, w = owa_gmd, alg = alg)
+end
+"""
+    OWA_CVaR(; settings::RiskMeasureSettings = RiskMeasureSettings(),
+               alpha::Number = 0.05,
+               alg::OrderedWeightsArrayFormulation = ApproxOrderedWeightsArray()) -> OrderedWeightsArray
+
+Alias for the Conditional Value at Risk (CVaR) [`OrderedWeightsArray`](@ref) risk measure using [`OrderedWeightsArrayConditionalValueatRisk`](@ref) weights at significance level `alpha`.
+"""
+function OWA_CVaR(; settings::RiskMeasureSettings = RiskMeasureSettings(),
+                  alpha::Number = 0.05,
+                  alg::OrderedWeightsArrayFormulation = ApproxOrderedWeightsArray())
+    return OrderedWeightsArray(; settings = settings,
+                               w = OrderedWeightsArrayConditionalValueatRisk(;
+                                                                             alpha = alpha),
+                               alg = alg)
+end
+"""
+    OWA_TG(; settings::RiskMeasureSettings = RiskMeasureSettings(),
+             alpha_i::Number = 1e-4,
+             alpha::Number = 0.05,
+             a_sim::Integer = 100,
+             alg::OrderedWeightsArrayFormulation = ApproxOrderedWeightsArray()) -> OrderedWeightsArray
+
+Alias for the Tail Gini (TG) [`OrderedWeightsArray`](@ref) risk measure using [`OrderedWeightsArrayTailGini`](@ref) weights.
+"""
+function OWA_TG(; settings::RiskMeasureSettings = RiskMeasureSettings(),
+                alpha_i::Number = 1e-4, alpha::Number = 0.05, a_sim::Integer = 100,
+                alg::OrderedWeightsArrayFormulation = ApproxOrderedWeightsArray())
+    return OrderedWeightsArray(; settings = settings,
+                               w = OrderedWeightsArrayTailGini(; alpha_i = alpha_i,
+                                                               alpha = alpha,
+                                                               a_sim = a_sim), alg = alg)
+end
+"""
+    OWA_WR(; settings::RiskMeasureSettings = RiskMeasureSettings(),
+             alg::OrderedWeightsArrayFormulation = ApproxOrderedWeightsArray()) -> OrderedWeightsArray
+
+Alias for the Worst Realisation (WR) [`OrderedWeightsArray`](@ref) risk measure using [`owa_wr`](@ref) weights.
+"""
+function OWA_WR(; settings::RiskMeasureSettings = RiskMeasureSettings(),
+                alg::OrderedWeightsArrayFormulation = ApproxOrderedWeightsArray())
+    return OrderedWeightsArray(; settings = settings, w = owa_wr, alg = alg)
+end
+"""
+    OWA_RG(; settings::RiskMeasureSettings = RiskMeasureSettings(),
+             alg::OrderedWeightsArrayFormulation = ApproxOrderedWeightsArray()) -> OrderedWeightsArray
+
+Alias for the Range (RG) [`OrderedWeightsArray`](@ref) risk measure using [`owa_rg`](@ref) weights.
+"""
+function OWA_RG(; settings::RiskMeasureSettings = RiskMeasureSettings(),
+                alg::OrderedWeightsArrayFormulation = ApproxOrderedWeightsArray())
+    return OrderedWeightsArray(; settings = settings, w = owa_rg, alg = alg)
+end
+"""
+    OWA_CVaR_RG(; settings::RiskMeasureSettings = RiskMeasureSettings(),
+                  alpha::Number = 0.05,
+                  beta::Number = alpha,
+                  alg::OrderedWeightsArrayFormulation = ApproxOrderedWeightsArray()) -> OrderedWeightsArray
+
+Alias for the Conditional Value at Risk Range (CVaR RG) [`OrderedWeightsArray`](@ref) risk measure using [`OrderedWeightsArrayConditionalValueatRiskRange`](@ref) weights.
+"""
+function OWA_CVaR_RG(; settings::RiskMeasureSettings = RiskMeasureSettings(),
+                     alpha::Number = 0.05, beta::Number = alpha,
+                     alg::OrderedWeightsArrayFormulation = ApproxOrderedWeightsArray())
+    return OrderedWeightsArray(; settings = settings,
+                               w = OrderedWeightsArrayConditionalValueatRiskRange(;
+                                                                                  alpha = alpha,
+                                                                                  beta = beta),
+                               alg = alg)
+end
+"""
+    OWA_TG_RG(; settings::RiskMeasureSettings = RiskMeasureSettings(),
+                alpha_i::Number = 1e-4,
+                alpha::Number = 0.05,
+                a_sim::Integer = 100,
+                beta_i::Number = alpha_i,
+                beta::Number = alpha,
+                b_sim::Integer = a_sim,
+                alg::OrderedWeightsArrayFormulation = ApproxOrderedWeightsArray()) -> OrderedWeightsArray
+
+Alias for the Tail Gini Range (TG RG) [`OrderedWeightsArray`](@ref) risk measure using [`OrderedWeightsArrayTailGiniRange`](@ref) weights.
+"""
+function OWA_TG_RG(; settings::RiskMeasureSettings = RiskMeasureSettings(),
+                   alpha_i::Number = 1e-4, alpha::Number = 0.05, a_sim::Integer = 100,
+                   beta_i::Number = alpha_i, beta::Number = alpha, b_sim::Integer = a_sim,
+                   alg::OrderedWeightsArrayFormulation = ApproxOrderedWeightsArray())
+    return OrderedWeightsArray(; settings = settings,
+                               w = OrderedWeightsArrayTailGiniRange(; alpha_i = alpha_i,
+                                                                    alpha = alpha,
+                                                                    a_sim = a_sim,
+                                                                    beta_i = beta_i,
+                                                                    beta = beta,
+                                                                    b_sim = b_sim),
+                               alg = alg)
+end
+"""
+    OWA_LMoment(; settings::RiskMeasureSettings = RiskMeasureSettings(),
+                  method::AbstractOrderedWeightsArrayEstimator = NormalisedConstantRelativeRiskAversion(),
+                  k::Integer = 2,
+                  alg::OrderedWeightsArrayFormulation = ApproxOrderedWeightsArray()) -> OrderedWeightsArray
+
+Alias for the L-Moment [`OrderedWeightsArray`](@ref) risk measure using [`LinearMoment`](@ref) weights of order `k`.
+"""
+function OWA_LMoment(; settings::RiskMeasureSettings = RiskMeasureSettings(),
+                     method::AbstractOrderedWeightsArrayEstimator = NormalisedConstantRelativeRiskAversion(),
+                     k::Integer = 2,
+                     alg::OrderedWeightsArrayFormulation = ApproxOrderedWeightsArray())
+    return OrderedWeightsArray(; settings = settings,
+                               w = LinearMoment(; method = method, k = k), alg = alg)
+end
+
+# ── Risk measures — Drawdown family ──────────────────────────────────────
+"""
+    ADD
+
+Alias for [`AverageDrawdown`](@ref).
+"""
+const ADD = AverageDrawdown
+"""
+    R_ADD
+
+Alias for [`RelativeAverageDrawdown`](@ref).
+"""
+const R_ADD = RelativeAverageDrawdown
+"""
+    UCI
+
+Alias for [`UlcerIndex`](@ref).
+"""
+const UCI = UlcerIndex
+"""
+    R_UCI
+
+Alias for [`RelativeUlcerIndex`](@ref).
+"""
+const R_UCI = RelativeUlcerIndex
+"""
+    MDD
+
+Alias for [`MaximumDrawdown`](@ref).
+"""
+const MDD = MaximumDrawdown
+"""
+    R_MDD
+
+Alias for [`RelativeMaximumDrawdown`](@ref).
+"""
+const R_MDD = RelativeMaximumDrawdown
+
+# ── Risk measures — Nonlinear relationships ──────────────────────────────────────
+"""
+    BDVariance
+
+Alias for [`BrownianDistanceVariance`](@ref).
+"""
+const BDVariance = BrownianDistanceVariance
+
+# ── Risk measures — Tracking and turnover ──────────────────────────────────────
+"""
+    TrRM
+
+Alias for [`TrackingRiskMeasure`](@ref).
+"""
+const TrRM = TrackingRiskMeasure
+"""
+    RkTrRM
+
+Alias for [`RiskTrackingRiskMeasure`](@ref).
+"""
+const RkTrRM = RiskTrackingRiskMeasure
+"""
+    TnRM
+
+Alias for [`TurnoverRiskMeasure`](@ref).
+"""
+const TnRM = TurnoverRiskMeasure
+
+# ── Risk measures — Higher-order moments ──────────────────────────────────────
+"""
+    VSK
+
+Alias for [`VarianceSkewKurtosis`](@ref).
+"""
+const VSK = VarianceSkewKurtosis
+
+# ── Risk measures — Performance risk measures ──────────────────────────────────────
+"""
+    NonOptRkRatio
+
+Alias for [`NonOptimisationRiskRatio`](@ref).
+"""
+const NonOptRkRatio = NonOptimisationRiskRatio

@@ -180,7 +180,7 @@ makedocs(; modules = [PortfolioOptimisers], doctest = false,
                                  joinpath.(api_pages[11][1][idx1:end], api_pages[11][3])
                                  joinpath.(api_pages[12][1][idx1:end], api_pages[12][3])]];
                   "Contribute" => contribute;
-                  "References" => root_pages[2]],
+                  "References" => root_pages[end]],
          plugins = [CitationBibliography(joinpath(@__DIR__, "src", "References.bib");
                                          style = :numeric)])
 

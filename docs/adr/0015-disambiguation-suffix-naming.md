@@ -15,7 +15,7 @@ some types append a *role suffix* naming the abstraction they belong to: `RiskMe
 An ergonomics review flagged the `RiskMeasure` suffix as applied inconsistently: most
 risk measures are bare, while `TurnoverRiskMeasure`, `TrackingRiskMeasure`,
 `RiskTrackingRiskMeasure`, and `NonOptimisationRiskRatioRiskMeasure` carry the suffix,
-alongside two that did not fit any rule — `EqualRiskMeasure` and `RiskRatioRiskMeasure`.
+alongside two that did not fit any rule — `EqualRisk` and `RiskRatioRiskMeasure`.
 Said aloud, `Variance` and `TurnoverRiskMeasure` are the same kind of thing (a risk
 measure), so a caller cannot predict the name or trust autocomplete — the convention
 teaches one pattern but breaks it part of the time.
@@ -33,7 +33,7 @@ Looking across the surface, the suffixed measures share one property: each has a
   exists to separate.
 
 The two misfits had no such sibling: nothing else claims "equal risk" or "risk ratio",
-so `EqualRiskMeasure` → `EqualRisk` and `RiskRatioRiskMeasure` → `RiskRatio` were renamed
+so `EqualRisk` → `EqualRisk` and `RiskRatioRiskMeasure` → `RiskRatio` were renamed
 to bare. That left one violation: `NonOptimisationRiskRatioRiskMeasure` keeps the suffix,
 but its only same-stem siblings (`RiskRatio`, `ExpectedReturnRiskRatio`,
 `MeanReturnRiskRatio`) are all risk measures — no non-measure construct competes for the
@@ -67,7 +67,7 @@ claim. Concretely:
 - Keep the suffix: `TurnoverRiskMeasure` (vs `Turnover`/`TurnoverEstimator`),
   `TrackingRiskMeasure` and `RiskTrackingRiskMeasure` (vs the `AbstractTracking` family
   incl. `RiskTrackingError`).
-- Drop the suffix: `EqualRiskMeasure` → `EqualRisk`, `RiskRatioRiskMeasure` → `RiskRatio`
+- Drop the suffix: `EqualRisk` → `EqualRisk`, `RiskRatioRiskMeasure` → `RiskRatio`
   (done), and `NonOptimisationRiskRatioRiskMeasure` → `NonOptimisationRiskRatio` — none
   has a non-measure namesake; the `NonOptimisation` prefix already separates it from the
   hierarchical `RiskRatio`.
@@ -107,7 +107,7 @@ confusable in. There is no `TurnoverRiskMeasureEstimator`.
 
 ## Rollout
 
-`EqualRiskMeasure` → `EqualRisk` and `RiskRatioRiskMeasure` → `RiskRatio` are already
+`EqualRisk` → `EqualRisk` and `RiskRatioRiskMeasure` → `RiskRatio` are already
 done. Remaining: rename `NonOptimisationRiskRatioRiskMeasure` → `NonOptimisationRiskRatio`
 (type, constructors, exports, tests, docs, and the `CONTEXT.md` §5 entry). Hard rename, no
 alias, under a `Breaking:` commit. The `Estimator`/`Result` names are already compliant and

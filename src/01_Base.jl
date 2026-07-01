@@ -635,6 +635,12 @@ const arg_dict = Dict(
                       :w1_owa => "`w1`: Optional first OWA weight vector.",#
                       :w2_owa => "`w2`: Optional second OWA weight vector.",#
                       :owa_w => "`w`: Optional OWA weight vector.",#
+                      :owa_method => "`method`: OWA weight estimation method.",#
+                      :lm_k => "`k`: L-moment order.",#
+                      :alpha_i => "`alpha_i`: Lower integration bound for the tail Gini approximation.",#
+                      :a_sim => "`a_sim`: Number of integration points for the tail Gini approximation.",#
+                      :beta_i => "`beta_i`: Lower integration bound for the upper tail Gini approximation.",#
+                      :b_sim => "`b_sim`: Number of integration points for the upper tail Gini approximation.",#
                       # Constraint generation.
                       :rkb_val => "`val`: Vector of risk budget allocations.",#
                       :rkbe_val => "`val`: Mapping of names to risk budget values.",#
@@ -728,6 +734,11 @@ val_dict = Dict(:oow => "If `w` is not `nothing`, `!isempty(w)`.",
                 :S => "`!isempty(S)`.",#
                 :D => "`!isempty(D)`.",#
                 :ck => "`k >= 1`.",#
+                :lm_k => "`k >= 2`.",#
+                :alpha_i_alpha => "`0 < alpha_i < alpha < 1`.",#
+                :a_sim_pos => "`a_sim > 0`.",#
+                :beta_i_beta => "`0 < beta_i < beta < 1`.",#
+                :b_sim_pos => "`b_sim > 0`.",#
                 :S_D => "size(S) == size(D)`.",#
                 :max_k => "If `max_k` is not `nothing`, `max_k >= 1`.",#
                 :kalg => "If `alg` is not `nothing`, `alg >= 1`.",#
@@ -1487,16 +1498,26 @@ Alias for a union of a numeric type or an abstract vector of numeric types.
 """
 const Num_VecNum = Union{<:Number, <:VecNum}
 """
-    const Func_Num_VecNum = Union{<:Function, <:Num_VecNum}
+    const Func_VecNum = Union{<:Function, <:VecNum}
+
+Alias for a union of a function and a vector of numeric types.
+
+# Related
+
+  - [`VecNum`](@ref)
+  - [`Func_Num_VecNum`](@ref)
+"""
+const Func_VecNum = Union{<:Function, <:VecNum}
+"""
+    const Func_Num_VecNum = Union{<:Number, <:Func_VecNum}
 
 Alias for a union of a function type or a numeric type or an abstract vector of numeric types.
 
 # Related
 
-  - [`Num_VecNum`](@ref)
+  - [`Func_VecNum`](@ref)
 """
-const Func_Num_VecNum = Union{<:Function, <:Num_VecNum}
-
+const Func_Num_VecNum = Union{<:Number, <:Func_VecNum}
 """
     const Num_ArrNum = Union{<:Number, <:ArrNum}
 

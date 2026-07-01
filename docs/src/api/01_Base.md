@@ -125,6 +125,7 @@ Str_Vec
 ObsWeights
 Num_VecNum_VecScalar
 Num_ArrNum_VecScalar_DynWeights
+Func_VecNum
 ```
 
 ## Glossaries

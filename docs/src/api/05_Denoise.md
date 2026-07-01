@@ -16,3 +16,8 @@ _denoise!
 denoise!
 denoise
 ```
+
+```@bibliography
+Pages = ["05_Denoise.md"]
+Canonical = false
+```

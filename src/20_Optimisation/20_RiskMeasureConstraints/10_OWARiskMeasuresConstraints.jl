@@ -92,7 +92,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                                                                               [1:T]
                                                                                           end)
     owa_risk = model[key] = JuMP.@expression(model, sum(owa_a + owa_b))
-    owa_w = isnothing(r.w) ? owa_gmd(T) : r.w
+    owa_w = isa(r.w, VecNum) ? r.w : r.w(T)
     model[Symbol(:cowa_, i)] = JuMP.@constraint(model,
                                                 sc * (owa * transpose(owa_w) -
                                                       ovec * transpose(owa_a) -
@@ -147,8 +147,8 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                                                                                           [1:T]
                                                                                                       end)
     owa_range_risk = model[key] = JuMP.@expression(model, sum(owa_a + owa_b))
-    owa_w1 = isnothing(r.w1) ? owa_tg(T) : r.w1
-    owa_w2 = isnothing(r.w2) ? reverse(owa_w1) : r.w2
+    owa_w1 = isa(r.w1, VecNum) ? r.w1 : r.w1(T)
+    owa_w2 = isa(r.w2, VecNum) ? r.w2 : r.w2(T)
     owa_w = owa_w1 - owa_w2
     model[Symbol(:cowa_range_, i)] = JuMP.@constraint(model,
                                                       sc * (owa * transpose(owa_w) -
@@ -213,7 +213,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                                                                                                                                                                                                                                                                               [1:M],
                                                                                                                                                                                                                                                                                               (lower_bound = 0)
                                                                                                                                                                                                                                                                                           end)
-    owa_w = isnothing(r.w) ? -owa_gmd(T) : -r.w
+    owa_w = isa(r.w, VecNum) ? -r.w : -r.w(T)
     owa_s = sum(owa_w)
     owa_l = minimum(owa_w)
     owa_h = maximum(owa_w)
@@ -333,12 +333,12 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           [1:M],
                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           (lower_bound = 0)
                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       end)
-    owa_l_w = isnothing(r.w1) ? -owa_tg(T) : -r.w1
+    owa_l_w = isa(r.w1, VecNum) ? -r.w1 : -r.w1(T)
     owa_l_s = sum(owa_l_w)
     owa_l_l = minimum(owa_l_w)
     owa_l_h = maximum(owa_l_w)
     owa_l_d = [LinearAlgebra.norm(owa_l_w, p) for p in owa_p]
-    owa_h_w = isnothing(r.w2) ? reverse(owa_l_w) : -r.w2
+    owa_h_w = isa(r.w2, VecNum) ? -r.w2 : -r.w2(T)
     owa_h_s = sum(owa_h_w)
     owa_h_l = minimum(owa_h_w)
     owa_h_h = maximum(owa_h_w)

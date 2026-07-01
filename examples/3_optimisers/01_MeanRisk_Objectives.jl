@@ -94,12 +94,8 @@ opt = JuMPOptimiser(; pe = pr, slv = slv)
     slice, but the estimator form is the one to reach for whenever the data changes underneath
     the optimiser:
 
-      - **Cross-validation** refits on each training fold, so it *requires* the estimator form —
-        a precomputed result (fit on the whole sample) would leak the test data into training,
-        and is therefore disallowed.
-      - **Meta-optimisers** ([`Stacking`](@ref), [`NestedClustered`](@ref)) feed their *outer*
-        optimiser synthetic returns assembled from the inner solves, where a precomputed
-        asset-level prior is meaningless; that slot takes an estimator (or just a solver).
+    - **Cross-validation** refits on each training fold, so it *requires* the estimator form — a precomputed result (fit on the whole sample) would leak the test data into training, and is therefore disallowed.
+    - **Meta-optimisers** ([`Stacking`](@ref), [`NestedClustered`](@ref)) feed their *outer* optimiser synthetic returns assembled from the inner solves, where a precomputed asset-level prior is meaningless; that slot takes an estimator.
 
     Both are shown in the [meta-optimisers](13_Meta_Optimisers.md) and
     [subset resampling / cross-validation](14_Subset_Resampling_and_Cross_Validation.md) examples.

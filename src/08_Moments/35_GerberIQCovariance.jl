@@ -64,7 +64,7 @@ All concrete and/or abstract types implementing Gerber Information Quality param
 """
 abstract type GerberIQEpsEstimator <: AbstractEstimator end
 """
-    const GerberIQEps = Union{<:Number, Function, <:GerberIQEpsEstimator}
+    const GerberIQEps = Union{<:Number, <:Function, <:GerberIQEpsEstimator}
 
 A type alias for the union of `Number`, `Function`, and `GerberIQEpsEstimator` used for Gerber Information Quality lookback and delay parameter definitions.
 
@@ -76,7 +76,7 @@ A type alias for the union of `Number`, `Function`, and `GerberIQEpsEstimator` u
 
   - [gerber2025squeezing](@cite) Gerber, Sander and Smyth, William and Markowitz, Harry and Miao, Yinsen and Ernst, Philip and Sargen, Paul, *Squeezing Financial Noise: A Novel Approach to Covariance Matrix Estimation* (December 01, 2025). Available at SSRN: https://ssrn.com/abstract=4986939 or http://dx.doi.org/10.2139/ssrn.4986939
 """
-const GerberIQEps = Union{<:Number, Function, <:GerberIQEpsEstimator}
+const GerberIQEps = Union{<:Number, <:Function, <:GerberIQEpsEstimator}
 """
     gerber_iq_eps(e::Number, ::MatNum) -> Number
     gerber_iq_eps(e::Function, X::MatNum) -> Number

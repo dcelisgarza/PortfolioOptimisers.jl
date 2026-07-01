@@ -33,10 +33,10 @@ Three things make OWA measures attractive:
 !!! note "Exact vs approximate formulation"
     [`OrderedWeightsArray`](@ref) supports two internal formulations:
 
-    - **Exact** (`ExactOrderedWeightsArray`) — solves a small LP per portfolio
+      - **Exact** (`ExactOrderedWeightsArray`) — solves a small LP per portfolio
         evaluation. Fast for a small number of assets / observations but does not scale to
         large problems.
-    - **Approximate** (`ApproxOrderedWeightsArray`, the default) — approximates the OWA
+      - **Approximate** (`ApproxOrderedWeightsArray`, the default) — approximates the OWA
         objective with a set of p-norms. Solves as a second-order cone problem and scales to
         the normal S&P 500 slice used throughout the examples.
 

@@ -213,7 +213,7 @@ its docstring.
 
 │&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;├──&nbsp;[MeanReturnRiskRatio](@ref)
 
-│&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;├──&nbsp;[NonOptimisationRiskRatioRiskMeasure](@ref)
+│&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;├──&nbsp;[NonOptimisationRiskRatio](@ref)
 
 │&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;├──&nbsp;[Skewness](@ref)
 
@@ -494,6 +494,18 @@ its docstring.
 │&nbsp;&nbsp;&nbsp;├──&nbsp;[NormalisedConstantRelativeRiskAversion](@ref)
 
 │&nbsp;&nbsp;&nbsp;└──&nbsp;[OWAJuMP](@ref)
+
+├──&nbsp;[AbstractOrderedWeightsArrayFunction](@ref)
+
+│&nbsp;&nbsp;&nbsp;├──&nbsp;[LinearMoment](@ref)
+
+│&nbsp;&nbsp;&nbsp;├──&nbsp;[OrderedWeightsArrayConditionalValueatRisk](@ref)
+
+│&nbsp;&nbsp;&nbsp;├──&nbsp;[OrderedWeightsArrayConditionalValueatRiskRange](@ref)
+
+│&nbsp;&nbsp;&nbsp;├──&nbsp;[OrderedWeightsArrayTailGini](@ref)
+
+│&nbsp;&nbsp;&nbsp;└──&nbsp;[OrderedWeightsArrayTailGiniRange](@ref)
 
 ├──&nbsp;[AbstractPhylogenyEstimator](@ref)
 
