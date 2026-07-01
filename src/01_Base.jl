@@ -250,7 +250,7 @@ const arg_dict = Dict(
                       :sigrhoX => "`X`: Covariance-like or correlation-like matrix `features × features`.",
                       :kt => "`kt`: Cokurtosis matrix `features^2 × features^2`.",#
                       :sk => "`sk`: Coskewness matrix `features × features^2`.",#
-                      :V => "`V`: Sum of the negative spectral slices of the cokurtosis matrix `features × features`.",
+                      :V => "`V`: Sum of the negative spectral slices of the coskewness matrix `features × features`.",
                       :X => "`X`: Data matrix `observations × features` if the `dims` keyword does not exist or `dims = 1`, `features × observations` when `dims = 2`.",#
                       :F => "`F`: Data matrix `observations × factors` if the `dims` keyword does not exist or `dims = 1`, `factors × observations` when `dims = 2`.",#
                       :Xv => "`X`: Data vector `observations × 1`.",#
@@ -353,7 +353,7 @@ const arg_dict = Dict(
                       # High order priors.
                       :f_kt => "`f_kt`: Factor cokurtosis matrix.",#
                       :f_sk => "`f_sk`: Factor coskewness matrix.",#
-                      :f_V => "`f_V`: Factor sum of negative spectral slices of the cokurtosis matrix.",#
+                      :f_V => "`f_V`: Factor sum of negative spectral slices of the coskewness matrix.",#
                       :skmp => "`skmp`: Coskewness matrix processing estimator.",#
                       :D2 => "`D2`: Duplication matrix.",#
                       :L2 => "`L2`: Elimination matrix.",#
@@ -713,6 +713,20 @@ Each entry is derived from [`arg_dict`](@ref) by stripping the leading parameter
 """
 const field_dict = Dict(key => strip(val[(findfirst(":", val)[1] + 1):end])
                         for (key, val) in arg_dict)
+"""
+    err_name_dict
+
+Maps high-order-moment argument keys to the domain noun used in error messages, so a
+message names what the caller supplied (e.g. `cokurtosis`) rather than the bare field
+symbol. The symbol itself is appended at the call site, giving messages like
+`` cokurtosis (`kt`) cannot be empty ``.
+"""
+const err_name_dict = Dict(:kt => "cokurtosis", :sk => "coskewness",
+                           :V => "negative spectral coskewness",
+                           :D2 => "duplication matrix", :L2 => "elimination matrix",
+                           :S2 => "summation matrix", :f_kt => "factor cokurtosis",
+                           :f_sk => "factor coskewness",
+                           :f_V => "factor negative spectral coskewness")
 """
     val_dict = Dict(:oow => "If `w` is not `nothing`, `!isempty(w)`.")
 

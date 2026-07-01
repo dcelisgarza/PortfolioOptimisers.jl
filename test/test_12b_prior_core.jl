@@ -125,6 +125,26 @@ end
     @test isapprox(pr2.kt, cokurtosis(Cokurtosis(; alg = FullMoment()), rd.X))
     @test all(isapprox.((pr2.sk, pr2.V),
                         coskewness(Coskewness(; alg = FullMoment()), rd.X)))
+
+    # Error messages name the caller's domain quantity, not the bare field symbol.
+    lopr = prior(EmpiricalPrior(), rd)
+    kt_err = try
+        HighOrderPrior(; pr = lopr, kt = zeros(0, 0), L2 = ones(1, 1), S2 = ones(1, 1))
+    catch e
+        e
+    end
+    @test kt_err isa PortfolioOptimisers.IsEmptyError
+    @test occursin("cokurtosis", kt_err.msg)
+    @test occursin("`kt`", kt_err.msg)
+
+    rr_err = try
+        HighOrderPrior(; pr = lopr, f_kt = ones(1, 1))
+    catch e
+        e
+    end
+    @test rr_err isa PortfolioOptimisers.IsNothingError
+    @test occursin("regression result", rr_err.msg)
+    @test occursin("`rr`", rr_err.msg)
 end
 
 @testset "High Order Factor Prior" begin
