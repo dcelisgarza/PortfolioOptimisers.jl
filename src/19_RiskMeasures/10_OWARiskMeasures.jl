@@ -1799,6 +1799,10 @@ $(DocStringExtensions.FIELDS)
     $(field_dict[:alg])
     """
     alg
+    """
+    Whether to reverse the second OWA weight vector before computing the range. If `true`, `w2` is reversed; if `false`, it is used as-is.
+    """
+    rev
     function OrderedWeightsArrayRange(settings::RiskMeasureSettings, w1::OWA_Func_VecNum,
                                       w2::OWA_Func_VecNum,
                                       alg::OrderedWeightsArrayFormulation, rev::Bool)
@@ -1825,8 +1829,11 @@ $(DocStringExtensions.FIELDS)
             @argcheck(length(w1) == length(w2),
                       DimensionMismatch("w1 ($(length(w1))) must match w2 ($(length(w2)))"))
         end
-        return new{typeof(settings), typeof(w1), typeof(w2), typeof(alg)}(settings, w1, w2,
-                                                                          alg)
+        return new{typeof(settings), typeof(w1), typeof(w2), typeof(alg), typeof(rev)}(settings,
+                                                                                       w1,
+                                                                                       w2,
+                                                                                       alg,
+                                                                                       true)
     end
 end
 function OrderedWeightsArrayRange(; settings::RiskMeasureSettings = RiskMeasureSettings(),
