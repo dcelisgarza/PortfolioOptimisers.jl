@@ -714,21 +714,21 @@ function optimise_JuMP_model!(model::JuMP.Model, opt::JuMPOptimisationEstimator,
             trials[solver.name] = Dict(:optimize! => err)
             continue
         end
-        all_finite_weights = all(isfinite, JuMP.value.(model[:w]))
-        all_non_zero_weights = !all(x -> isapprox(x, zero(datatype)),
-                                    abs.(JuMP.value.(model[:w])))
+        trial = Dict{Symbol, Any}(:settings => solver.settings)
         try
             JuMP.assert_is_solved_and_feasible(model; solver.check_sol...)
+            all_finite_weights = all(isfinite, JuMP.value.(model[:w]))
+            all_non_zero_weights = !all(x -> isapprox(x, zero(datatype)),
+                                        abs.(JuMP.value.(model[:w])))
             if all_finite_weights && all_non_zero_weights
                 success = true
                 break
             end
         catch err
-            trials[solver.name] = Dict(:assert_is_solved_and_feasible => err,
-                                       :settings => solver.settings)
+            trial[:assert_is_solved_and_feasible] = err
         end
-        trials[solver.name] = Dict(:err => JuMP.solution_summary(model),
-                                   :settings => solver.settings)
+        trial[:err] = JuMP.solution_summary(model)
+        trials[solver.name] = trial
     end
     retcode = if success
         OptimisationSuccess(; res = trials)

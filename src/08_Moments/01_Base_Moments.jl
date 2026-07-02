@@ -574,8 +574,9 @@ Compute the covariance matrix robustly using the specified covariance estimator 
 
 # Details
 
-  - This function attempts to compute the optionally weighted covariance matrix using the provided estimator and keyword arguments.
-  - If an error occurs (e.g., due to unsupported keyword arguments), it retries with a reduced set of arguments for compatibility.
+  - This function computes the optionally weighted covariance matrix using the provided estimator and keyword arguments.
+  - Keyword arguments are only forwarded if the estimator's `cov` method accepts them (checked via `hasmethod`); otherwise the call is made with `dims` and `mean` alone. If the forwarded call throws a `MethodError` (e.g. a `kwargs...` slurp that rejects them further down its call chain), it is retried without them. Genuine errors thrown by the estimator propagate to the caller.
+  - If the call throws a `MethodError`, it is retried once with a densified `Matrix(X)`.
 
 # Related
 
@@ -583,53 +584,44 @@ Compute the covariance matrix robustly using the specified covariance estimator 
   - [`robust_cor`](@ref)
   - [`Statistics.cov`](https://juliastats.org/StatsBase.jl/stable/cov/)
 """
+function compat_cov(ce::StatsBase.CovarianceEstimator, X::AbstractMatrix, args...;
+                    dims::Int = 1, mean = nothing, kwargs...)
+    if !isempty(kwargs) &&
+       hasmethod(Statistics.cov, Tuple{typeof(ce), typeof(X), typeof.(args)...},
+                 (:dims, :mean, keys(kwargs)...))
+        try
+            return Statistics.cov(ce, X, args...; dims = dims, mean = mean, kwargs...)
+        catch err
+            # A method with a `kwargs...` slurp satisfies `hasmethod` but can still
+            # reject the keyword arguments further down its call chain.
+            if !(err isa MethodError)
+                rethrow()
+            end
+        end
+    end
+    return Statistics.cov(ce, X, args...; dims = dims, mean = mean)
+end
 function robust_cov(ce::StatsBase.CovarianceEstimator, X::MatNum; dims::Int = 1,
                     mean = nothing, kwargs...)
     return try
-        try
-            Statistics.cov(ce, X; dims = dims, mean = mean, kwargs...)
-        catch
-            Statistics.cov(ce, X; dims = dims, mean = mean)
+        compat_cov(ce, X; dims = dims, mean = mean, kwargs...)
+    catch err
+        if !(err isa MethodError)
+            rethrow()
         end
-    catch
-        X = Matrix(X)
-        try
-            Statistics.cov(ce, X; dims = dims, mean = mean, kwargs...)
-        catch
-            Statistics.cov(ce, X; dims = dims, mean = mean)
-        end
+        compat_cov(ce, Matrix(X); dims = dims, mean = mean, kwargs...)
     end
-    #=
-    return if hasmethod(cov, (typeof(ce), typeof(X)), (:dims, :mean, :my_kwargs))
-        Statistics.cov(ce, X; dims = dims, mean = mean, kwargs...)
-    elseif hasmethod(cov, (typeof(ce), typeof(X)), (:dims, :mean))
-        Statistics.cov(ce, X; dims = dims, mean = mean)
-    end
-    =#
 end
 function robust_cov(ce::StatsBase.CovarianceEstimator, X::MatNum,
                     w::StatsBase.AbstractWeights; dims::Int = 1, mean = nothing, kwargs...)
     return try
-        try
-            Statistics.cov(ce, X, w; dims = dims, mean = mean, kwargs...)
-        catch
-            Statistics.cov(ce, X, w; dims = dims, mean = mean)
+        compat_cov(ce, X, w; dims = dims, mean = mean, kwargs...)
+    catch err
+        if !(err isa MethodError)
+            rethrow()
         end
-    catch
-        X = Matrix(X)
-        try
-            Statistics.cov(ce, X, w; dims = dims, mean = mean, kwargs...)
-        catch
-            Statistics.cov(ce, X, w; dims = dims, mean = mean)
-        end
+        compat_cov(ce, Matrix(X), w; dims = dims, mean = mean, kwargs...)
     end
-    #=
-    return if hasmethod(cov, (typeof(ce), typeof(X), typeof(w)), (:dims, :mean, :my_kwargs))
-        Statistics.cov(ce, X, w; dims = dims, mean = mean, kwargs...)
-    elseif hasmethod(cov, (typeof(ce), typeof(X), typeof(w)), (:dims, :mean))
-        Statistics.cov(ce, X, w; dims = dims, mean = mean)
-    end
-    =#
 end
 """
     robust_cor(
@@ -658,9 +650,10 @@ Compute the correlation matrix robustly using the specified covariance estimator
 
 # Details
 
-  - This function attempts to compute the optionally weighted correlation matrix using the provided estimator and keyword arguments.
-  - If an error occurs (e.g., due to unsupported keyword arguments), it retries with a reduced set of arguments for compatibility.
-  - If that also errors, it tries again with [`robust_cov`](@ref) and converts the result to a correlation matrix.
+  - This function computes the optionally weighted correlation matrix using the provided estimator and keyword arguments.
+  - Keyword arguments are only forwarded if the estimator's `cor` method accepts them (checked via `hasmethod`); otherwise the call is made with `dims` and `mean` alone. If the forwarded call throws a `MethodError` (e.g. a `kwargs...` slurp that rejects them further down its call chain), it is retried without them. Genuine errors thrown by the estimator propagate to the caller.
+  - If the estimator defines no suitable `cor` method, the result is computed with [`robust_cov`](@ref) and converted to a correlation matrix.
+  - If the call throws a `MethodError`, it is retried once with a densified `Matrix(X)`.
 
 # Related
 
@@ -668,109 +661,60 @@ Compute the correlation matrix robustly using the specified covariance estimator
   - [`robust_cov`](@ref)
   - [`Statistics.cor`](https://juliastats.org/StatsBase.jl/stable/cov/)
 """
+function compat_cor(ce::StatsBase.CovarianceEstimator, X::AbstractMatrix, args...;
+                    dims::Int = 1, mean = nothing, kwargs...)
+    if hasmethod(Statistics.cor, Tuple{typeof(ce), typeof(X), typeof.(args)...},
+                 (:dims, :mean))
+        if !isempty(kwargs) &&
+           hasmethod(Statistics.cor, Tuple{typeof(ce), typeof(X), typeof.(args)...},
+                     (:dims, :mean, keys(kwargs)...))
+            try
+                return Statistics.cor(ce, X, args...; dims = dims, mean = mean, kwargs...)
+            catch err
+                # A method with a `kwargs...` slurp satisfies `hasmethod` but can still
+                # reject the keyword arguments further down its call chain.
+                if !(err isa MethodError)
+                    rethrow()
+                end
+            end
+        end
+        try
+            return Statistics.cor(ce, X, args...; dims = dims, mean = mean)
+        catch err
+            if !(err isa MethodError)
+                rethrow()
+            end
+        end
+    end
+    sigma = robust_cov(ce, X, args...; dims = dims, mean = mean, kwargs...)
+    if ismutable(sigma)
+        StatsBase.cov2cor!(sigma, sqrt.(LinearAlgebra.diag(sigma)))
+    else
+        sigma = StatsBase.cov2cor(Matrix(sigma))
+    end
+    return sigma
+end
 function robust_cor(ce::StatsBase.CovarianceEstimator, X::MatNum; dims::Int = 1,
                     mean = nothing, kwargs...)
     return try
-        try
-            try
-                Statistics.cor(ce, X; dims = dims, mean = mean, kwargs...)
-            catch
-                Statistics.cor(ce, X; dims = dims, mean = mean)
-            end
-        catch
-            sigma = robust_cov(ce, X; dims = dims, mean = mean, kwargs...)
-            if ismutable(sigma)
-                StatsBase.cov2cor!(sigma, sqrt.(LinearAlgebra.diag(sigma)))
-            else
-                sigma = StatsBase.cov2cor(Matrix(sigma))
-            end
-            sigma
+        compat_cor(ce, X; dims = dims, mean = mean, kwargs...)
+    catch err
+        if !(err isa MethodError)
+            rethrow()
         end
-    catch
-        X = Matrix(X)
-        try
-            try
-                Statistics.cor(ce, X; dims = dims, mean = mean, kwargs...)
-            catch
-                Statistics.cor(ce, X; dims = dims, mean = mean)
-            end
-        catch
-            sigma = robust_cov(ce, X; dims = dims, mean = mean, kwargs...)
-            if ismutable(sigma)
-                StatsBase.cov2cor!(sigma, sqrt.(LinearAlgebra.diag(sigma)))
-            else
-                sigma = StatsBase.cov2cor(Matrix(sigma))
-            end
-            sigma
-        end
+        compat_cor(ce, Matrix(X); dims = dims, mean = mean, kwargs...)
     end
-    #=
-    return if hasmethod(cor, (typeof(ce), typeof(X)), (:dims, :mean, :my_kwargs))
-        Statistics.cor(ce, X; dims = dims, mean = mean, kwargs...)
-    elseif hasmethod(cor, (typeof(ce), typeof(X)), (:dims, :mean))
-        Statistics.cor(ce, X; dims = dims, mean = mean)
-    else
-        sigma = robust_cov(ce, X; dims = dims, mean = mean, kwargs...)
-        if ismutable(sigma)
-            StatsBase.cov2cor!(sigma, sqrt.(LinearAlgebra.diag(sigma)))
-        else
-            sigma = StatsBase.cov2cor(Matrix(sigma))
-        end
-        sigma
-    end
-    =#
 end
 function robust_cor(ce::StatsBase.CovarianceEstimator, X::MatNum,
                     w::StatsBase.AbstractWeights; dims::Int = 1, mean = nothing, kwargs...)
     return try
-        try
-            try
-                Statistics.cor(ce, X, w; dims = dims, mean = mean, kwargs...)
-            catch
-                Statistics.cor(ce, X, w; dims = dims, mean = mean)
-            end
-        catch
-            sigma = robust_cov(ce, X, w; dims = dims, mean = mean, kwargs...)
-            if ismutable(sigma)
-                StatsBase.cov2cor!(sigma, sqrt.(LinearAlgebra.diag(sigma)))
-            else
-                sigma = StatsBase.cov2cor(Matrix(sigma))
-            end
-            sigma
+        compat_cor(ce, X, w; dims = dims, mean = mean, kwargs...)
+    catch err
+        if !(err isa MethodError)
+            rethrow()
         end
-    catch
-        X = Matrix(X)
-        try
-            try
-                Statistics.cor(ce, X, w; dims = dims, mean = mean, kwargs...)
-            catch
-                Statistics.cor(ce, X, w; dims = dims, mean = mean)
-            end
-        catch
-            sigma = robust_cov(ce, X, w; dims = dims, mean = mean, kwargs...)
-            if ismutable(sigma)
-                StatsBase.cov2cor!(sigma, sqrt.(LinearAlgebra.diag(sigma)))
-            else
-                sigma = StatsBase.cov2cor(Matrix(sigma))
-            end
-            sigma
-        end
+        compat_cor(ce, Matrix(X), w; dims = dims, mean = mean, kwargs...)
     end
-    #=
-    return if hasmethod(cor, (typeof(ce), typeof(X), typeof(w)), (:dims, :mean, :my_kwargs))
-        Statistics.cor(ce, X, w; dims = dims, mean = mean, kwargs...)
-    elseif hasmethod(cor, (typeof(ce), typeof(X), typeof(w)), (:dims, :mean))
-        Statistics.cor(ce, X, w; dims = dims, mean = mean)
-    else
-        sigma = robust_cov(ce, X, w; dims = dims, mean = mean, kwargs...)
-        if ismutable(sigma)
-            StatsBase.cov2cor!(sigma, sqrt.(LinearAlgebra.diag(sigma)))
-        else
-            sigma = StatsBase.cov2cor(Matrix(sigma))
-        end
-        sigma
-    end
-    =#
 end
 """
     moment_window_and_weights(
