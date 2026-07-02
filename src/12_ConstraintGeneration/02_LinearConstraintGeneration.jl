@@ -633,7 +633,7 @@ end
 Set of allowed functions in equation parsing. This is used to stop security issues when evaluating expressions, and to ensure that only valid mathematical functions are used in constraint equations.
 """
 const allowed_functions = Set((:+, :-, :*, :/, :^, :sqrt, :cbrt, :exp, :exp2, :exp10, :log,
-                               :log2, :log10, :abs, :min, :max))
+                               :log2, :log10, :abs, :min, :max, :prior))
 """
     eval_numeric_functions(expr)
 
