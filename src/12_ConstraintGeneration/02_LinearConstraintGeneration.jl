@@ -627,6 +627,14 @@ function estimator_to_val(::UniformValues, sets::AssetSets, ::Any = nothing,
     return range(; start = iN, stop = iN, length = N)
 end
 """
+    allowed_functions = Set((:+, :-, :*, :/, :^, :sqrt, :cbrt, :exp, :exp2, :exp10, :log,
+                             :log2, :log10, :abs, :min, :max))
+
+Set of allowed functions in equation parsing. This is used to stop security issues when evaluating expressions, and to ensure that only valid mathematical functions are used in constraint equations.
+"""
+const allowed_functions = Set((:+, :-, :*, :/, :^, :sqrt, :cbrt, :exp, :exp2, :exp10, :log,
+                               :log2, :log10, :abs, :min, :max))
+"""
     eval_numeric_functions(expr)
 
 Recursively evaluate numeric functions and constants in a Julia expression.
@@ -659,6 +667,9 @@ function eval_numeric_functions(expr)
     return if isa(expr, Expr)
         if expr.head == :call
             fname = expr.args[1]
+            if !(fname in allowed_functions)
+                throw(Meta.ParseError("Function `$(fname)` is not allowed in constraint expressions."))
+            end
             # Only evaluate if all arguments are numeric
             args = [eval_numeric_functions(arg) for arg in expr.args[2:end]]
             if all(x -> isa(x, Number), args)

@@ -270,7 +270,7 @@ Converts integer, symbol, or vector expression AST nodes to concrete index value
 """
 _eval_index(x::Integer) = x
 _eval_index(x::Symbol) = x
-_eval_index(ex::Expr)  = ex.head === :vect ? [_eval_index(a) for a in ex.args] : error("Unsupported index expression: $ex")
+_eval_index(ex::Expr)  = ex.head === :vect ? [_eval_index(a) for a in ex.args] : throw(Meta.ParseError("Unsupported index expression: $ex"))
 """
     expr_to_lens_chain(ex)
 
