@@ -15,7 +15,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract type for bootstrap algorithms used in constructing uncertainty sets for time series data in portfolio optimisation.
 
-Subtypes implement specific bootstrap methods using [`archpy`](https://pypi.org/project/arch/).
+Subtypes implement specific block bootstrap methods for dependent (time series) data.
 
 # Related
 
@@ -27,7 +27,7 @@ abstract type ARCHBootstrapSet <: AbstractAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Bootstrap algorithm for constructing uncertainty sets using a [stationary bootstrap](https://bashtage.github.io/arch/bootstrap/generated/arch.bootstrap.StationaryBootstrap.html#arch.bootstrap.StationaryBootstrap) in time series data.
+Bootstrap algorithm for constructing uncertainty sets using a stationary bootstrap [politis1994stationary](@cite) in time series data. Blocks have geometrically distributed random lengths with mean `block_size`, and wrap around the end of the sample.
 
 # Related
 
@@ -39,7 +39,7 @@ struct StationaryBootstrap <: ARCHBootstrapSet end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Bootstrap algorithm for constructing uncertainty sets using a [circular bootstrap](https://bashtage.github.io/arch/bootstrap/generated/arch.bootstrap.CircularBlockBootstrap.html#arch.bootstrap.CircularBlockBootstrap) in time series data.
+Bootstrap algorithm for constructing uncertainty sets using a circular block bootstrap [politis1992circular](@cite) in time series data. Blocks have fixed length `block_size` and wrap around the end of the sample.
 
 # Related
 
@@ -51,7 +51,7 @@ struct CircularBootstrap <: ARCHBootstrapSet end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Bootstrap algorithm for constructing uncertainty sets using a [moving bootstrap](https://bashtage.github.io/arch/bootstrap/generated/arch.bootstrap.MovingBlockBootstrap.html#arch.bootstrap.MovingBlockBootstrap) in time series data.
+Bootstrap algorithm for constructing uncertainty sets using a moving block bootstrap [kunsch1989](@cite) in time series data. Blocks have fixed length `block_size` and do not wrap around the end of the sample.
 
 # Related
 
@@ -61,26 +61,31 @@ Bootstrap algorithm for constructing uncertainty sets using a [moving bootstrap]
 """
 struct MovingBootstrap <: ARCHBootstrapSet end
 """
-    bootstrap_func(alg::ARCHBootstrapSet, block_size, X, seed)
+    bootstrap_indices(alg::ARCHBootstrapSet, rng::Random.AbstractRNG, T::Integer,
+                      block_size::Integer)
 
-Creates a bootstrap generator for time series data using the specified bootstrap algorithm.
+Generate a vector of `T` observation indices for one block bootstrap resample.
 
 # Arguments
 
   - `alg`: Bootstrap algorithm type.
-  - `block_size`: Size of blocks for resampling.
-  - `X`: Data matrix to be resampled.
-  - `seed`: Random seed for reproducibility.
+  - `rng`: Random number generator.
+  - `T`: Number of observations in the sample being resampled.
+  - `block_size`: Size of blocks for resampling. Mean block length for [`StationaryBootstrap`](@ref), fixed block length otherwise.
 
 # Returns
 
-  - Returns a Python bootstrap generator object from the `arch.bootstrap` package.
+  - `idx::Vector{Int}`: Indices in `1:T` selecting the rows of one bootstrap resample.
 
 # Details
 
-  - Dispatches to the appropriate bootstrap algorithm based on `alg`.
-  - Uses Python's `arch.bootstrap` via `pyimport` for stationary, circular, or moving block bootstraps.
-  - The generator can be used to produce resampled datasets for uncertainty set estimation.
+  - [`StationaryBootstrap`](@ref): each index either continues the previous block (wrapping around `T`) or, with probability `1 / block_size`, starts a new block at a uniformly random position, yielding geometrically distributed block lengths [politis1994stationary](@cite).
+  - [`CircularBootstrap`](@ref): fixed-length blocks with uniformly random starts, wrapping around `T` [politis1992circular](@cite).
+  - [`MovingBootstrap`](@ref): fixed-length blocks with uniformly random starts in `1:(T - block_size + 1)`, no wrap-around [kunsch1989](@cite).
+
+## Validation
+
+  - [`MovingBootstrap`](@ref) requires `block_size <= T`.
 
 # Related
 
@@ -89,17 +94,44 @@ Creates a bootstrap generator for time series data using the specified bootstrap
   - [`MovingBootstrap`](@ref)
   - [`ARCHBootstrapSet`](@ref)
 """
-function bootstrap_func(::StationaryBootstrap, block_size, X, seed)
-    return PythonCall.pyimport("arch.bootstrap").StationaryBootstrap(block_size, X;
-                                                                     seed = seed)
+function bootstrap_indices(::StationaryBootstrap, rng::Random.AbstractRNG, T::Integer,
+                           block_size::Integer)
+    p = inv(block_size)
+    idx = Vector{Int}(undef, T)
+    idx[1] = rand(rng, 1:T)
+    for t in 2:T
+        idx[t] = rand(rng) < p ? rand(rng, 1:T) : mod1(idx[t - 1] + 1, T)
+    end
+    return idx
 end
-function bootstrap_func(::CircularBootstrap, block_size, X, seed)
-    return PythonCall.pyimport("arch.bootstrap").CircularBlockBootstrap(block_size, X;
-                                                                        seed = seed)
+function bootstrap_indices(::CircularBootstrap, rng::Random.AbstractRNG, T::Integer,
+                           block_size::Integer)
+    idx = Vector{Int}(undef, T)
+    t = 0
+    while t < T
+        s = rand(rng, 1:T)
+        for k in 0:(min(block_size, T - t) - 1)
+            idx[t + k + 1] = mod1(s + k, T)
+        end
+        t += block_size
+    end
+    return idx
 end
-function bootstrap_func(::MovingBootstrap, block_size, X, seed)
-    return PythonCall.pyimport("arch.bootstrap").MovingBlockBootstrap(block_size, X;
-                                                                      seed = seed)
+function bootstrap_indices(::MovingBootstrap, rng::Random.AbstractRNG, T::Integer,
+                           block_size::Integer)
+    @argcheck(block_size <= T,
+              DomainError(block_size,
+                          "block_size must be <= the number of observations $T"))
+    idx = Vector{Int}(undef, T)
+    t = 0
+    while t < T
+        s = rand(rng, 1:(T - block_size + 1))
+        for k in 0:(min(block_size, T - t) - 1)
+            idx[t + k + 1] = s + k
+        end
+        t += block_size
+    end
+    return idx
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -118,6 +150,7 @@ $(DocStringExtensions.FIELDS)
         n_sim::Integer = 3_000,
         block_size::Integer = 3,
         q::Number = 0.05,
+        rng::Random.AbstractRNG = Random.default_rng(),
         seed::Option{<:Integer} = nothing,
         bootstrap::ARCHBootstrapSet = StationaryBootstrap(),
         kwargs::NamedTuple = (;),
@@ -160,6 +193,7 @@ ARCHUncertaintySet
        n_sim ┼ Int64: 3000
   block_size ┼ Int64: 3
            q ┼ Float64: 0.05
+         rng ┼ Random.TaskLocalRNG: Random.TaskLocalRNG()
         seed ┼ nothing
    bootstrap ┼ StationaryBootstrap()
       kwargs ┴ @NamedTuple{}: NamedTuple()
@@ -197,6 +231,10 @@ ARCHUncertaintySet
     """
     q
     """
+    $(field_dict[:rng])
+    """
+    rng
+    """
     $(field_dict[:seed])
     """
     seed
@@ -210,25 +248,32 @@ ARCHUncertaintySet
     kwargs
     function ARCHUncertaintySet(pe::AbstractLowOrderPriorEstimator,
                                 alg::AbstractUncertaintySetAlgorithm, n_sim::Integer,
-                                block_size::Integer, q::Number, seed::Option{<:Integer},
-                                bootstrap::ARCHBootstrapSet, kwargs::NamedTuple)
+                                block_size::Integer, q::Number, rng::Random.AbstractRNG,
+                                seed::Option{<:Integer}, bootstrap::ARCHBootstrapSet,
+                                kwargs::NamedTuple)
         @argcheck(n_sim > zero(n_sim), DomainError(n_sim, "n_sim must be > 0"))
         @argcheck(block_size > zero(block_size),
                   DomainError(block_size, "block_size must be > 0"))
         @argcheck(zero(q) < q < one(q), DomainError(q, "q must be in (0, 1)"))
         return new{typeof(pe), typeof(alg), typeof(n_sim), typeof(block_size), typeof(q),
-                   typeof(seed), typeof(bootstrap), typeof(kwargs)}(pe, alg, n_sim,
-                                                                    block_size, q, seed,
-                                                                    bootstrap, kwargs)
+                   typeof(rng), typeof(seed), typeof(bootstrap), typeof(kwargs)}(pe, alg,
+                                                                                 n_sim,
+                                                                                 block_size,
+                                                                                 q, rng,
+                                                                                 seed,
+                                                                                 bootstrap,
+                                                                                 kwargs)
     end
 end
 function ARCHUncertaintySet(; pe::AbstractLowOrderPriorEstimator = EmpiricalPrior(),
                             alg::AbstractUncertaintySetAlgorithm = BoxUncertaintySetAlgorithm(),
                             n_sim::Integer = 3_000, block_size::Integer = 3,
-                            q::Number = 0.05, seed::Option{<:Integer} = nothing,
+                            q::Number = 0.05,
+                            rng::Random.AbstractRNG = Random.default_rng(),
+                            seed::Option{<:Integer} = nothing,
                             bootstrap::ARCHBootstrapSet = StationaryBootstrap(),
                             kwargs::NamedTuple = (;))::ARCHUncertaintySet
-    return ARCHUncertaintySet(pe, alg, n_sim, block_size, q, seed, bootstrap, kwargs)
+    return ARCHUncertaintySet(pe, alg, n_sim, block_size, q, rng, seed, bootstrap, kwargs)
 end
 """
     bootstrap_generator(ue::ARCHUncertaintySet, X::MatNum; kwargs...)
@@ -248,25 +293,28 @@ Generates bootstrapped samples of expected returns and covariance statistics for
 # Details
 
   - Uses the bootstrap algorithm specified in `ue.bootstrap` to generate resampled datasets.
+  - If `ue.seed` is provided, seeds `ue.rng` before resampling for reproducibility.
   - For each bootstrap sample, computes the expected return and covariance using the prior estimator in `ue.pe`.
   - Stores the bootstrapped expected returns and covariances for uncertainty set estimation.
 
 # Related
 
   - [`ARCHUncertaintySet`](@ref)
-  - [`bootstrap_func`](@ref)
+  - [`bootstrap_indices`](@ref)
   - [`mu_bootstrap_generator`](@ref)
   - [`sigma_bootstrap_generator`](@ref)
 """
 function bootstrap_generator(ue::ARCHUncertaintySet, X::MatNum; kwargs...)
+    T = size(X, 1)
     mus = Matrix{eltype(X)}(undef, size(X, 2), ue.n_sim)
     sigmas = Array{eltype(X)}(undef, size(X, 2), size(X, 2), ue.n_sim)
-    gen = bootstrap_func(ue.bootstrap, ue.block_size, PythonCall.Py(X).to_numpy(), ue.seed)
-    for (i, data) in enumerate(gen.bootstrap(ue.n_sim))
-        X = PythonCall.pyconvert(Array, data)[1][1]
-        mu = Statistics.mean(ue.pe.me, X; dims = 1, kwargs...)
-        mus[:, i] = vec(mu)
-        sigmas[:, :, i] = Statistics.cov(ue.pe.ce, X; dims = 1, kwargs...)
+    if !isnothing(ue.seed)
+        Random.seed!(ue.rng, ue.seed)
+    end
+    for i in 1:(ue.n_sim)
+        Xi = X[bootstrap_indices(ue.bootstrap, ue.rng, T, ue.block_size), :]
+        mus[:, i] = vec(Statistics.mean(ue.pe.me, Xi; dims = 1, kwargs...))
+        sigmas[:, :, i] = Statistics.cov(ue.pe.ce, Xi; dims = 1, kwargs...)
     end
     return mus, sigmas
 end
@@ -287,23 +335,26 @@ Generates bootstrap samples of expected return vectors for returns data using th
 # Details
 
   - Uses the bootstrap algorithm specified in `ue.bootstrap` to generate resampled datasets.
+  - If `ue.seed` is provided, seeds `ue.rng` before resampling for reproducibility.
   - For each bootstrap sample, computes the expected return using the prior estimator in `ue.pe`.
   - Stores the bootstrapped expected returns for uncertainty set estimation.
 
 # Related
 
   - [`ARCHUncertaintySet`](@ref)
-  - [`bootstrap_func`](@ref)
+  - [`bootstrap_indices`](@ref)
   - [`bootstrap_generator`](@ref)
   - [`sigma_bootstrap_generator`](@ref)
 """
 function mu_bootstrap_generator(ue::ARCHUncertaintySet, X::MatNum; kwargs...)
+    T = size(X, 1)
     mus = Matrix{eltype(X)}(undef, size(X, 2), ue.n_sim)
-    gen = bootstrap_func(ue.bootstrap, ue.block_size, PythonCall.Py(X).to_numpy(), ue.seed)
-    for (i, data) in enumerate(gen.bootstrap(ue.n_sim))
-        X = PythonCall.pyconvert(Array, data)[1][1]
-        mu = Statistics.mean(ue.pe.me, X; dims = 1, kwargs...)
-        mus[:, i] = vec(mu)
+    if !isnothing(ue.seed)
+        Random.seed!(ue.rng, ue.seed)
+    end
+    for i in 1:(ue.n_sim)
+        Xi = X[bootstrap_indices(ue.bootstrap, ue.rng, T, ue.block_size), :]
+        mus[:, i] = vec(Statistics.mean(ue.pe.me, Xi; dims = 1, kwargs...))
     end
     return mus
 end
@@ -324,22 +375,26 @@ Generates bootstrap samples of covariance matrices for time series data using th
 # Details
 
   - Uses the bootstrap algorithm specified in `ue.bootstrap` to generate resampled datasets.
+  - If `ue.seed` is provided, seeds `ue.rng` before resampling for reproducibility.
   - For each bootstrap sample, computes the covariance using the prior estimator in `ue.pe`.
   - Stores the bootstrapped covariances for uncertainty set estimation.
 
 # Related
 
   - [`ARCHUncertaintySet`](@ref)
-  - [`bootstrap_func`](@ref)
+  - [`bootstrap_indices`](@ref)
   - [`bootstrap_generator`](@ref)
   - [`mu_bootstrap_generator`](@ref)
 """
 function sigma_bootstrap_generator(ue::ARCHUncertaintySet, X::MatNum; kwargs...)
+    T = size(X, 1)
     sigmas = Array{eltype(X)}(undef, size(X, 2), size(X, 2), ue.n_sim)
-    gen = bootstrap_func(ue.bootstrap, ue.block_size, PythonCall.Py(X).to_numpy(), ue.seed)
-    for (i, data) in enumerate(gen.bootstrap(ue.n_sim))
-        X = PythonCall.pyconvert(Array, data)[1][1]
-        sigmas[:, :, i] = Statistics.cov(ue.pe.ce, X; dims = 1, kwargs...)
+    if !isnothing(ue.seed)
+        Random.seed!(ue.rng, ue.seed)
+    end
+    for i in 1:(ue.n_sim)
+        Xi = X[bootstrap_indices(ue.bootstrap, ue.rng, T, ue.block_size), :]
+        sigmas[:, :, i] = Statistics.cov(ue.pe.ce, Xi; dims = 1, kwargs...)
     end
     return sigmas
 end
@@ -523,7 +578,7 @@ Where:
 
 # Arguments
 
-  - `ue`: ARCH uncertainty set estimator. Contains prior estimator, box algorithm, simulation parameters, block size, quantile, seed, and bootstrap type.
+  - `ue`: ARCH uncertainty set estimator. Contains prior estimator, box algorithm, simulation parameters, block size, quantile, rng, seed, and bootstrap type.
   - `X`: Data matrix to be resampled.
   - `F`: Optional factor matrix. Used by the prior estimator.
   - $(arg_dict[:dims])
@@ -612,7 +667,7 @@ Where:
 
 # Arguments
 
-  - `ue`: ARCH uncertainty set estimator. Contains prior estimator, ellipsoidal algorithm, simulation parameters, block size, quantile, seed, and bootstrap type.
+  - `ue`: ARCH uncertainty set estimator. Contains prior estimator, ellipsoidal algorithm, simulation parameters, block size, quantile, rng, seed, and bootstrap type.
   - `X`: Data matrix to be resampled.
   - `F`: Optional factor matrix. Used by the prior estimator.
   - $(arg_dict[:dims])
@@ -692,7 +747,7 @@ Where:
 
 # Arguments
 
-  - `ue`: ARCH uncertainty set estimator. Contains prior estimator, ellipsoidal algorithm, simulation parameters, block size, quantile, seed, and bootstrap type.
+  - `ue`: ARCH uncertainty set estimator. Contains prior estimator, ellipsoidal algorithm, simulation parameters, block size, quantile, rng, seed, and bootstrap type.
   - `X`: Data matrix to be resampled.
   - `F`: Optional factor matrix. Used by the prior estimator.
   - $(arg_dict[:dims])
@@ -763,7 +818,7 @@ Where:
 
 # Arguments
 
-  - `ue`: ARCH uncertainty set estimator. Contains prior estimator, ellipsoidal algorithm, simulation parameters, block size, quantile, seed, and bootstrap type.
+  - `ue`: ARCH uncertainty set estimator. Contains prior estimator, ellipsoidal algorithm, simulation parameters, block size, quantile, rng, seed, and bootstrap type.
   - `X`: Data matrix to be resampled.
   - `F`: Optional factor matrix. Used by the prior estimator.
   - $(arg_dict[:dims])

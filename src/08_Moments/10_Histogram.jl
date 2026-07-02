@@ -7,7 +7,7 @@ Abstract supertype for all histogram binning algorithms.
 
 # Related
 
-  - [`AstroPyBins`](@ref)
+  - [`BinWidthBins`](@ref)
   - [`Knuth`](@ref)
   - [`FreedmanDiaconis`](@ref)
   - [`Scott`](@ref)
@@ -30,9 +30,9 @@ const Int_Bin = Union{<:AbstractBins, <:Integer}
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all histogram binning algorithms implemented using AstroPy's bin width selection methods.
+Abstract supertype for all histogram binning algorithms based on a bin width selection rule.
 
-`AstroPyBins` is the abstract type for all binning algorithm types that rely on bin width selection functions from the [AstroPy](https://www.astropy.org/) Python library, such as Knuth, Freedman-Diaconis, and Scott. Concrete subtypes implement specific binning strategies and provide a consistent interface for bin selection in histogram-based calculations within `PortfolioOptimisers.jl`.
+`BinWidthBins` is the abstract type for all binning algorithm types that select the number of bins by first computing an optimal bin width from the data, such as Knuth, Freedman-Diaconis, and Scott. Concrete subtypes implement specific binning strategies and provide a consistent interface for bin selection in histogram-based calculations within `PortfolioOptimisers.jl`.
 
 # Related
 
@@ -41,13 +41,13 @@ Abstract supertype for all histogram binning algorithms implemented using AstroP
   - [`Scott`](@ref)
   - [`AbstractBins`](@ref)
 """
-abstract type AstroPyBins <: AbstractBins end
+abstract type BinWidthBins <: AbstractBins end
 """
 $(DocStringExtensions.TYPEDEF)
 
 Histogram binning algorithm using Knuth's rule.
 
-`Knuth` implements Knuth's rule for selecting the optimal number of bins in a histogram, as provided by the [AstroPy](https://www.astropy.org/) library. This method aims to maximize the posterior probability of the histogram given the data, resulting in an adaptive binning strategy that balances bias and variance.
+`Knuth` implements Knuth's rule for selecting the optimal number of bins in a histogram [knuth2019](@cite). This method maximises the posterior probability of a piecewise-constant density model given the data, resulting in an adaptive binning strategy that balances bias and variance.
 
 # Constructors
 
@@ -62,19 +62,19 @@ Knuth()
 
 # Related
 
-  - [`AstroPyBins`](@ref)
+  - [`BinWidthBins`](@ref)
   - [`FreedmanDiaconis`](@ref)
   - [`Scott`](@ref)
   - [`HacineGharbiRavier`](@ref)
   - [`get_bin_width_func`](@ref)
 """
-struct Knuth <: AstroPyBins end
+struct Knuth <: BinWidthBins end
 """
 $(DocStringExtensions.TYPEDEF)
 
 Histogram binning algorithm using the Freedman-Diaconis rule.
 
-`FreedmanDiaconis` implements the Freedman-Diaconis rule for selecting the number of bins in a histogram, as provided by the [AstroPy](https://www.astropy.org/) library. This method determines bin width based on the interquartile range (IQR) and the number of data points, making it robust to outliers and suitable for skewed distributions.
+`FreedmanDiaconis` implements the Freedman-Diaconis rule for selecting the number of bins in a histogram [freedman1981](@cite). This method determines bin width based on the interquartile range (IQR) and the number of data points, making it robust to outliers and suitable for skewed distributions.
 
 # Constructors
 
@@ -89,19 +89,19 @@ FreedmanDiaconis()
 
 # Related
 
-  - [`AstroPyBins`](@ref)
+  - [`BinWidthBins`](@ref)
   - [`Knuth`](@ref)
   - [`Scott`](@ref)
   - [`HacineGharbiRavier`](@ref)
   - [`get_bin_width_func`](@ref)
 """
-struct FreedmanDiaconis <: AstroPyBins end
+struct FreedmanDiaconis <: BinWidthBins end
 """
 $(DocStringExtensions.TYPEDEF)
 
 Histogram binning algorithm using Scott's rule.
 
-`Scott` implements Scott's rule for selecting the number of bins in a histogram, as provided by the [AstroPy](https://www.astropy.org/) library. This method chooses bin width based on the standard deviation of the data and the number of observations, providing a good default for normally distributed data.
+`Scott` implements Scott's rule for selecting the number of bins in a histogram [scott1979](@cite). This method chooses bin width based on the standard deviation of the data and the number of observations, providing a good default for normally distributed data.
 
 # Constructors
 
@@ -116,13 +116,13 @@ Scott()
 
 # Related
 
-  - [`AstroPyBins`](@ref)
+  - [`BinWidthBins`](@ref)
   - [`Knuth`](@ref)
   - [`FreedmanDiaconis`](@ref)
   - [`HacineGharbiRavier`](@ref)
   - [`get_bin_width_func`](@ref)
 """
-struct Scott <: AstroPyBins end
+struct Scott <: BinWidthBins end
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -144,7 +144,7 @@ HacineGharbiRavier()
 # Related
 
   - [`AbstractBins`](@ref)
-  - [`AstroPyBins`](@ref)
+  - [`BinWidthBins`](@ref)
   - [`Knuth`](@ref)
   - [`FreedmanDiaconis`](@ref)
   - [`Scott`](@ref)
@@ -152,17 +152,152 @@ HacineGharbiRavier()
 """
 struct HacineGharbiRavier <: AbstractBins end
 """
+    scott_bin_width(x::VecNum)
+
+Compute the optimal histogram bin width for `x` using Scott's rule [scott1979](@cite).
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\Delta_x &= \\sigma_x \\left(\\frac{24 \\sqrt{\\pi}}{n}\\right)^{1/3}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\Delta_x``: Bin width.
+  - ``\\sigma_x``: Uncorrected standard deviation of the data.
+  - ``n``: Number of observations.
+
+# Arguments
+
+  - `x`: Data vector.
+
+# Returns
+
+  - `dx::Number`: The optimal bin width.
+
+# Related
+
+  - [`Scott`](@ref)
+  - [`freedman_bin_width`](@ref)
+  - [`knuth_bin_width`](@ref)
+"""
+function scott_bin_width(x::VecNum)
+    return Statistics.std(x; corrected = false) * cbrt(24 * sqrt(pi) / length(x))
+end
+"""
+    freedman_bin_width(x::VecNum)
+
+Compute the optimal histogram bin width for `x` using the Freedman-Diaconis rule [freedman1981](@cite).
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\Delta_x &= \\frac{2 \\, \\mathrm{IQR}(x)}{n^{1/3}}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\Delta_x``: Bin width.
+  - ``\\mathrm{IQR}(x)``: Interquartile range of the data.
+  - ``n``: Number of observations.
+
+# Arguments
+
+  - `x`: Data vector.
+
+# Returns
+
+  - `dx::Number`: The optimal bin width.
+
+# Related
+
+  - [`FreedmanDiaconis`](@ref)
+  - [`scott_bin_width`](@ref)
+  - [`knuth_bin_width`](@ref)
+"""
+function freedman_bin_width(x::VecNum)
+    q25, q75 = Statistics.quantile(x, [0.25, 0.75])
+    return 2 * (q75 - q25) / cbrt(length(x))
+end
+"""
+    knuth_bin_width(x::VecNum)
+
+Compute the optimal histogram bin width for `x` using Knuth's rule [knuth2019](@cite).
+
+Maximises the marginal posterior probability of a piecewise-constant density model with ``M`` equal-width bins over the data range,
+
+```math
+\\begin{align}
+F(M) &= n \\log M + \\log\\Gamma\\!\\left(\\frac{M}{2}\\right) - M \\log\\Gamma\\!\\left(\\frac{1}{2}\\right) - \\log\\Gamma\\!\\left(n + \\frac{M}{2}\\right) + \\sum_{k=1}^{M} \\log\\Gamma\\!\\left(n_k + \\frac{1}{2}\\right)\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``M``: Number of bins.
+  - ``n``: Number of observations.
+  - ``n_k``: Number of observations in bin ``k``.
+
+# Arguments
+
+  - `x`: Data vector.
+
+# Returns
+
+  - `dx::Number`: The optimal bin width.
+
+# Details
+
+  - The optimisation is performed with Nelder-Mead over a continuous relaxation of ``M`` (evaluated at ``\\lfloor M \\rfloor``), started at the bin count implied by the Freedman-Diaconis rule.
+
+# Related
+
+  - [`Knuth`](@ref)
+  - [`scott_bin_width`](@ref)
+  - [`freedman_bin_width`](@ref)
+"""
+function knuth_bin_width(x::VecNum)
+    n = length(x)
+    xl, xu = extrema(x)
+    rx = xu - xl
+    lg_half = SpecialFunctions.loggamma(0.5)
+    nk = Vector{Int}(undef, 0)
+    function f(Ms)
+        M = floor(Int, first(Ms))
+        if M <= 0
+            return Inf
+        end
+        resize!(nk, M)
+        fill!(nk, 0)
+        for xi in x
+            k = min(floor(Int, (xi - xl) / rx * M) + 1, M)
+            nk[k] += 1
+        end
+        return -(n * log(M) + SpecialFunctions.loggamma(M / 2) - M * lg_half -
+                 SpecialFunctions.loggamma(n + M / 2) +
+                 sum(SpecialFunctions.loggamma, nk .+ 0.5))
+    end
+    M0 = max(1.0, rx / freedman_bin_width(x)) + 1
+    res = Optim.optimize(f, [M0], Optim.NelderMead())
+    return rx / floor(Int, first(Optim.minimizer(res)))
+end
+"""
     get_bin_width_func(bins::Int_Bin)
 
 Return the bin width selection function associated with a histogram binning algorithm.
 
-This utility dispatches on the binning algorithm type and returns the corresponding bin width function from the [AstroPy](https://www.astropy.org/) Python library for `Knuth`, `FreedmanDiaconis`, and `Scott`. For `HacineGharbiRavier` and integer bin counts, it returns `nothing`, as these strategies do not use a bin width function.
+This utility dispatches on the binning algorithm type and returns the corresponding bin width function for `Knuth`, `FreedmanDiaconis`, and `Scott`. For `HacineGharbiRavier` and integer bin counts, it returns `nothing`, as these strategies do not use a bin width function.
 
 # Arguments
 
-  - `bins::Knuth`: Use Knuth's rule (`astropy.stats.knuth_bin_width`).
-  - `bins::FreedmanDiaconis`: Use the Freedman-Diaconis rule (`astropy.stats.freedman_bin_width`).
-  - `bins::Scott`: Use Scott's rule (`astropy.stats.scott_bin_width`).
+  - `bins::Knuth`: Use Knuth's rule ([`knuth_bin_width`](@ref)).
+  - `bins::FreedmanDiaconis`: Use the Freedman-Diaconis rule ([`freedman_bin_width`](@ref)).
+  - `bins::Scott`: Use Scott's rule ([`scott_bin_width`](@ref)).
   - `bins::Union{<:HacineGharbiRavier, <:Integer}`: No bin width function (returns `nothing`).
 
 # Returns
@@ -171,15 +306,15 @@ This utility dispatches on the binning algorithm type and returns the correspond
 
 # Examples
 
-```jldoctest; filter = r"0x[0-9a-fA-F]+" => s"..."
+```jldoctest
 julia> PortfolioOptimisers.get_bin_width_func(Knuth())
-Python: <function knuth_bin_width at 0x7da1178e0fe0>
+knuth_bin_width (generic function with 1 method)
 
 julia> PortfolioOptimisers.get_bin_width_func(FreedmanDiaconis())
-Python: <function freedman_bin_width at 0x7da1178e0fe0>
+freedman_bin_width (generic function with 1 method)
 
 julia> PortfolioOptimisers.get_bin_width_func(Scott())
-Python: <function scott_bin_width at 0x7da1178e0fe0>
+scott_bin_width (generic function with 1 method)
 
 julia> PortfolioOptimisers.get_bin_width_func(HacineGharbiRavier())
 
@@ -195,13 +330,13 @@ julia> PortfolioOptimisers.get_bin_width_func(10)
   - [`HacineGharbiRavier`](@ref)
 """
 function get_bin_width_func(::Knuth)
-    return PythonCall.pyimport("astropy.stats").knuth_bin_width
+    return knuth_bin_width
 end
 function get_bin_width_func(::FreedmanDiaconis)
-    return PythonCall.pyimport("astropy.stats").freedman_bin_width
+    return freedman_bin_width
 end
 function get_bin_width_func(::Scott)
-    return PythonCall.pyimport("astropy.stats").scott_bin_width
+    return scott_bin_width
 end
 function get_bin_width_func(::Union{<:HacineGharbiRavier, <:Integer})::Nothing
     return nothing
@@ -214,7 +349,7 @@ Compute the number of histogram bins for a pair of variables using a specified b
 
 This function determines the number of bins to use for histogram-based calculations (such as mutual information or variation of information) between two variables, based on the selected binning strategy. It dispatches on the binning algorithm type and uses the appropriate method for each:
 
-  - For `AstroPyBins`, it computes the bin width using the provided `bin_width_func` and computes the number of bins as the range divided by the bin width, rounding to the nearest integer. For off-diagonal pairs, it uses the maximum of the two variables' bin counts.
+  - For `BinWidthBins`, it computes the bin width using the provided `bin_width_func` and computes the number of bins as the range divided by the bin width, rounding to the nearest integer. For off-diagonal pairs, it uses the maximum of the two variables' bin counts.
   - For `HacineGharbiRavier`, it uses the Hacine-Gharbi–Ravier rule, which adapts the bin count based on the correlation and sample size.
   - For an integer, it returns the specified number of bins directly.
 
@@ -240,16 +375,13 @@ This function determines the number of bins to use for histogram-based calculati
   - [`Scott`](@ref)
   - [`HacineGharbiRavier`](@ref)
 """
-function calc_num_bins(::AstroPyBins, xj::VecNum, xi::VecNum, j::Integer, i::Integer,
+function calc_num_bins(::BinWidthBins, xj::VecNum, xi::VecNum, j::Integer, i::Integer,
                        bin_width_func, ::Any)
     xjl, xju = extrema(xj)
-    k1 = (xju - xjl) /
-         PythonCall.pyconvert(eltype(xj), bin_width_func(PythonCall.Py(xj).to_numpy()))
-    return round(Int,
-                 if j != i
+    k1 = (xju - xjl) / bin_width_func(xj)
+    return round(Int, if j != i
                      xil, xiu = extrema(xi)
-                     k2 = (xiu - xil) / PythonCall.pyconvert(eltype(xi),
-                                                             bin_width_func(PythonCall.Py(xi).to_numpy()))
+                     k2 = (xiu - xil) / bin_width_func(xi)
                      max(k1, k2)
                  else
                      k1

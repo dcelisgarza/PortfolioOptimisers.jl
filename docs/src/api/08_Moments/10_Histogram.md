@@ -6,8 +6,11 @@ FreedmanDiaconis
 Scott
 HacineGharbiRavier
 AbstractBins
-AstroPyBins
+BinWidthBins
 Int_Bin
+scott_bin_width
+freedman_bin_width
+knuth_bin_width
 get_bin_width_func
 calc_num_bins
 calc_hist_data

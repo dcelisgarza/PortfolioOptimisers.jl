@@ -1,6 +1,6 @@
 @testset "Moments" begin
     using Test, PortfolioOptimisers, DataFrames, TimeSeries, CSV, CovarianceEstimation,
-          StableRNGs, StatsBase, LinearAlgebra, SparseArrays, Distributions
+          StableRNGs, StatsBase, LinearAlgebra, SparseArrays, Distributions, FLoops
     rng = StableRNG(123456789)
     rd = prices_to_returns(TimeArray(CSV.File(joinpath(@__DIR__, "./assets/SP500.csv.gz"));
                                      timestamp = :Date)[(end - 252):end],
@@ -330,6 +330,16 @@
                        cov(LowerTailDependenceCovariance(), rd.X'; dims = 2))
         @test isapprox(cor(LowerTailDependenceCovariance(), rd.X),
                        cor(LowerTailDependenceCovariance(), rd.X'; dims = 2))
+        # Regression: the threaded pair-count loop used to fill the tail mask
+        # lazily per iteration, so with >1 thread iteration j could read the
+        # not-yet-written mask of column i < j. Threaded and sequential
+        # executors must agree exactly, and repeated runs must be identical.
+        let ltd_seq = cor(LowerTailDependenceCovariance(; ex = FLoops.SequentialEx()), rd.X)
+            for _ in 1:5
+                @test cor(LowerTailDependenceCovariance(; ex = FLoops.ThreadedEx()),
+                          rd.X) == ltd_seq
+            end
+        end
 
         ce0 = PortfolioOptimisersCovariance(; ce = KendallCovariance(;))
         ce = PortfolioOptimisers.factory(ce0, ew)

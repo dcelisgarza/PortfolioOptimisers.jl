@@ -101,9 +101,6 @@ PortfolioOptimisers.jl is a modular, extensible Julia package for advanced portf
 
   - Managed in `Project.toml` and loaded in the main module.
 
-- **Python dependencies:**
-
-  - (for PythonCall) are managed in `CondaPkg.toml`.
 - **Package extensions:**
 
   - via extensions in `ext/`.

@@ -27,7 +27,6 @@ using MultivariateStats: MultivariateStats
 using NearestCorrelationMatrix: NearestCorrelationMatrix
 using Optim: Optim
 using PrecompileTools: PrecompileTools
-using PythonCall: PythonCall
 using Random: Random
 using Roots: Roots
 using SimpleWeightedGraphs: SimpleWeightedGraphs

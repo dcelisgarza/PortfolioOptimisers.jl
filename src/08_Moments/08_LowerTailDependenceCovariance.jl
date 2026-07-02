@@ -132,9 +132,12 @@ function lower_tail_dependence(X::MatNum, alpha::Number = 0.05,
             partialsort!(view(Xs, :, i), k)
         end
         mv = sqrt(eps(eltype(X)))
+        # The mask must be complete before the pair counts: iteration j reads
+        # column i < j, so filling it inside the threaded loop is a race.
+        for j in axes(X, 2)
+            mask[:, j] .= view(X, :, j) .<= Xs[k, j]
+        end
         FLoops.@floop ex for j in axes(X, 2)
-            xj = view(X, :, j)
-            mask[:, j] .= xj .<= Xs[k, j]
             for i in 1:j
                 ltd = count(view(mask, :, i) .&& view(mask, :, j)) / k
                 rho[j, i] = rho[i, j] = clamp(ltd, mv, one(eltype(X)))

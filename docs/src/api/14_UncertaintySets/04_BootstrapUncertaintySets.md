@@ -25,7 +25,7 @@ sigma_ucs(ue::ARCHUncertaintySet{<:Any, <:EllipsoidalUncertaintySetAlgorithm, <:
                    F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
 BootstrapUncertaintySetEstimator
 ARCHBootstrapSet
-bootstrap_func
+bootstrap_indices
 bootstrap_generator
 mu_bootstrap_generator
 sigma_bootstrap_generator

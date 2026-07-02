@@ -149,7 +149,7 @@ Overloads `Statistics.cov` and `Statistics.cor`.
   - Kendall covariance [`KendallCovariance`](@ref)
   - Spearman covariance [`SpearmanCovariance`](@ref)
 - ::: details Mutual information covariance with custom variance estimator and various binning algorithms [`MutualInfoCovariance`](@ref)
-  - ::: details [`AstroPy`](https://docs.astropy.org/en/stable/stats/ref_api.html)-defined bins
+  - ::: details Bin-width-rule bins [`BinWidthBins`](@ref)
     - Knuth's optimal bin width [`Knuth`](@ref)
     - Freedman Diaconis bin width [`FreedmanDiaconis`](@ref)
     - Scott's bin width [`Scott`](@ref)
@@ -194,7 +194,7 @@ The distance estimators are used together with various distance matrix algorithm
 - Logarithmic distance [`LogDistance`](@ref)
 - Correlation distance [`CorrelationDistance`](@ref)
 - ::: details Variation of Information distance with various binning algorithms [`VariationInfoDistance`](@ref)
-  - ::: details [`AstroPy`](https://docs.astropy.org/en/stable/stats/ref_api.html)-defined bins
+  - ::: details Bin-width-rule bins [`BinWidthBins`](@ref)
     - Knuth's optimal bin width [`Knuth`](@ref)
     - Freedman Diaconis bin width [`FreedmanDiaconis`](@ref)
     - Scott's bin width [`Scott`](@ref)

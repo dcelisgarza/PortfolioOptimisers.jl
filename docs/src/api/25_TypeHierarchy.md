@@ -747,7 +747,7 @@ its docstring.
 
 ├──&nbsp;[AbstractBins](@ref)
 
-│&nbsp;&nbsp;&nbsp;├──&nbsp;[AstroPyBins](@ref)
+│&nbsp;&nbsp;&nbsp;├──&nbsp;[BinWidthBins](@ref)
 
 │&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;├──&nbsp;[FreedmanDiaconis](@ref)
 
