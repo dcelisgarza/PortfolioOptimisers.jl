@@ -441,8 +441,7 @@ Pagerank
     epsilon
     function Pagerank(n::Integer, alpha::Number, epsilon::Number)
         @argcheck(0 < n, DomainError)
-        @argcheck(zero(alpha) < alpha < one(alpha),
-                  DomainError("0 < alpha < 1 must hold. Got\nalpha => $alpha"))
+        assert_unit_interval(alpha, :alpha)
         @argcheck(zero(epsilon) < epsilon, DomainError)
         return new{typeof(n), typeof(alpha), typeof(epsilon)}(n, alpha, epsilon)
     end

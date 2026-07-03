@@ -464,7 +464,7 @@ NormalisedConstantRelativeRiskAversion
     """
     g
     function NormalisedConstantRelativeRiskAversion(g::Number)
-        @argcheck(zero(g) < g < one(g), DomainError("0 < g < 1 must hold. Got\ng => $g"))
+        assert_unit_interval(g, :g)
         return new{typeof(g)}(g)
     end
 end
@@ -558,8 +558,7 @@ OWAJuMP
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
         end
-        @argcheck(zero(max_phi) < max_phi < one(max_phi),
-                  DomainError("0 < max_phi < 1 must hold. Got\nmax_phi => $max_phi"))
+        assert_unit_interval(max_phi, :max_phi)
         assert_nonempty_gt0_finite_val(sc, :sc)
         assert_nonempty_gt0_finite_val(so, :so)
         return new{typeof(slv), typeof(max_phi), typeof(sc), typeof(so), typeof(alg)}(slv,
@@ -964,8 +963,7 @@ Compute the Ordered Weights Array (OWA) weights for the Conditional Value at Ris
   - [`VecNum`](@ref)
 """
 function owa_cvar(T::Integer, alpha::Number = 0.05)
-    @argcheck(zero(alpha) < alpha < one(alpha),
-              DomainError("0 < alpha < 1 must hold. Got\nalpha => $alpha"))
+    assert_unit_interval(alpha, :alpha)
     k = floor(Int, T * alpha)
     w = zeros(typeof(alpha), T)
     w[1:k] .= -one(alpha) / (T * alpha)
@@ -1016,8 +1014,7 @@ OrderedWeightsArrayConditionalValueatRisk
     """
     alpha
     function OrderedWeightsArrayConditionalValueatRisk(alpha::Number)
-        @argcheck(0 < alpha < 1,
-                  DomainError("0 < alpha < 1 must hold. Got\nalpha => $alpha"))
+        assert_unit_interval(alpha, :alpha)
         return new{typeof(alpha)}(alpha)
     end
 end
@@ -1296,9 +1293,8 @@ OrderedWeightsArrayConditionalValueatRiskRange
     """
     beta
     function OrderedWeightsArrayConditionalValueatRiskRange(alpha::Number, beta::Number)
-        @argcheck(0 < alpha < 1,
-                  DomainError("0 < alpha < 1 must hold. Got\nalpha => $alpha"))
-        @argcheck(0 < beta < 1, DomainError("0 < beta < 1 must hold. Got\nbeta => $beta"))
+        assert_unit_interval(alpha, :alpha)
+        assert_unit_interval(beta, :beta)
         return new{typeof(alpha), typeof(beta)}(alpha, beta)
     end
 end

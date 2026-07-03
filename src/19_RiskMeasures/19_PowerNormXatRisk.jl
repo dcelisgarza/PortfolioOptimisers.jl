@@ -171,8 +171,7 @@ PowerNormValueatRisk
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
         end
-        @argcheck(zero(alpha) < alpha < one(alpha),
-                  DomainError(alpha, "alpha must be in (0, 1)"))
+        assert_unit_interval(alpha, :alpha)
         @argcheck(p >= one(p), DomainError(p, "p must be >= 1"))
         assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(settings), typeof(slv), typeof(alpha), typeof(p), typeof(w)}(settings,
@@ -307,10 +306,8 @@ PowerNormValueatRiskRange
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
         end
-        @argcheck(zero(alpha) < alpha < one(alpha),
-                  DomainError(alpha, "alpha must be in (0, 1)"))
-        @argcheck(zero(beta) < beta < one(beta),
-                  DomainError(beta, "beta must be in (0, 1)"))
+        assert_unit_interval(alpha, :alpha)
+        assert_unit_interval(beta, :beta)
         @argcheck(pa > one(pa), DomainError(pa, "pa must be > 1"))
         @argcheck(pb > one(pb), DomainError(pb, "pb must be > 1"))
         assert_nonempty_nonneg_finite_val(w, :w)
@@ -452,8 +449,7 @@ PowerNormDrawdownatRisk
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
         end
-        @argcheck(zero(alpha) < alpha < one(alpha),
-                  DomainError(alpha, "alpha must be in (0, 1)"))
+        assert_unit_interval(alpha, :alpha)
         @argcheck(p >= one(p), DomainError(p, "p must be >= 1"))
         assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(settings), typeof(slv), typeof(alpha), typeof(p), typeof(w)}(settings,
@@ -593,8 +589,7 @@ RelativePowerNormDrawdownatRisk
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
         end
-        @argcheck(zero(alpha) < alpha < one(alpha),
-                  DomainError(alpha, "alpha must be in (0, 1)"))
+        assert_unit_interval(alpha, :alpha)
         @argcheck(p >= one(p), DomainError(p, "p must be >= 1"))
         assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(settings), typeof(slv), typeof(alpha), typeof(p), typeof(w)}(settings,

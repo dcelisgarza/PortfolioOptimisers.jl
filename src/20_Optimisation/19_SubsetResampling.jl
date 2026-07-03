@@ -246,8 +246,7 @@ Where:
         if isa(subset_size, Integer)
             assert_nonempty_nonneg_finite_val(subset_size - 1, "subset_size - 1")
         elseif isa(subset_size, AbstractFloat)
-            @argcheck(0 < subset_size < 1,
-                      DomainError(subset_size, "subset_size must be in (0, 1)"))
+            assert_unit_interval(subset_size, :subset_size)
         end
         if isa(n_subsets, Integer)
             assert_nonempty_nonneg_finite_val(n_subsets - 2, "n_subsets - 2")

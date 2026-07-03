@@ -2202,6 +2202,30 @@ function assert_gt0(val::Number, sym::Sym_Str = :val)::Nothing
     return nothing
 end
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Assert that `val` lies strictly inside the open unit interval (`0 < val < 1`).
+
+# Arguments
+
+  - `val`: Value to check.
+  - `sym`: Symbolic name used in the error message.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`assert_nonneg`](@ref)
+  - [`assert_gt0`](@ref)
+"""
+function assert_unit_interval(val::Number, sym::Sym_Str = :val)::Nothing
+    @argcheck(zero(val) < val < one(val),
+              DomainError("0 < $sym < 1 must hold. Got\n$sym => $(val)"))
+    return nothing
+end
+"""
     assert_nonempty_nonneg_finite_val(
         val::Union{<:AbstractDict, <:VecPair, <:ArrNum, Pair, Number},
         val_sym::Union{Symbol,<:AbstractString} = :val

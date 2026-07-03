@@ -40,7 +40,7 @@ PValue
     """
     t
     function PValue(t::Number)
-        @argcheck(zero(t) < t < one(t), DomainError("0 < t < 1 must hold. Got\nt => $t"))
+        assert_unit_interval(t, :t)
         return new{typeof(t)}(t)
     end
 end

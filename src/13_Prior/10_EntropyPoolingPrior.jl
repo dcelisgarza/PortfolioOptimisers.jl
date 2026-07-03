@@ -661,16 +661,14 @@ EntropyPoolingPrior
         end
         if !isnothing(var_views)
             if !isnothing(var_alpha)
-                @argcheck(zero(var_alpha) < var_alpha < one(var_alpha),
-                          DomainError(var_alpha, "var_alpha must be in (0, 1)"))
+                assert_unit_interval(var_alpha, :var_alpha)
             else
                 var_alpha = 0.05
             end
         end
         if !isnothing(cvar_views)
             if !isnothing(cvar_alpha)
-                @argcheck(zero(cvar_alpha) < cvar_alpha < one(cvar_alpha),
-                          DomainError(cvar_alpha, "cvar_alpha must be in (0, 1)"))
+                assert_unit_interval(cvar_alpha, :cvar_alpha)
             else
                 cvar_alpha = 0.05
             end

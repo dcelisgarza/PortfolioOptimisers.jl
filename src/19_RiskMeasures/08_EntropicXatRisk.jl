@@ -167,8 +167,7 @@ EntropicValueatRisk
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
         end
-        @argcheck(zero(alpha) < alpha < one(alpha),
-                  DomainError(alpha, "alpha must be in (0, 1)"))
+        assert_unit_interval(alpha, :alpha)
         assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(settings), typeof(slv), typeof(alpha), typeof(w)}(settings, slv,
                                                                             alpha, w)
@@ -259,10 +258,8 @@ Keywords correspond to the struct's fields.
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
         end
-        @argcheck(zero(alpha) < alpha < one(alpha),
-                  DomainError(alpha, "alpha must be in (0, 1)"))
-        @argcheck(zero(beta) < beta < one(beta),
-                  DomainError(beta, "beta must be in (0, 1)"))
+        assert_unit_interval(alpha, :alpha)
+        assert_unit_interval(beta, :beta)
         assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(settings), typeof(slv), typeof(alpha), typeof(beta), typeof(w)}(settings,
                                                                                           slv,
@@ -394,8 +391,7 @@ EntropicDrawdownatRisk
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
         end
-        @argcheck(zero(alpha) < alpha < one(alpha),
-                  DomainError(alpha, "alpha must be in (0, 1)"))
+        assert_unit_interval(alpha, :alpha)
         assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(settings), typeof(slv), typeof(alpha), typeof(w)}(settings, slv,
                                                                             alpha, w)
@@ -521,8 +517,7 @@ RelativeEntropicDrawdownatRisk
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
         end
-        @argcheck(zero(alpha) < alpha < one(alpha),
-                  DomainError(alpha, "alpha must be in (0, 1)"))
+        assert_unit_interval(alpha, :alpha)
         assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(settings), typeof(slv), typeof(alpha), typeof(w)}(settings, slv,
                                                                             alpha, w)

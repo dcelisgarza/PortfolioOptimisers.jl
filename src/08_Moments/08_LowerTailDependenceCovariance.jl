@@ -59,8 +59,7 @@ LowerTailDependenceCovariance
     ex
     function LowerTailDependenceCovariance(ve::AbstractVarianceEstimator, alpha::Number,
                                            ex::FLoops.Transducers.Executor)
-        @argcheck(zero(alpha) < alpha < one(alpha),
-                  DomainError("0 < alpha < 1 must hold. Got\nalpha => $alpha"))
+        assert_unit_interval(alpha, :alpha)
         return new{typeof(ve), typeof(alpha), typeof(ex)}(ve, alpha, ex)
     end
 end

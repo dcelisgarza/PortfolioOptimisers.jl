@@ -316,8 +316,7 @@ ValueatRisk
     @fprop @vprop alg
     function ValueatRisk(settings::RiskMeasureSettings, alpha::Number,
                          w::Option{<:ObsWeights}, alg::ValueatRiskFormulation)
-        @argcheck(zero(alpha) < alpha < one(alpha),
-                  DomainError(alpha, "alpha must be in (0, 1)"))
+        assert_unit_interval(alpha, :alpha)
         assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(settings), typeof(alpha), typeof(w), typeof(alg)}(settings, alpha,
                                                                             w, alg)
@@ -445,10 +444,8 @@ ValueatRiskRange
     @fprop @vprop alg
     function ValueatRiskRange(settings::RiskMeasureSettings, alpha::Number, beta::Number,
                               w::Option{<:ObsWeights}, alg::ValueatRiskFormulation)
-        @argcheck(zero(alpha) < alpha < one(alpha),
-                  DomainError(alpha, "alpha must be in (0, 1)"))
-        @argcheck(zero(beta) < beta < one(beta),
-                  DomainError(beta, "beta must be in (0, 1)"))
+        assert_unit_interval(alpha, :alpha)
+        assert_unit_interval(beta, :beta)
         assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(settings), typeof(alpha), typeof(beta), typeof(w), typeof(alg)}(settings,
                                                                                           alpha,
@@ -608,8 +605,7 @@ DrawdownatRisk
     function DrawdownatRisk(settings::RiskMeasureSettings, alpha::Number,
                             w::Option{<:ObsWeights}, b::Option{<:Number},
                             s::Option{<:Number})
-        @argcheck(zero(alpha) < alpha < one(alpha),
-                  DomainError(alpha, "alpha must be in (0, 1)"))
+        assert_unit_interval(alpha, :alpha)
         assert_nonempty_nonneg_finite_val(w, :w)
         bflag = !isnothing(b)
         sflag = !isnothing(s)
@@ -783,8 +779,7 @@ RelativeDrawdownatRisk
     @pprop w
     function RelativeDrawdownatRisk(settings::HierarchicalRiskMeasureSettings,
                                     alpha::Number, w::Option{<:ObsWeights})
-        @argcheck(zero(alpha) < alpha < one(alpha),
-                  DomainError(alpha, "alpha must be in (0, 1)"))
+        assert_unit_interval(alpha, :alpha)
         assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(settings), typeof(alpha), typeof(w)}(settings, alpha, w)
     end

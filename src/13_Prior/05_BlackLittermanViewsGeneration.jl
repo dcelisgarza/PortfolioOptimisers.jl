@@ -297,8 +297,7 @@ function assert_bl_views_conf(::Nothing, args...)::Nothing
     return nothing
 end
 function assert_bl_views_conf(views_conf::Number, ::EqnType)::Nothing
-    @argcheck(zero(views_conf) < views_conf < one(views_conf),
-              DomainError(views_conf, "views_conf must be in (0, 1)"))
+    assert_unit_interval(views_conf, :views_conf)
     return nothing
 end
 function assert_bl_views_conf(views_conf::VecNum, val::EqnType)::Nothing
