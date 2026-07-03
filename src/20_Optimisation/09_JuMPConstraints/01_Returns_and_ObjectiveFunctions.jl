@@ -328,40 +328,27 @@ function return_sharpe_alog_ret_constraints(port, type, obj::Sharpe, ::AKelly, :
     return nothing
 end
 =#
-for (i, r) in enumerate(traverse_concrete_subtypes(JuMPReturnsEstimator))
-    doc_str = if isone(i)
-        """
-            bounds_returns_estimator(r, lb::Number)
+"""
+    bounds_returns_estimator(r, lb::Number)
 
-        Return a copy of returns estimator `r` with its lower bound set to `lb`.
+Return a copy of returns estimator `r` with its lower bound set to `lb`.
 
-        # Arguments
+# Arguments
 
-          - `r`: Returns estimator.
-          - `lb::Number`: Lower bound on the portfolio return.
+  - `r`: Returns estimator.
+  - `lb::Number`: Lower bound on the portfolio return.
 
-        # Returns
+# Returns
 
-          - Returns estimator with updated lower bound.
+  - Returns estimator with updated lower bound.
 
-        # Related
+# Related
 
-          - [`ArithmeticReturn`](@ref)
-          - [`LogarithmicReturn`](@ref)
-        """
-    else
-        nothing
-    end
-    eval(quote
-             @doc $(doc_str) function bounds_returns_estimator(r::$(r), lb::Number)
-                 pnames = Tuple(setdiff(fieldnames(typeof(r)), (:lb,)))
-                 return if isempty(pnames)
-                     $(r)(; lb = lb)
-                 else
-                     $(r)(; lb = lb, NamedTuple{pnames}(getfield.(r, pnames))...)
-                 end
-             end
-         end)
+  - [`ArithmeticReturn`](@ref)
+  - [`LogarithmicReturn`](@ref)
+"""
+function bounds_returns_estimator(r::JuMPReturnsEstimator, lb::Number)
+    return Accessors.@set r.lb = lb
 end
 """
 $(DocStringExtensions.TYPEDEF)

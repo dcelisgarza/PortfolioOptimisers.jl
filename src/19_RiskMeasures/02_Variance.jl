@@ -644,8 +644,68 @@ function UncertaintySetVariance(; settings::RiskMeasureSettings = RiskMeasureSet
                                 sigma::Option{<:MatNum} = nothing)
     return UncertaintySetVariance(settings, ucs, sigma)
 end
+"""
+    (r::UncertaintySetVariance)(w::VecNum)
+
+Compute the risk of weights `w` under an [`UncertaintySetVariance`](@ref) measure.
+
+When `r.ucs` is a fitted [`AbstractUncertaintySetResult`](@ref), returns the worst-case
+variance over the uncertainty set via [`ucs_variance`](@ref) — consistent with the risk
+expression built by [`set_ucs_variance_risk!`](@ref). With an unfitted estimator (or
+`nothing`), falls back to the nominal variance `w' * sigma * w`.
+
+# Related
+
+  - [`UncertaintySetVariance`](@ref)
+  - [`ucs_variance`](@ref)
+"""
+function (r::UncertaintySetVariance{<:Any, <:AbstractUncertaintySetResult, <:Any})(w::VecNum)
+    return ucs_variance(r.ucs, r.sigma, w)
+end
 function (r::UncertaintySetVariance)(w::VecNum)
     return LinearAlgebra.dot(w, r.sigma, w)
+end
+"""
+    ucs_variance(ucs::AbstractUncertaintySetResult, sigma::MatNum, w::VecNum)
+
+Compute the worst-case portfolio variance of weights `w` over a fitted uncertainty set.
+
+This is the scalar twin of the JuMP expression built by [`set_ucs_variance_risk!`](@ref):
+for a [`BoxUncertaintySet`](@ref) it evaluates `tr(Au * ub) - tr(Al * lb)` at the optimal
+`Au = max.(W, 0)`, `Al = max.(-W, 0)` with `W = w * w'`; for an
+[`EllipsoidalUncertaintySet`](@ref) it evaluates `tr(sigma * W) + k * norm(G * vec(W))`
+with `G` the upper Cholesky factor of the set's shape matrix (the `E = 0` evaluation of
+the model expression, an upper bound on its optimum).
+
+The [`UncertaintySetVariance`](@ref) functor dispatches here when its `ucs` field is a
+fitted result, keeping scalar risk evaluation consistent with the risk expression the
+optimiser sees.
+
+# Arguments
+
+  - `ucs`: Fitted uncertainty set result.
+  - `sigma::MatNum`: Nominal covariance matrix.
+  - `w::VecNum`: Vector of portfolio weights.
+
+# Returns
+
+  - `risk::Number`: Worst-case portfolio variance.
+
+# Related
+
+  - [`UncertaintySetVariance`](@ref)
+  - [`BoxUncertaintySet`](@ref)
+  - [`EllipsoidalUncertaintySet`](@ref)
+"""
+function ucs_variance(ucs::BoxUncertaintySet, ::Any, w::VecNum)
+    W = w * transpose(w)
+    z = zero(eltype(W))
+    return sum(ucs.ub .* max.(W, z)) - sum(ucs.lb .* max.(-W, z))
+end
+function ucs_variance(ucs::EllipsoidalUncertaintySet, sigma::MatNum, w::VecNum)
+    W = w * transpose(w)
+    G = LinearAlgebra.cholesky(ucs.sigma).U
+    return LinearAlgebra.tr(sigma * W) + ucs.k * LinearAlgebra.norm(G * vec(W))
 end
 """
     _no_bounds_risk_measure(r, flag)

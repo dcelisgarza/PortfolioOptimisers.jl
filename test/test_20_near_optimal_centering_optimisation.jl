@@ -391,4 +391,56 @@
         @test isapprox(res1.w, res3.w, rtol = 1e-3)
         @test isapprox(res4.w, res_m1.w, rtol = 1e-4)
     end
+    @testset "UncertaintySetVariance barrier target parity" begin
+        # Regression: the barrier risk targets used to be computed from the nominal
+        # variance functor while the model risk expression is the worst-case variance,
+        # making the noc_opt sub-problem provably infeasible. Solver-level stalls
+        # (slow progress or numerical error, seen with ellipsoidal sets) are acceptable;
+        # a proven INFEASIBLE noc_opt is the bug and must fail.
+        function noc_solver_stalled(rc)
+            isa(rc, OptimisationFailure) || return false
+            err = string(get(get(rc.res, :clarabel1, Dict()), :err, ""))
+            return occursin("SLOW_PROGRESS", err) || occursin("NUMERICAL_ERROR", err)
+        end
+        opt = JuMPOptimiser(; pe = pr, slv = slv)
+        w0 = fill(inv(size(pr.X, 2)), size(pr.X, 2))
+        ucs1 = sigma_ucs(NormalUncertaintySet(; pe = EmpiricalPrior(),
+                                              rng = StableRNG(987654321),
+                                              alg = BoxUncertaintySetAlgorithm()), rd.X)
+        ucs2 = sigma_ucs(NormalUncertaintySet(; pe = EmpiricalPrior(),
+                                              rng = StableRNG(987654321),
+                                              alg = EllipsoidalUncertaintySetAlgorithm()),
+                         rd.X)
+        ucs3 = NormalUncertaintySet(; pe = EmpiricalPrior(), rng = StableRNG(987654321))
+        @test PortfolioOptimisers.ucs_variance(ucs1, pr.sigma, w0) >= dot(w0, pr.sigma, w0)
+        @test PortfolioOptimisers.ucs_variance(ucs2, pr.sigma, w0) >= dot(w0, pr.sigma, w0)
+        # Functor is worst-case with a fitted set, nominal with an estimator.
+        for ucs in (ucs1, ucs2)
+            rf1 = factory(UncertaintySetVariance(; ucs = ucs), pr, slv)
+            @test rf1(w0) == PortfolioOptimisers.ucs_variance(ucs, pr.sigma, w0)
+        end
+        rf2 = factory(UncertaintySetVariance(; ucs = ucs3), pr, slv)
+        @test rf2(w0) == dot(w0, pr.sigma, w0)
+        # Overall failure retcode carries the sub-problem retcodes and diagnostics.
+        rc = PortfolioOptimisers.get_overall_retcode(OptimisationFailure(;
+                                                                         res = Dict(:a => 1)),
+                                                     OptimisationSuccess(),
+                                                     OptimisationSuccess(),
+                                                     OptimisationSuccess())
+        @test isa(rc, OptimisationFailure)
+        @test occursin("w_min failed", rc.res.msg)
+        @test isa(rc.res.w_min, OptimisationFailure) && rc.res.w_min.res[:a] == 1
+        @test isa(rc.res.noc_opt, OptimisationSuccess)
+        for ucs in (ucs1, ucs2, ucs3)
+            r = UncertaintySetVariance(; ucs = ucs)
+            res1 = optimise(NearOptimalCentering(; r = r, opt = opt), rd)
+            @test isa(res1.retcode, OptimisationSuccess) ||
+                  noc_solver_stalled(res1.noc_retcode)
+            res2 = optimise(NearOptimalCentering(; r = r, opt = opt,
+                                                 alg = ConstrainedNearOptimalCentering()),
+                            rd)
+            @test isa(res2.retcode, OptimisationSuccess) ||
+                  noc_solver_stalled(res2.noc_retcode)
+        end
+    end
 end

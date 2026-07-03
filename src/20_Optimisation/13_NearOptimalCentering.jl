@@ -124,7 +124,7 @@ $(DocStringExtensions.FIELDS)
         w_opt_ini::Option{<:VecNum_VecVecNum} = nothing,
         w_max::Option{<:VecNum} = nothing,
         w_max_ini::Option{<:VecNum} = nothing,
-        ucs_flag::Bool = false,
+        ucs_flag::Bool = true,
         alg::NearOptimalCenteringAlgorithm = ConstrainedNearOptimalCentering(),
         fb::Option{<:OptE_Opt} = nothing
     ) -> NearOptimalCentering
@@ -335,6 +335,35 @@ function port_opt_view(noc::NearOptimalCentering, i, X::MatNum,
                                 obj = noc.obj, opt = opt, bins = noc.bins, w_min = w_min,
                                 w_min_ini = w_min_ini, w_opt = w_opt, w_opt_ini = w_opt_ini,
                                 w_max = w_max, w_max_ini = w_max_ini, fb = noc.fb)
+end
+"""
+    ucs_risk_measure(r, rd::ReturnsResult)
+
+Resolve the uncertainty set of an [`UncertaintySetVariance`](@ref) risk measure to a
+fitted [`AbstractUncertaintySetResult`](@ref) using the returns data. Other risk measures
+are returned unchanged; vectors of risk measures are resolved element-wise.
+
+Used by [`near_optimal_centering_setup`](@ref) so that the barrier risk targets, the
+sub-problem solves, and the NOC model all share the same fitted uncertainty set (fitted
+results pass through [`sigma_ucs`](@ref) unchanged). With a fitted set the
+[`UncertaintySetVariance`](@ref) functor evaluates the worst-case variance via
+[`ucs_variance`](@ref), keeping the barrier targets consistent with the model risk
+expression.
+
+# Related
+
+  - [`UncertaintySetVariance`](@ref)
+  - [`sigma_ucs`](@ref)
+  - [`near_optimal_centering_setup`](@ref)
+"""
+function ucs_risk_measure(r::UncertaintySetVariance, rd::ReturnsResult)
+    return Accessors.@set r.ucs = sigma_ucs(r.ucs, rd)
+end
+function ucs_risk_measure(r::Any, ::ReturnsResult)
+    return r
+end
+function ucs_risk_measure(rs::VecBaseRM, rd::ReturnsResult)
+    return ucs_risk_measure.(rs, Ref(rd))
 end
 """
     near_optimal_centering_risks(scalariser, r, pr, fees, slv, w_min, w_opt, w_max)
@@ -598,7 +627,7 @@ function near_optimal_centering_setup(noc::NearOptimalCentering, rd::ReturnsResu
     w_opt_retcode = OptimisationSuccess()
     w_max_retcode = OptimisationSuccess()
     unconstrained = isa(noc.alg, UnconstrainedNearOptimalCentering)
-    r = noc.r
+    r = ucs_risk_measure(noc.r, rd)
     attrs = processed_jump_optimiser_attributes(noc.opt, rd; dims = dims, kwargs...)
     opt = jump_optimiser_from_attributes(noc.opt, attrs)
     if w_min_flag || w_max_flag || unconstrained
@@ -1008,7 +1037,9 @@ Combines the return codes from the minimum, optimal, and maximum weight sub-prob
 
 # Returns
 
-  - Overall return code.
+  - `OptimisationSuccess()` if every sub-problem succeeded; otherwise an
+    `OptimisationFailure` whose `res` is a named tuple `(; msg, w_min, w_opt, w_max, noc_opt)` carrying the failure summary and the individual sub-problem return codes
+    (including their solver trial diagnostics).
 
 # Related
 
@@ -1036,7 +1067,10 @@ function get_overall_retcode(w_min_retcode, w_opt_retcode, w_max_retcode, noc_re
         OptimisationSuccess()
     else
         @warn("Failed to solve optimisation problem. Check `retcode.res` for details.")
-        OptimisationFailure(; res = msg)
+        OptimisationFailure(;
+                            res = (; msg = msg, w_min = w_min_retcode,
+                                   w_opt = w_opt_retcode, w_max = w_max_retcode,
+                                   noc_opt = noc_retcode))
     end
 end
 function _optimise(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,

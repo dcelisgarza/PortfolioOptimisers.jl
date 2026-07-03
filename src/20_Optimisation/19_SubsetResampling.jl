@@ -328,6 +328,38 @@ function port_opt_view(sr::SubsetResampling, i, X::MatNum, args...)::SubsetResam
                             seed = sr.seed, fb = sr.fb, brt = sr.brt, strict = sr.strict)
 end
 """
+    subset_resampling_retcode(ress::VecOpt, retcode::OptimisationReturnCode)
+
+Aggregate the subset optimisation return codes with the weight-finalisation return code.
+
+Returns `retcode` unchanged when every subset optimisation succeeded; otherwise returns
+an `OptimisationFailure` whose `res` is a named tuple `(; msg, opti, wb)` carrying the
+failure summary, the subset optimisation return codes, and the weight-finalisation
+return code (including their solver trial diagnostics).
+
+# Related
+
+  - [`subset_resampling_finaliser`](@ref)
+  - [`SubsetResampling`](@ref)
+"""
+function subset_resampling_retcode(ress::VecOpt, retcode::OptimisationReturnCode)
+    resi_retcodes = getproperty.(ress, :retcode)
+    resi_flag = any(x -> isa(x, OptimisationFailure), resi_retcodes)
+    wb_flag = isa(retcode, OptimisationFailure)
+    return if resi_flag || wb_flag
+        msg = ""
+        if resi_flag
+            msg *= "opti failed.\n"
+        end
+        if wb_flag
+            msg *= "weight bounds finalisation failed.\n"
+        end
+        OptimisationFailure(; res = (; msg = msg, opti = resi_retcodes, wb = retcode))
+    else
+        retcode
+    end
+end
+"""
     subset_resampling_finaliser(N, n_subsets, asset_idx, ...)
 
 Aggregate and finalise portfolio weights from subset resampling.
@@ -359,7 +391,7 @@ function subset_resampling_finaliser(N::Integer, n_subsets::Integer, asset_idx::
     end
     w /= n_subsets
     retcode, w = finalise_weight_bounds(wf, wb, w)
-    return retcode, w
+    return subset_resampling_retcode(ress, retcode), w
 end
 function subset_resampling_finaliser(N::Integer, n_subsets::Integer, asset_idx::MatNum,
                                      wb::Option{<:WeightBounds}, wf::WeightFinaliser,
@@ -376,7 +408,8 @@ function subset_resampling_finaliser(N::Integer, n_subsets::Integer, asset_idx::
         w[j] /= n_subsets
     end
     retcode_w = [finalise_weight_bounds(wf, wb, wi) for wi in w]
-    return map(x -> x[1], retcode_w), map(x -> x[2], retcode_w)
+    return map(x -> subset_resampling_retcode(ress, x[1]), retcode_w),
+           map(x -> x[2], retcode_w)
 end
 function subset_resampling_finaliser(N::Integer, n_subsets::Integer, asset_idx::MatNum,
                                      wb::Option{<:WeightBounds}, wf::WeightFinaliser,
@@ -388,7 +421,7 @@ function subset_resampling_finaliser(N::Integer, n_subsets::Integer, asset_idx::
     end
     w /= sum(scale)
     retcode, w = finalise_weight_bounds(wf, wb, w)
-    return retcode, w
+    return subset_resampling_retcode(ress, retcode), w
 end
 function subset_resampling_finaliser(N::Integer, n_subsets::Integer, asset_idx::MatNum,
                                      wb::Option{<:WeightBounds}, wf::WeightFinaliser,
@@ -406,7 +439,8 @@ function subset_resampling_finaliser(N::Integer, n_subsets::Integer, asset_idx::
         w[j] /= denom
     end
     retcode_w = [finalise_weight_bounds(wf, wb, wi) for wi in w]
-    return map(x -> x[1], retcode_w), map(x -> x[2], retcode_w)
+    return map(x -> subset_resampling_retcode(ress, x[1]), retcode_w),
+           map(x -> x[2], retcode_w)
 end
 function _optimise(sr::SubsetResampling, rd::ReturnsResult; dims::Int = 1,
                    branchorder::Symbol = :optimal, str_names::Bool = false,
