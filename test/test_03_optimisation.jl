@@ -41,8 +41,11 @@ end
                       check_sol = (; allow_local = true, allow_almost = true),
                       settings = Dict("verbose" => false))]
         mr = MeanRisk(; opt = JuMPOptimiser(; slv = slv))
-        retcode, sol = @test_logs (:warn, r"Failed to solve") PortfolioOptimisers.optimise_JuMP_model!(testmodel(0.9),
-                                                                                                       mr)
+        logger = SimpleLogger()
+        with_logger(logger) do
+            return retcode, sol = @test_logs (:warn, r"Failed to solve") PortfolioOptimisers.optimise_JuMP_model!(testmodel(0.9),
+                                                                                                                  mr)
+        end
         @test isa(retcode, OptimisationFailure)
         @test all(isnan, sol.w)
         # Both solvers must have been tried and their diagnostics merged: the
@@ -76,11 +79,14 @@ end
     frc = FactorRiskContribution(; opt = JuMPOptimiser(; slv = slv))
     model = JuMP.Model()
     # A user-set `settings.ub` must warn instead of being silently dropped.
-    @test_logs (:warn, r"Risk upper bound") PortfolioOptimisers.set_risk_upper_bound!(model,
-                                                                                      frc,
-                                                                                      1.0,
-                                                                                      1.0,
-                                                                                      :risk)
+    logger = SimpleLogger()
+    with_logger(logger) do
+        @test_logs (:warn, r"Risk upper bound") PortfolioOptimisers.set_risk_upper_bound!(model,
+                                                                                          frc,
+                                                                                          1.0,
+                                                                                          1.0,
+                                                                                          :risk)
+    end
     # No bound requested: no-op.
     @test isnothing(PortfolioOptimisers.set_risk_upper_bound!(model, frc, 1.0, nothing,
                                                               :risk))

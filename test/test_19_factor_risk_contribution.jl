@@ -66,13 +66,16 @@
 
     # A risk upper bound is not supported by FactorRiskContribution: it must warn
     # instead of silently ignoring the bound.
-    res = @test_logs (:warn, r"Risk upper bound") match_mode = :any optimise(FactorRiskContribution(;
-                                                                                                    r = ConditionalValueatRisk(;
-                                                                                                                               settings = RiskMeasureSettings(;
-                                                                                                                                                              ub = 1.0)),
-                                                                                                    opt = JuMPOptimiser(;
-                                                                                                                        pe = pr,
-                                                                                                                        slv = slv)),
-                                                                             rd)
+    logger = SimpleLogger()
+    with_logger(logger) do
+        return res = @test_logs (:warn, r"Risk upper bound") match_mode = :any optimise(FactorRiskContribution(;
+                                                                                                               r = ConditionalValueatRisk(;
+                                                                                                                                          settings = RiskMeasureSettings(;
+                                                                                                                                                                         ub = 1.0)),
+                                                                                                               opt = JuMPOptimiser(;
+                                                                                                                                   pe = pr,
+                                                                                                                                   slv = slv)),
+                                                                                        rd)
+    end
     @test isa(res.retcode, OptimisationSuccess)
 end
