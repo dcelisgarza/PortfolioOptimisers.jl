@@ -914,9 +914,12 @@ HighOrderPrior
                       ArgumentError("L2 must be provided when kt or S2 is provided, isnothing(kt) = $(kt_flag), isnothing(L2) = $(L2_flag), isnothing(S2) = $(S2_flag)"))
             @argcheck(S2_flag,
                       ArgumentError("S2 must be provided when kt or L2 is provided, isnothing(kt) = $(kt_flag), isnothing(L2) = $(L2_flag), isnothing(S2) = $(S2_flag)"))
-            @argcheck(!isempty(kt), IsEmptyError("$(err_name_dict[:kt]) (`kt`) cannot be empty"))
-            @argcheck(!isempty(L2), IsEmptyError("$(err_name_dict[:L2]) (`L2`) cannot be empty"))
-            @argcheck(!isempty(S2), IsEmptyError("$(err_name_dict[:S2]) (`S2`) cannot be empty"))
+            @argcheck(!isempty(kt),
+                      IsEmptyError("$(err_name_dict[:kt]) (`kt`) cannot be empty"))
+            @argcheck(!isempty(L2),
+                      IsEmptyError("$(err_name_dict[:L2]) (`L2`) cannot be empty"))
+            @argcheck(!isempty(S2),
+                      IsEmptyError("$(err_name_dict[:S2]) (`S2`) cannot be empty"))
             @argcheck(size(kt) == (N^2, N^2),
                       DimensionMismatch("size(kt) ($(size(kt))) must be ($(N^2), $(N^2))"))
             @argcheck(size(L2) == size(S2) == (div(N * (N + 1), 2), N^2),
@@ -924,7 +927,8 @@ HighOrderPrior
             if sk_flag
                 @argcheck(isa(D2, MatNum),
                           ArgumentError("D2 must be provided when sk is provided, isnothing(D2) = $(isnothing(D2)), isnothing(sk) = $(sk_flag)"))
-                @argcheck(!isempty(D2), IsEmptyError("$(err_name_dict[:D2]) (`D2`) cannot be empty"))
+                @argcheck(!isempty(D2),
+                          IsEmptyError("$(err_name_dict[:D2]) (`D2`) cannot be empty"))
                 @argcheck(size(D2) == size(transpose(L2)),
                           DimensionMismatch("size(D2) = $(size(D2)) must match size(L2') = $(size(transpose(L2)))"))
             end
@@ -935,8 +939,10 @@ HighOrderPrior
                       ArgumentError("sk must be provided when V is provided, isnothing(sk) = $(sk_flag), isnothing(V) = $(V_flag)"))
             @argcheck(V_flag,
                       ArgumentError("V must be provided when sk is provided, isnothing(sk) = $(sk_flag), isnothing(V) = $(V_flag)"))
-            @argcheck(!isempty(sk), IsEmptyError("$(err_name_dict[:sk]) (`sk`) cannot be empty"))
-            @argcheck(!isempty(V), IsEmptyError("$(err_name_dict[:V]) (`V`) cannot be empty"))
+            @argcheck(!isempty(sk),
+                      IsEmptyError("$(err_name_dict[:sk]) (`sk`) cannot be empty"))
+            @argcheck(!isempty(V),
+                      IsEmptyError("$(err_name_dict[:V]) (`V`) cannot be empty"))
             @argcheck(size(V) == (N, N),
                       DimensionMismatch("size(V) = $(size(V)) must be ($N, $N)"))
             @argcheck(size(sk) == (N, N^2),
@@ -950,7 +956,8 @@ HighOrderPrior
                       IsNothingError("factor cokurtosis/coskewness (`f_kt`/`f_sk`) require a regression result, but the prior's `rr` is nothing — supply a factor-based prior whose `rr` is set"))
             Nf = size(rr.M, 2)
             if f_kt_flag
-                @argcheck(!isempty(f_kt), IsEmptyError("$(err_name_dict[:f_kt]) (`f_kt`) cannot be empty"))
+                @argcheck(!isempty(f_kt),
+                          IsEmptyError("$(err_name_dict[:f_kt]) (`f_kt`) cannot be empty"))
                 # @argcheck(!isempty(chol_kt))
                 assert_matrix_issquare(f_kt, :f_kt)
                 @argcheck(Nf^2 == size(f_kt, 1),
@@ -958,8 +965,10 @@ HighOrderPrior
                 # @argcheck(N^2 == Nfa^2 == size(chol_kt, 2))
             end
             if f_sk_flag
-                @argcheck(!isempty(f_sk), IsEmptyError("$(err_name_dict[:f_sk]) (`f_sk`) cannot be empty"))
-                @argcheck(!isempty(f_V), IsEmptyError("$(err_name_dict[:f_V]) (`f_V`) cannot be empty"))
+                @argcheck(!isempty(f_sk),
+                          IsEmptyError("$(err_name_dict[:f_sk]) (`f_sk`) cannot be empty"))
+                @argcheck(!isempty(f_V),
+                          IsEmptyError("$(err_name_dict[:f_V]) (`f_V`) cannot be empty"))
                 @argcheck(size(f_sk) == (Nf, Nf^2),
                           DimensionMismatch("size(f_sk) ($(size(f_sk))) must be ($Nf, $(Nf^2))"))
                 @argcheck(size(f_V) == (Nf, Nf),

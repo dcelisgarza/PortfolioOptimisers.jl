@@ -548,7 +548,7 @@ SemiMoment()
 """
 struct SemiMoment <: AbstractMomentAlgorithm end
 """
-    robust_cov(
+    compat_cov(
         ce::StatsBase.CovarianceEstimator,
         X::MatNum,
         [w::StatsBase.AbstractWeights];
@@ -601,6 +601,42 @@ function compat_cov(ce::StatsBase.CovarianceEstimator, X::AbstractMatrix, args..
     end
     return Statistics.cov(ce, X, args...; dims = dims, mean = mean)
 end
+"""
+    robust_cov(
+        ce::StatsBase.CovarianceEstimator,
+        X::MatNum,
+        [w::StatsBase.AbstractWeights];
+        dims::Int = 1,
+        mean = nothing,
+        kwargs...
+    ) -> MatNum
+
+Tries calling [`compat_cov`](@ref) and falls back to a densified `Matrix` if a `MethodError` is thrown.
+
+# Arguments
+
+  - $(arg_dict[:ce])
+  - $(arg_dict[:X])
+  - $(arg_dict[:oow])
+  - $(arg_dict[:dims])
+  - $(arg_dict[:omean])
+  - `kwargs...`: Additional keyword arguments passed to `compat_cov`.
+
+# Returns
+
+  - $(ret_dict[:sigma])
+
+# Details
+
+  - This function computes the optionally weighted covariance matrix using the provided estimator and keyword arguments.
+  - If the call throws a `MethodError`, it is retried once with a densified `Matrix(X)`.
+
+# Related
+
+  - [`MatNum`](@ref)
+  - [`compat_cov`](@ref)
+  - [`Statistics.cov`](https://juliastats.org/StatsBase.jl/stable/cov/)
+"""
 function robust_cov(ce::StatsBase.CovarianceEstimator, X::MatNum; dims::Int = 1,
                     mean = nothing, kwargs...)
     return try
@@ -624,7 +660,7 @@ function robust_cov(ce::StatsBase.CovarianceEstimator, X::MatNum,
     end
 end
 """
-    robust_cor(
+    compat_cor(
         ce::StatsBase.CovarianceEstimator,
         X::MatNum,
         [w::StatsBase.AbstractWeights];
@@ -694,6 +730,42 @@ function compat_cor(ce::StatsBase.CovarianceEstimator, X::AbstractMatrix, args..
     end
     return sigma
 end
+"""
+    robust_cor(
+        ce::StatsBase.CovarianceEstimator,
+        X::MatNum,
+        [w::StatsBase.AbstractWeights];
+        dims::Int = 1,
+        mean = nothing,
+        kwargs...
+    ) -> MatNum
+
+Tries calling [`compat_cor`](@ref) and falls back to a densified `Matrix` if a `MethodError` is thrown.
+
+# Arguments
+
+  - $(arg_dict[:ce])
+  - $(arg_dict[:X])
+  - $(arg_dict[:oow])
+  - $(arg_dict[:dims])
+  - $(arg_dict[:omean])
+  - `kwargs...`: Additional keyword arguments passed to `compat_cor`.
+
+# Returns
+
+  - $(ret_dict[:rho])
+
+# Details
+
+  - This function computes the optionally weighted correlation matrix using the provided estimator and keyword arguments.
+  - If the call throws a `MethodError`, it is retried once with a densified `Matrix(X)`.
+
+# Related
+
+  - [`MatNum`](@ref)
+  - [`compat_cor`](@ref)
+  - [`Statistics.cor`](https://juliastats.org/StatsBase.jl/stable/cor/)
+"""
 function robust_cor(ce::StatsBase.CovarianceEstimator, X::MatNum; dims::Int = 1,
                     mean = nothing, kwargs...)
     return try

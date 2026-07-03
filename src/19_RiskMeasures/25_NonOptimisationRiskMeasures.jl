@@ -153,6 +153,10 @@ $(DocStringExtensions.FIELDS)
 
 Keywords correspond to the struct's fields.
 
+## Validation
+
+  - $(val_dict[:rf])
+
 # Related
 
   - [`NonOptimisationRiskMeasure`](@ref)
@@ -173,6 +177,7 @@ Keywords correspond to the struct's fields.
     """
     rf
     function MeanReturnRiskRatio(rt::MeanReturn, rk::AbstractBaseRiskMeasure, rf::Number)
+        @argcheck(isfinite(rf), IsNonFiniteError("rf must be finite, got $rf"))
         return new{typeof(rt), typeof(rk), typeof(rf)}(rt, rk, rf)
     end
 end

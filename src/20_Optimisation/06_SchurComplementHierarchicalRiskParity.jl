@@ -647,13 +647,15 @@ function schur_complement_weights(pr::AbstractPriorResult, items::VecVecInt,
         for i in 1:2:length(items)
             lc = items[i]
             rc = items[i + 1]
-            A = view(sigma, lc, lc)
-            C = view(sigma, rc, rc)
+            # Copies, not views: the write-backs into `sigma` below (and `posdef!`) must
+            # not alias the blocks being augmented.
+            A = sigma[lc, lc]
+            C = sigma[rc, rc]
             if length(lc) <= 1
                 A_aug = A
                 C_aug = C
             else
-                B = view(sigma, lc, rc)
+                B = sigma[lc, rc]
                 A_aug = schur_augmentation(A, B, C, gamma)
                 C_aug = schur_augmentation(C, transpose(B), A, gamma)
                 sigma[lc, lc] = A_aug
@@ -664,7 +666,7 @@ function schur_complement_weights(pr::AbstractPriorResult, items::VecVecInt,
                     posdef!(pdm, A_aug)
                     posdef!(pdm, C_aug)
                 catch e
-                    throw(ArgumentError("Augmented matrix could not be made positive definite. Use `MonotonicSchurComplement()` or reduce gamma: $gamma."))
+                    throw(ArgumentError("Augmented matrix could not be made positive definite. Use `MonotonicSchurComplement()` or reduce gamma: $gamma. Original error: $(sprint(showerror, e))"))
                 end
             else
                 if !LinearAlgebra.isposdef(A_aug) || !LinearAlgebra.isposdef(C_aug)

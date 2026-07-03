@@ -107,6 +107,10 @@ $(DocStringExtensions.FIELDS)
 
 Keywords correspond to the struct's fields.
 
+## Validation
+
+  - $(val_dict[:unit])
+
 # Examples
 
 ```jldoctest
@@ -143,6 +147,7 @@ GreedyAllocation
     fb
     function GreedyAllocation(unit::Number, args::Tuple, kwargs::NamedTuple,
                               fb::Option{<:FOptE_FOpt} = nothing)
+        @argcheck(unit > zero(unit), DomainError(unit, "`unit` must be positive"))
         return new{typeof(unit), typeof(args), typeof(kwargs), typeof(fb)}(unit, args,
                                                                            kwargs, fb)
     end

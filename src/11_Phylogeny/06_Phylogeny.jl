@@ -354,6 +354,10 @@ $(DocStringExtensions.FIELDS)
 
 Keywords correspond to the struct's fields.
 
+## Validation
+
+  - $(val_dict[:katz_alpha])
+
 # Examples
 
 ```jldoctest
@@ -373,6 +377,7 @@ KatzCentrality
     """
     alpha
     function KatzCentrality(alpha::Number)
+        @argcheck(zero(alpha) < alpha, DomainError(alpha, "`alpha` must be positive"))
         return new{typeof(alpha)}(alpha)
     end
 end

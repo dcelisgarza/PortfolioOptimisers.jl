@@ -9,6 +9,17 @@
         @test vs.v == [1.0, -2.0, 3.0]
         @test vs.s == 2
     end
+    @testset "Constructor validation" begin
+        @test_throws IsNonFiniteError ExcessExpectedReturns(; rf = Inf)
+        @test_throws IsNonFiniteError MeanReturnRiskRatio(; rf = NaN)
+        @test_throws IsNonFiniteError ExpectedReturnRiskRatio(; rf = -Inf)
+        @test_throws DomainError NearestQuantilePrediction(; q = 1.5)
+        @test_throws DomainError NearestQuantilePrediction(; q = -0.1)
+        @test_throws DomainError KatzCentrality(; alpha = 0.0)
+        @test_throws DomainError KatzCentrality(; alpha = -0.3)
+        @test_throws DomainError GreedyAllocation(; unit = 0)
+        @test_throws DomainError GreedyAllocation(; unit = -1)
+    end
     @testset "Norms" begin
         @test isapprox(PortfolioOptimisers.norm_error(L1Norm(), [0.5, 0.5], [0.6, 0.4], 2),
                        PortfolioOptimisers.norm_error(L1Norm(), [0.5, 0.5] - [0.6, 0.4], 2))

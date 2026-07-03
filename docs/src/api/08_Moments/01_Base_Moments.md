@@ -20,6 +20,8 @@ port_opt_view(alg::AbstractExpectedReturnsAlgorithm, ::Any, args...)
 factory(alg::AbstractExpectedReturnsAlgorithm, args...; kwargs...)
 robust_cov
 robust_cor
+compat_cov
+compat_cor
 moment_window_and_weights
 windowed_preamble
 demean_returns

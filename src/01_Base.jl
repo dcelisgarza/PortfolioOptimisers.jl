@@ -719,7 +719,7 @@ const field_dict = Dict(key => strip(val[(findfirst(":", val)[1] + 1):end])
 Maps high-order-moment argument keys to the domain noun used in error messages, so a
 message names what the caller supplied (e.g. `cokurtosis`) rather than the bare field
 symbol. The symbol itself is appended at the call site, giving messages like
-`` cokurtosis (`kt`) cannot be empty ``.
+``cokurtosis (`kt`) cannot be empty``.
 """
 const err_name_dict = Dict(:kt => "cokurtosis", :sk => "coskewness",
                            :V => "negative spectral coskewness",
@@ -728,75 +728,79 @@ const err_name_dict = Dict(:kt => "cokurtosis", :sk => "coskewness",
                            :f_sk => "factor coskewness",
                            :f_V => "factor negative spectral coskewness")
 """
-    val_dict = Dict(:oow => "If `w` is not `nothing`, `!isempty(w)`.")
+    const val_dict = Dict(:oow => "If `w` is not `nothing`, `!isempty(w)`.")
 
 Validation rules for certain arg_dict terms used in the documentation of `PortfolioOptimisers.jl`.
 """
-val_dict = Dict(:oow => "If `w` is not `nothing`, `!isempty(w)`.",
-                :oidx => "If `idx` is not `nothing`, `!isempty(idx)` and all indices are positive integers.",
-                :gerbt => "`0 <= t`.",#
-                :t => "`0 < t < 1`.",#
-                :c1 => "`0 < c1 <= 1`.",#
-                :c2 => "`0 < c2 <= 1`.",#
-                :c3c2 => "`c3 > c2`.",#
-                :dims => "`dims in (1, 2)`.",#
-                :alpha => "`0 < alpha < 1`.",#
-                :beta => "`0 < beta < 1`.",#
-                :bins => "If `bins` is an integer, `bins > 0`.",#
-                :dopower => "If `power` is not `nothing`, `power >= 1`.",#
-                :settings => "If not `nothing`, `!isempty(settings)`.",#
-                :S => "`!isempty(S)`.",#
-                :D => "`!isempty(D)`.",#
-                :ck => "`k >= 1`.",#
-                :lm_k => "`k >= 2`.",#
-                :alpha_i_alpha => "`0 < alpha_i < alpha < 1`.",#
-                :a_sim_pos => "`a_sim > 0`.",#
-                :beta_i_beta => "`0 < beta_i < beta < 1`.",#
-                :b_sim_pos => "`b_sim > 0`.",#
-                :S_D => "size(S) == size(D)`.",#
-                :max_k => "If `max_k` is not `nothing`, `max_k >= 1`.",#
-                :kalg => "If `alg` is not `nothing`, `alg >= 1`.",#
-                :dbhtpower => "`power > 0`.",#
-                :dbhtcoef => "`coef > 0`.", :Xe => "`!isempty(X)`.",#
-                :phX_Xv => "`If `X` is a `MatNum`:\n    + Must be symmetric, `LinearAlgebra.issymmetric(X)`\n    + Must have zero diagonal, `all(iszero, LinearAlgebra.diag(X))`.",#
-                :ntn => "`n >= 1`.",#
-                :A => "`!isempty(A)`.",#
-                :B => "`!isempty(B)`.",#
-                :eqineq => "Both `eq` and `ineq` cannot be `nothing` at the same time, `!(isnothing(ineq) && isnothing(eq))`.",
-                :decay => "`decay > 0`.",#
-                :min_obs => "`min_obs > 0`.",#
-                :hac_lags => "If `hac_lags` is not `nothing`, `hac_lags > 0`.",#
-                :regime_min_obs => "`regime_min_obs > 0`.",#
-                :regime_lohi_mult => "If `regime_lohi_mult` is not `nothing`, `0 < regime_lohi_mult[1] < regime_lohi_mult[2]`.",#
-                :ra_x => "`x` is valid",#
-                :ra_y => "`y` is valid",#
-                :ra_norm_x => "`x` is valid")
+const val_dict = Dict(:oow => "If `w` is not `nothing`, `!isempty(w)`.",
+                      :oidx => "If `idx` is not `nothing`, `!isempty(idx)` and all indices are positive integers.",
+                      :gerbt => "`0 <= t`.",#
+                      :t => "`0 < t < 1`.",#
+                      :c1 => "`0 < c1 <= 1`.",#
+                      :c2 => "`0 < c2 <= 1`.",#
+                      :c3c2 => "`c3 > c2`.",#
+                      :dims => "`dims in (1, 2)`.",#
+                      :alpha => "`0 < alpha < 1`.",#
+                      :beta => "`0 < beta < 1`.",#
+                      :bins => "If `bins` is an integer, `bins > 0`.",#
+                      :dopower => "If `power` is not `nothing`, `power >= 1`.",#
+                      :settings => "If not `nothing`, `!isempty(settings)`.",#
+                      :S => "`!isempty(S)`.",#
+                      :D => "`!isempty(D)`.",#
+                      :ck => "`k >= 1`.",#
+                      :lm_k => "`k >= 2`.",#
+                      :alpha_i_alpha => "`0 < alpha_i < alpha < 1`.",#
+                      :a_sim_pos => "`a_sim > 0`.",#
+                      :beta_i_beta => "`0 < beta_i < beta < 1`.",#
+                      :b_sim_pos => "`b_sim > 0`.",#
+                      :S_D => "size(S) == size(D)`.",#
+                      :max_k => "If `max_k` is not `nothing`, `max_k >= 1`.",#
+                      :kalg => "If `alg` is not `nothing`, `alg >= 1`.",#
+                      :dbhtpower => "`power > 0`.",#
+                      :dbhtcoef => "`coef > 0`.", :Xe => "`!isempty(X)`.",#
+                      :phX_Xv => "`If `X` is a `MatNum`:\n    + Must be symmetric, `LinearAlgebra.issymmetric(X)`\n    + Must have zero diagonal, `all(iszero, LinearAlgebra.diag(X))`.",#
+                      :ntn => "`n >= 1`.",#
+                      :A => "`!isempty(A)`.",#
+                      :B => "`!isempty(B)`.",#
+                      :eqineq => "Both `eq` and `ineq` cannot be `nothing` at the same time, `!(isnothing(ineq) && isnothing(eq))`.",
+                      :decay => "`decay > 0`.",#
+                      :rf => "`isfinite(rf)`.",#
+                      :q_scorer => "`0 <= q <= 1`.",#
+                      :unit => "`unit > 0`.",#
+                      :katz_alpha => "`alpha > 0`.",#
+                      :min_obs => "`min_obs > 0`.",#
+                      :hac_lags => "If `hac_lags` is not `nothing`, `hac_lags > 0`.",#
+                      :regime_min_obs => "`regime_min_obs > 0`.",#
+                      :regime_lohi_mult => "If `regime_lohi_mult` is not `nothing`, `0 < regime_lohi_mult[1] < regime_lohi_mult[2]`.",#
+                      :ra_x => "`x` is valid",#
+                      :ra_y => "`y` is valid",#
+                      :ra_norm_x => "`x` is valid")
 
 """
 Dictionary containing return value descriptions for common parameters used in `PortfolioOptimisers.jl`.
 """
-ret_dict = Dict(:mu => "`mu::ArrNum`: Expected returns vector `features x 1` if the `dims` keyword does not exist or `dims = 2`, `1 x features` if `dims = 1`.",#
-                :sigma => "`sigma::MatNum`: Covariance matrix `features x features`.",#
-                :rho => "`rho::MatNum`: Correlation matrix `features x features`.",#
-                :sigrho => "`sigrho::MatNum`: Covariance/correlation matrix `features x features`.",#
-                :sk => "`sk::MatNum`: Coskewness matrix `features x features`.",#
-                :kte => "`kte::MatNum`: Cokurtosis matrix `features x features`.",#
-                :me => "`me`: New expected returns estimator of the same type as the argument, with the appropriate weights applied.",#
-                :mev => "`mev`: New expected returns estimator of the same type as the argument, for the new view.",#
-                :ce => "`ce`: New covariance estimator of the same type as the argument, with the new weights applied.",#
-                :cev => "`ce`: New covariance estimator of the same type as the argument, for the new view.",#
-                :ve => "`ve`: New variance estimator of the same type as the argument, with the new weights applied.",#
-                :vev => "`ve`: New variance estimator of the same type as the argument, for the new view.",#
-                :skev => "`skev`: New coskewness estimator of the same type as the argument, for the new view.",#
-                :ktev => "`kev`: New cokurtosis estimator of the same type as the argument, for the new view.",#
-                :stdvar => "`res::ArrNum`: Variance or standard deviation vector of `X`, reshaped to be consistent with the dimension along which the value is computed.",#
-                :stdvarnum => "`res::Number`: Variance or standard deviation `X`",#
-                :stdarr => "`sd::ArrNum`: Standard deviation vector of `X`, reshaped to be consistent with the dimension along which the value is computed.",
-                :vararr => "`vr::ArrNum`: Variance vector of `X`, reshaped to be consistent with the dimension along which the value is computed.",
-                :stdnum => "`vr::Number`: Standard deviation of `X`",
-                :varnum => "`vr::Number`: Variance of `X`",
-                :algw => "`alg`: New algorithm instance of the same type as the argument, with the new weights applied.",
-                :alg => "`alg`: The original algorithm instance.")
+const ret_dict = Dict(:mu => "`mu::ArrNum`: Expected returns vector `features x 1` if the `dims` keyword does not exist or `dims = 2`, `1 x features` if `dims = 1`.",#
+                      :sigma => "`sigma::MatNum`: Covariance matrix `features x features`.",#
+                      :rho => "`rho::MatNum`: Correlation matrix `features x features`.",#
+                      :sigrho => "`sigrho::MatNum`: Covariance/correlation matrix `features x features`.",#
+                      :sk => "`sk::MatNum`: Coskewness matrix `features x features`.",#
+                      :kte => "`kte::MatNum`: Cokurtosis matrix `features x features`.",#
+                      :me => "`me`: New expected returns estimator of the same type as the argument, with the appropriate weights applied.",#
+                      :mev => "`mev`: New expected returns estimator of the same type as the argument, for the new view.",#
+                      :ce => "`ce`: New covariance estimator of the same type as the argument, with the new weights applied.",#
+                      :cev => "`ce`: New covariance estimator of the same type as the argument, for the new view.",#
+                      :ve => "`ve`: New variance estimator of the same type as the argument, with the new weights applied.",#
+                      :vev => "`ve`: New variance estimator of the same type as the argument, for the new view.",#
+                      :skev => "`skev`: New coskewness estimator of the same type as the argument, for the new view.",#
+                      :ktev => "`kev`: New cokurtosis estimator of the same type as the argument, for the new view.",#
+                      :stdvar => "`res::ArrNum`: Variance or standard deviation vector of `X`, reshaped to be consistent with the dimension along which the value is computed.",#
+                      :stdvarnum => "`res::Number`: Variance or standard deviation `X`",#
+                      :stdarr => "`sd::ArrNum`: Standard deviation vector of `X`, reshaped to be consistent with the dimension along which the value is computed.",
+                      :vararr => "`vr::ArrNum`: Variance vector of `X`, reshaped to be consistent with the dimension along which the value is computed.",
+                      :stdnum => "`vr::Number`: Standard deviation of `X`",
+                      :varnum => "`vr::Number`: Variance of `X`",
+                      :algw => "`alg`: New algorithm instance of the same type as the argument, with the new weights applied.",
+                      :alg => "`alg`: The original algorithm instance.")
 """
     math_dict
 
@@ -804,30 +808,30 @@ Dictionary of mathematical notation descriptions used for docstring interpolatio
 
 Keys are symbols that identify mathematical variables or subscripts; values are LaTeX-formatted strings suitable for embedding in docstrings.
 """
-math_dict = Dict(:Xv => "``\\boldsymbol{X}``: Data vector `observations × 1`.",#
-                 :tgt => "``t``: Target value, usually the unweighted (or weighted) expected value ``E[\\boldsymbol{X}]``.",#
-                 :A => "``\\mathbf{A}``: Constraint coefficient matrix.",#
-                 :B => "``\\boldsymbol{B}``: Constraint response vector.",#
-                 :x => "``\\boldsymbol{x}``: Constrained variable.",#
-                 :ineq => "``\\text{ineq}``: Subscript for inequality constraints.",#
-                 :eq => "``\\text{eq}``: Subscript for equality constraints.",#
-                 # Portfolio returns and dimensions.
-                 :xret => "``\\boldsymbol{x}``: Portfolio returns vector ``T \\times 1``.",#
-                 :T => "``T``: Number of observations.",#
-                 :N => "``N``: Number of assets.",#
-                 # Risk measure parameters.
-                 :alpha_rm => "``\\alpha``: Significance level (left tail probability), ``\\alpha \\in (0, 1)``.",#
-                 :w_port => "``\\boldsymbol{w}``: Portfolio weights vector ``N \\times 1``.",#
-                 # Absolute drawdown series.
-                 :ct => "``c_t``: Cumulative simple portfolio return at period ``t``.",#
-                 :dtdd => "``d_t \\leq 0``: Absolute drawdown at period ``t``.",#
-                 # Relative drawdown series.
-                 :Ct => "``C_t``: Compound wealth process at period ``t``.",#
-                 :rdt => "``rd_t \\leq 0``: Relative drawdown at period ``t``.",#
-                 # JuMP optimisation variables.
-                 :k_budget => "``k``: Budget scaling / homogenisation variable.",#
-                 :mu_er => "``\\boldsymbol{\\mu}``: Expected returns vector ``N \\times 1``.",#
-                 :R_w => "``R(\\boldsymbol{w})``: Portfolio risk.")
+const math_dict = Dict(:Xv => "``\\boldsymbol{X}``: Data vector `observations × 1`.",#
+                       :tgt => "``t``: Target value, usually the unweighted (or weighted) expected value ``E[\\boldsymbol{X}]``.",#
+                       :A => "``\\mathbf{A}``: Constraint coefficient matrix.",#
+                       :B => "``\\boldsymbol{B}``: Constraint response vector.",#
+                       :x => "``\\boldsymbol{x}``: Constrained variable.",#
+                       :ineq => "``\\text{ineq}``: Subscript for inequality constraints.",#
+                       :eq => "``\\text{eq}``: Subscript for equality constraints.",#
+                       # Portfolio returns and dimensions.
+                       :xret => "``\\boldsymbol{x}``: Portfolio returns vector ``T \\times 1``.",#
+                       :T => "``T``: Number of observations.",#
+                       :N => "``N``: Number of assets.",#
+                       # Risk measure parameters.
+                       :alpha_rm => "``\\alpha``: Significance level (left tail probability), ``\\alpha \\in (0, 1)``.",#
+                       :w_port => "``\\boldsymbol{w}``: Portfolio weights vector ``N \\times 1``.",#
+                       # Absolute drawdown series.
+                       :ct => "``c_t``: Cumulative simple portfolio return at period ``t``.",#
+                       :dtdd => "``d_t \\leq 0``: Absolute drawdown at period ``t``.",#
+                       # Relative drawdown series.
+                       :Ct => "``C_t``: Compound wealth process at period ``t``.",#
+                       :rdt => "``rd_t \\leq 0``: Relative drawdown at period ``t``.",#
+                       # JuMP optimisation variables.
+                       :k_budget => "``k``: Budget scaling / homogenisation variable.",#
+                       :mu_er => "``\\boldsymbol{\\mu}``: Expected returns vector ``N \\times 1``.",#
+                       :R_w => "``R(\\boldsymbol{w})``: Portfolio risk.")
 
 """
 $(DocStringExtensions.TYPEDEF)
