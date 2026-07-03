@@ -1562,6 +1562,85 @@ function gerber_IQ_delta(xi::Number, xj::Number, axi::Number, axj::Number,
     return w * p
 end
 """
+$(DocStringExtensions.TYPEDEF)
+
+Co-movement policy for [`gerber_comovement!`](@ref) implementing the Gerber IQ family.
+
+Observations are thresholded against the pair's scaled thresholds from [`gerber_iq_scaling`](@ref), classified by the sign of the product of returns, and weighted by the IQ noise-compression template and temporal decay via [`gerber_IQ_delta`](@ref). The `alg` marker selects the denominator policy ([`comovement_ratio`](@ref)).
+
+# Fields
+
+  - `alg`: Gerber algorithm marker selecting the denominator policy.
+  - `kind`: Gerber IQ noise-compression template.
+  - `decay`: Regenerated temporal decay estimator.
+  - `sc`: Threshold scaling factor estimator.
+  - `c`: Small co-movement threshold.
+  - `sd`: Vector of asset standard deviations.
+
+# Related
+
+  - [`GerberIQCovariance`](@ref)
+  - [`gerber_IQ`](@ref)
+  - [`gerber_comovement!`](@ref)
+"""
+struct GerberIQKernel{T1 <: GerberCovarianceAlgorithm, T2 <: GerberIQCovarianceAlgorithm,
+                      T3 <: GerberIQDecayEstimator, T4, T5 <: Number, T6 <: ArrNum}
+    alg::T1
+    kind::T2
+    decay::T3
+    sc::T4
+    c::T5
+    sd::T6
+end
+@inline function comovement_pair_state(pol::GerberIQKernel, i::Integer, j::Integer)
+    sci, scj = gerber_iq_scaling(pol.sc, pol.sd[i], pol.sd[j])
+    return (sci = sci, scj = scj, ci = sci * pol.c, cj = scj * pol.c)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Accumulate a neutral (one-sided) observation into the Gerber IQ pair accumulator.
+
+Only [`Gerber1`](@ref) tracks neutral co-movements, adding the [`gerber_IQ_delta`](@ref) weight to the neutral score; the fall-through method returns the accumulator unchanged.
+
+# Related
+
+  - [`comovement_step`](@ref)
+"""
+@inline function iq_add_neutral(pol::GerberIQKernel{<:Gerber1}, acc, st, xi::Number,
+                                xj::Number, axi::Number, axj::Number, T::Integer,
+                                k::Integer)
+    return (; acc...,
+            nn = acc.nn +
+                 gerber_IQ_delta(xi, xj, axi, axj, pol.decay, T, k, st.sci, st.scj,
+                                 pol.kind))
+end
+@inline function iq_add_neutral(::GerberIQKernel, acc, args...)
+    return acc
+end
+@inline function comovement_step(pol::GerberIQKernel, acc, st, xi::Number, xj::Number,
+                                 T::Integer, k::Integer)
+    axi = abs(xi)
+    axj = abs(xj)
+    if axi < st.ci && axj < st.cj
+        return acc
+    end
+    return if axi >= st.ci && axj >= st.cj && xi * xj > zero(xi)
+        (; acc...,
+         pos = acc.pos +
+               gerber_IQ_delta(xi, xj, axi, axj, pol.decay, T, k, st.sci, st.scj, pol.kind))
+    elseif axi >= st.ci && axj >= st.cj && xi * xj < zero(xi)
+        (; acc...,
+         neg = acc.neg +
+               gerber_IQ_delta(xi, xj, axi, axj, pol.decay, T, k, st.sci, st.scj, pol.kind))
+    else
+        iq_add_neutral(pol, acc, st, xi, xj, axi, axj, T, k)
+    end
+end
+@inline function comovement_finalise(pol::GerberIQKernel, acc, ::Type{T}) where {T}
+    return comovement_ratio(pol.alg, acc.pos, acc.neg, acc.nn, T)
+end
+"""
     gerber_IQ(
         ce::GerberIQCovariance,
         X::MatNum,
@@ -1635,6 +1714,8 @@ Where:
 # Related
 
   - [`GerberIQCovariance`](@ref)
+  - [`GerberIQKernel`](@ref)
+  - [`gerber_comovement!`](@ref)
   - [`Gerber0`](@ref)
   - [`Gerber1`](@ref)
   - [`Gerber2`](@ref)
@@ -1647,132 +1728,13 @@ Where:
 
   - [gerber2025squeezing](@cite) Gerber, Sander and Smyth, William and Markowitz, Harry and Miao, Yinsen and Ernst, Philip and Sargen, Paul, *Squeezing Financial Noise: A Novel Approach to Covariance Matrix Estimation* (December 01, 2025). Available at SSRN: https://ssrn.com/abstract=4986939 or http://dx.doi.org/10.2139/ssrn.4986939
 """
-function gerber_IQ(ce::GerberIQCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                          <:Gerber0}, X::MatNum, sd::ArrNum)
-    T, N = size(X)
+function gerber_IQ(ce::GerberIQCovariance, X::MatNum, sd::ArrNum)
+    N = size(X, 2)
     rho = Matrix{eltype(X)}(undef, N, N)
-    (; c, decay, sc, kind, ex) = ce
-    decay = regenerate_decay(decay, X)
-    let decay = decay
-        FLoops.@floop ex for j in axes(X, 2)
-            sdj = sd[j]
-            for i in 1:j
-                sdi = sd[i]
-                sci, scj = gerber_iq_scaling(sc, sdi, sdj)
-                ci, cj = sci * c, scj * c
-                neg = zero(eltype(X))
-                pos = zero(eltype(X))
-                for k in 1:T
-                    xi = X[k, i]
-                    xj = X[k, j]
-                    axi = abs(xi)
-                    axj = abs(xj)
-                    if axi < ci && axj < cj
-                        continue
-                    end
-                    if axi >= ci && axj >= cj && xi * xj > zero(xi)
-                        pos += gerber_IQ_delta(xi, xj, axi, axj, decay, T, k, sci, scj,
-                                               kind)
-                    elseif axi >= ci && axj >= cj && xi * xj < zero(xi)
-                        neg += gerber_IQ_delta(xi, xj, axi, axj, decay, T, k, sci, scj,
-                                               kind)
-                    end
-                end
-                den = (pos + neg)
-                rho[j, i] = rho[i, j] = if !iszero(den)
-                    (pos - neg) / den
-                else
-                    zero(eltype(X))
-                end
-            end
-        end
-    end
-    posdef!(ce.pdm, rho)
-    return rho
-end
-function gerber_IQ(ce::GerberIQCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                          <:Gerber1}, X::MatNum, sd::ArrNum)
-    T, N = size(X)
-    rho = Matrix{eltype(X)}(undef, N, N)
-    (; c, decay, sc, kind, ex) = ce
-    decay = regenerate_decay(decay, X)
-    let decay = decay
-        FLoops.@floop ex for j in axes(X, 2)
-            sdj = sd[j]
-            for i in 1:j
-                sdi = sd[i]
-                sci, scj = gerber_iq_scaling(sc, sdi, sdj)
-                ci, cj = sci * c, scj * c
-                neg = zero(eltype(X))
-                pos = zero(eltype(X))
-                nn = zero(eltype(X))
-                for k in 1:T
-                    xi = X[k, i]
-                    xj = X[k, j]
-                    axi = abs(xi)
-                    axj = abs(xj)
-                    if axi < ci && axj < cj
-                        continue
-                    end
-                    if axi >= ci && axj >= cj && xi * xj > zero(xi)
-                        pos += gerber_IQ_delta(xi, xj, axi, axj, decay, T, k, sci, scj,
-                                               kind)
-                    elseif axi >= ci && axj >= cj && xi * xj < zero(xi)
-                        neg += gerber_IQ_delta(xi, xj, axi, axj, decay, T, k, sci, scj,
-                                               kind)
-                    else
-                        nn += gerber_IQ_delta(xi, xj, axi, axj, decay, T, k, sci, scj, kind)
-                    end
-                end
-                den = (pos + neg + nn)
-                rho[j, i] = rho[i, j] = if !iszero(den)
-                    (pos - neg) / den
-                else
-                    zero(eltype(X))
-                end
-            end
-        end
-    end
-    posdef!(ce.pdm, rho)
-    return rho
-end
-function gerber_IQ(ce::GerberIQCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                          <:Gerber2}, X::MatNum, sd::ArrNum)
-    T, N = size(X)
-    rho = Matrix{eltype(X)}(undef, N, N)
-    (; c, decay, sc, kind, ex) = ce
-    decay = regenerate_decay(decay, X)
-    let decay = decay
-        FLoops.@floop ex for j in axes(X, 2)
-            sdj = sd[j]
-            for i in 1:j
-                sdi = sd[i]
-                sci, scj = gerber_iq_scaling(sc, sdi, sdj)
-                ci, cj = sci * c, scj * c
-                neg = zero(eltype(X))
-                pos = zero(eltype(X))
-                for k in 1:T
-                    xi = X[k, i]
-                    xj = X[k, j]
-                    axi = abs(xi)
-                    axj = abs(xj)
-                    if axi < ci && axj < cj
-                        continue
-                    end
-                    if axi >= ci && axj >= cj && xi * xj > zero(xi)
-                        pos += gerber_IQ_delta(xi, xj, axi, axj, decay, T, k, sci, scj,
-                                               kind)
-                    elseif axi >= ci && axj >= cj && xi * xj < zero(xi)
-                        neg += gerber_IQ_delta(xi, xj, axi, axj, decay, T, k, sci, scj,
-                                               kind)
-                    end
-                end
-                rho[j, i] = rho[i, j] = (pos - neg)
-            end
-        end
-    end
-    h = max.(sqrt.(LinearAlgebra.diag(rho)), sqrt(eps(eltype(rho))))
-    rho .= LinearAlgebra.Symmetric(rho ⊘ (h * transpose(h)), :U)
+    decay = regenerate_decay(ce.decay, X)
+    pol = GerberIQKernel(ce.alg, ce.kind, decay, ce.sc, ce.c, sd)
+    gerber_comovement!(rho, ce.ex, X, pol)
+    standardise_comovement!(ce.alg, rho)
     posdef!(ce.pdm, rho)
     return rho
 end

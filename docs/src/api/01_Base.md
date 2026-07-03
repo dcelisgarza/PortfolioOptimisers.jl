@@ -77,6 +77,7 @@ assert_nonempty_nonneg_finite_val
 assert_nonempty_gt0_finite_val
 assert_nonempty_finite_val
 assert_matrix_issquare
+assert_unit_interval
 ```
 
 ## Base type aliases
