@@ -337,35 +337,6 @@ function port_opt_view(noc::NearOptimalCentering, i, X::MatNum,
                                 w_max = w_max, w_max_ini = w_max_ini, fb = noc.fb)
 end
 """
-    ucs_risk_measure(r, rd::ReturnsResult)
-
-Resolve the uncertainty set of an [`UncertaintySetVariance`](@ref) risk measure to a
-fitted [`AbstractUncertaintySetResult`](@ref) using the returns data. Other risk measures
-are returned unchanged; vectors of risk measures are resolved element-wise.
-
-Used by [`near_optimal_centering_setup`](@ref) so that the barrier risk targets, the
-sub-problem solves, and the NOC model all share the same fitted uncertainty set (fitted
-results pass through [`sigma_ucs`](@ref) unchanged). With a fitted set the
-[`UncertaintySetVariance`](@ref) functor evaluates the worst-case variance via
-[`ucs_variance`](@ref), keeping the barrier targets consistent with the model risk
-expression.
-
-# Related
-
-  - [`UncertaintySetVariance`](@ref)
-  - [`sigma_ucs`](@ref)
-  - [`near_optimal_centering_setup`](@ref)
-"""
-function ucs_risk_measure(r::UncertaintySetVariance, rd::ReturnsResult)
-    return Accessors.@set r.ucs = sigma_ucs(r.ucs, rd)
-end
-function ucs_risk_measure(r::Any, ::ReturnsResult)
-    return r
-end
-function ucs_risk_measure(rs::VecBaseRM, rd::ReturnsResult)
-    return ucs_risk_measure.(rs, Ref(rd))
-end
-"""
     near_optimal_centering_risks(scalariser, r, pr, fees, slv, w_min, w_opt, w_max)
 
 Compute the scaled risk values for the minimum, optimal, and maximum portfolios.
