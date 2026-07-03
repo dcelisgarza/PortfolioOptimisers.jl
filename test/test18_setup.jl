@@ -452,10 +452,8 @@ function mr_block2(idx)
             1e-4
         elseif i == 23
             1e-3
-        elseif i in (26, 43, 44, 48)
+        elseif i in (4, 26, 43, 44, 48)
             5e-5
-        elseif i == 4
-            1e-5
         else
             1e-6
         end

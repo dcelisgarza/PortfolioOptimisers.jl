@@ -737,7 +737,7 @@ end
 function _no_bounds_risk_measure(r::UncertaintySetVariance, ::Val{false})
     return Variance(;
                     settings = RiskMeasureSettings(; rke = r.settings.rke,
-                                                   scale = r.settings.scale), rc = nothing,
+                                                   scale = r.settings.scale),
                     sigma = r.sigma)
 end
 function no_bounds_risk_measure(r::UncertaintySetVariance,
