@@ -121,6 +121,10 @@ SumScalariser
 MaxScalariser
 MinScalariser
 LogSumExpScalariser
+scalarise
+scalarise_combine
+scalarise_map
+scalarise_logsumexp
 AbstractBaseRiskMeasure
 NonOptimisationRiskMeasure
 OptimisationRiskMeasure

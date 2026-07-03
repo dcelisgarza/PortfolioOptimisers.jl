@@ -326,88 +326,20 @@ Aggregates risk measures across clusters using a scalariser (sum, max, min, or l
   - [`HierarchicalRiskParity`](@ref)
   - [`herc_scalarised_risk_i!`](@ref)
 """
-function hrp_scalarised_risk(::SumScalariser, wu::MatNum, wk::VecNum, rku::VecNum,
+function hrp_scalarised_risk(sca::Scalariser, wu::MatNum, wk::VecNum, rku::VecNum,
                              lc::VecNum, rc::VecNum, rs::VecOptRM, X::MatNum,
                              fees::Option{<:Fees})
-    lrisk = zero(eltype(X))
-    rrisk = zero(eltype(X))
-    for r in rs
+    return scalarise(sca, rs; by = sum) do r
         fill!(wu, zero(eltype(X)))
         unitary_expected_risks!(wk, rku, r, X, fees)
         wu[lc, 1] .= inv.(view(rku, lc))
         wu[lc, 1] ./= sum(view(wu, lc, 1))
         wu[rc, 2] .= inv.(view(rku, rc))
         wu[rc, 2] ./= sum(view(wu, rc, 2))
-        lrisk += expected_risk(r, view(wu, :, 1), X, fees) * r.settings.scale
-        rrisk += expected_risk(r, view(wu, :, 2), X, fees) * r.settings.scale
+        scale = r.settings.scale
+        return (expected_risk(r, view(wu, :, 1), X, fees) * scale,
+                expected_risk(r, view(wu, :, 2), X, fees) * scale)
     end
-    return lrisk, rrisk
-end
-function hrp_scalarised_risk(::MaxScalariser, wu::MatNum, wk::VecNum, rku::VecNum,
-                             lc::VecNum, rc::VecNum, rs::VecOptRM, X::MatNum,
-                             fees::Option{<:Fees})
-    lrisk = zero(eltype(X))
-    rrisk = zero(eltype(X))
-    trisk = typemin(eltype(X))
-    for r in rs
-        fill!(wu, zero(eltype(X)))
-        unitary_expected_risks!(wk, rku, r, X, fees)
-        wu[lc, 1] .= inv.(view(rku, lc))
-        wu[lc, 1] ./= sum(view(wu, lc, 1))
-        wu[rc, 2] .= inv.(view(rku, rc))
-        wu[rc, 2] ./= sum(view(wu, rc, 2))
-        lrisk_i = expected_risk(r, view(wu, :, 1), X, fees) * r.settings.scale
-        rrisk_i = expected_risk(r, view(wu, :, 2), X, fees) * r.settings.scale
-        trisk_i = lrisk_i + rrisk_i
-        if trisk_i > trisk
-            lrisk = lrisk_i
-            rrisk = rrisk_i
-            trisk = trisk_i
-        end
-    end
-    return lrisk, rrisk
-end
-function hrp_scalarised_risk(::MinScalariser, wu::MatNum, wk::VecNum, rku::VecNum,
-                             lc::VecNum, rc::VecNum, rs::VecOptRM, X::MatNum,
-                             fees::Option{<:Fees})
-    lrisk = zero(eltype(X))
-    rrisk = zero(eltype(X))
-    trisk = typemax(eltype(X))
-    for r in rs
-        fill!(wu, zero(eltype(X)))
-        unitary_expected_risks!(wk, rku, r, X, fees)
-        wu[lc, 1] .= inv.(view(rku, lc))
-        wu[lc, 1] ./= sum(view(wu, lc, 1))
-        wu[rc, 2] .= inv.(view(rku, rc))
-        wu[rc, 2] ./= sum(view(wu, rc, 2))
-        lrisk_i = expected_risk(r, view(wu, :, 1), X, fees) * r.settings.scale
-        rrisk_i = expected_risk(r, view(wu, :, 2), X, fees) * r.settings.scale
-        trisk_i = lrisk_i + rrisk_i
-        if trisk_i < trisk
-            lrisk = lrisk_i
-            rrisk = rrisk_i
-            trisk = trisk_i
-        end
-    end
-    return lrisk, rrisk
-end
-function hrp_scalarised_risk(sca::LogSumExpScalariser, wu::MatNum, wk::VecNum, rku::VecNum,
-                             lc::VecNum, rc::VecNum, rs::VecOptRM, X::MatNum,
-                             fees::Option{<:Fees})
-    risk = Matrix{eltype(X)}(undef, length(rs), 2)
-    for (i, r) in enumerate(rs)
-        fill!(wu, zero(eltype(X)))
-        unitary_expected_risks!(wk, rku, r, X, fees)
-        wu[lc, 1] .= inv.(view(rku, lc))
-        wu[lc, 1] ./= sum(view(wu, lc, 1))
-        wu[rc, 2] .= inv.(view(rku, rc))
-        wu[rc, 2] ./= sum(view(wu, rc, 2))
-        scale = r.settings.scale * sca.gamma
-        risk[i, 1] = expected_risk(r, view(wu, :, 1), X, fees) * scale
-        risk[i, 2] = expected_risk(r, view(wu, :, 2), X, fees) * scale
-    end
-    return LogExpFunctions.logsumexp(view(risk, :, 1)) / sca.gamma,
-           LogExpFunctions.logsumexp(view(risk, :, 2)) / sca.gamma
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

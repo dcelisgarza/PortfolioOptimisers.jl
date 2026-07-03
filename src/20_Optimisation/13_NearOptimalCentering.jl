@@ -374,93 +374,17 @@ function near_optimal_centering_risks(::Any, r::RiskMeasure, pr::AbstractPriorRe
     risk_max = expected_risk(r, w_max, X, fees) * scale
     return risk_min, risk_opt, risk_max
 end
-function near_optimal_centering_risks(::SumScalariser, rs::VecRM, pr::AbstractPriorResult,
-                                      fees::Option{<:Fees}, slv::Slv_VecSlv, w_min::VecNum,
-                                      w_opt::VecNum_VecVecNum, w_max::VecNum)
-    X = pr.X
-    rs = factory(rs, pr, slv)
-    datatype = eltype(X)
-    risk_min = zero(datatype)
-    flag = isa(w_opt, VecNum)
-    risk_opt = flag ? zero(datatype) : zeros(datatype, length(w_opt))
-    risk_max = zero(datatype)
-    for r in rs
-        scale = r.settings.scale
-        risk_min += expected_risk(r, w_min, X, fees) * scale
-        risk_opt += expected_risk(r, w_opt, X, fees) * scale
-        risk_max += expected_risk(r, w_max, X, fees) * scale
-    end
-    return risk_min, risk_opt, risk_max
-end
-function near_optimal_centering_risks(scalarisation::LogSumExpScalariser, rs::VecRM,
-                                      pr::AbstractPriorResult, fees::Option{<:Fees},
-                                      slv::Slv_VecSlv, w_min::VecNum,
-                                      w_opt::VecNum_VecVecNum, w_max::VecNum)
-    X = pr.X
-    rs = factory(rs, pr, slv)
-    datatype = eltype(X)
-    N = length(rs)
-    risk_min = zeros(datatype, N)
-    flag = isa(w_opt, VecNum)
-    risk_opt = if flag
-        zeros(datatype, N)
-    else
-        zeros(datatype, N, length(w_opt))
-    end
-    risk_max = zeros(datatype, N)
-    gamma = scalarisation.gamma
-    for (i, r) in enumerate(rs)
-        scale = r.settings.scale * gamma
-        risk_min[i] = expected_risk(r, w_min, X, fees) * scale
-        tmp = expected_risk(r, w_opt, X, fees) * scale
-        if flag
-            risk_opt[i] = tmp
-        else
-            risk_opt[i, :] .= tmp
-        end
-        risk_max[i] = expected_risk(r, w_max, X, fees) * scale
-    end
-    igamma = inv(gamma)
-    risk_min = LogExpFunctions.logsumexp(risk_min) * igamma
-    risk_opt = if flag
-        LogExpFunctions.logsumexp(risk_opt) * igamma
-    else
-        vec(LogExpFunctions.logsumexp(risk_opt; dims = 1)) * igamma
-    end
-    risk_max = LogExpFunctions.logsumexp(risk_max) * igamma
-    return risk_min, risk_opt, risk_max
-end
-function near_optimal_centering_risks(::MaxScalariser, rs::VecRM, pr::AbstractPriorResult,
+function near_optimal_centering_risks(sca::Scalariser, rs::VecRM, pr::AbstractPriorResult,
                                       fees::Option{<:Fees}, slv::Option{<:Slv_VecSlv},
                                       w_min::VecNum, w_opt::VecNum_VecVecNum, w_max::VecNum)
     X = pr.X
     rs = factory(rs, pr, slv)
-    datatype = eltype(X)
-    risk_min = typemin(datatype)
-    flag = isa(w_opt, VecNum)
-    risk_opt = flag ? zero(datatype) : zeros(datatype, length(w_opt))
-    risk_max = typemin(datatype)
-    for r in rs
+    return scalarise(sca, rs) do r
         scale = r.settings.scale
-        risk_min_i = expected_risk(r, w_min, X, fees) * scale
-        risk_opt_i = expected_risk(r, w_opt, X, fees) * scale
-        risk_max_i = expected_risk(r, w_max, X, fees) * scale
-        if risk_min_i >= risk_min
-            risk_min = risk_min_i
-        end
-        if flag
-            if risk_opt_i >= risk_opt
-                risk_opt = risk_opt_i
-            end
-        else
-            idx = risk_opt_i .>= risk_opt
-            risk_opt[idx] = view(risk_opt_i, idx)
-        end
-        if risk_max_i >= risk_max
-            risk_max = risk_max_i
-        end
+        return (expected_risk(r, w_min, X, fees) * scale,
+                expected_risk(r, w_opt, X, fees) * scale,
+                expected_risk(r, w_max, X, fees) * scale)
     end
-    return risk_min, risk_opt, risk_max
 end
 """
 $(DocStringExtensions.TYPEDEF)

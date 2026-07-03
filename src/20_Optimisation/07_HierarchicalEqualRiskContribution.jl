@@ -297,103 +297,61 @@ Updates `rkbo` with inverse-risk weights for cluster `cl` and accumulates the sc
   - [`HierarchicalEqualRiskContribution`](@ref)
   - [`herc_scalarised_risk_i!`](@ref)
 """
-function herc_scalarised_risk_o!(::SumScalariser, wk::VecNum, roku::VecNum, rkbo::VecNum,
-                                 cl::VecInt, ros::VecOptRM, X::MatNum, fees::Option{<:Fees})
-    crisk = zero(eltype(X))
-    for ro in ros
-        unitary_expected_risks!(wk, roku, ro, X, fees)
-        rkbo[cl] .= inv.(view(roku, cl))
-        rkbo[cl] ./= sum(view(rkbo, cl))
-        crisk += ro.settings.scale * expected_risk(ro, rkbo, X, fees)
-    end
-    return crisk
-end
-function herc_scalarised_risk_o!(::SumScalariser, wk::VecNum, roku::MatNum, rkbo::VecNum,
-                                 cl::VecInt, ros::VecOptRM, X::MatNum, fees::Option{<:Fees})
-    crisk = zero(eltype(X))
-    for (i, ro) in pairs(ros)
-        rkbo[cl] .= inv.(view(roku, cl, i))
-        rkbo[cl] ./= sum(view(rkbo, cl))
-        crisk += ro.settings.scale * expected_risk(ro, rkbo, X, fees)
-    end
-    return crisk
-end
-function herc_scalarised_risk_o!(::MaxScalariser, wk::VecNum, roku::VecNum, rkbo::VecNum,
-                                 cl::VecInt, ros::VecOptRM, X::MatNum, fees::Option{<:Fees})
-    crisk = typemin(eltype(X))
-    for ro in ros
-        unitary_expected_risks!(wk, roku, ro, X, fees)
-        rkbo[cl] .= inv.(view(roku, cl))
-        rkbo[cl] ./= sum(view(rkbo, cl))
-        crisk_i = ro.settings.scale * expected_risk(ro, rkbo, X, fees)
-        if crisk_i > crisk
-            crisk = crisk_i
-        end
-    end
-    return crisk
-end
-function herc_scalarised_risk_o!(::MaxScalariser, wk::VecNum, roku::MatNum, rkbo::VecNum,
-                                 cl::VecInt, ros::VecOptRM, X::MatNum, fees::Option{<:Fees})
-    crisk = typemin(eltype(X))
-    for (i, ro) in pairs(ros)
-        rkbo[cl] .= inv.(view(roku, cl, i))
-        rkbo[cl] ./= sum(view(rkbo, cl))
-        crisk_i = ro.settings.scale * expected_risk(ro, rkbo, X, fees)
-        if crisk_i > crisk
-            crisk = crisk_i
-        end
-    end
-    return crisk
-end
-function herc_scalarised_risk_o!(::MinScalariser, wk::VecNum, roku::VecNum, rkbo::VecNum,
-                                 cl::VecInt, ros::VecOptRM, X::MatNum, fees::Option{<:Fees})
-    crisk = typemax(eltype(X))
-    for ro in ros
-        unitary_expected_risks!(wk, roku, ro, X, fees)
-        rkbo[cl] .= inv.(view(roku, cl))
-        rkbo[cl] ./= sum(view(rkbo, cl))
-        crisk_i = ro.settings.scale * expected_risk(ro, rkbo, X, fees)
-        if crisk_i < crisk
-            crisk = crisk_i
-        end
-    end
-    return crisk
-end
-function herc_scalarised_risk_o!(::MinScalariser, wk::VecNum, roku::MatNum, rkbo::VecNum,
-                                 cl::VecInt, ros::VecOptRM, X::MatNum, fees::Option{<:Fees})
-    crisk = typemax(eltype(X))
-    for (i, ro) in pairs(ros)
-        rkbo[cl] .= inv.(view(roku, cl, i))
-        rkbo[cl] ./= sum(view(rkbo, cl))
-        crisk_i = ro.settings.scale * expected_risk(ro, rkbo, X, fees)
-        if crisk_i < crisk
-            crisk = crisk_i
-        end
-    end
-    return crisk
-end
-function herc_scalarised_risk_o!(sca::LogSumExpScalariser, wk::VecNum, roku::VecNum,
+function herc_scalarised_risk_o!(sca::Scalariser, wk::VecNum, roku::VecNum_MatNum,
                                  rkbo::VecNum, cl::VecInt, ros::VecOptRM, X::MatNum,
                                  fees::Option{<:Fees})
-    crisk = Vector{eltype(X)}(undef, length(ros))
-    for (i, ro) in enumerate(ros)
-        unitary_expected_risks!(wk, roku, ro, X, fees)
-        rkbo[cl] .= inv.(view(roku, cl))
+    return scalarise(sca, pairs(ros)) do (i, ro)
+        rokui = herc_unitary_risks_o!(wk, roku, i, ro, X, fees)
+        rkbo[cl] .= inv.(view(rokui, cl))
         rkbo[cl] ./= sum(view(rkbo, cl))
-        crisk[i] = ro.settings.scale * sca.gamma * expected_risk(ro, rkbo, X, fees)
+        return ro.settings.scale * expected_risk(ro, rkbo, X, fees)
     end
-    return LogExpFunctions.logsumexp(crisk) / sca.gamma
 end
-function herc_scalarised_risk_o!(sca::LogSumExpScalariser, ::VecNum, roku::MatNum,
-                                 rkbo::VecNum, cl::VecInt, ros::VecOptRM, X::MatNum,
-                                 fees::Option{<:Fees})
-    crisk = Vector{eltype(X)}(undef, length(ros))
-    for (i, ro) in enumerate(ros)
-        rkbo[cl] .= inv.(view(roku, cl, i))
-        rkbo[cl] ./= sum(view(rkbo, cl))
-        crisk[i] = ro.settings.scale * sca.gamma * expected_risk(ro, rkbo, X, fees)
-    end
-    return LogExpFunctions.logsumexp(crisk) / sca.gamma
+"""
+    herc_unitary_risks_i!(wk, rku, i, r, X, fees)
+
+Return the unitary risk vector for inner measure `i` of a HERC scalarised risk computation.
+
+When `rku` is a vector it is a shared buffer and the unitary risks for measure `r` are recomputed into it. When `rku` is a matrix, the unitary risks are computed into column `i`, caching them per measure for reuse by [`herc_scalarised_risk_o!`](@ref) when the inner and outer measures are identical.
+
+# Related
+
+  - [`herc_scalarised_risk_i!`](@ref)
+  - [`herc_unitary_risks_o!`](@ref)
+  - [`unitary_expected_risks!`](@ref)
+"""
+function herc_unitary_risks_i!(wk::VecNum, rku::VecNum, ::Any, r::OptimisationRiskMeasure,
+                               X::MatNum, fees::Option{<:Fees})
+    unitary_expected_risks!(wk, rku, r, X, fees)
+    return rku
+end
+function herc_unitary_risks_i!(wk::VecNum, rku::MatNum, i::Any, r::OptimisationRiskMeasure,
+                               X::MatNum, fees::Option{<:Fees})
+    rkui = view(rku, :, i)
+    unitary_expected_risks!(wk, rkui, r, X, fees)
+    return rkui
+end
+"""
+    herc_unitary_risks_o!(wk, rku, i, r, X, fees)
+
+Return the unitary risk vector for outer measure `i` of a HERC scalarised risk computation.
+
+When `rku` is a vector it is a shared buffer and the unitary risks for measure `r` are recomputed into it. When `rku` is a matrix, column `i` already caches measure `i`'s unitary risks (filled by [`herc_scalarised_risk_i!`](@ref) when the inner and outer measures are identical) and is returned as-is.
+
+# Related
+
+  - [`herc_scalarised_risk_o!`](@ref)
+  - [`herc_unitary_risks_i!`](@ref)
+  - [`unitary_expected_risks!`](@ref)
+"""
+function herc_unitary_risks_o!(wk::VecNum, rku::VecNum, ::Any, r::OptimisationRiskMeasure,
+                               X::MatNum, fees::Option{<:Fees})
+    unitary_expected_risks!(wk, rku, r, X, fees)
+    return rku
+end
+function herc_unitary_risks_o!(::VecNum, rku::MatNum, i::Any, ::OptimisationRiskMeasure,
+                               ::MatNum, ::Option{<:Fees})
+    return view(rku, :, i)
 end
 """
     herc_scalarised_risk_i!(scalariser, wk, riku, cl, ris, X, fees)
@@ -421,115 +379,27 @@ Aggregates inner risk measures across the assets in cluster `cl` using the given
   - [`HierarchicalEqualRiskContribution`](@ref)
   - [`herc_scalarised_risk_o!`](@ref)
 """
-function herc_scalarised_risk_i!(::SumScalariser, wk::VecNum, riku::VecNum, cl::VecInt,
-                                 ris::VecOptRM, X::MatNum, fees::Option{<:Fees})
-    risk = zeros(eltype(X), length(cl), 2)
-    for ri in ris
-        unitary_expected_risks!(wk, riku, ri, X, fees)
-        risk[:, 1] .= inv.(view(riku, cl))
-        risk[:, 1] ./= sum(view(risk, :, 1))
-        risk[:, 2] += ri.settings.scale * view(risk, :, 1)
+function herc_scalarised_risk_i!(sca::Union{SumScalariser, LogSumExpScalariser}, wk::VecNum,
+                                 riku::VecNum_MatNum, cl::VecInt, ris::VecOptRM, X::MatNum,
+                                 fees::Option{<:Fees})
+    return scalarise(sca, pairs(ris)) do (i, ri)
+        rikui = herc_unitary_risks_i!(wk, riku, i, ri, X, fees)
+        risk = inv.(view(rikui, cl))
+        risk ./= sum(risk)
+        return ri.settings.scale * risk
     end
-    return view(risk, :, 2)
 end
-function herc_scalarised_risk_i!(::SumScalariser, wk::VecNum, riku::MatNum, cl::VecInt,
-                                 ris::VecOptRM, X::MatNum, fees::Option{<:Fees})
-    risk = zeros(eltype(X), length(cl), 2)
-    for (i, ri) in pairs(ris)
-        unitary_expected_risks!(wk, view(riku, :, i), ri, X, fees)
-        risk[:, 1] .= inv.(view(view(riku, :, i), cl))
-        risk[:, 1] ./= sum(view(risk, :, 1))
-        risk[:, 2] += ri.settings.scale * view(risk, :, 1)
-    end
-    return view(risk, :, 2)
-end
-function herc_scalarised_risk_i!(::MaxScalariser, wk::VecNum, riku::VecNum, cl::VecInt,
-                                 ris::VecOptRM, X::MatNum, fees::Option{<:Fees})
-    risk_t = typemin(eltype(X))
-    risk = zeros(eltype(X), length(cl), 2)
-    for ri in ris
-        unitary_expected_risks!(wk, riku, ri, X, fees)
-        risk[:, 1] = ri.settings.scale * view(riku, cl)
-        risk_i = sum(view(risk, :, 1))
-        if risk_i > risk_t
-            risk_t = risk_i
-            risk[:, 2] .= inv.(view(risk, :, 1))
-            risk[:, 2] = view(risk, :, 2) / sum(view(risk, :, 2))
-        end
-    end
-    return view(risk, :, 2)
-end
-function herc_scalarised_risk_i!(::MaxScalariser, wk::VecNum, riku::MatNum, cl::VecInt,
-                                 ris::VecOptRM, X::MatNum, fees::Option{<:Fees})
-    risk_t = typemin(eltype(X))
-    risk = zeros(eltype(X), length(cl), 2)
-    for (i, ri) in pairs(ris)
-        unitary_expected_risks!(wk, view(riku, :, i), ri, X, fees)
-        risk[:, 1] = ri.settings.scale * view(riku, cl, i)
-        risk_i = sum(view(risk, :, 1))
-        if risk_i > risk_t
-            risk_t = risk_i
-            risk[:, 2] .= inv.(view(risk, :, 1))
-            risk[:, 2] = view(risk, :, 2) / sum(view(risk, :, 2))
-        end
-    end
-    return view(risk, :, 2)
-end
-function herc_scalarised_risk_i!(::MinScalariser, wk::VecNum, riku::VecNum, cl::VecInt,
-                                 ris::VecOptRM, X::MatNum, fees::Option{<:Fees})
-    risk_t = typemax(eltype(X))
-    risk = zeros(eltype(X), length(cl), 2)
-    for ri in ris
-        unitary_expected_risks!(wk, riku, ri, X, fees)
-        risk[:, 1] = ri.settings.scale * view(riku, cl)
-        risk_i = sum(view(risk, :, 1))
-        if risk_i < risk_t
-            risk_t = risk_i
-            risk[:, 2] .= inv.(view(risk, :, 1))
-            risk[:, 2] = view(risk, :, 2) / sum(view(risk, :, 2))
-        end
-    end
-    return view(risk, :, 2)
-end
-function herc_scalarised_risk_i!(::MinScalariser, wk::VecNum, riku::MatNum, cl::VecInt,
-                                 ris::VecOptRM, X::MatNum, fees::Option{<:Fees})
-    risk_t = typemax(eltype(X))
-    risk = zeros(eltype(X), length(cl), 2)
-    for (i, ri) in pairs(ris)
-        unitary_expected_risks!(wk, view(riku, :, i), ri, X, fees)
-        risk[:, 1] = ri.settings.scale * view(riku, cl, i)
-        risk_i = sum(view(risk, :, 1))
-        if risk_i < risk_t
-            risk_t = risk_i
-            risk[:, 2] .= inv.(view(risk, :, 1))
-            risk[:, 2] = view(risk, :, 2) / sum(view(risk, :, 2))
-        end
-    end
-    return view(risk, :, 2)
-end
-function herc_scalarised_risk_i!(sca::LogSumExpScalariser, wk::VecNum, riku::VecNum,
-                                 cl::VecInt, ris::VecOptRM, X::MatNum, fees::Option{<:Fees})
-    N = length(ris)
-    risk = zeros(eltype(X), length(cl), 1 + N)
-    for (i, ri) in pairs(ris)
-        unitary_expected_risks!(wk, riku, ri, X, fees)
-        risk[:, 1] .= inv.(view(riku, cl))
-        risk[:, 1] ./= sum(view(risk, :, 1))
-        risk[:, 1 + i] = ri.settings.scale * sca.gamma * view(risk, :, 1)
-    end
-    return LogExpFunctions.logsumexp(view(risk, :, 2:N); dims = 2) / sca.gamma
-end
-function herc_scalarised_risk_i!(sca::LogSumExpScalariser, wk::VecNum, riku::MatNum,
-                                 cl::VecInt, ris::VecOptRM, X::MatNum, fees::Option{<:Fees})
-    N = length(ris)
-    risk = zeros(eltype(X), length(cl), 1 + N)
-    for (i, ri) in pairs(ris)
-        unitary_expected_risks!(wk, view(riku, :, i), ri, X, fees)
-        risk[:, 1] .= inv.(view(riku, cl, i))
-        risk[:, 1] ./= sum(view(risk, :, 1))
-        risk[:, 1 + i] += ri.settings.scale * sca.gamma * view(risk, :, 1)
-    end
-    return LogExpFunctions.logsumexp(view(risk, :, 2:N); dims = 2) / sca.gamma
+function herc_scalarised_risk_i!(sca::Union{MaxScalariser, MinScalariser}, wk::VecNum,
+                                 riku::VecNum_MatNum, cl::VecInt, ris::VecOptRM, X::MatNum,
+                                 fees::Option{<:Fees})
+    risk = scalarise(sca, pairs(ris); by = first) do (i, ri)
+        rikui = herc_unitary_risks_i!(wk, riku, i, ri, X, fees)
+        rk = ri.settings.scale * view(rikui, cl)
+        return (sum(rk), rk)
+    end[2]
+    risk = inv.(risk)
+    risk ./= sum(risk)
+    return risk
 end
 """
     herc_risk(hec, pr, cls)
