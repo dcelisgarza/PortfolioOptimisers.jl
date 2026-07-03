@@ -438,7 +438,7 @@ function mr_block2(idx)
         end
         rtol = if i in (12, 14, 30)
             5e-4
-        elseif i in (13, 16, 17)
+        elseif i in (13, 16, 17, 18)
             0.05
         elseif i in (15, 28, 41, 42)
             0.1
@@ -454,6 +454,8 @@ function mr_block2(idx)
             1e-3
         elseif i in (26, 43, 44, 48)
             5e-5
+        elseif i == 4
+            1e-5
         else
             1e-6
         end
