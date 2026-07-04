@@ -43,9 +43,10 @@ end
         mr = MeanRisk(; opt = JuMPOptimiser(; slv = slv))
         logger = SimpleLogger()
         with_logger(logger) do
-            return retcode, sol = @test_logs (:warn, r"Failed to solve") PortfolioOptimisers.optimise_JuMP_model!(testmodel(0.9),
-                                                                                                                  mr)
+            @test_logs (:warn, r"Failed to solve") PortfolioOptimisers.optimise_JuMP_model!(testmodel(0.9),
+                                                                                            mr)
         end
+        retcode, sol = PortfolioOptimisers.optimise_JuMP_model!(testmodel(0.9), mr)
         @test isa(retcode, OptimisationFailure)
         @test all(isnan, sol.w)
         # Both solvers must have been tried and their diagnostics merged: the

@@ -146,6 +146,8 @@ $(DocStringExtensions.FIELDS)
 
     ARCHUncertaintySet(;
         pe::AbstractLowOrderPriorEstimator = EmpiricalPrior(),
+        ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
+        me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
         alg::AbstractUncertaintySetAlgorithm = BoxUncertaintySetAlgorithm(),
         n_sim::Integer = 3_000,
         block_size::Integer = 3,
@@ -189,6 +191,24 @@ ARCHUncertaintySet
              │        me ┼ SimpleExpectedReturns
              │           │   w ┴ nothing
              │   horizon ┴ nothing
+          ce ┼ PortfolioOptimisersCovariance
+             │   ce ┼ Covariance
+             │      │    me ┼ SimpleExpectedReturns
+             │      │       │   w ┴ nothing
+             │      │    ce ┼ GeneralCovariance
+             │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+             │      │       │    w ┴ nothing
+             │      │   alg ┴ FullMoment()
+             │   mp ┼ MatrixProcessing
+             │      │     pdm ┼ Posdef
+             │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+             │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+             │      │      dn ┼ nothing
+             │      │      dt ┼ nothing
+             │      │     alg ┼ nothing
+             │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
+          me ┼ SimpleExpectedReturns
+             │   w ┴ nothing
          alg ┼ BoxUncertaintySetAlgorithm()
        n_sim ┼ Int64: 3000
   block_size ┼ Int64: 3
@@ -214,6 +234,14 @@ ARCHUncertaintySet
     $(field_dict[:pe])
     """
     pe
+    """
+    $(field_dict[:ce])
+    """
+    ce
+    """
+    $(field_dict[:me])
+    """
+    me
     """
     $(field_dict[:ucsa])
     """
@@ -247,6 +275,8 @@ ARCHUncertaintySet
     """
     kwargs
     function ARCHUncertaintySet(pe::AbstractLowOrderPriorEstimator,
+                                ce::StatsBase.CovarianceEstimator,
+                                me::AbstractExpectedReturnsEstimator,
                                 alg::AbstractUncertaintySetAlgorithm, n_sim::Integer,
                                 block_size::Integer, q::Number, rng::Random.AbstractRNG,
                                 seed::Option{<:Integer}, bootstrap::ARCHBootstrapSet,
@@ -255,17 +285,15 @@ ARCHUncertaintySet
         @argcheck(block_size > zero(block_size),
                   DomainError(block_size, "block_size must be > 0"))
         assert_unit_interval(q, :q)
-        return new{typeof(pe), typeof(alg), typeof(n_sim), typeof(block_size), typeof(q),
-                   typeof(rng), typeof(seed), typeof(bootstrap), typeof(kwargs)}(pe, alg,
-                                                                                 n_sim,
-                                                                                 block_size,
-                                                                                 q, rng,
-                                                                                 seed,
-                                                                                 bootstrap,
-                                                                                 kwargs)
+        return new{typeof(pe), typeof(ce), typeof(me), typeof(alg), typeof(n_sim),
+                   typeof(block_size), typeof(q), typeof(rng), typeof(seed),
+                   typeof(bootstrap), typeof(kwargs)}(pe, ce, me, alg, n_sim, block_size, q,
+                                                      rng, seed, bootstrap, kwargs)
     end
 end
 function ARCHUncertaintySet(; pe::AbstractLowOrderPriorEstimator = EmpiricalPrior(),
+                            ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
+                            me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
                             alg::AbstractUncertaintySetAlgorithm = BoxUncertaintySetAlgorithm(),
                             n_sim::Integer = 3_000, block_size::Integer = 3,
                             q::Number = 0.05,
@@ -273,7 +301,8 @@ function ARCHUncertaintySet(; pe::AbstractLowOrderPriorEstimator = EmpiricalPrio
                             seed::Option{<:Integer} = nothing,
                             bootstrap::ARCHBootstrapSet = StationaryBootstrap(),
                             kwargs::NamedTuple = (;))::ARCHUncertaintySet
-    return ARCHUncertaintySet(pe, alg, n_sim, block_size, q, rng, seed, bootstrap, kwargs)
+    return ARCHUncertaintySet(pe, ce, me, alg, n_sim, block_size, q, rng, seed, bootstrap,
+                              kwargs)
 end
 """
     bootstrap_generator(ue::ARCHUncertaintySet, X::MatNum; kwargs...)
@@ -313,8 +342,8 @@ function bootstrap_generator(ue::ARCHUncertaintySet, X::MatNum; kwargs...)
     end
     for i in 1:(ue.n_sim)
         Xi = X[bootstrap_indices(ue.bootstrap, ue.rng, T, ue.block_size), :]
-        mus[:, i] = vec(Statistics.mean(ue.pe.me, Xi; dims = 1, kwargs...))
-        sigmas[:, :, i] = Statistics.cov(ue.pe.ce, Xi; dims = 1, kwargs...)
+        mus[:, i] = vec(Statistics.mean(ue.me, Xi; dims = 1, kwargs...))
+        sigmas[:, :, i] = Statistics.cov(ue.ce, Xi; dims = 1, kwargs...)
     end
     return mus, sigmas
 end
@@ -354,7 +383,7 @@ function mu_bootstrap_generator(ue::ARCHUncertaintySet, X::MatNum; kwargs...)
     end
     for i in 1:(ue.n_sim)
         Xi = X[bootstrap_indices(ue.bootstrap, ue.rng, T, ue.block_size), :]
-        mus[:, i] = vec(Statistics.mean(ue.pe.me, Xi; dims = 1, kwargs...))
+        mus[:, i] = vec(Statistics.mean(ue.me, Xi; dims = 1, kwargs...))
     end
     return mus
 end
@@ -394,12 +423,12 @@ function sigma_bootstrap_generator(ue::ARCHUncertaintySet, X::MatNum; kwargs...)
     end
     for i in 1:(ue.n_sim)
         Xi = X[bootstrap_indices(ue.bootstrap, ue.rng, T, ue.block_size), :]
-        sigmas[:, :, i] = Statistics.cov(ue.pe.ce, Xi; dims = 1, kwargs...)
+        sigmas[:, :, i] = Statistics.cov(ue.ce, Xi; dims = 1, kwargs...)
     end
     return sigmas
 end
 """
-    ucs(ue::ARCHUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:Any, <:Any,
+    ucs(ue::ARCHUncertaintySet{<:Any, <:Any, <:Any, <:BoxUncertaintySetAlgorithm, <:Any, <:Any,
                                <:Any, <:Any, <:Any}, X::MatNum,
         F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
 
@@ -460,8 +489,8 @@ Where:
   - [`mu_bootstrap_generator`](@ref)
   - [`sigma_bootstrap_generator`](@ref)
 """
-function ucs(ue::ARCHUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:Any, <:Any,
-                                    <:Any, <:Any, <:Any}, X::MatNum,
+function ucs(ue::ARCHUncertaintySet{<:Any, <:Any, <:Any, <:BoxUncertaintySetAlgorithm,
+                                    <:Any, <:Any, <:Any, <:Any, <:Any}, X::MatNum,
              F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
     pr = prior(ue.pe, X, F; dims = dims, kwargs...)
     X = pr.X
@@ -487,7 +516,7 @@ function ucs(ue::ARCHUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:Any, 
            BoxUncertaintySet(; lb = sigma_l, ub = sigma_u)
 end
 """
-    mu_ucs(ue::ARCHUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:Any, <:Any,
+    mu_ucs(ue::ARCHUncertaintySet{<:Any, <:Any, <:Any, <:BoxUncertaintySetAlgorithm, <:Any, <:Any,
                                   <:Any, <:Any, <:Any}, X::MatNum,
            F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
 
@@ -536,8 +565,8 @@ Where:
   - [`mu_bootstrap_generator`](@ref)
   - [`sigma_bootstrap_generator`](@ref)
 """
-function mu_ucs(ue::ARCHUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:Any, <:Any,
-                                       <:Any, <:Any, <:Any}, X::MatNum,
+function mu_ucs(ue::ARCHUncertaintySet{<:Any, <:Any, <:Any, <:BoxUncertaintySetAlgorithm,
+                                       <:Any, <:Any, <:Any, <:Any, <:Any}, X::MatNum,
                 F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
     pr = prior(ue.pe, X, F; dims = dims, kwargs...)
     X = pr.X
@@ -554,7 +583,7 @@ function mu_ucs(ue::ARCHUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:An
     return BoxUncertaintySet(; lb = mu_l, ub = mu_u)
 end
 """
-    sigma_ucs(ue::ARCHUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:Any, <:Any,
+    sigma_ucs(ue::ARCHUncertaintySet{<:Any, <:Any, <:Any, <:BoxUncertaintySetAlgorithm, <:Any, <:Any,
                                      <:Any, <:Any, <:Any}, X::MatNum,
               F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
 
@@ -603,8 +632,8 @@ Where:
   - [`mu_bootstrap_generator`](@ref)
   - [`sigma_bootstrap_generator`](@ref)
 """
-function sigma_ucs(ue::ARCHUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:Any, <:Any,
-                                          <:Any, <:Any, <:Any}, X::MatNum,
+function sigma_ucs(ue::ARCHUncertaintySet{<:Any, <:Any, <:Any, <:BoxUncertaintySetAlgorithm,
+                                          <:Any, <:Any, <:Any, <:Any, <:Any}, X::MatNum,
                    F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
     pr = prior(ue.pe, X, F; dims = dims, kwargs...)
     X = pr.X
@@ -624,7 +653,7 @@ function sigma_ucs(ue::ARCHUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <
     return BoxUncertaintySet(; lb = sigma_l, ub = sigma_u)
 end
 """
-    ucs(ue::ARCHUncertaintySet{<:Any, <:EllipsoidalUncertaintySetAlgorithm, <:Any, <:Any,
+    ucs(ue::ARCHUncertaintySet{<:Any, <:Any, <:Any, <:EllipsoidalUncertaintySetAlgorithm, <:Any, <:Any,
                                <:Any, <:Any, <:Any}, X::MatNum,
         F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
 
@@ -694,8 +723,9 @@ Where:
   - [`mu_bootstrap_generator`](@ref)
   - [`sigma_bootstrap_generator`](@ref)
 """
-function ucs(ue::ARCHUncertaintySet{<:Any, <:EllipsoidalUncertaintySetAlgorithm, <:Any,
-                                    <:Any, <:Any, <:Any, <:Any}, X::MatNum,
+function ucs(ue::ARCHUncertaintySet{<:Any, <:Any, <:Any,
+                                    <:EllipsoidalUncertaintySetAlgorithm, <:Any, <:Any,
+                                    <:Any, <:Any, <:Any}, X::MatNum,
              F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
     pr = prior(ue.pe, X, F; dims = dims, kwargs...)
     X = pr.X
@@ -709,8 +739,8 @@ function ucs(ue::ARCHUncertaintySet{<:Any, <:EllipsoidalUncertaintySetAlgorithm,
     end
     X_mu = transpose(X_mu)
     X_sigma = transpose(X_sigma)
-    sigma_mu = Statistics.cov(ue.pe.ce, X_mu)
-    sigma_sigma = Statistics.cov(ue.pe.ce, X_sigma)
+    sigma_mu = Statistics.cov(ue.ce, X_mu)
+    sigma_sigma = Statistics.cov(ue.ce, X_sigma)
     if ue.alg.diagonal
         sigma_mu = LinearAlgebra.Diagonal(sigma_mu)
         sigma_sigma = LinearAlgebra.Diagonal(sigma_sigma)
@@ -723,7 +753,7 @@ function ucs(ue::ARCHUncertaintySet{<:Any, <:EllipsoidalUncertaintySetAlgorithm,
                                      class = SigmaEllipsoidalUncertaintySet())
 end
 """
-    mu_ucs(ue::ARCHUncertaintySet{<:Any, <:EllipsoidalUncertaintySetAlgorithm, <:Any, <:Any,
+    mu_ucs(ue::ARCHUncertaintySet{<:Any, <:Any, <:Any, <:EllipsoidalUncertaintySetAlgorithm, <:Any, <:Any,
                                   <:Any, <:Any, <:Any}, X::MatNum,
            F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
 
@@ -773,8 +803,9 @@ Where:
   - [`mu_bootstrap_generator`](@ref)
   - [`sigma_bootstrap_generator`](@ref)
 """
-function mu_ucs(ue::ARCHUncertaintySet{<:Any, <:EllipsoidalUncertaintySetAlgorithm, <:Any,
-                                       <:Any, <:Any, <:Any, <:Any}, X::MatNum,
+function mu_ucs(ue::ARCHUncertaintySet{<:Any, <:Any, <:Any,
+                                       <:EllipsoidalUncertaintySetAlgorithm, <:Any, <:Any,
+                                       <:Any, <:Any, <:Any}, X::MatNum,
                 F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
     pr = prior(ue.pe, X, F; dims = dims, kwargs...)
     X = pr.X
@@ -785,7 +816,7 @@ function mu_ucs(ue::ARCHUncertaintySet{<:Any, <:EllipsoidalUncertaintySetAlgorit
         X_mu[:, i] = vec(mus[:, i] - pr.mu)
     end
     X_mu = transpose(X_mu)
-    sigma_mu = Statistics.cov(ue.pe.ce, X_mu)
+    sigma_mu = Statistics.cov(ue.ce, X_mu)
     if ue.alg.diagonal
         sigma_mu = LinearAlgebra.Diagonal(sigma_mu)
     end
@@ -794,7 +825,7 @@ function mu_ucs(ue::ARCHUncertaintySet{<:Any, <:EllipsoidalUncertaintySetAlgorit
                                      class = MuEllipsoidalUncertaintySet())
 end
 """
-    sigma_ucs(ue::ARCHUncertaintySet{<:Any, <:EllipsoidalUncertaintySetAlgorithm, <:Any, <:Any,
+    sigma_ucs(ue::ARCHUncertaintySet{<:Any, <:Any, <:Any, <:EllipsoidalUncertaintySetAlgorithm, <:Any, <:Any,
                                      <:Any, <:Any, <:Any}, X::MatNum,
               F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
 
@@ -844,8 +875,9 @@ Where:
   - [`mu_bootstrap_generator`](@ref)
   - [`sigma_bootstrap_generator`](@ref)
 """
-function sigma_ucs(ue::ARCHUncertaintySet{<:Any, <:EllipsoidalUncertaintySetAlgorithm,
-                                          <:Any, <:Any, <:Any, <:Any, <:Any}, X::MatNum,
+function sigma_ucs(ue::ARCHUncertaintySet{<:Any, <:Any, <:Any,
+                                          <:EllipsoidalUncertaintySetAlgorithm, <:Any,
+                                          <:Any, <:Any, <:Any, <:Any}, X::MatNum,
                    F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
     pr = prior(ue.pe, X, F; dims = dims, kwargs...)
     X = pr.X
@@ -856,7 +888,7 @@ function sigma_ucs(ue::ARCHUncertaintySet{<:Any, <:EllipsoidalUncertaintySetAlgo
         X_sigma[:, i] = vec(sigmas[:, :, i] - pr.sigma)
     end
     X_sigma = transpose(X_sigma)
-    sigma_sigma = Statistics.cov(ue.pe.ce, X_sigma)
+    sigma_sigma = Statistics.cov(ue.ce, X_sigma)
     if ue.alg.diagonal
         sigma_sigma = LinearAlgebra.Diagonal(sigma_sigma)
     end

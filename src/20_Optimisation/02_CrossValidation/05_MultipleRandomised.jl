@@ -567,31 +567,19 @@ function path_fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator,
                               rd::ReturnsResult, train_idx, test_idx, cols;
                               ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
                               id = nothing)
-    predictions = Vector{PredictionResult}(undef, length(train_idx))
-    prev_w_flag = needs_previous_weights(opt)
-    time_dep_flag = is_time_dependent(opt)
-    if prev_w_flag || time_dep_flag
-        @info("Running walk forward sequentially because the optimiser must either use the previous optimisation's weights (needs_previous_weights(opt) == $prev_w_flag), and/or is time dependent (is_time_dependent(opt) == $time_dep_flag). This is because somewhere within the optimisation estimator is contained at least one of the following:\n\t- Turnover and/or TurnoverEstimator,\n\t- WeightsTracking,\n\t- TurnoverRiskMeasure,\n\t- custom constraints which use asset weights,\n\t- custom objective penalties which use asset weights.\n\t- Or there is a time dependent constraint or objective penalty.\nTo enable parallel processing please either mark the weights as fixed or remove the offending component(s).")
-        for (i, (train, test, col)) in enumerate(zip(train_idx, test_idx, cols))
-            rdi = returns_result_view(rd, col)
-            opti = port_opt_view(opt, col, rdi.X)
-            if i > 1
-                if prev_w_flag
-                    opti = factory(opti, predictions[i - 1].res.w)
-                end
-                if time_dep_flag
-                    opti = update_time_dependent_estimator(opti, i, rdi, train_idx,
-                                                           test_idx)
-                end
+    predictions = run_folds(opt, length(train_idx), ex) do i, prev
+        col = cols[i]
+        rdi = returns_result_view(rd, col)
+        opti = port_opt_view(opt, col, rdi.X)
+        if !isnothing(prev)
+            if needs_previous_weights(opt)
+                opti = factory(opti, prev.res.w)
             end
-            predictions[i] = fit_and_predict(opti, rdi; train_idx = train, test_idx = test)
+            if is_time_dependent(opt)
+                opti = update_time_dependent_estimator(opti, i, rdi, train_idx, test_idx)
+            end
         end
-    else
-        FLoops.@floop ex for (i, (train, test, col)) in
-                             enumerate(zip(train_idx, test_idx, cols))
-            predictions[i] = fit_and_predict(opt, rd; train_idx = train, test_idx = test,
-                                             cols = col)
-        end
+        return fit_and_predict(opti, rdi; train_idx = train_idx[i], test_idx = test_idx[i])
     end
     return MultiPeriodPredictionResult(; pred = sort_predictions!(test_idx, predictions),
                                        id = id)
@@ -607,12 +595,13 @@ function fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator, rd::Retu
     for (train, test, asset, path_id) in zip(train_idx, test_idx, asset_idx, path_ids)
         push!(dict[path_id], (train, test, asset))
     end
-    predictions = Vector{MultiPeriodPredictionResult}(undef, length(unique_ids))
-    FLoops.@floop ex for (i, vals) in enumerate(dict)
+    predictions = parallel_folds(length(unique_ids), ex; ElT = MultiPeriodPredictionResult
+                                 ) do i
+        vals = dict[i]
         train = map(x -> x[1], vals)
         test = map(x -> x[2], vals)
         asset = map(x -> x[3], vals)
-        predictions[i] = path_fit_and_predict(opt, rd, train, test, asset; ex = ex, id = i)
+        return path_fit_and_predict(opt, rd, train, test, asset; ex = ex, id = i)
     end
     return PopulationPredictionResult(; pred = predictions)
 end

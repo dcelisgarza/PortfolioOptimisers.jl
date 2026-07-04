@@ -871,6 +871,66 @@ end
 function sort_predictions!(res::CrossValidationResult, predictions::VecPredRes)
     return sort_predictions!(res.test_idx, predictions)
 end
+"""
+    cv_sequential_info(prev_w_flag::Bool, time_dep_flag::Bool)
+
+Build the informational message emitted when a cross-validation run falls back to sequential
+execution because the optimiser needs the previous fold's weights and/or is time dependent.
+Shared by the [`run_folds`](@ref) walk fallback used in walk-forward and multiple-randomised
+cross-validation.
+"""
+function cv_sequential_info(prev_w_flag::Bool, time_dep_flag::Bool)
+    return "Running cross-validation sequentially because the optimiser must either use the previous optimisation's weights (needs_previous_weights(opt) == $prev_w_flag), and/or is time dependent (is_time_dependent(opt) == $time_dep_flag). This is because somewhere within the optimisation estimator is contained at least one of the following:\n\t- Turnover and/or TurnoverEstimator,\n\t- WeightsTracking,\n\t- TurnoverRiskMeasure,\n\t- custom constraints which use asset weights,\n\t- custom objective penalties which use asset weights.\n\t- Or there is a time dependent constraint or objective penalty.\nTo enable parallel processing please either mark the weights as fixed or remove the offending component(s)."
+end
+"""
+    parallel_folds(fit_fold, n::Integer, ex::FLoops.Transducers.Executor; ElT = PredictionResult)
+
+Run `n` cross-validation folds in parallel, filling `predictions[i] = fit_fold(i)` for `i in 1:n`
+over executor `ex`. `ElT` is the per-fold result element type (a single [`PredictionResult`](@ref)
+for time-ordered schemes, a `Vector{PredictionResult}` for the multi-path combinatorial scheme).
+
+# Related
+
+  - [`run_folds`](@ref)
+  - [`fit_and_predict`](@ref)
+"""
+function parallel_folds(fit_fold, n::Integer, ex::FLoops.Transducers.Executor;
+                        ElT = PredictionResult)
+    predictions = Vector{ElT}(undef, n)
+    FLoops.@floop ex for i in 1:n
+        predictions[i] = fit_fold(i)
+    end
+    return predictions
+end
+"""
+    run_folds(fit_fold, opt, n::Integer, ex::FLoops.Transducers.Executor; ElT = PredictionResult)
+
+Run `n` cross-validation folds, either in parallel or — when `opt` needs the previous fold's
+weights (`needs_previous_weights`) or is time dependent (`is_time_dependent`) — sequentially,
+emitting [`cv_sequential_info`](@ref). `fit_fold(i, prev)` returns the prediction for fold `i`,
+where `prev` is `nothing` in parallel mode or the previous fold's prediction in sequential mode;
+the caller uses `prev` to thread previous weights / time-dependent state into fold `i`.
+
+# Related
+
+  - [`parallel_folds`](@ref)
+  - [`cv_sequential_info`](@ref)
+  - [`fit_and_predict`](@ref)
+"""
+function run_folds(fit_fold, opt, n::Integer, ex::FLoops.Transducers.Executor;
+                   ElT = PredictionResult)
+    prev_w_flag = needs_previous_weights(opt)
+    time_dep_flag = is_time_dependent(opt)
+    if prev_w_flag || time_dep_flag
+        @info(cv_sequential_info(prev_w_flag, time_dep_flag))
+        predictions = Vector{ElT}(undef, n)
+        for i in 1:n
+            predictions[i] = fit_fold(i, i > 1 ? predictions[i - 1] : nothing)
+        end
+        return predictions
+    end
+    return parallel_folds(i -> fit_fold(i, nothing), n, ex; ElT = ElT)
+end
 function fit_and_predict(opt::OptE_Opt, rd::ReturnsResult, cv::NonSeqCVER; cols = :,
                          ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
                          id = nothing)
@@ -880,10 +940,9 @@ function fit_and_predict(opt::OptE_Opt, rd::ReturnsResult, cv::NonSeqCVER; cols 
     (; train_idx, test_idx) = cv_res
     @argcheck(all(map(x -> x > zero(x), map(x -> diff(x), train_idx))),
               "Cross validation estimator must not be shuffled.")
-    predictions = Vector{PredictionResult}(undef, length(train_idx))
-    FLoops.@floop ex for (i, (train, test)) in enumerate(zip(train_idx, test_idx))
-        predictions[i] = fit_and_predict(opt, rd; train_idx = train, test_idx = test,
-                                         cols = cols)
+    predictions = parallel_folds(length(train_idx), ex) do i
+        return fit_and_predict(opt, rd; train_idx = train_idx[i], test_idx = test_idx[i],
+                               cols = cols)
     end
     return MultiPeriodPredictionResult(; pred = predictions, id = id)
 end

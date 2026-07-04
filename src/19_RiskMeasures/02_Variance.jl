@@ -602,6 +602,9 @@ UncertaintySetVariance
            │      rng ┼ Random.TaskLocalRNG: Random.TaskLocalRNG()
            │     seed ┼ nothing
            │      ens ┼ nothing
+           │      pdm ┼ Posdef
+           │          │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+           │          │   kwargs ┴ @NamedTuple{}: NamedTuple()
            │   kwargs ┴ @NamedTuple{}: NamedTuple()
      sigma ┴ 3×3 Matrix{Float64}
 

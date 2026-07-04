@@ -505,10 +505,9 @@ function fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator, rd::Retu
                          ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())
     cv_res = split(cv, rd)
     (; train_idx, test_idx) = cv_res
-    predictions = Vector{Vector{PredictionResult}}(undef, length(train_idx))
-    FLoops.@floop ex for (i, (train, test)) in enumerate(zip(train_idx, test_idx))
-        predictions[i] = fit_and_predict(opt, rd; train_idx = train, test_idx = test,
-                                         cols = cols)
+    predictions = parallel_folds(length(train_idx), ex; ElT = Vector{PredictionResult}) do i
+        return fit_and_predict(opt, rd; train_idx = train_idx[i], test_idx = test_idx[i],
+                               cols = cols)
     end
     return PopulationPredictionResult(; pred = sort_predictions!(cv_res, predictions))
 end
@@ -517,9 +516,8 @@ function fit_and_predict(res::NonFiniteAllocationOptimisationResult, rd::Returns
                          ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())
     cv_res = split(cv, rd)
     test_idx = cv_res.test_idx
-    predictions = Vector{Vector{PredictionResult}}(undef, length(test_idx))
-    FLoops.@floop ex for (i, test) in enumerate(test_idx)
-        predictions[i] = StatsAPI.predict(res, rd, test)
+    predictions = parallel_folds(length(test_idx), ex; ElT = Vector{PredictionResult}) do i
+        return StatsAPI.predict(res, rd, test_idx[i])
     end
     return PopulationPredictionResult(; pred = sort_predictions!(cv_res, predictions))
 end

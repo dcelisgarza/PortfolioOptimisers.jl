@@ -721,30 +721,19 @@ function fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator, rd::Retu
                          id = nothing)
     cv_res = split(cv, rd)
     (; train_idx, test_idx) = cv_res
-    predictions = Vector{PredictionResult}(undef, length(train_idx))
-    prev_w_flag = needs_previous_weights(opt)
-    time_dep_flag = is_time_dependent(opt)
-    if prev_w_flag || time_dep_flag
-        @info("Running walk forward sequentially because the optimiser must either use the previous optimisation's weights (needs_previous_weights(opt) == $prev_w_flag), and/or is time dependent (is_time_dependent(opt) == $time_dep_flag). This is because somewhere within the optimisation estimator is contained at least one of the following:\n\t- Turnover and/or TurnoverEstimator,\n\t- WeightsTracking,\n\t- TurnoverRiskMeasure,\n\t- custom constraints which use asset weights,\n\t- custom objective penalties which use asset weights.\n\t- Or there is a time dependent constraint or objective penalty.\nTo enable parallel processing please either mark the weights as fixed or remove the offending component(s).")
-        for (i, (train, test)) in enumerate(zip(train_idx, test_idx))
-            if i > 1
-                if prev_w_flag
-                    opt = factory(opt, predictions[i - 1].res.w)
-                end
-                if time_dep_flag
-                    opt = update_time_dependent_estimator(opt, i, rd, train_idx, test_idx)
-                end
+    running = opt
+    predictions = run_folds(opt, length(train_idx), ex) do i, prev
+        if !isnothing(prev)
+            if needs_previous_weights(opt)
+                running = factory(running, prev.res.w)
             end
-            predictions[i] = fit_and_predict(opt, rd; train_idx = train, test_idx = test,
-                                             cols = cols)
-        end
-    else
-        let opt = opt
-            FLoops.@floop ex for (i, (train, test)) in enumerate(zip(train_idx, test_idx))
-                predictions[i] = fit_and_predict(opt, rd; train_idx = train,
-                                                 test_idx = test, cols = cols)
+            if is_time_dependent(opt)
+                running = update_time_dependent_estimator(running, i, rd, train_idx,
+                                                          test_idx)
             end
         end
+        return fit_and_predict(running, rd; train_idx = train_idx[i],
+                               test_idx = test_idx[i], cols = cols)
     end
     return MultiPeriodPredictionResult(; pred = predictions, id = id)
 end
@@ -753,9 +742,8 @@ function fit_and_predict(res::NonFiniteAllocationOptimisationResult, rd::Returns
                          id = nothing)
     cv_res = split(cv, rd)
     test_idx = cv_res.test_idx
-    predictions = Vector{PredictionResult}(undef, length(test_idx))
-    FLoops.@floop ex for (i, test) in enumerate(test_idx)
-        predictions[i] = StatsAPI.predict(res, rd, test)
+    predictions = parallel_folds(length(test_idx), ex) do i
+        return StatsAPI.predict(res, rd, test_idx[i])
     end
     return MultiPeriodPredictionResult(; pred = predictions, id = id)
 end
