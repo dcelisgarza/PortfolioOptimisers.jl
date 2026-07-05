@@ -35,11 +35,33 @@
         end
     end
 
-    @testset "meta-optimisers throw (delegated)" begin
-        @test_throws ArgumentError supported_risk_measures(NestedClustered)
-        @test_throws ArgumentError supports_risk_measure(NestedClustered, Variance)
-        @test_throws ArgumentError supports_risk_measure(Stacking, Variance)
-        @test_throws ArgumentError supports_risk_measure(SubsetResampling, Variance)
+    @testset "meta-optimisers delegate (intersection of children)" begin
+        jmp() = MeanRisk(; opt = JuMPOptimiser(; slv = Solver(; solver = nothing)))  # RiskMeasure
+        none = EqualWeighted()                                                       # Union{}
+
+        # NestedClustered: inner ∩ outer.
+        nco_rm = NestedClustered(; opti = jmp(), opto = jmp())
+        @test supported_risk_measures(nco_rm) === RiskMeasure
+        @test supports_risk_measure(nco_rm, Variance())
+        @test !supports_risk_measure(nco_rm, EqualRisk())
+        # One child that accepts nothing collapses the whole meta to Union{}.
+        nco_none = NestedClustered(; opti = jmp(), opto = none)
+        @test supported_risk_measures(nco_none) === Union{}
+        @test !supports_risk_measure(nco_none, Variance())
+
+        # SubsetResampling: delegates to its single inner optimiser.
+        @test supported_risk_measures(SubsetResampling(; opt = jmp())) === RiskMeasure
+        @test supports_risk_measure(SubsetResampling(; opt = jmp()), Variance())
+        @test supported_risk_measures(SubsetResampling(; opt = none)) === Union{}
+
+        # Stacking: outer ∩ all inner, broadcasting over the (possibly heterogeneous) inner vector.
+        stk_rm = Stacking(; opti = [jmp(), jmp()], opto = jmp())
+        @test supported_risk_measures(stk_rm) === RiskMeasure
+        @test supports_risk_measure(stk_rm, Variance())
+        # An inner optimiser that accepts nothing ⇒ the meta accepts nothing.
+        stk_none = Stacking(; opti = [jmp(), none], opto = jmp())
+        @test supported_risk_measures(stk_none) === Union{}
+        @test !supports_risk_measure(stk_none, Variance())
     end
 
     @testset "clustering acceptance ⊇ JuMP acceptance (table invariant)" begin

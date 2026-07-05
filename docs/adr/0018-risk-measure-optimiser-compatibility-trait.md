@@ -25,14 +25,23 @@ their existing runtime errors and belong to the `@risk_measure` macro (M5) and t
 meta-optimiser legality seam (M11), not here — duplicating them would reintroduce the drift
 this trait removes.
 
-## Meta-optimisers throw
+## Meta-optimisers delegate (intersection)
 
-`NestedClustered`, `Stacking`, and `SubsetResampling` have no `r` of their own; acceptance is
-delegated to their inner/outer optimisers. Rather than emit a misleading `true`/`false`, the
-predicate throws a typed "delegated — query the inner optimiser" error via explicit methods on
-those three types. This matches the library's actionable-error style and avoids a silent
-wrong-answer path; real delegation drops in later at the M11 meta-legality seam. Meta-optimisers
-are excluded from the generated table with a pointer note.
+`NestedClustered`, `Stacking`, and `SubsetResampling` have no `r` of their own; acceptance is a
+property of their constituent optimisers. Each meta accepts a measure only when *every* one of
+its optimisers does, so `supported_risk_measures` returns the **`typeintersect`** of its
+children's categories: `NestedClustered` intersects inner (`opti`) and outer (`opto`);
+`Stacking` intersects outer (`opto`) with all inner (`opti`); `SubsetResampling` delegates to its
+single inner optimiser (`opt`). Because the predicate is `R <: supported_risk_measures(O)`, this
+means exactly "R is accepted by every child".
+
+Methods are keyed on the **concrete** meta types (not the `Base*` abstract supertypes) and read
+the child optimiser field types, which `@concrete` exposes as type parameters. This is exact for
+a fully parametric meta type or a constructed instance; an under-specified bare meta `UnionAll`
+(children unresolved) conservatively yields `Union{}`. A heterogeneous `Stacking` inner vector
+spanning different optimiser *families* also collapses to `Union{}` via the vector `eltype`, the
+one known imprecision. Meta-optimisers are excluded from the generated table (their acceptance is
+instance-specific) with a pointer note.
 
 ## Consequences
 

@@ -196,42 +196,6 @@ function assert_internal_optimiser(opt::VecOptE_Opt)::Nothing
     return nothing
 end
 """
-    assert_no_internal_precomputed_prior(opt)
-
-Assert that the optimiser's embedded prior estimator `opt.opt.pe` is an estimator rather than a
-precomputed [`AbstractPriorResult`](@ref). Shared by the outer (`assert_external_optimiser`)
-legality checks of the JuMP, risk-budgeting, and factor-risk-contribution optimisers, whose outer
-role forbids a precomputed prior.
-
-# Related
-
-  - [`assert_external_optimiser`](@ref)
-  - [`NestedClustered`](@ref)
-"""
-function assert_no_internal_precomputed_prior(opt)::Nothing
-    @argcheck(!isa(opt.opt.pe, AbstractPriorResult),
-              ArgumentError("opt.opt.pe cannot be a precomputed AbstractPriorResult; use an estimator instead"))
-    return nothing
-end
-"""
-    assert_no_precomputed_prior(opt)
-
-Assert that the optimiser's embedded prior estimator `opt.opt.pe` is an estimator rather than a
-precomputed [`AbstractPriorResult`](@ref). Shared by the outer (`assert_external_optimiser`)
-legality checks of the JuMP, risk-budgeting, and factor-risk-contribution optimisers, whose outer
-role forbids a precomputed prior.
-
-# Related
-
-  - [`assert_external_optimiser`](@ref)
-  - [`NestedClustered`](@ref)
-"""
-function assert_no_precomputed_prior(opt)::Nothing
-    @argcheck(!isa(opt.pe, AbstractPriorResult),
-              ArgumentError("opt.pe cannot be a precomputed AbstractPriorResult; use an estimator instead"))
-    return nothing
-end
-"""
     assert_external_optimiser(opt)
 
 Assert that the outer optimiser is valid for use in NCO.

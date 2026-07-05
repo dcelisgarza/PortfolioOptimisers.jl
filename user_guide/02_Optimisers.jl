@@ -107,8 +107,9 @@ supported_risk_measures(HierarchicalRiskParity)           # OptimisationRiskMeas
 
 The table below is *generated* from that same predicate, so it can never drift from what the
 optimisers actually dispatch on. Meta-optimisers (`NestedClustered`, `Stacking`,
-`SubsetResampling`) are omitted: they delegate acceptance to their inner/outer optimisers, so
-querying one throws by design.
+`SubsetResampling`) are omitted because their acceptance is instance-specific: they *delegate*,
+accepting a measure only when every constituent optimiser does (the intersection of their
+children's categories).
 =#
 
 using InteractiveUtils
