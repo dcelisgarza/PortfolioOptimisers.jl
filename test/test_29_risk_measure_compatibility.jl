@@ -39,7 +39,7 @@
         @test_throws ArgumentError supported_risk_measures(NestedClustered)
         @test_throws ArgumentError supports_risk_measure(NestedClustered, Variance)
         @test_throws ArgumentError supports_risk_measure(Stacking, Variance)
-        @test supports_risk_measure(SubsetResampling, Variance)
+        @test_throws ArgumentError supports_risk_measure(SubsetResampling, Variance)
     end
 
     @testset "clustering acceptance ⊇ JuMP acceptance (table invariant)" begin
