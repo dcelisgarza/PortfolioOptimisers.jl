@@ -134,17 +134,24 @@ Where:
 
 Because this is a *relaxation* of the risk budgeting problem, the realised risk contributions will not adhere to the target risk budget as tightly as the exact logarithmic-barrier or mixed-integer formulations in [`RiskBudgeting`](@ref). In well-behaved problems the deviation is negligible, but in pathological cases (e.g. ill-conditioned covariance matrices or extreme budget allocations) it can be noticeable. The trade-off is that the SOC formulation is convex and composes cleanly with additional constraints, making it the friendlier choice when the risk budget is one of several objectives rather than a hard requirement. Use [`RiskBudgeting`](@ref) when strict adherence to the risk budget is essential.
 
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+
+  - `opt`: Recursively updated via [`factory`](@ref).
+  - `fb`: Recursively updated via [`factory`](@ref).
+
 # Related
 
   - [`JuMPOptimisationEstimator`](@ref)
   - [`RiskBudgeting`](@ref)
   - [`RelaxedRiskBudgetingAlgorithm`](@ref)
 """
-@concrete struct RelaxedRiskBudgeting <: JuMPOptimisationEstimator
+@propagatable @concrete struct RelaxedRiskBudgeting <: JuMPOptimisationEstimator
     """
     $(field_dict[:opt_jmp])
     """
-    opt
+    @fprop opt
     """
     $(field_dict[:rba])
     """
@@ -160,7 +167,7 @@ Because this is a *relaxation* of the risk budgeting problem, the realised risk 
     """
     $(field_dict[:fb])
     """
-    fb
+    @fprop fb
     function RelaxedRiskBudgeting(opt::JuMPOptimiser, rba::RiskBudgetingAlgorithm,
                                   wi::Option{<:VecNum}, alg::RelaxedRiskBudgetingAlgorithm,
                                   fb::Option{<:OptE_Opt})
@@ -186,17 +193,6 @@ Return `true` if the JuMP optimiser or fallback requires previous portfolio weig
 """
 function needs_previous_weights(opt::RelaxedRiskBudgeting)
     return (needs_previous_weights(opt.opt) || needs_previous_weights(opt.fb))
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Build an updated [`RelaxedRiskBudgeting`](@ref) with all estimators that track previous weights updated via `factory` using `w`.
-"""
-function factory(rrb::RelaxedRiskBudgeting, w::AbstractVector)::RelaxedRiskBudgeting
-    opt = factory(rrb.opt, w)
-    fb = factory(rrb.fb, w)
-    return RelaxedRiskBudgeting(; opt = opt, rba = rrb.rba, wi = rrb.wi, alg = rrb.alg,
-                                fb = fb)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

@@ -146,13 +146,22 @@ Where:
   - ``\\boldsymbol{W}_k``: Returns proxy matrix weighted by inner-optimiser weights ``\\boldsymbol{w}_k``.
   - ``\\mathrm{opto}``: Outer optimiser applied to the aggregated returns proxy.
 
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+
+  - `fees`: Recursively updated via [`factory`](@ref).
+  - `opti`: Recursively updated via [`factory`](@ref).
+  - `opto`: Recursively updated via [`factory`](@ref).
+  - `fb`: Recursively updated via [`factory`](@ref).
+
 # Related
 
   - [`BaseStackingOptimisationEstimator`](@ref)
   - [`NestedClustered`](@ref)
   - [`StackingResult`](@ref)
 """
-@concrete struct Stacking <: BaseStackingOptimisationEstimator
+@propagatable @concrete struct Stacking <: BaseStackingOptimisationEstimator
     """
     $(field_dict[:pe])
     """
@@ -164,7 +173,7 @@ Where:
     """
     $(field_dict[:feese])
     """
-    fees
+    @fprop fees
     """
     $(field_dict[:sets])
     """
@@ -176,11 +185,11 @@ Where:
     """
     $(field_dict[:opti])
     """
-    opti
+    @fprop opti
     """
     $(field_dict[:opto])
     """
-    opto
+    @fprop opto
     """
     $(field_dict[:cv])
     """
@@ -196,7 +205,7 @@ Where:
     """
     $(field_dict[:fb])
     """
-    fb
+    @fprop fb
     """
     $(field_dict[:brt])
     """
@@ -278,20 +287,6 @@ function needs_previous_weights(opt::Stacking)
             needs_previous_weights(opt.opti) ||
             needs_previous_weights(opt.opto) ||
             needs_previous_weights(opt.fb))
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Build an updated [`Stacking`](@ref) with all estimators that track previous weights updated via `factory` using `w`.
-"""
-function factory(st::Stacking, w::AbstractVector)::Stacking
-    fees = factory(st.fees, w)
-    opti = factory(st.opti, w)
-    opto = factory(st.opto, w)
-    fb = factory(st.fb, w)
-    return Stacking(; pe = st.pe, wb = st.wb, fees = fees, sets = st.sets, scale = st.scale,
-                    opti = opti, opto = opto, cv = st.cv, wf = st.wf, ex = st.ex, fb = fb,
-                    brt = st.brt, strict = st.strict)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

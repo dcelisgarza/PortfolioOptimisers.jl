@@ -33,6 +33,13 @@ $(DocStringExtensions.FIELDS)
 
 Keywords correspond to the struct's fields.
 
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+
+  - `r1`: Recursively updated via [`factory`](@ref).
+  - `r2`: Recursively updated via [`factory`](@ref).
+
 # Examples
 
 ```jldoctest
@@ -62,15 +69,15 @@ RiskRatio
   - [`OptimisationRiskMeasure`](@ref)
   - [`NonOptimisationRiskRatio`](@ref)
 """
-@concrete struct RiskRatio <: HierarchicalRiskMeasure
+@propagatable @concrete struct RiskRatio <: HierarchicalRiskMeasure
     """
     $(field_dict[:r1])
     """
-    r1
+    @fprop r1
     """
     $(field_dict[:r2])
     """
-    r2
+    @fprop r2
     function RiskRatio(r1::OptimisationRiskMeasure, r2::OptimisationRiskMeasure)
         return new{typeof(r1), typeof(r2)}(r1, r2)
     end
@@ -78,36 +85,6 @@ end
 function RiskRatio(; r1::OptimisationRiskMeasure = Variance(),
                    r2::OptimisationRiskMeasure = ConditionalValueatRisk())::RiskRatio
     return RiskRatio(r1, r2)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Create an instance of [`RiskRatio`](@ref) by updating both constituent risk measures from the optimisation context.
-
-Forwards all arguments to `factory` on `r1` and `r2`.
-
-# Related
-
-  - [`RiskRatio`](@ref)
-  - [`factory`](@ref)
-"""
-function factory(r::RiskRatio, args...; kwargs...)::RiskRatio
-    r1 = factory(r.r1, args...; kwargs...)
-    r2 = factory(r.r2, args...; kwargs...)
-    return RiskRatio(; r1 = r1, r2 = r2)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Create an instance of [`RiskRatio`](@ref) updating both constituent risk measures from new portfolio weights `w`.
-
-# Related
-
-  - [`RiskRatio`](@ref)
-  - [`factory`](@ref)
-"""
-function factory(r::RiskRatio, w::VecNum)::RiskRatio
-    return RiskRatio(; r1 = factory(r.r1, w), r2 = factory(r.r2, w))
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -144,21 +121,28 @@ $(DocStringExtensions.FIELDS)
 
 Keywords correspond to the struct's fields.
 
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+
+  - `r1`: Recursively updated via [`factory`](@ref).
+  - `r2`: Recursively updated via [`factory`](@ref).
+
 # Related
 
   - [`NonOptimisationRiskMeasure`](@ref)
   - [`AbstractBaseRiskMeasure`](@ref)
   - [`RiskRatio`](@ref)
 """
-@concrete struct NonOptimisationRiskRatio <: NonOptimisationRiskMeasure
+@propagatable @concrete struct NonOptimisationRiskRatio <: NonOptimisationRiskMeasure
     """
     $(field_dict[:r1])
     """
-    r1
+    @fprop r1
     """
     $(field_dict[:r2])
     """
-    r2
+    @fprop r2
     function NonOptimisationRiskRatio(r1::AbstractBaseRiskMeasure,
                                       r2::AbstractBaseRiskMeasure)
         return new{typeof(r1), typeof(r2)}(r1, r2)
@@ -167,23 +151,6 @@ end
 function NonOptimisationRiskRatio(; r1::AbstractBaseRiskMeasure = Variance(),
                                   r2::AbstractBaseRiskMeasure = ConditionalValueatRisk())::NonOptimisationRiskRatio
     return NonOptimisationRiskRatio(r1, r2)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Create an instance of [`NonOptimisationRiskRatio`](@ref) by updating both constituent risk measures from the optimisation context.
-
-Forwards all arguments to `factory` on `r1` and `r2`.
-
-# Related
-
-  - [`NonOptimisationRiskRatio`](@ref)
-  - [`factory`](@ref)
-"""
-function factory(r::NonOptimisationRiskRatio, args...; kwargs...)::NonOptimisationRiskRatio
-    r1 = factory(r.r1, args...; kwargs...)
-    r2 = factory(r.r2, args...; kwargs...)
-    return NonOptimisationRiskRatio(; r1 = r1, r2 = r2)
 end
 
 export RiskRatio, NonOptimisationRiskRatio

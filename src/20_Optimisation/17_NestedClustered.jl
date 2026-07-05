@@ -308,6 +308,15 @@ Let clusters ``C_1, \\ldots, C_K`` partition the ``N`` assets. The NCO algorithm
  2. **Outer**: form a ``T \\times K`` synthetic returns matrix from cluster portfolios and solve ``\\boldsymbol{a} = \\mathrm{opto}(\\mathbf{X}_{\\mathrm{cluster}})`` (allocation across clusters).
  3. **Combine**: ``w_i = a_k \\cdot w_{C_k, i}`` for ``i \\in C_k``.
 
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+
+  - `fees`: Recursively updated via [`factory`](@ref).
+  - `opti`: Recursively updated via [`factory`](@ref).
+  - `opto`: Recursively updated via [`factory`](@ref).
+  - `fb`: Recursively updated via [`factory`](@ref).
+
 # Related
 
   - [`ClusteringOptimisationEstimator`](@ref)
@@ -315,7 +324,7 @@ Let clusters ``C_1, \\ldots, C_K`` partition the ``N`` assets. The NCO algorithm
   - [`Stacking`](@ref)
   - [`NestedClusteredResult`](@ref)
 """
-@concrete struct NestedClustered <: ClusteringOptimisationEstimator
+@propagatable @concrete struct NestedClustered <: ClusteringOptimisationEstimator
     """
     $(field_dict[:pe])
     """
@@ -331,7 +340,7 @@ Let clusters ``C_1, \\ldots, C_K`` partition the ``N`` assets. The NCO algorithm
     """
     $(field_dict[:feese])
     """
-    fees
+    @fprop fees
     """
     $(field_dict[:sets])
     """
@@ -339,11 +348,11 @@ Let clusters ``C_1, \\ldots, C_K`` partition the ``N`` assets. The NCO algorithm
     """
     $(field_dict[:opti])
     """
-    opti
+    @fprop opti
     """
     $(field_dict[:opto])
     """
-    opto
+    @fprop opto
     """
     $(field_dict[:cv])
     """
@@ -359,7 +368,7 @@ Let clusters ``C_1, \\ldots, C_K`` partition the ``N`` assets. The NCO algorithm
     """
     $(field_dict[:fb])
     """
-    fb
+    @fprop fb
     """
     $(field_dict[:brt])
     """
@@ -451,21 +460,6 @@ function needs_previous_weights(opt::NestedClustered)
             needs_previous_weights(opt.opti) ||
             needs_previous_weights(opt.opto) ||
             needs_previous_weights(opt.fb))
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Build an updated [`NestedClustered`](@ref) with all estimators that track previous weights updated via `factory` using `w`.
-"""
-function factory(nco::NestedClustered, w::AbstractVector)
-    fees = factory(nco.fees, w)
-    opti = factory(nco.opti, w)
-    opto = factory(nco.opto, w)
-    fb = factory(nco.fb, w)
-    return NestedClustered(; pe = nco.pe, cle = nco.cle, wb = nco.wb, fees = fees,
-                           sets = nco.sets, opti = opti, opto = opto, cv = nco.cv,
-                           wf = nco.wf, ex = nco.ex, fb = fb, brt = nco.brt,
-                           cle_pr = nco.cle_pr, strict = nco.strict)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

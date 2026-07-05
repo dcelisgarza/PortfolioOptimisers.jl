@@ -27,6 +27,15 @@ Keywords correspond to the struct's fields.
 
   - If `ri` or `ro` is a vector: `!isempty(ri)` / `!isempty(ro)`.
 
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+
+  - `opt`: Recursively updated via [`factory`](@ref).
+  - `ri`: Recursively updated via [`factory`](@ref).
+  - `ro`: Recursively updated via [`factory`](@ref).
+  - `fb`: Recursively updated via [`factory`](@ref).
+
 # Examples
 
 ```jldoctest
@@ -154,19 +163,20 @@ Where:
   - [`SchurComplementHierarchicalRiskParity`](@ref)
   - [`HierarchicalOptimiser`](@ref)
 """
-@concrete struct HierarchicalEqualRiskContribution <: ClusteringOptimisationEstimator
+@propagatable @concrete struct HierarchicalEqualRiskContribution <:
+                               ClusteringOptimisationEstimator
     """
     $(field_dict[:opt_hier])
     """
-    opt
+    @fprop opt
     """
     $(field_dict[:ri])
     """
-    ri
+    @fprop ri
     """
     $(field_dict[:ro])
     """
-    ro
+    @fprop ro
     """
     $(field_dict[:scai])
     """
@@ -225,25 +235,6 @@ function needs_previous_weights(opt::HierarchicalEqualRiskContribution)
             needs_previous_weights(opt.ri) ||
             needs_previous_weights(opt.ro) ||
             needs_previous_weights(opt.fb))
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Create a [`HierarchicalEqualRiskContribution`](@ref) updating the base optimiser, risk measures, and fallback with weights `w`.
-
-# Related
-
-  - [`HierarchicalEqualRiskContribution`](@ref)
-  - [`factory`](@ref)
-"""
-function factory(hec::HierarchicalEqualRiskContribution,
-                 w::AbstractVector)::HierarchicalEqualRiskContribution
-    opt = factory(hec.opt, w)
-    ri = factory(hec.ri, w)
-    ro = factory(hec.ro, w)
-    fb = factory(hec.fb, w)
-    return HierarchicalEqualRiskContribution(; opt = opt, ri = ri, ro = ro, scai = hec.scai,
-                                             scao = hec.scao, ex = hec.ex, fb = fb)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

@@ -156,13 +156,21 @@ Where:
   - ``\\boldsymbol{e}_{S_m}(\\cdot)``: Embedding operator that places subset weights into full ``N``-asset space (zero-filling excluded assets).
   - ``N``: Total number of assets.
 
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+
+  - `fees`: Recursively updated via [`factory`](@ref).
+  - `opt`: Recursively updated via [`factory`](@ref).
+  - `fb`: Recursively updated via [`factory`](@ref).
+
 # Related
 
   - [`BaseSubsetResamplingOptimisationEstimator`](@ref)
   - [`SubsetResamplingResult`](@ref)
   - [`MeanRisk`](@ref)
 """
-@concrete struct SubsetResampling <: BaseSubsetResamplingOptimisationEstimator
+@propagatable @concrete struct SubsetResampling <: BaseSubsetResamplingOptimisationEstimator
     """
     $(field_dict[:pe])
     """
@@ -174,7 +182,7 @@ Where:
     """
     $(field_dict[:feese])
     """
-    fees
+    @fprop fees
     """
     $(field_dict[:sets])
     """
@@ -186,7 +194,7 @@ Where:
     """
     Base portfolio optimiser applied to each asset subset.
     """
-    opt
+    @fprop opt
     """
     $(field_dict[:wf])
     """
@@ -218,7 +226,7 @@ Where:
     """
     $(field_dict[:fb])
     """
-    fb
+    @fprop fb
     """
     $(field_dict[:brt])
     """
@@ -294,21 +302,6 @@ function needs_previous_weights(opt::SubsetResampling)
     return (needs_previous_weights(opt.fees) ||
             needs_previous_weights(opt.opt) ||
             needs_previous_weights(opt.fb))
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Build an updated [`SubsetResampling`](@ref) with all estimators that track previous weights updated via `factory` using `w`.
-"""
-function factory(sr::SubsetResampling, w::AbstractVector)::SubsetResampling
-    fees = factory(sr.fees, w)
-    opt = factory(sr.opt, w)
-    fb = factory(sr.fb, w)
-    return SubsetResampling(; pe = sr.pe, wb = sr.wb, fees = fees, sets = sr.sets,
-                            scale = sr.scale, opt = opt, wf = sr.wf, ex = sr.ex,
-                            subset_size = sr.subset_size, n_subsets = sr.n_subsets,
-                            max_comb = sr.max_comb, rng = sr.rng, seed = sr.seed, fb = fb,
-                            brt = sr.brt, strict = sr.strict)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

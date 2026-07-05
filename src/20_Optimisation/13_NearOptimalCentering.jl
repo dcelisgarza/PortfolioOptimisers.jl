@@ -161,6 +161,14 @@ Where:
 
 The solution yields a portfolio centrally located within the near-optimal region, robust to small perturbations of the objective.
 
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+
+  - `opt`: Recursively updated via [`factory`](@ref).
+  - `r`: Recursively updated via [`factory`](@ref).
+  - `fb`: Recursively updated via [`factory`](@ref).
+
 # Related
 
   - [`scalarise_risk_expression!`](@ref)
@@ -169,15 +177,15 @@ The solution yields a portfolio centrally located within the near-optimal region
   - [`MeanRisk`](@ref)
   - [`NearOptimalCenteringAlgorithm`](@ref)
 """
-@concrete struct NearOptimalCentering <: RiskJuMPOptimisationEstimator
+@propagatable @concrete struct NearOptimalCentering <: RiskJuMPOptimisationEstimator
     """
     $(field_dict[:opt_jmp])
     """
-    opt
+    @fprop opt
     """
     $(field_dict[:r_opt])
     """
-    r
+    @fprop r
     """
     $(field_dict[:obj])
     """
@@ -221,7 +229,7 @@ The solution yields a portfolio centrally located within the near-optimal region
     """
     $(field_dict[:fb])
     """
-    fb
+    @fprop fb
     function NearOptimalCentering(opt::JuMPOptimiser, r::RM_VecRM,
                                   obj::Option{<:ObjectiveFunction}, bins::Option{<:Number},
                                   w_min::Option{<:VecNum}, w_min_ini::Option{<:VecNum},
@@ -299,21 +307,6 @@ function needs_previous_weights(opt::NearOptimalCentering)
     return (needs_previous_weights(opt.opt) ||
             needs_previous_weights(opt.r) ||
             needs_previous_weights(opt.fb))
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Build an updated [`NearOptimalCentering`](@ref) with all estimators that track previous weights updated via `factory` using `w`.
-"""
-function factory(noc::NearOptimalCentering, w::AbstractVector)::NearOptimalCentering
-    opt = factory(noc.opt, w)
-    r = factory(noc.r, w)
-    fb = factory(noc.fb, w)
-    return NearOptimalCentering(; opt = opt, r = r, obj = noc.obj, bins = noc.bins,
-                                w_min = noc.w_min, w_min_ini = noc.w_min_ini,
-                                w_opt = noc.w_opt, w_opt_ini = noc.w_opt_ini,
-                                w_max = noc.w_max, w_max_ini = noc.w_max_ini,
-                                ucs_flag = noc.ucs_flag, alg = noc.alg, fb = fb)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

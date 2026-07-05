@@ -400,6 +400,14 @@ Where:
   - ``N``: Number of assets.
   - ``\\boldsymbol{w}``: Portfolio weight vector.
 
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+
+  - `opt`: Recursively updated via [`factory`](@ref).
+  - `r`: Recursively updated via [`factory`](@ref).
+  - `fb`: Recursively updated via [`factory`](@ref).
+
 # Related
 
   - [`scalarise_risk_expression!`](@ref)
@@ -410,15 +418,15 @@ Where:
   - [`AssetRiskBudgeting`](@ref)
   - [`FactorRiskBudgeting`](@ref)
 """
-@concrete struct RiskBudgeting <: RiskJuMPOptimisationEstimator
+@propagatable @concrete struct RiskBudgeting <: RiskJuMPOptimisationEstimator
     """
     $(field_dict[:opt_jmp])
     """
-    opt
+    @fprop opt
     """
     $(field_dict[:r_opt])
     """
-    r
+    @fprop r
     """
     $(field_dict[:rba])
     """
@@ -430,7 +438,7 @@ Where:
     """
     $(field_dict[:fb])
     """
-    fb
+    @fprop fb
     function RiskBudgeting(opt::JuMPOptimiser, r::RM_VecRM, rba::RiskBudgetingAlgorithm,
                            wi::Option{<:VecNum}, fb::Option{<:OptE_Opt})
         if isa(r, AbstractVector)
@@ -458,17 +466,6 @@ function needs_previous_weights(opt::RiskBudgeting)
     return (needs_previous_weights(opt.opt) ||
             needs_previous_weights(opt.r) ||
             needs_previous_weights(opt.fb))
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Build an updated [`RiskBudgeting`](@ref) with all estimators that track previous weights updated via `factory` using `w`.
-"""
-function factory(rb::RiskBudgeting, w::AbstractVector)::RiskBudgeting
-    opt = factory(rb.opt, w)
-    r = factory(rb.r, w)
-    fb = factory(rb.fb, w)
-    return RiskBudgeting(; opt = opt, r = r, rba = rb.rba, wi = rb.wi, fb = fb)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

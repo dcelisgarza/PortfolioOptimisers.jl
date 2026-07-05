@@ -66,6 +66,14 @@ Keywords correspond to the struct's fields.
   - If `r` is a vector: `!isempty(r)`.
   - If `wi` is provided: `!isempty(wi)`.
 
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+
+  - `opt`: Recursively updated via [`factory`](@ref).
+  - `r`: Recursively updated via [`factory`](@ref).
+  - `fb`: Recursively updated via [`factory`](@ref).
+
 # Examples
 
 ```jldoctest
@@ -199,15 +207,15 @@ Where:
   - [`ObjectiveFunction`](@ref)
   - [`RiskMeasure`](@ref)
 """
-@concrete struct MeanRisk <: RiskJuMPOptimisationEstimator
+@propagatable @concrete struct MeanRisk <: RiskJuMPOptimisationEstimator
     """
     $(field_dict[:opt_jmp])
     """
-    opt
+    @fprop opt
     """
     $(field_dict[:r_opt])
     """
-    r
+    @fprop r
     """
     $(field_dict[:obj])
     """
@@ -219,7 +227,7 @@ Where:
     """
     $(field_dict[:fb])
     """
-    fb
+    @fprop fb
     function MeanRisk(opt::JuMPOptimiser, r::RM_VecRM, obj::ObjectiveFunction,
                       wi::Option{<:VecNum}, fb::Option{<:OptE_Opt})
         if isa(r, AbstractVector)
@@ -246,17 +254,6 @@ function needs_previous_weights(opt::MeanRisk)
     return (needs_previous_weights(opt.opt) ||
             needs_previous_weights(opt.r) ||
             needs_previous_weights(opt.fb))
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Build an updated [`MeanRisk`](@ref) with all estimators that track previous weights updated via `factory` using `w`.
-"""
-function factory(mr::MeanRisk, w::AbstractVector)::MeanRisk
-    opt = factory(mr.opt, w)
-    r = factory(mr.r, w)
-    fb = factory(mr.fb, w)
-    return MeanRisk(; opt = opt, r = r, obj = mr.obj, wi = mr.wi, fb = fb)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

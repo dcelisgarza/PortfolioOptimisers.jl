@@ -141,6 +141,40 @@ Three staged PRs, each independently reviewable:
 3. **Dedup** — convert eligible pure-shape structs to `@vprop` and delete their
    hand-written `port_opt_view` bodies.
 
+   **Status (in progress).** Extended per-method beyond `@vprop`: any hand-written
+   `factory`/`port_opt_view` body that is pure propagation is replaced by the
+   corresponding tag, independently of its sibling. Converted so far:
+
+   - **`@fprop` factories** (hand `factory(x, w)` → generated `factory(x, args...)`):
+     `RiskRatio`, `NonOptimisationRiskRatio`, `MeanReturnRiskRatio`, `MeanRisk`,
+     `RiskBudgeting`, `RelaxedRiskBudgeting`, `Stacking`, `NearOptimalCentering`,
+     `NestedClustered`, `SubsetResampling`, `HierarchicalEqualRiskContribution`. The
+     meta-optimisers keep their hand-written `port_opt_view` (custom `X`-rebind /
+     `ri === ro` aliasing), so only the factory is macro-generated. Verified the
+     broadened `factory(x, args...)` does not clash with the `factory(::OptE_Opt, ::Any)`
+     identity — first-argument specificity makes the concrete method win.
+   - **`@vprop` views**: `MedianAbsoluteDeviation` (`mu`), `ThirdCentralMoment` (`mu`),
+     `TurnoverRiskMeasure` (`w`, newly `@propagatable`). `MeanReturn`'s identity
+     `port_opt_view` was deleted outright — subsumed by the `AbstractBaseRiskMeasure`
+     fallback (decision §4).
+
+   **Deliberately kept hand-written** (fail the pure-propagation bar):
+
+   - View bodies with `X`-rebind (`MeanRisk`, `RiskBudgeting`, …), asymmetric/multi-axis
+     slicing (`Regression`, `Variance`, `ReturnsResult`), aliasing preservation
+     (`JuMPOptimiser`, `HERC`), or dict logic (`AssetSets`).
+   - Prior-*type*-dispatched factories (`Kurtosis`, `Skewness`, `NegativeSkewness`,
+     `LowOrderMoment`, `HighOrderMoment`) — a single `@pprop` method cannot express the
+     `HighOrderPrior`/`LowOrderPrior` split (see the `@pprop` Kurtosis fold-in note).
+   - Weight-replacement factories with a `fixed`-guard (`TurnoverEstimator`, `Turnover`,
+     `WeightsTracking`) or nested-`kwargs` splat (`LinearModel`, `GeneralisedLinearModel`,
+     `KMeansAlgorithm`) — not expressible as a bare `@wprop`.
+   - Tracking risk measures (`RiskTrackingError`, `TrackingRiskMeasure`,
+     `RiskTrackingRiskMeasure`): the pure weight-factory coexists with a multi-arity
+     prior-binding factory that threads context asymmetrically to children, so replacing
+     it with the generic `factory(x, args...)` would change dispatch for partial-arity
+     calls. Left intact.
+
 ## Relationship to ADR 0002
 
 Amends ADR 0002: decision 0002§1's `@prop` tag is renamed to `@fprop` and joined by the

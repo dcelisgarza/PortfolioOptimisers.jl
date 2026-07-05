@@ -108,6 +108,12 @@ Computes the MAD of the portfolio returns series.
   - `X::MatNum`: Asset returns matrix (``T \\times N``).
   - `fees`: Optional fee structure.
 
+## View parameters
+
+When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+
+  - `mu`: Sliced to the selected indices via [`port_opt_view`](@ref).
+
 # Examples
 
 ```jldoctest
@@ -139,7 +145,7 @@ MedianAbsoluteDeviation
     """
     $(field_dict[:mu_rm])
     """
-    mu
+    @vprop mu
     """
     $(field_dict[:flag])
     """
@@ -180,23 +186,6 @@ Identity pass-through: centering functions are not sliced by asset index.
 """
 function nothing_scalar_array_view(x::MedianCenteringFunction, ::Any)
     return x
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Return a view of [`MedianAbsoluteDeviation`](@ref) `r` sliced to asset indices `i`.
-
-Slices the centering target `mu` for cluster-based optimisation.
-
-# Related
-
-  - [`MedianAbsoluteDeviation`](@ref)
-  - [`port_opt_view`](@ref)
-  - [`nothing_scalar_array_view`](@ref)
-"""
-function port_opt_view(r::MedianAbsoluteDeviation, i, args...)::MedianAbsoluteDeviation
-    mu = nothing_scalar_array_view(r.mu, i)
-    return MedianAbsoluteDeviation(; settings = r.settings, w = r.w, mu = mu, flag = r.flag)
 end
 """
     calc_moment_target(::MedianAbsoluteDeviation{<:Any, Nothing, <:MeanCentering, ...}, ::Any, x::VecNum)

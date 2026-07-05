@@ -50,6 +50,12 @@ Computes the Turnover risk of a portfolio weight vector `w`.
 
   - `w::VecNum`: New portfolio weights vector.
 
+## View parameters
+
+When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+
+  - `w`: Sliced to the selected indices via [`port_opt_view`](@ref).
+
 # Examples
 
 ```jldoctest
@@ -69,7 +75,7 @@ TurnoverRiskMeasure
   - [`RiskMeasureSettings`](@ref)
   - [`TrackingRiskMeasure`](@ref)
 """
-@concrete struct TurnoverRiskMeasure <: RiskMeasure
+@propagatable @concrete struct TurnoverRiskMeasure <: RiskMeasure
     """
     $(field_dict[:settings_rm])
     """
@@ -77,7 +83,7 @@ TurnoverRiskMeasure
     """
     $(field_dict[:w_ref])
     """
-    w
+    @vprop w
     """
     $(field_dict[:fixed])
     """
@@ -93,22 +99,6 @@ function TurnoverRiskMeasure(; settings::RiskMeasureSettings = RiskMeasureSettin
 end
 function (r::TurnoverRiskMeasure)(w::VecNum)
     return LinearAlgebra.norm(r.w - w, 1)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Return a view of [`TurnoverRiskMeasure`](@ref) `r` sliced to the asset indices `i`.
-
-Used for cluster-based optimisation where only a subset of assets is considered.
-
-# Related
-
-  - [`TurnoverRiskMeasure`](@ref)
-  - [`port_opt_view`](@ref)
-"""
-function port_opt_view(r::TurnoverRiskMeasure, i, args...)
-    w = view(r.w, i)
-    return TurnoverRiskMeasure(; settings = r.settings, w = w, fixed = r.fixed)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
