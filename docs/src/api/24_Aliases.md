@@ -122,6 +122,8 @@ NonOptRkRatio
 
 ## Optimisers
 
+### Non-finite optimisers
+
 ```@docs
 HRP
 HERC
@@ -134,4 +136,12 @@ NOC
 NCO
 STO
 SSR
+```
+
+### Finite optimisers
+
+```@docs
+DAO
+GAO
+FAI
 ```

@@ -75,6 +75,24 @@ const FRC = FactorRiskContribution
 Alias for [`NearOptimalCentering`](@ref).
 """
 const NOC = NearOptimalCentering
+"""
+    DAO
+
+Alias for [`DiscreteAllocation`](@ref).
+"""
+const DAO = DiscreteAllocation
+"""
+    GAO
+
+    Alias for [`GreedyAllocation`](@ref).
+"""
+const GAO = GreedyAllocation
+"""
+    FAI
+
+Alias for [`FiniteAllocationInput`](@ref).
+"""
+const FAI = FiniteAllocationInput
 
 # ── Risk measures — Covariance-based ──────────────────────────────────────
 """
@@ -641,3 +659,11 @@ const VSK = VarianceSkewKurtosis
 Alias for [`NonOptimisationRiskRatio`](@ref).
 """
 const NonOptRkRatio = NonOptimisationRiskRatio
+
+export HRP, HERC, SCHRP, NCO, STO, SSR, MR, RB, RRB, FRC, NOC, DAO, GAO, FAI, SD,
+       UcVariance, WR, VaR, CVaR, DRCVaR, EVaR, RVaR, PNVaR, RG, VaR_RG, CVaR_RG, DRCVaR_RG,
+       EVaR_RG, RVaR_RG, PNVaR_RG, GVaR_RG, DaR, CDaR, DRCDaR, EDaR, RDaR, PNDaR, R_DaR,
+       R_CDaR, R_EDaR, R_RDaR, R_PNDaR, OWA, ADD, R_ADD, UCI, R_UCI, MDD, R_MDD, BDVariance,
+       TrRM, RkTrRM, TnRM, VSK, NonOptRkRatio, FLM, MAD, SCM, SLM, ECM, ELM, TLM, SSK, FTCM,
+       FTLM, KT, SKT, OWA_GMD, OWA_CVaR, OWA_TG, OWA_WR, OWA_RG, OWA_CVaR_RG, OWA_TG_RG,
+       OWA_LMoment

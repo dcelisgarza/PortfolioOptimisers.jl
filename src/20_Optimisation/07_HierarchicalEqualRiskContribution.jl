@@ -192,7 +192,7 @@ Where:
     """
     $(field_dict[:fb])
     """
-    fb
+    @fprop fb
     function HierarchicalEqualRiskContribution(opt::HierarchicalOptimiser,
                                                ri::OptRM_VecOptRM, ro::OptRM_VecOptRM,
                                                scai::Scalariser, scao::Scalariser,
