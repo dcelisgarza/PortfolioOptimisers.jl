@@ -196,6 +196,24 @@ function assert_internal_optimiser(opt::VecOptE_Opt)::Nothing
     return nothing
 end
 """
+    assert_no_internal_precomputed_prior(opt)
+
+Assert that the optimiser's embedded prior estimator `opt.opt.pe` is an estimator rather than a
+precomputed [`AbstractPriorResult`](@ref). Shared by the outer (`assert_external_optimiser`)
+legality checks of the JuMP, risk-budgeting, and factor-risk-contribution optimisers, whose outer
+role forbids a precomputed prior.
+
+# Related
+
+  - [`assert_external_optimiser`](@ref)
+  - [`NestedClustered`](@ref)
+"""
+function assert_no_internal_precomputed_prior(opt)::Nothing
+    @argcheck(!isa(opt.opt.pe, AbstractPriorResult),
+              ArgumentError("opt.opt.pe cannot be a precomputed AbstractPriorResult; use an estimator instead"))
+    return nothing
+end
+"""
     assert_no_precomputed_prior(opt)
 
 Assert that the optimiser's embedded prior estimator `opt.opt.pe` is an estimator rather than a
@@ -209,8 +227,8 @@ role forbids a precomputed prior.
   - [`NestedClustered`](@ref)
 """
 function assert_no_precomputed_prior(opt)::Nothing
-    @argcheck(!isa(opt.opt.pe, AbstractPriorResult),
-              ArgumentError("opt.opt.pe cannot be a precomputed AbstractPriorResult; use an estimator instead"))
+    @argcheck(!isa(opt.pe, AbstractPriorResult),
+              ArgumentError("opt.pe cannot be a precomputed AbstractPriorResult; use an estimator instead"))
     return nothing
 end
 """
@@ -238,7 +256,8 @@ function assert_external_optimiser(opt::ClusteringOptimisationEstimator)::Nothin
 end
 function assert_external_optimiser(opt::JuMPOptimisationEstimator)::Nothing
     #! Maybe results can be allowed with a warning. This goes for other stuff like bounds and threshold vectors. And then the optimisation can throw a domain error when it comes to using them.
-    assert_no_precomputed_prior(opt)
+    @argcheck(!isa(opt.opt.pe, AbstractPriorResult),
+              ArgumentError("opt.opt.pe cannot be a precomputed AbstractPriorResult; use an estimator instead"))
     assert_internal_optimiser(opt)
     return nothing
 end
@@ -257,7 +276,8 @@ Matches either [`RiskBudgeting`](@ref) or [`RelaxedRiskBudgeting`](@ref). Used f
 const RiskBudgetingOptimiser = Union{<:RiskBudgeting, <:RelaxedRiskBudgeting}
 function assert_external_optimiser(opt::RiskBudgetingOptimiser)::Nothing
     #! Maybe results can be allowed with a warning. This goes for other stuff like bounds and threshold vectors. And then the optimisation can throw a domain error when it comes to using them.
-    assert_no_precomputed_prior(opt)
+    @argcheck(!isa(opt.opt.pe, AbstractPriorResult),
+              ArgumentError("opt.opt.pe cannot be a precomputed AbstractPriorResult; use an estimator instead"))
     if isa(opt.rba, FactorRiskBudgeting)
         @argcheck(!isa(opt.rba.re, AbstractRegressionResult),
                   ArgumentError("opt.rba.re cannot be a precomputed AbstractRegressionResult; use an estimator instead"))
@@ -267,7 +287,8 @@ function assert_external_optimiser(opt::RiskBudgetingOptimiser)::Nothing
 end
 function assert_external_optimiser(opt::FactorRiskContribution)::Nothing
     #! Maybe results can be allowed with a warning. This goes for other stuff like bounds and threshold vectors. And then the optimisation can throw a domain error when it comes to using them.
-    assert_no_precomputed_prior(opt)
+    @argcheck(!isa(opt.opt.pe, AbstractPriorResult),
+              ArgumentError("opt.opt.pe cannot be a precomputed AbstractPriorResult; use an estimator instead"))
     @argcheck(!isa(opt.re, AbstractRegressionResult),
               ArgumentError("opt.re cannot be a precomputed AbstractRegressionResult; use an estimator instead"))
     assert_internal_optimiser(opt)

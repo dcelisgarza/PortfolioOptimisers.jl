@@ -48,12 +48,15 @@ meta-optimiser methods of [`supported_risk_measures`](@ref).
   - [`supports_risk_measure`](@ref)
 """
 function _delegated_risk_measure_error(O::Type)
-    return throw(ArgumentError("risk-measure acceptance for `$(nameof(O))` is delegated to its inner/outer optimiser(s); query those directly with `supported_risk_measures`/`supports_risk_measure`. See ADR 0018."))
+    return throw(ArgumentError("risk-measure acceptance for `$(nameof(O))` is delegated to its inner/outer optimiser(s); query those directly with `supported_risk_measures`/`supports_risk_measure`."))
 end
 function supported_risk_measures(O::Type{<:NestedClustered})
     return _delegated_risk_measure_error(O)
 end
-function supported_risk_measures(O::Type{<:BaseStackingOptimisationEstimator})
+function supported_risk_measures(O::Type{<:Stacking})
+    return _delegated_risk_measure_error(O)
+end
+function supported_risk_measures(O::Type{<:SubsetResampling})
     return _delegated_risk_measure_error(O)
 end
 """

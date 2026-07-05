@@ -137,7 +137,7 @@ da = DiscreteAllocation(; slv = mip_slv)
 # Perform the finite discrete allocation, uses the final asset
 # prices, and an available cash amount. This is for us mortals
 # without infinite wealth.
-mip_res = optimise(da, res.w, vec(values(prices[end])), 4206.90)
+mip_res = optimise(da, FiniteAllocationInput(; w = res.w, prices = vec(values(prices[end])), cash = 4206.90))
 
 df = DataFrame(:assets => rd.nx, :shares => mip_res.shares, :cost => mip_res.cost,
                :opt_weights => res.w, :mip_weights => mip_res.w)

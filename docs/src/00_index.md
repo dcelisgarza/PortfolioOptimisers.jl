@@ -207,7 +207,7 @@ The discrete allocation minimises the absolute or relative L1- or L2-norm (confi
 # Perform the finite discrete allocation, uses the final asset
 # prices, and an available cash amount. This is for us mortals
 # without infinite wealth.
-mip_res = optimise(da, res.w, vec(values(prices[end])), 4206.90)
+mip_res = optimise(da, FiniteAllocationInput(; w = res.w, prices = vec(values(prices[end])), cash = 4206.90))
 ```
 
 We can display the results in a table.
