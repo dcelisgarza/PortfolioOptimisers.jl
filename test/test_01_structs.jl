@@ -19,6 +19,19 @@
         @test_throws DomainError KatzCentrality(; alpha = -0.3)
         @test_throws DomainError GreedyAllocation(; unit = 0)
         @test_throws DomainError GreedyAllocation(; unit = -1)
+        # FiniteAllocationInput (U4)
+        @test isa(FiniteAllocationInput(; w = [0.5, 0.5], prices = [10.0, 20.0]),
+                  PortfolioOptimisers.AbstractEstimator)
+        @test FiniteAllocationInput(; w = [0.5, 0.5], prices = [10.0, 20.0]).cash == 1e6
+        @test_throws PortfolioOptimisers.IsEmptyError FiniteAllocationInput(; w = Float64[],
+                                                                            prices = Float64[])
+        @test_throws DimensionMismatch FiniteAllocationInput(; w = [0.5],
+                                                             prices = [1.0, 2.0])
+        @test_throws DomainError FiniteAllocationInput(; w = [1.0], prices = [1.0],
+                                                       cash = -5.0)
+        @test_throws PortfolioOptimisers.IsNothingError FiniteAllocationInput(; w = [1.0],
+                                                                              prices = [1.0],
+                                                                              fees = Fees())
     end
     @testset "Norms" begin
         @test isapprox(PortfolioOptimisers.norm_error(L1Norm(), [0.5, 0.5], [0.6, 0.4], 2),

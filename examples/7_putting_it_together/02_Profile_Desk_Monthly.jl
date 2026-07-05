@@ -96,7 +96,8 @@ it uses [`DiscreteAllocation`](@ref) with a MIP solver ([HiGHS](https://github.c
 
 mip_slv = Solver(; name = :highs, solver = HiGHS.Optimizer,
                  settings = Dict("log_to_console" => false))
-alloc = optimise(DiscreteAllocation(; slv = mip_slv), desk.w, prices, 500_000.0)
+alloc = optimise(DiscreteAllocation(; slv = mip_slv),
+                 FiniteAllocationInput(; w = desk.w, prices = prices, cash = 500_000.0))
 
 invested = sum(alloc.shares .* prices)
 pretty_table(DataFrame("Asset" => rd.nx, "Target" => desk.w,

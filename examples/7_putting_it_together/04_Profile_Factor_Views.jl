@@ -143,7 +143,8 @@ On a \$1,000,000 book the desk wants the provably-best whole-share allocation, s
 
 mip_slv = Solver(; name = :highs, solver = HiGHS.Optimizer,
                  settings = Dict("log_to_console" => false))
-alloc = optimise(DiscreteAllocation(; slv = mip_slv), desk.w, prices, 1_000_000.0)
+alloc = optimise(DiscreteAllocation(; slv = mip_slv),
+                 FiniteAllocationInput(; w = desk.w, prices = prices, cash = 1_000_000.0))
 
 invested = sum(alloc.shares .* prices)
 pretty_table(DataFrame("Asset" => rd.nx, "Target" => desk.w,

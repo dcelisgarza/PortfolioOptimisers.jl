@@ -31,7 +31,10 @@
         df = CSV.read(joinpath(@__DIR__, "./assets/Fees.csv.gz"), DataFrame)
         f1s = [0.02002313426946848, 0.12149580659357644]
         for (i, fe) in pairs(fes)
-            res_mip = optimise(da, res.w, vec(values(X[end])), 1000, T, fe)
+            res_mip = optimise(da,
+                               FiniteAllocationInput(; w = res.w,
+                                                     prices = vec(values(X[end])),
+                                                     cash = 1000, horizon = T, fees = fe))
             f1 = calc_fees(res.w, fe)
             @test isapprox(f1s[i], f1)
             f2 = calc_asset_fees(res.w, fe)

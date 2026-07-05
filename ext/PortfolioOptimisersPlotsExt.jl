@@ -47,11 +47,18 @@ function PortfolioOptimisers.plot_ptf_cumulative_returns(w::VecNum_VecVecNum, pr
     return PortfolioOptimisers.plot_ptf_cumulative_returns(w, pr.X, fees; ts = ts,
                                                            compound = compound, kwargs...)
 end
-function PortfolioOptimisers.plot_ptf_cumulative_returns(res::OptimisationResult;
-                                                         pr::Option{<:Pr_RR} = nothing,
+function PortfolioOptimisers.plot_ptf_cumulative_returns(res::OptimisationResult, pr::Pr_RR;
                                                          fees::Option{<:Fees} = nothing,
                                                          compound::Bool = false, kwargs...)
     pr = extract_pr(res, pr)
+    fees = extract_fees(res, fees)
+    return PortfolioOptimisers.plot_ptf_cumulative_returns(res.w, pr, fees;
+                                                           compound = compound, kwargs...)
+end
+function PortfolioOptimisers.plot_ptf_cumulative_returns(res::OptimisationResult;
+                                                         fees::Option{<:Fees} = nothing,
+                                                         compound::Bool = false, kwargs...)
+    pr = extract_pr(res, nothing)
     fees = extract_fees(res, fees)
     return PortfolioOptimisers.plot_ptf_cumulative_returns(res.w, pr, fees;
                                                            compound = compound, kwargs...)
@@ -123,13 +130,24 @@ function PortfolioOptimisers.plot_asset_cumulative_returns(w::VecNum, pr::Pr_RR,
                                                              nx = nx, compound = compound,
                                                              N = N, kwargs...)
 end
-function PortfolioOptimisers.plot_asset_cumulative_returns(res::OptimisationResult;
-                                                           pr::Option{<:Pr_RR} = nothing,
+function PortfolioOptimisers.plot_asset_cumulative_returns(res::OptimisationResult,
+                                                           pr::Pr_RR;
                                                            fees::Option{<:Fees} = nothing,
                                                            compound::Bool = false,
                                                            N::Option{<:Integer} = nothing,
                                                            kwargs...)
     pr = extract_pr(res, pr)
+    fees = extract_fees(res, fees)
+    return PortfolioOptimisers.plot_asset_cumulative_returns(res.w, pr, fees;
+                                                             compound = compound, N = N,
+                                                             kwargs...)
+end
+function PortfolioOptimisers.plot_asset_cumulative_returns(res::OptimisationResult;
+                                                           fees::Option{<:Fees} = nothing,
+                                                           compound::Bool = false,
+                                                           N::Option{<:Integer} = nothing,
+                                                           kwargs...)
+    pr = extract_pr(res, nothing)
     fees = extract_fees(res, fees)
     return PortfolioOptimisers.plot_asset_cumulative_returns(res.w, pr, fees;
                                                              compound = compound, N = N,

@@ -3,6 +3,7 @@
 ```@docs
 FiniteAllocationOptimisationEstimator
 FiniteAllocationOptimisationResult
+FiniteAllocationInput
 FOptE_FOpt
 setup_alloc_optim
 adjust_long_cash

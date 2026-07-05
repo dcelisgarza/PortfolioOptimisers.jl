@@ -5,22 +5,22 @@ StationaryBootstrap
 CircularBootstrap
 MovingBootstrap
 ARCHUncertaintySet
-ucs(ue::ARCHUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:Any, <:Any,
+ucs(ue::ARCHUncertaintySet{<:Any, <:Any, <:Any, <:BoxUncertaintySetAlgorithm, <:Any, <:Any,
                                     <:Any, <:Any, <:Any}, X::MatNum,
              F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
-ucs(ue::ARCHUncertaintySet{<:Any, <:EllipsoidalUncertaintySetAlgorithm, <:Any, <:Any,
+ucs(ue::ARCHUncertaintySet{<:Any, <:Any, <:Any, <:EllipsoidalUncertaintySetAlgorithm, <:Any, <:Any,
                                     <:Any, <:Any, <:Any}, X::MatNum,
              F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
-mu_ucs(ue::ARCHUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:Any, <:Any,
+mu_ucs(ue::ARCHUncertaintySet{<:Any, <:Any, <:Any, <:BoxUncertaintySetAlgorithm, <:Any, <:Any,
                                        <:Any, <:Any, <:Any}, X::MatNum,
                 F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
-mu_ucs(ue::ARCHUncertaintySet{<:Any, <:EllipsoidalUncertaintySetAlgorithm, <:Any,
+mu_ucs(ue::ARCHUncertaintySet{<:Any, <:Any, <:Any, <:EllipsoidalUncertaintySetAlgorithm, <:Any,
                                        <:Any, <:Any, <:Any, <:Any}, X::MatNum,
                 F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
-sigma_ucs(ue::ARCHUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:Any, <:Any,
+sigma_ucs(ue::ARCHUncertaintySet{<:Any, <:Any, <:Any, <:BoxUncertaintySetAlgorithm, <:Any, <:Any,
                                        <:Any, <:Any, <:Any}, X::MatNum,
                 F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
-sigma_ucs(ue::ARCHUncertaintySet{<:Any, <:EllipsoidalUncertaintySetAlgorithm, <:Any,
+sigma_ucs(ue::ARCHUncertaintySet{<:Any, <:Any, <:Any, <:EllipsoidalUncertaintySetAlgorithm, <:Any,
                                           <:Any, <:Any, <:Any, <:Any}, X::MatNum,
                    F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
 BootstrapUncertaintySetEstimator

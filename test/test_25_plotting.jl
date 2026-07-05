@@ -60,7 +60,7 @@
         @test is_plot(plot_ptf_cumulative_returns(w, X; compound = true))
         @test is_plot(plot_ptf_cumulative_returns(w_rd, rd))
         @test is_plot(plot_ptf_cumulative_returns(w_rd, pr))
-        @test is_plot(plot_ptf_cumulative_returns(res; pr = rd))
+        @test is_plot(plot_ptf_cumulative_returns(res, rd))
         @test is_plot(plot_ptf_cumulative_returns(res))
     end
 
@@ -218,7 +218,7 @@
     @testset "Optimisation-based dispatch" begin
         @test !isnothing(res)
 
-        @test is_plot(plot_asset_cumulative_returns(res; pr = rd))
+        @test is_plot(plot_asset_cumulative_returns(res, rd))
         @test is_plot(plot_composition(res, rd))
         @test is_plot(plot_composition(res, pr))
         @test is_plot(plot_risk_contribution(r_cvr, res, rd))

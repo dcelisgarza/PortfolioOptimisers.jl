@@ -249,6 +249,10 @@ Discretises continuous weights into whole shares for a fixed cash budget (real-w
 - **DiscreteAllocation**: MIP-based exact allocation (needs a MIP solver).
 - **GreedyAllocation**: heuristic greedy rounding.
 
+**FiniteAllocationInput**
+The problem data fed to a Finite Allocation optimiser: target weights, asset prices, cash budget, and optional time horizon / fees. Shared by both `DiscreteAllocation` and `GreedyAllocation`, and passed as the single positional argument to `optimise`. Subtypes `AbstractEstimator` — deliberately treated as a configuration object (the primary input to `optimise`) rather than as a computed output, keeping the `Result` tree reserved for outputs and staying clear of the `plot_*`/`OptimisationResult` dispatch surface. This makes it the one pure-data struct classified as an Estimator (the `WeightBounds`/`RiskBudget` precedent puts data under the Result tree); the deviation is intentional so the allocation *inputs* never collide with allocation *results*.
+*Avoid*: FiniteAllocation (that is the family), AllocationProblem, AllocationInput.
+
 ## 5. Risk Measures
 
 **Risk Measure**

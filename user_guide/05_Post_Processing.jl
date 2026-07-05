@@ -40,7 +40,8 @@ call takes the weights, the price vector, and the available cash.
 
 prices = vec(values(X)[end, :])
 cash = 100_000.0
-alloc = optimise(GreedyAllocation(), res.w, prices, cash)
+alloc = optimise(GreedyAllocation(),
+                 FiniteAllocationInput(; w = res.w, prices = prices, cash = cash))
 
 #=
 The result carries the integer `shares`, the per-asset `cost`, the *realised* weights `w` (after
@@ -74,7 +75,7 @@ plot_stacked_bar_composition([res], rd; xticks = (1:1, ["Min risk"]))
 #src - Shallow guide page: GreedyAllocation (solver-free) as the blessed finite-allocation path,
 #src   DiscreteAllocation (MIP) as the exact alternative. Verified on kaimon (f102cae9):
 #src   100k budget → $99,986 invested, $14.22 leftover, realised weights within 0.06% of target.
-#src - optimise(GreedyAllocation(), w, prices, cash) — prices = vec(values(X)[end,:]) (latest row).
+#src - optimise(GreedyAllocation(), FiniteAllocationInput(; w, prices, cash)) — prices = vec(values(X)[end,:]) (latest row).
 #src   Result fields: shares / cost / w (realised) / cash (leftover).
 #src - Reporting section points to the plot_* family; 6_post_processing/02_Plotting_and_Reporting
 #src   example NOT YET AUTHORED — cross-link resolves once that group lands.

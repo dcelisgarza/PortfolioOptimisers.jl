@@ -98,7 +98,9 @@ residual cash.
 
 mip_slv = Solver(; name = :highs, solver = HiGHS.Optimizer,
                  settings = Dict("log_to_console" => false))
-alloc = optimise(DiscreteAllocation(; slv = mip_slv), institutional.w, prices, 10_000_000.0)
+alloc = optimise(DiscreteAllocation(; slv = mip_slv),
+                 FiniteAllocationInput(; w = institutional.w, prices = prices,
+                                       cash = 10_000_000.0))
 
 invested = sum(alloc.shares .* prices)
 pretty_table(DataFrame("Asset" => rd.nx, "Target" => institutional.w,

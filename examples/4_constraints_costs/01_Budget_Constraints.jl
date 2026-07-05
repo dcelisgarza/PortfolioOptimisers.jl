@@ -110,7 +110,9 @@ Now let's allocate a finite amount of capital, `4206.9`, to this portfolio.
 =#
 
 da = DiscreteAllocation(; slv = mip_slv)
-mip_res1 = optimise(da, res1.w, vec(values(X[end])), 4206.9)
+mip_res1 = optimise(da,
+                    FiniteAllocationInput(; w = res1.w, prices = vec(values(X[end])),
+                                          cash = 4206.9))
 pretty_table(DataFrame(:assets => rd.nx, :shares => mip_res1.shares, :cost => mip_res1.cost,
                        :opt_weights => res1.w, :mip_weights => mip_res1.w);
              formatters = [mipresfmt])
@@ -149,7 +151,9 @@ Let's allocate a finite amount of capital. Since we set the long and short budge
 The discrete allocation procedure automatically adjusts the cash amount depending on the optimal long and short weights, so there is no need to split the cash amount into long and short allocations.
 =#
 
-mip_res2 = optimise(da, res2.w, vec(values(X[end])), 4206.9)
+mip_res2 = optimise(da,
+                    FiniteAllocationInput(; w = res2.w, prices = vec(values(X[end])),
+                                          cash = 4206.9))
 pretty_table(DataFrame(:assets => rd.nx, :shares => mip_res2.shares, :cost => mip_res2.cost,
                        :opt_weights => res2.w, :mip_weights => mip_res2.w);
              formatters = [mipresfmt])
@@ -181,7 +185,9 @@ println("weight bounds: $(all(x -> -one(x) <= x <= zero(x), res3.w))")
 We can confirm that the finite allocation behaves as expected.
 =#
 
-mip_res3 = optimise(da, res3.w, vec(values(X[end])), 4206.9)
+mip_res3 = optimise(da,
+                    FiniteAllocationInput(; w = res3.w, prices = vec(values(X[end])),
+                                          cash = 4206.9))
 pretty_table(DataFrame(:assets => rd.nx, :shares => mip_res3.shares, :cost => mip_res3.cost,
                        :opt_weights => res3.w, :mip_weights => mip_res3.w);
              formatters = [mipresfmt])
@@ -209,7 +215,9 @@ println("weight bounds: $(all(x -> zero(x) <= x <= one(x), res4.w))")
 Again, the finite allocation respects the budget constraints.
 =#
 
-mip_res4 = optimise(da, res4.w, vec(values(X[end])), 4206.9)
+mip_res4 = optimise(da,
+                    FiniteAllocationInput(; w = res4.w, prices = vec(values(X[end])),
+                                          cash = 4206.9))
 pretty_table(DataFrame(:assets => rd.nx, :shares => mip_res4.shares, :cost => mip_res4.cost,
                        :opt_weights => res4.w, :mip_weights => mip_res4.w);
              formatters = [mipresfmt])
@@ -243,7 +251,9 @@ println("weight bounds: $(all(x -> -one(x) <= x <= one(x), res5.w))")
 For this portfolio, the sum of the long and short cost will be approximately equal to half the allocated value of `4206.9`. Any discrepancies are due to the fact we are allocating a finite amount.
 =#
 
-mip_res5 = optimise(da, res5.w, vec(values(X[end])), 4506.9)
+mip_res5 = optimise(da,
+                    FiniteAllocationInput(; w = res5.w, prices = vec(values(X[end])),
+                                          cash = 4506.9))
 pretty_table(DataFrame(:assets => rd.nx, :shares => mip_res5.shares, :cost => mip_res5.cost,
                        :opt_weights => res5.w, :mip_weights => mip_res5.w);
              formatters = [mipresfmt])

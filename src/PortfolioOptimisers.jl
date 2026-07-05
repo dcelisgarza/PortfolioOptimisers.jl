@@ -233,6 +233,7 @@ include("20_Optimisation/20_RiskMeasureConstraints/21_GenericValueatRiskRangeCon
 include("20_Optimisation/21_Base_FiniteAllocation.jl")
 include("20_Optimisation/22_DiscreteFiniteAllocation.jl")
 include("20_Optimisation/23_GreedyFiniteAllocation.jl")
+include("20_Optimisation/24_RiskMeasureCompatibility.jl")
 include("21_ExpectedReturns.jl")
 include("22_Plotting.jl")
 include("23_Precompilation.jl")
