@@ -51,13 +51,18 @@ Histogram binning algorithm using Knuth's rule.
 
 # Constructors
 
-    Knuth() -> Knuth
+    Knuth(;
+      args::Tuple = (Optim.NelderMead(),),
+      kwargs::NamedTuple = (;)
+    ) -> Knuth
 
 # Examples
 
 ```jldoctest
 julia> Knuth()
-Knuth()
+Knuth
+    args ┼ Tuple{Optim.NelderMead{Optim.AffineSimplexer, Optim.AdaptiveParameters}}: (Optim.NelderMead{Optim.AffineSimplexer, Optim.AdaptiveParameters}(Optim.AffineSimplexer(0.025, 0.5), Optim.AdaptiveParameters(1.0, 1.0, 0.75, 1.0)),)
+  kwargs ┴ @NamedTuple{}: NamedTuple()
 ```
 
 # Related
@@ -66,9 +71,17 @@ Knuth()
   - [`FreedmanDiaconis`](@ref)
   - [`Scott`](@ref)
   - [`HacineGharbiRavier`](@ref)
-  - [`get_bin_width_func`](@ref)
 """
-struct Knuth <: BinWidthBins end
+@concrete struct Knuth <: BinWidthBins
+    args
+    kwargs
+    function Knuth(args::Tuple, kwargs::NamedTuple)
+        return new{typeof(args), typeof(kwargs)}(args, kwargs)
+    end
+end
+function Knuth(; args::Tuple = (Optim.NelderMead(),), kwargs::NamedTuple = (;))::Knuth
+    return Knuth(args, kwargs)
+end
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -93,7 +106,6 @@ FreedmanDiaconis()
   - [`Knuth`](@ref)
   - [`Scott`](@ref)
   - [`HacineGharbiRavier`](@ref)
-  - [`get_bin_width_func`](@ref)
 """
 struct FreedmanDiaconis <: BinWidthBins end
 """
@@ -120,7 +132,6 @@ Scott()
   - [`Knuth`](@ref)
   - [`FreedmanDiaconis`](@ref)
   - [`HacineGharbiRavier`](@ref)
-  - [`get_bin_width_func`](@ref)
 """
 struct Scott <: BinWidthBins end
 """
@@ -148,11 +159,10 @@ HacineGharbiRavier()
   - [`Knuth`](@ref)
   - [`FreedmanDiaconis`](@ref)
   - [`Scott`](@ref)
-  - [`get_bin_width_func`](@ref)
 """
 struct HacineGharbiRavier <: AbstractBins end
 """
-    scott_bin_width(x::VecNum)
+    bin_width(::Scott, x::VecNum)
 
 Compute the optimal histogram bin width for `x` using Scott's rule [scott1979](@cite).
 
@@ -181,14 +191,13 @@ Where:
 # Related
 
   - [`Scott`](@ref)
-  - [`freedman_bin_width`](@ref)
-  - [`knuth_bin_width`](@ref)
+  - [`calc_num_bins`](@ref)
 """
-function scott_bin_width(x::VecNum)
+function bin_width(::Scott, x::VecNum)
     return Statistics.std(x; corrected = false) * cbrt(24 * sqrt(pi) / length(x))
 end
 """
-    freedman_bin_width(x::VecNum)
+    bin_width(::FreedmanDiaconis, x::VecNum)
 
 Compute the optimal histogram bin width for `x` using the Freedman-Diaconis rule [freedman1981](@cite).
 
@@ -217,15 +226,14 @@ Where:
 # Related
 
   - [`FreedmanDiaconis`](@ref)
-  - [`scott_bin_width`](@ref)
-  - [`knuth_bin_width`](@ref)
+  - [`calc_num_bins`](@ref)
 """
-function freedman_bin_width(x::VecNum)
+function bin_width(::FreedmanDiaconis, x::VecNum)
     q25, q75 = Statistics.quantile(x, [0.25, 0.75])
     return 2 * (q75 - q25) / cbrt(length(x))
 end
 """
-    knuth_bin_width(x::VecNum)
+    bin_width(bins::Knuth, x::VecNum)
 
 Compute the optimal histogram bin width for `x` using Knuth's rule [knuth2019](@cite).
 
@@ -258,10 +266,9 @@ Where:
 # Related
 
   - [`Knuth`](@ref)
-  - [`scott_bin_width`](@ref)
-  - [`freedman_bin_width`](@ref)
+  - [`calc_num_bins`](@ref)
 """
-function knuth_bin_width(x::VecNum)
+function bin_width(bins::Knuth, x::VecNum)
     n = length(x)
     xl, xu = extrema(x)
     rx = xu - xl
@@ -282,64 +289,9 @@ function knuth_bin_width(x::VecNum)
                  SpecialFunctions.loggamma(n + M / 2) +
                  sum(SpecialFunctions.loggamma, nk .+ 0.5))
     end
-    M0 = max(1.0, rx / freedman_bin_width(x)) + 1
-    res = Optim.optimize(f, [M0], Optim.NelderMead())
+    M0 = max(1.0, rx / bin_width(FreedmanDiaconis(), x)) + 1
+    res = Optim.optimize(f, [M0], bins.args...; bins.kwargs...)
     return rx / floor(Int, first(Optim.minimizer(res)))
-end
-"""
-    get_bin_width_func(bins::Int_Bin)
-
-Return the bin width selection function associated with a histogram binning algorithm.
-
-This utility dispatches on the binning algorithm type and returns the corresponding bin width function for `Knuth`, `FreedmanDiaconis`, and `Scott`. For `HacineGharbiRavier` and integer bin counts, it returns `nothing`, as these strategies do not use a bin width function.
-
-# Arguments
-
-  - `bins::Knuth`: Use Knuth's rule ([`knuth_bin_width`](@ref)).
-  - `bins::FreedmanDiaconis`: Use the Freedman-Diaconis rule ([`freedman_bin_width`](@ref)).
-  - `bins::Scott`: Use Scott's rule ([`scott_bin_width`](@ref)).
-  - `bins::Union{<:HacineGharbiRavier, <:Integer}`: No bin width function (returns `nothing`).
-
-# Returns
-
-  - `bin_width_func::Function`: The corresponding bin width function (callable), or `nothing` if not applicable.
-
-# Examples
-
-```jldoctest
-julia> PortfolioOptimisers.get_bin_width_func(Knuth())
-knuth_bin_width (generic function with 1 method)
-
-julia> PortfolioOptimisers.get_bin_width_func(FreedmanDiaconis())
-freedman_bin_width (generic function with 1 method)
-
-julia> PortfolioOptimisers.get_bin_width_func(Scott())
-scott_bin_width (generic function with 1 method)
-
-julia> PortfolioOptimisers.get_bin_width_func(HacineGharbiRavier())
-
-julia> PortfolioOptimisers.get_bin_width_func(10)
-
-```
-
-# Related
-
-  - [`Knuth`](@ref)
-  - [`FreedmanDiaconis`](@ref)
-  - [`Scott`](@ref)
-  - [`HacineGharbiRavier`](@ref)
-"""
-function get_bin_width_func(::Knuth)
-    return knuth_bin_width
-end
-function get_bin_width_func(::FreedmanDiaconis)
-    return freedman_bin_width
-end
-function get_bin_width_func(::Scott)
-    return scott_bin_width
-end
-function get_bin_width_func(::Union{<:HacineGharbiRavier, <:Integer})::Nothing
-    return nothing
 end
 """
     calc_num_bins(bins::Int_Bin, xj::VecNum,
@@ -360,7 +312,6 @@ This function determines the number of bins to use for histogram-based calculati
   - `xi`: Data vector for variable `i`.
   - `j`: Index of variable `j`.
   - `i`: Index of variable `i`.
-  - `bin_width_func`: Bin width selection function (from `get_bin_width_func`), or `nothing`.
   - `T`: Number of observations (used by some algorithms).
 
 # Returns
@@ -369,26 +320,26 @@ This function determines the number of bins to use for histogram-based calculati
 
 # Related
 
-  - [`get_bin_width_func`](@ref)
   - [`Knuth`](@ref)
   - [`FreedmanDiaconis`](@ref)
   - [`Scott`](@ref)
   - [`HacineGharbiRavier`](@ref)
+  - [`bin_width`](@ref)
 """
-function calc_num_bins(::BinWidthBins, xj::VecNum, xi::VecNum, j::Integer, i::Integer,
-                       bin_width_func, ::Any)
+function calc_num_bins(bins::BinWidthBins, xj::VecNum, xi::VecNum, j::Integer, i::Integer,
+                       args...)
     xjl, xju = extrema(xj)
-    k1 = (xju - xjl) / bin_width_func(xj)
+    k1 = (xju - xjl) / bin_width(bins, xj)
     return round(Int, if j != i
                      xil, xiu = extrema(xi)
-                     k2 = (xiu - xil) / bin_width_func(xi)
+                     k2 = (xiu - xil) / bin_width(bins, xi)
                      max(k1, k2)
                  else
                      k1
                  end)
 end
 function calc_num_bins(::HacineGharbiRavier, xj::VecNum, xi::VecNum, j::Integer, i::Integer,
-                       ::Any, T::Integer)
+                       T::Integer)
     corr = Statistics.cor(xj, xi)
     return round(Int, if isone(corr)
                      z = cbrt(8 + 324 * T + 12 * sqrt(36 * T + 729 * T^2))
@@ -585,12 +536,11 @@ function variation_info(X::MatNum, bins::Int_Bin = HacineGharbiRavier(),
                         normalise::Bool = true)
     T, N = size(X)
     var_mtx = Matrix{eltype(X)}(undef, N, N)
-    bin_width_func = get_bin_width_func(bins)
     for j in axes(X, 2)
         xj = view(X, :, j)
         for i in 1:j
             xi = view(X, :, i)
-            nbins = calc_num_bins(bins, xj, xi, j, i, bin_width_func, T)
+            nbins = calc_num_bins(bins, xj, xi, j, i, T)
             ex, ey, hxy = calc_hist_data(xj, xi, nbins)
 
             mut_ixy = intrinsic_mutual_info(hxy)
@@ -630,14 +580,11 @@ function mutual_variation_info(X::MatNum, bins::Int_Bin = Knuth(), normalise::Bo
     T, N = size(X)
     mut_mtx = Matrix{eltype(X)}(undef, N, N)
     var_mtx = Matrix{eltype(X)}(undef, N, N)
-
-    bin_width_func = get_bin_width_func(bins)
-
     for j in axes(X, 2)
         xj = view(X, :, j)
         for i in 1:j
             xi = view(X, :, i)
-            nbins = calc_num_bins(bins, xj, xi, j, i, bin_width_func, T)
+            nbins = calc_num_bins(bins, xj, xi, j, i, T)
             ex, ey, hxy = calc_hist_data(xj, xi, nbins)
 
             mut_ixy = intrinsic_mutual_info(hxy)
@@ -731,12 +678,11 @@ function mutual_info(X::MatNum, bins::Int_Bin = HacineGharbiRavier(),
                      normalise::Bool = true)
     T, N = size(X)
     mut_mtx = Matrix{eltype(X)}(undef, N, N)
-    bin_width_func = get_bin_width_func(bins)
     for j in axes(X, 2)
         xj = view(X, :, j)
         for i in 1:j
             xi = view(X, :, i)
-            nbins = calc_num_bins(bins, xj, xi, j, i, bin_width_func, T)
+            nbins = calc_num_bins(bins, xj, xi, j, i, T)
             ex, ey, hxy = calc_hist_data(xj, xi, nbins)
             mut_ixy = intrinsic_mutual_info(hxy)
             if normalise

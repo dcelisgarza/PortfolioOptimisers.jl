@@ -98,20 +98,28 @@ end
         # Trust boundary: an over-long / deeply nested untrusted string fails closed with a
         # typed Meta.ParseError before Meta.parse and the recursive walks can exhaust the stack.
         deep = "(" ^ 20000 * "w_A" * ")" ^ 20000 * " <= 1"
-        @test length(deep) > pe.EQUATION_LIMITS.max_length
+        @test length(deep) > pe.EQUATION_LIMITS[].max_length
         @test_throws Meta.ParseError parse_equation(deep)
         # The Expr form has no length cap; the depth guard rejects an over-deep pre-built AST.
         ex = :w_A
-        for _ in 1:(pe.EQUATION_LIMITS.max_depth + 10)
+        for _ in 1:(pe.EQUATION_LIMITS[].max_depth + 10)
             ex = Expr(:call, :-, ex)
         end
         @test_throws Meta.ParseError parse_equation(Expr(:call, :(<=), ex, 1))
-        # Caps are runtime-overridable via the STRING_DISTANCE-style config, and validated.
+        # The global default is runtime-settable via the ScopedConfig setter, and validated.
         @test_throws ArgumentError pe.set_equation_limits!(max_length = 0)
         @test_throws ArgumentError pe.set_equation_limits!(max_depth = -1)
         pe.set_equation_limits!(max_length = 8)
         @test_throws Meta.ParseError parse_equation("w_A <= 1.0")   # now under the tightened cap
         pe.set_equation_limits!(max_length = 4096, max_depth = 256)  # restore defaults
+        # Task-scoped override: tightened inside the block (inherited by child tasks),
+        # restored automatically on exit, global default untouched.
+        pe.with_equation_limits(; max_length = 8) do
+            @test pe.EQUATION_LIMITS[].max_length == 8
+            @test_throws Meta.ParseError parse_equation("w_A <= 1.0")
+            @test fetch(@async pe.EQUATION_LIMITS[].max_length) == 8
+        end
+        @test pe.EQUATION_LIMITS[].max_length == 4096
         # A legitimate constraint still parses under the default caps.
         res = parse_equation("w_A <= 1.0")
         @test res.vars == ["w_A"]
@@ -136,10 +144,59 @@ end
                    pe.empty_row_msg("APL >= 0.05", nx, "nx"))
     @test occursin("view `", pe.empty_row_msg("APL == 0.02", nx, "nx"; noun = "view"))
     @test !occursin("did you mean", pe.empty_row_msg("APL >= 0.05", nx, "nx"))
-    # Global config mirrors the pretty-print config: threshold gates, metric is swappable.
+    # Global default: threshold gates, metric is swappable (ScopedConfig setter).
     pe.set_string_distance!(min_score = 1.1)
     @test pe.did_you_mean("APL", nx) == ""   # suggestions disabled
     pe.set_string_distance!(dist = pe.StringDistances.DamerauLevenshtein(), min_score = 0.7)
     @test occursin("did you mean `MSFT`?", pe.did_you_mean("MSTF", nx))  # transposition
     pe.set_string_distance!(dist = pe.StringDistances.Levenshtein(), min_score = 0.7)  # restore defaults
+    # Task-scoped override (e.g. silencing suggestions inside a meta-optimiser loop):
+    # active inside the block, restored on exit, global default untouched.
+    pe.with_string_distance(; min_score = 1.1) do
+        @test pe.did_you_mean("APL", nx) == ""
+    end
+    @test occursin("did you mean `AAPL`?", pe.did_you_mean("APL", nx))
+end
+@testset "ScopedConfig preferences fail closed" begin
+    using PortfolioOptimisers, Test
+    pe = PortfolioOptimisers
+    # Valid preference values route through the set_*! setters (same validation as runtime).
+    pe.apply_preferences!(Dict{String, Any}("equation_max_length" => 512,
+                                            "suggestion_distance" => "damerau_levenshtein",
+                                            "suggestion_min_score" => 0.8,
+                                            "compact_show" => 4))
+    @test pe.EQUATION_LIMITS[].max_length == 512
+    @test pe.EQUATION_LIMITS[].max_depth == 256          # unset key keeps its default
+    @test pe.STRING_DISTANCE[].dist isa pe.StringDistances.DamerauLevenshtein
+    @test pe.STRING_DISTANCE[].min_score == 0.8
+    @test pe.COMPACT_SHOW[] == 4
+    # Unset preferences (nothing) are skipped entirely.
+    pe.apply_preferences!(Dict{String, Any}())
+    @test pe.EQUATION_LIMITS[].max_length == 512
+    # Invalid values throw a typed error naming the key — the package refuses to load
+    # rather than silently running with a weaker cap than the project requested.
+    @test_throws ArgumentError pe.apply_preferences!(Dict{String, Any}("equation_max_length" =>
+                                                                           -5))
+    @test_throws ArgumentError pe.apply_preferences!(Dict{String, Any}("equation_max_length" => "512"))
+    @test_throws ArgumentError pe.apply_preferences!(Dict{String, Any}("equation_max_depth" =>
+                                                                           true))
+    @test_throws ArgumentError pe.apply_preferences!(Dict{String, Any}("suggestion_min_score" =>
+                                                                           true))
+    @test_throws ArgumentError pe.apply_preferences!(Dict{String, Any}("compact_show" => "yes"))
+    # Unknown distance name fails closed against the enumerated allowlist, with a suggestion.
+    err = try
+        pe.apply_preferences!(Dict{String, Any}("suggestion_distance" => "levenstein"))
+        nothing
+    catch e
+        e
+    end
+    @test err isa ArgumentError
+    @test occursin("did you mean `levenshtein`?", err.msg)
+    # Scoped display override, then restore all shipped defaults.
+    pe.with_compact_show(false) do
+        @test pe.COMPACT_SHOW[] === false
+    end
+    pe.set_equation_limits!(max_length = 4096, max_depth = 256)
+    pe.set_string_distance!(dist = pe.StringDistances.Levenshtein(), min_score = 0.7)
+    pe.set_compact_show!(true)
 end

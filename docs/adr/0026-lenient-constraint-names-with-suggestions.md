@@ -106,3 +106,24 @@ typo is obvious while a legitimately-absent asset stays quiet.**
   [test_02_equation_parsing.jl](../../test/test_02_equation_parsing.jl) ("Asset name suggestions").
   Related hardening of the same boundary is in
   [ADR 0025](0025-enumerated-parser-allowlist.md).
+
+## Amendment (2026-07-06): the solve-failure warning joins the shared-builder roster
+
+A later review found one more unbounded internal-state dump outside the shared-builder discipline:
+the `JuMPResult` constructor's solve-failure warning
+([10_JuMPModelOptimisation.jl](../../src/10_JuMPModelOptimisation.jl)) interpolated the whole
+`trials` dictionary into the log — every solver name, the solver *settings*, and full caught
+exception objects, unbounded in size. It now routes through a fourth shared builder,
+`failed_solve_msg` ([01_Base.jl](../../src/01_Base.jl), beside the other three): one bounded line
+per failed solver stage (solver name, stage, first line of the error truncated to 200 characters so
+a JuMP termination status stays visible), solver names sorted for deterministic logs, and
+`:settings` entries never printed. The raw exceptions and settings remain available on
+`JuMPResult.trials` — the log is summarised, the data is not lost. Regression coverage in the
+"failed_solve_msg" testset of [test_01_structs.jl](../../test/test_01_structs.jl).
+
+Separately, the config idiom this ADR describes for `STRING_DISTANCE` ("global, mutable config …
+mirrors `COMPACT_SHOW`") has been superseded: the value is now an immutable `StringDistanceConfig`
+held in a thread-safe `ScopedConfig` (atomic global default via the unchanged `set_string_distance!`,
+task-scoped override via `with_string_distance`, optional per-project seeding via Preferences.jl).
+See the 2026-07-06 amendment of [ADR 0027](0027-cap-equation-parser-recursion.md) for the rationale
+and rejected alternatives.

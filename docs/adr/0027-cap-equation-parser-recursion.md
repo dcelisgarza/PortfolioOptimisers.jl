@@ -102,3 +102,58 @@ The same security review raised two sibling findings at adjacent boundaries. Bot
   [test_02_equation_parsing.jl](../../test/test_02_equation_parsing.jl). Related hardening of the same
   boundary is in [ADR 0025](0025-enumerated-parser-allowlist.md) and
   [ADR 0026](0026-lenient-constraint-names-with-suggestions.md).
+
+## Amendment (2026-07-06): scoped, atomically-defaulted, Preferences-seeded config
+
+A follow-up review flagged that the three global mutable configs (`COMPACT_SHOW`, `STRING_DISTANCE`,
+`EQUATION_LIMITS`) were mutated by their setters with no synchronisation while being read inside
+`FLoops.@floop ThreadedEx` meta-optimiser loops — a latent data race, reachable only if a caller
+mutates config concurrently with a running optimisation (no untrusted path writes them). None of the
+three setters had shipped in a release, so reshaping the idiom was free. The config idiom this ADR
+and ADR 0026 described ("global mutable struct + `set_*!` setter") is superseded as follows:
+
+- The config structs (`StringDistanceConfig`, `EquationLimits`) are now **immutable**;
+  `EquationLimits` validates positivity in its constructor, so every construction path (setter,
+  scoped override, preference seeding) gets the same check.
+- Each global is a `ScopedConfig{T}` ([01_Base.jl](../../src/01_Base.jl)): an `@atomic default`
+  field swapped whole-struct — *jointly* atomic, so a reader can never observe `max_length` from one
+  setting and `max_depth` from another — plus a `Base.ScopedValues.ScopedValue` override. Reads go
+  through `CFG[]`: scoped override first, atomic default otherwise.
+- The `set_*!` setters keep their signatures and now swap the default atomically. New `with_*`
+  do-block helpers (`with_equation_limits`, `with_string_distance`, `with_compact_show`) provide a
+  task-scoped, automatically-restored override — inherited by tasks spawned inside the block,
+  invisible to concurrent tasks outside it. This matches the actual override use cases: tightening
+  the caps around one batch of untrusted strings, or silencing suggestions inside a meta-optimiser's
+  inner loops, without perturbing other concurrent work.
+- Defaults may be seeded per project at load time via **Preferences.jl** (new dependency, compat
+  `1.4`): `LocalPreferences.toml` keys `equation_max_length`, `equation_max_depth`,
+  `suggestion_min_score`, `suggestion_distance`, `compact_show`, read by `__init__` and applied
+  through the setters (`apply_preferences!`), so they receive the same validation as runtime calls.
+  The `suggestion_distance` string resolves through an enumerated `Dict` allowlist
+  (`PREFERENCE_DISTANCES`) that fails closed with a `did_you_mean` suggestion — the
+  [ADR 0025](0025-enumerated-parser-allowlist.md) single-source-of-truth discipline applied to
+  config ingestion.
+- **Invalid preference values throw at load.** Falling back to the shipped default with a warning
+  would let a process run with a *weaker* cap than the one the project explicitly requested —
+  fail-open in the wrong direction. An unset key keeps the shipped default. A misspelled *key*
+  cannot be detected (Preferences.jl exposes no key-enumeration API) and is silently ignored;
+  recorded here as a known limitation so it is not re-flagged as an oversight.
+
+Considered and rejected:
+
+- **Pure ScopedValues (delete the setters).** The persistent runtime toggle would be gone — a REPL
+  user could not `set_compact_show!(4)` once and have later displays honour it; every call would
+  need a `with` block. Ergonomically wrong for the display config, and the same objection applies
+  to interactively raising the parser caps.
+- **`@atomic` fields on the existing mutable structs, setters unchanged.** Smallest diff and closes
+  the race, but the two `EquationLimits` fields would be only *individually* atomic (a reader could
+  see a torn pair), and there would be no task-scoped override — the use cases above would still
+  mutate global state to affect one call site.
+- **Freeze at load via Preferences only.** No race by construction, but it removes the runtime
+  overrides this ADR and ADR 0026 explicitly value (per-batch cap changes, per-loop suggestion
+  silencing).
+
+Regression coverage: the "Equation parser recursion caps" testset (scoped override + child-task
+inheritance), the "Asset name suggestions" testset (scoped suggestion silencing), and the new
+"ScopedConfig preferences fail closed" testset, all in
+[test_02_equation_parsing.jl](../../test/test_02_equation_parsing.jl).

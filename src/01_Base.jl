@@ -524,7 +524,6 @@ const arg_dict = Dict(
                       :cv => "`cv`: Cross-validation estimator.",#
                       :scorer => "`scorer`: Scoring function.",#
                       :train_score => "`train_score`: Whether to also compute the training set score.",#
-                      :warn_comb => "`warn_comb`: Whether to warn when the number of combinations exceeds `max_comb`.",#
                       :path_ids => "`path_ids`: Path identifiers for cross-validation splits.",#
                       :train_scores => "`train_scores`: Training set scores.",#
                       :test_scores => "`test_scores`: Test set scores.",#
@@ -1087,6 +1086,66 @@ macro define_pretty_show(T, flag::Bool = true)
         end)
 end
 """
+$(DocStringExtensions.TYPEDEF)
+
+Thread-safe holder for a package-level configuration value, combining a persistent global default with a task-scoped override.
+
+Reads go through `cfg[]`, which returns the innermost active scoped override when inside a `with_*` block, otherwise the global default. The default is an `@atomic` field swapped as a whole — a `set_*!` call is a single atomic store, so concurrent readers (e.g. the `FLoops.@floop` loops inside meta-optimisers) can never observe a torn or partially-updated configuration. The scoped override is a `Base.ScopedValues.ScopedValue`: it is inherited by tasks spawned inside the scope, restored automatically when the scope exits, and invisible to unrelated concurrent tasks.
+
+Configs held this way store *immutable* structs (or bits values); changing any knob builds a new value and swaps it in, never mutates in place.
+
+Used by [`COMPACT_SHOW`](@ref), [`STRING_DISTANCE`](@ref), and [`EQUATION_LIMITS`](@ref); their global defaults are set via the `set_*!` setters, scoped overrides via the `with_*` helpers, and load-time per-project defaults via Preferences.jl (see [`apply_preferences!`](@ref)).
+
+# Related
+
+  - [`set_compact_show!`](@ref) / [`with_compact_show`](@ref)
+  - [`set_string_distance!`](@ref) / [`with_string_distance`](@ref)
+  - [`set_equation_limits!`](@ref) / [`with_equation_limits`](@ref)
+  - [`apply_preferences!`](@ref)
+"""
+mutable struct ScopedConfig{T}
+    @atomic default::T
+    const scoped::ScopedValue{Union{Nothing, T}}
+    function ScopedConfig{T}(x) where {T}
+        return new{T}(convert(T, x), ScopedValue{Union{Nothing, T}}(nothing))
+    end
+end
+ScopedConfig(x::T) where {T} = ScopedConfig{T}(x)
+"""
+    getindex(cfg::ScopedConfig)
+
+Read the active value of a [`ScopedConfig`](@ref): the innermost task-scoped override when inside a `with_*` block, otherwise the global default (read atomically).
+"""
+Base.getindex(cfg::ScopedConfig) = @something(cfg.scoped[], @atomic(cfg.default))
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Atomically replace the global default of a [`ScopedConfig`](@ref) with `x` and return it. Does not affect any active scoped override.
+
+# Related
+
+  - [`ScopedConfig`](@ref)
+  - [`with_config`](@ref)
+"""
+function set_default!(cfg::ScopedConfig{T}, x) where {T}
+    x = convert(T, x)
+    @atomic cfg.default = x
+    return x
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Run `f()` with the [`ScopedConfig`](@ref) `cfg` overridden to `x` for the dynamic extent of the call, restoring the previous value on exit. Thread-safe: the override is task-scoped (inherited by tasks spawned inside `f`, invisible to concurrent tasks outside it).
+
+# Related
+
+  - [`ScopedConfig`](@ref)
+  - [`set_default!`](@ref)
+"""
+function with_config(f, cfg::ScopedConfig{T}, x) where {T}
+    return Base.ScopedValues.with(f, cfg.scoped => convert(T, x))
+end
+"""
 Global control for collapsing large nested structs in [`@define_pretty_show`](@ref) output.
 
 Holds one of:
@@ -1095,9 +1154,9 @@ Holds one of:
   - `true`: collapsing enabled with an automatic, terminal-size-derived line budget.
   - `n::Int`: collapsing enabled with a fixed line budget of `n`.
 
-Set via [`set_compact_show!`](@ref). Read (together with the per-call `:po_compact` IO property) by [`compact_show_budget`](@ref).
+Held in a [`ScopedConfig`](@ref): set the global default via [`set_compact_show!`](@ref), override per scope via [`with_compact_show`](@ref), and read (together with the per-call `:po_compact` IO property) by [`compact_show_budget`](@ref). The default may be seeded per project at load time via the `"compact_show"` preference (see [`apply_preferences!`](@ref)).
 """
-const COMPACT_SHOW = Ref{Union{Bool, Int}}(true)
+const COMPACT_SHOW = ScopedConfig{Union{Bool, Int}}(true)
 """
     set_compact_show!(x::Bool)
     set_compact_show!(n::Integer)
@@ -1110,13 +1169,29 @@ Configure whether [`@define_pretty_show`](@ref) collapses large nested structs.
 
 Collapsing only ever applies to height-limited output (`get(io, :limit, false)`), i.e. the interactive REPL. Non-limited output (`string`, `repr`, file writes) always expands fully. The documentation build disables this so rendered docs keep full detail. Individual calls can override the global setting with the `:po_compact` IO property (`false`, `true`, or an `Int`).
 
+Sets the global default (atomically; see [`ScopedConfig`](@ref)). For a temporary, task-scoped override use [`with_compact_show`](@ref).
+
 # Related
 
   - [`@define_pretty_show`](@ref)
   - [`compact_show_budget`](@ref)
+  - [`with_compact_show`](@ref)
 """
-set_compact_show!(x::Bool) = (COMPACT_SHOW[] = x; return x)
-set_compact_show!(n::Integer) = (COMPACT_SHOW[] = Int(n); return n)
+set_compact_show!(x::Bool) = set_default!(COMPACT_SHOW, x)
+set_compact_show!(n::Integer) = set_default!(COMPACT_SHOW, Int(n))
+"""
+    with_compact_show(f, x::Bool)
+    with_compact_show(f, n::Integer)
+
+Run `f()` with the [`COMPACT_SHOW`](@ref) collapsing setting overridden to `x`/`n` for the dynamic extent of the call, restoring the previous setting on exit. Task-scoped and thread-safe (see [`ScopedConfig`](@ref)); the global default is untouched.
+
+# Related
+
+  - [`set_compact_show!`](@ref)
+  - [`compact_show_budget`](@ref)
+"""
+with_compact_show(f, x::Bool) = with_config(f, COMPACT_SHOW, x)
+with_compact_show(f, n::Integer) = with_config(f, COMPACT_SHOW, Int(n))
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
@@ -1162,52 +1237,73 @@ Global configuration for the fuzzy "did you mean?" suggestions appended to "vari
   - `dist`: the `StringDistances.StringDistance` used to score candidate names against the offending one (default `StringDistances.Levenshtein()`).
   - `min_score`: the minimum normalised similarity in `[0, 1]` a candidate must reach before it is suggested (default `0.7`). Raising it toward `1` keeps only near-exact matches; setting it above `1` disables suggestions entirely — useful in meta-optimiser inner loops, where an asset name legitimately absent from a cluster/subset is not a typo and should draw no suggestion.
 
-Set via [`set_string_distance!`](@ref). Read by [`did_you_mean`](@ref). Mirrors the [`COMPACT_SHOW`](@ref) pretty-printing config.
+Immutable; held in the [`STRING_DISTANCE`](@ref) [`ScopedConfig`](@ref). Set the global default via [`set_string_distance!`](@ref), override per scope via [`with_string_distance`](@ref). Read by [`did_you_mean`](@ref).
 
 # Related
 
   - [`STRING_DISTANCE`](@ref)
   - [`set_string_distance!`](@ref)
+  - [`with_string_distance`](@ref)
   - [`did_you_mean`](@ref)
 """
-mutable struct StringDistanceConfig
+struct StringDistanceConfig
     dist::StringDistances.StringDistance
     min_score::Float64
 end
 """
-    STRING_DISTANCE = StringDistanceConfig(StringDistances.Levenshtein(), 0.7)
+    STRING_DISTANCE = ScopedConfig(StringDistanceConfig(StringDistances.Levenshtein(), 0.7))
 
-Default string distance configuration for fuzzy "did you mean?" suggestions appended to "variable not in asset universe" messages by [`did_you_mean`](@ref).
+Default string distance configuration for fuzzy "did you mean?" suggestions appended to "variable not in asset universe" messages by [`did_you_mean`](@ref). Read as `STRING_DISTANCE[]`; the defaults may be seeded per project at load time via the `"suggestion_distance"` / `"suggestion_min_score"` preferences (see [`apply_preferences!`](@ref)).
 
 # Related
 
   - [`StringDistanceConfig`](@ref)
   - [`set_string_distance!`](@ref)
+  - [`with_string_distance`](@ref)
   - [`did_you_mean`](@ref)
 """
-const STRING_DISTANCE = StringDistanceConfig(StringDistances.Levenshtein(), 0.7)
+const STRING_DISTANCE = ScopedConfig(StringDistanceConfig(StringDistances.Levenshtein(),
+                                                          0.7))
 """
-    set_string_distance!(; dist::StringDistances.StringDistance = STRING_DISTANCE.dist,
-                         min_score::Real = STRING_DISTANCE.min_score)
+    set_string_distance!(; dist::StringDistances.StringDistance, min_score::Real)
 
-Configure the global fuzzy-suggestion settings read by [`did_you_mean`](@ref).
+Configure the global default fuzzy-suggestion settings read by [`did_you_mean`](@ref). The store is atomic (see [`ScopedConfig`](@ref)); unspecified keywords keep their current default. For a temporary, task-scoped override use [`with_string_distance`](@ref).
 
   - `dist`: distance used to rank candidate names (e.g. `StringDistances.Levenshtein()`, `StringDistances.DamerauLevenshtein()`, `StringDistances.JaroWinkler()`).
   - `min_score`: minimum normalised similarity in `[0, 1]` to emit a suggestion; set above `1` to disable suggestions.
 
-Returns the updated [`STRING_DISTANCE`](@ref) config.
+Returns the new default [`StringDistanceConfig`](@ref).
 
 # Related
 
   - [`did_you_mean`](@ref)
   - [`STRING_DISTANCE`](@ref)
+  - [`with_string_distance`](@ref)
   - [`set_compact_show!`](@ref)
 """
-function set_string_distance!(; dist::StringDistances.StringDistance = STRING_DISTANCE.dist,
-                              min_score::Real = STRING_DISTANCE.min_score)
-    STRING_DISTANCE.dist = dist
-    STRING_DISTANCE.min_score = Float64(min_score)
-    return STRING_DISTANCE
+function set_string_distance!(;
+                              dist::StringDistances.StringDistance = (@atomic STRING_DISTANCE.default).dist,
+                              min_score::Real = (@atomic STRING_DISTANCE.default).min_score)
+    return set_default!(STRING_DISTANCE, StringDistanceConfig(dist, Float64(min_score)))
+end
+"""
+    with_string_distance(f; dist::StringDistances.StringDistance = STRING_DISTANCE[].dist,
+                         min_score::Real = STRING_DISTANCE[].min_score)
+
+Run `f()` with the fuzzy-suggestion settings read by [`did_you_mean`](@ref) overridden for the dynamic extent of the call, restoring the previous settings on exit. Task-scoped and thread-safe (see [`ScopedConfig`](@ref)); the global default is untouched. Unspecified keywords inherit from the currently active value, so nested overrides compose.
+
+Useful around a meta-optimiser run to silence suggestions (`min_score` above `1`) in its inner loops without affecting other concurrent work.
+
+# Related
+
+  - [`set_string_distance!`](@ref)
+  - [`STRING_DISTANCE`](@ref)
+  - [`did_you_mean`](@ref)
+"""
+function with_string_distance(f;
+                              dist::StringDistances.StringDistance = STRING_DISTANCE[].dist,
+                              min_score::Real = STRING_DISTANCE[].min_score)
+    return with_config(f, STRING_DISTANCE, StringDistanceConfig(dist, Float64(min_score)))
 end
 """
 Global resource caps for equation parsing, guarding the string→AST trust boundary against a stack-exhaustion denial of service.
@@ -1219,57 +1315,78 @@ Constraint, Black-Litterman view and entropy-pooling view strings are untrusted 
   - `max_length`: maximum number of characters in an equation string handed to `Meta.parse` (default `4096`). A legitimate linear constraint is short; the bound sits far above any real constraint and far below the nesting depth that threatens the stack. Because achieving nesting depth `d` from a string needs at least `d` characters, the length cap also bounds the AST depth of the *string* form.
   - `max_depth`: maximum expression-tree depth accepted by the `Expr` form of [`parse_equation`](@ref) (default `256`), which receives a pre-built AST that no length cap covers.
 
-The values are conservative static defaults (portable across build and deployment machines, unlike a value auto-detected during precompilation) and are runtime-overridable via [`set_equation_limits!`](@ref). Mirrors the [`STRING_DISTANCE`](@ref) / [`COMPACT_SHOW`](@ref) config idiom. See `docs/adr/0027-cap-equation-parser-recursion.md`.
+The values are conservative static defaults (portable across build and deployment machines, unlike a value auto-detected during precompilation). Immutable; held in the [`EQUATION_LIMITS`](@ref) [`ScopedConfig`](@ref). Set the global default via [`set_equation_limits!`](@ref), override per scope via [`with_equation_limits`](@ref). Both fields must be positive (enforced by the constructor). See `docs/adr/0027-cap-equation-parser-recursion.md`.
 """
-mutable struct EquationLimits
+struct EquationLimits
     max_length::Int
     max_depth::Int
+    function EquationLimits(max_length::Integer, max_depth::Integer)
+        @argcheck(max_length > 0 && max_depth > 0,
+                  ArgumentError("max_length and max_depth must be positive."))
+        return new(Int(max_length), Int(max_depth))
+    end
 end
 """
-const EQUATION_LIMITS = EquationLimits(4096, 256)
+    EQUATION_LIMITS = ScopedConfig(EquationLimits(4096, 256))
 
-Default global resource caps for equation parsing, guarding the string→AST trust boundary against a stack-exhaustion denial of service.
+Default global resource caps for equation parsing, guarding the string→AST trust boundary against a stack-exhaustion denial of service. Read as `EQUATION_LIMITS[]`; the defaults may be seeded per project at load time via the `"equation_max_length"` / `"equation_max_depth"` preferences (see [`apply_preferences!`](@ref)).
 
 # Related
 
   - [`EquationLimits`](@ref)
   - [`set_equation_limits!`](@ref)
+  - [`with_equation_limits`](@ref)
   - [`parse_equation`](@ref)
 """
-const EQUATION_LIMITS = EquationLimits(4096, 256)
+const EQUATION_LIMITS = ScopedConfig(EquationLimits(4096, 256))
 """
-    set_equation_limits!(; max_length::Integer = EQUATION_LIMITS.max_length,
-                         max_depth::Integer = EQUATION_LIMITS.max_depth)
+    set_equation_limits!(; max_length::Integer, max_depth::Integer)
 
-Configure the global equation-parser resource caps read at the string→AST trust boundary (see [`EQUATION_LIMITS`](@ref)).
+Configure the global default equation-parser resource caps read at the string→AST trust boundary (see [`EQUATION_LIMITS`](@ref)).
 
   - `max_length`: maximum equation-string length passed to `Meta.parse`.
   - `max_depth`: maximum expression-tree depth accepted by the `Expr` form of [`parse_equation`](@ref).
 
-Raise them for a genuinely large machine-generated constraint set, or lower them to tighten the boundary. Both must be positive.
+Raise them for a genuinely large machine-generated constraint set, or lower them to tighten the boundary. Both must be positive; unspecified keywords keep their current default. The store is atomic (see [`ScopedConfig`](@ref)); for a temporary, task-scoped override use [`with_equation_limits`](@ref).
 
-Returns the updated [`EQUATION_LIMITS`](@ref) config.
+Returns the new default [`EquationLimits`](@ref).
 
 # Related
 
   - [`EQUATION_LIMITS`](@ref)
+  - [`with_equation_limits`](@ref)
   - [`parse_equation`](@ref)
   - [`set_string_distance!`](@ref)
 """
-function set_equation_limits!(; max_length::Integer = EQUATION_LIMITS.max_length,
-                              max_depth::Integer = EQUATION_LIMITS.max_depth)
-    @argcheck(max_length > 0 && max_depth > 0,
-              ArgumentError("max_length and max_depth must be positive."))
-    EQUATION_LIMITS.max_length = Int(max_length)
-    EQUATION_LIMITS.max_depth = Int(max_depth)
-    return EQUATION_LIMITS
+function set_equation_limits!(;
+                              max_length::Integer = (@atomic EQUATION_LIMITS.default).max_length,
+                              max_depth::Integer = (@atomic EQUATION_LIMITS.default).max_depth)
+    return set_default!(EQUATION_LIMITS, EquationLimits(max_length, max_depth))
+end
+"""
+    with_equation_limits(f; max_length::Integer = EQUATION_LIMITS[].max_length,
+                         max_depth::Integer = EQUATION_LIMITS[].max_depth)
+
+Run `f()` with the equation-parser resource caps (see [`EQUATION_LIMITS`](@ref)) overridden for the dynamic extent of the call, restoring the previous caps on exit. Task-scoped and thread-safe (see [`ScopedConfig`](@ref)); the global default is untouched. Unspecified keywords inherit from the currently active value, so nested overrides compose.
+
+Useful to tighten the boundary around one batch of untrusted constraint strings, or to raise it for a single machine-generated constraint set, without affecting other concurrent work.
+
+# Related
+
+  - [`set_equation_limits!`](@ref)
+  - [`EQUATION_LIMITS`](@ref)
+  - [`parse_equation`](@ref)
+"""
+function with_equation_limits(f; max_length::Integer = EQUATION_LIMITS[].max_length,
+                              max_depth::Integer = EQUATION_LIMITS[].max_depth)
+    return with_config(f, EQUATION_LIMITS, EquationLimits(max_length, max_depth))
 end
 """
     did_you_mean(name::AbstractString, candidates) -> String
 
 Return a `" (did you mean \`X\`?)"`suffix naming the closest match to`name`among`candidates`, or `""` when no candidate reaches the global [`STRING_DISTANCE`](@ref) `min_score`threshold (or`candidates` is empty).
 
-Used to enrich "variable not in asset universe" messages (see [`unknown_variable_msg`](@ref)) with a typo suggestion. The distance and threshold are read from the global [`STRING_DISTANCE`](@ref) config, set via [`set_string_distance!`](@ref); the threshold gating means a name legitimately absent from a meta-optimiser cluster/subset (no close neighbour) draws no suggestion.
+Used to enrich "variable not in asset universe" messages (see [`unknown_variable_msg`](@ref)) with a typo suggestion. The distance and threshold are read from the active [`STRING_DISTANCE`](@ref) config — global default via [`set_string_distance!`](@ref), task-scoped override via [`with_string_distance`](@ref); the threshold gating means a name legitimately absent from a meta-optimiser cluster/subset (no close neighbour) draws no suggestion.
 
 # Related
 
@@ -1281,8 +1398,9 @@ function did_you_mean(name::AbstractString, candidates)
     if isempty(candidates)
         return ""
     end
-    match, _ = StringDistances.findnearest(name, candidates, STRING_DISTANCE.dist;
-                                           min_score = STRING_DISTANCE.min_score)
+    sd = STRING_DISTANCE[]
+    match, _ = StringDistances.findnearest(name, candidates, sd.dist;
+                                           min_score = sd.min_score)
     return isnothing(match) ? "" : " (did you mean `$(match)`?)"
 end
 """
@@ -1339,6 +1457,163 @@ function missing_group_assets_msg(group, missing_assets, nx, key)
     return "group `$(group)`: $(length(missing_assets)) member(s) not in asset universe " *
            "($(length(nx)) assets under key `$(key)`): $(missing_assets); dropped" *
            did_you_mean(string(first(missing_assets)), nx)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Render the first line of an error for a log message, truncated to `max_line_length` characters (a trailing `…` marks the cut). Exceptions render via `showerror`, so the line carries the exception type and message; anything else renders via `repr`.
+
+# Related
+
+  - [`failed_solve_msg`](@ref)
+"""
+function first_error_line(err, max_line_length::Integer)
+    s = err isa Exception ? sprint(showerror, err) : repr(err)
+    line = String(first(split(s, '\n')))
+    return length(line) <= max_line_length ? line : first(line, max_line_length) * "…"
+end
+"""
+    failed_solve_msg(trials::AbstractDict; max_line_length::Integer = 200) -> String
+
+Build the warning text for a JuMP model that no configured solver could solve satisfactorily (see `JuMPResult`). One line per failed stage of each solver trial: the solver name, the stage that failed (`set_optimizer`, `optimize!`, or `assert_is_solved_and_feasible`), and the first line of the error truncated to `max_line_length` characters — so a JuMP termination status stays visible.
+
+Never interpolates the whole trials dictionary, the solver settings, or full exception payloads into the log; the raw data remains available on the returned `JuMPResult.trials`. This is the same info-leak-safe message discipline as [`unknown_variable_msg`](@ref) and its siblings. Solver names and stages are sorted so the message is deterministic.
+
+# Related
+
+  - [`unknown_variable_msg`](@ref)
+  - [`empty_row_msg`](@ref)
+  - [`missing_group_assets_msg`](@ref)
+  - [`first_error_line`](@ref)
+"""
+function failed_solve_msg(trials::AbstractDict; max_line_length::Integer = 200)
+    msg = "Model could not be solved satisfactorily ($(length(trials)) solver trial(s))."
+    for name in sort!(collect(keys(trials)); by = string)
+        trial = trials[name]
+        stages = trial isa AbstractDict ? trial : Dict{Symbol, Any}(:trial => trial)
+        for stage in sort!(collect(keys(stages)); by = string)
+            if stage === :settings
+                continue
+            end
+            msg *= "\n  $(name): $(stage) → $(first_error_line(stages[stage], max_line_length))"
+        end
+    end
+    return msg
+end
+"""
+    PREFERENCE_DISTANCES
+
+Enumerated allowlist mapping the names accepted by the `"suggestion_distance"` preference to their `StringDistances.StringDistance` objects. Membership and dispatch are one `Dict` — the same single-source-of-truth discipline as the equation parser's function allowlist (`docs/adr/0025-enumerated-parser-allowlist.md`): an unknown name fails closed at load with a typed error carrying a [`did_you_mean`](@ref) suggestion.
+
+Supported names: `"levenshtein"`, `"damerau_levenshtein"`, `"jaro"`, `"jaro_winkler"`, `"ratcliff_obershelp"`.
+
+# Related
+
+  - [`apply_preferences!`](@ref)
+  - [`set_string_distance!`](@ref)
+"""
+const PREFERENCE_DISTANCES = Dict{String, StringDistances.StringDistance}("levenshtein" =>
+                                                                              StringDistances.Levenshtein(),
+                                                                          "damerau_levenshtein" =>
+                                                                              StringDistances.DamerauLevenshtein(),
+                                                                          "jaro" =>
+                                                                              StringDistances.Jaro(),
+                                                                          "jaro_winkler" =>
+                                                                              StringDistances.JaroWinkler(),
+                                                                          "ratcliff_obershelp" =>
+                                                                              StringDistances.RatcliffObershelp())
+"""
+    PREFERENCE_KEYS
+
+The Preferences.jl keys read at package load to seed the global config defaults (see [`apply_preferences!`](@ref)):
+
+  - `"equation_max_length"` / `"equation_max_depth"`: positive integers for [`EQUATION_LIMITS`](@ref).
+  - `"suggestion_min_score"`: real number for the [`STRING_DISTANCE`](@ref) threshold.
+  - `"suggestion_distance"`: a [`PREFERENCE_DISTANCES`](@ref) name for the [`STRING_DISTANCE`](@ref) metric.
+  - `"compact_show"`: boolean or integer for [`COMPACT_SHOW`](@ref).
+
+Preferences.jl offers no way to enumerate the keys a project has set, so a misspelled *key* cannot be detected and is silently ignored (the shipped default applies) — misspelled or invalid *values* under these keys fail closed at load.
+
+# Related
+
+  - [`apply_preferences!`](@ref)
+"""
+const PREFERENCE_KEYS = ("equation_max_length", "equation_max_depth",
+                         "suggestion_min_score", "suggestion_distance", "compact_show")
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Apply load-time preference values to the global config defaults ([`EQUATION_LIMITS`](@ref), [`STRING_DISTANCE`](@ref), [`COMPACT_SHOW`](@ref)). Called by the package `__init__` with the [`PREFERENCE_KEYS`](@ref) values read via `Preferences.load_preference`; `nothing` values (unset preferences) are skipped and keep the shipped default.
+
+Fails closed: an invalid value throws a typed `ArgumentError` naming the key and value, so the package refuses to load rather than silently running with a weaker cap than the one the project requested. Values are applied through the `set_*!` setters, so they receive the same validation as runtime calls.
+
+To persist a configuration, put the keys in the active project's `LocalPreferences.toml`, e.g.:
+
+```toml
+[PortfolioOptimisers]
+equation_max_length = 512
+equation_max_depth = 64
+suggestion_min_score = 0.8
+suggestion_distance = "damerau_levenshtein"
+compact_show = 4
+```
+
+# Related
+
+  - [`PREFERENCE_KEYS`](@ref)
+  - [`PREFERENCE_DISTANCES`](@ref)
+  - [`set_equation_limits!`](@ref)
+  - [`set_string_distance!`](@ref)
+  - [`set_compact_show!`](@ref)
+"""
+function apply_preferences!(prefs::AbstractDict{<:AbstractString, <:Any})
+    ml = get(prefs, "equation_max_length", nothing)
+    md = get(prefs, "equation_max_depth", nothing)
+    if !(isnothing(ml) && isnothing(md))
+        for (key, val) in ("equation_max_length" => ml, "equation_max_depth" => md)
+            @argcheck(isnothing(val) || val isa Integer && !(val isa Bool) && val > 0,
+                      ArgumentError("preference `$(key) = $(repr(val))` must be a positive integer."))
+        end
+        lim = @atomic EQUATION_LIMITS.default
+        set_equation_limits!(; max_length = something(ml, lim.max_length),
+                             max_depth = something(md, lim.max_depth))
+    end
+    ms = get(prefs, "suggestion_min_score", nothing)
+    if !isnothing(ms)
+        @argcheck(ms isa Real && !(ms isa Bool),
+                  ArgumentError("preference `suggestion_min_score = $(repr(ms))` must be a real number."))
+        set_string_distance!(; min_score = ms)
+    end
+    dn = get(prefs, "suggestion_distance", nothing)
+    if !isnothing(dn)
+        @argcheck(dn isa AbstractString,
+                  ArgumentError("preference `suggestion_distance = $(repr(dn))` must be a string."))
+        dist = get(PREFERENCE_DISTANCES, dn, nothing)
+        if isnothing(dist)
+            throw(ArgumentError("preference `suggestion_distance = $(repr(dn))` is not one of the $(length(PREFERENCE_DISTANCES)) supported distance names ($(join(sort!(collect(keys(PREFERENCE_DISTANCES))), ", ")))" *
+                                did_you_mean(dn, collect(keys(PREFERENCE_DISTANCES)))))
+        end
+        set_string_distance!(; dist = dist)
+    end
+    cs = get(prefs, "compact_show", nothing)
+    if !isnothing(cs)
+        @argcheck(cs isa Bool || cs isa Integer,
+                  ArgumentError("preference `compact_show = $(repr(cs))` must be a boolean or an integer."))
+        set_compact_show!(cs)
+    end
+    return nothing
+end
+"""
+    __init__()
+
+Package load hook: reads the [`PREFERENCE_KEYS`](@ref) preferences of the active project via `Preferences.load_preference` and applies them to the global config defaults through [`apply_preferences!`](@ref). An invalid preference value fails closed — the package refuses to load — rather than silently running with a weaker cap than the one the project requested.
+"""
+function __init__()
+    return apply_preferences!(Dict{String, Any}(key =>
+                                                    Preferences.load_preference(@__MODULE__,
+                                                                                key,
+                                                                                nothing)
+                                                for key in PREFERENCE_KEYS))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

@@ -177,6 +177,8 @@ Result type for JuMP model optimisation.
 
 The `JuMPResult` struct records the outcome of a JuMP optimisation, including trial errors and success status.
 
+When `success` is `false` the constructor emits a warning built by [`failed_solve_msg`](@ref): one bounded line per failed solver stage (name, stage, first line of the error). The full per-solver exceptions and settings stay available on `trials` and are never dumped into the log.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -214,7 +216,9 @@ JuMPResult
     success
     function JuMPResult(trials::AbstractDict, success::Bool)::JuMPResult
         if !success
-            @warn("Model could not be solved satisfactorily.\n$trials")
+            # Summarised via the shared builder: one bounded line per failed stage, never
+            # the whole trials dict, the solver settings, or full exception payloads.
+            @warn(failed_solve_msg(trials))
         end
         return new{typeof(trials), typeof(success)}(trials, success)
     end

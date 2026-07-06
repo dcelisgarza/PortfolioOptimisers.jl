@@ -8,10 +8,9 @@ HacineGharbiRavier
 AbstractBins
 BinWidthBins
 Int_Bin
-scott_bin_width
-freedman_bin_width
-knuth_bin_width
-get_bin_width_func
+bin_width
+bin_width
+bin_width
 calc_num_bins
 calc_hist_data
 intrinsic_mutual_info

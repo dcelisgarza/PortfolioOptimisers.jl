@@ -5,6 +5,7 @@ module PortfolioOptimisers
 
 using Accessors: Accessors
 using ArgCheck: @argcheck
+using Base.ScopedValues: ScopedValue
 using AverageShiftedHistograms: AverageShiftedHistograms
 using Clustering: Clustering, assignments
 using Combinatorics: Combinatorics
@@ -27,6 +28,7 @@ using MultivariateStats: MultivariateStats
 using NearestCorrelationMatrix: NearestCorrelationMatrix
 using Optim: Optim
 using PrecompileTools: PrecompileTools
+using Preferences: Preferences
 using Random: Random
 using Roots: Roots
 using SimpleWeightedGraphs: SimpleWeightedGraphs

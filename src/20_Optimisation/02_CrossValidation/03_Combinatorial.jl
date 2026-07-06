@@ -14,7 +14,7 @@ $(DocStringExtensions.FIELDS)
         n_test_folds::Integer = 8,
         purged_size::Integer = 0,
         embargo_size::Integer = 0,
-        warn_comb::Integer = 100_000,
+        max_comb::Integer = 100_000,
     ) -> CombinatorialCrossValidation
 
 Keyword arguments correspond to the struct's fields.
@@ -24,7 +24,7 @@ Keyword arguments correspond to the struct's fields.
   - `n_folds` must be non-empty, greater than zero, and finite.
   - `n_test_folds` must be non-empty, greater than zero, and finite.
   - `purged_size` and `embargo_size` must be non-empty and finite.
-  - Warns if the number of combinations exceeds `warn_comb`.
+  - Ensures the number of combinations does not exceed `max_comb`.
 
 # Examples
 
@@ -63,23 +63,23 @@ CombinatorialCrossValidation
     embargo_size
     function CombinatorialCrossValidation(n_folds::Integer, n_test_folds::Integer,
                                           purged_size::Integer, embargo_size::Integer,
-                                          warn_comb::Integer = 100_000)
+                                          max_comb::Integer = 100_000)
         assert_nonempty_gt0_finite_val(n_folds, :n_folds)
         assert_nonempty_gt0_finite_val(n_test_folds, :n_test_folds)
         assert_nonempty_finite_val(purged_size, :purged_size)
         assert_nonempty_finite_val(embargo_size, :embargo_size)
-        if binomial(n_folds, n_test_folds) > warn_comb
-            @warn("The number of splits for `n_folds = $n_folds` and `n_test_folds = $n_test_folds` is `$(binomial(n_folds, n_test_folds))`, which may be computationally expensive. The number of combinations should typically be between 10^1 to 10^4 for statistical power. Such a large number of combinations may lead to long computation times and memory issues. Consider reducing `n_folds` or shifting `n_test_folds` further away from being equal to `div(n_folds, 2) = $(div(n_folds, 2))`.")
-        end
+        @argcheck(binomial(n_folds, n_test_folds) <= max_comb,
+                  ArgumentError("The number of splits for `n_folds = $n_folds` and `n_test_folds = $n_test_folds` is `$(binomial(n_folds, n_test_folds))`, which may be computationally expensive. The number of combinations should typically be between 10^1 to 10^4 for statistical power. Such a large number of combinations may lead to long computation times and memory issues. Consider reducing `n_folds` or shifting `n_test_folds` further away from being equal to `div(n_folds, 2) = $(div(n_folds, 2))`."))
+
         return new{typeof(n_folds), typeof(n_test_folds), typeof(purged_size),
                    typeof(embargo_size)}(n_folds, n_test_folds, purged_size, embargo_size)
     end
 end
 function CombinatorialCrossValidation(; n_folds::Integer = 10, n_test_folds::Integer = 8,
                                       purged_size::Integer = 0, embargo_size::Integer = 0,
-                                      warn_comb::Integer = 100_000)::CombinatorialCrossValidation
+                                      max_comb::Integer = 100_000)::CombinatorialCrossValidation
     return CombinatorialCrossValidation(n_folds, n_test_folds, purged_size, embargo_size,
-                                        warn_comb)
+                                        max_comb)
 end
 """
 $(DocStringExtensions.TYPEDEF)

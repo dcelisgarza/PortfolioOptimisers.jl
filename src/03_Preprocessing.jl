@@ -161,6 +161,14 @@ ReturnsResult
                            F::Option{<:MatNum}, nb::Option{<:VecStr},
                            B::Option{<:VecNum_MatNum}, ts::Option{<:VecDate},
                            iv::Option{<:MatNum}, ivpa::Option{<:Num_VecNum})
+        if !isnothing(nx)
+            @argcheck(allunique(nx),
+                      ArgumentError("Asset names must be unique. Got\nallunique(nx) => $(allunique(nx))"))
+        end
+        if !isnothing(nf)
+            @argcheck(allunique(nf),
+                      ArgumentError("Factor names must be unique. Got\nallunique(nf) => $(allunique(nf))"))
+        end
         check_names_and_returns_matrix(nx, X, :nx, :X)
         check_names_and_returns_matrix(nf, F, :nf, :F)
         if isa(B, VecNum) && !isnothing(nb)

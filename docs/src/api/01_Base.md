@@ -17,6 +17,21 @@ AbstractResult
 DynamicAbstractWeights
 ```
 
+## Configuration
+
+Package-level configuration values (pretty-printing collapse, fuzzy-suggestion distance, equation-parser resource caps) are held in thread-safe [`ScopedConfig`](@ref) holders: a `set_*!` setter swaps the global default atomically, a `with_*` helper overrides it for the dynamic extent of a call (task-scoped, automatically restored), and per-project defaults can be seeded at load time via Preferences.jl.
+
+```@docs
+ScopedConfig
+Base.getindex(cfg::ScopedConfig)
+set_default!
+with_config
+apply_preferences!
+PortfolioOptimisers.__init__
+PREFERENCE_KEYS
+PREFERENCE_DISTANCES
+```
+
 ## Pretty printing
 
 `PortfolioOptimisers.jl`'s types tend to contain quite a lot of information, these functions enable pretty printing so they are easier to interpret.
@@ -25,6 +40,7 @@ DynamicAbstractWeights
 @define_pretty_show
 has_pretty_show_method
 set_compact_show!
+with_compact_show
 COMPACT_SHOW
 compact_show_budget
 pretty_show_vector_summary
@@ -57,13 +73,17 @@ Functionality for logging messages.
 StringDistanceConfig
 STRING_DISTANCE
 set_string_distance!
+with_string_distance
 did_you_mean
 unknown_variable_msg
 missing_group_assets_msg
 empty_row_msg
+failed_solve_msg
+first_error_line
 EquationLimits
 EQUATION_LIMITS
 set_equation_limits!
+with_equation_limits
 ```
 
 ## Error types

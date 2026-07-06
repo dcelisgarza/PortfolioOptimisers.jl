@@ -184,14 +184,36 @@
         trials = Dict(:try => false)
         logger = SimpleLogger()
         with_logger(logger) do
-            @test_logs (:warn, "Model could not be solved satisfactorily.\n$trials") JuMPResult(;
-                                                                                                trials = Dict(:try =>
-                                                                                                                  false),
-                                                                                                success = false)
+            @test_logs (:warn, PortfolioOptimisers.failed_solve_msg(trials)) JuMPResult(;
+                                                                                        trials = Dict(:try =>
+                                                                                                          false),
+                                                                                        success = false)
         end
         res = JuMPResult(; trials = trials, success = true)
         @test res.trials === trials
         @test res.success == true
+    end
+    @testset "failed_solve_msg" begin
+        pe = PortfolioOptimisers
+        trials = Dict("clarabel2" =>
+                          Dict(:optimize! => ErrorException("boom\nsecond line")),
+                      "clarabel1" => Dict(:assert_is_solved_and_feasible =>
+                                              ArgumentError("infeasible"),
+                                          :settings => Dict("verbose" => true)))
+        msg = pe.failed_solve_msg(trials)
+        # Deterministic (solvers sorted by name), one bounded line per failed stage.
+        @test occursin("2 solver trial(s)", msg)
+        @test first(findfirst("clarabel1", msg)) < first(findfirst("clarabel2", msg))
+        @test occursin("clarabel1: assert_is_solved_and_feasible → ArgumentError: infeasible",
+                       msg)
+        @test occursin("clarabel2: optimize! → boom", msg)
+        # Log hygiene: solver settings and post-first-line payloads never reach the log.
+        @test !occursin("verbose", msg)
+        @test !occursin("second line", msg)
+        # Over-long first lines are truncated.
+        long = pe.failed_solve_msg(Dict("s" => Dict(:optimize! => ErrorException("x"^500))))
+        @test occursin("…", long)
+        @test length(long) < 500
     end
     @testset "OWA" begin
         @test_throws DomainError NormalisedConstantRelativeRiskAversion(; g = 0)

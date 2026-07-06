@@ -1066,8 +1066,9 @@ function parse_equation(eqn::AbstractString; ops1::Tuple = ("==", "<=", ">="),
     # Trust boundary: cap the untrusted string length before `Meta.parse` and the
     # recursive expression walks, so a deeply nested string cannot exhaust the stack.
     # Bounding the length bounds the achievable AST depth of the string form.
-    @argcheck(length(eqn) <= EQUATION_LIMITS.max_length,
-              Meta.ParseError("Equation string is too long ($(length(eqn)) > $(EQUATION_LIMITS.max_length) characters)."))
+    lim = EQUATION_LIMITS[]
+    @argcheck(length(eqn) <= lim.max_length,
+              Meta.ParseError("Equation string is too long ($(length(eqn)) > $(lim.max_length) characters)."))
     @argcheck(!occursin("++", eqn),
               Meta.ParseError("Invalid operator '++' detected in equation."))
     # 1. Identify the comparison operator
@@ -1135,8 +1136,9 @@ function parse_equation(expr::Expr; ops2::Tuple = (:call, :(==), :(<=), :(>=)),
                         datatype::DataType = Float64, kwargs...)::ParsingResult
     # Trust-boundary defence for the pre-built-AST form (no string length cap applies):
     # reject an over-deep tree before the recursive walks below can exhaust the stack.
-    @argcheck(!_expr_depth_exceeds(expr, EQUATION_LIMITS.max_depth),
-              Meta.ParseError("Equation expression is too deeply nested (exceeds depth $(EQUATION_LIMITS.max_depth))."))
+    lim = EQUATION_LIMITS[]
+    @argcheck(!_expr_depth_exceeds(expr, lim.max_depth),
+              Meta.ParseError("Equation expression is too deeply nested (exceeds depth $(lim.max_depth))."))
     # Recursively check for invalid "++" pattern in the expression tree
     @argcheck(!has_invalid_plus(expr),
               Meta.ParseError("Invalid operator pattern '++' detected in equation expression:\n$expr"))
