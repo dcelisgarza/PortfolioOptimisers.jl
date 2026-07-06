@@ -366,7 +366,7 @@ function port_opt_view(sets::AssetSets, i, args...)::AssetSets
 end
 """
     group_to_val!(nx::VecStr, sdict::AbstractDict, key::Any, val::Number,
-                  dict::EstValType, arr::VecNum, strict::Bool)
+                  arr::VecNum, strict::Bool, nxkey::AbstractString)
 
 Set values in a vector for all assets belonging to a specified group.
 
@@ -378,14 +378,15 @@ Set values in a vector for all assets belonging to a specified group.
   - `sdict`: Dictionary mapping group names to vectors of asset names.
   - `key`: Name of the group of assets to set values for.
   - `val`: The value to assign to the assets in the group.
-  - `dict`: The original dictionary, vector of pairs, or pair being processed (used for logging messages).
   - `arr`: The array to be modified in-place.
   - `strict`: If `true`, throws an error if `key` is not found in `sdict`; if `false`, issues a warning.
+  - `nxkey`: Name of the asset-universe key in `sets.dict` (e.g. `"nx"`), used only to name the universe in the diagnostic message — see [`unknown_variable_msg`](@ref) / [`missing_group_assets_msg`](@ref).
 
 # Details
 
   - If `key` is found in `sdict`, all assets in the group are mapped to their indices in `nx`, and the corresponding entries in `arr` are set to `val`.
   - If `key` is not found and `strict` is `true`, an `ArgumentError` is thrown; otherwise, a warning is issued.
+  - Diagnostic messages name only the universe *size* (never the full universe or the input value dictionary), routed through the shared builders in `02_Tools.jl`.
 
 # Returns
 
@@ -395,21 +396,24 @@ Set values in a vector for all assets belonging to a specified group.
 
   - [`estimator_to_val`](@ref)
   - [`AssetSets`](@ref)
+  - [`unknown_variable_msg`](@ref)
+  - [`missing_group_assets_msg`](@ref)
 """
-function group_to_val!(nx::VecStr, sdict::AbstractDict, key::Any, val::Number,
-                       dict::EstValType, arr::VecNum, strict::Bool)::Nothing
+function group_to_val!(nx::VecStr, sdict::AbstractDict, key::Any, val::Number, arr::VecNum,
+                       strict::Bool, nxkey::AbstractString)::Nothing
     assets = get(sdict, key, nothing)
     if isnothing(assets)
-        msg = "$(key) is not in $(keys(sdict)) or in sets.dict[nx] = $nx.\n$(dict)"
+        # A missing key may be a mistyped asset *or* a mistyped group/set name, so widen the
+        # suggestion pool beyond the raw universe to include the group/set keys.
+        msg = unknown_variable_msg(key, nx, nxkey; candidates = [nx; collect(keys(sdict))])
         strict ? throw(ArgumentError(msg)) : @warn(msg)
     else
         unique!(assets)
         idx = [findfirst(x -> x == asset, nx) for asset in assets]
-        N1 = length(idx)
+        missing_assets = assets[isnothing.(idx)]
         filter!(!isnothing, idx)
-        N2 = length(idx)
-        if N1 != N2
-            msg = "Some assets in group `$(key)` are not in the asset universe.\nAssets in group `$key`: $(assets)\nAssets in universe: $(nx).\n$(dict)"
+        if !isempty(missing_assets)
+            msg = missing_group_assets_msg(key, missing_assets, nx, nxkey)
             strict ? throw(ArgumentError(msg)) : @warn(msg)
         end
         arr[idx] .= val
@@ -460,13 +464,14 @@ function estimator_to_val(dict::MultiEstValType, sets::AssetSets,
                           key::Option{<:AbstractString} = nothing;
                           datatype::DataType = Float64, strict::Bool = false)
     val = ifelse(isnothing(val), zero(datatype), val)
-    nx = sets.dict[ifelse(isnothing(key), sets.key, key)]
+    nxkey = ifelse(isnothing(key), sets.key, key)
+    nx = sets.dict[nxkey]
     arr = fill(val, length(nx))
     for (key, val) in dict
         if key in nx
             arr[findfirst(x -> x == key, nx)] = val
         else
-            group_to_val!(nx, sets.dict, key, val, dict, arr, strict)
+            group_to_val!(nx, sets.dict, key, val, arr, strict, nxkey)
         end
     end
     return arr
@@ -476,13 +481,14 @@ function estimator_to_val(dict::PairStrNum, sets::AssetSets,
                           key::Option{<:AbstractString} = nothing;
                           datatype::DataType = Float64, strict::Bool = false)
     val = ifelse(isnothing(val), zero(datatype), val)
-    nx = sets.dict[ifelse(isnothing(key), sets.key, key)]
+    nxkey = ifelse(isnothing(key), sets.key, key)
+    nx = sets.dict[nxkey]
     arr = fill(val, length(nx))
     key, val = dict
     if key in nx
         arr[findfirst(x -> x == key, nx)] = val
     else
-        group_to_val!(nx, sets.dict, key, val, dict, arr, strict)
+        group_to_val!(nx, sets.dict, key, val, arr, strict, nxkey)
     end
     return arr
 end

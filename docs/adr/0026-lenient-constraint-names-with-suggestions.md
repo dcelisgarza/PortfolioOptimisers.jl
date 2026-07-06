@@ -41,12 +41,25 @@ typo is obvious while a legitimately-absent asset stays quiet.**
 - The distance and threshold live in a global, mutable config, `STRING_DISTANCE`, set via
   `set_string_distance!(; dist, min_score)` — mirroring the existing `COMPACT_SHOW` /
   `set_compact_show!` pretty-printing config. Setting `min_score > 1` disables suggestions entirely.
-- The message builders (`unknown_variable_msg`, `empty_row_msg`) and the suggestion helper live once
-  in `02_Tools.jl` and are called by both `get_linear_constraints`
-  ([02_LinearConstraintGeneration.jl](../../src/12_ConstraintGeneration/02_LinearConstraintGeneration.jl))
-  and the Black-Litterman view generator
-  ([05_BlackLittermanViewsGeneration.jl](../../src/13_Prior/05_BlackLittermanViewsGeneration.jl)),
-  so the two previously-drifted copies of this message can never diverge again.
+- The message builders (`unknown_variable_msg`, `empty_row_msg`, `missing_group_assets_msg`) and the
+  suggestion helper live once in `02_Tools.jl`. **Every boundary that resolves an untrusted
+  asset/group/view name against the universe must route its diagnostic through these builders** — the
+  builders never interpolate the full universe (only `length(nx)` and the key) nor the input
+  value dictionary / parsed struct, so the info-leak-safe shape and the suggestion behaviour cannot
+  drift between call sites. The known boundaries are `get_linear_constraints`
+  ([02_LinearConstraintGeneration.jl](../../src/12_ConstraintGeneration/02_LinearConstraintGeneration.jl)),
+  `group_to_val!` / `estimator_to_val` (same file — the value-mapping path behind
+  `WeightBoundsEstimator`, `Fees`, `Turnover`, threshold and risk-budget estimators), the
+  Black-Litterman view generator
+  ([05_BlackLittermanViewsGeneration.jl](../../src/13_Prior/05_BlackLittermanViewsGeneration.jl)), and
+  the entropy-pooling view generator
+  ([10_EntropyPoolingPrior.jl](../../src/13_Prior/10_EntropyPoolingPrior.jl)).
+- `unknown_variable_msg` takes an optional `candidates` pool (default: the asset universe `nx`) that
+  is searched for the typo suggestion, while the *reported* universe size stays `length(nx)`.
+  `group_to_val!` passes `[nx; keys(sdict)]` so a mistyped **group** name — valid only in the group
+  namespace, not in `nx` — can still be suggested. `missing_group_assets_msg` is the sibling builder
+  for the distinct "group resolves but some of its member assets are absent" case: it names the
+  group, the offending member names (caller input, not internal state) and the universe *size*.
 
 ## Considered options
 
@@ -63,6 +76,12 @@ typo is obvious while a legitimately-absent asset stays quiet.**
 - **Add the suggestion to the all-zero-row message too.** Rejected: that message only fires after the
   per-variable messages have already emitted their suggestions, or when valid coefficients cancelled
   (no typo to suggest) — so a suggestion there would be redundant or meaningless.
+- **Migrate only the two boundaries the original review named (`get_linear_constraints` + Black-Litterman views).**
+  Rejected in the follow-up: a second security review (report
+  `docs/reports/security-review-20260706-121314.html`) found `group_to_val!` (which additionally
+  dumped the *whole input value dictionary*) and five entropy-pooling view sites still on the old
+  hand-rolled message that interpolated the full universe. "Two previously-drifted copies" was an
+  undercount; the rule is now *all* name-resolution boundaries route through the shared builders.
 
 ## Consequences
 
@@ -74,7 +93,15 @@ typo is obvious while a legitimately-absent asset stays quiet.**
 - New public-ish surface: `set_string_distance!` / `STRING_DISTANCE`, callable qualified like
   `set_compact_show!` (neither is exported).
 - Finding 1 remains *open* in the sense that the default is still fail-open by design; this ADR
-  records that this is intentional. Callers who want fail-closed opt in with `strict = true`.
+  records that this is intentional. Callers who want fail-closed opt in with `strict = true`. This
+  applies uniformly to **every** boundary listed above, not only the constraint and Black-Litterman
+  paths: `estimator_to_val` (value mapping) and the entropy-pooling views carry the same
+  `strict = false` default for the same meta-optimiser reason. A future review should not re-flag any
+  of them as a silent-wrong-answer bug — the mitigation is the shared diagnostic, not a strict flip.
+- The log-hygiene consolidation is complete as of the follow-up: `group_to_val!` no longer logs the
+  input value dictionary or the full universe, and the entropy-pooling view generator no longer logs
+  the full universe or the parsed `ParsingResult`. Verified by a clean precompile plus
+  `test_02_equation_parsing.jl` (57/57) and `test_12a_entropy_pooling.jl` (67/67).
 - Regression coverage in
   [test_02_equation_parsing.jl](../../test/test_02_equation_parsing.jl) ("Asset name suggestions").
   Related hardening of the same boundary is in

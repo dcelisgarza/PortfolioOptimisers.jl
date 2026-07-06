@@ -812,7 +812,7 @@ function replace_prior_views(res::ParsingResult, pr::AbstractPriorResult, sets::
         end
         j = findfirst(x -> x == m.captures[1], nx)
         if isnothing(j)
-            msg = "Asset $(m.captures[1]) not found in $nx."
+            msg = unknown_variable_msg(m.captures[1], nx, sets.key)
             strict ? throw(ArgumentError(msg)) : @warn(msg)
             push!(idx_rm, i)
             continue
@@ -824,7 +824,7 @@ function replace_prior_views(res::ParsingResult, pr::AbstractPriorResult, sets::
         return res
     end
     @argcheck(non_prior,
-              ArgumentError("Priors in views are replaced by their prior value, thus they are essentially part of the constant of the view, so you need a non-prior view to serve as the variable.\n$(res)"))
+              ArgumentError("Priors in views are replaced by their prior value, thus they are essentially part of the constant of the view, so you need a non-prior view to serve as the variable."))
     idx = setdiff(1:length(variables), idx_rm)
     variables_new = variables[idx]
     coeffs_new = coeffs[idx]
@@ -1813,11 +1813,11 @@ function replace_coprior_views(res::ParsingResult, pr::AbstractPriorResult, sets
                 j = findfirst(x -> x == asset1, nx)
                 k = findfirst(x -> x == asset2, nx)
                 if isnothing(j)
-                    msg = "Asset $(asset1) not found in $nx."
+                    msg = unknown_variable_msg(asset1, nx, sets.key)
                     strict ? throw(ArgumentError(msg)) : @warn(msg)
                 end
                 if isnothing(k)
-                    msg = "Asset $(asset2) not found in $nx."
+                    msg = unknown_variable_msg(asset2, nx, sets.key)
                     strict ? throw(ArgumentError(msg)) : @warn(msg)
                 end
                 if isnothing(j) || isnothing(k)
@@ -1842,11 +1842,11 @@ function replace_coprior_views(res::ParsingResult, pr::AbstractPriorResult, sets
             j = findfirst(x -> x == asset1, nx)
             k = findfirst(x -> x == asset2, nx)
             if isnothing(j)
-                msg = "Asset $(asset1) not found in $nx."
+                msg = unknown_variable_msg(asset1, nx, sets.key)
                 strict ? throw(ArgumentError(msg)) : @warn(msg)
             end
             if isnothing(k)
-                msg = "Asset $(asset2) not found in $nx."
+                msg = unknown_variable_msg(asset2, nx, sets.key)
                 strict ? throw(ArgumentError(msg)) : @warn(msg)
             end
             if isnothing(j) || isnothing(k)
@@ -1861,7 +1861,7 @@ function replace_coprior_views(res::ParsingResult, pr::AbstractPriorResult, sets
         return RhoParsingResult(res.vars, res.coef, res.op, res.rhs, res.eqn, jk_idx)
     end
     @argcheck(non_prior,
-              ArgumentError("Priors in views are replaced by their prior value, thus they are essentially part of the constant of the view, so you need a non-prior view to serve as the variable.\n$(res)"))
+              ArgumentError("Priors in views are replaced by their prior value, thus they are essentially part of the constant of the view, so you need a non-prior view to serve as the variable."))
     idx = setdiff(1:length(variables), idx_rm)
     variables_new = variables[idx]
     coeffs_new = coeffs[idx]

@@ -2314,20 +2314,22 @@ function did_you_mean(name::AbstractString, candidates)
     return isnothing(match) ? "" : " (did you mean `$(match)`?)"
 end
 """
-    unknown_variable_msg(v, nx, key) -> String
+    unknown_variable_msg(v, nx, key; candidates = nx) -> String
 
 Build the warning/error text for a constraint or view variable `v` that is absent from the asset universe `nx` (stored under `key`). Names the variable and the universe *size* only — never the full universe — and appends a [`did_you_mean`](@ref) suggestion when a close match exists.
 
-Shared by [`get_linear_constraints`](@ref) and Black-Litterman view generation so the message (and its info-leak-safe shape) lives in exactly one place.
+`candidates` is the pool searched for the typo suggestion (default: the asset universe `nx`). Callers whose valid namespace is broader than the raw asset universe — e.g. [`group_to_val!`](@ref), where a key may name a *group* rather than an asset — pass a wider pool (asset names plus group/set keys) so the suggestion can name a mistyped group. The reported universe *size* is always `length(nx)` regardless of `candidates`.
+
+Shared by [`get_linear_constraints`](@ref), Black-Litterman view generation, entropy-pooling view generation, and [`group_to_val!`](@ref) so the message (and its info-leak-safe shape) lives in exactly one place.
 
 # Related
 
   - [`did_you_mean`](@ref)
   - [`empty_row_msg`](@ref)
 """
-function unknown_variable_msg(v, nx, key)
+function unknown_variable_msg(v, nx, key; candidates = nx)
     return "variable `$(v)` not in asset universe ($(length(nx)) assets under key `$(key)`); term dropped" *
-           did_you_mean(string(v), nx)
+           did_you_mean(string(v), candidates)
 end
 """
     empty_row_msg(eqn, nx, key; noun::AbstractString = "constraint") -> String
@@ -2342,6 +2344,29 @@ Shared by [`get_linear_constraints`](@ref) and Black-Litterman view generation.
 """
 function empty_row_msg(eqn, nx, key; noun::AbstractString = "constraint")
     return "$(noun) `$(eqn)` matched no assets in the universe ($(length(nx)) assets under key `$(key)`); row dropped"
+end
+"""
+    missing_group_assets_msg(group, missing_assets, nx, key) -> String
+
+Build the warning/error text for a `group` that resolves in the asset sets but whose members
+`missing_assets` are absent from the asset universe `nx` (stored under `key`). Names the group, the
+offending member names (which are caller input, not internal state), and the universe *size* only —
+never the full universe or the input value dictionary — and appends a [`did_you_mean`](@ref)
+suggestion for the first missing member.
+
+Shared by [`group_to_val!`](@ref) so the info-leak-safe message shape lives in exactly one place,
+alongside [`unknown_variable_msg`](@ref) and [`empty_row_msg`](@ref).
+
+# Related
+
+  - [`unknown_variable_msg`](@ref)
+  - [`empty_row_msg`](@ref)
+  - [`did_you_mean`](@ref)
+"""
+function missing_group_assets_msg(group, missing_assets, nx, key)
+    return "group `$(group)`: $(length(missing_assets)) member(s) not in asset universe " *
+           "($(length(nx)) assets under key `$(key)`): $(missing_assets); dropped" *
+           did_you_mean(string(first(missing_assets)), nx)
 end
 
 export factory, concrete_typed_array, MinValue, MeanValue, MedianValue, MaxValue,
