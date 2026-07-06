@@ -853,4 +853,21 @@
         @test PortfolioOptimisers.parse_lens("opt.pe.ce") isa Base.Callable
         @test PortfolioOptimisers.parse_lens("a[2]") isa Base.Callable
     end
+    @testset "parse_lens recursion caps" begin
+        # Same trust boundary as the equation parser (ADR 0027): an over-long / deeply
+        # nested untrusted key fails closed with a typed Meta.ParseError before
+        # `Meta.parse` and the recursive lens-building walk can exhaust the stack.
+        pe = PortfolioOptimisers
+        deep = "a" * "[1]"^(cld(pe.EQUATION_LIMITS.max_length, 3) + 10)
+        @test length(deep) > pe.EQUATION_LIMITS.max_length
+        @test_throws Meta.ParseError pe.parse_lens(deep)
+        # The Expr form has no length cap; the depth guard rejects an over-deep pre-built AST.
+        ex = :a
+        for _ in 1:(pe.EQUATION_LIMITS.max_depth + 10)
+            ex = Expr(:ref, ex, 1)
+        end
+        @test_throws Meta.ParseError pe.parse_lens(ex)
+        # A legitimate key still parses under the default caps.
+        @test pe.parse_lens("opt.pe.ce") isa Base.Callable
+    end
 end
