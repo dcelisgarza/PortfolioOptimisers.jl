@@ -160,14 +160,14 @@ function get_black_litterman_views(lcs::PR_VecPR, sets::AssetSets;
         for (v, c) in zip(lc.vars, lc.coef)
             Ai = (nx .== v)
             if !any(isone, Ai)
-                msg = "$(v) is not found in $(nx)."
+                msg = unknown_variable_msg(v, nx, sets.key)
                 strict ? throw(ArgumentError(msg)) : @warn(msg)
                 continue
             end
             At += Ai * c
         end
         if !any(!iszero, At)
-            msg = "At least one entry in At must be non-zero:\nlc => $(lc)\nany(!iszero, At) => $(any(!iszero, At))"
+            msg = empty_row_msg(lc.eqn, nx, sets.key; noun = "view")
             if strict
                 throw(ArgumentError(msg))
             else

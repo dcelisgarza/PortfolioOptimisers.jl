@@ -2292,6 +2292,57 @@ function vec_to_real_measure(f::Function,
                              val::Union{<:VecNum, NTuple{N, <:Number} where {N}}; kwargs...)
     return f(val)
 end
+"""
+    did_you_mean(name::AbstractString, candidates) -> String
+
+Return a `" (did you mean \`X\`?)"`suffix naming the closest match to`name`among`candidates`, or `""` when no candidate reaches the global [`STRING_DISTANCE`](@ref) `min_score`threshold (or`candidates` is empty).
+
+Used to enrich "variable not in asset universe" messages (see [`unknown_variable_msg`](@ref)) with a typo suggestion. The distance and threshold are read from the global [`STRING_DISTANCE`](@ref) config, set via [`set_string_distance!`](@ref); the threshold gating means a name legitimately absent from a meta-optimiser cluster/subset (no close neighbour) draws no suggestion.
+
+# Related
+
+  - [`STRING_DISTANCE`](@ref)
+  - [`set_string_distance!`](@ref)
+  - [`unknown_variable_msg`](@ref)
+"""
+function did_you_mean(name::AbstractString, candidates)
+    if isempty(candidates)
+        return ""
+    end
+    match, _ = StringDistances.findnearest(name, candidates, STRING_DISTANCE.dist;
+                                           min_score = STRING_DISTANCE.min_score)
+    return isnothing(match) ? "" : " (did you mean `$(match)`?)"
+end
+"""
+    unknown_variable_msg(v, nx, key) -> String
+
+Build the warning/error text for a constraint or view variable `v` that is absent from the asset universe `nx` (stored under `key`). Names the variable and the universe *size* only — never the full universe — and appends a [`did_you_mean`](@ref) suggestion when a close match exists.
+
+Shared by [`get_linear_constraints`](@ref) and Black-Litterman view generation so the message (and its info-leak-safe shape) lives in exactly one place.
+
+# Related
+
+  - [`did_you_mean`](@ref)
+  - [`empty_row_msg`](@ref)
+"""
+function unknown_variable_msg(v, nx, key)
+    return "variable `$(v)` not in asset universe ($(length(nx)) assets under key `$(key)`); term dropped" *
+           did_you_mean(string(v), nx)
+end
+"""
+    empty_row_msg(eqn, nx, key; noun::AbstractString = "constraint") -> String
+
+Build the warning/error text for a parsed equation `eqn` whose every term missed the asset universe `nx` (stored under `key`), leaving an all-zero row that is dropped. Names the equation and the universe *size* only — never the full universe or the parsed struct. `noun` is `"constraint"` for linear constraints or `"view"` for Black-Litterman views.
+
+Shared by [`get_linear_constraints`](@ref) and Black-Litterman view generation.
+
+# Related
+
+  - [`unknown_variable_msg`](@ref)
+"""
+function empty_row_msg(eqn, nx, key; noun::AbstractString = "constraint")
+    return "$(noun) `$(eqn)` matched no assets in the universe ($(length(nx)) assets under key `$(key)`); row dropped"
+end
 
 export factory, concrete_typed_array, MinValue, MeanValue, MedianValue, MaxValue,
        StandardisedValue, StdValue, VarValue, SumValue, ProdValue, ModeValue

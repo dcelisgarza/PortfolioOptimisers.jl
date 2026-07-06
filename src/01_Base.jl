@@ -1153,6 +1153,44 @@ function compact_show_budget(io::IO)
     return max(8, displaysize(io)[1] - 4)
 end
 """
+Global configuration for the fuzzy "did you mean?" suggestions appended to "variable not in asset universe" messages by [`did_you_mean`](@ref).
+
+Holds:
+
+  - `dist`: the `StringDistances.StringDistance` used to score candidate names against the offending one (default `StringDistances.Levenshtein()`).
+  - `min_score`: the minimum normalised similarity in `[0, 1]` a candidate must reach before it is suggested (default `0.7`). Raising it toward `1` keeps only near-exact matches; setting it above `1` disables suggestions entirely — useful in meta-optimiser inner loops, where an asset name legitimately absent from a cluster/subset is not a typo and should draw no suggestion.
+
+Set via [`set_string_distance!`](@ref). Read by [`did_you_mean`](@ref). Mirrors the [`COMPACT_SHOW`](@ref) pretty-printing config.
+"""
+mutable struct StringDistanceConfig
+    dist::StringDistances.StringDistance
+    min_score::Float64
+end
+const STRING_DISTANCE = StringDistanceConfig(StringDistances.Levenshtein(), 0.7)
+"""
+    set_string_distance!(; dist::StringDistances.StringDistance = STRING_DISTANCE.dist,
+                         min_score::Real = STRING_DISTANCE.min_score)
+
+Configure the global fuzzy-suggestion settings read by [`did_you_mean`](@ref).
+
+  - `dist`: distance used to rank candidate names (e.g. `StringDistances.Levenshtein()`, `StringDistances.DamerauLevenshtein()`, `StringDistances.JaroWinkler()`).
+  - `min_score`: minimum normalised similarity in `[0, 1]` to emit a suggestion; set above `1` to disable suggestions.
+
+Returns the updated [`STRING_DISTANCE`](@ref) config.
+
+# Related
+
+  - [`did_you_mean`](@ref)
+  - [`STRING_DISTANCE`](@ref)
+  - [`set_compact_show!`](@ref)
+"""
+function set_string_distance!(; dist::StringDistances.StringDistance = STRING_DISTANCE.dist,
+                              min_score::Real = STRING_DISTANCE.min_score)
+    STRING_DISTANCE.dist = dist
+    STRING_DISTANCE.min_score = Float64(min_score)
+    return STRING_DISTANCE
+end
+"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Build the single-line summary for a vector field rendered by [`@define_pretty_show`](@ref).

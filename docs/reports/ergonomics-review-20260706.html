@@ -1,0 +1,435 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Ergonomics review — PortfolioOptimisers.jl</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="module">
+      import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+      mermaid.initialize({ startOnLoad: true, theme: "neutral", securityLevel: "loose" });
+    </script>
+    <style>
+      .friction  { border-left: 4px solid #dc2626; }
+      .signal    { border-left: 4px solid #059669; }
+      .diff-old  { background: #fef2f2; color: #991b1b; }
+      .diff-new  { background: #f0fdf4; color: #166534; }
+    </style>
+  </head>
+  <body class="bg-stone-50 text-slate-900 font-sans">
+    <main class="max-w-5xl mx-auto px-6 py-12 space-y-12">
+
+      <header class="space-y-2">
+        <h1 class="text-3xl font-bold">Ergonomics review — PortfolioOptimisers.jl</h1>
+        <p class="text-slate-600">2026-07-06 · branch <code class="font-mono">dev</code> · public surface: ~369 exported names, 10 <code class="font-mono">public</code> names, 55 const + 20 function aliases · docstring coverage ~95%+</p>
+        <div class="flex gap-4 text-xs text-slate-500 pt-1">
+          <span><span class="inline-block w-3 h-3 align-middle bg-red-50 border-l-4 border-red-600 mr-1"></span>friction</span>
+          <span><span class="inline-block w-3 h-3 align-middle bg-emerald-50 border-l-4 border-emerald-600 mr-1"></span>high signal</span>
+          <span><span class="inline-block w-3 h-3 align-middle diff-old mr-1"></span>before</span>
+          <span><span class="inline-block w-3 h-3 align-middle diff-new mr-1"></span>after</span>
+        </div>
+      </header>
+
+      <section id="candidates" class="space-y-10">
+
+        <!-- ============ Card 1 ============ -->
+        <article id="c1" class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 space-y-4">
+          <div class="flex items-center gap-2 flex-wrap">
+            <h2 class="text-xl font-semibold grow">1 · One-line happy path for the first optimisation</h2>
+            <span class="text-xs uppercase tracking-wider bg-emerald-600 text-white rounded px-2 py-1">Strong</span>
+            <span class="text-xs uppercase tracking-wider bg-slate-200 text-slate-700 rounded px-2 py-1">defaults</span>
+          </div>
+          <div class="font-mono text-sm text-slate-500">src/20_Optimisation/11_MeanRisk.jl:243 · src/20_Optimisation/10_JuMPOptimiser.jl:767 · src/10_JuMPModelOptimisation.jl:143</div>
+
+          <div class="rounded-lg border border-slate-200 bg-white p-4">
+            <pre class="mermaid">
+flowchart LR
+  A[caller] --> B["Solver(; solver = Clarabel.Optimizer,<br/>check_sol = …)"]
+  B --> C["JuMPOptimiser(; slv = …)"]
+  C --> D["MeanRisk(; opt = …)"]
+  D --> E["optimise(mr, rd)"]
+  A2[caller] -- convenience path --> D2["MeanRisk(; slv = Solver(Clarabel.Optimizer))"]
+  D2 --> E2["optimise(mr, rd)"]
+  classDef alias stroke:#059669,stroke-width:2px;
+  class A2,D2,E2 alias
+            </pre>
+          </div>
+
+          <div class="grid grid-cols-2 gap-4 font-mono text-sm">
+            <div class="diff-old rounded p-3 overflow-x-auto">
+              <div class="text-xs uppercase tracking-wider mb-2 text-red-700">Before — minimum viable MeanRisk</div>
+<pre>mr = MeanRisk(;
+  opt = JuMPOptimiser(;
+    slv = Solver(;
+      solver = Clarabel.Optimizer,
+      check_sol = (; allow_local = true,
+                     allow_almost = true))))</pre>
+            </div>
+            <div class="diff-new rounded p-3 overflow-x-auto">
+              <div class="text-xs uppercase tracking-wider mb-2 text-green-700">After — auto-wrap when only a solver differs</div>
+<pre>mr = MeanRisk(; slv = Solver(Clarabel.Optimizer))
+
+# `slv` kwarg auto-wraps into
+# JuMPOptimiser(; slv = …); `opt` still
+# accepted for full control.</pre>
+            </div>
+          </div>
+
+          <p><strong>Problem:</strong> `opt` has no default and `JuMPOptimiser` requires `slv`, so the three-level wrapper ceremony <code class="font-mono text-sm">opt = JuMPOptimiser(; slv = Solver(; solver = …))</code> is repeated at <strong>418 call sites</strong> in examples + user guide + tests before any optimisation runs.</p>
+          <p><strong>Direction:</strong> JuMP-based optimisers accept <code class="font-mono text-sm">slv</code> directly and auto-wrap it in a default <code class="font-mono text-sm">JuMPOptimiser</code>; additionally <code class="font-mono text-sm">Solver</code> takes the optimiser factory as its first positional argument (the field named <code class="font-mono text-sm">solver</code> inside the type named <code class="font-mono text-sm">Solver</code> is low-signal and required at 378 sites).</p>
+          <ul class="list-disc list-inside text-sm space-y-1">
+            <li>Friction removed at 418 call sites</li>
+            <li>Blast radius: zero — additive convenience</li>
+            <li>Signal: first-hour path fits one line</li>
+            <li>Convention: <code class="font-mono">opt =</code> path unchanged</li>
+          </ul>
+        </article>
+
+        <!-- ============ Card 2 ============ -->
+        <article id="c2" class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 space-y-4">
+          <div class="flex items-center gap-2 flex-wrap">
+            <h2 class="text-xl font-semibold grow">2 · <code class="font-mono">check_sol</code> default covers ≈0% of callers</h2>
+            <span class="text-xs uppercase tracking-wider bg-emerald-600 text-white rounded px-2 py-1">Strong</span>
+            <span class="text-xs uppercase tracking-wider bg-slate-200 text-slate-700 rounded px-2 py-1">defaults</span>
+          </div>
+          <div class="font-mono text-sm text-slate-500">src/10_JuMPModelOptimisation.jl:144</div>
+
+          <div class="space-y-3">
+            <div>
+              <div class="font-mono text-sm mb-1">check_sol = (;)   — who keeps the default?</div>
+              <div class="h-6 rounded overflow-hidden flex">
+                <div class="bg-emerald-400 flex items-center justify-center text-xs text-white" style="width:2%"></div>
+                <div class="bg-slate-400 flex items-center justify-center text-xs text-white" style="width:98%">344 sites pass (; allow_local = true, allow_almost = true) verbatim</div>
+              </div>
+              <div class="text-xs text-slate-500 mt-1">Every example, user-guide chapter, README block, and test overrides the default with the identical value.</div>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-4 font-mono text-sm">
+            <div class="diff-old rounded p-3 overflow-x-auto">
+              <div class="text-xs uppercase tracking-wider mb-2 text-red-700">Before</div>
+<pre>Solver(; name = "", solver::Any,
+  settings = nothing,
+  check_sol::NamedTuple = (;),
+  add_bridges = true)</pre>
+            </div>
+            <div class="diff-new rounded p-3 overflow-x-auto">
+              <div class="text-xs uppercase tracking-wider mb-2 text-green-700">After</div>
+<pre>Solver(; name = "", solver::Any,
+  settings = nothing,
+  check_sol::NamedTuple =
+    (; allow_local = true, allow_almost = true),
+  add_bridges = true)</pre>
+            </div>
+          </div>
+
+          <p><strong>Problem:</strong> with the empty default, conic solvers returning <code class="font-mono text-sm">ALMOST_OPTIMAL</code> are treated as failures, so callers hit a surprising <code class="font-mono text-sm">OptimisationFailure</code> until they discover the two flags everyone else already passes.</p>
+          <p><strong>Direction:</strong> make <code class="font-mono text-sm">(; allow_local = true, allow_almost = true)</code> the default; strict checking becomes the explicit opt-in <code class="font-mono text-sm">check_sol = (;)</code>.</p>
+          <ul class="list-disc list-inside text-sm space-y-1">
+            <li>Default covers ~100% of observed callers</li>
+            <li>Friction: removes first-hour failure surprise</li>
+            <li>Blast radius: behaviour change — document loudly</li>
+            <li>344 sites become deletable noise</li>
+          </ul>
+        </article>
+
+        <!-- ============ Card 3 ============ -->
+        <article id="c3" class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 space-y-4">
+          <div class="flex items-center gap-2 flex-wrap">
+            <h2 class="text-xl font-semibold grow">3 · “sets cannot be nothing” names a field, not the fix</h2>
+            <span class="text-xs uppercase tracking-wider bg-emerald-600 text-white rounded px-2 py-1">Strong</span>
+            <span class="text-xs uppercase tracking-wider bg-slate-200 text-slate-700 rounded px-2 py-1">errors</span>
+          </div>
+          <div class="font-mono text-sm text-slate-500">10 sites: src/20_Optimisation/{04_Base_ClusteringOptimisation, 14_RiskBudgeting, 17_NestedClustered, 18_Stacking, 19_SubsetResampling}.jl · src/13_Prior/10_EntropyPoolingPrior.jl</div>
+
+          <div class="space-y-3 font-mono text-sm">
+            <div class="friction rounded p-3 bg-red-50 overflow-x-auto">
+              <div class="text-xs uppercase tracking-wider mb-1 text-red-700">Before (verbatim, ×10)</div>
+              <pre>ERROR: IsNothingError: sets cannot be nothing</pre>
+            </div>
+            <div class="signal rounded p-3 bg-emerald-50 overflow-x-auto">
+              <div class="text-xs uppercase tracking-wider mb-1 text-emerald-700">After — modelled on the library's own best sibling</div>
+<pre>ERROR: IsNothingError: this optimiser has a group/estimator
+constraint that must be resolved against asset groups, but no
+`AssetSets` was provided. Pass `sets = AssetSets(...)` to the
+optimiser, or replace the estimator-form constraint with its
+precomputed numeric form.</pre>
+            </div>
+          </div>
+
+          <p><strong>Problem:</strong> a caller who attached a group constraint sees a bare field name — nothing links “sets” to the <code class="font-mono text-sm">AssetSets</code> they must supply, while sibling sites in the <em>same files</em> already say <em>“sets cannot be nothing when wb is a WeightBoundsEstimator”</em> (src/20_Optimisation/03_NaiveOptimisation.jl:274) and 12_FactorRiskContribution.jl spells out mistake + two fixes.</p>
+          <p><strong>Direction:</strong> raise all 10 sites to the standard the library already sets — name which constraint triggered the requirement and the two escape hatches.</p>
+          <ul class="list-disc list-inside text-sm space-y-1">
+            <li>Signal: names mistake and fix</li>
+            <li>Convention: error quality holds surface-wide</li>
+            <li>Blast radius: message-only, zero API change</li>
+          </ul>
+        </article>
+
+        <!-- ============ Card 4 ============ -->
+        <article id="c4" class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 space-y-4">
+          <div class="flex items-center gap-2 flex-wrap">
+            <h2 class="text-xl font-semibold grow">4 · Alias coverage drift: priors and cross-validation have no acronyms</h2>
+            <span class="text-xs uppercase tracking-wider bg-emerald-600 text-white rounded px-2 py-1">Strong</span>
+            <span class="text-xs uppercase tracking-wider bg-slate-200 text-slate-700 rounded px-2 py-1">aliases</span>
+          </div>
+          <div class="font-mono text-sm text-slate-500">src/24_Aliases.jl (55 const + 20 function aliases — all risk measures &amp; optimisers)</div>
+
+          <div class="grid grid-cols-2 gap-4">
+            <div class="rounded p-3 bg-emerald-50 border border-emerald-200">
+              <div class="text-xs uppercase tracking-wider mb-2 text-emerald-700">Has an alias</div>
+              <div class="flex flex-wrap gap-1 font-mono text-xs">
+                <span class="rounded px-2 py-1 bg-emerald-100">HRP</span>
+                <span class="rounded px-2 py-1 bg-emerald-100">HERC</span>
+                <span class="rounded px-2 py-1 bg-emerald-100">CVaR</span>
+                <span class="rounded px-2 py-1 bg-emerald-100">EVaR</span>
+                <span class="rounded px-2 py-1 bg-emerald-100">CVaR_RG</span>
+                <span class="rounded px-2 py-1 bg-emerald-100">MR</span>
+                <span class="rounded px-2 py-1 bg-emerald-100">RB</span>
+                <span class="rounded px-2 py-1 bg-emerald-100">NCO</span>
+                <span class="rounded px-2 py-1 bg-emerald-100">+67 more</span>
+              </div>
+            </div>
+            <div class="rounded p-3 bg-red-50 border border-red-200">
+              <div class="text-xs uppercase tracking-wider mb-2 text-red-700">Equally long, no alias (0 prior/CV entries)</div>
+              <div class="flex flex-wrap gap-1 font-mono text-xs">
+                <span class="rounded px-2 py-1 bg-red-100">AugmentedBlackLittermanPrior</span>
+                <span class="rounded px-2 py-1 bg-red-100">BayesianBlackLittermanPrior</span>
+                <span class="rounded px-2 py-1 bg-red-100">FactorBlackLittermanPrior</span>
+                <span class="rounded px-2 py-1 bg-red-100">EntropyPoolingPrior</span>
+                <span class="rounded px-2 py-1 bg-red-100">CombinatorialCrossValidation</span>
+                <span class="rounded px-2 py-1 bg-red-100">DimensionReductionRegression</span>
+                <span class="rounded px-2 py-1 bg-red-100">NormalisedConstantRelativeRiskAversion</span>
+              </div>
+            </div>
+          </div>
+
+          <p><strong>Problem:</strong> the alias file's own rationale — a caller who knows the literature acronym discovers the type via autocomplete — applies identically to <code class="font-mono text-sm">BBL</code>/<code class="font-mono text-sm">ABL</code>/<code class="font-mono text-sm">FBL</code>/<code class="font-mono text-sm">EP</code>/<code class="font-mono text-sm">CCV</code>, so the missing entries read as coverage drift, and the convention teaches a lie outside the risk-measure family.</p>
+          <p><strong>Direction:</strong> extend src/24_Aliases.jl to the prior, regression, and cross-validation families (and <code class="font-mono text-sm">NormalisedConstantRelativeRiskAversion</code>, 37 chars and a default) using the same literature-acronym rule.</p>
+          <ul class="list-disc list-inside text-sm space-y-1">
+            <li>Convention holds across whole surface</li>
+            <li>Discoverability: acronym autocomplete for priors</li>
+            <li>Blast radius: zero — additive consts</li>
+          </ul>
+        </article>
+
+        <!-- ============ Card 5 ============ -->
+        <article id="c5" class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 space-y-4">
+          <div class="flex items-center gap-2 flex-wrap">
+            <h2 class="text-xl font-semibold grow">5 · JuMPOptimiser: ~40 keyword slots, ~14 documented in the abbreviation table</h2>
+            <span class="text-xs uppercase tracking-wider bg-emerald-600 text-white rounded px-2 py-1">Strong</span>
+            <span class="text-xs uppercase tracking-wider bg-slate-200 text-slate-700 rounded px-2 py-1">docs</span>
+          </div>
+          <div class="font-mono text-sm text-slate-500">src/20_Optimisation/10_JuMPOptimiser.jl:767-796 · user_guide/00_Introduction.jl:47-56</div>
+
+          <div class="grid grid-cols-2 gap-4">
+            <div class="rounded p-3 bg-emerald-50 border border-emerald-200">
+              <div class="text-xs uppercase tracking-wider mb-2 text-emerald-700">In the guide's abbreviation table</div>
+              <div class="flex flex-wrap gap-1 font-mono text-xs">
+                <span class="rounded px-2 py-1 bg-emerald-100">pe</span><span class="rounded px-2 py-1 bg-emerald-100">slv</span><span class="rounded px-2 py-1 bg-emerald-100">ce</span><span class="rounded px-2 py-1 bg-emerald-100">me</span><span class="rounded px-2 py-1 bg-emerald-100">ve</span><span class="rounded px-2 py-1 bg-emerald-100">de</span><span class="rounded px-2 py-1 bg-emerald-100">mp</span><span class="rounded px-2 py-1 bg-emerald-100">pdm</span><span class="rounded px-2 py-1 bg-emerald-100">cle</span><span class="rounded px-2 py-1 bg-emerald-100">re</span><span class="rounded px-2 py-1 bg-emerald-100">wb</span><span class="rounded px-2 py-1 bg-emerald-100">opt</span><span class="rounded px-2 py-1 bg-emerald-100">r</span><span class="rounded px-2 py-1 bg-emerald-100">rd</span>
+              </div>
+            </div>
+            <div class="rounded p-3 bg-red-50 border border-red-200">
+              <div class="text-xs uppercase tracking-wider mb-2 text-red-700">Autocomplete-only, zero signal</div>
+              <div class="flex flex-wrap gap-1 font-mono text-xs">
+                <span class="rounded px-2 py-1 bg-red-100">sgcarde</span><span class="rounded px-2 py-1 bg-red-100">gcarde</span><span class="rounded px-2 py-1 bg-red-100">brt</span><span class="rounded px-2 py-1 bg-red-100">cle_pr</span><span class="rounded px-2 py-1 bg-red-100">nea</span><span class="rounded px-2 py-1 bg-red-100">sbgt</span><span class="rounded px-2 py-1 bg-red-100">lcse</span><span class="rounded px-2 py-1 bg-red-100">cte</span><span class="rounded px-2 py-1 bg-red-100">ple</span><span class="rounded px-2 py-1 bg-red-100">sca</span><span class="rounded px-2 py-1 bg-red-100">slt / sst / sglt / sgst</span><span class="rounded px-2 py-1 bg-red-100">smtx / sgmtx</span><span class="rounded px-2 py-1 bg-red-100">ccnt</span><span class="rounded px-2 py-1 bg-red-100">cobj</span>
+              </div>
+            </div>
+          </div>
+
+          <p><strong>Problem:</strong> the central config object (288 construction sites in examples + user guide) surfaces slots like <code class="font-mono text-sm">sgcarde</code> in autocomplete with no entry in the one place the guide promises to decode abbreviations — the caller must read the JuMPOptimiser docstring source to learn that it is the group-cardinality estimator's short-sell counterpart.</p>
+          <p><strong>Direction:</strong> complete the abbreviation table (or generate it from the docstring) so every JuMPOptimiser slot appears, grouped by constraint family, with the <code class="font-mono text-sm">s-</code>“short” / <code class="font-mono text-sm">g-</code>“group” prefix pattern stated once as a rule.</p>
+          <ul class="list-disc list-inside text-sm space-y-1">
+            <li>Discoverability: every slot decodable sans source</li>
+            <li>Signal: prefix rule stated once, reused</li>
+            <li>Blast radius: docs-only</li>
+          </ul>
+        </article>
+
+        <!-- ============ Card 6 ============ -->
+        <article id="c6" class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 space-y-4">
+          <div class="flex items-center gap-2 flex-wrap">
+            <h2 class="text-xl font-semibold grow">6 · One <code class="font-mono">dims</code> contract, four error phrasings</h2>
+            <span class="text-xs uppercase tracking-wider bg-amber-500 text-white rounded px-2 py-1">Worth exploring</span>
+            <span class="text-xs uppercase tracking-wider bg-slate-200 text-slate-700 rounded px-2 py-1">errors</span>
+          </div>
+          <div class="font-mono text-sm text-slate-500">src/03_Preprocessing.jl:731 · src/08_Moments/*.jl (53 sites)</div>
+
+          <div class="space-y-3 font-mono text-sm">
+            <div class="friction rounded p-3 bg-red-50 overflow-x-auto">
+              <div class="text-xs uppercase tracking-wider mb-1 text-red-700">Before — the same rule, said four ways</div>
+<pre>"dims must be 1 or 2"          × 43
+"dims must be either 1 or 2"   ×  5
+"dims must be in (1, 2)"       ×  5
+@argcheck(dims in (1, 2), DomainError)   ×  1
+  → ERROR: DomainError   (no value, no message)</pre>
+            </div>
+            <div class="signal rounded p-3 bg-emerald-50 overflow-x-auto">
+              <div class="text-xs uppercase tracking-wider mb-1 text-emerald-700">After — one phrasing, value included, everywhere</div>
+<pre>ERROR: DomainError with 3:
+dims must be 1 (observations × assets) or 2 (assets × observations)</pre>
+            </div>
+          </div>
+
+          <p><strong>Problem:</strong> the worst site — <code class="font-mono text-sm">find_complete_indices</code>, an exported preprocessing function — throws a bare <code class="font-mono text-sm">DomainError</code> carrying neither the offending value nor any message, while its 53 siblings each pick one of three phrasings.</p>
+          <p><strong>Direction:</strong> a single shared <code class="font-mono text-sm">check_dims</code> helper (or one message constant) so the contract is stated once, includes the passed value, and says what each dim means.</p>
+          <ul class="list-disc list-inside text-sm space-y-1">
+            <li>Signal: error names value and meaning</li>
+            <li>Convention: one phrasing, 54 sites</li>
+            <li>Blast radius: message-only</li>
+          </ul>
+        </article>
+
+        <!-- ============ Card 7 ============ -->
+        <article id="c7" class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 space-y-4">
+          <div class="flex items-center gap-2 flex-wrap">
+            <h2 class="text-xl font-semibold grow">7 · <code class="font-mono">mp</code> / <code class="font-mono">pdm</code> break the documented <code class="font-mono">-e</code> slot convention</h2>
+            <span class="text-xs uppercase tracking-wider bg-amber-500 text-white rounded px-2 py-1">Worth exploring</span>
+            <span class="text-xs uppercase tracking-wider bg-slate-200 text-slate-700 rounded px-2 py-1">naming</span>
+          </div>
+          <div class="font-mono text-sm text-slate-500">user_guide/00_Introduction.jl:41-52 · mp = at 39 sites, pdm = at 8 sites</div>
+
+          <div class="grid grid-cols-2 gap-4 font-mono text-sm">
+            <div class="diff-old rounded p-3 overflow-x-auto">
+              <div class="text-xs uppercase tracking-wider mb-2 text-red-700">Before — the guide's own table breaks its rule</div>
+<pre>"the trailing letter tells you what kind
+ of thing the slot holds: `-e` is an
+ estimator …"
+
+| `pe`  | prior estimator      |  ✓ rule holds
+| `ce`  | covariance estimator |  ✓
+| `mp`  | matrix-processing estimator | ✗
+| `pdm` | posdef-matrix estimator     | ✗</pre>
+            </div>
+            <div class="diff-new rounded p-3 overflow-x-auto">
+              <div class="text-xs uppercase tracking-wider mb-2 text-green-700">After — rule holds, old names deprecated kwargs</div>
+<pre>| `mpe`  | matrix-processing estimator | ✓
+| `pdme` | posdef-matrix estimator     | ✓
+
+# or: amend the stated rule to name
+# mp/pdm as grandfathered exceptions</pre>
+            </div>
+          </div>
+
+          <p><strong>Problem:</strong> a caller who learns the stated <code class="font-mono text-sm">-e</code> rule and predicts the matrix-processing slot name guesses <code class="font-mono text-sm">mpe</code> and gets a kwarg error — the convention teaches a lie exactly where the guide promises it holds.</p>
+          <p><strong>Direction:</strong> either rename with a deprecation window (blast radius 47 kwarg sites) or explicitly carve out <code class="font-mono text-sm">mp</code>/<code class="font-mono text-sm">pdm</code> in the table so the rule as stated is true.</p>
+          <div class="rounded p-3 bg-amber-50 border border-amber-300 text-sm">ADR 0015 governs <em>type</em>-name suffixes, not kwarg slots — this extends its bare-when-unambiguous spirit to the slot-abbreviation scheme rather than re-litigating it.</div>
+          <ul class="list-disc list-inside text-sm space-y-1">
+            <li>Convention test passes surface-wide</li>
+            <li>Blast radius: 47 sites, or docs-only carve-out</li>
+          </ul>
+        </article>
+
+        <!-- ============ Card 8 ============ -->
+        <article id="c8" class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 space-y-4">
+          <div class="flex items-center gap-2 flex-wrap">
+            <h2 class="text-xl font-semibold grow">8 · <code class="font-mono">w</code> means four different things</h2>
+            <span class="text-xs uppercase tracking-wider bg-slate-500 text-white rounded px-2 py-1">Speculative</span>
+            <span class="text-xs uppercase tracking-wider bg-slate-200 text-slate-700 rounded px-2 py-1">naming</span>
+          </div>
+          <div class="font-mono text-sm text-slate-500">src/24_Aliases.jl:121,469 · src/15_Turnover.jl:149 · src/19_RiskMeasures/27_ExpectedRisk.jl:56</div>
+
+          <div class="grid grid-cols-2 gap-2 font-mono text-xs">
+            <div class="rounded p-3 bg-red-50 border border-red-200">
+              <div class="text-red-700 uppercase tracking-wider mb-1">w = observation weights</div>
+              LowOrderMoment(; w = eweights(...))
+            </div>
+            <div class="rounded p-3 bg-red-50 border border-red-200">
+              <div class="text-red-700 uppercase tracking-wider mb-1">w = OWA weight generator</div>
+              OrderedWeightsArray(; w = owa_gmd)
+            </div>
+            <div class="rounded p-3 bg-red-50 border border-red-200">
+              <div class="text-red-700 uppercase tracking-wider mb-1">w = portfolio weight vector</div>
+              expected_risk(r, w, X) · factory(tn, w)
+            </div>
+            <div class="rounded p-3 bg-red-50 border border-red-200">
+              <div class="text-red-700 uppercase tracking-wider mb-1">w = equilibrium weights</div>
+              EquilibriumExpectedReturns(; w = ...)
+            </div>
+          </div>
+
+          <p><strong>Problem:</strong> a caller who learns “<code class="font-mono text-sm">w</code> is the portfolio weights” from <code class="font-mono text-sm">expected_risk</code> then meets <code class="font-mono text-sm">OrderedWeightsArray(; w = …)</code> and passes a vector where a generator function is expected — same letter, four concepts, no signal to distinguish them at the call site.</p>
+          <p><strong>Direction:</strong> reserve <code class="font-mono text-sm">w</code> for portfolio weights (the positional-argument sense) and migrate estimator slots toward the existing scheme (<code class="font-mono text-sm">ow</code> observation weights already appears elsewhere; OWA's generator slot could be <code class="font-mono text-sm">alg</code>-consistent) — high blast radius, so kwarg aliases with a deprecation window first.</p>
+          <ul class="list-disc list-inside text-sm space-y-1">
+            <li>Signal: one letter, one concept</li>
+            <li>Blast radius: high — audit before renaming</li>
+            <li>Alias-first migration mandatory</li>
+          </ul>
+        </article>
+
+        <!-- ============ Card 9 ============ -->
+        <article id="c9" class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 space-y-4">
+          <div class="flex items-center gap-2 flex-wrap">
+            <h2 class="text-xl font-semibold grow">9 · Three internal helpers pollute the exported namespace</h2>
+            <span class="text-xs uppercase tracking-wider bg-amber-500 text-white rounded px-2 py-1">Worth exploring</span>
+            <span class="text-xs uppercase tracking-wider bg-slate-200 text-slate-700 rounded px-2 py-1">discoverability</span>
+          </div>
+          <div class="font-mono text-sm text-slate-500">src/19_RiskMeasures/20_VarianceSkewKurtosis.jl:309 · src/03_Preprocessing.jl:444,730</div>
+
+          <div class="grid grid-cols-2 gap-4 font-mono text-sm">
+            <div class="diff-old rounded p-3 overflow-x-auto">
+              <div class="text-xs uppercase tracking-wider mb-2 text-red-700">Before — in every caller's autocomplete</div>
+<pre>export no_bounds_no_risk_expr_risk_measure
+export returns_result_picker
+export find_complete_indices</pre>
+            </div>
+            <div class="diff-new rounded p-3 overflow-x-auto">
+              <div class="text-xs uppercase tracking-wider mb-2 text-green-700">After — the pattern the library already uses</div>
+<pre>public no_bounds_no_risk_expr_risk_measure,
+       returns_result_picker,
+       find_complete_indices
+# same treatment as port_opt_view,
+# factory_child, traverse_concrete_subtypes</pre>
+            </div>
+          </div>
+
+          <p><strong>Problem:</strong> plumbing helpers sit in autocomplete alongside <code class="font-mono text-sm">MeanRisk</code> and <code class="font-mono text-sm">optimise</code>, inflating the 369-name surface with names a caller should never reach for — only 1 use exists outside src/ across examples, user guide, and tests.</p>
+          <p><strong>Direction:</strong> demote to <code class="font-mono text-sm">public</code> (the treatment <code class="font-mono text-sm">port_opt_view</code> already gets), keeping them documented and reachable but out of <code class="font-mono text-sm">using</code>-namespace autocomplete.</p>
+          <ul class="list-disc list-inside text-sm space-y-1">
+            <li>Discoverability: autocomplete = caller surface</li>
+            <li>Convention: matches existing public-not-export rule</li>
+            <li>Blast radius: 1 external call site</li>
+          </ul>
+        </article>
+
+        <!-- ============ Card 10 ============ -->
+        <article id="c10" class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 space-y-4">
+          <div class="flex items-center gap-2 flex-wrap">
+            <h2 class="text-xl font-semibold grow">10 · README buries the first <code class="font-mono">optimise</code> under 66 lines of ceremony</h2>
+            <span class="text-xs uppercase tracking-wider bg-amber-500 text-white rounded px-2 py-1">Worth exploring</span>
+            <span class="text-xs uppercase tracking-wider bg-slate-200 text-slate-700 rounded px-2 py-1">docs</span>
+          </div>
+          <div class="font-mono text-sm text-slate-500">README.md:61-127</div>
+
+          <div class="space-y-1 text-sm">
+            <div class="flex items-center gap-2"><span class="w-8 text-right font-mono text-xs text-slate-400">61</span><div class="grow rounded px-3 py-1.5 bg-slate-100 text-slate-500">using YFinance, PrettyTables, … (7 packages)</div></div>
+            <div class="flex items-center gap-2"><span class="w-8 text-right font-mono text-xs text-slate-400">70</span><div class="grow rounded px-3 py-1.5 bg-slate-100 text-slate-500">two pretty_table formatter closures</div></div>
+            <div class="flex items-center gap-2"><span class="w-8 text-right font-mono text-xs text-slate-400">86</span><div class="grow rounded px-3 py-1.5 bg-slate-100 text-slate-500">custom stock_price_to_time_array helper</div></div>
+            <div class="flex items-center gap-2"><span class="w-8 text-right font-mono text-xs text-slate-400">95</span><div class="grow rounded px-3 py-1.5 bg-slate-100 text-slate-500">hard-coded 30-ticker meme-stock list + date plumbing</div></div>
+            <div class="flex items-center gap-2"><span class="w-8 text-right font-mono text-xs text-slate-400">127</span><div class="grow rounded px-3 py-1.5 bg-emerald-100 text-emerald-800 font-medium">res = optimise(mr, rd) &nbsp;← the payoff, two screens down</div></div>
+          </div>
+
+          <p><strong>Problem:</strong> the front-door document makes the caller read YFinance/PrettyTables plumbing before the one line they came for, while the user guide already demonstrates the better shape (data → plot in ~5 lines, user_guide/00_Introduction.jl:72-77).</p>
+          <p><strong>Direction:</strong> open the README with a ≤10-line happy path on bundled/synthetic returns (prices_to_returns → MeanRisk → optimise), and push the live-data walkthrough below it.</p>
+          <ul class="list-disc list-inside text-sm space-y-1">
+            <li>Friction: payoff visible on first screen</li>
+            <li>Happy path precedes edge ceremony</li>
+            <li>Blast radius: docs-only</li>
+          </ul>
+          <div class="rounded p-3 bg-amber-50 border border-amber-300 text-sm">ADR 0014 governs user-guide/example grouping, not the README — no conflict.</div>
+        </article>
+
+      </section>
+
+      <!-- ============ Top recommendation ============ -->
+      <section id="top-recommendation" class="bg-emerald-50 border-2 border-emerald-600 rounded-xl p-8 space-y-3">
+        <div class="text-xs uppercase tracking-wider text-emerald-700 font-semibold">Top recommendation</div>
+        <h2 class="text-2xl font-bold"><a href="#c1" class="underline decoration-emerald-400">One-line happy path for the first optimisation</a></h2>
+        <p class="text-slate-700">418 call sites repeat the <code class="font-mono text-sm">opt = JuMPOptimiser(; slv = Solver(; solver = …))</code> ceremony and 344 of them also re-pass the same <code class="font-mono text-sm">check_sol</code> flags (<a href="#c2" class="underline">card 2</a>) — fixing these two defaults together collapses the library's most-travelled first-hour path from six lines of nesting to one, with zero blast radius on the existing explicit forms.</p>
+      </section>
+
+      <footer class="text-xs text-slate-400 pt-4">
+        Generated 2026-07-06 · /improve-ergonomics · evidence verified against branch dev (grep counts, verbatim source)
+      </footer>
+    </main>
+  </body>
+</html>

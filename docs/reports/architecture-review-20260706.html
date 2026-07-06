@@ -1,0 +1,331 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Architecture review — PortfolioOptimisers.jl</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="module">
+      import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+      mermaid.initialize({ startOnLoad: true, theme: "neutral", securityLevel: "loose" });
+    </script>
+    <style>
+      .seam { border-style: dashed; }
+      .tailblock { font-size: 10px; line-height: 1.5; }
+    </style>
+  </head>
+  <body class="bg-stone-50 text-slate-900 font-sans">
+    <main class="max-w-5xl mx-auto px-6 py-12 space-y-12">
+
+      <header class="space-y-3">
+        <h1 class="font-serif text-3xl">Architecture review — PortfolioOptimisers.jl</h1>
+        <p class="text-sm text-slate-500">2026-07-06 · branch <span class="font-mono">dev</span> · ~88.7k LOC src · 50 test files</p>
+        <div class="flex flex-wrap gap-4 text-xs text-slate-600">
+          <span class="inline-flex items-center gap-1"><span class="inline-block w-4 h-3 border border-slate-400 bg-white"></span> module</span>
+          <span class="inline-flex items-center gap-1"><span class="inline-block w-4 h-0 border-t-2 border-dashed border-slate-500"></span> seam</span>
+          <span class="inline-flex items-center gap-1"><span class="inline-block w-4 h-0 border-t-2 border-red-600"></span> duplication / leakage</span>
+          <span class="inline-flex items-center gap-1"><span class="inline-block w-4 h-3 bg-slate-800"></span> deep module</span>
+        </div>
+        <p class="text-xs text-slate-500">Prior-review items closed since July&nbsp;2: the builder-combinator candidate is resolved by ADR&nbsp;0008 (<span class="font-mono">assemble_jump_model!</span> is one shared 15-builder sequence, called once per optimiser); Gerber marker consolidation is decided by ADR&nbsp;0022. Equation parsing was re-checked: the expression-tree walker is genuinely deep, zero-row handling is one cohesive block — not re-surfaced.</p>
+      </header>
+
+      <section id="candidates" class="space-y-10">
+
+        <!-- ============ CANDIDATE 1 ============ -->
+        <article id="c1" class="rounded-xl border border-slate-200 bg-white p-6 space-y-5 shadow-sm">
+          <div class="flex flex-wrap items-center gap-3">
+            <h2 class="font-serif text-xl">Deepen the tail-measure family: Range = two single-tail calls</h2>
+            <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">Strong</span>
+            <span class="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">in-process</span>
+          </div>
+          <p class="font-mono text-sm text-slate-600 leading-relaxed">
+            src/20_Optimisation/20_RiskMeasureConstraints/06_XatRiskConstraints.jl (463)<br/>
+            &nbsp;·&nbsp;07_ConditionalXatRiskConstraints.jl (676) · 08_EntropicXatRiskConstraints.jl (269)<br/>
+            &nbsp;·&nbsp;09_RelativisticXatRiskConstraints.jl (394) · 19_PowerNormXatRiskConstraints.jl (311)<br/>
+            &nbsp;template: 21_GenericValueatRiskRangeConstraints.jl (41 lines)
+          </p>
+
+          <div class="grid md:grid-cols-2 gap-4">
+            <!-- BEFORE -->
+            <div class="rounded-lg border border-slate-200 bg-stone-50 p-4">
+              <p class="text-xs uppercase tracking-wider text-slate-500 mb-3">Before — 5 families hand-roll both tails</p>
+              <div class="space-y-2">
+                <!-- one row per family -->
+                <div class="flex items-center gap-2">
+                  <span class="text-xs uppercase tracking-wider w-16 text-slate-600">VaR</span>
+                  <div class="flex-1 flex gap-1">
+                    <div class="flex-1 border border-slate-400 bg-white px-2 py-1 tailblock font-mono">single-tail<br/>(loss)</div>
+                    <div class="flex-1 border-2 border-red-500 bg-red-50 px-2 py-1 tailblock font-mono">Range: _l_ block<br/>(copy of tail)</div>
+                    <div class="flex-1 border-2 border-red-500 bg-red-50 px-2 py-1 tailblock font-mono">Range: _h_ block<br/>(tail on −net_X)</div>
+                  </div>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span class="text-xs uppercase tracking-wider w-16 text-slate-600">CVaR</span>
+                  <div class="flex-1 flex gap-1">
+                    <div class="flex-1 border border-slate-400 bg-white px-2 py-1 tailblock font-mono">single-tail<br/>:51–80</div>
+                    <div class="flex-1 border-2 border-red-500 bg-red-50 px-2 py-1 tailblock font-mono">Range _l_ ×7<br/>:106–168</div>
+                    <div class="flex-1 border-2 border-red-500 bg-red-50 px-2 py-1 tailblock font-mono">Range _h_ ×7</div>
+                  </div>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span class="text-xs uppercase tracking-wider w-16 text-slate-600">EVaR</span>
+                  <div class="flex-1 flex gap-1">
+                    <div class="flex-1 border border-slate-400 bg-white px-2 py-1 tailblock font-mono">single-tail<br/>(exp cone)</div>
+                    <div class="flex-1 border-2 border-red-500 bg-red-50 px-2 py-1 tailblock font-mono">Range _l_ ×5</div>
+                    <div class="flex-1 border-2 border-red-500 bg-red-50 px-2 py-1 tailblock font-mono">Range _h_ ×5</div>
+                  </div>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span class="text-xs uppercase tracking-wider w-16 text-slate-600">RVaR</span>
+                  <div class="flex-1 flex gap-1">
+                    <div class="flex-1 border border-slate-400 bg-white px-2 py-1 tailblock font-mono">single-tail<br/>(power cone)</div>
+                    <div class="flex-1 border-2 border-red-500 bg-red-50 px-2 py-1 tailblock font-mono">Range _l_ ×3</div>
+                    <div class="flex-1 border-2 border-red-500 bg-red-50 px-2 py-1 tailblock font-mono">Range _h_ ×3</div>
+                  </div>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span class="text-xs uppercase tracking-wider w-16 text-slate-600">PNVaR</span>
+                  <div class="flex-1 flex gap-1">
+                    <div class="flex-1 border border-slate-400 bg-white px-2 py-1 tailblock font-mono">single-tail<br/>(p-norm)</div>
+                    <div class="flex-1 border-2 border-red-500 bg-red-50 px-2 py-1 tailblock font-mono">Range _l_ ×5</div>
+                    <div class="flex-1 border-2 border-red-500 bg-red-50 px-2 py-1 tailblock font-mono">Range _h_ ×5</div>
+                  </div>
+                </div>
+              </div>
+              <p class="text-xs text-slate-500 mt-3">2,154 lines; each red block re-derives its family's single-tail body with <span class="font-mono">_l_/_h_</span> suffixed variables.</p>
+            </div>
+            <!-- AFTER -->
+            <div class="rounded-lg border border-slate-200 bg-stone-50 p-4">
+              <p class="text-xs uppercase tracking-wider text-slate-500 mb-3">After — one delegation, per-family cones stay put</p>
+              <div class="space-y-3">
+                <div class="bg-slate-800 text-slate-100 rounded px-3 py-2">
+                  <p class="text-xs uppercase tracking-wider text-slate-300">deep: Range delegation</p>
+                  <p class="tailblock font-mono text-slate-200 mt-1">set_risk_constraints!(…, loss=true)<br/>set_risk_constraints!(…, loss=false)<br/>sum the two expressions</p>
+                  <p class="tailblock text-slate-400 mt-1">≈ 21_GenericValueatRiskRange…:34–40, today 41 lines</p>
+                </div>
+                <div class="border-t-2 border-dashed border-slate-500 relative">
+                  <span class="absolute -top-2 left-1/2 -translate-x-1/2 bg-stone-50 px-2 text-[10px] uppercase tracking-wider text-slate-500">seam: single-tail + loss kwarg</span>
+                </div>
+                <div class="grid grid-cols-5 gap-1">
+                  <div class="border border-slate-400 bg-white px-1 py-2 tailblock font-mono text-center">VaR<br/>big-M</div>
+                  <div class="border border-slate-400 bg-white px-1 py-2 tailblock font-mono text-center">CVaR<br/>LP</div>
+                  <div class="border border-slate-400 bg-white px-1 py-2 tailblock font-mono text-center">EVaR<br/>exp</div>
+                  <div class="border border-slate-400 bg-white px-1 py-2 tailblock font-mono text-center">RVaR<br/>power</div>
+                  <div class="border border-slate-400 bg-white px-1 py-2 tailblock font-mono text-center">PNVaR<br/>p-norm</div>
+                </div>
+                <p class="text-xs text-slate-500">Five adapters already satisfy the single-tail seam — the seam is real, only the Range side ignores it.</p>
+              </div>
+            </div>
+          </div>
+
+          <p class="text-sm"><span class="font-semibold">Problem —</span> each Range measure's implementation re-derives its family's single-tail body twice, so the Range modules are shallow: the interface says "combine two tails," the implementation hand-copies them per cone family.</p>
+          <p class="text-sm"><span class="font-semibold">Direction —</span> rewrite the five hand-rolled Range bodies as twofold delegation through the existing single-tail <span class="font-mono">loss</span> seam, the shape <span class="font-mono">GenericValueatRiskRange</span> already demonstrates; likely restructuring each Range struct to hold two sub-measures (alpha/beta today live in one struct).</p>
+          <ul class="text-sm list-disc list-inside space-y-1 text-slate-700">
+            <li>locality: tail logic in one place</li>
+            <li>leverage: one seam, five families</li>
+            <li>delete ~5 duplicated tail blocks</li>
+            <li>tests hit the single-tail interface</li>
+            <li>new family gets Range free</li>
+          </ul>
+          <div class="rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">Aligns with ADR&nbsp;0024's single-seam discipline; no ADR conflict. Caveat: cones differ per family — the delegation must not touch the cone code, only the two-tail scaffolding.</div>
+        </article>
+
+        <!-- ============ CANDIDATE 2 ============ -->
+        <article id="c2" class="rounded-xl border border-slate-200 bg-white p-6 space-y-5 shadow-sm">
+          <div class="flex flex-wrap items-center gap-3">
+            <h2 class="font-serif text-xl">Make <span class="font-mono">set_risk_constraints!</span> the test surface</h2>
+            <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">Strong</span>
+            <span class="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">in-process</span>
+          </div>
+          <p class="font-mono text-sm text-slate-600 leading-relaxed">
+            src/20_Optimisation/20_RiskMeasureConstraints/ (54 methods) · test/test_03b_jump_model_assembly.jl (79 lines, the only solver-free probe)
+          </p>
+
+          <div class="grid md:grid-cols-2 gap-4">
+            <div class="rounded-lg border border-slate-200 bg-stone-50 p-4">
+              <p class="text-xs uppercase tracking-wider text-slate-500 mb-3">Before — measures tested only end-to-end</p>
+              <pre class="mermaid">
+flowchart TB
+  T[test_09 / test_18j] --> O[optimise]
+  O --> A[assemble_jump_model!]
+  A --> R54["54 × set_risk_constraints!"]
+  R54 --> S[Clarabel solve]
+  S --> N[assert numeric risk]
+  classDef leak stroke:#dc2626,stroke-width:2px;
+  class S,N leak
+              </pre>
+              <p class="text-xs text-slate-500 mt-2">A cone change is only caught after a full solve — failures surface as numeric drift, not as "wrong constraint registered."</p>
+            </div>
+            <div class="rounded-lg border border-slate-200 bg-stone-50 p-4">
+              <p class="text-xs uppercase tracking-wider text-slate-500 mb-3">After — solver-free probe per measure</p>
+              <pre class="mermaid">
+flowchart TB
+  T["per-measure test loop"] --> A[assemble_jump_model!]
+  A --> R["set_risk_constraints! (one measure)"]
+  R --> K["assert registered Model State keys\n+ expression structure"]
+  classDef deep fill:#1e293b,color:#f1f5f9,stroke:#0f172a;
+  class R deep
+              </pre>
+              <p class="text-xs text-slate-500 mt-2">The <span class="font-mono">test_03b</span> pattern already proves this works for the assembler; extend it across the measure set.</p>
+            </div>
+          </div>
+
+          <p class="text-sm"><span class="font-semibold">Problem —</span> 54 <span class="font-mono">set_risk_constraints!</span> implementations register typed Model State, yet none has a test at that interface — every regression must round-trip through a solver.</p>
+          <p class="text-sm"><span class="font-semibold">Direction —</span> extend the <span class="font-mono">test_03b</span> solver-free harness into a loop over risk measures asserting registered variables/constraints and returned expression shape.</p>
+          <ul class="text-sm list-disc list-inside space-y-1 text-slate-700">
+            <li>the interface is the test surface</li>
+            <li>locality: cone bugs caught in-module</li>
+            <li>no new src code needed</li>
+            <li>safety net for candidate&nbsp;1</li>
+          </ul>
+          <div class="rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">Builds directly on ADR&nbsp;0004 (typed Model State) and ADR&nbsp;0008 (assembly seam) — those decisions created this test surface; it is simply unused.</div>
+        </article>
+
+        <!-- ============ CANDIDATE 3 ============ -->
+        <article id="c3" class="rounded-xl border border-slate-200 bg-white p-6 space-y-5 shadow-sm">
+          <div class="flex flex-wrap items-center gap-3">
+            <h2 class="font-serif text-xl">One declaration for a risk measure's parallel surfaces</h2>
+            <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">Worth exploring</span>
+            <span class="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">in-process</span>
+          </div>
+          <p class="font-mono text-sm text-slate-600 leading-relaxed">
+            src/19_RiskMeasures/ (28 files, 59 structs) · src/20_Optimisation/20_RiskMeasureConstraints/ (21 mirror files) · src/24_Aliases.jl · src/PortfolioOptimisers.jl (two include lists)
+          </p>
+
+          <div class="grid md:grid-cols-2 gap-4">
+            <div class="rounded-lg border border-slate-200 bg-stone-50 p-4">
+              <p class="text-xs uppercase tracking-wider text-slate-500 mb-3">Before — adding EVaR touches 5 surfaces</p>
+              <pre class="mermaid">
+flowchart LR
+  M["new measure"] --> F1["19_…/08_EntropicXatRisk.jl\nstruct · functor · risk_input_kind"]
+  M --> F2["20_…/08_…Constraints.jl\nset_risk_constraints!"]
+  M --> F3["24_Aliases.jl:320"]
+  M --> F4["PortfolioOptimisers.jl\ninclude ×2, index-aligned"]
+  M --> F5["supports_* traits"]
+  classDef leak stroke:#dc2626,stroke-width:2px;
+  class F3,F4 leak
+              </pre>
+            </div>
+            <div class="rounded-lg border border-slate-200 bg-stone-50 p-4">
+              <p class="text-xs uppercase tracking-wider text-slate-500 mb-3">After — declaration emits the satellites</p>
+              <div class="space-y-3">
+                <div class="bg-slate-800 text-slate-100 rounded px-3 py-2">
+                  <p class="text-xs uppercase tracking-wider text-slate-300">deep: @risk_measure declaration</p>
+                  <p class="tailblock font-mono text-slate-200 mt-1">one site declares kind + traits + alias;<br/>macro emits risk_input_kind,<br/>supports_precomputed_returns, functor stubs</p>
+                </div>
+                <div class="grid grid-cols-2 gap-1">
+                  <div class="border border-slate-400 bg-white px-2 py-1 tailblock font-mono text-center">19_… measure file<br/>(hand-written)</div>
+                  <div class="border border-slate-400 bg-white px-2 py-1 tailblock font-mono text-center">20_… constraints file<br/>(hand-written, stays)</div>
+                </div>
+                <p class="text-xs text-slate-500">The 19↔20 split stays — it earns its keep (measure is prior-agnostic; constraints need the JuMP model). What collapses is the trait/alias/include bookkeeping.</p>
+              </div>
+            </div>
+          </div>
+
+          <p class="text-sm"><span class="font-semibold">Problem —</span> the measure↔constraints mirror-file index alignment and the dual include lists are unenforced conventions, so one new measure means five coordinated edits and understanding one measure means bouncing across four files.</p>
+          <p class="text-sm"><span class="font-semibold">Direction —</span> a <span class="font-mono">@risk_measure</span> declaration (the arch-review item 5 idea) that emits <span class="font-mono">risk_input_kind</span>, <span class="font-mono">supports_precomputed_returns</span>, and functor stubs in sync — plus a cheap test asserting the two include lists stay aligned.</p>
+          <ul class="text-sm list-disc list-inside space-y-1 text-slate-700">
+            <li>locality: one declaration per measure</li>
+            <li>convention becomes checked, not remembered</li>
+            <li>trait drift becomes impossible</li>
+          </ul>
+          <div class="rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">Do not merge the 19/20 trees — the split is deliberate and mirrors ADR&nbsp;0006/0018's trait separation. This candidate deepens the declaration, not the file layout.</div>
+        </article>
+
+        <!-- ============ CANDIDATE 4 ============ -->
+        <article id="c4" class="rounded-xl border border-slate-200 bg-white p-6 space-y-5 shadow-sm">
+          <div class="flex flex-wrap items-center gap-3">
+            <h2 class="font-serif text-xl">Factor the NormalUncertaintySet asymptotic-covariance core</h2>
+            <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">Worth exploring</span>
+            <span class="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">in-process</span>
+          </div>
+          <p class="font-mono text-sm text-slate-600 leading-relaxed">
+            src/14_UncertaintySets/03_NormalUncertaintySets.jl (1,105 lines; ucs/mu_ucs/sigma_ucs × Box/Ellipsoidal at :327–:850)
+          </p>
+
+          <div class="grid md:grid-cols-2 gap-4">
+            <div class="rounded-lg border border-slate-200 bg-stone-50 p-4">
+              <p class="text-xs uppercase tracking-wider text-slate-500 mb-3">Before — mass diagram: 6 entry points, shared core recomputed</p>
+              <div class="flex items-end justify-around h-56">
+                <div class="flex flex-col items-center gap-1 w-1/4">
+                  <div class="w-full h-20 border border-slate-400 bg-white flex items-center justify-center tailblock font-mono text-center">interface<br/>ucs · mu_ucs · sigma_ucs<br/>× Box · Ellipsoidal</div>
+                  <div class="w-full h-28 border-2 border-red-500 bg-red-50 flex items-center justify-center tailblock font-mono text-center">implementation<br/>asymptotic-cov slices<br/>re-derived per method</div>
+                  <span class="text-[10px] uppercase tracking-wider text-slate-500">shallow</span>
+                </div>
+              </div>
+            </div>
+            <div class="rounded-lg border border-slate-200 bg-stone-50 p-4">
+              <p class="text-xs uppercase tracking-wider text-slate-500 mb-3">After — thin accessors over one deep core</p>
+              <div class="flex items-end justify-around h-56">
+                <div class="flex flex-col items-center gap-1 w-1/4">
+                  <div class="w-full h-8 border border-slate-400 bg-white flex items-center justify-center tailblock font-mono text-center">same 6 accessors</div>
+                  <div class="w-full h-40 bg-slate-800 text-slate-100 flex items-center justify-center tailblock font-mono text-center">deep core:<br/>asymptotic moments<br/>computed once</div>
+                  <span class="text-[10px] uppercase tracking-wider text-slate-500">deep</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <p class="text-sm"><span class="font-semibold">Problem —</span> <span class="font-mono">ucs</span>, <span class="font-mono">mu_ucs</span>, and <span class="font-mono">sigma_ucs</span> mostly recompute the same asymptotic-covariance intermediates per algorithm, so the module is moderately shallow: three public entry points over one repeated computation.</p>
+          <p class="text-sm"><span class="font-semibold">Direction —</span> keep the per-algorithm dispatch (idiomatic Julia) and the public accessors, but factor the shared asymptotic-moment computation into one internal deep function all six methods call.</p>
+          <ul class="text-sm list-disc list-inside space-y-1 text-slate-700">
+            <li>locality: moment math in one place</li>
+            <li>interface unchanged; implementation absorbs slices</li>
+            <li>core testable without full ucs call</li>
+          </ul>
+          <div class="rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">ADR&nbsp;0016 (uncertainty sets own their posdef/moment config) is untouched — this factors internals, not ownership.</div>
+        </article>
+
+        <!-- ============ CANDIDATE 5 ============ -->
+        <article id="c5" class="rounded-xl border border-slate-200 bg-white p-6 space-y-5 shadow-sm">
+          <div class="flex flex-wrap items-center gap-3">
+            <h2 class="font-serif text-xl">Funnel <span class="font-mono">parse_equation</span>'s three fronts into one</h2>
+            <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-200 text-slate-700">Speculative</span>
+            <span class="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">in-process</span>
+          </div>
+          <p class="font-mono text-sm text-slate-600 leading-relaxed">
+            src/12_ConstraintGeneration/02_LinearConstraintGeneration.jl:1032 / :1079 / :1095 (~60 lines)
+          </p>
+
+          <div class="grid md:grid-cols-2 gap-4">
+            <div class="rounded-lg border border-slate-200 bg-stone-50 p-4">
+              <p class="text-xs uppercase tracking-wider text-slate-500 mb-3">Before — three fronts, each finds the operator</p>
+              <div class="space-y-1">
+                <div class="h-10 border-l-4 border-red-500 border border-slate-300 bg-white flex items-center px-3 tailblock font-mono">parse_equation(::String) — locate op, split</div>
+                <div class="h-10 border-l-4 border-red-500 border border-slate-300 bg-white flex items-center px-3 tailblock font-mono">parse_equation(::Expr) — locate op, split</div>
+                <div class="h-10 border-l-4 border-red-500 border border-slate-300 bg-white flex items-center px-3 tailblock font-mono">parse_equation(::Vector) — locate op, split</div>
+                <div class="h-10 border border-slate-400 bg-white flex items-center px-3 tailblock font-mono">_parse_equation — the real walker</div>
+              </div>
+            </div>
+            <div class="rounded-lg border border-slate-200 bg-stone-50 p-4">
+              <p class="text-xs uppercase tracking-wider text-slate-500 mb-3">After — thin coercions, one operator-split</p>
+              <div class="space-y-1">
+                <div class="h-8 border border-slate-300 bg-white flex items-center px-3 tailblock font-mono text-slate-500">coerce String / Expr / Vector</div>
+                <div class="h-12 bg-slate-800 text-slate-100 flex items-center px-3 tailblock font-mono">split-on-operator + _parse_equation (deep)</div>
+              </div>
+              <p class="text-xs text-slate-500 mt-3">Deletion test barely passes: the duplication is ~60 lines and already well-tested via <span class="font-mono">test_02</span>. Only worth doing opportunistically.</p>
+            </div>
+          </div>
+
+          <p class="text-sm"><span class="font-semibold">Problem —</span> three method bodies independently re-derive the comparison operator before funnelling into the deep walker.</p>
+          <p class="text-sm"><span class="font-semibold">Direction —</span> make the three methods pure input coercions and move the operator split into the shared implementation.</p>
+          <ul class="text-sm list-disc list-inside space-y-1 text-slate-700">
+            <li>one operator-split, three call sites</li>
+            <li>tests already cover the interface</li>
+          </ul>
+        </article>
+
+      </section>
+
+      <!-- ============ TOP RECOMMENDATION ============ -->
+      <section id="top-recommendation" class="rounded-xl bg-slate-800 text-slate-100 p-8 space-y-3">
+        <p class="text-xs uppercase tracking-wider text-slate-400">Top recommendation</p>
+        <h2 class="font-serif text-2xl"><a href="#c2" class="underline decoration-slate-500">Candidate 2</a> then <a href="#c1" class="underline decoration-slate-500">candidate 1</a>, as one move</h2>
+        <p class="text-sm text-slate-300 max-w-3xl">First extend the solver-free <span class="font-mono">test_03b</span> harness across the tail measures — the interface is the test surface, and it costs no src changes. Then, behind that net, rewrite the five hand-rolled Range bodies as twofold delegation through the single-tail <span class="font-mono">loss</span> seam. That deletes the largest block of near-identical code in the codebase (~2,154 lines across five families shrink to per-family cone code plus one delegation), and the 41-line <span class="font-mono">GenericValueatRiskRange</span> file proves the target shape already works.</p>
+      </section>
+
+      <footer class="text-xs text-slate-400">
+        Generated 2026-07-06 · glossary: CONTEXT.md · decisions honoured: docs/adr/0001–0024
+      </footer>
+    </main>
+  </body>
+</html>

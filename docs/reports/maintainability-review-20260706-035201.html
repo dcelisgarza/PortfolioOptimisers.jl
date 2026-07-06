@@ -1,0 +1,370 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Maintainability review — PortfolioOptimisers.jl</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="module">
+      import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+      mermaid.initialize({ startOnLoad: true, theme: "neutral", securityLevel: "loose" });
+    </script>
+    <style>
+      .copy    { border: 1px solid #cbd5e1; background: #f8fafc; }
+      .drifted { border: 1px solid #d97706; background: #fffbeb; }
+      .spoc    { background: linear-gradient(135deg, #064e3b, #065f46); color: #fff; }
+      .diff-old { background: #fef2f2; color: #991b1b; }
+      .diff-new { background: #f0fdf4; color: #166534; }
+    </style>
+  </head>
+  <body class="bg-stone-50 text-slate-900 font-sans">
+    <main class="max-w-5xl mx-auto px-6 py-12 space-y-12">
+
+      <header class="space-y-3">
+        <h1 class="text-3xl font-bold tracking-tight">Maintainability review — PortfolioOptimisers.jl</h1>
+        <p class="text-slate-500 text-sm">2026-07-06 · branch <span class="font-mono">dev</span> · 88,693 LOC across 177 files in <span class="font-mono">src/</span> · informed by CONTEXT.md and 24 ADRs</p>
+        <div class="flex flex-wrap items-center gap-4 text-xs text-slate-600 pt-1">
+          <span class="flex items-center gap-1.5"><span class="copy inline-block w-4 h-4 rounded"></span> copy of one shape</span>
+          <span class="flex items-center gap-1.5"><span class="drifted inline-block w-4 h-4 rounded"></span> drifted copy</span>
+          <span class="flex items-center gap-1.5"><span class="spoc inline-block w-4 h-4 rounded"></span> single point of change</span>
+        </div>
+        <p class="text-sm text-slate-600 max-w-3xl">The variance/moment constraint builders were already consolidated (helpers like <span class="font-mono text-xs">set_second_moment_risk!</span>); no load-time <span class="font-mono text-xs">eval</span> codegen exists in <span class="font-mono text-xs">src/</span>. The remaining change cost is concentrated in the <strong>tail-risk (XatRisk) constraint builders</strong> — candidates 1, 2, 3 and 6 are four views of that one unrefactored region.</p>
+      </header>
+
+      <section id="candidates" class="space-y-10">
+
+        <!-- ═══════════════ 1 ═══════════════ -->
+        <article id="c1" class="bg-white rounded-xl border border-slate-200 shadow-sm p-8 space-y-5">
+          <div class="flex items-start justify-between gap-4">
+            <h2 class="text-xl font-semibold">1 · Extract the tail-risk builder combinator</h2>
+            <div class="flex gap-2 shrink-0">
+              <span class="text-xs uppercase tracking-wider bg-emerald-100 text-emerald-800 rounded-full px-3 py-1 font-semibold">Strong</span>
+              <span class="text-xs uppercase tracking-wider bg-slate-100 text-slate-600 rounded-full px-3 py-1">duplication</span>
+            </div>
+          </div>
+          <p class="font-mono text-sm text-slate-500">~20 <span class="text-slate-700">set_risk_constraints!</span> methods · 5 files · src/20_Optimisation/20_RiskMeasureConstraints/</p>
+
+          <!-- duplication grid -->
+          <div>
+            <div class="text-xs uppercase tracking-wider text-slate-400 mb-2">Before — one skeleton, ~20 re-encodings</div>
+            <div class="grid grid-cols-5 gap-2 font-mono text-xs">
+              <div class="copy rounded p-2">06_XatRisk:67<br/><span class="text-slate-400">VaR MIP</span></div>
+              <div class="copy rounded p-2">06_XatRisk:136<br/><span class="text-slate-400">VaRRange MIP</span></div>
+              <div class="copy rounded p-2">06_XatRisk:310<br/><span class="text-slate-400">VaR dist</span></div>
+              <div class="copy rounded p-2">06_XatRisk:366<br/><span class="text-slate-400">VaRRange dist</span></div>
+              <div class="copy rounded p-2">06_XatRisk:428<br/><span class="text-slate-400">DaR</span></div>
+              <div class="copy rounded p-2">07_CondXatRisk:51</div>
+              <div class="drifted rounded p-2">07_CondXatRisk:106 ⚠</div>
+              <div class="copy rounded p-2">07_CondXatRisk:195</div>
+              <div class="copy rounded p-2">07_CondXatRisk:324</div>
+              <div class="copy rounded p-2">07_CondXatRisk:522</div>
+              <div class="copy rounded p-2">07_CondXatRisk:579</div>
+              <div class="copy rounded p-2">08_EntXatRisk:59</div>
+              <div class="drifted rounded p-2">08_EntXatRisk:124 ⚠</div>
+              <div class="copy rounded p-2">08_EntXatRisk:234</div>
+              <div class="copy rounded p-2">09_RelXatRisk:50</div>
+              <div class="copy rounded p-2">09_RelXatRisk:153</div>
+              <div class="copy rounded p-2">09_RelXatRisk:318</div>
+              <div class="copy rounded p-2">19_PNXatRisk:61</div>
+              <div class="copy rounded p-2">19_PNXatRisk:140</div>
+              <div class="copy rounded p-2">19_PNXatRisk:262</div>
+            </div>
+            <p class="text-xs text-slate-500 mt-2">Each method re-encodes the same 6-part skeleton: preamble (<span class="font-mono">sc = get_constraint_scale</span>, 57 copies dir-wide) → <span class="font-mono">@variables</span> → observation-weights branch → cone constraint → risk expression → <span class="font-mono">set_risk_bounds_and_expression!</span>. ⚠ = the Range combiner has drifted (see card 6).</p>
+          </div>
+
+          <!-- before/after code -->
+          <div class="grid md:grid-cols-2 gap-4">
+            <div class="diff-old rounded p-3 font-mono text-xs leading-relaxed overflow-x-auto">
+              <div class="text-xs uppercase tracking-wider mb-2 text-red-700 font-sans">08_EntropicXatRiskConstraints.jl:63–96 (× ~20)</div>
+<pre>key = Symbol(:evar_risk_, i)
+sc = get_constraint_scale(model)
+net_X = set_net_portfolio_returns!(model, pr.X;
+                                   prefix = prefix)
+# … @variables, wi branch, ExponentialCone …
+evar_risk = model[key] =
+    JuMP.@expression(model, t_evar - z_evar*log(at))
+set_risk_bounds_and_expression!(model, opt,
+    evar_risk, r.settings, key)</pre>
+            </div>
+            <div class="space-y-3">
+              <div class="spoc rounded p-3 font-mono text-xs leading-relaxed">
+                <div class="text-xs uppercase tracking-wider mb-2 opacity-70 font-sans">After — one combinator, per-family one-liners</div>
+<pre>build_tail_risk!(model, i, r, opt;
+    cone = ExponentialCone(),
+    expr = (t, z, at) -> t - z*log(at))</pre>
+              </div>
+              <p class="text-sm text-slate-500">The combinator owns preamble, variable registry, weights branch and bounds call. A family supplies only what genuinely varies: its cone and its risk expression.</p>
+            </div>
+          </div>
+
+          <p class="text-sm"><span class="font-semibold">Problem:</span> renaming a model key, changing variable namespacing, or fixing the weights branch is change amplification across ~20 methods — blast radius 20, and the Range combiner has already drifted between families.</p>
+          <p class="text-sm"><span class="font-semibold">Direction:</span> a <span class="font-mono text-xs">build_tail_risk!</span> combinator parameterised by cone + risk-expression closure, mirroring what ADR 0024 did for scalarisers.</p>
+          <ul class="text-sm text-slate-700 grid grid-cols-2 gap-x-6 gap-y-1 list-disc list-inside">
+            <li>~20 sites → 1 skeleton</li>
+            <li>blast radius: one fix</li>
+            <li>new tail family: one-liner</li>
+            <li>kernel gets one test surface</li>
+          </ul>
+          <div class="drifted rounded p-3 text-sm text-amber-800">Prior review caveat (arch-review item 4): cones differ per family — that difference is exactly the combinator's parameter, not a reason to skip. Sibling of ADR 0008 (assembly) and ADR 0024 (scalarise seam).</div>
+        </article>
+
+        <!-- ═══════════════ 2 ═══════════════ -->
+        <article id="c2" class="bg-white rounded-xl border border-slate-200 shadow-sm p-8 space-y-5">
+          <div class="flex items-start justify-between gap-4">
+            <h2 class="text-xl font-semibold">2 · One <span class="font-mono">isnothing(wi)</span> fork, 23 copies</h2>
+            <div class="flex gap-2 shrink-0">
+              <span class="text-xs uppercase tracking-wider bg-emerald-100 text-emerald-800 rounded-full px-3 py-1 font-semibold">Strong</span>
+              <span class="text-xs uppercase tracking-wider bg-slate-100 text-slate-600 rounded-full px-3 py-1">duplication</span>
+            </div>
+          </div>
+          <p class="font-mono text-sm text-slate-500">23 sites · 7 files · src/20_Optimisation/20_RiskMeasureConstraints/</p>
+
+          <div>
+            <div class="text-xs uppercase tracking-wider text-slate-400 mb-2">Before — the uniform/weighted fork re-encoded 23×</div>
+            <div class="grid grid-cols-6 gap-2 font-mono text-xs">
+              <div class="copy rounded p-2">03:122</div><div class="copy rounded p-2">03:174</div>
+              <div class="copy rounded p-2">03:343</div><div class="copy rounded p-2">03:445</div>
+              <div class="copy rounded p-2">06:92</div><div class="copy rounded p-2">06:161</div>
+              <div class="copy rounded p-2">06:447</div><div class="copy rounded p-2">07:70</div>
+              <div class="copy rounded p-2">07:124</div><div class="copy rounded p-2">07:290</div>
+              <div class="copy rounded p-2">07:481</div><div class="copy rounded p-2">07:538</div>
+              <div class="copy rounded p-2">07:669</div><div class="copy rounded p-2">08:79</div>
+              <div class="copy rounded p-2">08:144</div><div class="copy rounded p-2">08:251</div>
+              <div class="copy rounded p-2">09:81</div><div class="copy rounded p-2">09:185</div>
+              <div class="copy rounded p-2">09:347</div><div class="copy rounded p-2">11:50</div>
+              <div class="copy rounded p-2">19:84</div><div class="copy rounded p-2">19:164</div>
+              <div class="copy rounded p-2">19:280</div>
+            </div>
+          </div>
+
+          <div class="grid md:grid-cols-2 gap-4">
+            <div class="diff-old rounded p-3 font-mono text-xs leading-relaxed overflow-x-auto">
+              <div class="text-xs uppercase tracking-wider mb-2 text-red-700 font-sans">07_ConditionalXatRiskConstraints.jl:70–76 (× 23)</div>
+<pre>cvar_risk = model[key] = if isnothing(wi)
+    iat = inv(r.alpha * T)
+    JuMP.@expression(model,
+        var + sum(z_cvar) * iat)
+else
+    iat = inv(r.alpha * sum(wi))
+    JuMP.@expression(model,
+        var + dot(wi, z_cvar) * iat)
+end</pre>
+            </div>
+            <div class="space-y-3">
+              <div class="spoc rounded p-3 font-mono text-xs leading-relaxed">
+                <div class="text-xs uppercase tracking-wider mb-2 opacity-70 font-sans">After — two tiny helpers, 23 one-liners</div>
+<pre>iat = inv(r.alpha * total_weight(wi, T))
+cvar_risk = model[key] = JuMP.@expression(
+    model, var + weighted_sum(wi, z_cvar)*iat)</pre>
+              </div>
+              <p class="text-sm text-slate-500"><span class="font-mono text-xs">total_weight(wi, T)</span> = <span class="font-mono text-xs">isnothing(wi) ? T : sum(wi)</span>; <span class="font-mono text-xs">weighted_sum(wi, z)</span> = <span class="font-mono text-xs">isnothing(wi) ? sum(z) : dot(wi, z)</span>.</p>
+            </div>
+          </div>
+
+          <p class="text-sm"><span class="font-semibold">Problem:</span> supporting a third weighting mode (exponential decay is already hinted by <span class="font-mono text-xs">DynamicAbstractWeights</span>) is change amplification across all 23 forks.</p>
+          <p class="text-sm"><span class="font-semibold">Direction:</span> two one-line reducers beside <span class="font-mono text-xs">get_observation_weights</span>; a new weighting mode then lands in exactly one place.</p>
+          <ul class="text-sm text-slate-700 grid grid-cols-2 gap-x-6 gap-y-1 list-disc list-inside">
+            <li>23 sites → 1</li>
+            <li>third weighting mode: one edit</li>
+            <li>collapses to one-liners cleanly</li>
+            <li>independent of candidate 1</li>
+          </ul>
+        </article>
+
+        <!-- ═══════════════ 3 ═══════════════ -->
+        <article id="c3" class="bg-white rounded-xl border border-slate-200 shadow-sm p-8 space-y-5">
+          <div class="flex items-start justify-between gap-4">
+            <h2 class="text-xl font-semibold">3 · Big-M defaults and the <span class="font-mono">b &gt; s</span> guard have drifted</h2>
+            <div class="flex gap-2 shrink-0">
+              <span class="text-xs uppercase tracking-wider bg-emerald-100 text-emerald-800 rounded-full px-3 py-1 font-semibold">Strong</span>
+              <span class="text-xs uppercase tracking-wider bg-amber-100 text-amber-800 rounded-full px-3 py-1">drift</span>
+            </div>
+          </div>
+          <p class="font-mono text-sm text-slate-500">5 sites · 06_XatRiskConstraints.jl:72–74, 141–143, 431–433 · 06_XatRisk.jl:117, 619</p>
+
+          <!-- drift timeline -->
+          <div class="rounded-lg border border-slate-200 bg-white p-4 space-y-2">
+            <div class="text-xs uppercase tracking-wider text-slate-400 mb-1">Drift timeline — one invariant, two phrasings, two field paths</div>
+            <div class="grid grid-cols-[7rem_1fr] gap-2 items-center text-xs">
+              <div class="font-mono text-slate-500">struct ctor<br/>06_XatRisk.jl:117,619</div>
+              <div class="copy rounded p-2 font-mono">"b must be greater than s, got b = $b, s = $s"</div>
+              <div class="font-mono text-slate-500">builders<br/>06_XatRiskConstraints:72,141</div>
+              <div class="drifted rounded p-2 font-mono">"b ($b) must be greater than s ($s)" ⚠ message drifted · reads <span class="font-semibold">r.alg.b / r.alg.s</span></div>
+              <div class="font-mono text-slate-500">DaR builder<br/>06_XatRiskConstraints:431</div>
+              <div class="drifted rounded p-2 font-mono">⚠ reads <span class="font-semibold">r.b / r.s</span> directly — field-path drifted</div>
+              <div class="font-mono text-slate-500">defaults</div>
+              <div class="drifted rounded p-2 font-mono">1e3 / 1e-5 exist only as <span class="font-semibold">ifelse</span> fallbacks at 3 builder sites; struct default is <span class="font-semibold">nothing</span> ⚠ no single source of truth</div>
+            </div>
+            <div class="mt-3 flex items-center gap-3">
+              <div class="spoc rounded p-3 font-mono text-sm">resolve_bigM(r) -&gt; (b, s)</div>
+              <span class="text-slate-500 text-sm">← one guard, one message, one pair of default constants</span>
+            </div>
+          </div>
+
+          <p class="text-sm"><span class="font-semibold">Problem:</span> tuning the default big-M or tightening the tolerance must land at 3 builder sites, and the guard message already exists in two divergent phrasings — the copies have drifted.</p>
+          <p class="text-sm"><span class="font-semibold">Direction:</span> a <span class="font-mono text-xs">resolve_bigM</span> helper owning defaults, guard and message; the 3 builders call it and drop their <span class="font-mono text-xs">ifelse</span>/<span class="font-mono text-xs">@argcheck</span> triples.</p>
+          <ul class="text-sm text-slate-700 grid grid-cols-2 gap-x-6 gap-y-1 list-disc list-inside">
+            <li>5 sites → 1</li>
+            <li>drift becomes impossible</li>
+            <li>defaults get one home</li>
+            <li>one error message, one test</li>
+          </ul>
+        </article>
+
+        <!-- ═══════════════ 4 ═══════════════ -->
+        <article id="c4" class="bg-white rounded-xl border border-slate-200 shadow-sm p-8 space-y-5">
+          <div class="flex items-start justify-between gap-4">
+            <h2 class="text-xl font-semibold">4 · A new risk measure touches ~8 places</h2>
+            <div class="flex gap-2 shrink-0">
+              <span class="text-xs uppercase tracking-wider bg-amber-100 text-amber-800 rounded-full px-3 py-1 font-semibold">Worth exploring</span>
+              <span class="text-xs uppercase tracking-wider bg-slate-100 text-slate-600 rounded-full px-3 py-1">change-amplification</span>
+            </div>
+          </div>
+          <p class="font-mono text-sm text-slate-500">~8 edit sites per measure · traced via ConditionalValueatRiskRange</p>
+
+          <div class="rounded-lg border border-slate-200 bg-white p-4">
+            <pre class="mermaid">
+flowchart LR
+  X[new risk measure] --> A["struct + ctors<br/>07_ConditionalXatRisk.jl:360"]
+  X --> B["functor r(x)<br/>:330"]
+  X --> C["risk_input_kind<br/>:1036 (50 methods, 36 identical)"]
+  X --> D["Union alias RMCVaRRg<br/>:550"]
+  X --> E["set_risk_constraints!<br/>20_RiskMeasureConstraints/07:106"]
+  X --> F["alias + export<br/>24_Aliases.jl:663"]
+  X --> G["supported_risk_measures<br/>24_RiskMeasureCompatibility.jl"]
+  X --> H["export line<br/>(142 export lines, decentralised)"]
+  classDef hit stroke:#dc2626,stroke-width:2px;
+  class A,B,C,D,E,F,G,H hit
+            </pre>
+          </div>
+
+          <p class="text-sm"><span class="font-semibold">Problem:</span> change amplification of ~8 sites per new measure; the compiler enforces only the <span class="font-mono text-xs">risk_input_kind</span> method (base fallback throws) — a measure compiles while missing its alias, export, or compatibility entry (a validation gap for #4/#6/#7).</p>
+          <p class="text-sm"><span class="font-semibold">Direction:</span> a <span class="font-mono text-xs">@risk_measure</span> declaration macro (or registry) emitting the Union alias, <span class="font-mono text-xs">risk_input_kind</span>, and export from one call site — ~8 sites → ~3 (struct, functor, constraint builder).</p>
+          <ul class="text-sm text-slate-700 grid grid-cols-2 gap-x-6 gap-y-1 list-disc list-inside">
+            <li>~8 sites → ~3</li>
+            <li>missing-alias gap closed</li>
+            <li>36 boilerplate one-liners deleted</li>
+          </ul>
+          <div class="drifted rounded p-3 text-sm text-amber-800">ADR 0006/0007 deliberately chose throw-over-default for <span class="font-mono text-xs">risk_input_kind</span> — the macro must keep the kind an <em>explicit</em> declaration argument, never a silent default. Watch codegen opacity: whatever the macro emits must stay grep-discoverable (documented expansion, or emit <span class="font-mono text-xs">const</span>/<span class="font-mono text-xs">export</span> lines it can echo).</div>
+        </article>
+
+        <!-- ═══════════════ 5 ═══════════════ -->
+        <article id="c5" class="bg-white rounded-xl border border-slate-200 shadow-sm p-8 space-y-5">
+          <div class="flex items-start justify-between gap-4">
+            <h2 class="text-xl font-semibold">5 · OWA hand-writes the interval guard the rest of the library centralised</h2>
+            <div class="flex gap-2 shrink-0">
+              <span class="text-xs uppercase tracking-wider bg-amber-100 text-amber-800 rounded-full px-3 py-1 font-semibold">Worth exploring</span>
+              <span class="text-xs uppercase tracking-wider bg-slate-100 text-slate-600 rounded-full px-3 py-1">validation-gap</span>
+            </div>
+          </div>
+          <p class="font-mono text-sm text-slate-500">3 hand-written sites · 10_OWARiskMeasures.jl:1086, 1155, 1454 · vs assert_unit_interval (01_Base.jl:2223, 35 call sites)</p>
+
+          <div class="grid grid-cols-4 gap-2 font-mono text-xs">
+            <div class="spoc rounded p-2">assert_unit_interval<br/><span class="opacity-70">35 sites use it</span></div>
+            <div class="drifted rounded p-2">OWA:1086 ⚠<br/>zero(alpha) &lt; α_i &lt; α &lt; one(alpha)</div>
+            <div class="copy rounded p-2">OWA:1155<br/>0 &lt; α_i &lt; α &lt; 1</div>
+            <div class="copy rounded p-2">OWA:1454<br/>0 &lt; α_i &lt; α &lt; 1</div>
+          </div>
+          <p class="text-xs text-slate-500">Same message string at all 3 sites, but two different bound spellings — drift has begun. The guard is uneven: chained bounds exist only as hand copies while single-value bounds go through one shape.</p>
+
+          <p class="text-sm"><span class="font-semibold">Problem:</span> the chained <span class="font-mono text-xs">α_i &lt; α</span> guard is re-encoded 3× (already drifted in spelling) because <span class="font-mono text-xs">assert_unit_interval</span> only handles a single value; a fourth OWA variant copies it a fourth time.</p>
+          <p class="text-sm"><span class="font-semibold">Direction:</span> add <span class="font-mono text-xs">assert_ordered_unit_interval(alpha_i, alpha, …)</span> beside the existing helper and replace the 3 hand-written checks.</p>
+          <ul class="text-sm text-slate-700 grid grid-cols-2 gap-x-6 gap-y-1 list-disc list-inside">
+            <li>3 sites → 1</li>
+            <li>guard becomes uniform</li>
+            <li>small, safe, an hour's work</li>
+          </ul>
+        </article>
+
+        <!-- ═══════════════ 6 ═══════════════ -->
+        <article id="c6" class="bg-white rounded-xl border border-slate-200 shadow-sm p-8 space-y-5">
+          <div class="flex items-start justify-between gap-4">
+            <h2 class="text-xl font-semibold">6 · Range builders hand-mirror the single-tail body — and the combiner drifted</h2>
+            <div class="flex gap-2 shrink-0">
+              <span class="text-xs uppercase tracking-wider bg-amber-100 text-amber-800 rounded-full px-3 py-1 font-semibold">Worth exploring</span>
+              <span class="text-xs uppercase tracking-wider bg-slate-100 text-slate-600 rounded-full px-3 py-1">mirror</span>
+            </div>
+          </div>
+          <p class="font-mono text-sm text-slate-500">5 Range methods, each an internal 2× mirror · 06:136 · 07:106 · 08:124 · 09:153 · 19:140</p>
+
+          <div class="grid grid-cols-2 gap-4 font-mono text-xs">
+            <div class="diff-old rounded p-3 leading-relaxed">
+              <div class="text-xs uppercase tracking-wider mb-2 text-red-700 font-sans">lower tail (_l_, α)</div>
+<pre>@variables … _l_ block  (08:131–141)
+isnothing(wi) branch    (08:144–158)
+[sc*(-net_X[i] - t_l)…] ∈ ExpCone  (08:178)</pre>
+            </div>
+            <div class="diff-old rounded p-3 leading-relaxed">
+              <div class="text-xs uppercase tracking-wider mb-2 text-red-700 font-sans">upper tail (_h_, β) — same body, sign flipped</div>
+<pre>@variables … _h_ block  (mirrored)
+isnothing(wi) branch    (mirrored)
+[sc*( net_X[i] - t_h)…] ∈ ExpCone  (08:187)</pre>
+            </div>
+          </div>
+
+          <div class="rounded-lg border border-slate-200 p-3 text-sm space-y-1">
+            <div class="text-xs uppercase tracking-wider text-slate-400">The combiner has drifted across families</div>
+            <div class="font-mono text-xs"><span class="drifted rounded px-1">06_XatRiskConstraints.jl:298 — var_risk_l <strong>−</strong> var_risk_h</span> &nbsp;vs&nbsp; <span class="copy rounded px-1">07:152, 08:204 — cvar/evar_risk_l <strong>+</strong> _h</span></div>
+            <p class="text-slate-500 text-xs">Same "range = two tails" concept, opposite operator — consistent with each family's tail-sign convention today, but nothing structural keeps a new family from picking the wrong one.</p>
+          </div>
+
+          <div class="flex items-center gap-3">
+            <div class="spoc rounded p-3 font-mono text-sm">build_tail!(…; loss = true) + build_tail!(…; loss = false)</div>
+            <span class="text-slate-500 text-sm">← a Range method becomes two calls + one combiner</span>
+          </div>
+
+          <p class="text-sm"><span class="font-semibold">Problem:</span> each Range method pastes its single-tail body twice (sign flip, α→β, <span class="font-mono text-xs">_l_</span>→<span class="font-mono text-xs">_h_</span>), so a tail fix lands 2× per family × 5 families, and the combining operator has already drifted between families.</p>
+          <p class="text-sm"><span class="font-semibold">Direction:</span> falls out of candidate 1 — once the combinator exists, Range = two tail calls plus an explicit, named combiner.</p>
+          <ul class="text-sm text-slate-700 grid grid-cols-2 gap-x-6 gap-y-1 list-disc list-inside">
+            <li>10 tail bodies → 1</li>
+            <li>combiner drift made explicit</li>
+            <li>rides on candidate 1</li>
+          </ul>
+        </article>
+
+        <!-- ═══════════════ 7 ═══════════════ -->
+        <article id="c7" class="bg-white rounded-xl border border-slate-200 shadow-sm p-8 space-y-5">
+          <div class="flex items-start justify-between gap-4">
+            <h2 class="text-xl font-semibold">7 · Plot functions each re-unwrap every result type</h2>
+            <div class="flex gap-2 shrink-0">
+              <span class="text-xs uppercase tracking-wider bg-slate-200 text-slate-700 rounded-full px-3 py-1 font-semibold">Speculative</span>
+              <span class="text-xs uppercase tracking-wider bg-slate-100 text-slate-600 rounded-full px-3 py-1">change-amplification</span>
+            </div>
+          </div>
+          <p class="font-mono text-sm text-slate-500">~20 plot_* functions × 5–8 unwrap overloads ≈ 100+ methods · ext/PortfolioOptimisersPlotsExt.jl (2,082 LOC) · stubs in src/22_Plotting.jl:64–748</p>
+
+          <div class="rounded-lg border border-slate-200 bg-white p-4">
+            <pre class="mermaid">
+flowchart LR
+  X[new Result type] --> A[plot_ptf_cumulative_returns<br/>7 overloads]
+  X --> B[plot_asset_cumulative_returns<br/>8 overloads]
+  X --> C[plot_drawdowns]
+  X --> D[plot_histogram]
+  X --> E[plot_rolling_measure]
+  X --> F[…~15 more plot_* fns]
+  classDef hit stroke:#dc2626,stroke-width:2px;
+  class A,B,C,D,E,F hit
+            </pre>
+          </div>
+
+          <p class="text-sm"><span class="font-semibold">Problem:</span> each new Result type forces one unwrap overload per plot function (~20 edits) — the "extract weights/returns, delegate" preamble is re-encoded per function × per input type.</p>
+          <p class="text-sm"><span class="font-semibold">Direction:</span> one <span class="font-mono text-xs">plot_inputs(x) → (w, X, names)</span> extraction dispatched per input type; each <span class="font-mono text-xs">plot_*</span> keeps one method over the canonical tuple.</p>
+          <ul class="text-sm text-slate-700 grid grid-cols-2 gap-x-6 gap-y-1 list-disc list-inside">
+            <li>100+ methods → ~20 + N unwraps</li>
+            <li>new Result type: one edit</li>
+          </ul>
+          <div class="drifted rounded p-3 text-sm text-amber-800">Apply the consolidation test carefully: some overloads carry genuinely different defaults (titles, axes) — those stay out. Verify per function before migrating.</div>
+        </article>
+
+      </section>
+
+      <!-- ═══════════════ TOP RECOMMENDATION ═══════════════ -->
+      <section id="top-recommendation" class="spoc rounded-xl p-8 space-y-3">
+        <div class="text-xs uppercase tracking-wider opacity-70">Top recommendation</div>
+        <h2 class="text-2xl font-bold">The tail-risk builder combinator (candidates 1 + 2 + 6, with 3 riding along)</h2>
+        <p class="text-emerald-50 max-w-3xl">One migration through <span class="font-mono text-sm">src/20_Optimisation/20_RiskMeasureConstraints/</span> collapses ~20 builder skeletons, 23 observation-weight forks, and 10 hand-mirrored tail bodies into one shape — and drift is already underway there (the Range combiner's operator, the big-M guard's message and field path). It finishes the job ADR 0008 and ADR 0024 started: the variance/moment builders are already consolidated; the tail families are the unrefactored half of the same pattern. Blast radius today: ~20 sites per fix. After: one. <a href="#c1" class="underline font-semibold">See candidate 1 →</a></p>
+      </section>
+
+      <footer class="text-xs text-slate-400 pb-8">Generated 2026-07-06 · maintainability review (consolidation) · sibling of the architecture, ergonomics and security reviews</footer>
+    </main>
+  </body>
+</html>

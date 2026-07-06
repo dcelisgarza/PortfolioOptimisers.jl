@@ -35,6 +35,7 @@ using SpecialFunctions: SpecialFunctions
 using Statistics: Statistics, mean, std, var, cor, cov
 using StatsAPI: StatsAPI, predict
 using StatsBase: StatsBase
+using StringDistances: StringDistances
 using TimeSeries: TimeSeries
 
 #=

@@ -61,4 +61,52 @@
     @test res.op == "<="
     @test res.rhs == Inf
     # @test res.eqn == "Inf*a <= Inf"
+    # F3: numeric literals evaluate in the target float type, not machine Int64, so an
+    # overflowing exponent yields the correct float instead of silently wrapping, and a
+    # negative integer exponent no longer raises a raw DomainError.
+    res = parse_equation("w_A <= 2^64")
+    @test res.vars == ["w_A"]
+    @test res.coef == [1.0]
+    @test res.rhs == 1.8446744073709552e19
+    res = parse_equation("w_A <= 10^19")
+    @test res.rhs == 1.0e19
+    res = parse_equation("w_A <= 2^-1")
+    @test res.rhs == 0.5
+    # F3: coercion respects a non-default datatype.
+    res = parse_equation("w_A <= 2^64"; datatype = Float32)
+    @test res.rhs == Float32(2)^64
+    # F2: only the enumerated math functions may be evaluated. `prior(...)` reaching numeric
+    # evaluation (all-numeric args) is a typed parse error, not a raw UndefVarError, and a
+    # name absent from the table fails closed rather than resolving against Base.
+    @test_throws Meta.ParseError parse_equation("w_A <= prior(2)")
+    @test_throws Meta.ParseError parse_equation("w_A <= run(2)")
+    @test_throws Meta.ParseError parse_equation("w_A <= gensym(2)")
+    # F2: `prior(name)` and `sqrt(prior(name))` still pass through structurally.
+    res = parse_equation("w_A <= prior(b)")
+    @test "prior(b)" in res.vars
+end
+@testset "Asset name suggestions" begin
+    using PortfolioOptimisers, Test
+    pe = PortfolioOptimisers
+    nx = ["AAPL", "MSFT", "GOOG"]
+    # Close typo -> suggestion; far-off name (meta-opt legit-absent) -> none; empty -> none.
+    @test occursin("did you mean `AAPL`?", pe.did_you_mean("APL", nx))
+    @test pe.did_you_mean("ZZZZ", nx) == ""
+    @test pe.did_you_mean("APL", String[]) == ""
+    # Message builders: name + count + key only (no full universe), suggestion appended to msg1.
+    m1 = pe.unknown_variable_msg("APL", nx, "nx")
+    @test occursin("3 assets under key `nx`", m1)
+    @test occursin("did you mean `AAPL`?", m1)
+    @test !occursin("GOOG", m1)              # universe not dumped
+    # All-zero-row message: no suggestion, noun switches for views.
+    @test occursin("constraint `APL >= 0.05` matched no assets",
+                   pe.empty_row_msg("APL >= 0.05", nx, "nx"))
+    @test occursin("view `", pe.empty_row_msg("APL == 0.02", nx, "nx"; noun = "view"))
+    @test !occursin("did you mean", pe.empty_row_msg("APL >= 0.05", nx, "nx"))
+    # Global config mirrors the pretty-print config: threshold gates, metric is swappable.
+    pe.set_string_distance!(min_score = 1.1)
+    @test pe.did_you_mean("APL", nx) == ""   # suggestions disabled
+    pe.set_string_distance!(dist = pe.StringDistances.DamerauLevenshtein(), min_score = 0.7)
+    @test occursin("did you mean `MSFT`?", pe.did_you_mean("MSTF", nx))  # transposition
+    pe.set_string_distance!(dist = pe.StringDistances.Levenshtein(), min_score = 0.7)  # restore defaults
 end
