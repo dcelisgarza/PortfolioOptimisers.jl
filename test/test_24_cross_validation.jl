@@ -839,4 +839,18 @@
             @test rs_res2.lens_grid[rs_res2.idx] == rs_res1.lens_grid[rs_res1.idx]
         end
     end
+    @testset "parse_lens fails closed" begin
+        # Param-key parsing is a string->AST boundary (ADR 0025): only `.`/`[]`
+        # heads survive; everything else fails closed with a typed Meta.ParseError.
+        # :call head -- the headline "no code runs" case.
+        @test_throws Meta.ParseError PortfolioOptimisers.parse_lens("exit(1)")
+        # Non-symbol base case (literal path root).
+        @test_throws Meta.ParseError PortfolioOptimisers.parse_lens("5")
+        @test_throws Meta.ParseError PortfolioOptimisers.parse_lens("\"pe\"")
+        # Non-vect index expression, rejected in _eval_index.
+        @test_throws Meta.ParseError PortfolioOptimisers.parse_lens("a[b()]")
+        # Liveness: valid property and index paths still build working lenses.
+        @test PortfolioOptimisers.parse_lens("opt.pe.ce") isa Base.Callable
+        @test PortfolioOptimisers.parse_lens("a[2]") isa Base.Callable
+    end
 end

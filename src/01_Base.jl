@@ -1153,19 +1153,38 @@ function compact_show_budget(io::IO)
     return max(8, displaysize(io)[1] - 4)
 end
 """
+$(DocStringExtensions.TYPEDEF)
+
 Global configuration for the fuzzy "did you mean?" suggestions appended to "variable not in asset universe" messages by [`did_you_mean`](@ref).
 
-Holds:
+# Fields
 
   - `dist`: the `StringDistances.StringDistance` used to score candidate names against the offending one (default `StringDistances.Levenshtein()`).
   - `min_score`: the minimum normalised similarity in `[0, 1]` a candidate must reach before it is suggested (default `0.7`). Raising it toward `1` keeps only near-exact matches; setting it above `1` disables suggestions entirely — useful in meta-optimiser inner loops, where an asset name legitimately absent from a cluster/subset is not a typo and should draw no suggestion.
 
 Set via [`set_string_distance!`](@ref). Read by [`did_you_mean`](@ref). Mirrors the [`COMPACT_SHOW`](@ref) pretty-printing config.
+
+# Related
+
+  - [`STRING_DISTANCE`](@ref)
+  - [`set_string_distance!`](@ref)
+  - [`did_you_mean`](@ref)
 """
 mutable struct StringDistanceConfig
     dist::StringDistances.StringDistance
     min_score::Float64
 end
+"""
+    STRING_DISTANCE = StringDistanceConfig(StringDistances.Levenshtein(), 0.7)
+
+Default string distance configuration for fuzzy "did you mean?" suggestions appended to "variable not in asset universe" messages by [`did_you_mean`](@ref).
+
+# Related
+
+  - [`StringDistanceConfig`](@ref)
+  - [`set_string_distance!`](@ref)
+  - [`did_you_mean`](@ref)
+"""
 const STRING_DISTANCE = StringDistanceConfig(StringDistances.Levenshtein(), 0.7)
 """
     set_string_distance!(; dist::StringDistances.StringDistance = STRING_DISTANCE.dist,
@@ -1189,6 +1208,82 @@ function set_string_distance!(; dist::StringDistances.StringDistance = STRING_DI
     STRING_DISTANCE.dist = dist
     STRING_DISTANCE.min_score = Float64(min_score)
     return STRING_DISTANCE
+end
+"""
+    did_you_mean(name::AbstractString, candidates) -> String
+
+Return a `" (did you mean \`X\`?)"`suffix naming the closest match to`name`among`candidates`, or `""` when no candidate reaches the global [`STRING_DISTANCE`](@ref) `min_score`threshold (or`candidates` is empty).
+
+Used to enrich "variable not in asset universe" messages (see [`unknown_variable_msg`](@ref)) with a typo suggestion. The distance and threshold are read from the global [`STRING_DISTANCE`](@ref) config, set via [`set_string_distance!`](@ref); the threshold gating means a name legitimately absent from a meta-optimiser cluster/subset (no close neighbour) draws no suggestion.
+
+# Related
+
+  - [`STRING_DISTANCE`](@ref)
+  - [`set_string_distance!`](@ref)
+  - [`unknown_variable_msg`](@ref)
+"""
+function did_you_mean(name::AbstractString, candidates)
+    if isempty(candidates)
+        return ""
+    end
+    match, _ = StringDistances.findnearest(name, candidates, STRING_DISTANCE.dist;
+                                           min_score = STRING_DISTANCE.min_score)
+    return isnothing(match) ? "" : " (did you mean `$(match)`?)"
+end
+"""
+    unknown_variable_msg(v, nx, key; candidates = nx) -> String
+
+Build the warning/error text for a constraint or view variable `v` that is absent from the asset universe `nx` (stored under `key`). Names the variable and the universe *size* only — never the full universe — and appends a [`did_you_mean`](@ref) suggestion when a close match exists.
+
+`candidates` is the pool searched for the typo suggestion (default: the asset universe `nx`). Callers whose valid namespace is broader than the raw asset universe — e.g. [`group_to_val!`](@ref), where a key may name a *group* rather than an asset — pass a wider pool (asset names plus group/set keys) so the suggestion can name a mistyped group. The reported universe *size* is always `length(nx)` regardless of `candidates`.
+
+Shared by [`get_linear_constraints`](@ref), Black-Litterman view generation, entropy-pooling view generation, and [`group_to_val!`](@ref) so the message (and its info-leak-safe shape) lives in exactly one place.
+
+# Related
+
+  - [`did_you_mean`](@ref)
+  - [`empty_row_msg`](@ref)
+"""
+function unknown_variable_msg(v, nx, key; candidates = nx)
+    return "variable `$(v)` not in asset universe ($(length(nx)) assets under key `$(key)`); term dropped" *
+           did_you_mean(string(v), candidates)
+end
+"""
+    empty_row_msg(eqn, nx, key; noun::AbstractString = "constraint") -> String
+
+Build the warning/error text for a parsed equation `eqn` whose every term missed the asset universe `nx` (stored under `key`), leaving an all-zero row that is dropped. Names the equation and the universe *size* only — never the full universe or the parsed struct. `noun` is `"constraint"` for linear constraints or `"view"` for Black-Litterman views.
+
+Shared by [`get_linear_constraints`](@ref) and Black-Litterman view generation.
+
+# Related
+
+  - [`unknown_variable_msg`](@ref)
+"""
+function empty_row_msg(eqn, nx, key; noun::AbstractString = "constraint")
+    return "$(noun) `$(eqn)` matched no assets in the universe ($(length(nx)) assets under key `$(key)`); row dropped"
+end
+"""
+    missing_group_assets_msg(group, missing_assets, nx, key) -> String
+
+Build the warning/error text for a `group` that resolves in the asset sets but whose members
+`missing_assets` are absent from the asset universe `nx` (stored under `key`). Names the group, the
+offending member names (which are caller input, not internal state), and the universe *size* only —
+never the full universe or the input value dictionary — and appends a [`did_you_mean`](@ref)
+suggestion for the first missing member.
+
+Shared by [`group_to_val!`](@ref) so the info-leak-safe message shape lives in exactly one place,
+alongside [`unknown_variable_msg`](@ref) and [`empty_row_msg`](@ref).
+
+# Related
+
+  - [`unknown_variable_msg`](@ref)
+  - [`empty_row_msg`](@ref)
+  - [`did_you_mean`](@ref)
+"""
+function missing_group_assets_msg(group, missing_assets, nx, key)
+    return "group `$(group)`: $(length(missing_assets)) member(s) not in asset universe " *
+           "($(length(nx)) assets under key `$(key)`): $(missing_assets); dropped" *
+           did_you_mean(string(first(missing_assets)), nx)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

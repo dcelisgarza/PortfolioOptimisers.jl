@@ -49,6 +49,20 @@ LInfNorm
 norm_error
 ```
 
+## Logging
+
+Functionality for logging messages.
+
+```@docs
+StringDistanceConfig
+STRING_DISTANCE
+set_string_distance!
+did_you_mean
+unknown_variable_msg
+missing_group_assets_msg
+empty_row_msg
+```
+
 ## Error types
 
 Many of the types defined in `PortfolioOptimisers.jl` make use of extensive data validation to ensure values meet various criteria. This simplifies the implementation of methods, and improves performance and by delegating as many checks as possible to variable instantiation. In cases where validation cannot be performed at variable instantiation, they are performed as soon as possible within functions.

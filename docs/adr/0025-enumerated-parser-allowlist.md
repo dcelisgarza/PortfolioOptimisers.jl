@@ -84,3 +84,23 @@ the single source of truth for what may be called, and handle `:prior` structura
   that previously-raw crashes are now typed `Meta.ParseError`s. Carried over from item S1 of the
   2026-07-02 combined review. Regression coverage in
   [test_02_equation_parsing.jl](../../test/test_02_equation_parsing.jl).
+
+## Amendment (2026-07-06): the fifth string→AST boundary
+
+The original enumeration named four boundaries that all funnel through `parse_equation`. A later
+review found a fifth, independent string→AST boundary the enumeration omitted:
+[`parse_lens`/`expr_to_lens_chain`](../../src/20_Optimisation/02_CrossValidation/09_Base_SearchCrossValidation.jl),
+which turns grid-/randomised-search hyperparameter key strings (e.g. `"opt.pe.ce"`) into
+`Accessors.jl` lenses via `Meta.parse`. It does **not** share the `parse_equation` path — it is a
+separate parser with a separate sink (`getproperty`/`set` on the estimator tree).
+
+It is brought under the same discipline: the accepted expression heads are enumerated
+(`.` property and `[]` index only) in `expr_to_lens_chain`, and every other head — plus a non-`Symbol`
+path root — now fails closed with a typed `Meta.ParseError` instead of an untyped `error()`. Unlike
+the equation parser there is no namespace lookup to shrink (the two heads are hard-coded branches, not
+a `getfield`-style name resolution), so no allowlist `Dict` is warranted; the branch structure *is* the
+allowlist. The echoed offending fragment (`$ex`) is caller-supplied input, not internal state, so it is
+kept for debuggability and is **not** the universe/struct dump ADR 0026 warns about — a future review
+should not re-flag it as a leak. Risk is boundary uniformity, not a reachable exploit: these keys are
+developer-authored code, not config/UI input. Regression coverage in the `parse_lens fails closed`
+testset of [test_24_cross_validation.jl](../../test/test_24_cross_validation.jl).
