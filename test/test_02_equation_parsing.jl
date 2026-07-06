@@ -85,6 +85,32 @@
     res = parse_equation("w_A <= prior(b)")
     @test "prior(b)" in res.vars
 end
+@testset "Equation parser recursion caps" begin
+    using PortfolioOptimisers, Test, Logging
+    Logging.disable_logging(Logging.Warn)
+    pe = PortfolioOptimisers
+    # Trust boundary: an over-long / deeply nested untrusted string fails closed with a
+    # typed Meta.ParseError before Meta.parse and the recursive walks can exhaust the stack.
+    deep = "(" ^ 20000 * "w_A" * ")" ^ 20000 * " <= 1"
+    @test length(deep) > pe.EQUATION_LIMITS.max_length
+    @test_throws Meta.ParseError parse_equation(deep)
+    # The Expr form has no length cap; the depth guard rejects an over-deep pre-built AST.
+    ex = :w_A
+    for _ in 1:(pe.EQUATION_LIMITS.max_depth + 10)
+        ex = Expr(:call, :-, ex)
+    end
+    @test_throws Meta.ParseError parse_equation(Expr(:call, :(<=), ex, 1))
+    # Caps are runtime-overridable via the STRING_DISTANCE-style config, and validated.
+    @test_throws ArgumentError pe.set_equation_limits!(max_length = 0)
+    @test_throws ArgumentError pe.set_equation_limits!(max_depth = -1)
+    pe.set_equation_limits!(max_length = 8)
+    @test_throws Meta.ParseError parse_equation("w_A <= 1.0")   # now under the tightened cap
+    pe.set_equation_limits!(max_length = 4096, max_depth = 256)  # restore defaults
+    # A legitimate constraint still parses under the default caps.
+    res = parse_equation("w_A <= 1.0")
+    @test res.vars == ["w_A"]
+    @test res.rhs == 1.0
+end
 @testset "Asset name suggestions" begin
     using PortfolioOptimisers, Test
     pe = PortfolioOptimisers

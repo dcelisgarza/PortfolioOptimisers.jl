@@ -1210,6 +1210,61 @@ function set_string_distance!(; dist::StringDistances.StringDistance = STRING_DI
     return STRING_DISTANCE
 end
 """
+Global resource caps for equation parsing, guarding the string→AST trust boundary against a stack-exhaustion denial of service.
+
+Constraint, Black-Litterman view and entropy-pooling view strings are untrusted input (config files, spreadsheets, UI). They funnel through [`parse_equation`](@ref), which calls `Meta.parse` and then walks the resulting expression tree recursively ([`eval_numeric_functions`](@ref), `collect_terms!`, `has_invalid_plus`). Without a bound, a deeply nested string (e.g. tens of thousands of parentheses) produces an AST deep enough to exhaust the stack and take down the host process. These caps fail closed with a typed `Meta.ParseError` well before that point.
+
+# Fields
+
+  - `max_length`: maximum number of characters in an equation string handed to `Meta.parse` (default `4096`). A legitimate linear constraint is short; the bound sits far above any real constraint and far below the nesting depth that threatens the stack. Because achieving nesting depth `d` from a string needs at least `d` characters, the length cap also bounds the AST depth of the *string* form.
+  - `max_depth`: maximum expression-tree depth accepted by the `Expr` form of [`parse_equation`](@ref) (default `256`), which receives a pre-built AST that no length cap covers.
+
+The values are conservative static defaults (portable across build and deployment machines, unlike a value auto-detected during precompilation) and are runtime-overridable via [`set_equation_limits!`](@ref). Mirrors the [`STRING_DISTANCE`](@ref) / [`COMPACT_SHOW`](@ref) config idiom. See `docs/adr/0027-cap-equation-parser-recursion.md`.
+"""
+mutable struct EquationLimits
+    max_length::Int
+    max_depth::Int
+end
+"""
+const EQUATION_LIMITS = EquationLimits(4096, 256)
+
+Default global resource caps for equation parsing, guarding the string→AST trust boundary against a stack-exhaustion denial of service.
+
+# Related
+
+  - [`EquationLimits`](@ref)
+  - [`set_equation_limits!`](@ref)
+  - [`parse_equation`](@ref)
+"""
+const EQUATION_LIMITS = EquationLimits(4096, 256)
+"""
+    set_equation_limits!(; max_length::Integer = EQUATION_LIMITS.max_length,
+                         max_depth::Integer = EQUATION_LIMITS.max_depth)
+
+Configure the global equation-parser resource caps read at the string→AST trust boundary (see [`EQUATION_LIMITS`](@ref)).
+
+  - `max_length`: maximum equation-string length passed to `Meta.parse`.
+  - `max_depth`: maximum expression-tree depth accepted by the `Expr` form of [`parse_equation`](@ref).
+
+Raise them for a genuinely large machine-generated constraint set, or lower them to tighten the boundary. Both must be positive.
+
+Returns the updated [`EQUATION_LIMITS`](@ref) config.
+
+# Related
+
+  - [`EQUATION_LIMITS`](@ref)
+  - [`parse_equation`](@ref)
+  - [`set_string_distance!`](@ref)
+"""
+function set_equation_limits!(; max_length::Integer = EQUATION_LIMITS.max_length,
+                              max_depth::Integer = EQUATION_LIMITS.max_depth)
+    @argcheck(max_length > 0 && max_depth > 0,
+              ArgumentError("max_length and max_depth must be positive."))
+    EQUATION_LIMITS.max_length = Int(max_length)
+    EQUATION_LIMITS.max_depth = Int(max_depth)
+    return EQUATION_LIMITS
+end
+"""
     did_you_mean(name::AbstractString, candidates) -> String
 
 Return a `" (did you mean \`X\`?)"`suffix naming the closest match to`name`among`candidates`, or `""` when no candidate reaches the global [`STRING_DISTANCE`](@ref) `min_score`threshold (or`candidates` is empty).

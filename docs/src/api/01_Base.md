@@ -61,6 +61,9 @@ did_you_mean
 unknown_variable_msg
 missing_group_assets_msg
 empty_row_msg
+EquationLimits
+EQUATION_LIMITS
+set_equation_limits!
 ```
 
 ## Error types
