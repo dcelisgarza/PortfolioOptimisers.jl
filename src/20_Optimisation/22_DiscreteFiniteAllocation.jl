@@ -135,7 +135,7 @@ Keywords correspond to the struct's fields.
 # Examples
 
 ```jldoctest
-julia> DiscreteAllocation(; slv = Solver())
+julia> DiscreteAllocation(; slv = Solver(; solver = nothing))
 DiscreteAllocation
   slv ┼ Solver
       │          name ┼ String: ""
@@ -184,10 +184,10 @@ DiscreteAllocation
                                 wf::JuMPWeightFinaliserFormulation,
                                 fb::Option{<:FOptE_FOpt})
         if isa(slv, VecSlv)
-            @argcheck(!isempty(slv))
+            @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
         end
-        @argcheck(sc > zero(sc))
-        @argcheck(so > zero(so))
+        @argcheck(sc > zero(sc), DomainError(sc, "sc must be > 0"))
+        @argcheck(so > zero(so), DomainError(so, "so must be > 0"))
         return new{typeof(slv), typeof(sc), typeof(so), typeof(wf), typeof(fb)}(slv, sc, so,
                                                                                 wf, fb)
     end
@@ -338,16 +338,9 @@ function finite_sub_allocation(w::VecNum, p::VecNum, cash::Number, bgt::Number,
     acash = JuMP.value(r)
     return shares, cost, aw, acash, res, model
 end
-function _optimise(da::DiscreteAllocation, w::VecNum, p::VecNum, cash::Number = 1e6,
-                   T::Option{<:Number} = nothing, fees::Option{<:Fees} = nothing;
+function _optimise(da::DiscreteAllocation, fai::FiniteAllocationInput;
                    str_names::Bool = false, save::Bool = true, kwargs...)
-    @argcheck(!isempty(w))
-    @argcheck(!isempty(p))
-    @argcheck(length(w) == length(p))
-    @argcheck(cash > zero(cash))
-    if !isnothing(fees)
-        @argcheck(!isnothing(T))
-    end
+    w, p, cash, T, fees = fai.w, fai.prices, fai.cash, fai.horizon, fai.fees
     cash, bgt, lbgt, sbgt, lidx, sidx, lcash, scash = setup_alloc_optim(w, p, cash, T, fees)
     sshares, scost, sw, scash, sretcode, smodel = finite_sub_allocation(-view(w, sidx),
                                                                         view(p, sidx),
@@ -385,9 +378,8 @@ function _optimise(da::DiscreteAllocation, w::VecNum, p::VecNum, cash::Number = 
                                     l_model = ifelse(save, lmodel, nothing), fb = nothing)
 end
 """
-    optimise(da::DiscreteAllocation{<:Any, <:Any, <:Any, Nothing}, w::VecNum,
-             p::VecNum, cash::Number = 1e6, T::Option{<:Number} = nothing,
-             fees::Option{<:Fees} = nothing; str_names::Bool = false,
+    optimise(da::DiscreteAllocation{<:Any, <:Any, <:Any, Nothing},
+             fai::FiniteAllocationInput; str_names::Bool = false,
              save::Bool = true, kwargs...) -> DiscreteAllocationResult
 
 Run the Discrete Allocation portfolio optimisation.
@@ -395,11 +387,7 @@ Run the Discrete Allocation portfolio optimisation.
 # Arguments
 
   - `da`: The discrete allocation optimiser to use.
-  - $(arg_dict[:pw])
-  - `p`: The prices of the assets in the same order as `w`.
-  - `cash`: The initial cash balance.
-  - `T`: The time horizon for the optimisation. Used to adjust the initial cash balance according to the fees charged on the portfolio for the time horizon.
-  - `fees`: The fees to apply to the portfolio.
+  - `fai`: The [`FiniteAllocationInput`](@ref) carrying the target weights, prices, cash budget, and optional horizon and fees.
   - `str_names`: Whether to use string names for the assets in the optimisation.
   - `save`: Whether to save the JuMP model in the optimisation result.
   - `kwargs`: Additional keyword arguments passed to the optimisation function.
@@ -408,12 +396,12 @@ Run the Discrete Allocation portfolio optimisation.
 
   - [`DiscreteAllocation`](@ref)
   - [`DiscreteAllocationResult`](@ref)
+  - [`FiniteAllocationInput`](@ref)
 """
-function optimise(da::DiscreteAllocation{<:Any, <:Any, <:Any, Nothing}, w::VecNum,
-                  p::VecNum, cash::Number = 1e6, T::Option{<:Number} = nothing,
-                  fees::Option{<:Fees} = nothing; str_names::Bool = false,
-                  save::Bool = true, kwargs...)
-    return _optimise(da, w, p, cash, T, fees; str_names = str_names, save = save, kwargs...)
+function optimise(da::DiscreteAllocation{<:Any, <:Any, <:Any, Nothing},
+                  fai::FiniteAllocationInput; str_names::Bool = false, save::Bool = true,
+                  kwargs...)
+    return _optimise(da, fai; str_names = str_names, save = save, kwargs...)
 end
 
 export DiscreteAllocationResult, DiscreteAllocation

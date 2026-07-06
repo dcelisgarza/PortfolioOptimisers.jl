@@ -68,6 +68,10 @@ $(DocStringExtensions.FIELDS)
         q_kwargs::NamedTuple = (;)
     ) -> NearestQuantilePrediction
 
+## Validation
+
+  - $(val_dict[:q_scorer])
+
 # Functor
 
     (s::NearestQuantilePrediction)(ppred::PopulationPredictionResult)
@@ -100,6 +104,7 @@ prediction.
     q_kwargs
     function NearestQuantilePrediction(r::AbstractBaseRiskMeasure, q::Real,
                                        r_kwargs::NamedTuple, q_kwargs::NamedTuple)
+        @argcheck(zero(q) <= q <= one(q), DomainError(q, "`q` must be in [0, 1]"))
         return new{typeof(r), typeof(q), typeof(r_kwargs), typeof(q_kwargs)}(r, q, r_kwargs,
                                                                              q_kwargs)
     end

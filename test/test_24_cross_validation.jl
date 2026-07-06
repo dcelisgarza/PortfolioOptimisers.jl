@@ -69,7 +69,7 @@
                                                      n_test_paths_w = 11)
         @test n_folds == 4
         @test n_test_folds == 3
-        cv = CombinatorialCrossValidation(n_folds, n_test_folds, 23, 11, 1)
+        cv = CombinatorialCrossValidation(n_folds, n_test_folds, 23, 11)
         @test PortfolioOptimisers.average_train_size(cv, rd) == 252
         (; train_idx, test_idx, path_ids) = split(cv, rd)
         @test length(train_idx) == length(test_idx) == n_splits(cv)
@@ -838,5 +838,36 @@
             @test rs_res2.val_grid[rs_res2.idx] == rs_res1.val_grid[rs_res1.idx]
             @test rs_res2.lens_grid[rs_res2.idx] == rs_res1.lens_grid[rs_res1.idx]
         end
+    end
+    @testset "parse_lens fails closed" begin
+        # Param-key parsing is a string->AST boundary (ADR 0025): only `.`/`[]`
+        # heads survive; everything else fails closed with a typed Meta.ParseError.
+        # :call head -- the headline "no code runs" case.
+        @test_throws Meta.ParseError PortfolioOptimisers.parse_lens("exit(1)")
+        # Non-symbol base case (literal path root).
+        @test_throws Meta.ParseError PortfolioOptimisers.parse_lens("5")
+        @test_throws Meta.ParseError PortfolioOptimisers.parse_lens("\"pe\"")
+        # Non-vect index expression, rejected in _eval_index.
+        @test_throws Meta.ParseError PortfolioOptimisers.parse_lens("a[b()]")
+        # Liveness: valid property and index paths still build working lenses.
+        @test PortfolioOptimisers.parse_lens("opt.pe.ce") isa Base.Callable
+        @test PortfolioOptimisers.parse_lens("a[2]") isa Base.Callable
+    end
+    @testset "parse_lens recursion caps" begin
+        # Same trust boundary as the equation parser (ADR 0027): an over-long / deeply
+        # nested untrusted key fails closed with a typed Meta.ParseError before
+        # `Meta.parse` and the recursive lens-building walk can exhaust the stack.
+        pe = PortfolioOptimisers
+        deep = "a" * "[1]"^(cld(pe.EQUATION_LIMITS[].max_length, 3) + 10)
+        @test length(deep) > pe.EQUATION_LIMITS[].max_length
+        @test_throws Meta.ParseError pe.parse_lens(deep)
+        # The Expr form has no length cap; the depth guard rejects an over-deep pre-built AST.
+        ex = :a
+        for _ in 1:(pe.EQUATION_LIMITS[].max_depth + 10)
+            ex = Expr(:ref, ex, 1)
+        end
+        @test_throws Meta.ParseError pe.parse_lens(ex)
+        # A legitimate key still parses under the default caps.
+        @test pe.parse_lens("opt.pe.ce") isa Base.Callable
     end
 end

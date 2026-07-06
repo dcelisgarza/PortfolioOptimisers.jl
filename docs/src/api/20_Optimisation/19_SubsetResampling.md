@@ -14,4 +14,5 @@ optimise(sr::SubsetResampling{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                   branchorder::Symbol = :optimal, str_names::Bool = false,
                   save::Bool = true, kwargs...)
 subset_resampling_finaliser
+subset_resampling_retcode
 ```

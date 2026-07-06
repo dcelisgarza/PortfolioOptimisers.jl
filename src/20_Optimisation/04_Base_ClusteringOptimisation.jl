@@ -134,7 +134,7 @@ HierarchicalOptimiser
          │           │      │    ce ┼ GeneralCovariance
          │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
          │           │      │       │    w ┴ nothing
-         │           │      │   alg ┴ Full()
+         │           │      │   alg ┴ FullMoment()
          │           │   mp ┼ MatrixProcessing
          │           │      │     pdm ┼ Posdef
          │           │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
@@ -154,7 +154,7 @@ HierarchicalOptimiser
          │       │      │    ce ┼ GeneralCovariance
          │       │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
          │       │      │       │    w ┴ nothing
-         │       │      │   alg ┴ Full()
+         │       │      │   alg ┴ FullMoment()
          │       │   mp ┼ MatrixProcessing
          │       │      │     pdm ┼ Posdef
          │       │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
@@ -243,7 +243,7 @@ HierarchicalOptimiser
                                    sets::Option{<:AssetSets}, wf::WeightFinaliser,
                                    brt::Bool, cle_pr::Bool, strict::Bool)
         if isa(wb, WeightBoundsEstimator)
-            @argcheck(!isnothing(sets))
+            @argcheck(!isnothing(sets), IsNothingError("sets cannot be nothing"))
         end
         return new{typeof(pe), typeof(cle), typeof(slv), typeof(wb), typeof(fees),
                    typeof(sets), typeof(wf), typeof(brt), typeof(cle_pr), typeof(strict)}(pe,

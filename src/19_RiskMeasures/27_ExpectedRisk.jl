@@ -11,17 +11,17 @@ Union of matrix-like types accepted as the data argument in [`risk_contribution`
 """
 const MatNum_Pr = Union{<:MatNum, <:AbstractPriorResult, <:ReturnsResult}
 """
-    const RkRatioRM = Union{<:RiskRatioRiskMeasure, <:NonOptimisationRiskRatioRiskMeasure}
+    const RkRatioRM = Union{<:RiskRatio, <:NonOptimisationRiskRatio}
 
 Union of all risk-ratio risk measures, where the expected risk is defined as the ratio of two component risk values.
 
 # Related
 
-  - [`RiskRatioRiskMeasure`](@ref)
-  - [`NonOptimisationRiskRatioRiskMeasure`](@ref)
+  - [`RiskRatio`](@ref)
+  - [`NonOptimisationRiskRatio`](@ref)
   - [`expected_risk`](@ref)
 """
-const RkRatioRM = Union{<:RiskRatioRiskMeasure, <:NonOptimisationRiskRatioRiskMeasure}
+const RkRatioRM = Union{<:RiskRatio, <:NonOptimisationRiskRatio}
 """
     expected_risk(r::AbstractBaseRiskMeasure, w::VecNum, args...; kwargs...)
     expected_risk(kind::RiskInputKind, r, w::VecNum, args...; kwargs...)
@@ -145,7 +145,7 @@ route through here rather than calling the functor directly.
 """
 function expected_risk_from_returns(r::AbstractBaseRiskMeasure, X::VecNum; kwargs...)
     if !supports_precomputed_returns(r)
-        throw(ArgumentError("`$(typeof(r))` cannot be evaluated on a precomputed return series: it requires portfolio weights and/or per-asset data (e.g. a weights-only measure such as `TurnoverRiskMeasure`/`EqualRiskMeasure`, a tracking measure, a variance-carrying composite such as `VarianceSkewKurtosis`, or a moment measure with a per-asset `mu`). Evaluate it through `expected_risk(r, w, X, fees)` with explicit weights instead."))
+        throw(ArgumentError("`$(typeof(r))` cannot be evaluated on a precomputed return series: it requires portfolio weights and/or per-asset data (e.g. a weights-only measure such as `TurnoverRiskMeasure`/`EqualRisk`, a tracking measure, a variance-carrying composite such as `VarianceSkewKurtosis`, or a moment measure with a per-asset `mu`). Evaluate it through `expected_risk(r, w, X, fees)` with explicit weights instead."))
     end
     return r(X)
 end
@@ -196,9 +196,9 @@ concentration as the given weight vector `w`.
 # Related
 
   - [`set_number_effective_assets!`](@ref)
-  - [`EqualRiskMeasure`](@ref)
+  - [`EqualRisk`](@ref)
   - [`risk_contribution`](@ref)
-  - [`EqualRiskMeasure`](@ref)
+  - [`EqualRisk`](@ref)
 """
 function number_effective_assets(w::VecNum)
     return inv(LinearAlgebra.dot(w, w))
@@ -376,5 +376,5 @@ function rolling_window_measure(r::AbstractBaseRiskMeasure, w::VecNum, X::MatNum
     return [expected_risk(r, w, view(X, (t - window + 1):t, :), fees) for t in window:T]
 end
 
-export RiskRatioRiskMeasure, number_effective_assets, risk_contribution,
-       factor_risk_contribution, rolling_window_measure
+export RiskRatio, number_effective_assets, risk_contribution, factor_risk_contribution,
+       rolling_window_measure

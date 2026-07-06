@@ -52,7 +52,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     MeanRisk(;
-        opt::JuMPOptimiser = JuMPOptimiser(),
+        opt::JuMPOptimiser,
         r::RM_VecRM = Variance(),
         obj::ObjectiveFunction = MinimumRisk(),
         wi::Option{<:VecNum} = nothing,
@@ -66,10 +66,18 @@ Keywords correspond to the struct's fields.
   - If `r` is a vector: `!isempty(r)`.
   - If `wi` is provided: `!isempty(wi)`.
 
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+
+  - `opt`: Recursively updated via [`factory`](@ref).
+  - `r`: Recursively updated via [`factory`](@ref).
+  - `fb`: Recursively updated via [`factory`](@ref).
+
 # Examples
 
 ```jldoctest
-julia> MeanRisk(; opt = JuMPOptimiser(; slv = Solver()))
+julia> MeanRisk(; opt = JuMPOptimiser(; slv = Solver(; solver = nothing)))
 MeanRisk
   opt ┼ JuMPOptimiser
       │        pe ┼ EmpiricalPrior
@@ -80,7 +88,7 @@ MeanRisk
       │           │           │      │    ce ┼ GeneralCovariance
       │           │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
       │           │           │      │       │    w ┴ nothing
-      │           │           │      │   alg ┴ Full()
+      │           │           │      │   alg ┴ FullMoment()
       │           │           │   mp ┼ MatrixProcessing
       │           │           │      │     pdm ┼ Posdef
       │           │           │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
@@ -199,15 +207,15 @@ Where:
   - [`ObjectiveFunction`](@ref)
   - [`RiskMeasure`](@ref)
 """
-@concrete struct MeanRisk <: RiskJuMPOptimisationEstimator
+@propagatable @concrete struct MeanRisk <: RiskJuMPOptimisationEstimator
     """
     $(field_dict[:opt_jmp])
     """
-    opt
+    @fprop opt
     """
     $(field_dict[:r_opt])
     """
-    r
+    @fprop r
     """
     $(field_dict[:obj])
     """
@@ -219,20 +227,20 @@ Where:
     """
     $(field_dict[:fb])
     """
-    fb
+    @fprop fb
     function MeanRisk(opt::JuMPOptimiser, r::RM_VecRM, obj::ObjectiveFunction,
                       wi::Option{<:VecNum}, fb::Option{<:OptE_Opt})
         if isa(r, AbstractVector)
-            @argcheck(!isempty(r))
+            @argcheck(!isempty(r), IsEmptyError("r cannot be empty"))
         end
         if !isnothing(wi)
-            @argcheck(!isempty(wi))
+            @argcheck(!isempty(wi), IsEmptyError("wi cannot be empty"))
         end
         return new{typeof(opt), typeof(r), typeof(obj), typeof(wi), typeof(fb)}(opt, r, obj,
                                                                                 wi, fb)
     end
 end
-function MeanRisk(; opt::JuMPOptimiser = JuMPOptimiser(), r::RM_VecRM = Variance(),
+function MeanRisk(; opt::JuMPOptimiser, r::RM_VecRM = Variance(),
                   obj::ObjectiveFunction = MinimumRisk(), wi::Option{<:VecNum} = nothing,
                   fb::Option{<:OptE_Opt} = nothing)::MeanRisk
     return MeanRisk(opt, r, obj, wi, fb)
@@ -246,17 +254,6 @@ function needs_previous_weights(opt::MeanRisk)
     return (needs_previous_weights(opt.opt) ||
             needs_previous_weights(opt.r) ||
             needs_previous_weights(opt.fb))
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Build an updated [`MeanRisk`](@ref) with all estimators that track previous weights updated via `factory` using `w`.
-"""
-function factory(mr::MeanRisk, w::AbstractVector)::MeanRisk
-    opt = factory(mr.opt, w)
-    r = factory(mr.r, w)
-    fb = factory(mr.fb, w)
-    return MeanRisk(; opt = opt, r = r, obj = mr.obj, wi = mr.wi, fb = fb)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -362,11 +359,13 @@ function compute_ret_lbs(lbs::Frontier, model::JuMP.Model, mr::MeanRisk,
     X = pr.X
     set_portfolio_objective_function!(model, MinimumRisk(), ret, mr.opt.cobj, mr, pr)
     retcode, sol_min = optimise_JuMP_model!(model, mr, eltype(X))
-    @argcheck(isa(retcode, OptimisationSuccess))
+    @argcheck(isa(retcode, OptimisationSuccess),
+              ArgumentError("minimum-risk solve failed with retcode $retcode"))
     JuMP.unregister(model, :obj_expr)
     set_portfolio_objective_function!(model, MaximumReturn(), ret, mr.opt.cobj, mr, pr)
     retcode, sol_max = optimise_JuMP_model!(model, mr, eltype(X))
-    @argcheck(isa(retcode, OptimisationSuccess))
+    @argcheck(isa(retcode, OptimisationSuccess),
+              ArgumentError("maximum-return solve failed with retcode $retcode"))
     JuMP.unregister(model, :obj_expr)
     rt_min = expected_return(ret, sol_min.w, pr, fees)
     rt_max = expected_return(ret, sol_max.w, pr, fees)
@@ -466,11 +465,13 @@ function rebuild_risk_frontier(model::JuMP.Model,
     risk_frontier = copy(risk_frontier)
     set_portfolio_objective_function!(model, MinimumRisk(), ret, mr.opt.cobj, mr, pr)
     retcode, sol_min = optimise_JuMP_model!(model, mr, eltype(X))
-    @argcheck(isa(retcode, OptimisationSuccess))
+    @argcheck(isa(retcode, OptimisationSuccess),
+              ArgumentError("minimum-risk solve failed with retcode $retcode"))
     JuMP.unregister(model, :obj_expr)
     set_portfolio_objective_function!(model, MaximumReturn(), ret, mr.opt.cobj, mr, pr)
     retcode, sol_max = optimise_JuMP_model!(model, mr, eltype(X))
-    @argcheck(isa(retcode, OptimisationSuccess))
+    @argcheck(isa(retcode, OptimisationSuccess),
+              ArgumentError("maximum-return solve failed with retcode $retcode"))
     JuMP.unregister(model, :obj_expr)
     r = factory(view(mr.r, idx), pr, mr.opt.slv)
     for (i, ri) in zip(idx, r)
@@ -485,11 +486,13 @@ function rebuild_risk_frontier(model::JuMP.Model, mr::MeanRisk{<:Any, <:Any, <:A
     X = pr.X
     set_portfolio_objective_function!(model, MinimumRisk(), ret, mr.opt.cobj, mr, pr)
     retcode, sol_min = optimise_JuMP_model!(model, mr, eltype(X))
-    @argcheck(isa(retcode, OptimisationSuccess))
+    @argcheck(isa(retcode, OptimisationSuccess),
+              ArgumentError("minimum-risk solve failed with retcode $retcode"))
     JuMP.unregister(model, :obj_expr)
     set_portfolio_objective_function!(model, MaximumReturn(), ret, mr.opt.cobj, mr, pr)
     retcode, sol_max = optimise_JuMP_model!(model, mr, eltype(X))
-    @argcheck(isa(retcode, OptimisationSuccess))
+    @argcheck(isa(retcode, OptimisationSuccess),
+              ArgumentError("maximum-return solve failed with retcode $retcode"))
     JuMP.unregister(model, :obj_expr)
     r = factory(mr.r, pr, mr.opt.slv)
     return (_rebuild_risk_frontier(pr, fees, r, risk_frontier, sol_min.w, sol_max.w),)

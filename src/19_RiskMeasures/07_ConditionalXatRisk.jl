@@ -104,7 +104,7 @@ ConditionalValueatRisk
     @pprop w
     function ConditionalValueatRisk(settings::RiskMeasureSettings, alpha::Number,
                                     w::Option{<:ObsWeights})
-        @argcheck(zero(alpha) < alpha < one(alpha))
+        assert_unit_interval(alpha, :alpha)
         assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(settings), typeof(alpha), typeof(w)}(settings, alpha, w)
     end
@@ -220,11 +220,11 @@ DistributionallyRobustConditionalValueatRisk
                                                           alpha::Number, l::Number,
                                                           r::Number,
                                                           w::Option{<:ObsWeights})
-        @argcheck(zero(alpha) < alpha < one(alpha))
-        @argcheck(l > zero(l))
-        @argcheck(r > zero(r))
+        assert_unit_interval(alpha, :alpha)
+        @argcheck(l > zero(l), DomainError(l, "l must be positive"))
+        @argcheck(r > zero(r), DomainError(r, "r must be positive"))
         if !isnothing(w)
-            @argcheck(!isempty(w))
+            @argcheck(!isempty(w), IsEmptyError("w cannot be empty"))
         end
         return new{typeof(settings), typeof(alpha), typeof(l), typeof(r), typeof(w)}(settings,
                                                                                      alpha,
@@ -376,8 +376,8 @@ ConditionalValueatRiskRange
     @pprop w
     function ConditionalValueatRiskRange(settings::RiskMeasureSettings, alpha::Number,
                                          beta::Number, w::Option{<:ObsWeights})
-        @argcheck(zero(alpha) < alpha < one(alpha))
-        @argcheck(zero(beta) < beta < one(beta))
+        assert_unit_interval(alpha, :alpha)
+        assert_unit_interval(beta, :beta)
         assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(settings), typeof(alpha), typeof(beta), typeof(w)}(settings,
                                                                              alpha, beta, w)
@@ -511,12 +511,12 @@ DistributionallyRobustConditionalValueatRiskRange
                                                                r_a::Number, beta::Number,
                                                                l_b::Number, r_b::Number,
                                                                w::Option{<:ObsWeights})
-        @argcheck(zero(alpha) < alpha < one(alpha))
-        @argcheck(zero(beta) < beta < one(beta))
-        @argcheck(l_a > zero(l_a))
-        @argcheck(r_a > zero(r_a))
-        @argcheck(l_b > zero(l_b))
-        @argcheck(r_b > zero(r_b))
+        assert_unit_interval(alpha, :alpha)
+        assert_unit_interval(beta, :beta)
+        @argcheck(l_a > zero(l_a), DomainError(l_a, "l_a must be positive"))
+        @argcheck(r_a > zero(r_a), DomainError(r_a, "r_a must be positive"))
+        @argcheck(l_b > zero(l_b), DomainError(l_b, "l_b must be positive"))
+        @argcheck(r_b > zero(r_b), DomainError(r_b, "r_b must be positive"))
         assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(settings), typeof(alpha), typeof(l_a), typeof(r_a), typeof(beta),
                    typeof(l_b), typeof(r_b), typeof(w)}(settings, alpha, l_a, r_a, beta,
@@ -711,7 +711,7 @@ ConditionalDrawdownatRisk
     @pprop w
     function ConditionalDrawdownatRisk(settings::RiskMeasureSettings, alpha::Number,
                                        w::Option{<:ObsWeights})
-        @argcheck(zero(alpha) < alpha < one(alpha))
+        assert_unit_interval(alpha, :alpha)
         assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(settings), typeof(alpha), typeof(w)}(settings, alpha, w)
     end
@@ -825,9 +825,9 @@ DistributionallyRobustConditionalDrawdownatRisk
                                                              alpha::Number, l::Number,
                                                              r::Number,
                                                              w::Option{<:ObsWeights})
-        @argcheck(zero(alpha) < alpha < one(alpha))
-        @argcheck(l > zero(l))
-        @argcheck(r > zero(r))
+        assert_unit_interval(alpha, :alpha)
+        @argcheck(l > zero(l), DomainError(l, "l must be positive"))
+        @argcheck(r > zero(r), DomainError(r, "r must be positive"))
         assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(settings), typeof(alpha), typeof(l), typeof(r), typeof(w)}(settings,
                                                                                      alpha,
@@ -989,7 +989,7 @@ RelativeConditionalDrawdownatRisk
     @pprop w
     function RelativeConditionalDrawdownatRisk(settings::HierarchicalRiskMeasureSettings,
                                                alpha::Number, w::Option{<:ObsWeights})
-        @argcheck(zero(alpha) < alpha < one(alpha))
+        assert_unit_interval(alpha, :alpha)
         assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(settings), typeof(alpha), typeof(w)}(settings, alpha, w)
     end

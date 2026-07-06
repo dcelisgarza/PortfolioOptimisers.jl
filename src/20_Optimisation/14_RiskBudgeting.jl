@@ -1,6 +1,17 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
+Abstract supertype for processed risk budgeting attributes. Every collection of processed risk budgeting attributes should subtype this.
+
+# Related
+
+  - [`ProcessedAssetRiskBudgetingAttributes`](@ref)
+  - [`ProcessedFactorRiskBudgetingAttributes`](@ref)
+"""
+abstract type ProcessedRiskBudgetingAttributes <: ProcessedAttributes end
+"""
+$(DocStringExtensions.TYPEDEF)
+
 Processed factor risk budgeting attributes for intermediate computations.
 
 # Fields
@@ -12,7 +23,7 @@ $(DocStringExtensions.FIELDS)
   - [`RiskBudgeting`](@ref)
   - [`FactorRiskBudgeting`](@ref)
 """
-@concrete struct ProcessedFactorRiskBudgetingAttributes <: AbstractResult
+@concrete struct ProcessedFactorRiskBudgetingAttributes <: ProcessedRiskBudgetingAttributes
     """
     Processed risk budget constraints vector.
     """
@@ -48,7 +59,7 @@ $(DocStringExtensions.FIELDS)
   - [`RiskBudgeting`](@ref)
   - [`AssetRiskBudgeting`](@ref)
 """
-@concrete struct ProcessedAssetRiskBudgetingAttributes <: AbstractResult
+@concrete struct ProcessedAssetRiskBudgetingAttributes <: ProcessedRiskBudgetingAttributes
     """
     Processed asset risk budget constraints vector.
     """
@@ -175,8 +186,9 @@ Keywords correspond to the struct's fields.
     z::T
     function LogRiskBudgeting(z::Option{<:VecInt})
         if !isnothing(z)
-            @argcheck(!isempty(z))
-            @argcheck(all(x -> abs(x) == 1, z))
+            @argcheck(!isempty(z), IsEmptyError("z cannot be empty"))
+            @argcheck(all(x -> abs(x) == 1, z),
+                      ArgumentError("all elements of z must be ±1"))
         end
         return new{typeof(z)}(z)
     end
@@ -261,7 +273,7 @@ Keywords correspond to the struct's fields.
     function AssetRiskBudgeting(rkb::Option{<:RkbE_Rkb}, sets::Option{<:AssetSets},
                                 alg::RiskBudgetingFormulation)
         if isa(rkb, RiskBudgetEstimator)
-            @argcheck(!isnothing(sets))
+            @argcheck(!isnothing(sets), IsNothingError("sets cannot be nothing"))
         end
         return new{typeof(rkb), typeof(sets), typeof(alg)}(rkb, sets, alg)
     end
@@ -323,7 +335,7 @@ Keywords correspond to the struct's fields.
     function FactorRiskBudgeting(re::RegE_Reg, rkb::Option{<:RkbE_Rkb},
                                  sets::Option{<:AssetSets}, flag::Bool)
         if isa(rkb, RiskBudgetEstimator)
-            @argcheck(!isnothing(sets))
+            @argcheck(!isnothing(sets), IsNothingError("sets cannot be nothing"))
         end
         return new{typeof(re), typeof(rkb), typeof(sets), typeof(flag)}(re, rkb, sets, flag)
     end
@@ -348,7 +360,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     RiskBudgeting(;
-        opt::JuMPOptimiser = JuMPOptimiser(),
+        opt::JuMPOptimiser,
         r::RM_VecRM = Variance(),
         rba::RiskBudgetingAlgorithm = AssetRiskBudgeting(),
         wi::Option{<:VecNum} = nothing,
@@ -388,6 +400,14 @@ Where:
   - ``N``: Number of assets.
   - ``\\boldsymbol{w}``: Portfolio weight vector.
 
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+
+  - `opt`: Recursively updated via [`factory`](@ref).
+  - `r`: Recursively updated via [`factory`](@ref).
+  - `fb`: Recursively updated via [`factory`](@ref).
+
 # Related
 
   - [`scalarise_risk_expression!`](@ref)
@@ -398,15 +418,15 @@ Where:
   - [`AssetRiskBudgeting`](@ref)
   - [`FactorRiskBudgeting`](@ref)
 """
-@concrete struct RiskBudgeting <: RiskJuMPOptimisationEstimator
+@propagatable @concrete struct RiskBudgeting <: RiskJuMPOptimisationEstimator
     """
     $(field_dict[:opt_jmp])
     """
-    opt
+    @fprop opt
     """
     $(field_dict[:r_opt])
     """
-    r
+    @fprop r
     """
     $(field_dict[:rba])
     """
@@ -418,20 +438,20 @@ Where:
     """
     $(field_dict[:fb])
     """
-    fb
+    @fprop fb
     function RiskBudgeting(opt::JuMPOptimiser, r::RM_VecRM, rba::RiskBudgetingAlgorithm,
                            wi::Option{<:VecNum}, fb::Option{<:OptE_Opt})
         if isa(r, AbstractVector)
-            @argcheck(!isempty(r))
+            @argcheck(!isempty(r), IsEmptyError("r cannot be empty"))
         end
         if isa(wi, VecNum)
-            @argcheck(!isempty(wi))
+            @argcheck(!isempty(wi), IsEmptyError("wi cannot be empty"))
         end
         return new{typeof(opt), typeof(r), typeof(rba), typeof(wi), typeof(fb)}(opt, r, rba,
                                                                                 wi, fb)
     end
 end
-function RiskBudgeting(; opt::JuMPOptimiser = JuMPOptimiser(), r::RM_VecRM = Variance(),
+function RiskBudgeting(; opt::JuMPOptimiser, r::RM_VecRM = Variance(),
                        rba::RiskBudgetingAlgorithm = AssetRiskBudgeting(),
                        wi::Option{<:VecNum} = nothing,
                        fb::Option{<:OptE_Opt} = nothing)::RiskBudgeting
@@ -446,17 +466,6 @@ function needs_previous_weights(opt::RiskBudgeting)
     return (needs_previous_weights(opt.opt) ||
             needs_previous_weights(opt.r) ||
             needs_previous_weights(opt.fb))
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Build an updated [`RiskBudgeting`](@ref) with all estimators that track previous weights updated via `factory` using `w`.
-"""
-function factory(rb::RiskBudgeting, w::AbstractVector)::RiskBudgeting
-    opt = factory(rb.opt, w)
-    r = factory(rb.r, w)
-    fb = factory(rb.fb, w)
-    return RiskBudgeting(; opt = opt, r = r, rba = rb.rba, wi = rb.wi, fb = fb)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -497,7 +506,7 @@ function _set_risk_budgeting_constraints!(model::JuMP.Model, rb::RiskBudgeting,
     N = length(w)
     rkb = risk_budget_constraints(rb.rba.rkb, rb.rba.sets; N = N, strict = strict)
     rb = rkb.val
-    @argcheck(length(rb) == N)
+    @argcheck(length(rb) == N, DimensionMismatch("rb ($(length(rb))) must match N ($N)"))
     sc = get_constraint_scale(model)
     JuMP.@variables(model, begin
                         k
@@ -557,7 +566,8 @@ function set_risk_budgeting_constraints!(model::JuMP.Model,
                                          wb::WeightBounds, args...)
     set_w!(model, pr.X, rb.wi)
     z = rb.rba.alg.z
-    @argcheck(length(z) == length(get_w(model)))
+    @argcheck(length(z) == length(get_w(model)),
+              DimensionMismatch("z ($(length(z))) must match w ($(length(get_w(model)))))"))
     w = z .* get_w(model)
     rkb = _set_risk_budgeting_constraints!(model, rb, w; strict = rb.opt.strict)
     sc = get_constraint_scale(model)

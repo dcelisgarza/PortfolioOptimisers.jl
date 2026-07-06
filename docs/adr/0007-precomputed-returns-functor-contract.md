@@ -37,7 +37,7 @@ so that `X * SingletonVector()` short-circuits to the single column. Problems:
    `reshape(view(pr.X, :, i), :, 1)` — a `ReshapedArray`, not a `Matrix` — so the product
    falls through to the generic `getindex`-based matvec anyway. The sentinel saves nothing there.
 3. **It silently does the wrong thing for measures that genuinely need weights.** Routed
-   through `expected_risk`, a `WeightsInput` measure (`Turnover`, `EqualRiskMeasure`) receives
+   through `expected_risk`, a `WeightsInput` measure (`Turnover`, `EqualRisk`) receives
    `r(SingletonVector())` — turnover of `[1]`, a meaningless number with no error. A moment
    measure carrying a per-asset target `mu::VecNum` hits `dot(SingletonVector, r.mu)` and throws
    an opaque length-mismatch. The "precomputed series" path was only ever well-defined for
@@ -136,7 +136,7 @@ test are removed.
   per-asset `mu`, or a variance-carrying composite now throws an actionable `ArgumentError` via
   the `supports_precomputed_returns` gate, instead of returning nonsense (turnover of the series
   read as weights) or an opaque `MethodError`. The guarantee lives at the gate, not the bare
-  functor: `EqualRiskMeasure()(v)` remains a legitimate `r(weights)` call and cannot be told
+  functor: `EqualRisk()(v)` remains a legitimate `r(weights)` call and cannot be told
   apart from a misuse by dispatch.
 - **The boundary is documented by construction.** Which measures support a bare return series
   is now a property visible at each measure's functor definition, not an emergent consequence
@@ -158,7 +158,7 @@ That holds only for measures with **no** `VecNum` functor at all (e.g. `Variance
 It is **not** true for the two cases the ADR explicitly named as now-loud:
 
 - a `WeightsInput` measure's functor `r(w)` shares the `r(::VecNum)` signature, so it shadows
-  the catch-all and **silently scores the series as weights** (`EqualRiskMeasure()(x)` → `1/N`,
+  the catch-all and **silently scores the series as weights** (`EqualRisk()(x)` → `1/N`,
   `TurnoverRiskMeasure()(x)` → turnover-of-series), or throws an opaque `DimensionMismatch`
   (`Variance`/`StandardDeviation`);
 - a moment measure with a per-asset `mu` is shadowed by the moment family's generic `r(x)` and

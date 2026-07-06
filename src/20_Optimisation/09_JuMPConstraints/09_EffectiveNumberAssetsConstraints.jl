@@ -35,7 +35,7 @@ Where:
 # Related
 
   - [`number_effective_assets`](@ref)
-  - [`EqualRiskMeasure`](@ref)
+  - [`EqualRisk`](@ref)
 """
 function set_number_effective_assets!(args...)
     return nothing

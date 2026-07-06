@@ -270,7 +270,7 @@ Converts integer, symbol, or vector expression AST nodes to concrete index value
 """
 _eval_index(x::Integer) = x
 _eval_index(x::Symbol) = x
-_eval_index(ex::Expr)  = ex.head === :vect ? [_eval_index(a) for a in ex.args] : error("Unsupported index expression: $ex")
+_eval_index(ex::Expr)  = ex.head === :vect ? [_eval_index(a) for a in ex.args] : throw(Meta.ParseError("Unsupported index expression: $ex"))
 """
     expr_to_lens_chain(ex)
 
@@ -302,8 +302,11 @@ function expr_to_lens_chain(ex)
             push!(optics, Accessors.IndexLens(indices))
             ex = ex.args[1]
         else
-            error("Unsupported expression: $ex")
+            throw(Meta.ParseError("Unsupported expression: $ex"))
         end
+    end
+    if !(ex isa Symbol)
+        throw(Meta.ParseError("Unsupported expression: $ex"))
     end
     push!(optics, Accessors.PropertyLens(ex))  # base case: Symbol
     return foldl(∘, optics)
@@ -319,6 +322,11 @@ Converts a dotted string path (e.g., `"opt.pe.ce"`) into a composable lens for g
 
   - `key`: Dotted field path string.
 
+# Validation
+
+  - String keys longer than `EQUATION_LIMITS[].max_length` are rejected before `Meta.parse`.
+  - `Expr`/`Symbol` keys deeper than `EQUATION_LIMITS[].max_depth` are rejected before the lens-building walk.
+
 # Returns
 
   - Composed Accessors.jl lens.
@@ -328,11 +336,22 @@ Converts a dotted string path (e.g., `"opt.pe.ce"`) into a composable lens for g
   - [`expr_to_lens_chain`](@ref)
   - [`GridSearchCrossValidation`](@ref)
   - [`RandomisedSearchCrossValidation`](@ref)
+  - [`EQUATION_LIMITS`](@ref)
 """
 function parse_lens(key::AbstractString)
+    # Trust boundary: cap the untrusted string length before `Meta.parse` and the
+    # recursive lens-building walk, so a deeply nested key cannot exhaust the stack.
+    lim = EQUATION_LIMITS[]
+    @argcheck(length(key) <= lim.max_length,
+              Meta.ParseError("Lens key string is too long ($(length(key)) > $(lim.max_length) characters)."))
     return expr_to_lens_chain(Meta.parse(key))
 end
 function parse_lens(key::Union{Expr, Symbol})
+    # Trust-boundary defence for the pre-built-AST form (no string length cap applies):
+    # reject an over-deep tree before `expr_to_lens_chain`'s recursive walk can exhaust the stack.
+    lim = EQUATION_LIMITS[]
+    @argcheck(!_expr_depth_exceeds(key, lim.max_depth),
+              Meta.ParseError("Lens key expression is too deeply nested (exceeds depth $(lim.max_depth))."))
     return expr_to_lens_chain(key)
 end
 function parse_lens(key::Union{<:ComposedFunction, <:Accessors.PropertyLens,

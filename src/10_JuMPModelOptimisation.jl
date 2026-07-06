@@ -67,7 +67,7 @@ $(DocStringExtensions.FIELDS)
 
     Solver(;
         name::Sym_Str = "",
-        solver::Any = nothing,
+        solver::Any,
         settings::Option{<:SlvSettings} = nothing,
         check_sol::NamedTuple = (;),
         add_bridges::Bool = true
@@ -82,7 +82,7 @@ Keywords correspond to the struct's fields.
 # Examples
 
 ```jldoctest
-julia> Solver()
+julia> Solver(; solver = nothing)
 Solver
          name ┼ String: ""
        solver ┼ nothing
@@ -126,18 +126,21 @@ Solver
         if isa(settings, Dict_VecPair)
             @argcheck(!isempty(settings), IsEmptyError)
             if isa(settings, AbstractVector)
-                @argcheck(all(x -> isa(x[1], SlvKeys), settings))
+                @argcheck(all(x -> isa(x[1], SlvKeys), settings),
+                          ArgumentError("all keys in settings must be a SlvKeys (AbstractString or MOI.AbstractModelAttribute)"))
             else
-                @argcheck(all(x -> isa(x, SlvKeys), keys(settings)))
+                @argcheck(all(x -> isa(x, SlvKeys), keys(settings)),
+                          ArgumentError("all keys in settings must be a SlvKeys (AbstractString or MOI.AbstractModelAttribute)"))
             end
         elseif isa(settings, Pair)
-            @argcheck(isa(settings[1], SlvKeys))
+            @argcheck(isa(settings[1], SlvKeys),
+                      ArgumentError("settings[1] must be a SlvKeys (AbstractString or MOI.AbstractModelAttribute), got $(settings[1])"))
         end
         return new{typeof(name), typeof(solver), typeof(settings), typeof(check_sol),
                    typeof(add_bridges)}(name, solver, settings, check_sol, add_bridges)
     end
 end
-function Solver(; name::Sym_Str = "", solver::Any = nothing,
+function Solver(; name::Sym_Str = "", solver::Any,
                 settings::Option{<:SlvSettings} = nothing, check_sol::NamedTuple = (;),
                 add_bridges::Bool = true)::Solver
     return Solver(name, solver, settings, check_sol, add_bridges)
@@ -173,6 +176,8 @@ $(DocStringExtensions.TYPEDEF)
 Result type for JuMP model optimisation.
 
 The `JuMPResult` struct records the outcome of a JuMP optimisation, including trial errors and success status.
+
+When `success` is `false` the constructor emits a warning built by [`failed_solve_msg`](@ref): one bounded line per failed solver stage (name, stage, first line of the error). The full per-solver exceptions and settings stay available on `trials` and are never dumped into the log.
 
 # Fields
 
@@ -211,7 +216,9 @@ JuMPResult
     success
     function JuMPResult(trials::AbstractDict, success::Bool)::JuMPResult
         if !success
-            @warn("Model could not be solved satisfactorily.\n$trials")
+            # Summarised via the shared builder: one bounded line per failed stage, never
+            # the whole trials dict, the solver settings, or full exception payloads.
+            @warn(failed_solve_msg(trials))
         end
         return new{typeof(trials), typeof(success)}(trials, success)
     end

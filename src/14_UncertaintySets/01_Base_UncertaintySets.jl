@@ -247,7 +247,8 @@ Constructs an uncertainty set from a given estimator and returns data.
 function ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult; kwargs...)
     @argcheck(!isnothing(rd.X), IsNothingError)
     if isa(uc.pe, AbstractHiLoOrderPriorEstimator_F)
-        @argcheck(!isnothing(rd.F), IsNothingError)
+        @argcheck(!isnothing(rd.F),
+                  IsNothingError("this is a factor prior; it needs factor returns. ReturnsResult.F is nothing — populate F (e.g. via prices_to_returns on factor prices)."))
     end
     return ucs(uc, rd.X, rd.F; iv = rd.iv, ivpa = rd.ivpa, kwargs...)
 end
@@ -283,7 +284,8 @@ Constructs an expected returns uncertainty set from a given estimator and return
 function mu_ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult; kwargs...)
     @argcheck(!isnothing(rd.X), IsNothingError)
     if isa(uc.pe, AbstractHiLoOrderPriorEstimator_F)
-        @argcheck(!isnothing(rd.F), IsNothingError)
+        @argcheck(!isnothing(rd.F),
+                  IsNothingError("this is a factor prior; it needs factor returns. ReturnsResult.F is nothing — populate F (e.g. via prices_to_returns on factor prices)."))
     end
     return mu_ucs(uc, rd.X, rd.F; iv = rd.iv, ivpa = rd.ivpa, kwargs...)
 end
@@ -319,7 +321,8 @@ Constructs a covariance uncertainty set from a given estimator and returns data.
 function sigma_ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult; kwargs...)
     @argcheck(!isnothing(rd.X), IsNothingError)
     if isa(uc.pe, AbstractHiLoOrderPriorEstimator_F)
-        @argcheck(!isnothing(rd.F), IsNothingError)
+        @argcheck(!isnothing(rd.F),
+                  IsNothingError("this is a factor prior; it needs factor returns. ReturnsResult.F is nothing — populate F (e.g. via prices_to_returns on factor prices)."))
     end
     return sigma_ucs(uc, rd.X, rd.F; iv = rd.iv, ivpa = rd.ivpa, kwargs...)
 end
@@ -405,9 +408,10 @@ BoxUncertaintySet
     """
     ub
     function BoxUncertaintySet(lb::ArrNum, ub::ArrNum)
-        @argcheck(!isempty(lb))
-        @argcheck(!isempty(ub))
-        @argcheck(size(lb) == size(ub))
+        @argcheck(!isempty(lb), IsEmptyError("lb cannot be empty"))
+        @argcheck(!isempty(ub), IsEmptyError("ub cannot be empty"))
+        @argcheck(size(lb) == size(ub),
+                  DimensionMismatch("lb ($(size(lb))) must match ub ($(size(ub)))"))
         return new{typeof(lb), typeof(ub)}(lb, ub)
     end
 end
@@ -741,9 +745,9 @@ EllipsoidalUncertaintySet
     class
     function EllipsoidalUncertaintySet(sigma::MatNum, k::Number,
                                        class::AbstractEllipsoidalUncertaintySetResultClass)
-        @argcheck(!isempty(sigma))
+        @argcheck(!isempty(sigma), IsEmptyError("sigma cannot be empty"))
         assert_matrix_issquare(sigma, :sigma)
-        @argcheck(k > zero(k))
+        @argcheck(k > zero(k), DomainError(k, "k must be positive"))
         return new{typeof(sigma), typeof(k), typeof(class)}(sigma, k, class)
     end
 end

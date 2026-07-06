@@ -118,8 +118,8 @@ $(DocStringExtensions.FIELDS)
 
     HighOrderFactorPriorEstimator(;
         pe::AbstractLowOrderPriorEstimator_F_AF = FactorPrior(),
-        kte::Option{<:CokurtosisEstimator} = Cokurtosis(; alg = Full()),
-        ske::Option{<:CoskewnessEstimator} = Coskewness(; alg = Full()),
+        kte::Option{<:CokurtosisEstimator} = Cokurtosis(; alg = FullMoment()),
+        ske::Option{<:CoskewnessEstimator} = Coskewness(; alg = FullMoment()),
         ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
         rsd::Bool = true
     ) -> HighOrderFactorPriorEstimator
@@ -140,7 +140,7 @@ HighOrderFactorPriorEstimator
       │       │           │      │    ce ┼ GeneralCovariance
       │       │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
       │       │           │      │       │    w ┴ nothing
-      │       │           │      │   alg ┴ Full()
+      │       │           │      │   alg ┴ FullMoment()
       │       │           │   mp ┼ MatrixProcessing
       │       │           │      │     pdm ┼ Posdef
       │       │           │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
@@ -163,7 +163,7 @@ HighOrderFactorPriorEstimator
       │    re ┼ StepwiseRegression
       │       │   crit ┼ PValue
       │       │        │   t ┴ Float64: 0.05
-      │       │    alg ┼ Forward()
+      │       │    alg ┼ ForwardSelection()
       │       │    tgt ┼ LinearModel
       │       │        │   kwargs ┴ @NamedTuple{}: NamedTuple()
       │    ve ┼ SimpleVariance
@@ -183,7 +183,7 @@ HighOrderFactorPriorEstimator
       │       │      dt ┼ nothing
       │       │     alg ┼ nothing
       │       │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
-      │   alg ┼ Full()
+      │   alg ┼ FullMoment()
       │     w ┴ nothing
   ske ┼ Coskewness
       │    me ┼ SimpleExpectedReturns
@@ -196,7 +196,7 @@ HighOrderFactorPriorEstimator
       │       │      dt ┼ nothing
       │       │     alg ┼ nothing
       │       │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
-      │   alg ┼ Full()
+      │   alg ┼ FullMoment()
       │     w ┴ nothing
    ex ┼ Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
   rsd ┴ Bool: true
@@ -244,9 +244,9 @@ end
 function HighOrderFactorPriorEstimator(;
                                        pe::AbstractLowOrderPriorEstimator_F_AF = FactorPrior(),
                                        kte::Option{<:CokurtosisEstimator} = Cokurtosis(;
-                                                                                       alg = Full()),
+                                                                                       alg = FullMoment()),
                                        ske::Option{<:CoskewnessEstimator} = Coskewness(;
-                                                                                       alg = Full()),
+                                                                                       alg = FullMoment()),
                                        ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
                                        rsd::Bool = true)::HighOrderFactorPriorEstimator
     return HighOrderFactorPriorEstimator(pe, kte, ske, ex, rsd)
@@ -316,7 +316,7 @@ Where:
 """
 function prior(pe::HighOrderFactorPriorEstimator, X::MatNum, F::MatNum; dims::Int = 1,
                kwargs...)
-    @argcheck(dims in (1, 2))
+    @argcheck(dims in (1, 2), DomainError(dims, "dims must be in (1, 2)"))
     if dims == 2
         X = transpose(X)
         F = transpose(F)

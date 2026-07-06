@@ -14,8 +14,8 @@ cor(ce::GeneralCovariance, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)
 
 ```@docs
 Covariance
-cov(ce::Covariance{<:Any, <:Any, <:Full}, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)
-cov(ce::Covariance{<:Any, <:Any, <:Semi}, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)
-cor(ce::Covariance{<:Any, <:Any, <:Full}, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)
-cor(ce::Covariance{<:Any, <:Any, <:Semi}, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)
+cov(ce::Covariance{<:Any, <:Any, <:FullMoment}, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)
+cov(ce::Covariance{<:Any, <:Any, <:SemiMoment}, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)
+cor(ce::Covariance{<:Any, <:Any, <:FullMoment}, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)
+cor(ce::Covariance{<:Any, <:Any, <:SemiMoment}, X::MatNum; dims::Int = 1, mean = nothing, kwargs...)
 ```

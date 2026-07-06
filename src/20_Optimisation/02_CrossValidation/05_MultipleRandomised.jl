@@ -144,7 +144,7 @@ $(DocStringExtensions.FIELDS)
         if isa(subset_size, Integer)
             assert_nonempty_nonneg_finite_val(subset_size - 1, "subset_size - 1")
         elseif isa(subset_size, AbstractFloat)
-            @argcheck(0 < subset_size < 1)
+            assert_unit_interval(subset_size, :subset_size)
         end
         if isa(n_subsets, Integer)
             assert_nonempty_nonneg_finite_val(n_subsets - 2, "n_subsets - 2")
@@ -153,7 +153,7 @@ $(DocStringExtensions.FIELDS)
         if isa(window_size, Integer)
             assert_nonempty_nonneg_finite_val(window_size - 2, "window_size - 2")
         elseif isa(window_size, AbstractFloat)
-            @argcheck(0 < window_size < 1)
+            assert_unit_interval(window_size, :window_size)
         end
         return new{typeof(cv), typeof(subset_size), typeof(n_subsets), typeof(max_comb),
                    typeof(window_size), typeof(rng), typeof(seed)}(cv, subset_size,
@@ -222,14 +222,15 @@ Keywords correspond to the struct's fields.
     path_ids
     function MultipleRandomisedResult(train_idx::VecVecInt, test_idx::VecVecInt,
                                       asset_idx::VecVecInt, path_ids::VecInt)
-        @argcheck(!isempty(train_idx))
-        @argcheck(!isempty(test_idx))
-        @argcheck(!isempty(asset_idx))
-        @argcheck(!isempty(path_ids))
+        @argcheck(!isempty(train_idx), IsEmptyError("train_idx cannot be empty"))
+        @argcheck(!isempty(test_idx), IsEmptyError("test_idx cannot be empty"))
+        @argcheck(!isempty(asset_idx), IsEmptyError("asset_idx cannot be empty"))
+        @argcheck(!isempty(path_ids), IsEmptyError("path_ids cannot be empty"))
         @argcheck(length(train_idx) ==
                   length(test_idx) ==
                   length(asset_idx) ==
-                  length(path_ids))
+                  length(path_ids),
+                  DimensionMismatch("train_idx ($(length(train_idx))), test_idx ($(length(test_idx))), asset_idx ($(length(asset_idx))), and path_ids ($(length(path_ids))) must all match"))
         return new{typeof(train_idx), typeof(test_idx), typeof(asset_idx),
                    typeof(path_ids)}(train_idx, test_idx, asset_idx, path_ids)
     end
@@ -288,7 +289,7 @@ Internal helper for combinatorial path generation. Converts a lexicographic comb
 """
 function combination_by_index(idx::Integer, N::Integer, k::Integer)
     n_comb = binomial(N, k)
-    @argcheck(0 < idx <= n_comb)
+    @argcheck(0 < idx <= n_comb, DomainError(idx, "idx must be in (0, $n_comb]"))
     combination = Vector{typeof(N)}(undef, k)
     remaining_rank = idx
     next_element = 1
@@ -335,7 +336,7 @@ function sample_unique_assets(N::Integer, k::Integer, n_subsets::Integer;
                               seed::Option{<:Integer} = nothing)
     assert_nonempty_nonneg_finite_val(N, :N)
     assert_nonempty_nonneg_finite_val(k, :k)
-    @argcheck(k <= N)
+    @argcheck(k <= N, DomainError("k ($k) must be less than or equal to N ($N)"))
     assert_nonempty_finite_val(n_subsets, :n_subsets)
     n_comb = binomial(N, k)
     @argcheck(n_subsets <= n_comb,
@@ -544,7 +545,7 @@ Handles sequential and parallel execution. If the optimiser requires previous we
 # Arguments
 
   - `opt::NonFiniteAllocationOptimisationEstimator`: Portfolio optimisation estimator.
-  - `rd::ReturnsResult`: Full returns data.
+  - `rd::ReturnsResult`: FullMoment returns data.
   - `train_idx`: Sequence of training index vectors.
   - `test_idx`: Sequence of test index vectors.
   - `cols`: Sequence of asset column indices for each fold.
@@ -566,31 +567,19 @@ function path_fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator,
                               rd::ReturnsResult, train_idx, test_idx, cols;
                               ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
                               id = nothing)
-    predictions = Vector{PredictionResult}(undef, length(train_idx))
-    prev_w_flag = needs_previous_weights(opt)
-    time_dep_flag = is_time_dependent(opt)
-    if prev_w_flag || time_dep_flag
-        @info("Running walk forward sequentially because the optimiser must either use the previous optimisation's weights (needs_previous_weights(opt) == $prev_w_flag), and/or is time dependent (is_time_dependent(opt) == $time_dep_flag). This is because somewhere within the optimisation estimator is contained at least one of the following:\n\t- Turnover and/or TurnoverEstimator,\n\t- WeightsTracking,\n\t- TurnoverRiskMeasure,\n\t- custom constraints which use asset weights,\n\t- custom objective penalties which use asset weights.\n\t- Or there is a time dependent constraint or objective penalty.\nTo enable parallel processing please either mark the weights as fixed or remove the offending component(s).")
-        for (i, (train, test, col)) in enumerate(zip(train_idx, test_idx, cols))
-            rdi = returns_result_view(rd, col)
-            opti = port_opt_view(opt, col, rdi.X)
-            if i > 1
-                if prev_w_flag
-                    opti = factory(opti, predictions[i - 1].res.w)
-                end
-                if time_dep_flag
-                    opti = update_time_dependent_estimator(opti, i, rdi, train_idx,
-                                                           test_idx)
-                end
+    predictions = run_folds(opt, length(train_idx), ex) do i, prev
+        col = cols[i]
+        rdi = returns_result_view(rd, col)
+        opti = port_opt_view(opt, col, rdi.X)
+        if !isnothing(prev)
+            if needs_previous_weights(opt)
+                opti = factory(opti, prev.res.w)
             end
-            predictions[i] = fit_and_predict(opti, rdi; train_idx = train, test_idx = test)
+            if is_time_dependent(opt)
+                opti = update_time_dependent_estimator(opti, i, rdi, train_idx, test_idx)
+            end
         end
-    else
-        FLoops.@floop ex for (i, (train, test, col)) in
-                             enumerate(zip(train_idx, test_idx, cols))
-            predictions[i] = fit_and_predict(opt, rd; train_idx = train, test_idx = test,
-                                             cols = col)
-        end
+        return fit_and_predict(opti, rdi; train_idx = train_idx[i], test_idx = test_idx[i])
     end
     return MultiPeriodPredictionResult(; pred = sort_predictions!(test_idx, predictions),
                                        id = id)
@@ -606,12 +595,13 @@ function fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator, rd::Retu
     for (train, test, asset, path_id) in zip(train_idx, test_idx, asset_idx, path_ids)
         push!(dict[path_id], (train, test, asset))
     end
-    predictions = Vector{MultiPeriodPredictionResult}(undef, length(unique_ids))
-    FLoops.@floop ex for (i, vals) in enumerate(dict)
+    predictions = parallel_folds(length(unique_ids), ex; ElT = MultiPeriodPredictionResult
+                                 ) do i
+        vals = dict[i]
         train = map(x -> x[1], vals)
         test = map(x -> x[2], vals)
         asset = map(x -> x[3], vals)
-        predictions[i] = path_fit_and_predict(opt, rd, train, test, asset; ex = ex, id = i)
+        return path_fit_and_predict(opt, rd, train, test, asset; ex = ex, id = i)
     end
     return PopulationPredictionResult(; pred = predictions)
 end

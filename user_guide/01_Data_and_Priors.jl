@@ -29,6 +29,13 @@ missing prices ([Impute.jl](https://github.com/invenia/Impute.jl)) and collapse 
 frequencies ([TimeSeries.jl](https://github.com/JuliaStats/TimeSeries.jl)). Given a single
 `TimeArray` of prices it returns a [`ReturnsResult`](@ref) holding the asset names `nx` and the
 return matrix `X`.
+
+Real price tables are rarely clean — newly listed or delisted names leave leading/trailing gaps,
+halts and stale quotes leave flat stretches, and exchanges keep different holiday calendars. The
+`missing_col_percent` / `missing_row_percent` filters and `impute_method` handle all of it in this
+one call, *before* differencing prices into returns; the
+[Data preprocessing and imputation](../examples/1_foundations/02_Data_Preprocessing.md) example is
+the deep dive.
 =#
 
 X = TimeArray(CSV.File(joinpath(@__DIR__, "../examples/SP500.csv.gz")); timestamp = :Date)[(end - 252):end]
@@ -60,14 +67,21 @@ interface, so swapping one in is a one-line change. The common alternatives:
   - [`FactorPrior`](@ref) — moments from a factor model (deep dive:
     [Factor Priors](../examples/2_moments_priors/04_Factor_Priors.md)).
   - [`BlackLittermanPrior`](@ref) — blend market-equilibrium moments with your views (deep dive:
-    [Black–Litterman](../examples/2_moments_priors/05_Black_Litterman.md)).
+    [Black–Litterman](../examples/2_moments_priors/05_Black_Litterman.md)). The family extends to
+    [`BayesianBlackLittermanPrior`](@ref), [`FactorBlackLittermanPrior`](@ref) (views on factor
+    premia) and [`AugmentedBlackLittermanPrior`](@ref) (asset *and* factor views together) — see
+    [Advanced Black–Litterman](../examples/2_moments_priors/06_Advanced_Black_Litterman.md).
   - [`EntropyPoolingPrior`](@ref) / [`OpinionPoolingPrior`](@ref) — reweight the empirical
     scenarios to satisfy views on any moment (deep dives:
-    [Entropy Pooling](../examples/2_moments_priors/06_Entropy_Pooling.md),
-    [Opinion Pooling](../examples/2_moments_priors/07_Opinion_Pooling.md)).
+    [Entropy Pooling](../examples/2_moments_priors/07_Entropy_Pooling.md),
+    [Opinion Pooling](../examples/2_moments_priors/08_Opinion_Pooling.md)).
 
 The covariance estimator inside a prior is itself swappable (shrinkage, denoising, Gerber, …);
-see [Covariance Estimation](../examples/2_moments_priors/02_Covariance_Estimation.md).
+see [Covariance Estimation](../examples/2_moments_priors/02_Covariance_Estimation.md). Any moment
+estimator can also be **windowed** — restricted to a trailing window or recency-weighted — when
+the recent regime is more informative than the full sample (deep dive:
+[Windowed Estimators](../examples/2_moments_priors/10_Windowed_Estimators.md); regime-adjusted
+estimators are a related sibling).
 
 ## 4. A first look at the data
 

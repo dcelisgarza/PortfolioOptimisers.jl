@@ -14,7 +14,7 @@ $(DocStringExtensions.FIELDS)
         n_test_folds::Integer = 8,
         purged_size::Integer = 0,
         embargo_size::Integer = 0,
-        warn_comb::Integer = 100_000,
+        max_comb::Integer = 100_000,
     ) -> CombinatorialCrossValidation
 
 Keyword arguments correspond to the struct's fields.
@@ -24,7 +24,7 @@ Keyword arguments correspond to the struct's fields.
   - `n_folds` must be non-empty, greater than zero, and finite.
   - `n_test_folds` must be non-empty, greater than zero, and finite.
   - `purged_size` and `embargo_size` must be non-empty and finite.
-  - Warns if the number of combinations exceeds `warn_comb`.
+  - Ensures the number of combinations does not exceed `max_comb`.
 
 # Examples
 
@@ -63,23 +63,23 @@ CombinatorialCrossValidation
     embargo_size
     function CombinatorialCrossValidation(n_folds::Integer, n_test_folds::Integer,
                                           purged_size::Integer, embargo_size::Integer,
-                                          warn_comb::Integer = 100_000)
+                                          max_comb::Integer = 100_000)
         assert_nonempty_gt0_finite_val(n_folds, :n_folds)
         assert_nonempty_gt0_finite_val(n_test_folds, :n_test_folds)
         assert_nonempty_finite_val(purged_size, :purged_size)
         assert_nonempty_finite_val(embargo_size, :embargo_size)
-        if binomial(n_folds, n_test_folds) > warn_comb
-            @warn("The number of splits for `n_folds = $n_folds` and `n_test_folds = $n_test_folds` is `$(binomial(n_folds, n_test_folds))`, which may be computationally expensive. The number of combinations should typically be between 10^1 to 10^4 for statistical power. Such a large number of combinations may lead to long computation times and memory issues. Consider reducing `n_folds` or shifting `n_test_folds` further away from being equal to `div(n_folds, 2) = $(div(n_folds, 2))`.")
-        end
+        @argcheck(binomial(n_folds, n_test_folds) <= max_comb,
+                  ArgumentError("The number of splits for `n_folds = $n_folds` and `n_test_folds = $n_test_folds` is `$(binomial(n_folds, n_test_folds))`, which is greater than the maximum allowed `$max_comb`. The number of combinations should typically be between 10^1 to 10^4 for statistical power. Such a large number of combinations may lead to long computation times and memory issues. Consider reducing `n_folds` or shifting `n_test_folds` further away from being equal to `div(n_folds, 2) = $(div(n_folds, 2))`."))
+
         return new{typeof(n_folds), typeof(n_test_folds), typeof(purged_size),
                    typeof(embargo_size)}(n_folds, n_test_folds, purged_size, embargo_size)
     end
 end
 function CombinatorialCrossValidation(; n_folds::Integer = 10, n_test_folds::Integer = 8,
                                       purged_size::Integer = 0, embargo_size::Integer = 0,
-                                      warn_comb::Integer = 100_000)::CombinatorialCrossValidation
+                                      max_comb::Integer = 100_000)::CombinatorialCrossValidation
     return CombinatorialCrossValidation(n_folds, n_test_folds, purged_size, embargo_size,
-                                        warn_comb)
+                                        max_comb)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -131,10 +131,11 @@ Keywords correspond to the struct's fields.
     function CombinatorialCrossValidationResult(train_idx::VecVecInt,
                                                 test_idx::VecVecVecInt,
                                                 path_ids::AbstractMatrix{<:Integer})
-        @argcheck(!isempty(train_idx))
-        @argcheck(!isempty(test_idx))
-        @argcheck(!isempty(path_ids))
-        @argcheck(length(train_idx) == length(test_idx) == size(path_ids, 2))
+        @argcheck(!isempty(train_idx), IsEmptyError("train_idx cannot be empty"))
+        @argcheck(!isempty(test_idx), IsEmptyError("test_idx cannot be empty"))
+        @argcheck(!isempty(path_ids), IsEmptyError("path_ids cannot be empty"))
+        @argcheck(length(train_idx) == length(test_idx) == size(path_ids, 2),
+                  DimensionMismatch("train_idx ($(length(train_idx))), test_idx ($(length(test_idx))), and path_ids columns ($(size(path_ids, 2))) must all match"))
         return new{typeof(train_idx), typeof(test_idx), typeof(path_ids)}(train_idx,
                                                                           test_idx,
                                                                           path_ids)
@@ -358,7 +359,9 @@ function Base.split(ccv::CombinatorialCrossValidation, rd::ReturnsResult)
     T = size(rd.X, 1)
     (; n_folds, n_test_folds, purged_size, embargo_size) = ccv
     min_fold_size = div(T, n_folds)
-    @argcheck(purged_size + embargo_size < min_fold_size)
+    @argcheck(purged_size + embargo_size < min_fold_size,
+              DomainError(purged_size + embargo_size,
+                          "purged_size + embargo_size ($(purged_size + embargo_size)) must be less than the minimum fold size ($min_fold_size)"))
     fold_idx_num = div.(0:(T - 1), min_fold_size)
     fold_idx_num[fold_idx_num .== n_folds] .= n_folds - 1
     fold_idx_num .+= 1
@@ -502,10 +505,9 @@ function fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator, rd::Retu
                          ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())
     cv_res = split(cv, rd)
     (; train_idx, test_idx) = cv_res
-    predictions = Vector{Vector{PredictionResult}}(undef, length(train_idx))
-    FLoops.@floop ex for (i, (train, test)) in enumerate(zip(train_idx, test_idx))
-        predictions[i] = fit_and_predict(opt, rd; train_idx = train, test_idx = test,
-                                         cols = cols)
+    predictions = parallel_folds(length(train_idx), ex; ElT = Vector{PredictionResult}) do i
+        return fit_and_predict(opt, rd; train_idx = train_idx[i], test_idx = test_idx[i],
+                               cols = cols)
     end
     return PopulationPredictionResult(; pred = sort_predictions!(cv_res, predictions))
 end
@@ -514,9 +516,8 @@ function fit_and_predict(res::NonFiniteAllocationOptimisationResult, rd::Returns
                          ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())
     cv_res = split(cv, rd)
     test_idx = cv_res.test_idx
-    predictions = Vector{Vector{PredictionResult}}(undef, length(test_idx))
-    FLoops.@floop ex for (i, test) in enumerate(test_idx)
-        predictions[i] = StatsAPI.predict(res, rd, test)
+    predictions = parallel_folds(length(test_idx), ex; ElT = Vector{PredictionResult}) do i
+        return StatsAPI.predict(res, rd, test_idx[i])
     end
     return PopulationPredictionResult(; pred = sort_predictions!(cv_res, predictions))
 end

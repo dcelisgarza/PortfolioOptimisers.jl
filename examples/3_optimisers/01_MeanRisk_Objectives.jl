@@ -63,8 +63,8 @@ rd = prices_to_returns(X)
 We will hold the risk measure fixed and vary only the objective. For the risk measure we reach for
 the **semi–standard deviation** — and here we meet a consequence of the package's design
 philosophy: an entire class of risk measures is expressed as a single
-[`LowOrderMoment`](@ref) parametrised by an internal algorithm. Semi–standard deviation is the
-second lower partial moment (`Semi()`) rendered as a second-order cone expression
+[`LowOrderMoment`](@ref) parametrised by an internal algorithm. SemiMoment–standard deviation is the
+second lower partial moment (`SemiMoment()`) rendered as a second-order cone expression
 ([`SOCRiskExpr`](@ref)).
 =#
 
@@ -73,7 +73,7 @@ slv = Solver(; name = :clarabel1, solver = Clarabel.Optimizer,
              settings = Dict("verbose" => false),
              check_sol = (; allow_local = true, allow_almost = true))
 
-r = LowOrderMoment(; alg = SecondMoment(; alg1 = Semi(), alg2 = SOCRiskExpr()))
+r = LowOrderMoment(; alg = SecondMoment(; alg1 = SemiMoment(), alg2 = SOCRiskExpr()))
 
 #=
 Since every optimisation runs on the same data, we precompute the prior statistics once with
@@ -85,6 +85,21 @@ pr = prior(EmpiricalPrior(), rd)
 opt = JuMPOptimiser(; pe = pr, slv = slv)
 
 #=
+!!! note "Precomputed result vs estimator"
+    Passing `pe = pr` — the *result* of `prior(...)` — fixes the statistics once and reuses them
+    on every `optimise` call, which is why we need not pass the returns data again. But you can
+    instead hand the optimiser the **estimator itself**, `pe = EmpiricalPrior()`, and call
+    `optimise(model, rd)`; the prior is then recomputed from whatever data the optimiser is
+    given. Most examples here precompute for speed because they solve repeatedly on one fixed
+    slice, but the estimator form is the one to reach for whenever the data changes underneath
+    the optimiser:
+
+    - **Cross-validation** refits on each training fold, so it *requires* the estimator form — a precomputed result (fit on the whole sample) would leak the test data into training, and is therefore disallowed.
+    - **Meta-optimisers** ([`Stacking`](@ref), [`NestedClustered`](@ref)) feed their *outer* optimiser synthetic returns assembled from the inner solves, where a precomputed asset-level prior is meaningless; that slot takes an estimator.
+
+    Both are shown in the [meta-optimisers](13_Meta_Optimisers.md) and
+    [subset resampling / cross-validation](14_Subset_Resampling_and_Cross_Validation.md) examples.
+
 Now the four objectives. Only the `obj` field changes — same prior, same risk measure, same
 optimiser.
 =#
@@ -154,8 +169,8 @@ step traces that path explicitly.
 using StatsPlots, GraphRecipes
 
 plot([s[2] for s in sweep], [s[3] for s in sweep]; seriestype = :path,
-     marker = (:circle, 5), xlabel = "Semi-deviation risk", ylabel = "Arithmetic return",
-     title = "MaximumUtility risk-aversion path",
+     marker = (:circle, 5), xlabel = "SemiMoment-deviation risk",
+     ylabel = "Arithmetic return", title = "MaximumUtility risk-aversion path",
      label = "l = " * join(string.(lambdas), ", "))
 
 #=

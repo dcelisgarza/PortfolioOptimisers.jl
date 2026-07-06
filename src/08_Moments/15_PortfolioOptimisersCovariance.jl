@@ -29,7 +29,7 @@ PortfolioOptimisersCovariance
      │    ce ┼ GeneralCovariance
      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
      │       │    w ┴ nothing
-     │   alg ┴ Full()
+     │   alg ┴ FullMoment()
   mp ┼ MatrixProcessing
      │     pdm ┼ Posdef
      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
@@ -92,7 +92,7 @@ This method computes the covariance matrix for the input data matrix `X` using t
   - [`Statistics.cov`](https://juliastats.org/StatsBase.jl/stable/cov/#Statistics.cov-Tuple%7BCovarianceEstimator,%20AbstractMatrix%7D)
 """
 function Statistics.cov(ce::PortfolioOptimisersCovariance, X::MatNum; dims = 1, kwargs...)
-    @argcheck(dims in (1, 2))
+    @argcheck(dims in (1, 2), DomainError(dims, "dims must be 1 or 2"))
     if dims == 2
         X = transpose(X)
     end
@@ -132,7 +132,7 @@ This method computes the correlation matrix for the input data matrix `X` using 
   - [`Statistics.cor`](https://juliastats.org/StatsBase.jl/stable/cov/#Statistics.cor)
 """
 function Statistics.cor(ce::PortfolioOptimisersCovariance, X::MatNum; dims = 1, kwargs...)
-    @argcheck(dims in (1, 2))
+    @argcheck(dims in (1, 2), DomainError(dims, "dims must be 1 or 2"))
     if dims == 2
         X = transpose(X)
     end

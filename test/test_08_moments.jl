@@ -1,6 +1,6 @@
 @testset "Moments" begin
     using Test, PortfolioOptimisers, DataFrames, TimeSeries, CSV, CovarianceEstimation,
-          StableRNGs, StatsBase, LinearAlgebra, SparseArrays, Distributions
+          StableRNGs, StatsBase, LinearAlgebra, SparseArrays, Distributions, FLoops
     rng = StableRNG(123456789)
     rd = prices_to_returns(TimeArray(CSV.File(joinpath(@__DIR__, "./assets/SP500.csv.gz"));
                                      timestamp = :Date)[(end - 252):end],
@@ -57,7 +57,7 @@
         me0 = ShrunkExpectedReturns(;
                                     ce = PortfolioOptimisersCovariance(;
                                                                        ce = Covariance(;
-                                                                                       alg = Semi())),
+                                                                                       alg = SemiMoment())),
                                     alg = JamesStein(; tgt = VolatilityWeighted()))
         me = PortfolioOptimisers.factory(me0, ew)
         @test !(me.me === me0.me)
@@ -71,7 +71,7 @@
         me0 = EquilibriumExpectedReturns(;
                                          ce = PortfolioOptimisersCovariance(;
                                                                             ce = Covariance(;
-                                                                                            alg = Semi())),
+                                                                                            alg = SemiMoment())),
                                          w = [1, 2])
         me = PortfolioOptimisers.factory(me0, ew)
         @test !(me.ce === me0.ce)
@@ -99,19 +99,19 @@
         @test mean(MedianExpectedReturns(), rd.X) == median(rd.X; dims = 1)
     end
     @testset "Covariance Estimators" begin
-        ces = [Covariance(; alg = Full()),
-               Covariance(; alg = Full(), me = SimpleExpectedReturns(; w = ew),
+        ces = [Covariance(; alg = FullMoment()),
+               Covariance(; alg = FullMoment(), me = SimpleExpectedReturns(; w = ew),
                           ce = GeneralCovariance(;
                                                  ce = SimpleCovariance(; corrected = false),
                                                  w = ew)),
-               Covariance(; alg = Full(),
+               Covariance(; alg = FullMoment(),
                           ce = GeneralCovariance(; ce = AnalyticalNonlinearShrinkage())),
-               Covariance(; alg = Semi()),
-               Covariance(; alg = Semi(), me = SimpleExpectedReturns(; w = ew),
+               Covariance(; alg = SemiMoment()),
+               Covariance(; alg = SemiMoment(), me = SimpleExpectedReturns(; w = ew),
                           ce = GeneralCovariance(;
                                                  ce = SimpleCovariance(; corrected = false),
                                                  w = ew)),
-               Covariance(; alg = Semi(), me = SimpleExpectedReturns(; w = fw),
+               Covariance(; alg = SemiMoment(), me = SimpleExpectedReturns(; w = fw),
                           ce = GeneralCovariance(; ce = AnalyticalNonlinearShrinkage(),
                                                  w = fw)), SpearmanCovariance(),
                KendallCovariance(), MutualInfoCovariance(),
@@ -330,6 +330,16 @@
                        cov(LowerTailDependenceCovariance(), rd.X'; dims = 2))
         @test isapprox(cor(LowerTailDependenceCovariance(), rd.X),
                        cor(LowerTailDependenceCovariance(), rd.X'; dims = 2))
+        # Regression: the threaded pair-count loop used to fill the tail mask
+        # lazily per iteration, so with >1 thread iteration j could read the
+        # not-yet-written mask of column i < j. Threaded and sequential
+        # executors must agree exactly, and repeated runs must be identical.
+        let ltd_seq = cor(LowerTailDependenceCovariance(; ex = FLoops.SequentialEx()), rd.X)
+            for _ in 1:5
+                @test cor(LowerTailDependenceCovariance(; ex = FLoops.ThreadedEx()),
+                          rd.X) == ltd_seq
+            end
+        end
 
         ce0 = PortfolioOptimisersCovariance(; ce = KendallCovariance(;))
         ce = PortfolioOptimisers.factory(ce0, ew)
@@ -479,23 +489,24 @@
         end
     end
     @testset "Regression" begin
-        res = [StepwiseRegression(; alg = Forward()),
-               StepwiseRegression(; alg = Forward(), crit = AIC()),
-               StepwiseRegression(; alg = Forward(), crit = AICC()),
-               StepwiseRegression(; alg = Forward(), crit = BIC()),
-               StepwiseRegression(; alg = Forward(), crit = RSquared()),
-               StepwiseRegression(; alg = Forward(), crit = AdjustedRSquared()),
-               StepwiseRegression(; alg = Backward()),
-               StepwiseRegression(; alg = Backward(), crit = AIC()),
-               StepwiseRegression(; alg = Backward(), crit = AICC()),
-               StepwiseRegression(; alg = Backward(), crit = BIC()),
-               StepwiseRegression(; alg = Backward(), crit = RSquared()),
-               StepwiseRegression(; alg = Backward(), crit = AdjustedRSquared()),
+        res = [StepwiseRegression(; alg = ForwardSelection()),
+               StepwiseRegression(; alg = ForwardSelection(), crit = AIC()),
+               StepwiseRegression(; alg = ForwardSelection(), crit = AICC()),
+               StepwiseRegression(; alg = ForwardSelection(), crit = BIC()),
+               StepwiseRegression(; alg = ForwardSelection(), crit = RSquared()),
+               StepwiseRegression(; alg = ForwardSelection(), crit = AdjustedRSquared()),
+               StepwiseRegression(; alg = BackwardElimination()),
+               StepwiseRegression(; alg = BackwardElimination(), crit = AIC()),
+               StepwiseRegression(; alg = BackwardElimination(), crit = AICC()),
+               StepwiseRegression(; alg = BackwardElimination(), crit = BIC()),
+               StepwiseRegression(; alg = BackwardElimination(), crit = RSquared()),
+               StepwiseRegression(; alg = BackwardElimination(), crit = AdjustedRSquared()),
                DimensionReductionRegression(),
                DimensionReductionRegression(; retgt = GeneralisedLinearModel(;)),
                DimensionReductionRegression(; drtgt = PPCA()),
                StepwiseRegression(; crit = PValue(; t = 1e-15)),
-               StepwiseRegression(; crit = PValue(; t = 1e-15), alg = Backward())]
+               StepwiseRegression(; crit = PValue(; t = 1e-15),
+                                  alg = BackwardElimination())]
         df = CSV.read(joinpath(@__DIR__, "./assets/Regression.csv.gz"), DataFrame)
         for (i, re) in pairs(res)
             rr = regression(re, rd)
@@ -514,7 +525,7 @@
         end
     end
     @testset "Coskewness" begin
-        skes = [Coskewness(; alg = Full()), Coskewness(; alg = Semi())]
+        skes = [Coskewness(; alg = FullMoment()), Coskewness(; alg = SemiMoment())]
         df = CSV.read(joinpath(@__DIR__, "./assets/coskewness.csv.gz"), DataFrame)
         for (i, ske) in pairs(skes)
             sk, v = coskewness(ske, rd.X'; dims = 2)
@@ -526,7 +537,7 @@
             @test success
         end
         @test (nothing, nothing) === coskewness(nothing)
-        sk0 = Coskewness(; alg = Semi())
+        sk0 = Coskewness(; alg = SemiMoment())
         sk = PortfolioOptimisers.factory(sk0, ew)
         @test sk.me.w === ew
         @test sk.alg === sk0.alg
@@ -542,7 +553,7 @@
         @test isapprox(V0, V)
     end
     @testset "Cokurtosis" begin
-        ktes = [Cokurtosis(; alg = Full()), Cokurtosis(; alg = Semi())]
+        ktes = [Cokurtosis(; alg = FullMoment()), Cokurtosis(; alg = SemiMoment())]
         df = CSV.read(joinpath(@__DIR__, "./assets/cokurtosis.csv.gz"), DataFrame)
         for (i, kte) in pairs(ktes)
             kt = cokurtosis(kte, rd.X'; dims = 2)
@@ -554,7 +565,7 @@
             @test success
         end
         @test isnothing(cokurtosis(nothing))
-        kt0 = Cokurtosis(; alg = Semi())
+        kt0 = Cokurtosis(; alg = SemiMoment())
         kt = PortfolioOptimisers.factory(kt0, ew)
         @test kt.me.w === ew
         @test kt.alg === kt0.alg
@@ -601,7 +612,7 @@
         end
     end
     @testset "Canonical Distance" begin
-        ces = [Covariance(; alg = Full()), SpearmanCovariance(), KendallCovariance(),
+        ces = [Covariance(; alg = FullMoment()), SpearmanCovariance(), KendallCovariance(),
                MutualInfoCovariance(), DistanceCovariance(),
                LowerTailDependenceCovariance(),
                GerberCovariance(; me = CustomValueExpectedReturns()),

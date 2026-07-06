@@ -4,6 +4,7 @@
 RiskBudgetingResult
 factory(res::RiskBudgetingResult, fb::Option{<:OptE_Opt})
 Base.getproperty(r::RiskBudgetingResult, sym::Symbol)
+ProcessedRiskBudgetingAttributes
 ProcessedFactorRiskBudgetingAttributes
 ProcessedAssetRiskBudgetingAttributes
 RiskBudgetingFormulation

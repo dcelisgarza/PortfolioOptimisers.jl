@@ -71,12 +71,14 @@ BlackLittermanViews
     """
     excl
     function BlackLittermanViews(P::MatNum, Q::VecNum, excl::Option{<:VecInt})
-        @argcheck(!isempty(P))
-        @argcheck(!isempty(Q))
-        @argcheck(size(P, 1) == length(Q))
+        @argcheck(!isempty(P), IsEmptyError("P cannot be empty"))
+        @argcheck(!isempty(Q), IsEmptyError("Q cannot be empty"))
+        @argcheck(size(P, 1) == length(Q),
+                  DimensionMismatch("size(P, 1) = $(size(P, 1)) must match length(Q) = $(length(Q))"))
         if !isnothing(excl)
-            @argcheck(!isempty(excl))
-            @argcheck(length(excl) <= length(Q))
+            @argcheck(!isempty(excl), IsEmptyError("excl cannot be empty"))
+            @argcheck(length(excl) <= length(Q),
+                      DimensionMismatch("length(excl) = $(length(excl)) must be <= length(Q) = $(length(Q))"))
         end
         return new{typeof(P), typeof(Q), typeof(excl)}(P, Q, excl)
     end
@@ -146,7 +148,7 @@ BlackLittermanViews
 function get_black_litterman_views(lcs::PR_VecPR, sets::AssetSets;
                                    datatype::DataType = Float64, strict::Bool = false)
     if isa(lcs, AbstractVector)
-        @argcheck(!isempty(lcs))
+        @argcheck(!isempty(lcs), IsEmptyError("lcs cannot be empty"))
     end
     P = Vector{datatype}(undef, 0)
     Q = Vector{datatype}(undef, 0)
@@ -158,14 +160,14 @@ function get_black_litterman_views(lcs::PR_VecPR, sets::AssetSets;
         for (v, c) in zip(lc.vars, lc.coef)
             Ai = (nx .== v)
             if !any(isone, Ai)
-                msg = "$(v) is not found in $(nx)."
+                msg = unknown_variable_msg(v, nx, sets.key)
                 strict ? throw(ArgumentError(msg)) : @warn(msg)
                 continue
             end
             At += Ai * c
         end
         if !any(!iszero, At)
-            msg = "At least one entry in At must be non-zero:\nlc => $(lc)\nany(!iszero, At) => $(any(!iszero, At))"
+            msg = empty_row_msg(lc.eqn, nx, sets.key; noun = "view")
             if strict
                 throw(ArgumentError(msg))
             else
@@ -295,16 +297,19 @@ function assert_bl_views_conf(::Nothing, args...)::Nothing
     return nothing
 end
 function assert_bl_views_conf(views_conf::Number, ::EqnType)::Nothing
-    @argcheck(zero(views_conf) < views_conf < one(views_conf))
+    assert_unit_interval(views_conf, :views_conf)
     return nothing
 end
 function assert_bl_views_conf(views_conf::VecNum, val::EqnType)::Nothing
     if isa(val, AbstractVector)
-        @argcheck(length(val) == length(views_conf))
+        @argcheck(length(val) == length(views_conf),
+                  DimensionMismatch("length(val) = $(length(val)) must match length(views_conf) = $(length(views_conf))"))
     else
-        @argcheck(length(views_conf) == 1)
+        @argcheck(length(views_conf) == 1,
+                  DimensionMismatch("views_conf must have length 1 for a single view, got $(length(views_conf))"))
     end
-    @argcheck(all(x -> zero(x) < x < one(x), views_conf))
+    @argcheck(all(x -> zero(x) < x < one(x), views_conf),
+              DomainError("all views_conf values must be in (0, 1), got $views_conf"))
     return nothing
 end
 function assert_bl_views_conf(views_conf::Num_VecNum,
@@ -312,7 +317,8 @@ function assert_bl_views_conf(views_conf::Num_VecNum,
     return assert_bl_views_conf(views_conf, views.val)
 end
 function assert_bl_views_conf(views_conf::Num_VecNum, views::BlackLittermanViews)::Nothing
-    return @argcheck(length(views_conf) == length(views.Q))
+    return @argcheck(length(views_conf) == length(views.Q),
+                     DimensionMismatch("length(views_conf) ($(length(views_conf))) must match length(views.Q) ($(length(views.Q)))"))
 end
 
 export black_litterman_views, BlackLittermanViews

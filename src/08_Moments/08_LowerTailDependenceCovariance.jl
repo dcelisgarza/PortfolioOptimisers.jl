@@ -59,8 +59,7 @@ LowerTailDependenceCovariance
     ex
     function LowerTailDependenceCovariance(ve::AbstractVarianceEstimator, alpha::Number,
                                            ex::FLoops.Transducers.Executor)
-        @argcheck(zero(alpha) < alpha < one(alpha),
-                  DomainError("0 < alpha < 1 must hold. Got\nalpha => $alpha"))
+        assert_unit_interval(alpha, :alpha)
         return new{typeof(ve), typeof(alpha), typeof(ex)}(ve, alpha, ex)
     end
 end
@@ -132,9 +131,12 @@ function lower_tail_dependence(X::MatNum, alpha::Number = 0.05,
             partialsort!(view(Xs, :, i), k)
         end
         mv = sqrt(eps(eltype(X)))
+        # The mask must be complete before the pair counts: iteration j reads
+        # column i < j, so filling it inside the threaded loop is a race.
+        for j in axes(X, 2)
+            mask[:, j] .= view(X, :, j) .<= Xs[k, j]
+        end
         FLoops.@floop ex for j in axes(X, 2)
-            xj = view(X, :, j)
-            mask[:, j] .= xj .<= Xs[k, j]
             for i in 1:j
                 ltd = count(view(mask, :, i) .&& view(mask, :, j)) / k
                 rho[j, i] = rho[i, j] = clamp(ltd, mv, one(eltype(X)))
@@ -185,7 +187,7 @@ julia> cor(ce, X)
 """
 function Statistics.cor(ce::LowerTailDependenceCovariance, X::MatNum; dims::Int = 1,
                         kwargs...)
-    @argcheck(dims in (1, 2))
+    @argcheck(dims in (1, 2), DomainError(dims, "dims must be 1 or 2"))
     if dims == 2
         X = transpose(X)
     end
@@ -233,7 +235,7 @@ julia> cov(ce, X)
 """
 function Statistics.cov(ce::LowerTailDependenceCovariance, X::MatNum; dims::Int = 1,
                         kwargs...)
-    @argcheck(dims in (1, 2))
+    @argcheck(dims in (1, 2), DomainError(dims, "dims must be 1 or 2"))
     if dims == 2
         X = transpose(X)
     end

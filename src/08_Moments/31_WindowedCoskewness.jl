@@ -40,7 +40,7 @@ WindowedCoskewness
          │       │      dt ┼ nothing
          │       │     alg ┼ nothing
          │       │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
-         │   alg ┼ Full()
+         │   alg ┼ FullMoment()
          │     w ┴ nothing
        w ┼ nothing
   window ┴ nothing

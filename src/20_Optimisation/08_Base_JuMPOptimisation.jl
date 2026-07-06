@@ -257,7 +257,7 @@ Keywords correspond to the struct's fields.
     """
     w
     function JuMPOptimisationSolution(w::ArrNum)
-        @argcheck(!isempty(w))
+        @argcheck(!isempty(w), IsEmptyError("w cannot be empty"))
         return new{typeof(w)}(w)
     end
 end
@@ -335,7 +335,8 @@ Asserts the scale has been registered (via [`set_model_scales!`](@ref)); errors 
   - [`get_objective_scale`](@ref)
 """
 function get_constraint_scale(model::JuMP.Model)
-    @argcheck(haskey(model, :sc))
+    @argcheck(haskey(model, :sc),
+              ArgumentError("model[:sc] (constraint scale) has not been registered; call set_model_scales! first"))
     return model[:sc]
 end
 """
@@ -351,7 +352,8 @@ Asserts the scale has been registered (via [`set_model_scales!`](@ref)); errors 
   - [`get_constraint_scale`](@ref)
 """
 function get_objective_scale(model::JuMP.Model)
-    @argcheck(haskey(model, :so))
+    @argcheck(haskey(model, :so),
+              ArgumentError("model[:so] (objective scale) has not been registered; call set_model_scales! first"))
     return model[:so]
 end
 """
@@ -366,7 +368,8 @@ Asserts the weights have been registered (via [`set_w!`](@ref)); errors otherwis
   - [`set_w!`](@ref)
 """
 function get_w(model::JuMP.Model, prefix::Symbol = Symbol(""))
-    @argcheck(haskey(model, Symbol(prefix, :w)))
+    @argcheck(haskey(model, Symbol(prefix, :w)),
+              ArgumentError("model[$(Symbol(prefix, :w))] (portfolio weights) have not been registered; call set_w! first"))
     return model[Symbol(prefix, :w)]
 end
 """
@@ -384,7 +387,8 @@ been registered; errors otherwise.
   - [`get_w`](@ref)
 """
 function get_k(model::JuMP.Model)
-    @argcheck(haskey(model, :k))
+    @argcheck(haskey(model, :k),
+              ArgumentError("model[:k] (homogenisation variable) has not been registered; call set_maximum_ratio_factor_variables! first"))
     return model[:k]
 end
 """
@@ -399,7 +403,8 @@ Asserts the return expression has been registered; errors otherwise.
   - [`get_risk`](@ref)
 """
 function get_ret(model::JuMP.Model)
-    @argcheck(haskey(model, :ret))
+    @argcheck(haskey(model, :ret),
+              ArgumentError("model[:ret] (portfolio expected-return expression) has not been registered; call set_return_constraints! first"))
     return model[:ret]
 end
 """
@@ -416,7 +421,8 @@ errors otherwise.
   - [`get_ret`](@ref)
 """
 function get_risk(model::JuMP.Model)
-    @argcheck(haskey(model, :risk))
+    @argcheck(haskey(model, :risk),
+              ArgumentError("model[:risk] (scalarised risk expression) has not been registered; call scalarise_risk_expression! first"))
     return model[:risk]
 end
 """
@@ -445,7 +451,8 @@ Asserts it has been registered (via [`set_portfolio_returns!`](@ref)); errors ot
   - [`has_X`](@ref)
 """
 function get_X(model::JuMP.Model, prefix::Symbol = Symbol(""))
-    @argcheck(has_X(model, prefix))
+    @argcheck(has_X(model, prefix),
+              ArgumentError("model[$(Symbol(prefix, :X))] (portfolio returns) have not been registered; call set_portfolio_returns! first"))
     return model[Symbol(prefix, :X)]
 end
 """
@@ -474,7 +481,8 @@ Asserts it has been registered (via [`set_net_portfolio_returns!`](@ref)); error
   - [`has_net_X`](@ref)
 """
 function get_net_X(model::JuMP.Model, prefix::Symbol = Symbol(""))
-    @argcheck(has_net_X(model, prefix))
+    @argcheck(has_net_X(model, prefix),
+              ArgumentError("model[$(Symbol(prefix, :net_X))] (net portfolio returns) have not been registered; call set_net_portfolio_returns! first"))
     return model[Symbol(prefix, :net_X)]
 end
 """
@@ -503,7 +511,8 @@ Asserts it has been registered (via [`set_asset_returns_plus_one!`](@ref)); erro
   - [`has_Xap1`](@ref)
 """
 function get_Xap1(model::JuMP.Model, prefix::Symbol = Symbol(""))
-    @argcheck(has_Xap1(model, prefix))
+    @argcheck(has_Xap1(model, prefix),
+              ArgumentError("model[$(Symbol(prefix, :Xap1))] (gross asset returns X.+1) have not been registered; call set_asset_returns_plus_one! first"))
     return model[Symbol(prefix, :Xap1)]
 end
 """
@@ -532,7 +541,8 @@ Asserts it has been registered (via [`set_portfolio_drawdowns_plus_one!`](@ref))
   - [`has_ddap1`](@ref)
 """
 function get_ddap1(model::JuMP.Model, prefix::Symbol = Symbol(""))
-    @argcheck(has_ddap1(model, prefix))
+    @argcheck(has_ddap1(model, prefix),
+              ArgumentError("model[$(Symbol(prefix, :ddap1))] (drawdowns-plus-one) have not been registered; call set_portfolio_drawdowns_plus_one! first"))
     return model[Symbol(prefix, :ddap1)]
 end
 """
@@ -561,7 +571,8 @@ Asserts they have been registered (via [`set_drawdown_constraints!`](@ref)); err
   - [`has_dd`](@ref)
 """
 function get_dd(model::JuMP.Model, prefix::Symbol = Symbol(""))
-    @argcheck(has_dd(model, prefix))
+    @argcheck(has_dd(model, prefix),
+              ArgumentError("model[$(Symbol(prefix, :dd))] (cumulative-drawdown variables) have not been registered; call set_drawdown_constraints! first"))
     return model[Symbol(prefix, :dd)]
 end
 """
@@ -609,7 +620,8 @@ function set_initial_w!(args...)
     return nothing
 end
 function set_initial_w!(w::VecNum, wi::VecNum)
-    @argcheck(length(wi) == length(w))
+    @argcheck(length(wi) == length(w),
+              DimensionMismatch("wi ($(length(wi))) must match w ($(length(w)))"))
     JuMP.set_start_value.(w, wi)
     return nothing
 end
@@ -702,21 +714,21 @@ function optimise_JuMP_model!(model::JuMP.Model, opt::JuMPOptimisationEstimator,
             trials[solver.name] = Dict(:optimize! => err)
             continue
         end
-        all_finite_weights = all(isfinite, JuMP.value.(model[:w]))
-        all_non_zero_weights = !all(x -> isapprox(x, zero(datatype)),
-                                    abs.(JuMP.value.(model[:w])))
+        trial = Dict{Symbol, Any}(:settings => solver.settings)
         try
             JuMP.assert_is_solved_and_feasible(model; solver.check_sol...)
+            all_finite_weights = all(isfinite, JuMP.value.(model[:w]))
+            all_non_zero_weights = !all(x -> isapprox(x, zero(datatype)),
+                                        abs.(JuMP.value.(model[:w])))
             if all_finite_weights && all_non_zero_weights
                 success = true
                 break
             end
         catch err
-            trials[solver.name] = Dict(:assert_is_solved_and_feasible => err,
-                                       :settings => solver.settings)
+            trial[:assert_is_solved_and_feasible] = err
         end
-        trials[solver.name] = Dict(:err => JuMP.solution_summary(model),
-                                   :settings => solver.settings)
+        trial[:err] = JuMP.solution_summary(model)
+        trials[solver.name] = trial
     end
     retcode = if success
         OptimisationSuccess(; res = trials)

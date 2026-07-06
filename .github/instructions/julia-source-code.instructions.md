@@ -18,7 +18,7 @@ These three abstract hierarchies form the backbone of the library. Understanding
   - Internal dispatch mechanism. Never called directly from user-facing APIs.
   - Modify or specialise the behaviour of an estimator they are stored in.
   - Must not contain data — only parameters that tune an algorithm's behaviour.
-  - Example: `Full`, `Semi`, `SpectralDenoise`, `Newton`.
+  - Example: `FullMoment`, `SemiMoment`, `SpectralDenoise`, `Newton`.
 
 - **Results** (`<: AbstractResult`):
   - Returned by functions that consume estimators when the output is complex enough to warrant its own type (e.g., contains multiple arrays, metadata).

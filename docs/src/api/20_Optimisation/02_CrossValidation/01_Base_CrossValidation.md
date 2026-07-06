@@ -39,4 +39,7 @@ reconstruct_rd(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult, X:
 sort_predictions!(test_idx::VecVecInt, predictions::VecPredRes)
 VecVecPredRes
 VecPredRes_MultiPredRes
+cv_sequential_info
+parallel_folds
+run_folds
 ```

@@ -50,7 +50,7 @@ julia> asset_sets_matrix(est, sets)
     """
     val
     function AssetSetsMatrixEstimator(val::AbstractString)::AssetSetsMatrixEstimator
-        @argcheck(!isempty(val))
+        @argcheck(!isempty(val), IsEmptyError("val cannot be empty"))
         return new{typeof(val)}(val)
     end
 end

@@ -1,6 +1,18 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
+Abstract supertype for processed optimiser attributes. Every collection of processed optimiser attributes should subtype
+
+# Related
+
+  - [`ProcessedJuMPOptimiserAttributes`](@ref)
+  - [`ProcessedRiskBudgetingAttributes`](@ref)
+  - [`JuMPOptimiser`](@ref)
+"""
+abstract type ProcessedAttributes <: AbstractResult end
+"""
+$(DocStringExtensions.TYPEDEF)
+
 Flat bundle of all processed constraint and prior results consumed by
 [`assemble_jump_model!`](@ref).
 
@@ -53,7 +65,7 @@ true
   - [`assemble_jump_model!`](@ref)
   - [`MeanRisk`](@ref)
 """
-@concrete struct ProcessedJuMPOptimiserAttributes <: AbstractResult
+@concrete struct ProcessedJuMPOptimiserAttributes <: ProcessedAttributes
     """
     $(field_dict[:pr])
     """
@@ -287,14 +299,17 @@ julia> PortfolioOptimisers.assert_finite_nonnegative_real_or_vec([0.5, 1.0])
   - [`JuMPOptimiser`](@ref)
 """
 function assert_finite_nonnegative_real_or_vec(val::Number)::Nothing
-    @argcheck(isfinite(val))
-    @argcheck(val > zero(val))
+    @argcheck(isfinite(val), IsNonFiniteError("val must be finite, got $val"))
+    @argcheck(val > zero(val), DomainError(val, "val must be > 0"))
     return nothing
 end
 function assert_finite_nonnegative_real_or_vec(val::VecNum)::Nothing
-    @argcheck(any(isfinite, val))
-    @argcheck(any(x -> x > zero(x), val))
-    @argcheck(all(x -> zero(x) <= x, val))
+    @argcheck(any(isfinite, val),
+              IsNonFiniteError("val must contain at least one finite element, got $val"))
+    @argcheck(any(x -> x > zero(x), val),
+              DomainError(val, "val must contain at least one positive element"))
+    @argcheck(all(x -> zero(x) <= x, val),
+              DomainError(val, "all elements of val must be >= 0"))
     return nothing
 end
 """
@@ -555,27 +570,28 @@ Keywords correspond to the struct's fields.
                            linf::Option{<:Number}, lp::Option{LpReg_VecLpReg}, brt::Bool,
                            cle_pr::Bool, strict::Bool)
         if isa(slv, VecSlv)
-            @argcheck(!isempty(slv))
+            @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
         end
         if isa(bgt, Number)
-            @argcheck(isfinite(bgt))
+            @argcheck(isfinite(bgt), IsNonFiniteError("bgt must be finite, got $bgt"))
         elseif isa(bgt, BudgetCostEstimator)
-            @argcheck(isnothing(sbgt))
+            @argcheck(isnothing(sbgt),
+                      IsNothingError("sbgt must be nothing when bgt is a BudgetCostEstimator, got sbgt = $sbgt"))
         end
         if isa(sbgt, Number)
             assert_nonempty_nonneg_finite_val(sbgt, :sbgt)
         end
         if isa(cte, AbstractVector)
-            @argcheck(!isempty(cte))
+            @argcheck(!isempty(cte), IsEmptyError("cte cannot be empty"))
         end
         if !isnothing(card)
             assert_nonempty_gt0_finite_val(card, :card)
         end
         if isa(tn, AbstractVector)
-            @argcheck(!isempty(tn))
+            @argcheck(!isempty(tn), IsEmptyError("tn cannot be empty"))
         end
         if isa(tr, AbstractVector)
-            @argcheck(!isempty(tr))
+            @argcheck(!isempty(tr), IsEmptyError("tr cannot be empty"))
         end
         if !isnothing(nea)
             assert_nonempty_gt0_finite_val(nea, :nea)
@@ -590,83 +606,107 @@ Keywords correspond to the struct's fields.
             assert_nonempty_gt0_finite_val(linf, :linf)
         end
         if isa(lp, AbstractVector)
-            @argcheck(!isempty(lp))
+            @argcheck(!isempty(lp), IsEmptyError("lp cannot be empty"))
         end
         if isa(scard, Integer)
             assert_nonempty_gt0_finite_val(scard, :scard)
-            @argcheck(isa(smtx, MatNum_ASetMatE))
-            @argcheck(isa(slt, Option{<:BtE_Bt}))
-            @argcheck(isa(sst, Option{<:BtE_Bt}))
+            @argcheck(isa(smtx, MatNum_ASetMatE),
+                      ArgumentError("smtx must be a MatNum_ASetMatE when scard is an Integer, got $(typeof(smtx))"))
+            @argcheck(isa(slt, Option{<:BtE_Bt}),
+                      ArgumentError("slt must be a scalar BtE_Bt or nothing when scard is an Integer, got $(typeof(slt))"))
+            @argcheck(isa(sst, Option{<:BtE_Bt}),
+                      ArgumentError("sst must be a scalar BtE_Bt or nothing when scard is an Integer, got $(typeof(sst))"))
         elseif isa(scard, VecInt)
             assert_nonempty_gt0_finite_val(scard, :scard)
-            @argcheck(isa(smtx, AbstractVector))
-            @argcheck(length(scard) == length(smtx))
+            @argcheck(isa(smtx, AbstractVector),
+                      ArgumentError("smtx must be an AbstractVector when scard is a VecInt, got $(typeof(smtx))"))
+            @argcheck(length(scard) == length(smtx),
+                      DimensionMismatch("scard ($(length(scard))) must match smtx ($(length(smtx)))"))
             if isa(slt, AbstractVector)
-                @argcheck(!isempty(slt))
-                @argcheck(length(scard) == length(slt))
+                @argcheck(!isempty(slt), IsEmptyError("slt cannot be empty"))
+                @argcheck(length(scard) == length(slt),
+                          DimensionMismatch("scard ($(length(scard))) must match slt ($(length(slt)))"))
             end
             if isa(sst, AbstractVector)
-                @argcheck(!isempty(sst))
-                @argcheck(length(scard) == length(sst))
+                @argcheck(!isempty(sst), IsEmptyError("sst cannot be empty"))
+                @argcheck(length(scard) == length(sst),
+                          DimensionMismatch("scard ($(length(scard))) must match sst ($(length(sst)))"))
             end
         elseif isnothing(scard) && (isa(slt, BtE_Bt) || isa(sst, BtE_Bt))
-            @argcheck(isa(smtx, MatNum_ASetMatE))
+            @argcheck(isa(smtx, MatNum_ASetMatE),
+                      ArgumentError("smtx must be a MatNum_ASetMatE when slt or sst is a scalar BtE_Bt, got $(typeof(smtx))"))
         elseif isnothing(scard) && (isa(slt, AbstractVector) || isa(sst, AbstractVector))
-            @argcheck(isa(smtx, AbstractVector))
-            @argcheck(!isempty(smtx))
+            @argcheck(isa(smtx, AbstractVector),
+                      ArgumentError("smtx must be an AbstractVector when slt or sst is a vector, got $(typeof(smtx))"))
+            @argcheck(!isempty(smtx), IsEmptyError("smtx cannot be empty"))
             if isa(slt, AbstractVector)
-                @argcheck(!isempty(slt))
-                @argcheck(length(slt) == length(smtx))
+                @argcheck(!isempty(slt), IsEmptyError("slt cannot be empty"))
+                @argcheck(length(slt) == length(smtx),
+                          DimensionMismatch("slt ($(length(slt))) must match smtx ($(length(smtx)))"))
             end
             if isa(sst, AbstractVector)
-                @argcheck(!isempty(sst))
-                @argcheck(length(sst) == length(smtx))
+                @argcheck(!isempty(sst), IsEmptyError("sst cannot be empty"))
+                @argcheck(length(sst) == length(smtx),
+                          DimensionMismatch("sst ($(length(sst))) must match smtx ($(length(smtx)))"))
             end
         end
         if isa(sgcarde, LcE_Lc)
-            @argcheck(isa(sgmtx, MatNum_ASetMatE))
-            @argcheck(isa(sglt, Option{<:BtE_Bt}))
-            @argcheck(isa(sgst, Option{<:BtE_Bt}))
+            @argcheck(isa(sgmtx, MatNum_ASetMatE),
+                      ArgumentError("sgmtx must be a MatNum_ASetMatE when sgcarde is a scalar LcE_Lc, got $(typeof(sgmtx))"))
+            @argcheck(isa(sglt, Option{<:BtE_Bt}),
+                      ArgumentError("sglt must be a scalar BtE_Bt or nothing when sgcarde is a scalar LcE_Lc, got $(typeof(sglt))"))
+            @argcheck(isa(sgst, Option{<:BtE_Bt}),
+                      ArgumentError("sgst must be a scalar BtE_Bt or nothing when sgcarde is a scalar LcE_Lc, got $(typeof(sgst))"))
             if isa(sgcarde, LinearConstraint) && isa(smtx, MatNum)
                 N = size(smtx, 1)
                 N_ineq = !isnothing(sgcarde.ineq) ? length(sgcarde.B_ineq) : 0
                 N_eq = !isnothing(sgcarde.eq) ? length(sgcarde.B_eq) : 0
-                @argcheck(N == N_ineq + N_eq)
+                @argcheck(N == N_ineq + N_eq,
+                          DimensionMismatch("smtx rows ($N) must equal N_ineq + N_eq ($(N_ineq + N_eq))"))
             end
         elseif isa(sgcarde, AbstractVector)
-            @argcheck(!isempty(sgcarde))
-            @argcheck(isa(sgmtx, AbstractVector))
-            @argcheck(!isempty(sgmtx))
-            @argcheck(length(sgcarde) == length(sgmtx))
+            @argcheck(!isempty(sgcarde), IsEmptyError("sgcarde cannot be empty"))
+            @argcheck(isa(sgmtx, AbstractVector),
+                      ArgumentError("sgmtx must be an AbstractVector when sgcarde is a vector, got $(typeof(sgmtx))"))
+            @argcheck(!isempty(sgmtx), IsEmptyError("sgmtx cannot be empty"))
+            @argcheck(length(sgcarde) == length(sgmtx),
+                      DimensionMismatch("sgcarde ($(length(sgcarde))) must match sgmtx ($(length(sgmtx)))"))
             if isa(sglt, AbstractVector)
-                @argcheck(!isempty(sglt))
-                @argcheck(length(sgcarde) == length(sglt))
+                @argcheck(!isempty(sglt), IsEmptyError("sglt cannot be empty"))
+                @argcheck(length(sgcarde) == length(sglt),
+                          DimensionMismatch("sgcarde ($(length(sgcarde))) must match sglt ($(length(sglt)))"))
             end
             if isa(sgst, AbstractVector)
-                @argcheck(!isempty(sgst))
-                @argcheck(length(sgcarde) == length(sgst))
+                @argcheck(!isempty(sgst), IsEmptyError("sgst cannot be empty"))
+                @argcheck(length(sgcarde) == length(sgst),
+                          DimensionMismatch("sgcarde ($(length(sgcarde))) must match sgst ($(length(sgst)))"))
             end
             for (sgc, smt) in zip(sgcarde, sgmtx)
                 if isa(sgc, LinearConstraint) && isa(smt, MatNum)
                     N = size(smt, 1)
                     N_ineq = !isnothing(sgc.ineq) ? length(sgc.B_ineq) : 0
                     N_eq = !isnothing(sgc.eq) ? length(sgc.B_eq) : 0
-                    @argcheck(N == N_ineq + N_eq)
+                    @argcheck(N == N_ineq + N_eq,
+                              DimensionMismatch("smt rows ($N) must equal N_ineq + N_eq ($(N_ineq + N_eq))"))
                 end
             end
         elseif isnothing(sgcarde) && (isa(sglt, BtE_Bt) || isa(sgst, BtE_Bt))
-            @argcheck(isa(sgmtx, MatNum_ASetMatE))
+            @argcheck(isa(sgmtx, MatNum_ASetMatE),
+                      ArgumentError("sgmtx must be a MatNum_ASetMatE when sglt or sgst is a scalar BtE_Bt, got $(typeof(sgmtx))"))
         elseif isnothing(sgcarde) &&
                (isa(sglt, AbstractVector) || isa(sgst, AbstractVector))
-            @argcheck(isa(sgmtx, AbstractVector))
-            @argcheck(!isempty(sgmtx))
+            @argcheck(isa(sgmtx, AbstractVector),
+                      ArgumentError("sgmtx must be an AbstractVector when sglt or sgst is a vector, got $(typeof(sgmtx))"))
+            @argcheck(!isempty(sgmtx), IsEmptyError("sgmtx cannot be empty"))
             if isa(sglt, AbstractVector)
-                @argcheck(!isempty(sglt))
-                @argcheck(length(sglt) == length(sgmtx))
+                @argcheck(!isempty(sglt), IsEmptyError("sglt cannot be empty"))
+                @argcheck(length(sglt) == length(sgmtx),
+                          DimensionMismatch("sglt ($(length(sglt))) must match sgmtx ($(length(sgmtx)))"))
             end
             if isa(sgst, AbstractVector)
-                @argcheck(!isempty(sgst))
-                @argcheck(length(sgst) == length(sgmtx))
+                @argcheck(!isempty(sgst), IsEmptyError("sgst cannot be empty"))
+                @argcheck(length(sgst) == length(sgmtx),
+                          DimensionMismatch("sgst ($(length(sgst))) must match sgmtx ($(length(sgmtx)))"))
             end
         end
         if isa(wb, WeightBoundsEstimator) ||
@@ -698,7 +738,8 @@ Keywords correspond to the struct's fields.
            isa(sgmtx, AbstractVector) &&
            any(x -> isa(x, AssetSetsMatrixEstimator), sgmtx) ||
            isa(tn, AbstractVector) && any(x -> isa(x, TurnoverEstimator), tn)
-            @argcheck(!isnothing(sets))
+            @argcheck(!isnothing(sets),
+                      IsNothingError("sets cannot be nothing when estimator-type fields are provided"))
         end
         return new{typeof(pe), typeof(slv), typeof(wb), typeof(bgt), typeof(sbgt),
                    typeof(lt), typeof(st), typeof(lcse), typeof(cte), typeof(gcarde),
@@ -776,7 +817,8 @@ Checks turnover, fees, tracking error, custom constraint, and custom objective f
 # Examples
 
 ```jldoctest
-julia> PortfolioOptimisers.needs_previous_weights(JuMPOptimiser(; slv = Solver()))
+julia> PortfolioOptimisers.needs_previous_weights(JuMPOptimiser(;
+                                                                slv = Solver(; solver = nothing)))
 false
 ```
 
@@ -812,7 +854,7 @@ all other fields are carried through unchanged.
 # Examples
 
 ```jldoctest
-julia> opt = JuMPOptimiser(; slv = Solver());
+julia> opt = JuMPOptimiser(; slv = Solver(; solver = nothing));
 
 julia> PortfolioOptimisers.factory(opt, fill(0.1, 10)) isa JuMPOptimiser
 true
@@ -853,7 +895,7 @@ carried through unchanged.
 
   - `opt::JuMPOptimiser`: JuMP optimiser configuration.
   - `i`: Asset index or index set for the cluster.
-  - `X::MatNum`: Full returns matrix used to slice tracking estimators.
+  - `X::MatNum`: FullMoment returns matrix used to slice tracking estimators.
 
 # Returns
 
@@ -862,7 +904,7 @@ carried through unchanged.
 # Examples
 
 ```jldoctest
-julia> opt = JuMPOptimiser(; slv = Solver());
+julia> opt = JuMPOptimiser(; slv = Solver(; solver = nothing));
 
 julia> X = rand(50, 5);
 
@@ -1021,7 +1063,7 @@ removed so the solver can range freely.
 # Examples
 
 ```jldoctest
-julia> opt = JuMPOptimiser(; slv = Solver());
+julia> opt = JuMPOptimiser(; slv = Solver(; solver = nothing));
 
 julia> PortfolioOptimisers.no_bounds_optimiser(opt) isa JuMPOptimiser
 true

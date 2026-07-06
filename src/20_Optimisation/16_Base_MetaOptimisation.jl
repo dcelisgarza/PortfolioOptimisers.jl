@@ -14,7 +14,11 @@ Combines inner cluster weights `w_inner` with outer portfolio weights `w_outer`,
 
 # Returns
 
-  - Final combined portfolio weights.
+  - `(retcode, w)`: Final combined portfolio weights and return code. On failure of any
+    sub-problem, `retcode` is an `OptimisationFailure` whose `res` is a named tuple
+    `(; msg, opti, opto, wb)` carrying the failure summary, the inner optimisation return
+    codes, the outer return code, and the weight-finalisation return code (including
+    their solver trial diagnostics).
 
 # Related
 
@@ -28,7 +32,8 @@ function outer_optimisation_finaliser(wb::Option{<:WeightBounds}, wf::WeightFina
     retcode, w = finalise_weight_bounds(wf, wb, w)
     wb_flag = isa(retcode, OptimisationFailure)
     opto_flag = isa(rco, OptimisationFailure)
-    resi_flag = any(x -> isa(x, OptimisationFailure), getproperty.(resi, :retcode))
+    resi_retcodes = getproperty.(resi, :retcode)
+    resi_flag = any(x -> isa(x, OptimisationFailure), resi_retcodes)
     if resi_flag || opto_flag || wb_flag
         msg = ""
         if resi_flag
@@ -38,9 +43,11 @@ function outer_optimisation_finaliser(wb::Option{<:WeightBounds}, wf::WeightFina
             msg *= "opto failed.\n"
         end
         if wb_flag
-            msg *= "Full optimisation failed.\n"
+            msg *= "weight bounds finalisation failed.\n"
         end
-        retcode = OptimisationFailure(; res = msg)
+        retcode = OptimisationFailure(;
+                                      res = (; msg = msg, opti = resi_retcodes, opto = rco,
+                                             wb = retcode))
     end
     return retcode, w
 end

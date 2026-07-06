@@ -45,7 +45,8 @@ call takes the weights, the price vector, and the available cash.
 ````@example 05_Post_Processing
 prices = vec(values(X)[end, :])
 cash = 100_000.0
-alloc = optimise(GreedyAllocation(), res.w, prices, cash)
+alloc = optimise(GreedyAllocation(),
+                 FiniteAllocationInput(; w = res.w, prices = prices, cash = cash))
 ````
 
 The result carries the integer `shares`, the per-asset `cost`, the *realised* weights `w` (after

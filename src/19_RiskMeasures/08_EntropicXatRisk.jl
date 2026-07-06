@@ -26,7 +26,7 @@ function ERM(x::VecNum, slv::Slv_VecSlv, alpha::Number = 0.05,
              w::Option{<:ObsWeights} = nothing)
     w = get_observation_weights(w, x)
     if isa(slv, VecSlv)
-        @argcheck(!isempty(slv))
+        @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
     end
     model = JuMP.Model()
     JuMP.set_string_names_on_creation(model, false)
@@ -165,9 +165,9 @@ EntropicValueatRisk
     function EntropicValueatRisk(settings::RiskMeasureSettings, slv::Option{<:Slv_VecSlv},
                                  alpha::Number, w::Option{<:ObsWeights})
         if isa(slv, VecSlv)
-            @argcheck(!isempty(slv))
+            @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
         end
-        @argcheck(zero(alpha) < alpha < one(alpha))
+        assert_unit_interval(alpha, :alpha)
         assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(settings), typeof(slv), typeof(alpha), typeof(w)}(settings, slv,
                                                                             alpha, w)
@@ -256,10 +256,10 @@ Keywords correspond to the struct's fields.
                                       slv::Option{<:Slv_VecSlv}, alpha::Number,
                                       beta::Number, w::Option{<:ObsWeights})
         if isa(slv, VecSlv)
-            @argcheck(!isempty(slv))
+            @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
         end
-        @argcheck(zero(alpha) < alpha < one(alpha))
-        @argcheck(zero(beta) < beta < one(beta))
+        assert_unit_interval(alpha, :alpha)
+        assert_unit_interval(beta, :beta)
         assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(settings), typeof(slv), typeof(alpha), typeof(beta), typeof(w)}(settings,
                                                                                           slv,
@@ -389,9 +389,9 @@ EntropicDrawdownatRisk
                                     slv::Option{<:Slv_VecSlv}, alpha::Number,
                                     w::Option{<:ObsWeights})
         if isa(slv, VecSlv)
-            @argcheck(!isempty(slv))
+            @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
         end
-        @argcheck(zero(alpha) < alpha < one(alpha))
+        assert_unit_interval(alpha, :alpha)
         assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(settings), typeof(slv), typeof(alpha), typeof(w)}(settings, slv,
                                                                             alpha, w)
@@ -515,9 +515,9 @@ RelativeEntropicDrawdownatRisk
                                             slv::Option{<:Slv_VecSlv}, alpha::Number,
                                             w::Option{<:ObsWeights})
         if isa(slv, VecSlv)
-            @argcheck(!isempty(slv))
+            @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
         end
-        @argcheck(zero(alpha) < alpha < one(alpha))
+        assert_unit_interval(alpha, :alpha)
         assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(settings), typeof(slv), typeof(alpha), typeof(w)}(settings, slv,
                                                                             alpha, w)

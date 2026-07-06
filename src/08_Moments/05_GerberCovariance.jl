@@ -523,7 +523,7 @@ Compute the Gerber correlation matrix using the algorithm specified in `ce.alg`.
   - [gerber](@cite) Gerber, Sander and Markowitz, Harry and Ernst, Philip and Miao, Yinsen and Name, No and Sargen, Paul, *The Gerber Statistic: A Robust Co-Movement Measure for Portfolio Optimization* (July 4, 2021). Available at SSRN: https://ssrn.com/abstract=3880054 or http://dx.doi.org/10.2139/ssrn.3880054
 """
 function Statistics.cor(ce::GerberCovariance, X::MatNum; dims::Int = 1, kwargs...)
-    @argcheck(dims in (1, 2))
+    @argcheck(dims in (1, 2), DomainError(dims, "dims must be 1 or 2"))
     if dims == 2
         X = transpose(X)
     end
@@ -578,7 +578,7 @@ Compute the Gerber covariance matrix using the algorithm specified in `ce.alg`.
   - [gerber](@cite) Gerber, Sander and Markowitz, Harry and Ernst, Philip and Miao, Yinsen and Name, No and Sargen, Paul, *The Gerber Statistic: A Robust Co-Movement Measure for Portfolio Optimization* (July 4, 2021). Available at SSRN: https://ssrn.com/abstract=3880054 or http://dx.doi.org/10.2139/ssrn.3880054
 """
 function Statistics.cov(ce::GerberCovariance, X::MatNum; dims::Int = 1, kwargs...)
-    @argcheck(dims in (1, 2))
+    @argcheck(dims in (1, 2), DomainError(dims, "dims must be 1 or 2"))
     if dims == 2
         X = transpose(X)
     end

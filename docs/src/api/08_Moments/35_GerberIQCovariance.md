@@ -24,6 +24,8 @@ gerber_iq_assert_c_d
 gerber_iq_weight
 GerberIQCovariance
 gerber_IQ_delta
+GerberIQKernel
+iq_add_neutral
 gerber_IQ
 cor(ce::GerberIQCovariance, X::MatNum; dims::Int = 1,
                         kwargs...)

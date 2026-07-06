@@ -19,8 +19,14 @@
         kwargs...
     ) -> Plot
     plot_ptf_cumulative_returns(
+        res::OptimisationResult,
+        pr::Pr_RR;
+        fees::Option{<:Fees} = nothing,
+        compound::Bool = false,
+        kwargs...
+    ) -> Plot
+    plot_ptf_cumulative_returns(
         res::OptimisationResult;
-        pr::Option{<:Pr_RR} = nothing,
         fees::Option{<:Fees} = nothing,
         compound::Bool = false,
         kwargs...
@@ -72,7 +78,7 @@ function plot_ptf_cumulative_returns end
         kwargs...
     ) -> Plot
     plot_asset_cumulative_returns(w::VecNum, pr::Pr_RR, fees = nothing; compound, N, kwargs...) -> Plot
-    plot_asset_cumulative_returns(res::OptimisationResult, rd; compound, N, kwargs...) -> Plot
+    plot_asset_cumulative_returns(res::OptimisationResult[, pr]; compound, N, kwargs...) -> Plot
     plot_asset_cumulative_returns(pred; compound, N, kwargs...) -> Plot
 
 Plot the cumulative returns of individual assets, selecting the most relevant via `N`.

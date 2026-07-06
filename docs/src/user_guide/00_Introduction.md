@@ -38,6 +38,35 @@ The guide mirrors that spine, one page per stage:
     compute budget, rebalance frequency, risk appetite, and capital. Worked end-to-end profiles
     live in [putting it together](../examples/7_putting_it_together/01_Profile_Retail_Daily.md).
 
+## Reading the API
+
+Two conventions run through the whole library. Knowing them up front makes the two-letter
+keyword names and the call sites read at a glance.
+
+**Abbreviations follow a scheme.** Composed estimators take their sub-parts as short keyword
+arguments. The trailing letter tells you what *kind* of thing the slot holds: `-e` is an
+**estimator** (a configuration that still has to be run), `-r` is a **result** (an already-computed
+value passed downstream). So `pe` is a prior estimator, but a *computed* prior can be passed into
+the same slot; `cle` is a clustering estimator, `clr` a clustering result.
+
+| Abbrev. | Slot | Abbrev. | Slot |
+| :-- | :-- | :-- | :-- |
+| `pe` | prior estimator / result | `slv` | solver(s) |
+| `ce` | covariance estimator | `me` | expected-returns (mean) estimator |
+| `ve` | variance estimator | `de` | distance estimator |
+| `mp` | matrix-processing estimator | `pdm` | posdef-matrix estimator |
+| `cle` / `clr` | clustering estimator / result | `re` | regression estimator |
+| `wb` | weight bounds | `opt` | optimiser configuration (`JuMPOptimiser` / `HierarchicalOptimiser`) |
+| `r` | risk measure | `obj` | objective function |
+| `rd` | returns data (`ReturnsResult`) | `fb` | fallback estimator |
+
+**Callable signal: functor vs verb.** Most stages are run with a **verb** applied to an
+estimator — `prior(EmpiricalPrior(), rd)`, `optimise(MeanRisk(…))`, `clusterise(…)`,
+`factory(…)`. **Risk measures are the exception**: a risk measure is itself a **callable
+functor** — you call the measure value directly to evaluate the risk of a portfolio, rather than
+passing it to a verb. Rule of thumb: a type that names a *stage* (prior, optimiser, clustering)
+is driven by a verb; a type that names a *risk quantity* is called directly.
+
 ## The data
 
 Every page in the guide uses the same bundled S&P 500 slice, so the pieces compose. Loading it

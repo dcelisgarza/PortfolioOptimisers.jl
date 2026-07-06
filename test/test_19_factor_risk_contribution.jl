@@ -63,4 +63,24 @@
                                                                                            1])),
                                           fb = InverseVolatility(; pe = pr)), rd)
     @test isapprox(res.w, optimise(InverseVolatility(; pe = pr)).w)
+
+    # A risk upper bound is not supported by FactorRiskContribution: it must warn
+    # instead of silently ignoring the bound.
+    logger = SimpleLogger()
+    with_logger(logger) do
+        @test_logs (:warn, r"Risk upper bound") match_mode = :any optimise(FactorRiskContribution(;
+                                                                                                  r = ConditionalValueatRisk(;
+                                                                                                                             settings = RiskMeasureSettings(;
+                                                                                                                                                            ub = 1.0)),
+                                                                                                  opt = JuMPOptimiser(;
+                                                                                                                      pe = pr,
+                                                                                                                      slv = slv)),
+                                                                           rd)
+    end
+    res = optimise(FactorRiskContribution(;
+                                          r = ConditionalValueatRisk(;
+                                                                     settings = RiskMeasureSettings(;
+                                                                                                    ub = 1.0)),
+                                          opt = JuMPOptimiser(; pe = pr, slv = slv)), rd)
+    @test isa(res.retcode, OptimisationSuccess)
 end

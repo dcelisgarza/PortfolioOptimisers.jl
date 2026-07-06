@@ -3,9 +3,9 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Add tracking risk constraints to `model`.
 
-The `L1Tracking` overload uses an L1-norm cone. The `L2Tracking` / `SquaredL2Tracking`
-overload uses an SOC. The `LpTracking` overload uses power cones parameterised by `r.alg.p`.
-The `LInfTracking` overload uses an infinity-norm cone. The independent-variable overload
+The `L1Norm` overload uses an L1-norm cone. The `L2Norm` / `SquaredL2Norm`
+overload uses an SOC. The `LpNorm` overload uses power cones parameterised by `r.alg.p`.
+The `LInfNorm` overload uses an infinity-norm cone. The independent-variable overload
 shifts the weight vector by a benchmark before delegating to [`set_risk_tracking_risk_constraints!`](@ref).
 The dependent-variable overload computes a benchmark risk and adds an L1-norm cone on the
 risk difference via [`set_risk_tracking_risk_constraints!`](@ref).
@@ -50,7 +50,7 @@ where ``\\boldsymbol{b}`` is the benchmark return series, ``k`` is the budget sc
   - [`set_risk_tracking_risk_constraints!`](@ref)
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any,
-                               r::TrackingRiskMeasure{<:Any, <:Any, <:L1Tracking},
+                               r::TrackingRiskMeasure{<:Any, <:Any, <:L1Norm},
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; prefix::Symbol = Symbol(""), kwargs...)
     key = Symbol(:tracking_risk_, i)
@@ -77,8 +77,8 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Finalise the L2 or squared-L2 tracking risk expression and apply bounds.
 
-The `L2Tracking` overload calls [`set_risk_bounds_and_expression!`](@ref) directly with the
-SOC variable. The `SquaredL2Tracking` overload squares it and applies a sqrt-converted upper
+The `L2Norm` overload calls [`set_risk_bounds_and_expression!`](@ref) directly with the
+SOC variable. The `SquaredL2Norm` overload squares it and applies a sqrt-converted upper
 bound to the original SOC variable.
 
 # Arguments
@@ -99,14 +99,14 @@ bound to the original SOC variable.
   - [`variance_risk_bounds_val`](@ref)
 """
 function set_tracking_risk!(model::JuMP.Model,
-                            r::TrackingRiskMeasure{<:Any, <:Any, <:L2Tracking},
+                            r::TrackingRiskMeasure{<:Any, <:Any, <:L2Norm},
                             opt::RiskJuMPOptimisationEstimator,
                             tracking_risk::JuMP.AbstractJuMPScalar, key::Symbol)
     set_risk_bounds_and_expression!(model, opt, tracking_risk, r.settings, key)
     return tracking_risk
 end
 function set_tracking_risk!(model::JuMP.Model,
-                            r::TrackingRiskMeasure{<:Any, <:Any, <:SquaredL2Tracking},
+                            r::TrackingRiskMeasure{<:Any, <:Any, <:SquaredL2Norm},
                             opt::RiskJuMPOptimisationEstimator,
                             tracking_risk::JuMP.AbstractJuMPScalar, key::Symbol)
     qtracking_risk = model[Symbol(:sq_, key)] = JuMP.@expression(model, tracking_risk^2)
@@ -118,8 +118,8 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Add JuMP risk constraints for `TrackingRiskMeasure` with `L2Tracking` or
-`SquaredL2Tracking` to `model`.
+Add JuMP risk constraints for `TrackingRiskMeasure` with `L2Norm` or
+`SquaredL2Norm` to `model`.
 
 Introduces a scalar variable and an SOC constraint to encode the L2 (root mean squared)
 tracking error between portfolio and benchmark returns.
@@ -128,7 +128,7 @@ tracking error between portfolio and benchmark returns.
 
   - $(arg_dict[:model])
   - $(arg_dict[:ci])
-  - `r::TrackingRiskMeasure{<:Any, <:Any, <:Union{<:L2Tracking, <:SquaredL2Tracking}}`:
+  - `r::TrackingRiskMeasure{<:Any, <:Any, <:Union{<:L2Norm, <:SquaredL2Norm}}`:
     The tracking risk measure.
   - $(arg_dict[:opt_rjumpe])
   - $(arg_dict[:pr])
@@ -140,13 +140,12 @@ tracking error between portfolio and benchmark returns.
 # Related
 
   - [`TrackingRiskMeasure`](@ref)
-  - [`L2Tracking`](@ref)
+  - [`L2Norm`](@ref)
   - [`set_risk_constraints!`](@ref)
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::TrackingRiskMeasure{<:Any, <:Any,
-                                                      <:Union{<:L2Tracking,
-                                                              <:SquaredL2Tracking}},
+                                                      <:Union{<:L2Norm, <:SquaredL2Norm}},
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; prefix::Symbol = Symbol(""), kwargs...)
     key = Symbol(:tracking_risk_, i)
@@ -171,7 +170,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Add JuMP risk constraints for `TrackingRiskMeasure` with `LpTracking` to `model`.
+Add JuMP risk constraints for `TrackingRiskMeasure` with `LpNorm` to `model`.
 
 Introduces a scalar variable and power-cone constraints to encode the Lp-norm tracking
 error between portfolio and benchmark returns, scaled by `(T - ddof)^(1/p)`.
@@ -180,7 +179,7 @@ error between portfolio and benchmark returns, scaled by `(T - ddof)^(1/p)`.
 
   - $(arg_dict[:model])
   - $(arg_dict[:ci])
-  - `r::TrackingRiskMeasure{<:Any, <:Any, <:LpTracking}`: The tracking risk measure.
+  - `r::TrackingRiskMeasure{<:Any, <:Any, <:LpNorm}`: The tracking risk measure.
   - $(arg_dict[:opt_rjumpe])
   - $(arg_dict[:pr])
 
@@ -191,11 +190,11 @@ error between portfolio and benchmark returns, scaled by `(T - ddof)^(1/p)`.
 # Related
 
   - [`TrackingRiskMeasure`](@ref)
-  - [`LpTracking`](@ref)
+  - [`LpNorm`](@ref)
   - [`set_risk_constraints!`](@ref)
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any,
-                               r::TrackingRiskMeasure{<:Any, <:Any, <:LpTracking},
+                               r::TrackingRiskMeasure{<:Any, <:Any, <:LpNorm},
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; prefix::Symbol = Symbol(""), kwargs...)
     @argcheck(r.alg.p > 1, DomainError)
@@ -238,7 +237,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Add JuMP risk constraints for `TrackingRiskMeasure` with `LInfTracking` to `model`.
+Add JuMP risk constraints for `TrackingRiskMeasure` with `LInfNorm` to `model`.
 
 Introduces a scalar variable and an infinity-norm cone constraint to encode the L∞-norm
 (maximum) tracking error between portfolio and benchmark returns, scaled by `T - ddof`.
@@ -247,7 +246,7 @@ Introduces a scalar variable and an infinity-norm cone constraint to encode the 
 
   - $(arg_dict[:model])
   - $(arg_dict[:ci])
-  - `r::TrackingRiskMeasure{<:Any, <:Any, <:LInfTracking}`: The tracking risk measure.
+  - `r::TrackingRiskMeasure{<:Any, <:Any, <:LInfNorm}`: The tracking risk measure.
   - $(arg_dict[:opt_rjumpe])
   - $(arg_dict[:pr])
 
@@ -258,11 +257,11 @@ Introduces a scalar variable and an infinity-norm cone constraint to encode the 
 # Related
 
   - [`TrackingRiskMeasure`](@ref)
-  - [`LInfTracking`](@ref)
+  - [`LInfNorm`](@ref)
   - [`set_risk_constraints!`](@ref)
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any,
-                               r::TrackingRiskMeasure{<:Any, <:Any, <:LInfTracking},
+                               r::TrackingRiskMeasure{<:Any, <:Any, <:LInfNorm},
                                opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
                                args...; prefix::Symbol = Symbol(""), kwargs...)
     key = Symbol(:tracking_risk_, i)

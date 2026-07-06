@@ -114,7 +114,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     NearOptimalCentering(;
-        opt::JuMPOptimiser = JuMPOptimiser(),
+        opt::JuMPOptimiser,
         r::RM_VecRM = Variance(),
         obj::Option{<:ObjectiveFunction} = nothing,
         bins::Option{<:Number} = nothing,
@@ -124,7 +124,7 @@ $(DocStringExtensions.FIELDS)
         w_opt_ini::Option{<:VecNum_VecVecNum} = nothing,
         w_max::Option{<:VecNum} = nothing,
         w_max_ini::Option{<:VecNum} = nothing,
-        ucs_flag::Bool = false,
+        ucs_flag::Bool = true,
         alg::NearOptimalCenteringAlgorithm = ConstrainedNearOptimalCentering(),
         fb::Option{<:OptE_Opt} = nothing
     ) -> NearOptimalCentering
@@ -161,6 +161,14 @@ Where:
 
 The solution yields a portfolio centrally located within the near-optimal region, robust to small perturbations of the objective.
 
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+
+  - `opt`: Recursively updated via [`factory`](@ref).
+  - `r`: Recursively updated via [`factory`](@ref).
+  - `fb`: Recursively updated via [`factory`](@ref).
+
 # Related
 
   - [`scalarise_risk_expression!`](@ref)
@@ -169,15 +177,15 @@ The solution yields a portfolio centrally located within the near-optimal region
   - [`MeanRisk`](@ref)
   - [`NearOptimalCenteringAlgorithm`](@ref)
 """
-@concrete struct NearOptimalCentering <: RiskJuMPOptimisationEstimator
+@propagatable @concrete struct NearOptimalCentering <: RiskJuMPOptimisationEstimator
     """
     $(field_dict[:opt_jmp])
     """
-    opt
+    @fprop opt
     """
     $(field_dict[:r_opt])
     """
-    r
+    @fprop r
     """
     $(field_dict[:obj])
     """
@@ -221,7 +229,7 @@ The solution yields a portfolio centrally located within the near-optimal region
     """
     $(field_dict[:fb])
     """
-    fb
+    @fprop fb
     function NearOptimalCentering(opt::JuMPOptimiser, r::RM_VecRM,
                                   obj::Option{<:ObjectiveFunction}, bins::Option{<:Number},
                                   w_min::Option{<:VecNum}, w_min_ini::Option{<:VecNum},
@@ -231,7 +239,7 @@ The solution yields a portfolio centrally located within the near-optimal region
                                   ucs_flag::Bool, alg::NearOptimalCenteringAlgorithm,
                                   fb::Option{<:OptE_Opt})
         if isa(r, AbstractVector)
-            @argcheck(!isempty(r))
+            @argcheck(!isempty(r), IsEmptyError("r cannot be empty"))
             if any(x -> isa(x, QuadExpressionRiskMeasures), r)
                 @warn("Risk measures that produce JuMP.QuadExpr risk expressions are not guaranteed to work. The variance with SDP constraints works because the risk measure is the trace of a matrix, an affine expression.")
             end
@@ -241,25 +249,26 @@ The solution yields a portfolio centrally located within the near-optimal region
             end
         end
         if !isnothing(w_min)
-            @argcheck(!isempty(w_min))
+            @argcheck(!isempty(w_min), IsEmptyError("w_min cannot be empty"))
         end
         if !isnothing(w_min_ini)
-            @argcheck(!isempty(w_min_ini))
+            @argcheck(!isempty(w_min_ini), IsEmptyError("w_min_ini cannot be empty"))
         end
         if !isnothing(w_opt)
-            @argcheck(!isempty(w_opt))
+            @argcheck(!isempty(w_opt), IsEmptyError("w_opt cannot be empty"))
         end
         if !isnothing(w_opt)
-            @argcheck(!isempty(w_opt_ini))
+            @argcheck(!isempty(w_opt_ini), IsEmptyError("w_opt_ini cannot be empty"))
         end
         if !isnothing(w_max)
-            @argcheck(!isempty(w_max))
+            @argcheck(!isempty(w_max), IsEmptyError("w_max cannot be empty"))
         end
         if !isnothing(w_max_ini)
-            @argcheck(!isempty(w_max_ini))
+            @argcheck(!isempty(w_max_ini), IsEmptyError("w_max_ini cannot be empty"))
         end
         if isa(bins, Number)
-            @argcheck(isfinite(bins) && bins > 0)
+            @argcheck(isfinite(bins) && bins > 0,
+                      DomainError(bins, "bins must be finite and > 0"))
         end
         return new{typeof(opt), typeof(r), typeof(obj), typeof(bins), typeof(w_min),
                    typeof(w_min_ini), typeof(w_opt), typeof(w_opt_ini), typeof(w_max),
@@ -275,8 +284,7 @@ The solution yields a portfolio centrally located within the near-optimal region
                                                                                  alg, fb)
     end
 end
-function NearOptimalCentering(; opt::JuMPOptimiser = JuMPOptimiser(),
-                              r::RM_VecRM = StandardDeviation(),
+function NearOptimalCentering(; opt::JuMPOptimiser, r::RM_VecRM = StandardDeviation(),
                               obj::Option{<:ObjectiveFunction} = MinimumRisk(),
                               bins::Option{<:Number} = nothing,
                               w_min::Option{<:VecNum} = nothing,
@@ -299,21 +307,6 @@ function needs_previous_weights(opt::NearOptimalCentering)
     return (needs_previous_weights(opt.opt) ||
             needs_previous_weights(opt.r) ||
             needs_previous_weights(opt.fb))
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Build an updated [`NearOptimalCentering`](@ref) with all estimators that track previous weights updated via `factory` using `w`.
-"""
-function factory(noc::NearOptimalCentering, w::AbstractVector)::NearOptimalCentering
-    opt = factory(noc.opt, w)
-    r = factory(noc.r, w)
-    fb = factory(noc.fb, w)
-    return NearOptimalCentering(; opt = opt, r = r, obj = noc.obj, bins = noc.bins,
-                                w_min = noc.w_min, w_min_ini = noc.w_min_ini,
-                                w_opt = noc.w_opt, w_opt_ini = noc.w_opt_ini,
-                                w_max = noc.w_max, w_max_ini = noc.w_max_ini,
-                                ucs_flag = noc.ucs_flag, alg = noc.alg, fb = fb)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -374,93 +367,17 @@ function near_optimal_centering_risks(::Any, r::RiskMeasure, pr::AbstractPriorRe
     risk_max = expected_risk(r, w_max, X, fees) * scale
     return risk_min, risk_opt, risk_max
 end
-function near_optimal_centering_risks(::SumScalariser, rs::VecRM, pr::AbstractPriorResult,
-                                      fees::Option{<:Fees}, slv::Slv_VecSlv, w_min::VecNum,
-                                      w_opt::VecNum_VecVecNum, w_max::VecNum)
-    X = pr.X
-    rs = factory(rs, pr, slv)
-    datatype = eltype(X)
-    risk_min = zero(datatype)
-    flag = isa(w_opt, VecNum)
-    risk_opt = flag ? zero(datatype) : zeros(datatype, length(w_opt))
-    risk_max = zero(datatype)
-    for r in rs
-        scale = r.settings.scale
-        risk_min += expected_risk(r, w_min, X, fees) * scale
-        risk_opt += expected_risk(r, w_opt, X, fees) * scale
-        risk_max += expected_risk(r, w_max, X, fees) * scale
-    end
-    return risk_min, risk_opt, risk_max
-end
-function near_optimal_centering_risks(scalarisation::LogSumExpScalariser, rs::VecRM,
-                                      pr::AbstractPriorResult, fees::Option{<:Fees},
-                                      slv::Slv_VecSlv, w_min::VecNum,
-                                      w_opt::VecNum_VecVecNum, w_max::VecNum)
-    X = pr.X
-    rs = factory(rs, pr, slv)
-    datatype = eltype(X)
-    N = length(rs)
-    risk_min = zeros(datatype, N)
-    flag = isa(w_opt, VecNum)
-    risk_opt = if flag
-        zeros(datatype, N)
-    else
-        zeros(datatype, N, length(w_opt))
-    end
-    risk_max = zeros(datatype, N)
-    gamma = scalarisation.gamma
-    for (i, r) in enumerate(rs)
-        scale = r.settings.scale * gamma
-        risk_min[i] = expected_risk(r, w_min, X, fees) * scale
-        tmp = expected_risk(r, w_opt, X, fees) * scale
-        if flag
-            risk_opt[i] = tmp
-        else
-            risk_opt[i, :] .= tmp
-        end
-        risk_max[i] = expected_risk(r, w_max, X, fees) * scale
-    end
-    igamma = inv(gamma)
-    risk_min = LogExpFunctions.logsumexp(risk_min) * igamma
-    risk_opt = if flag
-        LogExpFunctions.logsumexp(risk_opt) * igamma
-    else
-        vec(LogExpFunctions.logsumexp(risk_opt; dims = 1)) * igamma
-    end
-    risk_max = LogExpFunctions.logsumexp(risk_max) * igamma
-    return risk_min, risk_opt, risk_max
-end
-function near_optimal_centering_risks(::MaxScalariser, rs::VecRM, pr::AbstractPriorResult,
+function near_optimal_centering_risks(sca::Scalariser, rs::VecRM, pr::AbstractPriorResult,
                                       fees::Option{<:Fees}, slv::Option{<:Slv_VecSlv},
                                       w_min::VecNum, w_opt::VecNum_VecVecNum, w_max::VecNum)
     X = pr.X
     rs = factory(rs, pr, slv)
-    datatype = eltype(X)
-    risk_min = typemin(datatype)
-    flag = isa(w_opt, VecNum)
-    risk_opt = flag ? zero(datatype) : zeros(datatype, length(w_opt))
-    risk_max = typemin(datatype)
-    for r in rs
+    return scalarise(sca, rs) do r
         scale = r.settings.scale
-        risk_min_i = expected_risk(r, w_min, X, fees) * scale
-        risk_opt_i = expected_risk(r, w_opt, X, fees) * scale
-        risk_max_i = expected_risk(r, w_max, X, fees) * scale
-        if risk_min_i >= risk_min
-            risk_min = risk_min_i
-        end
-        if flag
-            if risk_opt_i >= risk_opt
-                risk_opt = risk_opt_i
-            end
-        else
-            idx = risk_opt_i .>= risk_opt
-            risk_opt[idx] = view(risk_opt_i, idx)
-        end
-        if risk_max_i >= risk_max
-            risk_max = risk_max_i
-        end
+        return (expected_risk(r, w_min, X, fees) * scale,
+                expected_risk(r, w_opt, X, fees) * scale,
+                expected_risk(r, w_max, X, fees) * scale)
     end
-    return risk_min, risk_opt, risk_max
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -598,7 +515,7 @@ function near_optimal_centering_setup(noc::NearOptimalCentering, rd::ReturnsResu
     w_opt_retcode = OptimisationSuccess()
     w_max_retcode = OptimisationSuccess()
     unconstrained = isa(noc.alg, UnconstrainedNearOptimalCentering)
-    r = noc.r
+    r = ucs_risk_measure(noc.r, rd)
     attrs = processed_jump_optimiser_attributes(noc.opt, rd; dims = dims, kwargs...)
     opt = jump_optimiser_from_attributes(noc.opt, attrs)
     if w_min_flag || w_max_flag || unconstrained
@@ -1008,7 +925,9 @@ Combines the return codes from the minimum, optimal, and maximum weight sub-prob
 
 # Returns
 
-  - Overall return code.
+  - `OptimisationSuccess()` if every sub-problem succeeded; otherwise an
+    `OptimisationFailure` whose `res` is a named tuple `(; msg, w_min, w_opt, w_max, noc_opt)` carrying the failure summary and the individual sub-problem return codes
+    (including their solver trial diagnostics).
 
 # Related
 
@@ -1036,7 +955,10 @@ function get_overall_retcode(w_min_retcode, w_opt_retcode, w_max_retcode, noc_re
         OptimisationSuccess()
     else
         @warn("Failed to solve optimisation problem. Check `retcode.res` for details.")
-        OptimisationFailure(; res = msg)
+        OptimisationFailure(;
+                            res = (; msg = msg, w_min = w_min_retcode,
+                                   w_opt = w_opt_retcode, w_max = w_max_retcode,
+                                   noc_opt = noc_retcode))
     end
 end
 function _optimise(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,

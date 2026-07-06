@@ -35,7 +35,7 @@ EmpiricalPrior
           │      │    ce ┼ GeneralCovariance
           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
           │      │       │    w ┴ nothing
-          │      │   alg ┴ Full()
+          │      │   alg ┴ FullMoment()
           │   mp ┼ MatrixProcessing
           │      │     pdm ┼ Posdef
           │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
@@ -74,7 +74,7 @@ EmpiricalPrior
     function EmpiricalPrior(ce::StatsBase.CovarianceEstimator,
                             me::AbstractExpectedReturnsEstimator, horizon::Option{<:Number})
         if !isnothing(horizon)
-            @argcheck(horizon > 0)
+            @argcheck(horizon > 0, DomainError(horizon, "horizon must be > 0"))
         end
         return new{typeof(ce), typeof(me), typeof(horizon)}(ce, me, horizon)
     end
@@ -135,7 +135,7 @@ Where:
 """
 function prior(pe::EmpiricalPrior{<:Any, <:Any, Nothing}, X::MatNum, args...; dims::Int = 1,
                kwargs...)
-    @argcheck(dims in (1, 2))
+    @argcheck(dims in (1, 2), DomainError(dims, "dims must be 1 or 2"))
     if dims == 2
         X = transpose(X)
     end
@@ -201,7 +201,7 @@ Where:
 """
 function prior(pe::EmpiricalPrior{<:Any, <:Any, <:Number}, X::MatNum, args...;
                dims::Int = 1, kwargs...)
-    @argcheck(dims in (1, 2))
+    @argcheck(dims in (1, 2), DomainError(dims, "dims must be 1 or 2"))
     if dims == 2
         X = transpose(X)
     end

@@ -101,9 +101,10 @@ Keywords correspond to the struct's fields.
     """
     test_idx
     function KFoldResult(train_idx::VecVecInt, test_idx::VecVecInt)
-        @argcheck(!isempty(train_idx))
-        @argcheck(!isempty(test_idx))
-        @argcheck(length(train_idx) == length(test_idx))
+        @argcheck(!isempty(train_idx), IsEmptyError("train_idx cannot be empty"))
+        @argcheck(!isempty(test_idx), IsEmptyError("test_idx cannot be empty"))
+        @argcheck(length(train_idx) == length(test_idx),
+                  DimensionMismatch("train_idx ($(length(train_idx))) must match test_idx ($(length(test_idx)))"))
         return new{typeof(train_idx), typeof(test_idx)}(train_idx, test_idx)
     end
 end
@@ -136,7 +137,9 @@ function Base.split(kf::KFold, rd::ReturnsResult)
     (; n, purged_size, embargo_size) = kf
     idx = 1:T
     min_fold_size = div(T, n)
-    @argcheck(purged_size + embargo_size < min_fold_size)
+    @argcheck(purged_size + embargo_size < min_fold_size,
+              DomainError(purged_size + embargo_size,
+                          "purged_size + embargo_size ($(purged_size + embargo_size)) must be less than the minimum fold size ($min_fold_size)"))
     fold_sizes = fill(min_fold_size, n)
     fold_sizes[1:(mod(T, n))] .+= one(eltype(fold_sizes))
     test_idx = Vector{typeof(idx)}(undef, 0)

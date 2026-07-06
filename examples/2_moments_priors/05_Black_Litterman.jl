@@ -10,7 +10,7 @@ views, weighting each by its confidence. The result is a posterior mean and cova
 feed to any optimiser.
 
 This is the first of a short, sequenced arc on **view-based priors** — Black–Litterman here,
-then [Entropy Pooling](06_Entropy_Pooling.md), then [Opinion Pooling](07_Opinion_Pooling.md).
+then [Entropy Pooling](07_Entropy_Pooling.md), then [Opinion Pooling](08_Opinion_Pooling.md).
 Each builds on the last, but each page also stands alone.
 
 In `PortfolioOptimisers`, [`BlackLittermanPrior`](@ref) takes a base estimator `pe` (whose
@@ -75,10 +75,10 @@ pretty_table(DataFrame(["Assets" => rd.nx, "Sample mean" => pr_sample.mu,
                         "Equilibrium" => pr_eq.mu]); formatters = [mmtfmt],
              title = "Sample mean vs equilibrium prior")
 
-using StatsPlots, GraphRecipes #= Noisy sample-mean expected returns. =#
-
-plot_mu(pr_sample, rd.nx) #= Smoother market-equilibrium prior. =#
-
+# Noisy sample-mean expected returns.
+using StatsPlots, GraphRecipes
+# Smoother market-equilibrium prior.
+plot_mu(pr_sample, rd.nx)
 plot_mu(pr_eq, rd.nx)
 
 #=

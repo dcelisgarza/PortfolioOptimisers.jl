@@ -15,7 +15,7 @@ const SquaredRiskMeasures = Union{<:Variance, <:BrownianDistanceVariance,
                                              <:SOCRiskExpr},
                                   <:NegativeSkewness{<:Any, <:Any, <:Any, <:Any,
                                                      <:NSkeQuadFormulations},
-                                  <:TrackingRiskMeasure{<:Any, <:Any, <:SquaredL2Tracking}}
+                                  <:TrackingRiskMeasure{<:Any, <:Any, <:SquaredL2Norm}}
 """
     const QuadExpressionRiskMeasures
 
@@ -31,7 +31,7 @@ const QuadExpressionRiskMeasures = Union{<:Variance, <:BrownianDistanceVariance,
                                          <:Kurtosis{<:Any, <:Any, <:Any, <:Any, <:Any,
                                                     <:Any, <:QuadSecondMomentFormulations},
                                          <:TrackingRiskMeasure{<:Any, <:Any,
-                                                               <:SquaredL2Tracking}}
+                                                               <:SquaredL2Norm}}
 """
     const CubedRiskMeasures
 
@@ -77,7 +77,7 @@ to account for the mathematical structure of risk measure `r`.
 
 Returns `val` unchanged for most risk measures. Specialisations scale the value
 appropriately for [`SquaredRiskMeasures`](@ref) (×0.5), [`CubedRiskMeasures`](@ref)
-(÷3), [`FourthPowerRiskMeasures`](@ref) (×0.25), and [`EqualRiskMeasure`](@ref)
+(÷3), [`FourthPowerRiskMeasures`](@ref) (×0.25), and [`EqualRisk`](@ref)
 (+`delta`).
 
 # Arguments
@@ -94,7 +94,7 @@ appropriately for [`SquaredRiskMeasures`](@ref) (×0.5), [`CubedRiskMeasures`](@
   - [`SquaredRiskMeasures`](@ref)
   - [`CubedRiskMeasures`](@ref)
   - [`FourthPowerRiskMeasures`](@ref)
-  - [`EqualRiskMeasure`](@ref)
+  - [`EqualRisk`](@ref)
   - [`risk_contribution`](@ref)
 """
 function adjust_risk_contribution(::Any, val::Number, args...)
@@ -109,6 +109,6 @@ end
 function adjust_risk_contribution(::FourthPowerRiskMeasures, val::Number, args...)
     return val * 0.25
 end
-function adjust_risk_contribution(::EqualRiskMeasure, val::Number, delta::Number = 0.0)
+function adjust_risk_contribution(::EqualRisk, val::Number, delta::Number = 0.0)
     return val + delta
 end

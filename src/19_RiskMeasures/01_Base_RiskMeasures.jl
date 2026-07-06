@@ -528,9 +528,9 @@ Frontier
     bound
     function Frontier(N::Integer, factor::Number = 1,
                       bound::FrontierBoundEstimator = LinearBound())::Frontier
-        @argcheck(N > zero(N))
-        @argcheck(isfinite(factor))
-        @argcheck(factor > zero(factor))
+        @argcheck(N > zero(N), DomainError(N, "N must be > 0"))
+        @argcheck(isfinite(factor), IsNonFiniteError("factor must be finite, got $factor"))
+        @argcheck(factor > zero(factor), DomainError(factor, "factor must be positive"))
         return new{typeof(N), typeof(factor), typeof(bound)}(N, factor, bound)
     end
 end
@@ -647,7 +647,7 @@ RiskMeasureSettings
     function RiskMeasureSettings(scale::Number, ub::Option{<:RkRtBounds},
                                  rke::Bool)::RiskMeasureSettings
         assert_nonempty_nonneg_finite_val(ub, :ub)
-        @argcheck(isfinite(scale))
+        @argcheck(isfinite(scale), IsNonFiniteError("scale must be finite, got $scale"))
         return new{typeof(scale), typeof(ub), typeof(rke)}(scale, ub, rke)
     end
 end
@@ -698,7 +698,7 @@ HierarchicalRiskMeasureSettings
     """
     scale
     function HierarchicalRiskMeasureSettings(scale::Number)::HierarchicalRiskMeasureSettings
-        @argcheck(isfinite(scale))
+        @argcheck(isfinite(scale), IsNonFiniteError("scale must be finite, got $scale"))
         return new{typeof(scale)}(scale)
     end
 end
@@ -957,12 +957,141 @@ LogSumExpScalariser
     """
     gamma
     function LogSumExpScalariser(gamma::Number)
-        @argcheck(gamma > zero(gamma))
+        @argcheck(gamma > zero(gamma), DomainError(gamma, "gamma must be positive"))
         return new{typeof(gamma)}(gamma)
     end
 end
 function LogSumExpScalariser(; gamma::Number = 1.0)
     return LogSumExpScalariser(gamma)
+end
+"""
+    scalarise_combine(op, a, b)
+
+Combine two scalarised risk values slot-wise.
+
+Numbers combine directly via `op`, arrays elementwise, and tuples recursively per slot. Used by [`scalarise`](@ref) to accumulate values that may be scalars, vectors, or tuples mixing both.
+
+# Related
+
+  - [`scalarise`](@ref)
+  - [`scalarise_map`](@ref)
+"""
+scalarise_combine(op, a::Number, b::Number) = op(a, b)
+scalarise_combine(op, a::AbstractArray, b::AbstractArray) = op.(a, b)
+function scalarise_combine(op, a::Tuple, b::Tuple)
+    return map((x, y) -> scalarise_combine(op, x, y), a, b)
+end
+"""
+    scalarise_map(op, x)
+
+Apply `op` slot-wise to a scalarised risk value.
+
+Numbers are transformed directly, arrays elementwise, and tuples recursively per slot.
+
+# Related
+
+  - [`scalarise`](@ref)
+  - [`scalarise_combine`](@ref)
+"""
+scalarise_map(op, x::Number) = op(x)
+scalarise_map(op, x::AbstractArray) = op.(x)
+scalarise_map(op, x::Tuple) = map(y -> scalarise_map(op, y), x)
+"""
+    scalarise_logsumexp(vs)
+
+Slot-wise log-sum-exp across a vector of scalarised risk values.
+
+For a vector of numbers this is `LogExpFunctions.logsumexp`; for a vector of same-shaped arrays it is applied elementwise across the vector; for a vector of same-shaped tuples it recurses per slot.
+
+# Related
+
+  - [`scalarise`](@ref)
+  - [`LogSumExpScalariser`](@ref)
+"""
+scalarise_logsumexp(vs::AbstractVector{<:Number}) = LogExpFunctions.logsumexp(vs)
+function scalarise_logsumexp(vs::AbstractVector{<:AbstractArray})
+    return map(i -> LogExpFunctions.logsumexp([v[i] for v in vs]), eachindex(first(vs)))
+end
+function scalarise_logsumexp(vs::AbstractVector{<:Tuple})
+    return ntuple(k -> scalarise_logsumexp([v[k] for v in vs]), Val(length(first(vs))))
+end
+"""
+    scalarise(f, sca::Scalariser, itr; by = nothing)
+
+Reduce per-risk-measure values into a single scalarised value.
+
+Applies `f` to every element of `itr` (typically a vector of risk measures, or `pairs` thereof) and combines the results according to the scalariser. `f` must return a `Number`, an `AbstractArray`, or a `Tuple` of these, and must return freshly allocated values (no views into buffers reused across iterations), since results may be retained across iterations.
+
+The combining rules are:
+
+  - [`SumScalariser`](@ref): slot-wise sum of all values. `f` is expected to include the measure's `settings.scale` weight in its result.
+
+  - [`MaxScalariser`](@ref)/[`MinScalariser`](@ref):
+
+      + `by === nothing`: slot-wise (elementwise) maximum/minimum across values.
+      + `by` given: winner-take-all — returns the single `f` result whose `by(result)` is largest/smallest (ties keep the earliest).
+
+  - [`LogSumExpScalariser`](@ref): slot-wise `logsumexp` of `gamma`-scaled values, divided by `gamma`.
+
+# Arguments
+
+  - `f`: Per-element evaluation closure, applied to each element of `itr`.
+  - `sca`: Scalarisation strategy.
+  - `itr`: Iterable of risk measures (or `pairs` of them, when `f` needs the index).
+  - `by`: Optional selection key for `MaxScalariser`/`MinScalariser`; ignored by the other scalarisers.
+
+# Returns
+
+  - The scalarised value, with the same shape as the values returned by `f`.
+
+# Related
+
+  - [`Scalariser`](@ref)
+  - [`scalarise_combine`](@ref)
+  - [`scalarise_map`](@ref)
+  - [`scalarise_logsumexp`](@ref)
+"""
+function scalarise(f, ::SumScalariser, itr; by = nothing)
+    acc = nothing
+    for el in itr
+        v = f(el)
+        acc = acc === nothing ? v : scalarise_combine(+, acc, v)
+    end
+    return acc
+end
+function scalarise(f, ::MaxScalariser, itr; by = nothing)
+    acc, k = nothing, nothing
+    for el in itr
+        v = f(el)
+        if by === nothing
+            acc = acc === nothing ? v : scalarise_combine(max, acc, v)
+        else
+            ki = by(v)
+            if k === nothing || ki > k
+                acc, k = v, ki
+            end
+        end
+    end
+    return acc
+end
+function scalarise(f, ::MinScalariser, itr; by = nothing)
+    acc, k = nothing, nothing
+    for el in itr
+        v = f(el)
+        if by === nothing
+            acc = acc === nothing ? v : scalarise_combine(min, acc, v)
+        else
+            ki = by(v)
+            if k === nothing || ki < k
+                acc, k = v, ki
+            end
+        end
+    end
+    return acc
+end
+function scalarise(f, sca::LogSumExpScalariser, itr; by = nothing)
+    vs = [scalarise_map(x -> sca.gamma * x, f(el)) for el in itr]
+    return scalarise_map(x -> x / sca.gamma, scalarise_logsumexp(vs))
 end
 """
     nothing_scalar_array_selector(risk_variable::Nothing, prior_variable::Nothing)
@@ -1015,7 +1144,7 @@ Internal helper for slicing scalar, array, or `nothing` risk/prior variables by 
   - [`port_opt_view`](@ref)
 """
 function risk_measure_nothing_scalar_array_view(::Nothing, ::Nothing, i)
-    return throw(ArgumentError("Both risk_variable and prior_variable are nothing."))
+    return throw(ArgumentError("Both risk_variable and prior_variable are `nothing`."))
 end
 function risk_measure_nothing_scalar_array_view(risk_variable::Num_ArrNum, ::Any, i)
     return nothing_scalar_array_view(risk_variable, i)
@@ -1052,7 +1181,7 @@ function solver_selector(::Nothing, slv::Slv_VecSlv)
     return slv
 end
 function solver_selector(::Nothing, ::Nothing)
-    return throw(ArgumentError("Both risk_solver and prior_solver are nothing, cannot solve JuMP model."))
+    return throw(ArgumentError("Both risk_solver and prior_solver are `nothing`, cannot solve JuMP model."))
 end
 """
     sel(risk_variable, source_variable)

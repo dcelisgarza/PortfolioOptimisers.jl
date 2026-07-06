@@ -10,7 +10,7 @@ the boundary to mixed-integer constraints (thresholds, cardinality) lies.
 
 The unifying idea is the [`AssetSets`](@ref): you name assets and groups once, then every
 constraint refers to those names. The same `"name op value"` string grammar drives both the
-linear constraints here and the views in the [prior examples](../2_moments_priors/06_Entropy_Pooling.md).
+linear constraints here and the views in the [prior examples](../2_moments_priors/07_Entropy_Pooling.md).
 
 !!! tip "When to reach for this"
     Reach for these whenever a real mandate dictates the shape of the book: a 5% single-name cap,
@@ -185,4 +185,4 @@ plot_stacked_bar_composition(results, rd; xticks = (1:length(labels), labels))
 #src - FINDING (→ this group's issue): ThresholdEstimator(lt) and cardinality are MIP — Clarabel
 #src   returns a FAILED retcode (not an error, not a wrong answer). Documented in §6 with the
 #src   Pajarito/HiGHS pointer. A clearer "this constraint needs a MIP solver" message would help.
-#src - cte (centrality) / phylogeny constraints deferred to 03_Phylogeny_Centrality.
+#src - cte (centrality) / phylogeny constraints deferred to 04_Phylogeny_Centrality.

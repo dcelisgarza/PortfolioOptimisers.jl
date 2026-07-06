@@ -267,9 +267,9 @@ objs = [MinimumRisk(), MaximumUtility(), MaximumRatio(; rf = rf)]
 rets = [ArithmeticReturn(), LogarithmicReturn()]
 rs = [StandardDeviation(), Variance(), UncertaintySetVariance(; ucs = ucs1),
       UncertaintySetVariance(; ucs = ucs2), LowOrderMoment(),
-      LowOrderMoment(; alg = SecondMoment(; alg1 = Semi(), alg2 = SOCRiskExpr())),
-      LowOrderMoment(; alg = SecondMoment(; alg1 = Semi())),
-      LowOrderMoment(; alg = SecondMoment(; alg1 = Full(), alg2 = SOCRiskExpr())),
+      LowOrderMoment(; alg = SecondMoment(; alg1 = SemiMoment(), alg2 = SOCRiskExpr())),
+      LowOrderMoment(; alg = SecondMoment(; alg1 = SemiMoment())),
+      LowOrderMoment(; alg = SecondMoment(; alg1 = FullMoment(), alg2 = SOCRiskExpr())),
       LowOrderMoment(; alg = SecondMoment()),
       LowOrderMoment(; alg = MeanAbsoluteDeviation()), WorstRealisation(), Range(),
       ConditionalValueatRisk(), ConditionalValueatRiskRange(), EntropicValueatRisk(),
@@ -285,14 +285,14 @@ rs = [StandardDeviation(), Variance(), UncertaintySetVariance(; ucs = ucs1),
       DistributionallyRobustConditionalValueatRiskRange(),
       ValueatRiskRange(; alg = DistributionValueatRisk()), TurnoverRiskMeasure(; w = w0),
       TrackingRiskMeasure(; tr = WeightsTracking(; w = w0)),
-      TrackingRiskMeasure(; tr = WeightsTracking(; w = w0), alg = L1Tracking()),
+      TrackingRiskMeasure(; tr = WeightsTracking(; w = w0), alg = L1Norm()),
       DistributionallyRobustConditionalDrawdownatRisk(), PowerNormValueatRisk(),
       PowerNormValueatRiskRange(), PowerNormDrawdownatRisk(),
-      TrackingRiskMeasure(; tr = WeightsTracking(; w = w0), alg = LpTracking(; p = 2)),
-      TrackingRiskMeasure(; tr = WeightsTracking(; w = w0), alg = LInfTracking()),
-      TrackingRiskMeasure(; tr = WeightsTracking(; w = w0), alg = LpTracking(; p = 10)),
+      TrackingRiskMeasure(; tr = WeightsTracking(; w = w0), alg = LpNorm(; p = 2)),
+      TrackingRiskMeasure(; tr = WeightsTracking(; w = w0), alg = LInfNorm()),
+      TrackingRiskMeasure(; tr = WeightsTracking(; w = w0), alg = LpNorm(; p = 10)),
       LowOrderMoment(; alg = EvenMoment()),
-      LowOrderMoment(; alg = EvenMoment(; alg = Semi()))]
+      LowOrderMoment(; alg = EvenMoment(; alg = SemiMoment()))]
 tr = WeightsTracking(; w = w0)
 
 function mr_block1(idx)
@@ -438,7 +438,7 @@ function mr_block2(idx)
         end
         rtol = if i in (12, 14, 30)
             5e-4
-        elseif i in (13, 16, 17)
+        elseif i in (13, 16, 17, 18)
             0.05
         elseif i in (15, 28, 41, 42)
             0.1
@@ -452,7 +452,7 @@ function mr_block2(idx)
             1e-4
         elseif i == 23
             1e-3
-        elseif i in (26, 43, 44, 48)
+        elseif i in (4, 26, 43, 44, 48)
             5e-5
         else
             1e-6

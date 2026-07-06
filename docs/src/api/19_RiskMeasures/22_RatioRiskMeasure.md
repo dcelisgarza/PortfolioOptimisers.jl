@@ -1,9 +1,9 @@
 # Ratio Risk Measure
 
 ```@docs
-RiskRatioRiskMeasure
-factory(r::RiskRatioRiskMeasure, args...; kwargs...)
-factory(r::RiskRatioRiskMeasure, w::VecNum)
-NonOptimisationRiskRatioRiskMeasure
-factory(r::NonOptimisationRiskRatioRiskMeasure, args...; kwargs...)
+RiskRatio
+factory(r::RiskRatio, args...; kwargs...)
+factory(r::RiskRatio, w::VecNum)
+NonOptimisationRiskRatio
+factory(r::NonOptimisationRiskRatio, args...; kwargs...)
 ```

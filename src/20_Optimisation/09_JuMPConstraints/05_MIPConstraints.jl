@@ -16,7 +16,7 @@ When `ss` is a number it is returned directly. When `nothing`, the value is deri
 # Related
 
   - [`mip_constraints`](@ref)
-  - [`smip_constraints`](@ref)
+  - [`set_mip_ss_expr!`](@ref)
   - [`WeightBounds`](@ref)
 """
 function get_mip_ss(ss::Number, args...)
@@ -44,9 +44,154 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
+Register the big-M scaling constant as the model expression `:ss` and return it.
+
+Asset-space and sub-group MIP builders share the single `:ss` key; the first caller registers it via [`get_mip_ss`](@ref), subsequent callers reuse the registered expression.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - $(arg_dict[:ss_arg])
+  - $(arg_dict[:wb_arg])
+
+# Returns
+
+  - `ss`: The registered scaling-constant expression.
+
+# Related
+
+  - [`get_mip_ss`](@ref)
+  - [`short_mip_threshold_constraints`](@ref)
+  - [`mip_constraints`](@ref)
+"""
+function set_mip_ss_expr!(model::JuMP.Model, ss::Option{<:Number}, wb::WeightBounds)
+    if haskey(model, :ss)
+        return model[:ss]
+    end
+    return model[:ss] = JuMP.@expression(model, get_mip_ss(ss, wb))
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for the weight space a MIP constraint builder acts on.
+
+A MIP space tells the shared builders which expression the binary indicators gate ([`mip_wx!`](@ref)), how weight bounds map into that space ([`mip_bounds`](@ref)), and how model keys are named ([`mip_key`](@ref)).
+
+# Related
+
+  - [`AssetMIPSpace`](@ref)
+  - [`SubsetMIPSpace`](@ref)
+"""
+abstract type AbstractMIPSpace end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Asset-space MIP constraints: indicators gate the portfolio weights `w` directly and model keys use the bare names (`:ib`, `:i_mip`, `:w_mip_lt`, ...).
+
+# Related
+
+  - [`AbstractMIPSpace`](@ref)
+  - [`SubsetMIPSpace`](@ref)
+"""
+struct AssetMIPSpace <: AbstractMIPSpace end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Sub-group MIP constraints: indicators gate the sub-group weights `smtx * w` and weight bounds map through the selection matrix. Model keys are namespaced as `Symbol(pfx, name, :_, i)` so multiple sub-groups (and the cardinality/group-cardinality variants) do not collide.
+
+# Fields
+
+  - `smtx`: Selection matrix mapping assets to sub-groups.
+  - `pfx::Symbol`: Key prefix; `:s` for cardinality sub-groups, `:sg` for group-cardinality sub-groups.
+  - `i::Integer`: Index of the selection matrix, used in key naming.
+
+# Related
+
+  - [`AbstractMIPSpace`](@ref)
+  - [`AssetMIPSpace`](@ref)
+  - [`mip_key`](@ref)
+"""
+struct SubsetMIPSpace{T1 <: MatNum, T2 <: Integer} <: AbstractMIPSpace
+    smtx::T1
+    pfx::Symbol
+    i::T2
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Map a logical MIP builder name to the model key for the given space.
+
+Asset space returns the name unchanged; sub-group space returns `Symbol(pfx, name, :_, i)`.
+
+# Related
+
+  - [`AbstractMIPSpace`](@ref)
+"""
+function mip_key(::AssetMIPSpace, name::Symbol)
+    return name
+end
+function mip_key(sp::SubsetMIPSpace, name::Symbol)
+    return Symbol(sp.pfx, name, :_, sp.i, :_)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the weight expression the MIP indicators gate.
+
+Asset space returns the portfolio weights `w`; sub-group space registers and returns the sub-group weight expression `smtx * w` under the space's `:mtx_expr` key.
+
+# Related
+
+  - [`AbstractMIPSpace`](@ref)
+  - [`mip_bounds`](@ref)
+"""
+function mip_wx!(model::JuMP.Model, ::AssetMIPSpace)
+    return get_w(model)
+end
+function mip_wx!(model::JuMP.Model, sp::SubsetMIPSpace)
+    return model[mip_key(sp, :mtx_expr)] = JuMP.@expression(model, sp.smtx * get_w(model))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Map a weight bound vector into the MIP space.
+
+Asset space returns the bounds unchanged; sub-group space maps them through the selection matrix, `smtx * b`.
+
+# Related
+
+  - [`AbstractMIPSpace`](@ref)
+  - [`mip_wx!`](@ref)
+"""
+function mip_bounds(::AssetMIPSpace, b::VecNum)
+    return b
+end
+function mip_bounds(sp::SubsetMIPSpace, b::VecNum)
+    return sp.smtx * b
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Whether the binary indicators can gate the weights directly, without the continuous big-M relaxation of `indicator * k`.
+
+True when the budget `k` is a constant. The asset space additionally treats the presence of the [`RiskBudgeting`](@ref) normalisation constraint `:crkb` as a fixed budget.
+
+# Related
+
+  - [`short_mip_threshold_constraints`](@ref)
+"""
+function use_direct_mip_indicators(model::JuMP.Model, ::AssetMIPSpace, k)
+    return isa(k, Number) || haskey(model, :crkb)
+end
+function use_direct_mip_indicators(::JuMP.Model, ::SubsetMIPSpace, k)
+    return isa(k, Number)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
 Add MIP-compatible weight bound constraints using binary selection variables.
 
-The fall-through method does nothing when `wb` is `nothing`. The concrete method adds `w ≥ is ⊙ lb` and `w ≤ il ⊙ ub` constraints when the respective finite bounds are present.
+The fall-through method does nothing when `wb` is `nothing`. The concrete method adds `wx ≥ is ⊙ lb` and `wx ≤ il ⊙ ub` constraints when the respective finite bounds are present, where `wx` and the bounds live in the space selected by `sp` ([`mip_wx!`](@ref), [`mip_bounds`](@ref)).
 
 # Mathematical definition
 
@@ -60,12 +205,14 @@ Where:
 
   - $(math_dict[:w_port])
   - ``\\boldsymbol{i}_l``, ``\\boldsymbol{i}_s``: Long and short binary indicator vectors.
-  - ``\\boldsymbol{\\ell}``, ``\\boldsymbol{u}``: Lower and upper bound vectors from `wb`.
+  - ``\\boldsymbol{\\ell}``, ``\\boldsymbol{u}``: Lower and upper bound vectors from `wb`, mapped into the space of `sp`.
 
 # Arguments
 
   - $(arg_dict[:model])
+  - `sp::AbstractMIPSpace`: Weight space the constraints act on.
   - $(arg_dict[:wb_arg])
+  - `wx::VecNum`: Weight expression from [`mip_wx!`](@ref).
   - $(arg_dict[:il_arg])
   - $(arg_dict[:is_arg])
 
@@ -76,23 +223,29 @@ Where:
 # Related
 
   - [`mip_constraints`](@ref)
-  - [`smip_wb`](@ref)
+  - [`short_mip_threshold_constraints`](@ref)
   - [`w_finite_flag`](@ref)
   - [`WeightBounds`](@ref)
 """
-function mip_wb(::Any, ::Nothing, args...)
+function mip_wb(::JuMP.Model, ::AbstractMIPSpace, ::Nothing, args...)
     return nothing
 end
-function mip_wb(model::JuMP.Model, wb::WeightBounds, il::VecNum, is::VecNum)
+function mip_wb(model::JuMP.Model, sp::AbstractMIPSpace, wb::WeightBounds, wx::VecNum,
+                il::VecNum, is::VecNum)
     sc = get_constraint_scale(model)
-    w = get_w(model)
     lb = wb.lb
     if !isnothing(lb) && w_finite_flag(lb)
-        JuMP.@constraint(model, w_mip_lb, sc * (w - is ⊙ lb) >= 0)
+        model[mip_key(sp, :w_mip_lb)] = JuMP.@constraint(model,
+                                                         sc *
+                                                         (wx - mip_bounds(sp, lb) ⊙ is) >=
+                                                         0)
     end
     ub = wb.ub
     if !isnothing(ub) && w_finite_flag(ub)
-        JuMP.@constraint(model, w_mip_ub, sc * (w - il ⊙ ub) <= 0)
+        model[mip_key(sp, :w_mip_ub)] = JuMP.@constraint(model,
+                                                         sc *
+                                                         (wx - mip_bounds(sp, ub) ⊙ il) <=
+                                                         0)
     end
     return nothing
 end
@@ -101,7 +254,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Add MIP binary selection variables and threshold constraints for long-short portfolios.
 
-Creates `ilb`/`isb` binary indicator variables (or their continuous relaxations `ilf`/`isf` when `k` is a JuMP variable), enforces that each asset is either long or short but not both (`ilb + isb ≤ 1`), and applies long/short minimum-holding threshold and rebalancing constraints based on the flags provided.
+Creates long/short binary indicator variables (or their continuous relaxations when `k` is a JuMP variable), enforces that each position is either long or short but not both, and applies long/short minimum-holding threshold, fixed-fee, and rebalancing constraints based on the flags provided. The weight expression, bound mapping, and model key naming are selected by `sp`, so the same builder serves asset-space and sub-group constraints.
 
 # Mathematical definition
 
@@ -115,7 +268,7 @@ ilb_i + isb_i \\leq 1, \\quad ilf_i &= ilb_i \\cdot k, \\quad isf_i = isb_i \\cd
 
 Where:
 
-  - ``ilb_i``, ``isb_i``: Long and short binary indicator variables for asset ``i``.
+  - ``ilb_i``, ``isb_i``: Long and short binary indicator variables for position ``i``.
   - ``ilf_i``, ``isf_i``: Continuous relaxations of ``ilb_i \\cdot k`` and ``isb_i \\cdot k``.
   - $(math_dict[:k_budget])
 
@@ -130,15 +283,16 @@ w_i &\\leq -isf_i\\, u_i + M(1 - isb_i)\\,.
 
 Where:
 
-  - ``w_i``: Portfolio weight for asset ``i``.
+  - ``w_i``: Weight expression for position ``i`` in the space of `sp`.
   - ``ilf_i``, ``isf_i``: Long and short continuous indicator expressions.
-  - ``ilb_i``, ``isb_i``: Long and short binary indicator variables for asset ``i``.
-  - ``\\ell_i``, ``u_i``: Long and short minimum-holding thresholds for asset ``i``.
+  - ``ilb_i``, ``isb_i``: Long and short binary indicator variables for position ``i``.
+  - ``\\ell_i``, ``u_i``: Long and short minimum-holding thresholds for position ``i``.
   - ``M``: Big-M constant.
 
 # Arguments
 
   - $(arg_dict[:model])
+  - `sp::AbstractMIPSpace`: Weight space the constraints act on.
   - $(arg_dict[:wb_arg])
   - $(arg_dict[:lt_arg])
   - $(arg_dict[:st_arg])
@@ -158,82 +312,84 @@ Where:
 # Related
 
   - [`mip_constraints`](@ref)
-  - [`get_mip_ss`](@ref)
+  - [`set_mip_ss_expr!`](@ref)
   - [`mip_wb`](@ref)
   - [`Threshold`](@ref)
   - [`WeightBounds`](@ref)
 """
-function short_mip_threshold_constraints(model::JuMP.Model, wb::WeightBounds,
-                                         lt::Option{<:Threshold}, st::Option{<:Threshold},
-                                         ffl::Option{<:Num_VecNum},
+function short_mip_threshold_constraints(model::JuMP.Model, sp::AbstractMIPSpace,
+                                         wb::WeightBounds, lt::Option{<:Threshold},
+                                         st::Option{<:Threshold}, ffl::Option{<:Num_VecNum},
                                          ffs::Option{<:Num_VecNum}, ss::Option{<:Number},
                                          lt_flag::Bool, st_flag::Bool, ffl_flag::Bool,
                                          ffs_flag::Bool, miprb_flag::Bool)
-    w = get_w(model)
+    wx = mip_wx!(model, sp)
     k = get_k(model)
     sc = get_constraint_scale(model)
-    JuMP.@expression(model, ss, get_mip_ss(ss, wb))
-    N = length(w)
-    JuMP.@variables(model, begin
-                        ilb[1:N], (binary = true)
-                        isb[1:N], (binary = true)
-                    end)
-    JuMP.@expression(model, i_mip, ilb + isb)
-    if isa(k, Number) || haskey(model, :crkb)
-        JuMP.@expressions(model, begin
-                              il, ilb
-                              is, isb
-                          end)
+    ss = set_mip_ss_expr!(model, ss, wb)
+    N = length(wx)
+    ilb = model[mip_key(sp, :ilb)] = JuMP.@variable(model, [1:N], binary = true,
+                                                    base_name = string(mip_key(sp, :ilb)))
+    isb = model[mip_key(sp, :isb)] = JuMP.@variable(model, [1:N], binary = true,
+                                                    base_name = string(mip_key(sp, :isb)))
+    i_mip = model[mip_key(sp, :i_mip)] = JuMP.@expression(model, ilb + isb)
+    if use_direct_mip_indicators(model, sp, k)
+        il = model[mip_key(sp, :il)] = JuMP.@expression(model, ilb)
+        is = model[mip_key(sp, :is)] = JuMP.@expression(model, isb)
     else
-        JuMP.@variables(model, begin
-                            ilf[1:N] >= 0
-                            isf[1:N] >= 0
-                        end)
-        JuMP.@constraints(model, begin
-                              ilf_ub, sc * (ilf .- k) <= 0
-                              isf_ub, sc * (isf .- k) <= 0
-                              ilfd_ub, sc * (ilf - ss * ilb) <= 0
-                              isfd_ub, sc * (isf - ss * isb) <= 0
-                              ilfd_lb, sc * ((ilf + ss * (1 .- ilb)) .- k) >= 0
-                              isfd_lb, sc * ((isf + ss * (1 .- isb)) .- k) >= 0
-                          end)
-        JuMP.@expressions(model, begin
-                              il, ilf
-                              is, isf
-                          end)
+        ilf = model[mip_key(sp, :ilf)] = JuMP.@variable(model, [1:N], lower_bound = 0,
+                                                        base_name = string(mip_key(sp,
+                                                                                   :ilf)))
+        isf = model[mip_key(sp, :isf)] = JuMP.@variable(model, [1:N], lower_bound = 0,
+                                                        base_name = string(mip_key(sp,
+                                                                                   :isf)))
+        model[mip_key(sp, :ilf_ub)] = JuMP.@constraint(model, sc * (ilf .- k) <= 0)
+        model[mip_key(sp, :isf_ub)] = JuMP.@constraint(model, sc * (isf .- k) <= 0)
+        model[mip_key(sp, :ilfd_ub)] = JuMP.@constraint(model, sc * (ilf - ss * ilb) <= 0)
+        model[mip_key(sp, :isfd_ub)] = JuMP.@constraint(model, sc * (isf - ss * isb) <= 0)
+        model[mip_key(sp, :ilfd_lb)] = JuMP.@constraint(model,
+                                                        sc *
+                                                        ((ilf + ss * (1 .- ilb)) .- k) >= 0)
+        model[mip_key(sp, :isfd_lb)] = JuMP.@constraint(model,
+                                                        sc *
+                                                        ((isf + ss * (1 .- isb)) .- k) >= 0)
+        il = model[mip_key(sp, :il)] = JuMP.@expression(model, ilf)
+        is = model[mip_key(sp, :is)] = JuMP.@expression(model, isf)
     end
-    JuMP.@constraint(model, i_mip_ub, sc * (i_mip .- 1) <= 0)
-    mip_wb(model, wb, il, is)
+    model[mip_key(sp, :i_mip_ub)] = JuMP.@constraint(model, sc * (i_mip .- 1) <= 0)
+    mip_wb(model, sp, wb, wx, il, is)
     if lt_flag
-        JuMP.@constraint(model, w_mip_lt, sc * (w - il ⊙ lt.val + ss * (1 .- ilb)) >= 0)
+        model[mip_key(sp, :w_mip_lt)] = JuMP.@constraint(model,
+                                                         sc * (wx - il ⊙ lt.val +
+                                                               ss * (1 .- ilb)) >= 0)
     end
     if st_flag
-        JuMP.@constraint(model, w_mip_st, sc * (w + is ⊙ st.val - ss * (1 .- isb)) <= 0)
+        model[mip_key(sp, :w_mip_st)] = JuMP.@constraint(model,
+                                                         sc * (wx + is ⊙ st.val -
+                                                               ss * (1 .- isb)) <= 0)
     end
     if ffl_flag
-        JuMP.@expression(model, ffl, dot_scalar(ffl, ilb))
+        ffl = model[mip_key(sp, :ffl)] = JuMP.@expression(model, dot_scalar(ffl, ilb))
         add_to_fees!(model, ffl)
     end
     if ffs_flag
-        JuMP.@expression(model, ffs, dot_scalar(ffs, isb))
+        ffs = model[mip_key(sp, :ffs)] = JuMP.@expression(model, dot_scalar(ffs, isb))
         add_to_fees!(model, ffs)
     end
     if miprb_flag
         lw = model[:lw]
         sw = model[:sw]
-        JuMP.@constraints(model, begin
-                              lmiprb, sc * (lw - ss * il) <= 0
-                              smiprb, sc * (sw - ss * is) <= 0
-                          end)
+        model[mip_key(sp, :lmiprb)] = JuMP.@constraint(model, sc * (lw - ss * il) <= 0)
+        model[mip_key(sp, :smiprb)] = JuMP.@constraint(model, sc * (sw - ss * is) <= 0)
     end
     return i_mip
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Add long-only MIP binary indicator variable and associated constraints to the JuMP optimisation model.
+Add a long-only MIP binary indicator variable and associated constraints to the JuMP optimisation model.
 
-Creates binary variable `ib[i]` per asset indicating whether the asset is held. When `k` is a JuMP variable, introduces continuous relaxation `ibf` with big-M linking constraints. Optionally applies minimum-holding threshold, fixed-fee, and rebalancing constraints.
+Creates a binary variable per position indicating whether it is held. When `k` is a JuMP variable, introduces a continuous relaxation with big-M linking constraints. Optionally applies minimum-holding threshold, fixed-fee, and rebalancing constraints. The weight expression, bound mapping, and model key naming are selected by `sp`, so the same builder serves asset-space and sub-group constraints.
 
 # Mathematical definition
 
@@ -247,7 +403,7 @@ ibf_i &\\leq k, \\quad ibf_i \\leq M\\, ib_i, \\quad ibf_i + M(1 - ib_i) \\geq k
 
 Where:
 
-  - ``ib_i``: Binary inclusion indicator for asset ``i``.
+  - ``ib_i``: Binary inclusion indicator for position ``i``.
   - ``ibf_i``: Continuous relaxation of ``ib_i \\cdot k``.
   - $(math_dict[:k_budget])
   - ``M``: Big-M constant.
@@ -263,14 +419,15 @@ w_i &\\geq ibf_i\\, \\ell_i\\,, \\\\
 
 Where:
 
-  - ``w_i``: Portfolio weight for asset ``i``.
+  - ``w_i``: Weight expression for position ``i`` in the space of `sp`.
   - ``ibf_i``: Continuous relaxation of ``ib_i \\cdot k``.
-  - ``\\ell_i``: Minimum-holding threshold for asset ``i``.
-  - ``\\mathrm{card}``: Maximum number of non-zero assets (cardinality bound).
+  - ``\\ell_i``: Minimum-holding threshold for position ``i``.
+  - ``\\mathrm{card}``: Maximum number of non-zero positions (cardinality bound).
 
 # Arguments
 
   - $(arg_dict[:model])
+  - `sp::AbstractMIPSpace`: Weight space the constraints act on.
   - $(arg_dict[:wb_arg])
   - `ffl::Option{<:Num_VecNum}`: Long-side fixed fee rate(s).
   - $(arg_dict[:lt_arg])
@@ -288,46 +445,50 @@ Where:
   - [`short_mip_threshold_constraints`](@ref)
   - [`set_mip_constraints!`](@ref)
   - [`mip_wb`](@ref)
-  - [`get_mip_ss`](@ref)
+  - [`set_mip_ss_expr!`](@ref)
   - [`set_iplg_constraints!`](@ref)
   - [`Threshold`](@ref)
   - [`WeightBounds`](@ref)
 """
-function mip_constraints(model::JuMP.Model, wb::WeightBounds, ffl::Option{<:Num_VecNum},
-                         lt::Option{<:Threshold}, ss::Option{<:Number}, lt_flag::Bool,
-                         ffl_flag::Bool, miprb_flag::Bool)
-    w = get_w(model)
+function mip_constraints(model::JuMP.Model, sp::AbstractMIPSpace, wb::WeightBounds,
+                         ffl::Option{<:Num_VecNum}, lt::Option{<:Threshold},
+                         ss::Option{<:Number}, lt_flag::Bool, ffl_flag::Bool,
+                         miprb_flag::Bool)
+    wx = mip_wx!(model, sp)
     k = get_k(model)
     sc = get_constraint_scale(model)
-    N = length(w)
-    JuMP.@variable(model, ib[1:N], binary = true)
-    if isa(k, Number)
-        JuMP.@expression(model, i_mip, ib)
+    N = length(wx)
+    ib = model[mip_key(sp, :ib)] = JuMP.@variable(model, [1:N], binary = true,
+                                                  base_name = string(mip_key(sp, :ib)))
+    i_mip = if isa(k, Number)
+        model[mip_key(sp, :i_mip)] = JuMP.@expression(model, ib)
     else
-        JuMP.@expression(model, ss, get_mip_ss(ss, wb))
-        JuMP.@variable(model, ibf[1:N] >= 0)
-        JuMP.@constraints(model, begin
-                              ibf_ub, sc * (ibf .- k) <= 0
-                              ibfd_ub, sc * (ibf - ss * ib) <= 0
-                              ibfd_lb, sc * ((ibf + ss * (1 .- ib)) .- k) >= 0
-                          end)
-        JuMP.@expression(model, i_mip, ibf)
+        ss = set_mip_ss_expr!(model, ss, wb)
+        ibf = model[mip_key(sp, :ibf)] = JuMP.@variable(model, [1:N], lower_bound = 0,
+                                                        base_name = string(mip_key(sp,
+                                                                                   :ibf)))
+        model[mip_key(sp, :ibf_ub)] = JuMP.@constraint(model, sc * (ibf .- k) <= 0)
+        model[mip_key(sp, :ibfd_ub)] = JuMP.@constraint(model, sc * (ibf - ss * ib) <= 0)
+        model[mip_key(sp, :ibfd_lb)] = JuMP.@constraint(model,
+                                                        sc *
+                                                        ((ibf + ss * (1 .- ib)) .- k) >= 0)
+        model[mip_key(sp, :i_mip)] = JuMP.@expression(model, ibf)
     end
-    mip_wb(model, wb, i_mip, i_mip)
+    mip_wb(model, sp, wb, wx, i_mip, i_mip)
     if lt_flag
-        JuMP.@constraint(model, w_mip_lt, sc * (w - i_mip ⊙ lt.val) >= 0)
+        model[mip_key(sp, :w_mip_lt)] = JuMP.@constraint(model,
+                                                         sc * (wx - i_mip ⊙ lt.val) >= 0)
     end
     if ffl_flag
-        JuMP.@expression(model, ffl, dot_scalar(ffl, ib))
+        ffl = model[mip_key(sp, :ffl)] = JuMP.@expression(model, dot_scalar(ffl, ib))
         add_to_fees!(model, ffl)
     end
     if miprb_flag
         lw = model[:lw]
         sw = model[:sw]
-        JuMP.@constraints(model, begin
-                              lmiprb, sc * (lw - ss * ib) <= 0
-                              smiprb, sc * (sw - ss * (1 .- ib)) <= 0
-                          end)
+        model[mip_key(sp, :lmiprb)] = JuMP.@constraint(model, sc * (lw - ss * ib) <= 0)
+        model[mip_key(sp, :smiprb)] = JuMP.@constraint(model,
+                                                       sc * (sw - ss * (1 .- ib)) <= 0)
     end
     return ib
 end
@@ -426,11 +587,12 @@ function set_mip_constraints!(model::JuMP.Model, wb::WeightBounds, card::Option{
          miprb_flag)
         return nothing
     end
+    sp = AssetMIPSpace()
     ib = if (st_flag || ffl_flag || ffs_flag) && haskey(model, :sw)
-        short_mip_threshold_constraints(model, wb, lt, st, ffl, ffs, ss, lt_flag, st_flag,
-                                        ffl_flag, ffs_flag, miprb_flag)
+        short_mip_threshold_constraints(model, sp, wb, lt, st, ffl, ffs, ss, lt_flag,
+                                        st_flag, ffl_flag, ffs_flag, miprb_flag)
     else
-        mip_constraints(model, wb, ffl, lt, ss, lt_flag, ffl_flag, miprb_flag)
+        mip_constraints(model, sp, wb, ffl, lt, ss, lt_flag, ffl_flag, miprb_flag)
     end
     sc = get_constraint_scale(model)
     if card_flag
@@ -456,267 +618,9 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Add sub-group MIP weight bound constraints using a selection matrix.
-
-The fall-through method does nothing when `wb` is `nothing`. The concrete method applies bounds `smtx * lb` and `smtx * ub` gated by binary selection variables `is` and `il` respectively.
-
-# Arguments
-
-  - $(arg_dict[:model])
-  - $(arg_dict[:wb_arg])
-  - `smtx::MatNum`: Selection matrix mapping assets to sub-groups.
-  - `smtx_expr`: JuMP expression for the sub-group weight combination.
-  - $(arg_dict[:il_arg])
-  - $(arg_dict[:is_arg])
-  - `key::Symbol = :set_w_mip_`: Base key for naming constraints.
-  - `i::Integer = 1`: Index for generating unique constraint names.
-
-# Returns
-
-  - `nothing`.
-
-# Related
-
-  - [`mip_wb`](@ref)
-  - [`smip_constraints`](@ref)
-  - [`WeightBounds`](@ref)
-"""
-function smip_wb(::Any, ::Nothing, args...)
-    return nothing
-end
-function smip_wb(model::JuMP.Model, wb::WeightBounds, smtx::MatNum,
-                 smtx_expr::VecJuMPScalar, il::VecNum, is::VecNum,
-                 key::Symbol = :set_w_mip_, i::Integer = 1)
-    sc = get_constraint_scale(model)
-    lb = wb.lb
-    if !isnothing(lb) && w_finite_flag(lb)
-        lb = smtx * lb
-        model[Symbol(key, :lb_, i)] = JuMP.@constraint(model,
-                                                       sc * (smtx_expr - lb ⊙ is) >= 0)
-    end
-    ub = wb.ub
-    if !isnothing(ub) && w_finite_flag(ub)
-        ub = smtx * ub
-        model[Symbol(key, :ub_, i)] = JuMP.@constraint(model,
-                                                       sc * (smtx_expr - ub ⊙ il) <= 0)
-    end
-    return nothing
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Add sub-group MIP binary selection variables and threshold constraints for long-short portfolios using a selection matrix.
-
-Creates per-group binary indicator variables and, when `k` is a JuMP variable, their continuous relaxations with big-M linking constraints. Applies long/short minimum-holding thresholds gated by the selection matrix `smtx`.
-
-# Arguments
-
-  - $(arg_dict[:model])
-  - $(arg_dict[:wb_arg])
-  - $(arg_dict[:smtx_arg])
-  - $(arg_dict[:lt_arg])
-  - $(arg_dict[:st_arg])
-  - $(arg_dict[:ss_arg])
-  - $(arg_dict[:lt_flag_arg])
-  - $(arg_dict[:st_flag_arg])
-  - `key1::Symbol = :si`: Base key for long indicator variables.
-  - `key7::Symbol = :smtx_expr_`: Base key for sub-group weight expressions.
-  - `key8::Symbol = :set_w_mip_`: Base key for weight bound constraints.
-  - `i::Integer = 1`: Index for generating unique names.
-
-# Returns
-
-  - `i_mip`: Combined long+short indicator expression for the sub-group.
-
-# Related
-
-  - [`short_mip_threshold_constraints`](@ref)
-  - [`smip_constraints`](@ref)
-  - [`smip_wb`](@ref)
-  - [`get_mip_ss`](@ref)
-  - [`Threshold`](@ref)
-  - [`WeightBounds`](@ref)
-"""
-function short_smip_threshold_constraints(model::JuMP.Model, wb::WeightBounds,
-                                          smtx::Option{<:MatNum}, lt::Option{<:Threshold},
-                                          st::Option{<:Threshold}, ss::Option{<:Number},
-                                          lt_flag::Bool, st_flag::Bool, key1::Symbol = :si,
-                                          key7::Symbol = :smtx_expr_,
-                                          key8::Symbol = :set_w_mip_, i::Integer = 1)
-    w = get_w(model)
-    k = get_k(model)
-    sc = get_constraint_scale(model)
-    JuMP.@expression(model, ss, get_mip_ss(ss, wb))
-    N = size(smtx, 1)
-    ilb, isb = model[Symbol(key1, :lb_, i)], model[Symbol(key1, :ub_, i)] = JuMP.@variables(model,
-                                                                                            begin
-                                                                                                [1:N],
-                                                                                                (binary = true)
-                                                                                                [1:N],
-                                                                                                (binary = true)
-                                                                                            end)
-    key2 = Symbol(key1, :_mip_)
-    i_mip = model[Symbol(key2, i)] = JuMP.@expression(model, ilb + isb)
-    il, is = if isa(k, Number)
-        model[Symbol(key1, :l_, i)], model[Symbol(key1, :s_, i)] = JuMP.@expressions(model,
-                                                                                     begin
-                                                                                         ilb
-                                                                                         isb
-                                                                                     end)
-    else
-        key3 = Symbol(key1, :lf_)
-        key4 = Symbol(key1, :sf_)
-        ilf, isf = model[Symbol(key3, i)], model[Symbol(key4, i)] = JuMP.@variables(model,
-                                                                                    begin
-                                                                                        [1:N],
-                                                                                        (lower_bound = 0)
-                                                                                        [1:N],
-                                                                                        (lower_bound = 0)
-                                                                                    end)
-        key5 = Symbol(key1, :lfd_)
-        key6 = Symbol(key1, :sfd_)
-        model[Symbol(key3, :ub_, i)], model[Symbol(key4, :ub_, i)], model[Symbol(key5, :ub_, i)], model[Symbol(key6, :ub_, i)], model[Symbol(key5, :lb_, i)], model[Symbol(key6, :lb_, i)] = JuMP.@constraints(model,
-                                                                                                                                                                                                               begin
-                                                                                                                                                                                                                   sc *
-                                                                                                                                                                                                                   (ilf .-
-                                                                                                                                                                                                                    k) <=
-                                                                                                                                                                                                                   0
-                                                                                                                                                                                                                   sc *
-                                                                                                                                                                                                                   (isf .-
-                                                                                                                                                                                                                    k) <=
-                                                                                                                                                                                                                   0
-                                                                                                                                                                                                                   sc *
-                                                                                                                                                                                                                   (ilf -
-                                                                                                                                                                                                                    ss *
-                                                                                                                                                                                                                    ilb) <=
-                                                                                                                                                                                                                   0
-                                                                                                                                                                                                                   sc *
-                                                                                                                                                                                                                   (isf -
-                                                                                                                                                                                                                    ss *
-                                                                                                                                                                                                                    isb) <=
-                                                                                                                                                                                                                   0
-                                                                                                                                                                                                                   sc *
-                                                                                                                                                                                                                   ((ilf +
-                                                                                                                                                                                                                     ss *
-                                                                                                                                                                                                                     (1 .-
-                                                                                                                                                                                                                      ilb)) .-
-                                                                                                                                                                                                                    k) >=
-                                                                                                                                                                                                                   0
-                                                                                                                                                                                                                   sc *
-                                                                                                                                                                                                                   ((isf +
-                                                                                                                                                                                                                     ss *
-                                                                                                                                                                                                                     (1 .-
-                                                                                                                                                                                                                      isb)) .-
-                                                                                                                                                                                                                    k) >=
-                                                                                                                                                                                                                   0
-                                                                                                                                                                                                               end)
-        model[Symbol(key1, :l_, i)], model[Symbol(key1, :s_, i)] = JuMP.@expressions(model,
-                                                                                     begin
-                                                                                         ilf
-                                                                                         isf
-                                                                                     end)
-    end
-    model[Symbol(key2, :ub, i)] = JuMP.@constraint(model, sc * (i_mip .- 1) <= 0)
-    smtx_expr = model[Symbol(key7, i)] = JuMP.@expression(model, smtx * w)
-    smip_wb(model, wb, smtx, smtx_expr, il, is, key8, i)
-    if lt_flag
-        model[Symbol(key8, :lt, i)] = JuMP.@constraint(model,
-                                                       sc * (smtx_expr - il ⊙ lt.val +
-                                                             ss * (1 .- ilb)) >= 0)
-    end
-    if st_flag
-        model[Symbol(key8, :st, i)] = JuMP.@constraint(model,
-                                                       sc * (smtx_expr + is ⊙ st.val -
-                                                             ss * (1 .- isb)) <= 0)
-    end
-    return i_mip
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Add a sub-group MIP binary indicator variable and associated weight and threshold constraints for a single selection matrix group.
-
-Creates binary variable `sib` (or continuous relaxation when `k` is a JuMP variable) representing asset inclusion within the sub-group, then applies sub-group weight expression and optional threshold bounds via [`smip_wb`](@ref).
-
-# Arguments
-
-  - $(arg_dict[:model])
-  - $(arg_dict[:wb_arg])
-  - `smtx::Option{<:MatNum}`: Selection matrix for this sub-group.
-  - $(arg_dict[:lt_arg])
-  - $(arg_dict[:ss_arg])
-  - $(arg_dict[:lt_flag_arg])
-  - `key1::Symbol = :sib_`: Base key for binary indicator variable.
-  - `key2::Symbol = :i_smip_`: Base key for the indicator expression.
-  - `key3::Symbol = :isbf_`: Base key for continuous relaxation variable.
-  - `key4::Symbol = :smtx_expr_`: Base key for sub-group weight expression.
-  - `key5::Symbol = :set_w_mip_`: Base key for weight bound constraints.
-  - `key6::Symbol = :w_smip_lt_`: Base key for threshold constraints.
-  - `i::Integer = 1`: Index for generating unique names.
-
-# Returns
-
-  - `sib`: Binary indicator JuMP variable for this sub-group.
-
-# Related
-
-  - [`smip_wb`](@ref)
-  - [`set_all_smip_constraints!`](@ref)
-  - [`set_scardmip_constraints!`](@ref)
-  - [`get_mip_ss`](@ref)
-  - [`WeightBounds`](@ref)
-"""
-function smip_constraints(model::JuMP.Model, wb::WeightBounds, smtx::Option{<:MatNum},
-                          lt::Option{<:Threshold}, ss::Option{<:Number}, lt_flag::Bool,
-                          key1::Symbol = :sib_, key2::Symbol = :i_smip_,
-                          key3::Symbol = :isbf_, key4::Symbol = :smtx_expr_,
-                          key5::Symbol = :set_w_mip_, key6::Symbol = :w_smip_lt_,
-                          i::Integer = 1)
-    w = get_w(model)
-    k = get_k(model)
-    sc = get_constraint_scale(model)
-    N = size(smtx, 1)
-    sib = model[Symbol(key1, i)] = JuMP.@variable(model, [1:N], binary = true)
-    i_smip = if isa(k, Number)
-        model[Symbol(key2, i)] = JuMP.@expression(model, sib)
-    else
-        JuMP.@expression(model, ss, get_mip_ss(ss, wb))
-        isbf = model[Symbol(key3, i)] = JuMP.@variable(model, [1:N], lower_bound = 0)
-        model[Symbol(key3, :_ub_, i)], model[Symbol(key3, :d_ub_, i)], model[Symbol(key3, :d_lb_, i)] = JuMP.@constraints(model,
-                                                                                                                          begin
-                                                                                                                              sc *
-                                                                                                                              (isbf .-
-                                                                                                                               k) <=
-                                                                                                                              0
-                                                                                                                              sc *
-                                                                                                                              (isbf -
-                                                                                                                               ss *
-                                                                                                                               sib) <=
-                                                                                                                              0
-                                                                                                                              sc *
-                                                                                                                              ((isbf +
-                                                                                                                                ss *
-                                                                                                                                (1 .-
-                                                                                                                                 sib)) .-
-                                                                                                                               k) >=
-                                                                                                                              0
-                                                                                                                          end)
-        model[Symbol(key2, i)] = JuMP.@expression(model, isbf)
-    end
-    smtx_expr = model[Symbol(key4, i)] = JuMP.@expression(model, smtx * w)
-    smip_wb(model, wb, smtx, smtx_expr, i_smip, i_smip, key5, i)
-    if lt_flag
-        model[Symbol(key6, i)] = JuMP.@constraint(model,
-                                                  sc * (smtx_expr - i_smip ⊙ lt.val) >= 0)
-    end
-    return sib
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
 Add all sub-group MIP constraints for a single or multiple selection matrices.
 
-The single-matrix method handles cardinality, group cardinality, long/short threshold, and weight-bound constraints for one sub-group. The vector method iterates over collections of cardinalities, group constraints, and selection matrices.
+The single-matrix method handles cardinality, group cardinality, long/short threshold, and weight-bound constraints for one sub-group via the shared builders ([`short_mip_threshold_constraints`](@ref), [`mip_constraints`](@ref)) on a [`SubsetMIPSpace`](@ref). The vector method iterates over collections of cardinalities, group constraints, and selection matrices.
 
 # Arguments
 
@@ -736,8 +640,8 @@ The single-matrix method handles cardinality, group cardinality, long/short thre
 
 # Related
 
-  - [`smip_constraints`](@ref)
-  - [`short_smip_threshold_constraints`](@ref)
+  - [`mip_constraints`](@ref)
+  - [`short_mip_threshold_constraints`](@ref)
   - [`set_scardmip_constraints!`](@ref)
   - [`set_sgcardmip_constraints!`](@ref)
   - [`set_smip_constraints!`](@ref)
@@ -757,12 +661,12 @@ function set_all_smip_constraints!(model::JuMP.Model, wb::WeightBounds,
         return nothing
     end
     sc = get_constraint_scale(model)
+    sp = SubsetMIPSpace(smtx, :s, i)
     sib = if st_flag && haskey(model, :sw)
-        short_smip_threshold_constraints(model, wb, smtx, lt, st, ss, lt_flag, st_flag, :si,
-                                         :smtx_expr_, :set_w_mip_, i)
+        short_mip_threshold_constraints(model, sp, wb, lt, st, nothing, nothing, ss,
+                                        lt_flag, st_flag, false, false, false)
     else
-        smip_constraints(model, wb, smtx, lt, ss, lt_flag, :sib_, :i_smip_, :isbf_,
-                         :smtx_expr_, :set_w_mip_, :w_smip_lt_, i)
+        mip_constraints(model, sp, wb, nothing, lt, ss, lt_flag, false, false)
     end
     if card_flag
         model[Symbol(:scard_, i)] = JuMP.@constraint(model, sc * (sum(sib) - card) <= 0)
@@ -816,8 +720,8 @@ The single-matrix method enforces `sum(sib) ≤ card` for one sub-group. The vec
 
 # Related
 
-  - [`smip_constraints`](@ref)
-  - [`short_smip_threshold_constraints`](@ref)
+  - [`mip_constraints`](@ref)
+  - [`short_mip_threshold_constraints`](@ref)
   - [`set_sgcardmip_constraints!`](@ref)
   - [`set_smip_constraints!`](@ref)
   - [`WeightBounds`](@ref)
@@ -833,12 +737,12 @@ function set_scardmip_constraints!(model::JuMP.Model, wb::WeightBounds,
         return nothing
     end
     sc = get_constraint_scale(model)
+    sp = SubsetMIPSpace(smtx, :s, i)
     sib = if st_flag && haskey(model, :sw)
-        short_smip_threshold_constraints(model, wb, smtx, lt, st, ss, lt_flag, st_flag, :si,
-                                         :smtx_expr_, :set_w_mip_, i)
+        short_mip_threshold_constraints(model, sp, wb, lt, st, nothing, nothing, ss,
+                                        lt_flag, st_flag, false, false, false)
     else
-        smip_constraints(model, wb, smtx, lt, ss, lt_flag, :sib_, :i_smip_, :isbf_,
-                         :smtx_expr_, :set_w_mip_, :w_smip_lt_, i)
+        mip_constraints(model, sp, wb, nothing, lt, ss, lt_flag, false, false)
     end
     model[Symbol(:scard_, i)] = JuMP.@constraint(model, sc * (sum(sib) - card) <= 0)
     return nothing
@@ -877,8 +781,8 @@ The single-matrix method enforces linear group cardinality constraints `A * sib 
 
 # Related
 
-  - [`smip_constraints`](@ref)
-  - [`short_smip_threshold_constraints`](@ref)
+  - [`mip_constraints`](@ref)
+  - [`short_mip_threshold_constraints`](@ref)
   - [`set_scardmip_constraints!`](@ref)
   - [`set_smip_constraints!`](@ref)
   - [`WeightBounds`](@ref)
@@ -895,12 +799,12 @@ function set_sgcardmip_constraints!(model::JuMP.Model, wb::WeightBounds,
         return nothing
     end
     sc = get_constraint_scale(model)
+    sp = SubsetMIPSpace(smtx, :sg, i)
     sib = if st_flag && haskey(model, :sw)
-        short_smip_threshold_constraints(model, wb, smtx, lt, st, ss, lt_flag, st_flag,
-                                         :sgi, :sgmtx_expr_, :setg_w_mip_, i)
+        short_mip_threshold_constraints(model, sp, wb, lt, st, nothing, nothing, ss,
+                                        lt_flag, st_flag, false, false, false)
     else
-        smip_constraints(model, wb, smtx, lt, ss, lt_flag, :sgib_, :i_sgmip_, :isgbf_,
-                         :sgmtx_expr_, :setg_w_mip_, :w_sgmip_lt_, i)
+        mip_constraints(model, sp, wb, nothing, lt, ss, lt_flag, false, false)
     end
     if !isnothing(gcard.ineq)
         A = gcard.ineq.A

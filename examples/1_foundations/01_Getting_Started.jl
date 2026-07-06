@@ -108,14 +108,14 @@ We can visualise the composition, cumulative returns, return distribution, and d
 the optimal portfolio.
 =#
 
-using StatsPlots, GraphRecipes #= Portfolio weights as a bar chart. =#
-
-plot_composition(res, rd) #= Cumulative returns of the optimised portfolio over the sample period. =#
-
-plot_ptf_cumulative_returns(res; pr = rd) #= Return histogram with tail-risk markers (VaR, CVaR). =#
-
-plot_histogram(res, rd) #= Drawdown time series showing peak-to-trough loss periods. =#
-
+# Portfolio weights as a bar chart.
+using StatsPlots, GraphRecipes
+# Cumulative returns of the optimised portfolio over the sample period.
+plot_composition(res, rd)
+# Return histogram with tail-risk markers (VaR, CVaR).
+plot_ptf_cumulative_returns(res, rd)
+# Drawdown time series showing peak-to-trough loss periods.
+plot_histogram(res, rd)
 plot_drawdowns(res, rd)
 
 #=
@@ -136,10 +136,12 @@ da = DiscreteAllocation(; slv = mip_slv)
 #=
 Luckily, we have the optimal weights, the latest prices are the last entry of our original time array `X`, and let's say we have `4206.9` USD to invest.
 
-The function can optionally take extra positional arguments to account for a variety of fees, but we will not use them here.
+The inputs are bundled into a `FiniteAllocationInput`, which can optionally carry a time horizon and a variety of fees, but we will not use them here.
 =#
 
-mip_res = optimise(da, res.w, vec(values(X[end])), 4206.9)
+mip_res = optimise(da,
+                   FiniteAllocationInput(; w = res.w, prices = vec(values(X[end])),
+                                         cash = 4206.9))
 
 #=
 The result of this optimisation contains different pieces of information to the previous one. The reason various fields are prefixed by `l_`or `s_` is because the discrete allocation method splits the assets into long and short positions, which are recombined in the final result.

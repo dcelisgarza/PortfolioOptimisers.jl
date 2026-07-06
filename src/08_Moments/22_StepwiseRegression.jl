@@ -40,7 +40,7 @@ PValue
     """
     t
     function PValue(t::Number)
-        @argcheck(zero(t) < t < one(t), DomainError("0 < t < 1 must hold. Got\nt => $t"))
+        assert_unit_interval(t, :t)
         return new{typeof(t)}(t)
     end
 end
@@ -52,29 +52,29 @@ $(DocStringExtensions.TYPEDEF)
 
 Stepwise regression algorithm: forward selection.
 
-`Forward` specifies the forward selection strategy for stepwise regression. In forward selection, variables are added to the model one at a time based on a criterion (such as p-value or information criterion), starting from an empty model and including the variable that most improves the model at each step. The process continues until no further improvement is possible or a stopping criterion is met.
+`ForwardSelection` specifies the forward selection strategy for stepwise regression. In forward selection, variables are added to the model one at a time based on a criterion (such as p-value or information criterion), starting from an empty model and including the variable that most improves the model at each step. The process continues until no further improvement is possible or a stopping criterion is met.
 
 # Related
 
   - [`AbstractStepwiseRegressionAlgorithm`](@ref)
-  - [`Backward`](@ref)
+  - [`BackwardElimination`](@ref)
   - [`StepwiseRegression`](@ref)
 """
-struct Forward <: AbstractStepwiseRegressionAlgorithm end
+struct ForwardSelection <: AbstractStepwiseRegressionAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
 Stepwise regression algorithm: backward elimination.
 
-`Backward` specifies the backward elimination strategy for stepwise regression. In backward elimination, all candidate variables are initially included in the model, and variables are removed one at a time based on a criterion (such as p-value or information criterion). At each step, the variable whose removal most improves the model (or least degrades it) is excluded, until no further improvement is possible or a stopping criterion is met.
+`BackwardElimination` specifies the backward elimination strategy for stepwise regression. In backward elimination, all candidate variables are initially included in the model, and variables are removed one at a time based on a criterion (such as p-value or information criterion). At each step, the variable whose removal most improves the model (or least degrades it) is excluded, until no further improvement is possible or a stopping criterion is met.
 
 # Related
 
   - [`AbstractStepwiseRegressionAlgorithm`](@ref)
-  - [`Forward`](@ref)
+  - [`ForwardSelection`](@ref)
   - [`StepwiseRegression`](@ref)
 """
-struct Backward <: AbstractStepwiseRegressionAlgorithm end
+struct BackwardElimination <: AbstractStepwiseRegressionAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -90,7 +90,7 @@ $(DocStringExtensions.FIELDS)
 
     StepwiseRegression(;
         crit::AbstractStepwiseRegressionCriterion = PValue(),
-        alg::AbstractStepwiseRegressionAlgorithm = Forward(),
+        alg::AbstractStepwiseRegressionAlgorithm = ForwardSelection(),
         tgt::AbstractRegressionTarget = LinearModel()
     ) -> StepwiseRegression
 
@@ -109,7 +109,7 @@ julia> StepwiseRegression()
 StepwiseRegression
   crit ┼ PValue
        │   t ┴ Float64: 0.05
-   alg ┼ Forward()
+   alg ┼ ForwardSelection()
    tgt ┼ LinearModel
        │   kwargs ┴ @NamedTuple{}: NamedTuple()
 ```
@@ -147,7 +147,7 @@ StepwiseRegression
     end
 end
 function StepwiseRegression(; crit::AbstractStepwiseRegressionCriterion = PValue(),
-                            alg::AbstractStepwiseRegressionAlgorithm = Forward(),
+                            alg::AbstractStepwiseRegressionAlgorithm = ForwardSelection(),
                             tgt::AbstractRegressionTarget = LinearModel())::StepwiseRegression
     return StepwiseRegression(crit, alg, tgt)
 end
@@ -206,7 +206,7 @@ function add_best_feature_after_pval_failure!(tgt::AbstractRegressionTarget,
     return nothing
 end
 """
-    _regression(re::StepwiseRegression{<:PValue, <:Forward}, x::VecNum,
+    _regression(re::StepwiseRegression{<:PValue, <:ForwardSelection}, x::VecNum,
                F::MatNum)
 
 Perform forward stepwise regression using a p-value criterion.
@@ -215,7 +215,7 @@ This method implements forward selection for stepwise regression, where variable
 
 # Arguments
 
-  - `re`: Stepwise regression estimator with a `PValue` criterion and `Forward` algorithm.
+  - `re`: Stepwise regression estimator with a `PValue` criterion and `ForwardSelection` algorithm.
   - `x`: Response vector.
   - `F`: Feature matrix (observations × variables).
 
@@ -233,10 +233,11 @@ This method implements forward selection for stepwise regression, where variable
 
   - [`StepwiseRegression`](@ref)
   - [`PValue`](@ref)
-  - [`Forward`](@ref)
+  - [`ForwardSelection`](@ref)
   - [`add_best_feature_after_pval_failure!`](@ref)
 """
-function _regression(re::StepwiseRegression{<:PValue, <:Forward}, x::VecNum, F::MatNum)
+function _regression(re::StepwiseRegression{<:PValue, <:ForwardSelection}, x::VecNum,
+                     F::MatNum)
     ovec = range(one(eltype(F)), one(eltype(F)); length = length(x))
     indices = 1:size(F, 2)
     included = Vector{eltype(indices)}(undef, 0)
@@ -357,7 +358,7 @@ function get_forward_reg_incl_excl!(::AbstractMaxValStepwiseRegressionCriteria,
 end
 """
     _regression(re::StepwiseRegression{<:AbstractMinMaxValStepwiseRegressionCriterion,
-                                      <:Forward}, x::VecNum, F::MatNum)
+                                      <:ForwardSelection}, x::VecNum, F::MatNum)
 
 Perform forward stepwise regression using a general criterion (minimization or maximization).
 
@@ -365,7 +366,7 @@ This method implements forward selection for stepwise regression, where variable
 
 # Arguments
 
-  - `re`: Stepwise regression estimator with a minimization or maximization criterion and `Forward` algorithm.
+  - `re`: Stepwise regression estimator with a minimization or maximization criterion and `ForwardSelection` algorithm.
   - `x`: Response vector.
   - `F`: Feature matrix (observations × variables).
 
@@ -385,11 +386,11 @@ This method implements forward selection for stepwise regression, where variable
   - [`StepwiseRegression`](@ref)
   - [`AbstractMinValStepwiseRegressionCriterion`](@ref)
   - [`AbstractMaxValStepwiseRegressionCriteria`](@ref)
-  - [`Forward`](@ref)
+  - [`ForwardSelection`](@ref)
   - [`get_forward_reg_incl_excl!`](@ref)
 """
 function _regression(re::StepwiseRegression{<:AbstractMinMaxValStepwiseRegressionCriterion,
-                                            <:Forward}, x::VecNum, F::MatNum)
+                                            <:ForwardSelection}, x::VecNum, F::MatNum)
     T, N = size(F)
     ovec = range(one(eltype(F)), one(eltype(F)); length = T)
     indices = 1:N
@@ -417,7 +418,7 @@ function _regression(re::StepwiseRegression{<:AbstractMinMaxValStepwiseRegressio
     return included
 end
 """
-    _regression(re::StepwiseRegression{<:PValue, <:Backward}, x::VecNum,
+    _regression(re::StepwiseRegression{<:PValue, <:BackwardElimination}, x::VecNum,
                F::MatNum)
 
 Perform backward stepwise regression using a p-value criterion.
@@ -426,7 +427,7 @@ This method implements backward elimination for stepwise regression, where all v
 
 # Arguments
 
-  - `re`: Stepwise regression estimator with a `PValue` criterion and `Backward` algorithm.
+  - `re`: Stepwise regression estimator with a `PValue` criterion and `BackwardElimination` algorithm.
   - `x`: Response vector.
   - `F`: Feature matrix (observations × variables).
 
@@ -444,10 +445,11 @@ This method implements backward elimination for stepwise regression, where all v
 
   - [`StepwiseRegression`](@ref)
   - [`PValue`](@ref)
-  - [`Backward`](@ref)
+  - [`BackwardElimination`](@ref)
   - [`add_best_feature_after_pval_failure!`](@ref)
 """
-function _regression(re::StepwiseRegression{<:PValue, <:Backward}, x::VecNum, F::MatNum)
+function _regression(re::StepwiseRegression{<:PValue, <:BackwardElimination}, x::VecNum,
+                     F::MatNum)
     ovec = range(one(eltype(F)), one(eltype(F)); length = length(x))
     fri = StatsAPI.fit(re.tgt, [ovec F], x)
     included = 1:size(F, 2)
@@ -551,7 +553,7 @@ function get_backward_reg_incl!(::AbstractMaxValStepwiseRegressionCriteria, valu
 end
 """
     _regression(re::StepwiseRegression{<:AbstractMinMaxValStepwiseRegressionCriterion,
-                                      <:Backward}, x::VecNum, F::MatNum)
+                                      <:BackwardElimination}, x::VecNum, F::MatNum)
 
 Perform backward stepwise regression using a general criterion (minimization or maximization).
 
@@ -559,7 +561,7 @@ This method implements backward elimination for stepwise regression, where all v
 
 # Arguments
 
-  - `re`: Stepwise regression estimator with a minimization or maximization criterion and `Backward` algorithm.
+  - `re`: Stepwise regression estimator with a minimization or maximization criterion and `BackwardElimination` algorithm.
   - `x`: Response vector.
   - `F`: Feature matrix (observations × variables).
 
@@ -580,11 +582,11 @@ This method implements backward elimination for stepwise regression, where all v
   - [`StepwiseRegression`](@ref)
   - [`AbstractMinValStepwiseRegressionCriterion`](@ref)
   - [`AbstractMaxValStepwiseRegressionCriteria`](@ref)
-  - [`Backward`](@ref)
+  - [`BackwardElimination`](@ref)
   - [`get_backward_reg_incl!`](@ref)
 """
 function _regression(re::StepwiseRegression{<:AbstractMinMaxValStepwiseRegressionCriterion,
-                                            <:Backward}, x::VecNum, F::MatNum)
+                                            <:BackwardElimination}, x::VecNum, F::MatNum)
     T, N = size(F)
     ovec = range(one(eltype(F)), one(eltype(F)); length = T)
     included = collect(1:N)
@@ -664,4 +666,4 @@ function regression(re::StepwiseRegression, X::MatNum, F::MatNum)
     return Regression(; b = view(rr, :, 1), M = view(rr, :, 2:cols))
 end
 
-export PValue, Forward, Backward, StepwiseRegression
+export PValue, ForwardSelection, BackwardElimination, StepwiseRegression

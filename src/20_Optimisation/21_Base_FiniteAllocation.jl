@@ -40,6 +40,89 @@ Matches either a [`FiniteAllocationOptimisationEstimator`](@ref) or a [`FiniteAl
 const FOptE_FOpt = Union{<:FiniteAllocationOptimisationEstimator,
                          <:FiniteAllocationOptimisationResult}
 """
+$(DocStringExtensions.TYPEDEF)
+
+Problem data fed to a finite allocation optimiser.
+
+`FiniteAllocationInput` bundles the inputs shared by every finite allocation optimiser — the target continuous weights, current asset prices, cash budget, and optional time horizon and fees — into a single value passed as the second argument to [`optimise`](@ref). It is consumed by both [`DiscreteAllocation`](@ref) and [`GreedyAllocation`](@ref).
+
+It subtypes [`AbstractEstimator`](@ref) rather than the [`FiniteAllocationOptimisationResult`](@ref) tree: it is the *input* to an allocation, not a computed output, and is deliberately kept clear of the `OptimisationResult` dispatch surface (plotting, result `factory`) that its fields cannot honour. See ADR 0017.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    FiniteAllocationInput(;
+        w::VecNum,
+        prices::VecNum,
+        cash::Number = 1e6,
+        horizon::Option{<:Number} = nothing,
+        fees::Option{<:Fees} = nothing
+    ) -> FiniteAllocationInput
+
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - `!isempty(w)`, `!isempty(prices)`.
+  - `length(w) == length(prices)`.
+  - `cash > 0`.
+  - `horizon` must not be `nothing` when `fees` is provided.
+
+# Related
+
+  - [`DiscreteAllocation`](@ref)
+  - [`GreedyAllocation`](@ref)
+  - [`optimise`](@ref)
+"""
+@concrete struct FiniteAllocationInput <: AbstractEstimator
+    """
+    Target (continuous) portfolio weights to be discretised.
+    """
+    w
+    """
+    Current asset prices, in the same order as `w`.
+    """
+    prices
+    """
+    Cash budget available for the allocation.
+    """
+    cash
+    """
+    Optional time horizon; used to adjust the cash budget for the fees charged over that horizon. Required when `fees` is provided.
+    """
+    horizon
+    """
+    Optional fees to charge against the allocation over `horizon`.
+    """
+    fees
+    function FiniteAllocationInput(w::VecNum, prices::VecNum, cash::Number,
+                                   horizon::Option{<:Number}, fees::Option{<:Fees})
+        @argcheck(!isempty(w), IsEmptyError("w cannot be empty"))
+        @argcheck(!isempty(prices), IsEmptyError("prices cannot be empty"))
+        @argcheck(length(w) == length(prices),
+                  DimensionMismatch("w ($(length(w))) must match prices ($(length(prices)))"))
+        @argcheck(cash > zero(cash), DomainError(cash, "cash must be > 0"))
+        if !isnothing(fees)
+            @argcheck(!isnothing(horizon),
+                      IsNothingError("horizon cannot be nothing when fees are provided"))
+        end
+        return new{typeof(w), typeof(prices), typeof(cash), typeof(horizon), typeof(fees)}(w,
+                                                                                           prices,
+                                                                                           cash,
+                                                                                           horizon,
+                                                                                           fees)
+    end
+end
+function FiniteAllocationInput(; w::VecNum, prices::VecNum, cash::Number = 1e6,
+                               horizon::Option{<:Number} = nothing,
+                               fees::Option{<:Fees} = nothing)::FiniteAllocationInput
+    return FiniteAllocationInput(w, prices, cash, horizon, fees)
+end
+export FiniteAllocationInput
+"""
     factory(res::FiniteAllocationOptimisationResult, fb::Option{<:FOptE_FOpt})
 
 Rebuild a finite allocation result with an updated fallback optimiser `fb`.

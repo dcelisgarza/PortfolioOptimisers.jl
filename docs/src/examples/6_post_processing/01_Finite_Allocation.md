@@ -10,8 +10,8 @@ An optimiser returns *continuous* weights — fractions of capital. To actually 
 whole shares at real prices under a finite cash budget, and the rounding is not free: it pulls the
 realised portfolio away from the target, and the smaller the account the more it hurts.
 `PortfolioOptimisers.jl` provides two finite-allocation optimisers — a fast solver-free heuristic
-and an exact mixed-integer one — both called through the same `optimise(allocator, w, prices, cash)`
-interface.
+and an exact mixed-integer one — both called through the same
+`optimise(allocator, FiniteAllocationInput(; w, prices, cash))` interface.
 
 - [`GreedyAllocation`](@ref) — a two-pass heuristic: round to whole (or lot-sized) shares, then
     spend the leftover cash on the largest underweights. No solver needed.
@@ -65,7 +65,8 @@ weights track the target tightly and only a few dollars go uninvested.
 
 ````@example 01_Finite_Allocation
 cash = 100_000.0
-greedy = optimise(GreedyAllocation(), res.w, prices, cash)
+greedy = optimise(GreedyAllocation(),
+                  FiniteAllocationInput(; w = res.w, prices = prices, cash = cash))
 
 drift(alloc) = sum(abs, alloc.w .- res.w)
 pretty_table(DataFrame("Asset" => rd.nx, "Target" => res.w,
@@ -85,7 +86,8 @@ gains on the table.
 ````@example 01_Finite_Allocation
 mip_slv = Solver(; name = :highs, solver = HiGHS.Optimizer,
                  settings = Dict("log_to_console" => false))
-discrete = optimise(DiscreteAllocation(; slv = mip_slv), res.w, prices, cash)
+discrete = optimise(DiscreteAllocation(; slv = mip_slv),
+                    FiniteAllocationInput(; w = res.w, prices = prices, cash = cash))
 
 pretty_table(DataFrame("Method" => ["Greedy", "Discrete (MIP)"],
                        "Leftover cash" => [greedy.cash, discrete.cash],
@@ -101,7 +103,8 @@ can even overshoot the budget (the leftover cash goes negative), which is the si
 size is too big for the account.
 
 ````@example 01_Finite_Allocation
-greedy_lots = optimise(GreedyAllocation(; unit = 10), res.w, prices, cash)
+greedy_lots = optimise(GreedyAllocation(; unit = 10),
+                       FiniteAllocationInput(; w = res.w, prices = prices, cash = cash))
 
 pretty_table(DataFrame("Allocation" => ["Single shares", "Lots of 10"],
                        "Leftover cash" => [greedy.cash, greedy_lots.cash],
@@ -117,7 +120,9 @@ on a small account, the *choice* of finite-allocation method (and lot size) matt
 
 ````@example 01_Finite_Allocation
 budgets = [100_000.0, 25_000.0, 5_000.0]
-budget_allocs = [optimise(GreedyAllocation(), res.w, prices, c) for c in budgets]
+budget_allocs = [optimise(GreedyAllocation(),
+                          FiniteAllocationInput(; w = res.w, prices = prices, cash = c))
+                 for c in budgets]
 
 pretty_table(DataFrame("Budget" => budgets,
                        "Leftover cash" => [a.cash for a in budget_allocs],
@@ -127,7 +132,7 @@ pretty_table(DataFrame("Budget" => budgets,
 ````
 
 Both allocators also accept a [`Fees`](@ref) argument, so the share counts can be chosen net of
-transaction costs (see [Fees and Net Returns](../4_constraints_costs/05_Fees_and_Net_Returns.md)).
+transaction costs (see [Fees and Net Returns](../4_constraints_costs/06_Fees_and_Net_Returns.md)).
 
 ## 6. Target vs realised
 

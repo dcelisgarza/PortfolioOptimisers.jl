@@ -39,7 +39,7 @@ pr = prior(HighOrderPriorEstimator(), rd)
 clr = clusterise(ClustersEstimator(), pr)
 w0 = range(; start = inv(size(pr.X, 2)), stop = inv(size(pr.X, 2)), length = size(pr.X, 2))
 opt = HierarchicalOptimiser(; pe = pr, cle = clr, slv = slv)
-rs = [EqualRiskMeasure(), Variance(), StandardDeviation(), UncertaintySetVariance(),
+rs = [EqualRisk(), Variance(), StandardDeviation(), UncertaintySetVariance(),
       LowOrderMoment(), HighOrderMoment(), Kurtosis(), NegativeSkewness(), ValueatRisk(),
       ValueatRiskRange(), ConditionalValueatRisk(),
       DistributionallyRobustConditionalValueatRisk(), ConditionalValueatRiskRange(),
@@ -50,13 +50,12 @@ rs = [EqualRiskMeasure(), Variance(), StandardDeviation(), UncertaintySetVarianc
       RelativeRelativisticDrawdownatRisk(), AverageDrawdown(), RelativeAverageDrawdown(),
       TurnoverRiskMeasure(; w = w0), TrackingRiskMeasure(; tr = WeightsTracking(; w = w0)),
       RiskTrackingRiskMeasure(; r = StandardDeviation(), tr = WeightsTracking(; w = w0)),
-      TrackingRiskMeasure(; tr = WeightsTracking(; w = w0), alg = L1Tracking()),
+      TrackingRiskMeasure(; tr = WeightsTracking(; w = w0), alg = L1Norm()),
       RiskTrackingRiskMeasure(; r = StandardDeviation(), tr = WeightsTracking(; w = w0),
-                              alg = DependentVariableTracking()), RiskRatioRiskMeasure(),
+                              alg = DependentVariableTracking()), RiskRatio(),
       MedianAbsoluteDeviation(),
-      TrackingRiskMeasure(; tr = WeightsTracking(; w = w0), alg = LpTracking()),
-      TrackingRiskMeasure(; tr = WeightsTracking(; w = w0), alg = LpTracking(; p = -10)),
-      TrackingRiskMeasure(; tr = WeightsTracking(; w = w0),
-                          alg = LInfTracking(; pos = false)),
-      TrackingRiskMeasure(; tr = WeightsTracking(; w = w0), alg = LpTracking(; p = 10)),
-      TrackingRiskMeasure(; tr = WeightsTracking(; w = w0), alg = LInfTracking())]
+      TrackingRiskMeasure(; tr = WeightsTracking(; w = w0), alg = LpNorm()),
+      TrackingRiskMeasure(; tr = WeightsTracking(; w = w0), alg = LpNorm(; p = -10)),
+      TrackingRiskMeasure(; tr = WeightsTracking(; w = w0), alg = LInfNorm(; pos = false)),
+      TrackingRiskMeasure(; tr = WeightsTracking(; w = w0), alg = LpNorm(; p = 10)),
+      TrackingRiskMeasure(; tr = WeightsTracking(; w = w0), alg = LInfNorm())]

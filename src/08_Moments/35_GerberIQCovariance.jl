@@ -64,7 +64,7 @@ All concrete and/or abstract types implementing Gerber Information Quality param
 """
 abstract type GerberIQEpsEstimator <: AbstractEstimator end
 """
-    const GerberIQEps = Union{<:Number, Function, <:GerberIQEpsEstimator}
+    const GerberIQEps = Union{<:Number, <:Function, <:GerberIQEpsEstimator}
 
 A type alias for the union of `Number`, `Function`, and `GerberIQEpsEstimator` used for Gerber Information Quality lookback and delay parameter definitions.
 
@@ -76,7 +76,7 @@ A type alias for the union of `Number`, `Function`, and `GerberIQEpsEstimator` u
 
   - [gerber2025squeezing](@cite) Gerber, Sander and Smyth, William and Markowitz, Harry and Miao, Yinsen and Ernst, Philip and Sargen, Paul, *Squeezing Financial Noise: A Novel Approach to Covariance Matrix Estimation* (December 01, 2025). Available at SSRN: https://ssrn.com/abstract=4986939 or http://dx.doi.org/10.2139/ssrn.4986939
 """
-const GerberIQEps = Union{<:Number, Function, <:GerberIQEpsEstimator}
+const GerberIQEps = Union{<:Number, <:Function, <:GerberIQEpsEstimator}
 """
     gerber_iq_eps(e::Number, ::MatNum) -> Number
     gerber_iq_eps(e::Function, X::MatNum) -> Number
@@ -298,7 +298,8 @@ julia> struct GaussianDecay{T} <: PortfolioOptimisers.GerberIQDecayEstimator
            a::T
            function GaussianDecay(a::Union{Nothing, <:Number})
                if isa(a, Number)
-                   @assert(a >= 0)
+                   PortfolioOptimisers.@argcheck(a >= 0,
+                                                 DomainError(a, "`a` must be non-negative"))
                end
                return new{typeof(a)}(a)
            end
@@ -626,7 +627,7 @@ BasicGerberIQ
     n
     function BasicGerberIQ(d::Number, n::Number)
         assert_nonempty_nonneg_finite_val(d, :d)
-        @argcheck(zero(n) <= n <= one(n))
+        @argcheck(zero(n) <= n <= one(n), DomainError(n, "n must be in [0, 1]"))
         return new{typeof(d), typeof(n)}(d, n)
     end
 end
@@ -654,7 +655,8 @@ Asserts that `c <= kind.d`, where `c` is the small movement threshold and `d` th
   - [gerber2025squeezing](@cite) Gerber, Sander and Smyth, William and Markowitz, Harry and Miao, Yinsen and Ernst, Philip and Sargen, Paul, *Squeezing Financial Noise: A Novel Approach to Covariance Matrix Estimation* (December 01, 2025). Available at SSRN: https://ssrn.com/abstract=4986939 or http://dx.doi.org/10.2139/ssrn.4986939
 """
 function gerber_iq_assert_c_d(c::Number, kind::BasicGerberIQ)
-    @argcheck(c <= kind.d)
+    @argcheck(c <= kind.d,
+              DomainError("c must be <= kind.d, got c = $c, kind.d = $(kind.d)"))
     return nothing
 end
 """
@@ -857,16 +859,16 @@ PartialGerberIQ
         assert_nonempty_nonneg_finite_val(dcn, :dcn)
         assert_nonempty_nonneg_finite_val(ddp, :ddp)
         assert_nonempty_nonneg_finite_val(ddn, :ddn)
-        @argcheck(zero(n1) <= n1 <= one(n1))
-        @argcheck(zero(n2) <= n2 <= one(n2))
-        @argcheck(zero(n3) <= n3 <= one(n3))
-        @argcheck(zero(n4) <= n4 <= one(n4))
-        @argcheck(zero(n5) <= n5 <= one(n5))
-        @argcheck(zero(n6) <= n6 <= one(n6))
-        @argcheck(zero(n7) <= n7 <= one(n7))
-        @argcheck(zero(n8) <= n8 <= one(n8))
-        @argcheck(zero(n9) <= n9 <= one(n9))
-        @argcheck(zero(n10) <= n10 <= one(n10))
+        @argcheck(zero(n1) <= n1 <= one(n1), DomainError(n1, "n1 must be in [0, 1]"))
+        @argcheck(zero(n2) <= n2 <= one(n2), DomainError(n2, "n2 must be in [0, 1]"))
+        @argcheck(zero(n3) <= n3 <= one(n3), DomainError(n3, "n3 must be in [0, 1]"))
+        @argcheck(zero(n4) <= n4 <= one(n4), DomainError(n4, "n4 must be in [0, 1]"))
+        @argcheck(zero(n5) <= n5 <= one(n5), DomainError(n5, "n5 must be in [0, 1]"))
+        @argcheck(zero(n6) <= n6 <= one(n6), DomainError(n6, "n6 must be in [0, 1]"))
+        @argcheck(zero(n7) <= n7 <= one(n7), DomainError(n7, "n7 must be in [0, 1]"))
+        @argcheck(zero(n8) <= n8 <= one(n8), DomainError(n8, "n8 must be in [0, 1]"))
+        @argcheck(zero(n9) <= n9 <= one(n9), DomainError(n9, "n9 must be in [0, 1]"))
+        @argcheck(zero(n10) <= n10 <= one(n10), DomainError(n10, "n10 must be in [0, 1]"))
         return new{typeof(dcp), typeof(dcn), typeof(ddp), typeof(ddn), typeof(n1),
                    typeof(n2), typeof(n3), typeof(n4), typeof(n5), typeof(n6), typeof(n7),
                    typeof(n8), typeof(n9), typeof(n10)}(dcp, dcn, ddp, ddn, n1, n2, n3, n4,
@@ -1200,27 +1202,27 @@ FullGerberIQ
         assert_nonempty_nonneg_finite_val(dn2, :dn2)
         dp2, dp1 = extrema((dp1, dp2))
         dn2, dn1 = extrema((dn1, dn2))
-        @argcheck(zero(n1) <= n1 <= one(n1))
-        @argcheck(zero(n2) <= n2 <= one(n2))
-        @argcheck(zero(n3) <= n3 <= one(n3))
-        @argcheck(zero(n4) <= n4 <= one(n4))
-        @argcheck(zero(n5) <= n5 <= one(n5))
-        @argcheck(zero(n6) <= n6 <= one(n6))
-        @argcheck(zero(n7) <= n7 <= one(n7))
-        @argcheck(zero(n8) <= n8 <= one(n8))
-        @argcheck(zero(n9) <= n9 <= one(n9))
-        @argcheck(zero(n10) <= n10 <= one(n10))
-        @argcheck(zero(n11) <= n11 <= one(n11))
-        @argcheck(zero(n12) <= n12 <= one(n12))
-        @argcheck(zero(n13) <= n13 <= one(n13))
-        @argcheck(zero(n14) <= n14 <= one(n14))
-        @argcheck(zero(n15) <= n15 <= one(n15))
-        @argcheck(zero(n16) <= n16 <= one(n16))
-        @argcheck(zero(n17) <= n17 <= one(n17))
-        @argcheck(zero(n18) <= n18 <= one(n18))
-        @argcheck(zero(n19) <= n19 <= one(n19))
-        @argcheck(zero(n20) <= n20 <= one(n20))
-        @argcheck(zero(n21) <= n21 <= one(n21))
+        @argcheck(zero(n1) <= n1 <= one(n1), DomainError(n1, "n1 must be in [0, 1]"))
+        @argcheck(zero(n2) <= n2 <= one(n2), DomainError(n2, "n2 must be in [0, 1]"))
+        @argcheck(zero(n3) <= n3 <= one(n3), DomainError(n3, "n3 must be in [0, 1]"))
+        @argcheck(zero(n4) <= n4 <= one(n4), DomainError(n4, "n4 must be in [0, 1]"))
+        @argcheck(zero(n5) <= n5 <= one(n5), DomainError(n5, "n5 must be in [0, 1]"))
+        @argcheck(zero(n6) <= n6 <= one(n6), DomainError(n6, "n6 must be in [0, 1]"))
+        @argcheck(zero(n7) <= n7 <= one(n7), DomainError(n7, "n7 must be in [0, 1]"))
+        @argcheck(zero(n8) <= n8 <= one(n8), DomainError(n8, "n8 must be in [0, 1]"))
+        @argcheck(zero(n9) <= n9 <= one(n9), DomainError(n9, "n9 must be in [0, 1]"))
+        @argcheck(zero(n10) <= n10 <= one(n10), DomainError(n10, "n10 must be in [0, 1]"))
+        @argcheck(zero(n11) <= n11 <= one(n11), DomainError(n11, "n11 must be in [0, 1]"))
+        @argcheck(zero(n12) <= n12 <= one(n12), DomainError(n12, "n12 must be in [0, 1]"))
+        @argcheck(zero(n13) <= n13 <= one(n13), DomainError(n13, "n13 must be in [0, 1]"))
+        @argcheck(zero(n14) <= n14 <= one(n14), DomainError(n14, "n14 must be in [0, 1]"))
+        @argcheck(zero(n15) <= n15 <= one(n15), DomainError(n15, "n15 must be in [0, 1]"))
+        @argcheck(zero(n16) <= n16 <= one(n16), DomainError(n16, "n16 must be in [0, 1]"))
+        @argcheck(zero(n17) <= n17 <= one(n17), DomainError(n17, "n17 must be in [0, 1]"))
+        @argcheck(zero(n18) <= n18 <= one(n18), DomainError(n18, "n18 must be in [0, 1]"))
+        @argcheck(zero(n19) <= n19 <= one(n19), DomainError(n19, "n19 must be in [0, 1]"))
+        @argcheck(zero(n20) <= n20 <= one(n20), DomainError(n20, "n20 must be in [0, 1]"))
+        @argcheck(zero(n21) <= n21 <= one(n21), DomainError(n21, "n21 must be in [0, 1]"))
         return new{typeof(dp1), typeof(dp2), typeof(dn1), typeof(dn2), typeof(n1),
                    typeof(n2), typeof(n3), typeof(n4), typeof(n5), typeof(n6), typeof(n7),
                    typeof(n8), typeof(n9), typeof(n10), typeof(n11), typeof(n12),
@@ -1268,17 +1270,17 @@ Asserts that all `c <= kind.d**`, where `c` is the small movement threshold and 
   - [gerber2025squeezing](@cite) Gerber, Sander and Smyth, William and Markowitz, Harry and Miao, Yinsen and Ernst, Philip and Sargen, Paul, *Squeezing Financial Noise: A Novel Approach to Covariance Matrix Estimation* (December 01, 2025). Available at SSRN: https://ssrn.com/abstract=4986939 or http://dx.doi.org/10.2139/ssrn.4986939
 """
 function gerber_iq_assert_c_d(c::Number, kind::PartialGerberIQ)
-    @argcheck(c <= kind.dcp)
-    @argcheck(c <= kind.dcn)
-    @argcheck(c <= kind.ddp)
-    @argcheck(c <= kind.ddn)
+    @argcheck(c <= kind.dcp, DomainError("c ($c) must be <= kind.dcp ($(kind.dcp))"))
+    @argcheck(c <= kind.dcn, DomainError("c ($c) must be <= kind.dcn ($(kind.dcn))"))
+    @argcheck(c <= kind.ddp, DomainError("c ($c) must be <= kind.ddp ($(kind.ddp))"))
+    @argcheck(c <= kind.ddn, DomainError("c ($c) must be <= kind.ddn ($(kind.ddn))"))
     return nothing
 end
 function gerber_iq_assert_c_d(c::Number, kind::FullGerberIQ)
-    @argcheck(c <= kind.dp1)
-    @argcheck(c <= kind.dp2)
-    @argcheck(c <= kind.dn1)
-    @argcheck(c <= kind.dn2)
+    @argcheck(c <= kind.dp1, DomainError("c ($c) must be <= kind.dp1 ($(kind.dp1))"))
+    @argcheck(c <= kind.dp2, DomainError("c ($c) must be <= kind.dp2 ($(kind.dp2))"))
+    @argcheck(c <= kind.dn1, DomainError("c ($c) must be <= kind.dn1 ($(kind.dn1))"))
+    @argcheck(c <= kind.dn2, DomainError("c ($c) must be <= kind.dn2 ($(kind.dn2))"))
     return nothing
 end
 """
@@ -1560,6 +1562,85 @@ function gerber_IQ_delta(xi::Number, xj::Number, axi::Number, axj::Number,
     return w * p
 end
 """
+$(DocStringExtensions.TYPEDEF)
+
+Co-movement policy for [`gerber_comovement!`](@ref) implementing the Gerber IQ family.
+
+Observations are thresholded against the pair's scaled thresholds from [`gerber_iq_scaling`](@ref), classified by the sign of the product of returns, and weighted by the IQ noise-compression template and temporal decay via [`gerber_IQ_delta`](@ref). The `alg` marker selects the denominator policy ([`comovement_ratio`](@ref)).
+
+# Fields
+
+  - `alg`: Gerber algorithm marker selecting the denominator policy.
+  - `kind`: Gerber IQ noise-compression template.
+  - `decay`: Regenerated temporal decay estimator.
+  - `sc`: Threshold scaling factor estimator.
+  - `c`: Small co-movement threshold.
+  - `sd`: Vector of asset standard deviations.
+
+# Related
+
+  - [`GerberIQCovariance`](@ref)
+  - [`gerber_IQ`](@ref)
+  - [`gerber_comovement!`](@ref)
+"""
+struct GerberIQKernel{T1 <: GerberCovarianceAlgorithm, T2 <: GerberIQCovarianceAlgorithm,
+                      T3 <: GerberIQDecayEstimator, T4, T5 <: Number, T6 <: ArrNum}
+    alg::T1
+    kind::T2
+    decay::T3
+    sc::T4
+    c::T5
+    sd::T6
+end
+@inline function comovement_pair_state(pol::GerberIQKernel, i::Integer, j::Integer)
+    sci, scj = gerber_iq_scaling(pol.sc, pol.sd[i], pol.sd[j])
+    return (sci = sci, scj = scj, ci = sci * pol.c, cj = scj * pol.c)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Accumulate a neutral (one-sided) observation into the Gerber IQ pair accumulator.
+
+Only [`Gerber1`](@ref) tracks neutral co-movements, adding the [`gerber_IQ_delta`](@ref) weight to the neutral score; the fall-through method returns the accumulator unchanged.
+
+# Related
+
+  - [`comovement_step`](@ref)
+"""
+@inline function iq_add_neutral(pol::GerberIQKernel{<:Gerber1}, acc, st, xi::Number,
+                                xj::Number, axi::Number, axj::Number, T::Integer,
+                                k::Integer)
+    return (; acc...,
+            nn = acc.nn +
+                 gerber_IQ_delta(xi, xj, axi, axj, pol.decay, T, k, st.sci, st.scj,
+                                 pol.kind))
+end
+@inline function iq_add_neutral(::GerberIQKernel, acc, args...)
+    return acc
+end
+@inline function comovement_step(pol::GerberIQKernel, acc, st, xi::Number, xj::Number,
+                                 T::Integer, k::Integer)
+    axi = abs(xi)
+    axj = abs(xj)
+    if axi < st.ci && axj < st.cj
+        return acc
+    end
+    return if axi >= st.ci && axj >= st.cj && xi * xj > zero(xi)
+        (; acc...,
+         pos = acc.pos +
+               gerber_IQ_delta(xi, xj, axi, axj, pol.decay, T, k, st.sci, st.scj, pol.kind))
+    elseif axi >= st.ci && axj >= st.cj && xi * xj < zero(xi)
+        (; acc...,
+         neg = acc.neg +
+               gerber_IQ_delta(xi, xj, axi, axj, pol.decay, T, k, st.sci, st.scj, pol.kind))
+    else
+        iq_add_neutral(pol, acc, st, xi, xj, axi, axj, T, k)
+    end
+end
+@inline function comovement_finalise(pol::GerberIQKernel, acc, ::Type{T}) where {T}
+    return comovement_ratio(pol.alg, acc.pos, acc.neg, acc.nn, T)
+end
+"""
     gerber_IQ(
         ce::GerberIQCovariance,
         X::MatNum,
@@ -1633,6 +1714,8 @@ Where:
 # Related
 
   - [`GerberIQCovariance`](@ref)
+  - [`GerberIQKernel`](@ref)
+  - [`gerber_comovement!`](@ref)
   - [`Gerber0`](@ref)
   - [`Gerber1`](@ref)
   - [`Gerber2`](@ref)
@@ -1645,132 +1728,13 @@ Where:
 
   - [gerber2025squeezing](@cite) Gerber, Sander and Smyth, William and Markowitz, Harry and Miao, Yinsen and Ernst, Philip and Sargen, Paul, *Squeezing Financial Noise: A Novel Approach to Covariance Matrix Estimation* (December 01, 2025). Available at SSRN: https://ssrn.com/abstract=4986939 or http://dx.doi.org/10.2139/ssrn.4986939
 """
-function gerber_IQ(ce::GerberIQCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                          <:Gerber0}, X::MatNum, sd::ArrNum)
-    T, N = size(X)
+function gerber_IQ(ce::GerberIQCovariance, X::MatNum, sd::ArrNum)
+    N = size(X, 2)
     rho = Matrix{eltype(X)}(undef, N, N)
-    (; c, decay, sc, kind, ex) = ce
-    decay = regenerate_decay(decay, X)
-    let decay = decay
-        FLoops.@floop ex for j in axes(X, 2)
-            sdj = sd[j]
-            for i in 1:j
-                sdi = sd[i]
-                sci, scj = gerber_iq_scaling(sc, sdi, sdj)
-                ci, cj = sci * c, scj * c
-                neg = zero(eltype(X))
-                pos = zero(eltype(X))
-                for k in 1:T
-                    xi = X[k, i]
-                    xj = X[k, j]
-                    axi = abs(xi)
-                    axj = abs(xj)
-                    if axi < ci && axj < cj
-                        continue
-                    end
-                    if axi >= ci && axj >= cj && xi * xj > zero(xi)
-                        pos += gerber_IQ_delta(xi, xj, axi, axj, decay, T, k, sci, scj,
-                                               kind)
-                    elseif axi >= ci && axj >= cj && xi * xj < zero(xi)
-                        neg += gerber_IQ_delta(xi, xj, axi, axj, decay, T, k, sci, scj,
-                                               kind)
-                    end
-                end
-                den = (pos + neg)
-                rho[j, i] = rho[i, j] = if !iszero(den)
-                    (pos - neg) / den
-                else
-                    zero(eltype(X))
-                end
-            end
-        end
-    end
-    posdef!(ce.pdm, rho)
-    return rho
-end
-function gerber_IQ(ce::GerberIQCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                          <:Gerber1}, X::MatNum, sd::ArrNum)
-    T, N = size(X)
-    rho = Matrix{eltype(X)}(undef, N, N)
-    (; c, decay, sc, kind, ex) = ce
-    decay = regenerate_decay(decay, X)
-    let decay = decay
-        FLoops.@floop ex for j in axes(X, 2)
-            sdj = sd[j]
-            for i in 1:j
-                sdi = sd[i]
-                sci, scj = gerber_iq_scaling(sc, sdi, sdj)
-                ci, cj = sci * c, scj * c
-                neg = zero(eltype(X))
-                pos = zero(eltype(X))
-                nn = zero(eltype(X))
-                for k in 1:T
-                    xi = X[k, i]
-                    xj = X[k, j]
-                    axi = abs(xi)
-                    axj = abs(xj)
-                    if axi < ci && axj < cj
-                        continue
-                    end
-                    if axi >= ci && axj >= cj && xi * xj > zero(xi)
-                        pos += gerber_IQ_delta(xi, xj, axi, axj, decay, T, k, sci, scj,
-                                               kind)
-                    elseif axi >= ci && axj >= cj && xi * xj < zero(xi)
-                        neg += gerber_IQ_delta(xi, xj, axi, axj, decay, T, k, sci, scj,
-                                               kind)
-                    else
-                        nn += gerber_IQ_delta(xi, xj, axi, axj, decay, T, k, sci, scj, kind)
-                    end
-                end
-                den = (pos + neg + nn)
-                rho[j, i] = rho[i, j] = if !iszero(den)
-                    (pos - neg) / den
-                else
-                    zero(eltype(X))
-                end
-            end
-        end
-    end
-    posdef!(ce.pdm, rho)
-    return rho
-end
-function gerber_IQ(ce::GerberIQCovariance{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                          <:Gerber2}, X::MatNum, sd::ArrNum)
-    T, N = size(X)
-    rho = Matrix{eltype(X)}(undef, N, N)
-    (; c, decay, sc, kind, ex) = ce
-    decay = regenerate_decay(decay, X)
-    let decay = decay
-        FLoops.@floop ex for j in axes(X, 2)
-            sdj = sd[j]
-            for i in 1:j
-                sdi = sd[i]
-                sci, scj = gerber_iq_scaling(sc, sdi, sdj)
-                ci, cj = sci * c, scj * c
-                neg = zero(eltype(X))
-                pos = zero(eltype(X))
-                for k in 1:T
-                    xi = X[k, i]
-                    xj = X[k, j]
-                    axi = abs(xi)
-                    axj = abs(xj)
-                    if axi < ci && axj < cj
-                        continue
-                    end
-                    if axi >= ci && axj >= cj && xi * xj > zero(xi)
-                        pos += gerber_IQ_delta(xi, xj, axi, axj, decay, T, k, sci, scj,
-                                               kind)
-                    elseif axi >= ci && axj >= cj && xi * xj < zero(xi)
-                        neg += gerber_IQ_delta(xi, xj, axi, axj, decay, T, k, sci, scj,
-                                               kind)
-                    end
-                end
-                rho[j, i] = rho[i, j] = (pos - neg)
-            end
-        end
-    end
-    h = max.(sqrt.(LinearAlgebra.diag(rho)), sqrt(eps(eltype(rho))))
-    rho .= LinearAlgebra.Symmetric(rho ⊘ (h * transpose(h)), :U)
+    decay = regenerate_decay(ce.decay, X)
+    pol = GerberIQKernel(ce.alg, ce.kind, decay, ce.sc, ce.c, sd)
+    gerber_comovement!(rho, ce.ex, X, pol)
+    standardise_comovement!(ce.alg, rho)
     posdef!(ce.pdm, rho)
     return rho
 end
@@ -1819,7 +1783,7 @@ This method computes the Gerber IQ correlation matrix for the input data matrix 
   - [gerber2025squeezing](@cite) Gerber, Sander and Smyth, William and Markowitz, Harry and Miao, Yinsen and Ernst, Philip and Sargen, Paul, *Squeezing Financial Noise: A Novel Approach to Covariance Matrix Estimation* (December 01, 2025). Available at SSRN: https://ssrn.com/abstract=4986939 or http://dx.doi.org/10.2139/ssrn.4986939
 """
 function Statistics.cor(ce::GerberIQCovariance, X::MatNum; dims::Int = 1, kwargs...)
-    @argcheck(dims in (1, 2))
+    @argcheck(dims in (1, 2), DomainError(dims, "dims must be 1 or 2"))
     if dims == 2
         X = transpose(X)
     end
@@ -1873,7 +1837,7 @@ This method computes the Gerber IQ covariance matrix for the input data matrix `
   - [gerber2025squeezing](@cite) Gerber, Sander and Smyth, William and Markowitz, Harry and Miao, Yinsen and Ernst, Philip and Sargen, Paul, *Squeezing Financial Noise: A Novel Approach to Covariance Matrix Estimation* (December 01, 2025). Available at SSRN: https://ssrn.com/abstract=4986939 or http://dx.doi.org/10.2139/ssrn.4986939
 """
 function Statistics.cov(ce::GerberIQCovariance, X::MatNum; dims::Int = 1, kwargs...)
-    @argcheck(dims in (1, 2))
+    @argcheck(dims in (1, 2), DomainError(dims, "dims must be 1 or 2"))
     if dims == 2
         X = transpose(X)
     end

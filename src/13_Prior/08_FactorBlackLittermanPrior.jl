@@ -54,7 +54,7 @@ FactorBlackLittermanPrior
              │           │      │    ce ┼ GeneralCovariance
              │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
              │           │      │       │    w ┴ nothing
-             │           │      │   alg ┴ Full()
+             │           │      │   alg ┴ FullMoment()
              │           │   mp ┼ MatrixProcessing
              │           │      │     pdm ┼ Posdef
              │           │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
@@ -85,7 +85,7 @@ FactorBlackLittermanPrior
           re ┼ StepwiseRegression
              │   crit ┼ PValue
              │        │   t ┴ Float64: 0.05
-             │    alg ┼ Forward()
+             │    alg ┼ ForwardSelection()
              │    tgt ┼ LinearModel
              │        │   kwargs ┴ @NamedTuple{}: NamedTuple()
           ve ┼ SimpleVariance
@@ -284,12 +284,13 @@ Where:
 """
 function prior(pe::FactorBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int = 1,
                strict::Bool = false, kwargs...)
-    @argcheck(dims in (1, 2))
+    @argcheck(dims in (1, 2), DomainError(dims, "dims must be 1 or 2"))
     if dims == 2
         X = transpose(X)
         F = transpose(F)
     end
-    @argcheck(length(pe.sets.dict[pe.sets.key]) == size(F, 2))
+    @argcheck(length(pe.sets.dict[pe.sets.key]) == size(F, 2),
+              DimensionMismatch("length(pe.sets.dict[pe.sets.key]) ($(length(pe.sets.dict[pe.sets.key]))) must match size(F, 2) ($(size(F, 2)))"))
     # Factor prior.
     f_prior = prior(pe.pe, F; strict = strict)
     prior_mu, prior_sigma = f_prior.mu, f_prior.sigma
@@ -301,7 +302,8 @@ function prior(pe::FactorBlackLittermanPrior, X::MatNum, F::MatNum; dims::Int = 
                                       size(X, 1), eltype(posterior_X), strict)
     prior_mu = if !isnothing(pe.l)
         w = if !isnothing(pe.w)
-            @argcheck(length(pe.w) == size(X, 2))
+            @argcheck(length(pe.w) == size(X, 2),
+                      DimensionMismatch("length(pe.w) ($(length(pe.w))) must match size(X, 2) ($(size(X, 2)))"))
             pe.w
         else
             iN = inv(size(X, 2))

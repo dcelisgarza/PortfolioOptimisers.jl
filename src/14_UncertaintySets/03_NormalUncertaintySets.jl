@@ -17,6 +17,7 @@ $(DocStringExtensions.FIELDS)
         rng::Random.AbstractRNG = Random.default_rng(),
         seed::Option{<:Integer} = nothing,
         ens::Option{<:Number} = nothing,
+        pdm::Option{<:AbstractPosdefEstimator} = Posdef(),
         kwargs::NamedTuple = (;),
     ) -> NormalUncertaintySet
 
@@ -40,7 +41,7 @@ NormalUncertaintySet
          │           │      │    ce ┼ GeneralCovariance
          │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
          │           │      │       │    w ┴ nothing
-         │           │      │   alg ┴ Full()
+         │           │      │   alg ┴ FullMoment()
          │           │   mp ┼ MatrixProcessing
          │           │      │     pdm ┼ Posdef
          │           │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
@@ -58,6 +59,9 @@ NormalUncertaintySet
      rng ┼ Random.TaskLocalRNG: Random.TaskLocalRNG()
     seed ┼ nothing
      ens ┼ nothing
+     pdm ┼ Posdef
+         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+         │   kwargs ┴ @NamedTuple{}: NamedTuple()
   kwargs ┴ @NamedTuple{}: NamedTuple()
 ```
 
@@ -99,6 +103,10 @@ NormalUncertaintySet
     """
     ens
     """
+    $(field_dict[:pdm])
+    """
+    pdm
+    """
     $(field_dict[:kwargs])
     """
     kwargs
@@ -106,12 +114,14 @@ NormalUncertaintySet
                                   alg::AbstractUncertaintySetAlgorithm, n_sim::Integer,
                                   q::Number, rng::Random.AbstractRNG,
                                   seed::Option{<:Integer}, ens::Option{<:Number},
+                                  pdm::Option{<:AbstractPosdefEstimator},
                                   kwargs::NamedTuple)
-        @argcheck(zero(n_sim) < n_sim)
-        @argcheck(zero(q) < q < one(q))
+        @argcheck(zero(n_sim) < n_sim, DomainError(n_sim, "n_sim must be > 0"))
+        assert_unit_interval(q, :q)
         return new{typeof(pe), typeof(alg), typeof(n_sim), typeof(q), typeof(rng),
-                   typeof(seed), typeof(ens), typeof(kwargs)}(pe, alg, n_sim, q, rng, seed,
-                                                              ens, kwargs)
+                   typeof(seed), typeof(ens), typeof(pdm), typeof(kwargs)}(pe, alg, n_sim,
+                                                                           q, rng, seed,
+                                                                           ens, pdm, kwargs)
     end
 end
 function NormalUncertaintySet(; pe::AbstractLowOrderPriorEstimator = EmpiricalPrior(),
@@ -120,8 +130,9 @@ function NormalUncertaintySet(; pe::AbstractLowOrderPriorEstimator = EmpiricalPr
                               rng::Random.AbstractRNG = Random.default_rng(),
                               seed::Option{<:Integer} = nothing,
                               ens::Option{<:Number} = nothing,
+                              pdm::Option{<:AbstractPosdefEstimator} = Posdef(),
                               kwargs::NamedTuple = (;))::NormalUncertaintySet
-    return NormalUncertaintySet(pe, alg, n_sim, q, rng, seed, ens, kwargs)
+    return NormalUncertaintySet(pe, alg, n_sim, q, rng, seed, ens, pdm, kwargs)
 end
 """
     commutation_matrix(X::MatNum)
@@ -209,6 +220,44 @@ function choose_scaling_parameter(ue::NormalUncertaintySet, pr::LowOrderPrior)
     end
 end
 """
+    mu_asymptotic_cov(pdm, sigma, T)
+
+Asymptotic covariance of the mean estimator, ``\\hat{\\mathbf{\\Sigma}} / T``, projected to the
+nearest positive definite matrix with `pdm`. Shared by the box and ellipsoidal
+[`NormalUncertaintySet`](@ref) constructions.
+
+# Related
+
+  - [`sigma_asymptotic_cov`](@ref)
+  - [`NormalUncertaintySet`](@ref)
+"""
+function mu_asymptotic_cov(pdm::Option{<:AbstractPosdefEstimator}, sigma::MatNum, T::Number)
+    sigma_mu = sigma / T
+    posdef!(pdm, sigma_mu)
+    return sigma_mu
+end
+"""
+    sigma_asymptotic_cov(pdm, sigma_mu, sigma, T)
+
+Asymptotic (vectorised) covariance of the covariance estimator,
+``T (\\mathbf{I} + \\mathbf{K})(\\mathbf{\\Sigma}_{\\mu} \\otimes \\mathbf{\\Sigma}_{\\mu})``,
+projected to the nearest positive definite matrix with `pdm`. `sigma_mu` is the (raw,
+pre-diagonalisation) mean asymptotic covariance from [`mu_asymptotic_cov`](@ref); `K` is the
+[`commutation_matrix`](@ref) of `sigma`.
+
+# Related
+
+  - [`mu_asymptotic_cov`](@ref)
+  - [`NormalUncertaintySet`](@ref)
+"""
+function sigma_asymptotic_cov(pdm::Option{<:AbstractPosdefEstimator}, sigma_mu::MatNum,
+                              sigma::MatNum, T::Number)
+    K = commutation_matrix(sigma)
+    sigma_sigma = T * (LinearAlgebra.I + K) * kron(sigma_mu, sigma_mu)
+    posdef!(pdm, sigma_sigma)
+    return sigma_sigma
+end
+"""
     ucs(ue::NormalUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:Any, <:Any, <:Any},
         X::MatNum,
         F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
@@ -283,8 +332,7 @@ function ucs(ue::NormalUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:Any
     T = choose_scaling_parameter(ue, pr)
     sigma = pr.sigma
     q = ue.q * 0.5
-    sigma_mu = sigma / T
-    posdef!(ue.pe.ce.mp.pdm, sigma_mu)
+    sigma_mu = mu_asymptotic_cov(ue.pdm, sigma, T)
     if !isnothing(ue.seed)
         Random.seed!(ue.rng, ue.seed)
     end
@@ -299,8 +347,8 @@ function ucs(ue::NormalUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:Any
                                                                 ue.kwargs...)
         end
     end
-    posdef!(ue.pe.ce.mp.pdm, sigma_l)
-    posdef!(ue.pe.ce.mp.pdm, sigma_u)
+    posdef!(ue.pdm, sigma_l)
+    posdef!(ue.pdm, sigma_u)
     mu_u = Distributions.cquantile(Distributions.Normal(), q) *
            sqrt.(LinearAlgebra.diag(sigma_mu)) *
            2
@@ -434,8 +482,7 @@ function sigma_ucs(ue::NormalUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm,
     T = choose_scaling_parameter(ue, pr)
     sigma = pr.sigma
     q = ue.q * 0.5
-    sigma_mu = sigma / T
-    posdef!(ue.pe.ce.mp.pdm, sigma_mu)
+    sigma_mu = mu_asymptotic_cov(ue.pdm, sigma, T)
     if !isnothing(ue.seed)
         Random.seed!(ue.rng, ue.seed)
     end
@@ -450,8 +497,8 @@ function sigma_ucs(ue::NormalUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm,
                                                                 ue.kwargs...)
         end
     end
-    posdef!(ue.pe.ce.mp.pdm, sigma_l)
-    posdef!(ue.pe.ce.mp.pdm, sigma_u)
+    posdef!(ue.pdm, sigma_l)
+    posdef!(ue.pdm, sigma_u)
     return BoxUncertaintySet(; lb = sigma_l, ub = sigma_u)
 end
 """
@@ -540,8 +587,7 @@ function ucs(ue::NormalUncertaintySet{<:Any,
     (; mu, sigma) = pr
     N = size(pr.X, 2)
     T = choose_scaling_parameter(ue, pr)
-    sigma_mu = sigma / T
-    posdef!(ue.pe.ce.mp.pdm, sigma_mu)
+    sigma_mu = mu_asymptotic_cov(ue.pdm, sigma, T)
     if !isnothing(ue.seed)
         Random.seed!(ue.rng, ue.seed)
     end
@@ -552,9 +598,7 @@ function ucs(ue::NormalUncertaintySet{<:Any,
         X_sigma[:, :, i] = sigmas[i] - sigma
     end
     X_sigma = transpose(reshape(X_sigma, N^2, :))
-    K = commutation_matrix(sigma)
-    sigma_sigma = T * (LinearAlgebra.I + K) * kron(sigma_mu, sigma_mu)
-    posdef!(ue.pe.ce.mp.pdm, sigma_sigma)
+    sigma_sigma = sigma_asymptotic_cov(ue.pdm, sigma_mu, sigma, T)
     if ue.alg.diagonal
         sigma_sigma = LinearAlgebra.Diagonal(sigma_sigma)
         sigma_mu = LinearAlgebra.Diagonal(sigma_mu)
@@ -648,11 +692,8 @@ function ucs(ue::NormalUncertaintySet{<:Any,
     pr = prior(ue.pe, X, F; dims = dims, kwargs...)
     sigma = pr.sigma
     T = choose_scaling_parameter(ue, pr)
-    sigma_mu = sigma / T
-    posdef!(ue.pe.ce.mp.pdm, sigma_mu)
-    K = commutation_matrix(sigma)
-    sigma_sigma = T * (LinearAlgebra.I + K) * kron(sigma_mu, sigma_mu)
-    posdef!(ue.pe.ce.mp.pdm, sigma_sigma)
+    sigma_mu = mu_asymptotic_cov(ue.pdm, sigma, T)
+    sigma_sigma = sigma_asymptotic_cov(ue.pdm, sigma_mu, sigma, T)
     if ue.alg.diagonal
         sigma_sigma = LinearAlgebra.Diagonal(sigma_sigma)
         sigma_mu = LinearAlgebra.Diagonal(sigma_mu)
@@ -708,11 +749,8 @@ function ucs(ue::NormalUncertaintySet{<:Any,
     pr = prior(ue.pe, X, F; dims = dims, kwargs...)
     sigma = pr.sigma
     T = choose_scaling_parameter(ue, pr)
-    sigma_mu = sigma / T
-    posdef!(ue.pe.ce.mp.pdm, sigma_mu)
-    K = commutation_matrix(sigma)
-    sigma_sigma = T * (LinearAlgebra.I + K) * kron(sigma_mu, sigma_mu)
-    posdef!(ue.pe.ce.mp.pdm, sigma_sigma)
+    sigma_mu = mu_asymptotic_cov(ue.pdm, sigma, T)
+    sigma_sigma = sigma_asymptotic_cov(ue.pdm, sigma_mu, sigma, T)
     if ue.alg.diagonal
         sigma_sigma = LinearAlgebra.Diagonal(sigma_sigma)
         sigma_mu = LinearAlgebra.Diagonal(sigma_mu)
@@ -769,8 +807,7 @@ function mu_ucs(ue::NormalUncertaintySet{<:Any,
     pr = prior(ue.pe, X, F; dims = dims, kwargs...)
     (; mu, sigma) = pr
     T = choose_scaling_parameter(ue, pr)
-    sigma_mu = sigma / T
-    posdef!(ue.pe.ce.mp.pdm, sigma_mu)
+    sigma_mu = mu_asymptotic_cov(ue.pdm, sigma, T)
     if !isnothing(ue.seed)
         Random.seed!(ue.rng, ue.seed)
     end
@@ -828,8 +865,7 @@ function mu_ucs(ue::NormalUncertaintySet{<:Any,
     pr = prior(ue.pe, X, F; dims = dims, kwargs...)
     sigma = pr.sigma
     T = choose_scaling_parameter(ue, pr)
-    sigma_mu = sigma / T
-    posdef!(ue.pe.ce.mp.pdm, sigma_mu)
+    sigma_mu = mu_asymptotic_cov(ue.pdm, sigma, T)
     if ue.alg.diagonal
         sigma_mu = LinearAlgebra.Diagonal(sigma_mu)
     end
@@ -882,8 +918,7 @@ function mu_ucs(ue::NormalUncertaintySet{<:Any,
     pr = prior(ue.pe, X, F; dims = dims, kwargs...)
     sigma = pr.sigma
     T = choose_scaling_parameter(ue, pr)
-    sigma_mu = sigma / T
-    posdef!(ue.pe.ce.mp.pdm, sigma_mu)
+    sigma_mu = mu_asymptotic_cov(ue.pdm, sigma, T)
     if ue.alg.diagonal
         sigma_mu = LinearAlgebra.Diagonal(sigma_mu)
     end
@@ -938,8 +973,7 @@ function sigma_ucs(ue::NormalUncertaintySet{<:Any,
     sigma = pr.sigma
     N = size(pr.X, 2)
     T = choose_scaling_parameter(ue, pr)
-    sigma_mu = sigma / T
-    posdef!(ue.pe.ce.mp.pdm, sigma_mu)
+    sigma_mu = mu_asymptotic_cov(ue.pdm, sigma, T)
     if !isnothing(ue.seed)
         Random.seed!(ue.rng, ue.seed)
     end
@@ -949,9 +983,7 @@ function sigma_ucs(ue::NormalUncertaintySet{<:Any,
         X_sigma[:, :, i] = sigmas[i] - sigma
     end
     X_sigma = transpose(reshape(X_sigma, N^2, :))
-    K = commutation_matrix(sigma)
-    sigma_sigma = T * (LinearAlgebra.I + K) * kron(sigma_mu, sigma_mu)
-    posdef!(ue.pe.ce.mp.pdm, sigma_sigma)
+    sigma_sigma = sigma_asymptotic_cov(ue.pdm, sigma_mu, sigma, T)
     if ue.alg.diagonal
         sigma_sigma = LinearAlgebra.Diagonal(sigma_sigma)
     end
@@ -1006,11 +1038,8 @@ function sigma_ucs(ue::NormalUncertaintySet{<:Any,
     pr = prior(ue.pe, X, F; dims = dims, kwargs...)
     sigma = pr.sigma
     T = choose_scaling_parameter(ue, pr)
-    sigma_mu = sigma / T
-    posdef!(ue.pe.ce.mp.pdm, sigma_mu)
-    K = commutation_matrix(sigma)
-    sigma_sigma = T * (LinearAlgebra.I + K) * kron(sigma_mu, sigma_mu)
-    posdef!(ue.pe.ce.mp.pdm, sigma_sigma)
+    sigma_mu = mu_asymptotic_cov(ue.pdm, sigma, T)
+    sigma_sigma = sigma_asymptotic_cov(ue.pdm, sigma_mu, sigma, T)
     if ue.alg.diagonal
         sigma_sigma = LinearAlgebra.Diagonal(sigma_sigma)
     end
@@ -1063,11 +1092,8 @@ function sigma_ucs(ue::NormalUncertaintySet{<:Any,
     pr = prior(ue.pe, X, F; dims = dims, kwargs...)
     sigma = pr.sigma
     T = choose_scaling_parameter(ue, pr)
-    sigma_mu = sigma / T
-    posdef!(ue.pe.ce.mp.pdm, sigma_mu)
-    K = commutation_matrix(sigma)
-    sigma_sigma = T * (LinearAlgebra.I + K) * kron(sigma_mu, sigma_mu)
-    posdef!(ue.pe.ce.mp.pdm, sigma_sigma)
+    sigma_mu = mu_asymptotic_cov(ue.pdm, sigma, T)
+    sigma_sigma = sigma_asymptotic_cov(ue.pdm, sigma_mu, sigma, T)
     if ue.alg.diagonal
         sigma_sigma = LinearAlgebra.Diagonal(sigma_sigma)
     end

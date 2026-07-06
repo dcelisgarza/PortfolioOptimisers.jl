@@ -9,6 +9,46 @@
         @test vs.v == [1.0, -2.0, 3.0]
         @test vs.s == 2
     end
+    @testset "Constructor validation" begin
+        @test_throws IsNonFiniteError ExcessExpectedReturns(; rf = Inf)
+        @test_throws IsNonFiniteError MeanReturnRiskRatio(; rf = NaN)
+        @test_throws IsNonFiniteError ExpectedReturnRiskRatio(; rf = -Inf)
+        @test_throws DomainError NearestQuantilePrediction(; q = 1.5)
+        @test_throws DomainError NearestQuantilePrediction(; q = -0.1)
+        @test_throws DomainError KatzCentrality(; alpha = 0.0)
+        @test_throws DomainError KatzCentrality(; alpha = -0.3)
+        @test_throws DomainError GreedyAllocation(; unit = 0)
+        @test_throws DomainError GreedyAllocation(; unit = -1)
+        # FiniteAllocationInput (U4)
+        @test isa(FiniteAllocationInput(; w = [0.5, 0.5], prices = [10.0, 20.0]),
+                  PortfolioOptimisers.AbstractEstimator)
+        @test FiniteAllocationInput(; w = [0.5, 0.5], prices = [10.0, 20.0]).cash == 1e6
+        @test_throws PortfolioOptimisers.IsEmptyError FiniteAllocationInput(; w = Float64[],
+                                                                            prices = Float64[])
+        @test_throws DimensionMismatch FiniteAllocationInput(; w = [0.5],
+                                                             prices = [1.0, 2.0])
+        @test_throws DomainError FiniteAllocationInput(; w = [1.0], prices = [1.0],
+                                                       cash = -5.0)
+        @test_throws PortfolioOptimisers.IsNothingError FiniteAllocationInput(; w = [1.0],
+                                                                              prices = [1.0],
+                                                                              fees = Fees())
+    end
+    @testset "Norms" begin
+        @test isapprox(PortfolioOptimisers.norm_error(L1Norm(), [0.5, 0.5], [0.6, 0.4], 2),
+                       PortfolioOptimisers.norm_error(L1Norm(), [0.5, 0.5] - [0.6, 0.4], 2))
+        @test isapprox(PortfolioOptimisers.norm_error(L2Norm(), [0.5, 0.5], [0.6, 0.4], 2),
+                       PortfolioOptimisers.norm_error(L2Norm(), [0.5, 0.5] - [0.6, 0.4], 2))
+        @test isapprox(PortfolioOptimisers.norm_error(LpNorm(), [0.5, 0.5], [0.6, 0.4], 2),
+                       PortfolioOptimisers.norm_error(LpNorm(), [0.5, 0.5] - [0.6, 0.4], 2))
+        @test isapprox(PortfolioOptimisers.norm_error(LInfNorm(), [0.5, 0.5], [0.6, 0.4],
+                                                      2),
+                       PortfolioOptimisers.norm_error(LInfNorm(), [0.5, 0.5] - [0.6, 0.4],
+                                                      2))
+        @test isapprox(PortfolioOptimisers.norm_error(LInfNorm(pos = false), [0.5, 0.5],
+                                                      [0.6, 0.4], 2),
+                       PortfolioOptimisers.norm_error(LInfNorm(pos = false),
+                                                      [0.5, 0.5] - [0.6, 0.4], 2))
+    end
     @testset "ReturnsResult" begin
         X = rand(3, 4)
         F = rand(3, 2)
@@ -122,10 +162,10 @@
         @test dt.n == 5
     end
     @testset "Solver" begin
-        @test_throws IsEmptyError Solver(; settings = Dict{String, Any}())
-        @test_throws IsEmptyError Solver(; settings = Pair{String, Any}[])
+        @test_throws IsEmptyError Solver(; solver = nothing, settings = Dict{String, Any}())
+        @test_throws IsEmptyError Solver(; solver = nothing, settings = Pair{String, Any}[])
 
-        s = Solver()
+        s = Solver(; solver = nothing)
         @test s.name == ""
         @test isnothing(s.solver)
         @test isnothing(s.settings)
@@ -144,14 +184,36 @@
         trials = Dict(:try => false)
         logger = SimpleLogger()
         with_logger(logger) do
-            @test_logs (:warn, "Model could not be solved satisfactorily.\n$trials") JuMPResult(;
-                                                                                                trials = Dict(:try =>
-                                                                                                                  false),
-                                                                                                success = false)
+            @test_logs (:warn, PortfolioOptimisers.failed_solve_msg(trials)) JuMPResult(;
+                                                                                        trials = Dict(:try =>
+                                                                                                          false),
+                                                                                        success = false)
         end
         res = JuMPResult(; trials = trials, success = true)
         @test res.trials === trials
         @test res.success == true
+    end
+    @testset "failed_solve_msg" begin
+        pe = PortfolioOptimisers
+        trials = Dict("clarabel2" =>
+                          Dict(:optimize! => ErrorException("boom\nsecond line")),
+                      "clarabel1" => Dict(:assert_is_solved_and_feasible =>
+                                              ArgumentError("infeasible"),
+                                          :settings => Dict("verbose" => true)))
+        msg = pe.failed_solve_msg(trials)
+        # Deterministic (solvers sorted by name), one bounded line per failed stage.
+        @test occursin("2 solver trial(s)", msg)
+        @test first(findfirst("clarabel1", msg)) < first(findfirst("clarabel2", msg))
+        @test occursin("clarabel1: assert_is_solved_and_feasible → ArgumentError: infeasible",
+                       msg)
+        @test occursin("clarabel2: optimize! → boom", msg)
+        # Log hygiene: solver settings and post-first-line payloads never reach the log.
+        @test !occursin("verbose", msg)
+        @test !occursin("second line", msg)
+        # Over-long first lines are truncated.
+        long = pe.failed_solve_msg(Dict("s" => Dict(:optimize! => ErrorException("x"^500))))
+        @test occursin("…", long)
+        @test length(long) < 500
     end
     @testset "OWA" begin
         @test_throws DomainError NormalisedConstantRelativeRiskAversion(; g = 0)
@@ -163,23 +225,23 @@
         @test ncrra.g == 0.25
 
         @test_throws IsEmptyError OWAJuMP(; slv = Solver[])
-        @test_throws DomainError OWAJuMP(; max_phi = 0)
-        @test_throws DomainError OWAJuMP(; max_phi = 1)
-        @test_throws DomainError OWAJuMP(; sc = 0)
-        @test_throws DomainError OWAJuMP(; sc = Inf)
-        @test_throws DomainError OWAJuMP(; so = 0)
-        @test_throws DomainError OWAJuMP(; so = Inf)
+        @test_throws DomainError OWAJuMP(; slv = Solver(; solver = nothing), max_phi = 0)
+        @test_throws DomainError OWAJuMP(; slv = Solver(; solver = nothing), max_phi = 1)
+        @test_throws DomainError OWAJuMP(; slv = Solver(; solver = nothing), sc = 0)
+        @test_throws DomainError OWAJuMP(; slv = Solver(; solver = nothing), sc = Inf)
+        @test_throws DomainError OWAJuMP(; slv = Solver(; solver = nothing), so = 0)
+        @test_throws DomainError OWAJuMP(; slv = Solver(; solver = nothing), so = Inf)
 
-        owj = OWAJuMP()
-        @test owj.slv == Solver()
+        owj = OWAJuMP(; slv = Solver(; solver = nothing))
+        @test owj.slv == Solver(; solver = nothing)
         @test owj.max_phi == 0.5
         @test owj.sc == 1.0
         @test owj.so == 1.0
         @test owj.alg == MaximumEntropy()
 
-        owj = OWAJuMP(; slv = Solver(; name = "Foo"), max_phi = 0.25, sc = 2.0, so = 3.0,
-                      alg = MinimumSumSquares())
-        @test owj.slv == Solver(; name = "Foo")
+        owj = OWAJuMP(; slv = Solver(; solver = nothing, name = "Foo"), max_phi = 0.25,
+                      sc = 2.0, so = 3.0, alg = MinimumSumSquares())
+        @test owj.slv == Solver(; solver = nothing, name = "Foo")
         @test owj.max_phi == 0.25
         @test owj.sc == 2.0
         @test owj.so == 3.0

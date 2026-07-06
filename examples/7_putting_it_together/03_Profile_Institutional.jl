@@ -13,7 +13,7 @@ The reasoning, following the [strategy decision framework](../../user_guide/06_C
     ceiling are hard requirements, exactly what the [`JuMPOptimiser`](@ref) constraint keywords
     express.
   - **Benchmarked** — this is enhanced indexing: minimise risk but stay within a tracking-error
-    budget of the benchmark (see [Turnover and Tracking](../4_constraints_costs/04_Turnover_and_Tracking.md)).
+    budget of the benchmark (see [Turnover and Tracking](../4_constraints_costs/05_Turnover_and_Tracking.md)).
   - **Large and precise** — a big book justifies an exact [`DiscreteAllocation`](@ref).
 
 !!! tip "When to reach for this"
@@ -98,7 +98,9 @@ residual cash.
 
 mip_slv = Solver(; name = :highs, solver = HiGHS.Optimizer,
                  settings = Dict("log_to_console" => false))
-alloc = optimise(DiscreteAllocation(; slv = mip_slv), institutional.w, prices, 10_000_000.0)
+alloc = optimise(DiscreteAllocation(; slv = mip_slv),
+                 FiniteAllocationInput(; w = institutional.w, prices = prices,
+                                       cash = 10_000_000.0))
 
 invested = sum(alloc.shares .* prices)
 pretty_table(DataFrame("Asset" => rd.nx, "Target" => institutional.w,

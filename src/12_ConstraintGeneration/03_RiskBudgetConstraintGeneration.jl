@@ -49,8 +49,9 @@ RiskBudget
     """
     @vprop val
     function RiskBudget(val::VecNum)::RiskBudget
-        @argcheck(!isempty(val))
-        @argcheck(all(x -> zero(x) <= x, val))
+        @argcheck(!isempty(val), IsEmptyError("val cannot be empty"))
+        @argcheck(all(x -> zero(x) <= x, val),
+                  DomainError(val, "all entries of val must be >= 0"))
         return new{typeof(val)}(val)
     end
 end
@@ -111,8 +112,8 @@ RiskBudgetEstimator
     dval
     function RiskBudgetEstimator(val::EstValType,
                                  dval::Option{<:Number})::RiskBudgetEstimator
-        assert_nonempty_nonneg_finite_val(val)
-        assert_nonempty_nonneg_finite_val(dval)
+        assert_nonempty_nonneg_finite_val(val, :val)
+        assert_nonempty_nonneg_finite_val(dval, :dval)
         return new{typeof(val), typeof(dval)}(val, dval)
     end
 end

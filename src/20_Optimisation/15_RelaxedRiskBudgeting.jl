@@ -71,7 +71,7 @@ Keywords correspond to the struct's fields.
     """
     p
     function RegularisedPenalisedRelaxedRiskBudgeting(p::Number)
-        @argcheck(isfinite(p) && p > zero(p))
+        @argcheck(isfinite(p) && p > zero(p), DomainError(p, "p must be finite and > 0"))
         return new{typeof(p)}(p)
     end
 end
@@ -93,7 +93,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     RelaxedRiskBudgeting(;
-        opt::JuMPOptimiser = JuMPOptimiser(),
+        opt::JuMPOptimiser,
         rba::RiskBudgetingAlgorithm = AssetRiskBudgeting(),
         wi::Option{<:VecNum} = nothing,
         alg::RelaxedRiskBudgetingAlgorithm = BasicRelaxedRiskBudgeting(),
@@ -134,17 +134,24 @@ Where:
 
 Because this is a *relaxation* of the risk budgeting problem, the realised risk contributions will not adhere to the target risk budget as tightly as the exact logarithmic-barrier or mixed-integer formulations in [`RiskBudgeting`](@ref). In well-behaved problems the deviation is negligible, but in pathological cases (e.g. ill-conditioned covariance matrices or extreme budget allocations) it can be noticeable. The trade-off is that the SOC formulation is convex and composes cleanly with additional constraints, making it the friendlier choice when the risk budget is one of several objectives rather than a hard requirement. Use [`RiskBudgeting`](@ref) when strict adherence to the risk budget is essential.
 
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+
+  - `opt`: Recursively updated via [`factory`](@ref).
+  - `fb`: Recursively updated via [`factory`](@ref).
+
 # Related
 
   - [`JuMPOptimisationEstimator`](@ref)
   - [`RiskBudgeting`](@ref)
   - [`RelaxedRiskBudgetingAlgorithm`](@ref)
 """
-@concrete struct RelaxedRiskBudgeting <: JuMPOptimisationEstimator
+@propagatable @concrete struct RelaxedRiskBudgeting <: JuMPOptimisationEstimator
     """
     $(field_dict[:opt_jmp])
     """
-    opt
+    @fprop opt
     """
     $(field_dict[:rba])
     """
@@ -160,19 +167,19 @@ Because this is a *relaxation* of the risk budgeting problem, the realised risk 
     """
     $(field_dict[:fb])
     """
-    fb
+    @fprop fb
     function RelaxedRiskBudgeting(opt::JuMPOptimiser, rba::RiskBudgetingAlgorithm,
                                   wi::Option{<:VecNum}, alg::RelaxedRiskBudgetingAlgorithm,
                                   fb::Option{<:OptE_Opt})
         if isa(wi, VecNum)
-            @argcheck(!isempty(wi))
+            @argcheck(!isempty(wi), IsEmptyError("wi cannot be empty"))
         end
         return new{typeof(opt), typeof(rba), typeof(wi), typeof(alg), typeof(fb)}(opt, rba,
                                                                                   wi, alg,
                                                                                   fb)
     end
 end
-function RelaxedRiskBudgeting(; opt::JuMPOptimiser = JuMPOptimiser(),
+function RelaxedRiskBudgeting(; opt::JuMPOptimiser,
                               rba::RiskBudgetingAlgorithm = AssetRiskBudgeting(),
                               wi::Option{<:VecNum} = nothing,
                               alg::RelaxedRiskBudgetingAlgorithm = BasicRelaxedRiskBudgeting(),
@@ -186,17 +193,6 @@ Return `true` if the JuMP optimiser or fallback requires previous portfolio weig
 """
 function needs_previous_weights(opt::RelaxedRiskBudgeting)
     return (needs_previous_weights(opt.opt) || needs_previous_weights(opt.fb))
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Build an updated [`RelaxedRiskBudgeting`](@ref) with all estimators that track previous weights updated via `factory` using `w`.
-"""
-function factory(rrb::RelaxedRiskBudgeting, w::AbstractVector)::RelaxedRiskBudgeting
-    opt = factory(rrb.opt, w)
-    fb = factory(rrb.fb, w)
-    return RelaxedRiskBudgeting(; opt = opt, rba = rrb.rba, wi = rrb.wi, alg = rrb.alg,
-                                fb = fb)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -313,7 +309,7 @@ function _set_relaxed_risk_budgeting_constraints!(model::JuMP.Model,
     N = length(w)
     rkb = risk_budget_constraints(rrb.rba.rkb, rrb.rba.sets; N = N, strict = rrb.opt.strict)
     rb = rkb.val
-    @argcheck(length(rb) == N)
+    @argcheck(length(rb) == N, DimensionMismatch("rb ($(length(rb))) must match N ($N)"))
     sc = get_constraint_scale(model)
     JuMP.@variables(model, begin
                         psi >= 0

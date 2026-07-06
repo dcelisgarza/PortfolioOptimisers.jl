@@ -274,11 +274,11 @@ julia> r(w)
                       chol::Option{<:MatNum}, rc::Option{<:LcE_Lc},
                       alg::VarianceFormulation)::Variance
         if isa(sigma, MatNum)
-            @argcheck(!isempty(sigma))
+            @argcheck(!isempty(sigma), IsEmptyError("sigma cannot be empty"))
             assert_matrix_issquare(sigma, :sigma)
         end
         if isa(chol, MatNum)
-            @argcheck(!isempty(chol))
+            @argcheck(!isempty(chol), IsEmptyError("chol cannot be empty"))
         end
         return new{typeof(settings), typeof(sigma), typeof(chol), typeof(rc), typeof(alg)}(settings,
                                                                                            sigma,
@@ -406,11 +406,11 @@ julia> r(w)
     function StandardDeviation(settings::RiskMeasureSettings, sigma::Option{<:MatNum},
                                chol::Option{<:MatNum})::StandardDeviation
         if isa(sigma, MatNum)
-            @argcheck(!isempty(sigma))
+            @argcheck(!isempty(sigma), IsEmptyError("sigma cannot be empty"))
             assert_matrix_issquare(sigma, :sigma)
         end
         if isa(chol, MatNum)
-            @argcheck(!isempty(chol))
+            @argcheck(!isempty(chol), IsEmptyError("chol cannot be empty"))
         end
         return new{typeof(settings), typeof(sigma), typeof(chol)}(settings, sigma, chol)
     end
@@ -584,7 +584,7 @@ UncertaintySetVariance
            │          │           │      │    ce ┼ GeneralCovariance
            │          │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
            │          │           │      │       │    w ┴ nothing
-           │          │           │      │   alg ┴ Full()
+           │          │           │      │   alg ┴ FullMoment()
            │          │           │   mp ┼ MatrixProcessing
            │          │           │      │     pdm ┼ Posdef
            │          │           │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
@@ -602,6 +602,9 @@ UncertaintySetVariance
            │      rng ┼ Random.TaskLocalRNG: Random.TaskLocalRNG()
            │     seed ┼ nothing
            │      ens ┼ nothing
+           │      pdm ┼ Posdef
+           │          │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+           │          │   kwargs ┴ @NamedTuple{}: NamedTuple()
            │   kwargs ┴ @NamedTuple{}: NamedTuple()
      sigma ┴ 3×3 Matrix{Float64}
 
@@ -634,7 +637,7 @@ julia> r(w)
     function UncertaintySetVariance(settings::RiskMeasureSettings, ucs::Option{<:UcSE_UcS},
                                     sigma::Option{<:MatNum})
         if isa(sigma, MatNum)
-            @argcheck(!isempty(sigma))
+            @argcheck(!isempty(sigma), IsEmptyError("sigma cannot be empty"))
         end
         return new{typeof(settings), typeof(ucs), typeof(sigma)}(settings, ucs, sigma)
     end
@@ -644,8 +647,68 @@ function UncertaintySetVariance(; settings::RiskMeasureSettings = RiskMeasureSet
                                 sigma::Option{<:MatNum} = nothing)
     return UncertaintySetVariance(settings, ucs, sigma)
 end
+"""
+    (r::UncertaintySetVariance)(w::VecNum)
+
+Compute the risk of weights `w` under an [`UncertaintySetVariance`](@ref) measure.
+
+When `r.ucs` is a fitted [`AbstractUncertaintySetResult`](@ref), returns the worst-case
+variance over the uncertainty set via [`ucs_variance`](@ref) — consistent with the risk
+expression built by [`set_ucs_variance_risk!`](@ref). With an unfitted estimator (or
+`nothing`), falls back to the nominal variance `w' * sigma * w`.
+
+# Related
+
+  - [`UncertaintySetVariance`](@ref)
+  - [`ucs_variance`](@ref)
+"""
+function (r::UncertaintySetVariance{<:Any, <:AbstractUncertaintySetResult, <:Any})(w::VecNum)
+    return ucs_variance(r.ucs, r.sigma, w)
+end
 function (r::UncertaintySetVariance)(w::VecNum)
     return LinearAlgebra.dot(w, r.sigma, w)
+end
+"""
+    ucs_variance(ucs::AbstractUncertaintySetResult, sigma::MatNum, w::VecNum)
+
+Compute the worst-case portfolio variance of weights `w` over a fitted uncertainty set.
+
+This is the scalar twin of the JuMP expression built by [`set_ucs_variance_risk!`](@ref):
+for a [`BoxUncertaintySet`](@ref) it evaluates `tr(Au * ub) - tr(Al * lb)` at the optimal
+`Au = max.(W, 0)`, `Al = max.(-W, 0)` with `W = w * w'`; for an
+[`EllipsoidalUncertaintySet`](@ref) it evaluates `tr(sigma * W) + k * norm(G * vec(W))`
+with `G` the upper Cholesky factor of the set's shape matrix (the `E = 0` evaluation of
+the model expression, an upper bound on its optimum).
+
+The [`UncertaintySetVariance`](@ref) functor dispatches here when its `ucs` field is a
+fitted result, keeping scalar risk evaluation consistent with the risk expression the
+optimiser sees.
+
+# Arguments
+
+  - `ucs`: Fitted uncertainty set result.
+  - `sigma::MatNum`: Nominal covariance matrix.
+  - `w::VecNum`: Vector of portfolio weights.
+
+# Returns
+
+  - `risk::Number`: Worst-case portfolio variance.
+
+# Related
+
+  - [`UncertaintySetVariance`](@ref)
+  - [`BoxUncertaintySet`](@ref)
+  - [`EllipsoidalUncertaintySet`](@ref)
+"""
+function ucs_variance(ucs::BoxUncertaintySet, ::Any, w::VecNum)
+    W = w * transpose(w)
+    z = zero(eltype(W))
+    return sum(ucs.ub .* max.(W, z)) - sum(ucs.lb .* max.(-W, z))
+end
+function ucs_variance(ucs::EllipsoidalUncertaintySet, sigma::MatNum, w::VecNum)
+    W = w * transpose(w)
+    G = LinearAlgebra.cholesky(ucs.sigma).U
+    return LinearAlgebra.tr(sigma * W) + ucs.k * LinearAlgebra.norm(G * vec(W))
 end
 """
     _no_bounds_risk_measure(r, flag)
@@ -677,7 +740,7 @@ end
 function _no_bounds_risk_measure(r::UncertaintySetVariance, ::Val{false})
     return Variance(;
                     settings = RiskMeasureSettings(; rke = r.settings.rke,
-                                                   scale = r.settings.scale), rc = nothing,
+                                                   scale = r.settings.scale),
                     sigma = r.sigma)
 end
 function no_bounds_risk_measure(r::UncertaintySetVariance,
@@ -800,6 +863,35 @@ function factory(r::UncertaintySetVariance, ucs::UcSE_UcS,
         nothing_scalar_array_selector(r.sigma, pr.sigma)
     end
     return UncertaintySetVariance(; settings = r.settings, ucs = ucs, sigma = sigma)
+end
+"""
+    ucs_risk_measure(r, rd::ReturnsResult)
+
+Resolve the uncertainty set of an [`UncertaintySetVariance`](@ref) risk measure to a
+fitted [`AbstractUncertaintySetResult`](@ref) using the returns data. Other risk measures
+are returned unchanged; vectors of risk measures are resolved element-wise.
+
+Used by [`near_optimal_centering_setup`](@ref) so that the barrier risk targets, the
+sub-problem solves, and the NOC model all share the same fitted uncertainty set (fitted
+results pass through [`sigma_ucs`](@ref) unchanged). With a fitted set the
+[`UncertaintySetVariance`](@ref) functor evaluates the worst-case variance via
+[`ucs_variance`](@ref), keeping the barrier targets consistent with the model risk
+expression.
+
+# Related
+
+  - [`UncertaintySetVariance`](@ref)
+  - [`sigma_ucs`](@ref)
+  - [`near_optimal_centering_setup`](@ref)
+"""
+function ucs_risk_measure(r::UncertaintySetVariance, rd::ReturnsResult)
+    return Accessors.@set r.ucs = sigma_ucs(r.ucs, rd)
+end
+function ucs_risk_measure(r::Any, ::ReturnsResult)
+    return r
+end
+function ucs_risk_measure(rs::VecBaseRM, rd::ReturnsResult)
+    return ucs_risk_measure.(rs, Ref(rd))
 end
 function port_opt_view(r::UncertaintySetVariance, i, args...)
     ucs = port_opt_view(r.ucs, i)

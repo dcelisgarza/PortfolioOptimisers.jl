@@ -15,32 +15,36 @@ Checks that all lower bound values are less than or equal to corresponding upper
   - `nothing`.
 """
 function validate_bounds(lb::Number, ub::Number)::Nothing
-    @argcheck(lb <= ub)
+    @argcheck(lb <= ub, DomainError("lb ($lb) must be <= ub ($ub)"))
     return nothing
 end
 function validate_bounds(lb::VecNum, ub::Number)::Nothing
-    @argcheck(!isempty(lb))
-    @argcheck(all(x -> x <= ub, lb))
+    @argcheck(!isempty(lb), IsEmptyError("lb cannot be empty"))
+    @argcheck(all(x -> x <= ub, lb),
+              DomainError("all entries of lb must be <= ub ($ub), got lb = $lb"))
     return nothing
 end
 function validate_bounds(lb::Number, ub::VecNum)::Nothing
-    @argcheck(!isempty(ub))
-    @argcheck(all(x -> lb <= x, ub))
+    @argcheck(!isempty(ub), IsEmptyError("ub cannot be empty"))
+    @argcheck(all(x -> lb <= x, ub),
+              DomainError("all entries of ub must be >= lb ($lb), got ub = $ub"))
     return nothing
 end
 function validate_bounds(lb::VecNum, ub::VecNum)::Nothing
-    @argcheck(!isempty(lb))
-    @argcheck(!isempty(ub))
-    @argcheck(length(lb) == length(ub))
-    @argcheck(all(map((x, y) -> x <= y, lb, ub)))
+    @argcheck(!isempty(lb), IsEmptyError("lb cannot be empty"))
+    @argcheck(!isempty(ub), IsEmptyError("ub cannot be empty"))
+    @argcheck(length(lb) == length(ub),
+              DimensionMismatch("lb ($(length(lb))) and ub ($(length(ub))) must have the same length"))
+    @argcheck(all(map((x, y) -> x <= y, lb, ub)),
+              DomainError("all entries of lb must be <= corresponding entries of ub"))
     return nothing
 end
 function validate_bounds(lb::VecNum, ::Any)::Nothing
-    @argcheck(!isempty(lb))
+    @argcheck(!isempty(lb), IsEmptyError("lb cannot be empty"))
     return nothing
 end
 function validate_bounds(::Any, ub::VecNum)::Nothing
-    @argcheck(!isempty(ub))
+    @argcheck(!isempty(ub), IsEmptyError("ub cannot be empty"))
     return nothing
 end
 function validate_bounds(args...)::Nothing
@@ -210,13 +214,14 @@ WeightBoundsEstimator
             @argcheck(!isempty(ub), IsEmptyError)
         end
         if isa(lb, VecNum) && isa(ub, VecNum)
-            @argcheck(length(lb) == length(ub))
+            @argcheck(length(lb) == length(ub),
+                      DimensionMismatch("lb ($(length(lb))) and ub ($(length(ub))) must have the same length"))
             validate_bounds(lb, ub)
         elseif isa(lb, Num_VecNum) && isa(ub, Num_VecNum)
             validate_bounds(lb, ub)
         end
         if !isnothing(dlb) && !isnothing(dub)
-            @argcheck(dlb <= dub)
+            @argcheck(dlb <= dub, DomainError("dlb ($dlb) must be <= dub ($dub)"))
         end
         return new{typeof(lb), typeof(ub), typeof(dlb), typeof(dub)}(lb, ub, dlb, dub)
     end

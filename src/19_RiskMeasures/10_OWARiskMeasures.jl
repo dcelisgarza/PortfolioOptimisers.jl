@@ -15,6 +15,55 @@ abstract type AbstractOrderedWeightsArrayEstimator <: AbstractEstimator end
 """
 $(DocStringExtensions.TYPEDEF)
 
+Abstract supertype for callable OWA weight function estimators in `PortfolioOptimisers.jl`.
+
+All concrete subtypes implementing callable OWA weight functions should subtype `AbstractOrderedWeightsArrayFunction`.
+
+# Interfaces
+
+In order to implement a new callable OWA weight function that works seamlessly with the library, subtype `AbstractOrderedWeightsArrayFunction`, ensuring that the structure contains all necessary parameters, and implement the following method:
+
+## Callable interface
+
+  - `(r::ConcreteType)(T::Integer) -> VecNum`: Computes and returns the OWA weight vector for `T` observations.
+
+### Arguments
+
+  - `r`: Callable OWA weight function instance.
+  - `T::Integer`: Number of observations.
+
+### Returns
+
+  - `w::VecNum`: OWA weight vector of length `T`.
+
+### Examples
+
+```jldoctest
+julia> struct MyOWAFunction <: PortfolioOptimisers.AbstractOrderedWeightsArrayFunction end
+
+julia> function (r::MyOWAFunction)(T::Integer)
+           return fill(inv(T), T)
+       end
+
+julia> MyOWAFunction()(4)
+4-element Vector{Float64}:
+ 0.25
+ 0.25
+ 0.25
+ 0.25
+```
+
+## Related
+
+  - [`LinearMoment`](@ref)
+  - [`OWA_Func_VecNum`](@ref)
+  - [`OrderedWeightsArray`](@ref)
+  - [`OrderedWeightsArrayRange`](@ref)
+"""
+abstract type AbstractOrderedWeightsArrayFunction <: AbstractEstimator end
+"""
+$(DocStringExtensions.TYPEDEF)
+
 Abstract supertype for all Ordered Weights Array (OWA) algorithm types in `PortfolioOptimisers.jl`.
 
 All concrete and/or abstract types implementing specific OWA algorithms should be subtypes of `AbstractOrderedWeightsArrayAlgorithm`.
@@ -415,7 +464,7 @@ NormalisedConstantRelativeRiskAversion
     """
     g
     function NormalisedConstantRelativeRiskAversion(g::Number)
-        @argcheck(zero(g) < g < one(g), DomainError("0 < g < 1 must hold. Got\ng => $g"))
+        assert_unit_interval(g, :g)
         return new{typeof(g)}(g)
     end
 end
@@ -437,7 +486,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     OWAJuMP(;
-        slv::Slv_VecSlv = Solver(),
+        slv::Slv_VecSlv,
         max_phi::Number = 0.5,
         sc::Number = 1.0,
         so::Number = 1.0,
@@ -456,7 +505,7 @@ Keyword arguments correspond to the struct's fields.
 # Examples
 
 ```jldoctest
-julia> OWAJuMP()
+julia> OWAJuMP(; slv = Solver(; solver = nothing))
 OWAJuMP
       slv ┼ Solver
           │          name ┼ String: ""
@@ -507,10 +556,9 @@ OWAJuMP
     function OWAJuMP(slv::Slv_VecSlv, max_phi::Number, sc::Number, so::Number,
                      alg::AbstractOrderedWeightsArrayAlgorithm)
         if isa(slv, VecSlv)
-            @argcheck(!isempty(slv), IsEmptyError)
+            @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
         end
-        @argcheck(zero(max_phi) < max_phi < one(max_phi),
-                  DomainError("0 < max_phi < 1 must hold. Got\nmax_phi => $max_phi"))
+        assert_unit_interval(max_phi, :max_phi)
         assert_nonempty_gt0_finite_val(sc, :sc)
         assert_nonempty_gt0_finite_val(so, :so)
         return new{typeof(slv), typeof(max_phi), typeof(sc), typeof(so), typeof(alg)}(slv,
@@ -520,7 +568,7 @@ OWAJuMP
                                                                                       alg)
     end
 end
-function OWAJuMP(; slv::Slv_VecSlv = Solver(), max_phi::Number = 0.5, sc::Number = 1.0,
+function OWAJuMP(; slv::Slv_VecSlv, max_phi::Number = 0.5, sc::Number = 1.0,
                  so::Number = 1.0,
                  alg::AbstractOrderedWeightsArrayAlgorithm = MaximumEntropy())::OWAJuMP
     return OWAJuMP(slv, max_phi, sc, so, alg)
@@ -915,13 +963,66 @@ Compute the Ordered Weights Array (OWA) weights for the Conditional Value at Ris
   - [`VecNum`](@ref)
 """
 function owa_cvar(T::Integer, alpha::Number = 0.05)
-    @argcheck(zero(alpha) < alpha < one(alpha),
-              DomainError("0 < alpha < 1 must hold. Got\nalpha => $alpha"))
+    assert_unit_interval(alpha, :alpha)
     k = floor(Int, T * alpha)
     w = zeros(typeof(alpha), T)
     w[1:k] .= -one(alpha) / (T * alpha)
     w[k + 1] = -one(alpha) - sum(w[1:k])
     return w
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Callable OWA weight estimator for the Conditional Value at Risk (CVaR) risk measure.
+
+When called as `r(T)`, returns the OWA weight vector for CVaR at confidence level `alpha` for `T` observations.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    OrderedWeightsArrayConditionalValueatRisk(;
+        alpha::Number = 0.05
+    ) -> OrderedWeightsArrayConditionalValueatRisk
+
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - $(val_dict[:alpha])
+
+# Examples
+
+```jldoctest
+julia> OrderedWeightsArrayConditionalValueatRisk()
+OrderedWeightsArrayConditionalValueatRisk
+  alpha ┴ Float64: 0.05
+```
+
+## Related
+
+  - [`AbstractOrderedWeightsArrayFunction`](@ref)
+  - [`owa_cvar`](@ref)
+  - [`OWA_Func_VecNum`](@ref)
+"""
+@concrete struct OrderedWeightsArrayConditionalValueatRisk <:
+                 AbstractOrderedWeightsArrayFunction
+    """
+    $(field_dict[:alpha])
+    """
+    alpha
+    function OrderedWeightsArrayConditionalValueatRisk(alpha::Number)
+        assert_unit_interval(alpha, :alpha)
+        return new{typeof(alpha)}(alpha)
+    end
+end
+function OrderedWeightsArrayConditionalValueatRisk(; alpha::Number = 0.05)
+    return OrderedWeightsArrayConditionalValueatRisk(alpha)
+end
+function (r::OrderedWeightsArrayConditionalValueatRisk)(T::Integer)
+    return owa_cvar(T, r.alpha)
 end
 """
     owa_wcvar(T::Integer, alphas::VecNum, weights::VecNum)
@@ -994,6 +1095,75 @@ function owa_tg(T::Integer; alpha_i::Number = 1e-4, alpha::Number = 0.05,
     end
     w[n] = (alphas[n] - alphas[n - 1]) / alphas[n]
     return owa_wcvar(T, alphas, w)
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Callable OWA weight estimator for the tail Gini risk measure.
+
+When called as `r(T)`, returns the OWA weight vector approximating the tail Gini measure by integrating over CVaR levels from `alpha_i` to `alpha` using `a_sim` points.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    OrderedWeightsArrayTailGini(;
+        alpha_i::Number = 1e-4,
+        alpha::Number = 0.05,
+        a_sim::Integer = 100
+    ) -> OrderedWeightsArrayTailGini
+
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - $(val_dict[:alpha_i_alpha])
+  - $(val_dict[:a_sim_pos])
+
+# Examples
+
+```jldoctest
+julia> OrderedWeightsArrayTailGini()
+OrderedWeightsArrayTailGini
+  alpha_i ┼ Float64: 0.0001
+    alpha ┼ Float64: 0.05
+    a_sim ┴ Int64: 100
+```
+
+## Related
+
+  - [`AbstractOrderedWeightsArrayFunction`](@ref)
+  - [`owa_tg`](@ref)
+  - [`OWA_Func_VecNum`](@ref)
+"""
+@concrete struct OrderedWeightsArrayTailGini <: AbstractOrderedWeightsArrayFunction
+    """
+    $(field_dict[:alpha_i])
+    """
+    alpha_i
+    """
+    $(field_dict[:alpha])
+    """
+    alpha
+    """
+    $(field_dict[:a_sim])
+    """
+    a_sim
+    function OrderedWeightsArrayTailGini(alpha_i::Number, alpha::Number, a_sim::Integer)
+        @argcheck(0 < alpha_i < alpha < 1,
+                  DomainError("0 < alpha_i < alpha < 1 must hold. Got\nalpha_i => $alpha_i\nalpha => $alpha"))
+        @argcheck(0 < a_sim, DomainError("a_sim must be positive. Got\n a_sim => $a_sim"))
+        return new{typeof(alpha_i), typeof(alpha), typeof(a_sim)}(alpha_i, alpha, a_sim)
+    end
+end
+function OrderedWeightsArrayTailGini(; alpha_i::Number = 1e-4, alpha::Number = 0.05,
+                                     a_sim::Integer = 100)
+    return OrderedWeightsArrayTailGini(alpha_i, alpha, a_sim)
+end
+function (r::OrderedWeightsArrayTailGini)(T::Integer)
+    return owa_tg(T; alpha_i = r.alpha_i, alpha = r.alpha, a_sim = r.a_sim)
 end
 """
     owa_wr(T::Integer)
@@ -1073,6 +1243,69 @@ function owa_cvarrg(T::Integer; alpha::Number = 0.05, beta::Number = alpha)
     return owa_cvar(T, alpha) - reverse!(owa_cvar(T, beta))
 end
 """
+$(DocStringExtensions.TYPEDEF)
+
+Callable OWA weight estimator for the Conditional Value at Risk Range risk measure.
+
+When called as `r(T)`, returns the OWA weight vector for the CVaR range at lower confidence level `alpha` and upper confidence level `beta` for `T` observations.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    OrderedWeightsArrayConditionalValueatRiskRange(;
+        alpha::Number = 0.05,
+        beta::Number = alpha
+    ) -> OrderedWeightsArrayConditionalValueatRiskRange
+
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - $(val_dict[:alpha])
+  - $(val_dict[:beta])
+
+# Examples
+
+```jldoctest
+julia> OrderedWeightsArrayConditionalValueatRiskRange()
+OrderedWeightsArrayConditionalValueatRiskRange
+  alpha ┼ Float64: 0.05
+   beta ┴ Float64: 0.05
+```
+
+## Related
+
+  - [`AbstractOrderedWeightsArrayFunction`](@ref)
+  - [`owa_cvarrg`](@ref)
+  - [`OWA_Func_VecNum`](@ref)
+"""
+@concrete struct OrderedWeightsArrayConditionalValueatRiskRange <:
+                 AbstractOrderedWeightsArrayFunction
+    """
+    $(field_dict[:alpha])
+    """
+    alpha
+    """
+    $(field_dict[:beta])
+    """
+    beta
+    function OrderedWeightsArrayConditionalValueatRiskRange(alpha::Number, beta::Number)
+        assert_unit_interval(alpha, :alpha)
+        assert_unit_interval(beta, :beta)
+        return new{typeof(alpha), typeof(beta)}(alpha, beta)
+    end
+end
+function OrderedWeightsArrayConditionalValueatRiskRange(; alpha::Number = 0.05,
+                                                        beta::Number = alpha)
+    return OrderedWeightsArrayConditionalValueatRiskRange(alpha, beta)
+end
+function (r::OrderedWeightsArrayConditionalValueatRiskRange)(T::Integer)
+    return owa_cvarrg(T; alpha = r.alpha, beta = r.beta)
+end
+"""
     owa_wcvarrg(T::Integer, alphas::VecNum, weights_a::VecNum;
                 betas::VecNum = alphas,
                 weights_b::VecNum = weights_a)
@@ -1139,6 +1372,103 @@ function owa_tgrg(T::Integer; alpha_i::Number = 0.0001, alpha::Number = 0.05,
         reverse!(owa_tg(T; alpha_i = beta_i, alpha = beta, a_sim = b_sim))
 
     return w
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Callable OWA weight estimator for the tail Gini range risk measure.
+
+When called as `r(T)`, returns the OWA weight vector for the difference between the lower and upper tail Gini measures, each approximated by integrating over CVaR levels.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    OrderedWeightsArrayTailGiniRange(;
+        alpha_i::Number = 1e-4,
+        alpha::Number = 0.05,
+        a_sim::Integer = 100,
+        beta_i::Number = alpha_i,
+        beta::Number = alpha,
+        b_sim::Integer = a_sim
+    ) -> OrderedWeightsArrayTailGiniRange
+
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - $(val_dict[:alpha_i_alpha])
+  - $(val_dict[:a_sim_pos])
+  - $(val_dict[:beta_i_beta])
+  - $(val_dict[:b_sim_pos])
+
+# Examples
+
+```jldoctest
+julia> OrderedWeightsArrayTailGiniRange()
+OrderedWeightsArrayTailGiniRange
+  alpha_i ┼ Float64: 0.0001
+    alpha ┼ Float64: 0.05
+    a_sim ┼ Int64: 100
+   beta_i ┼ Float64: 0.0001
+     beta ┼ Float64: 0.05
+    b_sim ┴ Int64: 100
+```
+
+## Related
+
+  - [`AbstractOrderedWeightsArrayFunction`](@ref)
+  - [`owa_tgrg`](@ref)
+  - [`OWA_Func_VecNum`](@ref)
+"""
+@concrete struct OrderedWeightsArrayTailGiniRange <: AbstractOrderedWeightsArrayFunction
+    """
+    $(field_dict[:alpha_i])
+    """
+    alpha_i
+    """
+    $(field_dict[:alpha])
+    """
+    alpha
+    """
+    $(field_dict[:a_sim])
+    """
+    a_sim
+    """
+    $(field_dict[:beta_i])
+    """
+    beta_i
+    """
+    $(field_dict[:beta])
+    """
+    beta
+    """
+    $(field_dict[:b_sim])
+    """
+    b_sim
+    function OrderedWeightsArrayTailGiniRange(alpha_i::Number, alpha::Number,
+                                              a_sim::Integer, beta_i::Number, beta::Number,
+                                              b_sim::Integer)
+        @argcheck(0 < alpha_i < alpha < 1,
+                  DomainError("0 < alpha_i < alpha < 1 must hold. Got\nalpha_i => $alpha_i\nalpha => $alpha"))
+        @argcheck(0 < a_sim, DomainError("a_sim must be positive. Got\n a_sim => $a_sim"))
+        @argcheck(0 < beta_i < beta < 1,
+                  DomainError("0 < beta_i < beta < 1 must hold. Got\nbeta_i => $beta_i\nbeta => $beta"))
+        @argcheck(0 < b_sim, DomainError("b_sim must be positive. Got\n b_sim => $b_sim"))
+        return new{typeof(alpha_i), typeof(alpha), typeof(a_sim), typeof(beta_i),
+                   typeof(beta), typeof(b_sim)}(alpha_i, alpha, a_sim, beta_i, beta, b_sim)
+    end
+end
+function OrderedWeightsArrayTailGiniRange(; alpha_i::Number = 1e-4, alpha::Number = 0.05,
+                                          a_sim::Integer = 100, beta_i::Number = alpha_i,
+                                          beta::Number = alpha, b_sim::Integer = a_sim)
+    return OrderedWeightsArrayTailGiniRange(alpha_i, alpha, a_sim, beta_i, beta, b_sim)
+end
+function (r::OrderedWeightsArrayTailGiniRange)(T::Integer)
+    return owa_tgrg(T; alpha_i = r.alpha_i, alpha = r.alpha, a_sim = r.a_sim,
+                    beta_i = r.beta_i, beta = r.beta, b_sim = r.b_sim)
 end
 """
     owa_l_moment(T::Integer, k::Integer = 2)
@@ -1223,7 +1553,83 @@ function owa_l_moment_crm(T::Integer,
     end
     return owa_l_moment_crm(method, weights)
 end
+"""
+$(DocStringExtensions.TYPEDEF)
 
+Callable estimator that generates OWA linear moment convex risk measure (CRM) weights for a given number of observations.
+
+When called as `lm(T)`, returns the OWA weight vector produced by [`owa_l_moment_crm`](@ref) using the configured `method` and moment order `k`.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    LinearMoment(;
+        method::AbstractOrderedWeightsArrayEstimator = NormalisedConstantRelativeRiskAversion(),
+        k::Integer = 2
+    ) -> LinearMoment
+
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - $(val_dict[:lm_k])
+
+# Examples
+
+```jldoctest
+julia> LinearMoment()
+LinearMoment
+  method ┼ NormalisedConstantRelativeRiskAversion
+         │   g ┴ Float64: 0.5
+       k ┴ Int64: 2
+```
+
+## Related
+
+  - [`AbstractOrderedWeightsArrayEstimator`](@ref)
+  - [`NormalisedConstantRelativeRiskAversion`](@ref)
+  - [`OWAJuMP`](@ref)
+  - [`owa_l_moment_crm`](@ref)
+  - [`OWA_Func_VecNum`](@ref)
+"""
+@concrete struct LinearMoment <: AbstractOrderedWeightsArrayFunction
+    """
+    $(field_dict[:owa_method])
+    """
+    method
+    """
+    $(field_dict[:lm_k])
+    """
+    k
+    function LinearMoment(method::AbstractOrderedWeightsArrayEstimator, k::Integer)
+        @argcheck(2 <= k, DomainError)
+        return new{typeof(method), typeof(k)}(method, k)
+    end
+end
+function LinearMoment(;
+                      method::AbstractOrderedWeightsArrayEstimator = NormalisedConstantRelativeRiskAversion(),
+                      k::Integer = 2)
+    return LinearMoment(method, k)
+end
+function (r::LinearMoment)(T::Integer)
+    return owa_l_moment_crm(T, r.method; k = r.k)
+end
+"""
+    const OWA_Func_VecNum = Union{<:Func_VecNum, <:AbstractOrderedWeightsArrayFunction}
+
+Union type for OWA weight specifications: a function, a numeric vector, or an [`AbstractOrderedWeightsArrayFunction`](@ref) callable.
+
+# Related
+
+  - [`Func_VecNum`](@ref)
+  - [`AbstractOrderedWeightsArrayFunction`](@ref)
+  - [`OrderedWeightsArray`](@ref)
+  - [`OrderedWeightsArrayRange`](@ref)
+"""
+const OWA_Func_VecNum = Union{<:Func_VecNum, <:AbstractOrderedWeightsArrayFunction}
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -1278,8 +1684,8 @@ $(DocStringExtensions.FIELDS)
     """
     p
     function ApproxOrderedWeightsArray(p::VecNum)
-        @argcheck(!isempty(p))
-        @argcheck(all(x -> x > one(x), p))
+        @argcheck(!isempty(p), IsEmptyError("p cannot be empty"))
+        @argcheck(all(x -> x > one(x), p), DomainError(p, "all elements of p must be > 1"))
         return new{typeof(p)}(p)
     end
 end
@@ -1301,7 +1707,7 @@ $(DocStringExtensions.FIELDS)
 
     OrderedWeightsArray(;
         settings::RiskMeasureSettings = RiskMeasureSettings(),
-        w::Option{<:VecNum} = nothing,
+        w::OWA_Func_VecNum = owa_gmd,
         alg::OrderedWeightsArrayFormulation = ApproxOrderedWeightsArray()
     ) -> OrderedWeightsArray
 
@@ -1326,21 +1732,21 @@ $(DocStringExtensions.FIELDS)
     $(field_dict[:alg])
     """
     alg
-    function OrderedWeightsArray(settings::RiskMeasureSettings, w::Option{<:VecNum},
+    function OrderedWeightsArray(settings::RiskMeasureSettings, w::OWA_Func_VecNum,
                                  alg::OrderedWeightsArrayFormulation)
-        if !isnothing(w)
-            @argcheck(!isempty(w))
+        if isa(w, VecNum)
+            @argcheck(!isempty(w), IsEmptyError("w cannot be empty"))
         end
         return new{typeof(settings), typeof(w), typeof(alg)}(settings, w, alg)
     end
 end
 function OrderedWeightsArray(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                             w::Option{<:VecNum} = nothing,
+                             w::OWA_Func_VecNum = owa_gmd,
                              alg::OrderedWeightsArrayFormulation = ApproxOrderedWeightsArray())
     return OrderedWeightsArray(settings, w, alg)
 end
 function (r::OrderedWeightsArray)(x::VecNum)
-    w = isnothing(r.w) ? owa_gmd(length(x)) : r.w
+    w = isa(r.w, VecNum) ? r.w : r.w(length(x))
     return LinearAlgebra.dot(w, sort(x))
 end
 """
@@ -1358,8 +1764,8 @@ $(DocStringExtensions.FIELDS)
 
     OrderedWeightsArrayRange(;
         settings::RiskMeasureSettings = RiskMeasureSettings(),
-        w1::Option{<:VecNum} = nothing,
-        w2::Option{<:VecNum} = nothing,
+        w1::OWA_Func_VecNum = owa_gmd,
+        w2::OWA_Func_VecNum = owa_gmd,
         alg::OrderedWeightsArrayFormulation = ApproxOrderedWeightsArray(),
         rev::Bool = false
     ) -> OrderedWeightsArrayRange
@@ -1389,16 +1795,20 @@ $(DocStringExtensions.FIELDS)
     $(field_dict[:alg])
     """
     alg
-    function OrderedWeightsArrayRange(settings::RiskMeasureSettings, w1::Option{<:VecNum},
-                                      w2::Option{<:VecNum},
+    """
+    Whether to reverse the second OWA weight vector before computing the range. If `true`, `w2` is reversed; if `false`, it is used as-is.
+    """
+    rev
+    function OrderedWeightsArrayRange(settings::RiskMeasureSettings, w1::OWA_Func_VecNum,
+                                      w2::OWA_Func_VecNum,
                                       alg::OrderedWeightsArrayFormulation, rev::Bool)
-        w1_flag = !isnothing(w1)
-        w2_flag = !isnothing(w2)
+        w1_flag = isa(w1, VecNum)
+        w2_flag = isa(w2, VecNum)
         if w1_flag
-            @argcheck(!isempty(w1))
+            @argcheck(!isempty(w1), IsEmptyError("w1 cannot be empty"))
         end
         if w2_flag
-            @argcheck(!isempty(w2))
+            @argcheck(!isempty(w2), IsEmptyError("w2 cannot be empty"))
             if !rev
                 if w1 === w2
                     w2 = reverse(w2)
@@ -1406,24 +1816,32 @@ $(DocStringExtensions.FIELDS)
                     reverse!(w2)
                 end
             end
+        else
+            if !rev
+                w2 = reverse! ∘ w2
+            end
         end
         if w1_flag && w2_flag
-            @argcheck(length(w1) == length(w2))
+            @argcheck(length(w1) == length(w2),
+                      DimensionMismatch("w1 ($(length(w1))) must match w2 ($(length(w2)))"))
         end
-        return new{typeof(settings), typeof(w1), typeof(w2), typeof(alg)}(settings, w1, w2,
-                                                                          alg)
+        return new{typeof(settings), typeof(w1), typeof(w2), typeof(alg), typeof(rev)}(settings,
+                                                                                       w1,
+                                                                                       w2,
+                                                                                       alg,
+                                                                                       true)
     end
 end
 function OrderedWeightsArrayRange(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                                  w1::Option{<:VecNum} = nothing,
-                                  w2::Option{<:VecNum} = nothing,
+                                  w1::OWA_Func_VecNum = owa_tg,
+                                  w2::OWA_Func_VecNum = owa_tg,
                                   alg::OrderedWeightsArrayFormulation = ApproxOrderedWeightsArray(),
                                   rev::Bool = false)
     return OrderedWeightsArrayRange(settings, w1, w2, alg, rev)
 end
 function (r::OrderedWeightsArrayRange)(x::VecNum)
-    w1 = isnothing(r.w1) ? owa_tg(length(x)) : r.w1
-    w2 = isnothing(r.w2) ? reverse(w1) : r.w2
+    w1 = isa(r.w1, VecNum) ? r.w1 : r.w1(length(x))
+    w2 = isa(r.w2, VecNum) ? r.w2 : r.w2(length(x))
     w = w1 - w2
     return LinearAlgebra.dot(w, sort(x))
 end
@@ -1436,4 +1854,6 @@ export MaximumEntropy, ExponentialConeEntropy, RelativeEntropy, MinimumSquaredDi
        MinimumSumSquares, NormalisedConstantRelativeRiskAversion, OWAJuMP, owa_gmd,
        owa_cvar, owa_wcvar, owa_tg, owa_wr, owa_rg, owa_cvarrg, owa_wcvarrg, owa_tgrg,
        owa_l_moment, owa_l_moment_crm, ExactOrderedWeightsArray, ApproxOrderedWeightsArray,
-       OrderedWeightsArray, OrderedWeightsArrayRange
+       OrderedWeightsArray, OrderedWeightsArrayRange, LinearMoment,
+       OrderedWeightsArrayConditionalValueatRisk, OrderedWeightsArrayTailGini,
+       OrderedWeightsArrayConditionalValueatRiskRange, OrderedWeightsArrayTailGiniRange

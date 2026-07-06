@@ -15,7 +15,7 @@ the boundary to mixed-integer constraints (thresholds, cardinality) lies.
 
 The unifying idea is the [`AssetSets`](@ref): you name assets and groups once, then every
 constraint refers to those names. The same `"name op value"` string grammar drives both the
-linear constraints here and the views in the [prior examples](../2_moments_priors/06_Entropy_Pooling.md).
+linear constraints here and the views in the [prior examples](../2_moments_priors/07_Entropy_Pooling.md).
 
 !!! tip "When to reach for this"
     Reach for these whenever a real mandate dictates the shape of the book: a 5% single-name cap,

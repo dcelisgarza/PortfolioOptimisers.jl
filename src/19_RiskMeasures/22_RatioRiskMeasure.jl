@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Represents a risk ratio risk measure for hierarchical portfolio optimisation.
 
-`RiskRatioRiskMeasure` computes the ratio of two risk measures, enabling the construction of risk-adjusted performance metrics for use in hierarchical optimisation routines.
+`RiskRatio` computes the ratio of two risk measures, enabling the construction of risk-adjusted performance metrics for use in hierarchical optimisation routines.
 
 # Mathematical definition
 
@@ -26,18 +26,25 @@ $(DocStringExtensions.FIELDS)
 
 # Constructors
 
-    RiskRatioRiskMeasure(;
+    RiskRatio(;
         r1::OptimisationRiskMeasure = Variance(),
         r2::OptimisationRiskMeasure = ConditionalValueatRisk()
-    ) -> RiskRatioRiskMeasure
+    ) -> RiskRatio
 
 Keywords correspond to the struct's fields.
+
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+
+  - `r1`: Recursively updated via [`factory`](@ref).
+  - `r2`: Recursively updated via [`factory`](@ref).
 
 # Examples
 
 ```jldoctest
-julia> RiskRatioRiskMeasure()
-RiskRatioRiskMeasure
+julia> RiskRatio()
+RiskRatio
   r1 ┼ Variance
      │   settings ┼ RiskMeasureSettings
      │            │   scale ┼ Float64: 1.0
@@ -60,61 +67,31 @@ RiskRatioRiskMeasure
 
   - [`HierarchicalRiskMeasure`](@ref)
   - [`OptimisationRiskMeasure`](@ref)
-  - [`NonOptimisationRiskRatioRiskMeasure`](@ref)
+  - [`NonOptimisationRiskRatio`](@ref)
 """
-@concrete struct RiskRatioRiskMeasure <: HierarchicalRiskMeasure
+@propagatable @concrete struct RiskRatio <: HierarchicalRiskMeasure
     """
     $(field_dict[:r1])
     """
-    r1
+    @fprop r1
     """
     $(field_dict[:r2])
     """
-    r2
-    function RiskRatioRiskMeasure(r1::OptimisationRiskMeasure, r2::OptimisationRiskMeasure)
+    @fprop r2
+    function RiskRatio(r1::OptimisationRiskMeasure, r2::OptimisationRiskMeasure)
         return new{typeof(r1), typeof(r2)}(r1, r2)
     end
 end
-function RiskRatioRiskMeasure(; r1::OptimisationRiskMeasure = Variance(),
-                              r2::OptimisationRiskMeasure = ConditionalValueatRisk())::RiskRatioRiskMeasure
-    return RiskRatioRiskMeasure(r1, r2)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Create an instance of [`RiskRatioRiskMeasure`](@ref) by updating both constituent risk measures from the optimisation context.
-
-Forwards all arguments to `factory` on `r1` and `r2`.
-
-# Related
-
-  - [`RiskRatioRiskMeasure`](@ref)
-  - [`factory`](@ref)
-"""
-function factory(r::RiskRatioRiskMeasure, args...; kwargs...)::RiskRatioRiskMeasure
-    r1 = factory(r.r1, args...; kwargs...)
-    r2 = factory(r.r2, args...; kwargs...)
-    return RiskRatioRiskMeasure(; r1 = r1, r2 = r2)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Create an instance of [`RiskRatioRiskMeasure`](@ref) updating both constituent risk measures from new portfolio weights `w`.
-
-# Related
-
-  - [`RiskRatioRiskMeasure`](@ref)
-  - [`factory`](@ref)
-"""
-function factory(r::RiskRatioRiskMeasure, w::VecNum)::RiskRatioRiskMeasure
-    return RiskRatioRiskMeasure(; r1 = factory(r.r1, w), r2 = factory(r.r2, w))
+function RiskRatio(; r1::OptimisationRiskMeasure = Variance(),
+                   r2::OptimisationRiskMeasure = ConditionalValueatRisk())::RiskRatio
+    return RiskRatio(r1, r2)
 end
 """
 $(DocStringExtensions.TYPEDEF)
 
 Represents a non-optimisation risk ratio measure.
 
-`NonOptimisationRiskRatioRiskMeasure` computes the ratio of two risk measures for analysis or reporting purposes. Unlike `RiskRatioRiskMeasure`, it is not intended for use as an objective or constraint in optimisation routines.
+`NonOptimisationRiskRatio` computes the ratio of two risk measures for analysis or reporting purposes. Unlike `RiskRatio`, it is not intended for use as an objective or constraint in optimisation routines.
 
 # Mathematical definition
 
@@ -137,54 +114,43 @@ $(DocStringExtensions.FIELDS)
 
 # Constructors
 
-    NonOptimisationRiskRatioRiskMeasure(;
+    NonOptimisationRiskRatio(;
         r1::AbstractBaseRiskMeasure = Variance(),
         r2::AbstractBaseRiskMeasure = ConditionalValueatRisk()
-    ) -> NonOptimisationRiskRatioRiskMeasure
+    ) -> NonOptimisationRiskRatio
 
 Keywords correspond to the struct's fields.
+
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+
+  - `r1`: Recursively updated via [`factory`](@ref).
+  - `r2`: Recursively updated via [`factory`](@ref).
 
 # Related
 
   - [`NonOptimisationRiskMeasure`](@ref)
   - [`AbstractBaseRiskMeasure`](@ref)
-  - [`RiskRatioRiskMeasure`](@ref)
+  - [`RiskRatio`](@ref)
 """
-@concrete struct NonOptimisationRiskRatioRiskMeasure <: NonOptimisationRiskMeasure
+@propagatable @concrete struct NonOptimisationRiskRatio <: NonOptimisationRiskMeasure
     """
     $(field_dict[:r1])
     """
-    r1
+    @fprop r1
     """
     $(field_dict[:r2])
     """
-    r2
-    function NonOptimisationRiskRatioRiskMeasure(r1::AbstractBaseRiskMeasure,
-                                                 r2::AbstractBaseRiskMeasure)
+    @fprop r2
+    function NonOptimisationRiskRatio(r1::AbstractBaseRiskMeasure,
+                                      r2::AbstractBaseRiskMeasure)
         return new{typeof(r1), typeof(r2)}(r1, r2)
     end
 end
-function NonOptimisationRiskRatioRiskMeasure(; r1::AbstractBaseRiskMeasure = Variance(),
-                                             r2::AbstractBaseRiskMeasure = ConditionalValueatRisk())::NonOptimisationRiskRatioRiskMeasure
-    return NonOptimisationRiskRatioRiskMeasure(r1, r2)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Create an instance of [`NonOptimisationRiskRatioRiskMeasure`](@ref) by updating both constituent risk measures from the optimisation context.
-
-Forwards all arguments to `factory` on `r1` and `r2`.
-
-# Related
-
-  - [`NonOptimisationRiskRatioRiskMeasure`](@ref)
-  - [`factory`](@ref)
-"""
-function factory(r::NonOptimisationRiskRatioRiskMeasure, args...;
-                 kwargs...)::NonOptimisationRiskRatioRiskMeasure
-    r1 = factory(r.r1, args...; kwargs...)
-    r2 = factory(r.r2, args...; kwargs...)
-    return NonOptimisationRiskRatioRiskMeasure(; r1 = r1, r2 = r2)
+function NonOptimisationRiskRatio(; r1::AbstractBaseRiskMeasure = Variance(),
+                                  r2::AbstractBaseRiskMeasure = ConditionalValueatRisk())::NonOptimisationRiskRatio
+    return NonOptimisationRiskRatio(r1, r2)
 end
 
-export RiskRatioRiskMeasure, NonOptimisationRiskRatioRiskMeasure
+export RiskRatio, NonOptimisationRiskRatio

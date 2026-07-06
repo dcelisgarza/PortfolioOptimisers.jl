@@ -132,12 +132,13 @@ NegativeSkewness
         sk_flag = isnothing(sk)
         V_flag = isnothing(V)
         if sk_flag || V_flag
-            @argcheck(sk_flag)
-            @argcheck(V_flag)
+            @argcheck(sk_flag, IsNothingError("sk cannot be nothing when V is provided"))
+            @argcheck(V_flag, IsNothingError("V cannot be nothing when sk is provided"))
         else
-            @argcheck(!isempty(sk))
-            @argcheck(!isempty(V))
-            @argcheck(size(sk, 1)^2 == size(sk, 2))
+            @argcheck(!isempty(sk), IsEmptyError("sk cannot be empty"))
+            @argcheck(!isempty(V), IsEmptyError("V cannot be empty"))
+            @argcheck(size(sk, 1)^2 == size(sk, 2),
+                      DimensionMismatch("size(sk, 1)^2 = $(size(sk, 1)^2) must equal size(sk, 2) = $(size(sk, 2))"))
             assert_matrix_issquare(V, :V)
         end
         assert_nonempty_nonneg_finite_val(window, :window)

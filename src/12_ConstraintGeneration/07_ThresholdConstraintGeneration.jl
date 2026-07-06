@@ -89,7 +89,7 @@ ThresholdEstimator
         assert_nonempty_nonneg_finite_val(val, :val)
         assert_nonempty_nonneg_finite_val(dval, :dval)
         if !isnothing(key)
-            @argcheck(!isempty(key))
+            @argcheck(!isempty(key), IsEmptyError("key cannot be empty"))
         end
         return new{typeof(val), typeof(key), typeof(dval)}(val, key, dval)
     end
@@ -140,7 +140,6 @@ Threshold
 # Related
 
   - [`short_mip_threshold_constraints`](@ref)
-  - [`short_smip_threshold_constraints`](@ref)
   - [`mip_constraints`](@ref)
   - [`set_mip_constraints!`](@ref)
   - [`ThresholdEstimator`](@ref)
@@ -154,7 +153,7 @@ Threshold
     """
     @vprop val
     function Threshold(val::Num_VecNum)::Threshold
-        assert_nonempty_nonneg_finite_val(val)
+        assert_nonempty_nonneg_finite_val(val, :val)
         return new{typeof(val)}(val)
     end
 end

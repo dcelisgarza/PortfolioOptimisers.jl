@@ -15,7 +15,7 @@ Represents the Range risk measure.
 
 Where:
 
-  - ``\\mathrm{Range}(\\boldsymbol{x})``: Full return spread of the portfolio.
+  - ``\\mathrm{Range}(\\boldsymbol{x})``: FullMoment return spread of the portfolio.
   - $(math_dict[:xret])
   - $(math_dict[:T])
 

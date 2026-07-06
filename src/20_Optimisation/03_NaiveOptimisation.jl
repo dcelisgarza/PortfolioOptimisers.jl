@@ -201,7 +201,7 @@ InverseVolatility
          │           │      │    ce ┼ GeneralCovariance
          │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
          │           │      │       │    w ┴ nothing
-         │           │      │   alg ┴ Full()
+         │           │      │   alg ┴ FullMoment()
          │           │   mp ┼ MatrixProcessing
          │           │      │     pdm ┼ Posdef
          │           │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
@@ -270,7 +270,8 @@ InverseVolatility
                                wf::WeightFinaliser, fb::Option{<:OptE_Opt}, sq::Bool,
                                brt::Bool, strict::Bool)
         if isa(wb, WeightBoundsEstimator)
-            @argcheck(!isnothing(sets))
+            @argcheck(!isnothing(sets),
+                      IsNothingError("sets cannot be nothing when wb is a WeightBoundsEstimator"))
         end
         return new{typeof(pe), typeof(wb), typeof(sets), typeof(wf), typeof(fb), typeof(sq),
                    typeof(brt), typeof(strict)}(pe, wb, sets, wf, fb, sq, brt, strict)
@@ -298,7 +299,8 @@ Requires that `opt.pe` is not an `AbstractPriorResult`.
 """
 function assert_external_optimiser(opt::InverseVolatility)::Nothing
     #! Maybe results can be allowed with a warning. This goes for other stuff like bounds and threshold vectors. And then the optimisation can throw a domain error when it comes to using them.
-    @argcheck(!isa(opt.pe, AbstractPriorResult))
+    @argcheck(!isa(opt.pe, AbstractPriorResult),
+              ArgumentError("opt.pe must not be an AbstractPriorResult for external use, got $(typeof(opt.pe))"))
     assert_internal_optimiser(opt)
     return nothing
 end
@@ -317,7 +319,7 @@ Internal dispatch called by [`optimise`](@ref). Computes covariance via the prio
 """
 function _optimise(iv::InverseVolatility, rd::ReturnsResult = ReturnsResult();
                    dims::Int = 1, kwargs...)
-    @argcheck(dims in (1, 2))
+    @argcheck(dims in (1, 2), DomainError(dims, "dims must be 1 or 2"))
     rd = returns_result_picker(rd, iv.brt)
     pr = prior(iv.pe, rd; dims = dims)
     X = pr.X
@@ -444,7 +446,8 @@ EqualWeighted
     function EqualWeighted(wb::Option{<:WbE_Wb}, sets::Option{<:AssetSets},
                            wf::WeightFinaliser, fb::Option{<:OptE_Opt}, strict::Bool)
         if isa(wb, WeightBoundsEstimator)
-            @argcheck(!isnothing(sets))
+            @argcheck(!isnothing(sets),
+                      IsNothingError("sets cannot be nothing when wb is a WeightBoundsEstimator"))
         end
         return new{typeof(wb), typeof(sets), typeof(wf), typeof(fb), typeof(strict)}(wb,
                                                                                      sets,
@@ -473,8 +476,8 @@ Internal dispatch called by [`optimise`](@ref). Assigns equal weights to all ass
   - [`_optimise`](@ref)
 """
 function _optimise(ew::EqualWeighted, rd::ReturnsResult; dims::Int = 1, kwargs...)
-    @argcheck(!isnothing(rd.X))
-    @argcheck(dims in (1, 2))
+    @argcheck(!isnothing(rd.X), IsNothingError("rd.X cannot be nothing"))
+    @argcheck(dims in (1, 2), DomainError(dims, "dims must be 1 or 2"))
     dims = ifelse(isone(dims), 2, 1)
     N = size(rd.X, dims)
     w = fill(inv(N), N)
@@ -623,7 +626,8 @@ RandomWeighted
             assert_nonempty_gt0_finite_val(alpha, :alpha)
         end
         if isa(wb, WeightBoundsEstimator)
-            @argcheck(!isnothing(sets))
+            @argcheck(!isnothing(sets),
+                      IsNothingError("sets cannot be nothing when wb is a WeightBoundsEstimator"))
         end
         return new{typeof(alpha), typeof(rng), typeof(seed), typeof(wb), typeof(sets),
                    typeof(wf), typeof(fb), typeof(strict)}(alpha, rng, seed, wb, sets, wf,
@@ -653,12 +657,13 @@ Internal dispatch called by [`optimise`](@ref). Draws weights from a Dirichlet d
   - [`_optimise`](@ref)
 """
 function _optimise(rw::RandomWeighted, rd::ReturnsResult; dims::Int = 1, kwargs...)
-    @argcheck(!isnothing(rd.X))
-    @argcheck(dims in (1, 2))
+    @argcheck(!isnothing(rd.X), IsNothingError("rd.X cannot be nothing"))
+    @argcheck(dims in (1, 2), DomainError(dims, "dims must be 1 or 2"))
     dims = ifelse(isone(dims), 2, 1)
     N = size(rd.X, dims)
     if isa(rw.alpha, VecNum)
-        @argcheck(length(rw.alpha) == N)
+        @argcheck(length(rw.alpha) == N,
+                  DimensionMismatch("rw.alpha ($(length(rw.alpha))) must match N ($N)"))
     end
     dist = if isa(rw.alpha, Number)
         Distributions.Dirichlet(N, rw.alpha)

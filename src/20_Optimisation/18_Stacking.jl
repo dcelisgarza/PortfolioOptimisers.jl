@@ -146,13 +146,22 @@ Where:
   - ``\\boldsymbol{W}_k``: Returns proxy matrix weighted by inner-optimiser weights ``\\boldsymbol{w}_k``.
   - ``\\mathrm{opto}``: Outer optimiser applied to the aggregated returns proxy.
 
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+
+  - `fees`: Recursively updated via [`factory`](@ref).
+  - `opti`: Recursively updated via [`factory`](@ref).
+  - `opto`: Recursively updated via [`factory`](@ref).
+  - `fb`: Recursively updated via [`factory`](@ref).
+
 # Related
 
   - [`BaseStackingOptimisationEstimator`](@ref)
   - [`NestedClustered`](@ref)
   - [`StackingResult`](@ref)
 """
-@concrete struct Stacking <: BaseStackingOptimisationEstimator
+@propagatable @concrete struct Stacking <: BaseStackingOptimisationEstimator
     """
     $(field_dict[:pe])
     """
@@ -164,7 +173,7 @@ Where:
     """
     $(field_dict[:feese])
     """
-    fees
+    @fprop fees
     """
     $(field_dict[:sets])
     """
@@ -176,11 +185,11 @@ Where:
     """
     $(field_dict[:opti])
     """
-    opti
+    @fprop opti
     """
     $(field_dict[:opto])
     """
-    opto
+    @fprop opto
     """
     $(field_dict[:cv])
     """
@@ -196,7 +205,7 @@ Where:
     """
     $(field_dict[:fb])
     """
-    fb
+    @fprop fb
     """
     $(field_dict[:brt])
     """
@@ -211,20 +220,22 @@ Where:
                       cv::Option{<:OptimisationCrossValidation}, wf::WeightFinaliser,
                       ex::FLoops.Transducers.Executor, fb::Option{<:OptE_Opt}, brt::Bool,
                       strict::Bool)
-        @argcheck(!isempty(opti))
+        @argcheck(!isempty(opti), IsEmptyError("opti cannot be empty"))
         if !isnothing(scale)
-            @argcheck(length(scale) == length(opti))
-            @argcheck(all(isfinite, scale))
+            @argcheck(length(scale) == length(opti),
+                      DimensionMismatch("scale ($(length(scale))) must match opti ($(length(opti)))"))
+            @argcheck(all(isfinite, scale),
+                      IsNonFiniteError("all elements of scale must be finite"))
         end
         assert_external_optimiser(opto)
         if !isnothing(cv)
             assert_external_optimiser(opti)
         end
         if isa(wb, WeightBoundsEstimator)
-            @argcheck(!isnothing(sets))
+            @argcheck(!isnothing(sets), IsNothingError("sets cannot be nothing"))
         end
         if isa(fees, FeesEstimator)
-            @argcheck(!isnothing(sets))
+            @argcheck(!isnothing(sets), IsNothingError("sets cannot be nothing"))
         end
         return new{typeof(pe), typeof(wb), typeof(fees), typeof(sets), typeof(scale),
                    typeof(opti), typeof(opto), typeof(cv), typeof(wf), typeof(ex),
@@ -245,12 +256,14 @@ function Stacking(; pe::PrE_Pr = EmpiricalPrior(), wb::Option{<:WbE_Wb} = nothin
     return Stacking(pe, wb, fees, sets, scale, opti, opto, cv, wf, ex, fb, brt, strict)
 end
 function assert_special_nco_requirements(opt::Stacking)::Nothing
-    @argcheck(!any(x -> isa(x, NonFiniteAllocationOptimisationResult), opt.opti))
+    @argcheck(!any(x -> isa(x, NonFiniteAllocationOptimisationResult), opt.opti),
+              ArgumentError("opti cannot contain NonFiniteAllocationOptimisationResult elements"))
     return nothing
 end
 function assert_external_optimiser(opt::Stacking)::Nothing
     #! Maybe results can be allowed with a warning. This goes for other stuff like bounds and threshold vectors. And then the optimisation can throw a domain error when it comes to using them.
-    @argcheck(!isa(opt.pe, AbstractPriorResult))
+    @argcheck(!isa(opt.pe, AbstractPriorResult),
+              ArgumentError("opt.pe cannot be a precomputed AbstractPriorResult; use an estimator instead"))
     assert_external_optimiser(opt.opto)
     if !isnothing(opt.cv)
         assert_external_optimiser(opt.opti)
@@ -274,20 +287,6 @@ function needs_previous_weights(opt::Stacking)
             needs_previous_weights(opt.opti) ||
             needs_previous_weights(opt.opto) ||
             needs_previous_weights(opt.fb))
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Build an updated [`Stacking`](@ref) with all estimators that track previous weights updated via `factory` using `w`.
-"""
-function factory(st::Stacking, w::AbstractVector)::Stacking
-    fees = factory(st.fees, w)
-    opti = factory(st.opti, w)
-    opto = factory(st.opto, w)
-    fb = factory(st.fb, w)
-    return Stacking(; pe = st.pe, wb = st.wb, fees = fees, sets = st.sets, scale = st.scale,
-                    opti = opti, opto = opto, cv = st.cv, wf = st.wf, ex = st.ex, fb = fb,
-                    brt = st.brt, strict = st.strict)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -379,7 +378,8 @@ function _optimise(st::Stacking, rd::ReturnsResult; dims::Int = 1,
         res = optimise(opt, rd; dims = dims, branchorder = branchorder,
                        str_names = str_names, save = save, kwargs...)
         #! Support efficient frontier?
-        @argcheck(!isa(res.retcode, AbstractVector))
+        @argcheck(!isa(res.retcode, AbstractVector),
+                  ArgumentError("res.retcode cannot be an AbstractVector; efficient frontier results are not supported here"))
         wi[:, i] = res.w
         resi[i] = res
     end

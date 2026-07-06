@@ -1,5 +1,7 @@
 # Base optimisation
 
+All optimisers are defined as their whole names, however this can be unwieldy, so we also provide convenience aliases defined in [API](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/24_Aliases).
+
 ```@docs
 AbstractOptimisationEstimator
 BaseOptimisationEstimator

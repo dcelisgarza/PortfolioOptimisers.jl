@@ -159,7 +159,7 @@ a **centred** frontier instead: at each point it returns the portfolio at the an
 the near-optimal neighbourhood rather than the corner. The result sits just inside the extreme
 frontier — slightly less optimal, noticeably more diversified and more stable to changes in the
 prior. (NOC's neighbourhood-centring behaviour is dissected on its own
-[page](08_Near_Optimal_Centering.md); here we only use it as a frontier engine.)
+[page](15_Near_Optimal_Centering.md); here we only use it as a frontier engine.)
 
 NOC solves a harder problem than plain `MeanRisk`, so a single solver configuration can fail to
 converge. We give it a richer fallback vector with decreasing `max_step_fraction`.
@@ -247,7 +247,7 @@ fronts — we can even use the ratio of two risk measures as the colourbar.
 =#
 
 plot_measures(resA.w, resA.pr; x = r, y = ConditionalDrawdownatRisk(),
-              c = RiskRatioRiskMeasure(; r1 = ConditionalDrawdownatRisk(), r2 = r),
+              c = RiskRatio(; r1 = ConditionalDrawdownatRisk(), r2 = r),
               title = "Pareto Front", xlabel = "CVaR", ylabel = "CDaR",
               colorbar_title = "\nCDaR/CVaR Ratio", right_margin = 6Plots.mm)
 

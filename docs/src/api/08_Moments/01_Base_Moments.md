@@ -20,16 +20,18 @@ port_opt_view(alg::AbstractExpectedReturnsAlgorithm, ::Any, args...)
 factory(alg::AbstractExpectedReturnsAlgorithm, args...; kwargs...)
 robust_cov
 robust_cor
+compat_cov
+compat_cor
 moment_window_and_weights
 windowed_preamble
 demean_returns
 ```
 
-## Full and semi moments
+## FullMoment and semi moments
 
 Moments other than the expected return can be estimated using the entire spectrum of deviations (full), or only the deviations below a target (semi/downside). These types allow us to provide such functionality.
 
 ```@docs
-Full
-Semi
+FullMoment
+SemiMoment
 ```

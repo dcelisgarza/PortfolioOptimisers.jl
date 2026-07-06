@@ -6,7 +6,9 @@ exported_symbols = names(PortfolioOptimisers)
 all_symbols = names(PortfolioOptimisers; all = true)
 filter!(x -> !contains(string(x), r"#|^eval$|^include$"), all_symbols)
 private_symbols = setdiff(all_symbols, exported_symbols)
-for sym in private_symbols
+public_symbols = exported_symbols[findall(x->!Base.isexported(PortfolioOptimisers, x),
+                                          exported_symbols)]
+for sym in [private_symbols; public_symbols]
     eval(quote
              import PortfolioOptimisers: $(sym)
          end)
@@ -58,6 +60,17 @@ const GROUP_LABELS = Dict("1_foundations" => "Foundations",
                           "6_post_processing" => "Post-processing",
                           "7_putting_it_together" => "Putting It Together")
 
+# Regenerate Literate outputs against the previous commit: resolve HEAD's parent and only
+# rebuild the examples/guide whose sources changed since then. A shared-code change
+# (src/ext/test) can alter every example's rendered output, so it forces a full rebuild.
+# If the parent can't be resolved (initial commit or a shallow CI checkout), rebuild
+# everything.
+const DIFF_REF = try
+    strip(String(read(`git rev-parse HEAD"~"1`)))
+catch
+    ""
+end
+
 function group_label(dir)
     return get(GROUP_LABELS, dir,
                titlecase(replace(replace(dir, r"^\d+_" => ""), "_" => " ")))
@@ -90,7 +103,7 @@ function generate_files(source::String, build::String, diff_flag::Bool)
     # Returns the page path relative to docs/src.
     function process(jl, src_dir_abs, out_build_abs, rel_build)
         if !(diff_flag &&
-             isempty(String(read(Cmd(`git diff $(joinpath(src_dir_abs, jl))`)))))
+             isempty(String(read(Cmd(`git diff $DIFF_REF -- $(joinpath(src_dir_abs, jl))`)))))
             Literate.markdown(joinpath(src_dir_abs, jl), out_build_abs;
                               preprocess = pre_process_content_md,
                               postprocess = postprocess, documenter = true, credit = true)
@@ -122,10 +135,13 @@ function generate_files(source::String, build::String, diff_flag::Bool)
     return pages
 end
 
-diff_flag = isempty(String(read(Cmd(`git diff $(@__DIR__) $(joinpath(@__DIR__, "../src/")) $(joinpath(@__DIR__, "../ext/")) $(joinpath(@__DIR__, "../test/"))`))))
+# `diff_flag == true` enables selective per-file rebuilding (see `process`); we only enable
+# it when the shared code is unchanged relative to the previous commit.
+diff_flag = !isempty(DIFF_REF) &&
+            isempty(String(read(Cmd(`git diff $DIFF_REF -- $(joinpath(@__DIR__, "../src/")) $(joinpath(@__DIR__, "../ext/")) $(joinpath(@__DIR__, "../test/"))`))))
 
-examples = generate_files("../examples/", "examples/", false)
-user_guide = generate_files("../user_guide/", "user_guide/", false)
+examples = generate_files("../examples/", "examples/", diff_flag)
+user_guide = generate_files("../user_guide/", "user_guide/", diff_flag)
 
 include(joinpath(@__DIR__, "generate_type_hierarchy.jl"))
 generate_type_hierarchy()
@@ -164,7 +180,7 @@ makedocs(; modules = [PortfolioOptimisers], doctest = false,
                                  joinpath.(api_pages[11][1][idx1:end], api_pages[11][3])
                                  joinpath.(api_pages[12][1][idx1:end], api_pages[12][3])]];
                   "Contribute" => contribute;
-                  "References" => root_pages[2]],
+                  "References" => root_pages[end]],
          plugins = [CitationBibliography(joinpath(@__DIR__, "src", "References.bib");
                                          style = :numeric)])
 

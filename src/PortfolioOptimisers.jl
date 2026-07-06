@@ -5,6 +5,7 @@ module PortfolioOptimisers
 
 using Accessors: Accessors
 using ArgCheck: @argcheck
+using Base.ScopedValues: ScopedValue
 using AverageShiftedHistograms: AverageShiftedHistograms
 using Clustering: Clustering, assignments
 using Combinatorics: Combinatorics
@@ -27,7 +28,7 @@ using MultivariateStats: MultivariateStats
 using NearestCorrelationMatrix: NearestCorrelationMatrix
 using Optim: Optim
 using PrecompileTools: PrecompileTools
-using PythonCall: PythonCall
+using Preferences: Preferences
 using Random: Random
 using Roots: Roots
 using SimpleWeightedGraphs: SimpleWeightedGraphs
@@ -36,6 +37,7 @@ using SpecialFunctions: SpecialFunctions
 using Statistics: Statistics, mean, std, var, cor, cov
 using StatsAPI: StatsAPI, predict
 using StatsBase: StatsBase
+using StringDistances: StringDistances
 using TimeSeries: TimeSeries
 
 #=
@@ -234,8 +236,10 @@ include("20_Optimisation/20_RiskMeasureConstraints/21_GenericValueatRiskRangeCon
 include("20_Optimisation/21_Base_FiniteAllocation.jl")
 include("20_Optimisation/22_DiscreteFiniteAllocation.jl")
 include("20_Optimisation/23_GreedyFiniteAllocation.jl")
+include("20_Optimisation/24_RiskMeasureCompatibility.jl")
 include("21_ExpectedReturns.jl")
 include("22_Plotting.jl")
 include("23_Precompilation.jl")
+include("24_Aliases.jl")
 
 end

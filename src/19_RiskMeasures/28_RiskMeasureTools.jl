@@ -1,77 +1,32 @@
-for r in setdiff(traverse_concrete_subtypes(RiskMeasure), (UncertaintySetVariance,))
-    eval(quote
-             function no_bounds_risk_measure(r::$(r), ::Any = nothing)
-                 pnames = Tuple(setdiff(fieldnames(typeof(r)), (:settings,)))
-                 settings = r.settings
-                 settings = RiskMeasureSettings(; rke = settings.rke,
-                                                scale = settings.scale)
-                 return if isempty(pnames)
-                     $(r)(; settings = settings)
-                 else
-                     $(r)(; settings = settings,
-                          NamedTuple{pnames}(getfield.(r, pnames))...)
-                 end
-             end
-         end)
+function no_bounds_risk_measure(r::RiskMeasure, ::Any = nothing)
+    settings = r.settings
+    return Accessors.@set r.settings = RiskMeasureSettings(; rke = settings.rke,
+                                                           scale = settings.scale)
 end
-for r in setdiff(traverse_concrete_subtypes(RiskMeasure), (UncertaintySetVariance,))
-    eval(quote
-             function no_bounds_no_risk_expr_risk_measure(r::$(r), ::Any = nothing)
-                 pnames = Tuple(setdiff(fieldnames(typeof(r)), (:settings,)))
-                 settings = r.settings
-                 settings = RiskMeasureSettings(; rke = false, scale = 1)
-                 return if isempty(pnames)
-                     $(r)(; settings = settings)
-                 else
-                     $(r)(; settings = settings,
-                          NamedTuple{pnames}(getfield.(r, pnames))...)
-                 end
-             end
-             function no_risk_expr_risk_measure(r::$(r))
-                 pnames = Tuple(setdiff(fieldnames(typeof(r)), (:settings,)))
-                 settings = r.settings
-                 settings = RiskMeasureSettings(; rke = false, ub = settings.ub,
-                                                scale = settings.scale)
-                 return if isempty(pnames)
-                     $(r)(; settings = settings)
-                 else
-                     $(r)(; settings = settings,
-                          NamedTuple{pnames}(getfield.(r, pnames))...)
-                 end
-             end
-         end)
+function no_bounds_no_risk_expr_risk_measure(r::RiskMeasure, ::Any = nothing)
+    return Accessors.@set r.settings = RiskMeasureSettings(; rke = false, scale = 1)
 end
-for r in traverse_concrete_subtypes(RiskMeasure)
-    eval(quote
-             function bounds_risk_measure(r::$(r), ub::Number)
-                 pnames = Tuple(setdiff(fieldnames(typeof(r)), (:settings,)))
-                 settings = r.settings
-                 settings = RiskMeasureSettings(; ub = ub, rke = settings.rke,
-                                                scale = settings.scale)
-                 return if isempty(pnames)
-                     $(r)(; settings = settings)
-                 else
-                     $(r)(; settings = settings,
-                          NamedTuple{pnames}(getfield.(r, pnames))...)
-                 end
-             end
-         end)
+function no_risk_expr_risk_measure(r::RiskMeasure)
+    settings = r.settings
+    return Accessors.@set r.settings = RiskMeasureSettings(; rke = false, ub = settings.ub,
+                                                           scale = settings.scale)
 end
-for r in traverse_concrete_subtypes(HierarchicalRiskMeasure)
-    eval(quote
-             function no_bounds_risk_measure(r::$(r), ::Any = nothing)
-                 return r
-             end
-             function no_bounds_no_risk_expr_risk_measure(r::$(r), ::Any = nothing)
-                 return r
-             end
-             function no_risk_expr_risk_measure(r::$(r))
-                 return r
-             end
-             function bounds_risk_measure(r::$(r), ::Any = nothing)
-                 return r
-             end
-         end)
+function bounds_risk_measure(r::RiskMeasure, ub::Number)
+    settings = r.settings
+    return Accessors.@set r.settings = RiskMeasureSettings(; ub = ub, rke = settings.rke,
+                                                           scale = settings.scale)
+end
+function no_bounds_risk_measure(r::HierarchicalRiskMeasure, ::Any = nothing)
+    return r
+end
+function no_bounds_no_risk_expr_risk_measure(r::HierarchicalRiskMeasure, ::Any = nothing)
+    return r
+end
+function no_risk_expr_risk_measure(r::HierarchicalRiskMeasure)
+    return r
+end
+function bounds_risk_measure(r::HierarchicalRiskMeasure, ::Any = nothing)
+    return r
 end
 """
     no_bounds_risk_measure(r, flag = nothing)

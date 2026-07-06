@@ -21,13 +21,18 @@ A plain data struct that holds the computed outputs of a function applied to an 
 A generic configuration mechanism for immutable structs — they may be Estimator, Result, or Algorithm structs. Because all structs are immutable and the library relies heavily on composition, `factory` is the standard way to propagate runtime-computed values (moments from a Prior Result, observation weights, previous portfolio weights, etc.) down through a composed struct tree. It takes a struct and runtime data and returns a new, fully-configured struct of the same type.
 
 **View**
-The sub-selection counterpart to Factory. Where Factory propagates runtime *values* down a composed struct tree, a View propagates an index *selection*: it restricts an Estimator, Algorithm, or Result (or an array of them) to a subset of assets — or, for returns data, observations — and returns a new struct of the same type with every data-bearing field and composed child consistently sub-selected. Used wherever the library operates on part of the problem rather than the whole: meta-optimisers (Subset Resampling, Nested Clustered), Cross-Validation, and windowed moment estimators. Like Factory, it relies on composition — each struct declares which of its fields participate, and the selection is threaded recursively down the tree.
+The sub-selection counterpart to Factory. Where Factory propagates runtime *values* down a composed struct tree, a View propagates an index *selection*: it restricts an Estimator, Algorithm, or Result (or an array of them) to a subset of assets — or, for returns data, observations — and returns a new struct of the same type with every data-bearing field and composed child consistently sub-selected. Used wherever the library operates on part of the problem rather than the whole: meta-optimisers (Subset Resampling, Nested Clustered), Cross-Validation, and windowed moment estimators. Like Factory, it relies on composition — each struct declares which of its fields participate, and the selection is threaded recursively down the tree. Unlike Factory, View is primarily an *internal* mechanism — driven by the meta-optimisers and Cross-Validation rather than called directly by everyday callers — so its entry point `port_opt_view` is marked `public`, not exported.
+Extension authors implementing a new composed estimator should define a `port_opt_view` method for it, or tag data-bearing fields with `@vprop` to have the method generated automatically.
 
 **Vector-to-Scalar Reducers**
 Small reusable Algorithms that collapse a vector of reals to a scalar, reused throughout the library: `MinValue`, `MaxValue`, `MeanValue`, `MedianValue`, `ModeValue`, `StdValue`, `VarValue`, `SumValue`, `ProdValue`, `StandardisedValue` (weighted mean ÷ weighted std). Most accept optional observation weights.
 
-**Full vs Semi**
-A pervasive Algorithm distinction in moment estimation: `Full` includes all deviations; `Semi` includes only observations below a target (downside-only). Drives the split between symmetric and downside risk/moment measures.
+**LxNorm error family**
+LxNorm errors are used as constraints, targets for risk measures, and in entropy pooling of multiple
+conditional value at risk views: `L1Norm`, `L2Norm`, `SquaredL2Norm`, `LpNorm`, `LInfNorm`.
+
+**FullMoment vs SemiMoment**
+A pervasive Algorithm distinction in moment estimation: `FullMoment` includes all deviations; `SemiMoment` includes only observations below a target (downside-only). Drives the split between symmetric and downside risk/moment measures.
 
 ## 2. Data
 
@@ -77,14 +82,14 @@ Computes an asset covariance (and correlation) matrix. Core wrappers: `Covarianc
 ### 3.3 Higher-Order Moments
 
 **Coskewness** / **Cokurtosis**
-Third- and fourth-order co-moment tensors (with `Full`/`Semi` variants and windowed forms `WindowedCoskewness`, `WindowedCokurtosis`). Feed high-order priors and higher-moment risk measures.
+Third- and fourth-order co-moment tensors (with `FullMoment`/`SemiMoment` variants and windowed forms `WindowedCoskewness`, `WindowedCokurtosis`). Feed high-order priors and higher-moment risk measures.
 
 ### 3.4 Regression (factor modelling)
 
 **Regression Estimator**
 Builds a factor model mapping factor returns to asset returns; underpins factor priors. Families:
 
-- **StepwiseRegression**: greedy feature selection — `Forward` (selection) or `Backward` (elimination), driven by a criterion: `PValue`, `AIC`, `AICC`, `BIC`, `RSquared`, `AdjustedRSquared`.
+- **StepwiseRegression**: greedy feature selection — `ForwardSelection` (selection) or `BackwardElimination` (elimination), driven by a criterion: `PValue`, `AIC`, `AICC`, `BIC`, `RSquared`, `AdjustedRSquared`.
 - **DimensionReductionRegression**: regression on reduced factors — targets `PCA`, `PPCA`.
 - **Regression target** models: `LinearModel`, `GeneralisedLinearModel` (GLM).
 
@@ -215,7 +220,7 @@ Post-solve adjustment forcing weights into the feasible region: `IterativeWeight
 Measures/constrains change relative to a reference. Dynamic (vs previous weights, needs them at runtime) or fixed (vs static target). Soft penalty or hard constraint.
 
 **Tracking Error**
-Measures/constrains closeness to a benchmark/target. `WeightsTracking` (vs a reference weight vector — needs a weight vector, not necessarily *previous*) or `ReturnsTracking` (vs a benchmark return series). Return formulations: `L1Tracking`, `L2Tracking`, `SquaredL2Tracking`, `LpTracking`, `LInfTracking` (norms) and `IndependentVariableTracking` / `DependentVariableTracking` (variable). Soft penalty or hard constraint.
+Measures/constrains closeness to a benchmark/target. `WeightsTracking` (vs a reference weight vector — needs a weight vector, not necessarily *previous*) or `ReturnsTracking` (vs a benchmark return series). Return tracking formulations: LxNorm error family (norm-based errors). Risk tracking formulations: `IndependentVariableTracking` / `DependentVariableTracking` (variable). Soft penalty or hard constraint.
 
 ### 4.5 Meta-optimisers
 
@@ -243,6 +248,10 @@ Discretises continuous weights into whole shares for a fixed cash budget (real-w
 
 - **DiscreteAllocation**: MIP-based exact allocation (needs a MIP solver).
 - **GreedyAllocation**: heuristic greedy rounding.
+
+**FiniteAllocationInput**
+The problem data fed to a Finite Allocation optimiser: target weights, asset prices, cash budget, and optional time horizon / fees. Shared by both `DiscreteAllocation` and `GreedyAllocation`, and passed as the single positional argument to `optimise`. Subtypes `AbstractEstimator` — deliberately treated as a configuration object (the primary input to `optimise`) rather than as a computed output, keeping the `Result` tree reserved for outputs and staying clear of the `plot_*`/`OptimisationResult` dispatch surface. This makes it the one pure-data struct classified as an Estimator (the `WeightBounds`/`RiskBudget` precedent puts data under the Result tree); the deviation is intentional so the allocation *inputs* never collide with allocation *results*.
+*Avoid*: FiniteAllocation (that is the family), AllocationProblem, AllocationInput.
 
 ## 5. Risk Measures
 
@@ -275,7 +284,7 @@ The `XatRisk` naming uses "X" as shorthand for "Value" or "Drawdown" — the sam
 - **Value-at-Risk (VaR)**: `ValueatRisk` (formulations `MIPValueatRisk`, `DistributionValueatRisk`), `ValueatRiskRange`; drawdown forms `DrawdownatRisk`, `RelativeDrawdownatRisk`.
 - **Conditional (CVaR / Expected Shortfall)**: `ConditionalValueatRisk`, `…Range`, DR forms, drawdown `ConditionalDrawdownatRisk` (CDaR) and relatives.
 - **Entropic (EVaR)**: `EntropicValueatRisk`, `…Range`, `EntropicDrawdownatRisk` (EDaR), relatives.
-- **Relativistic (RVaR)**: `RelativisticValueatRisk`, `…Range`, `RelativisticDrawdownatRisk` (RDDaR), relatives.
+- **Relativistic (RVaR)**: `RelativisticValueatRisk`, `…Range`, `RelativisticDrawdownatRisk` (RDaR), relatives.
 - **Power Norm**: `PowerNormValueatRisk` (PNVaR), `…Range`, `PowerNormDrawdownatRisk`, relatives.
 
 **OWA (Ordered Weights Array)**
@@ -293,8 +302,8 @@ Weighted sum of *sorted* return realisations; weights generated by an Algorithm 
 - **TurnoverRiskMeasure**: turnover expressed as a risk quantity.
 - **TrackingRiskMeasure**: benchmark deviation measured as a **norm** of the portfolio-vs-benchmark difference.
 - **RiskTrackingRiskMeasure**: benchmark deviation measured through a configurable **risk measure `r`** applied to the portfolio-vs-benchmark difference (a `WeightsTracking` benchmark + risk measure + `VariableTracking` algorithm) — i.e. tracking the *risk* relative to a benchmark rather than the raw norm.
-- **EqualRiskMeasure**: enforces equal risk contributions (hierarchical).
-- **RiskRatioRiskMeasure** / **NonOptimisationRiskRatioRiskMeasure**: ratio-form measures for hierarchical use.
+- **EqualRisk**: enforces equal risk contributions (hierarchical).
+- **RiskRatio** / **NonOptimisationRiskRatio**: ratio-form measures for hierarchical use.
 
 ### Non-optimisation (analysis) measures
 

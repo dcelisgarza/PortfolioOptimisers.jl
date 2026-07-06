@@ -318,8 +318,10 @@ AssetSets
         @argcheck(!isempty(dict), IsEmptyError)
         @argcheck(haskey(dict, key), KeyError)
         @argcheck(key !== ukey, ValueError)
-        @argcheck(!startswith(key, ukey))
-        @argcheck(!startswith(ukey, key))
+        @argcheck(!startswith(key, ukey),
+                  ArgumentError("key ($key) must not start with ukey ($ukey)"))
+        @argcheck(!startswith(ukey, key),
+                  ArgumentError("ukey ($ukey) must not start with key ($key)"))
         for k in setdiff(keys(dict), (key,))
             if startswith(k, key)
                 @argcheck(length(dict[k]) == length(dict[key]), DimensionMismatch)
@@ -364,7 +366,7 @@ function port_opt_view(sets::AssetSets, i, args...)::AssetSets
 end
 """
     group_to_val!(nx::VecStr, sdict::AbstractDict, key::Any, val::Number,
-                  dict::EstValType, arr::VecNum, strict::Bool)
+                  arr::VecNum, strict::Bool, nxkey::AbstractString)
 
 Set values in a vector for all assets belonging to a specified group.
 
@@ -376,14 +378,15 @@ Set values in a vector for all assets belonging to a specified group.
   - `sdict`: Dictionary mapping group names to vectors of asset names.
   - `key`: Name of the group of assets to set values for.
   - `val`: The value to assign to the assets in the group.
-  - `dict`: The original dictionary, vector of pairs, or pair being processed (used for logging messages).
   - `arr`: The array to be modified in-place.
   - `strict`: If `true`, throws an error if `key` is not found in `sdict`; if `false`, issues a warning.
+  - `nxkey`: Name of the asset-universe key in `sets.dict` (e.g. `"nx"`), used only to name the universe in the diagnostic message — see [`unknown_variable_msg`](@ref) / [`missing_group_assets_msg`](@ref).
 
 # Details
 
   - If `key` is found in `sdict`, all assets in the group are mapped to their indices in `nx`, and the corresponding entries in `arr` are set to `val`.
   - If `key` is not found and `strict` is `true`, an `ArgumentError` is thrown; otherwise, a warning is issued.
+  - Diagnostic messages name only the universe *size* (never the full universe or the input value dictionary), routed through the shared builders in `02_Tools.jl`.
 
 # Returns
 
@@ -393,21 +396,24 @@ Set values in a vector for all assets belonging to a specified group.
 
   - [`estimator_to_val`](@ref)
   - [`AssetSets`](@ref)
+  - [`unknown_variable_msg`](@ref)
+  - [`missing_group_assets_msg`](@ref)
 """
-function group_to_val!(nx::VecStr, sdict::AbstractDict, key::Any, val::Number,
-                       dict::EstValType, arr::VecNum, strict::Bool)::Nothing
+function group_to_val!(nx::VecStr, sdict::AbstractDict, key::Any, val::Number, arr::VecNum,
+                       strict::Bool, nxkey::AbstractString)::Nothing
     assets = get(sdict, key, nothing)
     if isnothing(assets)
-        msg = "$(key) is not in $(keys(sdict)) or in sets.dict[nx] = $nx.\n$(dict)"
+        # A missing key may be a mistyped asset *or* a mistyped group/set name, so widen the
+        # suggestion pool beyond the raw universe to include the group/set keys.
+        msg = unknown_variable_msg(key, nx, nxkey; candidates = [nx; collect(keys(sdict))])
         strict ? throw(ArgumentError(msg)) : @warn(msg)
     else
         unique!(assets)
         idx = [findfirst(x -> x == asset, nx) for asset in assets]
-        N1 = length(idx)
+        missing_assets = assets[isnothing.(idx)]
         filter!(!isnothing, idx)
-        N2 = length(idx)
-        if N1 != N2
-            msg = "Some assets in group `$(key)` are not in the asset universe.\nAssets in group `$key`: $(assets)\nAssets in universe: $(nx).\n$(dict)"
+        if !isempty(missing_assets)
+            msg = missing_group_assets_msg(key, missing_assets, nx, nxkey)
             strict ? throw(ArgumentError(msg)) : @warn(msg)
         end
         arr[idx] .= val
@@ -458,13 +464,14 @@ function estimator_to_val(dict::MultiEstValType, sets::AssetSets,
                           key::Option{<:AbstractString} = nothing;
                           datatype::DataType = Float64, strict::Bool = false)
     val = ifelse(isnothing(val), zero(datatype), val)
-    nx = sets.dict[ifelse(isnothing(key), sets.key, key)]
+    nxkey = ifelse(isnothing(key), sets.key, key)
+    nx = sets.dict[nxkey]
     arr = fill(val, length(nx))
     for (key, val) in dict
         if key in nx
             arr[findfirst(x -> x == key, nx)] = val
         else
-            group_to_val!(nx, sets.dict, key, val, dict, arr, strict)
+            group_to_val!(nx, sets.dict, key, val, arr, strict, nxkey)
         end
     end
     return arr
@@ -474,13 +481,14 @@ function estimator_to_val(dict::PairStrNum, sets::AssetSets,
                           key::Option{<:AbstractString} = nothing;
                           datatype::DataType = Float64, strict::Bool = false)
     val = ifelse(isnothing(val), zero(datatype), val)
-    nx = sets.dict[ifelse(isnothing(key), sets.key, key)]
+    nxkey = ifelse(isnothing(key), sets.key, key)
+    nx = sets.dict[nxkey]
     arr = fill(val, length(nx))
     key, val = dict
     if key in nx
         arr[findfirst(x -> x == key, nx)] = val
     else
-        group_to_val!(nx, sets.dict, key, val, dict, arr, strict)
+        group_to_val!(nx, sets.dict, key, val, arr, strict, nxkey)
     end
     return arr
 end
@@ -625,15 +633,37 @@ function estimator_to_val(::UniformValues, sets::AssetSets, ::Any = nothing,
     return range(; start = iN, stop = iN, length = N)
 end
 """
-    eval_numeric_functions(expr)
+    allowed_functions = Dict{Symbol, Function}(:+ => +, :- => -, :* => *, :/ => /,
+                                               :^ => ^, :sqrt => sqrt, :cbrt => cbrt,
+                                               :exp => exp, :exp2 => exp2, :exp10 => exp10,
+                                               :log => log, :log2 => log2, :log10 => log10,
+                                               :abs => abs, :min => min, :max => max)
+
+Enumerated table of the functions permitted in equation parsing, mapping each allowed name directly to its function object. Evaluating constraint/view strings crosses a trust boundary (config files, spreadsheets, UI), so the parser must be able to call *only* these 16 mathematical functions. Using an explicit `Symbol => Function` table — rather than resolving a name against `Base` with `getfield(Base, fname)` — bounds that capability to exactly this table: a name absent from the keys fails closed with a `Meta.ParseError`, and the set of callable functions cannot drift from the set of allowed names, because they are the same list. See `docs/adr/0025-enumerated-parser-allowlist.md`.
+
+The `prior(...)` marker is deliberately absent from this table: it names assets/groups (not numbers) and is expanded structurally by [`eval_numeric_functions`](@ref)/[`replace_group_by_assets`](@ref), never evaluated numerically.
+"""
+const allowed_functions = Dict{Symbol, Function}(:+ => +, :- => -, :* => *, :/ => /,
+                                                 :^ => ^, :sqrt => sqrt, :cbrt => cbrt,
+                                                 :exp => exp, :exp2 => exp2,
+                                                 :exp10 => exp10, :log => log,
+                                                 :log2 => log2, :log10 => log10,
+                                                 :abs => abs, :min => min, :max => max)
+"""
+    eval_numeric_functions(expr, datatype::DataType = Float64)
 
 Recursively evaluate numeric functions and constants in a Julia expression.
 
 `eval_numeric_functions` traverses a Julia expression tree and evaluates any sub-expressions that are purely numeric, including standard mathematical functions and constants (such as `Inf`). This is used to simplify constraint equations before further parsing and canonicalisation.
 
+When an allowlisted function is actually evaluated (all its arguments are numeric), its arguments are coerced to `datatype` (a float type) *first*, so the arithmetic happens in the same numeric domain the optimiser will use rather than in machine `Int64`. This prevents integer literals from combining and wrapping — e.g. `2^64` yields `1.8446744073709552e19` rather than silently wrapping to `0`, and `2^-1` yields `0.5` rather than a `DomainError`. Numeric literals that survive inside an *unevaluated* (nonlinear) subexpression are left untouched, so `2^z` still renders as `2 ^ z`.
+
+Only the functions enumerated in [`allowed_functions`](@ref) may be evaluated; any other call head fails closed with a `Meta.ParseError`. The `prior(...)` marker is handled structurally (see [`replace_group_by_assets`](@ref)) and throws a `Meta.ParseError` if given purely numeric arguments.
+
 # Arguments
 
   - `expr`: The Julia expression to evaluate. Can be a `Number`, `Symbol`, or `Expr`.
+  - `datatype`: Float type into which numeric arguments are coerced before an allowlisted function is evaluated.
 
 # Details
 
@@ -641,7 +671,7 @@ Recursively evaluate numeric functions and constants in a Julia expression.
 
       + `Number`: It is returned as-is.
       + `:Inf`: Returns `Inf`.
-      + `Expr`: Representing a function call, and all arguments are numeric, the function is evaluated and replaced with its result.
+      + `Expr`: Representing a function call whose arguments are all numeric, the allowlisted function is evaluated (on arguments coerced to `datatype`) and replaced with its result.
       + Otherwise, the function recurses into sub-expressions, returning a new expression with numeric parts evaluated.
 
 # Returns
@@ -653,19 +683,34 @@ Recursively evaluate numeric functions and constants in a Julia expression.
   - [`_collect_terms`](@ref)
   - [`_parse_equation`](@ref)
 """
-function eval_numeric_functions(expr)
+function eval_numeric_functions(expr, datatype::DataType = Float64)
     return if isa(expr, Expr)
         if expr.head == :call
             fname = expr.args[1]
-            # Only evaluate if all arguments are numeric
-            args = [eval_numeric_functions(arg) for arg in expr.args[2:end]]
-            if all(x -> isa(x, Number), args)
-                Base.invokelatest(getfield(Base, fname), args...)
-            else
+            args = [eval_numeric_functions(arg, datatype) for arg in expr.args[2:end]]
+            if fname === :prior
+                # `prior(...)` names assets/groups and is expanded structurally later; it
+                # must never be evaluated numerically, so all-numeric args are a user error.
+                if all(x -> isa(x, Number), args)
+                    throw(Meta.ParseError("`prior(...)` takes asset/group names, not numbers."))
+                end
                 Expr(:call, fname, args...)
+            else
+                f = get(allowed_functions, fname, nothing)
+                if isnothing(f)
+                    throw(Meta.ParseError("Function `$(fname)` is not allowed in constraint expressions."))
+                end
+                # Only evaluate if all arguments are numeric. Coerce them to `datatype`
+                # first so arithmetic happens in the optimiser's float domain rather than
+                # machine `Int64` (`2^64` would otherwise wrap; `2^-1` would `DomainError`).
+                if all(x -> isa(x, Number), args)
+                    f((datatype(a) for a in args)...)
+                else
+                    Expr(:call, fname, args...)
+                end
             end
         else
-            Expr(expr.head, map(eval_numeric_functions, expr.args)...)
+            Expr(expr.head, map(a -> eval_numeric_functions(a, datatype), expr.args)...)
         end
     elseif isa(expr, Symbol) && expr == :Inf
         Inf
@@ -899,9 +944,9 @@ Parse and canonicalise a linear constraint equation from Julia expressions.
 function _parse_equation(lhs, opstr::AbstractString, rhs,
                          datatype::DataType = Float64)::ParsingResult
     # 3. Evaluate numeric functions on both sides
-    lexpr = eval_numeric_functions(lhs)
+    lexpr = eval_numeric_functions(lhs, datatype)
     rethrow_parse_error(lexpr, :lhs)
-    rexpr = eval_numeric_functions(rhs)
+    rexpr = eval_numeric_functions(rhs, datatype)
     rethrow_parse_error(rexpr, :rhs)
 
     # 4. Move all terms to LHS: lhs - rhs == 0
@@ -1018,6 +1063,12 @@ ParsingResult
 """
 function parse_equation(eqn::AbstractString; ops1::Tuple = ("==", "<=", ">="),
                         datatype::DataType = Float64, kwargs...)::ParsingResult
+    # Trust boundary: cap the untrusted string length before `Meta.parse` and the
+    # recursive expression walks, so a deeply nested string cannot exhaust the stack.
+    # Bounding the length bounds the achievable AST depth of the string form.
+    lim = EQUATION_LIMITS[]
+    @argcheck(length(eqn) <= lim.max_length,
+              Meta.ParseError("Equation string is too long ($(length(eqn)) > $(lim.max_length) characters)."))
     @argcheck(!occursin("++", eqn),
               Meta.ParseError("Invalid operator '++' detected in equation."))
     # 1. Identify the comparison operator
@@ -1063,8 +1114,31 @@ function has_invalid_plus(expr)::Bool
     # Recurse into sub-expressions
     return any(has_invalid_plus(arg) for arg in expr.args[2:end] if isa(arg, Expr))
 end
+"""
+    _expr_depth_exceeds(x, limit::Integer) -> Bool
+
+Return `true` if the expression tree `x` is deeper than `limit`.
+
+Guards the `Expr` form of [`parse_equation`](@ref) against a deeply nested AST that no
+string length cap covers. The check itself recurses at most `limit + 1` frames deep and
+short-circuits the moment the limit is breached, so it cannot exhaust the stack it protects.
+"""
+function _expr_depth_exceeds(x, limit::Integer)::Bool
+    if limit < 0
+        return true
+    end
+    if !(isa(x, Expr))
+        return false
+    end
+    return any(_expr_depth_exceeds(a, limit - 1) for a in x.args)
+end
 function parse_equation(expr::Expr; ops2::Tuple = (:call, :(==), :(<=), :(>=)),
                         datatype::DataType = Float64, kwargs...)::ParsingResult
+    # Trust-boundary defence for the pre-built-AST form (no string length cap applies):
+    # reject an over-deep tree before the recursive walks below can exhaust the stack.
+    lim = EQUATION_LIMITS[]
+    @argcheck(!_expr_depth_exceeds(expr, lim.max_depth),
+              Meta.ParseError("Equation expression is too deeply nested (exceeds depth $(lim.max_depth))."))
     # Recursively check for invalid "++" pattern in the expression tree
     @argcheck(!has_invalid_plus(expr),
               Meta.ParseError("Invalid operator pattern '++' detected in equation expression:\n$expr"))
@@ -1290,21 +1364,22 @@ function get_linear_constraints(lcs::PR_VecPR, sets::AssetSets,
     B_ineq = Vector{datatype}(undef, 0)
     A_eq = Vector{datatype}(undef, 0)
     B_eq = Vector{datatype}(undef, 0)
-    nx = sets.dict[ifelse(isnothing(key), sets.key, key)]
+    k = ifelse(isnothing(key), sets.key, key)
+    nx = sets.dict[k]
     At = Vector{datatype}(undef, length(nx))
     for lc in lcs
         fill!(At, zero(eltype(At)))
         for (v, c) in zip(lc.vars, lc.coef)
             Ai = (nx .== v)
             if !any(isone, Ai)
-                msg = "$(v) is not found in $(nx)."
+                msg = unknown_variable_msg(v, nx, k)
                 strict ? throw(ArgumentError(msg)) : @warn(msg)
                 continue
             end
             At += Ai * c
         end
         if !any(!iszero, At)
-            msg = "At least one entry in At must be non-zero:\nlc => $(lc)\nany(!iszero, At) => $(any(!iszero, At))"
+            msg = empty_row_msg(lc.eqn, nx, k)
             if strict
                 throw(ArgumentError(msg))
             else
@@ -1400,10 +1475,10 @@ LinearConstraint
     function LinearConstraintEstimator(val::EqnType,
                                        key::Option{<:AbstractString} = nothing)::LinearConstraintEstimator
         if isa(val, Str_Vec)
-            @argcheck(!isempty(val))
+            @argcheck(!isempty(val), IsEmptyError("val cannot be empty"))
         end
         if !isnothing(key)
-            @argcheck(!isempty(key))
+            @argcheck(!isempty(key), IsEmptyError("key cannot be empty"))
         end
         return new{typeof(val), typeof(key)}(val, key)
     end

@@ -44,7 +44,7 @@ nothing #hide
 
 The desk's thesis: healthcare will outperform energy. It encodes that as an entropy-pooling view,
 reweighting the empirical scenarios so the prior reflects the conviction (see
-[Entropy Pooling](../2_moments_priors/06_Entropy_Pooling.md)).
+[Entropy Pooling](../2_moments_priors/07_Entropy_Pooling.md)).
 
 ````@example 02_Profile_Desk_Monthly
 X = TimeArray(CSV.File(joinpath(@__DIR__, "..", "SP500.csv.gz")); timestamp = :Date)[(end - 252):end]
@@ -102,7 +102,8 @@ it uses [`DiscreteAllocation`](@ref) with a MIP solver ([HiGHS](https://github.c
 ````@example 02_Profile_Desk_Monthly
 mip_slv = Solver(; name = :highs, solver = HiGHS.Optimizer,
                  settings = Dict("log_to_console" => false))
-alloc = optimise(DiscreteAllocation(; slv = mip_slv), desk.w, prices, 500_000.0)
+alloc = optimise(DiscreteAllocation(; slv = mip_slv),
+                 FiniteAllocationInput(; w = desk.w, prices = prices, cash = 500_000.0))
 
 invested = sum(alloc.shares .* prices)
 pretty_table(DataFrame("Asset" => rd.nx, "Target" => desk.w,

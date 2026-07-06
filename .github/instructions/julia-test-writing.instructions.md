@@ -69,10 +69,10 @@ applyTo: "test/test-*.jl"
 When a function has several dispatch variants (e.g., different algorithm types), test each variant explicitly:
 
 ```julia
-@testset "Full vs Semi algorithm dispatch" begin
+@testset "FullMoment vs SemiMoment algorithm dispatch" begin
     X = rand(50, 4)
-    ce_full = Covariance(; alg = Full())
-    ce_semi = Covariance(; alg = Semi())
+    ce_full = Covariance(; alg = FullMoment())
+    ce_semi = Covariance(; alg = SemiMoment())
     sigma_full = Statistics.cov(ce_full, X)
     sigma_semi = Statistics.cov(ce_semi, X)
     @test size(sigma_full) == (4, 4)
@@ -88,7 +88,7 @@ Test that nested/composed estimators produce correct results when combined:
 ```julia
 @testset "Composed estimator" begin
     X = rand(50, 4)
-    ce = PortfolioOptimisersCovariance(; ce = Covariance(; alg = Semi()))
+    ce = PortfolioOptimisersCovariance(; ce = Covariance(; alg = SemiMoment()))
     sigma = Statistics.cov(ce, X)
     @test size(sigma) == (4, 4)
     @test LinearAlgebra.isposdef(sigma)

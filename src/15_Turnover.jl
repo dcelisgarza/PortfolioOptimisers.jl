@@ -74,7 +74,7 @@ TurnoverEstimator
     function TurnoverEstimator(w::VecNum, val::EstValType, dval::Option{<:Number},
                                fixed::Bool)::TurnoverEstimator
         assert_nonempty_finite_val(w, :w)
-        assert_nonempty_nonneg_finite_val(val)
+        assert_nonempty_nonneg_finite_val(val, :val)
         if !isnothing(dval)
             @argcheck(zero(dval) <= dval, DomainError)
         end
@@ -298,7 +298,7 @@ Turnover
     fixed
     function Turnover(w::VecNum, val::Num_VecNum, fixed::Bool)::Turnover
         assert_nonempty_finite_val(w, :w)
-        assert_nonempty_nonneg_finite_val(val)
+        assert_nonempty_nonneg_finite_val(val, :val)
         if isa(val, VecNum)
             @argcheck(length(val) == length(w), DimensionMismatch)
         end

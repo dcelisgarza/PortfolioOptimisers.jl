@@ -23,7 +23,7 @@ Algorithms are internal dispatch mechanisms. They must never appear in high-leve
 Decide which abstract algorithm type this algorithm belongs to:
 
 - `AbstractAlgorithm` (base for all algorithms)
-- `AbstractMomentAlgorithm` (`Full`, `Semi`)
+- `AbstractMomentAlgorithm` (`FullMoment`, `SemiMoment`)
 - `AbstractDenoiseAlgorithm`, `AbstractDetoneAlgorithm`
 - `AbstractPosdefAlgorithm`
 - Other domain-specific abstract algorithm type

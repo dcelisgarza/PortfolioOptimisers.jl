@@ -149,10 +149,12 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Add an upper-bound constraint on a risk expression to `model`.
 
-The fall-through method (`args...`) does nothing. The `Front_NumVec` overload records the
-expression and its frontier bound vector in `model[:risk_frontier]` for later use in Pareto
-frontier solves. The `Number` overload adds the constraint `sc * (r_expr - ub * k) <= 0`
-directly to the model.
+The `Nothing` overload does nothing (no bound was requested). The `Front_NumVec` overload
+records the expression and its frontier bound vector in `model[:risk_frontier]` for later
+use in Pareto frontier solves. The `Number` overload adds the constraint
+`sc * (r_expr - ub * k) <= 0` directly to the model. The fall-through method emits a
+warning: a non-`nothing` bound with an optimiser outside [`NonFRCJuMPOpt`](@ref) is
+ignored, which would otherwise happen silently.
 
 # Arguments
 
@@ -171,8 +173,13 @@ directly to the model.
   - [`set_risk_bounds_and_expression!`](@ref)
   - [`set_risk_expression!`](@ref)
 """
-function set_risk_upper_bound!(args...)
+function set_risk_upper_bound!(::JuMP.Model, ::JuMPOptimisationEstimator, r_expr, ::Nothing,
+                               key, flag::Bool = true)
     return nothing
+end
+function set_risk_upper_bound!(::JuMP.Model, opt::JuMPOptimisationEstimator, r_expr, ub,
+                               key, flag::Bool = true)
+    return @warn("Risk upper bound `settings.ub = $ub` ($key) is not supported by `$(typeof(opt).name.name)` and would be silently ignored. Remove `ub` from the risk measure settings, or use an optimiser that supports risk upper bounds (`MeanRisk`, `NearOptimalCentering`, `RiskBudgeting`).")
 end
 #! Using parameters to set the upper bounds would make things more difficult from a user perspective. Keep an eye on this in case things change in the future. We could simplify solve_mean_risk! and solve_noc! for pareto frontiers, we can define ub as a parameter and update it for subsequent solves.
 # Solver(; name = :clarabel2,

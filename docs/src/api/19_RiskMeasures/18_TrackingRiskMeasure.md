@@ -17,7 +17,6 @@ port_opt_view(r::RiskTrackingRiskMeasure, i, X::MatNum, args...)
 needs_previous_weights(r::RiskTrackingRiskMeasure)
 factory(r::RiskTrackingRiskMeasure, w::VecNum)
 factory(r::RiskTrackingRiskMeasure, pr::AbstractPriorResult, args...; kwargs...)
-TrRM
 supports_precomputed_returns(::TrackingRiskMeasure{<:WeightsTracking})
 supports_precomputed_returns(::TrackingRiskMeasure{<:ReturnsTracking})
 ```

@@ -38,20 +38,20 @@
 
     @testset "Keyword validation" begin
         # alpha validated in plot_drawdowns, plot_histogram, plot_performance_summary
-        @test_throws ArgumentError plot_drawdowns(w, X; alpha = 0.0)
-        @test_throws ArgumentError plot_drawdowns(w, X; alpha = 1.0)
-        @test_throws ArgumentError plot_histogram(w, X; alpha = 0.0)
-        @test_throws ArgumentError plot_performance_summary(w, X; alpha = 1.0)
+        @test_throws DomainError plot_drawdowns(w, X; alpha = 0.0)
+        @test_throws DomainError plot_drawdowns(w, X; alpha = 1.0)
+        @test_throws DomainError plot_histogram(w, X; alpha = 0.0)
+        @test_throws DomainError plot_performance_summary(w, X; alpha = 1.0)
         # kappa validated in plot_drawdowns, plot_histogram
-        @test_throws ArgumentError plot_drawdowns(w, X; kappa = 0.0)
-        @test_throws ArgumentError plot_histogram(w, X; kappa = 1.0)
+        @test_throws DomainError plot_drawdowns(w, X; kappa = 0.0)
+        @test_throws DomainError plot_histogram(w, X; kappa = 1.0)
         # delta validated in plot_risk_contribution, plot_factor_risk_contribution
-        @test_throws ArgumentError plot_risk_contribution(r_cvr, w, X; delta = 0.0)
+        @test_throws DomainError plot_risk_contribution(r_cvr, w, X; delta = 0.0)
         # points validated in plot_histogram
-        @test_throws ArgumentError plot_histogram(w, X; points = -1)
+        @test_throws DomainError plot_histogram(w, X; points = -1)
         # rolling validated in plot_rolling_measure, plot_rolling_drawdowns
-        @test_throws ArgumentError plot_rolling_measure(r_cvr, w, X; rolling = -1)
-        @test_throws ArgumentError plot_rolling_drawdowns(w, X; rolling = -1)
+        @test_throws DomainError plot_rolling_measure(r_cvr, w, X; rolling = -1)
+        @test_throws DomainError plot_rolling_drawdowns(w, X; rolling = -1)
     end
 
     @testset "plot_ptf_cumulative_returns" begin
@@ -60,7 +60,7 @@
         @test is_plot(plot_ptf_cumulative_returns(w, X; compound = true))
         @test is_plot(plot_ptf_cumulative_returns(w_rd, rd))
         @test is_plot(plot_ptf_cumulative_returns(w_rd, pr))
-        @test is_plot(plot_ptf_cumulative_returns(res; pr = rd))
+        @test is_plot(plot_ptf_cumulative_returns(res, rd))
         @test is_plot(plot_ptf_cumulative_returns(res))
     end
 
@@ -218,7 +218,7 @@
     @testset "Optimisation-based dispatch" begin
         @test !isnothing(res)
 
-        @test is_plot(plot_asset_cumulative_returns(res; pr = rd))
+        @test is_plot(plot_asset_cumulative_returns(res, rd))
         @test is_plot(plot_composition(res, rd))
         @test is_plot(plot_composition(res, pr))
         @test is_plot(plot_risk_contribution(r_cvr, res, rd))

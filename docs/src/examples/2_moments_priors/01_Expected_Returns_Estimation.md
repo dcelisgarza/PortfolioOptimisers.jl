@@ -90,11 +90,16 @@ pretty_table(DataFrame(["Assets" => rd.nx; [k => p.mu for (k, p) in prs]]);
 [`plot_mu`](@ref) makes the pull-toward-target visible: compared with the raw sample mean, the
 shrunk estimator compresses the dispersion of the per-asset expected returns.
 
+Vanilla sample-mean expected returns.
+
 ````@example 01_Expected_Returns_Estimation
-using StatsPlots, GraphRecipes #= Vanilla sample-mean expected returns. =#
+using StatsPlots, GraphRecipes
+````
 
-plot_mu(prs[1].second, rd.nx) #= Bayes–Stein (volatility-weighted target) expected returns. =#
+Bayes–Stein (volatility-weighted target) expected returns.
 
+````@example 01_Expected_Returns_Estimation
+plot_mu(prs[1].second, rd.nx)
 plot_mu(prs[3].second, rd.nx)
 ````
 

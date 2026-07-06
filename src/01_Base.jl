@@ -250,7 +250,7 @@ const arg_dict = Dict(
                       :sigrhoX => "`X`: Covariance-like or correlation-like matrix `features × features`.",
                       :kt => "`kt`: Cokurtosis matrix `features^2 × features^2`.",#
                       :sk => "`sk`: Coskewness matrix `features × features^2`.",#
-                      :V => "`V`: Sum of the negative spectral slices of the cokurtosis matrix `features × features`.",
+                      :V => "`V`: Sum of the negative spectral slices of the coskewness matrix `features × features`.",
                       :X => "`X`: Data matrix `observations × features` if the `dims` keyword does not exist or `dims = 1`, `features × observations` when `dims = 2`.",#
                       :F => "`F`: Data matrix `observations × factors` if the `dims` keyword does not exist or `dims = 1`, `factors × observations` when `dims = 2`.",#
                       :Xv => "`X`: Data vector `observations × 1`.",#
@@ -334,17 +334,17 @@ const arg_dict = Dict(
                       :p_pool => "`p`: Opinion pooling blending parameter.",#
                       # Entropy pooling.
                       :mu_views => "`mu_views`: Expected returns views estimator or result.",#
-                      :var_views => "`var_views`: Variance views estimator or result.",#
+                      :var_views => "`var_views`: Value-at-risk views estimator or result.",#
                       :cvar_views => "`cvar_views`: Conditional value-at-risk views estimator or result.",#
-                      :sigma_views => "`sigma_views`: Covariance views estimator or result.",#
-                      :sk_views => "`sk_views`: Coskewness views estimator or result.",#
-                      :kt_views => "`kt_views`: Cokurtosis views estimator or result.",#
+                      :sigma_views => "`sigma_views`: Variance views estimator or result.",#
+                      :sk_views => "`sk_views`: Skewness views estimator or result.",#
+                      :kt_views => "`kt_views`: Kurtosis views estimator or result.",#
                       :cov_views => "`cov_views`: Covariance views estimator or result.",#
                       :rho_views => "`rho_views`: Correlation views estimator or result.",#
                       :var_alpha => "`var_alpha`: Quantile level for variance views.",#
                       :cvar_alpha => "`cvar_alpha`: Quantile level for conditional value-at-risk views.",#
-                      :ds_opt => "`ds_opt`: Dual sigma optimisation estimator.",#
-                      :dm_opt => "`dm_opt`: Dual mean optimisation estimator.",#
+                      :ds_opt => "`ds_opt`: Thin wrapper for arguments and keyword arguments used in `Roots.findzero` for use with a single conditional value-at-risk view.",#
+                      :dm_opt => "`dm_opt`: Optimiser for multiple conditional value at risk views.",#
                       :opt_ep => "`opt`: Entropy pooling optimisation estimator.",#
                       # Black-Litterman views.
                       :P => "`P`: Views loading matrix `views × assets`.",#
@@ -353,7 +353,7 @@ const arg_dict = Dict(
                       # High order priors.
                       :f_kt => "`f_kt`: Factor cokurtosis matrix.",#
                       :f_sk => "`f_sk`: Factor coskewness matrix.",#
-                      :f_V => "`f_V`: Factor sum of negative spectral slices of the cokurtosis matrix.",#
+                      :f_V => "`f_V`: Factor sum of negative spectral slices of the coskewness matrix.",#
                       :skmp => "`skmp`: Coskewness matrix processing estimator.",#
                       :D2 => "`D2`: Duplication matrix.",#
                       :L2 => "`L2`: Elimination matrix.",#
@@ -524,7 +524,6 @@ const arg_dict = Dict(
                       :cv => "`cv`: Cross-validation estimator.",#
                       :scorer => "`scorer`: Scoring function.",#
                       :train_score => "`train_score`: Whether to also compute the training set score.",#
-                      :warn_comb => "`warn_comb`: Whether to warn when the number of combinations exceeds `max_comb`.",#
                       :path_ids => "`path_ids`: Path identifiers for cross-validation splits.",#
                       :train_scores => "`train_scores`: Training set scores.",#
                       :test_scores => "`test_scores`: Test set scores.",#
@@ -635,6 +634,12 @@ const arg_dict = Dict(
                       :w1_owa => "`w1`: Optional first OWA weight vector.",#
                       :w2_owa => "`w2`: Optional second OWA weight vector.",#
                       :owa_w => "`w`: Optional OWA weight vector.",#
+                      :owa_method => "`method`: OWA weight estimation method.",#
+                      :lm_k => "`k`: L-moment order.",#
+                      :alpha_i => "`alpha_i`: Lower integration bound for the tail Gini approximation.",#
+                      :a_sim => "`a_sim`: Number of integration points for the tail Gini approximation.",#
+                      :beta_i => "`beta_i`: Lower integration bound for the upper tail Gini approximation.",#
+                      :b_sim => "`b_sim`: Number of integration points for the upper tail Gini approximation.",#
                       # Constraint generation.
                       :rkb_val => "`val`: Vector of risk budget allocations.",#
                       :rkbe_val => "`val`: Mapping of names to risk budget values.",#
@@ -708,70 +713,93 @@ Each entry is derived from [`arg_dict`](@ref) by stripping the leading parameter
 const field_dict = Dict(key => strip(val[(findfirst(":", val)[1] + 1):end])
                         for (key, val) in arg_dict)
 """
-    val_dict = Dict(:oow => "If `w` is not `nothing`, `!isempty(w)`.")
+    err_name_dict
+
+Maps high-order-moment argument keys to the domain noun used in error messages, so a
+message names what the caller supplied (e.g. `cokurtosis`) rather than the bare field
+symbol. The symbol itself is appended at the call site, giving messages like
+``cokurtosis (`kt`) cannot be empty``.
+"""
+const err_name_dict = Dict(:kt => "cokurtosis", :sk => "coskewness",
+                           :V => "negative spectral coskewness",
+                           :D2 => "duplication matrix", :L2 => "elimination matrix",
+                           :S2 => "summation matrix", :f_kt => "factor cokurtosis",
+                           :f_sk => "factor coskewness",
+                           :f_V => "factor negative spectral coskewness")
+"""
+    const val_dict = Dict(:oow => "If `w` is not `nothing`, `!isempty(w)`.")
 
 Validation rules for certain arg_dict terms used in the documentation of `PortfolioOptimisers.jl`.
 """
-val_dict = Dict(:oow => "If `w` is not `nothing`, `!isempty(w)`.",
-                :oidx => "If `idx` is not `nothing`, `!isempty(idx)` and all indices are positive integers.",
-                :gerbt => "`0 <= t`.",#
-                :t => "`0 < t < 1`.",#
-                :c1 => "`0 < c1 <= 1`.",#
-                :c2 => "`0 < c2 <= 1`.",#
-                :c3c2 => "`c3 > c2`.",#
-                :dims => "`dims in (1, 2)`.",#
-                :alpha => "`0 < alpha < 1`.",#
-                :beta => "`0 < beta < 1`.",#
-                :bins => "If `bins` is an integer, `bins > 0`.",#
-                :dopower => "If `power` is not `nothing`, `power >= 1`.",#
-                :settings => "If not `nothing`, `!isempty(settings)`.",#
-                :S => "`!isempty(S)`.",#
-                :D => "`!isempty(D)`.",#
-                :ck => "`k >= 1`.",#
-                :S_D => "size(S) == size(D)`.",#
-                :max_k => "If `max_k` is not `nothing`, `max_k >= 1`.",#
-                :kalg => "If `alg` is not `nothing`, `alg >= 1`.",#
-                :dbhtpower => "`power > 0`.",#
-                :dbhtcoef => "`coef > 0`.", :Xe => "`!isempty(X)`.",#
-                :phX_Xv => "`If `X` is a `MatNum`:\n    + Must be symmetric, `LinearAlgebra.issymmetric(X)`\n    + Must have zero diagonal, `all(iszero, LinearAlgebra.diag(X))`.",#
-                :ntn => "`n >= 1`.",#
-                :A => "`!isempty(A)`.",#
-                :B => "`!isempty(B)`.",#
-                :eqineq => "Both `eq` and `ineq` cannot be `nothing` at the same time, `!(isnothing(ineq) && isnothing(eq))`.",
-                :decay => "`decay > 0`.",#
-                :min_obs => "`min_obs > 0`.",#
-                :hac_lags => "If `hac_lags` is not `nothing`, `hac_lags > 0`.",#
-                :regime_min_obs => "`regime_min_obs > 0`.",#
-                :regime_lohi_mult => "If `regime_lohi_mult` is not `nothing`, `0 < regime_lohi_mult[1] < regime_lohi_mult[2]`.",#
-                :ra_x => "`x` is valid",#
-                :ra_y => "`y` is valid",#
-                :ra_norm_x => "`x` is valid")
+const val_dict = Dict(:oow => "If `w` is not `nothing`, `!isempty(w)`.",
+                      :oidx => "If `idx` is not `nothing`, `!isempty(idx)` and all indices are positive integers.",
+                      :gerbt => "`0 <= t`.",#
+                      :t => "`0 < t < 1`.",#
+                      :c1 => "`0 < c1 <= 1`.",#
+                      :c2 => "`0 < c2 <= 1`.",#
+                      :c3c2 => "`c3 > c2`.",#
+                      :dims => "`dims in (1, 2)`.",#
+                      :alpha => "`0 < alpha < 1`.",#
+                      :beta => "`0 < beta < 1`.",#
+                      :bins => "If `bins` is an integer, `bins > 0`.",#
+                      :dopower => "If `power` is not `nothing`, `power >= 1`.",#
+                      :settings => "If not `nothing`, `!isempty(settings)`.",#
+                      :S => "`!isempty(S)`.",#
+                      :D => "`!isempty(D)`.",#
+                      :ck => "`k >= 1`.",#
+                      :lm_k => "`k >= 2`.",#
+                      :alpha_i_alpha => "`0 < alpha_i < alpha < 1`.",#
+                      :a_sim_pos => "`a_sim > 0`.",#
+                      :beta_i_beta => "`0 < beta_i < beta < 1`.",#
+                      :b_sim_pos => "`b_sim > 0`.",#
+                      :S_D => "size(S) == size(D)`.",#
+                      :max_k => "If `max_k` is not `nothing`, `max_k >= 1`.",#
+                      :kalg => "If `alg` is not `nothing`, `alg >= 1`.",#
+                      :dbhtpower => "`power > 0`.",#
+                      :dbhtcoef => "`coef > 0`.", :Xe => "`!isempty(X)`.",#
+                      :phX_Xv => "`If `X` is a `MatNum`:\n    + Must be symmetric, `LinearAlgebra.issymmetric(X)`\n    + Must have zero diagonal, `all(iszero, LinearAlgebra.diag(X))`.",#
+                      :ntn => "`n >= 1`.",#
+                      :A => "`!isempty(A)`.",#
+                      :B => "`!isempty(B)`.",#
+                      :eqineq => "Both `eq` and `ineq` cannot be `nothing` at the same time, `!(isnothing(ineq) && isnothing(eq))`.",
+                      :decay => "`decay > 0`.",#
+                      :rf => "`isfinite(rf)`.",#
+                      :q_scorer => "`0 <= q <= 1`.",#
+                      :unit => "`unit > 0`.",#
+                      :katz_alpha => "`alpha > 0`.",#
+                      :min_obs => "`min_obs > 0`.",#
+                      :hac_lags => "If `hac_lags` is not `nothing`, `hac_lags > 0`.",#
+                      :regime_min_obs => "`regime_min_obs > 0`.",#
+                      :regime_lohi_mult => "If `regime_lohi_mult` is not `nothing`, `0 < regime_lohi_mult[1] < regime_lohi_mult[2]`.",#
+                      :ra_x => "`x` is valid",#
+                      :ra_y => "`y` is valid",#
+                      :ra_norm_x => "`x` is valid")
 
 """
 Dictionary containing return value descriptions for common parameters used in `PortfolioOptimisers.jl`.
 """
-ret_dict = Dict(:mu => "`mu::ArrNum`: Expected returns vector `features x 1` if the `dims` keyword does not exist or `dims = 2`, `1 x features` if `dims = 1`.",#
-                :sigma => "`sigma::MatNum`: Covariance matrix `features x features`.",#
-                :rho => "`rho::MatNum`: Correlation matrix `features x features`.",#
-                :sigrho => "`sigrho::MatNum`: Covariance/correlation matrix `features x features`.",#
-                :sk => "`sk::MatNum`: Coskewness matrix `features x features`.",#
-                :kte => "`kte::MatNum`: Cokurtosis matrix `features x features`.",#
-                :me => "`me`: New expected returns estimator of the same type as the argument, with the appropriate weights applied.",#
-                :mev => "`mev`: New expected returns estimator of the same type as the argument, for the new view.",#
-                :ce => "`ce`: New covariance estimator of the same type as the argument, with the new weights applied.",#
-                :cev => "`ce`: New covariance estimator of the same type as the argument, for the new view.",#
-                :ve => "`ve`: New variance estimator of the same type as the argument, with the new weights applied.",#
-                :vev => "`ve`: New variance estimator of the same type as the argument, for the new view.",#
-                :skev => "`skev`: New coskewness estimator of the same type as the argument, for the new view.",#
-                :ktev => "`kev`: New cokurtosis estimator of the same type as the argument, for the new view.",#
-                :stdvar => "`res::ArrNum`: Variance or standard deviation vector of `X`, reshaped to be consistent with the dimension along which the value is computed.",#
-                :stdvarnum => "`res::Number`: Variance or standard deviation `X`",#
-                :stdarr => "`sd::ArrNum`: Standard deviation vector of `X`, reshaped to be consistent with the dimension along which the value is computed.",
-                :vararr => "`vr::ArrNum`: Variance vector of `X`, reshaped to be consistent with the dimension along which the value is computed.",
-                :stdnum => "`vr::Number`: Standard deviation of `X`",
-                :varnum => "`vr::Number`: Variance of `X`",
-                :algw => "`alg`: New algorithm instance of the same type as the argument, with the new weights applied.",
-                :alg => "`alg`: The original algorithm instance.")
+const ret_dict = Dict(:mu => "`mu::ArrNum`: Expected returns vector `features x 1` if the `dims` keyword does not exist or `dims = 2`, `1 x features` if `dims = 1`.",#
+                      :sigma => "`sigma::MatNum`: Covariance matrix `features x features`.",#
+                      :rho => "`rho::MatNum`: Correlation matrix `features x features`.",#
+                      :sigrho => "`sigrho::MatNum`: Covariance/correlation matrix `features x features`.",#
+                      :sk => "`sk::MatNum`: Coskewness matrix `features x features`.",#
+                      :kte => "`kte::MatNum`: Cokurtosis matrix `features x features`.",#
+                      :me => "`me`: New expected returns estimator of the same type as the argument, with the appropriate weights applied.",#
+                      :mev => "`mev`: New expected returns estimator of the same type as the argument, for the new view.",#
+                      :ce => "`ce`: New covariance estimator of the same type as the argument, with the new weights applied.",#
+                      :cev => "`ce`: New covariance estimator of the same type as the argument, for the new view.",#
+                      :ve => "`ve`: New variance estimator of the same type as the argument, with the new weights applied.",#
+                      :vev => "`ve`: New variance estimator of the same type as the argument, for the new view.",#
+                      :skev => "`skev`: New coskewness estimator of the same type as the argument, for the new view.",#
+                      :ktev => "`kev`: New cokurtosis estimator of the same type as the argument, for the new view.",#
+                      :stdvar => "`res::ArrNum`: Variance or standard deviation vector of `X`, reshaped to be consistent with the dimension along which the value is computed.",#
+                      :stdvarnum => "`res::Number`: Variance or standard deviation `X`",#
+                      :stdarr => "`sd::ArrNum`: Standard deviation vector of `X`, reshaped to be consistent with the dimension along which the value is computed.",
+                      :vararr => "`vr::ArrNum`: Variance vector of `X`, reshaped to be consistent with the dimension along which the value is computed.",
+                      :stdnum => "`vr::Number`: Standard deviation of `X`",
+                      :varnum => "`vr::Number`: Variance of `X`",
+                      :algw => "`alg`: New algorithm instance of the same type as the argument, with the new weights applied.",
+                      :alg => "`alg`: The original algorithm instance.")
 """
     math_dict
 
@@ -779,30 +807,30 @@ Dictionary of mathematical notation descriptions used for docstring interpolatio
 
 Keys are symbols that identify mathematical variables or subscripts; values are LaTeX-formatted strings suitable for embedding in docstrings.
 """
-math_dict = Dict(:Xv => "``\\boldsymbol{X}``: Data vector `observations × 1`.",#
-                 :tgt => "``t``: Target value, usually the unweighted (or weighted) expected value ``E[\\boldsymbol{X}]``.",#
-                 :A => "``\\mathbf{A}``: Constraint coefficient matrix.",#
-                 :B => "``\\boldsymbol{B}``: Constraint response vector.",#
-                 :x => "``\\boldsymbol{x}``: Constrained variable.",#
-                 :ineq => "``\\text{ineq}``: Subscript for inequality constraints.",#
-                 :eq => "``\\text{eq}``: Subscript for equality constraints.",#
-                 # Portfolio returns and dimensions.
-                 :xret => "``\\boldsymbol{x}``: Portfolio returns vector ``T \\times 1``.",#
-                 :T => "``T``: Number of observations.",#
-                 :N => "``N``: Number of assets.",#
-                 # Risk measure parameters.
-                 :alpha_rm => "``\\alpha``: Significance level (left tail probability), ``\\alpha \\in (0, 1)``.",#
-                 :w_port => "``\\boldsymbol{w}``: Portfolio weights vector ``N \\times 1``.",#
-                 # Absolute drawdown series.
-                 :ct => "``c_t``: Cumulative simple portfolio return at period ``t``.",#
-                 :dtdd => "``d_t \\leq 0``: Absolute drawdown at period ``t``.",#
-                 # Relative drawdown series.
-                 :Ct => "``C_t``: Compound wealth process at period ``t``.",#
-                 :rdt => "``rd_t \\leq 0``: Relative drawdown at period ``t``.",#
-                 # JuMP optimisation variables.
-                 :k_budget => "``k``: Budget scaling / homogenisation variable.",#
-                 :mu_er => "``\\boldsymbol{\\mu}``: Expected returns vector ``N \\times 1``.",#
-                 :R_w => "``R(\\boldsymbol{w})``: Portfolio risk.")
+const math_dict = Dict(:Xv => "``\\boldsymbol{X}``: Data vector `observations × 1`.",#
+                       :tgt => "``t``: Target value, usually the unweighted (or weighted) expected value ``E[\\boldsymbol{X}]``.",#
+                       :A => "``\\mathbf{A}``: Constraint coefficient matrix.",#
+                       :B => "``\\boldsymbol{B}``: Constraint response vector.",#
+                       :x => "``\\boldsymbol{x}``: Constrained variable.",#
+                       :ineq => "``\\text{ineq}``: Subscript for inequality constraints.",#
+                       :eq => "``\\text{eq}``: Subscript for equality constraints.",#
+                       # Portfolio returns and dimensions.
+                       :xret => "``\\boldsymbol{x}``: Portfolio returns vector ``T \\times 1``.",#
+                       :T => "``T``: Number of observations.",#
+                       :N => "``N``: Number of assets.",#
+                       # Risk measure parameters.
+                       :alpha_rm => "``\\alpha``: Significance level (left tail probability), ``\\alpha \\in (0, 1)``.",#
+                       :w_port => "``\\boldsymbol{w}``: Portfolio weights vector ``N \\times 1``.",#
+                       # Absolute drawdown series.
+                       :ct => "``c_t``: Cumulative simple portfolio return at period ``t``.",#
+                       :dtdd => "``d_t \\leq 0``: Absolute drawdown at period ``t``.",#
+                       # Relative drawdown series.
+                       :Ct => "``C_t``: Compound wealth process at period ``t``.",#
+                       :rdt => "``rd_t \\leq 0``: Relative drawdown at period ``t``.",#
+                       # JuMP optimisation variables.
+                       :k_budget => "``k``: Budget scaling / homogenisation variable.",#
+                       :mu_er => "``\\boldsymbol{\\mu}``: Expected returns vector ``N \\times 1``.",#
+                       :R_w => "``R(\\boldsymbol{w})``: Portfolio risk.")
 
 """
 $(DocStringExtensions.TYPEDEF)
@@ -883,7 +911,7 @@ julia> struct MyWeights{T} <: PortfolioOptimisers.DynamicAbstractWeights
            half_life::T
            function MyWeights(half_life::Integer)
                if half_life < one(half_life)
-                   throw(ArgumentError("half_life must be a positive integer"))
+                   throw(DomainError(half_life, "half_life must be an integer greater than zero"))
                end
                return new{typeof(half_life)}(half_life)
            end
@@ -1058,6 +1086,66 @@ macro define_pretty_show(T, flag::Bool = true)
         end)
 end
 """
+$(DocStringExtensions.TYPEDEF)
+
+Thread-safe holder for a package-level configuration value, combining a persistent global default with a task-scoped override.
+
+Reads go through `cfg[]`, which returns the innermost active scoped override when inside a `with_*` block, otherwise the global default. The default is an `@atomic` field swapped as a whole — a `set_*!` call is a single atomic store, so concurrent readers (e.g. the `FLoops.@floop` loops inside meta-optimisers) can never observe a torn or partially-updated configuration. The scoped override is a `Base.ScopedValues.ScopedValue`: it is inherited by tasks spawned inside the scope, restored automatically when the scope exits, and invisible to unrelated concurrent tasks.
+
+Configs held this way store *immutable* structs (or bits values); changing any knob builds a new value and swaps it in, never mutates in place.
+
+Used by [`COMPACT_SHOW`](@ref), [`STRING_DISTANCE`](@ref), and [`EQUATION_LIMITS`](@ref); their global defaults are set via the `set_*!` setters, scoped overrides via the `with_*` helpers, and load-time per-project defaults via Preferences.jl (see [`apply_preferences!`](@ref)).
+
+# Related
+
+  - [`set_compact_show!`](@ref) / [`with_compact_show`](@ref)
+  - [`set_string_distance!`](@ref) / [`with_string_distance`](@ref)
+  - [`set_equation_limits!`](@ref) / [`with_equation_limits`](@ref)
+  - [`apply_preferences!`](@ref)
+"""
+mutable struct ScopedConfig{T}
+    @atomic default::T
+    const scoped::ScopedValue{Union{Nothing, T}}
+    function ScopedConfig{T}(x) where {T}
+        return new{T}(convert(T, x), ScopedValue{Union{Nothing, T}}(nothing))
+    end
+end
+ScopedConfig(x::T) where {T} = ScopedConfig{T}(x)
+"""
+    getindex(cfg::ScopedConfig)
+
+Read the active value of a [`ScopedConfig`](@ref): the innermost task-scoped override when inside a `with_*` block, otherwise the global default (read atomically).
+"""
+Base.getindex(cfg::ScopedConfig) = @something(cfg.scoped[], @atomic(cfg.default))
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Atomically replace the global default of a [`ScopedConfig`](@ref) with `x` and return it. Does not affect any active scoped override.
+
+# Related
+
+  - [`ScopedConfig`](@ref)
+  - [`with_config`](@ref)
+"""
+function set_default!(cfg::ScopedConfig{T}, x) where {T}
+    x = convert(T, x)
+    @atomic cfg.default = x
+    return x
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Run `f()` with the [`ScopedConfig`](@ref) `cfg` overridden to `x` for the dynamic extent of the call, restoring the previous value on exit. Thread-safe: the override is task-scoped (inherited by tasks spawned inside `f`, invisible to concurrent tasks outside it).
+
+# Related
+
+  - [`ScopedConfig`](@ref)
+  - [`set_default!`](@ref)
+"""
+function with_config(f, cfg::ScopedConfig{T}, x) where {T}
+    return Base.ScopedValues.with(f, cfg.scoped => convert(T, x))
+end
+"""
 Global control for collapsing large nested structs in [`@define_pretty_show`](@ref) output.
 
 Holds one of:
@@ -1066,9 +1154,9 @@ Holds one of:
   - `true`: collapsing enabled with an automatic, terminal-size-derived line budget.
   - `n::Int`: collapsing enabled with a fixed line budget of `n`.
 
-Set via [`set_compact_show!`](@ref). Read (together with the per-call `:po_compact` IO property) by [`compact_show_budget`](@ref).
+Held in a [`ScopedConfig`](@ref): set the global default via [`set_compact_show!`](@ref), override per scope via [`with_compact_show`](@ref), and read (together with the per-call `:po_compact` IO property) by [`compact_show_budget`](@ref). The default may be seeded per project at load time via the `"compact_show"` preference (see [`apply_preferences!`](@ref)).
 """
-const COMPACT_SHOW = Ref{Union{Bool, Int}}(true)
+const COMPACT_SHOW = ScopedConfig{Union{Bool, Int}}(true)
 """
     set_compact_show!(x::Bool)
     set_compact_show!(n::Integer)
@@ -1081,13 +1169,29 @@ Configure whether [`@define_pretty_show`](@ref) collapses large nested structs.
 
 Collapsing only ever applies to height-limited output (`get(io, :limit, false)`), i.e. the interactive REPL. Non-limited output (`string`, `repr`, file writes) always expands fully. The documentation build disables this so rendered docs keep full detail. Individual calls can override the global setting with the `:po_compact` IO property (`false`, `true`, or an `Int`).
 
+Sets the global default (atomically; see [`ScopedConfig`](@ref)). For a temporary, task-scoped override use [`with_compact_show`](@ref).
+
 # Related
 
   - [`@define_pretty_show`](@ref)
   - [`compact_show_budget`](@ref)
+  - [`with_compact_show`](@ref)
 """
-set_compact_show!(x::Bool) = (COMPACT_SHOW[] = x; return x)
-set_compact_show!(n::Integer) = (COMPACT_SHOW[] = Int(n); return n)
+set_compact_show!(x::Bool) = set_default!(COMPACT_SHOW, x)
+set_compact_show!(n::Integer) = set_default!(COMPACT_SHOW, Int(n))
+"""
+    with_compact_show(f, x::Bool)
+    with_compact_show(f, n::Integer)
+
+Run `f()` with the [`COMPACT_SHOW`](@ref) collapsing setting overridden to `x`/`n` for the dynamic extent of the call, restoring the previous setting on exit. Task-scoped and thread-safe (see [`ScopedConfig`](@ref)); the global default is untouched.
+
+# Related
+
+  - [`set_compact_show!`](@ref)
+  - [`compact_show_budget`](@ref)
+"""
+with_compact_show(f, x::Bool) = with_config(f, COMPACT_SHOW, x)
+with_compact_show(f, n::Integer) = with_config(f, COMPACT_SHOW, Int(n))
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
@@ -1122,6 +1226,394 @@ function compact_show_budget(io::IO)
         return Int(v)
     end
     return max(8, displaysize(io)[1] - 4)
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Global configuration for the fuzzy "did you mean?" suggestions appended to "variable not in asset universe" messages by [`did_you_mean`](@ref).
+
+# Fields
+
+  - `dist`: the `StringDistances.StringDistance` used to score candidate names against the offending one (default `StringDistances.Levenshtein()`).
+  - `min_score`: the minimum normalised similarity in `[0, 1]` a candidate must reach before it is suggested (default `0.7`). Raising it toward `1` keeps only near-exact matches; setting it above `1` disables suggestions entirely — useful in meta-optimiser inner loops, where an asset name legitimately absent from a cluster/subset is not a typo and should draw no suggestion.
+
+Immutable; held in the [`STRING_DISTANCE`](@ref) [`ScopedConfig`](@ref). Set the global default via [`set_string_distance!`](@ref), override per scope via [`with_string_distance`](@ref). Read by [`did_you_mean`](@ref).
+
+# Related
+
+  - [`STRING_DISTANCE`](@ref)
+  - [`set_string_distance!`](@ref)
+  - [`with_string_distance`](@ref)
+  - [`did_you_mean`](@ref)
+"""
+struct StringDistanceConfig
+    dist::StringDistances.StringDistance
+    min_score::Float64
+end
+"""
+    STRING_DISTANCE = ScopedConfig(StringDistanceConfig(StringDistances.Levenshtein(), 0.7))
+
+Default string distance configuration for fuzzy "did you mean?" suggestions appended to "variable not in asset universe" messages by [`did_you_mean`](@ref). Read as `STRING_DISTANCE[]`; the defaults may be seeded per project at load time via the `"suggestion_distance"` / `"suggestion_min_score"` preferences (see [`apply_preferences!`](@ref)).
+
+# Related
+
+  - [`StringDistanceConfig`](@ref)
+  - [`set_string_distance!`](@ref)
+  - [`with_string_distance`](@ref)
+  - [`did_you_mean`](@ref)
+"""
+const STRING_DISTANCE = ScopedConfig(StringDistanceConfig(StringDistances.Levenshtein(),
+                                                          0.7))
+"""
+    set_string_distance!(; dist::StringDistances.StringDistance, min_score::Real)
+
+Configure the global default fuzzy-suggestion settings read by [`did_you_mean`](@ref). The store is atomic (see [`ScopedConfig`](@ref)); unspecified keywords keep their current default. For a temporary, task-scoped override use [`with_string_distance`](@ref).
+
+  - `dist`: distance used to rank candidate names (e.g. `StringDistances.Levenshtein()`, `StringDistances.DamerauLevenshtein()`, `StringDistances.JaroWinkler()`).
+  - `min_score`: minimum normalised similarity in `[0, 1]` to emit a suggestion; set above `1` to disable suggestions.
+
+Returns the new default [`StringDistanceConfig`](@ref).
+
+# Related
+
+  - [`did_you_mean`](@ref)
+  - [`STRING_DISTANCE`](@ref)
+  - [`with_string_distance`](@ref)
+  - [`set_compact_show!`](@ref)
+"""
+function set_string_distance!(;
+                              dist::StringDistances.StringDistance = (@atomic STRING_DISTANCE.default).dist,
+                              min_score::Real = (@atomic STRING_DISTANCE.default).min_score)
+    return set_default!(STRING_DISTANCE, StringDistanceConfig(dist, Float64(min_score)))
+end
+"""
+    with_string_distance(f; dist::StringDistances.StringDistance = STRING_DISTANCE[].dist,
+                         min_score::Real = STRING_DISTANCE[].min_score)
+
+Run `f()` with the fuzzy-suggestion settings read by [`did_you_mean`](@ref) overridden for the dynamic extent of the call, restoring the previous settings on exit. Task-scoped and thread-safe (see [`ScopedConfig`](@ref)); the global default is untouched. Unspecified keywords inherit from the currently active value, so nested overrides compose.
+
+Useful around a meta-optimiser run to silence suggestions (`min_score` above `1`) in its inner loops without affecting other concurrent work.
+
+# Related
+
+  - [`set_string_distance!`](@ref)
+  - [`STRING_DISTANCE`](@ref)
+  - [`did_you_mean`](@ref)
+"""
+function with_string_distance(f;
+                              dist::StringDistances.StringDistance = STRING_DISTANCE[].dist,
+                              min_score::Real = STRING_DISTANCE[].min_score)
+    return with_config(f, STRING_DISTANCE, StringDistanceConfig(dist, Float64(min_score)))
+end
+"""
+Global resource caps for equation parsing, guarding the string→AST trust boundary against a stack-exhaustion denial of service.
+
+Constraint, Black-Litterman view and entropy-pooling view strings are untrusted input (config files, spreadsheets, UI). They funnel through [`parse_equation`](@ref), which calls `Meta.parse` and then walks the resulting expression tree recursively ([`eval_numeric_functions`](@ref), `collect_terms!`, `has_invalid_plus`). Without a bound, a deeply nested string (e.g. tens of thousands of parentheses) produces an AST deep enough to exhaust the stack and take down the host process. These caps fail closed with a typed `Meta.ParseError` well before that point.
+
+# Fields
+
+  - `max_length`: maximum number of characters in an equation string handed to `Meta.parse` (default `4096`). A legitimate linear constraint is short; the bound sits far above any real constraint and far below the nesting depth that threatens the stack. Because achieving nesting depth `d` from a string needs at least `d` characters, the length cap also bounds the AST depth of the *string* form.
+  - `max_depth`: maximum expression-tree depth accepted by the `Expr` form of [`parse_equation`](@ref) (default `256`), which receives a pre-built AST that no length cap covers.
+
+The values are conservative static defaults (portable across build and deployment machines, unlike a value auto-detected during precompilation). Immutable; held in the [`EQUATION_LIMITS`](@ref) [`ScopedConfig`](@ref). Set the global default via [`set_equation_limits!`](@ref), override per scope via [`with_equation_limits`](@ref). Both fields must be positive (enforced by the constructor). See `docs/adr/0027-cap-equation-parser-recursion.md`.
+"""
+struct EquationLimits
+    max_length::Int
+    max_depth::Int
+    function EquationLimits(max_length::Integer, max_depth::Integer)
+        @argcheck(max_length > 0 && max_depth > 0,
+                  ArgumentError("max_length and max_depth must be positive."))
+        return new(Int(max_length), Int(max_depth))
+    end
+end
+"""
+    EQUATION_LIMITS = ScopedConfig(EquationLimits(4096, 256))
+
+Default global resource caps for equation parsing, guarding the string→AST trust boundary against a stack-exhaustion denial of service. Read as `EQUATION_LIMITS[]`; the defaults may be seeded per project at load time via the `"equation_max_length"` / `"equation_max_depth"` preferences (see [`apply_preferences!`](@ref)).
+
+# Related
+
+  - [`EquationLimits`](@ref)
+  - [`set_equation_limits!`](@ref)
+  - [`with_equation_limits`](@ref)
+  - [`parse_equation`](@ref)
+"""
+const EQUATION_LIMITS = ScopedConfig(EquationLimits(4096, 256))
+"""
+    set_equation_limits!(; max_length::Integer, max_depth::Integer)
+
+Configure the global default equation-parser resource caps read at the string→AST trust boundary (see [`EQUATION_LIMITS`](@ref)).
+
+  - `max_length`: maximum equation-string length passed to `Meta.parse`.
+  - `max_depth`: maximum expression-tree depth accepted by the `Expr` form of [`parse_equation`](@ref).
+
+Raise them for a genuinely large machine-generated constraint set, or lower them to tighten the boundary. Both must be positive; unspecified keywords keep their current default. The store is atomic (see [`ScopedConfig`](@ref)); for a temporary, task-scoped override use [`with_equation_limits`](@ref).
+
+Returns the new default [`EquationLimits`](@ref).
+
+# Related
+
+  - [`EQUATION_LIMITS`](@ref)
+  - [`with_equation_limits`](@ref)
+  - [`parse_equation`](@ref)
+  - [`set_string_distance!`](@ref)
+"""
+function set_equation_limits!(;
+                              max_length::Integer = (@atomic EQUATION_LIMITS.default).max_length,
+                              max_depth::Integer = (@atomic EQUATION_LIMITS.default).max_depth)
+    return set_default!(EQUATION_LIMITS, EquationLimits(max_length, max_depth))
+end
+"""
+    with_equation_limits(f; max_length::Integer = EQUATION_LIMITS[].max_length,
+                         max_depth::Integer = EQUATION_LIMITS[].max_depth)
+
+Run `f()` with the equation-parser resource caps (see [`EQUATION_LIMITS`](@ref)) overridden for the dynamic extent of the call, restoring the previous caps on exit. Task-scoped and thread-safe (see [`ScopedConfig`](@ref)); the global default is untouched. Unspecified keywords inherit from the currently active value, so nested overrides compose.
+
+Useful to tighten the boundary around one batch of untrusted constraint strings, or to raise it for a single machine-generated constraint set, without affecting other concurrent work.
+
+# Related
+
+  - [`set_equation_limits!`](@ref)
+  - [`EQUATION_LIMITS`](@ref)
+  - [`parse_equation`](@ref)
+"""
+function with_equation_limits(f; max_length::Integer = EQUATION_LIMITS[].max_length,
+                              max_depth::Integer = EQUATION_LIMITS[].max_depth)
+    return with_config(f, EQUATION_LIMITS, EquationLimits(max_length, max_depth))
+end
+"""
+    did_you_mean(name::AbstractString, candidates) -> String
+
+Return a `" (did you mean \`X\`?)"`suffix naming the closest match to`name`among`candidates`, or `""` when no candidate reaches the global [`STRING_DISTANCE`](@ref) `min_score`threshold (or`candidates` is empty).
+
+Used to enrich "variable not in asset universe" messages (see [`unknown_variable_msg`](@ref)) with a typo suggestion. The distance and threshold are read from the active [`STRING_DISTANCE`](@ref) config — global default via [`set_string_distance!`](@ref), task-scoped override via [`with_string_distance`](@ref); the threshold gating means a name legitimately absent from a meta-optimiser cluster/subset (no close neighbour) draws no suggestion.
+
+# Related
+
+  - [`STRING_DISTANCE`](@ref)
+  - [`set_string_distance!`](@ref)
+  - [`unknown_variable_msg`](@ref)
+"""
+function did_you_mean(name::AbstractString, candidates)
+    if isempty(candidates)
+        return ""
+    end
+    sd = STRING_DISTANCE[]
+    match, _ = StringDistances.findnearest(name, candidates, sd.dist;
+                                           min_score = sd.min_score)
+    return isnothing(match) ? "" : " (did you mean `$(match)`?)"
+end
+"""
+    unknown_variable_msg(v, nx, key; candidates = nx) -> String
+
+Build the warning/error text for a constraint or view variable `v` that is absent from the asset universe `nx` (stored under `key`). Names the variable and the universe *size* only — never the full universe — and appends a [`did_you_mean`](@ref) suggestion when a close match exists.
+
+`candidates` is the pool searched for the typo suggestion (default: the asset universe `nx`). Callers whose valid namespace is broader than the raw asset universe — e.g. [`group_to_val!`](@ref), where a key may name a *group* rather than an asset — pass a wider pool (asset names plus group/set keys) so the suggestion can name a mistyped group. The reported universe *size* is always `length(nx)` regardless of `candidates`.
+
+Shared by [`get_linear_constraints`](@ref), Black-Litterman view generation, entropy-pooling view generation, and [`group_to_val!`](@ref) so the message (and its info-leak-safe shape) lives in exactly one place.
+
+# Related
+
+  - [`did_you_mean`](@ref)
+  - [`empty_row_msg`](@ref)
+"""
+function unknown_variable_msg(v, nx, key; candidates = nx)
+    return "variable `$(v)` not in asset universe ($(length(nx)) assets under key `$(key)`); term dropped" *
+           did_you_mean(string(v), candidates)
+end
+"""
+    empty_row_msg(eqn, nx, key; noun::AbstractString = "constraint") -> String
+
+Build the warning/error text for a parsed equation `eqn` whose every term missed the asset universe `nx` (stored under `key`), leaving an all-zero row that is dropped. Names the equation and the universe *size* only — never the full universe or the parsed struct. `noun` is `"constraint"` for linear constraints or `"view"` for Black-Litterman views.
+
+Shared by [`get_linear_constraints`](@ref) and Black-Litterman view generation.
+
+# Related
+
+  - [`unknown_variable_msg`](@ref)
+"""
+function empty_row_msg(eqn, nx, key; noun::AbstractString = "constraint")
+    return "$(noun) `$(eqn)` matched no assets in the universe ($(length(nx)) assets under key `$(key)`); row dropped"
+end
+"""
+    missing_group_assets_msg(group, missing_assets, nx, key) -> String
+
+Build the warning/error text for a `group` that resolves in the asset sets but whose members
+`missing_assets` are absent from the asset universe `nx` (stored under `key`). Names the group, the
+offending member names (which are caller input, not internal state), and the universe *size* only —
+never the full universe or the input value dictionary — and appends a [`did_you_mean`](@ref)
+suggestion for the first missing member.
+
+Shared by [`group_to_val!`](@ref) so the info-leak-safe message shape lives in exactly one place,
+alongside [`unknown_variable_msg`](@ref) and [`empty_row_msg`](@ref).
+
+# Related
+
+  - [`unknown_variable_msg`](@ref)
+  - [`empty_row_msg`](@ref)
+  - [`did_you_mean`](@ref)
+"""
+function missing_group_assets_msg(group, missing_assets, nx, key)
+    return "group `$(group)`: $(length(missing_assets)) member(s) not in asset universe " *
+           "($(length(nx)) assets under key `$(key)`): $(missing_assets); dropped" *
+           did_you_mean(string(first(missing_assets)), nx)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Render the first line of an error for a log message, truncated to `max_line_length` characters (a trailing `…` marks the cut). Exceptions render via `showerror`, so the line carries the exception type and message; anything else renders via `repr`.
+
+# Related
+
+  - [`failed_solve_msg`](@ref)
+"""
+function first_error_line(err, max_line_length::Integer)
+    s = err isa Exception ? sprint(showerror, err) : repr(err)
+    line = String(first(split(s, '\n')))
+    return length(line) <= max_line_length ? line : first(line, max_line_length) * "…"
+end
+"""
+    failed_solve_msg(trials::AbstractDict; max_line_length::Integer = 200) -> String
+
+Build the warning text for a JuMP model that no configured solver could solve satisfactorily (see `JuMPResult`). One line per failed stage of each solver trial: the solver name, the stage that failed (`set_optimizer`, `optimize!`, or `assert_is_solved_and_feasible`), and the first line of the error truncated to `max_line_length` characters — so a JuMP termination status stays visible.
+
+Never interpolates the whole trials dictionary, the solver settings, or full exception payloads into the log; the raw data remains available on the returned `JuMPResult.trials`. This is the same info-leak-safe message discipline as [`unknown_variable_msg`](@ref) and its siblings. Solver names and stages are sorted so the message is deterministic.
+
+# Related
+
+  - [`unknown_variable_msg`](@ref)
+  - [`empty_row_msg`](@ref)
+  - [`missing_group_assets_msg`](@ref)
+  - [`first_error_line`](@ref)
+"""
+function failed_solve_msg(trials::AbstractDict; max_line_length::Integer = 200)
+    msg = "Model could not be solved satisfactorily ($(length(trials)) solver trial(s))."
+    for name in sort!(collect(keys(trials)); by = string)
+        trial = trials[name]
+        stages = trial isa AbstractDict ? trial : Dict{Symbol, Any}(:trial => trial)
+        for stage in sort!(collect(keys(stages)); by = string)
+            if stage === :settings
+                continue
+            end
+            msg *= "\n  $(name): $(stage) → $(first_error_line(stages[stage], max_line_length))"
+        end
+    end
+    return msg
+end
+"""
+    PREFERENCE_DISTANCES
+
+Enumerated allowlist mapping the names accepted by the `"suggestion_distance"` preference to their `StringDistances.StringDistance` objects. Membership and dispatch are one `Dict` — the same single-source-of-truth discipline as the equation parser's function allowlist (`docs/adr/0025-enumerated-parser-allowlist.md`): an unknown name fails closed at load with a typed error carrying a [`did_you_mean`](@ref) suggestion.
+
+Supported names: `"levenshtein"`, `"damerau_levenshtein"`, `"jaro"`, `"jaro_winkler"`, `"ratcliff_obershelp"`.
+
+# Related
+
+  - [`apply_preferences!`](@ref)
+  - [`set_string_distance!`](@ref)
+"""
+const PREFERENCE_DISTANCES = Dict{String, StringDistances.StringDistance}("levenshtein" =>
+                                                                              StringDistances.Levenshtein(),
+                                                                          "damerau_levenshtein" =>
+                                                                              StringDistances.DamerauLevenshtein(),
+                                                                          "jaro" =>
+                                                                              StringDistances.Jaro(),
+                                                                          "jaro_winkler" =>
+                                                                              StringDistances.JaroWinkler(),
+                                                                          "ratcliff_obershelp" =>
+                                                                              StringDistances.RatcliffObershelp())
+"""
+    PREFERENCE_KEYS
+
+The Preferences.jl keys read at package load to seed the global config defaults (see [`apply_preferences!`](@ref)):
+
+  - `"equation_max_length"` / `"equation_max_depth"`: positive integers for [`EQUATION_LIMITS`](@ref).
+  - `"suggestion_min_score"`: real number for the [`STRING_DISTANCE`](@ref) threshold.
+  - `"suggestion_distance"`: a [`PREFERENCE_DISTANCES`](@ref) name for the [`STRING_DISTANCE`](@ref) metric.
+  - `"compact_show"`: boolean or integer for [`COMPACT_SHOW`](@ref).
+
+Preferences.jl offers no way to enumerate the keys a project has set, so a misspelled *key* cannot be detected and is silently ignored (the shipped default applies) — misspelled or invalid *values* under these keys fail closed at load.
+
+# Related
+
+  - [`apply_preferences!`](@ref)
+"""
+const PREFERENCE_KEYS = ("equation_max_length", "equation_max_depth",
+                         "suggestion_min_score", "suggestion_distance", "compact_show")
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Apply load-time preference values to the global config defaults ([`EQUATION_LIMITS`](@ref), [`STRING_DISTANCE`](@ref), [`COMPACT_SHOW`](@ref)). Called by the package `__init__` with the [`PREFERENCE_KEYS`](@ref) values read via `Preferences.load_preference`; `nothing` values (unset preferences) are skipped and keep the shipped default.
+
+Fails closed: an invalid value throws a typed `ArgumentError` naming the key and value, so the package refuses to load rather than silently running with a weaker cap than the one the project requested. Values are applied through the `set_*!` setters, so they receive the same validation as runtime calls.
+
+To persist a configuration, put the keys in the active project's `LocalPreferences.toml`, e.g.:
+
+```toml
+[PortfolioOptimisers]
+equation_max_length = 512
+equation_max_depth = 64
+suggestion_min_score = 0.8
+suggestion_distance = "damerau_levenshtein"
+compact_show = 4
+```
+
+# Related
+
+  - [`PREFERENCE_KEYS`](@ref)
+  - [`PREFERENCE_DISTANCES`](@ref)
+  - [`set_equation_limits!`](@ref)
+  - [`set_string_distance!`](@ref)
+  - [`set_compact_show!`](@ref)
+"""
+function apply_preferences!(prefs::AbstractDict{<:AbstractString, <:Any})
+    ml = get(prefs, "equation_max_length", nothing)
+    md = get(prefs, "equation_max_depth", nothing)
+    if !(isnothing(ml) && isnothing(md))
+        for (key, val) in ("equation_max_length" => ml, "equation_max_depth" => md)
+            @argcheck(isnothing(val) || val isa Integer && !(val isa Bool) && val > 0,
+                      ArgumentError("preference `$(key) = $(repr(val))` must be a positive integer."))
+        end
+        lim = @atomic EQUATION_LIMITS.default
+        set_equation_limits!(; max_length = something(ml, lim.max_length),
+                             max_depth = something(md, lim.max_depth))
+    end
+    ms = get(prefs, "suggestion_min_score", nothing)
+    if !isnothing(ms)
+        @argcheck(ms isa Real && !(ms isa Bool),
+                  ArgumentError("preference `suggestion_min_score = $(repr(ms))` must be a real number."))
+        set_string_distance!(; min_score = ms)
+    end
+    dn = get(prefs, "suggestion_distance", nothing)
+    if !isnothing(dn)
+        @argcheck(dn isa AbstractString,
+                  ArgumentError("preference `suggestion_distance = $(repr(dn))` must be a string."))
+        dist = get(PREFERENCE_DISTANCES, dn, nothing)
+        if isnothing(dist)
+            throw(ArgumentError("preference `suggestion_distance = $(repr(dn))` is not one of the $(length(PREFERENCE_DISTANCES)) supported distance names ($(join(sort!(collect(keys(PREFERENCE_DISTANCES))), ", ")))" *
+                                did_you_mean(dn, collect(keys(PREFERENCE_DISTANCES)))))
+        end
+        set_string_distance!(; dist = dist)
+    end
+    cs = get(prefs, "compact_show", nothing)
+    if !isnothing(cs)
+        @argcheck(cs isa Bool || cs isa Integer,
+                  ArgumentError("preference `compact_show = $(repr(cs))` must be a boolean or an integer."))
+        set_compact_show!(cs)
+    end
+    return nothing
+end
+"""
+    __init__()
+
+Package load hook: reads the [`PREFERENCE_KEYS`](@ref) preferences of the active project via `Preferences.load_preference` and applies them to the global config defaults through [`apply_preferences!`](@ref). An invalid preference value fails closed — the package refuses to load — rather than silently running with a weaker cap than the one the project requested.
+"""
+function __init__()
+    return apply_preferences!(Dict{String, Any}(key =>
+                                                    Preferences.load_preference(@__MODULE__,
+                                                                                key,
+                                                                                nothing)
+                                                for key in PREFERENCE_KEYS))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1487,16 +1979,26 @@ Alias for a union of a numeric type or an abstract vector of numeric types.
 """
 const Num_VecNum = Union{<:Number, <:VecNum}
 """
-    const Func_Num_VecNum = Union{<:Function, <:Num_VecNum}
+    const Func_VecNum = Union{<:Function, <:VecNum}
+
+Alias for a union of a function and a vector of numeric types.
+
+# Related
+
+  - [`VecNum`](@ref)
+  - [`Func_Num_VecNum`](@ref)
+"""
+const Func_VecNum = Union{<:Function, <:VecNum}
+"""
+    const Func_Num_VecNum = Union{<:Number, <:Func_VecNum}
 
 Alias for a union of a function type or a numeric type or an abstract vector of numeric types.
 
 # Related
 
-  - [`Num_VecNum`](@ref)
+  - [`Func_VecNum`](@ref)
 """
-const Func_Num_VecNum = Union{<:Function, <:Num_VecNum}
-
+const Func_Num_VecNum = Union{<:Number, <:Func_VecNum}
 """
     const Num_ArrNum = Union{<:Number, <:ArrNum}
 
@@ -2163,6 +2665,30 @@ function assert_gt0(val::Number, sym::Sym_Str = :val)::Nothing
     return nothing
 end
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Assert that `val` lies strictly inside the open unit interval (`0 < val < 1`).
+
+# Arguments
+
+  - `val`: Value to check.
+  - `sym`: Symbolic name used in the error message.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`assert_nonneg`](@ref)
+  - [`assert_gt0`](@ref)
+"""
+function assert_unit_interval(val::Number, sym::Sym_Str = :val)::Nothing
+    @argcheck(zero(val) < val < one(val),
+              DomainError("0 < $sym < 1 must hold. Got\n$sym => $(val)"))
+    return nothing
+end
+"""
     assert_nonempty_nonneg_finite_val(
         val::Union{<:AbstractDict, <:VecPair, <:ArrNum, Pair, Number},
         val_sym::Union{Symbol,<:AbstractString} = :val
@@ -2414,5 +2940,457 @@ Alias for a union of a numeric type, an array of numeric types, or a `VecScalar`
 """
 const Num_ArrNum_VecScalar_DynWeights = Union{<:Num_ArrNum, <:VecScalar,
                                               <:DynamicAbstractWeights}
+"""
+$(DocStringExtensions.TYPEDEF)
 
-export IsEmptyError, IsNothingError, IsNonFiniteError, PropertyPathError, VecScalar
+Abstract supertype for all norm-based error algorithms in `PortfolioOptimisers.jl`.
+
+All concrete and/or abstract types representing norm-based error algorithms (such as second-order cone or norm-one error) should be subtypes of `NormError`.
+
+# Related
+
+  - [`L2Norm`](@ref)
+  - [`SquaredL2Norm`](@ref)
+  - [`L1Norm`](@ref)
+"""
+abstract type NormError <: AbstractEstimator end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Second-order cone (SOC) norm-based error formulation.
+
+`L2Norm` implements a norm-based error formulation using the Euclidean (L2) norm, scaled by the square root of the number of assets minus the degrees of freedom (`ddof`). This is commonly used for error constraints and objectives in portfolio optimisation.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathrm{TE}_{L_2}(\\boldsymbol{a},\\boldsymbol{b}) &= \\frac{\\|\\boldsymbol{a} - \\boldsymbol{b}\\|_2}{\\sqrt{T - d}}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathrm{TE}_{L_2}(\\boldsymbol{a},\\boldsymbol{b})``: L2-norm error.
+  - ``\\boldsymbol{a}``: Portfolio weight or return vector ``T \\times 1``.
+  - ``\\boldsymbol{b}``: Benchmark vector ``T \\times 1``.
+  - $(math_dict[:T])
+  - ``d``: Degrees of freedom, `ddof`. When ``T`` is not provided the denominator is 1.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    L2Norm(;
+        ddof::Integer = 1
+    ) -> L2Norm
+
+## Validation
+
+  - `0 <= ddof`.
+
+# Examples
+
+```jldoctest
+julia> L2Norm()
+L2Norm
+  ddof ┴ Int64: 1
+```
+
+# Related
+
+  - [`NormError`](@ref)
+  - [`SquaredSOCRiskExpr`](@ref)
+  - [`L1Norm`](@ref)
+  - [`norm_error`](@ref)
+"""
+@concrete struct L2Norm <: NormError
+    """
+    $(field_dict[:ddof])
+    """
+    ddof
+    function L2Norm(ddof::Integer)::L2Norm
+        assert_nonempty_nonneg_finite_val(ddof, :ddof)
+        return new{typeof(ddof)}(ddof)
+    end
+end
+function L2Norm(; ddof::Integer = 1)::L2Norm
+    return L2Norm(ddof)
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Second-order cone (SOC) squared norm-based error formulation.
+
+`SquaredL2Norm` implements a norm-based error formulation using the squared Euclidean (L2) norm, scaled by the number of assets minus the degrees of freedom (`ddof`). This is commonly used for norm error constraints and objectives in portfolio optimisation where squared error is preferred.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathrm{TE}_{L_2^2}(\\boldsymbol{a},\\boldsymbol{b}) &= \\frac{\\|\\boldsymbol{a} - \\boldsymbol{b}\\|_2^2}{T - d}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathrm{TE}_{L_2^2}(\\boldsymbol{a},\\boldsymbol{b})``: Squared L2-norm error.
+  - ``\\boldsymbol{a}``: Portfolio weight or return vector ``T \\times 1``.
+  - ``\\boldsymbol{b}``: Benchmark vector ``T \\times 1``.
+  - $(math_dict[:T])
+  - ``d``: Degrees of freedom, `ddof`. When ``T`` is not provided the denominator is 1.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    SquaredL2Norm(;
+        ddof::Integer = 1,
+    ) -> SquaredL2Norm
+
+## Validation
+
+  - `0 <= ddof`.
+
+# Examples
+
+```jldoctest
+julia> SquaredL2Norm()
+SquaredL2Norm
+  ddof ┴ Int64: 1
+```
+
+# Related
+
+  - [`NormError`](@ref)
+  - [`L2Norm`](@ref)
+  - [`L1Norm`](@ref)
+  - [`norm_error`](@ref)
+"""
+@concrete struct SquaredL2Norm <: NormError
+    """
+    $(field_dict[:ddof])
+    """
+    ddof
+    function SquaredL2Norm(ddof::Integer)::SquaredL2Norm
+        assert_nonempty_nonneg_finite_val(ddof, :ddof)
+        return new{typeof(ddof)}(ddof)
+    end
+end
+function SquaredL2Norm(; ddof::Integer = 1)::SquaredL2Norm
+    return SquaredL2Norm(ddof)
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Norm-one (NOC) error formulation.
+
+`L1Norm` implements a norm-based error formulation using the L1 (norm-one) distance between portfolio and benchmark weights. This is commonly used for error constraints and objectives in portfolio optimisation where sparsity or absolute deviations are preferred.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathrm{TE}_{L_1}(\\boldsymbol{a},\\boldsymbol{b}) &= \\frac{\\|\\boldsymbol{a} - \\boldsymbol{b}\\|_1}{T}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathrm{TE}_{L_1}(\\boldsymbol{a},\\boldsymbol{b})``: L1-norm error.
+  - ``\\boldsymbol{a}``: Portfolio weight or return vector ``T \\times 1``.
+  - ``\\boldsymbol{b}``: Benchmark vector ``T \\times 1``.
+  - $(math_dict[:T]) When ``T`` is not provided the denominator is 1.
+
+# Constructors
+
+    L1Norm() -> L1Norm
+
+# Examples
+
+```jldoctest
+julia> L1Norm()
+L1Norm()
+```
+
+# Related
+
+  - [`NormError`](@ref)
+  - [`L2Norm`](@ref)
+  - [`SquaredL2Norm`](@ref)
+  - [`norm_error`](@ref)
+"""
+struct L1Norm <: NormError end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+L-p norm error estimator.
+
+Computes the Lp-norm of the difference between portfolio and benchmark returns: ``\\lvert\\mathbf{X} \\boldsymbol{w} - \\boldsymbol{b}\\rvert_p``.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathrm{TE}_{L_p}(\\boldsymbol{a},\\boldsymbol{b}) &= \\frac{\\|\\boldsymbol{a} - \\boldsymbol{b}\\|_p}{(T - d)^{1/p}}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathrm{TE}_{L_p}(\\boldsymbol{a},\\boldsymbol{b})``: Lp-norm error.
+  - ``\\boldsymbol{a}``: Portfolio weight or return vector ``T \\times 1``.
+  - ``\\boldsymbol{b}``: Benchmark vector ``T \\times 1``.
+  - $(math_dict[:T])
+  - ``d``: Degrees of freedom, `ddof`. When ``T`` is not provided the denominator is 1.
+  - ``p``: Norm order.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    LpNorm(; p::Number = 3, ddof::Integer = 0) -> LpNorm
+
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - `0 <= ddof`.
+
+# Examples
+
+```jldoctest
+julia> LpNorm()
+LpNorm
+     p ┼ Int64: 3
+  ddof ┴ Int64: 0
+```
+
+# Related
+
+  - [`NormError`](@ref)
+  - [`L1Norm`](@ref)
+  - [`L2Norm`](@ref)
+  - [`LInfNorm`](@ref)
+"""
+@concrete struct LpNorm <: NormError
+    """
+    $(field_dict[:p_rm])
+    """
+    p
+    """
+    $(field_dict[:ddof])
+    """
+    ddof
+    function LpNorm(p::Number, ddof::Integer)::LpNorm
+        assert_nonempty_nonneg_finite_val(ddof, :ddof)
+        return new{typeof(p), typeof(ddof)}(p, ddof)
+    end
+end
+function LpNorm(; p::Number = 3, ddof::Integer = 0)::LpNorm
+    return LpNorm(p, ddof)
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+L-infinity norm (maximum absolute deviation) error estimator.
+
+Computes the L∞-norm (maximum absolute deviation) of the difference between portfolio and benchmark returns.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathrm{TE}_{L_\\infty}(\\boldsymbol{a},\\boldsymbol{b}) &= \\frac{\\|\\boldsymbol{a} - \\boldsymbol{b}\\|_\\infty}{T - d}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathrm{TE}_{L_\\infty}(\\boldsymbol{a},\\boldsymbol{b})``: L∞-norm error. `pos = true` uses ``+\\infty``, `pos = false` uses ``-\\infty``.
+  - ``\\boldsymbol{a}``: Portfolio weight or return vector ``T \\times 1``.
+  - ``\\boldsymbol{b}``: Benchmark vector ``T \\times 1``.
+  - $(math_dict[:T])
+  - ``d``: Degrees of freedom, `ddof`. When ``T`` is not provided the denominator is 1.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    LInfNorm(; ddof::Integer = 0, pos::Bool = true) -> LInfNorm
+
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - `0 <= ddof`.
+
+# Examples
+
+```jldoctest
+julia> LInfNorm()
+LInfNorm
+  ddof ┼ Int64: 0
+   pos ┴ Bool: true
+```
+
+# Related
+
+  - [`NormError`](@ref)
+  - [`LpNorm`](@ref)
+  - [`L1Norm`](@ref)
+  - [`L2Norm`](@ref)
+"""
+@concrete struct LInfNorm <: NormError
+    """
+    $(field_dict[:ddof])
+    """
+    ddof
+    """
+    $(field_dict[:pos])
+    """
+    pos
+    function LInfNorm(ddof::Integer, pos::Bool)::LInfNorm
+        assert_nonempty_nonneg_finite_val(ddof, :ddof)
+        return new{typeof(ddof), typeof(pos)}(ddof, pos)
+    end
+end
+function LInfNorm(; ddof::Integer = 0, pos::Bool = true)::LInfNorm
+    return LInfNorm(ddof, pos)
+end
+"""
+    norm_error(f::L2Norm, a, b, T::Option{<:Number} = nothing)
+    norm_error(f::SquaredL2Norm, a, b, T::Option{<:Number} = nothing)
+    norm_error(::L1Norm, a, b, T::Option{<:Number} = nothing)
+    norm_error(f::LpNorm, a, b, T::Option{<:Number} = nothing)
+    norm_error(f::LInfNorm, a, b, T::Option{<:Number} = nothing)
+
+Compute the norm-based tracking error between portfolio and benchmark weights.
+
+`norm_error` computes the tracking error using either the Euclidean (L2) norm for [`L2Norm`](@ref), squared Euclidean (L2) norm for [`SquaredL2Norm`](@ref), or the L1 (norm-one) distance for [`L1Norm`](@ref). The error is optionally scaled by the number of assets and degrees of freedom for SOC, or by the number of assets for NOC.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathrm{TE}_{L_2}(\\boldsymbol{a},\\boldsymbol{b}) &= \\frac{\\|\\boldsymbol{a} - \\boldsymbol{b}\\|_2}{\\sqrt{T - d}}\\,, \\\\
+\\mathrm{TE}_{L_2^2}(\\boldsymbol{a},\\boldsymbol{b}) &= \\frac{\\|\\boldsymbol{a} - \\boldsymbol{b}\\|_2^2}{T - d}\\,, \\\\
+\\mathrm{TE}_{L_1}(\\boldsymbol{a},\\boldsymbol{b}) &= \\frac{\\|\\boldsymbol{a} - \\boldsymbol{b}\\|_1}{T}\\,, \\\\
+\\mathrm{TE}_{L_p}(\\boldsymbol{a},\\boldsymbol{b}) &= \\frac{\\|\\boldsymbol{a} - \\boldsymbol{b}\\|_p}{(T-d)^{1/p}}\\,, \\\\
+\\mathrm{TE}_{L_\\infty}(\\boldsymbol{a},\\boldsymbol{b}) &= \\frac{\\|\\boldsymbol{a} - \\boldsymbol{b}\\|_\\infty}{T - d}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{a}``: Portfolio weight or return vector ``T \\times 1``.
+  - ``\\boldsymbol{b}``: Benchmark vector ``T \\times 1``.
+  - $(math_dict[:T])
+  - ``d``: Degrees of freedom, `ddof`.
+  - ``p``: Norm order.
+
+# Arguments
+
+  - `f`: Tracking formulation algorithm.
+  - `a`: Portfolio weights.
+  - `b`: Benchmark weights.
+  - `T`: Optional number of observations.
+
+# Returns
+
+  - `err::Number`: Norm-based tracking error.
+
+# Details
+
+  - For `L2Norm`, computes `LinearAlgebra.norm(a - b, 2) / sqrt(T - f.ddof)` if `T` is not `nothing`, else unscaled.
+  - For `SquaredL2Norm`, computes `LinearAlgebra.norm(a - b, 2)^2 / (T - f.ddof)` if `T` is not `nothing`, else unscaled.
+  - For `L1Norm`, computes `LinearAlgebra.norm(a - b, 1) / T` if `T` is not `nothing`, else unscaled.
+
+# Examples
+
+```jldoctest
+julia> PortfolioOptimisers.norm_error(L2Norm(), [0.5, 0.5], [0.6, 0.4], 2)
+0.14142135623730948
+
+julia> PortfolioOptimisers.norm_error(L1Norm(), [0.5, 0.5], [0.6, 0.4], 2)
+0.09999999999999998
+```
+
+# Related
+
+  - [`L2Norm`](@ref)
+  - [`L1Norm`](@ref)
+  - [`NormError`](@ref)
+  - [`Option`](@ref)
+"""
+function norm_error(f::L2Norm, a, b, T::Option{<:Number} = nothing)
+    factor = isnothing(T) ? 1 : sqrt(T - f.ddof)
+    return LinearAlgebra.norm(a - b, 2) / factor
+end
+function norm_error(f::L2Norm, a, T::Option{<:Number} = nothing)
+    factor = isnothing(T) ? 1 : sqrt(T - f.ddof)
+    return LinearAlgebra.norm(a, 2) / factor
+end
+function norm_error(::Nothing, a, T::Option{<:Number} = nothing)
+    factor = isnothing(T) ? 1 : sqrt(T)
+    return LinearAlgebra.norm(a, 2) / factor
+end
+function norm_error(f::SquaredL2Norm, a, b, T::Option{<:Number} = nothing)
+    factor = isnothing(T) ? 1 : (T - f.ddof)
+    val = LinearAlgebra.norm(a - b, 2)
+    return val^2 / factor
+end
+function norm_error(f::SquaredL2Norm, a, T::Option{<:Number} = nothing)
+    factor = isnothing(T) ? 1 : (T - f.ddof)
+    val = LinearAlgebra.norm(a, 2)
+    return val^2 / factor
+end
+function norm_error(::L1Norm, a, b, T::Option{<:Number} = nothing)
+    factor = ifelse(isnothing(T), 1, T)
+    return LinearAlgebra.norm(a - b, 1) / factor
+end
+function norm_error(::L1Norm, a, T::Option{<:Number} = nothing)
+    factor = ifelse(isnothing(T), 1, T)
+    return LinearAlgebra.norm(a, 1) / factor
+end
+function norm_error(f::LpNorm, a, b, T::Option{<:Number} = nothing)
+    factor = ifelse(isnothing(T), 1, T - f.ddof)
+    factor = if f.p == 3
+        cbrt(factor)
+    else
+        factor^(inv(f.p))
+    end
+    return LinearAlgebra.norm(a - b, f.p) / factor
+end
+function norm_error(f::LpNorm, a, T::Option{<:Number} = nothing)
+    factor = ifelse(isnothing(T), 1, T - f.ddof)
+    factor = if f.p == 3
+        cbrt(factor)
+    else
+        factor^(inv(f.p))
+    end
+    return LinearAlgebra.norm(a, f.p) / factor
+end
+function norm_error(f::LInfNorm, a, b, T::Option{<:Number} = nothing)
+    factor = ifelse(isnothing(T), 1, T - f.ddof)
+    ty = promote_type(eltype(a), eltype(b))
+    p = ifelse(f.pos, typemax(ty), typemin(ty))
+    return LinearAlgebra.norm(a - b, p) / factor
+end
+function norm_error(f::LInfNorm, a, T::Option{<:Number} = nothing)
+    factor = ifelse(isnothing(T), 1, T - f.ddof)
+    ty = eltype(a)
+    p = ifelse(f.pos, typemax(ty), typemin(ty))
+    return LinearAlgebra.norm(a, p) / factor
+end
+
+export IsEmptyError, IsNothingError, IsNonFiniteError, PropertyPathError, VecScalar, L2Norm,
+       SquaredL2Norm, L1Norm, LpNorm, LInfNorm

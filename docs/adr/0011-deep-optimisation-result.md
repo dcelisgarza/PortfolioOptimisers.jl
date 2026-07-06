@@ -82,7 +82,7 @@ AbstractResult
   / meta hang directly off `NonFiniteAllocationOptimisationEstimator` with no non-JuMP umbrella).
   **Rejected:** we accept the asymmetry deliberately for a tidy JuMP-vs-non-JuMP dispatch handle, even
   though the umbrella carries no shared behaviour.
-- **Full `BaseOptimisationResult` mirror layer.** **Rejected (YAGNI):** nothing else needs it yet, so
+- **FullMoment `BaseOptimisationResult` mirror layer.** **Rejected (YAGNI):** nothing else needs it yet, so
   `BaseJuMPOptimisationResult <: AbstractResult` directly.
 
 ## Consequences

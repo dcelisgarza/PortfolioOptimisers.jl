@@ -48,8 +48,8 @@ PhylogenyResult
     function PhylogenyResult(X::ArrNum)
         @argcheck(!isempty(X), IsEmptyError)
         if isa(X, MatNum)
-            @argcheck(LinearAlgebra.issymmetric(X))
-            @argcheck(all(iszero, LinearAlgebra.diag(X)))
+            @argcheck(LinearAlgebra.issymmetric(X) && all(iszero, LinearAlgebra.diag(X)),
+                      ArgumentError("phylogeny needs a distance matrix (symmetric, zero diagonal). Got a $(ifelse(LinearAlgebra.issymmetric(X), "symmetric", "non-symmetric")) $(ifelse(all(iszero, LinearAlgebra.diag(X)), "zero diagonal", "non-zero diagonal")) matrix."))
         end
         return new{typeof(X)}(X)
     end
@@ -315,7 +315,7 @@ DegreeCentrality
     """
     kwargs
     function DegreeCentrality(kind::Integer, kwargs::NamedTuple)
-        @argcheck(kind in 0:2)
+        @argcheck(kind in 0:2, DomainError(kind, "kind must be in 0:2"))
         return new{typeof(kind), typeof(kwargs)}(kind, kwargs)
     end
 end
@@ -354,6 +354,10 @@ $(DocStringExtensions.FIELDS)
 
 Keywords correspond to the struct's fields.
 
+## Validation
+
+  - $(val_dict[:katz_alpha])
+
 # Examples
 
 ```jldoctest
@@ -373,6 +377,7 @@ KatzCentrality
     """
     alpha
     function KatzCentrality(alpha::Number)
+        @argcheck(zero(alpha) < alpha, DomainError(alpha, "`alpha` must be positive"))
         return new{typeof(alpha)}(alpha)
     end
 end
@@ -436,8 +441,7 @@ Pagerank
     epsilon
     function Pagerank(n::Integer, alpha::Number, epsilon::Number)
         @argcheck(0 < n, DomainError)
-        @argcheck(zero(alpha) < alpha < one(alpha),
-                  DomainError("0 < alpha < 1 must hold. Got\nalpha => $alpha"))
+        assert_unit_interval(alpha, :alpha)
         @argcheck(zero(epsilon) < epsilon, DomainError)
         return new{typeof(n), typeof(alpha), typeof(epsilon)}(n, alpha, epsilon)
     end
@@ -879,7 +883,7 @@ NetworkEstimator
       │      │    ce ┼ GeneralCovariance
       │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
       │      │       │    w ┴ nothing
-      │      │   alg ┴ Full()
+      │      │   alg ┴ FullMoment()
       │   mp ┼ MatrixProcessing
       │      │     pdm ┼ Posdef
       │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
@@ -922,7 +926,7 @@ NetworkEstimator
     n
     function NetworkEstimator(ce::StatsBase.CovarianceEstimator,
                               de::AbstractDistanceEstimator, alg::Tree_SimMat, n::Integer)
-        @argcheck(n >= one(n))
+        @argcheck(n >= one(n), DomainError(n, "n must be >= 1"))
         return new{typeof(ce), typeof(de), typeof(alg), typeof(n)}(ce, de, alg, n)
     end
 end
@@ -972,7 +976,7 @@ NetworkClustersEstimator
       │       │      │    ce ┼ GeneralCovariance
       │       │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
       │       │      │       │    w ┴ nothing
-      │       │      │   alg ┴ Full()
+      │       │      │   alg ┴ FullMoment()
       │       │   mp ┼ MatrixProcessing
       │       │      │     pdm ┼ Posdef
       │       │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
@@ -1077,7 +1081,7 @@ CentralityEstimator
      │       │      │    ce ┼ GeneralCovariance
      │       │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
      │       │      │       │    w ┴ nothing
-     │       │      │   alg ┴ Full()
+     │       │      │   alg ┴ FullMoment()
      │       │   mp ┼ MatrixProcessing
      │       │      │     pdm ┼ Posdef
      │       │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton

@@ -102,21 +102,6 @@ function (r::MeanReturn)(x::VecNum)
     return isnothing(r.w) ? Statistics.mean(x) : Statistics.mean(x, r.w)
 end
 """
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Return the [`MeanReturn`](@ref) risk measure `r` unchanged.
-
-[`MeanReturn`](@ref) does not have asset-level parameters to slice.
-
-# Related
-
-  - [`MeanReturn`](@ref)
-  - [`port_opt_view`](@ref)
-"""
-function port_opt_view(r::MeanReturn, ::Any, args...)::MeanReturn
-    return r
-end
-"""
 $(DocStringExtensions.TYPEDEF)
 
 Represents a mean return to risk ratio measure.
@@ -153,26 +138,38 @@ $(DocStringExtensions.FIELDS)
 
 Keywords correspond to the struct's fields.
 
+## Validation
+
+  - $(val_dict[:rf])
+
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+
+  - `rt`: Recursively updated via [`factory`](@ref).
+  - `rk`: Recursively updated via [`factory`](@ref).
+
 # Related
 
   - [`NonOptimisationRiskMeasure`](@ref)
   - [`MeanReturn`](@ref)
   - [`AbstractBaseRiskMeasure`](@ref)
 """
-@concrete struct MeanReturnRiskRatio <: NonOptimisationRiskMeasure
+@propagatable @concrete struct MeanReturnRiskRatio <: NonOptimisationRiskMeasure
     """
     $(field_dict[:rt_mean])
     """
-    rt
+    @fprop rt
     """
     $(field_dict[:rk])
     """
-    rk
+    @fprop rk
     """
     $(field_dict[:rf])
     """
     rf
     function MeanReturnRiskRatio(rt::MeanReturn, rk::AbstractBaseRiskMeasure, rf::Number)
+        @argcheck(isfinite(rf), IsNonFiniteError("rf must be finite, got $rf"))
         return new{typeof(rt), typeof(rk), typeof(rf)}(rt, rk, rf)
     end
 end
@@ -180,36 +177,6 @@ function MeanReturnRiskRatio(; rt::MeanReturn = MeanReturn(),
                              rk::AbstractBaseRiskMeasure = ConditionalValueatRisk(),
                              rf::Number = 0.0)::MeanReturnRiskRatio
     return MeanReturnRiskRatio(rt, rk, rf)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Create an instance of [`MeanReturnRiskRatio`](@ref) by updating both the return measure and risk measure from the optimisation context.
-
-# Related
-
-  - [`MeanReturnRiskRatio`](@ref)
-  - [`factory`](@ref)
-"""
-function factory(r::MeanReturnRiskRatio, args...; kwargs...)::MeanReturnRiskRatio
-    rt = factory(r.rt, args...)
-    rk = factory(r.rk, args...; kwargs...)
-    return MeanReturnRiskRatio(; rt = rt, rk = rk, rf = r.rf)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Create an instance of [`MeanReturnRiskRatio`](@ref) updating the risk measure from new portfolio weights `w`.
-
-The return measure `rt` is preserved unchanged.
-
-# Related
-
-  - [`MeanReturnRiskRatio`](@ref)
-  - [`factory`](@ref)
-"""
-function factory(r::MeanReturnRiskRatio, w::VecNum)::MeanReturnRiskRatio
-    return MeanReturnRiskRatio(; rt = r.rt, rk = factory(r.rk, w), rf = r.rf)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -283,6 +250,12 @@ Computes the third central moment of the portfolio returns.
   - `X::MatNum`: Asset returns matrix (``T \\times N``).
   - `fees`: Optional fee structure.
 
+## View parameters
+
+When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+
+  - `mu`: Sliced to the selected indices via [`port_opt_view`](@ref).
+
 # Examples
 
 ```jldoctest
@@ -305,11 +278,11 @@ ThirdCentralMoment
     """
     $(field_dict[:mu_rm])
     """
-    @pprop mu
+    @pprop @vprop mu
     function ThirdCentralMoment(w::Option{<:ObsWeights}, mu::Option{<:Num_VecNum_VecScalar})
         assert_nonempty_nonneg_finite_val(w, :w)
         if isa(mu, VecNum)
-            @argcheck(!isempty(mu))
+            @argcheck(!isempty(mu), IsEmptyError("mu cannot be empty"))
         end
         return new{typeof(w), typeof(mu)}(w, mu)
     end
@@ -408,23 +381,6 @@ Single-argument form used by the precomputed-returns functor `r(x::VecNum)` (ADR
 """
 function calc_deviations_vec(r::TCM_Sk, x::VecNum)
     return x .- calc_moment_target(r, nothing, x)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Return a view of [`ThirdCentralMoment`](@ref) `r` sliced to asset indices `i`.
-
-Slices the expected returns `mu` for cluster-based optimisation.
-
-# Related
-
-  - [`ThirdCentralMoment`](@ref)
-  - [`port_opt_view`](@ref)
-  - [`nothing_scalar_array_view`](@ref)
-"""
-function port_opt_view(r::ThirdCentralMoment, i, args...)
-    mu = nothing_scalar_array_view(r.mu, i)
-    return ThirdCentralMoment(; w = r.w, mu = mu)
 end
 function moment_risk(r::ThirdCentralMoment{<:Option{<:StatsBase.AbstractWeights}},
                      val::VecNum)

@@ -47,11 +47,18 @@ function PortfolioOptimisers.plot_ptf_cumulative_returns(w::VecNum_VecVecNum, pr
     return PortfolioOptimisers.plot_ptf_cumulative_returns(w, pr.X, fees; ts = ts,
                                                            compound = compound, kwargs...)
 end
-function PortfolioOptimisers.plot_ptf_cumulative_returns(res::OptimisationResult;
-                                                         pr::Option{<:Pr_RR} = nothing,
+function PortfolioOptimisers.plot_ptf_cumulative_returns(res::OptimisationResult, pr::Pr_RR;
                                                          fees::Option{<:Fees} = nothing,
                                                          compound::Bool = false, kwargs...)
     pr = extract_pr(res, pr)
+    fees = extract_fees(res, fees)
+    return PortfolioOptimisers.plot_ptf_cumulative_returns(res.w, pr, fees;
+                                                           compound = compound, kwargs...)
+end
+function PortfolioOptimisers.plot_ptf_cumulative_returns(res::OptimisationResult;
+                                                         fees::Option{<:Fees} = nothing,
+                                                         compound::Bool = false, kwargs...)
+    pr = extract_pr(res, nothing)
     fees = extract_fees(res, fees)
     return PortfolioOptimisers.plot_ptf_cumulative_returns(res.w, pr, fees;
                                                            compound = compound, kwargs...)
@@ -123,13 +130,24 @@ function PortfolioOptimisers.plot_asset_cumulative_returns(w::VecNum, pr::Pr_RR,
                                                              nx = nx, compound = compound,
                                                              N = N, kwargs...)
 end
-function PortfolioOptimisers.plot_asset_cumulative_returns(res::OptimisationResult;
-                                                           pr::Option{<:Pr_RR} = nothing,
+function PortfolioOptimisers.plot_asset_cumulative_returns(res::OptimisationResult,
+                                                           pr::Pr_RR;
                                                            fees::Option{<:Fees} = nothing,
                                                            compound::Bool = false,
                                                            N::Option{<:Integer} = nothing,
                                                            kwargs...)
     pr = extract_pr(res, pr)
+    fees = extract_fees(res, fees)
+    return PortfolioOptimisers.plot_asset_cumulative_returns(res.w, pr, fees;
+                                                             compound = compound, N = N,
+                                                             kwargs...)
+end
+function PortfolioOptimisers.plot_asset_cumulative_returns(res::OptimisationResult;
+                                                           fees::Option{<:Fees} = nothing,
+                                                           compound::Bool = false,
+                                                           N::Option{<:Integer} = nothing,
+                                                           kwargs...)
+    pr = extract_pr(res, nothing)
     fees = extract_fees(res, fees)
     return PortfolioOptimisers.plot_asset_cumulative_returns(res.w, pr, fees;
                                                              compound = compound, N = N,
@@ -234,7 +252,7 @@ function PortfolioOptimisers.plot_composition(pred::MultiPeriodPredictionResult;
     end
     return PortfolioOptimisers.plot_stacked_bar_composition(collect(eachcol(w_mat)), nx;
                                                             xlabel = "Fold",
-                                                            title = "Walk-Forward Composition",
+                                                            title = "Walk-ForwardSelection Composition",
                                                             kwargs...)
 end
 function PortfolioOptimisers.plot_composition(pred::PopulationPredictionResult;
@@ -292,7 +310,7 @@ function PortfolioOptimisers.plot_risk_contribution(r::PortfolioOptimisers.Abstr
                                                     fees::Option{<:Fees} = nothing;
                                                     delta::Number = 1e-6,
                                                     marginal::Bool = false,
-                                                    percentage::Bool = false,
+                                                    percentage::Bool = true,
                                                     N::Option{<:Number} = nothing,
                                                     kwargs...)
     nx = isnothing(rd.nx) ? (1:size(rd.X, 2)) : rd.nx
@@ -305,7 +323,7 @@ function PortfolioOptimisers.plot_risk_contribution(r::PortfolioOptimisers.Abstr
                                                     res::OptimisationResult,
                                                     rd::ReturnsResult; delta::Number = 1e-6,
                                                     marginal::Bool = false,
-                                                    percentage::Bool = false,
+                                                    percentage::Bool = true,
                                                     N::Option{<:Number} = nothing,
                                                     kwargs...)
     fees = extract_fees(res, nothing)
@@ -320,7 +338,7 @@ function PortfolioOptimisers.plot_risk_contribution(r::PortfolioOptimisers.Abstr
                                                     nx::AbstractVector = 1:length(res.w),
                                                     delta::Number = 1e-6,
                                                     marginal::Bool = false,
-                                                    percentage::Bool = false,
+                                                    percentage::Bool = true,
                                                     N::Option{<:Number} = nothing,
                                                     kwargs...)
     fees = extract_fees(res, nothing)
@@ -679,7 +697,7 @@ end
 function PortfolioOptimisers.plot_centrality(cte::AbstractCentralityEstimator, X::MatNum,
                                              nx::AbstractVector = 1:size(X, 2);
                                              N::Option{<:Number} = nothing,
-                                             percentage::Bool = false, kwargs...)
+                                             percentage::Bool = true, kwargs...)
     plr = centrality_vector(cte, X)
     scores = plr.X
     M = length(scores)
@@ -687,7 +705,7 @@ function PortfolioOptimisers.plot_centrality(cte::AbstractCentralityEstimator, X
     top_idx = view(idx, 1:N)
     sort!(top_idx; by = i -> scores[i], rev = true)
     if percentage
-        scores ./= sum(scores)
+        scores /= sum(scores)
     end
     return bar(scores[top_idx]; xticks = (1:N, nx[top_idx]), title = "Asset Centrality",
                xlabel = "Asset", ylabel = "Centrality Score", xrotation = 90,
@@ -697,14 +715,14 @@ function PortfolioOptimisers.plot_centrality(cte::AbstractCentralityEstimator,
                                              pr::PortfolioOptimisers.AbstractPriorResult,
                                              nx::AbstractVector = 1:size(pr.X, 2);
                                              N::Option{<:Number} = nothing,
-                                             percentage::Bool = false, kwargs...)
+                                             percentage::Bool = true, kwargs...)
     return PortfolioOptimisers.plot_centrality(cte, pr.X, nx; N = N,
                                                percentage = percentage, kwargs...)
 end
 function PortfolioOptimisers.plot_centrality(cte::AbstractCentralityEstimator,
                                              rd::ReturnsResult;
                                              N::Option{<:Number} = nothing,
-                                             percentage::Bool = false, kwargs...)
+                                             percentage::Bool = true, kwargs...)
     nx = isnothing(rd.nx) ? (1:size(rd.X, 2)) : rd.nx
     return PortfolioOptimisers.plot_centrality(cte, rd.X, nx; N = N,
                                                percentage = percentage, kwargs...)
@@ -712,7 +730,7 @@ end
 function PortfolioOptimisers.plot_centrality(cte::AbstractCentralityEstimator,
                                              res::OptimisationResult, rd::ReturnsResult;
                                              N::Option{<:Number} = nothing,
-                                             percentage::Bool = false, kwargs...)
+                                             percentage::Bool = true, kwargs...)
     nx = isnothing(rd.nx) ? (1:length(res.w)) : rd.nx
     return PortfolioOptimisers.plot_centrality(cte, rd.X, nx; N = N,
                                                percentage = percentage, kwargs...)
@@ -1139,19 +1157,19 @@ function PortfolioOptimisers.plot_risk_contribution(r::PortfolioOptimisers.Abstr
                                                     nx::AbstractVector = 1:length(w),
                                                     delta::Number = 1e-6,
                                                     marginal::Bool = false,
-                                                    percentage::Bool = false,
+                                                    percentage::Bool = true,
                                                     erc::Bool = true,
                                                     N::Option{<:Number} = nothing,
                                                     kwargs...)
     if !(delta > zero(delta))
-        throw(ArgumentError("delta must be > 0; got $delta"))
+        throw(DomainError(delta, "delta must be > 0"))
     end
     if !isnothing(N) && !(N > zero(N))
-        throw(ArgumentError("N must be > 0; got $N"))
+        throw(DomainError(N, "N must be > 0"))
     end
     rc = risk_contribution(r, w, X, fees; delta = delta, marginal = marginal)
     if percentage
-        rc = rc ./ sum(rc)
+        rc = rc / sum(rc)
     end
     plt = PortfolioOptimisers.plot_composition(rc, nx; N = N, ylabel = "Contribution",
                                                title = "Risk Contribution", kwargs...)
@@ -1172,12 +1190,13 @@ function PortfolioOptimisers.plot_factor_risk_contribution(r::PortfolioOptimiser
                                                            nf::Option{<:AbstractVector} = nothing,
                                                            delta::Number = 1e-6,
                                                            N::Option{<:Number} = nothing,
-                                                           kwargs...)
+                                                           percentage::Bool = true,
+                                                           erc::Bool = true, kwargs...)
     if !(delta > zero(delta))
-        throw(ArgumentError("delta must be > 0; got $delta"))
+        throw(DomainError(delta, "delta must be > 0"))
     end
     if !isnothing(N) && !(N > zero(N))
-        throw(ArgumentError("N must be > 0; got $N"))
+        throw(DomainError(N, "N must be > 0"))
     end
     rc = factor_risk_contribution(r, w, X, fees; re = re, rd = rd, delta = delta)
     factor_names = if !isnothing(nf) && length(rc) <= length(nf) + 1
@@ -1187,10 +1206,17 @@ function PortfolioOptimisers.plot_factor_risk_contribution(r::PortfolioOptimiser
     else
         [string.(1:(length(rc) - 1)); "Constant"]
     end
-    return PortfolioOptimisers.plot_composition(rc, factor_names; N = N,
-                                                title = "Factor Risk Contribution",
-                                                xlabel = "Factor",
-                                                ylabel = "Risk Contribution", kwargs...)
+    if percentage
+        rc = rc / sum(rc)
+    end
+    plt = PortfolioOptimisers.plot_composition(rc, factor_names; N = N,
+                                               title = "Factor Risk Contribution",
+                                               xlabel = "Factor",
+                                               ylabel = "Risk Contribution", kwargs...)
+    if erc
+        hline!(plt, [mean(rc)])
+    end
+    return plt
 end
 ## ────────────────────────────────────────────────────────────────────────────
 ## Drawdowns
@@ -1212,24 +1238,23 @@ function PortfolioOptimisers.plot_drawdowns(ret::VecNum;
                                             alpha::Number = 0.05, kappa::Number = 0.3,
                                             rw = nothing, kwargs...)
     if !(zero(alpha) < alpha < one(alpha))
-        throw(ArgumentError("alpha must satisfy 0 < alpha < 1; got $alpha"))
+        throw(DomainError(alpha, "alpha must satisfy 0 < alpha < 1"))
     end
     if !(zero(kappa) < kappa < one(kappa))
-        throw(ArgumentError("kappa must satisfy 0 < kappa < 1; got $kappa"))
+        throw(DomainError(kappa, "kappa must satisfy 0 < kappa < 1"))
     end
     cret = cumulative_returns(ret, compound)
     dd = drawdowns(cret, compound; cX = true) .* 100
 
     base_risks = 100 * if !compound
-                       [-AverageDrawdown(; w = rw)(copy(ret)), -UlcerIndex()(copy(ret)),
-                        -DrawdownatRisk(; alpha = alpha)(copy(ret)),
-                        -ConditionalDrawdownatRisk(; alpha = alpha)(copy(ret)),
-                        -MaximumDrawdown()(copy(ret))]
+                       [-AverageDrawdown(; w = rw)(ret), -UlcerIndex()(ret),
+                        -DrawdownatRisk(; alpha = alpha)(ret),
+                        -ConditionalDrawdownatRisk(; alpha = alpha)(ret), -MaximumDrawdown()(ret)]
                        else
-                       [-RelativeAverageDrawdown(; w = rw)(copy(ret)), -RelativeUlcerIndex()(copy(ret)),
-                        -RelativeDrawdownatRisk(; alpha = alpha)(copy(ret)),
-                        -RelativeConditionalDrawdownatRisk(; alpha = alpha)(copy(ret)),
-                        -RelativeMaximumDrawdown()(copy(ret))]
+                       [-RelativeAverageDrawdown(; w = rw)(ret), -RelativeUlcerIndex()(ret),
+                        -RelativeDrawdownatRisk(; alpha = alpha)(ret),
+                        -RelativeConditionalDrawdownatRisk(; alpha = alpha)(ret),
+                        -RelativeMaximumDrawdown()(ret)]
                        end
 
     conf = round((1 - alpha) * 100; digits = 2)
@@ -1243,17 +1268,15 @@ function PortfolioOptimisers.plot_drawdowns(ret::VecNum;
     labels = copy(base_labels)
     if !isnothing(slv)
         if !compound
-            push!(risks,
-                  100 * -EntropicDrawdownatRisk(; slv = slv, alpha = alpha)(copy(ret)),
+            push!(risks, 100 * -EntropicDrawdownatRisk(; slv = slv, alpha = alpha)(ret),
                   100 *
-                  -RelativisticDrawdownatRisk(; slv = slv, alpha = alpha, kappa = kappa)(copy(ret)))
+                  -RelativisticDrawdownatRisk(; slv = slv, alpha = alpha, kappa = kappa)(ret))
         else
             push!(risks,
-                  100 *
-                  -RelativeEntropicDrawdownatRisk(; slv = slv, alpha = alpha)(copy(ret)),
+                  100 * -RelativeEntropicDrawdownatRisk(; slv = slv, alpha = alpha)(ret),
                   100 *
                   -RelativeRelativisticDrawdownatRisk(; slv = slv, alpha = alpha,
-                                                      kappa = kappa)(copy(ret)))
+                                                      kappa = kappa)(ret))
         end
         push!(labels, "$(conf)% EDaR: $(round(risks[6]; digits=2))%",
               "$(conf)% RLDaR ($(round(kappa; digits=2))): $(round(risks[7]; digits=2))%")
@@ -1296,13 +1319,13 @@ function PortfolioOptimisers.plot_histogram(ret::VecNum;
                                             rw = nothing, points::Integer = 0,
                                             reference::Bool = true, kwargs...)
     if !(zero(alpha) < alpha < one(alpha))
-        throw(ArgumentError("alpha must satisfy 0 < alpha < 1; got $alpha"))
+        throw(DomainError(alpha, "alpha must satisfy 0 < alpha < 1"))
     end
     if !(zero(kappa) < kappa < one(kappa))
-        throw(ArgumentError("kappa must satisfy 0 < kappa < 1; got $kappa"))
+        throw(DomainError(kappa, "kappa must satisfy 0 < kappa < 1"))
     end
     if !(points >= 0)
-        throw(ArgumentError("points must be >= 0; got $points"))
+        throw(DomainError(points, "points must be >= 0"))
     end
     T = length(ret)
     npts = points == 0 ? ceil(Int, 4 * sqrt(T)) : points
@@ -1311,12 +1334,12 @@ function PortfolioOptimisers.plot_histogram(ret::VecNum;
     mir, mar = extrema(ret)
     x_range = range(mir, mar; length = npts)
     mad = LowOrderMoment(; w = rw, alg = MeanAbsoluteDeviation())(ret)
-    gmd = OrderedWeightsArray()(copy(ret))
+    gmd = OrderedWeightsArray()(ret)
 
     base_risks = [mu_r, mu_r - sigma_r, mu_r - mad, mu_r - gmd,
-                  -ValueatRisk(; w = rw, alpha = alpha)(copy(ret)),
-                  -ConditionalValueatRisk(; w = rw, alpha = alpha)(copy(ret)),
-                  -OrderedWeightsArray(; w = owa_tg(T))(copy(ret))]
+                  -ValueatRisk(; w = rw, alpha = alpha)(ret),
+                  -ConditionalValueatRisk(; w = rw, alpha = alpha)(ret),
+                  -OrderedWeightsArray(; w = owa_tg(T))(ret)]
 
     conf = round((1 - alpha) * 100; digits = 2)
     base_labels = ["Mean: $(round(100*base_risks[1]; digits=2))%",
@@ -1330,8 +1353,8 @@ function PortfolioOptimisers.plot_histogram(ret::VecNum;
     risks = copy(base_risks)
     risk_labels = copy(base_labels)
     if !isnothing(slv)
-        push!(risks, -EntropicValueatRisk(; w = rw, slv = slv, alpha = alpha)(copy(ret)),
-              -RelativisticValueatRisk(; w = rw, slv = slv, alpha = alpha, kappa = kappa)(copy(ret)))
+        push!(risks, -EntropicValueatRisk(; w = rw, slv = slv, alpha = alpha)(ret),
+              -RelativisticValueatRisk(; w = rw, slv = slv, alpha = alpha, kappa = kappa)(ret))
         push!(risk_labels, "$(conf)% EVaR: $(round(100*risks[8]; digits=2))%",
               "$(conf)% RLVaR ($(round(kappa; digits=2))): $(round(100*risks[9]; digits=2))%")
     end
@@ -1731,7 +1754,7 @@ function PortfolioOptimisers.plot_portfolio_dashboard(res::OptimisationResult, r
                                                       N::Option{<:Number} = nothing,
                                                       delta::Number = 1e-6,
                                                       marginal::Bool = false,
-                                                      percentage::Bool = false,
+                                                      percentage::Bool = true,
                                                       alpha::Number = 0.05,
                                                       kappa::Number = 0.3, rw = nothing,
                                                       kwargs...)
@@ -1910,7 +1933,7 @@ function PortfolioOptimisers.plot_performance_summary(ret::VecNum;
                                                       alpha::Number = 0.05,
                                                       compound::Bool = false, kwargs...)
     if !(zero(alpha) < alpha < one(alpha))
-        throw(ArgumentError("alpha must satisfy 0 < alpha < 1; got $alpha"))
+        throw(DomainError(alpha, "alpha must satisfy 0 < alpha < 1"))
     end
     ann = periods_per_year
     ann_ret = mean(ret) * ann
@@ -1923,7 +1946,7 @@ function PortfolioOptimisers.plot_performance_summary(ret::VecNum;
     dd_series = drawdowns(cret, compound; cX = true)
     max_dd = minimum(dd_series)
     calmar = max_dd < 0 ? ann_ret / abs(max_dd) : NaN
-    cvar_val = -ConditionalValueatRisk(; alpha = alpha)(copy(ret))
+    cvar_val = -ConditionalValueatRisk(; alpha = alpha)(ret)
     conf = round((1 - alpha) * 100; digits = 1)
     vals = [ann_ret * 100, ann_vol * 100, sharpe, sortino, calmar, max_dd * 100,
             cvar_val * 100]
@@ -1982,7 +2005,7 @@ function PortfolioOptimisers.plot_rolling_drawdowns(ret::VecNum; ts::AbstractVec
                                                     rolling::Integer = 0,
                                                     compound::Bool = false, kwargs...)
     if !(rolling >= 0)
-        throw(ArgumentError("rolling must be >= 0; got $rolling"))
+        throw(DomainError(rolling, "rolling must be >= 0"))
     end
     T = length(ret)
     window = rolling == 0 ? ceil(Int, sqrt(T)) : rolling
@@ -2045,7 +2068,7 @@ function PortfolioOptimisers.plot_rolling_measure(r::PortfolioOptimisers.Abstrac
                                                   ret::VecNum; ts::AbstractVector,
                                                   rolling::Integer = 0, kwargs...)
     if !(rolling >= 0)
-        throw(ArgumentError("rolling must be >= 0; got $rolling"))
+        throw(DomainError(rolling, "rolling must be >= 0"))
     end
     T = length(ret)
     window = rolling == 0 ? ceil(Int, sqrt(T)) : rolling

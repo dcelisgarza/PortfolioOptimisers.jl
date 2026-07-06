@@ -6,9 +6,9 @@ FreedmanDiaconis
 Scott
 HacineGharbiRavier
 AbstractBins
-AstroPyBins
+BinWidthBins
 Int_Bin
-get_bin_width_func
+bin_width
 calc_num_bins
 calc_hist_data
 intrinsic_mutual_info

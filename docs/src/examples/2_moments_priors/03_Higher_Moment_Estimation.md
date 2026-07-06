@@ -104,15 +104,28 @@ pretty_table(DataFrame(; :estimator => [k for (k, _) in prs],
 The coskewness and cokurtosis heatmaps show the denoising at work — the raw matrices are dense
 and noisy, the processed ones cleaner and better conditioned.
 
+Coskewness heatmap: vanilla vs denoised.
+
 ````@example 03_Higher_Moment_Estimation
-using StatsPlots, GraphRecipes #= Coskewness heatmap: vanilla vs denoised. =#
+using StatsPlots, GraphRecipes
+````
 
-plot_coskewness(prs[1].second, rd) #= Coskewness heatmap: denoised. =#
+Coskewness heatmap: denoised.
 
-plot_coskewness(prs[2].second, rd) #= Cokurtosis eigenspectrum: vanilla vs denoised. =#
+````@example 03_Higher_Moment_Estimation
+plot_coskewness(prs[1].second, rd)
+````
 
-plot_cokurtosis(prs[1].second, rd) #= Cokurtosis eigenspectrum: denoised. =#
+Cokurtosis eigenspectrum: vanilla vs denoised.
 
+````@example 03_Higher_Moment_Estimation
+plot_coskewness(prs[2].second, rd)
+````
+
+Cokurtosis eigenspectrum: denoised.
+
+````@example 03_Higher_Moment_Estimation
+plot_cokurtosis(prs[1].second, rd)
 plot_cokurtosis(prs[2].second, rd)
 ````
 

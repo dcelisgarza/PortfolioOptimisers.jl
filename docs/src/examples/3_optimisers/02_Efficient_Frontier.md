@@ -101,7 +101,8 @@ giving a 30-point frontier. The lower bound lives on the *return* side, so it is
 [`ArithmeticReturn`](@ref)'s `lb`.
 
 ````@example 02_Efficient_Frontier
-optA = JuMPOptimiser(; pe = pr, slv = slv, ret = ArithmeticReturn(; lb = Frontier(; N = 30)))
+optA = JuMPOptimiser(; pe = pr, slv = slv,
+                     ret = ArithmeticReturn(; lb = Frontier(; N = 30)))
 resA = optimise(MeanRisk(; opt = optA, r = r))
 ````
 
@@ -149,9 +150,11 @@ ys_B = [expected_return(ArithmeticReturn(), w, pr) for w in resB.w]
 
 using StatsPlots, GraphRecipes
 
-plot(xs_A, ys_A; seriestype = :scatter, marker = (:circle, 5), label = "Min risk | return floor",
-     xlabel = "CVaR", ylabel = "Arithmetic return", title = "Same frontier from both directions")
-plot!(xs_B, ys_B; seriestype = :scatter, marker = (:cross, 7), label = "Max return | risk ceiling")
+plot(xs_A, ys_A; seriestype = :scatter, marker = (:circle, 5),
+     label = "Min risk | return floor", xlabel = "CVaR", ylabel = "Arithmetic return",
+     title = "Same frontier from both directions")
+plot!(xs_B, ys_B; seriestype = :scatter, marker = (:cross, 7),
+      label = "Max return | risk ceiling")
 ````
 
 ## 3. The `MeanRisk` frontier vs the `NearOptimalCentering` frontier
@@ -162,7 +165,7 @@ a **centred** frontier instead: at each point it returns the portfolio at the an
 the near-optimal neighbourhood rather than the corner. The result sits just inside the extreme
 frontier — slightly less optimal, noticeably more diversified and more stable to changes in the
 prior. (NOC's neighbourhood-centring behaviour is dissected on its own
-[page](08_Near_Optimal_Centering.md); here we only use it as a frontier engine.)
+[page](15_Near_Optimal_Centering.md); here we only use it as a frontier engine.)
 
 NOC solves a harder problem than plain `MeanRisk`, so a single solver configuration can fail to
 converge. We give it a richer fallback vector with decreasing `max_step_fraction`.
@@ -179,9 +182,11 @@ sweep — only the optimiser changes.
 
 ````@example 02_Efficient_Frontier
 ret15 = ArithmeticReturn(; lb = Frontier(; N = 15))
-resM = optimise(MeanRisk(; opt = JuMPOptimiser(; pe = pr, slv = slv_noc, ret = ret15), r = r))
-resN = optimise(NearOptimalCentering(; opt = JuMPOptimiser(; pe = pr, slv = slv_noc, ret = ret15),
-                                     r = r))
+resM = optimise(MeanRisk(; opt = JuMPOptimiser(; pe = pr, slv = slv_noc, ret = ret15),
+                         r = r))
+resN = optimise(NearOptimalCentering(;
+                                     opt = JuMPOptimiser(; pe = pr, slv = slv_noc,
+                                                         ret = ret15), r = r))
 ````
 
 NOC summarises its many internal `MeanRisk` solves into a single `retcode`; let's confirm success.
@@ -248,7 +253,7 @@ fronts — we can even use the ratio of two risk measures as the colourbar.
 
 ````@example 02_Efficient_Frontier
 plot_measures(resA.w, resA.pr; x = r, y = ConditionalDrawdownatRisk(),
-              c = RiskRatioRiskMeasure(; r1 = ConditionalDrawdownatRisk(), r2 = r),
+              c = RiskRatio(; r1 = ConditionalDrawdownatRisk(), r2 = r),
               title = "Pareto Front", xlabel = "CVaR", ylabel = "CDaR",
               colorbar_title = "\nCDaR/CVaR Ratio", right_margin = 6Plots.mm)
 ````

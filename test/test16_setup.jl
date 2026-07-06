@@ -157,8 +157,8 @@ wp = StatsBase.pweights(range(; start = inv(size(pr.X, 1)), stop = inv(size(pr.X
                               length = size(pr.X, 1)))
 rf = 4.2 / 100 / 252
 rs = [StandardDeviation(), Variance(), LowOrderMoment(),
-      LowOrderMoment(; alg = SecondMoment(; alg1 = Semi(), alg2 = SOCRiskExpr())),
-      LowOrderMoment(; alg = SecondMoment(; alg1 = Semi())),
+      LowOrderMoment(; alg = SecondMoment(; alg1 = SemiMoment(), alg2 = SOCRiskExpr())),
+      LowOrderMoment(; alg = SecondMoment(; alg1 = SemiMoment())),
       LowOrderMoment(; alg = SecondMoment(; alg2 = SOCRiskExpr())),
       LowOrderMoment(; alg = SecondMoment()),
       LowOrderMoment(; alg = MeanAbsoluteDeviation()), WorstRealisation(), Range(),

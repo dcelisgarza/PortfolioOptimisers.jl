@@ -55,7 +55,7 @@ MaxRiskMeasureSettings
     rke
     function MaxRiskMeasureSettings(scale::Number, lb::Option{<:RkRtBounds},
                                     rke::Bool)::MaxRiskMeasureSettings
-        @argcheck(isfinite(scale))
+        @argcheck(isfinite(scale), IsNonFiniteError("scale must be finite, got $scale"))
         return new{typeof(scale), typeof(lb), typeof(rke)}(scale, lb, rke)
     end
 end
@@ -175,12 +175,13 @@ Skewness
                       sk::Option{<:MatNum}, w::Option{<:ObsWeights},
                       mu::Option{<:Num_VecNum_VecScalar})
         if !isnothing(sk)
-            @argcheck(!isempty(sk))
-            @argcheck(size(sk, 1)^2 == size(sk, 2))
+            @argcheck(!isempty(sk), IsEmptyError("sk cannot be empty"))
+            @argcheck(size(sk, 1)^2 == size(sk, 2),
+                      DimensionMismatch("size(sk, 1)^2 ($(size(sk, 1)^2)) must equal size(sk, 2) ($(size(sk, 2)))"))
         end
         assert_nonempty_nonneg_finite_val(w, :w)
         if isa(mu, VecNum)
-            @argcheck(!isempty(mu))
+            @argcheck(!isempty(mu), IsEmptyError("mu cannot be empty"))
         end
         return new{typeof(settings), typeof(ve), typeof(sk), typeof(w), typeof(mu)}(settings,
                                                                                     ve, sk,
@@ -432,7 +433,7 @@ VarianceSkewKurtosis
            │         mu ┼ nothing
            │         kt ┼ nothing
            │          N ┼ nothing
-           │       alg1 ┼ Full()
+           │       alg1 ┼ FullMoment()
            │       alg2 ┴ SOCRiskExpr()
 ```
 

@@ -341,6 +341,10 @@ $(DocStringExtensions.FIELDS)
 
 Keywords correspond to the struct's fields.
 
+## Validation
+
+  - $(val_dict[:rf])
+
 ## Propagated parameters
 
 When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
@@ -392,6 +396,7 @@ ExpectedReturnRiskRatio
     rf
     function ExpectedReturnRiskRatio(rt::JuMPReturnsEstimator, rk::AbstractBaseRiskMeasure,
                                      rf::Number)
+        @argcheck(isfinite(rf), IsNonFiniteError("rf must be finite, got $rf"))
         return new{typeof(rt), typeof(rk), typeof(rf)}(rt, rk, rf)
     end
 end

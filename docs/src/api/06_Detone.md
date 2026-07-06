@@ -10,3 +10,8 @@ Detone
 detone!
 detone
 ```
+
+```@bibliography
+Pages = ["06_Detone.md"]
+Canonical = false
+```

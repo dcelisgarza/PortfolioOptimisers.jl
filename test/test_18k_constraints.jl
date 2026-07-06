@@ -474,7 +474,7 @@ end
 
     opt = JuMPOptimiser(; pe = pr, slv = slv,
                         tr = TrackingError(; tr = ReturnsTracking(; w = wr), err = 2.5e-3,
-                                           alg = L1Tracking()))
+                                           alg = L1Norm()))
     mre = MeanRisk(; obj = MinimumRisk(), opt = opt)
     res = optimise(mre)
     @test LinearAlgebra.norm(rd.X * res.w - wr, 1) / size(rd.X, 1) <= 2.5e-3
@@ -489,21 +489,21 @@ end
 
     opt = JuMPOptimiser(; pe = pr, slv = slv,
                         tr = TrackingError(; tr = ReturnsTracking(; w = wr), err = 4.5e-3,
-                                           alg = LpTracking()))
+                                           alg = LpNorm()))
     mre = MeanRisk(; obj = MinimumRisk(), opt = opt)
     res = optimise(mre)
     @test LinearAlgebra.norm(rd.X * res.w - wr, 3) / cbrt(size(rd.X, 1)) <= 4.5e-3
 
     opt = JuMPOptimiser(; pe = pr, slv = slv,
                         tr = TrackingError(; tr = ReturnsTracking(; w = wr), err = 8e-5,
-                                           alg = LInfTracking()))
+                                           alg = LInfNorm()))
     mre = MeanRisk(; obj = MinimumRisk(), opt = opt)
     res = optimise(mre)
     @test LinearAlgebra.norm(rd.X * res.w - wr, Inf) / size(rd.X, 1) <= 8e-5
 
     opt = JuMPOptimiser(; pe = pr, slv = slv,
                         tr = [TrackingError(; tr = WeightsTracking(; w = w0), err = 2e-3,
-                                            alg = L1Tracking())])
+                                            alg = L1Norm())])
     mre = MeanRisk(; obj = MinimumRisk(), opt = opt)
     res = optimise(mre)
     @test LinearAlgebra.norm(rd.X * (res.w - w0), 1) / size(rd.X, 1) <= 2e-3
@@ -640,4 +640,30 @@ end
     res = optimise(mr)
     @test !haskey(res.model, :sbgt)
     @test !haskey(res.model, :lbgt)
+end
+
+@testset "Scalar weight bounds (broadcast ⊖ regression)" begin
+    # Scalar positive bounds with MaximumRatio previously errored ("Subtraction between an
+    # array and a JuMP scalar") because set_weight_constraints! built `w - k*lb` / `w - k*ub`
+    # without broadcasting. Vector bounds worked by accident; scalars did not. The constraint
+    # now uses `⊖`, so a scalar upper cap must assemble, solve, and bind.
+    opt = JuMPOptimiser(; pe = pr, slv = slv, wb = WeightBounds(; ub = 0.15))
+    res = optimise(MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt))
+    @test isapprox(sum(res.w), 1; rtol = 1e-6)
+    @test all(res.w .<= 0.15 + 1e-6)
+    @test isapprox(maximum(res.w), 0.15; atol = 1e-4)
+
+    # Estimator form (lb defaulting to nothing) must also assemble and solve. The
+    # WeightBoundsEstimator resolves per-name bounds, so it needs `sets`.
+    opt = JuMPOptimiser(; pe = pr, slv = slv, sets = sets,
+                        wb = WeightBoundsEstimator(; ub = 0.15))
+    res = optimise(MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt))
+    @test isapprox(sum(res.w), 1; rtol = 1e-6)
+    @test all(res.w .<= 0.15 + 1e-6)
+
+    # Scalar lower and upper bounds together both bind.
+    opt = JuMPOptimiser(; pe = pr, slv = slv, wb = WeightBounds(; lb = 0.01, ub = 0.2))
+    res = optimise(MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt))
+    @test all(res.w .>= 0.01 - 1e-6)
+    @test all(res.w .<= 0.2 + 1e-6)
 end

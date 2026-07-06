@@ -824,16 +824,18 @@ result by the square of the regime multiplier derived from the smoothed regime s
 function Statistics.var(ce::RegimeAdjustedExpWeightedVariance, X::MatNum; dims::Int = 1,
                         estimation_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
                         active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
-    @argcheck(dims in (1, 2))
+    @argcheck(dims in (1, 2), DomainError(dims, "dims must be in (1, 2)"))
     est_flag = !isnothing(estimation_mask)
     act_flag = !isnothing(active_mask)
     itr, v = ifelse(isone(dims), (eachrow, (x, y) -> view(x, y, :)),
                     (eachcol, (x, y) -> view(x, :, y)))
     if est_flag
-        @argcheck(size(X) == size(estimation_mask))
+        @argcheck(size(X) == size(estimation_mask),
+                  DimensionMismatch("size(X) ($(size(X))) must match size(estimation_mask) ($(size(estimation_mask)))"))
     end
     if act_flag
-        @argcheck(size(X) == size(active_mask))
+        @argcheck(size(X) == size(active_mask),
+                  DimensionMismatch("size(X) ($(size(X))) must match size(active_mask) ($(size(active_mask)))"))
     end
     N = size(X, setdiff((1, 2), (dims,))[1])
 

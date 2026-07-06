@@ -34,7 +34,7 @@ FactorPrior
       │           │      │    ce ┼ GeneralCovariance
       │           │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
       │           │      │       │    w ┴ nothing
-      │           │      │   alg ┴ Full()
+      │           │      │   alg ┴ FullMoment()
       │           │   mp ┼ MatrixProcessing
       │           │      │     pdm ┼ Posdef
       │           │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
@@ -57,7 +57,7 @@ FactorPrior
    re ┼ StepwiseRegression
       │   crit ┼ PValue
       │        │   t ┴ Float64: 0.05
-      │    alg ┼ Forward()
+      │    alg ┼ ForwardSelection()
       │    tgt ┼ LinearModel
       │        │   kwargs ┴ @NamedTuple{}: NamedTuple()
    ve ┼ SimpleVariance
@@ -176,7 +176,7 @@ Where:
   - [`prior`](@ref)
 """
 function prior(pe::FactorPrior, X::MatNum, F::MatNum; dims::Int = 1, kwargs...)
-    @argcheck(dims in (1, 2))
+    @argcheck(dims in (1, 2), DomainError(dims, "dims must be 1 or 2"))
     if dims == 2
         X = transpose(X)
         F = transpose(F)

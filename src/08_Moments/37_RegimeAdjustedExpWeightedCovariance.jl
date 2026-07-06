@@ -154,7 +154,7 @@ PortfolioTarget
     w
     function PortfolioTarget(w::Option{<:EstValType})
         if isa(w, AbstractVector)
-            @argcheck(!isempty(w))
+            @argcheck(!isempty(w), IsEmptyError("w cannot be empty"))
         end
         return new{typeof(w)}(w)
     end

@@ -96,14 +96,14 @@ kfold_pred = cross_val_predict(mr, rd, kfold)
 We can visualise the out-of-sample performance and weight behaviour across folds.
 =#
 
-using StatsPlots, GraphRecipes #= Portfolio cumulative returns across all KFold test periods. =#
-
-plot_ptf_cumulative_returns(kfold_pred) #= Per-asset weight distribution across folds. =#
-
-plot_weight_stability(kfold_pred) #= Portfolio turnover between consecutive folds. =#
-
-plot_turnover(kfold_pred) #= Cross-validation scores (second moment / variance) per fold. =#
-
+# Portfolio cumulative returns across all KFold test periods.
+using StatsPlots, GraphRecipes
+# Per-asset weight distribution across folds.
+plot_ptf_cumulative_returns(kfold_pred)
+# Portfolio turnover between consecutive folds.
+plot_weight_stability(kfold_pred)
+# Cross-validation scores (second moment / variance) per fold.
+plot_turnover(kfold_pred)
 plot_cv_scores(LowOrderMoment(; alg = SecondMoment()), kfold_pred)
 
 #=
@@ -115,7 +115,7 @@ We can individually access the result of each fold by indexing into the `pred` f
 println("isequal(kfold_pred.mrd.ts, rd.ts) = $(isequal(kfold_pred.mrd.ts, rd.ts))")
 
 #=
-We can also compute performance metrics (risk measures) on the predicted returns. However, we can only use risk measures that use the returns series as an input. This means [`StandardDeviation`](@ref), [`NegativeSkewness`](@ref), [`TurnoverRiskMeasure`](@ref), [`TrackingRiskMeasure`](@ref) with [`WeightsTracking`](@ref), [`Variance`](@ref), [`UncertaintySetVariance`](@ref), [`EqualRiskMeasure`](@ref), [`ExpectedReturn`](@ref) and [`ExpectedReturnRiskRatio`](@ref), as well as any risk measure that uses any of these cannot be used. But there are ways around this, for example:
+We can also compute performance metrics (risk measures) on the predicted returns. However, we can only use risk measures that use the returns series as an input. This means [`StandardDeviation`](@ref), [`NegativeSkewness`](@ref), [`TurnoverRiskMeasure`](@ref), [`TrackingRiskMeasure`](@ref) with [`WeightsTracking`](@ref), [`Variance`](@ref), [`UncertaintySetVariance`](@ref), [`EqualRisk`](@ref), [`ExpectedReturn`](@ref) and [`ExpectedReturnRiskRatio`](@ref), as well as any risk measure that uses any of these cannot be used. But there are ways around this, for example:
 
 - For the variance and standard deviation, we can use [`LowOrderMoment`](@ref) with the appropriate algorithms.
 - For [`NegativeSkewness`](@ref) we can use [`HighOrderMoment`](@ref), or [`Skewness`](@ref).

@@ -56,20 +56,84 @@ res_mr = optimise(MeanRisk(; obj = MinimumRisk(),
 
 #=
 `MeanRisk` also offers [`MaximumUtility`](@ref), [`MaximumRatio`](@ref) and
-[`MaximumReturn`](@ref) objectives, swappable risk measures, and efficient frontiers — see
+[`MaximumReturn`](@ref) objectives and efficient frontiers — see
 [MeanRisk Objectives](../examples/3_optimisers/01_MeanRisk_Objectives.md) and
-[Efficient Frontier](../examples/3_optimisers/02_Efficient_Frontier.md). The other JuMP families
-follow the same `opt = JuMPOptimiser(...)` pattern:
+[Efficient Frontier](../examples/3_optimisers/02_Efficient_Frontier.md).
+
+The **risk measure** is the `r` field (of `MeanRisk` and of the clustering optimisers below); the
+default is [`Variance`](@ref). Which family you pick encodes *what kind* of risk you penalise:
+
+  - **Moment-based** — [`Variance`](@ref), [`StandardDeviation`](@ref), and higher-moment
+    measures. Cheap and classic; the right default when returns are roughly symmetric and you care
+    about overall dispersion.
+  - **Quantile / tail** — [`ConditionalValueatRisk`](@ref), [`EntropicValueatRisk`](@ref),
+    [`RelativisticValueatRisk`](@ref), … Reach for these when the *left tail* matters more than
+    overall spread ([Exotic Tail Risk Measures](../examples/3_optimisers/08_Exotic_Tail_Risk_Measures.md)).
+  - **OWA (ordered-weight)** — [`OrderedWeightsArray`](@ref) measures weight the whole ordered loss
+    distribution, the most general family
+    ([OWA Risk Measures](../examples/3_optimisers/05_OWA_Risk_Measures.md)).
+
+You can mix several in one objective ([Multiple Risk Measures](../examples/3_optimisers/04_Multiple_Risk_Measures.md)).
+**Drawdown** measures ([`MaximumDrawdown`](@ref), [`ConditionalDrawdownatRisk`](@ref), …) penalise
+peak-to-trough paths ([Drawdown Risk Measures](../examples/3_optimisers/07_Drawdown_Risk_Measures.md));
+the same drawdown notion is also useful purely as a *post-optimisation diagnostic* — via
+[`drawdowns`](@ref) on a realised book — when you want to measure rather than optimise it
+([Performance Attribution](../examples/6_post_processing/03_Performance_Attribution.md)).
+
+The other JuMP families follow the same `opt = JuMPOptimiser(...)` pattern:
 
   - [`RiskBudgeting`](@ref) / [`RelaxedRiskBudgeting`](@ref) — target a risk contribution per
-    asset or factor ([Risk Budgeting](../examples/3_optimisers/05_Risk_Budgeting.md)).
+    asset or factor ([Risk Budgeting](../examples/3_optimisers/09_Risk_Budgeting.md)).
   - [`NearOptimalCentering`](@ref) — a robust point near the efficient frontier
-    ([Near Optimal Centering](../examples/3_optimisers/08_Near_Optimal_Centering.md)).
+    ([Near Optimal Centering](../examples/3_optimisers/15_Near_Optimal_Centering.md)).
 
 Here is the minimal risk-budgeting call (equal risk contribution by default):
 =#
 
 res_rb = optimise(RiskBudgeting(; opt = JuMPOptimiser(; pe = pr, slv = slv)))
+
+#=
+### Which risk measures each optimiser family accepts
+
+Compatibility is a property of the optimiser *family*, not the individual optimiser: every
+JuMP optimiser accepts the same [`RiskMeasure`](@ref)s, and clustering optimisers additionally
+accept the hierarchical-only measures. You can ask programmatically with
+[`supports_risk_measure`](@ref) / [`supported_risk_measures`](@ref):
+
+```julia
+supports_risk_measure(MeanRisk, ConditionalValueatRisk)   # true
+supported_risk_measures(HierarchicalRiskParity)           # OptimisationRiskMeasure
+```
+
+The table below is *generated* from that same predicate, so it can never drift from what the
+optimisers actually dispatch on. Meta-optimisers (`NestedClustered`, `Stacking`,
+`SubsetResampling`) are omitted because their acceptance is instance-specific: they *delegate*,
+accepting a measure only when every constituent optimiser does (the intersection of their
+children's categories).
+=#
+
+using InteractiveUtils
+## Leaf risk-measure types (concrete or parametric) under a supertype.
+function _leaf_risk_measures(T, acc = Type[])
+    subs = subtypes(T)
+    if isempty(subs)
+        push!(acc, T)
+    else
+        for S in subs
+            _leaf_risk_measures(S, acc)
+        end
+    end
+    return acc
+end
+rms = sort(unique(vcat(_leaf_risk_measures(RiskMeasure),
+                       _leaf_risk_measures(HierarchicalRiskMeasure))); by = nameof)
+tick(x) = x ? "✓" : ""
+pretty_table(DataFrame("Risk measure" => String.(nameof.(rms)),
+                       "JuMP (MeanRisk, RiskBudgeting, NOC, FRC)" =>
+                           [tick(supports_risk_measure(MeanRisk, M)) for M in rms],
+                       "Clustering (HRP, HERC, SCHRP)" =>
+                           [tick(supports_risk_measure(HierarchicalRiskParity, M))
+                            for M in rms]))
 
 #=
 ## 3. Clustering optimisers
@@ -79,7 +143,7 @@ single program. They take a [`HierarchicalOptimiser`](@ref) carrying the prior a
 estimate. [`HierarchicalRiskParity`](@ref) (HRP) is the canonical one;
 [`HierarchicalEqualRiskContribution`](@ref) and
 [`SchurComplementHierarchicalRiskParity`](@ref) are its siblings — see
-[Clustering Optimisers](../examples/3_optimisers/06_Clustering_Optimisers.md).
+[Clustering Optimisers](../examples/3_optimisers/11_Clustering_Optimisers.md).
 =#
 
 clr = clusterise(ClustersEstimator(), pr.X)
@@ -92,7 +156,7 @@ res_hrp = optimise(HierarchicalRiskParity(; opt = hopt, r = Variance()))
 Meta-optimisers compose other optimisers. [`NestedClustered`](@ref) (NCO) runs an **inner**
 optimiser within each cluster and an **outer** optimiser across the cluster representatives;
 [`Stacking`](@ref) and [`SubsetResampling`](@ref) blend several fits — see
-[Meta Optimisers](../examples/3_optimisers/07_Meta_Optimisers.md). The inner optimiser carries
+[Meta Optimisers](../examples/3_optimisers/13_Meta_Optimisers.md). The inner optimiser carries
 the prior; the outer one does not.
 =#
 

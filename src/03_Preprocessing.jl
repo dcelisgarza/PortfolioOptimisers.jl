@@ -161,6 +161,14 @@ ReturnsResult
                            F::Option{<:MatNum}, nb::Option{<:VecStr},
                            B::Option{<:VecNum_MatNum}, ts::Option{<:VecDate},
                            iv::Option{<:MatNum}, ivpa::Option{<:Num_VecNum})
+        if !isnothing(nx)
+            @argcheck(allunique(nx),
+                      ArgumentError("Asset names must be unique. Got\nallunique(nx) => $(allunique(nx))"))
+        end
+        if !isnothing(nf)
+            @argcheck(allunique(nf),
+                      ArgumentError("Factor names must be unique. Got\nallunique(nf) => $(allunique(nf))"))
+        end
         check_names_and_returns_matrix(nx, X, :nx, :X)
         check_names_and_returns_matrix(nf, F, :nf, :F)
         if isa(B, VecNum) && !isnothing(nb)
@@ -617,11 +625,10 @@ function prices_to_returns(X::TimeSeries.TimeArray,
     end
     X = DataFrames.DataFrame(X)
 
-    f(x) = if isa(x, Number)
-        isnan(x)
-    end ? missing : x
-
-    DataFrames.transform!(X, 2:DataFrames.DataAPI.ncol(X) .=> DataFrames.ByRow((x) -> f(x));
+    DataFrames.transform!(X,
+                          2:DataFrames.DataAPI.ncol(X) .=>
+                              DataFrames.ByRow((x) -> ifelse((isa(x, Number) && isnan(x)),
+                                                             missing, x));
                           renamecols = false)
     if !isnothing(impute_method)
         X = Impute.impute(X, impute_method)
@@ -650,7 +657,8 @@ function prices_to_returns(X::TimeSeries.TimeArray,
     N = length(nx)
     ts = isempty(oc) ? nothing : vec(Matrix(X[!, oc]))
     if !isnothing(ts) && !isnothing(iv)
-        @argcheck(issubset(ts, TimeSeries.timestamp(iv)))
+        @argcheck(issubset(ts, TimeSeries.timestamp(iv)),
+                  ArgumentError("ts must be a subset of the timestamps in iv"))
         iv = iv[ts]
     end
     if !isnothing(iv)

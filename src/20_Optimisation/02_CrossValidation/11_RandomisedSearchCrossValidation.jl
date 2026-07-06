@@ -128,23 +128,32 @@ RandomisedSearchCrossValidation
         vp_flag = isa(p, AbstractVector{<:AbstractVector{<:Pair}})
         vd_flag = isa(p, AbstractVector{<:AbstractDict})
         if p_flag
-            @argcheck(all(x -> isa(x[1], GSCVKey), p))
-            @argcheck(all(x -> isa(x[2], RSCVVal), p))
+            @argcheck(all(x -> isa(x[1], GSCVKey), p),
+                      ArgumentError("all keys in p must be of type GSCVKey (String, Symbol, or Integer)"))
+            @argcheck(all(x -> isa(x[2], RSCVVal), p),
+                      ArgumentError("all values in p must be of type RSCVVal (AbstractVector or Distribution)"))
         elseif d_flag
-            @argcheck(all(x -> isa(x, GSCVKey), keys(p)))
-            @argcheck(all(x -> isa(x, RSCVVal), values(p)))
+            @argcheck(all(x -> isa(x, GSCVKey), keys(p)),
+                      ArgumentError("all keys in p must be of type GSCVKey (String, Symbol, or Integer)"))
+            @argcheck(all(x -> isa(x, RSCVVal), values(p)),
+                      ArgumentError("all values in p must be of type RSCVVal (AbstractVector or Distribution)"))
         elseif vp_flag || vd_flag
-            @argcheck(all(!isempty, p), IsEmptyError)
+            @argcheck(all(!isempty, p),
+                      IsEmptyError("each parameter set in p cannot be empty"))
             if vp_flag
                 for _p in p
-                    @argcheck(all(x -> isa(x[1], GSCVKey), _p))
-                    @argcheck(all(x -> isa(x[2], RSCVVal), _p))
+                    @argcheck(all(x -> isa(x[1], GSCVKey), _p),
+                              ArgumentError("all keys in p must be of type GSCVKey (String, Symbol, or Integer)"))
+                    @argcheck(all(x -> isa(x[2], RSCVVal), _p),
+                              ArgumentError("all values in p must be of type RSCVVal (AbstractVector or Distribution)"))
                 end
             end
             if vd_flag
                 for _p in p
-                    @argcheck(all(x -> isa(x, GSCVKey), keys(_p)))
-                    @argcheck(all(x -> isa(x, RSCVVal), values(_p)))
+                    @argcheck(all(x -> isa(x, GSCVKey), keys(_p)),
+                              ArgumentError("all keys in p must be of type GSCVKey (String, Symbol, or Integer)"))
+                    @argcheck(all(x -> isa(x, RSCVVal), values(_p)),
+                              ArgumentError("all values in p must be of type RSCVVal (AbstractVector or Distribution)"))
                 end
             end
         end

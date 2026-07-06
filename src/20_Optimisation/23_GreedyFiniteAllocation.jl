@@ -107,6 +107,10 @@ $(DocStringExtensions.FIELDS)
 
 Keywords correspond to the struct's fields.
 
+## Validation
+
+  - $(val_dict[:unit])
+
 # Examples
 
 ```jldoctest
@@ -143,6 +147,7 @@ GreedyAllocation
     fb
     function GreedyAllocation(unit::Number, args::Tuple, kwargs::NamedTuple,
                               fb::Option{<:FOptE_FOpt} = nothing)
+        @argcheck(unit > zero(unit), DomainError(unit, "`unit` must be positive"))
         return new{typeof(unit), typeof(args), typeof(kwargs), typeof(fb)}(unit, args,
                                                                            kwargs, fb)
     end
@@ -263,15 +268,8 @@ function finite_sub_allocation!(w::VecNum, p::VecNum, cash::Number, bgt::Number,
     idx = invperm(idx)
     return view(shares, idx), view(cost, idx), view(aw, idx), acash
 end
-function _optimise(ga::GreedyAllocation, w::VecNum, p::VecNum, cash::Number = 1e6,
-                   T::Option{<:Number} = nothing, fees::Option{<:Fees} = nothing; kwargs...)
-    @argcheck(!isempty(w))
-    @argcheck(!isempty(p))
-    @argcheck(length(w) == length(p))
-    @argcheck(cash > zero(cash))
-    if !isnothing(fees)
-        @argcheck(!isnothing(T))
-    end
+function _optimise(ga::GreedyAllocation, fai::FiniteAllocationInput; kwargs...)
+    w, p, cash, T, fees = fai.w, fai.prices, fai.cash, fai.horizon, fai.fees
     cash, bgt, lbgt, sbgt, lidx, sidx, lcash, scash = setup_alloc_optim(w, p, cash, T, fees)
     sshares, scost, sw, scash = finite_sub_allocation!(-view(w, sidx), view(p, sidx), scash,
                                                        sbgt, ga)
@@ -290,31 +288,26 @@ function _optimise(ga::GreedyAllocation, w::VecNum, p::VecNum, cash::Number = 1e
                                   w = view(res, :, 3), cash = lcash, fb = nothing)
 end
 """
-    optimise(ga::GreedyAllocation{<:Any, <:Any, <:Any, Nothing}, w::VecNum, p::VecNum,
-             cash::Number = 1e6, T::Option{<:Number} = nothing,
-             fees::Option{<:Fees} = nothing; kwargs...) -> GreedyAllocationResult
+    optimise(ga::GreedyAllocation{<:Any, <:Any, <:Any, Nothing},
+             fai::FiniteAllocationInput; kwargs...) -> GreedyAllocationResult
 
 Run the Greedy Allocation portfolio optimisation.
 
 # Arguments
 
   - `ga`: The greedy allocation optimiser to use.
-  - $(arg_dict[:pw])
-  - `p`: The prices of the assets in the same order as `w`.
-  - `cash`: The initial cash balance.
-  - `T`: The time horizon for the optimisation. Used to adjust the initial cash balance according to the fees charged on the portfolio for the time horizon.
-  - `fees`: The fees to apply to the portfolio.
+  - `fai`: The [`FiniteAllocationInput`](@ref) carrying the target weights, prices, cash budget, and optional horizon and fees.
   - `kwargs`: Additional keyword arguments passed to the optimisation function.
 
 # Related
 
   - [`GreedyAllocation`](@ref)
   - [`GreedyAllocationResult`](@ref)
+  - [`FiniteAllocationInput`](@ref)
 """
-function optimise(ga::GreedyAllocation{<:Any, <:Any, <:Any, Nothing}, w::VecNum, p::VecNum,
-                  cash::Number = 1e6, T::Option{<:Number} = nothing,
-                  fees::Option{<:Fees} = nothing; kwargs...)
-    return _optimise(ga, w, p, cash, T, fees; kwargs...)
+function optimise(ga::GreedyAllocation{<:Any, <:Any, <:Any, Nothing},
+                  fai::FiniteAllocationInput; kwargs...)
+    return _optimise(ga, fai; kwargs...)
 end
 
 export GreedyAllocationResult, GreedyAllocation
