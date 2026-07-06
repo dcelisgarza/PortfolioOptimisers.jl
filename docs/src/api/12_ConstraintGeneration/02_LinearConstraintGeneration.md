@@ -32,4 +32,5 @@ allowed_functions
 eval_numeric_functions
 has_invalid_plus
 port_opt_view(sets::AssetSets, i, args...)
+_expr_depth_exceeds
 ```
