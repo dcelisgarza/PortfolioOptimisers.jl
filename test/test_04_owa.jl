@@ -1,200 +1,208 @@
 @testset "OWA" begin
     using PortfolioOptimisers, CSV, DataFrames, Clarabel, Test, Random, Logging
-    Logging.disable_logging(Logging.Warn)
-    @testset "OWA l-moments" begin
-        slv = Solver(; solver = Clarabel.Optimizer,
-                     settings = Dict("max_step_fraction" => 0.75, "verbose" => false))
-        owa_t = CSV.read(joinpath(@__DIR__, "./assets/OWA_l_moment_weights.csv.gz"),
-                         DataFrame)
-        owas = [NormalisedConstantRelativeRiskAversion(; g = 0.75),
-                NormalisedConstantRelativeRiskAversion(),
-                NormalisedConstantRelativeRiskAversion(; g = 0.25),
-                OWAJuMP(; alg = MaximumEntropy(), max_phi = 0.75, slv = slv),
-                OWAJuMP(; alg = MaximumEntropy(), slv = slv),
-                OWAJuMP(; alg = MaximumEntropy(), max_phi = 0.25, slv = slv),
-                OWAJuMP(; alg = MinimumSumSquares(), max_phi = 0.75, slv = slv),
-                OWAJuMP(; alg = MinimumSumSquares(), slv = slv),
-                OWAJuMP(; alg = MinimumSumSquares(), max_phi = 0.25, slv = slv),
-                OWAJuMP(; alg = MinimumSquaredDistance(), max_phi = 0.75, slv = slv),
-                OWAJuMP(; alg = MinimumSquaredDistance(), slv = slv),
-                OWAJuMP(; alg = MinimumSquaredDistance(), max_phi = 0.25, slv = slv)]
-        owas_entr = [OWAJuMP(; alg = MaximumEntropy(; alg = ExponentialConeEntropy()),
-                             max_phi = 0.75, slv = slv),
-                     OWAJuMP(; alg = MaximumEntropy(; alg = ExponentialConeEntropy()),
-                             slv = slv),
-                     OWAJuMP(; alg = MaximumEntropy(; alg = ExponentialConeEntropy()),
-                             max_phi = 0.25, slv = slv)]
-        owas_sum_sq_sqsoc = [OWAJuMP(;
-                                     alg = MinimumSumSquares(; alg = SquaredSOCRiskExpr()),
-                                     max_phi = 0.75, slv = slv),
-                             OWAJuMP(;
-                                     alg = MinimumSumSquares(; alg = SquaredSOCRiskExpr()),
-                                     slv = slv),
-                             OWAJuMP(;
-                                     alg = MinimumSumSquares(; alg = SquaredSOCRiskExpr()),
-                                     max_phi = 0.25, slv = slv)]
-        owas_sum_sq_rsoc = [OWAJuMP(; alg = MinimumSumSquares(; alg = RSOCRiskExpr()),
-                                    max_phi = 0.75, slv = slv),
-                            OWAJuMP(; alg = MinimumSumSquares(; alg = RSOCRiskExpr()),
-                                    slv = slv),
-                            OWAJuMP(; alg = MinimumSumSquares(; alg = RSOCRiskExpr()),
-                                    max_phi = 0.25, slv = slv)]
-        owas_min_sq_dist_sqsoc = [OWAJuMP(;
-                                          alg = MinimumSquaredDistance(;
-                                                                       alg = SquaredSOCRiskExpr()),
-                                          max_phi = 0.75, slv = slv),
-                                  OWAJuMP(;
-                                          alg = MinimumSquaredDistance(;
-                                                                       alg = SquaredSOCRiskExpr()),
-                                          slv = slv),
-                                  OWAJuMP(;
-                                          alg = MinimumSquaredDistance(;
-                                                                       alg = SquaredSOCRiskExpr()),
-                                          max_phi = 0.25, slv = slv)]
-        owas_min_sq_dist_rsoc = [OWAJuMP(;
-                                         alg = MinimumSquaredDistance(;
-                                                                      alg = RSOCRiskExpr()),
+    # Scope warning suppression to this task. `Logging.disable_logging` mutates a
+    # process-global level that never restores and leaks into other test files sharing
+    # a reused worker (see ParallelTestRunner worker pool), randomly emptying their
+    # `@test_logs` captures. `with_logger` is task-local and restores on exit.
+    with_logger(SimpleLogger(stderr, Logging.Error)) do
+        @testset "OWA l-moments" begin
+            slv = Solver(; solver = Clarabel.Optimizer,
+                         settings = Dict("max_step_fraction" => 0.75, "verbose" => false))
+            owa_t = CSV.read(joinpath(@__DIR__, "./assets/OWA_l_moment_weights.csv.gz"),
+                             DataFrame)
+            owas = [NormalisedConstantRelativeRiskAversion(; g = 0.75),
+                    NormalisedConstantRelativeRiskAversion(),
+                    NormalisedConstantRelativeRiskAversion(; g = 0.25),
+                    OWAJuMP(; alg = MaximumEntropy(), max_phi = 0.75, slv = slv),
+                    OWAJuMP(; alg = MaximumEntropy(), slv = slv),
+                    OWAJuMP(; alg = MaximumEntropy(), max_phi = 0.25, slv = slv),
+                    OWAJuMP(; alg = MinimumSumSquares(), max_phi = 0.75, slv = slv),
+                    OWAJuMP(; alg = MinimumSumSquares(), slv = slv),
+                    OWAJuMP(; alg = MinimumSumSquares(), max_phi = 0.25, slv = slv),
+                    OWAJuMP(; alg = MinimumSquaredDistance(), max_phi = 0.75, slv = slv),
+                    OWAJuMP(; alg = MinimumSquaredDistance(), slv = slv),
+                    OWAJuMP(; alg = MinimumSquaredDistance(), max_phi = 0.25, slv = slv)]
+            owas_entr = [OWAJuMP(; alg = MaximumEntropy(; alg = ExponentialConeEntropy()),
+                                 max_phi = 0.75, slv = slv),
+                         OWAJuMP(; alg = MaximumEntropy(; alg = ExponentialConeEntropy()),
+                                 slv = slv),
+                         OWAJuMP(; alg = MaximumEntropy(; alg = ExponentialConeEntropy()),
+                                 max_phi = 0.25, slv = slv)]
+            owas_sum_sq_sqsoc = [OWAJuMP(;
+                                         alg = MinimumSumSquares(;
+                                                                 alg = SquaredSOCRiskExpr()),
                                          max_phi = 0.75, slv = slv),
                                  OWAJuMP(;
-                                         alg = MinimumSquaredDistance(;
-                                                                      alg = RSOCRiskExpr()),
+                                         alg = MinimumSumSquares(;
+                                                                 alg = SquaredSOCRiskExpr()),
                                          slv = slv),
                                  OWAJuMP(;
-                                         alg = MinimumSquaredDistance(;
-                                                                      alg = RSOCRiskExpr()),
+                                         alg = MinimumSumSquares(;
+                                                                 alg = SquaredSOCRiskExpr()),
                                          max_phi = 0.25, slv = slv)]
-        for i in eachindex(owas)
-            owa = owa_l_moment_crm(200, owas[i]; k = 5)
-            if i in 4:6
-                if i == 4
-                    rtol = 0.05
+            owas_sum_sq_rsoc = [OWAJuMP(; alg = MinimumSumSquares(; alg = RSOCRiskExpr()),
+                                        max_phi = 0.75, slv = slv),
+                                OWAJuMP(; alg = MinimumSumSquares(; alg = RSOCRiskExpr()),
+                                        slv = slv),
+                                OWAJuMP(; alg = MinimumSumSquares(; alg = RSOCRiskExpr()),
+                                        max_phi = 0.25, slv = slv)]
+            owas_min_sq_dist_sqsoc = [OWAJuMP(;
+                                              alg = MinimumSquaredDistance(;
+                                                                           alg = SquaredSOCRiskExpr()),
+                                              max_phi = 0.75, slv = slv),
+                                      OWAJuMP(;
+                                              alg = MinimumSquaredDistance(;
+                                                                           alg = SquaredSOCRiskExpr()),
+                                              slv = slv),
+                                      OWAJuMP(;
+                                              alg = MinimumSquaredDistance(;
+                                                                           alg = SquaredSOCRiskExpr()),
+                                              max_phi = 0.25, slv = slv)]
+            owas_min_sq_dist_rsoc = [OWAJuMP(;
+                                             alg = MinimumSquaredDistance(;
+                                                                          alg = RSOCRiskExpr()),
+                                             max_phi = 0.75, slv = slv),
+                                     OWAJuMP(;
+                                             alg = MinimumSquaredDistance(;
+                                                                          alg = RSOCRiskExpr()),
+                                             slv = slv),
+                                     OWAJuMP(;
+                                             alg = MinimumSquaredDistance(;
+                                                                          alg = RSOCRiskExpr()),
+                                             max_phi = 0.25, slv = slv)]
+            for i in eachindex(owas)
+                owa = owa_l_moment_crm(200, owas[i]; k = 5)
+                if i in 4:6
+                    if i == 4
+                        rtol = 0.05
+                    elseif i == 5
+                        rtol = 0.005
+                    else
+                        rtol = 1e-6
+                    end
+                    owa_entr = owa_l_moment_crm(200, owas_entr[i - 3]; k = 5)
+                    res = isapprox(owa, owa_entr; rtol = rtol)
+                    if !res
+                        println("Fails on OWA l-moments (entropy) iteration $i")
+                        find_tol(owa, owa_entr)
+                    end
+                    @test res
+                elseif i in 7:9
+                    owa_qsoc = owa_l_moment_crm(200, owas_sum_sq_sqsoc[i - 6]; k = 5)
+                    owa_rsoc = owa_l_moment_crm(200, owas_sum_sq_rsoc[i - 6]; k = 5)
+                    if i in 7:8
+                        rtol = 5e-3
+                    else
+                        rtol = 1e-6
+                    end
+                    res = isapprox(owa, owa_qsoc; rtol = rtol)
+                    if !res
+                        println("Fails on OWA l-moments (sq soc) iteration $i")
+                        find_tol(owa, owa_qsoc)
+                    end
+                    @test res
+                    res = isapprox(owa, owa_rsoc; rtol = rtol)
+                    if !res
+                        println("Fails on OWA l-moments (rsoc) iteration $i")
+                        find_tol(owa, owa_rsoc)
+                    end
+                    res = isapprox(owa_qsoc, owa_rsoc; rtol = rtol)
+                    if !res
+                        println("Fails on OWA l-moments (rsoc, qsoc) iteration $i")
+                        find_tol(owa_qsoc, owa_rsoc)
+                    end
+                    @test res
+                elseif i in 10:12
+                    owa_qsoc = owa_l_moment_crm(200, owas_min_sq_dist_sqsoc[i - 9]; k = 5)
+                    owa_rsoc = owa_l_moment_crm(200, owas_min_sq_dist_rsoc[i - 9]; k = 5)
+                    if i == 10
+                        rtol = 5e-2
+                    elseif i == 11
+                        rtol = 5e-3
+                    else
+                        rtol = 1e-6
+                    end
+                    res = isapprox(owa, owa_qsoc; rtol = rtol)
+                    if !res
+                        println("Fails on OWA l-moments (sq soc) iteration $i")
+                        find_tol(owa, owa_qsoc)
+                    end
+                    @test res
+                    res = isapprox(owa, owa_rsoc; rtol = rtol)
+                    if !res
+                        println("Fails on OWA l-moments (rsoc) iteration $i")
+                        find_tol(owa, owa_rsoc)
+                    end
+                    @test res
+                    if i in 10:11
+                        rtol = 5e-3
+                    else
+                        rtol = 1e-6
+                    end
+                    res = isapprox(owa_qsoc, owa_rsoc; rtol = rtol)
+                    if !res
+                        println("Fails on OWA l-moments (rsoc, qsoc) iteration $i")
+                        find_tol(owa_qsoc, owa_rsoc)
+                    end
+                    @test res
+                end
+                rtol = if i == 4
+                    0.05
                 elseif i == 5
-                    rtol = 0.005
-                else
-                    rtol = 1e-6
-                end
-                owa_entr = owa_l_moment_crm(200, owas_entr[i - 3]; k = 5)
-                res = isapprox(owa, owa_entr; rtol = rtol)
-                if !res
-                    println("Fails on OWA l-moments (entropy) iteration $i")
-                    find_tol(owa, owa_entr)
-                end
-                @test res
-            elseif i in 7:9
-                owa_qsoc = owa_l_moment_crm(200, owas_sum_sq_sqsoc[i - 6]; k = 5)
-                owa_rsoc = owa_l_moment_crm(200, owas_sum_sq_rsoc[i - 6]; k = 5)
-                if i in 7:8
-                    rtol = 5e-3
-                else
-                    rtol = 1e-6
-                end
-                res = isapprox(owa, owa_qsoc; rtol = rtol)
-                if !res
-                    println("Fails on OWA l-moments (sq soc) iteration $i")
-                    find_tol(owa, owa_qsoc)
-                end
-                @test res
-                res = isapprox(owa, owa_rsoc; rtol = rtol)
-                if !res
-                    println("Fails on OWA l-moments (rsoc) iteration $i")
-                    find_tol(owa, owa_rsoc)
-                end
-                res = isapprox(owa_qsoc, owa_rsoc; rtol = rtol)
-                if !res
-                    println("Fails on OWA l-moments (rsoc, qsoc) iteration $i")
-                    find_tol(owa_qsoc, owa_rsoc)
-                end
-                @test res
-            elseif i in 10:12
-                owa_qsoc = owa_l_moment_crm(200, owas_min_sq_dist_sqsoc[i - 9]; k = 5)
-                owa_rsoc = owa_l_moment_crm(200, owas_min_sq_dist_rsoc[i - 9]; k = 5)
-                if i == 10
-                    rtol = 5e-2
+                    0.005
+                elseif i in (7, 8) || Sys.isapple() && i == 11
+                    1e-6
                 elseif i == 11
-                    rtol = 5e-3
+                    5e-8
                 else
-                    rtol = 1e-6
+                    1e-9
                 end
-                res = isapprox(owa, owa_qsoc; rtol = rtol)
+                res = isapprox(owa, owa_t[!, i]; rtol = rtol)
                 if !res
-                    println("Fails on OWA l-moments (sq soc) iteration $i")
-                    find_tol(owa, owa_qsoc)
-                end
-                @test res
-                res = isapprox(owa, owa_rsoc; rtol = rtol)
-                if !res
-                    println("Fails on OWA l-moments (rsoc) iteration $i")
-                    find_tol(owa, owa_rsoc)
-                end
-                @test res
-                if i in 10:11
-                    rtol = 5e-3
-                else
-                    rtol = 1e-6
-                end
-                res = isapprox(owa_qsoc, owa_rsoc; rtol = rtol)
-                if !res
-                    println("Fails on OWA l-moments (rsoc, qsoc) iteration $i")
-                    find_tol(owa_qsoc, owa_rsoc)
+                    println("Fails on OWA l-moments iteration $i")
+                    find_tol(owa, owa_t[!, i]; name1 = :owa, name2 = :owa_t)
                 end
                 @test res
             end
-            rtol = if i == 4
-                0.05
-            elseif i == 5
-                0.005
-            elseif i in (7, 8) || Sys.isapple() && i == 11
-                1e-6
-            elseif i == 11
-                5e-8
-            else
-                1e-9
-            end
-            res = isapprox(owa, owa_t[!, i]; rtol = rtol)
-            if !res
-                println("Fails on OWA l-moments iteration $i")
-                find_tol(owa, owa_t[!, i]; name1 = :owa, name2 = :owa_t)
-            end
-            @test res
+
+            @test_throws IsEmptyError OWAJuMP(slv = Solver[])
         end
+        @testset "OWA weight vectors" begin
+            owa_t = CSV.read(joinpath(@__DIR__, "./assets/OWA_weights.csv.gz"), DataFrame)
+            @test isapprox(owa_gmd(100), owa_t[!, 1])
+            @test isapprox(owa_cvar(100), owa_t[!, 2])
+            @test isapprox(owa_tg(100), owa_t[!, 3])
+            @test isapprox(owa_wr(100), owa_t[!, 4])
+            @test isapprox(owa_rg(100), owa_t[!, 5])
+            @test isapprox(owa_cvarrg(100), owa_t[!, 6])
+            @test isapprox(owa_tgrg(100), owa_t[!, 7])
+            @test isapprox(owa_l_moment(100), owa_t[!, 8])
+            @test isapprox(owa_l_moment(100, 3), owa_t[!, 9])
+            @test isapprox(owa_l_moment(100, 4), owa_t[!, 10])
+            @test isapprox(owa_l_moment(100, 10), owa_t[!, 11])
 
-        @test_throws IsEmptyError OWAJuMP(slv = Solver[])
-    end
-    @testset "OWA weight vectors" begin
-        owa_t = CSV.read(joinpath(@__DIR__, "./assets/OWA_weights.csv.gz"), DataFrame)
-        @test isapprox(owa_gmd(100), owa_t[!, 1])
-        @test isapprox(owa_cvar(100), owa_t[!, 2])
-        @test isapprox(owa_tg(100), owa_t[!, 3])
-        @test isapprox(owa_wr(100), owa_t[!, 4])
-        @test isapprox(owa_rg(100), owa_t[!, 5])
-        @test isapprox(owa_cvarrg(100), owa_t[!, 6])
-        @test isapprox(owa_tgrg(100), owa_t[!, 7])
-        @test isapprox(owa_l_moment(100), owa_t[!, 8])
-        @test isapprox(owa_l_moment(100, 3), owa_t[!, 9])
-        @test isapprox(owa_l_moment(100, 4), owa_t[!, 10])
-        @test isapprox(owa_l_moment(100, 10), owa_t[!, 11])
+            w1 = owa_tgrg(100)
+            alpha_i = 0.0001
+            alpha = 0.05
+            a_sim = 100
+            alphas = range(; start = alpha_i, stop = alpha, length = a_sim)
+            n = length(alphas)
+            w = Vector{typeof(alpha)}(undef, n)
 
-        w1 = owa_tgrg(100)
-        alpha_i = 0.0001
-        alpha = 0.05
-        a_sim = 100
-        alphas = range(; start = alpha_i, stop = alpha, length = a_sim)
-        n = length(alphas)
-        w = Vector{typeof(alpha)}(undef, n)
+            w[1] = alphas[2] * alphas[1] / alphas[n]^2
+            for i in 2:(n - 1)
+                w[i] = (alphas[i + 1] - alphas[i - 1]) * alphas[i] / alphas[n]^2
+            end
+            w[n] = (alphas[n] - alphas[n - 1]) / alphas[n]
+            w2 = owa_wcvarrg(100, alphas, w)
+            @test isapprox(w1, w2)
 
-        w[1] = alphas[2] * alphas[1] / alphas[n]^2
-        for i in 2:(n - 1)
-            w[i] = (alphas[i + 1] - alphas[i - 1]) * alphas[i] / alphas[n]^2
+            w = owa_tg(100)
+            r = OrderedWeightsArrayRange(; w1 = w, w2 = w)
+            @test r.w1 == reverse(r.w2)
+
+            r = OrderedWeightsArrayRange(; w1 = w, w2 = w, rev = true)
+            @test r.w1 == r.w2
         end
-        w[n] = (alphas[n] - alphas[n - 1]) / alphas[n]
-        w2 = owa_wcvarrg(100, alphas, w)
-        @test isapprox(w1, w2)
-
-        w = owa_tg(100)
-        r = OrderedWeightsArrayRange(; w1 = w, w2 = w)
-        @test r.w1 == reverse(r.w2)
-
-        r = OrderedWeightsArrayRange(; w1 = w, w2 = w, rev = true)
-        @test r.w1 == r.w2
     end
 end

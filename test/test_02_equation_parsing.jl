@@ -1,115 +1,122 @@
 @testset "Equation tests" begin
     using PortfolioOptimisers, Test, Logging
-    Logging.disable_logging(Logging.Warn)
-    res = parse_equation("2*sqrt(prior(a ,   1b1)) /2*  5 + cbrt(3)^3*f >= 5/5 + d-69/3*c")
-    idx = sortperm(res.vars)
-    @test res.vars[idx] == ["d", "f", "c", "sqrt(prior(a, 1b1))"][idx]
-    @test res.coef[idx] == [-1.0, 3.0, 23.0, 5.0][idx]
-    @test res.op == ">="
-    @test res.rhs == 1.0
-    res = parse_equation("2*sqrt(prior(a ,   b)) /2*  5 - - - -6 + cbrt(3)^3*f  -69/3*c <= - d")
-    idx = sortperm(res.vars)
-    @test res.vars[idx] == ["sqrt(prior(a, b))", "f", "c", "d"][idx]
-    @test res.coef[idx] == [5.0, 3.0, -23.0, 1.0][idx]
-    @test res.op == "<="
-    @test res.rhs == -6.0
-    res = parse_equation(" == 2*sqrt(prior(a ,   b)) /2*  5 - 6 + 7 + -  - cbrt(3)^3 *f  - - 69/ 3*c-d+(3*2)/(3*(1+1))*d")
-    idx = sortperm(res.vars)
-    @test res.vars[idx] == ["sqrt(prior(a, b))", "f", "c", "d"][idx]
-    @test res.coef[idx] == [-5.0, -3.0, -23.0, 0.0][idx]
-    @test res.op == "=="
-    @test res.rhs == 1.0
-    @test_throws Meta.ParseError parse_equation("2*sqrt(prior(a ,   b)) /2*  5 + cbrt(3)^3*f >= 5/")
-    @test_throws Meta.ParseError parse_equation("2*sqrt(prior(a ,   b))   5 + cbrt(3)^3*f + 1/>= 5/5 ")
-    @test_throws Meta.ParseError parse_equation("2*sqrt(prior(a ,   b))   5 + cbrt(3)^3*f + 1/ = 5/5 ")
-    @test_throws Meta.ParseError parse_equation("2*sqrt(prior(a ,   b)) /2*  5 ++ cbrt(3)^3*f >= 5/5 + d-69/3*c")
-    @test_throws Meta.ParseError parse_equation(:(2 * sqrt(prior(a, b)) / 2 * 5 ++
-                                                  cbrt(3)^3 * f >= 5 / 5 + d - 69 / 3 * c))
-    @test_throws Meta.ParseError parse_equation("2*sqrt(prior(a ,   b)) /2*  5 + cbrt(3)^3*f >= >= 5/5 + d-69/3*c")
-    @test_throws Meta.ParseError parse_equation(:(2 * sqrt(prior(a, b)) / 2 * 5 >=
-                                                  cbrt(3)^3 * f >=
-                                                  5 / 5 + d - 69 / 3 * c))
-    @test_throws Meta.ParseError parse_equation(:(2 * sqrt(prior(a, b)) / 2 * 5 +
-                                                  cbrt(3)^3 * f +
-                                                  5 / 5 +
-                                                  d - 69 / 3 * c))
-    res = parse_equation("1/3*x/((2^z)*y)+5z==1-5")
-    idx = sortperm(res.vars)
-    @test res.vars[idx] == ["z", "(0.3333333333333333x) / (2 ^ z * y)"][idx]
-    @test res.coef[idx] == [5.0, 1.0][idx]
-    @test res.op == "=="
-    @test res.rhs == -4.0
-    # @test res.eqn == "5.0*z + (0.3333333333333333x) / (2 ^ z * y) == -4.0"
-    res = parse_equation("-x>=-1.0y+2")
-    idx = sortperm(res.vars)
-    @test res.vars[idx] == ["x", "y"][idx]
-    @test res.coef[idx] == [-1.0, 1.0][idx]
-    @test res.op == ">="
-    @test res.rhs == 2.0
-    # @test res.eqn == "-x + y >= 2.0"
-    res = parse_equation("-_1*_3<=-1.1y+2")
-    idx = sortperm(res.vars)
-    @test res.vars[idx] == ["-_1 * _3", "y"][idx]
-    @test res.coef[idx] == [1.0, 1.1][idx]
-    @test res.op == "<="
-    @test res.rhs == 2.0
-    # @test res.eqn == "-_1 * _3 + 1.1*y <= 2.0"
-    res = parse_equation("Inf*a<=Inf")
-    idx = sortperm(res.vars)
-    @test res.vars[idx] == ["a"][idx]
-    @test res.coef[idx] == [Inf][idx]
-    @test res.op == "<="
-    @test res.rhs == Inf
-    # @test res.eqn == "Inf*a <= Inf"
-    # F3: numeric literals evaluate in the target float type, not machine Int64, so an
-    # overflowing exponent yields the correct float instead of silently wrapping, and a
-    # negative integer exponent no longer raises a raw DomainError.
-    res = parse_equation("w_A <= 2^64")
-    @test res.vars == ["w_A"]
-    @test res.coef == [1.0]
-    @test res.rhs == 1.8446744073709552e19
-    res = parse_equation("w_A <= 10^19")
-    @test res.rhs == 1.0e19
-    res = parse_equation("w_A <= 2^-1")
-    @test res.rhs == 0.5
-    # F3: coercion respects a non-default datatype.
-    res = parse_equation("w_A <= 2^64"; datatype = Float32)
-    @test res.rhs == Float32(2)^64
-    # F2: only the enumerated math functions may be evaluated. `prior(...)` reaching numeric
-    # evaluation (all-numeric args) is a typed parse error, not a raw UndefVarError, and a
-    # name absent from the table fails closed rather than resolving against Base.
-    @test_throws Meta.ParseError parse_equation("w_A <= prior(2)")
-    @test_throws Meta.ParseError parse_equation("w_A <= run(2)")
-    @test_throws Meta.ParseError parse_equation("w_A <= gensym(2)")
-    # F2: `prior(name)` and `sqrt(prior(name))` still pass through structurally.
-    res = parse_equation("w_A <= prior(b)")
-    @test "prior(b)" in res.vars
+    # Scope warning suppression to this task. `Logging.disable_logging` mutates a
+    # process-global level that never restores and leaks into other test files sharing
+    # a reused worker (see ParallelTestRunner worker pool), randomly emptying their
+    # `@test_logs` captures. `with_logger` is task-local and restores on exit.
+    with_logger(SimpleLogger(stderr, Logging.Error)) do
+        res = parse_equation("2*sqrt(prior(a ,   1b1)) /2*  5 + cbrt(3)^3*f >= 5/5 + d-69/3*c")
+        idx = sortperm(res.vars)
+        @test res.vars[idx] == ["d", "f", "c", "sqrt(prior(a, 1b1))"][idx]
+        @test res.coef[idx] == [-1.0, 3.0, 23.0, 5.0][idx]
+        @test res.op == ">="
+        @test res.rhs == 1.0
+        res = parse_equation("2*sqrt(prior(a ,   b)) /2*  5 - - - -6 + cbrt(3)^3*f  -69/3*c <= - d")
+        idx = sortperm(res.vars)
+        @test res.vars[idx] == ["sqrt(prior(a, b))", "f", "c", "d"][idx]
+        @test res.coef[idx] == [5.0, 3.0, -23.0, 1.0][idx]
+        @test res.op == "<="
+        @test res.rhs == -6.0
+        res = parse_equation(" == 2*sqrt(prior(a ,   b)) /2*  5 - 6 + 7 + -  - cbrt(3)^3 *f  - - 69/ 3*c-d+(3*2)/(3*(1+1))*d")
+        idx = sortperm(res.vars)
+        @test res.vars[idx] == ["sqrt(prior(a, b))", "f", "c", "d"][idx]
+        @test res.coef[idx] == [-5.0, -3.0, -23.0, 0.0][idx]
+        @test res.op == "=="
+        @test res.rhs == 1.0
+        @test_throws Meta.ParseError parse_equation("2*sqrt(prior(a ,   b)) /2*  5 + cbrt(3)^3*f >= 5/")
+        @test_throws Meta.ParseError parse_equation("2*sqrt(prior(a ,   b))   5 + cbrt(3)^3*f + 1/>= 5/5 ")
+        @test_throws Meta.ParseError parse_equation("2*sqrt(prior(a ,   b))   5 + cbrt(3)^3*f + 1/ = 5/5 ")
+        @test_throws Meta.ParseError parse_equation("2*sqrt(prior(a ,   b)) /2*  5 ++ cbrt(3)^3*f >= 5/5 + d-69/3*c")
+        @test_throws Meta.ParseError parse_equation(:(2 * sqrt(prior(a, b)) / 2 * 5 ++
+                                                      cbrt(3)^3 * f >=
+                                                      5 / 5 + d - 69 / 3 * c))
+        @test_throws Meta.ParseError parse_equation("2*sqrt(prior(a ,   b)) /2*  5 + cbrt(3)^3*f >= >= 5/5 + d-69/3*c")
+        @test_throws Meta.ParseError parse_equation(:(2 * sqrt(prior(a, b)) / 2 * 5 >=
+                                                      cbrt(3)^3 * f >=
+                                                      5 / 5 + d - 69 / 3 * c))
+        @test_throws Meta.ParseError parse_equation(:(2 * sqrt(prior(a, b)) / 2 * 5 +
+                                                      cbrt(3)^3 * f +
+                                                      5 / 5 +
+                                                      d - 69 / 3 * c))
+        res = parse_equation("1/3*x/((2^z)*y)+5z==1-5")
+        idx = sortperm(res.vars)
+        @test res.vars[idx] == ["z", "(0.3333333333333333x) / (2 ^ z * y)"][idx]
+        @test res.coef[idx] == [5.0, 1.0][idx]
+        @test res.op == "=="
+        @test res.rhs == -4.0
+        # @test res.eqn == "5.0*z + (0.3333333333333333x) / (2 ^ z * y) == -4.0"
+        res = parse_equation("-x>=-1.0y+2")
+        idx = sortperm(res.vars)
+        @test res.vars[idx] == ["x", "y"][idx]
+        @test res.coef[idx] == [-1.0, 1.0][idx]
+        @test res.op == ">="
+        @test res.rhs == 2.0
+        # @test res.eqn == "-x + y >= 2.0"
+        res = parse_equation("-_1*_3<=-1.1y+2")
+        idx = sortperm(res.vars)
+        @test res.vars[idx] == ["-_1 * _3", "y"][idx]
+        @test res.coef[idx] == [1.0, 1.1][idx]
+        @test res.op == "<="
+        @test res.rhs == 2.0
+        # @test res.eqn == "-_1 * _3 + 1.1*y <= 2.0"
+        res = parse_equation("Inf*a<=Inf")
+        idx = sortperm(res.vars)
+        @test res.vars[idx] == ["a"][idx]
+        @test res.coef[idx] == [Inf][idx]
+        @test res.op == "<="
+        @test res.rhs == Inf
+        # @test res.eqn == "Inf*a <= Inf"
+        # F3: numeric literals evaluate in the target float type, not machine Int64, so an
+        # overflowing exponent yields the correct float instead of silently wrapping, and a
+        # negative integer exponent no longer raises a raw DomainError.
+        res = parse_equation("w_A <= 2^64")
+        @test res.vars == ["w_A"]
+        @test res.coef == [1.0]
+        @test res.rhs == 1.8446744073709552e19
+        res = parse_equation("w_A <= 10^19")
+        @test res.rhs == 1.0e19
+        res = parse_equation("w_A <= 2^-1")
+        @test res.rhs == 0.5
+        # F3: coercion respects a non-default datatype.
+        res = parse_equation("w_A <= 2^64"; datatype = Float32)
+        @test res.rhs == Float32(2)^64
+        # F2: only the enumerated math functions may be evaluated. `prior(...)` reaching numeric
+        # evaluation (all-numeric args) is a typed parse error, not a raw UndefVarError, and a
+        # name absent from the table fails closed rather than resolving against Base.
+        @test_throws Meta.ParseError parse_equation("w_A <= prior(2)")
+        @test_throws Meta.ParseError parse_equation("w_A <= run(2)")
+        @test_throws Meta.ParseError parse_equation("w_A <= gensym(2)")
+        # F2: `prior(name)` and `sqrt(prior(name))` still pass through structurally.
+        res = parse_equation("w_A <= prior(b)")
+        @test "prior(b)" in res.vars
+    end
 end
 @testset "Equation parser recursion caps" begin
     using PortfolioOptimisers, Test, Logging
-    Logging.disable_logging(Logging.Warn)
-    pe = PortfolioOptimisers
-    # Trust boundary: an over-long / deeply nested untrusted string fails closed with a
-    # typed Meta.ParseError before Meta.parse and the recursive walks can exhaust the stack.
-    deep = "(" ^ 20000 * "w_A" * ")" ^ 20000 * " <= 1"
-    @test length(deep) > pe.EQUATION_LIMITS.max_length
-    @test_throws Meta.ParseError parse_equation(deep)
-    # The Expr form has no length cap; the depth guard rejects an over-deep pre-built AST.
-    ex = :w_A
-    for _ in 1:(pe.EQUATION_LIMITS.max_depth + 10)
-        ex = Expr(:call, :-, ex)
+    with_logger(SimpleLogger(stderr, Logging.Error)) do
+        pe = PortfolioOptimisers
+        # Trust boundary: an over-long / deeply nested untrusted string fails closed with a
+        # typed Meta.ParseError before Meta.parse and the recursive walks can exhaust the stack.
+        deep = "(" ^ 20000 * "w_A" * ")" ^ 20000 * " <= 1"
+        @test length(deep) > pe.EQUATION_LIMITS.max_length
+        @test_throws Meta.ParseError parse_equation(deep)
+        # The Expr form has no length cap; the depth guard rejects an over-deep pre-built AST.
+        ex = :w_A
+        for _ in 1:(pe.EQUATION_LIMITS.max_depth + 10)
+            ex = Expr(:call, :-, ex)
+        end
+        @test_throws Meta.ParseError parse_equation(Expr(:call, :(<=), ex, 1))
+        # Caps are runtime-overridable via the STRING_DISTANCE-style config, and validated.
+        @test_throws ArgumentError pe.set_equation_limits!(max_length = 0)
+        @test_throws ArgumentError pe.set_equation_limits!(max_depth = -1)
+        pe.set_equation_limits!(max_length = 8)
+        @test_throws Meta.ParseError parse_equation("w_A <= 1.0")   # now under the tightened cap
+        pe.set_equation_limits!(max_length = 4096, max_depth = 256)  # restore defaults
+        # A legitimate constraint still parses under the default caps.
+        res = parse_equation("w_A <= 1.0")
+        @test res.vars == ["w_A"]
+        @test res.rhs == 1.0
     end
-    @test_throws Meta.ParseError parse_equation(Expr(:call, :(<=), ex, 1))
-    # Caps are runtime-overridable via the STRING_DISTANCE-style config, and validated.
-    @test_throws ArgumentError pe.set_equation_limits!(max_length = 0)
-    @test_throws ArgumentError pe.set_equation_limits!(max_depth = -1)
-    pe.set_equation_limits!(max_length = 8)
-    @test_throws Meta.ParseError parse_equation("w_A <= 1.0")   # now under the tightened cap
-    pe.set_equation_limits!(max_length = 4096, max_depth = 256)  # restore defaults
-    # A legitimate constraint still parses under the default caps.
-    res = parse_equation("w_A <= 1.0")
-    @test res.vars == ["w_A"]
-    @test res.rhs == 1.0
 end
 @testset "Asset name suggestions" begin
     using PortfolioOptimisers, Test
