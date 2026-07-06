@@ -9,8 +9,6 @@ AbstractBins
 BinWidthBins
 Int_Bin
 bin_width
-bin_width
-bin_width
 calc_num_bins
 calc_hist_data
 intrinsic_mutual_info

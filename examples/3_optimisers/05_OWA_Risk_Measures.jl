@@ -26,14 +26,14 @@ Three things make OWA measures attractive:
     of the distribution rather than only to variance or a single quantile.
 
 !!! note "Exact vs approximate formulation"
-    [`OrderedWeightsArray`](@ref) supports two internal formulations:
-
-    - **Exact** (`ExactOrderedWeightsArray`) — solves a small LP per portfolio evaluation. Fast for a small number of assets / observations but does not scale to large problems.
-    - **Approximate** (`ApproxOrderedWeightsArray`, the default) — approximates the OWA objective with a set of p-norms. Solves as a second-order cone problem and scales to the normal S&P 500 slice used throughout the examples.
-
-    All optimisations in this example use the **approximate** formulation, which is the
-    default; the approximate version is appropriate for the ~252 observations and ~20 assets
-    used here.
+    [`OrderedWeightsArray`](@ref) supports two internal formulations: **exact**
+    (`ExactOrderedWeightsArray`), which solves a small LP per portfolio evaluation and is
+    fast for a small number of assets/observations but does not scale to large problems;
+    and **approximate** (`ApproxOrderedWeightsArray`, the default), which approximates the
+    OWA objective with a set of p-norms and solves as a second-order cone problem, scaling
+    to the normal S&P 500 slice used throughout the examples. All optimisations in this
+    example use the **approximate** formulation, which is the default and is appropriate
+    for the ~252 observations and ~20 assets used here.
 =#
 
 using PortfolioOptimisers, PrettyTables, DataFrames

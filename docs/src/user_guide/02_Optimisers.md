@@ -98,6 +98,49 @@ Here is the minimal risk-budgeting call (equal risk contribution by default):
 res_rb = optimise(RiskBudgeting(; opt = JuMPOptimiser(; pe = pr, slv = slv)))
 ````
 
+### Which risk measures each optimiser family accepts
+
+Compatibility is a property of the optimiser *family*, not the individual optimiser: every
+JuMP optimiser accepts the same [`RiskMeasure`](@ref)s, and clustering optimisers additionally
+accept the hierarchical-only measures. You can ask programmatically with
+[`supports_risk_measure`](@ref) / [`supported_risk_measures`](@ref):
+
+```julia
+supports_risk_measure(MeanRisk, ConditionalValueatRisk)   # true
+supported_risk_measures(HierarchicalRiskParity)           # OptimisationRiskMeasure
+```
+
+The table below is *generated* from that same predicate, so it can never drift from what the
+optimisers actually dispatch on. Meta-optimisers (`NestedClustered`, `Stacking`,
+`SubsetResampling`) are omitted because their acceptance is instance-specific: they *delegate*,
+accepting a measure only when every constituent optimiser does (the intersection of their
+children's categories).
+
+````@example 02_Optimisers
+using InteractiveUtils
+# Leaf risk-measure types (concrete or parametric) under a supertype.
+function _leaf_risk_measures(T, acc = Type[])
+    subs = subtypes(T)
+    if isempty(subs)
+        push!(acc, T)
+    else
+        for S in subs
+            _leaf_risk_measures(S, acc)
+        end
+    end
+    return acc
+end
+rms = sort(unique(vcat(_leaf_risk_measures(RiskMeasure),
+                       _leaf_risk_measures(HierarchicalRiskMeasure))); by = nameof)
+tick(x) = x ? "✓" : ""
+pretty_table(DataFrame("Risk measure" => String.(nameof.(rms)),
+                       "JuMP (MeanRisk, RiskBudgeting, NOC, FRC)" =>
+                           [tick(supports_risk_measure(MeanRisk, M)) for M in rms],
+                       "Clustering (HRP, HERC, SCHRP)" =>
+                           [tick(supports_risk_measure(HierarchicalRiskParity, M))
+                            for M in rms]))
+````
+
 ## 3. Clustering optimisers
 
 Clustering optimisers build the allocation from the asset correlation hierarchy instead of a

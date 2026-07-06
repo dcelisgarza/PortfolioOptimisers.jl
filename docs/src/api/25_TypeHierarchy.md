@@ -643,6 +643,8 @@ its docstring.
 
 ├──&nbsp;[FeesEstimator](@ref)
 
+├──&nbsp;[FiniteAllocationInput](@ref)
+
 ├──&nbsp;[FrontierBoundEstimator](@ref)
 
 │&nbsp;&nbsp;&nbsp;├──&nbsp;[LinearBound](@ref)

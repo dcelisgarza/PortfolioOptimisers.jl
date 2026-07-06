@@ -69,7 +69,7 @@
                                                      n_test_paths_w = 11)
         @test n_folds == 4
         @test n_test_folds == 3
-        cv = CombinatorialCrossValidation(n_folds, n_test_folds, 23, 11, 1)
+        cv = CombinatorialCrossValidation(n_folds, n_test_folds, 23, 11)
         @test PortfolioOptimisers.average_train_size(cv, rd) == 252
         (; train_idx, test_idx, path_ids) = split(cv, rd)
         @test length(train_idx) == length(test_idx) == n_splits(cv)

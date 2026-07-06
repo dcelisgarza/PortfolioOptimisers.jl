@@ -85,7 +85,8 @@ The account is \$10,000. [`GreedyAllocation`](@ref) converts the target into who
 solver, instant, which suits a daily cadence.
 
 ````@example 01_Profile_Retail_Daily
-alloc = optimise(GreedyAllocation(), retail.w, prices, 10_000.0)
+alloc = optimise(GreedyAllocation(),
+                 FiniteAllocationInput(; w = retail.w, prices = prices, cash = 10_000.0))
 
 invested = sum(alloc.shares .* prices)
 pretty_table(DataFrame("Asset" => rd.nx, "Target" => retail.w,

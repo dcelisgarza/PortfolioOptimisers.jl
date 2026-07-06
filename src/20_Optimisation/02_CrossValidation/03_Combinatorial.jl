@@ -69,7 +69,7 @@ CombinatorialCrossValidation
         assert_nonempty_finite_val(purged_size, :purged_size)
         assert_nonempty_finite_val(embargo_size, :embargo_size)
         @argcheck(binomial(n_folds, n_test_folds) <= max_comb,
-                  ArgumentError("The number of splits for `n_folds = $n_folds` and `n_test_folds = $n_test_folds` is `$(binomial(n_folds, n_test_folds))`, which may be computationally expensive. The number of combinations should typically be between 10^1 to 10^4 for statistical power. Such a large number of combinations may lead to long computation times and memory issues. Consider reducing `n_folds` or shifting `n_test_folds` further away from being equal to `div(n_folds, 2) = $(div(n_folds, 2))`."))
+                  ArgumentError("The number of splits for `n_folds = $n_folds` and `n_test_folds = $n_test_folds` is `$(binomial(n_folds, n_test_folds))`, which is greater than the maximum allowed `$max_comb`. The number of combinations should typically be between 10^1 to 10^4 for statistical power. Such a large number of combinations may lead to long computation times and memory issues. Consider reducing `n_folds` or shifting `n_test_folds` further away from being equal to `div(n_folds, 2) = $(div(n_folds, 2))`."))
 
         return new{typeof(n_folds), typeof(n_test_folds), typeof(purged_size),
                    typeof(embargo_size)}(n_folds, n_test_folds, purged_size, embargo_size)
