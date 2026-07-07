@@ -241,5 +241,7 @@ include("21_ExpectedReturns.jl")
 include("22_Plotting.jl")
 include("23_Precompilation.jl")
 include("24_Aliases.jl")
+include("25_Pipeline/01_Base_Pipeline.jl")
+include("25_Pipeline/02_PreprocessingSteps.jl")
 
 end
