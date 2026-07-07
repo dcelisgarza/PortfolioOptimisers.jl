@@ -880,13 +880,13 @@ Internal utility for error handling during equation parsing.
 
 # Details
 
-  - If `expr` is `Nothing`, a warning is issued indicating that the side is empty and zero is assumed.
+  - If `expr` is `Nothing` (the side is empty, e.g. a truncated equation string), a `Meta.ParseError` is thrown — the parser fails closed rather than assuming zero, because a silently-assumed zero constraint is one the author never wrote. Callers who mean zero must write it explicitly.
   - If `expr` is an incomplete expression (`expr.head == :incomplete`), a `Meta.ParseError` is thrown with a descriptive message.
   - For all other cases, the function returns `nothing` and does not modify the input.
 
 # Validation
 
-  - Throws a `Meta.ParseError` if the expression is incomplete.
+  - Throws a `Meta.ParseError` if the expression is empty or incomplete.
 
 # Returns
 
@@ -901,8 +901,10 @@ function rethrow_parse_error(::Any, side = :lhs)::Nothing
     return nothing
 end
 function rethrow_parse_error(::Nothing, side = :lhs)::Nothing
-    @warn("$(side) of equation is empy, assuming zero")
-    return nothing
+    # Fail closed: an empty side comes from a malformed (e.g. truncated) equation
+    # string, never a legitimate constraint; assuming zero would silently create a
+    # constraint the author did not write.
+    return throw(Meta.ParseError("$side of equation is empty; write an explicit zero if that is intended."))
 end
 function rethrow_parse_error(expr::Expr, side = :lhs)::Nothing
     @argcheck(expr.head != :incomplete,

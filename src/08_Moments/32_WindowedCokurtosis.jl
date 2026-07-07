@@ -12,7 +12,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     WindowedCokurtosis(;
-        ke::Cokurtosis = Cokurtosis(),
+        ke::CokurtosisEstimator = Cokurtosis(),
         w::Option{<:ObsWeights} = nothing,
         window::Option{<:Int_VecInt} = nothing
     ) -> WindowedCokurtosis
@@ -64,14 +64,14 @@ WindowedCokurtosis
     Window specification: an integer (last `window` observations) or a vector of indices.
     """
     window
-    function WindowedCokurtosis(ke::Cokurtosis, w::Option{<:ObsWeights},
+    function WindowedCokurtosis(ke::CokurtosisEstimator, w::Option{<:ObsWeights},
                                 window::Option{<:Int_VecInt})
         assert_nonempty_nonneg_finite_val(w, :w)
         assert_nonempty_nonneg_finite_val(window, :window)
         return new{typeof(ke), typeof(w), typeof(window)}(ke, w, window)
     end
 end
-function WindowedCokurtosis(; ke::Cokurtosis = Cokurtosis(),
+function WindowedCokurtosis(; ke::CokurtosisEstimator = Cokurtosis(),
                             w::Option{<:ObsWeights} = nothing,
                             window::Option{<:Int_VecInt} = nothing)::WindowedCokurtosis
     return WindowedCokurtosis(ke, w, window)
