@@ -412,12 +412,12 @@ function mu_ucs(ue::NormalUncertaintySet{<:Any, <:BoxUncertaintySetAlgorithm, <:
                 dims::Int = 1, kwargs...)
     pr = prior(ue.pe, X, F; dims = dims, kwargs...)
     T = choose_scaling_parameter(ue, pr)
-    sigma = pr.sigma
+    sigma_mu = mu_asymptotic_cov(ue.pdm, pr.sigma, T)
     q = ue.q * 0.5
     mu_u = Distributions.cquantile(Distributions.Normal(), q) *
-           sqrt.(LinearAlgebra.diag(sigma / T)) *
+           sqrt.(LinearAlgebra.diag(sigma_mu)) *
            2
-    mu_l = range(zero(eltype(sigma)), zero(eltype(sigma)); length = size(pr.X, 2))
+    mu_l = range(zero(eltype(sigma_mu)), zero(eltype(sigma_mu)); length = size(pr.X, 2))
     return BoxUncertaintySet(; lb = mu_l, ub = mu_u)
 end
 """

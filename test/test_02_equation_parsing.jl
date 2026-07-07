@@ -17,12 +17,16 @@
         @test res.coef[idx] == [5.0, 3.0, -23.0, 1.0][idx]
         @test res.op == "<="
         @test res.rhs == -6.0
-        res = parse_equation(" == 2*sqrt(prior(a ,   b)) /2*  5 - 6 + 7 + -  - cbrt(3)^3 *f  - - 69/ 3*c-d+(3*2)/(3*(1+1))*d")
+        res = parse_equation("0 == 2*sqrt(prior(a ,   b)) /2*  5 - 6 + 7 + -  - cbrt(3)^3 *f  - - 69/ 3*c-d+(3*2)/(3*(1+1))*d")
         idx = sortperm(res.vars)
         @test res.vars[idx] == ["sqrt(prior(a, b))", "f", "c", "d"][idx]
         @test res.coef[idx] == [-5.0, -3.0, -23.0, 0.0][idx]
         @test res.op == "=="
         @test res.rhs == 1.0
+        # An empty side fails closed: assuming zero would silently create a constraint
+        # the author never wrote (e.g. a truncated config/spreadsheet row).
+        @test_throws Meta.ParseError parse_equation("w_A >= ")
+        @test_throws Meta.ParseError parse_equation(" == 2*w_A + 1")
         @test_throws Meta.ParseError parse_equation("2*sqrt(prior(a ,   b)) /2*  5 + cbrt(3)^3*f >= 5/")
         @test_throws Meta.ParseError parse_equation("2*sqrt(prior(a ,   b))   5 + cbrt(3)^3*f + 1/>= 5/5 ")
         @test_throws Meta.ParseError parse_equation("2*sqrt(prior(a ,   b))   5 + cbrt(3)^3*f + 1/ = 5/5 ")
