@@ -94,8 +94,8 @@ Estimators whose family is not steppable throw an `ArgumentError` directing the 
   - [`PipelineContext`](@ref)
   - [`PipelineStep`](@ref)
 """
-function run_step(est::AbstractEstimator, ::PipelineContext)
-    throw(ArgumentError("a $(typeof(est)) is not steppable; wrap it in a PipelineStep to declare its reads/writes explicitly"))
+function run_step(est, ::PipelineContext)
+    return throw(ArgumentError("a $(typeof(est)) is not steppable; wrap it in a PipelineStep to declare its reads/writes explicitly"))
 end
 function run_step(pe::AbstractPriorEstimator, ctx::PipelineContext)
     require_slot(ctx, :returns, pe)
@@ -135,7 +135,128 @@ function run_step(ps::PipelineStep, ctx::PipelineContext)
         val = ps.est(ctx)
         return val, set_slot(ctx, ps.writes, val)
     end
+    if isa(ps.est, AbstractUncertaintySetEstimator)
+        return run_uncertainty_step(ps.est, ps.target, ctx)
+    end
     return run_step(ps.est, ctx)
+end
+function run_step(ue::AbstractUncertaintySetEstimator, ::PipelineContext)
+    return throw(ArgumentError("a $(typeof(ue)) step must declare whether it bounds the mean or the covariance; wrap it in a PipelineStep with target = :mu or target = :sigma"))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Execute an uncertainty-set step pinned to a target and merge its result into the `uncertainty` slot.
+
+The target comes from the [`PipelineStep`](@ref) wrapper: `:mu` computes [`mu_ucs`](@ref), `:sigma` computes [`sigma_ucs`](@ref). The result fills its half of the [`PipelineUncertaintySets`](@ref) pair, leaving the other half untouched, so separate mu and sigma steps compose.
+
+# Arguments
+
+  - `ue`: The uncertainty-set estimator.
+  - `target`: `:mu` or `:sigma`; anything else throws an `ArgumentError`.
+  - `ctx`: The pipeline context; requires the `returns` slot.
+
+# Returns
+
+  - `(res, ctx′)`: The computed [`AbstractUncertaintySetResult`](@ref) and the updated context.
+
+# Related
+
+  - [`run_step`](@ref)
+  - [`PipelineStep`](@ref)
+  - [`PipelineUncertaintySets`](@ref)
+"""
+function run_uncertainty_step(ue::AbstractUncertaintySetEstimator, target::Option{Symbol},
+                              ctx::PipelineContext)
+    @argcheck(target in (:mu, :sigma),
+              ArgumentError("the PipelineStep target of a $(typeof(ue)) step must be :mu or :sigma, got $(repr(target))"))
+    require_slot(ctx, :returns, ue)
+    cur = ctx.uncertainty
+    res, pair = if target == :mu
+        r = mu_ucs(ue, ctx.returns.X, ctx.returns.F)
+        r, PipelineUncertaintySets(; mu = r, sigma = isnothing(cur) ? nothing : cur.sigma)
+    else
+        r = sigma_ucs(ue, ctx.returns.X, ctx.returns.F)
+        r, PipelineUncertaintySets(; mu = isnothing(cur) ? nothing : cur.mu, sigma = r)
+    end
+    return res, set_slot(ctx, :uncertainty, pair)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Build the [`AssetSets`](@ref) a constraint-generation step needs from the asset names of the context's `returns` slot.
+
+Constraint estimators referencing groups beyond the plain asset names cannot be satisfied by this minimal set; precompute their result instead, or wrap a callable in a [`PipelineStep`](@ref) that supplies richer sets.
+
+# Arguments
+
+  - `ctx`: The pipeline context; requires the `returns` slot.
+  - `est`: The step about to run, used in the error message.
+
+# Returns
+
+  - `sets::AssetSets`: Asset sets whose `nx` entry holds the asset names.
+
+# Related
+
+  - [`run_step`](@ref)
+  - [`AssetSets`](@ref)
+"""
+function pipeline_asset_sets(ctx::PipelineContext, est)::AssetSets
+    require_slot(ctx, :returns, est)
+    return AssetSets(; dict = Dict("nx" => ctx.returns.nx))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Append a constraint result to the `constraints` slot of the context.
+
+The slot accumulates: the first result is stored as-is, later results widen it into a `Vector{AbstractConstraintResult}` preserving step order.
+
+# Arguments
+
+  - `ctx`: The pipeline context.
+  - `res`: The constraint result to append.
+
+# Returns
+
+  - `ctx′::PipelineContext`: The updated context.
+
+# Related
+
+  - [`run_step`](@ref)
+  - [`PipelineContext`](@ref)
+"""
+function add_constraint_result(ctx::PipelineContext,
+                               res::AbstractConstraintResult)::PipelineContext
+    cur = ctx.constraints
+    val = if isnothing(cur)
+        res
+    elseif isa(cur, AbstractVector)
+        AbstractConstraintResult[cur; res]
+    else
+        AbstractConstraintResult[cur, res]
+    end
+    return set_slot(ctx, :constraints, val)
+end
+function run_step(ce::WeightBoundsEstimator, ctx::PipelineContext)
+    res = weight_bounds_constraints(ce, pipeline_asset_sets(ctx, ce))
+    return res, add_constraint_result(ctx, res)
+end
+function run_step(ce::LinearConstraintEstimator, ctx::PipelineContext)
+    res = linear_constraints(ce, pipeline_asset_sets(ctx, ce))
+    return res, add_constraint_result(ctx, res)
+end
+function run_step(ce::ThresholdEstimator, ctx::PipelineContext)
+    res = threshold_constraints(ce, pipeline_asset_sets(ctx, ce))
+    return res, add_constraint_result(ctx, res)
+end
+function run_step(ce::RiskBudgetEstimator, ctx::PipelineContext)
+    res = risk_budget_constraints(ce, pipeline_asset_sets(ctx, ce))
+    return res, add_constraint_result(ctx, res)
+end
+function run_step(ce::AbstractConstraintEstimator, ::PipelineContext)
+    return throw(ArgumentError("a $(typeof(ce)) is not supported as a bare pipeline step; precompute its result and pass it to the optimiser, or wrap a callable in a PipelineStep that writes :constraints"))
 end
 """
     fit_step(est::AbstractPreprocessingEstimator, data) -> fitted
@@ -167,7 +288,7 @@ Concrete preprocessing estimators must implement:
   - [`AbstractPreprocessingEstimator`](@ref)
 """
 function fit_step(est::AbstractPreprocessingEstimator, data)
-    throw(ArgumentError("fit_step is not implemented for $(typeof(est)); implement fit_step(est, data) and apply_step(fitted, data)"))
+    return throw(ArgumentError("fit_step is not implemented for $(typeof(est)); implement fit_step(est, data) and apply_step(fitted, data)"))
 end
 """
     apply_step(fitted, data) -> data′
@@ -193,7 +314,7 @@ Applying the fitted object produced by [`fit_step`](@ref) on the training window
 """
 function apply_step(fitted::Union{<:AbstractPreprocessingEstimator,
                                   <:AbstractPreprocessingResult}, data)
-    throw(ArgumentError("apply_step is not implemented for $(typeof(fitted))"))
+    return throw(ArgumentError("apply_step is not implemented for $(typeof(fitted))"))
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -331,8 +452,8 @@ Keywords correspond to the struct's fields.
 # Examples
 
 ```jldoctest
-julia> X = TimeArray(Date(2020, 1, 1):Day(1):Date(2020, 1, 3),
-                     [100.0 NaN; 102.0 NaN; 104.0 105.0], ["A", "B"]);
+julia> X = TimeArray(Date(2020, 1, 1):Day(1):Date(2020, 1, 3), [100.0 NaN; 102.0 NaN; 104.0 105.0],
+                     ["A", "B"]);
 
 julia> pr = PricesResult(; X = X);
 
@@ -446,8 +567,8 @@ Keywords correspond to the struct's fields.
 # Examples
 
 ```jldoctest
-julia> X = TimeArray(Date(2020, 1, 1):Day(1):Date(2020, 1, 3),
-                     [100.0 1.0; NaN 3.0; 104.0 5.0], ["A", "B"]);
+julia> X = TimeArray(Date(2020, 1, 1):Day(1):Date(2020, 1, 3), [100.0 1.0; NaN 3.0; 104.0 5.0],
+                     ["A", "B"]);
 
 julia> pr = PricesResult(; X = X);
 

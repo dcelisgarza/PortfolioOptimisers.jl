@@ -51,8 +51,7 @@
         @test_throws DomainError PricesResult(; X = X, iv = iv, ivpa = Inf)
 
         # vector ivpa length must match asset count
-        @test_throws DimensionMismatch PricesResult(; X = X, iv = iv,
-                                                    ivpa = fill(0.5, 2))
+        @test_throws DimensionMismatch PricesResult(; X = X, iv = iv, ivpa = fill(0.5, 2))
     end
 
     @testset "prices_view" begin
@@ -103,8 +102,8 @@
         @test PortfolioOptimisers.pipe_reads(ClustersEstimator()) == (:returns,)
         @test PortfolioOptimisers.pipe_writes(NormalUncertaintySet()) == :uncertainty
         @test PortfolioOptimisers.pipe_reads(NormalUncertaintySet()) == (:returns,)
-        @test PortfolioOptimisers.pipe_writes(MeanRisk()) == :opt
-        @test PortfolioOptimisers.pipe_reads(MeanRisk()) == (:returns,)
+        @test PortfolioOptimisers.pipe_writes(EqualWeighted()) == :opt
+        @test PortfolioOptimisers.pipe_reads(EqualWeighted()) == (:returns,)
 
         # estimators without a steppable family are rejected with guidance
         @test_throws ArgumentError PortfolioOptimisers.pipe_writes(Covariance())
@@ -137,8 +136,7 @@
 
     @testset "PipelineContext" begin
         ctx = PortfolioOptimisers.PipelineContext()
-        @test all(s -> isnothing(getproperty(ctx, s)),
-                  PortfolioOptimisers.PIPELINE_SLOTS)
+        @test all(s -> isnothing(getproperty(ctx, s)), PortfolioOptimisers.PIPELINE_SLOTS)
 
         rd = ReturnsResult(; nx = ["a", "b"], X = [0.1 -0.2; -0.1 0.2; 0.05 0.1])
         pr = prior(EmpiricalPrior(), rd)
@@ -146,7 +144,7 @@
         @test ctx.returns === rd
         @test ctx.prior === pr
 
-        # slots are typed
-        @test_throws MethodError PortfolioOptimisers.PipelineContext(; returns = pr)
+        # slots are typed (keyword type mismatch throws a TypeError)
+        @test_throws TypeError PortfolioOptimisers.PipelineContext(; returns = pr)
     end
 end

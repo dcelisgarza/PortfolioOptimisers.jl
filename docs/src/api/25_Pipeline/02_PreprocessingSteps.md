@@ -11,6 +11,9 @@ apply_step
 require_slot
 set_slot
 is_missing_value
+run_uncertainty_step
+pipeline_asset_sets
+add_constraint_result
 ```
 
 ## Preprocessing estimators

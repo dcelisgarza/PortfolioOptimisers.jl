@@ -35,7 +35,7 @@ using SimpleWeightedGraphs: SimpleWeightedGraphs
 using SparseArrays: SparseArrays
 using SpecialFunctions: SpecialFunctions
 using Statistics: Statistics, mean, std, var, cor, cov
-using StatsAPI: StatsAPI, predict
+using StatsAPI: StatsAPI, fit, predict
 using StatsBase: StatsBase
 using StringDistances: StringDistances
 using TimeSeries: TimeSeries
@@ -243,5 +243,6 @@ include("23_Precompilation.jl")
 include("24_Aliases.jl")
 include("25_Pipeline/01_Base_Pipeline.jl")
 include("25_Pipeline/02_PreprocessingSteps.jl")
+include("25_Pipeline/03_Pipeline.jl")
 
 end

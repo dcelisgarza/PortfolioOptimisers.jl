@@ -207,7 +207,8 @@ julia> size(values(pr.X))
                                                                               ivpa)
     end
 end
-function PricesResult(; X::TimeSeries.TimeArray, F::Option{<:TimeSeries.TimeArray} = nothing,
+function PricesResult(; X::TimeSeries.TimeArray,
+                      F::Option{<:TimeSeries.TimeArray} = nothing,
                       B::Option{<:TimeSeries.TimeArray} = nothing,
                       iv::Option{<:TimeSeries.TimeArray} = nothing,
                       ivpa::Option{<:Num_VecNum} = nothing)::PricesResult
@@ -341,7 +342,7 @@ $(DocStringExtensions.FIELDS)
         returns::Option{<:AbstractReturnsResult} = nothing,
         prior::Option{<:AbstractPriorResult} = nothing,
         phylogeny::Option{<:AbstractPhylogenyResult} = nothing,
-        uncertainty::Option{<:Union{<:AbstractUncertaintySetResult, <:AbstractVector{<:AbstractUncertaintySetResult}}} = nothing,
+        uncertainty::Option{<:PipelineUncertaintySets} = nothing,
         constraints::Option{<:Union{<:AbstractConstraintResult, <:AbstractVector{<:AbstractConstraintResult}}} = nothing,
         opt::Option{<:OptimisationResult} = nothing,
     ) -> PipelineContext
@@ -372,7 +373,7 @@ Keywords correspond to the struct's fields.
     """
     phylogeny
     """
-    Uncertainty set result(s) ([`AbstractUncertaintySetResult`](@ref) or a vector thereof).
+    Uncertainty set results as an explicit mu/sigma pair ([`PipelineUncertaintySets`](@ref)).
     """
     uncertainty
     """
@@ -387,8 +388,7 @@ Keywords correspond to the struct's fields.
                              returns::Option{<:AbstractReturnsResult},
                              prior::Option{<:AbstractPriorResult},
                              phylogeny::Option{<:AbstractPhylogenyResult},
-                             uncertainty::Option{<:Union{<:AbstractUncertaintySetResult,
-                                                         <:AbstractVector{<:AbstractUncertaintySetResult}}},
+                             uncertainty::Option{<:PipelineUncertaintySets},
                              constraints::Option{<:Union{<:AbstractConstraintResult,
                                                          <:AbstractVector{<:AbstractConstraintResult}}},
                              opt::Option{<:OptimisationResult})
@@ -403,8 +403,7 @@ function PipelineContext(; prices::Option{<:AbstractPricesResult} = nothing,
                          returns::Option{<:AbstractReturnsResult} = nothing,
                          prior::Option{<:AbstractPriorResult} = nothing,
                          phylogeny::Option{<:AbstractPhylogenyResult} = nothing,
-                         uncertainty::Option{<:Union{<:AbstractUncertaintySetResult,
-                                                     <:AbstractVector{<:AbstractUncertaintySetResult}}} = nothing,
+                         uncertainty::Option{<:PipelineUncertaintySets} = nothing,
                          constraints::Option{<:Union{<:AbstractConstraintResult,
                                                      <:AbstractVector{<:AbstractConstraintResult}}} = nothing,
                          opt::Option{<:OptimisationResult} = nothing)::PipelineContext
@@ -438,8 +437,8 @@ julia> PortfolioOptimisers.pipe_writes(EmpiricalPrior())
   - [`PIPELINE_SLOTS`](@ref)
   - [`PipelineStep`](@ref)
 """
-function pipe_writes(est::AbstractEstimator)
-    throw(ArgumentError("cannot infer the pipeline slot written by a $(typeof(est)); wrap it in a PipelineStep to declare its reads/writes explicitly"))
+function pipe_writes(est)
+    return throw(ArgumentError("cannot infer the pipeline slot written by a $(typeof(est)); wrap it in a PipelineStep to declare its reads/writes explicitly"))
 end
 pipe_writes(::AbstractPricesPreprocessingEstimator) = :prices
 pipe_writes(::AbstractReturnsPreprocessingEstimator) = :returns
@@ -476,15 +475,15 @@ julia> PortfolioOptimisers.pipe_reads(EmpiricalPrior())
   - [`PIPELINE_SLOTS`](@ref)
   - [`PipelineStep`](@ref)
 """
-function pipe_reads(est::AbstractEstimator)
-    throw(ArgumentError("cannot infer the pipeline slots read by a $(typeof(est)); wrap it in a PipelineStep to declare its reads/writes explicitly"))
+function pipe_reads(est)
+    return throw(ArgumentError("cannot infer the pipeline slots read by a $(typeof(est)); wrap it in a PipelineStep to declare its reads/writes explicitly"))
 end
 pipe_reads(::AbstractPricesPreprocessingEstimator) = (:prices,)
 pipe_reads(::AbstractReturnsPreprocessingEstimator) = (:returns,)
 pipe_reads(::AbstractPriorEstimator) = (:returns,)
 pipe_reads(::AbstractPhylogenyEstimator) = (:returns,)
 pipe_reads(::AbstractUncertaintySetEstimator) = (:returns,)
-pipe_reads(::AbstractConstraintEstimator) = ()
+pipe_reads(::AbstractConstraintEstimator) = (:returns,)
 pipe_reads(::OptimisationEstimator) = (:returns,)
 """
 $(DocStringExtensions.TYPEDEF)
