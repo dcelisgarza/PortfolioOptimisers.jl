@@ -148,6 +148,7 @@ generate_type_hierarchy()
 
 root_pages = [file
               for file in readdir(joinpath(@__DIR__, "src")) if splitext(file)[2] == ".md"]
+home = popat!(root_pages, findfirst(x->contains(x, "index"), root_pages))
 api_pages = [item for item in walkdir(joinpath(@__DIR__, "src/api"))]
 contribute = [joinpath("contribute", file)
               for file in readdir(joinpath(@__DIR__, "src/contribute"))
@@ -160,7 +161,7 @@ makedocs(; modules = [PortfolioOptimisers], doctest = false,
          sitename = "PortfolioOptimisers.jl",
          format = DocumenterVitepress.MarkdownVitepress(;
                                                         repo = "https://github.com/dcelisgarza/PortfolioOptimisers.jl"),
-         pages = ["Home" => root_pages[1];
+         pages = ["Home" => home;
                   "User Guide" => user_guide;
                   "Examples" => examples;
                   "API" => [joinpath.(api_pages[1][1][idx1:end], api_pages[1][3]);
