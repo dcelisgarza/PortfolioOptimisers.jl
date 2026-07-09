@@ -7,19 +7,9 @@ A pipeline reifies an end-to-end workflow — price preprocessing, prices-to-ret
 ```@docs
 AbstractPipelineEstimator
 AbstractPipelineResult
-AbstractPreprocessingEstimator
-AbstractPricesPreprocessingEstimator
-AbstractReturnsPreprocessingEstimator
-AbstractPreprocessingResult
-AbstractPricesResult
 ```
 
-## Price-level data
-
-```@docs
-PricesResult
-prices_view
-```
+The preprocessing estimator and result hierarchies, the price-level [`PricesResult`](@ref) container, and their fit/apply verbs are not pipeline concepts — they are documented under [Pre-processing](../03_Preprocessing.md).
 
 ## Context and slots
 

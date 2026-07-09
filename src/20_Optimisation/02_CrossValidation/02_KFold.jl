@@ -112,15 +112,15 @@ function KFoldResult(; train_idx::VecVecInt, test_idx::VecVecInt)::KFoldResult
     return KFoldResult(train_idx, test_idx)
 end
 """
-    Base.split(kf::KFold, rd::ReturnsResult) -> KFoldResult
+    Base.split(kf::KFold, rd::Rd_Pr) -> KFoldResult
 
-Split the returns data `rd` into `n` non-overlapping folds using k-fold cross-validation
+Split the data `rd` into `n` non-overlapping folds using k-fold cross-validation
 with optional purging and embargoing.
 
 # Arguments
 
   - `kf::KFold`: K-fold cross-validation estimator.
-  - `rd::ReturnsResult`: Returns data to split.
+  - `rd`: Returns-level or price-level data to split ([`Rd_Pr`](@ref)).
 
 # Returns
 
@@ -132,8 +132,8 @@ with optional purging and embargoing.
   - [`KFoldResult`](@ref)
   - [`n_splits`](@ref)
 """
-function Base.split(kf::KFold, rd::ReturnsResult)
-    T = size(rd.X, 1)
+function Base.split(kf::KFold, rd::Rd_Pr)
+    T = cv_nobs(rd)
     (; n, purged_size, embargo_size) = kf
     idx = 1:T
     min_fold_size = div(T, n)
@@ -167,8 +167,8 @@ function Base.split(kf::KFold, rd::ReturnsResult)
     end
     return KFoldResult(; train_idx = train_idx, test_idx = test_idx)
 end
-function n_splits(kf::KFold, rd::ReturnsResult)
-    return min(kf.n, size(rd.X, 1))
+function n_splits(kf::KFold, rd::Rd_Pr)
+    return min(kf.n, cv_nobs(rd))
 end
 
 export KFold, KFoldResult

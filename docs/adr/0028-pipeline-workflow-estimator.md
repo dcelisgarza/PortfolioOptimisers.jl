@@ -86,3 +86,54 @@ once the v1 fit/apply contract has settled.
   machinery; further prep steps are additive.
 - Existing entry points (`optimise(opt, rd)`, `search_cross_validation(opt, …, rd)`,
   `prices_to_returns`) are unchanged; the pipeline is a purely additive layer.
+
+## Amendment (implementation, M4/M6): `PricesToReturns` is stateless but not universe-neutral
+
+Implementing `predict` surfaced a wrinkle in decision 6. `PricesToReturns` is stateless as
+designed — its fitted object is its config — but the `prices_to_returns` it wraps *drops
+assets that are entirely missing in the window being converted*. A training window in which
+an asset has no history therefore yields a smaller universe than a clean test window, so
+weights fitted on train would silently misalign with test returns (in practice, a
+`DimensionMismatch` deep inside the risk calculation).
+
+Rather than make `PricesToReturns` fitted — which would destroy the one-exemplar-per-contract
+property that motivated it — the universe contract is enforced at the boundary:
+`assert_universe_aligned` compares the replayed test universe against the training universe
+and rejects a mismatch with an error naming both. The remedy is the design's own answer: pin
+the universe with `MissingDataFilter` (universe as fitted state) and fill the remaining gaps
+with `Imputer` (parameters as fitted state) *before* converting. Both the `PricesToReturns`
+docstring and the user-facing example say so.
+
+The takeaway is that "stateless" in decision 6 means *carries no fitted state*, not *cannot
+change the asset universe*. Only a universe-mutating step may define the universe.
+
+## Amendment (post-M6): preprocessing estimators are decoupled from the pipeline
+
+Decision 2 says steps are ordinary Estimators, but the v1 prep estimators were defined inside
+`src/24_Pipeline/` and their fit/apply verbs were named `fit_step`/`apply_step` — naming and
+placement that implied a dependency on the pipeline that never actually existed. The verbs
+take `(estimator, data)` and `(fitted, data)`; they never saw a `PipelineContext`.
+
+`PricesResult`, the preprocessing type hierarchy, `PricesToReturns`, `MissingDataFilter`, and
+`Imputer` now live in `src/03_Preprocessing.jl` beside `ReturnsResult` and
+`prices_to_returns`, and the verbs are `fit_preprocessing`/`apply_preprocessing`. They are
+exported and usable on their own.
+
+This makes preprocessing symmetric with every other family: the pipeline's only pipeline-aware
+layer is `run_step`, which reads the context slots a step needs, dispatches to that family's
+**native verb** (`prior`, `clusterise`, `optimise`, `ucs`, `fit_preprocessing`), and writes the
+slot the family produces. Nothing outside `src/24_Pipeline/` knows the pipeline exists.
+
+## Amendment (post-M6): uncertainty steps accept `target = :both`
+
+The open question "mu/sigma routing when a single uncertainty step produces both" is resolved
+in favour of *both mechanisms*. `PipelineUncertaintySets` is the composite the router splits,
+and a `PipelineStep` declares `target = :mu`, `:sigma`, or `:both`. `:both` calls `ucs`, which
+derives the two halves from a single fit — sharing the prior and, for the sampling algorithms,
+the simulation draws — making it strictly cheaper than two narrowed calls.
+
+A bare, unwrapped uncertainty estimator still throws. Although `ucs` makes the written *slot*
+unambiguous, which parameters the user wants bounded remains an intent to declare, not one to
+guess; and injection stays strict, so a populated half that cannot reach the optimiser is an
+error rather than a silent drop. `:both` therefore requires an `ArithmeticReturn` return
+estimator *and* an `UncertaintySetVariance` risk measure.

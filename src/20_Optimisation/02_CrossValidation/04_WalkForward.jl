@@ -159,7 +159,7 @@ function IndexWalkForward(train_size::Integer, test_size::Integer; purged_size::
     return IndexWalkForward(train_size, test_size, purged_size, expand_train, reduce_test)
 end
 """
-    Base.split(iwf::IndexWalkForward, rd::ReturnsResult) -> WalkForwardResult
+    Base.split(iwf::IndexWalkForward, rd::Rd_Pr) -> WalkForwardResult
 
 Split the returns data `rd` into sequential walk-forward folds using integer observation
 indices. Each fold advances the test window by `test_size` observations.
@@ -167,7 +167,7 @@ indices. Each fold advances the test window by `test_size` observations.
 # Arguments
 
   - `iwf::IndexWalkForward`: Index-based walk-forward cross-validation estimator.
-  - `rd::ReturnsResult`: Returns data to split.
+  - `rd`: Returns-level or price-level data to split ([`Rd_Pr`](@ref)).
 
 # Returns
 
@@ -179,9 +179,9 @@ indices. Each fold advances the test window by `test_size` observations.
   - [`WalkForwardResult`](@ref)
   - [`n_splits`](@ref)
 """
-function Base.split(iwf::IndexWalkForward, rd::ReturnsResult)
+function Base.split(iwf::IndexWalkForward, rd::Rd_Pr)
     (; train_size, test_size, purged_size, expand_train, reduce_test) = iwf
-    T = size(rd.X, 1)
+    T = cv_nobs(rd)
     @argcheck(train_size + purged_size < T,
               DomainError(train_size + purged_size,
                           "train_size + purged_size ($(train_size + purged_size)) must be less than T ($T)"))
@@ -211,7 +211,7 @@ function Base.split(iwf::IndexWalkForward, rd::ReturnsResult)
     return WalkForwardResult(; train_idx = train_indices, test_idx = test_indices)
 end
 """
-    n_splits(cv, rd::ReturnsResult)
+    n_splits(cv, rd::Rd_Pr)
     n_splits(cv)
 
 Return the number of cross-validation splits (folds) that would be produced by `cv` for the given returns data `rd`.
@@ -219,7 +219,7 @@ Return the number of cross-validation splits (folds) that would be produced by `
 # Arguments
 
   - `cv`: A cross-validation estimator or result (e.g. [`KFold`](@ref), [`IndexWalkForward`](@ref), [`DateWalkForward`](@ref), [`CombinatorialCrossValidation`](@ref), [`MultipleRandomised`](@ref), or their corresponding result types).
-  - `rd::ReturnsResult`: Returns data used to determine the number of splits.
+  - `rd`: Returns-level or price-level data used to determine the number of splits ([`Rd_Pr`](@ref)).
 
 # Returns
 
@@ -233,9 +233,9 @@ Return the number of cross-validation splits (folds) that would be produced by `
   - [`WalkForwardResult`](@ref)
   - [`CombinatorialCrossValidation`](@ref)
 """
-function n_splits(iwf::IndexWalkForward, rd::ReturnsResult)
+function n_splits(iwf::IndexWalkForward, rd::Rd_Pr)
     (; train_size, test_size, purged_size, reduce_test) = iwf
-    T = size(rd.X, 1)
+    T = cv_nobs(rd)
     N = T - train_size - purged_size
     val = div(N, test_size)
     if reduce_test && N % test_size != 0
@@ -416,19 +416,19 @@ function DateWalkForward(train_size::IntPeriodDateRange, test_size::Integer;
                            adjuster, previous, expand_train, reduce_test)
 end
 """
-    Base.split(dwf::DateWalkForward{<:Integer}, rd::ReturnsResult) -> WalkForwardResult
+    Base.split(dwf::DateWalkForward{<:Integer}, rd::Rd_Pr) -> WalkForwardResult
 
 Split the returns data `rd` into sequential walk-forward folds using date-aligned indices,
 where `train_size` is specified as an integer number of date-range steps.
 
-The timestamp vector `rd.ts` must not be `nothing`. Training and test windows are aligned
+The timestamp vector ([`cv_timestamps`](@ref)) must not be `nothing`. Training and test windows are aligned
 to the `period` date range and advanced by `test_size` steps at a time.
 
 # Arguments
 
   - `dwf::DateWalkForward{<:Integer}`: Date-based walk-forward estimator with an integer
     `train_size`.
-  - `rd::ReturnsResult`: Returns data containing the matrix `X` and timestamp vector `ts`.
+  - `rd`: Returns-level or price-level data with timestamps ([`Rd_Pr`](@ref)).
 
 # Returns
 
@@ -440,11 +440,11 @@ to the `period` date range and advanced by `test_size` steps at a time.
   - [`WalkForwardResult`](@ref)
   - [`n_splits`](@ref)
 """
-function Base.split(dwf::DateWalkForward{<:Integer}, rd::ReturnsResult)
-    @argcheck(!isnothing(rd.ts), IsNothingError)
+function Base.split(dwf::DateWalkForward{<:Integer}, rd::Rd_Pr)
+    ts = cv_timestamps(rd)
+    @argcheck(!isnothing(ts), IsNothingError)
     (; train_size, test_size, period, period_offset, purged_size, adjuster, previous, expand_train, reduce_test) = dwf
-    T = size(rd.X, 1)
-    ts = rd.ts
+    T = cv_nobs(rd)
     ti = ts[1]
     tf = ts[end]
     po_flag = !isnothing(period_offset)
@@ -514,7 +514,7 @@ function special_div(a::Integer, b::Integer)
     return q - ifelse(iszero(r), 1, 0)
 end
 """
-    n_splits(dwf::DateWalkForward{<:Integer}, rd::ReturnsResult) -> Integer
+    n_splits(dwf::DateWalkForward{<:Integer}, rd::Rd_Pr) -> Integer
 
 Return the number of walk-forward folds that would be produced by `dwf` for the given
 returns data `rd` when the training window size is specified as an integer number of
@@ -524,7 +524,7 @@ date-range steps.
 
   - `dwf::DateWalkForward{<:Integer}`: Date-based walk-forward estimator with an integer
     `train_size`.
-  - `rd::ReturnsResult`: Returns data containing a timestamp vector `ts`.
+  - `rd`: Returns-level or price-level data with timestamps ([`Rd_Pr`](@ref)).
 
 # Returns
 
@@ -534,12 +534,12 @@ date-range steps.
 
   - [`DateWalkForward`](@ref)
   - [`WalkForwardResult`](@ref)
-  - [`Base.split(dwf::DateWalkForward{<:Integer}, rd::ReturnsResult)`](@ref)
+  - [`Base.split(dwf::DateWalkForward{<:Integer}, rd::Rd_Pr)`](@ref)
 """
-function n_splits(dwf::DateWalkForward{<:Integer}, rd::ReturnsResult)
-    @argcheck(!isnothing(rd.ts), IsNothingError)
+function n_splits(dwf::DateWalkForward{<:Integer}, rd::Rd_Pr)
+    ts = cv_timestamps(rd)
+    @argcheck(!isnothing(ts), IsNothingError)
     (; train_size, test_size, period, period_offset, adjuster, previous, reduce_test) = dwf
-    ts = rd.ts
     ti = ts[1]
     tf = ts[end]
     po_flag = !isnothing(period_offset)
@@ -566,19 +566,19 @@ function n_splits(dwf::DateWalkForward{<:Integer}, rd::ReturnsResult)
     return max_start > 0 ? special_div(max_start, test_size) + 1 : 0
 end
 """
-    Base.split(dwf::DateWalkForward{<:Any}, rd::ReturnsResult) -> WalkForwardResult
+    Base.split(dwf::DateWalkForward{<:Any}, rd::Rd_Pr) -> WalkForwardResult
 
 Split the returns data `rd` into sequential walk-forward folds using date-aligned indices,
 where `train_size` is specified as a date `Period` (e.g., `Dates.Month(6)`).
 
-The timestamp vector `rd.ts` must not be `nothing`. Training windows are defined by
+The timestamp vector ([`cv_timestamps`](@ref)) must not be `nothing`. Training windows are defined by
 subtracting `train_size` from the split date, allowing calendar-based window lengths.
 
 # Arguments
 
   - `dwf::DateWalkForward{<:Any}`: Date-based walk-forward estimator with a `Period`
     `train_size`.
-  - `rd::ReturnsResult`: Returns data containing the matrix `X` and timestamp vector `ts`.
+  - `rd`: Returns-level or price-level data with timestamps ([`Rd_Pr`](@ref)).
 
 # Returns
 
@@ -590,11 +590,11 @@ subtracting `train_size` from the split date, allowing calendar-based window len
   - [`WalkForwardResult`](@ref)
   - [`n_splits`](@ref)
 """
-function Base.split(dwf::DateWalkForward{<:Any}, rd::ReturnsResult)
-    @argcheck(!isnothing(rd.ts), IsNothingError)
+function Base.split(dwf::DateWalkForward{<:Any}, rd::Rd_Pr)
+    ts = cv_timestamps(rd)
+    @argcheck(!isnothing(ts), IsNothingError)
     (; train_size, test_size, period, period_offset, purged_size, adjuster, previous, expand_train, reduce_test) = dwf
-    T = size(rd.X, 1)
-    ts = rd.ts
+    T = cv_nobs(rd)
     ti = ts[1]
     tf = ts[end]
     po_flag = !isnothing(period_offset)
@@ -648,7 +648,7 @@ function Base.split(dwf::DateWalkForward{<:Any}, rd::ReturnsResult)
     return WalkForwardResult(; train_idx = train_indices, test_idx = test_indices)
 end
 """
-    n_splits(dwf::DateWalkForward{<:Any}, rd::ReturnsResult) -> Integer
+    n_splits(dwf::DateWalkForward{<:Any}, rd::Rd_Pr) -> Integer
 
 Return the number of walk-forward folds that would be produced by `dwf` for the given
 returns data `rd` when the training window size is specified as a date `Period`.
@@ -657,7 +657,7 @@ returns data `rd` when the training window size is specified as a date `Period`.
 
   - `dwf::DateWalkForward{<:Any}`: Date-based walk-forward estimator with a `Period`
     `train_size`.
-  - `rd::ReturnsResult`: Returns data containing a timestamp vector `ts`.
+  - `rd`: Returns-level or price-level data with timestamps ([`Rd_Pr`](@ref)).
 
 # Returns
 
@@ -667,12 +667,12 @@ returns data `rd` when the training window size is specified as a date `Period`.
 
   - [`DateWalkForward`](@ref)
   - [`WalkForwardResult`](@ref)
-  - [`Base.split(dwf::DateWalkForward{<:Any}, rd::ReturnsResult)`](@ref)
+  - [`Base.split(dwf::DateWalkForward{<:Any}, rd::Rd_Pr)`](@ref)
 """
-function n_splits(dwf::DateWalkForward{<:Any}, rd::ReturnsResult)
-    @argcheck(!isnothing(rd.ts), IsNothingError)
+function n_splits(dwf::DateWalkForward{<:Any}, rd::Rd_Pr)
+    ts = cv_timestamps(rd)
+    @argcheck(!isnothing(ts), IsNothingError)
     (; train_size, test_size, period, period_offset, adjuster, previous, reduce_test) = dwf
-    ts = rd.ts
     ti = ts[1]
     tf = ts[end]
     po_flag = !isnothing(period_offset)

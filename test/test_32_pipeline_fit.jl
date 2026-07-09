@@ -142,11 +142,45 @@
         @test mr2.r[2].ucs === unc.sigma
         @test mr2.r[1] === mr.r[1]
 
+        # target = :both derives both halves from a single `ucs` call
+        ps_both = PipelineStep(; est = DeltaUncertaintySet(), reads = (:returns,),
+                               writes = :uncertainty, target = :both)
+        res_both = PortfolioOptimisers.fit(Pipeline(; steps = (ps_both,)), rd)
+        unc_both = res_both.ctx.uncertainty
+        @test unc_both isa PortfolioOptimisers.PipelineUncertaintySets
+        @test unc_both.mu.lb == mu_ref.lb
+        @test unc_both.mu.ub == mu_ref.ub
+        @test unc_both.sigma.lb == sigma_ref.lb
+        @test unc_both.sigma.ub == sigma_ref.ub
+
+        # ... and agrees with the two narrowed steps run separately
+        @test unc_both.mu.ub == unc.mu.ub
+        @test unc_both.sigma.ub == unc.sigma.ub
+
+        # the fitted object of a :both step is the pair itself
+        @test res_both.results[1] === unc_both
+
+        # :both requires an optimiser that can take *both* halves
+        mr_both = PortfolioOptimisers.inject_context(MeanRisk(; opt = jopt(),
+                                                              r = UncertaintySetVariance()),
+                                                     res_both.ctx)
+        @test mr_both.opt.ret.ucs === unc_both.mu
+        @test mr_both.r.ucs === unc_both.sigma
+        @test_throws ArgumentError PortfolioOptimisers.inject_context(MeanRisk(;
+                                                                               opt = jopt(),
+                                                                               r = Variance()),
+                                                                      res_both.ctx)
+
         # bare uncertainty steps must declare a target
         ctx = PortfolioOptimisers.PipelineContext(; returns = rd)
         @test_throws ArgumentError PortfolioOptimisers.run_step(DeltaUncertaintySet(), ctx)
         ps_bad = PipelineStep(; est = DeltaUncertaintySet(), writes = :uncertainty)
         @test_throws ArgumentError PortfolioOptimisers.run_step(ps_bad, ctx)
+
+        # an unknown target is rejected
+        ps_wrong = PipelineStep(; est = DeltaUncertaintySet(), reads = (:returns,),
+                                writes = :uncertainty, target = :nonsense)
+        @test_throws ArgumentError PortfolioOptimisers.run_step(ps_wrong, ctx)
 
         # unroutable targets fail loudly
         @test_throws ArgumentError PortfolioOptimisers.fit(Pipeline(;
@@ -181,6 +215,15 @@
         mr2 = PortfolioOptimisers.inject_context(MeanRisk(; opt = jopt()), res.ctx)
         @test mr2.opt.wb === cons[1]
         @test mr2.opt.lcse === cons[2]
+
+        # phylogeny-constraint estimators are steppable: they compute their own
+        # phylogeny from :returns and route to the JuMP optimiser's `ple` field
+        pipe_ph = Pipeline(; steps = (SemiDefinitePhylogenyEstimator(), EmpiricalPrior()))
+        @test pipe_ph.names == ("constraints", "prior")
+        res_ph = PortfolioOptimisers.fit(pipe_ph, rd)
+        @test res_ph.ctx.constraints isa SemiDefinitePhylogeny
+        mr_ph = PortfolioOptimisers.inject_context(MeanRisk(; opt = jopt()), res_ph.ctx)
+        @test mr_ph.opt.ple === res_ph.ctx.constraints
 
         # hierarchical optimisers accept weight bounds but not linear constraints
         ctx_wb = PortfolioOptimisers.PipelineContext(; returns = rd, constraints = cons[1])

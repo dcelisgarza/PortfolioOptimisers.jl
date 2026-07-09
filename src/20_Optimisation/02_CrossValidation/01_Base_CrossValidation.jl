@@ -132,6 +132,54 @@ Union of all sequential cross-validation estimators and results.
 const SeqCVER = Union{<:SequentialCrossValidationEstimator,
                       <:SequentialCrossValidationResult}
 """
+    const Rd_Pr
+
+Union of the two data levels cross-validation folds can be computed on: returns-level ([`AbstractReturnsResult`](@ref)) and price-level ([`AbstractPricesResult`](@ref)) data.
+
+Fold generation only needs an observation count ([`cv_nobs`](@ref)) and a timestamp vector ([`cv_timestamps`](@ref)), so [`Base.split`](@ref) and [`n_splits`](@ref) accept either level. Price-level splitting is what lets a `Pipeline` be cross-validated on its *input* rows, keeping stateful preprocessing inside the fold.
+"""
+const Rd_Pr = Union{<:AbstractReturnsResult, <:AbstractPricesResult}
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the number of observations (rows) cross-validation folds index into.
+
+# Arguments
+
+  - `data`: Returns-level or price-level data ([`Rd_Pr`](@ref)).
+
+# Returns
+
+  - `T::Integer`: The number of observation rows.
+
+# Related
+
+  - [`cv_timestamps`](@ref)
+  - [`Base.split`](@ref)
+"""
+cv_nobs(rd::AbstractReturnsResult) = size(rd.X, 1)
+cv_nobs(pr::AbstractPricesResult) = size(TimeSeries.values(pr.X), 1)
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the timestamp vector aligned with the observation rows of `data`, or `nothing` when it has none.
+
+# Arguments
+
+  - `data`: Returns-level or price-level data ([`Rd_Pr`](@ref)).
+
+# Returns
+
+  - `ts`: Timestamp vector, or `nothing`.
+
+# Related
+
+  - [`cv_nobs`](@ref)
+  - [`Base.split`](@ref)
+"""
+cv_timestamps(rd::AbstractReturnsResult) = rd.ts
+cv_timestamps(pr::AbstractPricesResult) = TimeSeries.timestamp(pr.X)
+"""
 $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for cross-validation estimators used in non-optimisation contexts

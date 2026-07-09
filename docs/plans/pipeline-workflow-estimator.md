@@ -38,11 +38,15 @@ alignment); slot-trait coverage for every steppable family.
 
 ## M2 — Preprocessing estimators + fit/apply contract
 
-`src/25_Pipeline/02_Preprocessing_Steps.jl` (split into files per estimator if they grow)
+The preprocessing estimators live in `src/03_Preprocessing.jl` (see the post-M6 decoupling
+amendment in ADR 0028); only the context adapter lives in
+`src/24_Pipeline/02_StepExecution.jl`.
 
 - The step execution contract: `run_step(est, ctx) -> (fitted_result, ctx′)` dispatching to
-  each family's native verb (`prior`, `clusters`, constraint generation, `optimise`, …), and
-  the apply contract for prep results: `apply_step(fitted_result, data) -> data′`.
+  each family's native verb (`prior`, `clusterise`, constraint generation, `optimise`, `ucs`,
+  `fit_preprocessing`/`apply_preprocessing`, …).
+- The prep fit/apply contract, standalone and pipeline-free:
+  `fit_preprocessing(est, data) -> fitted` and `apply_preprocessing(fitted, data) -> data′`.
 - `PricesToReturns` estimator (ret_method simple/log, padding, collapse args) wrapping the
   existing `prices_to_returns` internals ([src/03_Preprocessing.jl:586]). Stateless: its
   fitted Result is the config; apply = run. The existing function stays unchanged.
@@ -129,16 +133,34 @@ Tests: tune a prep hyperparameter (imputation method) jointly with an optimiser
 hyperparameter; name-addressed vs index-addressed lenses give identical results; a
 leakage-sensitive tuning case where full-sample preprocessing would pick a different winner.
 
-## M6 — Exports, docs, precompilation, polish
+## M6 — Exports, docs, precompilation, polish — DONE
 
-- Exports + `24_Aliases.jl` entries; `public` for internal-but-documented names
-  (`PipelineContext` stays private).
-- Docs: `docs/src/api/25_Pipeline/…` pages (grouped per ADR 0014, docs-by-pipeline-stage), a
-  user-guide example: prices → filter → impute → returns → prior → phylogeny → constraints →
-  MeanRisk, tuned end-to-end with walk-forward CV.
-- Precompilation workload addition (`23_Precompilation.jl`) once the API settles.
-- Sweep: error-message quality for every "deliberately unsupported" boundary (meta-wrapping,
-  combinatorial CV, predict-without-weights, unroutable slot elements).
+- Exports done in M1–M5 (`PricesResult`, `PipelineStep`, `PricesToReturns`,
+  `MissingDataFilter(Result)`, `Imputer(Result)`, `Pipeline`, `PipelineResult`); `public fit`.
+  `predict` is already public via `StatsAPI`. `PipelineContext` stays private, as planned.
+  No `25_Aliases.jl` entries added — the short-alias table is for risk measures and
+  optimisers, and no pipeline name is long enough to warrant one.
+- Docs: `docs/src/api/24_Pipeline/01…05` pages. Example added at
+  `examples/5_validation_tuning/03_Pipelines.jl` (prices → filter → impute → returns → prior
+  → phylogeny constraints → weight bounds → `MeanRisk`, then joint preprocessing/optimiser
+  tuning under walk-forward CV, structural search, and the boundary errors). Tracked in
+  `docs/adr/examples-coverage.md`.
+- Precompilation: **deliberately skipped.** `23_Precompilation.jl` is an empty, fully
+  commented-out stub — the package ships no workload at all — so adding a pipeline-only one
+  would be inconsistent and would slow precompile for no benefit. Revisit if the package
+  ever enables a workload.
+- Sweep done. Unsupported boundaries now each throw an explanatory error:
+  combinatorial CV on prices, `MultipleRandomised` on prices, `optimise(::Pipeline)`,
+  `port_opt_view(::Pipeline, …)` (the meta-wrapping blocker named by ADR 0028; the
+  constructors additionally reject a `Pipeline` by type), predict-without-weights,
+  prices-predict without a `PricesToReturns` step, unroutable uncertainty/constraint slot
+  elements, non-steppable estimators, and uncertainty steps with no `:mu`/`:sigma` target.
+- Two gaps found and fixed while writing the example:
+  - `AbstractPhylogenyConstraintEstimator` hit the throwing constraint fallback and could not
+    be a bare step, which blocked the ADR's own example chain. It now has a `run_step` that
+    reads `:returns` and routes its result to `ple`.
+  - `PricesToReturns` is stateless but *not* universe-neutral (see the ADR amendment):
+    `assert_universe_aligned` now rejects a train/test universe mismatch at `predict` time.
 
 ## Known risks / open questions (to resolve during implementation, not design)
 
@@ -148,5 +170,11 @@ leakage-sensitive tuning case where full-sample preprocessing would pick a diffe
   either forbid padding inside pipelines or make the row bookkeeping explicit.
 - Constraint-generation estimators need `AssetSets` at fit time; decide whether `sets` lives
   in the context (a step output/input) or stays optimiser config in v1.
-- Mu/sigma routing when a single uncertainty step produces both: return a small composite
-  Result that the router splits, or require two steps; pick when writing M3.
+- ~~Mu/sigma routing when a single uncertainty step produces both: return a small composite
+  Result that the router splits, or require two steps; pick when writing M3.~~ **Resolved:**
+  both. The composite `PipelineUncertaintySets` *is* the split, and a step declares
+  `target = :mu`, `:sigma`, or `:both`. `:both` calls `ucs`, which derives the two halves
+  from one fit — sharing the prior and the simulation draws — so it is strictly cheaper than
+  two narrowed calls. A bare (unwrapped) uncertainty estimator still throws: the target is
+  an intent, not something to guess. Injection stays strict, so `:both` demands an optimiser
+  with an `ArithmeticReturn` *and* an `UncertaintySetVariance`.

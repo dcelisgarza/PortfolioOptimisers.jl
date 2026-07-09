@@ -84,6 +84,7 @@ Mark a topic covered (✅) only when all of the following hold:
 | ✅ | Cross-validation — `KFold`, `CombinatorialCrossValidation`, `IndexWalkForward`, `NearestQuantilePrediction` | `examples/5_validation_tuning/01_Cross_Validation.jl` |
 | ✅ | Hyperparameter tuning | `examples/5_validation_tuning/02_Hyperparameter_Tuning.jl` |
 | ✅ | `DateWalkForward` — calendar-aligned walk-forward using Julia's `Dates` module (month-end `adjuster`, `previous` alignment) | `examples/5_validation_tuning/01_Cross_Validation.jl` (§2.3.2) |
+| ✅ | `Pipeline` — end-to-end workflow as a fitted, tunable unit: `PricesResult`, `MissingDataFilter` (universe as fitted state), `Imputer` (train-only fill values), `PricesToReturns`, slot injection, price-level walk-forward CV, joint preprocessing + optimiser tuning, structural search | `examples/5_validation_tuning/03_Pipelines.jl` |
 
 ## 6. Post-processing
 
