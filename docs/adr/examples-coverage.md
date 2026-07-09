@@ -26,6 +26,7 @@ Mark a topic covered (✅) only when all of the following hold:
 | ------ | ----- | ---- |
 | ✅ | Getting started — `prices_to_returns`, `ReturnsResult`, basic `MeanRisk` solve | `examples/1_foundations/01_Getting_Started.jl` |
 | ✅ | Data preprocessing and imputation — `missing_col_percent`, `missing_row_percent`, `Impute.jl` imputors (`LOCF`, `Interpolate`), handling stale prices and gaps before `prices_to_returns` | `examples/1_foundations/02_Data_Preprocessing.jl` |
+| ✅ | Asset selection — `ScoreSelector` with `ThresholdRule`/`RankRule`/`QuantileRule`, `ZeroVarianceFilter`, `CompleteAssetSelector`, `RedundancySelector` with `PairwiseCorrelation` vs `CorrelationComponents` vs `ClusterGroups`, the universe as fitted state, step-order invalidation, tuning `best` as a hyperparameter, the trust-neither tie policy | `examples/1_foundations/03_Asset_Selection.jl` |
 
 ## 2. Moments and priors
 
@@ -84,6 +85,7 @@ Mark a topic covered (✅) only when all of the following hold:
 | ✅ | Cross-validation — `KFold`, `CombinatorialCrossValidation`, `IndexWalkForward`, `NearestQuantilePrediction` | `examples/5_validation_tuning/01_Cross_Validation.jl` |
 | ✅ | Hyperparameter tuning | `examples/5_validation_tuning/02_Hyperparameter_Tuning.jl` |
 | ✅ | `DateWalkForward` — calendar-aligned walk-forward using Julia's `Dates` module (month-end `adjuster`, `previous` alignment) | `examples/5_validation_tuning/01_Cross_Validation.jl` (§2.3.2) |
+| ✅ | `Pipeline` — end-to-end workflow as a fitted, tunable unit: `PricesResult`, `MissingDataFilter` (universe as fitted state), `Imputer` (train-only fill values), `PricesToReturns`, slot injection, price-level walk-forward CV, joint preprocessing + optimiser tuning, structural search | `examples/5_validation_tuning/03_Pipelines.jl` |
 
 ## 6. Post-processing
 

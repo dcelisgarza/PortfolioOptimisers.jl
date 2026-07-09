@@ -52,8 +52,7 @@ This section is under active development so any [`<name>`]-(@ref) lacks docstrin
 ### Preprocessing
 
 - Prices to returns [`prices_to_returns`](@ref) and [`ReturnsResult`](@ref)
-- Find complete indices [`find_complete_indices`](@ref)
-- Find uncorrelated indices [`find_uncorrelated_indices`](@ref)
+- Asset selection [`ScoreSelector`](@ref), [`ZeroVarianceFilter`](@ref), [`CompleteAssetSelector`](@ref)
 
 ### Matrix processing
 

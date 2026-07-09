@@ -1,8 +1,10 @@
 # PortfolioOptimisers.jl — Domain Glossary
 
-The library is organised as a pipeline:
+The library is organised as a workflow:
 
 > data → moments → prior → optimisation → post-processing
+
+("Pipeline" is reserved for the reified workflow Estimator below, not this informal organisation.)
 
 with a small set of cross-cutting abstractions (Estimator / Algorithm / Result / Factory) that everything is built from. This glossary follows that order. Concept families list their concrete variants as one-line bullets.
 
@@ -23,6 +25,32 @@ A generic configuration mechanism for immutable structs — they may be Estimato
 **View**
 The sub-selection counterpart to Factory. Where Factory propagates runtime *values* down a composed struct tree, a View propagates an index *selection*: it restricts an Estimator, Algorithm, or Result (or an array of them) to a subset of assets — or, for returns data, observations — and returns a new struct of the same type with every data-bearing field and composed child consistently sub-selected. Used wherever the library operates on part of the problem rather than the whole: meta-optimisers (Subset Resampling, Nested Clustered), Cross-Validation, and windowed moment estimators. Like Factory, it relies on composition — each struct declares which of its fields participate, and the selection is threaded recursively down the tree. Unlike Factory, View is primarily an *internal* mechanism — driven by the meta-optimisers and Cross-Validation rather than called directly by everyday callers — so its entry point `port_opt_view` is marked `public`, not exported.
 Extension authors implementing a new composed estimator should define a `port_opt_view` method for it, or tag data-bearing fields with `@vprop` to have the method generated automatically.
+`ReturnsResult` is Viewed through the same entry point: `port_opt_view(rd, i)` selects assets, while `port_opt_view(rd, i, j, k)` selects observations, assets, and factors — the one place in the family where the first index is not the asset index.
+
+**Pipeline**
+An Estimator that reifies an end-to-end workflow — price preprocessing, prices-to-returns, returns preprocessing, prior, phylogeny, uncertainty sets, constraint generation, optimisation — as an ordered list of optionally-named steps executed left-to-right over a Pipeline Context. Steps are ordinary Estimators; the step's family determines which context slot it reads and writes (custom steps use an explicit wrapper). Executed with `fit` (producing a result that carries every step's fitted Result) and evaluated out-of-sample with `predict`.
+The Pipeline — data preparation included — is the unit that Cross-Validation splits (on contiguous input-time windows) and hyperparameter tuning searches; tuning lenses address steps by name or index and may swap entire estimators. Slots computed by pipeline steps override the optimisation step's corresponding internal configuration; slots with no step are computed internally by the optimiser as usual, so every stage is optional. Pipelines may nest as steps of other Pipelines; wrapping a Pipeline in a Meta-optimiser is deliberately unsupported (a Meta-optimiser may instead *be* the optimisation step).
+*Avoid*: Workflow, Workbench (GUI-era synonyms); using "pipeline" for the library's informal stage ordering.
+
+**Pipeline Context**
+The accumulating blackboard threaded through a Pipeline's steps: a set of coarse typed slots — prices, returns, prior, phylogeny, uncertainty, constraints, weights — where each step reads the slots it needs and writes the slot its family produces. Heterogeneous slots (uncertainty, constraints) hold collections whose elements are routed to their optimiser targets by Result type. Internal machinery, not user-facing.
+
+**Preprocessing Estimator**
+The family of Estimators that transform price or returns data inside a Pipeline (prices-to-returns conversion, missing-data filtering, imputation, asset selection). Fitting one on training data produces a Result carrying any fitted state — imputation parameters, thresholds, and crucially the selected asset universe — which is then *applied* to unseen data so train and test are transformed consistently. Stateless steps carry no state and applying them is just running them.
+
+**Asset Selector**
+The Preprocessing Estimator subfamily that restricts the *asset universe* from returns data — dropping constant columns, keeping the best or worst assets by a risk measure, pruning redundant ones. A selector answers one question on the training window, *which asset columns survive?*, and that answer is its fitted state: applying it to an unseen window replays the fitted universe rather than re-deciding it. Selectors restrict columns only; dropping observations is a price-level concern (`MissingDataFilter`), because a fitted transformation cannot choose which rows of an unseen window to drop without breaking the weights/returns alignment. Every selector implements one method, `select_assets`, and shares a single `AssetSelectorResult`.
+*Avoid*: Filter, Screen (used only by `MissingDataFilter`, which drops and never selects, and by the `ZeroVarianceFilter` alias, which is a pure drop).
+
+**Selection Rule**
+The Algorithm consumed by a `ScoreSelector` that turns per-asset scores into a keep-mask. *Literal* rules (`ThresholdRule`) compare raw scores against absolute bounds and ignore orientation. *Ordinal* rules (`RankRule`, `QuantileRule`) consult `bigger_is_better` — so "best" is lowest risk for a risk measure and highest value for a return measure — and take counts or fractions **from each end**, not positions, which is what makes "drop the worst 5" expressible without knowing the universe size.
+
+**Redundancy Algorithm**
+The Algorithm consumed by a `RedundancySelector`, deciding which assets duplicate information others already carry. It returns a *keep-mask*, not a partition: `PairwiseCorrelation` drops one asset at a time and may keep two members of the same correlated blob, which partition-then-keep-the-best cannot express. `CorrelationComponents` and `ClusterGroups` do partition, and share a `groups_argbest` helper. The selector's `score` chooses the survivor of each redundancy group; absent one, the correlation algorithms fall back on each asset's summary correlation to the rest of the universe.
+Note that `PairwiseCorrelation` and `CorrelationComponents` give different answers on the same input: the former guarantees no surviving pair exceeds the threshold, the latter reads correlation transitively and keeps one representative per connected blob.
+
+**Trust-neither tie policy**
+When two assets are indistinguishable under the criterion being applied, the library keeps *neither*. A tied block straddling a rank cut is excluded entirely (so `RankRule(; best = 20)` may return fewer than 20), and `find_uncorrelated_indices` removes both members of an exactly-tied correlated pair. The alternative — breaking ties by column index — would make the result depend on column order, which is not a property of the data.
 
 **Vector-to-Scalar Reducers**
 Small reusable Algorithms that collapse a vector of reals to a scalar, reused throughout the library: `MinValue`, `MaxValue`, `MeanValue`, `MedianValue`, `ModeValue`, `StdValue`, `VarValue`, `SumValue`, `ProdValue`, `StandardisedValue` (weighted mean ÷ weighted std). Most accept optional observation weights.
@@ -38,6 +66,9 @@ A pervasive Algorithm distinction in moment estimation: `FullMoment` includes al
 
 **ReturnsResult**
 The central data structure carrying all return series through the library. Fields: `X` (asset returns matrix, observations × assets), `F` (factor returns matrix), `B` (benchmark returns matrix), `nx`/`nf`/`nb` (asset/factor/benchmark names), `ts` (timestamps), `iv` (implied volatility), `ivpa` (implied volatility premium). Produced by `prices_to_returns` from raw price data. Every Prior Estimator and Optimisation Estimator consumes a `ReturnsResult`.
+
+**PricesResult**
+The container of aligned, time-indexed *price-level* series — asset prices plus optional factor, benchmark, and implied-volatility series — the prices-level mirror of `ReturnsResult`. The input to price Preprocessing Estimators and to prices-to-returns conversion, and the type that defines timestamp-window slicing for pipeline Cross-Validation. Like `ReturnsResult`, user-constructible yet classified as a Result (produced by filtering steps); `FiniteAllocationInput` remains the glossary's only data-as-Estimator deviation.
 
 **Implied Volatility**
 A forward-looking estimate of how much an asset's price is expected to fluctuate, derived from current options contract prices using models such as Black-Scholes. Stored as `iv`. Not a historical measurement.

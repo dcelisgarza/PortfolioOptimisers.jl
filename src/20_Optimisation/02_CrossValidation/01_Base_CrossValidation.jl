@@ -36,7 +36,7 @@ function Base.split(res::CrossValidationResult, args...)
     return res
 end
 """
-    const CVER = Union{<:CrossValidationEstimator, <:CrossValidationResult}
+    CVER = Union{<:CrossValidationEstimator, <:CrossValidationResult}
 
 Union of all cross-validation estimators and result types.
 """
@@ -110,7 +110,7 @@ Abstract supertype for non-sequential optimisation cross-validation results.
 """
 abstract type NonSequentialCrossValidationResult <: OptimisationCrossValidationResult end
 """
-    const OptCVER
+    OptCVER
 
 Union of all optimisation cross-validation estimators and results.
 """
@@ -118,19 +118,67 @@ const OptCVER = Union{<:OptimisationCrossValidationEstimator,
                       <:OptimisationCrossValidationResult}
 
 """
-    const NonSeqCVER
+    NonSeqCVER
 
 Union of all non-sequential cross-validation estimators and results.
 """
 const NonSeqCVER = Union{<:NonSequentialCrossValidationEstimator,
                          <:NonSequentialCrossValidationResult}
 """
-    const SeqCVER
+    SeqCVER
 
 Union of all sequential cross-validation estimators and results.
 """
 const SeqCVER = Union{<:SequentialCrossValidationEstimator,
                       <:SequentialCrossValidationResult}
+"""
+    Prices_RR
+
+Union of the two data levels cross-validation folds can be computed on: returns-level ([`AbstractReturnsResult`](@ref)) and price-level ([`AbstractPricesResult`](@ref)) data.
+
+Fold generation only needs an observation count ([`cv_nobs`](@ref)) and a timestamp vector ([`cv_timestamps`](@ref)), so [`Base.split`](@ref) and [`n_splits`](@ref) accept either level. Price-level splitting is what lets a `Pipeline` be cross-validated on its *input* rows, keeping stateful preprocessing inside the fold.
+"""
+const Prices_RR = Union{<:AbstractReturnsResult, <:AbstractPricesResult}
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the number of observations (rows) cross-validation folds index into.
+
+# Arguments
+
+  - `data`: Returns-level or price-level data ([`Prices_RR`](@ref)).
+
+# Returns
+
+  - `T::Integer`: The number of observation rows.
+
+# Related
+
+  - [`cv_timestamps`](@ref)
+  - [`Base.split`](@ref)
+"""
+cv_nobs(rd::AbstractReturnsResult) = size(rd.X, 1)
+cv_nobs(pr::AbstractPricesResult) = size(TimeSeries.values(pr.X), 1)
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the timestamp vector aligned with the observation rows of `data`, or `nothing` when it has none.
+
+# Arguments
+
+  - `data`: Returns-level or price-level data ([`Prices_RR`](@ref)).
+
+# Returns
+
+  - `ts`: Timestamp vector, or `nothing`.
+
+# Related
+
+  - [`cv_nobs`](@ref)
+  - [`Base.split`](@ref)
+"""
+cv_timestamps(rd::AbstractReturnsResult) = rd.ts
+cv_timestamps(pr::AbstractPricesResult) = TimeSeries.timestamp(pr.X)
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -383,7 +431,7 @@ function PredictionResult(; res::NonFiniteAllocationOptimisationResult,
     return PredictionResult(res, rd)
 end
 """
-    const VecPredRes = AbstractVector{<:PredictionResult}
+    VecPredRes = AbstractVector{<:PredictionResult}
 
 Alias for a vector of single-fold prediction results.
 
@@ -396,7 +444,7 @@ Represents a collection of [`PredictionResult`](@ref) objects from cross-validat
 """
 const VecPredRes = AbstractVector{<:PredictionResult}
 """
-    const VecVecPredRes = AbstractVector{<:VecPredRes}
+    VecVecPredRes = AbstractVector{<:VecPredRes}
 
 Alias for a vector of vectors of prediction results.
 
@@ -494,7 +542,7 @@ function MultiPeriodPredictionResult(;
     return MultiPeriodPredictionResult(pred, id)
 end
 """
-    const VecMPredRes = AbstractVector{<:MultiPeriodPredictionResult}
+    VecMPredRes = AbstractVector{<:MultiPeriodPredictionResult}
 
 Alias for a vector of multi-period prediction results.
 
@@ -518,7 +566,7 @@ function expected_risk(r::AbstractBaseRiskMeasure, mpred::MultiPeriodPredictionR
     return expected_risk_from_returns(r, X; kwargs...)
 end
 """
-    const PredRes_MultiPredRes = Union{<:PredictionResult, <:MultiPeriodPredictionResult}
+    PredRes_MultiPredRes = Union{<:PredictionResult, <:MultiPeriodPredictionResult}
 
 Alias for a single-fold or multi-period prediction result.
 
@@ -532,7 +580,7 @@ Matches either a [`PredictionResult`](@ref) or a [`MultiPeriodPredictionResult`]
 """
 const PredRes_MultiPredRes = Union{<:PredictionResult, <:MultiPeriodPredictionResult}
 """
-    const VecPredRes_MultiPredRes = AbstractVector{<:PredRes_MultiPredRes}
+    VecPredRes_MultiPredRes = AbstractVector{<:PredRes_MultiPredRes}
 
 Alias for a vector of single-fold or multi-period prediction results.
 
@@ -759,7 +807,7 @@ function StatsAPI.predict(res::NonFiniteAllocationOptimisationResult, rd::Return
     return PredictionResult(; res = res, rd = rd)
 end
 """
-    fit_predict(opt, rd::ReturnsResult)
+    fit_predict(opt::OptE_Opt, rd::ReturnsResult)
 
 Fit optimisation estimator `opt` on returns data `rd` and immediately produce a
 [`PredictionResult`](@ref) for the same data.
@@ -785,7 +833,7 @@ function fit_predict(opt::OptE_Opt, rd::ReturnsResult)
 end
 function StatsAPI.predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult,
                           test_idx::VecInt, cols = :)
-    rdi = returns_result_view(rd, test_idx, cols)
+    rdi = port_opt_view(rd, test_idx, cols)
     X = calc_net_returns(res, rdi.X)
     rdi = reconstruct_rd(res, rdi, X)
     return PredictionResult(; res = res, rd = rdi)
@@ -830,7 +878,7 @@ function fit_and_predict(res::NonFiniteAllocationOptimisationResult, rd::Returns
 end
 function fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator, rd::ReturnsResult;
                          train_idx::VecInt, test_idx::VecInt_VecVecInt, cols = :)
-    rd_train = returns_result_view(rd, train_idx, cols)
+    rd_train = port_opt_view(rd, train_idx, cols)
     if !isa(cols, Colon)
         opt = port_opt_view(opt, cols, rd.X)
     end

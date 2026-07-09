@@ -660,10 +660,307 @@ Alias for [`NonOptimisationRiskRatio`](@ref).
 """
 const NonOptRkRatio = NonOptimisationRiskRatio
 
+# ── Moments ──────────────────────────────────────
+
+"""
+    SmER
+
+Alias for [`SimpleExpectedReturns`](@ref).
+"""
+const SmER = SimpleExpectedReturns
+"""
+    GCov
+
+Alias for [`GeneralCovariance`](@ref).
+"""
+const GCov = GeneralCovariance
+"""
+    FMoment
+
+Alias for [`FullMoment`](@ref).
+"""
+const FMoment = FullMoment
+"""
+    SMoment
+
+Alias for [`SemiMoment`](@ref).
+"""
+const SMoment = SemiMoment
+"""
+    Cov
+
+Alias for [`Covariance`](@ref).
+"""
+const Cov = Covariance
+"""
+    SVar
+
+Alias for [`SimpleVariance`](@ref).
+"""
+const SVar = SimpleVariance
+"""
+    G0
+
+Alias for [`Gerber0`](@ref).
+"""
+const G0 = Gerber0
+"""
+    G1
+
+Alias for [`Gerber1`](@ref).
+"""
+const G1 = Gerber1
+"""
+    G2
+
+Alias for [`Gerber2`](@ref).
+"""
+const G2 = Gerber2
+"""
+    GerberCov
+
+Alias for [`GerberCovariance`](@ref).
+"""
+const GerberCov = GerberCovariance
+"""
+    SBCov
+
+Alias for [`SmythBrobyCovariance`](@ref).
+"""
+const SBCov = SmythBrobyCovariance
+"""
+    SB0
+
+Alias for [`SmythBroby0`](@ref).
+"""
+const SB0 = SmythBroby0
+"""
+    SB1
+
+Alias for [`SmythBroby1`](@ref).
+"""
+const SB1 = SmythBroby1
+"""
+    SB2
+
+Alias for [`SmythBroby2`](@ref).
+"""
+const SB2 = SmythBroby2
+"""
+    SBG0
+
+Alias for [`SmythBrobyGerber0`](@ref).
+"""
+const SBG0 = SmythBrobyGerber0
+"""
+    SBG1
+
+Alias for [`SmythBrobyGerber1`](@ref).
+"""
+const SBG1 = SmythBrobyGerber1
+"""
+    SBG2
+
+Alias for [`SmythBrobyGerber2`](@ref).
+"""
+const SBG2 = SmythBrobyGerber2
+"""
+    SBC0
+
+Alias for [`SmythBrobyCount0`](@ref).
+"""
+const SBC0 = SmythBrobyCount0
+"""
+    SBC1
+
+Alias for [`SmythBrobyCount1`](@ref).
+"""
+const SBC1 = SmythBrobyCount1
+"""
+    SBC2
+
+Alias for [`SmythBrobyCount2`](@ref).
+"""
+const SBC2 = SmythBrobyCount2
+"""
+    DCov
+
+Alias for [`DistanceCovariance`](@ref).
+"""
+const DCov = DistanceCovariance
+"""
+    LTDCov
+
+Alias for [`LowerTailDependenceCovariance`](@ref).
+"""
+const LTDCov = LowerTailDependenceCovariance
+"""
+    KCov
+
+Alias for [`KendallCovariance`](@ref).
+"""
+const KCov = KendallCovariance
+"""
+    SCov
+
+Alias for [`SpearmanCovariance`](@ref).
+"""
+const SCov = SpearmanCovariance
+"""
+    MICov
+
+Alias for [`MutualInfoCovariance`](@ref).
+"""
+const MICov = MutualInfoCovariance
+"""
+    DnCov
+
+Alias for [`DenoiseCovariance`](@ref).
+"""
+const DnCov = DenoiseCovariance
+"""
+    DtCov
+
+Alias for [`DetoneCovariance`](@ref).
+"""
+const DtCov = DetoneCovariance
+"""
+    PrCov
+
+Alias for [`ProcessedCovariance`](@ref).
+"""
+const PrCov = ProcessedCovariance
+"""
+    POCov
+
+Alias for [`PortfolioOptimisersCovariance`](@ref).
+"""
+const POCov = PortfolioOptimisersCovariance
+"""
+    ShER
+
+Alias for [`ShrunkExpectedReturns`](@ref).
+"""
+const ShER = ShrunkExpectedReturns
+"""
+    GM
+
+Alias for [`GrandMean`](@ref).
+"""
+const GM = GrandMean
+"""
+    VW
+
+Alias for [`VolatilityWeighted`](@ref).
+"""
+const VW = VolatilityWeighted
+"""
+    MSE
+
+Alias for [`MeanSquaredError`](@ref).
+"""
+const MSE = MeanSquaredError
+"""
+    JS
+
+Alias for [`JamesStein`](@ref).
+"""
+const JS = JamesStein
+"""
+    BS
+
+Alias for [`BayesStein`](@ref).
+"""
+const BS = BayesStein
+"""
+    BOP
+
+Alias for [`BodnarOkhrinParolya`](@ref).
+"""
+const BOP = BodnarOkhrinParolya
+"""
+    EqER
+
+Alias for [`EquilibriumExpectedReturns`](@ref).
+"""
+const EqER = EquilibriumExpectedReturns
+"""
+    ExER
+
+Alias for [`ExcessExpectedReturns`](@ref).
+"""
+const ExER = ExcessExpectedReturns
+"""
+    CoSk
+
+Alias for [`Coskewness`](@ref).
+"""
+const CoSk = Coskewness
+"""
+    CoKt
+
+Alias for [`Cokurtosis`](@ref).
+"""
+const CoKt = Cokurtosis
+"""
+    LinMod
+
+Alias for [`LinearModel`](@ref).
+"""
+const LinMod = LinearModel
+"""
+    GLinMod
+
+Alias for [`GeneralisedLinearModel`](@ref).
+"""
+const GLinMod = GeneralisedLinearModel
+"""
+    R2
+
+Alias for [`RSquared`](@ref).
+"""
+const R2 = RSquared
+"""
+    AdjR2
+
+Alias for [`AdjustedRSquared`](@ref).
+"""
+const AdjR2 = AdjustedRSquared
+
+# ── Filters ──────────────────────────────────────
+
+"""
+    ZeroVarianceFilter(; tol::Number = 1e-12) -> ScoreSelector
+
+Alias for the zero-variance asset selector [`ScoreSelector`](@ref) + [`SCM`](@ref) + [`ThresholdRule`](@ref).
+
+Keeps assets whose second central moment strictly exceeds `tol`, dropping constant and
+near-constant columns before they reach a prior or an optimiser. The bound is exclusive, so
+`tol = 0` still drops an exactly-constant asset.
+
+Spelled with `SCM()` rather than [`Variance`](@ref): `Variance` is a [`WeightsInput`](@ref)
+risk measure whose functor consumes portfolio weights, so it cannot score a single asset's
+return series.
+
+# Related
+
+  - [`ScoreSelector`](@ref)
+  - [`ThresholdRule`](@ref)
+  - [`SCM`](@ref)
+"""
+function ZeroVarianceFilter(; tol::Number = 1e-12)::ScoreSelector
+    @argcheck(tol >= zero(tol),
+              DomainError(tol, "the tolerance of a ZeroVarianceFilter must be >= 0"))
+    return ScoreSelector(; score = SCM(), rule = ThresholdRule(; lo = tol))
+end
+
 export HRP, HERC, SCHRP, NCO, STO, SSR, MR, RB, RRB, FRC, NOC, DAO, GAO, FAI, SD,
        UcVariance, WR, VaR, CVaR, DRCVaR, EVaR, RVaR, PNVaR, RG, VaR_RG, CVaR_RG, DRCVaR_RG,
        EVaR_RG, RVaR_RG, PNVaR_RG, GVaR_RG, DaR, CDaR, DRCDaR, EDaR, RDaR, PNDaR, R_DaR,
        R_CDaR, R_EDaR, R_RDaR, R_PNDaR, OWA, ADD, R_ADD, UCI, R_UCI, MDD, R_MDD, BDVariance,
        TrRM, RkTrRM, TnRM, VSK, NonOptRkRatio, FLM, MAD, SCM, SLM, ECM, ELM, TLM, SSK, FTCM,
        FTLM, KT, SKT, OWA_GMD, OWA_CVaR, OWA_TG, OWA_WR, OWA_RG, OWA_CVaR_RG, OWA_TG_RG,
-       OWA_LMoment
+       OWA_LMoment, SmER, GCov, FMoment, SMoment, Cov, SVar, G0, G1, G2, GerberCov, SBCov,
+       SB0, SB1, SB2, SBG0, SBG1, SBG2, SBC0, SBC1, SBC2, DCov, LTDCov, KCov, SCov, MICov,
+       DnCov, DtCov, PrCov, POCov, ShER, GM, VW, MSE, JS, BS, BOP, EqER, ExER, CoSk, CoKt,
+       LinMod, GLinMod, R2, AdjR2, ZeroVarianceFilter

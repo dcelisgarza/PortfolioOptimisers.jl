@@ -561,7 +561,7 @@ function _optimise(nco::NestedClustered, rd::ReturnsResult; dims::Int = 1,
     # FLoops.@floop nco.ex
     for (i, cl) in pairs(cls)
         optic = port_opt_view(opti, cl, X)
-        rdc = returns_result_view(rd, cl)
+        rdc = port_opt_view(rd, cl)
         res = optimise(optic, rdc; dims = dims, branchorder = branchorder,
                        str_names = str_names, save = save, kwargs...)
         #! Support efficient frontier?

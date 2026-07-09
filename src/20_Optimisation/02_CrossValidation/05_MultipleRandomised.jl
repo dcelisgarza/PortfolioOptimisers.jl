@@ -245,7 +245,7 @@ function n_splits(mre::MultipleRandomised, rd::ReturnsResult)
         throw(ArgumentError("when using a `DateWalkForward` with `window_size`, the number of splits cannot be determined before calling [`split`](@ref)."))
     end
     if !isnothing(mre.window_size)
-        rd = returns_result_view(rd, 1:(mre.window_size), :)
+        rd = port_opt_view(rd, 1:(mre.window_size), :)
     end
     return mre.n_subsets * n_splits(mre.cv, rd)
 end
@@ -513,7 +513,7 @@ function Base.split(mrcv::MultipleRandomised, rd::ReturnsResult)
         else
             start_obs = rand(rng, 1:(T - window_size))
             idx = start_obs:(start_obs + window_size)
-            rdi = returns_result_view(rd, idx, :)
+            rdi = port_opt_view(rd, idx, :)
         end
         start_obs -= 1
         (; train_idx, test_idx) = try
@@ -569,7 +569,7 @@ function path_fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator,
                               id = nothing)
     predictions = run_folds(opt, length(train_idx), ex) do i, prev
         col = cols[i]
-        rdi = returns_result_view(rd, col)
+        rdi = port_opt_view(rd, col)
         opti = port_opt_view(opt, col, rdi.X)
         if !isnothing(prev)
             if needs_previous_weights(opt)

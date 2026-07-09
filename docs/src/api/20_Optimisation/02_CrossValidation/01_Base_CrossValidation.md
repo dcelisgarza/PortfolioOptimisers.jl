@@ -31,7 +31,7 @@ MultiPeriodPredictionResult
 VecMPredRes
 PopulationPredictionResult
 predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)
-fit_predict
+fit_predict(opt::OptE_Opt, rd::ReturnsResult)
 sort_by_measure
 quantile_by_measure
 fit_and_predict
@@ -42,4 +42,7 @@ VecPredRes_MultiPredRes
 cv_sequential_info
 parallel_folds
 run_folds
+cv_nobs
+cv_timestamps
+Prices_RR
 ```

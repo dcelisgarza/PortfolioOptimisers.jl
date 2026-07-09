@@ -1,7 +1,7 @@
 # Type hierarchy
 
 The trees below are generated automatically from the live type hierarchy
-every time the documentation is built (see `[docs/generate_type_hierarchy.jl](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/docs/generate_type_hierarchy.jl)`),
+every time the documentation is built (see [docs/generate_type_hierarchy.jl](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/docs/generate_type_hierarchy.jl)),
 so they always reflect the current state of the package. Each type links to
 its docstring.
 
@@ -49,6 +49,10 @@ its docstring.
 
 │&nbsp;&nbsp;&nbsp;└──&nbsp;[PhylogenyResult](@ref)
 
+├──&nbsp;[AbstractPipelineResult](@ref)
+
+│&nbsp;&nbsp;&nbsp;└──&nbsp;[PipelineResult](@ref)
+
 ├──&nbsp;[AbstractPredictionResult](@ref)
 
 │&nbsp;&nbsp;&nbsp;├──&nbsp;[MultiPeriodPredictionResult](@ref)
@@ -56,6 +60,22 @@ its docstring.
 │&nbsp;&nbsp;&nbsp;├──&nbsp;[PopulationPredictionResult](@ref)
 
 │&nbsp;&nbsp;&nbsp;└──&nbsp;[PredictionResult](@ref)
+
+├──&nbsp;[AbstractPreprocessingResult](@ref)
+
+│&nbsp;&nbsp;&nbsp;├──&nbsp;[AbstractPricesPreprocessingResult](@ref)
+
+│&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;├──&nbsp;[ImputerResult](@ref)
+
+│&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;└──&nbsp;[MissingDataFilterResult](@ref)
+
+│&nbsp;&nbsp;&nbsp;└──&nbsp;[AbstractReturnsPreprocessingResult](@ref)
+
+│&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└──&nbsp;[AssetSelectorResult](@ref)
+
+├──&nbsp;[AbstractPricesResult](@ref)
+
+│&nbsp;&nbsp;&nbsp;└──&nbsp;[PricesResult](@ref)
 
 ├──&nbsp;[AbstractPriorResult](@ref)
 
@@ -172,6 +192,10 @@ its docstring.
 │&nbsp;&nbsp;&nbsp;├──&nbsp;[OptimisationFailure](@ref)
 
 │&nbsp;&nbsp;&nbsp;└──&nbsp;[OptimisationSuccess](@ref)
+
+├──&nbsp;[PipelineContext](@ref)
+
+├──&nbsp;[PipelineUncertaintySets](@ref)
 
 ├──&nbsp;[ProcessedAttributes](@ref)
 
@@ -519,9 +543,33 @@ its docstring.
 
 │&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└──&nbsp;[NetworkEstimator](@ref)
 
+├──&nbsp;[AbstractPipelineEstimator](@ref)
+
+│&nbsp;&nbsp;&nbsp;└──&nbsp;[Pipeline](@ref)
+
 ├──&nbsp;[AbstractPosdefEstimator](@ref)
 
 │&nbsp;&nbsp;&nbsp;└──&nbsp;[Posdef](@ref)
+
+├──&nbsp;[AbstractPreprocessingEstimator](@ref)
+
+│&nbsp;&nbsp;&nbsp;├──&nbsp;[AbstractPricesPreprocessingEstimator](@ref)
+
+│&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;├──&nbsp;[Imputer](@ref)
+
+│&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;└──&nbsp;[MissingDataFilter](@ref)
+
+│&nbsp;&nbsp;&nbsp;├──&nbsp;[AbstractReturnsPreprocessingEstimator](@ref)
+
+│&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;└──&nbsp;[AbstractAssetSelector](@ref)
+
+│&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;├──&nbsp;[CompleteAssetSelector](@ref)
+
+│&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;├──&nbsp;[RedundancySelector](@ref)
+
+│&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└──&nbsp;[ScoreSelector](@ref)
+
+│&nbsp;&nbsp;&nbsp;└──&nbsp;[PricesToReturns](@ref)
 
 ├──&nbsp;[AbstractPriorEstimator](@ref)
 
@@ -696,6 +744,8 @@ its docstring.
 │&nbsp;&nbsp;&nbsp;└──&nbsp;[MinimumRisk](@ref)
 
 ├──&nbsp;[OptimisationCrossValidation](@ref)
+
+├──&nbsp;[PipelineStep](@ref)
 
 ├──&nbsp;[RegimeAdjustedMethod](@ref)
 
@@ -925,6 +975,14 @@ its docstring.
 
 │&nbsp;&nbsp;&nbsp;└──&nbsp;[PreorderTreeByID](@ref)
 
+├──&nbsp;[AbstractRedundancyAlgorithm](@ref)
+
+│&nbsp;&nbsp;&nbsp;├──&nbsp;[ClusterGroups](@ref)
+
+│&nbsp;&nbsp;&nbsp;├──&nbsp;[CorrelationComponents](@ref)
+
+│&nbsp;&nbsp;&nbsp;└──&nbsp;[PairwiseCorrelation](@ref)
+
 ├──&nbsp;[AbstractRegressionAlgorithm](@ref)
 
 │&nbsp;&nbsp;&nbsp;├──&nbsp;[AbstractRegressionTarget](@ref)
@@ -966,6 +1024,14 @@ its docstring.
 │&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└──&nbsp;[PPCA](@ref)
 
 ├──&nbsp;[AbstractSearchCrossValidationAlgorithm](@ref)
+
+├──&nbsp;[AbstractSelectionRule](@ref)
+
+│&nbsp;&nbsp;&nbsp;├──&nbsp;[QuantileRule](@ref)
+
+│&nbsp;&nbsp;&nbsp;├──&nbsp;[RankRule](@ref)
+
+│&nbsp;&nbsp;&nbsp;└──&nbsp;[ThresholdRule](@ref)
 
 ├──&nbsp;[AbstractSimilarityMatrixAlgorithm](@ref)
 

@@ -31,7 +31,7 @@ function cross_val_predict(opt::NonFiniteAllocationOptimisationEstimator, rd::Re
     assert_internal_optimiser(opt)
     assert_external_optimiser(opt)
     if !isa(cols, Colon)
-        rd = returns_result_view(rd, cols)
+        rd = port_opt_view(rd, cols)
         opt = port_opt_view(opt, cols, rd.X)
     end
     return fit_and_predict(opt, rd, cv; ex = ex)

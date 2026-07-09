@@ -2024,7 +2024,7 @@ const PairStrNum = Pair{<:AbstractString, <:Number}
 """
 $(DocStringExtensions.TYPEDEF)
 
-Alias for a key type used in grid search cross-validation, which can be an abstract string, an expression, a symbol, a composed function, or an accessor lens.
+Alias for a key type used in grid search cross-validation, which can be an abstract string, an expression, a symbol, a composed function, an accessor lens, or an integer (a step position when tuning a `Pipeline`).
 
 # Related
 
@@ -2033,7 +2033,7 @@ Alias for a key type used in grid search cross-validation, which can be an abstr
   - [`MultiGSCVValType`](@ref)
 """
 const GSCVKey = Union{<:AbstractString, Expr, Symbol, <:ComposedFunction,
-                      <:Accessors.PropertyLens, <:Accessors.IndexLens}
+                      <:Accessors.PropertyLens, <:Accessors.IndexLens, <:Integer}
 """
 $(DocStringExtensions.TYPEDEF)
 

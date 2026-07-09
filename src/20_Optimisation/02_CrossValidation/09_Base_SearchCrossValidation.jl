@@ -213,7 +213,7 @@ Fits a portfolio optimisation estimator on training data, scores it on test and 
 function fit_and_score(opt::NonFiniteAllocationOptimisationEstimator,
                        scv::AbstractSearchCrossValidationEstimator, rd::ReturnsResult,
                        train_idx::VecInt, test_idx::VecInt)
-    rd_train = returns_result_view(rd, train_idx, :)
+    rd_train = port_opt_view(rd, train_idx, :)
     res = optimise(opt, rd_train)
     test_pred = StatsAPI.predict(res, rd, test_idx)
     r = scv.r

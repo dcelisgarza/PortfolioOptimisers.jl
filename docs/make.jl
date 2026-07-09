@@ -179,7 +179,9 @@ makedocs(; modules = [PortfolioOptimisers], doctest = false,
                                 [joinpath.(api_pages[9][1][idx1:end], api_pages[9][3])
                                  joinpath.(api_pages[10][1][idx1:end], api_pages[10][3])
                                  joinpath.(api_pages[11][1][idx1:end], api_pages[11][3])
-                                 joinpath.(api_pages[12][1][idx1:end], api_pages[12][3])]];
+                                 joinpath.(api_pages[12][1][idx1:end], api_pages[12][3])]
+                            "Pipeline" =>
+                                joinpath.(api_pages[13][1][idx1:end], api_pages[13][3])];
                   "Contribute" => contribute;
                   "References" => root_pages[end]],
          plugins = [CitationBibliography(joinpath(@__DIR__, "src", "References.bib");
