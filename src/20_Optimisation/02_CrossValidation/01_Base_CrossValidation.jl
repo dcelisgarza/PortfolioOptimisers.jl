@@ -833,7 +833,7 @@ function fit_predict(opt::OptE_Opt, rd::ReturnsResult)
 end
 function StatsAPI.predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult,
                           test_idx::VecInt, cols = :)
-    rdi = returns_result_view(rd, test_idx, cols)
+    rdi = port_opt_view(rd, test_idx, cols)
     X = calc_net_returns(res, rdi.X)
     rdi = reconstruct_rd(res, rdi, X)
     return PredictionResult(; res = res, rd = rdi)
@@ -878,7 +878,7 @@ function fit_and_predict(res::NonFiniteAllocationOptimisationResult, rd::Returns
 end
 function fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator, rd::ReturnsResult;
                          train_idx::VecInt, test_idx::VecInt_VecVecInt, cols = :)
-    rd_train = returns_result_view(rd, train_idx, cols)
+    rd_train = port_opt_view(rd, train_idx, cols)
     if !isa(cols, Colon)
         opt = port_opt_view(opt, cols, rd.X)
     end

@@ -104,8 +104,7 @@
         rng = StableRNG(987654321)
         rd = ReturnsResult(; nx = string.("A", 1:5), X = randn(rng, 100, 5) / 100)
         pipe = Pipeline(; steps = (EmpiricalPrior(), EqualWeighted()))
-        res = PortfolioOptimisers.fit(pipe,
-                                      PortfolioOptimisers.returns_result_view(rd, 1:60, :))
+        res = PortfolioOptimisers.fit(pipe, PortfolioOptimisers.port_opt_view(rd, 1:60, :))
 
         pred = PortfolioOptimisers.predict(res, rd, 61:100)
         pred_ref = PortfolioOptimisers.predict(res.ctx.opt, rd, collect(61:100))

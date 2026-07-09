@@ -180,3 +180,32 @@ Three staged PRs, each independently reviewable:
 Amends ADR 0002: decision 0002§1's `@prop` tag is renamed to `@fprop` and joined by the
 orthogonal `@vprop`; the AST-handling and composition-order decisions (0002§2–§6) carry
 over unchanged and now apply to both tags.
+
+## Amendment: `returns_result_view` folds into `port_opt_view`
+
+Decision 2 said "collapse *every* `*_view` family into a single generic function", but
+`returns_result_view` survived the rollout — the last `*_view` name in the library. It is a
+View by CONTEXT.md's own definition: it restricts a Result to a subset of assets (and, in
+its four-argument form, observations and factors) and returns a new struct of the same type
+with every data-bearing field consistently sub-selected. It is now
+`port_opt_view(rd::ReturnsResult, …)`.
+
+Two wrinkles the fold-in had to answer.
+
+**The arities index different axes.** `port_opt_view(rd, i)` selects assets, matching the
+rest of the family. `port_opt_view(rd, i, j, k = :)` selects observations, assets, and
+factors — so `i` means observations there. The two forms are kept as they were rather than
+normalised to an assets-positional / observations-keyword shape, because cross-validation
+splits both axes together and the multi-axis call is the common one. Both docstrings carry
+an explicit warning, since the family's convention elsewhere is that argument 1 is always
+the asset index and the variadic tail is threaded *data* (`X`), never a further index.
+
+**The universal leaf fallback is fail-open.** `port_opt_view(x, i, args...) =
+nothing_scalar_array_view(x, i)` exists so a macro-threaded call never `MethodError`s on a
+leaf field. Under the old name, calling `returns_result_view` on an unhandled type raised a
+`MethodError`; under the new name it would fall through the fallback and return the returns
+result *unsubselected*, which a meta-optimiser or CV fold would silently accept — training
+on the full universe while believing it had a subset. A `port_opt_view(::AbstractReturnsResult,
+args...)` tripwire therefore throws: returns data is never a leaf value, so an unhandled
+subtype is a missing method, not a pass-through. This keeps the fail-closed posture of
+ADRs 0025–0027.

@@ -460,7 +460,7 @@ function _optimise(sr::SubsetResampling, rd::ReturnsResult; dims::Int = 1,
     FLoops.@floop sr.ex for i in 1:n_subsets
         idx = view(asset_idx, :, i)
         opti = port_opt_view(opt, idx, X)
-        rdi = returns_result_view(rd, idx)
+        rdi = port_opt_view(rd, idx)
         ress[i] = optimise(opti, rdi; dims = dims, branchorder = branchorder,
                            str_names = str_names, save = save, kwargs...)
     end

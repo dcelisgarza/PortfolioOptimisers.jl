@@ -15,11 +15,11 @@ Return the observation-window view of price- or returns-level data used by pipel
 # Related
 
   - [`prices_view`](@ref)
-  - [`returns_result_view`](@ref)
+  - [`port_opt_view`](@ref)
   - [`fit_and_score`](@ref)
 """
 pipeline_data_view(pr::AbstractPricesResult, idx) = prices_view(pr, idx)
-pipeline_data_view(rd::AbstractReturnsResult, idx) = returns_result_view(rd, idx, :)
+pipeline_data_view(rd::AbstractReturnsResult, idx) = port_opt_view(rd, idx, :)
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 

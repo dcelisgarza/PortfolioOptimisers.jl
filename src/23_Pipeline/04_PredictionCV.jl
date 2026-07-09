@@ -121,7 +121,7 @@ function StatsAPI.predict(res::PipelineResult, data::AbstractReturnsResult,
     opt = res.ctx.opt
     @argcheck(!isnothing(opt),
               IsNothingError("the pipeline produced no optimisation result; add a terminal optimisation step before predicting"))
-    rd = isa(window, Colon) ? data : returns_result_view(data, window, :)
+    rd = isa(window, Colon) ? data : port_opt_view(data, window, :)
     rd = apply_fitted_steps(res.results, rd)
     assert_universe_aligned(res, rd)
     return StatsAPI.predict(opt, rd)

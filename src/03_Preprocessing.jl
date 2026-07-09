@@ -216,7 +216,7 @@ julia> size(values(pv.X))
 # Related
 
   - [`PricesResult`](@ref)
-  - [`returns_result_view`](@ref)
+  - [`port_opt_view`](@ref)
 """
 function prices_view(pr::PricesResult, ::Colon)
     return pr
@@ -401,6 +401,12 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return a view of the `ReturnsResult` object for the assets at indices `i`.
 
+This is the [`port_opt_view`](@ref) method for [`ReturnsResult`](@ref) — the View of the library's central data structure, restricting it to a subset of assets.
+
+!!! warning
+
+    This two-argument method indexes **assets**, matching the rest of the `port_opt_view` family. The four-argument method `port_opt_view(rd, i, j, k)` indexes **observations** first and assets second. The two arities therefore give `i` different meanings; see [`port_opt_view(rd::ReturnsResult, i, j, k)`](@ref).
+
 # Arguments
 
   - `rd`: A `ReturnsResult` object containing asset and/or factor returns.
@@ -431,7 +437,7 @@ ReturnsResult
     iv ┼ nothing
   ivpa ┴ nothing
 
-julia> PortfolioOptimisers.returns_result_view(rd, 2:2)
+julia> PortfolioOptimisers.port_opt_view(rd, 2:2)
 ReturnsResult
     nx ┼ SubArray{String, 1, Vector{String}, Tuple{UnitRange{Int64}}, true}: ["B"]
      X ┼ 2×1 SubArray{Float64, 2, Matrix{Float64}, Tuple{Base.Slice{Base.OneTo{Int64}}, UnitRange{Int64}}, true}
@@ -447,12 +453,13 @@ ReturnsResult
 # Related
 
   - [`ReturnsResult`](@ref)
+  - [`port_opt_view`](@ref)
   - [`prices_to_returns`](@ref)
   - [`Option`](@ref)
   - [`VecStr`](@ref)
   - [`MatNum`](@ref)
 """
-function returns_result_view(rd::ReturnsResult, i)
+function port_opt_view(rd::ReturnsResult, i)
     nx = nothing_scalar_array_view(rd.nx, i)
     X = isnothing(rd.X) ? nothing : view(rd.X, :, i)
     nb = !isa(rd.B, MatNum) ? rd.nb : nothing_scalar_array_view(rd.nb, i)
@@ -463,14 +470,18 @@ function returns_result_view(rd::ReturnsResult, i)
                          iv = iv, ivpa = ivpa)
 end
 """
-    returns_result_view(
-                        rd::ReturnsResult,
-                        i,
-                        j,
-                        k = :
+    port_opt_view(
+                  rd::ReturnsResult,
+                  i,
+                  j,
+                  k = :
     ) -> ReturnsResult
 
 Return a view of the `ReturnsResult` object for assets at indices `j`, observations at indices `i`, and factors at indices `k`.
+
+!!! warning
+
+    Unlike every other [`port_opt_view`](@ref) method — including [`port_opt_view(rd::ReturnsResult, i)`](@ref) — the first index of this method selects **observations**, not assets. Assets are the *second* index. Cross-validation splits observations and assets together, which is why this arity exists at all.
 
 # Arguments
 
@@ -494,7 +505,7 @@ Return a view of the `ReturnsResult` object for assets at indices `j`, observati
 # Related
 
   - [`ReturnsResult`](@ref)
-  - [`returns_result_view`](@ref)
+  - [`port_opt_view`](@ref)
   - [`prices_to_returns`](@ref)
   - [`Option`](@ref)
   - [`VecStr`](@ref)
@@ -516,7 +527,7 @@ ReturnsResult
     iv ┼ nothing
   ivpa ┴ nothing
 
-julia> PortfolioOptimisers.returns_result_view(rd, 1:2, 2:2)
+julia> PortfolioOptimisers.port_opt_view(rd, 1:2, 2:2)
 ReturnsResult
     nx ┼ SubArray{String, 1, Vector{String}, Tuple{UnitRange{Int64}}, true}: ["B"]
      X ┼ 2×1 SubArray{Float64, 2, Matrix{Float64}, Tuple{UnitRange{Int64}, UnitRange{Int64}}, false}
@@ -529,7 +540,7 @@ ReturnsResult
   ivpa ┴ nothing
 ```
 """
-function returns_result_view(rd::ReturnsResult, i, j, k = :)
+function port_opt_view(rd::ReturnsResult, i, j, k = :)
     nx = nothing_scalar_array_view(rd.nx, j)
     X = isnothing(rd.X) ? rd.X : view(rd.X, i, j)
     nf = isnothing(rd.nf) || isa(k, Colon) ? rd.nf : view(rd.nf, k)
@@ -547,6 +558,21 @@ function returns_result_view(rd::ReturnsResult, i, j, k = :)
     ivpa = nothing_scalar_array_view(rd.ivpa, j)
     return ReturnsResult(; nx = nx, X = X, nf = nf, F = F, nb = nb, B = B, ts = ts, iv = iv,
                          ivpa = ivpa)
+end
+"""
+    port_opt_view(rd::AbstractReturnsResult, args...; kwargs...)
+
+Erroring tripwire for [`AbstractReturnsResult`](@ref) subtypes that do not implement [`port_opt_view`](@ref).
+
+Without it, the universal leaf fallback `port_opt_view(x, i, args...)` would hand back the returns result *unsubselected*, and a meta-optimiser or cross-validation fold would silently train on the full universe. Returns data is never a leaf value, so an unhandled subtype is a missing method, not a pass-through.
+
+# Related
+
+  - [`port_opt_view`](@ref)
+  - [`AbstractReturnsResult`](@ref)
+"""
+function port_opt_view(rd::AbstractReturnsResult, args...; kwargs...)
+    return throw(ArgumentError("port_opt_view is not implemented for $(typeof(rd)) with $(length(args)) index argument(s); implement it for the subtype. ReturnsResult supports port_opt_view(rd, assets) and port_opt_view(rd, observations, assets, factors = :)."))
 end
 """
     returns_result_picker(rd::ReturnsResult, brt::Bool) -> ReturnsResult
@@ -625,7 +651,7 @@ true
 # Related
 
   - [`ReturnsResult`](@ref)
-  - [`returns_result_view`](@ref)
+  - [`port_opt_view`](@ref)
 """
 function returns_result_picker(rd::ReturnsResult{<:Any, <:Any, <:Any, <:Any, <:Any,
                                                  Nothing}, ::Any)
