@@ -24,6 +24,7 @@ Steps are given in execution order. Each element is either a step estimator or a
   - `!isempty(steps)`.
   - Every step must be steppable ([`pipe_writes`](@ref) must be defined for it).
   - Every slot a step reads must be written by an earlier step or fillable by the pipeline input (`prices` or `returns`).
+  - No step may write a slot that invalidates a slot an earlier step already wrote (see [`PIPELINE_INVALIDATES`](@ref)). A step that rewrites `:returns` after a prior, phylogeny, uncertainty, or constraint step would leave that result computed on a stale asset universe.
   - Step names must be unique.
 
 # Examples
@@ -74,11 +75,17 @@ function Pipeline(; steps::Union{<:Tuple, <:AbstractVector})::Pipeline
     end
     slots = Symbol[pipe_writes(e) for e in ests]
     avail = Set{Symbol}((:prices, :returns))
+    written = Dict{Symbol, Any}()
     for (e, slot) in zip(ests, slots)
         for r in pipe_reads(e)
             @argcheck(r in avail,
                       ArgumentError("a $(typeof(e)) step reads the :$r slot, which no earlier step writes and the pipeline input cannot fill"))
         end
+        for inv in get(PIPELINE_INVALIDATES, slot, ())
+            @argcheck(!haskey(written, inv),
+                      ArgumentError("a $(typeof(e)) step writes the :$slot slot, invalidating the :$inv slot written by an earlier $(typeof(written[inv])) step; the stale :$inv result would no longer match the assets of the new :$slot data. Move the $(typeof(e)) step before the $(typeof(written[inv])) step, or drop one of them."))
+        end
+        written[slot] = e
         push!(avail, slot)
     end
     counts = Dict{Symbol, Int}()

@@ -110,6 +110,45 @@
         @test_throws ArgumentError PortfolioOptimisers.pipe_reads(Covariance())
     end
 
+    @testset "slot invalidation" begin
+        # a step that rewrites :returns after a returns-derived slot was written
+        # leaves that slot computed on a stale asset universe
+        @test_throws ArgumentError Pipeline(;
+                                            steps = (PricesToReturns(), EmpiricalPrior(),
+                                                     MissingDataFilter(),
+                                                     PricesToReturns()))
+        @test_throws ArgumentError Pipeline(;
+                                            steps = (PricesToReturns(), ClustersEstimator(),
+                                                     PricesToReturns()))
+
+        # a prices-level step after the prices-to-returns conversion leaves :returns stale
+        @test_throws ArgumentError Pipeline(;
+                                            steps = (PricesToReturns(),
+                                                     MissingDataFilter()))
+
+        # the invalidation is declared by the step's writes, so a wrapped callable is caught too
+        @test_throws ArgumentError Pipeline(;
+                                            steps = (PricesToReturns(), EmpiricalPrior(),
+                                                     PipelineStep(;
+                                                                  est = ctx -> ctx.returns,
+                                                                  reads = (:returns,),
+                                                                  writes = :returns)))
+
+        # slots filled by the pipeline input are not "written", so the canonical
+        # prices-level ordering is unaffected
+        @test Pipeline(;
+                       steps = (MissingDataFilter(), Imputer(), PricesToReturns(),
+                                EmpiricalPrior(), EqualWeighted())) isa Pipeline
+
+        # writing a derived slot invalidates nothing
+        @test Pipeline(;
+                       steps = (PricesToReturns(), EmpiricalPrior(), ClustersEstimator(),
+                                EqualWeighted())) isa Pipeline
+
+        @test PortfolioOptimisers.PIPELINE_INVALIDATES.returns ==
+              (:prior, :phylogeny, :uncertainty, :constraints)
+    end
+
     @testset "PipelineStep" begin
         ps = PipelineStep(; est = NormalUncertaintySet(), reads = (:returns,),
                           writes = :uncertainty, target = :mu)

@@ -137,3 +137,43 @@ unambiguous, which parameters the user wants bounded remains an intent to declar
 guess; and injection stays strict, so a populated half that cannot reach the optimiser is an
 error rather than a silent drop. `:both` therefore requires an `ArithmeticReturn` return
 estimator *and* an `UncertaintySetVariance` risk measure.
+
+## Amendment (post-M6): a step may not invalidate a slot an earlier step wrote
+
+Construction-time validation checked only that a step's *reads* were already available: the
+`avail` set grew monotonically and never noticed that a step's *write* could make an
+earlier slot stale. `inject_context` then injected `ctx.prior` into the optimiser without a
+dimension check. So this constructed, ran, and injected an N-asset prior into an M-asset
+problem:
+
+```julia
+Pipeline(steps = [PricesToReturns(), EmpiricalPrior(), ZeroVarianceFilter(), MeanRisk()])
+```
+
+The hazard was latent while `PricesToReturns` was the only step writing `:returns` — nobody
+puts it after a prior. Returns-level asset selectors (ADR 0029) make "a step that shrinks
+`:returns`" an ordinary, easily-misordered thing, and the same applies to `:phylogeny`,
+`:uncertainty`, and `:constraints`, all asset-dimensioned and all derived from `:returns`.
+
+`PIPELINE_INVALIDATES` names, per written slot, the slots that write invalidates.
+`Pipeline(; steps)` tracks which slots were written *by a step* — distinct from `avail`,
+which is seeded with `:prices` and `:returns` because `fit` may be handed either — and
+throws when a step writes a slot that invalidates an already-written one, naming both
+steps. It also catches `PipelineStep(est = callable, writes = :returns)`, since the check
+reads declared writes rather than inspecting the estimator.
+
+Failing at construction rather than dimension-checking at injection was chosen because it
+costs nothing at runtime, reports before any data is touched, and names the offending pair
+of steps rather than the symptom. It also catches a pre-existing latent bug for free:
+`PricesToReturns → MissingDataFilter` writes `:prices` after `:returns` was derived from
+it, so the optimiser silently consumed the pre-filter returns.
+
+The rule forbids a deliberate "prior-informed selection, then re-prior" ordering. The
+remedy is to say so: add a second prior step *after* the selector, which the rule permits
+and which is what the user meant.
+
+## Amendment: file renumbering
+
+`src/23_Precompilation.jl` was removed and `src/24_Pipeline/` became `src/23_Pipeline/`
+(mirrored by `docs/src/api/23_Pipeline/`), freeing `24` for `src/24_AssetSelection.jl`.
+References to the old paths above are retained as written at the time of the decision.

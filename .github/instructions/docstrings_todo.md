@@ -14,7 +14,6 @@ These files are found in the `../src/` folder.
 - [ ] 18_Tracking.jl
 - [ ] 21_ExpectedReturns.jl
 - [ ] 22_Plotting.jl
-- [ ] 23_Precompilation.jl
 - [ ] 08_Moments/01_Base_Moments.jl
 - [ ] 08_Moments/02_SimpleExpectedReturns.jl
 - [ ] 08_Moments/03_Covariance.jl

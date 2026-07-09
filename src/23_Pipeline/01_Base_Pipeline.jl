@@ -83,6 +83,25 @@ The named slots of a [`PipelineContext`](@ref). Each pipeline step reads the slo
 const PIPELINE_SLOTS = (:prices, :returns, :prior, :phylogeny, :uncertainty, :constraints,
                         :opt)
 """
+    const PIPELINE_INVALIDATES = (prices = (:returns, :prior, :phylogeny, :uncertainty, :constraints),
+                                  returns = (:prior, :phylogeny, :uncertainty, :constraints))
+
+The [`PipelineContext`](@ref) slots each written slot invalidates.
+
+Writing a data slot makes every slot *derived* from that data stale: a prior, phylogeny, uncertainty set, or constraint result computed on one asset universe does not match a later, different one. [`Pipeline`](@ref) rejects such an ordering at construction rather than letting a stale, asset-misdimensioned result reach [`inject_context`](@ref).
+
+A slot filled by the pipeline *input* rather than by a step is not "written", so the usual `MissingDataFilter → Imputer → PricesToReturns → …` ordering is unaffected. Slots absent from this table (`prior`, `phylogeny`, `uncertainty`, `constraints`, `opt`) invalidate nothing.
+
+# Related
+
+  - [`PIPELINE_SLOTS`](@ref)
+  - [`Pipeline`](@ref)
+  - [`PipelineContext`](@ref)
+"""
+const PIPELINE_INVALIDATES = (prices = (:returns, :prior, :phylogeny, :uncertainty,
+                                        :constraints),
+                              returns = (:prior, :phylogeny, :uncertainty, :constraints))
+"""
 $(DocStringExtensions.TYPEDEF)
 
 The accumulating blackboard threaded through a pipeline's steps.
