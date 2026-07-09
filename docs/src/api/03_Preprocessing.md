@@ -20,7 +20,7 @@ returns_result_picker
 ```@docs
 AbstractPricesResult
 PricesResult
-prices_view
+port_opt_view(pr::PricesResult, ::Colon)
 ```
 
 ## Preprocessing estimators
@@ -54,8 +54,8 @@ ImputerResult
 Asset selectors are the returns-level preprocessing subfamily that restricts the *asset universe*. The universe chosen on the training window is the selector's fitted state, so a selector is safe inside cross-validation. The concrete selectors live in [Asset selection](@ref); this is the seam they share.
 
 ```@docs
-PortfolioOptimisers.AbstractAssetSelector
+AbstractAssetSelector
 AssetSelectorResult
-PortfolioOptimisers.select_assets
-PortfolioOptimisers.find_complete_indices
+select_assets
+find_complete_indices
 ```

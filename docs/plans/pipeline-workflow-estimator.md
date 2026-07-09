@@ -19,7 +19,7 @@ Milestones are ordered so each is independently mergeable and testable.
 - `PricesResult <: AbstractResult`: bundles the `prices_to_returns` inputs — asset `TimeArray`
   plus optional factor/benchmark/iv `TimeArray`s and `ivpa` — with timestamp-alignment
   validation (mirror `ReturnsResult`'s checks at price level).
-- Timestamp-window slicing: `prices_view(pr::PricesResult, window)` (contiguous
+- Timestamp-window slicing: `port_opt_view(pr::PricesResult, window)` (contiguous
   timestamp/index range → sliced `PricesResult`). This is the pipeline-CV analogue of
   `returns_result_view`.
 - `PipelineContext`: internal struct with `Option` slots — `prices`, `returns`, `prior`,
@@ -33,7 +33,7 @@ Milestones are ordered so each is independently mergeable and testable.
 - `PipelineStep` explicit wrapper (escape hatch): user-supplied reads/writes plus a routing
   annotation for cases dispatch cannot disambiguate (notably mu-vs-sigma uncertainty targets).
 
-Tests: `PricesResult` validation; `prices_view` window semantics (inclusive bounds, iv/ivpa
+Tests: `PricesResult` validation; `port_opt_view` window semantics (inclusive bounds, iv/ivpa
 alignment); slot-trait coverage for every steppable family.
 
 ## M2 — Preprocessing estimators + fit/apply contract

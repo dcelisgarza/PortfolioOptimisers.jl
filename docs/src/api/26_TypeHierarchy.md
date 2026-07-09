@@ -71,6 +71,8 @@ its docstring.
 
 │&nbsp;&nbsp;&nbsp;└──&nbsp;[AbstractReturnsPreprocessingResult](@ref)
 
+│&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└──&nbsp;[AssetSelectorResult](@ref)
+
 ├──&nbsp;[AbstractPricesResult](@ref)
 
 │&nbsp;&nbsp;&nbsp;└──&nbsp;[PricesResult](@ref)
@@ -559,6 +561,14 @@ its docstring.
 
 │&nbsp;&nbsp;&nbsp;├──&nbsp;[AbstractReturnsPreprocessingEstimator](@ref)
 
+│&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;└──&nbsp;[AbstractAssetSelector](@ref)
+
+│&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;├──&nbsp;[CompleteAssetSelector](@ref)
+
+│&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;├──&nbsp;[RedundancySelector](@ref)
+
+│&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└──&nbsp;[ScoreSelector](@ref)
+
 │&nbsp;&nbsp;&nbsp;└──&nbsp;[PricesToReturns](@ref)
 
 ├──&nbsp;[AbstractPriorEstimator](@ref)
@@ -965,6 +975,14 @@ its docstring.
 
 │&nbsp;&nbsp;&nbsp;└──&nbsp;[PreorderTreeByID](@ref)
 
+├──&nbsp;[AbstractRedundancyAlgorithm](@ref)
+
+│&nbsp;&nbsp;&nbsp;├──&nbsp;[ClusterGroups](@ref)
+
+│&nbsp;&nbsp;&nbsp;├──&nbsp;[CorrelationComponents](@ref)
+
+│&nbsp;&nbsp;&nbsp;└──&nbsp;[PairwiseCorrelation](@ref)
+
 ├──&nbsp;[AbstractRegressionAlgorithm](@ref)
 
 │&nbsp;&nbsp;&nbsp;├──&nbsp;[AbstractRegressionTarget](@ref)
@@ -1006,6 +1024,14 @@ its docstring.
 │&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└──&nbsp;[PPCA](@ref)
 
 ├──&nbsp;[AbstractSearchCrossValidationAlgorithm](@ref)
+
+├──&nbsp;[AbstractSelectionRule](@ref)
+
+│&nbsp;&nbsp;&nbsp;├──&nbsp;[QuantileRule](@ref)
+
+│&nbsp;&nbsp;&nbsp;├──&nbsp;[RankRule](@ref)
+
+│&nbsp;&nbsp;&nbsp;└──&nbsp;[ThresholdRule](@ref)
 
 ├──&nbsp;[AbstractSimilarityMatrixAlgorithm](@ref)
 

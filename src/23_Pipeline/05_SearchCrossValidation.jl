@@ -14,11 +14,11 @@ Return the observation-window view of price- or returns-level data used by pipel
 
 # Related
 
-  - [`prices_view`](@ref)
+  - [`port_opt_view`](@ref)
   - [`port_opt_view`](@ref)
   - [`fit_and_score`](@ref)
 """
-pipeline_data_view(pr::AbstractPricesResult, idx) = prices_view(pr, idx)
+pipeline_data_view(pr::AbstractPricesResult, idx) = port_opt_view(pr, idx)
 pipeline_data_view(rd::AbstractReturnsResult, idx) = port_opt_view(rd, idx, :)
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -144,7 +144,7 @@ The whole workflow is fitted per fold: stateful preprocessing (universe, imputat
   - [`predict(res::PipelineResult, data::AbstractPricesResult, window)`](@ref)
 """
 function fit_and_score(pipe::Pipeline, scv::AbstractSearchCrossValidationEstimator,
-                       data::Rd_Pr, train_idx::VecInt, test_idx::VecInt)
+                       data::Prices_RR, train_idx::VecInt, test_idx::VecInt)
     res = StatsAPI.fit(pipe, pipeline_data_view(data, train_idx))
     test_pred = StatsAPI.predict(res, data, test_idx)
     r = scv.r
@@ -158,8 +158,8 @@ function fit_and_score(pipe::Pipeline, scv::AbstractSearchCrossValidationEstimat
     return test_score, train_score
 end
 """
-    search_cross_validation(pipe::Pipeline, gscv::GridSearchCrossValidation, data::Rd_Pr)
-    search_cross_validation(pipe::Pipeline, rscv::RandomisedSearchCrossValidation, data::Rd_Pr)
+    search_cross_validation(pipe::Pipeline, gscv::GridSearchCrossValidation, data::Prices_RR)
+    search_cross_validation(pipe::Pipeline, rscv::RandomisedSearchCrossValidation, data::Prices_RR)
 
 Tune a [`Pipeline`](@ref) by grid (or randomised) search cross-validation on price- or returns-level input data.
 
@@ -169,7 +169,7 @@ The input is split into contiguous observation windows by `gscv.cv` (price-level
 
   - `pipe`: The pipeline to tune.
   - `gscv`/`rscv`: The search cross-validation estimator.
-  - `data`: Price- or returns-level input data ([`Rd_Pr`](@ref)).
+  - `data`: Price- or returns-level input data ([`Prices_RR`](@ref)).
 
 # Returns
 
@@ -183,7 +183,7 @@ The input is split into contiguous observation windows by `gscv.cv` (price-level
   - [`fit_and_score`](@ref)
 """
 function search_cross_validation(pipe::Pipeline, gscv::GridSearchCrossValidation,
-                                 data::Rd_Pr)
+                                 data::Prices_RR)
     lens_grid, val_grid = pipeline_lens_val_grid(pipe, gscv.p)
     cv = split(gscv.cv, data)
     @argcheck(isa(cv.test_idx[1], VecInt),
@@ -224,7 +224,7 @@ function search_cross_validation(pipe::Pipeline, gscv::GridSearchCrossValidation
                                        val_grid = val_grid, idx = opt_idx)
 end
 function search_cross_validation(pipe::Pipeline, rscv::RandomisedSearchCrossValidation,
-                                 data::Rd_Pr)
+                                 data::Prices_RR)
     if !isnothing(rscv.seed)
         Random.seed!(rscv.rng, rscv.seed)
     end

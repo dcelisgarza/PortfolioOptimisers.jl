@@ -927,6 +927,8 @@ Alias for [`AdjustedRSquared`](@ref).
 """
 const AdjR2 = AdjustedRSquared
 
+# ── Filters ──────────────────────────────────────
+
 """
     ZeroVarianceFilter(; tol::Number = 1e-12) -> ScoreSelector
 

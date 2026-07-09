@@ -48,7 +48,7 @@
     @testset "fit at returns level" begin
         rd = make_returns()
         pipe = Pipeline(; steps = (EmpiricalPrior(), EqualWeighted()))
-        res = PortfolioOptimisers.fit(pipe, rd)
+        res = fit(pipe, rd)
         @test res isa PipelineResult
         @test res["prior"] === res.results[1]
         @test res.ctx.prior.X == rd.X
@@ -58,7 +58,7 @@
         @test_throws ArgumentError res["nope"]
 
         # a pipeline without an optimisation step has no weights
-        res = PortfolioOptimisers.fit(Pipeline(; steps = (EmpiricalPrior(),)), rd)
+        res = fit(Pipeline(; steps = (EmpiricalPrior(),)), rd)
         @test isnothing(res.ctx.opt)
         @test_throws PortfolioOptimisers.PropertyPathError res.w
     end
@@ -70,7 +70,7 @@
                         steps = (MissingDataFilter(; col_thr = 0.5), Imputer(),
                                  PricesToReturns(), EmpiricalPrior(),
                                  HierarchicalRiskParity()))
-        res = PortfolioOptimisers.fit(pipe, pr)
+        res = fit(pipe, pr)
         @test size(res.ctx.returns.X) == (59, 5)
         @test length(res.w) == 5
         @test sum(res.w) ≈ 1
@@ -120,7 +120,7 @@
                                 writes = :uncertainty, target = :sigma)
         pipe = Pipeline(; steps = (ps_mu, ps_sigma))
         @test pipe.names == ("uncertainty_1", "uncertainty_2")
-        res = PortfolioOptimisers.fit(pipe, rd)
+        res = fit(pipe, rd)
         unc = res.ctx.uncertainty
         @test unc isa PortfolioOptimisers.PipelineUncertaintySets
         mu_ref = mu_ucs(DeltaUncertaintySet(), rd.X)
@@ -145,7 +145,7 @@
         # target = :both derives both halves from a single `ucs` call
         ps_both = PipelineStep(; est = DeltaUncertaintySet(), reads = (:returns,),
                                writes = :uncertainty, target = :both)
-        res_both = PortfolioOptimisers.fit(Pipeline(; steps = (ps_both,)), rd)
+        res_both = fit(Pipeline(; steps = (ps_both,)), rd)
         unc_both = res_both.ctx.uncertainty
         @test unc_both isa PortfolioOptimisers.PipelineUncertaintySets
         @test unc_both.mu.lb == mu_ref.lb
@@ -183,19 +183,14 @@
         @test_throws ArgumentError PortfolioOptimisers.run_step(ps_wrong, ctx)
 
         # unroutable targets fail loudly
-        @test_throws ArgumentError PortfolioOptimisers.fit(Pipeline(;
-                                                                    steps = (ps_sigma,
-                                                                             EqualWeighted())),
-                                                           rd)
-        @test_throws ArgumentError PortfolioOptimisers.fit(Pipeline(;
-                                                                    steps = (ps_mu,
-                                                                             HierarchicalRiskParity())),
-                                                           rd)
+        @test_throws ArgumentError fit(Pipeline(; steps = (ps_sigma, EqualWeighted())), rd)
+        @test_throws ArgumentError fit(Pipeline(;
+                                                steps = (ps_mu, HierarchicalRiskParity())),
+                                       rd)
         # sigma with no UncertaintySetVariance in r
-        @test_throws ArgumentError PortfolioOptimisers.fit(Pipeline(;
-                                                                    steps = (ps_sigma,
-                                                                             HierarchicalRiskParity())),
-                                                           rd)
+        @test_throws ArgumentError fit(Pipeline(;
+                                                steps = (ps_sigma,
+                                                         HierarchicalRiskParity())), rd)
     end
 
     @testset "constraint steps and routing" begin
@@ -205,7 +200,7 @@
                                  LinearConstraintEstimator(; val = "A1 <= 0.25"),
                                  EmpiricalPrior()))
         @test pipe.names == ("constraints_1", "constraints_2", "prior")
-        res = PortfolioOptimisers.fit(pipe, rd)
+        res = fit(pipe, rd)
         cons = res.ctx.constraints
         @test cons isa Vector{PortfolioOptimisers.AbstractConstraintResult}
         @test cons[1] isa WeightBounds
@@ -220,7 +215,7 @@
         # phylogeny from :returns and route to the JuMP optimiser's `ple` field
         pipe_ph = Pipeline(; steps = (SemiDefinitePhylogenyEstimator(), EmpiricalPrior()))
         @test pipe_ph.names == ("constraints", "prior")
-        res_ph = PortfolioOptimisers.fit(pipe_ph, rd)
+        res_ph = fit(pipe_ph, rd)
         @test res_ph.ctx.constraints isa SemiDefinitePhylogeny
         mr_ph = PortfolioOptimisers.inject_context(MeanRisk(; opt = jopt()), res_ph.ctx)
         @test mr_ph.opt.ple === res_ph.ctx.constraints
@@ -252,7 +247,7 @@
         @test PortfolioOptimisers.pipe_writes(sub) == :returns
         pipe = Pipeline(; steps = (sub, EmpiricalPrior(), EqualWeighted()))
         @test pipe.names == ("returns", "prior", "opt")
-        res = PortfolioOptimisers.fit(pipe, pr)
+        res = fit(pipe, pr)
         @test res.results[1] isa PipelineResult
         @test size(res.ctx.returns.X) == (59, 5)
         @test res.w ≈ fill(0.2, 5)

@@ -1,4 +1,4 @@
-using Test, PortfolioOptimisers, StableRNGs, StatsAPI, Statistics
+using Test, PortfolioOptimisers, StableRNGs, Statistics
 
 @testset "Redundancy selection" begin
     POx = PortfolioOptimisers
@@ -154,11 +154,11 @@ using Test, PortfolioOptimisers, StableRNGs, StatsAPI, Statistics
                                                     alg = PairwiseCorrelation(; thr = 0.95),
                                                     score = SCM()), EmpiricalPrior(),
                                  EqualWeighted()))
-        res = StatsAPI.fit(pipe, rd)
+        res = fit(pipe, rd)
         @test length(res.ctx.returns.nx) < 5
         @test length(res.ctx.opt.w) == length(res.ctx.returns.nx)
 
         # replaying the fitted universe on an unseen window
-        @test StatsAPI.predict(res, rd) isa Any
+        @test predict(res, rd) isa Any
     end
 end

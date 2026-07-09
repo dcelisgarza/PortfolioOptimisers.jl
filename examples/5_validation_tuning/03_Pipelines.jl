@@ -103,7 +103,7 @@ Fitting walks the steps left to right. The result carries every step's fitted ou
 final context, and the terminal weights.
 =#
 
-res = PortfolioOptimisers.fit(pipe, pr)
+res = fit(pipe, pr)
 pretty_table(DataFrame(; asset = res.ctx.returns.nx, weight = res.w); formatters = [resfmt])
 
 #=
@@ -127,7 +127,7 @@ With `col_thr = 0.4`, JNJ (missing half its history) is dropped.
 pipe = Pipeline(;
                 steps = ("filter" => MissingDataFilter(; col_thr = 0.4), PricesToReturns(),
                          EmpiricalPrior(), EqualWeighted()))
-res = PortfolioOptimisers.fit(pipe, pr)
+res = fit(pipe, pr)
 res["filter"].nx
 
 #=
@@ -147,11 +147,9 @@ tune it rather than guess it.
     the two universes it found.
 =#
 
-res_lax = PortfolioOptimisers.fit(Pipeline(;
-                                           steps = ("filter" =>
-                                                        MissingDataFilter(; col_thr = 0.9),
-                                                    PricesToReturns(), EmpiricalPrior(),
-                                                    EqualWeighted())), pr)
+res_lax = fit(Pipeline(;
+                       steps = ("filter" => MissingDataFilter(; col_thr = 0.9),
+                                PricesToReturns(), EmpiricalPrior(), EqualWeighted())), pr)
 res_lax["filter"].nx
 
 #=
@@ -167,8 +165,8 @@ learns.
 
 pipe_imp = Pipeline(; steps = ("impute" => Imputer(), PricesToReturns(), EmpiricalPrior()))
 
-res_train = PortfolioOptimisers.fit(pipe_imp, PricesResult(; X = Xm[1:500]))
-res_test = PortfolioOptimisers.fit(pipe_imp, PricesResult(; X = Xm[501:end]))
+res_train = fit(pipe_imp, PricesResult(; X = Xm[1:500]))
+res_test = fit(pipe_imp, PricesResult(; X = Xm[501:end]))
 
 j = findfirst(==(:AAPL), res_train["impute"].nx)
 k = findfirst(==(:AAPL), res_test["impute"].nx)
@@ -212,7 +210,7 @@ pipe = Pipeline(;
                          MeanRisk(; opt = JuMPOptimiser(; slv = slv))))
 pipe.names
 
-res = PortfolioOptimisers.fit(pipe, pr)
+res = fit(pipe, pr)
 pretty_table(DataFrame(; asset = res.ctx.returns.nx, weight = res.w); formatters = [resfmt])
 
 #=
@@ -231,7 +229,7 @@ weights-level prediction machinery. Scorers and risk measures carry over untouch
 =#
 
 T = size(values(Xm), 1)
-res_train = PortfolioOptimisers.fit(pipe, PricesResult(; X = Xm[1:800]))
+res_train = fit(pipe, PricesResult(; X = Xm[1:800]))
 pred = PortfolioOptimisers.predict(res_train, pr, 801:T)
 expected_risk(ConditionalValueatRisk(), pred)
 
@@ -276,7 +274,7 @@ pretty_table(scores)
 
 tuned.idx, tuned.opt.steps[1].col_thr, nameof(typeof(tuned.opt.steps[2].stat))
 
-final = PortfolioOptimisers.fit(tuned.opt, pr)
+final = fit(tuned.opt, pr)
 pretty_table(DataFrame(; asset = final.ctx.returns.nx, weight = final.w);
              formatters = [resfmt])
 

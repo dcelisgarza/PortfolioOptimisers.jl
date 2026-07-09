@@ -97,7 +97,7 @@
         @test 1 <= res.idx <= 2
 
         # the tuned pipeline fits end to end
-        fit_res = PortfolioOptimisers.fit(res.opt, pr)
+        fit_res = fit(res.opt, pr)
         @test length(fit_res.w) == 5
     end
 
@@ -153,9 +153,9 @@
         train_idx = cvres.train_idx[1]
         winner = res.opt.steps[1]
         fitted = PortfolioOptimisers.fit_preprocessing(winner,
-                                                       PortfolioOptimisers.prices_view(pr,
-                                                                                       train_idx))
-        train_vals = values(PortfolioOptimisers.prices_view(pr, train_idx).X)[:, 1]
+                                                       PortfolioOptimisers.port_opt_view(pr,
+                                                                                         train_idx))
+        train_vals = values(PortfolioOptimisers.port_opt_view(pr, train_idx).X)[:, 1]
         obs = [x for x in train_vals if !isnan(x)]
         expected = winner.stat isa MeanValue ? mean(obs) : median(obs)
         j = findfirst(==(:A1), fitted.nx)

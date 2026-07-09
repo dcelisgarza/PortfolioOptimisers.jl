@@ -66,7 +66,7 @@
                                  "impute" => Imputer(), PricesToReturns(), EmpiricalPrior(),
                                  EqualWeighted()))
         train_idx, test_idx = 1:80, 81:120
-        res = PortfolioOptimisers.fit(pipe, PortfolioOptimisers.prices_view(pr, train_idx))
+        res = fit(pipe, PortfolioOptimisers.port_opt_view(pr, train_idx))
 
         # the train window decided the universe
         @test res["filter"].nx == [:A1, :A3, :A4, :A5]
@@ -75,7 +75,7 @@
         pred = PortfolioOptimisers.predict(res, pr, test_idx)
 
         # manual replay of the fitted steps on the test window
-        pv = PortfolioOptimisers.prices_view(pr, test_idx)
+        pv = PortfolioOptimisers.port_opt_view(pr, test_idx)
         pv = PortfolioOptimisers.apply_preprocessing(res["filter"], pv)
         pv = PortfolioOptimisers.apply_preprocessing(res["impute"], pv)
         rd_test = PortfolioOptimisers.apply_preprocessing(PricesToReturns(), pv)
@@ -90,8 +90,8 @@
         pred_clean = PortfolioOptimisers.predict(res, pr_clean, test_idx)
         @test size(pred_clean.rd.X, 2) == 1  # net portfolio returns column
         rd_clean = PortfolioOptimisers.apply_fitted_steps(res.results,
-                                                          PortfolioOptimisers.prices_view(pr_clean,
-                                                                                          test_idx))
+                                                          PortfolioOptimisers.port_opt_view(pr_clean,
+                                                                                            test_idx))
         @test rd_clean.nx == ["A1", "A3", "A4", "A5"]
 
         # timestamp windows work too
@@ -104,7 +104,7 @@
         rng = StableRNG(987654321)
         rd = ReturnsResult(; nx = string.("A", 1:5), X = randn(rng, 100, 5) / 100)
         pipe = Pipeline(; steps = (EmpiricalPrior(), EqualWeighted()))
-        res = PortfolioOptimisers.fit(pipe, PortfolioOptimisers.port_opt_view(rd, 1:60, :))
+        res = fit(pipe, PortfolioOptimisers.port_opt_view(rd, 1:60, :))
 
         pred = PortfolioOptimisers.predict(res, rd, 61:100)
         pred_ref = PortfolioOptimisers.predict(res.ctx.opt, rd, collect(61:100))
@@ -121,14 +121,12 @@
 
         # no optimisation step -> no weights to predict with
         pipe = Pipeline(; steps = (PricesToReturns(), EmpiricalPrior()))
-        res = PortfolioOptimisers.fit(pipe, pr)
+        res = fit(pipe, pr)
         @test_throws PortfolioOptimisers.IsNothingError PortfolioOptimisers.predict(res, pr,
                                                                                     1:10)
 
         # prices-level prediction requires a returns conversion among the fitted steps
-        full = PortfolioOptimisers.fit(Pipeline(;
-                                                steps = (PricesToReturns(),
-                                                         EqualWeighted())), pr)
+        full = fit(Pipeline(; steps = (PricesToReturns(), EqualWeighted())), pr)
         broken = PortfolioOptimisers.PipelineResult(("filter",),
                                                     (PortfolioOptimisers.fit_preprocessing(MissingDataFilter(),
                                                                                            pr),),
@@ -148,7 +146,7 @@
         pr = PricesResult(; X = Xm)
 
         pipe = Pipeline(; steps = (PricesToReturns(), EmpiricalPrior(), EqualWeighted()))
-        res = PortfolioOptimisers.fit(pipe, PortfolioOptimisers.prices_view(pr, 1:30))
+        res = fit(pipe, PortfolioOptimisers.port_opt_view(pr, 1:30))
         @test res.ctx.returns.nx == ["A1", "A3", "A4"]
         @test length(res.w) == 3
 
@@ -159,7 +157,7 @@
         pipe_ok = Pipeline(;
                            steps = (MissingDataFilter(; col_thr = 0.5), Imputer(),
                                     PricesToReturns(), EmpiricalPrior(), EqualWeighted()))
-        res_ok = PortfolioOptimisers.fit(pipe_ok, PortfolioOptimisers.prices_view(pr, 1:30))
+        res_ok = fit(pipe_ok, PortfolioOptimisers.port_opt_view(pr, 1:30))
         @test res_ok.ctx.returns.nx == ["A1", "A3", "A4"]
         pred = PortfolioOptimisers.predict(res_ok, pr, 31:60)
         @test size(pred.rd.X, 1) == 29
@@ -170,7 +168,7 @@
         pr = PricesResult(; X = X)
         sub = Pipeline(; steps = (MissingDataFilter(), PricesToReturns()))
         pipe = Pipeline(; steps = (sub, EmpiricalPrior(), EqualWeighted()))
-        res = PortfolioOptimisers.fit(pipe, PortfolioOptimisers.prices_view(pr, 1:80))
+        res = fit(pipe, PortfolioOptimisers.port_opt_view(pr, 1:80))
         pred = PortfolioOptimisers.predict(res, pr, 81:120)
         @test size(pred.rd.X, 1) == 39
     end

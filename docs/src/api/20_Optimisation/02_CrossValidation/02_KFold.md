@@ -3,5 +3,5 @@
 ```@docs
 KFold
 KFoldResult
-Base.split(kf::KFold, rd::ReturnsResult)
+Base.split(kf::KFold, rd::Prices_RR)
 ```

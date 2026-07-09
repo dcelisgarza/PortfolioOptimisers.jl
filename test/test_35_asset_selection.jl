@@ -1,4 +1,4 @@
-using Test, PortfolioOptimisers, TimeSeries, Dates, StableRNGs, StatsAPI
+using Test, PortfolioOptimisers, TimeSeries, Dates, StableRNGs
 
 # a selector that never implements select_assets, for the erroring-fallback test
 struct UnimplementedSelector <: PortfolioOptimisers.AbstractAssetSelector end
@@ -169,12 +169,12 @@ struct UnimplementedSelector <: PortfolioOptimisers.AbstractAssetSelector end
         pipe = Pipeline(;
                         steps = (MissingDataFilter(), Imputer(), PricesToReturns(),
                                  ZeroVarianceFilter(), EmpiricalPrior(), EqualWeighted()))
-        res = StatsAPI.fit(pipe, pr)
+        res = fit(pipe, pr)
         @test res.ctx.returns.nx == ["A", "B", "D", "E", "F"]
         @test length(res.ctx.opt.w) == 5
 
         # predict replays the fitted universe on an unseen window
-        @test StatsAPI.predict(res, pr, 61:120) isa Any
+        @test predict(res, pr, 61:120) isa Any
 
         # a selector after a returns-derived step is rejected at construction
         @test_throws ArgumentError Pipeline(;

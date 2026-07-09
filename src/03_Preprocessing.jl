@@ -71,9 +71,9 @@ $(DocStringExtensions.TYPEDEF)
 
 A container for aligned, time-indexed price-level data in `PortfolioOptimisers.jl`.
 
-`PricesResult` is the prices-level mirror of [`ReturnsResult`](@ref): it bundles asset prices with optional factor, benchmark, and implied volatility series, all as `TimeSeries.TimeArray`s. It is the input to price-level preprocessing estimators and prices-to-returns conversion, and the type that defines timestamp-window slicing for pipeline cross-validation via [`prices_view`](@ref).
+`PricesResult` is the prices-level mirror of [`ReturnsResult`](@ref): it bundles asset prices with optional factor, benchmark, and implied volatility series, all as `TimeSeries.TimeArray`s. It is the input to price-level preprocessing estimators and prices-to-returns conversion, and the type that defines timestamp-window slicing for pipeline cross-validation via [`port_opt_view`](@ref).
 
-The asset price series `X` is the master clock: [`prices_view`](@ref) selects observation windows on `X` and aligns the other series to the selected timestamps.
+The asset price series `X` is the master clock: [`port_opt_view`](@ref) selects observation windows on `X` and aligns the other series to the selected timestamps.
 
 # Fields
 
@@ -115,7 +115,7 @@ julia> size(values(pr.X))
 
   - [`AbstractPricesResult`](@ref)
   - [`ReturnsResult`](@ref)
-  - [`prices_view`](@ref)
+  - [`port_opt_view`](@ref)
   - [`prices_to_returns`](@ref)
   - [`Option`](@ref)
   - [`Num_VecNum`](@ref)
@@ -204,7 +204,7 @@ julia> X = TimeArray(Date(2020, 1, 1):Day(1):Date(2020, 1, 3),
 
 julia> pr = PricesResult(; X = X);
 
-julia> pv = PortfolioOptimisers.prices_view(pr, 2:3);
+julia> pv = PortfolioOptimisers.port_opt_view(pr, 2:3);
 
 julia> first(timestamp(pv.X))
 2020-01-02
@@ -218,18 +218,18 @@ julia> size(values(pv.X))
   - [`PricesResult`](@ref)
   - [`port_opt_view`](@ref)
 """
-function prices_view(pr::PricesResult, ::Colon)
+function port_opt_view(pr::PricesResult, ::Colon)
     return pr
 end
-function prices_view(pr::PricesResult, i::AbstractVector{<:Dates.AbstractTime})
+function port_opt_view(pr::PricesResult, i::AbstractVector{<:Dates.AbstractTime})
     X = pr.X[i]
     F = isnothing(pr.F) ? nothing : pr.F[i]
     B = isnothing(pr.B) ? nothing : pr.B[i]
     iv = isnothing(pr.iv) ? nothing : pr.iv[i]
     return PricesResult(; X = X, F = F, B = B, iv = iv, ivpa = pr.ivpa)
 end
-function prices_view(pr::PricesResult, i::Union{<:VecInt, <:AbstractRange{<:Integer}})
-    return prices_view(pr, TimeSeries.timestamp(pr.X)[i])
+function port_opt_view(pr::PricesResult, i::Union{<:VecInt, <:AbstractRange{<:Integer}})
+    return port_opt_view(pr, TimeSeries.timestamp(pr.X)[i])
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -1336,14 +1336,17 @@ function PricesToReturns(; ret_method::Symbol = :simple, padding::Bool = false,
                          join_method::Symbol = :outer)::PricesToReturns
     return PricesToReturns(ret_method, padding, collapse_args, map_func, join_method)
 end
-function fit_preprocessing(ptr::PricesToReturns, ::PricesResult)
-    return ptr
-end
-function apply_preprocessing(ptr::PricesToReturns, pr::PricesResult)::ReturnsResult
+function prices_to_returns(ptr::PricesToReturns, pr::PricesResult)::ReturnsResult
     return prices_to_returns(pr.X, pr.F; B = pr.B, iv = pr.iv, ivpa = pr.ivpa,
                              ret_method = ptr.ret_method, padding = ptr.padding,
                              collapse_args = ptr.collapse_args, map_func = ptr.map_func,
                              join_method = ptr.join_method)
+end
+function fit_preprocessing(ptr::PricesToReturns, ::PricesResult)
+    return ptr
+end
+function apply_preprocessing(ptr::PricesToReturns, pr::PricesResult)::ReturnsResult
+    return prices_to_returns(ptr, pr)
 end
 """
 $(DocStringExtensions.TYPEDEF)

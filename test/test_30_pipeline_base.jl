@@ -54,15 +54,15 @@
         @test_throws DimensionMismatch PricesResult(; X = X, iv = iv, ivpa = fill(0.5, 2))
     end
 
-    @testset "prices_view" begin
+    @testset "port_opt_view" begin
         X, F, B, iv = make_prices()
         pr = PricesResult(; X = X, F = F, B = B, iv = iv, ivpa = fill(0.5, 3))
 
         # Colon is a passthrough
-        @test PortfolioOptimisers.prices_view(pr, :) === pr
+        @test PortfolioOptimisers.port_opt_view(pr, :) === pr
 
         # integer window
-        pv = PortfolioOptimisers.prices_view(pr, 2:4)
+        pv = PortfolioOptimisers.port_opt_view(pr, 2:4)
         @test timestamp(pv.X) == timestamp(X)[2:4]
         @test values(pv.X) == values(X)[2:4, :]
         @test timestamp(pv.F) == timestamp(X)[2:4]
@@ -73,7 +73,7 @@
 
         # timestamp window
         window = timestamp(X)[[1, 3, 5]]
-        pv = PortfolioOptimisers.prices_view(pr, window)
+        pv = PortfolioOptimisers.port_opt_view(pr, window)
         @test timestamp(pv.X) == window
         @test values(pv.X) == values(X)[[1, 3, 5], :]
 
@@ -81,13 +81,13 @@
         # series are dropped from that series, not invented
         Fshort = TimeArray(timestamp(X)[1:3], values(F)[1:3, :], ["f1", "f2"])
         pr2 = PricesResult(; X = X, F = Fshort)
-        pv2 = PortfolioOptimisers.prices_view(pr2, 2:5)
+        pv2 = PortfolioOptimisers.port_opt_view(pr2, 2:5)
         @test timestamp(pv2.X) == timestamp(X)[2:5]
         @test timestamp(pv2.F) == timestamp(X)[2:3]
 
         # optional series stay nothing
         pr3 = PricesResult(; X = X)
-        pv3 = PortfolioOptimisers.prices_view(pr3, 2:3)
+        pv3 = PortfolioOptimisers.port_opt_view(pr3, 2:3)
         @test isnothing(pv3.F)
         @test isnothing(pv3.B)
         @test isnothing(pv3.iv)

@@ -112,7 +112,7 @@ function KFoldResult(; train_idx::VecVecInt, test_idx::VecVecInt)::KFoldResult
     return KFoldResult(train_idx, test_idx)
 end
 """
-    Base.split(kf::KFold, rd::Rd_Pr) -> KFoldResult
+    Base.split(kf::KFold, rd::Prices_RR) -> KFoldResult
 
 Split the data `rd` into `n` non-overlapping folds using k-fold cross-validation
 with optional purging and embargoing.
@@ -120,7 +120,7 @@ with optional purging and embargoing.
 # Arguments
 
   - `kf::KFold`: K-fold cross-validation estimator.
-  - `rd`: Returns-level or price-level data to split ([`Rd_Pr`](@ref)).
+  - `rd`: Returns-level or price-level data to split ([`Prices_RR`](@ref)).
 
 # Returns
 
@@ -132,7 +132,7 @@ with optional purging and embargoing.
   - [`KFoldResult`](@ref)
   - [`n_splits`](@ref)
 """
-function Base.split(kf::KFold, rd::Rd_Pr)
+function Base.split(kf::KFold, rd::Prices_RR)
     T = cv_nobs(rd)
     (; n, purged_size, embargo_size) = kf
     idx = 1:T
@@ -167,7 +167,7 @@ function Base.split(kf::KFold, rd::Rd_Pr)
     end
     return KFoldResult(; train_idx = train_idx, test_idx = test_idx)
 end
-function n_splits(kf::KFold, rd::Rd_Pr)
+function n_splits(kf::KFold, rd::Prices_RR)
     return min(kf.n, cv_nobs(rd))
 end
 
