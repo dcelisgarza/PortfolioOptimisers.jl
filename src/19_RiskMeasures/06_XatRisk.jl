@@ -637,9 +637,13 @@ Compute the absolute drawdown series for a single-asset return vector.
 
 Each element of the result is the difference between the current cumulative return and its running maximum (always ≤ 0).
 
+The running maximum starts at zero, so the drawdown is measured against the initial portfolio value rather than against the first observation.
+
+`x` is read, never written: the accumulator and the running peak are carried in scalars, so any `AbstractVector` works — a column view, a range, an immutable array.
+
 # Arguments
 
-  - `x::VecNum`: Return series vector (modified in place temporarily, then restored).
+  - `x::VecNum`: Return series vector.
 
 # Returns
 
@@ -651,16 +655,14 @@ Each element of the result is the difference between the current cumulative retu
   - [`DrawdownatRisk`](@ref)
 """
 function absolute_drawdown_vec(x::VecNum)
-    pushfirst!(x, zero(eltype(x)))
-    cs = cumsum(x)
-    peak = typemin(eltype(x))
-    dd = similar(cs)
-    for (idx, i) in pairs(cs)
-        peak = ifelse(i > peak, i, peak)
-        dd[idx] = i - peak
+    T = eltype(x)
+    dd = similar(x, T)
+    cs = peak = zero(T)
+    for (idx, xi) in pairs(x)
+        cs += xi
+        peak = ifelse(cs > peak, cs, peak)
+        dd[idx] = cs - peak
     end
-    popfirst!(x)
-    popfirst!(dd)
     return dd
 end
 function (r::DrawdownatRisk{<:Any, <:Any, Nothing})(x::VecNum)
@@ -797,6 +799,10 @@ Compute the relative drawdown vector for a vector of portfolio returns.
 
 Returns the relative drawdown at each time step, computed as the current portfolio value relative to its running maximum.
 
+The running maximum starts at one, so the drawdown is measured against the initial portfolio value rather than against the first observation.
+
+`x` is read, never written: the compounding factor and the running peak are carried in scalars, so any `AbstractVector` works — a column view, a range, an immutable array.
+
 # Arguments
 
   - `x`: Vector of portfolio returns.
@@ -811,16 +817,14 @@ Returns the relative drawdown at each time step, computed as the current portfol
   - [`relative_drawdown_arr`](@ref)
 """
 function relative_drawdown_vec(x::VecNum)
-    pushfirst!(x, zero(eltype(x)))
-    cs = cumprod(x .+ one(eltype(x)))
-    peak = typemin(eltype(x))
-    dd = similar(cs)
-    for (idx, i) in pairs(cs)
-        peak = ifelse(i > peak, i, peak)
-        dd[idx] = i / peak - one(peak)
+    T = eltype(x)
+    dd = similar(x, T)
+    cp = peak = one(T)
+    for (idx, xi) in pairs(x)
+        cp *= xi + one(T)
+        peak = ifelse(cp > peak, cp, peak)
+        dd[idx] = cp / peak - one(peak)
     end
-    popfirst!(x)
-    popfirst!(dd)
     return dd
 end
 function (r::RelativeDrawdownatRisk{<:Any, <:Any, Nothing})(x::VecNum)
