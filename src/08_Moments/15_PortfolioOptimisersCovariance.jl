@@ -147,11 +147,16 @@ end
     find_uncorrelated_indices(X::MatNum;
                               ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
                               t::Number = 0.95, absolute::Bool = false,
-                              measure::VectorToScalarMeasure = MeanValue())
+                              measure::VectorToScalarMeasure = MeanValue(),
+                              scores::Option{<:VecNum} = nothing)
 
 Find indices of a maximally uncorrelated subset of assets from a data matrix.
 
-This function identifies a subset of asset columns in `X` such that no two assets in the subset have a pairwise (absolute) correlation exceeding the threshold `t`. When two assets are too correlated, the one with the higher summary correlation measure (across all assets) is removed. The function returns the indices of the remaining uncorrelated assets.
+This function identifies a subset of asset columns in `X` such that no two assets in the subset have a pairwise (absolute) correlation exceeding the threshold `t`. When two assets are too correlated, the one with the higher *drop score* is removed. The function returns the indices of the remaining uncorrelated assets.
+
+By default the drop score is each asset's summary correlation to every other asset, so the asset that is redundant with the *most* of the universe goes first. Supplying `scores` replaces that criterion — higher means "drop me" — which is how [`RedundancySelector`](@ref) makes the survivor of each correlated pair the better-scoring asset under a risk measure.
+
+Internal machinery — the caller-facing form is [`RedundancySelector`](@ref) with a [`PairwiseCorrelation`](@ref) algorithm.
 
 # Arguments
 
@@ -159,7 +164,8 @@ This function identifies a subset of asset columns in `X` such that no two asset
   - `ce`: Covariance estimator used to compute the correlation matrix.
   - `t`: Correlation threshold above which two assets are considered too correlated.
   - `absolute`: If `true`, the absolute value of the correlation is used for comparison.
-  - `measure`: Summary measure applied to each column of the correlation matrix (e.g., mean) to decide which asset to remove when two are too correlated.
+  - `measure`: Summary measure applied to each column of the correlation matrix (e.g., mean) to produce the default drop score. Ignored when `scores` is given.
+  - `scores`: Per-asset drop scores; the asset with the *higher* score is removed from a correlated pair.
 
 # Returns
 
@@ -169,11 +175,13 @@ This function identifies a subset of asset columns in `X` such that no two asset
 
   - Computes the (absolute) correlation matrix for all assets.
   - Identifies pairs of assets with correlation at or above `t`, sorted from most to least correlated.
-  - For each correlated pair (not yet removed), removes the asset with the higher summary correlation value. If both assets have equal summary values, both are removed.
+  - For each correlated pair (not yet removed), removes the asset with the higher drop score. **If both assets score equally, both are removed** — the library's "if we cannot tell them apart, trust neither" tie policy, which is why two identical columns leave no survivor.
   - Returns the indices of assets not in the removed set.
 
 # Related
 
+  - [`RedundancySelector`](@ref)
+  - [`PairwiseCorrelation`](@ref)
   - [`PortfolioOptimisersCovariance`](@ref)
   - [`VectorToScalarMeasure`](@ref)
   - [`MeanValue`](@ref)
@@ -181,10 +189,19 @@ This function identifies a subset of asset columns in `X` such that no two asset
 function find_uncorrelated_indices(X::MatNum;
                                    ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
                                    t::Number = 0.95, absolute::Bool = false,
-                                   measure::VectorToScalarMeasure = MeanValue())
+                                   measure::VectorToScalarMeasure = MeanValue(),
+                                   scores::Option{<:VecNum} = nothing)
     N = size(X, 2)
     rho = !absolute ? Statistics.cor(ce, X) : abs.(Statistics.cor(ce, X))
-    summary_rho = [vec_to_real_measure(measure, x) for x in eachcol(rho)]
+    if !isnothing(scores)
+        @argcheck(length(scores) == N,
+                  DimensionMismatch("find_uncorrelated_indices got $(length(scores)) scores for $N assets"))
+    end
+    summary_rho = if isnothing(scores)
+        [vec_to_real_measure(measure, x) for x in eachcol(rho)]
+    else
+        scores
+    end
     tril_idx = findall(LinearAlgebra.tril!(trues(size(rho)), -1))
     candidate_idx = findall(x -> x >= t, rho[tril_idx])
     candidate_idx = candidate_idx[sortperm(rho[tril_idx][candidate_idx]; rev = true)]
@@ -205,4 +222,4 @@ function find_uncorrelated_indices(X::MatNum;
     return setdiff(1:N, to_remove)
 end
 
-export PortfolioOptimisersCovariance, find_uncorrelated_indices
+export PortfolioOptimisersCovariance

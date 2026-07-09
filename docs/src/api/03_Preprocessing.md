@@ -49,11 +49,13 @@ Imputer
 ImputerResult
 ```
 
-## Pre-filtering
+## Asset selection
 
-Price data is often incomplete or noisy, so it can be worthwhile having some pre-filtering steps to remove data that does not contribute meaningful information and may pollute calculations.
+Asset selectors are the returns-level preprocessing subfamily that restricts the *asset universe*. The universe chosen on the training window is the selector's fitted state, so a selector is safe inside cross-validation. The concrete selectors live in [Asset selection](@ref); this is the seam they share.
 
 ```@docs
-find_complete_indices
-select_k_extremes
+PortfolioOptimisers.AbstractAssetSelector
+AssetSelectorResult
+PortfolioOptimisers.select_assets
+PortfolioOptimisers.find_complete_indices
 ```

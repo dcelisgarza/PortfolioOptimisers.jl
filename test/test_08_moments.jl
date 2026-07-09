@@ -468,7 +468,8 @@
         @test isapprox(var(ce0, rd.X[:, 1]; mean = 0), var(ce, rd.X[:, 1]; mean = 0))
         @test isapprox(std(ce0, rd.X[:, 2]; mean = 0), std(ce, rd.X[:, 2]; mean = 0))
 
-        @test find_uncorrelated_indices(rd.X; t = 0.5) == [4, 6, 12, 16, 17, 19]
+        @test PortfolioOptimisers.find_uncorrelated_indices(rd.X; t = 0.5) ==
+              [4, 6, 12, 16, 17, 19]
 
         for alg in (Gerber0(), Gerber2())
             ce0 = GerberCovariance(; me = CustomValueExpectedReturns(), alg = alg, t = 0.5)

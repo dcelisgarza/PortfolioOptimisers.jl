@@ -927,6 +927,31 @@ Alias for [`AdjustedRSquared`](@ref).
 """
 const AdjR2 = AdjustedRSquared
 
+"""
+    ZeroVarianceFilter(; tol::Number = 1e-12) -> ScoreSelector
+
+Alias for the zero-variance asset selector [`ScoreSelector`](@ref) + [`SCM`](@ref) + [`ThresholdRule`](@ref).
+
+Keeps assets whose second central moment strictly exceeds `tol`, dropping constant and
+near-constant columns before they reach a prior or an optimiser. The bound is exclusive, so
+`tol = 0` still drops an exactly-constant asset.
+
+Spelled with `SCM()` rather than [`Variance`](@ref): `Variance` is a [`WeightsInput`](@ref)
+risk measure whose functor consumes portfolio weights, so it cannot score a single asset's
+return series.
+
+# Related
+
+  - [`ScoreSelector`](@ref)
+  - [`ThresholdRule`](@ref)
+  - [`SCM`](@ref)
+"""
+function ZeroVarianceFilter(; tol::Number = 1e-12)::ScoreSelector
+    @argcheck(tol >= zero(tol),
+              DomainError(tol, "the tolerance of a ZeroVarianceFilter must be >= 0"))
+    return ScoreSelector(; score = SCM(), rule = ThresholdRule(; lo = tol))
+end
+
 export HRP, HERC, SCHRP, NCO, STO, SSR, MR, RB, RRB, FRC, NOC, DAO, GAO, FAI, SD,
        UcVariance, WR, VaR, CVaR, DRCVaR, EVaR, RVaR, PNVaR, RG, VaR_RG, CVaR_RG, DRCVaR_RG,
        EVaR_RG, RVaR_RG, PNVaR_RG, GVaR_RG, DaR, CDaR, DRCDaR, EDaR, RDaR, PNDaR, R_DaR,
@@ -936,4 +961,4 @@ export HRP, HERC, SCHRP, NCO, STO, SSR, MR, RB, RRB, FRC, NOC, DAO, GAO, FAI, SD
        OWA_LMoment, SmER, GCov, FMoment, SMoment, Cov, SVar, G0, G1, G2, GerberCov, SBCov,
        SB0, SB1, SB2, SBG0, SBG1, SBG2, SBC0, SBC1, SBC2, DCov, LTDCov, KCov, SCov, MICov,
        DnCov, DtCov, PrCov, POCov, ShER, GM, VW, MSE, JS, BS, BOP, EqER, ExER, CoSk, CoKt,
-       LinMod, GLinMod, R2, AdjR2
+       LinMod, GLinMod, R2, AdjR2, ZeroVarianceFilter

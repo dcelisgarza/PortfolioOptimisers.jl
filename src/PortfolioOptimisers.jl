@@ -244,6 +244,7 @@ include("23_Pipeline/02_StepExecution.jl")
 include("23_Pipeline/03_Pipeline.jl")
 include("23_Pipeline/04_PredictionCV.jl")
 include("23_Pipeline/05_SearchCrossValidation.jl")
+include("24_AssetSelection.jl")
 include("25_Aliases.jl")
 
 end
