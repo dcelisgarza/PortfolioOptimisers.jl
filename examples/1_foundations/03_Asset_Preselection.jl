@@ -1,5 +1,5 @@
 #=
-# Asset selection
+# Asset pre-selection
 
 Not every asset in a universe earns its place. Some carry no information at all — a constant
 column, a name that never traded. Some are dominated: you asked for the twenty lowest-risk

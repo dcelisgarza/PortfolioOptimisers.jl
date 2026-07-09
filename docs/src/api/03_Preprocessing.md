@@ -10,7 +10,7 @@ ReturnsResult
 check_names_and_returns_matrix
 prices_to_returns
 port_opt_view(rd::ReturnsResult, i::Any)
-port_opt_view(rd::ReturnsResult, i::Any, j::Any, k::Any)
+port_opt_view(rd::ReturnsResult, i::Any, j::Any, args...)
 port_opt_view(rd::AbstractReturnsResult, args...; kwargs...)
 returns_result_picker
 ```
@@ -49,7 +49,7 @@ Imputer
 ImputerResult
 ```
 
-## Asset selection
+## Asset selection infrastructure
 
 Asset selectors are the returns-level preprocessing subfamily that restricts the *asset universe*. The universe chosen on the training window is the selector's fitted state, so a selector is safe inside cross-validation. The concrete selectors live in [Asset selection](@ref); this is the seam they share.
 
