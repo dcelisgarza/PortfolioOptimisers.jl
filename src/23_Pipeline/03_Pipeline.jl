@@ -79,11 +79,11 @@ function Pipeline(; steps::Union{<:Tuple, <:AbstractVector})::Pipeline
     for (e, slot) in zip(ests, slots)
         for r in pipe_reads(e)
             @argcheck(r in avail,
-                      ArgumentError("a $(typeof(e)) step reads the :$r slot, which no earlier step writes and the pipeline input cannot fill"))
+                      ArgumentError("a $(Base.typename(typeof(e)).wrapper) step reads the :$r slot, which no earlier step writes and the pipeline input cannot fill"))
         end
         for inv in get(PIPELINE_INVALIDATES, slot, ())
             @argcheck(!haskey(written, inv),
-                      ArgumentError("a $(typeof(e)) step writes the :$slot slot, invalidating the :$inv slot written by an earlier $(typeof(written[inv])) step; the stale :$inv result would no longer match the assets of the new :$slot data. Move the $(typeof(e)) step before the $(typeof(written[inv])) step, or drop one of them."))
+                      ArgumentError("a $(Base.typename(typeof(e)).wrapper) step writes the :$slot slot, invalidating the :$inv slot written by an earlier $(Base.typename(typeof(written[inv])).wrapper) step; the stale :$inv result would no longer match the assets of the new :$slot data. Move the $(Base.typename(typeof(e)).wrapper) step before the $(Base.typename(typeof(written[inv])).wrapper) step, or drop one of them."))
         end
         written[slot] = e
         push!(avail, slot)
@@ -221,7 +221,7 @@ function inject_config(cfg::JuMPOptimiser, ctx::PipelineContext)
     unc = ctx.uncertainty
     if !isnothing(unc) && !isnothing(unc.mu)
         @argcheck(isa(cfg.ret, ArithmeticReturn),
-                  ArgumentError("cannot route a mean uncertainty set into a $(typeof(cfg.ret)); expected returns uncertainty requires an ArithmeticReturn return estimator"))
+                  ArgumentError("cannot route a mean uncertainty set into a $(Base.typename(typeof(cfg.ret)).wrapper); expected returns uncertainty requires an ArithmeticReturn return estimator"))
         ret = Accessors.set(cfg.ret, Accessors.PropertyLens{:ucs}(), unc.mu)
         cfg = Accessors.set(cfg, Accessors.PropertyLens{:ret}(), ret)
     end
@@ -235,7 +235,7 @@ function inject_config(cfg::JuMPOptimiser, ctx::PipelineContext)
         elseif isa(c, AbstractPhylogenyConstraintResult)
             push!(ples, c)
         else
-            throw(ArgumentError("cannot route a $(typeof(c)) constraint result into a JuMPOptimiser; supported: WeightBounds, LinearConstraint, and phylogeny constraint results"))
+            throw(ArgumentError("cannot route a $(Base.typename(typeof(c)).wrapper) constraint result into a JuMPOptimiser; supported: WeightBounds, LinearConstraint, and phylogeny constraint results"))
         end
     end
     if !isempty(lcs)
@@ -263,7 +263,7 @@ function inject_config(cfg::HierarchicalOptimiser, ctx::PipelineContext)
         if isa(c, WeightBounds)
             cfg = Accessors.set(cfg, Accessors.PropertyLens{:wb}(), c)
         else
-            throw(ArgumentError("cannot route a $(typeof(c)) constraint result into a HierarchicalOptimiser; supported: WeightBounds"))
+            throw(ArgumentError("cannot route a $(Base.typename(typeof(c)).wrapper) constraint result into a HierarchicalOptimiser; supported: WeightBounds"))
         end
     end
     return cfg
@@ -291,7 +291,7 @@ The optimiser must expose a risk-measure field `r` containing at least one [`Unc
 """
 function inject_sigma_ucs(opt::OptimisationEstimator, sig::AbstractUncertaintySetResult)
     @argcheck(hasproperty(opt, :r),
-              ArgumentError("cannot route a covariance uncertainty set into a $(typeof(opt)): it has no risk-measure field"))
+              ArgumentError("cannot route a covariance uncertainty set into a $(Base.typename(typeof(opt)).wrapper): it has no risk-measure field"))
     replace_usv(x) =
         if isa(x, UncertaintySetVariance)
             Accessors.set(x, Accessors.PropertyLens{:ucs}(), sig)
@@ -306,7 +306,7 @@ function inject_sigma_ucs(opt::OptimisationEstimator, sig::AbstractUncertaintySe
         isa(newr, UncertaintySetVariance)
     end
     @argcheck(found,
-              ArgumentError("cannot route a covariance uncertainty set into a $(typeof(opt)): no UncertaintySetVariance risk measure in its r field"))
+              ArgumentError("cannot route a covariance uncertainty set into a $(Base.typename(typeof(opt)).wrapper): no UncertaintySetVariance risk measure in its r field"))
     return Accessors.set(opt, Accessors.PropertyLens{:r}(), newr)
 end
 """
@@ -348,9 +348,9 @@ function inject_context(opt::OptimisationEstimator, ctx::PipelineContext)
         return opt
     end
     @argcheck(isnothing(ctx.uncertainty),
-              ArgumentError("cannot route uncertainty sets into a $(typeof(opt)): it has no injectable optimiser configuration"))
+              ArgumentError("cannot route uncertainty sets into a $(Base.typename(typeof(opt)).wrapper): it has no injectable optimiser configuration"))
     @argcheck(isnothing(ctx.constraints),
-              ArgumentError("cannot route constraint results into a $(typeof(opt)): it has no injectable optimiser configuration"))
+              ArgumentError("cannot route constraint results into a $(Base.typename(typeof(opt)).wrapper): it has no injectable optimiser configuration"))
     return opt
 end
 """
@@ -580,7 +580,7 @@ function StatsAPI.predict(res::PipelineResult, data::AbstractPricesResult, windo
     pr = port_opt_view(data, window)
     rd = apply_fitted_steps(res.results, pr)
     @argcheck(isa(rd, AbstractReturnsResult),
-              ArgumentError("the pipeline's fitted steps do not convert price-level data to returns; predicting on a $(typeof(data)) requires a PricesToReturns step"))
+              ArgumentError("the pipeline's fitted steps do not convert price-level data to returns; predicting on a $(Base.typename(typeof(data)).wrapper) requires a PricesToReturns step"))
     assert_universe_aligned(res, rd)
     return StatsAPI.predict(opt, rd)
 end

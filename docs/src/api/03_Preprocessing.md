@@ -9,8 +9,8 @@ AbstractReturnsResult
 ReturnsResult
 check_names_and_returns_matrix
 prices_to_returns
-port_opt_view(rd::ReturnsResult, i)
-port_opt_view(rd::ReturnsResult, i, j, k)
+port_opt_view(rd::ReturnsResult, i::Any)
+port_opt_view(rd::ReturnsResult, i::Any, j::Any, k::Any)
 port_opt_view(rd::AbstractReturnsResult, args...; kwargs...)
 returns_result_picker
 ```

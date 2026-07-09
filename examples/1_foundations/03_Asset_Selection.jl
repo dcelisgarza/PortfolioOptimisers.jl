@@ -43,22 +43,6 @@ resfmt = (v, i, j) -> begin
     end
 end;
 
-## The library's error messages name the concrete types, whose parameters are long. Strip them
-## so the messages below read as prose.
-function strip_type_params(s::AbstractString)
-    io, depth = IOBuffer(), 0
-    for c in s
-        if c == '{'
-            (depth += 1; continue)
-        end
-        if c == '}'
-            (depth -= 1; continue)
-        end
-        iszero(depth) && print(io, c)
-    end
-    return String(take!(io))
-end;
-
 #=
 ## 1. The data
 
@@ -118,7 +102,7 @@ computing something else.
 try
     ScoreSelector(; score = Variance(), rule = ThresholdRule(; lo = 0.0))
 catch e
-    println(strip_type_params(e.msg))
+    println(e.msg)
 end
 
 #=
@@ -311,7 +295,7 @@ length(kept_cl), join(kept_cl, ", ")
 try
     RedundancySelector(; alg = ClusterGroups())            # no score
 catch e
-    println(strip_type_params(e.msg))
+    println(e.msg)
 end
 
 #=
@@ -351,7 +335,7 @@ asset-misdimensioned prior reach the optimiser.
 try
     Pipeline(; steps = (EmpiricalPrior(), ZeroVarianceFilter(), EqualWeighted()))
 catch e
-    println(strip_type_params(e.msg))
+    println(e.msg)
 end
 
 #=

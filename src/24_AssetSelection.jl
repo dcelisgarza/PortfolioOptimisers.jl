@@ -358,7 +358,7 @@ function assert_scoreable(score::AbstractBaseRiskMeasure)::Nothing
         else
             ""
         end
-        throw(ArgumentError("`$(typeof(score))` cannot score a single asset's return series: its `supports_precomputed_returns` is false, so its functor consumes portfolio weights rather than a precomputed return vector.$hint"))
+        throw(ArgumentError("`$(Base.typename(typeof(score)).wrapper)` cannot score a single asset's return series: its `supports_precomputed_returns` is false, so its functor consumes portfolio weights rather than a precomputed return vector.$hint"))
     end
     return nothing
 end
@@ -909,7 +909,7 @@ julia> PortfolioOptimisers.fit_preprocessing(sel, rd).nx
             assert_scoreable(score)
         else
             @argcheck(!requires_score(alg),
-                      IsNothingError("a $(typeof(alg)) redundancy algorithm cannot choose the survivor of a group on its own; give the RedundancySelector a score"))
+                      IsNothingError("a $(Base.typename(typeof(alg)).wrapper) redundancy algorithm cannot choose the survivor of a group on its own; give the RedundancySelector a score"))
         end
         return new{typeof(alg), typeof(score)}(alg, score)
     end

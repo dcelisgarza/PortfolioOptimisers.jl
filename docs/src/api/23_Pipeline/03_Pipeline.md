@@ -10,6 +10,7 @@ PipelineResult
 fit(pipe::Pipeline, data::Prices_RR)
 predict(res::PipelineResult, data::AbstractPricesResult, window)
 fit_predict(pipe::Pipeline, data::Prices_RR)
+port_opt_view(::Pipeline, args...; kwargs...)
 ```
 
 ## Injection
