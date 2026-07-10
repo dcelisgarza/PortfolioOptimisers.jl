@@ -34,10 +34,10 @@ Return `true` if the inner optimiser or fallback carries time-dependent constrai
 function is_time_dependent(opt::ClusteringOptimisationEstimator)
     return is_time_dependent(opt.opt) || is_time_dependent(opt.fb)
 end
-function assert_time_dependent_fold_count(opt::ClusteringOptimisationEstimator,
-                                          n::Integer)::Nothing
-    assert_time_dependent_fold_count(opt.opt, n)
-    assert_time_dependent_fold_count(opt.fb, n)
+function assert_time_dependent_fold_count(opt::ClusteringOptimisationEstimator, n::Integer,
+                                          all_binds::Bool = true)::Nothing
+    assert_time_dependent_fold_count(opt.opt, n, all_binds)
+    assert_time_dependent_fold_count(opt.fb, n, all_binds)
     return nothing
 end
 """
@@ -48,13 +48,15 @@ Resolve time-dependent constraints for the fold described by `ctx` by recursing 
 [`NestedClustered`](@ref) overrides this with its own method resolving its own fields and inner estimators.
 """
 function update_time_dependent_estimator(opt::ClusteringOptimisationEstimator,
-                                         ctx::TimeDependentContext)
+                                         ctx::TimeDependentContext, all_binds::Bool = true)
     if !is_time_dependent(opt)
         return opt
     end
     return rebuild_estimator(opt,
-                             (; opt = update_time_dependent_estimator(opt.opt, ctx),
-                              fb = update_time_dependent_estimator(opt.fb, ctx)))
+                             (;
+                              opt = update_time_dependent_estimator(opt.opt, ctx,
+                                                                    all_binds),
+                              fb = update_time_dependent_estimator(opt.fb, ctx, all_binds)))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -338,9 +340,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Resolve the time-dependent constraints of a [`HierarchicalOptimiser`](@ref) for the fold described by `ctx`.
-
-Rebuilds the optimiser through its validated keyword constructor with each [`TimeDependent`](@ref)-valued field replaced by its resolved per-fold value, so the result is an ordinary static optimiser.
+Return the static defaults of the [`HierarchicalOptimiser`](@ref) fields that may hold a [`TimeDependent`](@ref).
 
 # Related
 
@@ -348,15 +348,8 @@ Rebuilds the optimiser through its validated keyword constructor with each [`Tim
   - [`TimeDependent`](@ref)
   - [`TimeDependentContext`](@ref)
 """
-function update_time_dependent_estimator(opt::HierarchicalOptimiser,
-                                         ctx::TimeDependentContext)
-    return update_time_dependent_fields(opt, ctx)
-end
 function time_dependent_field_defaults(::HierarchicalOptimiser)::NamedTuple
     return (; wb = WeightBounds())
-end
-function reset_time_dependent_estimator(opt::HierarchicalOptimiser)
-    return reset_time_dependent_fields(opt)
 end
 """
     unitary_expected_risks(r, X, ...)

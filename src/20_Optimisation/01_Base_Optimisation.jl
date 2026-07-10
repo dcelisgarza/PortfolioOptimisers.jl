@@ -327,6 +327,8 @@ A `TimeDependent` is stored *directly in the optimiser field it varies* — e.g.
 
 `val` is either a vector of per-fold values — entry `i` is the complete field value for fold `i` of the consuming scheme's `split` enumeration — or a callable evaluated per fold: a bare function `f(ctx::TimeDependentContext)` (optionally wrapped in [`PreviousWeightsFunction`](@ref)) or a [`TimeDependentCallable`](@ref) functor struct.
 
+For a field that itself accepts a *vector of constraints* statically, a per-fold entry is that whole vector, so a schedule of per-fold constraint vectors is a vector of vectors — `TimeDependent([[c₁ᵃ, c₁ᵇ], [c₂ᵃ, c₂ᵇ], …])`, entry `i` being fold `i`'s complete constraint vector. There is no separate "vector of `TimeDependent`" facility and none is needed: `TimeDependent` is recognised only at a top-level field, so to vary individual constraints within a vector, build the fold's vector in a callable — `TimeDependent(ctx -> [dynamic(ctx), static])` — which keeps the shared static parts in one place.
+
 The machinery imposes no ordering of its own: fold `i` is whatever `split(cv, rd)` enumerates `i`-th, which is chronological for walk-forward and (unshuffled) KFold schemes. For schemes whose enumeration is not a timeline (combinatorial splits, randomised paths) it is the user's responsibility to key entries off the fold's indices — a callable sees its own fold's windows via `ctx.train_idx[ctx.i]`/`ctx.test_idx[ctx.i]` and may derive any ordering from them.
 
 A time-dependent constraint participates only where folds exist and is inert everywhere else — a fold-less `optimise` replaces it with the field's static default (see [`reset_time_dependent_estimator`](@ref)). Vector entries must have length equal to the number of folds of the consuming cross-validation scheme, validated at `split` time. Entries may be `nothing`, giving the field `nothing` for that fold.
@@ -337,21 +339,23 @@ $(DocStringExtensions.FIELDS)
 
 # Constructors
 
-    TimeDependent(val)
-    TimeDependent(; val)
+    TimeDependent(val, bind::Symbol = :outermost)
+    TimeDependent(; val, bind::Symbol = :outermost)
 
 ## Validation
 
   - If `val` is a vector: `!isempty(val)`.
+  - `bind in (:outermost, :nearest)`.
 
 # Examples
 
 ```jldoctest
 julia> TimeDependent([Fees(; l = 0.001), Fees(; l = 0.002)])
 TimeDependent
-  val ┼ 2-element Vector{Fees}
-      │ Fees ⋯
-      │ Fees ⋯
+   val ┼ 2-element Vector{Fees}
+       │ Fees ⋯
+       │ Fees ⋯
+  bind ┴ Symbol: :outermost
 ```
 
 # Related
@@ -367,18 +371,26 @@ struct TimeDependent{T1} <: AbstractEstimator
     Vector of per-fold values (in the consuming scheme's `split` enumeration order), or a callable of the fold's [`TimeDependentContext`](@ref): a bare function (optionally wrapped in [`PreviousWeightsFunction`](@ref)) or a [`TimeDependentCallable`](@ref) functor struct.
     """
     val::T1
+    """
+    Which fold loop consumes the schedule: `:outermost` (default) binds it to the outermost fold loop processing the estimator tree; `:nearest` binds it to the nearest enclosing fold loop — inside a meta-optimiser's inner estimators that is the meta's own cross-validation leg, which then consumes the schedule even when the meta is backtested under an outer fold loop.
+    """
+    bind::Symbol
     function TimeDependent(val::Union{<:AbstractVector, <:Base.Callable,
-                                      <:PreviousWeightsFunction, <:TimeDependentCallable})
+                                      <:PreviousWeightsFunction, <:TimeDependentCallable},
+                           bind::Symbol = :outermost)
         if isa(val, AbstractVector)
             @argcheck(!isempty(val), IsEmptyError("val cannot be empty"))
         end
-        return new{typeof(val)}(val)
+        @argcheck(bind in (:outermost, :nearest),
+                  ArgumentError("bind must be :outermost or :nearest, got :$bind"))
+        return new{typeof(val)}(val, bind)
     end
 end
 function TimeDependent(;
                        val::Union{<:AbstractVector, <:Base.Callable,
-                                  <:PreviousWeightsFunction, <:TimeDependentCallable})::TimeDependent
-    return TimeDependent(val)
+                                  <:PreviousWeightsFunction, <:TimeDependentCallable},
+                       bind::Symbol = :outermost)::TimeDependent
+    return TimeDependent(val, bind)
 end
 """
     const TD_Option{X} = Union{Nothing, <:TimeDependent, X}
@@ -485,7 +497,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return `true` if a time-dependent constraint requires the previous optimisation's weights.
 
-`true` for a [`PreviousWeightsFunction`](@ref) value; for vector values, delegates to [`needs_previous_weights`](@ref) on entries that support it (turnover, fees, tracking). Bare callables contribute `false` — their output cannot be inspected.
+`true` for a [`PreviousWeightsFunction`](@ref) value; for vector values, delegates to [`needs_previous_weights`](@ref) on entries that support it (turnover, fees, tracking), descending into per-fold vector entries. Bare callables contribute `false` — their output cannot be inspected.
 
 # Related
 
@@ -522,19 +534,30 @@ function time_dependent_entry_needs_previous_weights(x::Union{<:TnE_Tn, <:FeesE_
                                                               <:Tr_VecTr})::Bool
     return needs_previous_weights(x)
 end
+function time_dependent_entry_needs_previous_weights(x::AbstractVector)::Bool
+    return any(time_dependent_entry_needs_previous_weights, x)
+end
 function port_opt_view(td::TimeDependent, i, args...)
     v = td.val
     if isa(v, AbstractVector)
         v = [port_opt_view(x, i) for x in v]
     end
-    return TimeDependent(v)
+    return TimeDependent(v, td.bind)
 end
 """
-    time_dependent_fields(opt)
+    time_dependent_fields(opt, all_binds::Bool = true)
 
 Return the tuple of field names of `opt` whose values are [`TimeDependent`](@ref).
 
 The scan is generic over `fieldnames`, so the widened constructor signatures (see [`TD_Option`](@ref)) remain the single source of truth for which fields may vary over folds — there is no hand-maintained list.
+
+# The `all_binds` argument
+
+`all_binds` encodes something the schedule's own `bind` field cannot: it is a property of the *recursion position*, not of the schedule. A [`TimeDependent`](@ref)'s `bind` (`:outermost` / `:nearest`) says *which* fold loop the schedule wants; `all_binds` says whether the loop currently recursing is *entitled* to consume nearest-bound schedules at this depth. The second fact is not on the schedule.
+
+Why position matters: under `outer CV loop → meta → (meta's inner CV loop) → inner estimator with a :nearest field`, the same `:nearest` field is visited by two loops. The outer loop recurses through the meta (mandatory — that recursion is how an inner estimator's `:outermost` field is resolved against the outer folds) and must *skip* the `:nearest` field, because it is not the nearest enclosing loop. The meta's inner CV loop drives the same estimator directly and must *consume* it, because it is. Same field, same `bind`, opposite actions — the difference is whether a nearer fold-loop boundary was crossed to reach it, which is exactly what `all_binds` carries.
+
+So `all_binds` is `true` at every ordinary (outermost/standalone) fold loop — which is both outermost and nearest, and therefore takes everything remaining, including `:nearest`. It is forced to `false` only where a meta-optimiser recurses into the estimators its own inner CV owns, leaving their `:nearest` schedules for that inner loop. With `all_binds = false`, only fields with `bind === :outermost` are returned.
 
 # Related
 
@@ -542,9 +565,16 @@ The scan is generic over `fieldnames`, so the widened constructor signatures (se
   - [`TD_Option`](@ref)
   - [`is_time_dependent`](@ref)
 """
-function time_dependent_fields(opt)
+function time_dependent_fields(opt, all_binds::Bool = true)
     fns = fieldnames(typeof(opt))
-    return filter(f -> isa(getfield(opt, f), TimeDependent), fns)
+    return filter(f -> begin
+                      x = getfield(opt, f)
+                      if isa(x, TimeDependent)
+                          (all_binds || x.bind === :outermost)
+                      else
+                          false
+                      end
+                  end, fns)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -576,11 +606,11 @@ function assert_time_dependent_substitution(::Type{T}, args::NamedTuple,
     return nothing
 end
 """
-    assert_time_dependent_fold_count(opt, n::Integer)
+    assert_time_dependent_fold_count(opt, n::Integer, all_binds::Bool = true)
 
 Assert that every vector-valued time-dependent constraint in `opt` has exactly `n` entries.
 
-Called by the cross-validation fold loops immediately after `split`, before any fold runs. The default is a no-op; hosts scan their [`time_dependent_fields`](@ref) and wrapper optimisers recurse.
+Called by the cross-validation fold loops immediately after `split`, before any fold runs. The default is a no-op; hosts scan their [`time_dependent_fields`](@ref) and wrapper optimisers recurse. When `all_binds` is `false`, `bind === :nearest` schedules are skipped — they are validated by the nearest enclosing fold loop against its own fold count instead (see [`TimeDependent`](@ref)).
 
 # Related
 
@@ -588,10 +618,10 @@ Called by the cross-validation fold loops immediately after `split`, before any 
   - [`time_dependent_fields`](@ref)
   - [`is_time_dependent`](@ref)
 """
-function assert_time_dependent_fold_count(::OptE_Opt, ::Integer)::Nothing
+function assert_time_dependent_fold_count(::OptE_Opt, ::Integer, ::Bool = true)::Nothing
     return nothing
 end
-function assert_time_dependent_fold_count(::Nothing, ::Integer)::Nothing
+function assert_time_dependent_fold_count(::Nothing, ::Integer, ::Bool = true)::Nothing
     return nothing
 end
 function assert_time_dependent_fold_count(td::TimeDependent, n::Integer,
@@ -613,8 +643,9 @@ Assert the fold count of every [`TimeDependent`](@ref)-valued field of a host op
   - [`assert_time_dependent_fold_count`](@ref)
   - [`time_dependent_fields`](@ref)
 """
-function assert_time_dependent_fields_fold_count(opt, n::Integer)::Nothing
-    for f in time_dependent_fields(opt)
+function assert_time_dependent_fields_fold_count(opt, n::Integer,
+                                                 all_binds::Bool = true)::Nothing
+    for f in time_dependent_fields(opt, all_binds)
         assert_time_dependent_fold_count(getfield(opt, f), n, f)
     end
     return nothing
@@ -633,10 +664,41 @@ Return `true` if the base optimiser configuration carries time-dependent constra
 function is_time_dependent(opt::BaseOptimisationEstimator)
     return !isempty(time_dependent_fields(opt))
 end
-function assert_time_dependent_fold_count(opt::BaseOptimisationEstimator,
-                                          n::Integer)::Nothing
-    assert_time_dependent_fields_fold_count(opt, n)
+function assert_time_dependent_fold_count(opt::BaseOptimisationEstimator, n::Integer,
+                                          all_binds::Bool = true)::Nothing
+    assert_time_dependent_fields_fold_count(opt, n, all_binds)
     return nothing
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Resolve the time-dependent constraints of a base optimiser configuration for the fold described by `ctx`.
+
+Rebuilds the configuration through its validated keyword constructor with each [`TimeDependent`](@ref)-valued field replaced by its resolved per-fold value, so the result is an ordinary static configuration. When `all_binds` is `false`, `bind === :nearest` fields are left in place for the nearest enclosing fold loop to consume.
+
+# Related
+
+  - [`BaseOptimisationEstimator`](@ref)
+  - [`update_time_dependent_estimator`](@ref)
+  - [`update_time_dependent_fields`](@ref)
+"""
+function update_time_dependent_estimator(opt::BaseOptimisationEstimator,
+                                         ctx::TimeDependentContext, all_binds::Bool = true)
+    return update_time_dependent_fields(opt, ctx, all_binds)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Replace the time-dependent constraints of a base optimiser configuration with their static defaults (see [`time_dependent_field_defaults`](@ref)).
+
+# Related
+
+  - [`BaseOptimisationEstimator`](@ref)
+  - [`reset_time_dependent_estimator`](@ref)
+  - [`reset_time_dependent_fields`](@ref)
+"""
+function reset_time_dependent_estimator(opt::BaseOptimisationEstimator)
+    return reset_time_dependent_fields(opt)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -678,7 +740,7 @@ function is_time_dependent(::Nothing)
     return false
 end
 """
-    update_time_dependent_estimator(opt, ctx::TimeDependentContext)
+    update_time_dependent_estimator(opt, ctx::TimeDependentContext, all_binds::Bool = true)
 
 Resolve the time-dependent constraints of `opt` for the fold described by `ctx`.
 
@@ -688,6 +750,7 @@ The default returns the estimator unchanged. Hosts rebuild themselves through th
 
   - `opt`: Optimisation estimator or result.
   - `ctx::TimeDependentContext`: The fold's context.
+  - `all_binds::Bool`: When `false`, `bind === :nearest` schedules are skipped, leaving them for the nearest enclosing fold loop to consume. Meta-optimisers pass `false` when recursing into the estimators their internal fold loop processes; fold loops call with the default `true`.
 
 # Returns
 
@@ -699,10 +762,11 @@ The default returns the estimator unchanged. Hosts rebuild themselves through th
   - [`TimeDependentContext`](@ref)
   - [`is_time_dependent`](@ref)
 """
-function update_time_dependent_estimator(opt::OptE_Opt, ::TimeDependentContext)
+function update_time_dependent_estimator(opt::OptE_Opt, ::TimeDependentContext,
+                                         ::Bool = true)
     return opt
 end
-function update_time_dependent_estimator(::Nothing, ::TimeDependentContext)
+function update_time_dependent_estimator(::Nothing, ::TimeDependentContext, ::Bool = true)
     return nothing
 end
 """
@@ -718,8 +782,9 @@ Shared implementation behind the hosts' [`update_time_dependent_estimator`](@ref
   - [`time_dependent_fields`](@ref)
   - [`time_dependent_value`](@ref)
 """
-function update_time_dependent_fields(opt, ctx::TimeDependentContext)
-    tdfs = time_dependent_fields(opt)
+function update_time_dependent_fields(opt, ctx::TimeDependentContext,
+                                      all_binds::Bool = true)
+    tdfs = time_dependent_fields(opt, all_binds)
     if isempty(tdfs)
         return opt
     end
@@ -857,8 +922,9 @@ Apply [`update_time_dependent_estimator`](@ref) element-wise to a vector of opti
   - [`update_time_dependent_estimator`](@ref)
   - [`VecOptE_Opt`](@ref)
 """
-function update_time_dependent_estimator(opt::VecOptE_Opt, ctx::TimeDependentContext)
-    return [update_time_dependent_estimator(opti, ctx) for opti in opt]
+function update_time_dependent_estimator(opt::VecOptE_Opt, ctx::TimeDependentContext,
+                                         all_binds::Bool = true)
+    return [update_time_dependent_estimator(opti, ctx, all_binds) for opti in opt]
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -870,9 +936,10 @@ Apply [`assert_time_dependent_fold_count`](@ref) element-wise to a vector of opt
   - [`assert_time_dependent_fold_count`](@ref)
   - [`VecOptE_Opt`](@ref)
 """
-function assert_time_dependent_fold_count(opt::VecOptE_Opt, n::Integer)::Nothing
+function assert_time_dependent_fold_count(opt::VecOptE_Opt, n::Integer,
+                                          all_binds::Bool = true)::Nothing
     for opti in opt
-        assert_time_dependent_fold_count(opti, n)
+        assert_time_dependent_fold_count(opti, n, all_binds)
     end
     return nothing
 end
@@ -1652,7 +1719,8 @@ Return `false`.
 
   - [`needs_previous_weights`](@ref)
 """
-function needs_previous_weights(::Nothing)
+function needs_previous_weights(::Option{<:Union{<:AbstractEstimator, <:AbstractAlgorithm,
+                                                 <: AbstractResult}})
     return false
 end
 

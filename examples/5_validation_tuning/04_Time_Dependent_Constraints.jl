@@ -66,10 +66,10 @@ A schedule is a vector of per-fold values; the field it sits in says what it var
 
 The schedule below is a de-leveraging plan: the cap tightens as we walk forward through time. We size it later, once we know how many folds the consuming cross-validation scheme produces — **a schedule must have exactly one entry per fold**, which is validated as soon as the scheme is split, before any fold runs.
 =#
-function deleverage(n)
+function deleverage(n, bind = :outermost)
     return TimeDependent([WeightBounds(; lb = 0.0,
                                        ub = 0.35 - 0.15 * (i - 1) / max(n - 1, 1))
-                          for i in 1:n])
+                          for i in 1:n], bind)
 end;
 #=
 ### 2.3 Callable
@@ -275,7 +275,7 @@ length(pred_mr_sched.pred)
 #=
 ## 7. Nesting fold loops: who consumes the schedule?
 
-Meta-optimisers like [`Stacking`](@ref) and [`NestedClustered`](@ref) run a cross-validation of their *own* to estimate inner out-of-sample returns. That means a schedule inside a meta can sit under **two** fold loops — the meta's inner one and, when the meta itself is backtested with [`cross_val_predict`](@ref), an outer one. The rule is simple: **the outermost fold loop wins**, so the entries must be sized for whichever loop actually consumes them.
+Meta-optimisers like [`Stacking`](@ref) and [`NestedClustered`](@ref) run a cross-validation of their *own* to estimate inner out-of-sample returns. That means a schedule inside a meta can sit under **two** fold loops — the meta's inner one and, when the meta itself is backtested with [`cross_val_predict`](@ref), an outer one. Which one consumes the schedule is chosen by its `bind`: the default `:outermost` means **the outermost fold loop wins**, while `:nearest` (§7.5) hands the schedule to the nearest enclosing loop instead. Either way the entries must be sized for whichever loop actually consumes them.
 
 ### 7.1 Outer CV, no inner CV
 
@@ -288,8 +288,8 @@ Used standalone, a meta's inner cross-validation is the outermost (and only) fol
 Here one of the stacked optimisers de-leverages across the inner `KFold(4)` folds used to build the out-of-sample returns fed to the outer optimiser:
 =#
 st_inner = Stacking(;
-                    opti = [MeanRisk(; opt = JuMPOptimiser(; slv = slv,
-                                                           wb = deleverage(4))),
+                    opti = [MeanRisk(;
+                                     opt = JuMPOptimiser(; slv = slv, wb = deleverage(4))),
                             mr_static], opto = mr_static,
                     cv = OptimisationCrossValidation(; cv = KFold(; n = 4)))
 res_st_inner = optimise(st_inner, rd)
@@ -299,8 +299,8 @@ The same estimator with a mis-sized schedule fails at the *inner* split:
 =#
 try
     optimise(Stacking(;
-                      opti = [MeanRisk(; opt = JuMPOptimiser(; slv = slv,
-                                                             wb = deleverage(7))),
+                      opti = [MeanRisk(;
+                                       opt = JuMPOptimiser(; slv = slv, wb = deleverage(7))),
                               mr_static], opto = mr_static,
                       cv = OptimisationCrossValidation(; cv = KFold(; n = 4))), rd)
 catch err
@@ -312,8 +312,9 @@ end
 Backtesting that same meta puts an outer fold loop on top. Now the *outer* loop resolves every schedule — the meta's own fields and its inner estimators' — against the outer folds *before* the meta ever runs, so the inner `KFold(4)` only ever sees static estimators. The schedule therefore must be sized to the **outer** fold count, even though it lives next to an inner `KFold(4)`:
 =#
 st_nested = Stacking(;
-                     opti = [MeanRisk(; opt = JuMPOptimiser(; slv = slv,
-                                                            wb = deleverage(n_wf))),
+                     opti = [MeanRisk(;
+                                      opt = JuMPOptimiser(; slv = slv,
+                                                          wb = deleverage(n_wf))),
                              mr_static], opto = mr_static,
                      cv = OptimisationCrossValidation(; cv = KFold(; n = 4)))
 pred_st_nested = cross_val_predict(st_nested, rd, wf)
@@ -332,15 +333,48 @@ end
 
 Because a schedule is just a field value, it is tunable like any other hyperparameter: [`GridSearchCrossValidation`](@ref) sets each candidate into the field through the estimator's validated constructor and scores it with its own cross-validation. Here we let the data pick between staying uncapped, the de-leveraging plan, and a gentler variant:
 =#
-gentler(n) = TimeDependent([WeightBounds(; lb = 0.0,
-                                         ub = 0.45 - 0.1 * (i - 1) / max(n - 1, 1))
-                            for i in 1:n]);
+function gentler(n)
+    return TimeDependent([WeightBounds(; lb = 0.0,
+                                       ub = 0.45 - 0.1 * (i - 1) / max(n - 1, 1))
+                          for i in 1:n])
+end;
 candidates = ["opt.wb" => [WeightBounds(), deleverage(n_wf), gentler(n_wf)]]
 gs = GridSearchCrossValidation(candidates; cv = wf)
 gs_res = search_cross_validation(mr_static, gs, rd)
 gs_res.idx
 #=
 The winning candidate (`gs_res.val_grid[gs_res.idx]`) is whichever schedule scored best out of sample — the tuning pass consumes each candidate's entries through the search's own fold loop, so every candidate must be sized to `n_splits(gs.cv, rd)`.
+
+### 7.5 Binding to the inner loop with `:nearest`
+
+Sometimes you want the opposite of §7.3: a schedule that belongs to a meta's *inner* cross-validation and should keep being consumed there even when the meta is backtested under an outer loop — an inner estimator whose regularisation follows the inner `KFold(4)`, say, regardless of the outer horizon. Pass `bind = :nearest` (here through the `deleverage` helper's second argument). The outer loop then skips it and the inner loop resolves it, so it is sized to the **inner** folds even under an outer backtest:
+=#
+st_bind_near = Stacking(;
+                        opti = [MeanRisk(;
+                                         opt = JuMPOptimiser(; slv = slv,
+                                                             wb = deleverage(4, :nearest))),
+                                mr_static], opto = mr_static,
+                        cv = OptimisationCrossValidation(; cv = KFold(; n = 4)))
+pred_bind_near = cross_val_predict(st_bind_near, rd, wf)
+pretty_table(DataFrame(:fold => 1:n_wf, :nearest => max_weights(pred_bind_near));
+             formatters = [resfmt])
+#=
+The size-4 schedule that failed at the *outer* split in §7.3 now succeeds, because `:nearest` routes it past the outer loop to the inner `KFold(4)`. The two binds compose freely: a meta's own `wb` can be `:outermost` (sized to the backtest) while an inner estimator's schedule is `:nearest` (sized to the inner scheme), each validated at its own split.
+
+### 7.6 Per-fold *vectors* of constraints
+
+An input that already accepts a vector of constraints varies over folds by holding a per-fold *vector of vectors* — entry `i` is fold `i`'s whole constraint vector. Here the linear-constraint input `lcse` tightens from one cap in early folds to two in later ones:
+=#
+sets = AssetSets(; dict = Dict("nx" => rd.nx))
+cap_a = LinearConstraintEstimator(; val = "$(rd.nx[1]) <= 0.5")
+cap_b = LinearConstraintEstimator(; val = "$(rd.nx[2]) <= 0.5")
+lcse_sched = TimeDependent([i <= n_wf ÷ 2 ? [cap_a] : [cap_a, cap_b] for i in 1:n_wf])
+mr_lcse = MeanRisk(; opt = JuMPOptimiser(; slv = slv, sets = sets, lcse = lcse_sched))
+pred_lcse = cross_val_predict(mr_lcse, rd, wf)
+pretty_table(DataFrame(:fold => 1:n_wf, :vector_schedule => max_weights(pred_lcse));
+             formatters = [resfmt])
+#=
+There is no separate "vector of schedules": to vary only *some* entries of a constraint vector, build the fold's vector inside a callable — `TimeDependent(ctx -> [dynamic(ctx), a_static_constraint])` — which also keeps the shared static parts in one place.
 
 ## 8. Summary
 
@@ -350,5 +384,5 @@ The winning candidate (`gs_res.val_grid[gs_res.idx]`) is whichever schedule scor
 | Schedule | `field = TimeDependent([v₁, …, vₙ])` | each entry test-substituted at construction; length vs fold count at `split` time | yes | known calendars: de-leveraging plans, phased mandates, regime dates fixed in advance |
 | Callable | `field = TimeDependent(f)` — a function, or a [`TimeDependentCallable`](@ref) struct that can declare previous-weights needs as a trait | output validated by the host constructor at each fold | yes, unless previous weights are declared ([`PreviousWeightsFunction`](@ref) wrapper or the struct's trait) | values computed from the fold: volatility regimes, universe size, previous weights |
 
-Across schemes, the entry index always means the same thing — fold `i` of the consuming scheme's `split` enumeration, with `ctx.train_idx[ctx.i]`/`ctx.test_idx[ctx.i]` as the fold's own windows — and whatever the spelling, each fold ends up solving an ordinary static optimiser: the schedule is resolved through the host's validated constructor, so nothing downstream of the fold loop knows time dependence exists. Meta-optimisers ([`NestedClustered`](@ref), [`Stacking`](@ref), [`SubsetResampling`](@ref)) accept schedules in their own `wb`/`fees` and forward the resolution into their inner estimators like any other wrapper, so an outer fold loop over a meta resolves an inner schedule against the outer folds; standalone, the meta's inner cross-validation consumes it instead.
+Across schemes, the entry index always means the same thing — fold `i` of the consuming scheme's `split` enumeration, with `ctx.train_idx[ctx.i]`/`ctx.test_idx[ctx.i]` as the fold's own windows — and whatever the spelling, each fold ends up solving an ordinary static optimiser: the schedule is resolved through the host's validated constructor, so nothing downstream of the fold loop knows time dependence exists. For an input that accepts a vector of constraints, a schedule is a per-fold vector of vectors (§7.6). Meta-optimisers ([`NestedClustered`](@ref), [`Stacking`](@ref), [`SubsetResampling`](@ref)) accept schedules in their own `wb`/`fees` and forward the resolution into their inner estimators like any other wrapper. Which fold loop consumes a schedule is its `bind`: the default `:outermost` means an outer fold loop over a meta resolves an inner schedule against the outer folds (standalone, the meta's inner cross-validation consumes it instead), while `:nearest` (§7.5) keeps a meta's inner schedule bound to the inner cross-validation even under an outer backtest.
 =#

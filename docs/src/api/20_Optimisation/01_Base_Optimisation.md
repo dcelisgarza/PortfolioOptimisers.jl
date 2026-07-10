@@ -30,7 +30,8 @@ optimise(opt::OptimisationEstimator, args...; kwargs...)
 calc_net_returns(res::OptimisationResult, X::MatNum, fees::Option{<:Fees} = nothing)
 assert_special_nco_requirements(::OptE_Opt)
 assert_special_nco_requirements(opt::VecOptE_Opt)
-needs_previous_weights(::Nothing)
+needs_previous_weights(::Option{<:Union{<:AbstractEstimator, <:AbstractAlgorithm,
+                                                 <: AbstractResult}})
 needs_previous_weights(::OptE_Opt)
 needs_previous_weights(opt::VecOptE_Opt)
 needs_previous_weights(td::TimeDependent)
@@ -49,11 +50,14 @@ assert_time_dependent_fields_fold_count
 rebuild_estimator
 is_time_dependent(::OptE_Opt)
 is_time_dependent(opt::VecOptE_Opt)
+is_time_dependent(opt::BaseOptimisationEstimator)
 update_time_dependent_estimator(opt::OptE_Opt, ::TimeDependentContext)
 update_time_dependent_estimator(opt::VecOptE_Opt, ctx::TimeDependentContext)
+update_time_dependent_estimator(opt::BaseOptimisationEstimator, ctx::TimeDependentContext)
 update_time_dependent_fields
 time_dependent_field_defaults
 reset_time_dependent_estimator(opt::OptE_Opt)
+reset_time_dependent_estimator(opt::BaseOptimisationEstimator)
 reset_time_dependent_fields
 set_clustering_weight_finaliser_alg!
 opt_weight_bounds

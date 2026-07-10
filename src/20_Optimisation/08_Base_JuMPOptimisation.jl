@@ -33,10 +33,10 @@ Return `true` if the inner JuMP optimiser or fallback carries time-dependent con
 function is_time_dependent(opt::JuMPOptimisationEstimator)
     return is_time_dependent(opt.opt) || is_time_dependent(opt.fb)
 end
-function assert_time_dependent_fold_count(opt::JuMPOptimisationEstimator,
-                                          n::Integer)::Nothing
-    assert_time_dependent_fold_count(opt.opt, n)
-    assert_time_dependent_fold_count(opt.fb, n)
+function assert_time_dependent_fold_count(opt::JuMPOptimisationEstimator, n::Integer,
+                                          all_binds::Bool = true)::Nothing
+    assert_time_dependent_fold_count(opt.opt, n, all_binds)
+    assert_time_dependent_fold_count(opt.fb, n, all_binds)
     return nothing
 end
 """
@@ -45,13 +45,15 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 Resolve time-dependent constraints for the fold described by `ctx` by recursing into the inner JuMP optimiser and fallback.
 """
 function update_time_dependent_estimator(opt::JuMPOptimisationEstimator,
-                                         ctx::TimeDependentContext)
+                                         ctx::TimeDependentContext, all_binds::Bool = true)
     if !is_time_dependent(opt)
         return opt
     end
     return rebuild_estimator(opt,
-                             (; opt = update_time_dependent_estimator(opt.opt, ctx),
-                              fb = update_time_dependent_estimator(opt.fb, ctx)))
+                             (;
+                              opt = update_time_dependent_estimator(opt.opt, ctx,
+                                                                    all_binds),
+                              fb = update_time_dependent_estimator(opt.fb, ctx, all_binds)))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

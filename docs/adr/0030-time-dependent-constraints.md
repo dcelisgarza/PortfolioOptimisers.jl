@@ -25,8 +25,13 @@ processes the estimator, and replaced by the field's static default everywhere e
 - The field's position names the target: a field holds either a static value or a per-fold
   schedule, never both, so double-specification and target typos are unrepresentable — a wrong
   keyword is an ordinary construction error. `val` is either a vector — entry `i` is the
-  complete field value for fold `i`, so vector-valued fields nest one level — or a callable
-  `f(ctx::TimeDependentContext)` evaluated per fold. Callables may be structs subtyping
+  complete field value for fold `i`, so a field that itself accepts a *vector of constraints*
+  carries a per-fold vector of vectors (`TimeDependent([[c₁ᵃ, c₁ᵇ], [c₂ᵃ], …])`) — or a callable
+  `f(ctx::TimeDependentContext)` evaluated per fold. There is no separate "vector of
+  `TimeDependent`" facility and none is needed: because the wrapper is recognised only at a
+  top-level field, varying individual entries within a constraint vector is done by assembling
+  the fold's vector in a callable (`TimeDependent(ctx -> [dynamic(ctx), static])`), which also
+  keeps shared static parts in one place. Callables may be structs subtyping
   `TimeDependentCallable <: AbstractAlgorithm` (a functor over the context): being types, they
   can define `needs_previous_weights` to declare previous-weights requirements directly — the
   `PreviousWeightsFunction` wrapper exists only for the uninspectable bare-function case.
@@ -81,12 +86,29 @@ processes the estimator, and replaced by the field's static default everywhere e
   inputs) and forward `is_time_dependent` / `update_time_dependent_estimator` / the fold-count
   assertion into their inner and outer estimators like every other wrapper — an outer fold loop
   over a meta resolves both the meta's own schedules and the inner ones against the *outer*
-  folds (outermost fold loop wins; swap-in produces static estimators, so inner legs see
-  ordinary per-fold optimisers). A meta-level schedule is never pushed down into inner
-  estimators: sharing one schedule across hosts is passing the same `TimeDependent` object into
-  each host's own field, and a host without the field has no keyword to put it in. Because
-  swap-in and reset build new structs, the original estimator is never mutated and one
-  `TimeDependent` object may be safely shared between hosts (e.g. a primary and its fallback).
+  folds (swap-in produces static estimators, so inner legs see ordinary per-fold optimisers). A
+  meta-level schedule is never pushed down into inner estimators: sharing one schedule across
+  hosts is passing the same `TimeDependent` object into each host's own field, and a host without
+  the field has no keyword to put it in. Because swap-in and reset build new structs, the
+  original estimator is never mutated and one `TimeDependent` object may be safely shared between
+  hosts (e.g. a primary and its fallback).
+- **`bind` chooses the consuming fold loop**: `TimeDependent(val, bind::Symbol = :outermost)`.
+  The default `:outermost` is the composition rule above — the outermost fold loop consumes the
+  schedule, so an inner estimator's schedule under an outer backtest is resolved against the
+  *outer* folds. `:nearest` binds the schedule to the *nearest enclosing* fold loop instead:
+  inside a meta-optimiser's inner estimators that is the meta's own cross-validation leg, which
+  consumes the schedule even when the meta is backtested under an outer loop (sizing it to the
+  inner folds). The mechanism is a positional `all_binds::Bool = true` flag threaded through the
+  scan/update/assert recursion: it is a property of the *recursion position*, not of the
+  schedule, and cannot be read off `bind` — the same `:nearest` field is *visited* by both the
+  outer loop (recursing through the meta) and the meta's inner loop, and only their position
+  distinguishes which should consume it. Every ordinary (outermost/standalone) fold loop calls
+  with `true` (it is both outermost and nearest, so it takes everything remaining, `:nearest`
+  included); a meta forces `false` only into the estimators its own inner cross-validation owns
+  (`Stacking`/`NestedClustered` `opti`), leaving their `:nearest` schedules for that inner loop.
+  `needs_previous_weights` is deliberately left scope-blind (it never consults `bind`): declaring
+  sequentiality conservatively is always safe, and threading the flag through the trait would buy
+  nothing.
 
 ## Considered options
 

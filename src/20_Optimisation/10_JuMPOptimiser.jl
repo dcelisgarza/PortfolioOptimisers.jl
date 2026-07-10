@@ -851,27 +851,8 @@ function needs_previous_weights(opt::JuMPOptimiser)
             needs_previous_weights(opt.cobj) ||
             any(f -> needs_previous_weights(getfield(opt, f)), time_dependent_fields(opt)))
 end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Resolve the time-dependent constraints of a [`JuMPOptimiser`](@ref) for the fold described by `ctx`.
-
-Rebuilds the optimiser through its validated keyword constructor with each [`TimeDependent`](@ref)-valued field replaced by its resolved per-fold value, so the result is an ordinary static optimiser and every construction invariant re-runs.
-
-# Related
-
-  - [`JuMPOptimiser`](@ref)
-  - [`TimeDependent`](@ref)
-  - [`TimeDependentContext`](@ref)
-"""
-function update_time_dependent_estimator(opt::JuMPOptimiser, ctx::TimeDependentContext)
-    return update_time_dependent_fields(opt, ctx)
-end
 function time_dependent_field_defaults(::JuMPOptimiser)::NamedTuple
     return (; wb = WeightBounds(), bgt = 1.0)
-end
-function reset_time_dependent_estimator(opt::JuMPOptimiser)
-    return reset_time_dependent_fields(opt)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

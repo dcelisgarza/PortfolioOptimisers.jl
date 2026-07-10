@@ -24,8 +24,8 @@ Return whether the naive optimiser's fallback estimator requires previous portfo
   - [`NaiveOptimisationEstimator`](@ref)
 """
 function needs_previous_weights(opt::NaiveOptimisationEstimator)
-    return any(f -> needs_previous_weights(getfield(opt, f)),
-               time_dependent_fields(opt)) || needs_previous_weights(opt.fb)
+    return any(f -> needs_previous_weights(getfield(opt, f)), time_dependent_fields(opt)) ||
+           needs_previous_weights(opt.fb)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -67,10 +67,10 @@ Return `true` if the naive optimiser configuration carries time-dependent constr
 function is_time_dependent(opt::NaiveOptimisationEstimator)
     return !isempty(time_dependent_fields(opt)) || is_time_dependent(opt.fb)
 end
-function assert_time_dependent_fold_count(opt::NaiveOptimisationEstimator,
-                                          n::Integer)::Nothing
-    assert_time_dependent_fields_fold_count(opt, n)
-    assert_time_dependent_fold_count(opt.fb, n)
+function assert_time_dependent_fold_count(opt::NaiveOptimisationEstimator, n::Integer,
+                                          all_binds::Bool = true)::Nothing
+    assert_time_dependent_fields_fold_count(opt, n, all_binds)
+    assert_time_dependent_fold_count(opt.fb, n, all_binds)
     return nothing
 end
 """
@@ -87,12 +87,14 @@ Rebuilds the optimiser through its validated keyword constructor with each [`Tim
   - [`TimeDependentContext`](@ref)
 """
 function update_time_dependent_estimator(opt::NaiveOptimisationEstimator,
-                                         ctx::TimeDependentContext)
+                                         ctx::TimeDependentContext, all_binds::Bool = true)
     if !is_time_dependent(opt)
         return opt
     end
-    opt = update_time_dependent_fields(opt, ctx)
-    return rebuild_estimator(opt, (; fb = update_time_dependent_estimator(opt.fb, ctx)))
+    opt = update_time_dependent_fields(opt, ctx, all_binds)
+    return rebuild_estimator(opt,
+                             (;
+                              fb = update_time_dependent_estimator(opt.fb, ctx, all_binds)))
 end
 function time_dependent_field_defaults(::NaiveOptimisationEstimator)::NamedTuple
     return (; wb = WeightBounds())

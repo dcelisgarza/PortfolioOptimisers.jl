@@ -35,6 +35,15 @@ end
         @test TimeDependent(TDCap(0.35, 0.2)) isa TimeDependent
         @test TimeDependent(PreviousWeightsFunction(ctx -> WeightBounds())) isa
               TimeDependent
+        # bind defaults to :outermost and only accepts :outermost or :nearest.
+        @test td.bind == :outermost
+        @test TimeDependent([1.0], :nearest).bind == :nearest
+        @test TimeDependent(; val = [1.0], bind = :nearest).bind == :nearest
+        @test_throws ArgumentError TimeDependent([1.0], :sideways)
+        @test_throws ArgumentError TimeDependent(; val = [1.0], bind = :sideways)
+        # port_opt_view preserves bind.
+        @test PortfolioOptimisers.port_opt_view(TimeDependent([1.0, 2.0], :nearest), 1).bind ==
+              :nearest
     end
     @testset "Host validation" begin
         td = TimeDependent([Threshold(; val = 0.01), Threshold(; val = 0.02)])
@@ -334,13 +343,15 @@ end
         # A vector schedule sized to the inner CV works standalone; a mis-sized one
         # fails at the inner split.
         l2_3 = TimeDependent([1e-4, 2e-4, 3e-4])
-        st3 = Stacking(; opti = [MeanRisk(; opt = JuMPOptimiser(; slv = slv, l2 = l2_3)),
-                                 mr0], opto = mr0,
+        st3 = Stacking(;
+                       opti = [MeanRisk(; opt = JuMPOptimiser(; slv = slv, l2 = l2_3)),
+                               mr0], opto = mr0,
                        cv = OptimisationCrossValidation(; cv = KFold(; n = 3)))
         @test isa(optimise(st3, rd).retcode, OptimisationSuccess)
         l2_2 = TimeDependent([1e-4, 2e-4])
-        st2 = Stacking(; opti = [MeanRisk(; opt = JuMPOptimiser(; slv = slv, l2 = l2_2)),
-                                 mr0], opto = mr0,
+        st2 = Stacking(;
+                       opti = [MeanRisk(; opt = JuMPOptimiser(; slv = slv, l2 = l2_2)),
+                               mr0], opto = mr0,
                        cv = OptimisationCrossValidation(; cv = KFold(; n = 3)))
         @test_throws DimensionMismatch optimise(st2, rd)
         # Under an outer fold loop the OUTERMOST CV wins: the same 2-entry schedule now
@@ -353,9 +364,8 @@ end
                                  WeightBounds(; lb = 0.0, ub = 0.9)
                              end)
         st_outer = Stacking(;
-                            opti = [MeanRisk(; opt = JuMPOptimiser(; slv = slv,
-                                                                   wb = obs2)), mr0],
-                            opto = mr0,
+                            opti = [MeanRisk(; opt = JuMPOptimiser(; slv = slv, wb = obs2)),
+                                    mr0], opto = mr0,
                             cv = OptimisationCrossValidation(; cv = KFold(; n = 3)))
         opreds = cross_val_predict(st_outer, rd, cvw)
         @test length(opreds.pred) == 2
@@ -371,22 +381,22 @@ end
         # A schedule sized to the inner CV fails at the OUTER split when an outer fold
         # loop is present.
         st_outer3 = Stacking(;
-                             opti = [MeanRisk(; opt = JuMPOptimiser(; slv = slv,
-                                                                    l2 = l2_3)), mr0],
-                             opto = mr0,
+                             opti = [MeanRisk(;
+                                              opt = JuMPOptimiser(; slv = slv, l2 = l2_3)),
+                                     mr0], opto = mr0,
                              cv = OptimisationCrossValidation(; cv = KFold(; n = 3)))
         @test_throws DimensionMismatch cross_val_predict(st_outer3, rd, cvw)
         # NestedClustered under an outer walk-forward with a different inner CV.
-        nco = NestedClustered(; opti = MeanRisk(; opt = JuMPOptimiser(; slv = slv,
-                                                                      l2 = l2_2)),
+        nco = NestedClustered(;
+                              opti = MeanRisk(;
+                                              opt = JuMPOptimiser(; slv = slv, l2 = l2_2)),
                               opto = mr0,
                               cv = OptimisationCrossValidation(; cv = KFold(; n = 3)))
         npreds = cross_val_predict(nco, rd, cvw)
         @test length(npreds.pred) == 2
         # The meta's own wb schedule is resolved against the outer folds and caps the
         # combined weights; standalone it is inert.
-        srsched = TimeDependent([WeightBounds(),
-                                 WeightBounds(; lb = 0.15, ub = 0.25)])
+        srsched = TimeDependent([WeightBounds(), WeightBounds(; lb = 0.15, ub = 0.25)])
         sr = SubsetResampling(; opt = mr0, wb = srsched, subset_size = 3, n_subsets = 2,
                               rng = StableRNG(7), seed = 11)
         spreds = cross_val_predict(sr, rd, cvw)
@@ -395,5 +405,149 @@ end
         sr0 = SubsetResampling(; opt = mr0, subset_size = 3, n_subsets = 2,
                                rng = StableRNG(7), seed = 11)
         @test optimise(sr, rd).w == optimise(sr0, rd).w
+    end
+    @testset "Bind: nearest vs outermost fold loops" begin
+        mr0 = MeanRisk(; opt = JuMPOptimiser(; slv = slv))
+        cvw = IndexWalkForward(100, 50)  # 2 outer folds over the 200-row sample
+        # On a plain (non-meta) estimator the single fold loop is BOTH outermost and
+        # nearest, so a :nearest schedule is consumed by it exactly like :outermost:
+        # it must be sized to that loop's folds (2), and a mis-sized one still fails.
+        mr_near2 = MeanRisk(;
+                            opt = JuMPOptimiser(; slv = slv,
+                                                l2 = TimeDependent([1e-4, 2e-4], :nearest)))
+        @test length(cross_val_predict(mr_near2, rd, cvw).pred) == 2
+        mr_near3 = MeanRisk(;
+                            opt = JuMPOptimiser(; slv = slv,
+                                                l2 = TimeDependent([1e-4, 2e-4, 3e-4],
+                                                                   :nearest)))
+        @test_throws DimensionMismatch cross_val_predict(mr_near3, rd, cvw)
+        # The discriminating case: an inner estimator's schedule sized to the INNER
+        # KFold(3) under an outer walk-forward (2 folds). With the default :outermost
+        # the outer loop tries to consume it and the size-3 schedule fails at the outer
+        # split; with :nearest the outer loop skips it and the inner KFold(3) consumes it.
+        l2_3 = [1e-4, 2e-4, 3e-4]
+        st_out = Stacking(;
+                          opti = [MeanRisk(;
+                                           opt = JuMPOptimiser(; slv = slv,
+                                                               l2 = TimeDependent(l2_3))),
+                                  mr0], opto = mr0,
+                          cv = OptimisationCrossValidation(; cv = KFold(; n = 3)))
+        @test_throws DimensionMismatch cross_val_predict(st_out, rd, cvw)
+        st_near = Stacking(;
+                           opti = [MeanRisk(;
+                                            opt = JuMPOptimiser(; slv = slv,
+                                                                l2 = TimeDependent(l2_3,
+                                                                                   :nearest))),
+                                   mr0], opto = mr0,
+                           cv = OptimisationCrossValidation(; cv = KFold(; n = 3)))
+        npreds = cross_val_predict(st_near, rd, cvw)
+        @test length(npreds.pred) == 2
+        @test isa(npreds.pred[1].res.retcode, OptimisationSuccess)
+        # Standalone, the meta's inner CV is the nearest (and only) loop, so a :nearest
+        # schedule sized to the inner KFold(3) is consumed there.
+        st_solo = Stacking(;
+                           opti = [MeanRisk(;
+                                            opt = JuMPOptimiser(; slv = slv,
+                                                                l2 = TimeDependent(l2_3,
+                                                                                   :nearest))),
+                                   mr0], opto = mr0,
+                           cv = OptimisationCrossValidation(; cv = KFold(; n = 3)))
+        @test isa(optimise(st_solo, rd).retcode, OptimisationSuccess)
+        # Mixed binds coexist: the meta's own wb is :outermost (sized to the 2 outer
+        # folds) while the inner estimator's l2 is :nearest (sized to the inner KFold(3)),
+        # each validated at its own split.
+        st_mix = Stacking(;
+                          opti = [MeanRisk(;
+                                           opt = JuMPOptimiser(; slv = slv,
+                                                               l2 = TimeDependent(l2_3,
+                                                                                  :nearest))),
+                                  mr0], opto = mr0,
+                          wb = TimeDependent([WeightBounds(),
+                                              WeightBounds(; lb = 0.0, ub = 0.9)]),
+                          cv = OptimisationCrossValidation(; cv = KFold(; n = 3)))
+        @test length(cross_val_predict(st_mix, rd, cvw).pred) == 2
+    end
+    @testset "Per-fold vectors of constraints" begin
+        mr0 = MeanRisk(; opt = JuMPOptimiser(; slv = slv))
+        cvw = IndexWalkForward(100, 50)
+        # A field that statically accepts a vector of constraints holds a per-fold vector
+        # of such vectors: entry i is fold i's whole constraint vector. Here fold 1 gets
+        # one linear constraint and fold 2 gets two.
+        sets = AssetSets(; dict = Dict("nx" => ["A", "B", "C", "D", "E"]))
+        lce1 = LinearConstraintEstimator(; val = "A <= 0.5")
+        lce2 = LinearConstraintEstimator(; val = "B <= 0.5")
+        mr_vv = MeanRisk(;
+                         opt = JuMPOptimiser(; slv = slv, sets = sets,
+                                             lcse = TimeDependent([[lce1], [lce1, lce2]])))
+        pvv = cross_val_predict(mr_vv, rd, cvw)
+        @test length(pvv.pred) == 2
+        @test isa(pvv.pred[1].res.retcode, OptimisationSuccess)
+        @test isa(pvv.pred[2].res.retcode, OptimisationSuccess)
+        # The whole per-fold vector is returned by time_dependent_value.
+        ctx1 = TimeDependentContext(; i = 1, n = 2, rd = rd, train_idx = [1:100, 1:150],
+                                    test_idx = [101:150, 151:200])
+        ctx2 = TimeDependentContext(; i = 2, n = 2, rd = rd, train_idx = [1:100, 1:150],
+                                    test_idx = [101:150, 151:200])
+        td_vv = TimeDependent([[lce1], [lce1, lce2]])
+        @test length(PortfolioOptimisers.time_dependent_value(td_vv, ctx1)) == 1
+        @test length(PortfolioOptimisers.time_dependent_value(td_vv, ctx2)) == 2
+        # A mis-sized schedule still fails the fold-count check.
+        mr_bad = MeanRisk(;
+                          opt = JuMPOptimiser(; slv = slv, sets = sets,
+                                              lcse = TimeDependent([[lce1]])))
+        @test_throws DimensionMismatch cross_val_predict(mr_bad, rd, cvw)
+        # needs_previous_weights descends into per-fold vector entries.
+        w0 = fill(0.2, 5)
+        tds = TimeDependent([[Turnover(; val = 0.1, w = w0)],
+                             [Turnover(; val = 0.2, w = w0)]])
+        @test PortfolioOptimisers.needs_previous_weights(tds)
+        # The callable form assembles the fold's whole constraint vector, keeping shared
+        # static parts in one place — here a per-fold dynamic cap plus a fixed one.
+        mr_fn = MeanRisk(;
+                         opt = JuMPOptimiser(; slv = slv, sets = sets,
+                                             lcse = TimeDependent(ctx -> [LinearConstraintEstimator(;
+                                                                                                    val = "A <= $(0.5 - 0.05 * (ctx.i - 1))"),
+                                                                          lce2])))
+        pfn = cross_val_predict(mr_fn, rd, cvw)
+        @test length(pfn.pred) == 2
+        @test all(p -> isa(p.res.retcode, OptimisationSuccess), pfn.pred)
+        # The callable may also return vectors that differ in length per fold (the
+        # vector-of-vectors shape, computed rather than listed).
+        struct LC_Callable <: PortfolioOptimisers.TimeDependentCallable end
+        function (c::LC_Callable)(ctx::TimeDependentContext)
+            return if ctx.i == 1
+                [LinearConstraintEstimator(; val = "A <= $(0.5 - 0.05 * (ctx.i - 1))")]
+            else
+                [LinearConstraintEstimator(; val = "A <= 0.4"), lce2]
+            end
+        end
+        mr_fn_vv = MeanRisk(;
+                            opt = JuMPOptimiser(; slv = slv, sets = sets,
+                                                lcse = TimeDependent(ctx -> if ctx.i == 1
+                                                                         [LinearConstraintEstimator(;
+                                                                                                    val = "A <= $(0.5 - 0.05 * (ctx.i - 1))")]
+                                                                     else
+                                                                         [LinearConstraintEstimator(;
+                                                                                                    val = "A <= 0.4"),
+                                                                          lce2]
+                                                                     end)))
+        pfn_vv = cross_val_predict(mr_fn_vv, rd, cvw)
+        @test length(pfn_vv.pred) == 2
+        @test all(p -> isa(p.res.retcode, OptimisationSuccess), pfn_vv.pred)
+        # time_dependent_value invokes the callable and returns its per-fold vector.
+        td_fn_vv = TimeDependent(ctx -> ctx.i == 1 ? [lce2] : [lce1, lce2])
+        @test length(PortfolioOptimisers.time_dependent_value(td_fn_vv, ctx1)) == 1
+        @test length(PortfolioOptimisers.time_dependent_value(td_fn_vv, ctx2)) == 2
+
+        mr_fn_vv2 = MeanRisk(;
+                             opt = JuMPOptimiser(; slv = slv, sets = sets,
+                                                 lcse = TimeDependent(LC_Callable())))
+        pfn_vv = cross_val_predict(mr_fn_vv2, rd, cvw)
+        @test length(pfn_vv.pred) == 2
+        @test all(p -> isa(p.res.retcode, OptimisationSuccess), pfn_vv.pred)
+        # time_dependent_value invokes the callable and returns its per-fold vector.
+        td_fn_vv = TimeDependent(ctx -> ctx.i == 1 ? [lce2] : [lce1, lce2])
+        @test length(PortfolioOptimisers.time_dependent_value(td_fn_vv, ctx1)) == 1
+        @test length(PortfolioOptimisers.time_dependent_value(td_fn_vv, ctx2)) == 2
     end
 end

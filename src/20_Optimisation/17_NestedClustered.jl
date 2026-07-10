@@ -477,11 +477,12 @@ function is_time_dependent(opt::NestedClustered)
             is_time_dependent(opt.opto) ||
             is_time_dependent(opt.fb))
 end
-function assert_time_dependent_fold_count(opt::NestedClustered, n::Integer)::Nothing
-    assert_time_dependent_fields_fold_count(opt, n)
-    assert_time_dependent_fold_count(opt.opti, n)
-    assert_time_dependent_fold_count(opt.opto, n)
-    assert_time_dependent_fold_count(opt.fb, n)
+function assert_time_dependent_fold_count(opt::NestedClustered, n::Integer,
+                                          all_binds::Bool = true)::Nothing
+    assert_time_dependent_fields_fold_count(opt, n, all_binds)
+    assert_time_dependent_fold_count(opt.opti, n, false)
+    assert_time_dependent_fold_count(opt.opto, n, all_binds)
+    assert_time_dependent_fold_count(opt.fb, n, all_binds)
     return nothing
 end
 """
@@ -489,15 +490,18 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Resolve time-dependent constraints for the fold described by `ctx` by recursing into the inner optimiser, outer optimiser, and fallback.
 """
-function update_time_dependent_estimator(opt::NestedClustered, ctx::TimeDependentContext)
+function update_time_dependent_estimator(opt::NestedClustered, ctx::TimeDependentContext,
+                                         all_binds::Bool = true)
     if !is_time_dependent(opt)
         return opt
     end
-    opt = update_time_dependent_fields(opt, ctx)
+    opt = update_time_dependent_fields(opt, ctx, all_binds)
     return rebuild_estimator(opt,
-                             (; opti = update_time_dependent_estimator(opt.opti, ctx),
-                              opto = update_time_dependent_estimator(opt.opto, ctx),
-                              fb = update_time_dependent_estimator(opt.fb, ctx)))
+                             (;
+                              opti = update_time_dependent_estimator(opt.opti, ctx, false),
+                              opto = update_time_dependent_estimator(opt.opto, ctx,
+                                                                     all_binds),
+                              fb = update_time_dependent_estimator(opt.fb, ctx, all_binds)))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
