@@ -267,6 +267,25 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
+Abstract supertype for callable structs used as time-dependent constraint values.
+
+A subtype is a data-carrying alternative to a bare function inside a [`TimeDependent`](@ref): it must implement a functor `(x::MySubtype)(ctx::TimeDependentContext)` returning the fold's field value. Because it is a struct, it participates in the traits a bare function cannot: define `default_time_dependent_target(::MySubtype)` to make the target field inferable, and `needs_previous_weights(::MySubtype) = true` to declare a previous-weights requirement directly (the default is `false`), instead of wrapping in [`PreviousWeightsFunction`](@ref).
+
+# Related
+
+  - [`TimeDependent`](@ref)
+  - [`TimeDependentContext`](@ref)
+  - [`PreviousWeightsFunction`](@ref)
+  - [`default_time_dependent_target`](@ref)
+  - [`needs_previous_weights`](@ref)
+"""
+abstract type TimeDependentCallable <: AbstractAlgorithm end
+function needs_previous_weights(::TimeDependentCallable)::Bool
+    return false
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
 Wrapper marking a callable time-dependent constraint entry as requiring the previous optimisation's weights.
 
 A bare callable inside a [`TimeDependent`](@ref) cannot be inspected for previous-weight requirements, so it contributes `false` to [`needs_previous_weights`](@ref) and its context's `w_prev` is only populated when something else makes the fold loop sequential. Wrapping the callable in `PreviousWeightsFunction` declares the requirement as data: it contributes `true` to [`needs_previous_weights`](@ref), forcing sequential fold execution and a populated `w_prev` in the [`TimeDependentContext`](@ref).
@@ -312,7 +331,7 @@ Defined only for value types that admit exactly one target field on the optimise
   - [`TimeDependent`](@ref)
 """
 function default_time_dependent_target(val)
-    return throw(ArgumentError("cannot infer the target field for a time-dependent value of type $(typeof(val)); provide the target field explicitly, e.g. TimeDependent(val, :lt)"))
+    return throw(ArgumentError("cannot infer the target field for a time-dependent value of type $(typeof(val)); provide the target field explicitly (e.g. TimeDependent(val, :lt)), or use a TimeDependentCallable subtype with a default_time_dependent_target method"))
 end
 function default_time_dependent_target(::WbE_Wb)::Symbol
     return :wb
@@ -340,7 +359,9 @@ $(DocStringExtensions.TYPEDEF)
 
 Time-dependent constraint: an optimiser input whose value changes across the folds of a cross-validation scheme.
 
-`val` is either a vector of per-fold values — entry `i` is the complete field value for the fold whose test window is `i`-th in time within its path — or a callable `f(ctx::TimeDependentContext)` evaluated per fold (optionally wrapped in [`PreviousWeightsFunction`](@ref)). `field` names the optimiser field the entries stand in for; it defaults via [`default_time_dependent_target`](@ref) and must be given explicitly for callables and for ambiguous value types.
+`val` is either a vector of per-fold values — entry `i` is the complete field value for fold `i` of the consuming scheme's `split` enumeration — or a callable evaluated per fold: a bare function `f(ctx::TimeDependentContext)` (optionally wrapped in [`PreviousWeightsFunction`](@ref)) or a [`TimeDependentCallable`](@ref) functor struct. `field` names the optimiser field the entries stand in for; it defaults via [`default_time_dependent_target`](@ref) and must be given explicitly for bare functions and for ambiguous value types — [`TimeDependentCallable`](@ref) subtypes may define the trait to make it inferable.
+
+The machinery imposes no ordering of its own: fold `i` is whatever `split(cv, rd)` enumerates `i`-th, which is chronological for walk-forward and (unshuffled) KFold schemes. For schemes whose enumeration is not a timeline (combinatorial splits, randomised paths) it is the user's responsibility to key entries off the fold's indices — a callable sees its own fold's windows via `ctx.train_idx[ctx.i]`/`ctx.test_idx[ctx.i]` and may derive any ordering from them.
 
 A time-dependent constraint is the *sole source* of its target: the targeted optimiser field must be left at its constructor default. It participates only where folds exist and is inert everywhere else — a fold-less `optimise` runs with the target at its default. Vector entries must have length equal to the number of folds of the consuming cross-validation scheme, validated at `split` time. Entries may be `nothing`, leaving the target at its default for that fold.
 
@@ -379,7 +400,7 @@ TimeDependent
 """
 struct TimeDependent{T1} <: AbstractEstimator
     """
-    Vector of per-fold values (in chronological fold order), or a callable `f(ctx::TimeDependentContext)`, optionally wrapped in [`PreviousWeightsFunction`](@ref).
+    Vector of per-fold values (in the consuming scheme's `split` enumeration order), or a callable of the fold's [`TimeDependentContext`](@ref): a bare function (optionally wrapped in [`PreviousWeightsFunction`](@ref)) or a [`TimeDependentCallable`](@ref) functor struct.
     """
     val::T1
     """
@@ -387,12 +408,10 @@ struct TimeDependent{T1} <: AbstractEstimator
     """
     field::Symbol
     function TimeDependent(val::Union{<:AbstractVector, <:Base.Callable,
-                                      <:PreviousWeightsFunction},
+                                      <:PreviousWeightsFunction, <:TimeDependentCallable},
                            field::Option{<:Symbol} = nothing)
         if isa(val, AbstractVector)
             @argcheck(!isempty(val), IsEmptyError("val cannot be empty"))
-        elseif isnothing(field)
-            throw(ArgumentError("field cannot be inferred from a callable; provide it explicitly, e.g. TimeDependent(f, :tn)"))
         end
         if isnothing(field)
             field = default_time_dependent_target(val)
@@ -402,7 +421,7 @@ struct TimeDependent{T1} <: AbstractEstimator
 end
 function TimeDependent(;
                        val::Union{<:AbstractVector, <:Base.Callable,
-                                  <:PreviousWeightsFunction},
+                                  <:PreviousWeightsFunction, <:TimeDependentCallable},
                        field::Option{<:Symbol} = nothing)::TimeDependent
     return TimeDependent(val, field)
 end
@@ -448,7 +467,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Per-fold context handed to time-dependent constraints when they are resolved.
 
-Carries the fold's chronological position and the data needed for a callable entry to compute its value. `rd` is the fold's (possibly asset-viewed) returns data, so callables see the current universe and timestamps. `w_prev` is populated only when the fold loop runs sequentially and a previous fold exists; `path_id` only under multi-path schemes.
+Carries the fold's position in the consuming scheme's `split` enumeration and the data needed for a callable entry to compute its value. `i` indexes `train_idx`/`test_idx`, so `ctx.train_idx[ctx.i]`/`ctx.test_idx[ctx.i]` are always the fold's own windows; no ordering beyond the scheme's enumeration is implied. `rd` is the fold's (possibly asset-viewed) returns data, so callables see the current universe and timestamps. `w_prev` is populated only when the fold loop runs sequentially and a previous fold exists; `path_id` only under multi-path schemes.
 
 # Fields
 
@@ -468,7 +487,7 @@ $(DocStringExtensions.FIELDS)
 """
 struct TimeDependentContext{T1, T2, T3, T4, T5, T6, T7} <: AbstractResult
     """
-    Chronological rank of the fold's test window within its path (1-based).
+    Index of the fold within the scheme's `split` enumeration (1-based); indexes `train_idx`/`test_idx`.
     """
     i::T1
     """
@@ -546,6 +565,8 @@ function needs_previous_weights(td::TimeDependent)::Bool
     v = td.val
     if isa(v, PreviousWeightsFunction)
         return true
+    elseif isa(v, TimeDependentCallable)
+        return needs_previous_weights(v)
     elseif isa(v, AbstractVector)
         return any(time_dependent_entry_needs_previous_weights, v)
     end
@@ -643,20 +664,6 @@ function assert_time_dependent_fold_count(tdc::VecTd, n::Integer)::Nothing
         assert_time_dependent_fold_count(td, n)
     end
     return nothing
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Return the chronological rank of each fold's test window.
-
-Rank `k` means the fold's test window is `k`-th in time. Fold loops use these ranks as the time-dependent entry index, so entry `i` always maps to the `i`-th test window in time regardless of iteration order.
-
-# Related
-
-  - [`TimeDependentContext`](@ref)
-"""
-function chronological_fold_ranks(test_idx)
-    return invperm(sortperm([first(t) for t in test_idx]))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1602,4 +1609,5 @@ end
 export optimise, OptimisationSuccess, OptimisationFailure, IterativeWeightFinaliser,
        RelativeErrorWeightFinaliser, SquaredRelativeErrorWeightFinaliser,
        AbsoluteErrorWeightFinaliser, SquaredAbsoluteErrorWeightFinaliser,
-       JuMPWeightFinaliser, TimeDependent, TimeDependentContext, PreviousWeightsFunction
+       JuMPWeightFinaliser, TimeDependent, TimeDependentContext, PreviousWeightsFunction,
+       TimeDependentCallable

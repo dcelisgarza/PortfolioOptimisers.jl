@@ -36,6 +36,7 @@ needs_previous_weights(opt::VecOptE_Opt)
 needs_previous_weights(td::TimeDependent)
 TimeDependent
 TimeDependentContext
+TimeDependentCallable
 PreviousWeightsFunction
 VecTd
 Td_VecTd
@@ -46,7 +47,6 @@ time_dependent_entry_needs_previous_weights
 assert_time_dependent_targets
 assert_time_dependent_fold_count(::OptE_Opt, ::Integer)
 assert_time_dependent_fold_count(opt::VecOptE_Opt, n::Integer)
-chronological_fold_ranks
 rebuild_estimator
 is_time_dependent(::OptE_Opt)
 is_time_dependent(opt::VecOptE_Opt)

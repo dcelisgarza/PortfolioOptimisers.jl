@@ -1,3 +1,27 @@
+# TimeDependentCallable subtypes must be defined at top level. `TDCap` declares its
+# target via the trait; `TDPrevWCap` declares its previous-weights requirement directly.
+struct TDCap <: PortfolioOptimisers.TimeDependentCallable
+    hi::Float64
+    lo::Float64
+end
+function (c::TDCap)(ctx::TimeDependentContext)
+    return WeightBounds(; lb = 0.0,
+                        ub = c.hi - (c.hi - c.lo) * (ctx.i - 1) / max(ctx.n - 1, 1))
+end
+function PortfolioOptimisers.default_time_dependent_target(::TDCap)
+    return :wb
+end
+struct TDPrevWCap <: PortfolioOptimisers.TimeDependentCallable end
+function (c::TDPrevWCap)(ctx::TimeDependentContext)
+    return Threshold(; val = isnothing(ctx.w_prev) ? 0.01 : 0.05)
+end
+function PortfolioOptimisers.needs_previous_weights(::TDPrevWCap)
+    return true
+end
+struct TDNoTrait <: PortfolioOptimisers.TimeDependentCallable end
+function (c::TDNoTrait)(ctx::TimeDependentContext)
+    return nothing
+end
 @testset "Time-dependent constraints" begin
     using Test, PortfolioOptimisers, Clarabel, StableRNGs
     rng = StableRNG(987654321)
@@ -110,9 +134,44 @@
                                                                                             5)
         @test isnothing(PortfolioOptimisers.assert_time_dependent_fold_count(opt, 2))
         @test isnothing(PortfolioOptimisers.assert_time_dependent_fold_count(optwb, 5))
-        # Chronological ranks map entries to time, not iteration order.
-        @test PortfolioOptimisers.chronological_fold_ranks([[50, 51], [1, 2], [30, 31]]) ==
-              [3, 1, 2]
+        # Callable structs: functor over ctx, trait-inferred target, direct
+        # needs_previous_weights declaration; equivalent to the bare-function form.
+        tdcap = TimeDependent(TDCap(0.35, 0.2))
+        @test tdcap.field == :wb
+        optcap = JuMPOptimiser(; slv = slv, tdc = tdcap)
+        @test !PortfolioOptimisers.needs_previous_weights(optcap)
+        tdfn = TimeDependent(ctx -> WeightBounds(; lb = 0.0,
+                                                 ub = 0.35 -
+                                                      0.15 * (ctx.i - 1) /
+                                                      max(ctx.n - 1, 1)), :wb)
+        optfn = JuMPOptimiser(; slv = slv, tdc = tdfn)
+        for ctx in (ctx1, ctx2)
+            oc = PortfolioOptimisers.update_time_dependent_estimator(optcap, ctx)
+            of = PortfolioOptimisers.update_time_dependent_estimator(optfn, ctx)
+            @test oc.wb.ub ≈ of.wb.ub
+        end
+        optpw = JuMPOptimiser(; slv = slv, tdc = TimeDependent(TDPrevWCap(), :lt))
+        @test PortfolioOptimisers.needs_previous_weights(optpw)
+        @test PortfolioOptimisers.update_time_dependent_estimator(optpw, ctx1).lt.val ==
+              0.01
+        # A subtype without the target trait still requires an explicit field.
+        @test_throws ArgumentError TimeDependent(TDNoTrait())
+        @test TimeDependent(TDNoTrait(), :lt) isa TimeDependent
+        # Meta-optimisers forward the traits and the per-fold update to their inner
+        # estimators.
+        sr = SubsetResampling(; opt = mr)
+        @test PortfolioOptimisers.is_time_dependent(sr)
+        sr2 = PortfolioOptimisers.update_time_dependent_estimator(sr, ctx2)
+        @test sr2.opt.opt.lt.val == 0.02
+        @test isnothing(sr2.opt.opt.tdc)
+        st = Stacking(; opti = [mr, MeanRisk(; opt = JuMPOptimiser(; slv = slv))],
+                      opto = MeanRisk(; opt = JuMPOptimiser(; slv = slv)))
+        @test PortfolioOptimisers.is_time_dependent(st)
+        st2 = PortfolioOptimisers.update_time_dependent_estimator(st, ctx1)
+        @test st2.opti[1].opt.lt.val == 0.01
+        @test isnothing(st2.opti[1].opt.tdc)
+        @test_throws DimensionMismatch PortfolioOptimisers.assert_time_dependent_fold_count(st,
+                                                                                            9)
         # Asset views map through vector entries.
         tdv = TimeDependent([WeightBounds(; lb = zeros(5), ub = fill(0.8, 5)),
                              WeightBounds(; lb = zeros(5), ub = fill(0.9, 5))])

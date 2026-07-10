@@ -464,6 +464,35 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
+Return `true` if the inner optimiser, outer optimiser, or fallback carries time-dependent constraints.
+"""
+function is_time_dependent(opt::NestedClustered)
+    return (is_time_dependent(opt.opti) ||
+            is_time_dependent(opt.opto) ||
+            is_time_dependent(opt.fb))
+end
+function assert_time_dependent_fold_count(opt::NestedClustered, n::Integer)::Nothing
+    assert_time_dependent_fold_count(opt.opti, n)
+    assert_time_dependent_fold_count(opt.opto, n)
+    return assert_time_dependent_fold_count(opt.fb, n)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Resolve time-dependent constraints for the fold described by `ctx` by recursing into the inner optimiser, outer optimiser, and fallback.
+"""
+function update_time_dependent_estimator(opt::NestedClustered, ctx::TimeDependentContext)
+    if !is_time_dependent(opt)
+        return opt
+    end
+    return rebuild_estimator(opt,
+                             (; opti = update_time_dependent_estimator(opt.opti, ctx),
+                              opto = update_time_dependent_estimator(opt.opto, ctx),
+                              fb = update_time_dependent_estimator(opt.fb, ctx)))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
 Return a cluster-sliced copy of [`NestedClustered`](@ref) for asset index set `i` and returns matrix `X`.
 """
 function port_opt_view(nco::NestedClustered, i, X::MatNum, args...)

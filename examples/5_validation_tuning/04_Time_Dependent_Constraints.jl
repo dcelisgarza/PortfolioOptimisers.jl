@@ -6,13 +6,13 @@ Every constraint we have used so far is *static*: it is fixed when the optimiser
 [`TimeDependent`](@ref) expresses exactly this. It wraps *either* a vector of per-fold values (a **schedule**) *or* a function of the fold's [`TimeDependentContext`](@ref) (a **callable**), together with the name of the optimiser field it stands in for, and lives in the `tdc` field of [`JuMPOptimiser`](@ref) and [`HierarchicalOptimiser`](@ref). This gives three ways to specify any targetable input:
 
  1. **Static** — set the field itself; the same value applies to every fold.
- 2. **Schedule-based** — `TimeDependent([v₁, …, vₙ])`; entry `i` is the complete field value for the fold whose test window is `i`-th *in time*.
- 3. **Callable** — `TimeDependent(f, :field)`; `f(ctx)` computes the value per fold on the fly.
+ 2. **Schedule-based** — `TimeDependent([v₁, …, vₙ])`; entry `i` is the complete field value for fold `i` of the consuming scheme's `split` enumeration.
+ 3. **Callable** — `TimeDependent(f, :field)`; `f(ctx)` computes the value per fold on the fly. `f` can be a bare function or a [`TimeDependentCallable`](@ref) functor struct.
 
 Three rules govern the behaviour:
 
   - **Sole source**: the targeted field must be left at its constructor default — the `TimeDependent` is its only source, validated at construction.
-  - **Chronological indexing**: entry `i` always maps to the `i`-th test window *in time*, never to iteration order, so schedules mean the same thing under every scheme.
+  - **Enumeration-order indexing, no hidden ranking**: entry `i` maps to fold `i` of `split(cv, rd)` — the machinery never re-orders folds behind your back. Walk-forward and (unshuffled) KFold enumerate chronologically, so there "fold time" is calendar time; for schemes whose enumeration is not a timeline it is *your* job to key entries off the fold's indices, which the context provides.
   - **Inert outside fold loops**: a plain `optimise` call has no folds, so the `tdc` simply does not participate — the targeted fields stay at their defaults.
 
 In this example we run the same portfolio problem under each cross-validation scheme — [`IndexWalkForward`](@ref), [`KFold`](@ref), [`CombinatorialCrossValidation`](@ref) and [`MultipleRandomised`](@ref) — and compare how the three methods behave in each.
@@ -75,7 +75,7 @@ end;
 #=
 ### 2.3 Callable
 
-A callable computes the value when the fold runs. It receives a [`TimeDependentContext`](@ref) carrying the fold's chronological rank `i`, the fold count `n`, the (possibly asset-viewed) returns data `rd`, the scheme's fold index vectors, and — only when previous weights are threaded — `w_prev`.
+A callable computes the value when the fold runs. It receives a [`TimeDependentContext`](@ref) carrying the fold's enumeration index `i`, the fold count `n`, the (possibly asset-viewed) returns data `rd`, the scheme's fold index vectors, and — only when previous weights are threaded — `w_prev`.
 
 This one reproduces the same de-leveraging plan from the rank alone, so we can check that schedules and callables are two spellings of the same thing:
 =#
@@ -84,7 +84,7 @@ deleverage_fn = TimeDependent(ctx -> WeightBounds(; lb = 0.0,
                                                        0.15 * (ctx.i - 1) /
                                                        max(ctx.n - 1, 1)), :wb);
 #=
-And this one is genuinely dynamic — it reads the volatility of the fold's training window and tightens the cap in turbulent regimes. Note that it indexes `ctx.train_idx` with `ctx.i`; this identifies the fold's own training window under chronologically-ordered schemes (walk-forward, KFold), which is where window-dependent callables belong.
+And this one is genuinely dynamic — it reads the volatility of the fold's training window and tightens the cap in turbulent regimes. Note that it indexes `ctx.train_idx` with `ctx.i`; because `i` is the fold's position in the scheme's own enumeration, `ctx.train_idx[ctx.i]`/`ctx.test_idx[ctx.i]` are always the fold's *own* windows, under every scheme.
 =#
 function vol_cap(ctx)
     Xtr = ctx.rd.X[ctx.train_idx[ctx.i], :]
@@ -93,6 +93,23 @@ function vol_cap(ctx)
     return WeightBounds(; lb = 0.0, ub = clamp(0.35 - vol, 0.15, 0.35))
 end
 vol_cap_td = TimeDependent(vol_cap, :wb);
+#=
+Callables need not be bare functions. A struct subtyping [`TimeDependentCallable`](@ref) whose functor takes the context does the same job with two advantages: its parameters are inspectable data, and — being a type — it participates in the traits a bare function cannot. Defining [`default_time_dependent_target`](@ref) makes the target field inferable (no explicit symbol needed), and a [`needs_previous_weights`](@ref) method declares a previous-weights requirement directly, without the [`PreviousWeightsFunction`](@ref) wrapper.
+
+Here is the de-leveraging plan once more, as a reusable parameterised type:
+=#
+struct DeleverageCap <: PortfolioOptimisers.TimeDependentCallable
+    hi::Float64
+    lo::Float64
+end
+function (c::DeleverageCap)(ctx::TimeDependentContext)
+    return WeightBounds(; lb = 0.0,
+                        ub = c.hi - (c.hi - c.lo) * (ctx.i - 1) / max(ctx.n - 1, 1))
+end
+PortfolioOptimisers.default_time_dependent_target(::DeleverageCap) = :wb
+
+deleverage_struct = TimeDependent(DeleverageCap(0.35, 0.2))
+deleverage_struct.field
 #=
 ### 2.4 Validation happens as early as possible
 
@@ -143,6 +160,15 @@ pretty_table(DataFrame(:fold => 1:n_wf, :static => max_weights(pred_wf_static),
                        :vol_callable => max_weights(pred_wf_vol)); formatters = [resfmt])
 #=
 The static column is free to concentrate; the schedule column respects the tightening cap fold by fold; the rank-based callable matches the schedule exactly (same rule, different spelling); and the volatility callable moves with the regime instead of the calendar.
+
+The struct form is a third spelling of the same rule — its fold weights are identical to the function form's:
+=#
+pred_wf_struct = cross_val_predict(MeanRisk(;
+                                            opt = JuMPOptimiser(; slv = slv,
+                                                                tdc = deleverage_struct)),
+                                   rd, wf)
+all(isapprox(a.res.w, b.res.w) for (a, b) in zip(pred_wf_struct.pred, pred_wf_fn.pred))
+#=
 
 The composition plot makes the de-leveraging visible — later folds are forced to spread weight across more assets:
 =#
@@ -201,12 +227,12 @@ end
 #=
 ## 5. Combinatorial
 
-Under [`CombinatorialCrossValidation`](@ref) a *fold* is a train/test split, and each split's test set is a union of several disjoint time groups. Splits are enumerated combinatorially, so their processing order is not chronological — this is where the chronological-indexing rule earns its keep: entry `i` belongs to the split whose *earliest test observation* is `i`-th in time, regardless of the order the splits are solved in (they run in parallel).
+Under [`CombinatorialCrossValidation`](@ref) a *fold* is a train/test split, and each split's test set is a union of several disjoint time groups. Splits are enumerated combinatorially, so the enumeration is *not* a timeline — and the machinery deliberately does not invent one: any single "position in time" for a split whose test set is a union of disjoint groups would be an arbitrary hidden policy. Entry `i` simply belongs to split `i` of `split(ccv, rd)`, which you can inspect; to key a constraint to time here, prefer a callable that reads its own windows (`ctx.train_idx[ctx.i]`/`ctx.test_idx[ctx.i]`) and derives whatever ordering your problem calls for.
 =#
 ccv = CombinatorialCrossValidation(; n_folds = 4, n_test_folds = 2)
 n_ccv = n_splits(ccv)
 #=
-With 4 groups choose 2 test groups we get 6 splits, so the schedule needs 6 entries. Because a split spans several time groups, a schedule under this scheme is coarser in meaning than under walk-forward — "the constraint in force for this split" — and window-dependent callables that index `ctx.train_idx` with `ctx.i` do **not** identify their own split here (ranks and iteration order differ), so under combinatorial schemes prefer schedules or callables of `ctx.i`/`ctx.n` alone.
+With 4 groups choose 2 test groups we get 6 splits, so the schedule needs 6 entries — one per split, in `split(ccv, rd)`'s enumeration order. Because a split spans several time groups, "the constraint in force for this split" is inherently coarser in meaning than under walk-forward; the schedule below is kept to show the mechanics (entry `i` caps split `i`), and a genuinely time-keyed policy is better expressed as a callable deriving its value from its own windows.
 =#
 mr_cc_sched = MeanRisk(; opt = JuMPOptimiser(; slv = slv, tdc = deleverage(n_ccv)))
 pred_cc_static = cross_val_predict(mr_static, rd, ccv)
@@ -225,7 +251,7 @@ pretty_table(DataFrame(:path => 1:length(pred_cc_sched.pred),
 
 [`MultipleRandomised`](@ref) crosses random *asset subsets* with a walk-forward over time, producing one path per subset. Two things happen to a `tdc` here:
 
-  - Folds within a path are processed out of time order (predictions are re-sorted afterwards), so — as always — entry `i` maps to the `i`-th test window in time.
+  - `ctx.i` is the fold's position in the path's enumeration; predictions are re-sorted by test window *afterwards, for reporting only* — output order never influences which entry a fold received.
   - Each path sees a different asset universe: the optimiser is *viewed* down to the subset before the `tdc` is resolved, so schedule entries are sub-selected along with everything else, and callables see the viewed universe through `ctx.rd` (its `nx` are the subset's names).
 
 A universe-aware callable is the natural fit — here the cap adapts to however many assets the path drew, allowing at most twice the equal weight:
@@ -259,7 +285,7 @@ length(pred_mr_sched.pred)
 |---|---|---|---|---|
 | Static | the field itself | at construction | yes | constraints that do not change |
 | Schedule | `TimeDependent([v₁, …, vₙ])` | targets at construction (each entry test-substituted); length vs fold count at `split` time | yes | known calendars: de-leveraging plans, phased mandates, regime dates fixed in advance |
-| Callable | `TimeDependent(f, :field)` | targets at construction; output validated by the host constructor at each fold | yes, unless wrapped in [`PreviousWeightsFunction`](@ref) | values computed from the fold: volatility regimes, universe size, previous weights |
+| Callable | `TimeDependent(f, :field)` — a function, or a [`TimeDependentCallable`](@ref) struct whose traits can infer the target and declare previous-weights needs | targets at construction; output validated by the host constructor at each fold | yes, unless previous weights are declared ([`PreviousWeightsFunction`](@ref) wrapper or the struct's trait) | values computed from the fold: volatility regimes, universe size, previous weights |
 
-Across schemes, the entry index always means the same thing — the `i`-th test window in time within a path — and whatever the spelling, each fold ends up solving an ordinary static optimiser: the `tdc` is resolved through the host's validated constructor with the `tdc` slot cleared, so nothing downstream of the fold loop knows time dependence exists.
+Across schemes, the entry index always means the same thing — fold `i` of the consuming scheme's `split` enumeration, with `ctx.train_idx[ctx.i]`/`ctx.test_idx[ctx.i]` as the fold's own windows — and whatever the spelling, each fold ends up solving an ordinary static optimiser: the `tdc` is resolved through the host's validated constructor with the `tdc` slot cleared, so nothing downstream of the fold loop knows time dependence exists. Meta-optimisers ([`NestedClustered`](@ref), [`Stacking`](@ref), [`SubsetResampling`](@ref)) forward the resolution into their inner estimators like any other wrapper, so an outer fold loop over a meta resolves an inner `tdc` against the outer folds; standalone, the meta's inner cross-validation consumes it instead.
 =#

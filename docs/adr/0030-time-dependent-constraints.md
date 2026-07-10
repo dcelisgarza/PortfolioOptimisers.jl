@@ -27,17 +27,24 @@ estimator, and inert everywhere else.**
 - `val` is either a vector — entry `i` is the complete field value for fold `i`, so vector-valued
   fields nest one level — or a callable `f(ctx::TimeDependentContext)` evaluated per fold.
   `field` defaults via a trait on the stored value type; types that admit several targets
-  (`Threshold` → `:lt`/`:st`) have no trait method and require an explicit symbol, as do all
-  function forms. `tdc` accepts one wrapper or a vector of them (duplicate targets error).
+  (`Threshold` → `:lt`/`:st`) have no trait method and require an explicit symbol, as do bare
+  function forms. Callables may instead be structs subtyping
+  `TimeDependentCallable <: AbstractAlgorithm` (a functor over the context): being types, they
+  can define `default_time_dependent_target` to make the target inferable and
+  `needs_previous_weights` to declare previous-weights requirements directly — the
+  `PreviousWeightsFunction` wrapper exists only for the uninspectable bare-function case.
+  `tdc` accepts one wrapper or a vector of them (duplicate targets error).
 - **Sole source**: the targeted base field must be left at its constructor default (`nothing`
   for most, `WeightBounds()` for `wb`, `1.0` for `bgt`); the constructor errors if both are set.
   Entry `i` applies to fold `i` *including fold 1*.
-- **Chronological indexing**: entry `i` corresponds to the fold whose *test window is i-th in
-  time within its path*, never the loop-iteration order — combinatorial and MultipleRandomised
-  paths process folds out of time order and sort predictions afterwards, so iteration-order
-  indexing would silently misalign a time-keyed constraint. One shared vector serves all paths;
-  its length must equal folds-per-path, validated immediately after `split(cv, rd)` before any
-  fold runs.
+- **Enumeration-order indexing, no hidden ranking**: entry `i` corresponds to fold `i` of the
+  consuming scheme's `split` enumeration — the machinery never re-ranks folds. `ctx.i` therefore
+  always indexes `ctx.train_idx`/`ctx.test_idx`, so a callable can identify its own fold's
+  windows under every scheme. Walk-forward and (unshuffled) KFold enumerate chronologically;
+  for schemes whose enumeration is not a timeline (combinatorial splits, randomised paths) it
+  is the *user's* responsibility to key entries off the fold's indices. One shared vector
+  serves all paths; its length must equal folds-per-path, validated immediately after
+  `split(cv, rd)` before any fold runs.
 - **Swap-in is a constructor rebuild**: the fold loop rebuilds the host through its validated
   keyword constructor with the fold's values substituted and `tdc = nothing`, so every existing
   invariant re-runs each fold (including on function outputs) and the per-fold optimiser is an
@@ -58,11 +65,14 @@ estimator, and inert everywhere else.**
   and function forms see the viewed universe through `ctx.rd`.
 - **Inert outside fold loops**: a plain (fold-less) `optimise` ignores `tdc` — the targeted
   fields are at their defaults, so the solve is well-defined without it. Meta-optimisers
-  therefore need no special treatment: their inner CV leg consumes the `tdc` against the inner
-  folds through the ordinary `fit_and_predict` path, their fold-less full-window solves run at
-  the defaults, and because swap-in builds new structs the original estimator is never mutated.
-  When a meta sits under an outer CV, the outermost fold loop consumes the `tdc` and inner legs
-  see static per-fold estimators. The entries must be sized for whichever CV consumes them.
+  (NestedClustered, Stacking, SubsetResampling) forward `is_time_dependent` /
+  `update_time_dependent_estimator` / the fold-count assertion into their inner and outer
+  estimators like every other wrapper, so an outer fold loop over a meta resolves the inner
+  `tdc` against the *outer* folds; used standalone, the meta's inner CV leg consumes it against
+  the inner folds through the ordinary `fit_and_predict` path (outermost fold loop wins —
+  swap-in clears `tdc`, so inner legs then see static per-fold estimators). Fold-less
+  full-window solves run at the defaults, and because swap-in builds new structs the original
+  estimator is never mutated. The entries must be sized for whichever CV consumes them.
 
 ## Considered options
 
@@ -70,8 +80,17 @@ estimator, and inert everywhere else.**
   from constraint contents via the recursive trait; a flag would duplicate that channel for
   vector entries. `PreviousWeightsFunction` covers the one uninspectable case (callables) as
   data rather than as a boolean field.
-- **Iteration-order fold indexing.** Rejected as silently wrong under combinatorial /
-  MultipleRandomised, where within-path processing order is not chronological.
+- **Machinery-imposed chronological ranking of folds.** An earlier draft ranked folds by their
+  test window's position in time (`invperm(sortperm(first.(test_idx)))`) so entry `i` always
+  meant "the `i`-th test window in time". Rejected: the ranking is a hidden policy the user
+  never stated, and under combinatorial schemes any single "position" of a split (whose test
+  set is a union of disjoint groups) is arbitrary. Ranking by the *training* windows instead is
+  worse — under KFold the training set is the test slice's complement, so train-based ordering
+  is exactly the reverse of test-based ordering, inverting meaning across schemes. Note the
+  test-position rank is *not* a data leak (fold boundaries are scheme metadata fixed before any
+  returns are observed, and `sort_predictions!` only orders outputs for reporting); it was
+  dropped for its implicitness, not for leakage. The enumeration-order contract puts the keying
+  decision where the knowledge is — with the user, who has the fold's indices in the context.
 - **Direct field replacement (`@set`) plus a hand-maintained symbol→type admissibility table.**
   Rejected: the table re-encodes constructor invariants and drifts; the constructor rebuild
   makes the existing validation the single source of truth at negligible per-fold cost.

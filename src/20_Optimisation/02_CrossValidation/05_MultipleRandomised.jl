@@ -572,10 +572,9 @@ function path_fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator,
     if td_flag
         assert_time_dependent_fold_count(opt, n)
     end
-    # Folds within a path are not processed in time order (predictions are sorted after
-    # the loop), so time-dependent entries are indexed by the chronological rank of each
-    # fold's test window.
-    ranks = td_flag ? chronological_fold_ranks(test_idx) : nothing
+    # `i` is the fold's position in the path's split enumeration — no ordering is imposed
+    # on time-dependent entries (predictions are sorted for reporting only, after the
+    # loop); the user keys entries off ctx.train_idx[ctx.i] / ctx.test_idx[ctx.i].
     predictions = run_folds(opt, n, ex) do i, prev
         col = cols[i]
         rdi = port_opt_view(rd, col)
@@ -583,8 +582,8 @@ function path_fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator,
         # Resolve time-dependent constraints first so freshly swapped-in per-fold
         # constraints also receive the previous weights from the factory pass below.
         if td_flag
-            ctx = TimeDependentContext(; i = ranks[i], n = n, rd = rdi,
-                                       train_idx = train_idx, test_idx = test_idx,
+            ctx = TimeDependentContext(; i = i, n = n, rd = rdi, train_idx = train_idx,
+                                       test_idx = test_idx,
                                        w_prev = isnothing(prev) ? nothing : prev.res.w,
                                        path_id = id)
             opti = update_time_dependent_estimator(opti, ctx)

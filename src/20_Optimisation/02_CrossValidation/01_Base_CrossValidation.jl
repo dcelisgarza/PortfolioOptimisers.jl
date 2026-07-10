@@ -993,12 +993,11 @@ function fit_and_predict(opt::OptE_Opt, rd::ReturnsResult, cv::NonSeqCVER; cols 
     if td_flag
         assert_time_dependent_fold_count(opt, n)
     end
-    ranks = td_flag ? chronological_fold_ranks(test_idx) : nothing
     predictions = parallel_folds(n, ex) do i
         opti = opt
         if td_flag
-            ctx = TimeDependentContext(; i = ranks[i], n = n, rd = rd,
-                                       train_idx = train_idx, test_idx = test_idx)
+            ctx = TimeDependentContext(; i = i, n = n, rd = rd, train_idx = train_idx,
+                                       test_idx = test_idx)
             opti = update_time_dependent_estimator(opti, ctx)
         end
         return fit_and_predict(opti, rd; train_idx = train_idx[i], test_idx = test_idx[i],

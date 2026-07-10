@@ -510,23 +510,14 @@ function fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator, rd::Retu
     if td_flag
         assert_time_dependent_fold_count(opt, n)
     end
-    # Under the combinatorial scheme a fold is a train/test split; splits are ranked by
-    # the earliest observation of their test set so time-dependent entries map to time,
-    # not to iteration order.
-    #! Would it not be more appropriate to use `sortperm(map(x->sum(x), train_idx))` to find the ranks?
-    #! otherwise we are adjusting based on unseen data, which i think is a data leak. Shouldn't the ranks be based off
-    #! the training set? Also since training sets are disjoint it might be better to use the sum? Perhaps the solution
-    #! is to pass i as it is and let the user decide how to handle the time-dependent context, since they know their data best.
-    ranks = if td_flag
-        chronological_fold_ranks(map(x -> minimum(minimum, x), test_idx))
-    else
-        nothing
-    end
+    # A fold is a train/test split and `i` is its position in the split enumeration —
+    # no ordering is imposed on time-dependent entries; the user keys them off the
+    # fold's indices (ctx.train_idx[ctx.i] / ctx.test_idx[ctx.i]).
     predictions = parallel_folds(n, ex; ElT = Vector{PredictionResult}) do i
         opti = opt
         if td_flag
-            ctx = TimeDependentContext(; i = ranks[i], n = n, rd = rd,
-                                       train_idx = train_idx, test_idx = test_idx)
+            ctx = TimeDependentContext(; i = i, n = n, rd = rd, train_idx = train_idx,
+                                       test_idx = test_idx)
             opti = update_time_dependent_estimator(opti, ctx)
         end
         return fit_and_predict(opti, rd; train_idx = train_idx[i], test_idx = test_idx[i],
