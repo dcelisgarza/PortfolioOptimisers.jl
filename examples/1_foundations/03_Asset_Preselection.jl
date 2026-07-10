@@ -229,7 +229,7 @@ identically, so neither survives.
 =#
 
 rd_dup = ReturnsResult(; nx = [rd.nx; "AAPL_copy"], X = hcat(rd.X, rd.X[:, 1]))
-dup_kept = fit_preprocessing(RedundancySelector(; alg = PairwiseCorrelation(; thr = 0.99),
+dup_kept = fit_preprocessing(RedundancySelector(; alg = PairwiseCorrelation(; t = 0.99),
                                                 score = SCM()), rd_dup).nx
 ("AAPL" in dup_kept, "AAPL_copy" in dup_kept, length(dup_kept))
 
@@ -244,7 +244,7 @@ correlation to the rest of the universe survives, i.e. the least redundant one.
 The two correlation algorithms sound interchangeable. They are not.
 
 [`PairwiseCorrelation`](@ref) is **greedy**. It visits correlated pairs from most to least
-correlated and drops the worse asset of each, until no surviving pair exceeds `thr`. That is
+correlated and drops the worse asset of each, until no surviving pair exceeds `t`. That is
 the literal promise the threshold makes, and it is the default.
 
 [`CorrelationComponents`](@ref) reads the same correlations **transitively**. Assets are nodes,
@@ -255,15 +255,15 @@ are discarded — even though `A` and `C` are uncorrelated.
 Chaining is not hypothetical. On real data, at the same threshold:
 =#
 
-greedy = RedundancySelector(; alg = PairwiseCorrelation(; thr = 0.65, absolute = true),
+greedy = RedundancySelector(; alg = PairwiseCorrelation(; t = 0.65, absolute = true),
                             score = SCM())
-comps = RedundancySelector(; alg = CorrelationComponents(; thr = 0.65, absolute = true),
+comps = RedundancySelector(; alg = CorrelationComponents(; t = 0.65, absolute = true),
                            score = SCM())
 
 kept_g = fit_preprocessing(greedy, rd).nx
 kept_c = fit_preprocessing(comps, rd).nx
 
-## the greedy guarantee, verified: no surviving pair exceeds thr
+## the greedy guarantee, verified: no surviving pair exceeds t
 gi = [findfirst(==(n), rd.nx) for n in kept_g]
 sub = abs.(cor(rd.X[:, gi]))
 max_surviving = maximum(sub[i, j] for j in axes(sub, 2) for i in (j + 1):size(sub, 1))
@@ -416,13 +416,12 @@ algorithms agree only once the graph has no chains left to traverse.
 
 thrs = 0.5:0.025:0.85
 n_greedy = [length(fit_preprocessing(RedundancySelector(;
-                                                        alg = PairwiseCorrelation(; thr = t,
+                                                        alg = PairwiseCorrelation(; t = t,
                                                                                   absolute = true),
                                                         score = SCM()), rd).nx)
             for t in thrs]
 n_comps = [length(fit_preprocessing(RedundancySelector(;
-                                                       alg = CorrelationComponents(;
-                                                                                   thr = t,
+                                                       alg = CorrelationComponents(; t = t,
                                                                                    absolute = true),
                                                        score = SCM()), rd).nx)
            for t in thrs]
@@ -462,7 +461,7 @@ plot!(; xlabel = "|correlation| threshold", ylabel = "assets kept",
 #src - Verified on the SP500 slice under Kaimon (20 assets × 1000 obs, docs env):
 #src     * CVaR best-5  = JNJ, MRK, PEP, PG, WMT  (defensive);
 #src       MeanReturn best-5 = AAPL, AMD, LLY, MSFT, RRC (growth). Orientation flip is real.
-#src     * thr = 0.65, absolute: greedy keeps 15 with max surviving |rho| = 0.643 < 0.65;
+#src     * t = 0.65, absolute: greedy keeps 15 with max surviving |rho| = 0.643 < 0.65;
 #src       components keeps 13, additionally dropping KO and XOM by chaining.
 #src     * Tie demo is honest: duplicating the 2nd-lowest-variance column makes ranks 2 and 3
 #src       tie, so best=2 returns 1 asset and best=3 returns 3. Do not "fix" this.

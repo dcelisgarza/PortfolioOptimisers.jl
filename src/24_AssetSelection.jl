@@ -600,11 +600,11 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Greedy pairwise correlation pruning: drop assets until no surviving pair exceeds `thr`.
+Greedy pairwise correlation pruning: drop assets until no surviving pair exceeds `t`.
 
 Correlated pairs are visited from most to least correlated, and the worse asset of each pair is removed. "Worse" means the higher drop score: the `RedundancySelector`'s `score` when it has one, otherwise each asset's summary correlation to the rest of the universe — so the asset that is redundant with *most* of the universe goes first.
 
-This algorithm never **chains**. If `ρ(A, B) = 0.97` and `ρ(B, C) = 0.97` but `ρ(A, C) = 0.10`, it drops `B` and keeps both `A` and `C`, honouring the literal promise that no surviving pair exceeds `thr`. [`CorrelationComponents`](@ref) reads the same inputs transitively and keeps only one of the three.
+This algorithm never **chains**. If `ρ(A, B) = 0.97` and `ρ(B, C) = 0.97` but `ρ(A, C) = 0.10`, it drops `B` and keeps both `A` and `C`, honouring the literal promise that no surviving pair exceeds `t`. [`CorrelationComponents`](@ref) reads the same inputs transitively and keeps only one of the three.
 
 Delegates to [`find_uncorrelated_indices`](@ref).
 
@@ -616,9 +616,9 @@ $(DocStringExtensions.FIELDS)
 
     PairwiseCorrelation(;
         ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
-        thr::Number = 0.95,
+        t::Number = 0.95,
         absolute::Bool = false,
-        measure::VectorToScalarMeasure = MeanValue(),
+        measure::Num_VecToScaM = MeanValue(),
     ) -> PairwiseCorrelation
 
 Keywords correspond to the struct's fields.
@@ -637,7 +637,7 @@ Keywords correspond to the struct's fields.
     """
     Correlation at or above which two assets are considered redundant.
     """
-    thr
+    t
     """
     Whether to compare the absolute value of the correlation.
     """
@@ -646,25 +646,25 @@ Keywords correspond to the struct's fields.
     Reducer producing the fallback drop score from each column of the correlation matrix; ignored when the selector carries a `score`.
     """
     measure
-    function PairwiseCorrelation(ce::StatsBase.CovarianceEstimator, thr::Number,
-                                 absolute::Bool, measure::VectorToScalarMeasure)
-        assert_correlation_threshold(thr)
-        return new{typeof(ce), typeof(thr), typeof(absolute), typeof(measure)}(ce, thr,
-                                                                               absolute,
-                                                                               measure)
+    function PairwiseCorrelation(ce::StatsBase.CovarianceEstimator, t::Number,
+                                 absolute::Bool, measure::Num_VecToScaM)
+        assert_correlation_threshold(t)
+        return new{typeof(ce), typeof(t), typeof(absolute), typeof(measure)}(ce, t,
+                                                                             absolute,
+                                                                             measure)
     end
 end
 function PairwiseCorrelation(;
                              ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
-                             thr::Number = 0.95, absolute::Bool = false,
-                             measure::VectorToScalarMeasure = MeanValue())::PairwiseCorrelation
-    return PairwiseCorrelation(ce, thr, absolute, measure)
+                             t::Number = 0.95, absolute::Bool = false,
+                             measure::Num_VecToScaM = MeanValue())::PairwiseCorrelation
+    return PairwiseCorrelation(ce, t, absolute, measure)
 end
 requires_score(::PairwiseCorrelation) = false
 function redundancy_keep(alg::PairwiseCorrelation, rd::AbstractReturnsResult,
                          scores::Option{<:VecNum}, bib::Bool)::BitVector
     keep = falses(size(rd.X, 2))
-    idx = find_uncorrelated_indices(rd.X; ce = alg.ce, t = alg.thr, absolute = alg.absolute,
+    idx = find_uncorrelated_indices(rd.X; ce = alg.ce, t = alg.t, absolute = alg.absolute,
                                     measure = alg.measure,
                                     scores = if isnothing(scores)
                                         nothing
@@ -679,7 +679,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Group assets by connected component of the over-threshold correlation graph, and keep the best-scoring member of each.
 
-Two assets share an edge when their (absolute) correlation is at or above `thr`. Components are transitive, so this reads a chain `A ~ B ~ C` as one redundant blob even when `A` and `C` are uncorrelated, and keeps a single asset from it. That is a stronger claim than [`PairwiseCorrelation`](@ref)'s, and a stronger reduction; choose it when you want one representative per correlated blob rather than a guarantee about surviving pairs.
+Two assets share an edge when their (absolute) correlation is at or above `t`. Components are transitive, so this reads a chain `A ~ B ~ C` as one redundant blob even when `A` and `C` are uncorrelated, and keeps a single asset from it. That is a stronger claim than [`PairwiseCorrelation`](@ref)'s, and a stronger reduction; choose it when you want one representative per correlated blob rather than a guarantee about surviving pairs.
 
 A component whose best score is tied keeps nobody (see [`groups_argbest`](@ref)).
 
@@ -691,9 +691,9 @@ $(DocStringExtensions.FIELDS)
 
     CorrelationComponents(;
         ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
-        thr::Number = 0.95,
+        t::Number = 0.95,
         absolute::Bool = false,
-        measure::VectorToScalarMeasure = MeanValue(),
+        measure::Num_VecToScaM = MeanValue(),
     ) -> CorrelationComponents
 
 Keywords correspond to the struct's fields.
@@ -712,7 +712,7 @@ Keywords correspond to the struct's fields.
     """
     Correlation at or above which two assets share an edge.
     """
-    thr
+    t
     """
     Whether to compare the absolute value of the correlation.
     """
@@ -721,19 +721,19 @@ Keywords correspond to the struct's fields.
     Reducer producing the fallback score from each column of the correlation matrix; ignored when the selector carries a `score`. Lower is better, so the surviving representative is the least redundant member of its component.
     """
     measure
-    function CorrelationComponents(ce::StatsBase.CovarianceEstimator, thr::Number,
-                                   absolute::Bool, measure::VectorToScalarMeasure)
-        assert_correlation_threshold(thr)
-        return new{typeof(ce), typeof(thr), typeof(absolute), typeof(measure)}(ce, thr,
-                                                                               absolute,
-                                                                               measure)
+    function CorrelationComponents(ce::StatsBase.CovarianceEstimator, t::Number,
+                                   absolute::Bool, measure::Num_VecToScaM)
+        assert_correlation_threshold(t)
+        return new{typeof(ce), typeof(t), typeof(absolute), typeof(measure)}(ce, t,
+                                                                             absolute,
+                                                                             measure)
     end
 end
 function CorrelationComponents(;
                                ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
-                               thr::Number = 0.95, absolute::Bool = false,
-                               measure::VectorToScalarMeasure = MeanValue())::CorrelationComponents
-    return CorrelationComponents(ce, thr, absolute, measure)
+                               t::Number = 0.95, absolute::Bool = false,
+                               measure::Num_VecToScaM = MeanValue())::CorrelationComponents
+    return CorrelationComponents(ce, t, absolute, measure)
 end
 requires_score(::CorrelationComponents) = false
 function redundancy_keep(alg::CorrelationComponents, rd::AbstractReturnsResult,
@@ -747,12 +747,12 @@ function redundancy_keep(alg::CorrelationComponents, rd::AbstractReturnsResult,
     else
         scores, bib
     end
-    return groups_argbest(correlation_components(rho, alg.thr), s, sbib)
+    return groups_argbest(correlation_components(rho, alg.t), s, sbib)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return the connected components of the graph whose edges are the pairs of `rho` at or above `thr`.
+Return the connected components of the graph whose edges are the pairs of `rho` at or above `t`.
 
 A union-find pass over the strict lower triangle, so components are transitive and every asset lands in exactly one of them (a singleton when it has no over-threshold partner).
 
@@ -764,12 +764,12 @@ A union-find pass over the strict lower triangle, so components are transitive a
 
   - [`CorrelationComponents`](@ref)
 """
-function correlation_components(rho::MatNum, thr::Number)
+function correlation_components(rho::MatNum, t::Number)
     n = size(rho, 1)
     parent = collect(1:n)
     find(i) = parent[i] == i ? i : (parent[i] = find(parent[i]))
     for j in 1:n, i in (j + 1):n
-        if rho[i, j] >= thr
+        if rho[i, j] >= t
             ri, rj = find(i), find(j)
             if ri != rj
                 parent[max(ri, rj)] = min(ri, rj)
@@ -840,9 +840,9 @@ Validate a correlation threshold.
   - [`PairwiseCorrelation`](@ref)
   - [`CorrelationComponents`](@ref)
 """
-function assert_correlation_threshold(thr::Number)::Nothing
-    @argcheck(-one(thr) <= thr <= one(thr),
-              DomainError(thr, "a correlation threshold must lie in [-1, 1]"))
+function assert_correlation_threshold(t::Number)::Nothing
+    @argcheck(-one(t) <= t <= one(t),
+              DomainError(t, "a correlation threshold must lie in [-1, 1]"))
     return nothing
 end
 """
@@ -879,7 +879,7 @@ julia> rd = ReturnsResult(; nx = ["A", "B", "C"],
                           X = [0.10 0.10 -0.05; -0.10 -0.10 0.07; 0.05 0.05 -0.02;
                                0.02 0.02 0.09]);
 
-julia> sel = RedundancySelector(; alg = PairwiseCorrelation(; thr = 0.99), score = SCM());
+julia> sel = RedundancySelector(; alg = PairwiseCorrelation(; t = 0.99), score = SCM());
 
 julia> PortfolioOptimisers.fit_preprocessing(sel, rd).nx
 1-element Vector{String}:

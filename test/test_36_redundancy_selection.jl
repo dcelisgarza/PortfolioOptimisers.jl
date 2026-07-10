@@ -12,8 +12,8 @@ using Test, PortfolioOptimisers, StableRNGs, Statistics
                                  0.002 0.004 0.09])
 
     @testset "construction validation" begin
-        @test_throws DomainError PairwiseCorrelation(; thr = 1.5)
-        @test_throws DomainError CorrelationComponents(; thr = -1.5)
+        @test_throws DomainError PairwiseCorrelation(; t = 1.5)
+        @test_throws DomainError CorrelationComponents(; t = -1.5)
 
         # ClusterGroups has no fallback survivor rule, so it needs a score
         @test_throws POx.IsNothingError RedundancySelector(; alg = ClusterGroups())
@@ -35,7 +35,7 @@ using Test, PortfolioOptimisers, StableRNGs, Statistics
 
     @testset "score orients the survivor" begin
         # lower variance is better, so A survives the A/B pair
-        sel = RedundancySelector(; alg = PairwiseCorrelation(; thr = 0.99), score = SCM())
+        sel = RedundancySelector(; alg = PairwiseCorrelation(; t = 0.99), score = SCM())
         @test fit_preprocessing(sel, rd_pair).nx == ["A", "C"]
 
         # MeanReturn is maximised, so the higher-mean asset of the pair survives
@@ -44,7 +44,7 @@ using Test, PortfolioOptimisers, StableRNGs, Statistics
                                 -0.010 -0.020 0.07
                                 0.005 0.010 -0.02
                                 0.002 0.004 0.09])
-        selm = RedundancySelector(; alg = PairwiseCorrelation(; thr = 0.99),
+        selm = RedundancySelector(; alg = PairwiseCorrelation(; t = 0.99),
                                   score = MeanReturn())
         kept = fit_preprocessing(selm, rd).nx
         @test "C" in kept
@@ -93,12 +93,10 @@ using Test, PortfolioOptimisers, StableRNGs, Statistics
                                 -0.10 -0.10 0.07
                                 0.05 0.05 -0.02
                                 0.02 0.02 0.09])
-        @test fit_preprocessing(RedundancySelector(;
-                                                   alg = PairwiseCorrelation(; thr = 0.99),
+        @test fit_preprocessing(RedundancySelector(; alg = PairwiseCorrelation(; t = 0.99),
                                                    score = SCM()), rd).nx == ["C"]
         @test fit_preprocessing(RedundancySelector(;
-                                                   alg = CorrelationComponents(;
-                                                                               thr = 0.99),
+                                                   alg = CorrelationComponents(; t = 0.99),
                                                    score = SCM()), rd).nx == ["C"]
     end
 
@@ -150,8 +148,7 @@ using Test, PortfolioOptimisers, StableRNGs, Statistics
         rd = ReturnsResult(; nx = string.('A':'E'), X = X)
 
         pipe = Pipeline(;
-                        steps = (RedundancySelector(;
-                                                    alg = PairwiseCorrelation(; thr = 0.95),
+                        steps = (RedundancySelector(; alg = PairwiseCorrelation(; t = 0.95),
                                                     score = SCM()), EmpiricalPrior(),
                                  EqualWeighted()))
         res = fit(pipe, rd)

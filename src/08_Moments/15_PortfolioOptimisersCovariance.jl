@@ -147,7 +147,7 @@ end
     find_uncorrelated_indices(X::MatNum;
                               ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
                               t::Number = 0.95, absolute::Bool = false,
-                              measure::VectorToScalarMeasure = MeanValue(),
+                              measure::Num_VecToScaM = MeanValue(),
                               scores::Option{<:VecNum} = nothing)
 
 Find indices of a maximally uncorrelated subset of assets from a data matrix.
@@ -183,13 +183,13 @@ Internal machinery — the caller-facing form is [`RedundancySelector`](@ref) wi
   - [`RedundancySelector`](@ref)
   - [`PairwiseCorrelation`](@ref)
   - [`PortfolioOptimisersCovariance`](@ref)
-  - [`VectorToScalarMeasure`](@ref)
+  - [`Num_VecToScaM`](@ref)
   - [`MeanValue`](@ref)
 """
 function find_uncorrelated_indices(X::MatNum;
                                    ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
                                    t::Number = 0.95, absolute::Bool = false,
-                                   measure::VectorToScalarMeasure = MeanValue(),
+                                   measure::Num_VecToScaM = MeanValue(),
                                    scores::Option{<:VecNum} = nothing)
     N = size(X, 2)
     rho = !absolute ? Statistics.cor(ce, X) : abs.(Statistics.cor(ce, X))
