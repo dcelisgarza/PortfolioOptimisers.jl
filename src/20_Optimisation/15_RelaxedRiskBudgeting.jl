@@ -197,6 +197,32 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
+Return `true` if the inner JuMP optimiser or fallback carries time-dependent constraints.
+"""
+function is_time_dependent(opt::RelaxedRiskBudgeting)
+    return is_time_dependent(opt.opt) || is_time_dependent(opt.fb)
+end
+function assert_time_dependent_fold_count(opt::RelaxedRiskBudgeting, n::Integer)::Nothing
+    assert_time_dependent_fold_count(opt.opt, n)
+    return assert_time_dependent_fold_count(opt.fb, n)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Resolve time-dependent constraints for the fold described by `ctx` by recursing into the inner JuMP optimiser and fallback.
+"""
+function update_time_dependent_estimator(opt::RelaxedRiskBudgeting,
+                                         ctx::TimeDependentContext)
+    if !is_time_dependent(opt)
+        return opt
+    end
+    return rebuild_estimator(opt,
+                             (; opt = update_time_dependent_estimator(opt.opt, ctx),
+                              fb = update_time_dependent_estimator(opt.fb, ctx)))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
 Return a cluster-sliced copy of [`RelaxedRiskBudgeting`](@ref) for asset index set `i` and returns matrix `X`.
 """
 function port_opt_view(rrb::RelaxedRiskBudgeting, i, X::MatNum,

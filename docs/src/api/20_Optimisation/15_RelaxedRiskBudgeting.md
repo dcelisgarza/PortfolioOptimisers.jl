@@ -7,6 +7,8 @@ RegularisedRelaxedRiskBudgeting
 RegularisedPenalisedRelaxedRiskBudgeting
 RelaxedRiskBudgeting
 needs_previous_weights(opt::RelaxedRiskBudgeting)
+is_time_dependent(opt::RelaxedRiskBudgeting)
+update_time_dependent_estimator(opt::RelaxedRiskBudgeting, ctx::TimeDependentContext)
 factory(rrb::RelaxedRiskBudgeting, w::AbstractVector)
 port_opt_view(rrb::RelaxedRiskBudgeting, i, X::MatNum, args...)
 set_relaxed_risk_budgeting_alg_constraints!

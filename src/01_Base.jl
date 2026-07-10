@@ -473,6 +473,7 @@ const arg_dict = Dict(
                       :sglt => "`sglt`: Sub-grouped long threshold.",#
                       :sgst => "`sgst`: Sub-grouped short threshold.",#
                       :tn_jmp => "`tn`: Turnover constraint estimator(s).",#
+                      :tdc => "`tdc`: Time-dependent constraint(s); each entry supplies a targeted field's per-fold values under cross-validation (the targeted field must be left at its default). Inert outside fold loops.",#
                       :fees_jmp => "`fees`: Fee estimator or fee structure.",#
                       :tr_jmp => "`tr`: Tracking error constraint(s).",#
                       :ple => "`ple`: Phylogeny constraint estimator(s).",#

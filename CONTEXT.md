@@ -244,6 +244,12 @@ User-facing utilities converting high-level specifications into the numeric form
 **JuMP Constraints**
 The layer adding numeric constraint data into a JuMP model. Includes budget constraints (`BudgetRange` = sum-of-weights interval, `BudgetCosts` = linear transaction costs, `BudgetMarketImpact` = power-law impact), `LpRegularisation`, plus Turnover, Tracking, and Fees constraints.
 
+**Time-Dependent Constraint**
+An optimiser input whose value changes across the folds of a cross-validation scheme instead of being fixed for the whole horizon. Expressed by wrapping a per-fold sequence of values — or a function that computes the value from the fold's Time-Dependent Context — together with the name of the optimiser input it stands in for. Entry *i* corresponds to the *i*-th *chronological* test fold within a path, never the iteration order. A time-dependent constraint is the *sole source* of its target: the static input must be left at its default. It participates only where folds exist and is inert everywhere else — a plain (fold-less) optimisation, including a meta-optimiser's full-window solve, runs with the target at its default (the folds belong to whichever cross-validation consumes the entries, which must be sized for it).
+
+**Time-Dependent Context**
+The per-fold information handed to a function-form Time-Dependent Constraint: the fold's chronological position and fold count, the (possibly asset-viewed) returns data, the fold index vectors, and — only when previous weights are threaded — the previous fold's weights.
+
 **Weight Finaliser**
 Post-solve adjustment forcing weights into the feasible region: `IterativeWeightFinaliser` (projection) or `JuMPWeightFinaliser` (re-solve).
 

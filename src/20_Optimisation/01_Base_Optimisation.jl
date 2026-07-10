@@ -265,11 +265,417 @@ function needs_previous_weights(::OptE_Opt)
 end
 #! Start: Overload these for all estimators which can use time-dependent constraints.
 """
+$(DocStringExtensions.TYPEDEF)
+
+Wrapper marking a callable time-dependent constraint entry as requiring the previous optimisation's weights.
+
+A bare callable inside a [`TimeDependent`](@ref) cannot be inspected for previous-weight requirements, so it contributes `false` to [`needs_previous_weights`](@ref) and its context's `w_prev` is only populated when something else makes the fold loop sequential. Wrapping the callable in `PreviousWeightsFunction` declares the requirement as data: it contributes `true` to [`needs_previous_weights`](@ref), forcing sequential fold execution and a populated `w_prev` in the [`TimeDependentContext`](@ref).
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    PreviousWeightsFunction(; f)
+
+# Related
+
+  - [`TimeDependent`](@ref)
+  - [`TimeDependentContext`](@ref)
+  - [`needs_previous_weights`](@ref)
+"""
+struct PreviousWeightsFunction{T} <: AbstractAlgorithm
+    """
+    Callable evaluated per fold as `f(ctx::TimeDependentContext)`, returning the fold's field value.
+    """
+    f::T
+    function PreviousWeightsFunction(f)
+        return new{typeof(f)}(f)
+    end
+end
+function PreviousWeightsFunction(; f)::PreviousWeightsFunction
+    return PreviousWeightsFunction(f)
+end
+function needs_previous_weights(::PreviousWeightsFunction)::Bool
+    return true
+end
+"""
+    default_time_dependent_target(val)
+
+Return the default target field symbol for a time-dependent constraint value.
+
+Defined only for value types that admit exactly one target field on the optimisers carrying a `tdc` slot (e.g. weight bounds → `:wb`, turnover → `:tn`). Ambiguous types (e.g. a buy-in threshold, which may target `:lt` or `:st`) deliberately have no method, so the target must be given explicitly when constructing the [`TimeDependent`](@ref). For a vector of per-fold values the target is inferred from the entries, which must agree.
+
+# Related
+
+  - [`TimeDependent`](@ref)
+"""
+function default_time_dependent_target(val)
+    return throw(ArgumentError("cannot infer the target field for a time-dependent value of type $(typeof(val)); provide the target field explicitly, e.g. TimeDependent(val, :lt)"))
+end
+function default_time_dependent_target(::WbE_Wb)::Symbol
+    return :wb
+end
+function default_time_dependent_target(::TnE_Tn)::Symbol
+    return :tn
+end
+function default_time_dependent_target(::FeesE_Fees)::Symbol
+    return :fees
+end
+function default_time_dependent_target(::AbstractTracking)::Symbol
+    return :tr
+end
+function default_time_dependent_target(::PlCE_PlC)::Symbol
+    return :ple
+end
+function default_time_dependent_target(val::AbstractVector)
+    targets = unique!([default_time_dependent_target(v) for v in val if !isnothing(v)])
+    @argcheck(length(targets) == 1,
+              ArgumentError("cannot infer a unique target field from the time-dependent entries, got $targets; provide the target field explicitly"))
+    return only(targets)
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Time-dependent constraint: an optimiser input whose value changes across the folds of a cross-validation scheme.
+
+`val` is either a vector of per-fold values — entry `i` is the complete field value for the fold whose test window is `i`-th in time within its path — or a callable `f(ctx::TimeDependentContext)` evaluated per fold (optionally wrapped in [`PreviousWeightsFunction`](@ref)). `field` names the optimiser field the entries stand in for; it defaults via [`default_time_dependent_target`](@ref) and must be given explicitly for callables and for ambiguous value types.
+
+A time-dependent constraint is the *sole source* of its target: the targeted optimiser field must be left at its constructor default. It participates only where folds exist and is inert everywhere else — a fold-less `optimise` runs with the target at its default. Vector entries must have length equal to the number of folds of the consuming cross-validation scheme, validated at `split` time. Entries may be `nothing`, leaving the target at its default for that fold.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    TimeDependent(val, field::Option{<:Symbol} = nothing)
+    TimeDependent(; val, field::Option{<:Symbol} = nothing)
+
+## Validation
+
+  - If `val` is a vector: `!isempty(val)`.
+  - If `val` is a callable: `field` must be provided.
+  - If `field` is `nothing`: it is inferred via [`default_time_dependent_target`](@ref).
+
+# Examples
+
+```jldoctest
+julia> TimeDependent([Fees(; l = 0.001), Fees(; l = 0.002)])
+TimeDependent
+    val ┼ 2-element Vector{Fees}
+        │ Fees ⋯
+        │ Fees ⋯
+  field ┴ Symbol: :fees
+```
+
+# Related
+
+  - [`TimeDependentContext`](@ref)
+  - [`PreviousWeightsFunction`](@ref)
+  - [`is_time_dependent`](@ref)
+  - [`update_time_dependent_estimator`](@ref)
+"""
+struct TimeDependent{T1} <: AbstractEstimator
+    """
+    Vector of per-fold values (in chronological fold order), or a callable `f(ctx::TimeDependentContext)`, optionally wrapped in [`PreviousWeightsFunction`](@ref).
+    """
+    val::T1
+    """
+    Target optimiser field the entries stand in for.
+    """
+    field::Symbol
+    function TimeDependent(val::Union{<:AbstractVector, <:Base.Callable,
+                                      <:PreviousWeightsFunction},
+                           field::Option{<:Symbol} = nothing)
+        if isa(val, AbstractVector)
+            @argcheck(!isempty(val), IsEmptyError("val cannot be empty"))
+        elseif isnothing(field)
+            throw(ArgumentError("field cannot be inferred from a callable; provide it explicitly, e.g. TimeDependent(f, :tn)"))
+        end
+        if isnothing(field)
+            field = default_time_dependent_target(val)
+        end
+        return new{typeof(val)}(val, field)
+    end
+end
+function TimeDependent(;
+                       val::Union{<:AbstractVector, <:Base.Callable,
+                                  <:PreviousWeightsFunction},
+                       field::Option{<:Symbol} = nothing)::TimeDependent
+    return TimeDependent(val, field)
+end
+"""
+    const VecTd = AbstractVector{<:TimeDependent}
+
+Alias for a vector of time-dependent constraints.
+
+# Related
+
+  - [`TimeDependent`](@ref)
+"""
+const VecTd = AbstractVector{<:TimeDependent}
+"""
+    const Td_VecTd = Union{<:TimeDependent, <:VecTd}
+
+Alias for a single time-dependent constraint or a vector of them.
+
+# Related
+
+  - [`TimeDependent`](@ref)
+  - [`VecTd`](@ref)
+"""
+const Td_VecTd = Union{<:TimeDependent, <:VecTd}
+"""
+    time_dependent_entries(tdc::Td_VecTd)
+
+Return an iterable of the [`TimeDependent`](@ref) entries in a `tdc` slot, whether it holds a single wrapper or a vector of them.
+
+# Related
+
+  - [`TimeDependent`](@ref)
+  - [`Td_VecTd`](@ref)
+"""
+function time_dependent_entries(tdc::TimeDependent)
+    return (tdc,)
+end
+function time_dependent_entries(tdc::VecTd)
+    return tdc
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Per-fold context handed to time-dependent constraints when they are resolved.
+
+Carries the fold's chronological position and the data needed for a callable entry to compute its value. `rd` is the fold's (possibly asset-viewed) returns data, so callables see the current universe and timestamps. `w_prev` is populated only when the fold loop runs sequentially and a previous fold exists; `path_id` only under multi-path schemes.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    TimeDependentContext(;
+        i::Integer, n::Integer, rd::ReturnsResult, train_idx, test_idx,
+        w_prev::Option{<:VecNum} = nothing, path_id::Option{<:Integer} = nothing
+    )
+
+# Related
+
+  - [`TimeDependent`](@ref)
+  - [`update_time_dependent_estimator`](@ref)
+"""
+struct TimeDependentContext{T1, T2, T3, T4, T5, T6, T7} <: AbstractResult
+    """
+    Chronological rank of the fold's test window within its path (1-based).
+    """
+    i::T1
+    """
+    Number of folds within the path.
+    """
+    n::T2
+    """
+    The fold loop's (possibly asset-viewed) returns data.
+    """
+    rd::T3
+    """
+    Per-path training index vectors.
+    """
+    train_idx::T4
+    """
+    Per-path test index vectors.
+    """
+    test_idx::T5
+    """
+    Previous fold's portfolio weights, when threaded; `nothing` otherwise.
+    """
+    w_prev::T6
+    """
+    Path identifier under multi-path schemes; `nothing` otherwise.
+    """
+    path_id::T7
+    function TimeDependentContext(i::Integer, n::Integer, rd::ReturnsResult, train_idx,
+                                  test_idx, w_prev::Option{<:VecNum},
+                                  path_id::Option{<:Integer})
+        @argcheck(1 <= i <= n, DomainError(i, "fold index i must be in 1:$n"))
+        return new{typeof(i), typeof(n), typeof(rd), typeof(train_idx), typeof(test_idx),
+                   typeof(w_prev), typeof(path_id)}(i, n, rd, train_idx, test_idx, w_prev,
+                                                    path_id)
+    end
+end
+function TimeDependentContext(; i::Integer, n::Integer, rd::ReturnsResult, train_idx,
+                              test_idx, w_prev::Option{<:VecNum} = nothing,
+                              path_id::Option{<:Integer} = nothing)::TimeDependentContext
+    return TimeDependentContext(i, n, rd, train_idx, test_idx, w_prev, path_id)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Resolve a time-dependent constraint to its value for the fold described by `ctx`.
+
+Vector values index entry `ctx.i`; callables are invoked with `ctx`.
+
+# Related
+
+  - [`TimeDependent`](@ref)
+  - [`TimeDependentContext`](@ref)
+"""
+function time_dependent_value(td::TimeDependent, ctx::TimeDependentContext)
+    v = td.val
+    if isa(v, AbstractVector)
+        return v[ctx.i]
+    elseif isa(v, PreviousWeightsFunction)
+        return v.f(ctx)
+    end
+    return v(ctx)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return `true` if a time-dependent constraint requires the previous optimisation's weights.
+
+`true` for a [`PreviousWeightsFunction`](@ref) value; for vector values, delegates to [`needs_previous_weights`](@ref) on entries that support it (turnover, fees, tracking). Bare callables contribute `false` — their output cannot be inspected.
+
+# Related
+
+  - [`TimeDependent`](@ref)
+  - [`needs_previous_weights`](@ref)
+"""
+function needs_previous_weights(td::TimeDependent)::Bool
+    v = td.val
+    if isa(v, PreviousWeightsFunction)
+        return true
+    elseif isa(v, AbstractVector)
+        return any(time_dependent_entry_needs_previous_weights, v)
+    end
+    return false
+end
+function needs_previous_weights(tdc::VecTd)::Bool
+    return any(needs_previous_weights, tdc)
+end
+"""
+    time_dependent_entry_needs_previous_weights(x)
+
+Return `true` if a per-fold entry value of a [`TimeDependent`](@ref) requires the previous optimisation's weights.
+
+Delegates to [`needs_previous_weights`](@ref) for the value types that support the trait (turnover, fees, tracking); every other value contributes `false`.
+
+# Related
+
+  - [`TimeDependent`](@ref)
+  - [`needs_previous_weights`](@ref)
+"""
+function time_dependent_entry_needs_previous_weights(::Any)::Bool
+    return false
+end
+function time_dependent_entry_needs_previous_weights(x::Union{<:TnE_Tn, <:FeesE_Fees,
+                                                              <:Tr_VecTr})::Bool
+    return needs_previous_weights(x)
+end
+function port_opt_view(td::TimeDependent, i, args...)
+    v = td.val
+    if isa(v, AbstractVector)
+        v = [port_opt_view(x, i) for x in v]
+    end
+    return TimeDependent(v, td.field)
+end
+function port_opt_view(tdc::VecTd, i, args...)
+    return [port_opt_view(td, i) for td in tdc]
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Validate the targets of a `tdc` slot against the host optimiser's targetable fields.
+
+`current` maps each targetable field to the value passed to the host constructor; `defaults` holds the non-`nothing` constructor defaults. Checks that targets are unique, targetable, and that each targeted field was left at its default (the sole-source rule).
+
+# Related
+
+  - [`TimeDependent`](@ref)
+"""
+function assert_time_dependent_targets(tdc::Td_VecTd, current::NamedTuple,
+                                       defaults::NamedTuple, host::Symbol)::Nothing
+    if isa(tdc, VecTd)
+        @argcheck(!isempty(tdc), IsEmptyError("tdc cannot be empty"))
+    end
+    entries = time_dependent_entries(tdc)
+    fields = [td.field for td in entries]
+    @argcheck(allunique(fields), ArgumentError("tdc targets must be unique, got $fields"))
+    for td in entries
+        f = td.field
+        @argcheck(haskey(current, f),
+                  ArgumentError("$f is not a time-dependent-targetable field of $host; targetable fields are $(keys(current))"))
+        def = get(defaults, f, nothing)
+        @argcheck(current[f] === def,
+                  ArgumentError("$f is targeted by a time-dependent constraint, so it must be left at its default ($def), got $(current[f])"))
+    end
+    return nothing
+end
+"""
+    assert_time_dependent_fold_count(opt, n::Integer)
+
+Assert that every vector-valued time-dependent constraint in `opt` has exactly `n` entries.
+
+Called by the cross-validation fold loops immediately after `split`, before any fold runs. The default is a no-op; hosts check their `tdc` slot and wrapper optimisers recurse.
+
+# Related
+
+  - [`TimeDependent`](@ref)
+  - [`is_time_dependent`](@ref)
+"""
+function assert_time_dependent_fold_count(::OptE_Opt, ::Integer)::Nothing
+    return nothing
+end
+function assert_time_dependent_fold_count(::Nothing, ::Integer)::Nothing
+    return nothing
+end
+function assert_time_dependent_fold_count(td::TimeDependent, n::Integer)::Nothing
+    v = td.val
+    if isa(v, AbstractVector)
+        @argcheck(length(v) == n,
+                  DimensionMismatch("time-dependent entries for $(td.field) ($(length(v))) must equal the number of folds ($n)"))
+    end
+    return nothing
+end
+function assert_time_dependent_fold_count(tdc::VecTd, n::Integer)::Nothing
+    for td in tdc
+        assert_time_dependent_fold_count(td, n)
+    end
+    return nothing
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the chronological rank of each fold's test window.
+
+Rank `k` means the fold's test window is `k`-th in time. Fold loops use these ranks as the time-dependent entry index, so entry `i` always maps to the `i`-th test window in time regardless of iteration order.
+
+# Related
+
+  - [`TimeDependentContext`](@ref)
+"""
+function chronological_fold_ranks(test_idx)
+    return invperm(sortperm([first(t) for t in test_idx]))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Rebuild an estimator through its keyword constructor with the fields in `repl` replaced.
+
+All remaining fields are carried through unchanged. Because the rebuild goes through the validated keyword constructor, every construction invariant re-runs.
+"""
+function rebuild_estimator(x, repl::NamedTuple)
+    fns = fieldnames(typeof(x))
+    nt = NamedTuple{fns}(map(f -> getfield(x, f), fns))
+    return (typeof(x).name.wrapper)(; merge(nt, repl)...)
+end
+"""
     is_time_dependent(opt)
 
-Return `true` if the optimiser has time-dependent constraints or objectives.
+Return `true` if the optimiser carries time-dependent constraints.
 
-The default returns `false`. Overridden for estimators that must be updated between periods (e.g. when constraints depend on the current time step).
+The default returns `false`. Hosts return `true` when their `tdc` slot is set; wrapper optimisers recurse into their inner optimiser and fallback.
 
 # Arguments
 
@@ -281,23 +687,27 @@ The default returns `false`. Overridden for estimators that must be updated betw
 
 # Related
 
+  - [`TimeDependent`](@ref)
   - [`update_time_dependent_estimator`](@ref)
   - [`needs_previous_weights`](@ref)
 """
 function is_time_dependent(::OptE_Opt)
     return false
 end
+function is_time_dependent(::Nothing)
+    return false
+end
 """
-    update_time_dependent_estimator(opt, args...)
+    update_time_dependent_estimator(opt, ctx::TimeDependentContext)
 
-Update the estimator for the current time period.
+Resolve the time-dependent constraints of `opt` for the fold described by `ctx`.
 
-The default returns the estimator unchanged. Overridden for estimators that need to be updated between periods (e.g. sliding window constraints, time-varying parameters).
+The default returns the estimator unchanged. Hosts rebuild themselves through their validated keyword constructor with each targeted field replaced by its resolved per-fold value and the `tdc` slot cleared, so the result is an ordinary static estimator; wrapper optimisers recurse.
 
 # Arguments
 
   - `opt`: Optimisation estimator or result.
-  - `args...`: Additional arguments (e.g. current period index, returns data).
+  - `ctx::TimeDependentContext`: The fold's context.
 
 # Returns
 
@@ -305,11 +715,15 @@ The default returns the estimator unchanged. Overridden for estimators that need
 
 # Related
 
+  - [`TimeDependent`](@ref)
+  - [`TimeDependentContext`](@ref)
   - [`is_time_dependent`](@ref)
-  - [`path_fit_and_predict`](@ref)
 """
-function update_time_dependent_estimator(opt::OptE_Opt, args...)
+function update_time_dependent_estimator(opt::OptE_Opt, ::TimeDependentContext)
     return opt
+end
+function update_time_dependent_estimator(::Nothing, ::TimeDependentContext)
+    return nothing
 end
 #! End: Overload these for all estimators which can use time-dependent constraints.
 """
@@ -386,8 +800,24 @@ Apply [`update_time_dependent_estimator`](@ref) element-wise to a vector of opti
   - [`update_time_dependent_estimator`](@ref)
   - [`VecOptE_Opt`](@ref)
 """
-function update_time_dependent_estimator(opt::VecOptE_Opt, args...)
-    return [update_time_dependent_estimator(opti, args...) for opti in opt]
+function update_time_dependent_estimator(opt::VecOptE_Opt, ctx::TimeDependentContext)
+    return [update_time_dependent_estimator(opti, ctx) for opti in opt]
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Apply [`assert_time_dependent_fold_count`](@ref) element-wise to a vector of optimisation estimators or results.
+
+# Related
+
+  - [`assert_time_dependent_fold_count`](@ref)
+  - [`VecOptE_Opt`](@ref)
+"""
+function assert_time_dependent_fold_count(opt::VecOptE_Opt, n::Integer)::Nothing
+    for opti in opt
+        assert_time_dependent_fold_count(opti, n)
+    end
+    return nothing
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -1172,4 +1602,4 @@ end
 export optimise, OptimisationSuccess, OptimisationFailure, IterativeWeightFinaliser,
        RelativeErrorWeightFinaliser, SquaredRelativeErrorWeightFinaliser,
        AbsoluteErrorWeightFinaliser, SquaredAbsoluteErrorWeightFinaliser,
-       JuMPWeightFinaliser
+       JuMPWeightFinaliser, TimeDependent, TimeDependentContext, PreviousWeightsFunction

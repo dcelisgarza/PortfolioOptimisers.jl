@@ -114,12 +114,17 @@ $(DocStringExtensions.FIELDS)
         fees::Option{<:FeesE_Fees} = nothing,
         sets::Option{<:AssetSets} = nothing,
         wf::WeightFinaliser = IterativeWeightFinaliser(),
+        tdc::Option{<:Td_VecTd} = nothing,
         brt::Bool = false,
         cle_pr::Bool = true,
         strict::Bool = false
     ) -> HierarchicalOptimiser
 
 Keywords correspond to the struct's fields.
+
+## Validation
+
+  - If `tdc` is provided: targets must be unique targetable fields (`wb`, `fees`) left at their defaults (the sole-source rule), and every vector entry is test-substituted through this constructor so type compatibility errors surface immediately.
 
 # Examples
 
@@ -185,6 +190,7 @@ HierarchicalOptimiser
     sets ┼ nothing
       wf ┼ IterativeWeightFinaliser
          │   iter ┴ Int64: 100
+     tdc ┼ nothing
      brt ┼ Bool: false
   cle_pr ┼ Bool: true
   strict ┴ Bool: false
@@ -227,6 +233,10 @@ HierarchicalOptimiser
     """
     wf
     """
+    $(field_dict[:tdc])
+    """
+    @vprop tdc
+    """
     $(field_dict[:brt])
     """
     brt
@@ -241,21 +251,27 @@ HierarchicalOptimiser
     function HierarchicalOptimiser(pe::PrE_Pr, cle::HClE_HCl, slv::Option{<:Slv_VecSlv},
                                    wb::Option{<:WbE_Wb}, fees::Option{<:FeesE_Fees},
                                    sets::Option{<:AssetSets}, wf::WeightFinaliser,
-                                   brt::Bool, cle_pr::Bool, strict::Bool)
+                                   tdc::Option{<:Td_VecTd}, brt::Bool, cle_pr::Bool,
+                                   strict::Bool)
         if isa(wb, WeightBoundsEstimator)
             @argcheck(!isnothing(sets), IsNothingError("sets cannot be nothing"))
         end
+        if !isnothing(tdc)
+            assert_time_dependent_targets(tdc, (; wb, fees), (; wb = WeightBounds()),
+                                          :HierarchicalOptimiser)
+            nt = (; pe, cle, slv, wb, fees, sets, wf, tdc = nothing, brt, cle_pr, strict)
+            for td in time_dependent_entries(tdc)
+                if isa(td.val, AbstractVector)
+                    for v in td.val
+                        HierarchicalOptimiser(; merge(nt, NamedTuple{(td.field,)}((v,)))...)
+                    end
+                end
+            end
+        end
         return new{typeof(pe), typeof(cle), typeof(slv), typeof(wb), typeof(fees),
-                   typeof(sets), typeof(wf), typeof(brt), typeof(cle_pr), typeof(strict)}(pe,
-                                                                                          cle,
-                                                                                          slv,
-                                                                                          wb,
-                                                                                          fees,
-                                                                                          sets,
-                                                                                          wf,
-                                                                                          brt,
-                                                                                          cle_pr,
-                                                                                          strict)
+                   typeof(sets), typeof(wf), typeof(tdc), typeof(brt), typeof(cle_pr),
+                   typeof(strict)}(pe, cle, slv, wb, fees, sets, wf, tdc, brt, cle_pr,
+                                   strict)
     end
 end
 function HierarchicalOptimiser(; pe::PrE_Pr = EmpiricalPrior(),
@@ -265,14 +281,15 @@ function HierarchicalOptimiser(; pe::PrE_Pr = EmpiricalPrior(),
                                fees::Option{<:FeesE_Fees} = nothing,
                                sets::Option{<:AssetSets} = nothing,
                                wf::WeightFinaliser = IterativeWeightFinaliser(),
-                               brt::Bool = false, cle_pr::Bool = true,
+                               tdc::Option{<:Td_VecTd} = nothing, brt::Bool = false,
+                               cle_pr::Bool = true,
                                strict::Bool = false)::HierarchicalOptimiser
-    return HierarchicalOptimiser(pe, cle, slv, wb, fees, sets, wf, brt, cle_pr, strict)
+    return HierarchicalOptimiser(pe, cle, slv, wb, fees, sets, wf, tdc, brt, cle_pr, strict)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return whether the [`HierarchicalOptimiser`](@ref) requires previous portfolio weights (based on fee structure).
+Return whether the [`HierarchicalOptimiser`](@ref) requires previous portfolio weights (based on fee structure and time-dependent constraints).
 
 # Related
 
@@ -280,7 +297,49 @@ Return whether the [`HierarchicalOptimiser`](@ref) requires previous portfolio w
   - [`HierarchicalOptimiser`](@ref)
 """
 function needs_previous_weights(opt::HierarchicalOptimiser)
-    return needs_previous_weights(opt.fees)
+    return needs_previous_weights(opt.fees) || needs_previous_weights(opt.tdc)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return `true` if the hierarchical optimiser configuration carries time-dependent constraints.
+
+# Related
+
+  - [`HierarchicalOptimiser`](@ref)
+  - [`TimeDependent`](@ref)
+  - [`is_time_dependent`](@ref)
+"""
+function is_time_dependent(opt::HierarchicalOptimiser)
+    return !isnothing(opt.tdc)
+end
+function assert_time_dependent_fold_count(opt::HierarchicalOptimiser, n::Integer)::Nothing
+    return assert_time_dependent_fold_count(opt.tdc, n)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Resolve the time-dependent constraints of a [`HierarchicalOptimiser`](@ref) for the fold described by `ctx`.
+
+Rebuilds the optimiser through its validated keyword constructor with each targeted field replaced by its resolved per-fold value and `tdc` cleared, so the result is an ordinary static optimiser.
+
+# Related
+
+  - [`HierarchicalOptimiser`](@ref)
+  - [`TimeDependent`](@ref)
+  - [`TimeDependentContext`](@ref)
+"""
+function update_time_dependent_estimator(opt::HierarchicalOptimiser,
+                                         ctx::TimeDependentContext)
+    tdc = opt.tdc
+    if isnothing(tdc)
+        return opt
+    end
+    repl::NamedTuple = (; tdc = nothing)
+    for td in time_dependent_entries(tdc)
+        repl = merge(repl, NamedTuple{(td.field,)}((time_dependent_value(td, ctx),)))
+    end
+    return rebuild_estimator(opt, repl)
 end
 """
     unitary_expected_risks(r, X, ...)

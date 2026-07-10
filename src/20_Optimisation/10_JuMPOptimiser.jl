@@ -362,9 +362,10 @@ $(DocStringExtensions.FIELDS)
         l2::Option{<:Number} = nothing,
         linf::Option{<:Number} = nothing,
         lp::Option{LpReg_VecLpReg} = nothing,
+        tdc::Option{<:Td_VecTd} = nothing
         brt::Bool = false,
         cle_pr::Bool = true,
-        strict::Bool = false
+        strict::Bool = false,
     ) -> JuMPOptimiser
 
 Keywords correspond to the struct's fields.
@@ -382,6 +383,7 @@ Keywords correspond to the struct's fields.
   - If `scard` is provided: compatible `smtx`, `slt`, `sst` sizes required.
   - If `sgcarde` is provided: compatible `sgmtx`, `sglt`, `sgst` sizes required.
   - If any estimator-type field (`wb`, `lt`, `fees`, etc.) is provided: `!isnothing(sets)`.
+  - If `tdc` is provided: targets must be unique targetable fields left at their defaults (the sole-source rule), and every vector entry is test-substituted through this constructor so type and cross-field compatibility errors surface immediately.
 
 # Related
 
@@ -536,6 +538,10 @@ Keywords correspond to the struct's fields.
     """
     lp
     """
+    $(field_dict[:tdc])
+    """
+    tdc
+    """
     $(field_dict[:brt])
     """
     brt
@@ -567,8 +573,8 @@ Keywords correspond to the struct's fields.
                            ss::Option{<:Number}, card::Option{<:Integer},
                            scard::Option{<:Int_VecInt}, nea::Option{<:Number},
                            l1::Option{<:Number}, l2::Option{<:Number},
-                           linf::Option{<:Number}, lp::Option{LpReg_VecLpReg}, brt::Bool,
-                           cle_pr::Bool, strict::Bool)
+                           linf::Option{<:Number}, lp::Option{LpReg_VecLpReg},
+                           tdc::Option{<:Td_VecTd}, brt::Bool, cle_pr::Bool, strict::Bool)
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
         end
@@ -741,6 +747,26 @@ Keywords correspond to the struct's fields.
             @argcheck(!isnothing(sets),
                       IsNothingError("sets cannot be nothing when estimator-type fields are provided"))
         end
+        if !isnothing(tdc)
+            assert_time_dependent_targets(tdc,
+                                          (; wb, bgt, sbgt, lt, st, lcse, cte, gcarde,
+                                           sgcarde, smtx, sgmtx, slt, sst, sglt, sgst, tn,
+                                           fees, tr, ple, ccnt, cobj, ss, card, scard, nea,
+                                           l1, l2, linf, lp),
+                                          (; wb = WeightBounds(), bgt = 1.0),
+                                          :JuMPOptimiser)
+            nt = (; pe, slv, wb, bgt, sbgt, lt, st, lcse, cte, gcarde, sgcarde, smtx, sgmtx,
+                  slt, sst, sglt, sgst, tn, fees, sets, tr, ple, ret, sca, ccnt, cobj, sc,
+                  so, ss, card, scard, nea, l1, l2, linf, lp, tdc = nothing, brt, cle_pr,
+                  strict)
+            for td in time_dependent_entries(tdc)
+                if isa(td.val, AbstractVector)
+                    for v in td.val
+                        JuMPOptimiser(; merge(nt, NamedTuple{(td.field,)}((v,)))...)
+                    end
+                end
+            end
+        end
         return new{typeof(pe), typeof(slv), typeof(wb), typeof(bgt), typeof(sbgt),
                    typeof(lt), typeof(st), typeof(lcse), typeof(cte), typeof(gcarde),
                    typeof(sgcarde), typeof(smtx), typeof(sgmtx), typeof(slt), typeof(sst),
@@ -748,20 +774,46 @@ Keywords correspond to the struct's fields.
                    typeof(tr), typeof(ple), typeof(ret), typeof(sca), typeof(ccnt),
                    typeof(cobj), typeof(sc), typeof(so), typeof(ss), typeof(card),
                    typeof(scard), typeof(nea), typeof(l1), typeof(l2), typeof(linf),
-                   typeof(lp), typeof(brt), typeof(cle_pr), typeof(strict)}(pe, slv, wb,
-                                                                            bgt, sbgt, lt,
-                                                                            st, lcse, cte,
-                                                                            gcarde, sgcarde,
-                                                                            smtx, sgmtx,
-                                                                            slt, sst, sglt,
-                                                                            sgst, tn, fees,
-                                                                            sets, tr, ple,
-                                                                            ret, sca, ccnt,
-                                                                            cobj, sc, so,
-                                                                            ss, card, scard,
-                                                                            nea, l1, l2,
-                                                                            linf, lp, brt,
-                                                                            cle_pr, strict)
+                   typeof(lp), typeof(tdc), typeof(brt), typeof(cle_pr), typeof(strict)}(pe,
+                                                                                         slv,
+                                                                                         wb,
+                                                                                         bgt,
+                                                                                         sbgt,
+                                                                                         lt,
+                                                                                         st,
+                                                                                         lcse,
+                                                                                         cte,
+                                                                                         gcarde,
+                                                                                         sgcarde,
+                                                                                         smtx,
+                                                                                         sgmtx,
+                                                                                         slt,
+                                                                                         sst,
+                                                                                         sglt,
+                                                                                         sgst,
+                                                                                         tn,
+                                                                                         fees,
+                                                                                         sets,
+                                                                                         tr,
+                                                                                         ple,
+                                                                                         ret,
+                                                                                         sca,
+                                                                                         ccnt,
+                                                                                         cobj,
+                                                                                         sc,
+                                                                                         so,
+                                                                                         ss,
+                                                                                         card,
+                                                                                         scard,
+                                                                                         nea,
+                                                                                         l1,
+                                                                                         l2,
+                                                                                         linf,
+                                                                                         lp,
+                                                                                         tdc,
+                                                                                         brt,
+                                                                                         cle_pr,
+                                                                                         strict)
     end
 end
 function JuMPOptimiser(; pe::PrE_Pr = EmpiricalPrior(), slv::Slv_VecSlv,
@@ -792,12 +844,13 @@ function JuMPOptimiser(; pe::PrE_Pr = EmpiricalPrior(), slv::Slv_VecSlv,
                        scard::Option{<:Int_VecInt} = nothing,
                        nea::Option{<:Number} = nothing, l1::Option{<:Number} = nothing,
                        l2::Option{<:Number} = nothing, linf::Option{<:Number} = nothing,
-                       lp::Option{<:LpReg_VecLpReg} = nothing, brt::Bool = false,
+                       lp::Option{<:LpReg_VecLpReg} = nothing,
+                       tdc::Option{<:Td_VecTd} = nothing, brt::Bool = false,
                        cle_pr::Bool = true, strict::Bool = false)::JuMPOptimiser
     return JuMPOptimiser(pe, slv, wb, bgt, sbgt, lt, st, lcse, cte, gcarde, sgcarde, smtx,
                          sgmtx, slt, sst, sglt, sgst, tn, fees, sets, tr, ple, ret, sca,
-                         ccnt, cobj, sc, so, ss, card, scard, nea, l1, l2, linf, lp, brt,
-                         cle_pr, strict)
+                         ccnt, cobj, sc, so, ss, card, scard, nea, l1, l2, linf, lp, tdc,
+                         brt, cle_pr, strict)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -832,7 +885,49 @@ function needs_previous_weights(opt::JuMPOptimiser)
             needs_previous_weights(opt.fees) ||
             needs_previous_weights(opt.tr) ||
             needs_previous_weights(opt.ccnt) ||
-            needs_previous_weights(opt.cobj))
+            needs_previous_weights(opt.cobj) ||
+            needs_previous_weights(opt.tdc))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return `true` if the JuMP optimiser configuration carries time-dependent constraints.
+
+# Related
+
+  - [`JuMPOptimiser`](@ref)
+  - [`TimeDependent`](@ref)
+  - [`is_time_dependent`](@ref)
+"""
+function is_time_dependent(opt::JuMPOptimiser)
+    return !isnothing(opt.tdc)
+end
+function assert_time_dependent_fold_count(opt::JuMPOptimiser, n::Integer)::Nothing
+    return assert_time_dependent_fold_count(opt.tdc, n)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Resolve the time-dependent constraints of a [`JuMPOptimiser`](@ref) for the fold described by `ctx`.
+
+Rebuilds the optimiser through its validated keyword constructor with each targeted field replaced by its resolved per-fold value and `tdc` cleared, so the result is an ordinary static optimiser and every construction invariant re-runs.
+
+# Related
+
+  - [`JuMPOptimiser`](@ref)
+  - [`TimeDependent`](@ref)
+  - [`TimeDependentContext`](@ref)
+"""
+function update_time_dependent_estimator(opt::JuMPOptimiser, ctx::TimeDependentContext)
+    tdc = opt.tdc
+    if isnothing(tdc)
+        return opt
+    end
+    repl::NamedTuple = (; tdc = nothing)
+    for td in time_dependent_entries(tdc)
+        repl = merge(repl, NamedTuple{(td.field,)}((time_dependent_value(td, ctx),)))
+    end
+    return rebuild_estimator(opt, repl)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -880,7 +975,8 @@ function factory(opt::JuMPOptimiser, w::AbstractVector)::JuMPOptimiser
                          sca = opt.sca, ccnt = ccnt, cobj = cobj, sc = opt.sc, so = opt.so,
                          ss = opt.ss, card = opt.card, scard = opt.scard, nea = opt.nea,
                          l1 = opt.l1, l2 = opt.l2, linf = opt.linf, lp = opt.lp,
-                         brt = opt.brt, cle_pr = opt.cle_pr, strict = opt.strict)
+                         tdc = opt.tdc, brt = opt.brt, cle_pr = opt.cle_pr,
+                         strict = opt.strict)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -949,6 +1045,7 @@ function port_opt_view(opt::JuMPOptimiser, i, X::MatNum, args...)::JuMPOptimiser
     ret = port_opt_view(opt.ret, i)
     ccnt = port_opt_view(opt.ccnt, i)
     cobj = port_opt_view(opt.cobj, i)
+    tdc = port_opt_view(opt.tdc, i)
     return JuMPOptimiser(; pe = pe, slv = opt.slv, wb = wb, bgt = bgt, sbgt = opt.sbgt,
                          lt = lt, st = st, lcse = opt.lcse, cte = opt.cte,
                          gcarde = opt.gcarde, sgcarde = opt.sgcarde, smtx = smtx,
@@ -957,7 +1054,7 @@ function port_opt_view(opt::JuMPOptimiser, i, X::MatNum, args...)::JuMPOptimiser
                          ret = ret, sca = opt.sca, ccnt = ccnt, cobj = cobj, sc = opt.sc,
                          so = opt.so, ss = opt.ss, card = opt.card, scard = opt.scard,
                          nea = opt.nea, l1 = opt.l1, l2 = opt.l2, linf = opt.linf,
-                         lp = opt.lp, brt = opt.brt, cle_pr = opt.cle_pr,
+                         lp = opt.lp, tdc = tdc, brt = opt.brt, cle_pr = opt.cle_pr,
                          strict = opt.strict)
 end
 """

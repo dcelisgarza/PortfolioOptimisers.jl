@@ -145,6 +145,7 @@ MeanRisk
       │        l2 ┼ nothing
       │      linf ┼ nothing
       │        lp ┼ nothing
+      │       tdc ┼ nothing
       │       brt ┼ Bool: false
       │    cle_pr ┼ Bool: true
       │    strict ┴ Bool: false
@@ -254,6 +255,31 @@ function needs_previous_weights(opt::MeanRisk)
     return (needs_previous_weights(opt.opt) ||
             needs_previous_weights(opt.r) ||
             needs_previous_weights(opt.fb))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return `true` if the inner JuMP optimiser or fallback carries time-dependent constraints.
+"""
+function is_time_dependent(opt::MeanRisk)
+    return is_time_dependent(opt.opt) || is_time_dependent(opt.fb)
+end
+function assert_time_dependent_fold_count(opt::MeanRisk, n::Integer)::Nothing
+    assert_time_dependent_fold_count(opt.opt, n)
+    return assert_time_dependent_fold_count(opt.fb, n)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Resolve time-dependent constraints for the fold described by `ctx` by recursing into the inner JuMP optimiser and fallback.
+"""
+function update_time_dependent_estimator(opt::MeanRisk, ctx::TimeDependentContext)
+    if !is_time_dependent(opt)
+        return opt
+    end
+    return rebuild_estimator(opt,
+                             (; opt = update_time_dependent_estimator(opt.opt, ctx),
+                              fb = update_time_dependent_estimator(opt.fb, ctx)))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

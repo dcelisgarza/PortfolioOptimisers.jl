@@ -3,6 +3,8 @@
 ```@docs
 HierarchicalEqualRiskContribution
 needs_previous_weights(opt::HierarchicalEqualRiskContribution)
+is_time_dependent(opt::HierarchicalEqualRiskContribution)
+update_time_dependent_estimator(opt::HierarchicalEqualRiskContribution, ctx::TimeDependentContext)
 factory(hec::HierarchicalEqualRiskContribution, w::AbstractVector)
 port_opt_view(hec::HierarchicalEqualRiskContribution, i, X::MatNum, args...)
 herc_scalarised_risk_o!
