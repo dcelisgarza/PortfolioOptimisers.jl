@@ -14,6 +14,7 @@ optimise(nco::NestedClustered{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
 needs_previous_weights(opt::NestedClustered)
 is_time_dependent(opt::NestedClustered)
 update_time_dependent_estimator(opt::NestedClustered, ctx::TimeDependentContext)
+reset_time_dependent_estimator(opt::NestedClustered)
 assert_rc_pl(::Any)
 assert_external_optimiser(opt::ClusteringOptimisationEstimator)
 RiskBudgetingOptimiser

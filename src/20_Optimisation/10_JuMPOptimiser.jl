@@ -328,47 +328,46 @@ $(DocStringExtensions.FIELDS)
     JuMPOptimiser(;
         pe::PrE_Pr = EmpiricalPrior(),
         slv::Slv_VecSlv,
-        wb::Option{<:WbE_Wb} = WeightBounds(),
-        bgt::Option{<:Num_BgtCE} = 1.0,
-        sbgt::Option{<:Num_BgtRg} = nothing,
-        lt::Option{<:BtE_Bt} = nothing,
-        st::Option{<:BtE_Bt} = nothing,
-        lcse::Option{<:LcE_Lc_VecLcE_Lc} = nothing,
-        cte::Option{<:Lc_CC_VecCC} = nothing,
-        gcarde::Option{<:LcE_Lc} = nothing,
-        sgcarde::Option{<:LcE_Lc_VecLcE_Lc} = nothing,
-        smtx::Option{<:MatNum_ASetMatE_VecMatNum_ASetMatE} = nothing,
-        sgmtx::Option{<:MatNum_ASetMatE_VecMatNum_ASetMatE} = nothing,
-        slt::Option{<:BtE_Bt_VecOptBtE_Bt} = nothing,
-        sst::Option{<:BtE_Bt_VecOptBtE_Bt} = nothing,
-        sglt::Option{<:BtE_Bt_VecOptBtE_Bt} = nothing,
-        sgst::Option{<:BtE_Bt_VecOptBtE_Bt} = nothing,
-        tn::Option{<:TnE_Tn_VecTnE_Tn} = nothing,
-        fees::Option{<:FeesE_Fees} = nothing,
+        wb::TD_Option{<:WbE_Wb} = WeightBounds(),
+        bgt::TD_Option{<:Num_BgtCE} = 1.0,
+        sbgt::TD_Option{<:Num_BgtRg} = nothing,
+        lt::TD_Option{<:BtE_Bt} = nothing,
+        st::TD_Option{<:BtE_Bt} = nothing,
+        lcse::TD_Option{<:LcE_Lc_VecLcE_Lc} = nothing,
+        cte::TD_Option{<:Lc_CC_VecCC} = nothing,
+        gcarde::TD_Option{<:LcE_Lc} = nothing,
+        sgcarde::TD_Option{<:LcE_Lc_VecLcE_Lc} = nothing,
+        smtx::TD_Option{<:MatNum_ASetMatE_VecMatNum_ASetMatE} = nothing,
+        sgmtx::TD_Option{<:MatNum_ASetMatE_VecMatNum_ASetMatE} = nothing,
+        slt::TD_Option{<:BtE_Bt_VecOptBtE_Bt} = nothing,
+        sst::TD_Option{<:BtE_Bt_VecOptBtE_Bt} = nothing,
+        sglt::TD_Option{<:BtE_Bt_VecOptBtE_Bt} = nothing,
+        sgst::TD_Option{<:BtE_Bt_VecOptBtE_Bt} = nothing,
+        tn::TD_Option{<:TnE_Tn_VecTnE_Tn} = nothing,
+        fees::TD_Option{<:FeesE_Fees} = nothing,
         sets::Option{<:AssetSets} = nothing,
-        tr::Option{<:Tr_VecTr} = nothing,
-        ple::Option{<:PlCE_PhC_VecPlCE_PlC} = nothing,
+        tr::TD_Option{<:Tr_VecTr} = nothing,
+        ple::TD_Option{<:PlCE_PhC_VecPlCE_PlC} = nothing,
         ret::JuMPReturnsEstimator = ArithmeticReturn(),
         sca::NonHierarchicalScalariser = SumScalariser(),
-        ccnt::Option{<:CustomJuMPConstraint} = nothing,
-        cobj::Option{<:CustomJuMPObjective} = nothing,
+        ccnt::TD_Option{<:CustomJuMPConstraint} = nothing,
+        cobj::TD_Option{<:CustomJuMPObjective} = nothing,
         sc::Number = 1,
         so::Number = 1,
-        ss::Option{<:Number} = nothing,
-        card::Option{<:Integer} = nothing,
-        scard::Option{<:Int_VecInt} = nothing,
-        nea::Option{<:Number} = nothing,
-        l1::Option{<:Number} = nothing,
-        l2::Option{<:Number} = nothing,
-        linf::Option{<:Number} = nothing,
-        lp::Option{LpReg_VecLpReg} = nothing,
-        tdc::Option{<:Td_VecTd} = nothing
+        ss::TD_Option{<:Number} = nothing,
+        card::TD_Option{<:Integer} = nothing,
+        scard::TD_Option{<:Int_VecInt} = nothing,
+        nea::TD_Option{<:Number} = nothing,
+        l1::TD_Option{<:Number} = nothing,
+        l2::TD_Option{<:Number} = nothing,
+        linf::TD_Option{<:Number} = nothing,
+        lp::TD_Option{<:LpReg_VecLpReg} = nothing,
         brt::Bool = false,
         cle_pr::Bool = true,
         strict::Bool = false,
     ) -> JuMPOptimiser
 
-Keywords correspond to the struct's fields.
+Keywords correspond to the struct's fields. Fields typed [`TD_Option`](@ref) may hold a [`TimeDependent`](@ref) per-fold schedule instead of a static value; a cross-validation fold loop resolves it per fold, and a fold-less `optimise` runs with the field at its static default.
 
 ## Validation
 
@@ -383,7 +382,7 @@ Keywords correspond to the struct's fields.
   - If `scard` is provided: compatible `smtx`, `slt`, `sst` sizes required.
   - If `sgcarde` is provided: compatible `sgmtx`, `sglt`, `sgst` sizes required.
   - If any estimator-type field (`wb`, `lt`, `fees`, etc.) is provided: `!isnothing(sets)`.
-  - If `tdc` is provided: targets must be unique targetable fields left at their defaults (the sole-source rule), and every vector entry is test-substituted through this constructor so type and cross-field compatibility errors surface immediately.
+  - If any field holds a [`TimeDependent`](@ref): every vector entry is test-substituted through this constructor (with the other time-dependent fields at their static defaults) so type and cross-field compatibility errors surface immediately. Validation coupling a time-dependent field to static fields is deferred to the per-fold rebuild.
 
 # Related
 
@@ -538,10 +537,6 @@ Keywords correspond to the struct's fields.
     """
     lp
     """
-    $(field_dict[:tdc])
-    """
-    tdc
-    """
     $(field_dict[:brt])
     """
     brt
@@ -553,28 +548,29 @@ Keywords correspond to the struct's fields.
     $(field_dict[:strict_opt])
     """
     strict
-    function JuMPOptimiser(pe::PrE_Pr, slv::Slv_VecSlv, wb::Option{<:WbE_Wb},
-                           bgt::Option{<:Num_BgtCE}, sbgt::Option{<:Num_BgtRg},
-                           lt::Option{<:BtE_Bt}, st::Option{<:BtE_Bt},
-                           lcse::Option{<:LcE_Lc_VecLcE_Lc}, cte::Option{<:Lc_CC_VecCC},
-                           gcarde::Option{<:LcE_Lc}, sgcarde::Option{<:LcE_Lc_VecLcE_Lc},
-                           smtx::Option{<:MatNum_ASetMatE_VecMatNum_ASetMatE},
-                           sgmtx::Option{<:MatNum_ASetMatE_VecMatNum_ASetMatE},
-                           slt::Option{<:BtE_Bt_VecOptBtE_Bt},
-                           sst::Option{<:BtE_Bt_VecOptBtE_Bt},
-                           sglt::Option{<:BtE_Bt_VecOptBtE_Bt},
-                           sgst::Option{<:BtE_Bt_VecOptBtE_Bt},
-                           tn::Option{<:TnE_Tn_VecTnE_Tn}, fees::Option{<:FeesE_Fees},
-                           sets::Option{<:AssetSets}, tr::Option{<:Tr_VecTr},
-                           ple::Option{<:PlCE_PhC_VecPlCE_PlC}, ret::JuMPReturnsEstimator,
-                           sca::NonHierarchicalScalariser,
-                           ccnt::Option{<:CustomJuMPConstraint},
-                           cobj::Option{<:CustomJuMPObjective}, sc::Number, so::Number,
-                           ss::Option{<:Number}, card::Option{<:Integer},
-                           scard::Option{<:Int_VecInt}, nea::Option{<:Number},
-                           l1::Option{<:Number}, l2::Option{<:Number},
-                           linf::Option{<:Number}, lp::Option{LpReg_VecLpReg},
-                           tdc::Option{<:Td_VecTd}, brt::Bool, cle_pr::Bool, strict::Bool)
+    function JuMPOptimiser(pe::PrE_Pr, slv::Slv_VecSlv, wb::TD_Option{<:WbE_Wb},
+                           bgt::TD_Option{<:Num_BgtCE}, sbgt::TD_Option{<:Num_BgtRg},
+                           lt::TD_Option{<:BtE_Bt}, st::TD_Option{<:BtE_Bt},
+                           lcse::TD_Option{<:LcE_Lc_VecLcE_Lc},
+                           cte::TD_Option{<:Lc_CC_VecCC}, gcarde::TD_Option{<:LcE_Lc},
+                           sgcarde::TD_Option{<:LcE_Lc_VecLcE_Lc},
+                           smtx::TD_Option{<:MatNum_ASetMatE_VecMatNum_ASetMatE},
+                           sgmtx::TD_Option{<:MatNum_ASetMatE_VecMatNum_ASetMatE},
+                           slt::TD_Option{<:BtE_Bt_VecOptBtE_Bt},
+                           sst::TD_Option{<:BtE_Bt_VecOptBtE_Bt},
+                           sglt::TD_Option{<:BtE_Bt_VecOptBtE_Bt},
+                           sgst::TD_Option{<:BtE_Bt_VecOptBtE_Bt},
+                           tn::TD_Option{<:TnE_Tn_VecTnE_Tn}, fees::TD_Option{<:FeesE_Fees},
+                           sets::Option{<:AssetSets}, tr::TD_Option{<:Tr_VecTr},
+                           ple::TD_Option{<:PlCE_PhC_VecPlCE_PlC},
+                           ret::JuMPReturnsEstimator, sca::NonHierarchicalScalariser,
+                           ccnt::TD_Option{<:CustomJuMPConstraint},
+                           cobj::TD_Option{<:CustomJuMPObjective}, sc::Number, so::Number,
+                           ss::TD_Option{<:Number}, card::TD_Option{<:Integer},
+                           scard::TD_Option{<:Int_VecInt}, nea::TD_Option{<:Number},
+                           l1::TD_Option{<:Number}, l2::TD_Option{<:Number},
+                           linf::TD_Option{<:Number}, lp::TD_Option{<:LpReg_VecLpReg},
+                           brt::Bool, cle_pr::Bool, strict::Bool)
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
         end
@@ -590,7 +586,7 @@ Keywords correspond to the struct's fields.
         if isa(cte, AbstractVector)
             @argcheck(!isempty(cte), IsEmptyError("cte cannot be empty"))
         end
-        if !isnothing(card)
+        if !isnothing(card) && !isa(card, TimeDependent)
             assert_nonempty_gt0_finite_val(card, :card)
         end
         if isa(tn, AbstractVector)
@@ -599,22 +595,23 @@ Keywords correspond to the struct's fields.
         if isa(tr, AbstractVector)
             @argcheck(!isempty(tr), IsEmptyError("tr cannot be empty"))
         end
-        if !isnothing(nea)
+        if !isnothing(nea) && !isa(nea, TimeDependent)
             assert_nonempty_gt0_finite_val(nea, :nea)
         end
-        if !isnothing(l1)
+        if !isnothing(l1) && !isa(l1, TimeDependent)
             assert_nonempty_gt0_finite_val(l1, :l1)
         end
-        if !isnothing(l2)
+        if !isnothing(l2) && !isa(l2, TimeDependent)
             assert_nonempty_gt0_finite_val(l2, :l2)
         end
-        if !isnothing(linf)
+        if !isnothing(linf) && !isa(linf, TimeDependent)
             assert_nonempty_gt0_finite_val(linf, :linf)
         end
         if isa(lp, AbstractVector)
             @argcheck(!isempty(lp), IsEmptyError("lp cannot be empty"))
         end
-        if isa(scard, Integer)
+        scard_td = any(x -> isa(x, TimeDependent), (scard, smtx, slt, sst))
+        if !scard_td && isa(scard, Integer)
             assert_nonempty_gt0_finite_val(scard, :scard)
             @argcheck(isa(smtx, MatNum_ASetMatE),
                       ArgumentError("smtx must be a MatNum_ASetMatE when scard is an Integer, got $(typeof(smtx))"))
@@ -622,7 +619,7 @@ Keywords correspond to the struct's fields.
                       ArgumentError("slt must be a scalar BtE_Bt or nothing when scard is an Integer, got $(typeof(slt))"))
             @argcheck(isa(sst, Option{<:BtE_Bt}),
                       ArgumentError("sst must be a scalar BtE_Bt or nothing when scard is an Integer, got $(typeof(sst))"))
-        elseif isa(scard, VecInt)
+        elseif !scard_td && isa(scard, VecInt)
             assert_nonempty_gt0_finite_val(scard, :scard)
             @argcheck(isa(smtx, AbstractVector),
                       ArgumentError("smtx must be an AbstractVector when scard is a VecInt, got $(typeof(smtx))"))
@@ -638,10 +635,12 @@ Keywords correspond to the struct's fields.
                 @argcheck(length(scard) == length(sst),
                           DimensionMismatch("scard ($(length(scard))) must match sst ($(length(sst)))"))
             end
-        elseif isnothing(scard) && (isa(slt, BtE_Bt) || isa(sst, BtE_Bt))
+        elseif !scard_td && isnothing(scard) && (isa(slt, BtE_Bt) || isa(sst, BtE_Bt))
             @argcheck(isa(smtx, MatNum_ASetMatE),
                       ArgumentError("smtx must be a MatNum_ASetMatE when slt or sst is a scalar BtE_Bt, got $(typeof(smtx))"))
-        elseif isnothing(scard) && (isa(slt, AbstractVector) || isa(sst, AbstractVector))
+        elseif !scard_td &&
+               isnothing(scard) &&
+               (isa(slt, AbstractVector) || isa(sst, AbstractVector))
             @argcheck(isa(smtx, AbstractVector),
                       ArgumentError("smtx must be an AbstractVector when slt or sst is a vector, got $(typeof(smtx))"))
             @argcheck(!isempty(smtx), IsEmptyError("smtx cannot be empty"))
@@ -656,7 +655,8 @@ Keywords correspond to the struct's fields.
                           DimensionMismatch("sst ($(length(sst))) must match smtx ($(length(smtx)))"))
             end
         end
-        if isa(sgcarde, LcE_Lc)
+        sgcard_td = any(x -> isa(x, TimeDependent), (sgcarde, sgmtx, sglt, sgst))
+        if !sgcard_td && isa(sgcarde, LcE_Lc)
             @argcheck(isa(sgmtx, MatNum_ASetMatE),
                       ArgumentError("sgmtx must be a MatNum_ASetMatE when sgcarde is a scalar LcE_Lc, got $(typeof(sgmtx))"))
             @argcheck(isa(sglt, Option{<:BtE_Bt}),
@@ -670,7 +670,7 @@ Keywords correspond to the struct's fields.
                 @argcheck(N == N_ineq + N_eq,
                           DimensionMismatch("smtx rows ($N) must equal N_ineq + N_eq ($(N_ineq + N_eq))"))
             end
-        elseif isa(sgcarde, AbstractVector)
+        elseif !sgcard_td && isa(sgcarde, AbstractVector)
             @argcheck(!isempty(sgcarde), IsEmptyError("sgcarde cannot be empty"))
             @argcheck(isa(sgmtx, AbstractVector),
                       ArgumentError("sgmtx must be an AbstractVector when sgcarde is a vector, got $(typeof(sgmtx))"))
@@ -696,10 +696,11 @@ Keywords correspond to the struct's fields.
                               DimensionMismatch("smt rows ($N) must equal N_ineq + N_eq ($(N_ineq + N_eq))"))
                 end
             end
-        elseif isnothing(sgcarde) && (isa(sglt, BtE_Bt) || isa(sgst, BtE_Bt))
+        elseif !sgcard_td && isnothing(sgcarde) && (isa(sglt, BtE_Bt) || isa(sgst, BtE_Bt))
             @argcheck(isa(sgmtx, MatNum_ASetMatE),
                       ArgumentError("sgmtx must be a MatNum_ASetMatE when sglt or sgst is a scalar BtE_Bt, got $(typeof(sgmtx))"))
-        elseif isnothing(sgcarde) &&
+        elseif !sgcard_td &&
+               isnothing(sgcarde) &&
                (isa(sglt, AbstractVector) || isa(sgst, AbstractVector))
             @argcheck(isa(sgmtx, AbstractVector),
                       ArgumentError("sgmtx must be an AbstractVector when sglt or sgst is a vector, got $(typeof(sgmtx))"))
@@ -747,26 +748,13 @@ Keywords correspond to the struct's fields.
             @argcheck(!isnothing(sets),
                       IsNothingError("sets cannot be nothing when estimator-type fields are provided"))
         end
-        if !isnothing(tdc)
-            assert_time_dependent_targets(tdc,
-                                          (; wb, bgt, sbgt, lt, st, lcse, cte, gcarde,
-                                           sgcarde, smtx, sgmtx, slt, sst, sglt, sgst, tn,
-                                           fees, tr, ple, ccnt, cobj, ss, card, scard, nea,
-                                           l1, l2, linf, lp),
-                                          (; wb = WeightBounds(), bgt = 1.0),
-                                          :JuMPOptimiser)
-            nt = (; pe, slv, wb, bgt, sbgt, lt, st, lcse, cte, gcarde, sgcarde, smtx, sgmtx,
-                  slt, sst, sglt, sgst, tn, fees, sets, tr, ple, ret, sca, ccnt, cobj, sc,
-                  so, ss, card, scard, nea, l1, l2, linf, lp, tdc = nothing, brt, cle_pr,
-                  strict)
-            for td in time_dependent_entries(tdc)
-                if isa(td.val, AbstractVector)
-                    for v in td.val
-                        JuMPOptimiser(; merge(nt, NamedTuple{(td.field,)}((v,)))...)
-                    end
-                end
-            end
-        end
+        assert_time_dependent_substitution(JuMPOptimiser,
+                                           (; pe, slv, wb, bgt, sbgt, lt, st, lcse, cte,
+                                            gcarde, sgcarde, smtx, sgmtx, slt, sst, sglt,
+                                            sgst, tn, fees, sets, tr, ple, ret, sca, ccnt,
+                                            cobj, sc, so, ss, card, scard, nea, l1, l2,
+                                            linf, lp, brt, cle_pr, strict),
+                                           (; wb = WeightBounds(), bgt = 1.0))
         return new{typeof(pe), typeof(slv), typeof(wb), typeof(bgt), typeof(sbgt),
                    typeof(lt), typeof(st), typeof(lcse), typeof(cte), typeof(gcarde),
                    typeof(sgcarde), typeof(smtx), typeof(sgmtx), typeof(slt), typeof(sst),
@@ -774,83 +762,58 @@ Keywords correspond to the struct's fields.
                    typeof(tr), typeof(ple), typeof(ret), typeof(sca), typeof(ccnt),
                    typeof(cobj), typeof(sc), typeof(so), typeof(ss), typeof(card),
                    typeof(scard), typeof(nea), typeof(l1), typeof(l2), typeof(linf),
-                   typeof(lp), typeof(tdc), typeof(brt), typeof(cle_pr), typeof(strict)}(pe,
-                                                                                         slv,
-                                                                                         wb,
-                                                                                         bgt,
-                                                                                         sbgt,
-                                                                                         lt,
-                                                                                         st,
-                                                                                         lcse,
-                                                                                         cte,
-                                                                                         gcarde,
-                                                                                         sgcarde,
-                                                                                         smtx,
-                                                                                         sgmtx,
-                                                                                         slt,
-                                                                                         sst,
-                                                                                         sglt,
-                                                                                         sgst,
-                                                                                         tn,
-                                                                                         fees,
-                                                                                         sets,
-                                                                                         tr,
-                                                                                         ple,
-                                                                                         ret,
-                                                                                         sca,
-                                                                                         ccnt,
-                                                                                         cobj,
-                                                                                         sc,
-                                                                                         so,
-                                                                                         ss,
-                                                                                         card,
-                                                                                         scard,
-                                                                                         nea,
-                                                                                         l1,
-                                                                                         l2,
-                                                                                         linf,
-                                                                                         lp,
-                                                                                         tdc,
-                                                                                         brt,
-                                                                                         cle_pr,
-                                                                                         strict)
+                   typeof(lp), typeof(brt), typeof(cle_pr), typeof(strict)}(pe, slv, wb,
+                                                                            bgt, sbgt, lt,
+                                                                            st, lcse, cte,
+                                                                            gcarde, sgcarde,
+                                                                            smtx, sgmtx,
+                                                                            slt, sst, sglt,
+                                                                            sgst, tn, fees,
+                                                                            sets, tr, ple,
+                                                                            ret, sca, ccnt,
+                                                                            cobj, sc, so,
+                                                                            ss, card, scard,
+                                                                            nea, l1, l2,
+                                                                            linf, lp, brt,
+                                                                            cle_pr, strict)
     end
 end
 function JuMPOptimiser(; pe::PrE_Pr = EmpiricalPrior(), slv::Slv_VecSlv,
-                       wb::Option{<:WbE_Wb} = WeightBounds(),
-                       bgt::Option{<:Num_BgtCE} = 1.0, sbgt::Option{<:Num_BgtRg} = nothing,
-                       lt::Option{<:BtE_Bt} = nothing, st::Option{<:BtE_Bt} = nothing,
-                       lcse::Option{<:LcE_Lc_VecLcE_Lc} = nothing,
-                       cte::Option{<:Lc_CC_VecCC} = nothing,
-                       gcarde::Option{<:LcE_Lc} = nothing,
-                       sgcarde::Option{<:LcE_Lc_VecLcE_Lc} = nothing,
-                       smtx::Option{<:MatNum_ASetMatE_VecMatNum_ASetMatE} = nothing,
-                       sgmtx::Option{<:MatNum_ASetMatE_VecMatNum_ASetMatE} = nothing,
-                       slt::Option{<:BtE_Bt_VecOptBtE_Bt} = nothing,
-                       sst::Option{<:BtE_Bt_VecOptBtE_Bt} = nothing,
-                       sglt::Option{<:BtE_Bt_VecOptBtE_Bt} = nothing,
-                       sgst::Option{<:BtE_Bt_VecOptBtE_Bt} = nothing,
-                       tn::Option{<:TnE_Tn_VecTnE_Tn} = nothing,
-                       fees::Option{<:FeesE_Fees} = nothing,
+                       wb::TD_Option{<:WbE_Wb} = WeightBounds(),
+                       bgt::TD_Option{<:Num_BgtCE} = 1.0,
+                       sbgt::TD_Option{<:Num_BgtRg} = nothing,
+                       lt::TD_Option{<:BtE_Bt} = nothing, st::TD_Option{<:BtE_Bt} = nothing,
+                       lcse::TD_Option{<:LcE_Lc_VecLcE_Lc} = nothing,
+                       cte::TD_Option{<:Lc_CC_VecCC} = nothing,
+                       gcarde::TD_Option{<:LcE_Lc} = nothing,
+                       sgcarde::TD_Option{<:LcE_Lc_VecLcE_Lc} = nothing,
+                       smtx::TD_Option{<:MatNum_ASetMatE_VecMatNum_ASetMatE} = nothing,
+                       sgmtx::TD_Option{<:MatNum_ASetMatE_VecMatNum_ASetMatE} = nothing,
+                       slt::TD_Option{<:BtE_Bt_VecOptBtE_Bt} = nothing,
+                       sst::TD_Option{<:BtE_Bt_VecOptBtE_Bt} = nothing,
+                       sglt::TD_Option{<:BtE_Bt_VecOptBtE_Bt} = nothing,
+                       sgst::TD_Option{<:BtE_Bt_VecOptBtE_Bt} = nothing,
+                       tn::TD_Option{<:TnE_Tn_VecTnE_Tn} = nothing,
+                       fees::TD_Option{<:FeesE_Fees} = nothing,
                        sets::Option{<:AssetSets} = nothing,
-                       tr::Option{<:Tr_VecTr} = nothing,
-                       ple::Option{<:PlCE_PhC_VecPlCE_PlC} = nothing,
+                       tr::TD_Option{<:Tr_VecTr} = nothing,
+                       ple::TD_Option{<:PlCE_PhC_VecPlCE_PlC} = nothing,
                        ret::JuMPReturnsEstimator = ArithmeticReturn(),
                        sca::NonHierarchicalScalariser = SumScalariser(),
-                       ccnt::Option{<:CustomJuMPConstraint} = nothing,
-                       cobj::Option{<:CustomJuMPObjective} = nothing, sc::Number = 1,
-                       so::Number = 1, ss::Option{<:Number} = nothing,
-                       card::Option{<:Integer} = nothing,
-                       scard::Option{<:Int_VecInt} = nothing,
-                       nea::Option{<:Number} = nothing, l1::Option{<:Number} = nothing,
-                       l2::Option{<:Number} = nothing, linf::Option{<:Number} = nothing,
-                       lp::Option{<:LpReg_VecLpReg} = nothing,
-                       tdc::Option{<:Td_VecTd} = nothing, brt::Bool = false,
+                       ccnt::TD_Option{<:CustomJuMPConstraint} = nothing,
+                       cobj::TD_Option{<:CustomJuMPObjective} = nothing, sc::Number = 1,
+                       so::Number = 1, ss::TD_Option{<:Number} = nothing,
+                       card::TD_Option{<:Integer} = nothing,
+                       scard::TD_Option{<:Int_VecInt} = nothing,
+                       nea::TD_Option{<:Number} = nothing,
+                       l1::TD_Option{<:Number} = nothing, l2::TD_Option{<:Number} = nothing,
+                       linf::TD_Option{<:Number} = nothing,
+                       lp::TD_Option{<:LpReg_VecLpReg} = nothing, brt::Bool = false,
                        cle_pr::Bool = true, strict::Bool = false)::JuMPOptimiser
     return JuMPOptimiser(pe, slv, wb, bgt, sbgt, lt, st, lcse, cte, gcarde, sgcarde, smtx,
                          sgmtx, slt, sst, sglt, sgst, tn, fees, sets, tr, ple, ret, sca,
-                         ccnt, cobj, sc, so, ss, card, scard, nea, l1, l2, linf, lp, tdc,
-                         brt, cle_pr, strict)
+                         ccnt, cobj, sc, so, ss, card, scard, nea, l1, l2, linf, lp, brt,
+                         cle_pr, strict)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -886,31 +849,14 @@ function needs_previous_weights(opt::JuMPOptimiser)
             needs_previous_weights(opt.tr) ||
             needs_previous_weights(opt.ccnt) ||
             needs_previous_weights(opt.cobj) ||
-            needs_previous_weights(opt.tdc))
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Return `true` if the JuMP optimiser configuration carries time-dependent constraints.
-
-# Related
-
-  - [`JuMPOptimiser`](@ref)
-  - [`TimeDependent`](@ref)
-  - [`is_time_dependent`](@ref)
-"""
-function is_time_dependent(opt::JuMPOptimiser)
-    return !isnothing(opt.tdc)
-end
-function assert_time_dependent_fold_count(opt::JuMPOptimiser, n::Integer)::Nothing
-    return assert_time_dependent_fold_count(opt.tdc, n)
+            any(f -> needs_previous_weights(getfield(opt, f)), time_dependent_fields(opt)))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Resolve the time-dependent constraints of a [`JuMPOptimiser`](@ref) for the fold described by `ctx`.
 
-Rebuilds the optimiser through its validated keyword constructor with each targeted field replaced by its resolved per-fold value and `tdc` cleared, so the result is an ordinary static optimiser and every construction invariant re-runs.
+Rebuilds the optimiser through its validated keyword constructor with each [`TimeDependent`](@ref)-valued field replaced by its resolved per-fold value, so the result is an ordinary static optimiser and every construction invariant re-runs.
 
 # Related
 
@@ -919,15 +865,13 @@ Rebuilds the optimiser through its validated keyword constructor with each targe
   - [`TimeDependentContext`](@ref)
 """
 function update_time_dependent_estimator(opt::JuMPOptimiser, ctx::TimeDependentContext)
-    tdc = opt.tdc
-    if isnothing(tdc)
-        return opt
-    end
-    repl::NamedTuple = (; tdc = nothing)
-    for td in time_dependent_entries(tdc)
-        repl = merge(repl, NamedTuple{(td.field,)}((time_dependent_value(td, ctx),)))
-    end
-    return rebuild_estimator(opt, repl)
+    return update_time_dependent_fields(opt, ctx)
+end
+function time_dependent_field_defaults(::JuMPOptimiser)::NamedTuple
+    return (; wb = WeightBounds(), bgt = 1.0)
+end
+function reset_time_dependent_estimator(opt::JuMPOptimiser)
+    return reset_time_dependent_fields(opt)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -975,8 +919,7 @@ function factory(opt::JuMPOptimiser, w::AbstractVector)::JuMPOptimiser
                          sca = opt.sca, ccnt = ccnt, cobj = cobj, sc = opt.sc, so = opt.so,
                          ss = opt.ss, card = opt.card, scard = opt.scard, nea = opt.nea,
                          l1 = opt.l1, l2 = opt.l2, linf = opt.linf, lp = opt.lp,
-                         tdc = opt.tdc, brt = opt.brt, cle_pr = opt.cle_pr,
-                         strict = opt.strict)
+                         brt = opt.brt, cle_pr = opt.cle_pr, strict = opt.strict)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1045,7 +988,6 @@ function port_opt_view(opt::JuMPOptimiser, i, X::MatNum, args...)::JuMPOptimiser
     ret = port_opt_view(opt.ret, i)
     ccnt = port_opt_view(opt.ccnt, i)
     cobj = port_opt_view(opt.cobj, i)
-    tdc = port_opt_view(opt.tdc, i)
     return JuMPOptimiser(; pe = pe, slv = opt.slv, wb = wb, bgt = bgt, sbgt = opt.sbgt,
                          lt = lt, st = st, lcse = opt.lcse, cte = opt.cte,
                          gcarde = opt.gcarde, sgcarde = opt.sgcarde, smtx = smtx,
@@ -1054,7 +996,7 @@ function port_opt_view(opt::JuMPOptimiser, i, X::MatNum, args...)::JuMPOptimiser
                          ret = ret, sca = opt.sca, ccnt = ccnt, cobj = cobj, sc = opt.sc,
                          so = opt.so, ss = opt.ss, card = opt.card, scard = opt.scard,
                          nea = opt.nea, l1 = opt.l1, l2 = opt.l2, linf = opt.linf,
-                         lp = opt.lp, tdc = tdc, brt = opt.brt, cle_pr = opt.cle_pr,
+                         lp = opt.lp, brt = opt.brt, cle_pr = opt.cle_pr,
                          strict = opt.strict)
 end
 """

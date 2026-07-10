@@ -389,7 +389,6 @@ SchurComplementHierarchicalRiskParity
          │     sets ┼ nothing
          │       wf ┼ IterativeWeightFinaliser
          │          │   iter ┴ Int64: 100
-         │      tdc ┼ nothing
          │      brt ┼ Bool: false
          │   cle_pr ┼ Bool: true
          │   strict ┴ Bool: false
@@ -486,19 +485,6 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return `true` if the inner optimiser or fallback carries time-dependent constraints.
-"""
-function is_time_dependent(opt::SchurComplementHierarchicalRiskParity)
-    return is_time_dependent(opt.opt) || is_time_dependent(opt.fb)
-end
-function assert_time_dependent_fold_count(opt::SchurComplementHierarchicalRiskParity,
-                                          n::Integer)::Nothing
-    assert_time_dependent_fold_count(opt.opt, n)
-    return assert_time_dependent_fold_count(opt.fb, n)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
 Resolve time-dependent constraints for the fold described by `ctx` by recursing into the inner optimiser and fallback.
 """
 function update_time_dependent_estimator(opt::SchurComplementHierarchicalRiskParity,
@@ -509,6 +495,19 @@ function update_time_dependent_estimator(opt::SchurComplementHierarchicalRiskPar
     return rebuild_estimator(opt,
                              (; opt = update_time_dependent_estimator(opt.opt, ctx),
                               fb = update_time_dependent_estimator(opt.fb, ctx)))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Replace time-dependent constraints with their static defaults by recursing into the inner optimiser and fallback.
+"""
+function reset_time_dependent_estimator(opt::SchurComplementHierarchicalRiskParity)
+    if !is_time_dependent(opt)
+        return opt
+    end
+    return rebuild_estimator(opt,
+                             (; opt = reset_time_dependent_estimator(opt.opt),
+                              fb = reset_time_dependent_estimator(opt.fb)))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -838,6 +837,7 @@ Internal dispatch called by [`optimise`](@ref). Computes the prior and clusterin
 """
 function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:Any},
                    rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)
+    sh = reset_time_dependent_estimator(sh)
     rd = returns_result_picker(rd, sh.opt.brt)
     pr = prior(sh.opt.pe, rd; dims = dims)
     X = pr.X
@@ -868,6 +868,7 @@ Internal dispatch called by [`optimise`](@ref). Combines risk-scaled weights fro
 """
 function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:AbstractVector},
                    rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)
+    sh = reset_time_dependent_estimator(sh)
     rd = returns_result_picker(rd, sh.opt.brt)
     pr = prior(sh.opt.pe, rd; dims = dims)
     X = pr.X

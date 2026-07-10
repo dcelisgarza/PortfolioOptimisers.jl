@@ -145,7 +145,6 @@ MeanRisk
       │        l2 ┼ nothing
       │      linf ┼ nothing
       │        lp ┼ nothing
-      │       tdc ┼ nothing
       │       brt ┼ Bool: false
       │    cle_pr ┼ Bool: true
       │    strict ┴ Bool: false
@@ -259,18 +258,6 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return `true` if the inner JuMP optimiser or fallback carries time-dependent constraints.
-"""
-function is_time_dependent(opt::MeanRisk)
-    return is_time_dependent(opt.opt) || is_time_dependent(opt.fb)
-end
-function assert_time_dependent_fold_count(opt::MeanRisk, n::Integer)::Nothing
-    assert_time_dependent_fold_count(opt.opt, n)
-    return assert_time_dependent_fold_count(opt.fb, n)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
 Resolve time-dependent constraints for the fold described by `ctx` by recursing into the inner JuMP optimiser and fallback.
 """
 function update_time_dependent_estimator(opt::MeanRisk, ctx::TimeDependentContext)
@@ -280,6 +267,19 @@ function update_time_dependent_estimator(opt::MeanRisk, ctx::TimeDependentContex
     return rebuild_estimator(opt,
                              (; opt = update_time_dependent_estimator(opt.opt, ctx),
                               fb = update_time_dependent_estimator(opt.fb, ctx)))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Replace time-dependent constraints with their static defaults by recursing into the inner optimiser and fallback.
+"""
+function reset_time_dependent_estimator(opt::MeanRisk)
+    if !is_time_dependent(opt)
+        return opt
+    end
+    return rebuild_estimator(opt,
+                             (; opt = reset_time_dependent_estimator(opt.opt),
+                              fb = reset_time_dependent_estimator(opt.fb)))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -627,6 +627,7 @@ function solve_mean_risk!(model::JuMP.Model, mr::MeanRisk, ret::JuMPReturnsEstim
 end
 function _optimise(mr::MeanRisk, rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
                    str_names::Bool = false, save::Bool = true, kwargs...)
+    mr = reset_time_dependent_estimator(mr)
     attrs = processed_jump_optimiser_attributes(mr.opt, rd; dims = dims, kwargs...)
     model = JuMP.Model()
     JuMP.set_string_names_on_creation(model, str_names)

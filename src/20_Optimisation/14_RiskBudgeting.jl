@@ -470,18 +470,6 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return `true` if the inner JuMP optimiser or fallback carries time-dependent constraints.
-"""
-function is_time_dependent(opt::RiskBudgeting)
-    return is_time_dependent(opt.opt) || is_time_dependent(opt.fb)
-end
-function assert_time_dependent_fold_count(opt::RiskBudgeting, n::Integer)::Nothing
-    assert_time_dependent_fold_count(opt.opt, n)
-    return assert_time_dependent_fold_count(opt.fb, n)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
 Resolve time-dependent constraints for the fold described by `ctx` by recursing into the inner JuMP optimiser and fallback.
 """
 function update_time_dependent_estimator(opt::RiskBudgeting, ctx::TimeDependentContext)
@@ -491,6 +479,19 @@ function update_time_dependent_estimator(opt::RiskBudgeting, ctx::TimeDependentC
     return rebuild_estimator(opt,
                              (; opt = update_time_dependent_estimator(opt.opt, ctx),
                               fb = update_time_dependent_estimator(opt.fb, ctx)))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Replace time-dependent constraints with their static defaults by recursing into the inner optimiser and fallback.
+"""
+function reset_time_dependent_estimator(opt::RiskBudgeting)
+    if !is_time_dependent(opt)
+        return opt
+    end
+    return rebuild_estimator(opt,
+                             (; opt = reset_time_dependent_estimator(opt.opt),
+                              fb = reset_time_dependent_estimator(opt.fb)))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -665,6 +666,7 @@ function set_risk_budgeting_constraints!(model::JuMP.Model,
 end
 function _optimise(rb::RiskBudgeting, rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
                    str_names::Bool = false, save::Bool = true, kwargs...)
+    rb = reset_time_dependent_estimator(rb)
     attrs = processed_jump_optimiser_attributes(rb.opt, rd; dims = dims, kwargs...)
     model = JuMP.Model()
     JuMP.set_string_names_on_creation(model, str_names)

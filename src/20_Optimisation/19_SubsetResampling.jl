@@ -107,8 +107,8 @@ $(DocStringExtensions.FIELDS)
 
     SubsetResampling(;
         pe::PrE_Pr = EmpiricalPrior(),
-        wb::Option{<:WbE_Wb} = nothing,
-        fees::Option{<:FeesE_Fees} = nothing,
+        wb::TD_Option{<:WbE_Wb} = nothing,
+        fees::TD_Option{<:FeesE_Fees} = nothing,
         sets::Option{<:AssetSets} = nothing,
         scale::Option{<:VecNum} = nothing,
         opt::NonFiniteAllocationOptimisationEstimator,
@@ -235,8 +235,9 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
     $(field_dict[:strict_opt])
     """
     strict
-    function SubsetResampling(pe::PrE_Pr, wb::Option{<:WbE_Wb}, fees::Option{<:FeesE_Fees},
-                              sets::Option{<:AssetSets}, scale::Option{<:VecNum},
+    function SubsetResampling(pe::PrE_Pr, wb::TD_Option{<:WbE_Wb},
+                              fees::TD_Option{<:FeesE_Fees}, sets::Option{<:AssetSets},
+                              scale::Option{<:VecNum},
                               opt::NonFiniteAllocationOptimisationEstimator,
                               wf::WeightFinaliser, ex::FLoops.Transducers.Executor,
                               subset_size::SubsetSizeE, n_subsets::NumberSubsetsE,
@@ -260,6 +261,10 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
             assert_nonempty_nonneg_finite_val(n_subsets - 2, "n_subsets - 2")
         end
         assert_nonempty_gt0_finite_val(max_comb, :max_comb)
+        assert_time_dependent_substitution(SubsetResampling,
+                                           (; pe, wb, fees, sets, scale, opt, wf, ex,
+                                            subset_size, n_subsets, max_comb, rng, seed, fb,
+                                            brt, strict), (;))
         return new{typeof(pe), typeof(wb), typeof(fees), typeof(sets), typeof(scale),
                    typeof(opt), typeof(wf), typeof(ex), typeof(subset_size),
                    typeof(n_subsets), typeof(max_comb), typeof(rng), typeof(seed),
@@ -269,8 +274,9 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
                                                             strict)
     end
 end
-function SubsetResampling(; pe::PrE_Pr = EmpiricalPrior(), wb::Option{<:WbE_Wb} = nothing,
-                          fees::Option{<:FeesE_Fees} = nothing,
+function SubsetResampling(; pe::PrE_Pr = EmpiricalPrior(),
+                          wb::TD_Option{<:WbE_Wb} = nothing,
+                          fees::TD_Option{<:FeesE_Fees} = nothing,
                           sets::Option{<:AssetSets} = nothing,
                           scale::Option{<:VecNum} = nothing,
                           opt::NonFiniteAllocationOptimisationEstimator,
@@ -299,7 +305,9 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 Return `true` if any sub-estimator of `opt` requires previous portfolio weights (fees, base optimiser, or fallback).
 """
 function needs_previous_weights(opt::SubsetResampling)
-    return (needs_previous_weights(opt.fees) ||
+    return (any(f -> needs_previous_weights(getfield(opt, f)),
+                time_dependent_fields(opt)) ||
+            needs_previous_weights(opt.fees) ||
             needs_previous_weights(opt.opt) ||
             needs_previous_weights(opt.fb))
 end
@@ -309,11 +317,15 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 Return `true` if the base optimiser or fallback carries time-dependent constraints.
 """
 function is_time_dependent(opt::SubsetResampling)
-    return is_time_dependent(opt.opt) || is_time_dependent(opt.fb)
+    return (!isempty(time_dependent_fields(opt)) ||
+            is_time_dependent(opt.opt) ||
+            is_time_dependent(opt.fb))
 end
 function assert_time_dependent_fold_count(opt::SubsetResampling, n::Integer)::Nothing
+    assert_time_dependent_fields_fold_count(opt, n)
     assert_time_dependent_fold_count(opt.opt, n)
-    return assert_time_dependent_fold_count(opt.fb, n)
+    assert_time_dependent_fold_count(opt.fb, n)
+    return nothing
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -324,9 +336,24 @@ function update_time_dependent_estimator(opt::SubsetResampling, ctx::TimeDepende
     if !is_time_dependent(opt)
         return opt
     end
+    opt = update_time_dependent_fields(opt, ctx)
     return rebuild_estimator(opt,
                              (; opt = update_time_dependent_estimator(opt.opt, ctx),
                               fb = update_time_dependent_estimator(opt.fb, ctx)))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Replace time-dependent constraints with their static defaults, both on this estimator's own fields and by recursing into the wrapped optimisers.
+"""
+function reset_time_dependent_estimator(opt::SubsetResampling)
+    if !is_time_dependent(opt)
+        return opt
+    end
+    opt = reset_time_dependent_fields(opt)
+    return rebuild_estimator(opt,
+                             (; opt = reset_time_dependent_estimator(opt.opt),
+                              fb = reset_time_dependent_estimator(opt.fb)))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -463,6 +490,7 @@ end
 function _optimise(sr::SubsetResampling, rd::ReturnsResult; dims::Int = 1,
                    branchorder::Symbol = :optimal, str_names::Bool = false,
                    save::Bool = true, kwargs...)
+    sr = reset_time_dependent_estimator(sr)
     rd = returns_result_picker(rd, sr.brt)
     pr = prior(sr.pe, rd; dims = dims)
     X = pr.X

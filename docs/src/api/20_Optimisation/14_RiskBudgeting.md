@@ -20,6 +20,7 @@ RiskBudgeting
 needs_previous_weights(opt::RiskBudgeting)
 is_time_dependent(opt::RiskBudgeting)
 update_time_dependent_estimator(opt::RiskBudgeting, ctx::TimeDependentContext)
+reset_time_dependent_estimator(opt::RiskBudgeting)
 factory(rb::RiskBudgeting, w::AbstractVector)
 port_opt_view(rb::RiskBudgeting, i, X::MatNum, args...)
 _set_risk_budgeting_constraints!(model::JuMP.Model, rb::RiskBudgeting, w::VecJuMPScalar; strict::Bool = false)

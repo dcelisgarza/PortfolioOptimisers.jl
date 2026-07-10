@@ -12,6 +12,7 @@ NearOptimalCentering
 needs_previous_weights(opt::NearOptimalCentering)
 is_time_dependent(opt::NearOptimalCentering)
 update_time_dependent_estimator(opt::NearOptimalCentering, ctx::TimeDependentContext)
+reset_time_dependent_estimator(opt::NearOptimalCentering)
 factory(noc::NearOptimalCentering, w::AbstractVector)
 port_opt_view(noc::NearOptimalCentering, i, X::MatNum, args...)
 near_optimal_centering_risks

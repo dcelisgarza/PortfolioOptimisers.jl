@@ -53,6 +53,25 @@ function assert_external_optimiser(::NaiveOptimisationEstimator)::Nothing
     return nothing
 end
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return `true` if the naive optimiser configuration carries time-dependent constraints.
+
+# Related
+
+  - [`NaiveOptimisationEstimator`](@ref)
+  - [`TimeDependent`](@ref)
+  - [`is_time_dependent`](@ref)
+"""
+function is_time_dependent(opt::NaiveOptimisationEstimator)
+    return !isempty(time_dependent_fields(opt)) || is_time_dependent(opt.fb)
+end
+function assert_time_dependent_fold_count(opt::NaiveOptimisationEstimator,
+                                          n::Integer)::Nothing
+    assert_time_dependent_fields_fold_count(opt, n)
+    return nothing
+end
+"""
 $(DocStringExtensions.TYPEDEF)
 
 Result type for naive portfolio optimisation estimators.
@@ -266,19 +285,22 @@ InverseVolatility
     $(field_dict[:strict_opt])
     """
     strict
-    function InverseVolatility(pe::PrE_Pr, wb::Option{<:WbE_Wb}, sets::Option{<:AssetSets},
-                               wf::WeightFinaliser, fb::Option{<:OptE_Opt}, sq::Bool,
-                               brt::Bool, strict::Bool)
+    function InverseVolatility(pe::PrE_Pr, wb::TD_Option{<:WbE_Wb},
+                               sets::Option{<:AssetSets}, wf::WeightFinaliser,
+                               fb::Option{<:OptE_Opt}, sq::Bool, brt::Bool, strict::Bool)
         if isa(wb, WeightBoundsEstimator)
             @argcheck(!isnothing(sets),
                       IsNothingError("sets cannot be nothing when wb is a WeightBoundsEstimator"))
         end
+        assert_time_dependent_substitution(InverseVolatility,
+                                           (; pe, wb, sets, wf, fb, sq, brt, strict),
+                                           (; wb = WeightBounds()))
         return new{typeof(pe), typeof(wb), typeof(sets), typeof(wf), typeof(fb), typeof(sq),
                    typeof(brt), typeof(strict)}(pe, wb, sets, wf, fb, sq, brt, strict)
     end
 end
 function InverseVolatility(; pe::PrE_Pr = EmpiricalPrior(),
-                           wb::Option{<:WbE_Wb} = WeightBounds(),
+                           wb::TD_Option{<:WbE_Wb} = WeightBounds(),
                            sets::Option{<:AssetSets} = nothing,
                            wf::WeightFinaliser = IterativeWeightFinaliser(),
                            fb::Option{<:OptE_Opt} = nothing, sq::Bool = false,
@@ -307,6 +329,29 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
+Resolve the time-dependent constraints of a [`InverseVolatility`](@ref) for the fold described by `ctx`.
+
+Rebuilds the optimiser through its validated keyword constructor with each [`TimeDependent`](@ref)-valued field replaced by its resolved per-fold value, so the result is an ordinary static optimiser.
+
+# Related
+
+  - [`InverseVolatility`](@ref)
+  - [`TimeDependent`](@ref)
+  - [`TimeDependentContext`](@ref)
+"""
+function update_time_dependent_estimator(opt::InverseVolatility, ctx::TimeDependentContext)
+    return update_time_dependent_fields(opt, ctx)
+end
+function time_dependent_field_defaults(::InverseVolatility)::NamedTuple
+    return (; wb = WeightBounds())
+end
+function reset_time_dependent_estimator(opt::InverseVolatility)
+    opt = reset_time_dependent_fields(opt)
+    return rebuild_estimator(opt, (; fb = reset_time_dependent_estimator(opt.fb)))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
 Run the inverse volatility portfolio optimisation.
 
 Internal dispatch called by [`optimise`](@ref). Computes covariance via the prior estimator, assigns weights inversely proportional to volatility (or variance when `iv.sq = true`), then applies weight bounds.
@@ -320,6 +365,7 @@ Internal dispatch called by [`optimise`](@ref). Computes covariance via the prio
 function _optimise(iv::InverseVolatility, rd::ReturnsResult = ReturnsResult();
                    dims::Int = 1, kwargs...)
     @argcheck(dims in (1, 2), DomainError(dims, "dims must be 1 or 2"))
+    iv = reset_time_dependent_estimator(iv)
     rd = returns_result_picker(rd, iv.brt)
     pr = prior(iv.pe, rd; dims = dims)
     X = pr.X
@@ -377,7 +423,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     EqualWeighted(;
-        wb::Option{<:WbE_Wb} = WeightBounds(),
+        wb::TD_Option{<:WbE_Wb} = WeightBounds(),
         sets::Option{<:AssetSets} = nothing,
         wf::WeightFinaliser = IterativeWeightFinaliser(),
         fb::Option{<:OptE_Opt} = nothing,
@@ -443,24 +489,49 @@ EqualWeighted
     $(field_dict[:strict_opt])
     """
     strict
-    function EqualWeighted(wb::Option{<:WbE_Wb}, sets::Option{<:AssetSets},
+    function EqualWeighted(wb::TD_Option{<:WbE_Wb}, sets::Option{<:AssetSets},
                            wf::WeightFinaliser, fb::Option{<:OptE_Opt}, strict::Bool)
         if isa(wb, WeightBoundsEstimator)
             @argcheck(!isnothing(sets),
                       IsNothingError("sets cannot be nothing when wb is a WeightBoundsEstimator"))
         end
+        assert_time_dependent_substitution(EqualWeighted, (; wb, sets, wf, fb, strict),
+                                           (; wb = WeightBounds()))
         return new{typeof(wb), typeof(sets), typeof(wf), typeof(fb), typeof(strict)}(wb,
                                                                                      sets,
                                                                                      wf, fb,
                                                                                      strict)
     end
 end
-function EqualWeighted(; wb::Option{<:WbE_Wb} = WeightBounds(),
+function EqualWeighted(; wb::TD_Option{<:WbE_Wb} = WeightBounds(),
                        sets::Option{<:AssetSets} = nothing,
                        wf::WeightFinaliser = IterativeWeightFinaliser(),
                        fb::Option{<:OptE_Opt} = nothing,
                        strict::Bool = false)::EqualWeighted
     return EqualWeighted(wb, sets, wf, fb, strict)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Resolve the time-dependent constraints of a [`EqualWeighted`](@ref) for the fold described by `ctx`.
+
+Rebuilds the optimiser through its validated keyword constructor with each [`TimeDependent`](@ref)-valued field replaced by its resolved per-fold value, so the result is an ordinary static optimiser.
+
+# Related
+
+  - [`EqualWeighted`](@ref)
+  - [`TimeDependent`](@ref)
+  - [`TimeDependentContext`](@ref)
+"""
+function update_time_dependent_estimator(opt::EqualWeighted, ctx::TimeDependentContext)
+    return update_time_dependent_fields(opt, ctx)
+end
+function time_dependent_field_defaults(::EqualWeighted)::NamedTuple
+    return (; wb = WeightBounds())
+end
+function reset_time_dependent_estimator(opt::EqualWeighted)
+    opt = reset_time_dependent_fields(opt)
+    return rebuild_estimator(opt, (; fb = reset_time_dependent_estimator(opt.fb)))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -478,6 +549,7 @@ Internal dispatch called by [`optimise`](@ref). Assigns equal weights to all ass
 function _optimise(ew::EqualWeighted, rd::ReturnsResult; dims::Int = 1, kwargs...)
     @argcheck(!isnothing(rd.X), IsNothingError("rd.X cannot be nothing"))
     @argcheck(dims in (1, 2), DomainError(dims, "dims must be 1 or 2"))
+    ew = reset_time_dependent_estimator(ew)
     dims = ifelse(isone(dims), 2, 1)
     N = size(rd.X, dims)
     w = fill(inv(N), N)
@@ -534,7 +606,7 @@ $(DocStringExtensions.FIELDS)
         alpha::Num_VecNum = 1,
         rng::Random.AbstractRNG = Random.default_rng(),
         seed::Option{<:Integer} = nothing,
-        wb::Option{<:WbE_Wb} = nothing,
+        wb::TD_Option{<:WbE_Wb} = nothing,
         sets::Option{<:AssetSets} = nothing,
         wf::WeightFinaliser = IterativeWeightFinaliser(),
         fb::Option{<:OptE_Opt} = nothing,
@@ -619,7 +691,7 @@ RandomWeighted
     """
     strict
     function RandomWeighted(alpha::Num_VecNum, rng::Random.AbstractRNG,
-                            seed::Option{<:Integer}, wb::Option{<:WbE_Wb},
+                            seed::Option{<:Integer}, wb::TD_Option{<:WbE_Wb},
                             sets::Option{<:AssetSets}, wf::WeightFinaliser,
                             fb::Option{<:OptE_Opt}, strict::Bool)
         if !isnothing(alpha)
@@ -629,6 +701,9 @@ RandomWeighted
             @argcheck(!isnothing(sets),
                       IsNothingError("sets cannot be nothing when wb is a WeightBoundsEstimator"))
         end
+        assert_time_dependent_substitution(RandomWeighted,
+                                           (; alpha, rng, seed, wb, sets, wf, fb, strict),
+                                           (; wb = WeightBounds()))
         return new{typeof(alpha), typeof(rng), typeof(seed), typeof(wb), typeof(sets),
                    typeof(wf), typeof(fb), typeof(strict)}(alpha, rng, seed, wb, sets, wf,
                                                            fb, strict)
@@ -636,12 +711,36 @@ RandomWeighted
 end
 function RandomWeighted(; alpha::Num_VecNum = 1,
                         rng::Random.AbstractRNG = Random.default_rng(),
-                        seed::Option{<:Integer} = nothing, wb::Option{<:WbE_Wb} = nothing,
+                        seed::Option{<:Integer} = nothing,
+                        wb::TD_Option{<:WbE_Wb} = nothing,
                         sets::Option{<:AssetSets} = nothing,
                         wf::WeightFinaliser = IterativeWeightFinaliser(),
                         fb::Option{<:OptE_Opt} = nothing,
                         strict::Bool = false)::RandomWeighted
     return RandomWeighted(alpha, rng, seed, wb, sets, wf, fb, strict)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Resolve the time-dependent constraints of a [`RandomWeighted`](@ref) for the fold described by `ctx`.
+
+Rebuilds the optimiser through its validated keyword constructor with each [`TimeDependent`](@ref)-valued field replaced by its resolved per-fold value, so the result is an ordinary static optimiser.
+
+# Related
+
+  - [`RandomWeighted`](@ref)
+  - [`TimeDependent`](@ref)
+  - [`TimeDependentContext`](@ref)
+"""
+function update_time_dependent_estimator(opt::RandomWeighted, ctx::TimeDependentContext)
+    return update_time_dependent_fields(opt, ctx)
+end
+function time_dependent_field_defaults(::RandomWeighted)::NamedTuple
+    return (; wb = WeightBounds())
+end
+function reset_time_dependent_estimator(opt::RandomWeighted)
+    opt = reset_time_dependent_fields(opt)
+    return rebuild_estimator(opt, (; fb = reset_time_dependent_estimator(opt.fb)))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -659,6 +758,7 @@ Internal dispatch called by [`optimise`](@ref). Draws weights from a Dirichlet d
 function _optimise(rw::RandomWeighted, rd::ReturnsResult; dims::Int = 1, kwargs...)
     @argcheck(!isnothing(rd.X), IsNothingError("rd.X cannot be nothing"))
     @argcheck(dims in (1, 2), DomainError(dims, "dims must be 1 or 2"))
+    rw = reset_time_dependent_estimator(rw)
     dims = ifelse(isone(dims), 2, 1)
     N = size(rd.X, dims)
     if isa(rw.alpha, VecNum)

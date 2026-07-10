@@ -26,6 +26,20 @@ JuMP optimisers formulate and solve portfolio optimisation problems using mathem
 """
 abstract type JuMPOptimisationEstimator <: NonFiniteAllocationOptimisationEstimator end
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return `true` if the inner JuMP optimiser or fallback carries time-dependent constraints.
+"""
+function is_time_dependent(opt::JuMPOptimisationEstimator)
+    return is_time_dependent(opt.opt) || is_time_dependent(opt.fb)
+end
+function assert_time_dependent_fold_count(opt::JuMPOptimisationEstimator,
+                                          n::Integer)::Nothing
+    assert_time_dependent_fold_count(opt.opt, n)
+    assert_time_dependent_fold_count(opt.fb, n)
+    return nothing
+end
+"""
 $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for risk-based JuMP portfolio optimisation estimators.
