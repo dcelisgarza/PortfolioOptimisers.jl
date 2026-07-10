@@ -19,9 +19,6 @@ SchurComplementHierarchicalRiskParityResult
 factory(res::SchurComplementHierarchicalRiskParityResult, fb::Option{<:OptE_Opt})
 SchurComplementHierarchicalRiskParity
 needs_previous_weights(opt::SchurComplementHierarchicalRiskParity)
-is_time_dependent(opt::SchurComplementHierarchicalRiskParity)
-update_time_dependent_estimator(opt::SchurComplementHierarchicalRiskParity, ctx::TimeDependentContext)
-reset_time_dependent_estimator(opt::SchurComplementHierarchicalRiskParity)
 port_opt_view(sh::SchurComplementHierarchicalRiskParity, i, X::MatNum, args...)
 optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:Any, Nothing},
                   rd::ReturnsResult = ReturnsResult(); dims::Int = 1, kwargs...)

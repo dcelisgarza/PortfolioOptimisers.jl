@@ -344,16 +344,12 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Replace time-dependent constraints with their static defaults, both on this estimator's own fields and by recursing into the wrapped optimisers.
+Replace this meta-optimiser's own time-dependent fields with their static defaults.
+
+Deliberately does **not** recurse into the wrapped optimisers: a standalone meta solve consumes inner per-fold schedules through its inner cross-validation leg, and its fold-less full-window inner solves reset themselves at their own `_optimise` seam. Only the meta's own fields (applied to the combined weights, resolved by an outer fold loop when one exists) are inert here.
 """
 function reset_time_dependent_estimator(opt::SubsetResampling)
-    if !is_time_dependent(opt)
-        return opt
-    end
-    opt = reset_time_dependent_fields(opt)
-    return rebuild_estimator(opt,
-                             (; opt = reset_time_dependent_estimator(opt.opt),
-                              fb = reset_time_dependent_estimator(opt.fb)))
+    return reset_time_dependent_fields(opt)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

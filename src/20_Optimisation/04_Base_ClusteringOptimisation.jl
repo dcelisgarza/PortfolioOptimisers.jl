@@ -41,6 +41,37 @@ function assert_time_dependent_fold_count(opt::ClusteringOptimisationEstimator,
     return nothing
 end
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Resolve time-dependent constraints for the fold described by `ctx` by recursing into the inner optimiser and fallback.
+
+[`NestedClustered`](@ref) overrides this with its own method resolving its own fields and inner estimators.
+"""
+function update_time_dependent_estimator(opt::ClusteringOptimisationEstimator,
+                                         ctx::TimeDependentContext)
+    if !is_time_dependent(opt)
+        return opt
+    end
+    return rebuild_estimator(opt,
+                             (; opt = update_time_dependent_estimator(opt.opt, ctx),
+                              fb = update_time_dependent_estimator(opt.fb, ctx)))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Replace time-dependent constraints with their static defaults by recursing into the inner optimiser and fallback.
+
+[`NestedClustered`](@ref) overrides this with its own method resetting its own fields and inner estimators.
+"""
+function reset_time_dependent_estimator(opt::ClusteringOptimisationEstimator)
+    if !is_time_dependent(opt)
+        return opt
+    end
+    return rebuild_estimator(opt,
+                             (; opt = reset_time_dependent_estimator(opt.opt),
+                              fb = reset_time_dependent_estimator(opt.fb)))
+end
+"""
 $(DocStringExtensions.TYPEDEF)
 
 Result type for hierarchical (clustering-based) portfolio optimisation.

@@ -261,4 +261,139 @@ end
         @test isnothing(hpreds.pred[1].res.fees) || hpreds.pred[1].res.fees.l == 0.0
         @test hpreds.pred[2].res.fees.l == 0.01
     end
+    @testset "Naive optimisers" begin
+        sched = TimeDependent([WeightBounds(; lb = 0.0, ub = 0.9),
+                               WeightBounds(; lb = 0.0, ub = 0.8)])
+        ew = EqualWeighted(; wb = sched)
+        @test PortfolioOptimisers.is_time_dependent(ew)
+        @test PortfolioOptimisers.time_dependent_fields(ew) == (:wb,)
+        @test !PortfolioOptimisers.needs_previous_weights(ew)
+        # The fallback participates in the trait, the fold-count assertion, and the
+        # per-fold update.
+        ewfb = EqualWeighted(; fb = EqualWeighted(; wb = sched))
+        @test PortfolioOptimisers.is_time_dependent(ewfb)
+        @test isempty(PortfolioOptimisers.time_dependent_fields(ewfb))
+        @test_throws DimensionMismatch PortfolioOptimisers.assert_time_dependent_fold_count(ewfb,
+                                                                                            5)
+        @test isnothing(PortfolioOptimisers.assert_time_dependent_fold_count(ewfb, 2))
+        ctx2 = TimeDependentContext(; i = 2, n = 2, rd = rd, train_idx = [1:100, 1:150],
+                                    test_idx = [101:150, 151:200])
+        ew2 = PortfolioOptimisers.update_time_dependent_estimator(ew, ctx2)
+        @test ew2.wb.ub == 0.8
+        ewfb2 = PortfolioOptimisers.update_time_dependent_estimator(ewfb, ctx2)
+        @test ewfb2.fb.wb.ub == 0.8
+        @test !PortfolioOptimisers.is_time_dependent(ewfb2)
+        # A previous-weights callable in a naive field forces sequential execution.
+        @test PortfolioOptimisers.needs_previous_weights(EqualWeighted(;
+                                                                       wb = TimeDependent(PreviousWeightsFunction(ctx -> WeightBounds()))))
+        @test PortfolioOptimisers.needs_previous_weights(EqualWeighted(;
+                                                                       fb = EqualWeighted(;
+                                                                                          wb = TimeDependent(PreviousWeightsFunction(ctx -> WeightBounds())))))
+        # Reset restores each type's static default: WeightBounds() for EqualWeighted
+        # and InverseVolatility, nothing for RandomWeighted.
+        @test PortfolioOptimisers.reset_time_dependent_estimator(ew).wb == WeightBounds()
+        @test PortfolioOptimisers.reset_time_dependent_estimator(InverseVolatility(;
+                                                                                   wb = sched)).wb ==
+              WeightBounds()
+        @test isnothing(PortfolioOptimisers.reset_time_dependent_estimator(RandomWeighted(;
+                                                                                          wb = sched)).wb)
+        @test PortfolioOptimisers.reset_time_dependent_estimator(ewfb).fb.wb ==
+              WeightBounds()
+        # Inert outside fold loops.
+        res = optimise(ew, rd)
+        @test isa(res.retcode, OptimisationSuccess)
+        @test res.w == optimise(EqualWeighted(), rd).w
+        ivsched = InverseVolatility(; wb = sched)
+        @test optimise(ivsched, rd).w == optimise(InverseVolatility(), rd).w
+        # Walk-forward end to end: fold 2 caps the first asset.
+        cvw = IndexWalkForward(100, 50)
+        tdcap = TimeDependent([WeightBounds(),
+                               WeightBounds(; lb = 0.0, ub = [0.1, 1.0, 1.0, 1.0, 1.0])])
+        ewp = cross_val_predict(EqualWeighted(; wb = tdcap), rd, cvw)
+        @test length(ewp.pred) == 2
+        @test all(isapprox(0.2), ewp.pred[1].res.w)
+        @test ewp.pred[2].res.w[1] <= 0.1 + 1e-6
+        @test !isapprox(ewp.pred[1].res.w, ewp.pred[2].res.w)
+    end
+    @testset "Meta-optimisers: outer and inner cross-validation" begin
+        mr0 = MeanRisk(; opt = JuMPOptimiser(; slv = slv))
+        # Standalone meta: the inner CV leg consumes the inner estimator's schedule
+        # against the INNER folds, while the fold-less full-window inner solves reset
+        # themselves and never evaluate it.
+        seen3 = zeros(Int, 3)
+        obs3 = TimeDependent(ctx -> begin
+                                 seen3[ctx.i] += 1
+                                 WeightBounds(; lb = 0.0, ub = 0.9)
+                             end)
+        mr_obs = MeanRisk(; opt = JuMPOptimiser(; slv = slv, wb = obs3))
+        st = Stacking(; opti = [mr_obs, mr0], opto = mr0,
+                      cv = OptimisationCrossValidation(; cv = KFold(; n = 3)))
+        stres = optimise(st, rd)
+        @test isa(stres.retcode, OptimisationSuccess)
+        @test seen3 == [1, 1, 1]
+        # A vector schedule sized to the inner CV works standalone; a mis-sized one
+        # fails at the inner split.
+        l2_3 = TimeDependent([1e-4, 2e-4, 3e-4])
+        st3 = Stacking(; opti = [MeanRisk(; opt = JuMPOptimiser(; slv = slv, l2 = l2_3)),
+                                 mr0], opto = mr0,
+                       cv = OptimisationCrossValidation(; cv = KFold(; n = 3)))
+        @test isa(optimise(st3, rd).retcode, OptimisationSuccess)
+        l2_2 = TimeDependent([1e-4, 2e-4])
+        st2 = Stacking(; opti = [MeanRisk(; opt = JuMPOptimiser(; slv = slv, l2 = l2_2)),
+                                 mr0], opto = mr0,
+                       cv = OptimisationCrossValidation(; cv = KFold(; n = 3)))
+        @test_throws DimensionMismatch optimise(st2, rd)
+        # Under an outer fold loop the OUTERMOST CV wins: the same 2-entry schedule now
+        # matches the outer walk-forward (2 folds), the callable sees only outer fold
+        # indices, and the inner KFold(3) receives already-static estimators.
+        cvw = IndexWalkForward(100, 50)
+        seen2 = zeros(Int, 2)
+        obs2 = TimeDependent(ctx -> begin
+                                 seen2[ctx.i] += 1
+                                 WeightBounds(; lb = 0.0, ub = 0.9)
+                             end)
+        st_outer = Stacking(;
+                            opti = [MeanRisk(; opt = JuMPOptimiser(; slv = slv,
+                                                                   wb = obs2)), mr0],
+                            opto = mr0,
+                            cv = OptimisationCrossValidation(; cv = KFold(; n = 3)))
+        opreds = cross_val_predict(st_outer, rd, cvw)
+        @test length(opreds.pred) == 2
+        @test seen2 == [1, 1]
+        @test isa(optimise(PortfolioOptimisers.update_time_dependent_estimator(st_outer,
+                                                                               TimeDependentContext(;
+                                                                                                    i = 1,
+                                                                                                    n = 2,
+                                                                                                    rd = rd,
+                                                                                                    train_idx = [1:100],
+                                                                                                    test_idx = [101:150])),
+                           rd).retcode, OptimisationSuccess)
+        # A schedule sized to the inner CV fails at the OUTER split when an outer fold
+        # loop is present.
+        st_outer3 = Stacking(;
+                             opti = [MeanRisk(; opt = JuMPOptimiser(; slv = slv,
+                                                                    l2 = l2_3)), mr0],
+                             opto = mr0,
+                             cv = OptimisationCrossValidation(; cv = KFold(; n = 3)))
+        @test_throws DimensionMismatch cross_val_predict(st_outer3, rd, cvw)
+        # NestedClustered under an outer walk-forward with a different inner CV.
+        nco = NestedClustered(; opti = MeanRisk(; opt = JuMPOptimiser(; slv = slv,
+                                                                      l2 = l2_2)),
+                              opto = mr0,
+                              cv = OptimisationCrossValidation(; cv = KFold(; n = 3)))
+        npreds = cross_val_predict(nco, rd, cvw)
+        @test length(npreds.pred) == 2
+        # The meta's own wb schedule is resolved against the outer folds and caps the
+        # combined weights; standalone it is inert.
+        srsched = TimeDependent([WeightBounds(),
+                                 WeightBounds(; lb = 0.15, ub = 0.25)])
+        sr = SubsetResampling(; opt = mr0, wb = srsched, subset_size = 3, n_subsets = 2,
+                              rng = StableRNG(7), seed = 11)
+        spreds = cross_val_predict(sr, rd, cvw)
+        @test length(spreds.pred) == 2
+        @test all(x -> 0.15 - 1e-6 <= x <= 0.25 + 1e-6, spreds.pred[2].res.w)
+        sr0 = SubsetResampling(; opt = mr0, subset_size = 3, n_subsets = 2,
+                               rng = StableRNG(7), seed = 11)
+        @test optimise(sr, rd).w == optimise(sr0, rd).w
+    end
 end

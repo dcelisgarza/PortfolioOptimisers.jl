@@ -24,7 +24,8 @@ Return whether the naive optimiser's fallback estimator requires previous portfo
   - [`NaiveOptimisationEstimator`](@ref)
 """
 function needs_previous_weights(opt::NaiveOptimisationEstimator)
-    return needs_previous_weights(opt.fb)
+    return any(f -> needs_previous_weights(getfield(opt, f)),
+               time_dependent_fields(opt)) || needs_previous_weights(opt.fb)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -69,7 +70,44 @@ end
 function assert_time_dependent_fold_count(opt::NaiveOptimisationEstimator,
                                           n::Integer)::Nothing
     assert_time_dependent_fields_fold_count(opt, n)
+    assert_time_dependent_fold_count(opt.fb, n)
     return nothing
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Resolve the time-dependent constraints of a naive optimiser for the fold described by `ctx`.
+
+Rebuilds the optimiser through its validated keyword constructor with each [`TimeDependent`](@ref)-valued field replaced by its resolved per-fold value, recursing into the fallback, so the result is an ordinary static optimiser.
+
+# Related
+
+  - [`NaiveOptimisationEstimator`](@ref)
+  - [`TimeDependent`](@ref)
+  - [`TimeDependentContext`](@ref)
+"""
+function update_time_dependent_estimator(opt::NaiveOptimisationEstimator,
+                                         ctx::TimeDependentContext)
+    if !is_time_dependent(opt)
+        return opt
+    end
+    opt = update_time_dependent_fields(opt, ctx)
+    return rebuild_estimator(opt, (; fb = update_time_dependent_estimator(opt.fb, ctx)))
+end
+function time_dependent_field_defaults(::NaiveOptimisationEstimator)::NamedTuple
+    return (; wb = WeightBounds())
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Replace time-dependent constraints with their static defaults, both on the naive optimiser's own fields and by recursing into the fallback.
+"""
+function reset_time_dependent_estimator(opt::NaiveOptimisationEstimator)
+    if !is_time_dependent(opt)
+        return opt
+    end
+    opt = reset_time_dependent_fields(opt)
+    return rebuild_estimator(opt, (; fb = reset_time_dependent_estimator(opt.fb)))
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -329,29 +367,6 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Resolve the time-dependent constraints of a [`InverseVolatility`](@ref) for the fold described by `ctx`.
-
-Rebuilds the optimiser through its validated keyword constructor with each [`TimeDependent`](@ref)-valued field replaced by its resolved per-fold value, so the result is an ordinary static optimiser.
-
-# Related
-
-  - [`InverseVolatility`](@ref)
-  - [`TimeDependent`](@ref)
-  - [`TimeDependentContext`](@ref)
-"""
-function update_time_dependent_estimator(opt::InverseVolatility, ctx::TimeDependentContext)
-    return update_time_dependent_fields(opt, ctx)
-end
-function time_dependent_field_defaults(::InverseVolatility)::NamedTuple
-    return (; wb = WeightBounds())
-end
-function reset_time_dependent_estimator(opt::InverseVolatility)
-    opt = reset_time_dependent_fields(opt)
-    return rebuild_estimator(opt, (; fb = reset_time_dependent_estimator(opt.fb)))
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
 Run the inverse volatility portfolio optimisation.
 
 Internal dispatch called by [`optimise`](@ref). Computes covariance via the prior estimator, assigns weights inversely proportional to volatility (or variance when `iv.sq = true`), then applies weight bounds.
@@ -509,29 +524,6 @@ function EqualWeighted(; wb::TD_Option{<:WbE_Wb} = WeightBounds(),
                        fb::Option{<:OptE_Opt} = nothing,
                        strict::Bool = false)::EqualWeighted
     return EqualWeighted(wb, sets, wf, fb, strict)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Resolve the time-dependent constraints of a [`EqualWeighted`](@ref) for the fold described by `ctx`.
-
-Rebuilds the optimiser through its validated keyword constructor with each [`TimeDependent`](@ref)-valued field replaced by its resolved per-fold value, so the result is an ordinary static optimiser.
-
-# Related
-
-  - [`EqualWeighted`](@ref)
-  - [`TimeDependent`](@ref)
-  - [`TimeDependentContext`](@ref)
-"""
-function update_time_dependent_estimator(opt::EqualWeighted, ctx::TimeDependentContext)
-    return update_time_dependent_fields(opt, ctx)
-end
-function time_dependent_field_defaults(::EqualWeighted)::NamedTuple
-    return (; wb = WeightBounds())
-end
-function reset_time_dependent_estimator(opt::EqualWeighted)
-    opt = reset_time_dependent_fields(opt)
-    return rebuild_estimator(opt, (; fb = reset_time_dependent_estimator(opt.fb)))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -719,28 +711,8 @@ function RandomWeighted(; alpha::Num_VecNum = 1,
                         strict::Bool = false)::RandomWeighted
     return RandomWeighted(alpha, rng, seed, wb, sets, wf, fb, strict)
 end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Resolve the time-dependent constraints of a [`RandomWeighted`](@ref) for the fold described by `ctx`.
-
-Rebuilds the optimiser through its validated keyword constructor with each [`TimeDependent`](@ref)-valued field replaced by its resolved per-fold value, so the result is an ordinary static optimiser.
-
-# Related
-
-  - [`RandomWeighted`](@ref)
-  - [`TimeDependent`](@ref)
-  - [`TimeDependentContext`](@ref)
-"""
-function update_time_dependent_estimator(opt::RandomWeighted, ctx::TimeDependentContext)
-    return update_time_dependent_fields(opt, ctx)
-end
 function time_dependent_field_defaults(::RandomWeighted)::NamedTuple
-    return (; wb = WeightBounds())
-end
-function reset_time_dependent_estimator(opt::RandomWeighted)
-    opt = reset_time_dependent_fields(opt)
-    return rebuild_estimator(opt, (; fb = reset_time_dependent_estimator(opt.fb)))
+    return (;)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

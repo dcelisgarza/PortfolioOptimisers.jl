@@ -6,9 +6,6 @@ factory(res::MeanRiskResult, fb::Option{<:OptE_Opt})
 Base.getproperty(r::MeanRiskResult, sym::Symbol)
 MeanRisk
 needs_previous_weights(opt::MeanRisk)
-is_time_dependent(opt::MeanRisk)
-update_time_dependent_estimator(opt::MeanRisk, ctx::TimeDependentContext)
-reset_time_dependent_estimator(opt::MeanRisk)
 factory(mr::MeanRisk, w::AbstractVector)
 port_opt_view(mr::MeanRisk, i, X::MatNum, args...)
 solve_mean_risk!

@@ -485,33 +485,6 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Resolve time-dependent constraints for the fold described by `ctx` by recursing into the inner optimiser and fallback.
-"""
-function update_time_dependent_estimator(opt::SchurComplementHierarchicalRiskParity,
-                                         ctx::TimeDependentContext)
-    if !is_time_dependent(opt)
-        return opt
-    end
-    return rebuild_estimator(opt,
-                             (; opt = update_time_dependent_estimator(opt.opt, ctx),
-                              fb = update_time_dependent_estimator(opt.fb, ctx)))
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Replace time-dependent constraints with their static defaults by recursing into the inner optimiser and fallback.
-"""
-function reset_time_dependent_estimator(opt::SchurComplementHierarchicalRiskParity)
-    if !is_time_dependent(opt)
-        return opt
-    end
-    return rebuild_estimator(opt,
-                             (; opt = reset_time_dependent_estimator(opt.opt),
-                              fb = reset_time_dependent_estimator(opt.fb)))
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
 Return a view of [`SchurComplementHierarchicalRiskParity`](@ref) `sh` sliced to asset indices `i`.
 
 # Related

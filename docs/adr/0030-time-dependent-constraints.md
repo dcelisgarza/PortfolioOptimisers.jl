@@ -72,7 +72,10 @@ processes the estimator, and replaced by the field's static default everywhere e
   `bgt → 1.0`, otherwise `nothing`) and recurses through wrapper optimisers. Placing the seam
   in `_optimise` covers the fallback chain, the `fb = Nothing` fast paths, and meta-optimisers'
   fold-less full-window solves uniformly; per-fold estimators produced by the swap contain no
-  `TimeDependent` values and pass through at the cost of one field scan.
+  `TimeDependent` values and pass through at the cost of one field scan. Meta-optimisers reset
+  *only their own fields*: their inner schedules must survive the seam to be consumed by the
+  meta's inner cross-validation leg, while the meta's fold-less full-window inner solves reset
+  themselves at their own `_optimise`.
 - **Meta-optimisers compose, never distribute**: NestedClustered, Stacking, and
   SubsetResampling accept `TimeDependent` in their *own* `wb`/`fees` (the post-combination
   inputs) and forward `is_time_dependent` / `update_time_dependent_estimator` / the fold-count

@@ -273,7 +273,76 @@ mr_mr_sched = MeanRisk(; opt = JuMPOptimiser(; slv = slv, wb = deleverage(n_mr))
 pred_mr_sched = cross_val_predict(mr_mr_sched, rd, mrand)
 length(pred_mr_sched.pred)
 #=
-## 7. Summary
+## 7. Nesting fold loops: who consumes the schedule?
+
+Meta-optimisers like [`Stacking`](@ref) and [`NestedClustered`](@ref) run a cross-validation of their *own* to estimate inner out-of-sample returns. That means a schedule inside a meta can sit under **two** fold loops — the meta's inner one and, when the meta itself is backtested with [`cross_val_predict`](@ref), an outer one. The rule is simple: **the outermost fold loop wins**, so the entries must be sized for whichever loop actually consumes them.
+
+### 7.1 Outer CV, no inner CV
+
+This is everything we have done so far: the backtest's fold loop resolves the schedule and each fold solves an ordinary static optimiser.
+
+### 7.2 No outer CV, inner CV
+
+Used standalone, a meta's inner cross-validation is the outermost (and only) fold loop, so it consumes the schedules of its inner estimators — sized to the *inner* scheme's folds. The meta's fold-less full-window inner solves run at the fields' static defaults, exactly like a plain `optimise`.
+
+Here one of the stacked optimisers de-leverages across the inner `KFold(4)` folds used to build the out-of-sample returns fed to the outer optimiser:
+=#
+st_inner = Stacking(;
+                    opti = [MeanRisk(; opt = JuMPOptimiser(; slv = slv,
+                                                           wb = deleverage(4))),
+                            mr_static], opto = mr_static,
+                    cv = OptimisationCrossValidation(; cv = KFold(; n = 4)))
+res_st_inner = optimise(st_inner, rd)
+maximum(res_st_inner.w)
+#=
+The same estimator with a mis-sized schedule fails at the *inner* split:
+=#
+try
+    optimise(Stacking(;
+                      opti = [MeanRisk(; opt = JuMPOptimiser(; slv = slv,
+                                                             wb = deleverage(7))),
+                              mr_static], opto = mr_static,
+                      cv = OptimisationCrossValidation(; cv = KFold(; n = 4))), rd)
+catch err
+    err
+end
+#=
+### 7.3 Outer CV + inner CV
+
+Backtesting that same meta puts an outer fold loop on top. Now the *outer* loop resolves every schedule — the meta's own fields and its inner estimators' — against the outer folds *before* the meta ever runs, so the inner `KFold(4)` only ever sees static estimators. The schedule therefore must be sized to the **outer** fold count, even though it lives next to an inner `KFold(4)`:
+=#
+st_nested = Stacking(;
+                     opti = [MeanRisk(; opt = JuMPOptimiser(; slv = slv,
+                                                            wb = deleverage(n_wf))),
+                             mr_static], opto = mr_static,
+                     cv = OptimisationCrossValidation(; cv = KFold(; n = 4)))
+pred_st_nested = cross_val_predict(st_nested, rd, wf)
+pretty_table(DataFrame(:fold => 1:n_wf, :stacked => max_weights(pred_st_nested));
+             formatters = [resfmt])
+#=
+And the inner-sized schedule from §7.2 now fails at the *outer* split — same estimator, different consumer:
+=#
+try
+    cross_val_predict(st_inner, rd, wf)
+catch err
+    err
+end
+#=
+### 7.4 A hyperparameter-tuning pass over schedules
+
+Because a schedule is just a field value, it is tunable like any other hyperparameter: [`GridSearchCrossValidation`](@ref) sets each candidate into the field through the estimator's validated constructor and scores it with its own cross-validation. Here we let the data pick between staying uncapped, the de-leveraging plan, and a gentler variant:
+=#
+gentler(n) = TimeDependent([WeightBounds(; lb = 0.0,
+                                         ub = 0.45 - 0.1 * (i - 1) / max(n - 1, 1))
+                            for i in 1:n]);
+candidates = ["opt.wb" => [WeightBounds(), deleverage(n_wf), gentler(n_wf)]]
+gs = GridSearchCrossValidation(candidates; cv = wf)
+gs_res = search_cross_validation(mr_static, gs, rd)
+gs_res.idx
+#=
+The winning candidate (`gs_res.val_grid[gs_res.idx]`) is whichever schedule scored best out of sample — the tuning pass consumes each candidate's entries through the search's own fold loop, so every candidate must be sized to `n_splits(gs.cv, rd)`.
+
+## 8. Summary
 
 | Method | Spelling | Sized/validated | Parallel? | Best for |
 |---|---|---|---|---|
