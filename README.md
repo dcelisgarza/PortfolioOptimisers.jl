@@ -56,7 +56,7 @@ First we import the packages we will need for the example.
 - `CSV`, `TimeSeries` and `DataFrames` for loading and preprocessing price data.
 - `PrettyTables` for displaying the results.
 
-We use the S&P 500 sample dataset shipped in [`examples/SP500.csv.gz`](examples/SP500.csv.gz): daily adjusted close prices for 20 large-cap stocks. To keep things quick, we only use the most recent year.
+We use the S&P 500 sample dataset shipped in [`examples/SP500.csv.gz`](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/docs/src/examples): daily adjusted close prices for 20 large-cap stocks. To keep things quick, we only use the most recent year.
 
 ```julia
 # Import module and plotting extension.
