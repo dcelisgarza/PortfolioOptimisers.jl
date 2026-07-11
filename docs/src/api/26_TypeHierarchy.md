@@ -209,6 +209,8 @@ its docstring.
 
 ├──&nbsp;[RegimeAdjustedVarianceCache](@ref)
 
+├──&nbsp;[TimeDependentContext](@ref)
+
 ├──&nbsp;[Turnover](@ref)
 
 └──&nbsp;[VecScalar](@ref)
@@ -773,6 +775,8 @@ its docstring.
 
 ├──&nbsp;[SubsetSizeEstimator](@ref)
 
+├──&nbsp;[TimeDependent](@ref)
+
 ├──&nbsp;[TurnoverEstimator](@ref)
 
 └──&nbsp;[WindowSizeEstimator](@ref)
@@ -1169,6 +1173,8 @@ its docstring.
 
 │&nbsp;&nbsp;&nbsp;└──&nbsp;[ExactOrderedWeightsArray](@ref)
 
+├──&nbsp;[PreviousWeightsFunction](@ref)
+
 ├──&nbsp;[RegimeAdjustedTarget](@ref)
 
 │&nbsp;&nbsp;&nbsp;├──&nbsp;[DiagonalTarget](@ref)
@@ -1196,6 +1202,8 @@ its docstring.
 │&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;├──&nbsp;[QuadRiskExpr](@ref)
 
 │&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└──&nbsp;[SquaredSOCRiskExpr](@ref)
+
+├──&nbsp;[TimeDependentCallable](@ref)
 
 ├──&nbsp;[TrackingFormulation](@ref)
 

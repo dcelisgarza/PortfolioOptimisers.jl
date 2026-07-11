@@ -7,7 +7,7 @@ factory(sr::SubsetResamplingResult, fb::Option{<:OptE_Opt})
 SubsetResampling
 needs_previous_weights(opt::SubsetResampling)
 is_time_dependent(opt::SubsetResampling)
-update_time_dependent_estimator(opt::SubsetResampling, ctx::TimeDependentContext)
+update_time_dependent_estimator(opt::SubsetResampling, ctx::TimeDependentContext, all_binds::Bool = true)
 reset_time_dependent_estimator(opt::SubsetResampling)
 factory(sr::SubsetResampling, w::AbstractVector)
 port_opt_view(sr::SubsetResampling, i, X::MatNum, args...)

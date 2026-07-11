@@ -44,16 +44,17 @@ time_dependent_value
 time_dependent_fields
 time_dependent_entry_needs_previous_weights
 assert_time_dependent_substitution
-assert_time_dependent_fold_count(::OptE_Opt, ::Integer)
-assert_time_dependent_fold_count(opt::VecOptE_Opt, n::Integer)
+assert_time_dependent_fold_count(::OptE_Opt, ::Integer, ::Bool = true)
+assert_time_dependent_fold_count(opt::VecOptE_Opt, n::Integer, ::Bool = true)
 assert_time_dependent_fields_fold_count
 rebuild_estimator
 is_time_dependent(::OptE_Opt)
 is_time_dependent(opt::VecOptE_Opt)
 is_time_dependent(opt::BaseOptimisationEstimator)
-update_time_dependent_estimator(opt::OptE_Opt, ::TimeDependentContext)
-update_time_dependent_estimator(opt::VecOptE_Opt, ctx::TimeDependentContext)
-update_time_dependent_estimator(opt::BaseOptimisationEstimator, ctx::TimeDependentContext)
+update_time_dependent_estimator(::Nothing, ::TimeDependentContext, ::Bool = true)
+update_time_dependent_estimator(opt::OptE_Opt, ::TimeDependentContext, all_binds::Bool = true)
+update_time_dependent_estimator(opt::VecOptE_Opt, ctx::TimeDependentContext, all_binds::Bool = true)
+update_time_dependent_estimator(opt::BaseOptimisationEstimator, ctx::TimeDependentContext, all_binds::Bool = true)
 update_time_dependent_fields
 time_dependent_field_defaults
 reset_time_dependent_estimator(opt::OptE_Opt)
