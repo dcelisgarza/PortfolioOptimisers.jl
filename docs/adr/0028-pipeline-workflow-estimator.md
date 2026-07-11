@@ -174,6 +174,6 @@ and which is what the user meant.
 
 ## Amendment: file renumbering
 
-`src/23_Precompilation.jl` was removed and `src/24_Pipeline/` became `src/23_Pipeline/`
-(mirrored by `docs/src/api/23_Pipeline/`), freeing `24` for `src/24_AssetSelection.jl`.
+`src/23_Precompilation.jl` was removed and `src/24_Pipeline/` became `src/22_Pipeline/`
+(mirrored by `docs/src/api/22_Pipeline/`), freeing `24` for `src/23_AssetSelection.jl`.
 References to the old paths above are retained as written at the time of the decision.

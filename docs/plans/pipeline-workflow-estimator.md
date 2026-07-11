@@ -40,7 +40,7 @@ alignment); slot-trait coverage for every steppable family.
 
 The preprocessing estimators live in `src/03_Preprocessing.jl` (see the post-M6 decoupling
 amendment in ADR 0028); only the context adapter lives in
-`src/23_Pipeline/02_StepExecution.jl`.
+`src/22_Pipeline/02_StepExecution.jl`.
 
 - The step execution contract: `run_step(est, ctx) -> (fitted_result, ctx′)` dispatching to
   each family's native verb (`prior`, `clusterise`, constraint generation, `optimise`, `ucs`,
@@ -140,7 +140,7 @@ leakage-sensitive tuning case where full-sample preprocessing would pick a diffe
   `predict` is already public via `StatsAPI`. `PipelineContext` stays private, as planned.
   No `25_Aliases.jl` entries added — the short-alias table is for risk measures and
   optimisers, and no pipeline name is long enough to warrant one.
-- Docs: `docs/src/api/23_Pipeline/01…05` pages. Example added at
+- Docs: `docs/src/api/22_Pipeline/01…05` pages. Example added at
   `examples/5_validation_tuning/03_Pipelines.jl` (prices → filter → impute → returns → prior
   → phylogeny constraints → weight bounds → `MeanRisk`, then joint preprocessing/optimiser
   tuning under walk-forward CV, structural search, and the boundary errors). Tracked in

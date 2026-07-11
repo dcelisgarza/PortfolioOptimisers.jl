@@ -377,7 +377,7 @@ flowchart LR
           <h2 class="text-xl font-semibold text-slate-600">Checked and healthy — no action</h2>
           <ul class="text-sm text-slate-600 space-y-2 leading-relaxed">
             <li><span class="font-semibold text-slate-800">JuMP optimiser spine (post-ADR-0008).</span> MeanRisk, RiskBudgeting, RelaxedRiskBudgeting, FactorRiskContribution and constrained NearOptimalCentering converge on one shared Model Assembly sequence (<code>11_MeanRisk.jl:602–611</code> ≡ <code>12_FactorRiskContribution.jl:278–286</code>); the differences that remain are real per-optimiser behaviour, not duplication. The five 4-line <code>optimise(…{…,Nothing})</code> forwards are the dispatch seam itself — not worth touching.</li>
-            <li><span class="font-semibold text-slate-800">Plotting extension seam.</span> <code>src/22_Plotting.jl</code> is 35 empty stubs + docstrings; all behaviour sits behind them in <code>ext/PortfolioOptimisersPlotsExt.jl</code> (2,082 ln). Small interface, big implementation — deep by design.</li>
+            <li><span class="font-semibold text-slate-800">Plotting extension seam.</span> <code>src/24_Plotting.jl</code> is 35 empty stubs + docstrings; all behaviour sits behind them in <code>ext/PortfolioOptimisersPlotsExt.jl</code> (2,082 ln). Small interface, big implementation — deep by design.</li>
             <li><span class="font-semibold text-slate-800">Risk-measure trait machinery.</span> <code>risk_input_kind</code> (ADR-0006) gives a new measure <code>supports_precomputed_returns</code> and <code>expected_risk</code> for free (<code>01_Base_RiskMeasures.jl:193–238</code>) — the declaration burden the last review worried about is mostly already absorbed by the trait.</li>
           </ul>
         </article>
