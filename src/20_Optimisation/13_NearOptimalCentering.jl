@@ -966,6 +966,7 @@ function _optimise(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, 
                                              <:UnconstrainedNearOptimalCentering},
                    rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
                    str_names::Bool = false, save::Bool = true, kwargs...)
+    noc = reset_time_dependent_estimator(noc)
     (; w_opt, rk_opt, rt_opt, r, opt, w_min_retcode, w_opt_retcode, w_max_retcode) = near_optimal_centering_setup(noc,
                                                                                                                   rd;
                                                                                                                   dims = dims,
@@ -1017,6 +1018,7 @@ function _optimise(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, 
                                              <:ConstrainedNearOptimalCentering},
                    rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
                    str_names::Bool = false, save::Bool = true, kwargs...)
+    noc = reset_time_dependent_estimator(noc)
     (; w_opt, rk_opt, rt_opt, r, opt, attrs, rt_min, rt_max, w_min, w_max, w_min_retcode, w_opt_retcode, w_max_retcode) = near_optimal_centering_setup(noc,
                                                                                                                                                        rd;
                                                                                                                                                        dims = dims,

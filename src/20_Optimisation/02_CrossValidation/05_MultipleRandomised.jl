@@ -567,17 +567,29 @@ function path_fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator,
                               rd::ReturnsResult, train_idx, test_idx, cols;
                               ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
                               id = nothing)
-    predictions = run_folds(opt, length(train_idx), ex) do i, prev
+    n = length(train_idx)
+    td_flag = is_time_dependent(opt)
+    if td_flag
+        assert_time_dependent_fold_count(opt, n)
+    end
+    # `i` is the fold's position in the path's split enumeration — no ordering is imposed
+    # on time-dependent entries (predictions are sorted for reporting only, after the
+    # loop); the user keys entries off ctx.train_idx[ctx.i] / ctx.test_idx[ctx.i].
+    predictions = run_folds(opt, n, ex) do i, prev
         col = cols[i]
         rdi = port_opt_view(rd, col)
         opti = port_opt_view(opt, col, rdi.X)
-        if !isnothing(prev)
-            if needs_previous_weights(opt)
-                opti = factory(opti, prev.res.w)
-            end
-            if is_time_dependent(opt)
-                opti = update_time_dependent_estimator(opti, i, rdi, train_idx, test_idx)
-            end
+        # Resolve time-dependent constraints first so freshly swapped-in per-fold
+        # constraints also receive the previous weights from the factory pass below.
+        if td_flag
+            ctx = TimeDependentContext(; i = i, n = n, rd = rdi, train_idx = train_idx,
+                                       test_idx = test_idx,
+                                       w_prev = isnothing(prev) ? nothing : prev.res.w,
+                                       path_id = id)
+            opti = update_time_dependent_estimator(opti, ctx)
+        end
+        if !isnothing(prev) && needs_previous_weights(opt)
+            opti = factory(opti, prev.res.w)
         end
         return fit_and_predict(opti, rdi; train_idx = train_idx[i], test_idx = test_idx[i])
     end

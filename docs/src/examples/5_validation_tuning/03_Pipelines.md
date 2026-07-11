@@ -156,10 +156,8 @@ tune it rather than guess it.
 
 ````@example 03_Pipelines
 res_lax = fit(Pipeline(;
-                                           steps = ("filter" =>
-                                                        MissingDataFilter(; col_thr = 0.9),
-                                                    PricesToReturns(), EmpiricalPrior(),
-                                                    EqualWeighted())), pr)
+                       steps = ("filter" => MissingDataFilter(; col_thr = 0.9),
+                                PricesToReturns(), EmpiricalPrior(), EqualWeighted())), pr)
 res_lax["filter"].nx
 ````
 

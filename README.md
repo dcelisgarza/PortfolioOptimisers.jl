@@ -53,18 +53,20 @@ First we import the packages we will need for the example.
 
 - `StatsPlots` and `GraphRecipes` is needed to load the plotting extension.
 - `Clarabel` and `HiGHS` are the optimisers we will use.
-- `YFinance` and `TimeSeries` for downloading and preprocessing price data.
-- `PrettyTables` and `DataFrames` for displaying the results.
+- `CSV`, `TimeSeries` and `DataFrames` for loading and preprocessing price data.
+- `PrettyTables` for displaying the results.
+
+We use the S&P 500 sample dataset shipped in [`examples/SP500.csv.gz`](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/docs/src/examples): daily adjusted close prices for 20 large-cap stocks. To keep things quick, we only use the most recent year.
 
 ```julia
 # Import module and plotting extension.
 using PortfolioOptimisers, StatsPlots, GraphRecipes
 # Import optimisers.
 using Clarabel, HiGHS
-# Download data.
-using YFinance, TimeSeries
+# Load and preprocess data.
+using CSV, TimeSeries, DataFrames
 # Pretty printing.
-using PrettyTables, DataFrames
+using PrettyTables
 
 # Format for pretty tables.
 fmt1 = (v, i, j) -> begin
@@ -82,31 +84,29 @@ fmt2 = (v, i, j) -> begin
     end
 end
 
-# Function to convert prices to time array.
-function stock_price_to_time_array(x)
-    # Only get the keys that are not ticker or datetime.
-    coln = collect(keys(x))[3:end]
-    # Convert the dictionary into a matrix.
-    m = hcat([x[k] for k in coln]...)
-    return TimeArray(x["timestamp"], m, Symbol.(coln), x["ticker"])
-end
+# Load the shipped S&P 500 price data as a TimeArray (run from the repo root).
+prices = TimeArray(CSV.File(joinpath("examples", "SP500.csv.gz")); timestamp = :Date)[(end - 252):end]
 
-# Tickers to download. These are popular meme stocks, use something better.
-assets = sort!(["SOUN", "RIVN", "GME", "AMC", "SOFI", "ENVX", "ANVS", "LUNR", "EOSE", "SMR",
-                "NVAX", "UPST", "ACHR", "RKLB", "MARA", "LGVN", "LCID", "CHPT", "MAXN",
-                "BB"])
+#=
+Any price history with a `Date` column and one column per asset works. To pull live
+data instead, download it with YFinance and assemble a TimeArray:
 
-# Prices date range.
-Date_0 = "2024-01-01"
-Date_1 = "2025-10-05"
+    using YFinance, TimeSeries
+    function stock_price_to_time_array(x)
+        coln = collect(keys(x))[3:end]
+        m = hcat([x[k] for k in coln]...)
+        return TimeArray(x["timestamp"], m, Symbol.(coln), x["ticker"])
+    end
+    assets = sort!(["AAPL", "AMD", "BAC", "BBY", "CVX", "GE", "HD", "JNJ", "JPM", "KO",
+                    "LLY", "MRK", "MSFT", "PEP", "PFE", "PG", "RRC", "UNH", "WMT", "XOM"])
+    prices = get_prices.(assets; startdt = "2024-01-01", enddt = "2025-01-01")
+    prices = stock_price_to_time_array.(prices)
+    prices = hcat(prices...)
+    cidx = colnames(prices)[occursin.(r"adj", string.(colnames(prices)))]
+    prices = prices[cidx]
+    TimeSeries.rename!(prices, Symbol.(assets))
+=#
 
-# Download the price data using YFinance.
-prices = get_prices.(assets; startdt = Date_0, enddt = Date_1)
-prices = stock_price_to_time_array.(prices)
-prices = hcat(prices...)
-cidx = colnames(prices)[occursin.(r"adj", string.(colnames(prices)))]
-prices = prices[cidx]
-TimeSeries.rename!(prices, Symbol.(assets))
 pretty_table(prices[(end - 5):end]; formatters = [fmt1])
 
 # Compute the returns.

@@ -277,6 +277,7 @@ function set_factor_risk_contribution_constraints!(model::JuMP.Model, re::RegE_R
 end
 function _optimise(frc::FactorRiskContribution, rd::ReturnsResult = ReturnsResult();
                    dims::Int = 1, str_names::Bool = false, save::Bool = true, kwargs...)
+    frc = reset_time_dependent_estimator(frc)
     attrs = processed_jump_optimiser_attributes(frc.opt, rd; dims = dims, kwargs...)
     model = JuMP.Model()
     JuMP.set_string_names_on_creation(model, str_names)

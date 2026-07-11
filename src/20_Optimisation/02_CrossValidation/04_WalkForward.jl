@@ -721,19 +721,26 @@ function fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator, rd::Retu
                          id = nothing)
     cv_res = split(cv, rd)
     (; train_idx, test_idx) = cv_res
-    running = opt
-    predictions = run_folds(opt, length(train_idx), ex) do i, prev
-        if !isnothing(prev)
-            if needs_previous_weights(opt)
-                running = factory(running, prev.res.w)
-            end
-            if is_time_dependent(opt)
-                running = update_time_dependent_estimator(running, i, rd, train_idx,
-                                                          test_idx)
-            end
+    n = length(train_idx)
+    td_flag = is_time_dependent(opt)
+    if td_flag
+        assert_time_dependent_fold_count(opt, n)
+    end
+    predictions = run_folds(opt, n, ex) do i, prev
+        opti = opt
+        # Resolve time-dependent constraints first so freshly swapped-in per-fold
+        # constraints also receive the previous weights from the factory pass below.
+        if td_flag
+            ctx = TimeDependentContext(; i = i, n = n, rd = rd, train_idx = train_idx,
+                                       test_idx = test_idx,
+                                       w_prev = isnothing(prev) ? nothing : prev.res.w)
+            opti = update_time_dependent_estimator(opti, ctx)
         end
-        return fit_and_predict(running, rd; train_idx = train_idx[i],
-                               test_idx = test_idx[i], cols = cols)
+        if !isnothing(prev) && needs_previous_weights(opt)
+            opti = factory(opti, prev.res.w)
+        end
+        return fit_and_predict(opti, rd; train_idx = train_idx[i], test_idx = test_idx[i],
+                               cols = cols)
     end
     return MultiPeriodPredictionResult(; pred = predictions, id = id)
 end

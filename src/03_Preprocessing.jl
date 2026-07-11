@@ -1477,7 +1477,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Preprocessing estimator imputing missing price observations from per-asset statistics fitted on the training window.
 
-The *imputation parameters are fitted state*: each asset's fill value is computed from the training window's observed (non-missing) prices with the configured [`VectorToScalarMeasure`](@ref), and applying the fitted result to an unseen window fills that window's missing observations with the *training* values — never with statistics of the window being transformed, which is exactly the leakage a fit/apply contract exists to prevent.
+The *imputation parameters are fitted state*: each asset's fill value is computed from the training window's observed (non-missing) prices with the configured [`Num_VecToScaM`](@ref), and applying the fitted result to an unseen window fills that window's missing observations with the *training* values — never with statistics of the window being transformed, which is exactly the leakage a fit/apply contract exists to prevent.
 
 Assets with no observed values in the training window get no fill value and are left untouched at apply time; combine with [`MissingDataFilter`](@ref) to drop them instead.
 
@@ -1488,7 +1488,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     Imputer(;
-        stat::VectorToScalarMeasure = MedianValue(),
+        stat::Num_VecToScaM = MedianValue(),
     ) -> Imputer
 
 Keywords correspond to the struct's fields.
@@ -1514,18 +1514,18 @@ julia> values(pv.X)[2, 1]
   - [`ImputerResult`](@ref)
   - [`AbstractPricesPreprocessingEstimator`](@ref)
   - [`MissingDataFilter`](@ref)
-  - [`VectorToScalarMeasure`](@ref)
+  - [`Num_VecToScaM`](@ref)
 """
 @concrete struct Imputer <: AbstractPricesPreprocessingEstimator
     """
-    Reducer computing an asset's fill value from its observed training prices ([`VectorToScalarMeasure`](@ref)).
+    Reducer computing an asset's fill value from its observed training prices ([`Num_VecToScaM`](@ref)).
     """
     stat
-    function Imputer(stat::VectorToScalarMeasure)
+    function Imputer(stat::Num_VecToScaM)
         return new{typeof(stat)}(stat)
     end
 end
-function Imputer(; stat::VectorToScalarMeasure = MedianValue())::Imputer
+function Imputer(; stat::Num_VecToScaM = MedianValue())::Imputer
     return Imputer(stat)
 end
 """

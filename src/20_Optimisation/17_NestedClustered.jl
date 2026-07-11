@@ -278,8 +278,8 @@ $(DocStringExtensions.FIELDS)
     NestedClustered(;
         pe::PrE_Pr = EmpiricalPrior(),
         cle::ClE_Cl = ClustersEstimator(),
-        wb::Option{<:WbE_Wb} = WeightBounds(),
-        fees::Option{<:FeesE_Fees} = nothing,
+        wb::TD_Option{<:WbE_Wb} = WeightBounds(),
+        fees::TD_Option{<:FeesE_Fees} = nothing,
         sets::Option{<:AssetSets} = nothing,
         opti::NonFiniteAllocationOptimisationEstimator,
         opto::NonFiniteAllocationOptimisationEstimator = opti,
@@ -381,8 +381,8 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
     $(field_dict[:strict_opt])
     """
     strict
-    function NestedClustered(pe::PrE_Pr, cle::ClE_Cl, wb::Option{<:WbE_Wb},
-                             fees::Option{<:FeesE_Fees}, sets::Option{<:AssetSets},
+    function NestedClustered(pe::PrE_Pr, cle::ClE_Cl, wb::TD_Option{<:WbE_Wb},
+                             fees::TD_Option{<:FeesE_Fees}, sets::Option{<:AssetSets},
                              opti::NonFiniteAllocationOptimisationEstimator,
                              opto::NonFiniteAllocationOptimisationEstimator,
                              cv::Option{<:OptimisationCrossValidation}, wf::WeightFinaliser,
@@ -403,6 +403,9 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
         if isa(fees, FeesEstimator)
             @argcheck(!isnothing(sets), IsNothingError("sets cannot be nothing"))
         end
+        assert_time_dependent_substitution(NestedClustered,
+                                           (; pe, cle, wb, fees, sets, opti, opto, cv, wf,
+                                            ex, fb, brt, cle_pr, strict), (;))
         return new{typeof(pe), typeof(cle), typeof(wb), typeof(fees), typeof(sets),
                    typeof(opti), typeof(opto), typeof(cv), typeof(wf), typeof(ex),
                    typeof(fb), typeof(brt), typeof(cle_pr), typeof(strict)}(pe, cle, wb,
@@ -413,8 +416,8 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
     end
 end
 function NestedClustered(; pe::PrE_Pr = EmpiricalPrior(), cle::ClE_Cl = ClustersEstimator(),
-                         wb::Option{<:WbE_Wb} = nothing,
-                         fees::Option{<:FeesE_Fees} = nothing,
+                         wb::TD_Option{<:WbE_Wb} = nothing,
+                         fees::TD_Option{<:FeesE_Fees} = nothing,
                          sets::Option{<:AssetSets} = nothing,
                          opti::NonFiniteAllocationOptimisationEstimator,
                          opto::NonFiniteAllocationOptimisationEstimator,
@@ -456,10 +459,59 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 Return `true` if any sub-estimator of `opt` requires previous portfolio weights (fees, inner optimiser, outer optimiser, or fallback).
 """
 function needs_previous_weights(opt::NestedClustered)
-    return (needs_previous_weights(opt.fees) ||
+    return (any(f -> needs_previous_weights(getfield(opt, f)),
+                time_dependent_fields(opt)) ||
+            needs_previous_weights(opt.fees) ||
             needs_previous_weights(opt.opti) ||
             needs_previous_weights(opt.opto) ||
             needs_previous_weights(opt.fb))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return `true` if the inner optimiser, outer optimiser, or fallback carries time-dependent constraints.
+"""
+function is_time_dependent(opt::NestedClustered)
+    return (!isempty(time_dependent_fields(opt)) ||
+            is_time_dependent(opt.opti) ||
+            is_time_dependent(opt.opto) ||
+            is_time_dependent(opt.fb))
+end
+function assert_time_dependent_fold_count(opt::NestedClustered, n::Integer,
+                                          all_binds::Bool = true)::Nothing
+    assert_time_dependent_fields_fold_count(opt, n, all_binds)
+    assert_time_dependent_fold_count(opt.opti, n, false)
+    assert_time_dependent_fold_count(opt.opto, n, all_binds)
+    assert_time_dependent_fold_count(opt.fb, n, all_binds)
+    return nothing
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Resolve time-dependent constraints for the fold described by `ctx` by recursing into the inner optimiser, outer optimiser, and fallback.
+"""
+function update_time_dependent_estimator(opt::NestedClustered, ctx::TimeDependentContext,
+                                         all_binds::Bool = true)
+    if !is_time_dependent(opt)
+        return opt
+    end
+    opt = update_time_dependent_fields(opt, ctx, all_binds)
+    return rebuild_estimator(opt,
+                             (;
+                              opti = update_time_dependent_estimator(opt.opti, ctx, false),
+                              opto = update_time_dependent_estimator(opt.opto, ctx,
+                                                                     all_binds),
+                              fb = update_time_dependent_estimator(opt.fb, ctx, all_binds)))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Replace this meta-optimiser's own time-dependent fields with their static defaults.
+
+Deliberately does **not** recurse into the wrapped optimisers: a standalone meta solve consumes inner per-fold schedules through its inner cross-validation leg, and its fold-less full-window inner solves reset themselves at their own `_optimise` seam. Only the meta's own fields (applied to the combined weights, resolved by an outer fold loop when one exists) are inert here.
+"""
+function reset_time_dependent_estimator(opt::NestedClustered)
+    return reset_time_dependent_fields(opt)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -547,6 +599,7 @@ end
 function _optimise(nco::NestedClustered, rd::ReturnsResult; dims::Int = 1,
                    branchorder::Symbol = :optimal, str_names::Bool = false,
                    save::Bool = true, kwargs...)
+    nco = reset_time_dependent_estimator(nco)
     rd = returns_result_picker(rd, nco.brt)
     pr = prior(nco.pe, rd; dims = dims)
     X = pr.X

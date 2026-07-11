@@ -26,6 +26,49 @@ JuMP optimisers formulate and solve portfolio optimisation problems using mathem
 """
 abstract type JuMPOptimisationEstimator <: NonFiniteAllocationOptimisationEstimator end
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return `true` if the inner JuMP optimiser or fallback carries time-dependent constraints.
+"""
+function is_time_dependent(opt::JuMPOptimisationEstimator)
+    return is_time_dependent(opt.opt) || is_time_dependent(opt.fb)
+end
+function assert_time_dependent_fold_count(opt::JuMPOptimisationEstimator, n::Integer,
+                                          all_binds::Bool = true)::Nothing
+    assert_time_dependent_fold_count(opt.opt, n, all_binds)
+    assert_time_dependent_fold_count(opt.fb, n, all_binds)
+    return nothing
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Resolve time-dependent constraints for the fold described by `ctx` by recursing into the inner JuMP optimiser and fallback.
+"""
+function update_time_dependent_estimator(opt::JuMPOptimisationEstimator,
+                                         ctx::TimeDependentContext, all_binds::Bool = true)
+    if !is_time_dependent(opt)
+        return opt
+    end
+    return rebuild_estimator(opt,
+                             (;
+                              opt = update_time_dependent_estimator(opt.opt, ctx,
+                                                                    all_binds),
+                              fb = update_time_dependent_estimator(opt.fb, ctx, all_binds)))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Replace time-dependent constraints with their static defaults by recursing into the inner JuMP optimiser and fallback.
+"""
+function reset_time_dependent_estimator(opt::JuMPOptimisationEstimator)
+    if !is_time_dependent(opt)
+        return opt
+    end
+    return rebuild_estimator(opt,
+                             (; opt = reset_time_dependent_estimator(opt.opt),
+                              fb = reset_time_dependent_estimator(opt.fb)))
+end
+"""
 $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for risk-based JuMP portfolio optimisation estimators.

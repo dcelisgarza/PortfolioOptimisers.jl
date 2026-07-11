@@ -140,7 +140,7 @@ each" is a helper two of the three redundancy algorithms happen to use.
   `CONTEXT.md`.
 - `PairwiseCorrelation` and `CorrelationComponents` give *different answers on the same input*
   by design. The docstrings state the chaining difference at the call site rather than burying
-  it, because a caller who sets `thr = 0.95` expecting a pairwise guarantee would read
+  it, because a caller who sets `t = 0.95` expecting a pairwise guarantee would read
   component semantics as a bug.
 - `find_complete_indices` and `find_uncorrelated_indices` are no longer exported.
 - Worked example at `examples/1_foundations/03_Asset_Selection.jl`, which demonstrates the

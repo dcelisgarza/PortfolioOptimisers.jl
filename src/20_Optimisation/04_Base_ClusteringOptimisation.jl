@@ -27,6 +27,53 @@ Clustering optimisation estimators use asset clustering to decompose the portfol
 """
 abstract type ClusteringOptimisationEstimator <: NonFiniteAllocationOptimisationEstimator end
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return `true` if the inner optimiser or fallback carries time-dependent constraints.
+"""
+function is_time_dependent(opt::ClusteringOptimisationEstimator)
+    return is_time_dependent(opt.opt) || is_time_dependent(opt.fb)
+end
+function assert_time_dependent_fold_count(opt::ClusteringOptimisationEstimator, n::Integer,
+                                          all_binds::Bool = true)::Nothing
+    assert_time_dependent_fold_count(opt.opt, n, all_binds)
+    assert_time_dependent_fold_count(opt.fb, n, all_binds)
+    return nothing
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Resolve time-dependent constraints for the fold described by `ctx` by recursing into the inner optimiser and fallback.
+
+[`NestedClustered`](@ref) overrides this with its own method resolving its own fields and inner estimators.
+"""
+function update_time_dependent_estimator(opt::ClusteringOptimisationEstimator,
+                                         ctx::TimeDependentContext, all_binds::Bool = true)
+    if !is_time_dependent(opt)
+        return opt
+    end
+    return rebuild_estimator(opt,
+                             (;
+                              opt = update_time_dependent_estimator(opt.opt, ctx,
+                                                                    all_binds),
+                              fb = update_time_dependent_estimator(opt.fb, ctx, all_binds)))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Replace time-dependent constraints with their static defaults by recursing into the inner optimiser and fallback.
+
+[`NestedClustered`](@ref) overrides this with its own method resetting its own fields and inner estimators.
+"""
+function reset_time_dependent_estimator(opt::ClusteringOptimisationEstimator)
+    if !is_time_dependent(opt)
+        return opt
+    end
+    return rebuild_estimator(opt,
+                             (; opt = reset_time_dependent_estimator(opt.opt),
+                              fb = reset_time_dependent_estimator(opt.fb)))
+end
+"""
 $(DocStringExtensions.TYPEDEF)
 
 Result type for hierarchical (clustering-based) portfolio optimisation.
@@ -110,8 +157,8 @@ $(DocStringExtensions.FIELDS)
         pe::PrE_Pr = EmpiricalPrior(),
         cle::HClE_HCl = ClustersEstimator(),
         slv::Option{<:Slv_VecSlv} = nothing,
-        wb::Option{<:WbE_Wb} = WeightBounds(),
-        fees::Option{<:FeesE_Fees} = nothing,
+        wb::TD_Option{<:WbE_Wb} = WeightBounds(),
+        fees::TD_Option{<:FeesE_Fees} = nothing,
         sets::Option{<:AssetSets} = nothing,
         wf::WeightFinaliser = IterativeWeightFinaliser(),
         brt::Bool = false,
@@ -119,7 +166,11 @@ $(DocStringExtensions.FIELDS)
         strict::Bool = false
     ) -> HierarchicalOptimiser
 
-Keywords correspond to the struct's fields.
+Keywords correspond to the struct's fields. Fields typed [`TD_Option`](@ref) (`wb`, `fees`) may hold a [`TimeDependent`](@ref) per-fold schedule instead of a static value; a cross-validation fold loop resolves it per fold, and a fold-less `optimise` runs with the field at its static default.
+
+## Validation
+
+  - If any field holds a [`TimeDependent`](@ref): every vector entry is test-substituted through this constructor so type compatibility errors surface immediately.
 
 # Examples
 
@@ -239,12 +290,15 @@ HierarchicalOptimiser
     """
     strict
     function HierarchicalOptimiser(pe::PrE_Pr, cle::HClE_HCl, slv::Option{<:Slv_VecSlv},
-                                   wb::Option{<:WbE_Wb}, fees::Option{<:FeesE_Fees},
+                                   wb::TD_Option{<:WbE_Wb}, fees::TD_Option{<:FeesE_Fees},
                                    sets::Option{<:AssetSets}, wf::WeightFinaliser,
                                    brt::Bool, cle_pr::Bool, strict::Bool)
         if isa(wb, WeightBoundsEstimator)
             @argcheck(!isnothing(sets), IsNothingError("sets cannot be nothing"))
         end
+        assert_time_dependent_substitution(HierarchicalOptimiser,
+                                           (; pe, cle, slv, wb, fees, sets, wf, brt, cle_pr,
+                                            strict), (; wb = WeightBounds()))
         return new{typeof(pe), typeof(cle), typeof(slv), typeof(wb), typeof(fees),
                    typeof(sets), typeof(wf), typeof(brt), typeof(cle_pr), typeof(strict)}(pe,
                                                                                           cle,
@@ -261,8 +315,8 @@ end
 function HierarchicalOptimiser(; pe::PrE_Pr = EmpiricalPrior(),
                                cle::HClE_HCl = ClustersEstimator(),
                                slv::Option{<:Slv_VecSlv} = nothing,
-                               wb::Option{<:WbE_Wb} = WeightBounds(),
-                               fees::Option{<:FeesE_Fees} = nothing,
+                               wb::TD_Option{<:WbE_Wb} = WeightBounds(),
+                               fees::TD_Option{<:FeesE_Fees} = nothing,
                                sets::Option{<:AssetSets} = nothing,
                                wf::WeightFinaliser = IterativeWeightFinaliser(),
                                brt::Bool = false, cle_pr::Bool = true,
@@ -272,7 +326,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return whether the [`HierarchicalOptimiser`](@ref) requires previous portfolio weights (based on fee structure).
+Return whether the [`HierarchicalOptimiser`](@ref) requires previous portfolio weights (based on fee structure and time-dependent constraints).
 
 # Related
 
@@ -280,7 +334,22 @@ Return whether the [`HierarchicalOptimiser`](@ref) requires previous portfolio w
   - [`HierarchicalOptimiser`](@ref)
 """
 function needs_previous_weights(opt::HierarchicalOptimiser)
-    return needs_previous_weights(opt.fees)
+    return needs_previous_weights(opt.fees) ||
+           any(f -> needs_previous_weights(getfield(opt, f)), time_dependent_fields(opt))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the static defaults of the [`HierarchicalOptimiser`](@ref) fields that may hold a [`TimeDependent`](@ref).
+
+# Related
+
+  - [`HierarchicalOptimiser`](@ref)
+  - [`TimeDependent`](@ref)
+  - [`TimeDependentContext`](@ref)
+"""
+function time_dependent_field_defaults(::HierarchicalOptimiser)::NamedTuple
+    return (; wb = WeightBounds())
 end
 """
     unitary_expected_risks(r, X, ...)

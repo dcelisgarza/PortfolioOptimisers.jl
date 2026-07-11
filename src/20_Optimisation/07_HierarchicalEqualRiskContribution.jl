@@ -651,6 +651,7 @@ Clusters assets, computes intra- and inter-cluster risk contributions, and alloc
 function _optimise(hec::HierarchicalEqualRiskContribution,
                    rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
                    branchorder::Symbol = :optimal, kwargs...)
+    hec = reset_time_dependent_estimator(hec)
     rd = returns_result_picker(rd, hec.opt.brt)
     pr = prior(hec.opt.pe, rd; dims = dims)
     X = pr.X

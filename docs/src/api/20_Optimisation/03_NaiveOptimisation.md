@@ -3,6 +3,8 @@
 ```@docs
 NaiveOptimisationEstimator
 needs_previous_weights(opt::NaiveOptimisationEstimator)
+is_time_dependent(opt::NaiveOptimisationEstimator)
+reset_time_dependent_estimator(opt::NaiveOptimisationEstimator)
 assert_internal_optimiser(::NaiveOptimisationEstimator)
 assert_external_optimiser(::NaiveOptimisationEstimator)
 NaiveOptimisationResult

@@ -1,6 +1,6 @@
 # Base optimisation
 
-All optimisers are defined as their whole names, however this can be unwieldy, so we also provide convenience aliases defined in [API](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/24_Aliases).
+All optimisers are defined as their whole names, however this can be unwieldy, so we also provide convenience aliases defined in [API](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/25_Aliases).
 
 ```@docs
 AbstractOptimisationEstimator
@@ -30,13 +30,33 @@ optimise(opt::OptimisationEstimator, args...; kwargs...)
 calc_net_returns(res::OptimisationResult, X::MatNum, fees::Option{<:Fees} = nothing)
 assert_special_nco_requirements(::OptE_Opt)
 assert_special_nco_requirements(opt::VecOptE_Opt)
-needs_previous_weights(::Nothing)
+needs_previous_weights(::Option{<:Union{<:AbstractEstimator, <:AbstractAlgorithm,
+                                                 <: AbstractResult}})
 needs_previous_weights(::OptE_Opt)
 needs_previous_weights(opt::VecOptE_Opt)
+needs_previous_weights(td::TimeDependent)
+TimeDependent
+TimeDependentContext
+TimeDependentCallable
+PreviousWeightsFunction
+TD_Option
+time_dependent_value
+time_dependent_fields
+time_dependent_entry_needs_previous_weights
+assert_time_dependent_substitution
+assert_time_dependent_fold_count(::OptE_Opt, ::Integer)
+assert_time_dependent_fold_count(opt::VecOptE_Opt, n::Integer, ::Bool = true)
+assert_time_dependent_fields_fold_count
+rebuild_estimator
 is_time_dependent(::OptE_Opt)
 is_time_dependent(opt::VecOptE_Opt)
-update_time_dependent_estimator(opt::OptE_Opt, args...)
-update_time_dependent_estimator(opt::VecOptE_Opt, args...)
+is_time_dependent(opt::BaseOptimisationEstimator)
+update_time_dependent_estimator
+update_time_dependent_fields
+time_dependent_field_defaults
+reset_time_dependent_estimator(opt::OptE_Opt)
+reset_time_dependent_estimator(opt::BaseOptimisationEstimator)
+reset_time_dependent_fields
 set_clustering_weight_finaliser_alg!
 opt_weight_bounds
 finalise_weight_bounds

@@ -1,6 +1,6 @@
 # Base Risk Measures
 
-All risk measures are defined as their whole names, however this can be unwieldy, so we also provide convenience aliases defined in [API](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/24_Aliases).
+All risk measures are defined as their whole names, however this can be unwieldy, so we also provide convenience aliases defined in [API](https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/api/25_Aliases).
 
 All concrete risk measures can be used as functors (callable structs) to compute their associated risk quantity, according to its [`risk_input_kind`](@ref), or via [`expected_risk`](@ref).
 

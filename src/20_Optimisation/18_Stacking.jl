@@ -107,8 +107,8 @@ $(DocStringExtensions.FIELDS)
 
     Stacking(;
         pe::PrE_Pr = EmpiricalPrior(),
-        wb::Option{<:WbE_Wb} = nothing,
-        fees::Option{<:FeesE_Fees} = nothing,
+        wb::TD_Option{<:WbE_Wb} = nothing,
+        fees::TD_Option{<:FeesE_Fees} = nothing,
         sets::Option{<:AssetSets} = nothing,
         scale::Option{<:VecNum} = nothing,
         opti::VecOptE_Opt,
@@ -214,7 +214,7 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
     $(field_dict[:strict_opt])
     """
     strict
-    function Stacking(pe::PrE_Pr, wb::Option{<:WbE_Wb}, fees::Option{<:FeesE_Fees},
+    function Stacking(pe::PrE_Pr, wb::TD_Option{<:WbE_Wb}, fees::TD_Option{<:FeesE_Fees},
                       sets::Option{<:AssetSets}, scale::Option{<:VecNum}, opti::VecOptE_Opt,
                       opto::NonFiniteAllocationOptimisationEstimator,
                       cv::Option{<:OptimisationCrossValidation}, wf::WeightFinaliser,
@@ -237,6 +237,9 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
         if isa(fees, FeesEstimator)
             @argcheck(!isnothing(sets), IsNothingError("sets cannot be nothing"))
         end
+        assert_time_dependent_substitution(Stacking,
+                                           (; pe, wb, fees, sets, scale, opti, opto, cv, wf,
+                                            ex, fb, brt, strict), (;))
         return new{typeof(pe), typeof(wb), typeof(fees), typeof(sets), typeof(scale),
                    typeof(opti), typeof(opto), typeof(cv), typeof(wf), typeof(ex),
                    typeof(fb), typeof(brt), typeof(strict)}(pe, wb, fees, sets, scale, opti,
@@ -244,10 +247,10 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
                                                             strict)
     end
 end
-function Stacking(; pe::PrE_Pr = EmpiricalPrior(), wb::Option{<:WbE_Wb} = nothing,
-                  fees::Option{<:FeesE_Fees} = nothing, sets::Option{<:AssetSets} = nothing,
-                  scale::Option{<:VecNum} = nothing, opti::VecOptE_Opt,
-                  opto::NonFiniteAllocationOptimisationEstimator,
+function Stacking(; pe::PrE_Pr = EmpiricalPrior(), wb::TD_Option{<:WbE_Wb} = nothing,
+                  fees::TD_Option{<:FeesE_Fees} = nothing,
+                  sets::Option{<:AssetSets} = nothing, scale::Option{<:VecNum} = nothing,
+                  opti::VecOptE_Opt, opto::NonFiniteAllocationOptimisationEstimator,
                   cv::Option{<:OptimisationCrossValidation} = nothing,
                   wf::WeightFinaliser = IterativeWeightFinaliser(),
                   ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
@@ -283,10 +286,59 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 Return `true` if any sub-estimator of `opt` requires previous portfolio weights (fees, inner optimiser, outer optimiser, or fallback).
 """
 function needs_previous_weights(opt::Stacking)
-    return (needs_previous_weights(opt.fees) ||
+    return (any(f -> needs_previous_weights(getfield(opt, f)),
+                time_dependent_fields(opt)) ||
+            needs_previous_weights(opt.fees) ||
             needs_previous_weights(opt.opti) ||
             needs_previous_weights(opt.opto) ||
             needs_previous_weights(opt.fb))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return `true` if any inner optimiser, the outer optimiser, or the fallback carries time-dependent constraints.
+"""
+function is_time_dependent(opt::Stacking)
+    return (!isempty(time_dependent_fields(opt)) ||
+            is_time_dependent(opt.opti) ||
+            is_time_dependent(opt.opto) ||
+            is_time_dependent(opt.fb))
+end
+function assert_time_dependent_fold_count(opt::Stacking, n::Integer,
+                                          all_binds::Bool = true)::Nothing
+    assert_time_dependent_fields_fold_count(opt, n, all_binds)
+    assert_time_dependent_fold_count(opt.opti, n, false)
+    assert_time_dependent_fold_count(opt.opto, n, all_binds)
+    assert_time_dependent_fold_count(opt.fb, n, all_binds)
+    return nothing
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Resolve time-dependent constraints for the fold described by `ctx` by recursing into the inner optimisers, outer optimiser, and fallback.
+"""
+function update_time_dependent_estimator(opt::Stacking, ctx::TimeDependentContext,
+                                         all_binds::Bool = true)
+    if !is_time_dependent(opt)
+        return opt
+    end
+    opt = update_time_dependent_fields(opt, ctx, all_binds)
+    return rebuild_estimator(opt,
+                             (;
+                              opti = update_time_dependent_estimator(opt.opti, ctx, false),
+                              opto = update_time_dependent_estimator(opt.opto, ctx,
+                                                                     all_binds),
+                              fb = update_time_dependent_estimator(opt.fb, ctx, all_binds)))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Replace this meta-optimiser's own time-dependent fields with their static defaults.
+
+Deliberately does **not** recurse into the wrapped optimisers: a standalone meta solve consumes inner per-fold schedules through its inner cross-validation leg, and its fold-less full-window inner solves reset themselves at their own `_optimise` seam. Only the meta's own fields (applied to the combined weights, resolved by an outer fold loop when one exists) are inert here.
+"""
+function reset_time_dependent_estimator(opt::Stacking)
+    return reset_time_dependent_fields(opt)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -366,6 +418,7 @@ end
 function _optimise(st::Stacking, rd::ReturnsResult; dims::Int = 1,
                    branchorder::Symbol = :optimal, str_names::Bool = false,
                    save::Bool = true, kwargs...)
+    st = reset_time_dependent_estimator(st)
     rd = returns_result_picker(rd, st.brt)
     pr = prior(st.pe, rd; dims = dims)
     X = pr.X

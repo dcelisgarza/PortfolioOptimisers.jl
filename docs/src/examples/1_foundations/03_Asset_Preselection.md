@@ -1,7 +1,7 @@
 The source files can be found in [examples/](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/examples/).
 
 ```@meta
-EditURL = "../../../../examples/1_foundations/03_Asset_Selection.jl"
+EditURL = "../../../../examples/1_foundations/03_Asset_Preselection.jl"
 ```
 
 # Asset pre-selection
@@ -37,7 +37,7 @@ scored on.
     matrix is destabilising the optimiser. Screening and pruning are hyperparameters — tune
     them inside cross-validation (§7), never on the full sample.
 
-````@example 03_Asset_Selection
+````@example 03_Asset_Preselection
 using PortfolioOptimisers, PrettyTables, DataFrames, Statistics, StatsAPI
 
 resfmt = (v, i, j) -> begin
@@ -47,22 +47,6 @@ resfmt = (v, i, j) -> begin
         return v
     end
 end;
-
-# The library's error messages name the concrete types, whose parameters are long. Strip them
-# so the messages below read as prose.
-function strip_type_params(s::AbstractString)
-    io, depth = IOBuffer(), 0
-    for c in s
-        if c == '{'
-            (depth += 1; continue)
-        end
-        if c == '}'
-            (depth -= 1; continue)
-        end
-        iszero(depth) && print(io, c)
-    end
-    return String(take!(io))
-end;
 nothing #hide
 ````
 
@@ -71,7 +55,7 @@ nothing #hide
 Twenty S&P 500 names, the last 1000 trading days. Real data, so the correlations are real
 too — that matters for §5, where two algorithms that sound equivalent give different answers.
 
-````@example 03_Asset_Selection
+````@example 03_Asset_Preselection
 using CSV, TimeSeries
 
 X = TimeArray(CSV.File(joinpath(@__DIR__, "..", "SP500.csv.gz")); timestamp = :Date)
@@ -90,7 +74,7 @@ Two traits do the work. [`supports_precomputed_returns`](@ref) says whether a me
 functor can consume a bare return series at all, and [`bigger_is_better`](@ref) says which end
 of the resulting ordering is "best".
 
-````@example 03_Asset_Selection
+````@example 03_Asset_Preselection
 measures = ["SCM()" => SCM(), "ConditionalValueatRisk()" => ConditionalValueatRisk(),
             "MaximumDrawdown()" => MaximumDrawdown(), "MeanReturn()" => MeanReturn(),
             "Variance()" => Variance()]
@@ -105,7 +89,7 @@ pretty_table(DataFrame(; measure = first.(measures),
 So `ConditionalValueatRisk` is minimised and `MeanReturn` is maximised, and a rule that says
 `best` means the right thing for each without you having to remember which.
 
-````@example 03_Asset_Selection
+````@example 03_Asset_Preselection
 cvar = PortfolioOptimisers.asset_scores(ConditionalValueatRisk(), rd.X)
 mu = PortfolioOptimisers.asset_scores(MeanReturn(), rd.X)
 pretty_table(sort(DataFrame(; asset = rd.nx, cvar = cvar, mean_return = mu), :cvar);
@@ -120,11 +104,11 @@ portfolio *weights* and a covariance matrix, not a return series. It has no mean
 one asset in isolation, so `ScoreSelector` rejects it at construction rather than silently
 computing something else.
 
-````@example 03_Asset_Selection
+````@example 03_Asset_Preselection
 try
     ScoreSelector(; score = Variance(), rule = ThresholdRule(; lo = 0.0))
 catch e
-    println(strip_type_params(e.msg))
+    println(e.msg)
 end
 ````
 
@@ -132,7 +116,7 @@ The remedy is in the error: `SCM()` — the second central moment, an alias for
 [`LowOrderMoment`](@ref) with [`SecondMoment`](@ref) and [`FullMoment`](@ref) — computes the
 same quantity from a return series, and is scoreable.
 
-````@example 03_Asset_Selection
+````@example 03_Asset_Preselection
 PortfolioOptimisers.asset_scores(SCM(), rd.X)[1:3],
 var(rd.X[:, 1:3]; dims = 1, corrected = false)
 ````
@@ -152,7 +136,7 @@ consulting `bigger_is_better`, and take **counts (or fractions) from each end**.
 positions — counts. That is what makes "drop the worst 5" expressible without knowing how many
 assets there are, and what lets you take both tails at once.
 
-````@example 03_Asset_Selection
+````@example 03_Asset_Preselection
 rules = ["RankRule(best = 5)" => RankRule(; best = 5),
          "RankRule(worst = 5)" => RankRule(; worst = 5),
          "RankRule(worst = 3, action = :drop)" => RankRule(; worst = 3, action = :drop),
@@ -172,7 +156,7 @@ five *defensive* names. Swap the score for `MeanReturn`, which is maximised, and
 returns the five *growth* names — the same rule, the opposite end of the table, and no flag to
 remember.
 
-````@example 03_Asset_Selection
+````@example 03_Asset_Preselection
 DataFrame(; rule = ["best = 5", "worst = 5"],
           by_cvar = [join(fit_preprocessing(ScoreSelector(;
                                                           score = ConditionalValueatRisk(),
@@ -202,7 +186,7 @@ covariance matrix singular.
 useful when a pipeline is fed a `ReturnsResult` directly and the price-level
 [`MissingDataFilter`](@ref) never runs.
 
-````@example 03_Asset_Selection
+````@example 03_Asset_Preselection
 Xz = copy(rd.X)
 Xz[:, 4] .= 0.0                                  # BBY stops trading
 rd_z = ReturnsResult(; nx = rd.nx, X = Xz)
@@ -225,7 +209,7 @@ of the columns in your CSV, which is not a property of the data.
 
 The consequence to internalise: **`RankRule(; best = k)` may return fewer than `k` assets.**
 
-````@example 03_Asset_Selection
+````@example 03_Asset_Preselection
 v = PortfolioOptimisers.asset_scores(SCM(), rd.X)
 ord = sortperm(v)                                # ascending variance; lower is better
 Xs = copy(rd.X)
@@ -249,9 +233,9 @@ downstream.
 The same stance governs redundancy. Two identical columns are perfectly correlated and score
 identically, so neither survives.
 
-````@example 03_Asset_Selection
+````@example 03_Asset_Preselection
 rd_dup = ReturnsResult(; nx = [rd.nx; "AAPL_copy"], X = hcat(rd.X, rd.X[:, 1]))
-dup_kept = fit_preprocessing(RedundancySelector(; alg = PairwiseCorrelation(; thr = 0.99),
+dup_kept = fit_preprocessing(RedundancySelector(; alg = PairwiseCorrelation(; t = 0.99),
                                                 score = SCM()), rd_dup).nx
 ("AAPL" in dup_kept, "AAPL_copy" in dup_kept, length(dup_kept))
 ````
@@ -266,7 +250,7 @@ correlation to the rest of the universe survives, i.e. the least redundant one.
 The two correlation algorithms sound interchangeable. They are not.
 
 [`PairwiseCorrelation`](@ref) is **greedy**. It visits correlated pairs from most to least
-correlated and drops the worse asset of each, until no surviving pair exceeds `thr`. That is
+correlated and drops the worse asset of each, until no surviving pair exceeds `t`. That is
 the literal promise the threshold makes, and it is the default.
 
 [`CorrelationComponents`](@ref) reads the same correlations **transitively**. Assets are nodes,
@@ -276,16 +260,16 @@ are discarded — even though `A` and `C` are uncorrelated.
 
 Chaining is not hypothetical. On real data, at the same threshold:
 
-````@example 03_Asset_Selection
-greedy = RedundancySelector(; alg = PairwiseCorrelation(; thr = 0.65, absolute = true),
+````@example 03_Asset_Preselection
+greedy = RedundancySelector(; alg = PairwiseCorrelation(; t = 0.65, absolute = true),
                             score = SCM())
-comps = RedundancySelector(; alg = CorrelationComponents(; thr = 0.65, absolute = true),
+comps = RedundancySelector(; alg = CorrelationComponents(; t = 0.65, absolute = true),
                            score = SCM())
 
 kept_g = fit_preprocessing(greedy, rd).nx
 kept_c = fit_preprocessing(comps, rd).nx
 
-# the greedy guarantee, verified: no surviving pair exceeds thr
+# the greedy guarantee, verified: no surviving pair exceeds t
 gi = [findfirst(==(n), rd.nx) for n in kept_g]
 sub = abs.(cor(rd.X[:, gi]))
 max_surviving = maximum(sub[i, j] for j in axes(sub, 2) for i in (j + 1):size(sub, 1))
@@ -309,7 +293,7 @@ reduces harder. Choose knowingly.
 hierarchical linkage, DBHT, the optimal-number-of-clusters estimators — becomes a way to define
 "redundant". It has no fallback survivor rule, so it *requires* a `score`.
 
-````@example 03_Asset_Selection
+````@example 03_Asset_Preselection
 clustered = RedundancySelector(; alg = ClusterGroups(), score = SCM())
 kept_cl = fit_preprocessing(clustered, rd).nx
 length(kept_cl), join(kept_cl, ", ")
@@ -317,7 +301,7 @@ length(kept_cl), join(kept_cl, ", ")
 try
     RedundancySelector(; alg = ClusterGroups())            # no score
 catch e
-    println(strip_type_params(e.msg))
+    println(e.msg)
 end
 ````
 
@@ -327,7 +311,7 @@ Everything above ran `fit_preprocessing` on one window. In a pipeline, that wind
 *training* window, and the selected universe is carried in the fitted result. Predicting on an
 unseen window **replays** it.
 
-````@example 03_Asset_Selection
+````@example 03_Asset_Preselection
 selector = ScoreSelector(; score = ConditionalValueatRisk(), rule = RankRule(; best = 10))
 train = ReturnsResult(; nx = rd.nx, X = rd.X[1:700, :])
 test = ReturnsResult(; nx = rd.nx, X = rd.X[701:end, :])
@@ -353,17 +337,17 @@ an uncertainty set, generated constraints — is then computed on an asset unive
 longer exists. `Pipeline` rejects that ordering at construction rather than letting a stale,
 asset-misdimensioned prior reach the optimiser.
 
-````@example 03_Asset_Selection
+````@example 03_Asset_Preselection
 try
     Pipeline(; steps = (EmpiricalPrior(), ZeroVarianceFilter(), EqualWeighted()))
 catch e
-    println(strip_type_params(e.msg))
+    println(e.msg)
 end
 ````
 
 Put the selector first, and it composes with everything else without comment.
 
-````@example 03_Asset_Selection
+````@example 03_Asset_Preselection
 using Clarabel
 slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
              settings = Dict("verbose" => false),
@@ -380,7 +364,7 @@ pretty_table(DataFrame(; asset = res.ctx.returns.nx, weight = res.w); formatters
 
 Ten assets in, ten weights out. `predict` on any window replays the fitted ten.
 
-````@example 03_Asset_Selection
+````@example 03_Asset_Preselection
 pred = StatsAPI.predict(res, rd)
 expected_risk(ConditionalValueatRisk(), pred)
 ````
@@ -394,7 +378,7 @@ while choosing its universe.
 
 Lens keys reach into the selector by name: `"select.rule"` swaps the whole rule.
 
-````@example 03_Asset_Selection
+````@example 03_Asset_Preselection
 p = ["select.rule" => [RankRule(; best = 5), RankRule(; best = 10), RankRule(; best = 15)]]
 gscv = GridSearchCrossValidation(p; cv = IndexWalkForward(500, 250),
                                  r = ConditionalValueatRisk())
@@ -406,7 +390,7 @@ pretty_table(DataFrame(; k = [v[1].best for v in tuned.val_grid],
 
 `tuned.opt` is the winning *pipeline*, selector and all, ready to fit on the full sample.
 
-````@example 03_Asset_Selection
+````@example 03_Asset_Preselection
 tuned.opt.steps[1].rule.best
 ````
 
@@ -419,7 +403,7 @@ rule that selects nothing, a non-finite score, a fitted asset missing from a tes
 
 The score-and-rule decision is one dimension: sort the assets, cut somewhere.
 
-````@example 03_Asset_Selection
+````@example 03_Asset_Preselection
 using StatsPlots
 
 perm = sortperm(cvar)
@@ -435,16 +419,15 @@ bar(1:length(perm), cvar[perm]; color = colours, legend = false,
 The redundancy decision is a threshold sweep, and it shows the chaining gap opening up. The two
 algorithms agree only once the graph has no chains left to traverse.
 
-````@example 03_Asset_Selection
+````@example 03_Asset_Preselection
 thrs = 0.5:0.025:0.85
 n_greedy = [length(fit_preprocessing(RedundancySelector(;
-                                                        alg = PairwiseCorrelation(; thr = t,
+                                                        alg = PairwiseCorrelation(; t = t,
                                                                                   absolute = true),
                                                         score = SCM()), rd).nx)
             for t in thrs]
 n_comps = [length(fit_preprocessing(RedundancySelector(;
-                                                       alg = CorrelationComponents(;
-                                                                                   thr = t,
+                                                       alg = CorrelationComponents(; t = t,
                                                                                    absolute = true),
                                                        score = SCM()), rd).nx)
            for t in thrs]

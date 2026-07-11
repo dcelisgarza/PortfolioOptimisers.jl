@@ -505,8 +505,22 @@ function fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator, rd::Retu
                          ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())
     cv_res = split(cv, rd)
     (; train_idx, test_idx) = cv_res
-    predictions = parallel_folds(length(train_idx), ex; ElT = Vector{PredictionResult}) do i
-        return fit_and_predict(opt, rd; train_idx = train_idx[i], test_idx = test_idx[i],
+    n = length(train_idx)
+    td_flag = is_time_dependent(opt)
+    if td_flag
+        assert_time_dependent_fold_count(opt, n)
+    end
+    # A fold is a train/test split and `i` is its position in the split enumeration —
+    # no ordering is imposed on time-dependent entries; the user keys them off the
+    # fold's indices (ctx.train_idx[ctx.i] / ctx.test_idx[ctx.i]).
+    predictions = parallel_folds(n, ex; ElT = Vector{PredictionResult}) do i
+        opti = opt
+        if td_flag
+            ctx = TimeDependentContext(; i = i, n = n, rd = rd, train_idx = train_idx,
+                                       test_idx = test_idx)
+            opti = update_time_dependent_estimator(opti, ctx)
+        end
+        return fit_and_predict(opti, rd; train_idx = train_idx[i], test_idx = test_idx[i],
                                cols = cols)
     end
     return PopulationPredictionResult(; pred = sort_predictions!(cv_res, predictions))

@@ -11,6 +11,8 @@ CustomJuMPConstraint
 CustomJuMPObjective
 needs_previous_weights(::CustomJuMPConstraint)
 needs_previous_weights(::CustomJuMPObjective)
+is_time_dependent(opt::JuMPOptimisationEstimator)
+reset_time_dependent_estimator(opt::JuMPOptimisationEstimator)
 JuMPOptimisationSolution
 VecJuMPOptSol
 JuMPOptSol_VecJuMPOptSol

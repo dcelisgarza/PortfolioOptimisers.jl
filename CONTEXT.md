@@ -244,6 +244,15 @@ User-facing utilities converting high-level specifications into the numeric form
 **JuMP Constraints**
 The layer adding numeric constraint data into a JuMP model. Includes budget constraints (`BudgetRange` = sum-of-weights interval, `BudgetCosts` = linear transaction costs, `BudgetMarketImpact` = power-law impact), `LpRegularisation`, plus Turnover, Tracking, and Fees constraints.
 
+**Time-Dependent Constraint**
+An optimiser input whose value changes across the folds of a cross-validation scheme instead of being fixed for the whole horizon.
+Expressed by storing a per-fold sequence of values — or a callable (a function, or a functor struct that can additionally declare its previous-weights needs as inspectable data) computing the value from the fold's Time-Dependent Context — *directly in the optimiser input it varies*, so an input holds either a static value or a schedule, never both, and the input's position names what varies.
+Entry *i* corresponds to fold *i* of the consuming scheme's split enumeration; the machinery imposes no ordering of its own, so where that enumeration is not a timeline (combinatorial splits, randomised paths) keying entries to time is the user's responsibility. For an input that itself accepts a vector of constraints, entry *i* is fold *i*'s whole vector (a vector of vectors); there is no separate "vector of schedules" — to vary individual entries within a constraint vector, build the fold's vector inside a callable.
+A time-dependent constraint participates only where folds exist and is inert everywhere else — a plain (fold-less) optimisation, including a meta-optimiser's full-window solve, runs with the affected input at its static default. Which fold loop consumes a schedule is chosen by its `bind`: the default `:outermost` binds it to the outermost fold loop (so an inner estimator's schedule under an outer backtest is sized to the outer folds), while `:nearest` binds it to the nearest enclosing loop — inside a meta-optimiser's inner estimators, the meta's own cross-validation leg, which consumes it (sized to the inner folds) even under an outer backtest. Either way a schedule must be sized to the folds of the loop that consumes it.
+
+**Time-Dependent Context**
+The per-fold information handed to a function-form Time-Dependent Constraint: the fold's position in the scheme's split enumeration (which indexes the fold index vectors, so a function can always identify its own training and test windows), the fold count, the (possibly asset-viewed) returns data, and — only when previous weights are threaded — the previous fold's weights.
+
 **Weight Finaliser**
 Post-solve adjustment forcing weights into the feasible region: `IterativeWeightFinaliser` (projection) or `JuMPWeightFinaliser` (re-solve).
 

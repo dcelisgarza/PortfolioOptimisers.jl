@@ -382,6 +382,7 @@ function set_relaxed_risk_budgeting_constraints!(model::JuMP.Model,
 end
 function _optimise(rrb::RelaxedRiskBudgeting, rd::ReturnsResult = ReturnsResult();
                    dims::Int = 1, str_names::Bool = false, save::Bool = true, kwargs...)
+    rrb = reset_time_dependent_estimator(rrb)
     attrs = processed_jump_optimiser_attributes(rrb.opt, rd; dims = dims, kwargs...)
     model = JuMP.Model()
     JuMP.set_string_names_on_creation(model, str_names)
