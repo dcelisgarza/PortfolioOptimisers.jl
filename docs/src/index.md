@@ -13,7 +13,7 @@ hero:
   actions:
     - theme: brand
       text: User Guide
-      link: user_guide/00_User_Guide
+      link: user_guide/00_Introduction
     - theme: brand
       text: Examples
       link: examples/00_Examples
