@@ -7,7 +7,6 @@ factory(res::StackingResult, fb::Option{<:OptE_Opt})
 Stacking
 needs_previous_weights(opt::Stacking)
 is_time_dependent(opt::Stacking)
-update_time_dependent_estimator(opt::Stacking, ctx::TimeDependentContext, all_binds::Bool = true)
 reset_time_dependent_estimator(opt::Stacking)
 factory(st::Stacking, w::AbstractVector)
 port_opt_view(st::Stacking, i, X::MatNum, args...)

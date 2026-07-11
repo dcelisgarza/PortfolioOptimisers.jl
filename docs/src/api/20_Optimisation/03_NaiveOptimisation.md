@@ -4,7 +4,6 @@
 NaiveOptimisationEstimator
 needs_previous_weights(opt::NaiveOptimisationEstimator)
 is_time_dependent(opt::NaiveOptimisationEstimator)
-update_time_dependent_estimator(opt::NaiveOptimisationEstimator, ctx::TimeDependentContext, all_binds::Bool = true)
 reset_time_dependent_estimator(opt::NaiveOptimisationEstimator)
 assert_internal_optimiser(::NaiveOptimisationEstimator)
 assert_external_optimiser(::NaiveOptimisationEstimator)

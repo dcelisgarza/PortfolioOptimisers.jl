@@ -13,7 +13,6 @@ optimise(nco::NestedClustered{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                   save::Bool = true, kwargs...)
 needs_previous_weights(opt::NestedClustered)
 is_time_dependent(opt::NestedClustered)
-update_time_dependent_estimator(opt::NestedClustered, ctx::TimeDependentContext, all_binds::Bool = true)
 reset_time_dependent_estimator(opt::NestedClustered)
 assert_rc_pl(::Any)
 assert_external_optimiser(opt::ClusteringOptimisationEstimator)
