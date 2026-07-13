@@ -9,9 +9,6 @@
 #text-args-title.insert("fill", black)
 #text-args-authors.insert("size", 12pt)
 
-#set text(font: "New Computer Modern")
-#set enum(numbering: "1.")
-
 #show: template.with(
   title: link("https://github.com/dcelisgarza/PortfolioOptimisers.jl/")[PortfolioOptimisers.jl],
   authors: (
@@ -32,6 +29,9 @@
 #show heading.where(level: 1): set block(spacing: 1.5em)
 #show heading.where(level: 2): set block(spacing: 1.25em)
 #set par(first-line-indent: 2em, spacing: 2em, leading: 1.2em)
+#set text(font: "New Computer Modern")
+#set enum(numbering: "1.")
+#set math.equation(numbering: "(1)")
 
 = Introduction
 The field of portfolio optimisation was introduced by Harry Markowitz's seminal 1952 paper "Modern portfolio theory" @markowitz1952. However, the field has grown significantly since then, with many new techniques and methods being developed. The original Markowitz model is highly sensitive to estimation errors in the input parameters, particularly the expected returns. After all, it attempts to summarise the entire distribution of returns in highly compressed summary statistics, both of which can be sensitive to outliers and atypical conditions for the lookback period. Many have studied and addressed the strengths and weaknesses of the Markowitz model @cajasbook @lopezdepradobook @dppalomarbook.
@@ -47,13 +47,13 @@ There also exist myriad optimisation methods, pre-filtering, distribution and mo
 #link("https://github.com/dcelisgarza/PortfolioOptimisers.jl/")[PortfolioOptimisers.jl] is built with modularity and extensibility in mind. We can demonstrate a simple improvement over the Markowitz model by using by adding an L2 regularisation term to the optimisation problem.
 
 $
-  & min_bold(w) #h(1.5em) && bold(w)^top bold(Sigma) bold(w) + lambda ||bold(w)||_2^2 \
-  & upright(s.t.)         && bold(w)^top bold(mu) >= mu_i forall i in {1, ..., N} \
-  &                       && bold(w)^top bold(1) = 1 \
-  &                       && bold(w) >= 0 \
-  &                       && bold(w)_(i != "AAPL") <= 1 \
-  &                       && w_("AAPL") <= 0.2
-$
+  & min_bold(w) quad && bold(w)^top bold(Sigma) bold(w) + lambda ||bold(w)||_2^2 \
+  & upright(s.t.)    && bold(w)^top bold(mu) >= mu_i forall i in {1, ..., N} \
+  &                  && bold(w)^top bold(1) = 1 \
+  &                  && bold(w) >= 0 \
+  &                  && bold(w)_(i != "AAPL") <= 1 \
+  &                  && w_("AAPL") <= 0.2
+$<eq1>
 
 // #read-julia-output(json("main-jlyfish.json"))
 // #jl-pkg(
@@ -72,29 +72,42 @@ $
 # Import packages.
 using PortfolioOptimisers, CSV, TimeSeries, Clarabel, StatsPlots, GraphRecipes
 # Load data.
-X = TimeArray(CSV.File(joinpath(@__DIR__, "examples/SP500.csv.gz"));
+X = TimeArray(CSV.File(joinpath(@__DIR__, "../../examples/SP500.csv.gz"));
               timestamp = :Date)
 # Compute returns.
 rd = prices_to_returns(X)
 # Split into training and test sets.
 rd_train, rd_test = train_test_split(rd; test_size = 0.2)
-# Define solver. Use clarabel with no verbose output and default settings.
-slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
-             settings = Dict("verbose" => false))
-# Define assets sets used to match constraints to the asset universe.
-sets = AssetSets(; dict = Dict("nx" => rd.nx))
-# Lower bounds of 0 % for all assets, APPL has upper bounds of 20 %, the other assets default to 100 %.
-wb = WBE(; lb = 0, ub = "AAPL" => 0.2)
-# L2 norm penalty, lambda × ||w ⋅ w||^2, is added to the objective function. The sign depends on whether the optimisation is a minimisation or maximisation problem. It reduces the overfitting of a model to the training data and improves out-of-sample performance.
-l2 = L2Reg(; val = 0.0005, alg = SquaredSOCRiskExpr())
-# Define the return with 100 points in the pareto front. Risk measures can take an `lb` parameter which can also be used to define a pareto front. When using the returns, the optimisation must be a minimisation of risk for the efficient frontier to be fully computed. if using risk measures, the optimisations must be a maximisation of return.
-ret = ArithmeticReturn(; lb = Frontier(; N = 100))
-# Define the optimiser with all the above settings.
-opt = JuMPOpt(; slv = slv, wb = wb, sets = sets, l2 = l2, ret = ret)
-# Markowitz model.
-r = Variance()
-# Mean Risk optimisation with all the above settings.
-mr = MR(; r = r, opt = opt)
+# Mean Risk optimisation. Defaults to minimising risk.
+mr = MR(;
+  # Variance (default)
+  r = Variance(),
+  # Configured optimiser.
+  opt = JuMPOpt(;
+    # Using Clarabel as the solver. It's possible to provide fallbacks in the form of
+    # a vector, `PortfolioOptimisers.jl` will iterate until it finds one that works
+    # or they all fail.
+    slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
+      settings = Dict("verbose" => false)
+    ), # slv
+    # Weight bounds using an estimator (it builds the constraint based on the data).
+    # Lower bound for all assets is 0, upper bound for AAPL is 0.2, for the rest it's
+    # 1.
+    wb = WBE(; lb = 0, ub = "AAPL" => 0.2),
+    # This maps asset names to their indices in the data, as well as sets to which
+    # they belong. It is needed to build constraints from estimators and is used by
+    # other components such as some prior statistics.
+    sets = AssetSets(; dict = Dict("nx" => rd.nx)),
+    # L2 regularisation using a squared L2 norm with a scalar value of 0.0001. This
+    # is used to prevent weight concentration and thus reduce overfitting and improve
+    #generalisation.
+    l2 = L2Reg(; val = 0.0001, alg = SquaredSOCRiskExpr()),
+    # Arithmetic returns with 100 evenly distributed points between the minimum and
+    # maximum returns in the training set. This way we can compute the efficient
+    # frontier, which is a subset of pareto fronts.
+    ret = ArithmeticReturn(; lb = Frontier(; N = 100))
+  ) # opt
+) # mr
 # Perform optimisation on the training set.
 res = optimise(mr, rd_train)
 # Predict on training data.
@@ -103,16 +116,41 @@ pred_train = predict(res, rd_train)
 pred_test = predict(res, rd_test)
 # Scenario based standard deviation.
 r = SCM(; alg = SOCRiskExpr())
+# Plot the results.
 plt = plot_measures(pred_train; x = r, label = "Training", zcolor = nothing)
 plt = plot_measures(pred_test; x = r, plt = plt, label = "Test", zcolor = nothing,
-                    markercolor = :red, ylabel = "Daily Mean Return",
-                    xlabel = "Daily Standard Deviation")
+                    markercolor = :red, ylabel = "Mean Return",
+                    xlabel = "Standard Deviation")
+savefig(plt, joinpath(@__DIR__, "fig1.svg"))
+
 ```<code1>
 // )
 #figure(
   image("fig1.svg", width: 65%),
-  caption: [Train and test efficient frontier for an L2 regularised Markowitz model with a scenario-based standard deviation risk measure.],
+  caption: [Train and test efficient frontier for an L2 regularised Markowitz model with a scenario-based standard deviation risk measure. The training set does much better than the test set, this is why other portfolio optimisation modalities have been invented.],
 )<fig1>
+
+== Optimisers
+
+#link("https://github.com/dcelisgarza/PortfolioOptimisers.jl/")[PortfolioOptimisers.jl] provides a large number of optimisers. They can be categorised into 4 types.
+
++ Naïve: Speed and robustness, but not necessarily optimal. Can be interesting as sub-optimisers to more complex optimisers, and as fallbacks.
++ #link("https://github.com/jump-dev/JuMP.jl")[JuMP]-based: These are the most flexible and powerful, but they also require a solver, and are typically slower than other first-order optimisers. They support a wide range of constraints and objectives, and can be used to solve complex optimisation problems. They all use conic reformulations of problems.
++ Hierarchical: These utilise the relational structure of the universe in order to compute the risk of each group and sub-group, eventually leading to a diversified portfolio which encodes the relational structure as well as the risk characteristics of each group/subgroup. They are typically faster than #link("https://github.com/jump-dev/JuMP.jl")[JuMP]-based optimisers, but support fewer constraints. They are very good for large numbers of assets and build well-diversified portfolios.
++ Meta-optimisers: These consume other optimisers and combine their results in order to produce a better result. They are typically slower than other optimisers, but can be very effective in finding good solutions.
++ Finite optimisers: These do not optimise portfolios in the traditional sense, but rather let the user specify a finite cash amount, as well as the asset prices and other options, and compute the best portfolio that can be constructed with the given cash amount. They are used after the others have produced a result.
+
+== Constraints and penalties
+
+There is a huge variety of constraints. Every optimiser supports weight bounds constraints, all but the naïve ones also support fees. However, the richness of the constraints is in the #link("https://github.com/jump-dev/JuMP.jl")[JuMP.jl]-based estimators. They can be divided into a few categories:
+
++ Upper/lower bounds: These limit the maximum and minimum weights of the assets in the portfolio. Their implementation differs depending on the optimiser, but in #link("https://github.com/jump-dev/JuMP.jl")[JuMP.jl]-based estimators they are implemented as linear constraints.
++ Budget: These limit the total value of the weights of the portfolio. They integrate seamlessly with the finite optimisers in that they adjust the available cash based on the portfolio's budget. Together with bounds and linear constraints, they can be used to implement leveraged, dollar-neutral, and other types of portfolios.
++ Linear constraints: These are used in a variety of contexts, as risk contribution constraints, weight bounds, and relational structure constraints.
++ Cardinality constraints: These these can enforce sparsity, buy-in thresholds, inclusion/exclusion constraints. They can operate at the level of assets, or sets of assets. They are implemented as linear mixed integer constraints.
++ Fees: These penalise the return of the portfolio (thus indirectly penalise certain risk measures and objective functions). They include long and short proportional, long and short fixed, and turnover fees.
++ Weight penalties: These apply L-norm penalties to the objective function, or limit the L-norm of the weights of the portfolio. They can be used to regulate the sparsity and robustness of the portfolio.
++ Tracking and turnover: These limit how much a portfolio can deviate from a reference.
 
 == Design philosophy
 
@@ -200,7 +238,7 @@ To get a bibliography, we also add a citation.
 
 #lorem(50)
 
-#bibliography("bibliography.bib")
+#bibliography("refs.bib")
 
 // Create appendix section
 #show: appendices

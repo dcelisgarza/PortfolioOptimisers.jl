@@ -318,12 +318,11 @@ end
 function set_linf_regularisation!(model::JuMP.Model, linf::Number)
     w = get_w(model)
     sc = get_constraint_scale(model)
-    t_linf = model[:t_linf] = JuMP.@variable(model)
-    model[:clinf_nic] = JuMP.@constraint(model,
-                                         [sc * t_linf;
-                                          sc * w] in
-                                         JuMP.MOI.NormInfinityCone(1 + length(w)))
-    linf = model[:linf] = JuMP.@expression(model, linf * t_linf)
+    JuMP.@variable(model, t_linf)
+    JuMP.@constraint(model, clinf_nic,
+                     [sc * t_linf;
+                      sc * w] in JuMP.MOI.NormInfinityCone(1 + length(w)))
+    JuMP.@expression(model, linf, linf * t_linf)
     add_to_objective_penalty!(model, linf)
     return nothing
 end
