@@ -913,6 +913,10 @@ function add_to_objective_penalty!(model::JuMP.Model, expr)
     else
         model[:op]
     end
+    if isa(expr, JuMP.QuadExpr) && !isa(op, JuMP.QuadExpr)
+        JuMP.unregister(model, :op)
+        op = JuMP.@expression(model, op, JuMP.QuadExpr(op))
+    end
     JuMP.add_to_expression!(op, expr)
     return nothing
 end
@@ -943,6 +947,10 @@ function add_penalty_to_objective!(model::JuMP.Model, factor::Integer, expr)
         return nothing
     end
     op = model[:op]
+    if !isa(expr, JuMP.QuadExpr) && isa(op, JuMP.QuadExpr)
+        JuMP.unregister(model, :obj_expr)
+        expr = JuMP.@expression(model, obj_expr, JuMP.QuadExpr(expr))
+    end
     JuMP.add_to_expression!(expr, factor, op)
     return nothing
 end

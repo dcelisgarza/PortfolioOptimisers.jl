@@ -423,13 +423,16 @@ end
         @test seen3 == [1, 1, 1]
         # A vector schedule sized to the inner CV works standalone; a mis-sized one
         # fails at the inner split.
-        l2_3 = TimeDependent([1e-4, 2e-4, 3e-4])
+        l2_3 = TimeDependent([L2Regularisation(; val = 1e-4),
+                              L2Regularisation(; val = 2e-4),
+                              L2Regularisation(; val = 3e-4)])
         st3 = Stacking(;
                        opti = [MeanRisk(; opt = JuMPOptimiser(; slv = slv, l2 = l2_3)),
                                mr0], opto = mr0,
                        cv = OptimisationCrossValidation(; cv = KFold(; n = 3)))
         @test isa(optimise(st3, rd).retcode, OptimisationSuccess)
-        l2_2 = TimeDependent([1e-4, 2e-4])
+        l2_2 = TimeDependent([L2Regularisation(; val = 1e-4),
+                              L2Regularisation(; val = 2e-4)])
         st2 = Stacking(;
                        opti = [MeanRisk(; opt = JuMPOptimiser(; slv = slv, l2 = l2_2)),
                                mr0], opto = mr0,
@@ -495,18 +498,28 @@ end
         # it must be sized to that loop's folds (2), and a mis-sized one still fails.
         mr_near2 = MeanRisk(;
                             opt = JuMPOptimiser(; slv = slv,
-                                                l2 = TimeDependent([1e-4, 2e-4], :nearest)))
+                                                l2 = TimeDependent([L2Regularisation(;
+                                                                                     val = 1e-4),
+                                                                    L2Regularisation(;
+                                                                                     val = 2e-4)],
+                                                                   :nearest)))
         @test length(cross_val_predict(mr_near2, rd, cvw).pred) == 2
         mr_near3 = MeanRisk(;
                             opt = JuMPOptimiser(; slv = slv,
-                                                l2 = TimeDependent([1e-4, 2e-4, 3e-4],
+                                                l2 = TimeDependent([L2Regularisation(;
+                                                                                     val = 1e-4),
+                                                                    L2Regularisation(;
+                                                                                     val = 2e-4),
+                                                                    L2Regularisation(;
+                                                                                     val = 3e-4)],
                                                                    :nearest)))
         @test_throws DimensionMismatch cross_val_predict(mr_near3, rd, cvw)
         # The discriminating case: an inner estimator's schedule sized to the INNER
         # KFold(3) under an outer walk-forward (2 folds). With the default :outermost
         # the outer loop tries to consume it and the size-3 schedule fails at the outer
         # split; with :nearest the outer loop skips it and the inner KFold(3) consumes it.
-        l2_3 = [1e-4, 2e-4, 3e-4]
+        l2_3 = [L2Regularisation(; val = 1e-4), L2Regularisation(; val = 2e-4),
+                L2Regularisation(; val = 3e-4)]
         st_out = Stacking(;
                           opti = [MeanRisk(;
                                            opt = JuMPOptimiser(; slv = slv,
@@ -775,6 +788,240 @@ end
             @test !isapprox(p0.pred[1].res.w, p1.pred[1].res.w)
         end
     end
+    @testset "Problem-definition fields of the concrete estimators" begin
+        # The concrete estimators' own problem definition varies over folds too: the risk
+        # measure, objective, budgeting algorithm, warm starts and the fallback itself.
+        # Execution control (`bins`, `ucs_flag`, `alg` variants, `flag`, `ex`, `sq`, `rng`,
+        # `seed`, `brt`, `strict`) stays static.
+        cvw = IndexWalkForward(100, 50)
+        jopt = JuMPOptimiser(; slv = slv)
+        ctx2 = TimeDependentContext(; i = 2, n = 2, rd = rd, train_idx = 1:150,
+                                    test_idx = 151:200)
+        @testset "MeanRisk: widened fields, defaults and the scheduled fallback" begin
+            tdr = TimeDependent([Variance(), ConditionalValueatRisk()])
+            tdobj = TimeDependent([MinimumRisk(), MaximumUtility(; l = 4.0)])
+            tdwi = TimeDependent([fill(0.2, 5), fill(0.2, 5)])
+            tdfb = TimeDependent([EqualWeighted(), InverseVolatility()])
+            mr = MeanRisk(; opt = jopt, r = tdr, obj = tdobj, wi = tdwi, fb = tdfb)
+            @test PortfolioOptimisers.is_time_dependent(mr)
+            @test PortfolioOptimisers.time_dependent_fields(mr) == (:r, :obj, :wi, :fb)
+            # Fold-less: r/obj reset to their registered static defaults, wi/fb to nothing.
+            mr0 = PortfolioOptimisers.reset_time_dependent_estimator(mr)
+            @test mr0.r == Variance()
+            @test mr0.obj == MinimumRisk()
+            @test isnothing(mr0.wi)
+            @test isnothing(mr0.fb)
+            @test !PortfolioOptimisers.is_time_dependent(mr0)
+            # Per fold: entry i is swapped into each field.
+            mr2 = PortfolioOptimisers.update_time_dependent_estimator(mr, ctx2)
+            @test isa(mr2.r, ConditionalValueatRisk)
+            @test isa(mr2.obj, MaximumUtility)
+            @test mr2.wi == fill(0.2, 5)
+            @test isa(mr2.fb, InverseVolatility)
+            @test !PortfolioOptimisers.is_time_dependent(mr2)
+            # A scheduled fallback with a `default` survives a fold-less reset as that
+            # default.
+            mrd = MeanRisk(; opt = jopt,
+                           fb = TimeDependent([EqualWeighted(), InverseVolatility()];
+                                              default = EqualWeighted()))
+            @test PortfolioOptimisers.reset_time_dependent_estimator(mrd).fb ==
+                  EqualWeighted()
+            # Required fields stay non-nothing (typed TD, not TD_Option).
+            @test_throws TypeError MeanRisk(; opt = jopt, r = nothing)
+            @test_throws TypeError MeanRisk(; opt = jopt, obj = nothing)
+            # The constructor test-substitutes each entry, so a wrongly-typed or invalid
+            # one throws at construction rather than mid-backtest.
+            @test_throws TypeError MeanRisk(; opt = jopt,
+                                            r = TimeDependent([Variance(), 1.0]))
+            @test_throws TypeError MeanRisk(; opt = jopt,
+                                            obj = TimeDependent([MinimumRisk(), Variance()]))
+            @test_throws PortfolioOptimisers.IsEmptyError MeanRisk(; opt = jopt,
+                                                                   wi = TimeDependent([Float64[],
+                                                                                       fill(0.2,
+                                                                                            5)]))
+            # The schedules participate in the fold-count assertion, entries included.
+            @test_throws DimensionMismatch PortfolioOptimisers.assert_time_dependent_fold_count(mr,
+                                                                                                5)
+            @test isnothing(PortfolioOptimisers.assert_time_dependent_fold_count(mr, 2))
+            # An asset-subset view slices the warm-start schedule's entries.
+            mrv = PortfolioOptimisers.port_opt_view(MeanRisk(; opt = jopt, wi = tdwi), 1:3,
+                                                    X)
+            @test all(x -> length(x) == 3, mrv.wi.val)
+        end
+        @testset "Per-fold risk measure under walk-forward" begin
+            tdr = TimeDependent([Variance(), ConditionalValueatRisk()])
+            p = cross_val_predict(MeanRisk(; opt = jopt, r = tdr), rd, cvw)
+            p0 = cross_val_predict(MeanRisk(; opt = jopt), rd, cvw)
+            p1 = cross_val_predict(MeanRisk(; opt = jopt, r = ConditionalValueatRisk()), rd,
+                                   cvw)
+            @test isapprox(p.pred[1].res.w, p0.pred[1].res.w)
+            @test isapprox(p.pred[2].res.w, p1.pred[2].res.w)
+            @test !isapprox(p0.pred[2].res.w, p1.pred[2].res.w)
+        end
+        @testset "Per-fold objective under walk-forward" begin
+            tdobj = TimeDependent([MinimumRisk(), MaximumUtility(; l = 4.0)])
+            p = cross_val_predict(MeanRisk(; opt = jopt, obj = tdobj), rd, cvw)
+            p0 = cross_val_predict(MeanRisk(; opt = jopt), rd, cvw)
+            p1 = cross_val_predict(MeanRisk(; opt = jopt, obj = MaximumUtility(; l = 4.0)),
+                                   rd, cvw)
+            @test isapprox(p.pred[1].res.w, p0.pred[1].res.w)
+            @test isapprox(p.pred[2].res.w, p1.pred[2].res.w)
+            @test !isapprox(p0.pred[2].res.w, p1.pred[2].res.w)
+        end
+        @testset "Scheduled fallback: consumed per fold, inert without one" begin
+            # An infeasible primary (lower bounds sum past the budget) forces the fallback
+            # walk. Fold-less, a defaulted schedule resets to its default and that
+            # optimiser runs; a defaultless one resets to nothing and the failure stands.
+            bad = JuMPOptimiser(; slv = slv, wb = WeightBounds(; lb = 0.5, ub = 0.55))
+            mrd = MeanRisk(; opt = bad,
+                           fb = TimeDependent([EqualWeighted(), InverseVolatility()];
+                                              default = EqualWeighted()))
+            res = optimise(mrd, rd)
+            @test isa(res.retcode, OptimisationSuccess)
+            @test isapprox(res.w, optimise(EqualWeighted(), rd).w)
+            mrn = MeanRisk(; opt = bad,
+                           fb = TimeDependent([EqualWeighted(), InverseVolatility()]))
+            resn = optimise(mrn, rd)
+            @test !isa(resn.retcode, OptimisationSuccess)
+            # Under the fold loop, fold 2's entry is the fallback that runs.
+            p = cross_val_predict(MeanRisk(; opt = bad,
+                                           fb = TimeDependent([EqualWeighted(),
+                                                               InverseVolatility()])), rd,
+                                  cvw)
+            piv = cross_val_predict(InverseVolatility(), rd, cvw)
+            @test isapprox(p.pred[2].res.w, piv.pred[2].res.w)
+        end
+        @testset "RiskBudgeting and RelaxedRiskBudgeting" begin
+            rba1, rba2 = AssetRiskBudgeting(), AssetRiskBudgeting()
+            rb = RiskBudgeting(; opt = jopt, r = TimeDependent([Variance(), Variance()]),
+                               rba = TimeDependent([rba1, rba2]))
+            @test PortfolioOptimisers.time_dependent_fields(rb) == (:r, :rba)
+            rb0 = PortfolioOptimisers.reset_time_dependent_estimator(rb)
+            @test rb0.r == Variance()
+            @test rb0.rba == AssetRiskBudgeting()
+            @test PortfolioOptimisers.update_time_dependent_estimator(rb, ctx2).rba === rba2
+            @test_throws TypeError RiskBudgeting(; opt = jopt, rba = nothing)
+            rrb = RelaxedRiskBudgeting(; opt = jopt, rba = TimeDependent([rba1, rba2]))
+            @test PortfolioOptimisers.time_dependent_fields(rrb) == (:rba,)
+            @test PortfolioOptimisers.reset_time_dependent_estimator(rrb).rba ==
+                  AssetRiskBudgeting()
+            @test PortfolioOptimisers.update_time_dependent_estimator(rrb, ctx2).rba ===
+                  rba2
+        end
+        @testset "NearOptimalCentering and FactorRiskContribution" begin
+            noc = NearOptimalCentering(; opt = jopt,
+                                       r = TimeDependent([StandardDeviation(),
+                                                          ConditionalValueatRisk()]),
+                                       obj = TimeDependent([MinimumRisk(),
+                                                            MaximumUtility(; l = 4.0)]),
+                                       w_min = TimeDependent([fill(0.0, 5), fill(0.01, 5)]))
+            @test PortfolioOptimisers.time_dependent_fields(noc) == (:r, :obj, :w_min)
+            noc0 = PortfolioOptimisers.reset_time_dependent_estimator(noc)
+            @test noc0.r == StandardDeviation()
+            @test noc0.obj == MinimumRisk()
+            @test isnothing(noc0.w_min)
+            noc2 = PortfolioOptimisers.update_time_dependent_estimator(noc, ctx2)
+            @test isa(noc2.r, ConditionalValueatRisk)
+            @test noc2.w_min == fill(0.01, 5)
+            frc = FactorRiskContribution(; opt = jopt,
+                                         re = TimeDependent([StepwiseRegression(),
+                                                             StepwiseRegression()]),
+                                         r = TimeDependent([Variance(), Variance()]))
+            @test PortfolioOptimisers.time_dependent_fields(frc) == (:re, :r)
+            frc0 = PortfolioOptimisers.reset_time_dependent_estimator(frc)
+            @test frc0.re == StepwiseRegression()
+            @test frc0.r == Variance()
+            @test isa(PortfolioOptimisers.update_time_dependent_estimator(frc, ctx2).re,
+                      StepwiseRegression)
+        end
+        @testset "Hierarchical estimators: HRP, HERC and Schur" begin
+            hopt = HierarchicalOptimiser(; slv = slv)
+            tdr = TimeDependent([Variance(), ConditionalValueatRisk()])
+            hrp = HierarchicalRiskParity(; opt = hopt, r = tdr,
+                                         sca = TimeDependent([SumScalariser(),
+                                                              MaxScalariser()]))
+            @test PortfolioOptimisers.time_dependent_fields(hrp) == (:r, :sca)
+            hrp0 = PortfolioOptimisers.reset_time_dependent_estimator(hrp)
+            @test hrp0.r == Variance()
+            @test hrp0.sca == SumScalariser()
+            hrp2 = PortfolioOptimisers.update_time_dependent_estimator(hrp, ctx2)
+            @test isa(hrp2.r, ConditionalValueatRisk)
+            @test isa(hrp2.sca, MaxScalariser)
+            # End to end: fold 2 allocates with the scheduled risk measure.
+            p = cross_val_predict(HierarchicalRiskParity(; opt = hopt, r = tdr), rd, cvw)
+            p0 = cross_val_predict(HierarchicalRiskParity(; opt = hopt), rd, cvw)
+            p1 = cross_val_predict(HierarchicalRiskParity(; opt = hopt,
+                                                          r = ConditionalValueatRisk()), rd,
+                                   cvw)
+            @test isapprox(p.pred[1].res.w, p0.pred[1].res.w)
+            @test isapprox(p.pred[2].res.w, p1.pred[2].res.w)
+            @test !isapprox(p0.pred[2].res.w, p1.pred[2].res.w)
+            herc = HierarchicalEqualRiskContribution(; opt = hopt, ri = tdr,
+                                                     ro = TimeDependent([Variance(),
+                                                                         StandardDeviation()]),
+                                                     scai = TimeDependent([SumScalariser(),
+                                                                           MaxScalariser()]))
+            # `scao` defaults to `scai`, so an explicit `scai` schedule aliases into
+            # `scao` — the same flow-through the static default has always had.
+            @test PortfolioOptimisers.time_dependent_fields(herc) ==
+                  (:ri, :ro, :scai, :scao)
+            @test herc.scao === herc.scai
+            herc0 = PortfolioOptimisers.reset_time_dependent_estimator(herc)
+            @test herc0.ri == Variance()
+            @test herc0.ro == Variance()
+            @test herc0.scai == SumScalariser()
+            @test herc0.scao == SumScalariser()
+            herc2 = PortfolioOptimisers.update_time_dependent_estimator(herc, ctx2)
+            @test isa(herc2.ri, ConditionalValueatRisk)
+            @test isa(herc2.ro, StandardDeviation)
+            @test isa(herc2.scao, MaxScalariser)
+            # An explicit static `scao` breaks the alias: no schedule reaches it, so it
+            # stays put across folds while `scai` varies.
+            herc_static = HierarchicalEqualRiskContribution(; opt = hopt,
+                                                            scai = TimeDependent([SumScalariser(),
+                                                                                  MaxScalariser()]),
+                                                            scao = SumScalariser())
+            @test PortfolioOptimisers.time_dependent_fields(herc_static) == (:scai,)
+            hst0 = PortfolioOptimisers.reset_time_dependent_estimator(herc_static)
+            @test hst0.scao == SumScalariser()
+            hst2 = PortfolioOptimisers.update_time_dependent_estimator(herc_static, ctx2)
+            @test isa(hst2.scai, MaxScalariser)
+            @test hst2.scao == SumScalariser()
+            sch = SchurComplementHierarchicalRiskParity(; opt = hopt,
+                                                        params = TimeDependent([SchurComplementParams(;
+                                                                                                      gamma = 0.2),
+                                                                                SchurComplementParams(;
+                                                                                                      gamma = 0.8)]))
+            @test PortfolioOptimisers.time_dependent_fields(sch) == (:params,)
+            @test PortfolioOptimisers.reset_time_dependent_estimator(sch).params ==
+                  SchurComplementParams()
+            @test PortfolioOptimisers.update_time_dependent_estimator(sch, ctx2).params.gamma ==
+                  0.8
+        end
+        @testset "Naive optimisers: weight finaliser, sets and prior" begin
+            tdwf = TimeDependent([IterativeWeightFinaliser(),
+                                  IterativeWeightFinaliser(; iter = 7)])
+            ew = EqualWeighted(; wf = tdwf)
+            @test PortfolioOptimisers.time_dependent_fields(ew) == (:wf,)
+            @test PortfolioOptimisers.reset_time_dependent_estimator(ew).wf ==
+                  IterativeWeightFinaliser()
+            @test PortfolioOptimisers.update_time_dependent_estimator(ew, ctx2).wf.iter == 7
+            @test_throws TypeError EqualWeighted(; wf = nothing)
+            # A fold-less solve runs with the finaliser at its static default.
+            @test isapprox(optimise(ew, rd).w, optimise(EqualWeighted(), rd).w)
+            iv = InverseVolatility(;
+                                   pe = TimeDependent([EmpiricalPrior(),
+                                                       EmpiricalPrior(;
+                                                                      ce = PortfolioOptimisersCovariance(;
+                                                                                                         ce = Covariance(;
+                                                                                                                         alg = SemiMoment())))]))
+            @test PortfolioOptimisers.time_dependent_fields(iv) == (:pe,)
+            @test PortfolioOptimisers.reset_time_dependent_estimator(iv).pe ==
+                  EmpiricalPrior()
+            @test isa(PortfolioOptimisers.update_time_dependent_estimator(iv, ctx2).pe.ce.ce.alg,
+                      SemiMoment)
+        end
+    end
     @testset "A schedule as the optimiser itself" begin
         ew, iv = EqualWeighted(), InverseVolatility()
         cvw = IndexWalkForward(100, 50)  # 2 folds over the 200-row sample
@@ -818,16 +1065,24 @@ end
         @testset "Post-swap recursion binds the entry's own schedules to this loop" begin
             # The swapped-in estimator's :outermost schedule is sized to the SAME 2 outer
             # folds and resolved against the same context, so fold 2 gets l2 = 2e-4.
-            l2 = TimeDependent([1e-4, 2e-4])
+            l2 = TimeDependent([L2Regularisation(; val = 1e-4),
+                                L2Regularisation(; val = 2e-4)])
             mr = MeanRisk(; opt = JuMPOptimiser(; slv = slv, l2 = l2))
             p = cross_val_predict(TimeDependent([ew, mr]), rd, cvw)
-            mr2 = MeanRisk(; opt = JuMPOptimiser(; slv = slv, l2 = 2e-4))
+            mr2 = MeanRisk(;
+                           opt = JuMPOptimiser(; slv = slv,
+                                               l2 = L2Regularisation(; val = 2e-4)))
             @test isapprox(p.pred[2].res.w, cross_val_predict(mr2, rd, cvw).pred[2].res.w)
             # A schedule inside an entry is still sized to this loop, so a mis-sized one
             # fails even though the top-level schedule is correctly sized.
             mr_bad = MeanRisk(;
                               opt = JuMPOptimiser(; slv = slv,
-                                                  l2 = TimeDependent([1e-4, 2e-4, 3e-4])))
+                                                  l2 = TimeDependent([L2Regularisation(;
+                                                                                       val = 1e-4),
+                                                                      L2Regularisation(;
+                                                                                       val = 2e-4),
+                                                                      L2Regularisation(;
+                                                                                       val = 3e-4)])))
             @test_throws DimensionMismatch cross_val_predict(TimeDependent([ew, mr_bad]),
                                                              rd, cvw)
         end
@@ -842,9 +1097,15 @@ end
             # It is reset in turn, so its own schedules take their defaults too.
             mr = MeanRisk(;
                           opt = JuMPOptimiser(; slv = slv,
-                                              l2 = TimeDependent([1e-4, 2e-4];
-                                                                 default = 5e-4)))
-            mr0 = MeanRisk(; opt = JuMPOptimiser(; slv = slv, l2 = 5e-4))
+                                              l2 = TimeDependent([L2Regularisation(;
+                                                                                   val = 1e-4),
+                                                                  L2Regularisation(;
+                                                                                   val = 2e-4)];
+                                                                 default = L2Regularisation(;
+                                                                                            val = 5e-4))))
+            mr0 = MeanRisk(;
+                           opt = JuMPOptimiser(; slv = slv,
+                                               l2 = L2Regularisation(; val = 5e-4)))
             @test isapprox(optimise(TimeDependent([ew, mr]; default = mr), rd).w,
                            optimise(mr0, rd).w)
         end
@@ -899,7 +1160,12 @@ end
             # The schedules inside each entry are sized to the same loop...
             mr_bad = MeanRisk(;
                               opt = JuMPOptimiser(; slv = slv,
-                                                  l2 = TimeDependent([1e-4, 2e-4, 3e-4])))
+                                                  l2 = TimeDependent([L2Regularisation(;
+                                                                                       val = 1e-4),
+                                                                      L2Regularisation(;
+                                                                                       val = 2e-4),
+                                                                      L2Regularisation(;
+                                                                                       val = 3e-4)])))
             @test_throws DimensionMismatch PortfolioOptimisers.assert_time_dependent_fold_count(TimeDependent([ew,
                                                                                                                mr_bad]),
                                                                                                 2)
@@ -925,7 +1191,10 @@ end
             # time-dependent survives it — even when the entry carries its own schedules.
             mrl = MeanRisk(;
                            opt = JuMPOptimiser(; slv = slv,
-                                               l2 = TimeDependent([1e-4, 2e-4])))
+                                               l2 = TimeDependent([L2Regularisation(;
+                                                                                    val = 1e-4),
+                                                                   L2Regularisation(;
+                                                                                    val = 2e-4)])))
             sched = TimeDependent([ew, mrl])
             ctx1 = TimeDependentContext(; i = 1, n = 2, rd = rd, train_idx = [1:100, 1:150],
                                         test_idx = [101:150, 151:200])
@@ -934,7 +1203,7 @@ end
             o1 = PortfolioOptimisers.update_time_dependent_estimator(sched, ctx1)
             o2 = PortfolioOptimisers.update_time_dependent_estimator(sched, ctx2)
             @test o1 isa EqualWeighted
-            @test o2.opt.l2 == 2e-4
+            @test o2.opt.l2.val == 2e-4
             @test !PortfolioOptimisers.is_time_dependent(o1)
             @test !PortfolioOptimisers.is_time_dependent(o2)
         end

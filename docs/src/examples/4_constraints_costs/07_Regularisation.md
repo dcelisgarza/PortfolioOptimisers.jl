@@ -100,7 +100,7 @@ opts = [JuMPOptimiser(; pe = pr, slv = slv, wb = WeightBounds(; lb = -1, ub = 1)
                       l1 = 4e-4),#
         JuMPOptimiser(; pe = pr, slv = slv, wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1,
                       ret = ArithmeticReturn(; lb = Frontier(; N = 50)), bgt = 1,
-                      l2 = 4e-4),#
+                      l2 = L2Regularisation(; val = 4e-4)),#
         JuMPOptimiser(; pe = pr, slv = slv, wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1,
                       ret = ArithmeticReturn(; lb = Frontier(; N = 50)), bgt = 1,
                       lp = LpRegularisation(; p = 5, val = 4e-4)),#
@@ -221,7 +221,7 @@ opts = [JuMPOptimiser(; pe = pr, slv = slv, wb = WeightBounds(; lb = -1, ub = 1)
         JuMPOptimiser(; pe = pr, slv = slv, wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1,
                       bgt = 1, l1 = 4e-4),# L1 regularisation
         JuMPOptimiser(; pe = pr, slv = slv, wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1,
-                      bgt = 1, l2 = 4e-4),# L2 regularisation
+                      bgt = 1, l2 = L2Regularisation(; val = 4e-4)),# L2 regularisation
         JuMPOptimiser(; pe = pr, slv = slv, wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1,
                       bgt = 1, lp = LpRegularisation(; p = 5, val = 4e-4)),# Lp regularisation with p = 5
         JuMPOptimiser(; pe = pr, slv = slv, wb = WeightBounds(; lb = -1, ub = 1), sbgt = 1,

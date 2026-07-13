@@ -1,4 +1,20 @@
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the static defaults of the [`HierarchicalRiskParity`](@ref) fields that may hold a [`TimeDependent`](@ref).
+
+Shared by the constructor's test-substitution pass and [`time_dependent_field_defaults`](@ref), so the fold-less value of a field is declared once. Fields whose static default is `nothing` are omitted.
+
+# Related
+
+  - [`HierarchicalRiskParity`](@ref)
+  - [`time_dependent_field_defaults`](@ref)
+  - [`assert_time_dependent_substitution`](@ref)
+"""
+function hierarchical_risk_parity_td_defaults()::NamedTuple
+    return (; r = Variance(), sca = SumScalariser())
+end
+"""
 $(DocStringExtensions.TYPEDEF)
 
 Hierarchical Risk Parity (HRP) portfolio optimiser.
@@ -13,12 +29,12 @@ $(DocStringExtensions.FIELDS)
 
     HierarchicalRiskParity(;
         opt::HierarchicalOptimiser = HierarchicalOptimiser(),
-        r::OptRM_VecOptRM = Variance(),
-        sca::Scalariser = SumScalariser(),
-        fb::Option{<:OptE_Opt} = nothing
+        r::TD{<:OptRM_VecOptRM} = Variance(),
+        sca::TD{<:Scalariser} = SumScalariser(),
+        fb::TDO_Option{<:OptE_Opt} = nothing
     ) -> HierarchicalRiskParity
 
-Keywords correspond to the struct's fields.
+Keywords correspond to the struct's fields. Fields typed [`TD`](@ref) or [`TDO_Option`](@ref) may hold a [`TimeDependent`](@ref) per-fold schedule instead of a static value: the risk measure, scalariser and fallback are problem definition, so a cross-validation fold loop resolves them per fold, and a fold-less `optimise` runs with each at its static default (`nothing` for `fb`).
 
 ## Validation
 
@@ -156,19 +172,24 @@ Where:
     $(field_dict[:fb])
     """
     @fprop fb
-    function HierarchicalRiskParity(opt::HierarchicalOptimiser, r::OptRM_VecOptRM,
-                                    sca::Scalariser, fb::Option{<:OptE_Opt})
+    function HierarchicalRiskParity(opt::HierarchicalOptimiser, r::TD{<:OptRM_VecOptRM},
+                                    sca::TD{<:Scalariser}, fb::TDO_Option{<:OptE_Opt})
         if isa(r, AbstractVector)
             @argcheck(!isempty(r), IsEmptyError("r cannot be empty"))
         end
+        assert_time_dependent_substitution(HierarchicalRiskParity, (; opt, r, sca, fb),
+                                           hierarchical_risk_parity_td_defaults())
         return new{typeof(opt), typeof(r), typeof(sca), typeof(fb)}(opt, r, sca, fb)
     end
 end
 function HierarchicalRiskParity(; opt::HierarchicalOptimiser = HierarchicalOptimiser(),
-                                r::OptRM_VecOptRM = Variance(),
-                                sca::Scalariser = SumScalariser(),
-                                fb::Option{<:OptE_Opt} = nothing)::HierarchicalRiskParity
+                                r::TD{<:OptRM_VecOptRM} = Variance(),
+                                sca::TD{<:Scalariser} = SumScalariser(),
+                                fb::TDO_Option{<:OptE_Opt} = nothing)::HierarchicalRiskParity
     return HierarchicalRiskParity(opt, r, sca, fb)
+end
+function time_dependent_field_defaults(::HierarchicalRiskParity)::NamedTuple
+    return hierarchical_risk_parity_td_defaults()
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -183,7 +204,9 @@ Returns `true` if any of the base optimiser, risk measure, or fallback estimator
   - [`HierarchicalRiskParity`](@ref)
 """
 function needs_previous_weights(opt::HierarchicalRiskParity)
-    return (needs_previous_weights(opt.opt) ||
+    return (any(f -> needs_previous_weights(getfield(opt, f)),
+                time_dependent_fields(opt)) ||
+            needs_previous_weights(opt.opt) ||
             needs_previous_weights(opt.r) ||
             needs_previous_weights(opt.fb))
 end

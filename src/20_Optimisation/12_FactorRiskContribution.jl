@@ -61,6 +61,22 @@ end
     forward(jr)
 end
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the static defaults of the [`FactorRiskContribution`](@ref) fields that may hold a [`TimeDependent`](@ref).
+
+Shared by the constructor's test-substitution pass and [`time_dependent_field_defaults`](@ref), so the fold-less value of a field is declared once. Fields whose static default is `nothing` are omitted.
+
+# Related
+
+  - [`FactorRiskContribution`](@ref)
+  - [`time_dependent_field_defaults`](@ref)
+  - [`assert_time_dependent_substitution`](@ref)
+"""
+function factor_risk_contribution_td_defaults()::NamedTuple
+    return (; re = StepwiseRegression(), r = Variance(), obj = MinimumRisk())
+end
+"""
 $(DocStringExtensions.TYPEDEF)
 
 Factor Risk Contribution (FRC) portfolio optimiser.
@@ -106,22 +122,22 @@ $(DocStringExtensions.FIELDS)
 
     FactorRiskContribution(;
         opt::JuMPOptimiser,
-        re::RegE_Reg = StepwiseRegression(),
-        r::RM_VecRM = Variance(),
-        obj::ObjectiveFunction = MinimumRisk(),
-        frc_ple::Option{<:PlCE_PhC_VecPlCE_PlC} = nothing,
-        sets::Option{<:AssetSets} = nothing,
-        wi::Option{<:VecNum} = nothing,
+        re::TD{<:RegE_Reg} = StepwiseRegression(),
+        r::TD{<:RM_VecRM} = Variance(),
+        obj::TD{<:ObjectiveFunction} = MinimumRisk(),
+        frc_ple::TD_Option{<:PlCE_PhC_VecPlCE_PlC} = nothing,
+        sets::TD_Option{<:AssetSets} = nothing,
+        wi::TD_Option{<:VecNum} = nothing,
         flag::Bool = false,
-        fb::Option{<:OptE_Opt} = nothing
+        fb::TDO_Option{<:OptE_Opt} = nothing
     ) -> FactorRiskContribution
 
-Keywords correspond to the struct's fields.
+Keywords correspond to the struct's fields. Fields typed [`TD`](@ref), [`TD_Option`](@ref) or [`TDO_Option`](@ref) may hold a [`TimeDependent`](@ref) per-fold schedule instead of a static value: the factor model, risk measure, objective, placeholder constraints, asset sets, warm start and fallback are problem definition, so a cross-validation fold loop resolves them per fold, and a fold-less `optimise` runs with each at its static default. `flag` is execution control and stays static.
 
 ## Validation
 
   - If `r` is a vector: `!isempty(r)`.
-  - If `wi` is provided: `!isempty(wi)`.
+  - If `wi` is a vector: `!isempty(wi)`.
 
 ## Propagated parameters
 
@@ -176,31 +192,38 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
     $(field_dict[:fb])
     """
     @fprop fb
-    function FactorRiskContribution(opt::JuMPOptimiser, re::RegE_Reg, r::RM_VecRM,
-                                    obj::ObjectiveFunction,
-                                    frc_ple::Option{<:PlCE_PhC_VecPlCE_PlC},
-                                    sets::Option{<:AssetSets}, wi::Option{<:VecNum},
-                                    flag::Bool, fb::Option{<:OptE_Opt})
+    function FactorRiskContribution(opt::JuMPOptimiser, re::TD{<:RegE_Reg},
+                                    r::TD{<:RM_VecRM}, obj::TD{<:ObjectiveFunction},
+                                    frc_ple::TD_Option{<:PlCE_PhC_VecPlCE_PlC},
+                                    sets::TD_Option{<:AssetSets}, wi::TD_Option{<:VecNum},
+                                    flag::Bool, fb::TDO_Option{<:OptE_Opt})
         if isa(r, AbstractVector)
             @argcheck(!isempty(r), IsEmptyError("r cannot be empty"))
         end
         if isa(wi, VecNum)
             @argcheck(!isempty(wi), IsEmptyError("wi cannot be empty"))
         end
+        assert_time_dependent_substitution(FactorRiskContribution,
+                                           (; opt, re, r, obj, frc_ple, sets, wi, flag, fb),
+                                           factor_risk_contribution_td_defaults())
         return new{typeof(opt), typeof(re), typeof(r), typeof(obj), typeof(frc_ple),
                    typeof(sets), typeof(wi), typeof(flag), typeof(fb)}(opt, re, r, obj,
                                                                        frc_ple, sets, wi,
                                                                        flag, fb)
     end
 end
-function FactorRiskContribution(; opt::JuMPOptimiser, re::RegE_Reg = StepwiseRegression(),
-                                r::RM_VecRM = Variance(),
-                                obj::ObjectiveFunction = MinimumRisk(),
-                                frc_ple::Option{<:PlCE_PhC_VecPlCE_PlC} = nothing,
-                                sets::Option{<:AssetSets} = nothing,
-                                wi::Option{<:VecNum} = nothing, flag::Bool = false,
-                                fb::Option{<:OptE_Opt} = nothing)::FactorRiskContribution
+function FactorRiskContribution(; opt::JuMPOptimiser,
+                                re::TD{<:RegE_Reg} = StepwiseRegression(),
+                                r::TD{<:RM_VecRM} = Variance(),
+                                obj::TD{<:ObjectiveFunction} = MinimumRisk(),
+                                frc_ple::TD_Option{<:PlCE_PhC_VecPlCE_PlC} = nothing,
+                                sets::TD_Option{<:AssetSets} = nothing,
+                                wi::TD_Option{<:VecNum} = nothing, flag::Bool = false,
+                                fb::TDO_Option{<:OptE_Opt} = nothing)::FactorRiskContribution
     return FactorRiskContribution(opt, re, r, obj, frc_ple, sets, wi, flag, fb)
+end
+function time_dependent_field_defaults(::FactorRiskContribution)::NamedTuple
+    return factor_risk_contribution_td_defaults()
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -208,7 +231,9 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 Return `true` if any sub-estimator of `opt` requires previous portfolio weights (JuMP optimiser, risk measure, or fallback).
 """
 function needs_previous_weights(opt::FactorRiskContribution)
-    return (needs_previous_weights(opt.opt) ||
+    return (any(f -> needs_previous_weights(getfield(opt, f)),
+                time_dependent_fields(opt)) ||
+            needs_previous_weights(opt.opt) ||
             needs_previous_weights(opt.r) ||
             needs_previous_weights(opt.fb))
 end

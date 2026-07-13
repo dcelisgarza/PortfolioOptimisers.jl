@@ -118,8 +118,8 @@ sets = AssetSets(;
 res_card = optimise(MeanRisk(; opt = JuMPOptimiser(; pe = pr, slv = mip_slv, card = 3)))
 
 res_card_l2 = optimise(MeanRisk(; obj = MaximumRatio(; rf = rf),
-                                opt = JuMPOptimiser(; l2 = 0.1, pe = pr, slv = mip_slv,
-                                                    card = 3)))
+                                opt = JuMPOptimiser(; l2 = L2Regularisation(; val = 0.1),
+                                                    pe = pr, slv = mip_slv, card = 3)))
 
 res_card_thr = optimise(MeanRisk(; obj = MaximumRatio(; rf = rf),
                                  opt = JuMPOptimiser(; pe = pr, slv = mip_slv,

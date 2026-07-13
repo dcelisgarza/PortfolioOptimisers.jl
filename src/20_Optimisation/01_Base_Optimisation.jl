@@ -697,7 +697,8 @@ function time_dependent_entry_needs_previous_weights(::Any)::Bool
     return false
 end
 function time_dependent_entry_needs_previous_weights(x::Union{<:TnE_Tn, <:FeesE_Fees,
-                                                              <:Tr_VecTr})::Bool
+                                                              <:Tr_VecTr,
+                                                              <:AbstractBaseRiskMeasure})::Bool
     return needs_previous_weights(x)
 end
 function time_dependent_entry_needs_previous_weights(x::AbstractVector)::Bool
@@ -712,6 +713,29 @@ function port_opt_view(td::TimeDependent, i, args...)
         v = [port_opt_view(x, i, args...) for x in v]
     end
     return TimeDependent(v, td.bind; default = port_opt_view(td.default, i, args...))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Slice a [`TimeDependent`](@ref) schedule of scalar-or-array field values (warm starts, initial weights) to asset indices `i`.
+
+Vector schedules slice each per-fold entry, and the `default` when one is set; callable schedules pass through — they see the sliced universe via their fold context's `rd`.
+
+# Related
+
+  - [`TimeDependent`](@ref)
+  - [`port_opt_view`](@ref)
+"""
+function nothing_scalar_array_view(td::TimeDependent, i)
+    v = td.val
+    if isa(v, AbstractVector)
+        v = [nothing_scalar_array_view(x, i) for x in v]
+    end
+    d = td.default
+    if !isa(d, NoDefault)
+        d = nothing_scalar_array_view(d, i)
+    end
+    return TimeDependent(v, td.bind; default = d)
 end
 """
     time_dependent_fields(opt, all_binds::Bool = true)
@@ -1953,6 +1977,8 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 High level optimisation function that wraps around estimator-specific optimisation functions. This takes care of fallback methods if the primary optimisation fails. It returns the first successful optimisation result but stores all fallback results in the `fb` field of the result.
 
+This is a fold-less entry point, so time-dependent schedules are inert here: the estimator is reset to its fold-less values (see [`reset_time_dependent_estimator`](@ref)) before the solve — in particular a scheduled fallback resets to its `default`, or to `nothing` (no fallback) when it has none, *before* the fallback chain is walked. Inside a fold loop this reset is a no-op, because the loop resolves every schedule before optimising.
+
 # Arguments
 
   - `opt::OptimisationEstimator`: The optimisation estimator to use.
@@ -1961,7 +1987,7 @@ High level optimisation function that wraps around estimator-specific optimisati
 """
 function optimise(opt::OptimisationEstimator, args...; kwargs...)
     fb = Tuple{OptimisationEstimator, OptimisationResult}[]
-    current_opt = opt
+    current_opt = reset_time_dependent_estimator(opt)
     res = nothing
     while true
         res = _optimise(current_opt, args...; kwargs...)

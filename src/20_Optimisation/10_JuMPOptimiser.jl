@@ -586,7 +586,7 @@ Keywords correspond to the struct's fields. Fields typed [`TD_Option`](@ref) or 
                            cobj::TD_Option{<:CustomJuMPObjective}, sc::Number, so::Number,
                            ss::TD_Option{<:Number}, card::TD_Option{<:Integer},
                            scard::TD_Option{<:Int_VecInt}, nea::TD_Option{<:Number},
-                           l1::TD_Option{<:Number}, l2::TD_Option{<:Number},
+                           l1::TD_Option{<:Number}, l2::TD_Option{<:L2Reg_VecL2Reg},
                            linf::TD_Option{<:Number}, lp::TD_Option{<:LpReg_VecLpReg},
                            brt::Bool, cle_pr::Bool, strict::Bool)
         if isa(slv, VecSlv)
@@ -824,7 +824,8 @@ function JuMPOptimiser(; pe::TD{<:PrE_Pr} = EmpiricalPrior(), slv::Slv_VecSlv,
                        card::TD_Option{<:Integer} = nothing,
                        scard::TD_Option{<:Int_VecInt} = nothing,
                        nea::TD_Option{<:Number} = nothing,
-                       l1::TD_Option{<:Number} = nothing, l2::TD_Option{<:Number} = nothing,
+                       l1::TD_Option{<:Number} = nothing,
+                       l2::TD_Option{<:L2Reg_VecL2Reg} = nothing,
                        linf::TD_Option{<:Number} = nothing,
                        lp::TD_Option{<:LpReg_VecLpReg} = nothing, brt::Bool = false,
                        cle_pr::Bool = true, strict::Bool = false)::JuMPOptimiser

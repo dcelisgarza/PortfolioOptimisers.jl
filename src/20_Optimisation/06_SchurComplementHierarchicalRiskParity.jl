@@ -293,6 +293,22 @@ function port_opt_view(sp::SchurComplementParams, i, X::MatNum, args...)
                                  flag = sp.flag)
 end
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the static defaults of the [`SchurComplementHierarchicalRiskParity`](@ref) fields that may hold a [`TimeDependent`](@ref).
+
+Shared by the constructor's test-substitution pass and [`time_dependent_field_defaults`](@ref), so the fold-less value of a field is declared once. Fields whose static default is `nothing` are omitted.
+
+# Related
+
+  - [`SchurComplementHierarchicalRiskParity`](@ref)
+  - [`time_dependent_field_defaults`](@ref)
+  - [`assert_time_dependent_substitution`](@ref)
+"""
+function schur_complement_hrp_td_defaults()::NamedTuple
+    return (; params = SchurComplementParams())
+end
+"""
 $(DocStringExtensions.TYPEDEF)
 
 Schur Complement Hierarchical Risk Parity (SCHRP) portfolio optimiser.
@@ -307,11 +323,11 @@ $(DocStringExtensions.FIELDS)
 
     SchurComplementHierarchicalRiskParity(;
         opt::HierarchicalOptimiser = HierarchicalOptimiser(),
-        params::ScP_VecScP = SchurComplementParams(),
-        fb::Option{<:OptE_Opt} = nothing
+        params::TD{<:ScP_VecScP} = SchurComplementParams(),
+        fb::TDO_Option{<:OptE_Opt} = nothing
     ) -> SchurComplementHierarchicalRiskParity
 
-Keywords correspond to the struct's fields.
+Keywords correspond to the struct's fields. Fields typed [`TD`](@ref) or [`TDO_Option`](@ref) may hold a [`TimeDependent`](@ref) per-fold schedule instead of a static value: the Schur parameters (risk measure and `gamma`) and the fallback are problem definition, so a cross-validation fold loop resolves them per fold, and a fold-less `optimise` runs with each at its static default (`nothing` for `fb`).
 
 ## Validation
 
@@ -455,19 +471,25 @@ The bisection weight ``\\alpha`` is then computed from the Schur-complement-corr
     """
     @fprop fb
     function SchurComplementHierarchicalRiskParity(opt::HierarchicalOptimiser,
-                                                   params::ScP_VecScP,
-                                                   fb::Option{<:OptE_Opt})
+                                                   params::TD{<:ScP_VecScP},
+                                                   fb::TDO_Option{<:OptE_Opt})
         if isa(params, AbstractVector)
             @argcheck(!isempty(params), IsEmptyError("params cannot be empty"))
         end
+        assert_time_dependent_substitution(SchurComplementHierarchicalRiskParity,
+                                           (; opt, params, fb),
+                                           schur_complement_hrp_td_defaults())
         return new{typeof(opt), typeof(params), typeof(fb)}(opt, params, fb)
     end
 end
 function SchurComplementHierarchicalRiskParity(;
                                                opt::HierarchicalOptimiser = HierarchicalOptimiser(),
-                                               params::ScP_VecScP = SchurComplementParams(),
-                                               fb::Option{<:OptE_Opt} = nothing)::SchurComplementHierarchicalRiskParity
+                                               params::TD{<:ScP_VecScP} = SchurComplementParams(),
+                                               fb::TDO_Option{<:OptE_Opt} = nothing)::SchurComplementHierarchicalRiskParity
     return SchurComplementHierarchicalRiskParity(opt, params, fb)
+end
+function time_dependent_field_defaults(::SchurComplementHierarchicalRiskParity)::NamedTuple
+    return schur_complement_hrp_td_defaults()
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -480,7 +502,10 @@ Return whether the [`SchurComplementHierarchicalRiskParity`](@ref) requires prev
   - [`SchurComplementHierarchicalRiskParity`](@ref)
 """
 function needs_previous_weights(opt::SchurComplementHierarchicalRiskParity)
-    return (needs_previous_weights(opt.opt) || needs_previous_weights(opt.fb))
+    return (any(f -> needs_previous_weights(getfield(opt, f)),
+                time_dependent_fields(opt)) ||
+            needs_previous_weights(opt.opt) ||
+            needs_previous_weights(opt.fb))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

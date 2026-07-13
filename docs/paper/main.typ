@@ -9,6 +9,9 @@
 #text-args-title.insert("fill", black)
 #text-args-authors.insert("size", 12pt)
 
+#set text(font: "New Computer Modern")
+#set enum(numbering: "1.")
+
 #show: template.with(
   title: link("https://github.com/dcelisgarza/PortfolioOptimisers.jl/")[PortfolioOptimisers.jl],
   authors: (
@@ -25,61 +28,91 @@
   abstract: [Portfolio optimisation is the science of either: _1)_ Minimising risk whilst keeping returns to acceptable levels. _2)_ Maximising returns whilst keeping risk to acceptable levels. To some definition of acceptable, and with any number of additional constraints available to the optimisation type. There exist myriad statistical, pre- and post-processing, optimisations, and constraints that allow one to explore an extensive landscape of "optimal" portfolios. PortfolioOptimisers.jl is an attempt at providing as many of these as possible under a single banner and making it accessible to all. We make extensive use of Julia's type system, module extensions, and multiple dispatch to simplify development and maintenance, while keeping robustness, testability, and usability high.],
   keywords: ("Portfolio Optimisation", "Quantitative Investment", "Conic Optimisation", "Parameter Estimation"),
 )
-#set enum(numbering: "1.")
+#show heading: set block(above: 1em, below: 1em)
+#show heading.where(level: 1): set block(spacing: 1.5em)
+#show heading.where(level: 2): set block(spacing: 1.25em)
+#set par(first-line-indent: 2em, spacing: 2em, leading: 1.2em)
 
 = Introduction
 The field of portfolio optimisation was introduced by Harry Markowitz's seminal 1952 paper "Modern portfolio theory" @markowitz1952. However, the field has grown significantly since then, with many new techniques and methods being developed. The original Markowitz model is highly sensitive to estimation errors in the input parameters, particularly the expected returns. After all, it attempts to summarise the entire distribution of returns in highly compressed summary statistics, both of which can be sensitive to outliers and atypical conditions for the lookback period. Many have studied and addressed the strengths and weaknesses of the Markowitz model @cajasbook @lopezdepradobook @dppalomarbook.
 
 Unfortunately, most implementations live in disparate, unconnected, often propriatary, bespoke codebases, which limit their applicability. It is only recently that various advanced yet very usable libraries have been published @dppalomargithub @riskfolio @skfolio. However, each has its own strengths, weaknesses, scope, and ideosyncrasies. That is no different from #link("https://github.com/dcelisgarza/PortfolioOptimisers.jl/")[PortfolioOptimisers.jl], but it is our hope that this library serves as a unifying framework for the various techniques and methods available in the field, while also eventually providing a simple and intuitive interface for users, with advanced features for experts.
 
-There also exist myriad optimisation methods, pre-filtering, distribution and moment estimators, machine learning techniques, validation, and parameter tuning methods that can all be used together to improve the out-of sample performance of a portfolio. To this day, only @skfolio has succeeded in providing a unified framework to do this. #link("https://github.com/dcelisgarza/PortfolioOptimisers.jl/")[PortfolioOptimisers.jl] provides an alternative that is not tied to the scikit-learn @scikit-learn or cvxpy @cvxpy1 @cvxpy2 APIs and ecosystems, as well as providing different functionality and a different architectural philosphy.
+There also exist myriad optimisation methods, pre-filtering, distribution and moment estimators, machine learning techniques, validation, and parameter tuning methods that can all be used together to improve the out-of sample performance of a portfolio. To this day, only @skfolio has succeeded in providing a unified framework for this. #link("https://github.com/dcelisgarza/PortfolioOptimisers.jl/")[PortfolioOptimisers.jl] provides an alternative that is not tied to the scikit-learn @scikit-learn or cvxpy @cvxpy1 @cvxpy2 APIs and ecosystems, as well as providing different functionality and a different architectural philosphy.
 
 = Design and implementation
 
 == Basic usage
 
-// #read-julia-output(json("main-jlyfish.json"))
-// #jl-pkg("PortfolioOptimisers", "CSV", "TimeSeries", "PrettyTables", "Clarabel", "StatsPlots", "GraphRecipes")
-// #set image(width: 10em)
-// #jl(recompute: false, ```
-// # Import packages.
-// using PortfolioOptimisers, CSV, TimeSeries, Clarabel, StatsPlots, GraphRecipes
-// # Load data.
-// X = TimeArray(CSV.File(joinpath(@__DIR__, "examples/SP500.csv.gz")); timestamp = :Date)
-// # Compute returns.
-// rd = prices_to_returns(X)
-// # Split into training and test sets.
-// # rd_train, rd_test = train_test_split(rd; test_size = 0.2)
-// rd_train = PortfolioOptimisers.port_opt_view(rd, 1:6650, :)
-// rd_test = PortfolioOptimisers.port_opt_view(rd, 6651:8312, :)
-// # Define solver. Use clarabel with no verbose output and default settings.
-// slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
-//              settings = Dict("verbose" => false))
-// # Define assets sets used to match constraints to the asset universe.
-// sets = AssetSets(; dict = Dict("nx" => rd.nx))
-// # Lower bounds of 0 and upper bounds of 20 % on AAPL, 1 for the rest.
-// wb = WeightBoundsEstimator(; lb = 0, ub = "AAPL" => 0.2)
-// # L2 norm constraint.
-// l2 = 0.0005
-// # Define the return with 100 points in the pareto front (efficient frontier in this case) of its lower bounds.
-// ret = ArithmeticReturn(; lb = Frontier(; N = 100))
-// # Define the optimiser with all the above settings.
-// opt = JuMPOptimiser(; slv = slv, wb = wb, sets = sets, l2 = l2, ret = ret)
-// # Define the variance with 100 points in the pareto front (efficient frontier in this case).
-// r = Variance()
-// # Mean Risk optimisation with all the above settings.
-// mr = MR(; r = r, opt = opt)
-// # Perform optimisation on the training set.
-// res = optimise(mr, rd_train)
-// # Predict on training data.
-// pred_train = predict(res, rd_train)
-// # Predict on test data.
-// pred_test = predict(res, rd_test)
-// # Scenario based standard deviation.
-// r = SCM(; alg = SOCRiskExpr())
-// plot_measures(pred_train.res.w, res.pr; x = r, label = "Training", zcolor = nothing)
+#link("https://github.com/dcelisgarza/PortfolioOptimisers.jl/")[PortfolioOptimisers.jl] is built with modularity and extensibility in mind. We can demonstrate a simple improvement over the Markowitz model by using by adding an L2 regularisation term to the optimisation problem.
 
-// ```)
+$
+  & min_bold(w) #h(1.5em) && bold(w)^top bold(Sigma) bold(w) + lambda ||bold(w)||_2^2 \
+  & upright(s.t.)         && bold(w)^top bold(mu) >= mu_i forall i in {1, ..., N} \
+  &                       && bold(w)^top bold(1) = 1 \
+  &                       && bold(w) >= 0 \
+  &                       && bold(w)_(i != "AAPL") <= 1 \
+  &                       && w_("AAPL") <= 0.2
+$
+
+// #read-julia-output(json("main-jlyfish.json"))
+// #jl-pkg(
+//   "Pkg",
+//   "Revise",
+//   "CSV",
+//   "TimeSeries",
+//   "PrettyTables",
+//   "Clarabel",
+//   "StatsPlots",
+//   "GraphRecipes",
+// )
+// #set image(width: 10em)
+// #jl(recompute: false,
+```julia
+# Import packages.
+using PortfolioOptimisers, CSV, TimeSeries, Clarabel, StatsPlots, GraphRecipes
+# Load data.
+X = TimeArray(CSV.File(joinpath(@__DIR__, "examples/SP500.csv.gz"));
+              timestamp = :Date)
+# Compute returns.
+rd = prices_to_returns(X)
+# Split into training and test sets.
+rd_train, rd_test = train_test_split(rd; test_size = 0.2)
+# Define solver. Use clarabel with no verbose output and default settings.
+slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
+             settings = Dict("verbose" => false))
+# Define assets sets used to match constraints to the asset universe.
+sets = AssetSets(; dict = Dict("nx" => rd.nx))
+# Lower bounds of 0 % for all assets, APPL has upper bounds of 20 %, the other assets default to 100 %.
+wb = WBE(; lb = 0, ub = "AAPL" => 0.2)
+# L2 norm penalty, lambda × ||w ⋅ w||^2, is added to the objective function. The sign depends on whether the optimisation is a minimisation or maximisation problem. It reduces the overfitting of a model to the training data and improves out-of-sample performance.
+l2 = L2Reg(; val = 0.0005, alg = SquaredSOCRiskExpr())
+# Define the return with 100 points in the pareto front. Risk measures can take an `lb` parameter which can also be used to define a pareto front. When using the returns, the optimisation must be a minimisation of risk for the efficient frontier to be fully computed. if using risk measures, the optimisations must be a maximisation of return.
+ret = ArithmeticReturn(; lb = Frontier(; N = 100))
+# Define the optimiser with all the above settings.
+opt = JuMPOpt(; slv = slv, wb = wb, sets = sets, l2 = l2, ret = ret)
+# Markowitz model.
+r = Variance()
+# Mean Risk optimisation with all the above settings.
+mr = MR(; r = r, opt = opt)
+# Perform optimisation on the training set.
+res = optimise(mr, rd_train)
+# Predict on training data.
+pred_train = predict(res, rd_train)
+# Predict on test data.
+pred_test = predict(res, rd_test)
+# Scenario based standard deviation.
+r = SCM(; alg = SOCRiskExpr())
+plt = plot_measures(pred_train; x = r, label = "Training", zcolor = nothing)
+plt = plot_measures(pred_test; x = r, plt = plt, label = "Test", zcolor = nothing,
+                    markercolor = :red, ylabel = "Daily Mean Return",
+                    xlabel = "Daily Standard Deviation")
+```<code1>
+// )
+#figure(
+  image("fig1.svg", width: 65%),
+  caption: [Train and test efficient frontier for an L2 regularised Markowitz model with a scenario-based standard deviation risk measure.],
+)<fig1>
 
 == Design philosophy
 

@@ -105,15 +105,6 @@ function set_l1_regularisation!(model::JuMP.Model, l1_val::Number)
     add_to_objective_penalty!(model, l1)
     return nothing
 end
-function set_l2_regularisation!(model::JuMP.Model, l2_val::Number)
-    w = get_w(model)
-    sc = get_constraint_scale(model)
-    JuMP.@variable(model, t_l2)
-    JuMP.@constraint(model, cl2_soc, [sc * t_l2; sc * w] in JuMP.SecondOrderCone())
-    JuMP.@expression(model, l2, l2_val * t_l2)
-    add_to_objective_penalty!(model, l2)
-    return nothing
-end
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -124,6 +115,87 @@ Abstract supertype for all portfolio weight regularisation estimators.
   - [`LpRegularisation`](@ref)
 """
 abstract type AbstractRegularisationEstimator <: AbstractEstimator end
+@concrete struct L2Regularisation <: AbstractRegularisationEstimator
+    """
+    $(field_dict[:val])
+    """
+    val
+    """
+    $(field_dict[:alg])
+    """
+    alg
+    function L2Regularisation(val::Number, alg::SecondMomentFormulation)
+        assert_nonempty_gt0_finite_val(val, :val)
+        return new{typeof(val), typeof(alg)}(val, alg)
+    end
+end
+function L2Regularisation(; val::Number = 1e-4,
+                          alg::SecondMomentFormulation = SOCRiskExpr())
+    return L2Regularisation(val, alg)
+end
+const VecL2Reg = AbstractVector{<:L2Regularisation}
+"""
+    const L2Reg_VecL2Reg = Union{<:L2Regularisation, <:VecL2Reg}
+
+Alias for a single or vector of L2 regularisation terms.
+
+Matches either a single [`L2Regularisation`](@ref) or a vector of them ([`VecL2Reg`](@ref)).
+
+# Related
+
+  - [`L2Regularisation`](@ref)
+  - [`VecL2Reg`](@ref)
+  - [`set_l2_regularisation!`](@ref)
+"""
+const L2Reg_VecL2Reg = Union{<:L2Regularisation, <:VecL2Reg}
+function _set_l2_regularisation!(model::JuMP.Model, i::Integer, w::VecNum,
+                                 l2::L2Regularisation{<:Any, <:SOCRiskExpr}, sc::Number)
+    val = l2.val
+    t_l2 = model[Symbol(:t_l2_, i)] = JuMP.@variable(model)
+    model[Symbol(:cl2_soc_, i)] = JuMP.@constraint(model,
+                                                   [sc * t_l2; sc * w] in
+                                                   JuMP.SecondOrderCone())
+    l2 = model[Symbol(:l2_, i)] = JuMP.@expression(model, val * t_l2)
+    add_to_objective_penalty!(model, l2)
+    return nothing
+end
+function _set_l2_regularisation!(model::JuMP.Model, i::Integer, w::VecNum,
+                                 l2::L2Regularisation{<:Any, <:SquaredSOCRiskExpr},
+                                 sc::Number)
+    val = l2.val
+    t_l2 = model[Symbol(:t_l2_, i)] = JuMP.@variable(model)
+    model[Symbol(:cl2_soc_, i)] = JuMP.@constraint(model,
+                                                   [sc * t_l2; sc * w] in
+                                                   JuMP.SecondOrderCone())
+    l2 = model[Symbol(:l2_, i)] = JuMP.@expression(model, val * t_l2^2)
+    add_to_objective_penalty!(model, l2)
+    return nothing
+end
+function _set_l2_regularisation!(model::JuMP.Model, i::Integer, w::VecNum,
+                                 l2::L2Regularisation{<:Any, <:QuadRiskExpr}, args...)
+    val = l2.val
+    l2 = model[Symbol(:l2_, i)] = JuMP.@expression(model, val * LinearAlgebra.dot(w, w))
+    add_to_objective_penalty!(model, l2)
+    return nothing
+end
+function _set_l2_regularisation!(model::JuMP.Model, i::Integer, w::VecNum,
+                                 l2::L2Regularisation{<:Any, <:RSOCRiskExpr}, sc::Number)
+    val = l2.val
+    t_l2 = model[Symbol(:t_l2_, i)] = JuMP.@variable(model)
+    model[Symbol(:cl2_rsoc_, i)] = JuMP.@constraint(model,
+                                                    [sc * t_l2; 0.5; sc * w] in
+                                                    JuMP.RotatedSecondOrderCone())
+    l2 = model[Symbol(:l2_, i)] = JuMP.@expression(model, val * t_l2)
+    add_to_objective_penalty!(model, l2)
+    return nothing
+end
+function set_l2_regularisation!(model::JuMP.Model, l2s::L2Reg_VecL2Reg)
+    w = get_w(model)
+    sc = get_constraint_scale(model)
+    for (i, l2) in enumerate(l2s)
+        _set_l2_regularisation!(model, i, w, l2, sc)
+    end
+end
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -256,4 +328,4 @@ function set_linf_regularisation!(model::JuMP.Model, linf::Number)
     return nothing
 end
 
-export LpRegularisation
+export L2Regularisation, LpRegularisation

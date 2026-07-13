@@ -80,6 +80,22 @@ function RegularisedPenalisedRelaxedRiskBudgeting(;
     return RegularisedPenalisedRelaxedRiskBudgeting(p)
 end
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the static defaults of the [`RelaxedRiskBudgeting`](@ref) fields that may hold a [`TimeDependent`](@ref).
+
+Shared by the constructor's test-substitution pass and [`time_dependent_field_defaults`](@ref), so the fold-less value of a field is declared once. Fields whose static default is `nothing` are omitted.
+
+# Related
+
+  - [`RelaxedRiskBudgeting`](@ref)
+  - [`time_dependent_field_defaults`](@ref)
+  - [`assert_time_dependent_substitution`](@ref)
+"""
+function relaxed_risk_budgeting_td_defaults()::NamedTuple
+    return (; rba = AssetRiskBudgeting())
+end
+"""
 $(DocStringExtensions.TYPEDEF)
 
 Relaxed Risk Budgeting (RRB) portfolio optimiser.
@@ -94,13 +110,13 @@ $(DocStringExtensions.FIELDS)
 
     RelaxedRiskBudgeting(;
         opt::JuMPOptimiser,
-        rba::RiskBudgetingAlgorithm = AssetRiskBudgeting(),
-        wi::Option{<:VecNum} = nothing,
+        rba::TD{<:RiskBudgetingAlgorithm} = AssetRiskBudgeting(),
+        wi::TD_Option{<:VecNum} = nothing,
         alg::RelaxedRiskBudgetingAlgorithm = BasicRelaxedRiskBudgeting(),
-        fb::Option{<:OptE_Opt} = nothing
+        fb::TDO_Option{<:OptE_Opt} = nothing
     ) -> RelaxedRiskBudgeting
 
-Keywords correspond to the struct's fields.
+Keywords correspond to the struct's fields. Fields typed [`TD`](@ref), [`TD_Option`](@ref) or [`TDO_Option`](@ref) may hold a [`TimeDependent`](@ref) per-fold schedule instead of a static value: the budgeting algorithm (and with it the risk budget), warm start and fallback are problem definition, so a cross-validation fold loop resolves them per fold, and a fold-less `optimise` runs with each at its static default (`nothing` for `wi` and `fb`). The relaxation variant `alg` is formulation control and stays static.
 
 ## Validation
 
@@ -168,23 +184,29 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
     $(field_dict[:fb])
     """
     @fprop fb
-    function RelaxedRiskBudgeting(opt::JuMPOptimiser, rba::RiskBudgetingAlgorithm,
-                                  wi::Option{<:VecNum}, alg::RelaxedRiskBudgetingAlgorithm,
-                                  fb::Option{<:OptE_Opt})
+    function RelaxedRiskBudgeting(opt::JuMPOptimiser, rba::TD{<:RiskBudgetingAlgorithm},
+                                  wi::TD_Option{<:VecNum},
+                                  alg::RelaxedRiskBudgetingAlgorithm,
+                                  fb::TDO_Option{<:OptE_Opt})
         if isa(wi, VecNum)
             @argcheck(!isempty(wi), IsEmptyError("wi cannot be empty"))
         end
+        assert_time_dependent_substitution(RelaxedRiskBudgeting, (; opt, rba, wi, alg, fb),
+                                           relaxed_risk_budgeting_td_defaults())
         return new{typeof(opt), typeof(rba), typeof(wi), typeof(alg), typeof(fb)}(opt, rba,
                                                                                   wi, alg,
                                                                                   fb)
     end
 end
 function RelaxedRiskBudgeting(; opt::JuMPOptimiser,
-                              rba::RiskBudgetingAlgorithm = AssetRiskBudgeting(),
-                              wi::Option{<:VecNum} = nothing,
+                              rba::TD{<:RiskBudgetingAlgorithm} = AssetRiskBudgeting(),
+                              wi::TD_Option{<:VecNum} = nothing,
                               alg::RelaxedRiskBudgetingAlgorithm = BasicRelaxedRiskBudgeting(),
-                              fb::Option{<:OptE_Opt} = nothing)::RelaxedRiskBudgeting
+                              fb::TDO_Option{<:OptE_Opt} = nothing)::RelaxedRiskBudgeting
     return RelaxedRiskBudgeting(opt, rba, wi, alg, fb)
+end
+function time_dependent_field_defaults(::RelaxedRiskBudgeting)::NamedTuple
+    return relaxed_risk_budgeting_td_defaults()
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -192,7 +214,10 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 Return `true` if the JuMP optimiser or fallback requires previous portfolio weights.
 """
 function needs_previous_weights(opt::RelaxedRiskBudgeting)
-    return (needs_previous_weights(opt.opt) || needs_previous_weights(opt.fb))
+    return (any(f -> needs_previous_weights(getfield(opt, f)),
+                time_dependent_fields(opt)) ||
+            needs_previous_weights(opt.opt) ||
+            needs_previous_weights(opt.fb))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

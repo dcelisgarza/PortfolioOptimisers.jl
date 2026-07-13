@@ -39,6 +39,22 @@ function MeanRiskResult(; jr::JuMPOptimisationResult,
     return MeanRiskResult(jr, fb)
 end
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the static defaults of the [`MeanRisk`](@ref) fields that may hold a [`TimeDependent`](@ref).
+
+Shared by the constructor's test-substitution pass and [`time_dependent_field_defaults`](@ref), so the fold-less value of a field is declared once. Fields whose static default is `nothing` are omitted.
+
+# Related
+
+  - [`MeanRisk`](@ref)
+  - [`time_dependent_field_defaults`](@ref)
+  - [`assert_time_dependent_substitution`](@ref)
+"""
+function mean_risk_td_defaults()::NamedTuple
+    return (; r = Variance(), obj = MinimumRisk())
+end
+"""
 $(DocStringExtensions.TYPEDEF)
 
 Mean-Risk portfolio optimiser.
@@ -53,13 +69,13 @@ $(DocStringExtensions.FIELDS)
 
     MeanRisk(;
         opt::JuMPOptimiser,
-        r::RM_VecRM = Variance(),
-        obj::ObjectiveFunction = MinimumRisk(),
-        wi::Option{<:VecNum} = nothing,
-        fb::Option{<:OptE_Opt} = nothing
+        r::TD{<:RM_VecRM} = Variance(),
+        obj::TD{<:ObjectiveFunction} = MinimumRisk(),
+        wi::TD_Option{<:VecNum} = nothing,
+        fb::TDO_Option{<:OptE_Opt} = nothing
     ) -> MeanRisk
 
-Keywords correspond to the struct's fields.
+Keywords correspond to the struct's fields. Fields typed [`TD`](@ref), [`TD_Option`](@ref) or [`TDO_Option`](@ref) may hold a [`TimeDependent`](@ref) per-fold schedule instead of a static value: the risk measure, objective, warm start and fallback are problem definition, so a cross-validation fold loop resolves them per fold, and a fold-less `optimise` runs with each at its static default (`nothing` for `wi` and `fb`, so a scheduled fallback is disabled outside fold loops unless the schedule carries a `default`).
 
 ## Validation
 
@@ -228,22 +244,28 @@ Where:
     $(field_dict[:fb])
     """
     @fprop fb
-    function MeanRisk(opt::JuMPOptimiser, r::RM_VecRM, obj::ObjectiveFunction,
-                      wi::Option{<:VecNum}, fb::Option{<:OptE_Opt})
+    function MeanRisk(opt::JuMPOptimiser, r::TD{<:RM_VecRM}, obj::TD{<:ObjectiveFunction},
+                      wi::TD_Option{<:VecNum}, fb::TDO_Option{<:OptE_Opt})
         if isa(r, AbstractVector)
             @argcheck(!isempty(r), IsEmptyError("r cannot be empty"))
         end
-        if !isnothing(wi)
+        if isa(wi, VecNum)
             @argcheck(!isempty(wi), IsEmptyError("wi cannot be empty"))
         end
+        assert_time_dependent_substitution(MeanRisk, (; opt, r, obj, wi, fb),
+                                           mean_risk_td_defaults())
         return new{typeof(opt), typeof(r), typeof(obj), typeof(wi), typeof(fb)}(opt, r, obj,
                                                                                 wi, fb)
     end
 end
-function MeanRisk(; opt::JuMPOptimiser, r::RM_VecRM = Variance(),
-                  obj::ObjectiveFunction = MinimumRisk(), wi::Option{<:VecNum} = nothing,
-                  fb::Option{<:OptE_Opt} = nothing)::MeanRisk
+function MeanRisk(; opt::JuMPOptimiser, r::TD{<:RM_VecRM} = Variance(),
+                  obj::TD{<:ObjectiveFunction} = MinimumRisk(),
+                  wi::TD_Option{<:VecNum} = nothing,
+                  fb::TDO_Option{<:OptE_Opt} = nothing)::MeanRisk
     return MeanRisk(opt, r, obj, wi, fb)
+end
+function time_dependent_field_defaults(::MeanRisk)::NamedTuple
+    return mean_risk_td_defaults()
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -251,7 +273,9 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 Return `true` if any sub-estimator of `opt` requires previous portfolio weights (JuMP optimiser, risk measure, or fallback).
 """
 function needs_previous_weights(opt::MeanRisk)
-    return (needs_previous_weights(opt.opt) ||
+    return (any(f -> needs_previous_weights(getfield(opt, f)),
+                time_dependent_fields(opt)) ||
+            needs_previous_weights(opt.opt) ||
             needs_previous_weights(opt.r) ||
             needs_previous_weights(opt.fb))
 end

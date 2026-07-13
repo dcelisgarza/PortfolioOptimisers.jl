@@ -976,6 +976,8 @@ const LCE = LinearConstraintEstimator
 Alias for [`WeightBoundsEstimator`](@ref).
 """
 const WBE = WeightBoundsEstimator
+const L2Reg = L2Regularisation
+const LpReg = LpRegularisation
 
 # ── Optimisers ──────────────────────────────────────
 """
@@ -1027,4 +1029,4 @@ export HRP, HERC, SCHRP, NCO, STO, SSR, MR, RB, RRB, FRC, NOC, DAO, GAO, FAI, SD
        SB0, SB1, SB2, SBG0, SBG1, SBG2, SBC0, SBC1, SBC2, DCov, LTDCov, KCov, SCov, MICov,
        DnCov, DtCov, PrCov, POCov, ShER, GM, VW, MSE, JS, BS, BOP, EqER, ExER, CoSk, CoKt,
        LinMod, GLinMod, R2, AdjR2, ZeroVarianceFilter, TTS, LCE, WBE, RkSet, HRkSet,
-       JuMPOpt, HOpt, MinRk, MaxRt, MaxUt, MaxSR
+       JuMPOpt, HOpt, MinRk, MaxRt, MaxUt, MaxSR, L2Reg, LpReg

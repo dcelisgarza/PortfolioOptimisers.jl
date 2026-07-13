@@ -7,7 +7,8 @@ include(joinpath(@__DIR__, "test18_setup.jl"))
     w = res.w
     @test count(w .> 1e-10) <= 3
 
-    opt = JuMPOptimiser(; l2 = 0.1, pe = pr, slv = mip_slv, card = 3)
+    opt = JuMPOptimiser(; l2 = L2Regularisation(; val = 0.1), pe = pr, slv = mip_slv,
+                        card = 3)
     mre = MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt)
     res = optimise(mre)
     w = res.w
@@ -318,7 +319,8 @@ end
 @testset "Phylogeny" begin
     plc = IntegerPhylogenyEstimator(; pl = NetworkEstimator(), B = 1)
     opt = JuMPOptimiser(; pe = pr, slv = mip_slv, sbgt = 1, bgt = 1, ple = plc,
-                        wb = WeightBounds(; lb = -1, ub = 1), l2 = 0.001)
+                        wb = WeightBounds(; lb = -1, ub = 1),
+                        l2 = L2Regularisation(; val = 0.001))
     res = optimise(MeanRisk(; obj = MaximumRatio(; rf = rf), opt = opt))
     @test all(JuMP.value.(res.plr.A * res.model[:ib]) .<= res.plr.B)
     idx = [BitVector(res.plr.A[:, i]) for i in axes(res.plr.A, 2)]
@@ -343,7 +345,8 @@ end
 
     plc = IntegerPhylogenyEstimator(; pl = NetworkEstimator(), B = fill(2, size(pr.X, 2)))
     opt = JuMPOptimiser(; pe = pr, slv = mip_slv, sbgt = 1, bgt = 1, ple = plc,
-                        wb = WeightBounds(; lb = -1, ub = 1), l2 = 0.0001)
+                        wb = WeightBounds(; lb = -1, ub = 1),
+                        l2 = L2Regularisation(; val = 0.0001))
     res = optimise(MeanRisk(; obj = MinimumRisk(), opt = opt))
     @test all(JuMP.value.(res.plr.A * res.model[:ib]) .<= res.plr.B)
     idx = [BitVector(res.plr.A[:, i]) for i in axes(res.plr.A, 2)]
@@ -361,7 +364,8 @@ end
 
     plc = IntegerPhylogenyEstimator(; pl = ClustersEstimator(), B = [2, 1])
     opt = JuMPOptimiser(; pe = pr, slv = mip_slv, sbgt = 1, bgt = 1, ple = plc,
-                        wb = WeightBounds(; lb = -1, ub = 1), l2 = 0.0001)
+                        wb = WeightBounds(; lb = -1, ub = 1),
+                        l2 = L2Regularisation(; val = 0.0001))
     res = optimise(MeanRisk(; obj = MinimumRisk(), opt = opt))
     @test all(JuMP.value.(res.plr.A * res.model[:ib]) .<= res.plr.B)
     idx = [BitVector(res.plr.A[i, :]) for i in axes(res.plr.A, 1)]

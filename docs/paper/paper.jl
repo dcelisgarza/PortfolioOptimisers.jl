@@ -22,12 +22,12 @@ sets = AssetSets(; dict = Dict("nx" => rd.nx))
 # Lower bounds of 0 and upper bounds of 20 % on AAPL, 1 for the rest.
 wb = WBE(; lb = 0, ub = "AAPL" => 0.2)
 # L2 norm constraint.
-l2 = 0.0005
+l2 = L2Reg(; val = 0.0001, alg = SquaredSOCRiskExpr())
 # Define the return with 100 points in the pareto front (efficient frontier in this case) of its lower bounds.
 ret = ArithmeticReturn(; lb = Frontier(; N = 100))
 # Define the optimiser with all the above settings.
 opt = JuMPOpt(; slv = slv, wb = wb, sets = sets, l2 = l2, ret = ret)
-# Define the variance with 100 points in the pareto front (efficient frontier in this case).
+# Markowitz model.
 r = Variance()
 # Mean Risk optimisation with all the above settings.
 mr = MR(; r = r, opt = opt)
@@ -43,3 +43,4 @@ plt = plot_measures(pred_train; x = r, label = "Training", zcolor = nothing)
 plt = plot_measures(pred_test; x = r, plt = plt, label = "Test", zcolor = nothing,
                     markercolor = :red, ylabel = "Mean Return",
                     xlabel = "Standard Deviation")
+savefig(plt, joinpath(@__DIR__, "fig1.svg"))
