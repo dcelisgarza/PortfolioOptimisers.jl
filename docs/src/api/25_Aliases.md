@@ -229,5 +229,5 @@ WBE
 MinRk
 MaxRt
 MaxUt
-MaxS
+MaxSR
 ```

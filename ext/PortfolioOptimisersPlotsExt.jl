@@ -614,10 +614,10 @@ function PortfolioOptimisers.plot_measures(res_vec::AbstractVector{<:Optimisatio
     fees = extract_fees.(res_vec, fees)
     w = getproperty.(res_vec, :w)
     if factory
-        x = PortfolioOptimisers.factory(x, pr, slv)
-        y = PortfolioOptimisers.factory(y, pr, slv)
-        z = isnothing(z) ? nothing : PortfolioOptimisers.factory(z, pr, slv)
-        c = PortfolioOptimisers.factory(c, pr, slv)
+        x = PortfolioOptimisers.factory.(x, pr, slv)
+        y = PortfolioOptimisers.factory.(y, pr, slv)
+        z = isnothing(z) ? nothing : PortfolioOptimisers.factory.(z, pr, slv)
+        c = PortfolioOptimisers.factory.(c, pr, slv)
     end
     xr = expected_risk.(x, w, pr, fees)
     yr = expected_risk.(y, w, pr, fees)

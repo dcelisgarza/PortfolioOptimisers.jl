@@ -1,5 +1,5 @@
 #=
-# Introduction
+# Introduction to the user guide
 
 Welcome to the `PortfolioOptimisers.jl` **user guide** — a fast, skimmable tour of the package.
 Each page gives you the *one minimal blessed call* for a task so you can get a portfolio out
