@@ -44,5 +44,4 @@ parallel_folds
 run_folds
 cv_nobs
 cv_timestamps
-Prices_RR
 ```

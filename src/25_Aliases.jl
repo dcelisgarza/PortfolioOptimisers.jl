@@ -142,7 +142,7 @@ end
           ve::AbstractVarianceEstimator = SimpleVariance(; me = nothing),
           alg::SecondMomentFormulation = SquaredSOCRiskExpr()) -> LowOrderMoment
 
-Alias for the Second Central Moment (SCM) risk measure [`LowOrderMoment`](@ref) + [`SecondMoment`](@ref) + [`FullMoment`](@ref).
+Alias for the Second Central Moment (SCM) risk measure [`LowOrderMoment`](@ref) + [`SecondMoment`](@ref) + [`FullMoment`](@ref). This can represent the scenario based variance or standard deviation.
 """
 function SCM(; settings::RiskMeasureSettings = RiskMeasureSettings(),
              w::Option{<:ObsWeights} = nothing,
@@ -660,6 +660,10 @@ Alias for [`NonOptimisationRiskRatio`](@ref).
 """
 const NonOptRkRatio = NonOptimisationRiskRatio
 
+# ── Risk measures — Settings ──────────────────────────────────────
+const RkSet = RiskMeasureSettings
+const HRkSet = HierarchicalRiskMeasureSettings
+
 # ── Moments ──────────────────────────────────────
 
 """
@@ -928,7 +932,6 @@ Alias for [`AdjustedRSquared`](@ref).
 const AdjR2 = AdjustedRSquared
 
 # ── Filters ──────────────────────────────────────
-
 """
     ZeroVarianceFilter(; tol::Number = 1e-12) -> ScoreSelector
 
@@ -953,6 +956,66 @@ function ZeroVarianceFilter(; tol::Number = 1e-12)::ScoreSelector
               DomainError(tol, "the tolerance of a ZeroVarianceFilter must be >= 0"))
     return ScoreSelector(; score = SCM(), rule = ThresholdRule(; lo = tol))
 end
+"""
+    TTS
+
+Alias for [`TrainTestSplit`](@ref).
+"""
+const TTS = TrainTestSplit
+
+# ── Constraints ──────────────────────────────────────
+"""
+    LCE
+
+Alias for [`LinearConstraintEstimator`](@ref).
+"""
+const LCE = LinearConstraintEstimator
+"""
+    WBE
+
+Alias for [`WeightBoundsEstimator`](@ref).
+"""
+const WBE = WeightBoundsEstimator
+
+# ── Optimisers ──────────────────────────────────────
+"""
+    JuMPOpt
+
+Alias for [`JuMPOptimiser`](@ref).
+"""
+const JuMPOpt = JuMPOptimiser
+"""
+    HOpt
+
+Alias for [`HierarchicalOptimiser`](@ref).
+"""
+const HOpt = HierarchicalOptimiser
+
+# ── Objectives ──────────────────────────────────────
+"""
+    MinRk
+
+Alias for [`MinimumRisk`](@ref).
+"""
+const MinRk = MinimumRisk
+"""
+    MaxRt
+
+Alias for [`MaximumReturn`](@ref).
+"""
+const MaxRt = MaximumReturn
+"""
+    MaxUt
+
+Alias for [`MaximumUtility`](@ref).
+"""
+const MaxUt = MaximumUtility
+"""
+    MaxSR
+
+Alias for [`MaximumRatio`](@ref).
+"""
+const MaxSR = MaximumRatio
 
 export HRP, HERC, SCHRP, NCO, STO, SSR, MR, RB, RRB, FRC, NOC, DAO, GAO, FAI, SD,
        UcVariance, WR, VaR, CVaR, DRCVaR, EVaR, RVaR, PNVaR, RG, VaR_RG, CVaR_RG, DRCVaR_RG,
@@ -963,4 +1026,5 @@ export HRP, HERC, SCHRP, NCO, STO, SSR, MR, RB, RRB, FRC, NOC, DAO, GAO, FAI, SD
        OWA_LMoment, SmER, GCov, FMoment, SMoment, Cov, SVar, G0, G1, G2, GerberCov, SBCov,
        SB0, SB1, SB2, SBG0, SBG1, SBG2, SBC0, SBC1, SBC2, DCov, LTDCov, KCov, SCov, MICov,
        DnCov, DtCov, PrCov, POCov, ShER, GM, VW, MSE, JS, BS, BOP, EqER, ExER, CoSk, CoKt,
-       LinMod, GLinMod, R2, AdjR2, ZeroVarianceFilter
+       LinMod, GLinMod, R2, AdjR2, ZeroVarianceFilter, TTS, LCE, WBE, RkSet, HRkSet,
+       JuMPOpt, HOpt, MinRk, MaxRt, MaxUt, MaxSR

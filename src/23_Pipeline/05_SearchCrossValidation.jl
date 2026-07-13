@@ -145,6 +145,7 @@ The whole workflow is fitted per fold: stateful preprocessing (universe, imputat
 """
 function fit_and_score(pipe::Pipeline, scv::AbstractSearchCrossValidationEstimator,
                        data::Prices_RR, train_idx::VecInt, test_idx::VecInt)
+    assert_no_holdout(pipe)
     res = StatsAPI.fit(pipe, pipeline_data_view(data, train_idx))
     test_pred = StatsAPI.predict(res, data, test_idx)
     r = scv.r
@@ -184,6 +185,7 @@ The input is split into contiguous observation windows by `gscv.cv` (price-level
 """
 function search_cross_validation(pipe::Pipeline, gscv::GridSearchCrossValidation,
                                  data::Prices_RR)
+    assert_no_holdout(pipe)
     lens_grid, val_grid = pipeline_lens_val_grid(pipe, gscv.p)
     cv = split(gscv.cv, data)
     @argcheck(isa(cv.test_idx[1], VecInt),

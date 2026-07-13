@@ -120,6 +120,13 @@ VSK
 NonOptRkRatio
 ```
 
+### Settings
+
+```@docs
+RkSet
+HRkSet
+```
+
 ## Optimisers
 
 ### Non-finite optimisers
@@ -136,6 +143,8 @@ NOC
 NCO
 STO
 SSR
+JuMPOpt
+HOpt
 ```
 
 ### Finite optimisers
@@ -199,4 +208,26 @@ AdjR2
 
 ```@docs
 ZeroVarianceFilter
+```
+
+## Preprocessing
+
+```@docs
+TTS
+```
+
+## Constraints
+
+```@docs
+LCE
+WBE
+```
+
+## Objectives
+
+```@docs
+MinRk
+MaxRt
+MaxUt
+MaxS
 ```

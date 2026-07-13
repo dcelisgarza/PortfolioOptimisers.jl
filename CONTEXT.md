@@ -38,6 +38,14 @@ The accumulating blackboard threaded through a Pipeline's steps: a set of coarse
 **Preprocessing Estimator**
 The family of Estimators that transform price or returns data inside a Pipeline (prices-to-returns conversion, missing-data filtering, imputation, asset selection). Fitting one on training data produces a Result carrying any fitted state — imputation parameters, thresholds, and crucially the selected asset universe — which is then *applied* to unseen data so train and test are transformed consistently. Stateless steps carry no state and applying them is just running them.
 
+**Holdout Split**
+The evaluation protocol that reserves the tail of the time-ordered observations as a test window and trains on the head. It exists in two forms: a free function (`train_test_split`) that cuts price- or returns-level data into a train/test pair, and a step form (`TrainTestSplit`) that must be the *first* step of a Pipeline, so every fitted step downstream sees the training window alone. The held-out window is fitted state — the split's Result carries both windows — and replaying a fitted split on unseen data is a pass-through, so predicting on future windows still works. One evaluation protocol per call: a Pipeline containing a holdout step cannot also be handed to Cross-Validation.
+Sizes are given as row counts (integers) or fractions of the observations (floats in (0, 1)); giving one side makes the other its complement.
+*Avoid*: Validation Split (nothing is tuned on the held-out window).
+
+**Embargo**
+The deliberate gap between the training and test windows of a Holdout Split when both sizes are given and sum to less than the number of observations: train comes from the head, test from the tail, and the middle rows belong to *neither* window. Overlapping windows are rejected outright.
+
 **Asset Selector**
 The Preprocessing Estimator subfamily that restricts the *asset universe* from returns data — dropping constant columns, keeping the best or worst assets by a risk measure, pruning redundant ones. A selector answers one question on the training window, *which asset columns survive?*, and that answer is its fitted state: applying it to an unseen window replays the fitted universe rather than re-deciding it. Selectors restrict columns only; dropping observations is a price-level concern (`MissingDataFilter`), because a fitted transformation cannot choose which rows of an unseen window to drop without breaking the weights/returns alignment. Every selector implements one method, `select_assets`, and shares a single `AssetSelectorResult`.
 *Avoid*: Filter, Screen (used only by `MissingDataFilter`, which drops and never selects, and by the `ZeroVarianceFilter` alias, which is a pure drop).

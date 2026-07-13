@@ -132,14 +132,6 @@ Union of all sequential cross-validation estimators and results.
 const SeqCVER = Union{<:SequentialCrossValidationEstimator,
                       <:SequentialCrossValidationResult}
 """
-    Prices_RR
-
-Union of the two data levels cross-validation folds can be computed on: returns-level ([`AbstractReturnsResult`](@ref)) and price-level ([`AbstractPricesResult`](@ref)) data.
-
-Fold generation only needs an observation count ([`cv_nobs`](@ref)) and a timestamp vector ([`cv_timestamps`](@ref)), so [`Base.split`](@ref) and [`n_splits`](@ref) accept either level. Price-level splitting is what lets a `Pipeline` be cross-validated on its *input* rows, keeping stateful preprocessing inside the fold.
-"""
-const Prices_RR = Union{<:AbstractReturnsResult, <:AbstractPricesResult}
-"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return the number of observations (rows) cross-validation folds index into.

@@ -1,4 +1,33 @@
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Validate that a [`TrainTestSplit`](@ref) appears only as the first step of a [`Pipeline`](@ref), and never inside a nested one.
+
+The holdout exists to keep the test window away from every fitted step. A stateful step fitted *before* the split — a [`MissingDataFilter`](@ref) choosing the universe, an [`Imputer`](@ref) computing fill values — would have read the held-out rows, so its fitted state leaks test data into the training workflow. Position one is the only place that cannot happen, and a nested pipeline is never step one of itself.
+
+## Validation
+
+  - At most one `TrainTestSplit`, and only at index 1.
+  - No `TrainTestSplit` inside a nested `Pipeline` or a [`PipelineStep`](@ref).
+
+# Related
+
+  - [`Pipeline`](@ref)
+  - [`TrainTestSplit`](@ref)
+  - [`has_split`](@ref)
+"""
+function assert_split_position(ests)::Nothing
+    for (i, e) in enumerate(ests)
+        if isa(e, TrainTestSplit)
+            @argcheck(i == 1,
+                      ArgumentError("a TrainTestSplit step must be the first step of a Pipeline, but one appears at step $i; a stateful step fitted before the split would have seen the held-out test rows, leaking them into the fitted workflow"))
+        elseif has_split(e)
+            throw(ArgumentError("a TrainTestSplit step is nested inside a $(Base.typename(typeof(e)).wrapper) step of a Pipeline; the holdout must be the first step of the outermost Pipeline, where no step has yet touched the data"))
+        end
+    end
+    return nothing
+end
+"""
 $(DocStringExtensions.TYPEDEF)
 
 A reified end-to-end portfolio workflow: an ordered list of steps executed left-to-right over a [`PipelineContext`](@ref).
@@ -73,6 +102,7 @@ function Pipeline(; steps::Union{<:Tuple, <:AbstractVector})::Pipeline
             ests[i] = s
         end
     end
+    assert_split_position(ests)
     slots = Symbol[pipe_writes(e) for e in ests]
     avail = Set{Symbol}((:prices, :returns))
     written = Dict{Symbol, Any}()
@@ -109,6 +139,41 @@ function Pipeline(; steps::Union{<:Tuple, <:AbstractVector})::Pipeline
 end
 pipe_writes(p::Pipeline) = pipe_writes(p.steps[end])
 pipe_reads(p::Pipeline) = pipe_reads(p.steps[1])
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return whether a step is, or contains, a [`TrainTestSplit`](@ref).
+
+A nested [`Pipeline`](@ref) is searched recursively: a split hidden inside one would be fitted on data an outer step had already touched, which is exactly what pinning it to the first position prevents. The same recursion answers whether a whole pipeline carries a holdout, which is what the cross-validation entry points check before running.
+
+# Related
+
+  - [`assert_split_position`](@ref)
+  - [`assert_no_holdout`](@ref)
+  - [`TrainTestSplit`](@ref)
+"""
+has_split(::Any) = false
+has_split(::TrainTestSplit) = true
+has_split(p::Pipeline) = any(has_split, p.steps)
+has_split(ps::PipelineStep) = has_split(ps.est)
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Reject a [`Pipeline`](@ref) carrying a [`TrainTestSplit`](@ref) from the cross-validation machinery.
+
+A holdout split and a cross-validator are two evaluation protocols, and cross-validation already defines the train/test windows of every fold. A split left in the pipeline would shave a second, redundant holdout off each fold's training window and stash a test window nobody reads — a silent loss of training data. One protocol per call: this throws instead.
+
+# Related
+
+  - [`TrainTestSplit`](@ref)
+  - [`search_cross_validation`](@ref)
+  - [`has_split`](@ref)
+"""
+function assert_no_holdout(pipe::Pipeline)::Nothing
+    @argcheck(!has_split(pipe),
+              ArgumentError("this Pipeline contains a TrainTestSplit step, so it cannot also be cross-validated: cross-validation already defines the train and test window of every fold, and the split would shave a second holdout off each fold's training data. Remove the TrainTestSplit step, or evaluate the pipeline with fit_predict instead of cross-validating it."))
+    return nothing
+end
 """
     port_opt_view(pipe::Pipeline, i, args...; kwargs...)
 
@@ -595,10 +660,26 @@ function StatsAPI.predict(res::PipelineResult, data::AbstractReturnsResult,
     return StatsAPI.predict(opt, rd)
 end
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the held-out window stashed by a pipeline's [`TrainTestSplit`](@ref) step, or `nothing` when it has none.
+
+# Related
+
+  - [`fit_predict`](@ref)
+  - [`TrainTestSplitResult`](@ref)
+"""
+function holdout_window(res::PipelineResult)
+    i = findfirst(r -> isa(r, TrainTestSplitResult), getfield(res, :results))
+    return isnothing(i) ? nothing : getfield(res, :results)[i].test
+end
+"""
     fit_predict(opt::Pipeline, data::Prices_RR)
 
 Fit pipeline estimator `opt` on data `data` and immediately produce a
-[`PredictionResult`](@ref) for the same data.
+[`PredictionResult`](@ref).
+
+The prediction is made on `data` itself — *in-sample* — unless the pipeline begins with a [`TrainTestSplit`](@ref), in which case it is made on the held-out window that step reserved and no fitted step has seen. That is the one-line holdout evaluation: fit on the training rows, score on the test rows.
 
 # Arguments
 
@@ -607,17 +688,19 @@ Fit pipeline estimator `opt` on data `data` and immediately produce a
 
 # Returns
 
-  - [`PredictionResult`](@ref).
+  - [`PredictionResult`](@ref): On the held-out window when the pipeline splits, on `data` otherwise.
 
 # Related
 
   - [`predict(res::PipelineResult, data::Prices_RR)`](@ref)
   - [`Pipeline`](@ref)
+  - [`TrainTestSplit`](@ref)
   - [`PredictionResult`](@ref)
 """
 function fit_predict(pipe::Pipeline, data::Prices_RR)
     res = StatsAPI.fit(pipe, data)
-    return StatsAPI.predict(res, data)
+    test = holdout_window(res)
+    return StatsAPI.predict(res, isnothing(test) ? data : test)
 end
 function run_step(p::Pipeline, ctx::PipelineContext)
     data = if :prices in pipe_reads(p)
@@ -636,3 +719,4 @@ function optimise(::Pipeline, args...; kwargs...)
 end
 
 export Pipeline, PipelineResult, fit
+public has_split, assert_no_holdout, assert_split_position, holdout_window
