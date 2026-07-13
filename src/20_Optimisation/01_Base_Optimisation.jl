@@ -1861,6 +1861,25 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
+A precomputed optimisation result cannot be restricted to an asset subset.
+
+Its weights were solved over the full universe and a sub-portfolio of them has no defined meaning, so an asset-subset view of a result throws. In particular, a [`TimeDependent`](@ref) schedule holding result entries is incompatible with asset-subsampling cross-validation ([`MultipleRandomised`](@ref)), whose fold loops view the optimiser to each fold's asset subset before the swap. The trivial all-assets view (`Colon`) passes the result through unchanged.
+
+# Related
+
+  - [`port_opt_view`](@ref)
+  - [`TimeDependent`](@ref)
+  - [`MultipleRandomised`](@ref)
+"""
+function port_opt_view(res::NonFiniteAllocationOptimisationResult, ::Colon, args...)
+    return res
+end
+function port_opt_view(::NonFiniteAllocationOptimisationResult, ::Any, args...)
+    return throw(ArgumentError("a precomputed optimisation result cannot be viewed to an asset subset: its weights were solved over the full universe and a sub-portfolio of them has no defined meaning. A TimeDependent schedule holding precomputed results is therefore incompatible with asset-subsampling cross-validation (e.g. MultipleRandomised); use estimator entries there instead."))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
 Apply [`port_opt_view`](@ref) element-wise to a vector of optimisation estimators.
 
 # Related

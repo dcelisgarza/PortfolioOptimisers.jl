@@ -866,4 +866,108 @@ end
                                              cvc).pred)
         end
     end
+    @testset "Traits and views over schedules of optimisers" begin
+        ew, iv = EqualWeighted(), InverseVolatility()
+        w0 = fill(1 / 5, 5)
+        res = optimise(iv, rd)
+        mrtn = MeanRisk(;
+                        opt = JuMPOptimiser(; slv = slv,
+                                            tn = Turnover(; val = 0.1, w = w0)))
+        mrv = MeanRisk(;
+                       opt = JuMPOptimiser(; slv = slv,
+                                           wb = WeightBounds(; lb = zeros(5),
+                                                             ub = fill(0.8, 5))))
+        cvw = IndexWalkForward(100, 50)  # 2 folds over the 200-row sample
+        @testset "needs_previous_weights recurses into entries" begin
+            # An estimator entry with an unfixed turnover needs the previous weights.
+            @test PortfolioOptimisers.needs_previous_weights(TimeDependent([mrtn, ew]))
+            # A precomputed result never does; nor do plain estimators.
+            @test !PortfolioOptimisers.needs_previous_weights(TimeDependent([res, res]))
+            @test !PortfolioOptimisers.needs_previous_weights(TimeDependent([ew, iv]))
+            # A mixed schedule takes the disjunction over its entries.
+            @test PortfolioOptimisers.needs_previous_weights(TimeDependent([mrtn, res]))
+            # The trait is scope-blind: it never consults bind.
+            @test PortfolioOptimisers.needs_previous_weights(TimeDependent([mrtn, ew],
+                                                                           :nearest))
+        end
+        @testset "Fold-count assertion over optimiser schedules" begin
+            # A mixed schedule is length-checked exactly like a schedule of values.
+            sched = TimeDependent([mrtn, res])
+            @test isnothing(PortfolioOptimisers.assert_time_dependent_fold_count(sched, 2))
+            @test_throws DimensionMismatch PortfolioOptimisers.assert_time_dependent_fold_count(sched,
+                                                                                                3)
+            # The schedules inside each entry are sized to the same loop...
+            mr_bad = MeanRisk(;
+                              opt = JuMPOptimiser(; slv = slv,
+                                                  l2 = TimeDependent([1e-4, 2e-4, 3e-4])))
+            @test_throws DimensionMismatch PortfolioOptimisers.assert_time_dependent_fold_count(TimeDependent([ew,
+                                                                                                               mr_bad]),
+                                                                                                2)
+            # ...but the default is not: it only ever runs outside a fold loop.
+            @test isnothing(PortfolioOptimisers.assert_time_dependent_fold_count(TimeDependent([ew,
+                                                                                                iv];
+                                                                                               default = mr_bad),
+                                                                                 2))
+            # A :nearest schedule is skipped by a loop scanning with all_binds = false —
+            # the fold loop that owns it validates it against its own fold count.
+            near = TimeDependent([ew, iv, ew], :nearest; default = ew)
+            @test isnothing(PortfolioOptimisers.assert_time_dependent_fold_count(near, 2,
+                                                                                 false))
+            @test_throws DimensionMismatch PortfolioOptimisers.assert_time_dependent_fold_count(near,
+                                                                                                2,
+                                                                                                true)
+        end
+        @testset "is_time_dependent sees the schedule; the swap resolves it fully" begin
+            @test PortfolioOptimisers.is_time_dependent(TimeDependent([ew, iv]))
+            @test PortfolioOptimisers.is_time_dependent(TimeDependent([res, res]))
+            @test PortfolioOptimisers.is_time_dependent(TimeDependent([mrtn, res]))
+            # The swap recurses into the resolved entry with the same context, so nothing
+            # time-dependent survives it — even when the entry carries its own schedules.
+            mrl = MeanRisk(;
+                           opt = JuMPOptimiser(; slv = slv,
+                                               l2 = TimeDependent([1e-4, 2e-4])))
+            sched = TimeDependent([ew, mrl])
+            ctx1 = TimeDependentContext(; i = 1, n = 2, rd = rd, train_idx = [1:100, 1:150],
+                                        test_idx = [101:150, 151:200])
+            ctx2 = TimeDependentContext(; i = 2, n = 2, rd = rd, train_idx = [1:100, 1:150],
+                                        test_idx = [101:150, 151:200])
+            o1 = PortfolioOptimisers.update_time_dependent_estimator(sched, ctx1)
+            o2 = PortfolioOptimisers.update_time_dependent_estimator(sched, ctx2)
+            @test o1 isa EqualWeighted
+            @test o2.opt.l2 == 2e-4
+            @test !PortfolioOptimisers.is_time_dependent(o1)
+            @test !PortfolioOptimisers.is_time_dependent(o2)
+        end
+        @testset "port_opt_view slices estimator entries and the default" begin
+            tdo = TimeDependent([mrv, ew]; default = mrv)
+            tdo2 = PortfolioOptimisers.port_opt_view(tdo, 1:3, rd.X)
+            @test tdo2.val[1].opt.wb.ub == fill(0.8, 3)
+            @test tdo2.val[1].opt.wb.lb == zeros(3)
+            @test tdo2.default.opt.wb.ub == fill(0.8, 3)
+            # Under multiple-randomised CV each fold's optimiser is viewed to the fold's
+            # random asset subset, so the per-fold weights live on the subset.
+            cvm = MultipleRandomised(IndexWalkForward(100, 50); subset_size = 3,
+                                     rng = StableRNG(42), seed = 7)
+            p = cross_val_predict(TimeDependent([mrv, ew]), rd, cvm)
+            @test all(path -> all(x -> length(x.res.w) == 3, path.pred), p.pred)
+            # A precomputed result has no asset-subset view: its full-universe weights
+            # have no sub-portfolio meaning, so a schedule holding one is rejected under
+            # asset subsampling...
+            @test_throws ArgumentError PortfolioOptimisers.port_opt_view(TimeDependent([mrv,
+                                                                                        res]),
+                                                                         1:3, rd.X)
+            @test_throws ArgumentError cross_val_predict(TimeDependent([mrv, res]), rd, cvm)
+            # ...but passes through the trivial all-assets view unchanged.
+            @test PortfolioOptimisers.port_opt_view(res, :, rd.X) === res
+        end
+        @testset "Swap-then-factory: previous weights reach the swapped-in optimiser" begin
+            p_direct = cross_val_predict(mrtn, rd, cvw)
+            p_sched = cross_val_predict(TimeDependent([mrtn, mrtn]), rd, cvw)
+            # The factory pass runs after the swap, so fold 2's turnover anchors to fold
+            # 1's weights exactly as in the unscheduled run...
+            @test isapprox(p_sched.pred[2].res.w, p_direct.pred[2].res.w)
+            # ...and the anchor is material: fold 1's weights are not the constructor's w0.
+            @test !isapprox(p_direct.pred[1].res.w, w0)
+        end
+    end
 end
