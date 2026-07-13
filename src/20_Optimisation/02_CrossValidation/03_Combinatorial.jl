@@ -500,8 +500,7 @@ function sort_predictions!(res::CombinatorialCrossValidationResult,
     return [MultiPeriodPredictionResult(; pred = pred, id = i)
             for (i, pred) in enumerate(sorted_preds)]
 end
-function fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator, rd::ReturnsResult,
-                         cv::CombCVER; cols = :,
+function fit_and_predict(opt::OptE_TD, rd::ReturnsResult, cv::CombCVER; cols = :,
                          ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())
     cv_res = split(cv, rd)
     (; train_idx, test_idx) = cv_res

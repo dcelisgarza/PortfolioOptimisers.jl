@@ -971,7 +971,7 @@ function run_folds(fit_fold, opt, n::Integer, ex::FLoops.Transducers.Executor;
     end
     return parallel_folds(i -> fit_fold(i, nothing), n, ex; ElT = ElT)
 end
-function fit_and_predict(opt::OptE_Opt, rd::ReturnsResult, cv::NonSeqCVER; cols = :,
+function fit_and_predict(opt::OptE_Opt_TD, rd::ReturnsResult, cv::NonSeqCVER; cols = :,
                          ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
                          id = nothing)
     @argcheck(!(hasfield(typeof(cv), :shuffle) && cv.shuffle),

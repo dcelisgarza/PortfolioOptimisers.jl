@@ -544,6 +544,34 @@ A required optimiser-valued field spells its union out — `Union{<:X, <:TD_OptE
 """
 const TDO_Option{X} = Union{Nothing, <:TD_OptE_Opt, X}
 """
+    const OptE_TD = Union{<:NonFiniteAllocationOptimisationEstimator, <:TD_OptE_Opt}
+
+Alias for an optimisation estimator, or a [`TimeDependent`](@ref) schedule standing in its place.
+
+This is the entry-point type of the cross-validation fold loops that *fit*: a schedule handed straight to [`cross_val_predict`](@ref) is the optimiser, and fold `i` runs entry `i`. Precomputed results are excluded because a bare result takes the predict-only path, which has no fold loop to resolve a schedule against — but a schedule *whose entries* are results is admissible here, and each such entry takes the predict-only path per fold (see [`OptE_Opt_TD`](@ref)).
+
+# Related
+
+  - [`TD_OptE_Opt`](@ref)
+  - [`OptE_Opt_TD`](@ref)
+  - [`cross_val_predict`](@ref)
+"""
+const OptE_TD = Union{<:NonFiniteAllocationOptimisationEstimator, <:TD_OptE_Opt}
+"""
+    const OptE_Opt_TD = Union{<:OptE_Opt, <:TD_OptE_Opt}
+
+Alias for an optimisation estimator or a precomputed result, or a [`TimeDependent`](@ref) schedule standing in their place.
+
+The entry-point type of the fold loops that accept a precomputed result as well as an estimator. A schedule's entries are [`OptE_Opt`](@ref), so a *mixed* schedule is admissible: fold `i` optimises when entry `i` is an estimator and predicts when it is a result, which the single-fold [`fit_and_predict`](@ref) methods already distinguish by dispatch.
+
+# Related
+
+  - [`OptE_TD`](@ref)
+  - [`TD_OptE_Opt`](@ref)
+  - [`OptE_Opt`](@ref)
+"""
+const OptE_Opt_TD = Union{<:OptE_Opt, <:TD_OptE_Opt}
+"""
 $(DocStringExtensions.TYPEDEF)
 
 Per-fold context handed to time-dependent constraints when they are resolved.
@@ -675,12 +703,15 @@ end
 function time_dependent_entry_needs_previous_weights(x::AbstractVector)::Bool
     return any(time_dependent_entry_needs_previous_weights, x)
 end
+function time_dependent_entry_needs_previous_weights(x::OptE_Opt)::Bool
+    return needs_previous_weights(x)
+end
 function port_opt_view(td::TimeDependent, i, args...)
     v = td.val
     if isa(v, AbstractVector)
-        v = [port_opt_view(x, i) for x in v]
+        v = [port_opt_view(x, i, args...) for x in v]
     end
-    return TimeDependent(v, td.bind; default = port_opt_view(td.default, i))
+    return TimeDependent(v, td.bind; default = port_opt_view(td.default, i, args...))
 end
 """
     time_dependent_fields(opt, all_binds::Bool = true)
@@ -1054,6 +1085,146 @@ function reset_time_dependent_fields(opt)
     return rebuild_estimator(opt, repl)
 end
 #! End: Overload these for all estimators which can use time-dependent constraints.
+#! Begin: TimeDependent as an optimiser in its own right.
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+A [`TimeDependent`](@ref) schedule is time-dependent by construction.
+
+# Related
+
+  - [`is_time_dependent`](@ref)
+"""
+function is_time_dependent(::TimeDependent)
+    return true
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Assert that a [`TimeDependent`](@ref) schedule in an optimiser position resolved to something that can be optimised or predicted.
+
+The vector and [`TimeDependentOptimiserCallable`](@ref) forms of a schedule declare their output kind in their type and are checked statically (see [`TD_OptE_Opt`](@ref)). The two callable forms — a bare `ctx -> optimiser` and a [`PreviousWeightsFunction`](@ref) wrapping one — cannot be, so their output is checked here, when the fold loop swaps it in.
+
+# Related
+
+  - [`TD_OptE_Opt`](@ref)
+  - [`update_time_dependent_estimator`](@ref)
+"""
+function assert_time_dependent_optimiser(::OptE_Opt)::Nothing
+    return nothing
+end
+function assert_time_dependent_optimiser(opt)::Nothing
+    return throw(ArgumentError("a TimeDependent schedule in an optimiser position resolved to a $(typeof(opt)), which is neither an optimisation estimator nor a precomputed optimisation result. A callable schedule standing in for an optimiser must return an OptE_Opt for every fold."))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Resolve a [`TimeDependent`](@ref) schedule standing in for an optimiser to the optimiser of fold `ctx.i`.
+
+Entry `i` may be an estimator or a precomputed result, so a *mixed* schedule optimises on some folds and predicts on others. After the swap the resolved estimator is recursed into with the **same** context, so its own `:outermost` schedules bind to this fold loop rather than going unresolved.
+
+Returns the schedule unchanged when `all_binds` is `false` and it is not `:outermost`-bound — a `:nearest` schedule in an optimiser position is consumed by a fold loop the host itself opens, not by the loop that reached the host.
+
+# Related
+
+  - [`TD_OptE_Opt`](@ref)
+  - [`update_time_dependent_estimator`](@ref)
+  - [`assert_time_dependent_optimiser`](@ref)
+"""
+function update_time_dependent_estimator(td::TD_OptE_Opt, ctx::TimeDependentContext,
+                                         all_binds::Bool = true)
+    if !all_binds && td.bind !== :outermost
+        return td
+    end
+    opt = time_dependent_value(td, ctx)
+    assert_time_dependent_optimiser(opt)
+    return update_time_dependent_estimator(opt, ctx, all_binds)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Assert that a [`TimeDependent`](@ref) schedule standing in for an optimiser has one entry per fold, and that the schedules *within* each entry are sized to the same fold loop.
+
+Entry `i` runs at fold `i` of this loop, so its own `:outermost` schedules bind here too (see [`update_time_dependent_estimator`](@ref)) and are validated against this loop's fold count. The `default` is not — it runs only outside a fold loop, where its schedules reset instead.
+
+Skipped when `all_binds` is `false` and the schedule is not `:outermost`-bound — the fold loop the host opens validates it against its own fold count instead.
+
+# Related
+
+  - [`assert_time_dependent_fold_count`](@ref)
+  - [`TD_OptE_Opt`](@ref)
+"""
+function assert_time_dependent_fold_count(td::TD_OptE_Opt, n::Integer,
+                                          all_binds::Bool = true)::Nothing
+    if !all_binds && td.bind !== :outermost
+        return nothing
+    end
+    v = td.val
+    if isa(v, AbstractVector)
+        @argcheck(length(v) == n,
+                  DimensionMismatch("a TimeDependent schedule of optimisers has $(length(v)) entries, which must equal the number of folds ($n)"))
+        for opt in v
+            assert_time_dependent_fold_count(opt, n, all_binds)
+        end
+    end
+    return nothing
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the optimiser a [`TimeDependent`](@ref) schedule takes outside every fold loop.
+
+An optimiser position is *required* — there is no static default to fall back to — so the schedule must supply its own `default`, and one that does not throws a [`TimeDependentDefaultError`](@ref). The fold-less optimiser is itself reset, so its own schedules resolve to their defaults too.
+
+# Related
+
+  - [`reset_time_dependent_estimator`](@ref)
+  - [`NoDefault`](@ref)
+  - [`TimeDependentDefaultError`](@ref)
+"""
+function reset_time_dependent_estimator(td::TD_OptE_Opt)
+    d = td.default
+    if isa(d, NoDefault)
+        throw(TimeDependentDefaultError("a TimeDependent schedule stands in for the optimiser itself but supplies no `default`, so there is no optimiser to run outside a fold loop. A schedule is defined only over the folds of a cross-validation scheme; this solve has none. Give the schedule a fold-less optimiser: TimeDependent(val; default = opt)."))
+    end
+    return reset_time_dependent_estimator(d)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the statically inspectable entries of a [`TimeDependent`](@ref) schedule: the per-fold values of a vector schedule, plus its `default` when it has one. A callable schedule contributes nothing — its per-fold values cannot be inspected before it runs.
+
+# Related
+
+  - [`TimeDependent`](@ref)
+"""
+function time_dependent_entries(td::TimeDependent)
+    v = td.val
+    entries = isa(v, AbstractVector) ? collect(v) : Any[]
+    if !isa(td.default, NoDefault)
+        push!(entries, td.default)
+    end
+    return entries
+end
+function assert_internal_optimiser(td::TD_OptE_Opt)::Nothing
+    for opt in time_dependent_entries(td)
+        assert_internal_optimiser(opt)
+    end
+    return nothing
+end
+function assert_external_optimiser(td::TD_OptE_Opt)::Nothing
+    for opt in time_dependent_entries(td)
+        assert_external_optimiser(opt)
+    end
+    return nothing
+end
+function assert_special_nco_requirements(td::TD_OptE_Opt)::Nothing
+    for opt in time_dependent_entries(td)
+        assert_special_nco_requirements(opt)
+    end
+    return nothing
+end
+#! End: TimeDependent as an optimiser in its own right.
 """
     const VecOptE_Opt = AbstractVector{<:OptE_Opt}
 
@@ -1784,6 +1955,22 @@ function optimise(opt::OptimisationEstimator, args...; kwargs...)
         end
     end
     return isempty(fb) ? res : factory(res, fb)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Optimise with a [`TimeDependent`](@ref) schedule standing in for the optimiser, outside any fold loop.
+
+There are no folds to index, so the schedule resolves to its `default` and that optimiser runs (see [`reset_time_dependent_estimator`](@ref)); a schedule with no `default` throws a [`TimeDependentDefaultError`](@ref). Inside a fold loop this method is never reached — the loop resolves entry `i` first.
+
+# Related
+
+  - [`TD_OptE_Opt`](@ref)
+  - [`reset_time_dependent_estimator`](@ref)
+  - [`cross_val_predict`](@ref)
+"""
+function optimise(td::TD_OptE_Opt, args...; kwargs...)
+    return optimise(reset_time_dependent_estimator(td), args...; kwargs...)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

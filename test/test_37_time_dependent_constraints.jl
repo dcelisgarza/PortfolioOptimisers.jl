@@ -775,4 +775,95 @@ end
             @test !isapprox(p0.pred[1].res.w, p1.pred[1].res.w)
         end
     end
+    @testset "A schedule as the optimiser itself" begin
+        ew, iv = EqualWeighted(), InverseVolatility()
+        cvw = IndexWalkForward(100, 50)  # 2 folds over the 200-row sample
+        @testset "Each fold runs its own optimiser" begin
+            sched = TimeDependent([ew, iv])
+            p = cross_val_predict(sched, rd, cvw)
+            pew = cross_val_predict(ew, rd, cvw)
+            piv = cross_val_predict(iv, rd, cvw)
+            @test length(p.pred) == 2
+            # Fold 1 is the EqualWeighted run, fold 2 the InverseVolatility one.
+            @test isapprox(p.pred[1].res.w, pew.pred[1].res.w)
+            @test isapprox(p.pred[2].res.w, piv.pred[2].res.w)
+            @test !isapprox(pew.pred[2].res.w, piv.pred[2].res.w)
+            # A declared optimiser callable schedules the same way (odd folds EqualWeighted).
+            pc = cross_val_predict(TimeDependent(TDOptCap()), rd, cvw)
+            @test isapprox(pc.pred[1].res.w, pew.pred[1].res.w)
+            @test isapprox(pc.pred[2].res.w, piv.pred[2].res.w)
+        end
+        @testset "A mis-sized schedule fails at the split" begin
+            @test_throws DimensionMismatch cross_val_predict(TimeDependent([ew, iv, ew]),
+                                                             rd, cvw)
+        end
+        @testset "A schedule of results replays per-fold weights" begin
+            r1, r2 = optimise(ew, rd), optimise(iv, rd)
+            p = cross_val_predict(TimeDependent([r1, r2]), rd, cvw)
+            @test length(p.pred) == 2
+            # Each entry is predicted on its fold's test window, not re-optimised.
+            @test isapprox(p.pred[1].res.w, r1.w)
+            @test isapprox(p.pred[2].res.w, r2.w)
+        end
+        @testset "A mixed schedule optimises or predicts per entry" begin
+            res = optimise(iv, rd)
+            p = cross_val_predict(TimeDependent([ew, res]), rd, cvw)
+            pew = cross_val_predict(ew, rd, cvw)
+            @test isapprox(p.pred[1].res.w, pew.pred[1].res.w)
+            # Fold 2's entry is a precomputed result: replayed, not refitted, so its weights
+            # are the full-sample ones rather than the fold-2 training-window ones.
+            @test isapprox(p.pred[2].res.w, res.w)
+            @test !isapprox(res.w, cross_val_predict(iv, rd, cvw).pred[2].res.w)
+        end
+        @testset "Post-swap recursion binds the entry's own schedules to this loop" begin
+            # The swapped-in estimator's :outermost schedule is sized to the SAME 2 outer
+            # folds and resolved against the same context, so fold 2 gets l2 = 2e-4.
+            l2 = TimeDependent([1e-4, 2e-4])
+            mr = MeanRisk(; opt = JuMPOptimiser(; slv = slv, l2 = l2))
+            p = cross_val_predict(TimeDependent([ew, mr]), rd, cvw)
+            mr2 = MeanRisk(; opt = JuMPOptimiser(; slv = slv, l2 = 2e-4))
+            @test isapprox(p.pred[2].res.w, cross_val_predict(mr2, rd, cvw).pred[2].res.w)
+            # A schedule inside an entry is still sized to this loop, so a mis-sized one
+            # fails even though the top-level schedule is correctly sized.
+            mr_bad = MeanRisk(;
+                              opt = JuMPOptimiser(; slv = slv,
+                                                  l2 = TimeDependent([1e-4, 2e-4, 3e-4])))
+            @test_throws DimensionMismatch cross_val_predict(TimeDependent([ew, mr_bad]),
+                                                             rd, cvw)
+        end
+        @testset "Fold-less solves need a default" begin
+            # A schedule is defined only over folds; a fold-less solve has none.
+            @test_throws PortfolioOptimisers.TimeDependentDefaultError optimise(TimeDependent([ew,
+                                                                                               iv]),
+                                                                                rd)
+            # The `default` is the fold-less optimiser.
+            @test isapprox(optimise(TimeDependent([ew, iv]; default = iv), rd).w,
+                           optimise(iv, rd).w)
+            # It is reset in turn, so its own schedules take their defaults too.
+            mr = MeanRisk(;
+                          opt = JuMPOptimiser(; slv = slv,
+                                              l2 = TimeDependent([1e-4, 2e-4];
+                                                                 default = 5e-4)))
+            mr0 = MeanRisk(; opt = JuMPOptimiser(; slv = slv, l2 = 5e-4))
+            @test isapprox(optimise(TimeDependent([ew, mr]; default = mr), rd).w,
+                           optimise(mr0, rd).w)
+        end
+        @testset "A callable's output is checked at the swap" begin
+            # Bare callables cannot be checked statically, so a non-optimiser output is
+            # caught when the fold loop swaps it in.
+            @test_throws ArgumentError cross_val_predict(TimeDependent(ctx -> Fees(;
+                                                                                   l = 0.001)),
+                                                         rd, cvw)
+        end
+        @testset "Other cross-validation schemes" begin
+            sched = TimeDependent([ew, iv, ew])
+            # KFold: 3 non-sequential folds.
+            @test length(cross_val_predict(sched, rd, KFold(; n = 3)).pred) == 3
+            # Combinatorial: the schedule is indexed by the fold's position in the split
+            # enumeration, and predictions are regrouped into paths.
+            cvc = CombinatorialCrossValidation(; n_folds = 4, n_test_folds = 2)
+            @test !isempty(cross_val_predict(TimeDependent(fill(ew, n_splits(cvc))), rd,
+                                             cvc).pred)
+        end
+    end
 end

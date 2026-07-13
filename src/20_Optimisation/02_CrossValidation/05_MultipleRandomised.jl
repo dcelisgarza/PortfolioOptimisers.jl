@@ -563,8 +563,7 @@ Handles sequential and parallel execution. If the optimiser requires previous we
   - [`is_time_dependent`](@ref)
   - [`update_time_dependent_estimator`](@ref)
 """
-function path_fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator,
-                              rd::ReturnsResult, train_idx, test_idx, cols;
+function path_fit_and_predict(opt::OptE_TD, rd::ReturnsResult, train_idx, test_idx, cols;
                               ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
                               id = nothing)
     n = length(train_idx)
@@ -596,9 +595,8 @@ function path_fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator,
     return MultiPeriodPredictionResult(; pred = sort_predictions!(test_idx, predictions),
                                        id = id)
 end
-function fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator, rd::ReturnsResult,
-                         cv::MRCVR; ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
-                         kwargs...)
+function fit_and_predict(opt::OptE_TD, rd::ReturnsResult, cv::MRCVR;
+                         ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(), kwargs...)
     cv_res = split(cv, rd)
     (; train_idx, test_idx, asset_idx, path_ids) = cv_res
     unique_ids = unique(path_ids)
