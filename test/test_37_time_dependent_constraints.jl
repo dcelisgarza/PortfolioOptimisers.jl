@@ -631,4 +631,148 @@ end
         @test length(PortfolioOptimisers.time_dependent_value(td_fn_vv, ctx1)) == 1
         @test length(PortfolioOptimisers.time_dependent_value(td_fn_vv, ctx2)) == 2
     end
+    @testset "Problem-definition fields of the base optimisers" begin
+        # The whole problem definition varies over folds, not just the constraints: the
+        # prior estimator, returns model, scalariser and asset sets of a `JuMPOptimiser`,
+        # and the prior, clustering estimator, sets and weight finaliser of a
+        # `HierarchicalOptimiser`. Execution control (`slv`, `sc`, `so`, `brt`, `cle_pr`,
+        # `strict`) stays static.
+        cvw = IndexWalkForward(100, 50)
+        pe_semi = EmpiricalPrior(;
+                                 ce = PortfolioOptimisersCovariance(;
+                                                                    ce = Covariance(;
+                                                                                    alg = SemiMoment())))
+        tdpe = TimeDependent([EmpiricalPrior(), pe_semi])
+        tdret = TimeDependent([ArithmeticReturn(), ArithmeticReturn(; lb = 0.0005)])
+        tdsca = TimeDependent([SumScalariser(), MaxScalariser()])
+        setsA = AssetSets(; dict = Dict("nx" => rd.nx, "g1" => ["A", "B"]))
+        setsB = AssetSets(; dict = Dict("nx" => rd.nx, "g1" => ["D", "E"]))
+        tdsets = TimeDependent([setsA, setsB])
+        @testset "Widened fields, defaults and required-field types" begin
+            opt = JuMPOptimiser(; slv = slv, pe = tdpe, ret = tdret, sca = tdsca,
+                                sets = tdsets)
+            @test PortfolioOptimisers.time_dependent_fields(opt) == (:pe, :sets, :ret, :sca)
+            # Fold-less: each field falls back to its registered static default.
+            r0 = PortfolioOptimisers.reset_time_dependent_estimator(opt)
+            @test r0.pe == EmpiricalPrior()
+            @test r0.ret == ArithmeticReturn()
+            @test r0.sca == SumScalariser()
+            @test isnothing(r0.sets)
+            # Per fold: the schedule's entry is swapped in.
+            ctx2 = TimeDependentContext(; i = 2, n = 2, rd = rd, train_idx = 1:150,
+                                        test_idx = 151:200)
+            r2 = PortfolioOptimisers.update_time_dependent_estimator(opt, ctx2)
+            @test r2.pe == pe_semi
+            @test r2.ret.lb == 0.0005
+            @test isa(r2.sca, MaxScalariser)
+            @test r2.sets === setsB
+            # These fields are typed `TD` rather than `TD_Option`: they always carry a
+            # value, so `nothing` stays inadmissible.
+            @test_throws TypeError JuMPOptimiser(; slv = slv, pe = nothing)
+            @test_throws TypeError JuMPOptimiser(; slv = slv, ret = nothing)
+            @test_throws TypeError JuMPOptimiser(; slv = slv, sca = nothing)
+            @test_throws TypeError HierarchicalOptimiser(; cle = nothing)
+            @test_throws TypeError HierarchicalOptimiser(; wf = nothing)
+            # The constructor test-substitutes each entry, so a wrongly-typed one throws
+            # here rather than mid-backtest.
+            @test_throws TypeError JuMPOptimiser(; slv = slv,
+                                                 pe = TimeDependent([EmpiricalPrior(), 1.0]))
+            hopt = HierarchicalOptimiser(; slv = slv, pe = tdpe, sets = tdsets,
+                                         cle = TimeDependent([ClustersEstimator(),
+                                                              ClustersEstimator(;
+                                                                                alg = HClustAlgorithm(;
+                                                                                                      linkage = :single))]),
+                                         wf = TimeDependent([IterativeWeightFinaliser(),
+                                                             IterativeWeightFinaliser(;
+                                                                                      iter = 7)]))
+            @test PortfolioOptimisers.time_dependent_fields(hopt) == (:pe, :cle, :sets, :wf)
+            h0 = PortfolioOptimisers.reset_time_dependent_estimator(hopt)
+            @test h0.pe == EmpiricalPrior()
+            @test h0.cle == ClustersEstimator()
+            @test h0.wf == IterativeWeightFinaliser()
+            @test isnothing(h0.sets)
+            h2 = PortfolioOptimisers.update_time_dependent_estimator(hopt, ctx2)
+            @test h2.pe == pe_semi
+            @test h2.cle.alg.linkage == :single
+            @test h2.wf.iter == 7
+            @test h2.sets === setsB
+        end
+        @testset "Per-fold prior estimator" begin
+            p = cross_val_predict(MeanRisk(; opt = JuMPOptimiser(; slv = slv, pe = tdpe)),
+                                  rd, cvw)
+            p0 = cross_val_predict(MeanRisk(; opt = JuMPOptimiser(; slv = slv)), rd, cvw)
+            p1 = cross_val_predict(MeanRisk(;
+                                            opt = JuMPOptimiser(; slv = slv, pe = pe_semi)),
+                                   rd, cvw)
+            @test isapprox(p.pred[1].res.w, p0.pred[1].res.w)
+            @test isapprox(p.pred[2].res.w, p1.pred[2].res.w)
+            @test !isapprox(p0.pred[2].res.w, p1.pred[2].res.w)
+        end
+        @testset "Per-fold returns model" begin
+            p = cross_val_predict(MeanRisk(; opt = JuMPOptimiser(; slv = slv, ret = tdret)),
+                                  rd, cvw)
+            p0 = cross_val_predict(MeanRisk(; opt = JuMPOptimiser(; slv = slv)), rd, cvw)
+            p1 = cross_val_predict(MeanRisk(;
+                                            opt = JuMPOptimiser(; slv = slv,
+                                                                ret = ArithmeticReturn(;
+                                                                                       lb = 0.0005))),
+                                   rd, cvw)
+            @test isapprox(p.pred[1].res.w, p0.pred[1].res.w)
+            @test isapprox(p.pred[2].res.w, p1.pred[2].res.w)
+            # The fold-2 minimum-return constraint binds, so it is not the fold-2 baseline.
+            @test !isapprox(p0.pred[2].res.w, p1.pred[2].res.w)
+        end
+        @testset "Per-fold scalariser" begin
+            r = [Variance(), ConditionalValueatRisk()]
+            p = cross_val_predict(MeanRisk(; r = r,
+                                           opt = JuMPOptimiser(; slv = slv, sca = tdsca)),
+                                  rd, cvw)
+            psum = cross_val_predict(MeanRisk(; r = r,
+                                              opt = JuMPOptimiser(; slv = slv,
+                                                                  sca = SumScalariser())),
+                                     rd, cvw)
+            pmax = cross_val_predict(MeanRisk(; r = r,
+                                              opt = JuMPOptimiser(; slv = slv,
+                                                                  sca = MaxScalariser())),
+                                     rd, cvw)
+            @test isapprox(p.pred[1].res.w, psum.pred[1].res.w)
+            @test isapprox(p.pred[2].res.w, pmax.pred[2].res.w)
+            @test !isapprox(psum.pred[2].res.w, pmax.pred[2].res.w)
+        end
+        @testset "Per-fold asset sets" begin
+            # The same group-keyed bound estimator caps a different group of assets each
+            # fold, because the sets it resolves against are scheduled.
+            wbe = WeightBoundsEstimator(; ub = ["g1" => 0.15])
+            p = cross_val_predict(MeanRisk(;
+                                           opt = JuMPOptimiser(; slv = slv, wb = wbe,
+                                                               sets = tdsets)), rd, cvw)
+            w1 = p.pred[1].res.w
+            w2 = p.pred[2].res.w
+            @test all(x -> x <= 0.15 + 1e-6, w1[1:2])
+            @test all(x -> x > 0.15 + 1e-6, w1[4:5])
+            @test all(x -> x <= 0.15 + 1e-6, w2[4:5])
+            @test all(x -> x > 0.15 + 1e-6, w2[1:2])
+        end
+        @testset "Per-fold clustering estimator" begin
+            single = ClustersEstimator(; alg = HClustAlgorithm(; linkage = :single))
+            tdcle = TimeDependent([single, ClustersEstimator()])
+            p = cross_val_predict(HierarchicalRiskParity(;
+                                                         opt = HierarchicalOptimiser(;
+                                                                                     slv = slv,
+                                                                                     cle = tdcle)),
+                                  rd, cvw)
+            p0 = cross_val_predict(HierarchicalRiskParity(;
+                                                          opt = HierarchicalOptimiser(;
+                                                                                      slv = slv)),
+                                   rd, cvw)
+            p1 = cross_val_predict(HierarchicalRiskParity(;
+                                                          opt = HierarchicalOptimiser(;
+                                                                                      slv = slv,
+                                                                                      cle = single)),
+                                   rd, cvw)
+            @test isapprox(p.pred[1].res.w, p1.pred[1].res.w)
+            @test isapprox(p.pred[2].res.w, p0.pred[2].res.w)
+            @test !isapprox(p0.pred[1].res.w, p1.pred[1].res.w)
+        end
+    end
 end

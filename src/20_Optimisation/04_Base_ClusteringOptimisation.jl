@@ -154,19 +154,19 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     HierarchicalOptimiser(;
-        pe::PrE_Pr = EmpiricalPrior(),
-        cle::HClE_HCl = ClustersEstimator(),
+        pe::TD{<:PrE_Pr} = EmpiricalPrior(),
+        cle::TD{<:HClE_HCl} = ClustersEstimator(),
         slv::Option{<:Slv_VecSlv} = nothing,
         wb::TD_Option{<:WbE_Wb} = WeightBounds(),
         fees::TD_Option{<:FeesE_Fees} = nothing,
-        sets::Option{<:AssetSets} = nothing,
-        wf::WeightFinaliser = IterativeWeightFinaliser(),
+        sets::TD_Option{<:AssetSets} = nothing,
+        wf::TD{<:WeightFinaliser} = IterativeWeightFinaliser(),
         brt::Bool = false,
         cle_pr::Bool = true,
         strict::Bool = false
     ) -> HierarchicalOptimiser
 
-Keywords correspond to the struct's fields. Fields typed [`TD_Option`](@ref) (`wb`, `fees`) may hold a [`TimeDependent`](@ref) per-fold schedule instead of a static value; a cross-validation fold loop resolves it per fold, and a fold-less `optimise` runs with the field at its static default.
+Keywords correspond to the struct's fields. Fields typed [`TD_Option`](@ref) or [`TD`](@ref) may hold a [`TimeDependent`](@ref) per-fold schedule instead of a static value; a cross-validation fold loop resolves it per fold, and a fold-less `optimise` runs with the field at its static default. The problem definition — the prior estimator, clustering estimator, weight finaliser and asset sets as much as the bounds and fees — may therefore vary over folds; execution control (`slv`, `brt`, `cle_pr`, `strict`) stays static.
 
 ## Validation
 
@@ -289,16 +289,17 @@ HierarchicalOptimiser
     $(field_dict[:strict_opt])
     """
     strict
-    function HierarchicalOptimiser(pe::PrE_Pr, cle::HClE_HCl, slv::Option{<:Slv_VecSlv},
-                                   wb::TD_Option{<:WbE_Wb}, fees::TD_Option{<:FeesE_Fees},
-                                   sets::Option{<:AssetSets}, wf::WeightFinaliser,
+    function HierarchicalOptimiser(pe::TD{<:PrE_Pr}, cle::TD{<:HClE_HCl},
+                                   slv::Option{<:Slv_VecSlv}, wb::TD_Option{<:WbE_Wb},
+                                   fees::TD_Option{<:FeesE_Fees},
+                                   sets::TD_Option{<:AssetSets}, wf::TD{<:WeightFinaliser},
                                    brt::Bool, cle_pr::Bool, strict::Bool)
         if isa(wb, WeightBoundsEstimator)
             @argcheck(!isnothing(sets), IsNothingError("sets cannot be nothing"))
         end
         assert_time_dependent_substitution(HierarchicalOptimiser,
                                            (; pe, cle, slv, wb, fees, sets, wf, brt, cle_pr,
-                                            strict), (; wb = WeightBounds()))
+                                            strict), hierarchical_optimiser_td_defaults())
         return new{typeof(pe), typeof(cle), typeof(slv), typeof(wb), typeof(fees),
                    typeof(sets), typeof(wf), typeof(brt), typeof(cle_pr), typeof(strict)}(pe,
                                                                                           cle,
@@ -312,16 +313,33 @@ HierarchicalOptimiser
                                                                                           strict)
     end
 end
-function HierarchicalOptimiser(; pe::PrE_Pr = EmpiricalPrior(),
-                               cle::HClE_HCl = ClustersEstimator(),
+function HierarchicalOptimiser(; pe::TD{<:PrE_Pr} = EmpiricalPrior(),
+                               cle::TD{<:HClE_HCl} = ClustersEstimator(),
                                slv::Option{<:Slv_VecSlv} = nothing,
                                wb::TD_Option{<:WbE_Wb} = WeightBounds(),
                                fees::TD_Option{<:FeesE_Fees} = nothing,
-                               sets::Option{<:AssetSets} = nothing,
-                               wf::WeightFinaliser = IterativeWeightFinaliser(),
+                               sets::TD_Option{<:AssetSets} = nothing,
+                               wf::TD{<:WeightFinaliser} = IterativeWeightFinaliser(),
                                brt::Bool = false, cle_pr::Bool = true,
                                strict::Bool = false)::HierarchicalOptimiser
     return HierarchicalOptimiser(pe, cle, slv, wb, fees, sets, wf, brt, cle_pr, strict)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the static defaults of the [`HierarchicalOptimiser`](@ref) fields that may hold a [`TimeDependent`](@ref).
+
+Shared by the constructor's test-substitution pass and [`time_dependent_field_defaults`](@ref), so the fold-less value of a field is declared once. Fields whose static default is `nothing` are omitted.
+
+# Related
+
+  - [`HierarchicalOptimiser`](@ref)
+  - [`time_dependent_field_defaults`](@ref)
+  - [`assert_time_dependent_substitution`](@ref)
+"""
+function hierarchical_optimiser_td_defaults()::NamedTuple
+    return (; pe = EmpiricalPrior(), cle = ClustersEstimator(), wb = WeightBounds(),
+            wf = IterativeWeightFinaliser())
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -349,7 +367,7 @@ Return the static defaults of the [`HierarchicalOptimiser`](@ref) fields that ma
   - [`TimeDependentContext`](@ref)
 """
 function time_dependent_field_defaults(::HierarchicalOptimiser)::NamedTuple
-    return (; wb = WeightBounds())
+    return hierarchical_optimiser_td_defaults()
 end
 """
     unitary_expected_risks(r, X, ...)

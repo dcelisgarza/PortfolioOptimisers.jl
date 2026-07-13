@@ -492,6 +492,20 @@ The set of fields whose constructor signatures use this alias is the single sour
 """
 const TD_Option{X} = Union{Nothing, <:TimeDependent, X}
 """
+    const TD{X} = Union{<:TimeDependent, X}
+
+Alias for a *required* optimiser field that accepts a static value of type `X` or a per-fold [`TimeDependent`](@ref) schedule, but not `nothing`.
+
+The problem-definition fields that always carry a value — the prior estimator, the returns model, the scalariser, the clustering estimator, the weight finaliser — are time-dependent through this alias rather than [`TD_Option`](@ref), so `nothing` stays inadmissible where it was never a legal static value. Such a field still has a *static default*, so a schedule in one resets to that default on a fold-less solve, unlike the optimiser-valued fields (see [`TD_OptE_Opt`](@ref)).
+
+# Related
+
+  - [`TimeDependent`](@ref)
+  - [`TD_Option`](@ref)
+  - [`time_dependent_field_defaults`](@ref)
+"""
+const TD{X} = Union{<:TimeDependent, X}
+"""
     const TD_OptE_Opt = Union{TimeDependent{<:AbstractVector{<:OptE_Opt}},
                               TimeDependent{<:TimeDependentOptimiserCallable},
                               TimeDependent{<:PreviousWeightsFunction},
