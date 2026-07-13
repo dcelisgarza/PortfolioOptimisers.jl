@@ -15,6 +15,12 @@ end
 function PortfolioOptimisers.needs_previous_weights(::TDPrevWCap)
     return true
 end
+# `TDOptCap` declares that its per-fold value is an optimiser, which is what makes a schedule
+# holding it statically admissible in an optimiser-valued field.
+struct TDOptCap <: PortfolioOptimisers.TimeDependentOptimiserCallable end
+function (c::TDOptCap)(ctx::TimeDependentContext)
+    return isodd(ctx.i) ? EqualWeighted() : InverseVolatility()
+end
 @testset "Time-dependent constraints" begin
     using Test, PortfolioOptimisers, Clarabel, StableRNGs
     rng = StableRNG(987654321)
@@ -44,6 +50,81 @@ end
         # port_opt_view preserves bind.
         @test PortfolioOptimisers.port_opt_view(TimeDependent([1.0, 2.0], :nearest), 1).bind ==
               :nearest
+    end
+    @testset "Schedules do not nest" begin
+        inner = TimeDependent([1.0, 2.0])
+        @test_throws ArgumentError TimeDependent(inner)
+        @test_throws ArgumentError TimeDependent(; val = inner)
+        @test_throws ArgumentError TimeDependent([inner, 2.0])
+        @test_throws ArgumentError TimeDependent([1.0, 2.0]; default = inner)
+    end
+    @testset "Fold-less defaults" begin
+        # No default: the field resets to its host's static default (`wb → WeightBounds()`).
+        td = TimeDependent([WeightBounds(; lb = 0.0, ub = 0.3),
+                            WeightBounds(; lb = 0.0, ub = 0.4)])
+        @test td.default === NoDefault()
+        wb0 = PortfolioOptimisers.reset_time_dependent_estimator(JuMPOptimiser(; slv = slv,
+                                                                               wb = td)).wb
+        @test wb0.lb == 0.0 && wb0.ub == 1.0
+        # An explicit default overrides it.
+        tdd = TimeDependent([WeightBounds(; lb = 0.0, ub = 0.3),
+                             WeightBounds(; lb = 0.0, ub = 0.4)];
+                            default = WeightBounds(; lb = 0.0, ub = 0.9))
+        @test PortfolioOptimisers.reset_time_dependent_estimator(JuMPOptimiser(; slv = slv,
+                                                                               wb = tdd)).wb.ub ==
+              0.9
+        # The default is test-substituted through the host constructor at construction time,
+        # so a type-incompatible or invalid default fails there, not mid-backtest.
+        @test_throws TypeError JuMPOptimiser(; slv = slv,
+                                             card = TimeDependent([2, 3];
+                                                                  default = Threshold(;
+                                                                                      val = 0.1)))
+        @test_throws DomainError JuMPOptimiser(; slv = slv,
+                                               card = TimeDependent([2, 3]; default = 0))
+        @test JuMPOptimiser(; slv = slv, card = TimeDependent([2, 3]; default = 5)).card.default ==
+              5
+        # A required field — one whose host declares `NoDefault()` because it has no static
+        # default — has no fold-less value unless the schedule supplies one.
+        ew, iv = EqualWeighted(), InverseVolatility()
+        @test_throws PortfolioOptimisers.TimeDependentDefaultError PortfolioOptimisers.time_dependent_reset_value(TimeDependent([ew,
+                                                                                                                                 iv]),
+                                                                                                                  (;
+                                                                                                                   opti = NoDefault()),
+                                                                                                                  :opti,
+                                                                                                                  ew)
+        @test PortfolioOptimisers.time_dependent_reset_value(TimeDependent([ew, iv];
+                                                                           default = ew),
+                                                             (; opti = NoDefault()), :opti,
+                                                             ew) === ew
+        # port_opt_view carries the default through alongside the entries.
+        v = PortfolioOptimisers.port_opt_view(tdd, 1)
+        @test v.bind == :outermost && v.default.ub == 0.9
+    end
+    @testset "Optimiser-position bound" begin
+        ew, iv = EqualWeighted(), InverseVolatility()
+        res = optimise(ew, rd)
+        # Statically admissible: a schedule of optimisers, a mixed schedule of an optimiser
+        # and a precomputed result, and a declared optimiser callable.
+        @test TimeDependent([ew, iv]) isa PortfolioOptimisers.TD_OptE_Opt
+        @test TimeDependent([ew, res]) isa PortfolioOptimisers.TD_OptE_Opt
+        @test TimeDependent(TDOptCap()) isa PortfolioOptimisers.TD_OptE_Opt
+        # Admitted, and checked only when the fold loop swaps the value in.
+        @test TimeDependent(ctx -> ew) isa PortfolioOptimisers.TD_OptE_Opt
+        @test TimeDependent(PreviousWeightsFunction(ctx -> ew)) isa
+              PortfolioOptimisers.TD_OptE_Opt
+        # A schedule of constraint values is not an optimiser schedule.
+        @test !(TimeDependent([Fees(; l = 0.001)]) isa PortfolioOptimisers.TD_OptE_Opt)
+        # The optional form additionally admits `nothing` and the static value.
+        TDO = PortfolioOptimisers.TDO_Option{<:PortfolioOptimisers.OptE_Opt}
+        @test nothing isa TDO
+        @test ew isa TDO
+        @test TimeDependent([ew, iv]) isa TDO
+        @test !(TimeDependent([Fees(; l = 0.001)]) isa TDO)
+        # A declared optimiser callable resolves per fold like any other callable.
+        ctx = TimeDependentContext(; i = 2, n = 2, rd = rd, train_idx = [1:100, 1:150],
+                                   test_idx = [101:150, 151:200])
+        @test PortfolioOptimisers.time_dependent_value(TimeDependent(TDOptCap()), ctx) isa
+              InverseVolatility
     end
     @testset "Host validation" begin
         td = TimeDependent([Threshold(; val = 0.01), Threshold(; val = 0.02)])

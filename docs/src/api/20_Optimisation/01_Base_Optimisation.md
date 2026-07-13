@@ -38,12 +38,19 @@ needs_previous_weights(td::TimeDependent)
 TimeDependent
 TimeDependentContext
 TimeDependentCallable
+TimeDependentOptimiserCallable
 PreviousWeightsFunction
+NoDefault
+TimeDependentDefaultError
 TD_Option
+TD_OptE_Opt
+TDO_Option
 time_dependent_value
 time_dependent_fields
 time_dependent_entry_needs_previous_weights
 assert_time_dependent_substitution
+time_dependent_stand_in
+time_dependent_reset_value
 assert_time_dependent_fold_count(::OptE_Opt, ::Integer)
 assert_time_dependent_fold_count(opt::VecOptE_Opt, n::Integer, ::Bool = true)
 assert_time_dependent_fields_fold_count

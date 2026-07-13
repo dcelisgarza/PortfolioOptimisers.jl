@@ -285,6 +285,21 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
+Abstract supertype for callable structs whose per-fold value is an *optimiser*.
+
+A subtype implements a functor `(x::MySubtype)(ctx::TimeDependentContext)` returning the fold's optimiser (an [`OptE_Opt`](@ref)), so a [`TimeDependent`](@ref) holding it is admissible wherever an optimiser-valued field accepts a schedule (see [`TD_OptE_Opt`](@ref)). Declaring the functor's output kind in the type is what makes the schedule *statically* admissible: a bare `ctx -> optimiser` is admitted as a [`Base.Callable`](@ref) and checked only when the fold loop swaps its value in.
+
+# Related
+
+  - [`TimeDependentCallable`](@ref)
+  - [`TimeDependent`](@ref)
+  - [`TD_OptE_Opt`](@ref)
+  - [`TimeDependentContext`](@ref)
+"""
+abstract type TimeDependentOptimiserCallable <: TimeDependentCallable end
+"""
+$(DocStringExtensions.TYPEDEF)
+
 Wrapper marking a callable time-dependent constraint entry as requiring the previous optimisation's weights.
 
 A bare callable inside a [`TimeDependent`](@ref) cannot be inspected for previous-weight requirements, so it contributes `false` to [`needs_previous_weights`](@ref) and its context's `w_prev` is only populated when something else makes the fold loop sequential. Wrapping the callable in `PreviousWeightsFunction` declares the requirement as data: it contributes `true` to [`needs_previous_weights`](@ref), forcing sequential fold execution and a populated `w_prev` in the [`TimeDependentContext`](@ref).
@@ -321,6 +336,50 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
+Marker for "no default here", used in the two places a fold-less value may be missing.
+
+  - As a [`TimeDependent`](@ref)'s `default`: the schedule states no fold-less value of its own, so a fold-less solve falls back to the field's static default (see [`time_dependent_field_defaults`](@ref)).
+  - As an entry of a host's [`time_dependent_field_defaults`](@ref): the field is *required* and has no static default (the optimiser-valued fields), so a schedule there must carry its own `default`. A fold-less solve of a host whose required field holds a defaultless schedule throws a [`TimeDependentDefaultError`](@ref).
+
+# Related
+
+  - [`TimeDependent`](@ref)
+  - [`TimeDependentDefaultError`](@ref)
+  - [`time_dependent_field_defaults`](@ref)
+  - [`reset_time_dependent_estimator`](@ref)
+"""
+struct NoDefault <: AbstractAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Exception thrown when a fold-less solve reaches a [`TimeDependent`](@ref) schedule that has no value to fall back to: the field has no static default and the schedule supplies no `default`.
+
+A schedule is defined *only* over the folds of a cross-validation scheme. Fields with a static default reset to it silently; a required field (the optimiser-valued ones) has nothing to reset to, so the schedule must state the value a fold-less solve should use, via `TimeDependent(val; default = x)`.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    TimeDependentDefaultError(msg)
+
+# Related
+
+  - [`PortfolioOptimisersError`](@ref)
+  - [`TimeDependent`](@ref)
+  - [`NoDefault`](@ref)
+  - [`reset_time_dependent_estimator`](@ref)
+"""
+@concrete struct TimeDependentDefaultError <: PortfolioOptimisersError
+    """
+    $(field_dict[:msg])
+    """
+    msg
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
 Time-dependent constraint: an optimiser input whose value changes across the folds of a cross-validation scheme.
 
 A `TimeDependent` is stored *directly in the optimiser field it varies* — e.g. `JuMPOptimiser(; lt = TimeDependent([...]))` — so the field's position names the target and a field holds either a static value or a per-fold schedule, never both. It is recognised at top-level optimiser fields only, never nested inside another input (e.g. inside a [`Fees`](@ref) or a risk measure).
@@ -331,7 +390,13 @@ For a field that itself accepts a *vector of constraints* statically, a per-fold
 
 The machinery imposes no ordering of its own: fold `i` is whatever `split(cv, rd)` enumerates `i`-th, which is chronological for walk-forward and (unshuffled) KFold schemes. For schemes whose enumeration is not a timeline (combinatorial splits, randomised paths) it is the user's responsibility to key entries off the fold's indices — a callable sees its own fold's windows via `ctx.train_idx[ctx.i]`/`ctx.test_idx[ctx.i]` and may derive any ordering from them.
 
-A time-dependent constraint participates only where folds exist and is inert everywhere else — a fold-less `optimise` replaces it with the field's static default (see [`reset_time_dependent_estimator`](@ref)). Vector entries must have length equal to the number of folds of the consuming cross-validation scheme, validated at `split` time. Entries may be `nothing`, giving the field `nothing` for that fold.
+A time-dependent constraint participates only where folds exist and is inert everywhere else — a fold-less `optimise` replaces it with the field's fold-less value (see [`reset_time_dependent_estimator`](@ref)). Vector entries must have length equal to the number of folds of the consuming cross-validation scheme, validated at `split` time. Entries may be `nothing`, giving the field `nothing` for that fold.
+
+The fold-less value is the field's static default, unless `default` overrides it. A field with *no* static default — the required, optimiser-valued fields — has nothing to reset to, so a schedule there **must** supply `default`; a fold-less solve of one that does not throws a [`TimeDependentDefaultError`](@ref).
+
+A vector whose entries are all optimisers or precomputed results ([`OptE_Opt`](@ref)) is stored as a `Vector{OptE_Opt}`, so a *mixed* schedule — fold `i` optimising or predicting depending on what entry `i` is — is admissible in an optimiser-valued field on its element type alone (see [`TD_OptE_Opt`](@ref)) rather than falling out to a `Vector{Any}` the field cannot accept.
+
+Schedules do not nest: neither `val`, nor a vector entry of `val`, nor `default` may be a `TimeDependent`. Entry `i` is fold `i`'s *complete* field value, and the fold-less value is by definition outside every fold loop, so nesting has no meaning. An estimator swapped in by a schedule may itself carry schedules — those resolve against the same fold context after the swap — but they live in *its* fields, not inside this wrapper.
 
 # Fields
 
@@ -339,12 +404,14 @@ $(DocStringExtensions.FIELDS)
 
 # Constructors
 
-    TimeDependent(val, bind::Symbol = :outermost)
-    TimeDependent(; val, bind::Symbol = :outermost)
+    TimeDependent(val, bind::Symbol = :outermost; default = NoDefault())
+    TimeDependent(; val, bind::Symbol = :outermost, default = NoDefault())
 
 ## Validation
 
-  - If `val` is a vector: `!isempty(val)`.
+  - If `val` is a vector: `!isempty(val)`, and no entry is a `TimeDependent`.
+  - `val` is not a `TimeDependent`.
+  - `default` is not a `TimeDependent`.
   - `bind in (:outermost, :nearest)`.
 
 # Examples
@@ -352,21 +419,25 @@ $(DocStringExtensions.FIELDS)
 ```jldoctest
 julia> TimeDependent([Fees(; l = 0.001), Fees(; l = 0.002)])
 TimeDependent
-   val ┼ 2-element Vector{Fees}
-       │ Fees ⋯
-       │ Fees ⋯
-  bind ┴ Symbol: :outermost
+      val ┼ 2-element Vector{Fees}
+          │ Fees ⋯
+          │ Fees ⋯
+     bind ┼ Symbol: :outermost
+  default ┴ NoDefault()
 ```
 
 # Related
 
   - [`TimeDependentContext`](@ref)
   - [`PreviousWeightsFunction`](@ref)
+  - [`NoDefault`](@ref)
+  - [`TimeDependentDefaultError`](@ref)
+  - [`TD_OptE_Opt`](@ref)
   - [`is_time_dependent`](@ref)
   - [`update_time_dependent_estimator`](@ref)
   - [`reset_time_dependent_estimator`](@ref)
 """
-struct TimeDependent{T1} <: AbstractEstimator
+struct TimeDependent{T1, T2} <: AbstractEstimator
     """
     Vector of per-fold values (in the consuming scheme's `split` enumeration order), or a callable of the fold's [`TimeDependentContext`](@ref): a bare function (optionally wrapped in [`PreviousWeightsFunction`](@ref)) or a [`TimeDependentCallable`](@ref) functor struct.
     """
@@ -375,22 +446,37 @@ struct TimeDependent{T1} <: AbstractEstimator
     Which fold loop consumes the schedule: `:outermost` (default) binds it to the outermost fold loop processing the estimator tree; `:nearest` binds it to the nearest enclosing fold loop — inside a meta-optimiser's inner estimators that is the meta's own cross-validation leg, which then consumes the schedule even when the meta is backtested under an outer fold loop.
     """
     bind::Symbol
+    """
+    Value the field takes outside every fold loop, overriding the host's static default (see [`time_dependent_field_defaults`](@ref)). [`NoDefault`](@ref) (the default) defers to the host's static default; a field that has none requires this to be set.
+    """
+    default::T2
     function TimeDependent(val::Union{<:AbstractVector, <:Base.Callable,
                                       <:PreviousWeightsFunction, <:TimeDependentCallable},
-                           bind::Symbol = :outermost)
+                           bind::Symbol = :outermost; default = NoDefault())
         if isa(val, AbstractVector)
             @argcheck(!isempty(val), IsEmptyError("val cannot be empty"))
+            @argcheck(!any(x -> isa(x, TimeDependent), val),
+                      ArgumentError("no entry of val may be a TimeDependent: entry i is fold i's complete field value, so schedules do not nest. To vary parts of a vector-valued field, assemble the fold's vector in a callable: TimeDependent(ctx -> [dynamic(ctx), static])."))
+            if !(eltype(val) <: OptE_Opt) && all(x -> isa(x, OptE_Opt), val)
+                val = convert(Vector{OptE_Opt}, val)
+            end
         end
+        @argcheck(!isa(default, TimeDependent),
+                  ArgumentError("default cannot be a TimeDependent: it is the field's value outside every fold loop, where a schedule is undefined."))
         @argcheck(bind in (:outermost, :nearest),
                   ArgumentError("bind must be :outermost or :nearest, got :$bind"))
-        return new{typeof(val)}(val, bind)
+        return new{typeof(val), typeof(default)}(val, bind, default)
     end
+end
+function TimeDependent(::TimeDependent, args...; kwargs...)
+    return throw(ArgumentError("val cannot be a TimeDependent: schedules do not nest. An estimator swapped in by a schedule may carry schedules of its own — they resolve against the same fold context after the swap — but they belong in its fields, not inside this wrapper."))
 end
 function TimeDependent(;
                        val::Union{<:AbstractVector, <:Base.Callable,
-                                  <:PreviousWeightsFunction, <:TimeDependentCallable},
-                       bind::Symbol = :outermost)::TimeDependent
-    return TimeDependent(val, bind)
+                                  <:PreviousWeightsFunction, <:TimeDependentCallable,
+                                  <:TimeDependent}, bind::Symbol = :outermost,
+                       default = NoDefault())::TimeDependent
+    return TimeDependent(val, bind; default = default)
 end
 """
     const TD_Option{X} = Union{Nothing, <:TimeDependent, X}
@@ -405,6 +491,44 @@ The set of fields whose constructor signatures use this alias is the single sour
   - [`Option`](@ref)
 """
 const TD_Option{X} = Union{Nothing, <:TimeDependent, X}
+"""
+    const TD_OptE_Opt = Union{TimeDependent{<:AbstractVector{<:OptE_Opt}},
+                              TimeDependent{<:TimeDependentOptimiserCallable},
+                              TimeDependent{<:PreviousWeightsFunction},
+                              TimeDependent{<:Base.Callable}}
+
+The [`TimeDependent`](@ref) forms admissible in an *optimiser-valued* field — where the scheduled thing is the optimiser itself, not one of its inputs.
+
+Two of the four are statically checked: a vector schedule whose entries are all [`OptE_Opt`](@ref) (an optimiser or a precomputed result — a mixed schedule is allowed, fold `i` optimising or predicting depending on what entry `i` is), and a [`TimeDependentOptimiserCallable`](@ref), which declares its output kind in its type. The other two — a bare `ctx -> optimiser` and a [`PreviousWeightsFunction`](@ref) wrapping one — cannot be checked before they run, so their output is checked when the fold loop swaps it into the field, by the host's own keyword constructor.
+
+Because an optimiser-valued field is *required*, a schedule in one has no static default to reset to on a fold-less solve and must supply `default` (see [`NoDefault`](@ref), [`TimeDependentDefaultError`](@ref)).
+
+# Related
+
+  - [`TimeDependent`](@ref)
+  - [`TimeDependentOptimiserCallable`](@ref)
+  - [`TDO_Option`](@ref)
+  - [`TD_Option`](@ref)
+  - [`OptE_Opt`](@ref)
+"""
+const TD_OptE_Opt = Union{TimeDependent{<:AbstractVector{<:OptE_Opt}},
+                          TimeDependent{<:TimeDependentOptimiserCallable},
+                          TimeDependent{<:PreviousWeightsFunction},
+                          TimeDependent{<:Base.Callable}}
+"""
+    const TDO_Option{X} = Union{Nothing, <:TD_OptE_Opt, X}
+
+Alias for an *optional* optimiser-valued field (e.g. a fallback) that accepts `nothing`, a static value of type `X`, or a per-fold schedule of optimisers.
+
+A required optimiser-valued field spells its union out — `Union{<:X, <:TD_OptE_Opt}` — since `nothing` is not one of its values.
+
+# Related
+
+  - [`TD_OptE_Opt`](@ref)
+  - [`TD_Option`](@ref)
+  - [`Option`](@ref)
+"""
+const TDO_Option{X} = Union{Nothing, <:TD_OptE_Opt, X}
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -542,7 +666,7 @@ function port_opt_view(td::TimeDependent, i, args...)
     if isa(v, AbstractVector)
         v = [port_opt_view(x, i) for x in v]
     end
-    return TimeDependent(v, td.bind)
+    return TimeDependent(v, td.bind; default = port_opt_view(td.default, i))
 end
 """
     time_dependent_fields(opt, all_binds::Bool = true)
@@ -581,12 +705,15 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Test-substitute every vector entry of the [`TimeDependent`](@ref)-valued fields in `args` through the keyword constructor of `T`.
 
-`args` holds the host constructor's arguments; `defaults` the static defaults of the fields that may be time-dependent (non-`nothing` defaults only). Each per-fold entry is substituted into its field — with every other time-dependent field at its static default — and the constructor re-run, surfacing type and cross-field errors at construction time instead of mid-backtest. Substituted calls contain no `TimeDependent` values, so the recursion terminates.
+`args` holds the host constructor's arguments; `defaults` the static defaults of the fields that may be time-dependent (see [`time_dependent_field_defaults`](@ref)). Each per-fold entry, and an explicit `default`, is substituted into its field — with every other time-dependent field standing at a value of its own (see [`time_dependent_stand_in`](@ref)) — and the constructor re-run, surfacing type and cross-field errors at construction time instead of mid-backtest. Substituted calls contain no `TimeDependent` values, so the recursion terminates.
+
+Validation is skipped when a time-dependent field has no stand-in at all — a callable schedule in a required field, whose value only exists once a fold context does.
 
 # Related
 
   - [`TimeDependent`](@ref)
   - [`time_dependent_fields`](@ref)
+  - [`time_dependent_stand_in`](@ref)
 """
 function assert_time_dependent_substitution(::Type{T}, args::NamedTuple,
                                             defaults::NamedTuple)::Nothing where {T}
@@ -594,16 +721,52 @@ function assert_time_dependent_substitution(::Type{T}, args::NamedTuple,
     if isempty(tdfs)
         return nothing
     end
-    base = merge(args, NamedTuple{tdfs}(map(f -> get(defaults, f, nothing), tdfs)))
+    stand_ins = map(f -> time_dependent_stand_in(args[f], defaults, f), tdfs)
+    if any(isnothing, stand_ins)
+        return nothing
+    end
+    base = merge(args, NamedTuple{tdfs}(map(something, stand_ins)))
     for f in tdfs
-        v = args[f].val
+        td = args[f]
+        v = td.val
         if isa(v, AbstractVector)
             for x in v
                 T(; merge(base, NamedTuple{(f,)}((x,)))...)
             end
         end
+        d = td.default
+        if !isa(d, NoDefault)
+            T(; merge(base, NamedTuple{(f,)}((d,)))...)
+        end
     end
     return nothing
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a valid static value for a [`TimeDependent`](@ref)-valued field, wrapped in `Some`, or `nothing` if none exists.
+
+Used by [`assert_time_dependent_substitution`](@ref) to stand the *other* time-dependent fields at a valid value while it test-substitutes one of them: the schedule's `default`, else the field's static default, else the schedule's first entry. A callable schedule in a field with no default of either kind has no stand-in — its value exists only inside a fold — so it returns `nothing` and validation is skipped.
+
+Unlike [`time_dependent_reset_value`](@ref) this never throws: a schedule without a fold-less value is legitimate at construction time and only fails if it reaches a fold-less solve.
+
+# Related
+
+  - [`assert_time_dependent_substitution`](@ref)
+  - [`time_dependent_reset_value`](@ref)
+  - [`NoDefault`](@ref)
+"""
+function time_dependent_stand_in(td::TimeDependent, defaults::NamedTuple, field::Symbol)
+    d = td.default
+    if !isa(d, NoDefault)
+        return Some(d)
+    end
+    d = get(defaults, field, nothing)
+    if !isa(d, NoDefault)
+        return Some(d)
+    end
+    v = td.val
+    return isa(v, AbstractVector) ? Some(v[1]) : nothing
 end
 """
     assert_time_dependent_fold_count(opt, n::Integer, all_binds::Bool = true)
@@ -794,17 +957,44 @@ end
 """
     time_dependent_field_defaults(opt)
 
-Return a `NamedTuple` of the non-`nothing` static defaults of the optimiser fields that may hold a [`TimeDependent`](@ref).
+Return a `NamedTuple` of the static defaults of the optimiser fields that may hold a [`TimeDependent`](@ref), for those whose default is not `nothing`.
 
-Used by [`reset_time_dependent_estimator`](@ref) to replace per-fold schedules with their static defaults on fold-less solves; fields absent from the tuple default to `nothing`. The fallback method returns an empty tuple.
+Used by [`reset_time_dependent_estimator`](@ref) to replace per-fold schedules with their static defaults on fold-less solves; fields absent from the tuple default to `nothing`. A *required* field — one with no static default at all, i.e. the optimiser-valued fields — is listed with [`NoDefault`](@ref), which is not a value it can take but a declaration that a schedule there must carry its own `default`. The fallback method returns an empty tuple.
 
 # Related
 
   - [`reset_time_dependent_estimator`](@ref)
+  - [`time_dependent_reset_value`](@ref)
+  - [`NoDefault`](@ref)
   - [`TD_Option`](@ref)
 """
 function time_dependent_field_defaults(::Any)::NamedTuple
     return (;)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the value a [`TimeDependent`](@ref)-valued field takes outside every fold loop.
+
+The schedule's own `default` wins; absent one ([`NoDefault`](@ref)), the host's static default for `field` is used ([`time_dependent_field_defaults`](@ref), `nothing` for fields it omits). Throws a [`TimeDependentDefaultError`](@ref) when neither exists — a schedule in a required field that never said what a fold-less solve should do.
+
+# Related
+
+  - [`reset_time_dependent_fields`](@ref)
+  - [`time_dependent_field_defaults`](@ref)
+  - [`TimeDependentDefaultError`](@ref)
+"""
+function time_dependent_reset_value(td::TimeDependent, defaults::NamedTuple, field::Symbol,
+                                    opt)
+    d = td.default
+    if !isa(d, NoDefault)
+        return d
+    end
+    d = get(defaults, field, nothing)
+    if isa(d, NoDefault)
+        throw(TimeDependentDefaultError("field `$field` of $(nameof(typeof(opt))) holds a TimeDependent schedule, but the field has no static default and the schedule supplies none, so there is no value to use outside a fold loop. A schedule is defined only over the folds of a cross-validation scheme; this solve has none. Give the schedule a fold-less value: TimeDependent(val; default = x)."))
+    end
+    return d
 end
 """
     reset_time_dependent_estimator(opt)
@@ -828,13 +1018,14 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Rebuild a host optimiser with each [`TimeDependent`](@ref)-valued field replaced by its static default.
+Rebuild a host optimiser with each [`TimeDependent`](@ref)-valued field replaced by its fold-less value (see [`time_dependent_reset_value`](@ref)).
 
 Shared implementation behind the hosts' [`reset_time_dependent_estimator`](@ref) methods. Returns `opt` unchanged when no field is time-dependent.
 
 # Related
 
   - [`reset_time_dependent_estimator`](@ref)
+  - [`time_dependent_reset_value`](@ref)
   - [`time_dependent_field_defaults`](@ref)
   - [`time_dependent_fields`](@ref)
 """
@@ -844,7 +1035,8 @@ function reset_time_dependent_fields(opt)
         return opt
     end
     defaults = time_dependent_field_defaults(opt)
-    repl = NamedTuple{tdfs}(map(f -> get(defaults, f, nothing), tdfs))
+    repl = NamedTuple{tdfs}(map(f -> time_dependent_reset_value(getfield(opt, f), defaults,
+                                                                f, opt), tdfs))
     return rebuild_estimator(opt, repl)
 end
 #! End: Overload these for all estimators which can use time-dependent constraints.
@@ -1728,4 +1920,5 @@ export optimise, OptimisationSuccess, OptimisationFailure, IterativeWeightFinali
        RelativeErrorWeightFinaliser, SquaredRelativeErrorWeightFinaliser,
        AbsoluteErrorWeightFinaliser, SquaredAbsoluteErrorWeightFinaliser,
        JuMPWeightFinaliser, TimeDependent, TimeDependentContext, PreviousWeightsFunction,
-       TimeDependentCallable
+       TimeDependentCallable, TimeDependentOptimiserCallable, NoDefault,
+       TimeDependentDefaultError
