@@ -54,7 +54,6 @@ VecOptE_Opt_TD
 factory(opt::VecOptE_Opt_TD, args...)
 TD_VecOptE_Opt
 TDO_OptE_Opt
-reset_time_dependent_estimator(td::TD_OptE_Opt)
 assert_nearest_optimiser_schedule
 inner_fold_fields
 time_dependent_value
@@ -76,6 +75,7 @@ is_time_dependent(::OptE_Opt)
 is_time_dependent(opt::VecOptE_Opt)
 is_time_dependent(opt::BaseOptimisationEstimator)
 is_time_dependent(::TimeDependent)
+is_time_dependent(opt::VecOptE_Opt_TD)
 update_time_dependent_estimator
 update_time_dependent_fields
 time_dependent_field_defaults
