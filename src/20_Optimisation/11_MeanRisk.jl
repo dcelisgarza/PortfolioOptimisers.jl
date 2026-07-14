@@ -158,6 +158,8 @@ MeanRisk
       │      card ┼ nothing
       │     scard ┼ nothing
       │       wn2 ┼ nothing
+      │       wnp ┼ nothing
+      │     wninf ┼ nothing
       │        l1 ┼ nothing
       │        l2 ┼ nothing
       │      linf ┼ nothing

@@ -4,6 +4,7 @@
 NestedClusteredResult
 factory(res::NestedClusteredResult, fb::Option{<:OptE_Opt})
 NestedClustered
+nested_clustered_td_defaults
 factory(nco::NestedClustered, w::AbstractVector)
 port_opt_view(nco::NestedClustered, i, X::MatNum, args...)
 predict_outer_nco_estimator_returns
@@ -18,4 +19,5 @@ assert_rc_pl(::Any)
 assert_external_optimiser(opt::ClusteringOptimisationEstimator)
 RiskBudgetingOptimiser
 assert_rc_variance
+_update_asset_sets
 ```

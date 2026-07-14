@@ -9,6 +9,7 @@ factory(res::NearOptimalCenteringResult, fb::Option{<:OptE_Opt})
 Base.getproperty(r::NearOptimalCenteringResult, sym::Symbol)
 NearOptimalSetup
 NearOptimalCentering
+near_optimal_centering_td_defaults
 needs_previous_weights(opt::NearOptimalCentering)
 factory(noc::NearOptimalCentering, w::AbstractVector)
 port_opt_view(noc::NearOptimalCentering, i, X::MatNum, args...)

@@ -7,6 +7,7 @@ is_time_dependent(opt::NaiveOptimisationEstimator)
 reset_time_dependent_estimator(opt::NaiveOptimisationEstimator)
 assert_internal_optimiser(::NaiveOptimisationEstimator)
 assert_external_optimiser(::NaiveOptimisationEstimator)
+naive_optimiser_td_defaults
 NaiveOptimisationResult
 factory(res::NaiveOptimisationResult, fb::Option{<:OptE_Opt})
 InverseVolatility

@@ -115,6 +115,23 @@ Abstract supertype for all portfolio weight regularisation estimators.
   - [`LpRegularisation`](@ref)
 """
 abstract type AbstractRegularisationEstimator <: AbstractEstimator end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Defines the L2-norm regularisation term added to the optimisation objective.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+## Validation
+
+  - `val > 0` and finite.
+
+# Related
+
+  - [`LpRegularisation`](@ref)
+"""
 @concrete struct L2Regularisation <: AbstractRegularisationEstimator
     """
     $(field_dict[:val])
@@ -133,6 +150,16 @@ function L2Regularisation(; val::Number = 1e-4,
                           alg::SecondMomentFormulation = SOCRiskExpr())
     return L2Regularisation(val, alg)
 end
+"""
+    const VecL2Reg = AbstractVector{<:L2Regularisation}
+
+Alias for a vector of [`L2Regularisation`](@ref) objects.
+
+# Related
+
+  - [`L2Regularisation`](@ref)
+  - [`L2Reg_VecL2Reg`](@ref)
+"""
 const VecL2Reg = AbstractVector{<:L2Regularisation}
 """
     const L2Reg_VecL2Reg = Union{<:L2Regularisation, <:VecL2Reg}
@@ -148,6 +175,12 @@ Matches either a single [`L2Regularisation`](@ref) or a vector of them ([`VecL2R
   - [`set_l2_regularisation!`](@ref)
 """
 const L2Reg_VecL2Reg = Union{<:L2Regularisation, <:VecL2Reg}
+"""
+    _set_l2_regularisation!(model::JuMP.Model, i::Integer, w::VecNum,
+                            l2::L2Regularisation, sc::Number)
+
+Sets the L2 regularisation term for a single [`L2Regularisation`](@ref) object in the optimisation model using the formulation specified by `l2.alg`. The penalty value is not adjusted so it must be consistent with the cone being used.
+"""
 function _set_l2_regularisation!(model::JuMP.Model, i::Integer, w::VecNum,
                                  l2::L2Regularisation{<:Any, <:SOCRiskExpr}, sc::Number)
     val = l2.val
@@ -315,6 +348,11 @@ function set_lp_regularisation!(model::JuMP.Model, lps::LpReg_VecLpReg)
         add_to_objective_penalty!(model, lp_expr)
     end
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Sets the L∞ regularisation term in the objective function. The penalty value is not adjusted so it must be consistent with the range of values the weights can take.
+"""
 function set_linf_regularisation!(model::JuMP.Model, linf::Number)
     w = get_w(model)
     sc = get_constraint_scale(model)

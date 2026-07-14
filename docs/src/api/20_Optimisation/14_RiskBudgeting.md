@@ -3,6 +3,7 @@
 ```@docs
 RiskBudgetingResult
 factory(res::RiskBudgetingResult, fb::Option{<:OptE_Opt})
+risk_budgeting_td_defaults
 Base.getproperty(r::RiskBudgetingResult, sym::Symbol)
 ProcessedRiskBudgetingAttributes
 ProcessedFactorRiskBudgetingAttributes

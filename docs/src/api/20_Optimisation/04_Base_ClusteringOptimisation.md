@@ -6,6 +6,7 @@ ClusteringOptimisationEstimator
 HierarchicalResult
 factory(res::HierarchicalResult, fb::Option{<:OptE_Opt})
 HierarchicalOptimiser
+hierarchical_optimiser_td_defaults
 needs_previous_weights(opt::HierarchicalOptimiser)
 is_time_dependent(opt::ClusteringOptimisationEstimator)
 reset_time_dependent_estimator(opt::ClusteringOptimisationEstimator)

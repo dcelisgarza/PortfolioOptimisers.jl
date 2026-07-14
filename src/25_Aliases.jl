@@ -661,7 +661,17 @@ Alias for [`NonOptimisationRiskRatio`](@ref).
 const NonOptRkRatio = NonOptimisationRiskRatio
 
 # ── Risk measures — Settings ──────────────────────────────────────
+"""
+    RkSet
+
+Alias for [`RiskMeasureSettings`](@ref).
+"""
 const RkSet = RiskMeasureSettings
+"""
+    HRkSet
+
+Alias for [`HierarchicalRiskMeasureSettings`](@ref).
+"""
 const HRkSet = HierarchicalRiskMeasureSettings
 
 # ── Moments ──────────────────────────────────────
@@ -976,7 +986,17 @@ const LCE = LinearConstraintEstimator
 Alias for [`WeightBoundsEstimator`](@ref).
 """
 const WBE = WeightBoundsEstimator
+"""
+    L2Reg
+
+Alias for [`L2Regularisation`](@ref).
+"""
 const L2Reg = L2Regularisation
+"""
+    LpReg
+
+Alias for [`LpRegularisation`](@ref).
+"""
 const LpReg = LpRegularisation
 
 # ── Optimisers ──────────────────────────────────────

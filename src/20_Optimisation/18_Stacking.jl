@@ -322,6 +322,11 @@ function Stacking(; pe::TD{<:PrE_Pr} = EmpiricalPrior(), wb::TD_Option{<:WbE_Wb}
     return Stacking(pe, wb, fees, sets, scale, narrow_optimiser_vector(opti), opto, cv, wf,
                     ex, fb, brt, strict)
 end
+"""
+    assert_special_nco_requirements_stacking_opti(opti::AbstractVector)
+
+Ensures there are no Finite optimisation estimators or results in the vector.
+"""
 function assert_special_nco_requirements_stacking_opti(opti::AbstractVector)::Nothing
     @argcheck(!any(x -> isa(x, NonFiniteAllocationOptimisationResult), opti),
               ArgumentError("opti cannot contain NonFiniteAllocationOptimisationResult elements"))

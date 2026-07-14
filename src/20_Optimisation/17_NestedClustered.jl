@@ -629,6 +629,15 @@ function predict_outer_nco_estimator_returns(nco::NestedClustered{<:Any, <:Any, 
     best_predictions = [scorer(prediction) for prediction in predictions]
     return rebuild_returns_result(rd, best_predictions)
 end
+"""
+    _update_asset_sets(nco::NestedClustered, rdo::ReturnsResult)
+
+Checks if `nco` uses asset sets, checks that the names are consistent with the outer returns result `rdo`, and updates the asset sets if necessary. Returns the new updated `nco` or the original if no update was needed.
+
+# Returns
+
+    - `nco::NestedClustered`: New instance of [`NestedClustered`](@ref) with updated asset sets, or the original if no update was needed.
+"""
 function _update_asset_sets(nco::NestedClustered, rdo::ReturnsResult)
     return if (hasproperty(nco.opto, :opt) &&
                hasproperty(nco.opto.opt, :sets) &&

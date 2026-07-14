@@ -7,6 +7,7 @@ RegularisedRelaxedRiskBudgeting
 RegularisedPenalisedRelaxedRiskBudgeting
 RelaxedRiskBudgeting
 needs_previous_weights(opt::RelaxedRiskBudgeting)
+relaxed_risk_budgeting_td_defaults
 factory(rrb::RelaxedRiskBudgeting, w::AbstractVector)
 port_opt_view(rrb::RelaxedRiskBudgeting, i, X::MatNum, args...)
 set_relaxed_risk_budgeting_alg_constraints!

@@ -51,6 +51,26 @@ function set_weight_norm_2_constraints!(model::JuMP.Model, val::Number)
                       end)
     return nothing
 end
+"""
+    set_weight_norm_p_constraints!(args...)
+    set_weight_norm_p_constraints!(model::JuMP.Model, lps::LpReg_VecLpReg)
+
+Constrain the P-Norm of the weights to be less than or equal to the value in `lps`. Vararg method is a no-op.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - `lps::LpReg_VecLpReg`: Single instance or vector of [`LpRegularisation`](@ref) objects, one for each P-Norm constraint.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`LpRegularisation`](@ref)
+  - [`set_weight_norm_inf_constraints!`](@ref)
+"""
 function set_weight_norm_p_constraints!(args...)
     return nothing
 end
@@ -87,6 +107,26 @@ function set_weight_norm_p_constraints!(model::JuMP.Model, lps::LpReg_VecLpReg)
     end
     return nothing
 end
+"""
+    set_weight_norm_inf_constraints!(args...)
+    set_weight_norm_inf_constraints!(model::JuMP.Model, linf::Number)
+
+Constrain the L∞-Norm of the weights to be less than or equal to `linf`. Vararg method is a no-op.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - `linf::Number`: Maximum allowed L∞-Norm of the weights.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`set_weight_norm_2_constraints!`](@ref)
+  - [`set_weight_norm_p_constraints!`](@ref)
+"""
 function set_weight_norm_inf_constraints!(args...)
     return nothing
 end

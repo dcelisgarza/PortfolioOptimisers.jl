@@ -221,6 +221,8 @@ TTS
 ```@docs
 LCE
 WBE
+L2Reg
+LpReg
 ```
 
 ## Objectives
