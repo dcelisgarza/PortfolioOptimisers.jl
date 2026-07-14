@@ -1239,4 +1239,325 @@ end
             @test !isapprox(p_direct.pred[1].res.w, w0)
         end
     end
+    @testset "Schedules in the meta-optimisers' optimiser-valued fields" begin
+        ew, iv = EqualWeighted(), InverseVolatility()
+        mr0 = MeanRisk(; opt = JuMPOptimiser(; slv = slv))
+        mrl = MeanRisk(;
+                       opt = JuMPOptimiser(; slv = slv,
+                                           l2 = L2Regularisation(; val = 1e-3)))
+        res = optimise(iv, rd)
+        cvw = IndexWalkForward(100, 50)  # 2 outer folds over the 200-row sample
+        cv3 = OptimisationCrossValidation(; cv = KFold(; n = 3))
+        sex = PortfolioOptimisers.FLoops.SequentialEx()
+        @testset "Construction: bind legality per position" begin
+            # :nearest is legal on NestedClustered.opti — its inner CV is entered per
+            # cluster, so the field is the inner fold loop's entry point — but the
+            # position's double consumer forces an explicit default (the per-cluster
+            # full-sample leg always resolves the schedule fold-lessly)...
+            @test_throws PortfolioOptimisers.TimeDependentDefaultError NestedClustered(;
+                                                                                       opti = TimeDependent([mr0,
+                                                                                                             mrl,
+                                                                                                             mr0],
+                                                                                                            :nearest),
+                                                                                       opto = mr0,
+                                                                                       cv = cv3)
+            # ...and an inner CV to bind to; without one the schedule would be inert.
+            @test_throws ArgumentError NestedClustered(;
+                                                       opti = TimeDependent([mr0, mrl, mr0],
+                                                                            :nearest;
+                                                                            default = mr0),
+                                                       opto = mr0)
+            @test isa(NestedClustered(;
+                                      opti = TimeDependent([mr0, mrl, mr0], :nearest;
+                                                           default = mr0), opto = mr0,
+                                      cv = cv3), NestedClustered)
+            # Stacking's inner CV is entered per candidate, so :nearest is legal on an
+            # element (same two checks)...
+            @test_throws PortfolioOptimisers.TimeDependentDefaultError Stacking(;
+                                                                                opti = [TimeDependent([ew,
+                                                                                                       iv,
+                                                                                                       ew],
+                                                                                                      :nearest),
+                                                                                        mr0],
+                                                                                opto = mr0,
+                                                                                cv = cv3)
+            @test_throws ArgumentError Stacking(;
+                                                opti = [TimeDependent([ew, iv, ew],
+                                                                      :nearest;
+                                                                      default = ew), mr0],
+                                                opto = mr0)
+            @test isa(Stacking(;
+                               opti = [TimeDependent([ew, iv, ew], :nearest; default = ew),
+                                       mr0], opto = mr0, cv = cv3), Stacking)
+            # ...and rejected on the field: the fold loop is handed the elements, and a
+            # per-fold candidate vector would break the identity of opto's columns.
+            @test_throws ArgumentError Stacking(;
+                                                opti = TimeDependent([[ew, mr0], [iv, mr0]],
+                                                                     :nearest;
+                                                                     default = [ew, mr0]),
+                                                opto = mr0, cv = cv3)
+            # No inner fold loop owns the outer optimisers, SubsetResampling.opt or any
+            # fallback, so :nearest is rejected there outright.
+            @test_throws ArgumentError Stacking(; opti = [mr0],
+                                                opto = TimeDependent([ew, iv], :nearest;
+                                                                     default = ew),
+                                                cv = cv3)
+            @test_throws ArgumentError NestedClustered(; opti = mr0,
+                                                       opto = TimeDependent([ew, iv],
+                                                                            :nearest;
+                                                                            default = ew),
+                                                       cv = cv3)
+            @test_throws ArgumentError SubsetResampling(;
+                                                        opt = TimeDependent([ew, iv],
+                                                                            :nearest;
+                                                                            default = ew),
+                                                        subset_size = 3, n_subsets = 2)
+            @test_throws ArgumentError Stacking(; opti = [mr0], opto = mr0,
+                                                fb = TimeDependent([ew, iv], :nearest))
+            @test_throws ArgumentError NestedClustered(; opti = mr0, opto = mr0,
+                                                       fb = TimeDependent([ew, iv],
+                                                                          :nearest))
+            @test_throws ArgumentError SubsetResampling(; opt = mr0,
+                                                        fb = TimeDependent([ew, iv],
+                                                                           :nearest),
+                                                        subset_size = 3, n_subsets = 2)
+            # NCO's opti/opto schedule entries must be estimators, like the static
+            # fields: the constructor's entry substitution rejects a precomputed result.
+            @test_throws TypeError NestedClustered(; opti = TimeDependent([mr0, res]),
+                                                   opto = mr0)
+            @test_throws TypeError NestedClustered(; opti = mr0,
+                                                   opto = TimeDependent([mr0, res]))
+            # cv stays static: it IS the inner fold loop, not per-fold problem definition.
+            @test_throws TypeError NestedClustered(; opti = mr0, opto = mr0,
+                                                   cv = TimeDependent([cv3, cv3]))
+            # A literal mixing static optimisers and schedules narrows through the
+            # keyword constructor even though its inferred eltype is too wide.
+            @test isa(Stacking(; opti = [mr0, TimeDependent([ew, iv]; default = ew)],
+                               opto = mr0).opti, PortfolioOptimisers.VecOptE_Opt_TD)
+            @test_throws ArgumentError Stacking(; opti = [mr0, Variance()], opto = mr0)
+            # The hosts declare which fields their own inner fold loop consumes.
+            @test PortfolioOptimisers.inner_fold_fields(Stacking(; opti = [mr0],
+                                                                 opto = mr0)) == (:opti,)
+            @test PortfolioOptimisers.inner_fold_fields(NestedClustered(; opti = mr0,
+                                                                        opto = mr0)) ==
+                  (:opti,)
+            @test PortfolioOptimisers.inner_fold_fields(SubsetResampling(; opt = mr0)) == ()
+        end
+        @testset "Per-field entitlement: the scan leaves :nearest opti for the inner CV" begin
+            ncoX = NestedClustered(;
+                                   opti = TimeDependent([mr0, mrl, mr0], :nearest;
+                                                        default = mr0),
+                                   opto = TimeDependent([ew, iv]; default = ew), cv = cv3)
+            # Even at all_binds = true the pass skips the :nearest opti — NCO's own inner
+            # CV, not the scanning loop, is nearest for that field — while the
+            # :outermost opto is taken either way.
+            @test PortfolioOptimisers.time_dependent_fields(ncoX, true) == (:opto,)
+            @test PortfolioOptimisers.time_dependent_fields(ncoX, false) == (:opto,)
+            # An :outermost opti is not the inner loop's to consume, so the scan takes it.
+            ncoO = NestedClustered(; opti = TimeDependent([mr0, mrl]; default = mr0),
+                                   opto = mr0)
+            @test PortfolioOptimisers.time_dependent_fields(ncoO, true) == (:opti,)
+        end
+        @testset "NestedClustered: reset trap and the double consumer" begin
+            # An observable :nearest schedule: the callable may only run in the inner CV
+            # leg, never in the per-cluster full-sample leg (which takes the default).
+            seen = zeros(Int, 3)
+            obs = TimeDependent(ctx -> begin
+                                    seen[ctx.i] += 1
+                                    mrl
+                                end, :nearest; default = mr0)
+            nco = NestedClustered(; opti = obs, opto = mr0, cv = cv3, ex = sex)
+            # The fold-less reset at the top of _optimise must leave the :nearest
+            # schedule in place — resetting it would swap in the default before the
+            # inner CV ever saw it.
+            nres = PortfolioOptimisers.reset_time_dependent_estimator(nco)
+            @test isa(nres.opti, TimeDependent)
+            # One standalone solve exercises both consumers: the callable fires once per
+            # inner fold per cluster; the per-cluster optimise leg runs the default.
+            nr = optimise(nco, rd)
+            @test isa(nr.retcode, OptimisationSuccess)
+            @test seen == fill(nr.clr.k, 3)
+            # Under an outer walk-forward the inner-sized :nearest schedule is skipped by
+            # the outer split's count check and consumed by the inner KFold(3).
+            near3 = TimeDependent([mr0, mrl, mr0], :nearest; default = ew)
+            nco3 = NestedClustered(; opti = near3, opto = mr0, cv = cv3)
+            @test length(cross_val_predict(nco3, rd, cvw).pred) == 2
+            @test isa(optimise(nco3, rd).retcode, OptimisationSuccess)
+            # :outermost resolves per outer fold before recursion; an inner-sized
+            # :outermost schedule therefore fails at the outer split.
+            nco2 = NestedClustered(; opti = TimeDependent([mr0, mrl]), opto = mr0)
+            @test length(cross_val_predict(nco2, rd, cvw).pred) == 2
+            nco_bad = NestedClustered(; opti = TimeDependent([mr0, mrl, mr0]), opto = mr0)
+            @test_throws DimensionMismatch cross_val_predict(nco_bad, rd, cvw)
+            # Fold-less, an :outermost schedule resolves to its default; without one
+            # there is no optimiser to run.
+            @test isa(optimise(NestedClustered(;
+                                               opti = TimeDependent([mr0, mrl];
+                                                                    default = mr0),
+                                               opto = mr0), rd).retcode,
+                      OptimisationSuccess)
+            @test_throws PortfolioOptimisers.TimeDependentDefaultError optimise(nco_bad, rd)
+        end
+        @testset "Stacking: element schedules and the field-level vector of vectors" begin
+            # An element schedule is the inner CV's per-candidate entry point; the
+            # full-sample wi fit resolves it to its default within the same solve.
+            seen = zeros(Int, 3)
+            el = TimeDependent(ctx -> begin
+                                   seen[ctx.i] += 1
+                                   mrl
+                               end, :nearest; default = mr0)
+            st = Stacking(; opti = [el, mr0], opto = mr0, cv = cv3, ex = sex)
+            sres = optimise(st, rd)
+            @test isa(sres.retcode, OptimisationSuccess)
+            @test seen == [1, 1, 1]
+            @test length(sres.resi) == 2
+            # Under an outer loop the recursion leaves the :nearest element alone; an
+            # outer-sized :outermost element is resolved by the outer loop instead.
+            @test length(cross_val_predict(st, rd, cvw).pred) == 2
+            st2 = Stacking(; opti = [TimeDependent([ew, iv]), mr0], opto = mr0)
+            @test length(cross_val_predict(st2, rd, cvw).pred) == 2
+            # Fold-less, a defaultless :outermost element hits the wi fit and throws.
+            @test_throws PortfolioOptimisers.TimeDependentDefaultError optimise(Stacking(;
+                                                                                         opti = [TimeDependent([ew,
+                                                                                                                iv]),
+                                                                                                 mr0],
+                                                                                         opto = mr0,
+                                                                                         ex = sex),
+                                                                                rd)
+            # A mixed element schedule optimises or predicts per outer fold.
+            stm = Stacking(; opti = [TimeDependent([mr0, res]), mr0], opto = mr0)
+            @test length(cross_val_predict(stm, rd, cvw).pred) == 2
+            # Field-level: entry i is fold i's complete candidate vector; the default is
+            # the fold-less vector, and a defaultless schedule cannot solve fold-lessly.
+            stf = Stacking(;
+                           opti = TimeDependent([[mr0, ew], [mrl, iv]];
+                                                default = [mr0, ew]), opto = mr0)
+            @test length(cross_val_predict(stf, rd, cvw).pred) == 2
+            @test isa(optimise(stf, rd).retcode, OptimisationSuccess)
+            @test_throws PortfolioOptimisers.TimeDependentDefaultError optimise(Stacking(;
+                                                                                         opti = TimeDependent([[mr0,
+                                                                                                                ew],
+                                                                                                               [mrl,
+                                                                                                                iv]]),
+                                                                                         opto = mr0),
+                                                                                rd)
+            @test_throws DimensionMismatch cross_val_predict(Stacking(;
+                                                                      opti = TimeDependent([[mr0,
+                                                                                             ew]]),
+                                                                      opto = mr0), rd, cvw)
+        end
+        @testset "Stacking: opto and scale schedules" begin
+            # opto resolves per outer fold; fold-less it resets to its default.
+            sto = Stacking(; opti = [mr0], opto = TimeDependent([ew, iv]; default = ew))
+            @test length(cross_val_predict(sto, rd, cvw).pred) == 2
+            @test isa(optimise(sto, rd).retcode, OptimisationSuccess)
+            @test_throws PortfolioOptimisers.TimeDependentDefaultError optimise(Stacking(;
+                                                                                         opti = [mr0],
+                                                                                         opto = TimeDependent([ew,
+                                                                                                               iv])),
+                                                                                rd)
+            # scale is ordinary problem definition: per-fold under CV, its static
+            # default (nothing) fold-lessly.
+            sts = Stacking(; opti = [mr0, mrl], opto = mr0,
+                           scale = TimeDependent([[1.0, 1.0], [2.0, 1.0]]))
+            @test length(cross_val_predict(sts, rd, cvw).pred) == 2
+            @test optimise(sts, rd).w ==
+                  optimise(Stacking(; opti = [mr0, mrl], opto = mr0), rd).w
+            # Entry substitution still runs the cross-field checks per fold.
+            @test_throws DimensionMismatch Stacking(; opti = [mr0, mrl], opto = mr0,
+                                                    scale = TimeDependent([[1.0],
+                                                                           [2.0, 1.0]]))
+        end
+        @testset "SubsetResampling: opt, sizes and the nothing-entry fallback" begin
+            sr = SubsetResampling(; opt = TimeDependent([mr0, mrl]; default = mr0),
+                                  subset_size = 3, n_subsets = 2, rng = StableRNG(7),
+                                  seed = 11)
+            @test length(cross_val_predict(sr, rd, cvw).pred) == 2
+            sr0 = SubsetResampling(; opt = mr0, subset_size = 3, n_subsets = 2,
+                                   rng = StableRNG(7), seed = 11)
+            @test optimise(sr, rd).w == optimise(sr0, rd).w
+            @test_throws PortfolioOptimisers.TimeDependentDefaultError optimise(SubsetResampling(;
+                                                                                                 opt = TimeDependent([mr0,
+                                                                                                                      mrl]),
+                                                                                                 subset_size = 3,
+                                                                                                 n_subsets = 2),
+                                                                                rd)
+            # subset_size and n_subsets are per-fold problem definition with static
+            # defaults to reset to.
+            srs = SubsetResampling(; opt = mr0, subset_size = TimeDependent([3, 4]),
+                                   n_subsets = TimeDependent([2, 3]), rng = StableRNG(7),
+                                   seed = 11)
+            @test length(cross_val_predict(srs, rd, cvw).pred) == 2
+            srr = PortfolioOptimisers.reset_time_dependent_estimator(srs)
+            @test srr.subset_size == 0.8
+            @test srr.n_subsets == 2
+            @test_throws TypeError SubsetResampling(; opt = mr0,
+                                                    subset_size = TimeDependent([3, "a"]))
+            # An optional optimiser field admits nothing entries: the fallback is
+            # switched off on fold 2 and the failure stands there.
+            bad = JuMPOptimiser(; slv = slv, wb = WeightBounds(; lb = 0.5, ub = 0.55))
+            mrbad = MeanRisk(; opt = bad)
+            fbsched = TimeDependent([iv, nothing])
+            @test isnothing(PortfolioOptimisers.assert_time_dependent_fold_count(fbsched, 2,
+                                                                                 true))
+            @test_throws DimensionMismatch PortfolioOptimisers.assert_time_dependent_fold_count(fbsched,
+                                                                                                3,
+                                                                                                true)
+            srf = SubsetResampling(; opt = mrbad, fb = fbsched, subset_size = 3,
+                                   n_subsets = 2, rng = StableRNG(7), seed = 11)
+            @test isnothing(PortfolioOptimisers.reset_time_dependent_estimator(srf).fb)
+            pf = cross_val_predict(srf, rd, cvw)
+            @test isa(pf.pred[1].res.retcode, OptimisationSuccess)
+            @test !isa(pf.pred[2].res.retcode, OptimisationSuccess)
+            # Regression: the fold-less fast path dispatches on fb, not seed — a static
+            # fallback must be walked even when seed is nothing.
+            sr_fb = SubsetResampling(; opt = mrbad, fb = iv, subset_size = 3, n_subsets = 2,
+                                     rng = StableRNG(7))
+            @test isa(optimise(sr_fb, rd).retcode, OptimisationSuccess)
+        end
+        @testset "factory and previous weights through surviving schedules" begin
+            w0 = fill(1 / 5, 5)
+            mrtn = MeanRisk(;
+                            opt = JuMPOptimiser(; slv = slv,
+                                                tn = Turnover(; val = 0.1, w = w0)))
+            # The factory pass sees through a schedule, rebuilding entries and default.
+            f = PortfolioOptimisers.factory(TimeDependent([mrtn, ew], :nearest;
+                                                          default = mrtn), fill(0.2, 5))
+            @test isa(f, TimeDependent)
+            @test f.bind === :nearest
+            # A schedule inside a field-level entry vector counts toward the trait...
+            @test PortfolioOptimisers.time_dependent_entry_needs_previous_weights(TimeDependent([mrtn,
+                                                                                                 ew]))
+            @test PortfolioOptimisers.needs_previous_weights(TimeDependent([[mrtn, ew],
+                                                                            [ew, ew]]))
+            # ...and so does an element schedule of a Stacking, driving sequential outer
+            # folds; the surviving :nearest element rides the post-resolution factory
+            # pass without being consumed.
+            stn = Stacking(;
+                           opti = [TimeDependent([mrtn, mrtn, mrtn], :nearest;
+                                                 default = mrtn), mr0], opto = mr0,
+                           cv = cv3)
+            @test PortfolioOptimisers.needs_previous_weights(stn)
+            @test length(cross_val_predict(stn, rd, cvw).pred) == 2
+        end
+        @testset "Asset-subset views through meta fields" begin
+            mrv = MeanRisk(;
+                           opt = JuMPOptimiser(; slv = slv,
+                                               wb = WeightBounds(; lb = zeros(5),
+                                                                 ub = fill(0.8, 5))))
+            stv = Stacking(; opti = [TimeDependent([mrv, ew]; default = mrv), mr0],
+                           opto = mr0)
+            sv = PortfolioOptimisers.port_opt_view(stv, 1:3, rd.X)
+            @test sv.opti[1].val[1].opt.wb.ub == fill(0.8, 3)
+            @test sv.opti[1].default.opt.wb.ub == fill(0.8, 3)
+            ncov = NestedClustered(;
+                                   opti = TimeDependent([mrv, mrv, ew], :nearest;
+                                                        default = mrv), opto = mr0,
+                                   cv = cv3)
+            nv = PortfolioOptimisers.port_opt_view(ncov, 1:3, rd.X)
+            @test isa(nv.opti, TimeDependent)
+            @test nv.opti.bind === :nearest
+            @test nv.opti.val[1].opt.wb.ub == fill(0.8, 3)
+        end
+    end
 end

@@ -110,32 +110,37 @@ $(DocStringExtensions.FIELDS)
         wb::TD_Option{<:WbE_Wb} = nothing,
         fees::TD_Option{<:FeesE_Fees} = nothing,
         sets::Option{<:AssetSets} = nothing,
-        scale::Option{<:VecNum} = nothing,
-        opt::NonFiniteAllocationOptimisationEstimator,
+        scale::TD_Option{<:VecNum} = nothing,
+        opt::OptE_TD,
         wf::WeightFinaliser = IterativeWeightFinaliser(),
         ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
-        subset_size::SubsetSizeE = 0.5,
-        n_subsets::NumberSubsetsE = 100,
+        subset_size::TD{<:SubsetSizeE} = 0.5,
+        n_subsets::TD{<:NumberSubsetsE} = 100,
         max_comb::Integer = 1000,
         rng::Random.AbstractRNG = Random.default_rng(),
         seed::Option{<:Integer} = nothing,
-        fb::Option{<:OptE_Opt} = nothing,
+        fb::TDO_Option{<:OptE_Opt} = nothing,
         brt::Bool = false,
         strict::Bool = false
     ) -> SubsetResampling
 
 Keywords correspond to the struct's fields.
 
+## Time-dependent fields
+
+`opt`, `scale`, `subset_size`, `n_subsets` and `fb` may hold a [`TimeDependent`](@ref) per-fold schedule. The optimiser-valued positions `opt` and `fb` are `bind = :outermost` only: `SubsetResampling`'s internal loop is over randomly drawn *asset subsets*, not time folds, so there is no inner fold loop for a `:nearest` optimiser schedule to bind to and it is rejected at construction. The fold loop that reaches the `SubsetResampling` resolves its schedules; a fold-less solve resets `subset_size`/`n_subsets` to their static defaults, `scale`/`fb` to `nothing`, and requires an `opt` schedule to carry its own `default`. `max_comb`, `rng` and `seed` are execution control and stay static.
+
 ## Validation
 
-  - If `scale` is provided: all elements must be non-empty, `> 0`, and finite.
-  - `opt` must pass `assert_internal_optimiser`.
+  - If `scale` is provided and static: all elements must be non-empty, `> 0`, and finite.
+  - `opt` must pass `assert_internal_optimiser` (a schedule delegates to its entries and `default`).
   - If `wb` is a `WeightBoundsEstimator`: `!isnothing(sets)`.
   - If `fees` is a `FeesEstimator`: `!isnothing(sets)`.
   - If `subset_size` is an `Integer`: `subset_size >= 1`.
   - If `subset_size` is a `Float`: `0 < subset_size < 1`.
   - If `n_subsets` is an `Integer`: `n_subsets >= 2`.
   - `max_comb > 0` and finite.
+  - `opt` and `fb` schedules: `bind !== :nearest`; vector-schedule entries of every time-dependent field are validated per entry through the constructor.
 
 # Mathematical definition
 
@@ -237,14 +242,17 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
     strict
     function SubsetResampling(pe::PrE_Pr, wb::TD_Option{<:WbE_Wb},
                               fees::TD_Option{<:FeesE_Fees}, sets::Option{<:AssetSets},
-                              scale::Option{<:VecNum},
-                              opt::NonFiniteAllocationOptimisationEstimator,
-                              wf::WeightFinaliser, ex::FLoops.Transducers.Executor,
-                              subset_size::SubsetSizeE, n_subsets::NumberSubsetsE,
-                              max_comb::Integer, rng::Random.AbstractRNG,
-                              seed::Option{<:Integer}, fb::Option{<:OptE_Opt}, brt::Bool,
-                              strict::Bool)
-        assert_nonempty_gt0_finite_val(scale, :scale)
+                              scale::TD_Option{<:VecNum}, opt::OptE_TD, wf::WeightFinaliser,
+                              ex::FLoops.Transducers.Executor,
+                              subset_size::TD{<:SubsetSizeE},
+                              n_subsets::TD{<:NumberSubsetsE}, max_comb::Integer,
+                              rng::Random.AbstractRNG, seed::Option{<:Integer},
+                              fb::TDO_Option{<:OptE_Opt}, brt::Bool, strict::Bool)
+        assert_no_nearest_bind_optimiser_schedule(opt, :opt, :SubsetResampling)
+        assert_no_nearest_bind_optimiser_schedule(fb, :fb, :SubsetResampling)
+        if !isa(scale, TimeDependent)
+            assert_nonempty_gt0_finite_val(scale, :scale)
+        end
         assert_internal_optimiser(opt)
         if isa(wb, WeightBoundsEstimator)
             @argcheck(!isnothing(sets), IsNothingError("sets cannot be nothing"))
@@ -264,7 +272,7 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
         assert_time_dependent_substitution(SubsetResampling,
                                            (; pe, wb, fees, sets, scale, opt, wf, ex,
                                             subset_size, n_subsets, max_comb, rng, seed, fb,
-                                            brt, strict), (;))
+                                            brt, strict), subset_resampling_td_defaults())
         return new{typeof(pe), typeof(wb), typeof(fees), typeof(sets), typeof(scale),
                    typeof(opt), typeof(wf), typeof(ex), typeof(subset_size),
                    typeof(n_subsets), typeof(max_comb), typeof(rng), typeof(seed),
@@ -278,18 +286,37 @@ function SubsetResampling(; pe::PrE_Pr = EmpiricalPrior(),
                           wb::TD_Option{<:WbE_Wb} = nothing,
                           fees::TD_Option{<:FeesE_Fees} = nothing,
                           sets::Option{<:AssetSets} = nothing,
-                          scale::Option{<:VecNum} = nothing,
-                          opt::NonFiniteAllocationOptimisationEstimator,
+                          scale::TD_Option{<:VecNum} = nothing, opt::OptE_TD,
                           wf::WeightFinaliser = IterativeWeightFinaliser(),
                           ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
-                          subset_size::SubsetSizeE = 0.8, n_subsets::NumberSubsetsE = 2,
+                          subset_size::TD{<:SubsetSizeE} = 0.8,
+                          n_subsets::TD{<:NumberSubsetsE} = 2,
                           max_comb::Integer = 1_000_000_000,
                           rng::Random.AbstractRNG = Random.default_rng(),
                           seed::Option{<:Integer} = nothing,
-                          fb::Option{<:OptE_Opt} = nothing, brt::Bool = false,
+                          fb::TDO_Option{<:OptE_Opt} = nothing, brt::Bool = false,
                           strict::Bool = false)::SubsetResampling
     return SubsetResampling(pe, wb, fees, sets, scale, opt, wf, ex, subset_size, n_subsets,
                             max_comb, rng, seed, fb, brt, strict)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the static defaults of the [`SubsetResampling`](@ref) fields that may hold a [`TimeDependent`](@ref).
+
+Shared by the constructor's test-substitution pass and [`time_dependent_field_defaults`](@ref). The optimiser-valued field `opt` is required and has no static default, so it is marked [`NoDefault`](@ref): a schedule there must carry its own `default` to be usable outside a fold loop. `subset_size` and `n_subsets` reset to their keyword defaults; fields whose static default is `nothing` (`wb`, `fees`, `scale`, `fb`) are omitted.
+
+# Related
+
+  - [`SubsetResampling`](@ref)
+  - [`time_dependent_field_defaults`](@ref)
+  - [`assert_time_dependent_substitution`](@ref)
+"""
+function subset_resampling_td_defaults()::NamedTuple
+    return (; opt = NoDefault(), subset_size = 0.8, n_subsets = 2)
+end
+function time_dependent_field_defaults(::SubsetResampling)::NamedTuple
+    return subset_resampling_td_defaults()
 end
 function assert_external_optimiser(opt::SubsetResampling)::Nothing
     @argcheck(!isa(opt.pe, AbstractPriorResult),
@@ -350,7 +377,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Replace this meta-optimiser's own time-dependent fields with their static defaults.
 
-Deliberately does **not** recurse into the wrapped optimisers: a standalone meta solve consumes inner per-fold schedules through its inner cross-validation leg, and its fold-less full-window inner solves reset themselves at their own `_optimise` seam. Only the meta's own fields (applied to the combined weights, resolved by an outer fold loop when one exists) are inert here.
+Deliberately does **not** recurse into the wrapped optimisers: a standalone meta solve consumes inner per-fold schedules through its inner cross-validation leg, and its fold-less full-window inner solves reset themselves at their own `_optimise` seam. Only the meta's own fields (applied to the combined weights, resolved by an outer fold loop when one exists) are inert here. A `bind = :nearest` schedule in a field the meta hands across its own inner fold loop (see [`inner_fold_fields`](@ref)) is likewise left in place — resetting it here would replace it with its `default` before the inner cross-validation ever saw it.
 """
 function reset_time_dependent_estimator(opt::SubsetResampling)
     return reset_time_dependent_fields(opt)
@@ -527,7 +554,7 @@ function _optimise(sr::SubsetResampling, rd::ReturnsResult; dims::Int = 1,
 end
 """
     optimise(sr::SubsetResampling{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                     <:Any, <:Any, <:Any, <:Any, <:Any, Nothing
+                     <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, Nothing
                  }, rd::ReturnsResult;
              dims::Int = 1, branchorder::Symbol = :optimal, str_names::Bool = false,
              save::Bool = true, kwargs...) -> SubsetResamplingResult
@@ -550,7 +577,7 @@ Run the Subset Resampling portfolio optimisation.
   - [`SubsetResamplingResult`](@ref)
 """
 function optimise(sr::SubsetResampling{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                       <:Any, <:Any, <:Any, <:Any, <:Any, Nothing},
+                                       <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, Nothing},
                   rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
                   branchorder::Symbol = :optimal, str_names::Bool = false,
                   save::Bool = true, kwargs...)

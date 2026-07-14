@@ -93,6 +93,45 @@ function StackingResult(; oe::Type{<:OptimisationEstimator},
     return StackingResult(oe, pr, wb, fees, resi, reso, cv, retcode, w, fb)
 end
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the static defaults of the [`Stacking`](@ref) fields that may hold a [`TimeDependent`](@ref).
+
+Shared by the constructor's test-substitution pass and [`time_dependent_field_defaults`](@ref). The optimiser-valued fields `opti` and `opto` are required and have no static default, so they are marked [`NoDefault`](@ref): a schedule there must carry its own `default` to be usable outside a fold loop. Fields whose static default is `nothing` (`wb`, `fees`, `scale`, `fb`) are omitted.
+
+# Related
+
+  - [`Stacking`](@ref)
+  - [`time_dependent_field_defaults`](@ref)
+  - [`assert_time_dependent_substitution`](@ref)
+"""
+function stacking_td_defaults()::NamedTuple
+    return (; opti = NoDefault(), opto = NoDefault())
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Narrow a vector of optimisers so element-level [`TimeDependent`](@ref) schedules type-check.
+
+A literal like `[MeanRisk(), TimeDependent(…)]` infers eltype `AbstractEstimator`, which the [`VecOptE_Opt_TD`](@ref) bound rejects even though every element is admissible. Vectors already matching the bound pass through unchanged; otherwise every element is checked against [`OptE_Opt_TD`](@ref) and the vector is rebuilt with the tightest element-type union. A field-level schedule passes through untouched.
+
+# Related
+
+  - [`VecOptE_Opt_TD`](@ref)
+  - [`Stacking`](@ref)
+"""
+function narrow_optimiser_vector(opti::AbstractVector)
+    if isa(opti, VecOptE_Opt_TD)
+        return opti
+    end
+    @argcheck(all(x -> isa(x, OptE_Opt_TD), opti),
+              ArgumentError("every element of opti must be an optimisation estimator, a precomputed optimisation result, or a TimeDependent schedule standing in for one"))
+    return convert(Vector{Union{unique(typeof.(opti))...}}, opti)
+end
+function narrow_optimiser_vector(opti::TimeDependent)
+    return opti
+end
+"""
 $(DocStringExtensions.TYPEDEF)
 
 Stacking portfolio optimiser.
@@ -110,23 +149,32 @@ $(DocStringExtensions.FIELDS)
         wb::TD_Option{<:WbE_Wb} = nothing,
         fees::TD_Option{<:FeesE_Fees} = nothing,
         sets::Option{<:AssetSets} = nothing,
-        scale::Option{<:VecNum} = nothing,
-        opti::VecOptE_Opt,
-        opto::NonFiniteAllocationOptimisationEstimator,
+        scale::TD_Option{<:VecNum} = nothing,
+        opti::Union{<:AbstractVector, <:TD_VecOptE_Opt},
+        opto::OptE_TD,
         cv::Option{<:OptimisationCrossValidation} = nothing,
         wf::WeightFinaliser = IterativeWeightFinaliser(),
         ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
-        fb::Option{<:OptE_Opt} = nothing,
+        fb::TDO_Option{<:OptE_Opt} = nothing,
         brt::Bool = false,
         strict::Bool = false
     ) -> Stacking
 
 Keywords correspond to the struct's fields.
 
+## Time-dependent fields
+
+`scale`, `opto` and `fb` may hold a [`TimeDependent`](@ref) per-fold schedule, `bind = :outermost` only — no inner fold loop of `Stacking` consumes them, so the fold loop that reaches the `Stacking` resolves them. `opti` admits schedules at two levels:
+
+  - **Element** (`opti = [static, TimeDependent(…)]`): the element is an optimiser position of the inner cross-validation (entered per candidate), so `bind = :nearest` is legal there — with a mandatory explicit `default` and `cv !== nothing`, because the full-sample `wi` fit always resolves the element fold-lessly to its `default` (see [`assert_nearest_optimiser_schedule`](@ref)).
+  - **Field** (`opti = TimeDependent([[…], […]])`, a per-fold vector of candidate vectors, see [`TD_VecOptE_Opt`](@ref)): `bind = :outermost` only. A `:nearest` field-level schedule is rejected — the inner cross-validation is handed the elements, never the field, and a per-fold candidate vector would change the number and identity of the returns-proxy columns `opto` sees.
+
 ## Validation
 
-  - `!isempty(opti)`.
-  - If `scale` is provided: `length(scale) == length(opti)` and all elements are finite.
+  - If `opti` is a vector: `!isempty(opti)`, every element is an [`OptE_Opt_TD`](@ref), and any `bind = :nearest` element schedule has an explicit `default` and `cv !== nothing`.
+  - If `opti` is a [`TimeDependent`](@ref): `bind !== :nearest`.
+  - If `scale` is provided and static: all elements are finite, and `length(scale) == length(opti)` when `opti` is a vector.
+  - `opto` and `fb` schedules: `bind !== :nearest`.
 
 # Mathematical definition
 
@@ -215,18 +263,30 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
     """
     strict
     function Stacking(pe::PrE_Pr, wb::TD_Option{<:WbE_Wb}, fees::TD_Option{<:FeesE_Fees},
-                      sets::Option{<:AssetSets}, scale::Option{<:VecNum}, opti::VecOptE_Opt,
-                      opto::NonFiniteAllocationOptimisationEstimator,
+                      sets::Option{<:AssetSets}, scale::TD_Option{<:VecNum},
+                      opti::Union{<:VecOptE_Opt_TD, <:TD_VecOptE_Opt}, opto::OptE_TD,
                       cv::Option{<:OptimisationCrossValidation}, wf::WeightFinaliser,
-                      ex::FLoops.Transducers.Executor, fb::Option{<:OptE_Opt}, brt::Bool,
-                      strict::Bool)
-        @argcheck(!isempty(opti), IsEmptyError("opti cannot be empty"))
-        if !isnothing(scale)
-            @argcheck(length(scale) == length(opti),
-                      DimensionMismatch("scale ($(length(scale))) must match opti ($(length(opti)))"))
+                      ex::FLoops.Transducers.Executor, fb::TDO_Option{<:OptE_Opt},
+                      brt::Bool, strict::Bool)
+        if isa(opti, TimeDependent)
+            @argcheck(opti.bind !== :nearest,
+                      ArgumentError("opti of Stacking cannot hold a `bind = :nearest` schedule at the field level: Stacking's inner cross-validation is entered per candidate (`cross_val_predict(opti[k], …)`), so the fold loop is handed the elements, never the field — and a per-fold candidate vector would change the number and identity of the returns-proxy columns opto sees. Schedule individual elements instead (`opti = [static, TimeDependent(…, :nearest; default = …)]`), or use `bind = :outermost` to vary the whole vector with the fold loop that reaches the Stacking."))
+        else
+            @argcheck(!isempty(opti), IsEmptyError("opti cannot be empty"))
+            for (i, x) in pairs(opti)
+                assert_nearest_optimiser_schedule(x, Symbol("opti[$i]"), cv, :Stacking)
+            end
+        end
+        if !isnothing(scale) && !isa(scale, TimeDependent)
+            if isa(opti, AbstractVector)
+                @argcheck(length(scale) == length(opti),
+                          DimensionMismatch("scale ($(length(scale))) must match opti ($(length(opti)))"))
+            end
             @argcheck(all(isfinite, scale),
                       IsNonFiniteError("all elements of scale must be finite"))
         end
+        assert_no_nearest_bind_optimiser_schedule(opto, :opto, :Stacking)
+        assert_no_nearest_bind_optimiser_schedule(fb, :fb, :Stacking)
         assert_external_optimiser(opto)
         if !isnothing(cv)
             assert_external_optimiser(opti)
@@ -239,7 +299,7 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
         end
         assert_time_dependent_substitution(Stacking,
                                            (; pe, wb, fees, sets, scale, opti, opto, cv, wf,
-                                            ex, fb, brt, strict), (;))
+                                            ex, fb, brt, strict), stacking_td_defaults())
         return new{typeof(pe), typeof(wb), typeof(fees), typeof(sets), typeof(scale),
                    typeof(opti), typeof(opto), typeof(cv), typeof(wf), typeof(ex),
                    typeof(fb), typeof(brt), typeof(strict)}(pe, wb, fees, sets, scale, opti,
@@ -249,18 +309,30 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
 end
 function Stacking(; pe::PrE_Pr = EmpiricalPrior(), wb::TD_Option{<:WbE_Wb} = nothing,
                   fees::TD_Option{<:FeesE_Fees} = nothing,
-                  sets::Option{<:AssetSets} = nothing, scale::Option{<:VecNum} = nothing,
-                  opti::VecOptE_Opt, opto::NonFiniteAllocationOptimisationEstimator,
+                  sets::Option{<:AssetSets} = nothing, scale::TD_Option{<:VecNum} = nothing,
+                  opti::Union{<:AbstractVector, <:TD_VecOptE_Opt}, opto::OptE_TD,
                   cv::Option{<:OptimisationCrossValidation} = nothing,
                   wf::WeightFinaliser = IterativeWeightFinaliser(),
                   ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
-                  fb::Option{<:OptE_Opt} = nothing, brt::Bool = false,
+                  fb::TDO_Option{<:OptE_Opt} = nothing, brt::Bool = false,
                   strict::Bool = false)::Stacking
-    return Stacking(pe, wb, fees, sets, scale, opti, opto, cv, wf, ex, fb, brt, strict)
+    return Stacking(pe, wb, fees, sets, scale, narrow_optimiser_vector(opti), opto, cv, wf,
+                    ex, fb, brt, strict)
+end
+function assert_special_nco_requirements_stacking_opti(opti::AbstractVector)::Nothing
+    @argcheck(!any(x -> isa(x, NonFiniteAllocationOptimisationResult), opti),
+              ArgumentError("opti cannot contain NonFiniteAllocationOptimisationResult elements"))
+    return nothing
 end
 function assert_special_nco_requirements(opt::Stacking)::Nothing
-    @argcheck(!any(x -> isa(x, NonFiniteAllocationOptimisationResult), opt.opti),
-              ArgumentError("opti cannot contain NonFiniteAllocationOptimisationResult elements"))
+    opti = opt.opti
+    if isa(opti, TimeDependent)
+        for v in time_dependent_entries(opti)
+            assert_special_nco_requirements_stacking_opti(v)
+        end
+    else
+        assert_special_nco_requirements_stacking_opti(opti)
+    end
     return nothing
 end
 function assert_external_optimiser(opt::Stacking)::Nothing
@@ -304,10 +376,18 @@ function is_time_dependent(opt::Stacking)
             is_time_dependent(opt.opto) ||
             is_time_dependent(opt.fb))
 end
+function time_dependent_field_defaults(::Stacking)::NamedTuple
+    return stacking_td_defaults()
+end
+function inner_fold_fields(::Stacking)::Tuple
+    return (:opti,)
+end
 function assert_time_dependent_fold_count(opt::Stacking, n::Integer,
                                           all_binds::Bool = true)::Nothing
     assert_time_dependent_fields_fold_count(opt, n, all_binds)
-    assert_time_dependent_fold_count(opt.opti, n, false)
+    if isa(opt.opti, AbstractVector)
+        assert_time_dependent_fold_count(opt.opti, n, false)
+    end
     assert_time_dependent_fold_count(opt.opto, n, all_binds)
     assert_time_dependent_fold_count(opt.fb, n, all_binds)
     return nothing
@@ -335,7 +415,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Replace this meta-optimiser's own time-dependent fields with their static defaults.
 
-Deliberately does **not** recurse into the wrapped optimisers: a standalone meta solve consumes inner per-fold schedules through its inner cross-validation leg, and its fold-less full-window inner solves reset themselves at their own `_optimise` seam. Only the meta's own fields (applied to the combined weights, resolved by an outer fold loop when one exists) are inert here.
+Deliberately does **not** recurse into the wrapped optimisers: a standalone meta solve consumes inner per-fold schedules through its inner cross-validation leg, and its fold-less full-window inner solves reset themselves at their own `_optimise` seam. Only the meta's own fields (applied to the combined weights, resolved by an outer fold loop when one exists) are inert here. A `bind = :nearest` schedule in a field the meta hands across its own inner fold loop (see [`inner_fold_fields`](@ref)) is likewise left in place — resetting it here would replace it with its `default` before the inner cross-validation ever saw it.
 """
 function reset_time_dependent_estimator(opt::Stacking)
     return reset_time_dependent_fields(opt)

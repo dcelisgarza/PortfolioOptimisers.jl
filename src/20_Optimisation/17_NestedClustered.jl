@@ -191,7 +191,7 @@ function assert_internal_optimiser(opt::JuMPOptimisationEstimator)::Nothing
               ArgumentError("opt.opt.ple cannot be a precomputed AbstractPhylogenyConstraintResult in NCO inner optimiser; use an estimator instead"))
     return nothing
 end
-function assert_internal_optimiser(opt::VecOptE_Opt)::Nothing
+function assert_internal_optimiser(opt::VecOptE_Opt_TD)::Nothing
     assert_internal_optimiser.(opt)
     return nothing
 end
@@ -258,7 +258,7 @@ function assert_external_optimiser(opt::FactorRiskContribution)::Nothing
     assert_internal_optimiser(opt)
     return nothing
 end
-function assert_external_optimiser(opt::VecOptE_Opt)::Nothing
+function assert_external_optimiser(opt::VecOptE_Opt_TD)::Nothing
     assert_external_optimiser.(opt)
     return nothing
 end
@@ -281,12 +281,12 @@ $(DocStringExtensions.FIELDS)
         wb::TD_Option{<:WbE_Wb} = WeightBounds(),
         fees::TD_Option{<:FeesE_Fees} = nothing,
         sets::Option{<:AssetSets} = nothing,
-        opti::NonFiniteAllocationOptimisationEstimator,
-        opto::NonFiniteAllocationOptimisationEstimator = opti,
+        opti::OptE_TD,
+        opto::OptE_TD,
         cv::Option{<:OptimisationCrossValidation} = nothing,
         wf::WeightFinaliser = IterativeWeightFinaliser(),
         ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
-        fb::Option{<:OptE_Opt} = nothing,
+        fb::TDO_Option{<:OptE_Opt} = nothing,
         brt::Bool = false,
         cle_pr::Bool = true,
         strict::Bool = false
@@ -294,11 +294,18 @@ $(DocStringExtensions.FIELDS)
 
 Keywords correspond to the struct's fields.
 
+## Time-dependent fields
+
+`opti`, `opto` and `fb` may hold a [`TimeDependent`](@ref) per-fold schedule. `opto` and `fb` are `bind = :outermost` only — no inner fold loop consumes them. `opti` additionally admits `bind = :nearest`: the inner cross-validation is entered per cluster (`cross_val_predict(opti, …; cols = cl)`), so the field itself is the inner fold loop's entry point and a `:nearest` schedule is consumed there, per cluster. A `:nearest` `opti` schedule requires an explicit `default` and `cv !== nothing` at construction (see [`assert_nearest_optimiser_schedule`](@ref)) because the per-cluster optimise leg always resolves it fold-lessly to its `default`. `cv` itself stays static: it *is* the inner fold loop, not part of the per-fold problem definition, and the `:nearest` construction checks must be able to inspect it.
+
+Schedule entries for `opti`/`opto` must be estimators, like the static fields: a vector schedule holding a precomputed result is rejected at construction by the entry substitution pass.
+
 ## Validation
 
-  - `opto` must pass `assert_external_optimiser` and `assert_special_nco_requirements`.
+  - `opto` must pass `assert_external_optimiser` and `assert_special_nco_requirements` (schedules delegate to their entries and `default`).
   - If `opti !== opto`: `opti` must pass `assert_internal_optimiser` and `assert_special_nco_requirements`.
   - If `cv` is provided: `opti` must also pass `assert_external_optimiser` and `assert_special_nco_requirements`.
+  - `opto` and `fb` schedules: `bind !== :nearest`. A `bind = :nearest` `opti` schedule: explicit `default` and `cv !== nothing`.
 
 # Mathematical definition
 
@@ -383,11 +390,13 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
     strict
     function NestedClustered(pe::PrE_Pr, cle::ClE_Cl, wb::TD_Option{<:WbE_Wb},
                              fees::TD_Option{<:FeesE_Fees}, sets::Option{<:AssetSets},
-                             opti::NonFiniteAllocationOptimisationEstimator,
-                             opto::NonFiniteAllocationOptimisationEstimator,
+                             opti::OptE_TD, opto::OptE_TD,
                              cv::Option{<:OptimisationCrossValidation}, wf::WeightFinaliser,
-                             ex::FLoops.Transducers.Executor, fb::Option{<:OptE_Opt},
+                             ex::FLoops.Transducers.Executor, fb::TDO_Option{<:OptE_Opt},
                              brt::Bool, cle_pr::Bool, strict::Bool)
+        assert_nearest_optimiser_schedule(opti, :opti, cv, :NestedClustered)
+        assert_no_nearest_bind_optimiser_schedule(opto, :opto, :NestedClustered)
+        assert_no_nearest_bind_optimiser_schedule(fb, :fb, :NestedClustered)
         assert_external_optimiser(opto)
         assert_special_nco_requirements(opto)
         if !(opti === opto)
@@ -405,7 +414,8 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
         end
         assert_time_dependent_substitution(NestedClustered,
                                            (; pe, cle, wb, fees, sets, opti, opto, cv, wf,
-                                            ex, fb, brt, cle_pr, strict), (;))
+                                            ex, fb, brt, cle_pr, strict),
+                                           nested_clustered_td_defaults())
         return new{typeof(pe), typeof(cle), typeof(wb), typeof(fees), typeof(sets),
                    typeof(opti), typeof(opto), typeof(cv), typeof(wf), typeof(ex),
                    typeof(fb), typeof(brt), typeof(cle_pr), typeof(strict)}(pe, cle, wb,
@@ -418,16 +428,36 @@ end
 function NestedClustered(; pe::PrE_Pr = EmpiricalPrior(), cle::ClE_Cl = ClustersEstimator(),
                          wb::TD_Option{<:WbE_Wb} = nothing,
                          fees::TD_Option{<:FeesE_Fees} = nothing,
-                         sets::Option{<:AssetSets} = nothing,
-                         opti::NonFiniteAllocationOptimisationEstimator,
-                         opto::NonFiniteAllocationOptimisationEstimator,
+                         sets::Option{<:AssetSets} = nothing, opti::OptE_TD, opto::OptE_TD,
                          cv::Option{<:OptimisationCrossValidation} = nothing,
                          wf::WeightFinaliser = IterativeWeightFinaliser(),
                          ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
-                         fb::Option{<:OptE_Opt} = nothing, brt::Bool = false,
+                         fb::TDO_Option{<:OptE_Opt} = nothing, brt::Bool = false,
                          cle_pr::Bool = true, strict::Bool = false)
     return NestedClustered(pe, cle, wb, fees, sets, opti, opto, cv, wf, ex, fb, brt, cle_pr,
                            strict)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the static defaults of the [`NestedClustered`](@ref) fields that may hold a [`TimeDependent`](@ref).
+
+Shared by the constructor's test-substitution pass and [`time_dependent_field_defaults`](@ref). The optimiser-valued fields `opti` and `opto` are required and have no static default, so they are marked [`NoDefault`](@ref): a schedule there must carry its own `default` to be usable outside a fold loop. Fields whose static default is `nothing` (`wb`, `fees`, `fb`) are omitted.
+
+# Related
+
+  - [`NestedClustered`](@ref)
+  - [`time_dependent_field_defaults`](@ref)
+  - [`assert_time_dependent_substitution`](@ref)
+"""
+function nested_clustered_td_defaults()::NamedTuple
+    return (; opti = NoDefault(), opto = NoDefault())
+end
+function time_dependent_field_defaults(::NestedClustered)::NamedTuple
+    return nested_clustered_td_defaults()
+end
+function inner_fold_fields(::NestedClustered)::Tuple
+    return (:opti,)
 end
 function assert_internal_optimiser(opt::NestedClustered)::Nothing
     @argcheck(!isa(opt.cle, AbstractClusteringResult),
@@ -508,7 +538,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Replace this meta-optimiser's own time-dependent fields with their static defaults.
 
-Deliberately does **not** recurse into the wrapped optimisers: a standalone meta solve consumes inner per-fold schedules through its inner cross-validation leg, and its fold-less full-window inner solves reset themselves at their own `_optimise` seam. Only the meta's own fields (applied to the combined weights, resolved by an outer fold loop when one exists) are inert here.
+Deliberately does **not** recurse into the wrapped optimisers: a standalone meta solve consumes inner per-fold schedules through its inner cross-validation leg, and its fold-less full-window inner solves reset themselves at their own `_optimise` seam. Only the meta's own fields (applied to the combined weights, resolved by an outer fold loop when one exists) are inert here. A `bind = :nearest` schedule in a field the meta hands across its own inner fold loop (see [`inner_fold_fields`](@ref)) is likewise left in place — resetting it here would replace it with its `default` before the inner cross-validation ever saw it.
 """
 function reset_time_dependent_estimator(opt::NestedClustered)
     return reset_time_dependent_fields(opt)
