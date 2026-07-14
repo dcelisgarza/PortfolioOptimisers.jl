@@ -1,15 +1,16 @@
 """
+    set_l1_regularisation!(model::JuMP.Model, l1_val::Number)
     set_l1_regularisation!(args...)
 
-No-op fallback for L1 regularisation setup.
+Add an L1 regularisation penalty to the objective function.
 
-Called when no L1 regularisation is configured. Returns `nothing`.
+The penalty is applied as given, so `l1_val` must be commensurate with the scale of the objective it is added to.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
-\\text{penalty} &= \\lambda_1 \\|\\boldsymbol{w}\\|_1\\,.
+\\text{penalty} &= \\lambda_1 \\lVert \\boldsymbol{w} \\rVert_1\\,.
 \\end{align}
 ```
 
@@ -18,68 +19,138 @@ Where:
   - ``\\lambda_1``: L1 regularisation coefficient.
   - $(math_dict[:w_port])
 
+# Arguments
+
+  - $(arg_dict[:model])
+  - `l1_val::Number`: L1 regularisation coefficient.
+
+# Returns
+
+  - `nothing`.
+
+# Details
+
+  - `l1_val::Number`: Introduces the auxiliary variable `t_l1`, bounds it with `[t_l1; w] in MOI.NormOneCone`, and adds `l1_val * t_l1` to the objective penalty via [`add_to_objective_penalty!`](@ref).
+  - `args...`: No-op, used when no L1 regularisation is configured.
+
 # Related
 
-  - [`LpRegularisation`](@ref)
+  - [`set_l2_regularisation!`](@ref)
   - [`set_lp_regularisation!`](@ref)
+  - [`set_linf_regularisation!`](@ref)
+  - [`add_to_objective_penalty!`](@ref)
 """
 function set_l1_regularisation!(args...)
     return nothing
 end
 """
+    set_l2_regularisation!(model::JuMP.Model, l2s::L2Reg_VecL2Reg)
     set_l2_regularisation!(args...)
 
-No-op fallback for L2 regularisation setup.
+Add one or more L2 regularisation penalties to the objective function.
 
-Called when no L2 regularisation is configured. Returns `nothing`.
+Each [`L2Regularisation`](@ref) carries its own coefficient and cone formulation, so several may be combined in a single model. The penalties are applied as given, so each coefficient must be commensurate with the scale of the objective it is added to, and with the formulation used to express it.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
-\\text{penalty} &= \\lambda_2 \\|\\boldsymbol{w}\\|_2\\,.
+\\text{penalty} &= \\sum_{i} \\lambda_{2,\\, i} \\lVert \\boldsymbol{w} \\rVert_2\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``\\lambda_2``: L2 regularisation coefficient.
+  - ``\\lambda_{2,\\, i}``: L2 regularisation coefficient of the ``i``-th term.
   - $(math_dict[:w_port])
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - `l2s::L2Reg_VecL2Reg`: One or more L2 regularisation terms.
+
+# Returns
+
+  - `nothing`.
+
+# Details
+
+  - `l2s::L2Reg_VecL2Reg`: Dispatches each term to [`_set_l2_regularisation!`](@ref), which selects the cone formulation from the term's `alg` field. Variables and constraints are suffixed by the term's index, so terms do not collide.
+  - `args...`: No-op, used when no L2 regularisation is configured.
 
 # Related
 
-  - [`LpRegularisation`](@ref)
-  - [`set_lp_regularisation!`](@ref)
+  - [`L2Regularisation`](@ref)
+  - [`L2Reg_VecL2Reg`](@ref)
+  - [`_set_l2_regularisation!`](@ref)
+  - [`set_l1_regularisation!`](@ref)
+  - [`add_to_objective_penalty!`](@ref)
 """
 function set_l2_regularisation!(args...)
     return nothing
 end
 """
+    set_lp_regularisation!(model::JuMP.Model, lps::LpReg_VecLpReg)
     set_lp_regularisation!(args...)
 
-No-op fallback for Lp regularisation setup.
+Add one or more Lp regularisation penalties to the objective function.
 
-Called when no Lp regularisation is configured. Returns `nothing`.
+Each [`LpRegularisation`](@ref) carries its own norm order and coefficient, so several may be combined in a single model. The penalties are applied as given, so each coefficient must be commensurate with the scale of the objective it is added to.
 
-# Related
-
-  - [`LpRegularisation`](@ref)
-"""
-function set_lp_regularisation!(args...)
-    return nothing
-end
-"""
-    set_linf_regularisation!(args...)
-
-No-op fallback for L∞ regularisation setup.
-
-Called when no L∞ regularisation is configured. Returns `nothing`.
+The same estimator also specifies a p-norm *constraint* when it is placed in the `wnp` field of [`JuMPOptimiser`](@ref) instead of the `lp` field, in which case its `val` field is a bound rather than a coefficient. See [`set_weight_norm_p_constraints!`](@ref).
 
 # Mathematical definition
 
 ```math
 \\begin{align}
-\\text{penalty} &= \\lambda_\\infty \\|\\boldsymbol{w}\\|_\\infty\\,.
+\\text{penalty} &= \\sum_{i} \\lambda_{p,\\, i} \\lVert \\boldsymbol{w} \\rVert_{p_i}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\lambda_{p,\\, i}``: Regularisation coefficient of the ``i``-th term, its `val` field.
+  - ``p_i``: Norm order of the ``i``-th term, its `p` field.
+  - $(math_dict[:w_port])
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - `lps::LpReg_VecLpReg`: One or more Lp regularisation terms.
+
+# Returns
+
+  - `nothing`.
+
+# Details
+
+  - `lps::LpReg_VecLpReg`: For each term, introduces the auxiliary variables `t_lp_i` and `r_lp_i`, bounds ``\\lVert \\boldsymbol{w} \\rVert_{p_i}`` above by `t_lp_i` with a set of `MOI.PowerCone` constraints, and adds `val * t_lp_i` to the objective penalty via [`add_to_objective_penalty!`](@ref). Variables and constraints are suffixed by the term's index, so terms do not collide.
+  - `args...`: No-op, used when no Lp regularisation is configured.
+
+# Related
+
+  - [`LpRegularisation`](@ref)
+  - [`LpReg_VecLpReg`](@ref)
+  - [`set_weight_norm_p_constraints!`](@ref)
+  - [`set_l1_regularisation!`](@ref)
+  - [`add_to_objective_penalty!`](@ref)
+"""
+function set_lp_regularisation!(args...)
+    return nothing
+end
+"""
+    set_linf_regularisation!(model::JuMP.Model, linf::Number)
+    set_linf_regularisation!(args...)
+
+Add an L∞ regularisation penalty to the objective function.
+
+The penalty is applied as given, so `linf` must be commensurate with the scale of the objective it is added to and with the range of values the weights can take.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\text{penalty} &= \\lambda_\\infty \\lVert \\boldsymbol{w} \\rVert_\\infty\\,.
 \\end{align}
 ```
 
@@ -88,9 +159,27 @@ Where:
   - ``\\lambda_\\infty``: L∞ regularisation coefficient.
   - $(math_dict[:w_port])
 
+# Arguments
+
+  - $(arg_dict[:model])
+  - `linf::Number`: L∞ regularisation coefficient.
+
+# Returns
+
+  - `nothing`.
+
+# Details
+
+  - `linf::Number`: Introduces the auxiliary variable `t_linf`, bounds it with `[t_linf; w] in MOI.NormInfinityCone`, and adds `linf * t_linf` to the objective penalty via [`add_to_objective_penalty!`](@ref).
+  - `args...`: No-op, used when no L∞ regularisation is configured.
+
 # Related
 
-  - [`LpRegularisation`](@ref)
+  - [`set_l1_regularisation!`](@ref)
+  - [`set_l2_regularisation!`](@ref)
+  - [`set_lp_regularisation!`](@ref)
+  - [`set_weight_norm_inf_constraints!`](@ref)
+  - [`add_to_objective_penalty!`](@ref)
 """
 function set_linf_regularisation!(args...)
     return nothing
@@ -118,11 +207,38 @@ abstract type AbstractRegularisationEstimator <: AbstractEstimator end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Defines the L2-norm regularisation term added to the optimisation objective.
+L2-norm regularisation term added to the optimisation objective.
+
+Penalises concentrated portfolios by shrinking the weights towards zero. The `alg` field selects the formulation used to express the penalty, which determines both the cones the solver sees and the power of the norm being penalised, so `val` must be interpreted in the light of the chosen formulation — see [`_set_l2_regularisation!`](@ref).
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\text{penalty} &= \\lambda_2 \\lVert \\boldsymbol{w} \\rVert_2\\,, \\\\
+\\text{penalty} &= \\lambda_2 \\lVert \\boldsymbol{w} \\rVert_2^2\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\lambda_2``: L2 regularisation coefficient, the `val` field.
+  - $(math_dict[:w_port])
+
+The first form is used by [`SOCRiskExpr`](@ref); the second by [`SquaredSOCRiskExpr`](@ref), [`QuadRiskExpr`](@ref) and [`RSOCRiskExpr`](@ref).
 
 # Fields
 
 $(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    L2Regularisation(;
+        val::Number = 1e-4,
+        alg::SecondMomentFormulation = SOCRiskExpr()
+    ) -> L2Regularisation
+
+Keywords correspond to the struct's fields.
 
 ## Validation
 
@@ -130,15 +246,21 @@ $(DocStringExtensions.FIELDS)
 
 # Related
 
+  - [`AbstractRegularisationEstimator`](@ref)
+  - [`L2Reg_VecL2Reg`](@ref)
+  - [`VecL2Reg`](@ref)
+  - [`SecondMomentFormulation`](@ref)
+  - [`set_l2_regularisation!`](@ref)
+  - [`_set_l2_regularisation!`](@ref)
   - [`LpRegularisation`](@ref)
 """
 @concrete struct L2Regularisation <: AbstractRegularisationEstimator
     """
-    $(field_dict[:val])
+    $(field_dict[:l2reg_val])
     """
     val
     """
-    $(field_dict[:alg])
+    $(field_dict[:l2reg_alg])
     """
     alg
     function L2Regularisation(val::Number, alg::SecondMomentFormulation)
@@ -155,10 +277,13 @@ end
 
 Alias for a vector of [`L2Regularisation`](@ref) objects.
 
+Represents a collection of L2-norm regularisation terms to be added to the optimisation objective.
+
 # Related
 
   - [`L2Regularisation`](@ref)
   - [`L2Reg_VecL2Reg`](@ref)
+  - [`set_l2_regularisation!`](@ref)
 """
 const VecL2Reg = AbstractVector{<:L2Regularisation}
 """
@@ -177,9 +302,59 @@ Matches either a single [`L2Regularisation`](@ref) or a vector of them ([`VecL2R
 const L2Reg_VecL2Reg = Union{<:L2Regularisation, <:VecL2Reg}
 """
     _set_l2_regularisation!(model::JuMP.Model, i::Integer, w::VecNum,
-                            l2::L2Regularisation, sc::Number)
+                            l2::L2Regularisation{<:Any, <:SOCRiskExpr}, sc::Number)
+    _set_l2_regularisation!(model::JuMP.Model, i::Integer, w::VecNum,
+                            l2::L2Regularisation{<:Any, <:SquaredSOCRiskExpr}, sc::Number)
+    _set_l2_regularisation!(model::JuMP.Model, i::Integer, w::VecNum,
+                            l2::L2Regularisation{<:Any, <:QuadRiskExpr}, args...)
+    _set_l2_regularisation!(model::JuMP.Model, i::Integer, w::VecNum,
+                            l2::L2Regularisation{<:Any, <:RSOCRiskExpr}, sc::Number)
 
-Sets the L2 regularisation term for a single [`L2Regularisation`](@ref) object in the optimisation model using the formulation specified by `l2.alg`. The penalty value is not adjusted so it must be consistent with the cone being used.
+Add the `i`-th L2 regularisation penalty to the objective, in the formulation given by `l2.alg`.
+
+The coefficient `l2.val` is applied as given, so it must be consistent with the formulation it multiplies: [`SOCRiskExpr`](@ref) penalises ``\\lVert \\boldsymbol{w} \\rVert_2``, whereas [`SquaredSOCRiskExpr`](@ref), [`QuadRiskExpr`](@ref) and [`RSOCRiskExpr`](@ref) penalise ``\\lVert \\boldsymbol{w} \\rVert_2^2``. The same `val` therefore does not produce the same penalty across formulations.
+
+[`QuadRiskExpr`](@ref) yields a quadratic objective term rather than a conic one; [`add_to_objective_penalty!`](@ref) promotes an affine penalty expression to a `JuMP.QuadExpr` to accommodate it.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\text{penalty} &= \\lambda_2 \\lVert \\boldsymbol{w} \\rVert_2\\,, \\\\
+\\text{penalty} &= \\lambda_2 \\lVert \\boldsymbol{w} \\rVert_2^2\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\lambda_2``: L2 regularisation coefficient, the `val` field of `l2`.
+  - $(math_dict[:w_port])
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - `i::Integer`: Index of the term, used to suffix the variables and constraints it creates so that multiple terms do not collide.
+  - `w::VecNum`: Portfolio weights variable.
+  - `l2::L2Regularisation`: The L2 regularisation term.
+  - `sc::Number`: Constraint scale factor.
+
+# Returns
+
+  - `nothing`.
+
+# Details
+
+  - `l2::L2Regularisation{<:Any, <:SOCRiskExpr}`: Introduces `t_l2_i`, constrains `[t_l2_i; w] in SecondOrderCone` so that `t_l2_i >= norm(w, 2)`, and penalises `val * t_l2_i`.
+  - `l2::L2Regularisation{<:Any, <:SquaredSOCRiskExpr}`: Introduces `t_l2_i`, constrains `[t_l2_i; w] in SecondOrderCone` so that `t_l2_i >= norm(w, 2)`, and penalises `val * t_l2_i^2`.
+  - `l2::L2Regularisation{<:Any, <:QuadRiskExpr}`: Introduces no auxiliary variable, and penalises `val * dot(w, w)` directly.
+  - `l2::L2Regularisation{<:Any, <:RSOCRiskExpr}`: Introduces `t_l2_i`, constrains `[t_l2_i; 0.5; w] in RotatedSecondOrderCone` so that `t_l2_i >= norm(w, 2)^2`, and penalises `val * t_l2_i`.
+
+# Related
+
+  - [`L2Regularisation`](@ref)
+  - [`SecondMomentFormulation`](@ref)
+  - [`set_l2_regularisation!`](@ref)
+  - [`add_to_objective_penalty!`](@ref)
 """
 function _set_l2_regularisation!(model::JuMP.Model, i::Integer, w::VecNum,
                                  l2::L2Regularisation{<:Any, <:SOCRiskExpr}, sc::Number)
@@ -234,22 +409,23 @@ $(DocStringExtensions.TYPEDEF)
 
 Lp-norm regularisation term added to the optimisation objective.
 
+Penalises concentrated portfolios by encouraging weight smoothness for ``p > 1``.
+
+The same estimator serves double duty. In the `lp` field of [`JuMPOptimiser`](@ref) it is a *penalty*, and `val` is the coefficient multiplying the norm. In the `wnp` field it is a *constraint*, and `val` is instead a lower bound on the p-norm effective number of assets. The norm order `p` means the same thing in both. See [`set_lp_regularisation!`](@ref) and [`set_weight_norm_p_constraints!`](@ref).
+
 # Mathematical definition
 
 ```math
 \\begin{align}
-\\text{penalty} &= \\mathrm{val} \\cdot \\left( \\sum_{i=1}^N |w_i|^p \\right)^{1/p}\\,.
+\\text{penalty} &= \\mathrm{val} \\cdot \\lVert \\boldsymbol{w} \\rVert_p\\,.
 \\end{align}
 ```
 
 Where:
 
   - ``\\mathrm{val}``: Regularisation coefficient.
-  - ``w_i``: Portfolio weight for asset ``i``.
   - ``p > 1``: Norm order.
-  - $(math_dict[:N])
-
-Penalises concentrated portfolios by encouraging weight smoothness for ``p > 1``.
+  - $(math_dict[:w_port])
 
 # Fields
 
@@ -270,14 +446,19 @@ Keywords correspond to the struct's fields.
 # Related
 
   - [`AbstractRegularisationEstimator`](@ref)
+  - [`LpReg_VecLpReg`](@ref)
+  - [`VecLpReg`](@ref)
+  - [`set_lp_regularisation!`](@ref)
+  - [`set_weight_norm_p_constraints!`](@ref)
+  - [`L2Regularisation`](@ref)
 """
 @concrete struct LpRegularisation <: AbstractRegularisationEstimator
     """
-    $(field_dict[:p_rm])
+    $(field_dict[:lpreg_p])
     """
     p
     """
-    $(field_dict[:val])
+    $(field_dict[:lpreg_val])
     """
     val
     function LpRegularisation(p::Number, val::Number)

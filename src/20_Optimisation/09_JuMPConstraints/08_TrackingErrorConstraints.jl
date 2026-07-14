@@ -18,7 +18,7 @@ The collection method iterates over all tracking errors in `tres`.
 
 ```math
 \\begin{align}
-t_{te} &\\geq \\|\\mathbf{X}\\boldsymbol{w} - \\boldsymbol{b} k\\|_p \\cdot c_p^{-1}\\,, \\\\
+t_{te} &\\geq \\lVert \\mathbf{X}\\boldsymbol{w} - \\boldsymbol{b} k \\rVert_p \\cdot c_p^{-1}\\,, \\\\
 t_{te} &\\leq \\mathrm{err} \\cdot k\\,.
 \\end{align}
 ```

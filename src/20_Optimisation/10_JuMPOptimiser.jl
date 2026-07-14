@@ -378,7 +378,7 @@ $(DocStringExtensions.FIELDS)
         wnp::TD_Option{<:LpReg_VecLpReg} = nothing,
         wninf::TD_Option{<:Number} = nothing,
         l1::TD_Option{<:Number} = nothing,
-        l2::TD_Option{<:Number} = nothing,
+        l2::TD_Option{<:L2Reg_VecL2Reg} = nothing,
         linf::TD_Option{<:Number} = nothing,
         lp::TD_Option{<:LpReg_VecLpReg} = nothing,
         brt::Bool = false,
@@ -397,7 +397,9 @@ Keywords correspond to the struct's fields. Fields typed [`TD_Option`](@ref) or 
   - If `cte` is a vector: `!isempty(cte)`.
   - If `card` is provided: `card > 0` and finite.
   - If `tn` or `tr` is a vector: each must be non-empty.
-  - If `wn2`, `wninf`, `l1`, `l2`, or `linf` is provided: each must be `> 0` and finite.
+  - If `wn2`, `wninf`, `l1`, or `linf` is provided: each must be `> 0` and finite.
+  - If `lp` is a vector: `!isempty(lp)`.
+  - `l2`, `lp` and `wnp` are validated by their own estimator constructors ([`L2Regularisation`](@ref), [`LpRegularisation`](@ref)).
   - If `scard` is provided: compatible `smtx`, `slt`, `sst` sizes required.
   - If `sgcarde` is provided: compatible `sgmtx`, `sglt`, `sgst` sizes required.
   - If any estimator-type field (`wb`, `lt`, `fees`, etc.) is provided: `!isnothing(sets)`.

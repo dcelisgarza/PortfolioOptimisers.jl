@@ -487,13 +487,17 @@ const arg_dict = Dict(
                       :ss => "`ss`: Optional scalar shrinkage parameter.",#
                       :card => "`card`: Global cardinality constraint.",#
                       :scard => "`scard`: Sub-group cardinality constraint(s).",#
-                      :wn2 => "`wn2`: 2-norm weight constraint.",#
-                      :wnp => "`wnp`: P-norm weight constraint.",#
-                      :wninf => "`wninf`: Infinity-norm weight constraint.",#
+                      :wn2 => "`wn2`: 2-norm weight constraint. Lower bound on the effective number of assets, `inv(norm(w, 2)^2) >= wn2`.",#
+                      :wnp => "`wnp`: P-norm weight constraint(s). Each [`LpRegularisation`](@ref) supplies a norm order `p` and a lower bound `val` on the p-norm effective number of assets, `inv(norm(w, p)^p) >= val`.",#
+                      :wninf => "`wninf`: Infinity-norm weight constraint. Lower bound on `inv(norm(w, Inf))`, equivalently an upper bound `inv(wninf)` on the largest weight.",#
                       :l1 => "`l1`: L1 regularisation coefficient.",#
-                      :l2 => "`l2`: L2 regularisation coefficient.",#
+                      :l2 => "`l2`: L2 regularisation term(s).",#
                       :linf => "`linf`: L∞ regularisation coefficient.",#
                       :lp => "`lp`: Lp regularisation specification(s).",#
+                      :l2reg_val => "`val`: L2 regularisation penalty coefficient.",#
+                      :l2reg_alg => "`alg`: Second-moment formulation used to express the L2 penalty.",#
+                      :lpreg_p => "`p`: Norm order, `p > 1`.",#
+                      :lpreg_val => "`val`: Penalty coefficient when the estimator is used as a regularisation term (the `lp` field of [`JuMPOptimiser`](@ref)), or the lower bound on the p-norm effective number of assets when it is used as a weight norm constraint (the `wnp` field).",#
                       :brt => "`brt`: Whether to use bootstrap returns.",#
                       :cle_pr => "`cle_pr`: Whether to pass the prior result to the clustering estimator.",#
                       :wf => "`wf`: Weight finaliser.",#
@@ -2969,7 +2973,7 @@ Second-order cone (SOC) norm-based error formulation.
 
 ```math
 \\begin{align}
-\\mathrm{TE}_{L_2}(\\boldsymbol{a},\\boldsymbol{b}) &= \\frac{\\|\\boldsymbol{a} - \\boldsymbol{b}\\|_2}{\\sqrt{T - d}}\\,.
+\\mathrm{TE}_{L_2}(\\boldsymbol{a},\\boldsymbol{b}) &= \\frac{\\lVert \\boldsymbol{a} - \\boldsymbol{b} \\rVert_2}{\\sqrt{T - d}}\\,.
 \\end{align}
 ```
 
@@ -3034,7 +3038,7 @@ Second-order cone (SOC) squared norm-based error formulation.
 
 ```math
 \\begin{align}
-\\mathrm{TE}_{L_2^2}(\\boldsymbol{a},\\boldsymbol{b}) &= \\frac{\\|\\boldsymbol{a} - \\boldsymbol{b}\\|_2^2}{T - d}\\,.
+\\mathrm{TE}_{L_2^2}(\\boldsymbol{a},\\boldsymbol{b}) &= \\frac{\\lVert \\boldsymbol{a} - \\boldsymbol{b} \\rVert_2^2}{T - d}\\,.
 \\end{align}
 ```
 
@@ -3099,7 +3103,7 @@ Norm-one (NOC) error formulation.
 
 ```math
 \\begin{align}
-\\mathrm{TE}_{L_1}(\\boldsymbol{a},\\boldsymbol{b}) &= \\frac{\\|\\boldsymbol{a} - \\boldsymbol{b}\\|_1}{T}\\,.
+\\mathrm{TE}_{L_1}(\\boldsymbol{a},\\boldsymbol{b}) &= \\frac{\\lVert \\boldsymbol{a} - \\boldsymbol{b} \\rVert_1}{T}\\,.
 \\end{align}
 ```
 
@@ -3140,7 +3144,7 @@ Computes the Lp-norm of the difference between portfolio and benchmark returns: 
 
 ```math
 \\begin{align}
-\\mathrm{TE}_{L_p}(\\boldsymbol{a},\\boldsymbol{b}) &= \\frac{\\|\\boldsymbol{a} - \\boldsymbol{b}\\|_p}{(T - d)^{1/p}}\\,.
+\\mathrm{TE}_{L_p}(\\boldsymbol{a},\\boldsymbol{b}) &= \\frac{\\lVert \\boldsymbol{a} - \\boldsymbol{b} \\rVert_p}{(T - d)^{1/p}}\\,.
 \\end{align}
 ```
 
@@ -3211,7 +3215,7 @@ Computes the L∞-norm (maximum absolute deviation) of the difference between po
 
 ```math
 \\begin{align}
-\\mathrm{TE}_{L_\\infty}(\\boldsymbol{a},\\boldsymbol{b}) &= \\frac{\\|\\boldsymbol{a} - \\boldsymbol{b}\\|_\\infty}{T - d}\\,.
+\\mathrm{TE}_{L_\\infty}(\\boldsymbol{a},\\boldsymbol{b}) &= \\frac{\\lVert \\boldsymbol{a} - \\boldsymbol{b} \\rVert_\\infty}{T - d}\\,.
 \\end{align}
 ```
 
@@ -3285,11 +3289,11 @@ Compute the norm-based tracking error between portfolio and benchmark weights.
 
 ```math
 \\begin{align}
-\\mathrm{TE}_{L_2}(\\boldsymbol{a},\\boldsymbol{b}) &= \\frac{\\|\\boldsymbol{a} - \\boldsymbol{b}\\|_2}{\\sqrt{T - d}}\\,, \\\\
-\\mathrm{TE}_{L_2^2}(\\boldsymbol{a},\\boldsymbol{b}) &= \\frac{\\|\\boldsymbol{a} - \\boldsymbol{b}\\|_2^2}{T - d}\\,, \\\\
-\\mathrm{TE}_{L_1}(\\boldsymbol{a},\\boldsymbol{b}) &= \\frac{\\|\\boldsymbol{a} - \\boldsymbol{b}\\|_1}{T}\\,, \\\\
-\\mathrm{TE}_{L_p}(\\boldsymbol{a},\\boldsymbol{b}) &= \\frac{\\|\\boldsymbol{a} - \\boldsymbol{b}\\|_p}{(T-d)^{1/p}}\\,, \\\\
-\\mathrm{TE}_{L_\\infty}(\\boldsymbol{a},\\boldsymbol{b}) &= \\frac{\\|\\boldsymbol{a} - \\boldsymbol{b}\\|_\\infty}{T - d}\\,.
+\\mathrm{TE}_{L_2}(\\boldsymbol{a},\\boldsymbol{b}) &= \\frac{\\lVert \\boldsymbol{a} - \\boldsymbol{b} \\rVert_2}{\\sqrt{T - d}}\\,, \\\\
+\\mathrm{TE}_{L_2^2}(\\boldsymbol{a},\\boldsymbol{b}) &= \\frac{\\lVert \\boldsymbol{a} - \\boldsymbol{b} \\rVert_2^2}{T - d}\\,, \\\\
+\\mathrm{TE}_{L_1}(\\boldsymbol{a},\\boldsymbol{b}) &= \\frac{\\lVert \\boldsymbol{a} - \\boldsymbol{b} \\rVert_1}{T}\\,, \\\\
+\\mathrm{TE}_{L_p}(\\boldsymbol{a},\\boldsymbol{b}) &= \\frac{\\lVert \\boldsymbol{a} - \\boldsymbol{b} \\rVert_p}{(T-d)^{1/p}}\\,, \\\\
+\\mathrm{TE}_{L_\\infty}(\\boldsymbol{a},\\boldsymbol{b}) &= \\frac{\\lVert \\boldsymbol{a} - \\boldsymbol{b} \\rVert_\\infty}{T - d}\\,.
 \\end{align}
 ```
 

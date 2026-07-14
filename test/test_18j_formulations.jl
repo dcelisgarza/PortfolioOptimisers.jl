@@ -398,3 +398,48 @@ end
 @testset "Generic X at Range" begin
     mr_block6()
 end
+@testset "L2 regularisation formulations reach affine objectives" begin
+    # Regression: a quadratic penalty (QuadRiskExpr, SquaredSOCRiskExpr) added to an affine
+    # objective (MaximumReturn) needs `obj_expr` promoted to a QuadExpr. The promotion
+    # allocates a new expression, so `add_penalty_to_objective!` must hand it back to the
+    # caller — otherwise the penalty is built, registered, and silently dropped.
+    opt_l2(alg) = JuMPOptimiser(; pe = pr, slv = slv,
+                                l2 = L2Regularisation(; val = 0.5, alg = alg))
+    w_of(alg) = optimise(MeanRisk(; obj = MaximumReturn(), opt = opt_l2(alg))).w
+    w_none = optimise(MeanRisk(; obj = MaximumReturn(),
+                               opt = JuMPOptimiser(; pe = pr, slv = slv))).w
+    w_soc = w_of(SOCRiskExpr())
+    w_ssoc = w_of(SquaredSOCRiskExpr())
+    w_quad = w_of(QuadRiskExpr())
+    w_rsoc = w_of(RSOCRiskExpr())
+    # Every formulation must actually penalise: an unpenalised MaximumReturn concentrates.
+    @test norm(w_none, 2) > 0.9
+    for w in (w_soc, w_ssoc, w_quad, w_rsoc)
+        @test norm(w, 2) < norm(w_none, 2)
+    end
+    # SquaredSOCRiskExpr, QuadRiskExpr and RSOCRiskExpr all penalise ‖w‖₂², so they agree.
+    @test isapprox(w_ssoc, w_quad; rtol = 5e-4)
+    @test isapprox(w_quad, w_rsoc; rtol = 5e-4)
+    # SOCRiskExpr penalises ‖w‖₂ instead, so it does not.
+    @test !isapprox(w_soc, w_quad; rtol = 5e-4)
+end
+@testset "Weight norm constraints bound the effective number of assets" begin
+    # wn2/wnp/wninf are lower bounds on diversification, not upper bounds on the norm.
+    opt(; kwargs...) = JuMPOptimiser(; pe = pr, slv = slv, kwargs...)
+    ena_p(w, p) = inv(sum(abs.(w) .^ p))
+    w_none = optimise(MeanRisk(; obj = MaximumReturn(), opt = opt())).w
+    @test number_effective_assets(w_none) < 1.5    # concentrated without a constraint
+    for v in (4, 8)
+        w = optimise(MeanRisk(; obj = MaximumReturn(), opt = opt(; wn2 = v))).w
+        @test number_effective_assets(w) >= v - 1e-4
+    end
+    for v in (4, 8)
+        w = optimise(MeanRisk(; obj = MaximumReturn(),
+                              opt = opt(; wnp = LpRegularisation(; p = 3, val = v)))).w
+        @test ena_p(w, 3) >= v - 1e-3
+    end
+    for v in (4, 8)
+        w = optimise(MeanRisk(; obj = MaximumReturn(), opt = opt(; wninf = v))).w
+        @test maximum(abs, w) <= inv(v) + 1e-4
+    end
+end

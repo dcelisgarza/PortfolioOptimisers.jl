@@ -304,7 +304,7 @@ scv_res.idx
 |                | Holdout (`TrainTestSplit`)              | Cross-validation                          |
 |:---------------|:----------------------------------------|:------------------------------------------|
 | Fits           | one                                     | one per fold                              |
-| Answers        | *does this survive unseen data?*         | *how does this behave across regimes?*    |
+| Answers        | *does this survive unseen data?*        | *how does this behave across regimes?*    |
 | Test rows      | the most recent tail, once              | every row, in turn                        |
 | Use it for     | a final, honest score on a locked model | selecting hyperparameters, estimating variance of the estimate |
 

@@ -278,8 +278,9 @@ window nobody ever reads.
 That is silent loss of training data, so the library refuses it rather than quietly doing it.
 
 ````@example 05_Train_Test_Split
-gscv = GridSearchCrossValidation(Dict("returns" => [PricesToReturns(; ret_method = :simple),
-                                                    PricesToReturns(; ret_method = :log)]);
+gscv = GridSearchCrossValidation(Dict("returns" =>
+                                          [PricesToReturns(; ret_method = :simple),
+                                           PricesToReturns(; ret_method = :log)]);
                                  cv = KFold(; n = 3), r = SCM())
 
 try
@@ -308,7 +309,7 @@ scv_res.idx
 |                | Holdout (`TrainTestSplit`)              | Cross-validation                          |
 |:---------------|:----------------------------------------|:------------------------------------------|
 | Fits           | one                                     | one per fold                              |
-| Answers        | *does this survive unseen data?*         | *how does this behave across regimes?*    |
+| Answers        | *does this survive unseen data?*        | *how does this behave across regimes?*    |
 | Test rows      | the most recent tail, once              | every row, in turn                        |
 | Use it for     | a final, honest score on a locked model | selecting hyperparameters, estimating variance of the estimate |
 

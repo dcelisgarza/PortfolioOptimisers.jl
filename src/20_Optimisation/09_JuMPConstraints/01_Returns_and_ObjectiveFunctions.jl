@@ -739,7 +739,7 @@ Ellipsoidal uncertainty set (worst-case return):
 
 ```math
 \\begin{align}
-\\hat{r}(\\boldsymbol{w}) &= \\boldsymbol{\\mu}^\\intercal \\boldsymbol{w} - \\kappa \\|\\mathbf{G}\\boldsymbol{w}\\|_2\\,.
+\\hat{r}(\\boldsymbol{w}) &= \\boldsymbol{\\mu}^\\intercal \\boldsymbol{w} - \\kappa \\lVert \\mathbf{G}\\boldsymbol{w} \\rVert_2\\,.
 \\end{align}
 ```
 
@@ -925,17 +925,19 @@ end
 
 Add the accumulated objective penalty to the main objective expression.
 
-If an `op` penalty term exists in the model, adds `factor * op` to `expr` in-place. Does nothing if no penalty term has been registered.
+If an `op` penalty term exists in the model, adds `factor * op` to `expr`. Returns `expr` unchanged if no penalty term has been registered.
+
+A quadratic penalty cannot be accumulated into an affine objective in-place, so an affine `expr` is promoted to a `JuMP.QuadExpr` when `op` is quadratic. Promotion allocates a new expression, which is why the caller must use the returned value rather than the one it passed in.
 
 # Arguments
 
   - `model::JuMP.Model`: JuMP optimisation model.
   - `factor::Integer`: Sign factor (`1` for minimisation, `-1` for maximisation).
-  - `expr`: JuMP objective expression to modify in-place.
+  - `expr`: JuMP objective expression.
 
 # Returns
 
-  - `nothing`.
+  - `expr`: The objective expression with the penalty added, promoted to a `JuMP.QuadExpr` if that was needed to hold a quadratic penalty.
 
 # Related
 
@@ -944,7 +946,7 @@ If an `op` penalty term exists in the model, adds `factor * op` to `expr` in-pla
 """
 function add_penalty_to_objective!(model::JuMP.Model, factor::Integer, expr)
     if !haskey(model, :op)
-        return nothing
+        return expr
     end
     op = model[:op]
     if !isa(expr, JuMP.QuadExpr) && isa(op, JuMP.QuadExpr)
@@ -952,7 +954,7 @@ function add_penalty_to_objective!(model::JuMP.Model, factor::Integer, expr)
         expr = JuMP.@expression(model, obj_expr, JuMP.QuadExpr(expr))
     end
     JuMP.add_to_expression!(expr, factor, op)
-    return nothing
+    return expr
 end
 """
     set_portfolio_objective_function!(model, obj, pret, cobj, opt, pr)
@@ -991,7 +993,7 @@ function set_portfolio_objective_function!(model::JuMP.Model, obj::MinimumRisk,
     so = get_objective_scale(model)
     risk = get_risk(model)
     JuMP.@expression(model, obj_expr, risk)
-    add_penalty_to_objective!(model, 1, obj_expr)
+    obj_expr = add_penalty_to_objective!(model, 1, obj_expr)
     add_custom_objective_term!(model, obj, pret, cobj, obj_expr, opt, pr)
     JuMP.@objective(model, Min, so * obj_expr)
     return nothing
@@ -1006,7 +1008,7 @@ function set_portfolio_objective_function!(model::JuMP.Model, obj::MaximumUtilit
     risk = get_risk(model)
     l = obj.l
     JuMP.@expression(model, obj_expr, ret - l * risk)
-    add_penalty_to_objective!(model, -1, obj_expr)
+    obj_expr = add_penalty_to_objective!(model, -1, obj_expr)
     add_custom_objective_term!(model, obj, pret, cobj, obj_expr, opt, pr)
     JuMP.@objective(model, Max, so * obj_expr)
     return nothing
@@ -1021,7 +1023,7 @@ function set_portfolio_objective_function!(model::JuMP.Model, obj::MaximumRatio,
     k = get_k(model)
     rf = obj.rf
     JuMP.@expression(model, obj_expr, ret - rf * k)
-    add_penalty_to_objective!(model, -1, obj_expr)
+    obj_expr = add_penalty_to_objective!(model, -1, obj_expr)
     add_custom_objective_term!(model, obj, pret, cobj, obj_expr, opt, pr)
     JuMP.@objective(model, Max, so * obj_expr)
     return nothing
@@ -1037,13 +1039,13 @@ function set_portfolio_objective_function!(model::JuMP.Model, obj::MaximumRatio,
         k = get_k(model)
         rf = obj.rf
         JuMP.@expression(model, obj_expr, ret - rf * k)
-        add_penalty_to_objective!(model, -1, obj_expr)
+        obj_expr = add_penalty_to_objective!(model, -1, obj_expr)
         add_custom_objective_term!(model, obj, pret, cobj, obj_expr, opt, pr)
         JuMP.@objective(model, Max, so * obj_expr)
     else
         risk = get_risk(model)
         JuMP.@expression(model, obj_expr, risk)
-        add_penalty_to_objective!(model, 1, obj_expr)
+        obj_expr = add_penalty_to_objective!(model, 1, obj_expr)
         add_custom_objective_term!(model, obj, pret, cobj, obj_expr, opt, pr)
         JuMP.@objective(model, Min, so * obj_expr)
     end
@@ -1057,7 +1059,7 @@ function set_portfolio_objective_function!(model::JuMP.Model, obj::MaximumReturn
     so = get_objective_scale(model)
     ret = get_ret(model)
     JuMP.@expression(model, obj_expr, ret)
-    add_penalty_to_objective!(model, -1, obj_expr)
+    obj_expr = add_penalty_to_objective!(model, -1, obj_expr)
     add_custom_objective_term!(model, obj, pret, cobj, obj_expr, opt, pr)
     JuMP.@objective(model, Max, so * obj_expr)
     return nothing

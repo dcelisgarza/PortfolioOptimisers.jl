@@ -113,7 +113,7 @@ Standard deviation:
 
 ```math
 \\begin{align}
-\\hat{\\sigma}(\\boldsymbol{w}) &= \\|\\mathbf{G}\\boldsymbol{w}\\|_2\\,.
+\\hat{\\sigma}(\\boldsymbol{w}) &= \\lVert \\mathbf{G}\\boldsymbol{w} \\rVert_2\\,.
 \\end{align}
 ```
 

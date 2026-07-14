@@ -297,7 +297,7 @@ One practical note: the schedule's entries run *per cluster*, over that cluster'
 our defensive strategy's 10 % position cap is infeasible on a cluster of fewer than ten
 assets, so inside `NestedClustered` we use the [`UniformValues`](@ref) algorithm to cap the weights
 dynamically to the cluster's size. We can do the same for the outer estimator, but we must first
-know how many clusters there will be, this means we have to run [`custerise`](@ref) before the run.
+know how many clusters there will be, this means we have to run [`clusterise`](@ref) before the run.
 Alternatively, we can provide a dummy asset set to the outer optimiser, and let it be populated with
 the correct names and size of the synthetic assets. They are named `_i` for `i = 1, …, k` where `k` is
 the number of clusters, and the outer optimiser's `WeightBoundsEstimator` will use the `UniformValues`

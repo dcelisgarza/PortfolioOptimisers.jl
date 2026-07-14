@@ -111,7 +111,7 @@ overload unconditionally throws an `ArgumentError`.
 
 ```math
 \\begin{align}
-\\mathrm{NSkew}(\\boldsymbol{w}) &= \\|\\mathbf{G}_V \\boldsymbol{w}\\|_2\\,, \\\\
+\\mathrm{NSkew}(\\boldsymbol{w}) &= \\lVert \\mathbf{G}_V \\boldsymbol{w} \\rVert_2\\,, \\\\
 \\mathbf{G}_V &= \\mathrm{chol}(\\mathbf{V})\\,.
 \\end{align}
 ```

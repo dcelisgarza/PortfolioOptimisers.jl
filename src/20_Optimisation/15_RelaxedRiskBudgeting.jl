@@ -135,7 +135,7 @@ The Relaxed Risk Budgeting (RRB) formulation replaces the non-convex risk-parity
 \\end{align}
 ```
 
-The risk cone constraint (basic variant): ``(\\psi,\\, \\mathbf{G}\\boldsymbol{w}) \\in \\mathcal{K}_{\\mathrm{SOC}}``, i.e. ``\\psi \\geq \\|\\mathbf{G}\\boldsymbol{w}\\|_2 = \\sqrt{\\boldsymbol{w}^\\intercal\\mathbf{\\Sigma}\\boldsymbol{w}}``.
+The risk cone constraint (basic variant): ``(\\psi,\\, \\mathbf{G}\\boldsymbol{w}) \\in \\mathcal{K}_{\\mathrm{SOC}}``, i.e. ``\\psi \\geq \\lVert \\mathbf{G}\\boldsymbol{w} \\rVert_2 = \\sqrt{\\boldsymbol{w}^\\intercal\\mathbf{\\Sigma}\\boldsymbol{w}}``.
 
 Where:
 

@@ -95,7 +95,7 @@ Default (absolute error) MIP formulation:
 ```math
 \\begin{align}
 \\underset{\\boldsymbol{x} \\in \\mathbb{Z}_{\\geq 0}^N}{\\min} \\quad & u + r\\,, \\\\
-\\text{s.t.} \\quad & u \\geq \\|\\boldsymbol{w} C - \\boldsymbol{x} \\odot \\boldsymbol{p}\\|_1\\,, \\\\
+\\text{s.t.} \\quad & u \\geq \\lVert \\boldsymbol{w} C - \\boldsymbol{x} \\odot \\boldsymbol{p} \\rVert_1\\,, \\\\
 & r = C - \\boldsymbol{x}^\\intercal \\boldsymbol{p} \\geq 0\\,.
 \\end{align}
 ```

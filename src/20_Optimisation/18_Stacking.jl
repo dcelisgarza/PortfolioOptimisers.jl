@@ -323,9 +323,29 @@ function Stacking(; pe::TD{<:PrE_Pr} = EmpiricalPrior(), wb::TD_Option{<:WbE_Wb}
                     ex, fb, brt, strict)
 end
 """
-    assert_special_nco_requirements_stacking_opti(opti::AbstractVector)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
-Ensures there are no Finite optimisation estimators or results in the vector.
+Validate that a [`Stacking`](@ref) candidate vector contains no precomputed results.
+
+The candidates in `opti` are refit on each inner cross-validation fold to produce the columns the outer optimiser stacks. A [`NonFiniteAllocationOptimisationResult`](@ref) is already solved, so it cannot be refit per fold and has no candidate semantics here; it is rejected at construction rather than silently producing a column that ignores the fold.
+
+# Arguments
+
+  - `opti::AbstractVector`: Candidate optimisers to validate.
+
+# Validation
+
+  - `!any(x -> isa(x, NonFiniteAllocationOptimisationResult), opti)`.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`Stacking`](@ref)
+  - [`assert_special_nco_requirements`](@ref)
+  - [`NonFiniteAllocationOptimisationResult`](@ref)
 """
 function assert_special_nco_requirements_stacking_opti(opti::AbstractVector)::Nothing
     @argcheck(!any(x -> isa(x, NonFiniteAllocationOptimisationResult), opti),

@@ -211,6 +211,8 @@ its docstring.
 
 ├──&nbsp;[TimeDependentContext](@ref)
 
+├──&nbsp;[TrainTestSplitResult](@ref)
+
 ├──&nbsp;[Turnover](@ref)
 
 └──&nbsp;[VecScalar](@ref)
@@ -571,7 +573,9 @@ its docstring.
 
 │&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└──&nbsp;[ScoreSelector](@ref)
 
-│&nbsp;&nbsp;&nbsp;└──&nbsp;[PricesToReturns](@ref)
+│&nbsp;&nbsp;&nbsp;├──&nbsp;[PricesToReturns](@ref)
+
+│&nbsp;&nbsp;&nbsp;└──&nbsp;[TrainTestSplit](@ref)
 
 ├──&nbsp;[AbstractPriorEstimator](@ref)
 
@@ -614,6 +618,8 @@ its docstring.
 │&nbsp;&nbsp;&nbsp;└──&nbsp;[StepwiseRegression](@ref)
 
 ├──&nbsp;[AbstractRegularisationEstimator](@ref)
+
+│&nbsp;&nbsp;&nbsp;├──&nbsp;[L2Regularisation](@ref)
 
 │&nbsp;&nbsp;&nbsp;└──&nbsp;[LpRegularisation](@ref)
 
@@ -1133,6 +1139,8 @@ its docstring.
 
 │&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└──&nbsp;[MeanAbsoluteDeviation](@ref)
 
+├──&nbsp;[NoDefault](@ref)
+
 ├──&nbsp;[OpinionPoolingAlgorithm](@ref)
 
 │&nbsp;&nbsp;&nbsp;├──&nbsp;[LinearOpinionPooling](@ref)
@@ -1204,6 +1212,8 @@ its docstring.
 │&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└──&nbsp;[SquaredSOCRiskExpr](@ref)
 
 ├──&nbsp;[TimeDependentCallable](@ref)
+
+│&nbsp;&nbsp;&nbsp;└──&nbsp;[TimeDependentOptimiserCallable](@ref)
 
 ├──&nbsp;[TrackingFormulation](@ref)
 

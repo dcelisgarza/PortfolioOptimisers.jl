@@ -11,7 +11,7 @@ Introduces a scalar variable `uci` and the SOC constraint
 
 ```math
 \\begin{align}
-\\mathrm{UCI}(\\boldsymbol{w}) &= \\frac{\\|\\boldsymbol{dd}\\|_2}{\\sqrt{T}} = \\sqrt{\\frac{1}{T}\\sum_{t=1}^T dd_t^2}\\,.
+\\mathrm{UCI}(\\boldsymbol{w}) &= \\frac{\\lVert \\boldsymbol{dd} \\rVert_2}{\\sqrt{T}} = \\sqrt{\\frac{1}{T}\\sum_{t=1}^T dd_t^2}\\,.
 \\end{align}
 ```
 

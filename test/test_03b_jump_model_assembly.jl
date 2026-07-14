@@ -76,4 +76,23 @@
         @test "l1" in assemble_keys(MeanRisk(; r = Variance(),
                                              opt = JuMPOptimiser(; slv = slv, l1 = 0.1)))
     end
+
+    @testset "lp penalty and wnp constraint register distinct keys" begin
+        # The p-norm weight constraint and the Lp regularisation penalty both build
+        # PowerCone epigraphs. They must not register under the same Model-State names,
+        # or whichever runs second silently clobbers the other's handle in the object
+        # dictionary (JuMP's `model[k] = v` overwrites without complaint).
+        ks = assemble_keys(MeanRisk(; r = Variance(),
+                                    opt = JuMPOptimiser(; slv = slv,
+                                                        lp = LpRegularisation(; p = 3,
+                                                                              val = 0.1),
+                                                        wnp = LpRegularisation(; p = 3,
+                                                                               val = 6))))
+        for k in ("clp_1", "cslp_1", "t_lp_1", "r_lp_1")       # Lp penalty
+            @test k in ks
+        end
+        for k in ("cwnp_1", "cswnp_1", "t_wnp_1", "r_wnp_1")   # p-norm constraint
+            @test k in ks
+        end
+    end
 end

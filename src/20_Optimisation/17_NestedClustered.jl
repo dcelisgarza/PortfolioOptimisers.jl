@@ -630,13 +630,31 @@ function predict_outer_nco_estimator_returns(nco::NestedClustered{<:Any, <:Any, 
     return rebuild_returns_result(rd, best_predictions)
 end
 """
-    _update_asset_sets(nco::NestedClustered, rdo::ReturnsResult)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
-Checks if `nco` uses asset sets, checks that the names are consistent with the outer returns result `rdo`, and updates the asset sets if necessary. Returns the new updated `nco` or the original if no update was needed.
+Align the outer optimiser's asset sets with the synthetic universe produced by the inner optimisations.
+
+The outer optimiser of a [`NestedClustered`](@ref) does not see the original assets. It sees one synthetic asset per cluster, whose names are carried by the outer returns result `rdo`. An outer optimiser configured with [`AssetSets`](@ref) built over the original universe would therefore resolve its constraints against the wrong names, so the sets are rebuilt over the cluster names before the outer solve.
+
+# Arguments
+
+  - `nco::NestedClustered`: The nested clustered optimiser.
+  - `rdo::ReturnsResult`: Outer returns result, whose `nx` holds the cluster names.
 
 # Returns
 
-    - `nco::NestedClustered`: New instance of [`NestedClustered`](@ref) with updated asset sets, or the original if no update was needed.
+  - `nco::NestedClustered`: Instance with the outer optimiser's asset sets rebuilt over `rdo.nx`, or `nco` unchanged when it has no outer asset sets, or they already match.
+
+# Details
+
+  - Handles both shapes of outer optimiser: one that nests its own optimiser (`nco.opto.opt.sets`) and one that carries the sets directly (`nco.opto.sets`).
+  - The dictionary is copied before being reset, so the caller's [`AssetSets`](@ref) is not mutated.
+
+# Related
+
+  - [`NestedClustered`](@ref)
+  - [`AssetSets`](@ref)
+  - [`predict_outer_nco_estimator_returns`](@ref)
 """
 function _update_asset_sets(nco::NestedClustered, rdo::ReturnsResult)
     return if (hasproperty(nco.opto, :opt) &&
