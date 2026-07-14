@@ -287,7 +287,7 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:OptimisationRiskMeasure}
     rd = returns_result_picker(rd, hrp.opt.brt)
     pr = prior(hrp.opt.pe, rd; dims = dims)
     X = pr.X
-    clr = clusterise(hrp.opt.cle, pr; iv = rd.iv, ivpa = rd.ivpa, dims = dims,
+    clr = clusterise(hrp.opt.cle, pr; rd = rd, iv = rd.iv, ivpa = rd.ivpa, dims = dims,
                      cle_pr = hrp.opt.cle_pr)
     r = factory(hrp.r, pr, hrp.opt.slv)
     wu = Matrix{eltype(X)}(undef, size(X, 2), 2)
@@ -387,7 +387,7 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:VecOptRM},
     rd = returns_result_picker(rd, hrp.opt.brt)
     pr = prior(hrp.opt.pe, rd; dims = dims)
     X = pr.X
-    clr = clusterise(hrp.opt.cle, pr; iv = rd.iv, ivpa = rd.ivpa, dims = dims,
+    clr = clusterise(hrp.opt.cle, pr; rd = rd, iv = rd.iv, ivpa = rd.ivpa, dims = dims,
                      cle_pr = hrp.opt.cle_pr)
     r = factory(hrp.r, pr, hrp.opt.slv)
     wu = Matrix{eltype(X)}(undef, size(X, 2), 2)

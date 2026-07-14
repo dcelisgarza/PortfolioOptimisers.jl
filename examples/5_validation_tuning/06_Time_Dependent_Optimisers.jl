@@ -295,13 +295,29 @@ consumer (the per-cluster full-window solve), a `:nearest` schedule there must c
 
 One practical note: the schedule's entries run *per cluster*, over that cluster's few assets —
 our defensive strategy's 10 % position cap is infeasible on a cluster of fewer than ten
-assets, so inside `NestedClustered` we use an uncapped minimum-variance variant instead:
+assets, so inside `NestedClustered` we use the [`UniformValues`](@ref) algorithm to cap the weights
+dynamically to the cluster's size. We can do the same for the outer estimator, but we must first
+know how many clusters there will be, this means we have to run [`custerise`](@ref) before the run.
+Alternatively, we can provide a dummy asset set to the outer optimiser, and let it be populated with
+the correct names and size of the synthetic assets. They are named `_i` for `i = 1, …, k` where `k` is
+the number of clusters, and the outer optimiser's `WeightBoundsEstimator` will use the `UniformValues`
+algorithm to cap the weights dynamically to the number of clusters.
 =#
-minvar = MeanRisk(; obj = MinimumRisk(), opt = JuMPOptimiser(; slv = slv))
+inner_sets = AssetSets(; dict = Dict("nx" => rd.nx))
+inner_minvar = MeanRisk(; obj = MinimumRisk(),
+                        opt = JuMPOptimiser(; slv = slv, sets = inner_sets,
+                                            wb = WeightBoundsEstimator(; lb = 0,
+                                                                       ub = UniformValues())))
+outer_sets = AssetSets(; dict = Dict("nx" => ["placeholder"]))
+outer_minvar = MeanRisk(; obj = MinimumRisk(),
+                        opt = JuMPOptimiser(; slv = slv, sets = outer_sets,
+                                            wb = WeightBoundsEstimator(; lb = 0,
+                                                                       ub = UniformValues())))
 inner_cv = OptimisationCrossValidation(; cv = KFold(; n = 3))
 nco = NestedClustered(;
-                      opti = TimeDependent([minvar, aggressive, minvar], :nearest;
-                                           default = minvar), opto = minvar, cv = inner_cv)
+                      opti = TimeDependent([inner_minvar, aggressive, inner_minvar],
+                                           :nearest; default = inner_minvar),
+                      opto = outer_minvar, cv = inner_cv)
 res_nco = optimise(nco, rd)
 maximum(res_nco.w)
 #=
@@ -311,12 +327,20 @@ served.
 
 [`Stacking`](@ref) enters its inner cross-validation once per *candidate*, so there the
 schedule goes on an **element** of `opti`, not the field (a field-level schedule would change
-the number of candidates per fold, and the outer optimiser's inputs would stop lining up):
+the number of candidates per fold, and the outer optimiser's inputs would stop lining up). For
+this optimiser, we always know how many inner folds there will be so it is the user's responsibility
+to provide the correct number of entries in the [`AssetSets`](@ref) instance, here we use two inner
+optimisers, so the synthetic asset names are `_1` and `_2`.
 =#
+outer_sets = AssetSets(; dict = Dict("nx" => ["_1", "_2"]))
+outer_minvar = MeanRisk(; obj = MinimumRisk(),
+                        opt = JuMPOptimiser(; slv = slv, sets = outer_sets,
+                                            wb = WeightBoundsEstimator(; lb = 0,
+                                                                       ub = UniformValues())))
 st = Stacking(;
-              opti = [TimeDependent([minvar, aggressive, minvar], :nearest;
-                                    default = minvar), aggressive], opto = minvar,
-              cv = inner_cv)
+              opti = [TimeDependent([inner_minvar, aggressive, inner_minvar], :nearest;
+                                    default = inner_minvar), aggressive],
+              opto = outer_minvar, cv = inner_cv)
 res_st = optimise(st, rd)
 maximum(res_st.w)
 #=

@@ -2234,7 +2234,8 @@ Alias for an abstract vector of strings or Julia expressions.
 """
 const VecStr_Expr = AbstractVector{<:Str_Expr}
 """
-    const EqnType = Union{<:AbstractString, Expr, <:VecStr_Expr}
+    const EqnType = Union{<:AbstractString, Expr, <:VecStr_Expr,
+                          <:AbstractEstimatorValueAlgorithm}
 
 Alias for a union of string, Julia expression, or vector of strings/expressions.
 
@@ -2243,7 +2244,8 @@ Alias for a union of string, Julia expression, or vector of strings/expressions.
   - [`Str_Expr`](@ref)
   - [`VecStr_Expr`](@ref)
 """
-const EqnType = Union{<:AbstractString, Expr, <:VecStr_Expr}
+const EqnType = Union{<:AbstractString, Expr, <:VecStr_Expr,
+                      <:AbstractEstimatorValueAlgorithm}
 """
 $(DocStringExtensions.TYPEDEF)
 

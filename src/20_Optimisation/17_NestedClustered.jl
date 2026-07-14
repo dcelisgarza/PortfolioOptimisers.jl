@@ -629,6 +629,24 @@ function predict_outer_nco_estimator_returns(nco::NestedClustered{<:Any, <:Any, 
     best_predictions = [scorer(prediction) for prediction in predictions]
     return rebuild_returns_result(rd, best_predictions)
 end
+function _update_asset_sets(nco::NestedClustered, rdo::ReturnsResult)
+    return if (hasproperty(nco.opto, :opt) &&
+               hasproperty(nco.opto.opt, :sets) &&
+               !isnothing(nco.opto.opt.sets) &&
+               get(nco.opto.opt.sets.dict, nco.opto.opt.sets.key, nothing) !== rdo.nx)
+        ndict = copy(nco.opto.opt.sets.dict)
+        ndict[nco.opto.opt.sets.key] = rdo.nx
+        Accessors.@reset nco.opto.opt.sets.dict = ndict
+    elseif (hasproperty(nco.opto, :sets) &&
+            !isnothing(nco.opto.sets) &&
+            get(nco.opto.sets.dict, nco.opto.sets.key, nothing) !== rdo.nx)
+        ndict = copy(nco.opto.sets.dict)
+        ndict[nco.opto.sets.key] = rdo.nx
+        Accessors.@reset nco.opto.sets.dict = ndict
+    else
+        nco
+    end
+end
 function _optimise(nco::NestedClustered, rd::ReturnsResult; dims::Int = 1,
                    branchorder::Symbol = :optimal, str_names::Bool = false,
                    save::Bool = true, kwargs...)
@@ -636,7 +654,7 @@ function _optimise(nco::NestedClustered, rd::ReturnsResult; dims::Int = 1,
     rd = returns_result_picker(rd, nco.brt)
     pr = prior(nco.pe, rd; dims = dims)
     X = pr.X
-    clr = clusterise(nco.cle, pr; iv = rd.iv, ivpa = rd.ivpa, dims = dims,
+    clr = clusterise(nco.cle, pr; rd = rd, iv = rd.iv, ivpa = rd.ivpa, dims = dims,
                      branchorder = branchorder, cle_pr = nco.cle_pr)
     fees = fees_constraints(nco.fees, nco.sets; datatype = eltype(X), strict = nco.strict)
     idx = assignments(clr)
@@ -644,8 +662,7 @@ function _optimise(nco::NestedClustered, rd::ReturnsResult; dims::Int = 1,
     wi = zeros(eltype(X), size(X, 2), clr.k)
     opti = nco.opti
     resi = Vector{NonFiniteAllocationOptimisationResult}(undef, clr.k)
-    # FLoops.@floop nco.ex
-    for (i, cl) in pairs(cls)
+    FLoops.@floop nco.ex for (i, cl) in pairs(cls)
         optic = port_opt_view(opti, cl, X)
         rdc = port_opt_view(rd, cl)
         res = optimise(optic, rdc; dims = dims, branchorder = branchorder,
@@ -657,6 +674,7 @@ function _optimise(nco::NestedClustered, rd::ReturnsResult; dims::Int = 1,
         resi[i] = res
     end
     rdo = predict_outer_nco_estimator_returns(nco, rd, pr, fees, wi, resi, cls)
+    nco = _update_asset_sets(nco, rdo)
     reso = optimise(nco.opto, rdo; dims = dims, branchorder = branchorder,
                     str_names = str_names, save = save, kwargs...)
     wb = weight_bounds_constraints(nco.wb, nco.sets; N = clr.k, strict = nco.strict,

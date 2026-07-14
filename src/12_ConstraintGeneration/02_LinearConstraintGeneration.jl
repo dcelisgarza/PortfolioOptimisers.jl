@@ -1637,6 +1637,14 @@ function linear_constraints(eqn::EqnType, sets::AssetSets,
     lcs = replace_group_by_assets(lcs, sets, bl_flag)
     return get_linear_constraints(lcs, sets, key; datatype = datatype, strict = strict)
 end
+function linear_constraints(lcs::LinearConstraintEstimator{<:AbstractEstimatorValueAlgorithm},
+                            sets::AssetSets, key::Option{<:AbstractString} = nothing;
+                            datatype::DataType = Float64, strict::Bool = false,
+                            args...)::Option{<:LinearConstraint}
+    return estimator_to_val(lcs.val, sets,
+                            !hasproperty(lcs.val, :default) ? nothing : lcs.val.default,
+                            key; datatype = datatype, strict = strict)
+end
 """
     linear_constraints(lcs::LcE_VecLcE,
                        sets::AssetSets; datatype::DataType = Float64, strict::Bool = false,

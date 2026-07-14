@@ -685,7 +685,7 @@ function _optimise(hec::HierarchicalEqualRiskContribution,
     rd = returns_result_picker(rd, hec.opt.brt)
     pr = prior(hec.opt.pe, rd; dims = dims)
     X = pr.X
-    clr = clusterise(hec.opt.cle, pr; iv = rd.iv, ivpa = rd.ivpa, dims = dims,
+    clr = clusterise(hec.opt.cle, pr; rd = rd, iv = rd.iv, ivpa = rd.ivpa, dims = dims,
                      branchorder = branchorder, cle_pr = hec.opt.cle_pr)
     idx = assignments(clr)
     cls = [findall(x -> x == i, idx) for i in 1:(clr.k)]
