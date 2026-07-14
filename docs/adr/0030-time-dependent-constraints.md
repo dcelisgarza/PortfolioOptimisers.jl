@@ -109,6 +109,31 @@ processes the estimator, and replaced by the field's static default everywhere e
   `needs_previous_weights` is deliberately left scope-blind (it never consults `bind`): declaring
   sequentiality conservatively is always safe, and threading the flag through the trait would buy
   nothing.
+- **Pipelines: swap, then inject — with the swap outside `fit` entirely.** The `Pipeline` fold
+  loop (`cross_val_predict(pipe, data::Prices_RR, cv)`) splits the *input* at its own level
+  (contiguous windows only: combinatorial and asset-resampling schemes are rejected — a fitted
+  workflow cannot replay non-contiguous windows and cannot take an asset view) and resolves
+  time-dependent steps per fold *before* `fit` runs on the training window, so injection
+  (`inject_context`/`maybe_inject_step`) only ever sees a plain, already-resolved optimiser and
+  `fit`/`run_step` never learn about folds. A schedule may *be* the optimisation step: the
+  statically-typed forms (a vector of optimisers/results, a declared
+  `TimeDependentOptimiserCallable`) classify as optimisation steps directly
+  (`pipe_writes = :opt`, `pipe_reads = (:returns,)`), while a bare `ctx -> optimiser` enters via
+  `PipelineStep(; est = td, writes = :opt)` with its output checked at the swap. A mixed
+  schedule's result entries run predict-only folds — `run_step` writes the result to the `opt`
+  slot as-is — and reuse the non-injectable pattern: computed `prior`/`phylogeny` slots pass by,
+  populated `uncertainty`/`constraints` slots fail closed. `TimeDependentContext.rd` widens from
+  `ReturnsResult` to `Prices_RR`: the pipeline loop passes the raw input data, so pipeline-level
+  callables see the fold's data *before* any preprocessing step has transformed it. Schedules of
+  non-optimiser families stay un-steppable (rejected at `PipelineStep` construction) — a
+  per-fold prior/constraint is spelled as a `TimeDependent` *field* of the optimisation step,
+  keeping one spelling per thing. `search_cross_validation` resolves candidate schedules against
+  its *tuning* folds (tuning fold `j` runs entry `j`, fold counts asserted per candidate, lenses
+  need no schedule semantics), and the fold-less `fit` resolves schedule steps to their explicit
+  `default` or throws a `TimeDependentDefaultError` pointing at `cross_val_predict`. When the
+  pipeline `needs_previous_weights`, the fold loop runs sequentially and threads the previous
+  fold's weights both into `ctx.w_prev` and — post-swap, so freshly swapped-in optimisers receive
+  them — into the optimisation steps via `factory`.
 
 ## Considered options
 
@@ -165,3 +190,7 @@ processes the estimator, and replaced by the field's static default everywhere e
 - Constructor validation that eagerly couples several fields (e.g. `scard`/`smtx`/`slt`/`sst`)
   is skipped when a participant is time-dependent and re-runs on every per-fold rebuild and on
   every construction-time entry substitution instead.
+- `cross_val_predict` gains a `Pipeline` method — the first whole-workflow fold loop — and
+  `fit(pipe, data)` gains a reset seam at its top, mirroring `_optimise`. The
+  `TimeDependentContext` inner constructor accepts `Prices_RR` where it required a
+  `ReturnsResult`; optimiser fold loops still always pass returns-level data.

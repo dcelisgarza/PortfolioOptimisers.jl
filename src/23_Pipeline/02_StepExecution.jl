@@ -94,6 +94,22 @@ function run_step(opt::OptimisationEstimator, ctx::PipelineContext)
     res = optimise(opt, ctx.returns)
     return res, set_slot(ctx, :opt, res)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Execute a precomputed optimisation result as the optimisation step: there is nothing to solve, so the result is written to the `opt` slot as-is and the fold predicts with its weights.
+
+This is how a *mixed* [`TimeDependent`](@ref) schedule runs its result entries: the fold-loop swap ([`update_time_dependent_estimator`](@ref)) replaces the schedule step with entry `i`, which may be an estimator (the fold optimises) or a result (the fold only predicts). A result cannot consume computed context slots — see [`maybe_inject_step`](@ref) for the fail-closed injection rules.
+
+# Related
+
+  - [`run_step`](@ref)
+  - [`maybe_inject_step`](@ref)
+  - [`TD_OptE_Opt`](@ref)
+"""
+function run_step(res::NonFiniteAllocationOptimisationResult, ctx::PipelineContext)
+    return res, set_slot(ctx, :opt, res)
+end
 function run_step(est::AbstractPricesPreprocessingEstimator, ctx::PipelineContext)
     require_slot(ctx, :prices, est)
     res = fit_preprocessing(est, ctx.prices)

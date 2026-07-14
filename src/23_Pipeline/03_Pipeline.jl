@@ -442,6 +442,25 @@ maybe_inject_step(est, ::PipelineContext) = est
 function maybe_inject_step(opt::OptimisationEstimator, ctx::PipelineContext)
     return inject_context(opt, ctx)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Injection rules for a precomputed optimisation result standing in the optimisation step — the predict-only fold of a mixed [`TimeDependent`](@ref) schedule.
+
+A result is already solved, so it has no configuration to override; this reuses the non-injectable pattern of [`inject_context`](@ref): computed `prior` and `phylogeny` slots pass by (the result was fitted with its own), but populated `uncertainty` or `constraints` slots throw an `ArgumentError` rather than being silently dropped — a computed constraint that never reaches a solve is a fail-closed error, not a no-op.
+
+# Related
+
+  - [`inject_context`](@ref)
+  - [`run_step`](@ref)
+"""
+function maybe_inject_step(res::NonFiniteAllocationOptimisationResult, ctx::PipelineContext)
+    @argcheck(isnothing(ctx.uncertainty),
+              ArgumentError("cannot route uncertainty sets into a $(Base.typename(typeof(res)).wrapper): a precomputed optimisation result is already solved, so a computed uncertainty set would be silently dropped"))
+    @argcheck(isnothing(ctx.constraints),
+              ArgumentError("cannot route constraint results into a $(Base.typename(typeof(res)).wrapper): a precomputed optimisation result is already solved, so computed constraints would be silently dropped"))
+    return res
+end
 function maybe_inject_step(ps::PipelineStep, ctx::PipelineContext)
     if isa(ps.est, OptimisationEstimator)
         return PipelineStep(; est = inject_context(ps.est, ctx), reads = ps.reads,
@@ -455,6 +474,8 @@ end
 Fit a [`Pipeline`](@ref) on price- or returns-level data.
 
 The context slot matching the input type is filled (`PricesResult` → `prices`, `ReturnsResult` → `returns`, so passing returns-level data skips the price stages), then the steps run left-to-right via [`run_step`](@ref). Immediately before an optimisation step runs, the computed slots override its internal configuration via [`inject_context`](@ref).
+
+`fit` is a fold-less entry point, so [`TimeDependent`](@ref) schedule steps are inert here: each resolves to its explicit `default` (see [`reset_time_dependent_estimator`](@ref)) before the steps run, and a schedule with no `default` throws a [`TimeDependentDefaultError`](@ref) — backtest the pipeline with [`cross_val_predict`](@ref), whose folds the schedule resolves against. Inside a fold loop this reset is a no-op, because the loop swaps every schedule for its per-fold value first.
 
 # Arguments
 
@@ -489,6 +510,9 @@ julia> res.w
   - [`inject_context`](@ref)
 """
 function StatsAPI.fit(pipe::Pipeline, data::Prices_RR)::PipelineResult
+    if is_time_dependent(pipe)
+        pipe = reset_time_dependent_estimator(pipe)
+    end
     ctx = if isa(data, AbstractPricesResult)
         PipelineContext(; prices = data)
     else

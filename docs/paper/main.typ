@@ -30,7 +30,7 @@
 #show heading.where(level: 2): set block(spacing: 1.25em)
 #set par(first-line-indent: 2em, spacing: 2em, leading: 1.2em)
 #set text(font: "New Computer Modern")
-#set enum(numbering: "1.")
+#set enum(numbering: "1.a.i.")
 #set math.equation(numbering: "(1)")
 
 = Introduction
@@ -42,7 +42,7 @@ There also exist myriad optimisation methods, pre-filtering, distribution and mo
 
 = Design and implementation
 
-== Basic usage
+== Basic example
 
 #link("https://github.com/dcelisgarza/PortfolioOptimisers.jl/")[PortfolioOptimisers.jl] is built with modularity and extensibility in mind. We can demonstrate a simple improvement over the Markowitz model by using by adding an L2 regularisation term to the optimisation problem.
 
@@ -101,7 +101,7 @@ mr = MR(;
     # L2 regularisation using a squared L2 norm with a scalar value of 0.0001. This
     # is used to prevent weight concentration and thus reduce overfitting and improve
     #generalisation.
-    l2 = L2Reg(; val = 0.0001, alg = SquaredSOCRiskExpr()),
+    l2 = L2Reg(; val = 0.01, alg = SquaredSOCRiskExpr()),
     # Arithmetic returns with 100 evenly distributed points between the minimum and
     # maximum returns in the training set. This way we can compute the efficient
     # frontier, which is a subset of pareto fronts.
@@ -129,6 +129,54 @@ savefig(plt, joinpath(@__DIR__, "fig1.svg"))
   image("fig1.svg", width: 65%),
   caption: [Train and test efficient frontier for an L2 regularised Markowitz model with a scenario-based standard deviation risk measure. The training set does much better than the test set, this is why other portfolio optimisation modalities have been invented.],
 )<fig1>
+
+== Data flow
+
+The library is configured to allow for different workflows. There is no rigid structure to the data flow. It is possible to use the library as simply as shown above or to build extremely complex workflows either manually, or using a pipeline. The functionality is grouped into three main stages, these break down in a hierarchy of standalone processes, which can be used in isolation or as part of a larger workflow.
+
++ Preprocessing: Data cleanup, filtering, and transformation.
+  + Transformation: Fills out pathological data with something tractable.
+  + Preselection: Uses various non-optimisation methods defined in the library to preselect assets based on various criteria. Can operate at the price or returns stage.
+  + Returns computation: Computes returns but can also impute, drop, or fill missing data. Not as advanced or flexible as the transformation or preselection stages but can be used standalone.
++ Processing: These can be used as separate steps and provided precomputed (only valid for certain optimisers and in standalone optimisations), or as a single step as part of an optimisation (required for certain meta optimisers and cross-validation). The only requirement to perform an optimisation is the computation of prior statistics, and for certain optimisers, a clustering.
+  + Prior statistics: These include standalone moment estimation, but also an integrative returns distribution estimation and adjustments to the moment estimations.
+  + Phylogeny: These uncover the relational structure of the asset universe. They include clustering and network analysis.
+  + Constraint generation: These let users easily define constraints. Some use prior and phylogeny statistics, others do not. Many require the user to define the sets of assets which let the library map the user's constraints to the data.
+  + Uncertainty sets: These are used for robust optimisation, they ameliorate the sensitivity to estimation errors. They only cover expected returns and covariance.
+  + Optimisation: These can either consume or internally carry out all aforementioned steps and produce a result with all the computed quantities. They can be used standalone or in a cross-validation framework (except the finite optimisers), where it is possible to tune the hyperparameters of the optimiser, including the entire processing stack.
++ Postprocessing: These just include reporting and visualisation. Which is by far the least mature aspect of the library.
+
+It is worth noting that the preprocessing and processing steps can be bundled into a single pipeline step, which can also be used standalone or in a cross-validation framework, which can be used to tune the hyperparameters of the entire preprocessing and processing stacks together.
+
+== Prior statistics
+
+#link("https://github.com/dcelisgarza/PortfolioOptimisers.jl/")[PortfolioOptimisers.jl] comes with a large number of moment estimation and prior statistics methods. It leverages #link("https://juliastats.org/StatsBase.jl/stable/cov/#StatsBase.CovarianceEstimator")[StatsBase.jl]'s covariance estimator defintions and API to allow interoperability with the Julia ecosystem, for example by composing with #link("https://github.com/mateuszbaran/CovarianceEstimation.jl")[CovarianceEstimation.jl]. They include a large number of methods, which can be combined in many ways. It's possible to compute the expected returns using a specific covariance method and vice-versa.
+
+- Full or downside co-moments.
+- Weighted, unweighted.
+- Shrinkage.
+- Probability-theoretic.
+- Denoising, detoning.
+- J-sparse.
+- Regression-based.
+- Rank based.
+- Coskewness and cokurtosis.
+
+The prior statistics fall under three categories:
+
+- Frequentist: Empirical, factor models.
+- Bayesian: Black-Litterman.
+- Information-theoretic: Entropy pooling, opinion pooling.
+
+== Phylogeny statistics
+
+These bundle clustering and network analysis pipelines to explore the relational structure of the asset universe, and derive insights from it which can be used . Clustering and network analysis, though different tackle similar issues from different, complementary angles. The same analysis techniques can be used to exploit the structure each uncovers. As such we choose to categorise them under the same umbrella. The distance matrices include first and second order distances as defined in @lopezdepradobook, and are compatible with every single covariance estimator that follows the #link("https://juliastats.org/StatsBase.jl/stable/cov/#StatsBase.CovarianceEstimator")[StatsBase.jl] API. The clustering and network analysis methods include:
+
+- Hierarchical agglomerative clustering.
+- Direct bubble hierarchy trees.
+- K-mean clustering.
+- Minimum spanning trees.
+- Planar maximally filtered graphs.
 
 == Optimisers
 

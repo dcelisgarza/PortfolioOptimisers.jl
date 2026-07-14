@@ -631,7 +631,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Per-fold context handed to time-dependent constraints when they are resolved.
 
-Carries the fold's position in the consuming scheme's `split` enumeration and the data needed for a callable entry to compute its value. `i` indexes `train_idx`/`test_idx`, so `ctx.train_idx[ctx.i]`/`ctx.test_idx[ctx.i]` are always the fold's own windows; no ordering beyond the scheme's enumeration is implied. `rd` is the fold's (possibly asset-viewed) returns data, so callables see the current universe and timestamps. `w_prev` is populated only when the fold loop runs sequentially and a previous fold exists; `path_id` only under multi-path schemes.
+Carries the fold's position in the consuming scheme's `split` enumeration and the data needed for a callable entry to compute its value. `i` indexes `train_idx`/`test_idx`, so `ctx.train_idx[ctx.i]`/`ctx.test_idx[ctx.i]` are always the fold's own windows; no ordering beyond the scheme's enumeration is implied. `rd` is the fold loop's (possibly asset-viewed) input data, so callables see the current universe and timestamps: the returns-level data at the optimiser fold loops, or the raw, pre-preprocessing price- or returns-level input at the [`Pipeline`](@ref) fold loop — a pipeline-level callable sees the fold's data *before* any pipeline step has transformed it. `w_prev` is populated only when the fold loop runs sequentially and a previous fold exists; `path_id` only under multi-path schemes.
 
 # Fields
 
@@ -640,7 +640,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     TimeDependentContext(;
-        i::Integer, n::Integer, rd::ReturnsResult, train_idx, test_idx,
+        i::Integer, n::Integer, rd::Prices_RR, train_idx, test_idx,
         w_prev::Option{<:VecNum} = nothing, path_id::Option{<:Integer} = nothing
     )
 
@@ -678,7 +678,7 @@ struct TimeDependentContext{T1, T2, T3, T4, T5, T6, T7} <: AbstractResult
     Path identifier under multi-path schemes; `nothing` otherwise.
     """
     path_id::T7
-    function TimeDependentContext(i::Integer, n::Integer, rd::ReturnsResult, train_idx,
+    function TimeDependentContext(i::Integer, n::Integer, rd::Prices_RR, train_idx,
                                   test_idx, w_prev::Option{<:VecNum},
                                   path_id::Option{<:Integer})
         @argcheck(1 <= i <= n, DomainError(i, "fold index i must be in 1:$n"))
@@ -687,8 +687,8 @@ struct TimeDependentContext{T1, T2, T3, T4, T5, T6, T7} <: AbstractResult
                                                     path_id)
     end
 end
-function TimeDependentContext(; i::Integer, n::Integer, rd::ReturnsResult, train_idx,
-                              test_idx, w_prev::Option{<:VecNum} = nothing,
+function TimeDependentContext(; i::Integer, n::Integer, rd::Prices_RR, train_idx, test_idx,
+                              w_prev::Option{<:VecNum} = nothing,
                               path_id::Option{<:Integer} = nothing)::TimeDependentContext
     return TimeDependentContext(i, n, rd, train_idx, test_idx, w_prev, path_id)
 end

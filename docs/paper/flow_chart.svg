@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="210mm"
+   height="297mm"
+   viewBox="0 0 210 297"
+   version="1.1"
+   id="svg5"
+   inkscape:version="1.2.2 (b0a8486541, 2022-12-01)"
+   sodipodi:docname="flow_chart.svg"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview7"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:document-units="mm"
+     showgrid="false"
+     inkscape:zoom="1.7870511"
+     inkscape:cx="430.31786"
+     inkscape:cy="421.92414"
+     inkscape:window-width="2560"
+     inkscape:window-height="1408"
+     inkscape:window-x="1920"
+     inkscape:window-y="0"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="layer1" />
+  <defs
+     id="defs2">
+    <marker
+       style="overflow:visible"
+       id="Arrow2"
+       refX="0"
+       refY="0"
+       orient="auto-start-reverse"
+       inkscape:stockid="Arrow2"
+       markerWidth="7.6999998"
+       markerHeight="5.5999999"
+       viewBox="0 0 7.7 5.6"
+       inkscape:isstock="true"
+       inkscape:collect="always"
+       preserveAspectRatio="xMidYMid">
+      <path
+         transform="scale(0.7)"
+         d="M -2,-4 9,0 -2,4 c 2,-2.33 2,-5.66 0,-8 z"
+         style="fill:context-stroke;fill-rule:evenodd;stroke:none"
+         id="arrow2L" />
+    </marker>
+  </defs>
+  <g
+     inkscape:label="Layer 1"
+     inkscape:groupmode="layer"
+     id="layer1">
+    <path
+       id="rect501"
+       style="fill:#2affd5;fill-opacity:1;stroke:#000000;stroke-width:0.352778;stroke-dasharray:none;stroke-dashoffset:8.8;stroke-opacity:1"
+       d="M 8.3413513,99.341062 H 29.754107 51.166865 c 0,0 -1.14156,2.411188 -1.524685,3.683678 -0.613693,2.03828 -1.227156,4.13942 -1.221517,6.26808 0.0055,2.08868 0.613725,4.14858 1.231147,6.14393 0.381184,1.23189 1.515055,3.55953 1.515055,3.55953 H 29.754107 8.3413513 c 0,0 -1.1340004,-2.32765 -1.5152338,-3.55956 -0.6174946,-1.99535 -1.2257898,-4.05527 -1.2313201,-6.14398 -0.00564,-2.12866 0.6079282,-4.22979 1.2216961,-6.26805 0.383174,-1.27248 1.5248578,-3.683628 1.5248578,-3.683628 z"
+       sodipodi:nodetypes="cccaaacccaaac" />
+    <path
+       style="fill:#000000;fill-opacity:1;stroke:#000000;stroke-width:0.352778;stroke-linecap:round;stroke-dasharray:none;stroke-dashoffset:8.8;stroke-opacity:1;marker-end:url(#Arrow2)"
+       d="m 48.433752,109.29508 h 5.042317"
+       id="path2066"
+       sodipodi:nodetypes="cc" />
+    <text
+       xml:space="preserve"
+       style="font-size:2.82222px;fill:#2affd5;fill-opacity:1;stroke:none;stroke-width:0.352777;stroke-dasharray:none;stroke-dashoffset:8.8"
+       x="8.166913"
+       y="105.13089"
+       id="text1112-3"><tspan
+         sodipodi:role="line"
+         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.82222px;font-family:'Latin Modern Roman';-inkscape-font-specification:'Latin Modern Roman, ';fill:#000000;stroke-width:0.352778"
+         x="8.166913"
+         y="105.13089"
+         id="tspan1266-7">- Prices (assets, factors)</tspan><tspan
+         sodipodi:role="line"
+         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.82222px;font-family:'Latin Modern Roman';-inkscape-font-specification:'Latin Modern Roman, ';fill:#000000;stroke-width:0.352778"
+         x="8.166913"
+         y="108.71828"
+         id="tspan2572">- Benchmark (index, per asset)</tspan><tspan
+         sodipodi:role="line"
+         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.82222px;font-family:'Latin Modern Roman';-inkscape-font-specification:'Latin Modern Roman, ';fill:#000000;stroke-width:0.352778"
+         x="8.166913"
+         y="112.30568"
+         id="tspan2574">- Metadata (implied vol, </tspan><tspan
+         sodipodi:role="line"
+         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.82222px;font-family:'Latin Modern Roman';-inkscape-font-specification:'Latin Modern Roman, ';fill:#000000;stroke-width:0.352778"
+         x="8.166913"
+         y="115.89307"
+         id="tspan2580">    vol premium, etc.)</tspan></text>
+    <rect
+       style="fill:#2affd5;stroke:#000000;stroke-width:0.392554;stroke-linecap:round;stroke-dasharray:2.35533, 2.35533;stroke-dashoffset:0;stroke-opacity:1"
+       id="rect520"
+       width="25.960224"
+       height="4.9604459"
+       x="55.749844"
+       y="106.78628" />
+    <text
+       xml:space="preserve"
+       style="font-size:2.82222px;fill:#2affd5;fill-opacity:1;stroke:none;stroke-width:0.352777;stroke-dasharray:none;stroke-dashoffset:8.8"
+       x="56.948399"
+       y="109.81542"
+       id="text1112-3-3"><tspan
+         sodipodi:role="line"
+         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.82222px;font-family:'Latin Modern Mono';-inkscape-font-specification:'Latin Modern Mono';fill:#000000;stroke-width:0.352778"
+         x="56.948399"
+         y="109.81542"
+         id="tspan2580-3">train_test_split</tspan></text>
+    <path
+       style="fill:#000000;fill-opacity:1;stroke:#000000;stroke-width:0.352778;stroke-linecap:round;stroke-dasharray:none;stroke-dashoffset:8.8;stroke-opacity:1;marker-end:url(#Arrow2)"
+       d="m 81.817001,109.29508 h 5.983125"
+       id="path6420" />
+    <g
+       id="g20850"
+       transform="translate(1.1285623,0.02399875)">
+      <rect
+         style="fill:#ffde6e;fill-opacity:1;stroke:#000000;stroke-width:0.446065;stroke-linecap:round;stroke-dasharray:2.67639, 2.67639;stroke-dashoffset:0;stroke-opacity:1"
+         id="rect9513"
+         width="19.774935"
+         height="5.2749348"
+         x="88.899033"
+         y="106.63303" />
+      <text
+         xml:space="preserve"
+         style="font-size:2.82222px;fill:#2affd5;fill-opacity:1;stroke:none;stroke-width:0.352777;stroke-dasharray:none;stroke-dashoffset:8.8"
+         x="91.3666"
+         y="110.23365"
+         id="text13225"><tspan
+           sodipodi:role="line"
+           style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.82222px;font-family:'Latin Modern Roman';-inkscape-font-specification:'Latin Modern Roman, ';fill:#000000;stroke-width:0.352778"
+           x="91.3666"
+           y="110.23365"
+           id="tspan13223">Preselection</tspan></text>
+    </g>
+  </g>
+</svg>

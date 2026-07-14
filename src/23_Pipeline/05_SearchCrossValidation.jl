@@ -166,6 +166,8 @@ Tune a [`Pipeline`](@ref) by grid (or randomised) search cross-validation on pri
 
 The input is split into contiguous observation windows by `gscv.cv` (price-level splits keep stateful preprocessing inside the fold); for each candidate the lens grid is applied to the pipeline (keys resolved by [`pipeline_lens`](@ref), so step names, step positions, and raw property paths all address steps), the whole workflow is fitted on the training window and scored on the test window via [`fit_and_score`](@ref), and the scorer picks the winner. The randomised form samples the grid and delegates, exactly as for plain optimisers.
 
+[`TimeDependent`](@ref) schedules resolve against the *tuning* folds: when a candidate is time-dependent, its schedules are sized to the tuning scheme's fold count (asserted per candidate — a grid value may swap a whole schedule in or out), and tuning fold `j` swaps in entry `j` via the pipeline-level [`update_time_dependent_estimator`](@ref) before [`fit_and_score`](@ref) runs. Lenses need no schedule-specific semantics: naming the step swaps the whole schedule as a grid value, and raw property paths address entries.
+
 # Arguments
 
   - `pipe`: The pipeline to tune.
@@ -205,8 +207,21 @@ function search_cross_validation(pipe::Pipeline, gscv::GridSearchCrossValidation
             for (lens, val) in zip(lenses, vals)
                 pipei = Accessors.set(pipei, lens, val)
             end
+            local td_flag = is_time_dependent(pipei)
+            if td_flag
+                assert_time_dependent_fold_count(pipei, M)
+            end
             for (j, (train_idx, test_idx)) in enumerate(zip(cv.train_idx, cv.test_idx))
-                test_score, train_score = fit_and_score(pipei, gscv, data, train_idx,
+                local pipej = pipei
+                if td_flag
+                    pipej = update_time_dependent_estimator(pipei,
+                                                            TimeDependentContext(; i = j,
+                                                                                 n = M,
+                                                                                 rd = data,
+                                                                                 train_idx = cv.train_idx,
+                                                                                 test_idx = cv.test_idx))
+                end
+                test_score, train_score = fit_and_score(pipej, gscv, data, train_idx,
                                                         test_idx)
                 test_scores[j, i] = test_score
                 if gscv.train_score
