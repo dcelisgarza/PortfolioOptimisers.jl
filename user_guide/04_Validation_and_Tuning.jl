@@ -70,7 +70,41 @@ res_tuned = optimise(gs_res.opt, rd)
 enumerating it — cheaper for large spaces; see
 [Hyperparameter Tuning](../examples/5_validation_tuning/02_Hyperparameter_Tuning.md).
 
-## 3. Cross-validation scores
+## 3. Time-dependent inputs
+
+Under cross-validation each fold is a separate optimisation over its own slice of time, and any
+*problem-definition* input — constraints, priors, risk measures, objectives, even the fallback
+optimiser — can be told to change with it. Wrap a per-fold vector (or a function of the fold's
+context) in [`TimeDependent`](@ref) and store it in the field it varies; the fold loop swaps
+entry `i` in for fold `i`. Execution-control inputs (solvers, RNGs) stay static. Here the
+per-asset weight cap tightens as a walk-forward advances:
+=#
+
+wf = IndexWalkForward(126, 42)
+n = n_splits(wf, rd)
+caps = TimeDependent([WeightBounds(; lb = 0.0, ub = ub) for ub in range(0.35, 0.2, n)])
+mr_caps = MeanRisk(; opt = JuMPOptimiser(; slv = slv, wb = caps))
+pred_caps = cross_val_predict(mr_caps, rd, wf)
+
+#=
+A schedule's values may be whole optimisers — so the *strategy itself* switches per fold — and
+such a schedule can be handed to [`cross_val_predict`](@ref) directly as the optimiser. Because
+there is no static optimiser to fall back to, it must state what a fold-less
+[`optimise`](@ref) should run, via `default`:
+=#
+
+iv = InverseVolatility()
+strategies = TimeDependent([isodd(i) ? mr : iv for i in 1:n]; default = mr)
+pred_switch = cross_val_predict(strategies, rd, wf)
+
+#=
+Outside a fold loop a schedule is inert: a plain `optimise` runs the affected field at its
+static default (or the schedule's own `default`). For schedules in meta-optimiser fields,
+callables that read the fold's data, and mixing precomputed results into a schedule, see
+[Time Dependent Constraints](../examples/5_validation_tuning/04_Time_Dependent_Constraints.md)
+and [Time Dependent Optimisers](../examples/5_validation_tuning/06_Time_Dependent_Optimisers.md).
+
+## 4. Cross-validation scores
 
 [`plot_cv_scores`](@ref) visualises the per-fold out-of-sample scores — a quick read on how
 stable the strategy is across the timeline.
