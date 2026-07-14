@@ -2,7 +2,7 @@
 
 Companion to [ADR 0028](../adr/0028-pipeline-workflow-estimator.md), which records the agreed
 design and rationale. Glossary terms: `CONTEXT.md` → Pipeline, Pipeline Context, Preprocessing
-Estimator, PricesResult. All code lives in `src/25_Pipeline/` (included after `24_Aliases.jl`
+Estimator, PricesResult. All code lives in `src/25_Pipeline/` (included after `25_Aliases.jl`
 or renumbered as appropriate); new estimators/results follow the house conventions in
 `.github/prompts/add-estimator.prompt.md` / `add-result.prompt.md` (field_dict docstrings,
 `@argcheck` validation, `@concrete`, pretty-printing via the abstract trees).

@@ -333,13 +333,13 @@ flowchart LR
 
         <!-- ══════════════════════ C6 ══════════════════════ -->
         <article id="c6" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
-          <h2 class="text-xl font-semibold">6 · Type aliases live in two homes: <code>01_Base.jl</code> and <code>24_Aliases.jl</code></h2>
+          <h2 class="text-xl font-semibold">6 · Type aliases live in two homes: <code>01_Base.jl</code> and <code>25_Aliases.jl</code></h2>
           <div class="flex flex-wrap gap-2">
             <span class="chip uppercase px-2 py-1 rounded bg-slate-500 text-white font-semibold">Speculative</span>
             <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">in-process</span>
           </div>
           <div class="font-mono text-sm text-slate-500">
-            src/01_Base.jl:1923–2381 (VecNum … VecDate, ~30 const aliases) · src/24_Aliases.jl
+            src/01_Base.jl:1923–2381 (VecNum … VecDate, ~30 const aliases) · src/25_Aliases.jl
           </div>
 
           <div class="grid md:grid-cols-2 gap-4 items-stretch">
@@ -347,7 +347,7 @@ flowchart LR
               <div class="text-xs uppercase tracking-wider text-red-700 font-semibold mb-3">Before</div>
               <div class="flex gap-2">
                 <div class="flex-1 border-2 border-slate-400 bg-white rounded p-2 text-xs font-mono">01_Base.jl<br/><span class="text-slate-400">doc dicts · abstract roots · ScopedConfig · errors ·</span> <span class="text-red-700">alias block</span></div>
-                <div class="flex-1 border-2 border-slate-400 bg-white rounded p-2 text-xs font-mono">24_Aliases.jl<br/><span class="text-red-700">more aliases</span></div>
+                <div class="flex-1 border-2 border-slate-400 bg-white rounded p-2 text-xs font-mono">25_Aliases.jl<br/><span class="text-red-700">more aliases</span></div>
               </div>
               <p class="text-xs text-slate-500 mt-3">One concept, two homes — a reader looking up an alias has to know which file to check.</p>
             </div>
