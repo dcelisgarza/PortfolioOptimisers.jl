@@ -55,7 +55,7 @@ EqualRisk
 # Related
 
   - [`number_effective_assets`](@ref)
-  - [`set_number_effective_assets!`](@ref)
+  - [`set_weight_norm_2_constraints!`](@ref)
   - [`HierarchicalRiskMeasure`](@ref)
   - [`HierarchicalRiskMeasureSettings`](@ref)
   - [`RiskRatio`](@ref)

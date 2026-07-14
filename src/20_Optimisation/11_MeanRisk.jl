@@ -156,7 +156,7 @@ MeanRisk
       │        ss ┼ nothing
       │      card ┼ nothing
       │     scard ┼ nothing
-      │       nea ┼ nothing
+      │       wn2 ┼ nothing
       │        l1 ┼ nothing
       │        l2 ┼ nothing
       │      linf ┼ nothing

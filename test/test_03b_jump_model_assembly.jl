@@ -2,7 +2,7 @@
 #
 # These build a model through the per-optimiser head and `assemble_jump_model!`, then
 # assert on the *constructed* model — without ever solving it. The interface under test is
-# the assembler's keyword arguments (`r`, `nea`/`l1`/… settings); the assertions check which
+# the assembler's keyword arguments (`r`, `wn2`/`l1`/… settings); the assertions check which
 # Model-State keys the middle registers, so they exercise the routing rather than numerics.
 @testset "JuMP model assembly (solver-free)" begin
     using Test, PortfolioOptimisers, CSV, TimeSeries, Clarabel, JuMP
@@ -68,9 +68,9 @@
     end
 
     @testset "optional constraints toggle on their settings" begin
-        @test "nea" ∉ assemble_keys(base)
-        @test "nea" in assemble_keys(MeanRisk(; r = Variance(),
-                                              opt = JuMPOptimiser(; slv = slv, nea = 5)))
+        @test "wn2" ∉ assemble_keys(base)
+        @test "wn2" in assemble_keys(MeanRisk(; r = Variance(),
+                                              opt = JuMPOptimiser(; slv = slv, wn2 = 5)))
 
         @test "l1" ∉ assemble_keys(base)
         @test "l1" in assemble_keys(MeanRisk(; r = Variance(),

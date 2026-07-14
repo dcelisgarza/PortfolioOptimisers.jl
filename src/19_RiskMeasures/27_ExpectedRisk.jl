@@ -195,7 +195,7 @@ concentration as the given weight vector `w`.
 
 # Related
 
-  - [`set_number_effective_assets!`](@ref)
+  - [`set_weight_norm_2_constraints!`](@ref)
   - [`EqualRisk`](@ref)
   - [`risk_contribution`](@ref)
   - [`EqualRisk`](@ref)

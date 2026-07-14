@@ -10,7 +10,7 @@ Every single-JuMP-model Optimisation Estimator builds its `JuMP.Model` by runnin
 same long sequence of constraint and risk builders inline in its own `_optimise` method.
 The sequence — `set_linear_weight_constraints!` (×2) → `set_mip_constraints!` →
 `set_smip_constraints!` → `set_turnover_constraints!` → `set_tracking_error_constraints!`
-→ `set_number_effective_assets!` → `set_l1/l2/linf/lp_regularisation!` →
+→ `set_weight_norm_2_constraints!` → `set_l1/l2/linf/lp_regularisation!` →
 `set_non_fixed_fees!` → `set_risk_constraints!` → `scalarise_risk_expression!` →
 `set_return_constraints!` → `set_sdp_phylogeny_constraints!` → `add_custom_constraint!` —
 is repeated, in the same order, across five files:
@@ -177,5 +177,5 @@ and `sdp_asset_phylogeny = false`), and Near Optimal Centering (24/24, cold load
 The promised solver-free surface is realised in `test/test_03b_jump_model_assembly.jl`: it
 runs the head + `assemble_jump_model!` and asserts on the registered Model-State keys
 without solving — `r` routing (one indexed risk key per measure), the `r = nothing` no-op
-(risk keys absent, head and return constraints still present), and `nea`/`l1` toggling their
+(risk keys absent, head and return constraints still present), and `wn2`/`l1` toggling their
 keys. 15 assertions, ~1 s — versus the multi-minute solver suites.

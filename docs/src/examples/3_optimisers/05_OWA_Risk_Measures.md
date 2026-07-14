@@ -170,7 +170,7 @@ weight vectors — one for losses, one for gains. This is the OWA generalisation
 two-sided risk measure.
 
 The default range is `owa_tg` (lower tail) minus the reversed `owa_tg` (upper tail), which
-is equivalent to `owa_tgrg`. Passing custom `w1` and `w2` gives full control over what
+is equivalent to `owa_tgrg`. Passing custom `w1` and `wn2` gives full control over what
 "bad" and "good" outcomes each side of the range tracks.
 
 ````@example 05_OWA_Risk_Measures
@@ -180,7 +180,7 @@ r_range_default = OrderedWeightsArrayRange()
 # Custom range: CVaR losses vs worst realisation gains.
 T_obs = T
 r_range_custom = OrderedWeightsArrayRange(; w1 = owa_cvar(T_obs),
-                                          w2 = reverse(owa_wr(T_obs)))
+                                          wn2 = reverse(owa_wr(T_obs)))
 
 res_range_d = optimise(MeanRisk(; r = r_range_default, opt = opt))
 res_range_c = optimise(MeanRisk(; r = r_range_custom, opt = opt))

@@ -294,11 +294,11 @@ end
 end
 
 @testset "Number of effective assets" begin
-    opt = JuMPOptimiser(; pe = pr, slv = slv, nea = 10)
+    opt = JuMPOptimiser(; pe = pr, slv = slv, wn2 = 10)
     res = optimise(MeanRisk(; obj = MinimumRisk(), opt = opt))
     @test round(inv(LinearAlgebra.dot(res.w, res.w))) >= 10
 
-    opt = JuMPOptimiser(; pe = pr, slv = slv, nea = 15)
+    opt = JuMPOptimiser(; pe = pr, slv = slv, wn2 = 15)
     res = optimise(MeanRisk(; obj = MaximumUtility(), opt = opt))
     @test round(inv(LinearAlgebra.dot(res.w, res.w))) >= 15
 end
