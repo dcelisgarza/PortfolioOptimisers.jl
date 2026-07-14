@@ -138,6 +138,7 @@ Keywords correspond to the struct's fields. Fields typed [`TD`](@ref), [`TD_Opti
 
   - If `r` is a vector: `!isempty(r)`.
   - If `wi` is a vector: `!isempty(wi)`.
+  - `fb` schedules: `bind !== :nearest`.
 
 ## Propagated parameters
 
@@ -197,6 +198,7 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
                                     frc_ple::TD_Option{<:PlCE_PhC_VecPlCE_PlC},
                                     sets::TD_Option{<:AssetSets}, wi::TD_Option{<:VecNum},
                                     flag::Bool, fb::TDO_Option{<:OptE_Opt})
+        assert_no_nearest_bind_optimiser_schedule(fb, :fb, :FactorRiskContribution)
         if isa(r, AbstractVector)
             @argcheck(!isempty(r), IsEmptyError("r cannot be empty"))
         end

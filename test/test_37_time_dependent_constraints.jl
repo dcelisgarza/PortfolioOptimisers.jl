@@ -1560,4 +1560,121 @@ end
             @test nv.opti.val[1].opt.wb.ub == fill(0.8, 3)
         end
     end
+    @testset "Problem-definition fields of the meta-optimisers" begin
+        # The metas' own non-optimiser problem definition — prior, sets, weight finaliser,
+        # and NestedClustered's clustering estimator — takes schedules like any other
+        # host's; `cv`, `ex`, `brt`, `cle_pr` and `strict` stay static.
+        ew, iv = EqualWeighted(), InverseVolatility()
+        mr0 = MeanRisk(; opt = JuMPOptimiser(; slv = slv))
+        cvw = IndexWalkForward(100, 50)
+        pe_semi = EmpiricalPrior(;
+                                 ce = PortfolioOptimisersCovariance(;
+                                                                    ce = Covariance(;
+                                                                                    alg = SemiMoment())))
+        tdpe = TimeDependent([EmpiricalPrior(), pe_semi])
+        setsA = AssetSets(; dict = Dict("nx" => rd.nx, "g1" => ["A", "B"]))
+        setsB = AssetSets(; dict = Dict("nx" => rd.nx, "g1" => ["D", "E"]))
+        tdsets = TimeDependent([setsA, setsB])
+        tdwf = TimeDependent([IterativeWeightFinaliser(),
+                              IterativeWeightFinaliser(; iter = 7)])
+        tdcle = TimeDependent([ClustersEstimator(),
+                               ClustersEstimator(;
+                                                 alg = HClustAlgorithm(; linkage = :single))])
+        ctx2 = TimeDependentContext(; i = 2, n = 2, rd = rd, train_idx = 1:150,
+                                    test_idx = 151:200)
+        @testset "Widened fields, defaults and per-fold resolution" begin
+            nco = NestedClustered(; pe = tdpe, cle = tdcle, sets = tdsets, wf = tdwf,
+                                  opti = mr0, opto = mr0)
+            @test PortfolioOptimisers.time_dependent_fields(nco) == (:pe, :cle, :sets, :wf)
+            n0 = PortfolioOptimisers.reset_time_dependent_estimator(nco)
+            @test n0.pe == EmpiricalPrior()
+            @test n0.cle == ClustersEstimator()
+            @test isnothing(n0.sets)
+            @test n0.wf == IterativeWeightFinaliser()
+            n2 = PortfolioOptimisers.update_time_dependent_estimator(nco, ctx2)
+            @test n2.pe == pe_semi
+            @test n2.cle.alg.linkage == :single
+            @test n2.sets === setsB
+            @test n2.wf.iter == 7
+            st = Stacking(; pe = tdpe, sets = tdsets, wf = tdwf, opti = [mr0], opto = mr0)
+            @test PortfolioOptimisers.time_dependent_fields(st) == (:pe, :sets, :wf)
+            s0 = PortfolioOptimisers.reset_time_dependent_estimator(st)
+            @test s0.pe == EmpiricalPrior() && isnothing(s0.sets)
+            @test s0.wf == IterativeWeightFinaliser()
+            s2 = PortfolioOptimisers.update_time_dependent_estimator(st, ctx2)
+            @test s2.pe == pe_semi && s2.sets === setsB && s2.wf.iter == 7
+            sr = SubsetResampling(; pe = tdpe, sets = tdsets, wf = tdwf, opt = ew,
+                                  subset_size = 3, n_subsets = 2)
+            @test PortfolioOptimisers.time_dependent_fields(sr) == (:pe, :sets, :wf)
+            sr0 = PortfolioOptimisers.reset_time_dependent_estimator(sr)
+            @test sr0.pe == EmpiricalPrior() && isnothing(sr0.sets)
+            @test sr0.wf == IterativeWeightFinaliser()
+            sr2 = PortfolioOptimisers.update_time_dependent_estimator(sr, ctx2)
+            @test sr2.pe == pe_semi && sr2.sets === setsB && sr2.wf.iter == 7
+            # The always-carrying fields stay `TD`, not `TD_Option`.
+            @test_throws TypeError NestedClustered(; opti = mr0, opto = mr0, pe = nothing)
+            @test_throws TypeError Stacking(; opti = [mr0], opto = mr0, wf = nothing)
+            @test_throws TypeError SubsetResampling(; opt = ew, pe = nothing)
+            # Entry substitution rejects a wrongly-typed entry at construction.
+            @test_throws TypeError NestedClustered(; opti = mr0, opto = mr0,
+                                                   pe = TimeDependent([EmpiricalPrior(),
+                                                                       1.0]))
+        end
+        @testset "Per-fold resolution under walk-forward" begin
+            # A scheduled meta field resolves against the fold loop that reaches the
+            # meta: the callable fires once per outer fold with that fold's context.
+            seen = zeros(Int, 2)
+            obspe = TimeDependent(ctx -> begin
+                                      seen[ctx.i] += 1
+                                      EmpiricalPrior()
+                                  end)
+            p = cross_val_predict(NestedClustered(; pe = obspe, opti = mr0, opto = mr0), rd,
+                                  cvw)
+            @test length(p.pred) == 2 && seen == [1, 1]
+            fill!(seen, 0)
+            obssets = TimeDependent(ctx -> begin
+                                        seen[ctx.i] += 1
+                                        setsA
+                                    end)
+            p = cross_val_predict(Stacking(; sets = obssets, opti = [ew], opto = ew), rd,
+                                  cvw)
+            @test length(p.pred) == 2 && seen == [1, 1]
+            fill!(seen, 0)
+            obswf = TimeDependent(ctx -> begin
+                                      seen[ctx.i] += 1
+                                      IterativeWeightFinaliser()
+                                  end)
+            p = cross_val_predict(SubsetResampling(; wf = obswf, opt = ew, subset_size = 3,
+                                                   n_subsets = 2), rd, cvw)
+            @test length(p.pred) == 2 && seen == [1, 1]
+            # A two-entry vector schedule in every widened field swaps entry i in per
+            # fold, end to end.
+            pv = cross_val_predict(NestedClustered(; pe = tdpe, cle = tdcle, sets = tdsets,
+                                                   wf = tdwf, opti = mr0, opto = mr0), rd,
+                                   cvw)
+            @test length(pv.pred) == 2
+            @test all(x -> isa(x.res.retcode, OptimisationSuccess), pv.pred)
+        end
+        @testset "A :nearest fallback is rejected at construction on every host" begin
+            # The #138 bind decision: no fold loop ever consumes a fallback — the
+            # fallback walk is a retry chain within one fold's solve — so :nearest has
+            # nothing to bind to and is rejected outright, as on the metas.
+            fbn = TimeDependent([ew, iv], :nearest)
+            jopt = JuMPOptimiser(; slv = slv)
+            @test_throws ArgumentError MeanRisk(; opt = jopt, fb = fbn)
+            @test_throws ArgumentError NearOptimalCentering(; opt = jopt, fb = fbn)
+            @test_throws ArgumentError RiskBudgeting(; opt = jopt, fb = fbn)
+            @test_throws ArgumentError RelaxedRiskBudgeting(; opt = jopt, fb = fbn)
+            @test_throws ArgumentError FactorRiskContribution(; opt = jopt, fb = fbn)
+            @test_throws ArgumentError HierarchicalRiskParity(; fb = fbn)
+            @test_throws ArgumentError HierarchicalEqualRiskContribution(; fb = fbn)
+            @test_throws ArgumentError SchurComplementHierarchicalRiskParity(; fb = fbn)
+            @test_throws ArgumentError InverseVolatility(; fb = fbn)
+            @test_throws ArgumentError EqualWeighted(; fb = fbn)
+            @test_throws ArgumentError RandomWeighted(; fb = fbn)
+            # :outermost fallbacks still construct.
+            @test isa(MeanRisk(; opt = jopt, fb = TimeDependent([ew, iv])), MeanRisk)
+            @test isa(InverseVolatility(; fb = TimeDependent([ew, iv])), InverseVolatility)
+        end
+    end
 end

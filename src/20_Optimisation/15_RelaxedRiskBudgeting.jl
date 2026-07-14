@@ -121,6 +121,7 @@ Keywords correspond to the struct's fields. Fields typed [`TD`](@ref), [`TD_Opti
 ## Validation
 
   - If `wi` is provided: `!isempty(wi)`.
+  - `fb` schedules: `bind !== :nearest`.
 
 # Mathematical definition
 
@@ -188,6 +189,7 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
                                   wi::TD_Option{<:VecNum},
                                   alg::RelaxedRiskBudgetingAlgorithm,
                                   fb::TDO_Option{<:OptE_Opt})
+        assert_no_nearest_bind_optimiser_schedule(fb, :fb, :RelaxedRiskBudgeting)
         if isa(wi, VecNum)
             @argcheck(!isempty(wi), IsEmptyError("wi cannot be empty"))
         end

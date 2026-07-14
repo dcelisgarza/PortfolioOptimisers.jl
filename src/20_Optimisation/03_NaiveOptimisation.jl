@@ -345,6 +345,7 @@ InverseVolatility
                                sets::TD_Option{<:AssetSets}, wf::TD{<:WeightFinaliser},
                                fb::TDO_Option{<:OptE_Opt}, sq::Bool, brt::Bool,
                                strict::Bool)
+        assert_no_nearest_bind_optimiser_schedule(fb, :fb, :InverseVolatility)
         if isa(wb, WeightBoundsEstimator)
             @argcheck(!isnothing(sets),
                       IsNothingError("sets cannot be nothing when wb is a WeightBoundsEstimator"))
@@ -530,6 +531,7 @@ EqualWeighted
     function EqualWeighted(wb::TD_Option{<:WbE_Wb}, sets::TD_Option{<:AssetSets},
                            wf::TD{<:WeightFinaliser}, fb::TDO_Option{<:OptE_Opt},
                            strict::Bool)
+        assert_no_nearest_bind_optimiser_schedule(fb, :fb, :EqualWeighted)
         if isa(wb, WeightBoundsEstimator)
             @argcheck(!isnothing(sets),
                       IsNothingError("sets cannot be nothing when wb is a WeightBoundsEstimator"))
@@ -634,6 +636,7 @@ Keywords correspond to the struct's fields. Fields typed [`TD`](@ref), [`TD_Opti
 ## Validation
 
   - If `alpha` is provided: all elements positive and finite.
+  - `fb` schedules: `bind !== :nearest`.
 
 ## Propagated parameters
 
@@ -710,6 +713,7 @@ RandomWeighted
                             seed::Option{<:Integer}, wb::TD_Option{<:WbE_Wb},
                             sets::TD_Option{<:AssetSets}, wf::TD{<:WeightFinaliser},
                             fb::TDO_Option{<:OptE_Opt}, strict::Bool)
+        assert_no_nearest_bind_optimiser_schedule(fb, :fb, :RandomWeighted)
         if !isnothing(alpha)
             assert_nonempty_gt0_finite_val(alpha, :alpha)
         end

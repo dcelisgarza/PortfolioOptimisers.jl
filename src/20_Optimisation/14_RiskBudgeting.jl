@@ -389,6 +389,7 @@ Keywords correspond to the struct's fields. Fields typed [`TD`](@ref), [`TD_Opti
 
   - If `r` is a vector: `!isempty(r)`.
   - If `wi` is provided: `!isempty(wi)`.
+  - `fb` schedules: `bind !== :nearest`.
 
 # Mathematical definition
 
@@ -458,6 +459,7 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
     function RiskBudgeting(opt::JuMPOptimiser, r::TD{<:RM_VecRM},
                            rba::TD{<:RiskBudgetingAlgorithm}, wi::TD_Option{<:VecNum},
                            fb::TDO_Option{<:OptE_Opt})
+        assert_no_nearest_bind_optimiser_schedule(fb, :fb, :RiskBudgeting)
         if isa(r, AbstractVector)
             @argcheck(!isempty(r), IsEmptyError("r cannot be empty"))
         end

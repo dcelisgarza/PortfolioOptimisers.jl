@@ -81,6 +81,7 @@ Keywords correspond to the struct's fields. Fields typed [`TD`](@ref), [`TD_Opti
 
   - If `r` is a vector: `!isempty(r)`.
   - If `wi` is provided: `!isempty(wi)`.
+  - `fb` schedules: `bind !== :nearest`.
 
 ## Propagated parameters
 
@@ -246,6 +247,7 @@ Where:
     @fprop fb
     function MeanRisk(opt::JuMPOptimiser, r::TD{<:RM_VecRM}, obj::TD{<:ObjectiveFunction},
                       wi::TD_Option{<:VecNum}, fb::TDO_Option{<:OptE_Opt})
+        assert_no_nearest_bind_optimiser_schedule(fb, :fb, :MeanRisk)
         if isa(r, AbstractVector)
             @argcheck(!isempty(r), IsEmptyError("r cannot be empty"))
         end

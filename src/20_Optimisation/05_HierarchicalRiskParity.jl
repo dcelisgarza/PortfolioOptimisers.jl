@@ -39,6 +39,7 @@ Keywords correspond to the struct's fields. Fields typed [`TD`](@ref) or [`TDO_O
 ## Validation
 
   - If `r` is a vector: `!isempty(r)`.
+  - `fb` schedules: `bind !== :nearest`.
 
 ## Propagated parameters
 
@@ -174,6 +175,7 @@ Where:
     @fprop fb
     function HierarchicalRiskParity(opt::HierarchicalOptimiser, r::TD{<:OptRM_VecOptRM},
                                     sca::TD{<:Scalariser}, fb::TDO_Option{<:OptE_Opt})
+        assert_no_nearest_bind_optimiser_schedule(fb, :fb, :HierarchicalRiskParity)
         if isa(r, AbstractVector)
             @argcheck(!isempty(r), IsEmptyError("r cannot be empty"))
         end

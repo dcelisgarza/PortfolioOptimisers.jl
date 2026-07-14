@@ -332,6 +332,7 @@ Keywords correspond to the struct's fields. Fields typed [`TD`](@ref) or [`TDO_O
 ## Validation
 
   - If `params` is a vector: `!isempty(params)`.
+  - `fb` schedules: `bind !== :nearest`.
 
 ## Propagated parameters
 
@@ -473,6 +474,8 @@ The bisection weight ``\\alpha`` is then computed from the Schur-complement-corr
     function SchurComplementHierarchicalRiskParity(opt::HierarchicalOptimiser,
                                                    params::TD{<:ScP_VecScP},
                                                    fb::TDO_Option{<:OptE_Opt})
+        assert_no_nearest_bind_optimiser_schedule(fb, :fb,
+                                                  :SchurComplementHierarchicalRiskParity)
         if isa(params, AbstractVector)
             @argcheck(!isempty(params), IsEmptyError("params cannot be empty"))
         end

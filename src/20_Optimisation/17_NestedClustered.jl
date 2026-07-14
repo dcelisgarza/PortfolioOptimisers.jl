@@ -276,15 +276,15 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     NestedClustered(;
-        pe::PrE_Pr = EmpiricalPrior(),
-        cle::ClE_Cl = ClustersEstimator(),
+        pe::TD{<:PrE_Pr} = EmpiricalPrior(),
+        cle::TD{<:ClE_Cl} = ClustersEstimator(),
         wb::TD_Option{<:WbE_Wb} = WeightBounds(),
         fees::TD_Option{<:FeesE_Fees} = nothing,
-        sets::Option{<:AssetSets} = nothing,
+        sets::TD_Option{<:AssetSets} = nothing,
         opti::OptE_TD,
         opto::OptE_TD,
         cv::Option{<:OptimisationCrossValidation} = nothing,
-        wf::WeightFinaliser = IterativeWeightFinaliser(),
+        wf::TD{<:WeightFinaliser} = IterativeWeightFinaliser(),
         ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
         fb::TDO_Option{<:OptE_Opt} = nothing,
         brt::Bool = false,
@@ -296,7 +296,7 @@ Keywords correspond to the struct's fields.
 
 ## Time-dependent fields
 
-`opti`, `opto` and `fb` may hold a [`TimeDependent`](@ref) per-fold schedule. `opto` and `fb` are `bind = :outermost` only — no inner fold loop consumes them. `opti` additionally admits `bind = :nearest`: the inner cross-validation is entered per cluster (`cross_val_predict(opti, …; cols = cl)`), so the field itself is the inner fold loop's entry point and a `:nearest` schedule is consumed there, per cluster. A `:nearest` `opti` schedule requires an explicit `default` and `cv !== nothing` at construction (see [`assert_nearest_optimiser_schedule`](@ref)) because the per-cluster optimise leg always resolves it fold-lessly to its `default`. `cv` itself stays static: it *is* the inner fold loop, not part of the per-fold problem definition, and the `:nearest` construction checks must be able to inspect it.
+`pe`, `cle`, `wb`, `fees`, `sets`, `wf`, `opti`, `opto` and `fb` may hold a [`TimeDependent`](@ref) per-fold schedule. `opto` and `fb` are `bind = :outermost` only — no inner fold loop consumes them. `opti` additionally admits `bind = :nearest`: the inner cross-validation is entered per cluster (`cross_val_predict(opti, …; cols = cl)`), so the field itself is the inner fold loop's entry point and a `:nearest` schedule is consumed there, per cluster. A `:nearest` `opti` schedule requires an explicit `default` and `cv !== nothing` at construction (see [`assert_nearest_optimiser_schedule`](@ref)) because the per-cluster optimise leg always resolves it fold-lessly to its `default`. `cv` itself stays static: it *is* the inner fold loop, not part of the per-fold problem definition, and the `:nearest` construction checks must be able to inspect it.
 
 Schedule entries for `opti`/`opto` must be estimators, like the static fields: a vector schedule holding a precomputed result is rejected at construction by the entry substitution pass.
 
@@ -388,12 +388,13 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
     $(field_dict[:strict_opt])
     """
     strict
-    function NestedClustered(pe::PrE_Pr, cle::ClE_Cl, wb::TD_Option{<:WbE_Wb},
-                             fees::TD_Option{<:FeesE_Fees}, sets::Option{<:AssetSets},
+    function NestedClustered(pe::TD{<:PrE_Pr}, cle::TD{<:ClE_Cl}, wb::TD_Option{<:WbE_Wb},
+                             fees::TD_Option{<:FeesE_Fees}, sets::TD_Option{<:AssetSets},
                              opti::OptE_TD, opto::OptE_TD,
-                             cv::Option{<:OptimisationCrossValidation}, wf::WeightFinaliser,
-                             ex::FLoops.Transducers.Executor, fb::TDO_Option{<:OptE_Opt},
-                             brt::Bool, cle_pr::Bool, strict::Bool)
+                             cv::Option{<:OptimisationCrossValidation},
+                             wf::TD{<:WeightFinaliser}, ex::FLoops.Transducers.Executor,
+                             fb::TDO_Option{<:OptE_Opt}, brt::Bool, cle_pr::Bool,
+                             strict::Bool)
         assert_nearest_optimiser_schedule(opti, :opti, cv, :NestedClustered)
         assert_no_nearest_bind_optimiser_schedule(opto, :opto, :NestedClustered)
         assert_no_nearest_bind_optimiser_schedule(fb, :fb, :NestedClustered)
@@ -425,12 +426,13 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
                                                                             cle_pr, strict)
     end
 end
-function NestedClustered(; pe::PrE_Pr = EmpiricalPrior(), cle::ClE_Cl = ClustersEstimator(),
+function NestedClustered(; pe::TD{<:PrE_Pr} = EmpiricalPrior(),
+                         cle::TD{<:ClE_Cl} = ClustersEstimator(),
                          wb::TD_Option{<:WbE_Wb} = nothing,
                          fees::TD_Option{<:FeesE_Fees} = nothing,
-                         sets::Option{<:AssetSets} = nothing, opti::OptE_TD, opto::OptE_TD,
-                         cv::Option{<:OptimisationCrossValidation} = nothing,
-                         wf::WeightFinaliser = IterativeWeightFinaliser(),
+                         sets::TD_Option{<:AssetSets} = nothing, opti::OptE_TD,
+                         opto::OptE_TD, cv::Option{<:OptimisationCrossValidation} = nothing,
+                         wf::TD{<:WeightFinaliser} = IterativeWeightFinaliser(),
                          ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
                          fb::TDO_Option{<:OptE_Opt} = nothing, brt::Bool = false,
                          cle_pr::Bool = true, strict::Bool = false)
@@ -442,7 +444,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return the static defaults of the [`NestedClustered`](@ref) fields that may hold a [`TimeDependent`](@ref).
 
-Shared by the constructor's test-substitution pass and [`time_dependent_field_defaults`](@ref). The optimiser-valued fields `opti` and `opto` are required and have no static default, so they are marked [`NoDefault`](@ref): a schedule there must carry its own `default` to be usable outside a fold loop. Fields whose static default is `nothing` (`wb`, `fees`, `fb`) are omitted.
+Shared by the constructor's test-substitution pass and [`time_dependent_field_defaults`](@ref). The optimiser-valued fields `opti` and `opto` are required and have no static default, so they are marked [`NoDefault`](@ref): a schedule there must carry its own `default` to be usable outside a fold loop. `pe`, `cle` and `wf` reset to their keyword defaults; fields whose static default is `nothing` (`wb`, `fees`, `sets`, `fb`) are omitted.
 
 # Related
 
@@ -451,7 +453,8 @@ Shared by the constructor's test-substitution pass and [`time_dependent_field_de
   - [`assert_time_dependent_substitution`](@ref)
 """
 function nested_clustered_td_defaults()::NamedTuple
-    return (; opti = NoDefault(), opto = NoDefault())
+    return (; pe = EmpiricalPrior(), cle = ClustersEstimator(), opti = NoDefault(),
+            opto = NoDefault(), wf = IterativeWeightFinaliser())
 end
 function time_dependent_field_defaults(::NestedClustered)::NamedTuple
     return nested_clustered_td_defaults()

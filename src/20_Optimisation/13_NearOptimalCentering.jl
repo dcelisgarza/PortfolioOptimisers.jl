@@ -157,6 +157,7 @@ Keywords correspond to the struct's fields. Fields typed [`TD`](@ref), [`TD_Opti
   - If `w_max` is a vector: `!isempty(w_max)`.
   - If `w_max_ini` is a vector: `!isempty(w_max_ini)`.
   - If `bins` is a number: `isfinite(bins) && bins > 0`.
+  - `fb` schedules: `bind !== :nearest`.
 
 # Mathematical definition
 
@@ -257,6 +258,7 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
                                   w_max_ini::TD_Option{<:VecNum}, ucs_flag::Bool,
                                   alg::NearOptimalCenteringAlgorithm,
                                   fb::TDO_Option{<:OptE_Opt})
+        assert_no_nearest_bind_optimiser_schedule(fb, :fb, :NearOptimalCentering)
         if isa(r, AbstractVector)
             @argcheck(!isempty(r), IsEmptyError("r cannot be empty"))
             if any(x -> isa(x, QuadExpressionRiskMeasures), r)

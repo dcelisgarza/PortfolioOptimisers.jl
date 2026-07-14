@@ -1346,12 +1346,21 @@ end
 
 Reject a `bind = :nearest` [`TimeDependent`](@ref) schedule in an optimiser-valued position no inner fold loop consumes.
 
-`:nearest` is legal on an optimiser-valued position iff a fold loop actually consumes the value there. The outer optimisers (`opto`), `SubsetResampling.opt` (its loop is over asset subsets, not time folds) and every fallback `fb` have no inner fold loop of their own, so a `:nearest` schedule there has nothing to bind to and is rejected at construction. No-op for anything that is not a [`TimeDependent`](@ref).
+`bind` picks *which fold loop supplies the schedule's index*. `:nearest` therefore says something different from `:outermost` only where the host opens a fold loop of its **own** and hands the field across it — `NestedClustered.opti` (its inner cross-validation is entered per cluster) and `Stacking.opti[k]` (entered per candidate), the positions declared by [`inner_fold_fields`](@ref). Everywhere else the loop that reaches the host *is* the nearest one, and the two binds would name the same loop.
+
+The positions this guards have no such inner loop:
+
+  - **A fallback (`fb`), on every host.** The fallback walk is a retry chain *within a single fold's solve* — it has no fold indices of its own — so `:nearest` there is either redundant with `:outermost` or, behind a meta's inner cross-validation, silently wrong: it would resolve against the inner loop's fold numbers (tuning folds) instead of the backtest's periods, changing meaning with nesting depth. A per-fold fallback is fully expressible with `:outermost`, including `nothing` entries to switch it off on some folds (see [`TDO_OptE_Opt`](@ref)).
+  - **The outer optimisers (`opto`).** They consume the *combined* inner output, once per solve.
+  - **`SubsetResampling.opt`.** Its internal loop is over randomly drawn asset subsets, not time folds.
+
+So a `:nearest` schedule in any of them has no nearest fold loop to bind to, and is rejected at construction rather than resolving against a loop the caller did not mean. No-op for anything that is not a [`TimeDependent`](@ref).
 
 # Related
 
   - [`assert_nearest_optimiser_schedule`](@ref)
   - [`inner_fold_fields`](@ref)
+  - [`TDO_OptE_Opt`](@ref)
 """
 function assert_no_nearest_bind_optimiser_schedule(x, field::Symbol, host::Symbol)::Nothing
     if isa(x, TimeDependent)

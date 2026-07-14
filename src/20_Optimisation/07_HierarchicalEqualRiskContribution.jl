@@ -43,6 +43,7 @@ Keywords correspond to the struct's fields. Fields typed [`TD`](@ref) or [`TDO_O
 ## Validation
 
   - If `ri` or `ro` is a vector: `!isempty(ri)` / `!isempty(ro)`.
+  - `fb` schedules: `bind !== :nearest`.
 
 ## Propagated parameters
 
@@ -217,6 +218,8 @@ Where:
                                                scao::TD{<:Scalariser},
                                                ex::FLoops.Transducers.Executor,
                                                fb::TDO_Option{<:OptE_Opt})
+        assert_no_nearest_bind_optimiser_schedule(fb, :fb,
+                                                  :HierarchicalEqualRiskContribution)
         if isa(ri, AbstractVector)
             @argcheck(!isempty(ri), IsEmptyError("ri cannot be empty"))
         end

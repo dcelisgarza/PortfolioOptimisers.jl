@@ -106,13 +106,13 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     SubsetResampling(;
-        pe::PrE_Pr = EmpiricalPrior(),
+        pe::TD{<:PrE_Pr} = EmpiricalPrior(),
         wb::TD_Option{<:WbE_Wb} = nothing,
         fees::TD_Option{<:FeesE_Fees} = nothing,
-        sets::Option{<:AssetSets} = nothing,
+        sets::TD_Option{<:AssetSets} = nothing,
         scale::TD_Option{<:VecNum} = nothing,
         opt::OptE_TD,
-        wf::WeightFinaliser = IterativeWeightFinaliser(),
+        wf::TD{<:WeightFinaliser} = IterativeWeightFinaliser(),
         ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
         subset_size::TD{<:SubsetSizeE} = 0.5,
         n_subsets::TD{<:NumberSubsetsE} = 100,
@@ -128,7 +128,7 @@ Keywords correspond to the struct's fields.
 
 ## Time-dependent fields
 
-`opt`, `scale`, `subset_size`, `n_subsets` and `fb` may hold a [`TimeDependent`](@ref) per-fold schedule. The optimiser-valued positions `opt` and `fb` are `bind = :outermost` only: `SubsetResampling`'s internal loop is over randomly drawn *asset subsets*, not time folds, so there is no inner fold loop for a `:nearest` optimiser schedule to bind to and it is rejected at construction. The fold loop that reaches the `SubsetResampling` resolves its schedules; a fold-less solve resets `subset_size`/`n_subsets` to their static defaults, `scale`/`fb` to `nothing`, and requires an `opt` schedule to carry its own `default`. `max_comb`, `rng` and `seed` are execution control and stay static.
+`pe`, `wb`, `fees`, `sets`, `scale`, `opt`, `wf`, `subset_size`, `n_subsets` and `fb` may hold a [`TimeDependent`](@ref) per-fold schedule. The optimiser-valued positions `opt` and `fb` are `bind = :outermost` only: `SubsetResampling`'s internal loop is over randomly drawn *asset subsets*, not time folds, so there is no inner fold loop for a `:nearest` optimiser schedule to bind to and it is rejected at construction. The fold loop that reaches the `SubsetResampling` resolves its schedules; a fold-less solve resets `pe`/`wf`/`subset_size`/`n_subsets` to their static defaults, `wb`/`fees`/`sets`/`scale`/`fb` to `nothing`, and requires an `opt` schedule to carry its own `default`. `max_comb`, `rng` and `seed` are execution control and stay static.
 
 ## Validation
 
@@ -240,10 +240,10 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
     $(field_dict[:strict_opt])
     """
     strict
-    function SubsetResampling(pe::PrE_Pr, wb::TD_Option{<:WbE_Wb},
-                              fees::TD_Option{<:FeesE_Fees}, sets::Option{<:AssetSets},
-                              scale::TD_Option{<:VecNum}, opt::OptE_TD, wf::WeightFinaliser,
-                              ex::FLoops.Transducers.Executor,
+    function SubsetResampling(pe::TD{<:PrE_Pr}, wb::TD_Option{<:WbE_Wb},
+                              fees::TD_Option{<:FeesE_Fees}, sets::TD_Option{<:AssetSets},
+                              scale::TD_Option{<:VecNum}, opt::OptE_TD,
+                              wf::TD{<:WeightFinaliser}, ex::FLoops.Transducers.Executor,
                               subset_size::TD{<:SubsetSizeE},
                               n_subsets::TD{<:NumberSubsetsE}, max_comb::Integer,
                               rng::Random.AbstractRNG, seed::Option{<:Integer},
@@ -282,12 +282,12 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
                                                             strict)
     end
 end
-function SubsetResampling(; pe::PrE_Pr = EmpiricalPrior(),
+function SubsetResampling(; pe::TD{<:PrE_Pr} = EmpiricalPrior(),
                           wb::TD_Option{<:WbE_Wb} = nothing,
                           fees::TD_Option{<:FeesE_Fees} = nothing,
-                          sets::Option{<:AssetSets} = nothing,
+                          sets::TD_Option{<:AssetSets} = nothing,
                           scale::TD_Option{<:VecNum} = nothing, opt::OptE_TD,
-                          wf::WeightFinaliser = IterativeWeightFinaliser(),
+                          wf::TD{<:WeightFinaliser} = IterativeWeightFinaliser(),
                           ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
                           subset_size::TD{<:SubsetSizeE} = 0.8,
                           n_subsets::TD{<:NumberSubsetsE} = 2,
@@ -304,7 +304,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return the static defaults of the [`SubsetResampling`](@ref) fields that may hold a [`TimeDependent`](@ref).
 
-Shared by the constructor's test-substitution pass and [`time_dependent_field_defaults`](@ref). The optimiser-valued field `opt` is required and has no static default, so it is marked [`NoDefault`](@ref): a schedule there must carry its own `default` to be usable outside a fold loop. `subset_size` and `n_subsets` reset to their keyword defaults; fields whose static default is `nothing` (`wb`, `fees`, `scale`, `fb`) are omitted.
+Shared by the constructor's test-substitution pass and [`time_dependent_field_defaults`](@ref). The optimiser-valued field `opt` is required and has no static default, so it is marked [`NoDefault`](@ref): a schedule there must carry its own `default` to be usable outside a fold loop. `pe`, `wf`, `subset_size` and `n_subsets` reset to their keyword defaults; fields whose static default is `nothing` (`wb`, `fees`, `sets`, `scale`, `fb`) are omitted.
 
 # Related
 
@@ -313,7 +313,8 @@ Shared by the constructor's test-substitution pass and [`time_dependent_field_de
   - [`assert_time_dependent_substitution`](@ref)
 """
 function subset_resampling_td_defaults()::NamedTuple
-    return (; opt = NoDefault(), subset_size = 0.8, n_subsets = 2)
+    return (; pe = EmpiricalPrior(), opt = NoDefault(), wf = IterativeWeightFinaliser(),
+            subset_size = 0.8, n_subsets = 2)
 end
 function time_dependent_field_defaults(::SubsetResampling)::NamedTuple
     return subset_resampling_td_defaults()

@@ -97,7 +97,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return the static defaults of the [`Stacking`](@ref) fields that may hold a [`TimeDependent`](@ref).
 
-Shared by the constructor's test-substitution pass and [`time_dependent_field_defaults`](@ref). The optimiser-valued fields `opti` and `opto` are required and have no static default, so they are marked [`NoDefault`](@ref): a schedule there must carry its own `default` to be usable outside a fold loop. Fields whose static default is `nothing` (`wb`, `fees`, `scale`, `fb`) are omitted.
+Shared by the constructor's test-substitution pass and [`time_dependent_field_defaults`](@ref). The optimiser-valued fields `opti` and `opto` are required and have no static default, so they are marked [`NoDefault`](@ref): a schedule there must carry its own `default` to be usable outside a fold loop. `pe` and `wf` reset to their keyword defaults; fields whose static default is `nothing` (`wb`, `fees`, `sets`, `scale`, `fb`) are omitted.
 
 # Related
 
@@ -106,7 +106,8 @@ Shared by the constructor's test-substitution pass and [`time_dependent_field_de
   - [`assert_time_dependent_substitution`](@ref)
 """
 function stacking_td_defaults()::NamedTuple
-    return (; opti = NoDefault(), opto = NoDefault())
+    return (; pe = EmpiricalPrior(), opti = NoDefault(), opto = NoDefault(),
+            wf = IterativeWeightFinaliser())
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -145,15 +146,15 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     Stacking(;
-        pe::PrE_Pr = EmpiricalPrior(),
+        pe::TD{<:PrE_Pr} = EmpiricalPrior(),
         wb::TD_Option{<:WbE_Wb} = nothing,
         fees::TD_Option{<:FeesE_Fees} = nothing,
-        sets::Option{<:AssetSets} = nothing,
+        sets::TD_Option{<:AssetSets} = nothing,
         scale::TD_Option{<:VecNum} = nothing,
         opti::Union{<:AbstractVector, <:TD_VecOptE_Opt},
         opto::OptE_TD,
         cv::Option{<:OptimisationCrossValidation} = nothing,
-        wf::WeightFinaliser = IterativeWeightFinaliser(),
+        wf::TD{<:WeightFinaliser} = IterativeWeightFinaliser(),
         ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
         fb::TDO_Option{<:OptE_Opt} = nothing,
         brt::Bool = false,
@@ -164,7 +165,7 @@ Keywords correspond to the struct's fields.
 
 ## Time-dependent fields
 
-`scale`, `opto` and `fb` may hold a [`TimeDependent`](@ref) per-fold schedule, `bind = :outermost` only — no inner fold loop of `Stacking` consumes them, so the fold loop that reaches the `Stacking` resolves them. `opti` admits schedules at two levels:
+`pe`, `wb`, `fees`, `sets`, `scale`, `wf`, `opto` and `fb` may hold a [`TimeDependent`](@ref) per-fold schedule — no inner fold loop of `Stacking` consumes them, so the fold loop that reaches the `Stacking` resolves them; the optimiser positions `opto` and `fb` are `bind = :outermost` only. `opti` admits schedules at two levels:
 
   - **Element** (`opti = [static, TimeDependent(…)]`): the element is an optimiser position of the inner cross-validation (entered per candidate), so `bind = :nearest` is legal there — with a mandatory explicit `default` and `cv !== nothing`, because the full-sample `wi` fit always resolves the element fold-lessly to its `default` (see [`assert_nearest_optimiser_schedule`](@ref)).
   - **Field** (`opti = TimeDependent([[…], […]])`, a per-fold vector of candidate vectors, see [`TD_VecOptE_Opt`](@ref)): `bind = :outermost` only. A `:nearest` field-level schedule is rejected — the inner cross-validation is handed the elements, never the field, and a per-fold candidate vector would change the number and identity of the returns-proxy columns `opto` sees.
@@ -262,10 +263,11 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
     $(field_dict[:strict_opt])
     """
     strict
-    function Stacking(pe::PrE_Pr, wb::TD_Option{<:WbE_Wb}, fees::TD_Option{<:FeesE_Fees},
-                      sets::Option{<:AssetSets}, scale::TD_Option{<:VecNum},
+    function Stacking(pe::TD{<:PrE_Pr}, wb::TD_Option{<:WbE_Wb},
+                      fees::TD_Option{<:FeesE_Fees}, sets::TD_Option{<:AssetSets},
+                      scale::TD_Option{<:VecNum},
                       opti::Union{<:VecOptE_Opt_TD, <:TD_VecOptE_Opt}, opto::OptE_TD,
-                      cv::Option{<:OptimisationCrossValidation}, wf::WeightFinaliser,
+                      cv::Option{<:OptimisationCrossValidation}, wf::TD{<:WeightFinaliser},
                       ex::FLoops.Transducers.Executor, fb::TDO_Option{<:OptE_Opt},
                       brt::Bool, strict::Bool)
         if isa(opti, TimeDependent)
@@ -307,12 +309,13 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
                                                             strict)
     end
 end
-function Stacking(; pe::PrE_Pr = EmpiricalPrior(), wb::TD_Option{<:WbE_Wb} = nothing,
+function Stacking(; pe::TD{<:PrE_Pr} = EmpiricalPrior(), wb::TD_Option{<:WbE_Wb} = nothing,
                   fees::TD_Option{<:FeesE_Fees} = nothing,
-                  sets::Option{<:AssetSets} = nothing, scale::TD_Option{<:VecNum} = nothing,
+                  sets::TD_Option{<:AssetSets} = nothing,
+                  scale::TD_Option{<:VecNum} = nothing,
                   opti::Union{<:AbstractVector, <:TD_VecOptE_Opt}, opto::OptE_TD,
                   cv::Option{<:OptimisationCrossValidation} = nothing,
-                  wf::WeightFinaliser = IterativeWeightFinaliser(),
+                  wf::TD{<:WeightFinaliser} = IterativeWeightFinaliser(),
                   ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
                   fb::TDO_Option{<:OptE_Opt} = nothing, brt::Bool = false,
                   strict::Bool = false)::Stacking
