@@ -208,7 +208,6 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     JuMPOptimisationResult(;
-        oe::Type{<:JuMPOptimisationEstimator},
         pa::ProcessedJuMPOptimiserAttributes,
         retcode::OptRetCode_VecOptRetCode,
         sol::JuMPOptSol_VecJuMPOptSol,
@@ -225,10 +224,6 @@ Keywords correspond to the struct's fields.
 """
 @concrete struct JuMPOptimisationResult <: BaseJuMPOptimisationResult
     """
-    $(field_dict[:oe])
-    """
-    oe
-    """
     $(field_dict[:pa])
     """
     pa
@@ -244,24 +239,19 @@ Keywords correspond to the struct's fields.
     $(field_dict[:model])
     """
     model
-    function JuMPOptimisationResult(oe::Type{<:JuMPOptimisationEstimator},
-                                    pa::ProcessedJuMPOptimiserAttributes,
+    function JuMPOptimisationResult(pa::ProcessedJuMPOptimiserAttributes,
                                     retcode::OptRetCode_VecOptRetCode,
                                     sol::JuMPOptSol_VecJuMPOptSol,
                                     model::Option{<:JuMP.Model})
-        return new{typeof(oe), typeof(pa), typeof(retcode), typeof(sol), typeof(model)}(oe,
-                                                                                        pa,
-                                                                                        retcode,
-                                                                                        sol,
-                                                                                        model)
+        return new{typeof(pa), typeof(retcode), typeof(sol), typeof(model)}(pa, retcode,
+                                                                            sol, model)
     end
 end
-function JuMPOptimisationResult(; oe::Type{<:JuMPOptimisationEstimator},
-                                pa::ProcessedJuMPOptimiserAttributes,
+function JuMPOptimisationResult(; pa::ProcessedJuMPOptimiserAttributes,
                                 retcode::OptRetCode_VecOptRetCode,
                                 sol::JuMPOptSol_VecJuMPOptSol,
                                 model::Option{<:JuMP.Model})::JuMPOptimisationResult
-    return JuMPOptimisationResult(oe, pa, retcode, sol, model)
+    return JuMPOptimisationResult(pa, retcode, sol, model)
 end
 # Virtual property `:w` extracts portfolio weights from `sol` (a single solution or a vector
 # of them, hence the broadcast); unknown properties forward to `pa` (see [`@forward_properties`](@ref)).

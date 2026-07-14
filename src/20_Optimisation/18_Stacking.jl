@@ -25,10 +25,6 @@ $(DocStringExtensions.FIELDS)
 """
 @concrete struct StackingResult <: NonJuMPOptimisationResult
     """
-    $(field_dict[:oe])
-    """
-    oe
-    """
     $(field_dict[:pr])
     """
     pr
@@ -64,33 +60,26 @@ $(DocStringExtensions.FIELDS)
     $(field_dict[:fb])
     """
     fb
-    function StackingResult(oe::Type{<:OptimisationEstimator},
-                            pr::Option{<:AbstractPriorResult}, wb::Option{<:WeightBounds},
+    function StackingResult(pr::Option{<:AbstractPriorResult}, wb::Option{<:WeightBounds},
                             fees::Option{<:Fees},
                             resi::AbstractVector{<:NonFiniteAllocationOptimisationResult},
                             reso::OptimisationResult,
                             cv::Option{<:OptimisationCrossValidation},
                             retcode::OptRetCode_VecOptRetCode, w::VecNum_VecVecNum,
                             fb::Option{<:OptE_Opt})
-        return new{typeof(oe), typeof(pr), typeof(wb), typeof(fees), typeof(resi),
-                   typeof(reso), typeof(cv), typeof(retcode), typeof(w), typeof(fb)}(oe, pr,
-                                                                                     wb,
-                                                                                     fees,
-                                                                                     resi,
-                                                                                     reso,
-                                                                                     cv,
-                                                                                     retcode,
-                                                                                     w, fb)
+        return new{typeof(pr), typeof(wb), typeof(fees), typeof(resi), typeof(reso),
+                   typeof(cv), typeof(retcode), typeof(w), typeof(fb)}(pr, wb, fees, resi,
+                                                                       reso, cv, retcode, w,
+                                                                       fb)
     end
 end
-function StackingResult(; oe::Type{<:OptimisationEstimator},
-                        pr::Option{<:AbstractPriorResult}, wb::Option{<:WeightBounds},
+function StackingResult(; pr::Option{<:AbstractPriorResult}, wb::Option{<:WeightBounds},
                         fees::Option{<:Fees},
                         resi::AbstractVector{<:NonFiniteAllocationOptimisationResult},
                         reso::OptimisationResult, cv::Option{<:OptimisationCrossValidation},
                         retcode::OptRetCode_VecOptRetCode, w::VecNum_VecVecNum,
                         fb::Option{<:OptE_Opt})::StackingResult
-    return StackingResult(oe, pr, wb, fees, resi, reso, cv, retcode, w, fb)
+    return StackingResult(pr, wb, fees, resi, reso, cv, retcode, w, fb)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -551,8 +540,8 @@ function _optimise(st::Stacking, rd::ReturnsResult; dims::Int = 1,
     wb = weight_bounds_constraints(st.wb, st.sets; N = Ni, strict = st.strict,
                                    datatype = eltype(X))
     retcode, w = outer_optimisation_finaliser(wb, st.wf, resi, reso.retcode, reso.w, wi)
-    return StackingResult(; oe = typeof(st), pr = pr, wb = wb, fees = fees, resi = resi,
-                          reso = reso, cv = st.cv, retcode = retcode, w = w, fb = nothing)
+    return StackingResult(; pr = pr, wb = wb, fees = fees, resi = resi, reso = reso,
+                          cv = st.cv, retcode = retcode, w = w, fb = nothing)
 end
 """
     optimise(st::Stacking{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,

@@ -812,6 +812,27 @@ function inner_fold_fields(::Any)::Tuple
     return ()
 end
 """
+    time_dependent_candidate_fields(opt)
+
+Field names of `opt` whose *type* admits a [`TimeDependent`](@ref) value — the candidate set [`time_dependent_fields`](@ref) narrows by value.
+
+Whether a field can hold a schedule is decidable from `fieldtype` alone: a host built through the widened constructor signatures (see [`TD_Option`](@ref)) records a schedule in the field's type parameter, so a field that holds no schedule cannot have a type intersecting [`TimeDependent`](@ref). The tuple is therefore computed once per host type by a generated function, and a fold-invariant scan over a wide static host (`JuMPOptimiser` has 41 fields) folds to an empty tuple at compile time rather than walking every field dynamically on every `split` and `_optimise`.
+
+This stays derived from the field types — no hand-maintained list — so the constructor signatures remain the single source of truth for which fields may vary over folds (ADR 0030).
+
+# Related
+
+  - [`TimeDependent`](@ref)
+  - [`TD_Option`](@ref)
+  - [`time_dependent_fields`](@ref)
+"""
+@generated function time_dependent_candidate_fields(::T) where {T}
+    fns = Tuple(f
+                for f in fieldnames(T)
+                if typeintersect(fieldtype(T, f), TimeDependent) !== Union{})
+    return :($fns)
+end
+"""
     entitled(opt, f::Symbol, all_binds::Bool)
 
 Return `true` when the recursion position described by `all_binds` may consume a `bind = :nearest` schedule in field `f` of `opt`.
@@ -831,7 +852,7 @@ end
 
 Return the tuple of field names of `opt` whose values are [`TimeDependent`](@ref).
 
-The scan is generic over `fieldnames`, so the widened constructor signatures (see [`TD_Option`](@ref)) remain the single source of truth for which fields may vary over folds — there is no hand-maintained list.
+The scan is generic over the host's fields, so the widened constructor signatures (see [`TD_Option`](@ref)) remain the single source of truth for which fields may vary over folds — there is no hand-maintained list. Only the fields whose type admits a schedule are visited (see [`time_dependent_candidate_fields`](@ref)); the rest are ruled out at compile time, so a static host returns an empty tuple without touching its fields.
 
 # The `all_binds` argument
 
@@ -852,7 +873,7 @@ Entitlement is refined **per field** by [`inner_fold_fields`](@ref): even at `al
   - [`entitled`](@ref)
 """
 function time_dependent_fields(opt, all_binds::Bool = true)
-    fns = fieldnames(typeof(opt))
+    fns = time_dependent_candidate_fields(opt)
     return filter(f -> begin
                       x = getfield(opt, f)
                       if isa(x, TimeDependent)

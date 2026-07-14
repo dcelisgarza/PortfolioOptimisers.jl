@@ -57,6 +57,7 @@ TDO_OptE_Opt
 assert_nearest_optimiser_schedule
 inner_fold_fields
 time_dependent_value
+time_dependent_candidate_fields
 time_dependent_fields
 time_dependent_entries
 time_dependent_entry_needs_previous_weights

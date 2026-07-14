@@ -14,10 +14,6 @@ $(DocStringExtensions.FIELDS)
 """
 @concrete struct DiscreteAllocationResult <: FiniteAllocationOptimisationResult
     """
-    $(field_dict[:oe])
-    """
-    oe
-    """
     $(field_dict[:retcode])
     """
     retcode
@@ -57,29 +53,27 @@ $(DocStringExtensions.FIELDS)
     $(field_dict[:fb])
     """
     fb
-    function DiscreteAllocationResult(oe::Type{<:FiniteAllocationOptimisationEstimator},
-                                      retcode::OptimisationReturnCode,
+    function DiscreteAllocationResult(retcode::OptimisationReturnCode,
                                       s_retcode::Option{<:OptimisationReturnCode},
                                       l_retcode::Option{<:OptimisationReturnCode},
                                       shares::VecNum, cost::VecNum, w::VecNum, cash::Number,
                                       s_model::Option{<:JuMP.Model},
                                       l_model::Option{<:JuMP.Model}, fb::Option{<:OptE_Opt})
-        return new{typeof(oe), typeof(retcode), typeof(s_retcode), typeof(l_retcode),
-                   typeof(shares), typeof(cost), typeof(w), typeof(cash), typeof(s_model),
-                   typeof(l_model), typeof(fb)}(oe, retcode, s_retcode, l_retcode, shares,
-                                                cost, w, cash, s_model, l_model, fb)
+        return new{typeof(retcode), typeof(s_retcode), typeof(l_retcode), typeof(shares),
+                   typeof(cost), typeof(w), typeof(cash), typeof(s_model), typeof(l_model),
+                   typeof(fb)}(retcode, s_retcode, l_retcode, shares, cost, w, cash,
+                               s_model, l_model, fb)
     end
 end
-function DiscreteAllocationResult(; oe::Type{<:FiniteAllocationOptimisationEstimator},
-                                  retcode::OptimisationReturnCode,
+function DiscreteAllocationResult(; retcode::OptimisationReturnCode,
                                   s_retcode::Option{<:OptimisationReturnCode},
                                   l_retcode::Option{<:OptimisationReturnCode},
                                   shares::VecNum, cost::VecNum, w::VecNum, cash::Number,
                                   s_model::Option{<:JuMP.Model},
                                   l_model::Option{<:JuMP.Model},
                                   fb::Option{<:OptE_Opt})::DiscreteAllocationResult
-    return DiscreteAllocationResult(oe, retcode, s_retcode, l_retcode, shares, cost, w,
-                                    cash, s_model, l_model, fb)
+    return DiscreteAllocationResult(retcode, s_retcode, l_retcode, shares, cost, w, cash,
+                                    s_model, l_model, fb)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -370,11 +364,10 @@ function _optimise(da::DiscreteAllocation, fai::FiniteAllocationInput;
     else
         OptimisationSuccess()
     end
-    return DiscreteAllocationResult(; oe = typeof(da), retcode = retcode,
-                                    s_retcode = sretcode, l_retcode = lretcode,
-                                    shares = view(res, :, 1), cost = view(res, :, 2),
-                                    w = view(res, :, 3), cash = lcash,
-                                    s_model = ifelse(save, smodel, nothing),
+    return DiscreteAllocationResult(; retcode = retcode, s_retcode = sretcode,
+                                    l_retcode = lretcode, shares = view(res, :, 1),
+                                    cost = view(res, :, 2), w = view(res, :, 3),
+                                    cash = lcash, s_model = ifelse(save, smodel, nothing),
                                     l_model = ifelse(save, lmodel, nothing), fb = nothing)
 end
 """

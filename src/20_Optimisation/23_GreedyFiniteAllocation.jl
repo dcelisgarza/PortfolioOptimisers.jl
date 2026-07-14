@@ -14,10 +14,6 @@ $(DocStringExtensions.FIELDS)
 """
 @concrete struct GreedyAllocationResult <: FiniteAllocationOptimisationResult
     """
-    $(field_dict[:oe])
-    """
-    oe
-    """
     $(field_dict[:retcode])
     """
     retcode
@@ -41,19 +37,17 @@ $(DocStringExtensions.FIELDS)
     $(field_dict[:fb])
     """
     fb
-    function GreedyAllocationResult(oe::Type{<:FiniteAllocationOptimisationEstimator},
-                                    retcode::OptimisationReturnCode, shares::VecNum,
+    function GreedyAllocationResult(retcode::OptimisationReturnCode, shares::VecNum,
                                     cost::VecNum, w::VecNum, cash::Number,
                                     fb::Option{<:OptE_Opt})
-        return new{typeof(oe), typeof(retcode), typeof(shares), typeof(cost), typeof(w),
-                   typeof(cash), typeof(fb)}(oe, retcode, shares, cost, w, cash, fb)
+        return new{typeof(retcode), typeof(shares), typeof(cost), typeof(w), typeof(cash),
+                   typeof(fb)}(retcode, shares, cost, w, cash, fb)
     end
 end
-function GreedyAllocationResult(; oe::Type{<:FiniteAllocationOptimisationEstimator},
-                                retcode::OptimisationReturnCode, shares::VecNum,
+function GreedyAllocationResult(; retcode::OptimisationReturnCode, shares::VecNum,
                                 cost::VecNum, w::VecNum, cash::Number,
                                 fb::Option{<:OptE_Opt})::GreedyAllocationResult
-    return GreedyAllocationResult(oe, retcode, shares, cost, w, cash, fb)
+    return GreedyAllocationResult(retcode, shares, cost, w, cash, fb)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -283,7 +277,7 @@ function _optimise(ga::GreedyAllocation, fai::FiniteAllocationInput; kwargs...)
     res[sidx, 2] = -scost
     res[lidx, 3] = lw
     res[sidx, 3] = -sw
-    return GreedyAllocationResult(; oe = typeof(ga), retcode = OptimisationSuccess(),
+    return GreedyAllocationResult(; retcode = OptimisationSuccess(),
                                   shares = view(res, :, 1), cost = view(res, :, 2),
                                   w = view(res, :, 3), cash = lcash, fb = nothing)
 end

@@ -725,8 +725,8 @@ function _optimise(hec::HierarchicalEqualRiskContribution,
     wb = weight_bounds_constraints(hec.opt.wb, hec.opt.sets; N = length(w),
                                    strict = hec.opt.strict, datatype = eltype(X))
     retcode, w = finalise_weight_bounds(hec.opt.wf, wb, w / sum(w))
-    return HierarchicalResult(; oe = typeof(hec), pr = pr, clr = clr, wb = wb, fees = fees,
-                              retcode = retcode, w = w, fb = nothing)
+    return HierarchicalResult(; pr = pr, clr = clr, wb = wb, fees = fees, retcode = retcode,
+                              w = w, fb = nothing)
 end
 """
     optimise(hec::HierarchicalEqualRiskContribution{

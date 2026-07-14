@@ -421,8 +421,8 @@ function _optimise(rrb::RelaxedRiskBudgeting, rd::ReturnsResult = ReturnsResult(
                                       attrs.pr)
     retcode, sol = optimise_JuMP_model!(model, rrb, eltype(attrs.pr.X))
     return RiskBudgetingResult(;
-                               jr = JuMPOptimisationResult(; oe = typeof(rrb), pa = attrs,
-                                                           retcode = retcode, sol = sol,
+                               jr = JuMPOptimisationResult(; pa = attrs, retcode = retcode,
+                                                           sol = sol,
                                                            model = ifelse(save, model,
                                                                           nothing)),
                                prb = prb, fb = nothing)

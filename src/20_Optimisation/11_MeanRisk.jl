@@ -642,8 +642,8 @@ function _optimise(mr::MeanRisk, rd::ReturnsResult = ReturnsResult(); dims::Int 
                                     Val(haskey(model, :ret_frontier)),
                                     Val(haskey(model, :risk_frontier)), attrs.fees)
     return MeanRiskResult(;
-                          jr = JuMPOptimisationResult(; oe = typeof(mr), pa = attrs,
-                                                      retcode = retcode, sol = sol,
+                          jr = JuMPOptimisationResult(; pa = attrs, retcode = retcode,
+                                                      sol = sol,
                                                       model = ifelse(save, model, nothing)),
                           fb = nothing)
 end

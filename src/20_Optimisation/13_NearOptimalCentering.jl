@@ -1014,7 +1014,7 @@ function _optimise(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, 
     noc_retcode, sol = solve_noc!(noc, model, rk_opt, rt_opt, opt)
     retcode = get_overall_retcode(w_min_retcode, w_opt_retcode, w_max_retcode, noc_retcode)
     return NearOptimalCenteringResult(;
-                                      jr = JuMPOptimisationResult(; oe = typeof(noc),
+                                      jr = JuMPOptimisationResult(;
                                                                   pa = ProcessedJuMPOptimiserAttributes(;
                                                                                                         pr = opt.pe,
                                                                                                         wb = opt.wb,
@@ -1066,8 +1066,7 @@ function _optimise(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, 
                                   Val(haskey(model, :risk_frontier)))
     retcode = get_overall_retcode(w_min_retcode, w_opt_retcode, w_max_retcode, noc_retcode)
     return NearOptimalCenteringResult(;
-                                      jr = JuMPOptimisationResult(; oe = typeof(noc),
-                                                                  pa = attrs,
+                                      jr = JuMPOptimisationResult(; pa = attrs,
                                                                   retcode = retcode,
                                                                   sol = sol,
                                                                   model = ifelse(save,

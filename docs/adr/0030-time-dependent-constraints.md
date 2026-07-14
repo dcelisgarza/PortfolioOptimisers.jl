@@ -65,8 +65,12 @@ where the position is required and neither exists — throws a structured
   smuggles `nothing` into a field that never admitted it), and the statically-parametric
   optimiser bounds `TD_OptE_Opt` / `TDO_OptE_Opt` / `TD_VecOptE_Opt`
   (e.g. `TimeDependent{<:AbstractVector{<:OptE_Opt}}`) for optimiser-valued positions.
-  Discovery is a generic `fieldnames` scan for `TimeDependent`-valued fields
-  (`time_dependent_fields`) — no hand-maintained list. Within an estimator, `TimeDependent` is
+  Discovery is a generic scan of the host's fields for `TimeDependent`-valued ones
+  (`time_dependent_fields`) — no hand-maintained list. The scan is narrowed to the fields whose
+  *type* admits a schedule (`time_dependent_candidate_fields`, a generated function over
+  `fieldtype`), which is still derived from the widened signatures and so keeps them the single
+  source of truth, but folds the scan of a static host to an empty tuple at compile time instead
+  of walking all of its fields per `split`/`_optimise`. Within an estimator, `TimeDependent` is
   recognised at top-level fields only, never nested inside another input; it is additionally
   recognised as the estimator handed to a fold loop itself (next bullet).
 - **A schedule can *be* the optimiser.** The fold-loop entry points widen to

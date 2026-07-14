@@ -58,6 +58,43 @@ end
         @test_throws ArgumentError TimeDependent([inner, 2.0])
         @test_throws ArgumentError TimeDependent([1.0, 2.0]; default = inner)
     end
+    @testset "Candidate fields narrow the scan without changing it" begin
+        # The scan only visits the fields whose type admits a schedule, so it must agree with
+        # a scan of every field of the host, on static and scheduled hosts alike.
+        function full_scan(opt, all_binds::Bool = true)
+            return filter(fieldnames(typeof(opt))) do f
+                x = getfield(opt, f)
+                return isa(x, TimeDependent) &&
+                       (PortfolioOptimisers.entitled(opt, f, all_binds) ||
+                        x.bind === :outermost)
+            end
+        end
+        hosts = [JuMPOptimiser(; slv = slv),
+                 JuMPOptimiser(; slv = slv,
+                               wb = TimeDependent([WeightBounds(; ub = 0.3),
+                                                   WeightBounds(; ub = 0.5)])),
+                 JuMPOptimiser(; slv = slv, bgt = TimeDependent([1.0, 0.9]),
+                               fees = TimeDependent([Fees(; l = 0.001), Fees(; l = 0.002)],
+                                                    :nearest; default = Fees())),
+                 MeanRisk(; opt = JuMPOptimiser(; slv = slv)),
+                 MeanRisk(; r = TimeDependent([Variance(), StandardDeviation()]),
+                          opt = JuMPOptimiser(; slv = slv)),
+                 NestedClustered(;
+                                 opti = TimeDependent([EqualWeighted(),
+                                                       InverseVolatility()], :nearest;
+                                                      default = EqualWeighted()),
+                                 opto = TimeDependent([EqualWeighted(),
+                                                       InverseVolatility()]),
+                                 cv = OptimisationCrossValidation(; cv = KFold(; n = 2)))]
+        for host in hosts, all_binds in (true, false)
+            @test PortfolioOptimisers.time_dependent_fields(host, all_binds) ==
+                  full_scan(host, all_binds)
+        end
+        # A static host has no schedule-admitting field at all, so it scans to nothing.
+        static = JuMPOptimiser(; slv = slv)
+        @test PortfolioOptimisers.time_dependent_candidate_fields(static) == ()
+        @test isempty(PortfolioOptimisers.time_dependent_fields(static))
+    end
     @testset "Fold-less defaults" begin
         # No default: the field resets to its host's static default (`wb → WeightBounds()`).
         td = TimeDependent([WeightBounds(; lb = 0.0, ub = 0.3),

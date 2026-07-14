@@ -319,8 +319,7 @@ function _optimise(frc::FactorRiskContribution, rd::ReturnsResult = ReturnsResul
                                       attrs.pr)
     retcode, sol = optimise_JuMP_model!(model, frc, eltype(attrs.pr.X))
     return FactorRiskContributionResult(;
-                                        jr = JuMPOptimisationResult(; oe = typeof(frc),
-                                                                    pa = attrs,
+                                        jr = JuMPOptimisationResult(; pa = attrs,
                                                                     retcode = retcode,
                                                                     sol = sol,
                                                                     model = ifelse(save,

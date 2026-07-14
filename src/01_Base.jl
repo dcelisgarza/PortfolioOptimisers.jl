@@ -447,7 +447,6 @@ const arg_dict = Dict(
                       :dfs => "`dfs`: Default short fixed fee.",#
                       :kwargs_fee => "`kwargs`: Named tuple of keyword arguments for fee computation.",#
                       # Optimisation results.
-                      :oe => "`oe`: Type of the optimisation estimator that produced this result.",#
                       :pa => "`pa`: Processed optimisation attributes.",#
                       :retcode => "`retcode`: Optimisation return code.",#
                       :sol => "`sol`: Optimisation solution.",#

@@ -139,7 +139,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     NaiveOptimisationResult(;
-        oe::Type{<:OptimisationEstimator}, pr::Option{<:AbstractPriorResult},
+        pr::Option{<:AbstractPriorResult},
         wb::Option{<:WeightBounds}, retcode::OptimisationReturnCode, w::Option{<:VecNum},
         fb::Option{<:OptE_Opt}
     ) -> NaiveOptimisationResult
@@ -149,10 +149,9 @@ Keywords correspond to the struct's fields.
 # Examples
 
 ```jldoctest
-julia> NaiveOptimisationResult(; oe = InverseVolatility, pr = nothing, wb = nothing,
-                               retcode = OptimisationSuccess(), w = [0.5, 0.5], fb = nothing)
+julia> NaiveOptimisationResult(; pr = nothing, wb = nothing, retcode = OptimisationSuccess(),
+                               w = [0.5, 0.5], fb = nothing)
 NaiveOptimisationResult
-       oe ┼ UnionAll: InverseVolatility
        pr ┼ nothing
        wb ┼ nothing
   retcode ┼ OptimisationSuccess
@@ -169,10 +168,6 @@ NaiveOptimisationResult
   - [`RandomWeighted`](@ref)
 """
 @concrete struct NaiveOptimisationResult <: NonJuMPOptimisationResult
-    """
-    $(field_dict[:oe])
-    """
-    oe
     """
     $(field_dict[:pr])
     """
@@ -193,21 +188,20 @@ NaiveOptimisationResult
     $(field_dict[:fb])
     """
     fb
-    function NaiveOptimisationResult(oe::Type{<:OptimisationEstimator},
-                                     pr::Option{<:AbstractPriorResult},
+    function NaiveOptimisationResult(pr::Option{<:AbstractPriorResult},
                                      wb::Option{<:WeightBounds},
                                      retcode::OptimisationReturnCode, w::Option{<:VecNum},
                                      fb::Option{<:OptE_Opt})
-        return new{typeof(oe), typeof(pr), typeof(wb), typeof(retcode), typeof(w),
-                   typeof(fb)}(oe, pr, wb, retcode, w, fb)
+        return new{typeof(pr), typeof(wb), typeof(retcode), typeof(w), typeof(fb)}(pr, wb,
+                                                                                   retcode,
+                                                                                   w, fb)
     end
 end
-function NaiveOptimisationResult(; oe::Type{<:OptimisationEstimator},
-                                 pr::Option{<:AbstractPriorResult},
+function NaiveOptimisationResult(; pr::Option{<:AbstractPriorResult},
                                  wb::Option{<:WeightBounds},
                                  retcode::OptimisationReturnCode, w::Option{<:VecNum},
                                  fb::Option{<:OptE_Opt})::NaiveOptimisationResult
-    return NaiveOptimisationResult(oe, pr, wb, retcode, w, fb)
+    return NaiveOptimisationResult(pr, wb, retcode, w, fb)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -414,8 +408,8 @@ function _optimise(iv::InverseVolatility, rd::ReturnsResult = ReturnsResult();
     wb = weight_bounds_constraints(iv.wb, iv.sets; N = size(X, ifelse(isone(dims), 2, 1)),
                                    strict = iv.strict, datatype = eltype(X))
     retcode, w = finalise_weight_bounds(iv.wf, wb, w)
-    return NaiveOptimisationResult(; oe = typeof(iv), pr = pr, wb = wb, retcode = retcode,
-                                   w = w, fb = nothing)
+    return NaiveOptimisationResult(; pr = pr, wb = wb, retcode = retcode, w = w,
+                                   fb = nothing)
 end
 """
     optimise(iv::InverseVolatility{<:Any, <:Any, <:Any, <:Any, Nothing},
@@ -574,8 +568,8 @@ function _optimise(ew::EqualWeighted, rd::ReturnsResult; dims::Int = 1, kwargs..
     wb = weight_bounds_constraints(ew.wb, ew.sets; N = N, strict = ew.strict,
                                    datatype = eltype(rd.X))
     retcode, w = finalise_weight_bounds(ew.wf, wb, w)
-    return NaiveOptimisationResult(; oe = typeof(ew), pr = nothing, wb = wb,
-                                   retcode = retcode, w = w, fb = nothing)
+    return NaiveOptimisationResult(; pr = nothing, wb = wb, retcode = retcode, w = w,
+                                   fb = nothing)
 end
 """
     optimise(ew::EqualWeighted{<:Any, <:Any, <:Any, Nothing},
@@ -777,8 +771,8 @@ function _optimise(rw::RandomWeighted, rd::ReturnsResult; dims::Int = 1, kwargs.
     wb = weight_bounds_constraints(rw.wb, rw.sets; N = N, strict = rw.strict,
                                    datatype = eltype(rd.X))
     retcode, w = finalise_weight_bounds(rw.wf, wb, w)
-    return NaiveOptimisationResult(; oe = typeof(rw), pr = nothing, wb = wb,
-                                   retcode = retcode, w = w, fb = nothing)
+    return NaiveOptimisationResult(; pr = nothing, wb = wb, retcode = retcode, w = w,
+                                   fb = nothing)
 end
 """
     optimise(rw::RandomWeighted{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, Nothing},
