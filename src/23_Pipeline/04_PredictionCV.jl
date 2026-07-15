@@ -252,19 +252,18 @@ function cross_val_predict(pipe::Pipeline, data::AbstractReturnsResult,
     return PopulationPredictionResult(; pred = sort_predictions!(cv_res, predictions))
 end
 """
-    pipeline_path_fit_and_predict(pipe::Pipeline, data::AbstractReturnsResult, folds, path_id; ex) -> MultiPeriodPredictionResult
+    pipeline_path_fit_and_predict(pipe::Pipeline, data::Prices_RR, folds, path_id; ex) -> MultiPeriodPredictionResult
 
-Run one [`MultipleRandomised`](@ref) path of a returns-level [`Pipeline`](@ref): fit and predict the path's inner walk-forward `folds` over the path's asset subset.
+Run one [`MultipleRandomised`](@ref) path of a price- or returns-level [`Pipeline`](@ref): fit and predict the path's inner walk-forward `folds` over the path's asset subset.
 
-`folds` is the path's `(train_idx, test_idx, asset_idx)` tuples in split-enumeration order. Each fold takes the asset-subset view of `data` (via [`port_opt_view`](@ref)) — the pipeline fits fresh on the sub-universe, so it never sub-selects fitted state — then fits on the training window and predicts on the test window. Time-dependent steps resolve per fold (the context carries `path_id`); when the pipeline [`needs_previous_weights`](@ref), [`run_folds`](@ref) runs the path sequentially and threads the previous fold's weights. Predictions are sorted by test index for reporting.
+`folds` is the path's `(train_idx, test_idx, asset_idx)` tuples in split-enumeration order. Each fold takes the asset-subset view of `data` (via [`pipeline_asset_view`](@ref), which indexes assets consistently at either level) — the pipeline fits fresh on the sub-universe, so it never sub-selects fitted state — then fits on the training window and predicts on the test window. Time-dependent steps resolve per fold (the context carries `path_id`); when the pipeline [`needs_previous_weights`](@ref), [`run_folds`](@ref) runs the path sequentially and threads the previous fold's weights. Predictions are sorted by test index for reporting.
 
 # Related
 
   - [`cross_val_predict(pipe::Pipeline, data::AbstractReturnsResult, cv::MultipleRandomised)`](@ref)
   - [`path_fit_and_predict`](@ref)
 """
-function pipeline_path_fit_and_predict(pipe::Pipeline, data::AbstractReturnsResult, folds,
-                                       path_id;
+function pipeline_path_fit_and_predict(pipe::Pipeline, data::Prices_RR, folds, path_id;
                                        ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())
     n = length(folds)
     td_flag = is_time_dependent(pipe)
@@ -276,7 +275,7 @@ function pipeline_path_fit_and_predict(pipe::Pipeline, data::AbstractReturnsResu
     test_idx = map(x -> x[2], folds)
     predictions = run_folds(pipe, n, ex) do i, prev
         (tr, te, as) = folds[i]
-        rdi = port_opt_view(data, as)
+        rdi = pipeline_asset_view(data, as)
         pipei = pipe
         if td_flag
             ctx = TimeDependentContext(; i = i, n = n, rd = rdi, train_idx = train_idx,
@@ -295,20 +294,20 @@ function pipeline_path_fit_and_predict(pipe::Pipeline, data::AbstractReturnsResu
                                        id = path_id)
 end
 """
-    cross_val_predict(pipe::Pipeline, data::AbstractReturnsResult, cv::MultipleRandomised; ex = FLoops.ThreadedEx(), kwargs...) -> PopulationPredictionResult
+    cross_val_predict(pipe::Pipeline, data::Prices_RR, cv::MultipleRandomised; ex = FLoops.ThreadedEx(), kwargs...) -> PopulationPredictionResult
 
-Run asset-resampling (multiple-randomised) cross-validation over a **returns-level** [`Pipeline`](@ref).
+Run asset-resampling (multiple-randomised) cross-validation over a price- or returns-level [`Pipeline`](@ref).
 
-Each resampled path is an inner walk-forward over a random asset subset; the subset is applied to the *input data* (an asset view), and the pipeline is fitted fresh on the sub-universe — so the pipeline never needs to sub-select its fitted universe. Paths are run by [`pipeline_path_fit_and_predict`](@ref) and returned as a [`PopulationPredictionResult`](@ref). Asset resampling keeps every observation window contiguous (it draws over assets, not rows), so — unlike combinatorial cross-validation — multiple-randomised is admissible at the price level; this *prediction* entry point handles the returns level, while price-level asset resampling is available through [`search_cross_validation`](@ref).
+Each resampled path is an inner walk-forward over a random asset subset; the subset is applied to the *input data* (an asset view via [`pipeline_asset_view`](@ref)), and the pipeline is fitted fresh on the sub-universe — so the pipeline never needs to sub-select its fitted universe. Paths are run by [`pipeline_path_fit_and_predict`](@ref) and returned as a [`PopulationPredictionResult`](@ref). Asset resampling keeps every observation window contiguous (it draws over assets, not rows), so — unlike combinatorial cross-validation — multiple-randomised is admissible at the **price level** too: a price-starting pipeline fits fresh on the asset-subset prices per fold, with no rolling-window violation.
 
 # Related
 
   - [`MultipleRandomised`](@ref)
   - [`pipeline_path_fit_and_predict`](@ref)
+  - [`pipeline_asset_view`](@ref)
   - [`cross_val_predict(pipe::Pipeline, data::Prices_RR, cv::CVER)`](@ref)
 """
-function cross_val_predict(pipe::Pipeline, data::AbstractReturnsResult,
-                           cv::MultipleRandomised;
+function cross_val_predict(pipe::Pipeline, data::Prices_RR, cv::MultipleRandomised;
                            ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(), kwargs...)
     assert_no_holdout(pipe)
     cv_res = split(cv, data)

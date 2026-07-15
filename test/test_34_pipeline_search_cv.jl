@@ -233,16 +233,43 @@
         @test gs.test_scores == rs.test_scores
     end
 
-    @testset "combinatorial search CV is gated off with an informative error" begin
+    @testset "combinatorial search CV tunes a returns-level pipeline (per-path scoring)" begin
         rd = make_returns()
-        pipe = Pipeline(; steps = (EmpiricalPrior(), EqualWeighted()))
+        pipe = Pipeline(; steps = ("prior" => EmpiricalPrior(), EqualWeighted()))
         r = ConditionalValueatRisk()
         ccv = CombinatorialCrossValidation(; n_folds = 4, n_test_folds = 2)
-        p = ["steps[1]" => [EmpiricalPrior(), EmpiricalPrior()]]
-        @test_throws ArgumentError search_cross_validation(pipe,
-                                                           GridSearchCrossValidation(p;
+        p = ["prior" => [EmpiricalPrior(), EmpiricalPrior()]]
+
+        res = search_cross_validation(pipe, GridSearchCrossValidation(p; cv = ccv, r = r),
+                                      rd)
+        cv = split(ccv, rd)
+        n_paths = maximum(cv.path_ids)
+        @test res.opt isa Pipeline
+        @test size(res.test_scores, 2) == 2                # candidates
+        @test size(res.test_scores, 1) == n_paths          # one row per backtest path
+        @test all(isfinite, res.test_scores)
+        @test res.idx in (1, 2)
+
+        # randomised search delegates to the combinatorial grid
+        rs = search_cross_validation(pipe,
+                                     RandomisedSearchCrossValidation(p; cv = ccv, r = r,
+                                                                     rng = StableRNG(42),
+                                                                     n_iter = 2), rd)
+        @test size(rs.test_scores) == (n_paths, 2)
+        @test all(isfinite, rs.test_scores)
+
+        # combinatorial stays rejected at the price level (rolling-window rule)
+        X = make_prices()
+        pr = PricesResult(; X = X)
+        pipe_pr = Pipeline(;
+                           steps = ("impute" => Imputer(), PricesToReturns(),
+                                    EmpiricalPrior(), EqualWeighted()))
+        p_pr = ["impute" =>
+                    [Imputer(; stat = MeanValue()), Imputer(; stat = MedianValue())]]
+        @test_throws ArgumentError search_cross_validation(pipe_pr,
+                                                           GridSearchCrossValidation(p_pr;
                                                                                      cv = ccv,
                                                                                      r = r),
-                                                           rd)
+                                                           pr)
     end
 end

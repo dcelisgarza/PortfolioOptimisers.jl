@@ -188,8 +188,7 @@ NaiveOptimisationResult
     $(field_dict[:fb])
     """
     fb
-    function NaiveOptimisationResult(pr::Option{<:AbstractPriorResult},
-                                     wb::Option{<:WeightBounds},
+    function NaiveOptimisationResult(pr::Option{<:Pr_RR}, wb::Option{<:WeightBounds},
                                      retcode::OptimisationReturnCode, w::Option{<:VecNum},
                                      fb::Option{<:OptE_Opt})
         return new{typeof(pr), typeof(wb), typeof(retcode), typeof(w), typeof(fb)}(pr, wb,
@@ -197,8 +196,7 @@ NaiveOptimisationResult
                                                                                    w, fb)
     end
 end
-function NaiveOptimisationResult(; pr::Option{<:AbstractPriorResult},
-                                 wb::Option{<:WeightBounds},
+function NaiveOptimisationResult(; pr::Option{<:Pr_RR}, wb::Option{<:WeightBounds},
                                  retcode::OptimisationReturnCode, w::Option{<:VecNum},
                                  fb::Option{<:OptE_Opt})::NaiveOptimisationResult
     return NaiveOptimisationResult(pr, wb, retcode, w, fb)
@@ -568,7 +566,7 @@ function _optimise(ew::EqualWeighted, rd::ReturnsResult; dims::Int = 1, kwargs..
     wb = weight_bounds_constraints(ew.wb, ew.sets; N = N, strict = ew.strict,
                                    datatype = eltype(rd.X))
     retcode, w = finalise_weight_bounds(ew.wf, wb, w)
-    return NaiveOptimisationResult(; pr = nothing, wb = wb, retcode = retcode, w = w,
+    return NaiveOptimisationResult(; pr = rd, wb = wb, retcode = retcode, w = w,
                                    fb = nothing)
 end
 """
@@ -771,7 +769,7 @@ function _optimise(rw::RandomWeighted, rd::ReturnsResult; dims::Int = 1, kwargs.
     wb = weight_bounds_constraints(rw.wb, rw.sets; N = N, strict = rw.strict,
                                    datatype = eltype(rd.X))
     retcode, w = finalise_weight_bounds(rw.wf, wb, w)
-    return NaiveOptimisationResult(; pr = nothing, wb = wb, retcode = retcode, w = w,
+    return NaiveOptimisationResult(; pr = rd, wb = wb, retcode = retcode, w = w,
                                    fb = nothing)
 end
 """

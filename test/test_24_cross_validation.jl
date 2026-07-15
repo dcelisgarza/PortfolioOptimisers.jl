@@ -872,6 +872,41 @@
         @test all(isfinite, rs_res.test_scores)
         @test 1 <= rs_res.idx <= 2
     end
+    @testset "Grid/Randomised search cv with a CombinatorialCrossValidation scheme" begin
+        # Combinatorial recombines disjoint test groups into backtest paths, so the score
+        # matrix is per-path (n_paths rows), not per-fold. Exercise the dedicated
+        # combinatorial search_cross_validation method for grid and randomised search.
+        est = MeanRisk(; opt = JuMPOptimiser(; slv = slv))
+        r = ConditionalValueatRisk()
+        ccv = CombinatorialCrossValidation(; n_folds = 4, n_test_folds = 2)
+        p = ["opt.l1" => range(; start = 0.0005, stop = 0.002, length = 2)]
+        cv = split(ccv, rd)
+        n_paths = maximum(cv.path_ids)
+
+        gs_res = search_cross_validation(est,
+                                         GridSearchCrossValidation(p; cv = ccv, r = r,
+                                                                   train_score = true), rd)
+        @test gs_res.opt isa MeanRisk
+        @test size(gs_res.test_scores) == (n_paths, 2)             # per-path scoring
+        @test all(isfinite, gs_res.test_scores)
+        # train scores keep every per-fold in-sample score: one (folds × candidates) matrix
+        # per path (a Vector of matrices), no collapsing
+        @test gs_res.train_scores isa AbstractVector
+        @test length(gs_res.train_scores) == n_paths
+        @test all(m -> size(m, 2) == 2, gs_res.train_scores)
+        @test all(m -> all(isfinite, m), gs_res.train_scores)
+        @test sum(m -> size(m, 1), gs_res.train_scores) == length(cv.path_ids)
+        @test 1 <= gs_res.idx <= 2
+
+        rs_res = search_cross_validation(est,
+                                         RandomisedSearchCrossValidation(p; cv = ccv,
+                                                                         rng = StableRNG(42),
+                                                                         r = r, n_iter = 2),
+                                         rd)
+        @test size(rs_res.test_scores) == (n_paths, 2)
+        @test all(isfinite, rs_res.test_scores)
+        @test 1 <= rs_res.idx <= 2
+    end
     @testset "parse_lens fails closed" begin
         # Param-key parsing is a string->AST boundary (ADR 0025): only `.`/`[]`
         # heads survive; everything else fails closed with a typed Meta.ParseError.

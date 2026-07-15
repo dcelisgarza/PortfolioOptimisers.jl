@@ -465,5 +465,28 @@ end
                                                                  rd_flat, mkmr())
             end
         end
+
+        @testset "MultipleRandomised over a price-starting pipeline" begin
+            # MR resamples assets; every observation window stays contiguous, so — unlike
+            # combinatorial — a price-starting pipeline (PricesToReturns) is admissible.
+            inner = IndexWalkForward(60, 30)
+            n_pp = PortfolioOptimisers.n_splits(inner, pr)
+            mr = MultipleRandomised(inner; subset_size = 3, n_subsets = 2,
+                                    rng = StableRNG(42), seed = 1)
+
+            pm = cross_val_predict(static_pipe(iv), pr, mr)
+            @test isa(pm, PortfolioOptimisers.PopulationPredictionResult)
+            @test length(pm.pred) == 2                       # n_subsets paths
+            @test all(path -> length(path.pred) == n_pp, pm.pred)
+            @test all(length(p.res.w) == 3 for pa in pm.pred for p in pa.pred)
+            @test all(isa(p.res.retcode, PortfolioOptimisers.OptimisationSuccess)
+                      for pa in pm.pred for p in pa.pred)
+
+            # combinatorial stays rejected at the price level (rolling-window rule)
+            @test_throws ArgumentError cross_val_predict(static_pipe(iv), pr,
+                                                         CombinatorialCrossValidation(;
+                                                                                      n_folds = 4,
+                                                                                      n_test_folds = 2))
+        end
     end
 end

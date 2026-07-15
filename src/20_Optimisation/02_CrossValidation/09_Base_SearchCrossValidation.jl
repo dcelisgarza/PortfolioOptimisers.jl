@@ -94,7 +94,6 @@ $(DocStringExtensions.FIELDS)
         p::MultiGSCVValType_VecMultiGSCVValType;
         cv::CrossValidationEstimator = KFold(),
         r::AbstractBaseRiskMeasure = ConditionalValueatRisk(),
-        pred_scorer::Option{<:PredictionCrossValScorer} = nothing,
         scorer::CrossValSearchScorer = HighestMeanScore(),
         ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
         train_score::Bool = false,
@@ -126,7 +125,6 @@ GridSearchCrossValidation
               │            │     rke ┴ Bool: true
               │      alpha ┼ Float64: 0.05
               │          w ┴ nothing
-  pred_scorer ┼ Option{<:PredictionCrossValScorer}: nothing
        scorer ┼ HighestMeanScore()
            ex ┼ Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
   train_score ┼ Bool: false
@@ -156,10 +154,6 @@ GridSearchCrossValidation
     """
     $(field_dict[:scorer])
     """
-    pred_scorer
-    """
-    $(field_dict[:scorer])
-    """
     scorer
     """
     $(field_dict[:ex])
@@ -182,7 +176,6 @@ GridSearchCrossValidation
                                                                                 <:AbstractVector}}},
                                        cv::CrossValidationEstimator,
                                        r::AbstractBaseRiskMeasure,
-                                       pred_scorer::Option{<:PredictionCrossValScorer},
                                        scorer::CrossValSearchScorer,
                                        ex::FLoops.Transducers.Executor, train_score::Bool,
                                        kwargs::NamedTuple)
@@ -213,10 +206,9 @@ GridSearchCrossValidation
                 end
             end
         end
-        return new{typeof(p), typeof(cv), typeof(r), typeof(pred_scorer), typeof(scorer),
-                   typeof(ex), typeof(train_score), typeof(kwargs)}(p, cv, r, pred_scorer,
-                                                                    scorer, ex, train_score,
-                                                                    kwargs)
+        return new{typeof(p), typeof(cv), typeof(r), typeof(scorer), typeof(ex),
+                   typeof(train_score), typeof(kwargs)}(p, cv, r, scorer, ex, train_score,
+                                                        kwargs)
     end
 end
 function GridSearchCrossValidation(p::Union{<:AbstractVector{<:Pair{<:Any,
@@ -228,11 +220,10 @@ function GridSearchCrossValidation(p::Union{<:AbstractVector{<:Pair{<:Any,
                                                                             <:AbstractVector}}};
                                    cv::CrossValidationEstimator = KFold(),
                                    r::AbstractBaseRiskMeasure = ConditionalValueatRisk(),
-                                   pred_scorer::Option{<:PredictionCrossValScorer} = nothing,
                                    scorer::CrossValSearchScorer = HighestMeanScore(),
                                    ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
                                    train_score::Bool = false, kwargs::NamedTuple = (;))
-    return GridSearchCrossValidation(p, cv, r, pred_scorer, scorer, ex, train_score, kwargs)
+    return GridSearchCrossValidation(p, cv, r, scorer, ex, train_score, kwargs)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -254,7 +245,6 @@ $(DocStringExtensions.FIELDS)
                                                <:Any}}};
         cv::CrossValidationEstimator = KFold(),
         r::AbstractBaseRiskMeasure = ConditionalValueatRisk(),
-        pred_scorer::Option{<:PredictionCrossValScorer} = nothing,
         scorer::CrossValSearchScorer = HighestMeanScore(),
         ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
         n_iter::Integer = 10,
@@ -292,7 +282,6 @@ RandomisedSearchCrossValidation
               │            │     rke ┴ Bool: true
               │      alpha ┼ Float64: 0.05
               │          w ┴ nothing
-  pred_scorer ┼ Option{<:PredictionCrossValScorer}: nothing
        scorer ┼ HighestMeanScore()
            ex ┼ Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
        n_iter ┼ Int64: 10
@@ -322,10 +311,6 @@ RandomisedSearchCrossValidation
     $(field_dict[:r])
     """
     r
-    """
-    $(field_dict[:scorer])
-    """
-    pred_scorer
     """
     $(field_dict[:scorer])
     """
@@ -360,7 +345,6 @@ RandomisedSearchCrossValidation
                                                       <:AbstractVector{<:AbstractDict}},
                                              cv::CrossValidationEstimator,
                                              r::AbstractBaseRiskMeasure,
-                                             pred_scorer::Option{<:PredictionCrossValScorer},
                                              scorer::CrossValSearchScorer,
                                              ex::FLoops.Transducers.Executor,
                                              n_iter::Integer, rng::Random.AbstractRNG,
@@ -401,12 +385,11 @@ RandomisedSearchCrossValidation
                 end
             end
         end
-        assert_nonempty_gt0_finite_val(n_iter, "n_iter")
-        return new{typeof(p), typeof(cv), typeof(r), typeof(pred_scorer), typeof(scorer),
-                   typeof(ex), typeof(n_iter), typeof(rng), typeof(seed),
-                   typeof(train_score), typeof(kwargs)}(p, cv, r, pred_scorer, scorer, ex,
-                                                        n_iter, rng, seed, train_score,
-                                                        kwargs)
+        assert_nonempty_gt0_finite_val(n_iter, :n_iter)
+        return new{typeof(p), typeof(cv), typeof(r), typeof(scorer), typeof(ex),
+                   typeof(n_iter), typeof(rng), typeof(seed), typeof(train_score),
+                   typeof(kwargs)}(p, cv, r, scorer, ex, n_iter, rng, seed, train_score,
+                                   kwargs)
     end
 end
 function RandomisedSearchCrossValidation(p::Union{<:AbstractVector{<:Pair},
@@ -415,7 +398,6 @@ function RandomisedSearchCrossValidation(p::Union{<:AbstractVector{<:Pair},
                                                   <:AbstractVector{<:AbstractDict}};
                                          cv::CrossValidationEstimator = KFold(),
                                          r::AbstractBaseRiskMeasure = ConditionalValueatRisk(),
-                                         pred_scorer::Option{<:PredictionCrossValScorer} = nothing,
                                          scorer::CrossValSearchScorer = HighestMeanScore(),
                                          ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
                                          n_iter::Integer = 10,
@@ -423,8 +405,8 @@ function RandomisedSearchCrossValidation(p::Union{<:AbstractVector{<:Pair},
                                          seed::Option{<:Integer} = nothing,
                                          train_score::Bool = false,
                                          kwargs::NamedTuple = (;))
-    return RandomisedSearchCrossValidation(p, cv, r, pred_scorer, scorer, ex, n_iter, rng,
-                                           seed, train_score, kwargs)
+    return RandomisedSearchCrossValidation(p, cv, r, scorer, ex, n_iter, rng, seed,
+                                           train_score, kwargs)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -496,7 +478,8 @@ $(DocStringExtensions.FIELDS)
     """
     idx
     function SearchCrossValidationResult(opt::AbstractEstimator, test_scores::MatNum,
-                                         train_scores::Option{<:MatNum},
+                                         train_scores::Option{<:Union{<:MatNum,
+                                                                      <:AbstractVector{<:MatNum}}},
                                          lens_grid::AbstractVector,
                                          val_grid::AbstractVector, idx::Integer)
         return new{typeof(opt), typeof(test_scores), typeof(train_scores),
@@ -507,7 +490,8 @@ $(DocStringExtensions.FIELDS)
     end
 end
 function SearchCrossValidationResult(; opt::AbstractEstimator, test_scores::MatNum,
-                                     train_scores::Option{<:MatNum},
+                                     train_scores::Option{<:Union{<:MatNum,
+                                                                  <:AbstractVector{<:MatNum}}},
                                      lens_grid::AbstractVector, val_grid::AbstractVector,
                                      idx::Integer)::SearchCrossValidationResult
     return SearchCrossValidationResult(opt, test_scores, train_scores, lens_grid, val_grid,
@@ -561,30 +545,6 @@ function fit_and_score(opt::NonFiniteAllocationOptimisationEstimator,
     test_score = sign * expected_risk(scv.r, prediction; scv.kwargs...)
     train_score = if scv.train_score
         sign * expected_risk(scv.r, prediction.res; scv.kwargs...)
-    else
-        nothing
-    end
-    return test_score, train_score
-end
-function fit_and_score(opt::NonFiniteAllocationOptimisationEstimator,
-                       scv::Union{<:GridSearchCrossValidation{<:Any,
-                                                              <:CombinatorialCrossValidation},
-                                  <:RandomisedSearchCrossValidation{<:Any,
-                                                                    <:CombinatorialCrossValidation}},
-                       cv::CombinatorialCrossValidationResult, rd::ReturnsResult,
-                       i::Integer)
-    predictions = fit_and_predict(opt, rd; train_idx = cv.train_idx[i],
-                                  test_idx = cv.test_idx[i])
-    predictions = PopulationPredictionResult(; pred = sort_predictions!(cv, predictions))
-    if isnothing(scv.pred_scorer)
-        scorer = NearestQuantilePrediction()
-    end
-    r = scv.r
-    sign = ifelse(bigger_is_better(r), 1, -1)
-    best_prediction = scorer(predictions, sign)
-    test_score = sign * expected_risk(scv.r, best_prediction; scv.kwargs...)
-    train_score = if scv.train_score
-        sign * expected_risk(scv.r, best_prediction.res; scv.kwargs...)
     else
         nothing
     end

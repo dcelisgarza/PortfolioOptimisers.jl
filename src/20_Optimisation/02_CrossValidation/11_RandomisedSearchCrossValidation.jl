@@ -85,7 +85,6 @@ function search_cross_validation(opt::NonFiniteAllocationOptimisationEstimator,
                                                                          rscv.n_iter,
                                                                          rscv.rng);
                                                              cv = rscv.cv, r = rscv.r,
-                                                             pred_scorer = rscv.pred_scorer,
                                                              scorer = rscv.scorer,
                                                              ex = rscv.ex,
                                                              train_score = rscv.train_score,
