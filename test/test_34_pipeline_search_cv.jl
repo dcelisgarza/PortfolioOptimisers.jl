@@ -258,7 +258,8 @@
         @test size(rs.test_scores) == (n_paths, 2)
         @test all(isfinite, rs.test_scores)
 
-        # combinatorial stays rejected at the price level (rolling-window rule)
+        # combinatorial now runs at the price level too (boundary-return approximation over
+        # the non-contiguous training rows); test groups are contiguous so scoring holds
         X = make_prices()
         pr = PricesResult(; X = X)
         pipe_pr = Pipeline(;
@@ -266,10 +267,11 @@
                                     EmpiricalPrior(), EqualWeighted()))
         p_pr = ["impute" =>
                     [Imputer(; stat = MeanValue()), Imputer(; stat = MedianValue())]]
-        @test_throws ArgumentError search_cross_validation(pipe_pr,
-                                                           GridSearchCrossValidation(p_pr;
-                                                                                     cv = ccv,
-                                                                                     r = r),
-                                                           pr)
+        res_pr = search_cross_validation(pipe_pr,
+                                         GridSearchCrossValidation(p_pr; cv = ccv, r = r),
+                                         pr)
+        @test res_pr.opt isa Pipeline
+        @test size(res_pr.test_scores) == (maximum(split(ccv, pr).path_ids), 2)
+        @test all(isfinite, res_pr.test_scores)
     end
 end

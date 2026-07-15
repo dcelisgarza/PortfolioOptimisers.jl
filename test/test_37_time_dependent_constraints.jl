@@ -1774,8 +1774,9 @@ end
             # The pipeline fold loop resolves a schedule step per fold; recovery is the same
             # fold-order alignment for the time-ordered schemes. A returns-level pipeline
             # also runs combinatorial and MultipleRandomised (recovery identical to the plain
-            # optimiser — same split, same recombination). Only a price-starting pipeline
-            # rejects them, by the rolling-window rule.
+            # optimiser — same split, same recombination). A price-starting pipeline runs them
+            # too: MR keeps rows contiguous, combinatorial accepts the boundary-return
+            # approximation over its non-contiguous training rows.
             mkpipe = step -> Pipeline(steps = (EmpiricalPrior(), step))
             @test assert_fold_is_pred(KFold(; n = 3), mkpipe) == 3
             @test assert_fold_is_pred(IndexWalkForward(100, 50), mkpipe) == 2
@@ -1795,13 +1796,19 @@ end
                                                          for i in 1:n_pp])), rd, mkmr())
             @test length(pm.pred) == 2
             @test all(path -> length(path.pred) == n_pp, pm.pred)
-            # A price-starting pipeline still rejects both (rolling-window rule).
+            # A price-starting pipeline now runs BOTH at the price level: combinatorial accepts
+            # the boundary-return approximation (non-contiguous training rows), MR keeps rows
+            # contiguous by drawing over assets.
             ts = range(; start = Date(2021, 1, 1), step = Day(1),
                        length = size(rd.X, 1) + 1)
             Xc = 100 .* cumprod(1 .+ vcat(zeros(1, size(rd.X, 2)), rd.X); dims = 1)
             pr = PricesResult(; X = TimeArray(collect(ts), Xc, rd.nx))
             ppipe = Pipeline(steps = (PricesToReturns(), EmpiricalPrior(), iv))
-            @test_throws ArgumentError cross_val_predict(ppipe, pr, ccv)
+            cc = cross_val_predict(ppipe, pr, ccv)
+            @test isa(cc, PortfolioOptimisers.PopulationPredictionResult)
+            @test length(cc.pred) == maximum(split(ccv, pr).path_ids)
+            @test all(isa(p.res.retcode, PortfolioOptimisers.OptimisationSuccess)
+                      for pa in cc.pred for p in pa.pred)
             mr = cross_val_predict(ppipe, pr, mkmr())
             @test length(mr.pred) == 2
         end

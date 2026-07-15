@@ -1,17 +1,17 @@
-"""
-    Base.split(ccv::CombinatorialCrossValidation, pr::AbstractPricesResult)
+# """
+#     Base.split(ccv::CombinatorialCrossValidation, pr::AbstractPricesResult)
 
-Unsupported at the **price level**: combinatorial cross-validation recombines non-contiguous test groups, and a pipeline that *starts from prices* runs a rolling, order-dependent transform (a [`PricesToReturns`](@ref) needs each row's predecessor; any windowed preprocessing needs contiguous history) that cannot be fitted or replayed across the gaps between groups. Throws an `ArgumentError`. This is the *rolling-window rule* — it applies only to price-starting pipelines; a **returns-level** pipeline has no such transform, so `cross_val_predict(pipe, rd::AbstractReturnsResult, ccv)` runs combinatorial folds like the plain-optimiser path (training rows may be non-contiguous, predictions recombine into paths).
+# Unsupported at the **price level**: combinatorial cross-validation recombines non-contiguous test groups, and a pipeline that *starts from prices* runs a rolling, order-dependent transform (a [`PricesToReturns`](@ref) needs each row's predecessor; any windowed preprocessing needs contiguous history) that cannot be fitted or replayed across the gaps between groups. Throws an `ArgumentError`. This is the *rolling-window rule* — it applies only to price-starting pipelines; a **returns-level** pipeline has no such transform, so `cross_val_predict(pipe, rd::AbstractReturnsResult, ccv)` runs combinatorial folds like the plain-optimiser path (training rows may be non-contiguous, predictions recombine into paths).
 
-# Related
+# # Related
 
-  - [`CombinatorialCrossValidation`](@ref)
-  - [`cross_val_predict(pipe::Pipeline, data::AbstractReturnsResult, cv::CombinatorialCrossValidation)`](@ref)
-  - [`Base.split(kf::KFold, rd::Prices_RR)`](@ref)
-"""
-function Base.split(::CombinatorialCrossValidation, ::AbstractPricesResult)
-    return throw(ArgumentError("CombinatorialCrossValidation is unsupported for a price-starting pipeline: its recombined, non-contiguous test groups break the rolling/price-level preprocessing (e.g. PricesToReturns) that needs contiguous windows — the rolling-window rule. Run it on a returns-level pipeline instead (cross_val_predict on an AbstractReturnsResult), or use KFold / a walk-forward scheme at the price level."))
-end
+#   - [`CombinatorialCrossValidation`](@ref)
+#   - [`cross_val_predict(pipe::Pipeline, data::AbstractReturnsResult, cv::CombinatorialCrossValidation)`](@ref)
+#   - [`Base.split(kf::KFold, rd::Prices_RR)`](@ref)
+# """
+# function Base.split(::CombinatorialCrossValidation, ::AbstractPricesResult)
+#     return throw(ArgumentError("CombinatorialCrossValidation is unsupported for a price-starting pipeline: its recombined, non-contiguous test groups break the rolling/price-level preprocessing (e.g. PricesToReturns) that needs contiguous windows — the rolling-window rule. Run it on a returns-level pipeline instead (cross_val_predict on an AbstractReturnsResult), or use KFold / a walk-forward scheme at the price level."))
+# end
 #! Begin: TimeDependent schedules as pipeline optimisation steps.
 """
     pipeline_step_is_time_dependent(x)
@@ -217,18 +217,20 @@ function factory(p::Pipeline, w::VecNum)
     return Pipeline(p.names, map(est -> pipeline_step_factory(est, w), p.steps))
 end
 """
-    cross_val_predict(pipe::Pipeline, data::AbstractReturnsResult, cv::CombinatorialCrossValidation; ex = FLoops.ThreadedEx(), kwargs...) -> PopulationPredictionResult
+    cross_val_predict(pipe::Pipeline, data::Prices_RR, cv::CombinatorialCrossValidation; ex = FLoops.ThreadedEx(), kwargs...) -> PopulationPredictionResult
 
-Run combinatorial cross-validation over a **returns-level** [`Pipeline`](@ref).
+Run combinatorial cross-validation over a price- or returns-level [`Pipeline`](@ref).
 
-A returns-level pipeline runs no rolling, price-level transform, so the rolling-window rule that blocks combinatorial for price-starting pipelines (see [`Base.split(ccv::CombinatorialCrossValidation, pr::AbstractPricesResult)`](@ref)) does not apply. Each split fits the whole workflow on its (possibly non-contiguous) training rows — moment-style fitted steps are order-independent — and predicts each of the split's disjoint test groups; [`sort_predictions!`](@ref) then recombines the per-split test-group predictions into the scheme's paths, exactly like the plain-optimiser combinatorial loop. Time-dependent steps resolve per split against the fold's [`TimeDependentContext`](@ref) before `fit`.
+Each split fits the whole workflow on its (possibly non-contiguous) training rows and predicts each of the split's disjoint test groups; [`sort_predictions!`](@ref) then recombines the per-split test-group predictions into the scheme's paths, exactly like the plain-optimiser combinatorial loop. Time-dependent steps resolve per split against the fold's [`TimeDependentContext`](@ref) before `fit`.
+
+At the **returns level** the training rows are order-independent for moment-style fitted steps, so this is exact. At the **price level** a split's training rows are non-contiguous — there are gaps where the held-out test groups sit — so the fold's rolling transform ([`PricesToReturns`](@ref)) produces one spurious return per gap boundary (a boundary return spanning a gap). That is the *rolling-window* approximation: combinatorial paths at the price level cost a few boundary returns in each fold's training window. Test groups are contiguous, so predictions are unaffected. Use [`MultipleRandomised`](@ref) if you need contiguous training rows at the price level.
 
 # Related
 
   - [`CombinatorialCrossValidation`](@ref)
   - [`cross_val_predict(pipe::Pipeline, data::Prices_RR, cv::CVER)`](@ref)
 """
-function cross_val_predict(pipe::Pipeline, data::AbstractReturnsResult,
+function cross_val_predict(pipe::Pipeline, data::Prices_RR,
                            cv::CombinatorialCrossValidation;
                            ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(), kwargs...)
     assert_no_holdout(pipe)
@@ -360,8 +362,8 @@ function cross_val_predict(pipe::Pipeline, data::Prices_RR, cv::CVER = KFold();
               "Cross validation estimator must not be shuffled.")
     cv_res = split(cv, data)
     (; train_idx, test_idx) = cv_res
-    @argcheck(isa(test_idx[1], VecInt),
-              ArgumentError("pipeline cross-validation requires non-combinatorial (VecInt) test indices, but got $(typeof(test_idx[1])); combinatorial schemes recombine non-contiguous test groups, which a fitted workflow cannot replay"))
+    # @argcheck(isa(test_idx[1], VecInt),
+    #           ArgumentError("pipeline cross-validation requires non-combinatorial (VecInt) test indices, but got $(typeof(test_idx[1])); combinatorial schemes recombine non-contiguous test groups, which a fitted workflow cannot replay"))
     n = length(train_idx)
     td_flag = is_time_dependent(pipe)
     if td_flag

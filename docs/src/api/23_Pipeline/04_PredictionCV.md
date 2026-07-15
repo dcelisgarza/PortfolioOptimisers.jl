@@ -5,8 +5,6 @@
 Combinatorial and multiple-randomised cross-validation recombine non-contiguous groups / resampled paths. A pipeline that *starts from prices* runs a rolling, order-dependent transform (a `PricesToReturns`, or any windowed preprocessing) that needs contiguous input rows, so those schemes are rejected at the price-level `split`. They are supported for a **returns-level** pipeline (below), which has no such transform.
 
 ```@docs
-Base.split(ccv::CombinatorialCrossValidation, pr::AbstractPricesResult)
-Base.split(mrcv::MultipleRandomised, pr::AbstractPricesResult)
 port_opt_view(pipe::Pipeline, i, args...; kwargs...)
 ```
 

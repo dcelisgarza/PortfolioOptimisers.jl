@@ -342,7 +342,7 @@ combinatorial cross-validation with optional purging and embargoing.
 # Arguments
 
   - `ccv::CombinatorialCrossValidation`: Combinatorial cross-validation estimator.
-  - `rd::ReturnsResult`: Returns data to split.
+  - `rd::Prices_RR`: Returns or price data to split.
 
 # Returns
 
@@ -355,7 +355,7 @@ combinatorial cross-validation with optional purging and embargoing.
   - [`CombinatorialCrossValidationResult`](@ref)
   - [`n_splits`](@ref)
 """
-function Base.split(ccv::CombinatorialCrossValidation, rd::ReturnsResult)
+function Base.split(ccv::CombinatorialCrossValidation, rd::Prices_RR)
     T = size(rd.X, 1)
     (; n_folds, n_test_folds, purged_size, embargo_size) = ccv
     min_fold_size = div(T, n_folds)

@@ -285,7 +285,7 @@ Combinatorial recombines its disjoint test groups into full-length backtest **pa
 
 `train_scores` (only when `gscv.train_score`) keeps every per-fold in-sample score: a `Vector` of `n_paths` matrices, one per path, each `folds_in_path × n_candidates` (test scores stay one-per-path because a path's out-of-sample returns pool into one series, while its folds train on distinct in-sample windows).
 
-Combinatorial is admissible only at the **returns level**: a price-starting pipeline's rolling preprocessing needs contiguous input rows, which the recombined groups break, so `split(gscv.cv, prices)` throws (the rolling-window rule). The randomised form delegates here through its grid.
+Combinatorial runs at both levels here. At the **price level** a split's training rows are non-contiguous (gaps where the held-out groups sit), so the fold's [`PricesToReturns`](@ref) produces one spurious return per gap boundary — an accepted approximation in exchange for the combinatorial paths (see [`cross_val_predict(pipe::Pipeline, data::Prices_RR, cv::CombinatorialCrossValidation)`](@ref)). The randomised form delegates here through its grid.
 
 # Related
 
@@ -300,7 +300,6 @@ function search_cross_validation(pipe::Pipeline,
                                  data::Prices_RR)
     assert_no_holdout(pipe)
     lens_grid, val_grid = pipeline_lens_val_grid(pipe, gscv.p)
-    # Returns-level only: prices throw here via the rolling-window rule.
     cv = split(gscv.cv, data)
     N = length(val_grid)
     M = maximum(cv.path_ids)          # one score per recombined backtest path

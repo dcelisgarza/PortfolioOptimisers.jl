@@ -62,8 +62,12 @@ end
         @test PortfolioOptimisers.cv_nobs(rd) == 120
         @test PortfolioOptimisers.cv_timestamps(rd) === rd.ts
 
-        # combinatorial recombines non-contiguous rows, so it fails loudly on prices
-        @test_throws ArgumentError split(CombinatorialCrossValidation(), pr)
+        # combinatorial split is level-agnostic (it partitions observations), so it runs on
+        # prices too and mirrors the returns-level split — the price-level combinatorial *fit*
+        # accepts the boundary-return approximation over the non-contiguous training rows
+        ccv0 = CombinatorialCrossValidation(; n_folds = 4, n_test_folds = 2)
+        @test split(ccv0, pr).train_idx == split(ccv0, rd).train_idx
+        @test split(ccv0, pr).test_idx == split(ccv0, rd).test_idx
         # multiple-randomised draws over assets (rows stay contiguous), so it is admissible
         # at the price level and mirrors the returns-level split
         mr = MultipleRandomised(IndexWalkForward(60, 20); subset_size = 3, n_subsets = 2,
@@ -353,18 +357,19 @@ end
             # a bare-callable schedule cannot infer its slot: wrap it
             @test_throws ArgumentError Pipeline(;
                                                 steps = (prep..., TimeDependent(ctx -> ew)))
-            # combinatorial and asset-resampling schemes are rejected only for a
-            # price-starting pipeline (the rolling-window rule); a returns-level pipeline runs
-            # them (covered in its own testset). `static_pipe` begins with PricesToReturns.
-            @test_throws ArgumentError cross_val_predict(static_pipe(ew), pr,
-                                                         CombinatorialCrossValidation(;
-                                                                                      n_folds = 4,
-                                                                                      n_test_folds = 2))
-            # @test_throws ArgumentError cross_val_predict(static_pipe(ew), pr,
-            #                                              MultipleRandomised(IndexWalkForward(60,
-            #                                                                                  30);
-            #                                                                 subset_size = 3,
-            #                                                                 n_subsets = 2))
+            # combinatorial and asset-resampling schemes now run for a price-starting pipeline
+            # too (`static_pipe` begins with PricesToReturns): combinatorial over non-contiguous
+            # training rows (boundary-return approximation), MR over asset subsets. Depth is in
+            # their own testsets; here just confirm they run.
+            @test isa(cross_val_predict(static_pipe(ew), pr,
+                                        CombinatorialCrossValidation(; n_folds = 4,
+                                                                     n_test_folds = 2)),
+                      PortfolioOptimisers.PopulationPredictionResult)
+            @test isa(cross_val_predict(static_pipe(ew), pr,
+                                        MultipleRandomised(IndexWalkForward(60, 30);
+                                                           subset_size = 3, n_subsets = 2,
+                                                           seed = 1)),
+                      PortfolioOptimisers.PopulationPredictionResult)
             # one evaluation protocol per call: a holdout pipeline is rejected
             @test_throws ArgumentError cross_val_predict(Pipeline(;
                                                                   steps = (TrainTestSplit(;
@@ -417,9 +422,10 @@ end
         end
 
         @testset "combinatorial and MultipleRandomised over a returns-level pipeline" begin
-            # The rolling-window rule blocks these only for price-starting pipelines. A
-            # returns-level pipeline runs them like the plain-optimiser loops. `rpipe` has no
-            # rolling/price step.
+            # A returns-level pipeline runs both exactly (no rolling transform), like the
+            # plain-optimiser loops. `rpipe` has no rolling/price step. (Price-starting
+            # pipelines also run them — combinatorial with a boundary-return approximation —
+            # covered in the price-level testsets.)
             rpipe(opt) = Pipeline(; steps = (EmpiricalPrior(), opt))
             @testset "combinatorial" begin
                 ccv = CombinatorialCrossValidation(; n_folds = 4, n_test_folds = 2)
@@ -482,11 +488,14 @@ end
             @test all(isa(p.res.retcode, PortfolioOptimisers.OptimisationSuccess)
                       for pa in pm.pred for p in pa.pred)
 
-            # combinatorial stays rejected at the price level (rolling-window rule)
-            @test_throws ArgumentError cross_val_predict(static_pipe(iv), pr,
-                                                         CombinatorialCrossValidation(;
-                                                                                      n_folds = 4,
-                                                                                      n_test_folds = 2))
+            # combinatorial also runs at the price level (boundary-return approximation over
+            # its non-contiguous training rows); test groups are contiguous so predictions hold
+            ccv = CombinatorialCrossValidation(; n_folds = 4, n_test_folds = 2)
+            cc = cross_val_predict(static_pipe(iv), pr, ccv)
+            @test isa(cc, PortfolioOptimisers.PopulationPredictionResult)
+            @test length(cc.pred) == maximum(split(ccv, pr).path_ids)
+            @test all(isa(p.res.retcode, PortfolioOptimisers.OptimisationSuccess)
+                      for pa in cc.pred for p in pa.pred)
         end
     end
 end

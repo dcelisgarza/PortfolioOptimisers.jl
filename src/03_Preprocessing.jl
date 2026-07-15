@@ -218,7 +218,7 @@ julia> size(values(pv.X))
   - [`PricesResult`](@ref)
   - [`port_opt_view`](@ref)
 """
-function port_opt_view(pr::PricesResult, ::Colon = :, ::Colon = :)
+function port_opt_view(pr::PricesResult, ::Colon, ::Colon)
     return pr
 end
 function port_opt_view(pr::PricesResult, i::AbstractVector{<:Dates.AbstractTime},

@@ -674,6 +674,10 @@ function StatsAPI.predict(res::PipelineResult, data::AbstractPricesResult,
     assert_universe_aligned(res, rd)
     return StatsAPI.predict(opt, rd)
 end
+function StatsAPI.predict(res::PipelineResult, data::AbstractPricesResult,
+                          test_idxs::VecVecInt, cols = Colon())
+    return [StatsAPI.predict(res, data, test_idx, cols) for test_idx in test_idxs]
+end
 function StatsAPI.predict(res::PipelineResult, data::AbstractReturnsResult,
                           test_idx = Colon(), cols = Colon())
     opt = res.ctx.opt
