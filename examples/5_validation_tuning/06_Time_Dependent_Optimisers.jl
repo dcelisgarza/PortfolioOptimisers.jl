@@ -383,7 +383,77 @@ pretty_table(DataFrame(:fold => 1:n_pipe,
 A fold-less `fit(pipe, X)` resolves the step to its `default`, exactly like §3's fold-less
 `optimise`.
 
-## 9. Summary
+## 9. Recovering which entry produced a fold
+
+Sections 2–8 read a fold's strategy back with `which_strategy`, matching its weights against the
+two static backtests. That works for *any* schedule, callables included, but it is indirect —
+and for a **vector** schedule it is unnecessary. A vector schedule is keyed by the fold index
+and nothing else: entry `i` runs at fold `i` of the scheme's `split` enumeration, so `val[i]`
+*is* fold `i`'s optimiser. No stored provenance, no weight matching — `calendar.val[i]` already
+answers "which strategy ran on fold `i`", and it agrees with the weight-matched column by
+construction:
+=#
+DataFrame(:fold => 1:n,
+          :from_schedule =>
+              [calendar.val[i] === defensive ? "defensive" : "aggressive" for i in 1:n],
+          :from_weights => [which_strategy(pred_cal, i) for i in 1:n])
+#=
+Under the time-ordered schemes (walk-forward, unshuffled [`KFold`](@ref), pipelines) fold `i`
+is also `pred.pred[i]`, so the index lines up from schedule to prediction end to end.
+
+The schemes that **regroup** for reporting break that last alignment but not the recovery.
+[`CombinatorialCrossValidation`](@ref) recombines each split's test groups into paths, so a
+path's predictions no longer sit in split order — yet the schedule is still keyed by the split
+index, and `split(cv, rd)` hands back the split→path map. So you can say which entry fed each
+path without inspecting a single prediction — the same indices you keyed the schedule by:
+=#
+ccv = CombinatorialCrossValidation(; n_folds = 6, n_test_folds = 2)
+n_c = n_splits(ccv)
+sched_c = TimeDependent([isodd(j) ? defensive : aggressive for j in 1:n_c];
+                        default = defensive)
+paths = split(ccv, rd).path_ids   # paths[group, split] = the path each test group lands in
+DataFrame(:split => 1:n_c,
+          :entry =>
+              [sched_c.val[j] === defensive ? "defensive" : "aggressive" for j in 1:n_c],
+          :feeds_paths => [sort(paths[:, j]) for j in 1:n_c])
+#=
+([`MultipleRandomised`](@ref) is the same idea one level in — it keys the schedule by each
+path's own fold position, so re-running `split` recovers the per-path fold order.)
+
+A **callable** has no entry to index, so none of this reaches it: what it returned on a fold is
+knowable only by re-running it, or by having it record its own choice. That last option is a
+logging concern you own, and a [`TimeDependentOptimiserCallable`](@ref) struct is the place for
+it — give the functor a field to write to, and it logs the regime as a side effect of picking
+it. Distinct folds write distinct slots, so it stays correct under the parallel fold loop:
+=#
+struct RegimeSwitchLogged{T <: PortfolioOptimisers.OptimisationEstimator,
+                          U <: PortfolioOptimisers.OptimisationEstimator} <:
+       PortfolioOptimisers.TimeDependentOptimiserCallable
+    calm::T
+    turbulent::U
+    log::Vector{Symbol}
+end
+function (r::RegimeSwitchLogged)(ctx::TimeDependentContext)
+    picked = if ew_vol(ctx.rd.X[ctx.train_idx[ctx.i], :]) > ew_vol(ctx.rd.X)
+        :turbulent
+    else
+        :calm
+    end
+    r.log[ctx.i] = picked
+    return picked === :turbulent ? r.turbulent : r.calm
+end
+logbook = Vector{Symbol}(undef, n)
+pred_logged = cross_val_predict(TimeDependent(RegimeSwitchLogged(aggressive, defensive,
+                                                                 logbook);
+                                              default = defensive), rd, wf)
+pretty_table(DataFrame(:fold => 1:n, :regime => logbook,
+                       :ran => [which_strategy(pred_logged, i) for i in 1:n]);
+             formatters = [resfmt])
+#=
+The `regime` column is the callable telling you what it saw, filled as the backtest ran rather
+than reconstructed after it; `ran` confirms `:turbulent` folds took the defensive strategy.
+
+## 10. Summary
 
 | Position | Spelling | `:nearest`? | Fold-less |
 |---|---|---|---|

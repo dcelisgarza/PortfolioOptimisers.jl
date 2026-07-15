@@ -344,15 +344,18 @@ end
             # a bare-callable schedule cannot infer its slot: wrap it
             @test_throws ArgumentError Pipeline(;
                                                 steps = (prep..., TimeDependent(ctx -> ew)))
-            # combinatorial and asset-resampling schemes are rejected
-            pipe_r = Pipeline(; steps = (EmpiricalPrior(), ew))
-            @test_throws ArgumentError cross_val_predict(pipe_r, rd_flat,
+            # combinatorial and asset-resampling schemes are rejected only for a
+            # price-starting pipeline (the rolling-window rule); a returns-level pipeline runs
+            # them (covered in its own testset). `static_pipe` begins with PricesToReturns.
+            @test_throws ArgumentError cross_val_predict(static_pipe(ew), pr,
                                                          CombinatorialCrossValidation(;
                                                                                       n_folds = 4,
                                                                                       n_test_folds = 2))
-            @test_throws ArgumentError cross_val_predict(pipe_r, rd_flat,
+            @test_throws ArgumentError cross_val_predict(static_pipe(ew), pr,
                                                          MultipleRandomised(IndexWalkForward(60,
-                                                                                             30)))
+                                                                                             30);
+                                                                            subset_size = 3,
+                                                                            n_subsets = 2))
             # one evaluation protocol per call: a holdout pipeline is rejected
             @test_throws ArgumentError cross_val_predict(Pipeline(;
                                                                   steps = (TrainTestSplit(;
@@ -402,6 +405,56 @@ end
                                                                                              r = r,
                                                                                              ex = FLoops.SequentialEx()),
                                                                    rd_flat)
+        end
+
+        @testset "combinatorial and MultipleRandomised over a returns-level pipeline" begin
+            # The rolling-window rule blocks these only for price-starting pipelines. A
+            # returns-level pipeline runs them like the plain-optimiser loops. `rpipe` has no
+            # rolling/price step.
+            rpipe(opt) = Pipeline(; steps = (EmpiricalPrior(), opt))
+            @testset "combinatorial" begin
+                ccv = CombinatorialCrossValidation(; n_folds = 4, n_test_folds = 2)
+                n_c = PortfolioOptimisers.n_splits(ccv)
+                pp = cross_val_predict(rpipe(iv), rd_flat, ccv)
+                @test isa(pp, PortfolioOptimisers.PopulationPredictionResult)
+                @test all(isa(p.res.retcode, PortfolioOptimisers.OptimisationSuccess)
+                          for pa in pp.pred for p in pa.pred)
+                # A homogeneous schedule reproduces the pure run at every position (the
+                # schedule is consumed per split); a mixed schedule runs and switches.
+                homog = cross_val_predict(rpipe(TimeDependent(fill(iv, n_c))), rd_flat, ccv)
+                @test [length(p.pred) for p in homog.pred] ==
+                      [length(p.pred) for p in pp.pred]
+                @test all(isapprox(a.res.w, b.res.w)
+                          for (pa, pb) in zip(homog.pred, pp.pred)
+                          for (a, b) in zip(pa.pred, pb.pred))
+                mixed = cross_val_predict(rpipe(TimeDependent([iseven(j) ? iv : ew
+                                                               for j in 1:n_c])), rd_flat,
+                                          ccv)
+                @test all(isa(p.res.retcode, PortfolioOptimisers.OptimisationSuccess)
+                          for pa in mixed.pred for p in pa.pred)
+            end
+            @testset "MultipleRandomised" begin
+                inner = IndexWalkForward(60, 30)
+                n_pp = PortfolioOptimisers.n_splits(inner, rd_flat)
+                mkmr = () -> MultipleRandomised(inner; subset_size = 3, n_subsets = 2,
+                                                rng = StableRNG(42), seed = 1)
+                pm = cross_val_predict(rpipe(iv), rd_flat, mkmr())
+                @test isa(pm, PortfolioOptimisers.PopulationPredictionResult)
+                @test length(pm.pred) == 2                       # n_subsets paths
+                @test all(path -> length(path.pred) == n_pp, pm.pred)
+                @test all(length(p.res.w) == 3 for pa in pm.pred for p in pa.pred)
+                @test all(isa(p.res.retcode, PortfolioOptimisers.OptimisationSuccess)
+                          for pa in pm.pred for p in pa.pred)
+                # Homogeneous schedule reproduces the pure run (same seed => same split).
+                homog = cross_val_predict(rpipe(TimeDependent(fill(iv, n_pp))), rd_flat,
+                                          mkmr())
+                @test all(isapprox(a.res.w, b.res.w)
+                          for (pa, pb) in zip(homog.pred, pm.pred)
+                          for (a, b) in zip(pa.pred, pb.pred))
+                # A wrong-length schedule is rejected per path.
+                @test_throws DimensionMismatch cross_val_predict(rpipe(TimeDependent([iv])),
+                                                                 rd_flat, mkmr())
+            end
         end
     end
 end

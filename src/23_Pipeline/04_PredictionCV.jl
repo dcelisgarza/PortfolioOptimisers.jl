@@ -1,32 +1,30 @@
 """
     Base.split(ccv::CombinatorialCrossValidation, pr::AbstractPricesResult)
 
-Deliberately unsupported: combinatorial cross-validation stays returns-level.
-
-Combinatorial folds recombine non-contiguous test groups, which is incompatible with the contiguous-window semantics price-level (pipeline) splitting relies on for stateful preprocessing. Throws an `ArgumentError`; split returns-level data instead, or use [`KFold`](@ref) / a [`WalkForwardEstimator`](@ref) at the prices level.
+Unsupported at the **price level**: combinatorial cross-validation recombines non-contiguous test groups, and a pipeline that *starts from prices* runs a rolling, order-dependent transform (a [`PricesToReturns`](@ref) needs each row's predecessor; any windowed preprocessing needs contiguous history) that cannot be fitted or replayed across the gaps between groups. Throws an `ArgumentError`. This is the *rolling-window rule* — it applies only to price-starting pipelines; a **returns-level** pipeline has no such transform, so `cross_val_predict(pipe, rd::AbstractReturnsResult, ccv)` runs combinatorial folds like the plain-optimiser path (training rows may be non-contiguous, predictions recombine into paths).
 
 # Related
 
   - [`CombinatorialCrossValidation`](@ref)
+  - [`cross_val_predict(pipe::Pipeline, data::AbstractReturnsResult, cv::CombinatorialCrossValidation)`](@ref)
   - [`Base.split(kf::KFold, rd::Prices_RR)`](@ref)
 """
 function Base.split(::CombinatorialCrossValidation, ::AbstractPricesResult)
-    return throw(ArgumentError("CombinatorialCrossValidation is returns-level only; price-level (pipeline) splitting requires contiguous windows — use KFold or a walk-forward scheme instead"))
+    return throw(ArgumentError("CombinatorialCrossValidation is unsupported for a price-starting pipeline: its recombined, non-contiguous test groups break the rolling/price-level preprocessing (e.g. PricesToReturns) that needs contiguous windows — the rolling-window rule. Run it on a returns-level pipeline instead (cross_val_predict on an AbstractReturnsResult), or use KFold / a walk-forward scheme at the price level."))
 end
 """
     Base.split(mrcv::MultipleRandomised, pr::AbstractPricesResult)
 
-Deliberately unsupported: multiple-randomised cross-validation stays returns-level.
-
-Its resampled asset subsets and randomised paths are defined over the returns matrix, not over price observations, so it cannot drive the contiguous input-row windows price-level (pipeline) splitting requires. Throws an `ArgumentError`; split returns-level data instead.
+Unsupported at the **price level**, for the same *rolling-window rule* as [`Base.split(ccv::CombinatorialCrossValidation, pr::AbstractPricesResult)`](@ref): a price-starting pipeline's rolling, order-dependent preprocessing needs contiguous input-row windows, which the resampled paths do not guarantee. Throws an `ArgumentError`. A **returns-level** pipeline has no such transform, so `cross_val_predict(pipe, rd::AbstractReturnsResult, mrcv)` resamples asset subsets and runs each path's inner walk-forward folds normally.
 
 # Related
 
   - [`MultipleRandomised`](@ref)
+  - [`cross_val_predict(pipe::Pipeline, data::AbstractReturnsResult, cv::MultipleRandomised)`](@ref)
   - [`Base.split(kf::KFold, rd::Prices_RR)`](@ref)
 """
 function Base.split(::MultipleRandomised, ::AbstractPricesResult)
-    return throw(ArgumentError("MultipleRandomised is returns-level only; price-level (pipeline) splitting requires contiguous input-row windows — use KFold or a walk-forward scheme instead"))
+    return throw(ArgumentError("MultipleRandomised is unsupported for a price-starting pipeline: its resampled paths do not guarantee the contiguous input-row windows that rolling/price-level preprocessing needs — the rolling-window rule. Run it on a returns-level pipeline instead (cross_val_predict on an AbstractReturnsResult), or use KFold / a walk-forward scheme at the price level."))
 end
 #! Begin: TimeDependent schedules as pipeline optimisation steps.
 """
@@ -233,20 +231,120 @@ function factory(p::Pipeline, w::VecNum)
     return Pipeline(p.names, map(est -> pipeline_step_factory(est, w), p.steps))
 end
 """
-    cross_val_predict(::Pipeline, ::AbstractReturnsResult, ::MultipleRandomised; kwargs...)
+    cross_val_predict(pipe::Pipeline, data::AbstractReturnsResult, cv::CombinatorialCrossValidation; ex = FLoops.ThreadedEx(), kwargs...) -> PopulationPredictionResult
 
-Deliberately unsupported: [`MultipleRandomised`](@ref) resamples asset subsets, and a [`Pipeline`](@ref)'s asset universe is fitted state — it cannot be sub-selected by asset view (see [`port_opt_view`](@ref)). Throws an `ArgumentError`; use [`KFold`](@ref) or a walk-forward scheme instead.
+Run combinatorial cross-validation over a **returns-level** [`Pipeline`](@ref).
+
+A returns-level pipeline runs no rolling, price-level transform, so the rolling-window rule that blocks combinatorial for price-starting pipelines (see [`Base.split(ccv::CombinatorialCrossValidation, pr::AbstractPricesResult)`](@ref)) does not apply. Each split fits the whole workflow on its (possibly non-contiguous) training rows — moment-style fitted steps are order-independent — and predicts each of the split's disjoint test groups; [`sort_predictions!`](@ref) then recombines the per-split test-group predictions into the scheme's paths, exactly like the plain-optimiser combinatorial loop. Time-dependent steps resolve per split against the fold's [`TimeDependentContext`](@ref) before `fit`.
+
+# Related
+
+  - [`CombinatorialCrossValidation`](@ref)
+  - [`cross_val_predict(pipe::Pipeline, data::Prices_RR, cv::CVER)`](@ref)
 """
-function cross_val_predict(::Pipeline, ::AbstractReturnsResult, ::MultipleRandomised;
-                           kwargs...)
-    return throw(ArgumentError("MultipleRandomised resamples asset subsets, and a Pipeline cannot be sub-selected by asset view: its universe is fitted state. Use KFold or a walk-forward scheme instead."))
+function cross_val_predict(pipe::Pipeline, data::AbstractReturnsResult,
+                           cv::CombinatorialCrossValidation;
+                           ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(), kwargs...)
+    assert_no_holdout(pipe)
+    cv_res = split(cv, data)
+    (; train_idx, test_idx) = cv_res
+    n = length(train_idx)
+    td_flag = is_time_dependent(pipe)
+    if td_flag
+        assert_time_dependent_fold_count(pipe, n)
+    end
+    predictions = parallel_folds(n, ex; ElT = Vector{PredictionResult}) do i
+        pipei = pipe
+        if td_flag
+            ctx = TimeDependentContext(; i = i, n = n, rd = data, train_idx = train_idx,
+                                       test_idx = test_idx)
+            pipei = update_time_dependent_estimator(pipei, ctx)
+        end
+        res = StatsAPI.fit(pipei, pipeline_data_view(data, train_idx[i]))
+        return [StatsAPI.predict(res, data, group) for group in test_idx[i]]
+    end
+    return PopulationPredictionResult(; pred = sort_predictions!(cv_res, predictions))
+end
+"""
+    pipeline_path_fit_and_predict(pipe::Pipeline, data::AbstractReturnsResult, folds, path_id; ex) -> MultiPeriodPredictionResult
+
+Run one [`MultipleRandomised`](@ref) path of a returns-level [`Pipeline`](@ref): fit and predict the path's inner walk-forward `folds` over the path's asset subset.
+
+`folds` is the path's `(train_idx, test_idx, asset_idx)` tuples in split-enumeration order. Each fold takes the asset-subset view of `data` (via [`port_opt_view`](@ref)) — the pipeline fits fresh on the sub-universe, so it never sub-selects fitted state — then fits on the training window and predicts on the test window. Time-dependent steps resolve per fold (the context carries `path_id`); when the pipeline [`needs_previous_weights`](@ref), [`run_folds`](@ref) runs the path sequentially and threads the previous fold's weights. Predictions are sorted by test index for reporting.
+
+# Related
+
+  - [`cross_val_predict(pipe::Pipeline, data::AbstractReturnsResult, cv::MultipleRandomised)`](@ref)
+  - [`path_fit_and_predict`](@ref)
+"""
+function pipeline_path_fit_and_predict(pipe::Pipeline, data::AbstractReturnsResult, folds,
+                                       path_id;
+                                       ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())
+    n = length(folds)
+    td_flag = is_time_dependent(pipe)
+    if td_flag
+        assert_time_dependent_fold_count(pipe, n)
+    end
+    prev_w_flag = needs_previous_weights(pipe)
+    train_idx = map(x -> x[1], folds)
+    test_idx = map(x -> x[2], folds)
+    predictions = run_folds(pipe, n, ex) do i, prev
+        (tr, te, as) = folds[i]
+        rdi = port_opt_view(data, as)
+        pipei = pipe
+        if td_flag
+            ctx = TimeDependentContext(; i = i, n = n, rd = rdi, train_idx = train_idx,
+                                       test_idx = test_idx,
+                                       w_prev = isnothing(prev) ? nothing : prev.res.w,
+                                       path_id = path_id)
+            pipei = update_time_dependent_estimator(pipei, ctx)
+        end
+        if !isnothing(prev) && prev_w_flag
+            pipei = factory(pipei, prev.res.w)
+        end
+        res = StatsAPI.fit(pipei, pipeline_data_view(rdi, tr))
+        return StatsAPI.predict(res, rdi, te)
+    end
+    return MultiPeriodPredictionResult(; pred = sort_predictions!(test_idx, predictions),
+                                       id = path_id)
+end
+"""
+    cross_val_predict(pipe::Pipeline, data::AbstractReturnsResult, cv::MultipleRandomised; ex = FLoops.ThreadedEx(), kwargs...) -> PopulationPredictionResult
+
+Run asset-resampling (multiple-randomised) cross-validation over a **returns-level** [`Pipeline`](@ref).
+
+The rolling-window rule that blocks this for price-starting pipelines (see [`Base.split(mrcv::MultipleRandomised, pr::AbstractPricesResult)`](@ref)) does not apply to a returns-level pipeline. Each resampled path is an inner walk-forward over a random asset subset; the subset is applied to the *input data* (an asset view), and the pipeline is fitted fresh on the sub-universe — so, contrary to the earlier restriction, the pipeline never needs to sub-select its fitted universe. Paths are run by [`pipeline_path_fit_and_predict`](@ref) and returned as a [`PopulationPredictionResult`](@ref).
+
+# Related
+
+  - [`MultipleRandomised`](@ref)
+  - [`pipeline_path_fit_and_predict`](@ref)
+  - [`cross_val_predict(pipe::Pipeline, data::Prices_RR, cv::CVER)`](@ref)
+"""
+function cross_val_predict(pipe::Pipeline, data::AbstractReturnsResult,
+                           cv::MultipleRandomised;
+                           ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(), kwargs...)
+    assert_no_holdout(pipe)
+    cv_res = split(cv, data)
+    (; train_idx, test_idx, asset_idx, path_ids) = cv_res
+    unique_ids = unique(path_ids)
+    dict = [Vector{Tuple{eltype(train_idx), eltype(test_idx), eltype(asset_idx)}}(undef, 0)
+            for _ in unique_ids]
+    for (train, test, asset, path_id) in zip(train_idx, test_idx, asset_idx, path_ids)
+        push!(dict[path_id], (train, test, asset))
+    end
+    predictions = parallel_folds(length(unique_ids), ex; ElT = MultiPeriodPredictionResult
+                                 ) do i
+        return pipeline_path_fit_and_predict(pipe, data, dict[i], i; ex = ex)
+    end
+    return PopulationPredictionResult(; pred = predictions)
 end
 """
     cross_val_predict(pipe::Pipeline, data::Prices_RR, cv::CVER = KFold(); ex = FLoops.ThreadedEx(), id = nothing)
 
 Run cross-validated prediction over an entire [`Pipeline`](@ref) workflow and return a [`MultiPeriodPredictionResult`](@ref).
 
-The input is split at its own level — price-level data by the prices-aware `split` methods (contiguous windows, so stateful preprocessing stays inside the fold), returns-level data as usual — and for each fold the whole workflow is fitted on the training window and predicts on the test window, exactly as [`fit`](@ref)/[`predict`](@ref) do for a holdout. Combinatorial and asset-resampling schemes are rejected: the former has no contiguous windows, the latter needs an asset view a pipeline cannot take.
+The input is split at its own level — price-level data by the prices-aware `split` methods (contiguous windows, so stateful preprocessing stays inside the fold), returns-level data as usual — and for each fold the whole workflow is fitted on the training window and predicts on the test window, exactly as [`fit`](@ref)/[`predict`](@ref) do for a holdout. This method covers the contiguous, single-path schemes ([`KFold`](@ref) and the walk-forwards). Combinatorial and asset-resampling schemes have their own methods for a **returns-level** pipeline (see [`cross_val_predict(pipe::Pipeline, data::AbstractReturnsResult, cv::CombinatorialCrossValidation)`](@ref) and [`cross_val_predict(pipe::Pipeline, data::AbstractReturnsResult, cv::MultipleRandomised)`](@ref)); for a **price-starting** pipeline they are rejected at `split` by the rolling-window rule.
 
 This is the fold loop that consumes [`TimeDependent`](@ref) schedules in a pipeline (ADR 0030): when the pipeline is time-dependent, fold `i` builds a [`TimeDependentContext`](@ref) — with `rd` the *raw, pre-preprocessing* input `data`, so pipeline-level callables see the fold's data before any step has transformed it — and swaps every schedule for its fold-`i` value via [`update_time_dependent_estimator`](@ref) **before** `fit` runs. A schedule step may resolve to an estimator (the fold optimises) or a precomputed result (the fold predicts only); injection never sees a schedule. When the pipeline [`needs_previous_weights`](@ref), [`run_folds`](@ref) runs sequentially and threads the previous fold's weights into the context's `w_prev` and, post-swap, into the optimisation steps via [`factory`](@ref).
 

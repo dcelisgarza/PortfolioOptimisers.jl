@@ -277,6 +277,8 @@ Abstract supertype for callable structs used as time-dependent constraint values
 
 A subtype is a data-carrying alternative to a bare function inside a [`TimeDependent`](@ref): it must implement a functor `(x::MySubtype)(ctx::TimeDependentContext)` returning the fold's field value. Because it is a struct, it participates in a trait a bare function cannot: define `needs_previous_weights(::MySubtype) = true` to declare a previous-weights requirement directly (the default is `false`), instead of wrapping in [`PreviousWeightsFunction`](@ref).
 
+Being a struct also makes it the natural home for **recording what a callable schedule chose**: a bare `ctx -> …` selects nothing by index, so its per-fold decision is not otherwise recoverable (see the provenance note on [`TimeDependent`](@ref)). A functor can carry a mutable field — e.g. a vector it writes at `ctx.i` — and log the fold's resolved value as a side effect of computing it.
+
 # Related
 
   - [`TimeDependent`](@ref)
@@ -403,6 +405,8 @@ The fold-less value is the field's static default, unless `default` overrides it
 A vector whose entries are all optimisers or precomputed results ([`OptE_Opt`](@ref)) is stored as a `Vector{OptE_Opt}`, so a *mixed* schedule — fold `i` optimising or predicting depending on what entry `i` is — is admissible in an optimiser-valued field on its element type alone (see [`TD_OptE_Opt`](@ref)) rather than falling out to a `Vector{Any}` the field cannot accept.
 
 Schedules do not nest: neither `val`, nor a vector entry of `val`, nor `default` may be a `TimeDependent`. Entry `i` is fold `i`'s *complete* field value, and the fold-less value is by definition outside every fold loop, so nesting has no meaning. An estimator swapped in by a schedule may itself carry schedules — those resolve against the same fold context after the swap — but they live in *its* fields, not inside this wrapper.
+
+**Recovering which entry a fold ran** needs no stored provenance, because a vector schedule is keyed by the fold index and nothing else. Entry `i` runs at fold `i` of the consuming scheme's `split` enumeration ([`time_dependent_value`](@ref) indexes `val[ctx.i]`), so `val[i]` *is* fold `i`'s value — the same index you keyed the schedule by. Under the time-ordered schemes (walk-forward, unshuffled [`KFold`](@ref), [`Pipeline`](@ref)) fold `i` is also the `i`-th entry of the returned [`MultiPeriodPredictionResult`](@ref); under schemes that regroup for reporting ([`MultipleRandomised`](@ref) sorts by test index, combinatorial recombines each split's test groups into paths) the prediction order no longer tracks the fold order, so re-run `split(cv, rd)` and read the fold→path map off its `path_ids` — it is keyed by the very enumeration index the schedule was, so entry `k` still governs enumeration fold `k`. A **callable** schedule computes its value rather than selecting an entry, so there is no index to recover: what it returned is knowable only by re-running it on the fold's [`TimeDependentContext`](@ref), or by having it record its own choice. Recording is a logging concern the caller owns, and the [`TimeDependentCallable`](@ref) struct interface is its natural home — a functor can stash the regime it picked per fold in a field of its own.
 
 # Fields
 

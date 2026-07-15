@@ -21,8 +21,22 @@ struct TDOptCap <: PortfolioOptimisers.TimeDependentOptimiserCallable end
 function (c::TDOptCap)(ctx::TimeDependentContext)
     return isodd(ctx.i) ? EqualWeighted() : InverseVolatility()
 end
+# `TDLog` records the optimiser it picks per fold in a mutable field, keyed by the coordinates
+# recovery needs — `(path_id, i)`, so it works under multi-path schemes too. A callable
+# schedule selects nothing by index, so its per-fold decision is recoverable only if it logs
+# it; the `TimeDependentCallable` struct interface is where that logging lives (#148).
+struct TDLog{T, U} <: PortfolioOptimisers.TimeDependentOptimiserCallable
+    odd::T
+    even::U
+    log::Vector{Tuple{Union{Int, Nothing}, Int, Symbol}}
+end
+function (c::TDLog)(ctx::TimeDependentContext)
+    pick = isodd(ctx.i) ? :odd : :even
+    push!(c.log, (ctx.path_id, ctx.i, pick))
+    return pick === :odd ? c.odd : c.even
+end
 @testset "Time-dependent constraints" begin
-    using Test, PortfolioOptimisers, Clarabel, StableRNGs
+    using Test, PortfolioOptimisers, Clarabel, StableRNGs, Dates, TimeSeries
     rng = StableRNG(987654321)
     X = randn(rng, 200, 5) * 0.01 .+ 0.001
     rd = ReturnsResult(; nx = ["A", "B", "C", "D", "E"], X = X)
@@ -1712,6 +1726,156 @@ end
             # :outermost fallbacks still construct.
             @test isa(MeanRisk(; opt = jopt, fb = TimeDependent([ew, iv])), MeanRisk)
             @test isa(InverseVolatility(; fb = TimeDependent([ew, iv])), InverseVolatility)
+        end
+    end
+    @testset "Recovering which entry produced a fold (#148)" begin
+        # No provenance is stored on predictions; the docs claim it is recoverable across every
+        # cross-validation form. These tests pin the contracts recovery leans on, once per
+        # scheme. EqualWeighted/InverseVolatility are deterministic and distinguishable, so a
+        # fold's weights identify the entry that ran. The single-thread executor keeps the
+        # callable-logging runs race-free and reproducible.
+        ew, iv = EqualWeighted(), InverseVolatility()
+        seqex = PortfolioOptimisers.FLoops.SequentialEx()
+        @testset "A vector schedule is keyed by the fold index" begin
+            # The scheme-independent linchpin: entry i is fold i, resolved purely from ctx.i —
+            # this is what makes `val[i]` the recovery answer for every vector schedule.
+            sched = TimeDependent([ew, iv, ew])
+            mkctx = i -> TimeDependentContext(; i = i, n = 3, rd = rd,
+                                              train_idx = [[1], [2], [3]],
+                                              test_idx = [[1], [2], [3]])
+            for i in 1:3
+                @test PortfolioOptimisers.time_dependent_value(sched, mkctx(i)) ===
+                      sched.val[i]
+            end
+        end
+        # Time-ordered single-path schemes: predictions come back in fold order, so fold i is
+        # pred[i] and `sched.val[i]` names the optimiser behind it, end to end.
+        function assert_fold_is_pred(cv, mkopt = identity)
+            n = PortfolioOptimisers.n_splits(cv, rd)
+            sched = TimeDependent([iseven(i) ? iv : ew for i in 1:n])
+            mp = cross_val_predict(mkopt(sched), rd, cv)
+            pe = cross_val_predict(mkopt(ew), rd, cv)
+            pv = cross_val_predict(mkopt(iv), rd, cv)
+            @test length(mp.pred) == n
+            for i in 1:n
+                expected = (sched.val[i] === iv ? pv : pe).pred[i].res.w
+                @test isapprox(mp.pred[i].res.w, expected)
+            end
+            return n
+        end
+        @testset "KFold" begin
+            @test assert_fold_is_pred(KFold(; n = 4)) == 4
+        end
+        @testset "WalkForward" begin
+            # All walk-forward variants share one fold loop; IndexWalkForward stands in.
+            @test assert_fold_is_pred(IndexWalkForward(100, 50)) == 2
+        end
+        @testset "Pipeline" begin
+            # The pipeline fold loop resolves a schedule step per fold; recovery is the same
+            # fold-order alignment for the time-ordered schemes. A returns-level pipeline
+            # also runs combinatorial and MultipleRandomised (recovery identical to the plain
+            # optimiser — same split, same recombination). Only a price-starting pipeline
+            # rejects them, by the rolling-window rule.
+            mkpipe = step -> Pipeline(steps = (EmpiricalPrior(), step))
+            @test assert_fold_is_pred(KFold(; n = 3), mkpipe) == 3
+            @test assert_fold_is_pred(IndexWalkForward(100, 50), mkpipe) == 2
+            # Combinatorial: split->entry recovery holds for a pipeline schedule too.
+            ccv = CombinatorialCrossValidation(; n_folds = 4, n_test_folds = 2)
+            n_c = PortfolioOptimisers.n_splits(ccv)
+            homog = cross_val_predict(mkpipe(TimeDependent(fill(iv, n_c))), rd, ccv)
+            pv = cross_val_predict(mkpipe(iv), rd, ccv)
+            @test [length(p.pred) for p in homog.pred] == [length(p.pred) for p in pv.pred]
+            @test all(isapprox(a.res.w, b.res.w) for (pa, pb) in zip(homog.pred, pv.pred)
+                      for (a, b) in zip(pa.pred, pb.pred))
+            # MultipleRandomised: each path runs the inner walk-forward over its asset subset.
+            mkmr = () -> MultipleRandomised(IndexWalkForward(100, 50); subset_size = 3,
+                                            n_subsets = 2, rng = StableRNG(42), seed = 1)
+            n_pp = PortfolioOptimisers.n_splits(IndexWalkForward(100, 50), rd)
+            pm = cross_val_predict(mkpipe(TimeDependent([iseven(i) ? iv : ew
+                                                         for i in 1:n_pp])), rd, mkmr())
+            @test length(pm.pred) == 2
+            @test all(path -> length(path.pred) == n_pp, pm.pred)
+            # A price-starting pipeline still rejects both (rolling-window rule).
+            ts = range(; start = Date(2021, 1, 1), step = Day(1),
+                       length = size(rd.X, 1) + 1)
+            Xc = 100 .* cumprod(1 .+ vcat(zeros(1, size(rd.X, 2)), rd.X); dims = 1)
+            pr = PricesResult(; X = TimeArray(collect(ts), Xc, rd.nx))
+            ppipe = Pipeline(steps = (PricesToReturns(), EmpiricalPrior(), iv))
+            @test_throws ArgumentError cross_val_predict(ppipe, pr, ccv)
+            @test_throws ArgumentError cross_val_predict(ppipe, pr, mkmr())
+        end
+        @testset "Combinatorial: split->path map recovers the entry behind each path" begin
+            # Predictions are recombined into paths, but the schedule is keyed by split index
+            # and `split` returns the split->path map, so the entry feeding a path is
+            # recoverable without touching a prediction — and it matches what actually ran.
+            ccv = CombinatorialCrossValidation(; n_folds = 4, n_test_folds = 2)
+            n_c = PortfolioOptimisers.n_splits(ccv)
+            sched = TimeDependent([iseven(j) ? iv : ew for j in 1:n_c])
+            paths = split(ccv, rd).path_ids
+            @test size(paths) == (ccv.n_test_folds, n_c)
+            pp = cross_val_predict(sched, rd, ccv)
+            pe = cross_val_predict(ew, rd, ccv)
+            pv = cross_val_predict(iv, rd, ccv)
+            # Every prediction in a path came from a split whose entry `paths` attributes to
+            # that path; that entry's static backtest holds a matching prediction.
+            for (path_id, path) in enumerate(pp.pred)
+                entries = unique(sched.val[j] for j in 1:n_c if path_id in paths[:, j])
+                pool = [p.res.w for e in entries for src in ((e === iv ? pv : pe),)
+                        for pa in src.pred for p in pa.pred]
+                for p in path.pred
+                    @test any(w -> isapprox(w, p.res.w), pool)
+                end
+            end
+        end
+        @testset "MultipleRandomised: schedule keyed per-path, coordinates via ctx.path_id" begin
+            # Each path runs the inner scheme's folds, so the schedule is keyed by the fold's
+            # position *within a path*; a wrong length is rejected up front.
+            inner = IndexWalkForward(100, 50)
+            n_pp = PortfolioOptimisers.n_splits(inner, rd)
+            # A fresh, same-seed estimator each call, so mixed and pure runs share one split.
+            mkmr = () -> MultipleRandomised(inner; subset_size = 3, n_subsets = 2,
+                                            rng = StableRNG(42), seed = 1)
+            pp = cross_val_predict(TimeDependent([iseven(i) ? iv : ew for i in 1:n_pp]), rd,
+                                   mkmr())
+            @test length(pp.pred) == 2                       # n_subsets paths
+            @test all(path -> length(path.pred) == n_pp, pp.pred)
+            @test_throws DimensionMismatch cross_val_predict(TimeDependent([ew]), rd,
+                                                             mkmr())
+            # Vector schedule, observable: a homogeneous schedule reproduces the pure run
+            # exactly, and a mixed one matches one of the two pure strategies at every
+            # position — the schedule really is consumed per fold within each path.
+            pe = cross_val_predict(ew, rd, mkmr())
+            pv = cross_val_predict(iv, rd, mkmr())
+            homog = cross_val_predict(TimeDependent(fill(iv, n_pp)), rd, mkmr())
+            for p in 1:2, k in 1:n_pp
+                @test isapprox(homog.pred[p].pred[k].res.w, pv.pred[p].pred[k].res.w)
+                w = pp.pred[p].pred[k].res.w
+                @test isapprox(w, pe.pred[p].pred[k].res.w) ||
+                      isapprox(w, pv.pred[p].pred[k].res.w)
+            end
+            # A callable recovers its per-fold decision from `(ctx.path_id, ctx.i)`: run
+            # sequentially so the shared log is race-free, and every (path, fold) is recorded.
+            log = Tuple{Union{Int, Nothing}, Int, Symbol}[]
+            cross_val_predict(TimeDependent(TDLog(ew, iv, log); default = ew), rd, mkmr();
+                              ex = seqex)
+            for p in 1:2
+                picks = sort([(e[2], e[3]) for e in log if e[1] == p])
+                @test picks == [(i, isodd(i) ? :odd : :even) for i in 1:n_pp]
+            end
+        end
+        @testset "A callable logs its own per-fold decision (single path)" begin
+            cvw = IndexWalkForward(100, 50)
+            n = PortfolioOptimisers.n_splits(cvw, rd)
+            log = Tuple{Union{Int, Nothing}, Int, Symbol}[]
+            mp = cross_val_predict(TimeDependent(TDLog(ew, iv, log); default = ew), rd, cvw;
+                                   ex = seqex)
+            @test Set(log) == Set([(nothing, i, isodd(i) ? :odd : :even) for i in 1:n])
+            pe = cross_val_predict(ew, rd, cvw)
+            pv = cross_val_predict(iv, rd, cvw)
+            for i in 1:n
+                picked = log[findfirst(e -> e[2] == i, log)][3]
+                @test isapprox(mp.pred[i].res.w, (picked === :odd ? pe : pv).pred[i].res.w)
+            end
         end
     end
 end

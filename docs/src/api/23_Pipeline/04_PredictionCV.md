@@ -1,14 +1,13 @@
 # Pipeline cross-validation
 
-## Deliberately unsupported CV boundaries
+## The price-level restriction (the rolling-window rule)
 
-Combinatorial and multiple-randomised cross-validation are defined over the returns matrix and cannot drive contiguous input-row windows; wrapping a `Pipeline` inside a meta-optimiser needs an asset view of a universe that is itself fitted state (ADR 0028, "Future expansion"). Each fails with an explanatory error rather than silently doing the wrong thing.
+Combinatorial and multiple-randomised cross-validation recombine non-contiguous groups / resampled paths. A pipeline that *starts from prices* runs a rolling, order-dependent transform (a `PricesToReturns`, or any windowed preprocessing) that needs contiguous input rows, so those schemes are rejected at the price-level `split`. They are supported for a **returns-level** pipeline (below), which has no such transform.
 
 ```@docs
 Base.split(ccv::CombinatorialCrossValidation, pr::AbstractPricesResult)
 Base.split(mrcv::MultipleRandomised, pr::AbstractPricesResult)
 port_opt_view(pipe::Pipeline, i, args...; kwargs...)
-cross_val_predict(::Pipeline, ::AbstractReturnsResult, ::MultipleRandomised; kwargs...)
 ```
 
 ## The pipeline fold loop
@@ -17,6 +16,16 @@ cross_val_predict(::Pipeline, ::AbstractReturnsResult, ::MultipleRandomised; kwa
 
 ```@docs
 cross_val_predict(pipe::Pipeline, data::Prices_RR, cv::CVER)
+```
+
+## Combinatorial and asset-resampling over a returns-level pipeline
+
+A returns-level pipeline runs the multi-path schemes like the plain-optimiser loops: combinatorial fits each split on its (possibly non-contiguous) training rows and predicts its test groups; multiple-randomised runs each path's inner walk-forward over an asset-subset view of the input, so the pipeline fits fresh on the sub-universe and never sub-selects fitted state.
+
+```@docs
+cross_val_predict(pipe::Pipeline, data::AbstractReturnsResult, cv::CombinatorialCrossValidation)
+cross_val_predict(pipe::Pipeline, data::AbstractReturnsResult, cv::MultipleRandomised)
+PortfolioOptimisers.pipeline_path_fit_and_predict
 ```
 
 ## Time-dependent traits and the swap over steps

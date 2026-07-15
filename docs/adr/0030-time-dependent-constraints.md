@@ -194,10 +194,14 @@ where the position is required and neither exists — throws a structured
   concrete hosts — no inner *fold* loop owns the position, so a `:nearest` optimiser schedule
   is rejected at construction (`assert_no_nearest_bind_optimiser_schedule`).
 - **Pipelines: swap, then inject — with the swap outside `fit` entirely.** The `Pipeline` fold
-  loop (`cross_val_predict(pipe, data::Prices_RR, cv)`) splits the *input* at its own level
-  (contiguous windows only: combinatorial and asset-resampling schemes are rejected — a fitted
-  workflow cannot replay non-contiguous windows and cannot take an asset view) and resolves
-  time-dependent steps per fold *before* `fit` runs on the training window, so injection
+  loop (`cross_val_predict(pipe, data::Prices_RR, cv)`) splits the *input* at its own level and
+  resolves time-dependent steps per fold *before* `fit` runs on the training window. Combinatorial
+  and asset-resampling schemes are supported for a **returns-level** pipeline — each fits on the
+  split's (possibly non-contiguous) training rows and predicts its test groups / asset-subset
+  paths, exactly as the plain-optimiser loops do — and rejected only for a **price-starting**
+  pipeline, by the *rolling-window rule*: a rolling, order-dependent price transform (a
+  `PricesToReturns`, or any windowed preprocessing) needs contiguous input rows, which the
+  recombined groups / resampled paths do not guarantee. Injection
   (`inject_context`/`maybe_inject_step`) only ever sees a plain, already-resolved optimiser and
   `fit`/`run_step` never learn about folds. A schedule may *be* the optimisation step: the
   statically-typed forms (a vector of optimisers/results, a declared
