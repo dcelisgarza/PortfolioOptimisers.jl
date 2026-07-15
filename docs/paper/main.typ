@@ -164,8 +164,8 @@ It is worth noting that the preprocessing and processing steps can be bundled in
 
 The prior statistics fall under three categories:
 
-- Frequentist: Empirical, factor models.
-- Bayesian: Black-Litterman.
+- Frequentist: Empirical and timeseries factor models for low and high moments.
+- Bayesian: Black-Litterman, vanilla, factor, Bayesian and Augmented.
 - Information-theoretic: Entropy pooling, opinion pooling.
 
 == Phylogeny statistics

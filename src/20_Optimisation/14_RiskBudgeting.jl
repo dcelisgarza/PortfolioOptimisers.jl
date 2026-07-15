@@ -676,7 +676,7 @@ function _optimise(rb::RiskBudgeting, rd::ReturnsResult = ReturnsResult(); dims:
                          isa(rb.rba,
                              AssetRiskBudgeting{<:Any, <:Any, <:MixedIntegerRiskBudgeting}))
     set_portfolio_objective_function!(model, MinimumRisk(), attrs.ret, rb.opt.cobj, rb,
-                                      attrs.pr)
+                                      attrs.pr, attrs)
     retcode, sol = optimise_JuMP_model!(model, rb, eltype(attrs.pr.X))
     return RiskBudgetingResult(;
                                jr = JuMPOptimisationResult(; pa = attrs, retcode = retcode,

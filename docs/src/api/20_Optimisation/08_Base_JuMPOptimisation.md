@@ -8,7 +8,11 @@ ObjectiveFunction
 JuMPReturnsEstimator
 JuMPConstraintEstimator
 CustomJuMPConstraint
+VecJuMPConstr
+JuMPConstr_VecJuMPConstr
 CustomJuMPObjective
+VecJuMPObj
+JuMPObj_VecJuMPObj
 needs_previous_weights(::CustomJuMPConstraint)
 needs_previous_weights(::CustomJuMPObjective)
 is_time_dependent(opt::JuMPOptimisationEstimator)

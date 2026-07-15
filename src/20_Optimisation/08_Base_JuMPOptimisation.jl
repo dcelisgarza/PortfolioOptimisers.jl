@@ -193,6 +193,27 @@ Implement `add_custom_constraint!` to define custom JuMP model constraints.
 """
 abstract type CustomJuMPConstraint <: JuMPConstraintEstimator end
 """
+    const VecJuMPConstr = AbstractVector{<:CustomJuMPConstraint}
+
+Alias for a vector of JuMP constraint estimators.
+
+# Related
+
+  - [`CustomJuMPConstraint`](@ref)
+"""
+const VecJuMPConstr = AbstractVector{<:CustomJuMPConstraint}
+"""
+    const JuMPConstr_VecJuMPConstr = Union{<:CustomJuMPConstraint, <:VecJuMPConstr}
+
+Alias for a single JuMP constraint estimator or a vector of them.
+
+# Related
+
+  - [`CustomJuMPConstraint`](@ref)
+  - [`VecJuMPConstr`](@ref)
+"""
+const JuMPConstr_VecJuMPConstr = Union{<:CustomJuMPConstraint, <:VecJuMPConstr}
+"""
 $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for custom JuMP objective implementations.
@@ -206,12 +227,36 @@ Implement `add_custom_objective_term!` to add custom terms to the JuMP model obj
 """
 abstract type CustomJuMPObjective <: JuMPConstraintEstimator end
 """
+    const VecJuMPObj = AbstractVector{<:JuMPObjective}
+
+Alias for a vector of JuMP objective estimators.
+
+# Related
+
+  - [`JuMPObjective`](@ref)
+"""
+const VecJuMPObj = AbstractVector{<:CustomJuMPObjective}
+"""
+    const JuMPObj_VecJuMPObj = Union{<:CustomJuMPObjective, <:VecJuMPObj}
+
+Alias for a single JuMP objective estimator or a vector of them.
+
+# Related
+
+  - [`CustomJuMPObjective`](@ref)
+  - [`VecJuMPObj`](@ref)
+"""
+const JuMPObj_VecJuMPObj = Union{<:CustomJuMPObjective, <:VecJuMPObj}
+"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return `false`: custom JuMP constraints never require previous portfolio weights.
 """
 function needs_previous_weights(::CustomJuMPConstraint)
     return false
+end
+function needs_previous_weights(c::VecJuMPConstr)
+    return any(needs_previous_weights, c)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -221,11 +266,20 @@ Return `false`: custom JuMP objectives never require previous portfolio weights.
 function needs_previous_weights(::CustomJuMPObjective)
     return false
 end
+function needs_previous_weights(c::VecJuMPObj)
+    return any(needs_previous_weights, c)
+end
 function port_opt_view(::CustomJuMPConstraint, ::Any, args...; kwargs...)
     return nothing
 end
+function port_opt_view(cs::VecJuMPConstr, i::Any, args...; kwargs...)
+    return [port_opt_view(c, i, args...; kwargs...) for c in cs]
+end
 function port_opt_view(::CustomJuMPObjective, ::Any, args...; kwargs...)
     return nothing
+end
+function port_opt_view(cs::VecJuMPObj, i::Any, args...; kwargs...)
+    return [port_opt_view(c, i, args...; kwargs...) for c in cs]
 end
 """
     add_custom_objective_term!(args...; kwargs...)

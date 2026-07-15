@@ -312,11 +312,11 @@ function _optimise(frc::FactorRiskContribution, rd::ReturnsResult = ReturnsResul
     set_maximum_ratio_factor_variables!(model, attrs.pr.mu, frc.obj)
     b1, rr = set_factor_risk_contribution_constraints!(model, frc.re, rd, frc.flag, frc.wi)
     set_weight_constraints!(model, attrs.wb, frc.opt.bgt, frc.opt.sbgt)
-    assemble_jump_model!(model, frc, frc.opt, attrs, rd, frc.r, frc.obj, false, b1, false)
     frc_plr = phylogeny_constraints(frc.frc_ple, rd.F, kwargs...)
     set_sdp_frc_phylogeny_constraints!(model, frc_plr)
+    assemble_jump_model!(model, frc, frc.opt, attrs, rd, frc.r, frc.obj, false, b1, false)
     set_portfolio_objective_function!(model, frc.obj, attrs.ret, frc.opt.cobj, frc,
-                                      attrs.pr)
+                                      attrs.pr, attrs)
     retcode, sol = optimise_JuMP_model!(model, frc, eltype(attrs.pr.X))
     return FactorRiskContributionResult(;
                                         jr = JuMPOptimisationResult(; pa = attrs,

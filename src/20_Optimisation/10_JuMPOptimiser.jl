@@ -357,8 +357,8 @@ $(DocStringExtensions.FIELDS)
         ple::TD_Option{<:PlCE_PhC_VecPlCE_PlC} = nothing,
         ret::TD{<:JuMPReturnsEstimator} = ArithmeticReturn(),
         sca::TD{<:NonHierarchicalScalariser} = SumScalariser(),
-        ccnt::TD_Option{<:CustomJuMPConstraint} = nothing,
-        cobj::TD_Option{<:CustomJuMPObjective} = nothing,
+        ccnt::TD_Option{<:JuMPConstr_VecJuMPConstr} = nothing,
+        cobj::TD_Option{<:JuMPObj_VecJuMPObj} = nothing,
         sc::Number = 1,
         so::Number = 1,
         ss::TD_Option{<:Number} = nothing,
@@ -436,7 +436,7 @@ Keywords correspond to the struct's fields. Fields typed [`TD_Option`](@ref) or 
     """
     lcse
     """
-    Centring constraint estimator or constraint(s).
+    Centring constraint estimator(s) or constraint(s).
     """
     cte
     """
@@ -584,8 +584,8 @@ Keywords correspond to the struct's fields. Fields typed [`TD_Option`](@ref) or 
                            ple::TD_Option{<:PlCE_PhC_VecPlCE_PlC},
                            ret::TD{<:JuMPReturnsEstimator},
                            sca::TD{<:NonHierarchicalScalariser},
-                           ccnt::TD_Option{<:CustomJuMPConstraint},
-                           cobj::TD_Option{<:CustomJuMPObjective}, sc::Number, so::Number,
+                           ccnt::TD_Option{<:JuMPConstr_VecJuMPConstr},
+                           cobj::TD_Option{<:JuMPObj_VecJuMPObj}, sc::Number, so::Number,
                            ss::TD_Option{<:Number}, card::TD_Option{<:Integer},
                            scard::TD_Option{<:Int_VecInt}, wn2::TD_Option{<:Number},
                            wnp::TD_Option{<:LpReg_VecLpReg}, wninf::TD_Option{<:Number},
@@ -813,8 +813,8 @@ function JuMPOptimiser(; pe::TD{<:PrE_Pr} = EmpiricalPrior(), slv::Slv_VecSlv,
                        ple::TD_Option{<:PlCE_PhC_VecPlCE_PlC} = nothing,
                        ret::TD{<:JuMPReturnsEstimator} = ArithmeticReturn(),
                        sca::TD{<:NonHierarchicalScalariser} = SumScalariser(),
-                       ccnt::TD_Option{<:CustomJuMPConstraint} = nothing,
-                       cobj::TD_Option{<:CustomJuMPObjective} = nothing, sc::Number = 1,
+                       ccnt::TD_Option{<:JuMPConstr_VecJuMPConstr} = nothing,
+                       cobj::TD_Option{<:JuMPObj_VecJuMPObj} = nothing, sc::Number = 1,
                        so::Number = 1, ss::TD_Option{<:Number} = nothing,
                        card::TD_Option{<:Integer} = nothing,
                        scard::TD_Option{<:Int_VecInt} = nothing,
@@ -1347,7 +1347,7 @@ function assemble_jump_model!(model::JuMP.Model, optimiser::JuMPOptimisationEsti
     if sdp_asset_phylogeny
         set_sdp_phylogeny_constraints!(model, plr)
     end
-    add_custom_constraint!(model, opt.ccnt, optimiser, pr)
+    add_custom_constraint!(model, opt.ccnt, optimiser, attrs)
     return nothing
 end
 

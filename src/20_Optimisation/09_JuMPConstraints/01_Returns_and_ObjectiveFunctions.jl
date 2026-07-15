@@ -908,10 +908,14 @@ Creates the `op` expression if it does not yet exist, then adds `expr` to it.
   - [`set_portfolio_objective_function!`](@ref)
 """
 function add_to_objective_penalty!(model::JuMP.Model, expr)
-    op = if !haskey(model, :op)
+    op = if !haskey(model, :op) && isa(expr, JuMP.AffExpr)
         JuMP.@expression(model, op, zero(JuMP.AffExpr))
-    else
+    elseif !haskey(model, :op) && isa(expr, JuMP.QuadExpr)
+        JuMP.@expression(model, op, zero(JuMP.QuadExpr))
+    elseif haskey(model, :op)
         model[:op]
+    else
+        throw(ArgumentError("expr must be a JuMP.AffExpr or JuMP.QuadExpr"))
     end
     if isa(expr, JuMP.QuadExpr) && !isa(op, JuMP.QuadExpr)
         JuMP.unregister(model, :op)
@@ -957,7 +961,7 @@ function add_penalty_to_objective!(model::JuMP.Model, factor::Integer, expr)
     return expr
 end
 """
-    set_portfolio_objective_function!(model, obj, pret, cobj, opt, pr)
+    set_portfolio_objective_function!(model, obj, pret, cobj, opt, pr, args...)
 
 Set the portfolio objective function in the JuMP model.
 
@@ -989,12 +993,12 @@ function set_portfolio_objective_function!(model::JuMP.Model, obj::MinimumRisk,
                                            pret::JuMPReturnsEstimator,
                                            cobj::Option{<:CustomJuMPObjective},
                                            opt::JuMPOptimisationEstimator,
-                                           pr::AbstractPriorResult)
+                                           pr::AbstractPriorResult, args...)
     so = get_objective_scale(model)
     risk = get_risk(model)
     JuMP.@expression(model, obj_expr, risk)
     obj_expr = add_penalty_to_objective!(model, 1, obj_expr)
-    add_custom_objective_term!(model, obj, pret, cobj, obj_expr, opt, pr)
+    add_custom_objective_term!(model, obj, pret, cobj, obj_expr, opt, pr, args...)
     JuMP.@objective(model, Min, so * obj_expr)
     return nothing
 end
@@ -1002,14 +1006,14 @@ function set_portfolio_objective_function!(model::JuMP.Model, obj::MaximumUtilit
                                            pret::JuMPReturnsEstimator,
                                            cobj::Option{<:CustomJuMPObjective},
                                            opt::JuMPOptimisationEstimator,
-                                           pr::AbstractPriorResult)
+                                           pr::AbstractPriorResult, args...)
     so = get_objective_scale(model)
     ret = get_ret(model)
     risk = get_risk(model)
     l = obj.l
     JuMP.@expression(model, obj_expr, ret - l * risk)
     obj_expr = add_penalty_to_objective!(model, -1, obj_expr)
-    add_custom_objective_term!(model, obj, pret, cobj, obj_expr, opt, pr)
+    add_custom_objective_term!(model, obj, pret, cobj, obj_expr, opt, pr, args...)
     JuMP.@objective(model, Max, so * obj_expr)
     return nothing
 end
@@ -1017,14 +1021,14 @@ function set_portfolio_objective_function!(model::JuMP.Model, obj::MaximumRatio,
                                            pret::LogarithmicReturn,
                                            cobj::Option{<:CustomJuMPObjective},
                                            opt::JuMPOptimisationEstimator,
-                                           pr::AbstractPriorResult)
+                                           pr::AbstractPriorResult, args...)
     so = get_objective_scale(model)
     ret = get_ret(model)
     k = get_k(model)
     rf = obj.rf
     JuMP.@expression(model, obj_expr, ret - rf * k)
     obj_expr = add_penalty_to_objective!(model, -1, obj_expr)
-    add_custom_objective_term!(model, obj, pret, cobj, obj_expr, opt, pr)
+    add_custom_objective_term!(model, obj, pret, cobj, obj_expr, opt, pr, args...)
     JuMP.@objective(model, Max, so * obj_expr)
     return nothing
 end
@@ -1032,7 +1036,7 @@ function set_portfolio_objective_function!(model::JuMP.Model, obj::MaximumRatio,
                                            pret::JuMPReturnsEstimator,
                                            cobj::Option{<:CustomJuMPObjective},
                                            opt::JuMPOptimisationEstimator,
-                                           pr::AbstractPriorResult)
+                                           pr::AbstractPriorResult, args...)
     so = get_objective_scale(model)
     if haskey(model, :sr_risk)
         ret = get_ret(model)
@@ -1040,13 +1044,13 @@ function set_portfolio_objective_function!(model::JuMP.Model, obj::MaximumRatio,
         rf = obj.rf
         JuMP.@expression(model, obj_expr, ret - rf * k)
         obj_expr = add_penalty_to_objective!(model, -1, obj_expr)
-        add_custom_objective_term!(model, obj, pret, cobj, obj_expr, opt, pr)
+        add_custom_objective_term!(model, obj, pret, cobj, obj_expr, opt, pr, args...)
         JuMP.@objective(model, Max, so * obj_expr)
     else
         risk = get_risk(model)
         JuMP.@expression(model, obj_expr, risk)
         obj_expr = add_penalty_to_objective!(model, 1, obj_expr)
-        add_custom_objective_term!(model, obj, pret, cobj, obj_expr, opt, pr)
+        add_custom_objective_term!(model, obj, pret, cobj, obj_expr, opt, pr, args...)
         JuMP.@objective(model, Min, so * obj_expr)
     end
     return nothing
@@ -1055,12 +1059,12 @@ function set_portfolio_objective_function!(model::JuMP.Model, obj::MaximumReturn
                                            pret::JuMPReturnsEstimator,
                                            cobj::Option{<:CustomJuMPObjective},
                                            opt::JuMPOptimisationEstimator,
-                                           pr::AbstractPriorResult)
+                                           pr::AbstractPriorResult, args...)
     so = get_objective_scale(model)
     ret = get_ret(model)
     JuMP.@expression(model, obj_expr, ret)
     obj_expr = add_penalty_to_objective!(model, -1, obj_expr)
-    add_custom_objective_term!(model, obj, pret, cobj, obj_expr, opt, pr)
+    add_custom_objective_term!(model, obj, pret, cobj, obj_expr, opt, pr, args...)
     JuMP.@objective(model, Max, so * obj_expr)
     return nothing
 end
