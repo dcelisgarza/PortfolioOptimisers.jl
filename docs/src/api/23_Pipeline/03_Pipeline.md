@@ -8,7 +8,8 @@ The `Pipeline` estimator reifies an end-to-end workflow — data preparation, pr
 Pipeline
 PipelineResult
 fit(pipe::Pipeline, data::Prices_RR)
-predict(res::PipelineResult, data::AbstractPricesResult, window = Colon())
+StatsAPI.predict(res::PipelineResult, data::AbstractPricesResult,
+                          test_idx = Colon(), cols = Colon())
 fit_predict(pipe::Pipeline, data::Prices_RR)
 port_opt_view(::Pipeline, args...; kwargs...)
 ```

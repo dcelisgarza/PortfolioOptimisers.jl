@@ -636,8 +636,15 @@ function apply_fitted_steps(results::Tuple, data::Prices_RR)
     return data
 end
 """
-    predict(res::PipelineResult, data::AbstractPricesResult, test_idx = :) -> PredictionResult
-    predict(res::PipelineResult, data::AbstractReturnsResult, test_idx = :) -> PredictionResult
+    predict(res::PipelineResult, data::AbstractPricesResult,
+                          test_idx = Colon(), cols = Colon()) -> PredictionResult
+
+
+    predict(res::PipelineResult, data::AbstractPricesResult,
+                          test_idxs::VecVecInt, cols = Colon()) -> PredictionResult
+
+    predict(res::PipelineResult, data::AbstractReturnsResult,
+                          test_idx = Colon(), cols = Colon()) -> PredictionResult
 
 Apply a fitted pipeline to an unseen data test_idx and produce the same [`PredictionResult`](@ref) the weights-level machinery consumes.
 
@@ -706,7 +713,7 @@ end
 function fit_and_predict(pipe::Pipeline, data::Prices_RR; train_idx::VecInt,
                          test_idx::VecInt_VecVecInt, cols = :)
     data_train = pipeline_data_view(data, train_idx, cols)
-    #! I think we should define a port_opt_view for pipelines.
+    #! Maybe we should define a port_opt_view for pipelines?
     # if !isa(cols, Colon)
     #     opt = port_opt_view(pipe, cols)
     # end
