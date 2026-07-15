@@ -97,7 +97,23 @@ function update_time_dependent_estimator(opt::NaiveOptimisationEstimator,
                               fb = update_time_dependent_estimator(opt.fb, ctx, all_binds)))
 end
 function time_dependent_field_defaults(::NaiveOptimisationEstimator)::NamedTuple
-    return (; wb = WeightBounds())
+    return naive_optimiser_td_defaults()
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the static defaults of the naive-optimiser fields that may hold a [`TimeDependent`](@ref).
+
+Shared by the constructors' test-substitution passes and [`time_dependent_field_defaults`](@ref), so the fold-less value of a field is declared once. Fields whose static default is `nothing` are omitted; [`RandomWeighted`](@ref) overrides the trait because its `wb` default is `nothing`, and [`InverseVolatility`](@ref) extends it with its prior estimator.
+
+# Related
+
+  - [`NaiveOptimisationEstimator`](@ref)
+  - [`time_dependent_field_defaults`](@ref)
+  - [`assert_time_dependent_substitution`](@ref)
+"""
+function naive_optimiser_td_defaults()::NamedTuple
+    return (; wb = WeightBounds(), wf = IterativeWeightFinaliser())
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -123,7 +139,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     NaiveOptimisationResult(;
-        oe::Type{<:OptimisationEstimator}, pr::Option{<:AbstractPriorResult},
+        pr::Option{<:AbstractPriorResult},
         wb::Option{<:WeightBounds}, retcode::OptimisationReturnCode, w::Option{<:VecNum},
         fb::Option{<:OptE_Opt}
     ) -> NaiveOptimisationResult
@@ -133,10 +149,9 @@ Keywords correspond to the struct's fields.
 # Examples
 
 ```jldoctest
-julia> NaiveOptimisationResult(; oe = InverseVolatility, pr = nothing, wb = nothing,
-                               retcode = OptimisationSuccess(), w = [0.5, 0.5], fb = nothing)
+julia> NaiveOptimisationResult(; pr = nothing, wb = nothing, retcode = OptimisationSuccess(),
+                               w = [0.5, 0.5], fb = nothing)
 NaiveOptimisationResult
-       oe ┼ UnionAll: InverseVolatility
        pr ┼ nothing
        wb ┼ nothing
   retcode ┼ OptimisationSuccess
@@ -153,10 +168,6 @@ NaiveOptimisationResult
   - [`RandomWeighted`](@ref)
 """
 @concrete struct NaiveOptimisationResult <: NonJuMPOptimisationResult
-    """
-    $(field_dict[:oe])
-    """
-    oe
     """
     $(field_dict[:pr])
     """
@@ -177,21 +188,18 @@ NaiveOptimisationResult
     $(field_dict[:fb])
     """
     fb
-    function NaiveOptimisationResult(oe::Type{<:OptimisationEstimator},
-                                     pr::Option{<:AbstractPriorResult},
-                                     wb::Option{<:WeightBounds},
+    function NaiveOptimisationResult(pr::Option{<:Pr_RR}, wb::Option{<:WeightBounds},
                                      retcode::OptimisationReturnCode, w::Option{<:VecNum},
                                      fb::Option{<:OptE_Opt})
-        return new{typeof(oe), typeof(pr), typeof(wb), typeof(retcode), typeof(w),
-                   typeof(fb)}(oe, pr, wb, retcode, w, fb)
+        return new{typeof(pr), typeof(wb), typeof(retcode), typeof(w), typeof(fb)}(pr, wb,
+                                                                                   retcode,
+                                                                                   w, fb)
     end
 end
-function NaiveOptimisationResult(; oe::Type{<:OptimisationEstimator},
-                                 pr::Option{<:AbstractPriorResult},
-                                 wb::Option{<:WeightBounds},
+function NaiveOptimisationResult(; pr::Option{<:Pr_RR}, wb::Option{<:WeightBounds},
                                  retcode::OptimisationReturnCode, w::Option{<:VecNum},
                                  fb::Option{<:OptE_Opt})::NaiveOptimisationResult
-    return NaiveOptimisationResult(oe, pr, wb, retcode, w, fb)
+    return NaiveOptimisationResult(pr, wb, retcode, w, fb)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -221,17 +229,17 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     InverseVolatility(;
-        pe::PrE_Pr = EmpiricalPrior(),
-        wb::Option{<:WbE_Wb} = WeightBounds(),
-        sets::Option{<:AssetSets} = nothing,
-        wf::WeightFinaliser = IterativeWeightFinaliser(),
-        fb::Option{<:OptE_Opt} = nothing,
+        pe::TD{<:PrE_Pr} = EmpiricalPrior(),
+        wb::TD_Option{<:WbE_Wb} = WeightBounds(),
+        sets::TD_Option{<:AssetSets} = nothing,
+        wf::TD{<:WeightFinaliser} = IterativeWeightFinaliser(),
+        fb::TDO_Option{<:OptE_Opt} = nothing,
         sq::Bool = false,
         brt::Bool = false,
         strict::Bool = false
     ) -> InverseVolatility
 
-Keywords correspond to the struct's fields.
+Keywords correspond to the struct's fields. Fields typed [`TD`](@ref), [`TD_Option`](@ref) or [`TDO_Option`](@ref) may hold a [`TimeDependent`](@ref) per-fold schedule instead of a static value: the prior estimator, weight bounds, asset sets, weight finaliser and fallback are problem definition, so a cross-validation fold loop resolves them per fold, and a fold-less `optimise` runs with each at its static default. `sq`, `brt` and `strict` are execution control and stay static.
 
 ## Propagated parameters
 
@@ -325,27 +333,33 @@ InverseVolatility
     $(field_dict[:strict_opt])
     """
     strict
-    function InverseVolatility(pe::PrE_Pr, wb::TD_Option{<:WbE_Wb},
-                               sets::Option{<:AssetSets}, wf::WeightFinaliser,
-                               fb::Option{<:OptE_Opt}, sq::Bool, brt::Bool, strict::Bool)
+    function InverseVolatility(pe::TD{<:PrE_Pr}, wb::TD_Option{<:WbE_Wb},
+                               sets::TD_Option{<:AssetSets}, wf::TD{<:WeightFinaliser},
+                               fb::TDO_Option{<:OptE_Opt}, sq::Bool, brt::Bool,
+                               strict::Bool)
+        assert_no_nearest_bind_optimiser_schedule(fb, :fb, :InverseVolatility)
         if isa(wb, WeightBoundsEstimator)
             @argcheck(!isnothing(sets),
                       IsNothingError("sets cannot be nothing when wb is a WeightBoundsEstimator"))
         end
         assert_time_dependent_substitution(InverseVolatility,
                                            (; pe, wb, sets, wf, fb, sq, brt, strict),
-                                           (; wb = WeightBounds()))
+                                           merge(naive_optimiser_td_defaults(),
+                                                 (; pe = EmpiricalPrior())))
         return new{typeof(pe), typeof(wb), typeof(sets), typeof(wf), typeof(fb), typeof(sq),
                    typeof(brt), typeof(strict)}(pe, wb, sets, wf, fb, sq, brt, strict)
     end
 end
-function InverseVolatility(; pe::PrE_Pr = EmpiricalPrior(),
+function InverseVolatility(; pe::TD{<:PrE_Pr} = EmpiricalPrior(),
                            wb::TD_Option{<:WbE_Wb} = WeightBounds(),
-                           sets::Option{<:AssetSets} = nothing,
-                           wf::WeightFinaliser = IterativeWeightFinaliser(),
-                           fb::Option{<:OptE_Opt} = nothing, sq::Bool = false,
+                           sets::TD_Option{<:AssetSets} = nothing,
+                           wf::TD{<:WeightFinaliser} = IterativeWeightFinaliser(),
+                           fb::TDO_Option{<:OptE_Opt} = nothing, sq::Bool = false,
                            brt::Bool = false, strict::Bool = false)::InverseVolatility
     return InverseVolatility(pe, wb, sets, wf, fb, sq, brt, strict)
+end
+function time_dependent_field_defaults(::InverseVolatility)::NamedTuple
+    return merge(naive_optimiser_td_defaults(), (; pe = EmpiricalPrior()))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -392,8 +406,8 @@ function _optimise(iv::InverseVolatility, rd::ReturnsResult = ReturnsResult();
     wb = weight_bounds_constraints(iv.wb, iv.sets; N = size(X, ifelse(isone(dims), 2, 1)),
                                    strict = iv.strict, datatype = eltype(X))
     retcode, w = finalise_weight_bounds(iv.wf, wb, w)
-    return NaiveOptimisationResult(; oe = typeof(iv), pr = pr, wb = wb, retcode = retcode,
-                                   w = w, fb = nothing)
+    return NaiveOptimisationResult(; pr = pr, wb = wb, retcode = retcode, w = w,
+                                   fb = nothing)
 end
 """
     optimise(iv::InverseVolatility{<:Any, <:Any, <:Any, <:Any, Nothing},
@@ -441,13 +455,13 @@ $(DocStringExtensions.FIELDS)
 
     EqualWeighted(;
         wb::TD_Option{<:WbE_Wb} = WeightBounds(),
-        sets::Option{<:AssetSets} = nothing,
-        wf::WeightFinaliser = IterativeWeightFinaliser(),
-        fb::Option{<:OptE_Opt} = nothing,
+        sets::TD_Option{<:AssetSets} = nothing,
+        wf::TD{<:WeightFinaliser} = IterativeWeightFinaliser(),
+        fb::TDO_Option{<:OptE_Opt} = nothing,
         strict::Bool = false
     ) -> EqualWeighted
 
-Keywords correspond to the struct's fields.
+Keywords correspond to the struct's fields. Fields typed [`TD`](@ref), [`TD_Option`](@ref) or [`TDO_Option`](@ref) may hold a [`TimeDependent`](@ref) per-fold schedule instead of a static value: the weight bounds, asset sets, weight finaliser and fallback are problem definition, so a cross-validation fold loop resolves them per fold, and a fold-less `optimise` runs with each at its static default. `strict` is execution control and stays static.
 
 ## Propagated parameters
 
@@ -506,14 +520,16 @@ EqualWeighted
     $(field_dict[:strict_opt])
     """
     strict
-    function EqualWeighted(wb::TD_Option{<:WbE_Wb}, sets::Option{<:AssetSets},
-                           wf::WeightFinaliser, fb::Option{<:OptE_Opt}, strict::Bool)
+    function EqualWeighted(wb::TD_Option{<:WbE_Wb}, sets::TD_Option{<:AssetSets},
+                           wf::TD{<:WeightFinaliser}, fb::TDO_Option{<:OptE_Opt},
+                           strict::Bool)
+        assert_no_nearest_bind_optimiser_schedule(fb, :fb, :EqualWeighted)
         if isa(wb, WeightBoundsEstimator)
             @argcheck(!isnothing(sets),
                       IsNothingError("sets cannot be nothing when wb is a WeightBoundsEstimator"))
         end
         assert_time_dependent_substitution(EqualWeighted, (; wb, sets, wf, fb, strict),
-                                           (; wb = WeightBounds()))
+                                           naive_optimiser_td_defaults())
         return new{typeof(wb), typeof(sets), typeof(wf), typeof(fb), typeof(strict)}(wb,
                                                                                      sets,
                                                                                      wf, fb,
@@ -521,9 +537,9 @@ EqualWeighted
     end
 end
 function EqualWeighted(; wb::TD_Option{<:WbE_Wb} = WeightBounds(),
-                       sets::Option{<:AssetSets} = nothing,
-                       wf::WeightFinaliser = IterativeWeightFinaliser(),
-                       fb::Option{<:OptE_Opt} = nothing,
+                       sets::TD_Option{<:AssetSets} = nothing,
+                       wf::TD{<:WeightFinaliser} = IterativeWeightFinaliser(),
+                       fb::TDO_Option{<:OptE_Opt} = nothing,
                        strict::Bool = false)::EqualWeighted
     return EqualWeighted(wb, sets, wf, fb, strict)
 end
@@ -550,8 +566,8 @@ function _optimise(ew::EqualWeighted, rd::ReturnsResult; dims::Int = 1, kwargs..
     wb = weight_bounds_constraints(ew.wb, ew.sets; N = N, strict = ew.strict,
                                    datatype = eltype(rd.X))
     retcode, w = finalise_weight_bounds(ew.wf, wb, w)
-    return NaiveOptimisationResult(; oe = typeof(ew), pr = nothing, wb = wb,
-                                   retcode = retcode, w = w, fb = nothing)
+    return NaiveOptimisationResult(; pr = rd, wb = wb, retcode = retcode, w = w,
+                                   fb = nothing)
 end
 """
     optimise(ew::EqualWeighted{<:Any, <:Any, <:Any, Nothing},
@@ -601,17 +617,18 @@ $(DocStringExtensions.FIELDS)
         rng::Random.AbstractRNG = Random.default_rng(),
         seed::Option{<:Integer} = nothing,
         wb::TD_Option{<:WbE_Wb} = nothing,
-        sets::Option{<:AssetSets} = nothing,
-        wf::WeightFinaliser = IterativeWeightFinaliser(),
-        fb::Option{<:OptE_Opt} = nothing,
+        sets::TD_Option{<:AssetSets} = nothing,
+        wf::TD{<:WeightFinaliser} = IterativeWeightFinaliser(),
+        fb::TDO_Option{<:OptE_Opt} = nothing,
         strict::Bool = false
     ) -> RandomWeighted
 
-Keywords correspond to the struct's fields.
+Keywords correspond to the struct's fields. Fields typed [`TD`](@ref), [`TD_Option`](@ref) or [`TDO_Option`](@ref) may hold a [`TimeDependent`](@ref) per-fold schedule instead of a static value: the weight bounds, asset sets, weight finaliser and fallback are problem definition, so a cross-validation fold loop resolves them per fold, and a fold-less `optimise` runs with each at its static default (`nothing` for `wb`, `sets` and `fb`). `rng`, `seed` and `strict` are execution control and stay static.
 
 ## Validation
 
   - If `alpha` is provided: all elements positive and finite.
+  - `fb` schedules: `bind !== :nearest`.
 
 ## Propagated parameters
 
@@ -686,8 +703,9 @@ RandomWeighted
     strict
     function RandomWeighted(alpha::Num_VecNum, rng::Random.AbstractRNG,
                             seed::Option{<:Integer}, wb::TD_Option{<:WbE_Wb},
-                            sets::Option{<:AssetSets}, wf::WeightFinaliser,
-                            fb::Option{<:OptE_Opt}, strict::Bool)
+                            sets::TD_Option{<:AssetSets}, wf::TD{<:WeightFinaliser},
+                            fb::TDO_Option{<:OptE_Opt}, strict::Bool)
+        assert_no_nearest_bind_optimiser_schedule(fb, :fb, :RandomWeighted)
         if !isnothing(alpha)
             assert_nonempty_gt0_finite_val(alpha, :alpha)
         end
@@ -697,7 +715,7 @@ RandomWeighted
         end
         assert_time_dependent_substitution(RandomWeighted,
                                            (; alpha, rng, seed, wb, sets, wf, fb, strict),
-                                           (; wb = WeightBounds()))
+                                           (; wf = IterativeWeightFinaliser()))
         return new{typeof(alpha), typeof(rng), typeof(seed), typeof(wb), typeof(sets),
                    typeof(wf), typeof(fb), typeof(strict)}(alpha, rng, seed, wb, sets, wf,
                                                            fb, strict)
@@ -707,14 +725,14 @@ function RandomWeighted(; alpha::Num_VecNum = 1,
                         rng::Random.AbstractRNG = Random.default_rng(),
                         seed::Option{<:Integer} = nothing,
                         wb::TD_Option{<:WbE_Wb} = nothing,
-                        sets::Option{<:AssetSets} = nothing,
-                        wf::WeightFinaliser = IterativeWeightFinaliser(),
-                        fb::Option{<:OptE_Opt} = nothing,
+                        sets::TD_Option{<:AssetSets} = nothing,
+                        wf::TD{<:WeightFinaliser} = IterativeWeightFinaliser(),
+                        fb::TDO_Option{<:OptE_Opt} = nothing,
                         strict::Bool = false)::RandomWeighted
     return RandomWeighted(alpha, rng, seed, wb, sets, wf, fb, strict)
 end
 function time_dependent_field_defaults(::RandomWeighted)::NamedTuple
-    return (;)
+    return (; wf = IterativeWeightFinaliser())
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -751,8 +769,8 @@ function _optimise(rw::RandomWeighted, rd::ReturnsResult; dims::Int = 1, kwargs.
     wb = weight_bounds_constraints(rw.wb, rw.sets; N = N, strict = rw.strict,
                                    datatype = eltype(rd.X))
     retcode, w = finalise_weight_bounds(rw.wf, wb, w)
-    return NaiveOptimisationResult(; oe = typeof(rw), pr = nothing, wb = wb,
-                                   retcode = retcode, w = w, fb = nothing)
+    return NaiveOptimisationResult(; pr = rd, wb = wb, retcode = retcode, w = w,
+                                   fb = nothing)
 end
 """
     optimise(rw::RandomWeighted{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, Nothing},

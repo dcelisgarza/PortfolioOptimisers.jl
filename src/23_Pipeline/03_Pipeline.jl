@@ -1,4 +1,33 @@
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Validate that a [`TrainTestSplit`](@ref) appears only as the first step of a [`Pipeline`](@ref), and never inside a nested one.
+
+The holdout exists to keep the test window away from every fitted step. A stateful step fitted *before* the split — a [`MissingDataFilter`](@ref) choosing the universe, an [`Imputer`](@ref) computing fill values — would have read the held-out rows, so its fitted state leaks test data into the training workflow. Position one is the only place that cannot happen, and a nested pipeline is never step one of itself.
+
+## Validation
+
+  - At most one `TrainTestSplit`, and only at index 1.
+  - No `TrainTestSplit` inside a nested `Pipeline` or a [`PipelineStep`](@ref).
+
+# Related
+
+  - [`Pipeline`](@ref)
+  - [`TrainTestSplit`](@ref)
+  - [`has_split`](@ref)
+"""
+function assert_split_position(ests)::Nothing
+    for (i, e) in enumerate(ests)
+        if isa(e, TrainTestSplit)
+            @argcheck(i == 1,
+                      ArgumentError("a TrainTestSplit step must be the first step of a Pipeline, but one appears at step $i; a stateful step fitted before the split would have seen the held-out test rows, leaking them into the fitted workflow"))
+        elseif has_split(e)
+            throw(ArgumentError("a TrainTestSplit step is nested inside a $(Base.typename(typeof(e)).wrapper) step of a Pipeline; the holdout must be the first step of the outermost Pipeline, where no step has yet touched the data"))
+        end
+    end
+    return nothing
+end
+"""
 $(DocStringExtensions.TYPEDEF)
 
 A reified end-to-end portfolio workflow: an ordered list of steps executed left-to-right over a [`PipelineContext`](@ref).
@@ -73,6 +102,7 @@ function Pipeline(; steps::Union{<:Tuple, <:AbstractVector})::Pipeline
             ests[i] = s
         end
     end
+    assert_split_position(ests)
     slots = Symbol[pipe_writes(e) for e in ests]
     avail = Set{Symbol}((:prices, :returns))
     written = Dict{Symbol, Any}()
@@ -109,6 +139,41 @@ function Pipeline(; steps::Union{<:Tuple, <:AbstractVector})::Pipeline
 end
 pipe_writes(p::Pipeline) = pipe_writes(p.steps[end])
 pipe_reads(p::Pipeline) = pipe_reads(p.steps[1])
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return whether a step is, or contains, a [`TrainTestSplit`](@ref).
+
+A nested [`Pipeline`](@ref) is searched recursively: a split hidden inside one would be fitted on data an outer step had already touched, which is exactly what pinning it to the first position prevents. The same recursion answers whether a whole pipeline carries a holdout, which is what the cross-validation entry points check before running.
+
+# Related
+
+  - [`assert_split_position`](@ref)
+  - [`assert_no_holdout`](@ref)
+  - [`TrainTestSplit`](@ref)
+"""
+has_split(::Any) = false
+has_split(::TrainTestSplit) = true
+has_split(p::Pipeline) = any(has_split, p.steps)
+has_split(ps::PipelineStep) = has_split(ps.est)
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Reject a [`Pipeline`](@ref) carrying a [`TrainTestSplit`](@ref) from the cross-validation machinery.
+
+A holdout split and a cross-validator are two evaluation protocols, and cross-validation already defines the train/test windows of every fold. A split left in the pipeline would shave a second, redundant holdout off each fold's training window and stash a test window nobody reads — a silent loss of training data. One protocol per call: this throws instead.
+
+# Related
+
+  - [`TrainTestSplit`](@ref)
+  - [`search_cross_validation`](@ref)
+  - [`has_split`](@ref)
+"""
+function assert_no_holdout(pipe::Pipeline)::Nothing
+    @argcheck(!has_split(pipe),
+              ArgumentError("this Pipeline contains a TrainTestSplit step, so it cannot also be cross-validated: cross-validation already defines the train and test window of every fold, and the split would shave a second holdout off each fold's training data. Remove the TrainTestSplit step, or evaluate the pipeline with fit_predict instead of cross-validating it."))
+    return nothing
+end
 """
     port_opt_view(pipe::Pipeline, i, args...; kwargs...)
 
@@ -377,6 +442,25 @@ maybe_inject_step(est, ::PipelineContext) = est
 function maybe_inject_step(opt::OptimisationEstimator, ctx::PipelineContext)
     return inject_context(opt, ctx)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Injection rules for a precomputed optimisation result standing in the optimisation step — the predict-only fold of a mixed [`TimeDependent`](@ref) schedule.
+
+A result is already solved, so it has no configuration to override; this reuses the non-injectable pattern of [`inject_context`](@ref): computed `prior` and `phylogeny` slots pass by (the result was fitted with its own), but populated `uncertainty` or `constraints` slots throw an `ArgumentError` rather than being silently dropped — a computed constraint that never reaches a solve is a fail-closed error, not a no-op.
+
+# Related
+
+  - [`inject_context`](@ref)
+  - [`run_step`](@ref)
+"""
+function maybe_inject_step(res::NonFiniteAllocationOptimisationResult, ctx::PipelineContext)
+    @argcheck(isnothing(ctx.uncertainty),
+              ArgumentError("cannot route uncertainty sets into a $(Base.typename(typeof(res)).wrapper): a precomputed optimisation result is already solved, so a computed uncertainty set would be silently dropped"))
+    @argcheck(isnothing(ctx.constraints),
+              ArgumentError("cannot route constraint results into a $(Base.typename(typeof(res)).wrapper): a precomputed optimisation result is already solved, so computed constraints would be silently dropped"))
+    return res
+end
 function maybe_inject_step(ps::PipelineStep, ctx::PipelineContext)
     if isa(ps.est, OptimisationEstimator)
         return PipelineStep(; est = inject_context(ps.est, ctx), reads = ps.reads,
@@ -390,6 +474,8 @@ end
 Fit a [`Pipeline`](@ref) on price- or returns-level data.
 
 The context slot matching the input type is filled (`PricesResult` → `prices`, `ReturnsResult` → `returns`, so passing returns-level data skips the price stages), then the steps run left-to-right via [`run_step`](@ref). Immediately before an optimisation step runs, the computed slots override its internal configuration via [`inject_context`](@ref).
+
+`fit` is a fold-less entry point, so [`TimeDependent`](@ref) schedule steps are inert here: each resolves to its explicit `default` (see [`reset_time_dependent_estimator`](@ref)) before the steps run, and a schedule with no `default` throws a [`TimeDependentDefaultError`](@ref) — backtest the pipeline with [`cross_val_predict`](@ref), whose folds the schedule resolves against. Inside a fold loop this reset is a no-op, because the loop swaps every schedule for its per-fold value first.
 
 # Arguments
 
@@ -424,6 +510,9 @@ julia> res.w
   - [`inject_context`](@ref)
 """
 function StatsAPI.fit(pipe::Pipeline, data::Prices_RR)::PipelineResult
+    if is_time_dependent(pipe)
+        pipe = reset_time_dependent_estimator(pipe)
+    end
     ctx = if isa(data, AbstractPricesResult)
         PipelineContext(; prices = data)
     else
@@ -547,24 +636,31 @@ function apply_fitted_steps(results::Tuple, data::Prices_RR)
     return data
 end
 """
-    predict(res::PipelineResult, data::AbstractPricesResult, window = :) -> PredictionResult
-    predict(res::PipelineResult, data::AbstractReturnsResult, window = :) -> PredictionResult
+    predict(res::PipelineResult, data::AbstractPricesResult,
+                          test_idx = Colon(), cols = Colon()) -> PredictionResult
 
-Apply a fitted pipeline to an unseen data window and produce the same [`PredictionResult`](@ref) the weights-level machinery consumes.
 
-The `window` selects observation rows of `data` (integer indices, timestamps, or `:` for all rows). The window is transformed by replaying the fitted preprocessing steps in step order — the *training* universe subset, the *training* imputation parameters, then the returns conversion — so no statistics of the test window leak into the transformation. The result is then handed to the existing weights-level `predict`, so scorers and risk measures carry over untouched.
+    predict(res::PipelineResult, data::AbstractPricesResult,
+                          test_idxs::VecVecInt, cols = Colon()) -> PredictionResult
+
+    predict(res::PipelineResult, data::AbstractReturnsResult,
+                          test_idx = Colon(), cols = Colon()) -> PredictionResult
+
+Apply a fitted pipeline to an unseen data test_idx and produce the same [`PredictionResult`](@ref) the weights-level machinery consumes.
+
+The `test_idx` selects observation rows of `data` (integer indices, timestamps, or `:` for all rows). The test_idx is transformed by replaying the fitted preprocessing steps in step order — the *training* universe subset, the *training* imputation parameters, then the returns conversion — so no statistics of the test test_idx leak into the transformation. The result is then handed to the existing weights-level `predict`, so scorers and risk measures carry over untouched.
 
 Price-level data requires the pipeline to contain a [`PricesToReturns`](@ref) step; a pipeline that produced no optimisation result cannot predict.
 
 # Arguments
 
   - `res`: The fitted [`PipelineResult`](@ref).
-  - `data`: Price- or returns-level data containing the window ([`PricesResult`](@ref) or [`ReturnsResult`](@ref)).
-  - `window`: Observation window into the rows of `data`. Integer indices, timestamps, or `:` (all rows).
+  - `data`: Price- or returns-level data containing the test_idx ([`PricesResult`](@ref) or [`ReturnsResult`](@ref)).
+  - `test_idx`: Observation test_idx into the rows of `data`. Integer indices, timestamps, or `:` (all rows).
 
 # Returns
 
-  - `pred::PredictionResult`: The weights-level prediction on the transformed window.
+  - `pred::PredictionResult`: The weights-level prediction on the transformed test_idx.
 
 # Related
 
@@ -573,32 +669,78 @@ Price-level data requires the pipeline to contain a [`PricesToReturns`](@ref) st
   - [`port_opt_view`](@ref)
   - [`predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)`](@ref)
 """
-function StatsAPI.predict(res::PipelineResult, data::AbstractPricesResult, window = Colon())
+function StatsAPI.predict(res::PipelineResult, data::AbstractPricesResult,
+                          test_idx = Colon(), cols = Colon())
     opt = res.ctx.opt
     @argcheck(!isnothing(opt),
               IsNothingError("the pipeline produced no optimisation result; add a terminal optimisation step before predicting"))
-    pr = port_opt_view(data, window)
+    pr = port_opt_view(data, test_idx, cols)
     rd = apply_fitted_steps(res.results, pr)
     @argcheck(isa(rd, AbstractReturnsResult),
               ArgumentError("the pipeline's fitted steps do not convert price-level data to returns; predicting on a $(Base.typename(typeof(data)).wrapper) requires a PricesToReturns step"))
     assert_universe_aligned(res, rd)
     return StatsAPI.predict(opt, rd)
 end
+function StatsAPI.predict(res::PipelineResult, data::AbstractPricesResult,
+                          test_idxs::VecVecInt, cols = Colon())
+    return [StatsAPI.predict(res, data, test_idx, cols) for test_idx in test_idxs]
+end
 function StatsAPI.predict(res::PipelineResult, data::AbstractReturnsResult,
-                          window = Colon())
+                          test_idx = Colon(), cols = Colon())
     opt = res.ctx.opt
     @argcheck(!isnothing(opt),
               IsNothingError("the pipeline produced no optimisation result; add a terminal optimisation step before predicting"))
-    rd = isa(window, Colon) ? data : port_opt_view(data, window, :)
+    rd = if isa(test_idx, Colon) && isa(cols, Colon)
+        data
+    else
+        port_opt_view(data, test_idx, cols)
+    end
     rd = apply_fitted_steps(res.results, rd)
     assert_universe_aligned(res, rd)
     return StatsAPI.predict(opt, rd)
+end
+function StatsAPI.predict(res::PipelineResult, data::AbstractReturnsResult,
+                          test_idxs::VecVecInt, cols = Colon())
+    return [StatsAPI.predict(res, data, test_idx, cols) for test_idx in test_idxs]
+end
+function fit_and_predict(res::PipelineResult, data::AbstractReturnsResult;
+                         test_idx::VecInt_VecVecInt, cols = :, kwargs...)
+    opt = res.ctx.opt
+    @argcheck(!isnothing(opt),
+              IsNothingError("the pipeline produced no optimisation result; add a terminal optimisation step before predicting"))
+    return StatsAPI.predict(res, data, test_idx, cols)
+end
+function fit_and_predict(pipe::Pipeline, data::Prices_RR; train_idx::VecInt,
+                         test_idx::VecInt_VecVecInt, cols = :)
+    data_train = pipeline_data_view(data, train_idx, cols)
+    #! Maybe we should define a port_opt_view for pipelines?
+    # if !isa(cols, Colon)
+    #     opt = port_opt_view(pipe, cols)
+    # end
+    res = StatsAPI.fit(pipe, data_train)
+    return StatsAPI.predict(res, data, test_idx, cols)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the held-out window stashed by a pipeline's [`TrainTestSplit`](@ref) step, or `nothing` when it has none.
+
+# Related
+
+  - [`fit_predict`](@ref)
+  - [`TrainTestSplitResult`](@ref)
+"""
+function holdout_window(res::PipelineResult)
+    i = findfirst(r -> isa(r, TrainTestSplitResult), getfield(res, :results))
+    return isnothing(i) ? nothing : getfield(res, :results)[i].test
 end
 """
     fit_predict(opt::Pipeline, data::Prices_RR)
 
 Fit pipeline estimator `opt` on data `data` and immediately produce a
-[`PredictionResult`](@ref) for the same data.
+[`PredictionResult`](@ref).
+
+The prediction is made on `data` itself — *in-sample* — unless the pipeline begins with a [`TrainTestSplit`](@ref), in which case it is made on the held-out window that step reserved and no fitted step has seen. That is the one-line holdout evaluation: fit on the training rows, score on the test rows.
 
 # Arguments
 
@@ -607,17 +749,19 @@ Fit pipeline estimator `opt` on data `data` and immediately produce a
 
 # Returns
 
-  - [`PredictionResult`](@ref).
+  - [`PredictionResult`](@ref): On the held-out window when the pipeline splits, on `data` otherwise.
 
 # Related
 
   - [`predict(res::PipelineResult, data::Prices_RR)`](@ref)
   - [`Pipeline`](@ref)
+  - [`TrainTestSplit`](@ref)
   - [`PredictionResult`](@ref)
 """
 function fit_predict(pipe::Pipeline, data::Prices_RR)
     res = StatsAPI.fit(pipe, data)
-    return StatsAPI.predict(res, data)
+    test = holdout_window(res)
+    return StatsAPI.predict(res, isnothing(test) ? data : test)
 end
 function run_step(p::Pipeline, ctx::PipelineContext)
     data = if :prices in pipe_reads(p)
@@ -636,3 +780,4 @@ function optimise(::Pipeline, args...; kwargs...)
 end
 
 export Pipeline, PipelineResult, fit
+public has_split, assert_no_holdout, assert_split_position, holdout_window

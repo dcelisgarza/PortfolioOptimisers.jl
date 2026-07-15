@@ -588,12 +588,12 @@ function PortfolioOptimisers.plot_measures(w::VecNum_VecVecNum, pr::Pr_RR,
     zr = isnothing(z) ? nothing : expected_risk(z, w, pr, fees)
     cr = expected_risk(c, w, pr, fees)
     return if isnothing(zr)
-        scatter(xr, yr; zcolor = cr, title = "Pareto Frontier", xlabel = "X", ylabel = "Y",
+        scatter(xr, yr; zcolor = cr, title = "Pareto Front", xlabel = "X", ylabel = "Y",
                 colorbar_title = "C", label = nothing, legend = true, kwargs...)
     else
-        scatter(xr, yr, zr; zcolor = cr, title = "Pareto Frontier", xlabel = "X",
-                ylabel = "Y", zlabel = "Z", colorbar_title = "C", label = nothing,
-                legend = true, kwargs...)
+        scatter(xr, yr, zr; zcolor = cr, title = "Pareto Front", xlabel = "X", ylabel = "Y",
+                zlabel = "Z", colorbar_title = "C", label = nothing, legend = true,
+                kwargs...)
     end
 end
 function PortfolioOptimisers.plot_measures(res_vec::AbstractVector{<:OptimisationResult},
@@ -624,41 +624,55 @@ function PortfolioOptimisers.plot_measures(res_vec::AbstractVector{<:Optimisatio
     zr = isnothing(z) ? nothing : expected_risk.(z, w, pr, fees)
     cr = expected_risk.(c, w, pr, fees)
     return if isnothing(zr)
-        scatter(xr, yr; zcolor = cr, title = "Pareto Frontier", xlabel = "X", ylabel = "Y",
+        scatter(xr, yr; zcolor = cr, title = "Pareto Front", xlabel = "X", ylabel = "Y",
                 colorbar_title = "C", label = nothing, legend = true, kwargs...)
     else
-        scatter(xr, yr, zr; zcolor = cr, title = "Pareto Frontier", xlabel = "X",
-                ylabel = "Y", zlabel = "Z", colorbar_title = "C", label = nothing,
-                legend = true, kwargs...)
+        scatter(xr, yr, zr; zcolor = cr, title = "Pareto Front", xlabel = "X", ylabel = "Y",
+                zlabel = "Z", colorbar_title = "C", label = nothing, legend = true,
+                kwargs...)
     end
 end
-function PortfolioOptimisers.plot_measures(ppred::PopulationPredictionResult;
+function PortfolioOptimisers.plot_measures(ppred::Union{<:PredictionResult,
+                                                        <:MultiPeriodPredictionResult,
+                                                        <:PopulationPredictionResult};
                                            x::PortfolioOptimisers.AbstractBaseRiskMeasure = ConditionalValueatRisk(),
-                                           y::PortfolioOptimisers.AbstractBaseRiskMeasure = ExpectedReturn(),
+                                           y::PortfolioOptimisers.AbstractBaseRiskMeasure = MeanReturn(),
                                            z::Option{<:PortfolioOptimisers.AbstractBaseRiskMeasure} = nothing,
-                                           c::PortfolioOptimisers.AbstractBaseRiskMeasure = ExpectedReturnRiskRatio(;
-                                                                                                                    rk = x,
-                                                                                                                    rt = ArithmeticReturn(),
-                                                                                                                    rf = 0),
+                                           c::PortfolioOptimisers.AbstractBaseRiskMeasure = MeanReturnRiskRatio(;
+                                                                                                                rk = x,
+                                                                                                                rt = MeanReturn(),
+                                                                                                                rf = 0),
                                            slv::Option{<:Slv_VecSlv} = nothing,
-                                           factory::Bool = true, kwargs...)
+                                           factory::Bool = true, plt = nothing, kwargs...)
     if factory
-        x = PortfolioOptimisers.factory.(x, nothing, slv)
-        y = PortfolioOptimisers.factory.(y, nothing, slv)
-        z = isnothing(z) ? nothing : PortfolioOptimisers.factory.(z, nothing, slv)
-        c = PortfolioOptimisers.factory.(c, nothing, slv)
+        x = PortfolioOptimisers.factory(x, nothing, slv)
+        y = PortfolioOptimisers.factory(y, nothing, slv)
+        z = isnothing(z) ? nothing : PortfolioOptimisers.factory(z, nothing, slv)
+        c = PortfolioOptimisers.factory(c, nothing, slv)
     end
-    xr = expected_risk.(x, ppred)
-    yr = expected_risk.(y, ppred)
-    zr = isnothing(z) ? nothing : expected_risk.(z, ppred)
-    cr = expected_risk.(c, ppred)
+    xr = expected_risk(x, ppred)
+    yr = expected_risk(y, ppred)
+    zr = isnothing(z) ? nothing : expected_risk(z, ppred)
+    cr = expected_risk(c, ppred)
     return if isnothing(zr)
-        scatter(xr, yr; zcolor = cr, title = "Pareto Frontier", xlabel = "X", ylabel = "Y",
-                colorbar_title = "C", label = nothing, legend = true, kwargs...)
+        if isnothing(plt)
+            scatter(xr, yr; zcolor = cr, title = "Pareto Front", xlabel = "X", ylabel = "Y",
+                    colorbar_title = "C", label = nothing, legend = true, kwargs...)
+        else
+            scatter!(xr, yr; zcolor = cr, title = "Pareto Front", xlabel = "X",
+                     ylabel = "Y", colorbar_title = "C", label = nothing, legend = true,
+                     kwargs...)
+        end
     else
-        scatter(xr, yr, zr; zcolor = cr, title = "Pareto Frontier", xlabel = "X",
-                ylabel = "Y", zlabel = "Z", colorbar_title = "C", label = nothing,
-                legend = true, kwargs...)
+        if isnothing(plt)
+            scatter(xr, yr, zr; zcolor = cr, title = "Pareto Front", xlabel = "X",
+                    ylabel = "Y", zlabel = "Z", colorbar_title = "C", label = nothing,
+                    legend = true, kwargs...)
+        else
+            scatter!(plt, xr, yr, zr; zcolor = cr, title = "Pareto Front", xlabel = "X",
+                     ylabel = "Y", zlabel = "Z", colorbar_title = "C", label = nothing,
+                     legend = true, kwargs...)
+        end
     end
 end
 ## plot_histogram

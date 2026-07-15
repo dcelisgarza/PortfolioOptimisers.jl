@@ -170,7 +170,7 @@ estimation requires a high-order prior.
 
 ```math
 \\begin{align}
-\\sqrt{\\mathrm{Kurt}(\\boldsymbol{w})} &= \\|\\mathbf{G}_{kt}(\\boldsymbol{w} \\otimes \\boldsymbol{w})\\|_2\\,, \\\\
+\\sqrt{\\mathrm{Kurt}(\\boldsymbol{w})} &= \\lVert \\mathbf{G}_{kt}(\\boldsymbol{w} \\otimes \\boldsymbol{w}) \\rVert_2\\,, \\\\
 \\mathbf{G}_{kt} &= \\mathrm{chol}(\\mathbf{S}_2 \\mathbf{K} \\mathbf{S}_2^\\intercal)\\,.
 \\end{align}
 ```

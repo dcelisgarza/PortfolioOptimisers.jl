@@ -29,13 +29,16 @@ abstract type ClusteringOptimisationEstimator <: NonFiniteAllocationOptimisation
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return `true` if the inner optimiser or fallback carries time-dependent constraints.
+Return `true` if the estimator's own problem-definition fields, the inner optimiser, or the fallback carry time-dependent constraints.
 """
 function is_time_dependent(opt::ClusteringOptimisationEstimator)
-    return is_time_dependent(opt.opt) || is_time_dependent(opt.fb)
+    return (!isempty(time_dependent_fields(opt)) ||
+            is_time_dependent(opt.opt) ||
+            is_time_dependent(opt.fb))
 end
 function assert_time_dependent_fold_count(opt::ClusteringOptimisationEstimator, n::Integer,
                                           all_binds::Bool = true)::Nothing
+    assert_time_dependent_fields_fold_count(opt, n, all_binds)
     assert_time_dependent_fold_count(opt.opt, n, all_binds)
     assert_time_dependent_fold_count(opt.fb, n, all_binds)
     return nothing
@@ -43,7 +46,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Resolve time-dependent constraints for the fold described by `ctx` by recursing into the inner optimiser and fallback.
+Resolve time-dependent constraints for the fold described by `ctx`: the estimator's own scheduled fields (risk measures, scalarisers, fallback, …) are swapped for their per-fold values, then the inner optimiser and the (possibly just-swapped-in) fallback are recursed into with the same context.
 
 [`NestedClustered`](@ref) overrides this with its own method resolving its own fields and inner estimators.
 """
@@ -52,6 +55,7 @@ function update_time_dependent_estimator(opt::ClusteringOptimisationEstimator,
     if !is_time_dependent(opt)
         return opt
     end
+    opt = update_time_dependent_fields(opt, ctx, all_binds)
     return rebuild_estimator(opt,
                              (;
                               opt = update_time_dependent_estimator(opt.opt, ctx,
@@ -61,7 +65,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Replace time-dependent constraints with their static defaults by recursing into the inner optimiser and fallback.
+Replace time-dependent constraints with their static defaults, both on the estimator's own fields and by recursing into the inner optimiser and fallback.
 
 [`NestedClustered`](@ref) overrides this with its own method resetting its own fields and inner estimators.
 """
@@ -69,6 +73,7 @@ function reset_time_dependent_estimator(opt::ClusteringOptimisationEstimator)
     if !is_time_dependent(opt)
         return opt
     end
+    opt = reset_time_dependent_fields(opt)
     return rebuild_estimator(opt,
                              (; opt = reset_time_dependent_estimator(opt.opt),
                               fb = reset_time_dependent_estimator(opt.fb)))
@@ -89,10 +94,6 @@ $(DocStringExtensions.FIELDS)
   - [`HierarchicalEqualRiskContribution`](@ref)
 """
 @concrete struct HierarchicalResult <: NonJuMPOptimisationResult
-    """
-    $(field_dict[:oe])
-    """
-    oe
     """
     $(field_dict[:pr])
     """
@@ -121,24 +122,21 @@ $(DocStringExtensions.FIELDS)
     $(field_dict[:fb])
     """
     fb
-    function HierarchicalResult(oe::Type{<:OptimisationEstimator},
-                                pr::Option{<:AbstractPriorResult},
+    function HierarchicalResult(pr::Option{<:AbstractPriorResult},
                                 clr::Option{<:AbstractClusteringResult},
                                 wb::Option{<:WeightBounds}, fees::Option{<:Fees},
                                 retcode::OptimisationReturnCode, w::Option{<:VecNum},
                                 fb::Option{<:OptE_Opt})
-        return new{typeof(oe), typeof(pr), typeof(clr), typeof(wb), typeof(fees),
-                   typeof(retcode), typeof(w), typeof(fb)}(oe, pr, clr, wb, fees, retcode,
-                                                           w, fb)
+        return new{typeof(pr), typeof(clr), typeof(wb), typeof(fees), typeof(retcode),
+                   typeof(w), typeof(fb)}(pr, clr, wb, fees, retcode, w, fb)
     end
 end
-function HierarchicalResult(; oe::Type{<:OptimisationEstimator},
-                            pr::Option{<:AbstractPriorResult},
+function HierarchicalResult(; pr::Option{<:AbstractPriorResult},
                             clr::Option{<:AbstractClusteringResult},
                             wb::Option{<:WeightBounds}, fees::Option{<:Fees},
                             retcode::OptimisationReturnCode, w::Option{<:VecNum},
                             fb::Option{<:OptE_Opt})::HierarchicalResult
-    return HierarchicalResult(oe, pr, clr, wb, fees, retcode, w, fb)
+    return HierarchicalResult(pr, clr, wb, fees, retcode, w, fb)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -154,19 +152,19 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     HierarchicalOptimiser(;
-        pe::PrE_Pr = EmpiricalPrior(),
-        cle::HClE_HCl = ClustersEstimator(),
+        pe::TD{<:PrE_Pr} = EmpiricalPrior(),
+        cle::TD{<:HClE_HCl} = ClustersEstimator(),
         slv::Option{<:Slv_VecSlv} = nothing,
         wb::TD_Option{<:WbE_Wb} = WeightBounds(),
         fees::TD_Option{<:FeesE_Fees} = nothing,
-        sets::Option{<:AssetSets} = nothing,
-        wf::WeightFinaliser = IterativeWeightFinaliser(),
+        sets::TD_Option{<:AssetSets} = nothing,
+        wf::TD{<:WeightFinaliser} = IterativeWeightFinaliser(),
         brt::Bool = false,
         cle_pr::Bool = true,
         strict::Bool = false
     ) -> HierarchicalOptimiser
 
-Keywords correspond to the struct's fields. Fields typed [`TD_Option`](@ref) (`wb`, `fees`) may hold a [`TimeDependent`](@ref) per-fold schedule instead of a static value; a cross-validation fold loop resolves it per fold, and a fold-less `optimise` runs with the field at its static default.
+Keywords correspond to the struct's fields. Fields typed [`TD_Option`](@ref) or [`TD`](@ref) may hold a [`TimeDependent`](@ref) per-fold schedule instead of a static value; a cross-validation fold loop resolves it per fold, and a fold-less `optimise` runs with the field at its static default. The problem definition — the prior estimator, clustering estimator, weight finaliser and asset sets as much as the bounds and fees — may therefore vary over folds; execution control (`slv`, `brt`, `cle_pr`, `strict`) stays static.
 
 ## Validation
 
@@ -289,16 +287,17 @@ HierarchicalOptimiser
     $(field_dict[:strict_opt])
     """
     strict
-    function HierarchicalOptimiser(pe::PrE_Pr, cle::HClE_HCl, slv::Option{<:Slv_VecSlv},
-                                   wb::TD_Option{<:WbE_Wb}, fees::TD_Option{<:FeesE_Fees},
-                                   sets::Option{<:AssetSets}, wf::WeightFinaliser,
+    function HierarchicalOptimiser(pe::TD{<:PrE_Pr}, cle::TD{<:HClE_HCl},
+                                   slv::Option{<:Slv_VecSlv}, wb::TD_Option{<:WbE_Wb},
+                                   fees::TD_Option{<:FeesE_Fees},
+                                   sets::TD_Option{<:AssetSets}, wf::TD{<:WeightFinaliser},
                                    brt::Bool, cle_pr::Bool, strict::Bool)
         if isa(wb, WeightBoundsEstimator)
             @argcheck(!isnothing(sets), IsNothingError("sets cannot be nothing"))
         end
         assert_time_dependent_substitution(HierarchicalOptimiser,
                                            (; pe, cle, slv, wb, fees, sets, wf, brt, cle_pr,
-                                            strict), (; wb = WeightBounds()))
+                                            strict), hierarchical_optimiser_td_defaults())
         return new{typeof(pe), typeof(cle), typeof(slv), typeof(wb), typeof(fees),
                    typeof(sets), typeof(wf), typeof(brt), typeof(cle_pr), typeof(strict)}(pe,
                                                                                           cle,
@@ -312,16 +311,33 @@ HierarchicalOptimiser
                                                                                           strict)
     end
 end
-function HierarchicalOptimiser(; pe::PrE_Pr = EmpiricalPrior(),
-                               cle::HClE_HCl = ClustersEstimator(),
+function HierarchicalOptimiser(; pe::TD{<:PrE_Pr} = EmpiricalPrior(),
+                               cle::TD{<:HClE_HCl} = ClustersEstimator(),
                                slv::Option{<:Slv_VecSlv} = nothing,
                                wb::TD_Option{<:WbE_Wb} = WeightBounds(),
                                fees::TD_Option{<:FeesE_Fees} = nothing,
-                               sets::Option{<:AssetSets} = nothing,
-                               wf::WeightFinaliser = IterativeWeightFinaliser(),
+                               sets::TD_Option{<:AssetSets} = nothing,
+                               wf::TD{<:WeightFinaliser} = IterativeWeightFinaliser(),
                                brt::Bool = false, cle_pr::Bool = true,
                                strict::Bool = false)::HierarchicalOptimiser
     return HierarchicalOptimiser(pe, cle, slv, wb, fees, sets, wf, brt, cle_pr, strict)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the static defaults of the [`HierarchicalOptimiser`](@ref) fields that may hold a [`TimeDependent`](@ref).
+
+Shared by the constructor's test-substitution pass and [`time_dependent_field_defaults`](@ref), so the fold-less value of a field is declared once. Fields whose static default is `nothing` are omitted.
+
+# Related
+
+  - [`HierarchicalOptimiser`](@ref)
+  - [`time_dependent_field_defaults`](@ref)
+  - [`assert_time_dependent_substitution`](@ref)
+"""
+function hierarchical_optimiser_td_defaults()::NamedTuple
+    return (; pe = EmpiricalPrior(), cle = ClustersEstimator(), wb = WeightBounds(),
+            wf = IterativeWeightFinaliser())
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -349,7 +365,7 @@ Return the static defaults of the [`HierarchicalOptimiser`](@ref) fields that ma
   - [`TimeDependentContext`](@ref)
 """
 function time_dependent_field_defaults(::HierarchicalOptimiser)::NamedTuple
-    return (; wb = WeightBounds())
+    return hierarchical_optimiser_td_defaults()
 end
 """
     unitary_expected_risks(r, X, ...)

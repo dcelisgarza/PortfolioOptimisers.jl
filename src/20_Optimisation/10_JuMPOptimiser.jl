@@ -208,7 +208,6 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     JuMPOptimisationResult(;
-        oe::Type{<:JuMPOptimisationEstimator},
         pa::ProcessedJuMPOptimiserAttributes,
         retcode::OptRetCode_VecOptRetCode,
         sol::JuMPOptSol_VecJuMPOptSol,
@@ -225,10 +224,6 @@ Keywords correspond to the struct's fields.
 """
 @concrete struct JuMPOptimisationResult <: BaseJuMPOptimisationResult
     """
-    $(field_dict[:oe])
-    """
-    oe
-    """
     $(field_dict[:pa])
     """
     pa
@@ -244,24 +239,19 @@ Keywords correspond to the struct's fields.
     $(field_dict[:model])
     """
     model
-    function JuMPOptimisationResult(oe::Type{<:JuMPOptimisationEstimator},
-                                    pa::ProcessedJuMPOptimiserAttributes,
+    function JuMPOptimisationResult(pa::ProcessedJuMPOptimiserAttributes,
                                     retcode::OptRetCode_VecOptRetCode,
                                     sol::JuMPOptSol_VecJuMPOptSol,
                                     model::Option{<:JuMP.Model})
-        return new{typeof(oe), typeof(pa), typeof(retcode), typeof(sol), typeof(model)}(oe,
-                                                                                        pa,
-                                                                                        retcode,
-                                                                                        sol,
-                                                                                        model)
+        return new{typeof(pa), typeof(retcode), typeof(sol), typeof(model)}(pa, retcode,
+                                                                            sol, model)
     end
 end
-function JuMPOptimisationResult(; oe::Type{<:JuMPOptimisationEstimator},
-                                pa::ProcessedJuMPOptimiserAttributes,
+function JuMPOptimisationResult(; pa::ProcessedJuMPOptimiserAttributes,
                                 retcode::OptRetCode_VecOptRetCode,
                                 sol::JuMPOptSol_VecJuMPOptSol,
                                 model::Option{<:JuMP.Model})::JuMPOptimisationResult
-    return JuMPOptimisationResult(oe, pa, retcode, sol, model)
+    return JuMPOptimisationResult(pa, retcode, sol, model)
 end
 # Virtual property `:w` extracts portfolio weights from `sol` (a single solution or a vector
 # of them, hence the broadcast); unknown properties forward to `pa` (see [`@forward_properties`](@ref)).
@@ -313,6 +303,23 @@ function assert_finite_nonnegative_real_or_vec(val::VecNum)::Nothing
     return nothing
 end
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the static defaults of the [`JuMPOptimiser`](@ref) fields that may hold a [`TimeDependent`](@ref).
+
+Shared by the constructor's test-substitution pass and [`time_dependent_field_defaults`](@ref), so the fold-less value of a field is declared once. Fields whose static default is `nothing` are omitted.
+
+# Related
+
+  - [`JuMPOptimiser`](@ref)
+  - [`time_dependent_field_defaults`](@ref)
+  - [`assert_time_dependent_substitution`](@ref)
+"""
+function jump_optimiser_td_defaults()::NamedTuple
+    return (; pe = EmpiricalPrior(), wb = WeightBounds(), bgt = 1.0,
+            ret = ArithmeticReturn(), sca = SumScalariser())
+end
+"""
 $(DocStringExtensions.TYPEDEF)
 
 Main JuMP-based portfolio optimiser configuration.
@@ -326,7 +333,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     JuMPOptimiser(;
-        pe::PrE_Pr = EmpiricalPrior(),
+        pe::TD{<:PrE_Pr} = EmpiricalPrior(),
         slv::Slv_VecSlv,
         wb::TD_Option{<:WbE_Wb} = WeightBounds(),
         bgt::TD_Option{<:Num_BgtCE} = 1.0,
@@ -345,11 +352,11 @@ $(DocStringExtensions.FIELDS)
         sgst::TD_Option{<:BtE_Bt_VecOptBtE_Bt} = nothing,
         tn::TD_Option{<:TnE_Tn_VecTnE_Tn} = nothing,
         fees::TD_Option{<:FeesE_Fees} = nothing,
-        sets::Option{<:AssetSets} = nothing,
+        sets::TD_Option{<:AssetSets} = nothing,
         tr::TD_Option{<:Tr_VecTr} = nothing,
         ple::TD_Option{<:PlCE_PhC_VecPlCE_PlC} = nothing,
-        ret::JuMPReturnsEstimator = ArithmeticReturn(),
-        sca::NonHierarchicalScalariser = SumScalariser(),
+        ret::TD{<:JuMPReturnsEstimator} = ArithmeticReturn(),
+        sca::TD{<:NonHierarchicalScalariser} = SumScalariser(),
         ccnt::TD_Option{<:CustomJuMPConstraint} = nothing,
         cobj::TD_Option{<:CustomJuMPObjective} = nothing,
         sc::Number = 1,
@@ -357,9 +364,11 @@ $(DocStringExtensions.FIELDS)
         ss::TD_Option{<:Number} = nothing,
         card::TD_Option{<:Integer} = nothing,
         scard::TD_Option{<:Int_VecInt} = nothing,
-        nea::TD_Option{<:Number} = nothing,
+        wn2::TD_Option{<:Number} = nothing,
+        wnp::TD_Option{<:LpReg_VecLpReg} = nothing,
+        wninf::TD_Option{<:Number} = nothing,
         l1::TD_Option{<:Number} = nothing,
-        l2::TD_Option{<:Number} = nothing,
+        l2::TD_Option{<:L2Reg_VecL2Reg} = nothing,
         linf::TD_Option{<:Number} = nothing,
         lp::TD_Option{<:LpReg_VecLpReg} = nothing,
         brt::Bool = false,
@@ -367,7 +376,7 @@ $(DocStringExtensions.FIELDS)
         strict::Bool = false,
     ) -> JuMPOptimiser
 
-Keywords correspond to the struct's fields. Fields typed [`TD_Option`](@ref) may hold a [`TimeDependent`](@ref) per-fold schedule instead of a static value; a cross-validation fold loop resolves it per fold, and a fold-less `optimise` runs with the field at its static default.
+Keywords correspond to the struct's fields. Fields typed [`TD_Option`](@ref) or [`TD`](@ref) may hold a [`TimeDependent`](@ref) per-fold schedule instead of a static value; a cross-validation fold loop resolves it per fold, and a fold-less `optimise` runs with the field at its static default. The problem definition — the prior estimator, returns model, scalariser and asset sets as much as the constraints — may therefore vary over folds; execution control (`slv`, `sc`, `so`, `brt`, `cle_pr`, `strict`) stays static.
 
 ## Validation
 
@@ -378,7 +387,9 @@ Keywords correspond to the struct's fields. Fields typed [`TD_Option`](@ref) may
   - If `cte` is a vector: `!isempty(cte)`.
   - If `card` is provided: `card > 0` and finite.
   - If `tn` or `tr` is a vector: each must be non-empty.
-  - If `nea`, `l1`, `l2`, or `linf` is provided: each must be `> 0` and finite.
+  - If `wn2`, `wninf`, `l1`, or `linf` is provided: each must be `> 0` and finite.
+  - If `lp` is a vector: `!isempty(lp)`.
+  - `l2`, `lp` and `wnp` are validated by their own estimator constructors ([`L2Regularisation`](@ref), [`LpRegularisation`](@ref)).
   - If `scard` is provided: compatible `smtx`, `slt`, `sst` sizes required.
   - If `sgcarde` is provided: compatible `sgmtx`, `sglt`, `sgst` sizes required.
   - If any estimator-type field (`wb`, `lt`, `fees`, etc.) is provided: `!isnothing(sets)`.
@@ -517,9 +528,17 @@ Keywords correspond to the struct's fields. Fields typed [`TD_Option`](@ref) may
     """
     scard
     """
-    $(field_dict[:nea])
+    $(field_dict[:wn2])
     """
-    nea
+    wn2
+    """
+    $(field_dict[:wnp])
+    """
+    wnp
+    """
+    $(field_dict[:wninf])
+    """
+    wninf
     """
     $(field_dict[:l1])
     """
@@ -548,7 +567,7 @@ Keywords correspond to the struct's fields. Fields typed [`TD_Option`](@ref) may
     $(field_dict[:strict_opt])
     """
     strict
-    function JuMPOptimiser(pe::PrE_Pr, slv::Slv_VecSlv, wb::TD_Option{<:WbE_Wb},
+    function JuMPOptimiser(pe::TD{<:PrE_Pr}, slv::Slv_VecSlv, wb::TD_Option{<:WbE_Wb},
                            bgt::TD_Option{<:Num_BgtCE}, sbgt::TD_Option{<:Num_BgtRg},
                            lt::TD_Option{<:BtE_Bt}, st::TD_Option{<:BtE_Bt},
                            lcse::TD_Option{<:LcE_Lc_VecLcE_Lc},
@@ -561,14 +580,16 @@ Keywords correspond to the struct's fields. Fields typed [`TD_Option`](@ref) may
                            sglt::TD_Option{<:BtE_Bt_VecOptBtE_Bt},
                            sgst::TD_Option{<:BtE_Bt_VecOptBtE_Bt},
                            tn::TD_Option{<:TnE_Tn_VecTnE_Tn}, fees::TD_Option{<:FeesE_Fees},
-                           sets::Option{<:AssetSets}, tr::TD_Option{<:Tr_VecTr},
+                           sets::TD_Option{<:AssetSets}, tr::TD_Option{<:Tr_VecTr},
                            ple::TD_Option{<:PlCE_PhC_VecPlCE_PlC},
-                           ret::JuMPReturnsEstimator, sca::NonHierarchicalScalariser,
+                           ret::TD{<:JuMPReturnsEstimator},
+                           sca::TD{<:NonHierarchicalScalariser},
                            ccnt::TD_Option{<:CustomJuMPConstraint},
                            cobj::TD_Option{<:CustomJuMPObjective}, sc::Number, so::Number,
                            ss::TD_Option{<:Number}, card::TD_Option{<:Integer},
-                           scard::TD_Option{<:Int_VecInt}, nea::TD_Option{<:Number},
-                           l1::TD_Option{<:Number}, l2::TD_Option{<:Number},
+                           scard::TD_Option{<:Int_VecInt}, wn2::TD_Option{<:Number},
+                           wnp::TD_Option{<:LpReg_VecLpReg}, wninf::TD_Option{<:Number},
+                           l1::TD_Option{<:Number}, l2::TD_Option{<:L2Reg_VecL2Reg},
                            linf::TD_Option{<:Number}, lp::TD_Option{<:LpReg_VecLpReg},
                            brt::Bool, cle_pr::Bool, strict::Bool)
         if isa(slv, VecSlv)
@@ -595,14 +616,14 @@ Keywords correspond to the struct's fields. Fields typed [`TD_Option`](@ref) may
         if isa(tr, AbstractVector)
             @argcheck(!isempty(tr), IsEmptyError("tr cannot be empty"))
         end
-        if !isnothing(nea) && !isa(nea, TimeDependent)
-            assert_nonempty_gt0_finite_val(nea, :nea)
+        if !isnothing(wn2) && !isa(wn2, TimeDependent)
+            assert_nonempty_gt0_finite_val(wn2, :wn2)
+        end
+        if !isnothing(wninf) && !isa(wninf, TimeDependent)
+            assert_nonempty_gt0_finite_val(wninf, :wninf)
         end
         if !isnothing(l1) && !isa(l1, TimeDependent)
             assert_nonempty_gt0_finite_val(l1, :l1)
-        end
-        if !isnothing(l2) && !isa(l2, TimeDependent)
-            assert_nonempty_gt0_finite_val(l2, :l2)
         end
         if !isnothing(linf) && !isa(linf, TimeDependent)
             assert_nonempty_gt0_finite_val(linf, :linf)
@@ -752,33 +773,25 @@ Keywords correspond to the struct's fields. Fields typed [`TD_Option`](@ref) may
                                            (; pe, slv, wb, bgt, sbgt, lt, st, lcse, cte,
                                             gcarde, sgcarde, smtx, sgmtx, slt, sst, sglt,
                                             sgst, tn, fees, sets, tr, ple, ret, sca, ccnt,
-                                            cobj, sc, so, ss, card, scard, nea, l1, l2,
-                                            linf, lp, brt, cle_pr, strict),
-                                           (; wb = WeightBounds(), bgt = 1.0))
+                                            cobj, sc, so, ss, card, scard, wn2, wnp, wninf,
+                                            l1, l2, linf, lp, brt, cle_pr, strict),
+                                           jump_optimiser_td_defaults())
         return new{typeof(pe), typeof(slv), typeof(wb), typeof(bgt), typeof(sbgt),
                    typeof(lt), typeof(st), typeof(lcse), typeof(cte), typeof(gcarde),
                    typeof(sgcarde), typeof(smtx), typeof(sgmtx), typeof(slt), typeof(sst),
                    typeof(sglt), typeof(sgst), typeof(tn), typeof(fees), typeof(sets),
                    typeof(tr), typeof(ple), typeof(ret), typeof(sca), typeof(ccnt),
                    typeof(cobj), typeof(sc), typeof(so), typeof(ss), typeof(card),
-                   typeof(scard), typeof(nea), typeof(l1), typeof(l2), typeof(linf),
-                   typeof(lp), typeof(brt), typeof(cle_pr), typeof(strict)}(pe, slv, wb,
-                                                                            bgt, sbgt, lt,
-                                                                            st, lcse, cte,
-                                                                            gcarde, sgcarde,
-                                                                            smtx, sgmtx,
-                                                                            slt, sst, sglt,
-                                                                            sgst, tn, fees,
-                                                                            sets, tr, ple,
-                                                                            ret, sca, ccnt,
-                                                                            cobj, sc, so,
-                                                                            ss, card, scard,
-                                                                            nea, l1, l2,
-                                                                            linf, lp, brt,
-                                                                            cle_pr, strict)
+                   typeof(scard), typeof(wn2), typeof(wnp), typeof(wninf), typeof(l1),
+                   typeof(l2), typeof(linf), typeof(lp), typeof(brt), typeof(cle_pr),
+                   typeof(strict)}(pe, slv, wb, bgt, sbgt, lt, st, lcse, cte, gcarde,
+                                   sgcarde, smtx, sgmtx, slt, sst, sglt, sgst, tn, fees,
+                                   sets, tr, ple, ret, sca, ccnt, cobj, sc, so, ss, card,
+                                   scard, wn2, wnp, wninf, l1, l2, linf, lp, brt, cle_pr,
+                                   strict)
     end
 end
-function JuMPOptimiser(; pe::PrE_Pr = EmpiricalPrior(), slv::Slv_VecSlv,
+function JuMPOptimiser(; pe::TD{<:PrE_Pr} = EmpiricalPrior(), slv::Slv_VecSlv,
                        wb::TD_Option{<:WbE_Wb} = WeightBounds(),
                        bgt::TD_Option{<:Num_BgtCE} = 1.0,
                        sbgt::TD_Option{<:Num_BgtRg} = nothing,
@@ -795,25 +808,28 @@ function JuMPOptimiser(; pe::PrE_Pr = EmpiricalPrior(), slv::Slv_VecSlv,
                        sgst::TD_Option{<:BtE_Bt_VecOptBtE_Bt} = nothing,
                        tn::TD_Option{<:TnE_Tn_VecTnE_Tn} = nothing,
                        fees::TD_Option{<:FeesE_Fees} = nothing,
-                       sets::Option{<:AssetSets} = nothing,
+                       sets::TD_Option{<:AssetSets} = nothing,
                        tr::TD_Option{<:Tr_VecTr} = nothing,
                        ple::TD_Option{<:PlCE_PhC_VecPlCE_PlC} = nothing,
-                       ret::JuMPReturnsEstimator = ArithmeticReturn(),
-                       sca::NonHierarchicalScalariser = SumScalariser(),
+                       ret::TD{<:JuMPReturnsEstimator} = ArithmeticReturn(),
+                       sca::TD{<:NonHierarchicalScalariser} = SumScalariser(),
                        ccnt::TD_Option{<:CustomJuMPConstraint} = nothing,
                        cobj::TD_Option{<:CustomJuMPObjective} = nothing, sc::Number = 1,
                        so::Number = 1, ss::TD_Option{<:Number} = nothing,
                        card::TD_Option{<:Integer} = nothing,
                        scard::TD_Option{<:Int_VecInt} = nothing,
-                       nea::TD_Option{<:Number} = nothing,
-                       l1::TD_Option{<:Number} = nothing, l2::TD_Option{<:Number} = nothing,
+                       wn2::TD_Option{<:Number} = nothing,
+                       wnp::TD_Option{<:LpReg_VecLpReg} = nothing,
+                       wninf::TD_Option{<:Number} = nothing,
+                       l1::TD_Option{<:Number} = nothing,
+                       l2::TD_Option{<:L2Reg_VecL2Reg} = nothing,
                        linf::TD_Option{<:Number} = nothing,
                        lp::TD_Option{<:LpReg_VecLpReg} = nothing, brt::Bool = false,
                        cle_pr::Bool = true, strict::Bool = false)::JuMPOptimiser
     return JuMPOptimiser(pe, slv, wb, bgt, sbgt, lt, st, lcse, cte, gcarde, sgcarde, smtx,
                          sgmtx, slt, sst, sglt, sgst, tn, fees, sets, tr, ple, ret, sca,
-                         ccnt, cobj, sc, so, ss, card, scard, nea, l1, l2, linf, lp, brt,
-                         cle_pr, strict)
+                         ccnt, cobj, sc, so, ss, card, scard, wn2, wnp, wninf, l1, l2, linf,
+                         lp, brt, cle_pr, strict)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -852,7 +868,7 @@ function needs_previous_weights(opt::JuMPOptimiser)
             any(f -> needs_previous_weights(getfield(opt, f)), time_dependent_fields(opt)))
 end
 function time_dependent_field_defaults(::JuMPOptimiser)::NamedTuple
-    return (; wb = WeightBounds(), bgt = 1.0)
+    return jump_optimiser_td_defaults()
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -898,9 +914,10 @@ function factory(opt::JuMPOptimiser, w::AbstractVector)::JuMPOptimiser
                          sglt = opt.sglt, sgst = opt.sgst, tn = tn, fees = fees,
                          sets = opt.sets, tr = tr, ple = opt.ple, ret = opt.ret,
                          sca = opt.sca, ccnt = ccnt, cobj = cobj, sc = opt.sc, so = opt.so,
-                         ss = opt.ss, card = opt.card, scard = opt.scard, nea = opt.nea,
-                         l1 = opt.l1, l2 = opt.l2, linf = opt.linf, lp = opt.lp,
-                         brt = opt.brt, cle_pr = opt.cle_pr, strict = opt.strict)
+                         ss = opt.ss, card = opt.card, scard = opt.scard, wn2 = opt.wn2,
+                         wnp = opt.wnp, wninf = opt.wninf, l1 = opt.l1, l2 = opt.l2,
+                         linf = opt.linf, lp = opt.lp, brt = opt.brt, cle_pr = opt.cle_pr,
+                         strict = opt.strict)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -976,9 +993,9 @@ function port_opt_view(opt::JuMPOptimiser, i, X::MatNum, args...)::JuMPOptimiser
                          tn = tn, fees = fees, sets = sets, tr = tr, ple = opt.ple,
                          ret = ret, sca = opt.sca, ccnt = ccnt, cobj = cobj, sc = opt.sc,
                          so = opt.so, ss = opt.ss, card = opt.card, scard = opt.scard,
-                         nea = opt.nea, l1 = opt.l1, l2 = opt.l2, linf = opt.linf,
-                         lp = opt.lp, brt = opt.brt, cle_pr = opt.cle_pr,
-                         strict = opt.strict)
+                         wn2 = opt.wn2, wnp = opt.wnp, wninf = opt.wninf, l1 = opt.l1,
+                         l2 = opt.l2, linf = opt.linf, lp = opt.lp, brt = opt.brt,
+                         cle_pr = opt.cle_pr, strict = opt.strict)
 end
 """
     processed_jump_optimiser_attributes(
@@ -1140,9 +1157,9 @@ function jump_optimiser_from_attributes(opt::JuMPOptimiser,
                          tn = attrs.tn, fees = attrs.fees, sets = opt.sets, tr = opt.tr,
                          ple = attrs.plr, ret = attrs.ret, sca = opt.sca, ccnt = opt.ccnt,
                          cobj = opt.cobj, sc = opt.sc, so = opt.so, ss = opt.ss,
-                         card = opt.card, nea = opt.nea, l1 = opt.l1, l2 = opt.l2,
-                         linf = opt.linf, lp = opt.lp, brt = opt.brt, cle_pr = opt.cle_pr,
-                         strict = opt.strict)
+                         card = opt.card, wn2 = opt.wn2, wnp = opt.wnp, wninf = opt.wninf,
+                         l1 = opt.l1, l2 = opt.l2, linf = opt.linf, lp = opt.lp,
+                         brt = opt.brt, cle_pr = opt.cle_pr, strict = opt.strict)
 end
 """
     processed_jump_optimiser(
@@ -1253,7 +1270,7 @@ before calling this function. See `Model Assembly` in `CONTEXT.md` and
   - $(arg_dict[:model])
   - `optimiser::JuMPOptimisationEstimator`: Dispatch object for risk, tracking, and custom
     constraint builders.
-  - `opt::JuMPOptimiser`: Supplies scalar settings (`nea`, `l1`, `l2`, `linf`, `lp`,
+  - `opt::JuMPOptimiser`: Supplies scalar settings (`wn2`, `wninf`, `l1`, `l2`, `linf`, `lp`,
     `card`, `scard`, `tr`, `ccnt`, `sca`, `ss`).
   - `attrs::ProcessedJuMPOptimiserAttributes`: Pre-computed constraint and prior bundle
     produced by [`processed_jump_optimiser_attributes`](@ref).
@@ -1317,7 +1334,9 @@ function assemble_jump_model!(model::JuMP.Model, optimiser::JuMPOptimisationEsti
                           opt.ss)
     set_turnover_constraints!(model, tn)
     set_tracking_error_constraints!(model, pr, opt.tr, optimiser, plr, fees, b1; rd = rd)
-    set_number_effective_assets!(model, opt.nea)
+    set_weight_norm_2_constraints!(model, opt.wn2)
+    set_weight_norm_p_constraints!(model, opt.wnp)
+    set_weight_norm_inf_constraints!(model, opt.wninf)
     set_l1_regularisation!(model, opt.l1)
     set_l2_regularisation!(model, opt.l2)
     set_linf_regularisation!(model, opt.linf)

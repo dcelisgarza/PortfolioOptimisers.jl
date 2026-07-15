@@ -1,69 +1,98 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Ergonomics review — PortfolioOptimisers.jl</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script type="module">
-      import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
-      mermaid.initialize({ startOnLoad: true, theme: "neutral", securityLevel: "loose" });
-    </script>
-    <style>
-      /* shared shell — identical in every /improve-* report */
-      .diff-old { background: #fef2f2; color: #991b1b; }
-      .diff-new { background: #f0fdf4; color: #166534; }
-      .chip     { font-size: 0.65rem; letter-spacing: 0.08em; }
-      code, pre.mermaid { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
-      /* ergonomics accent classes */
-      .friction { border-left: 4px solid #dc2626; }
-      .signal   { border-left: 4px solid #059669; }
-    </style>
-  </head>
-  <body class="bg-stone-50 text-slate-900 font-sans">
-    <main class="max-w-5xl mx-auto px-6 py-12 space-y-12">
 
-      <header class="space-y-5">
-        <div class="flex items-baseline justify-between flex-wrap gap-2">
-          <h1 class="text-3xl font-bold tracking-tight">Ergonomics review — PortfolioOptimisers.jl</h1>
-          <span class="text-sm text-slate-500 font-mono">2026-07-07 · branch <code>dev</code></span>
-        </div>
-        <p class="text-slate-600 max-w-3xl leading-relaxed">
-          This pass walked the public surface as a caller would: exports, the happy path from prices to weights,
-          constructor keyword signatures, error text, and what the REPL prints back. The library's composition model
-          is coherent and the <code>field_dict</code> discipline means every field <em>is</em> documented in
-          <code>?</code>-help — the friction concentrates in abbreviated keyword names, error messages that name
-          internal composition paths instead of the caller's keyword, and struct printing that buries the two fields
-          a caller set under eighty lines of defaults. Eight candidates below; items already decided in
-          ADRs 0014/0015/0017/0023/0025–0027 are excluded.
-        </p>
-        <div class="flex flex-wrap items-center gap-3 text-xs">
-          <span class="chip uppercase px-2 py-1 rounded bg-emerald-600 text-white font-semibold">3 Strong</span>
-          <span class="chip uppercase px-2 py-1 rounded bg-amber-500 text-white font-semibold">4 Worth exploring</span>
-          <span class="chip uppercase px-2 py-1 rounded bg-slate-500 text-white font-semibold">1 Speculative</span>
-          <span class="text-slate-400">·</span>
-          <span class="inline-flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm" style="background:#dc2626"></span> friction</span>
-          <span class="inline-flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm" style="background:#059669"></span> high signal</span>
-        </div>
-      </header>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Ergonomics review — PortfolioOptimisers.jl</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script type="module">
+    import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+    mermaid.initialize({ startOnLoad: true, theme: "neutral", securityLevel: "loose" });
+  </script>
+  <style>
+    /* shared shell — identical in every /improve-* report */
+    .diff-old {
+      background: #fef2f2;
+      color: #991b1b;
+    }
 
-      <section id="candidates" class="space-y-10">
+    .diff-new {
+      background: #f0fdf4;
+      color: #166534;
+    }
 
-        <!-- C1 -->
-        <article id="c1" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
-          <div class="flex items-start justify-between flex-wrap gap-2">
-            <h2 class="text-xl font-semibold">1 · Compact <code>Base.show</code> — stop printing the whole default tree</h2>
-            <div class="flex flex-wrap gap-2">
-              <span class="chip uppercase px-2 py-1 rounded bg-emerald-600 text-white font-semibold">Strong</span>
-              <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">discoverability</span>
-            </div>
+    .chip {
+      font-size: 0.65rem;
+      letter-spacing: 0.08em;
+    }
+
+    code,
+    pre.mermaid {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+
+    /* ergonomics accent classes */
+    .friction {
+      border-left: 4px solid #dc2626;
+    }
+
+    .signal {
+      border-left: 4px solid #059669;
+    }
+  </style>
+</head>
+
+<body class="bg-stone-50 text-slate-900 font-sans">
+  <main class="max-w-5xl mx-auto px-6 py-12 space-y-12">
+
+    <header class="space-y-5">
+      <div class="flex items-baseline justify-between flex-wrap gap-2">
+        <h1 class="text-3xl font-bold tracking-tight">Ergonomics review — PortfolioOptimisers.jl</h1>
+        <span class="text-sm text-slate-500 font-mono">2026-07-07 · branch <code>dev</code></span>
+      </div>
+      <p class="text-slate-600 max-w-3xl leading-relaxed">
+        This pass walked the public surface as a caller would: exports, the happy path from prices to weights,
+        constructor keyword signatures, error text, and what the REPL prints back. The library's composition model
+        is coherent and the <code>field_dict</code> discipline means every field <em>is</em> documented in
+        <code>?</code>-help — the friction concentrates in abbreviated keyword names, error messages that name
+        internal composition paths instead of the caller's keyword, and struct printing that buries the two fields
+        a caller set under eighty lines of defaults. Eight candidates below; items already decided in
+        ADRs 0014/0015/0017/0023/0025–0027 are excluded.
+      </p>
+      <div class="flex flex-wrap items-center gap-3 text-xs">
+        <span class="chip uppercase px-2 py-1 rounded bg-emerald-600 text-white font-semibold">3 Strong</span>
+        <span class="chip uppercase px-2 py-1 rounded bg-amber-500 text-white font-semibold">4 Worth exploring</span>
+        <span class="chip uppercase px-2 py-1 rounded bg-slate-500 text-white font-semibold">1 Speculative</span>
+        <span class="text-slate-400">·</span>
+        <span class="inline-flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm"
+            style="background:#dc2626"></span> friction</span>
+        <span class="inline-flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm"
+            style="background:#059669"></span> high signal</span>
+      </div>
+    </header>
+
+    <section id="candidates" class="space-y-10">
+
+      <!-- C1 -->
+      <article id="c1" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
+        <div class="flex items-start justify-between flex-wrap gap-2">
+          <h2 class="text-xl font-semibold">1 · Compact <code>Base.show</code> — stop printing the whole default tree
+          </h2>
+          <div class="flex flex-wrap gap-2">
+            <span class="chip uppercase px-2 py-1 rounded bg-emerald-600 text-white font-semibold">Strong</span>
+            <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">discoverability</span>
           </div>
-          <div class="font-mono text-sm text-slate-500">src/20_Optimisation/11_MeanRisk.jl:80–162 · show methods · every jldoctest that prints an estimator</div>
+        </div>
+        <div class="font-mono text-sm text-slate-500">src/20_Optimisation/11_MeanRisk.jl:80–162 · show methods · every
+          jldoctest that prints an estimator</div>
 
-          <div class="space-y-3 font-mono text-xs">
-            <div class="friction rounded p-3 bg-red-50 overflow-x-auto">
-              <div class="text-xs uppercase tracking-wider mb-1 text-red-700">Before — <code>julia&gt; MeanRisk(; opt = JuMPOptimiser(; slv = slv))</code>, abridged from the real 82-line output</div>
-<pre>MeanRisk
+        <div class="space-y-3 font-mono text-xs">
+          <div class="friction rounded p-3 bg-red-50 overflow-x-auto">
+            <div class="text-xs uppercase tracking-wider mb-1 text-red-700">Before —
+              <code>julia&gt; MeanRisk(; opt = JuMPOptimiser(; slv = slv))</code>, abridged from the real 82-line output
+            </div>
+            <pre>MeanRisk
   opt ┼ JuMPOptimiser
       │        pe ┼ EmpiricalPrior
       │           │        ce ┼ PortfolioOptimisersCovariance
@@ -83,219 +112,316 @@
   obj ┼ MinimumRisk()
    wi ┼ nothing
    fb ┴ nothing</pre>
-            </div>
-            <div class="signal rounded p-3 bg-emerald-50 overflow-x-auto">
-              <div class="text-xs uppercase tracking-wider mb-1 text-emerald-700">After — non-default fields only, defaults collapsed</div>
-<pre>MeanRisk
+          </div>
+          <div class="signal rounded p-3 bg-emerald-50 overflow-x-auto">
+            <div class="text-xs uppercase tracking-wider mb-1 text-emerald-700">After — non-default fields only,
+              defaults collapsed</div>
+            <pre>MeanRisk
   opt ┼ JuMPOptimiser
       │   slv ┼ Solver(:clarabel1, Clarabel.Optimizer)
       │     … 37 fields at defaults (pe = EmpiricalPrior(), wb = WeightBounds(0.0, 1.0), …)
     r ┼ Variance()
   obj ┼ MinimumRisk()
     … 2 fields at defaults</pre>
-            </div>
           </div>
+        </div>
 
-          <div class="space-y-1.5 text-sm leading-relaxed">
-            <p><span class="font-semibold">Problem.</span> A caller who types <code>mr</code> at the REPL to check their config gets ~80 lines of the fully-expanded default sub-tree — down to <code>StatsBase.SimpleCovariance(true)</code> — and the two fields they actually set carry no more visual weight than the 37 they didn't.</p>
-            <p><span class="font-semibold">Direction.</span> The <code>MIME"text/plain"</code> show collapses fields that equal their constructor default into one summary line, keeping the full tree behind <code>show(io, MIME"text/plain"(), x; expand = true)</code> or similar.</p>
+        <div class="space-y-1.5 text-sm leading-relaxed">
+          <p><span class="font-semibold">Problem.</span> A caller who types <code>mr</code> at the REPL to check their
+            config gets ~80 lines of the fully-expanded default sub-tree — down to
+            <code>StatsBase.SimpleCovariance(true)</code> — and the two fields they actually set carry no more visual
+            weight than the 37 they didn't.</p>
+          <p><span class="font-semibold">Direction.</span> The <code>MIME"text/plain"</code> show collapses fields that
+            equal their constructor default into one summary line, keeping the full tree behind
+            <code>show(io, MIME"text/plain"(), x; expand = true)</code> or similar.</p>
+        </div>
+
+        <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
+          <li>signal: caller's choices stand out</li>
+          <li>blast radius: zero, display only</li>
+          <li>every jldoctest shrinks with it</li>
+          <li>docs examples stop teaching plumbing</li>
+        </ul>
+
+        <div class="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+          <span class="font-semibold">Doctest coupling.</span> Hundreds of jldoctests assert today's expanded output
+          (e.g. <code>EmpiricalPrior</code>'s example exposes the whole covariance-processing stack before the reader
+          has done anything). Changing show means regenerating them — one mechanical pass, and the regenerated examples
+          become happy-path-first for free.
+        </div>
+      </article>
+
+      <!-- C2 -->
+      <article id="c2" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
+        <div class="flex items-start justify-between flex-wrap gap-2">
+          <h2 class="text-xl font-semibold">2 · Errors that name internal composition paths, not the caller's keyword
+          </h2>
+          <div class="flex flex-wrap gap-2">
+            <span class="chip uppercase px-2 py-1 rounded bg-emerald-600 text-white font-semibold">Strong</span>
+            <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">errors</span>
           </div>
+        </div>
+        <div class="font-mono text-sm text-slate-500">src/20_Optimisation/17_NestedClustered.jl:106,168 ·
+          src/20_Optimisation/01_Base_Optimisation.jl:1127</div>
 
-          <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
-            <li>signal: caller's choices stand out</li>
-            <li>blast radius: zero, display only</li>
-            <li>every jldoctest shrinks with it</li>
-            <li>docs examples stop teaching plumbing</li>
-          </ul>
-
-          <div class="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
-            <span class="font-semibold">Doctest coupling.</span> Hundreds of jldoctests assert today's expanded output (e.g. <code>EmpiricalPrior</code>'s example exposes the whole covariance-processing stack before the reader has done anything). Changing show means regenerating them — one mechanical pass, and the regenerated examples become happy-path-first for free.
-          </div>
-        </article>
-
-        <!-- C2 -->
-        <article id="c2" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
-          <div class="flex items-start justify-between flex-wrap gap-2">
-            <h2 class="text-xl font-semibold">2 · Errors that name internal composition paths, not the caller's keyword</h2>
-            <div class="flex flex-wrap gap-2">
-              <span class="chip uppercase px-2 py-1 rounded bg-emerald-600 text-white font-semibold">Strong</span>
-              <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">errors</span>
-            </div>
-          </div>
-          <div class="font-mono text-sm text-slate-500">src/20_Optimisation/17_NestedClustered.jl:106,168 · src/20_Optimisation/01_Base_Optimisation.jl:1127</div>
-
-          <div class="space-y-3 font-mono text-sm">
-            <div class="friction rounded p-3 bg-red-50 overflow-x-auto">
-              <div class="text-xs uppercase tracking-wider mb-1 text-red-700">Before — verbatim</div>
-<pre>ArgumentError: opt.opt.cle cannot be a precomputed AbstractClusteringResult; use an estimator instead
+        <div class="space-y-3 font-mono text-sm">
+          <div class="friction rounded p-3 bg-red-50 overflow-x-auto">
+            <div class="text-xs uppercase tracking-wider mb-1 text-red-700">Before — verbatim</div>
+            <pre>ArgumentError: opt.opt.cle cannot be a precomputed AbstractClusteringResult; use an estimator instead
 
 ArgumentError: opt.frc_ple cannot be a precomputed AbstractPhylogenyConstraintResult in NCO outer optimiser; use an estimator instead
 
 ArgumentError: `MeanRiskResult` has no `.pr` or `.jr.pr`; provide `pr` explicitly</pre>
-            </div>
-            <div class="signal rounded p-3 bg-emerald-50 overflow-x-auto">
-              <div class="text-xs uppercase tracking-wider mb-1 text-emerald-700">After — modelled on the factor-prior error already in the codebase</div>
-<pre>ArgumentError: NestedClustered re-clusters each inner subset, so the clustering
+          </div>
+          <div class="signal rounded p-3 bg-emerald-50 overflow-x-auto">
+            <div class="text-xs uppercase tracking-wider mb-1 text-emerald-700">After — modelled on the factor-prior
+              error already in the codebase</div>
+            <pre>ArgumentError: NestedClustered re-clusters each inner subset, so the clustering
 estimator (`cle` inside the inner optimiser's `opt`) cannot be a precomputed
 ClusteringResult — pass an estimator, e.g. `cle = ClustersEstimator()`.</pre>
+          </div>
+        </div>
+
+        <div class="space-y-1.5 text-sm leading-relaxed">
+          <p><span class="font-semibold">Problem.</span> The caller wrote <code>NestedClustered(; ...)</code>; nothing
+            in their code is spelled <code>opt.opt.cle</code> — the message exposes the implementation's field path and
+            leaves the caller to reverse-map it onto the keyword they passed and the reason for the rule.</p>
+          <p><span class="font-semibold">Direction.</span> Rewrite the handful of composition-path errors to say which
+            estimator, which keyword, why the rule exists, and the literal fix — the pattern <code>prior</code> already
+            uses: <span class="font-mono text-xs">"this is a factor prior; it needs factor returns. ReturnsResult.F is
+              nothing — populate F (e.g. via prices_to_returns on factor prices)."</span>
+            (src/13_Prior/01_Base_Prior.jl:231).</p>
+        </div>
+
+        <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
+          <li>signal: names the caller's mistake</li>
+          <li>fix stated in the message</li>
+          <li>blast radius: message strings only</li>
+          <li>in-repo model already exists</li>
+        </ul>
+      </article>
+
+      <!-- C3 -->
+      <article id="c3" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
+        <div class="flex items-start justify-between flex-wrap gap-2">
+          <h2 class="text-xl font-semibold">3 · <code>var_views</code> means Value-at-Risk — and
+            <code>var_alpha</code>'s doc says the opposite</h2>
+          <div class="flex flex-wrap gap-2">
+            <span class="chip uppercase px-2 py-1 rounded bg-emerald-600 text-white font-semibold">Strong</span>
+            <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">naming</span>
+          </div>
+        </div>
+        <div class="font-mono text-sm text-slate-500">src/01_Base.jl:337–345 ·
+          src/13_Prior/10_EntropyPoolingPrior.jl:449–488</div>
+
+        <div class="grid md:grid-cols-2 gap-4">
+          <div class="friction rounded p-3 bg-red-50 font-mono text-xs space-y-1 overflow-x-auto">
+            <div class="uppercase tracking-wider mb-2 text-red-700">Before — field_dict, verbatim</div>
+            <div>:var_views&nbsp;&nbsp;&nbsp;→ "Value-at-risk views estimator or result."</div>
+            <div>:sigma_views → "Variance views estimator or result."</div>
+            <div class="mt-2 rounded bg-red-100 p-2">:var_alpha&nbsp;&nbsp;&nbsp;→ "Quantile level for <b>variance</b>
+              views."<br /><span class="text-red-600">← contradicts var_views: variance views have no quantile
+                level</span></div>
+          </div>
+          <div class="signal rounded p-3 bg-emerald-50 font-mono text-xs space-y-1 overflow-x-auto">
+            <div class="uppercase tracking-wider mb-2 text-emerald-700">After</div>
+            <div>:var_alpha → "Quantile level for <b>value-at-risk</b> views."</div>
+            <div class="mt-2 text-emerald-800">plus a one-line disambiguation on both view
+              fields:<br />"<code>var_views</code> = Value-at-Risk (quantile), not variance —<br />&nbsp;variance views
+              are <code>sigma_views</code>."</div>
+          </div>
+        </div>
+
+        <div class="space-y-1.5 text-sm leading-relaxed">
+          <p><span class="font-semibold">Problem.</span> A statistician reads <code>var</code> as variance and
+            <code>sigma</code> as standard deviation; here both are swapped from that intuition, and the one docstring
+            that could disambiguate (<code>var_alpha</code>) is itself wrong — a caller who puts a variance view in
+            <code>var_views</code> gets a quantile constraint on the wrong statistic.</p>
+          <p><span class="font-semibold">Direction.</span> Fix the <code>var_alpha</code> entry now; add the
+            cross-reference line to both view fields; separately weigh a <code>value_at_risk_views</code> keyword alias
+            — the field names' blast radius (every EP example and user script) argues for alias-first if renamed at all.
+          </p>
+        </div>
+
+        <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
+          <li>doc contradiction: one-line fix</li>
+          <li>signal: cross-reference kills the trap</li>
+          <li>alias sidesteps rename blast radius</li>
+          <li>operator rules surfaced in docs too</li>
+        </ul>
+
+        <div class="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+          <span class="font-semibold">Also discoverable only via ParseError:</span> <code>var_views</code> accepts only
+          <code>==</code>/<code>&gt;=</code> and <code>cvar_views</code> only <code>==</code> — worth stating in the
+          field docs rather than at parse time.
+        </div>
+      </article>
+
+      <!-- C4 -->
+      <article id="c4" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
+        <div class="flex items-start justify-between flex-wrap gap-2">
+          <h2 class="text-xl font-semibold">4 · Long-form keyword aliases for <code>JuMPOptimiser</code>'s 38
+            abbreviations</h2>
+          <div class="flex flex-wrap gap-2">
+            <span class="chip uppercase px-2 py-1 rounded bg-amber-500 text-white font-semibold">Worth exploring</span>
+            <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">aliases</span>
+          </div>
+        </div>
+        <div class="font-mono text-sm text-slate-500">src/20_Optimisation/10_JuMPOptimiser.jl:328–368 · src/01_Base.jl
+          (field_dict)</div>
+
+        <div class="space-y-3">
+          <div class="friction rounded p-3 bg-red-50 overflow-x-auto">
+            <div class="text-xs uppercase tracking-wider mb-2 text-red-700">Before — the full keyword surface, verbatim
             </div>
-          </div>
-
-          <div class="space-y-1.5 text-sm leading-relaxed">
-            <p><span class="font-semibold">Problem.</span> The caller wrote <code>NestedClustered(; ...)</code>; nothing in their code is spelled <code>opt.opt.cle</code> — the message exposes the implementation's field path and leaves the caller to reverse-map it onto the keyword they passed and the reason for the rule.</p>
-            <p><span class="font-semibold">Direction.</span> Rewrite the handful of composition-path errors to say which estimator, which keyword, why the rule exists, and the literal fix — the pattern <code>prior</code> already uses: <span class="font-mono text-xs">"this is a factor prior; it needs factor returns. ReturnsResult.F is nothing — populate F (e.g. via prices_to_returns on factor prices)."</span> (src/13_Prior/01_Base_Prior.jl:231).</p>
-          </div>
-
-          <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
-            <li>signal: names the caller's mistake</li>
-            <li>fix stated in the message</li>
-            <li>blast radius: message strings only</li>
-            <li>in-repo model already exists</li>
-          </ul>
-        </article>
-
-        <!-- C3 -->
-        <article id="c3" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
-          <div class="flex items-start justify-between flex-wrap gap-2">
-            <h2 class="text-xl font-semibold">3 · <code>var_views</code> means Value-at-Risk — and <code>var_alpha</code>'s doc says the opposite</h2>
-            <div class="flex flex-wrap gap-2">
-              <span class="chip uppercase px-2 py-1 rounded bg-emerald-600 text-white font-semibold">Strong</span>
-              <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">naming</span>
+            <div class="flex flex-wrap gap-1 font-mono text-xs">
+              <span class="rounded px-2 py-0.5 bg-red-100">pe</span><span
+                class="rounded px-2 py-0.5 bg-red-100">slv</span><span
+                class="rounded px-2 py-0.5 bg-red-100">wb</span><span
+                class="rounded px-2 py-0.5 bg-red-100">bgt</span><span
+                class="rounded px-2 py-0.5 bg-red-100">sbgt</span><span
+                class="rounded px-2 py-0.5 bg-red-100">lt</span><span
+                class="rounded px-2 py-0.5 bg-red-100">st</span><span
+                class="rounded px-2 py-0.5 bg-red-100">lcse</span><span
+                class="rounded px-2 py-0.5 bg-red-100">cte</span><span
+                class="rounded px-2 py-0.5 bg-red-100">gcarde</span><span
+                class="rounded px-2 py-0.5 bg-red-200 font-semibold">sgcarde</span><span
+                class="rounded px-2 py-0.5 bg-red-100">smtx</span><span
+                class="rounded px-2 py-0.5 bg-red-100">sgmtx</span><span
+                class="rounded px-2 py-0.5 bg-red-200 font-semibold">slt</span><span
+                class="rounded px-2 py-0.5 bg-red-200 font-semibold">sst</span><span
+                class="rounded px-2 py-0.5 bg-red-200 font-semibold">sglt</span><span
+                class="rounded px-2 py-0.5 bg-red-200 font-semibold">sgst</span><span
+                class="rounded px-2 py-0.5 bg-red-100">tn</span><span
+                class="rounded px-2 py-0.5 bg-red-100">fees</span><span
+                class="rounded px-2 py-0.5 bg-red-100">sets</span><span
+                class="rounded px-2 py-0.5 bg-red-100">tr</span><span
+                class="rounded px-2 py-0.5 bg-red-100">ple</span><span
+                class="rounded px-2 py-0.5 bg-red-100">ret</span><span
+                class="rounded px-2 py-0.5 bg-red-100">sca</span><span
+                class="rounded px-2 py-0.5 bg-red-100">ccnt</span><span
+                class="rounded px-2 py-0.5 bg-red-100">cobj</span><span
+                class="rounded px-2 py-0.5 bg-red-100">sc</span><span
+                class="rounded px-2 py-0.5 bg-red-100">so</span><span
+                class="rounded px-2 py-0.5 bg-red-100">ss</span><span
+                class="rounded px-2 py-0.5 bg-red-100">card</span><span
+                class="rounded px-2 py-0.5 bg-red-100">scard</span><span
+                class="rounded px-2 py-0.5 bg-red-100">wn2</span><span
+                class="rounded px-2 py-0.5 bg-red-100">l1</span><span
+                class="rounded px-2 py-0.5 bg-red-100">l2</span><span
+                class="rounded px-2 py-0.5 bg-red-100">linf</span><span
+                class="rounded px-2 py-0.5 bg-red-100">lp</span><span
+                class="rounded px-2 py-0.5 bg-red-100">brt</span><span
+                class="rounded px-2 py-0.5 bg-red-200 font-semibold">cle_pr</span><span
+                class="rounded px-2 py-0.5 bg-red-100">strict</span>
             </div>
+            <div class="text-xs text-red-700 mt-2">Darker cells: names whose meaning a caller cannot even guess the
+              family of (<code>slt/sst/sglt/sgst</code> = short/long × grouped/ungrouped thresholds; <code>cle_pr</code>
+              = pass prior to clustering estimator).</div>
           </div>
-          <div class="font-mono text-sm text-slate-500">src/01_Base.jl:337–345 · src/13_Prior/10_EntropyPoolingPrior.jl:449–488</div>
-
-          <div class="grid md:grid-cols-2 gap-4">
-            <div class="friction rounded p-3 bg-red-50 font-mono text-xs space-y-1 overflow-x-auto">
-              <div class="uppercase tracking-wider mb-2 text-red-700">Before — field_dict, verbatim</div>
-              <div>:var_views&nbsp;&nbsp;&nbsp;→ "Value-at-risk views estimator or result."</div>
-              <div>:sigma_views → "Variance views estimator or result."</div>
-              <div class="mt-2 rounded bg-red-100 p-2">:var_alpha&nbsp;&nbsp;&nbsp;→ "Quantile level for <b>variance</b> views."<br/><span class="text-red-600">← contradicts var_views: variance views have no quantile level</span></div>
-            </div>
-            <div class="signal rounded p-3 bg-emerald-50 font-mono text-xs space-y-1 overflow-x-auto">
-              <div class="uppercase tracking-wider mb-2 text-emerald-700">After</div>
-              <div>:var_alpha → "Quantile level for <b>value-at-risk</b> views."</div>
-              <div class="mt-2 text-emerald-800">plus a one-line disambiguation on both view fields:<br/>"<code>var_views</code> = Value-at-Risk (quantile), not variance —<br/>&nbsp;variance views are <code>sigma_views</code>."</div>
-            </div>
-          </div>
-
-          <div class="space-y-1.5 text-sm leading-relaxed">
-            <p><span class="font-semibold">Problem.</span> A statistician reads <code>var</code> as variance and <code>sigma</code> as standard deviation; here both are swapped from that intuition, and the one docstring that could disambiguate (<code>var_alpha</code>) is itself wrong — a caller who puts a variance view in <code>var_views</code> gets a quantile constraint on the wrong statistic.</p>
-            <p><span class="font-semibold">Direction.</span> Fix the <code>var_alpha</code> entry now; add the cross-reference line to both view fields; separately weigh a <code>value_at_risk_views</code> keyword alias — the field names' blast radius (every EP example and user script) argues for alias-first if renamed at all.</p>
-          </div>
-
-          <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
-            <li>doc contradiction: one-line fix</li>
-            <li>signal: cross-reference kills the trap</li>
-            <li>alias sidesteps rename blast radius</li>
-            <li>operator rules surfaced in docs too</li>
-          </ul>
-
-          <div class="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
-            <span class="font-semibold">Also discoverable only via ParseError:</span> <code>var_views</code> accepts only <code>==</code>/<code>&gt;=</code> and <code>cvar_views</code> only <code>==</code> — worth stating in the field docs rather than at parse time.
-          </div>
-        </article>
-
-        <!-- C4 -->
-        <article id="c4" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
-          <div class="flex items-start justify-between flex-wrap gap-2">
-            <h2 class="text-xl font-semibold">4 · Long-form keyword aliases for <code>JuMPOptimiser</code>'s 38 abbreviations</h2>
-            <div class="flex flex-wrap gap-2">
-              <span class="chip uppercase px-2 py-1 rounded bg-amber-500 text-white font-semibold">Worth exploring</span>
-              <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">aliases</span>
-            </div>
-          </div>
-          <div class="font-mono text-sm text-slate-500">src/20_Optimisation/10_JuMPOptimiser.jl:328–368 · src/01_Base.jl (field_dict)</div>
-
-          <div class="space-y-3">
-            <div class="friction rounded p-3 bg-red-50 overflow-x-auto">
-              <div class="text-xs uppercase tracking-wider mb-2 text-red-700">Before — the full keyword surface, verbatim</div>
-              <div class="flex flex-wrap gap-1 font-mono text-xs">
-                <span class="rounded px-2 py-0.5 bg-red-100">pe</span><span class="rounded px-2 py-0.5 bg-red-100">slv</span><span class="rounded px-2 py-0.5 bg-red-100">wb</span><span class="rounded px-2 py-0.5 bg-red-100">bgt</span><span class="rounded px-2 py-0.5 bg-red-100">sbgt</span><span class="rounded px-2 py-0.5 bg-red-100">lt</span><span class="rounded px-2 py-0.5 bg-red-100">st</span><span class="rounded px-2 py-0.5 bg-red-100">lcse</span><span class="rounded px-2 py-0.5 bg-red-100">cte</span><span class="rounded px-2 py-0.5 bg-red-100">gcarde</span><span class="rounded px-2 py-0.5 bg-red-200 font-semibold">sgcarde</span><span class="rounded px-2 py-0.5 bg-red-100">smtx</span><span class="rounded px-2 py-0.5 bg-red-100">sgmtx</span><span class="rounded px-2 py-0.5 bg-red-200 font-semibold">slt</span><span class="rounded px-2 py-0.5 bg-red-200 font-semibold">sst</span><span class="rounded px-2 py-0.5 bg-red-200 font-semibold">sglt</span><span class="rounded px-2 py-0.5 bg-red-200 font-semibold">sgst</span><span class="rounded px-2 py-0.5 bg-red-100">tn</span><span class="rounded px-2 py-0.5 bg-red-100">fees</span><span class="rounded px-2 py-0.5 bg-red-100">sets</span><span class="rounded px-2 py-0.5 bg-red-100">tr</span><span class="rounded px-2 py-0.5 bg-red-100">ple</span><span class="rounded px-2 py-0.5 bg-red-100">ret</span><span class="rounded px-2 py-0.5 bg-red-100">sca</span><span class="rounded px-2 py-0.5 bg-red-100">ccnt</span><span class="rounded px-2 py-0.5 bg-red-100">cobj</span><span class="rounded px-2 py-0.5 bg-red-100">sc</span><span class="rounded px-2 py-0.5 bg-red-100">so</span><span class="rounded px-2 py-0.5 bg-red-100">ss</span><span class="rounded px-2 py-0.5 bg-red-100">card</span><span class="rounded px-2 py-0.5 bg-red-100">scard</span><span class="rounded px-2 py-0.5 bg-red-100">nea</span><span class="rounded px-2 py-0.5 bg-red-100">l1</span><span class="rounded px-2 py-0.5 bg-red-100">l2</span><span class="rounded px-2 py-0.5 bg-red-100">linf</span><span class="rounded px-2 py-0.5 bg-red-100">lp</span><span class="rounded px-2 py-0.5 bg-red-100">brt</span><span class="rounded px-2 py-0.5 bg-red-200 font-semibold">cle_pr</span><span class="rounded px-2 py-0.5 bg-red-100">strict</span>
-              </div>
-              <div class="text-xs text-red-700 mt-2">Darker cells: names whose meaning a caller cannot even guess the family of (<code>slt/sst/sglt/sgst</code> = short/long × grouped/ungrouped thresholds; <code>cle_pr</code> = pass prior to clustering estimator).</div>
-            </div>
-            <div class="signal rounded p-3 bg-emerald-50 overflow-x-auto font-mono text-xs">
-              <div class="text-xs uppercase tracking-wider mb-2 text-emerald-700">After — short names stay canonical; long forms accepted at the keyword constructor</div>
-<pre>JuMPOptimiser(; solvers = slv, weight_bounds = WeightBounds(0.0, 0.3),
+          <div class="signal rounded p-3 bg-emerald-50 overflow-x-auto font-mono text-xs">
+            <div class="text-xs uppercase tracking-wider mb-2 text-emerald-700">After — short names stay canonical; long
+              forms accepted at the keyword constructor</div>
+            <pre>JuMPOptimiser(; solvers = slv, weight_bounds = WeightBounds(0.0, 0.3),
                 budget = 1.0, turnover = tn, linear_constraints = lcse)
 # identical to
 JuMPOptimiser(; slv = slv, wb = WeightBounds(0.0, 0.3),
                 bgt = 1.0, tn = tn, lcse = lcse)</pre>
-            </div>
           </div>
+        </div>
 
-          <div class="space-y-1.5 text-sm leading-relaxed">
-            <p><span class="font-semibold">Problem.</span> A call site like <code>JuMPOptimiser(; slv, wb, sbgt, tn, ple)</code> fails the signal test — every read of user code routes through <code>?</code>-help, and autocomplete on 38 two-to-four-letter names offers no discoverability foothold (typing <code>thr</code> for threshold finds nothing; the field is <code>lt</code>/<code>st</code>).</p>
-            <p><span class="font-semibold">Direction.</span> Accept long-form spellings in the keyword constructors (a name-map at construction, zero change to fields, factories, or views), with the long form listed alongside the short one in field docs — additive, so blast radius is zero and existing code is untouched.</p>
+        <div class="space-y-1.5 text-sm leading-relaxed">
+          <p><span class="font-semibold">Problem.</span> A call site like
+            <code>JuMPOptimiser(; slv, wb, sbgt, tn, ple)</code> fails the signal test — every read of user code routes
+            through <code>?</code>-help, and autocomplete on 38 two-to-four-letter names offers no discoverability
+            foothold (typing <code>thr</code> for threshold finds nothing; the field is
+            <code>lt</code>/<code>st</code>).</p>
+          <p><span class="font-semibold">Direction.</span> Accept long-form spellings in the keyword constructors (a
+            name-map at construction, zero change to fields, factories, or views), with the long form listed alongside
+            the short one in field docs — additive, so blast radius is zero and existing code is untouched.</p>
+        </div>
+
+        <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
+          <li>signal: call sites readable unaided</li>
+          <li>discoverability: autocomplete finds concepts</li>
+          <li>blast radius: zero, additive alias</li>
+          <li>field_dict already holds the meanings</li>
+        </ul>
+
+        <div class="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+          <span class="font-semibold">Scope check.</span> The same map covers <code>MeanRisk</code>'s
+          <code>r/wi/fb</code> and <code>ReturnsResult</code>'s <code>nx/nf/nb/iv/ivpa</code> — one mechanism, decided
+          once, applied per struct. Two-name surfaces also carry a cost (which form do docs teach?); the grilling should
+          settle a single teaching form first.
+        </div>
+      </article>
+
+      <!-- C5 -->
+      <article id="c5" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
+        <div class="flex items-start justify-between flex-wrap gap-2">
+          <h2 class="text-xl font-semibold">5 · Solve-failure warnings: no sub-problem name, and "please ignore" as an
+            instruction</h2>
+          <div class="flex flex-wrap gap-2">
+            <span class="chip uppercase px-2 py-1 rounded bg-amber-500 text-white font-semibold">Worth exploring</span>
+            <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">errors</span>
           </div>
+        </div>
+        <div class="font-mono text-sm text-slate-500">src/20_Optimisation/08_Base_JuMPOptimisation.jl:736 ·
+          13_NearOptimalCentering.jl:957 · 01_Base_Optimisation.jl:1023</div>
 
-          <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
-            <li>signal: call sites readable unaided</li>
-            <li>discoverability: autocomplete finds concepts</li>
-            <li>blast radius: zero, additive alias</li>
-            <li>field_dict already holds the meanings</li>
-          </ul>
-
-          <div class="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
-            <span class="font-semibold">Scope check.</span> The same map covers <code>MeanRisk</code>'s <code>r/wi/fb</code> and <code>ReturnsResult</code>'s <code>nx/nf/nb/iv/ivpa</code> — one mechanism, decided once, applied per struct. Two-name surfaces also carry a cost (which form do docs teach?); the grilling should settle a single teaching form first.
-          </div>
-        </article>
-
-        <!-- C5 -->
-        <article id="c5" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
-          <div class="flex items-start justify-between flex-wrap gap-2">
-            <h2 class="text-xl font-semibold">5 · Solve-failure warnings: no sub-problem name, and "please ignore" as an instruction</h2>
-            <div class="flex flex-wrap gap-2">
-              <span class="chip uppercase px-2 py-1 rounded bg-amber-500 text-white font-semibold">Worth exploring</span>
-              <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">errors</span>
-            </div>
-          </div>
-          <div class="font-mono text-sm text-slate-500">src/20_Optimisation/08_Base_JuMPOptimisation.jl:736 · 13_NearOptimalCentering.jl:957 · 01_Base_Optimisation.jl:1023</div>
-
-          <div class="space-y-3 font-mono text-sm">
-            <div class="friction rounded p-3 bg-red-50 overflow-x-auto">
-              <div class="text-xs uppercase tracking-wider mb-1 text-red-700">Before — verbatim, as a fallback run prints them</div>
-<pre>┌ Warning: Failed to solve optimisation problem. Check `retcode.res` for details.
+        <div class="space-y-3 font-mono text-sm">
+          <div class="friction rounded p-3 bg-red-50 overflow-x-auto">
+            <div class="text-xs uppercase tracking-wider mb-1 text-red-700">Before — verbatim, as a fallback run prints
+              them</div>
+            <pre>┌ Warning: Failed to solve optimisation problem. Check `retcode.res` for details.
 ┌ Warning: Using fallback method. Please ignore previous optimisation failure warnings.</pre>
-            </div>
-            <div class="signal rounded p-3 bg-emerald-50 overflow-x-auto">
-              <div class="text-xs uppercase tracking-wider mb-1 text-emerald-700">After — names the problem, the solver chain, and what happened next</div>
-<pre>┌ Warning: MeanRisk solve failed: all 2 solvers rejected the problem
+          </div>
+          <div class="signal rounded p-3 bg-emerald-50 overflow-x-auto">
+            <div class="text-xs uppercase tracking-wider mb-1 text-emerald-700">After — names the problem, the solver
+              chain, and what happened next</div>
+            <pre>┌ Warning: MeanRisk solve failed: all 2 solvers rejected the problem
 │ (clarabel1: INFEASIBLE, highs1: TIME_LIMIT). Falling back to `fb`.
 │ Inspect `res.retcode.res` for per-solver diagnostics.</pre>
-            </div>
           </div>
+        </div>
 
-          <div class="space-y-1.5 text-sm leading-relaxed">
-            <p><span class="font-semibold">Problem.</span> The failure warn is identical from every optimiser and sub-problem, so in a NearOptimalCentering or meta-optimiser run the caller can't tell which solve failed; when a fallback rescues the run, the library asks the caller to retroactively ignore warnings instead of not emitting a misleading sequence.</p>
-            <p><span class="font-semibold">Direction.</span> Include the optimiser/sub-problem name and per-solver termination summary in the failure warn, and make the fallback path emit one self-contained warning rather than a failure + "please ignore" pair.</p>
+        <div class="space-y-1.5 text-sm leading-relaxed">
+          <p><span class="font-semibold">Problem.</span> The failure warn is identical from every optimiser and
+            sub-problem, so in a NearOptimalCentering or meta-optimiser run the caller can't tell which solve failed;
+            when a fallback rescues the run, the library asks the caller to retroactively ignore warnings instead of not
+            emitting a misleading sequence.</p>
+          <p><span class="font-semibold">Direction.</span> Include the optimiser/sub-problem name and per-solver
+            termination summary in the failure warn, and make the fallback path emit one self-contained warning rather
+            than a failure + "please ignore" pair.</p>
+        </div>
+
+        <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
+          <li>signal: which solve, which solver</li>
+          <li>fallback logs one coherent story</li>
+          <li>blast radius: warn strings only</li>
+        </ul>
+
+        <div class="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+          <span class="font-semibold">ADR 0023.</span> The <em>structure</em> of failure diagnostics (named-tuple
+          sub-problem retcodes) is decided and done — this card is only about the human-readable warn text layered on
+          top.
+        </div>
+      </article>
+
+      <!-- C6 -->
+      <article id="c6" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
+        <div class="flex items-start justify-between flex-wrap gap-2">
+          <h2 class="text-xl font-semibold">6 · The first optimisation pays a three-estimator composition cost</h2>
+          <div class="flex flex-wrap gap-2">
+            <span class="chip uppercase px-2 py-1 rounded bg-amber-500 text-white font-semibold">Worth exploring</span>
+            <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">defaults</span>
           </div>
+        </div>
+        <div class="font-mono text-sm text-slate-500">examples/1_foundations/01_Getting_Started.jl:73–96 ·
+          src/20_Optimisation/10_JuMPOptimiser.jl:330</div>
 
-          <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
-            <li>signal: which solve, which solver</li>
-            <li>fallback logs one coherent story</li>
-            <li>blast radius: warn strings only</li>
-          </ul>
-
-          <div class="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
-            <span class="font-semibold">ADR 0023.</span> The <em>structure</em> of failure diagnostics (named-tuple sub-problem retcodes) is decided and done — this card is only about the human-readable warn text layered on top.
-          </div>
-        </article>
-
-        <!-- C6 -->
-        <article id="c6" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
-          <div class="flex items-start justify-between flex-wrap gap-2">
-            <h2 class="text-xl font-semibold">6 · The first optimisation pays a three-estimator composition cost</h2>
-            <div class="flex flex-wrap gap-2">
-              <span class="chip uppercase px-2 py-1 rounded bg-amber-500 text-white font-semibold">Worth exploring</span>
-              <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">defaults</span>
-            </div>
-          </div>
-          <div class="font-mono text-sm text-slate-500">examples/1_foundations/01_Getting_Started.jl:73–96 · src/20_Optimisation/10_JuMPOptimiser.jl:330</div>
-
-          <div class="rounded-lg border border-slate-200 bg-white p-4">
-            <pre class="mermaid">
+        <div class="rounded-lg border border-slate-200 bg-white p-4">
+          <pre class="mermaid">
 flowchart LR
   A[caller] --> B["Solver(; name, solver, settings, check_sol)"]
   B --> C["JuMPOptimiser(; slv = …)"]
@@ -306,110 +432,145 @@ flowchart LR
   classDef alias stroke:#059669,stroke-width:2px;
   class A2,D2,E2 alias
             </pre>
+        </div>
+
+        <div class="space-y-1.5 text-sm leading-relaxed">
+          <p><span class="font-semibold">Problem.</span> The minimum-variance base case — the field's hello-world —
+            requires the caller to learn <code>Solver</code>, <code>JuMPOptimiser</code>, and <code>MeanRisk</code> and
+            nest them correctly before the first <code>optimise</code> runs; <code>slv</code> is required with no
+            default (correctly — the library can't pick a solver dependency), but the two wrapper layers are pure
+            boilerplate at this point in the caller's journey.</p>
+          <p><span class="font-semibold">Direction.</span> Let the solver flow to the optimiser without the caller
+            spelling the intermediate layer — e.g. <code>MeanRisk(; slv = …)</code> building the default
+            <code>JuMPOptimiser</code> internally, and/or a positional <code>Solver(Clarabel.Optimizer)</code> for the
+            name/settings-free case. The 90th-percentile first call sets exactly one thing: which solver.</p>
+        </div>
+
+        <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
+          <li>friction: 3 concepts before hello-world</li>
+          <li>default covers the one required choice</li>
+          <li>blast radius: zero, additive path</li>
+          <li>composition model untouched underneath</li>
+        </ul>
+      </article>
+
+      <!-- C7 -->
+      <article id="c7" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
+        <div class="flex items-start justify-between flex-wrap gap-2">
+          <h2 class="text-xl font-semibold">7 · ~609 exported names, including two-letter acronyms squatting common
+            identifiers</h2>
+          <div class="flex flex-wrap gap-2">
+            <span class="chip uppercase px-2 py-1 rounded bg-amber-500 text-white font-semibold">Worth exploring</span>
+            <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">discoverability</span>
           </div>
+        </div>
+        <div class="font-mono text-sm text-slate-500">src/25_Aliases.jl:663–669 · 142 export statements across src/
+        </div>
 
-          <div class="space-y-1.5 text-sm leading-relaxed">
-            <p><span class="font-semibold">Problem.</span> The minimum-variance base case — the field's hello-world — requires the caller to learn <code>Solver</code>, <code>JuMPOptimiser</code>, and <code>MeanRisk</code> and nest them correctly before the first <code>optimise</code> runs; <code>slv</code> is required with no default (correctly — the library can't pick a solver dependency), but the two wrapper layers are pure boilerplate at this point in the caller's journey.</p>
-            <p><span class="font-semibold">Direction.</span> Let the solver flow to the optimiser without the caller spelling the intermediate layer — e.g. <code>MeanRisk(; slv = …)</code> building the default <code>JuMPOptimiser</code> internally, and/or a positional <code>Solver(Clarabel.Optimizer)</code> for the name/settings-free case. The 90th-percentile first call sets exactly one thing: which solver.</p>
-          </div>
-
-          <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
-            <li>friction: 3 concepts before hello-world</li>
-            <li>default covers the one required choice</li>
-            <li>blast radius: zero, additive path</li>
-            <li>composition model untouched underneath</li>
-          </ul>
-        </article>
-
-        <!-- C7 -->
-        <article id="c7" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
-          <div class="flex items-start justify-between flex-wrap gap-2">
-            <h2 class="text-xl font-semibold">7 · ~609 exported names, including two-letter acronyms squatting common identifiers</h2>
-            <div class="flex flex-wrap gap-2">
-              <span class="chip uppercase px-2 py-1 rounded bg-amber-500 text-white font-semibold">Worth exploring</span>
-              <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">discoverability</span>
+        <div class="space-y-3">
+          <div class="friction rounded p-3 bg-red-50 overflow-x-auto">
+            <div class="text-xs uppercase tracking-wider mb-2 text-red-700">Before — the alias export block, verbatim
             </div>
-          </div>
-          <div class="font-mono text-sm text-slate-500">src/24_Aliases.jl:663–669 · 142 export statements across src/</div>
-
-          <div class="space-y-3">
-            <div class="friction rounded p-3 bg-red-50 overflow-x-auto">
-              <div class="text-xs uppercase tracking-wider mb-2 text-red-700">Before — the alias export block, verbatim</div>
-<pre class="font-mono text-xs">export HRP, HERC, SCHRP, NCO, STO, SSR, MR, RB, RRB, FRC, NOC, DAO, GAO, FAI, SD,
+            <pre class="font-mono text-xs">export HRP, HERC, SCHRP, NCO, STO, SSR, MR, RB, RRB, FRC, NOC, DAO, GAO, FAI, SD,
        UcVariance, WR, VaR, CVaR, DRCVaR, EVaR, RVaR, PNVaR, RG, VaR_RG, CVaR_RG, DRCVaR_RG,
        EVaR_RG, RVaR_RG, PNVaR_RG, GVaR_RG, DaR, CDaR, DRCDaR, EDaR, RDaR, PNDaR, R_DaR, …</pre>
-              <div class="text-xs text-red-700 mt-2"><code>MR</code>, <code>RB</code>, <code>SD</code>, <code>RG</code>, <code>WR</code>, <code>KT</code>, <code>STO</code> are two-to-three-letter names any script might define; <code>using PortfolioOptimisers</code> claims all of them.</div>
-            </div>
-            <div class="signal rounded p-3 bg-emerald-50 overflow-x-auto font-mono text-xs">
-              <div class="text-xs uppercase tracking-wider mb-2 text-emerald-700">After — acronyms opt-in, full names exported</div>
-<pre>using PortfolioOptimisers                    # full names only
+            <div class="text-xs text-red-700 mt-2"><code>MR</code>, <code>RB</code>, <code>SD</code>, <code>RG</code>,
+              <code>WR</code>, <code>KT</code>, <code>STO</code> are two-to-three-letter names any script might define;
+              <code>using PortfolioOptimisers</code> claims all of them.</div>
+          </div>
+          <div class="signal rounded p-3 bg-emerald-50 overflow-x-auto font-mono text-xs">
+            <div class="text-xs uppercase tracking-wider mb-2 text-emerald-700">After — acronyms opt-in, full names
+              exported</div>
+            <pre>using PortfolioOptimisers                    # full names only
 using PortfolioOptimisers.Acronyms          # opt-in: HRP, CVaR, MR, RB, …</pre>
-            </div>
           </div>
+        </div>
 
-          <div class="space-y-1.5 text-sm leading-relaxed">
-            <p><span class="font-semibold">Problem.</span> Everything is exported and almost nothing is <code>public</code>-only (7 names), so <code>using PortfolioOptimisers</code> floods the namespace and autocomplete with ~609 names — the acronym layer doubles the surface a caller must scan, and the two-letter forms collide with names callers plausibly own.</p>
-            <p><span class="font-semibold">Direction.</span> Keep the domain-standard acronyms (<code>CVaR</code>, <code>HRP</code>) but move the block — or at least the ≤3-letter subset — behind an opt-in submodule or <code>public</code> marking, with a deprecation cycle since removal is breaking for existing scripts.</p>
+        <div class="space-y-1.5 text-sm leading-relaxed">
+          <p><span class="font-semibold">Problem.</span> Everything is exported and almost nothing is
+            <code>public</code>-only (7 names), so <code>using PortfolioOptimisers</code> floods the namespace and
+            autocomplete with ~609 names — the acronym layer doubles the surface a caller must scan, and the two-letter
+            forms collide with names callers plausibly own.</p>
+          <p><span class="font-semibold">Direction.</span> Keep the domain-standard acronyms (<code>CVaR</code>,
+            <code>HRP</code>) but move the block — or at least the ≤3-letter subset — behind an opt-in submodule or
+            <code>public</code> marking, with a deprecation cycle since removal is breaking for existing scripts.</p>
+        </div>
+
+        <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
+          <li>discoverability: autocomplete scans less noise</li>
+          <li>collision risk removed from caller scope</li>
+          <li>blast radius: existing scripts — deprecate first</li>
+          <li>convention: exported ⇒ teachable name</li>
+        </ul>
+      </article>
+
+      <!-- C8 -->
+      <article id="c8" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
+        <div class="flex items-start justify-between flex-wrap gap-2">
+          <h2 class="text-xl font-semibold">8 · <code>w</code> carries six documented meanings across the surface</h2>
+          <div class="flex flex-wrap gap-2">
+            <span class="chip uppercase px-2 py-1 rounded bg-slate-500 text-white font-semibold">Speculative</span>
+            <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">naming</span>
           </div>
+        </div>
+        <div class="font-mono text-sm text-slate-500">src/01_Base.jl:4–5,427–428,636,664 (field_dict entries, verbatim)
+        </div>
 
-          <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
-            <li>discoverability: autocomplete scans less noise</li>
-            <li>collision risk removed from caller scope</li>
-            <li>blast radius: existing scripts — deprecate first</li>
-            <li>convention: exported ⇒ teachable name</li>
-          </ul>
-        </article>
-
-        <!-- C8 -->
-        <article id="c8" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
-          <div class="flex items-start justify-between flex-wrap gap-2">
-            <h2 class="text-xl font-semibold">8 · <code>w</code> carries six documented meanings across the surface</h2>
-            <div class="flex flex-wrap gap-2">
-              <span class="chip uppercase px-2 py-1 rounded bg-slate-500 text-white font-semibold">Speculative</span>
-              <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">naming</span>
-            </div>
+        <div class="grid sm:grid-cols-2 gap-2 font-mono text-xs">
+          <div class="friction rounded p-2 bg-red-50"><b>:pw</b> → "`w`: Portfolio weights vector."</div>
+          <div class="friction rounded p-2 bg-red-50"><b>:ow</b> → "`w`: Observation weights vector."</div>
+          <div class="friction rounded p-2 bg-red-50"><b>:w_ref</b> → "`w`: Reference portfolio weights vector."</div>
+          <div class="friction rounded p-2 bg-red-50"><b>:w_bm_ret</b> → "`w`: Benchmark portfolio returns vector."
           </div>
-          <div class="font-mono text-sm text-slate-500">src/01_Base.jl:4–5,427–428,636,664 (field_dict entries, verbatim)</div>
+          <div class="friction rounded p-2 bg-red-50"><b>:owa_w</b> → "`w`: Optional OWA weight vector."</div>
+          <div class="friction rounded p-2 bg-red-50"><b>:ep_w</b> → "`w`: Prior observation probability weights…"</div>
+        </div>
 
-          <div class="grid sm:grid-cols-2 gap-2 font-mono text-xs">
-            <div class="friction rounded p-2 bg-red-50"><b>:pw</b> → "`w`: Portfolio weights vector."</div>
-            <div class="friction rounded p-2 bg-red-50"><b>:ow</b> → "`w`: Observation weights vector."</div>
-            <div class="friction rounded p-2 bg-red-50"><b>:w_ref</b> → "`w`: Reference portfolio weights vector."</div>
-            <div class="friction rounded p-2 bg-red-50"><b>:w_bm_ret</b> → "`w`: Benchmark portfolio returns vector."</div>
-            <div class="friction rounded p-2 bg-red-50"><b>:owa_w</b> → "`w`: Optional OWA weight vector."</div>
-            <div class="friction rounded p-2 bg-red-50"><b>:ep_w</b> → "`w`: Prior observation probability weights…"</div>
-          </div>
+        <div class="space-y-1.5 text-sm leading-relaxed">
+          <p><span class="font-semibold">Problem.</span> <code>SimpleExpectedReturns(; w=…)</code> takes observation
+            weights, <code>EquilibriumExpectedReturns(; w=…)</code> equilibrium portfolio weights,
+            <code>WeightsTracking(; w=…)</code> a reference weight vector, and a tracking measure's <code>w</code> is
+            benchmark <em>returns</em> — the internal doc keys (<code>:pw/:ow/:w_ref/:w_bm_ret</code>) prove the
+            concepts are distinct, but the caller-facing name flattens them, so reading <code>w = x</code> at a call
+            site tells the caller nothing.</p>
+          <p><span class="font-semibold">Direction.</span> If the long-form alias mechanism of <a
+              class="text-emerald-700 underline" href="#c4">card 4</a> lands, give each semantics its long name there
+            (<code>obs_weights</code>, <code>benchmark_returns</code>, …) and leave <code>w</code> as the short form — a
+            field rename is high blast radius (the <code>res.w</code> result convention is load-bearing and should not
+            move).</p>
+        </div>
 
-          <div class="space-y-1.5 text-sm leading-relaxed">
-            <p><span class="font-semibold">Problem.</span> <code>SimpleExpectedReturns(; w=…)</code> takes observation weights, <code>EquilibriumExpectedReturns(; w=…)</code> equilibrium portfolio weights, <code>WeightsTracking(; w=…)</code> a reference weight vector, and a tracking measure's <code>w</code> is benchmark <em>returns</em> — the internal doc keys (<code>:pw/:ow/:w_ref/:w_bm_ret</code>) prove the concepts are distinct, but the caller-facing name flattens them, so reading <code>w = x</code> at a call site tells the caller nothing.</p>
-            <p><span class="font-semibold">Direction.</span> If the long-form alias mechanism of <a class="text-emerald-700 underline" href="#c4">card 4</a> lands, give each semantics its long name there (<code>obs_weights</code>, <code>benchmark_returns</code>, …) and leave <code>w</code> as the short form — a field rename is high blast radius (the <code>res.w</code> result convention is load-bearing and should not move).</p>
-          </div>
+        <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
+          <li>signal: call sites self-describing</li>
+          <li>rides card 4's mechanism</li>
+          <li>blast radius: zero if alias-only</li>
+          <li>result-side <code>res.w</code> untouched</li>
+        </ul>
+      </article>
 
-          <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
-            <li>signal: call sites self-describing</li>
-            <li>rides card 4's mechanism</li>
-            <li>blast radius: zero if alias-only</li>
-            <li>result-side <code>res.w</code> untouched</li>
-          </ul>
-        </article>
+    </section>
 
-      </section>
+    <section id="top-recommendation" class="rounded-xl border-2 border-emerald-200 bg-white shadow-sm p-6 space-y-3">
+      <h2 class="text-lg font-bold text-emerald-800">Top recommendation — compact <code>Base.show</code> (card 1)</h2>
+      <p class="text-sm text-slate-700 leading-relaxed">
+        Start with <a class="text-emerald-700 underline font-semibold" href="#c1">card 1</a>. It is display-only — zero
+        blast radius on the API, no ADR to re-litigate — and it pays out everywhere at once: every REPL inspection,
+        every
+        jldoctest, and every docs example currently teaches the full default plumbing tree before the caller's own
+        choices;
+        collapsing defaults inverts that in one place. It also softens cards 4 and 8 for free, because the abbreviated
+        field
+        names stop arriving eighty at a time. The error-text cards (<a class="text-emerald-700 underline"
+          href="#c2">2</a>,
+        <a class="text-emerald-700 underline" href="#c3">3</a>) are the quick follow-ups: verbatim string edits with an
+        in-repo model to copy.
+      </p>
+    </section>
 
-      <section id="top-recommendation" class="rounded-xl border-2 border-emerald-200 bg-white shadow-sm p-6 space-y-3">
-        <h2 class="text-lg font-bold text-emerald-800">Top recommendation — compact <code>Base.show</code> (card 1)</h2>
-        <p class="text-sm text-slate-700 leading-relaxed">
-          Start with <a class="text-emerald-700 underline font-semibold" href="#c1">card 1</a>. It is display-only — zero
-          blast radius on the API, no ADR to re-litigate — and it pays out everywhere at once: every REPL inspection, every
-          jldoctest, and every docs example currently teaches the full default plumbing tree before the caller's own choices;
-          collapsing defaults inverts that in one place. It also softens cards 4 and 8 for free, because the abbreviated field
-          names stop arriving eighty at a time. The error-text cards (<a class="text-emerald-700 underline" href="#c2">2</a>,
-          <a class="text-emerald-700 underline" href="#c3">3</a>) are the quick follow-ups: verbatim string edits with an
-          in-repo model to copy.
-        </p>
-      </section>
+    <footer class="pt-6 text-xs text-slate-400">Generated 2026-07-07 · <code>/improve-ergonomics</code> · quotes
+      verified verbatim against src/ on branch <code>dev</code> (508839674)</footer>
 
-      <footer class="pt-6 text-xs text-slate-400">Generated 2026-07-07 · <code>/improve-ergonomics</code> · quotes verified verbatim against src/ on branch <code>dev</code> (508839674)</footer>
+  </main>
+</body>
 
-    </main>
-  </body>
 </html>

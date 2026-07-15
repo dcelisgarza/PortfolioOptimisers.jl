@@ -102,12 +102,12 @@ cross-validation predictions.
    the threshold makes. `ClusterGroups` has no fallback survivor rule, so `requires_score`
    is true for it and the constructor rejects a `nothing` score.
 
-10. **Concrete selectors live in `src/24_AssetSelection.jl`; the seam stays in
+10. **Concrete selectors live in `src/23_AssetSelection.jl`; the seam stays in
     `src/03_Preprocessing.jl`.** The seam depends on nothing but `ReturnsResult`. The
     concretes need covariance estimators (include #75), clustering (#116), and risk measures
     (#149), and the library's `@concrete struct` idiom evaluates its inner constructor's type
     annotations at definition time — so they physically cannot sit beside `MissingDataFilter`
-    and `Imputer` at include #3. Nothing forces them to precede `23_Pipeline/`, since
+    and `Imputer` at include #3. Nothing forces them to precede `22_Pipeline/`, since
     `run_step` dispatches on the abstract type. This is the exception to ADR 0028's post-M6
     amendment, which placed preprocessing in `03_Preprocessing.jl`.
 

@@ -1,5 +1,25 @@
+# TimeDependentCallable subtypes must be defined at top level. `TDPipeOpt` declares that
+# its per-fold value is an optimiser and records the raw fold data its context carries;
+# `TDPipePrevW` additionally declares its previous-weights requirement.
+struct TDPipeOpt <: PortfolioOptimisers.TimeDependentOptimiserCallable
+    seen::Vector{Any}
+end
+function (c::TDPipeOpt)(ctx::TimeDependentContext)
+    c.seen[ctx.i] = ctx.rd
+    return isodd(ctx.i) ? EqualWeighted() : InverseVolatility()
+end
+struct TDPipePrevW <: PortfolioOptimisers.TimeDependentOptimiserCallable
+    seen::Vector{Any}
+end
+function (c::TDPipePrevW)(ctx::TimeDependentContext)
+    c.seen[ctx.i] = ctx.w_prev
+    return EqualWeighted()
+end
+function PortfolioOptimisers.needs_previous_weights(::TDPipePrevW)
+    return true
+end
 @testset "Pipeline prediction and CV" begin
-    using Test, PortfolioOptimisers, TimeSeries, Dates, StableRNGs, Statistics
+    using Test, PortfolioOptimisers, TimeSeries, Dates, StableRNGs, Statistics, FLoops
 
     # business days only: an irregular calendar for date-based splitting
     function make_ts(; T = 120)
@@ -42,9 +62,22 @@
         @test PortfolioOptimisers.cv_nobs(rd) == 120
         @test PortfolioOptimisers.cv_timestamps(rd) === rd.ts
 
-        # returns-level-only CV schemes fail loudly on price-level data
-        @test_throws ArgumentError split(CombinatorialCrossValidation(), pr)
-        @test_throws ArgumentError split(MultipleRandomised(IndexWalkForward(60, 20)), pr)
+        # combinatorial split is level-agnostic (it partitions observations), so it runs on
+        # prices too and mirrors the returns-level split — the price-level combinatorial *fit*
+        # accepts the boundary-return approximation over the non-contiguous training rows
+        ccv0 = CombinatorialCrossValidation(; n_folds = 4, n_test_folds = 2)
+        @test split(ccv0, pr).train_idx == split(ccv0, rd).train_idx
+        @test split(ccv0, pr).test_idx == split(ccv0, rd).test_idx
+        # multiple-randomised draws over assets (rows stay contiguous), so it is admissible
+        # at the price level and mirrors the returns-level split
+        mr = MultipleRandomised(IndexWalkForward(60, 20); subset_size = 3, n_subsets = 2,
+                                seed = 42)
+        mr_pr = split(mr, pr)
+        mr_rd = split(mr, rd)
+        @test mr_pr isa PortfolioOptimisers.MultipleRandomisedResult
+        @test mr_pr.train_idx == mr_rd.train_idx
+        @test mr_pr.test_idx == mr_rd.test_idx
+        @test mr_pr.asset_idx == mr_rd.asset_idx
 
         # a Pipeline cannot be sub-selected by asset view, so it cannot be wrapped
         # in a meta-optimiser (ADR 0028 future expansion)
@@ -171,5 +204,298 @@
         res = fit(pipe, PortfolioOptimisers.port_opt_view(pr, 1:80))
         pred = PortfolioOptimisers.predict(res, pr, 81:120)
         @test size(pred.rd.X, 1) == 39
+    end
+
+    @testset "cross_val_predict over a pipeline" begin
+        X = make_prices()
+        pr = PricesResult(; X = X)
+        cvw = IndexWalkForward(60, 30)
+        sp = split(cvw, pr)
+        nf = length(sp.train_idx)
+        @test nf == 2
+        ew, iv = EqualWeighted(), InverseVolatility()
+        prep = (MissingDataFilter(), Imputer(), PricesToReturns(), EmpiricalPrior())
+        static_pipe(opt) = Pipeline(; steps = (prep..., opt))
+        function manual(opt, i)
+            res = fit(static_pipe(opt),
+                      PortfolioOptimisers.port_opt_view(pr, sp.train_idx[i]))
+            return PortfolioOptimisers.predict(res, pr, sp.test_idx[i])
+        end
+        rng = StableRNG(192837465)
+        rd_flat = ReturnsResult(; nx = string.("A", 1:5), X = randn(rng, 120, 5) / 100,
+                                ts = make_ts())
+
+        @testset "a static pipeline fits and predicts per fold" begin
+            pipe = static_pipe(ew)
+            @test !PortfolioOptimisers.is_time_dependent(pipe)
+            @test !PortfolioOptimisers.needs_previous_weights(pipe)
+            p = cross_val_predict(pipe, pr, cvw)
+            @test length(p.pred) == nf
+            for i in 1:nf
+                m = manual(ew, i)
+                @test isapprox(p.pred[i].res.w, m.res.w)
+                @test isapprox(p.pred[i].rd.X, m.rd.X)
+            end
+            # returns-level input splits at its own level
+            p2 = cross_val_predict(Pipeline(; steps = (EmpiricalPrior(), ew)), rd_flat,
+                                   KFold(; n = 4))
+            @test length(p2.pred) == 4
+        end
+
+        @testset "vector, functor and wrapped-callable schedules agree" begin
+            sched = TimeDependent([ew, iv])
+            pipe = Pipeline(; steps = (prep..., sched))
+            # the statically-typed schedule forms classify as optimisation steps
+            @test pipe.names[end] == "opt"
+            @test PortfolioOptimisers.pipe_writes(sched) == :opt
+            @test PortfolioOptimisers.pipe_reads(sched) == (:returns,)
+            @test PortfolioOptimisers.is_time_dependent(pipe)
+            p = cross_val_predict(pipe, pr, cvw)
+            @test length(p.pred) == nf
+            m1, m2 = manual(ew, 1), manual(iv, 2)
+            @test isapprox(p.pred[1].res.w, m1.res.w)
+            @test isapprox(p.pred[2].res.w, m2.res.w)
+            @test !isapprox(p.pred[1].res.w, p.pred[2].res.w)
+            # a declared functor schedules the same way, and its context carries the
+            # fold's raw, pre-preprocessing input data
+            cap = TDPipeOpt(Vector{Any}(nothing, nf))
+            pc = cross_val_predict(Pipeline(; steps = (prep..., TimeDependent(cap))), pr,
+                                   cvw)
+            @test isapprox(pc.pred[1].res.w, m1.res.w)
+            @test isapprox(pc.pred[2].res.w, m2.res.w)
+            @test all(x -> x === pr, cap.seen)
+            # a bare callable enters via PipelineStep(writes = :opt)
+            ps = PipelineStep(; est = TimeDependent(ctx -> isodd(ctx.i) ? ew : iv),
+                              writes = :opt)
+            pw = cross_val_predict(Pipeline(; steps = (prep..., ps)), pr, cvw)
+            @test isapprox(pw.pred[1].res.w, m1.res.w)
+            @test isapprox(pw.pred[2].res.w, m2.res.w)
+            # its output is type-checked at the swap
+            bad = PipelineStep(; est = TimeDependent(ctx -> EmpiricalPrior()),
+                               writes = :opt)
+            @test_throws ArgumentError cross_val_predict(Pipeline(; steps = (prep..., bad)),
+                                                         pr, cvw,
+                                                         ex = FLoops.SequentialEx())
+        end
+
+        @testset "mixed schedules: result folds predict, estimator folds optimise" begin
+            r_pre = fit(static_pipe(iv), pr).ctx.opt
+            p = cross_val_predict(Pipeline(; steps = (prep..., TimeDependent([ew, r_pre]))),
+                                  pr, cvw)
+            @test isapprox(p.pred[1].res.w, manual(ew, 1).res.w)
+            # fold 2 replays the precomputed full-sample weights, not a fold-2 refit
+            @test isapprox(p.pred[2].res.w, r_pre.w)
+            @test !isapprox(r_pre.w, manual(iv, 2).res.w)
+        end
+
+        @testset "the fold's computed slots reach the fold's optimiser" begin
+            hrp = HierarchicalRiskParity()
+            capped = (MissingDataFilter(), Imputer(), PricesToReturns(),
+                      WeightBoundsEstimator(; ub = 0.3))
+            p = cross_val_predict(Pipeline(;
+                                           steps = (capped..., TimeDependent([hrp, hrp]))),
+                                  pr, cvw)
+            @test all(pred -> all(w -> w <= 0.3 + 1e-8, pred.res.w), p.pred)
+            # identical to the static pipeline: the injected slots reach the swapped-in
+            # optimiser exactly as they reach a static step
+            mp = cross_val_predict(Pipeline(; steps = (capped..., hrp)), pr, cvw)
+            for i in 1:nf
+                @test isapprox(p.pred[i].res.w, mp.pred[i].res.w)
+            end
+            # a result fold cannot consume computed constraints: fail closed
+            r_pre = fit(static_pipe(iv), pr).ctx.opt
+            bad = Pipeline(; steps = (capped..., TimeDependent([hrp, r_pre])))
+            @test_throws ArgumentError cross_val_predict(bad, pr, cvw,
+                                                         ex = FLoops.SequentialEx())
+            # but a computed prior passes a result fold by
+            okp = cross_val_predict(Pipeline(;
+                                             steps = (prep..., TimeDependent([hrp, r_pre]))),
+                                    pr, cvw)
+            @test isapprox(okp.pred[2].res.w, r_pre.w)
+        end
+
+        @testset "previous weights thread through the fold loop" begin
+            cap = TDPipePrevW(Vector{Any}(nothing, nf))
+            pipe = Pipeline(; steps = (prep..., TimeDependent(cap)))
+            @test PortfolioOptimisers.needs_previous_weights(pipe)
+            p = @test_logs (:info,) match_mode = :any cross_val_predict(pipe, pr, cvw)
+            @test isnothing(cap.seen[1])
+            @test cap.seen[2] ≈ p.pred[1].res.w
+        end
+
+        @testset "fold-less fit is default-or-throw" begin
+            @test_throws PortfolioOptimisers.TimeDependentDefaultError fit(Pipeline(;
+                                                                                    steps = (prep...,
+                                                                                             TimeDependent([ew,
+                                                                                                            iv]))),
+                                                                           pr)
+            pd = Pipeline(; steps = (prep..., TimeDependent([ew, iv]; default = iv)))
+            res = fit(pd, pr)
+            @test isapprox(res.w, fit(static_pipe(iv), pr).w)
+        end
+
+        @testset "construction and scheme guards" begin
+            # a mis-sized schedule fails at the split, entries included
+            @test_throws DimensionMismatch cross_val_predict(Pipeline(;
+                                                                      steps = (prep...,
+                                                                               TimeDependent([ew,
+                                                                                              iv,
+                                                                                              ew]))),
+                                                             pr, cvw)
+            # schedules of non-optimiser families are not steppable
+            @test_throws ArgumentError PipelineStep(;
+                                                    est = TimeDependent([EmpiricalPrior(),
+                                                                         EmpiricalPrior()]),
+                                                    writes = :prior)
+            @test_throws ArgumentError PipelineStep(;
+                                                    est = TimeDependent([EmpiricalPrior(),
+                                                                         EmpiricalPrior()]),
+                                                    writes = :opt)
+            # an optimiser schedule step must write :opt
+            @test_throws ArgumentError PipelineStep(; est = TimeDependent([ew, iv]),
+                                                    writes = :prior)
+            # a bare-callable schedule cannot infer its slot: wrap it
+            @test_throws ArgumentError Pipeline(;
+                                                steps = (prep..., TimeDependent(ctx -> ew)))
+            # combinatorial and asset-resampling schemes now run for a price-starting pipeline
+            # too (`static_pipe` begins with PricesToReturns): combinatorial over non-contiguous
+            # training rows (boundary-return approximation), MR over asset subsets. Depth is in
+            # their own testsets; here just confirm they run.
+            @test isa(cross_val_predict(static_pipe(ew), pr,
+                                        CombinatorialCrossValidation(; n_folds = 4,
+                                                                     n_test_folds = 2)),
+                      PortfolioOptimisers.PopulationPredictionResult)
+            @test isa(cross_val_predict(static_pipe(ew), pr,
+                                        MultipleRandomised(IndexWalkForward(60, 30);
+                                                           subset_size = 3, n_subsets = 2,
+                                                           seed = 1)),
+                      PortfolioOptimisers.PopulationPredictionResult)
+            # one evaluation protocol per call: a holdout pipeline is rejected
+            @test_throws ArgumentError cross_val_predict(Pipeline(;
+                                                                  steps = (TrainTestSplit(;
+                                                                                          test_size = 0.2),
+                                                                           EmpiricalPrior(),
+                                                                           ew)), rd_flat,
+                                                         cvw)
+        end
+
+        @testset "tuning folds resolve schedules in search CV" begin
+            cvt = IndexWalkForward(60, 30)
+            spt = split(cvt, rd_flat)
+            M = length(spt.train_idx)
+            r = ConditionalValueatRisk()
+            pipe = Pipeline(; steps = (EmpiricalPrior(), ew))
+            # constant schedules score identically to their static candidates
+            res = search_cross_validation(pipe,
+                                          GridSearchCrossValidation(["opt" =>
+                                                                         [TimeDependent(fill(ew,
+                                                                                             M)),
+                                                                          TimeDependent(fill(iv,
+                                                                                             M))]];
+                                                                    cv = cvt, r = r),
+                                          rd_flat)
+            rref = search_cross_validation(pipe,
+                                           GridSearchCrossValidation(["opt" => [ew, iv]];
+                                                                     cv = cvt, r = r),
+                                           rd_flat)
+            @test size(res.test_scores) == (M, 2)
+            @test res.test_scores ≈ rref.test_scores
+            # tuning fold j runs entry j
+            rmix = search_cross_validation(pipe,
+                                           GridSearchCrossValidation(["opt" =>
+                                                                          [TimeDependent([ew,
+                                                                                          iv])]];
+                                                                     cv = cvt, r = r),
+                                           rd_flat)
+            @test rmix.test_scores[1, 1] ≈ rref.test_scores[1, 1]
+            @test rmix.test_scores[2, 1] ≈ rref.test_scores[2, 2]
+            # a candidate's schedule must match the tuning fold count
+            @test_throws DimensionMismatch search_cross_validation(pipe,
+                                                                   GridSearchCrossValidation(["opt" =>
+                                                                                                  [TimeDependent([ew,
+                                                                                                                  iv,
+                                                                                                                  ew])]];
+                                                                                             cv = cvt,
+                                                                                             r = r,
+                                                                                             ex = FLoops.SequentialEx()),
+                                                                   rd_flat)
+        end
+
+        @testset "combinatorial and MultipleRandomised over a returns-level pipeline" begin
+            # A returns-level pipeline runs both exactly (no rolling transform), like the
+            # plain-optimiser loops. `rpipe` has no rolling/price step. (Price-starting
+            # pipelines also run them — combinatorial with a boundary-return approximation —
+            # covered in the price-level testsets.)
+            rpipe(opt) = Pipeline(; steps = (EmpiricalPrior(), opt))
+            @testset "combinatorial" begin
+                ccv = CombinatorialCrossValidation(; n_folds = 4, n_test_folds = 2)
+                n_c = PortfolioOptimisers.n_splits(ccv)
+                pp = cross_val_predict(rpipe(iv), rd_flat, ccv)
+                @test isa(pp, PortfolioOptimisers.PopulationPredictionResult)
+                @test all(isa(p.res.retcode, PortfolioOptimisers.OptimisationSuccess)
+                          for pa in pp.pred for p in pa.pred)
+                # A homogeneous schedule reproduces the pure run at every position (the
+                # schedule is consumed per split); a mixed schedule runs and switches.
+                homog = cross_val_predict(rpipe(TimeDependent(fill(iv, n_c))), rd_flat, ccv)
+                @test [length(p.pred) for p in homog.pred] ==
+                      [length(p.pred) for p in pp.pred]
+                @test all(isapprox(a.res.w, b.res.w)
+                          for (pa, pb) in zip(homog.pred, pp.pred)
+                          for (a, b) in zip(pa.pred, pb.pred))
+                mixed = cross_val_predict(rpipe(TimeDependent([iseven(j) ? iv : ew
+                                                               for j in 1:n_c])), rd_flat,
+                                          ccv)
+                @test all(isa(p.res.retcode, PortfolioOptimisers.OptimisationSuccess)
+                          for pa in mixed.pred for p in pa.pred)
+            end
+            @testset "MultipleRandomised" begin
+                inner = IndexWalkForward(60, 30)
+                n_pp = PortfolioOptimisers.n_splits(inner, rd_flat)
+                mkmr = () -> MultipleRandomised(inner; subset_size = 3, n_subsets = 2,
+                                                rng = StableRNG(42), seed = 1)
+                pm = cross_val_predict(rpipe(iv), rd_flat, mkmr())
+                @test isa(pm, PortfolioOptimisers.PopulationPredictionResult)
+                @test length(pm.pred) == 2                       # n_subsets paths
+                @test all(path -> length(path.pred) == n_pp, pm.pred)
+                @test all(length(p.res.w) == 3 for pa in pm.pred for p in pa.pred)
+                @test all(isa(p.res.retcode, PortfolioOptimisers.OptimisationSuccess)
+                          for pa in pm.pred for p in pa.pred)
+                # Homogeneous schedule reproduces the pure run (same seed => same split).
+                homog = cross_val_predict(rpipe(TimeDependent(fill(iv, n_pp))), rd_flat,
+                                          mkmr())
+                @test all(isapprox(a.res.w, b.res.w)
+                          for (pa, pb) in zip(homog.pred, pm.pred)
+                          for (a, b) in zip(pa.pred, pb.pred))
+                # A wrong-length schedule is rejected per path.
+                @test_throws DimensionMismatch cross_val_predict(rpipe(TimeDependent([iv])),
+                                                                 rd_flat, mkmr())
+            end
+        end
+
+        @testset "MultipleRandomised over a price-starting pipeline" begin
+            # MR resamples assets; every observation window stays contiguous, so — unlike
+            # combinatorial — a price-starting pipeline (PricesToReturns) is admissible.
+            inner = IndexWalkForward(60, 30)
+            n_pp = PortfolioOptimisers.n_splits(inner, pr)
+            mr = MultipleRandomised(inner; subset_size = 3, n_subsets = 2,
+                                    rng = StableRNG(42), seed = 1)
+
+            pm = cross_val_predict(static_pipe(iv), pr, mr)
+            @test isa(pm, PortfolioOptimisers.PopulationPredictionResult)
+            @test length(pm.pred) == 2                       # n_subsets paths
+            @test all(path -> length(path.pred) == n_pp, pm.pred)
+            @test all(length(p.res.w) == 3 for pa in pm.pred for p in pa.pred)
+            @test all(isa(p.res.retcode, PortfolioOptimisers.OptimisationSuccess)
+                      for pa in pm.pred for p in pa.pred)
+
+            # combinatorial also runs at the price level (boundary-return approximation over
+            # its non-contiguous training rows); test groups are contiguous so predictions hold
+            ccv = CombinatorialCrossValidation(; n_folds = 4, n_test_folds = 2)
+            cc = cross_val_predict(static_pipe(iv), pr, ccv)
+            @test isa(cc, PortfolioOptimisers.PopulationPredictionResult)
+            @test length(cc.pred) == maximum(split(ccv, pr).path_ids)
+            @test all(isa(p.res.retcode, PortfolioOptimisers.OptimisationSuccess)
+                      for pa in cc.pred for p in pa.pred)
+        end
     end
 end

@@ -4,7 +4,7 @@
 CombinatorialCrossValidation
 CombinatorialCrossValidationResult
 CombCVER
-Base.split(ccv::CombinatorialCrossValidation, rd::ReturnsResult)
+Base.split(ccv::CombinatorialCrossValidation, rd::Prices_RR)
 test_set_index(ccv::CombinatorialCrossValidation)
 binary_train_test_sets(ccv::CombinatorialCrossValidation)
 get_path_ids(ccv::CombinatorialCrossValidation)

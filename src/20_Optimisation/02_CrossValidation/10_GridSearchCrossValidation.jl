@@ -1,150 +1,4 @@
 """
-$(DocStringExtensions.TYPEDEF)
-
-Performs grid search cross-validation for portfolio optimisation estimators. Iterates over parameter grids, applies cross-validation splits, and scores each configuration to select the optimal parameters.
-
-# Fields
-
-$(DocStringExtensions.FIELDS)
-
-# Constructors
-
-    GridSearchCrossValidation(
-        p::MultiGSCVValType_VecMultiGSCVValType;
-        cv::SearchCV = KFold(),
-        r::AbstractBaseRiskMeasure = ConditionalValueatRisk(),
-        scorer::CrossValSearchScorer = HighestMeanScore(),
-        ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
-        train_score::Bool = false,
-        kwargs::NamedTuple = (;),
-    ) -> GridSearchCrossValidation
-
-Positional and keyword arguments correspond to fields above.
-
-## Validation
-
-  - `!isempty(p)`.
-  - If `p` is a vector of parameter sets: each element must not be empty.
-  - All keys in `p` must be of type `GSCVKey` (i.e. `String`, `Symbol`, or `Integer`).
-
-# Examples
-
-```jldoctest
-julia> GridSearchCrossValidation(Dict("alpha" => [0.1, 0.2], "beta" => [1.0, 2.0]))
-GridSearchCrossValidation
-            p ┼ Dict{String, Vector{Float64}}: Dict("alpha" => [0.1, 0.2], "beta" => [1.0, 2.0])
-           cv ┼ KFold
-              │              n ┼ Int64: 5
-              │    purged_size ┼ Int64: 0
-              │   embargo_size ┴ Int64: 0
-            r ┼ ConditionalValueatRisk
-              │   settings ┼ RiskMeasureSettings
-              │            │   scale ┼ Float64: 1.0
-              │            │      ub ┼ nothing
-              │            │     rke ┴ Bool: true
-              │      alpha ┼ Float64: 0.05
-              │          w ┴ nothing
-       scorer ┼ HighestMeanScore()
-           ex ┼ Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
-  train_score ┼ Bool: false
-       kwargs ┴ @NamedTuple{}: NamedTuple()
-```
-
-# Related
-
-  - [`MultiGSCVValType_VecMultiGSCVValType`](@ref)
-  - [`SearchCV`](@ref)
-  - [`AbstractBaseRiskMeasure`](@ref)
-  - [`CrossValSearchScorer`](@ref)
-  - [`search_cross_validation`](@ref)
-"""
-@concrete struct GridSearchCrossValidation <: AbstractSearchCrossValidationEstimator
-    """
-    $(field_dict[:p_cv])
-    """
-    p
-    """
-    $(field_dict[:cv])
-    """
-    cv
-    """
-    $(field_dict[:r])
-    """
-    r
-    """
-    $(field_dict[:scorer])
-    """
-    scorer
-    """
-    $(field_dict[:ex])
-    """
-    ex
-    """
-    $(field_dict[:train_score])
-    """
-    train_score
-    """
-    $(field_dict[:kwargs])
-    """
-    kwargs
-    function GridSearchCrossValidation(p::Union{<:AbstractVector{<:Pair{<:Any,
-                                                                        <:AbstractVector}},
-                                                <:AbstractVector{<:AbstractVector{<:Pair{<:Any,
-                                                                                         <:AbstractVector}}},
-                                                <:AbstractDict{<:Any, <:AbstractVector},
-                                                <:AbstractVector{<:AbstractDict{<:Any,
-                                                                                <:AbstractVector}}},
-                                       cv::SearchCV, r::AbstractBaseRiskMeasure,
-                                       scorer::CrossValSearchScorer,
-                                       ex::FLoops.Transducers.Executor, train_score::Bool,
-                                       kwargs::NamedTuple)
-        @argcheck(!isempty(p), IsEmptyError)
-        p_flag = isa(p, AbstractVector{<:Pair})
-        d_flag = isa(p, AbstractDict)
-        vp_flag = isa(p, AbstractVector{<:AbstractVector{<:Pair}})
-        vd_flag = isa(p, AbstractVector{<:AbstractDict})
-        if p_flag
-            @argcheck(all(x -> isa(x[1], GSCVKey), p),
-                      ArgumentError("all keys in p must be of type GSCVKey (String, Symbol, or Integer)"))
-        elseif d_flag
-            @argcheck(all(x -> isa(x, GSCVKey), keys(p)),
-                      ArgumentError("all keys in p must be of type GSCVKey (String, Symbol, or Integer)"))
-        elseif vp_flag || vd_flag
-            @argcheck(all(!isempty, p),
-                      IsEmptyError("each parameter set in p cannot be empty"))
-            if vp_flag
-                for _p in p
-                    @argcheck(all(x -> isa(x[1], GSCVKey), _p),
-                              ArgumentError("all keys in p must be of type GSCVKey (String, Symbol, or Integer)"))
-                end
-            end
-            if vd_flag
-                for _p in p
-                    @argcheck(all(x -> isa(x, GSCVKey), keys(_p)),
-                              ArgumentError("all keys in p must be of type GSCVKey (String, Symbol, or Integer)"))
-                end
-            end
-        end
-        return new{typeof(p), typeof(cv), typeof(r), typeof(scorer), typeof(ex),
-                   typeof(train_score), typeof(kwargs)}(p, cv, r, scorer, ex, train_score,
-                                                        kwargs)
-    end
-end
-function GridSearchCrossValidation(p::Union{<:AbstractVector{<:Pair{<:Any,
-                                                                    <:AbstractVector}},
-                                            <:AbstractVector{<:AbstractVector{<:Pair{<:Any,
-                                                                                     <:AbstractVector}}},
-                                            <:AbstractDict{<:Any, <:AbstractVector},
-                                            <:AbstractVector{<:AbstractDict{<:Any,
-                                                                            <:AbstractVector}}};
-                                   cv::SearchCV = KFold(),
-                                   r::AbstractBaseRiskMeasure = ConditionalValueatRisk(),
-                                   scorer::CrossValSearchScorer = HighestMeanScore(),
-                                   ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
-                                   train_score::Bool = false, kwargs::NamedTuple = (;))
-    return GridSearchCrossValidation(p, cv, r, scorer, ex, train_score, kwargs)
-end
-"""
     lens_val_grid(estval)
 
 Build a grid of (lens, value) pairs from a parameter specification.
@@ -221,8 +75,6 @@ function search_cross_validation(opt::NonFiniteAllocationOptimisationEstimator,
     p = gscv.p
     lens_grid, val_grid = lens_val_grid(p)
     cv = split(gscv.cv, rd)
-    @argcheck(isa(cv.test_idx[1], VecInt),
-              ArgumentError("grid search cross-validation requires non-combinatorial (VecInt) test indices, but got $(typeof(cv.test_idx[1]))"))
     N = length(val_grid)
     M = length(cv.train_idx)
     test_scores = Matrix{eltype(rd.X)}(undef, M, N)
@@ -238,8 +90,8 @@ function search_cross_validation(opt::NonFiniteAllocationOptimisationEstimator,
             for (lens, val) in zip(lenses, vals)
                 opti = Accessors.set(opti, lens, val)
             end
-            for (j, (train_idx, test_idx)) in enumerate(zip(cv.train_idx, cv.test_idx))
-                test_score, train_score = fit_and_score(opti, gscv, rd, train_idx, test_idx)
+            for j in eachindex(cv.train_idx)
+                test_score, train_score = fit_and_score(opti, gscv, cv, rd, j)
                 test_scores[j, i] = test_score
                 if gscv.train_score
                     train_scores[j, i] = train_score
@@ -251,6 +103,77 @@ function search_cross_validation(opt::NonFiniteAllocationOptimisationEstimator,
     opt_lens = lens_grid[opt_idx]
     opt_vals = val_grid[opt_idx]
     for (lens, val) in zip(opt_lens, opt_vals)
+        opt = Accessors.set(opt, lens, val)
+    end
+    return SearchCrossValidationResult(; opt = opt, test_scores = test_scores,
+                                       train_scores = train_scores, lens_grid = lens_grid,
+                                       val_grid = val_grid, idx = opt_idx)
+end
+"""
+    search_cross_validation(opt::NonFiniteAllocationOptimisationEstimator,
+                            gscv::GridSearchCrossValidation{<:Any, <:CombinatorialCrossValidation},
+                            rd::ReturnsResult)
+
+Grid search cross-validation over a [`CombinatorialCrossValidation`](@ref) scheme.
+
+Unlike the contiguous schemes (which score one fold per row), combinatorial cross-validation
+recombines its disjoint test groups into full-length backtest **paths**. Scoring a single
+split in isolation would mix groups belonging to different paths, so this method scores
+per-path instead: for each candidate the whole scheme is run through [`fit_and_predict`](@ref)
+(splits fitted, groups recombined by [`sort_predictions!`](@ref) into a
+[`PopulationPredictionResult`](@ref)), and [`expected_risk`](@ref) yields one score per path.
+The score matrix is therefore `n_paths × n_candidates`; the scorer selects across candidates
+exactly as for the other schemes. The randomised form delegates here through its grid.
+
+`train_scores` (only when `gscv.train_score`) keeps every per-fold in-sample score rather than
+collapsing to one number per path: it is a `Vector` of `n_paths` matrices, one per path, each
+`folds_in_path × n_candidates`. (Test scores stay one-per-path because a path's out-of-sample
+returns pool into a single series, whereas its folds train on distinct in-sample windows.)
+
+# Related
+
+  - [`CombinatorialCrossValidation`](@ref)
+  - [`fit_and_predict`](@ref)
+  - [`expected_risk`](@ref)
+  - [`search_cross_validation`](@ref)
+"""
+function search_cross_validation(opt::NonFiniteAllocationOptimisationEstimator,
+                                 gscv::GridSearchCrossValidation{<:Any,
+                                                                 <:CombinatorialCrossValidation},
+                                 rd::ReturnsResult)
+    lens_grid, val_grid = lens_val_grid(gscv.p)
+    cv = split(gscv.cv, rd)
+    N = length(val_grid)
+    M = maximum(cv.path_ids)          # one score per recombined backtest path
+    r = gscv.r
+    sgn = ifelse(bigger_is_better(r), 1, -1)
+    test_scores = Matrix{eltype(rd.X)}(undef, M, N)
+    # Train scores are per fold, and each path holds a different number of folds, so they
+    # are kept as one `folds × candidates` matrix per path (a Vector of matrices) rather
+    # than collapsed — test scores stay one-per-path.
+    train_scores = if gscv.train_score
+        [Matrix{eltype(rd.X)}(undef, count(==(p), cv.path_ids), N) for p in 1:M]
+    else
+        nothing
+    end
+    for (i, (lenses, vals)) in enumerate(zip(lens_grid, val_grid))
+        opti = opt
+        for (lens, val) in zip(lenses, vals)
+            opti = Accessors.set(opti, lens, val)
+        end
+        # Fold-level parallelism happens inside fit_and_predict; the candidate loop is
+        # sequential to avoid nested threading.
+        predictions = fit_and_predict(opti, rd, gscv.cv; ex = gscv.ex)
+        test_scores[:, i] = sgn * expected_risk(r, predictions; gscv.kwargs...)
+        if gscv.train_score
+            for (p, path) in enumerate(predictions.pred)
+                train_scores[p][:, i] = [sgn * expected_risk(r, fp.res; gscv.kwargs...)
+                                         for fp in path.pred]
+            end
+        end
+    end
+    opt_idx = gscv.scorer(test_scores)
+    for (lens, val) in zip(lens_grid[opt_idx], val_grid[opt_idx])
         opt = Accessors.set(opt, lens, val)
     end
     return SearchCrossValidationResult(; opt = opt, test_scores = test_scores,

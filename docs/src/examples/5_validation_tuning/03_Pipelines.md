@@ -321,14 +321,64 @@ tuned_rand = search_cross_validation(pipe, rscv, pr)
 size(tuned_rand.test_scores)
 ````
 
-## 5. Boundaries
+## 5. Many paths: combinatorial and asset-resampling cross-validation
+
+The walk-forward above produces *one* backtest path. [`CombinatorialCrossValidation`](@ref) and
+[`MultipleRandomised`](@ref) produce *many* — a distribution of out-of-sample outcomes rather
+than a single number. There is one rule: they need contiguous input rows, which recombined
+groups and resampled paths do not guarantee, so a pipeline that **starts from prices** — with a
+[`PricesToReturns`](@ref) or any rolling, order-dependent step — rejects them (the
+*rolling-window rule*). A **returns-level** pipeline has no such step, so it runs them exactly
+as a plain optimiser would.
+
+So we start from returns and drop the price-level cleaning:
+
+````@example 03_Pipelines
+rd = prices_to_returns(X)
+rpipe = Pipeline(;
+                 steps = (EmpiricalPrior(),
+                          MeanRisk(; obj = MinimumRisk(), opt = JuMPOptimiser(; slv = slv))))
+````
+
+### 5.1 Combinatorial paths
+
+Each split trains on its (possibly non-contiguous) groups and predicts the held-out ones; the
+per-split test groups recombine into paths. `expected_risk` over the population gives one
+realised risk per path — the spread *is* the robustness picture the scheme exists to produce.
+
+````@example 03_Pipelines
+comb = CombinatorialCrossValidation(; n_folds = 5, n_test_folds = 2)
+pp = cross_val_predict(rpipe, rd, comb)
+cvar = ConditionalValueatRisk()
+pretty_table(DataFrame(; path = [p.id for p in pp.pred],
+                       folds = [length(p.pred) for p in pp.pred],
+                       cvar = expected_risk(cvar, pp)); formatters = [resfmt])
+````
+
+### 5.2 Asset-resampling paths
+
+[`MultipleRandomised`](@ref) draws a random asset subset per path and runs an inner
+walk-forward over it. The subset is applied to the *input*, so the pipeline fits fresh on each
+sub-universe — it never sub-selects fitted state (the restriction that used to rule this out).
+
+````@example 03_Pipelines
+mr = MultipleRandomised(IndexWalkForward(500, 250); subset_size = 6, n_subsets = 4,
+                        rng = StableRNG(20240607))
+pm = cross_val_predict(rpipe, rd, mr)
+pretty_table(DataFrame(; path = [p.id for p in pm.pred],
+                       folds = [length(p.pred) for p in pm.pred],
+                       assets = [length(p.pred[1].res.w) for p in pm.pred]);
+             formatters = [resfmt])
+````
+
+## 6. Boundaries
 
 A few things a pipeline deliberately will not do, each with an explanatory error rather than
 a silent wrong answer:
 
-- **Combinatorial and multiple-randomised cross-validation stay returns-level.** Their
-    folds recombine non-contiguous groups, which is incompatible with the contiguous input
-    windows stateful preprocessing needs.
+- **Combinatorial and multiple-randomised cross-validation are price-level-restricted.** A
+    price-starting pipeline rejects them by the rolling-window rule of §5; run them on a
+    returns-level pipeline, as above.
 - **A pipeline cannot be wrapped in a meta-optimiser** (`NestedClustered`, `Stacking`,
     `SubsetResampling`). Those build asset sub-portfolios via an asset view of their inner
     estimator, and a pipeline's universe is fitted state, so the view is not well defined
@@ -351,7 +401,7 @@ catch e
 end
 ````
 
-## 6. Summary
+## 7. Summary
 
 A [`Pipeline`](@ref) turns an implicit, hand-tuned data-preparation prologue into an explicit,
 fitted, tunable part of the model.

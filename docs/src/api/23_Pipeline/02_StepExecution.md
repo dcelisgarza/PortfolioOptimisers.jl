@@ -12,3 +12,5 @@ run_uncertainty_step
 pipeline_asset_sets
 add_constraint_result
 ```
+
+A [`TrainTestSplit`](@ref) is the one step whose written slot is not a property of its type: it narrows whichever data slot the pipeline input filled, and declares the sentinel `:split` (see [`pipe_writes`](@ref)) so that the generic constructor machinery treats it as writing nothing. Its `run_step` method and slot declarations are documented with `run_step`, [`pipe_reads`](@ref), and [`pipe_writes`](@ref).

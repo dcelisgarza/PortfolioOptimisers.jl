@@ -11,7 +11,7 @@ is the reference weight vector from `r.w`.
 
 ```math
 \\begin{align}
-\\mathrm{Turnover}(\\boldsymbol{w}) &= \\|\\boldsymbol{w} - \\boldsymbol{w}_b k\\|_1\\,.
+\\mathrm{Turnover}(\\boldsymbol{w}) &= \\lVert \\boldsymbol{w} - \\boldsymbol{w}_b k \\rVert_1\\,.
 \\end{align}
 ```
 
@@ -21,7 +21,7 @@ Where:
   - $(math_dict[:w_port])
   - ``\\boldsymbol{w}_b``: Benchmark weight vector.
   - ``k``: Rebalancing factor (0 or 1).
-  - ``\\|\\cdot\\|_1``: L1 norm.
+  - ``\\lVert \\cdot \\rVert_1``: L1 norm.
 
 where ``\\boldsymbol{w}_b`` is the benchmark weight vector and ``k`` is the budget scaling variable.
 

@@ -1,4 +1,21 @@
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the static defaults of the [`HierarchicalEqualRiskContribution`](@ref) fields that may hold a [`TimeDependent`](@ref).
+
+Shared by the constructor's test-substitution pass and [`time_dependent_field_defaults`](@ref), so the fold-less value of a field is declared once. Fields whose static default is `nothing` are omitted.
+
+# Related
+
+  - [`HierarchicalEqualRiskContribution`](@ref)
+  - [`time_dependent_field_defaults`](@ref)
+  - [`assert_time_dependent_substitution`](@ref)
+"""
+function herc_td_defaults()::NamedTuple
+    return (; ri = Variance(), ro = Variance(), scai = SumScalariser(),
+            scao = SumScalariser())
+end
+"""
 $(DocStringExtensions.TYPEDEF)
 
 Hierarchical Equal Risk Contribution (HERC) portfolio optimiser.
@@ -13,19 +30,20 @@ $(DocStringExtensions.FIELDS)
 
     HierarchicalEqualRiskContribution(;
         opt::HierarchicalOptimiser = HierarchicalOptimiser(),
-        ri::OptRM_VecOptRM = Variance(),
-        ro::OptRM_VecOptRM = ri,
-        scai::Scalariser = SumScalariser(),
-        scao::Scalariser = scai,
+        ri::TD{<:OptRM_VecOptRM} = Variance(),
+        ro::TD{<:OptRM_VecOptRM} = ri,
+        scai::TD{<:Scalariser} = SumScalariser(),
+        scao::TD{<:Scalariser} = scai,
         ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
-        fb::Option{<:OptE_Opt} = nothing
+        fb::TDO_Option{<:OptE_Opt} = nothing
     ) -> HierarchicalEqualRiskContribution
 
-Keywords correspond to the struct's fields.
+Keywords correspond to the struct's fields. Fields typed [`TD`](@ref) or [`TDO_Option`](@ref) may hold a [`TimeDependent`](@ref) per-fold schedule instead of a static value: the inner/outer risk measures, their scalarisers and the fallback are problem definition, so a cross-validation fold loop resolves them per fold, and a fold-less `optimise` runs with each at its static default (`nothing` for `fb`). The executor `ex` is execution control and stays static.
 
 ## Validation
 
   - If `ri` or `ro` is a vector: `!isempty(ri)` / `!isempty(ro)`.
+  - `fb` schedules: `bind !== :nearest`.
 
 ## Propagated parameters
 
@@ -194,29 +212,39 @@ Where:
     """
     @fprop fb
     function HierarchicalEqualRiskContribution(opt::HierarchicalOptimiser,
-                                               ri::OptRM_VecOptRM, ro::OptRM_VecOptRM,
-                                               scai::Scalariser, scao::Scalariser,
+                                               ri::TD{<:OptRM_VecOptRM},
+                                               ro::TD{<:OptRM_VecOptRM},
+                                               scai::TD{<:Scalariser},
+                                               scao::TD{<:Scalariser},
                                                ex::FLoops.Transducers.Executor,
-                                               fb::Option{<:OptE_Opt})
+                                               fb::TDO_Option{<:OptE_Opt})
+        assert_no_nearest_bind_optimiser_schedule(fb, :fb,
+                                                  :HierarchicalEqualRiskContribution)
         if isa(ri, AbstractVector)
             @argcheck(!isempty(ri), IsEmptyError("ri cannot be empty"))
         end
         if isa(ro, AbstractVector)
             @argcheck(!isempty(ro), IsEmptyError("ro cannot be empty"))
         end
+        assert_time_dependent_substitution(HierarchicalEqualRiskContribution,
+                                           (; opt, ri, ro, scai, scao, ex, fb),
+                                           herc_td_defaults())
         return new{typeof(opt), typeof(ri), typeof(ro), typeof(scai), typeof(scao),
                    typeof(ex), typeof(fb)}(opt, ri, ro, scai, scao, ex, fb)
     end
 end
 function HierarchicalEqualRiskContribution(;
                                            opt::HierarchicalOptimiser = HierarchicalOptimiser(),
-                                           ri::OptRM_VecOptRM = Variance(),
-                                           ro::OptRM_VecOptRM = ri,
-                                           scai::Scalariser = SumScalariser(),
-                                           scao::Scalariser = scai,
+                                           ri::TD{<:OptRM_VecOptRM} = Variance(),
+                                           ro::TD{<:OptRM_VecOptRM} = ri,
+                                           scai::TD{<:Scalariser} = SumScalariser(),
+                                           scao::TD{<:Scalariser} = scai,
                                            ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
-                                           fb::Option{<:OptE_Opt} = nothing)::HierarchicalEqualRiskContribution
+                                           fb::TDO_Option{<:OptE_Opt} = nothing)::HierarchicalEqualRiskContribution
     return HierarchicalEqualRiskContribution(opt, ri, ro, scai, scao, ex, fb)
+end
+function time_dependent_field_defaults(::HierarchicalEqualRiskContribution)::NamedTuple
+    return herc_td_defaults()
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -231,7 +259,9 @@ Returns `true` if any of the base optimiser, inner/outer risk measures, or fallb
   - [`HierarchicalEqualRiskContribution`](@ref)
 """
 function needs_previous_weights(opt::HierarchicalEqualRiskContribution)
-    return (needs_previous_weights(opt.opt) ||
+    return (any(f -> needs_previous_weights(getfield(opt, f)),
+                time_dependent_fields(opt)) ||
+            needs_previous_weights(opt.opt) ||
             needs_previous_weights(opt.ri) ||
             needs_previous_weights(opt.ro) ||
             needs_previous_weights(opt.fb))
@@ -655,7 +685,7 @@ function _optimise(hec::HierarchicalEqualRiskContribution,
     rd = returns_result_picker(rd, hec.opt.brt)
     pr = prior(hec.opt.pe, rd; dims = dims)
     X = pr.X
-    clr = clusterise(hec.opt.cle, pr; iv = rd.iv, ivpa = rd.ivpa, dims = dims,
+    clr = clusterise(hec.opt.cle, pr; rd = rd, iv = rd.iv, ivpa = rd.ivpa, dims = dims,
                      branchorder = branchorder, cle_pr = hec.opt.cle_pr)
     idx = assignments(clr)
     cls = [findall(x -> x == i, idx) for i in 1:(clr.k)]
@@ -695,8 +725,8 @@ function _optimise(hec::HierarchicalEqualRiskContribution,
     wb = weight_bounds_constraints(hec.opt.wb, hec.opt.sets; N = length(w),
                                    strict = hec.opt.strict, datatype = eltype(X))
     retcode, w = finalise_weight_bounds(hec.opt.wf, wb, w / sum(w))
-    return HierarchicalResult(; oe = typeof(hec), pr = pr, clr = clr, wb = wb, fees = fees,
-                              retcode = retcode, w = w, fb = nothing)
+    return HierarchicalResult(; pr = pr, clr = clr, wb = wb, fees = fees, retcode = retcode,
+                              w = w, fb = nothing)
 end
 """
     optimise(hec::HierarchicalEqualRiskContribution{

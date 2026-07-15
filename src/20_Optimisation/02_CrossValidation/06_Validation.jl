@@ -25,8 +25,7 @@ is controlled by `ex`.
   - [`WalkForwardEstimator`](@ref)
   - [`fit_and_predict`](@ref)
 """
-function cross_val_predict(opt::NonFiniteAllocationOptimisationEstimator, rd::ReturnsResult,
-                           cv::CVER = KFold(); cols = :,
+function cross_val_predict(opt::OptE_TD, rd::ReturnsResult, cv::CVER = KFold(); cols = :,
                            ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())
     assert_internal_optimiser(opt)
     assert_external_optimiser(opt)

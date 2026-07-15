@@ -10,7 +10,6 @@ DocumenterCitations = "daee34ce-89f3-4625-b898-19384cb65244"
 DocumenterTools = "35a29f4d-8980-5a13-9543-d66fff28ecb8"
 DocumenterVitepress = "4710194d-e776-4893-9690-8d956a29c365"
 GraphRecipes = "bd48cda9-67a9-57be-86fa-5b3c104eda73"
-InteractiveUtils = "b77e0a4c-d291-57a0-90e8-8db25a27a240"
 Handcalcs = "e8a07092-c156-4455-ab8e-ed8bc81edefb"
 HiGHS = "87dc4568-4c63-4d18-b0c0-bb2238e4078b"
 Impute = "f7bf1975-0170-51b9-8c5f-a992d46b9575"
@@ -27,6 +26,9 @@ StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 StatsPlots = "f3b207a7-027a-5e70-b257-86293d7955fd"
 TimeSeries = "9e3dc215-6440-5c97-bce1-76c03772f85e"
 YFinance = "e4b3b0a2-f9a3-42f3-aabb-32142cceaf77"
+
+[sources]
+PortfolioOptimisers = {path = ".."}
 
 [compat]
 Clarabel = "0.11"

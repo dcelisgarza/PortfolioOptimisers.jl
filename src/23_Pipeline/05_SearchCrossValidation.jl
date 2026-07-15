@@ -18,8 +18,27 @@ Return the observation-window view of price- or returns-level data used by pipel
   - [`port_opt_view`](@ref)
   - [`fit_and_score`](@ref)
 """
-pipeline_data_view(pr::AbstractPricesResult, idx) = port_opt_view(pr, idx)
-pipeline_data_view(rd::AbstractReturnsResult, idx) = port_opt_view(rd, idx, :)
+pipeline_data_view(pr::AbstractPricesResult, idx, idx2 = :) = port_opt_view(pr, idx, idx2)
+pipeline_data_view(rd::AbstractReturnsResult, idx, idx2 = :) = port_opt_view(rd, idx, idx2)
+"""
+    pipeline_asset_view(data::AbstractReturnsResult, cols)
+    pipeline_asset_view(data::AbstractPricesResult, cols)
+
+Return the asset-subset view of price- or returns-level `data` for a [`MultipleRandomised`](@ref)
+resampling path — all observations, only the columns `cols`.
+
+The two levels index assets through different `port_opt_view` arities: returns take the
+two-argument asset form `port_opt_view(rd, cols)`, prices the observation-then-asset form
+`port_opt_view(pr, :, cols)`. This wrapper hides that asymmetry so
+[`pipeline_path_fit_and_predict`](@ref) stays level-agnostic.
+
+# Related
+
+  - [`pipeline_data_view`](@ref)
+  - [`pipeline_path_fit_and_predict`](@ref)
+"""
+pipeline_asset_view(data::AbstractReturnsResult, cols) = port_opt_view(data, cols)
+pipeline_asset_view(data::AbstractPricesResult, cols) = port_opt_view(data, :, cols)
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
@@ -119,7 +138,10 @@ function pipeline_lens_val_grid(pipe::Pipeline,
     return lenses, vals
 end
 """
-    fit_and_score(pipe::Pipeline, scv::AbstractSearchCrossValidationEstimator, data, train_idx::VecInt, test_idx::VecInt)
+    fit_and_score(pipe::Pipeline,
+                       scv::Union{<:GridSearchCrossValidation{<:Any, <:Any},
+                                  <:RandomisedSearchCrossValidation{<:Any, <:Any}},
+                       cv::CrossValidationResult, rd::Prices_RR, i::Integer)
 
 Fit a [`Pipeline`](@ref) on the training window and score it on the test window for search cross-validation.
 
@@ -143,15 +165,36 @@ The whole workflow is fitted per fold: stateful preprocessing (universe, imputat
   - [`expected_risk`](@ref)
   - [`predict(res::PipelineResult, data::AbstractPricesResult, window)`](@ref)
 """
-function fit_and_score(pipe::Pipeline, scv::AbstractSearchCrossValidationEstimator,
-                       data::Prices_RR, train_idx::VecInt, test_idx::VecInt)
-    res = StatsAPI.fit(pipe, pipeline_data_view(data, train_idx))
-    test_pred = StatsAPI.predict(res, data, test_idx)
+function fit_and_score(pipe::Pipeline,
+                       scv::Union{<:GridSearchCrossValidation{<:Any, <:Any},
+                                  <:RandomisedSearchCrossValidation{<:Any, <:Any}},
+                       cv::CrossValidationResult, rd::Prices_RR, i::Integer)
+    assert_no_holdout(pipe)
+    prediction = fit_and_predict(pipe, rd; train_idx = cv.train_idx[i],
+                                 test_idx = cv.test_idx[i])
     r = scv.r
     sign = ifelse(bigger_is_better(r), 1, -1)
-    test_score = sign * expected_risk(r, test_pred; scv.kwargs...)
+    test_score = sign * expected_risk(r, prediction; scv.kwargs...)
     train_score = if scv.train_score
-        sign * expected_risk(r, res.ctx.opt; scv.kwargs...)
+        sign * expected_risk(r, prediction.res; scv.kwargs...)
+    else
+        nothing
+    end
+    return test_score, train_score
+end
+function fit_and_score(pipe::Pipeline,
+                       scv::Union{<:GridSearchCrossValidation{<:Any, <:MultipleRandomised},
+                                  <:RandomisedSearchCrossValidation{<:Any,
+                                                                    <:MultipleRandomised}},
+                       cv::MultipleRandomisedResult, rd::Prices_RR, i::Integer)
+    assert_no_holdout(pipe)
+    prediction = fit_and_predict(pipe, rd; train_idx = cv.train_idx[i],
+                                 test_idx = cv.test_idx[i], cols = cv.asset_idx[i])
+    r = scv.r
+    sign = ifelse(bigger_is_better(r), 1, -1)
+    test_score = sign * expected_risk(scv.r, prediction; scv.kwargs...)
+    train_score = if scv.train_score
+        sign * expected_risk(scv.r, prediction.res; scv.kwargs...)
     else
         nothing
     end
@@ -164,6 +207,8 @@ end
 Tune a [`Pipeline`](@ref) by grid (or randomised) search cross-validation on price- or returns-level input data.
 
 The input is split into contiguous observation windows by `gscv.cv` (price-level splits keep stateful preprocessing inside the fold); for each candidate the lens grid is applied to the pipeline (keys resolved by [`pipeline_lens`](@ref), so step names, step positions, and raw property paths all address steps), the whole workflow is fitted on the training window and scored on the test window via [`fit_and_score`](@ref), and the scorer picks the winner. The randomised form samples the grid and delegates, exactly as for plain optimisers.
+
+[`TimeDependent`](@ref) schedules resolve against the *tuning* folds: when a candidate is time-dependent, its schedules are sized to the tuning scheme's fold count (asserted per candidate — a grid value may swap a whole schedule in or out), and tuning fold `j` swaps in entry `j` via the pipeline-level [`update_time_dependent_estimator`](@ref) before [`fit_and_score`](@ref) runs. Lenses need no schedule-specific semantics: naming the step swaps the whole schedule as a grid value, and raw property paths address entries.
 
 # Arguments
 
@@ -184,10 +229,9 @@ The input is split into contiguous observation windows by `gscv.cv` (price-level
 """
 function search_cross_validation(pipe::Pipeline, gscv::GridSearchCrossValidation,
                                  data::Prices_RR)
+    assert_no_holdout(pipe)
     lens_grid, val_grid = pipeline_lens_val_grid(pipe, gscv.p)
     cv = split(gscv.cv, data)
-    @argcheck(isa(cv.test_idx[1], VecInt),
-              ArgumentError("grid search cross-validation requires non-combinatorial (VecInt) test indices, but got $(typeof(cv.test_idx[1]))"))
     N = length(val_grid)
     M = length(cv.train_idx)
     test_scores = Matrix{cv_data_eltype(data)}(undef, M, N)
@@ -203,9 +247,21 @@ function search_cross_validation(pipe::Pipeline, gscv::GridSearchCrossValidation
             for (lens, val) in zip(lenses, vals)
                 pipei = Accessors.set(pipei, lens, val)
             end
-            for (j, (train_idx, test_idx)) in enumerate(zip(cv.train_idx, cv.test_idx))
-                test_score, train_score = fit_and_score(pipei, gscv, data, train_idx,
-                                                        test_idx)
+            local td_flag = is_time_dependent(pipei)
+            if td_flag
+                assert_time_dependent_fold_count(pipei, M)
+            end
+            for j in eachindex(cv.train_idx)
+                local pipej = pipei
+                if td_flag
+                    pipej = update_time_dependent_estimator(pipei,
+                                                            TimeDependentContext(; i = j,
+                                                                                 n = M,
+                                                                                 rd = data,
+                                                                                 train_idx = cv.train_idx,
+                                                                                 test_idx = cv.test_idx))
+                end
+                test_score, train_score = fit_and_score(pipej, gscv, cv, data, j)
                 test_scores[j, i] = test_score
                 if gscv.train_score
                     train_scores[j, i] = train_score
@@ -217,6 +273,69 @@ function search_cross_validation(pipe::Pipeline, gscv::GridSearchCrossValidation
     opt_lens = lens_grid[opt_idx]
     opt_vals = val_grid[opt_idx]
     for (lens, val) in zip(opt_lens, opt_vals)
+        pipe = Accessors.set(pipe, lens, val)
+    end
+    return SearchCrossValidationResult(; opt = pipe, test_scores = test_scores,
+                                       train_scores = train_scores, lens_grid = lens_grid,
+                                       val_grid = val_grid, idx = opt_idx)
+end
+"""
+    search_cross_validation(pipe::Pipeline, gscv::GridSearchCrossValidation{<:Any, <:CombinatorialCrossValidation}, data::AbstractReturnsResult)
+
+Grid search cross-validation of a [`Pipeline`](@ref) over a [`CombinatorialCrossValidation`](@ref) scheme.
+
+Combinatorial recombines its disjoint test groups into full-length backtest **paths**, so — like the plain-optimiser combinatorial method — scoring is per-path, not per-split: scoring a split in isolation would mix groups belonging to different paths. For each candidate the whole workflow runs through [`cross_val_predict`](@ref) (splits fitted, groups recombined by [`sort_predictions!`](@ref) into a [`PopulationPredictionResult`](@ref)), and [`expected_risk`](@ref) yields one score per path; the score matrix is therefore `n_paths × n_candidates` and the scorer selects across candidates as usual.
+
+`train_scores` (only when `gscv.train_score`) keeps every per-fold in-sample score: a `Vector` of `n_paths` matrices, one per path, each `folds_in_path × n_candidates` (test scores stay one-per-path because a path's out-of-sample returns pool into one series, while its folds train on distinct in-sample windows).
+
+Combinatorial runs at both levels here. At the **price level** a split's training rows are non-contiguous (gaps where the held-out groups sit), so the fold's [`PricesToReturns`](@ref) produces one spurious return per gap boundary — an accepted approximation in exchange for the combinatorial paths (see [`cross_val_predict(pipe::Pipeline, data::Prices_RR, cv::CombinatorialCrossValidation)`](@ref)). The randomised form delegates here through its grid.
+
+# Related
+
+  - [`CombinatorialCrossValidation`](@ref)
+  - [`cross_val_predict`](@ref)
+  - [`expected_risk`](@ref)
+  - [`search_cross_validation`](@ref)
+"""
+function search_cross_validation(pipe::Pipeline,
+                                 gscv::GridSearchCrossValidation{<:Any,
+                                                                 <:CombinatorialCrossValidation},
+                                 data::Prices_RR)
+    assert_no_holdout(pipe)
+    lens_grid, val_grid = pipeline_lens_val_grid(pipe, gscv.p)
+    cv = split(gscv.cv, data)
+    N = length(val_grid)
+    M = maximum(cv.path_ids)          # one score per recombined backtest path
+    r = gscv.r
+    sgn = ifelse(bigger_is_better(r), 1, -1)
+    test_scores = Matrix{cv_data_eltype(data)}(undef, M, N)
+    # Train scores are per fold, and each path holds a different number of folds, so they
+    # are kept as one `folds × candidates` matrix per path (a Vector of matrices) rather
+    # than collapsed — test scores stay one-per-path.
+    train_scores = if gscv.train_score
+        [Matrix{cv_data_eltype(data)}(undef, count(==(p), cv.path_ids), N) for p in 1:M]
+    else
+        nothing
+    end
+    for (i, (lenses, vals)) in enumerate(zip(lens_grid, val_grid))
+        pipei = pipe
+        for (lens, val) in zip(lenses, vals)
+            pipei = Accessors.set(pipei, lens, val)
+        end
+        # cross_val_predict fits every split and recombines groups into paths (handling any
+        # time-dependent schedules); fold-level parallelism lives inside it.
+        predictions = cross_val_predict(pipei, data, gscv.cv; ex = gscv.ex)
+        test_scores[:, i] = sgn * expected_risk(r, predictions; gscv.kwargs...)
+        if gscv.train_score
+            for (p, path) in enumerate(predictions.pred)
+                for (j, fp) in enumerate(path.pred)
+                    train_scores[p][j, i] = sgn * expected_risk(r, fp.res; gscv.kwargs...)
+                end
+            end
+        end
+    end
+    opt_idx = gscv.scorer(test_scores)
+    for (lens, val) in zip(lens_grid[opt_idx], val_grid[opt_idx])
         pipe = Accessors.set(pipe, lens, val)
     end
     return SearchCrossValidationResult(; opt = pipe, test_scores = test_scores,

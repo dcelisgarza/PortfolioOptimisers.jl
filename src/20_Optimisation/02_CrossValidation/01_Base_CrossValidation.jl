@@ -132,14 +132,6 @@ Union of all sequential cross-validation estimators and results.
 const SeqCVER = Union{<:SequentialCrossValidationEstimator,
                       <:SequentialCrossValidationResult}
 """
-    Prices_RR
-
-Union of the two data levels cross-validation folds can be computed on: returns-level ([`AbstractReturnsResult`](@ref)) and price-level ([`AbstractPricesResult`](@ref)) data.
-
-Fold generation only needs an observation count ([`cv_nobs`](@ref)) and a timestamp vector ([`cv_timestamps`](@ref)), so [`Base.split`](@ref) and [`n_splits`](@ref) accept either level. Price-level splitting is what lets a `Pipeline` be cross-validated on its *input* rows, keeping stateful preprocessing inside the fold.
-"""
-const Prices_RR = Union{<:AbstractReturnsResult, <:AbstractPricesResult}
-"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return the number of observations (rows) cross-validation folds index into.
@@ -682,10 +674,10 @@ Select the successful path in `ppred` whose expected risk under `r` is closest t
 """
 function quantile_by_measure(ppred::PopulationPredictionResult, r::AbstractBaseRiskMeasure,
                              q::Real; r_kwargs::NamedTuple = (;),
-                             q_kwargs::NamedTuple = (;))
+                             q_kwargs::NamedTuple = (;), sign::Integer = 1)
     pred = filter(x -> all(y -> isa(y.res.retcode, OptimisationSuccess), x.pred),
                   ppred.pred)
-    rks = [expected_risk(r, p; r_kwargs...) for p in pred]
+    rks = [sign*expected_risk(r, p; r_kwargs...) for p in pred]
     rkq = Statistics.quantile(rks, q; q_kwargs...)
     rk_min = typemax(eltype(rks))
     idx = 1
@@ -874,7 +866,7 @@ The two-argument methods operate on a single pre-defined train/test split or on 
 """
 function fit_and_predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult;
                          test_idx::VecInt_VecVecInt, cols = :, kwargs...)
-    return predict(res, rd, test_idx, cols)
+    return StatsAPI.predict(res, rd, test_idx, cols)
 end
 function fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator, rd::ReturnsResult;
                          train_idx::VecInt, test_idx::VecInt_VecVecInt, cols = :)
@@ -884,7 +876,7 @@ function fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator, rd::Retu
     end
     #! Add ability to do callbacks
     res = optimise(opt, rd_train)
-    return predict(res, rd, test_idx, cols)
+    return StatsAPI.predict(res, rd, test_idx, cols)
 end
 """
     sort_predictions!(res::Union{test_idx, CrossValidationResult}, pred::VecPredRes) -> VecPredRes
@@ -979,7 +971,7 @@ function run_folds(fit_fold, opt, n::Integer, ex::FLoops.Transducers.Executor;
     end
     return parallel_folds(i -> fit_fold(i, nothing), n, ex; ElT = ElT)
 end
-function fit_and_predict(opt::OptE_Opt, rd::ReturnsResult, cv::NonSeqCVER; cols = :,
+function fit_and_predict(opt::OptE_Opt_TD, rd::ReturnsResult, cv::NonSeqCVER; cols = :,
                          ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
                          id = nothing)
     @argcheck(!(hasfield(typeof(cv), :shuffle) && cv.shuffle),

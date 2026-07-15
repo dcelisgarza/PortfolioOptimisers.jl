@@ -13,7 +13,7 @@ These files are found in the `../src/` folder.
 - [ ] 17_NetReturnsDrawdowns.jl
 - [ ] 18_Tracking.jl
 - [ ] 21_ExpectedReturns.jl
-- [ ] 22_Plotting.jl
+- [ ] 24_Plotting.jl
 - [ ] 08_Moments/01_Base_Moments.jl
 - [ ] 08_Moments/02_SimpleExpectedReturns.jl
 - [ ] 08_Moments/03_Covariance.jl

@@ -347,6 +347,22 @@ function FactorRiskBudgeting(; re::RegE_Reg = StepwiseRegression(),
     return FactorRiskBudgeting(re, rkb, sets, flag)
 end
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the static defaults of the [`RiskBudgeting`](@ref) fields that may hold a [`TimeDependent`](@ref).
+
+Shared by the constructor's test-substitution pass and [`time_dependent_field_defaults`](@ref), so the fold-less value of a field is declared once. Fields whose static default is `nothing` are omitted.
+
+# Related
+
+  - [`RiskBudgeting`](@ref)
+  - [`time_dependent_field_defaults`](@ref)
+  - [`assert_time_dependent_substitution`](@ref)
+"""
+function risk_budgeting_td_defaults()::NamedTuple
+    return (; r = Variance(), rba = AssetRiskBudgeting())
+end
+"""
 $(DocStringExtensions.TYPEDEF)
 
 Risk Budgeting (RB) portfolio optimiser.
@@ -361,18 +377,19 @@ $(DocStringExtensions.FIELDS)
 
     RiskBudgeting(;
         opt::JuMPOptimiser,
-        r::RM_VecRM = Variance(),
-        rba::RiskBudgetingAlgorithm = AssetRiskBudgeting(),
-        wi::Option{<:VecNum} = nothing,
-        fb::Option{<:OptE_Opt} = nothing
+        r::TD{<:RM_VecRM} = Variance(),
+        rba::TD{<:RiskBudgetingAlgorithm} = AssetRiskBudgeting(),
+        wi::TD_Option{<:VecNum} = nothing,
+        fb::TDO_Option{<:OptE_Opt} = nothing
     ) -> RiskBudgeting
 
-Keywords correspond to the struct's fields.
+Keywords correspond to the struct's fields. Fields typed [`TD`](@ref), [`TD_Option`](@ref) or [`TDO_Option`](@ref) may hold a [`TimeDependent`](@ref) per-fold schedule instead of a static value: the risk measure, budgeting algorithm (and with it the risk budget), warm start and fallback are problem definition, so a cross-validation fold loop resolves them per fold, and a fold-less `optimise` runs with each at its static default (`nothing` for `wi` and `fb`).
 
 ## Validation
 
   - If `r` is a vector: `!isempty(r)`.
   - If `wi` is provided: `!isempty(wi)`.
+  - `fb` schedules: `bind !== :nearest`.
 
 # Mathematical definition
 
@@ -439,23 +456,30 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
     $(field_dict[:fb])
     """
     @fprop fb
-    function RiskBudgeting(opt::JuMPOptimiser, r::RM_VecRM, rba::RiskBudgetingAlgorithm,
-                           wi::Option{<:VecNum}, fb::Option{<:OptE_Opt})
+    function RiskBudgeting(opt::JuMPOptimiser, r::TD{<:RM_VecRM},
+                           rba::TD{<:RiskBudgetingAlgorithm}, wi::TD_Option{<:VecNum},
+                           fb::TDO_Option{<:OptE_Opt})
+        assert_no_nearest_bind_optimiser_schedule(fb, :fb, :RiskBudgeting)
         if isa(r, AbstractVector)
             @argcheck(!isempty(r), IsEmptyError("r cannot be empty"))
         end
         if isa(wi, VecNum)
             @argcheck(!isempty(wi), IsEmptyError("wi cannot be empty"))
         end
+        assert_time_dependent_substitution(RiskBudgeting, (; opt, r, rba, wi, fb),
+                                           risk_budgeting_td_defaults())
         return new{typeof(opt), typeof(r), typeof(rba), typeof(wi), typeof(fb)}(opt, r, rba,
                                                                                 wi, fb)
     end
 end
-function RiskBudgeting(; opt::JuMPOptimiser, r::RM_VecRM = Variance(),
-                       rba::RiskBudgetingAlgorithm = AssetRiskBudgeting(),
-                       wi::Option{<:VecNum} = nothing,
-                       fb::Option{<:OptE_Opt} = nothing)::RiskBudgeting
+function RiskBudgeting(; opt::JuMPOptimiser, r::TD{<:RM_VecRM} = Variance(),
+                       rba::TD{<:RiskBudgetingAlgorithm} = AssetRiskBudgeting(),
+                       wi::TD_Option{<:VecNum} = nothing,
+                       fb::TDO_Option{<:OptE_Opt} = nothing)::RiskBudgeting
     return RiskBudgeting(opt, r, rba, wi, fb)
+end
+function time_dependent_field_defaults(::RiskBudgeting)::NamedTuple
+    return risk_budgeting_td_defaults()
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -463,7 +487,9 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 Return `true` if any sub-estimator of `opt` requires previous portfolio weights (JuMP optimiser, risk measure, or fallback).
 """
 function needs_previous_weights(opt::RiskBudgeting)
-    return (needs_previous_weights(opt.opt) ||
+    return (any(f -> needs_previous_weights(getfield(opt, f)),
+                time_dependent_fields(opt)) ||
+            needs_previous_weights(opt.opt) ||
             needs_previous_weights(opt.r) ||
             needs_previous_weights(opt.fb))
 end
@@ -653,8 +679,8 @@ function _optimise(rb::RiskBudgeting, rd::ReturnsResult = ReturnsResult(); dims:
                                       attrs.pr)
     retcode, sol = optimise_JuMP_model!(model, rb, eltype(attrs.pr.X))
     return RiskBudgetingResult(;
-                               jr = JuMPOptimisationResult(; oe = typeof(rb), pa = attrs,
-                                                           retcode = retcode, sol = sol,
+                               jr = JuMPOptimisationResult(; pa = attrs, retcode = retcode,
+                                                           sol = sol,
                                                            model = ifelse(save, model,
                                                                           nothing)),
                                prb = prb, fb = nothing)

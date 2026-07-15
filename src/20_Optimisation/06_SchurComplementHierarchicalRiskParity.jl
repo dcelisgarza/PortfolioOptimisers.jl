@@ -30,10 +30,6 @@ $(DocStringExtensions.FIELDS)
 """
 @concrete struct SchurComplementHierarchicalRiskParityResult <: NonJuMPOptimisationResult
     """
-    $(field_dict[:oe])
-    """
-    oe
-    """
     $(field_dict[:pr])
     """
     pr
@@ -61,29 +57,25 @@ $(DocStringExtensions.FIELDS)
     $(field_dict[:fb])
     """
     fb
-    function SchurComplementHierarchicalRiskParityResult(oe::Type{<:OptimisationEstimator},
-                                                         pr::Option{<:AbstractPriorResult},
+    function SchurComplementHierarchicalRiskParityResult(pr::Option{<:AbstractPriorResult},
                                                          wb::Option{<:WeightBounds},
                                                          clr::Option{<:AbstractClusteringResult},
                                                          gamma::Union{<:Number, <:VecNum},
                                                          retcode::OptimisationReturnCode,
                                                          w::Option{<:VecNum},
                                                          fb::Option{<:OptE_Opt})
-        return new{typeof(oe), typeof(pr), typeof(wb), typeof(clr), typeof(gamma),
-                   typeof(retcode), typeof(w), typeof(fb)}(oe, pr, wb, clr, gamma, retcode,
-                                                           w, fb)
+        return new{typeof(pr), typeof(wb), typeof(clr), typeof(gamma), typeof(retcode),
+                   typeof(w), typeof(fb)}(pr, wb, clr, gamma, retcode, w, fb)
     end
 end
-function SchurComplementHierarchicalRiskParityResult(; oe::Type{<:OptimisationEstimator},
-                                                     pr::Option{<:AbstractPriorResult},
+function SchurComplementHierarchicalRiskParityResult(; pr::Option{<:AbstractPriorResult},
                                                      wb::Option{<:WeightBounds},
                                                      clr::Option{<:AbstractClusteringResult},
                                                      gamma::Union{<:Number, <:VecNum},
                                                      retcode::OptimisationReturnCode,
                                                      w::Option{<:VecNum},
                                                      fb::Option{<:OptE_Opt})::SchurComplementHierarchicalRiskParityResult
-    return SchurComplementHierarchicalRiskParityResult(oe, pr, wb, clr, gamma, retcode, w,
-                                                       fb)
+    return SchurComplementHierarchicalRiskParityResult(pr, wb, clr, gamma, retcode, w, fb)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -293,6 +285,22 @@ function port_opt_view(sp::SchurComplementParams, i, X::MatNum, args...)
                                  flag = sp.flag)
 end
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the static defaults of the [`SchurComplementHierarchicalRiskParity`](@ref) fields that may hold a [`TimeDependent`](@ref).
+
+Shared by the constructor's test-substitution pass and [`time_dependent_field_defaults`](@ref), so the fold-less value of a field is declared once. Fields whose static default is `nothing` are omitted.
+
+# Related
+
+  - [`SchurComplementHierarchicalRiskParity`](@ref)
+  - [`time_dependent_field_defaults`](@ref)
+  - [`assert_time_dependent_substitution`](@ref)
+"""
+function schur_complement_hrp_td_defaults()::NamedTuple
+    return (; params = SchurComplementParams())
+end
+"""
 $(DocStringExtensions.TYPEDEF)
 
 Schur Complement Hierarchical Risk Parity (SCHRP) portfolio optimiser.
@@ -307,15 +315,16 @@ $(DocStringExtensions.FIELDS)
 
     SchurComplementHierarchicalRiskParity(;
         opt::HierarchicalOptimiser = HierarchicalOptimiser(),
-        params::ScP_VecScP = SchurComplementParams(),
-        fb::Option{<:OptE_Opt} = nothing
+        params::TD{<:ScP_VecScP} = SchurComplementParams(),
+        fb::TDO_Option{<:OptE_Opt} = nothing
     ) -> SchurComplementHierarchicalRiskParity
 
-Keywords correspond to the struct's fields.
+Keywords correspond to the struct's fields. Fields typed [`TD`](@ref) or [`TDO_Option`](@ref) may hold a [`TimeDependent`](@ref) per-fold schedule instead of a static value: the Schur parameters (risk measure and `gamma`) and the fallback are problem definition, so a cross-validation fold loop resolves them per fold, and a fold-less `optimise` runs with each at its static default (`nothing` for `fb`).
 
 ## Validation
 
   - If `params` is a vector: `!isempty(params)`.
+  - `fb` schedules: `bind !== :nearest`.
 
 ## Propagated parameters
 
@@ -455,19 +464,27 @@ The bisection weight ``\\alpha`` is then computed from the Schur-complement-corr
     """
     @fprop fb
     function SchurComplementHierarchicalRiskParity(opt::HierarchicalOptimiser,
-                                                   params::ScP_VecScP,
-                                                   fb::Option{<:OptE_Opt})
+                                                   params::TD{<:ScP_VecScP},
+                                                   fb::TDO_Option{<:OptE_Opt})
+        assert_no_nearest_bind_optimiser_schedule(fb, :fb,
+                                                  :SchurComplementHierarchicalRiskParity)
         if isa(params, AbstractVector)
             @argcheck(!isempty(params), IsEmptyError("params cannot be empty"))
         end
+        assert_time_dependent_substitution(SchurComplementHierarchicalRiskParity,
+                                           (; opt, params, fb),
+                                           schur_complement_hrp_td_defaults())
         return new{typeof(opt), typeof(params), typeof(fb)}(opt, params, fb)
     end
 end
 function SchurComplementHierarchicalRiskParity(;
                                                opt::HierarchicalOptimiser = HierarchicalOptimiser(),
-                                               params::ScP_VecScP = SchurComplementParams(),
-                                               fb::Option{<:OptE_Opt} = nothing)::SchurComplementHierarchicalRiskParity
+                                               params::TD{<:ScP_VecScP} = SchurComplementParams(),
+                                               fb::TDO_Option{<:OptE_Opt} = nothing)::SchurComplementHierarchicalRiskParity
     return SchurComplementHierarchicalRiskParity(opt, params, fb)
+end
+function time_dependent_field_defaults(::SchurComplementHierarchicalRiskParity)::NamedTuple
+    return schur_complement_hrp_td_defaults()
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -480,7 +497,10 @@ Return whether the [`SchurComplementHierarchicalRiskParity`](@ref) requires prev
   - [`SchurComplementHierarchicalRiskParity`](@ref)
 """
 function needs_previous_weights(opt::SchurComplementHierarchicalRiskParity)
-    return (needs_previous_weights(opt.opt) || needs_previous_weights(opt.fb))
+    return (any(f -> needs_previous_weights(getfield(opt, f)),
+                time_dependent_fields(opt)) ||
+            needs_previous_weights(opt.opt) ||
+            needs_previous_weights(opt.fb))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -814,17 +834,16 @@ function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:Any},
     rd = returns_result_picker(rd, sh.opt.brt)
     pr = prior(sh.opt.pe, rd; dims = dims)
     X = pr.X
-    clr = clusterise(sh.opt.cle, pr; iv = rd.iv, ivpa = rd.ivpa, dims = dims,
+    clr = clusterise(sh.opt.cle, pr; rd = rd, iv = rd.iv, ivpa = rd.ivpa, dims = dims,
                      cle_pr = sh.opt.cle_pr)
     items = [clr.res.order]
     wb = weight_bounds_constraints(sh.opt.wb, sh.opt.sets; N = size(X, 2),
                                    strict = sh.opt.strict, datatype = eltype(X))
     w, gamma = schur_complement_weights(pr, items, wb, sh.params)
     retcode, w = finalise_weight_bounds(sh.opt.wf, wb, w)
-    return SchurComplementHierarchicalRiskParityResult(; oe = typeof(sh), pr = pr, wb = wb,
-                                                       clr = clr, gamma = gamma,
-                                                       retcode = retcode, w = w,
-                                                       fb = nothing)
+    return SchurComplementHierarchicalRiskParityResult(; pr = pr, wb = wb, clr = clr,
+                                                       gamma = gamma, retcode = retcode,
+                                                       w = w, fb = nothing)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -845,7 +864,7 @@ function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:AbstractVe
     rd = returns_result_picker(rd, sh.opt.brt)
     pr = prior(sh.opt.pe, rd; dims = dims)
     X = pr.X
-    clr = clusterise(sh.opt.cle, pr; iv = rd.iv, ivpa = rd.ivpa, dims = dims,
+    clr = clusterise(sh.opt.cle, pr; rd = rd, iv = rd.iv, ivpa = rd.ivpa, dims = dims,
                      cle_pr = sh.opt.cle_pr)
     items = [clr.res.order]
     wb = weight_bounds_constraints(sh.opt.wb, sh.opt.sets; N = size(X, 2),
@@ -859,10 +878,9 @@ function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:AbstractVe
         gammas[i] = gamma
     end
     retcode, w = finalise_weight_bounds(sh.opt.wf, wb, w / sum(w))
-    return SchurComplementHierarchicalRiskParityResult(; oe = typeof(sh), pr = pr, wb = wb,
-                                                       clr = clr, gamma = gammas,
-                                                       retcode = retcode, w = w,
-                                                       fb = nothing)
+    return SchurComplementHierarchicalRiskParityResult(; pr = pr, wb = wb, clr = clr,
+                                                       gamma = gammas, retcode = retcode,
+                                                       w = w, fb = nothing)
 end
 """
     optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:Any, Nothing},

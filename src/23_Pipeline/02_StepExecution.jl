@@ -94,6 +94,22 @@ function run_step(opt::OptimisationEstimator, ctx::PipelineContext)
     res = optimise(opt, ctx.returns)
     return res, set_slot(ctx, :opt, res)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Execute a precomputed optimisation result as the optimisation step: there is nothing to solve, so the result is written to the `opt` slot as-is and the fold predicts with its weights.
+
+This is how a *mixed* [`TimeDependent`](@ref) schedule runs its result entries: the fold-loop swap ([`update_time_dependent_estimator`](@ref)) replaces the schedule step with entry `i`, which may be an estimator (the fold optimises) or a result (the fold only predicts). A result cannot consume computed context slots — see [`maybe_inject_step`](@ref) for the fail-closed injection rules.
+
+# Related
+
+  - [`run_step`](@ref)
+  - [`maybe_inject_step`](@ref)
+  - [`TD_OptE_Opt`](@ref)
+"""
+function run_step(res::NonFiniteAllocationOptimisationResult, ctx::PipelineContext)
+    return res, set_slot(ctx, :opt, res)
+end
 function run_step(est::AbstractPricesPreprocessingEstimator, ctx::PipelineContext)
     require_slot(ctx, :prices, est)
     res = fit_preprocessing(est, ctx.prices)
@@ -256,4 +272,39 @@ pipe_writes(::PricesToReturns) = :returns
 function run_step(ptr::PricesToReturns, ctx::PipelineContext)
     require_slot(ctx, :prices, ptr)
     return ptr, set_slot(ctx, :returns, apply_preprocessing(ptr, ctx.prices))
+end
+"""
+    pipe_writes(::TrainTestSplit) = :split
+    pipe_reads(::TrainTestSplit) = ()
+
+A [`TrainTestSplit`](@ref) narrows whichever data slot the pipeline input filled, so the slot it writes is not a property of its type.
+
+`:split` is a sentinel, deliberately *not* a member of [`PIPELINE_SLOTS`](@ref): it names the step (`pipe.names` reads `"split"`), invalidates nothing, and satisfies nothing. That is sound only because a split is pinned to the first position of a [`Pipeline`](@ref), where both data slots are already available from the input and no derived slot exists to invalidate. Which data slot is actually rewritten — `:prices` or `:returns` — is decided at run time by [`run_step`](@ref).
+
+# Related
+
+  - [`TrainTestSplit`](@ref)
+  - [`assert_split_position`](@ref)
+  - [`PIPELINE_SLOTS`](@ref)
+"""
+pipe_writes(::TrainTestSplit) = :split
+pipe_reads(::TrainTestSplit) = ()
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Execute a [`TrainTestSplit`](@ref) step: replace the input data slot with the training window, and return the fitted [`TrainTestSplitResult`](@ref) holding both windows.
+
+The split runs at whichever level the pipeline input supplied — `prices` when the pipeline was fed price-level data, `returns` otherwise — so the same estimator serves both. Every later step therefore fits on the training window alone, which is the whole point of pinning the split to the first position.
+
+# Related
+
+  - [`TrainTestSplit`](@ref)
+  - [`fit_predict`](@ref)
+  - [`run_step`](@ref)
+"""
+function run_step(tts::TrainTestSplit, ctx::PipelineContext)
+    slot = !isnothing(ctx.prices) ? :prices : :returns
+    require_slot(ctx, slot, tts)
+    res = fit_preprocessing(tts, getproperty(ctx, slot))
+    return res, set_slot(ctx, slot, res.train)
 end

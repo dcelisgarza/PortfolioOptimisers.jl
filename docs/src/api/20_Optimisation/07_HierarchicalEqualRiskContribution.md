@@ -2,6 +2,7 @@
 
 ```@docs
 HierarchicalEqualRiskContribution
+herc_td_defaults
 needs_previous_weights(opt::HierarchicalEqualRiskContribution)
 factory(hec::HierarchicalEqualRiskContribution, w::AbstractVector)
 port_opt_view(hec::HierarchicalEqualRiskContribution, i, X::MatNum, args...)

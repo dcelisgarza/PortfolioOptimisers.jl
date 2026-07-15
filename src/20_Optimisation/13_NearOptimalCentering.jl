@@ -101,6 +101,22 @@ function NearOptimalCenteringResult(; jr::JuMPOptimisationResult,
                                       noc_retcode, fb)
 end
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the static defaults of the [`NearOptimalCentering`](@ref) fields that may hold a [`TimeDependent`](@ref).
+
+Shared by the constructor's test-substitution pass and [`time_dependent_field_defaults`](@ref), so the fold-less value of a field is declared once. Fields whose static default is `nothing` are omitted.
+
+# Related
+
+  - [`NearOptimalCentering`](@ref)
+  - [`time_dependent_field_defaults`](@ref)
+  - [`assert_time_dependent_substitution`](@ref)
+"""
+function near_optimal_centering_td_defaults()::NamedTuple
+    return (; r = StandardDeviation(), obj = MinimumRisk())
+end
+"""
 $(DocStringExtensions.TYPEDEF)
 
 Near Optimal Centering (NOC) portfolio optimiser.
@@ -115,31 +131,33 @@ $(DocStringExtensions.FIELDS)
 
     NearOptimalCentering(;
         opt::JuMPOptimiser,
-        r::RM_VecRM = Variance(),
-        obj::Option{<:ObjectiveFunction} = nothing,
+        r::TD{<:RM_VecRM} = StandardDeviation(),
+        obj::TD_Option{<:ObjectiveFunction} = MinimumRisk(),
         bins::Option{<:Number} = nothing,
-        w_min::Option{<:VecNum} = nothing,
-        w_min_ini::Option{<:VecNum} = nothing,
-        w_opt::Option{<:VecNum_VecVecNum} = nothing,
-        w_opt_ini::Option{<:VecNum_VecVecNum} = nothing,
-        w_max::Option{<:VecNum} = nothing,
-        w_max_ini::Option{<:VecNum} = nothing,
+        w_min::TD_Option{<:VecNum} = nothing,
+        w_min_ini::TD_Option{<:VecNum} = nothing,
+        w_opt::TD_Option{<:VecNum_VecVecNum} = nothing,
+        w_opt_ini::TD_Option{<:VecNum_VecVecNum} = nothing,
+        w_max::TD_Option{<:VecNum} = nothing,
+        w_max_ini::TD_Option{<:VecNum} = nothing,
         ucs_flag::Bool = true,
-        alg::NearOptimalCenteringAlgorithm = ConstrainedNearOptimalCentering(),
-        fb::Option{<:OptE_Opt} = nothing
+        alg::NearOptimalCenteringAlgorithm = UnconstrainedNearOptimalCentering(),
+        fb::TDO_Option{<:OptE_Opt} = nothing
     ) -> NearOptimalCentering
 
-Keywords correspond to the struct's fields.
+Keywords correspond to the struct's fields. Fields typed [`TD`](@ref), [`TD_Option`](@ref) or [`TDO_Option`](@ref) may hold a [`TimeDependent`](@ref) per-fold schedule instead of a static value: the risk measure, objective, anchor/warm-start weights and fallback are problem definition, so a cross-validation fold loop resolves them per fold, and a fold-less `optimise` runs with each at its static default. `bins`, `ucs_flag` and the `alg` formulation variant are execution control and stay static.
 
 ## Validation
 
   - If `r` is a vector: `!isempty(r)`.
-  - If `w_min` is provided: `!isempty(w_min)`.
-  - If `w_min_ini` is provided: `!isempty(w_min_ini)`.
-  - If `w_opt` is provided: `!isempty(w_opt)` and `!isempty(w_opt_ini)`.
-  - If `w_max` is provided: `!isempty(w_max)`.
-  - If `w_max_ini` is provided: `!isempty(w_max_ini)`.
+  - If `w_min` is a vector: `!isempty(w_min)`.
+  - If `w_min_ini` is a vector: `!isempty(w_min_ini)`.
+  - If `w_opt` is a vector: `!isempty(w_opt)`.
+  - If `w_opt_ini` is a vector: `!isempty(w_opt_ini)`.
+  - If `w_max` is a vector: `!isempty(w_max)`.
+  - If `w_max_ini` is a vector: `!isempty(w_max_ini)`.
   - If `bins` is a number: `isfinite(bins) && bins > 0`.
+  - `fb` schedules: `bind !== :nearest`.
 
 # Mathematical definition
 
@@ -230,14 +248,17 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
     $(field_dict[:fb])
     """
     @fprop fb
-    function NearOptimalCentering(opt::JuMPOptimiser, r::RM_VecRM,
-                                  obj::Option{<:ObjectiveFunction}, bins::Option{<:Number},
-                                  w_min::Option{<:VecNum}, w_min_ini::Option{<:VecNum},
-                                  w_opt::Option{<:VecNum_VecVecNum},
-                                  w_opt_ini::Option{<:VecNum_VecVecNum},
-                                  w_max::Option{<:VecNum}, w_max_ini::Option{<:VecNum},
-                                  ucs_flag::Bool, alg::NearOptimalCenteringAlgorithm,
-                                  fb::Option{<:OptE_Opt})
+    function NearOptimalCentering(opt::JuMPOptimiser, r::TD{<:RM_VecRM},
+                                  obj::TD_Option{<:ObjectiveFunction},
+                                  bins::Option{<:Number}, w_min::TD_Option{<:VecNum},
+                                  w_min_ini::TD_Option{<:VecNum},
+                                  w_opt::TD_Option{<:VecNum_VecVecNum},
+                                  w_opt_ini::TD_Option{<:VecNum_VecVecNum},
+                                  w_max::TD_Option{<:VecNum},
+                                  w_max_ini::TD_Option{<:VecNum}, ucs_flag::Bool,
+                                  alg::NearOptimalCenteringAlgorithm,
+                                  fb::TDO_Option{<:OptE_Opt})
+        assert_no_nearest_bind_optimiser_schedule(fb, :fb, :NearOptimalCentering)
         if isa(r, AbstractVector)
             @argcheck(!isempty(r), IsEmptyError("r cannot be empty"))
             if any(x -> isa(x, QuadExpressionRiskMeasures), r)
@@ -248,28 +269,32 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
                 @warn("Risk measures that produce JuMP.QuadExpr risk expressions are not guaranteed to work. The variance with SDP constraints works because the risk measure is the trace of a matrix, an affine expression.")
             end
         end
-        if !isnothing(w_min)
+        if isa(w_min, AbstractVector)
             @argcheck(!isempty(w_min), IsEmptyError("w_min cannot be empty"))
         end
-        if !isnothing(w_min_ini)
+        if isa(w_min_ini, AbstractVector)
             @argcheck(!isempty(w_min_ini), IsEmptyError("w_min_ini cannot be empty"))
         end
-        if !isnothing(w_opt)
+        if isa(w_opt, AbstractVector)
             @argcheck(!isempty(w_opt), IsEmptyError("w_opt cannot be empty"))
         end
-        if !isnothing(w_opt)
+        if isa(w_opt_ini, AbstractVector)
             @argcheck(!isempty(w_opt_ini), IsEmptyError("w_opt_ini cannot be empty"))
         end
-        if !isnothing(w_max)
+        if isa(w_max, AbstractVector)
             @argcheck(!isempty(w_max), IsEmptyError("w_max cannot be empty"))
         end
-        if !isnothing(w_max_ini)
+        if isa(w_max_ini, AbstractVector)
             @argcheck(!isempty(w_max_ini), IsEmptyError("w_max_ini cannot be empty"))
         end
         if isa(bins, Number)
             @argcheck(isfinite(bins) && bins > 0,
                       DomainError(bins, "bins must be finite and > 0"))
         end
+        assert_time_dependent_substitution(NearOptimalCentering,
+                                           (; opt, r, obj, bins, w_min, w_min_ini, w_opt,
+                                            w_opt_ini, w_max, w_max_ini, ucs_flag, alg, fb),
+                                           near_optimal_centering_td_defaults())
         return new{typeof(opt), typeof(r), typeof(obj), typeof(bins), typeof(w_min),
                    typeof(w_min_ini), typeof(w_opt), typeof(w_opt_ini), typeof(w_max),
                    typeof(w_max_ini), typeof(ucs_flag), typeof(alg), typeof(fb)}(opt, r,
@@ -284,19 +309,23 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
                                                                                  alg, fb)
     end
 end
-function NearOptimalCentering(; opt::JuMPOptimiser, r::RM_VecRM = StandardDeviation(),
-                              obj::Option{<:ObjectiveFunction} = MinimumRisk(),
+function NearOptimalCentering(; opt::JuMPOptimiser, r::TD{<:RM_VecRM} = StandardDeviation(),
+                              obj::TD_Option{<:ObjectiveFunction} = MinimumRisk(),
                               bins::Option{<:Number} = nothing,
-                              w_min::Option{<:VecNum} = nothing,
-                              w_min_ini::Option{<:VecNum} = nothing,
-                              w_opt::Option{<:VecNum_VecVecNum} = nothing,
-                              w_opt_ini::Option{<:VecNum_VecVecNum} = nothing,
-                              w_max::Option{<:VecNum} = nothing,
-                              w_max_ini::Option{<:VecNum} = nothing, ucs_flag::Bool = true,
+                              w_min::TD_Option{<:VecNum} = nothing,
+                              w_min_ini::TD_Option{<:VecNum} = nothing,
+                              w_opt::TD_Option{<:VecNum_VecVecNum} = nothing,
+                              w_opt_ini::TD_Option{<:VecNum_VecVecNum} = nothing,
+                              w_max::TD_Option{<:VecNum} = nothing,
+                              w_max_ini::TD_Option{<:VecNum} = nothing,
+                              ucs_flag::Bool = true,
                               alg::NearOptimalCenteringAlgorithm = UnconstrainedNearOptimalCentering(),
-                              fb::Option{<:OptE_Opt} = nothing)::NearOptimalCentering
+                              fb::TDO_Option{<:OptE_Opt} = nothing)::NearOptimalCentering
     return NearOptimalCentering(opt, r, obj, bins, w_min, w_min_ini, w_opt, w_opt_ini,
                                 w_max, w_max_ini, ucs_flag, alg, fb)
+end
+function time_dependent_field_defaults(::NearOptimalCentering)::NamedTuple
+    return near_optimal_centering_td_defaults()
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -304,7 +333,9 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 Return `true` if any sub-estimator of `opt` requires previous portfolio weights (JuMP optimiser, risk measure, or fallback).
 """
 function needs_previous_weights(opt::NearOptimalCentering)
-    return (needs_previous_weights(opt.opt) ||
+    return (any(f -> needs_previous_weights(getfield(opt, f)),
+                time_dependent_fields(opt)) ||
+            needs_previous_weights(opt.opt) ||
             needs_previous_weights(opt.r) ||
             needs_previous_weights(opt.fb))
 end
@@ -654,7 +685,7 @@ function set_near_optimal_objective_function!(::ConstrainedNearOptimalCentering,
                                               opt::BaseJuMPOptimisationEstimator)
     so = get_objective_scale(model)
     obj_expr = set_near_optimal_centering_constraints!(model, opt.wb)
-    add_penalty_to_objective!(model, 1, obj_expr)
+    obj_expr = add_penalty_to_objective!(model, 1, obj_expr)
     add_custom_objective_term!(model, opt.ret, opt.cobj, obj_expr, opt, opt.pe)
     JuMP.@objective(model, Min, so * obj_expr)
     return nothing
@@ -983,7 +1014,7 @@ function _optimise(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, 
     noc_retcode, sol = solve_noc!(noc, model, rk_opt, rt_opt, opt)
     retcode = get_overall_retcode(w_min_retcode, w_opt_retcode, w_max_retcode, noc_retcode)
     return NearOptimalCenteringResult(;
-                                      jr = JuMPOptimisationResult(; oe = typeof(noc),
+                                      jr = JuMPOptimisationResult(;
                                                                   pa = ProcessedJuMPOptimiserAttributes(;
                                                                                                         pr = opt.pe,
                                                                                                         wb = opt.wb,
@@ -1035,8 +1066,7 @@ function _optimise(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, 
                                   Val(haskey(model, :risk_frontier)))
     retcode = get_overall_retcode(w_min_retcode, w_opt_retcode, w_max_retcode, noc_retcode)
     return NearOptimalCenteringResult(;
-                                      jr = JuMPOptimisationResult(; oe = typeof(noc),
-                                                                  pa = attrs,
+                                      jr = JuMPOptimisationResult(; pa = attrs,
                                                                   retcode = retcode,
                                                                   sol = sol,
                                                                   model = ifelse(save,

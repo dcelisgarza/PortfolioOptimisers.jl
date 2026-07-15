@@ -183,7 +183,8 @@ end
                     0.0935238000646315, 0.04732709005036381], rtol = 1e-6)
 
     opt = JuMPOptimiser(; pe = pr, slv = slv, sets = sets, sbgt = 1, bgt = 1,
-                        wb = WeightBounds(; lb = -1, ub = 1), l2 = 5e-6)
+                        wb = WeightBounds(; lb = -1, ub = 1),
+                        l2 = L2Regularisation(; val = 5e-6))
     mr = MeanRisk(; opt = opt)
     res = optimise(mr)
     @test isapprox(res.w,
@@ -196,7 +197,8 @@ end
                     0.09297968577516197, 0.05718196591051368], rtol = 1e-6)
 
     opt = JuMPOptimiser(; pe = pr, slv = slv, sets = sets, sbgt = 1, bgt = 1,
-                        wb = WeightBounds(; lb = -1, ub = 1), l2 = 1e-4)
+                        wb = WeightBounds(; lb = -1, ub = 1),
+                        l2 = L2Regularisation(; val = 1e-4))
     mr = MeanRisk(; opt = opt)
     res = optimise(mr)
     @test isapprox(res.w,
@@ -209,7 +211,8 @@ end
                     0.09776343657139772, 0.06688094423564199], rtol = 1e-6)
 
     opt = JuMPOptimiser(; pe = pr, slv = slv, sets = sets, sbgt = 1, bgt = 1,
-                        wb = WeightBounds(; lb = -1, ub = 1), l1 = 5e-6, l2 = 5e-6)
+                        wb = WeightBounds(; lb = -1, ub = 1), l1 = 5e-6,
+                        l2 = L2Regularisation(; val = 5e-6))
     mr = MeanRisk(; opt = opt)
     res = optimise(mr)
     @test isapprox(res.w,
@@ -222,7 +225,8 @@ end
                     0.09499371625016041, 0.05554035007495228], rtol = 1e-6)
 
     opt = JuMPOptimiser(; pe = pr, slv = slv, sets = sets, sbgt = 1, bgt = 1,
-                        wb = WeightBounds(; lb = -1, ub = 1), l1 = 1, l2 = 1e-4)
+                        wb = WeightBounds(; lb = -1, ub = 1), l1 = 1,
+                        l2 = L2Regularisation(; val = 1e-4))
     mr = MeanRisk(; opt = opt)
     res = optimise(mr)
     @test isapprox(res.w,
@@ -290,11 +294,11 @@ end
 end
 
 @testset "Number of effective assets" begin
-    opt = JuMPOptimiser(; pe = pr, slv = slv, nea = 10)
+    opt = JuMPOptimiser(; pe = pr, slv = slv, wn2 = 10)
     res = optimise(MeanRisk(; obj = MinimumRisk(), opt = opt))
     @test round(inv(LinearAlgebra.dot(res.w, res.w))) >= 10
 
-    opt = JuMPOptimiser(; pe = pr, slv = slv, nea = 15)
+    opt = JuMPOptimiser(; pe = pr, slv = slv, wn2 = 15)
     res = optimise(MeanRisk(; obj = MaximumUtility(), opt = opt))
     @test round(inv(LinearAlgebra.dot(res.w, res.w))) >= 15
 end

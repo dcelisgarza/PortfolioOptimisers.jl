@@ -240,7 +240,7 @@ function MultipleRandomisedResult(; train_idx::VecVecInt, test_idx::VecVecInt,
                                   path_ids::VecInt)::MultipleRandomisedResult
     return MultipleRandomisedResult(train_idx, test_idx, asset_idx, path_ids)
 end
-function n_splits(mre::MultipleRandomised, rd::ReturnsResult)
+function n_splits(mre::MultipleRandomised, rd::Prices_RR)
     if !isnothing(mre.window_size) && isa(mre.cv, DateWalkForward)
         throw(ArgumentError("when using a `DateWalkForward` with `window_size`, the number of splits cannot be determined before calling [`split`](@ref)."))
     end
@@ -380,16 +380,19 @@ Resolves the subset size from either an integer (direct count) or a fraction of 
   - [`MultipleRandomised`](@ref)
   - [`sample_unique_assets`](@ref)
 """
-function get_subset_size(subset_size::Integer, rd::Pr_RR, args...)
+function get_subset_size(subset_size::Integer, rd::Union{<:Pr_RR, <:AbstractPricesResult},
+                         args...)
     @argcheck(subset_size <= size(rd.X, 2),
               "subset_size must not be greater than the number of assets")
     return subset_size
 end
-function get_subset_size(subset_size::AbstractFloat, rd::Pr_RR, args...)
+function get_subset_size(subset_size::AbstractFloat,
+                         rd::Union{<:Pr_RR, <:AbstractPricesResult}, args...)
     subset_size = max(round(Int, subset_size * size(rd.X, 2)), 1)
     return subset_size
 end
-function get_subset_size(subset_size::SubsetSizeEC, rd::Pr_RR)
+function get_subset_size(subset_size::SubsetSizeEC,
+                         rd::Union{<:Pr_RR, <:AbstractPricesResult})
     res = subset_size(rd)
     assert_nonempty_nonneg_finite_val(res - 1, "subset_size - 1")
     @argcheck(res <= size(rd.X, 2),
@@ -421,18 +424,21 @@ Resolves the window size from `nothing` (no windowing), an integer (direct count
 function get_window_size(::Nothing, args...)
     return nothing
 end
-function get_window_size(window_size::Integer, rd::Pr_RR, args...)
+function get_window_size(window_size::Integer, rd::Union{<:Pr_RR, <:AbstractPricesResult},
+                         args...)
     @argcheck(window_size <= size(rd.X, 1),
               "window_size must not be greater than the number of observations")
     return window_size
 end
-function get_window_size(window_size::AbstractFloat, rd::Pr_RR, args...)
+function get_window_size(window_size::AbstractFloat,
+                         rd::Union{<:Pr_RR, <:AbstractPricesResult}, args...)
     window_size = max(round(Int, window_size * size(rd.X, 1)), 2)
     @argcheck(window_size <= size(rd.X, 1),
               "window_size must not be greater than the number of observations")
     return window_size
 end
-function get_window_size(window_size::WindowSizeEC, rd::Pr_RR)
+function get_window_size(window_size::WindowSizeEC,
+                         rd::Union{<:Pr_RR, <:AbstractPricesResult})
     res = window_size(rd)
     assert_nonempty_nonneg_finite_val(res - 2, "window_size - 2")
     @argcheck(res <= size(rd.X, 1),
@@ -463,22 +469,28 @@ Resolves the number of subsets from either an integer (direct count) or a callab
 function get_n_subsets(n_subsets::Integer, args...)
     return n_subsets
 end
-function get_n_subsets(n_subsets::NumberSubsetsEC, rd::Pr_RR)
+function get_n_subsets(n_subsets::NumberSubsetsEC,
+                       rd::Union{<:Pr_RR, <:AbstractPricesResult})
     res = n_subsets(rd)
     assert_nonempty_nonneg_finite_val(res - 2, "n_subsets - 2")
     return res
 end
 """
-    Base.split(mrcv::MultipleRandomised, rd::ReturnsResult) -> MultipleRandomisedResult
+    Base.split(mrcv::MultipleRandomised, rd::Prices_RR) -> MultipleRandomisedResult
 
-Split the returns data `rd` by drawing multiple random asset subsets and applying the
-internal walk-forward estimator to each subset. Each combination of a random asset subset
-and a set of walk-forward folds forms one path.
+Split the price- or returns-level data `rd` by drawing multiple random asset subsets and
+applying the internal walk-forward estimator to each subset. Each combination of a random
+asset subset and a set of walk-forward folds forms one path.
+
+Unlike combinatorial cross-validation, multiple-randomised resampling draws over **assets**
+(columns) while every observation window comes from an inner walk-forward, so the rows of
+each fold stay contiguous. That is why it is admissible at the price level for a
+price-starting pipeline — the rolling-window rule that blocks combinatorial does not apply.
 
 # Arguments
 
   - `mrcv::MultipleRandomised`: Multiple randomised cross-validation estimator.
-  - `rd::ReturnsResult`: Returns data to split.
+  - `rd::Prices_RR`: Price- or returns-level data to split.
 
 # Returns
 
@@ -491,7 +503,7 @@ and a set of walk-forward folds forms one path.
   - [`MultipleRandomisedResult`](@ref)
   - [`n_splits`](@ref)
 """
-function Base.split(mrcv::MultipleRandomised, rd::ReturnsResult)
+function Base.split(mrcv::MultipleRandomised, rd::Prices_RR)
     T, N = size(rd.X)
     (; cv, subset_size, n_subsets, max_comb, window_size, rng, seed) = mrcv
     subset_size = get_subset_size(subset_size, rd)
@@ -563,8 +575,7 @@ Handles sequential and parallel execution. If the optimiser requires previous we
   - [`is_time_dependent`](@ref)
   - [`update_time_dependent_estimator`](@ref)
 """
-function path_fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator,
-                              rd::ReturnsResult, train_idx, test_idx, cols;
+function path_fit_and_predict(opt::OptE_TD, rd::ReturnsResult, train_idx, test_idx, cols;
                               ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
                               id = nothing)
     n = length(train_idx)
@@ -596,9 +607,8 @@ function path_fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator,
     return MultiPeriodPredictionResult(; pred = sort_predictions!(test_idx, predictions),
                                        id = id)
 end
-function fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator, rd::ReturnsResult,
-                         cv::MRCVR; ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
-                         kwargs...)
+function fit_and_predict(opt::OptE_TD, rd::ReturnsResult, cv::MRCVR;
+                         ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(), kwargs...)
     cv_res = split(cv, rd)
     (; train_idx, test_idx, asset_idx, path_ids) = cv_res
     unique_ids = unique(path_ids)

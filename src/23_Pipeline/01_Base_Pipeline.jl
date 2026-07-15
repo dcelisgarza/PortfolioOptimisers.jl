@@ -271,7 +271,7 @@ Explicit pipeline step wrapper — used when a step's slots or its routing inten
 
 Most estimators are used as pipeline steps directly: their family determines which [`PipelineContext`](@ref) slots they read and write via [`pipe_reads`](@ref)/[`pipe_writes`](@ref). `PipelineStep` covers the two cases that dispatch alone cannot settle:
 
-  - **Slots dispatch cannot infer**: a custom callable, or an estimator routed to a nonstandard slot. `reads` and `writes` supply what the family would otherwise declare.
+  - **Slots dispatch cannot infer**: a custom callable, or an estimator routed to a nonstandard slot. `reads` and `writes` supply what the family would otherwise declare. This includes a bare-callable [`TimeDependent`](@ref) schedule of optimisers (`TimeDependent(ctx -> optimiser)`), whose output kind is not in its type: it enters via `PipelineStep(; est = td, writes = :opt)` and its output is type-checked when the fold loop swaps it in (see [`TD_OptE_Opt_Inferable`](@ref)).
   - **Routing intent dispatch must not guess**: an uncertainty-set estimator writes the `uncertainty` slot either way, so the slot is never in doubt; what the wrapper declares through `target` is *which parameters you want bounded* — `:mu`, `:sigma`, or `:both`. Since [`ucs`](@ref) derives both halves from a single fit, this is a statement of intent, not a disambiguation, and every populated half must reach the optimiser or [`inject_context`](@ref) rejects it.
 
 # Fields
@@ -293,6 +293,7 @@ Keywords correspond to the struct's fields.
 
   - `writes in PIPELINE_SLOTS`.
   - `all(r -> r in PIPELINE_SLOTS, reads)`.
+  - A [`TimeDependent`](@ref) `est` must be an optimiser-position schedule ([`TD_OptE_Opt`](@ref)) and declare `writes = :opt`: schedules of non-optimiser families are not steppable — a per-fold prior/constraint/… is spelled as a `TimeDependent` *field* of the optimisation step instead.
 
 # Examples
 
@@ -338,6 +339,12 @@ julia> PortfolioOptimisers.pipe_reads(ps)
                   ArgumentError("writes must be one of $(PIPELINE_SLOTS), got :$writes"))
         @argcheck(all(r -> r in PIPELINE_SLOTS, reads),
                   ArgumentError("all reads must be members of $(PIPELINE_SLOTS), got $reads"))
+        if isa(est, TimeDependent)
+            @argcheck(isa(est, TD_OptE_Opt),
+                      ArgumentError("a TimeDependent schedule is only steppable when it stands in for the optimiser (an optimiser-position schedule, see TD_OptE_Opt); schedules of non-optimiser families are not pipeline steps. To vary a prior, constraint, or other input per fold, put a TimeDependent in the corresponding field of the optimisation step instead."))
+            @argcheck(writes === :opt,
+                      ArgumentError("a TimeDependent schedule step stands in for the optimiser, so it must declare writes = :opt, got :$writes"))
+        end
         return new{typeof(est), typeof(reads), typeof(writes), typeof(target)}(est, reads,
                                                                                writes,
                                                                                target)
@@ -350,5 +357,23 @@ function PipelineStep(; est::Union{<:AbstractEstimator, <:Function}, writes::Sym
 end
 pipe_writes(ps::PipelineStep) = ps.writes
 pipe_reads(ps::PipelineStep) = ps.reads
+"""
+    const TD_OptE_Opt_Inferable = Union{TimeDependent{<:AbstractVector{<:OptE_Opt}},
+                                        TimeDependent{<:TimeDependentOptimiserCallable}}
+
+The [`TimeDependent`](@ref) optimiser-position schedule forms whose pipeline slot is inferable from their type: a vector schedule whose entries are all optimisers or precomputed results, and a declared [`TimeDependentOptimiserCallable`](@ref) functor. Both are optimisation steps, so they write `:opt` and read `:returns` like any [`OptimisationEstimator`](@ref) step.
+
+The other two forms of [`TD_OptE_Opt`](@ref) — a bare `ctx -> optimiser` and a [`PreviousWeightsFunction`](@ref) wrapping one — declare nothing in their type, so they keep the cannot-infer throw of [`pipe_writes`](@ref) and enter via `PipelineStep(; est = td, writes = :opt)`, their output type-checked when the fold loop swaps it in (see [`assert_time_dependent_optimiser`](@ref)).
+
+# Related
+
+  - [`TD_OptE_Opt`](@ref)
+  - [`pipe_writes`](@ref)
+  - [`PipelineStep`](@ref)
+"""
+const TD_OptE_Opt_Inferable = Union{TimeDependent{<:AbstractVector{<:OptE_Opt}},
+                                    TimeDependent{<:TimeDependentOptimiserCallable}}
+pipe_writes(::TD_OptE_Opt_Inferable) = :opt
+pipe_reads(::TD_OptE_Opt_Inferable) = (:returns,)
 
 export PipelineStep

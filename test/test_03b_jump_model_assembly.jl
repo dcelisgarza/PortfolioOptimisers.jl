@@ -2,7 +2,7 @@
 #
 # These build a model through the per-optimiser head and `assemble_jump_model!`, then
 # assert on the *constructed* model — without ever solving it. The interface under test is
-# the assembler's keyword arguments (`r`, `nea`/`l1`/… settings); the assertions check which
+# the assembler's keyword arguments (`r`, `wn2`/`l1`/… settings); the assertions check which
 # Model-State keys the middle registers, so they exercise the routing rather than numerics.
 @testset "JuMP model assembly (solver-free)" begin
     using Test, PortfolioOptimisers, CSV, TimeSeries, Clarabel, JuMP
@@ -68,12 +68,31 @@
     end
 
     @testset "optional constraints toggle on their settings" begin
-        @test "nea" ∉ assemble_keys(base)
-        @test "nea" in assemble_keys(MeanRisk(; r = Variance(),
-                                              opt = JuMPOptimiser(; slv = slv, nea = 5)))
+        @test "wn2" ∉ assemble_keys(base)
+        @test "wn2" in assemble_keys(MeanRisk(; r = Variance(),
+                                              opt = JuMPOptimiser(; slv = slv, wn2 = 5)))
 
         @test "l1" ∉ assemble_keys(base)
         @test "l1" in assemble_keys(MeanRisk(; r = Variance(),
                                              opt = JuMPOptimiser(; slv = slv, l1 = 0.1)))
+    end
+
+    @testset "lp penalty and wnp constraint register distinct keys" begin
+        # The p-norm weight constraint and the Lp regularisation penalty both build
+        # PowerCone epigraphs. They must not register under the same Model-State names,
+        # or whichever runs second silently clobbers the other's handle in the object
+        # dictionary (JuMP's `model[k] = v` overwrites without complaint).
+        ks = assemble_keys(MeanRisk(; r = Variance(),
+                                    opt = JuMPOptimiser(; slv = slv,
+                                                        lp = LpRegularisation(; p = 3,
+                                                                              val = 0.1),
+                                                        wnp = LpRegularisation(; p = 3,
+                                                                               val = 6))))
+        for k in ("clp_1", "cslp_1", "t_lp_1", "r_lp_1")       # Lp penalty
+            @test k in ks
+        end
+        for k in ("cwnp_1", "cswnp_1", "t_wnp_1", "r_wnp_1")   # p-norm constraint
+            @test k in ks
+        end
     end
 end

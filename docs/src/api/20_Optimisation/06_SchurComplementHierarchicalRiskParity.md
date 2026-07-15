@@ -17,6 +17,7 @@ VecScP
 ScP_VecScP
 SchurComplementHierarchicalRiskParityResult
 factory(res::SchurComplementHierarchicalRiskParityResult, fb::Option{<:OptE_Opt})
+schur_complement_hrp_td_defaults
 SchurComplementHierarchicalRiskParity
 needs_previous_weights(opt::SchurComplementHierarchicalRiskParity)
 port_opt_view(sh::SchurComplementHierarchicalRiskParity, i, X::MatNum, args...)

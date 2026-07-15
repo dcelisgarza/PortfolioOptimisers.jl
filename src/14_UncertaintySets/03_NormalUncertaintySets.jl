@@ -531,7 +531,7 @@ The scaling ``k`` is fitted empirically from simulated samples ``\\hat{\\boldsym
 
 ```math
 \\begin{align}
-\\mathcal{E}_{\\Sigma} &= \\left\\{\\mathbf{\\Sigma} : \\left\\| \\mathbf{\\Sigma}_{\\Sigma}^{-1/2} \\operatorname{vec}(\\mathbf{\\Sigma} - \\hat{\\mathbf{\\Sigma}}) \\right\\|_2 \\leq k_{\\Sigma} \\right\\}\\,.
+\\mathcal{E}_{\\Sigma} &= \\left\\{\\mathbf{\\Sigma} : \\left\\lVert  \\mathbf{\\Sigma}_{\\Sigma}^{-1/2} \\operatorname{vec}(\\mathbf{\\Sigma} - \\hat{\\mathbf{\\Sigma}})  \\right\\rVert_2 \\leq k_{\\Sigma} \\right\\}\\,.
 \\end{align}
 ```
 

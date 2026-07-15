@@ -31,7 +31,7 @@ Parametric VaR (Normal/t/Laplace):
 
 ```math
 \\begin{align}
-\\mathrm{VaR}_\\alpha(\\boldsymbol{w}) &= -\\boldsymbol{\\mu}^\\intercal \\boldsymbol{w} + z_\\alpha \\|\\mathbf{G}\\boldsymbol{w}\\|_2\\,.
+\\mathrm{VaR}_\\alpha(\\boldsymbol{w}) &= -\\boldsymbol{\\mu}^\\intercal \\boldsymbol{w} + z_\\alpha \\lVert \\mathbf{G}\\boldsymbol{w} \\rVert_2\\,.
 \\end{align}
 ```
 

@@ -28,13 +28,16 @@ abstract type JuMPOptimisationEstimator <: NonFiniteAllocationOptimisationEstima
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return `true` if the inner JuMP optimiser or fallback carries time-dependent constraints.
+Return `true` if the estimator's own problem-definition fields, the inner JuMP optimiser, or the fallback carry time-dependent constraints.
 """
 function is_time_dependent(opt::JuMPOptimisationEstimator)
-    return is_time_dependent(opt.opt) || is_time_dependent(opt.fb)
+    return (!isempty(time_dependent_fields(opt)) ||
+            is_time_dependent(opt.opt) ||
+            is_time_dependent(opt.fb))
 end
 function assert_time_dependent_fold_count(opt::JuMPOptimisationEstimator, n::Integer,
                                           all_binds::Bool = true)::Nothing
+    assert_time_dependent_fields_fold_count(opt, n, all_binds)
     assert_time_dependent_fold_count(opt.opt, n, all_binds)
     assert_time_dependent_fold_count(opt.fb, n, all_binds)
     return nothing
@@ -42,13 +45,14 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Resolve time-dependent constraints for the fold described by `ctx` by recursing into the inner JuMP optimiser and fallback.
+Resolve time-dependent constraints for the fold described by `ctx`: the estimator's own scheduled fields (risk measure, objective, warm start, fallback, …) are swapped for their per-fold values, then the inner JuMP optimiser and the (possibly just-swapped-in) fallback are recursed into with the same context.
 """
 function update_time_dependent_estimator(opt::JuMPOptimisationEstimator,
                                          ctx::TimeDependentContext, all_binds::Bool = true)
     if !is_time_dependent(opt)
         return opt
     end
+    opt = update_time_dependent_fields(opt, ctx, all_binds)
     return rebuild_estimator(opt,
                              (;
                               opt = update_time_dependent_estimator(opt.opt, ctx,
@@ -58,12 +62,13 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Replace time-dependent constraints with their static defaults by recursing into the inner JuMP optimiser and fallback.
+Replace time-dependent constraints with their static defaults, both on the estimator's own fields and by recursing into the inner JuMP optimiser and fallback.
 """
 function reset_time_dependent_estimator(opt::JuMPOptimisationEstimator)
     if !is_time_dependent(opt)
         return opt
     end
+    opt = reset_time_dependent_fields(opt)
     return rebuild_estimator(opt,
                              (; opt = reset_time_dependent_estimator(opt.opt),
                               fb = reset_time_dependent_estimator(opt.fb)))

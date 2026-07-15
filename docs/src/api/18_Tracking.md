@@ -22,4 +22,5 @@ VariableTracking
 tracking_benchmark
 port_opt_view(tr::VecTr, ::Any, args...)
 factory(tr::WeightsTracking, w::VecNum)
+narrow_optimiser_vector
 ```

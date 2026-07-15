@@ -715,8 +715,7 @@ function n_splits(dwf::DateWalkForward{<:Any}, rd::Prices_RR)
     end
     return special_div(last_allowed_start - M, test_size) + 1
 end
-function fit_and_predict(opt::NonFiniteAllocationOptimisationEstimator, rd::ReturnsResult,
-                         cv::WFCVER; cols = :,
+function fit_and_predict(opt::OptE_TD, rd::ReturnsResult, cv::WFCVER; cols = :,
                          ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
                          id = nothing)
     cv_res = split(cv, rd)

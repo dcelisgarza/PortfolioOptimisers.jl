@@ -87,6 +87,7 @@ Mark a topic covered (✅) only when all of the following hold:
 | ✅ | `DateWalkForward` — calendar-aligned walk-forward using Julia's `Dates` module (month-end `adjuster`, `previous` alignment) | `examples/5_validation_tuning/01_Cross_Validation.jl` (§2.3.2) |
 | ✅ | `Pipeline` — end-to-end workflow as a fitted, tunable unit: `PricesResult`, `MissingDataFilter` (universe as fitted state), `Imputer` (train-only fill values), `PricesToReturns`, slot injection, price-level walk-forward CV, joint preprocessing + optimiser tuning, structural search | `examples/5_validation_tuning/03_Pipelines.jl` |
 | ✅ | Time-dependent constraints — in-field `TimeDependent` schedules vs callables vs static under every CV scheme, `TimeDependentContext`, `PreviousWeightsFunction`, entry-substitution/fold-count validation, inertness outside fold loops (ADR 0030) | `examples/5_validation_tuning/04_Time_Dependent_Constraints.jl` |
+| ✅ | Train/test splitting — `train_test_split` (keyword and estimator forms), `TrainTestSplit`/`TTS` as the first pipeline step, sizing by count vs fraction, complement and embargo, the leakage argument for the first-position rule, `fit_predict` on the held-out window, pass-through replay on fresh data, holdout-excludes-CV (ADR 0031) | `examples/5_validation_tuning/05_Train_Test_Split.jl` |
 
 ## 6. Post-processing
 

@@ -14,7 +14,7 @@ risk difference via [`set_risk_tracking_risk_constraints!`](@ref).
 
 ```math
 \\begin{align}
-\\mathrm{TR}_p(\\boldsymbol{w}) &= \\frac{\\|\\mathbf{X}\\boldsymbol{w} - \\boldsymbol{b}\\,k\\|_p}{c_p}\\,.
+\\mathrm{TR}_p(\\boldsymbol{w}) &= \\frac{\\lVert \\mathbf{X}\\boldsymbol{w} - \\boldsymbol{b}\\,k \\rVert_p}{c_p}\\,.
 \\end{align}
 ```
 

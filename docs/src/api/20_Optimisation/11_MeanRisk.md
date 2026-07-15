@@ -2,6 +2,7 @@
 
 ```@docs
 MeanRiskResult
+mean_risk_td_defaults
 factory(res::MeanRiskResult, fb::Option{<:OptE_Opt})
 Base.getproperty(r::MeanRiskResult, sym::Symbol)
 MeanRisk

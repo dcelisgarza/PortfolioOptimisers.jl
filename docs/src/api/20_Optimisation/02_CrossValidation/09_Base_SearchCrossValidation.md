@@ -1,7 +1,6 @@
 # Base search cross validation
 
 ```@docs
-SearchCV
 AbstractSearchCrossValidationEstimator
 CrossValidationSearchScorer
 CrossValSearchScorer
@@ -14,4 +13,5 @@ parse_lens
 _expr_to_lens
 _eval_index
 expr_to_lens_chain
+pipeline_asset_view
 ```

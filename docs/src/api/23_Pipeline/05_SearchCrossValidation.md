@@ -4,7 +4,14 @@ Tuning a pipeline widens the search boundary to the entire workflow: preprocessi
 
 ```@docs
 search_cross_validation(pipe::Pipeline, gscv::GridSearchCrossValidation, data::Prices_RR)
-fit_and_score(pipe::Pipeline, scv::AbstractSearchCrossValidationEstimator, data::Prices_RR, train_idx::VecInt, test_idx::VecInt)
+search_cross_validation(pipe::Pipeline,
+                                 gscv::GridSearchCrossValidation{<:Any,
+                                                                 <:CombinatorialCrossValidation},
+                                 data::Prices_RR)
+fit_and_score(pipe::Pipeline,
+                       scv::Union{<:GridSearchCrossValidation{<:Any, <:Any},
+                                  <:RandomisedSearchCrossValidation{<:Any, <:Any}},
+                       cv::CrossValidationResult, rd::Prices_RR, i::Integer)
 pipeline_lens
 pipeline_lens_val_grid
 pipeline_data_view
