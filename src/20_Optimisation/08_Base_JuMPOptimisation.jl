@@ -227,13 +227,13 @@ Implement `add_custom_objective_term!` to add custom terms to the JuMP model obj
 """
 abstract type CustomJuMPObjective <: JuMPConstraintEstimator end
 """
-    const VecJuMPObj = AbstractVector{<:JuMPObjective}
+    const VecJuMPObj = AbstractVector{<:CustomJuMPObjective}
 
 Alias for a vector of JuMP objective estimators.
 
 # Related
 
-  - [`JuMPObjective`](@ref)
+  - [`CustomJuMPObjective`](@ref)
 """
 const VecJuMPObj = AbstractVector{<:CustomJuMPObjective}
 """
