@@ -138,7 +138,10 @@ function pipeline_lens_val_grid(pipe::Pipeline,
     return lenses, vals
 end
 """
-    fit_and_score(pipe::Pipeline, scv::AbstractSearchCrossValidationEstimator, data, train_idx::VecInt, test_idx::VecInt)
+    fit_and_score(pipe::Pipeline,
+                       scv::Union{<:GridSearchCrossValidation{<:Any, <:Any},
+                                  <:RandomisedSearchCrossValidation{<:Any, <:Any}},
+                       cv::CrossValidationResult, rd::Prices_RR, i::Integer)
 
 Fit a [`Pipeline`](@ref) on the training window and score it on the test window for search cross-validation.
 
