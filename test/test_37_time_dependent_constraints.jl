@@ -1802,7 +1802,8 @@ end
             pr = PricesResult(; X = TimeArray(collect(ts), Xc, rd.nx))
             ppipe = Pipeline(steps = (PricesToReturns(), EmpiricalPrior(), iv))
             @test_throws ArgumentError cross_val_predict(ppipe, pr, ccv)
-            @test_throws ArgumentError cross_val_predict(ppipe, pr, mkmr())
+            mr = cross_val_predict(ppipe, pr, mkmr())
+            @test length(mr.pred) == 2
         end
         @testset "Combinatorial: split->path map recovers the entry behind each path" begin
             # Predictions are recombined into paths, but the schedule is keyed by split index

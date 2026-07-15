@@ -13,7 +13,7 @@ WindowSizeE
 MultipleRandomised
 MultipleRandomisedResult
 MRCVR
-Base.split(mrcv::MultipleRandomised, rd::ReturnsResult)
+Base.split(mrcv::MultipleRandomised, rd::Prices_RR)
 path_fit_and_predict
 combination_by_index
 get_window_size

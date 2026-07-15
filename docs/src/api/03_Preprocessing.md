@@ -19,7 +19,7 @@ Prices_RR
 ```@docs
 AbstractPricesResult
 PricesResult
-port_opt_view(pr::PricesResult, ::Colon)
+port_opt_view(pr::PricesResult, ::Colon = :, ::Colon = :)
 ```
 
 ## Preprocessing estimators

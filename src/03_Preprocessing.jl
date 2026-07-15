@@ -218,10 +218,11 @@ julia> size(values(pv.X))
   - [`PricesResult`](@ref)
   - [`port_opt_view`](@ref)
 """
-function port_opt_view(pr::PricesResult, ::Colon, ::Colon)
+function port_opt_view(pr::PricesResult, ::Colon = :, ::Colon = :)
     return pr
 end
-function port_opt_view(pr::PricesResult, i::AbstractVector{<:Dates.AbstractTime}, ::Colon)
+function port_opt_view(pr::PricesResult, i::AbstractVector{<:Dates.AbstractTime},
+                       ::Colon = :)
     X = pr.X[i]
     F = isnothing(pr.F) ? nothing : pr.F[i]
     B = if isnothing(pr.B)
@@ -236,23 +237,23 @@ function port_opt_view(pr::PricesResult, i::AbstractVector{<:Dates.AbstractTime}
 end
 function port_opt_view(pr::PricesResult, i::AbstractVector{<:Dates.AbstractTime},
                        j::AbstractVector)
-    X = pr.X[i][j]
+    X = pr.X[i][TimeSeries.colnames(pr.X)[j]]
     F = isnothing(pr.F) ? nothing : pr.F[i]
     B = if isnothing(pr.B)
         nothing
     elseif length(j) >= 1
-        pr.B[i][j]
+        pr.B[i][TimeSeries.colnames(pr.B)[j]]
     else
         pr.B[i]
     end
-    iv = isnothing(pr.iv) ? nothing : pr.iv[i][j]
+    iv = isnothing(pr.iv) ? nothing : pr.iv[i][TimeSeries.colnames(pr.iv)[j]]
     ivpa = nothing_scalar_array_view(pr.ivpa, j)
     return PricesResult(; X = X, F = F, B = B, iv = iv, ivpa = ivpa)
 end
 function port_opt_view(pr::PricesResult,
                        i::Union{<:VecInt, <:AbstractRange{<:Integer}, Colon} = :,
                        j::Union{<:VecInt, <:AbstractRange{<:Integer}, Colon} = :)
-    return port_opt_view(pr, TimeSeries.timestamp(pr.X)[i], TimeSeries.colnames(pr.X)[j])
+    return port_opt_view(pr, TimeSeries.timestamp(pr.X)[i], j)
 end
 """
 $(DocStringExtensions.TYPEDEF)
