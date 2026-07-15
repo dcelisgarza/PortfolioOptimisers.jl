@@ -71,7 +71,8 @@
         @test n_test_folds == 3
         cv = CombinatorialCrossValidation(n_folds, n_test_folds, 23, 11)
         @test PortfolioOptimisers.average_train_size(cv, rd) == 252
-        (; train_idx, test_idx, path_ids) = split(cv, rd)
+        res = split(cv, rd)
+        (; train_idx, test_idx, path_ids) = res
         @test length(train_idx) == length(test_idx) == n_splits(cv)
         @test train_idx ==
               [[791, 792, 793, 794, 795, 796, 797, 798, 799, 800, 801, 802, 803, 804, 805,
@@ -838,6 +839,38 @@
             @test rs_res2.val_grid[rs_res2.idx] == rs_res1.val_grid[rs_res1.idx]
             @test rs_res2.lens_grid[rs_res2.idx] == rs_res1.lens_grid[rs_res1.idx]
         end
+    end
+    @testset "Grid/Randomised search cv with a MultipleRandomised scheme" begin
+        # The search scheme resamples asset subsets (each fold optimises the sub-universe
+        # via cols = asset_idx). Exercise the MultipleRandomised fit_and_score branch on a
+        # plain optimiser for both grid and randomised search.
+        est = MeanRisk(; opt = JuMPOptimiser(; slv = slv))
+        r = ConditionalValueatRisk()
+        mr_cv = MultipleRandomised(IndexWalkForward(127, 171); subset_size = 5,
+                                   n_subsets = 2, rng = StableRNG(666), seed = 69)
+        p = ["opt.l1" => range(; start = 0.0005, stop = 0.002, length = 2)]
+        folds = split(mr_cv, rd)
+
+        gs_res = search_cross_validation(est,
+                                         GridSearchCrossValidation(p; cv = mr_cv, r = r),
+                                         rd)
+        @test gs_res.opt isa MeanRisk
+        @test size(gs_res.test_scores, 2) == 2                     # two candidates
+        @test size(gs_res.test_scores, 1) == length(folds.train_idx)  # folds across paths
+        @test length(unique(folds.path_ids)) == 2                  # n_subsets paths
+        @test all(isfinite, gs_res.test_scores)
+        @test 1 <= gs_res.idx <= 2
+
+        rs_res = search_cross_validation(est,
+                                         RandomisedSearchCrossValidation(p; cv = mr_cv,
+                                                                         rng = StableRNG(42),
+                                                                         r = r, n_iter = 2),
+                                         rd)
+        @test rs_res.opt isa MeanRisk
+        @test size(rs_res.test_scores, 2) == 2
+        @test size(rs_res.test_scores, 1) == length(folds.train_idx)
+        @test all(isfinite, rs_res.test_scores)
+        @test 1 <= rs_res.idx <= 2
     end
     @testset "parse_lens fails closed" begin
         # Param-key parsing is a string->AST boundary (ADR 0025): only `.`/`[]`

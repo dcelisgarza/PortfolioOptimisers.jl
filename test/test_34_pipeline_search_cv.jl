@@ -154,11 +154,95 @@
         winner = res.opt.steps[1]
         fitted = PortfolioOptimisers.fit_preprocessing(winner,
                                                        PortfolioOptimisers.port_opt_view(pr,
-                                                                                         train_idx))
-        train_vals = values(PortfolioOptimisers.port_opt_view(pr, train_idx).X)[:, 1]
+                                                                                         train_idx,
+                                                                                         :))
+        train_vals = values(PortfolioOptimisers.port_opt_view(pr, train_idx, :).X)[:, 1]
         obs = [x for x in train_vals if !isnan(x)]
         expected = winner.stat isa MeanValue ? mean(obs) : median(obs)
         j = findfirst(==(:A1), fitted.nx)
         @test fitted.v[j] ≈ expected
+    end
+
+    @testset "MultipleRandomised tunes a returns-level pipeline" begin
+        rd = make_returns()
+        pipe = Pipeline(; steps = ("prior" => EmpiricalPrior(), EqualWeighted()))
+        r = ConditionalValueatRisk()
+        mr = MultipleRandomised(IndexWalkForward(60, 20); subset_size = 3, n_subsets = 2,
+                                seed = 42)
+        p = ["prior" => [EmpiricalPrior(), EmpiricalPrior(), EmpiricalPrior()]]
+
+        res = search_cross_validation(pipe, GridSearchCrossValidation(p; cv = mr, r = r),
+                                      rd)
+        cv = split(mr, rd)
+        @test res.opt isa Pipeline
+        @test size(res.test_scores, 2) == 3                     # 3 candidates
+        # one row per fold across every resampled path
+        @test size(res.test_scores, 1) == length(cv.train_idx)
+        @test length(unique(cv.path_ids)) == 2                  # n_subsets paths
+        @test all(isfinite, res.test_scores)
+        @test 1 <= res.idx <= 3
+    end
+
+    @testset "MultipleRandomised tunes a price-level pipeline" begin
+        # MR draws over assets and windows rows with an inner walk-forward, so rows stay
+        # contiguous: a price-starting pipeline (PricesToReturns) is admissible.
+        X = make_prices()
+        vals = copy(values(X))
+        vals[3, 2] = NaN
+        vals[7, 4] = NaN
+        pr = PricesResult(; X = TimeArray(timestamp(X), vals, string.("A", 1:5)))
+        pipe = Pipeline(;
+                        steps = ("impute" => Imputer(), PricesToReturns(), EmpiricalPrior(),
+                                 EqualWeighted()))
+        r = ConditionalValueatRisk()
+        mr = MultipleRandomised(IndexWalkForward(60, 20); subset_size = 3, n_subsets = 2,
+                                seed = 42)
+        p = ["impute" => [Imputer(; stat = MeanValue()), Imputer(; stat = MedianValue())]]
+
+        # the price level must not be rejected (the old rolling-window rule blocked this)
+        res = search_cross_validation(pipe, GridSearchCrossValidation(p; cv = mr, r = r),
+                                      pr)
+        cv = split(mr, pr)
+        @test res.opt isa Pipeline
+        @test size(res.test_scores, 2) == 2
+        @test size(res.test_scores, 1) == length(cv.train_idx)
+        @test all(isfinite, res.test_scores)
+        @test res.opt.steps[1] isa Imputer
+        @test res.idx in (1, 2)
+
+        # the tuned pipeline fits end to end
+        fit_res = fit(res.opt, pr)
+        @test length(fit_res.w) == 5
+    end
+
+    @testset "randomised search with a MultipleRandomised scheme" begin
+        rd = make_returns()
+        pipe = Pipeline(; steps = (EmpiricalPrior(), EqualWeighted()))
+        r = ConditionalValueatRisk()
+        mr = MultipleRandomised(IndexWalkForward(60, 20); subset_size = 3, n_subsets = 2,
+                                seed = 42)
+        p = ["steps[1]" => [EmpiricalPrior(), EmpiricalPrior(), EmpiricalPrior()]]
+
+        gs = search_cross_validation(pipe, GridSearchCrossValidation(p; cv = mr, r = r), rd)
+        rs = search_cross_validation(pipe,
+                                     RandomisedSearchCrossValidation(p; cv = mr, r = r,
+                                                                     rng = StableRNG(42),
+                                                                     n_iter = 3), rd)
+        @test rs.opt isa Pipeline
+        @test size(rs.test_scores, 2) == 3
+        @test gs.test_scores == rs.test_scores
+    end
+
+    @testset "combinatorial search CV is gated off with an informative error" begin
+        rd = make_returns()
+        pipe = Pipeline(; steps = (EmpiricalPrior(), EqualWeighted()))
+        r = ConditionalValueatRisk()
+        ccv = CombinatorialCrossValidation(; n_folds = 4, n_test_folds = 2)
+        p = ["steps[1]" => [EmpiricalPrior(), EmpiricalPrior()]]
+        @test_throws ArgumentError search_cross_validation(pipe,
+                                                           GridSearchCrossValidation(p;
+                                                                                     cv = ccv,
+                                                                                     r = r),
+                                                           rd)
     end
 end

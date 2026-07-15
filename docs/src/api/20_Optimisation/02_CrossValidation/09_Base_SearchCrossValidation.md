@@ -1,7 +1,6 @@
 # Base search cross validation
 
 ```@docs
-SearchCV
 AbstractSearchCrossValidationEstimator
 CrossValidationSearchScorer
 CrossValSearchScorer

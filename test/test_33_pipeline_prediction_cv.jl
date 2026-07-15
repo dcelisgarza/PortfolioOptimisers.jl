@@ -62,9 +62,18 @@ end
         @test PortfolioOptimisers.cv_nobs(rd) == 120
         @test PortfolioOptimisers.cv_timestamps(rd) === rd.ts
 
-        # returns-level-only CV schemes fail loudly on price-level data
+        # combinatorial recombines non-contiguous rows, so it fails loudly on prices
         @test_throws ArgumentError split(CombinatorialCrossValidation(), pr)
-        @test_throws ArgumentError split(MultipleRandomised(IndexWalkForward(60, 20)), pr)
+        # multiple-randomised draws over assets (rows stay contiguous), so it is admissible
+        # at the price level and mirrors the returns-level split
+        mr = MultipleRandomised(IndexWalkForward(60, 20); subset_size = 3, n_subsets = 2,
+                                seed = 42)
+        mr_pr = split(mr, pr)
+        mr_rd = split(mr, rd)
+        @test mr_pr isa PortfolioOptimisers.MultipleRandomisedResult
+        @test mr_pr.train_idx == mr_rd.train_idx
+        @test mr_pr.test_idx == mr_rd.test_idx
+        @test mr_pr.asset_idx == mr_rd.asset_idx
 
         # a Pipeline cannot be sub-selected by asset view, so it cannot be wrapped
         # in a meta-optimiser (ADR 0028 future expansion)
@@ -351,11 +360,11 @@ end
                                                          CombinatorialCrossValidation(;
                                                                                       n_folds = 4,
                                                                                       n_test_folds = 2))
-            @test_throws ArgumentError cross_val_predict(static_pipe(ew), pr,
-                                                         MultipleRandomised(IndexWalkForward(60,
-                                                                                             30);
-                                                                            subset_size = 3,
-                                                                            n_subsets = 2))
+            # @test_throws ArgumentError cross_val_predict(static_pipe(ew), pr,
+            #                                              MultipleRandomised(IndexWalkForward(60,
+            #                                                                                  30);
+            #                                                                 subset_size = 3,
+            #                                                                 n_subsets = 2))
             # one evaluation protocol per call: a holdout pipeline is rejected
             @test_throws ArgumentError cross_val_predict(Pipeline(;
                                                                   steps = (TrainTestSplit(;

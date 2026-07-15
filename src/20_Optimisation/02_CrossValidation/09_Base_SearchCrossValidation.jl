@@ -1,10 +1,4 @@
 """
-    const SearchCV = Union{<:KFold, <:KFoldResult, <:WalkForwardEstimator, <:WalkForwardResult}
-
-Cross-validations compatible with search-based hyperparameter tuning.
-"""
-const SearchCV = Union{<:KFold, <:KFoldResult, <:WalkForwardEstimator, <:WalkForwardResult}
-"""
 $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all search-based cross-validation estimators in `PortfolioOptimisers.jl`.
@@ -16,7 +10,6 @@ Subtypes implement hyperparameter search strategies (e.g. grid search, randomise
   - [`GridSearchCrossValidation`](@ref)
   - [`RandomisedSearchCrossValidation`](@ref)
   - [`AbstractSearchCrossValidationResult`](@ref)
-  - [`SearchCV`](@ref)
 """
 abstract type AbstractSearchCrossValidationEstimator <: AbstractEstimator end
 """
@@ -86,6 +79,353 @@ abstract type CrossValidationSearchScorer <: AbstractEstimator end
 Union type for search cross-validation scoring strategies. Accepts either a subtype of `CrossValidationSearchScorer` or a plain function that accepts a matrix and returns an integer.
 """
 const CrossValSearchScorer = Union{<:CrossValidationSearchScorer, <:Function}
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Performs grid search cross-validation for portfolio optimisation estimators. Iterates over parameter grids, applies cross-validation splits, and scores each configuration to select the optimal parameters.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    GridSearchCrossValidation(
+        p::MultiGSCVValType_VecMultiGSCVValType;
+        cv::CrossValidationEstimator = KFold(),
+        r::AbstractBaseRiskMeasure = ConditionalValueatRisk(),
+        pred_scorer::Option{<:PredictionCrossValScorer} = nothing,
+        scorer::CrossValSearchScorer = HighestMeanScore(),
+        ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
+        train_score::Bool = false,
+        kwargs::NamedTuple = (;),
+    ) -> GridSearchCrossValidation
+
+Positional and keyword arguments correspond to fields above.
+
+## Validation
+
+  - `!isempty(p)`.
+  - If `p` is a vector of parameter sets: each element must not be empty.
+  - All keys in `p` must be of type `GSCVKey` (i.e. `String`, `Symbol`, or `Integer`).
+
+# Examples
+
+```jldoctest
+julia> GridSearchCrossValidation(Dict("alpha" => [0.1, 0.2], "beta" => [1.0, 2.0]))
+GridSearchCrossValidation
+            p ┼ Dict{String, Vector{Float64}}: Dict("alpha" => [0.1, 0.2], "beta" => [1.0, 2.0])
+           cv ┼ KFold
+              │              n ┼ Int64: 5
+              │    purged_size ┼ Int64: 0
+              │   embargo_size ┴ Int64: 0
+            r ┼ ConditionalValueatRisk
+              │   settings ┼ RiskMeasureSettings
+              │            │   scale ┼ Float64: 1.0
+              │            │      ub ┼ nothing
+              │            │     rke ┴ Bool: true
+              │      alpha ┼ Float64: 0.05
+              │          w ┴ nothing
+  pred_scorer ┼ Option{<:PredictionCrossValScorer}: nothing
+       scorer ┼ HighestMeanScore()
+           ex ┼ Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
+  train_score ┼ Bool: false
+       kwargs ┴ @NamedTuple{}: NamedTuple()
+```
+
+# Related
+
+  - [`MultiGSCVValType_VecMultiGSCVValType`](@ref)
+  - [`AbstractBaseRiskMeasure`](@ref)
+  - [`CrossValSearchScorer`](@ref)
+  - [`search_cross_validation`](@ref)
+"""
+@concrete struct GridSearchCrossValidation <: AbstractSearchCrossValidationEstimator
+    """
+    $(field_dict[:p_cv])
+    """
+    p
+    """
+    $(field_dict[:cv])
+    """
+    cv
+    """
+    $(field_dict[:r])
+    """
+    r
+    """
+    $(field_dict[:scorer])
+    """
+    pred_scorer
+    """
+    $(field_dict[:scorer])
+    """
+    scorer
+    """
+    $(field_dict[:ex])
+    """
+    ex
+    """
+    $(field_dict[:train_score])
+    """
+    train_score
+    """
+    $(field_dict[:kwargs])
+    """
+    kwargs
+    function GridSearchCrossValidation(p::Union{<:AbstractVector{<:Pair{<:Any,
+                                                                        <:AbstractVector}},
+                                                <:AbstractVector{<:AbstractVector{<:Pair{<:Any,
+                                                                                         <:AbstractVector}}},
+                                                <:AbstractDict{<:Any, <:AbstractVector},
+                                                <:AbstractVector{<:AbstractDict{<:Any,
+                                                                                <:AbstractVector}}},
+                                       cv::CrossValidationEstimator,
+                                       r::AbstractBaseRiskMeasure,
+                                       pred_scorer::Option{<:PredictionCrossValScorer},
+                                       scorer::CrossValSearchScorer,
+                                       ex::FLoops.Transducers.Executor, train_score::Bool,
+                                       kwargs::NamedTuple)
+        @argcheck(!isempty(p), IsEmptyError)
+        p_flag = isa(p, AbstractVector{<:Pair})
+        d_flag = isa(p, AbstractDict)
+        vp_flag = isa(p, AbstractVector{<:AbstractVector{<:Pair}})
+        vd_flag = isa(p, AbstractVector{<:AbstractDict})
+        if p_flag
+            @argcheck(all(x -> isa(x[1], GSCVKey), p),
+                      ArgumentError("all keys in p must be of type GSCVKey (String, Symbol, or Integer)"))
+        elseif d_flag
+            @argcheck(all(x -> isa(x, GSCVKey), keys(p)),
+                      ArgumentError("all keys in p must be of type GSCVKey (String, Symbol, or Integer)"))
+        elseif vp_flag || vd_flag
+            @argcheck(all(!isempty, p),
+                      IsEmptyError("each parameter set in p cannot be empty"))
+            if vp_flag
+                for _p in p
+                    @argcheck(all(x -> isa(x[1], GSCVKey), _p),
+                              ArgumentError("all keys in p must be of type GSCVKey (String, Symbol, or Integer)"))
+                end
+            end
+            if vd_flag
+                for _p in p
+                    @argcheck(all(x -> isa(x, GSCVKey), keys(_p)),
+                              ArgumentError("all keys in p must be of type GSCVKey (String, Symbol, or Integer)"))
+                end
+            end
+        end
+        return new{typeof(p), typeof(cv), typeof(r), typeof(pred_scorer), typeof(scorer),
+                   typeof(ex), typeof(train_score), typeof(kwargs)}(p, cv, r, pred_scorer,
+                                                                    scorer, ex, train_score,
+                                                                    kwargs)
+    end
+end
+function GridSearchCrossValidation(p::Union{<:AbstractVector{<:Pair{<:Any,
+                                                                    <:AbstractVector}},
+                                            <:AbstractVector{<:AbstractVector{<:Pair{<:Any,
+                                                                                     <:AbstractVector}}},
+                                            <:AbstractDict{<:Any, <:AbstractVector},
+                                            <:AbstractVector{<:AbstractDict{<:Any,
+                                                                            <:AbstractVector}}};
+                                   cv::CrossValidationEstimator = KFold(),
+                                   r::AbstractBaseRiskMeasure = ConditionalValueatRisk(),
+                                   pred_scorer::Option{<:PredictionCrossValScorer} = nothing,
+                                   scorer::CrossValSearchScorer = HighestMeanScore(),
+                                   ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
+                                   train_score::Bool = false, kwargs::NamedTuple = (;))
+    return GridSearchCrossValidation(p, cv, r, pred_scorer, scorer, ex, train_score, kwargs)
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Randomised search cross-validation estimator for portfolio optimisation. Samples parameter sets from distributions or vectors, applies cross-validation splits, fits and scores each configuration, and selects the optimal parameters using the provided scoring strategy.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    RandomisedSearchCrossValidation(
+        p::Union{AbstractVector{<:Pair{<:AbstractString, <:Any}},
+                 AbstractVector{<:AbstractVector{<:Pair{<:AbstractString,
+                                                        <:Any}}},
+                 AbstractDict{<:AbstractString, <:Any},
+                 AbstractVector{<:AbstractDict{<:AbstractString,
+                                               <:Any}}};
+        cv::CrossValidationEstimator = KFold(),
+        r::AbstractBaseRiskMeasure = ConditionalValueatRisk(),
+        pred_scorer::Option{<:PredictionCrossValScorer} = nothing,
+        scorer::CrossValSearchScorer = HighestMeanScore(),
+        ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
+        n_iter::Integer = 10,
+        rng::Random.AbstractRNG = Random.default_rng(),
+        seed::Option{<:Integer} = nothing,
+        train_score::Bool = false,
+        kwargs::NamedTuple = (;),
+    ) -> RandomisedSearchCrossValidation
+
+Keyword arguments correspond to the struct's fields.
+
+## Validation
+
+  - `!isempty(p)`.
+  - If `p` is a vector of parameter sets: each element must not be empty.
+  - All keys in `p` must be of type `GSCVKey` (i.e. `String`, `Symbol`, or `Integer`).
+  - All values in `p` must be of type `RSCVVal` (i.e. an `AbstractVector` or `Distributions.Distribution`).
+  - `n_iter > 0` and finite.
+
+# Examples
+
+```jldoctest
+julia> RandomisedSearchCrossValidation(Dict("alpha" => [0.1, 0.2, 0.3],
+                                            "beta" => Normal(1.0, 0.5)))
+RandomisedSearchCrossValidation
+            p ┼ Dict{String, Any}: Dict{String, Any}("alpha" => [0.1, 0.2, 0.3], "beta" => Distributions.Normal{Float64}(μ=1.0, σ=0.5))
+           cv ┼ KFold
+              │              n ┼ Int64: 5
+              │    purged_size ┼ Int64: 0
+              │   embargo_size ┴ Int64: 0
+            r ┼ ConditionalValueatRisk
+              │   settings ┼ RiskMeasureSettings
+              │            │   scale ┼ Float64: 1.0
+              │            │      ub ┼ nothing
+              │            │     rke ┴ Bool: true
+              │      alpha ┼ Float64: 0.05
+              │          w ┴ nothing
+  pred_scorer ┼ Option{<:PredictionCrossValScorer}: nothing
+       scorer ┼ HighestMeanScore()
+           ex ┼ Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
+       n_iter ┼ Int64: 10
+          rng ┼ Random.TaskLocalRNG: Random.TaskLocalRNG()
+         seed ┼ nothing
+  train_score ┼ Bool: false
+       kwargs ┴ @NamedTuple{}: NamedTuple()
+```
+
+# Related
+
+  - [`AbstractSearchCrossValidationEstimator`](@ref)
+  - [`GridSearchCrossValidation`](@ref)
+  - [`SearchCrossValidationResult`](@ref)
+  - [`CrossValSearchScorer`](@ref)
+"""
+@concrete struct RandomisedSearchCrossValidation <: AbstractSearchCrossValidationEstimator
+    """
+    $(field_dict[:p_cv])
+    """
+    p
+    """
+    $(field_dict[:cv])
+    """
+    cv
+    """
+    $(field_dict[:r])
+    """
+    r
+    """
+    $(field_dict[:scorer])
+    """
+    pred_scorer
+    """
+    $(field_dict[:scorer])
+    """
+    scorer
+    """
+    $(field_dict[:ex])
+    """
+    ex
+    """
+    $(field_dict[:n_iter])
+    """
+    n_iter
+    """
+    $(field_dict[:rng])
+    """
+    rng
+    """
+    $(field_dict[:seed])
+    """
+    seed
+    """
+    $(field_dict[:train_score])
+    """
+    train_score
+    """
+    $(field_dict[:kwargs])
+    """
+    kwargs
+    function RandomisedSearchCrossValidation(p::Union{<:AbstractVector{<:Pair},
+                                                      <:AbstractVector{<:AbstractVector{<:Pair}},
+                                                      <:AbstractDict,
+                                                      <:AbstractVector{<:AbstractDict}},
+                                             cv::CrossValidationEstimator,
+                                             r::AbstractBaseRiskMeasure,
+                                             pred_scorer::Option{<:PredictionCrossValScorer},
+                                             scorer::CrossValSearchScorer,
+                                             ex::FLoops.Transducers.Executor,
+                                             n_iter::Integer, rng::Random.AbstractRNG,
+                                             seed::Option{<:Integer}, train_score::Bool,
+                                             kwargs::NamedTuple)
+        @argcheck(!isempty(p), IsEmptyError)
+        p_flag = isa(p, AbstractVector{<:Pair})
+        d_flag = isa(p, AbstractDict)
+        vp_flag = isa(p, AbstractVector{<:AbstractVector{<:Pair}})
+        vd_flag = isa(p, AbstractVector{<:AbstractDict})
+        if p_flag
+            @argcheck(all(x -> isa(x[1], GSCVKey), p),
+                      ArgumentError("all keys in p must be of type GSCVKey (String, Symbol, or Integer)"))
+            @argcheck(all(x -> isa(x[2], RSCVVal), p),
+                      ArgumentError("all values in p must be of type RSCVVal (AbstractVector or Distribution)"))
+        elseif d_flag
+            @argcheck(all(x -> isa(x, GSCVKey), keys(p)),
+                      ArgumentError("all keys in p must be of type GSCVKey (String, Symbol, or Integer)"))
+            @argcheck(all(x -> isa(x, RSCVVal), values(p)),
+                      ArgumentError("all values in p must be of type RSCVVal (AbstractVector or Distribution)"))
+        elseif vp_flag || vd_flag
+            @argcheck(all(!isempty, p),
+                      IsEmptyError("each parameter set in p cannot be empty"))
+            if vp_flag
+                for _p in p
+                    @argcheck(all(x -> isa(x[1], GSCVKey), _p),
+                              ArgumentError("all keys in p must be of type GSCVKey (String, Symbol, or Integer)"))
+                    @argcheck(all(x -> isa(x[2], RSCVVal), _p),
+                              ArgumentError("all values in p must be of type RSCVVal (AbstractVector or Distribution)"))
+                end
+            end
+            if vd_flag
+                for _p in p
+                    @argcheck(all(x -> isa(x, GSCVKey), keys(_p)),
+                              ArgumentError("all keys in p must be of type GSCVKey (String, Symbol, or Integer)"))
+                    @argcheck(all(x -> isa(x, RSCVVal), values(_p)),
+                              ArgumentError("all values in p must be of type RSCVVal (AbstractVector or Distribution)"))
+                end
+            end
+        end
+        assert_nonempty_gt0_finite_val(n_iter, "n_iter")
+        return new{typeof(p), typeof(cv), typeof(r), typeof(pred_scorer), typeof(scorer),
+                   typeof(ex), typeof(n_iter), typeof(rng), typeof(seed),
+                   typeof(train_score), typeof(kwargs)}(p, cv, r, pred_scorer, scorer, ex,
+                                                        n_iter, rng, seed, train_score,
+                                                        kwargs)
+    end
+end
+function RandomisedSearchCrossValidation(p::Union{<:AbstractVector{<:Pair},
+                                                  <:AbstractVector{<:AbstractVector{<:Pair}},
+                                                  <:AbstractDict,
+                                                  <:AbstractVector{<:AbstractDict}};
+                                         cv::CrossValidationEstimator = KFold(),
+                                         r::AbstractBaseRiskMeasure = ConditionalValueatRisk(),
+                                         pred_scorer::Option{<:PredictionCrossValScorer} = nothing,
+                                         scorer::CrossValSearchScorer = HighestMeanScore(),
+                                         ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
+                                         n_iter::Integer = 10,
+                                         rng::Random.AbstractRNG = Random.default_rng(),
+                                         seed::Option{<:Integer} = nothing,
+                                         train_score::Bool = false,
+                                         kwargs::NamedTuple = (;))
+    return RandomisedSearchCrossValidation(p, cv, r, pred_scorer, scorer, ex, n_iter, rng,
+                                           seed, train_score, kwargs)
+end
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -211,16 +551,57 @@ Fits a portfolio optimisation estimator on training data, scores it on test and 
   - [`NonFiniteAllocationOptimisationEstimator`](@ref)
 """
 function fit_and_score(opt::NonFiniteAllocationOptimisationEstimator,
-                       scv::AbstractSearchCrossValidationEstimator, rd::ReturnsResult,
-                       train_idx::VecInt, test_idx::VecInt)
-    rd_train = port_opt_view(rd, train_idx, :)
-    res = optimise(opt, rd_train)
-    test_pred = StatsAPI.predict(res, rd, test_idx)
+                       scv::Union{<:GridSearchCrossValidation{<:Any, <:Any},
+                                  <:RandomisedSearchCrossValidation{<:Any, <:Any}},
+                       cv::CrossValidationResult, rd::ReturnsResult, i::Integer)
+    prediction = fit_and_predict(opt, rd; train_idx = cv.train_idx[i],
+                                 test_idx = cv.test_idx[i])
     r = scv.r
     sign = ifelse(bigger_is_better(r), 1, -1)
-    test_score = sign * expected_risk(scv.r, test_pred; scv.kwargs...)
+    test_score = sign * expected_risk(scv.r, prediction; scv.kwargs...)
     train_score = if scv.train_score
-        sign * expected_risk(scv.r, res; scv.kwargs...)
+        sign * expected_risk(scv.r, prediction.res; scv.kwargs...)
+    else
+        nothing
+    end
+    return test_score, train_score
+end
+function fit_and_score(opt::NonFiniteAllocationOptimisationEstimator,
+                       scv::Union{<:GridSearchCrossValidation{<:Any,
+                                                              <:CombinatorialCrossValidation},
+                                  <:RandomisedSearchCrossValidation{<:Any,
+                                                                    <:CombinatorialCrossValidation}},
+                       cv::CombinatorialCrossValidationResult, rd::ReturnsResult,
+                       i::Integer)
+    predictions = fit_and_predict(opt, rd; train_idx = cv.train_idx[i],
+                                  test_idx = cv.test_idx[i])
+    predictions = PopulationPredictionResult(; pred = sort_predictions!(cv, predictions))
+    if isnothing(scv.pred_scorer)
+        scorer = NearestQuantilePrediction()
+    end
+    r = scv.r
+    sign = ifelse(bigger_is_better(r), 1, -1)
+    best_prediction = scorer(predictions, sign)
+    test_score = sign * expected_risk(scv.r, best_prediction; scv.kwargs...)
+    train_score = if scv.train_score
+        sign * expected_risk(scv.r, best_prediction.res; scv.kwargs...)
+    else
+        nothing
+    end
+    return test_score, train_score
+end
+function fit_and_score(opt::NonFiniteAllocationOptimisationEstimator,
+                       scv::Union{<:GridSearchCrossValidation{<:Any, <:MultipleRandomised},
+                                  <:RandomisedSearchCrossValidation{<:Any,
+                                                                    <:MultipleRandomised}},
+                       cv::MultipleRandomisedResult, rd::ReturnsResult, i::Integer)
+    prediction = fit_and_predict(opt, rd; train_idx = cv.train_idx[i],
+                                 test_idx = cv.test_idx[i], cols = cv.asset_idx[i])
+    r = scv.r
+    sign = ifelse(bigger_is_better(r), 1, -1)
+    test_score = sign * expected_risk(scv.r, prediction; scv.kwargs...)
+    train_score = if scv.train_score
+        sign * expected_risk(scv.r, prediction.res; scv.kwargs...)
     else
         nothing
     end

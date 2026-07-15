@@ -636,24 +636,24 @@ function apply_fitted_steps(results::Tuple, data::Prices_RR)
     return data
 end
 """
-    predict(res::PipelineResult, data::AbstractPricesResult, window = :) -> PredictionResult
-    predict(res::PipelineResult, data::AbstractReturnsResult, window = :) -> PredictionResult
+    predict(res::PipelineResult, data::AbstractPricesResult, test_idx = :) -> PredictionResult
+    predict(res::PipelineResult, data::AbstractReturnsResult, test_idx = :) -> PredictionResult
 
-Apply a fitted pipeline to an unseen data window and produce the same [`PredictionResult`](@ref) the weights-level machinery consumes.
+Apply a fitted pipeline to an unseen data test_idx and produce the same [`PredictionResult`](@ref) the weights-level machinery consumes.
 
-The `window` selects observation rows of `data` (integer indices, timestamps, or `:` for all rows). The window is transformed by replaying the fitted preprocessing steps in step order — the *training* universe subset, the *training* imputation parameters, then the returns conversion — so no statistics of the test window leak into the transformation. The result is then handed to the existing weights-level `predict`, so scorers and risk measures carry over untouched.
+The `test_idx` selects observation rows of `data` (integer indices, timestamps, or `:` for all rows). The test_idx is transformed by replaying the fitted preprocessing steps in step order — the *training* universe subset, the *training* imputation parameters, then the returns conversion — so no statistics of the test test_idx leak into the transformation. The result is then handed to the existing weights-level `predict`, so scorers and risk measures carry over untouched.
 
 Price-level data requires the pipeline to contain a [`PricesToReturns`](@ref) step; a pipeline that produced no optimisation result cannot predict.
 
 # Arguments
 
   - `res`: The fitted [`PipelineResult`](@ref).
-  - `data`: Price- or returns-level data containing the window ([`PricesResult`](@ref) or [`ReturnsResult`](@ref)).
-  - `window`: Observation window into the rows of `data`. Integer indices, timestamps, or `:` (all rows).
+  - `data`: Price- or returns-level data containing the test_idx ([`PricesResult`](@ref) or [`ReturnsResult`](@ref)).
+  - `test_idx`: Observation test_idx into the rows of `data`. Integer indices, timestamps, or `:` (all rows).
 
 # Returns
 
-  - `pred::PredictionResult`: The weights-level prediction on the transformed window.
+  - `pred::PredictionResult`: The weights-level prediction on the transformed test_idx.
 
 # Related
 
@@ -662,11 +662,12 @@ Price-level data requires the pipeline to contain a [`PricesToReturns`](@ref) st
   - [`port_opt_view`](@ref)
   - [`predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)`](@ref)
 """
-function StatsAPI.predict(res::PipelineResult, data::AbstractPricesResult, window = Colon())
+function StatsAPI.predict(res::PipelineResult, data::AbstractPricesResult,
+                          test_idx = Colon(), cols = Colon())
     opt = res.ctx.opt
     @argcheck(!isnothing(opt),
               IsNothingError("the pipeline produced no optimisation result; add a terminal optimisation step before predicting"))
-    pr = port_opt_view(data, window)
+    pr = port_opt_view(data, test_idx, cols)
     rd = apply_fitted_steps(res.results, pr)
     @argcheck(isa(rd, AbstractReturnsResult),
               ArgumentError("the pipeline's fitted steps do not convert price-level data to returns; predicting on a $(Base.typename(typeof(data)).wrapper) requires a PricesToReturns step"))
@@ -674,14 +675,39 @@ function StatsAPI.predict(res::PipelineResult, data::AbstractPricesResult, windo
     return StatsAPI.predict(opt, rd)
 end
 function StatsAPI.predict(res::PipelineResult, data::AbstractReturnsResult,
-                          window = Colon())
+                          test_idx = Colon(), cols = Colon())
     opt = res.ctx.opt
     @argcheck(!isnothing(opt),
               IsNothingError("the pipeline produced no optimisation result; add a terminal optimisation step before predicting"))
-    rd = isa(window, Colon) ? data : port_opt_view(data, window, :)
+    rd = if isa(test_idx, Colon) && isa(cols, Colon)
+        data
+    else
+        port_opt_view(data, test_idx, cols)
+    end
     rd = apply_fitted_steps(res.results, rd)
     assert_universe_aligned(res, rd)
     return StatsAPI.predict(opt, rd)
+end
+function StatsAPI.predict(res::PipelineResult, data::AbstractReturnsResult,
+                          test_idxs::VecVecInt, cols = Colon())
+    return [StatsAPI.predict(res, data, test_idx, cols) for test_idx in test_idxs]
+end
+function fit_and_predict(res::PipelineResult, data::AbstractReturnsResult;
+                         test_idx::VecInt_VecVecInt, cols = :, kwargs...)
+    opt = res.ctx.opt
+    @argcheck(!isnothing(opt),
+              IsNothingError("the pipeline produced no optimisation result; add a terminal optimisation step before predicting"))
+    return StatsAPI.predict(res, data, test_idx, cols)
+end
+function fit_and_predict(pipe::Pipeline, data::Prices_RR; train_idx::VecInt,
+                         test_idx::VecInt_VecVecInt, cols = :)
+    data_train = pipeline_data_view(data, train_idx, cols)
+    #! I think we should define a port_opt_view for pipelines.
+    # if !isa(cols, Colon)
+    #     opt = port_opt_view(pipe, cols)
+    # end
+    res = StatsAPI.fit(pipe, data_train)
+    return StatsAPI.predict(res, data, test_idx, cols)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

@@ -114,9 +114,10 @@ function NearestQuantilePrediction(; r::AbstractBaseRiskMeasure = ConditionalVal
                                    q_kwargs::NamedTuple = (;))::NearestQuantilePrediction
     return NearestQuantilePrediction(r, q, r_kwargs, q_kwargs)
 end
-function (s::NearestQuantilePrediction)(ppred::PopulationPredictionResult)
+function (s::NearestQuantilePrediction)(ppred::PopulationPredictionResult,
+                                        sign::Integer = 1)
     return quantile_by_measure(ppred, s.r, s.q; r_kwargs = s.r_kwargs,
-                               q_kwargs = s.q_kwargs)
+                               q_kwargs = s.q_kwargs, sign = sign)
 end
 
 export NearestQuantilePrediction

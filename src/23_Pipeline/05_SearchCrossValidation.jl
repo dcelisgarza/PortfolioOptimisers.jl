@@ -18,8 +18,8 @@ Return the observation-window view of price- or returns-level data used by pipel
   - [`port_opt_view`](@ref)
   - [`fit_and_score`](@ref)
 """
-pipeline_data_view(pr::AbstractPricesResult, idx) = port_opt_view(pr, idx)
-pipeline_data_view(rd::AbstractReturnsResult, idx) = port_opt_view(rd, idx, :)
+pipeline_data_view(pr::AbstractPricesResult, idx, idx2 = :) = port_opt_view(pr, idx, idx2)
+pipeline_data_view(rd::AbstractReturnsResult, idx, idx2 = :) = port_opt_view(rd, idx, idx2)
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
@@ -119,6 +119,16 @@ function pipeline_lens_val_grid(pipe::Pipeline,
     return lenses, vals
 end
 """
+    const COMBINATORIAL_SEARCH_CV_UNSUPPORTED
+
+Error message thrown when a [`CombinatorialCrossValidation`](@ref) scheme is used for pipeline
+search cross-validation, which is not yet supported (tracked in issue #151): scoring a single
+combinatorial split into one row of the score matrix needs a per-split aggregation that the
+current [`sort_predictions!`](@ref) path (which recombines *all* splits into paths) does not
+provide. Use [`KFold`](@ref), a walk-forward scheme, or [`MultipleRandomised`](@ref) instead.
+"""
+const COMBINATORIAL_SEARCH_CV_UNSUPPORTED = "CombinatorialCrossValidation is not yet supported for pipeline search cross-validation (tracking issue #151): scoring one combinatorial split into a single row of the score matrix needs a per-split aggregation that the current sort_predictions! path does not provide. Use KFold, a walk-forward scheme, or MultipleRandomised instead."
+"""
     fit_and_score(pipe::Pipeline, scv::AbstractSearchCrossValidationEstimator, data, train_idx::VecInt, test_idx::VecInt)
 
 Fit a [`Pipeline`](@ref) on the training window and score it on the test window for search cross-validation.
@@ -143,16 +153,49 @@ The whole workflow is fitted per fold: stateful preprocessing (universe, imputat
   - [`expected_risk`](@ref)
   - [`predict(res::PipelineResult, data::AbstractPricesResult, window)`](@ref)
 """
-function fit_and_score(pipe::Pipeline, scv::AbstractSearchCrossValidationEstimator,
-                       data::Prices_RR, train_idx::VecInt, test_idx::VecInt)
+function fit_and_score(pipe::Pipeline,
+                       scv::Union{<:GridSearchCrossValidation{<:Any, <:Any},
+                                  <:RandomisedSearchCrossValidation{<:Any, <:Any}},
+                       cv::CrossValidationResult, rd::Prices_RR, i::Integer)
     assert_no_holdout(pipe)
-    res = StatsAPI.fit(pipe, pipeline_data_view(data, train_idx))
-    test_pred = StatsAPI.predict(res, data, test_idx)
+    prediction = fit_and_predict(pipe, rd; train_idx = cv.train_idx[i],
+                                 test_idx = cv.test_idx[i])
     r = scv.r
     sign = ifelse(bigger_is_better(r), 1, -1)
-    test_score = sign * expected_risk(r, test_pred; scv.kwargs...)
+    test_score = sign * expected_risk(r, prediction; scv.kwargs...)
     train_score = if scv.train_score
-        sign * expected_risk(r, res.ctx.opt; scv.kwargs...)
+        sign * expected_risk(r, prediction.res.ctx.opt; scv.kwargs...)
+    else
+        nothing
+    end
+    return test_score, train_score
+end
+function fit_and_score(::Pipeline,
+                       ::Union{<:GridSearchCrossValidation{<:Any,
+                                                           <:CombinatorialCrossValidation},
+                               <:RandomisedSearchCrossValidation{<:Any,
+                                                                 <:CombinatorialCrossValidation}},
+                       ::CombinatorialCrossValidationResult, ::Prices_RR, ::Integer)
+    # Combinatorial pipeline search CV is gated off pending a fix for the per-split score
+    # aggregation (the single-split predictions do not have the VecVecPredRes shape that
+    # sort_predictions! recombines into paths). Tracked in issue #151. The gate in
+    # search_cross_validation fails fast before reaching here; this method throws too so a
+    # direct call cannot silently fall through to the plain CrossValidationResult method.
+    return throw(ArgumentError(COMBINATORIAL_SEARCH_CV_UNSUPPORTED))
+end
+function fit_and_score(pipe::Pipeline,
+                       scv::Union{<:GridSearchCrossValidation{<:Any, <:MultipleRandomised},
+                                  <:RandomisedSearchCrossValidation{<:Any,
+                                                                    <:MultipleRandomised}},
+                       cv::MultipleRandomisedResult, rd::Prices_RR, i::Integer)
+    assert_no_holdout(pipe)
+    prediction = fit_and_predict(pipe, rd; train_idx = cv.train_idx[i],
+                                 test_idx = cv.test_idx[i], cols = cv.asset_idx[i])
+    r = scv.r
+    sign = ifelse(bigger_is_better(r), 1, -1)
+    test_score = sign * expected_risk(scv.r, prediction; scv.kwargs...)
+    train_score = if scv.train_score
+        sign * expected_risk(scv.r, prediction.res; scv.kwargs...)
     else
         nothing
     end
@@ -190,8 +233,8 @@ function search_cross_validation(pipe::Pipeline, gscv::GridSearchCrossValidation
     assert_no_holdout(pipe)
     lens_grid, val_grid = pipeline_lens_val_grid(pipe, gscv.p)
     cv = split(gscv.cv, data)
-    @argcheck(isa(cv.test_idx[1], VecInt),
-              ArgumentError("grid search cross-validation requires non-combinatorial (VecInt) test indices, but got $(typeof(cv.test_idx[1]))"))
+    @argcheck(!isa(cv, CombinatorialCrossValidationResult),
+              ArgumentError(COMBINATORIAL_SEARCH_CV_UNSUPPORTED))
     N = length(val_grid)
     M = length(cv.train_idx)
     test_scores = Matrix{cv_data_eltype(data)}(undef, M, N)
@@ -211,7 +254,7 @@ function search_cross_validation(pipe::Pipeline, gscv::GridSearchCrossValidation
             if td_flag
                 assert_time_dependent_fold_count(pipei, M)
             end
-            for (j, (train_idx, test_idx)) in enumerate(zip(cv.train_idx, cv.test_idx))
+            for j in eachindex(cv.train_idx)
                 local pipej = pipei
                 if td_flag
                     pipej = update_time_dependent_estimator(pipei,
@@ -221,8 +264,7 @@ function search_cross_validation(pipe::Pipeline, gscv::GridSearchCrossValidation
                                                                                  train_idx = cv.train_idx,
                                                                                  test_idx = cv.test_idx))
                 end
-                test_score, train_score = fit_and_score(pipej, gscv, data, train_idx,
-                                                        test_idx)
+                test_score, train_score = fit_and_score(pipej, gscv, cv, data, j)
                 test_scores[j, i] = test_score
                 if gscv.train_score
                     train_scores[j, i] = train_score

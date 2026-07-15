@@ -12,20 +12,6 @@ Unsupported at the **price level**: combinatorial cross-validation recombines no
 function Base.split(::CombinatorialCrossValidation, ::AbstractPricesResult)
     return throw(ArgumentError("CombinatorialCrossValidation is unsupported for a price-starting pipeline: its recombined, non-contiguous test groups break the rolling/price-level preprocessing (e.g. PricesToReturns) that needs contiguous windows — the rolling-window rule. Run it on a returns-level pipeline instead (cross_val_predict on an AbstractReturnsResult), or use KFold / a walk-forward scheme at the price level."))
 end
-"""
-    Base.split(mrcv::MultipleRandomised, pr::AbstractPricesResult)
-
-Unsupported at the **price level**, for the same *rolling-window rule* as [`Base.split(ccv::CombinatorialCrossValidation, pr::AbstractPricesResult)`](@ref): a price-starting pipeline's rolling, order-dependent preprocessing needs contiguous input-row windows, which the resampled paths do not guarantee. Throws an `ArgumentError`. A **returns-level** pipeline has no such transform, so `cross_val_predict(pipe, rd::AbstractReturnsResult, mrcv)` resamples asset subsets and runs each path's inner walk-forward folds normally.
-
-# Related
-
-  - [`MultipleRandomised`](@ref)
-  - [`cross_val_predict(pipe::Pipeline, data::AbstractReturnsResult, cv::MultipleRandomised)`](@ref)
-  - [`Base.split(kf::KFold, rd::Prices_RR)`](@ref)
-"""
-function Base.split(::MultipleRandomised, ::AbstractPricesResult)
-    return throw(ArgumentError("MultipleRandomised is unsupported for a price-starting pipeline: its resampled paths do not guarantee the contiguous input-row windows that rolling/price-level preprocessing needs — the rolling-window rule. Run it on a returns-level pipeline instead (cross_val_predict on an AbstractReturnsResult), or use KFold / a walk-forward scheme at the price level."))
-end
 #! Begin: TimeDependent schedules as pipeline optimisation steps.
 """
     pipeline_step_is_time_dependent(x)
@@ -313,7 +299,7 @@ end
 
 Run asset-resampling (multiple-randomised) cross-validation over a **returns-level** [`Pipeline`](@ref).
 
-The rolling-window rule that blocks this for price-starting pipelines (see [`Base.split(mrcv::MultipleRandomised, pr::AbstractPricesResult)`](@ref)) does not apply to a returns-level pipeline. Each resampled path is an inner walk-forward over a random asset subset; the subset is applied to the *input data* (an asset view), and the pipeline is fitted fresh on the sub-universe — so, contrary to the earlier restriction, the pipeline never needs to sub-select its fitted universe. Paths are run by [`pipeline_path_fit_and_predict`](@ref) and returned as a [`PopulationPredictionResult`](@ref).
+Each resampled path is an inner walk-forward over a random asset subset; the subset is applied to the *input data* (an asset view), and the pipeline is fitted fresh on the sub-universe — so the pipeline never needs to sub-select its fitted universe. Paths are run by [`pipeline_path_fit_and_predict`](@ref) and returned as a [`PopulationPredictionResult`](@ref). Asset resampling keeps every observation window contiguous (it draws over assets, not rows), so — unlike combinatorial cross-validation — multiple-randomised is admissible at the price level; this *prediction* entry point handles the returns level, while price-level asset resampling is available through [`search_cross_validation`](@ref).
 
 # Related
 
