@@ -259,6 +259,7 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
                                   alg::NearOptimalCenteringAlgorithm,
                                   fb::TDO_Option{<:OptE_Opt})
         assert_no_nearest_bind_optimiser_schedule(fb, :fb, :NearOptimalCentering)
+        assert_risk_measure_required(r, :NearOptimalCentering)
         if isa(r, AbstractVector)
             @argcheck(!isempty(r), IsEmptyError("r cannot be empty"))
             if any(x -> isa(x, QuadExpressionRiskMeasures), r)

@@ -818,6 +818,121 @@ function set_ucs_return_constraints!(model::JuMP.Model, ucs::EllipsoidalUncertai
     add_market_impact_cost!(model, ret)
     return nothing
 end
+"""
+    set_ucs_return_constraints!(model::JuMP.Model, ucs::L1UncertaintySet, mu::Num_VecNum)
+
+Add ``\\ell_1``-uncertainty-set-robust return constraints to the JuMP model.
+
+Introduces an infinity-norm cone constraint to model the worst-case characteristic under an ``\\ell_1`` uncertainty set. The constraint is linear, so the resulting model is an LP whenever the rest of the problem is (see [`NoRisk`](@ref)).
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\hat{r}(\\boldsymbol{w}) &= \\boldsymbol{\\mu}^\\intercal \\boldsymbol{w} - \\epsilon \\lVert \\boldsymbol{\\sigma} \\odot \\boldsymbol{w} \\rVert_\\infty\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\hat{r}(\\boldsymbol{w})``: Worst-case expected return.
+  - $(math_dict[:mu_er])
+  - $(math_dict[:w_port])
+  - ``\\epsilon``: Radius of the ``\\ell_1`` uncertainty set.
+  - ``\\boldsymbol{\\sigma}``: Per-asset scaling (`sd`); ``\\boldsymbol{1}`` when `sd` is `nothing`.
+
+# Arguments
+
+  - `model::JuMP.Model`: JuMP optimisation model.
+  - `ucs::L1UncertaintySet`: ``\\ell_1`` uncertainty set with radius `eps` and scaling `sd`.
+  - `mu::Num_VecNum`: Expected return vector.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`set_ucs_return_constraints!`](@ref)
+  - [`L1UncertaintySet`](@ref)
+  - [`CharacteristicUncertaintySet`](@ref)
+"""
+function set_ucs_return_constraints!(model::JuMP.Model, ucs::L1UncertaintySet,
+                                     mu::Num_VecNum)
+    sc = get_constraint_scale(model)
+    w = get_w(model)
+    sd = ucs.sd
+    sw = isnothing(sd) ? w : sd .* w
+    JuMP.@variable(model, t_l1ucs)
+    JuMP.@constraint(model, l1ucs_ret,
+                     [sc * t_l1ucs;
+                      sc * sw] in JuMP.MOI.NormInfinityCone(1 + length(w)))
+    JuMP.@expression(model, ret, dot_scalar(mu, w) - ucs.eps * t_l1ucs)
+    add_fees_to_ret!(model, ret)
+    add_market_impact_cost!(model, ret)
+    return nothing
+end
+"""
+    set_ucs_return_constraints!(model::JuMP.Model, ucs::SignedL1UncertaintySet, mu::Num_VecNum)
+
+Add signed-``\\ell_1``-uncertainty-set-robust return constraints to the JuMP model.
+
+Introduces one epigraph variable per error sign. Because the objective maximises the return expression, each variable is driven down to its lower bound, so `t_sl1ucs_p` attains ``[\\max_i(-\\sigma_i w_i)]_+`` and `t_sl1ucs_m` attains ``[\\max_i(\\sigma_i w_i)]_+`` at the optimum. The constraints are linear.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\hat{r}(\\boldsymbol{w}) &= \\boldsymbol{\\mu}^\\intercal \\boldsymbol{w} - \\epsilon_{+} \\left[\\underset{i}{\\max}\\, (-\\sigma_i w_i)\\right]_{+} - \\epsilon_{-} \\left[\\underset{i}{\\max}\\, (\\sigma_i w_i)\\right]_{+}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\hat{r}(\\boldsymbol{w})``: Worst-case expected return.
+  - $(math_dict[:mu_er])
+  - $(math_dict[:w_port])
+  - ``\\epsilon_{+}``, ``\\epsilon_{-}``: Radii of the positive- and negative-error sides.
+  - ``\\boldsymbol{\\sigma}``: Per-asset scaling (`sd`); ``\\boldsymbol{1}`` when `sd` is `nothing`.
+
+Modelling this worst case directly keeps the long-short problem *coupled*, so it does not need the decoupling of equations (27) and (28) of [quintile](@cite), nor the complementary-support caveat its Remark 12 attaches to recombining them.
+
+# Arguments
+
+  - `model::JuMP.Model`: JuMP optimisation model.
+  - `ucs::SignedL1UncertaintySet`: Signed ``\\ell_1`` uncertainty set with radii `ep`, `em` and scaling `sd`.
+  - `mu::Num_VecNum`: Expected return vector.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`set_ucs_return_constraints!`](@ref)
+  - [`SignedL1UncertaintySet`](@ref)
+  - [`L1UncertaintySet`](@ref)
+"""
+function set_ucs_return_constraints!(model::JuMP.Model, ucs::SignedL1UncertaintySet,
+                                     mu::Num_VecNum)
+    sc = get_constraint_scale(model)
+    w = get_w(model)
+    sd = ucs.sd
+    sw = isnothing(sd) ? w : sd .* w
+    JuMP.@variables(model, begin
+                        t_sl1ucs_p >= 0
+                        t_sl1ucs_m >= 0
+                    end)
+    JuMP.@constraints(model, begin
+                          sl1ucs_ret_p, sc * (-sw .- t_sl1ucs_p) <= 0
+                          sl1ucs_ret_m, sc * (sw .- t_sl1ucs_m) <= 0
+                      end)
+    JuMP.@expression(model, ret,
+                     dot_scalar(mu, w) - ucs.ep * t_sl1ucs_p - ucs.em * t_sl1ucs_m)
+    add_fees_to_ret!(model, ret)
+    add_market_impact_cost!(model, ret)
+    return nothing
+end
 function set_return_constraints!(model::JuMP.Model,
                                  pret::ArithmeticReturn{<:UcSE_UcS, <:Any, <:Any},
                                  obj::ObjectiveFunction, pr::AbstractPriorResult;

@@ -75,6 +75,30 @@ Alias for a union of uncertainty scaling algorithm and numeric types.
 """
 const Num_UcSK = Union{<:AbstractUncertaintyKAlgorithm, <:Number}
 """
+$(DocStringExtensions.TYPEDEF)
+
+Defines the abstract interface for algorithms that compute the radius `eps` of an ``\\ell_1`` uncertainty set on the characteristic vector.
+
+Subtypes implement specific methods for choosing the radius, which controls how far the true characteristic vector may lie from its estimate, and therefore how many assets the resulting portfolio holds. The counterpart of [`AbstractUncertaintyKAlgorithm`](@ref) for the ``\\ell_1`` family.
+
+# Related
+
+  - [`ActiveAssetsUncertaintyAlgorithm`](@ref)
+  - [`L1UncertaintySetAlgorithm`](@ref)
+  - [`AbstractUncertaintyKAlgorithm`](@ref)
+"""
+abstract type AbstractUncertaintyEpsAlgorithm <: AbstractAlgorithm end
+"""
+    const Num_UcSEps = Union{<:AbstractUncertaintyEpsAlgorithm, <:Number}
+
+Alias for a union of ``\\ell_1`` uncertainty radius algorithm and numeric types. A plain number is the radius itself; an algorithm defers its computation to the data.
+
+# Related
+
+  - [`AbstractUncertaintyEpsAlgorithm`](@ref)
+"""
+const Num_UcSEps = Union{<:AbstractUncertaintyEpsAlgorithm, <:Number}
+"""
     ucs(uc::Option{<:Tuple{<:Option{<:AbstractUncertaintySetResult},
                            <:Option{<:AbstractUncertaintySetResult}}}, args...; kwargs...)
 
@@ -793,4 +817,4 @@ export ucs, mu_ucs, sigma_ucs, BoxUncertaintySetAlgorithm, BoxUncertaintySet,
        NormalKUncertaintyAlgorithm, GeneralKUncertaintyAlgorithm,
        ChiSqKUncertaintyAlgorithm, EllipsoidalUncertaintySetAlgorithm,
        EllipsoidalUncertaintySet, SigmaEllipsoidalUncertaintySet,
-       MuEllipsoidalUncertaintySet
+       MuEllipsoidalUncertaintySet, AbstractUncertaintyEpsAlgorithm

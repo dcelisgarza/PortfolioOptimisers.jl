@@ -2,9 +2,9 @@ using PortfolioOptimisers
 using Documenter, DocumenterTools, DocumenterCitations, Literate, StatsPlots, GraphRecipes,
       Handcalcs, StatsBase, DocumenterVitepress, Dates, JuMP, StatsAPI, Random
 
-exported_symbols = names(PortfolioOptimisers)
-all_symbols = names(PortfolioOptimisers; all = true)
-filter!(x -> !contains(string(x), r"#|^eval$|^include$"), all_symbols)
+f = x -> !contains(string(x), r"#|^eval$|^include$")
+exported_symbols = filter!(f, names(PortfolioOptimisers))
+all_symbols = filter!(f, names(PortfolioOptimisers; all = true))
 private_symbols = setdiff(all_symbols, exported_symbols)
 public_symbols = exported_symbols[findall(x->!Base.isexported(PortfolioOptimisers, x),
                                           exported_symbols)]

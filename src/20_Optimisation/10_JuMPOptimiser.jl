@@ -338,6 +338,8 @@ $(DocStringExtensions.FIELDS)
         wb::TD_Option{<:WbE_Wb} = WeightBounds(),
         bgt::TD_Option{<:Num_BgtCE} = 1.0,
         sbgt::TD_Option{<:Num_BgtRg} = nothing,
+        gbgt::TD_Option{<:Num_BgtRg} = nothing,
+        xbgt::Bool = false,
         lt::TD_Option{<:BtE_Bt} = nothing,
         st::TD_Option{<:BtE_Bt} = nothing,
         lcse::TD_Option{<:LcE_Lc_VecLcE_Lc} = nothing,
@@ -384,6 +386,8 @@ Keywords correspond to the struct's fields. Fields typed [`TD_Option`](@ref) or 
   - If `bgt` is a number: `isfinite(bgt)`.
   - If `bgt` is a `BudgetCostEstimator`: `isnothing(sbgt)`.
   - If `sbgt` is a number: `isfinite(sbgt)` and `sbgt >= 0`.
+  - If `gbgt` is a number: `isfinite(gbgt)` and `gbgt >= 0`.
+  - If `gbgt` is provided: `wb` must admit short positions, and `bgt` and `sbgt` must not *both* be pinned numbers (which already determine the gross exposure as `bgt + 2 * sbgt`).
   - If `cte` is a vector: `!isempty(cte)`.
   - If `card` is provided: `card > 0` and finite.
   - If `tn` or `tr` is a vector: each must be non-empty.
@@ -423,6 +427,14 @@ Keywords correspond to the struct's fields. Fields typed [`TD_Option`](@ref) or 
     $(field_dict[:sbgt])
     """
     sbgt
+    """
+    $(field_dict[:gbgt])
+    """
+    gbgt
+    """
+    $(field_dict[:xbgt])
+    """
+    xbgt
     """
     $(field_dict[:lt])
     """
@@ -569,6 +581,7 @@ Keywords correspond to the struct's fields. Fields typed [`TD_Option`](@ref) or 
     strict
     function JuMPOptimiser(pe::TD{<:PrE_Pr}, slv::Slv_VecSlv, wb::TD_Option{<:WbE_Wb},
                            bgt::TD_Option{<:Num_BgtCE}, sbgt::TD_Option{<:Num_BgtRg},
+                           gbgt::TD_Option{<:Num_BgtRg}, xbgt::Bool,
                            lt::TD_Option{<:BtE_Bt}, st::TD_Option{<:BtE_Bt},
                            lcse::TD_Option{<:LcE_Lc_VecLcE_Lc},
                            cte::TD_Option{<:Lc_CC_VecCC}, gcarde::TD_Option{<:LcE_Lc},
@@ -604,6 +617,10 @@ Keywords correspond to the struct's fields. Fields typed [`TD_Option`](@ref) or 
         if isa(sbgt, Number)
             assert_nonempty_nonneg_finite_val(sbgt, :sbgt)
         end
+        if isa(gbgt, Number)
+            assert_nonempty_nonneg_finite_val(gbgt, :gbgt)
+        end
+        assert_gross_budget_admissible(bgt, sbgt, gbgt, wb)
         if isa(cte, AbstractVector)
             @argcheck(!isempty(cte), IsEmptyError("cte cannot be empty"))
         end
@@ -770,31 +787,43 @@ Keywords correspond to the struct's fields. Fields typed [`TD_Option`](@ref) or 
                       IsNothingError("sets cannot be nothing when estimator-type fields are provided"))
         end
         assert_time_dependent_substitution(JuMPOptimiser,
-                                           (; pe, slv, wb, bgt, sbgt, lt, st, lcse, cte,
-                                            gcarde, sgcarde, smtx, sgmtx, slt, sst, sglt,
-                                            sgst, tn, fees, sets, tr, ple, ret, sca, ccnt,
-                                            cobj, sc, so, ss, card, scard, wn2, wnp, wninf,
-                                            l1, l2, linf, lp, brt, cle_pr, strict),
-                                           jump_optimiser_td_defaults())
+                                           (; pe, slv, wb, bgt, sbgt, gbgt, xbgt, lt, st,
+                                            lcse, cte, gcarde, sgcarde, smtx, sgmtx, slt,
+                                            sst, sglt, sgst, tn, fees, sets, tr, ple, ret,
+                                            sca, ccnt, cobj, sc, so, ss, card, scard, wn2,
+                                            wnp, wninf, l1, l2, linf, lp, brt, cle_pr,
+                                            strict), jump_optimiser_td_defaults())
         return new{typeof(pe), typeof(slv), typeof(wb), typeof(bgt), typeof(sbgt),
-                   typeof(lt), typeof(st), typeof(lcse), typeof(cte), typeof(gcarde),
-                   typeof(sgcarde), typeof(smtx), typeof(sgmtx), typeof(slt), typeof(sst),
-                   typeof(sglt), typeof(sgst), typeof(tn), typeof(fees), typeof(sets),
-                   typeof(tr), typeof(ple), typeof(ret), typeof(sca), typeof(ccnt),
-                   typeof(cobj), typeof(sc), typeof(so), typeof(ss), typeof(card),
-                   typeof(scard), typeof(wn2), typeof(wnp), typeof(wninf), typeof(l1),
-                   typeof(l2), typeof(linf), typeof(lp), typeof(brt), typeof(cle_pr),
-                   typeof(strict)}(pe, slv, wb, bgt, sbgt, lt, st, lcse, cte, gcarde,
-                                   sgcarde, smtx, sgmtx, slt, sst, sglt, sgst, tn, fees,
-                                   sets, tr, ple, ret, sca, ccnt, cobj, sc, so, ss, card,
-                                   scard, wn2, wnp, wninf, l1, l2, linf, lp, brt, cle_pr,
-                                   strict)
+                   typeof(gbgt), typeof(xbgt), typeof(lt), typeof(st), typeof(lcse),
+                   typeof(cte), typeof(gcarde), typeof(sgcarde), typeof(smtx),
+                   typeof(sgmtx), typeof(slt), typeof(sst), typeof(sglt), typeof(sgst),
+                   typeof(tn), typeof(fees), typeof(sets), typeof(tr), typeof(ple),
+                   typeof(ret), typeof(sca), typeof(ccnt), typeof(cobj), typeof(sc),
+                   typeof(so), typeof(ss), typeof(card), typeof(scard), typeof(wn2),
+                   typeof(wnp), typeof(wninf), typeof(l1), typeof(l2), typeof(linf),
+                   typeof(lp), typeof(brt), typeof(cle_pr), typeof(strict)}(pe, slv, wb,
+                                                                            bgt, sbgt, gbgt,
+                                                                            xbgt, lt, st,
+                                                                            lcse, cte,
+                                                                            gcarde, sgcarde,
+                                                                            smtx, sgmtx,
+                                                                            slt, sst, sglt,
+                                                                            sgst, tn, fees,
+                                                                            sets, tr, ple,
+                                                                            ret, sca, ccnt,
+                                                                            cobj, sc, so,
+                                                                            ss, card, scard,
+                                                                            wn2, wnp, wninf,
+                                                                            l1, l2, linf,
+                                                                            lp, brt, cle_pr,
+                                                                            strict)
     end
 end
 function JuMPOptimiser(; pe::TD{<:PrE_Pr} = EmpiricalPrior(), slv::Slv_VecSlv,
                        wb::TD_Option{<:WbE_Wb} = WeightBounds(),
                        bgt::TD_Option{<:Num_BgtCE} = 1.0,
                        sbgt::TD_Option{<:Num_BgtRg} = nothing,
+                       gbgt::TD_Option{<:Num_BgtRg} = nothing, xbgt::Bool = false,
                        lt::TD_Option{<:BtE_Bt} = nothing, st::TD_Option{<:BtE_Bt} = nothing,
                        lcse::TD_Option{<:LcE_Lc_VecLcE_Lc} = nothing,
                        cte::TD_Option{<:Lc_CC_VecCC} = nothing,
@@ -826,10 +855,10 @@ function JuMPOptimiser(; pe::TD{<:PrE_Pr} = EmpiricalPrior(), slv::Slv_VecSlv,
                        linf::TD_Option{<:Number} = nothing,
                        lp::TD_Option{<:LpReg_VecLpReg} = nothing, brt::Bool = false,
                        cle_pr::Bool = true, strict::Bool = false)::JuMPOptimiser
-    return JuMPOptimiser(pe, slv, wb, bgt, sbgt, lt, st, lcse, cte, gcarde, sgcarde, smtx,
-                         sgmtx, slt, sst, sglt, sgst, tn, fees, sets, tr, ple, ret, sca,
-                         ccnt, cobj, sc, so, ss, card, scard, wn2, wnp, wninf, l1, l2, linf,
-                         lp, brt, cle_pr, strict)
+    return JuMPOptimiser(pe, slv, wb, bgt, sbgt, gbgt, xbgt, lt, st, lcse, cte, gcarde,
+                         sgcarde, smtx, sgmtx, slt, sst, sglt, sgst, tn, fees, sets, tr,
+                         ple, ret, sca, ccnt, cobj, sc, so, ss, card, scard, wn2, wnp,
+                         wninf, l1, l2, linf, lp, brt, cle_pr, strict)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -908,16 +937,16 @@ function factory(opt::JuMPOptimiser, w::AbstractVector)::JuMPOptimiser
     ccnt = factory(opt.ccnt, w)
     cobj = factory(opt.cobj, w)
     return JuMPOptimiser(; pe = opt.pe, slv = opt.slv, wb = opt.wb, bgt = opt.bgt,
-                         sbgt = opt.sbgt, lt = opt.lt, st = opt.st, lcse = opt.lcse,
-                         cte = opt.cte, gcarde = opt.gcarde, sgcarde = opt.sgcarde,
-                         smtx = opt.smtx, sgmtx = opt.sgmtx, slt = opt.slt, sst = opt.sst,
-                         sglt = opt.sglt, sgst = opt.sgst, tn = tn, fees = fees,
-                         sets = opt.sets, tr = tr, ple = opt.ple, ret = opt.ret,
-                         sca = opt.sca, ccnt = ccnt, cobj = cobj, sc = opt.sc, so = opt.so,
-                         ss = opt.ss, card = opt.card, scard = opt.scard, wn2 = opt.wn2,
-                         wnp = opt.wnp, wninf = opt.wninf, l1 = opt.l1, l2 = opt.l2,
-                         linf = opt.linf, lp = opt.lp, brt = opt.brt, cle_pr = opt.cle_pr,
-                         strict = opt.strict)
+                         sbgt = opt.sbgt, gbgt = opt.gbgt, xbgt = opt.xbgt, lt = opt.lt,
+                         st = opt.st, lcse = opt.lcse, cte = opt.cte, gcarde = opt.gcarde,
+                         sgcarde = opt.sgcarde, smtx = opt.smtx, sgmtx = opt.sgmtx,
+                         slt = opt.slt, sst = opt.sst, sglt = opt.sglt, sgst = opt.sgst,
+                         tn = tn, fees = fees, sets = opt.sets, tr = tr, ple = opt.ple,
+                         ret = opt.ret, sca = opt.sca, ccnt = ccnt, cobj = cobj,
+                         sc = opt.sc, so = opt.so, ss = opt.ss, card = opt.card,
+                         scard = opt.scard, wn2 = opt.wn2, wnp = opt.wnp, wninf = opt.wninf,
+                         l1 = opt.l1, l2 = opt.l2, linf = opt.linf, lp = opt.lp,
+                         brt = opt.brt, cle_pr = opt.cle_pr, strict = opt.strict)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -987,15 +1016,16 @@ function port_opt_view(opt::JuMPOptimiser, i, X::MatNum, args...)::JuMPOptimiser
     ccnt = port_opt_view(opt.ccnt, i)
     cobj = port_opt_view(opt.cobj, i)
     return JuMPOptimiser(; pe = pe, slv = opt.slv, wb = wb, bgt = bgt, sbgt = opt.sbgt,
-                         lt = lt, st = st, lcse = opt.lcse, cte = opt.cte,
-                         gcarde = opt.gcarde, sgcarde = opt.sgcarde, smtx = smtx,
-                         sgmtx = sgmtx, slt = slt, sst = sst, sglt = sglt, sgst = sgst,
-                         tn = tn, fees = fees, sets = sets, tr = tr, ple = opt.ple,
-                         ret = ret, sca = opt.sca, ccnt = ccnt, cobj = cobj, sc = opt.sc,
-                         so = opt.so, ss = opt.ss, card = opt.card, scard = opt.scard,
-                         wn2 = opt.wn2, wnp = opt.wnp, wninf = opt.wninf, l1 = opt.l1,
-                         l2 = opt.l2, linf = opt.linf, lp = opt.lp, brt = opt.brt,
-                         cle_pr = opt.cle_pr, strict = opt.strict)
+                         gbgt = opt.gbgt, xbgt = opt.xbgt, lt = lt, st = st,
+                         lcse = opt.lcse, cte = opt.cte, gcarde = opt.gcarde,
+                         sgcarde = opt.sgcarde, smtx = smtx, sgmtx = sgmtx, slt = slt,
+                         sst = sst, sglt = sglt, sgst = sgst, tn = tn, fees = fees,
+                         sets = sets, tr = tr, ple = opt.ple, ret = ret, sca = opt.sca,
+                         ccnt = ccnt, cobj = cobj, sc = opt.sc, so = opt.so, ss = opt.ss,
+                         card = opt.card, scard = opt.scard, wn2 = opt.wn2, wnp = opt.wnp,
+                         wninf = opt.wninf, l1 = opt.l1, l2 = opt.l2, linf = opt.linf,
+                         lp = opt.lp, brt = opt.brt, cle_pr = opt.cle_pr,
+                         strict = opt.strict)
 end
 """
     processed_jump_optimiser_attributes(
@@ -1150,16 +1180,17 @@ Used where a processed optimiser object is needed for inner sub-problems (e.g.
 function jump_optimiser_from_attributes(opt::JuMPOptimiser,
                                         attrs::ProcessedJuMPOptimiserAttributes)
     return JuMPOptimiser(; pe = attrs.pr, slv = opt.slv, wb = attrs.wb, bgt = opt.bgt,
-                         sbgt = opt.sbgt, lt = attrs.lt, st = attrs.st, lcse = attrs.lcsr,
-                         cte = attrs.ctr, gcarde = attrs.gcardr, sgcarde = attrs.sgcardr,
-                         smtx = attrs.smtx, sgmtx = attrs.sgmtx, slt = attrs.slt,
-                         sst = attrs.sst, sglt = attrs.sglt, sgst = attrs.sgst,
-                         tn = attrs.tn, fees = attrs.fees, sets = opt.sets, tr = opt.tr,
-                         ple = attrs.plr, ret = attrs.ret, sca = opt.sca, ccnt = opt.ccnt,
-                         cobj = opt.cobj, sc = opt.sc, so = opt.so, ss = opt.ss,
-                         card = opt.card, wn2 = opt.wn2, wnp = opt.wnp, wninf = opt.wninf,
-                         l1 = opt.l1, l2 = opt.l2, linf = opt.linf, lp = opt.lp,
-                         brt = opt.brt, cle_pr = opt.cle_pr, strict = opt.strict)
+                         sbgt = opt.sbgt, gbgt = opt.gbgt, xbgt = opt.xbgt, lt = attrs.lt,
+                         st = attrs.st, lcse = attrs.lcsr, cte = attrs.ctr,
+                         gcarde = attrs.gcardr, sgcarde = attrs.sgcardr, smtx = attrs.smtx,
+                         sgmtx = attrs.sgmtx, slt = attrs.slt, sst = attrs.sst,
+                         sglt = attrs.sglt, sgst = attrs.sgst, tn = attrs.tn,
+                         fees = attrs.fees, sets = opt.sets, tr = opt.tr, ple = attrs.plr,
+                         ret = attrs.ret, sca = opt.sca, ccnt = opt.ccnt, cobj = opt.cobj,
+                         sc = opt.sc, so = opt.so, ss = opt.ss, card = opt.card,
+                         wn2 = opt.wn2, wnp = opt.wnp, wninf = opt.wninf, l1 = opt.l1,
+                         l2 = opt.l2, linf = opt.linf, lp = opt.lp, brt = opt.brt,
+                         cle_pr = opt.cle_pr, strict = opt.strict)
 end
 """
     processed_jump_optimiser(
@@ -1329,7 +1360,8 @@ function assemble_jump_model!(model::JuMP.Model, optimiser::JuMPOptimisationEsti
     (; pr, wb, lt, st, lcsr, ctr, gcardr, sgcardr, smtx, sgmtx, slt, sst, sglt, sgst, tn, fees, plr, ret) = attrs
     set_linear_weight_constraints!(model, lcsr, :lcs_ineq_, :lcs_eq_)
     set_linear_weight_constraints!(model, ctr, :cent_ineq_, :cent_eq_)
-    set_mip_constraints!(model, wb, opt.card, gcardr, plr, lt, st, fees, opt.ss, miprb_flag)
+    set_mip_constraints!(model, wb, opt.card, gcardr, plr, lt, st, fees, opt.ss, miprb_flag,
+                         opt.xbgt)
     set_smip_constraints!(model, wb, opt.scard, sgcardr, smtx, sgmtx, slt, sst, sglt, sgst,
                           opt.ss)
     set_turnover_constraints!(model, tn)

@@ -253,6 +253,7 @@ Where:
         if isa(r, AbstractVector)
             @argcheck(!isempty(r), IsEmptyError("r cannot be empty"))
         end
+        assert_no_risk_objective_compatibility(r, obj)
         if isa(wi, VecNum)
             @argcheck(!isempty(wi), IsEmptyError("wi cannot be empty"))
         end
@@ -643,7 +644,7 @@ function _optimise(mr::MeanRisk, rd::ReturnsResult = ReturnsResult(); dims::Int 
     set_model_scales!(model, mr.opt.sc, mr.opt.so)
     set_maximum_ratio_factor_variables!(model, attrs.pr.mu, mr.obj)
     set_w!(model, attrs.pr.X, mr.wi)
-    set_weight_constraints!(model, attrs.wb, mr.opt.bgt, mr.opt.sbgt)
+    set_weight_constraints!(model, attrs.wb, mr.opt.bgt, mr.opt.sbgt; gbgt = mr.opt.gbgt)
     assemble_jump_model!(model, mr, mr.opt, attrs, rd, mr.r, mr.obj)
     retcode, sol = solve_mean_risk!(model, mr, attrs.ret, attrs.pr,
                                     Val(haskey(model, :ret_frontier)),

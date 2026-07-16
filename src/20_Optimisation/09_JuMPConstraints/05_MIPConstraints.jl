@@ -304,6 +304,24 @@ Where:
   - `ffl_flag::Bool`: Whether to add long fixed fee expressions.
   - `ffs_flag::Bool`: Whether to add short fixed fee expressions.
   - $(arg_dict[:miprb_flag_arg])
+  - `xbgt_flag::Bool = false`: Whether to pin the long/short decomposition exactly. See the section below.
+
+# Pinning the decomposition (`xbgt_flag`)
+
+`lw` and `sw` are *upper* bounds on the parts of `w` (`lw >= w`, `lw >= 0`, `sw >= -w`, `sw >= 0`), never equal to them, so every budget built on them (`bgt`, `sbgt`, `gbgt`) **bounds** the realised exposure rather than pinning it: `sbgt = 0.3` means at most 30% short. The slack is usually invisible — the objective normally pushes against the budget, making the bound tight — but it is not the same problem.
+
+The complementarity pair emitted for `miprb_flag` (`lw <= ss * il`, `sw <= ss * is`) forces the long-xor-short *sign pattern*, but does not close that slack. `xbgt_flag` emits the pair regardless of `miprb_flag` and adds the two constraints that do:
+
+```math
+\\begin{align}
+lw_i - w_i - M(1 - ilb_i) &\\leq 0\\,, \\\\
+sw_i + w_i - M(1 - isb_i) &\\leq 0\\,.
+\\end{align}
+```
+
+So `ilb_i = 1` gives `lw_i <= w_i`, which with `lw_i >= w_i` gives `lw_i == max(w_i, 0)`; `isb_i = 1` gives `sw_i == max(-w_i, 0)`; and both zero gives `lw_i == sw_i == 0`, hence `w_i == 0`. The budgets then hold exactly.
+
+This reuses `ilb`/`isb` rather than introducing a sign indicator of its own — they already mean long and short here, and `i_mip = ilb + isb` remains the *held* indicator that cardinality counts. The constraints are keyed on the binaries rather than on `il`/`is`, which relax to continuous variables when `k` is free.
 
 # Returns
 
@@ -314,6 +332,8 @@ Where:
   - [`mip_constraints`](@ref)
   - [`set_mip_ss_expr!`](@ref)
   - [`mip_wb`](@ref)
+  - [`set_gross_budget_constraints!`](@ref)
+  - [`JuMPOptimiser`](@ref)
   - [`Threshold`](@ref)
   - [`WeightBounds`](@ref)
 """
@@ -322,7 +342,8 @@ function short_mip_threshold_constraints(model::JuMP.Model, sp::AbstractMIPSpace
                                          st::Option{<:Threshold}, ffl::Option{<:Num_VecNum},
                                          ffs::Option{<:Num_VecNum}, ss::Option{<:Number},
                                          lt_flag::Bool, st_flag::Bool, ffl_flag::Bool,
-                                         ffs_flag::Bool, miprb_flag::Bool)
+                                         ffs_flag::Bool, miprb_flag::Bool,
+                                         xbgt_flag::Bool = false)
     wx = mip_wx!(model, sp)
     k = get_k(model)
     sc = get_constraint_scale(model)
@@ -376,11 +397,25 @@ function short_mip_threshold_constraints(model::JuMP.Model, sp::AbstractMIPSpace
         ffs = model[mip_key(sp, :ffs)] = JuMP.@expression(model, dot_scalar(ffs, isb))
         add_to_fees!(model, ffs)
     end
-    if miprb_flag
+    if miprb_flag || xbgt_flag
         lw = model[:lw]
         sw = model[:sw]
         model[mip_key(sp, :lmiprb)] = JuMP.@constraint(model, sc * (lw - ss * il) <= 0)
         model[mip_key(sp, :smiprb)] = JuMP.@constraint(model, sc * (sw - ss * is) <= 0)
+        if xbgt_flag
+            # The pair above only forces lw = 0 on the short side and sw = 0 on the long
+            # side. These close the remaining slack, so lw == max(wx, 0) and
+            # sw == max(-wx, 0) rather than merely bounding them. Keyed on the binaries,
+            # not on il/is, which relax to continuous variables when k is free.
+            model[mip_key(sp, :xbgt_lw_eq)] = JuMP.@constraint(model,
+                                                               sc *
+                                                               (lw - wx - ss * (1 .- ilb)) <=
+                                                               0)
+            model[mip_key(sp, :xbgt_sw_eq)] = JuMP.@constraint(model,
+                                                               sc *
+                                                               (sw + wx - ss * (1 .- isb)) <=
+                                                               0)
+        end
     end
     return i_mip
 end
@@ -495,6 +530,70 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
+Pin the long/short decomposition using a single binary *sign* indicator per asset.
+
+This is the lean form of the `xbgt_flag` branch of [`short_mip_threshold_constraints`](@ref), for when nothing else in the model needs binaries. It produces `N` of them rather than `2N`.
+
+The long-short builder splits each asset three ways — long, short, or inactive — because a threshold has to tell `w_i = 0` apart from `w_i >= lt_i`, and cardinality has to count the assets that are held. Pinning the decomposition needs neither: the sign split is *total*, since `w_i = 0` satisfies both `w_i >= 0` and `w_i <= 0` and is picked up by either branch. One bit per asset therefore suffices, and the inactive state is pure redundancy.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+lw_i - M\\, xb_i &\\leq 0\\,, & sw_i - M(1 - xb_i) &\\leq 0\\,, \\\\
+lw_i - w_i - M(1 - xb_i) &\\leq 0\\,, & sw_i + w_i - M\\, xb_i &\\leq 0\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``xb_i``: Binary sign indicator; `1` selects `w_i >= 0`, `0` selects `w_i <= 0`.
+  - $(math_dict[:w_port])
+  - ``lw_i``, ``sw_i``: Long and short parts of ``w_i``.
+  - ``M``: Big-M constant.
+
+The first pair forces `lw_i == 0` on the short side and `sw_i == 0` on the long side; the second closes the slack, giving `lw_i == max(w_i, 0)` and `sw_i == max(-w_i, 0)`.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - `sp::AbstractMIPSpace`: Weight space the constraints act on.
+  - $(arg_dict[:wb_arg])
+  - $(arg_dict[:ss_arg])
+
+# Returns
+
+  - `nothing`: There is no held indicator to return — this builder runs only when nothing would consume one.
+
+# Related
+
+  - [`short_mip_threshold_constraints`](@ref)
+  - [`set_mip_constraints!`](@ref)
+  - [`set_mip_ss_expr!`](@ref)
+  - [`JuMPOptimiser`](@ref)
+"""
+function sign_mip_constraints(model::JuMP.Model, sp::AbstractMIPSpace, wb::WeightBounds,
+                              ss::Option{<:Number})
+    wx = mip_wx!(model, sp)
+    lw = model[:lw]
+    sw = model[:sw]
+    sc = get_constraint_scale(model)
+    ss = set_mip_ss_expr!(model, ss, wb)
+    N = length(wx)
+    xb = model[mip_key(sp, :xbgt_ib)] = JuMP.@variable(model, [1:N], binary = true,
+                                                       base_name = string(mip_key(sp,
+                                                                                  :xbgt_ib)))
+    model[mip_key(sp, :xbgt_lw_ub)] = JuMP.@constraint(model, sc * (lw - ss * xb) <= 0)
+    model[mip_key(sp, :xbgt_sw_ub)] = JuMP.@constraint(model,
+                                                       sc * (sw - ss * (1 .- xb)) <= 0)
+    model[mip_key(sp, :xbgt_lw_eq)] = JuMP.@constraint(model,
+                                                       sc * (lw - wx - ss * (1 .- xb)) <= 0)
+    model[mip_key(sp, :xbgt_sw_eq)] = JuMP.@constraint(model, sc * (sw + wx - ss * xb) <= 0)
+    return nothing
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
 Add integer phylogeny cardinality constraints to the JuMP optimisation model.
 
 Iterates over `plgs` and, for each [`IntegerPhylogeny`](@ref) entry, enforces `A * ib ≤ B` where `ib` is the binary indicator variable created by [`mip_constraints`](@ref).
@@ -546,6 +645,7 @@ Orchestrates cardinality, group cardinality, integer phylogeny, minimum-holding 
   - `fees::Option{<:Fees}`: Optional fee specification.
   - $(arg_dict[:ss_arg])
   - `miprb_flag::Bool = false`: Whether to add MIP rebalancing constraints.
+  - `xbgt::Bool = false`: Whether to pin the long/short decomposition so the budgets hold exactly. Needs a per-asset sign bit, which the long-only [`mip_constraints`](@ref) does not have — its `ib` marks an asset as *held* and is what cardinality counts. It is therefore served by [`sign_mip_constraints`](@ref) when nothing else in the model needs binaries (`N` of them), and otherwise routed to [`short_mip_threshold_constraints`](@ref), whose `ilb`/`isb` it reuses for free. Ignored when the model has no short side.
 
 # Returns
 
@@ -555,6 +655,7 @@ Orchestrates cardinality, group cardinality, integer phylogeny, minimum-holding 
 
   - [`mip_constraints`](@ref)
   - [`short_mip_threshold_constraints`](@ref)
+  - [`sign_mip_constraints`](@ref)
   - [`set_iplg_constraints!`](@ref)
   - [`set_smip_constraints!`](@ref)
   - [`WeightBounds`](@ref)
@@ -565,13 +666,16 @@ function set_mip_constraints!(model::JuMP.Model, wb::WeightBounds, card::Option{
                               gcard::Option{<:LinearConstraint}, pl::Option{<:PlC_VecPlC},
                               lt::Option{<:Threshold}, st::Option{<:Threshold},
                               fees::Option{<:Fees}, ss::Option{<:Number},
-                              miprb_flag::Bool = false)
+                              miprb_flag::Bool = false, xbgt::Bool = false)
     card_flag = !isnothing(card)
     gcard_flag = !isnothing(gcard)
     iplg_flag = isa(pl, IntegerPhylogeny) ||
                 isa(pl, AbstractVector) && any(x -> isa(x, IntegerPhylogeny), pl)
     lt_flag = !isnothing(lt)
     st_flag = !isnothing(st)
+    # Pinning the decomposition is meaningless without a short side to pin: with no `sw`
+    # the weights are their own long part and the budgets are already exact.
+    xbgt_flag = xbgt && haskey(model, :sw)
     ffl_flag, ffs_flag, ffl, ffs = if !isnothing(fees)
         non_zero_real_or_vec(fees.fl), non_zero_real_or_vec(fees.fs), fees.fl, fees.fs
     else
@@ -584,13 +688,29 @@ function set_mip_constraints!(model::JuMP.Model, wb::WeightBounds, card::Option{
          st_flag ||
          ffl_flag ||
          ffs_flag ||
-         miprb_flag)
+         miprb_flag ||
+         xbgt_flag)
         return nothing
     end
     sp = AssetMIPSpace()
-    ib = if (st_flag || ffl_flag || ffs_flag) && haskey(model, :sw)
+    # `xbgt` needs a per-asset *sign* bit, which only the long-short builder has: the
+    # long-only builder's `ib` marks an asset as held and carries no sign.
+    ib = if xbgt_flag && !(card_flag ||
+                           gcard_flag ||
+                           iplg_flag ||
+                           lt_flag ||
+                           st_flag ||
+                           ffl_flag ||
+                           ffs_flag ||
+                           miprb_flag)
+        # Nothing here consumes a held indicator, so the long-short builder's third state
+        # (inactive) is dead weight: one sign bit per asset does the job with half the
+        # binaries. Returns nothing -- there is no held indicator, and by this branch's
+        # own condition nothing below would read one.
+        sign_mip_constraints(model, sp, wb, ss)
+    elseif (st_flag || ffl_flag || ffs_flag || xbgt_flag) && haskey(model, :sw)
         short_mip_threshold_constraints(model, sp, wb, lt, st, ffl, ffs, ss, lt_flag,
-                                        st_flag, ffl_flag, ffs_flag, miprb_flag)
+                                        st_flag, ffl_flag, ffs_flag, miprb_flag, xbgt_flag)
     else
         mip_constraints(model, sp, wb, ffl, lt, ss, lt_flag, ffl_flag, miprb_flag)
     end

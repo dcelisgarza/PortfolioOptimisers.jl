@@ -504,6 +504,81 @@ Various overloads handle different budget types (fixed, range), dispatching on t
 function set_long_short_budget_constraints!(args...)
     return nothing
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Assert that a gross budget is admissible alongside the net and short budgets.
+
+`bgt` and `sbgt` constrain the net and gross exposures only *together*: pinning both gives `1'w == bgt` and `norm(w, 1) == bgt + 2 * sbgt`. `gbgt` exists for the combination they cannot reach — gross pinned with net free — so it is rejected when they already determine the gross exposure, and when the weight bounds forbid short positions (whereupon gross and net coincide and `bgt` already owns the constraint).
+
+Only the statically-decidable contradictions are caught. Ranges may still conflict at solve time, surfacing as infeasibility, and a [`WeightBoundsEstimator`](@ref) is not resolved until then. [`TimeDependent`](@ref) schedules are reached through [`assert_time_dependent_substitution`](@ref).
+
+# Related
+
+  - [`JuMPOptimiser`](@ref)
+  - [`set_gross_budget_constraints!`](@ref)
+  - [`set_long_short_budget_constraints!`](@ref)
+"""
+function assert_gross_budget_admissible(bgt, sbgt, gbgt, wb)::Nothing
+    if isnothing(gbgt) || isa(gbgt, TimeDependent)
+        return nothing
+    end
+    @argcheck(!(isa(bgt, Number) && isa(sbgt, Number)),
+              ArgumentError("gbgt is over-determined: bgt ($bgt) and sbgt ($sbgt) already pin the gross exposure at bgt + 2 * sbgt = $(bgt + 2 * sbgt). Give at most two of bgt, sbgt and gbgt — gbgt exists for the case bgt and sbgt cannot express, a pinned gross exposure with a free net exposure (bgt = nothing)."))
+    if isa(wb, WeightBounds)
+        @argcheck(w_neg_flag(wb.lb) || w_neg_flag(wb.ub),
+                  ArgumentError("gbgt requires weight bounds that admit short positions: with non-negative bounds no short weights exist, so the gross exposure equals the net exposure and bgt already constrains it. Got wb = $wb."))
+    end
+    return nothing
+end
+"""
+    set_gross_budget_constraints!(model::JuMP.Model, gbgt::Option{<:Num_BgtRg})
+
+Constrain the gross exposure (leverage) `sum(lw) + sum(sw)`, independently of the net exposure.
+
+A number pins it; a [`BudgetRange`](@ref) bounds it on either side. Whether the constraint pins the *realised* gross exposure `norm(w, 1)` or merely bounds it depends on `xbgt` — see [`short_mip_threshold_constraints`](@ref).
+
+# Arguments
+
+  - `model::JuMP.Model`: JuMP optimisation model.
+  - `gbgt`: Gross budget specification, or `nothing` for no constraint.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`JuMPOptimiser`](@ref)
+  - [`assert_gross_budget_admissible`](@ref)
+  - [`set_long_short_budget_constraints!`](@ref)
+"""
+function set_gross_budget_constraints!(args...)
+    return nothing
+end
+function set_gross_budget_constraints!(model::JuMP.Model, gbgt::Number)
+    lw = model[:lw]
+    sw = model[:sw]
+    k = get_k(model)
+    sc = get_constraint_scale(model)
+    JuMP.@constraint(model, gbgt, sc * (sum(lw) + sum(sw) - k * gbgt) == 0)
+    return nothing
+end
+function set_gross_budget_constraints!(model::JuMP.Model, gbgt::BudgetRange)
+    lw = model[:lw]
+    sw = model[:sw]
+    k = get_k(model)
+    sc = get_constraint_scale(model)
+    lb = gbgt.lb
+    if !isnothing(lb)
+        JuMP.@constraint(model, gbgt_lb, sc * (sum(lw) + sum(sw) - k * lb) >= 0)
+    end
+    ub = gbgt.ub
+    if !isnothing(ub)
+        JuMP.@constraint(model, gbgt_ub, sc * (sum(lw) + sum(sw) - k * ub) <= 0)
+    end
+    return nothing
+end
 function set_long_short_budget_constraints!(model::JuMP.Model, bgt::Number, ::Nothing)
     lw = model[:lw]
     k = get_k(model)

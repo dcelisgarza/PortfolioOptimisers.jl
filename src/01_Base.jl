@@ -368,6 +368,15 @@ const arg_dict = Dict(
                       :class_ucs => "`class`: Uncertainty set class.",#
                       :method_ucs => "`method`: Ellipsoidal uncertainty set estimation method.",#
                       :diagonal => "`diagonal`: Whether to use only the diagonal of the covariance matrix.",#
+                      :eps_ucs => "`eps`: Radius of the ``\\\\ell_1`` uncertainty set on the characteristic vector. Larger values admit more estimation error, and therefore activate more assets.",#
+                      :ep_ucs => "`ep`: Radius of the positive-error side of the signed ``\\\\ell_1`` uncertainty set.",#
+                      :em_ucs => "`em`: Radius of the negative-error side of the signed ``\\\\ell_1`` uncertainty set.",#
+                      :sd_ucs => "`sd`: Per-asset scaling vector for the ``\\\\ell_1`` uncertainty set (the estimated standard deviations). `nothing` leaves the set unscaled, so every element of the characteristic vector is assumed to suffer the same estimation error.",#
+                      :method_l1_ucs => "`method`: Radius of the ``\\\\ell_1`` uncertainty set. A number is the radius itself; an [`AbstractUncertaintyEpsAlgorithm`](@ref) computes it from the data.",#
+                      :mp_ucs => "`mp`: Radius of the positive-error side. A number is the radius itself; an [`AbstractUncertaintyEpsAlgorithm`](@ref) computes it from the data.",#
+                      :mm_ucs => "`mm`: Radius of the negative-error side. A number is the radius itself; an [`AbstractUncertaintyEpsAlgorithm`](@ref) computes it from the data.",#
+                      :scaled_ucs => "`scaled`: Whether to scale the uncertainty set by the estimated standard deviations. `false` assumes every characteristic suffers the same estimation error; `true` assumes assets with larger variance suffer larger estimation error, which yields inverse-volatility weights.",#
+                      :active_ucs => "`active`: Target number of active assets on the *unconstrained* problem, as a count (integer `>= 1`) or a fraction of the universe (float in `(0, 1)`). This is a radius calibration, not a cardinality constraint: it selects the radius that would activate this many assets subject only to the budget and sign constraints. Any further constraint may change the realised count. Use `card` for a hard cardinality constraint.",#
                       :n_sim => "`n_sim`: Number of simulation samples.",#
                       :block_size => "`block_size`: Block size for bootstrap sampling.",#
                       :q_bs => "`q`: Confidence level that sizes the uncertainty set (`0 < q < 1`). A *smaller* `q` is more demanding and yields a *larger, more conservative* set (wider box intervals / larger ellipsoid radius); a larger `q` gives a tighter set closer to the point estimate.",#
@@ -460,6 +469,8 @@ const arg_dict = Dict(
                       :wb_jmp => "`wb`: Weight bounds estimator or weight bounds.",#
                       :bgt => "`bgt`: Portfolio budget constraint.",#
                       :sbgt => "`sbgt`: Short-sale budget constraint.",#
+                      :gbgt => "`gbgt`: Gross budget (leverage) constraint, `sum(lw) + sum(sw)`. A number pins the gross exposure; a [`BudgetRange`](@ref) bounds it, e.g. `BudgetRange(; lb = nothing, ub = 2.0)` caps leverage at 2x. Unlike `bgt` and `sbgt` — which pin the net and gross exposures only *together* — this constrains the gross exposure on its own, leaving the net free. Requires weight bounds that admit short positions, and is bounded rather than pinned unless `xbgt` is set.",#
+                      :xbgt => "`xbgt`: Whether to pin the long/short decomposition exactly. When `false` (the default), `lw` and `sw` are upper bounds on the positive and negative parts of `w`, so `bgt`, `sbgt` and `gbgt` bound the realised exposures rather than pinning them — a short budget of `0.3` means *at most* 30% short. When `true`, the long/short binary indicators force `lw == max(w, 0)` and `sw == max(-w, 0)`, so the budgets hold exactly, at the cost of turning the problem into a mixed-integer program. It reuses the indicators the cardinality, threshold and fee builders already create (see `short_mip_threshold_constraints`) rather than adding its own, and is ignored when the weight bounds admit no shorts.",#
                       :lt => "`lt`: Long-side minimum holding threshold.",#
                       :st => "`st`: Short-side minimum holding threshold.",#
                       :lcse => "`lcse`: Linear constraint set estimator(s).",#

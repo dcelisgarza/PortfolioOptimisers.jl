@@ -82,7 +82,12 @@ Where:
   - $(arg_dict[:wb_arg])
   - `bgt`: Optional total budget constraint (number or [`BudgetRange`](@ref)).
   - `sbgt`: Optional short-side budget constraint.
+  - `gbgt`: Optional gross (leverage) budget constraint, applied only when the weight bounds admit shorts. See [`set_gross_budget_constraints!`](@ref).
   - `long::Bool = false`: When `true`, raises an error if any bound is negative.
+
+!!! note
+
+    The budgets set here **bound** the realised exposures rather than pinning them, because `lw` and `sw` are upper bounds on the parts of `w`. Pinning them is the `xbgt` option of [`short_mip_threshold_constraints`](@ref), applied later by [`set_mip_constraints!`](@ref).
 
 # Validation
 
@@ -104,7 +109,7 @@ function set_weight_constraints!(args...)
 end
 function set_weight_constraints!(model::JuMP.Model, wb::WeightBounds,
                                  bgt::Option{<:Num_BgtRg}, sbgt::Option{<:Num_BgtRg},
-                                 long::Bool = false)
+                                 long::Bool = false; gbgt::Option{<:Num_BgtRg} = nothing)
     lb = wb.lb
     ub = wb.ub
     flag = w_neg_flag(lb) || w_neg_flag(ub)
@@ -134,6 +139,7 @@ function set_weight_constraints!(model::JuMP.Model, wb::WeightBounds,
                               w_sw, sc * (w + sw) >= 0
                           end)
         set_long_short_budget_constraints!(model, bgt, sbgt)
+        set_gross_budget_constraints!(model, gbgt)
     elseif !flag && !haskey(model, :lw)
         JuMP.@expression(model, lw, w)
     end
