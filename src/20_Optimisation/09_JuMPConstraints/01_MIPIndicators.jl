@@ -304,18 +304,32 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return the gates gating the lower and upper weight bounds in [`mip_wb`](@ref).
+Return the gate gating the *lower* weight bound in [`mip_wb`](@ref).
 
-The long-only bundle gates both bounds with the held indicator (`w = 0` unless held); the
-long-short bundle gates the lower bound with the short gate and the upper with the long gate.
+The long-only bundle gates it with the held indicator (`w = 0` unless held); the long-short
+bundle gates it with the short gate. See [`ub_gate`](@ref) for the upper bound.
 
 # Related
 
+  - [`ub_gate`](@ref)
   - [`mip_wb`](@ref)
 """
 function lb_gate(ind::HeldIndicators)
     return ind.i_mip
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the gate gating the *upper* weight bound in [`mip_wb`](@ref).
+
+The long-only bundle gates it with the held indicator (`w = 0` unless held); the long-short
+bundle gates it with the long gate. See [`lb_gate`](@ref) for the lower bound.
+
+# Related
+
+  - [`lb_gate`](@ref)
+  - [`mip_wb`](@ref)
+"""
 function ub_gate(ind::HeldIndicators)
     return ind.i_mip
 end
@@ -344,12 +358,47 @@ decomposition under a long-only weight bound, where held and long coincide.
 function long_gate(ind::HeldIndicators)
     return ind.ib
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the short-side gate bounding `sw` in the exact-decomposition constraints — the short
+counterpart of [`long_gate`](@ref), which carries the full explanation.
+
+# Related
+
+  - [`long_gate`](@ref)
+  - [`AbstractMIPIndicators`](@ref)
+"""
 function short_gate(ind::HeldIndicators)
     return 1 .- ind.ib
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the long *binary* the slack-closing exact-decomposition constraints key on — always the
+bit itself, never a continuous relaxation (see [`long_gate`](@ref) for why the binaries and
+gates differ).
+
+# Related
+
+  - [`short_bin`](@ref)
+  - [`long_gate`](@ref)
+"""
 function long_bin(ind::HeldIndicators)
     return ind.ib
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the short *binary* the slack-closing exact-decomposition constraints key on — always the
+bit itself, never a continuous relaxation (see [`long_gate`](@ref) for why the binaries and
+gates differ).
+
+# Related
+
+  - [`long_bin`](@ref)
+  - [`long_gate`](@ref)
+"""
 function short_bin(ind::HeldIndicators)
     return 1 .- ind.ib
 end
