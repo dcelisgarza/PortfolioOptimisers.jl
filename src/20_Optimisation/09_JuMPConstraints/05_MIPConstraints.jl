@@ -349,21 +349,15 @@ function short_mip_threshold_constraints(model::JuMP.Model, sp::AbstractMIPSpace
     sc = get_constraint_scale(model)
     ss = set_mip_ss_expr!(model, ss, wb)
     N = length(wx)
-    ilb = model[mip_key(sp, :ilb)] = JuMP.@variable(model, [1:N], binary = true,
-                                                    base_name = string(mip_key(sp, :ilb)))
-    isb = model[mip_key(sp, :isb)] = JuMP.@variable(model, [1:N], binary = true,
-                                                    base_name = string(mip_key(sp, :isb)))
+    ilb = model[mip_key(sp, :ilb)] = JuMP.@variable(model, [1:N], binary = true)
+    isb = model[mip_key(sp, :isb)] = JuMP.@variable(model, [1:N], binary = true)
     i_mip = model[mip_key(sp, :i_mip)] = JuMP.@expression(model, ilb + isb)
     if use_direct_mip_indicators(model, sp, k)
         il = model[mip_key(sp, :il)] = JuMP.@expression(model, ilb)
         is = model[mip_key(sp, :is)] = JuMP.@expression(model, isb)
     else
-        ilf = model[mip_key(sp, :ilf)] = JuMP.@variable(model, [1:N], lower_bound = 0,
-                                                        base_name = string(mip_key(sp,
-                                                                                   :ilf)))
-        isf = model[mip_key(sp, :isf)] = JuMP.@variable(model, [1:N], lower_bound = 0,
-                                                        base_name = string(mip_key(sp,
-                                                                                   :isf)))
+        ilf = model[mip_key(sp, :ilf)] = JuMP.@variable(model, [1:N], lower_bound = 0)
+        isf = model[mip_key(sp, :isf)] = JuMP.@variable(model, [1:N], lower_bound = 0)
         model[mip_key(sp, :ilf_ub)] = JuMP.@constraint(model, sc * (ilf .- k) <= 0)
         model[mip_key(sp, :isf_ub)] = JuMP.@constraint(model, sc * (isf .- k) <= 0)
         model[mip_key(sp, :ilfd_ub)] = JuMP.@constraint(model, sc * (ilf - ss * ilb) <= 0)
@@ -493,15 +487,12 @@ function mip_constraints(model::JuMP.Model, sp::AbstractMIPSpace, wb::WeightBoun
     k = get_k(model)
     sc = get_constraint_scale(model)
     N = length(wx)
-    ib = model[mip_key(sp, :ib)] = JuMP.@variable(model, [1:N], binary = true,
-                                                  base_name = string(mip_key(sp, :ib)))
+    ib = model[mip_key(sp, :ib)] = JuMP.@variable(model, [1:N], binary = true)
     i_mip = if isa(k, Number)
         model[mip_key(sp, :i_mip)] = JuMP.@expression(model, ib)
     else
         ss = set_mip_ss_expr!(model, ss, wb)
-        ibf = model[mip_key(sp, :ibf)] = JuMP.@variable(model, [1:N], lower_bound = 0,
-                                                        base_name = string(mip_key(sp,
-                                                                                   :ibf)))
+        ibf = model[mip_key(sp, :ibf)] = JuMP.@variable(model, [1:N], lower_bound = 0)
         model[mip_key(sp, :ibf_ub)] = JuMP.@constraint(model, sc * (ibf .- k) <= 0)
         model[mip_key(sp, :ibfd_ub)] = JuMP.@constraint(model, sc * (ibf - ss * ib) <= 0)
         model[mip_key(sp, :ibfd_lb)] = JuMP.@constraint(model,
@@ -580,9 +571,7 @@ function sign_mip_constraints(model::JuMP.Model, sp::AbstractMIPSpace, wb::Weigh
     sc = get_constraint_scale(model)
     ss = set_mip_ss_expr!(model, ss, wb)
     N = length(wx)
-    xb = model[mip_key(sp, :xbgt_ib)] = JuMP.@variable(model, [1:N], binary = true,
-                                                       base_name = string(mip_key(sp,
-                                                                                  :xbgt_ib)))
+    xb = model[mip_key(sp, :xbgt_ib)] = JuMP.@variable(model, [1:N], binary = true)
     model[mip_key(sp, :xbgt_lw_ub)] = JuMP.@constraint(model, sc * (lw - ss * xb) <= 0)
     model[mip_key(sp, :xbgt_sw_ub)] = JuMP.@constraint(model,
                                                        sc * (sw - ss * (1 .- xb)) <= 0)
