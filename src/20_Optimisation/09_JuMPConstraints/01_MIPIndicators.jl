@@ -671,25 +671,14 @@ function short_mip_threshold_constraints(model::JuMP.Model, sp::AbstractMIPSpace
                                          lt_flag::Bool, st_flag::Bool, ffl_flag::Bool,
                                          ffs_flag::Bool, xbgt_flag::Bool = false)
     wx = mip_wx!(model, sp)
-    sc = get_constraint_scale(model)
     ind = declare_long_short_indicators!(model, sp, wb, wx, ss)
     ss = set_mip_ss_expr!(model, ss, wb)
-    (; ilb, isb, il, is, i_mip) = ind
-    if lt_flag
-        model[mip_key(sp, :w_mip_lt)] = JuMP.@constraint(model,
-                                                         sc * (wx - il ⊙ lt.val +
-                                                               ss * (1 .- ilb)) >= 0)
-    end
-    if st_flag
-        model[mip_key(sp, :w_mip_st)] = JuMP.@constraint(model,
-                                                         sc * (wx + is ⊙ st.val -
-                                                               ss * (1 .- isb)) <= 0)
-    end
+    set_threshold_constraints!(model, sp, ind, wx, lt, st, ss, lt_flag, st_flag)
     set_fixed_fees!(model, sp, ind, ffl, ffs, ffl_flag, ffs_flag)
     if xbgt_flag
         set_exact_budget_constraints!(model, sp, ind, wx, ss)
     end
-    return i_mip
+    return ind.i_mip
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -763,13 +752,8 @@ function mip_constraints(model::JuMP.Model, sp::AbstractMIPSpace, wb::WeightBoun
                          ss::Option{<:Number}, lt_flag::Bool, ffl_flag::Bool,
                          xbgt_flag::Bool)
     wx = mip_wx!(model, sp)
-    sc = get_constraint_scale(model)
     ind = declare_held_indicators!(model, sp, wb, wx, ss)
-    (; ib, i_mip) = ind
-    if lt_flag
-        model[mip_key(sp, :w_mip_lt)] = JuMP.@constraint(model,
-                                                         sc * (wx - i_mip ⊙ lt.val) >= 0)
-    end
+    set_threshold_constraints!(model, sp, ind, wx, lt, lt_flag)
     set_fixed_fees!(model, sp, ind, ffl, nothing, ffl_flag, false)
     if xbgt_flag
         # Registered here rather than read from a local: the held declaration only builds the
@@ -778,7 +762,7 @@ function mip_constraints(model::JuMP.Model, sp::AbstractMIPSpace, wb::WeightBoun
         ss = set_mip_ss_expr!(model, ss, wb)
         set_exact_budget_constraints!(model, sp, ind, wx, ss)
     end
-    return ib
+    return ind.ib
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
