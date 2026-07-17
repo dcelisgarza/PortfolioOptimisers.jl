@@ -453,7 +453,7 @@ everything on one asset and MSRP puts 67% in its largest position; both are infe
 from 252 days of data as though they were certain. The quintile spreads across four names at
 25% each, and 1/N across all twenty. That concentration is the risk the in-sample columns
 cannot price, and the trade only pays out of sample — which this page does not test. See the
-[cross validation](../5_cross_validation/01_Walk_Forward.md) examples for the machinery that
+[cross validation](../5_validation_tuning/01_Cross_Validation.md) examples for the machinery that
 does.
 
 ## 12. Takeaways
