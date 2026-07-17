@@ -820,44 +820,9 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Add integer phylogeny cardinality constraints to the JuMP optimisation model.
+Add the asset-space MIP constraints to the JuMP optimisation model and return the held indicator.
 
-Iterates over `plgs` and, for each [`IntegerPhylogeny`](@ref) entry, enforces `A * ib ≤ B` where `ib` is the *held* indicator of the builder that ran — `ib` from [`mip_constraints`](@ref) or `i_mip` from [`short_mip_threshold_constraints`](@ref). It is passed in rather than read from the model, because only the long-only builder registers a `:ib` key.
-
-# Arguments
-
-  - $(arg_dict[:model])
-  - `plgs`: Collection of phylogeny constraint objects.
-  - `ib::VecNum`: Held indicator returned by the MIP builder that ran.
-
-# Returns
-
-  - `nothing`.
-
-# Related
-
-  - [`mip_constraints`](@ref)
-  - [`set_mip_constraints!`](@ref)
-  - [`IntegerPhylogeny`](@ref)
-"""
-function set_iplg_constraints!(model::JuMP.Model, plgs::PlC_VecPlC, ib::VecNum)
-    sc = get_constraint_scale(model)
-    for (i, pl) in enumerate(plgs)
-        if !isa(pl, IntegerPhylogeny)
-            continue
-        end
-        A = pl.A
-        B = pl.B
-        model[Symbol(:card_plg_, i)] = JuMP.@constraint(model, sc * (A * ib ⊖ B) <= 0)
-    end
-    return nothing
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Add all long-only MIP constraints to the JuMP optimisation model.
-
-Chooses the indicator builder the requested features need, then lets each feature emit against the bundle it returns: cardinality, group cardinality, integer phylogeny, minimum-holding thresholds, fixed fees, and pinning the long/short decomposition. Dispatches to [`mip_constraints`](@ref), [`short_mip_threshold_constraints`](@ref), [`sign_mip_constraints`](@ref), and [`set_iplg_constraints!`](@ref) as appropriate.
+Chooses the indicator builder the requested features need ([`mip_constraints`](@ref), [`short_mip_threshold_constraints`](@ref), or [`sign_mip_constraints`](@ref)), then lets each feature emit against the bundle it returns: minimum-holding thresholds and fixed fees inside the builder, then cardinality, group cardinality, and pinning the long/short decomposition here. Integer phylogeny is *not* emitted here — it is applied late in [`assemble_jump_model!`](@ref) beside its semidefinite sibling — but its presence still forces a builder to run, so the held indicator exists for that later call to gate on. That held indicator is the return value.
 
 # Pinning the decomposition
 
@@ -876,7 +841,7 @@ Pinning needs a per-asset *sign* bit, which the long-only [`mip_constraints`](@r
   - $(arg_dict[:wb_arg])
   - `card::Option{<:Integer}`: Optional maximum cardinality (number of non-zero assets).
   - `gcard::Option{<:LinearConstraint}`: Optional group cardinality constraint.
-  - `pl::Option{<:PlC_VecPlC}`: Optional phylogeny constraint(s).
+  - `pl::Option{<:PlC_VecPlC}`: Optional phylogeny constraint(s). Only used to detect whether an [`IntegerPhylogeny`](@ref) is present, which forces a builder to run so a held indicator is returned for the late [`set_iplg_constraints!`](@ref) call.
   - $(arg_dict[:lt_arg])
   - $(arg_dict[:st_arg])
   - `fees::Option{<:Fees}`: Optional fee specification.
@@ -885,7 +850,7 @@ Pinning needs a per-asset *sign* bit, which the long-only [`mip_constraints`](@r
 
 # Returns
 
-  - `nothing`.
+  - `ib`: The held indicator of the builder that ran, or `nothing` when none did (the sign-bit branch, or no MIP features at all). [`set_iplg_constraints!`](@ref) gates on it.
 
 # Related
 
@@ -971,10 +936,11 @@ function set_mip_constraints!(model::JuMP.Model, wb::WeightBounds, card::Option{
             JuMP.@constraint(model, gcard_eq, sc * (A * ib ⊖ B) == 0)
         end
     end
-    if iplg_flag
-        set_iplg_constraints!(model, pl, ib)
-    end
-    return nothing
+    # Hand the held indicator back so integer phylogeny can gate on it from its own emitter,
+    # called late in `assemble_jump_model!` beside the semidefinite one. `ib` is `nothing` when
+    # no builder ran (the sign-bit branch, or the no-flags early return) -- and by this
+    # function's own guards that is exactly when no integer phylogeny can be present.
+    return ib
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

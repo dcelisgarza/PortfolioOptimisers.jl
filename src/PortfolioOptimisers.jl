@@ -199,6 +199,7 @@ include("20_Optimisation/09_JuMPConstraints/02_Returns_and_ObjectiveFunctions.jl
 include("20_Optimisation/09_JuMPConstraints/03_BudgetConstraints.jl")
 include("20_Optimisation/09_JuMPConstraints/04_WeightConstraints.jl")
 include("20_Optimisation/09_JuMPConstraints/05_SDPConstraints.jl")
+include("20_Optimisation/09_JuMPConstraints/06_IntegerPhylogenyConstraints.jl")
 include("20_Optimisation/09_JuMPConstraints/09_TurnoverConstraints.jl")
 include("20_Optimisation/09_JuMPConstraints/10_FeesConstraints.jl")
 include("20_Optimisation/09_JuMPConstraints/11_TrackingErrorConstraints.jl")

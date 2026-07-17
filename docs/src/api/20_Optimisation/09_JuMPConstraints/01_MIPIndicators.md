@@ -13,7 +13,6 @@ use_direct_mip_indicators
 mip_wb
 short_mip_threshold_constraints
 mip_constraints
-set_iplg_constraints!
 set_mip_constraints!
 set_all_smip_constraints!
 set_scardmip_constraints!
