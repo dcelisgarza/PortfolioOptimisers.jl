@@ -1,0 +1,415 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Maintainability review — PortfolioOptimisers.jl</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="module">
+      import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+      mermaid.initialize({ startOnLoad: true, theme: "neutral", securityLevel: "loose" });
+    </script>
+    <style>
+      .diff-old { background: #fef2f2; color: #991b1b; }
+      .diff-new { background: #f0fdf4; color: #166534; }
+      .chip     { font-size: 0.65rem; letter-spacing: 0.08em; }
+      code, pre.mermaid { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+      .copy    { border: 1px solid #cbd5e1; background: #f8fafc; }
+      .drifted { border: 1px solid #d97706; background: #fffbeb; }
+      .gap     { border: 1px solid #dc2626; background: #fef2f2; }
+      .spoc    { background: linear-gradient(135deg, #064e3b, #065f46); color: #fff; }
+    </style>
+  </head>
+  <body class="bg-stone-50 text-slate-900 font-sans">
+    <main class="max-w-5xl mx-auto px-6 py-12 space-y-12">
+
+      <header class="space-y-5">
+        <div class="flex items-baseline justify-between flex-wrap gap-2">
+          <h1 class="text-3xl font-bold tracking-tight">Maintainability review — PortfolioOptimisers.jl</h1>
+          <span class="text-sm text-slate-500 font-mono">2026-07-18 · branch <code>dev</code></span>
+        </div>
+        <p class="text-slate-600 max-w-3xl leading-relaxed">
+          Second maintainability pass. It re-verified the five open items from the 2026-07-07 review — all five
+          remain open, and two now carry <em>fresh</em> drift evidence — and found three new candidates, the strongest
+          being the returns-vs-drawdown conic twins in the risk-measure constraint builders, where the copies have
+          already diverged in two ways. Settled consolidations (ADRs 0020–0024, 0033; the drawdown, Black-Litterman,
+          windowed, and Gerber-kernel seams) were checked and are holding.
+        </p>
+        <div class="flex flex-wrap items-center gap-3 text-xs">
+          <span class="chip uppercase px-2 py-1 rounded bg-emerald-600 text-white font-semibold">5 strong</span>
+          <span class="chip uppercase px-2 py-1 rounded bg-amber-500 text-white font-semibold">3 worth exploring</span>
+          <span class="chip uppercase px-2 py-1 rounded bg-slate-500 text-white font-semibold">1 speculative</span>
+          <span class="text-slate-400">·</span>
+          <span class="flex items-center gap-1.5"><span class="copy inline-block w-3.5 h-3.5 rounded"></span> a copy</span>
+          <span class="flex items-center gap-1.5"><span class="drifted inline-block w-3.5 h-3.5 rounded"></span> a drifted copy</span>
+          <span class="flex items-center gap-1.5"><span class="gap inline-block w-3.5 h-3.5 rounded"></span> validation gap</span>
+          <span class="flex items-center gap-1.5"><span class="spoc inline-block w-3.5 h-3.5 rounded"></span> single point of change</span>
+        </div>
+      </header>
+
+      <section id="candidates" class="space-y-10">
+
+        <!-- c1 -->
+        <article id="c1" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
+          <div class="space-y-2">
+            <h2 class="text-xl font-semibold">1 · Returns ↔ drawdown conic twins</h2>
+            <div class="flex flex-wrap gap-2">
+              <span class="chip uppercase px-2 py-1 rounded bg-emerald-600 text-white font-semibold">Strong</span>
+              <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">duplication</span>
+              <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">drift</span>
+              <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">new</span>
+            </div>
+          </div>
+          <div class="font-mono text-sm text-slate-500">
+            src/20_Optimisation/20_RiskMeasureConstraints/ 07 · 08 · 09 — <b>4 twin pairs · 8 builder bodies · 3 files</b>
+          </div>
+
+          <div class="grid md:grid-cols-2 gap-4 font-mono text-xs">
+            <div class="space-y-2">
+              <div class="text-[0.65rem] uppercase tracking-wider text-slate-400 font-sans">Before — each cone formulation encoded twice</div>
+              <div class="grid grid-cols-2 gap-2">
+                <div class="copy rounded p-2">CVaR<br/>07_…XatRisk…jl:51</div>
+                <div class="copy rounded p-2">CDaR<br/>07_…XatRisk…jl:522</div>
+                <div class="copy rounded p-2">DRCVaR<br/>07_…XatRisk…jl:195</div>
+                <div class="copy rounded p-2">DRCDaR<br/>07_…XatRisk…jl:579</div>
+                <div class="copy rounded p-2">EVaR<br/>08_…XatRisk…jl:59</div>
+                <div class="copy rounded p-2">EDaR<br/>08_…XatRisk…jl:234</div>
+                <div class="copy rounded p-2">RLVaR<br/>09_…XatRisk…jl:50</div>
+                <div class="drifted rounded p-2">RDaR ⚠ drifted<br/>09_…XatRisk…jl:318</div>
+              </div>
+              <div class="drifted rounded p-2 leading-relaxed">
+                RLVaR:76 computes <code>iat</code>/<code>lnk</code> inside each branch;<br/>
+                RDaR:327 hoists them <em>and</em> recomputes them — placement diverged.<br/>
+                RLVaR:78 weights by <code>net_X</code>; RDaR:345 by <code>pr.X</code>.
+              </div>
+            </div>
+            <div class="space-y-2">
+              <div class="text-[0.65rem] uppercase tracking-wider text-slate-400 font-sans">After — one cone kernel per family, parameterised by series</div>
+              <div class="spoc rounded p-3 text-sm">cvar_cone!(model, series, T, …)<br/>evar_cone!(model, series, T, …)<br/>rlvar_cone!(model, series, T, …)</div>
+              <div class="flex flex-col gap-1 text-slate-500">
+                <span>← returns builder passes <code>net_X</code> (± via <code>loss</code>)</span>
+                <span>← drawdown builder passes <code>view(dd, 2:T+1)</code></span>
+                <span>← range builder calls it twice (see card 2)</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="space-y-1.5 text-sm leading-relaxed">
+            <p><span class="font-semibold">Problem.</span> Each tail-risk cone formulation (CVaR, DR-CVaR, EVaR, RLVaR) is re-encoded twice — once over net returns, once over drawdowns — with identical variables, constants, weighted/unweighted expression splits, and cone constraints; the RLVaR/RDaR pair has already drifted in constant-hoisting placement and in the observation-weights source (<code>net_X</code> vs <code>pr.X</code>).</p>
+            <p><span class="font-semibold">Direction.</span> Extract one cone kernel per family whose per-site parameter is the series vector (net returns or the drawdown slice) plus the key suffix; each builder body collapses to fetching its series and calling the kernel.</p>
+          </div>
+          <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
+            <li>8 bodies → 4 kernels</li>
+            <li>drift already live at 2 points</li>
+            <li>blast radius: one fix per cone</li>
+            <li>kernel gets one test surface</li>
+          </ul>
+          <div class="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+            <b>Prereq.</b> Same as card 2: solver-free per-builder tests (extending test_03b) before touching the JuMP builders — the seam already proven by <code>GenericValueatRiskRange</code>.
+          </div>
+        </article>
+
+        <!-- c2 -->
+        <article id="c2" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
+          <div class="space-y-2">
+            <h2 class="text-xl font-semibold">2 · Twin-tail Range builders ignore their own proven seam</h2>
+            <div class="flex flex-wrap gap-2">
+              <span class="chip uppercase px-2 py-1 rounded bg-emerald-600 text-white font-semibold">Strong</span>
+              <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">duplication</span>
+              <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">change-amplification</span>
+              <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">reopened: Jul 7 c1</span>
+            </div>
+          </div>
+          <div class="font-mono text-sm text-slate-500">
+            20_RiskMeasureConstraints/07:106 · 07:324 · 08:124 · 09:153 · 19:140 — <b>5 inline re-encodings · 4 files</b>
+          </div>
+
+          <div class="grid md:grid-cols-2 gap-4 font-mono text-xs">
+            <div class="space-y-2">
+              <div class="text-[0.65rem] uppercase tracking-wider text-slate-400 font-sans">Before — every Range duplicates its single-tail body twice (_l / _h)</div>
+              <div class="grid grid-cols-2 gap-2">
+                <div class="copy rounded p-2">CVaRRange 07:106</div>
+                <div class="copy rounded p-2">DRCVaRRange 07:324</div>
+                <div class="copy rounded p-2">EVaRRange 08:124</div>
+                <div class="copy rounded p-2">RLVaRRange 09:153</div>
+                <div class="copy rounded p-2">PNVaRRange 19:140</div>
+              </div>
+            </div>
+            <div class="space-y-2">
+              <div class="text-[0.65rem] uppercase tracking-wider text-slate-400 font-sans">After — the shape GenericValueatRiskRange already uses (21:31–41)</div>
+              <div class="spoc rounded p-3 text-[0.7rem] leading-relaxed">loss = set_risk_constraints!(…, r.loss; loss = true)<br/>gain = set_risk_constraints!(…, r.gain; loss = false)<br/>@expression(model, loss + gain)</div>
+              <div class="text-slate-500">Every single-tail builder already accepts <code>loss::Bool</code> and negates <code>net_X</code> (07:53, 08:61, 09:52, 19:63) — the delegation is directly applicable.</div>
+            </div>
+          </div>
+
+          <div class="space-y-1.5 text-sm leading-relaxed">
+            <p><span class="font-semibold">Problem.</span> A fix to a single-tail cone encoding must be hand-mirrored into the <code>_l</code> and <code>_h</code> halves of its Range builder — two encodings of "run it twice" now coexist (one delegates, five inline), and a bug fixed in one tail can be missed in the other.</p>
+            <p><span class="font-semibold">Direction.</span> Replace each inline Range body with the ~10-line <code>GenericValueatRiskRange</code> delegation; the per-site parameter is the pair of single-tail measures.</p>
+          </div>
+          <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
+            <li>5 sites → 1 shape</li>
+            <li>tail fixes stop needing mirrors</li>
+            <li>seam already proven in-tree</li>
+          </ul>
+          <div class="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+            <b>Prior work.</b> Confirmed top candidate of the Jul 7 architecture review (item 4, XatRisk); combined with card 1 it is one consolidation: cone kernels parameterised by series and tail sign.
+          </div>
+        </article>
+
+        <!-- c3 -->
+        <article id="c3" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
+          <div class="space-y-2">
+            <h2 class="text-xl font-semibold">3 · ucs / mu_ucs / sigma_ucs triples — drift struck twice</h2>
+            <div class="flex flex-wrap gap-2">
+              <span class="chip uppercase px-2 py-1 rounded bg-emerald-600 text-white font-semibold">Strong</span>
+              <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">duplication</span>
+              <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">drift</span>
+              <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">reopened: Jul 7 c2</span>
+            </div>
+          </div>
+          <div class="font-mono text-sm text-slate-500">
+            src/14_UncertaintySets/ — <b>~31 methods (10 ucs · 11 mu_ucs · 10 sigma_ucs) · 4 files</b>
+          </div>
+
+          <div class="space-y-3">
+            <div class="text-[0.65rem] uppercase tracking-wider text-slate-400 font-sans">Drift timeline — same family, second divergence in 11 days</div>
+            <div class="flex items-stretch gap-2 font-mono text-xs">
+              <div class="copy rounded p-2 flex-1">origin<br/><span class="font-sans text-slate-500">ucs = mu-half ⧺ sigma-half, copied per method</span></div>
+              <div class="self-center text-slate-400">→</div>
+              <div class="drifted rounded p-2 flex-1">Jul 7 ⚠<br/><span class="font-sans">Normal-box <code>mu_ucs</code> missed <code>ucs</code>'s posdef'd <code>mu_asymptotic_cov</code> — real bug, fixed same day</span></div>
+              <div class="self-center text-slate-400">→</div>
+              <div class="drifted rounded p-2 flex-1">Jul 18 ⚠ (this pass)<br/><span class="font-sans"><code>ucs</code> 03:355 <code>zero(eltype(sigma))…N</code> vs <code>mu_ucs</code> 03:420 <code>zero(eltype(sigma_mu))…size(pr.X,2)</code></span></div>
+            </div>
+            <div class="flex items-center gap-3 font-mono text-xs">
+              <div class="spoc rounded p-3 text-sm">mu_half(ue, pr) · sigma_half(ue, pr)</div>
+              <span class="text-slate-500 font-sans text-sm">← ucs returns the pair; mu_ucs / sigma_ucs return one each — 31 methods become one-liners</span>
+            </div>
+          </div>
+
+          <div class="space-y-1.5 text-sm leading-relaxed">
+            <p><span class="font-semibold">Problem.</span> Every uncertainty-set estimator's <code>ucs</code> is literally its <code>mu_ucs</code> body concatenated with its <code>sigma_ucs</code> body (Box triple: 03_NormalUncertaintySets.jl:327/410/477; the Wishart sampling loop is byte-identical between ucs:340–353 and sigma_ucs:490–503) — and the copies have now diverged twice, once as a shipped posdef bug.</p>
+            <p><span class="font-semibold">Direction.</span> Extract per-algorithm <code>mu_half</code>/<code>sigma_half</code> helpers (per-site parameter: the estimator type); the extraction was explicitly deferred on Jul 7 and the new divergence is the argument for un-deferring it.</p>
+          </div>
+          <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
+            <li>31 methods → ~20 one-liners</li>
+            <li>drift becomes impossible</li>
+            <li>this family already shipped one drift bug</li>
+            <li>blast radius: one edit per algorithm</li>
+          </ul>
+          <div class="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+            <b>ADR 0016.</b> Uncertainty sets owning their posdef/moment config is settled — the halves extraction lives entirely inside that decision, it does not reopen it.
+          </div>
+        </article>
+
+        <!-- c4 -->
+        <article id="c4" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
+          <div class="space-y-2">
+            <h2 class="text-xl font-semibold">4 · dims guard + transpose preamble, with unguarded leaves</h2>
+            <div class="flex flex-wrap gap-2">
+              <span class="chip uppercase px-2 py-1 rounded bg-emerald-600 text-white font-semibold">Strong</span>
+              <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">duplication</span>
+              <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">validation-gap</span>
+              <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">reopened: Jul 7 c3</span>
+            </div>
+          </div>
+          <div class="font-mono text-sm text-slate-500">
+            src/08_Moments/ — <b>~34 guard sites + 25 transpose preambles · ~14 files · 3 unguarded leaves</b>
+          </div>
+
+          <div class="grid grid-cols-4 sm:grid-cols-6 gap-2 font-mono text-xs">
+            <div class="copy rounded p-2">09_Rank…:122</div>
+            <div class="copy rounded p-2">06_SmythBroby…:907</div>
+            <div class="copy rounded p-2">19_Coskewness:392</div>
+            <div class="copy rounded p-2">20_Cokurtosis:327</div>
+            <div class="copy rounded p-2 text-slate-400">…30 more</div>
+            <div class="copy rounded p-2 text-slate-400">&nbsp;</div>
+            <div class="gap rounded p-2">02_SimpleExpectedReturns:139 — no guard</div>
+            <div class="gap rounded p-2">04_SimpleVariance:176 — no guard</div>
+            <div class="gap rounded p-2">27_StdDevExpectedReturns — no guard</div>
+            <div class="col-span-3 flex items-center gap-2">
+              <div class="spoc rounded p-2">X = orient_observations(X, dims)</div>
+              <span class="text-slate-500 font-sans">← guard + transpose, once</span>
+            </div>
+          </div>
+
+          <div class="space-y-1.5 text-sm leading-relaxed">
+            <p><span class="font-semibold">Problem.</span> The 3-line stanza <code>@argcheck(dims ∈ (1,2), DomainError(…)); if dims == 2; X = transpose(X); end</code> is re-encoded at ~34 sites, and the guard is unevenly applied: <code>SimpleExpectedReturns</code>, <code>SimpleVariance</code>, and <code>StandardDeviationExpectedReturns</code> forward <code>dims</code> straight to Statistics, silently accepting <code>dims=3</code> — the "reject invalid dims" contract is unenforced at exactly the most-used estimators.</p>
+            <p><span class="font-semibold">Direction.</span> One <code>orient_observations(X, dims)</code> helper (per-site parameter: <code>dims</code>); the leaves adopt it, closing the gap in the same change.</p>
+          </div>
+          <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
+            <li>34 sites → 1</li>
+            <li>closes 3 validation gaps</li>
+            <li>error type changes touch one line</li>
+            <li>purely mechanical migration</li>
+          </ul>
+        </article>
+
+        <!-- c5 -->
+        <article id="c5" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
+          <div class="space-y-2">
+            <h2 class="text-xl font-semibold">5 · Admissible-measure Union written three times, one copy stale</h2>
+            <div class="flex flex-wrap gap-2">
+              <span class="chip uppercase px-2 py-1 rounded bg-emerald-600 text-white font-semibold">Strong</span>
+              <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">drift</span>
+              <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">mirror</span>
+              <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">reopened: Jul 7 c5</span>
+            </div>
+          </div>
+          <div class="font-mono text-sm text-slate-500">
+            src/19_RiskMeasures/21_GenericValueatRiskRange.jl:34-41 · :129-140 · :147-156 — <b>6 hand-kept Union lists (loss + gain × 3 copies)</b>
+          </div>
+
+          <div class="grid grid-cols-2 gap-4 font-mono text-xs">
+            <div class="diff-old rounded p-3 leading-relaxed">
+              <div class="text-[0.65rem] uppercase tracking-wider mb-2 text-red-700 font-sans">docstring :34-41</div>
+              Union{&lt;:ValueatRisk, &lt;:ConditionalValueatRisk,<br/>&nbsp;&nbsp;&lt;:DRConditionalValueatRisk, &lt;:EntropicValueatRisk,<br/>&nbsp;&nbsp;&lt;:RelativisticValueatRisk,<br/>&nbsp;&nbsp;<b>∅ — WorstRealisation missing</b>,<br/>&nbsp;&nbsp;&lt;:PowerNormValueatRisk}
+            </div>
+            <div class="diff-new rounded p-3 leading-relaxed">
+              <div class="text-[0.65rem] uppercase tracking-wider mb-2 text-green-700 font-sans">both constructors :133 / :150</div>
+              Union{&lt;:ValueatRisk, &lt;:ConditionalValueatRisk,<br/>&nbsp;&nbsp;&lt;:DRConditionalValueatRisk, &lt;:EntropicValueatRisk,<br/>&nbsp;&nbsp;&lt;:RelativisticValueatRisk,<br/>&nbsp;&nbsp;<b>&lt;:WorstRealisation ✓</b>,<br/>&nbsp;&nbsp;&lt;:PowerNormValueatRisk}
+            </div>
+          </div>
+
+          <div class="space-y-1.5 text-sm leading-relaxed">
+            <p><span class="font-semibold">Problem.</span> Admitting a new XatRisk measure into <code>loss</code>/<code>gain</code> means editing six Union lists; the docstring copy has already drifted — it hides <code>WorstRealisation</code> from users even though the constructors accept it. This is the same divergence flagged Jul 7, still unfixed.</p>
+            <p><span class="font-semibold">Direction.</span> One <code>const</code> Union alias referenced by both constructors and interpolated into the docstring — pure single point of change, no per-site parameter.</p>
+          </div>
+          <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
+            <li>6 lists → 1 const</li>
+            <li>drift already realised, user-visible</li>
+            <li>smallest fix in this report</li>
+          </ul>
+        </article>
+
+        <!-- c6 -->
+        <article id="c6" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
+          <div class="space-y-2">
+            <h2 class="text-xl font-semibold">6 · The selector→weights two-liner, 24 times</h2>
+            <div class="flex flex-wrap gap-2">
+              <span class="chip uppercase px-2 py-1 rounded bg-amber-500 text-white font-semibold">Worth exploring</span>
+              <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">duplication</span>
+              <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">reopened: Jul 7 c6</span>
+            </div>
+          </div>
+          <div class="font-mono text-sm text-slate-500">
+            risk measures + constraint builders — <b>24 occurrences · 16 files</b> (e.g. 08:77-78 · 03:120-121 · 19:82-83)
+          </div>
+          <div class="font-mono text-xs space-y-2">
+            <div class="copy rounded p-2">wi = nothing_scalar_array_selector(r.w, pr.w)<br/>wi = get_observation_weights(wi, <span class="text-amber-700 font-bold">net_X</span>)&nbsp;&nbsp;<span class="font-sans text-slate-400">// returns-style callers</span></div>
+            <div class="drifted rounded p-2">wi = nothing_scalar_array_selector(r.w, pr.w)<br/>wi = get_observation_weights(wi, <span class="text-amber-700 font-bold">pr.X</span>)&nbsp;&nbsp;<span class="font-sans text-slate-400">// drawdown-style callers (08:250, 09:345)</span></div>
+            <div class="flex items-center gap-2">
+              <div class="spoc rounded p-2">wi = observation_weights(r.w, pr.w, series)</div>
+              <span class="text-slate-500 font-sans text-sm">← the second argument becomes an explicit, reviewable parameter</span>
+            </div>
+          </div>
+          <div class="space-y-1.5 text-sm leading-relaxed">
+            <p><span class="font-semibold">Problem.</span> A 2-line idiom re-encoded at 24 sites, with an easy-to-miss inconsistency in the second argument (<code>net_X</code> vs <code>pr.X</code>) that today looks like noise and is actually load-bearing.</p>
+            <p><span class="font-semibold">Direction.</span> One helper whose per-site parameter is the observation matrix — making the returns/drawdown distinction explicit at each call.</p>
+          </div>
+          <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
+            <li>24 sites → 1 helper</li>
+            <li>the net_X / pr.X choice becomes visible</li>
+          </ul>
+        </article>
+
+        <!-- c7 -->
+        <article id="c7" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
+          <div class="space-y-2">
+            <h2 class="text-xl font-semibold">7 · Per-optimiser JuMP preamble/epilogue bracket</h2>
+            <div class="flex flex-wrap gap-2">
+              <span class="chip uppercase px-2 py-1 rounded bg-amber-500 text-white font-semibold">Worth exploring</span>
+              <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">duplication</span>
+              <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">new</span>
+            </div>
+          </div>
+          <div class="font-mono text-sm text-slate-500">
+            11_MeanRisk.jl:640 · 14_RiskBudgeting.jl:676 · 15_RelaxedRiskBudgeting.jl:410 · 12_FactorRiskContribution.jl:306 · 13_NearOptimalCentering.jl:996, 1048 — <b>6 bodies · 5 files</b>
+          </div>
+          <div class="grid md:grid-cols-2 gap-4 font-mono text-xs">
+            <div class="copy rounded p-3 leading-relaxed">
+              <div class="text-[0.65rem] uppercase tracking-wider mb-1 text-slate-400 font-sans">identical open (11:642-646 ≡ 14:678-682) + close</div>
+              X = reset_time_dependent_estimator(X)<br/>attrs = processed_jump_optimiser_attributes(…)<br/>model = JuMP.Model(); set_string_names…; set_model_scales!(…)<br/><span class="text-slate-400">… genuinely different middle …</span><br/>JuMPOptimisationResult(; pa=attrs, retcode, sol, model=ifelse(save, model, nothing))
+            </div>
+            <div class="space-y-2">
+              <div class="spoc rounded p-3">with_jump_model(opt, rd; …) do model, attrs<br/>&nbsp;&nbsp;# optimiser-specific assembly<br/>end</div>
+              <div class="text-slate-500 font-sans text-sm">The middles stay — MeanRisk's ratio factors, RB's budgets, NOC's centering are legitimately distinct (ADR 0008's seam already absorbs the shared assembly). Only the bracket collapses.</div>
+            </div>
+          </div>
+          <div class="space-y-1.5 text-sm leading-relaxed">
+            <p><span class="font-semibold">Problem.</span> The model-lifecycle bracket (reset, attributes, model creation, scales / result wrapping) is re-encoded around 6 optimise bodies; a change to result construction or model setup fans out to all 6.</p>
+            <p><span class="font-semibold">Direction.</span> A do-block scaffold owning the bracket; per-site parameter is the assembly closure. Fails the strict collapse-to-one-liner test — flagged honestly as a bracket, not a full-body duplicate.</p>
+          </div>
+          <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
+            <li>6 brackets → 1</li>
+            <li>result-shape changes: one edit</li>
+          </ul>
+        </article>
+
+        <!-- c8 -->
+        <article id="c8" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
+          <div class="space-y-2">
+            <h2 class="text-xl font-semibold">8 · Adding one risk measure fans out across the tree</h2>
+            <div class="flex flex-wrap gap-2">
+              <span class="chip uppercase px-2 py-1 rounded bg-amber-500 text-white font-semibold">Worth exploring</span>
+              <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">change-amplification</span>
+              <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">reflection-contract</span>
+            </div>
+          </div>
+          <div class="font-mono text-sm text-slate-500">
+            19_RiskMeasures/ ↔ 20_RiskMeasureConstraints/ (1:1 numbered mirror) · 24_RiskMeasureCompatibility.jl · 25_Aliases.jl · exports — <b>≥6 touch-points per new measure</b>
+          </div>
+          <div class="rounded-lg border border-slate-200 bg-white p-4">
+            <pre class="mermaid">
+flowchart LR
+  X[new risk measure] --> A[19_RiskMeasures/NN struct + ctor stanza]
+  X --> B[20_RiskMeasureConstraints/NN builder]
+  X --> C[supported_risk_measures row]
+  X --> D[risk_input_kind method]
+  X --> E[export list]
+  X --> F[25_Aliases.jl entry]
+  classDef hit stroke:#dc2626,stroke-width:2px;
+  class A,B,C,D,E,F hit
+            </pre>
+          </div>
+          <div class="space-y-1.5 text-sm leading-relaxed">
+            <p><span class="font-semibold">Problem.</span> The measure-file ↔ constraint-file numbering mirror is inherent, but the compatibility row, input-kind method, export, and alias are a hand-kept reflection contract — nothing enforces that every exported measure has all its entries, and the constructor stanza (<code>function X(settings) … new{typeof(settings)}(settings)</code>) is verbatim at ≥8 settings-only measures (12_UlcerIndex.jl:86-91 and siblings).</p>
+            <p><span class="font-semibold">Direction.</span> Two independent moves: a test that walks exported measures asserting the contract rows exist (cheap, no design), and the proposed <code>@risk_measure</code> declaration macro (arch-review item 5 — a design decision, not to be back-doored here).</p>
+          </div>
+          <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
+            <li>contract becomes machine-checked</li>
+            <li>≥6 touch-points made visible</li>
+            <li>8 ctor stanzas collapsible</li>
+          </ul>
+          <div class="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+            <b>ADRs 0006 / 0018 settled the traits themselves</b> — this card is only about the hand-maintenance of their per-measure rows. <code>@risk_measure</code> remains a proposal (arch-review item 5), not an accepted decision.
+          </div>
+        </article>
+
+        <!-- c9 -->
+        <article id="c9" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
+          <div class="space-y-2">
+            <h2 class="text-xl font-semibold">9 · The literature-alias mirror</h2>
+            <div class="flex flex-wrap gap-2">
+              <span class="chip uppercase px-2 py-1 rounded bg-slate-500 text-white font-semibold">Speculative</span>
+              <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">mirror</span>
+            </div>
+          </div>
+          <div class="font-mono text-sm text-slate-500">src/25_Aliases.jl — <b>1052 lines, one hand-kept const + docstring per alias</b></div>
+          <div class="space-y-1.5 text-sm leading-relaxed">
+            <p><span class="font-semibold">Problem.</span> A hand-maintained mirror of the export surface with no completeness test — but no live drift was found, the file documents its omissions as intentional, and the per-alias docstrings are genuinely hand-curated.</p>
+            <p><span class="font-semibold">Direction.</span> At most a test asserting every alias still points at an existing exported name; codegen would destroy curation for little gain. Kept only so the next review knows it was checked.</p>
+          </div>
+        </article>
+      </section>
+
+      <section id="top-recommendation" class="rounded-xl border-2 border-emerald-200 bg-white shadow-sm p-6 space-y-3">
+        <h2 class="text-lg font-bold text-emerald-800">Top recommendation — un-defer the ucs halves extraction (card 3)</h2>
+        <p class="text-sm text-slate-700 leading-relaxed">
+          The <a href="#c3" class="text-emerald-700 underline">ucs / mu_ucs / sigma_ucs triples</a> are the one candidate where drift is not hypothetical: this family shipped a real posdef bug on Jul 7, the extraction was deferred, and eleven days later a second divergence exists (<code>eltype(sigma)</code> vs <code>eltype(sigma_mu)</code>, <code>N</code> vs <code>size(pr.X, 2)</code>). It collapses ~31 methods to one-liners over per-algorithm halves, needs no test scaffolding a prereq doesn't already cover (test_10 exercises every triple), and touches no settled ADR. The bigger prize — the conic-twin + Range consolidation (<a href="#c1" class="text-emerald-700 underline">cards 1</a>+<a href="#c2" class="text-emerald-700 underline">2</a>, ~13 builder bodies over ~4 kernels) — is worth more sites but is gated on the solver-free per-builder tests the Jul 7 architecture review named as its prereq.
+        </p>
+      </section>
+
+      <footer class="pt-6 text-xs text-slate-400">Generated 2026-07-18 · <code>/improve-maintainability</code> · second pass; re-verifies the 2026-07-07 review's open items against branch <code>dev</code> at ccd441c.</footer>
+    </main>
+  </body>
+</html>

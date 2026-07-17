@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Security Review — PortfolioOptimisers.jl — 2026-07-18</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({ startOnLoad: true, theme: 'dark', themeVariables: { fontSize: '14px' } });
+</script>
+<style>
+  body { background: #0b1120; }
+  .card code, pre code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  pre { overflow-x: auto; }
+</style>
+</head>
+<body class="text-slate-200 antialiased">
+<div class="max-w-5xl mx-auto px-6 py-10">
+
+  <header class="mb-10">
+    <h1 class="text-3xl font-bold text-white">Security Review — PortfolioOptimisers.jl</h1>
+    <p class="mt-2 text-slate-400">2026-07-18 · branch <code class="text-slate-300">dev</code> · commit <code class="text-slate-300">ccd441c32</code> · defensive review of the caller's own codebase</p>
+    <p class="mt-4 text-slate-300 max-w-3xl">
+      Fourth review of this codebase. The injection/unsafe-eval surface is <strong>closed and stayed closed</strong>: an exhaustive
+      sweep of <code>src/</code> and <code>ext/</code> found no <code>eval</code>, dynamic name resolution, subprocess,
+      deserialization, network, or file-I/O sink outside the two ADR-accepted parser boundaries (ADR 0025/0026/0027).
+      What remains are <strong>input-validation gaps at the data trust boundary</strong> and two uncapped
+      allocation sinks. One finding is reachable from the public API with defaults; the rest are latent.
+    </p>
+  </header>
+
+  <!-- Scoreboard -->
+  <section class="mb-10 grid grid-cols-2 md:grid-cols-4 gap-4">
+    <div class="rounded-xl bg-slate-800/60 border border-slate-700 p-4">
+      <div class="text-2xl font-bold text-amber-400">1</div>
+      <div class="text-sm text-slate-400">Medium — reachable</div>
+    </div>
+    <div class="rounded-xl bg-slate-800/60 border border-slate-700 p-4">
+      <div class="text-2xl font-bold text-sky-400">3</div>
+      <div class="text-sm text-slate-400">Low — latent</div>
+    </div>
+    <div class="rounded-xl bg-slate-800/60 border border-slate-700 p-4">
+      <div class="text-2xl font-bold text-emerald-400">0</div>
+      <div class="text-sm text-slate-400">Injection / unsafe-eval</div>
+    </div>
+    <div class="rounded-xl bg-slate-800/60 border border-slate-700 p-4">
+      <div class="text-2xl font-bold text-emerald-400">5</div>
+      <div class="text-sm text-slate-400">Prior findings verified closed</div>
+    </div>
+  </section>
+
+  <!-- ============ FINDING 1 ============ -->
+  <article class="card rounded-2xl bg-slate-900 border border-amber-600/40 p-6 mb-8">
+    <div class="flex flex-wrap items-center gap-2 mb-4">
+      <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/40">Medium</span>
+      <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">Strong</span>
+      <span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-700 text-slate-300">input-validation</span>
+      <span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-rose-500/15 text-rose-300 border border-rose-500/30">REACHABLE with defaults</span>
+    </div>
+    <h2 class="text-xl font-semibold text-white mb-1">1 · Non-finite returns pass the <code>ReturnsResult</code> trust boundary</h2>
+    <p class="text-sm text-slate-400 font-mono mb-4">src/03_Preprocessing.jl:362–414 (inner constructor); contrast src/03_Preprocessing.jl:982 (prices_to_returns sanitizes)</p>
+
+    <p class="mb-4 text-slate-300"><strong class="text-white">Problem.</strong>
+      The <code>ReturnsResult</code> inner constructor is the boundary where untrusted return data
+      (CSV/spreadsheet imports) enters the library, and it validates everything <em>except the data itself</em>:
+      names get <code>allunique</code>, dimensions get <code>DimensionMismatch</code>, and the optional
+      <code>iv</code>/<code>ivpa</code> fields get full finiteness checks — but <code>X</code>, <code>F</code>, and
+      <code>B</code> are never checked with <code>isfinite</code>, so a NaN from a blank spreadsheet cell flows
+      into moments, distances, and clustering and can surface as a silently wrong portfolio.</p>
+
+    <div class="mb-4">
+      <div class="text-xs uppercase tracking-wide text-slate-500 mb-2">Taint trace — the silent path (no solver to catch it)</div>
+      <pre class="mermaid bg-slate-950 rounded-lg p-3">
+flowchart LR
+  A["CSV / spreadsheet<br/>blank cell → NaN"] --> B["ReturnsResult(; nx, X)<br/>X never isfinite-checked"]
+  B --> C["cov(X) → NaN Σ"]
+  C --> D["distance matrix → NaN"]
+  D --> E["hierarchical clustering<br/>(HRP-family, no JuMP)"]
+  E --> F["weights: garbage,<br/>returned without error"]
+  style B fill:#7c2d12,stroke:#f59e0b,color:#fff
+  style F fill:#7f1d1d,stroke:#ef4444,color:#fff
+      </pre>
+    </div>
+
+    <div class="grid md:grid-cols-2 gap-4 mb-4">
+      <div class="rounded-lg border border-rose-500/30 bg-rose-950/20 p-4">
+        <div class="text-xs font-semibold text-rose-300 mb-2">BEFORE — accepted today</div>
+        <pre class="text-sm text-slate-200"><code>julia> rd = ReturnsResult(;
+         nx = ["AAPL", "MSFT"],
+         X  = [0.01  NaN;      # blank cell in
+               0.02  0.03])    # the source CSV
+ReturnsResult   # ✓ constructs fine
+
+# JuMP paths: NaN Σ → solver-dependent
+# error or garbage. Hierarchical paths:
+# NaN distances → clustering runs →
+# weights returned, no error anywhere.</code></pre>
+      </div>
+      <div class="rounded-lg border border-emerald-500/30 bg-emerald-950/20 p-4">
+        <div class="text-xs font-semibold text-emerald-300 mb-2">AFTER — fail closed at the boundary</div>
+        <pre class="text-sm text-slate-200"><code># in the inner constructor, beside the
+# existing iv/ivpa checks (line 404):
+if !isnothing(X)
+    assert_finite_val(X, :X)
+end
+# likewise F and B
+
+julia> ReturnsResult(; nx, X)
+ERROR: ArgumentError: X must be
+finite: found 1 non-finite entry</code></pre>
+      </div>
+    </div>
+
+    <p class="mb-2 text-slate-300"><strong class="text-white">Direction.</strong>
+      Extend the constructor's existing <code>assert_*_finite_val</code> discipline (already applied to
+      <code>iv</code>/<code>ivpa</code>) to <code>X</code>/<code>F</code>/<code>B</code> — the check is O(n) once,
+      against workflows that cost seconds. No documented workflow carries NaN at returns level: imputation is
+      prices-level (inside <code>prices_to_returns</code>, which already maps NaN→missing and drops), so the
+      unguarded path is <em>only</em> direct construction — exactly the untrusted-import path.</p>
+
+    <ul class="text-sm text-slate-300 space-y-1 mb-1 list-disc list-inside">
+      <li>fail closed at the boundary</li>
+      <li>closes the silent-wrong-weights path</li>
+      <li>symmetric with iv/ivpa checks</li>
+      <li>blast radius: one constructor</li>
+    </ul>
+  </article>
+
+  <!-- ============ FINDING 2 ============ -->
+  <article class="card rounded-2xl bg-slate-900 border border-slate-700 p-6 mb-8">
+    <div class="flex flex-wrap items-center gap-2 mb-4">
+      <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-sky-500/20 text-sky-300 border border-sky-500/40">Low</span>
+      <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">Worth exploring</span>
+      <span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-700 text-slate-300">input-validation</span>
+      <span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-600/50 text-slate-300">LATENT</span>
+    </div>
+    <h2 class="text-xl font-semibold text-white mb-1">2 · Benchmark names skip the uniqueness check assets and factors get</h2>
+    <p class="text-sm text-slate-400 font-mono mb-4">src/03_Preprocessing.jl:366–373 (nx, nf checked) vs 376–380 (nb not)</p>
+
+    <p class="mb-4 text-slate-300"><strong class="text-white">Problem.</strong>
+      The same constructor enforces <code>allunique(nx)</code> and <code>allunique(nf)</code> but places no
+      uniqueness check on <code>nb</code>, so the three name vectors have two different validation contracts at
+      one boundary.</p>
+
+    <div class="grid md:grid-cols-2 gap-4 mb-4">
+      <div class="rounded-lg border border-rose-500/30 bg-rose-950/20 p-4">
+        <div class="text-xs font-semibold text-rose-300 mb-2">BEFORE — asymmetric contract</div>
+        <pre class="text-sm text-slate-200"><code>nx dupes → ArgumentError   ✓
+nf dupes → ArgumentError   ✓
+nb = ["SPY","SPY"] → accepted ✗</code></pre>
+      </div>
+      <div class="rounded-lg border border-emerald-500/30 bg-emerald-950/20 p-4">
+        <div class="text-xs font-semibold text-emerald-300 mb-2">AFTER — one contract</div>
+        <pre class="text-sm text-slate-200"><code>if !isnothing(nb)
+    @argcheck(allunique(nb), ...)
+end</code></pre>
+      </div>
+    </div>
+
+    <p class="mb-2 text-slate-300"><strong class="text-white">Direction.</strong>
+      Add the missing <code>allunique(nb)</code> branch. Severity is Low because <code>nb</code> is only carried
+      and sub-selected by Views (<code>src/03_Preprocessing.jl:574,586</code>) and CV prediction assembly — it is
+      never resolved name→index for constraint generation — so today duplicates confuse labels, not results. The
+      cost of the gap is boundary <em>uniformity</em>: a future consumer that does resolve benchmark names inherits
+      an unvalidated field.</p>
+
+    <ul class="text-sm text-slate-300 space-y-1 mb-1 list-disc list-inside">
+      <li>one validation contract per boundary</li>
+      <li>closes gap before a consumer exists</li>
+      <li>blast radius: three lines</li>
+    </ul>
+  </article>
+
+  <!-- ============ FINDING 3 ============ -->
+  <article class="card rounded-2xl bg-slate-900 border border-slate-700 p-6 mb-8">
+    <div class="flex flex-wrap items-center gap-2 mb-4">
+      <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-sky-500/20 text-sky-300 border border-sky-500/40">Low</span>
+      <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">Worth exploring</span>
+      <span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-700 text-slate-300">input-validation</span>
+      <span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-600/50 text-slate-300">LATENT — needs config-fed integer</span>
+    </div>
+    <h2 class="text-xl font-semibold text-white mb-1">3 · <code>n_sim</code> has a floor but no ceiling — unbounded O(N²·n_sim) allocation</h2>
+    <p class="text-sm text-slate-400 font-mono mb-4">src/14_UncertaintySets/04_BootstrapUncertaintySets.jl:284 (check), 338–339, 420, 735, 886 (allocations)</p>
+
+    <p class="mb-4 text-slate-300"><strong class="text-white">Problem.</strong>
+      <code>ARCHUncertaintySet</code> validates <code>n_sim &gt; 0</code> and nothing else; the fit then allocates
+      <code>Array(N, N, n_sim)</code> and <code>Matrix(N², n_sim)</code>, so an <code>n_sim</code> fed from a config
+      file drives allocation with no cap and no warning — an OOM process kill. The library already has the exact
+      countermeasure pattern one directory over: <code>CombinatorialCrossValidation</code> fails closed at
+      <code>max_comb = 100_000</code> with a message explaining sensible ranges.</p>
+
+    <div class="grid md:grid-cols-2 gap-4 mb-4">
+      <div class="rounded-lg border border-rose-500/30 bg-rose-950/20 p-4">
+        <div class="text-xs font-semibold text-rose-300 mb-2">BEFORE — floor only</div>
+        <pre class="text-sm text-slate-200"><code># config file: {"n_sim": 100000000000}
+ue = ARCHUncertaintySet(; n_sim =
+        100_000_000_000)   # ✓ constructs
+sigma_ucs(ue, X)  # 50 assets →
+# Array(50, 50, 1e11) ≈ 2 PB request
+# → OOM kill or swap death</code></pre>
+      </div>
+      <div class="rounded-lg border border-emerald-500/30 bg-emerald-950/20 p-4">
+        <div class="text-xs font-semibold text-emerald-300 mb-2">AFTER — the max_comb pattern</div>
+        <pre class="text-sm text-slate-200"><code># mirror 03_Combinatorial.jl:66-72
+ARCHUncertaintySet(; n_sim,
+    max_sim = 1_000_000)
+@argcheck(n_sim <= max_sim,
+  ArgumentError("n_sim = $n_sim exceeds
+  max_sim = $max_sim; typical values
+  are 10^3–10^4 ..."))</code></pre>
+      </div>
+    </div>
+
+    <p class="mb-2 text-slate-300"><strong class="text-white">Direction.</strong>
+      Mirror the <code>max_comb</code> keyword-with-default idiom so machine-authored large runs stay possible
+      (raise the cap explicitly) while a fat-fingered or hostile config integer fails closed at construction.
+      This was the "n_sim ceiling" item left open by the 2026-07-06 review; it has no accepted-risk ADR, so it
+      stands. The <code>rng</code>/bootstrap path itself is clean — no other uncapped bootstrap counts found.</p>
+
+    <ul class="text-sm text-slate-300 space-y-1 mb-1 list-disc list-inside">
+      <li>process-kill path fails closed</li>
+      <li>reuses existing max_comb idiom</li>
+      <li>blast radius: one constructor</li>
+    </ul>
+  </article>
+
+  <!-- ============ FINDING 4 ============ -->
+  <article class="card rounded-2xl bg-slate-900 border border-slate-700 p-6 mb-8">
+    <div class="flex flex-wrap items-center gap-2 mb-4">
+      <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-sky-500/20 text-sky-300 border border-sky-500/40">Low</span>
+      <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-500/20 text-slate-300 border border-slate-500/40">Speculative</span>
+      <span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-700 text-slate-300">input-validation</span>
+      <span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-600/50 text-slate-300">LATENT — developer-authored input</span>
+    </div>
+    <h2 class="text-xl font-semibold text-white mb-1">4 · Search-CV allocators materialise eagerly with no bound</h2>
+    <p class="text-sm text-slate-400 font-mono mb-4">src/20_Optimisation/02_CrossValidation/10_GridSearchCrossValidation.jl:22,27 · 11_RandomisedSearchCrossValidation.jl:29</p>
+
+    <p class="mb-4 text-slate-300"><strong class="text-white">Problem.</strong>
+      <code>lens_val_grid</code> fully materialises <code>vec(collect(Iterators.product(...)))</code> — the product
+      of every candidate-value list — and <code>make_p_grid</code> calls <code>rand(rng, dist, n_iter)</code> with
+      no ceiling on <code>n_iter</code>. Ten parameters × ten values each is 10¹⁰ tuples allocated before the
+      first fit runs.</p>
+
+    <div class="grid md:grid-cols-2 gap-4 mb-4">
+      <div class="rounded-lg border border-rose-500/30 bg-rose-950/20 p-4">
+        <div class="text-xs font-semibold text-rose-300 mb-2">BEFORE — eager, unbounded</div>
+        <pre class="text-sm text-slate-200"><code>vals = vec(collect(
+  Iterators.product(lists...)))
+# |grid| = ∏ length(list) — allocated
+# up front, silently</code></pre>
+      </div>
+      <div class="rounded-lg border border-emerald-500/30 bg-emerald-950/20 p-4">
+        <div class="text-xs font-semibold text-emerald-300 mb-2">AFTER — cheap pre-check</div>
+        <pre class="text-sm text-slate-200"><code>n = prod(length, lists)  # O(k) ints
+n <= max_grid || throw(
+  ArgumentError("grid has $n points,
+  exceeds max_grid = $max_grid"))</code></pre>
+      </div>
+    </div>
+
+    <p class="mb-2 text-slate-300"><strong class="text-white">Direction.</strong>
+      A <code>prod(length, ...)</code> pre-check (integers only, before any tuple exists) matched against a
+      <code>max_grid</code> default would fail closed for the cost of one multiply. Marked Speculative because the
+      ADR 0025 amendment already classifies search-CV specs as <em>developer-authored code, not config/UI input</em>
+      — the same trust class as <code>parse_lens</code> keys — so this is boundary uniformity, not a reachable
+      exploit. Reasonable to decline on the same grounds as ADR 0027's findings 1/3.</p>
+
+    <ul class="text-sm text-slate-300 space-y-1 mb-1 list-disc list-inside">
+      <li>fail closed before allocation</li>
+      <li>consistent with max_comb idiom</li>
+      <li>latent: developer-authored trust class</li>
+    </ul>
+  </article>
+
+  <!-- ============ VERIFIED CLOSED / POSTURE ============ -->
+  <section class="rounded-2xl bg-slate-900/60 border border-emerald-700/30 p-6 mb-8">
+    <h2 class="text-xl font-semibold text-emerald-300 mb-3">Verified clean this pass</h2>
+    <ul class="space-y-2 text-slate-300 text-sm list-disc list-inside">
+      <li><strong>No new string→code sinks.</strong> The only <code>Meta.parse</code> sites are the two ADR-accepted parsers; no <code>eval</code>/<code>invokelatest</code>/<code>getfield</code>-on-a-name, no subprocess, no deserialization, no network or runtime file I/O anywhere in <code>src/</code> or <code>ext/</code>. The <code>read</code>/<code>walkdir</code> in <code>PortfolioOptimisers.jl:44–66</code> is commented-out dead code.</li>
+      <li><strong>Combinatorial CV path-count cap now fails closed</strong> (<code>03_Combinatorial.jl:71</code>, error not warn) — this closes the "warn-only cap" item left open on 2026-07-06. <code>MultipleRandomised</code> caps exact enumeration at <code>max_comb</code> with a documented approximate-sampling fallback.</li>
+      <li><strong>Log hygiene held.</strong> All name-resolution diagnostics route through the four shared builders; no site interpolates a matrix, dictionary, or full universe into a log or exception.</li>
+      <li><strong>Preferences ingestion stayed fail-closed</strong> (typed validation, enumerated distance allowlist, throw-at-load); <code>__init__</code> is the only load-time behaviour and reads only the five enumerated keys. No <code>ENV</code> reads.</li>
+      <li><strong>The plots extension adds no sinks</strong> — it builds plot objects only; no file writes, no network.</li>
+      <li><strong>Supply-chain surface</strong>: 36 direct deps, pure Julia, all compat-bounded; the only weak deps (StatsPlots/GraphRecipes) are properly gated behind the extension. Large but conventional for the domain; nothing actionable.</li>
+    </ul>
+    <div class="mt-4 rounded-lg bg-amber-900/20 border border-amber-600/40 p-3 text-sm text-amber-200">
+      <strong>Accepted risks not re-flagged</strong> (ADRs 0025/0026/0027): the <code>strict = false</code> fail-open
+      default at every name-resolution boundary (load-bearing for meta-optimiser subsets), raw <code>MethodError</code>
+      arity failures from the 16 allowlisted functions, <code>parse_lens</code> index-literal fallthrough, and the
+      silently-ignored misspelled preference key.
+    </div>
+  </section>
+
+  <!-- ============ TOP RECOMMENDATION ============ -->
+  <section class="rounded-2xl bg-gradient-to-br from-amber-900/30 to-slate-900 border border-amber-500/50 p-6">
+    <h2 class="text-xl font-bold text-amber-300 mb-2">Top recommendation</h2>
+    <p class="text-slate-200">
+      Close <strong>Finding 1</strong> first: add <code>isfinite</code> validation for <code>X</code>/<code>F</code>/<code>B</code>
+      in the <code>ReturnsResult</code> inner constructor. It is the only finding reachable from the documented public
+      API with default settings, and its worst case is the worst category — a <em>silently wrong portfolio</em> through
+      the solver-free hierarchical paths, where nothing downstream ever errors. The fix is a three-branch extension of
+      the finiteness discipline the same constructor already applies to <code>iv</code>/<code>ivpa</code>, it cannot
+      break any documented workflow (imputation is prices-level, and <code>prices_to_returns</code> already sanitizes),
+      and its blast radius is one constructor plus a regression test. Findings 2 and 3 ride along naturally in the same
+      change; Finding 4 is a judgement call the ADR record arguably already answers.
+    </p>
+  </section>
+
+  <footer class="mt-10 text-xs text-slate-500">
+    Generated by /improve-security · sweep: full src/ + ext/ + load path · prior reports: security-review-20260706-*, security-review-20260707-022107
+  </footer>
+</div>
+</body>
+</html>

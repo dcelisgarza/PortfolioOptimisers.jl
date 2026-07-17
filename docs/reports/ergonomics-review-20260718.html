@@ -1,0 +1,397 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Ergonomics review — PortfolioOptimisers.jl</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="module">
+      import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+      mermaid.initialize({ startOnLoad: true, theme: "neutral", securityLevel: "loose" });
+    </script>
+    <style>
+      .diff-old { background: #fef2f2; color: #991b1b; }
+      .diff-new { background: #f0fdf4; color: #166534; }
+      .chip     { font-size: 0.65rem; letter-spacing: 0.08em; }
+      code, pre.mermaid { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+      .friction { border-left: 4px solid #dc2626; }
+      .signal   { border-left: 4px solid #059669; }
+    </style>
+  </head>
+  <body class="bg-stone-50 text-slate-900 font-sans">
+    <main class="max-w-5xl mx-auto px-6 py-12 space-y-12">
+
+      <header class="space-y-5">
+        <div class="flex items-baseline justify-between flex-wrap gap-2">
+          <h1 class="text-3xl font-bold tracking-tight">Ergonomics review — PortfolioOptimisers.jl</h1>
+          <span class="text-sm text-slate-500 font-mono">2026-07-18 · branch <code>dev</code></span>
+        </div>
+        <p class="text-slate-600 max-w-3xl leading-relaxed">
+          Second ergonomics pass, focused on the surface that landed since the July&nbsp;7 review:
+          pipelines, search cross-validation, the budget keyword family, weight-norm constraints,
+          ℓ₁ uncertainty sets, and the custom objective/constraint extension points. The new surface's
+          error messages are generally high-signal; the friction that survives is concentrated in
+          sign/unit conventions the caller cannot see, sibling drift between near-identical constructors,
+          and docstrings whose depth is inversely proportional to how often the keyword is used.
+          Items settled by ADR 0015/0017/0026/0032 or fixed since July&nbsp;7 (compact <code>show</code>,
+          acronym aliases, structured solve failures) are not re-raised.
+        </p>
+        <div class="flex flex-wrap items-center gap-3 text-xs">
+          <span class="chip uppercase px-2 py-1 rounded bg-emerald-600 text-white font-semibold">4 Strong</span>
+          <span class="chip uppercase px-2 py-1 rounded bg-amber-500 text-white font-semibold">2 Worth exploring</span>
+          <span class="chip uppercase px-2 py-1 rounded bg-slate-500 text-white font-semibold">1 Speculative</span>
+          <span class="text-slate-400">·</span>
+          <span class="inline-flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm bg-red-600 inline-block"></span> friction</span>
+          <span class="inline-flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm bg-emerald-600 inline-block"></span> high signal</span>
+          <span class="inline-flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm bg-amber-400 inline-block"></span> ADR / decision callout</span>
+        </div>
+      </header>
+
+      <section id="candidates" class="space-y-10">
+
+        <!-- ─────────────────────────────── Card 1 ─────────────────────────────── -->
+        <article id="c1" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
+          <div class="space-y-2">
+            <h2 class="text-xl font-semibold">1 · The scorer sign convention is invisible — and the shipped example tunes toward the worst portfolio</h2>
+            <div class="flex flex-wrap gap-2">
+              <span class="chip uppercase px-2 py-1 rounded bg-emerald-600 text-white font-semibold">Strong</span>
+              <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">errors</span>
+              <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">docs</span>
+            </div>
+          </div>
+          <div class="font-mono text-sm text-slate-500">
+            src/20_Optimisation/02_CrossValidation/09_Base_SearchCrossValidation.jl:45–68 ·
+            10_GridSearchCrossValidation.jl:149 · src/01_Base.jl:541
+          </div>
+
+          <div class="space-y-3 font-mono text-sm">
+            <div class="friction rounded p-3 bg-red-50 overflow-x-auto">
+              <div class="text-xs uppercase tracking-wider mb-1 text-red-700 font-sans">Before — the contract the caller reads, and the example they copy</div>
+<pre>“(::CrossValidationSearchScorer)(scores::AbstractMatrix): Returns the index
+ of the optimal parameter set.”                       # full interface doc
+“`scorer`: Scoring function.”                         # full field doc
+
+julia&gt; (s::MyScore)(X::Matrix{Float64}) =
+           argmin(dropdims(mean(X; dims = 1); dims = 1))   # shipped jldoctest</pre>
+              <div class="mt-2 text-xs text-red-800 font-sans">
+                The matrix is pre-signed <em>higher-is-better</em> —
+                <code>sgn = ifelse(bigger_is_better(r), 1, -1)</code>, then
+                <code>test_scores[:, i] = sgn * expected_risk(r, predictions)</code>.
+                Nothing the caller reads says so. <code>argmin</code> here selects the
+                <strong>worst</strong> candidate, contradicting the shipped
+                <code>HighestMeanScore</code> (<code>argmax</code>). No error fires.
+              </div>
+            </div>
+            <div class="signal rounded p-3 bg-emerald-50 overflow-x-auto">
+              <div class="text-xs uppercase tracking-wider mb-1 text-emerald-700 font-sans">After — the convention stated where the caller writes the scorer</div>
+<pre>“`scores` is orientation-normalised: risk-measure scores are negated so that
+ **higher is always better**, whatever measure `r` is. A scorer returns the
+ index of the column with the best (highest) aggregate score.”
+
+julia&gt; (s::MyScore)(X::Matrix{Float64}) =
+           argmax(dropdims(mean(X; dims = 1); dims = 1))   # corrected example</pre>
+            </div>
+          </div>
+
+          <div class="space-y-1.5 text-sm leading-relaxed">
+            <p><span class="font-semibold">Problem.</span> A caller writing a custom scorer has no signal that the score matrix is orientation-normalised, and the one example they copy silently selects the worst portfolio.</p>
+            <p><span class="font-semibold">Direction.</span> State the higher-is-better contract in the scorer interface doc and the <code>scorer</code> field doc, and flip the jldoctest to <code>argmax</code> so example and shipped scorers agree.</p>
+          </div>
+          <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
+            <li>closes a silent-wrong-answer path</li>
+            <li>signal: contract stated at write-site</li>
+            <li>example matches shipped convention</li>
+            <li>blast radius: docstrings only</li>
+          </ul>
+        </article>
+
+        <!-- ─────────────────────────────── Card 2 ─────────────────────────────── -->
+        <article id="c2" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
+          <div class="space-y-2">
+            <h2 class="text-xl font-semibold">2 · <code>wn2</code>/<code>wnp</code>/<code>wninf</code> read as norm ceilings but are diversification floors</h2>
+            <div class="flex flex-wrap gap-2">
+              <span class="chip uppercase px-2 py-1 rounded bg-emerald-600 text-white font-semibold">Strong</span>
+              <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">naming</span>
+              <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">docs</span>
+            </div>
+          </div>
+          <div class="font-mono text-sm text-slate-500">
+            src/20_Optimisation/10_JuMPOptimiser.jl:369–371 · src/01_Base.jl:500–502
+          </div>
+
+          <div class="grid md:grid-cols-2 gap-4 font-mono text-sm">
+            <div class="diff-old rounded p-3 overflow-x-auto">
+              <div class="text-xs uppercase tracking-wider mb-2 text-red-700 font-sans">What the name signals</div>
+<pre>wn2   = 5    # “‖w‖₂ ≤ 5”?
+wninf = 5    # “‖w‖∞ ≤ 5”?
+             # (meaningless when 1ᵀw = 1)</pre>
+              <div class="mt-2 text-xs font-sans text-red-800">Say it aloud: <em>weight-norm-2 equals five</em>. The value's apparent unit is a norm magnitude.</div>
+            </div>
+            <div class="diff-new rounded p-3 overflow-x-auto">
+              <div class="text-xs uppercase tracking-wider mb-2 text-green-700 font-sans">What the value means</div>
+<pre>wn2   = 5    # effective assets ≥ 5
+             # inv(norm(w,2)^2) &gt;= wn2
+wninf = 5    # largest weight ≤ 1/5
+             # inv(norm(w,Inf)) &gt;= wninf</pre>
+              <div class="mt-2 text-xs font-sans text-green-800">The unit is an <em>asset count</em> (a reciprocal-norm floor) — the opposite direction and different units from what the name signals.</div>
+            </div>
+          </div>
+
+          <div class="space-y-1.5 text-sm leading-relaxed">
+            <p><span class="font-semibold">Problem.</span> The caller sets a diversification floor believing they set a norm ceiling; the number's magnitude feels wrong in both directions, and the current one-line docs lead with the mechanism (<code>inv(norm(w, 2)^2)</code>) rather than the meaning.</p>
+            <p><span class="font-semibold">Direction.</span> Keep the names (the <code>nea</code>→<code>wn2</code> rename was deliberate) and fix the signal in the docs: lead every member's docstring with “diversification floor — minimum effective number of assets” before the formula, give each a worked value (<code>wn2 = 5</code> ⇒ at least 5 effective assets; <code>wninf = 5</code> ⇒ max weight 20%), and cross-link the three as one family.</p>
+          </div>
+          <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
+            <li>signal: units stated before formula</li>
+            <li>convention: family documented as one</li>
+            <li>no rename — zero blast radius</li>
+            <li>worked values anchor magnitudes</li>
+          </ul>
+          <div class="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+            <span class="font-semibold">Decision callout.</span> The family was renamed <code>nea</code> → <code>wn2</code> (+ new <code>wnp</code>/<code>wninf</code>) deliberately during the #146 additions. This card does not re-litigate the name — the direction is docstring signal only. If the rename rationale is load-bearing, it deserves a one-paragraph ADR so future reviews stop here.
+          </div>
+        </article>
+
+        <!-- ─────────────────────────────── Card 3 ─────────────────────────────── -->
+        <article id="c3" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
+          <div class="space-y-2">
+            <h2 class="text-xl font-semibold">3 · The budget family's doc depth is inverted: <code>bgt</code>/<code>sbgt</code> get one clause, <code>gbgt</code>/<code>xbgt</code> get paragraphs</h2>
+            <div class="flex flex-wrap gap-2">
+              <span class="chip uppercase px-2 py-1 rounded bg-emerald-600 text-white font-semibold">Strong</span>
+              <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">docs</span>
+            </div>
+          </div>
+          <div class="font-mono text-sm text-slate-500">src/01_Base.jl:470–473</div>
+
+          <div class="space-y-3 font-mono text-xs">
+            <div class="friction rounded p-3 bg-red-50 overflow-x-auto">
+              <div class="text-xs uppercase tracking-wider mb-1 text-red-700 font-sans">Before — verbatim, in field order</div>
+<pre>:bgt  =&gt; "`bgt`: Portfolio budget constraint."                      # 4 words
+:sbgt =&gt; "`sbgt`: Short-sale budget constraint."                    # 4 words
+:gbgt =&gt; "`gbgt`: Gross budget (leverage) constraint … Unlike `bgt` and `sbgt`
+          — which pin the net and gross exposures only *together* — …"   # ~90 words
+:xbgt =&gt; "`xbgt`: Whether to pin the long/short decomposition exactly. When
+          `false` (the default), `lw` and `sw` are upper bounds … so `bgt`,
+          `sbgt` and `gbgt` bound the realised exposures rather than pinning
+          them — a short budget of `0.3` means *at most* 30% short. …"   # ~130 words</pre>
+            </div>
+            <div class="signal rounded p-3 bg-emerald-50 overflow-x-auto">
+              <div class="text-xs uppercase tracking-wider mb-1 text-emerald-700 font-sans">After — parallel structure, semantics stated where first read</div>
+<pre>:bgt  =&gt; "`bgt`: Net budget `1ᵀw`. A number pins it, a `BudgetRange` bounds it.
+          By default budgets *bound* the realised exposure (see `xbgt`)."
+:sbgt =&gt; "`sbgt`: Short-side budget. `sbgt = 0.3` means *at most* 30% short
+          unless `xbgt` pins the decomposition. With `bgt`, fixes net + gross
+          together; for gross alone see `gbgt`."</pre>
+            </div>
+          </div>
+
+          <div class="space-y-1.5 text-sm leading-relaxed">
+            <p><span class="font-semibold">Problem.</span> The two keywords every caller reaches for first are documented in four words each — never mentioning <code>BudgetRange</code> or the bound-vs-pin semantics — while the two opt-in keywords that reference them carry the whole explanation, so understanding <code>bgt</code> requires reading <code>xbgt</code>.</p>
+            <p><span class="font-semibold">Direction.</span> Rebalance: give <code>bgt</code>/<code>sbgt</code> the accepted-value forms and the bound-vs-pin sentence up front, and let <code>gbgt</code>/<code>xbgt</code> reference them instead of the reverse.</p>
+          </div>
+          <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
+            <li>signal: semantics at first-read keyword</li>
+            <li>convention: family reads as one voice</li>
+            <li>discoverability: <code>BudgetRange</code> surfaced</li>
+            <li>blast radius: 4 docstrings</li>
+          </ul>
+          <div class="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+            <span class="font-semibold">Carry-over note.</span> The wider “~50 two-to-four-letter <code>JuMPOptimiser</code> keywords” finding from July 7 was mitigated with the user-guide prose on the abbreviation scheme rather than long-form aliases; it is not re-raised here as a separate card.
+          </div>
+        </article>
+
+        <!-- ─────────────────────────────── Card 4 ─────────────────────────────── -->
+        <article id="c4" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
+          <div class="space-y-2">
+            <h2 class="text-xl font-semibold">4 · <code>RandomisedSearchCrossValidation</code> rejects the <code>Symbol</code> keys its own docstring promises</h2>
+            <div class="flex flex-wrap gap-2">
+              <span class="chip uppercase px-2 py-1 rounded bg-emerald-600 text-white font-semibold">Strong</span>
+              <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">errors</span>
+            </div>
+          </div>
+          <div class="font-mono text-sm text-slate-500">
+            src/20_Optimisation/02_CrossValidation/09_Base_SearchCrossValidation.jl:240–265 (vs GridSearch :93–109, :188–205)
+          </div>
+
+          <div class="space-y-3 font-mono text-sm">
+            <div class="friction rounded p-3 bg-red-50 overflow-x-auto">
+              <div class="text-xs uppercase tracking-wider mb-1 text-red-700 font-sans">Before — sibling drift</div>
+<pre># GridSearchCrossValidation: keys validated to GSCVKey (String|Symbol|Integer)
+GridSearchCrossValidation(Dict(:alpha =&gt; [0.1, 0.2]))        # works
+
+# RandomisedSearchCrossValidation: signature hard-codes AbstractString keys,
+# but its Validation section still says:
+#   “All keys in `p` must be of type `GSCVKey` (i.e. `String`, `Symbol`, or `Integer`).”
+RandomisedSearchCrossValidation(Dict(:alpha =&gt; Uniform(0, 1)))
+ERROR: MethodError: no method matching RandomisedSearchCrossValidation(::Dict{Symbol, …})</pre>
+            </div>
+            <div class="signal rounded p-3 bg-emerald-50 overflow-x-auto">
+              <div class="text-xs uppercase tracking-wider mb-1 text-emerald-700 font-sans">After — one convention across both siblings</div>
+<pre># Same key contract as GridSearch: loose signature + @argcheck against GSCVKey,
+# so a caller can swap Grid ↔ Randomised without re-typing their keys.
+RandomisedSearchCrossValidation(Dict(:alpha =&gt; Uniform(0, 1)))   # works</pre>
+            </div>
+          </div>
+
+          <div class="space-y-1.5 text-sm leading-relaxed">
+            <p><span class="font-semibold">Problem.</span> A key type that works verbatim in <code>GridSearchCrossValidation</code> throws a <code>MethodError</code> in its randomised sibling, while the copied docstring promises it is valid — the convention teaches a lie exactly when the caller swaps schemes.</p>
+            <p><span class="font-semibold">Direction.</span> Widen the randomised constructor's key type to match GridSearch's <code>GSCVKey</code> validation (or, if strings-only is deliberate, fix the docstring and raise a typed error naming the fix).</p>
+          </div>
+          <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
+            <li>convention: siblings accept same keys</li>
+            <li>docstring matches behaviour again</li>
+            <li>blast radius: 1 constructor</li>
+            <li>Grid ↔ Randomised swap is free</li>
+          </ul>
+        </article>
+
+        <!-- ─────────────────────────────── Card 5 ─────────────────────────────── -->
+        <article id="c5" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
+          <div class="space-y-2">
+            <h2 class="text-xl font-semibold">5 · <code>cross_val_predict</code>'s result type flips with the CV scheme, discoverable only from three method docstrings</h2>
+            <div class="flex flex-wrap gap-2">
+              <span class="chip uppercase px-2 py-1 rounded bg-amber-500 text-white font-semibold">Worth exploring</span>
+              <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">discoverability</span>
+            </div>
+          </div>
+          <div class="font-mono text-sm text-slate-500">src/23_Pipeline/04_PredictionCV.jl:233, 312, 357</div>
+
+          <div class="rounded-lg border border-slate-200 bg-white p-4 overflow-x-auto">
+            <pre class="mermaid">
+flowchart LR
+  A["cross_val_predict(pipe, data, cv)"] -->|"cv::KFold / WalkForward (default)"| B["MultiPeriodPredictionResult<br/>.pred = one series"]
+  A -->|"cv::CombinatorialCrossValidation"| C["PopulationPredictionResult<br/>.pred = per-path collection"]
+  A -->|"cv::MultipleRandomised"| D["PopulationPredictionResult<br/>.pred = per-path collection"]
+  classDef pop stroke:#dc2626,stroke-width:2px;
+  class C,D pop
+            </pre>
+          </div>
+
+          <div class="space-y-1.5 text-sm leading-relaxed">
+            <p><span class="font-semibold">Problem.</span> Result-navigation code written against a <code>KFold</code> run breaks when the caller swaps in a combinatorial or randomised scheme, and the type flip is signalled nowhere at the call site — only by reading the three separate method docstrings.</p>
+            <p><span class="font-semibold">Direction.</span> Add a scheme→result-type table to a single umbrella <code>cross_val_predict</code> docstring (and cross-link the three result types), so the caller can predict the return shape from the <code>cv</code> argument before running anything.</p>
+          </div>
+          <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
+            <li>signal: return shape known pre-call</li>
+            <li>discoverability: one doc entry point</li>
+            <li>blast radius: docstrings only</li>
+            <li>multi-path convention made explicit</li>
+          </ul>
+        </article>
+
+        <!-- ─────────────────────────────── Card 6 ─────────────────────────────── -->
+        <article id="c6" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
+          <div class="space-y-2">
+            <h2 class="text-xl font-semibold">6 · Custom objectives subtype a type named <code>…ConstraintEstimator</code>, and the doc omits the one method to implement</h2>
+            <div class="flex flex-wrap gap-2">
+              <span class="chip uppercase px-2 py-1 rounded bg-amber-500 text-white font-semibold">Worth exploring</span>
+              <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">naming</span>
+              <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">discoverability</span>
+            </div>
+          </div>
+          <div class="font-mono text-sm text-slate-500">src/20_Optimisation/08_Base_JuMPOptimisation.jl:217–228, 285–305</div>
+
+          <div class="grid md:grid-cols-2 gap-4 font-mono text-xs">
+            <div class="diff-old rounded p-3 overflow-x-auto">
+              <div class="text-xs uppercase tracking-wider mb-2 text-red-700 font-sans">Before</div>
+<pre>abstract type CustomJuMPObjective &lt;:
+    JuMPConstraintEstimator end
+
+# docstring “Related” list:
+#  - JuMPConstraintEstimator
+#  - CustomJuMPConstraint
+# (add_custom_objective_term! named in
+#  prose but not cross-referenced)</pre>
+            </div>
+            <div class="diff-new rounded p-3 overflow-x-auto">
+              <div class="text-xs uppercase tracking-wider mb-2 text-green-700 font-sans">After</div>
+<pre># Related:
+#  - [`add_custom_objective_term!`](@ref)  ← the contract
+#  - [`CustomJuMPConstraint`](@ref) / [`add_custom_constraint!`](@ref)
+#  - the `cobj` field of [`JuMPOptimiser`](@ref)
+# + an extension-point section in the user guide
+#   showing one worked custom objective (the new
+#   piping support's front door)</pre>
+            </div>
+          </div>
+
+          <div class="space-y-1.5 text-sm leading-relaxed">
+            <p><span class="font-semibold">Problem.</span> A caller extending the objective must subtype a type whose name says “constraint”, then grep the source for <code>add_custom_objective_term!</code> because the docstring's Related list links everything except the method the type exists to make them implement — the piping feature's only discoverability path is the <code>cobj</code>/<code>ccnt</code> field docs.</p>
+            <p><span class="font-semibold">Direction.</span> Cross-reference the implement-this method from both custom abstract types, and give the custom objective/constraint extension point one worked example in the user guide; consider whether the supertype should be a neutral name both families share (high-bar rename — alias first if pursued).</p>
+          </div>
+          <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
+            <li>discoverability: contract linked at type</li>
+            <li>docs: extension point gets happy path</li>
+            <li>blast radius: docstrings (rename optional)</li>
+            <li>piping feature becomes findable</li>
+          </ul>
+        </article>
+
+        <!-- ─────────────────────────────── Card 7 ─────────────────────────────── -->
+        <article id="c7" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
+          <div class="space-y-2">
+            <h2 class="text-xl font-semibold">7 · The raw <code>eps</code> keyword sits beside the calibration built to replace it</h2>
+            <div class="flex flex-wrap gap-2">
+              <span class="chip uppercase px-2 py-1 rounded bg-slate-500 text-white font-semibold">Speculative</span>
+              <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">defaults</span>
+              <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">discoverability</span>
+            </div>
+          </div>
+          <div class="font-mono text-sm text-slate-500">src/14_UncertaintySets/05_L1UncertaintySets.jl:118–130 (raw eps) · :20–30 (the trap, documented)</div>
+
+          <div class="grid md:grid-cols-2 gap-4 font-mono text-xs">
+            <div class="diff-old rounded p-3 overflow-x-auto">
+              <div class="text-xs uppercase tracking-wider mb-2 text-red-700 font-sans">Trap path — equally reachable</div>
+<pre>L1UncertaintySet(; eps = 0.5)
+# only guard: isfinite(eps) &amp;&amp; eps &gt;= 0
+# but ε has no natural scale: ~1e-3 on
+# daily returns, ~250× larger annualised
+# — 0.5 on daily data ⇒ 1/N, silently</pre>
+            </div>
+            <div class="diff-new rounded p-3 overflow-x-auto">
+              <div class="text-xs uppercase tracking-wider mb-2 text-green-700 font-sans">Calibrated path — the quantity a caller can reason about</div>
+<pre>CharacteristicUncertaintySet(;
+    method = ActiveAssetsUncertaintyAlgorithm(;
+        active = 0.2))   # “hold ~a quintile”
+# inverts the closed forms to find ε</pre>
+            </div>
+          </div>
+
+          <div class="space-y-1.5 text-sm leading-relaxed">
+            <p><span class="font-semibold">Problem.</span> The scale trap is documented and the calibration exists, but the unscaled <code>eps</code> keyword remains equally reachable and equally prominent, so the trap path is one autocomplete away from the safe one and mis-scales silently with data frequency.</p>
+            <p><span class="font-semibold">Direction.</span> Steer, don't remove: put the calibrated form first in the <code>eps</code> docstring and both constructors' examples, and cross-link <code>ActiveAssetsUncertaintyAlgorithm</code> from <code>eps</code> itself (“if you are guessing this number, use the calibration”); a magnitude heuristic warning is possible but likely too clever.</p>
+          </div>
+          <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
+            <li>discoverability: safe path first</li>
+            <li>default stays — expert escape hatch</li>
+            <li>blast radius: docstrings only</li>
+            <li>memory-flagged gotcha closed at source</li>
+          </ul>
+          <div class="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+            <span class="font-semibold">ADR 0032.</span> Quintile portfolios are deliberately a recipe over this set, not an optimiser type — no <code>QuintilePortfolio</code> wrapper is proposed here; the direction is purely which constructor form the docs lead with.
+          </div>
+        </article>
+
+      </section>
+
+      <!-- ─────────────────────────── Top recommendation ─────────────────────────── -->
+      <section id="top-recommendation" class="rounded-xl border-2 border-emerald-200 bg-white shadow-sm p-6 space-y-3">
+        <h2 class="text-lg font-bold text-emerald-800">Top recommendation — state the scorer sign convention and fix the example (card 1)</h2>
+        <p class="text-sm text-slate-700 leading-relaxed">
+          <a href="#c1" class="text-emerald-700 underline">Card 1</a> is the only candidate that produces a
+          <em>silent wrong answer</em>: a caller who copies the shipped jldoctest gets a scorer that tunes
+          hyperparameters toward the worst portfolio, across all three search entry points, with no error and
+          no signal that the score matrix is orientation-normalised. The fix is docstrings plus a one-token
+          example change (<code>argmin</code>→<code>argmax</code>) — zero blast radius on working code.
+          Cards <a href="#c3" class="text-emerald-700 underline">3</a> and
+          <a href="#c4" class="text-emerald-700 underline">4</a> are natural same-sitting companions:
+          both are small, verified, and close convention lies in surface a caller touches early.
+        </p>
+      </section>
+
+      <footer class="pt-6 text-xs text-slate-400">
+        Generated 2026-07-18 · <code>/improve-ergonomics</code> · candidates verified verbatim against branch <code>dev</code> (post-MIP-refactor, ccd441c32); July 7 findings and ADR-settled decisions excluded.
+      </footer>
+    </main>
+  </body>
+</html>
