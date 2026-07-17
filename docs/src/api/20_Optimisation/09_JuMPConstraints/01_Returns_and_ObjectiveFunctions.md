@@ -18,6 +18,8 @@ add_market_impact_cost!
 set_return_constraints!
 set_ucs_return_constraints!(model::JuMP.Model, ucs::BoxUncertaintySet, mu::Num_VecNum)
 set_ucs_return_constraints!(model::JuMP.Model, ucs::EllipsoidalUncertaintySet, mu::Num_VecNum)
+set_ucs_return_constraints!(model::JuMP.Model, ucs::L1UncertaintySet, mu::Num_VecNum)
+set_ucs_return_constraints!(model::JuMP.Model, ucs::SignedL1UncertaintySet, mu::Num_VecNum)
 set_max_ratio_log_return_constraints!
 add_to_objective_penalty!
 add_penalty_to_objective!

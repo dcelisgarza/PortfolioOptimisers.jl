@@ -128,6 +128,8 @@ MeanRisk
       │           │   ub ┴ Float64: 1.0
       │       bgt ┼ Float64: 1.0
       │      sbgt ┼ nothing
+      │      gbgt ┼ nothing
+      │      xbgt ┼ Bool: false
       │        lt ┼ nothing
       │        st ┼ nothing
       │      lcse ┼ nothing

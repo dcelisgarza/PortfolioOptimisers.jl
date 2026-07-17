@@ -22,8 +22,10 @@ AbstractUncertaintySetEstimator
 AbstractUncertaintySetAlgorithm
 AbstractUncertaintySetResult
 AbstractUncertaintyKAlgorithm
+AbstractUncertaintyEpsAlgorithm
 UcSE_UcS
 Num_UcSK
+Num_UcSEps
 AbstractEllipsoidalUncertaintySetResultClass
 ucs_selector
 k_ucs

@@ -19,4 +19,5 @@ set_all_smip_constraints!
 set_scardmip_constraints!
 set_sgcardmip_constraints!
 set_smip_constraints!
+sign_mip_constraints
 ```
