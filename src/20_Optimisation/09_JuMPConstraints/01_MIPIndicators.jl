@@ -645,8 +645,8 @@ Where:
   - $(arg_dict[:ss_arg])
   - $(arg_dict[:lt_flag_arg])
   - $(arg_dict[:st_flag_arg])
-  - `ffl_flag::Bool`: Whether to add long fixed fee expressions.
-  - `ffs_flag::Bool`: Whether to add short fixed fee expressions.
+  - `ffl_flag::Bool`: Whether to add long fixed fee expressions. Emitted by [`set_fixed_fees!`](@ref) against `ilb`.
+  - `ffs_flag::Bool`: Whether to add short fixed fee expressions. Emitted by [`set_fixed_fees!`](@ref) against `isb`.
   - $(arg_dict[:xbgt_flag_arg]) Served by [`set_exact_budget_constraints!`](@ref), which reuses this builder's `ilb`/`isb` rather than introducing a sign indicator of its own — they already mean long and short here, and `i_mip = ilb + isb` remains the *held* indicator that cardinality counts.
 
 # Returns
@@ -658,7 +658,8 @@ Where:
   - [`mip_constraints`](@ref)
   - [`set_mip_ss_expr!`](@ref)
   - [`mip_wb`](@ref)
-  - [`set_gross_budget_constraints!`](@ref)
+  - [`set_fixed_fees!`](@ref)
+  - [`set_exact_budget_constraints!`](@ref)
   - [`JuMPOptimiser`](@ref)
   - [`Threshold`](@ref)
   - [`WeightBounds`](@ref)
@@ -684,14 +685,7 @@ function short_mip_threshold_constraints(model::JuMP.Model, sp::AbstractMIPSpace
                                                          sc * (wx + is ⊙ st.val -
                                                                ss * (1 .- isb)) <= 0)
     end
-    if ffl_flag
-        ffl = model[mip_key(sp, :ffl)] = JuMP.@expression(model, dot_scalar(ffl, ilb))
-        add_to_fees!(model, ffl)
-    end
-    if ffs_flag
-        ffs = model[mip_key(sp, :ffs)] = JuMP.@expression(model, dot_scalar(ffs, isb))
-        add_to_fees!(model, ffs)
-    end
+    set_fixed_fees!(model, sp, ind, ffl, ffs, ffl_flag, ffs_flag)
     if xbgt_flag
         set_exact_budget_constraints!(model, sp, ind, wx, ss)
     end
@@ -746,7 +740,7 @@ Where:
   - $(arg_dict[:lt_arg])
   - $(arg_dict[:ss_arg])
   - $(arg_dict[:lt_flag_arg])
-  - `ffl_flag::Bool`: Whether to add fixed fee expressions.
+  - `ffl_flag::Bool`: Whether to add fixed fee expressions. Emitted by [`set_fixed_fees!`](@ref) against `ib`.
   - $(arg_dict[:xbgt_flag_arg]) Under a long-only weight bound the held bit doubles as the sign, so this builder's `ib` can serve it.
 
 # Returns
@@ -759,6 +753,7 @@ Where:
   - [`set_mip_constraints!`](@ref)
   - [`mip_wb`](@ref)
   - [`set_mip_ss_expr!`](@ref)
+  - [`set_fixed_fees!`](@ref)
   - [`set_iplg_constraints!`](@ref)
   - [`Threshold`](@ref)
   - [`WeightBounds`](@ref)
@@ -775,10 +770,7 @@ function mip_constraints(model::JuMP.Model, sp::AbstractMIPSpace, wb::WeightBoun
         model[mip_key(sp, :w_mip_lt)] = JuMP.@constraint(model,
                                                          sc * (wx - i_mip ⊙ lt.val) >= 0)
     end
-    if ffl_flag
-        ffl = model[mip_key(sp, :ffl)] = JuMP.@expression(model, dot_scalar(ffl, ib))
-        add_to_fees!(model, ffl)
-    end
+    set_fixed_fees!(model, sp, ind, ffl, nothing, ffl_flag, false)
     if xbgt_flag
         # Registered here rather than read from a local: the held declaration only builds the
         # big-M expression on its free-budget branch, so under a constant budget `ss` is still

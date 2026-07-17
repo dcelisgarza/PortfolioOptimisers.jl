@@ -221,3 +221,66 @@ function set_non_fixed_fees!(model::JuMP.Model, fees::Fees)
     set_turnover_fees!(model, fees.tn)
     return nothing
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Add fixed-fee expressions to the JuMP optimisation model.
+
+A fixed fee is charged per *position held*, whatever its size, so unlike the proportional fees
+above it cannot be written against the weights — it needs a binary saying whether the position
+is there at all. That is the only reason this one takes an indicator bundle, and the only
+reason a MIP builder has to run before it.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+f_{fl} &= \\boldsymbol{f}_{fl}^\\intercal \\boldsymbol{b}^l\\,, &
+f_{fs} &= \\boldsymbol{f}_{fs}^\\intercal \\boldsymbol{b}^s\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{b}^l``, ``\\boldsymbol{b}^s``: Long and short binaries ([`long_bin`](@ref), [`short_bin`](@ref)). These are the binaries themselves, never the gates: a fee is incurred by the decision to hold, which is what the bit records, and the gates relax to continuous variables when the budget is free.
+  - ``\\boldsymbol{f}_{fl}``, ``\\boldsymbol{f}_{fs}``: Long and short fixed-fee rates.
+
+Under a long-only builder the held bit is the long bit ([`HeldIndicators`](@ref)), and there is
+no short side to charge.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - `sp::AbstractMIPSpace`: Weight space the fees are charged in.
+  - `ind::AbstractMIPIndicators`: Indicator bundle supplying the binaries.
+  - `ffl::Option{<:Num_VecNum}`: Long-side fixed fee rate(s).
+  - `ffs::Option{<:Num_VecNum}`: Short-side fixed fee rate(s).
+  - `ffl_flag::Bool`: Whether to add the long fixed-fee expression.
+  - `ffs_flag::Bool`: Whether to add the short fixed-fee expression.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`add_to_fees!`](@ref)
+  - [`set_non_fixed_fees!`](@ref)
+  - [`AbstractMIPIndicators`](@ref)
+  - [`Fees`](@ref)
+"""
+function set_fixed_fees!(model::JuMP.Model, sp::AbstractMIPSpace,
+                         ind::AbstractMIPIndicators, ffl::Option{<:Num_VecNum},
+                         ffs::Option{<:Num_VecNum}, ffl_flag::Bool, ffs_flag::Bool)
+    if ffl_flag
+        ffl = model[mip_key(sp, :ffl)] = JuMP.@expression(model,
+                                                          dot_scalar(ffl, long_bin(ind)))
+        add_to_fees!(model, ffl)
+    end
+    if ffs_flag
+        ffs = model[mip_key(sp, :ffs)] = JuMP.@expression(model,
+                                                          dot_scalar(ffs, short_bin(ind)))
+        add_to_fees!(model, ffs)
+    end
+    return nothing
+end
