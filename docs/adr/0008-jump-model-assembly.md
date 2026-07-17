@@ -91,6 +91,12 @@ in place.
    > factor-space SDP phylogeny in its tail *instead of* the standard asset-space one
    > (→ `sdp_asset_phylogeny = false`, with FRC's `set_sdp_frc_phylogeny_constraints!` left
    > caller-side).
+   >
+   > **Superseded (ADR 0033).** `miprb_flag` has since been removed from the signature: RB and
+   > the user-facing `xbgt` were emitting the same exact-decomposition constraints under two
+   > names, so both now route through a Model State head contract (`WeightsFromParts` vs
+   > `PartsBoundWeights`) read by `set_exact_budget_constraints!`, not a flag on the middle. The
+   > `sdp_asset_phylogeny` divergence is unaffected.
 
 3. **Head and tail stay per-optimiser.** Each `_optimise` keeps its own head (including
    `set_weight_constraints!`, which is intrinsic to how each head shapes `w`) and its own

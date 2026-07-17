@@ -14,12 +14,21 @@
     #
     # Keep this list in sync with the prefix-namespaced keys (ADR 0005 swap groups + the
     # shared infra keys `:w`/`:X`/`:net_X`/`:Xap1`/`:ddap1`/`:dd`).
+    #
+    # The MIP indicator-bundle keys (ADR 0033) are locked for a related reason: a feature that
+    # consumes an indicator must take the typed bundle and read it through `held`/`lb_gate`/…,
+    # never `model[:ib]`. Reading by key is exactly the regression that made `set_iplg_constraints!`
+    # throw `KeyError(:ib)` on a short + threshold/fee/xbgt model (only the long-only builder
+    # registers `:ib`; the long-short builder registers `:ilb`/`:isb`). These keys are also
+    # `mip_key`-namespaced under a sub-group space, so a bare read grabs the wrong (or absent) bit.
     managed = [:w, :X, :net_X, :Xap1, :ddap1, :dd, :cdd_start, :cdd_geq_0, :cdd, :W, :M,
                :M_PSD, :L2W, :variance_flag, :rc_variance, :Au, :Al, :cbucs_variance, :E,
                :WpE, :ceucs_variance, :wr_risk, :cwr, :range_risk, :br_risk, :cbr,
                :mdd_risk, :cmdd_risk, :uci, :uci_risk, :cuci_soc, :owa, :owac,
                :bdvariance_risk, :Dt, :Dx, :W1_vr_sk_kt, :W2_vr_sk_kt, :W3_vr_sk_kt,
-               :L2W1_vr_sk_kt, :M_vr_sk_kt, :M_vr_sk_kt_PSD]
+               :L2W1_vr_sk_kt, :M_vr_sk_kt, :M_vr_sk_kt_PSD,
+               # MIP indicator-bundle keys (ADR 0033): read via the bundle, never by key.
+               :ib, :ibf, :i_mip, :ilb, :isb, :il, :is, :ilf, :isf, :xbgt_ib]
     pat = Regex("model\\[:(" * join(managed, "|") * ")\\]")
     srcdir = normpath(joinpath(@__DIR__, "..", "src"))
     interface = "08_Base_JuMPOptimisation.jl"

@@ -61,3 +61,12 @@ constraint builders once against it.**
 - Adding a new "MIP space" (a different weight expression the indicators should gate) is now a
   `struct <: AbstractMIPSpace` plus `mip_wx!` / `mip_bounds` / `mip_key` methods — the builders come
   for free.
+
+## Extended by
+
+- **[ADR 0033](0033-split-mip-file-into-indicator-layer-and-emitters.md)** carries the same
+  "write it once against `AbstractMIPSpace`" decision into the cardinality/group-cardinality
+  emitters (`set_card_constraints!` / `set_gcard_constraints!`) and the builder selector
+  (`run_mip_builder!`), which this ADR left space-specific — folding the sub-group cardinality
+  path onto the seam. It also splits the unified file into an indicator layer plus topical
+  emitter files (`05_MIPConstraints.jl` → `01_MIPIndicators.jl` + siblings).
