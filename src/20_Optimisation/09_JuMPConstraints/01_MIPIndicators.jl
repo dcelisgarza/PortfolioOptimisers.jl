@@ -174,14 +174,14 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Whether the binary indicators can gate the weights directly, without the continuous big-M relaxation of `indicator * k`.
 
-True when the budget `k` is a constant. The asset space additionally treats the presence of the [`RiskBudgeting`](@ref) normalisation constraint `:crkb` as a fixed budget.
+True when the budget `k` is a constant. The asset space additionally accepts a unit budget ([`is_unit_budget`](@ref)): the head has normalised the scale, so the indicators may gate the weights directly even though `k` is still a free variable.
 
 # Related
 
   - [`short_mip_threshold_constraints`](@ref)
 """
 function use_direct_mip_indicators(model::JuMP.Model, ::AssetMIPSpace, k)
-    return isa(k, Number) || haskey(model, :crkb)
+    return isa(k, Number) || is_unit_budget(model)
 end
 function use_direct_mip_indicators(::JuMP.Model, ::SubsetMIPSpace, k)
     return isa(k, Number)

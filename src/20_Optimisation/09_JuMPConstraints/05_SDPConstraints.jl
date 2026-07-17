@@ -40,7 +40,7 @@ function set_sdp_constraints!(model::JuMP.Model; prefix::Symbol = Symbol(""))
         return model[Symbol(prefix, :W)]
     end
     w = get_w(model, prefix)
-    k = ifelse(haskey(model, :crkb), 1, get_k(model))
+    k = effective_k(model)
     sc = get_constraint_scale(model)
     N = length(w)
     W = preg!(model, prefix, :W, JuMP.@variable(model, [1:N, 1:N], Symmetric))

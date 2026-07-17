@@ -425,7 +425,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                args...; prefix::Symbol = Symbol(""), kwargs...)
     key = Symbol(:even_moment_risk_, i)
     w = get_w(model, prefix)
-    k = ifelse(haskey(model, :crkb), 1, get_k(model))
+    k = effective_k(model)
     sc = get_constraint_scale(model)
     tgt = calc_risk_constraint_target(r, w, pr.mu, k)
     net_X = set_net_portfolio_returns!(model, pr.X; prefix = prefix)

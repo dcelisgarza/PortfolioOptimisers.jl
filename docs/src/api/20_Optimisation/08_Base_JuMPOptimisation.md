@@ -46,6 +46,9 @@ get_ddap1
 get_w
 get_objective_scale
 get_k
+set_unit_budget!
+is_unit_budget
+effective_k
 get_Xap1
 has_ddap1
 has_net_X

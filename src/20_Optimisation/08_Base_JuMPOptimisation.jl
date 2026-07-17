@@ -494,6 +494,55 @@ function get_k(model::JuMP.Model)
     return model[:k]
 end
 """
+    set_unit_budget!(model::JuMP.Model)
+
+Record that the head normalised the model's budget scale to unit.
+
+A head declares this when its own constraints make the formulation scale-invariant, so
+downstream builders may substitute the literal `1` for the homogenisation variable `k`.
+[`RiskBudgeting`](@ref) is the only such head: its log-barrier normalisation pins the scale,
+and the weights are renormalised after the solve. Note that `k` remains a *free variable*
+under this declaration — it is the budget *scale* that is unit, not `k` that is constant.
+
+# Related
+
+  - [`is_unit_budget`](@ref)
+  - [`effective_k`](@ref)
+"""
+function set_unit_budget!(model::JuMP.Model)
+    model[:unit_budget] = true
+    return nothing
+end
+"""
+    is_unit_budget(model::JuMP.Model)
+
+Return whether the head normalised the budget scale to unit (see [`set_unit_budget!`](@ref)).
+
+# Related
+
+  - [`set_unit_budget!`](@ref)
+  - [`effective_k`](@ref)
+"""
+function is_unit_budget(model::JuMP.Model)
+    return haskey(model, :unit_budget)
+end
+"""
+    effective_k(model::JuMP.Model)
+
+Return the budget scale a builder should use: `1` under a unit budget, else `model[:k]`.
+
+Builders that multiply a bound by the budget want this rather than [`get_k`](@ref), so a
+scale-invariant head is honoured without each builder re-deriving that fact for itself.
+
+# Related
+
+  - [`is_unit_budget`](@ref)
+  - [`get_k`](@ref)
+"""
+function effective_k(model::JuMP.Model)
+    return ifelse(is_unit_budget(model), 1, get_k(model))
+end
+"""
     get_ret(model::JuMP.Model)
 
 Return the portfolio expected-return expression `model[:ret]`.

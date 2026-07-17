@@ -545,6 +545,9 @@ function _set_risk_budgeting_constraints!(model::JuMP.Model, rb::RiskBudgeting,
                           [sc * log_w[i], sc, sc * w[i]] in JuMP.MOI.ExponentialCone()
                           crkb, sc * LinearAlgebra.dot(rb, log_w) >= 0
                       end)
+    # The log-barrier normalisation above pins the scale, so downstream builders may use 1
+    # in place of the free variable `k`.
+    set_unit_budget!(model)
     return rkb
 end
 """

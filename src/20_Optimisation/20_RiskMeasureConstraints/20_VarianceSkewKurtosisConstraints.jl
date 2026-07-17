@@ -33,7 +33,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::VarianceSkewKurtosi
     kt_key = Symbol(:kt_risk_, i)
     w = get_w(model, prefix)
     sc = get_constraint_scale(model)
-    k = ifelse(haskey(model, :crkb), 1, get_k(model))
+    k = effective_k(model)
     sigma = nothing_scalar_array_selector(r.vr.sigma, pr.sigma)
     sk = nothing_scalar_array_selector(r.sk.sk, pr.sk)
     kt = nothing_scalar_array_selector(r.kt.kt, pr.kt)
