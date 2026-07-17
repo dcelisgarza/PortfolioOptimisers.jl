@@ -14,9 +14,5 @@ mip_wb
 short_mip_threshold_constraints
 mip_constraints
 set_mip_constraints!
-set_all_smip_constraints!
-set_scardmip_constraints!
-set_sgcardmip_constraints!
-set_smip_constraints!
 sign_mip_constraints
 ```
