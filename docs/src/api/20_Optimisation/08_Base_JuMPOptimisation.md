@@ -49,6 +49,11 @@ get_k
 set_unit_budget!
 is_unit_budget
 effective_k
+AbstractDecompositionContract
+WeightsFromParts
+PartsBoundWeights
+set_decomposition_contract!
+decomposition_contract
 get_Xap1
 has_ddap1
 has_net_X

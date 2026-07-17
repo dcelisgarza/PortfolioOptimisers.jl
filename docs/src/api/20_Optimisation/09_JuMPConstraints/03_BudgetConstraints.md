@@ -16,4 +16,5 @@ set_cost_budget_constraints!
 set_gross_budget_constraints!(model::JuMP.Model, gbgt::Number)
 set_gross_budget_constraints!(model::JuMP.Model, gbgt::BudgetRange)
 assert_gross_budget_admissible
+set_exact_budget_constraints!
 ```
