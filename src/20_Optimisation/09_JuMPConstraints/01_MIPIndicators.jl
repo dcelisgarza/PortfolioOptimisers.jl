@@ -187,6 +187,197 @@ function use_direct_mip_indicators(::JuMP.Model, ::SubsetMIPSpace, k)
     return isa(k, Number)
 end
 """
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for a declared set of MIP binary indicators.
+
+A MIP space ([`AbstractMIPSpace`](@ref)) says *which weights* the indicators gate; an
+indicator bundle says *which bits exist and what they mean*. The two are independent axes:
+the declaration step picks the bundle from the features the model needs, and every emitter
+is written once against the bundle's accessors rather than reading binaries back out of the
+model by key.
+
+The bits divide into two kinds, and conflating them is a bug — a *held* bit says an asset is
+in the portfolio (what cardinality counts), a *sign* bit says which side it is on. Bundles
+differ in which of the two they carry:
+
+| bundle                        | binaries    | states                  |
+|:----------------------------- |:----------- |:----------------------- |
+| [`HeldIndicators`](@ref)      | `ib`        | held / not              |
+| [`LongShortIndicators`](@ref) | `ilb`,`isb` | long / short / inactive |
+| [`SignIndicators`](@ref)      | `xb`        | long / short            |
+
+# Related
+
+  - [`HeldIndicators`](@ref)
+  - [`LongShortIndicators`](@ref)
+  - [`SignIndicators`](@ref)
+  - [`held`](@ref)
+"""
+abstract type AbstractMIPIndicators end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Long-only indicators: one *held* bit per asset, and no sign.
+
+# Fields
+
+  - `ib`: Binary held bit.
+  - `i_mip`: Held gate — `ib` itself, or its continuous relaxation `ibf` when the budget is free.
+
+# Related
+
+  - [`AbstractMIPIndicators`](@ref)
+"""
+struct HeldIndicators{T1, T2} <: AbstractMIPIndicators
+    ib::T1
+    i_mip::T2
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Long-short indicators: a long bit and a short bit per asset, mutually exclusive, so an asset
+is long, short, or inactive. Carries *both* a sign (which of `ilb`/`isb`) and a held
+indicator (`i_mip = ilb + isb`), which is why this bundle can serve cardinality and exact
+budgets at once.
+
+# Fields
+
+  - `ilb`, `isb`: Binary long and short bits.
+  - `il`, `is`: Long and short gates — the bits themselves, or their continuous relaxations `ilf`/`isf` when the budget is free.
+  - `i_mip`: Held gate, `ilb + isb`.
+
+# Related
+
+  - [`AbstractMIPIndicators`](@ref)
+"""
+struct LongShortIndicators{T1, T2, T3, T4, T5} <: AbstractMIPIndicators
+    ilb::T1
+    isb::T2
+    il::T3
+    is::T4
+    i_mip::T5
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Sign-only indicators: one *sign* bit per asset and no held indicator, for when nothing in the
+model needs to know whether an asset is held.
+
+The sign split is *total* — `w_i = 0` satisfies both `w_i >= 0` and `w_i <= 0` and is picked
+up by either branch — so one bit per asset suffices and the inactive state of
+[`LongShortIndicators`](@ref) is pure redundancy. This is what lets a model that only pins the
+decomposition use `N` binaries rather than `2N`.
+
+# Fields
+
+  - `xb`: Binary sign bit; `1` selects `w_i >= 0`, `0` selects `w_i <= 0`.
+
+# Related
+
+  - [`AbstractMIPIndicators`](@ref)
+"""
+struct SignIndicators{T1} <: AbstractMIPIndicators
+    xb::T1
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the *held* indicator — the per-asset quantity that is 1 when the asset is in the
+portfolio. This is what cardinality counts and what integer phylogeny gates on.
+
+[`SignIndicators`](@ref) deliberately has no method: it carries no held bit, and the
+declaration step only chooses it when nothing in the model consumes one. A caller that would
+need a held indicator therefore fails at the seam with a `MethodError`, rather than reading a
+sign bit and silently miscounting.
+
+# Related
+
+  - [`AbstractMIPIndicators`](@ref)
+"""
+function held(ind::HeldIndicators)
+    return ind.i_mip
+end
+function held(ind::LongShortIndicators)
+    return ind.i_mip
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the gates gating the lower and upper weight bounds in [`mip_wb`](@ref).
+
+The long-only bundle gates both bounds with the held indicator (`w = 0` unless held); the
+long-short bundle gates the lower bound with the short gate and the upper with the long gate.
+
+# Related
+
+  - [`mip_wb`](@ref)
+"""
+function lb_gate(ind::HeldIndicators)
+    return ind.i_mip
+end
+function ub_gate(ind::HeldIndicators)
+    return ind.i_mip
+end
+function lb_gate(ind::LongShortIndicators)
+    return ind.is
+end
+function ub_gate(ind::LongShortIndicators)
+    return ind.il
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the gates and binaries the exact-decomposition constraints key on.
+
+`long_gate`/`short_gate` bound `lw`/`sw` and may be continuous relaxations; `long_bin`/`short_bin`
+are always the binaries themselves, because the slack-closing constraints must key on a bit
+that is exactly 0 or 1 even when the budget is free and the gates relax.
+
+For [`HeldIndicators`](@ref) the held bit doubles as the sign: this bundle is only asked for a
+decomposition under a long-only weight bound, where held and long coincide.
+
+# Related
+
+  - [`AbstractMIPIndicators`](@ref)
+"""
+function long_gate(ind::HeldIndicators)
+    return ind.ib
+end
+function short_gate(ind::HeldIndicators)
+    return 1 .- ind.ib
+end
+function long_bin(ind::HeldIndicators)
+    return ind.ib
+end
+function short_bin(ind::HeldIndicators)
+    return 1 .- ind.ib
+end
+function long_gate(ind::LongShortIndicators)
+    return ind.il
+end
+function short_gate(ind::LongShortIndicators)
+    return ind.is
+end
+function long_bin(ind::LongShortIndicators)
+    return ind.ilb
+end
+function short_bin(ind::LongShortIndicators)
+    return ind.isb
+end
+function long_gate(ind::SignIndicators)
+    return ind.xb
+end
+function short_gate(ind::SignIndicators)
+    return 1 .- ind.xb
+end
+function long_bin(ind::SignIndicators)
+    return ind.xb
+end
+function short_bin(ind::SignIndicators)
+    return 1 .- ind.xb
+end
+"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Add MIP-compatible weight bound constraints using binary selection variables.
@@ -248,6 +439,159 @@ function mip_wb(model::JuMP.Model, sp::AbstractMIPSpace, wb::WeightBounds, wx::V
                                                          0)
     end
     return nothing
+end
+function mip_wb(model::JuMP.Model, sp::AbstractMIPSpace, wb::WeightBounds, wx::VecNum,
+                ind::AbstractMIPIndicators)
+    return mip_wb(model, sp, wb, wx, ub_gate(ind), lb_gate(ind))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Declare the long-only *held* indicators and the constraints that give them meaning.
+
+Creates one binary per asset and, when the budget `k` is a free variable, the continuous
+relaxation `ibf = ib * k` with its big-M linking constraints. Applies [`mip_wb`](@ref), which
+is what forces `w = 0` for an unheld asset and so makes the bit *mean* held.
+
+Emits no feature constraints — thresholds, fees, cardinality, phylogeny, and budgets are the
+business of their own emitters, which take the returned bundle.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - `sp::AbstractMIPSpace`: Weight space the indicators act on.
+  - $(arg_dict[:wb_arg])
+  - `wx::VecNum`: Weight expression from [`mip_wx!`](@ref).
+  - $(arg_dict[:ss_arg])
+
+# Returns
+
+  - `ind::HeldIndicators`: The declared indicator bundle.
+
+# Related
+
+  - [`HeldIndicators`](@ref)
+  - [`declare_long_short_indicators!`](@ref)
+  - [`declare_sign_indicators!`](@ref)
+"""
+function declare_held_indicators!(model::JuMP.Model, sp::AbstractMIPSpace,
+                                  wb::Option{<:WeightBounds}, wx::VecNum,
+                                  ss::Option{<:Number})
+    k = get_k(model)
+    sc = get_constraint_scale(model)
+    N = length(wx)
+    ib = model[mip_key(sp, :ib)] = JuMP.@variable(model, [1:N], binary = true)
+    i_mip = if isa(k, Number)
+        model[mip_key(sp, :i_mip)] = JuMP.@expression(model, ib)
+    else
+        ssx = set_mip_ss_expr!(model, ss, wb)
+        ibf = model[mip_key(sp, :ibf)] = JuMP.@variable(model, [1:N], lower_bound = 0)
+        model[mip_key(sp, :ibf_ub)] = JuMP.@constraint(model, sc * (ibf .- k) <= 0)
+        model[mip_key(sp, :ibfd_ub)] = JuMP.@constraint(model, sc * (ibf - ssx * ib) <= 0)
+        model[mip_key(sp, :ibfd_lb)] = JuMP.@constraint(model,
+                                                        sc *
+                                                        ((ibf + ssx * (1 .- ib)) .- k) >= 0)
+        model[mip_key(sp, :i_mip)] = JuMP.@expression(model, ibf)
+    end
+    ind = HeldIndicators(ib, i_mip)
+    mip_wb(model, sp, wb, wx, ind)
+    return ind
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Declare the long-short indicators and the constraints that give them meaning.
+
+Creates a long and a short binary per asset, forces them mutually exclusive (`ilb + isb <= 1`,
+so an asset is long, short, or inactive), builds the continuous relaxations `ilf`/`isf` with
+their big-M linking constraints when the budget is free, and applies [`mip_wb`](@ref).
+
+Emits no feature constraints; see [`declare_held_indicators!`](@ref).
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - `sp::AbstractMIPSpace`: Weight space the indicators act on.
+  - $(arg_dict[:wb_arg])
+  - `wx::VecNum`: Weight expression from [`mip_wx!`](@ref).
+  - $(arg_dict[:ss_arg])
+
+# Returns
+
+  - `ind::LongShortIndicators`: The declared indicator bundle.
+
+# Related
+
+  - [`LongShortIndicators`](@ref)
+  - [`declare_held_indicators!`](@ref)
+"""
+function declare_long_short_indicators!(model::JuMP.Model, sp::AbstractMIPSpace,
+                                        wb::Option{<:WeightBounds}, wx::VecNum,
+                                        ss::Option{<:Number})
+    k = get_k(model)
+    sc = get_constraint_scale(model)
+    ss = set_mip_ss_expr!(model, ss, wb)
+    N = length(wx)
+    ilb = model[mip_key(sp, :ilb)] = JuMP.@variable(model, [1:N], binary = true)
+    isb = model[mip_key(sp, :isb)] = JuMP.@variable(model, [1:N], binary = true)
+    i_mip = model[mip_key(sp, :i_mip)] = JuMP.@expression(model, ilb + isb)
+    if use_direct_mip_indicators(model, sp, k)
+        il = model[mip_key(sp, :il)] = JuMP.@expression(model, ilb)
+        is = model[mip_key(sp, :is)] = JuMP.@expression(model, isb)
+    else
+        ilf = model[mip_key(sp, :ilf)] = JuMP.@variable(model, [1:N], lower_bound = 0)
+        isf = model[mip_key(sp, :isf)] = JuMP.@variable(model, [1:N], lower_bound = 0)
+        model[mip_key(sp, :ilf_ub)] = JuMP.@constraint(model, sc * (ilf .- k) <= 0)
+        model[mip_key(sp, :isf_ub)] = JuMP.@constraint(model, sc * (isf .- k) <= 0)
+        model[mip_key(sp, :ilfd_ub)] = JuMP.@constraint(model, sc * (ilf - ss * ilb) <= 0)
+        model[mip_key(sp, :isfd_ub)] = JuMP.@constraint(model, sc * (isf - ss * isb) <= 0)
+        model[mip_key(sp, :ilfd_lb)] = JuMP.@constraint(model,
+                                                        sc *
+                                                        ((ilf + ss * (1 .- ilb)) .- k) >= 0)
+        model[mip_key(sp, :isfd_lb)] = JuMP.@constraint(model,
+                                                        sc *
+                                                        ((isf + ss * (1 .- isb)) .- k) >= 0)
+        il = model[mip_key(sp, :il)] = JuMP.@expression(model, ilf)
+        is = model[mip_key(sp, :is)] = JuMP.@expression(model, isf)
+    end
+    model[mip_key(sp, :i_mip_ub)] = JuMP.@constraint(model, sc * (i_mip .- 1) <= 0)
+    ind = LongShortIndicators(ilb, isb, il, is, i_mip)
+    mip_wb(model, sp, wb, wx, ind)
+    return ind
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Declare a single *sign* binary per asset.
+
+Unlike the held and long-short declarations there is no [`mip_wb`](@ref) here and no held
+indicator: a sign bit needs no weight-bound gating to mean what it means, and this bundle is
+only chosen when nothing in the model consumes a held indicator.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - `sp::AbstractMIPSpace`: Weight space the indicators act on.
+  - $(arg_dict[:wb_arg])
+  - `wx::VecNum`: Weight expression from [`mip_wx!`](@ref).
+  - $(arg_dict[:ss_arg])
+
+# Returns
+
+  - `ind::SignIndicators`: The declared indicator bundle.
+
+# Related
+
+  - [`SignIndicators`](@ref)
+  - [`declare_long_short_indicators!`](@ref)
+"""
+function declare_sign_indicators!(model::JuMP.Model, sp::AbstractMIPSpace,
+                                  wb::Option{<:WeightBounds}, wx::VecNum,
+                                  ss::Option{<:Number})
+    set_mip_ss_expr!(model, ss, wb)
+    N = length(wx)
+    xb = model[mip_key(sp, :xbgt_ib)] = JuMP.@variable(model, [1:N], binary = true)
+    return SignIndicators(xb)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -345,34 +689,10 @@ function short_mip_threshold_constraints(model::JuMP.Model, sp::AbstractMIPSpace
                                          ffs_flag::Bool, miprb_flag::Bool,
                                          xbgt_flag::Bool = false)
     wx = mip_wx!(model, sp)
-    k = get_k(model)
     sc = get_constraint_scale(model)
+    ind = declare_long_short_indicators!(model, sp, wb, wx, ss)
     ss = set_mip_ss_expr!(model, ss, wb)
-    N = length(wx)
-    ilb = model[mip_key(sp, :ilb)] = JuMP.@variable(model, [1:N], binary = true)
-    isb = model[mip_key(sp, :isb)] = JuMP.@variable(model, [1:N], binary = true)
-    i_mip = model[mip_key(sp, :i_mip)] = JuMP.@expression(model, ilb + isb)
-    if use_direct_mip_indicators(model, sp, k)
-        il = model[mip_key(sp, :il)] = JuMP.@expression(model, ilb)
-        is = model[mip_key(sp, :is)] = JuMP.@expression(model, isb)
-    else
-        ilf = model[mip_key(sp, :ilf)] = JuMP.@variable(model, [1:N], lower_bound = 0)
-        isf = model[mip_key(sp, :isf)] = JuMP.@variable(model, [1:N], lower_bound = 0)
-        model[mip_key(sp, :ilf_ub)] = JuMP.@constraint(model, sc * (ilf .- k) <= 0)
-        model[mip_key(sp, :isf_ub)] = JuMP.@constraint(model, sc * (isf .- k) <= 0)
-        model[mip_key(sp, :ilfd_ub)] = JuMP.@constraint(model, sc * (ilf - ss * ilb) <= 0)
-        model[mip_key(sp, :isfd_ub)] = JuMP.@constraint(model, sc * (isf - ss * isb) <= 0)
-        model[mip_key(sp, :ilfd_lb)] = JuMP.@constraint(model,
-                                                        sc *
-                                                        ((ilf + ss * (1 .- ilb)) .- k) >= 0)
-        model[mip_key(sp, :isfd_lb)] = JuMP.@constraint(model,
-                                                        sc *
-                                                        ((isf + ss * (1 .- isb)) .- k) >= 0)
-        il = model[mip_key(sp, :il)] = JuMP.@expression(model, ilf)
-        is = model[mip_key(sp, :is)] = JuMP.@expression(model, isf)
-    end
-    model[mip_key(sp, :i_mip_ub)] = JuMP.@constraint(model, sc * (i_mip .- 1) <= 0)
-    mip_wb(model, sp, wb, wx, il, is)
+    (; ilb, isb, il, is, i_mip) = ind
     if lt_flag
         model[mip_key(sp, :w_mip_lt)] = JuMP.@constraint(model,
                                                          sc * (wx - il ⊙ lt.val +
@@ -484,23 +804,9 @@ function mip_constraints(model::JuMP.Model, sp::AbstractMIPSpace, wb::WeightBoun
                          ss::Option{<:Number}, lt_flag::Bool, ffl_flag::Bool,
                          miprb_flag::Bool)
     wx = mip_wx!(model, sp)
-    k = get_k(model)
     sc = get_constraint_scale(model)
-    N = length(wx)
-    ib = model[mip_key(sp, :ib)] = JuMP.@variable(model, [1:N], binary = true)
-    i_mip = if isa(k, Number)
-        model[mip_key(sp, :i_mip)] = JuMP.@expression(model, ib)
-    else
-        ss = set_mip_ss_expr!(model, ss, wb)
-        ibf = model[mip_key(sp, :ibf)] = JuMP.@variable(model, [1:N], lower_bound = 0)
-        model[mip_key(sp, :ibf_ub)] = JuMP.@constraint(model, sc * (ibf .- k) <= 0)
-        model[mip_key(sp, :ibfd_ub)] = JuMP.@constraint(model, sc * (ibf - ss * ib) <= 0)
-        model[mip_key(sp, :ibfd_lb)] = JuMP.@constraint(model,
-                                                        sc *
-                                                        ((ibf + ss * (1 .- ib)) .- k) >= 0)
-        model[mip_key(sp, :i_mip)] = JuMP.@expression(model, ibf)
-    end
-    mip_wb(model, sp, wb, wx, i_mip, i_mip)
+    ind = declare_held_indicators!(model, sp, wb, wx, ss)
+    (; ib, i_mip) = ind
     if lt_flag
         model[mip_key(sp, :w_mip_lt)] = JuMP.@constraint(model,
                                                          sc * (wx - i_mip ⊙ lt.val) >= 0)
@@ -510,11 +816,17 @@ function mip_constraints(model::JuMP.Model, sp::AbstractMIPSpace, wb::WeightBoun
         add_to_fees!(model, ffl)
     end
     if miprb_flag
+        # Registered here rather than read from a local: the held declaration only builds the
+        # big-M expression on its free-budget branch, so under a constant budget `ss` is still
+        # the raw argument. `set_mip_ss_expr!` is idempotent.
+        ss = set_mip_ss_expr!(model, ss, wb)
         lw = model[:lw]
         sw = model[:sw]
-        model[mip_key(sp, :lmiprb)] = JuMP.@constraint(model, sc * (lw - ss * ib) <= 0)
+        model[mip_key(sp, :lmiprb)] = JuMP.@constraint(model,
+                                                       sc * (lw - ss * long_gate(ind)) <= 0)
         model[mip_key(sp, :smiprb)] = JuMP.@constraint(model,
-                                                       sc * (sw - ss * (1 .- ib)) <= 0)
+                                                       sc * (sw - ss * short_gate(ind)) <=
+                                                       0)
     end
     return ib
 end
@@ -569,15 +881,21 @@ function sign_mip_constraints(model::JuMP.Model, sp::AbstractMIPSpace, wb::Weigh
     lw = model[:lw]
     sw = model[:sw]
     sc = get_constraint_scale(model)
+    ind = declare_sign_indicators!(model, sp, wb, wx, ss)
     ss = set_mip_ss_expr!(model, ss, wb)
-    N = length(wx)
-    xb = model[mip_key(sp, :xbgt_ib)] = JuMP.@variable(model, [1:N], binary = true)
-    model[mip_key(sp, :xbgt_lw_ub)] = JuMP.@constraint(model, sc * (lw - ss * xb) <= 0)
+    model[mip_key(sp, :xbgt_lw_ub)] = JuMP.@constraint(model,
+                                                       sc * (lw - ss * long_gate(ind)) <= 0)
     model[mip_key(sp, :xbgt_sw_ub)] = JuMP.@constraint(model,
-                                                       sc * (sw - ss * (1 .- xb)) <= 0)
+                                                       sc * (sw - ss * short_gate(ind)) <=
+                                                       0)
     model[mip_key(sp, :xbgt_lw_eq)] = JuMP.@constraint(model,
-                                                       sc * (lw - wx - ss * (1 .- xb)) <= 0)
-    model[mip_key(sp, :xbgt_sw_eq)] = JuMP.@constraint(model, sc * (sw + wx - ss * xb) <= 0)
+                                                       sc *
+                                                       (lw - wx - ss * (1 .- long_bin(ind))) <=
+                                                       0)
+    model[mip_key(sp, :xbgt_sw_eq)] = JuMP.@constraint(model,
+                                                       sc * (sw + wx -
+                                                             ss * (1 .- short_bin(ind))) <=
+                                                       0)
     return nothing
 end
 """
