@@ -77,6 +77,36 @@
                                              opt = JuMPOptimiser(; slv = slv, l1 = 0.1)))
     end
 
+    @testset "integer phylogeny gates on the held indicator, not a fixed key" begin
+        # `set_iplg_constraints!` re-read `model[:ib]`, which only the long-only builder
+        # registers. Anything that routes the model to the long-short builder — a short
+        # threshold here, but fixed fees or `xbgt` do it too — registers `ilb`/`isb`/`i_mip`
+        # and no `:ib`, so the phylogeny constraint threw `KeyError(:ib)` at assembly time.
+        # The held indicator is already a local in `set_mip_constraints!`; pass it down.
+        mr = MeanRisk(; r = Variance(),
+                      opt = JuMPOptimiser(; slv = slv, bgt = 1, sbgt = 1,
+                                          wb = WeightBounds(; lb = -1, ub = 1),
+                                          ple = IntegerPhylogenyEstimator(;
+                                                                          pl = NetworkEstimator(),
+                                                                          B = 1),
+                                          st = Threshold(; val = 0.05)))
+        ks = assemble_keys(mr)
+        @test "card_plg_1" in ks       # the phylogeny constraint was emitted at all
+        @test "i_mip" in ks            # ... gated on the long-short builder's held indicator
+        @test "ib" ∉ ks                # ... which is not `:ib`; that key is never registered
+
+        # The long-only builder still routes through the same call and keeps `:ib`.
+        mrl = MeanRisk(; r = Variance(),
+                       opt = JuMPOptimiser(; slv = slv, bgt = 1, sbgt = 1,
+                                           wb = WeightBounds(; lb = -1, ub = 1),
+                                           ple = IntegerPhylogenyEstimator(;
+                                                                           pl = NetworkEstimator(),
+                                                                           B = 1)))
+        ksl = assemble_keys(mrl)
+        @test "card_plg_1" in ksl
+        @test "ib" in ksl
+    end
+
     @testset "lp penalty and wnp constraint register distinct keys" begin
         # The p-norm weight constraint and the Lp regularisation penalty both build
         # PowerCone epigraphs. They must not register under the same Model-State names,

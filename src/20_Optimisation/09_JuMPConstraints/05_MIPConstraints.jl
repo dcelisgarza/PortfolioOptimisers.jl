@@ -585,12 +585,13 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Add integer phylogeny cardinality constraints to the JuMP optimisation model.
 
-Iterates over `plgs` and, for each [`IntegerPhylogeny`](@ref) entry, enforces `A * ib ≤ B` where `ib` is the binary indicator variable created by [`mip_constraints`](@ref).
+Iterates over `plgs` and, for each [`IntegerPhylogeny`](@ref) entry, enforces `A * ib ≤ B` where `ib` is the *held* indicator of the builder that ran — `ib` from [`mip_constraints`](@ref) or `i_mip` from [`short_mip_threshold_constraints`](@ref). It is passed in rather than read from the model, because only the long-only builder registers a `:ib` key.
 
 # Arguments
 
   - $(arg_dict[:model])
   - `plgs`: Collection of phylogeny constraint objects.
+  - `ib::VecNum`: Held indicator returned by the MIP builder that ran.
 
 # Returns
 
@@ -602,8 +603,7 @@ Iterates over `plgs` and, for each [`IntegerPhylogeny`](@ref) entry, enforces `A
   - [`set_mip_constraints!`](@ref)
   - [`IntegerPhylogeny`](@ref)
 """
-function set_iplg_constraints!(model::JuMP.Model, plgs::PlC_VecPlC)
-    ib = model[:ib]
+function set_iplg_constraints!(model::JuMP.Model, plgs::PlC_VecPlC, ib::VecNum)
     sc = get_constraint_scale(model)
     for (i, pl) in enumerate(plgs)
         if !isa(pl, IntegerPhylogeny)
@@ -720,7 +720,7 @@ function set_mip_constraints!(model::JuMP.Model, wb::WeightBounds, card::Option{
         end
     end
     if iplg_flag
-        set_iplg_constraints!(model, pl)
+        set_iplg_constraints!(model, pl, ib)
     end
     return nothing
 end
