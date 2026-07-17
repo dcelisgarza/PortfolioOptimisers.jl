@@ -804,6 +804,70 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
+Run the MIP indicator builder the requested features call for and return its held indicator.
+
+Selects among the three builders on flags shared by the asset space and every sub-group:
+
+  - [`sign_mip_constraints`](@ref) when `sign_only` — an explicit `xbgt` with nothing else to
+    consume a held indicator, so a single sign bit per asset suffices (returns `nothing`).
+  - [`short_mip_threshold_constraints`](@ref) when a short side exists (`model[:sw]`) and
+    something needs it — a short threshold, a fixed fee, or a pinned decomposition.
+  - [`mip_constraints`](@ref) otherwise — the long-only held builder.
+
+The asset caller ([`set_mip_constraints!`](@ref)) and the sub-group callers
+([`set_all_smip_constraints!`](@ref), [`set_scardmip_constraints!`](@ref),
+[`set_sgcardmip_constraints!`](@ref)) all route through here, so builder selection lives in one
+place. The sub-groups leave every keyword at its default — no fees, no pinning, no sign-only
+branch — differing from the asset space only through `sp`.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - `sp::AbstractMIPSpace`: Weight space the indicators act on.
+  - $(arg_dict[:wb_arg])
+  - $(arg_dict[:lt_arg])
+  - $(arg_dict[:st_arg])
+  - $(arg_dict[:ss_arg])
+  - $(arg_dict[:lt_flag_arg])
+  - $(arg_dict[:st_flag_arg])
+  - `ffl::Option{<:Num_VecNum} = nothing`: Long-side fixed fee rate(s).
+  - `ffs::Option{<:Num_VecNum} = nothing`: Short-side fixed fee rate(s).
+  - `ffl_flag::Bool = false`: Whether to emit long fixed fees.
+  - `ffs_flag::Bool = false`: Whether to emit short fixed fees.
+  - `xbgt_flag::Bool = false`: Whether an explicit `xbgt` asked to pin the decomposition (asset space only).
+  - `pin_flag::Bool = false`: Whether the running builder should pin the long/short decomposition.
+  - `sign_only::Bool = false`: Whether to use the lean sign-bit builder (asset space only).
+
+# Returns
+
+  - The held indicator of the builder that ran, or `nothing` for the sign-bit branch.
+
+# Related
+
+  - [`mip_constraints`](@ref)
+  - [`short_mip_threshold_constraints`](@ref)
+  - [`sign_mip_constraints`](@ref)
+  - [`set_mip_constraints!`](@ref)
+"""
+function run_mip_builder!(model::JuMP.Model, sp::AbstractMIPSpace, wb::WeightBounds,
+                          lt::Option{<:Threshold}, st::Option{<:Threshold},
+                          ss::Option{<:Number}, lt_flag::Bool, st_flag::Bool;
+                          ffl::Option{<:Num_VecNum} = nothing,
+                          ffs::Option{<:Num_VecNum} = nothing, ffl_flag::Bool = false,
+                          ffs_flag::Bool = false, xbgt_flag::Bool = false,
+                          pin_flag::Bool = false, sign_only::Bool = false)
+    return if sign_only
+        sign_mip_constraints(model, sp, wb, ss)
+    elseif (st_flag || ffl_flag || ffs_flag || xbgt_flag) && haskey(model, :sw)
+        short_mip_threshold_constraints(model, sp, wb, lt, st, ffl, ffs, ss, lt_flag,
+                                        st_flag, ffl_flag, ffs_flag, pin_flag)
+    else
+        mip_constraints(model, sp, wb, ffl, lt, ss, lt_flag, ffl_flag, pin_flag)
+    end
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
 Add the asset-space MIP constraints to the JuMP optimisation model and return the held indicator.
 
 Chooses the indicator builder the requested features need ([`mip_constraints`](@ref), [`short_mip_threshold_constraints`](@ref), or [`sign_mip_constraints`](@ref)), then lets each feature emit against the bundle it returns: minimum-holding thresholds and fixed fees inside the builder, then cardinality, group cardinality, and pinning the long/short decomposition here. Integer phylogeny is *not* emitted here — it is applied late in [`assemble_jump_model!`](@ref) beside its semidefinite sibling — but its presence still forces a builder to run, so the held indicator exists for that later call to gate on. That held indicator is the return value.
@@ -884,28 +948,23 @@ function set_mip_constraints!(model::JuMP.Model, wb::WeightBounds, card::Option{
     end
     sp = AssetMIPSpace()
     # `xbgt` needs a per-asset *sign* bit, which only the long-short builder has: the
-    # long-only builder's `ib` marks an asset as held and carries no sign.
-    ib = if xbgt_flag && !(card_flag ||
-                           gcard_flag ||
-                           iplg_flag ||
-                           lt_flag ||
-                           st_flag ||
-                           ffl_flag ||
-                           ffs_flag ||
-                           wfp_flag)
-        # Nothing here consumes a held indicator, so the long-short builder's third state
-        # (inactive) is dead weight: one sign bit per asset does the job with half the
-        # binaries. Returns nothing -- there is no held indicator, and by this branch's
-        # own condition nothing below would read one.
-        sign_mip_constraints(model, sp, wb, ss)
-    elseif (st_flag || ffl_flag || ffs_flag || xbgt_flag) && haskey(model, :sw)
-        short_mip_threshold_constraints(model, sp, wb, lt, st, ffl, ffs, ss, lt_flag,
-                                        st_flag, ffl_flag, ffs_flag, pin_flag)
-    else
-        mip_constraints(model, sp, wb, ffl, lt, ss, lt_flag, ffl_flag, pin_flag)
-    end
-    set_card_constraints!(model, ib, card)
-    set_gcard_constraints!(model, ib, gcard)
+    # long-only builder's `ib` marks an asset as held and carries no sign. When nothing here
+    # consumes a held indicator, the long-short builder's third state (inactive) is dead
+    # weight, so the lean sign-bit builder does the job with half the binaries. That branch
+    # returns `nothing` -- there is no held indicator, and by its own condition nothing below
+    # would read one.
+    sign_only = xbgt_flag && !(card_flag ||
+                               gcard_flag ||
+                               iplg_flag ||
+                               lt_flag ||
+                               st_flag ||
+                               ffl_flag ||
+                               ffs_flag ||
+                               wfp_flag)
+    ib = run_mip_builder!(model, sp, wb, lt, st, ss, lt_flag, st_flag; ffl, ffs, ffl_flag,
+                          ffs_flag, xbgt_flag, pin_flag, sign_only)
+    set_card_constraints!(model, sp, ib, card)
+    set_gcard_constraints!(model, sp, ib, gcard)
     # Hand the held indicator back so integer phylogeny can gate on it from its own emitter,
     # called late in `assemble_jump_model!` beside the semidefinite one. `ib` is `nothing` when
     # no builder ran (the sign-bit branch, or the no-flags early return) -- and by this

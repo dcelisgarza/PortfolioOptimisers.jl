@@ -1,15 +1,17 @@
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Add the asset-space cardinality constraint `sum(ib) ≤ card` to the JuMP optimisation model.
+Add the cardinality constraint `sum(ib) ≤ card` to the JuMP optimisation model.
 
 `ib` is the *held* indicator returned by the MIP builder that ran, so the sum counts held
-assets and the bound caps how many may be non-zero. The fall-through method does nothing when
-`card` is `nothing`.
+assets and the bound caps how many may be non-zero. The constraint key is named for the space
+`sp` via [`mip_key`](@ref), so the same emitter serves the asset space and every sub-group. The
+fall-through method does nothing when `card` is `nothing`.
 
 # Arguments
 
   - $(arg_dict[:model])
+  - `sp::AbstractMIPSpace`: Weight space the constraint acts on.
   - `ib`: Held indicator returned by the MIP builder that ran.
   - `card::Option{<:Integer}`: Maximum number of non-zero assets, or `nothing`.
 
@@ -22,27 +24,30 @@ assets and the bound caps how many may be non-zero. The fall-through method does
   - [`set_gcard_constraints!`](@ref)
   - [`set_mip_constraints!`](@ref)
   - [`set_scardmip_constraints!`](@ref)
+  - [`mip_key`](@ref)
 """
-function set_card_constraints!(model::JuMP.Model, ib, card::Integer)
+function set_card_constraints!(model::JuMP.Model, sp::AbstractMIPSpace, ib, card::Integer)
     sc = get_constraint_scale(model)
-    JuMP.@constraint(model, card, sc * (sum(ib) - card) <= 0)
+    model[mip_key(sp, :card)] = JuMP.@constraint(model, sc * (sum(ib) - card) <= 0)
     return nothing
 end
-function set_card_constraints!(::JuMP.Model, ::Any, ::Nothing)
+function set_card_constraints!(::JuMP.Model, ::AbstractMIPSpace, ::Any, ::Nothing)
     return nothing
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Add the asset-space group-cardinality constraints `A * ib ≤ B` and `A * ib = B` to the model.
+Add the group-cardinality constraints `A * ib ≤ B` and `A * ib = B` to the model.
 
 Enforces the linear group-cardinality constraint carried by `gcard` on the held indicator `ib`,
-capping (or fixing) how many assets in each group may be held. The fall-through method does
-nothing when `gcard` is `nothing`.
+capping (or fixing) how many assets in each group may be held. The constraint keys are named for
+the space `sp` via [`mip_key`](@ref), so the same emitter serves the asset space and every
+sub-group. The fall-through method does nothing when `gcard` is `nothing`.
 
 # Arguments
 
   - $(arg_dict[:model])
+  - `sp::AbstractMIPSpace`: Weight space the constraints act on.
   - `ib`: Held indicator returned by the MIP builder that ran.
   - `gcard::Option{<:LinearConstraint}`: Group-cardinality constraint, or `nothing`.
 
@@ -55,22 +60,24 @@ nothing when `gcard` is `nothing`.
   - [`set_card_constraints!`](@ref)
   - [`set_mip_constraints!`](@ref)
   - [`set_sgcardmip_constraints!`](@ref)
+  - [`mip_key`](@ref)
 """
-function set_gcard_constraints!(model::JuMP.Model, ib, gcard::LinearConstraint)
+function set_gcard_constraints!(model::JuMP.Model, sp::AbstractMIPSpace, ib,
+                                gcard::LinearConstraint)
     sc = get_constraint_scale(model)
     if !isnothing(gcard.ineq)
         A = gcard.ineq.A
         B = gcard.ineq.B
-        JuMP.@constraint(model, gcard_ineq, sc * (A * ib ⊖ B) <= 0)
+        model[mip_key(sp, :gcard_ineq)] = JuMP.@constraint(model, sc * (A * ib ⊖ B) <= 0)
     end
     if !isnothing(gcard.eq)
         A = gcard.eq.A
         B = gcard.eq.B
-        JuMP.@constraint(model, gcard_eq, sc * (A * ib ⊖ B) == 0)
+        model[mip_key(sp, :gcard_eq)] = JuMP.@constraint(model, sc * (A * ib ⊖ B) == 0)
     end
     return nothing
 end
-function set_gcard_constraints!(::JuMP.Model, ::Any, ::Nothing)
+function set_gcard_constraints!(::JuMP.Model, ::AbstractMIPSpace, ::Any, ::Nothing)
     return nothing
 end
 """
@@ -78,7 +85,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Add all sub-group MIP constraints for a single or multiple selection matrices.
 
-The single-matrix method handles cardinality, group cardinality, long/short threshold, and weight-bound constraints for one sub-group via the shared builders ([`short_mip_threshold_constraints`](@ref), [`mip_constraints`](@ref)) on a [`SubsetMIPSpace`](@ref). The vector method iterates over collections of cardinalities, group constraints, and selection matrices.
+The single-matrix method runs the shared indicator builder ([`run_mip_builder!`](@ref)) on a [`SubsetMIPSpace`](@ref) — applying long/short thresholds and weight bounds — then emits the sub-group cardinality and group-cardinality constraints through the same space-generic emitters as the asset space ([`set_card_constraints!`](@ref), [`set_gcard_constraints!`](@ref)). The vector method iterates over collections of cardinalities, group constraints, and selection matrices.
 
 # Arguments
 
@@ -98,8 +105,9 @@ The single-matrix method handles cardinality, group cardinality, long/short thre
 
 # Related
 
-  - [`mip_constraints`](@ref)
-  - [`short_mip_threshold_constraints`](@ref)
+  - [`run_mip_builder!`](@ref)
+  - [`set_card_constraints!`](@ref)
+  - [`set_gcard_constraints!`](@ref)
   - [`set_scardmip_constraints!`](@ref)
   - [`set_sgcardmip_constraints!`](@ref)
   - [`set_smip_constraints!`](@ref)
@@ -118,30 +126,10 @@ function set_all_smip_constraints!(model::JuMP.Model, wb::WeightBounds,
     if !(card_flag || gcard_flag || lt_flag || st_flag)
         return nothing
     end
-    sc = get_constraint_scale(model)
     sp = SubsetMIPSpace(smtx, :s, i)
-    sib = if st_flag && haskey(model, :sw)
-        short_mip_threshold_constraints(model, sp, wb, lt, st, nothing, nothing, ss,
-                                        lt_flag, st_flag, false, false)
-    else
-        mip_constraints(model, sp, wb, nothing, lt, ss, lt_flag, false, false)
-    end
-    if card_flag
-        model[Symbol(:scard_, i)] = JuMP.@constraint(model, sc * (sum(sib) - card) <= 0)
-    end
-    if gcard_flag
-        if !isnothing(gcard.ineq)
-            A = gcard.ineq.A
-            B = gcard.ineq.B
-            model[Symbol(:sgcard_ineq_, i)] = JuMP.@constraint(model,
-                                                               sc * (A * sib ⊖ B) <= 0)
-        end
-        if !isnothing(gcard.eq)
-            A = gcard.eq.A
-            B = gcard.eq.B
-            model[Symbol(:sgcard_eq_, i)] = JuMP.@constraint(model, sc * (A * sib ⊖ B) == 0)
-        end
-    end
+    sib = run_mip_builder!(model, sp, wb, lt, st, ss, lt_flag, st_flag)
+    set_card_constraints!(model, sp, sib, card)
+    set_gcard_constraints!(model, sp, sib, gcard)
     return nothing
 end
 function set_all_smip_constraints!(model::JuMP.Model, wb::WeightBounds, card::VecInt,
@@ -159,7 +147,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Add sub-group cardinality MIP constraints using a selection matrix.
 
-The single-matrix method enforces `sum(sib) ≤ card` for one sub-group. The vector method iterates over collections of cardinalities and selection matrices.
+The single-matrix method runs the shared indicator builder ([`run_mip_builder!`](@ref)) on the sub-group and enforces `sum(sib) ≤ card` through [`set_card_constraints!`](@ref). The vector method iterates over collections of cardinalities and selection matrices.
 
 # Arguments
 
@@ -178,8 +166,8 @@ The single-matrix method enforces `sum(sib) ≤ card` for one sub-group. The vec
 
 # Related
 
-  - [`mip_constraints`](@ref)
-  - [`short_mip_threshold_constraints`](@ref)
+  - [`run_mip_builder!`](@ref)
+  - [`set_card_constraints!`](@ref)
   - [`set_sgcardmip_constraints!`](@ref)
   - [`set_smip_constraints!`](@ref)
   - [`WeightBounds`](@ref)
@@ -194,15 +182,9 @@ function set_scardmip_constraints!(model::JuMP.Model, wb::WeightBounds,
     if !(card_flag || lt_flag || st_flag)
         return nothing
     end
-    sc = get_constraint_scale(model)
     sp = SubsetMIPSpace(smtx, :s, i)
-    sib = if st_flag && haskey(model, :sw)
-        short_mip_threshold_constraints(model, sp, wb, lt, st, nothing, nothing, ss,
-                                        lt_flag, st_flag, false, false)
-    else
-        mip_constraints(model, sp, wb, nothing, lt, ss, lt_flag, false, false)
-    end
-    model[Symbol(:scard_, i)] = JuMP.@constraint(model, sc * (sum(sib) - card) <= 0)
+    sib = run_mip_builder!(model, sp, wb, lt, st, ss, lt_flag, st_flag)
+    set_card_constraints!(model, sp, sib, card)
     return nothing
 end
 function set_scardmip_constraints!(model::JuMP.Model, wb::WeightBounds, card::VecInt,
@@ -220,7 +202,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Add sub-group group-cardinality MIP constraints using a selection matrix.
 
-The single-matrix method enforces linear group cardinality constraints `A * sib ≤ B` and `A * sib = B` on the sub-group binary indicator. The vector method iterates over multiple group constraints and selection matrices.
+The single-matrix method runs the shared indicator builder ([`run_mip_builder!`](@ref)) on the sub-group and enforces the linear group cardinality constraints `A * sib ≤ B` and `A * sib = B` through [`set_gcard_constraints!`](@ref). The vector method iterates over multiple group constraints and selection matrices.
 
 # Arguments
 
@@ -239,8 +221,8 @@ The single-matrix method enforces linear group cardinality constraints `A * sib 
 
 # Related
 
-  - [`mip_constraints`](@ref)
-  - [`short_mip_threshold_constraints`](@ref)
+  - [`run_mip_builder!`](@ref)
+  - [`set_gcard_constraints!`](@ref)
   - [`set_scardmip_constraints!`](@ref)
   - [`set_smip_constraints!`](@ref)
   - [`WeightBounds`](@ref)
@@ -256,24 +238,9 @@ function set_sgcardmip_constraints!(model::JuMP.Model, wb::WeightBounds,
     if !(gcard_flag || lt_flag || st_flag)
         return nothing
     end
-    sc = get_constraint_scale(model)
     sp = SubsetMIPSpace(smtx, :sg, i)
-    sib = if st_flag && haskey(model, :sw)
-        short_mip_threshold_constraints(model, sp, wb, lt, st, nothing, nothing, ss,
-                                        lt_flag, st_flag, false, false)
-    else
-        mip_constraints(model, sp, wb, nothing, lt, ss, lt_flag, false, false)
-    end
-    if !isnothing(gcard.ineq)
-        A = gcard.ineq.A
-        B = gcard.ineq.B
-        model[Symbol(:sgcard_ineq_, i)] = JuMP.@constraint(model, sc * (A * sib ⊖ B) <= 0)
-    end
-    if !isnothing(gcard.eq)
-        A = gcard.eq.A
-        B = gcard.eq.B
-        model[Symbol(:sgcard_eq_, i)] = JuMP.@constraint(model, sc * (A * sib ⊖ B) == 0)
-    end
+    sib = run_mip_builder!(model, sp, wb, lt, st, ss, lt_flag, st_flag)
+    set_gcard_constraints!(model, sp, sib, gcard)
     return nothing
 end
 function set_sgcardmip_constraints!(model::JuMP.Model, wb::WeightBounds, gcard::VecLc,

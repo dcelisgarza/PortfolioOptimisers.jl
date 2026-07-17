@@ -13,6 +13,7 @@ use_direct_mip_indicators
 mip_wb
 short_mip_threshold_constraints
 mip_constraints
-set_mip_constraints!
 sign_mip_constraints
+run_mip_builder!
+set_mip_constraints!
 ```
