@@ -803,4 +803,110 @@ function set_budget_constraints!(model::JuMP.Model, bgt::BudgetMarketImpact, w::
     return nothing
 end
 
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Pin the long/short decomposition, so the budgets built on `lw`/`sw` hold *exactly*.
+
+`lw` and `sw` carry the long and short parts of the weights, and `bgt`, `sbgt` and `gbgt` are
+all stated in terms of them. Whether those budgets *pin* the realised exposure or merely
+*bound* it depends on how the head related the parts to the weights, so this dispatches on the
+head's [`AbstractDecompositionContract`](@ref). Both methods take the sign from `ind`, whichever
+bundle carries one — a dedicated sign bit, or the long/short bits of a builder that already
+needed them for thresholds or cardinality.
+
+# Mathematical definition
+
+Both contracts emit the *sign pair*, which forces `sw = 0` on the long side and `lw = 0` on the
+short side:
+
+```math
+\\begin{align}
+lw_i - M\\, g^l_i &\\leq 0\\,, & sw_i - M\\, g^s_i &\\leq 0\\,.
+\\end{align}
+```
+
+Under [`PartsBoundWeights`](@ref) that leaves the *held* side free to overstate itself (`lw_i`
+may exceed `w_i`), so two more constraints close the slack:
+
+```math
+\\begin{align}
+lw_i - w_i - M(1 - b^l_i) &\\leq 0\\,, & sw_i + w_i - M(1 - b^s_i) &\\leq 0\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``g^l_i``, ``g^s_i``: Long and short *gates* ([`long_gate`](@ref), [`short_gate`](@ref)), which relax to continuous variables when the budget is free.
+  - ``b^l_i``, ``b^s_i``: Long and short *binaries* ([`long_bin`](@ref), [`short_bin`](@ref)). The slack-closing pair keys on these rather than the gates, because it must key on a bit that is exactly 0 or 1 even when the gates relax.
+  - ``w_i``: Weight expression for position ``i`` in the space of `sp`.
+  - ``M``: Big-M constant.
+
+Together they give `lw_i == max(w_i, 0)` and `sw_i == max(-w_i, 0)`: `b^l_i = 1` turns the
+first into `lw_i <= w_i`, which against the head's `lw_i >= w_i` is an equality; both bits zero
+gives `lw_i == sw_i == 0`, hence `w_i == 0`.
+
+Under [`WeightsFromParts`](@ref) the pair alone is enough and the slack-closing constraints are
+not emitted: `w = lw - sw` is an identity, so `sw_i = 0` already leaves `lw_i == w_i`.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - `sp::AbstractMIPSpace`: Weight space the constraints act on.
+  - `ind::AbstractMIPIndicators`: Indicator bundle supplying the sign.
+  - `wx::VecNum`: Weight expression in the space of `sp`.
+  - `ss`: Big-M expression, as registered by [`set_mip_ss_expr!`](@ref).
+  - `dc::AbstractDecompositionContract`: The head's contract. There is deliberately no method for `nothing` — a model with no head contract has no short side, so there is no decomposition to pin and a caller that got here is confused.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`AbstractDecompositionContract`](@ref)
+  - [`set_long_short_budget_constraints!`](@ref)
+  - [`set_gross_budget_constraints!`](@ref)
+  - [`AbstractMIPIndicators`](@ref)
+"""
+function set_exact_budget_constraints!(model::JuMP.Model, sp::AbstractMIPSpace,
+                                       ind::AbstractMIPIndicators, wx::VecNum, ss,
+                                       ::WeightsFromParts)
+    lw = model[:lw]
+    sw = model[:sw]
+    sc = get_constraint_scale(model)
+    model[mip_key(sp, :xbgt_lw_ub)] = JuMP.@constraint(model,
+                                                       sc * (lw - ss * long_gate(ind)) <= 0)
+    model[mip_key(sp, :xbgt_sw_ub)] = JuMP.@constraint(model,
+                                                       sc * (sw - ss * short_gate(ind)) <=
+                                                       0)
+    return nothing
+end
+function set_exact_budget_constraints!(model::JuMP.Model, sp::AbstractMIPSpace,
+                                       ind::AbstractMIPIndicators, wx::VecNum, ss,
+                                       ::PartsBoundWeights)
+    lw = model[:lw]
+    sw = model[:sw]
+    sc = get_constraint_scale(model)
+    model[mip_key(sp, :xbgt_lw_ub)] = JuMP.@constraint(model,
+                                                       sc * (lw - ss * long_gate(ind)) <= 0)
+    model[mip_key(sp, :xbgt_sw_ub)] = JuMP.@constraint(model,
+                                                       sc * (sw - ss * short_gate(ind)) <=
+                                                       0)
+    model[mip_key(sp, :xbgt_lw_eq)] = JuMP.@constraint(model,
+                                                       sc *
+                                                       (lw - wx - ss * (1 .- long_bin(ind))) <=
+                                                       0)
+    model[mip_key(sp, :xbgt_sw_eq)] = JuMP.@constraint(model,
+                                                       sc * (sw + wx -
+                                                             ss * (1 .- short_bin(ind))) <=
+                                                       0)
+    return nothing
+end
+function set_exact_budget_constraints!(model::JuMP.Model, sp::AbstractMIPSpace,
+                                       ind::AbstractMIPIndicators, wx::VecNum, ss)
+    return set_exact_budget_constraints!(model, sp, ind, wx, ss,
+                                         decomposition_contract(model))
+end
+
 export BudgetRange, BudgetCosts, BudgetMarketImpact

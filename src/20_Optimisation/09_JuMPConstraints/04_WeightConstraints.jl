@@ -138,6 +138,9 @@ function set_weight_constraints!(model::JuMP.Model, wb::WeightBounds,
                               w_lw, sc * (w - lw) <= 0
                               w_sw, sc * (w + sw) >= 0
                           end)
+        # Only a declaration when no head made a stronger one: a head that derives `w` from the
+        # parts runs this too, and its identity survives these bounds.
+        set_decomposition_contract!(model, PartsBoundWeights())
         set_long_short_budget_constraints!(model, bgt, sbgt)
         set_gross_budget_constraints!(model, gbgt)
     elseif !flag && !haskey(model, :lw)

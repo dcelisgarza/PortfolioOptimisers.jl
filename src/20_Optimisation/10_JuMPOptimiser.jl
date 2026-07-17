@@ -1283,7 +1283,6 @@ end
         rd::ReturnsResult,
         r::Option{<:RM_VecRM} = nothing,
         obj::ObjectiveFunction = MinimumRisk(),
-        miprb_flag::Bool = false,
         b1::Option{<:MatNum} = nothing,
         sdp_asset_phylogeny::Bool = true
     ) -> Nothing
@@ -1309,8 +1308,6 @@ before calling this function. See `Model Assembly` in `CONTEXT.md` and
   - `r::Option{<:RiskMeasure} = nothing`: Risk measure(s), or `nothing` to skip risk
     constraints and scalarisation (the [`RelaxedRiskBudgeting`](@ref) path).
   - `obj::ObjectiveFunction = MinimumRisk()`: Objective used by the return constraints.
-  - `miprb_flag::Bool = false`: Mixed-integer risk-budgeting flag for
-    [`set_mip_constraints!`](@ref); only [`RiskBudgeting`](@ref) passes `true`.
   - `b1::Option{<:MatNum} = nothing`: Factor loading matrix for
     [`FactorRiskContribution`](@ref); `nothing` for all other optimisers.
   - `sdp_asset_phylogeny::Bool = true`: Whether to apply the standard asset-space SDP phylogeny
@@ -1355,13 +1352,12 @@ function assemble_jump_model!(model::JuMP.Model, optimiser::JuMPOptimisationEsti
                               opt::JuMPOptimiser, attrs::ProcessedJuMPOptimiserAttributes,
                               rd::ReturnsResult, r::Option{<:RM_VecRM} = nothing,
                               obj::ObjectiveFunction = MinimumRisk(),
-                              miprb_flag::Bool = false, b1::Option{<:MatNum} = nothing,
+                              b1::Option{<:MatNum} = nothing,
                               sdp_asset_phylogeny::Bool = true)
     (; pr, wb, lt, st, lcsr, ctr, gcardr, sgcardr, smtx, sgmtx, slt, sst, sglt, sgst, tn, fees, plr, ret) = attrs
     set_linear_weight_constraints!(model, lcsr, :lcs_ineq_, :lcs_eq_)
     set_linear_weight_constraints!(model, ctr, :cent_ineq_, :cent_eq_)
-    set_mip_constraints!(model, wb, opt.card, gcardr, plr, lt, st, fees, opt.ss, miprb_flag,
-                         opt.xbgt)
+    set_mip_constraints!(model, wb, opt.card, gcardr, plr, lt, st, fees, opt.ss, opt.xbgt)
     set_smip_constraints!(model, wb, opt.scard, sgcardr, smtx, sgmtx, slt, sst, sglt, sgst,
                           opt.ss)
     set_turnover_constraints!(model, tn)

@@ -626,6 +626,8 @@ Create long and short weight variables for MIP risk budgeting in the JuMP model.
 
 Registers long `lw`, short `sw` weight variables and the derived expressions `w = lw - sw` and `w_obj = lw + sw`.
 
+Because `w` is *derived* from the parts, this declares a [`WeightsFromParts`](@ref) decomposition contract for builders that pin the decomposition.
+
 # Arguments
 
   - `model::JuMP.Model`: JuMP optimisation model.
@@ -638,6 +640,8 @@ Registers long `lw`, short `sw` weight variables and the derived expressions `w 
 # Related
 
   - [`set_risk_budgeting_constraints!`](@ref)
+  - [`set_decomposition_contract!`](@ref)
+  - [`WeightsFromParts`](@ref)
   - [`RiskBudgeting`](@ref)
 """
 function set_rb_mip_w!(model::JuMP.Model, X::MatNum)
@@ -650,6 +654,7 @@ function set_rb_mip_w!(model::JuMP.Model, X::MatNum)
                           w, lw - sw
                           w_obj, lw + sw
                       end)
+    set_decomposition_contract!(model, WeightsFromParts())
     return nothing
 end
 function set_risk_budgeting_constraints!(model::JuMP.Model,
@@ -676,9 +681,7 @@ function _optimise(rb::RiskBudgeting, rd::ReturnsResult = ReturnsResult(); dims:
     JuMP.set_string_names_on_creation(model, str_names)
     set_model_scales!(model, rb.opt.sc, rb.opt.so)
     prb = set_risk_budgeting_constraints!(model, rb, attrs.pr, attrs.wb, rd)
-    assemble_jump_model!(model, rb, rb.opt, attrs, rd, rb.r, MinimumRisk(),
-                         isa(rb.rba,
-                             AssetRiskBudgeting{<:Any, <:Any, <:MixedIntegerRiskBudgeting}))
+    assemble_jump_model!(model, rb, rb.opt, attrs, rd, rb.r, MinimumRisk())
     set_portfolio_objective_function!(model, MinimumRisk(), attrs.ret, rb.opt.cobj, rb,
                                       attrs.pr, attrs)
     retcode, sol = optimise_JuMP_model!(model, rb, eltype(attrs.pr.X))

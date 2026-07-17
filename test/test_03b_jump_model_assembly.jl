@@ -16,7 +16,7 @@
     # Run the head + assembler for `mr`, stop before solving, return the set of registered
     # Model-State key names. `r`/`b1`/`obj`/… default to the optimiser's own values but can
     # be overridden to probe a single branch in isolation.
-    function assemble_keys(mr; r = mr.r, b1 = nothing, obj = mr.obj, miprb_flag = false,
+    function assemble_keys(mr; r = mr.r, b1 = nothing, obj = mr.obj,
                            sdp_asset_phylogeny = true)
         nt = PO.processed_jump_optimiser_attributes(mr.opt, rd)
         model = JuMP.Model()
@@ -33,7 +33,7 @@
                                                     sgst = nt.sgst, tn = nt.tn,
                                                     fees = nt.fees, plr = nt.plr,
                                                     ret = nt.ret)
-        PO.assemble_jump_model!(model, mr, mr.opt, attrs, rd, r, obj, miprb_flag, b1,
+        PO.assemble_jump_model!(model, mr, mr.opt, attrs, rd, r, obj, b1,
                                 sdp_asset_phylogeny)
         return Set(string.(keys(JuMP.object_dictionary(model))))
     end

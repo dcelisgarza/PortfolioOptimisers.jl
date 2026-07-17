@@ -543,6 +543,95 @@ function effective_k(model::JuMP.Model)
     return ifelse(is_unit_budget(model), 1, get_k(model))
 end
 """
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for the head's *decomposition contract*: how `model[:w]` relates to the
+long/short parts `model[:lw]` and `model[:sw]`.
+
+Heads build that relationship in one of two incompatible ways, and a builder that pins the
+decomposition needs to know which, because the two need different constraints to become exact.
+The head declares its own with [`set_decomposition_contract!`](@ref); builders read it back
+with [`decomposition_contract`](@ref) and dispatch.
+
+# Related
+
+  - [`WeightsFromParts`](@ref)
+  - [`PartsBoundWeights`](@ref)
+  - [`set_decomposition_contract!`](@ref)
+  - [`decomposition_contract`](@ref)
+"""
+abstract type AbstractDecompositionContract end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+The head defines the weights *from* the parts: `w = lw - sw` is an identity, `lw` and `sw`
+being the primitive variables. Declared by [`set_rb_mip_w!`](@ref).
+
+Because the identity always holds, forcing the long-xor-short sign pattern is enough to pin the
+decomposition: with `sw = 0` the identity leaves `lw == w`, and `lw >= 0` makes that
+`max(w, 0)`. No slack remains to close.
+
+# Related
+
+  - [`AbstractDecompositionContract`](@ref)
+  - [`PartsBoundWeights`](@ref)
+"""
+struct WeightsFromParts <: AbstractDecompositionContract end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+The head defines the parts as *bounds* on the weights: `lw >= w`, `sw >= -w`, `lw, sw >= 0`,
+`w` being the primitive variable. Declared by [`set_weight_constraints!`](@ref).
+
+The parts are only upper bounds on the true long/short exposures, so every budget built on
+them (`bgt`, `sbgt`, `gbgt`) bounds the realised exposure rather than pinning it. Forcing the
+sign pattern does not change that — the slack survives it — so pinning the decomposition under
+this contract needs two further constraints to close it.
+
+# Related
+
+  - [`AbstractDecompositionContract`](@ref)
+  - [`WeightsFromParts`](@ref)
+"""
+struct PartsBoundWeights <: AbstractDecompositionContract end
+"""
+    set_decomposition_contract!(model::JuMP.Model, dc::AbstractDecompositionContract)
+
+Record how the head related `model[:w]` to `model[:lw]`/`model[:sw]`.
+
+The first declaration wins: a head may run both builders (the mixed-integer
+[`RiskBudgeting`](@ref) head calls [`set_rb_mip_w!`](@ref), then hands the same `lw`/`sw` to
+[`set_weight_constraints!`](@ref), which re-states them as bounds). The identity is the
+stronger statement and still holds, so the bounds must not overwrite it.
+
+# Related
+
+  - [`AbstractDecompositionContract`](@ref)
+  - [`decomposition_contract`](@ref)
+"""
+function set_decomposition_contract!(model::JuMP.Model, dc::AbstractDecompositionContract)
+    if !haskey(model, :decomposition_contract)
+        model[:decomposition_contract] = dc
+    end
+    return nothing
+end
+"""
+    decomposition_contract(model::JuMP.Model)
+
+Return the head's decomposition contract, or `nothing` when no head declared one.
+
+`nothing` means the model has no short side — the weights are their own long part, `lw` is an
+alias for `w` and there is no `sw`, so there is no decomposition to pin.
+
+# Related
+
+  - [`AbstractDecompositionContract`](@ref)
+  - [`set_decomposition_contract!`](@ref)
+"""
+function decomposition_contract(model::JuMP.Model)
+    return haskey(model, :decomposition_contract) ? model[:decomposition_contract] : nothing
+end
+"""
     get_ret(model::JuMP.Model)
 
 Return the portfolio expected-return expression `model[:ret]`.
