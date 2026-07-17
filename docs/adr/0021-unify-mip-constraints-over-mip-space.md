@@ -6,7 +6,7 @@ status: accepted
 
 ## Context
 
-[05_MIPConstraints.jl](../../src/20_Optimisation/09_JuMPConstraints/05_MIPConstraints.jl) carried
+`05_MIPConstraints.jl` (superceded by `01_MIPIndicators.jl`) carried
 two nearly-parallel families of binary-indicator constraint builders:
 
 - **Asset-space MIP** (`mip_wb`, `short_mip_threshold_constraints`, `mip_constraints`): binary
