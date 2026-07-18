@@ -144,7 +144,7 @@ $(DocStringExtensions.FIELDS)
 
     SignedL1UncertaintySet(;
         ep::Number,
-        em::Number,
+        en::Number,
         sd::Option{<:VecNum} = nothing
     ) -> SignedL1UncertaintySet
 
@@ -153,7 +153,7 @@ Keywords correspond to the struct's fields.
 ## Validation
 
   - `isfinite(ep)` and `ep >= 0`.
-  - `isfinite(em)` and `em >= 0`.
+  - `isfinite(en)` and `en >= 0`.
   - If `sd` is provided: `!isempty(sd)` and `all(sd .> 0)`.
 
 # Mathematical definition
@@ -164,14 +164,14 @@ Keywords correspond to the struct's fields.
 
 Where:
 
-  - ``\\epsilon_{+}``, ``\\epsilon_{-}``: Radii of the positive- and negative-error sides (`ep`, `em`).
+  - ``\\epsilon_{+}``, ``\\epsilon_{-}``: Radii of the positive- and negative-error sides (`ep`, `en`).
   - ``[\\cdot]_{+}``, ``[\\cdot]_{-}``: Element-wise positive and negative parts.
 
 Still concave and LP-representable, with one epigraph variable per sign.
 
 # Notes
 
-This is **not** [`L1UncertaintySet`](@ref) with `ep == em`: the joint set shares one budget across both signs, giving ``\\max(t_{+}, t_{-})``, whereas this one spends a budget per sign, giving ``\\epsilon_{+} t_{+} + \\epsilon_{-} t_{-}``. The two agree only when ``\\boldsymbol{w}`` is single-signed — as it is under a long-only budget, where the joint set is the simpler choice.
+This is **not** [`L1UncertaintySet`](@ref) with `ep == en`: the joint set shares one budget across both signs, giving ``\\max(t_{+}, t_{-})``, whereas this one spends a budget per sign, giving ``\\epsilon_{+} t_{+} + \\epsilon_{-} t_{-}``. The two agree only when ``\\boldsymbol{w}`` is single-signed — as it is under a long-only budget, where the joint set is the simpler choice.
 
 [quintile](@cite) introduces this set in order to *decouple* the long-short problem into two independent problems (its equations 27 and 28), which its Remark 12 then recombines only when the two legs happen to have complementary support. Modelling the worst case above directly keeps the problem coupled, so that caveat does not arise.
 
@@ -187,29 +187,29 @@ This is **not** [`L1UncertaintySet`](@ref) with `ep == em`: the joint set shares
     """
     ep
     """
-    $(field_dict[:em_ucs])
+    $(field_dict[:en_ucs])
     """
-    em
+    en
     """
     $(field_dict[:sd_ucs])
     """
     sd
-    function SignedL1UncertaintySet(ep::Number, em::Number, sd::Option{<:VecNum})
+    function SignedL1UncertaintySet(ep::Number, en::Number, sd::Option{<:VecNum})
         @argcheck(isfinite(ep) && ep >= zero(ep),
                   DomainError(ep, "ep must be finite and >= 0"))
-        @argcheck(isfinite(em) && em >= zero(em),
-                  DomainError(em, "em must be finite and >= 0"))
+        @argcheck(isfinite(en) && en >= zero(en),
+                  DomainError(en, "en must be finite and >= 0"))
         if isa(sd, VecNum)
             @argcheck(!isempty(sd), IsEmptyError("sd cannot be empty"))
             @argcheck(all(x -> x > zero(x), sd),
                       DomainError(sd, "all entries of sd must be > 0"))
         end
-        return new{typeof(ep), typeof(em), typeof(sd)}(ep, em, sd)
+        return new{typeof(ep), typeof(en), typeof(sd)}(ep, en, sd)
     end
 end
-function SignedL1UncertaintySet(; ep::Number, em::Number,
+function SignedL1UncertaintySet(; ep::Number, en::Number,
                                 sd::Option{<:VecNum} = nothing)::SignedL1UncertaintySet
-    return SignedL1UncertaintySet(ep, em, sd)
+    return SignedL1UncertaintySet(ep, en, sd)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -559,13 +559,13 @@ function mu_ucs(ue::CharacteristicUncertaintySet{<:Any, <:SignedL1UncertaintySet
     idx = sortperm(pr.mu; rev = true)
     mus = pr.mu[idx]
     sds = isnothing(sd) ? nothing : sd[idx]
-    # em governs the long leg, calibrated against the top of the ranking; ep governs the
+    # en governs the long leg, calibrated against the top of the ranking; ep governs the
     # short leg, calibrated against the bottom — i.e. the top of the reversed, negated
     # ranking, which is the same ladder read from the other end (Corollary 13).
-    em = l1_resolve_eps(alg.mm, mus, sds, false)
+    en = l1_resolve_eps(alg.mm, mus, sds, false)
     ep = l1_resolve_eps(alg.mp, reverse(-mus), isnothing(sds) ? nothing : reverse(sds),
                         false)
-    return SignedL1UncertaintySet(; ep = ep, em = em, sd = sd)
+    return SignedL1UncertaintySet(; ep = ep, en = en, sd = sd)
 end
 """
     ucs(ue::CharacteristicUncertaintySet, X::MatNum, F::Option{<:MatNum} = nothing; kwargs...)

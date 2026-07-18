@@ -162,7 +162,7 @@ end
     @testset "Model 4 (eq. 25): quintile-IV long-short, solved coupled" begin
         # Modelling A2's worst case directly keeps the problem coupled, so the legs cannot
         # overlap -- the complementary-support caveat of the paper's Remark 12 cannot arise.
-        r = quintile(SignedL1UncertaintySet(; ep = 0.05, em = 0.05, sd = sd_hat); bgt = 0.0,
+        r = quintile(SignedL1UncertaintySet(; ep = 0.05, en = 0.05, sd = sd_hat); bgt = 0.0,
                      sbgt = 0.5, wb = WeightBounds(; lb = -1.0, ub = 1.0))
         w = r.w
         longs, shorts = findall(>(1e-6), w), findall(<(-1e-6), w)

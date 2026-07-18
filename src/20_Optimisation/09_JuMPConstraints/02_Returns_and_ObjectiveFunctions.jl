@@ -900,7 +900,7 @@ Modelling this worst case directly keeps the long-short problem *coupled*, so it
 # Arguments
 
   - `model::JuMP.Model`: JuMP optimisation model.
-  - `ucs::SignedL1UncertaintySet`: Signed ``\\ell_1`` uncertainty set with radii `ep`, `em` and scaling `sd`.
+  - `ucs::SignedL1UncertaintySet`: Signed ``\\ell_1`` uncertainty set with radii `ep`, `en` and scaling `sd`.
   - `mu::Num_VecNum`: Expected return vector.
 
 # Returns
@@ -928,7 +928,7 @@ function set_ucs_return_constraints!(model::JuMP.Model, ucs::SignedL1Uncertainty
                           sl1ucs_ret_m, sc * (sw .- t_sl1ucs_m) <= 0
                       end)
     JuMP.@expression(model, ret,
-                     dot_scalar(mu, w) - ucs.ep * t_sl1ucs_p - ucs.em * t_sl1ucs_m)
+                     dot_scalar(mu, w) - ucs.ep * t_sl1ucs_p - ucs.en * t_sl1ucs_m)
     add_fees_to_ret!(model, ret)
     add_market_impact_cost!(model, ret)
     return nothing

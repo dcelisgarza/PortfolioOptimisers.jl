@@ -53,16 +53,16 @@ Consequences of that choice, in order:
 `L1UncertaintySet` (radius `eps`, optional scaling `sd`) covers both the paper's `S` (eq. 5)
 and `A1` (eq. 18) — `S` is `A1` with `sd = 1`, which is algebra, not a judgement call.
 
-`SignedL1UncertaintySet` (radii `ep`, `em`) covers `A2` (eq. 25) and does *not* collapse into
+`SignedL1UncertaintySet` (radii `ep`, `en`) covers `A2` (eq. 25) and does *not* collapse into
 the first: the joint set shares one budget across both signs, giving `max(t+, t-)`; the signed
-set spends a budget per sign, giving `ep*t+ + em*t-`. They agree only when `w` is
+set spends a budget per sign, giving `ep*t+ + en*t-`. They agree only when `w` is
 single-signed. The paper never writes `A2`'s worst case for general `w` because it
 immediately *decouples* into its eqs. (27)/(28), and its Remark 12 then admits the
 recombination is optimal only when the two legs happen to have complementary support.
 Modelling the worst case directly —
 
 ```
-min_{mu in A2} mu'w = mu'w - ep*[max_i(-sd_i w_i)]_+ - em*[max_i(sd_i w_i)]_+
+min_{mu in A2} mu'w = mu'w - ep*[max_i(-sd_i w_i)]_+ - en*[max_i(sd_i w_i)]_+
 ```
 
 — keeps the problem coupled and dissolves that caveat. Verified: the coupled solve returns a

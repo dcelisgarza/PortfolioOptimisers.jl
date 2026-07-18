@@ -25,10 +25,10 @@
             @test_throws DomainError L1UncertaintySet(; eps = Inf)
             @test_throws DomainError L1UncertaintySet(; eps = 0.1, sd = [1.0, -1.0])
             @test_throws Exception L1UncertaintySet(; eps = 0.1, sd = Float64[])
-            @test SignedL1UncertaintySet(; ep = 0.1, em = 0.2).ep == 0.1
-            @test SignedL1UncertaintySet(; ep = 0.1, em = 0.2).em == 0.2
-            @test_throws DomainError SignedL1UncertaintySet(; ep = -0.1, em = 0.2)
-            @test_throws DomainError SignedL1UncertaintySet(; ep = 0.1, em = -0.2)
+            @test SignedL1UncertaintySet(; ep = 0.1, en = 0.2).ep == 0.1
+            @test SignedL1UncertaintySet(; ep = 0.1, en = 0.2).en == 0.2
+            @test_throws DomainError SignedL1UncertaintySet(; ep = -0.1, en = 0.2)
+            @test_throws DomainError SignedL1UncertaintySet(; ep = 0.1, en = -0.2)
             @test_throws DomainError L1UncertaintySetAlgorithm(; method = -1.0)
             @test_throws DomainError SignedL1UncertaintySetAlgorithm(; mp = -1.0)
             @test_throws DomainError SignedL1UncertaintySetAlgorithm(; mm = -1.0)
@@ -62,7 +62,7 @@
                                                                                      mm = 0.03,
                                                                                      scaled = false))
             ss = mu_ucs(ues, rdl1)
-            @test (ss.ep, ss.em) == (0.02, 0.03)
+            @test (ss.ep, ss.en) == (0.02, 0.03)
         end
         @testset "scaled toggles the sigma scaling (S vs A1)" begin
             unscaled = mu_ucs(CharacteristicUncertaintySet(;
