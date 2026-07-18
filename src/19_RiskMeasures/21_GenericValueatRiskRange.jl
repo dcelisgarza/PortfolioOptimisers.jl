@@ -1,4 +1,16 @@
 """
+    ValueatRiskRMs = Union{<:ValueatRisk, <:ConditionalValueatRisk,
+                             <:DistributionallyRobustConditionalValueatRisk,
+                             <:EntropicValueatRisk, <:WorstRealisation,
+                             <:RelativisticValueatRisk, <:PowerNormValueatRisk}
+
+Alias for the union of all XatRisk-type risk measures that can be used in the `GenericValueatRiskRange` risk measure.
+"""
+const ValueatRiskRMs = Union{<:ValueatRisk, <:ConditionalValueatRisk,
+                             <:DistributionallyRobustConditionalValueatRisk,
+                             <:EntropicValueatRisk, <:WorstRealisation,
+                             <:RelativisticValueatRisk, <:PowerNormValueatRisk}
+"""
 $(DocStringExtensions.TYPEDEF)
 
 Represents a generic Value-at-Risk range risk measure that combines any pair of XatRisk-type
@@ -31,14 +43,8 @@ $(DocStringExtensions.FIELDS)
 
     GenericValueatRiskRange(;
         settings::RiskMeasureSettings = RiskMeasureSettings(),
-        loss::Union{<:ValueatRisk, <:ConditionalValueatRisk,
-                    <:DistributionallyRobustConditionalValueatRisk,
-                    <:EntropicValueatRisk, <:RelativisticValueatRisk,
-                    <:PowerNormValueatRisk} = ConditionalValueatRisk(),
-        gain::Union{<:ValueatRisk, <:ConditionalValueatRisk,
-                    <:DistributionallyRobustConditionalValueatRisk,
-                    <:EntropicValueatRisk, <:RelativisticValueatRisk,
-                    <:PowerNormValueatRisk} = ConditionalValueatRisk()
+        loss::ValueatRiskRMs = ConditionalValueatRisk(),
+        gain::ValueatRiskRMs = ConditionalValueatRisk()
     ) -> GenericValueatRiskRange
 
 Keywords correspond to the struct's fields.
@@ -125,35 +131,16 @@ GenericValueatRiskRange
     $(field_dict[:gain_rm])
     """
     @fprop @vprop gain
-    function GenericValueatRiskRange(settings::RiskMeasureSettings,
-                                     loss::Union{<:ValueatRisk, <:ConditionalValueatRisk,
-                                                 <:DistributionallyRobustConditionalValueatRisk,
-                                                 <:EntropicValueatRisk,
-                                                 <:RelativisticValueatRisk,
-                                                 <:WorstRealisation,
-                                                 <:PowerNormValueatRisk},
-                                     gain::Union{<:ValueatRisk, <:ConditionalValueatRisk,
-                                                 <:DistributionallyRobustConditionalValueatRisk,
-                                                 <:EntropicValueatRisk,
-                                                 <:RelativisticValueatRisk,
-                                                 <:WorstRealisation,
-                                                 <:PowerNormValueatRisk})
+    function GenericValueatRiskRange(settings::RiskMeasureSettings, loss::ValueatRiskRMs,
+                                     gain::ValueatRiskRMs)
         loss = no_risk_expr_risk_measure(loss)
         gain = no_risk_expr_risk_measure(gain)
         return new{typeof(settings), typeof(loss), typeof(gain)}(settings, loss, gain)
     end
 end
 function GenericValueatRiskRange(; settings::RiskMeasureSettings = RiskMeasureSettings(),
-                                 loss::Union{<:ValueatRisk, <:ConditionalValueatRisk,
-                                             <:DistributionallyRobustConditionalValueatRisk,
-                                             <:EntropicValueatRisk,
-                                             <:RelativisticValueatRisk, <:WorstRealisation,
-                                             <:PowerNormValueatRisk} = ConditionalValueatRisk(),
-                                 gain::Union{<:ValueatRisk, <:ConditionalValueatRisk,
-                                             <:DistributionallyRobustConditionalValueatRisk,
-                                             <:EntropicValueatRisk,
-                                             <:RelativisticValueatRisk, <:WorstRealisation,
-                                             <:PowerNormValueatRisk} = ConditionalValueatRisk())::GenericValueatRiskRange
+                                 loss::ValueatRiskRMs = ConditionalValueatRisk(),
+                                 gain::ValueatRiskRMs = ConditionalValueatRisk())::GenericValueatRiskRange
     return GenericValueatRiskRange(settings, loss, gain)
 end
 function (r::GenericValueatRiskRange)(x::VecNum)
