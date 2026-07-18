@@ -1357,8 +1357,7 @@ function assemble_jump_model!(model::JuMP.Model, optimiser::JuMPOptimisationEsti
     (; pr, wb, lt, st, lcsr, ctr, gcardr, sgcardr, smtx, sgmtx, slt, sst, sglt, sgst, tn, fees, plr, ret) = attrs
     set_linear_weight_constraints!(model, lcsr, :lcs_ineq_, :lcs_eq_)
     set_linear_weight_constraints!(model, ctr, :cent_ineq_, :cent_eq_)
-    mip_held = set_mip_constraints!(model, wb, opt.card, gcardr, plr, lt, st, fees, opt.ss,
-                                    opt.xbgt)
+    set_mip_constraints!(model, wb, opt.card, gcardr, plr, lt, st, fees, opt.ss, opt.xbgt)
     set_smip_constraints!(model, wb, opt.scard, sgcardr, smtx, sgmtx, slt, sst, sglt, sgst,
                           opt.ss)
     set_turnover_constraints!(model, tn)
@@ -1373,7 +1372,7 @@ function assemble_jump_model!(model::JuMP.Model, optimiser::JuMPOptimisationEsti
     set_non_fixed_fees!(model, fees)
     set_risk_and_scalarise!(model, r, optimiser, opt, pr, plr, fees, b1; rd = rd)
     set_return_constraints!(model, ret, obj, pr; rd = rd)
-    set_iplg_constraints!(model, plr, mip_held)
+    set_iplg_constraints!(model, plr)
     if sdp_asset_phylogeny
         set_sdp_phylogeny_constraints!(model, plr)
     end

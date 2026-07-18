@@ -138,14 +138,15 @@ end
 function PortfolioOptimisers.add_custom_objective_term!(model::JuMP.Model, obj, pret,
                                                         cobj::MomentumTilt, obj_expr, opt,
                                                         pr, args...)
+    sign = ifelse(isa(obj, MinimumRisk), -1, 1)
     w = PortfolioOptimisers.get_w(model)
-    JuMP.add_to_expression!(obj_expr, -cobj.lambda * (cobj.score' * w))
+    JuMP.add_to_expression!(obj_expr, sign * cobj.lambda * (cobj.score' * w))
     return nothing
 end
 
 res_tilt = optimise(MeanRisk(; obj = MinimumRisk(),
                              opt = JuMPOptimiser(; pe = pr, slv = slv,
-                                                 cobj = MomentumTilt(score, 0.05))))
+                                                 cobj = MomentumTilt(score, 1e-4))))
 
 #=
 **A custom constraint.** Subtype [`CustomJuMPConstraint`](@ref) and add a JuMP constraint,
@@ -185,8 +186,9 @@ momentum_exposure = (base = score' * res_base.w, tilt = score' * res_tilt.w,
 Same prior, same objective — only the constraint or cost changes the allocation.
 =#
 
-results = [res_base, res_cap, res_grp, res_tn, res_fee]
-labels = ["Base", "Cap 10%", "Tech ≥ 15%", "Turnover", "Fees"]
+results = [res_base, res_cap, res_grp, res_tn, res_fee, res_tilt, res_floor]
+labels = ["Base", "Cap 10%", "Tech ≥ 15%", "Turnover", "Fees", "Momentum tilt",
+          "Momentum floor"]
 
 pretty_table(DataFrame(["Asset" => rd.nx,
                         [labels[i] => results[i].w for i in eachindex(results)]...]);

@@ -82,7 +82,8 @@
         # registers. Anything that routes the model to the long-short builder — a short
         # threshold here, but fixed fees or `xbgt` do it too — registers `ilb`/`isb`/`i_mip`
         # and no `:ib`, so the phylogeny constraint threw `KeyError(:ib)` at assembly time.
-        # The held indicator is already a local in `set_mip_constraints!`; pass it down.
+        # The builder now registers its bundle in Model State (`set_mip_indicators!`) and the
+        # late emitter reads it back with `mip_indicators` + `held_bin` — no key involved.
         mr = MeanRisk(; r = Variance(),
                       opt = JuMPOptimiser(; slv = slv, bgt = 1, sbgt = 1,
                                           wb = WeightBounds(; lb = -1, ub = 1),

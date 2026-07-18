@@ -15,6 +15,9 @@ HeldIndicators
 LongShortIndicators
 SignIndicators
 held
+held_bin
+set_mip_indicators!
+mip_indicators
 lb_gate
 ub_gate
 long_gate

@@ -3,16 +3,17 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Add the cardinality constraint `sum(ib) ≤ card` to the JuMP optimisation model.
 
-`ib` is the *held* indicator returned by the MIP builder that ran, so the sum counts held
-assets and the bound caps how many may be non-zero. The constraint key is named for the space
-`sp` via [`mip_key`](@ref), so the same emitter serves the asset space and every sub-group. The
-fall-through method does nothing when `card` is `nothing`.
+`ind` is the indicator bundle the MIP builder that ran returned; the *held binary*
+([`held_bin`](@ref)) is summed, so the sum counts held assets and the bound caps how many may be
+non-zero. The constraint key is named for the space `sp` via [`mip_key`](@ref), so the same
+emitter serves the asset space and every sub-group. The fall-through method does nothing when
+`card` is `nothing` — and so never reads a held indicator the bundle may not carry.
 
 # Arguments
 
   - $(arg_dict[:model])
   - `sp::AbstractMIPSpace`: Weight space the constraint acts on.
-  - `ib`: Held indicator returned by the MIP builder that ran.
+  - `ind::AbstractMIPIndicators`: Indicator bundle returned by the MIP builder that ran.
   - `card::Option{<:Integer}`: Maximum number of non-zero assets, or `nothing`.
 
 # Returns
@@ -24,10 +25,13 @@ fall-through method does nothing when `card` is `nothing`.
   - [`set_gcard_constraints!`](@ref)
   - [`set_mip_constraints!`](@ref)
   - [`set_scardmip_constraints!`](@ref)
+  - [`held_bin`](@ref)
   - [`mip_key`](@ref)
 """
-function set_card_constraints!(model::JuMP.Model, sp::AbstractMIPSpace, ib, card::Integer)
+function set_card_constraints!(model::JuMP.Model, sp::AbstractMIPSpace,
+                               ind::AbstractMIPIndicators, card::Integer)
     sc = get_constraint_scale(model)
+    ib = held_bin(ind)
     model[mip_key(sp, :card)] = JuMP.@constraint(model, sc * (sum(ib) - card) <= 0)
     return nothing
 end
@@ -39,16 +43,17 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Add the group-cardinality constraints `A * ib ≤ B` and `A * ib = B` to the model.
 
-Enforces the linear group-cardinality constraint carried by `gcard` on the held indicator `ib`,
-capping (or fixing) how many assets in each group may be held. The constraint keys are named for
-the space `sp` via [`mip_key`](@ref), so the same emitter serves the asset space and every
-sub-group. The fall-through method does nothing when `gcard` is `nothing`.
+Enforces the linear group-cardinality constraint carried by `gcard` on the held binary
+([`held_bin`](@ref)) of the bundle `ind`, capping (or fixing) how many assets in each group may
+be held. The constraint keys are named for the space `sp` via [`mip_key`](@ref), so the same
+emitter serves the asset space and every sub-group. The fall-through method does nothing when
+`gcard` is `nothing` — and so never reads a held indicator the bundle may not carry.
 
 # Arguments
 
   - $(arg_dict[:model])
   - `sp::AbstractMIPSpace`: Weight space the constraints act on.
-  - `ib`: Held indicator returned by the MIP builder that ran.
+  - `ind::AbstractMIPIndicators`: Indicator bundle returned by the MIP builder that ran.
   - `gcard::Option{<:LinearConstraint}`: Group-cardinality constraint, or `nothing`.
 
 # Returns
@@ -60,11 +65,13 @@ sub-group. The fall-through method does nothing when `gcard` is `nothing`.
   - [`set_card_constraints!`](@ref)
   - [`set_mip_constraints!`](@ref)
   - [`set_sgcardmip_constraints!`](@ref)
+  - [`held_bin`](@ref)
   - [`mip_key`](@ref)
 """
-function set_gcard_constraints!(model::JuMP.Model, sp::AbstractMIPSpace, ib,
-                                gcard::LinearConstraint)
+function set_gcard_constraints!(model::JuMP.Model, sp::AbstractMIPSpace,
+                                ind::AbstractMIPIndicators, gcard::LinearConstraint)
     sc = get_constraint_scale(model)
+    ib = held_bin(ind)
     if !isnothing(gcard.ineq)
         A = gcard.ineq.A
         B = gcard.ineq.B

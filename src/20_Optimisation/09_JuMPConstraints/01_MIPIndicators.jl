@@ -304,6 +304,76 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
+Return the *held binary* — the 0/1 per-asset quantity that cardinality sums, group cardinality
+gates, and integer phylogeny multiplies.
+
+Unlike [`held`](@ref), which returns the held *gate* (`i_mip`, the continuous relaxation `ibf`
+when the budget is free), this is always the raw binary: `ib` for the long-only bundle,
+`ilb + isb` for the long-short one. Counting must key on a bit that is exactly 0 or 1 even when
+the budget is free and the gate relaxes — the same reason [`long_bin`](@ref) exists alongside
+[`long_gate`](@ref).
+
+[`SignIndicators`](@ref) deliberately has no method, for the same reason [`held`](@ref) does
+not: it carries no held bit, so a caller that would count one fails at the seam with a
+`MethodError` rather than miscounting a sign bit.
+
+# Related
+
+  - [`held`](@ref)
+  - [`long_bin`](@ref)
+  - [`set_card_constraints!`](@ref)
+  - [`set_iplg_constraints!`](@ref)
+"""
+function held_bin(ind::HeldIndicators)
+    return ind.ib
+end
+function held_bin(ind::LongShortIndicators)
+    return ind.i_mip
+end
+"""
+    set_mip_indicators!(model::JuMP.Model, ind::AbstractMIPIndicators)
+
+Register the asset-space MIP indicator bundle as the Model-State entry `:mip_indicators`.
+
+This is what lets a *late* emitter — integer phylogeny, applied after the fact in
+[`assemble_jump_model!`](@ref) — reach the held indicator through [`mip_indicators`](@ref) and
+the typed accessors ([`held_bin`](@ref)) rather than having it hand-threaded back as a return
+value. With the bundle in Model State, the per-builder raw keys (`:ib`, `:ilb`/`:isb`, ...) stay
+private to the bundle: nothing outside a builder reaches an indicator by key.
+
+Only the asset space registers a bundle. Sub-group builders consume theirs immediately, in the
+same call, and never cross the late seam.
+
+# Related
+
+  - [`mip_indicators`](@ref)
+  - [`AbstractMIPIndicators`](@ref)
+  - [`set_iplg_constraints!`](@ref)
+"""
+function set_mip_indicators!(model::JuMP.Model, ind::AbstractMIPIndicators)
+    model[:mip_indicators] = ind
+    return nothing
+end
+"""
+    mip_indicators(model::JuMP.Model)
+
+Return the registered asset-space MIP indicator bundle, or `nothing` when no MIP builder ran.
+
+`nothing` means the model has no MIP features, so there is no held indicator for a late emitter
+to gate on.
+
+# Related
+
+  - [`set_mip_indicators!`](@ref)
+  - [`AbstractMIPIndicators`](@ref)
+  - [`held_bin`](@ref)
+"""
+function mip_indicators(model::JuMP.Model)
+    return haskey(model, :mip_indicators) ? model[:mip_indicators] : nothing
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
 Return the gate gating the *lower* weight bound in [`mip_wb`](@ref).
 
 The long-only bundle gates it with the held indicator (`w = 0` unless held); the long-short
@@ -700,7 +770,7 @@ Where:
 
 # Returns
 
-  - `i_mip`: Combined long+short indicator expression.
+  - `ind::LongShortIndicators`: The declared indicator bundle.
 
 # Related
 
@@ -727,7 +797,7 @@ function short_mip_threshold_constraints(model::JuMP.Model, sp::AbstractMIPSpace
     if xbgt_flag
         set_exact_budget_constraints!(model, sp, ind, wx, ss)
     end
-    return ind.i_mip
+    return ind
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -783,7 +853,7 @@ Where:
 
 # Returns
 
-  - `ib`: Binary indicator JuMP variable vector.
+  - `ind::HeldIndicators`: The declared indicator bundle.
 
 # Related
 
@@ -811,7 +881,7 @@ function mip_constraints(model::JuMP.Model, sp::AbstractMIPSpace, wb::WeightBoun
         ss = set_mip_ss_expr!(model, ss, wb)
         set_exact_budget_constraints!(model, sp, ind, wx, ss)
     end
-    return ind.ib
+    return ind
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -833,7 +903,7 @@ It declares the sign bit and hands it to [`set_exact_budget_constraints!`](@ref)
 
 # Returns
 
-  - `nothing`: There is no held indicator to return — this builder runs only when nothing would consume one.
+  - `ind::SignIndicators`: The declared indicator bundle. It carries no held indicator — [`held_bin`](@ref) has no method for it — because this builder runs only when nothing would consume one.
 
 # Related
 
@@ -848,17 +918,18 @@ function sign_mip_constraints(model::JuMP.Model, sp::AbstractMIPSpace, wb::Weigh
     ind = declare_sign_indicators!(model, sp, wb, wx, ss)
     ss = set_mip_ss_expr!(model, ss, wb)
     set_exact_budget_constraints!(model, sp, ind, wx, ss)
-    return nothing
+    return ind
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Run the MIP indicator builder the requested features call for and return its held indicator.
+Run the MIP indicator builder the requested features call for and return its indicator bundle.
 
 Selects among the three builders on flags shared by the asset space and every sub-group:
 
   - [`sign_mip_constraints`](@ref) when `sign_only` — an explicit `xbgt` with nothing else to
-    consume a held indicator, so a single sign bit per asset suffices (returns `nothing`).
+    consume a held indicator, so a single sign bit per asset suffices (returns a
+    [`SignIndicators`](@ref), which has no held indicator).
   - [`short_mip_threshold_constraints`](@ref) when a short side exists (`model[:sw]`) and
     something needs it — a short threshold, a fixed fee, or a pinned decomposition.
   - [`mip_constraints`](@ref) otherwise — the long-only held builder.
@@ -889,7 +960,7 @@ branch — differing from the asset space only through `sp`.
 
 # Returns
 
-  - The held indicator of the builder that ran, or `nothing` for the sign-bit branch.
+  - `ind::AbstractMIPIndicators`: The indicator bundle of the builder that ran. Consumers read the held indicator through [`held_bin`](@ref) (or the gate accessors), never by key.
 
 # Related
 
@@ -919,7 +990,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Add the asset-space MIP constraints to the JuMP optimisation model and return the held indicator.
 
-Chooses the indicator builder the requested features need ([`mip_constraints`](@ref), [`short_mip_threshold_constraints`](@ref), or [`sign_mip_constraints`](@ref)), then lets each feature emit against the bundle it returns: minimum-holding thresholds and fixed fees inside the builder, then cardinality, group cardinality, and pinning the long/short decomposition here. Integer phylogeny is *not* emitted here — it is applied late in [`assemble_jump_model!`](@ref) beside its semidefinite sibling — but its presence still forces a builder to run, so the held indicator exists for that later call to gate on. That held indicator is the return value.
+Chooses the indicator builder the requested features need ([`mip_constraints`](@ref), [`short_mip_threshold_constraints`](@ref), or [`sign_mip_constraints`](@ref)), then lets each feature emit against the bundle it returns: minimum-holding thresholds and fixed fees inside the builder, then cardinality, group cardinality, and pinning the long/short decomposition here. Integer phylogeny is *not* emitted here — it is applied late in [`assemble_jump_model!`](@ref) beside its semidefinite sibling — but its presence still forces a builder to run, so a held indicator exists for that later call to gate on. Rather than hand the bundle back as a return value, this registers it in Model State with [`set_mip_indicators!`](@ref); the late emitter reads it with [`mip_indicators`](@ref).
 
 # Pinning the decomposition
 
@@ -938,7 +1009,7 @@ Pinning needs a per-asset *sign* bit, which the long-only [`mip_constraints`](@r
   - $(arg_dict[:wb_arg])
   - `card::Option{<:Integer}`: Optional maximum cardinality (number of non-zero assets).
   - `gcard::Option{<:LinearConstraint}`: Optional group cardinality constraint.
-  - `pl::Option{<:PlC_VecPlC}`: Optional phylogeny constraint(s). Only used to detect whether an [`IntegerPhylogeny`](@ref) is present, which forces a builder to run so a held indicator is returned for the late [`set_iplg_constraints!`](@ref) call.
+  - `pl::Option{<:PlC_VecPlC}`: Optional phylogeny constraint(s). Only used to detect whether an [`IntegerPhylogeny`](@ref) is present, which forces a builder to run so a held indicator is registered in Model State for the late [`set_iplg_constraints!`](@ref) call.
   - $(arg_dict[:lt_arg])
   - $(arg_dict[:st_arg])
   - `fees::Option{<:Fees}`: Optional fee specification.
@@ -947,13 +1018,14 @@ Pinning needs a per-asset *sign* bit, which the long-only [`mip_constraints`](@r
 
 # Returns
 
-  - `ib`: The held indicator of the builder that ran, or `nothing` when none did (the sign-bit branch, or no MIP features at all). [`set_iplg_constraints!`](@ref) gates on it.
+  - `nothing`. When a builder runs, its bundle is registered in Model State via [`set_mip_indicators!`](@ref) for the late [`set_iplg_constraints!`](@ref) call to gate on; when none does (the no-MIP-features early return) nothing is registered and [`mip_indicators`](@ref) stays `nothing`.
 
 # Related
 
   - [`mip_constraints`](@ref)
   - [`short_mip_threshold_constraints`](@ref)
   - [`sign_mip_constraints`](@ref)
+  - [`set_mip_indicators!`](@ref)
   - [`set_iplg_constraints!`](@ref)
   - [`set_smip_constraints!`](@ref)
   - [`WeightBounds`](@ref)
@@ -1010,13 +1082,15 @@ function set_mip_constraints!(model::JuMP.Model, wb::WeightBounds, card::Option{
                                ffl_flag ||
                                ffs_flag ||
                                wfp_flag)
-    ib = run_mip_builder!(model, sp, wb, lt, st, ss, lt_flag, st_flag; ffl, ffs, ffl_flag,
-                          ffs_flag, xbgt_flag, pin_flag, sign_only)
-    set_card_constraints!(model, sp, ib, card)
-    set_gcard_constraints!(model, sp, ib, gcard)
-    # Hand the held indicator back so integer phylogeny can gate on it from its own emitter,
-    # called late in `assemble_jump_model!` beside the semidefinite one. `ib` is `nothing` when
-    # no builder ran (the sign-bit branch, or the no-flags early return) -- and by this
-    # function's own guards that is exactly when no integer phylogeny can be present.
-    return ib
+    ind = run_mip_builder!(model, sp, wb, lt, st, ss, lt_flag, st_flag; ffl, ffs, ffl_flag,
+                           ffs_flag, xbgt_flag, pin_flag, sign_only)
+    # Register the bundle in Model State so integer phylogeny can gate on the held indicator
+    # from its own emitter, called late in `assemble_jump_model!` beside the semidefinite one,
+    # without the bundle being hand-threaded back. Only a bundle that carries a held indicator
+    # is ever read there, and by this function's own guards a sign-only bundle rules out any
+    # integer phylogeny -- so the late `held_bin` read is never reached for it.
+    set_mip_indicators!(model, ind)
+    set_card_constraints!(model, sp, ind, card)
+    set_gcard_constraints!(model, sp, ind, gcard)
+    return nothing
 end
