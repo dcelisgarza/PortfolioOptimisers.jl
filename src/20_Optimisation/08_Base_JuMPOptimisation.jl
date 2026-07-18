@@ -171,12 +171,17 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for JuMP constraint estimators.
 
-Subtype `JuMPConstraintEstimator` to implement custom constraints or objectives for JuMP-based portfolio optimisers.
+The extension point for user-defined constraints and objectives. Rather than subtyping this directly, subtype one of the two purpose-built children and implement its one contract method:
+
+  - [`CustomJuMPConstraint`](@ref) ⇒ implement [`add_custom_constraint!`](@ref), supply via `JuMPOptimiser`'s `ccnt`.
+  - [`CustomJuMPObjective`](@ref) ⇒ implement [`add_custom_objective_term!`](@ref), supply via `JuMPOptimiser`'s `cobj`.
+
+(The objective child subtypes [`AbstractEstimator`](@ref) directly — it is grouped here as the sibling extension point, not by type hierarchy.)
 
 # Related
 
-  - [`CustomJuMPConstraint`](@ref)
-  - [`CustomJuMPObjective`](@ref)
+  - [`CustomJuMPConstraint`](@ref) / [`add_custom_constraint!`](@ref)
+  - [`CustomJuMPObjective`](@ref) / [`add_custom_objective_term!`](@ref)
 """
 abstract type JuMPConstraintEstimator <: AbstractConstraintEstimator end
 """
@@ -184,12 +189,13 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for custom JuMP constraint implementations.
 
-Implement `add_custom_constraint!` to define custom JuMP model constraints.
+Subtype this and implement [`add_custom_constraint!`](@ref) — the single method the type exists to make you define — to add custom constraints to the JuMP model. Pass the resulting estimator (or a vector of them) as the `ccnt` field of [`JuMPOptimiser`](@ref).
 
 # Related
 
-  - [`JuMPConstraintEstimator`](@ref)
-  - [`CustomJuMPObjective`](@ref)
+  - [`add_custom_constraint!`](@ref) — the method to implement
+  - [`CustomJuMPObjective`](@ref) / [`add_custom_objective_term!`](@ref) — the objective-side analogue
+  - [`JuMPOptimiser`](@ref) — its `ccnt` field is where a custom constraint is supplied
 """
 abstract type CustomJuMPConstraint <: JuMPConstraintEstimator end
 """
@@ -218,14 +224,15 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for custom JuMP objective implementations.
 
-Implement `add_custom_objective_term!` to add custom terms to the JuMP model objective.
+Subtype this and implement [`add_custom_objective_term!`](@ref) — the single method the type exists to make you define — to add custom penalty or reward terms to the JuMP model objective. Pass the resulting estimator (or a vector of them) as the `cobj` field of [`JuMPOptimiser`](@ref).
 
 # Related
 
-  - [`JuMPConstraintEstimator`](@ref)
-  - [`CustomJuMPConstraint`](@ref)
+  - [`add_custom_objective_term!`](@ref) — the method to implement
+  - [`CustomJuMPConstraint`](@ref) / [`add_custom_constraint!`](@ref) — the constraint-side analogue
+  - [`JuMPOptimiser`](@ref) — its `cobj` field is where a custom objective is supplied
 """
-abstract type CustomJuMPObjective <: JuMPConstraintEstimator end
+abstract type CustomJuMPObjective <: AbstractEstimator end
 """
     const VecJuMPObj = AbstractVector{<:CustomJuMPObjective}
 
