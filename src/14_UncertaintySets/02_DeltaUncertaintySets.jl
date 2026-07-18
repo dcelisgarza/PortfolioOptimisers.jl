@@ -82,6 +82,38 @@ function DeltaUncertaintySet(; pe::AbstractLowOrderPriorEstimator = EmpiricalPri
     return DeltaUncertaintySet(pe, dmu, dsigma)
 end
 """
+    mu_delta_box_set(pr, dmu::Number)
+
+Box uncertainty set for expected returns from delta bounds: zero lower bound and
+`2 * dmu * abs.(pr.mu)` upper bound. Shared by the delta [`ucs`](@ref)/[`mu_ucs`](@ref)
+constructions.
+
+# Related
+
+  - [`DeltaUncertaintySet`](@ref)
+  - [`sigma_delta_box_set`](@ref)
+"""
+function mu_delta_box_set(pr, dmu::Number)
+    return BoxUncertaintySet(;
+                             lb = range(zero(eltype(pr.mu)), zero(eltype(pr.mu));
+                                        length = length(pr.mu)), ub = dmu * abs.(pr.mu) * 2)
+end
+"""
+    sigma_delta_box_set(pr, dsigma::Number)
+
+Box uncertainty set for covariance from delta bounds: `pr.sigma ± dsigma * abs.(pr.sigma)`.
+Shared by the delta [`ucs`](@ref)/[`sigma_ucs`](@ref) constructions.
+
+# Related
+
+  - [`DeltaUncertaintySet`](@ref)
+  - [`mu_delta_box_set`](@ref)
+"""
+function sigma_delta_box_set(pr, dsigma::Number)
+    d_sigma = dsigma * abs.(pr.sigma)
+    return BoxUncertaintySet(; lb = pr.sigma - d_sigma, ub = pr.sigma + d_sigma)
+end
+"""
     ucs(ue::DeltaUncertaintySet, X::MatNum,
         F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
 
@@ -145,12 +177,7 @@ Where:
 function ucs(ue::DeltaUncertaintySet, X::MatNum, F::Option{<:MatNum} = nothing;
              dims::Int = 1, kwargs...)
     pr = prior(ue.pe, X, F; dims = dims, kwargs...)
-    d_sigma = ue.dsigma * abs.(pr.sigma)
-    return BoxUncertaintySet(;
-                             lb = range(zero(eltype(pr.mu)), zero(eltype(pr.mu));
-                                        length = length(pr.mu)),
-                             ub = ue.dmu * abs.(pr.mu) * 2),
-           BoxUncertaintySet(; lb = pr.sigma - d_sigma, ub = pr.sigma + d_sigma)
+    return mu_delta_box_set(pr, ue.dmu), sigma_delta_box_set(pr, ue.dsigma)
 end
 """
     mu_ucs(ue::DeltaUncertaintySet, X::MatNum,
@@ -202,10 +229,7 @@ Where:
 function mu_ucs(ue::DeltaUncertaintySet, X::MatNum, F::Option{<:MatNum} = nothing;
                 dims::Int = 1, kwargs...)
     pr = prior(ue.pe, X, F; dims = dims, kwargs...)
-    return BoxUncertaintySet(;
-                             lb = range(zero(eltype(pr.mu)), zero(eltype(pr.mu));
-                                        length = length(pr.mu)),
-                             ub = ue.dmu * abs.(pr.mu) * 2)
+    return mu_delta_box_set(pr, ue.dmu)
 end
 """
     sigma_ucs(ue::DeltaUncertaintySet, X::MatNum,
@@ -257,8 +281,7 @@ Where:
 function sigma_ucs(ue::DeltaUncertaintySet, X::MatNum, F::Option{<:MatNum} = nothing;
                    dims::Int = 1, kwargs...)
     pr = prior(ue.pe, X, F; dims = dims, kwargs...)
-    d_sigma = ue.dsigma * abs.(pr.sigma)
-    return BoxUncertaintySet(; lb = pr.sigma - d_sigma, ub = pr.sigma + d_sigma)
+    return sigma_delta_box_set(pr, ue.dsigma)
 end
 
 export DeltaUncertaintySet

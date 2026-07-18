@@ -254,4 +254,52 @@
             @test success
         end
     end
+    @testset "Extraction primitives" begin
+        # Shared post-sampling kernels used by every ucs / mu_ucs / sigma_ucs body.
+        q = 0.25
+        # box_quantile_bounds: symmetric element-wise quantile fill via an accessor.
+        samples = Dict((1, 1) => [1.0, 2.0, 3.0, 4.0], (2, 2) => [10.0, 20.0, 30.0, 40.0],
+                       (1, 2) => [5.0, 6.0, 7.0, 8.0])
+        get_ij = (i, j) -> samples[(min(i, j), max(i, j))]
+        lb, ub = PortfolioOptimisers.box_quantile_bounds(Float64, get_ij, 2, q, (;))
+        @test lb[1, 1] == quantile([1.0, 2.0, 3.0, 4.0], q)
+        @test ub[2, 2] == quantile([10.0, 20.0, 30.0, 40.0], 1 - q)
+        @test lb[1, 2] == lb[2, 1] == quantile([5.0, 6.0, 7.0, 8.0], q)          # symmetric
+        @test ub[1, 2] == ub[2, 1] == quantile([5.0, 6.0, 7.0, 8.0], 1 - q)
+        @test eltype(lb) === Float64
+
+        # vec_quantile_bounds: per-component quantile bounds over an N × M sample matrix.
+        mus = [1.0 2.0 3.0 4.0; 10.0 20.0 30.0 40.0]
+        vlb, vub = PortfolioOptimisers.vec_quantile_bounds(mus, q, (;))
+        @test vlb ==
+              [quantile([1.0, 2.0, 3.0, 4.0], q), quantile([10.0, 20.0, 30.0, 40.0], q)]
+        @test vub == [quantile([1.0, 2.0, 3.0, 4.0], 1 - q),
+                      quantile([10.0, 20.0, 30.0, 40.0], 1 - q)]
+
+        # ellipsoidal_set: optional diagonalisation + k fit + class tag, one k-method at a time.
+        cov = [2.0 0.5; 0.5 3.0]
+        Xs = randn(StableRNG(1), 50, 2)
+        # Number method returns k == the number verbatim; cov passed through untouched.
+        s = PortfolioOptimisers.ellipsoidal_set(false, 5, q, nothing, cov,
+                                                MuEllipsoidalUncertaintySet())
+        @test s.k == 5
+        @test s.sigma == cov
+        @test s.class isa MuEllipsoidalUncertaintySet
+        # diagonal = true restricts cov to its diagonal before fitting k.
+        sd = PortfolioOptimisers.ellipsoidal_set(true, 5, q, nothing, cov,
+                                                 SigmaEllipsoidalUncertaintySet())
+        @test sd.sigma == LinearAlgebra.Diagonal(cov)
+        @test sd.class isa SigmaEllipsoidalUncertaintySet
+        # General / ChiSq / Normal k-methods match k_ucs on the (possibly diagonalised) cov.
+        for (method, samp) in ((GeneralKUncertaintyAlgorithm(), nothing),
+                               (ChiSqKUncertaintyAlgorithm(), 1:50), (NormalKUncertaintyAlgorithm(), Xs))
+            for diag in (false, true)
+                e = PortfolioOptimisers.ellipsoidal_set(diag, method, q, samp, cov,
+                                                        MuEllipsoidalUncertaintySet())
+                cov_ref = diag ? LinearAlgebra.Diagonal(cov) : cov
+                @test e.sigma == cov_ref
+                @test e.k == PortfolioOptimisers.k_ucs(method, q, samp, cov_ref)
+            end
+        end
+    end
 end
