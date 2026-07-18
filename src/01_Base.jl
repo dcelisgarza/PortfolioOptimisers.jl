@@ -467,8 +467,8 @@ const arg_dict = Dict(
                       :wi => "`wi`: Initial portfolio weights for warm-starting the solver.",#
                       :sca => "`sca`: Scalariser for combining multiple risk measures.",#
                       :wb_jmp => "`wb`: Weight bounds estimator or weight bounds.",#
-                      :bgt => "`bgt`: Portfolio budget constraint.",#
-                      :sbgt => "`sbgt`: Short-sale budget constraint.",#
+                      :bgt => "`bgt`: Net budget, `1ᵀw`. A number pins it, a [`BudgetRange`](@ref) bounds it. By default budgets *bound* the realised exposure rather than pinning it (see `xbgt`). Together with `sbgt` this fixes the net and gross exposures only jointly; to constrain the gross exposure on its own see `gbgt`.",#
+                      :sbgt => "`sbgt`: Short-side budget, `sum(sw)`. A number pins it, a [`BudgetRange`](@ref) bounds it; by default it *bounds*, so `sbgt = 0.3` means *at most* 30% short unless `xbgt` pins the long/short decomposition. Together with `bgt` this fixes the net and gross exposures only jointly; to constrain the gross exposure on its own see `gbgt`.",#
                       :gbgt => "`gbgt`: Gross budget (leverage) constraint, `sum(lw) + sum(sw)`. A number pins the gross exposure; a [`BudgetRange`](@ref) bounds it, e.g. `BudgetRange(; lb = nothing, ub = 2.0)` caps leverage at 2x. Unlike `bgt` and `sbgt` — which pin the net and gross exposures only *together* — this constrains the gross exposure on its own, leaving the net free. Requires weight bounds that admit short positions, and is bounded rather than pinned unless `xbgt` is set.",#
                       :xbgt => "`xbgt`: Whether to pin the long/short decomposition exactly. When `false` (the default), `lw` and `sw` are upper bounds on the positive and negative parts of `w`, so `bgt`, `sbgt` and `gbgt` bound the realised exposures rather than pinning them — a short budget of `0.3` means *at most* 30% short. When `true`, the long/short binary indicators force `lw == max(w, 0)` and `sw == max(-w, 0)`, so the budgets hold exactly, at the cost of turning the problem into a mixed-integer program. It reuses the indicators the cardinality, threshold and fee builders already create (see `short_mip_threshold_constraints`) rather than adding its own, and is ignored when the weight bounds admit no shorts.",#
                       :lt => "`lt`: Long-side minimum holding threshold.",#
@@ -497,9 +497,9 @@ const arg_dict = Dict(
                       :ss => "`ss`: Optional scalar shrinkage parameter.",#
                       :card => "`card`: Global cardinality constraint.",#
                       :scard => "`scard`: Sub-group cardinality constraint(s).",#
-                      :wn2 => "`wn2`: 2-norm weight constraint. Lower bound on the effective number of assets, `inv(norm(w, 2)^2) >= wn2`.",#
-                      :wnp => "`wnp`: P-norm weight constraint(s). Each [`LpRegularisation`](@ref) supplies a norm order `p` and a lower bound `val` on the p-norm effective number of assets, `inv(norm(w, p)^p) >= val`.",#
-                      :wninf => "`wninf`: Infinity-norm weight constraint. Lower bound on `inv(norm(w, Inf))`, equivalently an upper bound `inv(wninf)` on the largest weight.",#
+                      :l2c => "`l2c`: 2-norm ceiling on the weights — bounds `norm(w, 2) <= l2c * k` (`k` is the budget, `1` for a fully invested portfolio). Smaller `l2c` forces a more evenly spread portfolio. Used as a diversification floor via the reciprocal: `l2c = 1 / sqrt(m)` requires at least `m` effective assets (`inv(norm(w, 2)^2) >= m`). Norm-constraint family with `lpc` and `linfc`.",#
+                      :lpc => "`lpc`: p-norm ceiling(s) on the weights at an arbitrary norm order. Each [`LpRegularisation`](@ref) supplies a norm order `p` and a bound `val`, enforcing `norm(w, p) <= val * k`. Smaller `val` forces a more evenly spread portfolio. Used as a diversification floor via the reciprocal: `val = m^(-1/p)` requires at least `m` p-norm effective assets (`inv(norm(w, p)^p) >= m`). Norm-constraint family with `l2c` and `linfc`.",#
+                      :linfc => "`linfc`: ∞-norm ceiling on the weights — a cap on the largest absolute weight: `norm(w, Inf) <= linfc * k`. So `linfc = 0.2` caps the largest weight at 20% of a fully invested portfolio. Used as a diversification floor via the reciprocal: `linfc = 1 / m` spreads the portfolio across at least `m` assets. Norm-constraint family with `l2c` and `lpc`.",#
                       :l1 => "`l1`: L1 regularisation coefficient.",#
                       :l2 => "`l2`: L2 regularisation term(s).",#
                       :linf => "`linf`: L∞ regularisation coefficient.",#
@@ -507,7 +507,7 @@ const arg_dict = Dict(
                       :l2reg_val => "`val`: L2 regularisation penalty coefficient.",#
                       :l2reg_alg => "`alg`: Second-moment formulation used to express the L2 penalty.",#
                       :lpreg_p => "`p`: Norm order, `p > 1`.",#
-                      :lpreg_val => "`val`: Penalty coefficient when the estimator is used as a regularisation term (the `lp` field of [`JuMPOptimiser`](@ref)), or the lower bound on the p-norm effective number of assets when it is used as a weight norm constraint (the `wnp` field).",#
+                      :lpreg_val => "`val`: Penalty coefficient when the estimator is used as a regularisation term (the `lp` field of [`JuMPOptimiser`](@ref)), or the upper bound on the p-norm of the weights when it is used as a norm constraint (the `lpc` field).",#
                       :brt => "`brt`: Whether to use bootstrap returns.",#
                       :cle_pr => "`cle_pr`: Whether to pass the prior result to the clustering estimator.",#
                       :wf => "`wf`: Weight finaliser.",#
@@ -538,7 +538,7 @@ const arg_dict = Dict(
                       :window_size => "`window_size`: Rolling window size for randomised cross-validation.",#
                       :n_iter => "`n_iter`: Number of random iterations.",#
                       :cv => "`cv`: Cross-validation estimator.",#
-                      :scorer => "`scorer`: Scoring function.",#
+                      :scorer => "`scorer`: Scoring function. Given the orientation-normalised score matrix (rows = CV splits, columns = parameter sets), it returns the column index of the best parameter set. The matrix is normalised so that **higher is always better**, whatever the risk measure, so a scorer selects the largest aggregate score (see [`CrossValidationSearchScorer`](@ref)).",#
                       :train_score => "`train_score`: Whether to also compute the training set score.",#
                       :path_ids => "`path_ids`: Path identifiers for cross-validation splits.",#
                       :train_scores => "`train_scores`: Training set scores.",#

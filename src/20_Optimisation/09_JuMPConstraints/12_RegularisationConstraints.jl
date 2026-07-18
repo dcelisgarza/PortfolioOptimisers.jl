@@ -97,7 +97,7 @@ Add one or more Lp regularisation penalties to the objective function.
 
 Each [`LpRegularisation`](@ref) carries its own norm order and coefficient, so several may be combined in a single model. The penalties are applied as given, so each coefficient must be commensurate with the scale of the objective it is added to.
 
-The same estimator also specifies a p-norm *constraint* when it is placed in the `wnp` field of [`JuMPOptimiser`](@ref) instead of the `lp` field, in which case its `val` field is a bound rather than a coefficient. See [`set_weight_norm_p_constraints!`](@ref).
+The same estimator also specifies a p-norm *constraint* when it is placed in the `lpc` field of [`JuMPOptimiser`](@ref) instead of the `lp` field, in which case its `val` field is an upper bound on the p-norm rather than a coefficient. See [`set_weight_norm_p_constraints!`](@ref).
 
 # Mathematical definition
 
@@ -411,7 +411,7 @@ Lp-norm regularisation term added to the optimisation objective.
 
 Penalises concentrated portfolios by encouraging weight smoothness for ``p > 1``.
 
-The same estimator serves double duty. In the `lp` field of [`JuMPOptimiser`](@ref) it is a *penalty*, and `val` is the coefficient multiplying the norm. In the `wnp` field it is a *constraint*, and `val` is instead a lower bound on the p-norm effective number of assets. The norm order `p` means the same thing in both. See [`set_lp_regularisation!`](@ref) and [`set_weight_norm_p_constraints!`](@ref).
+The same estimator serves double duty. In the `lp` field of [`JuMPOptimiser`](@ref) it is a *penalty*, and `val` is the coefficient multiplying the norm. In the `lpc` field it is a *constraint*, and `val` is instead an upper bound on the p-norm of the weights. The norm order `p` means the same thing in both. See [`set_lp_regularisation!`](@ref) and [`set_weight_norm_p_constraints!`](@ref).
 
 # Mathematical definition
 

@@ -42,11 +42,11 @@ Defines the interface for scoring strategies used in search cross-validation. Im
 
 # Interfaces
 
-  - `(::CrossValidationSearchScorer)(scores::AbstractMatrix)`: Returns the index of the optimal parameter set.
+  - `(::CrossValidationSearchScorer)(scores::AbstractMatrix)`: Returns the index of the optimal parameter set — the column with the best (highest) aggregate score.
 
 ## Arguments
 
-  - `scores`: Matrix of scores, where each column corresponds to a parameter set and each row to a cross-validation split.
+  - `scores`: Matrix of scores, where each column corresponds to a parameter set and each row to a cross-validation split. The matrix is orientation-normalised: risk-measure scores are negated so that **higher is always better**, whatever measure `r` is. A scorer therefore returns the index of the column with the best (highest) aggregate score.
 
 ## Returns
 
@@ -57,7 +57,7 @@ Defines the interface for scoring strategies used in search cross-validation. Im
 ```jldoctest
 julia> struct MyScore <: PortfolioOptimisers.CrossValidationSearchScorer end
 
-julia> (s::MyScore)(X::Matrix{Float64}) = argmin(dropdims(mean(X; dims = 1); dims = 1))
+julia> (s::MyScore)(X::Matrix{Float64}) = argmax(dropdims(mean(X; dims = 1); dims = 1))
 
 julia> scores = [0.5 0.6; 0.7 0.8];
 
@@ -65,7 +65,7 @@ julia> scorer = MyScore()
 MyScore()
 
 julia> scorer(scores)
-1
+2
 ```
 
 # Related Types
@@ -237,12 +237,12 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     RandomisedSearchCrossValidation(
-        p::Union{AbstractVector{<:Pair{<:AbstractString, <:Any}},
-                 AbstractVector{<:AbstractVector{<:Pair{<:AbstractString,
-                                                        <:Any}}},
-                 AbstractDict{<:AbstractString, <:Any},
-                 AbstractVector{<:AbstractDict{<:AbstractString,
-                                               <:Any}}};
+        p::Union{AbstractVector{<:Pair{<:GSCVKey, <:RSCVVal}},
+                 AbstractVector{<:AbstractVector{<:Pair{<:GSCVKey,
+                                                        <:RSCVVal}}},
+                 AbstractDict{<:GSCVKey, <:RSCVVal},
+                 AbstractVector{<:AbstractDict{<:GSCVKey,
+                                               <:RSCVVal}}};
         cv::CrossValidationEstimator = KFold(),
         r::AbstractBaseRiskMeasure = ConditionalValueatRisk(),
         scorer::CrossValSearchScorer = HighestMeanScore(),

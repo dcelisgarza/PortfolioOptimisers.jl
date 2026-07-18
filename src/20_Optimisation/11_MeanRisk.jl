@@ -159,9 +159,9 @@ MeanRisk
       │        ss ┼ nothing
       │      card ┼ nothing
       │     scard ┼ nothing
-      │       wn2 ┼ nothing
-      │       wnp ┼ nothing
-      │     wninf ┼ nothing
+      │       l2c ┼ nothing
+      │       lpc ┼ nothing
+      │     linfc ┼ nothing
       │        l1 ┼ nothing
       │        l2 ┼ nothing
       │      linf ┼ nothing

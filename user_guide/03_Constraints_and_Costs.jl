@@ -97,8 +97,8 @@ res_fee = optimise(MeanRisk(; obj = MaximumRatio(; rf = 4.2 / 100 / 252),
                                                 fees = Fees(; l = 0.001))))
 
 #=
-Soft alternatives to hard turnover/position limits — L1/L2 weight regularisation and an
-effective-number-of-assets floor (`l1`, `l2`, `wn2`) — are covered in
+Soft alternatives to hard turnover/position limits — L1/L2 weight regularisation and a
+weight-norm ceiling that doubles as a diversification floor (`l1`, `l2`, `l2c`) — are covered in
 [Regularisation](../examples/4_constraints_costs/07_Regularisation.md); benchmark
 [`Tracking`](@ref) (the `tr` keyword) in
 [Turnover & Tracking](../examples/4_constraints_costs/05_Turnover_and_Tracking.md).

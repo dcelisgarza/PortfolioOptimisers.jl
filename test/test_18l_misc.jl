@@ -294,11 +294,13 @@ end
 end
 
 @testset "Number of effective assets" begin
-    opt = JuMPOptimiser(; pe = pr, slv = slv, wn2 = 10)
+    # `l2c` is a 2-norm ceiling; the diversification recipe `l2c = 1/sqrt(m)` requires at
+    # least `m` effective assets (inv(norm(w, 2)^2) >= m).
+    opt = JuMPOptimiser(; pe = pr, slv = slv, l2c = inv(sqrt(10)))
     res = optimise(MeanRisk(; obj = MinimumRisk(), opt = opt))
     @test round(inv(LinearAlgebra.dot(res.w, res.w))) >= 10
 
-    opt = JuMPOptimiser(; pe = pr, slv = slv, wn2 = 15)
+    opt = JuMPOptimiser(; pe = pr, slv = slv, l2c = inv(sqrt(15)))
     res = optimise(MeanRisk(; obj = MaximumUtility(), opt = opt))
     @test round(inv(LinearAlgebra.dot(res.w, res.w))) >= 15
 end
