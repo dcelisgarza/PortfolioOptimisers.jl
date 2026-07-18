@@ -75,12 +75,12 @@
                 <div class="copy rounded p-2">EVaR<br/>08_…XatRisk…jl:59</div>
                 <div class="copy rounded p-2">EDaR<br/>08_…XatRisk…jl:234</div>
                 <div class="copy rounded p-2">RLVaR<br/>09_…XatRisk…jl:50</div>
-                <div class="drifted rounded p-2">RDaR ⚠ drifted<br/>09_…XatRisk…jl:318</div>
+                <div class="drifted rounded p-2">RLDaR ⚠ drifted<br/>09_…XatRisk…jl:318</div>
               </div>
               <div class="drifted rounded p-2 leading-relaxed">
                 RLVaR:76 computes <code>iat</code>/<code>lnk</code> inside each branch;<br/>
-                RDaR:327 hoists them <em>and</em> recomputes them — placement diverged.<br/>
-                RLVaR:78 weights by <code>net_X</code>; RDaR:345 by <code>pr.X</code>.
+                RLDaR:327 hoists them <em>and</em> recomputes them — placement diverged.<br/>
+                RLVaR:78 weights by <code>net_X</code>; RLDaR:345 by <code>pr.X</code>.
               </div>
             </div>
             <div class="space-y-2">
@@ -95,7 +95,7 @@
           </div>
 
           <div class="space-y-1.5 text-sm leading-relaxed">
-            <p><span class="font-semibold">Problem.</span> Each tail-risk cone formulation (CVaR, DR-CVaR, EVaR, RLVaR) is re-encoded twice — once over net returns, once over drawdowns — with identical variables, constants, weighted/unweighted expression splits, and cone constraints; the RLVaR/RDaR pair has already drifted in constant-hoisting placement and in the observation-weights source (<code>net_X</code> vs <code>pr.X</code>).</p>
+            <p><span class="font-semibold">Problem.</span> Each tail-risk cone formulation (CVaR, DR-CVaR, EVaR, RLVaR) is re-encoded twice — once over net returns, once over drawdowns — with identical variables, constants, weighted/unweighted expression splits, and cone constraints; the RLVaR/RLDaR pair has already drifted in constant-hoisting placement and in the observation-weights source (<code>net_X</code> vs <code>pr.X</code>).</p>
             <p><span class="font-semibold">Direction.</span> Extract one cone kernel per family whose per-site parameter is the series vector (net returns or the drawdown slice) plus the key suffix; each builder body collapses to fetching its series and calling the kernel.</p>
           </div>
           <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">

@@ -35,6 +35,9 @@ The Pipeline — data preparation included — is the unit that Cross-Validation
 **Pipeline Context**
 The accumulating blackboard threaded through a Pipeline's steps: a set of coarse typed slots — prices, returns, prior, phylogeny, uncertainty, constraints, weights — where each step reads the slots it needs and writes the slot its family produces. Heterogeneous slots (uncertainty, constraints) hold collections whose elements are routed to their optimiser targets by Result type. Internal machinery, not user-facing.
 
+**Data Slot**
+The two Pipeline Context slots — prices and returns — whose write *changes the asset universe*, as opposed to a *derived slot* (prior, phylogeny, uncertainty, constraints, weights) computed from the data. Writing a data slot makes every slot derived from it stale: a prior or constraint fitted on one universe does not match a later, different one, so a Pipeline rejects at construction any ordering that would strand such a result. The distinction is the whole content of the invalidation rule — only data slots invalidate, and they invalidate every later slot except the terminal *weights* slot, which is the workflow's output and which nothing derives from. Because nothing derives from weights, an optimisation step must be the last step of a Pipeline.
+
 **Preprocessing Estimator**
 The family of Estimators that transform price or returns data inside a Pipeline (prices-to-returns conversion, missing-data filtering, imputation, asset selection). Fitting one on training data produces a Result carrying any fitted state — imputation parameters, thresholds, and crucially the selected asset universe — which is then *applied* to unseen data so train and test are transformed consistently. Stateless steps carry no state and applying them is just running them.
 
@@ -356,7 +359,7 @@ The `XatRisk` naming uses "X" as shorthand for "Value" or "Drawdown" — the sam
 - **Value-at-Risk (VaR)**: `ValueatRisk` (formulations `MIPValueatRisk`, `DistributionValueatRisk`), `ValueatRiskRange`; drawdown forms `DrawdownatRisk`, `RelativeDrawdownatRisk`.
 - **Conditional (CVaR / Expected Shortfall)**: `ConditionalValueatRisk`, `…Range`, DR forms, drawdown `ConditionalDrawdownatRisk` (CDaR) and relatives.
 - **Entropic (EVaR)**: `EntropicValueatRisk`, `…Range`, `EntropicDrawdownatRisk` (EDaR), relatives.
-- **Relativistic (RVaR)**: `RelativisticValueatRisk`, `…Range`, `RelativisticDrawdownatRisk` (RDaR), relatives.
+- **Relativistic (RVaR)**: `RelativisticValueatRisk`, `…Range`, `RelativisticDrawdownatRisk` (RLDaR), relatives.
 - **Power Norm**: `PowerNormValueatRisk` (PNVaR), `…Range`, `PowerNormDrawdownatRisk`, relatives.
 
 **OWA (Ordered Weights Array)**

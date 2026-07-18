@@ -28,6 +28,32 @@ function assert_split_position(ests)::Nothing
     return nothing
 end
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Validate that an optimisation step, if present, is the last step of a [`Pipeline`](@ref).
+
+A pipeline's optimiser writes the terminal `:opt` slot — the workflow's output. Nothing is derived from `:opt`, so a step running *after* an optimiser could only strand those weights: a later data or estimator step would leave `:opt` computed on a since-changed context, and no later step reads `:opt` to catch it. Pinning the optimiser last keeps `:opt` genuinely terminal, which is also what lets [`PIPELINE_INVALIDATES`](@ref) omit it from the invalidatable slots. A terminal optimiser is optional (a prior-only pipeline is legal); when absent the rule is vacuous.
+
+## Validation
+
+  - No step writes `:opt` unless it is the final step. A nested [`Pipeline`](@ref) reports the slot its own last step writes and is validated at its own construction, so a non-terminal optimiser hidden inside one is caught there.
+
+# Related
+
+  - [`Pipeline`](@ref)
+  - [`PIPELINE_INVALIDATES`](@ref)
+  - [`pipe_writes`](@ref)
+"""
+function assert_opt_last(ests)::Nothing
+    n = length(ests)
+    for (i, e) in enumerate(ests)
+        if i < n && pipe_writes(e) === :opt
+            throw(ArgumentError("an optimisation step writes the terminal :opt slot, so it must be the last step of a Pipeline, but one appears at step $i of $n; move it to the end, or drop the steps that follow it"))
+        end
+    end
+    return nothing
+end
+"""
 $(DocStringExtensions.TYPEDEF)
 
 A reified end-to-end portfolio workflow: an ordered list of steps executed left-to-right over a [`PipelineContext`](@ref).
@@ -54,6 +80,7 @@ Steps are given in execution order. Each element is either a step estimator or a
   - Every step must be steppable ([`pipe_writes`](@ref) must be defined for it).
   - Every slot a step reads must be written by an earlier step or fillable by the pipeline input (`prices` or `returns`).
   - No step may write a slot that invalidates a slot an earlier step already wrote (see [`PIPELINE_INVALIDATES`](@ref)). A step that rewrites `:returns` after a prior, phylogeny, uncertainty, or constraint step would leave that result computed on a stale asset universe.
+  - An optimisation step, if present, must be the last step (see [`assert_opt_last`](@ref)): it writes the terminal `:opt` slot, and no step may run after it.
   - Step names must be unique.
 
 # Examples
@@ -103,8 +130,9 @@ function Pipeline(; steps::Union{<:Tuple, <:AbstractVector})::Pipeline
         end
     end
     assert_split_position(ests)
+    assert_opt_last(ests)
     slots = Symbol[pipe_writes(e) for e in ests]
-    avail = Set{Symbol}((:prices, :returns))
+    avail = Set{Symbol}(PIPELINE_DATA_SLOTS)
     written = Dict{Symbol, Any}()
     for (e, slot) in zip(ests, slots)
         for r in pipe_reads(e)

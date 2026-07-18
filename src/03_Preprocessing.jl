@@ -54,9 +54,11 @@ Validate that asset or factor names and their corresponding returns matrix are p
 """
 function check_names_and_returns_matrix(names::Option{<:VecStr}, mat::Option{<:MatNum},
                                         names_sym::Symbol, mat_sym::Symbol)
-    if !(isnothing(names) && isnothing(mat))
+    if !isnothing(names)
         @argcheck(allunique(names),
                   ArgumentError("$names_sym names must be unique. Got\nallunique($names_sym) => $(allunique(names))"))
+    end
+    if !(isnothing(names) && isnothing(mat))
         @argcheck(!isnothing(names),
                   IsNothingError("$names_sym cannot be nothing if $mat_sym is not `nothing`. Got\n!isnothing($names_sym) => $(isnothing(names))\n!isnothing($mat_sym) => $(isnothing(mat))"))
         @argcheck(!isnothing(mat),

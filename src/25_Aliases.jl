@@ -407,11 +407,11 @@ Alias for [`EntropicDrawdownatRisk`](@ref).
 """
 const EDaR = EntropicDrawdownatRisk
 """
-    RDaR
+    RLDaR
 
 Alias for [`RelativisticDrawdownatRisk`](@ref).
 """
-const RDaR = RelativisticDrawdownatRisk
+const RLDaR = RelativisticDrawdownatRisk
 """
     PNDaR
 
@@ -1041,7 +1041,7 @@ const MaxSR = MaximumRatio
 
 export HRP, HERC, SCHRP, NCO, STO, SSR, MR, RB, RRB, FRC, NOC, DAO, GAO, FAI, SD,
        UcVariance, WR, VaR, CVaR, DRCVaR, EVaR, RVaR, PNVaR, RG, VaR_RG, CVaR_RG, DRCVaR_RG,
-       EVaR_RG, RVaR_RG, PNVaR_RG, GVaR_RG, DaR, CDaR, DRCDaR, EDaR, RDaR, PNDaR, R_DaR,
+       EVaR_RG, RVaR_RG, PNVaR_RG, GVaR_RG, DaR, CDaR, DRCDaR, EDaR, RLDaR, PNDaR, R_DaR,
        R_CDaR, R_EDaR, R_RDaR, R_PNDaR, OWA, ADD, R_ADD, UCI, R_UCI, MDD, R_MDD, BDVariance,
        TrRM, RkTrRM, TnRM, VSK, NonOptRkRatio, FLM, MAD, SCM, SLM, ECM, ELM, TLM, SSK, FTCM,
        FTLM, KT, SKT, OWA_GMD, OWA_CVaR, OWA_TG, OWA_WR, OWA_RG, OWA_CVaR_RG, OWA_TG_RG,

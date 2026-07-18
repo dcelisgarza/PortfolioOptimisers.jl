@@ -708,13 +708,13 @@ The Relative Drawdown-at-Risk at level ``\\alpha`` is:
 
 ```math
 \\begin{align}
-\\mathrm{RDaR}_{\\alpha}(\\boldsymbol{x}) &= -rd_{(\\lceil \\alpha T \\rceil)}\\,.
+\\mathrm{RLDaR}_{\\alpha}(\\boldsymbol{x}) &= -rd_{(\\lceil \\alpha T \\rceil)}\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``\\mathrm{RDaR}_{\\alpha}(\\boldsymbol{x})``: Relative Drawdown-at-Risk at level ``\\alpha``.
+  - ``\\mathrm{RLDaR}_{\\alpha}(\\boldsymbol{x})``: Relative Drawdown-at-Risk at level ``\\alpha``.
   - $(math_dict[:alpha_rm])
   - $(math_dict[:T])
   - $(math_dict[:rdt])

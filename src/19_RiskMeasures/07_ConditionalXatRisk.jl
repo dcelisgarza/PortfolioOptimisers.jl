@@ -925,7 +925,7 @@ Where:
   - $(math_dict[:alpha_rm])
   - $(math_dict[:T])
   - $(math_dict[:rdt])
-  - ``\\nu``: Auxiliary variable (RDaR threshold).
+  - ``\\nu``: Auxiliary variable (RLDaR threshold).
 
 # Fields
 

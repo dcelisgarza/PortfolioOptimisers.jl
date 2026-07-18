@@ -83,24 +83,46 @@ The named slots of a [`PipelineContext`](@ref). Each pipeline step reads the slo
 const PIPELINE_SLOTS = (:prices, :returns, :prior, :phylogeny, :uncertainty, :constraints,
                         :opt)
 """
-    const PIPELINE_INVALIDATES = (prices = (:returns, :prior, :phylogeny, :uncertainty, :constraints),
-                                  returns = (:prior, :phylogeny, :uncertainty, :constraints))
+    const PIPELINE_DATA_SLOTS = (:prices, :returns)
 
-The [`PipelineContext`](@ref) slots each written slot invalidates.
-
-Writing a data slot makes every slot *derived* from that data stale: a prior, phylogeny, uncertainty set, or constraint result computed on one asset universe does not match a later, different one. [`Pipeline`](@ref) rejects such an ordering at construction rather than letting a stale, asset-misdimensioned result reach [`inject_context`](@ref).
-
-A slot filled by the pipeline *input* rather than by a step is not "written", so the usual `MissingDataFilter → Imputer → PricesToReturns → …` ordering is unaffected. Slots absent from this table (`prior`, `phylogeny`, `uncertainty`, `constraints`, `opt`) invalidate nothing.
+The [`PIPELINE_SLOTS`](@ref) whose write *changes the asset universe* — equivalently, the two slots a [`Pipeline`](@ref) input can fill directly. Writing one of these makes every slot *derived* from it stale, which is exactly what [`PIPELINE_INVALIDATES`](@ref) is derived from. Every other slot is computed from the data and reorders nothing, so writing it invalidates nothing.
 
 # Related
 
   - [`PIPELINE_SLOTS`](@ref)
+  - [`PIPELINE_INVALIDATES`](@ref)
+  - [`PipelineContext`](@ref)
+"""
+const PIPELINE_DATA_SLOTS = (:prices, :returns)
+"""
+    PIPELINE_INVALIDATES
+
+The [`PipelineContext`](@ref) slots each written slot invalidates, derived from [`PIPELINE_SLOTS`](@ref) order and [`PIPELINE_DATA_SLOTS`](@ref):
+
+```julia
+(prices = (:returns, :prior, :phylogeny, :uncertainty, :constraints),
+ returns = (:prior, :phylogeny, :uncertainty, :constraints))
+```
+
+Writing a [data slot](@ref PIPELINE_DATA_SLOTS) makes every slot *derived* from that data stale: a prior, phylogeny, uncertainty set, or constraint result computed on one asset universe does not match a later, different one. [`Pipeline`](@ref) rejects such an ordering at construction rather than letting a stale, asset-misdimensioned result reach [`inject_context`](@ref).
+
+The derivation: only a data slot invalidates, and it invalidates every slot after it in [`PIPELINE_SLOTS`](@ref) *except* the terminal `:opt`. `:opt` is the workflow's output — nothing derives from it, so a stale `:opt` is never read by a later step; it is excluded from the invalidatable set by construction. A slot filled by the pipeline *input* rather than by a step is not "written", so the usual `MissingDataFilter → Imputer → PricesToReturns → …` ordering is unaffected, and a non-data write (`prior`, `phylogeny`, `uncertainty`, `constraints`, `opt`) invalidates nothing.
+
+# Related
+
+  - [`PIPELINE_SLOTS`](@ref)
+  - [`PIPELINE_DATA_SLOTS`](@ref)
   - [`Pipeline`](@ref)
   - [`PipelineContext`](@ref)
 """
-const PIPELINE_INVALIDATES = (prices = (:returns, :prior, :phylogeny, :uncertainty,
-                                        :constraints),
-                              returns = (:prior, :phylogeny, :uncertainty, :constraints))
+const PIPELINE_INVALIDATES = let slots = PIPELINE_SLOTS, terminal = last(PIPELINE_SLOTS)
+    idx(x) = findfirst(==(x), slots)
+    NamedTuple{PIPELINE_DATA_SLOTS}(map(PIPELINE_DATA_SLOTS) do s
+                                        return Tuple(x
+                                                     for x in slots
+                                                     if x != terminal && idx(x) > idx(s))
+                                    end)
+end
 """
 $(DocStringExtensions.TYPEDEF)
 
