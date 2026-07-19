@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Architecture review — PortfolioOptimisers.jl — 2026-07-19</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="module">
+      import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+      mermaid.initialize({ startOnLoad: true, theme: "neutral", securityLevel: "loose" });
+    </script>
+    <style>
+      .seam { border-style: dashed; }
+      .deep { background: linear-gradient(135deg, #0f172a, #1e293b); }
+      .modlabel { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.08em; }
+    </style>
+  </head>
+  <body class="bg-stone-50 text-slate-900 font-sans">
+    <main class="max-w-5xl mx-auto px-6 py-12 space-y-12">
+
+      <header class="space-y-3">
+        <h1 class="text-3xl font-serif font-bold">Architecture review — PortfolioOptimisers.jl</h1>
+        <p class="text-sm text-slate-500">2026-07-19 · branch <span class="font-mono">dev</span> · seven candidates</p>
+        <div class="flex flex-wrap gap-4 text-xs text-slate-600 items-center">
+          <span class="inline-flex items-center gap-1"><span class="inline-block w-4 h-3 border border-slate-400 bg-white"></span> module</span>
+          <span class="inline-flex items-center gap-1"><span class="inline-block w-4 border-t-2 border-dashed border-slate-400"></span> seam</span>
+          <span class="inline-flex items-center gap-1"><span class="inline-block w-4 border-t-2 border-red-600"></span> leakage</span>
+          <span class="inline-flex items-center gap-1"><span class="inline-block w-4 h-3 deep rounded-sm"></span> deep module</span>
+        </div>
+      </header>
+
+      <section id="candidates" class="space-y-10">
+
+        <!-- ============================================================ C1 -->
+        <article id="c1" class="rounded-xl border border-slate-200 bg-white p-6 space-y-4 shadow-sm">
+          <div class="flex items-start justify-between gap-4">
+            <h2 class="text-xl font-serif font-semibold">1 · One <span class="font-mono">Windowed</span> module for the five windowed moment estimators</h2>
+            <span class="shrink-0 rounded-full bg-emerald-100 text-emerald-800 px-3 py-1 text-xs font-semibold">Strong</span>
+          </div>
+          <p class="font-mono text-sm text-slate-600">src/08_Moments/28_WindowedExpectedReturns.jl · 29_WindowedCovariance.jl · 30_WindowedVariance.jl · 31_WindowedCoskewness.jl · 32_WindowedCokurtosis.jl — 681 lines total</p>
+
+          <div class="grid md:grid-cols-2 gap-4">
+            <div class="rounded-lg border border-slate-200 bg-stone-50 p-4">
+              <p class="modlabel text-slate-500 mb-3">Before — five shallow modules</p>
+              <div class="space-y-2">
+                <!-- mass diagram: interface almost as tall as implementation, ×5 -->
+                <div class="grid grid-cols-5 gap-2">
+                  <div><div class="border border-slate-400 bg-white h-16 flex items-center justify-center modlabel text-center px-1">iface<br/>+docs<br/>+@fprop</div><div class="border border-slate-300 bg-slate-100 h-4 flex items-center justify-center modlabel">3-line body</div><p class="modlabel text-center mt-1 text-slate-500">…Returns</p></div>
+                  <div><div class="border border-slate-400 bg-white h-16 flex items-center justify-center modlabel text-center px-1">iface<br/>+docs<br/>+@fprop</div><div class="border border-slate-300 bg-slate-100 h-4 flex items-center justify-center modlabel">3-line body</div><p class="modlabel text-center mt-1 text-slate-500">…Cov</p></div>
+                  <div><div class="border border-slate-400 bg-white h-16 flex items-center justify-center modlabel text-center px-1">iface<br/>+docs<br/>+@fprop</div><div class="border border-slate-300 bg-slate-100 h-4 flex items-center justify-center modlabel">3-line body</div><p class="modlabel text-center mt-1 text-slate-500">…Var</p></div>
+                  <div><div class="border border-slate-400 bg-white h-16 flex items-center justify-center modlabel text-center px-1">iface<br/>+docs<br/>+@fprop</div><div class="border border-slate-300 bg-slate-100 h-4 flex items-center justify-center modlabel">3-line body</div><p class="modlabel text-center mt-1 text-slate-500">…Coskew</p></div>
+                  <div><div class="border border-slate-400 bg-white h-16 flex items-center justify-center modlabel text-center px-1">iface<br/>+docs<br/>+@fprop</div><div class="border border-slate-300 bg-slate-100 h-4 flex items-center justify-center modlabel">3-line body</div><p class="modlabel text-center mt-1 text-slate-500">…Cokurt</p></div>
+                </div>
+                <div class="border border-slate-300 bg-white h-8 flex items-center justify-center modlabel mt-3">windowed_preamble — the depth already exists, shared</div>
+              </div>
+            </div>
+            <div class="rounded-lg border border-slate-200 bg-stone-50 p-4">
+              <p class="modlabel text-slate-500 mb-3">After — one deep module</p>
+              <div class="deep rounded-lg p-4 text-slate-100">
+                <p class="modlabel text-slate-300">Windowed(inner; w, window)</p>
+                <div class="mt-3 space-y-1 opacity-60 text-xs font-mono">
+                  <p>├ windowed_preamble</p>
+                  <p>├ trait: inner estimator → generic (mean/cov/var/…)</p>
+                  <p>├ one forwarding method</p>
+                  <p>└ one @fprop/@vprop stanza, one docstring</p>
+                </div>
+              </div>
+              <p class="modlabel text-slate-500 mt-3">interface: 1 constructor · implementation absorbs the ×5</p>
+            </div>
+          </div>
+
+          <p><strong>Problem:</strong> five modules with the same struct, same constructor validation, same forwarding shim — the interface (docstrings, propagation stanzas, per-generic hooks) is five times the size of the shared implementation.</p>
+          <p><strong>Solution:</strong> one <span class="font-mono">Windowed{E}</span> wrapper whose trait maps the inner estimator to the generic it answers; the five types become aliases or vanish.</p>
+          <ul class="list-disc pl-5 text-sm space-y-1">
+            <li>Deletion test passes: complexity concentrates, not moves</li>
+            <li>Locality: windowing changes touch one module</li>
+            <li>Leverage: any future moment estimator windows for free</li>
+            <li>Tests exercise windowing once, not per moment kind</li>
+            <li>~600 lines of interface deleted</li>
+          </ul>
+        </article>
+
+        <!-- ============================================================ C2 -->
+        <article id="c2" class="rounded-xl border border-slate-200 bg-white p-6 space-y-4 shadow-sm">
+          <div class="flex items-start justify-between gap-4">
+            <h2 class="text-xl font-serif font-semibold">2 · Pipeline slot injection: routing knowledge belongs to the optimiser</h2>
+            <span class="shrink-0 rounded-full bg-emerald-100 text-emerald-800 px-3 py-1 text-xs font-semibold">Strong</span>
+          </div>
+          <p class="font-mono text-sm text-slate-600">src/23_Pipeline/03_Pipeline.jl:310–366 (inject_config) · :390–436 (inject_sigma_ucs, meta wrapping)</p>
+
+          <div class="grid md:grid-cols-2 gap-4">
+            <div class="rounded-lg border border-slate-200 bg-white p-4">
+              <p class="modlabel text-slate-500 mb-2">Before — Pipeline reaches across the seam</p>
+              <pre class="mermaid">
+flowchart LR
+  P[Pipeline<br/>inject_config] -->|"PropertyLens{:pe}"| J[JuMPOptimiser]
+  P -->|"PropertyLens{:lcse}"| J
+  P -->|"PropertyLens{:wb}"| J
+  P -->|"PropertyLens{:ple}"| J
+  P -->|"PropertyLens{:cle}"| H[HierarchicalOptimiser]
+  P -->|"PropertyLens{:wb}"| H
+  classDef leak stroke:#dc2626,stroke-width:2px;
+  class P leak
+              </pre>
+            </div>
+            <div class="rounded-lg border border-slate-200 bg-white p-4">
+              <p class="modlabel text-slate-500 mb-2">After — one polymorphic entry, field names stay home</p>
+              <pre class="mermaid">
+flowchart LR
+  P[Pipeline] -->|"apply_context_slots(opt, ctx)"| S(( ))
+  S --> J[JuMPOptimiser<br/>owns its slot→field map]
+  S --> H[HierarchicalOptimiser<br/>owns its slot→field map]
+  classDef deepnode fill:#0f172a,color:#f1f5f9,stroke:#0f172a;
+  class J,H deepnode
+              </pre>
+            </div>
+          </div>
+
+          <p><strong>Problem:</strong> the rule “which Pipeline Context slot lands in which optimiser field” lives in the Pipeline as string-keyed <span class="font-mono">PropertyLens</span> writes — the Pipeline’s interface to the optimiser is the optimiser’s private field layout, and a field rename breaks the Pipeline at runtime, far from the rename.</p>
+          <p><strong>Solution:</strong> each Optimisation Estimator owns one method — <span class="font-mono">apply_context_slots(opt, ctx)</span> — and the Pipeline calls it blind; the slot→field map moves behind the optimiser’s interface.</p>
+          <ul class="list-disc pl-5 text-sm space-y-1">
+            <li>Locality: field knowledge lives with the fields</li>
+            <li>Seam becomes real: two adapters (JuMP, Hierarchical)</li>
+            <li>Routing unit-testable per optimiser, solver-free</li>
+            <li>Duplicated WeightBounds/constraint loop collapses</li>
+          </ul>
+          <div class="rounded-md bg-amber-50 border border-amber-200 px-3 py-2 text-sm text-amber-900">ADR 0028 defines the Pipeline seam but not who owns the routing — no conflict, this sharpens it.</div>
+        </article>
+
+        <!-- ============================================================ C3 -->
+        <article id="c3" class="rounded-xl border border-slate-200 bg-white p-6 space-y-4 shadow-sm">
+          <div class="flex items-start justify-between gap-4">
+            <h2 class="text-xl font-serif font-semibold">3 · Model State: typed accessors instead of the regex seam-lock</h2>
+            <span class="shrink-0 rounded-full bg-amber-100 text-amber-800 px-3 py-1 text-xs font-semibold">Worth exploring</span>
+          </div>
+          <p class="font-mono text-sm text-slate-600">src/20_Optimisation/08_Base_JuMPOptimisation.jl (accessors) · test/test_28_seam_lock.jl (the regex) · ~22 emitter files, e.g. 20_RiskMeasureConstraints/06_XatRiskConstraints.jl:147</p>
+
+          <div class="grid md:grid-cols-2 gap-4">
+            <div class="rounded-lg border border-slate-200 bg-stone-50 p-4">
+              <p class="modlabel text-slate-500 mb-3">Before — convention policed after the fact</p>
+              <div class="space-y-2 text-xs">
+                <div class="border border-slate-400 bg-white p-2 font-mono">model[Symbol(:var_risk_l_, i)] — hand-built keys</div>
+                <div class="border-t-2 border-dashed border-slate-400 my-2"></div>
+                <div class="border border-slate-300 bg-white p-2">accessor layer <span class="text-slate-500">(bypassable)</span></div>
+                <div class="border border-red-300 bg-red-50 p-2 text-red-800">test_28 regex lint — admits its own hole: a sloppy <span class="font-mono">Symbol(prefix, :newCatA)</span> slips through</div>
+              </div>
+            </div>
+            <div class="rounded-lg border border-slate-200 bg-stone-50 p-4">
+              <p class="modlabel text-slate-500 mb-3">After — bare reads impossible to write</p>
+              <div class="deep rounded-lg p-4 text-slate-100 text-xs">
+                <p class="modlabel text-slate-300 mb-2">Model State module</p>
+                <p class="font-mono">risk_var(model, i; prefix)</p>
+                <p class="font-mono opacity-60 mt-2">key construction, prefix discipline,<br/>Cat-A/Cat-B routing — all internal</p>
+              </div>
+              <p class="modlabel text-slate-500 mt-3">the invariant moves from lint to interface</p>
+            </div>
+          </div>
+
+          <p><strong>Problem:</strong> the Model State interface is a <span class="font-mono">Dict{Symbol,Any}</span> plus a naming convention every emitter must know — the invariant “never read a prefix-managed key bare” is enforced by a regex over source text, which is a seam held shut by lint, not by types.</p>
+          <p><strong>Solution:</strong> widen the accessor family until emitters never build a key by hand; the prefix and category discipline become implementation.</p>
+          <ul class="list-disc pl-5 text-sm space-y-1">
+            <li>Interface shrinks: emitters learn accessors, not conventions</li>
+            <li>The seam-lock test becomes redundant, then deletable</li>
+            <li>Locality: key policy changes in one module</li>
+          </ul>
+          <div class="rounded-md bg-amber-50 border border-amber-200 px-3 py-2 text-sm text-amber-900">ADRs 0004/0005/0033/0034 already moved this direction and knowingly accepted the residual hole — reopen only as incremental accessor-widening, not a rewrite.</div>
+        </article>
+
+        <!-- ============================================================ C4 -->
+        <article id="c4" class="rounded-xl border border-slate-200 bg-white p-6 space-y-4 shadow-sm">
+          <div class="flex items-start justify-between gap-4">
+            <h2 class="text-xl font-serif font-semibold">4 · One dispatch table for view/getindex sub-selection — the copies have drifted</h2>
+            <span class="shrink-0 rounded-full bg-emerald-100 text-emerald-800 px-3 py-1 text-xs font-semibold">Strong</span>
+          </div>
+          <p class="font-mono text-sm text-slate-600">src/02_Tools.jl:311 (nothing_scalar_array_view) · :530 (nothing_scalar_array_getindex) · plus the two _odd_order twins</p>
+
+          <div class="rounded-lg border border-slate-200 bg-slate-900 p-4 text-sm font-mono overflow-x-auto">
+            <p class="text-slate-400 mb-1">// verified 2026-07-19 — the two fallback Unions, side by side</p>
+            <p class="text-emerald-400">view:&nbsp;&nbsp;&nbsp;&nbsp;Nothing · Number · Pair · VecPair · Dict · EstValueAlg · DynWeights · <span class="bg-emerald-900/60 px-1">AbstractEstimator · AbstractAlgorithm</span></p>
+            <p class="text-red-400">getindex: Nothing · Number · Pair · VecPair · Dict · EstValueAlg · DynWeights · <span class="bg-red-900/60 px-1">— missing —</span></p>
+          </div>
+
+          <div class="grid md:grid-cols-2 gap-4">
+            <div class="rounded-lg border border-slate-200 bg-stone-50 p-4">
+              <p class="modlabel text-slate-500 mb-3">Before — four copies of one dispatch rule</p>
+              <div class="grid grid-cols-2 gap-2 text-xs">
+                <div class="border border-slate-400 bg-white p-2">…_view</div>
+                <div class="border border-red-400 bg-red-50 p-2">…_getindex <span class="text-red-700">(drifted)</span></div>
+                <div class="border border-slate-400 bg-white p-2">…_view_odd_order</div>
+                <div class="border border-slate-400 bg-white p-2">…_getindex_odd_order</div>
+              </div>
+            </div>
+            <div class="rounded-lg border border-slate-200 bg-stone-50 p-4">
+              <p class="modlabel text-slate-500 mb-3">After — one authoritative table</p>
+              <div class="deep rounded-lg p-3 text-slate-100 text-xs">
+                <p class="font-mono">sub_select(op, x, i)</p>
+                <p class="font-mono opacity-60 mt-1">one Union, one recursion; op = view | getindex</p>
+              </div>
+            </div>
+          </div>
+
+          <p><strong>Problem:</strong> the pass-through type list — which is the family’s real interface — exists in two places and has already diverged: <span class="font-mono">getindex</span> drops estimators/algorithms that <span class="font-mono">view</span> passes through. Latent bug or undocumented intent; either way invisible.</p>
+          <p><strong>Solution:</strong> one generic parameterised on the leaf operation, so the type list is stated once; the four names survive as one-line adapters if callers need them.</p>
+          <ul class="list-disc pl-5 text-sm space-y-1">
+            <li>Drift class closed, same move as ADR 0010</li>
+            <li>Locality: extend the pass-through set in one place</li>
+            <li>First step: decide whether the asymmetry is a bug</li>
+          </ul>
+          <div class="rounded-md bg-amber-50 border border-amber-200 px-3 py-2 text-sm text-amber-900">Residue of ADR 0010 — the view family was unified above this line, not below it.</div>
+        </article>
+
+        <!-- ============================================================ C5 -->
+        <article id="c5" class="rounded-xl border border-slate-200 bg-white p-6 space-y-4 shadow-sm">
+          <div class="flex items-start justify-between gap-4">
+            <h2 class="text-xl font-serif font-semibold">5 · Vector-to-Scalar Reducers out of the Tools grab-bag</h2>
+            <span class="shrink-0 rounded-full bg-amber-100 text-amber-800 px-3 py-1 text-xs font-semibold">Worth exploring</span>
+          </div>
+          <p class="font-mono text-sm text-slate-600">src/02_Tools.jl:1779–2242 (Reducers, ~460 lines) · :1220–1604 (propagation macros) · src/01_Base.jl (137 top-level defs)</p>
+
+          <div class="grid md:grid-cols-2 gap-4">
+            <div class="rounded-lg border border-slate-200 bg-stone-50 p-4">
+              <p class="modlabel text-slate-500 mb-3">Before — one file, four unrelated concerns</p>
+              <div class="space-y-1 text-xs">
+                <div class="border-l-4 border-slate-400 bg-white p-2">sub-selection plumbing (cand. 4)</div>
+                <div class="border-l-4 border-slate-400 bg-white p-2">@fprop/@vprop/@pprop/@propagatable macro system</div>
+                <div class="border-l-4 border-slate-400 bg-white p-2">@forward_properties</div>
+                <div class="border-l-4 border-indigo-500 bg-indigo-50 p-2">Vector-to-Scalar Reducers — a named CONTEXT.md Algorithm family, living in “Tools”</div>
+              </div>
+            </div>
+            <div class="rounded-lg border border-slate-200 bg-stone-50 p-4">
+              <p class="modlabel text-slate-500 mb-3">After — concepts get their own address</p>
+              <div class="space-y-1 text-xs">
+                <div class="deep rounded p-2 text-slate-100">0x_Reducers.jl — MinValue … StandardisedValue + vec_to_real_measure</div>
+                <div class="border border-slate-300 bg-white p-2">0x_Propagation.jl — the macro system</div>
+                <div class="border border-slate-300 bg-white p-2">02_Tools.jl — what remains actually is tools</div>
+              </div>
+            </div>
+          </div>
+
+          <p><strong>Problem:</strong> locality — “what is a <span class="font-mono">MeanValue</span>” means opening a 2300-line utilities file; the domain glossary names the family but the source tree hides it. <span class="font-mono">01_Base.jl</span> has the same shape: docstring dicts, the core abstraction triad, ScopedConfig, error builders, and ~30 aliases share one file.</p>
+          <p><strong>Solution:</strong> move the Reducers (and optionally the propagation macro system) into their own numbered stage files; pure file moves, no interface change.</p>
+          <ul class="list-disc pl-5 text-sm space-y-1">
+            <li>Locality: a CONTEXT.md family gets one module</li>
+            <li>Zero behavioural risk — moves only</li>
+            <li>Grab-bags stop absorbing new arrivals by default</li>
+          </ul>
+        </article>
+
+        <!-- ============================================================ C6 -->
+        <article id="c6" class="rounded-xl border border-slate-200 bg-white p-6 space-y-4 shadow-sm">
+          <div class="flex items-start justify-between gap-4">
+            <h2 class="text-xl font-serif font-semibold">6 · Emitters ask the measure for resolved MIP constants</h2>
+            <span class="shrink-0 rounded-full bg-amber-100 text-amber-800 px-3 py-1 text-xs font-semibold">Worth exploring</span>
+          </div>
+          <p class="font-mono text-sm text-slate-600">src/20_Optimisation/20_RiskMeasureConstraints/06_XatRiskConstraints.jl:72–73, 141–143, 431–432 · defaults duplicated per call site</p>
+
+          <div class="grid md:grid-cols-2 gap-4">
+            <div class="rounded-lg border border-slate-200 bg-white p-4">
+              <p class="modlabel text-slate-500 mb-2">Before — emitter reaches two levels deep, re-validates</p>
+              <pre class="mermaid">
+flowchart LR
+  E[set_risk_constraints!] -->|r.alg.b, r.alg.s| A[MIPValueatRisk internals]
+  E -->|"re-asserts b &gt; s, re-derives 1e3/1e-5"| A
+  C[measure constructor] -->|already validates b &gt; s| A
+  classDef leak stroke:#dc2626,stroke-width:2px;
+  class E leak
+              </pre>
+            </div>
+            <div class="rounded-lg border border-slate-200 bg-white p-4">
+              <p class="modlabel text-slate-500 mb-2">After — the measure answers once</p>
+              <pre class="mermaid">
+flowchart LR
+  E[set_risk_constraints!] -->|"mip_big_m(r) → (b, s)"| M[risk measure]
+  classDef deepnode fill:#0f172a,color:#f1f5f9,stroke:#0f172a;
+  class M deepnode
+              </pre>
+            </div>
+          </div>
+
+          <p><strong>Problem:</strong> the seam between a risk measure and its JuMP encoding is the measure’s raw field layout — emitters read <span class="font-mono">r.alg.b</span>, duplicate the big-M defaults at every site, and re-implement validation the constructor already did.</p>
+          <p><strong>Solution:</strong> the measure’s interface grows one method, <span class="font-mono">mip_big_m(r)</span>, returning resolved, validated constants; emitters stop knowing the layout.</p>
+          <ul class="list-disc pl-5 text-sm space-y-1">
+            <li>Locality: defaults and validation in one place</li>
+            <li>Interface between the two dirs narrows</li>
+            <li>Complement to the recorded @risk_measure macro — that covers the struct side only</li>
+          </ul>
+          <div class="rounded-md bg-amber-50 border border-amber-200 px-3 py-2 text-sm text-amber-900">Adjacent to ADR 0018 (compatibility trait) — same trait-not-fields philosophy, applied to constants.</div>
+        </article>
+
+        <!-- ============================================================ C7 -->
+        <article id="c7" class="rounded-xl border border-slate-200 bg-white p-6 space-y-4 shadow-sm">
+          <div class="flex items-start justify-between gap-4">
+            <h2 class="text-xl font-serif font-semibold">7 · ValueatRiskRange composes two single-tail emitters <span class="text-sm font-sans font-normal text-slate-500">(known candidate — re-confirmed)</span></h2>
+            <span class="shrink-0 rounded-full bg-emerald-100 text-emerald-800 px-3 py-1 text-xs font-semibold">Strong</span>
+          </div>
+          <p class="font-mono text-sm text-slate-600">src/20_Optimisation/20_RiskMeasureConstraints/06_XatRiskConstraints.jl:76 (loss flag) · :135–213 (MIP Range, inlined twice) · :371–399 (distribution Range, same pattern)</p>
+
+          <div class="grid md:grid-cols-2 gap-4">
+            <div class="rounded-lg border border-slate-200 bg-stone-50 p-4">
+              <p class="modlabel text-slate-500 mb-3">Before — the Range emitter re-implements both tails</p>
+              <div class="space-y-2 text-xs">
+                <div class="border border-slate-400 bg-white p-2 font-mono">single-VaR emitter · loss::Bool flips the tail</div>
+                <div class="border border-red-400 bg-red-50 p-2 font-mono text-red-800">Range emitter: z_var_l + big-M + quantile count<br/>Range emitter: z_var_h + big-M + quantile count<br/><span class="text-red-600">← ~50-line copy, does not call the flag</span></div>
+              </div>
+            </div>
+            <div class="rounded-lg border border-slate-200 bg-stone-50 p-4">
+              <p class="modlabel text-slate-500 mb-3">After — call-graph collapse</p>
+              <div class="deep rounded-lg p-4 text-slate-100 text-xs">
+                <p class="font-mono">Range = emit(loss=true) − emit(loss=false)</p>
+                <p class="font-mono opacity-60 mt-2">binary vars, big-M, quantile count: written once, internal</p>
+              </div>
+              <p class="modlabel text-slate-500 mt-3">generalises to the OWA …Range twins (10_OWARiskMeasures.jl)</p>
+            </div>
+          </div>
+
+          <p><strong>Problem:</strong> the single-tail emitter already carries the <span class="font-mono">loss</span> flag that makes twofold delegation possible, but both Range overloads inline both halves — bug fixes to the MIP encoding must land in three places.</p>
+          <p><strong>Solution:</strong> the Range emitters become two calls to the single-tail emitter; the shared construction becomes implementation.</p>
+          <ul class="list-disc pl-5 text-sm space-y-1">
+            <li>Leverage: one encoding, three call sites</li>
+            <li>Prerequisite: solver-free per-measure tests (extend test_03b)</li>
+            <li>Sets the pattern for the OWA Range variants</li>
+          </ul>
+          <div class="rounded-md bg-amber-50 border border-amber-200 px-3 py-2 text-sm text-amber-900">Long-standing top candidate (re-confirmed in the 2026-07-07 and 07-18 reviews) — evidence unchanged; still gated on the solver-free test harness.</div>
+        </article>
+
+      </section>
+
+      <!-- ============================================================ TOP -->
+      <section id="top-recommendation" class="rounded-xl deep text-slate-100 p-8 space-y-3">
+        <p class="modlabel text-slate-400">Top recommendation</p>
+        <h2 class="text-2xl font-serif font-semibold"><a href="#c1" class="underline decoration-slate-500 hover:decoration-slate-200">Candidate 1 — one <span class="font-mono">Windowed</span> module</a></h2>
+        <p class="text-slate-300 max-w-3xl">It passes the deletion test cleanest: the depth already exists in <span class="font-mono">windowed_preamble</span>, so the refactor deletes ~600 lines of quintuplicated interface with no behavioural risk, and the estimator→generic trait it introduces is the pattern candidates 2 and 6 reuse. Candidate 2 is the close second — a real seam inversion, but it touches the Pipeline’s hot path and deserves its own design pass. Candidate 7 stays queued behind its solver-free test prerequisite.</p>
+      </section>
+
+      <footer class="text-xs text-slate-400 pt-4">
+        Not re-litigated: ucs triple extraction (ADR 0035) · MIP indicator split (ADR 0033/0034) · pipeline slot invalidation · scalarise seam (ADR 0024) · model assembly (ADR 0008) · Gerber marker folding and @risk_measure macro (recorded future items).
+      </footer>
+
+    </main>
+  </body>
+</html>

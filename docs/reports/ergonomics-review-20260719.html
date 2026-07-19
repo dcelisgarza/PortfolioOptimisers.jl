@@ -1,0 +1,514 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Ergonomics review — PortfolioOptimisers.jl</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="module">
+      import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+      mermaid.initialize({ startOnLoad: true, theme: "neutral", securityLevel: "loose" });
+    </script>
+    <style>
+      /* shared shell — identical in every /improve-* report */
+      .diff-old { background: #fef2f2; color: #991b1b; }
+      .diff-new { background: #f0fdf4; color: #166534; }
+      .chip     { font-size: 0.65rem; letter-spacing: 0.08em; }
+      code, pre.mermaid { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+      /* ergonomics accent classes */
+      .friction { border-left: 4px solid #dc2626; }
+      .signal   { border-left: 4px solid #059669; }
+    </style>
+  </head>
+  <body class="bg-stone-50 text-slate-900 font-sans">
+    <main class="max-w-5xl mx-auto px-6 py-12 space-y-12">
+
+      <header class="space-y-5">
+        <div class="flex items-baseline justify-between flex-wrap gap-2">
+          <h1 class="text-3xl font-bold tracking-tight">Ergonomics review — PortfolioOptimisers.jl</h1>
+          <span class="text-sm text-slate-500 font-mono">2026-07-19 · branch <code>dev</code></span>
+        </div>
+        <p class="text-slate-600 max-w-3xl leading-relaxed">
+          Second ergonomics pass, deliberately steered away from the surface the 2026-07-18 review covered
+          (search-CV scoring, budget docs, custom objective discoverability — all since fixed and committed).
+          This pass walked the entry-point verbs, the entropy-pooling view kwargs, the alias layer, the plotting
+          family, and the high-traffic error paths. It found one silent-wrong-number docs defect, one silent
+          ignored-argument path, a family of developer-facing error messages, and a handful of convention breaks
+          that are cheap to close.
+        </p>
+        <div class="flex flex-wrap items-center gap-3 text-xs">
+          <span class="chip uppercase px-2 py-1 rounded bg-emerald-600 text-white font-semibold">4 Strong</span>
+          <span class="chip uppercase px-2 py-1 rounded bg-amber-500 text-white font-semibold">5 Worth exploring</span>
+          <span class="chip uppercase px-2 py-1 rounded bg-slate-500 text-white font-semibold">1 Speculative</span>
+          <span class="text-slate-400">·</span>
+          <span class="flex items-center gap-1.5"><span class="inline-block w-3 h-3 rounded-sm bg-red-600"></span> friction / before</span>
+          <span class="flex items-center gap-1.5"><span class="inline-block w-3 h-3 rounded-sm bg-emerald-600"></span> high signal / after</span>
+          <span class="flex items-center gap-1.5"><span class="inline-block w-3 h-3 rounded-sm bg-amber-400"></span> ADR / warning</span>
+        </div>
+      </header>
+
+      <section id="candidates" class="space-y-10">
+
+        <!-- Card 1 -->
+        <article id="c1" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
+          <div class="space-y-2">
+            <h2 class="text-xl font-semibold">1 · <code>EntropyPoolingPrior</code>'s own docs say <code>var_views</code> is variance — it is Value-at-Risk</h2>
+            <div class="flex flex-wrap gap-2">
+              <span class="chip uppercase px-2 py-1 rounded bg-emerald-600 text-white font-semibold">Strong</span>
+              <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">docs</span>
+            </div>
+          </div>
+          <div class="font-mono text-sm text-slate-500">src/13_Prior/10_EntropyPoolingPrior.jl:439, 487, 1034, 1060, 1064 · src/01_Base.jl:337</div>
+
+          <div class="space-y-3 font-mono text-sm">
+            <div class="friction rounded p-3 bg-red-50">
+              <div class="text-xs uppercase tracking-wider mb-1 text-red-700 font-sans">Before — what the docstrings actually say</div>
+              <div class="space-y-2 text-xs leading-relaxed">
+                <p>:439 &nbsp;"It supports moment and view constraints (mean, <b>variance</b>, CVaR, covariance, skewness, kurtosis, correlation)…" — VaR never mentioned</p>
+                <p>:1034 "…does nothing when <b>variance view constraints</b> (`var_views`) are not provided…"</p>
+                <p>:1060 "`ep_var_views!` parses <b>variance (VaR)</b> view equations…"</p>
+                <p>:1064 "- `var_views`: <b>Variance (VaR)</b> view constraints."</p>
+              </div>
+            </div>
+            <div class="signal rounded p-3 bg-emerald-50">
+              <div class="text-xs uppercase tracking-wider mb-1 text-emerald-700 font-sans">After — one convention, stated everywhere</div>
+              <div class="space-y-2 text-xs leading-relaxed">
+                <p>:439 &nbsp;"…view constraints (mean, <b>Value-at-Risk</b>, CVaR, covariance, skewness, kurtosis, correlation)…"</p>
+                <p>Warning box on the estimator docstring: "<b>`var_views` constrains Value-at-Risk, not variance.</b> Variance views go through `sigma_views`."</p>
+                <p>:1034/:1060/:1064 scrubbed of every "variance (VaR)" / "variance view" phrasing.</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-2 font-mono text-xs">
+            <div class="rounded px-2 py-1 bg-red-100 text-red-800">var_views → caller reads "variance" ✗</div>
+            <div class="rounded px-2 py-1 bg-emerald-100 text-emerald-800">var_views → Value-at-Risk (5% tail) ✓</div>
+            <div class="rounded px-2 py-1 bg-emerald-100 text-emerald-800">sigma_views → variance ✓</div>
+            <div class="rounded px-2 py-1 bg-emerald-100 text-emerald-800">cvar_views → Conditional VaR ✓</div>
+          </div>
+
+          <div class="space-y-1.5 text-sm leading-relaxed">
+            <p><span class="font-semibold">Problem.</span> A caller writing <code>var_views = LinearConstraintEstimator(; val = ["A == 0.04"])</code> to pin asset A's variance silently constrains its 5% Value-at-Risk instead — the intro sentence lists "variance" as supported, never says VaR, and three internal docstrings repeat the wrong reading; the one correct parenthetical sits far down in an operator-comparison subsection.</p>
+            <p><span class="font-semibold">Direction.</span> Docs-only fix: correct the intro sentence, add a warning box pairing <code>var_views</code>→VaR with <code>sigma_views</code>→variance, and scrub the three "variance (VaR)" internal docstrings; optionally add a <code>value_at_risk_views</code> alias kwarg rather than renaming (~30 uses of <code>var_views</code> in the file).</p>
+          </div>
+          <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
+            <li>kills a silent-wrong-number path</li>
+            <li>zero blast radius (docs-only)</li>
+            <li>signal: name glossed at every mention</li>
+            <li>convention: matches CONTEXT.md entry</li>
+          </ul>
+          <div class="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+            <span class="font-semibold">Known gotcha, still open.</span> This trap is already recorded in the project's working notes ("entropy-pooling view naming") — the docstrings were never brought in line with it.
+          </div>
+        </article>
+
+        <!-- Card 2 -->
+        <article id="c2" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
+          <div class="space-y-2">
+            <h2 class="text-xl font-semibold">2 · <code>optimise(mr, rd_test)</code> silently ignores <code>rd_test</code> when <code>pe</code> holds a prior result</h2>
+            <div class="flex flex-wrap gap-2">
+              <span class="chip uppercase px-2 py-1 rounded bg-emerald-600 text-white font-semibold">Strong</span>
+              <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">errors</span>
+            </div>
+          </div>
+          <div class="font-mono text-sm text-slate-500">src/13_Prior/01_Base_Prior.jl:257 · src/20_Optimisation/11_MeanRisk.jl:681 · user_guide/02_Optimisers.jl:54, 93</div>
+
+          <div class="grid md:grid-cols-2 gap-4 font-mono text-sm">
+            <div class="diff-old rounded p-3">
+              <div class="text-xs uppercase tracking-wider mb-2 text-red-700 font-sans">Before — the silent path</div>
+<pre class="text-xs whitespace-pre-wrap">opt = JuMPOptimiser(; pe = pr,  # fitted prior RESULT
+                      slv = slv)
+mr  = MeanRisk(; opt = opt)
+
+res = optimise(mr, rd_test)
+# rd_test is silently ignored:
+# prior(pr::AbstractPriorResult,
+#       args...; kwargs...) = pr
+# ⇒ "out-of-sample" run is in-sample</pre>
+            </div>
+            <div class="diff-new rounded p-3">
+              <div class="text-xs uppercase tracking-wider mb-2 text-green-700 font-sans">After — the ignored argument announces itself</div>
+<pre class="text-xs whitespace-pre-wrap">res = optimise(mr, rd_test)
+┌ Warning: `pe` is a fitted prior result,
+│ so the returns passed to `optimise` are
+│ ignored. Pass a prior *estimator*
+│ (e.g. pe = EmpiricalPrior()) to have
+│ the prior fitted on these returns.
+└ @ PortfolioOptimisers</pre>
+            </div>
+          </div>
+
+          <div class="space-y-1.5 text-sm leading-relaxed">
+            <p><span class="font-semibold">Problem.</span> The same call shape means two different things depending on whether <code>pe</code> holds an estimator or a result — the estimator path consumes <code>rd</code>, the result path is a pass-through — and the ignored-argument case gives the caller no signal, so an out-of-sample evaluation silently becomes an in-sample one.</p>
+            <p><span class="font-semibold">Direction.</span> When <code>pe</code> is a prior result and the positional <code>rd</code> is non-empty, warn (or error) that <code>rd</code> is ignored; state the precedence rule once on the <code>JuMPOptimiser</code> and <code>optimise</code> docstrings. The estimator-vs-precomputed distinction is already documented for cross-validation — this closes the same gap on the plain-solve path.</p>
+          </div>
+          <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
+            <li>kills a silent in-sample evaluation</li>
+            <li>signal: precedence stated at call site</li>
+            <li>zero blast radius (additive warning)</li>
+            <li>convention: matches CV's estimator rule</li>
+          </ul>
+        </article>
+
+        <!-- Card 3 -->
+        <article id="c3" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
+          <div class="space-y-2">
+            <h2 class="text-xl font-semibold">3 · Fallback errors tell the caller to <em>implement a method</em> instead of naming their mistake</h2>
+            <div class="flex flex-wrap gap-2">
+              <span class="chip uppercase px-2 py-1 rounded bg-emerald-600 text-white font-semibold">Strong</span>
+              <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">errors</span>
+            </div>
+          </div>
+          <div class="font-mono text-sm text-slate-500">src/03_Preprocessing.jl:597, 1240, 1266, 1460</div>
+
+          <div class="space-y-3 font-mono text-sm">
+            <div class="friction rounded p-3 bg-red-50">
+              <div class="text-xs uppercase tracking-wider mb-1 text-red-700 font-sans">Before — verbatim, :1240</div>
+<pre class="text-xs whitespace-pre-wrap">ERROR: ArgumentError: fit_preprocessing is not implemented for Matrix{Float64};
+implement fit_preprocessing(est, data) and apply_preprocessing(fitted, data)</pre>
+            </div>
+            <div class="signal rounded p-3 bg-emerald-50">
+              <div class="text-xs uppercase tracking-wider mb-1 text-emerald-700 font-sans">After — names the caller's mistake, then the extension point</div>
+<pre class="text-xs whitespace-pre-wrap">ERROR: ArgumentError: expected a preprocessing estimator
+(e.g. MissingDataFilter, PricesToReturns), got Matrix{Float64}.
+Extension authors: subtype AbstractPreprocessingEstimator and implement
+fit_preprocessing(est, data) / apply_preprocessing(fitted, data).</pre>
+            </div>
+          </div>
+
+          <div class="space-y-1.5 text-sm leading-relaxed">
+            <p><span class="font-semibold">Problem.</span> Four fallback methods on high-traffic entry points (<code>fit_preprocessing</code>, <code>apply_preprocessing</code>, <code>select_assets</code>, <code>port_opt_view</code>) answer the most common caller mistake — passing the wrong kind of object — with "implement this method", handing an everyday caller the extension author's mental model.</p>
+            <p><span class="font-semibold">Direction.</span> Lead each message with what was expected and what was received; keep the "implement …" sentence as a trailing extension-author note (or move it entirely into the abstract type's docstring, where extension guidance already lives).</p>
+          </div>
+          <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
+            <li>signal: error names caller's mistake</li>
+            <li>fix suggestion in the message</li>
+            <li>zero blast radius (message text)</li>
+            <li>extension guidance kept, demoted</li>
+          </ul>
+        </article>
+
+        <!-- Card 4 -->
+        <article id="c4" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
+          <div class="space-y-2">
+            <h2 class="text-xl font-semibold">4 · The solve-failure warning points at <code>retcode.res</code> — a binding the caller doesn't hold</h2>
+            <div class="flex flex-wrap gap-2">
+              <span class="chip uppercase px-2 py-1 rounded bg-emerald-600 text-white font-semibold">Strong</span>
+              <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">errors</span>
+            </div>
+          </div>
+          <div class="font-mono text-sm text-slate-500">src/20_Optimisation/08_Base_JuMPOptimisation.jl:983</div>
+
+          <div class="space-y-3 font-mono text-sm">
+            <div class="friction rounded p-3 bg-red-50">
+              <div class="text-xs uppercase tracking-wider mb-1 text-red-700 font-sans">Before — verbatim</div>
+<pre class="text-xs whitespace-pre-wrap">┌ Warning: Failed to solve optimisation problem. Check `retcode.res` for details.
+
+julia> retcode.res
+ERROR: UndefVarError: `retcode` not defined</pre>
+            </div>
+            <div class="signal rounded p-3 bg-emerald-50">
+              <div class="text-xs uppercase tracking-wider mb-1 text-emerald-700 font-sans">After — phrased from the caller's side of the return value</div>
+<pre class="text-xs whitespace-pre-wrap">┌ Warning: Failed to solve optimisation problem.
+│ Check `result.retcode.res` on the returned result for per-solver diagnostics.</pre>
+            </div>
+          </div>
+
+          <div class="space-y-1.5 text-sm leading-relaxed">
+            <p><span class="font-semibold">Problem.</span> <code>retcode</code> is the <em>implementation's</em> local variable; the caller holds an <code>OptimisationResult</code>, so pasting the suggested expression throws <code>UndefVarError</code> and the caller must guess the real path <code>res.retcode.res</code>.</p>
+            <p><span class="font-semibold">Direction.</span> One-line message change naming the path from the returned value; the structured-diagnostics machinery (ADR 0023) already carries everything the caller needs.</p>
+          </div>
+          <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
+            <li>signal: suggested expression runs</li>
+            <li>one-line fix, zero blast radius</li>
+            <li>discoverability: ADR 0023 diagnostics reachable</li>
+          </ul>
+        </article>
+
+        <!-- Card 5 -->
+        <article id="c5" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
+          <div class="space-y-2">
+            <h2 class="text-xl font-semibold">5 · Docstring rendering defects: <code>RelativeDrawdownatRisk</code> loses its constructor line, <code>GAO</code> renders as code</h2>
+            <div class="flex flex-wrap gap-2">
+              <span class="chip uppercase px-2 py-1 rounded bg-amber-500 text-white font-semibold">Worth exploring</span>
+              <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">docs</span>
+            </div>
+          </div>
+          <div class="font-mono text-sm text-slate-500">src/19_RiskMeasures/06_XatRisk.jl:727-733 · src/25_Aliases.jl:84-89</div>
+
+          <div class="grid md:grid-cols-2 gap-4 font-mono text-sm">
+            <div class="diff-old rounded p-3">
+              <div class="text-xs uppercase tracking-wider mb-2 text-red-700 font-sans">Before — verbatim</div>
+<pre class="text-xs whitespace-pre-wrap"># Constructors
+
+        settings::HierarchicalRiskMeasureSettings = …,
+        alpha::Number = 0.05,
+        w::Option{&lt;:ObsWeights} = nothing
+    ) -&gt; RelativeDrawdownatRisk
+─────────────────────────────
+"""
+    GAO
+
+    Alias for [`GreedyAllocation`](@ref).
+"""</pre>
+            </div>
+            <div class="diff-new rounded p-3">
+              <div class="text-xs uppercase tracking-wider mb-2 text-green-700 font-sans">After</div>
+<pre class="text-xs whitespace-pre-wrap"># Constructors
+
+    RelativeDrawdownatRisk(;
+        settings::HierarchicalRiskMeasureSettings = …,
+        alpha::Number = 0.05,
+        w::Option{&lt;:ObsWeights} = nothing
+    ) -&gt; RelativeDrawdownatRisk
+─────────────────────────────
+"""
+    GAO
+
+Alias for [`GreedyAllocation`](@ref).
+"""</pre>
+            </div>
+          </div>
+
+          <div class="space-y-1.5 text-sm leading-relaxed">
+            <p><span class="font-semibold">Problem.</span> The rendered docs show a dangling parameter list with a closing paren and no opening call for <code>RelativeDrawdownatRisk</code> (every sibling measure has the line), and <code>GAO</code>'s summary is indented four spaces so Documenter absorbs it into the signature block — the only alias in the file with that defect.</p>
+            <p><span class="font-semibold">Direction.</span> Two mechanical edits; worth a one-off grep of docstrings for both patterns (parameter list with no opening call; indented prose after a signature) while there.</p>
+          </div>
+          <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
+            <li>convention: sibling docstrings all match</li>
+            <li>two-line fix, zero blast radius</li>
+          </ul>
+        </article>
+
+        <!-- Card 6 -->
+        <article id="c6" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
+          <div class="space-y-2">
+            <h2 class="text-xl font-semibold">6 · The clustering entry verb is <code>clusterise</code> — the one entry point a caller can't guess</h2>
+            <div class="flex flex-wrap gap-2">
+              <span class="chip uppercase px-2 py-1 rounded bg-amber-500 text-white font-semibold">Worth exploring</span>
+              <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">aliases</span>
+            </div>
+          </div>
+          <div class="font-mono text-sm text-slate-500">src/11_Phylogeny/02_Clusters.jl:205, 555 · src/25_Aliases.jl (no entry)</div>
+
+          <div class="rounded-lg border border-slate-200 bg-white p-4">
+            <pre class="mermaid">
+flowchart LR
+  A[caller] --> B["cluster(cle, rd) ?"]
+  B --> C["UndefVarError"]
+  C --> D["grep the source"]
+  D --> E["clusterise(cle, rd)"]
+  A2[caller] --alias--> E2["cluster(cle, rd) ≡ clusterise"]
+  classDef alias stroke:#059669,stroke-width:2px;
+  class A2,E2 alias
+            </pre>
+          </div>
+
+          <div class="space-y-1.5 text-sm leading-relaxed">
+            <p><span class="font-semibold">Problem.</span> The entry surface reads <code>optimise</code>, <code>prior</code>, <code>prices_to_returns</code>, <code>train_test_split</code>, <code>factory</code> — then <code>clusterise</code>; a caller reaching for clustering guesses <code>cluster(cle, rd)</code>, gets <code>UndefVarError</code>, and the alias layer that covers ~100 type names has no entry for the one verb outlier.</p>
+            <p><span class="font-semibold">Direction.</span> Add <code>const cluster = clusterise</code> to the alias layer (additive, zero blast radius); the noun collision with clustering results is worth a quick check before exporting.</p>
+          </div>
+          <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
+            <li>discoverability: guessable entry verb</li>
+            <li>alias: additive, zero blast radius</li>
+            <li>convention: entry-verb rhythm restored</li>
+          </ul>
+        </article>
+
+        <!-- Card 7 -->
+        <article id="c7" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
+          <div class="space-y-2">
+            <h2 class="text-xl font-semibold">7 · The alias layer's coverage looks total but breaks at the naive optimisers and the windowed/regime moment tier</h2>
+            <div class="flex flex-wrap gap-2">
+              <span class="chip uppercase px-2 py-1 rounded bg-amber-500 text-white font-semibold">Worth exploring</span>
+              <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">discoverability</span>
+            </div>
+          </div>
+          <div class="font-mono text-sm text-slate-500">src/25_Aliases.jl:1042-1052</div>
+
+          <div class="space-y-3">
+            <div class="text-xs uppercase tracking-wider text-slate-500">Aliased (convention holds)</div>
+            <div class="flex flex-wrap gap-1.5 font-mono text-xs">
+              <span class="rounded px-2 py-1 bg-emerald-100 text-emerald-800">MR</span>
+              <span class="rounded px-2 py-1 bg-emerald-100 text-emerald-800">RB</span>
+              <span class="rounded px-2 py-1 bg-emerald-100 text-emerald-800">RRB</span>
+              <span class="rounded px-2 py-1 bg-emerald-100 text-emerald-800">FRC</span>
+              <span class="rounded px-2 py-1 bg-emerald-100 text-emerald-800">NOC</span>
+              <span class="rounded px-2 py-1 bg-emerald-100 text-emerald-800">HRP</span>
+              <span class="rounded px-2 py-1 bg-emerald-100 text-emerald-800">HERC</span>
+              <span class="rounded px-2 py-1 bg-emerald-100 text-emerald-800">SCHRP</span>
+              <span class="rounded px-2 py-1 bg-emerald-100 text-emerald-800">NCO</span>
+              <span class="rounded px-2 py-1 bg-emerald-100 text-emerald-800">STO</span>
+              <span class="rounded px-2 py-1 bg-emerald-100 text-emerald-800">SSR</span>
+              <span class="rounded px-2 py-1 bg-emerald-100 text-emerald-800">Cov</span>
+              <span class="rounded px-2 py-1 bg-emerald-100 text-emerald-800">SVar</span>
+              <span class="rounded px-2 py-1 bg-emerald-100 text-emerald-800">GerberCov</span>
+              <span class="rounded px-2 py-1 bg-emerald-100 text-emerald-800">MICov</span>
+              <span class="rounded px-2 py-1 bg-emerald-100 text-emerald-800">DnCov</span>
+              <span class="rounded px-2 py-1 bg-emerald-100 text-emerald-800">POCov</span>
+            </div>
+            <div class="text-xs uppercase tracking-wider text-slate-500">No alias (convention breaks)</div>
+            <div class="flex flex-wrap gap-1.5 font-mono text-xs">
+              <span class="rounded px-2 py-1 bg-red-100 text-red-800">EqualWeighted</span>
+              <span class="rounded px-2 py-1 bg-red-100 text-red-800">InverseVolatility</span>
+              <span class="rounded px-2 py-1 bg-red-100 text-red-800">RandomWeighted</span>
+              <span class="rounded px-2 py-1 bg-red-100 text-red-800">WindowedCovariance</span>
+              <span class="rounded px-2 py-1 bg-red-100 text-red-800">WindowedVariance</span>
+              <span class="rounded px-2 py-1 bg-red-100 text-red-800">WindowedExpectedReturns</span>
+              <span class="rounded px-2 py-1 bg-red-100 text-red-800">RegimeAdjustedExpWeightedCovariance</span>
+              <span class="rounded px-2 py-1 bg-red-100 text-red-800">GerberIQCovariance</span>
+              <span class="rounded px-2 py-1 bg-red-100 text-red-800">CorrelationCovariance</span>
+            </div>
+          </div>
+
+          <div class="space-y-1.5 text-sm leading-relaxed">
+            <p><span class="font-semibold">Problem.</span> Autocomplete-by-acronym works for every JuMP, clustering, and meta optimiser and for the classic covariance estimators, then dead-ends at the naive optimisers and the whole windowed/regime tier — the caller cannot predict whether an alias exists, which is the failure mode of a partial convention.</p>
+            <p><span class="font-semibold">Direction.</span> Either extend the layer (<code>EW</code>, <code>IVol</code>, <code>RW</code>, <code>WCov</code>, <code>WVar</code>, <code>WER</code>, …) or state the layer's scope boundary in its module docstring so omission reads as intent; extension is additive with zero blast radius.</p>
+          </div>
+          <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
+            <li>convention: alias coverage predictable</li>
+            <li>discoverability: acronym autocomplete total</li>
+            <li>additive, zero blast radius</li>
+          </ul>
+          <div class="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+            <span class="font-semibold">ADR 0015.</span> The acronym-alias style itself is settled — this card is about where the existing convention stops, not about the style.
+          </div>
+        </article>
+
+        <!-- Card 8 -->
+        <article id="c8" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
+          <div class="space-y-2">
+            <h2 class="text-xl font-semibold">8 · <code>plot_ptf_cumulative_returns</code> is the one plotter that abbreviates "portfolio"</h2>
+            <div class="flex flex-wrap gap-2">
+              <span class="chip uppercase px-2 py-1 rounded bg-amber-500 text-white font-semibold">Worth exploring</span>
+              <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">naming</span>
+            </div>
+          </div>
+          <div class="font-mono text-sm text-slate-500">src/24_Plotting.jl:64, 1051 · referenced in 10 files (src / ext / user_guide / examples)</div>
+
+          <div class="grid md:grid-cols-2 gap-4 font-mono text-sm">
+            <div class="diff-old rounded p-3">
+              <div class="text-xs uppercase tracking-wider mb-2 text-red-700 font-sans">Before — plot_p&lt;tab&gt;</div>
+<pre class="text-xs whitespace-pre-wrap">plot_performance_summary
+plot_portfolio_dashboard
+plot_prior
+plot_ptf_cumulative_returns   ← odd stem out</pre>
+            </div>
+            <div class="diff-new rounded p-3">
+              <div class="text-xs uppercase tracking-wider mb-2 text-green-700 font-sans">After</div>
+<pre class="text-xs whitespace-pre-wrap">plot_performance_summary
+plot_portfolio_cumulative_returns
+plot_portfolio_dashboard
+plot_prior
+# plot_ptf_cumulative_returns kept as
+# deprecated alias</pre>
+            </div>
+          </div>
+
+          <div class="space-y-1.5 text-sm leading-relaxed">
+            <p><span class="font-semibold">Problem.</span> Across the 35 exported plotters "portfolio" is spelled in full everywhere except one — a caller who learned <code>plot_portfolio_dashboard</code> types <code>plot_portfolio_c&lt;tab&gt;</code> and finds nothing.</p>
+            <p><span class="font-semibold">Direction.</span> Rename with a deprecated alias left in place; blast radius is 10 files, mostly docstring <code>@ref</code> cross-links plus the ext implementation, so the mechanical rename is contained.</p>
+          </div>
+          <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
+            <li>convention: one noun, one stem</li>
+            <li>blast radius: 10 files, aliased first</li>
+            <li>discoverability: tab-completion by stem works</li>
+          </ul>
+        </article>
+
+        <!-- Card 9 -->
+        <article id="c9" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
+          <div class="space-y-2">
+            <h2 class="text-xl font-semibold">9 · No browsable risk-measure catalog — ~50 measures reachable only via source or deep examples</h2>
+            <div class="flex flex-wrap gap-2">
+              <span class="chip uppercase px-2 py-1 rounded bg-amber-500 text-white font-semibold">Worth exploring</span>
+              <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">docs</span>
+            </div>
+          </div>
+          <div class="font-mono text-sm text-slate-500">user_guide/ (gap) · src/19_RiskMeasures · src/25_Aliases.jl:113-288</div>
+
+          <div class="space-y-2">
+            <div class="text-xs uppercase tracking-wider text-slate-500">Steps to answer "what risk measures exist and which do I want?"</div>
+            <div class="space-y-1.5 text-sm font-mono">
+              <div class="rounded px-3 py-1.5 bg-slate-100 text-slate-600">1 · guide spine: no risk-measure page — dead end</div>
+              <div class="rounded px-3 py-1.5 bg-slate-100 text-slate-600">2 · examples/3_optimisers: measures appear incidentally, one at a time</div>
+              <div class="rounded px-3 py-1.5 bg-slate-100 text-slate-600">3 · read src/19_RiskMeasures (11 files) + src/25_Aliases.jl:113-288</div>
+              <div class="rounded px-3 py-1.5 bg-red-100 text-red-800">4 · decode LowOrderMoment(alg = MeanAbsoluteDeviation()) ≡ MAD() by hand</div>
+              <div class="rounded px-3 py-1.5 bg-emerald-100 text-emerald-800">after · guide page: measure → alias → one-line meaning → legal-usage class, one table</div>
+            </div>
+          </div>
+
+          <div class="space-y-1.5 text-sm leading-relaxed">
+            <p><span class="font-semibold">Problem.</span> <code>LowOrderMoment()</code> fails the say-it-aloud signal test — MAD, semi-deviation, and scenario variance all live behind its <code>alg</code> — and the alias layer that answers this (<code>FLM</code>, <code>MAD</code>, <code>SCM</code>, <code>SLM</code>, …) is itself only discoverable by reading <code>25_Aliases.jl</code>; the guide spine has no page where the ~50-measure family can be browsed.</p>
+            <p><span class="font-semibold">Direction.</span> Add a risk-measure catalog page to <code>user_guide/</code>: one table per family (dispersion, XatRisk, drawdown, OWA, other) with constructor, alias, one-line meaning, and the Optimisation/Non-Optimisation/Hierarchical class — docs-only, no API change.</p>
+          </div>
+          <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
+            <li>discoverability: family browsable from guide</li>
+            <li>alias layer surfaced, not source-only</li>
+            <li>docs-only, zero blast radius</li>
+          </ul>
+        </article>
+
+        <!-- Card 10 -->
+        <article id="c10" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
+          <div class="space-y-2">
+            <h2 class="text-xl font-semibold">10 · <code>DrawdownatRisk</code> exposes single-letter big-M kwargs <code>b</code>/<code>s</code> on its front constructor</h2>
+            <div class="flex flex-wrap gap-2">
+              <span class="chip uppercase px-2 py-1 rounded bg-slate-500 text-white font-semibold">Speculative</span>
+              <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">naming</span>
+            </div>
+          </div>
+          <div class="font-mono text-sm text-slate-500">src/19_RiskMeasures/06_XatRisk.jl:534-540, 69-73 · src/01_Base.jl:425-426</div>
+
+          <div class="grid md:grid-cols-2 gap-4 font-mono text-sm">
+            <div class="diff-old rounded p-3">
+              <div class="text-xs uppercase tracking-wider mb-2 text-red-700 font-sans">Before — verbatim signature</div>
+<pre class="text-xs whitespace-pre-wrap">DrawdownatRisk(;
+    settings::RiskMeasureSettings = …,
+    alpha::Number = 0.05,
+    w::Option{&lt;:ObsWeights} = nothing,
+    b::Option{&lt;:Number} = nothing,
+    s::Option{&lt;:Number} = nothing
+)</pre>
+            </div>
+            <div class="diff-new rounded p-3">
+              <div class="text-xs uppercase tracking-wider mb-2 text-green-700 font-sans">After — the formulation object ValueatRisk already uses</div>
+<pre class="text-xs whitespace-pre-wrap">DrawdownatRisk(;
+    settings::RiskMeasureSettings = …,
+    alpha::Number = 0.05,
+    w::Option{&lt;:ObsWeights} = nothing,
+    alg = MIPDrawdownatRisk(; b = …, s = …)
+)</pre>
+            </div>
+          </div>
+
+          <div class="space-y-1.5 text-sm leading-relaxed">
+            <p><span class="font-semibold">Problem.</span> <code>b</code> ("Big-M upper bound") and <code>s</code> ("Small-M lower bound") are MIP-formulation internals surfaced as bare single letters on a risk-measure constructor — at the call site <code>DrawdownatRisk(; b = 2.0, s = 1e-6)</code> carries no signal, and the sibling <code>ValueatRisk</code> already hides the same pair inside <code>MIPValueatRisk</code>.</p>
+            <p><span class="font-semibold">Direction.</span> Fold <code>b</code>/<code>s</code> into a formulation object mirroring <code>ValueatRisk</code>'s shape (or at minimum rename to <code>big_m</code>/<code>small_m</code>); speculative because it reshapes a constructor and the sibling asymmetry may be deliberate.</p>
+          </div>
+          <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
+            <li>signal: kwarg names its formulation</li>
+            <li>convention: matches ValueatRisk's shape</li>
+            <li>blast radius: constructor reshape, alias first</li>
+          </ul>
+        </article>
+
+      </section>
+
+      <section id="top-recommendation" class="rounded-xl border-2 border-emerald-200 bg-white shadow-sm p-6 space-y-3">
+        <h2 class="text-lg font-bold text-emerald-800">Top recommendation — fix the <code>var_views</code> variance/VaR docs before anything else</h2>
+        <p class="text-sm text-slate-700 leading-relaxed">
+          <a href="#c1" class="text-emerald-700 underline">Card 1</a> is the only candidate where the library's own documentation
+          actively produces a silent wrong number: the intro sentence promises "variance" views, three internal docstrings repeat it,
+          and a caller who follows them constrains Value-at-Risk instead. The fix is docs-only with zero blast radius, and the gotcha
+          is already recorded in the project's working notes — the docstrings just never caught up.
+          <a href="#c2" class="text-emerald-700 underline">Card 2</a> (the silently ignored <code>rd</code>) is the natural second:
+          also a silent-wrong-answer path, closed by one warning.
+        </p>
+      </section>
+
+      <footer class="pt-6 text-xs text-slate-400">Generated 2026-07-19 · <code>/improve-ergonomics</code> · branch <code>dev</code> at <code>b45fb03f8</code>, all quotes verified against source</footer>
+
+    </main>
+  </body>
+</html>

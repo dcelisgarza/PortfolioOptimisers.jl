@@ -1,0 +1,379 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Security review — PortfolioOptimisers.jl</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="module">
+      import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+      mermaid.initialize({ startOnLoad: true, theme: "neutral", securityLevel: "loose" });
+    </script>
+    <style>
+      .diff-old { background: #fef2f2; color: #991b1b; }
+      .diff-new { background: #f0fdf4; color: #166534; }
+      .chip     { font-size: 0.65rem; letter-spacing: 0.08em; }
+      code, pre.mermaid { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+      .boundary { stroke-dasharray: 5 4; stroke: #d97706; }
+      .taint    { stroke: #dc2626; stroke-width: 2px; }
+      .sink     { background: #7f1d1d; color: #fff; }
+    </style>
+  </head>
+  <body class="bg-stone-50 text-slate-900 font-sans">
+    <main class="max-w-5xl mx-auto px-6 py-12 space-y-12">
+
+      <header class="space-y-5">
+        <div class="flex items-baseline justify-between flex-wrap gap-2">
+          <h1 class="text-3xl font-bold tracking-tight">Security review — PortfolioOptimisers.jl</h1>
+          <span class="text-sm text-slate-500 font-mono">2026-07-19 · branch <code>dev</code></span>
+        </div>
+        <p class="text-slate-600 max-w-3xl leading-relaxed">
+          Third hardening pass. The injection surface closed by ADRs 0025–0027 (enumerated parser allowlist,
+          recursion caps, info-leak-safe diagnostic builders) is holding: both <code>Meta.parse</code> sites are
+          capped, no <code>eval</code>/subprocess/network/deserialization sink exists in <code>src/</code> or
+          <code>ext/</code>, and every asset/group/view name-resolution boundary routes through the shared
+          builders. What remains is the <em>resource</em> half of the trust perimeter — untrusted config integers
+          sizing allocations with no ceiling — plus a caller-state contamination path in RNG seeding and three
+          small boundary-discipline drifts in newer code (Pipeline, search-CV). One High carries over unfixed
+          from the 2026-07-07 pass: non-finite returns cross the <code>ReturnsResult</code> boundary unchecked and
+          produce a silent wrong answer in comparison-based moment estimators.
+        </p>
+        <div class="flex flex-wrap items-center gap-3 text-xs">
+          <span class="chip uppercase px-2 py-1 rounded bg-orange-600 text-white font-semibold">1 High</span>
+          <span class="chip uppercase px-2 py-1 rounded bg-amber-500 text-white font-semibold">2 Medium</span>
+          <span class="chip uppercase px-2 py-1 rounded bg-slate-500 text-white font-semibold">3 Low</span>
+          <span class="text-slate-400">·</span>
+          <span class="flex items-center gap-1.5"><svg width="26" height="10"><line x1="0" y1="5" x2="26" y2="5" class="boundary" stroke-width="2"/></svg> trust boundary</span>
+          <span class="flex items-center gap-1.5"><svg width="26" height="10"><line x1="0" y1="5" x2="20" y2="5" class="taint"/><polygon points="20,1 26,5 20,9" fill="#dc2626"/></svg> taint flow</span>
+          <span class="flex items-center gap-1.5"><span class="inline-block w-3.5 h-3.5 rounded-sm" style="background:#7f1d1d"></span> sink</span>
+        </div>
+      </header>
+
+      <section id="findings" class="space-y-10">
+
+        <!-- ─────────────────────────── Finding 1 ─────────────────────────── -->
+        <article id="c1" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
+          <div class="space-y-2">
+            <h2 class="text-xl font-semibold">1 · Non-finite returns cross the <code>ReturnsResult</code> boundary and silently corrupt comparison-based moments</h2>
+            <div class="flex flex-wrap gap-2">
+              <span class="chip uppercase px-2 py-1 rounded bg-emerald-600 text-white font-semibold">Strong</span>
+              <span class="chip uppercase px-2 py-1 rounded bg-orange-600 text-white font-semibold">High</span>
+              <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">input-validation</span>
+            </div>
+          </div>
+          <div class="font-mono text-sm text-slate-500">
+            src/03_Preprocessing.jl:151-170 (ReturnsResult ctor) · :974 (NaN→missing only, Inf passes) ·
+            src/08_Moments/05_GerberCovariance.jl:298-299 (comparison sink)
+          </div>
+
+          <div class="rounded-lg border border-slate-200 bg-white p-4">
+            <pre class="mermaid">
+flowchart LR
+  A["CSV / feed with NaN or a<br/>zero price (→ Inf return)"] -->|untrusted matrix| B["ReturnsResult(; X, nx)"]
+  B -->|"no isfinite check<br/>(iv/ivpa ARE checked)"| C["GerberCovariance"]
+  C -.taint.-> D["U .= X .&gt;= sd<br/>NaN compares false → 'no move'"]
+  D --> E["finite, plausible,<br/>wrong ρ → optimiser"]
+  classDef taint stroke:#dc2626,stroke-width:2px;
+  classDef sink fill:#7f1d1d,color:#fff;
+  class B,C taint
+  class D sink
+            </pre>
+          </div>
+
+          <div class="space-y-3 font-mono text-sm">
+            <div class="rounded p-3 bg-red-50" style="border-left:4px solid #dc2626">
+              <div class="text-xs uppercase tracking-wider mb-1 text-red-700">Before — fails open, silently</div>
+              ReturnsResult(; X = [0.01 NaN; -0.02 0.03], nx = ["A", "B"])&nbsp;&nbsp;# accepted<br/>
+              # Gerber: NaN .&gt;= sd → false in BOTH U and D → the corrupt observation counts as "no co-movement"<br/>
+              # ρ is finite and plausible — the wrong weights ship with no error anywhere
+            </div>
+            <div class="rounded p-3 bg-emerald-50" style="border-left:4px solid #059669">
+              <div class="text-xs uppercase tracking-wider mb-1 text-emerald-700">After — fails closed at the boundary</div>
+              ReturnsResult(; X = [0.01 NaN; -0.02 0.03], nx = ["A", "B"])<br/>
+              # IsNonFiniteError: X must be finite; non-finite entries at CartesianIndex(1, 2). Impute or filter first.
+            </div>
+          </div>
+
+          <div class="space-y-1.5 text-sm leading-relaxed">
+            <p><span class="font-semibold">Problem.</span> The central data boundary validates <code>iv</code>/<code>ivpa</code> for finiteness but never <code>X</code>/<code>F</code>/<code>B</code>, and <code>prices_to_returns</code> unifies only NaN→missing while a zero price yields an Inf return that passes — so untrusted data reaches comparison sinks like Gerber's <code>X .>= sd</code> where NaN masks as <code>false</code> and the blast radius is a silent wrong result (the worst category), reachable from the exported API with defaults.</p>
+            <p><span class="font-semibold">Direction.</span> Add <code>all(isfinite, ·)</code> checks for <code>X</code>/<code>F</code>/<code>B</code> in the <code>ReturnsResult</code> constructor (matching the existing <code>iv</code>/<code>ivpa</code> discipline) and widen the price-level NaN transform to <code>!isfinite</code> — roughly four lines total.</p>
+          </div>
+
+          <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
+            <li>closes a silent-wrong-answer path</li>
+            <li>fails closed at the data boundary</li>
+            <li>matches existing iv/ivpa discipline</li>
+            <li>blast radius: ~4-line fix</li>
+          </ul>
+
+          <div class="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+            <span class="font-semibold">Prior review:</span> flagged High in the 2026-07-07 pass and still open — no ADR accepts the risk. The inconsistency (checking derived <code>iv</code>/<code>ivpa</code> but not the primary matrices) is itself the tell.
+          </div>
+        </article>
+
+        <!-- ─────────────────────────── Finding 2 ─────────────────────────── -->
+        <article id="c2" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
+          <div class="space-y-2">
+            <h2 class="text-xl font-semibold">2 · Untrusted config integers size unbounded allocations and loops</h2>
+            <div class="flex flex-wrap gap-2">
+              <span class="chip uppercase px-2 py-1 rounded bg-emerald-600 text-white font-semibold">Strong</span>
+              <span class="chip uppercase px-2 py-1 rounded bg-amber-500 text-white font-semibold">Medium</span>
+              <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">input-validation</span>
+            </div>
+          </div>
+          <div class="font-mono text-sm text-slate-500">
+            src/14_UncertaintySets/03_NormalUncertaintySets.jl:119,589-591 ·
+            src/14_UncertaintySets/04_BootstrapUncertaintySets.jl:284,338-339 ·
+            src/20_Optimisation/19_SubsetResampling.jl:526,532-533
+          </div>
+
+          <div class="rounded-lg border border-slate-200 bg-white p-4">
+            <pre class="mermaid">
+flowchart LR
+  A["config file<br/>n_sim = 10_000_000_000"] -->|untrusted integer| B["ARCHUncertaintySet(; n_sim)"]
+  B -->|"only check: n_sim &gt; 0"| C["bootstrap_generator"]
+  C -.taint.-> D["Array{Float64}(undef, N, N, n_sim)"]
+  classDef taint stroke:#dc2626,stroke-width:2px;
+  classDef sink fill:#7f1d1d,color:#fff;
+  class B,C taint
+  class D sink
+            </pre>
+          </div>
+
+          <div class="space-y-3 font-mono text-sm">
+            <div class="rounded p-3 bg-red-50" style="border-left:4px solid #dc2626">
+              <div class="text-xs uppercase tracking-wider mb-1 text-red-700">Before — fails open above the lower bound</div>
+              ARCHUncertaintySet(; n_sim = 10_000_000_000)&nbsp;&nbsp;# passes @argcheck(n_sim &gt; 0)<br/>
+              # 20 assets → Array{Float64}(undef, 20, 20, 1e10) = a 32 TB request → OOM-killer takes the host process
+            </div>
+            <div class="rounded p-3 bg-emerald-50" style="border-left:4px solid #059669">
+              <div class="text-xs uppercase tracking-wider mb-1 text-emerald-700">After — fails closed at the boundary</div>
+              ARCHUncertaintySet(; n_sim = 10_000_000_000)<br/>
+              # DomainError: n_sim = 10000000000 exceeds RESOURCE_LIMITS[].max_samples = 1_000_000.<br/>
+              # Raise it with set_resource_limits!(; max_samples) for genuinely large machine-authored runs.
+            </div>
+          </div>
+
+          <div class="space-y-1.5 text-sm leading-relaxed">
+            <p><span class="font-semibold">Problem.</span> Three exported constructors accept an untrusted integer that directly multiplies an allocation or a full-optimisation loop with only a lower bound — <code>n_sim</code> in both <code>NormalUncertaintySet</code> (Wishart/MvNormal draws of <code>N²·n_sim</code>) and <code>ARCHUncertaintySet</code> (<code>N²·n_sim</code> bootstrap array), and <code>n_subsets</code> in <code>SubsetResampling</code> (whose only ceiling, <code>binomial(N, subset_size)</code>, is astronomically large for realistic universes) — so a config-supplied value reaches the allocation sink unchecked and the blast radius is a process kill (OOM / compute exhaustion), reachable from the exported API.</p>
+            <p><span class="font-semibold">Direction.</span> Add a runtime-overridable resource cap mirroring the <code>EQUATION_LIMITS</code> idiom (ADR 0027) — conservative default far above legitimate use, checked at the constructor trust boundary, raised explicitly via a setter by callers with genuinely large machine-authored runs.</p>
+          </div>
+
+          <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
+            <li>fails closed on absurd integers</li>
+            <li>blast radius: OOM kill → typed error</li>
+            <li>reuses proven EQUATION_LIMITS idiom</li>
+            <li>one config, three sinks closed</li>
+          </ul>
+
+          <div class="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+            <span class="font-semibold">Prior review:</span> the <code>n_sim</code> ceiling was an explicitly open item of the 2026-07-06 pass; no ADR accepts the risk. The sibling combinatorial-CV explosion was since closed with a hard <code>max_comb</code> <code>@argcheck</code> — this finding extends the same treatment to the remaining unbounded integers.
+          </div>
+        </article>
+
+        <!-- ─────────────────────────── Finding 3 ─────────────────────────── -->
+        <article id="c3" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
+          <div class="space-y-2">
+            <h2 class="text-xl font-semibold">3 · <code>seed</code> reseeds the caller's task-global RNG in place</h2>
+            <div class="flex flex-wrap gap-2">
+              <span class="chip uppercase px-2 py-1 rounded bg-emerald-600 text-white font-semibold">Strong</span>
+              <span class="chip uppercase px-2 py-1 rounded bg-amber-500 text-white font-semibold">Medium</span>
+              <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">least-privilege</span>
+            </div>
+          </div>
+          <div class="font-mono text-sm text-slate-500">
+            src/14_UncertaintySets/03_NormalUncertaintySets.jl:357,490,587 ·
+            04_BootstrapUncertaintySets.jl:341,382,422 ·
+            src/20_Optimisation/03_NaiveOptimisation.jl:766 · 02_CrossValidation/05_MultipleRandomised.jl:345 ·
+            11_RandomisedSearchCrossValidation.jl:81 · src/23_Pipeline/05_SearchCrossValidation.jl:348 ·
+            src/11_Phylogeny/05_NonHierarchicalClustering.jl:107
+          </div>
+
+          <div class="space-y-3 font-mono text-sm">
+            <div class="rounded p-3 bg-red-50" style="border-left:4px solid #dc2626">
+              <div class="text-xs uppercase tracking-wider mb-1 text-red-700">Before — seeding a shared object the caller also owns</div>
+              ue = NormalUncertaintySet(; seed = 42)&nbsp;&nbsp;# rng defaults to Random.default_rng()<br/>
+              ucs(ue, X)&nbsp;&nbsp;&nbsp;&nbsp;# Random.seed!(ue.rng, 42) → reseeds the caller's task-local RNG<br/>
+              rand()&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# caller's "random" stream is now deterministic from 42 — silently
+            </div>
+            <div class="rounded p-3 bg-emerald-50" style="border-left:4px solid #059669">
+              <div class="text-xs uppercase tracking-wider mb-1 text-emerald-700">After — a seed buys a private stream, not the shared one</div>
+              # resolve_rng(rng, seed) = isnothing(seed) ? rng : Random.Xoshiro(seed)<br/>
+              ucs(ue, X)&nbsp;&nbsp;&nbsp;&nbsp;# draws from a private Xoshiro(42); reproducible, self-contained<br/>
+              rand()&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# caller's stream untouched
+            </div>
+          </div>
+
+          <div class="space-y-1.5 text-sm leading-relaxed">
+            <p><span class="font-semibold">Problem.</span> Every seeded estimator defaults <code>rng = Random.default_rng()</code> and, when <code>seed</code> is set, calls <code>Random.seed!(ue.rng, ue.seed)</code> — so with default settings the library mutates the caller's task-global RNG state, holding more capability than reproducibility needs and silently derandomising every downstream consumer of the global stream (Monte-Carlo code, other libraries, test frameworks); reachable from the exported API with defaults.</p>
+            <p><span class="font-semibold">Direction.</span> One <code>resolve_rng(rng, seed)</code> helper at the draw sites: a supplied seed yields a private <code>Xoshiro(seed)</code>; an explicitly supplied rng is used as-is; the shared default rng is never seeded in place.</p>
+          </div>
+
+          <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
+            <li>least privilege: no global mutation</li>
+            <li>blast radius: one helper, ~12 sites</li>
+            <li>reproducibility preserved per estimator</li>
+            <li>closes silent caller-state contamination</li>
+          </ul>
+
+          <div class="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+            <span class="font-semibold">Behaviour note:</span> repeated fits of the same seeded estimator already restart the stream (that is what the in-place <code>seed!</code> is for), so a private per-call rng preserves the observable contract — only the side effect on the caller's stream disappears. Existing test CSVs seeded through the global rng may need regenerating; worth checking before committing to the swap.
+          </div>
+        </article>
+
+        <!-- ─────────────────────────── Finding 4 ─────────────────────────── -->
+        <article id="c4" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
+          <div class="space-y-2">
+            <h2 class="text-xl font-semibold">4 · <code>min_score</code> accepts any <code>Real</code> — a non-positive value turns "did you mean?" into a universe-name oracle</h2>
+            <div class="flex flex-wrap gap-2">
+              <span class="chip uppercase px-2 py-1 rounded bg-emerald-600 text-white font-semibold">Strong</span>
+              <span class="chip uppercase px-2 py-1 rounded bg-slate-500 text-white font-semibold">Low</span>
+              <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">info-leak</span>
+            </div>
+          </div>
+          <div class="font-mono text-sm text-slate-500">src/01_Base.jl:1267 (StringDistanceConfig) · :1300-1303 (set_string_distance!) · :1597-1601 (apply_preferences!)</div>
+
+          <div class="space-y-3 font-mono text-sm">
+            <div class="rounded p-3 bg-red-50" style="border-left:4px solid #dc2626">
+              <div class="text-xs uppercase tracking-wider mb-1 text-red-700">Before — type-checked, never range-checked</div>
+              # LocalPreferences.toml:&nbsp;&nbsp;suggestion_min_score = -1.0&nbsp;&nbsp;# loads fine<br/>
+              parse_equation("ZZZQX &gt;= 0.1") … @warn "…not found in nx (10 assets) (did you mean `AAPL`?)"<br/>
+              # threshold gone: EVERY unknown probe now names its nearest real asset — repeated probes enumerate the universe the builders deliberately never print
+            </div>
+            <div class="rounded p-3 bg-emerald-50" style="border-left:4px solid #059669">
+              <div class="text-xs uppercase tracking-wider mb-1 text-emerald-700">After — range enforced where the type is built</div>
+              StringDistanceConfig(dist, min_score) requires min_score &gt;= 0<br/>
+              # ArgumentError at set_string_distance! / package load — same throw-at-load posture as the EQUATION_LIMITS preferences<br/>
+              # (&gt; 1 stays legal: it is the documented "disable suggestions" sentinel)
+            </div>
+          </div>
+
+          <div class="space-y-1.5 text-sm leading-relaxed">
+            <p><span class="font-semibold">Problem.</span> The preference path and <code>set_string_distance!</code> validate <code>min_score</code> only as a non-<code>Bool</code> <code>Real</code>, so a zero or negative value silently removes the threshold that keeps <code>did_you_mean</code> from echoing a real asset name for arbitrary probes — undoing the ADR 0026 "never interpolate the universe" discipline one name per warning; latent (requires a bad project preference or setter call), not reachable with defaults.</p>
+            <p><span class="font-semibold">Direction.</span> Enforce <code>min_score >= 0</code> in the <code>StringDistanceConfig</code> inner constructor, so every route in — setter, scoped override, load-time preference — fails closed at construction, matching the <code>EquationLimits</code> pattern.</p>
+          </div>
+
+          <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
+            <li>fails closed at config load</li>
+            <li>one constructor guards three routes</li>
+            <li>preserves &gt;1 disable sentinel</li>
+            <li>keeps ADR 0026 leak posture intact</li>
+          </ul>
+
+          <div class="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+            <span class="font-semibold">ADR 0026:</span> the suggestion threshold is what makes the fuzzy hint safe to append to the info-leak-safe builders. This finding closes the one configuration that defeats it.
+          </div>
+        </article>
+
+        <!-- ─────────────────────────── Finding 5 ─────────────────────────── -->
+        <article id="c5" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
+          <div class="space-y-2">
+            <h2 class="text-xl font-semibold">5 · Pipeline step-name diagnostics dump the whole name collection</h2>
+            <div class="flex flex-wrap gap-2">
+              <span class="chip uppercase px-2 py-1 rounded bg-amber-500 text-white font-semibold">Worth exploring</span>
+              <span class="chip uppercase px-2 py-1 rounded bg-slate-500 text-white font-semibold">Low</span>
+              <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">info-leak</span>
+            </div>
+          </div>
+          <div class="font-mono text-sm text-slate-500">src/23_Pipeline/03_Pipeline.jl:259 (getindex) · :115 (constructor)</div>
+
+          <div class="space-y-3 font-mono text-sm">
+            <div class="rounded p-3 bg-red-50" style="border-left:4px solid #dc2626">
+              <div class="text-xs uppercase tracking-wider mb-1 text-red-700">Before — enumerates the valid set</div>
+              pr["wieghts"]<br/>
+              # ArgumentError: no pipeline step named "wieghts"; available steps: ["split", "p2r", "prior", "weights"]
+            </div>
+            <div class="rounded p-3 bg-emerald-50" style="border-left:4px solid #059669">
+              <div class="text-xs uppercase tracking-wider mb-1 text-emerald-700">After — builder shape: size + gated suggestion</div>
+              pr["wieghts"]<br/>
+              # ArgumentError: no pipeline step named "wieghts" among the 4 named steps (did you mean `weights`?)
+            </div>
+          </div>
+
+          <div class="space-y-1.5 text-sm leading-relaxed">
+            <p><span class="font-semibold">Problem.</span> <code>PipelineResult</code>'s string <code>getindex</code> (and the constructor's uniqueness check) resolve an untrusted name and interpolate the entire step-name collection into the error — the exact pattern ADR 0026's shared builders exist to prevent at asset/group/view boundaries; reachable from the exported API, though the leaked set is only the caller's own step names, hence Low.</p>
+            <p><span class="font-semibold">Direction.</span> Route both messages through the shared-builder shape — count plus threshold-gated <code>did_you_mean</code> over the step names — so the boundary discipline holds uniformly and future greps for drift stay clean.</p>
+          </div>
+
+          <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
+            <li>uniform builder discipline, no drift</li>
+            <li>typo still gets a suggestion</li>
+            <li>blast radius: two message strings</li>
+          </ul>
+        </article>
+
+        <!-- ─────────────────────────── Finding 6 ─────────────────────────── -->
+        <article id="c6" class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-5">
+          <div class="space-y-2">
+            <h2 class="text-xl font-semibold">6 · <code>pipeline_lens</code> fails open: an unknown step name silently becomes a property lens</h2>
+            <div class="flex flex-wrap gap-2">
+              <span class="chip uppercase px-2 py-1 rounded bg-amber-500 text-white font-semibold">Worth exploring</span>
+              <span class="chip uppercase px-2 py-1 rounded bg-slate-500 text-white font-semibold">Low</span>
+              <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">input-validation</span>
+            </div>
+          </div>
+          <div class="font-mono text-sm text-slate-500">src/23_Pipeline/05_SearchCrossValidation.jl:84-89</div>
+
+          <div class="rounded-lg border border-slate-200 bg-white p-4">
+            <pre class="mermaid">
+flowchart LR
+  A["tuning grid key<br/>:wieghts"] -->|untrusted name| B["pipeline_lens(pipe, key)"]
+  B -->|"name in pipe.names? no"| C["parse_lens(key)"]
+  C -.silent reinterpretation.-> D["PropertyLens(:wieghts)<br/>applied to Pipeline struct"]
+  classDef taint stroke:#dc2626,stroke-width:2px;
+  classDef sink fill:#7f1d1d,color:#fff;
+  class B,C taint
+  class D sink
+            </pre>
+          </div>
+
+          <div class="space-y-1.5 text-sm leading-relaxed">
+            <p><span class="font-semibold">Problem.</span> When a search-CV tuning key names a step that is not in <code>pipe.names</code>, the <code>Symbol</code> method falls through to <code>parse_lens</code> instead of failing closed, so a typo is silently reinterpreted as a field access on the <code>Pipeline</code> struct and surfaces later as an unrelated <code>FieldError</code> deep in the tuning loop — misdirection rather than a silent wrong answer (the capped, structurally-restricted <code>parse_lens</code> still bounds what the key can do), and reachable via the search-CV parameter grid.</p>
+            <p><span class="font-semibold">Direction.</span> Fail closed for plain (undotted) symbols that miss the step-name table — typed error with a threshold-gated <code>did_you_mean</code> over <code>pipe.names</code> — keeping the fallthrough only for genuinely dotted lens paths.</p>
+          </div>
+
+          <ul class="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-700 list-disc list-inside">
+            <li>fails closed on unknown step name</li>
+            <li>error surfaces at the boundary</li>
+            <li>blast radius: one method branch</li>
+          </ul>
+        </article>
+
+      </section>
+
+      <!-- ─────────────────────────── Checked clean ─────────────────────────── -->
+      <section class="rounded-xl border border-slate-200 bg-white shadow-sm p-6 space-y-3">
+        <h2 class="text-lg font-bold">Checked clean</h2>
+        <ul class="grid sm:grid-cols-2 gap-x-8 gap-y-1.5 text-sm text-slate-700 list-disc list-inside">
+          <li>No <code>eval</code>/<code>invokelatest</code>/subprocess/network/deserialization sink in <code>src/</code> or <code>ext/</code></li>
+          <li>Both <code>Meta.parse</code> sites capped (<code>parse_equation</code>, <code>parse_lens</code>) — ADRs 0025/0027 holding</li>
+          <li>All asset/group/view boundaries route through the ADR 0026 builders (constraints, BL views, entropy-pooling views, dict value maps)</li>
+          <li>Combinatorial-CV split explosion now fails closed via <code>max_comb</code> (Jul 6 open item — closed)</li>
+          <li><code>ReturnsResult</code>/<code>Pipeline</code> name vectors validated <code>allunique</code> (Jul 6 open item — closed)</li>
+          <li>Load-time preferences fail closed for <code>EQUATION_LIMITS</code> and distance names (throw-at-load)</li>
+          <li><code>expr_to_lens_chain</code> is structurally an allowlist: property/index access only, no calls</li>
+          <li><code>ext/</code> plotting extension: interpolation reaches labels/titles only</li>
+        </ul>
+      </section>
+
+      <!-- ─────────────────────────── Top recommendation ─────────────────────────── -->
+      <section id="top-recommendation" class="rounded-xl border-2 border-red-200 bg-white shadow-sm p-6 space-y-3">
+        <h2 class="text-lg font-bold text-red-800">Top recommendation — close the non-finite returns boundary (<a href="#c1" class="underline">finding 1</a>)</h2>
+        <p class="text-sm text-slate-700 leading-relaxed">
+          It is the review's one silent-wrong-answer path — untrusted data with a NaN or an Inf return crosses the
+          central <code>ReturnsResult</code> boundary unchecked and comes out the other side as plausible, finite,
+          wrong portfolio weights — it is reachable from the exported API with defaults, it has been open since the
+          2026-07-07 pass, and the fix is about four lines matching the validation the same constructor already
+          applies to <code>iv</code>/<code>ivpa</code>. Second in line: the unbounded resource integers
+          (<a href="#c2" class="underline">finding 2</a>), the one remaining process-kill path, closable with the
+          proven <code>EQUATION_LIMITS</code> cap idiom.
+        </p>
+      </section>
+
+      <footer class="pt-6 text-xs text-slate-400">
+        Generated 2026-07-19 · <code>/improve-security</code> · findings verified against source on branch <code>dev</code>; prior-pass accepted risks (ADRs 0025–0027) not re-flagged.
+      </footer>
+
+    </main>
+  </body>
+</html>
