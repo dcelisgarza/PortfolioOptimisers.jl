@@ -8,4 +8,6 @@ mu_ucs(ue::DeltaUncertaintySet, X::MatNum,
                 F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
 sigma_ucs(ue::DeltaUncertaintySet, X::MatNum,
                    F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
+mu_delta_box_set
+sigma_delta_box_set
 ```
