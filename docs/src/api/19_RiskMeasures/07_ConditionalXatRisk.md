@@ -11,4 +11,5 @@ ConditionalDrawdownatRisk
 DistributionallyRobustConditionalDrawdownatRisk
 RMCDaR
 RelativeConditionalDrawdownatRisk
+conditional_drawdown_at_risk
 ```

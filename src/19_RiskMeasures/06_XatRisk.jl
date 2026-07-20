@@ -580,6 +580,7 @@ DrawdownatRisk
   - [`RiskMeasureSettings`](@ref)
   - [`ConditionalDrawdownatRisk`](@ref)
   - [`RelativeDrawdownatRisk`](@ref)
+  - [`drawdown_at_risk`](@ref)
 """
 @propagatable @concrete struct DrawdownatRisk <: RiskMeasure
     """
@@ -665,20 +666,54 @@ function absolute_drawdown_vec(x::VecNum)
     end
     return dd
 end
-function (r::DrawdownatRisk{<:Any, <:Any, Nothing})(x::VecNum)
-    dd = absolute_drawdown_vec(x)
-    return -partialsort!(dd, ceil(Int, r.alpha * length(x)))
+"""
+    drawdown_at_risk(dd::VecNum, alpha::Real, ::Nothing) -> Number
+    drawdown_at_risk(dd::VecNum, alpha::Real, w::VecNum) -> Number
+
+Aggregate a drawdown series into its Drawdown-at-Risk at level `alpha`.
+
+This is the shared aggregation kernel behind [`DrawdownatRisk`](@ref) and [`RelativeDrawdownatRisk`](@ref): the two measures differ only in the drawdown series they feed it ([`absolute_drawdown_vec`](@ref) and [`relative_drawdown_vec`](@ref) respectively), so the tail selection lives here once.
+
+`dd` is **consumed in place** — the unweighted method reorders it via `partialsort!`. Callers pass a freshly computed drawdown vector.
+
+Dispatch on the third argument selects the weighting scheme, so callers resolve observation weights with [`get_observation_weights`](@ref) and let dispatch do the rest.
+
+  - `::Nothing`: unweighted, the `alpha`-quantile of the drawdown series by rank.
+  - `w::VecNum`: weighted, the drawdown at which the cumulative observation weight first reaches `alpha`.
+
+# Arguments
+
+  - `dd::VecNum`: Drawdown series, all entries ≤ 0. Consumed in place.
+  - `alpha::Real`: Significance level, `0 < alpha < 1`.
+  - `w`: Resolved observation weights, or `nothing` for the unweighted aggregation.
+
+# Returns
+
+  - `Number`: Drawdown-at-Risk, returned as a positive loss.
+
+# Related
+
+  - [`DrawdownatRisk`](@ref)
+  - [`RelativeDrawdownatRisk`](@ref)
+  - [`absolute_drawdown_vec`](@ref)
+  - [`relative_drawdown_vec`](@ref)
+  - [`conditional_drawdown_at_risk`](@ref)
+"""
+function drawdown_at_risk(dd::VecNum, alpha::Real, ::Nothing)
+    return -partialsort!(dd, ceil(Int, alpha * length(dd)))
 end
-function (r::DrawdownatRisk{<:Any, <:Any, <:ObsWeights})(x::VecNum)
-    dd = absolute_drawdown_vec(x)
+function drawdown_at_risk(dd::VecNum, alpha::Real, w::VecNum)
     order = sortperm(dd)
     sorted_dd = view(dd, order)
-    w = get_observation_weights(r.w, x)
     sorted_w = view(w, order)
     cum_w = cumsum(sorted_w)
-    idx = searchsortedfirst(cum_w, r.alpha)
+    idx = searchsortedfirst(cum_w, alpha)
     idx = ifelse(idx > length(dd), idx - 1, idx)
     return -sorted_dd[idx]
+end
+function (r::DrawdownatRisk)(x::VecNum)
+    return drawdown_at_risk(absolute_drawdown_vec(x), r.alpha,
+                            get_observation_weights(r.w, x))
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -766,6 +801,7 @@ RelativeDrawdownatRisk
   - [`HierarchicalRiskMeasureSettings`](@ref)
   - [`DrawdownatRisk`](@ref)
   - [`RelativeConditionalDrawdownatRisk`](@ref)
+  - [`drawdown_at_risk`](@ref)
 """
 @propagatable @concrete struct RelativeDrawdownatRisk <: HierarchicalRiskMeasure
     """
@@ -828,20 +864,9 @@ function relative_drawdown_vec(x::VecNum)
     end
     return dd
 end
-function (r::RelativeDrawdownatRisk{<:Any, <:Any, Nothing})(x::VecNum)
-    dd = relative_drawdown_vec(x)
-    return -partialsort!(dd, ceil(Int, r.alpha * length(x)))
-end
-function (r::RelativeDrawdownatRisk{<:Any, <:Any, <:ObsWeights})(x::VecNum)
-    dd = relative_drawdown_vec(x)
-    order = sortperm(dd)
-    sorted_dd = view(dd, order)
-    w = get_observation_weights(r.w, x)
-    sorted_w = view(w, order)
-    cum_w = cumsum(sorted_w)
-    idx = searchsortedfirst(cum_w, r.alpha)
-    idx = ifelse(idx > length(dd), idx - 1, idx)
-    return -sorted_dd[idx]
+function (r::RelativeDrawdownatRisk)(x::VecNum)
+    return drawdown_at_risk(relative_drawdown_vec(x), r.alpha,
+                            get_observation_weights(r.w, x))
 end
 
 """

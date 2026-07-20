@@ -695,6 +695,7 @@ ConditionalDrawdownatRisk
   - [`DrawdownatRisk`](@ref)
   - [`DistributionallyRobustConditionalDrawdownatRisk`](@ref)
   - [`RelativeConditionalDrawdownatRisk`](@ref)
+  - [`conditional_drawdown_at_risk`](@ref)
 """
 @propagatable @concrete struct ConditionalDrawdownatRisk <: RiskMeasure
     """
@@ -798,6 +799,7 @@ DistributionallyRobustConditionalDrawdownatRisk
   - [`RiskMeasureSettings`](@ref)
   - [`ConditionalDrawdownatRisk`](@ref)
   - [`DistributionallyRobustConditionalValueatRisk`](@ref)
+  - [`conditional_drawdown_at_risk`](@ref)
 """
 @propagatable @concrete struct DistributionallyRobustConditionalDrawdownatRisk <:
                                RiskMeasure
@@ -858,26 +860,57 @@ const RMCDaR{T} = Union{<:ConditionalDrawdownatRisk{<:Any, <:Any, <:T},
                         <:DistributionallyRobustConditionalDrawdownatRisk{<:Any, <:Any,
                                                                           <:Any, <:Any,
                                                                           <:T}}
-function (r::RMCDaR{Nothing})(x::VecNum)
-    aT = r.alpha * length(x)
+"""
+    conditional_drawdown_at_risk(dd::VecNum, alpha::Real, ::Nothing) -> Number
+    conditional_drawdown_at_risk(dd::VecNum, alpha::Real, w::VecNum) -> Number
+
+Aggregate a drawdown series into its Conditional Drawdown-at-Risk at level `alpha`.
+
+This is the shared aggregation kernel behind [`ConditionalDrawdownatRisk`](@ref), [`DistributionallyRobustConditionalDrawdownatRisk`](@ref) and [`RelativeConditionalDrawdownatRisk`](@ref): the measures differ only in the drawdown series they feed it ([`absolute_drawdown_vec`](@ref) and [`relative_drawdown_vec`](@ref) respectively), so the tail averaging lives here once.
+
+`dd` is **consumed in place** — the unweighted method reorders it via `partialsort!`. Callers pass a freshly computed drawdown vector.
+
+Dispatch on the third argument selects the weighting scheme, so callers resolve observation weights with [`get_observation_weights`](@ref) and let dispatch do the rest.
+
+  - `::Nothing`: unweighted, the mean of the drawdowns beyond the `alpha`-quantile by rank.
+  - `w::VecNum`: weighted, the weighted mean of the tail, with the boundary observation contributing only its partial weight.
+
+# Arguments
+
+  - `dd::VecNum`: Drawdown series, all entries ≤ 0. Consumed in place.
+  - `alpha::Real`: Significance level, `0 < alpha < 1`.
+  - `w`: Resolved observation weights, or `nothing` for the unweighted aggregation.
+
+# Returns
+
+  - `Number`: Conditional Drawdown-at-Risk, returned as a positive loss.
+
+# Related
+
+  - [`ConditionalDrawdownatRisk`](@ref)
+  - [`DistributionallyRobustConditionalDrawdownatRisk`](@ref)
+  - [`RelativeConditionalDrawdownatRisk`](@ref)
+  - [`absolute_drawdown_vec`](@ref)
+  - [`relative_drawdown_vec`](@ref)
+  - [`drawdown_at_risk`](@ref)
+"""
+function conditional_drawdown_at_risk(dd::VecNum, alpha::Real, ::Nothing)
+    aT = alpha * length(dd)
     idx = ceil(Int, aT)
-    dd = absolute_drawdown_vec(x)
     var = -partialsort!(dd, idx)
-    sum_var = zero(eltype(x))
+    sum_var = zero(eltype(dd))
     for i in 1:(idx - 1)
         sum_var += dd[i] + var
     end
     return var - sum_var / aT
 end
-function (r::RMCDaR{<:ObsWeights})(x::VecNum)
-    w = get_observation_weights(r.w, x)
+function conditional_drawdown_at_risk(dd::VecNum, alpha::Real, w::VecNum)
     sw = sum(w)
-    dd = absolute_drawdown_vec(x)
     order = sortperm(dd)
     sorted_dd = view(dd, order)
     sorted_w = view(w, order)
     cum_w = cumsum(sorted_w)
-    alpha = sw * r.alpha
+    alpha = sw * alpha
     idx = searchsortedfirst(cum_w, alpha)
     return if idx == 1
         -sorted_dd[1]
@@ -886,6 +919,10 @@ function (r::RMCDaR{<:ObsWeights})(x::VecNum)
         -(LinearAlgebra.dot(sorted_dd[1:(idx - 1)], sorted_w[1:(idx - 1)]) +
           sorted_dd[idx] * (alpha - cum_w[idx - 1])) / alpha
     end
+end
+function (r::RMCDaR)(x::VecNum)
+    return conditional_drawdown_at_risk(absolute_drawdown_vec(x), r.alpha,
+                                        get_observation_weights(r.w, x))
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -973,6 +1010,7 @@ RelativeConditionalDrawdownatRisk
   - [`HierarchicalRiskMeasureSettings`](@ref)
   - [`ConditionalDrawdownatRisk`](@ref)
   - [`RelativeDrawdownatRisk`](@ref)
+  - [`conditional_drawdown_at_risk`](@ref)
 """
 @propagatable @concrete struct RelativeConditionalDrawdownatRisk <: HierarchicalRiskMeasure
     """
@@ -1000,34 +1038,9 @@ function RelativeConditionalDrawdownatRisk(;
                                            w::Option{<:ObsWeights} = nothing)::RelativeConditionalDrawdownatRisk
     return RelativeConditionalDrawdownatRisk(settings, alpha, w)
 end
-function (r::RelativeConditionalDrawdownatRisk{<:Any, <:Any, Nothing})(x::VecNum)
-    aT = r.alpha * length(x)
-    idx = ceil(Int, aT)
-    dd = relative_drawdown_vec(x)
-    var = -partialsort!(dd, idx)
-    sum_var = zero(eltype(x))
-    for i in 1:(idx - 1)
-        sum_var += dd[i] + var
-    end
-    return var - sum_var / aT
-end
-function (r::RelativeConditionalDrawdownatRisk{<:Any, <:Any, <:ObsWeights})(x::VecNum)
-    w = get_observation_weights(r.w, x)
-    sw = sum(w)
-    dd = relative_drawdown_vec(x)
-    order = sortperm(dd)
-    sorted_dd = view(dd, order)
-    sorted_w = view(w, order)
-    cum_w = cumsum(sorted_w)
-    alpha = sw * r.alpha
-    idx = searchsortedfirst(cum_w, alpha)
-    return if idx == 1
-        -sorted_dd[1]
-    else
-        idx = ifelse(idx > length(dd), idx - 1, idx)
-        -(LinearAlgebra.dot(sorted_dd[1:(idx - 1)], sorted_w[1:(idx - 1)]) +
-          sorted_dd[idx] * (alpha - cum_w[idx - 1])) / alpha
-    end
+function (r::RelativeConditionalDrawdownatRisk)(x::VecNum)
+    return conditional_drawdown_at_risk(relative_drawdown_vec(x), r.alpha,
+                                        get_observation_weights(r.w, x))
 end
 
 # Expected-risk input kind — see `risk_input_kind`.
