@@ -12,6 +12,7 @@ StatsAPI.predict(res::PipelineResult, data::AbstractPricesResult,
                           test_idx = Colon(), cols = Colon())
 fit_predict(pipe::Pipeline, data::Prices_RR)
 port_opt_view(::Pipeline, args...; kwargs...)
+first_duplicate
 ```
 
 ## Holdout splitting

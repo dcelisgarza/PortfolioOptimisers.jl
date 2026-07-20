@@ -53,9 +53,25 @@ function assert_opt_last(ests)::Nothing
     end
     return nothing
 end
-# Return the first element that repeats an earlier one, for a name-uniqueness error
-# that names the offending token without dumping the whole collection (ADR 0026 boundary
-# discipline). Only ever called on the failing path.
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the first element that repeats an earlier one, for a name-uniqueness error
+that names the offending token without dumping the whole collection (ADR 0026 boundary
+discipline). Only ever called on the failing path.
+
+# Arguments
+
+  - `xs`: A collection of names.
+
+# Returns
+
+  - `seen::Set{String}`: A collection of names.
+
+# Related
+
+  - [`Pipeline`](@ref)
+"""
 function first_duplicate(xs)
     seen = Set{eltype(xs)}()
     for x in xs
