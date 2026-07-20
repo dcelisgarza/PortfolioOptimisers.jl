@@ -36,18 +36,17 @@ Where:
   - [`SemiDefinitePhylogeny`](@ref)
 """
 function set_sdp_constraints!(model::JuMP.Model; prefix::Symbol = Symbol(""))
-    if haskey(model, Symbol(prefix, :W))
-        return model[Symbol(prefix, :W)]
+    return state_build!(model, prefix, :W) do
+        w = get_w(model, prefix)
+        k = effective_k(model)
+        sc = get_constraint_scale(model)
+        N = length(w)
+        W = JuMP.@variable(model, [1:N, 1:N], Symmetric)
+        M = state_set!(model, prefix, :M,
+                       JuMP.@expression(model, hcat(vcat(W, transpose(w)), vcat(w, k))))
+        state_set!(model, prefix, :M_PSD, JuMP.@constraint(model, sc * M in JuMP.PSDCone()))
+        return W
     end
-    w = get_w(model, prefix)
-    k = effective_k(model)
-    sc = get_constraint_scale(model)
-    N = length(w)
-    W = preg!(model, prefix, :W, JuMP.@variable(model, [1:N, 1:N], Symmetric))
-    M = preg!(model, prefix, :M,
-              JuMP.@expression(model, hcat(vcat(W, transpose(w)), vcat(w, k))))
-    preg!(model, prefix, :M_PSD, JuMP.@constraint(model, sc * M in JuMP.PSDCone()))
-    return W
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -71,10 +70,10 @@ Creates a symmetric matrix variable `frc_W` and enforces that the bordered matri
   - [`SemiDefinitePhylogeny`](@ref)
 """
 function set_sdp_frc_constraints!(model::JuMP.Model)
-    if haskey(model, :frc_W)
-        return model[:frc_W]
+    if shared_has(model, :frc_W)
+        return shared_get(model, :frc_W)
     end
-    w1 = model[:w1]
+    w1 = shared_get(model, :w1)
     sc = get_constraint_scale(model)
     k = get_k(model)
     Nf = length(w1)
@@ -119,7 +118,7 @@ function set_sdp_phylogeny_constraints!(model::JuMP.Model, plgs::Option{<:PlC_Ve
         key = Symbol(:sdp_plg_, i)
         A = pl.A
         model[key] = JuMP.@constraint(model, sc * A ⊙ W == 0)
-        if !haskey(model, :variance_flag)
+        if !shared_has(model, :variance_flag)
             key = Symbol(key, :_p)
             p = pl.p
             plp = model[key] = JuMP.@expression(model, p * LinearAlgebra.tr(W))
@@ -165,7 +164,7 @@ function set_sdp_frc_phylogeny_constraints!(model::JuMP.Model,
         key = Symbol(:frc_sdp_plg_, i)
         A = pl.A
         model[key] = JuMP.@constraint(model, sc * A ⊙ W == 0)
-        if !haskey(model, :variance_flag)
+        if !shared_has(model, :variance_flag)
             key = Symbol(key, :_p)
             p = pl.p
             plp = model[key] = JuMP.@expression(model, p * LinearAlgebra.tr(W))

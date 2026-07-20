@@ -126,13 +126,13 @@ function set_weight_constraints!(model::JuMP.Model, wb::WeightBounds,
     end
     set_budget_constraints!(model, bgt, w)
     if flag
-        lw, sw = if !haskey(model, :sw)
+        lw, sw = if !shared_has(model, :sw)
             JuMP.@variables(model, begin
                                 lw[1:N] >= 0
                                 sw[1:N] >= 0
                             end)
         else
-            model[:lw], model[:sw]
+            shared_get(model, :lw), shared_get(model, :sw)
         end
         JuMP.@constraints(model, begin
                               w_lw, sc * (w - lw) <= 0
@@ -143,7 +143,7 @@ function set_weight_constraints!(model::JuMP.Model, wb::WeightBounds,
         set_decomposition_contract!(model, PartsBoundWeights())
         set_long_short_budget_constraints!(model, bgt, sbgt)
         set_gross_budget_constraints!(model, gbgt)
-    elseif !flag && !haskey(model, :lw)
+    elseif !flag && !shared_has(model, :lw)
         JuMP.@expression(model, lw, w)
     end
     return nothing

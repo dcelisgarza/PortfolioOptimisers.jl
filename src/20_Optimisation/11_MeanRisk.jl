@@ -407,7 +407,7 @@ function solve_mean_risk!(model::JuMP.Model, mr::MeanRisk, ret::JuMPReturnsEstim
                           pr::AbstractPriorResult, ::Val{true}, ::Val{false},
                           fees::Option{<:Fees}, attrs::ProcessedJuMPOptimiserAttributes)
     X = pr.X
-    lbs = compute_ret_lbs(model[:ret_frontier], model, mr, ret, pr, fees, attrs)
+    lbs = compute_ret_lbs(shared_get(model, :ret_frontier), model, mr, ret, pr, fees, attrs)
     retcodes = sizehint!(OptimisationReturnCode[], length(lbs))
     sols = sizehint!(JuMPOptimisationSolution[], length(lbs))
     k = get_k(model)
@@ -557,7 +557,7 @@ Extracts the risk frontier from the model and rebuilds any frontier bounds that 
 function compute_risk_ubs(model::JuMP.Model, mr::MeanRisk, ret::JuMPReturnsEstimator,
                           pr::AbstractPriorResult, fees::Option{<:Fees},
                           attrs::ProcessedJuMPOptimiserAttributes)
-    risk_frontier = model[:risk_frontier]
+    risk_frontier = shared_get(model, :risk_frontier)
     idx = Vector{Int}(undef, 0)
     for (i, rkf) in enumerate(risk_frontier)
         if !isa(rkf.second[2], VecNum)
@@ -602,7 +602,7 @@ function solve_mean_risk!(model::JuMP.Model, mr::MeanRisk, ret::JuMPReturnsEstim
                           pr::AbstractPriorResult, ::Val{true}, ::Val{true},
                           fees::Option{<:Fees}, attrs::ProcessedJuMPOptimiserAttributes)
     X = pr.X
-    lbs = compute_ret_lbs(model[:ret_frontier], model, mr, ret, pr, fees, attrs)
+    lbs = compute_ret_lbs(shared_get(model, :ret_frontier), model, mr, ret, pr, fees, attrs)
     risk_frontier = compute_risk_ubs(model, mr, ret, pr, fees, attrs)
     sc = get_constraint_scale(model)
     k = get_k(model)
@@ -646,8 +646,9 @@ function _optimise(mr::MeanRisk, rd::ReturnsResult = ReturnsResult(); dims::Int 
     set_weight_constraints!(model, attrs.wb, mr.opt.bgt, mr.opt.sbgt; gbgt = mr.opt.gbgt)
     assemble_jump_model!(model, mr, mr.opt, attrs, rd, mr.r, mr.obj)
     retcode, sol = solve_mean_risk!(model, mr, attrs.ret, attrs.pr,
-                                    Val(haskey(model, :ret_frontier)),
-                                    Val(haskey(model, :risk_frontier)), attrs.fees, attrs)
+                                    Val(shared_has(model, :ret_frontier)),
+                                    Val(shared_has(model, :risk_frontier)), attrs.fees,
+                                    attrs)
     return MeanRiskResult(;
                           jr = JuMPOptimisationResult(; pa = attrs, retcode = retcode,
                                                       sol = sol,

@@ -263,7 +263,7 @@ function set_relaxed_risk_budgeting_alg_constraints!(::BasicRelaxedRiskBudgeting
                                                      sigma::MatNum,
                                                      chol::Option{<:MatNum} = nothing)
     sc = get_constraint_scale(model)
-    psi = model[:psi]
+    psi = shared_get(model, :psi)
     G = isnothing(chol) ? LinearAlgebra.cholesky(sigma).U : chol
     JuMP.@constraint(model, cbasic_rrp, [sc * psi; sc * G * w] in JuMP.SecondOrderCone())
     return nothing
@@ -273,7 +273,7 @@ function set_relaxed_risk_budgeting_alg_constraints!(::RegularisedRelaxedRiskBud
                                                      sigma::MatNum,
                                                      chol::Option{<:MatNum} = nothing)
     sc = get_constraint_scale(model)
-    psi = model[:psi]
+    psi = shared_get(model, :psi)
     G = isnothing(chol) ? LinearAlgebra.cholesky(sigma).U : chol
     JuMP.@variable(model, rho >= 0)
     JuMP.@constraints(model,
@@ -291,7 +291,7 @@ function set_relaxed_risk_budgeting_alg_constraints!(alg::RegularisedPenalisedRe
                                                      sigma::MatNum,
                                                      chol::Option{<:MatNum} = nothing)
     sc = get_constraint_scale(model)
-    psi = model[:psi]
+    psi = shared_get(model, :psi)
     G = isnothing(chol) ? LinearAlgebra.cholesky(sigma).U : chol
     theta = LinearAlgebra.Diagonal(sqrt.(LinearAlgebra.diag(sigma)))
     p = alg.p
@@ -388,7 +388,7 @@ function set_relaxed_risk_budgeting_constraints!(model::JuMP.Model,
                                                  rd::ReturnsResult)
     b1, rr = set_factor_risk_contribution_constraints!(model, rrb.rba.re, rd, rrb.rba.flag,
                                                        rrb.wi)
-    rkb = _set_relaxed_risk_budgeting_constraints!(model, rrb, model[:w1],
+    rkb = _set_relaxed_risk_budgeting_constraints!(model, rrb, shared_get(model, :w1),
                                                    Matrix(LinearAlgebra.Symmetric(rr.L \
                                                                                   pr.sigma *
                                                                                   b1)))

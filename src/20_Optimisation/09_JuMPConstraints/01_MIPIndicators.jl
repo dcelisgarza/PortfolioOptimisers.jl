@@ -65,10 +65,10 @@ Asset-space and sub-group MIP builders share the single `:ss` key; the first cal
   - [`mip_constraints`](@ref)
 """
 function set_mip_ss_expr!(model::JuMP.Model, ss::Option{<:Number}, wb::WeightBounds)
-    if haskey(model, :ss)
-        return model[:ss]
+    if shared_has(model, :ss)
+        return shared_get(model, :ss)
     end
-    return model[:ss] = JuMP.@expression(model, get_mip_ss(ss, wb))
+    return shared_set!(model, :ss, JuMP.@expression(model, get_mip_ss(ss, wb)))
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -351,7 +351,7 @@ same call, and never cross the late seam.
   - [`set_iplg_constraints!`](@ref)
 """
 function set_mip_indicators!(model::JuMP.Model, ind::AbstractMIPIndicators)
-    model[:mip_indicators] = ind
+    shared_set!(model, :mip_indicators, ind)
     return nothing
 end
 """
@@ -369,7 +369,7 @@ to gate on.
   - [`held_bin`](@ref)
 """
 function mip_indicators(model::JuMP.Model)
-    return haskey(model, :mip_indicators) ? model[:mip_indicators] : nothing
+    return shared_has(model, :mip_indicators) ? shared_get(model, :mip_indicators) : nothing
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -930,7 +930,7 @@ Selects among the three builders on flags shared by the asset space and every su
   - [`sign_mip_constraints`](@ref) when `sign_only` — an explicit `xbgt` with nothing else to
     consume a held indicator, so a single sign bit per asset suffices (returns a
     [`SignIndicators`](@ref), which has no held indicator).
-  - [`short_mip_threshold_constraints`](@ref) when a short side exists (`model[:sw]`) and
+  - [`short_mip_threshold_constraints`](@ref) when a short side exists (`shared_get(model, :sw)`) and
     something needs it — a short threshold, a fixed fee, or a pinned decomposition.
   - [`mip_constraints`](@ref) otherwise — the long-only held builder.
 
@@ -978,7 +978,7 @@ function run_mip_builder!(model::JuMP.Model, sp::AbstractMIPSpace, wb::WeightBou
                           pin_flag::Bool = false, sign_only::Bool = false)
     return if sign_only
         sign_mip_constraints(model, sp, wb, ss)
-    elseif (st_flag || ffl_flag || ffs_flag || xbgt_flag) && haskey(model, :sw)
+    elseif (st_flag || ffl_flag || ffs_flag || xbgt_flag) && shared_has(model, :sw)
         short_mip_threshold_constraints(model, sp, wb, lt, st, ffl, ffs, ss, lt_flag,
                                         st_flag, ffl_flag, ffs_flag, pin_flag)
     else
@@ -1045,7 +1045,7 @@ function set_mip_constraints!(model::JuMP.Model, wb::WeightBounds, card::Option{
     st_flag = !isnothing(st)
     # Pinning the decomposition is meaningless without a short side to pin: with no `sw`
     # the weights are their own long part and the budgets are already exact.
-    xbgt_flag = xbgt && haskey(model, :sw)
+    xbgt_flag = xbgt && shared_has(model, :sw)
     # A `WeightsFromParts` head needs no flag of its own to ask for the decomposition to be
     # pinned: `w = lw - sw` is what its parts are *for*. It stays distinct from `xbgt_flag`
     # because it also picks the builder below -- its `lw`/`sw` are the primitive variables,

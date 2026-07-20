@@ -4,7 +4,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 Retrieve or compute and cache the Cholesky factor of the co-kurtosis matrix.
 
 If `model` does not yet contain `Gkt`, computes the upper Cholesky factor of
-`pr.S2 * pr.kt * pr.S2'` and stores it as `model[:Gkt]`.
+`pr.S2 * pr.kt * pr.S2'` and stores it as the `:Gkt` Model State entry.
 
 # Arguments
 
@@ -21,7 +21,7 @@ If `model` does not yet contain `Gkt`, computes the upper Cholesky factor of
   - [`set_risk_constraints!`](@ref)
 """
 function get_chol_or_Gkt_pm(model::JuMP.Model, pr::HighOrderPrior)
-    if !haskey(model, :Gkt)
+    if !shared_has(model, :Gkt)
         #=
         #! figure out how to add chol
         G = if isnothing(pr.chol_kt)
@@ -35,7 +35,7 @@ function get_chol_or_Gkt_pm(model::JuMP.Model, pr::HighOrderPrior)
         G = LinearAlgebra.cholesky(pr.S2 * pr.kt * transpose(pr.S2)).U
         JuMP.@expression(model, Gkt, G)
     end
-    return model[:Gkt]
+    return shared_get(model, :Gkt)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -60,7 +60,7 @@ and stores `vals_Akt` and `vecs_Akt` in `model`.
   - [`set_risk_constraints!`](@ref)
 """
 function get_kt_Akt_pm(model::JuMP.Model, pr::HighOrderPrior)
-    if !haskey(model, :vecs_Akt)
+    if !shared_has(model, :vecs_Akt)
         N = length(pr.mu)
         A = block_vec_pq(pr.kt, N, N)
         vals_A, vecs_A = LinearAlgebra.eigen(A)
@@ -70,7 +70,7 @@ function get_kt_Akt_pm(model::JuMP.Model, pr::HighOrderPrior)
                               vals_Akt, vals_A
                           end)
     end
-    return model[:vals_Akt], model[:vecs_Akt]
+    return shared_get(model, :vals_Akt), shared_get(model, :vecs_Akt)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -294,11 +294,9 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
         LinearAlgebra.cholesky(pr.S2 * r.kt * transpose(pr.S2)).U
     end
     sqrt_kurtosis_risk = model[key] = JuMP.@variable(model)
-    L2W = if !haskey(model, Symbol(prefix, :L2W))
+    L2W = state_build!(model, prefix, :L2W) do
         L2 = pr.L2
-        preg!(model, prefix, :L2W, JuMP.@expression(model, L2 * vec(W)))
-    else
-        model[Symbol(prefix, :L2W)]
+        JuMP.@expression(model, L2 * vec(W))
     end
     x_kurt = model[Symbol(:x_kurt_, i)] = JuMP.@expression(model, G * L2W)
     model[Symbol(:ckurt_soc_, i)] = JuMP.@constraint(model,

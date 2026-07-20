@@ -204,7 +204,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     if !loss
         net_X = -net_X
         X = -pr.X
-        prefix = Symbol(prefix, :gain_)
+        prefix = nested_prefix(prefix, :gain_)
     else
         X = pr.X
     end

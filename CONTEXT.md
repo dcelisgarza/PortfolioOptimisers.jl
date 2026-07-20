@@ -245,7 +245,10 @@ Wraps a single external backend (Clarabel, HiGHS, …): solver module, settings,
 The shared JuMP model configuration: one or more `Solver`s (fallback chains) plus JuMP-level settings. The execution environment consumed by all JuMP-based optimisers.
 
 **Model State**
-The in-flight state of the JuMP model as it is being built — the shared variables, expressions, and scales that successive constraint/risk builders read and write. Accessed through a named interface rather than raw model keys.
+The in-flight state of the JuMP model as it is being built — the shared variables, expressions, and scales that successive constraint/risk builders read and write. Reached only through its named interface, never by naming an entry directly; see Per-Build Risk State for which entries a nested build must keep to itself.
+
+**Per-Build Risk State**
+The part of Model State that belongs to *one* risk build rather than to the model as a whole, and so must not be shared with a build nested inside it. Two things qualify: anything that is a function of the weights being optimised — a nested build (risk tracking) shifts those weights, so the inner and outer answers genuinely differ — and any presence flag that gates a formulation choice for the build that set it. Everything else is a pure function of the Prior, identical in both builds, and is correctly shared: treating it as per-build would break sharing rather than protect it. The distinction decides correctness, not tidiness: getting it wrong makes a nested build silently read its parent's state.
 
 **Model Assembly**
 The fixed sequence in which a single-JuMP-model Optimisation Estimator's constraint and risk builders run to turn an empty model into a fully-constrained one — the steps between shaping the weight variables and setting the objective. Shared by MeanRisk, Risk Budgeting, Relaxed Risk Budgeting, Factor Risk Contribution, and constrained Near Optimal Centering; the per-optimiser parts (how weights are shaped, the objective, the solve) sit outside it. Distinct from Model State: Model State is the data the builders read and write, Model Assembly is the ordering of the builders themselves.

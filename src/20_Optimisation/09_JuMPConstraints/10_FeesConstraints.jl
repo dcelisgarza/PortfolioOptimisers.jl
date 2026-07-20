@@ -23,10 +23,10 @@ Creates the `:fees` expression if it does not yet exist; otherwise adds `expr` t
   - [`Fees`](@ref)
 """
 function add_to_fees!(model::JuMP.Model, expr::JuMP.AbstractJuMPScalar)
-    if !haskey(model, :fees)
+    if !shared_has(model, :fees)
         JuMP.@expression(model, fees, expr)
     else
-        fees = model[:fees]
+        fees = shared_get(model, :fees)
         JuMP.add_to_expression!(fees, expr)
     end
     return nothing
@@ -201,16 +201,16 @@ function set_short_non_fixed_fees!(args...)
     return nothing
 end
 function set_long_non_fixed_fees!(model::JuMP.Model, fl::Num_VecNum)
-    lw = model[:lw]
+    lw = shared_get(model, :lw)
     JuMP.@expression(model, fl, dot_scalar(fl, lw))
     add_to_fees!(model, fl)
     return nothing
 end
 function set_short_non_fixed_fees!(model::JuMP.Model, fs::Num_VecNum)
-    if !haskey(model, :sw)
+    if !shared_has(model, :sw)
         return nothing
     end
-    sw = model[:sw]
+    sw = shared_get(model, :sw)
     JuMP.@expression(model, fs, dot_scalar(fs, sw))
     add_to_fees!(model, fs)
     return nothing

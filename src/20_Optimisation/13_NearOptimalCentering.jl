@@ -625,8 +625,8 @@ function set_near_optimal_centering_constraints!(model::JuMP.Model, wb::WeightBo
     w_ub = wb.ub
     risk = get_risk(model)
     ret = get_ret(model)
-    rk = model[:noc_rk]
-    rt = model[:noc_rt]
+    rk = shared_get(model, :noc_rk)
+    rt = shared_get(model, :noc_rt)
     N = length(w)
     JuMP.@variables(model, begin
                         log_ret
@@ -781,7 +781,7 @@ function solve_noc!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any,
                     opt::BaseJuMPOptimisationEstimator,
                     attrs::ProcessedJuMPOptimiserAttributes, rt_min::Number, rt_max::Number,
                     ::Any, ::Any, ::Val{true}, ::Val{false}, args...)
-    lbs = compute_ret_lbs(model[:ret_frontier], rt_min, rt_max, args...)
+    lbs = compute_ret_lbs(shared_get(model, :ret_frontier), rt_min, rt_max, args...)
     sc = get_constraint_scale(model)
     retcodes = Vector{OptimisationReturnCode}(undef, length(rk_opts))
     sols = Vector{JuMPOptimisationSolution}(undef, length(rk_opts))
@@ -860,7 +860,7 @@ function compute_risk_ubs(model::JuMP.Model,
                                                     <:ConstrainedNearOptimalCentering},
                           pr::AbstractPriorResult, fees::Option{<:Fees}, w_min::VecNum,
                           w_max::VecNum, args...)
-    risk_frontier = model[:risk_frontier]
+    risk_frontier = shared_get(model, :risk_frontier)
     idx = Vector{Int}(undef, 0)
     for (i, rkf) in enumerate(risk_frontier)
         if !isa(rkf.second[2], VecNum)
@@ -914,7 +914,7 @@ function solve_noc!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any,
                     opt::BaseJuMPOptimisationEstimator,
                     attrs::ProcessedJuMPOptimiserAttributes, rt_min::Number, rt_max::Number,
                     w_min::VecNum, w_max::VecNum, ::Val{true}, ::Val{true}, args...)
-    lbs = compute_ret_lbs(model[:ret_frontier], rt_min, rt_max, args...)
+    lbs = compute_ret_lbs(shared_get(model, :ret_frontier), rt_min, rt_max, args...)
     risk_frontier = compute_risk_ubs(model, noc, opt.pe, opt.fees, w_min, w_max, args...)
     sc = get_constraint_scale(model)
     for (keys, vals) in risk_frontier
@@ -1071,8 +1071,8 @@ function _optimise(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, 
     set_weight_constraints!(model, opt.wb, opt.bgt, opt.sbgt)
     assemble_jump_model!(model, noc, opt, attrs, rd, r)
     noc_retcode, sol = solve_noc!(noc, model, rk_opt, rt_opt, opt, attrs, rt_min, rt_max,
-                                  w_min, w_max, Val(haskey(model, :ret_frontier)),
-                                  Val(haskey(model, :risk_frontier)))
+                                  w_min, w_max, Val(shared_has(model, :ret_frontier)),
+                                  Val(shared_has(model, :risk_frontier)))
     retcode = get_overall_retcode(w_min_retcode, w_opt_retcode, w_max_retcode, noc_retcode)
     return NearOptimalCenteringResult(;
                                       jr = JuMPOptimisationResult(; pa = attrs,

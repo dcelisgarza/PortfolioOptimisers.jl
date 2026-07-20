@@ -200,8 +200,8 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
     w = get_w(model, prefix)
     k = get_k(model)
     sc = get_constraint_scale(model)
-    tprefix = Symbol(prefix, :te_ir_, i, :_)
-    preg!(model, tprefix, :w, JuMP.@expression(model, w - wb * k))
+    tprefix = nested_prefix(prefix, :te_ir_, i)
+    state_set!(model, tprefix, :w, JuMP.@expression(model, w - wb * k))
     risk_expr = set_risk_tracking_risk_constraints!(model, r, opt, pr, pl, fees, tprefix,
                                                     args...; kwargs...)
     model[Symbol(:cter_, i)] = JuMP.@constraint(model, sc * (risk_expr - err * k) <= 0)
@@ -222,8 +222,8 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
     sc = get_constraint_scale(model)
     key = Symbol(:te_dr_, i)
     te_dr = model[key] = JuMP.@variable(model)
-    tprefix = Symbol(prefix, :te_dr_, i, :_)
-    preg!(model, tprefix, :w, get_w(model, prefix))
+    tprefix = nested_prefix(prefix, :te_dr_, i)
+    state_set!(model, tprefix, :w, get_w(model, prefix))
     risk_expr = set_risk_tracking_risk_constraints!(model, ri, opt, pr, pl, fees, tprefix,
                                                     args...; kwargs...)
     dr = model[Symbol(key, i)] = JuMP.@expression(model, risk_expr - rb * k)

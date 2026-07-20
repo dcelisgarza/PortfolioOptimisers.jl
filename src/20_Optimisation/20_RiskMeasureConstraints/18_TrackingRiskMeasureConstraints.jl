@@ -336,7 +336,7 @@ The caller stores the tracking-difference weights at `Symbol(tprefix, :w)`, so t
 keys (`:w`, `:net_X`, `:W`, `:variance_flag`, …) under `tprefix` and cannot collide with
 the outer model's keys. This replaces the former save/unregister/restore swap (ADR 0005):
 the prefix isolates the nested build structurally. Because tracking prefixes COMPOSE
-(`tprefix = Symbol(prefix, :tr_iv_, i, :_)`), tracking-nested-in-tracking is collision-free.
+(`tprefix = nested_prefix(prefix, :tr_iv_, i)`), tracking-nested-in-tracking is collision-free.
 
 # Arguments
 
@@ -371,7 +371,7 @@ Add JuMP risk constraints for `RiskTrackingRiskMeasure` with `IndependentVariabl
 to `model`.
 
 Stores the benchmark-shifted weights `w - wb*k` at `Symbol(tprefix, :w)` under the composed
-tracking prefix `tprefix = Symbol(prefix, :tr_iv_, i, :_)`, delegates to
+tracking prefix `tprefix = nested_prefix(prefix, :tr_iv_, i)`, delegates to
 [`set_risk_tracking_risk_constraints!`](@ref) to build the inner risk on those weights under
 `tprefix`, then applies risk bounds and expression registration. The prefix namespacing
 replaces the former save/restore swap (ADR 0005) and is re-entrant.
@@ -409,8 +409,8 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     wb = r.tr.w
     w = get_w(model, prefix)
     k = get_k(model)
-    tprefix = Symbol(prefix, :tr_iv_, i, :_)
-    preg!(model, tprefix, :w, JuMP.@expression(model, w - wb * k))
+    tprefix = nested_prefix(prefix, :tr_iv_, i)
+    state_set!(model, tprefix, :w, JuMP.@expression(model, w - wb * k))
     tracking_risk = set_risk_tracking_risk_constraints!(model, ri, opt, pr, pl, fees,
                                                         tprefix, args...; kwargs...)
     set_risk_bounds_and_expression!(model, opt, tracking_risk, r.settings, key)
@@ -424,7 +424,7 @@ to `model`.
 
 Computes the benchmark's expected risk value, stores the (unshifted) portfolio weights at
 `Symbol(tprefix, :w)` under the composed tracking prefix
-`tprefix = Symbol(prefix, :tr_dv_, i, :_)`, delegates to
+`tprefix = nested_prefix(prefix, :tr_dv_, i)`, delegates to
 [`set_risk_tracking_risk_constraints!`](@ref) to build the inner portfolio risk under
 `tprefix`, then adds an L1-norm cone constraint on the difference between the portfolio's
 risk expression and the benchmark's expected risk scaled by the allocation variable `k`.
@@ -465,8 +465,8 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     k = get_k(model)
     sc = get_constraint_scale(model)
     tracking_risk = model[key] = JuMP.@variable(model)
-    tprefix = Symbol(prefix, :tr_dv_, i, :_)
-    preg!(model, tprefix, :w, get_w(model, prefix))
+    tprefix = nested_prefix(prefix, :tr_dv_, i)
+    state_set!(model, tprefix, :w, get_w(model, prefix))
     risk_expr = set_risk_tracking_risk_constraints!(model, ri, opt, pr, pl, fees, tprefix,
                                                     args...; kwargs...)
     dr = model[Symbol(:r_dv_, i)] = JuMP.@expression(model, risk_expr - rb * k)

@@ -467,10 +467,10 @@ function set_max_ratio_return_constraints!(model::JuMP.Model, obj::MaximumRatio,
                                            mu::Num_VecNum)
     sc = get_constraint_scale(model)
     k = get_k(model)
-    ohf = model[:ohf]
+    ohf = shared_get(model, :ohf)
     ret = get_ret(model)
     rf = obj.rf
-    if haskey(model, :bucs_w) || haskey(model, :t_eucs_gw) || all(x -> x <= rf, mu)
+    if shared_has(model, :bucs_w) || shared_has(model, :t_eucs_gw) || all(x -> x <= rf, mu)
         risk = get_risk(model)
         JuMP.@constraint(model, sr_risk, sc * (risk - ohf) <= 0)
     else
@@ -500,10 +500,10 @@ If no fees are registered in the model, does nothing.
   - [`set_return_constraints!`](@ref)
 """
 function add_fees_to_ret!(model::JuMP.Model, ret)
-    if !haskey(model, :fees)
+    if !shared_has(model, :fees)
         return nothing
     end
-    fees = model[:fees]
+    fees = shared_get(model, :fees)
     JuMP.add_to_expression!(ret, -fees)
     return nothing
 end
@@ -529,10 +529,10 @@ If no market impact cost expression is registered in the model, does nothing.
   - [`set_return_constraints!`](@ref)
 """
 function add_market_impact_cost!(model::JuMP.Model, ret)
-    if !haskey(model, :wip)
+    if !shared_has(model, :wip)
         return nothing
     end
-    cost_bgt_expr = model[:cost_bgt_expr]
+    cost_bgt_expr = shared_get(model, :cost_bgt_expr)
     JuMP.add_to_expression!(ret, -cost_bgt_expr)
     return nothing
 end
@@ -838,7 +838,7 @@ function set_max_ratio_log_return_constraints!(args...)
 end
 function set_max_ratio_log_return_constraints!(model::JuMP.Model, ::MaximumRatio)
     sc = get_constraint_scale(model)
-    ohf = model[:ohf]
+    ohf = shared_get(model, :ohf)
     risk = get_risk(model)
     JuMP.@constraint(model, sr_elog_ret_risk, sc * (risk - ohf) <= 0)
 end
@@ -889,12 +889,12 @@ Creates the `op` expression if it does not yet exist, then adds `expr` to it.
   - [`set_portfolio_objective_function!`](@ref)
 """
 function add_to_objective_penalty!(model::JuMP.Model, expr)
-    op = if !haskey(model, :op) && isa(expr, JuMP.AffExpr)
+    op = if !shared_has(model, :op) && isa(expr, JuMP.AffExpr)
         JuMP.@expression(model, op, zero(JuMP.AffExpr))
-    elseif !haskey(model, :op) && isa(expr, JuMP.QuadExpr)
+    elseif !shared_has(model, :op) && isa(expr, JuMP.QuadExpr)
         JuMP.@expression(model, op, zero(JuMP.QuadExpr))
-    elseif haskey(model, :op)
-        model[:op]
+    elseif shared_has(model, :op)
+        shared_get(model, :op)
     else
         throw(ArgumentError("expr must be a JuMP.AffExpr or JuMP.QuadExpr"))
     end
@@ -930,10 +930,10 @@ A quadratic penalty cannot be accumulated into an affine objective in-place, so 
   - [`set_portfolio_objective_function!`](@ref)
 """
 function add_penalty_to_objective!(model::JuMP.Model, factor::Integer, expr)
-    if !haskey(model, :op)
+    if !shared_has(model, :op)
         return expr
     end
-    op = model[:op]
+    op = shared_get(model, :op)
     if !isa(expr, JuMP.QuadExpr) && isa(op, JuMP.QuadExpr)
         JuMP.unregister(model, :obj_expr)
         expr = JuMP.@expression(model, obj_expr, JuMP.QuadExpr(expr))
@@ -1014,7 +1014,7 @@ function set_portfolio_objective_function!(model::JuMP.Model, obj::MaximumRatio,
                                            ::JuMPReturnsEstimator,
                                            optimiser::JuMPOptimisationEstimator, attrs)
     so = get_objective_scale(model)
-    if haskey(model, :sr_risk)
+    if shared_has(model, :sr_risk)
         ret = get_ret(model)
         k = get_k(model)
         rf = obj.rf

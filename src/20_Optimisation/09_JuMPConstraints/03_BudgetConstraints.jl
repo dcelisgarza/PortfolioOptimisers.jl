@@ -557,16 +557,16 @@ function set_gross_budget_constraints!(args...)
     return nothing
 end
 function set_gross_budget_constraints!(model::JuMP.Model, gbgt::Number)
-    lw = model[:lw]
-    sw = model[:sw]
+    lw = shared_get(model, :lw)
+    sw = shared_get(model, :sw)
     k = get_k(model)
     sc = get_constraint_scale(model)
     JuMP.@constraint(model, gbgt, sc * (sum(lw) + sum(sw) - k * gbgt) == 0)
     return nothing
 end
 function set_gross_budget_constraints!(model::JuMP.Model, gbgt::BudgetRange)
-    lw = model[:lw]
-    sw = model[:sw]
+    lw = shared_get(model, :lw)
+    sw = shared_get(model, :sw)
     k = get_k(model)
     sc = get_constraint_scale(model)
     lb = gbgt.lb
@@ -580,22 +580,22 @@ function set_gross_budget_constraints!(model::JuMP.Model, gbgt::BudgetRange)
     return nothing
 end
 function set_long_short_budget_constraints!(model::JuMP.Model, bgt::Number, ::Nothing)
-    lw = model[:lw]
+    lw = shared_get(model, :lw)
     k = get_k(model)
     sc = get_constraint_scale(model)
     JuMP.@constraint(model, lbgt, sc * (sum(lw) - k * bgt) == 0)
     return nothing
 end
 function set_long_short_budget_constraints!(model::JuMP.Model, ::Nothing, sbgt::Number)
-    sw = model[:sw]
+    sw = shared_get(model, :sw)
     k = get_k(model)
     sc = get_constraint_scale(model)
     JuMP.@constraint(model, sbgt, sc * (sum(sw) - k * sbgt) == 0)
     return nothing
 end
 function set_long_short_budget_constraints!(model::JuMP.Model, bgt::Number, sbgt::Number)
-    lw = model[:lw]
-    sw = model[:sw]
+    lw = shared_get(model, :lw)
+    sw = shared_get(model, :sw)
     k = get_k(model)
     sc = get_constraint_scale(model)
     JuMP.@constraints(model, begin
@@ -605,7 +605,7 @@ function set_long_short_budget_constraints!(model::JuMP.Model, bgt::Number, sbgt
     return nothing
 end
 function set_long_short_budget_constraints!(model::JuMP.Model, bgt::BudgetRange, ::Nothing)
-    lw = model[:lw]
+    lw = shared_get(model, :lw)
     k = get_k(model)
     sc = get_constraint_scale(model)
     lb = bgt.lb
@@ -619,7 +619,7 @@ function set_long_short_budget_constraints!(model::JuMP.Model, bgt::BudgetRange,
     return nothing
 end
 function set_long_short_budget_constraints!(model::JuMP.Model, ::Nothing, sbgt::BudgetRange)
-    sw = model[:sw]
+    sw = shared_get(model, :sw)
     k = get_k(model)
     sc = get_constraint_scale(model)
     lb = sbgt.lb
@@ -634,8 +634,8 @@ function set_long_short_budget_constraints!(model::JuMP.Model, ::Nothing, sbgt::
 end
 function set_long_short_budget_constraints!(model::JuMP.Model, bgt::BudgetRange,
                                             sbgt::Number)
-    lw = model[:lw]
-    sw = model[:sw]
+    lw = shared_get(model, :lw)
+    sw = shared_get(model, :sw)
     k = get_k(model)
     sc = get_constraint_scale(model)
     lb = bgt.lb
@@ -651,8 +651,8 @@ function set_long_short_budget_constraints!(model::JuMP.Model, bgt::BudgetRange,
 end
 function set_long_short_budget_constraints!(model::JuMP.Model, bgt::Number,
                                             sbgt::BudgetRange)
-    lw = model[:lw]
-    sw = model[:sw]
+    lw = shared_get(model, :lw)
+    sw = shared_get(model, :sw)
     k = get_k(model)
     sc = get_constraint_scale(model)
     lb = sbgt.lb
@@ -673,8 +673,8 @@ function set_long_short_budget_constraints!(model::JuMP.Model, bgt::Number,
 end
 function set_long_short_budget_constraints!(model::JuMP.Model, bgt::BudgetRange,
                                             sbgt::BudgetRange)
-    lw = model[:lw]
-    sw = model[:sw]
+    lw = shared_get(model, :lw)
+    sw = shared_get(model, :sw)
     k = get_k(model)
     sc = get_constraint_scale(model)
     lb = bgt.lb
@@ -735,8 +735,8 @@ function set_cost_budget_constraints!(model::JuMP.Model, vp::Num_VecNum, vn::Num
                                       val::Number, w::VecNum)
     k = get_k(model)
     sc = get_constraint_scale(model)
-    wp = model[:wp]
-    wn = model[:wn]
+    wp = shared_get(model, :wp)
+    wn = shared_get(model, :wn)
     JuMP.@expression(model, cost_bgt_expr, dot_scalar(vp, wp) + dot_scalar(vn, wn))
     JuMP.@constraint(model, cost_bgt, sc * (sum(w) + cost_bgt_expr - k * val) == 0)
     return nothing
@@ -745,8 +745,8 @@ function set_cost_budget_constraints!(model::JuMP.Model, vp::Num_VecNum, vn::Num
                                       bgt::BudgetRange, w::VecNum)
     k = get_k(model)
     sc = get_constraint_scale(model)
-    wp = model[:wp]
-    wn = model[:wn]
+    wp = shared_get(model, :wp)
+    wn = shared_get(model, :wn)
     lb = bgt.lb
     ub = bgt.ub
     JuMP.@expression(model, cost_bgt_expr, dot_scalar(vp, wp) + dot_scalar(vn, wn))
@@ -872,8 +872,8 @@ not emitted: `w = lw - sw` is an identity, so `sw_i = 0` already leaves `lw_i ==
 function set_exact_budget_constraints!(model::JuMP.Model, sp::AbstractMIPSpace,
                                        ind::AbstractMIPIndicators, wx::VecNum, ss,
                                        ::WeightsFromParts)
-    lw = model[:lw]
-    sw = model[:sw]
+    lw = shared_get(model, :lw)
+    sw = shared_get(model, :sw)
     sc = get_constraint_scale(model)
     model[mip_key(sp, :xbgt_lw_ub)] = JuMP.@constraint(model,
                                                        sc * (lw - ss * long_gate(ind)) <= 0)
@@ -885,8 +885,8 @@ end
 function set_exact_budget_constraints!(model::JuMP.Model, sp::AbstractMIPSpace,
                                        ind::AbstractMIPIndicators, wx::VecNum, ss,
                                        ::PartsBoundWeights)
-    lw = model[:lw]
-    sw = model[:sw]
+    lw = shared_get(model, :lw)
+    sw = shared_get(model, :sw)
     sc = get_constraint_scale(model)
     model[mip_key(sp, :xbgt_lw_ub)] = JuMP.@constraint(model,
                                                        sc * (lw - ss * long_gate(ind)) <= 0)

@@ -62,5 +62,16 @@ get_risk
 get_dd
 has_X
 has_dd
-preg!
+SHARED_STATE
+assert_shared_state
+shared_set!
+shared_has
+shared_get
+state_key
+state_set!
+state_has
+state_get
+state_build!
+mark_state!
+nested_prefix
 ```

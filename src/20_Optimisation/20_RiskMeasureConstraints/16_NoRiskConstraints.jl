@@ -29,11 +29,10 @@ function set_risk_constraints!(model::JuMP.Model, ::Any, r::NoRisk,
                                args...; loss::Bool = true, prefix::Symbol = Symbol(""),
                                kwargs...)
     key = ifelse(loss, :nr_risk, :nr_risk_gain)
-    if haskey(model, Symbol(prefix, key))
-        return model[Symbol(prefix, key)]
+    return state_build!(model, prefix, key) do
+        nr_risk = JuMP.@expression(model, zero(JuMP.AffExpr))
+        set_risk_bounds_and_expression!(model, opt, nr_risk, r.settings, key;
+                                        prefix = prefix)
+        return nr_risk
     end
-    nr_risk = JuMP.@expression(model, zero(JuMP.AffExpr))
-    model[Symbol(prefix, key)] = nr_risk
-    set_risk_bounds_and_expression!(model, opt, nr_risk, r.settings, Symbol(prefix, key))
-    return nr_risk
 end
