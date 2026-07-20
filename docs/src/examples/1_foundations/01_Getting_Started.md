@@ -127,7 +127,7 @@ plot_composition(res, rd)
 Return histogram with tail-risk markers (VaR, CVaR).
 
 ````@example 01_Getting_Started
-plot_ptf_cumulative_returns(res, rd)
+plot_portfolio_cumulative_returns(res, rd)
 ````
 
 Drawdown time series showing peak-to-trough loss periods.

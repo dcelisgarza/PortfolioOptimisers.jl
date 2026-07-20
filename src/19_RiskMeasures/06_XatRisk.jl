@@ -726,6 +726,7 @@ $(DocStringExtensions.FIELDS)
 
 # Constructors
 
+    RelativeDrawdownatRisk(;
         settings::HierarchicalRiskMeasureSettings = HierarchicalRiskMeasureSettings(),
         alpha::Number = 0.05,
         w::Option{<:ObsWeights} = nothing

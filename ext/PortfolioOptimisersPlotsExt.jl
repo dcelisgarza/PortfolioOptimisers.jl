@@ -10,10 +10,11 @@ import PortfolioOptimisers: ArrNum, VecNum, MatNum, Option, VecNum_VecVecNum, Sl
                             AbstractBaseRiskMeasure, extract_pr, relevant_assets,
                             extract_fees, OptimisationResult
 
-## plot_ptf_cumulative_returns
-function PortfolioOptimisers.plot_ptf_cumulative_returns(net_ret::VecNum_VecVecNum;
-                                                         ts::AbstractVector,
-                                                         compound::Bool = false, kwargs...)
+## plot_portfolio_cumulative_returns
+function PortfolioOptimisers.plot_portfolio_cumulative_returns(net_ret::VecNum_VecVecNum;
+                                                               ts::AbstractVector,
+                                                               compound::Bool = false,
+                                                               kwargs...)
     ret = cumulative_returns(net_ret, compound)
     label = "$(compound ? "Compound" : "Simple") Cumulative Returns"
     return if isa(net_ret, VecNum)
@@ -28,56 +29,72 @@ function PortfolioOptimisers.plot_ptf_cumulative_returns(net_ret::VecNum_VecVecN
         plt
     end
 end
-function PortfolioOptimisers.plot_ptf_cumulative_returns(w::VecNum_VecVecNum, X::MatNum,
-                                                         fees::Option{<:Fees} = nothing;
-                                                         ts::AbstractVector = 1:size(X, 1),
-                                                         compound::Bool = false, kwargs...)
-    return PortfolioOptimisers.plot_ptf_cumulative_returns(calc_net_returns(w, X, fees);
-                                                           ts = ts, compound = compound,
-                                                           kwargs...)
+function PortfolioOptimisers.plot_portfolio_cumulative_returns(w::VecNum_VecVecNum,
+                                                               X::MatNum,
+                                                               fees::Option{<:Fees} = nothing;
+                                                               ts::AbstractVector = 1:size(X,
+                                                                                           1),
+                                                               compound::Bool = false,
+                                                               kwargs...)
+    return PortfolioOptimisers.plot_portfolio_cumulative_returns(calc_net_returns(w, X,
+                                                                                  fees);
+                                                                 ts = ts,
+                                                                 compound = compound,
+                                                                 kwargs...)
 end
-function PortfolioOptimisers.plot_ptf_cumulative_returns(w::VecNum_VecVecNum, pr::Pr_RR,
-                                                         fees::Option{<:Fees} = nothing;
-                                                         ts::AbstractVector = 1:size(pr.X,
-                                                                                     1),
-                                                         compound::Bool = false, kwargs...)
+function PortfolioOptimisers.plot_portfolio_cumulative_returns(w::VecNum_VecVecNum,
+                                                               pr::Pr_RR,
+                                                               fees::Option{<:Fees} = nothing;
+                                                               ts::AbstractVector = 1:size(pr.X,
+                                                                                           1),
+                                                               compound::Bool = false,
+                                                               kwargs...)
     if isa(pr, ReturnsResult)
         ts = isnothing(pr.ts) ? (1:size(pr.X, 1)) : pr.ts
     end
-    return PortfolioOptimisers.plot_ptf_cumulative_returns(w, pr.X, fees; ts = ts,
-                                                           compound = compound, kwargs...)
+    return PortfolioOptimisers.plot_portfolio_cumulative_returns(w, pr.X, fees; ts = ts,
+                                                                 compound = compound,
+                                                                 kwargs...)
 end
-function PortfolioOptimisers.plot_ptf_cumulative_returns(res::OptimisationResult, pr::Pr_RR;
-                                                         fees::Option{<:Fees} = nothing,
-                                                         compound::Bool = false, kwargs...)
+function PortfolioOptimisers.plot_portfolio_cumulative_returns(res::OptimisationResult,
+                                                               pr::Pr_RR;
+                                                               fees::Option{<:Fees} = nothing,
+                                                               compound::Bool = false,
+                                                               kwargs...)
     pr = extract_pr(res, pr)
     fees = extract_fees(res, fees)
-    return PortfolioOptimisers.plot_ptf_cumulative_returns(res.w, pr, fees;
-                                                           compound = compound, kwargs...)
+    return PortfolioOptimisers.plot_portfolio_cumulative_returns(res.w, pr, fees;
+                                                                 compound = compound,
+                                                                 kwargs...)
 end
-function PortfolioOptimisers.plot_ptf_cumulative_returns(res::OptimisationResult;
-                                                         fees::Option{<:Fees} = nothing,
-                                                         compound::Bool = false, kwargs...)
+function PortfolioOptimisers.plot_portfolio_cumulative_returns(res::OptimisationResult;
+                                                               fees::Option{<:Fees} = nothing,
+                                                               compound::Bool = false,
+                                                               kwargs...)
     pr = extract_pr(res, nothing)
     fees = extract_fees(res, fees)
-    return PortfolioOptimisers.plot_ptf_cumulative_returns(res.w, pr, fees;
-                                                           compound = compound, kwargs...)
+    return PortfolioOptimisers.plot_portfolio_cumulative_returns(res.w, pr, fees;
+                                                                 compound = compound,
+                                                                 kwargs...)
 end
-function PortfolioOptimisers.plot_ptf_cumulative_returns(pred::Union{<:PredictionResult,
-                                                                     <:MultiPeriodPredictionResult};
-                                                         compound::Bool = false, kwargs...)
+function PortfolioOptimisers.plot_portfolio_cumulative_returns(pred::Union{<:PredictionResult,
+                                                                           <:MultiPeriodPredictionResult};
+                                                               compound::Bool = false,
+                                                               kwargs...)
     rd = isa(pred, PredictionResult) ? pred.rd : pred.mrd
     ts = isnothing(rd.ts) ? (1:length(isa(rd.X, VecVecNum) ? first(rd.X) : rd.X)) : rd.ts
-    return PortfolioOptimisers.plot_ptf_cumulative_returns(rd.X; ts = ts,
-                                                           compound = compound, kwargs...)
+    return PortfolioOptimisers.plot_portfolio_cumulative_returns(rd.X; ts = ts,
+                                                                 compound = compound,
+                                                                 kwargs...)
 end
-function PortfolioOptimisers.plot_ptf_cumulative_returns(pred::PopulationPredictionResult;
-                                                         compound::Bool = false, kwargs...)
+function PortfolioOptimisers.plot_portfolio_cumulative_returns(pred::PopulationPredictionResult;
+                                                               compound::Bool = false,
+                                                               kwargs...)
     plt = plot(; kwargs...)
     for p in pred.pred
         plot!(plt,
-              PortfolioOptimisers.plot_ptf_cumulative_returns(p; compound = compound,
-                                                              kwargs...))
+              PortfolioOptimisers.plot_portfolio_cumulative_returns(p; compound = compound,
+                                                                    kwargs...))
     end
     return plt
 end
@@ -1779,8 +1796,8 @@ function PortfolioOptimisers.plot_portfolio_dashboard(res::OptimisationResult, r
         ts = rd.ts
     end
     p1 = PortfolioOptimisers.plot_composition(w, nx; N = N)
-    p2 = PortfolioOptimisers.plot_ptf_cumulative_returns(w, rd.X, fees; ts = ts,
-                                                         compound = compound)
+    p2 = PortfolioOptimisers.plot_portfolio_cumulative_returns(w, rd.X, fees; ts = ts,
+                                                               compound = compound)
     p3 = PortfolioOptimisers.plot_risk_contribution(r, w, rd.X, fees; nx = nx, N = N,
                                                     delta = delta, marginal = marginal,
                                                     percentage = percentage)
@@ -1797,7 +1814,7 @@ function PortfolioOptimisers.plot_cv_dashboard(mpred::MultiPeriodPredictionResul
                                                N::Option{<:Number} = nothing,
                                                compound::Bool = false, kwargs...)
     p1 = PortfolioOptimisers.plot_composition(mpred; N = N)
-    p2 = PortfolioOptimisers.plot_ptf_cumulative_returns(mpred; compound = compound)
+    p2 = PortfolioOptimisers.plot_portfolio_cumulative_returns(mpred; compound = compound)
     p3 = PortfolioOptimisers.plot_turnover(mpred)
     p4 = PortfolioOptimisers.plot_weight_stability(mpred; N = N)
     return plot(p1, p2, p3, p4; layout = (2, 2), size = (1200, 800), kwargs...)

@@ -687,7 +687,8 @@ function set_near_optimal_objective_function!(::ConstrainedNearOptimalCentering,
     so = get_objective_scale(model)
     obj_expr = set_near_optimal_centering_constraints!(model, opt.wb)
     obj_expr = add_penalty_to_objective!(model, 1, obj_expr)
-    add_custom_objective_term!(model, opt.ret, opt.cobj, obj_expr, opt, opt.pe, args...)
+    add_custom_objective_term!(model, MinimumRisk(), opt.ret, opt.cobj, obj_expr, opt,
+                               opt.pe, args...)
     JuMP.@objective(model, Min, so * obj_expr)
     return nothing
 end

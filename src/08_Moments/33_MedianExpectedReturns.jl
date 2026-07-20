@@ -38,6 +38,7 @@ MedianExpectedReturns
     """
     @wprop w
     function MedianExpectedReturns(w::Option{<:ObsWeights})
+        assert_nonempty_nonneg_finite_val(w, :w)
         return new{typeof(w)}(w)
     end
 end

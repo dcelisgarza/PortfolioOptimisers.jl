@@ -313,6 +313,23 @@ function add_custom_objective_term!(args...; kwargs...)
     return nothing
 end
 """
+    add_custom_objective_term!(model::JuMP.Model, obj, pret, cobjs::VecJuMPObj, obj_expr, opt, pr, args...)
+
+Apply each custom objective term in a vector, in order, accumulating into the shared `obj_expr`. Dispatches to the per-type [`add_custom_objective_term!`](@ref) for every element, so a `cobj` vector composes several custom terms into one objective.
+
+# Related
+
+  - [`CustomJuMPObjective`](@ref)
+  - [`VecJuMPObj`](@ref)
+"""
+function add_custom_objective_term!(model::JuMP.Model, obj, pret, cobjs::VecJuMPObj,
+                                    obj_expr, opt, pr, args...)
+    for cobj in cobjs
+        add_custom_objective_term!(model, obj, pret, cobj, obj_expr, opt, pr, args...)
+    end
+    return nothing
+end
+"""
     add_custom_constraint!(args...; kwargs...)
 
 Add a custom constraint to the JuMP model.
@@ -334,6 +351,22 @@ No-op fallback. Override this method for subtypes of [`CustomJuMPConstraint`](@r
   - [`add_custom_objective_term!`](@ref)
 """
 function add_custom_constraint!(args...; kwargs...)
+    return nothing
+end
+"""
+    add_custom_constraint!(model::JuMP.Model, ccnts::VecJuMPConstr, opt, attrs)
+
+Apply each custom constraint in a vector, in order. Dispatches to the per-type [`add_custom_constraint!`](@ref) for every element, so a `ccnt` vector adds several custom constraints to the same model.
+
+# Related
+
+  - [`CustomJuMPConstraint`](@ref)
+  - [`VecJuMPConstr`](@ref)
+"""
+function add_custom_constraint!(model::JuMP.Model, ccnts::VecJuMPConstr, opt, attrs)
+    for ccnt in ccnts
+        add_custom_constraint!(model, ccnt, opt, attrs)
+    end
     return nothing
 end
 """
@@ -980,7 +1013,7 @@ function optimise_JuMP_model!(model::JuMP.Model, opt::JuMPOptimisationEstimator,
     retcode = if success
         OptimisationSuccess(; res = trials)
     else
-        @warn("Failed to solve optimisation problem. Check `retcode.res` for details.")
+        @warn("Failed to solve optimisation problem.\nCheck `result.retcode.res` on the returned result for per-solver diagnostics.")
         OptimisationFailure(; res = trials)
     end
     return retcode, process_model(model, retcode)

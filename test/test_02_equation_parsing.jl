@@ -204,3 +204,73 @@ end
     pe.set_string_distance!(dist = pe.StringDistances.Levenshtein(), min_score = 0.7)
     pe.set_compact_show!(true)
 end
+@testset "Suggestion threshold rejects a non-positive min_score" begin
+    using PortfolioOptimisers, Test
+    pe = PortfolioOptimisers
+    # A zero or negative threshold would make did_you_mean echo a real asset name for any
+    # probe, turning the fuzzy hint into a universe-name oracle. The inner constructor is
+    # the single choke point, so every route in fails closed.
+    @test_throws ArgumentError pe.StringDistanceConfig(pe.StringDistances.Levenshtein(),
+                                                       -0.5)
+    @test_throws ArgumentError pe.set_string_distance!(min_score = -0.5)
+    @test_throws ArgumentError pe.with_string_distance(() -> nothing; min_score = -1)
+    @test_throws ArgumentError pe.apply_preferences!(Dict{String, Any}("suggestion_min_score" =>
+                                                                           -0.5))
+    # NaN is rejected too (NaN >= 0 is false).
+    @test_throws ArgumentError pe.StringDistanceConfig(pe.StringDistances.Levenshtein(),
+                                                       NaN)
+    # 0 is out, but the documented ">1 disables suggestions" sentinel stays legal.
+    @test_throws ArgumentError pe.StringDistanceConfig(pe.StringDistances.Levenshtein(), 0)
+    @test pe.StringDistanceConfig(pe.StringDistances.Levenshtein(), 1.5).min_score == 1.5
+    nx = ["AAPL", "MSFT", "GOOG"]
+    pe.with_string_distance(; min_score = 1.5) do
+        @test pe.did_you_mean("APL", nx) == ""
+    end
+    @test pe.STRING_DISTANCE[].min_score == 0.7  # scoped override restored
+end
+@testset "Sampling resource caps fail closed" begin
+    using PortfolioOptimisers, Test
+    pe = PortfolioOptimisers
+    @test pe.RESOURCE_LIMITS[] == pe.ResourceLimits(1_000_000, 100_000)
+    # Both fields must be positive, like EquationLimits.
+    @test_throws ArgumentError pe.ResourceLimits(0, 10)
+    @test_throws ArgumentError pe.ResourceLimits(10, -1)
+    @test_throws ArgumentError pe.set_resource_limits!(max_samples = 0)
+    @test_throws ArgumentError pe.set_resource_limits!(max_subsets = -1)
+    # n_sim sizes an N^2 * n_sim array in both uncertainty-set estimators; the ceiling
+    # converts an OOM kill into a typed DomainError naming the knob that raises it.
+    @test_throws DomainError NormalUncertaintySet(; n_sim = 10_000_000_000)
+    @test_throws DomainError ARCHUncertaintySet(; n_sim = 10_000_000_000)
+    err = try
+        NormalUncertaintySet(; n_sim = 10_000_000_000)
+        nothing
+    catch e
+        e
+    end
+    @test err isa DomainError
+    @test occursin("max_samples", err.msg)
+    @test occursin("set_resource_limits!", err.msg)
+    # The shipped default is far below the cap and still constructs.
+    @test NormalUncertaintySet(; n_sim = 3_000).n_sim == 3_000
+    # n_subsets is resolved at optimise time (it may be a schedule or callable), so the
+    # cap lives at that resolution seam and covers both the integer and callable forms.
+    rd = ReturnsResult(; nx = ["A", "B", "C"], X = randn(60, 3))
+    @test_throws DomainError pe.get_n_subsets(10_000_000)
+    @test_throws DomainError pe.get_n_subsets(x -> 10_000_000, rd)
+    @test pe.get_n_subsets(50) == 50
+    @test pe.get_n_subsets(x -> 7, rd) == 7
+    # A raised ceiling is honoured, and scoped overrides restore on exit.
+    pe.with_resource_limits(; max_samples = 20_000_000_000) do
+        @test NormalUncertaintySet(; n_sim = 10_000_000_000).n_sim == 10_000_000_000
+    end
+    @test pe.RESOURCE_LIMITS[].max_samples == 1_000_000
+    # Preferences fail closed at load, like the equation caps.
+    pe.apply_preferences!(Dict{String, Any}("max_subsets" => 1_234))
+    @test pe.RESOURCE_LIMITS[].max_subsets == 1_234
+    @test pe.RESOURCE_LIMITS[].max_samples == 1_000_000  # unset key keeps its default
+    @test_throws ArgumentError pe.apply_preferences!(Dict{String, Any}("max_samples" => -5))
+    @test_throws ArgumentError pe.apply_preferences!(Dict{String, Any}("max_subsets" =>
+                                                                           true))
+    @test_throws ArgumentError pe.apply_preferences!(Dict{String, Any}("max_samples" => "1000"))
+    pe.set_resource_limits!(max_samples = 1_000_000, max_subsets = 100_000)  # restore
+end

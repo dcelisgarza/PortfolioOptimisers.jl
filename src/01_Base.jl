@@ -1251,7 +1251,7 @@ Global configuration for the fuzzy "did you mean?" suggestions appended to "vari
 # Fields
 
   - `dist`: the `StringDistances.StringDistance` used to score candidate names against the offending one (default `StringDistances.Levenshtein()`).
-  - `min_score`: the minimum normalised similarity in `[0, 1]` a candidate must reach before it is suggested (default `0.7`). Raising it toward `1` keeps only near-exact matches; setting it above `1` disables suggestions entirely — useful in meta-optimiser inner loops, where an asset name legitimately absent from a cluster/subset is not a typo and should draw no suggestion.
+  - `min_score`: the minimum normalised similarity in `[0, 1]` a candidate must reach before it is suggested (default `0.7`). Raising it toward `1` keeps only near-exact matches; setting it above `1` disables suggestions entirely — useful in meta-optimiser inner loops, where an asset name legitimately absent from a cluster/subset is not a typo and should draw no suggestion. Must be positive (enforced by the constructor). `StringDistances.findnearest` never suggests a candidate scoring exactly `0`, but any threshold at or below `0` admits every candidate with *some* nonzero similarity — so `0` and a negative value behave identically and both defeat the info-leak-safe boundary by naming a real asset for a near-miss probe.
 
 Immutable; held in the [`STRING_DISTANCE`](@ref) [`ScopedConfig`](@ref). Set the global default via [`set_string_distance!`](@ref), override per scope via [`with_string_distance`](@ref). Read by [`did_you_mean`](@ref).
 
@@ -1265,6 +1265,11 @@ Immutable; held in the [`STRING_DISTANCE`](@ref) [`ScopedConfig`](@ref). Set the
 struct StringDistanceConfig
     dist::StringDistances.StringDistance
     min_score::Float64
+    function StringDistanceConfig(dist::StringDistances.StringDistance, min_score::Real)
+        @argcheck(min_score > 0,
+                  ArgumentError("min_score must be positive; got $(min_score). A value above 1 legitimately disables suggestions, but a zero or negative threshold admits every candidate with any nonzero similarity, making `did_you_mean` echo a real asset name for near-miss probes and defeating the info-leak-safe boundary (ADR 0026)."))
+        return new(dist, Float64(min_score))
+    end
 end
 """
     STRING_DISTANCE = ScopedConfig(StringDistanceConfig(StringDistances.Levenshtein(), 0.7))
@@ -1286,7 +1291,7 @@ const STRING_DISTANCE = ScopedConfig(StringDistanceConfig(StringDistances.Levens
 Configure the global default fuzzy-suggestion settings read by [`did_you_mean`](@ref). The store is atomic (see [`ScopedConfig`](@ref)); unspecified keywords keep their current default. For a temporary, task-scoped override use [`with_string_distance`](@ref).
 
   - `dist`: distance used to rank candidate names (e.g. `StringDistances.Levenshtein()`, `StringDistances.DamerauLevenshtein()`, `StringDistances.JaroWinkler()`).
-  - `min_score`: minimum normalised similarity in `[0, 1]` to emit a suggestion; set above `1` to disable suggestions.
+  - `min_score`: minimum normalised similarity in `(0, 1]` to emit a suggestion; set above `1` to disable suggestions. Must be positive: a non-positive threshold admits every candidate with any nonzero similarity.
 
 Returns the new default [`StringDistanceConfig`](@ref).
 
@@ -1396,6 +1401,88 @@ Useful to tighten the boundary around one batch of untrusted constraint strings,
 function with_equation_limits(f; max_length::Integer = EQUATION_LIMITS[].max_length,
                               max_depth::Integer = EQUATION_LIMITS[].max_depth)
     return with_config(f, EQUATION_LIMITS, EquationLimits(max_length, max_depth))
+end
+"""
+Global resource caps for the sampling-based estimators, guarding the config→allocation trust boundary against memory and compute exhaustion.
+
+The number of Monte-Carlo draws and the number of resampled asset subsets are untrusted configuration integers (config files, tuning grids, UI): each directly multiplies an allocation, and in the subset case a whole optimisation. Their own constructors only bound them from *below* (`n_sim > 0`, `n_subsets >= 2`), so an absurd value — a stray extra digit, a mis-scaled sweep — is accepted and the process is killed by the OOM killer rather than told what went wrong. These caps fail closed with a typed `DomainError` at the point the value is resolved.
+
+# Fields
+
+  - `max_samples`: maximum Monte-Carlo/bootstrap draws (`n_sim`) accepted by [`NormalUncertaintySet`](@ref) and [`ARCHUncertaintySet`](@ref) (default `1_000_000`). Each draw stores an `N × N` covariance, so the backing array is `N² · n_sim` elements: at 20 assets the default cap already permits a 3.2 GB request, while the shipped `n_sim` is `3_000`.
+  - `max_subsets`: maximum resampled asset subsets (`n_subsets`) accepted by [`SubsetResampling`](@ref) and [`MultipleRandomised`](@ref) (default `100_000`). This one bounds *compute* far more than memory — every subset runs a full inner optimisation — so the cap sits far above any realistic sweep (the shipped default is `2`) yet well below a value that would wedge a session for days.
+
+The values are conservative static defaults, deliberately far above legitimate use: they exist to convert an OOM kill into a typed error, not to second-guess a sizing choice. Immutable; held in the [`RESOURCE_LIMITS`](@ref) [`ScopedConfig`](@ref). Set the global default via [`set_resource_limits!`](@ref), override per scope via [`with_resource_limits`](@ref). Both fields must be positive (enforced by the constructor).
+
+# Related
+
+  - [`RESOURCE_LIMITS`](@ref)
+  - [`set_resource_limits!`](@ref)
+  - [`with_resource_limits`](@ref)
+  - [`assert_resource_cap`](@ref)
+  - [`EquationLimits`](@ref)
+"""
+struct ResourceLimits
+    max_samples::Int
+    max_subsets::Int
+    function ResourceLimits(max_samples::Integer, max_subsets::Integer)
+        @argcheck(max_samples > 0 && max_subsets > 0,
+                  ArgumentError("max_samples and max_subsets must be positive."))
+        return new(Int(max_samples), Int(max_subsets))
+    end
+end
+"""
+    RESOURCE_LIMITS = ScopedConfig(ResourceLimits(1_000_000, 100_000))
+
+Default global resource caps for the sampling-based estimators, guarding the config→allocation trust boundary against memory and compute exhaustion. Read as `RESOURCE_LIMITS[]`; the defaults may be seeded per project at load time via the `"max_samples"` / `"max_subsets"` preferences (see [`apply_preferences!`](@ref)).
+
+# Related
+
+  - [`ResourceLimits`](@ref)
+  - [`set_resource_limits!`](@ref)
+  - [`with_resource_limits`](@ref)
+  - [`assert_resource_cap`](@ref)
+"""
+const RESOURCE_LIMITS = ScopedConfig(ResourceLimits(1_000_000, 100_000))
+"""
+    set_resource_limits!(; max_samples::Integer, max_subsets::Integer)
+
+Configure the global default resource caps read at the config→allocation trust boundary (see [`RESOURCE_LIMITS`](@ref)).
+
+  - `max_samples`: maximum `n_sim` accepted by the uncertainty-set estimators.
+  - `max_subsets`: maximum `n_subsets` accepted by the subset-resampling estimators.
+
+Raise them for a genuinely large machine-authored run on a machine sized for it, or lower them to tighten the boundary. Both must be positive; unspecified keywords keep their current default. The store is atomic (see [`ScopedConfig`](@ref)); for a temporary, task-scoped override use [`with_resource_limits`](@ref).
+
+Returns the new default [`ResourceLimits`](@ref).
+
+# Related
+
+  - [`RESOURCE_LIMITS`](@ref)
+  - [`with_resource_limits`](@ref)
+  - [`set_equation_limits!`](@ref)
+"""
+function set_resource_limits!(;
+                              max_samples::Integer = (@atomic RESOURCE_LIMITS.default).max_samples,
+                              max_subsets::Integer = (@atomic RESOURCE_LIMITS.default).max_subsets)
+    return set_default!(RESOURCE_LIMITS, ResourceLimits(max_samples, max_subsets))
+end
+"""
+    with_resource_limits(f; max_samples::Integer = RESOURCE_LIMITS[].max_samples,
+                         max_subsets::Integer = RESOURCE_LIMITS[].max_subsets)
+
+Run `f()` with the sampling resource caps (see [`RESOURCE_LIMITS`](@ref)) overridden for the dynamic extent of the call, restoring the previous caps on exit. Task-scoped and thread-safe (see [`ScopedConfig`](@ref)); the global default is untouched. Unspecified keywords inherit from the currently active value, so nested overrides compose.
+
+Useful to raise the ceiling for one deliberately large run without loosening the boundary for other concurrent work. Note the cap is read where the value is *resolved*: `n_sim` at estimator construction, `n_subsets` when the optimisation resolves its (possibly [`TimeDependent`](@ref)) schedule — so wrap the constructor call in the former case and the `optimise` call in the latter.
+
+# Related
+
+  - [`set_resource_limits!`](@ref)
+  - [`RESOURCE_LIMITS`](@ref)
+"""
+function with_resource_limits(f; max_samples::Integer = RESOURCE_LIMITS[].max_samples,
+                              max_subsets::Integer = RESOURCE_LIMITS[].max_subsets)
+    return with_config(f, RESOURCE_LIMITS, ResourceLimits(max_samples, max_subsets))
 end
 """
     did_you_mean(name::AbstractString, candidates) -> String
@@ -1544,6 +1631,7 @@ const PREFERENCE_DISTANCES = Dict{String, StringDistances.StringDistance}("leven
 The Preferences.jl keys read at package load to seed the global config defaults (see [`apply_preferences!`](@ref)):
 
   - `"equation_max_length"` / `"equation_max_depth"`: positive integers for [`EQUATION_LIMITS`](@ref).
+  - `"max_samples"` / `"max_subsets"`: positive integers for [`RESOURCE_LIMITS`](@ref).
   - `"suggestion_min_score"`: real number for the [`STRING_DISTANCE`](@ref) threshold.
   - `"suggestion_distance"`: a [`PREFERENCE_DISTANCES`](@ref) name for the [`STRING_DISTANCE`](@ref) metric.
   - `"compact_show"`: boolean or integer for [`COMPACT_SHOW`](@ref).
@@ -1554,12 +1642,13 @@ Preferences.jl offers no way to enumerate the keys a project has set, so a missp
 
   - [`apply_preferences!`](@ref)
 """
-const PREFERENCE_KEYS = ("equation_max_length", "equation_max_depth",
-                         "suggestion_min_score", "suggestion_distance", "compact_show")
+const PREFERENCE_KEYS = ("equation_max_length", "equation_max_depth", "max_samples",
+                         "max_subsets", "suggestion_min_score", "suggestion_distance",
+                         "compact_show")
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Apply load-time preference values to the global config defaults ([`EQUATION_LIMITS`](@ref), [`STRING_DISTANCE`](@ref), [`COMPACT_SHOW`](@ref)). Called by the package `__init__` with the [`PREFERENCE_KEYS`](@ref) values read via `Preferences.load_preference`; `nothing` values (unset preferences) are skipped and keep the shipped default.
+Apply load-time preference values to the global config defaults ([`EQUATION_LIMITS`](@ref), [`RESOURCE_LIMITS`](@ref), [`STRING_DISTANCE`](@ref), [`COMPACT_SHOW`](@ref)). Called by the package `__init__` with the [`PREFERENCE_KEYS`](@ref) values read via `Preferences.load_preference`; `nothing` values (unset preferences) are skipped and keep the shipped default.
 
 Fails closed: an invalid value throws a typed `ArgumentError` naming the key and value, so the package refuses to load rather than silently running with a weaker cap than the one the project requested. Values are applied through the `set_*!` setters, so they receive the same validation as runtime calls.
 
@@ -1569,6 +1658,8 @@ To persist a configuration, put the keys in the active project's `LocalPreferenc
 [PortfolioOptimisers]
 equation_max_length = 512
 equation_max_depth = 64
+max_samples = 50_000
+max_subsets = 1_000
 suggestion_min_score = 0.8
 suggestion_distance = "damerau_levenshtein"
 compact_show = 4
@@ -1579,6 +1670,7 @@ compact_show = 4
   - [`PREFERENCE_KEYS`](@ref)
   - [`PREFERENCE_DISTANCES`](@ref)
   - [`set_equation_limits!`](@ref)
+  - [`set_resource_limits!`](@ref)
   - [`set_string_distance!`](@ref)
   - [`set_compact_show!`](@ref)
 """
@@ -1593,6 +1685,17 @@ function apply_preferences!(prefs::AbstractDict{<:AbstractString, <:Any})
         lim = @atomic EQUATION_LIMITS.default
         set_equation_limits!(; max_length = something(ml, lim.max_length),
                              max_depth = something(md, lim.max_depth))
+    end
+    xs = get(prefs, "max_samples", nothing)
+    xb = get(prefs, "max_subsets", nothing)
+    if !(isnothing(xs) && isnothing(xb))
+        for (key, val) in ("max_samples" => xs, "max_subsets" => xb)
+            @argcheck(isnothing(val) || val isa Integer && !(val isa Bool) && val > 0,
+                      ArgumentError("preference `$(key) = $(repr(val))` must be a positive integer."))
+        end
+        rlim = @atomic RESOURCE_LIMITS.default
+        set_resource_limits!(; max_samples = something(xs, rlim.max_samples),
+                             max_subsets = something(xb, rlim.max_subsets))
     end
     ms = get(prefs, "suggestion_min_score", nothing)
     if !isnothing(ms)
@@ -2575,6 +2678,92 @@ function assert_finite(val::Number, sym::Sym_Str = :val)::Nothing
     @argcheck(isfinite(val),
               DomainError("isfinite($sym) must hold. Got\nisfinite($sym) => $(isfinite(val))"))
     return nothing
+end
+"""
+    assert_all_finite(val::ArrNum, sym::Sym_Str = :val)
+
+Assert that *every* element of `val` is finite, failing closed with an [`IsNonFiniteError`](@ref) otherwise.
+
+Unlike [`assert_finite`](@ref), which only requires *one* finite element, this demands the whole array be finite. It guards the comparison-based covariance estimators ([`GerberCovariance`](@ref), [`SmythBrobyCovariance`](@ref)): their `X .>= sd` / `X .<= -sd` comparisons silently evaluate a `NaN` entry as `false`, masking it as "no co-movement" and yielding a finite, plausible, *wrong* covariance rather than an error. Clean returns first with an asset selector (e.g. [`CompleteAssetSelector`](@ref)) or [`MissingDataFilter`](@ref) — non-finite entries in a returns matrix are a supported input to *those*, but not to a comparison-based estimator. The message reports the count of offending entries and the first offending index only — never the data values.
+
+# Arguments
+
+  - `val`: Array to check.
+  - `sym`: Symbolic name used in the error message.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`assert_finite`](@ref)
+  - [`IsNonFiniteError`](@ref)
+"""
+function assert_all_finite(val::ArrNum, sym::Sym_Str = :val)::Nothing
+    @argcheck(all(isfinite, val),
+              IsNonFiniteError("all(isfinite, $sym) must hold. Got $(count(!isfinite, val)) non-finite entries; first at $(findfirst(!isfinite, val))."))
+    return nothing
+end
+"""
+    assert_resource_cap(val::Integer, cap::Integer, sym::Sym_Str, knob::Sym_Str)
+
+Assert that an untrusted sizing integer `val` does not exceed the active [`RESOURCE_LIMITS`](@ref) ceiling `cap`, failing closed with a `DomainError` otherwise.
+
+`sym` names the offending field in the message (e.g. `:n_sim`) and `knob` names the [`ResourceLimits`](@ref) field to raise (e.g. `:max_samples`), so the error tells the caller both what was rejected and how to allow it deliberately.
+
+# Arguments
+
+  - `val`: The requested size.
+  - `cap`: The active ceiling.
+  - `sym`: Symbolic name of the offending field.
+  - `knob`: Symbolic name of the [`ResourceLimits`](@ref) field that raises the ceiling.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`RESOURCE_LIMITS`](@ref)
+  - [`set_resource_limits!`](@ref)
+  - [`with_resource_limits`](@ref)
+"""
+function assert_resource_cap(val::Integer, cap::Integer, sym::Sym_Str,
+                             knob::Sym_Str)::Nothing
+    @argcheck(val <= cap,
+              DomainError(val,
+                          "$sym = $val exceeds RESOURCE_LIMITS[].$knob = $cap. Raise it with set_resource_limits!(; $knob) — or with_resource_limits for a single scope — for genuinely large machine-authored runs."))
+    return nothing
+end
+"""
+    resolve_rng(rng::Random.AbstractRNG, seed::Option{<:Integer})
+
+Resolve which random number generator to draw from given an optional `seed`.
+
+A supplied `seed` yields a fresh, private generator — a `copy` of `rng` reseeded with `seed`
+via `Random.seed!` — so a seeded estimator is reproducible **without** reseeding, and thereby
+silently derandomising, the task-global RNG the caller may also own (the default `rng` is
+`Random.default_rng()`, a shared object). When `seed` is `nothing`, `rng` is returned unchanged
+and used as-is.
+
+Copying `rng` before seeding (rather than constructing a fixed generator type such as
+`Random.Xoshiro(seed)`) preserves both the caller's generator *object* — it is never mutated —
+and its *type*, so a caller-supplied portable generator (e.g. `StableRNGs.StableRNG`) keeps
+producing the same stream `Random.seed!(rng, seed)` did in place. The observable draws are thus
+identical to the old in-place seeding; only the side effect on the caller's stream disappears.
+
+# Arguments
+
+  - `rng`: Fallback random number generator, used verbatim when `seed` is `nothing`.
+  - `seed`: Optional seed. If set, a private `Random.seed!(copy(rng), seed)` is returned instead of touching `rng`.
+
+# Returns
+
+  - `Random.AbstractRNG`: the generator to draw from.
+"""
+function resolve_rng(rng::Random.AbstractRNG, seed::Option{<:Integer})
+    return isnothing(seed) ? rng : Random.seed!(copy(rng), seed)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

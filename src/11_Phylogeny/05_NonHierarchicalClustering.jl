@@ -103,10 +103,8 @@ Internal function used by non-hierarchical clustering estimators.
   - [`KMeansAlgorithm`](@ref)
 """
 function get_k_clusters_from_alg(alg::KMeansAlgorithm, D::MatNum, k::Integer)
-    if !isnothing(alg.seed)
-        Random.seed!(alg.rng, alg.seed)
-    end
-    return Clustering.kmeans(D, k; alg.kwargs...)
+    rng = resolve_rng(alg.rng, alg.seed)
+    return Clustering.kmeans(D, k; rng = rng, alg.kwargs...)
 end
 """
     optimal_number_clusters(onc::OptimalNumberClusters{<:Any, <:Integer},

@@ -524,6 +524,7 @@ Compute the Gerber correlation matrix using the algorithm specified in `ce.alg`.
 """
 function Statistics.cor(ce::GerberCovariance, X::MatNum; dims::Int = 1, kwargs...)
     @argcheck(dims in (1, 2), DomainError(dims, "dims must be 1 or 2"))
+    assert_all_finite(X, :X)
     if dims == 2
         X = transpose(X)
     end
@@ -579,6 +580,7 @@ Compute the Gerber covariance matrix using the algorithm specified in `ce.alg`.
 """
 function Statistics.cov(ce::GerberCovariance, X::MatNum; dims::Int = 1, kwargs...)
     @argcheck(dims in (1, 2), DomainError(dims, "dims must be 1 or 2"))
+    assert_all_finite(X, :X)
     if dims == 2
         X = transpose(X)
     end

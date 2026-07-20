@@ -113,7 +113,7 @@ using StatsPlots, GraphRecipes
 # Cumulative returns of the optimised portfolio over the sample period.
 plot_composition(res, rd)
 # Return histogram with tail-risk markers (VaR, CVaR).
-plot_ptf_cumulative_returns(res, rd)
+plot_portfolio_cumulative_returns(res, rd)
 # Drawdown time series showing peak-to-trough loss periods.
 plot_histogram(res, rd)
 plot_drawdowns(res, rd)

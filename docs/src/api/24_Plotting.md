@@ -1,7 +1,7 @@
 # Plotting
 
 ```@docs
-plot_ptf_cumulative_returns
+plot_portfolio_cumulative_returns
 plot_asset_cumulative_returns
 plot_composition
 plot_stacked_bar_composition

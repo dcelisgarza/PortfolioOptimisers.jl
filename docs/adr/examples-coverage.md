@@ -77,6 +77,7 @@ Mark a topic covered (✅) only when all of the following hold:
 | ✅ | Fees and net returns | `examples/4_constraints_costs/06_Fees_and_Net_Returns.jl` |
 | ✅ | Regularisation and effective assets | `examples/4_constraints_costs/07_Regularisation.jl` |
 | ✅ | Nested clustered optimisation with layered constraints and fees | `examples/4_constraints_costs/08_Nested_Clustered_Constraints.jl` |
+| ✅ | Custom objectives and constraints (`cobj`/`ccnt`) — `CustomJuMPObjective`/`CustomJuMPConstraint`, `add_custom_objective_term!`/`add_custom_constraint!`, the `get_w`/`get_k`/`get_constraint_scale` idiom, objective-sense sign, and vector composition | `examples/4_constraints_costs/09_Custom_Objectives_and_Constraints.jl` |
 
 ## 5. Validation and tuning
 

@@ -88,12 +88,12 @@ plot_risk_contribution(factory(Variance(), pr), res_min, rd)
 
 ## 5. Realised performance
 
-[`plot_ptf_cumulative_returns`](@ref) and [`plot_drawdowns`](@ref) show how the book would have
+[`plot_portfolio_cumulative_returns`](@ref) and [`plot_drawdowns`](@ref) show how the book would have
 behaved over the sample, and [`plot_performance_summary`](@ref) collects the headline performance
 views into one figure.
 
 ````@example 02_Plotting_and_Reporting
-plot_ptf_cumulative_returns(res_ratio.w, rd)
+plot_portfolio_cumulative_returns(res_ratio.w, rd)
 ````
 
 The drawdown profile.

@@ -83,12 +83,12 @@ plot_risk_contribution(factory(Variance(), pr), res_min, rd)
 #=
 ## 5. Realised performance
 
-[`plot_ptf_cumulative_returns`](@ref) and [`plot_drawdowns`](@ref) show how the book would have
+[`plot_portfolio_cumulative_returns`](@ref) and [`plot_drawdowns`](@ref) show how the book would have
 behaved over the sample, and [`plot_performance_summary`](@ref) collects the headline performance
 views into one figure.
 =#
 
-plot_ptf_cumulative_returns(res_ratio.w, rd)
+plot_portfolio_cumulative_returns(res_ratio.w, rd)
 
 #=
 The drawdown profile.
@@ -127,7 +127,7 @@ views ([`plot_coskewness`](@ref), [`plot_cokurtosis`](@ref)) — each following 
 #src ## Findings (authoring dogfooding — stripped from rendered docs)
 #src - New deep dive; closes the 6_post_processing group. All plot calls verified to execute on
 #src   kaimon (f102cae9): plot_prior, plot_correlation, plot_mu, plot_stacked_bar_composition,
-#src   plot_ptf_cumulative_returns, plot_drawdowns, plot_performance_summary, plot_measures,
+#src   plot_portfolio_cumulative_returns, plot_drawdowns, plot_performance_summary, plot_measures,
 #src   plot_efficient_frontier all ok directly.
 #src - CONFIRMED known gotcha (arch-review item): plot_risk_contribution and
 #src   plot_portfolio_dashboard with a bare quadratic risk measure (Variance()) throw a cryptic

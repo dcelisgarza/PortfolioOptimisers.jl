@@ -2,7 +2,7 @@
 ## Cumulative returns
 ## ──────────────────────────────────────────────────────────────────────────────
 """
-    plot_ptf_cumulative_returns(
+    plot_portfolio_cumulative_returns(
         w::VecNum_VecVecNum,
         X::MatNum,
         fees::Option{<:Fees} = nothing;
@@ -10,7 +10,7 @@
         compound::Bool = false,
         kwargs...
     ) -> Plot
-    plot_ptf_cumulative_returns(
+    plot_portfolio_cumulative_returns(
         w::VecNum_VecVecNum,
         pr::Pr_RR,
         fees::Option{<:Fees} = nothing;
@@ -18,20 +18,20 @@
         compound::Bool = false,
         kwargs...
     ) -> Plot
-    plot_ptf_cumulative_returns(
+    plot_portfolio_cumulative_returns(
         res::OptimisationResult,
         pr::Pr_RR;
         fees::Option{<:Fees} = nothing,
         compound::Bool = false,
         kwargs...
     ) -> Plot
-    plot_ptf_cumulative_returns(
+    plot_portfolio_cumulative_returns(
         res::OptimisationResult;
         fees::Option{<:Fees} = nothing,
         compound::Bool = false,
         kwargs...
     ) -> Plot
-    plot_ptf_cumulative_returns(
+    plot_portfolio_cumulative_returns(
         pred::Union{
                         <:PredictionResult,
                         <:MultiPeriodPredictionResult,
@@ -61,7 +61,7 @@ Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
   - [`calc_net_returns`](@ref)
   - [`cumulative_returns`](@ref)
 """
-function plot_ptf_cumulative_returns end
+function plot_portfolio_cumulative_returns end
 
 ## ──────────────────────────────────────────────────────────────────────────────
 ## Asset cumulative returns
@@ -975,7 +975,7 @@ Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
 
 # Related
 
-  - [`plot_ptf_cumulative_returns`](@ref)
+  - [`plot_portfolio_cumulative_returns`](@ref)
   - [`ReturnsResult`](@ref)
 """
 function plot_benchmark end
@@ -1069,7 +1069,7 @@ function plot_cokurtosis end
 Four-panel composite plot for a single optimisation result:
 
  1. Portfolio composition ([`plot_composition`](@ref)).
- 2. Cumulative returns ([`plot_ptf_cumulative_returns`](@ref)).
+ 2. Cumulative returns ([`plot_portfolio_cumulative_returns`](@ref)).
  3. Asset risk contribution ([`plot_risk_contribution`](@ref)).
  4. Drawdowns ([`plot_drawdowns`](@ref)).
 
@@ -1098,7 +1098,7 @@ Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
 # Related
 
   - [`plot_composition`](@ref)
-  - [`plot_ptf_cumulative_returns`](@ref)
+  - [`plot_portfolio_cumulative_returns`](@ref)
   - [`plot_risk_contribution`](@ref)
   - [`plot_drawdowns`](@ref)
 """
@@ -1118,7 +1118,7 @@ function plot_portfolio_dashboard end
 Four-panel composite plot for a walk-forward cross-validation result:
 
  1. Stacked-bar fold compositions ([`plot_composition`](@ref)).
- 2. Fold-shaded cumulative returns ([`plot_ptf_cumulative_returns`](@ref)).
+ 2. Fold-shaded cumulative returns ([`plot_portfolio_cumulative_returns`](@ref)).
  3. Turnover per fold ([`plot_turnover`](@ref)).
  4. Weight stability box plot ([`plot_weight_stability`](@ref)).
 
@@ -1126,7 +1126,7 @@ Four-panel composite plot for a walk-forward cross-validation result:
 
   - `mpred::MultiPeriodPredictionResult`: Walk-forward prediction result.
   - `N::Option{<:Number} = nothing`: Forwarded to [`plot_weight_stability`](@ref).
-  - `compound::Bool = false`: Forwarded to [`plot_ptf_cumulative_returns`](@ref).
+  - `compound::Bool = false`: Forwarded to [`plot_portfolio_cumulative_returns`](@ref).
 
 Implemented by `PortfolioOptimisersPlotsExt` (requires `StatsPlots`).
 
@@ -1318,7 +1318,7 @@ function relevant_assets(w::VecNum, M::Integer, N_opt::Option{<:Number} = nothin
     return N, idx
 end
 
-export plot_ptf_cumulative_returns, plot_asset_cumulative_returns, plot_composition,
+export plot_portfolio_cumulative_returns, plot_asset_cumulative_returns, plot_composition,
        plot_stacked_bar_composition, plot_stacked_area_composition, plot_dendrogram,
        plot_clusters, plot_drawdowns, plot_risk_contribution, plot_factor_risk_contribution,
        plot_measures, plot_histogram, plot_network, plot_centrality, plot_correlation,

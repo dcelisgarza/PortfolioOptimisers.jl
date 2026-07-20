@@ -778,7 +778,7 @@ Unlike all other estimators, finite allocation does not yield an "optimal" value
 Visualising the results is quite a useful way of summarising the portfolio characteristics or evolution. To this extent we provide a few plotting functions with more to come.
 
 - ::: details Simple or compound cumulative returns.
-  - Portfolio [`plot_ptf_cumulative_returns`](@ref).
+  - Portfolio [`plot_portfolio_cumulative_returns`](@ref).
   - Assets [`plot_asset_cumulative_returns`](@ref).
 - ::: details Portfolio composition.
   - Single portfolio [`plot_composition`](@ref).

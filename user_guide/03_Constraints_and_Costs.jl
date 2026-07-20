@@ -105,80 +105,22 @@ weight-norm ceiling that doubles as a diversification floor (`l1`, `l2`, `l2c`) 
 
 ## 5. Custom objectives and constraints
 
-When a mandate needs something no built-in keyword covers, two [`JuMPOptimiser`](@ref) extension
-points let you write straight against the JuMP model. Each takes an estimator (or a vector of
-them) and dispatches on its type:
+When a mandate needs something no built-in keyword covers — a continuous per-asset preference
+like a factor score, or a relationship between weights that isn't a plain linear bound — two
+[`JuMPOptimiser`](@ref) extension points let you write straight against the JuMP model:
 
   - `cobj` takes a [`CustomJuMPObjective`](@ref) — implement [`add_custom_objective_term!`](@ref)
-    to add a term to the objective expression.
+    to add a reward or penalty term to the objective.
   - `ccnt` takes a [`CustomJuMPConstraint`](@ref) — implement [`add_custom_constraint!`](@ref) to
     add a constraint to the model.
 
-To show both, we tilt toward a *momentum score* — each asset's standardised trailing-63-day
-return. It is a continuous per-asset number, so no group string could express it.
+Each keyword takes a single estimator or a vector of them, and each hook dispatches on the
+estimator's type. The
+[custom objectives & constraints example](../examples/4_constraints_costs/09_Custom_Objectives_and_Constraints.md)
+builds both from scratch — a momentum tilt and a momentum floor — and works through the two
+model idioms (the constraint scale, and the homogenisation variable `k`) that keep a
+hand-written term correct.
 =#
-
-using JuMP: JuMP
-
-score = let m = vec(sum(rd.X[(end - 62):end, :]; dims = 1))
-    (m .- mean(m)) ./ std(m)
-end
-
-#=
-**A custom objective.** Subtype [`CustomJuMPObjective`](@ref) and mutate the objective
-expression. `MinimumRisk` is a *minimisation*, so we *subtract* the score reward (scaled by
-`lambda`) to favour high-momentum names; read the weight variables with the [`get_w`](@ref)
-accessor rather than reaching into `model[:w]` directly.
-=#
-
-struct MomentumTilt{T1, T2} <: PortfolioOptimisers.CustomJuMPObjective
-    score::T1
-    lambda::T2
-end
-function PortfolioOptimisers.add_custom_objective_term!(model::JuMP.Model, obj, pret,
-                                                        cobj::MomentumTilt, obj_expr, opt,
-                                                        pr, args...)
-    sign = ifelse(isa(obj, MinimumRisk), -1, 1)
-    w = PortfolioOptimisers.get_w(model)
-    JuMP.add_to_expression!(obj_expr, sign * cobj.lambda * (cobj.score' * w))
-    return nothing
-end
-
-res_tilt = optimise(MeanRisk(; obj = MinimumRisk(),
-                             opt = JuMPOptimiser(; pe = pr, slv = slv,
-                                                 cobj = MomentumTilt(score, 1e-4))))
-
-#=
-**A custom constraint.** Subtype [`CustomJuMPConstraint`](@ref) and add a JuMP constraint,
-following the model idiom: scale the constraint by [`get_constraint_scale`](@ref) and multiply
-any constant bound by the homogenisation variable [`get_k`](@ref) (`1` here, but load-bearing
-under a ratio objective). This puts a hard *floor* on the same momentum exposure.
-=#
-
-struct MomentumFloor{T1, T2} <: PortfolioOptimisers.CustomJuMPConstraint
-    score::T1
-    floor::T2
-end
-function PortfolioOptimisers.add_custom_constraint!(model::JuMP.Model, ccnt::MomentumFloor,
-                                                    opt, attrs)
-    w = PortfolioOptimisers.get_w(model)
-    k = PortfolioOptimisers.get_k(model)
-    sc = PortfolioOptimisers.get_constraint_scale(model)
-    JuMP.@constraint(model, sc * (ccnt.score' * w - ccnt.floor * k) >= 0)
-    return nothing
-end
-
-res_floor = optimise(MeanRisk(; obj = MinimumRisk(),
-                              opt = JuMPOptimiser(; pe = pr, slv = slv,
-                                                  ccnt = MomentumFloor(score, 1.0))))
-
-#=
-Both lift the portfolio's momentum exposure `score'w` above the baseline — the soft tilt as far
-as the risk trade-off allows, the hard floor to exactly its bound.
-=#
-
-momentum_exposure = (base = score' * res_base.w, tilt = score' * res_tilt.w,
-                     floor = score' * res_floor.w)
 
 #=
 ## 6. Comparing the effect
@@ -186,9 +128,8 @@ momentum_exposure = (base = score' * res_base.w, tilt = score' * res_tilt.w,
 Same prior, same objective — only the constraint or cost changes the allocation.
 =#
 
-results = [res_base, res_cap, res_grp, res_tn, res_fee, res_tilt, res_floor]
-labels = ["Base", "Cap 10%", "Tech ≥ 15%", "Turnover", "Fees", "Momentum tilt",
-          "Momentum floor"]
+results = [res_base, res_cap, res_grp, res_tn, res_fee]
+labels = ["Base", "Cap 10%", "Tech ≥ 15%", "Turnover", "Fees"]
 
 pretty_table(DataFrame(["Asset" => rd.nx,
                         [labels[i] => results[i].w for i in eachindex(results)]...]);
@@ -208,11 +149,8 @@ plot_stacked_bar_composition(results, rd; xticks = (1:length(labels), labels))
 #src - Cross-links to 4_constraints_costs/02 (linear/group), 03 (phylogeny/centrality), 04
 #src   (turnover/tracking) point at example pages NOT YET AUTHORED — resolve on Documenter
 #src   linkcheck once that group lands. → guide/examples cross-link audit.
-#src - §5 Custom objectives/constraints added for ergonomics-review-20260718 card 6 (the
-#src   extension point had no worked example). Both verified at Main top level on kaimon
-#src   (session 29092601): MomentumTilt cobj lifts score'w 0.204→1.403; MomentumFloor ccnt
-#src   pins it to the 1.0 floor. Idiom checks: objective mutates obj_expr via add_to_expression!
-#src   + get_w; constraint scales by get_constraint_scale and multiplies the constant by get_k
-#src   (k=1 under MinimumRisk but load-bearing under a ratio objective, so kept for correctness).
-#src   Scoped to MinimumRisk (Min sense ⇒ subtract the reward); a ratio-objective tilt would
-#src   need the k-normalisation caveat spelled out. `dot` is not exported by PO → used score'*w.
+#src - §5 Custom objectives/constraints: the worked MomentumTilt/MomentumFloor example was
+#src   MOVED to examples/4_constraints_costs/09_Custom_Objectives_and_Constraints.jl (a deep
+#src   dive: λ sweep, sense/sign, floor sweep, the k idiom, and vector composition). This page
+#src   now keeps only a shallow pointer, matching the guide=shallow / examples=deep split.
+#src   §6 comparison drops the two momentum columns (res_tilt/res_floor no longer defined here).

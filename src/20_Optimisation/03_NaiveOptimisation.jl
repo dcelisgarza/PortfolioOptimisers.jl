@@ -762,10 +762,8 @@ function _optimise(rw::RandomWeighted, rd::ReturnsResult; dims::Int = 1, kwargs.
     else
         Distributions.Dirichlet(rw.alpha)
     end
-    if !isnothing(rw.seed)
-        Random.seed!(rw.rng, rw.seed)
-    end
-    w = rand(rw.rng, dist)
+    rng = resolve_rng(rw.rng, rw.seed)
+    w = rand(rng, dist)
     wb = weight_bounds_constraints(rw.wb, rw.sets; N = N, strict = rw.strict,
                                    datatype = eltype(rd.X))
     retcode, w = finalise_weight_bounds(rw.wf, wb, w)

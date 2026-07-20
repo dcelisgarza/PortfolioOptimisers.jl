@@ -1087,7 +1087,7 @@ Dispatches based on the objective function type to configure the appropriate JuM
   - `model::JuMP.Model`: JuMP optimisation model.
   - `obj::ObjectiveFunction`: Portfolio objective (e.g. [`MinimumRisk`](@ref), [`MaximumUtility`](@ref)).
   - `pret::JuMPReturnsEstimator`: Returns estimator.
-  - `cobj::Option{<:CustomJuMPObjective}`: Optional custom objective term.
+  - `cobj::Option{<:JuMPObj_VecJuMPObj}`: Optional custom objective term, or a vector of them.
   - `opt::JuMPOptimisationEstimator`: JuMP optimiser configuration.
   - `pr::AbstractPriorResult`: Prior result.
 
@@ -1106,7 +1106,7 @@ Dispatches based on the objective function type to configure the appropriate JuM
 """
 function set_portfolio_objective_function!(model::JuMP.Model, obj::MinimumRisk,
                                            pret::JuMPReturnsEstimator,
-                                           cobj::Option{<:CustomJuMPObjective},
+                                           cobj::Option{<:JuMPObj_VecJuMPObj},
                                            opt::JuMPOptimisationEstimator,
                                            pr::AbstractPriorResult, args...)
     so = get_objective_scale(model)
@@ -1119,7 +1119,7 @@ function set_portfolio_objective_function!(model::JuMP.Model, obj::MinimumRisk,
 end
 function set_portfolio_objective_function!(model::JuMP.Model, obj::MaximumUtility,
                                            pret::JuMPReturnsEstimator,
-                                           cobj::Option{<:CustomJuMPObjective},
+                                           cobj::Option{<:JuMPObj_VecJuMPObj},
                                            opt::JuMPOptimisationEstimator,
                                            pr::AbstractPriorResult, args...)
     so = get_objective_scale(model)
@@ -1134,7 +1134,7 @@ function set_portfolio_objective_function!(model::JuMP.Model, obj::MaximumUtilit
 end
 function set_portfolio_objective_function!(model::JuMP.Model, obj::MaximumRatio,
                                            pret::LogarithmicReturn,
-                                           cobj::Option{<:CustomJuMPObjective},
+                                           cobj::Option{<:JuMPObj_VecJuMPObj},
                                            opt::JuMPOptimisationEstimator,
                                            pr::AbstractPriorResult, args...)
     so = get_objective_scale(model)
@@ -1149,7 +1149,7 @@ function set_portfolio_objective_function!(model::JuMP.Model, obj::MaximumRatio,
 end
 function set_portfolio_objective_function!(model::JuMP.Model, obj::MaximumRatio,
                                            pret::JuMPReturnsEstimator,
-                                           cobj::Option{<:CustomJuMPObjective},
+                                           cobj::Option{<:JuMPObj_VecJuMPObj},
                                            opt::JuMPOptimisationEstimator,
                                            pr::AbstractPriorResult, args...)
     so = get_objective_scale(model)
@@ -1172,7 +1172,7 @@ function set_portfolio_objective_function!(model::JuMP.Model, obj::MaximumRatio,
 end
 function set_portfolio_objective_function!(model::JuMP.Model, obj::MaximumReturn,
                                            pret::JuMPReturnsEstimator,
-                                           cobj::Option{<:CustomJuMPObjective},
+                                           cobj::Option{<:JuMPObj_VecJuMPObj},
                                            opt::JuMPOptimisationEstimator,
                                            pr::AbstractPriorResult, args...)
     so = get_objective_scale(model)

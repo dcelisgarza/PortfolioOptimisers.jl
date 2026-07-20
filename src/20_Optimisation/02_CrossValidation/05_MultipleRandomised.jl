@@ -341,9 +341,7 @@ function sample_unique_assets(N::Integer, k::Integer, n_subsets::Integer;
     n_comb = binomial(N, k)
     @argcheck(n_subsets <= n_comb,
               "n_subsets = $n_subsets must not be greater than `binomial(assets, subset_size) = n_comb => binomial($N, $k) = $n_comb`.")
-    if !isnothing(seed)
-        Random.seed!(rng, seed)
-    end
+    rng = resolve_rng(rng, seed)
     subsets = Matrix{typeof(N)}(undef, k, n_subsets)
     if n_comb <= max_comb
         ranks = StatsBase.sample(rng, 1:n_comb, n_subsets; replace = false)
@@ -452,6 +450,8 @@ Get the number of asset subsets for multiple-randomised cross-validation.
 
 Resolves the number of subsets from either an integer (direct count) or a callable that computes it from the returns data.
 
+This is the single point at which the (possibly [`TimeDependent`](@ref) or callable) subset count becomes a concrete integer, so it is where the [`RESOURCE_LIMITS`](@ref) `max_subsets` ceiling is enforced — a constructor check could not see the value a schedule or callable ultimately produces. Every subset runs a full inner optimisation, so an absurd count is a compute-exhaustion sink rather than a merely large allocation.
+
 # Arguments
 
   - `n_subsets`: Integer or callable number-of-subsets specification.
@@ -465,14 +465,17 @@ Resolves the number of subsets from either an integer (direct count) or a callab
 
   - [`MultipleRandomised`](@ref)
   - [`sample_unique_assets`](@ref)
+  - [`assert_resource_cap`](@ref)
 """
 function get_n_subsets(n_subsets::Integer, args...)
+    assert_resource_cap(n_subsets, RESOURCE_LIMITS[].max_subsets, :n_subsets, :max_subsets)
     return n_subsets
 end
 function get_n_subsets(n_subsets::NumberSubsetsEC,
                        rd::Union{<:Pr_RR, <:AbstractPricesResult})
     res = n_subsets(rd)
     assert_nonempty_nonneg_finite_val(res - 2, "n_subsets - 2")
+    assert_resource_cap(res, RESOURCE_LIMITS[].max_subsets, :n_subsets, :max_subsets)
     return res
 end
 """
@@ -512,8 +515,12 @@ function Base.split(mrcv::MultipleRandomised, rd::Prices_RR)
     n_comb = binomial(N, subset_size)
     @argcheck(n_subsets <= n_comb,
               "n_subsets = $n_subsets must not be greater than `binomial(assets, subset_size) = n_comb => binomial($N, $subset_size) = $n_comb`.")
+    # Resolve once: this single stream must serve BOTH the asset-subset sampling below and the
+    # per-path window offsets (`rand(rng, ...)` in the loop), so `seed` governs the whole split.
+    # `sample_unique_assets` is therefore handed the already-resolved rng and no seed.
+    rng = resolve_rng(rng, seed)
     asset_idx = sample_unique_assets(N, subset_size, n_subsets; max_comb = max_comb,
-                                     rng = rng, seed = seed)
+                                     rng = rng)
     path_ids = Vector{typeof(n_subsets)}(undef, 0)
     train_indices = Vector{UnitRange{typeof(T)}}(undef, 0)
     test_indices = Vector{UnitRange{typeof(T)}}(undef, 0)

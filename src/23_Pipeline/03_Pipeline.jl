@@ -53,6 +53,19 @@ function assert_opt_last(ests)::Nothing
     end
     return nothing
 end
+# Return the first element that repeats an earlier one, for a name-uniqueness error
+# that names the offending token without dumping the whole collection (ADR 0026 boundary
+# discipline). Only ever called on the failing path.
+function first_duplicate(xs)
+    seen = Set{eltype(xs)}()
+    for x in xs
+        if x in seen
+            return x
+        end
+        push!(seen, x)
+    end
+    return nothing
+end
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -112,7 +125,7 @@ julia> pipe.names
         @argcheck(!isempty(steps), IsEmptyError("steps cannot be empty"))
         @argcheck(length(names) == length(steps), DimensionMismatch)
         @argcheck(allunique(names),
-                  ArgumentError("pipeline step names must be unique, got $(collect(names))"))
+                  ArgumentError("pipeline step names must be unique; the name $(repr(first_duplicate(names))) is repeated among the $(length(names)) steps"))
         return new{typeof(names), typeof(steps)}(names, steps)
     end
 end
@@ -254,9 +267,11 @@ end
     compute(w, ctx.opt.w; broadcast)
 end
 function Base.getindex(pr::PipelineResult, name::AbstractString)
-    i = findfirst(==(name), getfield(pr, :names))
+    names = getfield(pr, :names)
+    i = findfirst(==(name), names)
     @argcheck(!isnothing(i),
-              ArgumentError("no pipeline step named $(repr(name)); available steps: $(collect(getfield(pr, :names)))"))
+              ArgumentError("no pipeline step named $(repr(name)) among the $(length(names)) named steps" *
+                            did_you_mean(name, names)))
     return getfield(pr, :results)[i]
 end
 """

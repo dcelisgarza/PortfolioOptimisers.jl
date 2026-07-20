@@ -282,6 +282,7 @@ ARCHUncertaintySet
                                 seed::Option{<:Integer}, bootstrap::ARCHBootstrapSet,
                                 kwargs::NamedTuple)
         @argcheck(n_sim > zero(n_sim), DomainError(n_sim, "n_sim must be > 0"))
+        assert_resource_cap(n_sim, RESOURCE_LIMITS[].max_samples, :n_sim, :max_samples)
         @argcheck(block_size > zero(block_size),
                   DomainError(block_size, "block_size must be > 0"))
         assert_unit_interval(q, :q)
@@ -322,7 +323,7 @@ Generates bootstrapped samples of expected returns and covariance statistics for
 # Details
 
   - Uses the bootstrap algorithm specified in `ue.bootstrap` to generate resampled datasets.
-  - If `ue.seed` is provided, seeds `ue.rng` before resampling for reproducibility.
+  - If `ue.seed` is provided, resampling draws from a private copy of `ue.rng` reseeded with `ue.seed` (via [`resolve_rng`](@ref)) for reproducibility, leaving `ue.rng` itself untouched.
   - For each bootstrap sample, computes the expected return and covariance using the prior estimator in `ue.pe`.
   - Stores the bootstrapped expected returns and covariances for uncertainty set estimation.
 
@@ -337,11 +338,9 @@ function bootstrap_generator(ue::ARCHUncertaintySet, X::MatNum; kwargs...)
     T = size(X, 1)
     mus = Matrix{eltype(X)}(undef, size(X, 2), ue.n_sim)
     sigmas = Array{eltype(X)}(undef, size(X, 2), size(X, 2), ue.n_sim)
-    if !isnothing(ue.seed)
-        Random.seed!(ue.rng, ue.seed)
-    end
+    rng = resolve_rng(ue.rng, ue.seed)
     for i in 1:(ue.n_sim)
-        Xi = X[bootstrap_indices(ue.bootstrap, ue.rng, T, ue.block_size), :]
+        Xi = X[bootstrap_indices(ue.bootstrap, rng, T, ue.block_size), :]
         mus[:, i] = vec(Statistics.mean(ue.me, Xi; dims = 1, kwargs...))
         sigmas[:, :, i] = Statistics.cov(ue.ce, Xi; dims = 1, kwargs...)
     end
@@ -364,7 +363,7 @@ Generates bootstrap samples of expected return vectors for returns data using th
 # Details
 
   - Uses the bootstrap algorithm specified in `ue.bootstrap` to generate resampled datasets.
-  - If `ue.seed` is provided, seeds `ue.rng` before resampling for reproducibility.
+  - If `ue.seed` is provided, resampling draws from a private copy of `ue.rng` reseeded with `ue.seed` (via [`resolve_rng`](@ref)) for reproducibility, leaving `ue.rng` itself untouched.
   - For each bootstrap sample, computes the expected return using the prior estimator in `ue.pe`.
   - Stores the bootstrapped expected returns for uncertainty set estimation.
 
@@ -378,11 +377,9 @@ Generates bootstrap samples of expected return vectors for returns data using th
 function mu_bootstrap_generator(ue::ARCHUncertaintySet, X::MatNum; kwargs...)
     T = size(X, 1)
     mus = Matrix{eltype(X)}(undef, size(X, 2), ue.n_sim)
-    if !isnothing(ue.seed)
-        Random.seed!(ue.rng, ue.seed)
-    end
+    rng = resolve_rng(ue.rng, ue.seed)
     for i in 1:(ue.n_sim)
-        Xi = X[bootstrap_indices(ue.bootstrap, ue.rng, T, ue.block_size), :]
+        Xi = X[bootstrap_indices(ue.bootstrap, rng, T, ue.block_size), :]
         mus[:, i] = vec(Statistics.mean(ue.me, Xi; dims = 1, kwargs...))
     end
     return mus
@@ -404,7 +401,7 @@ Generates bootstrap samples of covariance matrices for time series data using th
 # Details
 
   - Uses the bootstrap algorithm specified in `ue.bootstrap` to generate resampled datasets.
-  - If `ue.seed` is provided, seeds `ue.rng` before resampling for reproducibility.
+  - If `ue.seed` is provided, resampling draws from a private copy of `ue.rng` reseeded with `ue.seed` (via [`resolve_rng`](@ref)) for reproducibility, leaving `ue.rng` itself untouched.
   - For each bootstrap sample, computes the covariance using the prior estimator in `ue.pe`.
   - Stores the bootstrapped covariances for uncertainty set estimation.
 
@@ -418,11 +415,9 @@ Generates bootstrap samples of covariance matrices for time series data using th
 function sigma_bootstrap_generator(ue::ARCHUncertaintySet, X::MatNum; kwargs...)
     T = size(X, 1)
     sigmas = Array{eltype(X)}(undef, size(X, 2), size(X, 2), ue.n_sim)
-    if !isnothing(ue.seed)
-        Random.seed!(ue.rng, ue.seed)
-    end
+    rng = resolve_rng(ue.rng, ue.seed)
     for i in 1:(ue.n_sim)
-        Xi = X[bootstrap_indices(ue.bootstrap, ue.rng, T, ue.block_size), :]
+        Xi = X[bootstrap_indices(ue.bootstrap, rng, T, ue.block_size), :]
         sigmas[:, :, i] = Statistics.cov(ue.ce, Xi; dims = 1, kwargs...)
     end
     return sigmas

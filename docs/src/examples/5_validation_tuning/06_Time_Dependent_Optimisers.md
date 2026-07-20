@@ -216,7 +216,7 @@ pretty_table(DataFrame(:strategy => ["defensive", "aggressive", "regime switch"]
 
 ````@example 06_Time_Dependent_Optimisers
 using StatsPlots, GraphRecipes
-plot_ptf_cumulative_returns(pred_regime)
+plot_portfolio_cumulative_returns(pred_regime)
 ````
 
 The composition plot makes the switching visible — capped, spread-out folds alternate with
