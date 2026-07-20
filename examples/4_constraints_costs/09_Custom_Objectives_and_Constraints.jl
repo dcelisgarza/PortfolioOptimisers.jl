@@ -7,15 +7,15 @@ is a *pre-built* way to shape the problem. When a mandate needs something none o
 model**:
 
   - [`CustomJuMPObjective`](@ref) (the `cobj` keyword) — implement
-    [`add_custom_objective_term!`](@ref) to add a reward or penalty term to the objective.
+    [`add_custom_objective_term!`](@ref) to *price* a preference, softly.
   - [`CustomJuMPConstraint`](@ref) (the `ccnt` keyword) — implement
-    [`add_custom_constraint!`](@ref) to add a constraint to the model.
+    [`add_custom_constraint!`](@ref) to *mandate* one, hard.
 
 Each keyword takes a single estimator *or a vector of them*, and each hook **dispatches on the
-estimator's type**, so a term is just a struct carrying its data plus one method. This page
-builds both from scratch, works through the two model idioms that keep them correct
-(the constraint scale and the homogenisation variable `k`), and composes several into one
-problem. It is the deep dive behind the one-call summary in the
+estimator's type**, so a term is just a struct carrying its data plus one method. Subtyping one
+without implementing its method is an error, not a silent no-op. This page builds both from
+scratch, works through the model idioms that keep them correct (the constraint scale and the
+homogenisation variable `k`), and composes several into one problem. It is the deep dive behind the one-call summary in the
 [constraints & costs guide](../../user_guide/03_Constraints_and_Costs.md).
 
 !!! tip "When to reach for this"
@@ -76,32 +76,41 @@ base_exposure = score' * res_base.w
 
 A custom objective is a struct subtyping [`CustomJuMPObjective`](@ref), carrying whatever data
 the term needs, plus one method of [`add_custom_objective_term!`](@ref). The method is handed
-the model *mid-assembly* and mutates the objective expression in place. Its full signature is
+the model *mid-assembly* and contributes a term to the **objective penalty**. Its signature is
 
 ```julia
-add_custom_objective_term!(model, obj, pret, cobj, obj_expr, opt, pr, args...)
+add_custom_objective_term!(model, obj, cobj, optimiser, attrs)
 ```
 
   - `model` — the [`JuMP`](https://jump.dev/) model under construction.
-  - `obj` — the [`ObjectiveFunction`](@ref) (`MinimumRisk`, `MaximumUtility`, …). **Dispatch on
-    this** to get the optimisation *sense* right (below).
-  - `pret` — the [`JuMPReturnsEstimator`](@ref) (`ArithmeticReturn`/`LogarithmicReturn`).
+  - `obj` — the [`ObjectiveFunction`](@ref) being built (`MinimumRisk`, `MaximumUtility`, …).
+    Dispatch on this if your term should *differ* by objective; you do **not** need it to get
+    the sign right.
   - `cobj` — your estimator; the argument you dispatch your method on.
-  - `obj_expr` — the objective expression accumulated so far. Add your term into it with
-    `JuMP.add_to_expression!`.
-  - `opt` — the optimiser estimator (e.g. the [`MeanRisk`](@ref) itself).
-  - `pr` — the [`AbstractPriorResult`](@ref); `pr.mu`, `pr.sigma`, … are available if your term
-    is data-driven rather than carrying its own numbers.
+  - `optimiser` — the outer optimiser estimator (e.g. the [`MeanRisk`](@ref) itself). Its `opt`
+    field is the [`JuMPOptimiser`](@ref).
+  - `attrs` — the [`ProcessedJuMPOptimiserAttributes`](@ref) bundle: `attrs.pr` (prior),
+    `attrs.ret` (returns estimator), `attrs.wb` (bounds) and the rest of the processed problem
+    data, if your term is data-driven rather than carrying its own numbers.
 
 Read the weight variables with the [`get_w`](@ref) accessor rather than reaching into
 `model[:w]` — it asserts the variables have been registered and fails with a clear message if a
 hook runs out of order.
 
-!!! warning "The sign follows the optimisation *sense*, not the term"
-    `MinimumRisk` **minimises** `obj_expr`, so to *reward* high momentum you **subtract** it.
-    `MaximumUtility`/`MaximumReturn` **maximise**, so you **add** it. Get this backwards and you
-    will faithfully optimise *against* your own preference. We encode the rule once as
-    `reward_sign(obj)` and dispatch it on the objective type.
+Contribute the term with [`add_to_objective_penalty!`](@ref) rather than touching the objective
+expression yourself. That single call is what makes the term correct everywhere:
+
+!!! tip "The library orients your term; you just say what you mean"
+    Some objectives are minimised and some maximised, and [`MaximumRatio`](@ref) is *either*
+    depending on the risk measure — so a term written against the raw objective expression needs
+    a sign that no single rule can supply. The penalty accumulator sidesteps this: it is folded
+    into the objective with the factor matching whichever sense is being built, so **a
+    contribution always worsens the objective, and a reward is a negative contribution**. Write
+    `-λ * something_good` once and it rewards under every objective.
+
+    It also promotes an affine accumulator to a quadratic one as needed, so a quadratic term
+    (an L2 tilt, a tracking penalty) is safe against any objective — including the affine ones,
+    where mutating the expression directly would be a `MethodError`.
 =#
 
 struct MomentumTilt{T1, T2} <: PortfolioOptimisers.CustomJuMPObjective
@@ -109,15 +118,12 @@ struct MomentumTilt{T1, T2} <: PortfolioOptimisers.CustomJuMPObjective
     lambda::T2
 end
 
-## A reward term improves a minimisation when subtracted, a maximisation when added.
-reward_sign(::MinimumRisk) = -1
-reward_sign(::Union{MaximumUtility, MaximumReturn}) = 1
-
-function PortfolioOptimisers.add_custom_objective_term!(model::JuMP.Model, obj, pret,
-                                                        cobj::MomentumTilt, obj_expr, opt,
-                                                        pr, args...)
+function PortfolioOptimisers.add_custom_objective_term!(model::JuMP.Model, obj,
+                                                        cobj::MomentumTilt, optimiser,
+                                                        attrs)
     w = PortfolioOptimisers.get_w(model)
-    JuMP.add_to_expression!(obj_expr, reward_sign(obj) * cobj.lambda * (cobj.score' * w))
+    ## Negative penalty == reward. No sign dispatch, no objective-type special cases.
+    PortfolioOptimisers.add_to_objective_penalty!(model, -cobj.lambda * (cobj.score' * w))
     return nothing
 end
 
@@ -144,10 +150,11 @@ Note the term is **homogeneous of degree one in `w`** (it scales with the weight
 return and risk expressions). That is what lets it stay consistent under a ratio objective's
 internal rescaling — the constraint side, next, is where that rescaling needs explicit care.
 
-## 3. The sense in action
+## 3. The same term under a different sense
 
-The same tilt under [`MaximumUtility`](@ref) — a *maximisation* — must **add** the reward, which
-`reward_sign` handles. It lifts that objective's momentum exposure the same way.
+`MaximumUtility` is a *maximisation*, the exact opposite of the minimisation above — and the
+tilt needs no change at all. The identical `MomentumTilt` lifts its momentum exposure too,
+because the penalty accumulator is folded in with the factor for whichever sense is being built.
 =#
 
 util_base = optimise(MeanRisk(; obj = MaximumUtility(),
@@ -159,14 +166,14 @@ util_tilt = optimise(MeanRisk(; obj = MaximumUtility(),
 util_exposures = (base = score' * util_base.w, tilted = score' * util_tilt.w)
 
 #=
-!!! warning "[`MaximumRatio`](@ref) is deliberately left out of `reward_sign`"
+!!! note "[`MaximumRatio`](@ref) needs no special case"
     The maximum-ratio problem is solved through a homogenising transform that, depending on the
     risk measure, lands the objective in **either** a maximisation **or** a risk-minimisation
-    form. A single fixed sign would be wrong half the time, so `reward_sign` has no
-    `MaximumRatio` method: a tilt against a ratio objective raises a clear `MethodError` rather
-    than silently optimising the wrong way. If you need it, add the method deliberately for the
-    exact configuration you use, and verify the resulting exposure moves in the intended
-    direction.
+    form — so a term written against the raw objective expression has no single correct sign.
+    Because the contribution goes through the penalty accumulator, both forms fold it in with
+    their own factor and the tilt rewards momentum either way. Note this fixes the *sign*, not
+    the *scaling*: §5's `k` idiom still applies to any term that is not homogeneous of degree
+    one in `w`.
 
 ## 4. A custom constraint — a hard floor
 
@@ -174,12 +181,12 @@ A custom constraint is the same shape: a struct subtyping [`CustomJuMPConstraint
 one method of [`add_custom_constraint!`](@ref), whose signature is
 
 ```julia
-add_custom_constraint!(model, ccnt, opt, attrs)
+add_custom_constraint!(model, ccnt, optimiser, attrs)
 ```
 
-  - `model`, `ccnt`, `opt` — as before (`ccnt` is what you dispatch on).
-  - `attrs` — the [`ProcessedJuMPOptimiserAttributes`](@ref) bundle: `attrs.pr` (prior),
-    `attrs.wb` (bounds), and the rest of the processed problem data, if your constraint needs it.
+  - `model`, `optimiser`, `attrs` — exactly as on the objective side (`ccnt` is what you
+    dispatch on). The two hooks take the same arguments; the objective one adds `obj` ahead of
+    the dispatch argument, and that is the only difference between them.
 
 Two model idioms keep a hand-written constraint correct (see ADR 0008, *JuMP model assembly*):
 
@@ -197,7 +204,7 @@ struct MomentumFloor{T1, T2} <: PortfolioOptimisers.CustomJuMPConstraint
 end
 
 function PortfolioOptimisers.add_custom_constraint!(model::JuMP.Model, ccnt::MomentumFloor,
-                                                    opt, attrs)
+                                                    optimiser, attrs)
     w = PortfolioOptimisers.get_w(model)
     k = PortfolioOptimisers.get_k(model)
     sc = PortfolioOptimisers.get_constraint_scale(model)
@@ -281,7 +288,7 @@ struct MomentumCap{T1, T2} <: PortfolioOptimisers.CustomJuMPConstraint
     cap::T2
 end
 function PortfolioOptimisers.add_custom_constraint!(model::JuMP.Model, ccnt::MomentumCap,
-                                                    opt, attrs)
+                                                    optimiser, attrs)
     w = PortfolioOptimisers.get_w(model)
     k = PortfolioOptimisers.get_k(model)
     sc = PortfolioOptimisers.get_constraint_scale(model)
@@ -295,9 +302,9 @@ band = optimise(MeanRisk(; obj = MinimumRisk(),
                                                      MomentumCap(score, 0.8)])))
 
 #=
-**Additive objectives.** A `cobj` vector adds each term into the same expression, so two
-`1e-4` tilts compose into one of strength `2e-4` — a quick sanity check that vectors accumulate
-rather than replace:
+**Additive objectives.** A `cobj` vector contributes each term to the same penalty accumulator,
+so two `1e-4` tilts compose into one of strength `2e-4` — a quick sanity check that vectors
+accumulate rather than replace:
 =#
 
 two_tilts = optimise(MeanRisk(; obj = MinimumRisk(),
@@ -345,12 +352,22 @@ plot_stacked_bar_composition(results, rd; xticks = (1:length(labels), labels))
 #src - New deep dive (4_constraints_costs/09), lifted and expanded from user_guide §5 (which is
 #src   now trimmed to a pointer). Real SP500 slice, verified on kaimon (session e9b04ccf).
 #src - Objective hook: MomentumTilt cobj under MinimumRisk, λ sweep 0/1e-4/5e-4/2e-3 →
-#src   momentum exposure 0.204/1.295/1.396/1.399 (saturates; maxw 37%→69%→83%→89%). Sign follows
-#src   the optimisation SENSE not the term: MinimumRisk subtracts (Min), MaximumUtility adds
-#src   (Max) — reward_sign dispatches. MaximumUtility base 1.156 → tilt(5e-3) 1.403.
-#src - MaximumRatio deliberately has NO reward_sign method: the CC transform lands the objective
-#src   in a Max OR a risk-Min form depending on the risk measure, so a fixed sign is wrong half
-#src   the time. Tilt against a ratio objective → MethodError by design (verified).
+#src   momentum exposure 0.204/1.295/1.396/1.399 (saturates; maxw 37%→69%→83%→89%).
+#src   MaximumUtility base 1.156 → tilt(5e-3) 1.403.
+#src - ADR 0036 REWROTE this section. Custom terms now go through the objective PENALTY
+#src   (add_to_objective_penalty!) instead of mutating obj_expr, so the library applies the
+#src   sense-correct factor and reward_sign is DELETED — one definition (a negative penalty)
+#src   rewards under Min and Max alike.
+#src   VALUE-PRESERVING, re-verified against the new code path (2026-07-20): the λ sweep still
+#src   gives 0.204/1.295/1.396/1.399 (maxw 37.0/69.3/83.0/88.8) and MaximumUtility still gives
+#src   1.156 → 1.403. The MaximumUtility pair is the load-bearing check: it is the SENSE-FLIP
+#src   case, where the old code ADDED the term (reward_sign = +1) and the new code contributes
+#src   a NEGATIVE penalty folded in with factor -1. Same answer ⇒ the two routes agree across
+#src   the sense boundary, not just on the Min path where the arithmetic is trivially equal.
+#src - MaximumRatio is NO LONGER a special case: both branches of the CC transform (Max form
+#src   and risk-Min form) fold the penalty in with their own factor, so a tilt is correct
+#src   either way. The old "MethodError by design" carve-out is gone. The k idiom below is
+#src   UNAFFECTED — ADR 0036 fixes the sign trap, not the rescaling one.
 #src - Constraint hook: MomentumFloor ccnt binds EXACTLY (floor 0.5→0.500, 1.0→1.000, 1.35→1.350;
 #src   floor 0.0 non-binding at base 0.204). Idiom: scale by get_constraint_scale, multiply the
 #src   constant bound by get_k.
@@ -366,18 +383,26 @@ plot_stacked_bar_composition(results, rd; xticks = (1:length(labels), labels))
 #src   tilts == one 2e-4 tilt (1.3695). test_03b assembly suite still green.
 #src - BOTH follow-ups now CLOSED (uncommitted on dev):
 #src   1. NearOptimalCentering called add_custom_objective_term! with a DIFFERENT arg order
-#src      (model, ret, cobj, obj_expr, opt, pe) than the main path (model, obj, pret, cobj,
-#src      obj_expr, opt, pr), so a custom objective missed dispatch there. Fixed by inserting
+#src      than the main path, so a custom objective missed dispatch there. Fixed by inserting
 #src      MinimumRisk() as `obj` (NOC minimises: @objective(…, Min) + penalty factor 1).
 #src      test_20 NOC suite 39/39 green after.
-#src   2. New test/test_03c_custom_jump_hooks.jl (19 tests) covers both hooks: single + vector
-#src      cobj/ccnt, the k idiom under MaximumRatio, the no-op fallback, and a spy that pins
-#src      the (model, obj, pret, cobj, obj_expr, opt, pr) calling convention on BOTH the main
-#src      and NOC paths. Mutation-checked: reverting the NOC fix makes it fail.
+#src   2. New test/test_03c_custom_jump_hooks.jl covers both hooks: single + vector cobj/ccnt,
+#src      the k idiom under MaximumRatio, the fallback, and a spy pinning the calling
+#src      convention on BOTH the main and NOC paths. Mutation-checked.
 #src      Gotcha: `!isempty(spy_log)` is NOT a valid NOC regression detector — NOC solves
 #src      MeanRisk sub-problems that reach the hook through the main path and fire the spy 3×
-#src      regardless. The NOC builder's own call is the only one passing a JuMPOptimiser (not
-#src      an optimiser estimator) in the `opt` slot, so that's what the test keys on.
+#src      regardless. The NOC builder's own call is the one under test.
+#src - ADR 0036 changed what that spy keys on. It USED to key on the NOC call being the only
+#src   one passing a JuMPOptimiser (not an optimiser estimator) in the `opt` slot — i.e. on a
+#src   type inconsistency that WAS ITSELF THE BUG: a user hook dispatching on `opt`, or
+#src   reaching `opt.opt`, worked everywhere except under NOC. NOC now passes `noc` like every
+#src   other caller, so the detector keys on `isa(e.optimiser, NearOptimalCentering)` — naming
+#src   the estimator under test instead of detecting a type confusion. If you ever reintroduce
+#src   a JuMPOptimiser in that slot, this test will NOT catch it; the typed fallback will.
+#src - Also new in test_03c: a quadratic term (SpreadPenalty) against MaximumReturn's AFFINE
+#src   objective — impossible before ADR 0036 (add_to_expression!(::AffExpr, ::QuadExpr) is a
+#src   MethodError), so custom-term validity used to depend on the risk measure and objective.
+#src   And an Inert* pair asserting the fallback now RAISES rather than silently no-op'ing.
 #src   Also: constrained NOC does NOT solve on this SP500 slice (NaN) with Variance OR
 #src   StandardDeviation — test_20 uses a curated dataset + multi-solver list. Hence the NOC
 #src   test is deliberately solver-free (asserts on the assembly-time call, not the solution).

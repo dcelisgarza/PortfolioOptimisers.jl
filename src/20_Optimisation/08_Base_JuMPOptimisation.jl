@@ -289,16 +289,26 @@ function port_opt_view(cs::VecJuMPObj, i::Any, args...; kwargs...)
     return [port_opt_view(c, i, args...; kwargs...) for c in cs]
 end
 """
-    add_custom_objective_term!(args...; kwargs...)
+    add_custom_objective_term!(model::JuMP.Model, obj, cobj::Nothing, optimiser, attrs)
+    add_custom_objective_term!(model::JuMP.Model, obj, cobj::CustomJuMPObjective, optimiser, attrs)
 
 Add a custom objective term to the JuMP model.
 
-No-op fallback. Override this method for subtypes of [`CustomJuMPObjective`](@ref) to add custom penalty or reward terms to the JuMP model objective.
+Implement this for a subtype of [`CustomJuMPObjective`](@ref) to price a preference the library does not already name. Contribute the term with [`add_to_objective_penalty!`](@ref) rather than touching the objective expression: the accumulated penalty is folded in by [`add_penalty_to_objective!`](@ref) with the sign factor matching the objective's optimisation sense, so a contribution always worsens the objective and **a reward is a negative contribution**. This is what makes a term correct under every objective, [`MaximumRatio`](@ref) included, without the implementer consulting the sense (ADR 0036).
+
+`add_to_objective_penalty!` promotes an affine accumulator to a quadratic one as needed, so a quadratic term is safe on every configuration.
+
+Terms that are not homogeneous of degree one in `w` must still multiply any constant by [`get_k`](@ref): under a ratio objective the weights are solved in a rescaled space.
+
+There is no no-op fallback for a [`CustomJuMPObjective`](@ref) — a subtype with no method of its own raises, so a mis-shaped or stale signature fails loudly instead of silently contributing nothing. `nothing` (no custom term configured) is the only no-op.
 
 # Arguments
 
-  - `args...`: JuMP model and custom objective type (ignored in fallback).
-  - `kwargs...`: Additional keyword arguments.
+  - `model::JuMP.Model`: JuMP optimisation model, mid-assembly.
+  - `obj`: The [`ObjectiveFunction`](@ref) *being built*. During a [`Frontier`](@ref) sweep this differs from the objective the user declared — the endpoint sub-problems are built as [`MinimumRisk`](@ref) and [`MaximumReturn`](@ref).
+  - `cobj`: The custom objective estimator; the argument to dispatch on.
+  - `optimiser`: The outer optimisation estimator (e.g. the [`MeanRisk`](@ref) itself); its `opt` field is the [`JuMPOptimiser`](@ref).
+  - `attrs::ProcessedJuMPOptimiserAttributes`: Processed problem data — `attrs.pr` (prior), `attrs.ret` (returns estimator), `attrs.wb` (bounds), and the rest.
 
 # Returns
 
@@ -307,39 +317,56 @@ No-op fallback. Override this method for subtypes of [`CustomJuMPObjective`](@re
 # Related
 
   - [`CustomJuMPObjective`](@ref)
-  - [`add_custom_constraint!`](@ref)
+  - [`add_to_objective_penalty!`](@ref) — how to contribute a term
+  - [`add_custom_constraint!`](@ref) — the constraint-side analogue
 """
-function add_custom_objective_term!(args...; kwargs...)
+function add_custom_objective_term!(::JuMP.Model, ::Any, ::Nothing, ::Any, ::Any)
     return nothing
 end
-"""
-    add_custom_objective_term!(model::JuMP.Model, obj, pret, cobjs::VecJuMPObj, obj_expr, opt, pr, args...)
+function add_custom_objective_term!(::JuMP.Model, ::Any, cobj::CustomJuMPObjective, ::Any,
+                                    ::Any)
+    return throw(ArgumentError("""
+                               `$(nameof(typeof(cobj)))` subtypes `CustomJuMPObjective` but defines no `add_custom_objective_term!` method, so its term would contribute nothing.
 
-Apply each custom objective term in a vector, in order, accumulating into the shared `obj_expr`. Dispatches to the per-type [`add_custom_objective_term!`](@ref) for every element, so a `cobj` vector composes several custom terms into one objective.
+                               Define one with the signature:
+
+                                   PortfolioOptimisers.add_custom_objective_term!(model::JuMP.Model, obj, cobj::$(nameof(typeof(cobj))), optimiser, attrs)
+
+                               and contribute the term with `add_to_objective_penalty!(model, expr)`. A reward is a negative contribution; the optimisation sense is applied for you. See ADR 0036."""))
+end
+"""
+    add_custom_objective_term!(model::JuMP.Model, obj, cobjs::VecJuMPObj, optimiser, attrs)
+
+Apply each custom objective term in a vector, in order. Dispatches to the per-type [`add_custom_objective_term!`](@ref) for every element, so a `cobj` vector composes several custom terms into one objective — they accumulate additively in the shared objective penalty.
 
 # Related
 
   - [`CustomJuMPObjective`](@ref)
   - [`VecJuMPObj`](@ref)
 """
-function add_custom_objective_term!(model::JuMP.Model, obj, pret, cobjs::VecJuMPObj,
-                                    obj_expr, opt, pr, args...)
+function add_custom_objective_term!(model::JuMP.Model, obj, cobjs::VecJuMPObj, optimiser,
+                                    attrs)
     for cobj in cobjs
-        add_custom_objective_term!(model, obj, pret, cobj, obj_expr, opt, pr, args...)
+        add_custom_objective_term!(model, obj, cobj, optimiser, attrs)
     end
     return nothing
 end
 """
-    add_custom_constraint!(args...; kwargs...)
+    add_custom_constraint!(model::JuMP.Model, ccnt::Nothing, optimiser, attrs)
+    add_custom_constraint!(model::JuMP.Model, ccnt::CustomJuMPConstraint, optimiser, attrs)
 
 Add a custom constraint to the JuMP model.
 
-No-op fallback. Override this method for subtypes of [`CustomJuMPConstraint`](@ref) to add custom constraints to the JuMP model.
+Implement this for a subtype of [`CustomJuMPConstraint`](@ref) to mandate a preference the library does not already name. Two idioms keep a hand-written constraint correct (ADR 0008): scale it by [`get_constraint_scale`](@ref), and multiply any constant bound by [`get_k`](@ref), the homogenisation variable, so the bound is compared against unrescaled weights under a ratio objective.
+
+There is no no-op fallback for a [`CustomJuMPConstraint`](@ref) — a subtype with no method of its own raises, so a mis-shaped or stale signature fails loudly instead of silently adding no constraint. `nothing` (no custom constraint configured) is the only no-op.
 
 # Arguments
 
-  - `args...`: JuMP model and custom constraint type (ignored in fallback).
-  - `kwargs...`: Additional keyword arguments.
+  - `model::JuMP.Model`: JuMP optimisation model, mid-assembly.
+  - `ccnt`: The custom constraint estimator; the argument to dispatch on.
+  - `optimiser`: The outer optimisation estimator (e.g. the [`MeanRisk`](@ref) itself).
+  - `attrs::ProcessedJuMPOptimiserAttributes`: Processed problem data.
 
 # Returns
 
@@ -348,13 +375,23 @@ No-op fallback. Override this method for subtypes of [`CustomJuMPConstraint`](@r
 # Related
 
   - [`CustomJuMPConstraint`](@ref)
-  - [`add_custom_objective_term!`](@ref)
+  - [`add_custom_objective_term!`](@ref) — the objective-side analogue
 """
-function add_custom_constraint!(args...; kwargs...)
+function add_custom_constraint!(::JuMP.Model, ::Nothing, ::Any, ::Any)
     return nothing
 end
+function add_custom_constraint!(::JuMP.Model, ccnt::CustomJuMPConstraint, ::Any, ::Any)
+    return throw(ArgumentError("""
+                               `$(nameof(typeof(ccnt)))` subtypes `CustomJuMPConstraint` but defines no `add_custom_constraint!` method, so it would add no constraint.
+
+                               Define one with the signature:
+
+                                   PortfolioOptimisers.add_custom_constraint!(model::JuMP.Model, ccnt::$(nameof(typeof(ccnt))), optimiser, attrs)
+
+                               Scale the constraint by `get_constraint_scale(model)` and multiply any constant bound by `get_k(model)`. See ADR 0008."""))
+end
 """
-    add_custom_constraint!(model::JuMP.Model, ccnts::VecJuMPConstr, opt, attrs)
+    add_custom_constraint!(model::JuMP.Model, ccnts::VecJuMPConstr, optimiser, attrs)
 
 Apply each custom constraint in a vector, in order. Dispatches to the per-type [`add_custom_constraint!`](@ref) for every element, so a `ccnt` vector adds several custom constraints to the same model.
 
@@ -363,9 +400,9 @@ Apply each custom constraint in a vector, in order. Dispatches to the per-type [
   - [`CustomJuMPConstraint`](@ref)
   - [`VecJuMPConstr`](@ref)
 """
-function add_custom_constraint!(model::JuMP.Model, ccnts::VecJuMPConstr, opt, attrs)
+function add_custom_constraint!(model::JuMP.Model, ccnts::VecJuMPConstr, optimiser, attrs)
     for ccnt in ccnts
-        add_custom_constraint!(model, ccnt, opt, attrs)
+        add_custom_constraint!(model, ccnt, optimiser, attrs)
     end
     return nothing
 end
@@ -1193,3 +1230,12 @@ Generic function stub; concrete methods are defined in constraint and risk measu
 function set_risk_constraints! end
 
 export JuMPOptimisationSolution, JuMPOptimisationResult
+
+# The custom-term extension point (ADR 0036). Public API, but deliberately not exported:
+# `get_w`/`get_k` are too generic to put in a user's namespace, and the two builder methods
+# must be qualified anyway to be extended. Reach them as `PortfolioOptimisers.name`, or
+# import the ones you need. (`ProcessedJuMPOptimiserAttributes`, the `attrs` bundle a hook
+# receives, is already exported by `10_JuMPOptimiser.jl`.)
+public CustomJuMPObjective, CustomJuMPConstraint, VecJuMPObj, VecJuMPConstr,
+       add_custom_objective_term!, add_custom_constraint!, add_to_objective_penalty!, get_w,
+       get_k, get_constraint_scale

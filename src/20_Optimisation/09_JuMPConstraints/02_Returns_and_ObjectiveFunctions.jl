@@ -1076,20 +1076,23 @@ function add_penalty_to_objective!(model::JuMP.Model, factor::Integer, expr)
     return expr
 end
 """
-    set_portfolio_objective_function!(model, obj, pret, cobj, opt, pr, args...)
+    set_portfolio_objective_function!(model, obj, pret, optimiser, attrs)
 
 Set the portfolio objective function in the JuMP model.
 
-Dispatches based on the objective function type to configure the appropriate JuMP objective expression. Handles minimum risk, maximum utility, maximum Sharpe ratio, and maximum return objectives, including penalty terms and custom objective contributions.
+Dispatches on the objective function type to build the appropriate JuMP objective expression, then folds in the [Objective Penalty](@ref add_to_objective_penalty!) accumulated by the regularisation, soft-constraint, and custom-term builders.
+
+Custom objective terms are applied *before* the penalty is folded in, because they contribute to the same accumulator: `add_penalty_to_objective!` applies the sign factor matching this method's optimisation sense, so a contribution always worsens the objective regardless of which objective is being built. See ADR 0036.
+
+`pret` is redundant in value — it is always `attrs.ret` — but is passed positionally because [`MaximumRatio`](@ref) dispatches on it: a [`LogarithmicReturn`](@ref) ratio problem never registers `:sr_risk`, so without its own method it would fall through to the risk-minimisation branch.
 
 # Arguments
 
   - `model::JuMP.Model`: JuMP optimisation model.
-  - `obj::ObjectiveFunction`: Portfolio objective (e.g. [`MinimumRisk`](@ref), [`MaximumUtility`](@ref)).
-  - `pret::JuMPReturnsEstimator`: Returns estimator.
-  - `cobj::Option{<:JuMPObj_VecJuMPObj}`: Optional custom objective term, or a vector of them.
-  - `opt::JuMPOptimisationEstimator`: JuMP optimiser configuration.
-  - `pr::AbstractPriorResult`: Prior result.
+  - `obj::ObjectiveFunction`: Portfolio objective (e.g. [`MinimumRisk`](@ref), [`MaximumUtility`](@ref)). This is the objective *being built*, which during a [`Frontier`](@ref) sweep differs from the one the user declared.
+  - `pret::JuMPReturnsEstimator`: Returns estimator; always `attrs.ret`.
+  - `optimiser::JuMPOptimisationEstimator`: The outer optimisation estimator (e.g. the [`MeanRisk`](@ref) itself). Supplies the custom objective terms as `optimiser.opt.cobj`.
+  - `attrs::ProcessedJuMPOptimiserAttributes`: Pre-computed constraint and prior bundle.
 
 # Returns
 
@@ -1105,81 +1108,71 @@ Dispatches based on the objective function type to configure the appropriate JuM
   - [`add_custom_objective_term!`](@ref)
 """
 function set_portfolio_objective_function!(model::JuMP.Model, obj::MinimumRisk,
-                                           pret::JuMPReturnsEstimator,
-                                           cobj::Option{<:JuMPObj_VecJuMPObj},
-                                           opt::JuMPOptimisationEstimator,
-                                           pr::AbstractPriorResult, args...)
+                                           ::JuMPReturnsEstimator,
+                                           optimiser::JuMPOptimisationEstimator, attrs)
     so = get_objective_scale(model)
     risk = get_risk(model)
     JuMP.@expression(model, obj_expr, risk)
+    add_custom_objective_term!(model, obj, optimiser.opt.cobj, optimiser, attrs)
     obj_expr = add_penalty_to_objective!(model, 1, obj_expr)
-    add_custom_objective_term!(model, obj, pret, cobj, obj_expr, opt, pr, args...)
     JuMP.@objective(model, Min, so * obj_expr)
     return nothing
 end
 function set_portfolio_objective_function!(model::JuMP.Model, obj::MaximumUtility,
-                                           pret::JuMPReturnsEstimator,
-                                           cobj::Option{<:JuMPObj_VecJuMPObj},
-                                           opt::JuMPOptimisationEstimator,
-                                           pr::AbstractPriorResult, args...)
+                                           ::JuMPReturnsEstimator,
+                                           optimiser::JuMPOptimisationEstimator, attrs)
     so = get_objective_scale(model)
     ret = get_ret(model)
     risk = get_risk(model)
     l = obj.l
     JuMP.@expression(model, obj_expr, ret - l * risk)
+    add_custom_objective_term!(model, obj, optimiser.opt.cobj, optimiser, attrs)
     obj_expr = add_penalty_to_objective!(model, -1, obj_expr)
-    add_custom_objective_term!(model, obj, pret, cobj, obj_expr, opt, pr, args...)
     JuMP.@objective(model, Max, so * obj_expr)
     return nothing
 end
 function set_portfolio_objective_function!(model::JuMP.Model, obj::MaximumRatio,
-                                           pret::LogarithmicReturn,
-                                           cobj::Option{<:JuMPObj_VecJuMPObj},
-                                           opt::JuMPOptimisationEstimator,
-                                           pr::AbstractPriorResult, args...)
+                                           ::LogarithmicReturn,
+                                           optimiser::JuMPOptimisationEstimator, attrs)
     so = get_objective_scale(model)
     ret = get_ret(model)
     k = get_k(model)
     rf = obj.rf
     JuMP.@expression(model, obj_expr, ret - rf * k)
+    add_custom_objective_term!(model, obj, optimiser.opt.cobj, optimiser, attrs)
     obj_expr = add_penalty_to_objective!(model, -1, obj_expr)
-    add_custom_objective_term!(model, obj, pret, cobj, obj_expr, opt, pr, args...)
     JuMP.@objective(model, Max, so * obj_expr)
     return nothing
 end
 function set_portfolio_objective_function!(model::JuMP.Model, obj::MaximumRatio,
-                                           pret::JuMPReturnsEstimator,
-                                           cobj::Option{<:JuMPObj_VecJuMPObj},
-                                           opt::JuMPOptimisationEstimator,
-                                           pr::AbstractPriorResult, args...)
+                                           ::JuMPReturnsEstimator,
+                                           optimiser::JuMPOptimisationEstimator, attrs)
     so = get_objective_scale(model)
     if haskey(model, :sr_risk)
         ret = get_ret(model)
         k = get_k(model)
         rf = obj.rf
         JuMP.@expression(model, obj_expr, ret - rf * k)
+        add_custom_objective_term!(model, obj, optimiser.opt.cobj, optimiser, attrs)
         obj_expr = add_penalty_to_objective!(model, -1, obj_expr)
-        add_custom_objective_term!(model, obj, pret, cobj, obj_expr, opt, pr, args...)
         JuMP.@objective(model, Max, so * obj_expr)
     else
         risk = get_risk(model)
         JuMP.@expression(model, obj_expr, risk)
+        add_custom_objective_term!(model, obj, optimiser.opt.cobj, optimiser, attrs)
         obj_expr = add_penalty_to_objective!(model, 1, obj_expr)
-        add_custom_objective_term!(model, obj, pret, cobj, obj_expr, opt, pr, args...)
         JuMP.@objective(model, Min, so * obj_expr)
     end
     return nothing
 end
 function set_portfolio_objective_function!(model::JuMP.Model, obj::MaximumReturn,
-                                           pret::JuMPReturnsEstimator,
-                                           cobj::Option{<:JuMPObj_VecJuMPObj},
-                                           opt::JuMPOptimisationEstimator,
-                                           pr::AbstractPriorResult, args...)
+                                           ::JuMPReturnsEstimator,
+                                           optimiser::JuMPOptimisationEstimator, attrs)
     so = get_objective_scale(model)
     ret = get_ret(model)
     JuMP.@expression(model, obj_expr, ret)
+    add_custom_objective_term!(model, obj, optimiser.opt.cobj, optimiser, attrs)
     obj_expr = add_penalty_to_objective!(model, -1, obj_expr)
-    add_custom_objective_term!(model, obj, pret, cobj, obj_expr, opt, pr, args...)
     JuMP.@objective(model, Max, so * obj_expr)
     return nothing
 end

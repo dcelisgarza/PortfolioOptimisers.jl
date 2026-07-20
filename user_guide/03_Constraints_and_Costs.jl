@@ -110,12 +110,20 @@ like a factor score, or a relationship between weights that isn't a plain linear
 [`JuMPOptimiser`](@ref) extension points let you write straight against the JuMP model:
 
   - `cobj` takes a [`CustomJuMPObjective`](@ref) — implement [`add_custom_objective_term!`](@ref)
-    to add a reward or penalty term to the objective.
+    to price a preference, contributing the term with [`add_to_objective_penalty!`](@ref).
   - `ccnt` takes a [`CustomJuMPConstraint`](@ref) — implement [`add_custom_constraint!`](@ref) to
     add a constraint to the model.
 
 Each keyword takes a single estimator or a vector of them, and each hook dispatches on the
-estimator's type. The
+estimator's type. The two hooks take the same arguments — `(model, <what you dispatch on>,
+optimiser, attrs)`, with the objective one adding the [`ObjectiveFunction`](@ref) ahead of the
+dispatch argument. Subtyping one of these without implementing its method is an error, not a
+no-op, so a mis-shaped signature is caught rather than silently ignored.
+
+Because a custom objective term goes through the objective penalty, the library applies the sign
+matching whichever optimisation sense is being built: a contribution always worsens the
+objective, and **a reward is a negative contribution**. One definition is therefore correct under
+every objective, [`MaximumRatio`](@ref) included. The
 [custom objectives & constraints example](../examples/4_constraints_costs/09_Custom_Objectives_and_Constraints.md)
 builds both from scratch — a momentum tilt and a momentum floor — and works through the two
 model idioms (the constraint scale, and the homogenisation variable `k`) that keep a

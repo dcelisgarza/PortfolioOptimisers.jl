@@ -7,9 +7,13 @@
 #   - a VECTOR of them applies every element (both vector paths were broken: a `ccnt` vector
 #     silently hit the no-op `args...` fallback, a `cobj` vector raised a MethodError),
 #   - the `get_k` idiom is load-bearing under a ratio objective,
-#   - the hook still fires through `NearOptimalCentering`, whose objective builder calls it
-#     from its own site and must pass arguments in the main-path order,
-#   - a subtype with no method defined stays a documented no-op.
+#   - the hook still fires through `NearOptimalCentering`, which calls it from its own
+#     objective builder rather than through `set_portfolio_objective_function!`,
+#   - a subtype with no method defined RAISES rather than silently contributing nothing,
+#   - the same term is sense-correct under a minimisation and a maximisation with no
+#     sign dispatch by the implementer, and a QUADRATIC term works against an AFFINE
+#     objective — both consequences of routing custom terms through the objective penalty
+#     (ADR 0036).
 #
 # The custom types must be defined at module top level (a `struct` cannot be declared inside
 # the `@testset` block).
@@ -17,16 +21,30 @@ using Test, PortfolioOptimisers, CSV, TimeSeries, Clarabel, JuMP, LinearAlgebra,
       Logging
 const PO = PortfolioOptimisers
 
-# A soft reward on a per-asset score. Every objective exercised here is a MINIMISATION
-# (`MinimumRisk`, and NOC's centring objective), so the reward is subtracted.
+# A soft reward on a per-asset score. Contributed as a NEGATIVE penalty: the library applies
+# the factor matching each objective's optimisation sense, so this one definition rewards
+# score exposure under a minimisation and a maximisation alike.
 struct ScoreTilt{T1, T2} <: PO.CustomJuMPObjective
     score::T1
     lambda::T2
 end
-function PO.add_custom_objective_term!(model::JuMP.Model, obj, pret, cobj::ScoreTilt,
-                                       obj_expr, opt, pr, args...)
+function PO.add_custom_objective_term!(model::JuMP.Model, obj, cobj::ScoreTilt, optimiser,
+                                       attrs)
     w = PO.get_w(model)
-    JuMP.add_to_expression!(obj_expr, -cobj.lambda * (cobj.score' * w))
+    PO.add_to_objective_penalty!(model, -cobj.lambda * (cobj.score' * w))
+    return nothing
+end
+
+# A quadratic concentration penalty. Before ADR 0036 this was impossible against an affine
+# objective: the hook mutated `obj_expr` in place, and `add_to_expression!(::AffExpr,
+# ::QuadExpr)` is a MethodError. The penalty accumulator promotes instead.
+struct SpreadPenalty{T} <: PO.CustomJuMPObjective
+    lambda::T
+end
+function PO.add_custom_objective_term!(model::JuMP.Model, obj, cobj::SpreadPenalty,
+                                       optimiser, attrs)
+    w = PO.get_w(model)
+    PO.add_to_objective_penalty!(model, cobj.lambda * JuMP.@expression(model, dot(w, w)))
     return nothing
 end
 
@@ -36,7 +54,7 @@ struct ScoreFloor{T1, T2} <: PO.CustomJuMPConstraint
     score::T1
     floor::T2
 end
-function PO.add_custom_constraint!(model::JuMP.Model, ccnt::ScoreFloor, opt, attrs)
+function PO.add_custom_constraint!(model::JuMP.Model, ccnt::ScoreFloor, optimiser, attrs)
     w = PO.get_w(model)
     k = PO.get_k(model)
     sc = PO.get_constraint_scale(model)
@@ -49,7 +67,7 @@ struct ScoreCap{T1, T2} <: PO.CustomJuMPConstraint
     score::T1
     cap::T2
 end
-function PO.add_custom_constraint!(model::JuMP.Model, ccnt::ScoreCap, opt, attrs)
+function PO.add_custom_constraint!(model::JuMP.Model, ccnt::ScoreCap, optimiser, attrs)
     w = PO.get_w(model)
     k = PO.get_k(model)
     sc = PO.get_constraint_scale(model)
@@ -62,7 +80,7 @@ struct ScoreFloorNoK{T1, T2} <: PO.CustomJuMPConstraint
     score::T1
     floor::T2
 end
-function PO.add_custom_constraint!(model::JuMP.Model, ccnt::ScoreFloorNoK, opt, attrs)
+function PO.add_custom_constraint!(model::JuMP.Model, ccnt::ScoreFloorNoK, optimiser, attrs)
     w = PO.get_w(model)
     sc = PO.get_constraint_scale(model)
     JuMP.@constraint(model, sc * (ccnt.score' * w - ccnt.floor) >= 0)
@@ -74,9 +92,9 @@ end
 struct SpyObjective{T} <: PO.CustomJuMPObjective
     log::T
 end
-function PO.add_custom_objective_term!(model::JuMP.Model, obj, pret, cobj::SpyObjective,
-                                       obj_expr, opt, pr, args...)
-    push!(cobj.log, (; obj, pret, obj_expr, opt))
+function PO.add_custom_objective_term!(model::JuMP.Model, obj, cobj::SpyObjective,
+                                       optimiser, attrs)
+    push!(cobj.log, (; obj, optimiser, attrs))
     return nothing
 end
 
@@ -160,13 +178,41 @@ struct InertObjective <: PO.CustomJuMPObjective end
         @test !isapprox(exposure(wrong), f; atol = 1e-3)
     end
 
+    @testset "objective hook: the same term is sense-correct without sign dispatch" begin
+        # ADR 0036: a term contributed to the objective penalty is oriented by the library,
+        # so ONE definition rewards score exposure under a minimisation and a maximisation
+        # alike. Before this, the implementer had to dispatch a sign on the objective type
+        # and get it right, and `MaximumRatio` had no correct fixed sign at all.
+        util(; kwargs...) = optimise(MeanRisk(; obj = MaximumUtility(),
+                                              opt = JuMPOptimiser(; pe = pr, slv = slv,
+                                                                  kwargs...)))
+        @test exposure(util(; cobj = ScoreTilt(score, 5e-3))) > exposure(util()) + 1e-3
+        # ... and the same term still rewards under the minimisation.
+        @test exposure(minrisk(; cobj = ScoreTilt(score, 1e-4))) > base_exp + 1e-3
+    end
+
+    @testset "objective hook: a quadratic term works against an affine objective" begin
+        # Regression: `MaximumReturn` builds an AFFINE `obj_expr`, so a quadratic term used to
+        # be a MethodError from `add_to_expression!(::AffExpr, ::QuadExpr)` — a custom term
+        # whose validity depended on the risk measure and objective. The penalty accumulator
+        # promotes, so it now works everywhere.
+        maxret(; kwargs...) = optimise(MeanRisk(; obj = MaximumReturn(),
+                                                opt = JuMPOptimiser(; pe = pr, slv = slv,
+                                                                    kwargs...)))
+        plain = maxret()
+        spread = maxret(; cobj = SpreadPenalty(1e2))
+        # An unconstrained max-return solve piles into the highest-mean asset; the quadratic
+        # penalty prices concentration, so the book must spread out.
+        @test dot(spread.w, spread.w) < dot(plain.w, plain.w) - 1e-4
+    end
+
     @testset "objective hook is called with the documented argument order" begin
-        # The contract is `(model, obj, pret, cobj, obj_expr, opt, pr, args...)`. A caller that
-        # omits `obj`/`pret` shifts `cobj` out of position 4, so the user's method silently
-        # misses dispatch and the custom term vanishes without a word. `NearOptimalCentering`
-        # invokes the hook from its own objective builder and used to do exactly that, so
-        # assert the convention holds on both paths. Only the *constrained* NOC algorithm
-        # routes through that call.
+        # The contract is `(model, obj, cobj, optimiser, attrs)`. A caller that shifts `cobj`
+        # out of position 3 means the user's method misses dispatch — which now RAISES via the
+        # typed fallback rather than silently dropping the term. `NearOptimalCentering` invokes
+        # the hook from its own objective builder rather than through
+        # `set_portfolio_objective_function!`, so assert the convention holds on both paths.
+        # Only the *constrained* NOC algorithm routes through that call.
         #
         # This is deliberately solver-free: the spy records the call during model assembly, so
         # it pins the calling convention even where the subsequent solve is ill-conditioned.
@@ -181,8 +227,8 @@ struct InertObjective <: PO.CustomJuMPObjective end
         main = spy_log(spy -> minrisk(; cobj = spy))
         @test length(main) == 1
         @test main[1].obj isa PO.ObjectiveFunction
-        @test main[1].pret isa PO.JuMPReturnsEstimator
-        @test main[1].obj_expr isa JuMP.AbstractJuMPScalar
+        @test main[1].optimiser isa MeanRisk
+        @test main[1].attrs isa ProcessedJuMPOptimiserAttributes
 
         noc = spy_log(spy -> optimise(NearOptimalCentering(; r = StandardDeviation(),
                                                            obj = MinimumRisk(),
@@ -192,17 +238,24 @@ struct InertObjective <: PO.CustomJuMPObjective end
                                                                                cobj = spy))))
         # NOC also solves `MeanRisk` sub-problems for its reference points, and those reach the
         # hook through the main path — so a non-empty log proves nothing. The centring
-        # objective's own call is the one under test, and it is the only invocation that passes
-        # the `JuMPOptimiser` (rather than an optimiser estimator) in the `opt` slot.
-        @test any(e -> isa(e.opt, JuMPOptimiser), noc)   # regression: this call used to miss dispatch
+        # objective's own call is the one under test, and it is the only invocation carrying
+        # the `NearOptimalCentering` estimator in the `optimiser` slot. (Before ADR 0036 this
+        # call was the odd one out for the wrong reason: it passed a `JuMPOptimiser` there,
+        # a different branch of the type tree from every other caller.)
+        @test any(e -> isa(e.optimiser, NearOptimalCentering), noc)
         @test all(e -> e.obj isa PO.ObjectiveFunction, noc)
-        @test all(e -> e.pret isa PO.JuMPReturnsEstimator, noc)
-        @test all(e -> e.obj_expr isa JuMP.AbstractJuMPScalar, noc)
+        @test all(e -> e.optimiser isa PO.OptimisationEstimator, noc)
+        @test all(e -> e.attrs isa ProcessedJuMPOptimiserAttributes, noc)
     end
 
-    @testset "fallback: a subtype with no builder method is a no-op" begin
-        # The documented fallback: subtyping without implementing the method changes nothing.
-        res = minrisk(; ccnt = InertConstraint(), cobj = InertObjective())
-        @test isapprox(res.w, base.w; atol = 1e-6)
+    @testset "fallback: a subtype with no builder method raises" begin
+        # ADR 0036: the untyped `args...` catch-all used to absorb these silently, which is how
+        # a `ccnt` vector once vanished without a word — and is how every stale hook would have
+        # vanished when this signature changed. A subtype that defines no method is a user
+        # error, and now says so.
+        @test_throws ArgumentError minrisk(; cobj = InertObjective())
+        @test_throws ArgumentError minrisk(; ccnt = InertConstraint())
+        # `nothing` — no custom term configured — remains the one legitimate no-op.
+        @test isapprox(minrisk(; cobj = nothing, ccnt = nothing).w, base.w; atol = 1e-6)
     end
 end

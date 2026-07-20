@@ -250,6 +250,12 @@ The in-flight state of the JuMP model as it is being built — the shared variab
 **Model Assembly**
 The fixed sequence in which a single-JuMP-model Optimisation Estimator's constraint and risk builders run to turn an empty model into a fully-constrained one — the steps between shaping the weight variables and setting the objective. Shared by MeanRisk, Risk Budgeting, Relaxed Risk Budgeting, Factor Risk Contribution, and constrained Near Optimal Centering; the per-optimiser parts (how weights are shaped, the objective, the solve) sit outside it. Distinct from Model State: Model State is the data the builders read and write, Model Assembly is the ordering of the builders themselves.
 
+**Objective Penalty**
+The accumulator through which every *soft* contribution reaches the objective — built-in regularisation, soft Turnover and Tracking, and user-supplied Custom Objective Terms alike. It exists because the objective's optimisation *sense* varies (some objectives are minimised, some maximised, and a ratio objective is either depending on the risk measure), so contributions are expressed once, sense-free, and the sense-correct factor is applied centrally when the accumulator is folded into the objective. A contribution always worsens the objective; a reward is a negative contribution. Distinct from a hard constraint, which bounds the feasible region rather than pricing a preference.
+
+**Custom Term** (the extension point)
+The user-facing escape hatch for expressing a preference the library does not already name: a Custom Objective Term prices one (through the Objective Penalty), a Custom Constraint mandates one. Both are supplied as inputs to the JuMPOptimiser and both are reached during Model Assembly, receiving the model under construction, the outer Optimisation Estimator, and the processed problem data. A term that names itself as one but supplies no builder is an error, not a no-op.
+
 ### 4.4 Constraints
 
 **Asset Sets**

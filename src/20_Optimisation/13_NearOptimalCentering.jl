@@ -651,17 +651,20 @@ function set_near_optimal_centering_constraints!(model::JuMP.Model, wb::WeightBo
     return obj_expr
 end
 """
-    set_near_optimal_objective_function!(alg, model, opt, args...)
+    set_near_optimal_objective_function!(alg, model, noc, attrs)
 
 Set the Near Optimal Centering objective function in the JuMP model.
 
 Formulates the NOC objective based on the algorithm variant. For `UnconstrainedNearOptimalCentering`, uses only the barrier function. For `ConstrainedNearOptimalCentering`, also adds objective penalties and custom objective terms.
 
+The centring problem is a *distance minimisation*, so the objective it reports to a custom term is [`MinimumRisk`](@ref) — the objective actually being built, not `noc.obj`, which describes the reference-point sub-problems (ADR 0036).
+
 # Arguments
 
   - `alg`: NOC algorithm variant ([`UnconstrainedNearOptimalCentering`](@ref) or [`ConstrainedNearOptimalCentering`](@ref)).
   - `model::JuMP.Model`: JuMP optimisation model.
-  - `opt::BaseJuMPOptimisationEstimator`: JuMP optimiser configuration.
+  - `noc::NearOptimalCentering`: The outer optimisation estimator, passed on to custom objective terms.
+  - `attrs::ProcessedJuMPOptimiserAttributes`: Pre-computed constraint and prior bundle.
 
 # Returns
 
@@ -674,26 +677,25 @@ Formulates the NOC objective based on the algorithm variant. For `UnconstrainedN
   - [`solve_noc!`](@ref)
 """
 function set_near_optimal_objective_function!(::UnconstrainedNearOptimalCentering,
-                                              model::JuMP.Model,
-                                              opt::BaseJuMPOptimisationEstimator, args...)
+                                              model::JuMP.Model, ::NearOptimalCentering,
+                                              attrs::ProcessedJuMPOptimiserAttributes)
     so = get_objective_scale(model)
-    obj_expr = set_near_optimal_centering_constraints!(model, opt.wb)
+    obj_expr = set_near_optimal_centering_constraints!(model, attrs.wb)
     JuMP.@objective(model, Min, so * obj_expr)
     return nothing
 end
 function set_near_optimal_objective_function!(::ConstrainedNearOptimalCentering,
-                                              model::JuMP.Model,
-                                              opt::BaseJuMPOptimisationEstimator, args...)
+                                              model::JuMP.Model, noc::NearOptimalCentering,
+                                              attrs::ProcessedJuMPOptimiserAttributes)
     so = get_objective_scale(model)
-    obj_expr = set_near_optimal_centering_constraints!(model, opt.wb)
+    obj_expr = set_near_optimal_centering_constraints!(model, attrs.wb)
+    add_custom_objective_term!(model, MinimumRisk(), noc.opt.cobj, noc, attrs)
     obj_expr = add_penalty_to_objective!(model, 1, obj_expr)
-    add_custom_objective_term!(model, MinimumRisk(), opt.ret, opt.cobj, obj_expr, opt,
-                               opt.pe, args...)
     JuMP.@objective(model, Min, so * obj_expr)
     return nothing
 end
 """
-    solve_noc!(noc, model, rk_opt, rt_opt, opt, args...)
+    solve_noc!(noc, model, rk_opt, rt_opt, opt, attrs, args...)
 
 Solve the Near Optimal Centering problem given the model, risk, and return targets.
 
@@ -719,22 +721,24 @@ Sets model parameters for the risk and return targets, configures the NOC object
   - [`near_optimal_centering_setup`](@ref)
 """
 function solve_noc!(noc::NearOptimalCentering, model::JuMP.Model, rk_opt::Number,
-                    rt_opt::Number, opt::BaseJuMPOptimisationEstimator, args...)
+                    rt_opt::Number, opt::BaseJuMPOptimisationEstimator,
+                    attrs::ProcessedJuMPOptimiserAttributes, args...)
     JuMP.@expression(model, noc_rk, rk_opt)
     JuMP.@expression(model, noc_rt, rt_opt)
-    set_near_optimal_objective_function!(noc.alg, model, opt, args...)
+    set_near_optimal_objective_function!(noc.alg, model, noc, attrs)
     return optimise_JuMP_model!(model, noc, eltype(opt.pe.X))
 end
 function solve_noc!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                                               <:Any, <:Any, <:Any, <:Any, <:Any,
                                               <:UnconstrainedNearOptimalCentering},
                     model::JuMP.Model, rk_opts::VecNum, rt_opts::VecNum,
-                    opt::BaseJuMPOptimisationEstimator, args...)
+                    opt::BaseJuMPOptimisationEstimator,
+                    attrs::ProcessedJuMPOptimiserAttributes, args...)
     retcodes = sizehint!(OptimisationReturnCode[], length(rk_opts))
     sols = sizehint!(JuMPOptimisationSolution[], length(rk_opts))
     JuMP.@variable(model, noc_rk in JuMP.Parameter(zero(eltype(rk_opts))))
     JuMP.@variable(model, noc_rt in JuMP.Parameter(zero(eltype(rt_opts))))
-    set_near_optimal_objective_function!(noc.alg, model, opt, args...)
+    set_near_optimal_objective_function!(noc.alg, model, noc, attrs)
     for (rk_opt, rt_opt) in zip(rk_opts, rt_opts)
         JuMP.set_parameter_value(noc_rk, rk_opt)
         JuMP.set_parameter_value(noc_rt, rt_opt)
@@ -774,7 +778,8 @@ function solve_noc!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any,
                                               <:Any, <:Any, <:Any, <:Any, <:Any,
                                               <:ConstrainedNearOptimalCentering},
                     model::JuMP.Model, rk_opts::VecNum, rt_opts::VecNum,
-                    opt::BaseJuMPOptimisationEstimator, rt_min::Number, rt_max::Number,
+                    opt::BaseJuMPOptimisationEstimator,
+                    attrs::ProcessedJuMPOptimiserAttributes, rt_min::Number, rt_max::Number,
                     ::Any, ::Any, ::Val{true}, ::Val{false}, args...)
     lbs = compute_ret_lbs(model[:ret_frontier], rt_min, rt_max, args...)
     sc = get_constraint_scale(model)
@@ -785,7 +790,7 @@ function solve_noc!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any,
     JuMP.@constraint(model, ret_lb, sc * (ret - ret_lb_var) >= 0)
     JuMP.@variable(model, noc_rk in JuMP.Parameter(zero(eltype(rk_opts))))
     JuMP.@variable(model, noc_rt in JuMP.Parameter(zero(eltype(rt_opts))))
-    set_near_optimal_objective_function!(noc.alg, model, opt, args...)
+    set_near_optimal_objective_function!(noc.alg, model, noc, attrs)
     for (i, (rk_opt, rt_opt, lb)) in enumerate(zip(rk_opts, rt_opts, lbs))
         JuMP.set_parameter_value(ret_lb_var, lb)
         JuMP.set_parameter_value(noc_rk, rk_opt)
@@ -871,7 +876,8 @@ function solve_noc!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any,
                                               <:Any, <:Any, <:Any, <:Any, <:Any,
                                               <:ConstrainedNearOptimalCentering},
                     model::JuMP.Model, rk_opts::VecNum, rt_opts::VecNum,
-                    opt::BaseJuMPOptimisationEstimator, ::Any, ::Any, w_min::VecNum,
+                    opt::BaseJuMPOptimisationEstimator,
+                    attrs::ProcessedJuMPOptimiserAttributes, ::Any, ::Any, w_min::VecNum,
                     w_max::VecNum, ::Val{false}, ::Val{true}, args...)
     risk_frontier = compute_risk_ubs(model, noc, opt.pe, opt.fees, w_min, w_max, args...)
     sc = get_constraint_scale(model)
@@ -888,7 +894,7 @@ function solve_noc!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any,
     sols = sizehint!(JuMPOptimisationSolution[], length(rk_opts))
     JuMP.@variable(model, noc_rk in JuMP.Parameter(zero(eltype(rk_opts))))
     JuMP.@variable(model, noc_rt in JuMP.Parameter(zero(eltype(rt_opts))))
-    set_near_optimal_objective_function!(noc.alg, model, opt, args...)
+    set_near_optimal_objective_function!(noc.alg, model, noc, attrs)
     for (keys, ubs, rk_opt, rt_opt) in zip(pitrs[1], pitrs[2], rk_opts, rt_opts)
         for (key, ub) in zip(keys, ubs)
             JuMP.set_parameter_value(model[key], ub)
@@ -905,7 +911,8 @@ function solve_noc!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any,
                                               <:Any, <:Any, <:Any, <:Any, <:Any,
                                               <:ConstrainedNearOptimalCentering},
                     model::JuMP.Model, rk_opts::VecNum, rt_opts::VecNum,
-                    opt::BaseJuMPOptimisationEstimator, rt_min::Number, rt_max::Number,
+                    opt::BaseJuMPOptimisationEstimator,
+                    attrs::ProcessedJuMPOptimiserAttributes, rt_min::Number, rt_max::Number,
                     w_min::VecNum, w_max::VecNum, ::Val{true}, ::Val{true}, args...)
     lbs = compute_ret_lbs(model[:ret_frontier], rt_min, rt_max, args...)
     risk_frontier = compute_risk_ubs(model, noc, opt.pe, opt.fees, w_min, w_max, args...)
@@ -926,7 +933,7 @@ function solve_noc!(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any,
     JuMP.@constraint(model, ret_lb, sc * (ret - ret_lb_var) >= 0)
     JuMP.@variable(model, noc_rk in JuMP.Parameter(zero(eltype(rk_opts))))
     JuMP.@variable(model, noc_rt in JuMP.Parameter(zero(eltype(rt_opts))))
-    set_near_optimal_objective_function!(noc.alg, model, opt, args...)
+    set_near_optimal_objective_function!(noc.alg, model, noc, attrs)
     for lb in lbs
         JuMP.set_parameter_value(ret_lb_var, lb)
         for (keys, ubs, rk_opt, rt_opt) in zip(pitrs[1], pitrs[2], rk_opts, rt_opts)
@@ -1000,10 +1007,10 @@ function _optimise(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, 
                    rd::ReturnsResult = ReturnsResult(); dims::Int = 1,
                    str_names::Bool = false, save::Bool = true, kwargs...)
     noc = reset_time_dependent_estimator(noc)
-    (; w_opt, rk_opt, rt_opt, r, opt, w_min_retcode, w_opt_retcode, w_max_retcode) = near_optimal_centering_setup(noc,
-                                                                                                                  rd;
-                                                                                                                  dims = dims,
-                                                                                                                  kwargs...)
+    (; w_opt, rk_opt, rt_opt, r, opt, attrs, w_min_retcode, w_opt_retcode, w_max_retcode) = near_optimal_centering_setup(noc,
+                                                                                                                         rd;
+                                                                                                                         dims = dims,
+                                                                                                                         kwargs...)
     model = JuMP.Model()
     JuMP.set_string_names_on_creation(model, str_names)
     set_model_scales!(model, opt.sc, opt.so)
@@ -1013,7 +1020,7 @@ function _optimise(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, 
     set_risk_constraints!(model, r, noc, opt.pe, nothing, nothing, opt.fees; rd = rd)
     scalarise_risk_expression!(model, opt.sca)
     set_return_constraints!(model, opt.ret, MinimumRisk(), opt.pe; rd = rd)
-    noc_retcode, sol = solve_noc!(noc, model, rk_opt, rt_opt, opt)
+    noc_retcode, sol = solve_noc!(noc, model, rk_opt, rt_opt, opt, attrs)
     retcode = get_overall_retcode(w_min_retcode, w_opt_retcode, w_max_retcode, noc_retcode)
     return NearOptimalCenteringResult(;
                                       jr = JuMPOptimisationResult(;
@@ -1063,8 +1070,8 @@ function _optimise(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, 
     set_w!(model, opt.pe.X, w_opt)
     set_weight_constraints!(model, opt.wb, opt.bgt, opt.sbgt)
     assemble_jump_model!(model, noc, opt, attrs, rd, r)
-    noc_retcode, sol = solve_noc!(noc, model, rk_opt, rt_opt, opt, rt_min, rt_max, w_min,
-                                  w_max, Val(haskey(model, :ret_frontier)),
+    noc_retcode, sol = solve_noc!(noc, model, rk_opt, rt_opt, opt, attrs, rt_min, rt_max,
+                                  w_min, w_max, Val(haskey(model, :ret_frontier)),
                                   Val(haskey(model, :risk_frontier)))
     retcode = get_overall_retcode(w_min_retcode, w_opt_retcode, w_max_retcode, noc_retcode)
     return NearOptimalCenteringResult(;
