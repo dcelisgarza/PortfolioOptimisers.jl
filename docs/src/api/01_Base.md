@@ -30,6 +30,11 @@ apply_preferences!
 PortfolioOptimisers.__init__
 PREFERENCE_KEYS
 PREFERENCE_DISTANCES
+RESOURCE_LIMITS
+ResourceLimits
+assert_resource_cap
+set_resource_limits!
+with_resource_limits
 ```
 
 ## Pretty printing
@@ -63,6 +68,7 @@ L1Norm
 LpNorm
 LInfNorm
 norm_error
+resolve_rng
 ```
 
 ## Logging
@@ -115,6 +121,7 @@ assert_nonempty_gt0_finite_val
 assert_nonempty_finite_val
 assert_matrix_issquare
 assert_unit_interval
+assert_all_finite
 ```
 
 ## Base type aliases
