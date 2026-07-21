@@ -443,4 +443,6 @@ function optimise(hrp::HierarchicalRiskParity{<:Any, <:Any, <:Any, <:Nothing},
     return _optimise(hrp, rd; dims = dims, kwargs...)
 end
 
+@pipe_delegates HierarchicalRiskParity opt
+@pipe_route_sigma_ucs HierarchicalRiskParity
 export HierarchicalRiskParity

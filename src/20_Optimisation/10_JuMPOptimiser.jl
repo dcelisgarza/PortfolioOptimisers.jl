@@ -1379,5 +1379,26 @@ function assemble_jump_model!(model::JuMP.Model, optimiser::JuMPOptimisationEsti
     add_custom_constraint!(model, opt.ccnt, optimiser, attrs)
     return nothing
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Route a mean uncertainty set into a [`JuMPOptimiser`](@ref)'s return estimator.
+
+One of the two [Routing Targets](@ref PIPELINE_ROUTING_TARGETS) that names no plain field: the set lands in `ret.ucs`, and only an [`ArithmeticReturn`](@ref) can bound expected returns, so any other return estimator is an error rather than a silent drop.
+
+Internal machinery — not part of the user-facing API.
+
+# Related
+
+  - [`pipe_route`](@ref)
+  - [`route_sigma_ucs`](@ref)
+"""
+function pipe_route(cfg::JuMPOptimiser, ::Val{:mu_ucs}, v)
+    @argcheck(isa(cfg.ret, ArithmeticReturn),
+              ArgumentError("cannot route a mean uncertainty set into a $(Base.typename(typeof(cfg.ret)).wrapper); expected returns uncertainty requires an ArithmeticReturn return estimator"))
+    return Accessors.set(cfg, Accessors.PropertyLens{:ret}(),
+                         Accessors.set(cfg.ret, Accessors.PropertyLens{:ucs}(), v))
+end
+pipe_accepts(::JuMPOptimiser, ::Val{:mu_ucs})::Bool = true
 
 export ProcessedJuMPOptimiserAttributes, JuMPOptimiser

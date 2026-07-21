@@ -453,5 +453,6 @@ function optimise(rrb::RelaxedRiskBudgeting{<:Any, <:Any, <:Any, <:Any, Nothing}
     return _optimise(rrb, rd; dims = dims, str_names = str_names, save = save, kwargs...)
 end
 
+@pipe_delegates RelaxedRiskBudgeting opt
 export BasicRelaxedRiskBudgeting, RegularisedRelaxedRiskBudgeting,
        RegularisedPenalisedRelaxedRiskBudgeting, RelaxedRiskBudgeting

@@ -682,4 +682,6 @@ function optimise(mr::MeanRisk{<:Any, <:Any, <:Any, <:Any, Nothing},
     return _optimise(mr, rd; dims = dims, str_names = str_names, save = save, kwargs...)
 end
 
+@pipe_delegates MeanRisk opt
+@pipe_route_sigma_ucs MeanRisk
 export MeanRisk, MeanRiskResult

@@ -1116,5 +1116,7 @@ function optimise(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, <
     return _optimise(noc, rd; dims = dims, str_names = str_names, save = save, kwargs...)
 end
 
+@pipe_delegates NearOptimalCentering opt
+@pipe_route_sigma_ucs NearOptimalCentering
 export NearOptimalCentering, UnconstrainedNearOptimalCentering,
        ConstrainedNearOptimalCentering, NearOptimalCenteringResult

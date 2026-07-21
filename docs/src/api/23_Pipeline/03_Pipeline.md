@@ -28,12 +28,15 @@ PortfolioOptimisers.holdout_window
 
 ## Injection
 
+The pipeline resolves its computed slots into [routing targets](@ref PIPELINE_ROUTING_TARGETS) and hands each one to the optimiser, which owns the decision of where it lands. See [`pipe_route`](@ref) for the optimiser-owned half of the seam.
+
 ```@docs
 inject_context
-inject_config
-inject_sigma_ucs
 constraint_results
+constraint_targets
 maybe_inject_step
+pipe_required_targets
+assert_routable
 ```
 
 ## Prediction

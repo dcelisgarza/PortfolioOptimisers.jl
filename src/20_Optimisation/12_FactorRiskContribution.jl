@@ -357,4 +357,6 @@ function optimise(frc::FactorRiskContribution{<:Any, <:Any, <:Any, <:Any, <:Any,
     return _optimise(frc, rd; dims = dims, str_names = str_names, save = save, kwargs...)
 end
 
+@pipe_delegates FactorRiskContribution opt
+@pipe_route_sigma_ucs FactorRiskContribution
 export FactorRiskContribution, FactorRiskContributionResult
