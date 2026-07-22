@@ -522,7 +522,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Algorithm for computing the scaling parameter `k` for ellipsoidal uncertainty sets using a general formula `sqrt((1 - q) / q)`, this ignores the distribution of the underlying data.
+Computes the ellipsoidal uncertainty set scaling parameter `k` as `sqrt((1 - q) / q)`. This general formula ignores the distribution of the underlying data.
 
 # Related
 

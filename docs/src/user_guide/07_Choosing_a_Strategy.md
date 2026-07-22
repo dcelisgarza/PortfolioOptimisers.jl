@@ -1,7 +1,7 @@
 The source files can be found in [user_guide/](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/user_guide/).
 
 ```@meta
-EditURL = "../../../user_guide/06_Choosing_a_Strategy.jl"
+EditURL = "../../../user_guide/07_Choosing_a_Strategy.jl"
 ```
 
 # Choosing a strategy
@@ -60,7 +60,7 @@ To make the point concrete: three archetypes from the map — pure diversificati
 risk/return workhorse, and the hierarchy-based rule — produce visibly different portfolios on the
 same data. Picking a strategy is picking one of these shapes.
 
-````@example 06_Choosing_a_Strategy
+````@example 07_Choosing_a_Strategy
 using PortfolioOptimisers, CSV, TimeSeries, Clarabel, StatsPlots, GraphRecipes
 
 X = TimeArray(CSV.File(joinpath(@__DIR__, "../examples/SP500.csv.gz")); timestamp = :Date)[(end - 252):end]

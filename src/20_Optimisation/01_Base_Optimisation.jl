@@ -1,7 +1,7 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all portfolio optimisation estimators in `PortfolioOptimisers.jl`.
+Abstract supertype for all portfolio optimisation estimators.
 
 All optimisers and optimisation components should subtype `AbstractOptimisationEstimator` to participate in the optimisation dispatch system.
 

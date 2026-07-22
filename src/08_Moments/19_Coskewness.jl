@@ -1,7 +1,7 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all coskewness estimators in `PortfolioOptimisers.jl`.
+Abstract supertype for all coskewness estimators.
 
 All concrete and/or abstract types implementing coskewness estimation algorithms should be subtypes of `CoskewnessEstimator`.
 

@@ -1,7 +1,7 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all returns result types in `PortfolioOptimisers.jl`.
+Abstract supertype for all returns result types.
 
 All concrete and/or types representing the result of returns calculations should be subtypes of `AbstractReturnsResult`.
 
@@ -14,7 +14,7 @@ abstract type AbstractReturnsResult <: AbstractResult end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all price-level data result types in `PortfolioOptimisers.jl`.
+Abstract supertype for all price-level data result types.
 
 All concrete types representing price-level data should be subtypes of `AbstractPricesResult`. Defined alongside [`AbstractReturnsResult`](@ref) so cross-validation splitting, preprocessing, and prediction can dispatch on either data level.
 
@@ -73,7 +73,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-A container for aligned, time-indexed price-level data in `PortfolioOptimisers.jl`.
+A container for aligned, time-indexed price-level data.
 
 `PricesResult` is the prices-level mirror of [`ReturnsResult`](@ref): it bundles asset prices with optional factor, benchmark, and implied volatility series, all as `TimeSeries.TimeArray`s. It is the input to price-level preprocessing estimators and prices-to-returns conversion, and the type that defines timestamp-window slicing for pipeline cross-validation via [`port_opt_view`](@ref).
 
@@ -262,7 +262,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-A flexible container type for storing the results of asset and factor returns calculations in `PortfolioOptimisers.jl`.
+Stores the results of asset and factor returns calculations.
 
 `ReturnsResult` is the standard result type returned by returns-processing routines, such as [`prices_to_returns`](@ref).
 
@@ -841,7 +841,8 @@ end
         impute_method::Option{<:Impute.Imputor} = nothing
     ) -> ReturnsResult
 
-Convert price data (and optionally factor data) in `TimeSeries.TimeArray` format to returns, with flexible handling of missing data, imputation, and optional implied volatility information.
+Convert `TimeSeries.TimeArray` price data to returns. Handles factor data, missing data,
+imputation, and optional implied volatility information.
 
 # Mathematical definition
 
@@ -1117,7 +1118,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all preprocessing estimator types in `PortfolioOptimisers.jl`.
+Abstract supertype for all preprocessing estimator types.
 
 Preprocessing estimators transform price or returns data (prices-to-returns conversion, missing-data filtering, imputation) under a fit/apply contract. Fitting one on training data with [`fit_preprocessing`](@ref) produces a result carrying any fitted state — imputation parameters, thresholds, and the selected asset universe — which [`apply_preprocessing`](@ref) then replays on unseen data so train and test windows are transformed consistently. Stateless preprocessing estimators carry no state, and applying them is equivalent to running them.
 
@@ -1166,7 +1167,7 @@ abstract type AbstractReturnsPreprocessingEstimator <: AbstractPreprocessingEsti
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all preprocessing result types in `PortfolioOptimisers.jl`.
+Abstract supertype for all preprocessing result types.
 
 Preprocessing results are produced by [`fit_preprocessing`](@ref) on training data. They carry the fitted state needed to apply the same transformation to unseen data — imputation parameters, thresholds, and the selected asset universe. Stateless preprocessing estimators produce results that carry only their configuration.
 

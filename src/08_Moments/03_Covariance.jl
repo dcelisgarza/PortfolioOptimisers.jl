@@ -181,7 +181,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-A flexible container type for covariance estimation in `PortfolioOptimisers.jl`.
+Estimates the covariance matrix of asset returns from a centring estimator, a covariance estimator, and a moment algorithm.
 
 `Covariance` encapsulates all components required for estimating the covariance matrix of asset returns, including the expected returns estimator for centering the data, the covariance estimator, and the moment algorithm.
 

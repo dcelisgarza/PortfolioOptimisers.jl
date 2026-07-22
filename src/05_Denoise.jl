@@ -1,7 +1,7 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all denoising estimator types in `PortfolioOptimisers.jl`.
+Abstract supertype for all denoising estimator types.
 
 All concrete and/or abstract types that implement denoising of covariance-like or correlation-like matrices should be subtypes of `AbstractDenoiseEstimator`.
 
@@ -69,7 +69,7 @@ abstract type AbstractDenoiseEstimator <: AbstractEstimator end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all denoising algorithm types in `PortfolioOptimisers.jl`.
+Abstract supertype for all denoising algorithm types.
 
 All concrete and/or abstract types that implement a specific denoising algorithm should be subtypes of `AbstractDenoiseAlgorithm`.
 
@@ -132,7 +132,7 @@ abstract type AbstractDenoiseAlgorithm <: AbstractAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-A denoising algorithm that sets the smallest `num_factors` eigenvalues of a covariance or correlation matrix to zero, effectively removing the principal components relating to random noise according to random matrix theory-based approaches.
+Denoises by setting the smallest `num_factors` eigenvalues to zero. This removes the principal components that random matrix theory attributes to noise.
 
 # Mathematical definition
 
@@ -177,7 +177,7 @@ struct SpectralDenoise <: AbstractDenoiseAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-A denoising algorithm that replaces the smallest `num_factors` eigenvalues of a covariance or correlation matrix with their average, effectively averaging the principal components relating to random noise according to random matrix theory-based approaches.
+Denoises by replacing the smallest `num_factors` eigenvalues with their average. This flattens the principal components that random matrix theory attributes to noise, rather than discarding them.
 
 # Mathematical definition
 
@@ -222,7 +222,7 @@ struct FixedDenoise <: AbstractDenoiseAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-A denoising algorithm that shrinks the smallest `num_factors` eigenvalues of a covariance or correlation matrix towards their diagonal, controlled by the shrinkage parameter `alpha`. This approach interpolates between no shrinkage (`alpha = 0`) and full shrinkage (`alpha = 1`), providing a flexible way to regularize noisy eigenvalues.
+Denoises by shrinking the smallest `num_factors` eigenvalues towards the diagonal. The shrinkage parameter `alpha` interpolates between no shrinkage (`alpha = 0`) and full shrinkage (`alpha = 1`), giving a flexible way to regularise noisy eigenvalues.
 
 # Mathematical definition
 
@@ -294,7 +294,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-A flexible container type for configuring and applying denoising algorithms to covariance or correlation matrices in `PortfolioOptimisers.jl`.
+Configures and applies denoising algorithms to covariance or correlation matrices.
 
 `Denoise` encapsulates all parameters required for matrix denoising in [`denoise!`](@ref) and [`denoise`](@ref), allowing users to specify the denoising algorithm, optimization parameters, kernel settings for density estimation, and optional positive definite matrix projection.
 

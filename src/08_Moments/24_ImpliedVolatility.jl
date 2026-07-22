@@ -1,7 +1,7 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all implied volatility algorithms in `PortfolioOptimisers.jl`.
+Abstract supertype for all implied volatility algorithms.
 
 All concrete and/or abstract types implementing implied volatility estimation algorithms should be subtypes of `ImpliedVolatilityAlgorithm`.
 

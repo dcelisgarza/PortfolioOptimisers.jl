@@ -1,7 +1,7 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all constraint result types in `PortfolioOptimisers.jl`.
+Abstract supertype for all constraint result types.
 
 All concrete and/or abstract types representing the result of constraint generation or evaluation should be subtypes of `AbstractConstraintResult`.
 
@@ -14,7 +14,7 @@ abstract type AbstractConstraintResult <: AbstractResult end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all constraint estimator types in `PortfolioOptimisers.jl`.
+Abstract supertype for all constraint estimator types.
 
 All concrete and/or abstract types implementing constraint generation or estimation algorithms should be subtypes of `AbstractConstraintEstimator`.
 
@@ -29,7 +29,7 @@ abstract type AbstractConstraintEstimator <: AbstractEstimator end
 
 Union type representing supported comparison operators for constraint generation.
 
-This type is used to specify which comparison operators are valid for defining constraints in `PortfolioOptimisers.jl`. It includes equality and both directions of inequality.
+This type is used to specify which comparison operators are valid for defining constraints. It includes equality and both directions of inequality.
 
 # Related
 

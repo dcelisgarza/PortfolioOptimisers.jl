@@ -853,7 +853,7 @@ const math_dict = Dict(:Xv => "``\\boldsymbol{X}``: Data vector `observations ×
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all estimator types in `PortfolioOptimisers.jl`.
+Abstract supertype for all estimator types.
 
 All custom estimators should subtype `AbstractEstimator`.
 
@@ -868,7 +868,7 @@ abstract type AbstractEstimator end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all algorithm types in `PortfolioOptimisers.jl`.
+Abstract supertype for all algorithm types.
 
 All algorithms should subtype `AbstractAlgorithm`.
 
@@ -883,7 +883,7 @@ abstract type AbstractAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all result types in `PortfolioOptimisers.jl`.
+Abstract supertype for all result types.
 
 All result objects should subtype `AbstractResult`.
 
@@ -991,7 +991,7 @@ abstract type DynamicAbstractWeights <: AbstractEstimator end
 """
     define_pretty_show(T, flag::Bool = true)
 
-Macro to define a custom pretty-printing `Base.show` method for types in `PortfolioOptimisers.jl`.
+Macro to define a custom pretty-printing `Base.show` method for types.
 
 This macro generates a `show` method that displays the type name and all fields in a readable, aligned format. For fields that are themselves custom types or collections, the macro recursively applies pretty-printing for nested structures. Handles compact and multiline IO contexts gracefully.
 
@@ -1843,7 +1843,7 @@ has_pretty_show_method(::Clustering.KmeansResult)::Bool = true
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all custom exception types in `PortfolioOptimisers.jl`.
+Abstract supertype for all custom exception types.
 
 All error types specific to `PortfolioOptimisers.jl` should be subtypes of `PortfolioOptimisersError`.
 
@@ -2256,7 +2256,7 @@ const MultiGSCVValType_VecMultiGSCVValType = Union{<:MultiGSCVValType,
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all estimator value algorithm types in `PortfolioOptimisers.jl`.
+Abstract supertype for all estimator value algorithm types.
 
 Subtypes of `AbstractEstimatorValueAlgorithm` implement algorithms for computing constraint result values. These are used to extend or modify the behavior of estimators in a composable and modular fashion.
 
@@ -3072,7 +3072,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Represents a composite result containing a vector and a scalar in `PortfolioOptimisers.jl`.
+Represents a composite result containing a vector and a scalar.
 
 Encapsulates a vector and a scalar value, commonly used for storing results that combine both types of data (e.g., weighted statistics, risk measures).
 
@@ -3152,7 +3152,7 @@ const Num_ArrNum_VecScalar_DynWeights = Union{<:Num_ArrNum, <:VecScalar,
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all norm-based error algorithms in `PortfolioOptimisers.jl`.
+Abstract supertype for all norm-based error algorithms.
 
 All concrete and/or abstract types representing norm-based error algorithms (such as second-order cone or norm-one error) should be subtypes of `NormError`.
 

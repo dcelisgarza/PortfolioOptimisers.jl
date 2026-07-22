@@ -1,4 +1,9 @@
-#=
+The source files can be found in [user_guide/](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/user_guide/).
+
+```@meta
+EditURL = "../../../user_guide/03_Risk_Measures.jl"
+```
+
 # Risk measures
 
 The previous page showed *which optimiser* to call. This one is the catalogue of *what you ask it
@@ -17,12 +22,12 @@ Every table below is **generated from the type system and the compatibility trai
 ([`supports_risk_measure`](@ref), ADR 0018), so it cannot drift from what the optimisers actually
 dispatch on. The one-line meanings are curated, and the page fails the docs build if a measure is
 added without one.
-=#
 
+````@example 03_Risk_Measures
 using PortfolioOptimisers, CSV, TimeSeries, DataFrames, PrettyTables, InteractiveUtils,
       StatsPlots, GraphRecipes
+````
 
-#=
 ## 1. How a measure is used
 
 A risk measure plays two roles, and they use two different call shapes.
@@ -33,8 +38,8 @@ turns it into constraints and an objective term.
 **Outside an optimiser** it is a *callable functor*: you evaluate it on a book to get a number.
 [`expected_risk`](@ref) is the uniform way in — it knows which of the three input shapes
 (net returns, weights + returns + fees, weights alone) each measure wants, so you do not have to.
-=#
 
+````@example 03_Risk_Measures
 X = TimeArray(CSV.File(joinpath(@__DIR__, "../examples/SP500.csv.gz")); timestamp = :Date)[(end - 252):end]
 rd = prices_to_returns(X)
 pr = prior(EmpiricalPrior(), rd)
@@ -47,8 +52,8 @@ pretty_table(DataFrame("Measure" => ["StandardDeviation", "MAD (LowOrderMoment)"
                                      "MaximumDrawdown", "UlcerIndex"],
                        "Risk of the equal-weighted book" =>
                            [expected_risk(factory(r, pr), w, pr.X) for r in measures]))
+````
 
-#=
 !!! note
 
     [`factory`](@ref) binds a measure to a prior — it is what fills in `sigma` for
@@ -88,10 +93,10 @@ The curated one-liner for each measure, its alias, and its class — grouped by 
 signature, fields, and references live under
 [API → Risk Measures](../api/19_RiskMeasures/01_Base_RiskMeasures.md), and `?ConditionalValueatRisk`
 in the REPL gets you there without leaving the terminal.
-=#
 
-## Reverse-map the exported alias layer onto the measure types it names, so the alias column
-## is read off the package rather than transcribed.
+````@example 03_Risk_Measures
+# Reverse-map the exported alias layer onto the measure types it names, so the alias column
+# is read off the package rather than transcribed.
 rm_alias = Dict{Symbol, String}()
 for n in names(PortfolioOptimisers)
     v = getfield(PortfolioOptimisers, n)
@@ -100,7 +105,7 @@ for n in names(PortfolioOptimisers)
     end
 end
 
-## Class → the `Optimisers` column, derived from the ADR 0018 trait.
+# Class → the `Optimisers` column, derived from the ADR 0018 trait.
 function usage_class(T)
     return if supports_risk_measure(MeanRisk, T)
         "JuMP + clustering"
@@ -111,7 +116,7 @@ function usage_class(T)
     end
 end
 
-## The curated catalogue: family => [measure => what it penalises].
+# The curated catalogue: family => [measure => what it penalises].
 catalogue = ["Dispersion and moments" =>
                  [:Variance => "Portfolio variance from a covariance matrix — the default `r`.",
                   :StandardDeviation => "Square root of the variance; same ordering, different scale.",
@@ -178,7 +183,7 @@ catalogue = ["Dispersion and moments" =>
                   :ExpectedReturnRiskRatio => "Prior expected return over risk — a Sharpe-style score.",
                   :MeanReturnRiskRatio => "Realised mean return over risk."]]
 
-## Every concrete measure must appear exactly once — this is what stops the page drifting.
+# Every concrete measure must appear exactly once — this is what stops the page drifting.
 function leaf_measures(T, acc = Type[])
     subs = subtypes(T)
     isempty(subs) ? push!(acc, T) : foreach(S -> leaf_measures(S, acc), subs)
@@ -197,46 +202,70 @@ function family_table(name)
                      "Optimisers" => [usage_class(getfield(PortfolioOptimisers, first(e)))
                                       for e in entries])
 end;
+nothing #hide
+````
 
-# ### Dispersion and moments
+### Dispersion and moments
+
+````@example 03_Risk_Measures
 pretty_table(family_table("Dispersion and moments"))
+````
 
-# ### Tail — X-at-Risk
+### Tail — X-at-Risk
+
+````@example 03_Risk_Measures
 pretty_table(family_table("Tail — X-at-Risk"))
+````
 
-# ### Tail ranges (both sides)
+### Tail ranges (both sides)
+
+````@example 03_Risk_Measures
 pretty_table(family_table("Tail ranges (both sides)"))
+````
 
-# ### Drawdown — uncompounded
+### Drawdown — uncompounded
+
+````@example 03_Risk_Measures
 pretty_table(family_table("Drawdown — uncompounded"))
+````
 
-#=
 ### Drawdown — compounded (relative)
 
 The `Relative*` twins measure drawdown on the **compounded** wealth path rather than the
 cumulative sum of returns. They have no convex JuMP formulation, which is why the whole family is
 `clustering only`.
-=#
+
+````@example 03_Risk_Measures
 pretty_table(family_table("Drawdown — compounded (relative)"))
+````
 
-# ### Ordered weights arrays
+### Ordered weights arrays
+
+````@example 03_Risk_Measures
 pretty_table(family_table("Ordered weights arrays"))
+````
 
-# ### Path and mandate
+### Path and mandate
+
+````@example 03_Risk_Measures
 pretty_table(family_table("Path and mandate"))
+````
 
-# ### Composite and structural
+### Composite and structural
+
+````@example 03_Risk_Measures
 pretty_table(family_table("Composite and structural"))
+````
 
-#=
 ### Non-optimisation (diagnostics and scoring)
 
 These are *not* legal in an `r` slot. They exist to score a book after the fact and to serve as
 cross-validation scorers — see [validation and tuning](05_Validation_and_Tuning.md).
-=#
-pretty_table(family_table("Non-optimisation (diagnostics and scoring)"))
 
-#=
+````@example 03_Risk_Measures
+pretty_table(family_table("Non-optimisation (diagnostics and scoring)"))
+````
+
 ## 4. Measures that hide behind an `alg`
 
 Three of the types above are *generic*: [`LowOrderMoment`](@ref), [`HighOrderMoment`](@ref), and
@@ -246,8 +275,8 @@ removes — every row below is a one-call constructor exported by the package.
 
 The `Expands to` column is read off the constructed object, so it states what the alias actually
 builds today.
-=#
 
+````@example 03_Risk_Measures
 alias_ctors = [("FLM", FLM, "First lower partial moment."),
                ("MAD", MAD, "Mean absolute deviation."),
                ("SCM", SCM,
@@ -269,7 +298,7 @@ alias_ctors = [("FLM", FLM, "First lower partial moment."),
                ("OWA_TG_RG", OWA_TG_RG, "Two-sided tail Gini."),
                ("OWA_LMoment", OWA_LMoment, "L-moment weights of order `k`.")]
 
-## Walk the algorithm chain of a constructed measure so the expansion is observed, not asserted.
+# Walk the algorithm chain of a constructed measure so the expansion is observed, not asserted.
 function expands_to(m)
     if isa(m, OrderedWeightsArray)
         return "w = $(isa(m.w, Function) ? nameof(m.w) : nameof(typeof(m.w)))"
@@ -293,8 +322,8 @@ pretty_table(DataFrame("Alias" => [a[1] * "()" for a in alias_ctors],
                        "Builds" => [String(nameof(typeof(a[2]()))) for a in alias_ctors],
                        "Expands to" => [expands_to(a[2]()) for a in alias_ctors],
                        "Meaning" => [a[3] for a in alias_ctors]))
+````
 
-#=
 !!! warning "`MAD()` is not `MedianAbsoluteDeviation()`"
 
     [`MAD`](@ref) builds a [`LowOrderMoment`](@ref) with
@@ -307,16 +336,16 @@ pretty_table(DataFrame("Alias" => [a[1] * "()" for a in alias_ctors],
 
 The catalogue is long, but the choice collapses to what you believe about the return distribution:
 
-  - **Roughly symmetric, care about spread** — [`Variance`](@ref) (the default) or
+- **Roughly symmetric, care about spread** — [`Variance`](@ref) (the default) or
     [`StandardDeviation`](@ref).
-  - **Left tail matters more than spread** — [`ConditionalValueatRisk`](@ref) first; reach for
+- **Left tail matters more than spread** — [`ConditionalValueatRisk`](@ref) first; reach for
     [`EntropicValueatRisk`](@ref) / [`RelativisticValueatRisk`](@ref) when you want to control the
     tail more tightly than CVaR does.
-  - **Path matters, not just the distribution** — the drawdown family, headed by
+- **Path matters, not just the distribution** — the drawdown family, headed by
     [`MaximumDrawdown`](@ref) and [`ConditionalDrawdownatRisk`](@ref).
-  - **You distrust the covariance estimate** — [`UncertaintySetVariance`](@ref).
-  - **You want to shape the whole ordered loss curve** — [`OrderedWeightsArray`](@ref).
-  - **Trading costs bite** — add [`TurnoverRiskMeasure`](@ref) or
+- **You distrust the covariance estimate** — [`UncertaintySetVariance`](@ref).
+- **You want to shape the whole ordered loss curve** — [`OrderedWeightsArray`](@ref).
+- **Trading costs bite** — add [`TurnoverRiskMeasure`](@ref) or
     [`TrackingRiskMeasure`](@ref) alongside your main measure.
 
 Several measures can be combined in one objective — see
@@ -334,20 +363,11 @@ summarise. [`plot_histogram`](@ref) draws the equal-weighted book's returns with
 measure marked where it falls: VaR cuts at a quantile, CVaR sits further left as the *mean* of
 that tail, and the worst realisation anchors the end. Distance between the lines is exactly the
 difference in what you are asking the optimiser to control.
-=#
 
+````@example 03_Risk_Measures
 plot_histogram(w, rd)
+````
 
-#src ## Findings (authoring dogfooding — stripped from rendered docs)
-#src - Closes card 9 of the 2026-07-19 ergonomics review: the ~57-measure family was reachable
-#src   only from src/19_RiskMeasures + src/25_Aliases.jl, and the `LowOrderMoment(alg = …) ≡ MAD()`
-#src   decoding had to be done by hand.
-#src - Every table is generated: alias column reverse-maps the exported alias layer, `Optimisers`
-#src   column comes from the ADR 0018 trait, `Expands to` is read off constructed objects. The
-#src   only hand-written data is the one-line meaning, and the two `@assert`s make the docs build
-#src   fail if a measure is added or removed without updating the catalogue.
-#src - Absorbed the generated compatibility tick-table that previously lived in
-#src   02_Optimisers.jl §2 (it carried the same trait information in a flat alphabetical list with
-#src   no meanings); 02 now points here.
-#src - Trap worth keeping: `MAD()` (mean, LowOrderMoment, JuMP-legal) vs `MedianAbsoluteDeviation`
-#src   (median, hierarchical only).
+---
+
+*This page was generated using [Literate.jl](https://github.com/fredrikekre/Literate.jl).*

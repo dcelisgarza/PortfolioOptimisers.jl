@@ -1,7 +1,7 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-A flexible container type for configuring and applying distance-based covariance estimators in `PortfolioOptimisers.jl`.
+Configures and applies distance-based covariance estimators.
 
 `DistanceCovariance` encapsulates all components required for distance covariance or correlation estimation, including the distance metric, additional arguments and keyword arguments for the metric, optional weights, and parallel execution strategy.
 

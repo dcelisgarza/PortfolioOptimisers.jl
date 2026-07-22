@@ -12,6 +12,23 @@ applyTo: 'src/**/*.jl, docs/**/*.md'
 - Include code examples where applicable.
 - **All public types, functions, and macros must have docstrings.**
 
+## The summary sentence (load-bearing — read this before writing a type docstring)
+
+Every type docstring opens with `$(DocStringExtensions.TYPEDEF)`, a blank line, then a **summary paragraph**. The **first sentence of that paragraph is extracted verbatim** and rendered as the type's one-line description in the [Capability Catalogue](../../docs/capability_catalogue.jl) (ADR 0040), which is the user-facing inventory of everything the package can do.
+
+This is a real contract, not a convention that merely happens to hold. It is what lets the catalogue carry prose without keeping a second, drifting copy of every description. If a docstring loses its summary paragraph, the docs build fails with an error naming the type.
+
+Write the first sentence so it stands alone in a bullet list:
+
+- **Lead with what it does**, in the active voice. `Denoises by setting the smallest \`num_factors\` eigenvalues to zero.` — not `A denoising algorithm that sets...`.
+- **Keep it under ~120 characters.** If the idea needs more, put a crisp first sentence and move the detail into a *second* sentence, which still renders on the API page but not in the catalogue. Do not compress by deleting information.
+- **Avoid filler openers**: `A flexible container type for...`, `A concrete estimator type for...`. They cost a line and say nothing.
+- **Do not append `in \`PortfolioOptimisers.jl\``.** Every docstring in the package is in`PortfolioOptimisers.jl`.
+- **Do not put `@ref` links in the first sentence.** The catalogue appends the type's own links after the description, so a link in the summary renders twice. Put cross-references in a second sentence or in `# Related`.
+- **Do not open with a display formula.** Inline maths is fine; a full `$...$` equation belongs in `# Mathematical definition`.
+- **Never leave a bare `_` outside a code span.** Markdown reads `_` as emphasis and will pair it with the underscore inside a neighbouring `` `snake_case` `` link, eating both and destroying the link. `(f_μ vector)` sitting next to `` [`plot_factor_mu`](@ref) `` rendered as ``(fμ vector … [`plotfactor_`` — a dead link that Documenter cannot resolve and the site builder reports only as a single anonymous `./@ref`. Write `` `f_mu` `` instead.
+- **Siblings should not all share a prefix.** If every algorithm in a family starts `Centrality algorithm type for ...`, the catalogue shows that boilerplate eight times over. Say what distinguishes each one.
+
 ## Grammar
 
 - Use present tense verbs (is, open) instead of past tense (was, opened).

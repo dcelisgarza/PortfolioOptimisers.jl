@@ -1,7 +1,7 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-K-means clustering algorithm configuration for non-hierarchical clustering in `PortfolioOptimisers.jl`.
+K-means clustering algorithm configuration for non-hierarchical clustering.
 
 `KMeansAlgorithm` is a composable clustering algorithm type that specifies the use of the k-means algorithm (via [`Clustering.kmeans`](https://juliastats.org/Clustering.jl/stable/api/#Clustering.kmeans)) for constructing non-hierarchical clusterings from a distance matrix.
 

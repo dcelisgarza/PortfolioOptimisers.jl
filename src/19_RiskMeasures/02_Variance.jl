@@ -1,7 +1,7 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for optimisation formulations of second moment risk measures in `PortfolioOptimisers.jl`.
+Abstract supertype for optimisation formulations of second moment risk measures.
 
 # Related Types
 
@@ -15,7 +15,7 @@ abstract type SecondMomentFormulation <: AbstractAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for optimisation formulations of variance-based risk measures in `PortfolioOptimisers.jl`.
+Abstract supertype for optimisation formulations of variance-based risk measures.
 
 # Related Types
 

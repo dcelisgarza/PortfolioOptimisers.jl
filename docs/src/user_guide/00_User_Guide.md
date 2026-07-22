@@ -28,13 +28,15 @@ The guide mirrors that spine, one page per stage:
 - [Optimisers](02_Optimisers.md) — the breadth tour: naive, JuMP (MeanRisk, risk budgeting,
     near-optimal centering), clustering, and meta-optimisers. Deep dives:
     [optimiser examples](../examples/3_optimisers/01_MeanRisk_Objectives.md).
-- [Constraints and costs](03_Constraints_and_Costs.md) — budgets, weight bounds, turnover,
+- [Risk measures](03_Risk_Measures.md) — the catalog of what you ask an optimiser to minimise:
+    every measure with its alias, its meaning, and which optimisers accept it.
+- [Constraints and costs](04_Constraints_and_Costs.md) — budgets, weight bounds, turnover,
     fees. Deep dives: [constraints & costs examples](../examples/4_constraints_costs/01_Budget_Constraints.md).
-- [Validation and tuning](04_Validation_and_Tuning.md) — cross-validation and hyperparameter
+- [Validation and tuning](05_Validation_and_Tuning.md) — cross-validation and hyperparameter
     search. Deep dives: [validation examples](../examples/5_validation_tuning/01_Cross_Validation.md).
-- [Post-processing](05_Post_Processing.md) — discrete allocation and reporting. Deep dives:
+- [Post-processing](06_Post_Processing.md) — discrete allocation and reporting. Deep dives:
     [post-processing examples](../examples/6_post_processing/01_Finite_Allocation.md).
-- [Choosing a strategy](06_Choosing_a_Strategy.md) — a decision framework for picking tools by
+- [Choosing a strategy](07_Choosing_a_Strategy.md) — a decision framework for picking tools by
     compute budget, rebalance frequency, risk appetite, and capital. Worked end-to-end profiles
     live in [putting it together](../examples/7_putting_it_together/01_Profile_Retail_Daily.md).
 

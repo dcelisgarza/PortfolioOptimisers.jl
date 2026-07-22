@@ -1,7 +1,7 @@
 The source files can be found in [user_guide/](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/user_guide/).
 
 ```@meta
-EditURL = "../../../user_guide/05_Post_Processing.jl"
+EditURL = "../../../user_guide/06_Post_Processing.jl"
 ```
 
 # Post-processing
@@ -12,7 +12,7 @@ into an integer share count under a cash budget, and visualising the result. For
 treatment see the
 [post-processing examples](../examples/6_post_processing/01_Finite_Allocation.md).
 
-````@example 05_Post_Processing
+````@example 06_Post_Processing
 using PortfolioOptimisers, CSV, TimeSeries, DataFrames, PrettyTables, Clarabel, StatsPlots,
       GraphRecipes
 
@@ -42,7 +42,7 @@ buy, given the latest prices and a cash budget. [`GreedyAllocation`](@ref) is th
 option: it rounds to whole shares and spends the leftover cash on the largest underweights. The
 call takes the weights, the price vector, and the available cash.
 
-````@example 05_Post_Processing
+````@example 06_Post_Processing
 prices = vec(values(X)[end, :])
 cash = 100_000.0
 alloc = optimise(GreedyAllocation(),
@@ -53,7 +53,7 @@ The result carries the integer `shares`, the per-asset `cost`, the *realised* we
 rounding), and the leftover `cash`. The realised weights track the target closely, and only a
 few dollars are left uninvested.
 
-````@example 05_Post_Processing
+````@example 06_Post_Processing
 invested = sum(alloc.shares .* prices)
 pretty_table(DataFrame("Asset" => rd.nx, "Target weight" => res.w,
                        "Shares" => round.(Int, alloc.shares), "Realised weight" => alloc.w);
@@ -73,7 +73,7 @@ The plotting functions used throughout this guide are the reporting toolkit:
 risk/return scatters and frontiers, [`plot_risk_contribution`](@ref) for where the risk sits,
 and [`plot_prior`](@ref) for the input moments. Here is the realised portfolio's composition.
 
-````@example 05_Post_Processing
+````@example 06_Post_Processing
 plot_stacked_bar_composition([res], rd; xticks = (1:1, ["Min risk"]))
 ````
 

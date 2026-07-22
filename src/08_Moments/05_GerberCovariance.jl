@@ -1,7 +1,7 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all Gerber covariance estimators in `PortfolioOptimisers.jl`.
+Abstract supertype for all Gerber covariance estimators.
 
 All concrete and/or abstract types implementing Gerber covariance estimation algorithms should be subtypes of `BaseGerberCovariance`.
 
@@ -22,7 +22,7 @@ abstract type BaseGerberCovariance <: AbstractCovarianceEstimator end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all Gerber covariance algorithm types in `PortfolioOptimisers.jl`.
+Abstract supertype for all Gerber covariance algorithm types.
 
 All concrete and/or abstract types implementing specific Gerber covariance algorithms should be subtypes of `GerberCovarianceAlgorithm`.
 
@@ -129,7 +129,7 @@ struct Gerber2 <: GerberCovarianceAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-A flexible container type for configuring and applying Gerber covariance estimators in `PortfolioOptimisers.jl`.
+Configures and applies Gerber covariance estimators.
 
 `GerberCovariance` encapsulates all components required for Gerber-based covariance or correlation estimation, including the variance estimator, positive definite matrix estimator, t parameter, and the specific Gerber algorithm variant.
 

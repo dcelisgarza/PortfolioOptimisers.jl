@@ -1,7 +1,7 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all Gerber Information Quality covariance estimators in `PortfolioOptimisers.jl`.
+Abstract supertype for all Gerber Information Quality covariance estimators.
 
 All concrete and/or abstract types implementing Gerber Information Quality covariance estimation algorithms should be subtypes of `BaseGerberIQCovariance`.
 
@@ -17,7 +17,7 @@ abstract type BaseGerberIQCovariance <: BaseGerberCovariance end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all Gerber Information Quality covariance estimation algorithms in `PortfolioOptimisers.jl`.
+Abstract supertype for all Gerber Information Quality covariance estimation algorithms.
 
 All concrete and/or abstract types implementing Gerber Information Quality covariance estimation algorithms should be subtypes of `GerberIQCovarianceAlgorithm`.
 
@@ -50,7 +50,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all temporal lookback and delay Gerber Information Quality parameter estimators in `PortfolioOptimisers.jl`.
+Abstract supertype for all temporal lookback and delay Gerber Information Quality parameter estimators.
 
 All concrete and/or abstract types implementing Gerber Information Quality parameter estimators should be subtypes of `GerberIQEpsEstimator`.
 
@@ -350,7 +350,7 @@ abstract type GerberIQDecayEstimator <: AbstractEstimator end
 """
 $(DocStringExtensions.TYPEDEF)
 
-A concrete type for exponential Gerber IQ temporal decay.
+Exponential Gerber IQ temporal decay.
 
 # Fields
 
@@ -704,7 +704,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Implements a partial Gerber Information Quality covariance template with independently configurable asymmetric significance thresholds for concordant and discordant co-movements.
+Gerber Information Quality template with asymmetric thresholds. Concordant and discordant co-movements take independently configurable significance thresholds.
 
 # Fields
 
@@ -984,7 +984,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Implements a full Gerber Information Quality covariance template with fine-grained asymmetric thresholds, supporting finer region classification between two positive and two negative movement magnitude classes.
+Gerber Information Quality template with fine-grained asymmetric thresholds. Classifies co-movements into two positive and two negative magnitude classes.
 
 # Fields
 
@@ -1412,7 +1412,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-A flexible container type for configuring and applying Gerber Information Quality covariance estimators in `PortfolioOptimisers.jl`.
+Configures and applies Gerber Information Quality covariance estimators.
 
 `GerberIQCovariance` encapsulates all components required for Gerber Information Quality based covariance or correlation estimation.
 

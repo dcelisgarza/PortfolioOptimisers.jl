@@ -1,7 +1,7 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all search-based cross-validation estimators in `PortfolioOptimisers.jl`.
+Abstract supertype for all search-based cross-validation estimators.
 
 Subtypes implement hyperparameter search strategies (e.g. grid search, randomised search) that use cross-validation to select the best estimator configuration.
 

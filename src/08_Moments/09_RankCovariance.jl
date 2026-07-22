@@ -1,7 +1,7 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all rank-based covariance estimators in `PortfolioOptimisers.jl`.
+Abstract supertype for all rank-based covariance estimators.
 
 All concrete and/or abstract types implementing rank-based covariance estimation algorithms should be subtypes of `RankCovarianceEstimator`.
 

@@ -1,7 +1,7 @@
 The source files can be found in [user_guide/](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/user_guide/).
 
 ```@meta
-EditURL = "../../../user_guide/03_Constraints_and_Costs.jl"
+EditURL = "../../../user_guide/04_Constraints_and_Costs.jl"
 ```
 
 # Constraints and costs
@@ -16,7 +16,7 @@ each; for the full treatment see the
 We fix one empirical prior and a minimum-risk objective so each keyword's effect is visible
 against the same baseline.
 
-````@example 03_Constraints_and_Costs
+````@example 04_Constraints_and_Costs
 using PortfolioOptimisers, CSV, TimeSeries, DataFrames, PrettyTables, Clarabel, StatsPlots,
       GraphRecipes
 
@@ -46,7 +46,7 @@ res_base = optimise(MeanRisk(; obj = MinimumRisk(),
 default is `lb = 0, ub = 1` (long-only, fully invested). Capping `ub` forces diversification —
 no single name can exceed the bound.
 
-````@example 03_Constraints_and_Costs
+````@example 04_Constraints_and_Costs
 res_cap = optimise(MeanRisk(; obj = MinimumRisk(),
                             opt = JuMPOptimiser(; pe = pr, slv = slv,
                                                 wb = WeightBounds(; lb = 0.0, ub = 0.10))))
@@ -63,7 +63,7 @@ through `lcse` as a [`LinearConstraintEstimator`](@ref) — the same syntax used
 group, then bound it. Here we require the tech group to hold at least 15% (a floor the
 unconstrained minimum-risk portfolio would not give it).
 
-````@example 03_Constraints_and_Costs
+````@example 04_Constraints_and_Costs
 sets = AssetSets(; dict = Dict("nx" => rd.nx, "tech" => ["AAPL", "AMD", "MSFT"]))
 res_grp = optimise(MeanRisk(; obj = MinimumRisk(),
                             opt = JuMPOptimiser(; pe = pr, slv = slv, sets = sets,
@@ -81,7 +81,7 @@ Costs enter the same way. [`Turnover`](@ref) (`tn`) limits how far the new weigh
 from a reference portfolio `w` — your current holdings — so a rebalance stays cheap. Here we
 anchor at the current minimum-risk portfolio and re-solve under a turnover budget.
 
-````@example 03_Constraints_and_Costs
+````@example 04_Constraints_and_Costs
 res_tn = optimise(MeanRisk(; obj = MinimumRisk(),
                            opt = JuMPOptimiser(; pe = pr, slv = slv,
                                                tn = Turnover(; w = res_base.w, val = 0.02))))
@@ -96,7 +96,7 @@ optimiser to move toward the unconstrained solution.
 and short positions, which the objective then trades off against return. The minimal form sets a
 per-unit long fee.
 
-````@example 03_Constraints_and_Costs
+````@example 04_Constraints_and_Costs
 res_fee = optimise(MeanRisk(; obj = MaximumRatio(; rf = 4.2 / 100 / 252),
                             opt = JuMPOptimiser(; pe = pr, slv = slv,
                                                 fees = Fees(; l = 0.001))))
@@ -138,7 +138,7 @@ hand-written term correct.
 
 Same prior, same objective — only the constraint or cost changes the allocation.
 
-````@example 03_Constraints_and_Costs
+````@example 04_Constraints_and_Costs
 results = [res_base, res_cap, res_grp, res_tn, res_fee]
 labels = ["Base", "Cap 10%", "Tech ≥ 15%", "Turnover", "Fees"]
 

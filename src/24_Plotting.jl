@@ -380,8 +380,8 @@ function plot_clusters end
     plot_drawdowns(mpred::MultiPeriodPredictionResult; slv, compound, alpha, kappa, rw, kwargs...) -> Plot
     plot_drawdowns(ppred::PopulationPredictionResult; slv, compound, alpha, kappa, rw, kwargs...) -> Plot
 
-Plot portfolio drawdown over time with horizontal lines for AverageDrawdown, UlcerIndex,
-DaR, CDaR, MaximumDrawdown, and — when `slv` is provided — EDaR and RLDaR.
+Plot portfolio drawdown over time. Marks AverageDrawdown, UlcerIndex, DaR, CDaR and
+MaximumDrawdown with horizontal lines, plus EDaR and RLDaR when `slv` is provided.
 
 # Arguments
 
@@ -919,7 +919,7 @@ function plot_prior end
     plot_factor_mu(res::OptimisationResult[, rd]; N, kwargs...) -> Plot
     plot_factor_mu(pred::PredictionResult[, rd]; N, kwargs...) -> Plot
 
-Bar chart of per-factor expected returns (f_μ vector from a factor model prior).
+Bar chart of per-factor expected returns (the `f_mu` vector from a factor model prior).
 
 Requires that the prior was estimated with a factor model (`pr.f_mu` is not `nothing`).
 

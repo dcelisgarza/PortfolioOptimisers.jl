@@ -157,7 +157,8 @@ Before completing any task or creating a pull request, **ALWAYS**:
  3. **Run doctests**: Doctests are separate from `] test` — run them via the `docs` project environment (see `.github/prompts/pre-commit-and-test.prompt.md` for the exact commands).
  4. **Verify changes**: Ensure all file changes align with the task requirements.
  5. **Update documentation**: If adding new features, update relevant docstrings and docs.
- 6. **Check code quality**: Ensure code follows established patterns and conventions.
+ 6. **Update the Capability Catalogue**: Any new estimator, algorithm, or exported function must be placed in `docs/capability_catalogue.jl` (or listed in `NOT_A_FEATURE` with a reason). Do not write a description — it comes from the first sentence of the docstring. `test/test_26_docs.jl` fails if you skip this. See ADR 0040.
+ 7. **Check code quality**: Ensure code follows established patterns and conventions.
 
 * * *
 

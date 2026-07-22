@@ -1,7 +1,7 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all cross-validation estimators in `PortfolioOptimisers.jl`.
+Abstract supertype for all cross-validation estimators.
 
 # Related
 
@@ -13,7 +13,7 @@ abstract type CrossValidationEstimator <: AbstractEstimator end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all cross-validation result types in `PortfolioOptimisers.jl`.
+Abstract supertype for all cross-validation result types.
 
 # Related
 
@@ -375,7 +375,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all prediction result types in `PortfolioOptimisers.jl`.
+Abstract supertype for all prediction result types.
 
 All concrete prediction result types from cross-validation should subtype `AbstractPredictionResult`.
 

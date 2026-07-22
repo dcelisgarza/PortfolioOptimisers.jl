@@ -1,7 +1,7 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all Value-at-Risk formulation algorithms in `PortfolioOptimisers.jl`.
+Abstract supertype for all Value-at-Risk formulation algorithms.
 
 All concrete and/or abstract types representing the formulation for computing Value-at-Risk (e.g., mixed-integer programming, distribution-based) should be subtypes of `ValueatRiskFormulation`.
 

@@ -1,7 +1,7 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all pipeline estimator types in `PortfolioOptimisers.jl`.
+Abstract supertype for all pipeline estimator types.
 
 A pipeline reifies an end-to-end workflow — price preprocessing, prices-to-returns conversion, returns preprocessing, prior estimation, phylogeny, uncertainty sets, constraint generation, and optimisation — as an ordered list of steps executed left-to-right over a [`PipelineContext`](@ref). Pipelines widen the cross-validation and hyperparameter-tuning boundary to the entire workflow, data preparation included.
 
@@ -20,7 +20,7 @@ abstract type AbstractPipelineEstimator <: AbstractEstimator end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all pipeline result types in `PortfolioOptimisers.jl`.
+Abstract supertype for all pipeline result types.
 
 Pipeline results carry the fitted per-step results of executing an [`AbstractPipelineEstimator`](@ref), the final [`PipelineContext`](@ref), and the terminal optimisation result when one exists.
 

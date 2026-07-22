@@ -1,7 +1,7 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all moment-based risk measure algorithms in `PortfolioOptimisers.jl`.
+Abstract supertype for all moment-based risk measure algorithms.
 
 Defines the interface for algorithms that compute portfolio risk using statistical moments (e.g., mean, variance, skewness, kurtosis) of the return distribution. All concrete moment risk measure algorithms should subtype `MomentMeasureAlgorithm` to ensure consistency and composability within the risk measure framework.
 
@@ -14,7 +14,7 @@ abstract type MomentMeasureAlgorithm <: AbstractAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all low-order moment-based risk measure algorithms in `PortfolioOptimisers.jl`.
+Abstract supertype for all low-order moment-based risk measure algorithms.
 
 Defines the interface for algorithms that compute portfolio risk using low-order statistical moments (e.g., mean, variance, mean absolute deviation) of the return distribution. All concrete low-order moment risk measure algorithms should subtype `LowOrderMomentMeasureAlgorithm` to ensure consistency and composability within the risk measure framework.
 
@@ -26,7 +26,7 @@ abstract type LowOrderMomentMeasureAlgorithm <: MomentMeasureAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for low-order moment risk measure algorithms that are not standardised by the variance in `PortfolioOptimisers.jl`.
+Abstract supertype for low-order moment risk measure algorithms that are not standardised by the variance.
 
 Defines the interface for algorithms that compute portfolio risk using low-order statistical moments without normalising by the variance. All concrete unstandardised low-order moment risk measure algorithms should subtype `UnstandardisedLowOrderMomentMeasureAlgorithm` to ensure consistency and composability within the risk measure framework.
 
@@ -55,7 +55,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Represents the first lower moment risk measure algorithm in `PortfolioOptimisers.jl`.
+Represents the first lower moment risk measure algorithm.
 
 Computes portfolio risk using the first lower moment, which is the negative mean of the deviations of the returns series below a target value.
 
@@ -69,7 +69,7 @@ struct FirstLowerMoment <: UnstandardisedLowOrderMomentMeasureAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Represents the mean absolute deviation risk measure algorithm in `PortfolioOptimisers.jl`.
+Represents the mean absolute deviation risk measure algorithm.
 
 Computes portfolio risk as the mean of the absolute deviations of the returns series from a target value.
 
@@ -83,7 +83,7 @@ struct MeanAbsoluteDeviation <: UnstandardisedLowOrderMomentMeasureAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Represents a second moment (variance or standard deviation) risk measure algorithm in `PortfolioOptimisers.jl`.
+Represents a second moment (variance or standard deviation) risk measure algorithm.
 
 Computes portfolio risk using the second central (full) or lower (semi) moment of the return distribution, supporting both full and semi (downside) formulations. The specific formulation is determined by the `alg1` and `alg2` fields, enabling flexible representation of variance, semi-variance, standard deviation, or semi-standard deviation.
 
@@ -147,7 +147,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Represents an even-order moment risk measure algorithm in `PortfolioOptimisers.jl`.
+Represents an even-order moment risk measure algorithm.
 
 Computes portfolio risk using the square root of the ``2p``-th central (full) or lower (semi) even moment of the return distribution. Despite the potentially high moment order, even moments admit an exact power cone reformulation, keeping the optimisation formulation affine.
 
@@ -213,7 +213,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all high-order moment-based risk measure algorithms in `PortfolioOptimisers.jl`.
+Abstract supertype for all high-order moment-based risk measure algorithms.
 
 Defines the interface for algorithms that compute portfolio risk using high-order statistical moments (e.g., skewness, kurtosis) of the return distribution. All concrete high-order moment risk measure algorithms should subtype `HighOrderMomentMeasureAlgorithm` to ensure consistency and composability within the risk measure framework.
 
@@ -226,7 +226,7 @@ abstract type HighOrderMomentMeasureAlgorithm <: MomentMeasureAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for high-order moment risk measure algorithms that are not standardised by the variance in `PortfolioOptimisers.jl`.
+Abstract supertype for high-order moment risk measure algorithms that are not standardised by the variance.
 
 Defines the interface for algorithms that compute portfolio risk using high-order statistical moments (such as skewness, kurtosis) without normalising by the variance. All concrete unstandardised high-order moment risk measure algorithms should subtype `UnstandardisedHighOrderMomentMeasureAlgorithm` to ensure consistency and composability within the risk measure framework.
 
@@ -240,7 +240,7 @@ abstract type UnstandardisedHighOrderMomentMeasureAlgorithm <:
 """
 $(DocStringExtensions.TYPEDEF)
 
-Represents the unstandardised semi-skewness risk measure algorithm in `PortfolioOptimisers.jl`.
+Represents the unstandardised semi-skewness risk measure algorithm.
 
 Computes portfolio risk using the third lower moment (unstandardised semi-skewness), which quantifies downside asymmetry by considering only the cubed deviations below a target value. This algorithm is unstandardised and operates directly on the return distribution.
 
@@ -254,7 +254,7 @@ struct ThirdLowerMoment <: UnstandardisedHighOrderMomentMeasureAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Represents the unstandardised fourth moment (kurtosis or semi-kurtosis) risk measure algorithm in `PortfolioOptimisers.jl`.
+Represents the unstandardised fourth moment (kurtosis or semi-kurtosis) risk measure algorithm.
 
 Computes portfolio risk using the fourth central (full) or lower (semi) moment of the return distribution, depending on the provided moment algorithm. This algorithm quantifies the "tailedness" of the return distribution without normalising by the variance.
 
@@ -298,7 +298,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Represents a standardised high-order moment risk measure algorithm in `PortfolioOptimisers.jl`.
+Represents a standardised high-order moment risk measure algorithm.
 
 Computes portfolio risk using a high-order moment algorithm (such as semi-skewness or semi-kurtosis), standardised by a variance estimator.
 
@@ -370,7 +370,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Represents a low-order moment risk measure in `PortfolioOptimisers.jl`.
+Represents a low-order moment risk measure.
 
 Computes portfolio risk using a low-order moment algorithm (such as first lower moment, mean absolute deviation, or second moment), optionally with custom weights and target values. This type is used for risk measures based on mean, variance, or related statistics.
 
@@ -865,7 +865,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Represents a high-order moment risk measure in `PortfolioOptimisers.jl`.
+Represents a high-order moment risk measure.
 
 Computes portfolio risk using a high-order moment algorithm (such as semi-skewness, semi-kurtosis, or kurtosis), optionally with custom weights and target values. This type is used for risk measures based on third or fourth moments of the return distribution.
 

@@ -18,7 +18,7 @@ This is the pattern that the [advanced Black–Litterman](../2_moments_priors/06
 page builds up variant by variant, assembled here end-to-end as a reusable book: a
 [`FactorBlackLittermanPrior`](@ref), real sector constraints, and an exact allocation.
 
-The reasoning, following the [strategy decision framework](../../user_guide/06_Choosing_a_Strategy.md):
+The reasoning, following the [strategy decision framework](../../user_guide/07_Choosing_a_Strategy.md):
 
 - **The edge is a factor call, not a stock call** — the desk has a view on *factor premia*, so it
     encodes it where it belongs and propagates it through the factor regression.

@@ -1,7 +1,7 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all regime adjustment methods in `PortfolioOptimisers.jl`.
+Abstract supertype for all regime adjustment methods.
 
 All concrete subtypes should subtype `RegimeAdjustedMethod` and implement the
 [`regime_multiplier`](@ref) interface.

@@ -577,7 +577,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Container type for low order prior results in `PortfolioOptimisers.jl`.
+Container type for low order prior results.
 
 `LowOrderPrior` stores the output of low order prior estimation routines, including asset returns, mean vector, covariance matrix, Cholesky factor, weights, entropy, Kullback-Leibler divergence, outlier weights, regression results, and optional factor moments. It is used throughout the package to represent validated prior information for portfolio optimisation and analytics.
 
@@ -777,7 +777,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Container type for high order prior results in `PortfolioOptimisers.jl`.
+Container type for high order prior results.
 
 `HighOrderPrior` stores the output of high order prior estimation routines, including low order prior results, cokurtosis tensor, elimination and summation matrices, coskewness tensor, quadratic skewness matrix, and matrix processing estimator. It is used throughout the package to represent validated prior information for portfolio optimisation and analytics involving higher moments.
 

@@ -154,9 +154,23 @@ user_guide = generate_files("../user_guide/", "user_guide/", diff_flag)
 include(joinpath(@__DIR__, "generate_type_hierarchy.jl"))
 generate_type_hierarchy()
 
-root_pages = [file
-              for file in readdir(joinpath(@__DIR__, "src")) if splitext(file)[2] == ".md"]
-home = popat!(root_pages, findfirst(x->contains(x, "index"), root_pages))
+include(joinpath(@__DIR__, "generate_capability_catalogue.jl"))
+generate_capability_catalogue()
+
+# Root-level pages are named explicitly rather than picked positionally out of
+# `readdir`. The previous form took `root_pages[end]` as the references page,
+# which held only while `99_references.md` happened to sort last -- dropping any
+# new root page silently repointed the "References" nav entry at it.
+const HOME_PAGE = "index.md"
+const REFERENCES_PAGE = "99_references.md"
+const CATALOGUE_PAGE = "capability_catalogue.md"
+for page in (HOME_PAGE, REFERENCES_PAGE, CATALOGUE_PAGE)
+    if !(isfile(joinpath(@__DIR__, "src", page)))
+        error("docs/make.jl: expected root page `$page` is missing.")
+    else
+        true
+    end
+end
 api_pages = [item for item in walkdir(joinpath(@__DIR__, "src/api"))]
 contribute = [joinpath("contribute", file)
               for file in readdir(joinpath(@__DIR__, "src/contribute"))
@@ -169,7 +183,8 @@ makedocs(; modules = [PortfolioOptimisers], doctest = false,
          sitename = "PortfolioOptimisers.jl",
          format = DocumenterVitepress.MarkdownVitepress(;
                                                         repo = "https://github.com/dcelisgarza/PortfolioOptimisers.jl"),
-         pages = ["Home" => home;
+         pages = ["Home" => HOME_PAGE;
+                  "Capability Catalogue" => CATALOGUE_PAGE;
                   "User Guide" => user_guide;
                   "Examples" => examples;
                   "API" => [joinpath.(api_pages[1][1][idx1:end], api_pages[1][3]);
@@ -191,7 +206,7 @@ makedocs(; modules = [PortfolioOptimisers], doctest = false,
                             "Pipeline" =>
                                 joinpath.(api_pages[13][1][idx1:end], api_pages[13][3])];
                   "Contribute" => contribute;
-                  "References" => root_pages[end]],
+                  "References" => REFERENCES_PAGE],
          plugins = [CitationBibliography(joinpath(@__DIR__, "src", "References.bib");
                                          style = :numeric)])
 

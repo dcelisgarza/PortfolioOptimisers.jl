@@ -1,7 +1,7 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all Brownian Distance Variance formulation algorithms in `PortfolioOptimisers.jl`.
+Abstract supertype for all Brownian Distance Variance formulation algorithms.
 
 All concrete types implementing specific formulations for the Brownian Distance Variance optimisation constraint should subtype `BrownianDistanceVarianceFormulation`.
 

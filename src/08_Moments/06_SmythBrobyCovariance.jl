@@ -1,7 +1,7 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all Smyth-Broby covariance estimators in `PortfolioOptimisers.jl`.
+Abstract supertype for all Smyth-Broby covariance estimators.
 
 All concrete and/or abstract types implementing Smyth-Broby covariance estimation algorithms should be subtypes of `BaseSmythBrobyCovariance`.
 
@@ -14,7 +14,7 @@ abstract type BaseSmythBrobyCovariance <: BaseGerberCovariance end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all Smyth-Broby covariance algorithm types in `PortfolioOptimisers.jl`.
+Abstract supertype for all Smyth-Broby covariance algorithm types.
 
 All concrete and/or abstract types implementing specific Smyth-Broby covariance algorithms should be subtypes of `SmythBrobyCovarianceAlgorithm`.
 
@@ -245,7 +245,7 @@ struct SmythBrobyCount2 <: SmythBrobyCovarianceAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-A flexible container type for configuring and applying Smyth-Broby covariance estimators in `PortfolioOptimisers.jl`.
+Configures and applies Smyth-Broby covariance estimators.
 
 `SmythBrobyCovariance` encapsulates all components required for Smyth-Broby-based covariance or correlation estimation, including the expected returns estimator, variance estimator, positive definite matrix estimator, algorithm parameters, and the specific Smyth-Broby algorithm variant.
 

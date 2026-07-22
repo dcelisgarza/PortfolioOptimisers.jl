@@ -1,7 +1,7 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all cokurtosis estimators in `PortfolioOptimisers.jl`.
+Abstract supertype for all cokurtosis estimators.
 
 All concrete and/or abstract types implementing cokurtosis estimation algorithms should be subtypes of `CokurtosisEstimator`.
 

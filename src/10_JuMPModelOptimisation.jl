@@ -1,7 +1,7 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all JuMP-based optimisation result types in `PortfolioOptimisers.jl`.
+Abstract supertype for all JuMP-based optimisation result types.
 
 All concrete and/or abstract types representing the result of a JuMP model optimisation should be subtypes of `AbstractJuMPResult`.
 

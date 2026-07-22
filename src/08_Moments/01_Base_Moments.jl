@@ -53,7 +53,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all covariance estimator types in `PortfolioOptimisers.jl`.
+Abstract supertype for all covariance estimator types.
 
 All concrete and/or abstract types that implement covariance estimation should be subtypes of `AbstractCovarianceEstimator`.
 
@@ -169,7 +169,7 @@ abstract type AbstractCovarianceEstimator <: StatsBase.CovarianceEstimator end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all variance estimator types in `PortfolioOptimisers.jl`.
+Abstract supertype for all variance estimator types.
 
 All concrete and/or abstract types that implement variance estimation should be subtypes of `AbstractVarianceEstimator`.
 
@@ -310,7 +310,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all expected returns estimator types in `PortfolioOptimisers.jl`.
+Abstract supertype for all expected returns estimator types.
 
 All concrete and/or abstract types that implement expected returns estimation should be subtypes of `AbstractExpectedReturnsEstimator`.
 
@@ -424,7 +424,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all expected returns algorithm types in `PortfolioOptimisers.jl`.
+Abstract supertype for all expected returns algorithm types.
 
 All concrete and/or abstract types that implement a specific algorithm used by an expected returns estimator should be subtypes of `AbstractExpectedReturnsAlgorithm`.
 
@@ -463,7 +463,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all moment algorithm types in `PortfolioOptimisers.jl`.
+Abstract supertype for all moment algorithm types.
 
 All concrete and/or abstract types that implement a specific algorithm for moment estimation should be subtypes of `AbstractMomentAlgorithm`.
 

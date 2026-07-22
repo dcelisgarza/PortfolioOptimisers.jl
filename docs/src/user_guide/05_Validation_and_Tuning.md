@@ -1,7 +1,7 @@
 The source files can be found in [user_guide/](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/user_guide/).
 
 ```@meta
-EditURL = "../../../user_guide/04_Validation_and_Tuning.jl"
+EditURL = "../../../user_guide/05_Validation_and_Tuning.jl"
 ```
 
 # Validation and tuning
@@ -13,7 +13,7 @@ search that work with *any* optimiser. This page shows the minimal path; for the
 splitters and search strategies see the
 [validation & tuning examples](../examples/5_validation_tuning/01_Cross_Validation.md).
 
-````@example 04_Validation_and_Tuning
+````@example 05_Validation_and_Tuning
 using PortfolioOptimisers, CSV, TimeSeries, Clarabel, StatsPlots, GraphRecipes
 
 X = TimeArray(CSV.File(joinpath(@__DIR__, "../examples/SP500.csv.gz")); timestamp = :Date)[(end - 252):end]
@@ -33,7 +33,7 @@ A cross-validation splitter partitions the timeline into training and testing fo
 [`cross_val_predict`](@ref) fits the optimiser on each training fold and stitches the
 out-of-sample predictions back together, so you can score the strategy on data it never saw.
 
-````@example 04_Validation_and_Tuning
+````@example 05_Validation_and_Tuning
 kfold = KFold(; n = 3)
 pred = cross_val_predict(mr, rd, kfold)
 ````
@@ -41,7 +41,7 @@ pred = cross_val_predict(mr, rd, kfold)
 The stitched predictions carry an out-of-sample realised risk, here the second moment of the
 predicted returns via [`expected_risk`](@ref).
 
-````@example 04_Validation_and_Tuning
+````@example 05_Validation_and_Tuning
 cv_risk = expected_risk(LowOrderMoment(; alg = SecondMoment()), pred)
 ````
 
@@ -58,7 +58,7 @@ a scoring rule like [`MeanReturnRiskRatio`](@ref) ranks the candidates.
 [`search_cross_validation`](@ref) runs the search and returns the tuned estimator in its `opt`
 field. Here we tune the L1 regularisation strength of our `MeanRisk`.
 
-````@example 04_Validation_and_Tuning
+````@example 05_Validation_and_Tuning
 score = MeanReturnRiskRatio(; rk = LowOrderMoment(; alg = SecondMoment()))
 grid = [["opt.l1" => [0.001, 0.01, 0.05]]]
 
@@ -67,7 +67,7 @@ gs_res = search_cross_validation(mr, GridSearchCrossValidation(grid; r = score),
 
 The tuned estimator optimises like any other.
 
-````@example 04_Validation_and_Tuning
+````@example 05_Validation_and_Tuning
 res_tuned = optimise(gs_res.opt, rd)
 ````
 
@@ -84,7 +84,7 @@ context) in [`TimeDependent`](@ref) and store it in the field it varies; the fol
 entry `i` in for fold `i`. Execution-control inputs (solvers, RNGs) stay static. Here the
 per-asset weight cap tightens as a walk-forward advances:
 
-````@example 04_Validation_and_Tuning
+````@example 05_Validation_and_Tuning
 wf = IndexWalkForward(126, 42)
 n = n_splits(wf, rd)
 caps = TimeDependent([WeightBounds(; lb = 0.0, ub = ub) for ub in range(0.35, 0.2, n)])
@@ -97,7 +97,7 @@ such a schedule can be handed to [`cross_val_predict`](@ref) directly as the opt
 there is no static optimiser to fall back to, it must state what a fold-less
 [`optimise`](@ref) should run, via `default`:
 
-````@example 04_Validation_and_Tuning
+````@example 05_Validation_and_Tuning
 iv = InverseVolatility()
 strategies = TimeDependent([isodd(i) ? mr : iv for i in 1:n]; default = mr)
 pred_switch = cross_val_predict(strategies, rd, wf)
@@ -114,7 +114,7 @@ and [Time Dependent Optimisers](../examples/5_validation_tuning/06_Time_Dependen
 [`plot_cv_scores`](@ref) visualises the per-fold out-of-sample scores — a quick read on how
 stable the strategy is across the timeline.
 
-````@example 04_Validation_and_Tuning
+````@example 05_Validation_and_Tuning
 plot_cv_scores(LowOrderMoment(; alg = SecondMoment()), pred)
 ````
 

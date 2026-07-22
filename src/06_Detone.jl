@@ -1,7 +1,7 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all detoning estimators in `PortfolioOptimisers.jl`.
+Abstract supertype for all detoning estimators.
 
 All concrete and/or abstract types representing detoning estimators should be subtypes of `AbstractDetoneEstimator`.
 
@@ -65,7 +65,7 @@ abstract type AbstractDetoneEstimator <: AbstractEstimator end
 """
 $(DocStringExtensions.TYPEDEF)
 
-A concrete detoning estimator for removing the largest `n` principal components (market modes) from a covariance or correlation matrix in [`detone!`](@ref) and [`detone`](@ref).
+Removes the largest `n` principal components (market modes) from a covariance or correlation matrix. Applied by [`detone!`](@ref) and [`detone`](@ref).
 
 For financial data, the leading principal components often represent market-wide movements that can obscure asset-specific signals. The `Detone` estimator allows users to specify the number of these leading components to remove, thereby enhancing the focus on idiosyncratic relationships between market members [mlp1](@cite).
 

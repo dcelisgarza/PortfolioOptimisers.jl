@@ -19,6 +19,9 @@ A type used inside an Estimator to select or modify its computational behaviour.
 **Result**
 A plain data struct that holds the computed outputs of a function applied to an Estimator. Never callable. Passed downstream as inputs to further computation.
 
+**Choice Surface**
+The set of things a caller picks when specifying a problem: the concrete leaf Estimators and Algorithms. Results are not part of it — they are what comes back, never what is chosen, so a caller writes `MeanRisk` but never writes `MeanRiskResult`. The distinction is implied by the three definitions above but worth stating, because it decides membership questions that would otherwise be settled case by case: which types a user-facing inventory must cover, and which are outputs that merely need to be reachable from one.
+
 **Factory**
 A generic configuration mechanism for immutable structs — they may be Estimator, Result, or Algorithm structs. Because all structs are immutable and the library relies heavily on composition, `factory` is the standard way to propagate runtime-computed values (moments from a Prior Result, observation weights, previous portfolio weights, etc.) down through a composed struct tree. It takes a struct and runtime data and returns a new, fully-configured struct of the same type.
 

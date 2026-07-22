@@ -116,7 +116,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all preorder traversal strategies in `PortfolioOptimisers.jl`.
+Abstract supertype for all preorder traversal strategies.
 
 All concrete and/or abstract types implementing specific preorder traversal logic should be subtypes of `AbstractPreorderBy`.
 

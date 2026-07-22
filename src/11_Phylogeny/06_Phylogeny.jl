@@ -1,7 +1,7 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Container type for phylogeny matrix or vector results in `PortfolioOptimisers.jl`.
+Container type for phylogeny matrix or vector results.
 
 `PhylogenyResult` stores the output of phylogeny-based estimation routines, such as network or clustering-based phylogeny matrices, or centrality vectors. It is used throughout the package to represent validated phylogeny structures for constraint generation, centrality analysis, and related workflows.
 
@@ -168,7 +168,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Centrality algorithm type for betweenness centrality in `PortfolioOptimisers.jl`.
+Centrality algorithm type for betweenness centrality.
 
 `BetweennessCentrality` computes the [betweenness centrality](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.betweenness_centrality) of nodes in a graph, measuring the extent to which a node lies on shortest paths between other nodes.
 
@@ -219,7 +219,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Centrality algorithm type for closeness centrality in `PortfolioOptimisers.jl`.
+Centrality algorithm type for closeness centrality.
 
 `ClosenessCentrality` computes the [closeness centrality](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.closeness_centrality) of nodes in a graph, measuring how close a node is to all other nodes.
 
@@ -270,7 +270,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Centrality algorithm type for degree centrality in `PortfolioOptimisers.jl`.
+Centrality algorithm type for degree centrality.
 
 `DegreeCentrality` computes the [degree centrality](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.degree_centrality-Tuple%7BAbstractGraph%7D) of nodes in a graph, measuring the number of edges connected to each node. The `kind` parameter specifies the type of degree (0: total, 1: in-degree, 2: out-degree).
 
@@ -325,7 +325,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Centrality algorithm type for [eigenvector centrality](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.eigenvector_centrality-Tuple%7BAbstractGraph%7D) in `PortfolioOptimisers.jl`.
+Centrality algorithm type for [eigenvector centrality](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.eigenvector_centrality-Tuple%7BAbstractGraph%7D).
 
 `EigenvectorCentrality` computes the eigenvector centrality of nodes in a graph, measuring the influence of a node based on the centrality of its neighbors.
 
@@ -338,7 +338,7 @@ struct EigenvectorCentrality <: AbstractCentralityAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Centrality algorithm type for Katz centrality in `PortfolioOptimisers.jl`.
+Centrality algorithm type for Katz centrality.
 
 `KatzCentrality` computes the [Katz centrality](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.katz_centrality) of nodes in a graph, measuring the influence of a node based on the number and length of walks between nodes, controlled by the attenuation factor `alpha`.
 
@@ -387,7 +387,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Centrality algorithm type for PageRank in `PortfolioOptimisers.jl`.
+Centrality algorithm type for PageRank.
 
 `Pagerank` computes the [PageRank](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.pagerank-Union%7BTuple%7BAbstractGraph%7BU%7D%7D,%20Tuple%7BU%7D,%20Tuple%7BAbstractGraph%7BU%7D,%20Any%7D,%20Tuple%7BAbstractGraph%7BU%7D,%20Any,%20Integer%7D,%20Tuple%7BAbstractGraph%7BU%7D,%20Any,%20Integer,%20Any%7D%7D%20where%20U%3C:Integer) of nodes in a graph, measuring the importance of nodes based on the structure of incoming links. The algorithm is controlled by the damping factor `alpha`, number of iterations `n`, and convergence tolerance `epsilon`.
 
@@ -453,7 +453,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Centrality algorithm type for [radiality centrality](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.radiality_centrality-Tuple%7BAbstractGraph%7D) in `PortfolioOptimisers.jl`.
+Centrality algorithm type for [radiality centrality](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.radiality_centrality-Tuple%7BAbstractGraph%7D).
 
 `RadialityCentrality` computes the radiality centrality of nodes in a graph, measuring how close a node is to all other nodes, adjusted for the maximum possible distance.
 
@@ -466,7 +466,7 @@ struct RadialityCentrality <: AbstractCentralityAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Centrality algorithm type for [stress centrality](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.stress_centrality) in `PortfolioOptimisers.jl`.
+Centrality algorithm type for [stress centrality](https://juliagraphs.org/Graphs.jl/stable/algorithms/centrality/#Graphs.stress_centrality).
 
 `StressCentrality` computes the stress centrality of nodes in a graph, measuring the number of shortest paths passing through each node.
 
@@ -578,7 +578,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all minimum spanning tree (MST) algorithm types in `PortfolioOptimisers.jl`.
+Abstract supertype for all minimum spanning tree (MST) algorithm types.
 
 All concrete and/or abstract types implementing specific MST algorithms (e.g., Kruskal, Boruvka, Prim) should be subtypes of `AbstractTreeType`.
 
@@ -606,7 +606,7 @@ const Tree_SimMat = Union{<:AbstractSimilarityMatrixAlgorithm, <:AbstractTreeTyp
 """
 $(DocStringExtensions.TYPEDEF)
 
-Algorithm type for Kruskal's minimum spanning tree (MST) in `PortfolioOptimisers.jl`.
+Algorithm type for Kruskal's minimum spanning tree (MST).
 
 `KruskalTree` specifies the use of [Kruskal's algorithm](https://juliagraphs.org/Graphs.jl/stable/algorithms/spanningtrees/#Graphs.kruskal_mst) for constructing a minimum spanning tree from a graph.
 
@@ -656,7 +656,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Algorithm type for Boruvka's minimum spanning tree (MST) in `PortfolioOptimisers.jl`.
+Algorithm type for Boruvka's minimum spanning tree (MST).
 
 `BoruvkaTree` specifies the use of [Boruvka's algorithm](https://juliagraphs.org/Graphs.jl/stable/algorithms/spanningtrees/#Graphs.boruvka_mst) for constructing a minimum spanning tree from a graph.
 
@@ -706,7 +706,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Algorithm type for Prim's minimum spanning tree (MST) in `PortfolioOptimisers.jl`.
+Algorithm type for Prim's minimum spanning tree (MST).
 
 `PrimTree` specifies the use of [Prim's algorithm](https://juliagraphs.org/Graphs.jl/stable/algorithms/spanningtrees/#Graphs.prim_mst) for constructing a minimum spanning tree from a graph.
 
@@ -792,7 +792,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all network estimator types in `PortfolioOptimisers.jl`.
+Abstract supertype for all network estimator types.
 
 All concrete and/or abstract types implementing network-based estimation algorithms should be subtypes of `AbstractNetworkEstimator`.
 
@@ -848,7 +848,7 @@ const NwE_ClE_Cl = Union{<:AbstractNetworkEstimator, <:ClE_Cl}
 """
 $(DocStringExtensions.TYPEDEF)
 
-Estimator type for network-based phylogeny analysis in `PortfolioOptimisers.jl`.
+Estimator type for network-based phylogeny analysis.
 
 `NetworkEstimator` encapsulates the configuration for constructing a network from asset data, including the covariance estimator, distance estimator, tree or similarity algorithm, and the network depth parameter.
 
@@ -940,7 +940,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Estimator type for network-based phylogeny analysis in `PortfolioOptimisers.jl`.
+Estimator type for network-based phylogeny analysis.
 
 `NetworkEstimator` encapsulates the configuration for constructing a network from asset data, including the covariance estimator, distance estimator, tree or similarity algorithm, and the network depth parameter.
 
@@ -1038,7 +1038,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all centrality estimator types in `PortfolioOptimisers.jl`.
+Abstract supertype for all centrality estimator types.
 
 All concrete and/or abstract types implementing centrality-based estimation algorithms should be subtypes of `AbstractCentralityEstimator`.
 
@@ -1051,7 +1051,7 @@ abstract type AbstractCentralityEstimator <: AbstractEstimator end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Estimator type for centrality-based analysis in `PortfolioOptimisers.jl`.
+Estimator type for centrality-based analysis.
 
 `CentralityEstimator` encapsulates the configuration for computing centrality measures on a network, including the network estimator and the centrality algorithm.
 
