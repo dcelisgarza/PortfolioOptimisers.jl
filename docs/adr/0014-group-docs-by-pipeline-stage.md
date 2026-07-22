@@ -58,12 +58,25 @@ user_guide/
   02_Optimisers.jl              # the full breadth tour: naive, JuMP (MeanRisk, RB, RRB,
                                 #   FRC, NOC), clustering (HRP/HERC/SCHRP), meta (NCO/
                                 #   Stacking/SubsetResampling) — minimal call each
-  03_Constraints_and_Costs.jl
-  04_Validation_and_Tuning.jl
-  05_Post_Processing.jl
-  06_Choosing_a_Strategy.jl     # the decision framework (compute × frequency × risk × budget
+  03_Risk_Measures.jl           # [amended] the catalogue of the `r` slot: every measure with its
+                                #   alias, meaning, and accepting optimiser families
+  04_Constraints_and_Costs.jl
+  05_Validation_and_Tuning.jl
+  06_Post_Processing.jl
+  07_Choosing_a_Strategy.jl     # the decision framework (compute × frequency × risk × budget
                                 #   → which tools); the worked profiles live in examples
 ```
+
+**Amendment (2026-07-22).** `03_Risk_Measures.jl` was inserted and the pages after it
+renumbered. The risk-measure family is the one part of the optimiser stage that is a *menu*
+rather than a step: ~57 measures whose names do not disclose what they penalise, several of
+them reachable only as a configuration of a generic type behind its `alg` field. Leaving it distributed across
+the optimiser tour and the deep dives meant no page answered "what exists and which do I want?"
+(2026-07-19 ergonomics review, card 9). It is a *reference* page rather than a task recipe, so
+its tables are generated from the type system, the alias layer, and the ADR 0018 compatibility
+trait, with completeness assertions that fail the docs build if a measure is added without a
+catalogue entry. The generated compatibility tick-table previously in `02_Optimisers.jl` §2 was
+absorbed into it; `02` now points here.
 
 **Examples** — subdirectories per pipeline group, deep single-topic pages:
 

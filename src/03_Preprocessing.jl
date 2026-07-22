@@ -563,6 +563,19 @@ Without it, the universal leaf fallback `port_opt_view(x, i, args...)` would han
 
   - [`port_opt_view`](@ref)
   - [`AbstractReturnsResult`](@ref)
+
+* * *
+
+    port_opt_view(rd::ReturnsResult, args...; kwargs...)
+
+Erroring tripwire for [`ReturnsResult`](@ref) calls whose *call shape* no supported arity matches.
+
+`ReturnsResult` does implement [`port_opt_view`](@ref), so the [`AbstractReturnsResult`](@ref) tripwire above would misreport a mistyped call as an unimplemented subtype. This method takes the call instead and names the call shape: the supported arities take one, two, or three positional index arguments and no keyword arguments — in particular `factors` is the third *positional* index, not a keyword.
+
+# Related
+
+  - [`port_opt_view`](@ref)
+  - [`ReturnsResult`](@ref)
 """
 function port_opt_view(rd::ReturnsResult, i)
     nx = nothing_scalar_array_view(rd.nx, i)
@@ -593,8 +606,13 @@ function port_opt_view(rd::ReturnsResult, i, j, k = :)
     return ReturnsResult(; nx = nx, X = X, nf = nf, F = F, nb = nb, B = B, ts = ts, iv = iv,
                          ivpa = ivpa)
 end
+function port_opt_view(rd::ReturnsResult, args...; kwargs...)
+    kws = keys(kwargs)
+    kwmsg = isempty(kws) ? "" : " and keyword argument(s) " * join(kws, ", ")
+    return throw(ArgumentError("port_opt_view(::ReturnsResult, ...) does not accept this call shape; got $(length(args)) positional index argument(s)$(kwmsg). Supported shapes: port_opt_view(rd, assets) to subselect assets; port_opt_view(rd, observations, assets) or port_opt_view(rd, observations, assets, factors) to subselect observations and assets together (note the reversed index order, and that `factors` is the third positional index, not a keyword)."))
+end
 function port_opt_view(rd::AbstractReturnsResult, args...; kwargs...)
-    return throw(ArgumentError("port_opt_view is not implemented for $(typeof(rd)) with $(length(args)) index argument(s); implement it for the subtype. ReturnsResult supports port_opt_view(rd, assets) and port_opt_view(rd, observations, assets, factors = :)."))
+    return throw(ArgumentError("$(typeof(rd)) subtypes AbstractReturnsResult but does not implement port_opt_view for $(length(args)) index argument(s). Extension authors: implement port_opt_view for the subtype; without it a meta-optimiser or cross-validation fold would silently train on the unsubselected universe. See port_opt_view(rd::ReturnsResult, ...) for the reference implementation."))
 end
 """
     Prices_RR
@@ -1237,7 +1255,7 @@ Concrete preprocessing estimators must implement:
   - [`AbstractPreprocessingEstimator`](@ref)
 """
 function fit_preprocessing(est::AbstractPreprocessingEstimator, data)
-    return throw(ArgumentError("fit_preprocessing is not implemented for $(typeof(est)); implement fit_preprocessing(est, data) and apply_preprocessing(fitted, data)"))
+    return throw(ArgumentError("$(typeof(est)) subtypes AbstractPreprocessingEstimator but does not implement fit_preprocessing. Extension authors: a preprocessing estimator must implement both halves of the interface, fit_preprocessing(est, data) -> fitted and apply_preprocessing(fitted, data) -> data′."))
 end
 """
     apply_preprocessing(fitted, data) -> data′
@@ -1263,7 +1281,7 @@ Applying the fitted object produced by [`fit_preprocessing`](@ref) on the traini
 """
 function apply_preprocessing(fitted::Union{<:AbstractPreprocessingEstimator,
                                            <:AbstractPreprocessingResult}, data)
-    return throw(ArgumentError("apply_preprocessing is not implemented for $(typeof(fitted))"))
+    return throw(ArgumentError("$(typeof(fitted)) subtypes the preprocessing interface but does not implement apply_preprocessing. Extension authors: a preprocessing estimator must implement both halves of the interface, fit_preprocessing(est, data) -> fitted and apply_preprocessing(fitted, data) -> data′; a stateless estimator returns itself from fit_preprocessing and does the work here."))
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -1457,7 +1475,7 @@ This is the single method a concrete [`AbstractAssetSelector`](@ref) must implem
   - [`fit_preprocessing`](@ref)
 """
 function select_assets(sel::AbstractAssetSelector, rd::AbstractReturnsResult)
-    return throw(ArgumentError("select_assets is not implemented for $(typeof(sel)); every AbstractAssetSelector must define select_assets(sel, rd) returning a keep-mask over the asset columns of rd"))
+    return throw(ArgumentError("$(typeof(sel)) subtypes AbstractAssetSelector but does not implement select_assets. Extension authors: every AbstractAssetSelector must define select_assets(sel, rd) returning a keep-mask over the asset columns of rd."))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

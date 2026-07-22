@@ -6,7 +6,7 @@ The second profile is a **professional desk rebalancing monthly**. The trade-off
 afford real compute and real analysis, and turnover matters far less. The edge here comes from a
 *view* and from exploring the whole risk/return trade-off rather than from cost control.
 
-The reasoning, following the [strategy decision framework](../../user_guide/06_Choosing_a_Strategy.md):
+The reasoning, following the [strategy decision framework](../../user_guide/07_Choosing_a_Strategy.md):
 
   - **Compute is abundant, decisions are rare** — a monthly cadence justifies a richer prior and a
     full frontier sweep.

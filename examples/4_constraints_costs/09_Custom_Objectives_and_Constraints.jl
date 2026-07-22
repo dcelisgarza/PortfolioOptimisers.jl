@@ -16,7 +16,7 @@ estimator's type**, so a term is just a struct carrying its data plus one method
 without implementing its method is an error, not a silent no-op. This page builds both from
 scratch, works through the model idioms that keep them correct (the constraint scale and the
 homogenisation variable `k`), and composes several into one problem. It is the deep dive behind the one-call summary in the
-[constraints & costs guide](../../user_guide/03_Constraints_and_Costs.md).
+[constraints & costs guide](../../user_guide/04_Constraints_and_Costs.md).
 
 !!! tip "When to reach for this"
     Reach for a custom term when your preference is a **continuous per-asset number** that no

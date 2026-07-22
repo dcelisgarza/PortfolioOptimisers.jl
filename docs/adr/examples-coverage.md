@@ -112,7 +112,7 @@ Mark a topic covered (✅) only when all of the following hold:
 | Status | Topic | Where |
 | ------ | ----- | ----- |
 | ✅ | Data preprocessing and imputation before `prices_to_returns` | `user_guide/01_Data_and_Priors.jl` §1 |
-| ✅ | OWA vs moment-based vs quantile-based risk measure families — when to choose each | `user_guide/02_Optimisers.jl` §2 |
-| ✅ | Drawdown as a risk measure vs as a post-optimisation diagnostic | `user_guide/02_Optimisers.jl` §2 |
+| ✅ | OWA vs moment-based vs quantile-based risk measure families — when to choose each | `user_guide/03_Risk_Measures.jl` §3, §5 |
+| ✅ | Drawdown as a risk measure vs as a post-optimisation diagnostic | `user_guide/03_Risk_Measures.jl` §3 + `user_guide/02_Optimisers.jl` §2 |
 | ✅ | The full Black-Litterman family and how the Bayesian, Factor, and Augmented variants differ from the base form | `user_guide/01_Data_and_Priors.jl` §3 |
 | ✅ | Windowed and regime-adjusted moment estimators — motivation and trade-offs vs full-sample estimators | `user_guide/01_Data_and_Priors.jl` §3 |

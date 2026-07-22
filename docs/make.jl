@@ -17,6 +17,14 @@ end
 # Keep rendered docs and @example output fully expanded (no large-struct collapsing).
 PortfolioOptimisers.set_compact_show!(false)
 
+# `@example` output is captured into a plain `IOBuffer`, whose `displaysize` falls back to
+# `Base.displaysize()` — i.e. `ENV["LINES"]`/`ENV["COLUMNS"]`, defaulting to 24×80. PrettyTables
+# v3 fits tables to that size, so every `pretty_table` call in the guide and examples silently
+# loses rows and columns. Widening the environment here fixes all of them at once, with no
+# call-site options to keep in sync.
+ENV["LINES"] = 100_000
+ENV["COLUMNS"] = 100_000
+
 DocMeta.setdocmeta!(PortfolioOptimisers, :DocTestSetup,
                     :(using PortfolioOptimisers, StatsBase, Statistics, LinearAlgebra,
                             Dates, Distributions, StableRNGs, TimeSeries;
