@@ -259,11 +259,11 @@ lands **below** the requested floor, silently breaking the mandate.
 k_floors = [1.30, 1.35, 1.38]
 k_compare = [(f,
               score' * optimise(MeanRisk(; obj = MaximumRatio(; rf = rf),
-                                         opt = JuMPOptimiser(; pe = pr, slv = slv,
-                                                             ccnt = MomentumFloor(score, f)))).w,
+                            opt = JuMPOptimiser(; pe = pr, slv = slv,
+                                                ccnt = MomentumFloor(score, f)))).w,
               score' * optimise(MeanRisk(; obj = MaximumRatio(; rf = rf),
-                                         opt = JuMPOptimiser(; pe = pr, slv = slv,
-                                                             ccnt = MomentumFloorNoK(score, f)))).w)
+                            opt = JuMPOptimiser(; pe = pr, slv = slv,
+                                                ccnt = MomentumFloorNoK(score, f)))).w)
              for f in k_floors]
 
 pretty_table(DataFrame("Requested floor" => first.(k_compare),

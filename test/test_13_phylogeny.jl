@@ -259,29 +259,29 @@
         @test clr.k == 3
 
         @test 4 == PortfolioOptimisers.optimal_number_clusters(OptimalNumberClusters(;
-                                                                                     alg = SecondOrderDifference(),
-                                                                                     max_k = nothing),
-                                                               alg, clr.D)[2]
+                                                                                                                                                              alg = SecondOrderDifference(),
+                                                                                                                                                              max_k = nothing),
+                                                                                                                                        alg, clr.D)[2]
         @test 1 == PortfolioOptimisers.optimal_number_clusters(OptimalNumberClusters(;
-                                                                                     alg = SecondOrderDifference(),
-                                                                                     max_k = 1),
-                                                               alg, clr.D)[2]
+                                                                                                                                                        alg = SecondOrderDifference(),
+                                                                                                                                                        max_k = 1),
+                                                                                                                                  alg, clr.D)[2]
         @test 4 == PortfolioOptimisers.optimal_number_clusters(OptimalNumberClusters(;
-                                                                                     alg = SecondOrderDifference(),
-                                                                                     max_k = 100),
-                                                               alg, clr.D)[2]
+                                                                                                                                                          alg = SecondOrderDifference(),
+                                                                                                                                                          max_k = 100),
+                                                                                                                                    alg, clr.D)[2]
         @test 3 == PortfolioOptimisers.optimal_number_clusters(OptimalNumberClusters(;
-                                                                                     alg = SilhouetteScore(),
-                                                                                     max_k = nothing),
-                                                               alg, clr.D)[2]
+                                                                                                                                                        alg = SilhouetteScore(),
+                                                                                                                                                        max_k = nothing),
+                                                                                                                                  alg, clr.D)[2]
         @test 1 == PortfolioOptimisers.optimal_number_clusters(OptimalNumberClusters(;
-                                                                                     alg = SilhouetteScore(),
-                                                                                     max_k = 1),
-                                                               alg, clr.D)[2]
+                                                                                                                                                  alg = SilhouetteScore(),
+                                                                                                                                                  max_k = 1),
+                                                                                                                            alg, clr.D)[2]
         @test 3 == PortfolioOptimisers.optimal_number_clusters(OptimalNumberClusters(;
-                                                                                     alg = SilhouetteScore(),
-                                                                                     max_k = 100),
-                                                               alg, clr.D)[2]
+                                                                                                                                                    alg = SilhouetteScore(),
+                                                                                                                                                    max_k = 100),
+                                                                                                                              alg, clr.D)[2]
         @test 4 ==
               PortfolioOptimisers.optimal_number_clusters(OptimalNumberClusters(; alg = 10,
                                                                                 max_k = nothing),

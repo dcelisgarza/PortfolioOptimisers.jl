@@ -1075,13 +1075,13 @@ function set_mip_constraints!(model::JuMP.Model, wb::WeightBounds, card::Option{
     # returns `nothing` -- there is no held indicator, and by its own condition nothing below
     # would read one.
     sign_only = xbgt_flag && !(card_flag ||
-                               gcard_flag ||
-                               iplg_flag ||
-                               lt_flag ||
-                               st_flag ||
-                               ffl_flag ||
-                               ffs_flag ||
-                               wfp_flag)
+              gcard_flag ||
+              iplg_flag ||
+              lt_flag ||
+              st_flag ||
+              ffl_flag ||
+              ffs_flag ||
+              wfp_flag)
     ind = run_mip_builder!(model, sp, wb, lt, st, ss, lt_flag, st_flag; ffl, ffs, ffl_flag,
                            ffs_flag, xbgt_flag, pin_flag, sign_only)
     # Register the bundle in Model State so integer phylogeny can gate on the held indicator

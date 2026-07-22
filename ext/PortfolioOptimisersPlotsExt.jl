@@ -1278,15 +1278,15 @@ function PortfolioOptimisers.plot_drawdowns(ret::VecNum;
     dd = drawdowns(cret, compound; cX = true) .* 100
 
     base_risks = 100 * if !compound
-                       [-AverageDrawdown(; w = rw)(ret), -UlcerIndex()(ret),
-                        -DrawdownatRisk(; alpha = alpha)(ret),
-                        -ConditionalDrawdownatRisk(; alpha = alpha)(ret), -MaximumDrawdown()(ret)]
-                       else
-                       [-RelativeAverageDrawdown(; w = rw)(ret), -RelativeUlcerIndex()(ret),
-                        -RelativeDrawdownatRisk(; alpha = alpha)(ret),
-                        -RelativeConditionalDrawdownatRisk(; alpha = alpha)(ret),
-                        -RelativeMaximumDrawdown()(ret)]
-                       end
+    [-AverageDrawdown(; w = rw)(ret), -UlcerIndex()(ret),
+     -DrawdownatRisk(; alpha = alpha)(ret),
+     -ConditionalDrawdownatRisk(; alpha = alpha)(ret), -MaximumDrawdown()(ret)]
+else
+    [-RelativeAverageDrawdown(; w = rw)(ret), -RelativeUlcerIndex()(ret),
+     -RelativeDrawdownatRisk(; alpha = alpha)(ret),
+     -RelativeConditionalDrawdownatRisk(; alpha = alpha)(ret),
+     -RelativeMaximumDrawdown()(ret)]
+end
 
     conf = round((1 - alpha) * 100; digits = 2)
     base_labels = ["Average Drawdown: $(round(base_risks[1]; digits=2))%",

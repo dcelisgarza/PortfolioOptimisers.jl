@@ -1,6 +1,7 @@
 @testset "Moments" begin
     using Test, PortfolioOptimisers, DataFrames, TimeSeries, CSV, CovarianceEstimation,
-          StableRNGs, StatsBase, LinearAlgebra, SparseArrays, Distributions, FLoops
+          StableRNGs, StatsBase, Statistics, LinearAlgebra, SparseArrays, Distributions,
+          FLoops
     rng = StableRNG(123456789)
     rd = prices_to_returns(TimeArray(CSV.File(joinpath(@__DIR__, "./assets/SP500.csv.gz"));
                                      timestamp = :Date)[(end - 252):end],
@@ -824,8 +825,7 @@ end
     @test :mean in Base.kwarg_decl(only(methods(cokurtosis,
                                                 (WindowedCokurtosis, PortfolioOptimisers.MatNum))))
     @test :mean ∉ Base.kwarg_decl(only(methods(Statistics.mean,
-                                               (WindowedExpectedReturns,
-                                                PortfolioOptimisers.MatNum))))
+                                               (WindowedExpectedReturns, PortfolioOptimisers.MatNum))))
 
     # Passing `mean` explicitly must agree with letting the inner estimator compute it.
     mu = Statistics.mean(SimpleExpectedReturns(), rd.X[win, :])
