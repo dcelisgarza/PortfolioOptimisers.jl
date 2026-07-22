@@ -799,6 +799,8 @@ const ret_dict = Dict(:mu => "`mu::ArrNum`: Expected returns vector `features x 
                       :rho => "`rho::MatNum`: Correlation matrix `features x features`.",#
                       :sigrho => "`sigrho::MatNum`: Covariance/correlation matrix `features x features`.",#
                       :sk => "`sk::MatNum`: Coskewness matrix `features x features`.",#
+                      :cskew => "`cskew::MatNum`: Coskewness tensor `features x features²`.",#
+                      :cskewV => "`V::MatNum`: Processed coskewness matrix `features x features`.",#
                       :kte => "`kte::MatNum`: Cokurtosis matrix `features x features`.",#
                       :me => "`me`: New expected returns estimator of the same type as the argument, with the appropriate weights applied.",#
                       :mev => "`mev`: New expected returns estimator of the same type as the argument, for the new view.",#

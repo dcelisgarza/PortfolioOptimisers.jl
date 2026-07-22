@@ -2,10 +2,8 @@
 
 ```@docs
 WindowedVariance
-var(ce::WindowedVariance, X::MatNum; dims::Int = 1, mean = nothing,
-                        kwargs...)
-var(ce::WindowedVariance, X::VecNum; mean = nothing)
-std(ce::WindowedVariance, X::MatNum; dims::Int = 1, mean = nothing,
-                        kwargs...)
-std(ce::WindowedVariance, X::VecNum; mean = nothing)
+var(ve::WindowedVariance, X::MatNum; dims::Int = 1, mean = nothing, iv::Option{<:MatNum} = nothing, kwargs...)
+var(ve::WindowedVariance, X::VecNum; mean = nothing)
+std(ve::WindowedVariance, X::MatNum; dims::Int = 1, mean = nothing, iv::Option{<:MatNum} = nothing, kwargs...)
+std(ve::WindowedVariance, X::VecNum; mean = nothing)
 ```

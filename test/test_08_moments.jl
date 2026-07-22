@@ -428,26 +428,26 @@
         @test isapprox(cov(ce0, rd.X), cov(ce, rd.X))
         @test isapprox(cor(ce0, rd.X), cor(ce, rd.X))
 
-        ce0 = factory(WindowedVariance(; ce = SimpleVariance(; corrected = false),
+        ce0 = factory(WindowedVariance(; ve = SimpleVariance(; corrected = false),
                                        window = 50), ew)
-        ce = factory(ce0.ce, ew[(end - 49):end])
+        ce = factory(ce0.ve, ew[(end - 49):end])
         @test isapprox(var(ce0, rd.X[(end - 49):end, :]), var(ce, rd.X[(end - 49):end, :]))
         @test isapprox(std(ce0, rd.X[(end - 49):end, :]), std(ce, rd.X[(end - 49):end, :]))
         @test isapprox(var(ce0, rd.X[(end - 49):end, 1]), var(ce, rd.X[(end - 49):end, 1]))
         @test isapprox(std(ce0, rd.X[(end - 49):end, 2]), std(ce, rd.X[(end - 49):end, 2]))
 
-        ce0 = factory(WindowedVariance(; ce = SimpleVariance(; corrected = false)), ew)
-        ce = factory(ce0.ce, ew)
+        ce0 = factory(WindowedVariance(; ve = SimpleVariance(; corrected = false)), ew)
+        ce = factory(ce0.ve, ew)
         @test isapprox(var(ce0, rd.X), var(ce, rd.X))
         @test isapprox(std(ce0, rd.X), std(ce, rd.X))
         @test isapprox(var(ce0, rd.X[:, 1]), var(ce, rd.X[:, 1]))
         @test isapprox(std(ce0, rd.X[:, 2]), std(ce, rd.X[:, 2]))
 
         ce0 = factory(WindowedVariance(;
-                                       ce = SimpleVariance(; me = nothing,
+                                       ve = SimpleVariance(; me = nothing,
                                                            corrected = false), window = 50),
                       ew)
-        ce = factory(ce0.ce, ew[(end - 49):end])
+        ce = factory(ce0.ve, ew[(end - 49):end])
         @test isapprox(var(ce0, rd.X[(end - 49):end, :]; mean = zeros(1, size(rd.X, 2))),
                        var(ce, rd.X[(end - 49):end, :]; mean = zeros(1, size(rd.X, 2))))
         @test isapprox(std(ce0, rd.X[(end - 49):end, :]; mean = zeros(1, size(rd.X, 2))),
@@ -458,9 +458,9 @@
                        std(ce, rd.X[(end - 49):end, 2]; mean = 0))
 
         ce0 = factory(WindowedVariance(;
-                                       ce = SimpleVariance(; me = nothing,
+                                       ve = SimpleVariance(; me = nothing,
                                                            corrected = false)), ew)
-        ce = factory(ce0.ce, ew)
+        ce = factory(ce0.ve, ew)
         @test isapprox(var(ce0, rd.X; mean = zeros(1, size(rd.X, 2))),
                        var(ce, rd.X; mean = zeros(1, size(rd.X, 2))))
         @test isapprox(std(ce0, rd.X; mean = zeros(1, size(rd.X, 2))),
@@ -610,7 +610,7 @@
         @test isapprox(vec(kt), df[!, 1])
 
         kte0 = factory(WindowedCokurtosis(; window = 50), ew)
-        kte = factory(kte0.ke, ew[(end - 49):end])
+        kte = factory(kte0.kte, ew[(end - 49):end])
         @test isapprox(cokurtosis(kte0, rd.X[(end - 49):end, :]),
                        cokurtosis(kte, rd.X[(end - 49):end, :]))
     end
@@ -760,4 +760,105 @@
             @test isapprox(d6, d1)
         end
     end
+end
+"""
+Records the shape of the `iv` its `cov`/`cor` receive, so a windowed wrapper's `iv`
+subsetting can be asserted without depending on a real implied-volatility estimator.
+Returns `[size(iv, 1) size(iv, 2); 1 1]`, or a zero matrix when `iv` is `nothing`.
+"""
+struct IVProbe <: PortfolioOptimisers.AbstractCovarianceEstimator end
+function iv_probe_shape(iv)
+    return isnothing(iv) ? [0 0; 0 0] : [size(iv, 1) size(iv, 2); 1 1]
+end
+function Statistics.cov(::IVProbe, ::PortfolioOptimisers.MatNum; iv = nothing, kwargs...)
+    return iv_probe_shape(iv)
+end
+function Statistics.cor(::IVProbe, ::PortfolioOptimisers.MatNum; iv = nothing, kwargs...)
+    return iv_probe_shape(iv)
+end
+@testset "Windowed estimator family" begin
+    using Test, PortfolioOptimisers, DataFrames, TimeSeries, CSV, StatsBase, Statistics
+    rd = prices_to_returns(TimeArray(CSV.File(joinpath(@__DIR__, "./assets/SP500.csv.gz"));
+                                     timestamp = :Date)[(end - 252):end],
+                           TimeArray(CSV.File(joinpath(@__DIR__, "./assets/Factors.csv.gz"));
+                                     timestamp = :Date)[(end - 252):end])
+    ew = eweights(1:size(rd.X, 1), inv(size(rd.X, 1)); scale = true)
+    win = 1:50
+
+    # Every member of the family carries the same shape: the inner estimator under its
+    # conventional field name, `w`, `window` — and nothing else.
+    @test propertynames(WindowedExpectedReturns()) == (:me, :w, :window)
+    @test propertynames(WindowedCovariance()) == (:ce, :w, :window)
+    @test propertynames(WindowedVariance()) == (:ve, :w, :window)
+    @test propertynames(WindowedCoskewness()) == (:ske, :w, :window)
+    @test propertynames(WindowedCokurtosis()) == (:kte, :w, :window)
+
+    # Each answers a different generic, so each must keep its own supertype (ADR 0039).
+    @test WindowedExpectedReturns() isa PortfolioOptimisers.AbstractExpectedReturnsEstimator
+    @test WindowedCovariance() isa PortfolioOptimisers.AbstractCovarianceEstimator
+    @test WindowedVariance() isa PortfolioOptimisers.AbstractVarianceEstimator
+    @test WindowedCoskewness() isa PortfolioOptimisers.CoskewnessEstimator
+    @test WindowedCokurtosis() isa PortfolioOptimisers.CokurtosisEstimator
+
+    # `factory` propagates weights into the inner estimator and replaces `w`; `window`
+    # passes through untouched. Uniform across the family.
+    for (w0, inner) in ((WindowedExpectedReturns(; window = 50), :me),
+                        (WindowedCovariance(; window = 50), :ce), (WindowedVariance(; window = 50), :ve),
+                        (WindowedCoskewness(; window = 50), :ske),
+                        (WindowedCokurtosis(; window = 50), :kte))
+        w1 = factory(w0, ew)
+        @test w1.w === ew
+        @test w1.window == w0.window
+        @test getproperty(w1, inner) !== getproperty(w0, inner)
+    end
+
+    # `mean` is a *named* keyword on every forwarder except `Statistics.mean`, so it
+    # reaches the inner estimator instead of riding in `kwargs...` into
+    # `windowed_preamble` (ADR 0039).
+    for f in (Statistics.cov, Statistics.cor)
+        @test :mean in Base.kwarg_decl(only(methods(f,
+                                                    (WindowedCovariance, PortfolioOptimisers.MatNum))))
+    end
+    @test :mean in Base.kwarg_decl(only(methods(coskewness,
+                                                (WindowedCoskewness, PortfolioOptimisers.MatNum))))
+    @test :mean in Base.kwarg_decl(only(methods(cokurtosis,
+                                                (WindowedCokurtosis, PortfolioOptimisers.MatNum))))
+    @test :mean ∉ Base.kwarg_decl(only(methods(Statistics.mean,
+                                               (WindowedExpectedReturns,
+                                                PortfolioOptimisers.MatNum))))
+
+    # Passing `mean` explicitly must agree with letting the inner estimator compute it.
+    mu = Statistics.mean(SimpleExpectedReturns(), rd.X[win, :])
+    @test isapprox(cor(WindowedCovariance(; window = win), rd.X; mean = mu),
+                   cor(WindowedCovariance(; window = win), rd.X))
+    sk0, V0 = coskewness(WindowedCoskewness(; window = win), rd.X; mean = mu)
+    sk1, V1 = coskewness(WindowedCoskewness(; window = win), rd.X)
+    @test isapprox(sk0, sk1)
+    @test isapprox(V0, V1)
+    @test isapprox(cokurtosis(WindowedCokurtosis(; window = win), rd.X; mean = mu),
+                   cokurtosis(WindowedCokurtosis(; window = win), rd.X))
+
+    # `dims = 2` windows the transposed data identically to `dims = 1` on the original.
+    Xt = permutedims(rd.X)
+    @test isapprox(cov(WindowedCovariance(; window = win), rd.X),
+                   cov(WindowedCovariance(; window = win), Xt; dims = 2))
+    @test isapprox(vec(var(WindowedVariance(; window = win), rd.X)),
+                   vec(var(WindowedVariance(; window = win), Xt; dims = 2)))
+    @test isapprox(cokurtosis(WindowedCokurtosis(; window = win), rd.X),
+                   cokurtosis(WindowedCokurtosis(; window = win), Xt; dims = 2))
+
+    # An index `window` subsets `iv` to the same rows, so an estimator that consumes
+    # implied volatilities sees the window's own, aligned with the windowed returns.
+    iv = abs.(rd.X) .+ 0.1
+    probe = WindowedCovariance(; ce = IVProbe(), window = win)
+    @test cov(probe, rd.X; iv = iv) == [length(win) size(rd.X, 2); 1 1]
+    @test cor(probe, rd.X; iv = iv) == [length(win) size(rd.X, 2); 1 1]
+    # An Int window resolves to a range, which is also a VecInt, so it subsets `iv` too.
+    @test cov(WindowedCovariance(; ce = IVProbe(), window = 50), rd.X; iv = iv) ==
+          [50 size(rd.X, 2); 1 1]
+    # Only `window = nothing` resolves to a Colon and leaves `iv` whole.
+    @test cov(WindowedCovariance(; ce = IVProbe()), rd.X; iv = iv) ==
+          [size(rd.X, 1) size(rd.X, 2); 1 1]
+    # No `iv` at all still reaches the inner estimator as `nothing`.
+    @test cov(probe, rd.X) == [0 0; 0 0]
 end

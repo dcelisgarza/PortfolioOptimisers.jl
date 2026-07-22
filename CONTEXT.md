@@ -92,6 +92,9 @@ The difference between Implied Volatility (market expectation) and realised vola
 
 ## 3. Statistics
 
+**Windowed Estimator**
+A moment estimator that restricts an inner moment estimator to a sub-window of the observations — the most recent *n*, or an explicit set of indices — and rebinds observation weights to that window before delegating. The inner estimator's semantics are untouched: windowing decides *which observations are seen*, never how the moment is computed from them, so any moment kind can be windowed and a windowed estimator is substitutable wherever its inner one is. The family spans the moment kinds (expected returns, covariance, variance, coskewness, cokurtosis), one type each, because each answers a different generic. Distinct from a Cross-Validation fold, which restricts observations to evaluate a strategy; a Windowed Estimator restricts them because older observations are held to be less informative about the present.
+
 ### 3.1 Expected Returns (Moments)
 
 **Expected Returns Estimator**
@@ -104,7 +107,7 @@ Computes a per-asset mean-return vector. Variants:
 - **MedianExpectedReturns**: (weighted) per-asset median.
 - **StandardDeviationExpectedReturns** / **VarianceExpectedReturns**: return the asset standard deviations / variances (used where a "return" slot should carry dispersion).
 - **CustomValueExpectedReturns**: user-supplied per-asset values.
-- **WindowedExpectedReturns**: restricts computation to a rolling or indexed observation window.
+- **WindowedExpectedReturns**: the Windowed Estimator for expected returns.
 
 ### 3.2 Covariance & Variance (Moments)
 
@@ -122,12 +125,12 @@ Computes an asset covariance (and correlation) matrix. Core wrappers: `Covarianc
 - **ImpliedVolatility** (covariance): scales covariance using implied volatility, optionally regressing realised on implied (`ImpliedVolatilityRegression`) or applying a premium factor (`ImpliedVolatilityPremium`).
 - **DenoiseCovariance / DetoneCovariance / ProcessedCovariance**: wrap another covariance estimator and apply denoising / detoning / custom matrix processing plus posdef projection.
 - **PortfolioOptimisersCovariance**: composite estimator bundling covariance estimation with post-processing.
-- **Windowed** variants (`WindowedCovariance`, `WindowedVariance`): rolling/indexed observation window.
+- **Windowed** variants (`WindowedCovariance`, `WindowedVariance`): the Windowed Estimators for covariance and variance.
 
 ### 3.3 Higher-Order Moments
 
 **Coskewness** / **Cokurtosis**
-Third- and fourth-order co-moment tensors (with `FullMoment`/`SemiMoment` variants and windowed forms `WindowedCoskewness`, `WindowedCokurtosis`). Feed high-order priors and higher-moment risk measures.
+Third- and fourth-order co-moment tensors (with `FullMoment`/`SemiMoment` variants and the Windowed Estimators `WindowedCoskewness`, `WindowedCokurtosis`). Feed high-order priors and higher-moment risk measures.
 
 ### 3.4 Regression (factor modelling)
 

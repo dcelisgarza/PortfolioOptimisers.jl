@@ -894,8 +894,10 @@ Shared preamble for windowed moment estimators (matrix input).
 
 Resolves the window specification, subsets `X` (and `iv`) to the selected observations,
 rebinds observation weights to the window, and builds a weight-updated copy of `est` via
-[`factory`](@ref). When `window` is a vector of indices, `iv` is subset to the same rows
-(or columns when `dims = 2`); otherwise `iv` is returned unchanged.
+[`factory`](@ref). Whenever a window is given — an `Int` (which resolves to a range) or an
+explicit index vector — `iv` is subset to the same rows, or columns when `dims = 2`, so it
+stays aligned with the windowed returns. Only `window = nothing`, which resolves to a
+`Colon`, leaves `iv` unchanged.
 
 # Arguments
 
@@ -919,13 +921,12 @@ rebinds observation weights to the window, and builds a weight-updated copy of `
   - [`get_window`](@ref)
   - [`moment_window_and_weights`](@ref)
   - [`factory`](@ref)
-  - [`mean(me::WindowedExpectedReturns, X::MatNum; dims::Int = 1, iv::Option{<:MatNum} = nothing, kwargs...)`](@ref)
-  - [`cov(ce::WindowedCovariance, X::MatNum; dims::Int = 1, mean = nothing, iv::Option{<:MatNum} = nothing, kwargs...)`](@ref)
-  - [`cor(ce::WindowedCovariance, X::MatNum; dims::Int = 1, mean = nothing, iv::Option{<:MatNum} = nothing, kwargs...)`](@ref)
-  - [`var(ce::WindowedVariance, X::MatNum; dims::Int = 1, mean = nothing, iv::Option{<:MatNum} = nothing, kwargs...)`](@ref)
-  - [`std(ce::WindowedVariance, X::MatNum; dims::Int = 1, mean = nothing, iv::Option{<:MatNum} = nothing, kwargs...)`](@ref)
-  - [`coskewness(ske::WindowedCoskewness, X::MatNum; dims::Int = 1, iv::Option{<:MatNum} = nothing, kwargs...)`](@ref)
-  - [`cokurtosis(ke::WindowedCokurtosis, X::MatNum; dims::Int = 1, iv::Option{<:MatNum} = nothing, kwargs...)`](@ref)
+  - [`@windowed_estimator`](@ref)
+  - [`WindowedExpectedReturns`](@ref)
+  - [`WindowedCovariance`](@ref)
+  - [`WindowedVariance`](@ref)
+  - [`WindowedCoskewness`](@ref)
+  - [`WindowedCokurtosis`](@ref)
 """
 function windowed_preamble(est, w::Option{<:ObsWeights}, window::Option{<:Int_VecInt},
                            X::MatNum; iv::Option{<:MatNum} = nothing, dims::Int = 1,
@@ -964,8 +965,8 @@ observation weights to the window, and builds a weight-updated copy of `est` via
   - [`get_window`](@ref)
   - [`moment_window_and_weights`](@ref)
   - [`factory`](@ref)
-  - [`var(ce::WindowedVariance, X::VecNum; mean = nothing)`](@ref)
-  - [`std(ce::WindowedVariance, X::VecNum; mean = nothing)`](@ref)
+  - [`@windowed_estimator`](@ref)
+  - [`WindowedVariance`](@ref)
 """
 function windowed_preamble(est, w::Option{<:ObsWeights}, window::Option{<:Int_VecInt},
                            X::VecNum)
@@ -973,6 +974,480 @@ function windowed_preamble(est, w::Option{<:ObsWeights}, window::Option{<:Int_Ve
     X, w_new = moment_window_and_weights(X, w, win)
     inner = factory(est, w_new)
     return inner, X
+end
+
+# ---------------------------------------------------------------------------
+# @windowed_estimator — one declaration per windowed moment estimator (ADR 0039)
+# ---------------------------------------------------------------------------
+"""
+    WINDOWED_ESTIMATOR_KEYS
+
+Assignment keys recognised in a [`@windowed_estimator`](@ref) body, besides the single
+`field::Type = default` declaration. Anything else is rejected at macro-expansion time with
+a [`did_you_mean`](@ref) suggestion, so a mistyped key cannot silently produce a malformed
+docstring or a missing forwarding method.
+
+# Related
+
+  - [`@windowed_estimator`](@ref)
+"""
+const WINDOWED_ESTIMATOR_KEYS = (:noun, :forward, :doctest)
+"""
+    WINDOWED_ESTIMATOR_INPUTS
+
+Input types a [`@windowed_estimator`](@ref) `forward` entry may declare. `MatNum` generates
+the matrix forwarder (threading `dims` and `iv` through [`windowed_preamble`](@ref)),
+`VecNum` the vector forwarder.
+
+# Related
+
+  - [`@windowed_estimator`](@ref)
+"""
+const WINDOWED_ESTIMATOR_INPUTS = (:MatNum, :VecNum)
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Throw a uniform, expansion-time [`ArgumentError`](https://docs.julialang.org/en/v1/base/base/#Core.ArgumentError) for a malformed [`@windowed_estimator`](@ref) declaration.
+
+# Related
+
+  - [`@windowed_estimator`](@ref)
+"""
+function windowed_estimator_error(msg::AbstractString)
+    return throw(ArgumentError("@windowed_estimator: " * msg))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Validate that `key` names an entry of `dict`, appending a [`did_you_mean`](@ref) suggestion
+to the error when it does not. `what` names the table in the message.
+
+# Related
+
+  - [`@windowed_estimator`](@ref)
+  - [`did_you_mean`](@ref)
+"""
+function windowed_estimator_check_key(key::Symbol, dict::AbstractDict, what::AbstractString)
+    if !haskey(dict, key)
+        windowed_estimator_error("`$(key)` is not a `$(what)` key" *
+                                 windowed_estimator_suggest(key, keys(dict)) *
+                                 ".")
+    end
+    return key
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Suggest the nearest `candidates` entry to a mistyped [`@windowed_estimator`](@ref) key.
+
+Wraps [`did_you_mean`](@ref) in a looser scoped configuration than the global default:
+Damerau-Levenshtein (so a transposed pair costs one edit, not two) at `min_score = 0.5`. The
+strict global default exists to keep near-miss probes from echoing real *asset names* back to
+the caller (ADR 0026); that boundary does not apply here, because the candidates are
+compile-time constants — block keys and `field_dict`/`ret_dict` names — with nothing to leak.
+At the default `0.7` under plain Levenshtein, short keys never match: `nuon` scores 0.5
+against `noun`, so the suggestion would be dead code.
+
+# Related
+
+  - [`@windowed_estimator`](@ref)
+  - [`did_you_mean`](@ref)
+  - [`with_string_distance`](@ref)
+"""
+function windowed_estimator_suggest(key, candidates)
+    return with_string_distance(; dist = StringDistances.DamerauLevenshtein(),
+                                min_score = 0.5) do
+        return did_you_mean(string(key), string.(collect(candidates)))
+    end
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Parse the `field::Type = default` line of a [`@windowed_estimator`](@ref) body into the
+inner estimator's field name, its declared type, and its keyword-constructor default.
+
+The field name doubles as the [`field_dict`](@ref) key for the generated field docstring and
+as the argument name of every generated forwarding method, so it must follow the library's
+naming convention (`me`, `ce`, `ve`, `ske`, `kte`).
+
+# Related
+
+  - [`@windowed_estimator`](@ref)
+"""
+function windowed_parse_field(ex)
+    if !(Meta.isexpr(ex, :(=)) &&
+         Meta.isexpr(ex.args[1], :(::)) &&
+         length(ex.args[1].args) == 2)
+        windowed_estimator_error("the inner estimator must be declared as `field::Type = default`; got `$(ex)`.")
+    end
+    name, type = ex.args[1].args
+    if !isa(name, Symbol)
+        windowed_estimator_error("the inner estimator's field name must be a symbol; got `$(name)`.")
+    end
+    windowed_estimator_check_key(name, field_dict, "field_dict")
+    return name, type, ex.args[2]
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Parse one `forward` entry of a [`@windowed_estimator`](@ref) body — `generic(::MatNum; mean) => :ret_key` — into the generic being forwarded, its input type, whether it names a
+`mean` keyword, and the [`ret_dict`](@ref) keys documenting its return values.
+
+Naming `mean` in the mini-signature is what keeps it out of the forwarded `kwargs...`, where
+it would otherwise leak into [`windowed_preamble`](@ref).
+
+# Related
+
+  - [`@windowed_estimator`](@ref)
+"""
+function windowed_parse_forward(ex)
+    if !(Meta.isexpr(ex, :call) && length(ex.args) == 3 && ex.args[1] === :(=>))
+        windowed_estimator_error("each `forward` entry must read `generic(::MatNum[; mean]) => :ret_key` (or `=> (:k1, :k2)` for a tuple return); got `$(ex)`.")
+    end
+    sig, rets = ex.args[2], ex.args[3]
+    if !Meta.isexpr(sig, :call)
+        windowed_estimator_error("the left of a `forward` entry must be a call; got `$(sig)`.")
+    end
+    gen = sig.args[1]
+    input, has_mean = nothing, false
+    for arg in sig.args[2:end]
+        if Meta.isexpr(arg, :parameters)
+            for kw in arg.args
+                if kw !== :mean
+                    windowed_estimator_error("`mean` is the only keyword a `forward` entry may name; got `$(kw)`.")
+                end
+                has_mean = true
+            end
+        elseif Meta.isexpr(arg, :(::)) && length(arg.args) == 1
+            if !isnothing(input)
+                windowed_estimator_error("a `forward` entry takes exactly one positional argument type; got `$(sig)`.")
+            end
+            input = arg.args[1]
+        else
+            windowed_estimator_error("unexpected argument `$(arg)` in `forward` entry `$(sig)`.")
+        end
+    end
+    if !(input in WINDOWED_ESTIMATOR_INPUTS)
+        windowed_estimator_error("a `forward` entry's input type must be one of $(WINDOWED_ESTIMATOR_INPUTS); got `$(input)`.")
+    end
+    raw = Meta.isexpr(rets, :tuple) ? rets.args : Any[rets]
+    keys_ = Symbol[]
+    for r in raw
+        if !(isa(r, QuoteNode) && isa(r.value, Symbol))
+            windowed_estimator_error("`ret_dict` keys must be quoted symbols; got `$(r)`.")
+        end
+        push!(keys_, windowed_estimator_check_key(r.value, ret_dict, "ret_dict"))
+    end
+    return gen, input, has_mean, keys_
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Render the `generic(field::Name, X::Input)` reference used to cross-link one generated
+forwarding method from the type's and its siblings' `# Related` sections.
+
+Keyword arguments are deliberately omitted: Documenter resolves an `@ref` by positional
+method signature, and the two positional types already identify the method uniquely.
+
+# Related
+
+  - [`@windowed_estimator`](@ref)
+"""
+function windowed_method_ref(gen, field::Symbol, name::Symbol, input::Symbol)
+    return "[`$(gen)($(field)::$(name), X::$(input))`](@ref)"
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Build the docstring for one generated forwarding method as an interpolation AST.
+
+Returning `Expr(:string, ...)` rather than a `String` is load-bearing: it keeps
+[`arg_dict`](@ref) and [`ret_dict`](@ref) lookups as live parts of the `DocStr`, exactly as
+a hand-written `\$(arg_dict[:dims])` would be.
+
+# Related
+
+  - [`@windowed_estimator`](@ref)
+"""
+function windowed_method_doc(gen, field::Symbol, name::Symbol, input::Symbol,
+                             has_mean::Bool, ret_keys::Vector{Symbol}, noun::AbstractString,
+                             siblings::Vector{String})
+    lc = lowercasefirst(noun)
+    is_mat = input === :MatNum
+    sig = if is_mat
+        "    $(gen)($(field)::$(name), X::MatNum; dims::Int = 1, " *
+        (has_mean ? "mean = nothing, " : "") *
+        "iv::Option{<:MatNum} = nothing, kwargs...)"
+    else
+        "    $(gen)($(field)::$(name), X::VecNum" *
+        (has_mean ? "; mean = nothing" : "") *
+        ")"
+    end
+    # The summary names the *generic*, not the type's noun: `std` on a WindowedVariance
+    # computes a standard deviation, not a variance.
+    parts = Any["\n", sig,
+                "\n\nCompute `$(gen)` over a rolling or indexed observation window ($(is_mat ? "matrix" : "vector") input).\n\nThis method selects a window of observations from `X` (and applies observation weights if specified), then delegates to the underlying $(lc) estimator.\n\n# Arguments\n\n  - `$(field)`: Windowed $(lc) estimator.\n  - `X`: Data $(is_mat ? "matrix of asset returns (observations × assets)" : "vector of returns").\n"]
+    if is_mat
+        push!(parts, "  - ", :(arg_dict[:dims]), "\n")
+    end
+    if has_mean
+        push!(parts,
+              "  - `mean`: Optional pre-computed mean passed to the underlying estimator.\n")
+    end
+    if is_mat
+        push!(parts, "  - ", :(arg_dict[:oiv]),
+              "\n  - `kwargs...`: Additional keyword arguments passed to the underlying estimator.\n")
+    end
+    push!(parts, "\n# Returns\n")
+    for k in ret_keys
+        push!(parts, "\n  - ", :(ret_dict[$(QuoteNode(k))]))
+    end
+    push!(parts, "\n\n# Related\n\n  - [`$(name)`](@ref)\n")
+    for s in siblings
+        push!(parts, "  - ", s, "\n")
+    end
+    push!(parts, "  - [`windowed_preamble`](@ref)\n")
+    return Expr(:string, parts...)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Build one generated forwarding method: resolve the window via [`windowed_preamble`](@ref),
+then delegate to the inner estimator's own method.
+
+# Related
+
+  - [`@windowed_estimator`](@ref)
+"""
+function windowed_method_def(gen, field::Symbol, name::Symbol, input::Symbol,
+                             has_mean::Bool)
+    self = Expr(:(::), field, name)
+    inner = Expr(:., field, QuoteNode(field))
+    w = Expr(:., field, QuoteNode(:w))
+    window = Expr(:., field, QuoteNode(:window))
+    return if input === :MatNum
+        kws = Any[Expr(:kw, :(dims::Int), 1)]
+        if has_mean
+            push!(kws, Expr(:kw, :mean, nothing))
+        end
+        push!(kws, Expr(:kw, :(iv::Option{<:MatNum}), nothing), :(kwargs...))
+        call = Any[:(dims = dims)]
+        if has_mean
+            push!(call, :(mean = mean))
+        end
+        push!(call, :(iv = iv), :(kwargs...))
+        Expr(:function, Expr(:call, gen, Expr(:parameters, kws...), self, :(X::MatNum)),
+             quote
+                 inner, X, iv = windowed_preamble($inner, $w, $window, X; iv = iv,
+                                                  dims = dims, kwargs...)
+                 return $(Expr(:call, gen, Expr(:parameters, call...), :inner, :X))
+             end)
+    else
+        kws = has_mean ? Any[Expr(:kw, :mean, nothing)] : Any[]
+        call = has_mean ? Any[:(mean = mean)] : Any[]
+        Expr(:function, Expr(:call, gen, Expr(:parameters, kws...), self, :(X::VecNum)),
+             quote
+                 inner, X = windowed_preamble($inner, $w, $window, X)
+                 return $(Expr(:call, gen, Expr(:parameters, call...), :inner, :X))
+             end)
+    end
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Build the type docstring of a generated windowed estimator as an interpolation AST, keeping
+`DocStringExtensions` abbreviations and dictionary lookups live (see
+[`windowed_method_doc`](@ref)).
+
+# Related
+
+  - [`@windowed_estimator`](@ref)
+"""
+function windowed_type_doc(name::Symbol, super, field::Symbol, ftype, default,
+                           noun::AbstractString, doctest::AbstractString,
+                           methods::Vector{String})
+    lc = lowercasefirst(noun)
+    inner_ref = Meta.isexpr(default, :call) ? default.args[1] : default
+    parts = Any["\n", :(DocStringExtensions.TYPEDEF),
+                "\n\n$(noun) estimator that restricts computation to a rolling or indexed observation window.\n\n`$(name)` wraps another $(lc) estimator and applies it to a subset of observations defined by a window and/or custom observation weights. This enables time-varying or recency-weighted $(lc) estimation.\n\n# Fields\n\n",
+                :(DocStringExtensions.FIELDS),
+                "\n\n# Constructors\n\n    $(name)(;\n        $(field)::$(ftype) = $(default),\n        w::Option{<:ObsWeights} = nothing,\n        window::Option{<:Int_VecInt} = nothing\n    ) -> $(name)\n\nKeywords correspond to the struct's fields.\n\n## Validation\n\n  - ",
+                :(val_dict[:oow]),
+                "\n  - If `window` is provided, it must be nonempty, nonnegative, and finite.\n\n## Propagated parameters\n\nWhen [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:\n\n  - `$(field)`: Recursively updated via [`factory`](@ref).\n  - `w`: Replaced with the incoming [`ObsWeights`](@ref).\n\n## View parameters\n\nWhen [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:\n\n  - `$(field)`: Recursively viewed via [`port_opt_view`](@ref).\n\n# Examples\n\n```jldoctest\n$(strip(doctest))\n```\n\n# Related\n\n  - [`$(super)`](@ref)\n  - [`$(inner_ref)`](@ref)\n"]
+    for m in methods
+        push!(parts, "  - ", m, "\n")
+    end
+    push!(parts,
+          "  - [`factory`](@ref)\n  - [`port_opt_view`](@ref)\n  - [`windowed_preamble`](@ref)\n")
+    return Expr(:string, parts...)
+end
+"""
+    @windowed_estimator Name <: Super begin
+        field::FieldType = Default()
+        noun    = "Noun"
+        forward = [generic(::MatNum; mean) => :ret_key, ...]
+        doctest = \"\"\"...\"\"\"
+    end
+
+Declare a windowed moment estimator: a wrapper that restricts an inner moment estimator to a
+sub-window of observations and rebinds observation weights to that window, leaving the inner
+estimator's semantics untouched.
+
+One invocation emits the whole family member — the [`@propagatable`](@ref) `@concrete`
+struct (inner estimator tagged `@fprop @vprop`, `w` tagged `@wprop`, plus `window`), both
+constructors with their validation, one forwarding method per `forward` entry, the `export`,
+and every docstring.
+
+Five nominal types exist rather than one parametric `Windowed{E}` because each answers a
+different generic and must subtype a different abstract estimator — `AbstractCovarianceEstimator`,
+`CoskewnessEstimator`, and the rest are load-bearing for dispatch across the library, and a
+Julia struct's supertype cannot depend on a type parameter. This macro is what keeps the five
+in sync; see ADR 0039.
+
+# Body
+
+  - `field::FieldType = Default()`: the inner estimator. The field name is also its
+    [`field_dict`](@ref) key and the argument name of every generated method, so it must
+    follow the library convention (`me`, `ce`, `ve`, `ske`, `kte`).
+  - `noun`: capitalised noun phrase naming the moment, e.g. `"Expected returns"`. Drives all
+    generated prose.
+  - `forward`: one mini-signature per generic to forward, paired with the
+    [`ret_dict`](@ref) key(s) documenting its return values. Naming `mean` in the
+    mini-signature emits it as a named keyword instead of letting it ride in `kwargs...`,
+    where it would leak into [`windowed_preamble`](@ref).
+  - `doctest`: the body of the `jldoctest` block for the `# Examples` section, without its
+    fences.
+
+Unknown keys, malformed `forward` entries, and unknown `field_dict`/`ret_dict` keys are
+rejected at macro-expansion time with a [`did_you_mean`](@ref) suggestion.
+
+# Examples
+
+```julia
+@windowed_estimator WindowedVariance <: AbstractVarianceEstimator begin
+    ve::AbstractVarianceEstimator = SimpleVariance()
+    noun    = "Variance"
+    forward = [Statistics.var(::MatNum; mean) => :vararr,
+               Statistics.var(::VecNum; mean) => :varnum]
+    doctest = \"\"\"
+    julia> WindowedVariance()
+    ...
+    \"\"\"
+end
+```
+
+# Related
+
+  - [`windowed_preamble`](@ref)
+  - [`@propagatable`](@ref)
+  - [`WindowedExpectedReturns`](@ref)
+  - [`WindowedCovariance`](@ref)
+  - [`WindowedVariance`](@ref)
+  - [`WindowedCoskewness`](@ref)
+  - [`WindowedCokurtosis`](@ref)
+"""
+macro windowed_estimator(head, body)
+    if !(Meta.isexpr(head, :<:) && isa(head.args[1], Symbol))
+        windowed_estimator_error("the header must read `Name <: Super`; got `$(head)`.")
+    end
+    name, super = head.args
+    if !Meta.isexpr(body, :block)
+        windowed_estimator_error("the declaration body must be a `begin ... end` block.")
+    end
+    field, ftype, default = nothing, nothing, nothing
+    noun, forward, doctest = nothing, nothing, nothing
+    for stmt in body.args
+        if isa(stmt, LineNumberNode)
+            continue
+        end
+        if !Meta.isexpr(stmt, :(=))
+            windowed_estimator_error("every line of the body must be an assignment; got `$(stmt)`.")
+        end
+        lhs = stmt.args[1]
+        if Meta.isexpr(lhs, :(::))
+            if !isnothing(field)
+                windowed_estimator_error("exactly one `field::Type = default` line is allowed.")
+            end
+            field, ftype, default = windowed_parse_field(stmt)
+        elseif lhs === :noun
+            noun = stmt.args[2]
+        elseif lhs === :forward
+            if !Meta.isexpr(stmt.args[2], :vect)
+                windowed_estimator_error("`forward` must be a vector of `generic(::Input) => :ret_key` entries.")
+            end
+            forward = stmt.args[2].args
+        elseif lhs === :doctest
+            doctest = stmt.args[2]
+        else
+            windowed_estimator_error("`$(lhs)` is not a recognised key" *
+                                     windowed_estimator_suggest(lhs,
+                                                                WINDOWED_ESTIMATOR_KEYS) *
+                                     ".")
+        end
+    end
+    for (val, key) in
+        ((field, "field::Type = default"), (noun, "noun"), (forward, "forward"),
+         (doctest, "doctest"))
+        isnothing(val) && windowed_estimator_error("missing required `$(key)` declaration.")
+    end
+    if !isa(noun, AbstractString) || !isa(doctest, AbstractString)
+        windowed_estimator_error("`noun` and `doctest` must be string literals.")
+    end
+    if isempty(forward)
+        windowed_estimator_error("`forward` must declare at least one generic.")
+    end
+    specs = [windowed_parse_forward(f) for f in forward]
+    refs = [windowed_method_ref(gen, field, name, input) for (gen, input, _, _) in specs]
+    defs = Any[]
+    for (i, (gen, input, has_mean, ret_keys)) in pairs(specs)
+        siblings = [r for (j, r) in pairs(refs) if j != i]
+        push!(defs,
+              Expr(:macrocall, GlobalRef(Core, Symbol("@doc")), LineNumberNode(@__LINE__),
+                   windowed_method_doc(gen, field, name, input, has_mean, ret_keys, noun,
+                                       siblings),
+                   windowed_method_def(gen, field, name, input, has_mean)))
+    end
+    structexpr = Expr(:struct, false, Expr(:<:, name, super),
+                      Expr(:block, Expr(:string, :(field_dict[$(QuoteNode(field))])),
+                           Expr(:macrocall, Symbol("@fprop"), LineNumberNode(@__LINE__),
+                                Expr(:macrocall, Symbol("@vprop"),
+                                     LineNumberNode(@__LINE__), field)),
+                           Expr(:string, :(field_dict[:oow])),
+                           Expr(:macrocall, Symbol("@wprop"), LineNumberNode(@__LINE__),
+                                :w),
+                           "Window specification: an integer (last `window` observations) or a vector of indices.",
+                           :window,
+                           Expr(:function,
+                                Expr(:call, name, Expr(:(::), field, ftype),
+                                     :(w::Option{<:ObsWeights}),
+                                     :(window::Option{<:Int_VecInt})),
+                                quote
+                                    assert_nonempty_nonneg_finite_val(w, :w)
+                                    assert_nonempty_nonneg_finite_val(window, :window)
+                                    return $(Expr(:call,
+                                                  Expr(:curly, :new,
+                                                       Expr(:call, :typeof, field),
+                                                       :(typeof(w)), :(typeof(window))),
+                                                  field, :w, :window))
+                                end)))
+    kwctor = Expr(:function,
+                  Expr(:(::),
+                       Expr(:call, name,
+                            Expr(:parameters, Expr(:kw, Expr(:(::), field, ftype), default),
+                                 Expr(:kw, :(w::Option{<:ObsWeights}), nothing),
+                                 Expr(:kw, :(window::Option{<:Int_VecInt}), nothing))),
+                       name),
+                  Expr(:block, Expr(:return, Expr(:call, name, field, :w, :window))))
+    return esc(Expr(:block,
+                    Expr(:macrocall, GlobalRef(Core, Symbol("@doc")),
+                         LineNumberNode(@__LINE__),
+                         windowed_type_doc(name, super, field, ftype, default, noun,
+                                           doctest, refs),
+                         Expr(:macrocall, Symbol("@propagatable"),
+                              LineNumberNode(@__LINE__),
+                              Expr(:macrocall, Symbol("@concrete"),
+                                   LineNumberNode(@__LINE__), structexpr))), kwctor,
+                    defs..., Expr(:export, name)))
 end
 
 export FullMoment, SemiMoment
