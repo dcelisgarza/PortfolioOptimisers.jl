@@ -188,9 +188,32 @@ test_33 117/117, test_34 51/51, test_37 523/523, and a new solver-free
 `test_38_pipeline_routing.jl` 76/76 whose expected-routing table locks the derived
 consequences of the field layouts in both directions.
 
-**Deferred.** Recursion into the inner optimisers a meta-optimiser wraps (`opti`/`opto`/
-`opt`) — the genuinely useful case, where an asset-level `WeightBounds` reaches each inner
-`MeanRisk` — is not attempted here; it interacts with the `port_opt_view` subsetting
-`SubsetResampling` applies per subset, and with `NestedClustered`'s cluster-space `opto`.
-Extending the construction-time check to constraints would need a per-estimator target
-trait, reintroducing a declaration that can drift.
+**Rejected: recursion into the optimisers a meta-optimiser wraps.** Pushing targets down
+into `opti`/`opto`/`opt`, so that an asset-level `WeightBounds` reaches each inner
+`MeanRisk`, was considered and is not wanted.
+
+A routing target names a destination, and inside a meta-optimiser the destination is
+genuinely ambiguous rather than merely unimplemented — every inner optimiser, some of them,
+the outer one as well, subset-viewed or not. Resolving that needs a language for saying
+where each item goes, which is a larger and more speculative interface than the one this
+ADR removes.
+
+It would also buy less than it appears. The Pipeline exists to keep the test window out of
+stateful preparation; a meta-optimiser's inner optimisers are invoked with the *fold's
+training returns*, so whatever they compute internally is already leakage-safe. Recursion
+would deduplicate computation, not fix correctness — and that is not worth a new interface.
+Hyperparameter search reaches inner configuration through tuning lenses, which covers the
+fixed-configuration case; the per-fold computed case is covered by the inner optimiser
+computing its own.
+
+The residual gap, recorded rather than fixed: an inner optimiser computes *a* prior, not
+necessarily *the* prior the pipeline computed. `Stacking` uses `prior(st.pe, rd)` for the
+outer combination but calls `optimise(opt, rd)` on each inner, so a prior that cannot be
+reproduced from returns alone — entropy pooling with views, say — now reaches `Stacking.pe`
+and still does not reach the inner optimisers. Should that matter, the fix is `Stacking`
+threading its own prior down, which is an optimiser-internal question and does not involve
+this seam.
+
+**Deferred.** Extending the construction-time check to constraints would need a per-estimator
+target trait, reintroducing a declaration that can drift from the results the estimator
+actually produces.

@@ -45,7 +45,7 @@ WindowedVariance
 """
 @propagatable @concrete struct WindowedVariance <: AbstractVarianceEstimator
     """
-    $(field_dict[:me])
+    $(field_dict[:ce])
     """
     @fprop @vprop ce
     """

@@ -705,7 +705,7 @@ function _optimise(nco::NestedClustered, rd::ReturnsResult; dims::Int = 1,
     nco = _update_asset_sets(nco, rdo)
     reso = optimise(nco.opto, rdo; dims = dims, branchorder = branchorder,
                     str_names = str_names, save = save, kwargs...)
-    wb = weight_bounds_constraints(nco.wb, nco.sets; N = clr.k, strict = nco.strict,
+    wb = weight_bounds_constraints(nco.wb, nco.sets; N = size(X, 2), strict = nco.strict,
                                    datatype = eltype(X))
     retcode, w = outer_optimisation_finaliser(wb, nco.wf, resi, reso.retcode, reso.w, wi)
     return NestedClusteredResult(; pr = pr, clr = clr, wb = wb, fees = fees, resi = resi,
