@@ -658,8 +658,8 @@ end
         @test all(p -> isa(p.res.retcode, OptimisationSuccess), pfn.pred)
         # The callable may also return vectors that differ in length per fold (the
         # vector-of-vectors shape, computed rather than listed).
-        struct _test_LC_Callable <: PortfolioOptimisers.TimeDependentCallable end
-        function (c::_test_LC_Callable)(ctx::TimeDependentContext)
+        struct _test_TD_LC_Callable <: PortfolioOptimisers.TimeDependentCallable end
+        function (c::_test_TD_LC_Callable)(ctx::TimeDependentContext)
             return if ctx.i == 1
                 [LinearConstraintEstimator(; val = "A <= $(0.5 - 0.05 * (ctx.i - 1))")]
             else
@@ -686,7 +686,7 @@ end
 
         mr_fn_vv2 = MeanRisk(;
                              opt = JuMPOptimiser(; slv = slv, sets = sets,
-                                                 lcse = TimeDependent(_test_LC_Callable())))
+                                                 lcse = TimeDependent(_test_TD_LC_Callable())))
         pfn_vv = cross_val_predict(mr_fn_vv2, rd, cvw)
         @test length(pfn_vv.pred) == 2
         @test all(p -> isa(p.res.retcode, OptimisationSuccess), pfn_vv.pred)
