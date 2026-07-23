@@ -703,11 +703,12 @@ function drawdown_at_risk(dd::VecNum, alpha::Real, ::Nothing)
     return -partialsort!(dd, ceil(Int, alpha * length(dd)))
 end
 function drawdown_at_risk(dd::VecNum, alpha::Real, w::VecNum)
+    sw = sum(w)
     order = sortperm(dd)
     sorted_dd = view(dd, order)
     sorted_w = view(w, order)
     cum_w = cumsum(sorted_w)
-    idx = searchsortedfirst(cum_w, alpha)
+    idx = searchsortedfirst(cum_w, sw * alpha)
     idx = ifelse(idx > length(dd), idx - 1, idx)
     return -sorted_dd[idx]
 end

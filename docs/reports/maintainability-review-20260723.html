@@ -36,6 +36,15 @@
           three to seven times. Nine candidates below, ordered by leverage; the top two are correctness
           bugs a consolidation both fixes and prevents.
         </p>
+        <div class="rounded-lg border-2 border-emerald-300 bg-emerald-50 p-4 text-sm text-emerald-900 leading-relaxed">
+          <span class="font-semibold uppercase tracking-wider text-xs">Update · 2026-07-23</span>
+          All three latent bugs are now fixed on <code>dev</code>: <a href="#c1" class="underline">card 1</a>
+          (weighted <code>drawdown_at_risk</code> now scales by <code>sw</code>, matching its five siblings incl. its own CDaR twin),
+          <a href="#c2" class="underline">card 2</a> (DR-CDaR key corrected to <code>:drcdar_risk_</code>, no longer colliding
+          with DR-CVaR and now matching its internal stems), and <a href="#c5" class="underline">card 5</a>
+          (the ρ<sup>p</sup> correlation leak removed from every Integer <code>distance</code>/<code>cor_and_dist</code> method).
+          The consolidation directions below remain open.
+        </div>
         <div class="flex flex-wrap items-center gap-3 text-xs">
           <span class="chip uppercase px-2 py-1 rounded bg-emerald-600 text-white font-semibold">4 Strong</span>
           <span class="chip uppercase px-2 py-1 rounded bg-amber-500 text-white font-semibold">4 Worth exploring</span>
@@ -58,6 +67,7 @@
               <span class="chip uppercase px-2 py-1 rounded bg-emerald-600 text-white font-semibold">Strong</span>
               <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">drift</span>
               <span class="chip uppercase px-2 py-1 rounded bg-red-700 text-white font-semibold">latent bug</span>
+              <span class="chip uppercase px-2 py-1 rounded bg-emerald-700 text-white font-semibold">✓ fixed</span>
             </div>
           </div>
           <div class="font-mono text-sm text-slate-500">
@@ -93,6 +103,13 @@
             <li>drift becomes impossible</li>
             <li>one test surface for the quantile</li>
           </ul>
+          <div class="rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-900">
+            <span class="font-semibold">Resolved (2026-07-23).</span> Confirmed a real bug — with un-normalised weights
+            the bare-<code>alpha</code> branch degenerates to returning the worst drawdown regardless of <code>alpha</code>.
+            <code>drawdown_at_risk(dd, alpha, w::VecNum)</code> now computes <code>sw = sum(w)</code> and searches on
+            <code>sw · alpha</code>. Both <code>DrawdownatRisk</code> and <code>RelativeDrawdownatRisk</code> route through this
+            single helper, so one edit fixes both. Consolidation into a shared <code>weighted_quantile</code> is still open.
+          </div>
         </article>
 
         <!-- ===== CARD 2 ===== -->
@@ -103,6 +120,7 @@
               <span class="chip uppercase px-2 py-1 rounded bg-emerald-600 text-white font-semibold">Strong</span>
               <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">drift</span>
               <span class="chip uppercase px-2 py-1 rounded bg-red-700 text-white font-semibold">latent bug</span>
+              <span class="chip uppercase px-2 py-1 rounded bg-emerald-700 text-white font-semibold">✓ fixed</span>
             </div>
           </div>
           <div class="font-mono text-sm text-slate-500">
@@ -141,6 +159,13 @@
             <li>blast radius: one seam</li>
             <li>evidence the twins are cloned</li>
           </ul>
+          <div class="rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-900">
+            <span class="font-semibold">Resolved (2026-07-23).</span> The registry key at <code>:583</code> is now
+            <code>Symbol(:drcdar_risk_, i)</code> — distinct from DR-CVaR's <code>:drcvar_risk_</code> (<code>:200</code>),
+            matching the twelve internal <code>drcdar</code> stems, and following the family convention
+            (cvar→cdar, evar→edar, pvar→pdar, rlvar→rldar). The <code>risk_key(r, i)</code> seam that would derive the
+            prefix from the measure type is still open.
+          </div>
         </article>
 
         <!-- ===== CARD 3 ===== -->
@@ -177,7 +202,7 @@
 
               <div class="font-mono text-slate-600 pr-2">DR-CVaR / DR-CDaR</div>
               <div class="copy rounded p-2 font-mono">07:195–…</div>
-              <div class="drifted rounded p-2 font-mono">07:579–… ⚠ key drift (card 2)</div>
+              <div class="copy rounded p-2 font-mono">07:579–… <span class="text-emerald-700">✓ key fixed (card 2)</span></div>
 
               <div class="font-mono text-slate-600 pr-2">RVaR·PNVaR / …DaR</div>
               <div class="copy rounded p-2 font-mono">09 / 19 VaR</div>
@@ -267,6 +292,7 @@
               <span class="chip uppercase px-2 py-1 rounded bg-emerald-600 text-white font-semibold">Strong</span>
               <span class="chip uppercase px-2 py-1 rounded bg-slate-800 text-white font-semibold">mirror</span>
               <span class="chip uppercase px-2 py-1 rounded bg-red-700 text-white font-semibold">latent bug</span>
+              <span class="chip uppercase px-2 py-1 rounded bg-emerald-700 text-white font-semibold">✓ bug fixed</span>
             </div>
           </div>
           <div class="font-mono text-sm text-slate-500">
@@ -310,6 +336,14 @@
             <li>square-guard applied uniformly</li>
             <li>cov2cor preamble: 8 → 1</li>
           </ul>
+          <div class="rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-900">
+            <span class="font-semibold">Bug resolved (2026-07-23).</span> The <code>.^ power</code> was moved off the returned
+            correlation and into the transform in every Integer <code>distance</code> and <code>cor_and_dist</code> method:
+            each now returns the <em>true</em> ρ as the correlation half and applies the power only to the distance.
+            The <code>VariationInfoDistance</code> twin (<code>cor_and_dist</code> :510) now applies the power to
+            <code>variation_info</code>, matching its standalone <code>distance</code> method (:269). The ρ<sup>p</sup>
+            correlation leak is gone; the wider <code>dist_transform</code> consolidation (and the uneven square-guard) remains open.
+          </div>
         </article>
 
         <!-- ===== CARD 6 ===== -->
@@ -506,6 +540,11 @@ flowchart LR
       <!-- ================= TOP RECOMMENDATION ================= -->
       <section id="top-recommendation" class="rounded-xl border-2 border-emerald-200 bg-white shadow-sm p-6 space-y-3">
         <h2 class="text-lg font-bold text-emerald-800">Top recommendation — extract <code>weighted_quantile</code> and fix the drift it exposes</h2>
+        <p class="text-sm text-emerald-900 bg-emerald-50 border border-emerald-300 rounded p-3 leading-relaxed mb-2">
+          <span class="font-semibold">Status (2026-07-23):</span> the three latent bugs (cards 1, 2, 5) are fixed on <code>dev</code>.
+          What remains of this recommendation is the <em>consolidation</em> — the <code>weighted_quantile</code> helper and the
+          card-3 <code>emit_xatrisk!</code> skeleton — which would prevent this class of drift from recurring.
+        </p>
         <p class="text-sm text-slate-700 leading-relaxed">
           Start with <a href="#c1" class="text-emerald-700 underline">card 1</a>. It is the highest-leverage item because it is both a
           live correctness bug and a clean consolidation: five of six weighted-quantile sites scale the search target by <code>sw</code> and

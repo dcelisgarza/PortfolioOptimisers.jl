@@ -256,7 +256,7 @@ flowchart LR
           <div class="flex flex-wrap gap-2 mb-4">
             <span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 text-xs font-medium">Strong</span>
             <span class="px-2 py-0.5 rounded border border-slate-300 text-slate-600 text-xs">in-process</span>
-            <span class="px-2 py-0.5 rounded bg-rose-100 text-rose-800 text-xs font-medium">live bug confirmed</span>
+            <span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 text-xs font-medium">bug fixed · 9ff28d6</span>
           </div>
           <p class="font-mono text-sm text-slate-500 mb-4">
             src/20_Optimisation/10_JuMPOptimiser.jl — <code>JuMPOptimiser</code> (44 fields) · <code>jump_optimiser_from_attributes</code> · <code>ProcessedJuMPOptimiserAttributes</code>
@@ -279,7 +279,7 @@ flowchart LR
                   <div class="text-[10px] uppercase tracking-wider text-slate-400 mt-2">40-arg remap</div>
                 </div>
               </div>
-              <p class="text-[11px] text-rose-600 mt-2 border-t border-dashed border-rose-200 pt-2">The remap spells 40 fields by hand and <strong>drops <code class="font-mono">scard</code></strong> — <code class="font-mono">factory</code> and <code class="font-mono">port_opt_view</code> both carry it, this path defaults it to <code class="font-mono">nothing</code>. Constrained-NOC assembles from this twin → sub-group cardinality silently vanishes.</p>
+              <p class="text-[11px] text-rose-600 mt-2 border-t border-dashed border-rose-200 pt-2">The remap spells every field by hand — until <code class="font-mono">9ff28d6</code> it went straight from <code class="font-mono">card</code> to <code class="font-mono">l2c</code>, <strong>dropping <code class="font-mono">scard</code></strong>, so constrained-NOC assembled from this twin with sub-group cardinality silently vanished. <span class="text-emerald-700">Now patched</span> — but the shape that let one field slip remains.</p>
             </div>
             <div class="rounded-lg border border-emerald-200 bg-emerald-50/40 p-4">
               <div class="text-xs uppercase tracking-wider text-emerald-600 mb-3">After — the remap can't drop a field</div>
@@ -295,17 +295,17 @@ flowchart LR
           </div>
 
           <dl class="grid sm:grid-cols-2 gap-x-8 gap-y-3 text-sm">
-            <div><dt class="font-semibold text-slate-700">Problem</dt><dd class="text-slate-600">A 44-field struct with a hand-written 40-argument remap onto its processed twin: adding a knob touches ~8 sites, and the remap has already dropped <code class="font-mono">scard</code>, silently disabling sub-group cardinality in constrained-NOC.</dd></div>
+            <div><dt class="font-semibold text-slate-700">Problem</dt><dd class="text-slate-600">A 44-field struct with a hand-written remap onto its processed twin: adding a knob touches ~8 sites, and the remap <em>had</em> dropped <code class="font-mono">scard</code> (fixed in <code class="font-mono">9ff28d6</code>), which silently disabled sub-group cardinality in constrained-NOC — the concrete cost of the shape, not a one-off typo.</dd></div>
             <div><dt class="font-semibold text-slate-700">Solution</dt><dd class="text-slate-600">Generate the remap from field names (as <code class="font-mono">no_bounds_optimiser</code> does); longer term, make the processed attributes a view over the optimiser rather than a second wide struct.</dd></div>
           </dl>
           <ul class="mt-4 grid sm:grid-cols-2 gap-x-8 gap-y-1.5 text-sm text-slate-700">
-            <li class="flex gap-2"><span class="text-emerald-600">▸</span> fixes the live <code class="font-mono">scard</code> drop</li>
+            <li class="flex gap-2"><span class="text-emerald-600">▸</span> prevents the next <code class="font-mono">scard</code>-style drop (last one fixed in <code class="font-mono">9ff28d6</code>)</li>
             <li class="flex gap-2"><span class="text-emerald-600">▸</span> one edit per new knob, not eight</li>
             <li class="flex gap-2"><span class="text-emerald-600">▸</span> interface shrinks; implementation absorbs the mapping</li>
             <li class="flex gap-2"><span class="text-emerald-600">▸</span> locality: field list has one home</li>
           </ul>
           <div class="mt-4 rounded bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-800">
-            The <code class="font-mono">scard</code> drop is a correctness bug worth patching immediately, independent of the deepening. ADR 0008 already noted the two processed representations "coexist, left as-is" — this is the concrete cost.
+            The <code class="font-mono">scard</code> drop was a correctness bug, patched in <code class="font-mono">9ff28d6</code> independent of the deepening. ADR 0008 already noted the two processed representations "coexist, left as-is" — this was the concrete cost, and the hand-written remap can drop the next field just as quietly until it is generated.
           </div>
         </article>
 
@@ -538,7 +538,7 @@ flowchart LR
             It is the root that makes the whole risk-measure mirror expensive. Extracting the cones as pure builders delivers the report's single biggest testability win — the mathematically interesting formulations become testable on a returns vector instead of through a half-assembled JuMP model — collapses the returns/drawdown twins the analytic side already unified, and clears the way for #08. Two adapters (returns, drawdowns) justify the seam, so it is a real one, not a hypothetical.
           </p>
           <div class="flex flex-wrap gap-3 text-xs">
-            <span class="px-3 py-1 rounded-full bg-white/10">Then #04 — patch the live <span class="font-mono">scard</span> drop now, deepen the remap after</span>
+            <span class="px-3 py-1 rounded-full bg-white/10">Then #04 — <span class="font-mono">scard</span> drop patched (9ff28d6); deepen the remap so the next one can't happen</span>
             <span class="px-3 py-1 rounded-full bg-white/10">#06 &amp; #05 — low-risk locality wins, any time</span>
             <span class="px-3 py-1 rounded-full bg-white/10">#02 — the ambitious one; schedule deliberately</span>
           </div>
