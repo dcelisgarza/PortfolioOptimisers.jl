@@ -648,6 +648,42 @@
             end
         end
     end
+    @testset "Distance validation and kernel" begin
+        # Footgun fix: a non-square rho now throws for EVERY correlation-based
+        # algorithm, not only CorrelationDistance.
+        nonsquare = rand(3, 4)
+        for alg in (SimpleDistance(), SimpleAbsoluteDistance(), LogDistance(),
+                    CorrelationDistance())
+            @test_throws DimensionMismatch distance(Distance(; alg = alg), nonsquare)
+            @test_throws DimensionMismatch distance(Distance(; power = 1, alg = alg),
+                                                    nonsquare)
+        end
+        # Kernel exercised directly through the matrix entry point on a hand-built
+        # correlation matrix. Includes a negative entry to hit the abs-guard.
+        rho = [1.0 0.5 -0.5
+               0.5 1.0 0.0
+               -0.5 0.0 1.0]
+        # SimpleDistance: sqrt((1 - rho) / 2)
+        @test distance(Distance(; alg = SimpleDistance()), rho) ≈ sqrt.((1 .- rho) ./ 2)
+        # CorrelationDistance: sqrt(clamp(1 - rho, 0, 1)) — the -0.5 entry clamps to 1.
+        @test distance(Distance(; alg = CorrelationDistance()), rho) ≈
+              sqrt.(clamp.(1 .- rho, 0, 1))
+        # SimpleAbsoluteDistance: abs-guard folds the sign, then sqrt(1 - |rho|).
+        @test distance(Distance(; alg = SimpleAbsoluteDistance()), rho) ≈
+              sqrt.(1 .- abs.(rho))
+        # LogDistance: -log(|rho|); the off-diagonal 0.5 gives -log(0.5).
+        @test distance(Distance(; alg = LogDistance()), rho) ≈ -log.(abs.(rho))
+        # Power path: SimpleDistance p=2 is even, scale = 1.
+        @test distance(Distance(; power = 2, alg = SimpleDistance()), rho) ≈
+              sqrt.(clamp.(1 .- rho .^ 2, 0, 1))
+        # A covariance matrix (diagonal ≠ 1) is coerced to correlation, and must
+        # still be square.
+        cov = [4.0 1.0; 1.0 9.0]
+        @test distance(Distance(; alg = CorrelationDistance()), cov) ≈
+              distance(Distance(; alg = CorrelationDistance()), [1.0 1/6; 1/6 1.0])
+        @test_throws DimensionMismatch distance(Distance(; alg = SimpleDistance()),
+                                                rand(2, 3))
+    end
     @testset "Canonical Distance" begin
         ces = [Covariance(; alg = FullMoment()), SpearmanCovariance(), KendallCovariance(),
                MutualInfoCovariance(), DistanceCovariance(),

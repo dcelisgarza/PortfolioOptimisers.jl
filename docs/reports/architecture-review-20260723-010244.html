@@ -430,9 +430,10 @@ flowchart LR
             <span class="px-2 py-0.5 rounded bg-amber-100 text-amber-800 text-xs font-medium">Worth exploring</span>
             <span class="px-2 py-0.5 rounded border border-slate-300 text-slate-600 text-xs">in-process</span>
             <span class="px-2 py-0.5 rounded bg-rose-50 text-rose-700 text-xs">drifted validation</span>
+            <span class="px-2 py-0.5 rounded bg-slate-800 text-emerald-300 text-xs font-medium">✓ done — kernel + uniform validation landed</span>
           </div>
           <p class="font-mono text-sm text-slate-500 mb-4">
-            src/09_Distance/02_Distance.jl (630L) — <code>distance</code> ~24 methods · <code>cor_and_dist</code> duplicates the whole matrix
+            src/09_Distance/02_Distance.jl (630L → 521L) — <code>distance</code> ~24 methods · <code>cor_and_dist</code> duplicates the whole matrix
           </p>
 
           <div class="grid md:grid-cols-2 gap-4 mb-5">
@@ -462,14 +463,17 @@ flowchart LR
 
           <dl class="grid sm:grid-cols-2 gap-x-8 gap-y-3 text-sm">
             <div><dt class="font-semibold text-slate-700">Problem</dt><dd class="text-slate-600">The <code class="font-mono text-xs">distance</code> seam is a hand-enumerated product (algorithm × power × input), <code class="font-mono text-xs">cor_and_dist</code> re-enumerates it, and the square-matrix check is applied unevenly — a shallow module with a silent-input footgun.</dd></div>
-            <div><dt class="font-semibold text-slate-700">Solution</dt><dd class="text-slate-600">Factor the power/scale step and the cov2cor preamble into shared helpers, validate once, and let each algorithm supply only its transform.</dd></div>
+            <div><dt class="font-semibold text-slate-700">Solution <span class="text-emerald-700 font-normal">· done</span></dt><dd class="text-slate-600">Each correlation-based algorithm supplies one kernel, <code class="font-mono text-xs">_dist_from_cor(alg, power, rho)</code>; the <code class="font-mono">cov2cor</code> preamble and the square-matrix check moved into a shared <code class="font-mono">_as_correlation</code>, and the abs-guard into <code class="font-mono">_absguard</code>. The 24 rho-family methods collapsed to one <code class="font-mono">distance(ce,X)</code> + one <code class="font-mono">distance(rho)</code> + one <code class="font-mono">cor_and_dist</code> over a <code class="font-mono">RhoDistanceAlgorithm</code> union; <code class="font-mono">cor_and_dist</code> now delegates instead of re-enumerating.</dd></div>
           </dl>
           <ul class="mt-4 grid sm:grid-cols-2 gap-x-8 gap-y-1.5 text-sm text-slate-700">
-            <li class="flex gap-2"><span class="text-emerald-600">▸</span> interface shrinks; math concentrates</li>
-            <li class="flex gap-2"><span class="text-emerald-600">▸</span> validation applied uniformly</li>
-            <li class="flex gap-2"><span class="text-emerald-600">▸</span> new algorithm = one method</li>
-            <li class="flex gap-2"><span class="text-emerald-600">▸</span> cov2cor lives once, not ×8</li>
+            <li class="flex gap-2"><span class="text-emerald-600">✓</span> interface shrinks; math concentrates in one kernel per algorithm</li>
+            <li class="flex gap-2"><span class="text-emerald-600">✓</span> validation applied uniformly — the footgun is closed</li>
+            <li class="flex gap-2"><span class="text-emerald-600">✓</span> cov2cor lives once (<code class="font-mono">_as_correlation</code>), not ×8</li>
+            <li class="flex gap-2"><span class="text-emerald-600">▸</span> new algorithm = one kernel pair (Nothing/Integer)</li>
           </ul>
+          <div class="mt-4 rounded bg-emerald-50 border border-emerald-200 px-3 py-2 text-xs text-emerald-800">
+            <strong>Resolved.</strong> The correlation-based matrix collapsed to a shared kernel <code class="font-mono">_dist_from_cor</code> + helpers <code class="font-mono">_absguard</code> / <code class="font-mono">_as_correlation</code>; the <code class="font-mono">Nothing</code>/<code class="font-mono">Integer</code> power split was kept type-level by request. The <strong>drifted-validation footgun is closed</strong>: <code class="font-mono">assert_matrix_issquare</code> now runs once in <code class="font-mono">_as_correlation</code>, so a non-square <code class="font-mono">rho</code> throws <code class="font-mono">DimensionMismatch</code> for <em>every</em> algorithm, not only <code class="font-mono">CorrelationDistance</code>. The LTD/<code class="font-mono">LogDistance</code> overrides and the <code class="font-mono">VariationInfoDistance</code> / <code class="font-mono">CanonicalDistance</code> paths were kept (VI's <code class="font-mono">cor_and_dist</code> now delegates too). Verified value-identical: <code class="font-mono">test_08_moments</code> green (incl. the golden <code class="font-mono">distance1.csv.gz</code> / <code class="font-mono">CanonicalDistance.csv.gz</code> nets), a new throw + hand-built-matrix testset (13/13), and <code class="font-mono">test_13_phylogeny</code> (123) green through the 6 <code class="font-mono">cor_and_dist</code> callers. File 630L → 521L.
+          </div>
         </article>
 
         <!-- ===================== CANDIDATE 8 ===================== -->
@@ -544,6 +548,7 @@ flowchart LR
           <div class="flex flex-wrap gap-3 text-xs">
             <span class="px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-200">✓ #04 done — <span class="font-mono">scard</span> drop patched (9ff28d6) and remap now reflection-driven so the next one can't happen</span>
             <span class="px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-200">✓ #06 done — <span class="font-mono">assert_dims</span> replaces all 48 sites, three spellings collapsed to one</span>
+            <span class="px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-200">✓ #07 done — Distance matrix collapsed to a shared kernel; square-check footgun closed</span>
             <span class="px-3 py-1 rounded-full bg-white/10">#05 — low-risk locality win, any time</span>
             <span class="px-3 py-1 rounded-full bg-white/10">#02 — the ambitious one; schedule deliberately</span>
           </div>
