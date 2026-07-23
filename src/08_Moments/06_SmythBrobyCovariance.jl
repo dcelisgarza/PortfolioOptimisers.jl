@@ -904,7 +904,7 @@ This method computes the Smyth-Broby correlation matrix for the input data matri
   - [`cov(ce::SmythBrobyCovariance, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
 """
 function Statistics.cor(ce::SmythBrobyCovariance, X::MatNum; dims::Int = 1, kwargs...)
-    @argcheck(dims in (1, 2), DomainError(dims, "dims must be 1 or 2"))
+    assert_dims(dims)
     assert_all_finite(X, :X)
     if dims == 2
         X = transpose(X)
@@ -949,7 +949,7 @@ This method computes the Smyth-Broby covariance matrix for the input data matrix
   - [`cov(ce::SmythBrobyCovariance, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
 """
 function Statistics.cov(ce::SmythBrobyCovariance, X::MatNum; dims::Int = 1, kwargs...)
-    @argcheck(dims in (1, 2), DomainError(dims, "dims must be 1 or 2"))
+    assert_dims(dims)
     assert_all_finite(X, :X)
     if dims == 2
         X = transpose(X)

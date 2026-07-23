@@ -1179,18 +1179,18 @@ Used where a processed optimiser object is needed for inner sub-problems (e.g.
 """
 function jump_optimiser_from_attributes(opt::JuMPOptimiser,
                                         attrs::ProcessedJuMPOptimiserAttributes)
-    return JuMPOptimiser(; pe = attrs.pr, slv = opt.slv, wb = attrs.wb, bgt = opt.bgt,
-                         sbgt = opt.sbgt, gbgt = opt.gbgt, xbgt = opt.xbgt, lt = attrs.lt,
-                         st = attrs.st, lcse = attrs.lcsr, cte = attrs.ctr,
-                         gcarde = attrs.gcardr, sgcarde = attrs.sgcardr, smtx = attrs.smtx,
-                         sgmtx = attrs.sgmtx, slt = attrs.slt, sst = attrs.sst,
-                         sglt = attrs.sglt, sgst = attrs.sgst, tn = attrs.tn,
-                         fees = attrs.fees, sets = opt.sets, tr = opt.tr, ple = attrs.plr,
-                         ret = attrs.ret, sca = opt.sca, ccnt = opt.ccnt, cobj = opt.cobj,
-                         sc = opt.sc, so = opt.so, ss = opt.ss, card = opt.card,
-                         scard = opt.scard, l2c = opt.l2c, lpc = opt.lpc, linfc = opt.linfc,
-                         l1 = opt.l1, l2 = opt.l2, linf = opt.linf, lp = opt.lp,
-                         brt = opt.brt, cle_pr = opt.cle_pr, strict = opt.strict)
+    # The remap is derived by reflection so it can never silently drop a field (a hand-written
+    # pull-through once omitted `scard`, disabling sub-group cardinality in constrained-NOC;
+    # fixed in 9ff28d6). Every `opt` field flows through by name (`base`); every `attrs` result
+    # field overrides its optimiser slot. Six result fields carry a different name than their
+    # slot — listed in `rename` — the other twelve match by name and map automatically.
+    rename = (; pr = :pe, lcsr = :lcse, ctr = :cte, gcardr = :gcarde, sgcardr = :sgcarde,
+              plr = :ple)
+    of = fieldnames(JuMPOptimiser)
+    af = fieldnames(ProcessedJuMPOptimiserAttributes)
+    base = NamedTuple{of}(getfield.(opt, of))
+    overrides = NamedTuple{map(f -> get(rename, f, f), af)}(getfield.(attrs, af))
+    return JuMPOptimiser(; merge(base, overrides)...)
 end
 """
     processed_jump_optimiser(

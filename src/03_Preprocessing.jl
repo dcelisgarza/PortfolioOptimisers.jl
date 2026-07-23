@@ -1102,7 +1102,7 @@ Int64[]
   - [`prices_to_returns`](@ref)
 """
 function find_complete_indices(X::AbstractMatrix; dims::Int = 1)
-    @argcheck(dims in (1, 2), DomainError)
+    assert_dims(dims)
     if dims == 2
         X = transpose(X)
     end

@@ -3099,6 +3099,33 @@ function assert_matrix_issquare(X::MatNum, X_sym::Symbol = :X)::Nothing
     return nothing
 end
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Assert that `dims` selects a valid matrix dimension (`dims in (1, 2)`).
+
+# Arguments
+
+  - `dims`: Dimension selector to check.
+  - `sym`: Symbolic name used in the error message.
+
+# Returns
+
+  - `nothing`.
+
+# Details
+
+  - Throws `DomainError` if `dims ∉ (1, 2)`.
+
+# Related
+
+  - [`assert_matrix_issquare`](@ref)
+"""
+function assert_dims(dims::Integer, sym::Sym_Str = :dims)::Nothing
+    @argcheck(dims in (1, 2),
+              DomainError(dims, "$sym must be 1 or 2. Got\n$sym => $(dims)"))
+    return nothing
+end
+"""
 $(DocStringExtensions.TYPEDEF)
 
 Represents a composite result containing a vector and a scalar.

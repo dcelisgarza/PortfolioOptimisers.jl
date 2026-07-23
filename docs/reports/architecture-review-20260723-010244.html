@@ -256,7 +256,7 @@ flowchart LR
           <div class="flex flex-wrap gap-2 mb-4">
             <span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 text-xs font-medium">Strong</span>
             <span class="px-2 py-0.5 rounded border border-slate-300 text-slate-600 text-xs">in-process</span>
-            <span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 text-xs font-medium">bug fixed · 9ff28d6</span>
+            <span class="px-2 py-0.5 rounded bg-slate-800 text-emerald-300 text-xs font-medium">✓ done — reflection remap landed</span>
           </div>
           <p class="font-mono text-sm text-slate-500 mb-4">
             src/20_Optimisation/10_JuMPOptimiser.jl — <code>JuMPOptimiser</code> (44 fields) · <code>jump_optimiser_from_attributes</code> · <code>ProcessedJuMPOptimiserAttributes</code>
@@ -279,10 +279,10 @@ flowchart LR
                   <div class="text-[10px] uppercase tracking-wider text-slate-400 mt-2">40-arg remap</div>
                 </div>
               </div>
-              <p class="text-[11px] text-rose-600 mt-2 border-t border-dashed border-rose-200 pt-2">The remap spells every field by hand — until <code class="font-mono">9ff28d6</code> it went straight from <code class="font-mono">card</code> to <code class="font-mono">l2c</code>, <strong>dropping <code class="font-mono">scard</code></strong>, so constrained-NOC assembled from this twin with sub-group cardinality silently vanished. <span class="text-emerald-700">Now patched</span> — but the shape that let one field slip remains.</p>
+              <p class="text-[11px] text-rose-600 mt-2 border-t border-dashed border-rose-200 pt-2">The remap <em>used to</em> spell every field by hand — until <code class="font-mono">9ff28d6</code> it went straight from <code class="font-mono">card</code> to <code class="font-mono">l2c</code>, <strong>dropping <code class="font-mono">scard</code></strong>, so constrained-NOC assembled from this twin with sub-group cardinality silently vanished. Patched then — but the shape that let one field slip is now <span class="text-emerald-700">removed</span> (see After).</p>
             </div>
             <div class="rounded-lg border border-emerald-200 bg-emerald-50/40 p-4">
-              <div class="text-xs uppercase tracking-wider text-emerald-600 mb-3">After — the remap can't drop a field</div>
+              <div class="text-xs uppercase tracking-wider text-emerald-600 mb-3">After — the remap can't drop a field <span class="normal-case text-slate-800">· shipped</span></div>
               <div class="flex items-end justify-center gap-2" style="height:220px">
                 <div class="flex flex-col items-center">
                   <div class="mass-iface w-14 rounded-t" style="height:36px"></div>
@@ -290,22 +290,22 @@ flowchart LR
                   <div class="text-[10px] uppercase tracking-wider text-emerald-600 mt-2">generated<br/>remap</div>
                 </div>
               </div>
-              <p class="text-[11px] text-emerald-700 mt-2 border-t border-emerald-200 pt-2">Derive the remap by reflection over field names (the pattern <code class="font-mono">no_bounds_optimiser</code> already uses) so adding a knob touches one place, and a field can't be silently omitted.</p>
+              <p class="text-[11px] text-emerald-700 mt-2 border-t border-emerald-200 pt-2"><strong>Landed.</strong> <code class="font-mono">jump_optimiser_from_attributes</code> now builds an <code class="font-mono">opt</code>-sourced base by reflection over <code class="font-mono">fieldnames(JuMPOptimiser)</code> and overrides it with reflection over <code class="font-mono">fieldnames(ProcessedJuMPOptimiserAttributes)</code> plus a 6-entry rename table — so <em>both</em> directions are derived and neither can silently drop a field. Verified byte-identical to the patched hand-written remap.</p>
             </div>
           </div>
 
           <dl class="grid sm:grid-cols-2 gap-x-8 gap-y-3 text-sm">
             <div><dt class="font-semibold text-slate-700">Problem</dt><dd class="text-slate-600">A 44-field struct with a hand-written remap onto its processed twin: adding a knob touches ~8 sites, and the remap <em>had</em> dropped <code class="font-mono">scard</code> (fixed in <code class="font-mono">9ff28d6</code>), which silently disabled sub-group cardinality in constrained-NOC — the concrete cost of the shape, not a one-off typo.</dd></div>
-            <div><dt class="font-semibold text-slate-700">Solution</dt><dd class="text-slate-600">Generate the remap from field names (as <code class="font-mono">no_bounds_optimiser</code> does); longer term, make the processed attributes a view over the optimiser rather than a second wide struct.</dd></div>
+            <div><dt class="font-semibold text-slate-700">Solution <span class="text-emerald-700 font-normal">· done</span></dt><dd class="text-slate-600">The remap is now generated from field names (reflected base + reflected overrides + a 6-entry rename table). Longer term — still open — make the processed attributes a view over the optimiser rather than a second wide struct.</dd></div>
           </dl>
           <ul class="mt-4 grid sm:grid-cols-2 gap-x-8 gap-y-1.5 text-sm text-slate-700">
-            <li class="flex gap-2"><span class="text-emerald-600">▸</span> prevents the next <code class="font-mono">scard</code>-style drop (last one fixed in <code class="font-mono">9ff28d6</code>)</li>
+            <li class="flex gap-2"><span class="text-emerald-600">✓</span> prevents the next <code class="font-mono">scard</code>-style drop — remap now reflection-driven, both directions</li>
             <li class="flex gap-2"><span class="text-emerald-600">▸</span> one edit per new knob, not eight</li>
             <li class="flex gap-2"><span class="text-emerald-600">▸</span> interface shrinks; implementation absorbs the mapping</li>
             <li class="flex gap-2"><span class="text-emerald-600">▸</span> locality: field list has one home</li>
           </ul>
-          <div class="mt-4 rounded bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-800">
-            The <code class="font-mono">scard</code> drop was a correctness bug, patched in <code class="font-mono">9ff28d6</code> independent of the deepening. ADR 0008 already noted the two processed representations "coexist, left as-is" — this was the concrete cost, and the hand-written remap can drop the next field just as quietly until it is generated.
+          <div class="mt-4 rounded bg-emerald-50 border border-emerald-200 px-3 py-2 text-xs text-emerald-800">
+            <strong>Resolved.</strong> The <code class="font-mono">scard</code> drop was a correctness bug patched in <code class="font-mono">9ff28d6</code>; the deepening then removed the shape that allowed it — <code class="font-mono">jump_optimiser_from_attributes</code> is now generated by reflection over both field lists, so a field can no longer be silently omitted in either direction. Verified byte-identical to the patched remap; NOC suite green (Constrained 6/6). ADR 0008's "coexist, left as-is" note still stands — the two representations remain, but the bridge between them is now safe. The longer-term view-over-optimiser idea is still open.
           </div>
         </article>
 
@@ -376,9 +376,10 @@ flowchart LR
             <span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 text-xs font-medium">Strong</span>
             <span class="px-2 py-0.5 rounded border border-slate-300 text-slate-600 text-xs">in-process</span>
             <span class="px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 text-xs">quick win</span>
+            <span class="px-2 py-0.5 rounded bg-slate-800 text-emerald-300 text-xs font-medium">✓ done — assert_dims landed</span>
           </div>
           <p class="font-mono text-sm text-slate-500 mb-4">
-            <code>@argcheck(dims in (1,2), …)</code> — 48 sites across 26 files · message already drifted into two spellings
+            <code>@argcheck(dims in (1,2), …)</code> — 48 sites across 26 files · message had drifted into <strong>three</strong> spellings (42 × "must be 1 or 2", 5 × "must be in (1, 2)", 1 × a bare <code>DomainError</code> with no value or message)
           </p>
 
           <!-- cross-section -->
@@ -391,29 +392,32 @@ flowchart LR
                   <div class="h-3 bg-amber-200 rounded-sm"></div>
                   <div class="h-3 bg-amber-300 rounded-sm"></div><!-- drifted -->
                   <div class="h-3 bg-amber-200 rounded-sm"></div>
-                  <div class="h-3 bg-amber-200 rounded-sm"></div>
+                  <div class="h-3 bg-red-300 rounded-sm"></div><!-- bare DomainError -->
                   <div class="h-3 bg-amber-300 rounded-sm"></div><!-- drifted -->
-                  <div class="text-[10px] text-slate-400 mt-1">…48 bands · 2 already say "must be in (1, 2)"</div>
+                  <div class="text-[10px] text-slate-400 mt-1">…48 bands · 5 said "must be in (1, 2)" · 1 was a bare <code>DomainError</code></div>
                 </div>
               </div>
               <div>
-                <div class="text-xs uppercase tracking-wider text-emerald-600 mb-3">After — one band, one message</div>
+                <div class="text-xs uppercase tracking-wider text-emerald-600 mb-3">After — one band, one message <span class="normal-case text-slate-800">· shipped</span></div>
                 <div class="deep-impl text-slate-100 rounded px-3 py-4 font-mono text-xs text-center">assert_dims(dims)</div>
-                <div class="text-[10px] text-emerald-700 mt-2 text-center">joins the 27-function assertion module one file away</div>
+                <div class="text-[10px] text-emerald-700 mt-2 text-center">now a 28th function in the assertion module (01_Base.jl); all 48 sites migrated</div>
               </div>
             </div>
           </div>
 
           <dl class="grid sm:grid-cols-2 gap-x-8 gap-y-3 text-sm">
-            <div><dt class="font-semibold text-slate-700">Problem</dt><dd class="text-slate-600">The library's single most-repeated precondition is the one idiom that was never given a helper — despite a 27-function assertion module in the same base file. It has already drifted into two error spellings.</dd></div>
-            <div><dt class="font-semibold text-slate-700">Solution</dt><dd class="text-slate-600">Add <code class="font-mono text-xs">assert_dims</code> to the assertion module and replace the 48 call sites.</dd></div>
+            <div><dt class="font-semibold text-slate-700">Problem</dt><dd class="text-slate-600">The library's single most-repeated precondition was the one idiom that was never given a helper — despite a 27-function assertion module in the same base file. It had already drifted into <em>three</em> error spellings, one of them a bare <code class="font-mono">DomainError</code> that reported neither the offending value nor a message.</dd></div>
+            <div><dt class="font-semibold text-slate-700">Solution <span class="text-emerald-700 font-normal">· done</span></dt><dd class="text-slate-600"><code class="font-mono text-xs">assert_dims(dims)</code> was added to the assertion module and all 48 call sites replaced. It carries a <code class="font-mono">sym</code> argument (default <code class="font-mono">:dims</code>) and now throws a single, value-bearing <code class="font-mono">DomainError</code> everywhere.</dd></div>
           </dl>
           <ul class="mt-4 grid sm:grid-cols-2 gap-x-8 gap-y-1.5 text-sm text-slate-700">
-            <li class="flex gap-2"><span class="text-emerald-600">▸</span> one change reaches 48 sites</li>
-            <li class="flex gap-2"><span class="text-emerald-600">▸</span> message can't drift again</li>
-            <li class="flex gap-2"><span class="text-emerald-600">▸</span> lowest-risk deepening in this report</li>
-            <li class="flex gap-2"><span class="text-emerald-600">▸</span> natural companion to #05</li>
+            <li class="flex gap-2"><span class="text-emerald-600">✓</span> one change now reaches 48 sites</li>
+            <li class="flex gap-2"><span class="text-emerald-600">✓</span> message can't drift again — one spelling, and the bare-<code class="font-mono">DomainError</code> site now reports its value</li>
+            <li class="flex gap-2"><span class="text-emerald-600">✓</span> lowest-risk deepening in this report — landed as a pure relocation</li>
+            <li class="flex gap-2"><span class="text-emerald-600">▸</span> natural companion to #05 — the assertion module is a ready extraction target</li>
           </ul>
+          <div class="mt-4 rounded bg-emerald-50 border border-emerald-200 px-3 py-2 text-xs text-emerald-800">
+            <strong>Resolved.</strong> <code class="font-mono">assert_dims</code> is the 28th function in the assertion cluster of <code class="font-mono">src/01_Base.jl</code>; the 48 <code class="font-mono">@argcheck(dims in (1, 2), …)</code> sites across 26 files are gone, replaced by <code class="font-mono">assert_dims(dims)</code>. The review under-counted the drift — there were <strong>three</strong> spellings, not two (42 × "must be 1 or 2", 5 × "must be in (1, 2)", and 1 bare <code class="font-mono">DomainError</code> that swallowed both value and message). Behaviour verified identical: valid <code class="font-mono">dims ∈ (1, 2)</code> pass, everything else throws <code class="font-mono">DomainError</code> — confirmed across covariance, variation-of-information distance, and prior sites; <code class="font-mono">test_08_moments</code> green.
+          </div>
         </article>
 
         <!-- ===================== CANDIDATE 7 ===================== -->
@@ -538,8 +542,9 @@ flowchart LR
             It is the root that makes the whole risk-measure mirror expensive. Extracting the cones as pure builders delivers the report's single biggest testability win — the mathematically interesting formulations become testable on a returns vector instead of through a half-assembled JuMP model — collapses the returns/drawdown twins the analytic side already unified, and clears the way for #08. Two adapters (returns, drawdowns) justify the seam, so it is a real one, not a hypothetical.
           </p>
           <div class="flex flex-wrap gap-3 text-xs">
-            <span class="px-3 py-1 rounded-full bg-white/10">Then #04 — <span class="font-mono">scard</span> drop patched (9ff28d6); deepen the remap so the next one can't happen</span>
-            <span class="px-3 py-1 rounded-full bg-white/10">#06 &amp; #05 — low-risk locality wins, any time</span>
+            <span class="px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-200">✓ #04 done — <span class="font-mono">scard</span> drop patched (9ff28d6) and remap now reflection-driven so the next one can't happen</span>
+            <span class="px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-200">✓ #06 done — <span class="font-mono">assert_dims</span> replaces all 48 sites, three spellings collapsed to one</span>
+            <span class="px-3 py-1 rounded-full bg-white/10">#05 — low-risk locality win, any time</span>
             <span class="px-3 py-1 rounded-full bg-white/10">#02 — the ambitious one; schedule deliberately</span>
           </div>
         </div>

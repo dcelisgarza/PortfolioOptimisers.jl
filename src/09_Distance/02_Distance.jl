@@ -254,7 +254,7 @@ Compute the variation of information (VI) distance matrix from a data matrix.
 """
 function distance(de::Distance{Nothing, <:VariationInfoDistance}, ::Any, X::MatNum;
                   dims::Int = 1, kwargs...)
-    @argcheck(dims in (1, 2), DomainError(dims, "dims must be 1 or 2"))
+    assert_dims(dims)
     if dims == 2
         X = transpose(X)
     end
@@ -262,7 +262,7 @@ function distance(de::Distance{Nothing, <:VariationInfoDistance}, ::Any, X::MatN
 end
 function distance(de::Distance{<:Integer, <:VariationInfoDistance}, ::Any, X::MatNum;
                   dims::Int = 1, kwargs...)
-    @argcheck(dims in (1, 2), DomainError(dims, "dims must be 1 or 2"))
+    assert_dims(dims)
     if dims == 2
         X = transpose(X)
     end
@@ -492,7 +492,7 @@ end
 function cor_and_dist(de::Distance{Nothing, <:VariationInfoDistance},
                       ce::StatsBase.CovarianceEstimator, X::MatNum; dims::Int = 1,
                       kwargs...)
-    @argcheck(dims in (1, 2), DomainError(dims, "dims must be 1 or 2"))
+    assert_dims(dims)
     rho = Statistics.cor(ce, X; dims = dims, kwargs...)
     if dims == 2
         X = transpose(X)
@@ -502,7 +502,7 @@ end
 function cor_and_dist(de::Distance{<:Integer, <:VariationInfoDistance},
                       ce::StatsBase.CovarianceEstimator, X::MatNum; dims::Int = 1,
                       kwargs...)
-    @argcheck(dims in (1, 2), DomainError(dims, "dims must be 1 or 2"))
+    assert_dims(dims)
     rho = Statistics.cor(ce, X; dims = dims, kwargs...)
     if dims == 2
         X = transpose(X)

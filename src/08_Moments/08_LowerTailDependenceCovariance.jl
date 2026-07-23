@@ -187,7 +187,7 @@ julia> cor(ce, X)
 """
 function Statistics.cor(ce::LowerTailDependenceCovariance, X::MatNum; dims::Int = 1,
                         kwargs...)
-    @argcheck(dims in (1, 2), DomainError(dims, "dims must be 1 or 2"))
+    assert_dims(dims)
     if dims == 2
         X = transpose(X)
     end
@@ -235,7 +235,7 @@ julia> cov(ce, X)
 """
 function Statistics.cov(ce::LowerTailDependenceCovariance, X::MatNum; dims::Int = 1,
                         kwargs...)
-    @argcheck(dims in (1, 2), DomainError(dims, "dims must be 1 or 2"))
+    assert_dims(dims)
     if dims == 2
         X = transpose(X)
     end
